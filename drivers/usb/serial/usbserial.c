@@ -15,6 +15,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (04/10/2002) gkh
+ *	added serial_read_proc function which creates a
+ *	/proc/tty/driver/usb-serial file.
+ *
  * (03/27/2002) gkh
  *	Got USB serial console code working properly and merged into the main
  *	version of the tree.  Thanks to Randy Dunlap for the initial version
@@ -340,7 +344,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.4"
+#define DRIVER_VERSION "v1.5"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
 #define DRIVER_DESC "USB Serial Driver core"
 
@@ -842,6 +846,48 @@ static void serial_shutdown (struct usb_serial *serial)
 		serial->type->shutdown(serial);
 	else
 		generic_shutdown(serial);
+}
+
+static int serial_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	struct usb_serial *serial;
+	int length = 0;
+	int i;
+	off_t begin = 0;
+	char tmp[40];
+
+	dbg(__FUNCTION__);
+	length += sprintf (page, "usbserinfo:1.0 driver:%s\n", DRIVER_VERSION);
+	for (i = 0; i < SERIAL_TTY_MINORS && length < PAGE_SIZE; ++i) {
+		serial = get_serial_by_minor(i);
+		if (serial == NULL)
+			continue;
+
+		length += sprintf (page+length, "%d:", i);
+		if (serial->type->owner)
+			length += sprintf (page+length, " module:%s", serial->type->owner->name);
+		length += sprintf (page+length, " name:\"%s\"", serial->type->name);
+		length += sprintf (page+length, " vendor:%04x product:%04x", serial->vendor, serial->product);
+		length += sprintf (page+length, " num_ports:%d", serial->num_ports);
+		length += sprintf (page+length, " port:%d", i - serial->minor + 1);
+
+		usb_make_path(serial->dev, tmp, sizeof(tmp));
+		length += sprintf (page+length, " path:%s", tmp);
+			
+		length += sprintf (page+length, "\n");
+		if ((length + begin) > (off + count))
+			goto done;
+		if ((length + begin) < off) {
+			begin += length;
+			length = 0;
+		}
+	}
+	*eof = 1;
+done:
+	if (off >= (length + begin))
+		return 0;
+	*start = page + (off-begin);
+	return ((count < begin+length-off) ? count : begin+length-off);
 }
 
 /*****************************************************************************
@@ -1491,6 +1537,7 @@ static struct tty_driver serial_tty_driver = {
 	unthrottle:		serial_unthrottle,
 	break_ctl:		serial_break,
 	chars_in_buffer:	serial_chars_in_buffer,
+	read_proc:		serial_read_proc,
 };
 
 

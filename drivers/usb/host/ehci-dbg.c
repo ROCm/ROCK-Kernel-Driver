@@ -55,7 +55,7 @@ static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 			strcat(buf, tmp);
 		}
 		dbg ("%s: %s portroute %s", 
-			ehci->hcd.bus_name, label,
+			ehci->hcd.self.bus_name, label,
 			buf);
 	}
 }

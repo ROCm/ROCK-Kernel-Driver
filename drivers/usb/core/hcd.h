@@ -35,10 +35,8 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	/*
 	 * housekeeping
 	 */
-	struct usb_bus		*bus;		/* FIXME only use "self" */
 	struct usb_bus		self;		/* hcd is-a bus */
 
-	const char		*bus_name;
 	const char		*product_desc;	/* product/vendor string */
 	const char		*description;	/* "ehci-hcd" etc */
 

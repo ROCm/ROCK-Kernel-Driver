@@ -890,7 +890,6 @@ extern int usb_string(struct usb_device *dev, int index,
 	char *buf, size_t size);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
-extern int usb_make_path(struct usb_device *dev, char *buf, size_t size);
 
 /*
  * timeouts, in seconds, used for sending/receiving control messages
@@ -917,6 +916,7 @@ struct usb_operations;
  */
 struct usb_bus {
 	int busnum;			/* Bus number (in order of reg) */
+	char *bus_name;			/* stable id (PCI slot_name etc) */
 
 #ifdef DEVNUM_ROUND_ROBIN
 	int devnum_next;                /* Next open device number in round-robin allocation */
@@ -1086,6 +1086,37 @@ extern void usb_driver_release_interface(struct usb_driver *driver,
 const struct usb_device_id *usb_match_id(struct usb_device *dev,
 					 struct usb_interface *interface,
 					 const struct usb_device_id *id);
+
+/**
+ * usb_make_path - returns stable device path in the usb tree
+ * @dev: the device whose path is being constructed
+ * @buf: where to put the string
+ * @size: how big is "buf"?
+ *
+ * Returns length of the string (> 0) or negative if size was too small.
+ *
+ * This identifier is intended to be "stable", reflecting physical paths in
+ * hardware such as physical bus addresses for host controllers or ports on
+ * USB hubs.  That makes it stay the same until systems are physically
+ * reconfigured, by re-cabling a tree of USB devices or by moving USB host
+ * controllers.  Adding and removing devices, including virtual root hubs
+ * in host controller driver modules, does not change these path identifers;
+ * neither does rebooting or re-enumerating.  These are more useful identifiers
+ * than changeable ("unstable") ones like bus numbers or device addresses.
+ * 
+ * With a partial exception for devices connected to USB 2.0 root hubs, these
+ * identifiers are also predictable:  so long as the device tree isn't changed,
+ * plugging any USB device into a given hub port always gives it the same path.
+ * Because of the use of "companion" controllers, devices connected to ports on
+ * USB 2.0 root hubs (EHCI host controllers) will get one path ID if they are
+ * high speed, and a different one if they are full or low speed.
+ */
+static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
+{
+	int actual;
+	actual = snprintf (buf, size, "usb-%s-%s", dev->bus->bus_name, dev->devpath);
+	return (actual >= size) ? -1 : actual;
+}
 
 /* -------------------------------------------------------------------------- */
 

@@ -3571,7 +3571,7 @@ static void usb_audio_recurseunit(struct consmixstate *state, unsigned char unit
 		return;		
 
 	case PROCESSING_UNIT:
-		if (p1[0] < 13 || p1[0] < 13+p1[6] || p1[0] < 13+p1[6]+p1[11+p1[6]] || p1[0] < 13+p1[6]+p1[11+p1[6]]+p1[13+p1[6]+p1[11+p1[6]]]) {
+		if (p1[0] < 13 || p1[0] < 13+p1[6] || p1[0] < 13+p1[6]+p1[11+p1[6]]) {
 			printk(KERN_ERR "usbaudio: unit %u: invalid PROCESSING_UNIT descriptor\n", unitid);
 			return;
 		}

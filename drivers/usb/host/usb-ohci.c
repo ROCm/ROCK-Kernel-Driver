@@ -2400,6 +2400,7 @@ static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
 		return NULL;
 	}
 	ohci->bus->hcpriv = (void *) ohci;
+	ohci->bus->bus_name = dev->slot_name;
 
 	return ohci;
 } 
