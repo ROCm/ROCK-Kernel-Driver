@@ -80,17 +80,8 @@ can relax your locking.
 ---
 [mandatory]
 
-->lookup() is called without BKL now.  Grab it on the entry, drop upon return
-- that will guarantee the same locking you used to have.  If your ->lookup()
-or its parts do not need BKL - better yet, now you can shift lock_kernel()/
-unlock_kernel() so that they would protect exactly what needs to be protected.
-
----
-[mandatory]
-
-->truncate() is called without BKL now (same as above).
-
----
-[mandatory]
-
-->create() is called without BKL now (same as above).
+->lookup(), ->truncate(), ->create() and ->mknod() are called without BKL now.
+Grab it on the entry, drop upon return - that will guarantee the same
+locking you used to have.  If your ->method or its parts do not need
+BKL - better yet, now you can shift lock_kernel()/ unlock_kernel()
+so that they would protect exactly what needs to be protected.

@@ -52,7 +52,7 @@ locking rules:
 lookup:		no	yes
 create:		no	yes
 link:		yes	yes
-mknod:		yes	yes
+mknod:		no	yes
 mkdir:		yes	yes
 unlink:		yes	yes (both)
 rmdir:		yes	yes (both)	(see below)

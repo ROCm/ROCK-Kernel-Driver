@@ -679,6 +679,7 @@ static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, int r
 	int err;
 	struct FileIdentDesc cfi, *fi;
 
+	lock_kernel();
 	err = -EIO;
 	inode = udf_new_inode(dir, mode, &err);
 	if (!inode)
@@ -691,6 +692,7 @@ static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, int r
 		inode->i_nlink --;
 		mark_inode_dirty(inode);
 		iput(inode);
+		unlock_kernel();
 		return err;
 	}
 	cfi.icb.extLength = cpu_to_le32(inode->i_sb->s_blocksize);
@@ -710,6 +712,7 @@ static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, int r
 	d_instantiate(dentry, inode);
 	err = 0;
 out:
+	unlock_kernel();
 	return err;
 }
 

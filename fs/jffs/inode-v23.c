@@ -1052,6 +1052,7 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 
 	D1(printk("***jffs_mknod()\n"));
 
+	lock_kernel();
 	dir_f = (struct jffs_file *)dir->u.generic_ip;
 	c = dir_f->c;
 
@@ -1123,6 +1124,7 @@ jffs_mknod_err:
 jffs_mknod_end:
 	D3(printk (KERN_NOTICE "mknod(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return result;
 } /* jffs_mknod()  */
 

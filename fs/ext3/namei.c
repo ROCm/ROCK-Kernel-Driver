@@ -487,9 +487,12 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 	struct inode *inode;
 	int err;
 
+	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS + 3);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(dir))
 		handle->h_sync = 1;
@@ -502,6 +505,7 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
 	ext3_journal_stop(handle, dir);
+	unlock_kernel();
 	return err;
 }
 
@@ -1129,6 +1133,6 @@ struct inode_operations ext3_dir_inode_operations = {
 	symlink:	ext3_symlink,		/* BKL held */
 	mkdir:		ext3_mkdir,		/* BKL held */
 	rmdir:		ext3_rmdir,		/* BKL held */
-	mknod:		ext3_mknod,		/* BKL held */
+	mknod:		ext3_mknod,
 	rename:		ext3_rename,		/* BKL held */
 };

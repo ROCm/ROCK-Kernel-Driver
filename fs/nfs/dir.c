@@ -670,6 +670,7 @@ static int nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rde
 	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
 
+	lock_kernel();
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->mknod(dir, &dentry->d_name, &attr, rdev,
 					&fhandle, &fattr);
@@ -677,6 +678,7 @@ static int nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rde
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
 	if (error || fhandle.size == 0)
 		d_drop(dentry);
+	unlock_kernel();
 	return error;
 }
 

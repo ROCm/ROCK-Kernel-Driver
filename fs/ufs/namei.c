@@ -114,7 +114,9 @@ static int ufs_mknod (struct inode * dir, struct dentry *dentry, int mode, int r
 	if (!IS_ERR(inode)) {
 		init_special_inode(inode, mode, rdev);
 		mark_inode_dirty(inode);
+		lock_kernel();
 		err = ufs_add_nondir(dentry, inode);
+		unlock_kernel();
 	}
 	return err;
 }

@@ -1262,9 +1262,7 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 		return -EPERM;
 
 	DQUOT_INIT(dir);
-	lock_kernel();
 	error = dir->i_op->mknod(dir, dentry, mode, dev);
-	unlock_kernel();
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;

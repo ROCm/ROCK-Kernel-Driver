@@ -267,13 +267,16 @@ static int coda_mknod(struct inode *dir, struct dentry *de, int mode, int rdev)
 	if ( coda_hasmknod == 0 )
 		return -EIO;
 
+	lock_kernel();
 	coda_vfs_stat.create++;
 
 	CDEBUG(D_INODE, "name: %s, length %d, mode %o, rdev %x\n",
 	       name, length, mode, rdev);
 
-	if (coda_isroot(dir) && coda_iscontrol(name, length))
+	if (coda_isroot(dir) && coda_iscontrol(name, length)) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
 	error = venus_create(dir->i_sb, coda_i2f(dir), name, length, 
 				0, mode, rdev, &newfid, &attrs);
@@ -282,6 +285,7 @@ static int coda_mknod(struct inode *dir, struct dentry *de, int mode, int rdev)
 		CDEBUG(D_INODE, "mknod: %s, result %d\n",
 		       coda_f2s(&newfid), error); 
 		d_drop(de);
+		unlock_kernel();
 		return error;
 	}
 
@@ -289,11 +293,13 @@ static int coda_mknod(struct inode *dir, struct dentry *de, int mode, int rdev)
 	if ( error ) {
 		d_drop(de);
 		result = NULL;
+		unlock_kernel();
 		return error;
 	}
 
 	/* invalidate the directory cnode's attributes */
 	coda_dir_changed(dir, 0);
+	unlock_kernel();
 	d_instantiate(de, result);
         return 0;
 }			     

@@ -588,6 +588,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (!inode) {
 	return -ENOMEM ;
     }
+    lock_kernel();
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     windex = push_journal_writer("reiserfs_mknod") ;
 
@@ -595,6 +596,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (!inode) {
 	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
+	unlock_kernel();
 	return retval;
     }
 
@@ -614,12 +616,14 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
 	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
 	iput (inode);
+	unlock_kernel();
 	return retval;
     }
 
     d_instantiate(dentry, inode);
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+    unlock_kernel();
     return 0;
 }
 
