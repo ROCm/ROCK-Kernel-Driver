@@ -889,6 +889,9 @@ snd_pcm_sframes_t snd_pcm_lib_writev(snd_pcm_substream_t *substream,
 snd_pcm_sframes_t snd_pcm_lib_readv(snd_pcm_substream_t *substream,
 				    void **bufs, snd_pcm_uframes_t frames);
 
+int snd_pcm_limit_hw_rates(snd_pcm_runtime_t *runtime);
+
+
 /*
  *  Timer interface
  */

@@ -1095,21 +1095,12 @@ static int snd_intel8x0_pcm_open(snd_pcm_substream_t * substream, ichdev_t *ichd
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	static unsigned int i, rates[] = {
-		/* ATTENTION: these values depend on the definition in pcm.h! */
-		5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000
-	};
 	int err;
 
 	ichdev->substream = substream;
 	runtime->hw = snd_intel8x0_stream;
 	runtime->hw.rates = ichdev->pcm->rates;
-	for (i = 0; i < ARRAY_SIZE(rates); i++) {
-		if (runtime->hw.rates & (1 << i)) {
-			runtime->hw.rate_min = rates[i];
-			break;
-		}
-	}
+	snd_pcm_limit_hw_rates(runtime);
 	if (chip->device_type == DEVICE_SIS) {
 		runtime->hw.buffer_bytes_max = 64*1024;
 		runtime->hw.period_bytes_max = 64*1024;
