@@ -1606,11 +1606,9 @@ static int ext3_add_nondir(handle_t *handle,
 {
 	int err = ext3_add_entry(handle, dentry, inode);
 	if (!err) {
-		err = ext3_mark_inode_dirty(handle, inode);
-		if (!err) {
-			d_instantiate(dentry, inode);
-			return 0;
-		}
+		ext3_mark_inode_dirty(handle, inode);
+		d_instantiate(dentry, inode);
+		return 0;
 	}
 	ext3_dec_count(handle, inode);
 	iput(inode);

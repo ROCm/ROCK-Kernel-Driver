@@ -85,7 +85,7 @@ static void print_mce(struct mce *m)
 	if (m->addr)
 		printk("ADDR %Lx ", m->addr);
 	if (m->misc)
-		printk("MISC %Lx ", m->addr); 	
+		printk("MISC %Lx ", m->misc); 	
 	printk("\n");
 }
 
@@ -160,7 +160,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		if (m.status & MCI_STATUS_MISCV)
 			rdmsrl(MSR_IA32_MC0_MISC + i*4, m.misc);
 		if (m.status & MCI_STATUS_ADDRV)
-			rdmsrl(MSR_IA32_MC0_MISC + i*4, m.addr);
+			rdmsrl(MSR_IA32_MC0_ADDR + i*4, m.addr);
 
 		rdtscll(m.tsc);
 		wrmsrl(MSR_IA32_MC0_STATUS + i*4, 0);

@@ -20,11 +20,12 @@
 #endif
 
 #define ide_default_irq(base) (0)
-#define ide_default_io_base(index) ((ide_ioreg_t)0)
+#define ide_default_io_base(index) (0)
 
-static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
+static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
+				       unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t reg = data_port;
+	unsigned long reg = data_port;
 	int i;
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {

@@ -14,7 +14,6 @@
 #include <linux/config.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-#include <asm/hdreg.h>
 #include <asm/psr.h>
 
 #undef  MAX_HWIFS

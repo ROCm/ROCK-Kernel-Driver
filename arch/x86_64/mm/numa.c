@@ -9,6 +9,7 @@
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <linux/ctype.h>
+#include <linux/module.h>
 #include <asm/e820.h>
 #include <asm/proto.h>
 #include <asm/dma.h>
@@ -23,6 +24,9 @@ bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 
 int memnode_shift;
 u8  memnodemap[NODEMAPSIZE];
+
+unsigned char cpu_to_node[NR_CPUS];  
+cpumask_t     node_to_cpumask[MAXNODE]; 
 
 static int numa_off __initdata; 
 
@@ -105,7 +109,6 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 	reserve_bootmem_node(NODE_DATA(nodeid), bootmap_start, bootmap_pages<<PAGE_SHIFT);
 	if (nodeid + 1 > numnodes)
 		numnodes = nodeid + 1;
-	nodes_present |= (1UL << nodeid); 
 	node_set_online(nodeid);
 } 
 
@@ -136,13 +139,36 @@ void __init setup_node_zones(int nodeid)
 			    start_pfn, NULL); 
 } 
 
-int fake_node;
+void __init numa_init_array(void)
+{
+	int rr, i;
+	/* There are unfortunately some poorly designed mainboards around
+	   that only connect memory to a single CPU. This breaks the 1:1 cpu->node
+	   mapping. To avoid this fill in the mapping for all possible
+	   CPUs, as the number of CPUs is not known yet. 
+	   We round robin the existing nodes. */
+	rr = 0;
+	for (i = 0; i < MAXNODE; i++) {
+		if (node_online(i))
+			continue;
+		rr = find_next_bit(node_online_map, MAX_NUMNODES, rr);
+		if (rr == MAX_NUMNODES)
+			rr = find_first_bit(node_online_map, MAX_NUMNODES);
+		node_data[i] = node_data[rr];
+		cpu_to_node[i] = rr;
+		rr++; 
+	}
 
-int __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
+	set_bit(0, &node_to_cpumask[cpu_to_node(0)]);
+}
+
+void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 { 
+	int i;
+
 #ifdef CONFIG_K8_NUMA
 	if (!numa_off && !k8_scan_nodes(start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT))
-		return 0; 
+		return;
 #endif
 	printk(KERN_INFO "%s\n",
 	       numa_off ? "NUMA turned off" : "No NUMA configuration found");
@@ -151,12 +177,20 @@ int __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	       start_pfn << PAGE_SHIFT,
 	       end_pfn << PAGE_SHIFT); 
 		/* setup dummy node covering all memory */ 
-	fake_node = 1; 	
 	memnode_shift = 63; 
 	memnodemap[0] = 0;
 	numnodes = 1;
+	for (i = 0; i < NR_CPUS; i++)
+		cpu_to_node[i] = 0;
+	node_to_cpumask[0] = 1;
 	setup_node_bootmem(0, start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT);
-	return -1; 
+}
+
+__init void numa_add_cpu(int cpu)
+{
+	/* BP is initialized elsewhere */
+	if (cpu) 
+		set_bit(cpu, &node_to_cpumask[cpu_to_node(cpu)]);
 } 
 
 unsigned long __init numa_free_all_bootmem(void) 
@@ -185,4 +219,8 @@ __init int numa_setup(char *opt)
 	return 1;
 } 
 
-
+EXPORT_SYMBOL(cpu_to_node);
+EXPORT_SYMBOL(node_to_cpumask);
+EXPORT_SYMBOL(memnode_shift);
+EXPORT_SYMBOL(memnodemap);
+EXPORT_SYMBOL(node_data);

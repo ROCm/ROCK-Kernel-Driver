@@ -23,7 +23,7 @@
  * We always use the new IDE port registering,
  * so these are fixed here.
  */
-#define ide_default_io_base(i)		((ide_ioreg_t)0)
+#define ide_default_io_base(i)		(0)
 #define ide_default_irq(b)		(0)
 
 #define __ide_mm_insw(port,addr,len)	readsw(port,addr,len)

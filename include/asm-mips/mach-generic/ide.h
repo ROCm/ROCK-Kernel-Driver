@@ -34,7 +34,7 @@ static inline int ide_default_irq(unsigned long base)
 	}
 }
 
-static inline ide_ioreg_t ide_default_io_base(int index)
+static inline unsigned long ide_default_io_base(int index)
 {
 	switch (index) {
 		case 0: return 0x1f0;

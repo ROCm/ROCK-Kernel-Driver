@@ -9,12 +9,13 @@ struct node {
 };
 
 #define for_all_nodes(x) for ((x) = 0; (x) < numnodes; (x)++) \
-				if ((1UL << (x)) & nodes_present)
-
+				if (node_online(x))
 
 extern int compute_hash_shift(struct node *nodes);
-extern unsigned long nodes_present;
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
+
+extern void numa_add_cpu(int cpu);
+extern void numa_init_array(void);
 
 #endif

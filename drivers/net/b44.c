@@ -2,6 +2,8 @@
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
  * Fixed by Pekka Pietikainen (pp@ee.oulu.fi)
+ *
+ * Distribute under GPL.
  */
 
 #include <linux/kernel.h>
@@ -25,8 +27,8 @@
 
 #define DRV_MODULE_NAME		"b44"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.92"
-#define DRV_MODULE_RELDATE	"Nov 4, 2003"
+#define DRV_MODULE_VERSION	"0.93"
+#define DRV_MODULE_RELDATE	"Mar, 2004"
 
 #define B44_DEF_MSG_ENABLE	  \
 	(NETIF_MSG_DRV		| \
@@ -82,6 +84,10 @@ static int b44_debug = -1;	/* -1 == use B44_DEF_MSG_ENABLE as value */
 
 static struct pci_device_id b44_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_BCM4401,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_BCM4401B0,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_BCM4401B1,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ }	/* terminate list with empty entry */
 };
@@ -1178,7 +1184,6 @@ static int b44_init_hw(struct b44 *bp)
 {
 	u32 val;
 
-	b44_disable_ints(bp);
 	b44_chip_reset(bp);
 	b44_phy_reset(bp);
 	b44_setup_phy(bp);

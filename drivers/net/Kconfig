@@ -1962,16 +1962,6 @@ config R8169
 	  To compile this driver as a module, choose M here: the module
 	  will be called r8169.  This is recommended.
 
-config SIS190
-	tristate "SiS190 gigabit ethernet support (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
-	select CRC32
-	---help---
-	  Say Y here if you have a SiS 190 PCI Gigabit Ethernet adapter.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called sis190.  This is recommended.
-
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
@@ -2100,6 +2090,18 @@ config IXGB
 config IXGB_NAPI
 	bool "Use Rx Polling (NAPI) (EXPERIMENTAL)"
 	depends on IXGB && EXPERIMENTAL
+
+config S2IO
+	tristate "S2IO 10Gbe XFrame NIC"
+	depends on PCI
+	---help---
+	  This driver supports the 10Gbe XFrame NIC of S2IO. 
+	  For help regarding driver compilation, installation and 
+	  tuning please look into ~/drivers/net/s2io/README.txt.
+
+config S2IO_NAPI
+	bool "Use Rx Polling (NAPI) (EXPERIMENTAL)"
+	depends on S2IO && EXPERIMENTAL
 
 endmenu
 

@@ -6,6 +6,7 @@
 #ifndef ASM_MSI_H
 #define ASM_MSI_H
 
+#define NR_VECTORS		NR_IRQS
 #define FIRST_DEVICE_VECTOR 	IA64_FIRST_DEVICE_VECTOR
 #define LAST_DEVICE_VECTOR	IA64_LAST_DEVICE_VECTOR
 static inline void set_intr_gate (int nr, void *func) {}

@@ -13,7 +13,6 @@
 #include <linux/config.h>
 #include <asm/pgalloc.h>
 #include <asm/io.h>
-#include <asm/hdreg.h>
 #include <asm/page.h>
 #include <asm/spitfire.h>
 

@@ -48,7 +48,6 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	int nodeid, i, nb; 
 	int found = 0;
 	u32 reg;
-	int rr;
 
 	nb = find_northbridge(); 
 	if (nb < 0) 
@@ -91,7 +90,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 			       nodeid, (base>>8)&3, (limit>>8) & 3); 
 			return -1; 
 		}	
-		if ((1UL << nodeid) & nodes_present) { 
+		if (node_online(nodeid)) { 
 			printk(KERN_INFO "Node %d already present. Skipping\n", 
 			       nodeid);
 			continue;
@@ -152,28 +151,13 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	printk(KERN_INFO "Using node hash shift of %d\n", memnode_shift); 
 
 	for (i = 0; i < MAXNODE; i++) { 
-		if (nodes[i].start != nodes[i].end)
+		if (nodes[i].start != nodes[i].end) { 
+			/* assume 1:1 NODE:CPU */
+			cpu_to_node[i] = i; 
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end); 
 	} 
-
-	/* There are unfortunately some poorly designed mainboards around
-	   that only connect memory to a single CPU. This breaks the 1:1 cpu->node
-	   mapping. To avoid this fill in the mapping for all possible
-	   CPUs, as the number of CPUs is not known yet. 
-	   We round robin the existing nodes. */
-	rr = 0;
-	for (i = 0; i < MAXNODE; i++) {
-		if (nodes_present & (1UL<<i))
-			continue;
-		if ((nodes_present >> rr) == 0) 
-			rr = 0; 
-		rr = ffz(~nodes_present >> rr); 
-		node_data[i] = node_data[rr];
-		rr++; 
 	}
 
-	if (found == 1) 
-		fake_node = 1;
-
+	numa_init_array();
 	return 0;
 } 

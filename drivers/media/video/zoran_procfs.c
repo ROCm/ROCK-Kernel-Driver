@@ -204,8 +204,7 @@ zoran_write_proc (struct file   *file,
 	char *line, *ldelim, *varname, *svar, *tdelim;
 	struct zoran *zr;
 
-	/* Random maximum */
-	if (count > 256)
+	if (count > 32768)	/* Stupidity filter */
 		return -EINVAL;
 
 	zr = (struct zoran *) data;
