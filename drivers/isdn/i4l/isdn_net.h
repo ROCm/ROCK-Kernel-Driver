@@ -14,30 +14,13 @@
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/isdn.h>
-  			      /* Definitions for hupflags:                */
-#define ISDN_CHARGEHUP   4      /* We want to use the charge mechanism      */
-#define ISDN_INHUP       8      /* Even if incoming, close after huptimeout */
-#define ISDN_MANCHARGE  16      /* Charge Interval manually set             */
-
-/*
- * Definitions for Cisco-HDLC header.
- */
-
-#define CISCO_ADDR_UNICAST    0x0f
-#define CISCO_ADDR_BROADCAST  0x8f
-#define CISCO_CTRL            0x00
-#define CISCO_TYPE_CDP        0x2000
-#define CISCO_TYPE_SLARP      0x8035
-#define CISCO_SLARP_REQUEST   0
-#define CISCO_SLARP_REPLY     1
-#define CISCO_SLARP_KEEPALIVE 2
 
 void isdn_net_init(void);
 void isdn_net_exit(void);
 void isdn_net_lib_init(void);
 void isdn_net_lib_exit(void);
 void isdn_net_hangup_all(void);
-int isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
+int  isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
 
 int  register_isdn_netif(int encap, struct isdn_netif_ops *ops);
 int  isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
@@ -52,18 +35,6 @@ int  isdn_net_hangup(isdn_net_dev *);
 int  isdn_net_dial_req(isdn_net_dev *);
 void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
 void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
-
-enum {
-	ST_CHARGE_NULL,
-	ST_CHARGE_GOT_CINF,  /* got a first charge info */
-	ST_CHARGE_HAVE_CINT, /* got a second chare info and thus the timing */
-};
-
-static inline int
-isdn_net_bound(isdn_net_dev *idev)
-{
-	return idev->isdn_slot >= 0;
-}
 
 static inline int
 put_u8(unsigned char *p, u8 x)

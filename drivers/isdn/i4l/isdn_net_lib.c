@@ -152,6 +152,18 @@ static char *isdn_net_ev_str[] = {
 	"EV_DO_ACCEPT",
 };
 
+/* Definitions for hupflags: */
+
+#define ISDN_CHARGEHUP   4      /* We want to use the charge mechanism      */
+#define ISDN_INHUP       8      /* Even if incoming, close after huptimeout */
+#define ISDN_MANCHARGE  16      /* Charge Interval manually set             */
+
+enum {
+	ST_CHARGE_NULL,
+	ST_CHARGE_GOT_CINF,  /* got a first charge info */
+	ST_CHARGE_HAVE_CINT, /* got a second chare info and thus the timing */
+};
+
 /* ====================================================================== */
 /* Registration of ISDN network interface types                           */
 /* ====================================================================== */
@@ -1848,10 +1860,7 @@ isdn_net_hangup(isdn_net_dev *idev)
 	isdn_ctrl cmd;
 
 	del_timer(&idev->dial_timer);
-	if (!isdn_net_bound(idev)) {
-		isdn_BUG();
-		return 1;
-	}
+
 	printk(KERN_INFO "%s: local hangup\n", idev->name);
 	isdn_slot_command(idev->isdn_slot, ISDN_CMD_HANGUP, &cmd);
 	return 1;
