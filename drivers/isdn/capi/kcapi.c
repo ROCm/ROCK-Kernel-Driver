@@ -3,25 +3,22 @@
  * Kernel CAPI 2.0 Module
  * 
  * Copyright 1999 by Carsten Paeth <calle@calle.de>
+ * Copyright 2002 by Kai Germaschewski <kai@germaschewski.name>
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
-#define DBG(format, arg...) do { \
-printk(KERN_DEBUG __FUNCTION__ ": " format "\n" , ## arg); \
-} while (0)
-
 #define CONFIG_AVMB1_COMPAT
 
-#include <linux/config.h>
+#include "kcapi.h"
 #include <linux/module.h>
-#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/skbuff.h>
 #include <linux/tqueue.h>
 #include <linux/capi.h>
@@ -30,18 +27,11 @@ printk(KERN_DEBUG __FUNCTION__ ": " format "\n" , ## arg); \
 #include <asm/uaccess.h>
 #include <linux/isdn/capicmd.h>
 #include <linux/isdn/capiutil.h>
-#include <linux/isdn/capilli.h>
 #ifdef CONFIG_AVMB1_COMPAT
 #include <linux/b1lli.h>
 #endif
 
 static char *revision = "$Revision: 1.21.6.8 $";
-
-/* ------------------------------------------------------------- */
-
-#define CARD_DETECTED	1
-#define CARD_LOADING	2
-#define CARD_RUNNING	3
 
 /* ------------------------------------------------------------- */
 
@@ -70,13 +60,14 @@ static char capi_manufakturer[64] = "AVM Berlin";
 
 #define NCCI2CTRL(ncci)    (((ncci) >> 24) & 0x7f)
 
-static struct capi20_appl *applications[CAPI_MAXAPPL];
-static struct capi_ctr *cards[CAPI_MAXCONTR];
+LIST_HEAD(capi_drivers);
+spinlock_t capi_drivers_lock = SPIN_LOCK_UNLOCKED;
+
+struct capi20_appl *capi_applications[CAPI_MAXAPPL];
+struct capi_ctr *capi_cards[CAPI_MAXCONTR];
+
 static int ncards;
 static struct sk_buff_head recv_queue;
-
-static LIST_HEAD(drivers);
-static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 
 static struct tq_struct tq_state_notify;
 static struct tq_struct tq_recv_notify;
@@ -112,7 +103,7 @@ static inline struct capi_ctr *get_capi_ctr_by_nr(u16 contr)
 	if (contr - 1 >= CAPI_MAXCONTR)
 		return NULL;
 
-	return cards[contr - 1];
+	return capi_cards[contr - 1];
 }
 
 static inline struct capi20_appl *get_capi_appl_by_nr(u16 applid)
@@ -120,20 +111,10 @@ static inline struct capi20_appl *get_capi_appl_by_nr(u16 applid)
 	if (applid - 1 >= CAPI_MAXAPPL)
 		return NULL;
 
-	return applications[applid - 1];
+	return capi_applications[applid - 1];
 }
 
 /* -------- util functions ------------------------------------ */
-
-static char *cardstate2str(unsigned short cardstate)
-{
-	switch (cardstate) {
-	case CARD_DETECTED:	return "detected";
-	case CARD_LOADING:	return "loading";
-	case CARD_RUNNING:	return "running";
-	default:	        return "???";
-	}
-}
 
 static inline int capi_cmd_valid(u8 cmd)
 {
@@ -168,237 +149,6 @@ static inline int capi_subcmd_valid(u8 subcmd)
 		return 1;
 	}
 	return 0;
-}
-
-/* -------- /proc functions ----------------------------------- */
-/*
- * /proc/capi/applications:
- *      applid l3cnt dblkcnt dblklen #ncci recvqueuelen
- */
-static int proc_applications_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct capi20_appl *ap;
-	int i;
-	int len = 0;
-
-	for (i=1; i <= CAPI_MAXAPPL; i++) {
-		ap = get_capi_appl_by_nr(i);
-		if (!ap) continue;
-		len += sprintf(page+len, "%u %d %d %d\n",
-			       ap->applid,
-			       ap->rparam.level3cnt,
-			       ap->rparam.datablkcnt,
-			       ap->rparam.datablklen);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
- * /proc/capi/driver:
- *	driver ncontroller
- */
-static int proc_driver_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct list_head *l;
-	struct capi_driver *driver;
-	int len = 0;
-
-	spin_lock(&drivers_lock);
-	list_for_each(l, &drivers) {
-		driver = list_entry(l, struct capi_driver, driver_list);
-
-		len += sprintf(page+len, "%-32s %d %s\n",
-					driver->name,
-					driver->ncontroller,
-					driver->revision);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	spin_unlock(&drivers_lock);
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
- * /proc/capi/controller:
- *	cnr driver cardstate name driverinfo
- */
-static int proc_controller_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct capi_ctr *cp;
-	int i;
-	int len = 0;
-
-	for (i=0; i < CAPI_MAXCONTR; i++) {
-		cp = cards[i];
-		if (!cp)
-			continue;
-
-		len += sprintf(page+len, "%d %-10s %-8s %-16s %s\n",
-			cp->cnr, cp->driver->name, 
-			cardstate2str(cp->cardstate),
-			cp->name,
-			cp->driver->procinfo ?  cp->driver->procinfo(cp) : ""
-			);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
- * /proc/capi/applstats:
- *	applid nrecvctlpkt nrecvdatapkt nsentctlpkt nsentdatapkt
- */
-static int proc_applstats_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct capi20_appl *ap;
-	int i;
-	int len = 0;
-
-	for (i=1; i <= CAPI_MAXAPPL; i++) {
-		ap = get_capi_appl_by_nr(i);
-		if (!ap) continue;
-		len += sprintf(page+len, "%u %lu %lu %lu %lu\n",
-			ap->applid,
-			ap->nrecvctlpkt,
-			ap->nrecvdatapkt,
-			ap->nsentctlpkt,
-			ap->nsentdatapkt);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
- * /proc/capi/contrstats:
- *	cnr nrecvctlpkt nrecvdatapkt nsentctlpkt nsentdatapkt
- */
-static int proc_contrstats_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct capi_ctr *cp;
-	int i;
-	int len = 0;
-
-	for (i=0; i < CAPI_MAXCONTR; i++) {
-		cp = cards[i];
-		if (!cp)
-			continue;
-		len += sprintf(page+len, "%d %lu %lu %lu %lu\n",
-			cp->cnr, 
-			cp->nrecvctlpkt,
-			cp->nrecvdatapkt,
-			cp->nsentctlpkt,
-			cp->nsentdatapkt);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-static struct procfsentries {
-  char *name;
-  mode_t mode;
-  int (*read_proc)(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data);
-  struct proc_dir_entry *procent;
-} procfsentries[] = {
-   { "capi",		  S_IFDIR, 0 },
-   { "capi/applications", 0	 , proc_applications_read_proc },
-   { "capi/driver",       0	 , proc_driver_read_proc },
-   { "capi/controller",   0	 , proc_controller_read_proc },
-   { "capi/applstats",    0	 , proc_applstats_read_proc },
-   { "capi/contrstats",   0	 , proc_contrstats_read_proc },
-   { "capi/drivers",	  S_IFDIR, 0 },
-   { "capi/controllers",  S_IFDIR, 0 },
-};
-
-static void proc_capi_init(void)
-{
-    int nelem = sizeof(procfsentries)/sizeof(procfsentries[0]);
-    int i;
-
-    for (i=0; i < nelem; i++) {
-        struct procfsentries *p = procfsentries + i;
-	p->procent = create_proc_entry(p->name, p->mode, 0);
-	if (p->procent) p->procent->read_proc = p->read_proc;
-    }
-}
-
-static void proc_capi_exit(void)
-{
-    int nelem = sizeof(procfsentries)/sizeof(procfsentries[0]);
-    int i;
-
-    for (i=nelem-1; i >= 0; i--) {
-        struct procfsentries *p = procfsentries + i;
-	if (p->procent) {
-	   remove_proc_entry(p->name, 0);
-	   p->procent = 0;
-	}
-    }
 }
 
 /* ------------------------------------------------------------ */
@@ -692,7 +442,7 @@ attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
 	int i;
 
 	for (i=0; i < CAPI_MAXCONTR; i++) {
-		if (cards[i] == NULL)
+		if (capi_cards[i] == NULL)
 			break;
 	}
 	if (i == CAPI_MAXCONTR) {
@@ -703,7 +453,7 @@ attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
 	if (!card)
 		return NULL;
 
-	cards[i] = card;
+	capi_cards[i] = card;
 	memset(card, 0, sizeof(struct capi_ctr));
 	card->driver = driver;
 	card->cnr = i + 1;
@@ -753,7 +503,7 @@ int detach_capi_ctr(struct capi_ctr *card)
 	   remove_proc_entry(card->procfn, 0);
 	   card->procent = 0;
 	}
-	cards[card->cnr - 1] = NULL;
+	capi_cards[card->cnr - 1] = NULL;
 	printk(KERN_NOTICE "kcapi: Controller %d: %s unregistered\n",
 			card->cnr, card->name);
 	kfree(card);
@@ -789,9 +539,9 @@ void attach_capi_driver(struct capi_driver *driver)
 {
 	INIT_LIST_HEAD(&driver->contr_head);
 
-	spin_lock(&drivers_lock);
-	list_add_tail(&driver->driver_list, &drivers);
-	spin_unlock(&drivers_lock);
+	spin_lock(&capi_drivers_lock);
+	list_add_tail(&driver->driver_list, &capi_drivers);
+	spin_unlock(&capi_drivers_lock);
 
 	printk(KERN_NOTICE "kcapi: driver %s attached\n", driver->name);
 	sprintf(driver->procfn, "capi/drivers/%s", driver->name);
@@ -812,9 +562,9 @@ EXPORT_SYMBOL(attach_capi_driver);
 
 void detach_capi_driver(struct capi_driver *driver)
 {
-	spin_lock(&drivers_lock);
+	spin_lock(&capi_drivers_lock);
 	list_del(&driver->driver_list);
-	spin_unlock(&drivers_lock);
+	spin_unlock(&capi_drivers_lock);
 
 	printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
 	if (driver->procent) {
@@ -833,7 +583,7 @@ u16 capi20_isinstalled(void)
 {
 	int i;
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
-		if (cards[i] && cards[i]->cardstate == CARD_RUNNING)
+		if (capi_cards[i] && capi_cards[i]->cardstate == CARD_RUNNING)
 			return CAPI_NOERROR;
 	}
 	return CAPI_REGNOTINSTALLED;
@@ -852,14 +602,14 @@ u16 capi20_register(struct capi20_appl *ap)
 		return CAPI_LOGBLKSIZETOSMALL;
 
 	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
-		if (applications[applid - 1] == NULL)
+		if (capi_applications[applid - 1] == NULL)
 			break;
 	}
 	if (applid > CAPI_MAXAPPL)
 		return CAPI_TOOMANYAPPLS;
 
 	ap->applid = applid;
-	applications[applid - 1] = ap;
+	capi_applications[applid - 1] = ap;
 
 	ap->nrecvctlpkt = 0;
 	ap->nrecvdatapkt = 0;
@@ -868,9 +618,9 @@ u16 capi20_register(struct capi20_appl *ap)
 	ap->callback = 0;
 	
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
-		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
+		if (!capi_cards[i] || capi_cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		register_appl(cards[i], applid, &ap->rparam);
+		register_appl(capi_cards[i], applid, &ap->rparam);
 	}
 	printk(KERN_DEBUG "kcapi: appl %d up\n", applid);
 
@@ -886,11 +636,11 @@ u16 capi20_release(struct capi20_appl *ap)
 	DBG("applid %#x", ap->applid);
 
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
-		if (!cards[i] || cards[i]->cardstate != CARD_RUNNING)
+		if (!capi_cards[i] || capi_cards[i]->cardstate != CARD_RUNNING)
 			continue;
-		release_appl(cards[i], ap->applid);
+		release_appl(capi_cards[i], ap->applid);
 	}
-	applications[ap->applid - 1] = NULL;
+	capi_applications[ap->applid - 1] = NULL;
 	printk(KERN_DEBUG "kcapi: appl %d down\n", ap->applid);
 
 	return CAPI_NOERROR;
@@ -1032,15 +782,15 @@ static struct capi_driver *find_driver(char *name)
 {
 	struct list_head *l;
 	struct capi_driver *dp;
-	spin_lock(&drivers_lock);
-	list_for_each(l, &drivers) {
+	spin_lock(&capi_drivers_lock);
+	list_for_each(l, &capi_drivers) {
 		dp = list_entry(l, struct capi_driver, driver_list);
 		if (strcmp(dp->name, name) == 0)
 			goto found;
 	}
 	dp = NULL;
  found:
-	spin_unlock(&drivers_lock);
+	spin_unlock(&capi_drivers_lock);
 	return dp;
 }
 
@@ -1228,8 +978,6 @@ static int __init kcapi_init(void)
 	char *p;
 	char rev[32];
 
-	MOD_INC_USE_COUNT;
-
 	skb_queue_head_init(&recv_queue);
 
 	tq_state_notify.routine = notify_handler;
@@ -1238,7 +986,7 @@ static int __init kcapi_init(void)
 	tq_recv_notify.routine = recv_handler;
 	tq_recv_notify.data = 0;
 
-        proc_capi_init();
+        kcapi_proc_init();
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
@@ -1248,30 +996,14 @@ static int __init kcapi_init(void)
 	} else
 		strcpy(rev, "1.0");
 
-#ifdef MODULE
-        printk(KERN_NOTICE "CAPI-driver Rev %s: loaded\n", rev);
-#else
-	printk(KERN_NOTICE "CAPI-driver Rev %s: started\n", rev);
-#endif
-	MOD_DEC_USE_COUNT;
+        printk(KERN_NOTICE "CAPI Subsystem Rev %s\n", rev);
+
 	return 0;
 }
 
 static void __exit kcapi_exit(void)
 {
-	char rev[10];
-	char *p;
-
-	if ((p = strchr(revision, ':'))) {
-		strcpy(rev, p + 1);
-		p = strchr(rev, '$');
-		*p = 0;
-	} else {
-		strcpy(rev, "1.0");
-	}
-
-        proc_capi_exit();
-	printk(KERN_NOTICE "CAPI-driver Rev%s: unloaded\n", rev);
+        kcapi_proc_exit();
 }
 
 module_init(kcapi_init);
