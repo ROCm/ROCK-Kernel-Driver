@@ -676,6 +676,7 @@ static void handle_rt_signal32(unsigned long sig, struct k_sigaction *ka,
 	regs->nip = (unsigned long) ka->sa.sa_handler;
 	regs->link = (unsigned long) frame->tramp;
 	regs->trap = 0;
+	regs->result = 0;
 
 	return;
 
@@ -784,7 +785,6 @@ long sys32_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	 */
        	sys32_sigaltstack((u32)(u64)&rt_sf->uc.uc_stack, 0, 0, 0, 0, 0, regs);
 
-	regs->result &= 0xFFFFFFFF;
 	ret = regs->result;
 
 	return ret;
@@ -841,6 +841,7 @@ static void handle_signal32(unsigned long sig, struct k_sigaction *ka,
 	regs->nip = (unsigned long) ka->sa.sa_handler;
 	regs->link = (unsigned long) frame->mctx.tramp;
 	regs->trap = 0;
+	regs->result = 0;
 
 	return;
 
@@ -885,7 +886,6 @@ long sys32_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	    || restore_user_regs(regs, sr, 1))
 		goto badframe;
 
-	regs->result &= 0xFFFFFFFF;
 	ret = regs->result;
 	return ret;
 
