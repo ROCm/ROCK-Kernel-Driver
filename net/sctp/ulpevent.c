@@ -839,6 +839,9 @@ static void sctp_ulpevent_receive_data(struct sctp_ulpevent *event,
 	sctp_ulpevent_set_owner(event, asoc);
 	sctp_assoc_rwnd_decrease(asoc, skb_headlen(skb));
 
+	if (!skb->data_len)
+		return;
+
 	/* Note:  Not clearing the entire event struct as this is just a
 	 * fragment of the real event.  However, we still need to do rwnd
 	 * accounting.
@@ -867,6 +870,9 @@ static void sctp_ulpevent_release_data(struct sctp_ulpevent *event)
 	skb = sctp_event2skb(event);
 	sctp_assoc_rwnd_increase(event->asoc, skb_headlen(skb));
 
+	if (!skb->data_len)
+		goto done;
+
 	/* Don't forget the fragments. */
 	for (frag = skb_shinfo(skb)->frag_list; frag; frag = frag->next) {
 		/* NOTE:  skb_shinfos are recursive. Although IP returns
@@ -875,6 +881,8 @@ static void sctp_ulpevent_release_data(struct sctp_ulpevent *event)
 		 */
 		sctp_ulpevent_release_data(sctp_skb2event(frag));
 	}
+
+done:
 	sctp_ulpevent_release_owner(event);
 }
 

@@ -73,8 +73,6 @@ struct sctp_packet *sctp_packet_config(struct sctp_packet *packet,
 				       __u32 vtag, int ecn_capable,
 				       sctp_packet_phandler_t *prepend_handler)
 {
-	int packet_empty = (packet->size == SCTP_IP_OVERHEAD);
-
 	packet->vtag = vtag;
 	packet->ecn_capable = ecn_capable;
 	packet->get_prepend_chunk = prepend_handler;
@@ -83,7 +81,7 @@ struct sctp_packet *sctp_packet_config(struct sctp_packet *packet,
 	packet->ipfragok = 0;
 
 	/* We might need to call the prepend_handler right away.  */
-	if (packet_empty)
+	if (sctp_packet_empty(packet))
 		sctp_packet_reset(packet);
 	return packet;
 }
@@ -93,11 +91,22 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 				     struct sctp_transport *transport,
 				     __u16 sport, __u16 dport)
 {
+	struct sctp_association *asoc = transport->asoc;
+	size_t overhead;
+
 	packet->transport = transport;
 	packet->source_port = sport;
 	packet->destination_port = dport;
 	skb_queue_head_init(&packet->chunks);
-	packet->size = SCTP_IP_OVERHEAD;
+	if (asoc) {
+		struct sctp_opt *sp = sctp_sk(asoc->base.sk);	
+		overhead = sp->pf->af->net_header_len; 
+	} else {
+		overhead = sizeof(struct ipv6hdr);
+	}
+	overhead += sizeof(struct sctphdr);
+	packet->overhead = overhead;
+	packet->size = overhead;
 	packet->vtag = 0;
 	packet->ecn_capable = 0;
 	packet->get_prepend_chunk = NULL;
@@ -215,17 +224,14 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 
 	/* Decide if we need to fragment or resubmit later. */
 	if (too_big) {
-		int packet_empty = (packet->size == SCTP_IP_OVERHEAD);
-
 		/* Both control chunks and data chunks with TSNs are
 		 * non-fragmentable.
 		 */
-		if (packet_empty || !sctp_chunk_is_data(chunk)) {
+		if (sctp_packet_empty(packet) || !sctp_chunk_is_data(chunk)) {
 			/* We no longer do re-fragmentation.
 			 * Just fragment at the IP layer, if we
 			 * actually hit this condition
 			 */
-
 			packet->ipfragok = 1;
 			goto append;
 
@@ -297,7 +303,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 		goto nomem;
 
 	/* Make sure the outbound skb has enough header room reserved. */
-	skb_reserve(nskb, SCTP_IP_OVERHEAD);
+	skb_reserve(nskb, packet->overhead);
 
 	/* Set the owning socket so that we know where to get the
 	 * destination IP address.
@@ -471,7 +477,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	(*tp->af_specific->sctp_xmit)(nskb, tp, packet->ipfragok);
 
 out:
-	packet->size = SCTP_IP_OVERHEAD;
+	packet->size = packet->overhead;
 	return err;
 no_route:
 	kfree_skb(nskb);
@@ -497,7 +503,6 @@ err:
 	goto out;
 nomem:
 	err = -ENOMEM;
-	printk("%s alloc_skb failed.\n", __FUNCTION__);
 	goto err;
 }
 
@@ -512,7 +517,7 @@ static void sctp_packet_reset(struct sctp_packet *packet)
 {
 	struct sctp_chunk *chunk = NULL;
 
-	packet->size = SCTP_IP_OVERHEAD;
+	packet->size = packet->overhead;
 
 	if (packet->get_prepend_chunk)
 		chunk = packet->get_prepend_chunk(packet->transport->asoc);
@@ -609,7 +614,7 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 * if any previously transmitted data on the connection remains
 	 * unacknowledged.
 	 */
-	if (!sp->nodelay && SCTP_IP_OVERHEAD == packet->size &&
+	if (!sp->nodelay && sctp_packet_empty(packet) &&
 	    q->outstanding_bytes && sctp_state(asoc, ESTABLISHED)) {
 		unsigned len = datasize + q->out_qlen;
 
@@ -617,7 +622,7 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 		 * data will fit or delay in hopes of bundling a full
 		 * sized packet.
 		 */
-		if (len < asoc->pmtu - SCTP_IP_OVERHEAD) {
+		if (len < asoc->pmtu - packet->overhead) {
 			retval = SCTP_XMIT_NAGLE_DELAY;
 			goto finish;
 		}

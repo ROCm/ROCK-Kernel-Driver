@@ -437,11 +437,14 @@ static inline __s32 sctp_jitter(__u32 rto)
 static inline int sctp_frag_point(const struct sctp_opt *sp, int pmtu)
 {
 	int frag = pmtu;
-	frag -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
-	frag -= sizeof(struct sctp_sack_chunk);
+
+	frag -= sp->pf->af->net_header_len;
+	frag -= sizeof(struct sctphdr) + sizeof(struct sctp_data_chunk);
 
 	if (sp->user_frag)
 		frag = min_t(int, frag, sp->user_frag);
+
+	frag = min_t(int, frag, SCTP_MAX_CHUNK_LEN);
 
 	return frag;
 }

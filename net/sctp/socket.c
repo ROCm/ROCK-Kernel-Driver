@@ -1948,6 +1948,9 @@ static int sctp_setsockopt_mappedv4(struct sock *sk, char *optval, int optlen)
  */
 static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
 {
+	struct sctp_association *asoc;
+	struct list_head *pos;
+	struct sctp_opt *sp = sctp_sk(sk);
 	int val;
 
 	if (optlen < sizeof(int))
@@ -1956,7 +1959,15 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
 		return -EFAULT;
 	if ((val < 8) || (val > SCTP_MAX_CHUNK_LEN))
 		return -EINVAL;
-	sctp_sk(sk)->user_frag = val;
+	sp->user_frag = val;
+
+	if (val) {
+		/* Update the frag_point of the existing associations. */
+		list_for_each(pos, &(sp->ep->asocs)) {
+			asoc = list_entry(pos, struct sctp_association, asocs);
+			asoc->frag_point = sctp_frag_point(sp, asoc->pmtu); 
+		}
+	}
 
 	return 0;
 }
@@ -2531,10 +2542,6 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_penddata = sctp_tsnmap_pending(&asoc->peer.tsn_map);
 	status.sstat_instrms = asoc->c.sinit_max_instreams;
 	status.sstat_outstrms = asoc->c.sinit_num_ostreams;
-	/* Just in time frag_point update. */
-	if (sctp_sk(sk)->user_frag)
-		asoc->frag_point
-			= min_t(int, asoc->frag_point, sctp_sk(sk)->user_frag);
 	status.sstat_fragmentation_point = asoc->frag_point;
 	status.sstat_primary.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
 	memcpy(&status.sstat_primary.spinfo_address,

@@ -667,6 +667,9 @@ struct sctp_packet {
 
 	/* This contains the payload chunks.  */
 	struct sk_buff_head chunks;
+
+	/* This is the overhead of the sctp and ip headers. */
+	size_t overhead;
 	/* This is the total size of all chunks INCLUDING padding.  */
 	size_t size;
 
@@ -721,6 +724,10 @@ sctp_outq_ohandler_t	     sctp_packet_transmit_chunk;
 sctp_outq_ohandler_force_t   sctp_packet_transmit;
 void sctp_packet_free(struct sctp_packet *);
 
+static inline int sctp_packet_empty(struct sctp_packet *packet)
+{
+	return (packet->size == packet->overhead);
+}
 
 /* This represents a remote transport address.
  * For local transport addresses, we just use union sctp_addr.

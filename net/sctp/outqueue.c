@@ -926,7 +926,7 @@ sctp_flush_out:
 			transport = t;
 
 		packet = &transport->packet;
-		if (packet->size != SCTP_IP_OVERHEAD)
+		if (!sctp_packet_empty(packet))
 			error = (*q->force_output)(packet);
 	}
 

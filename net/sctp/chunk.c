@@ -192,24 +192,9 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 		msg->can_expire = 1;
 	}
 
-	/* What is a reasonable fragmentation point right now? */
-	max = asoc->pmtu;
-	if (max < SCTP_MIN_PMTU)
-		max = SCTP_MIN_PMTU;
-	max -= SCTP_IP_OVERHEAD;
+	max = asoc->frag_point;
 
-	/* Make sure not beyond maximum chunk size. */
-	if (max > SCTP_MAX_CHUNK_LEN)
-		max = SCTP_MAX_CHUNK_LEN;
-
-	/* Subtract out the overhead of a data chunk header. */
-	max -= sizeof(struct sctp_data_chunk);
 	whole = 0;
-
-	/* If user has specified smaller fragmentation, make it so. */
-	if (sctp_sk(asoc->base.sk)->user_frag)
-		max = min_t(int, max, sctp_sk(asoc->base.sk)->user_frag);
-
 	first_len = max;
 
 	/* Encourage Cookie-ECHO bundling. */
