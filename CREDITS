@@ -1394,6 +1394,7 @@ S: USA
 N: Marcel Holtmann
 E: marcel@holtmann.org
 W: http://www.holtmann.org
+D: Maintainer of the Linux Bluetooth Subsystem
 D: Author and maintainer of the various Bluetooth HCI drivers
 D: Author and maintainer of the CAPI message transport protocol driver
 D: Various other Bluetooth related patches, cleanups and fixes
