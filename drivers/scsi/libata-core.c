@@ -582,7 +582,7 @@ static const char * xfer_mode_str[] = {
 
 /**
  *	ata_udma_string - convert UDMA bit offset to string
- *	@udma_mask: mask of bits supported; only highest bit counts.
+ *	@mask: mask of bits supported; only highest bit counts.
  *
  *	Determine string which represents the highest speed
  *	(highest bit in @udma_mask).
@@ -819,7 +819,7 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
 
 /**
  *	ata_dev_id_string - Convert IDENTIFY DEVICE page into string
- *	@dev: Device whose IDENTIFY DEVICE results we will examine
+ *	@id: IDENTIFY DEVICE results we will examine
  *	@s: string into which data is output
  *	@ofs: offset into identify device page
  *	@len: length of string to return. must be an even number.
@@ -1766,8 +1766,10 @@ static int fgb(u32 bitmap)
 }
 
 /**
- *	ata_choose_xfer_mode -
- *	@ap:
+ *	ata_choose_xfer_mode - attempt to find best transfer mode
+ *	@ap: Port for which an xfer mode will be selected
+ *	@xfer_mode_out: (output) SET FEATURES - XFER MODE code
+ *	@xfer_shift_out: (output) bit shift that selects this mode
  *
  *	LOCKING:
  *
