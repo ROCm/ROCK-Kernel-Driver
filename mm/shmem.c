@@ -31,6 +31,7 @@
 #include <linux/backing-dev.h>
 #include <linux/shmem_fs.h>
 #include <linux/mount.h>
+#include <linux/writeback.h>
 
 #include <asm/uaccess.h>
 
@@ -686,10 +687,10 @@ static int shmem_writepage(struct page *page)
 	inode = mapping->host;
 	info = SHMEM_I(inode);
 	if (info->flags & VM_LOCKED)
-		return fail_writepage(page);
+		goto redirty;
 	swap = get_swap_page();
 	if (!swap.val)
-		return fail_writepage(page);
+		goto redirty;
 
 	spin_lock(&info->lock);
 	shmem_recalc_inode(inode);
@@ -709,12 +710,9 @@ static int shmem_writepage(struct page *page)
 	shmem_swp_unmap(entry);
 	spin_unlock(&info->lock);
 	swap_free(swap);
-	return fail_writepage(page);
-}
-
-static int shmem_writepages(struct address_space *mapping, struct writeback_control *wbc)
-{
-	return 0;
+redirty:
+	set_page_dirty(page);
+	return WRITEPAGE_ACTIVATE;	/* Return with the page locked */
 }
 
 /*
@@ -1802,7 +1800,6 @@ static void destroy_inodecache(void)
 
 static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
-	.writepages	= shmem_writepages,
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 #ifdef CONFIG_TMPFS
 	.readpage	= shmem_readpage,

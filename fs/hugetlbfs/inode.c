@@ -448,7 +448,6 @@ static int hugetlbfs_symlink(struct inode * dir, struct dentry *dentry, const ch
 
 static struct address_space_operations hugetlbfs_aops = {
 	.readpage	= hugetlbfs_readpage,
-	.writepage	= fail_writepage,
 	.prepare_write	= hugetlbfs_prepare_write,
 	.commit_write	= hugetlbfs_commit_write
 };

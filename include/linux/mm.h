@@ -355,7 +355,6 @@ extern struct page *mem_map;
 
 extern void show_free_areas(void);
 
-extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 extern void shmem_lock(struct file * file, int lock);

@@ -108,37 +108,6 @@ static inline int sync_page(struct page *page)
 	return 0;
 }
 
-/*
- * In-memory filesystems have to fail their
- * writepage function - and this has to be
- * worked around in the VM layer..
- *
- * We
- *  - mark the page dirty again (but do NOT
- *    add it back to the inode dirty list, as
- *    that would livelock in fdatasync)
- *  - activate the page so that the page stealer
- *    doesn't try to write it out over and over
- *    again.
- *
- * NOTE!  The livelock in fdatasync went away, due to io_pages.
- * So this function can now call set_page_dirty().
- */
-int fail_writepage(struct page *page)
-{
-	/* Only activate on memory-pressure, not fsync.. */
-	if (current->flags & PF_MEMALLOC) {
-		if (!PageActive(page))
-			activate_page(page);
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
-	}
-
-	unlock_page(page);
-	return -EAGAIN;		/* It will be set dirty again */
-}
-EXPORT_SYMBOL(fail_writepage);
-
 /**
  * filemap_fdatawrite - start writeback against all of a mapping's dirty pages
  * @mapping: address space structure to write
@@ -159,6 +128,9 @@ int filemap_fdatawrite(struct address_space *mapping)
 		.sync_mode = WB_SYNC_ALL,
 		.nr_to_write = mapping->nrpages * 2,
 	};
+
+	if (mapping->backing_dev_info->memory_backed)
+		return 0;
 
 	current->flags |= PF_SYNC;
 	ret = do_writepages(mapping, &wbc);
@@ -1327,10 +1299,6 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct inode *inode = mapping->host;
 
-	if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_MAYWRITE)) {
-		if (!mapping->a_ops->writepage)
-			return -EINVAL;
-	}
 	if (!mapping->a_ops->readpage)
 		return -ENOEXEC;
 	UPDATE_ATIME(inode);

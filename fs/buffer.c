@@ -1622,7 +1622,7 @@ EXPORT_SYMBOL(unmap_underlying_metadata);
  * state inside lock_buffer().
  *
  * If block_write_full_page() is called for regular writeback
- * (called_for_sync() is false) then it will return -EAGAIN for a locked
+ * (called_for_sync() is false) then it will redirty a page which has a locked
  * buffer.   This only can happen if someone has written the buffer directly,
  * with submit_bh().  At the address_space level PageWriteback prevents this
  * contention from occurring.
@@ -1631,7 +1631,6 @@ static int __block_write_full_page(struct inode *inode,
 			struct page *page, get_block_t *get_block)
 {
 	int err;
-	int ret = 0;
 	unsigned long block;
 	unsigned long last_block;
 	struct buffer_head *bh, *head;
@@ -1705,7 +1704,7 @@ static int __block_write_full_page(struct inode *inode,
 				lock_buffer(bh);
 			} else {
 				if (test_set_buffer_locked(bh)) {
-					ret = -EAGAIN;
+					__set_page_dirty_nobuffers(page);
 					continue;
 				}
 			}
@@ -1757,8 +1756,6 @@ done:
 			SetPageUptodate(page);
 		end_page_writeback(page);
 	}
-	if (err == 0)
-		return ret;
 	return err;
 
 recover:

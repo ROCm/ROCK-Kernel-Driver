@@ -206,8 +206,7 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 	else
 		UDF_I_ALLOCTYPE(inode) = ICBTAG_FLAG_AD_LONG;
 
-	if (inode->i_data.a_ops->writepage(page) == -EAGAIN)
-		__set_page_dirty_nobuffers(page);
+	inode->i_data.a_ops->writepage(page);
 	page_cache_release(page);
 
 	mark_inode_dirty(inode);

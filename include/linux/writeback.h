@@ -1,9 +1,5 @@
 /*
  * include/linux/writeback.h.
- *
- * These declarations are private to fs/ and mm/.
- * Declarations which are exported to filesystems do not
- * get placed here.
  */
 #ifndef WRITEBACK_H
 #define WRITEBACK_H
@@ -46,7 +42,16 @@ struct writeback_control {
 	int nonblocking;		/* Don't get stuck on request queues */
 	int encountered_congestion;	/* An output: a queue is full */
 };
-	
+
+/*
+ * ->writepage() return values (make these much larger than a pagesize, in
+ * case some fs is returning number-of-bytes-written from writepage)
+ */
+#define WRITEPAGE_ACTIVATE	0x80000	/* IO was not started: activate page */
+
+/*
+ * fs/fs-writeback.c
+ */	
 void writeback_inodes(struct writeback_control *wbc);
 void wake_up_inode(struct inode *inode);
 void __wait_on_inode(struct inode * inode);

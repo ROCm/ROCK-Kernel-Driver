@@ -147,7 +147,7 @@ locking rules:
 	All except set_page_dirty may block
 
 			BKL	PageLocked(page)
-writepage:		no	yes, unlocks
+writepage:		no	yes, unlocks (see below)
 readpage:		no	yes, unlocks
 readpages:		no
 sync_page:		no	maybe
@@ -165,16 +165,37 @@ may be called from the request handler (/dev/loop).
 	->readpage() unlocks the page, either synchronously or via I/O
 completion.
 
-	->readpages() populates the pagecache with the passed pages and starts I/O against them.  They come unlocked upon I/O completion.
+	->readpages() populates the pagecache with the passed pages and starts
+I/O against them.  They come unlocked upon I/O completion.
 
-	->writepage() unlocks the page synchronously, before returning to
-the caller.  If the page has write I/O underway against it, writepage()
-should run SetPageWriteback() against the page prior to unlocking it.
-The write I/O completion handler should run ClearPageWriteback against
-the page.
+	->writepage() is used for two purposes: for "memory cleansing" and for
+"sync".  These are quite different operations and the behaviour may differ
+depending upon the mode.  (Yes, there should be two a_ops for this, or
+writepage should take a writeback_control*)
 
-	That is: after 2.5.12, pages which are under writeout are *not*
-locked.
+If writepage is called for sync (current->flags & PF_SYNC) then it *must*
+write the page, even if that would involve blocking on in-progress I/O.
+
+If writepage is called for memory cleansing (!(current->flags & PF_SYNC))
+then its role is to get as much writeout underway as possible.  So writepage
+should try to avoid blocking against currently-in-progress I/O.
+
+If the filesystem is not called for "sync" and it determines that it
+would need to block against in-progress I/O to be able to start new I/O
+against the page the filesystem shoud redirty the page (usually with
+__set_page_dirty_nobuffers()), then unlock the page and return zero. 
+This may also be done to avoid internal deadlocks, but rarely.
+
+If the filesytem is called for sync then it must wait on any
+in-progress I/O and then start new I/O.
+
+The filesystem should unlock the page synchronously, before returning
+to the caller.  If the page has write I/O underway against it,
+writepage() should run SetPageWriteback() against the page prior to
+unlocking it.  The write I/O completion handler should run
+end_page_writeback() against the page.
+
+That is: after 2.5.12, pages which are under writeout are *not* locked.
 
 	->sync_page() locking rules are not well-defined - usually it is called
 with lock on page, but that is not guaranteed. Considering the currently

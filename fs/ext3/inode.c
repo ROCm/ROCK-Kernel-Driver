@@ -1371,11 +1371,10 @@ out_fail:
 
 	/*
 	 * We have to fail this writepage to avoid cross-fs transactions.
-	 * Return EAGAIN so the caller will the page back on
-	 * mapping->dirty_pages.  The page's buffers' dirty state will be left
-	 * as-is.
+	 * Put the page back on mapping->dirty_pages.  The page's buffers'
+	 * dirty state will be left as-is.
 	 */
-	ret = -EAGAIN;
+	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
 }

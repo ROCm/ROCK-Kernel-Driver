@@ -424,10 +424,6 @@ int write_one_page(struct page *page, int wait)
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 		ret = mapping->a_ops->writepage(page);
-		if (ret == -EAGAIN) {
-			__set_page_dirty_nobuffers(page);
-			ret = 0;
-		}
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
 			if (PageError(page))

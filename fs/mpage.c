@@ -610,10 +610,6 @@ mpage_writepages(struct address_space *mapping,
 					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page);
-				if (ret == -EAGAIN) {
-					__set_page_dirty_nobuffers(page);
-					ret = 0;
-				}
 			} else {
 				bio = mpage_writepage(bio, page, get_block,
 						&last_block_in_bio, &ret);

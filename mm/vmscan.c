@@ -309,7 +309,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto keep_locked;
 			if (!mapping)
 				goto keep_locked;
-			if (mapping->a_ops->writepage == fail_writepage)
+			if (mapping->a_ops->writepage == NULL)
 				goto activate_locked;
 			if (!may_enter_fs)
 				goto keep_locked;
@@ -327,14 +327,12 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				SetPageReclaim(page);
 				res = mapping->a_ops->writepage(page);
 
-				if (res == -EAGAIN) {
+				if (res == WRITEPAGE_ACTIVATE) {
 					ClearPageReclaim(page);
-					__set_page_dirty_nobuffers(page);
-				} else if (!PageWriteback(page)) {
-					/*
-					 * synchronous writeout or broken
-					 * a_ops?
-					 */
+					goto activate_locked;
+				}
+				if (!PageWriteback(page)) {
+					/* synchronous write or broken a_ops? */
 					ClearPageReclaim(page);
 				}
 				goto keep;
