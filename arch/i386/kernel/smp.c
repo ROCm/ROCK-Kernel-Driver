@@ -622,8 +622,6 @@ void smp_send_stop(void)
 	local_irq_enable();
 }
 
-EXPORT_SYMBOL(smp_send_stop);
-
 /*
  * Reschedule call back. Nothing to do,
  * all the work is done automatically when
