@@ -459,6 +459,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev);
 static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static int netdev_rx(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
+static void __set_rx_mode(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static struct ethtool_ops netdev_ethtool_ops;
@@ -979,7 +980,7 @@ static int netdev_open(struct net_device *dev)
 	getlinkstatus(dev);
 	if (np->linkok)
 		getlinktype(dev);
-	set_rx_mode(dev);
+	__set_rx_mode(dev);
 
 	netif_start_queue(dev);
 
@@ -1246,7 +1247,7 @@ static void enable_rxtx(struct net_device *dev)
 	writel(np->bcrvalue, ioaddr + BCR);
 
 	writel(0, ioaddr + RXPDR);
-	set_rx_mode(dev); /* changes np->crvalue, writes it into TCRRCR */
+	__set_rx_mode(dev); /* changes np->crvalue, writes it into TCRRCR */
 
 	/* Clear and Enable interrupts by setting the interrupt mask. */
 	writel(FBE | TUNF | CNTOVF | RBU | TI | RI, ioaddr + ISR);
@@ -1840,7 +1841,20 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
+
+/* for dev->set_multicast_list */
 static void set_rx_mode(struct net_device *dev)
+{
+	spinlock_t *lp = &((struct netdev_private *)dev->priv)->lock;
+	unsigned long flags;
+	spin_lock_irqsave(lp, flags);
+	__set_rx_mode(dev);
+	spin_unlock_irqrestore(&lp, flags);
+}
+
+
+/* Take lock before calling */
+static void __set_rx_mode(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
