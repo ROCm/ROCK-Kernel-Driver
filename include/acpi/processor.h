@@ -67,6 +67,8 @@ struct acpi_processor_px {
 	acpi_integer		status;			/* success indicator */
 };
 
+#define ACPI_PDC_REVISION_ID                   0x1
+
 struct acpi_processor_performance {
 	unsigned int		 state;
 	unsigned int		 platform_limit;
@@ -74,7 +76,11 @@ struct acpi_processor_performance {
 	struct acpi_pct_register status_register;
 	unsigned int		 state_count;
 	struct acpi_processor_px states[ACPI_PROCESSOR_MAX_PERFORMANCE];
+
+	/* the _PDC objects passed by the driver, if any */
+	struct acpi_object_list *pdc;
 };
+
 
 
 /* Throttling Control */
