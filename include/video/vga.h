@@ -187,6 +187,29 @@
 #define VGA_OUTW_WRITE
 #endif
 
+/* VGA State Save and Restore */
+#define VGA_SAVE_FONT0 1  /* save/restore plane 2 fonts	  */
+#define VGA_SAVE_FONT1 2  /* save/restore plane 3 fonts   */
+#define VGA_SAVE_TEXT  4  /* save/restore plane 0/1 fonts */
+#define VGA_SAVE_FONTS 7  /* save/restore all fonts	  */
+#define VGA_SAVE_MODE  8  /* save/restore video mode 	  */
+#define VGA_SAVE_CMAP  16 /* save/restore color map/DAC   */
+
+struct vgastate {
+	caddr_t vgabase;	/* mmio base, if supported 		   */
+	__u32 flags;		/* what state[s] to save (see VGA_SAVE_*)  */
+	__u32 membase;		/* VGA window base, 0 for default - 0xA000 */
+	__u32 memsize;		/* VGA window size, 0 for default 64K	   */
+	__u32 depth;		/* current fb depth, not important	   */
+	__u32 num_attr;		/* number of att registers, 0 for default  */
+	__u32 num_crtc;		/* number of crt registers, 0 for default  */
+	__u32 num_gfx;		/* number of gfx registers, 0 for default  */
+	__u32 num_seq;		/* number of seq registers, 0 for default  */
+	void *vidstate;
+};	
+
+extern int save_vga(struct vgastate *state);
+extern int restore_vga(struct vgastate *state);
 
 /*
  * generic VGA port read/write

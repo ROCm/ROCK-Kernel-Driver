@@ -38,7 +38,6 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/console.h>
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif
@@ -50,12 +49,8 @@
 #error This driver requires PCI support.
 #endif
 
-
-
 /* version number of this driver */
 #define RIVAFB_VERSION "0.9.3"
-
-
 
 /* ------------------------------------------------------------------------- *
  *
@@ -1166,12 +1161,12 @@ static int rivafb_open(struct fb_info *info, int user)
 	int cnt = atomic_read(&par->ref_count);
 
 	if (!cnt) {
-		memset(&par->state, 0, sizeof(struct fb_vgastate));
+		memset(&par->state, 0, sizeof(struct vgastate));
 		par->state.flags = VGA_SAVE_MODE  | VGA_SAVE_FONTS;
 		/* save the DAC for Riva128 */
 		if (par->riva.Architecture == NV_ARCH_03)
 			par->state.flags |= VGA_SAVE_CMAP;
-		fb_save_vga(&par->state);
+		save_vga(&par->state);
 
 		RivaGetConfig(&par->riva);
 		riva_save_state(par, &par->initial_state);
@@ -1192,7 +1187,7 @@ static int rivafb_release(struct fb_info *info, int user)
 		par->riva.LockUnlock(&par->riva, 0);
 		par->riva.LoadStateExt(&par->riva, &par->initial_state.ext);
 
-		fb_restore_vga(&par->state);
+		restore_vga(&par->state);
 		par->riva.LockUnlock(&par->riva, 1);
 	}
 

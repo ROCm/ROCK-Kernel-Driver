@@ -1967,8 +1967,7 @@ static void pm2fb_set_disp(const void* par, struct display* disp,
 	struct pm2fb_par* p=(struct pm2fb_par* )par;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 #ifdef __alpha__
 	disp->screen_base=i->regions.v_fb + dense_mem(i->regions.v_fb);
 #else
@@ -2014,7 +2013,7 @@ static void pm2fb_set_disp(const void* par, struct display* disp,
 			disp->dispsw=&fbcon_dummy;
 			break;
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 #ifdef PM2FB_HW_CURSOR

@@ -321,37 +321,6 @@ struct fb_cursor {
 	struct fb_image	image;	/* Cursor image */
 };
 
-/* VGA State Save and Restore */
-#define VGA_SAVE_FONT0 1  /* save/restore plane 2 fonts   */
-#define VGA_SAVE_FONT1 2  /* save/restore plane 3 fonts   */
-#define VGA_SAVE_TEXT  4  /* save/restore plane 0/1 fonts */
-#define VGA_SAVE_FONTS 7  /* save/restore all fonts       */
-#define VGA_SAVE_MODE  8  /* save/restore video mode      */
-#define VGA_SAVE_CMAP  16 /* save/restore color map/DAC  */
-
-struct fb_vgastate {
-	caddr_t vgabase;         /* mmio base, if supported                 */
-	__u32 flags;             /* what state/s to save (see VGA_SAVE_*)   */ 
-	__u32 depth;             /* current fb depth, not important         */
-	__u32 num_attr;          /* number of att registers, 0 for default  */
-	__u32 num_crtc;          /* number of crt registers, 0 for default  */
-	__u32 num_gfx;           /* number of gfx registers, 0 for default  */
-	__u32 num_seq;           /* number of seq registers, 0 for default  */
-	caddr_t fbbase;          /*    -- DO NOT ALTER STARTING HERE --     */
-	__u8 *vga_font0;         
-	__u8 *vga_font1;         
-	__u8 *vga_text;         
-	__u8 *vga_cmap;          
-	__u8 *attr;               
-	__u8 *crtc;              
-	__u8 *gfx;               
-	__u8 *seq;               
-	__u8 misc;               
-};
-
-extern int fb_save_vga(struct fb_vgastate *state);
-extern int fb_restore_vga(struct fb_vgastate *state);
-
 #ifdef __KERNEL__
 
 #include <linux/fs.h>

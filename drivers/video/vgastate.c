@@ -1,5 +1,5 @@
 /*
- * linux/include/video/vgastate.c -- VGA state save/restore
+ * linux/drivers/video/vgastate.c -- VGA state save/restore
  *
  * Copyright 2002 James Simmons
  * 
@@ -17,8 +17,19 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/fb.h>
+#include <video/vga.h>
 
-#include "vga.h"
+struct regstate {
+	__u8 *vga_font0;
+	__u8 *vga_font1;
+	__u8 *vga_text;
+	__u8 *vga_cmap;
+	__u8 *attr;
+	__u8 *crtc;
+	__u8 *gfx;
+	__u8 *seq;
+	__u8 misc;
+};	
 
 static inline unsigned char vga_rcrtcs(caddr_t regbase, unsigned short iobase, 
 				       unsigned char reg)
@@ -34,8 +45,9 @@ static inline void vga_wcrtcs(caddr_t regbase, unsigned short iobase,
 	vga_w(regbase, iobase + 0x5, val);
 }
 
-static void save_vga_text(struct fb_vgastate *state)
+static void save_vga_text(struct vgastate *state, caddr_t fbbase)
 {
+	struct regstate *saved = (struct regstate *) state->vidstate;
 	int i;
 	u8 misc, attr10, gr4, gr5, gr6, seq1, seq2, seq4;
 
@@ -61,44 +73,45 @@ static void save_vga_text(struct fb_vgastate *state)
 	vga_wseq(state->vgabase, VGA_SEQ_CLOCK_MODE, seq1 | 1 << 5);
 	vga_wseq(state->vgabase, VGA_SEQ_RESET, 0x3);
 
-	/* save font 0 */
+	/* save font at plane 2 */
 	if (state->flags & VGA_SAVE_FONT0) {
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x4);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x2);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 8 * 8192; i++) 
-			state->vga_font0[i] = vga_r(state->fbbase, i);
+		for (i = 0; i < 4 * 8192; i++) 
+			saved->vga_font0[i] = vga_r(fbbase, i);
 	}
-	/* save font 1 */
+
+	/* save font at plane 3 */
 	if (state->flags & VGA_SAVE_FONT1) {
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x8);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x3);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 8 * 8192; i++) 
-			state->vga_font1[i] = vga_r(state->fbbase, i);
+		for (i = 0; i < state->memsize; i++) 
+			saved->vga_font1[i] = vga_r(fbbase, i);
 	}
-	/* save font 2 */
+	
+	/* save font at plane 0/1 */
 	if (state->flags & VGA_SAVE_TEXT) {
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x1);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 2 * 8192; i++) 
-			state->vga_text[i] = vga_r(state->fbbase, i);
+		for (i = 0; i < 8192; i++) 
+			saved->vga_text[i] = vga_r(fbbase, i);
 
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x2);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x1);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 2 * 8192; i++) 
-			state->vga_text[i] = vga_r(state->fbbase + 
-						    2 * 8192, i);
+		for (i = 0; i < 8192; i++) 
+			saved->vga_text[i] = vga_r(fbbase + 2 * 8192, i); 
 	}
 
 	/* restore regs */
@@ -120,8 +133,9 @@ static void save_vga_text(struct fb_vgastate *state)
 	vga_wseq(state->vgabase, VGA_SEQ_CLOCK_MODE, seq1);
 }
 
-static void restore_vga_text(struct fb_vgastate *state)
+static void restore_vga_text(struct vgastate *state, caddr_t fbbase)
 {
+	struct regstate *saved = (struct regstate *) state->vidstate;
 	int i;
 	u8 misc, gr1, gr3, gr4, gr5, gr6, gr8; 
 	u8 seq1, seq2, seq4;
@@ -151,45 +165,49 @@ static void restore_vga_text(struct fb_vgastate *state)
 		vga_wgfx(state->vgabase, VGA_GFX_BIT_MASK, 0xff);
 		vga_wgfx(state->vgabase, VGA_GFX_SR_ENABLE, 0x00);
 	}
-	/* restore font 0 */
+	
+	/* restore font at plane 2 */
 	if (state->flags & VGA_SAVE_FONT0) {
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x4);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x2);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 8 * 8192; i++) 
-			vga_w(state->fbbase, i, state->vga_font0[i]);
+		for (i = 0; i < 4 * 8192; i++) 
+			vga_w(fbbase, i, saved->vga_font0[i]);
 	}
-	/* restore font 1 */
+
+	/* restore font at plane 3 */
 	if (state->flags & VGA_SAVE_FONT1) {
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x8);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x3);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 8 * 8192; i++) 
-			vga_w(state->fbbase, i, state->vga_font1[i]);
+		for (i = 0; i < 4 * 8192; i++) 
+			vga_w(fbbase, i, saved->vga_font1[i]);
 	}
-	/* restore font 2 */
+	
+	/* restore font at plane 0/1 */
 	if (state->flags & VGA_SAVE_TEXT) {
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x1);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 2 * 8192; i++) 
-			vga_w(state->fbbase, i, state->vga_text[i]);
+		for (i = 0; i < 8192; i++) 
+			vga_w(fbbase, i, saved->vga_text[i]);
 		
 		vga_wseq(state->vgabase, VGA_SEQ_PLANE_WRITE, 0x2);
 		vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, 0x6);
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x1);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 2 * 8192; i++) 
-			vga_w(state->fbbase + 2 * 8192, i, 
-			      state->vga_text[i]);
+		for (i = 0; i < 8192; i++) 
+			vga_w(fbbase + 2 * 8192, i, 
+			      saved->vga_text[i]);
 	}
+
 	/* unblank screen */
 	vga_wseq(state->vgabase, VGA_SEQ_RESET, 0x1);
 	vga_wseq(state->vgabase, VGA_SEQ_CLOCK_MODE, seq1 & ~(1 << 5));
@@ -210,81 +228,92 @@ static void restore_vga_text(struct fb_vgastate *state)
 	vga_wseq(state->vgabase, VGA_SEQ_MEMORY_MODE, seq4);
 }
 			      
-static void save_vga_mode(struct fb_vgastate *state)
+static void save_vga_mode(struct vgastate *state)
 {
+	struct regstate *saved = (struct regstate *) state->vidstate;
 	unsigned short iobase;
 	int i;
 
-	state->misc = vga_r(state->vgabase, VGA_MIS_R);
-	if (state->misc & 1)
+	saved->misc = vga_r(state->vgabase, VGA_MIS_R);
+	if (saved->misc & 1)
 		iobase = 0x3d0;
 	else
 		iobase = 0x3b0;
 
 	for (i = 0; i < state->num_crtc; i++) 
-		state->crtc[i] = vga_rcrtcs(state->vgabase, iobase, i);
+		saved->crtc[i] = vga_rcrtcs(state->vgabase, iobase, i);
 	
 	vga_r(state->vgabase, iobase + 0xa); 
 	vga_w(state->vgabase, VGA_ATT_W, 0x00);
 	for (i = 0; i < state->num_attr; i++) {
 		vga_r(state->vgabase, iobase + 0xa);
-		state->attr[i] = vga_rattr(state->vgabase, i);
+		saved->attr[i] = vga_rattr(state->vgabase, i);
 	}
 	vga_r(state->vgabase, iobase + 0xa);
 	vga_w(state->vgabase, VGA_ATT_W, 0x20);
 
 	for (i = 0; i < state->num_gfx; i++) 
-		state->gfx[i] = vga_rgfx(state->vgabase, i);
+		saved->gfx[i] = vga_rgfx(state->vgabase, i);
 
 	for (i = 0; i < state->num_seq; i++) 
-		state->seq[i] = vga_rseq(state->vgabase, i);
+		saved->seq[i] = vga_rseq(state->vgabase, i);
 }
 
-static void restore_vga_mode(struct fb_vgastate *state)
+static void restore_vga_mode(struct vgastate *state)
 {
+	struct regstate *saved = (struct regstate *) state->vidstate;
 	unsigned short iobase;
 	int i;
 
-	vga_w(state->vgabase, VGA_MIS_W, state->misc);
+	vga_w(state->vgabase, VGA_MIS_W, saved->misc);
 
-	if (state->misc & 1)
+	if (saved->misc & 1)
 		iobase = 0x3d0;
 	else
 		iobase = 0x3b0;
 
-	vga_wseq(state->vgabase, VGA_SEQ_RESET, 0x01);
+	/* turn off display */
 	vga_wseq(state->vgabase, VGA_SEQ_CLOCK_MODE, 
-		 state->seq[VGA_SEQ_CLOCK_MODE] | 0x20);
+		 saved->seq[VGA_SEQ_CLOCK_MODE] | 0x20);
 
-	for (i = 2; i < state->num_seq; i++) 
-		vga_wseq(state->vgabase, i, state->seq[i]);
-
-	vga_wseq(state->vgabase, VGA_SEQ_RESET, 0x03);
-
-	/* unprotect vga regs */
-	vga_wcrtcs(state->vgabase, iobase, 17, state->crtc[17] & ~0x80);
-	for (i = 0; i < state->num_crtc; i++) 
-		vga_wcrtcs(state->vgabase, iobase, i, state->crtc[i]);
+	/* disable sequencer */
+	vga_wseq(state->vgabase, VGA_SEQ_RESET, 0x01);
 	
-	for (i = 0; i < state->num_gfx; i++) 
-		vga_wgfx(state->vgabase, i, state->gfx[i]);
-
+	/* enable palette addressing */
 	vga_r(state->vgabase, iobase + 0xa);
 	vga_w(state->vgabase, VGA_ATT_W, 0x00);
+
+	for (i = 2; i < state->num_seq; i++) 
+		vga_wseq(state->vgabase, i, saved->seq[i]);
+
+
+	/* unprotect vga regs */
+	vga_wcrtcs(state->vgabase, iobase, 17, saved->crtc[17] & ~0x80);
+	for (i = 0; i < state->num_crtc; i++) 
+		vga_wcrtcs(state->vgabase, iobase, i, saved->crtc[i]);
+	
+	for (i = 0; i < state->num_gfx; i++) 
+		vga_wgfx(state->vgabase, i, saved->gfx[i]);
+
 	for (i = 0; i < state->num_attr; i++) {
 		vga_r(state->vgabase, iobase + 0xa);
-		vga_wattr(state->vgabase, i, state->attr[i]);
+		vga_wattr(state->vgabase, i, saved->attr[i]);
 	}
 
+	/* reenable sequencer */
+	vga_wseq(state->vgabase, VGA_SEQ_RESET, 0x03);
+	/* turn display on */
 	vga_wseq(state->vgabase, VGA_SEQ_CLOCK_MODE, 
-		 state->seq[VGA_SEQ_CLOCK_MODE]);
+		 saved->seq[VGA_SEQ_CLOCK_MODE] & ~(1 << 5));
 
+	/* disable video/palette source */
 	vga_r(state->vgabase, iobase + 0xa);
 	vga_w(state->vgabase, VGA_ATT_W, 0x20);
 }
 
-static void save_vga_cmap(struct fb_vgastate *state)
+static void save_vga_cmap(struct vgastate *state)
 {
+	struct regstate *saved = (struct regstate *) state->vidstate;
 	int i;
 
 	vga_w(state->vgabase, VGA_PEL_MSK, 0xff);
@@ -292,56 +321,55 @@ static void save_vga_cmap(struct fb_vgastate *state)
 	/* assumes DAC is readable and writable */
 	vga_w(state->vgabase, VGA_PEL_IR, 0x00);
 	for (i = 0; i < 768; i++)
-		state->vga_cmap[i] = vga_r(state->vgabase, VGA_PEL_D);
+		saved->vga_cmap[i] = vga_r(state->vgabase, VGA_PEL_D);
 }
 
-static void restore_vga_cmap(struct fb_vgastate *state)
+static void restore_vga_cmap(struct vgastate *state)
 {
+	struct regstate *saved = (struct regstate *) state->vidstate;
 	int i;
 
 	vga_w(state->vgabase, VGA_PEL_MSK, 0xff);
 
+	/* assumes DAC is readable and writable */
 	vga_w(state->vgabase, VGA_PEL_IW, 0x00);
 	for (i = 0; i < 768; i++)
-		vga_w(state->vgabase, VGA_PEL_D, state->vga_cmap[i]);
+		vga_w(state->vgabase, VGA_PEL_D, saved->vga_cmap[i]);
 }
 
-static void vga_cleanup(struct fb_vgastate *state)
+static void vga_cleanup(struct vgastate *state)
 {
-	if (state->vga_font0) 
-		kfree(state->vga_font0);
-	if (state->vga_font1) 
-		kfree(state->vga_font1);
-	if (state->vga_text)
-		kfree(state->vga_text);
-	if (state->fbbase)
-		iounmap(state->fbbase);
-	if (state->vga_cmap)
-		kfree(state->vga_cmap);
-	if (state->attr)
-		kfree(state->attr);
-	if (state->crtc)
-		kfree(state->crtc);
-	if (state->gfx)
-		kfree(state->gfx);
-	if (state->seq)
-		kfree(state->seq);
+	if (state->vidstate != NULL) {
+		struct regstate *saved = (struct regstate *) state->vidstate;
+
+		if (saved->vga_font0) 
+			vfree(saved->vga_font0);
+		if (saved->vga_font1) 
+			vfree(saved->vga_font1);
+		if (saved->vga_text)
+			vfree(saved->vga_text);
+		if (saved->vga_cmap)
+			vfree(saved->vga_cmap);
+		if (saved->attr)
+			vfree(saved->attr);
+		kfree(saved);
+		state->vidstate = NULL;
+	}
 }
 		
-int fb_save_vga(struct fb_vgastate *state)
+int save_vga(struct vgastate *state)
 {
-	state->vga_font0 = NULL;
-	state->vga_font1 = NULL;
-	state->vga_text = NULL;
-	state->vga_cmap = NULL;
-	state->attr = NULL;
-	state->crtc = NULL;
-	state->gfx = NULL;
-	state->seq = NULL;
+	struct regstate *saved;
+
+	saved = kmalloc(sizeof(struct regstate), GFP_KERNEL);
+	if (saved == NULL)
+		return 1;
+	memset (saved, 0, sizeof(struct regstate));
+	(struct regstate *) state->vidstate = saved;
 		
 	if (state->flags & VGA_SAVE_CMAP) {
-		state->vga_cmap = kmalloc(768, GFP_KERNEL);
-		if (!state->vga_cmap) {
+		saved->vga_cmap = vmalloc(768);
+		if (!saved->vga_cmap) {
 			vga_cleanup(state);
 			return 1;
 		}
@@ -349,6 +377,8 @@ int fb_save_vga(struct fb_vgastate *state)
 	}
 
 	if (state->flags & VGA_SAVE_MODE) {
+		int total;
+
 		if (state->num_attr < 21)
 			state->num_attr = 21;
 		if (state->num_crtc < 25)
@@ -357,64 +387,99 @@ int fb_save_vga(struct fb_vgastate *state)
 			state->num_gfx = 9;
 		if (state->num_seq < 5)
 			state->num_seq = 5;
-		state->attr = kmalloc(state->num_attr, GFP_KERNEL);
-		state->crtc = kmalloc(state->num_crtc, GFP_KERNEL);
-		state->gfx = kmalloc(state->num_gfx, GFP_KERNEL);
-		state->seq = kmalloc(state->num_seq, GFP_KERNEL);
-		if (!state->attr || !state->crtc || !state->gfx ||
-		    !state->seq) {
+		total = state->num_attr + state->num_crtc +
+			state->num_gfx + state->num_seq;
+
+		saved->attr = vmalloc(total);
+		if (!saved->attr) {
 			vga_cleanup(state);
 			return 1;
 		}
+		saved->crtc = saved->attr + state->num_attr;
+		saved->gfx = saved->crtc + state->num_crtc;
+		saved->seq = saved->gfx + state->num_gfx;
+
 		save_vga_mode(state);
 	}
 
-	if (state->flags & VGA_SAVE_FONT0) {
-		state->vga_font0 = kmalloc(8192 * 8, GFP_KERNEL);
-		if (!state->vga_font0) {
-			vga_cleanup(state);
-			return 1;
-		}
-	}
-	if (state->flags & VGA_SAVE_FONT1) {
-		state->vga_font1 = kmalloc(8192 * 8, GFP_KERNEL);
-		if (!state->vga_font1) {
-			vga_cleanup(state);
-			return 1;
-		}
-	}
-	if (state->flags & VGA_SAVE_TEXT) {
-		state->vga_text = kmalloc(8192 * 4, GFP_KERNEL);
-		if (!state->vga_text) {
-			vga_cleanup(state);
-			return 1;
-		}
-	}
 	if (state->flags & VGA_SAVE_FONTS) {
-		state->fbbase = ioremap(0xA0000, 8 * 8192);
-		if (!state->fbbase) {
+		caddr_t fbbase;
+
+		/* exit if window is less than 32K */
+		if (state->memsize && state->memsize < 4 * 8192) {
 			vga_cleanup(state);
 			return 1;
 		}
-		save_vga_text(state);
-		iounmap(state->fbbase);
-		state->fbbase = NULL;
+		if (!state->memsize)
+			state->memsize = 8 * 8192;
+		
+		if (!state->membase)
+			state->membase = 0xA0000;
+
+		fbbase = ioremap(state->membase, state->memsize);
+
+		if (!fbbase) {
+			vga_cleanup(state);
+			iounmap(fbbase);
+			return 1;
+	}
+
+		/* 
+		 * save only first 32K used by vgacon
+		 */
+		if (state->flags & VGA_SAVE_FONT0) {
+			saved->vga_font0 = vmalloc(4 * 8192);
+			if (!saved->vga_font0) {
+			vga_cleanup(state);
+			return 1;
+		}
+	}
+		/* 
+		 * largely unused, but if required by the caller
+		 * we'll just save everything.
+		 */
+		if (state->flags & VGA_SAVE_FONT1) {
+			saved->vga_font1 = vmalloc(state->memsize);
+			if (!saved->vga_font1) {
+			vga_cleanup(state);
+			return 1;
+		}
+	}
+		/*
+		 * Save 8K at plane0[0], and 8K at plane1[16K]
+		 */
+		if (state->flags & VGA_SAVE_TEXT) {
+			saved->vga_text = vmalloc(8192 * 2);
+			if (!saved->vga_text) {
+			vga_cleanup(state);
+			return 1;
+		}
+		}
+		
+		save_vga_text(state, fbbase);
+		iounmap(fbbase);
 	}
 	return 0;
 }
 
-int fb_restore_vga (struct fb_vgastate *state)
+int restore_vga (struct vgastate *state)
 {
+	if (state->vidstate == NULL)
+		return 1;
+
 	if (state->flags & VGA_SAVE_MODE)
 		restore_vga_mode(state);
 
 	if (state->flags & VGA_SAVE_FONTS) {
-		state->fbbase = ioremap(0xA0000, 8 * 8192);
-		if (!state->fbbase) {
+		caddr_t fbbase = ioremap(state->membase, state->memsize);
+
+		if (!fbbase) {
 			vga_cleanup(state);
+			iounmap(fbbase);
 			return 1;
 		}
-		restore_vga_text(state);
+		restore_vga_text(state, fbbase);
+		iounmap(fbbase);
 	}
 
 	if (state->flags & VGA_SAVE_CMAP)
@@ -429,8 +494,8 @@ int init_module(void) { return 0; };
 void cleanup_module(void) {};
 #endif
 
-EXPORT_SYMBOL(fb_save_vga);
-EXPORT_SYMBOL(fb_restore_vga);
+EXPORT_SYMBOL(save_vga);
+EXPORT_SYMBOL(restore_vga);
 
 MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
 MODULE_DESCRIPTION("VGA State Save/Restore");

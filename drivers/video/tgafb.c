@@ -780,8 +780,7 @@ static int tgafb_blank(int blank, struct fb_info_gen *info)
     u32 vhcr, vvcr, vvvr;
     unsigned long flags;
     
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 
     vhcr = TGA_READ_REG(TGA_HORIZ_REG);
     vvcr = TGA_READ_REG(TGA_VERT_REG);
@@ -821,7 +820,7 @@ static int tgafb_blank(int blank, struct fb_info_gen *info)
 	break;
     }
 
-    restore_flags(flags);
+    local_irq_restore(flags);
     return 0;
 }
 

@@ -23,7 +23,7 @@
 #include <linux/init.h>
 
 #include <asm/io.h>
-#include "vga.h"
+#include <video/vga.h>
 
 #define GRAPHICS_ADDR_REG VGA_GFX_I	/* Graphics address register. */
 #define GRAPHICS_DATA_REG VGA_GFX_D	/* Graphics data register. */
@@ -70,7 +70,7 @@ static struct vga16fb_par {
 		unsigned char	ModeControl;		/* CRT-Controller:17h */
 		unsigned char	ClockingMode;		/* Seq-Controller:01h */
 	} vga_state;
-	struct fb_vgastate state;
+	struct vgastate state;
 	atomic_t ref_count;
 	int palette_blanked, vesa_blanked, mode, isVGA;
 	u8 misc, pel_msk, vss, clkdiv;
@@ -304,9 +304,9 @@ static int vga16fb_open(struct fb_info *info, int user)
 	int cnt = atomic_read(&par->ref_count);
 
 	if (!cnt) {
-		memset(&par->state, 0, sizeof(struct fb_vgastate));
+		memset(&par->state, 0, sizeof(struct vgastate));
 		par->state.flags = 8;
-		fb_save_vga(&par->state);
+		save_vga(&par->state);
 	}
 	atomic_inc(&par->ref_count);
 	return 0;
@@ -320,7 +320,7 @@ static int vga16fb_release(struct fb_info *info, int user)
 	if (!cnt)
 		return -EINVAL;
 	if (cnt == 1)
-		fb_restore_vga(&par->state);
+		restore_vga(&par->state);
 	atomic_dec(&par->ref_count);
 
 	return 0;

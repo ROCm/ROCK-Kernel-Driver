@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/fb.h>
+#include <video/vga.h>
 #include "riva_hw.h"
 
 /* GGI compatibility macros */
@@ -34,7 +35,7 @@ struct riva_par {
 
 	struct riva_regs initial_state;	/* initial startup video mode */
 	struct riva_regs current_state;
-	struct fb_vgastate state;
+	struct vgastate state;
 	atomic_t ref_count;
 	riva_cfb8_cmap_t cmap[256];	/* VGA DAC palette cache */
 	u32 riva_palette[16];
