@@ -529,8 +529,8 @@ static ssize_t bm_register_write(struct file *file, const char *buffer,
 	inode->u.generic_ip = e;
 	inode->i_fop = &bm_entry_operations;
 
-	write_lock(&entries_lock);
 	d_instantiate(dentry, inode);
+	write_lock(&entries_lock);
 	list_add(&e->list, &entries);
 	write_unlock(&entries_lock);
 
