@@ -151,7 +151,9 @@ struct hw_pci enp2611_pci __initdata = {
 
 int __init enp2611_pci_init(void)
 {
-	pci_common_init(&enp2611_pci);
+	if (machine_is_enp2611())
+		pci_common_init(&enp2611_pci);
+
 	return 0;
 }
 
