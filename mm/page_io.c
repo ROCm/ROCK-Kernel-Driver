@@ -98,6 +98,7 @@ int swap_writepage(struct page *page)
 	}
 	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
 	if (bio == NULL) {
+		set_page_dirty(page);
 		ret = -ENOMEM;
 		goto out;
 	}
