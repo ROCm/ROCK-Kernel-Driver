@@ -7,6 +7,7 @@ Corrections, HA extensions : 2000/10/03-15 :
   - Constantine Gavrilov <const-g at xpert.com>
   - Chad N. Tindel <ctindel at ieee dot org>
   - Janice Girouard <girouard at us dot ibm dot com>
+  - Jay Vosburgh <fubar at us dot ibm dot com>
 
 Note :
 ------
@@ -199,28 +200,42 @@ It is critical that either the miimon or arp_interval and arp_ip_target
 parameters be specified, otherwise serious network degradation will occur
 during link failures.
 
+max_bonds
+
+	Specifies the number of bonding devices to create for this
+	instance of the bonding driver.  E.g., if max_bonds is 3, and
+	the bonding driver is not already loaded, then bond0, bond1
+	and bond2 will be created.  The default value is 1.
+
 mode
-        Specifies one of four bonding policies. The default is round-robin.
-        Possible values are:
- 
-        0       Round-robin policy: Transmit in a sequential order from the
-                first available slave through the last. This mode provides
-                load balancing and fault tolerance.
 
-        1       Active-backup policy: Only one slave in the bond is active. A 
-                different slave becomes active if, and only if, the active slave
-                fails. The bond's MAC address is externally visible on only 
-                one port (network adapter) to avoid confusing the switch.
-                This mode provides fault tolerance.
+	Specifies one of four bonding policies. The default is
+round-robin (balance-rr).  Possible values are (you can use either the
+text or numeric option):
  
- 
-        2       XOR policy: Transmit based on [(source MAC address XOR'd with 
-                destination MAC address) modula slave count]. This selects the 
-                same slave for each destination MAC address. This mode provides
-                load balancing and fault tolerance.
+	balance-rr or 0
+		Round-robin policy: Transmit in a sequential order
+		from the first available slave through the last. This
+		mode provides load balancing and fault tolerance.
 
-        3       Broadcast policy: transmits everything on all slave interfaces.
-                This mode provides fault tolerance.
+	active-backup or 1
+		Active-backup policy: Only one slave in the bond is
+		active. A different slave becomes active if, and only
+		if, the active slave fails. The bond's MAC address is
+		externally visible on only one port (network adapter)
+		to avoid confusing the switch.  This mode provides
+		fault tolerance.
+ 
+        balance-xor or 2
+		XOR policy: Transmit based on [(source MAC address
+		XOR'd with destination MAC address) modula slave
+		count]. This selects the same slave for each
+		destination MAC address. This mode provides load
+		balancing and fault tolerance.
+
+	broadcast or 3
+		Broadcast policy: transmits everything on all slave
+		interfaces. This mode provides fault tolerance.
 
 miimon
  
@@ -228,6 +243,27 @@ miimon
         occur. A value of zero disables MII link monitoring. A value of 
         100 is a good starting point. See High Availability section for 
         additional information. The default value is 0.
+
+use_carrier
+
+        Specifies whether or not miimon should use MII or ETHTOOL
+        ioctls vs. netif_carrier_ok() to determine the link status.
+        The MII or ETHTOOL ioctls are less efficient and utilize a
+        deprecated calling sequence within the kernel.  The
+        netif_carrier_ok() relies on the device driver to maintain its
+        state with netif_carrier_on/off; at this writing, most, but
+        not all, device drivers support this facility.
+
+        If bonding insists that the link is up when it should not be,
+        it may be that your network device driver does not support
+        netif_carrier_on/off.  This is because the default state for
+        netif_carrier is "carrier on." In this case, disabling
+        use_carrier will cause bonding to revert to the MII / ETHTOOL
+        ioctl method to determine the link state.
+
+        A value of 1 enables the use of netif_carrier_ok(), a value of
+        0 will use the deprecated MII / ETHTOOL ioctls.  The default
+        value is 1.
 
 downdelay
  
@@ -277,14 +313,17 @@ primary
 
 multicast
 
-        Integer value for the mode of operation for multicast support.
+        Option specifying the mode of operation for multicast support.
         Possible values are:
 
-        0       Disabled (no multicast support)
+	disabled or 0
+		Disabled (no multicast support)
 
-        1       Enabled on active slave only, useful in active-backup mode
+        active or 1
+		Enabled on active slave only, useful in active-backup mode
 
-        2       Enabled on all slaves, this is the default
+	all or 2
+		Enabled on all slaves, this is the default
 
 
 Configuring Multiple Bonds
@@ -321,7 +360,52 @@ For just a single target the options would resemble:
 alias bond0 bonding
 options bond0 arp_interval=60 arp_ip_target=192.168.0.100
 
+Potential Problems When Using ARP Monitor
+=========================================
 
+1. Driver support
+
+The ARP monitor relies on the network device driver to maintain two
+statistics: the last receive time (dev->last_rx), and the last
+transmit time (dev->trans_start).  If the network device driver does
+not update one or both of these, then the typical result will be that,
+upon startup, all links in the bond will immediately be declared down,
+and remain that way.  A network monitoring tool (tcpdump, e.g.) will
+show ARP requests and replies being sent and received on the bonding
+device.
+
+The possible resolutions for this are to (a) fix the device driver, or
+(b) discontinue the ARP monitor (using miimon as an alternative, for
+example).
+
+2. Adventures in Routing
+
+When bonding is set up with the ARP monitor, it is important that the
+slave devices not have routes that supercede routes of the master (or,
+generally, not have routes at all).  For example, suppose the bonding
+device bond0 has two slaves, eth0 and eth1, and the routing table is
+as follows:
+
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+10.0.0.0        0.0.0.0         255.255.0.0     U        40 0          0 eth0
+10.0.0.0        0.0.0.0         255.255.0.0     U        40 0          0 eth1
+10.0.0.0        0.0.0.0         255.255.0.0     U        40 0          0 bond0
+127.0.0.0       0.0.0.0         255.0.0.0       U        40 0          0 lo
+
+In this case, the ARP monitor (and ARP itself) may become confused,
+because ARP requests will be sent on one interface (bond0), but the
+corresponding reply will arrive on a different interface (eth0).  This
+reply looks to ARP as an unsolicited ARP reply (because ARP matches
+replies on an interface basis), and is discarded.  This will likely
+still update the receive/transmit times in the driver, but will lose
+packets.
+
+The resolution here is simply to insure that slaves do not have routes
+of their own, and if for some reason they must, those routes do not
+supercede routes of their master.  This should generally be the case,
+but unusual configurations or errant manual or automatic static route
+additions may cause trouble.
 
 Switch Configuration
 ====================
@@ -462,7 +546,7 @@ Frequently Asked Questions
 	If not explicitly configured with ifconfig, the MAC address of the
 	bonding device is taken from its first slave device. This MAC address
 	is then passed to all following slaves and remains persistent (even if
-	the first slave is removed) until the bonding device is brought
+	the the first slave is removed) until the bonding device is brought
 	down or reconfigured.
 	
 	If you wish to change the MAC address, you can set it with ifconfig:
@@ -606,12 +690,16 @@ backup, use ifconfig. All backup interfaces have the NOARP flag set.
 
 To use this mode, pass "mode=1" to the module at load time :
 
+    # modprobe bonding miimon=100 mode=active-backup
+
+	or:
+
     # modprobe bonding miimon=100 mode=1
 
 Or, put in your /etc/modules.conf :
 
     alias bond0 bonding
-    options bond0 miimon=100 mode=1
+    options bond0 miimon=100 mode=active-backup
 
 Example 1: Using multiple host and multiple switches to build a "no single
 point of failure" solution.
@@ -698,7 +786,7 @@ allows to reduce down-time if the value of updelay has been overestimated.
 Examples :
 
     # modprobe bonding miimon=100 mode=1 downdelay=2000 updelay=5000
-    # modprobe bonding miimon=100 mode=0 downdelay=0 updelay=5000
+    # modprobe bonding miimon=100 mode=balance-rr downdelay=0 updelay=5000
 
 
 Promiscuous Sniffing notes
