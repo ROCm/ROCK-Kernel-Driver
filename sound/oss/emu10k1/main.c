@@ -342,26 +342,26 @@ static int __devinit emu10k1_proc_init(struct emu10k1_card *card)
 {
 	char s[48];
 
-	if (!proc_mkdir ("driver/emu10k1", 0)) {
+	if (!proc_mkdir ("driver/emu10k1", NULL)) {
 		printk(KERN_ERR "emu10k1: unable to create proc directory driver/emu10k1\n");
 		goto err_out;
 	}
 
 	sprintf(s, "driver/emu10k1/%s", pci_name(card->pci_dev));
-	if (!proc_mkdir (s, 0)) {
+	if (!proc_mkdir (s, NULL)) {
 		printk(KERN_ERR "emu10k1: unable to create proc directory %s\n", s);
 		goto err_emu10k1_proc;
 	}
 
 	sprintf(s, "driver/emu10k1/%s/info", pci_name(card->pci_dev));
-	if (!create_proc_read_entry (s, 0, 0, emu10k1_info_proc, card)) {
+	if (!create_proc_read_entry (s, 0, NULL, emu10k1_info_proc, card)) {
 		printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
 		goto err_dev_proc;
 	}
 
 	if (!card->is_aps) {
 		sprintf(s, "driver/emu10k1/%s/ac97", pci_name(card->pci_dev));
-		if (!create_proc_read_entry (s, 0, 0, ac97_read_proc, card->ac97)) {
+		if (!create_proc_read_entry (s, 0, NULL, ac97_read_proc, card->ac97)) {
 			printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
 			goto err_proc_ac97;
 		}

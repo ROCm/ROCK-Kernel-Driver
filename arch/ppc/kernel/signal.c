@@ -187,7 +187,7 @@ struct rt_sigframe
  * altivec/spe instructions at some point.
  */
 static int
-save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
+save_user_regs(struct pt_regs *regs, struct mcontext __user *frame, int sigret)
 {
 	/* save general and floating-point registers */
 	CHECK_FULL_REGS(regs);
@@ -229,7 +229,7 @@ save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
 	 * significant bits of a vector, we "cheat" and stuff VRSAVE in the
 	 * most significant bits of that same vector. --BenH
 	 */
-	if (__put_user(current->thread.vrsave, (u32 *)&frame->mc_vregs[32]))
+	if (__put_user(current->thread.vrsave, (u32 __user *)&frame->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
 
@@ -308,7 +308,7 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 		memset(&current->thread.vr, 0, ELF_NVRREG * sizeof(vector128));
 
 	/* Always get VRSAVE back */
-	if (__get_user(current->thread.vrsave, (u32 *)&sr->mc_vregs[32]))
+	if (__get_user(current->thread.vrsave, (u32 __user *)&sr->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
 
@@ -412,7 +412,7 @@ badframe:
 static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs, int sig)
 {
 	sigset_t set;
-	struct mcontext *mcp;
+	struct mcontext __user *mcp;
 
 	if (__copy_from_user(&set, &ucp->uc_sigmask, sizeof(set))
 	    || __get_user(mcp, &ucp->uc_regs))
@@ -447,8 +447,8 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 	if (new_ctx == NULL)
 		return 0;
 	if (verify_area(VERIFY_READ, new_ctx, sizeof(*new_ctx))
-	    || __get_user(tmp, (u8 *) new_ctx)
-	    || __get_user(tmp, (u8 *) (new_ctx + 1) - 1))
+	    || __get_user(tmp, (u8 __user *) new_ctx)
+	    || __get_user(tmp, (u8 __user *) (new_ctx + 1) - 1))
 		return -EFAULT;
 
 	/*
@@ -524,7 +524,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	/* create a stack frame for the caller of the handler */
 	newsp -= __SIGNAL_FRAMESIZE;
 
-	if (verify_area(VERIFY_WRITE, (void *) newsp, origsp - newsp))
+	if (verify_area(VERIFY_WRITE, (void __user *) newsp, origsp - newsp))
 		goto badframe;
 
 #if _NSIG != 64
@@ -583,7 +583,7 @@ int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	set.sig[1] = sigctx._unused[3];
 	restore_sigmask(&set);
 
-	sr = (struct mcontext *) sigctx.regs;
+	sr = (struct mcontext __user *) sigctx.regs;
 	if (verify_area(VERIFY_READ, sr, sizeof(*sr))
 	    || restore_user_regs(regs, sr, 1))
 		goto badframe;

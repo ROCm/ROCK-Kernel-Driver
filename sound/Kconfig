@@ -70,7 +70,7 @@ source "sound/parisc/Kconfig"
 endmenu
 
 menu "Open Sound System"
-	depends on SOUND!=n
+	depends on SOUND!=n && (BROKEN || !SPARC64)
 
 config SOUND_PRIME
 	tristate "Open Sound System (DEPRECATED)"

@@ -978,6 +978,13 @@ int __init gus_wave_detect(int baseaddr)
 	unsigned long   loc;
 	unsigned char   val;
 
+	if (!request_region(baseaddr, 16, "GUS"))
+		return 0;
+	if (!request_region(baseaddr + 0x100, 12, "GUS")) { /* 0x10c-> is MAX */
+		release_region(baseaddr, 16);
+		return 0;
+	}
+
 	gus_base = baseaddr;
 
 	gus_write8(0x4c, 0);	/* Reset GF1 */
@@ -1015,8 +1022,11 @@ int __init gus_wave_detect(int baseaddr)
 
 	/* See if there is first block there.... */
 	gus_poke(0L, 0xaa);
-	if (gus_peek(0L) != 0xaa)
-		return (0);
+	if (gus_peek(0L) != 0xaa) {
+		release_region(baseaddr + 0x100, 12);
+		release_region(baseaddr, 16);
+		return 0;
+	}
 
 	/* Now zero it out so that I can check for mirroring .. */
 	gus_poke(0L, 0x00);

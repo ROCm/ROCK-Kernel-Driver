@@ -1248,7 +1248,7 @@ static void NCR5380_main(void *p)
 					 * and see if we can do an information transfer,
 					 * with failures we will restart.
 					 */
-					hostdata->selecting = 0;	
+					hostdata->selecting = NULL;
 					/* RvC: have to preset this to indicate a new command is being performed */
 
 					if (!NCR5380_select(instance, tmp,
@@ -1634,7 +1634,7 @@ part2:
 				   to go to sleep */
 	}
 
-	hostdata->selecting = 0;	/* clear this pointer, because we passed the
+	hostdata->selecting = NULL;/* clear this pointer, because we passed the
 					   waiting period */
 	if ((NCR5380_read(STATUS_REG) & (SR_SEL | SR_IO)) == (SR_SEL | SR_IO)) {
 		NCR5380_write(INITIATOR_COMMAND_REG, ICR_BASE);

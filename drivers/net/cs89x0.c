@@ -1566,7 +1566,7 @@ static void release_dma_buff(struct net_local *lp)
 {
 	if (lp->dma_buff) {
 		free_pages((unsigned long)(lp->dma_buff), get_order(lp->dmasize * 1024));
-		lp->dma_buff = 0;
+		lp->dma_buff = NULL;
 	}
 }
 #endif

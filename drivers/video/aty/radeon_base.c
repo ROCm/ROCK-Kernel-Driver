@@ -432,7 +432,7 @@ static int __devinit radeon_read_xtal_OF (struct radeonfb_info *rinfo)
 		printk(KERN_WARNING "radeonfb: Cannot match card to OF node !\n");
 		return -ENODEV;
 	}
-	val = (u32 *) get_property(dp, "ATY,RefCLK", 0);
+	val = (u32 *) get_property(dp, "ATY,RefCLK", NULL);
 	if (!val || !*val) {
 		printk(KERN_WARNING "radeonfb: No ATY,RefCLK property !\n");
 		return -EINVAL;
@@ -440,11 +440,11 @@ static int __devinit radeon_read_xtal_OF (struct radeonfb_info *rinfo)
 
 	rinfo->pll.ref_clk = (*val) / 10;
 
-	val = (u32 *) get_property(dp, "ATY,SCLK", 0);
+	val = (u32 *) get_property(dp, "ATY,SCLK", NULL);
 	if (val && *val)
 		rinfo->pll.sclk = (*val) / 10;
 
-	val = (u32 *) get_property(dp, "ATY,MCLK", 0);
+	val = (u32 *) get_property(dp, "ATY,MCLK", NULL);
 	if (val && *val)
 		rinfo->pll.mclk = (*val) / 10;
 

@@ -414,6 +414,27 @@ static int seeq8005_send_packet(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
+/*
+ * wait_for_buffer
+ *
+ * This routine waits for the SEEQ chip to assert that the FIFO is ready
+ * by checking for a window interrupt, and then clearing it. This has to
+ * occur in the interrupt handler!
+ */
+inline void wait_for_buffer(struct net_device * dev)
+{
+	int ioaddr = dev->base_addr;
+	unsigned long tmp;
+	int status;
+	
+	tmp = jiffies + HZ;
+	while ( ( ((status=inw(SEEQ_STATUS)) & SEEQSTAT_WINDOW_INT) != SEEQSTAT_WINDOW_INT) && time_before(jiffies, tmp))
+		cpu_relax();
+		
+	if ( (status & SEEQSTAT_WINDOW_INT) == SEEQSTAT_WINDOW_INT)
+		outw( SEEQCMD_WINDOW_INT_ACK | (status & SEEQCMD_INT_MASK), SEEQ_CMD);
+}
+
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
 static irqreturn_t seeq8005_interrupt(int irq, void *dev_id, struct pt_regs * regs)
@@ -712,27 +733,6 @@ static void hardware_send_packet(struct net_device * dev, char *buf, int length)
 }
 
 
-/*
- * wait_for_buffer
- *
- * This routine waits for the SEEQ chip to assert that the FIFO is ready
- * by checking for a window interrupt, and then clearing it. This has to
- * occur in the interrupt handler!
- */
-inline void wait_for_buffer(struct net_device * dev)
-{
-	int ioaddr = dev->base_addr;
-	unsigned long tmp;
-	int status;
-	
-	tmp = jiffies + HZ;
-	while ( ( ((status=inw(SEEQ_STATUS)) & SEEQSTAT_WINDOW_INT) != SEEQSTAT_WINDOW_INT) && time_before(jiffies, tmp))
-		cpu_relax();
-		
-	if ( (status & SEEQSTAT_WINDOW_INT) == SEEQSTAT_WINDOW_INT)
-		outw( SEEQCMD_WINDOW_INT_ACK | (status & SEEQCMD_INT_MASK), SEEQ_CMD);
-}
-	
 #ifdef MODULE
 
 static struct net_device *dev_seeq;

@@ -171,8 +171,6 @@ acpi_parse_lapic_addr_ovr (
 	if (BAD_MADT_ENTRY(lapic, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
 	if (lapic->address) {
 		iounmap((void *) ipi_base_addr);
 		ipi_base_addr = (unsigned long) ioremap(lapic->address, 0);
@@ -191,24 +189,12 @@ acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
 	if (BAD_MADT_ENTRY(lsapic, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
-	printk(KERN_INFO "CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
-
-	if (!lsapic->flags.enabled)
-		printk(" disabled");
-	else {
-		printk(" enabled");
+	if (lsapic->flags.enabled) {
 #ifdef CONFIG_SMP
 		smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
-		if (hard_smp_processor_id()
-		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
-			printk(" (BSP)");
 #endif
 		++available_cpus;
 	}
-
-	printk("\n");
 
 	total_cpus++;
 	return 0;
@@ -225,8 +211,6 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header, const unsigned long end)
 	if (BAD_MADT_ENTRY(lacpi_nmi, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
 	/* TBD: Support lapic_nmi entries */
 	return 0;
 }
@@ -241,8 +225,6 @@ acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
 
 	if (BAD_MADT_ENTRY(iosapic, end))
 		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
 
 	iosapic_init(iosapic->address, iosapic->global_irq_base);
 
@@ -261,8 +243,6 @@ acpi_parse_plat_int_src (
 
 	if (BAD_MADT_ENTRY(plintsrc, end))
 		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
 
 	/*
 	 * Get vector assignment for this interrupt, set attributes,
@@ -292,8 +272,6 @@ acpi_parse_int_src_ovr (
 	if (BAD_MADT_ENTRY(p, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
-
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
 				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
 				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
@@ -310,8 +288,6 @@ acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
 
 	if (BAD_MADT_ENTRY(nmi_src, end))
 		return -EINVAL;
-
-	acpi_table_print_madt_entry(header);
 
 	/* TBD: Support nimsrc entries */
 	return 0;

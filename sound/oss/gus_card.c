@@ -41,9 +41,6 @@ static void __init attach_gus(struct address_info *hw_config)
 {
 	gus_wave_init(hw_config);
 
-	request_region(hw_config->io_base, 16, "GUS");
-	request_region(hw_config->io_base + 0x100, 12, "GUS");	/* 0x10c-> is MAX */
-
 	if (sound_alloc_dma(hw_config->dma, "GUS"))
 		printk(KERN_ERR "gus_card.c: Can't allocate DMA channel %d\n", hw_config->dma);
 	if (hw_config->dma2 != -1 && hw_config->dma2 != hw_config->dma)
@@ -73,11 +70,7 @@ static int __init probe_gus(struct address_info *hw_config)
 			  printk(KERN_ERR "GUS: Unsupported IRQ %d\n", irq);
 			  return 0;
 		  }
-	if (check_region(hw_config->io_base, 16))
-		printk(KERN_ERR "GUS: I/O range conflict (1)\n");
-	else if (check_region(hw_config->io_base + 0x100, 16))
-		printk(KERN_ERR "GUS: I/O range conflict (2)\n");
-	else if (gus_wave_detect(hw_config->io_base))
+	if (gus_wave_detect(hw_config->io_base))
 		return 1;
 
 #ifndef EXCLUDE_GUS_IODETECT
@@ -86,17 +79,14 @@ static int __init probe_gus(struct address_info *hw_config)
 	 * Look at the possible base addresses (0x2X0, X=1, 2, 3, 4, 5, 6)
 	 */
 
-	for (io_addr = 0x210; io_addr <= 0x260; io_addr += 0x10)
-		if (io_addr != hw_config->io_base)	/*
-							 * Already tested
-							 */
-			if (!check_region(io_addr, 16))
-				if (!check_region(io_addr + 0x100, 16))
-					if (gus_wave_detect(io_addr))
-					  {
-						  hw_config->io_base = io_addr;
-						  return 1;
-					  }
+	for (io_addr = 0x210; io_addr <= 0x260; io_addr += 0x10) {
+		if (io_addr == hw_config->io_base)	/* Already tested */
+			continue;
+		if (gus_wave_detect(io_addr)) {
+			hw_config->io_base = io_addr;
+			return 1;
+		}
+	}
 #endif
 
 	printk("NO GUS card found !\n");

@@ -324,7 +324,7 @@ int saa7134_buffer_queue(struct saa7134_dev *dev,
 			 struct saa7134_buf *buf)
 {
 	struct saa7134_buf *next = NULL;
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	
@@ -353,7 +353,7 @@ void saa7134_buffer_finish(struct saa7134_dev *dev,
 			   struct saa7134_dmaqueue *q,
 			   unsigned int state)
 {
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	dprintk("buffer_finish %p\n",q->curr);
@@ -370,7 +370,7 @@ void saa7134_buffer_next(struct saa7134_dev *dev,
 {
 	struct saa7134_buf *buf,*next = NULL;
 
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	BUG_ON(NULL != q->curr);
@@ -427,7 +427,7 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 	enum v4l2_field cap = V4L2_FIELD_ANY;
 	enum v4l2_field ov  = V4L2_FIELD_ANY;
 
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 

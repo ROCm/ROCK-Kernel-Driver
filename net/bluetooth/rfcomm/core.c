@@ -323,14 +323,11 @@ static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst,
 
 int rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst, u8 channel)
 {
-	mm_segment_t fs;
 	int r;
 
 	rfcomm_lock();
 
-	fs = get_fs(); set_fs(KERNEL_DS);
 	r = __rfcomm_dlc_open(d, src, dst, channel);
-	set_fs(fs);
 
 	rfcomm_unlock();
 	return r;
@@ -376,14 +373,11 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 
 int rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 {
-	mm_segment_t fs;
 	int r;
 
 	rfcomm_lock();
 
-	fs = get_fs(); set_fs(KERNEL_DS);
 	r = __rfcomm_dlc_close(d, err);
-	set_fs(fs);
 
 	rfcomm_unlock();
 	return r;
@@ -552,9 +546,8 @@ struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *
 {
 	struct rfcomm_session *s = NULL;
 	struct sockaddr_l2 addr;
-	struct l2cap_options opts;
 	struct socket *sock;
-	int    size;
+	struct sock *sk;
 
 	BT_DBG("%s %s", batostr(src), batostr(dst));
 
@@ -570,11 +563,10 @@ struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *
 		goto failed;
 
 	/* Set L2CAP options */
-	size = sizeof(opts);
-	sock->ops->getsockopt(sock, SOL_L2CAP, L2CAP_OPTIONS, (void *)&opts, &size);
-	
-	opts.imtu = RFCOMM_MAX_L2CAP_MTU;
-	sock->ops->setsockopt(sock, SOL_L2CAP, L2CAP_OPTIONS, (void *)&opts, size);
+	sk = sock->sk;
+	lock_sock(sk);
+	l2cap_pi(sk)->imtu = RFCOMM_MAX_L2CAP_MTU;
+	release_sock(sk);
 
 	s = rfcomm_session_add(sock, BT_BOUND);
 	if (!s) {
@@ -612,16 +604,14 @@ void rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *d
 static int rfcomm_send_frame(struct rfcomm_session *s, u8 *data, int len)
 {
 	struct socket *sock = s->sock;
-	struct iovec iv = { data, len };
+	struct kvec iv = { data, len };
 	struct msghdr msg;
 
 	BT_DBG("session %p len %d", s, len);
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_iovlen = 1;
-	msg.msg_iov = &iv;
 
-	return sock_sendmsg(sock, &msg, len);
+	return kernel_sendmsg(sock, &msg, &iv, 1, len);
 }
 
 static int rfcomm_send_sabm(struct rfcomm_session *s, u8 dlci)
@@ -905,7 +895,7 @@ static int rfcomm_send_fcon(struct rfcomm_session *s, int cr)
 static int rfcomm_send_test(struct rfcomm_session *s, int cr, u8 *pattern, int len)
 {
 	struct socket *sock = s->sock;
-	struct iovec iv[3];
+	struct kvec iv[3];
 	struct msghdr msg;
 	unsigned char hdr[5], crc[1];
 
@@ -930,10 +920,8 @@ static int rfcomm_send_test(struct rfcomm_session *s, int cr, u8 *pattern, int l
 	iv[2].iov_len  = 1;
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_iovlen = 3;
-	msg.msg_iov = iv;
 
-	return sock_sendmsg(sock, &msg, 6 + len);
+	return kernel_sendmsg(sock, &msg, iv, 3, 6 + len);
 }
 
 static int rfcomm_send_credits(struct rfcomm_session *s, u8 addr, u8 credits)
@@ -1749,10 +1737,10 @@ static void rfcomm_worker(void)
 static int rfcomm_add_listener(bdaddr_t *ba)
 {
 	struct sockaddr_l2 addr;
-	struct l2cap_options opts;
 	struct socket *sock;
+	struct sock *sk;
 	struct rfcomm_session *s;
-	int    size, err = 0;
+	int    err = 0;
 
 	/* Create socket */
 	err = rfcomm_l2sock_create(&sock);
@@ -1772,11 +1760,10 @@ static int rfcomm_add_listener(bdaddr_t *ba)
 	}
 
 	/* Set L2CAP options */
-	size = sizeof(opts);
-	sock->ops->getsockopt(sock, SOL_L2CAP, L2CAP_OPTIONS, (void *)&opts, &size);
-
-	opts.imtu = RFCOMM_MAX_L2CAP_MTU;
-	sock->ops->setsockopt(sock, SOL_L2CAP, L2CAP_OPTIONS, (void *)&opts, size);
+	sk = sock->sk;
+	lock_sock(sk);
+	l2cap_pi(sk)->imtu = RFCOMM_MAX_L2CAP_MTU;
+	release_sock(sk);
 
 	/* Start listening on the socket */
 	err = sock->ops->listen(sock, 10);
@@ -1819,8 +1806,6 @@ static int rfcomm_run(void *unused)
 	daemonize("krfcommd");
 	set_user_nice(current, -10);
 	current->flags |= PF_NOFREEZE;
-
-	set_fs(KERNEL_DS);
 
 	BT_DBG("");
 

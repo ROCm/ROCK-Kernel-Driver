@@ -635,10 +635,11 @@ tas3004_eq_rw(	struct tas3004_data_t *self,
 		u_int cmd,
 		u_long arg)
 {
+	void __user *argp = (void __user *)arg;
 	int rc;
 	struct tas_biquad_ctrl_t biquad;
 
-	if (copy_from_user((void *)&biquad, (const void *)arg, sizeof(struct tas_biquad_ctrl_t))) {
+	if (copy_from_user((void *)&biquad, argp, sizeof(struct tas_biquad_ctrl_t))) {
 		return -EFAULT;
 	}
 
@@ -651,7 +652,7 @@ tas3004_eq_rw(	struct tas3004_data_t *self,
 		rc=tas3004_read_biquad(self, biquad.channel, biquad.filter, &biquad.data);
 		if (rc != 0) return rc;
 
-		if (copy_to_user((void *)arg, (const void *)&biquad, sizeof(struct tas_biquad_ctrl_t))) {
+		if (copy_to_user(argp, &biquad, sizeof(struct tas_biquad_ctrl_t))) {
 			return -EFAULT;
 		}
 
@@ -670,27 +671,21 @@ tas3004_eq_list_rw(	struct tas3004_data_t *self,
 	int i,j;
 	char sync_required[TAS3004_BIQUAD_CHANNEL_COUNT][TAS3004_BIQUAD_FILTER_COUNT];
 	struct tas_biquad_ctrl_t biquad;
+	struct tas_biquad_ctrl_list_t __user *argp = (void __user *)arg;
 
 	memset(sync_required,0,sizeof(sync_required));
 
-	if (copy_from_user((void *)&filter_count,
-			   (const void *)arg + offsetof(struct tas_biquad_ctrl_list_t,filter_count),
-			   sizeof(int))) {
+	if (copy_from_user(&filter_count, &argp->filter_count, sizeof(int)))
 		return -EFAULT;
-	}
 
-	if (copy_from_user((void *)&flags,
-			   (const void *)arg + offsetof(struct tas_biquad_ctrl_list_t,flags),
-			   sizeof(int))) {
+	if (copy_from_user(&flags, &argp->flags, sizeof(int)))
 		return -EFAULT;
-	}
 
 	if (cmd & SIOC_IN) {
 	}
 
 	for (i=0; i < filter_count; i++) {
-		if (copy_from_user((void *)&biquad,
-				   (const void *)arg + offsetof(struct tas_biquad_ctrl_list_t, biquads[i]),
+		if (copy_from_user(&biquad, &argp->biquads[i],
 				   sizeof(struct tas_biquad_ctrl_t))) {
 			return -EFAULT;
 		}
@@ -705,8 +700,7 @@ tas3004_eq_list_rw(	struct tas3004_data_t *self,
 			rc=tas3004_read_biquad(self, biquad.channel, biquad.filter, &biquad.data);
 			if (rc != 0) return rc;
 
-			if (copy_to_user((void *)arg + offsetof(struct tas_biquad_ctrl_list_t, biquads[i]),
-					 (const void *)&biquad,
+			if (copy_to_user(&argp->biquads[i], &biquad,
 					 sizeof(struct tas_biquad_ctrl_t))) {
 				return -EFAULT;
 			}
@@ -840,12 +834,10 @@ tas3004_drce_rw(	struct tas3004_data_t *self,
 {
 	int rc;
 	struct tas_drce_ctrl_t drce_ctrl;
+	void __user *argp = (void __user *)arg;
 
-	if (copy_from_user((void *)&drce_ctrl,
-			   (const void *)arg,
-			   sizeof(struct tas_drce_ctrl_t))) {
+	if (copy_from_user(&drce_ctrl, argp, sizeof(struct tas_drce_ctrl_t)))
 		return -EFAULT;
-	}
 
 #ifdef DEBUG_DRCE
 	printk("DRCE: input [ FLAGS:%x ENABLE:%x ABOVE:%x/%x BELOW:%x/%x THRESH:%x ENERGY:%x ATTACK:%x DECAY:%x\n",
@@ -880,8 +872,7 @@ tas3004_drce_rw(	struct tas3004_data_t *self,
 		if (drce_ctrl.flags & TAS_DRCE_DECAY)
 			drce_ctrl.data.decay = self->drce_state.decay;
 
-		if (copy_to_user((void *)arg,
-				 (const void *)&drce_ctrl,
+		if (copy_to_user(argp, &drce_ctrl,
 				 sizeof(struct tas_drce_ctrl_t))) {
 			return -EFAULT;
 		}
@@ -952,6 +943,7 @@ tas3004_device_ioctl(	struct tas3004_data_t *self,
 			u_int cmd,
 			u_long arg)
 {
+	uint __user *argp = (void __user *)arg;
 	switch (cmd) {
 	case TAS_READ_EQ:
 	case TAS_WRITE_EQ:
@@ -962,11 +954,11 @@ tas3004_device_ioctl(	struct tas3004_data_t *self,
 		return tas3004_eq_list_rw(self, cmd, arg);
 
 	case TAS_READ_EQ_FILTER_COUNT:
-		put_user(TAS3004_BIQUAD_FILTER_COUNT, (uint *)(arg));
+		put_user(TAS3004_BIQUAD_FILTER_COUNT, argp);
 		return 0;
 
 	case TAS_READ_EQ_CHANNEL_COUNT:
-		put_user(TAS3004_BIQUAD_CHANNEL_COUNT, (uint *)(arg));
+		put_user(TAS3004_BIQUAD_CHANNEL_COUNT, argp);
 		return 0;
 
 	case TAS_READ_DRCE:
@@ -981,7 +973,7 @@ tas3004_device_ioctl(	struct tas3004_data_t *self,
 			 TAS_DRCE_ENERGY         |
 			 TAS_DRCE_ATTACK         |
 			 TAS_DRCE_DECAY,
-			 (uint *)(arg));
+			 argp);
 		return 0;
 
 	case TAS_READ_DRCE_MIN:
@@ -989,8 +981,7 @@ tas3004_device_ioctl(	struct tas3004_data_t *self,
 		struct tas_drce_ctrl_t drce_ctrl;
 		const struct tas_drce_t *drce_copy;
 
-		if (copy_from_user((void *)&drce_ctrl,
-				   (const void *)arg,
+		if (copy_from_user(&drce_ctrl, argp,
 				   sizeof(struct tas_drce_ctrl_t))) {
 			return -EFAULT;
 		}
@@ -1020,8 +1011,7 @@ tas3004_device_ioctl(	struct tas3004_data_t *self,
 			drce_ctrl.data.decay=drce_copy->decay;
 		}
 
-		if (copy_to_user((void *)arg,
-				 (const void *)&drce_ctrl,
+		if (copy_to_user(argp, &drce_ctrl,
 				 sizeof(struct tas_drce_ctrl_t))) {
 			return -EFAULT;
 		}

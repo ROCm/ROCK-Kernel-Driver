@@ -1527,7 +1527,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 			/* clear all the negotiated parameters */
 			__shost_for_each_device(SDp, host)
-				SDp->hostdata = 0;
+				SDp->hostdata = NULL;
 			
 			/* clear all the slots and their pending commands */
 			for(i = 0; i < NCR_700_COMMAND_SLOTS_PER_HOST; i++) {

@@ -1129,7 +1129,7 @@ static int __init myri_sbus_match(struct sbus_dev *sdev)
 static int __init myri_sbus_probe(void)
 {
 	struct sbus_bus *bus;
-	struct sbus_dev *sdev = 0;
+	struct sbus_dev *sdev = NULL;
 	static int called;
 	int cards = 0, v;
 

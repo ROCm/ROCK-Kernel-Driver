@@ -1017,7 +1017,7 @@ static inline int hamachi_tx(struct net_device *dev)
 				hmp->tx_ring[entry].addr, skb->len, 
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			hmp->tx_skbuff[entry] = 0;
+			hmp->tx_skbuff[entry] = NULL;
 		}
 		hmp->tx_ring[entry].status_n_length = 0;
 		if (entry >= TX_RING_SIZE-1) 
@@ -1105,7 +1105,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 			pci_unmap_single(hmp->pci_dev, hmp->tx_ring[i].addr, 
 				skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			hmp->tx_skbuff[i] = 0;
+			hmp->tx_skbuff[i] = NULL;
 		}
 	}
 
@@ -1127,7 +1127,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 			pci_unmap_single(hmp->pci_dev, hmp->rx_ring[i].addr, 
 				hmp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(skb);
-			hmp->rx_skbuff[i] = 0;
+			hmp->rx_skbuff[i] = NULL;
 		}
 	}
 	/* Fill in the Rx buffers.  Handle allocation failure gracefully. */
@@ -1189,7 +1189,7 @@ static void hamachi_init_ring(struct net_device *dev)
 	/* Initialize all Rx descriptors. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		hmp->rx_ring[i].status_n_length = 0;
-		hmp->rx_skbuff[i] = 0;
+		hmp->rx_skbuff[i] = NULL;
 	}
 	/* Fill in the Rx buffers.  Handle allocation failure gracefully. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
@@ -1209,7 +1209,7 @@ static void hamachi_init_ring(struct net_device *dev)
 	hmp->rx_ring[RX_RING_SIZE-1].status_n_length |= cpu_to_le32(DescEndRing);
 
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		hmp->tx_skbuff[i] = 0;
+		hmp->tx_skbuff[i] = NULL;
 		hmp->tx_ring[i].status_n_length = 0;
 	}
 	/* Mark the last entry of the ring */
@@ -1421,7 +1421,7 @@ static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs
 							skb->len,
 							PCI_DMA_TODEVICE);
 						dev_kfree_skb_irq(skb);
-						hmp->tx_skbuff[entry] = 0;
+						hmp->tx_skbuff[entry] = NULL;
 					}
 					hmp->tx_ring[entry].status_n_length = 0;
 					if (entry >= TX_RING_SIZE-1)  
@@ -1791,7 +1791,7 @@ static int hamachi_close(struct net_device *dev)
 				hmp->rx_ring[i].addr, hmp->rx_buf_sz, 
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(skb);
-			hmp->rx_skbuff[i] = 0;
+			hmp->rx_skbuff[i] = NULL;
 		}
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -1801,7 +1801,7 @@ static int hamachi_close(struct net_device *dev)
 				hmp->tx_ring[i].addr, skb->len, 
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			hmp->tx_skbuff[i] = 0;
+			hmp->tx_skbuff[i] = NULL;
 		}
 	}
 

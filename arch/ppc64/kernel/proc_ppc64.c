@@ -84,7 +84,7 @@ static int __init proc_ppc64_create(void)
 {
 	struct proc_dir_entry *root;
 
-	root = proc_mkdir("ppc64", 0);
+	root = proc_mkdir("ppc64", NULL);
 	if (!root)
 		return 1;
 
@@ -94,7 +94,7 @@ static int __init proc_ppc64_create(void)
 	if (!proc_mkdir("rtas", root))
 		return 1;
 
-	if (!proc_symlink("rtas", 0, "ppc64/rtas"))
+	if (!proc_symlink("rtas", NULL, "ppc64/rtas"))
 		return 1;
 
 	return 0;

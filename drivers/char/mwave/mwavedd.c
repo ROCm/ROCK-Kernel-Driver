@@ -94,8 +94,8 @@ static int mwave_open(struct inode *inode, struct file *file)
 	unsigned int retval = 0;
 
 	PRINTK_3(TRACE_MWAVE,
-		"mwavedd::mwave_open, entry inode %x file %x\n",
-		(int) inode, (int) file);
+		"mwavedd::mwave_open, entry inode %p file %p\n",
+		 inode, file);
 	PRINTK_2(TRACE_MWAVE,
 		"mwavedd::mwave_open, exit return retval %x\n", retval);
 
@@ -107,8 +107,8 @@ static int mwave_close(struct inode *inode, struct file *file)
 	unsigned int retval = 0;
 
 	PRINTK_3(TRACE_MWAVE,
-		"mwavedd::mwave_close, entry inode %x file %x\n",
-		(int) inode, (int) file);
+		"mwavedd::mwave_close, entry inode %p file %p\n",
+		 inode,  file);
 
 	PRINTK_2(TRACE_MWAVE, "mwavedd::mwave_close, exit retval %x\n",
 		retval);
@@ -124,8 +124,8 @@ static int mwave_ioctl(struct inode *inode, struct file *file,
 	void __user *arg = (void __user *)ioarg;
 
 	PRINTK_5(TRACE_MWAVE,
-		"mwavedd::mwave_ioctl, entry inode %x file %x cmd %x arg %x\n",
-		(int) inode, (int) file, iocmd, (int) ioarg);
+		"mwavedd::mwave_ioctl, entry inode %p file %p cmd %x arg %x\n",
+		 inode,  file, iocmd, (int) ioarg);
 
 	switch (iocmd) {
 
@@ -389,7 +389,7 @@ static ssize_t mwave_read(struct file *file, char __user *buf, size_t count,
                           loff_t * ppos)
 {
 	PRINTK_5(TRACE_MWAVE,
-		"mwavedd::mwave_read entry file %p, buf %p, count %x ppos %p\n",
+		"mwavedd::mwave_read entry file %p, buf %p, count %zx ppos %p\n",
 		file, buf, count, ppos);
 
 	return -EINVAL;
@@ -401,7 +401,7 @@ static ssize_t mwave_write(struct file *file, const char __user *buf,
 {
 	PRINTK_5(TRACE_MWAVE,
 		"mwavedd::mwave_write entry file %p, buf %p,"
-		" count %x ppos %p\n",
+		" count %zx ppos %p\n",
 		file, buf, count, ppos);
 
 	return -EINVAL;

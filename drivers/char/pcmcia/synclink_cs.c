@@ -257,6 +257,11 @@ typedef struct _mgslpc_info {
     
 #define CHA     0x00   /* channel A offset */
 #define CHB     0x40   /* channel B offset */
+
+/*
+ *  FIXME: PPC has PVR defined in asm/reg.h.  For now we just undef it.
+ */
+#undef PVR
     
 #define RXFIFO  0
 #define TXFIFO  0

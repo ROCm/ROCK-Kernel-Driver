@@ -68,9 +68,9 @@ static int jffs_proc_layout_read (char *page, char **start, off_t off,
 int jffs_register_jffs_proc_dir(int mtd, struct jffs_control *c)
 {
 	struct jffs_partition_dir *part_dir;
-	struct proc_dir_entry *part_info = 0;
-	struct proc_dir_entry *part_layout = 0;
-	struct proc_dir_entry *part_root = 0;
+	struct proc_dir_entry *part_info = NULL;
+	struct proc_dir_entry *part_layout = NULL;
+	struct proc_dir_entry *part_root = NULL;
 	char name[10];
 
 	sprintf(name, "%d", mtd);
@@ -127,7 +127,7 @@ out:
 int jffs_unregister_jffs_proc_dir(struct jffs_control *c)
 {
 	struct jffs_partition_dir *part_dir = jffs_part_dirs;
-	struct jffs_partition_dir *prev_part_dir = 0;
+	struct jffs_partition_dir *prev_part_dir = NULL;
 
 	while (part_dir) {
 		if (part_dir->c == c) {
@@ -209,8 +209,8 @@ static int jffs_proc_layout_read (char *page, char **start, off_t off,
 		int count, int *eof, void *data)
 {
 	struct jffs_control *c = (struct jffs_control *) data;
-	struct jffs_fm *fm = 0;
-	struct jffs_fm *last_fm = 0;
+	struct jffs_fm *fm = NULL;
+	struct jffs_fm *last_fm = NULL;
 	int len = 0;
 
 	/* Get the first item in the list */

@@ -75,7 +75,7 @@ static int pcm20_getflags(struct pcm20_device *dev, __u32 *flags, __u16 *signal)
 
 	if ((i=aci_rw_cmd(ACI_READ_TUNERSTATION, -1, -1))<0)
 		return i;
-#if DEBUG
+#ifdef DEBUG
 	printk("check_sig: 0x%x\n", i);
 #endif
 	if (i & 0x80) {
@@ -107,7 +107,7 @@ static int pcm20_getflags(struct pcm20_device *dev, __u32 *flags, __u16 *signal)
 
 	if ((i=aci_rds_cmd(RDS_RXVALUE, &buf, 1))<0)
 		return i;
-#if DEBUG
+#ifdef DEBUG
 	printk("rds-signal: %d\n", buf);
 #endif
 	if (buf > 15) {
@@ -172,7 +172,7 @@ static int pcm20_do_ioctl(struct inode *inode, struct file *file,
 			unsigned long *freq = arg;
 			pcm20->freq = *freq;
 			i=pcm20_setfreq(pcm20, pcm20->freq);
-#if DEBUG
+#ifdef DEBUG
 			printk("First view (setfreq): 0x%x\n", i);
 #endif
 			return i;

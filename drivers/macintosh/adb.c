@@ -561,7 +561,7 @@ adb_unregister(int index)
 			write_lock_irq(&adb_handler_lock);
 		}
 		ret = 0;
-		adb_handler[index].handler = 0;
+		adb_handler[index].handler = NULL;
 	}
 	write_unlock_irq(&adb_handler_lock);
 	up(&adb_handler_sem);

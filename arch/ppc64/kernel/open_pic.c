@@ -168,7 +168,7 @@ void __init pSeries_init_openpic(void)
         struct device_node *np;
         int i;
         unsigned int *addrp;
-        unsigned char* chrp_int_ack_special = 0;
+        unsigned char* chrp_int_ack_special = NULL;
         unsigned char init_senses[NR_IRQS - NUM_ISA_INTERRUPTS];
         int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
@@ -642,13 +642,13 @@ void openpic_request_IPIs(void)
 
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(openpic_vec_ipi, openpic_ipi_action, SA_INTERRUPT,
-		    "IPI0 (call function)", 0);
+		    "IPI0 (call function)", NULL);
 	request_irq(openpic_vec_ipi+1, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI1 (reschedule)", 0);
+		   "IPI1 (reschedule)", NULL);
 	request_irq(openpic_vec_ipi+2, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI2 (unused)", 0);
+		   "IPI2 (unused)", NULL);
 	request_irq(openpic_vec_ipi+3, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI3 (debugger break)", 0);
+		   "IPI3 (debugger break)", NULL);
 
 	for ( i = 0; i < OPENPIC_NUM_IPI ; i++ )
 		openpic_enable_ipi(openpic_vec_ipi+i);

@@ -1190,7 +1190,7 @@ read_partial_upcase_page:
 			goto read_partial_upcase_page;
 	}
 	vol->upcase_len = ino->i_size >> UCHAR_T_SIZE_BITS;
-	ntfs_debug("Read %llu bytes from $UpCase (expected %u bytes).",
+	ntfs_debug("Read %llu bytes from $UpCase (expected %zu bytes).",
 			ino->i_size, 64 * 1024 * sizeof(ntfschar));
 	iput(ino);
 	down(&ntfs_lock);

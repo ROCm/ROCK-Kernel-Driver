@@ -274,7 +274,7 @@ static inline int hidp_recv_frame(struct hidp_session *session, struct sk_buff *
 
 static int hidp_send_frame(struct socket *sock, unsigned char *data, int len)
 {
-	struct iovec iv = { data, len };
+	struct kvec iv = { data, len };
 	struct msghdr msg;
 
 	BT_DBG("sock %p data %p len %d", sock, data, len);
@@ -283,10 +283,8 @@ static int hidp_send_frame(struct socket *sock, unsigned char *data, int len)
 		return 0;
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_iovlen = 1;
-	msg.msg_iov = &iv;
 
-	return sock_sendmsg(sock, &msg, len);
+	return kernel_sendmsg(sock, &msg, &iv, 1, len);
 }
 
 static int hidp_process_transmit(struct hidp_session *session)
@@ -339,8 +337,6 @@ static int hidp_session(void *arg)
 	daemonize("khidpd_%04x%04x", vendor, product);
 	set_user_nice(current, -15);
 	current->flags |= PF_NOFREEZE;
-
-	set_fs(KERNEL_DS);
 
 	init_waitqueue_entry(&ctrl_wait, current);
 	init_waitqueue_entry(&intr_wait, current);

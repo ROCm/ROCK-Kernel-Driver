@@ -41,6 +41,8 @@ static void elf32_set_personality (void);
 #undef SET_PERSONALITY
 #define SET_PERSONALITY(ex, ibcs2)	elf32_set_personality()
 
+#define elf_read_implies_exec(ex, have_pt_gnu_stack)	(!(have_pt_gnu_stack))
+
 /* Ugly but avoids duplication */
 #include "../../../fs/binfmt_elf.c"
 
@@ -163,7 +165,8 @@ ia32_setup_arg_pages (struct linux_binprm *bprm, int executable_stack)
 	if (!mpnt)
 		return -ENOMEM;
 
-	if (security_vm_enough_memory((IA32_STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+	if (security_vm_enough_memory((IA32_STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))
+				      >> PAGE_SHIFT)) {
 		kmem_cache_free(vm_area_cachep, mpnt);
 		return -ENOMEM;
 	}
@@ -210,7 +213,6 @@ elf32_set_personality (void)
 	set_personality(PER_LINUX32);
 	current->thread.map_base  = IA32_PAGE_OFFSET/3;
 	current->thread.task_size = IA32_PAGE_OFFSET;	/* use what Linux/x86 uses... */
-	current->thread.flags |= IA64_THREAD_XSTACK;	/* data must be executable */
 	set_fs(USER_DS);				/* set addr limit for new TASK_SIZE */
 }
 

@@ -40,7 +40,7 @@ ReadReg(struct IsdnCardState *cs, int data, u_char reg)
 			byteout(cs->hw.hfcD.addr | 1, reg);
 		}
 		ret = bytein(cs->hw.hfcD.addr);
-#if HFC_REG_DEBUG
+#ifdef HFC_REG_DEBUG
 		if (cs->debug & L1_DEB_HSCX_FIFO && (data != 2))
 			debugl1(cs, "t3c RD %02x %02x", reg, ret);
 #endif
@@ -58,7 +58,7 @@ WriteReg(struct IsdnCardState *cs, int data, u_char reg, u_char value)
 	}
 	if (data)
 		byteout(cs->hw.hfcD.addr, value);
-#if HFC_REG_DEBUG
+#ifdef HFC_REG_DEBUG
 	if (cs->debug & L1_DEB_HSCX_FIFO && (data != HFCD_DATA_NODEB))
 		debugl1(cs, "t3c W%c %02x %02x", data ? 'D' : 'C', reg, value);
 #endif

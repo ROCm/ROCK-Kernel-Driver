@@ -184,7 +184,7 @@ config SND_SBAWE
 
 config SND_SB16_CSP
 	bool "Sound Blaster 16/AWE CSP support"
-	depends on SND_SB16 || SND_SBAWE
+	depends on (SND_SB16 || SND_SBAWE) && (BROKEN || !PPC)
 	help
 	  Say 'Y' to include support for CSP core. This special coprocessor
 	  can do variable tasks like various compression and decompression

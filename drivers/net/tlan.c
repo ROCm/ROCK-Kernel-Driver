@@ -225,7 +225,7 @@ static  int tlan_have_eisa;
 
 const char *media[] = {
 	"10BaseT-HD ", "10BaseT-FD ","100baseTx-HD ", 
-	"100baseTx-FD", "100baseT4", 0
+	"100baseTx-FD", "100baseT4", NULL
 };
 
 int media_map[] = { 0x0020, 0x0040, 0x0080, 0x0100, 0x0200,};

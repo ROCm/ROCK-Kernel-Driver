@@ -27,6 +27,8 @@ cflags-y	+= -Iarch/$(ARCH) -msoft-float -pipe \
 		-ffixed-r2 -Wno-uninitialized -mmultiple
 CPP		= $(CC) -E $(CFLAGS)
 
+CHECK		:= $(CHECK) -D__powerpc__=1
+
 ifndef CONFIG_E500
 cflags-y	+= -mstring
 endif

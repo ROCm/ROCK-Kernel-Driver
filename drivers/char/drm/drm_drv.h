@@ -1178,7 +1178,7 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 	 * agent to request it then we should just be able to
 	 * take it immediately and not eat the ioctl.
 	 */
-	dev->lock.filp = 0;
+	dev->lock.filp = NULL;
 	{
 		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
 		unsigned int old, new, prev, ctx;

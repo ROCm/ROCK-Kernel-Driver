@@ -805,7 +805,7 @@ static int snd_sonicvibes_playback_open(snd_pcm_substream_t * substream)
 	sonic->mode |= SV_MODE_PLAY;
 	sonic->playback_substream = substream;
 	runtime->hw = snd_sonicvibes_playback;
-	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, snd_sonicvibes_hw_constraint_dac_rate, 0, SNDRV_PCM_HW_PARAM_RATE, -1);
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, snd_sonicvibes_hw_constraint_dac_rate, NULL, SNDRV_PCM_HW_PARAM_RATE, -1);
 	return 0;
 }
 

@@ -2615,10 +2615,10 @@ static int mpi_map_card(struct airo_info *ai, struct pci_dev *pci,
 
 static void wifi_setup(struct net_device *dev)
 {
-	dev->hard_header        = 0;
-	dev->rebuild_header     = 0;
-	dev->hard_header_cache  = 0;
-	dev->header_cache_update= 0;
+	dev->hard_header        = NULL;
+	dev->rebuild_header     = NULL;
+	dev->hard_header_cache  = NULL;
+	dev->header_cache_update= NULL;
 
 	dev->hard_header_parse  = wll_header_parse;
 	dev->hard_start_xmit = &airo_start_xmit11;
@@ -2699,7 +2699,7 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 	}
 
 	ai = dev->priv;
-	ai->wifidev = 0;
+	ai->wifidev = NULL;
 	ai->flags = 0;
 	if (pci && (pci->device == 0x5000 || pci->device == 0xa504)) {
 		printk(KERN_DEBUG "airo: Found an MPI350 card\n");
@@ -2829,7 +2829,7 @@ err_out_free:
 
 struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
 {
-	return _init_airo_card ( irq, port, is_pcmcia, 0);
+	return _init_airo_card ( irq, port, is_pcmcia, NULL);
 }
 
 EXPORT_SYMBOL(init_airo_card);
@@ -4351,7 +4351,7 @@ static struct file_operations proc_wepkey_ops = {
 	.release	= proc_close
 };
 
-static struct proc_dir_entry *airo_entry = 0;
+static struct proc_dir_entry *airo_entry;
 
 struct proc_data {
 	int release_buffer;
@@ -5139,7 +5139,7 @@ static void proc_wepkey_on_close( struct inode *inode, struct file *file ) {
 	    (data->wbuffer[1] == ' ' || data->wbuffer[1] == '\n')) {
 		index = data->wbuffer[0] - '0';
 		if (data->wbuffer[1] == '\n') {
-			set_wep_key(ai, index, 0, 0, 1, 1);
+			set_wep_key(ai, index, NULL, 0, 1, 1);
 			return;
 		}
 		j = 2;
@@ -5324,8 +5324,8 @@ static int proc_BSSList_open( struct inode *inode, struct file *file ) {
 	}
 	data->writelen = 0;
 	data->maxwritelen = 0;
-	data->wbuffer = 0;
-	data->on_close = 0;
+	data->wbuffer = NULL;
+	data->on_close = NULL;
 
 	if (file->f_mode & FMODE_WRITE) {
 		if (!(file->f_mode & FMODE_READ)) {
@@ -5386,7 +5386,7 @@ static int proc_close( struct inode *inode, struct file *file )
 static struct net_device_list {
 	struct net_device *dev;
 	struct net_device_list *next;
-} *airo_devices = 0;
+} *airo_devices;
 
 /* Since the card doesn't automatically switch to the right WEP mode,
    we will make it do it.  If the card isn't associated, every secs we
@@ -5407,13 +5407,13 @@ static void timer_func( struct net_device *dev ) {
 			break;
 		case AUTH_SHAREDKEY:
 			if (apriv->keyindex < auto_wep) {
-				set_wep_key(apriv, apriv->keyindex, 0, 0, 0, 0);
+				set_wep_key(apriv, apriv->keyindex, NULL, 0, 0, 0);
 				apriv->config.authType = AUTH_SHAREDKEY;
 				apriv->keyindex++;
 			} else {
 			        /* Drop to ENCRYPT */
 				apriv->keyindex = 0;
-				set_wep_key(apriv, apriv->defindex, 0, 0, 0, 0);
+				set_wep_key(apriv, apriv->defindex, NULL, 0, 0, 0);
 				apriv->config.authType = AUTH_ENCRYPT;
 			}
 			break;
@@ -6207,7 +6207,7 @@ static int airo_set_encode(struct net_device *dev,
 		/* Do we want to just set the transmit key index ? */
 		int index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 		if ((index >= 0) && (index < ((cap_rid.softCap & 0x80)?4:1))) {
-			set_wep_key(local, index, 0, 0, 1, 1);
+			set_wep_key(local, index, NULL, 0, 1, 1);
 		} else
 			/* Don't complain if only change the mode */
 			if(!dwrq->flags & IW_ENCODE_MODE) {

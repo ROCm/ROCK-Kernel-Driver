@@ -158,11 +158,11 @@ static unsigned int get_time_pit(void)
 
         return count;
 }
-#elif __x86_64__
+#elif defined(__x86_64__)
 #define GET_TIME(x)	rdtscl(x)
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"TSC"
-#elif __alpha__
+#elif defined(__alpha__)
 #define GET_TIME(x)	do { x = get_cycles(); } while (0)
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"PCC"
