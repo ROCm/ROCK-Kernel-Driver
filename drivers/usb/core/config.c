@@ -25,20 +25,20 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 	/*  check JIC */
 	if (header->bLength > size) {
 		err("ran out of descriptors parsing");
-		return -1;
+		return -EINVAL;
 	}
-		
+
 	if (header->bDescriptorType != USB_DT_ENDPOINT) {
 		warn("unexpected descriptor 0x%X, expecting endpoint, 0x%X",
 			header->bDescriptorType, USB_DT_ENDPOINT);
-		return parsed;
+		return -EINVAL;
 	}
 
 	if (header->bLength == USB_DT_ENDPOINT_AUDIO_SIZE)
 		memcpy(&endpoint->desc, buffer, USB_DT_ENDPOINT_AUDIO_SIZE);
 	else
 		memcpy(&endpoint->desc, buffer, USB_DT_ENDPOINT_SIZE);
-	
+
 	le16_to_cpus(&endpoint->desc.wMaxPacketSize);
 
 	buffer += header->bLength;
@@ -54,7 +54,7 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 
 		if (header->bLength < 2) {
 			err("invalid descriptor length of %d", header->bLength);
-			return -1;
+			return -EINVAL;
 		}
 
 		/* If we find another "proper" descriptor then we're done  */
@@ -139,18 +139,18 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 
 	/* put happens in usb_destroy_configuration */
 	get_device(&interface->dev);
-	
+
 	interface->altsetting = kmalloc(sizeof(*interface->altsetting) * interface->max_altsetting,
 					GFP_KERNEL);
-	
+
 	if (!interface->altsetting) {
 		err("couldn't kmalloc interface->altsetting");
-		return -1;
+		return -ENOMEM;
 	}
 
 	while (size > 0) {
 		struct usb_interface_descriptor	*d;
-	
+
 		if (interface->num_altsetting >= interface->max_altsetting) {
 			struct usb_host_interface *ptr;
 			int oldmas;
@@ -160,13 +160,13 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 			if (interface->max_altsetting > USB_MAXALTSETTING) {
 				warn("too many alternate settings (incr %d max %d)\n",
 					USB_ALTSETTINGALLOC, USB_MAXALTSETTING);
-				return -1;
+				return -EINVAL;
 			}
 
 			ptr = kmalloc(sizeof(*ptr) * interface->max_altsetting, GFP_KERNEL);
 			if (ptr == NULL) {
 				err("couldn't kmalloc interface->altsetting");
-				return -1;
+				return -ENOMEM;
 			}
 			memcpy(ptr, interface->altsetting, sizeof(*interface->altsetting) * oldmas);
 			kfree(interface->altsetting);
@@ -195,7 +195,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 
 			if (header->bLength < 2) {
 				err("invalid descriptor length of %d", header->bLength);
-				return -1;
+				return -EINVAL;
 			}
 
 			/* If we find another "proper" descriptor then we're done  */
@@ -224,7 +224,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 			if (!ifp->extra) {
 				err("couldn't allocate memory for interface extra descriptors");
 				ifp->extralen = 0;
-				return -1;
+				return -ENOMEM;
 			}
 			memcpy(ifp->extra, begin, len);
 			ifp->extralen = len;
@@ -239,7 +239,7 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 
 		if (ifp->desc.bNumEndpoints > USB_MAXENDPOINTS) {
 			warn("too many endpoints");
-			return -1;
+			return -EINVAL;
 		}
 
 		ifp->endpoint = (struct usb_host_endpoint *)
@@ -247,20 +247,20 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 			sizeof(struct usb_host_endpoint), GFP_KERNEL);
 		if (!ifp->endpoint) {
 			err("out of memory");
-			return -1;	
+			return -ENOMEM;
 		}
 
 		memset(ifp->endpoint, 0, ifp->desc.bNumEndpoints *
 			sizeof(struct usb_host_endpoint));
-	
+
 		for (i = 0; i < ifp->desc.bNumEndpoints; i++) {
 			header = (struct usb_descriptor_header *)buffer;
 
 			if (header->bLength > size) {
 				err("ran out of descriptors parsing");
-				return -1;
+				return -EINVAL;
 			}
-		
+
 			retval = usb_parse_endpoint(ifp->endpoint + i, buffer, size);
 			if (retval < 0)
 				return retval;
@@ -312,7 +312,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 
 	buffer += config->desc.bLength;
 	size -= config->desc.bLength;
-	
+
 	config->extra = NULL;
 	config->extralen = 0;
 
@@ -329,7 +329,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 
 			if ((header->bLength > size) || (header->bLength < 2)) {
 				err("invalid descriptor length of %d", header->bLength);
-				return -1;
+				return -EINVAL;
 			}
 
 			/* If we find another "proper" descriptor then we're done  */
@@ -359,7 +359,7 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 				if (!config->extra) {
 					err("couldn't allocate memory for config extra descriptors");
 					config->extralen = 0;
-					return -1;
+					return -ENOMEM;
 				}
 
 				memcpy(config->extra, begin, len);
@@ -387,7 +387,7 @@ error:
 void usb_destroy_configuration(struct usb_device *dev)
 {
 	int c, i;
-	
+
 	if (!dev->config)
 		return;
 
@@ -438,7 +438,7 @@ int usb_get_configuration(struct usb_device *dev)
 		sizeof(struct usb_host_config), GFP_KERNEL);
 	if (!dev->config) {
 		err("out of memory");
-		return -ENOMEM;	
+		return -ENOMEM;
 	}
 	memset(dev->config, 0, dev->descriptor.bNumConfigurations *
 		sizeof(struct usb_host_config));
@@ -487,8 +487,8 @@ int usb_get_configuration(struct usb_device *dev)
 			err("couldn't get all of config descriptors");
 			kfree(bigbuffer);
 			goto err;
-		}	
-	
+		}
+
 		if (result < length) {
 			err("config descriptor too short (expected %i, got %i)", length, result);
 			result = -EINVAL;
