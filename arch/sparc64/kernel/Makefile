@@ -3,7 +3,7 @@
 #
 
 EXTRA_AFLAGS := -ansi
-CFLAGS += -Werror
+EXTRA_CFLAGS := -Werror
 
 EXTRA_TARGETS	:= head.o init_task.o
 

@@ -4,7 +4,7 @@
 #
 
 EXTRA_AFLAGS := -ansi
-CFLAGS += -Werror
+EXTRA_CFLAGS := -Werror
 
 L_TARGET = lib.a
 obj-y   := bootstr.o devops.o init.o memory.o misc.o \
