@@ -221,6 +221,7 @@ int sync_blockdev(struct block_device *bdev)
 		err = filemap_fdatawait(bdev->bd_inode->i_mapping);
 		if (!ret)
 			ret = err;
+		blkdev_issue_flush(bdev, NULL);
 	}
 	return ret;
 }
@@ -2776,6 +2777,9 @@ int submit_bh(int rw, struct buffer_head * bh)
 		buffer_error();
 	if (rw == READ && buffer_dirty(bh))
 		buffer_error();
+
+	if (buffer_ordered(bh) && (rw == WRITE))
+		rw = WRITE_BARRIER;
 
 	/* Only clear out a write error when rewriting */
 	if (test_set_buffer_req(bh) && rw == WRITE)
