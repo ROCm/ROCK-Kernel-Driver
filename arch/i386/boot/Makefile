@@ -31,7 +31,7 @@ subdir- 	:= compressed
 
 host-progs	:= tools/build
 
-HOSTCFLAGS_build.o := -Iinclude
+HOSTCFLAGS_build.o := $(LINUXINCLUDE)
 
 # ---------------------------------------------------------------------------
 
