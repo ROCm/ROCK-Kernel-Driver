@@ -1454,7 +1454,7 @@ static int sppp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_t
 struct packet_type sppp_packet_type = {
 	.type	= __constant_htons(ETH_P_WAN_PPP),
 	.func	= sppp_rcv,
-	.data   = (void*)1, /* must be non-NULL to indicate 'new' protocol */
+	.data   = PKT_CAN_SHARE_SKB,
 };
 
 static char banner[] __initdata = 

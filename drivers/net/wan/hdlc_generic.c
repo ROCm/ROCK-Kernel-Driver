@@ -283,7 +283,7 @@ static struct packet_type hdlc_packet_type =
 {
 	.type = __constant_htons(ETH_P_HDLC),
 	.func = hdlc_rcv,
-	.data = (void *)1,
+	.data = PKT_CAN_SHARE_SKB,
 };
 
 

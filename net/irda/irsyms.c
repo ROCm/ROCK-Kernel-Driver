@@ -191,7 +191,7 @@ static struct packet_type irda_packet_type =
 	.type	= __constant_htons(ETH_P_IRDA),
 	.dev	= NULL,			/* Wildcard : All devices */
 	.func	= irlap_driver_rcv,	/* Packet type handler irlap_frame.c */
-	.data	= (void*) 1,		/* Understand shared skbs */
+	.data	= PKT_CAN_SHARE_SKB,
 	//.next	= NULL,
 };
 

@@ -109,10 +109,6 @@
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
-#ifdef CONFIG_PLIP
-extern int plip_init(void);
-#endif
-
 #include <asm/current.h>
 
 /* This define, if set, will randomly drop a packet when congestion
@@ -233,7 +229,7 @@ void dev_add_pack(struct packet_type *pt)
 	spin_lock_bh(&ptype_lock);
 #ifdef CONFIG_NET_FASTROUTE
 	/* Hack to detect packet socket */
-	if (pt->data && (long)(pt->data) != 1) {
+	if (pt->data && pt->data != PKT_CAN_SHARE_SKB) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
@@ -281,7 +277,7 @@ void __dev_remove_pack(struct packet_type *pt)
 	list_for_each_entry(pt1, head, list) {
 		if (pt == pt1) {
 #ifdef CONFIG_NET_FASTROUTE
-			if (pt->data)
+			if (pt->data && pt->data != PKT_CAN_SHARE_SKB)
 				netdev_fastroute_obstacles--;
 #endif
 			list_del_rcu(&pt->list);

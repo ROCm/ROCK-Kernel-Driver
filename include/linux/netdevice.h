@@ -477,6 +477,7 @@ struct net_device
  */
 #define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
+#define PKT_CAN_SHARE_SKB	((void*)1)
 
 struct packet_type 
 {

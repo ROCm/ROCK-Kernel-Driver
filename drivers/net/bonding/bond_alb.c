@@ -888,7 +888,7 @@ rlb_initialize(struct bonding *bond)
 	pk_type->type = __constant_htons(ETH_P_ARP);
 	pk_type->dev = bond->device;
 	pk_type->func = rlb_arp_recv;
-	pk_type->data = (void*)1;  /* understand shared skbs */
+	pk_type->data = PKT_CAN_SHARE_SKB;
 
 	dev_add_pack(pk_type);
 
