@@ -32,6 +32,17 @@ config EXPERIMENTAL
 	  you say Y here, you will be offered the choice of using features or
 	  drivers that are currently considered to be in the alpha-test phase.
 
+config BROKEN
+	bool "Prompt for old and known-broken drivers"
+	depends on EXPERIMENTAL
+	default n
+	help
+	  This option allows you to choose whether you want to try to
+	  compile (and fix) old drivers that haven't been updated to
+	  new infrastructure.
+
+	  If unsure, say N.
+
 endmenu
 
 
