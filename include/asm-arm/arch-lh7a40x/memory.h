@@ -31,6 +31,8 @@
 
 #ifdef CONFIG_DISCONTIGMEM
 
+#define NODES_SHIFT	4	/* Up to 16 nodes */
+
 /*
  * Given a kernel address, find the home node of the underlying memory.
  */

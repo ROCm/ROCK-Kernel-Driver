@@ -1178,7 +1178,6 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
 				// dangerous.
 				status = -ETIME;
 			}
-			schedule_timeout(timeout*HZ);
 		}
 		if(pHba->host)
 			spin_lock_irq(pHba->host->host_lock);

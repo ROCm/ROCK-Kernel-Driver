@@ -180,8 +180,6 @@ show_fc_fc4s (char *buf, u8 *fc4_list)
 
 
 
-static void transport_class_release(struct class_device *class_dev);
-static void host_class_release(struct class_device *class_dev);
 static void fc_timeout_blocked_host(void *data);
 static void fc_timeout_blocked_tgt(void *data);
 
@@ -207,32 +205,9 @@ struct fc_internal {
 
 #define to_fc_internal(tmpl)	container_of(tmpl, struct fc_internal, t)
 
-struct class fc_transport_class = {
-	.name = "fc_transport",
-	.release = transport_class_release,
-};
-
-struct class fc_host_class = {
-	.name = "fc_host",
-	.release = host_class_release,
-};
-
-static __init int fc_transport_init(void)
+static int fc_add_target(struct device *dev)
 {
-	int error = class_register(&fc_host_class);
-	if (error)
-		return error;
-	return class_register(&fc_transport_class);
-}
-
-static void __exit fc_transport_exit(void)
-{
-	class_unregister(&fc_transport_class);
-	class_unregister(&fc_host_class);
-}
-
-static int fc_setup_starget_transport_attrs(struct scsi_target *starget)
-{
+	struct scsi_target *starget = to_scsi_target(dev);
 	/* 
 	 * Set default values easily detected by the midlayer as
 	 * failure cases.  The scsi lldd is responsible for initializing
@@ -247,15 +222,24 @@ static int fc_setup_starget_transport_attrs(struct scsi_target *starget)
 	return 0;
 }
 
-static void fc_destroy_starget(struct scsi_target *starget)
+static int fc_remove_target(struct device *dev)
 {
+	struct scsi_target *starget = to_scsi_target(dev);
 	/* Stop the target timer */
 	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
 		flush_scheduled_work();
+	return 0;
 }
 
-static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
+static DECLARE_TRANSPORT_CLASS(fc_transport_class,
+			       "fc_transport",
+			       fc_add_target,
+			       fc_remove_target,
+			       NULL);
+
+static int fc_add_host(struct device *dev)
 {
+	struct Scsi_Host *shost = dev_to_shost(dev);
 	/* 
 	 * Set default values easily detected by the midlayer as
 	 * failure cases.  The scsi lldd is responsible for initializing
@@ -297,25 +281,34 @@ static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
 	return 0;
 }
 
-static void fc_destroy_host(struct Scsi_Host *shost)
+static int fc_remove_host(struct device *dev)
 {
+	struct Scsi_Host *shost = dev_to_shost(dev);
 	/* Stop the host timer */
 	if (cancel_delayed_work(&fc_host_link_down_work(shost)))
 		flush_scheduled_work();
+	return 0;
 }
 
-static void transport_class_release(struct class_device *class_dev)
+static DECLARE_TRANSPORT_CLASS(fc_host_class,
+			       "fc_host",
+			       fc_add_host,
+			       fc_remove_host,
+			       NULL);
+
+static __init int fc_transport_init(void)
 {
-	struct scsi_target *starget = transport_class_to_starget(class_dev);
-	put_device(&starget->dev);
+	int error = transport_class_register(&fc_host_class);
+	if (error)
+		return error;
+	return transport_class_register(&fc_transport_class);
 }
 
-static void host_class_release(struct class_device *class_dev)
+static void __exit fc_transport_exit(void)
 {
-	struct Scsi_Host *shost = transport_class_to_shost(class_dev);
-	put_device(&shost->shost_gendev);
+	transport_class_unregister(&fc_transport_class);
+	transport_class_unregister(&fc_host_class);
 }
-
 
 /*
  * Remote Port (Target) Attribute Management
@@ -731,6 +724,35 @@ static struct attribute_group fc_statistics_group = {
 	.attrs = fc_statistics_attrs,
 };
 
+static int fc_host_match(struct attribute_container *cont,
+			  struct device *dev)
+{
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_host_device(dev))
+		return 0;
+
+	shost = dev_to_shost(dev);
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &fc_host_class.class)
+		return 0;
+	return 1;
+}
+
+static int fc_target_match(struct attribute_container *cont,
+			    struct device *dev)
+{
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_target_device(dev))
+		return 0;
+
+	shost = dev_to_shost(dev->parent);
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &fc_host_class.class)
+		return 0;
+	return 1;
+}
 
 
 struct scsi_transport_template *
@@ -745,16 +767,16 @@ fc_attach_transport(struct fc_function_template *ft)
 
 	memset(i, 0, sizeof(struct fc_internal));
 
-	i->t.target_attrs = &i->starget_attrs[0];
-	i->t.target_class = &fc_transport_class;
-	i->t.target_setup = &fc_setup_starget_transport_attrs;
-	i->t.target_destroy = &fc_destroy_starget;
+	i->t.target_attrs.attrs = &i->starget_attrs[0];
+	i->t.target_attrs.class = &fc_transport_class.class;
+	i->t.target_attrs.match = fc_target_match;
+	attribute_container_register(&i->t.target_attrs);
 	i->t.target_size = sizeof(struct fc_starget_attrs);
 
-	i->t.host_attrs = &i->host_attrs[0];
-	i->t.host_class = &fc_host_class;
-	i->t.host_setup = &fc_setup_host_transport_attrs;
-	i->t.host_destroy = &fc_destroy_host;
+	i->t.host_attrs.attrs = &i->host_attrs[0];
+	i->t.host_attrs.class = &fc_host_class.class;
+	i->t.host_attrs.match = fc_host_match;
+	attribute_container_register(&i->t.host_attrs);
 	i->t.host_size = sizeof(struct fc_host_attrs);
 
 	if (ft->get_fc_host_stats)

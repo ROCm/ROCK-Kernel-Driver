@@ -290,7 +290,7 @@ static inline void esp_advance_phase(Scsi_Cmnd *s, int newphase)
 #endif
 
 #ifdef DEBUG_ESP_CMDS
-inline void esp_cmd(struct NCR_ESP *esp, struct ESP_regs *eregs,
+static inline void esp_cmd(struct NCR_ESP *esp, struct ESP_regs *eregs,
 			   unchar cmd)
 {
 	esp->espcmdlog[esp->espcmdent] = cmd;
@@ -505,7 +505,7 @@ static void esp_reset_esp(struct NCR_ESP *esp, struct ESP_regs *eregs)
 }
 
 /* This places the ESP into a known state at boot time. */
-static void esp_bootup_reset(struct NCR_ESP *esp, struct ESP_regs *eregs)
+void esp_bootup_reset(struct NCR_ESP *esp, struct ESP_regs *eregs)
 {
 	volatile unchar trash;
 

@@ -243,14 +243,14 @@ config SGIWD93_SCSI
 
 config SCSI_DECNCR
 	tristate "DEC NCR53C94 Scsi Driver"
-	depends on DECSTATION && TC && SCSI
+	depends on MACH_DECSTATION && SCSI && TC
 	help
 	  Say Y here to support the NCR53C94 SCSI controller chips on IOASIC
 	  based TURBOchannel DECstations and TURBOchannel PMAZ-A cards.
 
 config SCSI_DECSII
 	tristate "DEC SII Scsi Driver"
-	depends on DECSTATION && SCSI
+	depends on MACH_DECSTATION && SCSI && MIPS32
 
 config BLK_DEV_3W_XXXX_RAID
 	tristate "3ware 5/6/7/8xxx ATA-RAID support"

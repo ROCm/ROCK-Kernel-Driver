@@ -40,28 +40,17 @@ struct iscsi_internal {
 
 #define to_iscsi_internal(tmpl) container_of(tmpl, struct iscsi_internal, t)
 
-static void iscsi_transport_class_release(struct class_device *class_dev)
-{
-	struct scsi_target *starget = transport_class_to_starget(class_dev);
-	put_device(&starget->dev);
-}
+static DECLARE_TRANSPORT_CLASS(iscsi_transport_class,
+			       "iscsi_transport",
+			       NULL,
+			       NULL,
+			       NULL);
 
-struct class iscsi_transport_class = {
-	.name = "iscsi_transport_class",
-	.release = iscsi_transport_class_release,
-};
-
-static void iscsi_host_class_release(struct class_device *class_dev)
-{
-	struct Scsi_Host *shost = transport_class_to_shost(class_dev);
-	put_device(&shost->shost_gendev);
-}
-
-struct class iscsi_host_class = {
-	.name = "iscsi_host",
-	.release = iscsi_host_class_release,
-};
-
+static DECLARE_TRANSPORT_CLASS(iscsi_host_class,
+			       "iscsi_host",
+			       NULL,
+			       NULL,
+			       NULL);
 /*
  * iSCSI target and session attrs
  */
@@ -265,6 +254,36 @@ iscsi_host_rd_str_attr(initiator_alias);
 		count++;						\
 	}
 
+static int iscsi_host_match(struct attribute_container *cont,
+			  struct device *dev)
+{
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_host_device(dev))
+		return 0;
+
+	shost = dev_to_shost(dev);
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &iscsi_host_class.class)
+		return 0;
+	return 1;
+}
+
+static int iscsi_target_match(struct attribute_container *cont,
+			    struct device *dev)
+{
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_target_device(dev))
+		return 0;
+
+	shost = dev_to_shost(dev->parent);
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &iscsi_host_class.class)
+		return 0;
+	return 1;
+}
+
 struct scsi_transport_template *
 iscsi_attach_transport(struct iscsi_function_template *fnt)
 {
@@ -278,9 +297,10 @@ iscsi_attach_transport(struct iscsi_function_template *fnt)
 	memset(i, 0, sizeof(struct iscsi_internal));
 	i->fnt = fnt;
 
-	i->t.target_attrs = &i->session_attrs[0];
-	i->t.target_class = &iscsi_transport_class;
-	i->t.target_setup = NULL;
+	i->t.target_attrs.attrs = &i->session_attrs[0];
+	i->t.target_attrs.class = &iscsi_transport_class.class;
+	i->t.target_attrs.match = iscsi_target_match;
+	attribute_container_register(&i->t.target_attrs);
 	i->t.target_size = sizeof(struct iscsi_class_session);
 
 	SETUP_SESSION_RD_ATTR(tsih);
@@ -307,9 +327,10 @@ iscsi_attach_transport(struct iscsi_function_template *fnt)
 	BUG_ON(count > ISCSI_SESSION_ATTRS);
 	i->session_attrs[count] = NULL;
 
-	i->t.host_attrs = &i->host_attrs[0];
-	i->t.host_class = &iscsi_host_class;
-	i->t.host_setup = NULL;
+	i->t.host_attrs.attrs = &i->host_attrs[0];
+	i->t.host_attrs.class = &iscsi_host_class.class;
+	i->t.host_attrs.match = iscsi_host_match;
+	attribute_container_register(&i->t.host_attrs);
 	i->t.host_size = 0;
 
 	count = 0;
@@ -334,17 +355,17 @@ EXPORT_SYMBOL(iscsi_release_transport);
 
 static __init int iscsi_transport_init(void)
 {
-	int err = class_register(&iscsi_transport_class);
+	int err = transport_class_register(&iscsi_transport_class);
 
 	if (err)
 		return err;
-	return class_register(&iscsi_host_class);
+	return transport_class_register(&iscsi_host_class);
 }
 
 static void __exit iscsi_transport_exit(void)
 {
-	class_unregister(&iscsi_host_class);
-	class_unregister(&iscsi_transport_class);
+	transport_class_unregister(&iscsi_host_class);
+	transport_class_unregister(&iscsi_transport_class);
 }
 
 module_init(iscsi_transport_init);

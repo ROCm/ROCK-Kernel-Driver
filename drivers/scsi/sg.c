@@ -7,7 +7,7 @@
  * Original driver (sg.c):
  *        Copyright (C) 1992 Lawrence Foard
  * Version 2 and 3 extensions to driver:
- *        Copyright (C) 1998 - 2004 Douglas Gilbert
+ *        Copyright (C) 1998 - 2005 Douglas Gilbert
  *
  *  Modified  19-JAN-1998  Richard Gooch <rgooch@atnf.csiro.au>  Devfs support
  *
@@ -18,8 +18,8 @@
  *
  */
 
-static int sg_version_num = 30531;	/* 2 digits for each component */
-#define SG_VERSION_STR "3.5.31"
+static int sg_version_num = 30532;	/* 2 digits for each component */
+#define SG_VERSION_STR "3.5.32"
 
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
@@ -60,7 +60,7 @@ static int sg_version_num = 30531;	/* 2 digits for each component */
 
 #ifdef CONFIG_SCSI_PROC_FS
 #include <linux/proc_fs.h>
-static char *sg_version_date = "20040516";
+static char *sg_version_date = "20050117";
 
 static int sg_proc_init(void);
 static void sg_proc_cleanup(void);
@@ -1282,6 +1282,8 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	srp->header.duration =
 	    jiffies_to_msecs(jiffies - srp->header.duration);
 	if (0 != SRpnt->sr_result) {
+		struct scsi_sense_hdr sshdr;
+
 		memcpy(srp->sense_b, SRpnt->sr_sense_buffer,
 		       sizeof (srp->sense_b));
 		srp->header.status = 0xff & SRpnt->sr_result;
@@ -1296,11 +1298,12 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 
 		/* Following if statement is a patch supplied by Eric Youngdale */
 		if (driver_byte(SRpnt->sr_result) != 0
-		    && (SRpnt->sr_sense_buffer[0] & 0x7f) == 0x70
-		    && (SRpnt->sr_sense_buffer[2] & 0xf) == UNIT_ATTENTION
+		    && scsi_command_normalize_sense(SCpnt, &sshdr)
+		    && !scsi_sense_is_deferred(&sshdr)
+		    && sshdr.sense_key == UNIT_ATTENTION
 		    && sdp->device->removable) {
-			/* Detected disc change. Set the bit - this may be used if */
-			/* there are filesystems using this device. */
+			/* Detected possible disc change. Set the bit - this */
+			/* may be used if there are filesystems using this device */
 			sdp->device->changed = 1;
 		}
 	}
@@ -1573,8 +1576,8 @@ sg_remove(struct class_device *cl_dev)
  * of sysfs parameters (which module_param doesn't yet support).
  * Sysfs parameters defined explicitly below.
  */
-module_param_named(def_reserved_size, def_reserved_size, int, 0);
-module_param_named(allow_dio, sg_allow_dio, int, 0);
+module_param_named(def_reserved_size, def_reserved_size, int, S_IRUGO);
+module_param_named(allow_dio, sg_allow_dio, int, S_IRUGO | S_IWUSR);
 
 MODULE_AUTHOR("Douglas Gilbert");
 MODULE_DESCRIPTION("SCSI generic (sg) driver");
@@ -2606,9 +2609,14 @@ sg_page_free(char *buff, int size)
 	free_pages((unsigned long) buff, order);
 }
 
+#ifndef MAINTENANCE_IN_CMD
+#define MAINTENANCE_IN_CMD 0xa3
+#endif
+
 static unsigned char allow_ops[] = { TEST_UNIT_READY, REQUEST_SENSE,
 	INQUIRY, READ_CAPACITY, READ_BUFFER, READ_6, READ_10, READ_12,
-	MODE_SENSE, MODE_SENSE_10, LOG_SENSE
+	READ_16, MODE_SENSE, MODE_SENSE_10, LOG_SENSE, REPORT_LUNS,
+	SERVICE_ACTION_IN, RECEIVE_DIAGNOSTIC, READ_LONG, MAINTENANCE_IN_CMD
 };
 
 static int
