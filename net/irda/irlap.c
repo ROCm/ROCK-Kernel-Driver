@@ -540,7 +540,13 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
 	}
 
 	/* All operations will occur at predictable time, no need to lock */
-	self->discovery_log= hashbin_new(HB_NOLOCK);
+	self->discovery_log = hashbin_new(HB_NOLOCK);
+
+	if (self->discovery_log == NULL) {
+		WARNING("%s(), Unable to allocate discovery log!\n",
+			__FUNCTION__);
+		return;
+	}
 
 	info.S = discovery->nslots; /* Number of slots */
 	info.s = 0; /* Current slot */

@@ -84,8 +84,8 @@ struct ias_object *irias_new_object( char *name, int id)
 	obj = (struct ias_object *) kmalloc(sizeof(struct ias_object),
 					    GFP_ATOMIC);
 	if (obj == NULL) {
-		IRDA_DEBUG(0, "%s(), Unable to allocate object!\n",
-			   __FUNCTION__);
+		WARNING("%s(), Unable to allocate object!\n",
+			__FUNCTION__);
 		return NULL;
 	}
 	memset(obj, 0, sizeof( struct ias_object));
@@ -98,6 +98,12 @@ struct ias_object *irias_new_object( char *name, int id)
 	 * than the objects spinlock. Never grap the objects spinlock
 	 * while holding any attrib spinlock (risk of deadlock). Jean II */
 	obj->attribs = hashbin_new(HB_LOCK);
+
+	if (obj->attribs == NULL) {
+		WARNING("%s(), Unable to allocate attribs!\n", __FUNCTION__);
+		kfree(obj);
+		return NULL;
+	}
 
 	return obj;
 }

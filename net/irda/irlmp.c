@@ -89,6 +89,15 @@ int __init irlmp_init(void)
 	irlmp->links = hashbin_new(HB_LOCK);
 	irlmp->unconnected_lsaps = hashbin_new(HB_LOCK);
 	irlmp->cachelog = hashbin_new(HB_NOLOCK);
+
+	if ((irlmp->clients == NULL) ||
+	    (irlmp->services == NULL) ||
+	    (irlmp->links == NULL) ||
+	    (irlmp->unconnected_lsaps == NULL) ||
+	    (irlmp->cachelog == NULL)) {
+		return -ENOMEM;
+	}
+
 	spin_lock_init(&irlmp->cachelog->hb_spinlock);
 
 	irlmp->free_lsap_sel = 0x10; /* Reserved 0x00-0x0f */
@@ -287,10 +296,15 @@ void irlmp_register_link(struct irlap_cb *irlap, __u32 saddr, notify_t *notify)
 	lap->magic = LMP_LAP_MAGIC;
 	lap->saddr = saddr;
 	lap->daddr = DEV_ADDR_ANY;
-	lap->lsaps = hashbin_new(HB_LOCK);
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
 	lap->cache.valid = FALSE;
 #endif
+	lap->lsaps = hashbin_new(HB_LOCK);
+	if (lap->lsaps == NULL) {
+		WARNING("%s(), unable to kmalloc lsaps\n", __FUNCTION__);
+		kfree(lap);
+		return;
+	}
 
 	lap->lap_state = LAP_STANDBY;
 

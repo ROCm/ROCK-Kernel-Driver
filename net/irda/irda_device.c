@@ -94,6 +94,7 @@ int __init irda_device_init( void)
 	tasks = hashbin_new(HB_LOCK);
 	if (tasks == NULL) {
 		printk(KERN_WARNING "IrDA: Can't allocate tasks hashbin!\n");
+		hashbin_delete(dongles, NULL);
 		return -ENOMEM;
 	}
 

@@ -100,6 +100,7 @@ int __init iriap_init(void)
 	if (!irias_objects) {
 		WARNING("%s: Can't allocate irias_objects hashbin!\n",
 			__FUNCTION__);
+		hashbin_delete(iriap, NULL);
 		return -ENOMEM;
 	}
 
@@ -181,6 +182,10 @@ struct iriap_cb *iriap_open(__u8 slsap_sel, int mode, void *priv,
 
 	self->confirm = callback;
 	self->priv = priv;
+
+	/* iriap_getvaluebyclass_request() will construct packets before
+	 * we connect, so this must have a sane value... Jean II */
+	self->max_header_size = LMP_MAX_HEADER;
 
 	init_timer(&self->watchdog_timer);
 
