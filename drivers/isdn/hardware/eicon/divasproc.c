@@ -1,4 +1,4 @@
-/* $Id: divasproc.c,v 1.19 2004/03/21 17:26:01 armin Exp $
+/* $Id: divasproc.c,v 1.19.4.3 2005/01/31 12:22:20 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  * /proc functions
@@ -16,6 +16,7 @@
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
 #include <linux/list.h>
+#include <asm/uaccess.h>
 
 #include "platform.h"
 #include "debuglib.h"

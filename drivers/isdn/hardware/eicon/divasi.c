@@ -1,4 +1,4 @@
-/* $Id: divasi.c,v 1.25 2003/09/09 06:46:29 schindler Exp $
+/* $Id: divasi.c,v 1.25.6.2 2005/01/31 12:22:20 armin Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface 
@@ -20,6 +20,7 @@
 #include <linux/proc_fs.h>
 #include <linux/skbuff.h>
 #include <linux/devfs_fs_kernel.h>
+#include <asm/uaccess.h>
 
 #include "platform.h"
 #include "di_defs.h"
@@ -27,7 +28,7 @@
 #include "um_xdi.h"
 #include "um_idi.h"
 
-static char *main_revision = "$Revision: 1.25 $";
+static char *main_revision = "$Revision: 1.25.6.2 $";
 
 static int major;
 
