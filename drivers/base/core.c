@@ -139,7 +139,7 @@ static int __init device_init(void)
 	return error;
 }
 
-subsys_initcall(device_init);
+core_initcall(device_init);
 
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(put_device);
