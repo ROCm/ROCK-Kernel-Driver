@@ -963,7 +963,7 @@ tcp_state_change(struct sock *sk)
 	dprintk("RPC:      tcp_state_change client %p...\n", xprt);
 	dprintk("RPC:      state %x conn %d dead %d zapped %d\n",
 				sk->state, xprt_connected(xprt),
-				test_bit(SOCK_DEAD, &sk->flags), sk->zapped);
+				sock_flag(sk, SOCK_DEAD), sk->zapped);
 
 	switch (sk->state) {
 	case TCP_ESTABLISHED:

@@ -344,7 +344,7 @@ void x25_destroy_socket(struct sock *sk)
 			/*
 			 * Queue the unaccepted socket for death
 			 */
-			__set_bit(SOCK_DEAD, &skb->sk->flags);
+			sock_set_flag(skb->sk, SOCK_DEAD);
 			x25_start_heartbeat(skb->sk);
 			x25_sk(skb->sk)->state = X25_STATE_0;
 		}
@@ -574,8 +574,8 @@ static int x25_release(struct socket *sock)
 			sk->state               = TCP_CLOSE;
 			sk->shutdown           |= SEND_SHUTDOWN;
 			sk->state_change(sk);
-			__set_bit(SOCK_DEAD, &sk->flags);
-			__set_bit(SOCK_DESTROY, &sk->flags);
+			sock_set_flag(sk, SOCK_DEAD);
+			sock_set_flag(sk, SOCK_DESTROY);
 			break;
 	}
 
@@ -896,7 +896,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 
 	x25_start_heartbeat(make);
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->data_ready(sk, skb->len);
 	rc = 1;
 	sock_put(sk);
@@ -1106,8 +1106,8 @@ static int x25_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	if (flags & MSG_OOB) {
 		rc = -EINVAL;
-		if (test_bit(SOCK_URGINLINE, &sk->flags) ||
-				!skb_peek(&x25->interrupt_in_queue))
+		if (sock_flag(sk, SOCK_URGINLINE) ||
+		    !skb_peek(&x25->interrupt_in_queue))
 			goto out;
 
 		skb = skb_dequeue(&x25->interrupt_in_queue);

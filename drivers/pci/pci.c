@@ -701,6 +701,17 @@ pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
 	return 0;
 }
 
+int
+pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
+{
+	if (!pci_dma_supported(dev, mask))
+		return -EIO;
+
+	dev->consistent_dma_mask = mask;
+
+	return 0;
+}
+     
 static int __devinit pci_init(void)
 {
 	struct pci_dev *dev;
@@ -751,6 +762,7 @@ EXPORT_SYMBOL(pci_set_mwi);
 EXPORT_SYMBOL(pci_clear_mwi);
 EXPORT_SYMBOL(pci_set_dma_mask);
 EXPORT_SYMBOL(pci_dac_set_dma_mask);
+EXPORT_SYMBOL(pci_set_consistent_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);
 EXPORT_SYMBOL(pci_find_parent_resource);
 

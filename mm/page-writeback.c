@@ -430,11 +430,12 @@ int write_one_page(struct page *page, int wait)
 	int ret = 0;
 	struct writeback_control wbc = {
 		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = 1,
 	};
 
 	BUG_ON(!PageLocked(page));
 
-	if (wait && PageWriteback(page))
+	if (wait)
 		wait_on_page_writeback(page);
 
 	spin_lock(&mapping->page_lock);

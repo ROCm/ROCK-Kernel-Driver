@@ -589,6 +589,8 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	rqstp->rq_addr.sin_port = skb->h.uh->source;
 	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
 
+	svsk->sk_sk->stamp = skb->stamp;
+
 	if (skb_is_nonlinear(skb)) {
 		/* we have to copy */
 		local_bh_disable();
@@ -629,7 +631,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		serv->sv_stats->netudpcnt++;
 
 	/* One down, maybe more to go... */
-	svsk->sk_sk->stamp = skb->stamp;
 	svc_sock_received(svsk);
 
 	return len;
