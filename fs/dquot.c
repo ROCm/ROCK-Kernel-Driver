@@ -70,10 +70,36 @@
 int nr_dquots, nr_free_dquots;
 
 static char *quotatypes[] = INITQFNAMES;
+static struct quota_format_type *quota_formats;	/* List of registered formats */
 
-static inline struct quota_info *sb_dqopt(struct super_block *sb)
+int register_quota_format(struct quota_format_type *fmt)
 {
-	return &sb->s_dquot;
+	lock_kernel();
+	fmt->qf_next = quota_formats;
+	quota_formats = fmt;
+	unlock_kernel();
+	return 0;
+}
+
+void unregister_quota_format(struct quota_format_type *fmt)
+{
+	struct quota_format_type **actqf;
+
+	lock_kernel();
+	for (actqf = &quota_formats; *actqf && *actqf != fmt; actqf = &(*actqf)->qf_next);
+	if (*actqf)
+		*actqf = (*actqf)->qf_next;
+	unlock_kernel();
+}
+
+static struct quota_format_type *find_quota_format(int id)
+{
+	struct quota_format_type *actqf;
+
+	lock_kernel();
+	for (actqf = quota_formats; actqf && actqf->qf_fmt_id != id; actqf = actqf->qf_next);
+	unlock_kernel();
+	return actqf;
 }
 
 /*
@@ -1237,6 +1263,8 @@ int quota_off(struct super_block *sb, short type)
 		invalidate_dquots(sb, cnt);
                 if (info_dirty(&dqopt->info[cnt]))
                         dqopt->ops[cnt]->write_file_info(sb, cnt);
+		if (dqopt->ops[cnt]->free_file_info)
+			dqopt->ops[cnt]->free_file_info(sb, cnt);
 
 		filp = dqopt->files[cnt];
 		dqopt->files[cnt] = (struct file *)NULL;
@@ -1252,30 +1280,27 @@ out:
 	return 0;
 }
 
-static int quota_on(struct super_block *sb, short type, char *path)
+static int quota_on(struct super_block *sb, int type, int format_id, char *path)
 {
 	struct file *f;
 	struct inode *inode;
-	struct dquot *dquot;
 	struct quota_info *dqopt = sb_dqopt(sb);
-	char *tmp;
+	struct quota_format_type *fmt = find_quota_format(format_id);
 	int error;
 
+	if (!fmt)
+		return -EINVAL;
 	if (is_enabled(dqopt, type))
 		return -EBUSY;
 
 	down(&dqopt->dqoff_sem);
-	tmp = getname(path);
-	error = PTR_ERR(tmp);
-	if (IS_ERR(tmp))
-		goto out_lock;
 
-	f = filp_open(tmp, O_RDWR, 0600);
-	putname(tmp);
+	f = filp_open(path, O_RDWR, 0600);
 
 	error = PTR_ERR(f);
 	if (IS_ERR(f))
 		goto out_lock;
+	dqopt->files[type] = f;
 	error = -EIO;
 	if (!f->f_op || !f->f_op->read || !f->f_op->write)
 		goto out_f;
@@ -1284,13 +1309,16 @@ static int quota_on(struct super_block *sb, short type, char *path)
 	if (!S_ISREG(inode->i_mode))
 		goto out_f;
 	error = -EINVAL;
-	if (!check_quota_file(sb, type))
+	if (!fmt->qf_ops->check_quota_file(sb, type))
 		goto out_f;
 	/* We don't want quota on quota files */
 	dquot_drop(inode);
 	inode->i_flags |= S_NOQUOTA;
 
-	dqopt->files[type] = f;
+	dqopt->ops[type] = fmt->qf_ops;
+	dqopt->info[type].dqi_format = format_id;
+	if ((error = dqopt->ops[type]->read_file_info(sb, type)) < 0)
+		goto out_f;
 	sb->dq_op = &dquot_operations;
 	set_enable_flags(dqopt, type);
 
@@ -1301,6 +1329,7 @@ static int quota_on(struct super_block *sb, short type, char *path)
 
 out_f:
 	filp_close(f, NULL);
+	dqopt->files[type] = NULL;
 out_lock:
 	up(&dqopt->dqoff_sem);
 

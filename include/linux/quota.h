@@ -42,9 +42,6 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 
-#define __DQUOT_VERSION__	"dquot_6.5.1"
-#define __DQUOT_NUM_VERSION__	6*10000+5*100+1
-
 typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
 
 /*
@@ -116,7 +113,10 @@ struct mem_dqblk {
 /*
  * Data for one quotafile kept in memory
  */
+struct quota_format_type;
+
 struct mem_dqinfo {
+	struct quota_format_type *dqi_format;
 	int dqi_flags;
 	unsigned int dqi_bgrace;
 	unsigned int dqi_igrace;
@@ -157,7 +157,6 @@ extern inline void mark_info_dirty(struct mem_dqinfo *info)
 #ifdef __KERNEL__
 
 extern int nr_dquots, nr_free_dquots;
-extern int dquot_root_squash;
 
 struct dqstats {
 	__u32 lookups;
@@ -169,6 +168,8 @@ struct dqstats {
 	__u32 free_dquots;
 	__u32 syncs;
 };
+
+extern struct dqstats dqstats;
 
 #define NR_DQHASH 43            /* Just an arbitrary number */
 
@@ -218,6 +219,12 @@ struct quota_format_ops {
 	int (*free_file_info)(struct super_block *sb, int type);	/* Called on quotaoff() */
 	int (*read_dqblk)(struct dquot *dquot);		/* Read structure for one user */
 	int (*commit_dqblk)(struct dquot *dquot);	/* Write (or delete) structure for one user */
+};
+
+struct quota_format_type {
+	int qf_fmt_id;	/* Quota format id */
+	struct quota_format_ops *qf_ops;	/* Operations of format */
+	struct quota_format_type *qf_next;
 };
 
 #else
