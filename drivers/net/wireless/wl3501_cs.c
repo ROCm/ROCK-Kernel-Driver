@@ -163,17 +163,17 @@ static int wl3501_get_flash_mac_addr(struct wl3501_card *this)
 
 	/* wait for reading EEPROM */
 	WL3501_NOPLOOP(100);
-	this->mac_addr.b0 = inb(base_addr + WL3501_NIC_IODPA);
+	this->mac_addr[0] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
-	this->mac_addr.b1 = inb(base_addr + WL3501_NIC_IODPA);
+	this->mac_addr[1] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
-	this->mac_addr.b2 = inb(base_addr + WL3501_NIC_IODPA);
+	this->mac_addr[2] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
-	this->mac_addr.b3 = inb(base_addr + WL3501_NIC_IODPA);
+	this->mac_addr[3] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
-	this->mac_addr.b4 = inb(base_addr + WL3501_NIC_IODPA);
+	this->mac_addr[4] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
-	this->mac_addr.b5 = inb(base_addr + WL3501_NIC_IODPA);
+	this->mac_addr[5] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
 	this->freq_domain = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
@@ -188,7 +188,7 @@ static int wl3501_get_flash_mac_addr(struct wl3501_card *this)
 	wl3501_switch_page(this, WL3501_BSS_SPAGE0);
 
 	/* The MAC addr should be 00:60:... */
-	return this->mac_addr.b0 == 0x00 && this->mac_addr.b1 == 0x60;
+	return this->mac_addr[0] == 0x00 && this->mac_addr[1] == 0x60;
 }
 
 /**
@@ -358,7 +358,7 @@ out:
  * Send a packet.
  *
  * data = Ethernet raw frame.  (e.g. data[0] - data[5] is Dest MAC Addr,
- *                                    data[6] - data[11] is Src MAC Addr)
+ *                                   data[6] - data[11] is Src MAC Addr)
  * Ref: IEEE 802.11
  */
 static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
@@ -817,8 +817,8 @@ static void wl3501_online(struct net_device *dev)
 
 	printk(KERN_INFO "%s: Wireless LAN online. BSSID: "
 	       "%02X %02X %02X %02X %02X %02X\n", dev->name,
-	       this->bssid.b0, this->bssid.b1, this->bssid.b2,
-	       this->bssid.b3, this->bssid.b4, this->bssid.b5);
+	       this->bssid[0], this->bssid[1], this->bssid[2],
+	       this->bssid[3], this->bssid[4], this->bssid[5]);
 	netif_wake_queue(dev);
 }
 

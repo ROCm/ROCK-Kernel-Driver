@@ -426,13 +426,6 @@ struct wl3501_resync_req {
 /* For rough constant delay */
 #define WL3501_NOPLOOP(n) { int x = 0; while (x++ < n) slow_down_io(); }
 
-/* Ethernet MAC addr, BSS_ID, or ESS_ID */
-/* With this, we may simply write "x=y;" instead of "memcpy(x, y, 6);" */
-/* It's more efficiency with compiler's optimization and more clearly  */
-struct wl3501_mac_addr {
-	u8 b0, b1, b2, b3, b4, b5;
-} __attribute__ ((packed));
-
 /* Definitions for supporting clone adapters. */
 /* System Interface Registers (SIR space) */
 #define WL3501_NIC_GCR ((u8)0x00)	/* SIR0 - General Conf Register */
@@ -504,7 +497,7 @@ struct wl3501_80211_tx_hdr {
 
 struct wl3501_card {
 	int				base_addr;
-	struct wl3501_mac_addr		mac_addr;
+	unsigned char			mac_addr[ETH_ALEN];
 	spinlock_t			lock;
 	wait_queue_head_t		wait;
 	struct wl3501_get_confirm	sig_get_confirm;
@@ -521,7 +514,7 @@ struct wl3501_card {
 	u16				esbq_confirm;
 	u8				llc_type;
 	u8				essid[WL3501_ESSID_MAX_LEN];
-	struct wl3501_mac_addr		bssid;
+	unsigned char			bssid[ETH_ALEN];
 	int				ether_type;
 	int				net_type;
 	u8				keep_essid[WL3501_ESSID_MAX_LEN];
