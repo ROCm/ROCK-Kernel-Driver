@@ -1124,7 +1124,7 @@ void exit_mmap(struct mm_struct * mm)
 		BUG();
 
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
-	tlb_finish_mmu(tlb, FIRST_USER_PGD_NR*PGDIR_SIZE, USER_PTRS_PER_PGD*PGDIR_SIZE);
+	tlb_finish_mmu(tlb, 0, TASK_SIZE);
 
 	mpnt = mm->mmap;
 	mm->mmap = mm->mmap_cache = NULL;
