@@ -598,7 +598,6 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 
 	/* figure out which file struct to use 
 	if (file->private_data == NULL) {
-		kunmap(page);
 		FreeXid(xid);
 		return -EBADF;
 	}     
@@ -945,6 +944,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	for(i = 0;i<num_pages;) {
 		spin_lock(&mapping->page_lock);
 		if(list_empty(page_list)) {
+			spin_unlock(&mapping->page_lock);
 			break;
 		}
 		page = list_entry(page_list->prev, struct page, list);
