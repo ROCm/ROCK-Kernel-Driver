@@ -481,8 +481,6 @@ static void send_sigio_to_task(struct task_struct *p,
 void send_sigio(struct fown_struct *fown, int fd, int band)
 {
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pidptr;
 	int pid;
 	
 	read_lock(&fown->lock);
@@ -492,10 +490,13 @@ void send_sigio(struct fown_struct *fown, int fd, int band)
 	
 	read_lock(&tasklist_lock);
 	if (pid > 0) {
-		if (p = find_task_by_pid(pid)) {
+		p = find_task_by_pid(pid);
+		if (p) {
 			send_sigio_to_task(p, fown, fd, band);
 		}
 	} else {
+		struct list_head *l;
+		struct pid *pidptr;
 		for_each_task_pid(-pid, PIDTYPE_PGID, p, l, pidptr) {
 			send_sigio_to_task(p, fown, fd, band);
 		}
@@ -526,10 +527,13 @@ int send_sigurg(struct fown_struct *fown)
 	
 	read_lock(&tasklist_lock);
 	if (pid > 0) {
-		if (p = find_task_by_pid(pid)) {
+		p = find_task_by_pid(pid);
+		if (p) {
 			send_sigurg_to_task(p, fown);
 		}
 	} else {
+		struct list_head *l;
+		struct pid *pidptr;
 		for_each_task_pid(-pid, PIDTYPE_PGID, p, l, pidptr) {
 			send_sigurg_to_task(p, fown);
 		}
