@@ -384,6 +384,8 @@ struct Scsi_Host
      */
     struct Scsi_Host      * next;
     Scsi_Device           * host_queue;
+    struct list_head	  all_scsi_hosts;
+    struct list_head	  my_devices;
 
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
@@ -488,8 +490,6 @@ struct Scsi_Host
      * Value host_blocked counts down from
      */
     unsigned int max_host_blocked;
-
-    void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
 
     /*
      * For SCSI hosts which are PCI devices, set pci_dev so that
