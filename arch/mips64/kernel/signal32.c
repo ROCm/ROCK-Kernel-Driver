@@ -17,6 +17,7 @@
 #include <linux/wait.h>
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
+#include <linux/compat.h>
 
 #include <asm/asm.h>
 #include <asm/bitops.h>
@@ -59,7 +60,7 @@ struct sigaction32 {
 /* IRIX compatible stack_t  */
 typedef struct sigaltstack32 {
 	s32 ss_sp;
-	__kernel_size_t32 ss_size;
+	compat_size_t ss_size;
 	int ss_flags;
 } stack32_t;
 
