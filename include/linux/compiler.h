@@ -17,10 +17,9 @@
  * Allow us to mark functions as 'deprecated' and have gcc emit a nice
  * warning for each use, in hopes of speeding the functions removal.
  * Usage is:
- * 		int deprecated foo(void)
- * and then gcc will emit a warning for each usage of the function.
+ * 		int __deprecated foo(void)
  */
-#if __GNUC__ >= 3
+#if ( __GNUC__ == 3 && __GNUC_MINOR > 0 ) || __GNUC__ > 3
 #define __deprecated	__attribute__((deprecated))
 #else
 #define __deprecated
