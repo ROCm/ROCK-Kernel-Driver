@@ -41,6 +41,7 @@
  *    Dajiang Zhang	    <dajiang.zhang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -73,6 +74,8 @@ static void sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
 				  sctp_init_chunk_t *peer_init,
 				  int priority);
 static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *, sctp_association_t *);
+static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *, sctp_association_t *,
+				      sctp_transport_t *);
 static void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *, sctp_association_t *,
 				    sctp_bind_addr_t *);
 static void sctp_cmd_transport_reset(sctp_cmd_seq_t *, sctp_association_t *,
@@ -193,6 +196,7 @@ int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
 		/* BUG--we should now recover some memory, probably by
 		 * reneging...
 		 */
+		error = -ENOMEM;
 		break;
 
         case SCTP_DISPOSITION_DELETE_TCB:
@@ -559,6 +563,11 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_HB_TIMERS_START:
 			sctp_cmd_hb_timers_start(commands, asoc);
+			break;
+	
+		case SCTP_CMD_HB_TIMERS_UPDATE:
+			t = command->obj.transport;
+			sctp_cmd_hb_timers_update(commands, asoc, t);
 			break;
 
 		case SCTP_CMD_REPORT_ERROR:
@@ -978,7 +987,7 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 	 */
 	asoc->overall_error_count++;
 
-	if (transport->state.active &&
+	if (transport->active &&
 	    (transport->error_count++ >= transport->error_threshold)) {
 		SCTP_DEBUG_PRINTK("transport_strike: transport "
 				  "IP:%d.%d.%d.%d failed.\n",
@@ -1096,6 +1105,16 @@ static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *cmds,
 	}
 }
 
+/* Helper function to update the heartbeat timer. */
+static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *cmds,
+				   sctp_association_t *asoc,
+				   sctp_transport_t *t)
+{
+	/* Update the heartbeat timer.  */
+	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + jiffies))
+		sctp_transport_hold(t);
+}
+
 /* Helper function to break out SCTP_CMD_SET_BIND_ADDR handling.  */
 void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 			     sctp_bind_addr_t *bp)
@@ -1131,7 +1150,7 @@ static void sctp_cmd_transport_on(sctp_cmd_seq_t *cmds,
 	/* Mark the destination transport address as active if it is not so
 	 * marked.
 	 */
-	if (!t->state.active)
+	if (!t->active)
 		sctp_assoc_control_transport(asoc, t, SCTP_TRANSPORT_UP,
 					     SCTP_HEARTBEAT_SUCCESS);
 
@@ -1154,10 +1173,6 @@ static void sctp_cmd_transport_reset(sctp_cmd_seq_t *cmds,
 
 	/* Mark one strike against a transport.  */
 	sctp_do_8_2_transport_strike(asoc, t);
-
-	/* Update the heartbeat timer.  */
-	if (!mod_timer(&t->hb_timer, t->hb_interval + t->rto + jiffies))
-		sctp_transport_hold(t);
 }
 
 /* Helper function to process the process SACK command.  */

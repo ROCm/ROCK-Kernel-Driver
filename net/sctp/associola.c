@@ -461,6 +461,9 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		min(asoc->overall_error_threshold + peer->error_threshold,
 		    asoc->max_retrans);
 
+	/* By default, enable heartbeat for peer address. */
+	peer->hb_allowed = 1;
+
 	/* Initialize the peer's heartbeat interval based on the
 	 * sock configured value.
 	 */
@@ -523,12 +526,12 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	/* Record the transition on the transport.  */
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
-		transport->state.active = 1;
+		transport->active = 1;
 		spc_state = ADDRESS_AVAILABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
-		transport->state.active = 0;
+		transport->active = 0;
 		spc_state = ADDRESS_UNREACHABLE;
 		break;
 
@@ -558,7 +561,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		t = list_entry(pos, sctp_transport_t, transports);
 
-		if (!t->state.active)
+		if (!t->active)
 			continue;
 		if (!first || t->last_time_heard > first->last_time_heard) {
 			second = first;
@@ -578,7 +581,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	 * [If the primary is active but not most recent, bump the most
 	 * recently used transport.]
 	 */
-	if (asoc->peer.primary_path->state.active &&
+	if (asoc->peer.primary_path->active &&
 	    first != asoc->peer.primary_path) {
 		second = first;
 		first = asoc->peer.primary_path;
@@ -1018,7 +1021,7 @@ sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 
 		/* Try to find an active transport. */
 
-		if (t->state.active) {
+		if (t->active) {
 			break;
 		} else {
 			/* Keep track of the next transport in case

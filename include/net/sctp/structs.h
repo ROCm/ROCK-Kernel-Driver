@@ -685,13 +685,15 @@ struct SCTP_transport {
 	 */
 	unsigned long last_time_ecne_reduced;
 
-	/* state       : The current state of this destination,
-	 *             :  i.e. DOWN, UP, ALLOW-HB, NO-HEARTBEAT, etc.
+	/* active      : The current active state of this destination,
+	 *             :  i.e. DOWN, UP, etc.
 	 */
-	struct {
-		int active;
-		int hb_allowed;
-	} state;
+	int active;
+
+	/* hb_allowed  : The current heartbeat state of this destination,
+	 *             :  i.e. ALLOW-HB, NO-HEARTBEAT, etc.
+	 */
+	int hb_allowed;
 
 	/* These are the error stats for this destination.  */
 

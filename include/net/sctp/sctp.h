@@ -142,7 +142,7 @@ extern int sctp_primitive_ASSOCIATE(sctp_association_t *, void *arg);
 extern int sctp_primitive_SHUTDOWN(sctp_association_t *, void *arg);
 extern int sctp_primitive_ABORT(sctp_association_t *, void *arg);
 extern int sctp_primitive_SEND(sctp_association_t *, void *arg);
-
+extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
 
 /*
  * sctp_crc32c.c
