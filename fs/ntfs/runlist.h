@@ -40,6 +40,9 @@ typedef enum {
 	LCN_ENOENT		= -3,
 } LCN_SPECIAL_VALUES;
 
+extern runlist_element *ntfs_runlists_merge(runlist_element *drl,
+		runlist_element *srl);
+
 extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl);
 

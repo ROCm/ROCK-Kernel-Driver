@@ -1673,7 +1673,7 @@ err_out:
  * We solve these problems by starting with the $DATA attribute before anything
  * else and iterating using ntfs_attr_lookup($DATA) over all extents.  As each
  * extent is found, we ntfs_mapping_pairs_decompress() including the implied
- * ntfs_merge_runlists().  Each step of the iteration necessarily provides
+ * ntfs_runlists_merge().  Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
  * This should work but there are two possible pit falls (see inline comments
