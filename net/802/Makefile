@@ -2,50 +2,19 @@
 # Makefile for the Linux 802.x protocol layers.
 #
 
-export-objs = llc_macinit.o p8022.o psnap.o
+export-objs		:= llc_macinit.o p8022.o psnap.o
 
-obj-y	= p8023.o
+obj-y			:= p8023.o
 
-obj-$(CONFIG_SYSCTL) += sysctl_net_802.o
-obj-$(CONFIG_LLC) += llc_sendpdu.o llc_utility.o cl2llc.o llc_macinit.o
-ifeq ($(CONFIG_SYSCTL),y)
-obj-y += sysctl_net_802.o
-endif
-
-ifeq ($(CONFIG_LLC),y)
-subdir-y += transit
-obj-y += llc_sendpdu.o llc_utility.o cl2llc.o llc_macinit.o
-SNAP = y
-endif
-
-ifdef CONFIG_TR
-obj-y += tr.o
-	SNAP=y
-endif
-
-ifdef CONFIG_NET_FC
-obj-y += fc.o
-endif
-
-ifdef CONFIG_FDDI
-obj-y += fddi.o
-endif
-
-ifdef CONFIG_HIPPI
-obj-y += hippi.o
-endif
-
-ifdef CONFIG_IPX
-	SNAP=y
-endif
-
-ifdef CONFIG_ATALK
-	SNAP=y
-endif
-
-ifeq ($(SNAP),y)
-obj-y += p8022.o psnap.o
-endif
+obj-$(CONFIG_SYSCTL)	+= sysctl_net_802.o
+obj-$(CONFIG_LLC)	+= p8022.o psnap.o llc_sendpdu.o llc_utility.o \
+			   		   cl2llc.o llc_macinit.o	
+obj-$(CONFIG_TR)	+= p8022.o psnap.o tr.o
+obj-$(CONFIG_NET_FC)	+=                 fc.o
+obj-$(CONFIG_FDDI)	+=                 fddi.o
+obj-$(CONFIG_HIPPI)	+=                 hippi.o
+obj-$(CONFIG_IPX)	+= p8022.o psnap.o
+obj-$(CONFIG_ATALK)	+= p8022.o psnap.o
 
 include $(TOPDIR)/Rules.make
 
