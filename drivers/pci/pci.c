@@ -850,16 +850,16 @@ pci_set_master(struct pci_dev *dev)
 }
 
 /**
- * pdev_set_mwi - arch helper function for pcibios_set_mwi
+ * pdev_set_mwi - helper function for pci_set_mwi
  * @dev: the PCI device for which MWI is enabled
  *
- * Helper function for implementation the arch-specific pcibios_set_mwi
+ * Helper function for generic implementation of pci_set_mwi
  * function.  Originally copied from drivers/net/acenic.c.
  * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
  *
  * RETURNS: An appriopriate -ERRNO error value on eror, or zero for success.
  */
-int
+static int
 pdev_set_mwi(struct pci_dev *dev)
 {
 	int rc = 0;
@@ -2099,7 +2099,6 @@ EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_set_master);
 EXPORT_SYMBOL(pci_set_mwi);
 EXPORT_SYMBOL(pci_clear_mwi);
-EXPORT_SYMBOL(pdev_set_mwi);
 EXPORT_SYMBOL(pci_set_dma_mask);
 EXPORT_SYMBOL(pci_dac_set_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);
