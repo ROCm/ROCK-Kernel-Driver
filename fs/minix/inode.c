@@ -92,14 +92,14 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations minix_sops = {
-	alloc_inode:	minix_alloc_inode,
-	destroy_inode:	minix_destroy_inode,
-	read_inode:	minix_read_inode,
-	write_inode:	minix_write_inode,
-	delete_inode:	minix_delete_inode,
-	put_super:	minix_put_super,
-	statfs:		minix_statfs,
-	remount_fs:	minix_remount,
+	.alloc_inode	= minix_alloc_inode,
+	.destroy_inode	= minix_destroy_inode,
+	.read_inode	= minix_read_inode,
+	.write_inode	= minix_write_inode,
+	.delete_inode	= minix_delete_inode,
+	.put_super	= minix_put_super,
+	.statfs		= minix_statfs,
+	.remount_fs	= minix_remount,
 };
 
 static int minix_remount (struct super_block * sb, int * flags, char * data)
@@ -333,18 +333,18 @@ static int minix_bmap(struct address_space *mapping, long block)
 	return generic_block_bmap(mapping,block,minix_get_block);
 }
 static struct address_space_operations minix_aops = {
-	readpage: minix_readpage,
-	writepage: minix_writepage,
-	sync_page: block_sync_page,
-	prepare_write: minix_prepare_write,
-	commit_write: generic_commit_write,
-	bmap: minix_bmap
+	.readpage = minix_readpage,
+	.writepage = minix_writepage,
+	.sync_page = block_sync_page,
+	.prepare_write = minix_prepare_write,
+	.commit_write = generic_commit_write,
+	.bmap = minix_bmap
 };
 
 static struct inode_operations minix_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
-	getattr:	minix_getattr,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.getattr	= minix_getattr,
 };
 
 void minix_set_inode(struct inode *inode, dev_t rdev)
@@ -554,11 +554,11 @@ static struct super_block *minix_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type minix_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"minix",
-	get_sb:		minix_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "minix",
+	.get_sb		= minix_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_minix_fs(void)
