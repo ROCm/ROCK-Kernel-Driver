@@ -600,7 +600,9 @@ next_desc:
 	/* claim data interface and set it up ... with side effects.
 	 * network traffic can't flow until an altsetting is enabled.
 	 */
-	usb_driver_claim_interface (&usbnet_driver, info->data, dev);
+	status = usb_driver_claim_interface (&usbnet_driver, info->data, dev);
+	if (status < 0)
+		return status;
 	status = get_endpoints (dev, info->data);
 	if (status < 0) {
 		usb_driver_release_interface (&usbnet_driver, info->data);
