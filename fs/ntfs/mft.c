@@ -102,7 +102,7 @@ extern int ntfs_mst_readpage(struct file *, struct page *);
  * ntfs_mft_aops - address space operations for access to $MFT
  *
  * Address space operations for access to $MFT. This allows us to simply use
- * read_cache_page() in map_mft_record().
+ * ntfs_map_page() in map_mft_record_page().
  */
 struct address_space_operations ntfs_mft_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
@@ -334,9 +334,9 @@ void unmap_mft_record(const int rw, ntfs_inode *ni)
 
 	/*
 	 * If pure ntfs_inode, i.e. no vfs inode attached, we leave it to
-	 * ntfs_clear_inode() in the extent inode case, and to the caller in
-	 * the non-extent, yet pure ntfs inode case, to do the actual tear
-	 * down of all structures and freeing of all allocated memory.
+	 * ntfs_clear_extent_inode() in the extent inode case, and to the
+	 * caller in the non-extent, yet pure ntfs inode case, to do the actual
+	 * tear down of all structures and freeing of all allocated memory.
 	 */
 	return;
 }
@@ -417,14 +417,13 @@ map_err_out:
 		return m;
 	}
 	/* Record wasn't there. Get a new ntfs inode and initialize it. */
-	ni = ntfs_new_inode(base_ni->vol->sb);
+	ni = ntfs_new_extent_inode(base_ni->vol->sb, mft_no);
 	if (!ni) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
 		return ERR_PTR(-ENOMEM);
 	}
 	ni->vol = base_ni->vol;
-	ni->mft_no = mft_no;
 	ni->seq_no = seq_no;
 	ni->nr_extents = -1;
 	ni->_INE(base_ntfs_ino) = base_ni;
@@ -433,7 +432,7 @@ map_err_out:
 	if (IS_ERR(m)) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
-		ntfs_clear_inode(ni);
+		ntfs_clear_extent_inode(ni);
 		goto map_err_out;
 	}
 	/* Verify the sequence number. */
@@ -479,7 +478,7 @@ unm_err_out:
 	 * release it or we will leak memory.
 	 */
 	if (destroy_ni)
-		ntfs_clear_inode(ni);
+		ntfs_clear_extent_inode(ni);
 	return m;
 }
 

@@ -431,6 +431,11 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 		topCdromPtr = cdi->next;
 	cdi->ops->n_minors--;
 	devfs_unregister (cdi->de);
+	if (atomic_read (&cdi->cdrom_driverfs_dev.refcount)) {
+		device_remove_file (&cdi->cdrom_driverfs_dev, "name");
+		device_remove_file (&cdi->cdrom_driverfs_dev, "kdev");
+		put_device (&cdi->cdrom_driverfs_dev);
+	}
 	devfs_dealloc_unique_number (&cdrom_numspace, cdi->number);
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" unregistered\n", cdi->name);
 	return 0;
