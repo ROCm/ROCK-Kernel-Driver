@@ -147,7 +147,7 @@ static int qla2xxx_eh_abort(struct scsi_cmnd *);
 static int qla2xxx_eh_device_reset(struct scsi_cmnd *);
 static int qla2xxx_eh_bus_reset(struct scsi_cmnd *);
 static int qla2xxx_eh_host_reset(struct scsi_cmnd *);
-static uint8_t qla2x00_loop_reset(scsi_qla_host_t *ha);
+static int qla2x00_loop_reset(scsi_qla_host_t *ha);
 static int qla2x00_device_reset(scsi_qla_host_t *, fc_port_t *);
 
 static int qla2x00_proc_info(struct Scsi_Host *, char *, char **,
@@ -1568,7 +1568,7 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 	}
 
 	if (qla2x00_wait_for_loop_ready(ha) == QLA_SUCCESS) {
-		if (qla2x00_loop_reset(ha)) 
+		if (qla2x00_loop_reset(ha) == QLA_SUCCESS) 
 			rval = SUCCESS;
 	}
 
@@ -1683,10 +1683,10 @@ qla2xxx_eh_host_reset(struct scsi_cmnd *cmd)
 * Returns:
 *      0 = success
 */
-static uint8_t
+static int
 qla2x00_loop_reset(scsi_qla_host_t *ha)
 {
-	uint8_t  status = QLA_SUCCESS;
+	int status = QLA_SUCCESS;
 	uint16_t t;
 	os_tgt_t        *tq;
 
