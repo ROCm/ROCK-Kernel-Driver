@@ -317,7 +317,7 @@ struct buf_window {
 };
 
 /* Calculate offset of a buffer object within the shared memory window */
-#define BUF_OFFSET(X)   ((unsigned int)&(((struct buf_window *)BFM_BASE)->X))
+#define BUF_OFFSET(X)   offsetof(struct buf_window, X)
 
 #pragma pack()
 
