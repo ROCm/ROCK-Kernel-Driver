@@ -129,11 +129,12 @@
 		* be sure to write the MAC back to the chip (Manfred Spraul)
 		* lengthen EEPROM timeout, and always warn about timeouts
 		  (Manfred Spraul)
+		* comments update (Manfred)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
 	* support for an external PHY
-	* flow control
+	* NAPI
 */
 
 #if !defined(__OPTIMIZE__)
@@ -317,20 +318,19 @@ skbuff at an offset of "+2", 16-byte aligning the IP header.
 
 IIId. Synchronization
 
-The driver runs as two independent, single-threaded flows of control.  One
-is the send-packet routine, which enforces single-threaded use by the
-dev->tbusy flag.  The other thread is the interrupt handler, which is single
-threaded by the hardware and interrupt handling software.
+Most operations are synchronized on the np->lock irq spinlock, except the
+performance critical codepaths:
 
-The send packet thread has partial control over the Tx ring and 'dev->tbusy'
-flag.  It sets the tbusy flag whenever it's queuing a Tx packet. If the next
-queue slot is empty, it clears the tbusy flag when finished otherwise it sets
-the 'lp->tx_full' flag.
+The rx process only runs in the interrupt handler. Access from outside
+the interrupt handler is only permitted after disable_irq().
 
-The interrupt handler has exclusive control over the Rx ring and records stats
-from the Tx ring.  After reaping the stats, it marks the Tx queue entry as
-empty by incrementing the dirty_tx mark. Iff the 'lp->tx_full' flag is set, it
-clears both the tx_full and tbusy flags.
+The rx process usually runs under the dev->xmit_lock. If np->intr_tx_reap
+is set, then access is permitted under spin_lock_irq(&np->lock).
+
+Thus configuration functions that want to access everything must call
+	disable_irq(dev->irq);
+	spin_lock_bh(dev->xmit_lock);
+	spin_lock_irq(&np->lock);
 
 IV. Notes
 
@@ -1316,13 +1316,16 @@ static void init_registers(struct net_device *dev)
 }
 
 /*
+ * netdev_timer:
  * Purpose:
- * check for sudden death of the NIC:
- *
- * It seems that a reference set for this chip went out with incorrect info,
- * and there exist boards that aren't quite right.  An unexpected voltage drop
- * can cause the PHY to get itself in a weird state (basically reset..).
- * NOTE: this only seems to affect revC chips.
+ * 1) check for link changes. Usually they are handled by the MII interrupt
+ *    but it doesn't hurt to check twice.
+ * 2) check for sudden death of the NIC:
+ *    It seems that a reference set for this chip went out with incorrect info,
+ *    and there exist boards that aren't quite right.  An unexpected voltage 
+ *    drop can cause the PHY to get itself in a weird state (basically reset).
+ *    NOTE: this only seems to affect revC chips.
+ * 3) check of death of the RX path due to OOM
  */
 static void netdev_timer(unsigned long data)
 {
@@ -2578,23 +2581,26 @@ static void __devexit natsemi_remove1 (struct pci_dev *pdev)
 #ifdef CONFIG_PM
 
 /*
+ * The ns83815 chip doesn't have explicit RxStop bits.
+ * Kicking the Rx or Tx process for a new packet reenables the Rx process
+ * of the nic, thus this function must be very careful:
+ *
  * suspend/resume synchronization:
  * entry points:
  *   netdev_open, netdev_close, netdev_ioctl, set_rx_mode, intr_handler,
  *   start_tx, tx_timeout
- * Reading from some registers can restart the nic!
- * No function accesses the hardware without checking netif_device_present().
- * 	the check occurs under spin_lock_irq(&np->lock);
+ *
+ * No function accesses the hardware without checking np->hands_off.
+ *	the check occurs under spin_lock_irq(&np->lock);
  * exceptions:
- * 	* netdev_ioctl, netdev_open.
- * 		net/core checks netif_device_present() before calling them.
- * 	* netdev_close: doesn't hurt.
+ *	* netdev_ioctl: noncritical access.
+ *	* netdev_open: cannot happen due to the device_detach
+ *	* netdev_close: doesn't hurt.
  *	* netdev_timer: timer stopped by natsemi_suspend.
  *	* intr_handler: doesn't acquire the spinlock. suspend calls
  *		disable_irq() to enforce synchronization.
  *
- * netif_device_detach must occur under spin_unlock_irq(), interrupts from a
- * detached device would cause an irq storm.
+ * Interrupts must be disabled, otherwise hands_off can cause irq storms.
  */
 
 static int natsemi_suspend (struct pci_dev *pdev, u32 state)
