@@ -33,9 +33,7 @@
 #include "isl_oid.h"		/* additional types and defs for isl38xx fw */
 #include "oid_mgt.h"
 
-#if WIRELESS_EXT > 12
 #include <net/iw_handler.h>	/* New driver API */
-#endif				/* WIRELESS_EXT > 12 */
 
 static int init_mode = CARD_DEFAULT_IW_MODE;
 static int init_channel = CARD_DEFAULT_CHANNEL;
@@ -693,7 +691,6 @@ prism54_translate_bss(struct net_device *ndev, char *current_ev,
 	current_ev =
 	    iwe_stream_add_event(current_ev, end_buf, &iwe, IW_EV_QUAL_LEN);
 
-#if WIRELESS_EXT > 14
 	if (priv->wpa) {
 		u8 wpa_ie[MAX_WPA_IE_LEN];
 		char *buf, *p;
@@ -716,7 +713,6 @@ prism54_translate_bss(struct net_device *ndev, char *current_ev,
 			kfree(buf);
 		}
 	}
-#endif				/* WIRELESS_EXT > 14 */
 
 	return current_ev;
 }
@@ -2025,8 +2021,6 @@ prism54_set_oid(struct net_device *ndev, struct iw_request_info *info,
 	return ret;
 }
 
-#if WIRELESS_EXT > 12
-
 static const iw_handler prism54_handler[] = {
 	(iw_handler) prism54_commit,	/* SIOCSIWCOMMIT */
 	(iw_handler) prism54_get_name,	/* SIOCGIWNAME */
@@ -2044,28 +2038,16 @@ static const iw_handler prism54_handler[] = {
 	(iw_handler) NULL,	/* SIOCGIWPRIV */
 	(iw_handler) NULL,	/* SIOCSIWSTATS */
 	(iw_handler) NULL,	/* SIOCGIWSTATS */
-#if WIRELESS_EXT > 15
 	iw_handler_set_spy,	/* SIOCSIWSPY */
 	iw_handler_get_spy,	/* SIOCGIWSPY */
 	iw_handler_set_thrspy,	/* SIOCSIWTHRSPY */
 	iw_handler_get_thrspy,	/* SIOCGIWTHRSPY */
-#else				/* WIRELESS_EXT > 15 */
-	(iw_handler) NULL,	/* SIOCSIWSPY */
-	(iw_handler) NULL,	/* SIOCGIWSPY */
-	(iw_handler) NULL,	/* -- hole -- */
-	(iw_handler) NULL,	/* -- hole -- */
-#endif				/* WIRELESS_EXT > 15 */
 	(iw_handler) prism54_set_wap,	/* SIOCSIWAP */
 	(iw_handler) prism54_get_wap,	/* SIOCGIWAP */
 	(iw_handler) NULL,	/* -- hole -- */
 	(iw_handler) NULL,	/* SIOCGIWAPLIST depreciated */
-#if WIRELESS_EXT > 13
 	(iw_handler) prism54_set_scan,	/* SIOCSIWSCAN */
 	(iw_handler) prism54_get_scan,	/* SIOCGIWSCAN */
-#else				/* WIRELESS_EXT > 13 */
-	(iw_handler) NULL,	/* SIOCSIWSCAN */
-	(iw_handler) NULL,	/* SIOCGIWSCAN */
-#endif				/* WIRELESS_EXT > 13 */
 	(iw_handler) prism54_set_essid,	/* SIOCSIWESSID */
 	(iw_handler) prism54_get_essid,	/* SIOCGIWESSID */
 	(iw_handler) prism54_set_nick,	/* SIOCSIWNICKN */
@@ -2171,4 +2153,3 @@ const struct iw_handler_def prism54_handler_def = {
 	.private_args = (struct iw_priv_args *) prism54_private_args,
 };
 
-#endif				/* WIRELESS_EXT > 12 */

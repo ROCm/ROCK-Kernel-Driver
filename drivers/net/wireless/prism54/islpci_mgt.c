@@ -32,9 +32,7 @@
 #include "isl_oid.h"		/* additional types and defs for isl38xx fw */
 #include "isl_ioctl.h"
 
-#if WIRELESS_EXT > 12
 #include <net/iw_handler.h>
-#endif
 
 /******************************************************************************
         Global variable definition section

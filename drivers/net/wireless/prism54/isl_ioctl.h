@@ -25,10 +25,7 @@
 #include "islpci_mgt.h"
 #include "islpci_dev.h"
 
-#if WIRELESS_EXT > 12
 #include <net/iw_handler.h>	/* New driver API */
-#endif				/* WIRELESS_EXT > 12 */
-
 
 #define SUPPORTED_WIRELESS_EXT                  16
 
@@ -53,8 +50,6 @@ int prism54_set_mac_address(struct net_device *, void *);
 
 int prism54_ioctl(struct net_device *, struct ifreq *, int);
 
-#if WIRELESS_EXT > 12
 extern const struct iw_handler_def prism54_handler_def;
-#endif				/* WIRELESS_EXT > 12 */
 
 #endif				/* _ISL_IOCTL_H */

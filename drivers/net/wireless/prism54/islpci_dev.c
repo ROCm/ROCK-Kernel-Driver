@@ -695,10 +695,8 @@ islpci_setup(struct pci_dev *pdev)
 	ndev->get_stats = &islpci_statistics;
 	ndev->get_wireless_stats = &prism54_get_wireless_stats;
 	ndev->do_ioctl = &prism54_ioctl;
-#if WIRELESS_EXT > 12
 	ndev->wireless_handlers =
 	    (struct iw_handler_def *) &prism54_handler_def;
-#endif				/* WIRELESS_EXT > 12 */
 
 	ndev->hard_start_xmit = &islpci_eth_transmit;
 	/* ndev->set_multicast_list = &islpci_set_multicast_list; */
