@@ -28,7 +28,7 @@ config USB_EHCI_HCD
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ehci-hcd.o. If you want to compile it as a
+	  The module will be called ehci-hcd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_OHCI_HCD
@@ -46,7 +46,7 @@ config USB_OHCI_HCD
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ohci-hcd.o. If you want to compile it
+	  The module will be called ohci-hcd. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_UHCI_HCD
@@ -64,7 +64,7 @@ config USB_UHCI_HCD
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called uhci-hcd.o. If you want to compile it as a
+	  The module will be called uhci-hcd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SL811HS
@@ -77,6 +77,6 @@ config USB_SL811HS
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called hc_sl811.o. If you want to compile it
+	  The module will be called hc_sl811. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 

@@ -3,8 +3,8 @@ config IRCOMM
 	depends on IRDA
 	help
 	  Say Y here if you want to build support for the IrCOMM protocol.  If
-	  you want to compile it as a module (you will get ircomm.o and
-	  ircomm-tty.o), say M here and read <file:Documentation/modules.txt>.
+	  you want to compile it as a module (you will get ircomm and
+	  ircomm-tty), say M here and read <file:Documentation/modules.txt>.
 	  IrCOMM implements serial port emulation, and makes it possible to
 	  use all existing applications that understands TTY's with an
 	  infrared link.  Thus you should be able to use application like PPP,

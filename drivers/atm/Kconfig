@@ -34,7 +34,7 @@ config ATM_ENI
 
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called eni.o.
+	  <file:Documentation/modules.txt>.  The module will be called eni.
 
 config ATM_ENI_DEBUG
 	bool "Enable extended debugging"
@@ -141,7 +141,7 @@ config ATM_FIRESTREAM
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  firestream.o.
+	  firestream.
 
 config ATM_ZATM
 	tristate "ZeitNet ZN1221/ZN1225"
@@ -152,7 +152,7 @@ config ATM_ZATM
 
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called zatm.o.
+	  <file:Documentation/modules.txt>.  The module will be called zatm.
 
 config ATM_ZATM_DEBUG
 	bool "Enable extended debugging"
@@ -191,7 +191,7 @@ config ATM_NICSTAR
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>. The module will be called
-	  nicstar.o.
+	  nicstar.
 
 config ATM_NICSTAR_USE_SUNI
 	bool "Use suni PHY driver (155Mbps)"
@@ -223,7 +223,7 @@ config ATM_IDT77252
 
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called idt77252.o
+	  <file:Documentation/modules.txt>. The module will be called idt77252
 
 config ATM_IDT77252_DEBUG
 	bool "Enable debugging messages"
@@ -256,7 +256,7 @@ config ATM_AMBASSADOR
 	depends on PCI
 	help
 	  This is a driver for ATMizer based ATM card produced by Madge
-	  Networks Ltd. Say Y (or M to compile as a module named ambassador.o)
+	  Networks Ltd. Say Y (or M to compile as a module named ambassador)
 	  here if you have one of these cards.
 
 config ATM_AMBASSADOR_DEBUG
@@ -281,7 +281,7 @@ config ATM_HORIZON
 	help
 	  This is a driver for the Horizon chipset ATM adapter cards once
 	  produced by Madge Networks Ltd. Say Y (or M to compile as a module
-	  named horizon.o) here if you have one of these cards.
+	  named horizon) here if you have one of these cards.
 
 config ATM_HORIZON_DEBUG
 	bool "Enable debugging messages"
@@ -310,7 +310,7 @@ config ATM_IA
 	  UTP155, UTP25, DS3 and E3). Go to:
 	  	<http://www.iphase.com/products/ClassSheet.cfm?ClassID=ATM>
 	  for more info about the cards. Say Y (or M to compile as a module
-	  named iphase.o) here if you have one of these cards.
+	  named iphase) here if you have one of these cards.
 
 	  See the file <file:Documentation/networking/iphase.txt> for further
 	  details.
@@ -339,7 +339,7 @@ config ATM_FORE200E_MAYBE
 	  This is a driver for the FORE Systems 200E-series ATM adapter
 	  cards. It simultaneously supports PCA-200E and SBA-200E models
 	  on PCI and SBUS hosts. Say Y (or M to compile as a module
-	  named fore_200e.o) here if you have one of these ATM adapters.
+	  named fore_200e) here if you have one of these ATM adapters.
 
 	  Note that the driver will actually be compiled only if you
 	  additionally enable the support for PCA-200E and/or SBA-200E

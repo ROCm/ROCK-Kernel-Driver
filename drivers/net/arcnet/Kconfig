@@ -23,7 +23,7 @@ config ARCNET
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called arcnet.o.  If you want to compile it as a
+	  The module will be called arcnet.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -71,7 +71,7 @@ config ARCNET_COM90xx
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com90xx.o.  If you want to compile it as a
+	  The module will be called com90xx.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -86,7 +86,7 @@ config ARCNET_COM90xxIO
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com90io.o.  If you want to compile it as a
+	  The module will be called com90io.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -101,7 +101,7 @@ config ARCNET_RIM_I
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
-	  want). The module will be called arc-rimi.o.  If you want to compile
+	  want). The module will be called arc-rimi.  If you want to compile
 	  it as a module, say M here and read <file:Documentation/modules.txt>
 	  as  well as <file:Documentation/networking/net-modules.txt>.
 
@@ -115,7 +115,7 @@ config ARCNET_COM20020
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com20020.o.  If you want to compile it as
+	  The module will be called com20020.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
 

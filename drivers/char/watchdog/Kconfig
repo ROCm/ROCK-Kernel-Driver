@@ -50,7 +50,7 @@ config SOFT_WATCHDOG
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>. The module will be called
-	  softdog.o.
+	  softdog.
 
 config WDT
 	tristate "WDT Watchdog timer"
@@ -66,7 +66,7 @@ config WDT
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called wdt.o.
+	  will be called wdt.
 
 config WDTPCI
 	tristate "WDT PCI Watchdog timer"
@@ -82,7 +82,7 @@ config WDTPCI
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called wdt_pci.o.
+	  will be called wdt_pci.
 
 config WDT_501
 	bool "WDT501 features"
@@ -115,7 +115,7 @@ config PCWATCHDOG
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called pcwd.o. If you want to compile it as a module,
+	  The module is called pcwd. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 	  Most people will say N.
@@ -132,7 +132,7 @@ config ACQUIRE_WDT
 	  This driver is like the WDT501 driver but for different hardware.
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called pscwdt.o.  If you want to compile it as a
+	  The module is called pscwdt.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
@@ -150,7 +150,7 @@ config 21285_WATCHDOG
 	help
 	  The Intel Footbridge chip contains a builtin watchdog circuit. Say Y
 	  here if you wish to use this. Alternatively say M to compile the
-	  driver as a module, which will be called wdt285.o.
+	  driver as a module, which will be called wdt285.
 
 	  This driver does not work on all machines. In particular, early CATS
 	  boards have hardware problems that will cause the machine to simply
@@ -164,7 +164,7 @@ config 977_WATCHDOG
 	help
 	  Say Y here to include support for the WB977 watchdog included in
 	  NetWinder machines. Alternatively say M to compile the driver as
-	  a module, which will be called wdt977.o.
+	  a module, which will be called wdt977.
 
 	  Not sure? It's safe to say N.
 
@@ -179,7 +179,7 @@ config SA1100_WATCHDOG
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt. The module will be called sa1100_wdt.o.
+	  Documentation/modules.txt. The module will be called sa1100_wdt.
 
 config EUROTECH_WDT
 	tristate "Eurotech CPU-1220/1410 Watchdog Timer"
@@ -202,7 +202,7 @@ config IB700_WDT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called ib700wdt.o. If you want to compile it as a
+	  The module is called ib700wdt. If you want to compile it as a
 	  module, say M here and read Documentation/modules.txt. Most people
 	  will say N.
 
@@ -225,7 +225,7 @@ config I810_TCO
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  i810-tco.o.
+	  i810-tco.
 
 config MIXCOMWD
 	tristate "Mixcom Watchdog"
@@ -238,7 +238,7 @@ config MIXCOMWD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called mixcomwd.o.  If you want to compile it as a
+	  The module is called mixcomwd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
@@ -249,7 +249,7 @@ config SCx200_WDT
 	  Enable the built-in watchdog timer support on the National 
 	  Semiconductor SCx200 processors.
 
-	  If compiled as a module, it will be called scx200_watchdog.o.
+	  If compiled as a module, it will be called scx200_watchdog.
 
 config 60XX_WDT
 	tristate "SBC-60XX Watchdog Timer"
@@ -263,7 +263,7 @@ config 60XX_WDT
 	  you can probably make this driver work with your card as well.
 
 	  You can compile this driver directly into the kernel, or use
-	  it as a module.  The module will be called sbc60xxwdt.o.
+	  it as a module.  The module will be called sbc60xxwdt.
 
 config W83877F_WDT
 	tristate "W83877F (EMACS) Watchdog Timer"
@@ -277,7 +277,7 @@ config W83877F_WDT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called mixcomwd.o.  If you want to compile it as a
+	  The module is called mixcomwd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
@@ -293,7 +293,7 @@ config MACHZ_WDT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called machzwd.o.  If you want to compile it as a
+	  The module is called machzwd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config W83877F_WDT

@@ -16,7 +16,7 @@ config I2C_AMD756
 	  while the kernel is running.  If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
-	  The module will be called i2c-amd756.o.
+	  The module will be called i2c-amd756.
 
 	  You will also need the latest user-space utilties: you can find them
 	  in the lm_sensors package, which you can download at 
@@ -33,7 +33,7 @@ config I2C_AMD8111
 	  while the kernel is running.  If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
-	  The module will be called i2c-amd8111.o.
+	  The module will be called i2c-amd8111.
 
 	  You will also need the latest user-space utilties: you can find them
 	  in the lm_sensors package, which you can download at 

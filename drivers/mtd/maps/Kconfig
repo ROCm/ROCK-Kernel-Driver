@@ -137,7 +137,7 @@ config MTD_SCx200_DOCFLASH
 
 	  If you don't know what to do here, say N.
 
-	  If compiled as a module, it will be called scx200_docflash.o.
+	  If compiled as a module, it will be called scx200_docflash.
 
 config MTD_L440GX
 	tristate "BIOS flash chip on Intel L440GX boards"

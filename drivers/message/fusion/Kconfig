@@ -21,10 +21,10 @@ config FUSION
 
 	  If you have Fusion MPT hardware and want to use it, you can say
 	  Y or M here to add MPT (base + ScsiHost) drivers.
-	  <Y> = build lib (fusion.o), and link [static] into the kernel [2]
+	  <Y> = build lib (fusion), and link [static] into the kernel [2]
 	  proper
-	  <M> = compiled as [dynamic] modules [3] named: (mptbase.o,
-	  mptscsih.o)
+	  <M> = compiled as [dynamic] modules [3] named: (mptbase,
+	  mptscsih)
 
 	  [2] In order enable capability to boot the linux kernel
 	  natively from a Fusion MPT target device, you MUST
@@ -39,9 +39,9 @@ config FUSION
 
 	  If you say Y or M here you will get a choice of these
 	  additional protocol and support module options:         Module Name:
-	  <M>   Enhanced SCSI error reporting                     (isense.o)
-	  <M>   Fusion MPT misc device (ioctl) driver             (mptctl.o)
-	  <M>   Fusion MPT LAN driver                             (mptlan.o)
+	  <M>   Enhanced SCSI error reporting                     (isense)
+	  <M>   Fusion MPT misc device (ioctl) driver             (mptctl)
+	  <M>   Fusion MPT LAN driver                             (mptlan)
 
 	  ---
 	  Fusion MPT is trademark of LSI Logic Corporation, and its
@@ -95,7 +95,7 @@ config FUSION_ISENSE
 	  ASC/ASCQ=29h/00h "LOGICAL UNIT NOT READY, INITIALIZING CMD. REQUIRED"
 
 	  Say M for "Enhanced SCSI error reporting" to compile this optional module,
-	  creating a driver named: isense.o.
+	  creating a driver named: isense.
 
 	  NOTE: Support for building this feature into the kernel is not
 	  available, due to kernel size considerations.
@@ -114,7 +114,7 @@ config FUSION_CTL
 	  of the MPT adapter firmware.  Refer to readme file(s) distributed
 	  with the Fusion MPT linux driver for additional details.
 
-	  If enabled by saying M to this, a driver named: mptctl.o
+	  If enabled by saying M to this, a driver named: mptctl
 	  will be compiled.
 
 	  If unsure whether you really want or need this, say N.
@@ -131,7 +131,7 @@ config FUSION_LAN
 	  Installing this driver requires the knowledge to configure and
 	  activate a new network interface, "fc0", using standard Linux tools.
 
-	  If enabled by saying M to this, a driver named: mptlan.o
+	  If enabled by saying M to this, a driver named: mptlan
 	  will be compiled.
 
 	  If unsure whether you really want or need this, say N.

@@ -27,7 +27,7 @@ config I2C
 	  This I2C support is also available as a module.  If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-core.o.
+	  The module will be called i2c-core.
 
 config I2C_ALGOBIT
 	tristate "I2C bit-banging interfaces"
@@ -40,7 +40,7 @@ config I2C_ALGOBIT
 	  This support is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-algo-bit.o.
+	  The module will be called i2c-algo-bit.
 
 config I2C_PHILIPSPAR
 	tristate "Philips style parallel port adapter"
@@ -52,7 +52,7 @@ config I2C_PHILIPSPAR
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-philips-par.o.
+	  The module will be called i2c-philips-par.
 
 	  Note that if you want support for different parallel port devices,
 	  life will be much easier if you compile them all as modules.
@@ -67,7 +67,7 @@ config I2C_ELV
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-elv.o.
+	  The module will be called i2c-elv.
 
 config I2C_VELLEMAN
 	tristate "Velleman K9000 adapter"
@@ -79,7 +79,7 @@ config I2C_VELLEMAN
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-velleman.o.
+	  The module will be called i2c-velleman.
 
 config SCx200_I2C
 	tristate "NatSemi SCx200 I2C using GPIO pins"
@@ -89,7 +89,7 @@ config SCx200_I2C
 
 	  If you don't know what to do here, say N.
 
-	  If compiled as a module, it will be called scx200_i2c.o.
+	  If compiled as a module, it will be called scx200_i2c.
 
 config SCx200_I2C_SCL
 	int "GPIO pin used for SCL"
@@ -115,7 +115,7 @@ config SCx200_ACB
 
 	  If you don't know what to do here, say N.
 
-	  If compiled as a module, it will be called scx200_acb.o.
+	  If compiled as a module, it will be called scx200_acb.
 
 config I2C_ALGOPCF
 	tristate "I2C PCF 8584 interfaces"
@@ -128,7 +128,7 @@ config I2C_ALGOPCF
 	  This support is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-algo-pcf.o.
+	  The module will be called i2c-algo-pcf.
 
 config I2C_ELEKTOR
 	tristate "Elektor ISA card"
@@ -140,7 +140,7 @@ config I2C_ELEKTOR
 	  This driver is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-elektor.o.
+	  The module will be called i2c-elektor.
 
 config ITE_I2C_ALGO
 	tristate "ITE I2C Algorithm"
@@ -194,7 +194,7 @@ config I2C_CHARDEV
 	  This code is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called i2c-dev.o.
+	  The module will be called i2c-dev.
 
 config I2C_PROC
 	tristate "I2C /proc interface (required for hardware sensors)"
@@ -205,7 +205,7 @@ config I2C_PROC
 
 	  This code is also available as a module. If you want to compile
 	  it as a module, say M here and read <file:Documentation/modules.txt>.
-	  The module will be called i2c-proc.o.
+	  The module will be called i2c-proc.
 
 	source drivers/i2c/busses/Kconfig
 	source drivers/i2c/chips/Kconfig

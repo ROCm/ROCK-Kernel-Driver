@@ -31,7 +31,7 @@ config BLK_DEV_IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/ide.txt>. The module will be called ide-mod.o.
+	  <file:Documentation/ide.txt>. The module will be called ide-mod.
 	  Do not compile this driver as a module if your root file system (the
 	  one containing the directory /) is located on an IDE device.
 
@@ -77,7 +77,7 @@ config BLK_DEV_IDEDISK
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-disk.o.  Do not compile this driver as a module
+	  will be called ide-disk.  Do not compile this driver as a module
 	  if your root file system (the one containing the directory /) is
 	  located on the IDE disk. If unsure, say Y.
 
@@ -136,7 +136,7 @@ config BLK_DEV_IDECD
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-cd.o.
+	  will be called ide-cd.
 
 #dep_tristate '  Include IDE/ATAPI TAPE support' CONFIG_BLK_DEV_IDETAPE $CONFIG_BLK_DEV_IDE
 config BLK_DEV_IDEFLOPPY
@@ -162,7 +162,7 @@ config BLK_DEV_IDEFLOPPY
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-floppy.o.
+	  will be called ide-floppy.
 
 config BLK_DEV_IDESCSI
 	tristate "SCSI emulation support"

@@ -16,7 +16,7 @@ config SENSORS_ADM1021
 	  be built as a module which can be inserted and removed while the 
 	  kernel is running.
 
-	  The module will be called adm1021.o.
+	  The module will be called adm1021.
 	  
 	  You will also need the latest user-space utilties: you can find them
 	  in the lm_sensors package, which you can download at 
@@ -31,7 +31,7 @@ config SENSORS_LM75
 	  TCN75, and National Semi LM77. This can also be built as a module
 	  which can be inserted and removed while the kernel is running.
 
-	  The module will be called lm75.o.
+	  The module will be called lm75.
 
 	  You will also need the latest user-space utilties: you can find them
 	  in the lm_sensors package, which you can download at 

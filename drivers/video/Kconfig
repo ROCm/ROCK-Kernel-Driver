@@ -160,7 +160,7 @@ config FB_AMIGA
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called amifb.o. If you want to compile it as a
+	  module will be called amifb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_AMIGA_OCS
@@ -292,7 +292,7 @@ config FB_VGA16
 	  as a module ( = code which can be inserted in and removed from the
 	  running kernel whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  vga16fb.o.
+	  vga16fb.
 
 config FB_STI
 	tristate "HP STI frame buffer device support"
@@ -350,7 +350,7 @@ config FB_HGA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want).
-	  The module will be called hgafb.o. If you want to compile it as
+	  The module will be called hgafb. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 	  As this card technology is 15 years old, most people will answer N
@@ -406,7 +406,7 @@ config FB_PVR2
 
 	  This driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want).
-	  The module will be called pvr2fb.o.  If you want to compile it as
+	  The module will be called pvr2fb.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 	  You can pass several parameters to the driver at boot time or at
@@ -462,7 +462,7 @@ config FB_RIVA
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called rivafb.o. If you want to compile it as a
+	  module will be called rivafb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_I810
@@ -474,7 +474,7 @@ config FB_I810
 
           The driver is also available as a module ( = code which can be
           inserted and removed from the running kernel whenever you want). 
-          The module will be called i810fb.o. If you want to compile it as a
+          The module will be called i810fb. If you want to compile it as a
           module, say M here and read <file:Documentation/modules.txt>.
 
           For more information, please read 
@@ -514,7 +514,7 @@ config FB_MATROX
 
 	  This driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want).
-	  The module will be called matroxfb.o. If you want to compile it as
+	  The module will be called matroxfb. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 	  You can pass several parameters to the driver at boot time or at
@@ -606,7 +606,7 @@ config FB_MATROX_I2C
 	  second head of G400 or MGA-TVO on G200 or G400.
 
 	  If you compile it as module, it will create a module named
-	  i2c-matroxfb.o.
+	  i2c-matroxfb.
 
 config FB_MATROX_MAVEN
 	tristate "G400 second head support"
@@ -622,7 +622,7 @@ config FB_MATROX_MAVEN
 	  the fbdev driver on first head and the fbdev driver on second head.
 
 	  If you compile it as module, two modules are created,
-	  matroxfb_crtc2.o and matroxfb_maven.o. Matroxfb_maven is needed for
+	  matroxfb_crtc2 and matroxfb_maven. Matroxfb_maven is needed for
 	  both G200 and G400, matroxfb_crtc2 is needed only by G400. You must
 	  also load i2c-matroxfb to get it to run.
 
@@ -651,7 +651,7 @@ config FB_MATROX_MULTIHEAD
 
 	  If you said M to "Matrox unified accelerated driver" and N here, you
 	  will still be able to use several Matrox devices simultaneously:
-	  insert several instances of the module matroxfb.o into the kernel
+	  insert several instances of the module matroxfb into the kernel
 	  with insmod, supplying the parameter "dev=N" where N is 0, 1, etc.
 	  for the different Matrox devices. This method is slightly faster but
 	  uses 40 KB of kernel memory per Matrox card.
@@ -679,7 +679,7 @@ config FB_ATY128
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called aty128fb.o. If you want to compile it as a
+	  module will be called aty128fb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_ATY
@@ -691,7 +691,7 @@ config FB_ATY
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called atyfb.o. If you want to compile it as a
+	  module will be called atyfb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_ATY_CT
@@ -746,7 +746,7 @@ config FB_NEOMAGIC
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called neofb.o. If you want to compile it as a
+	  module will be called neofb. If you want to compile it as a
 	  module, say M here and read Documentation/modules.txt.
 
 config FB_3DFX
@@ -758,7 +758,7 @@ config FB_3DFX
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called tdfxfb.o. If you want to compile it as a
+	  module will be called tdfxfb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_VOODOO1
@@ -770,7 +770,7 @@ config FB_VOODOO1
 
 	  This driver is also available as a module ( = code which can be 
 	  inserted and removed from the running kernel whenever you want).
-	  The module will be called sstfb.o. If you want to compile it as
+	  The module will be called sstfb. If you want to compile it as
 	  a module, say M here and read Documentation/modules.txt.
 
 	  WARNING: Do not use any application that uses the 3D engine
@@ -791,7 +791,7 @@ config FB_TRIDENT
 
 	  The driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called tridentfb.o. If you want to compile it as a
+	  module will be called tridentfb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config FB_PM3
@@ -917,7 +917,7 @@ config FB_VIRTUAL
 
 	  This driver is also available as a module ( = code which can be
 	  inserted and removed from the running kernel whenever you want). The
-	  module will be called vfb.o. If you want to compile it as a module,
+	  module will be called vfb. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 	  If unsure, say N.

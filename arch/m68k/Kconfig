@@ -73,8 +73,8 @@ config PCMCIA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  When compiled this way, there will be modules called pcmcia_core.o
-	  and ds.o.  If you want to compile it as a module, say M here and
+	  When compiled this way, there will be modules called pcmcia_core
+	  and ds.  If you want to compile it as a module, say M here and
 	  read <file:Documentation/modules.txt>.
 
 config AMIGA
@@ -398,7 +398,7 @@ config BINFMT_AOUT
 	  QMAGIC support" then you'll have to say Y here. You may answer M to
 	  compile a.out support as a module and later load the module when you
 	  want to use a program or library in a.out format. The module will be
-	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  called binfmt_aout. Saying M or N here is dangerous though,
 	  because some crucial programs on your system might still be in A.OUT
 	  format.
 
@@ -428,7 +428,7 @@ config BINFMT_ELF
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
@@ -453,7 +453,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 config ZORRO
@@ -541,7 +541,7 @@ config PARPORT
 	  ( = code which can be inserted in and removed from the running
 	  kernel whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  parport.o.  If you have more than one parallel port and want to
+	  parport.  If you have more than one parallel port and want to
 	  specify which port and IRQ to be used by this driver at module load
 	  time, take a look at <file:Documentation/parport.txt>.
 
@@ -553,7 +553,7 @@ config PARPORT_AMIGA
 	help
 	  Say Y here if you need support for the parallel port hardware on
 	  Amiga machines. This code is also available as a module (say M),
-	  called parport_amiga.o. If in doubt, saying N is the safe plan.
+	  called parport_amiga. If in doubt, saying N is the safe plan.
 
 config PARPORT_MFC3
 	tristate "Multiface III parallel port"
@@ -561,7 +561,7 @@ config PARPORT_MFC3
 	help
 	  Say Y here if you need parallel port support for the MFC3 card.
 	  This code is also available as a module (say M), called
-	  parport_mfc3.o. If in doubt, saying N is the safe plan.
+	  parport_mfc3. If in doubt, saying N is the safe plan.
 
 config PARPORT_PC
 	bool
@@ -576,7 +576,7 @@ config PARPORT_PC
 	  as a module ( = code which can be inserted in and removed from the
 	  running kernel whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  parport_pc.o.
+	  parport_pc.
 
 	  If unsure, say Y.
 
@@ -586,7 +586,7 @@ config PARPORT_ATARI
 	help
 	  Say Y here if you need support for the parallel port hardware on
 	  Atari machines. This code is also available as a module (say M),
-	  called parport_atari.o. If in doubt, saying N is the safe plan.
+	  called parport_atari. If in doubt, saying N is the safe plan.
 
 config PRINTER
 	tristate "Parallel printer support"
@@ -604,7 +604,7 @@ config PRINTER
 	  driver as a module however ( = code which can be inserted in and
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt> and
-	  <file:Documentation/parport.txt>.  The module will be called lp.o.
+	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
@@ -702,7 +702,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -729,7 +729,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -750,7 +750,7 @@ config BLK_DEV_SD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sd_mod.o.  If you want to compile it as a
+	  The module will be called sd_mod.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  Do not compile this driver as a
 	  module if your root file system (the one containing the directory /)
@@ -786,7 +786,7 @@ config CHR_DEV_ST
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called st.o. If you want to compile it as a
+	  The module will be called st. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.
 
@@ -818,7 +818,7 @@ config BLK_DEV_SR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sr_mod.o. If you want to compile it as a
+	  The module will be called sr_mod. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.
 
@@ -871,7 +871,7 @@ config CHR_DEV_SG
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.o.
+	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.
 	  If unsure, say N.
 
 comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
@@ -934,7 +934,7 @@ config A3000_SCSI
 	  built-in SCSI controller, say Y. Otherwise, say N. This driver is
 	  also available as a module ( = code which can be inserted in and
 	  removed from the running kernel whenever you want). The module is
-	  called wd33c93.o. If you want to compile it as a module, say M here
+	  called wd33c93. If you want to compile it as a module, say M here
 	  and read <file:Documentation/modules.txt>.
 
 config A4000T_SCSI
@@ -950,7 +950,7 @@ config A2091_SCSI
 	  If you have a Commodore A2091 SCSI controller, say Y. Otherwise,
 	  say N. This driver is also available as a module ( = code which can
 	  be inserted in and removed from the running kernel whenever you
-	  want). The module is called wd33c93.o. If you want to compile it as
+	  want). The module is called wd33c93. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config GVP11_SCSI
@@ -965,7 +965,7 @@ config GVP11_SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
-	  want). The module will be called gvp11.o. If you want to compile it
+	  want). The module will be called gvp11. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config CYBERSTORM_SCSI
@@ -1050,7 +1050,7 @@ config ATARI_SCSI
 	  a compatible SCSI controller (e.g. for Medusa).  This driver is also
 	  available as a module ( = code which can be inserted in and removed
 	  from the running kernel whenever you want).  The module is called
-	  atari_scsi.o.  If you want to compile it as a module, say M here and
+	  atari_scsi.  If you want to compile it as a module, say M here and
 	  read <file:Documentation/modules.txt>.  This driver supports both
 	  styles of NCR integration into the system: the TT style (separate
 	  DMA), and the Falcon style (via ST-DMA, replacing ACSI).  It does
@@ -1101,7 +1101,7 @@ config SCSI_MAC_ESP
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mac_esp.o.  If you want to compile it as
+	  The module will be called mac_esp.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 #   dep_tristate 'SCSI debugging host adapter' CONFIG_SCSI_DEBUG $CONFIG_SCSI
@@ -1169,7 +1169,7 @@ config SERIAL
 
 	  If you want to compile this driver as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.o.
+	  serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -1315,7 +1315,7 @@ config NVRAM
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nvram.o. If you want to compile it as a
+	  The module will be called nvram. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ATARI_MFPSER
@@ -1426,9 +1426,9 @@ config A2232
 	  for which 8 pin to DB25 adapters were supplied. The card also had
 	  jumpers internally to toggle various pinning configurations.
 
-	  This driver can be built as a module; but then "generic_serial.o"
+	  This driver can be built as a module; but then "generic_serial"
 	  will also be built as a module. This has to be loaded before
-	  "ser_a2232.o". If you want to do this, answer M here and read
+	  "ser_a2232". If you want to do this, answer M here and read
 	  "<file:Documentation/modules.txt>".
 
 config GVPIOEXT
@@ -1686,7 +1686,7 @@ config SOFT_WATCHDOG
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>. The module will be called
-	  softdog.o.
+	  softdog.
 
 config RTC
 	bool "Enhanced Real Time Clock Support"
@@ -1713,7 +1713,7 @@ config RTC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc.o. If you want to compile it as a module,
+	  The module is called rtc. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 config GEN_RTC
@@ -1734,7 +1734,7 @@ config GEN_RTC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called genrtc.o. If you want to compile it as a module,
+	  The module is called genrtc. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>. To load the
 	  module automatically add 'alias char-major-10-135 genrtc' to your
 	  /etc/modules.conf
