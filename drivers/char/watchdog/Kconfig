@@ -309,6 +309,17 @@ config MACHZ_WDT
 	  To compile this driver as a module, choose M here: the
 	  module will be called machzwd.
 
+# MIPS Architecture
+
+config INDYDOG
+	tristate "Indy/I2 Hardware Watchdog"
+	depends on WATCHDOG && SGI_IP22
+	help
+	  Hardwaredriver for the Indy's/I2's watchdog. This is a
+	  watchdog timer that will reboot the machine after a 60 second
+	  timer expired and no process has written to /dev/watchdog during
+	  that time.
+
 # SUPERH Architecture
 
 config SH_WDT
