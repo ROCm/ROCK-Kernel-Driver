@@ -1492,7 +1492,10 @@ void time_interpolator_reset(void)
 
 unsigned long time_interpolator_resolution(void)
 {
-	return NSEC_PER_SEC / time_interpolator->frequency;
+	if (time_interpolator->frequency < NSEC_PER_SEC)
+		return NSEC_PER_SEC / time_interpolator->frequency;
+	else
+		return 1;
 }
 
 #define GET_TI_NSECS(count,i) ((((count) - i->last_counter) * i->nsec_per_cyc) >> i->shift)
