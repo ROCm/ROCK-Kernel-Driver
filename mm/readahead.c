@@ -470,7 +470,11 @@ do_io:
 			  * pages shall be accessed in the next
 			  * current window.
 			  */
-			ra->next_size = min(ra->average , (unsigned long)max);
+			average = ra->average;
+			if (ra->serial_cnt > average)
+				average = (ra->serial_cnt + ra->average + 1) / 2;
+
+			ra->next_size = min(average , (unsigned long)max);
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
@@ -552,6 +556,7 @@ void handle_ra_miss(struct address_space *mapping,
 				ra->size = max;
 				ra->ahead_start = 0;
 				ra->ahead_size = 0;
+				ra->average = max / 2;
 			}
 		}
 		ra->prev_page = offset;
