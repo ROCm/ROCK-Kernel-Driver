@@ -383,58 +383,32 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 		sig.next_blk = 0;
 		sig.sig_id = WL3501_SIG_MD_REQ;
 		sig.data = bf;
-		if (this->llc_type == 1) {
-			if (((*pdata) * 256 + (*(pdata + 1))) > 1500) {
-				unsigned char addr4[ETH_ALEN] = {
-					[0] = 0xAA, [1] = 0xAA,
-					[2] = 0x03, [4] = 0x00,
-				};
+		if (((*pdata) * 256 + (*(pdata + 1))) > 1500) {
+			unsigned char addr4[ETH_ALEN] = {
+				[0] = 0xAA, [1] = 0xAA, [2] = 0x03, [4] = 0x00,
+			};
 
-				wl3501_set_to_wla(this, bf + 2 +
-					 offsetof(struct wl3501_tx_hdr, addr4),
-					 	  addr4, sizeof(addr4));
-				sig.size = pktlen + 24 + 4 + 6;
-				if (pktlen >
-				    (254 - sizeof(struct wl3501_tx_hdr))) {
-					tmplen =
-					    254 - sizeof(struct wl3501_tx_hdr);
-					pktlen -= tmplen;
-				} else {
-					tmplen = pktlen;
-					pktlen = 0;
-				}
-				wl3501_set_to_wla(this, bf + 2 +
-						  sizeof(struct wl3501_tx_hdr),
-						  pdata, tmplen);
-				pdata += tmplen;
-				wl3501_get_from_wla(this, bf, &next,
-						    sizeof(next));
-				bf = next;
+			wl3501_set_to_wla(this, bf + 2 +
+					  offsetof(struct wl3501_tx_hdr, addr4),
+					  addr4, sizeof(addr4));
+			sig.size = pktlen + 24 + 4 + 6;
+			if (pktlen > (254 - sizeof(struct wl3501_tx_hdr))) {
+				tmplen = 254 - sizeof(struct wl3501_tx_hdr);
+				pktlen -= tmplen;
 			} else {
-				sig.size = pktlen + 24 + 4 - 2;
-				pdata += 2;
-				pktlen -= 2;
-				if (pktlen >
-				    (254 - sizeof(struct wl3501_tx_hdr) + 6)) {
-					tmplen = 254 -
-					    sizeof(struct wl3501_tx_hdr) + 6;
-					pktlen -= tmplen;
-				} else {
-					tmplen = pktlen;
-					pktlen = 0;
-				}
-				wl3501_set_to_wla(this, bf + 2 +
-					 offsetof(struct wl3501_tx_hdr, addr4),
-						  pdata, tmplen);
-				pdata += tmplen;
-				wl3501_get_from_wla(this, bf, &next,
-						    sizeof(next));
-				bf = next;
+				tmplen = pktlen;
+				pktlen = 0;
 			}
+			wl3501_set_to_wla(this,
+					  bf + 2 + sizeof(struct wl3501_tx_hdr),
+					  pdata, tmplen);
+			pdata += tmplen;
+			wl3501_get_from_wla(this, bf, &next, sizeof(next));
+			bf = next;
 		} else {
-			pktlen += 12;
-			sig.size = pktlen + 24 + 4;
-			pdata -= 12;
+			sig.size = pktlen + 24 + 4 - 2;
+			pdata += 2;
+			pktlen -= 2;
 			if (pktlen > (254 - sizeof(struct wl3501_tx_hdr) + 6)) {
 				tmplen = 254 - sizeof(struct wl3501_tx_hdr) + 6;
 				pktlen -= tmplen;
@@ -707,62 +681,41 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 	size -= 12;
 	wl3501_get_from_wla(this, this->start_seg + 2,
 			    &next_addr, sizeof(next_addr));
-	if (this->llc_type == 1) {
-		if (this->ether_type == ARPHRD_ETHER) {
-			if (size >
-			    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr)) {
-				wl3501_get_from_wla(this, this->start_seg +
-						    sizeof(struct
-							   wl3501_rx_hdr), data,
-						    WL3501_BLKSZ -
-						    sizeof(struct
-							   wl3501_rx_hdr));
-				size -= WL3501_BLKSZ -
-					sizeof(struct wl3501_rx_hdr);
-				data += WL3501_BLKSZ -
-					sizeof(struct wl3501_rx_hdr);
-			} else {
-				wl3501_get_from_wla(this, this->start_seg +
-						    sizeof(struct
-							   wl3501_rx_hdr), data,
-						    size);
-				size = 0;
-			}
+	if (this->ether_type == ARPHRD_ETHER) {
+		if (size >
+		    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr)) {
+			wl3501_get_from_wla(this,
+					    this->start_seg +
+						sizeof(struct wl3501_rx_hdr),
+					    data,
+					    WL3501_BLKSZ -
+						sizeof(struct wl3501_rx_hdr));
+			size -= WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
+			data += WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
 		} else {
-			size -= 2;
-			*data = (size >> 8) & 0xff;
-			*(data + 1) = size & 0xff;
-			data += 2;
-			if (size >
-			    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6) {
-				wl3501_get_from_wla(this,
-						    this->start_seg +
-							offset_addr4, data,
-						    WL3501_BLKSZ -
-						    sizeof(struct wl3501_rx_hdr)
-						    + 6);
-				size -= WL3501_BLKSZ -
-					sizeof(struct wl3501_rx_hdr) + 6;
-				data += WL3501_BLKSZ -
-					sizeof(struct wl3501_rx_hdr) + 6;
-			} else {
-				wl3501_get_from_wla(this,
-						    this->start_seg +
-							offset_addr4,
-						    data, size);
-				size = 0;
-			}
+			wl3501_get_from_wla(this,
+					    this->start_seg +
+						sizeof(struct wl3501_rx_hdr),
+					    data, size);
+			size = 0;
 		}
 	} else {
-		if (size > WL3501_BLKSZ - offset_addr4) {
-			wl3501_get_from_wla(this, this->start_seg +
-					    sizeof(struct wl3501_rx_hdr) + 6,
-					    data, WL3501_BLKSZ - offset_addr4);
-			size -= WL3501_BLKSZ - offset_addr4;
-			data += WL3501_BLKSZ - offset_addr4;
+		size -= 2;
+		*data = (size >> 8) & 0xff;
+		*(data + 1) = size & 0xff;
+		data += 2;
+		if (size >
+		    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6) {
+			wl3501_get_from_wla(this,
+					    this->start_seg + offset_addr4,
+					    data,
+					    WL3501_BLKSZ -
+					      sizeof(struct wl3501_rx_hdr) + 6);
+			size -= WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6;
+			data += WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6;
 		} else {
-			wl3501_get_from_wla(this, this->start_seg +
-					    sizeof(struct wl3501_rx_hdr) + 6,
+			wl3501_get_from_wla(this,
+					    this->start_seg + offset_addr4,
 					    data, size);
 			size = 0;
 		}
@@ -956,7 +909,7 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 {
 	struct wl3501_md_ind sig;
 	struct sk_buff *skb;
-	unsigned char rssi;
+	unsigned char rssi, addr4[ETH_ALEN];
 	u16 pkt_len;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
@@ -966,26 +919,21 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 			    &rssi, sizeof(rssi));
 	this->rssi = rssi <= 63 ? (rssi * 100) / 64 : 255;
 
-	if (this->llc_type == 1) {
-		unsigned char addr4[ETH_ALEN];
-
-		wl3501_get_from_wla(this,
-				    sig.data +
-				    	offsetof(struct wl3501_rx_hdr, addr4),
-				    &addr4, sizeof(addr4));
-		if (addr4[0] == 0xAA && addr4[1] == 0xAA &&
-		    addr4[2] == 0x03 && addr4[4] == 0x00) {
-			pkt_len = sig.size + 12 - 24 - 4 - 6;
-			this->ether_type = ARPHRD_ETHER;
-		} else if (addr4[0] == 0xE0 && addr4[1] == 0xE0) {
-			pkt_len = sig.size + 12 - 24 - 4 + 2;
-			this->ether_type = ARPHRD_IEEE80211; /* FIXME */
-		} else {
-			pkt_len = sig.size + 12 - 24 - 4 + 2;
-			this->ether_type = ARPHRD_IEEE80211; /* FIXME */
-		}
-	} else
-		pkt_len = sig.size - 24 - 4;
+	wl3501_get_from_wla(this,
+			    sig.data +
+				offsetof(struct wl3501_rx_hdr, addr4),
+			    &addr4, sizeof(addr4));
+	if (addr4[0] == 0xAA && addr4[1] == 0xAA &&
+	    addr4[2] == 0x03 && addr4[4] == 0x00) {
+		pkt_len = sig.size + 12 - 24 - 4 - 6;
+		this->ether_type = ARPHRD_ETHER;
+	} else if (addr4[0] == 0xE0 && addr4[1] == 0xE0) {
+		pkt_len = sig.size + 12 - 24 - 4 + 2;
+		this->ether_type = ARPHRD_IEEE80211; /* FIXME */
+	} else {
+		pkt_len = sig.size + 12 - 24 - 4 + 2;
+		this->ether_type = ARPHRD_IEEE80211; /* FIXME */
+	}
 
 	skb = dev_alloc_skb(pkt_len + 5);
 
@@ -995,8 +943,7 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 		this->stats.rx_dropped++;
 	} else {
 		skb->dev = dev;
-		skb_reserve(skb, 2);	/* IP headers on 16 bytes
-					   boundaries */
+		skb_reserve(skb, 2); /* IP headers on 16 bytes boundaries */
 		eth_copy_and_sum(skb, (unsigned char *)&sig.daddr, 12, 0);
 		wl3501_receive(this, skb->data, pkt_len);
 		skb_put(skb, pkt_len);
@@ -2127,9 +2074,10 @@ static void wl3501_config(dev_link_t *link)
 		printk("%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
 	}
 	printk("\n");
-	/* initialize card parameter - added by jss */
+	/*
+	 * Initialize card parameters - added by jss
+	 */
 	this->net_type		= IW_MODE_INFRA;
-	this->llc_type		= 1;
 	this->bss_cnt		= 0;
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;

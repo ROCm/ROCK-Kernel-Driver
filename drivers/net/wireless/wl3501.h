@@ -512,7 +512,6 @@ struct wl3501_card {
 	u16				esbq_confirm_start;
 	u16				esbq_confirm_end;
 	u16				esbq_confirm;
-	u8				llc_type;
 	u8				essid[WL3501_ESSID_MAX_LEN];
 	unsigned char			bssid[ETH_ALEN];
 	int				ether_type;
