@@ -118,6 +118,8 @@ struct hci_dev {
 	struct proc_dir_entry   *proc;
 #endif
 
+	struct module           *owner;
+	
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
 	int (*flush)(struct hci_dev *hdev);
@@ -299,12 +301,30 @@ static inline void hci_sched_tx(struct hci_dev *hdev)
 }
 
 /* ----- HCI Devices ----- */
-static inline void hci_dev_put(struct hci_dev *d)
-{ 
+static inline void __hci_dev_put(struct hci_dev *d)
+{
 	if (atomic_dec_and_test(&d->refcnt))
 		d->destruct(d);
 }
-#define hci_dev_hold(d)		atomic_inc(&d->refcnt)
+
+static inline void hci_dev_put(struct hci_dev *d)
+{ 
+	__hci_dev_put(d);
+	module_put(d->owner);
+}
+
+static inline struct hci_dev *__hci_dev_hold(struct hci_dev *d)
+{
+	atomic_inc(&d->refcnt);
+	return d;
+}
+
+static inline struct hci_dev *hci_dev_hold(struct hci_dev *d)
+{
+	if (try_module_get(d->owner))
+		return __hci_dev_hold(d);
+	return NULL;
+}
 
 #define hci_dev_lock(d)		spin_lock(&d->lock)
 #define hci_dev_unlock(d)	spin_unlock(&d->lock)
