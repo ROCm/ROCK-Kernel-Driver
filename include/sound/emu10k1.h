@@ -679,6 +679,9 @@
 #define A_ADCIDX		0x63
 #define A_ADCIDX_IDX		0x10000063
 
+#define A_MICIDX		0x64
+#define A_MICIDX_IDX		0x10000064
+
 #define FXIDX			0x65		/* FX recording buffer index register		*/
 #define FXIDX_MASK		0x0000ffff	/* 16-bit value					*/
 #define FXIDX_IDX		0x10000065
@@ -1201,8 +1204,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_EXTIN_OPT_SPDIF_R     0x05    /*                              right */ 
 #define A_EXTIN_LINE2_L		0x08	/* audigy drive line2/mic2 - left */
 #define A_EXTIN_LINE2_R		0x09	/*                           right */
-#define A_EXTIN_RCA_SPDIF_L     0x0a    /* audigy drive RCA SPDIF - left */
-#define A_EXTIN_RCA_SPDIF_R     0x0b    /*                          right */
+#define A_EXTIN_ADC_L		0x0a    /* Philips ADC - left */
+#define A_EXTIN_ADC_R		0x0b    /*               right */
 #define A_EXTIN_AUX2_L		0x0c	/* audigy drive aux2 - left */
 #define A_EXTIN_AUX2_R		0x0d	/*                   - right */
 
@@ -1227,6 +1230,7 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_EXTOUT_AC97_R		0x11	/*      right */
 #define A_EXTOUT_ADC_CAP_L	0x16	/* ADC capture buffer left */
 #define A_EXTOUT_ADC_CAP_R	0x17	/*                    right */
+#define A_EXTOUT_MIC_CAP	0x18	/* Mic capture buffer */
 
 /* Audigy constants */
 #define A_C_00000000	0xc0

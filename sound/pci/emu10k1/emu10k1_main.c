@@ -269,6 +269,9 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 			 * This has to be done after init ALice3 I2SOut beyond 48KHz.
 			 * So, sequence is important. */
 			outl(inl(emu->port + A_IOCFG) | 0x0040, emu->port + A_IOCFG);
+		} else {
+			/* Disable routing from AC97 line out to Front speakers */
+			outl(inl(emu->port + A_IOCFG) | 0x0080, emu->port + A_IOCFG);
 		}
 	}
 	

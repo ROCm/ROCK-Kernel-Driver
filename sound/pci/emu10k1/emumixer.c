@@ -478,6 +478,22 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			remove_ctl(card, "Master Playback Switch");
 			remove_ctl(card, "Master Playback Volume");
 			remove_ctl(card, "PCM Out Path & Mute");
+			remove_ctl(card, "Mono Output Select");
+			
+			/* set master volume to 0 dB */
+			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0202);
+			/* set capture source to mic */
+			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
+			
+			/* remove unused AC97 capture controls */
+			remove_ctl(card, "Capture Source");
+			remove_ctl(card, "Capture Switch");
+			remove_ctl(card, "Capture Volume");
+			remove_ctl(card, "Mic Select");
+			remove_ctl(card, "Video Playback Switch");
+			remove_ctl(card, "Video Playback Volume");
+			remove_ctl(card, "Mic Playback Switch");
+			remove_ctl(card, "Mic Playback Volume");
 		}
 	} else {
 		if (emu->APS)
@@ -493,6 +509,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		rename_ctl(card, "Wave Playback Volume", "PCM Playback Volume");
 		/* rename_ctl(card, "Wave Capture Volume", "PCM Capture Volume"); */
 		rename_ctl(card, "Wave Master Playback Volume", "Master Playback Volume");
+		rename_ctl(card, "AMic Playback Volume", "Mic Playback Volume");
 	}
 
 	if ((kctl = emu->ctl_send_routing = snd_ctl_new1(&snd_emu10k1_send_routing_control, emu)) == NULL)
@@ -534,6 +551,11 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
+		if ((kctl = ctl_find(card, SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT))) != NULL) {
+			/* already defined by ac97, remove it */
+			/* FIXME: or do we need both controls? */
+			remove_ctl(card, SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT));
+		}
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_control, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
