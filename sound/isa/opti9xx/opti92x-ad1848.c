@@ -474,7 +474,6 @@ static int __devinit snd_opti9xx_configure(opti9xx_t *chip)
 	unsigned char dma_bits;
 	unsigned char mpu_port_bits = 0;
 	unsigned char mpu_irq_bits;
-	unsigned long flags;
 
 	switch (chip->hardware) {
 #ifndef OPTi93X
@@ -601,13 +600,11 @@ __skip_base:
 	dma_bits |= 0x04;
 #endif	/* CS4231 || OPTi93X */
 
-	spin_lock_irqsave(&chip->lock, flags);
 #ifndef OPTi93X
 	 outb(irq_bits << 3 | dma_bits, chip->wss_base);
 #else /* OPTi93X */
 	snd_opti9xx_write(chip, OPTi9XX_MC_REG(3), (irq_bits << 3 | dma_bits));
 #endif /* OPTi93X */
-	spin_unlock_irqrestore(&chip->lock, flags);
 
 __skip_resources:
 	if (chip->hardware > OPTi9XX_HW_82C928) {
@@ -767,15 +764,10 @@ static void snd_opti93x_mce_down(opti93x_t *chip)
 
 static void snd_opti93x_mute(opti93x_t *chip, int mute)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->lock, flags);
-
 	mute = mute ? 1 : 0;
-	if (chip->mute == mute) {
-		spin_unlock_irqrestore(&chip->lock, flags);
+	if (chip->mute == mute)
 		return;
-	}
+
 	chip->mute = mute;
 
 	snd_opti93x_mute_reg(chip, OPTi93X_CD_LEFT_INPUT, mute);
@@ -800,8 +792,6 @@ static void snd_opti93x_mute(opti93x_t *chip, int mute)
 	snd_opti93x_mute_reg(chip, OPTi93X_MIC_RIGHT_INPUT, mute);
 	snd_opti93x_mute_reg(chip, OPTi93X_OUT_LEFT, mute);
 	snd_opti93x_mute_reg(chip, OPTi93X_OUT_RIGHT, mute);
-
-	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 
@@ -873,10 +863,8 @@ static unsigned char snd_opti93x_get_format(opti93x_t *chip,
 
 static void snd_opti93x_playback_format(opti93x_t *chip, unsigned char fmt)
 {
-	unsigned long flags;
 	unsigned char mask;
 
-	spin_lock_irqsave(&chip->lock, flags);
 	snd_opti93x_mute(chip, 1);
 
 	snd_opti93x_mce_up(chip);
@@ -885,14 +873,10 @@ static void snd_opti93x_playback_format(opti93x_t *chip, unsigned char fmt)
 	snd_opti93x_mce_down(chip);
 
 	snd_opti93x_mute(chip, 0);
-	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 static void snd_opti93x_capture_format(opti93x_t *chip, unsigned char fmt)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->lock, flags);
 	snd_opti93x_mute(chip, 1);
 
 	snd_opti93x_mce_up(chip);
@@ -904,7 +888,6 @@ static void snd_opti93x_capture_format(opti93x_t *chip, unsigned char fmt)
 	snd_opti93x_mce_down(chip);
 
 	snd_opti93x_mute(chip, 0);
-	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 
