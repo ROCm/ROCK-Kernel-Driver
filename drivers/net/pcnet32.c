@@ -1388,9 +1388,13 @@ pcnet32_open(struct net_device *dev)
 	val |= 0x10;
     lp->a.write_csr (ioaddr, 124, val);
 
+    /* 24 Jun 2004 according AMD, in order to change the PHY,
+     * DANAS (or DISPM for 79C976) must be set; then select the speed,
+     * duplex, and/or enable auto negotiation, and clear DANAS */
     if (lp->mii && !(lp->options & PCNET32_PORT_ASEL)) {
+	lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
 	/* disable Auto Negotiation, set 10Mpbs, HD */
-	val = lp->a.read_bcr (ioaddr, 32) & ~0x38;
+	val = lp->a.read_bcr(ioaddr, 32) & ~0xb8;
 	if (lp->options & PCNET32_PORT_FD)
 	    val |= 0x10;
 	if (lp->options & PCNET32_PORT_100)
@@ -1398,6 +1402,7 @@ pcnet32_open(struct net_device *dev)
 	lp->a.write_bcr (ioaddr, 32, val);
     } else {
 	if (lp->options & PCNET32_PORT_ASEL) {
+	    lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
 	    /* enable auto negotiate, setup, disable fd */
 	    val = lp->a.read_bcr(ioaddr, 32) & ~0x98;
 	    val |= 0x20;
