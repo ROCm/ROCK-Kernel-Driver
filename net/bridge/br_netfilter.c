@@ -37,7 +37,7 @@
 				 sizeof(struct bridge_skb_cb)))
 
 #define has_bridge_parent(device)	((device)->br_port != NULL)
-#define bridge_parent(device)		(&((device)->br_port->br->dev))
+#define bridge_parent(device)		((device)->br_port->br->dev)
 
 /* We need these fake structures to make netfilter happy --
  * lots of places assume that skb->dst != NULL, which isn't

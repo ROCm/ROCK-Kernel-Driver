@@ -38,9 +38,9 @@ static void br_hello_timer_expired(unsigned long arg)
 {
 	struct net_bridge *br = (struct net_bridge *)arg;
 	
-	pr_debug("%s: hello timer expired\n", br->dev.name);
+	pr_debug("%s: hello timer expired\n", br->dev->name);
 	spin_lock_bh(&br->lock);
-	if (br->dev.flags & IFF_UP) {
+	if (br->dev->flags & IFF_UP) {
 		br_config_bpdu_generation(br);
 
 		br->hello_timer.expires = jiffies + br->hello_time;
@@ -61,7 +61,7 @@ static void br_message_age_timer_expired(unsigned long arg)
 
 	
 	pr_info("%s: neighbor %.2x%.2x.%.2x:%.2x:%.2x:%.2x:%.2x:%.2x lost on port %d(%s)\n",
-		br->dev.name, 
+		br->dev->name, 
 		id->prio[0], id->prio[1], 
 		id->addr[0], id->addr[1], id->addr[2], 
 		id->addr[3], id->addr[4], id->addr[5],
@@ -89,7 +89,7 @@ static void br_forward_delay_timer_expired(unsigned long arg)
 	struct net_bridge *br = p->br;
 
 	pr_debug("%s: %d(%s) forward delay timer\n",
-		 br->dev.name, p->port_no, p->dev->name);
+		 br->dev->name, p->port_no, p->dev->name);
 	spin_lock_bh(&br->lock);
 	if (p->state == BR_STATE_LISTENING) {
 		p->state = BR_STATE_LEARNING;
@@ -108,9 +108,9 @@ static void br_tcn_timer_expired(unsigned long arg)
 {
 	struct net_bridge *br = (struct net_bridge *) arg;
 
-	pr_debug("%s: tcn timer expired\n", br->dev.name);
+	pr_debug("%s: tcn timer expired\n", br->dev->name);
 	spin_lock_bh(&br->lock);
-	if (br->dev.flags & IFF_UP) {
+	if (br->dev->flags & IFF_UP) {
 		br_transmit_tcn(br);
 	
 		br->tcn_timer.expires = jiffies + br->bridge_hello_time;
@@ -123,7 +123,7 @@ static void br_topology_change_timer_expired(unsigned long arg)
 {
 	struct net_bridge *br = (struct net_bridge *) arg;
 
-	pr_debug("%s: topo change timer expired\n", br->dev.name);
+	pr_debug("%s: topo change timer expired\n", br->dev->name);
 	spin_lock_bh(&br->lock);
 	br->topology_change_detected = 0;
 	br->topology_change = 0;
@@ -135,7 +135,7 @@ static void br_hold_timer_expired(unsigned long arg)
 	struct net_bridge_port *p = (struct net_bridge_port *) arg;
 
 	pr_debug("%s: %d(%s) hold timer expired\n", 
-		 p->br->dev.name,  p->port_no, p->dev->name);
+		 p->br->dev->name,  p->port_no, p->dev->name);
 
 	spin_lock_bh(&p->br->lock);
 	if (p->config_pending)
