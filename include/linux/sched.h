@@ -494,7 +494,7 @@ struct task_struct {
 	struct task_struct *group_leader;	/* threadgroup leader */
 
 	/* PID/PID hash table linkage. */
-	struct pid_link pids[PIDTYPE_MAX];
+	struct pid pids[PIDTYPE_MAX];
 
 	wait_queue_head_t wait_chldexit;	/* for wait4() */
 	struct completion *vfork_done;		/* for vfork() */
@@ -673,7 +673,8 @@ extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;
 
-extern struct task_struct *find_task_by_pid(int pid);
+#define find_task_by_pid(nr)	find_task_by_pid_type(PIDTYPE_PID, nr)
+extern struct task_struct *find_task_by_pid_type(int type, int pid);
 extern void set_special_pids(pid_t session, pid_t pgrp);
 extern void __set_special_pids(pid_t session, pid_t pgrp);
 
@@ -876,9 +877,7 @@ extern task_t * FASTCALL(next_thread(const task_t *p));
 
 static inline int thread_group_empty(task_t *p)
 {
-	struct pid *pid = p->pids[PIDTYPE_TGID].pidptr;
-
-	return pid->task_list.next->next == &pid->task_list;
+	return list_empty(&p->pids[PIDTYPE_TGID].pid_list);
 }
 
 #define delay_group_leader(p) \
