@@ -1771,10 +1771,8 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		if (unlikely(copied != bytes))
 			if (status >= 0)
 				status = -EFAULT;
-
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
 		unlock_page(page);
+		mark_page_accessed(page);
 		page_cache_release(page);
 		if (status < 0)
 			break;
