@@ -1641,13 +1641,10 @@ extern wait_queue_head_t reiserfs_commit_thread_wait ;
 #define JBH_HASH_SHIFT 13 /* these are based on journal hash size of 8192 */
 #define JBH_HASH_MASK 8191
 
-/* After several hours of tedious analysis, the following hash
- * function won.  Do not mess with it... -DaveM
- */
-#define _jhashfn(dev,block)	\
-	((((dev)<<(JBH_HASH_SHIFT - 6)) ^ ((dev)<<(JBH_HASH_SHIFT - 9))) ^ \
+#define _jhashfn(sb,block)	\
+	(((unsigned long)sb>>L1_CACHE_SHIFT) ^ \
 	 (((block)<<(JBH_HASH_SHIFT - 6)) ^ ((block) >> 13) ^ ((block) << (JBH_HASH_SHIFT - 12))))
-#define journal_hash(t,sb,block) ((t)[_jhashfn((kdev_t_to_nr(sb->s_dev)),(block)) & JBH_HASH_MASK])
+#define journal_hash(t,sb,block) ((t)[_jhashfn((sb),(block)) & JBH_HASH_MASK])
 
 /* finds n'th buffer with 0 being the start of this commit.  Needs to go away, j_ap_blocks has changed
 ** since I created this.  One chunk of code in journal.c needs changing before deleting it

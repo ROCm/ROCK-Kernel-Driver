@@ -60,7 +60,7 @@ static int v2_read_file_info(struct super_block *sb, int type)
 	set_fs(fs);
 	if (size != sizeof(struct v2_disk_dqinfo)) {
 		printk(KERN_WARNING "Can't read info structure on device %s.\n",
-			kdevname(f->f_dentry->d_sb->s_dev));
+			f->f_vfsmnt->mnt_sb->s_id);
 		return -1;
 	}
 	info->dqi_bgrace = le32_to_cpu(dinfo.dqi_bgrace);
@@ -95,7 +95,7 @@ static int v2_write_file_info(struct super_block *sb, int type)
 	set_fs(fs);
 	if (size != sizeof(struct v2_disk_dqinfo)) {
 		printk(KERN_WARNING "Can't write info structure on device %s.\n",
-			kdevname(f->f_dentry->d_sb->s_dev));
+			f->f_vfsmnt->mnt_sb->s_id);
 		return -1;
 	}
 	return 0;
@@ -424,7 +424,7 @@ static int v2_write_dquot(struct dquot *dquot)
 	ret = filp->f_op->write(filp, (char *)&ddquot, sizeof(struct v2_disk_dqblk), &offset);
 	set_fs(fs);
 	if (ret != sizeof(struct v2_disk_dqblk)) {
-		printk(KERN_WARNING "VFS: dquota write failed on dev %s\n", kdevname(dquot->dq_sb->s_dev));
+		printk(KERN_WARNING "VFS: dquota write failed on dev %s\n", dquot->dq_sb->s_id);
 		if (ret >= 0)
 			ret = -ENOSPC;
 	}

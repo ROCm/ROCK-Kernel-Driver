@@ -1578,7 +1578,7 @@ void generic_make_request(struct bio *bio)
 			printk(KERN_INFO
 			       "attempt to access beyond end of device\n");
 			printk(KERN_INFO "%s: rw=%ld, want=%ld, limit=%Lu\n",
-			       kdevname(to_kdev_t(bio->bi_bdev->bd_dev)),
+			       bdevname(bio->bi_bdev),
 			       bio->bi_rw,
 			       sector + nr_sectors,
 			       (long long) maxsector);
@@ -1601,7 +1601,7 @@ void generic_make_request(struct bio *bio)
 		if (!q) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
-			       kdevname(to_kdev_t(bio->bi_bdev->bd_dev)),
+			       bdevname(bio->bi_bdev),
 			       (long long) bio->bi_sector);
 end_io:
 			bio->bi_end_io(bio);

@@ -588,7 +588,7 @@ struct proc_dir_entry *reiserfs_proc_register( struct super_block *sb,
 {
 	return ( REISERFS_SB(sb)->procdir ) ? create_proc_read_entry
 		( name, 0, REISERFS_SB(sb)->procdir, func, 
-		  ( void * ) kdev_t_to_nr( sb -> s_dev ) ) : NULL;
+		  ( void * ) sb->s_bdev->bd_dev) : NULL;
 }
 
 void reiserfs_proc_unregister( struct super_block *sb, const char *name )
