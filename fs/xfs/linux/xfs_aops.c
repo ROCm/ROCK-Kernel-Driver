@@ -716,7 +716,7 @@ linvfs_readpage(
 	struct file		*unused,
 	struct page		*page)
 {
-	return block_read_full_page(page, linvfs_get_block);
+	return mpage_readpage(page, linvfs_get_block);
 }
 
 STATIC int
