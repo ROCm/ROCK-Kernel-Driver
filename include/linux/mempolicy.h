@@ -153,6 +153,9 @@ void mpol_free_shared_policy(struct shared_policy *p);
 struct mempolicy *mpol_shared_policy_lookup(struct shared_policy *sp,
 					    unsigned long idx);
 
+extern void numa_default_policy(void);
+extern void numa_policy_init(void);
+
 #else
 
 struct mempolicy {};
@@ -214,6 +217,14 @@ mpol_shared_policy_lookup(struct shared_policy *sp, unsigned long idx)
 
 #define vma_policy(vma) NULL
 #define vma_set_policy(vma, pol) do {} while(0)
+
+static inline void numa_policy_init(void)
+{
+}
+
+static inline void numa_default_policy(void)
+{
+}
 
 #endif /* CONFIG_NUMA */
 #endif /* __KERNEL__ */

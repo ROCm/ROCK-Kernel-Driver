@@ -43,6 +43,7 @@
 #include <linux/efi.h>
 #include <linux/unistd.h>
 #include <linux/rmap.h>
+#include <linux/mempolicy.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -385,6 +386,7 @@ static void __init smp_init(void)
 static void noinline rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
+	numa_default_policy();
 	unlock_kernel();
  	cpu_idle();
 } 
@@ -456,6 +458,7 @@ asmlinkage void __init start_kernel(void)
 #endif
 	mem_init();
 	kmem_cache_init();
+	numa_policy_init();
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();
@@ -645,6 +648,7 @@ static int init(void * unused)
 	free_initmem();
 	unlock_kernel();
 	system_state = SYSTEM_RUNNING;
+	numa_default_policy();
 
 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");
