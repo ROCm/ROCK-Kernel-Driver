@@ -464,8 +464,6 @@ attach_capi_ctr(struct capi_ctr *card)
         card->resume_output = controllercb_resume_output;
         card->handle_capimsg = controllercb_handle_capimsg;
 
-	list_add_tail(&card->driver_list, &card->driver->contr_head);
-	card->driver->ncontroller++;
 	sprintf(card->procfn, "capi/controllers/%d", card->cnr);
 	card->procent = create_proc_entry(card->procfn, 0, 0);
 	if (card->procent) {
@@ -485,13 +483,10 @@ EXPORT_SYMBOL(attach_capi_ctr);
 
 int detach_capi_ctr(struct capi_ctr *card)
 {
-	struct capi_driver *driver = card->driver;
-
         if (card->cardstate != CARD_DETECTED)
 		controllercb_reseted(card);
 
 	list_del(&card->driver_list);
-	driver->ncontroller--;
 	ncards--;
 
 	if (card->procent) {
@@ -507,32 +502,6 @@ int detach_capi_ctr(struct capi_ctr *card)
 }
 
 EXPORT_SYMBOL(detach_capi_ctr);
-
-/* ------------------------------------------------------------- */
-
-void attach_capi_driver(struct capi_driver *driver)
-{
-	INIT_LIST_HEAD(&driver->contr_head);
-
-	spin_lock(&capi_drivers_lock);
-	list_add_tail(&driver->driver_list, &capi_drivers);
-	spin_unlock(&capi_drivers_lock);
-
-	printk(KERN_NOTICE "kcapi: driver %s attached\n", driver->name);
-}
-
-EXPORT_SYMBOL(attach_capi_driver);
-
-void detach_capi_driver(struct capi_driver *driver)
-{
-	spin_lock(&capi_drivers_lock);
-	list_del(&driver->driver_list);
-	spin_unlock(&capi_drivers_lock);
-
-	printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
-}
-
-EXPORT_SYMBOL(detach_capi_driver);
 
 /* ------------------------------------------------------------- */
 /* -------- CAPI2.0 Interface ---------------------------------- */
@@ -737,28 +706,11 @@ u16 capi20_get_profile(u32 contr, struct capi_profile *profp)
 
 EXPORT_SYMBOL(capi20_get_profile);
 
-static struct capi_driver *find_driver(char *name)
-{
-	struct list_head *l;
-	struct capi_driver *dp;
-	spin_lock(&capi_drivers_lock);
-	list_for_each(l, &capi_drivers) {
-		dp = list_entry(l, struct capi_driver, driver_list);
-		if (strcmp(dp->name, name) == 0)
-			goto found;
-	}
-	dp = NULL;
- found:
-	spin_unlock(&capi_drivers_lock);
-	return dp;
-}
-
 #ifdef CONFIG_AVMB1_COMPAT
 static int old_capi_manufacturer(unsigned int cmd, void *data)
 {
 	avmb1_loadandconfigdef ldef;
 	avmb1_resetdef rdef;
-	avmb1_getdef gdef;
 	struct capi_ctr *card;
 	capiloaddata ldata;
 	int retval;
@@ -783,7 +735,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		if (!card)
 			return -ESRCH;
 		if (card->load_firmware == 0) {
-			printk(KERN_DEBUG "kcapi: load: driver \%s\" has no load function\n", card->driver->name);
+			printk(KERN_DEBUG "kcapi: load: no load function\n");
 			return -ESRCH;
 		}
 
@@ -852,23 +804,6 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		}
 		return 0;
 
-	case AVMB1_GET_CARDINFO:
-		if (copy_from_user((void *)&gdef, data, sizeof(avmb1_getdef)))
-			return -EFAULT;
-
-		card = get_capi_ctr_by_nr(gdef.contr);
-		if (!card)
-			return -ESRCH;
-
-		gdef.cardstate = card->cardstate;
-		if (card->driver == find_driver("t1isa"))
-			gdef.cardtype = AVM_CARDTYPE_T1;
-		else gdef.cardtype = AVM_CARDTYPE_B1;
-
-		if (copy_to_user(data, (void *)&gdef, sizeof(avmb1_getdef)))
-			return -EFAULT;
-
-		return 0;
 	}
 	return -EINVAL;
 }

@@ -26,8 +26,6 @@
 #include <linux/isdn/capilli.h>
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.1.4.1.2.1 $";
-
 /* ------------------------------------------------------------- */
 
 static struct pci_device_id b1pci_pci_tbl[] __devinitdata = {
@@ -60,9 +58,7 @@ static char *b1pci_procinfo(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static int b1pci_probe(struct capi_driver *driver,
-		       struct capicardparams *p,
-		       struct pci_dev *pdev)
+static int b1pci_probe(struct capicardparams *p, struct pci_dev *pdev)
 {
 	avmcard *card;
 	avmctrl_info *cinfo;
@@ -70,7 +66,7 @@ static int b1pci_probe(struct capi_driver *driver,
 
 	card = b1_alloc_card(1);
 	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		printk(KERN_WARNING "b1pci: no memory.\n");
 		retval = -ENOMEM;
 		goto err;
 	}
@@ -82,17 +78,16 @@ static int b1pci_probe(struct capi_driver *driver,
 	card->cardtype = avm_b1pci;
 	
 	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
-		printk(KERN_WARNING
-		       "%s: ports 0x%03x-0x%03x in use.\n",
-		       driver->name, card->port, card->port + AVMB1_PORTLEN);
+		printk(KERN_WARNING "b1pci: ports 0x%03x-0x%03x in use.\n",
+		       card->port, card->port + AVMB1_PORTLEN);
 		retval = -EBUSY;
 		goto err_free;
 	}
 	b1_reset(card->port);
 	retval = b1_detect(card->port, card->cardtype);
 	if (retval) {
-		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-		       driver->name, card->port, retval);
+		printk(KERN_NOTICE "b1pci: NO card at 0x%x (%d)\n",
+		       card->port, retval);
 		retval = -ENODEV;
 		goto err_release_region;
 	}
@@ -101,13 +96,12 @@ static int b1pci_probe(struct capi_driver *driver,
 	
 	retval = request_irq(card->irq, b1_interrupt, SA_SHIRQ, card->name, card);
 	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-		       driver->name, card->irq);
+		printk(KERN_ERR "b1pci: unable to get IRQ %d.\n", card->irq);
 		retval = -EBUSY;
 		goto err_release_region;
 	}
 	
-	cinfo->capi_ctrl.driver        = driver;
+	cinfo->capi_ctrl.driver_name   = "b1pci";
 	cinfo->capi_ctrl.driverdata    = cinfo;
 	cinfo->capi_ctrl.register_appl = b1_register_appl;
 	cinfo->capi_ctrl.release_appl  = b1_release_appl;
@@ -121,19 +115,16 @@ static int b1pci_probe(struct capi_driver *driver,
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
-		printk(KERN_ERR "%s: attach controller failed.\n",
-		       driver->name);
+		printk(KERN_ERR "b1pci: attach controller failed.\n");
 		goto err_free_irq;
 	}
 
 	if (card->revision >= 4) {
-		printk(KERN_INFO
-			"%s: AVM B1 PCI V4 at i/o %#x, irq %d, revision %d (no dma)\n",
-			driver->name, card->port, card->irq, card->revision);
+		printk(KERN_INFO "b1pci: AVM B1 PCI V4 at i/o %#x, irq %d, revision %d (no dma)\n",
+		       card->port, card->irq, card->revision);
 	} else {
-		printk(KERN_INFO
-			"%s: AVM B1 PCI at i/o %#x, irq %d, revision %d\n",
-			driver->name, card->port, card->irq, card->revision);
+		printk(KERN_INFO "b1pci: AVM B1 PCI at i/o %#x, irq %d, revision %d\n",
+		       card->port, card->irq, card->revision);
 	}
 
 	pci_set_drvdata(pdev, card);
@@ -164,13 +155,6 @@ static void b1pci_remove(struct pci_dev *pdev)
 	b1_free_card(card);
 }
 
-/* ------------------------------------------------------------- */
-
-static struct capi_driver b1pci_driver = {
-	name: "b1pci",
-	revision: "0.0",
-};
-
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
 /* ------------------------------------------------------------- */
 
@@ -193,9 +177,7 @@ static char *b1pciv4_procinfo(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static int b1pciv4_probe(struct capi_driver *driver,
-			 struct capicardparams *p,
-			 struct pci_dev *pdev)
+static int b1pciv4_probe(struct capicardparams *p, struct pci_dev *pdev)
 {
 	avmcard *card;
 	avmctrl_info *cinfo;
@@ -203,14 +185,14 @@ static int b1pciv4_probe(struct capi_driver *driver,
 
 	card = b1_alloc_card(1);
 	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		printk(KERN_WARNING "b1pci: no memory.\n");
 		retval = -ENOMEM;
 		goto err;
 	}
 
-        card->dma = avmcard_dma_alloc(driver->name, pdev, 2048+128, 2048+128);
+        card->dma = avmcard_dma_alloc("b1pci", pdev, 2048+128, 2048+128);
 	if (!card->dma) {
-		printk(KERN_WARNING "%s: dma alloc.\n", driver->name);
+		printk(KERN_WARNING "b1pci: dma alloc.\n");
 		retval = -ENOMEM;
 		goto err_free;
 	}
@@ -223,17 +205,16 @@ static int b1pciv4_probe(struct capi_driver *driver,
 	card->cardtype = avm_b1pci;
 
 	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
-		printk(KERN_WARNING
-		       "%s: ports 0x%03x-0x%03x in use.\n",
-		       driver->name, card->port, card->port + AVMB1_PORTLEN);
+		printk(KERN_WARNING "b1pci: ports 0x%03x-0x%03x in use.\n",
+		       card->port, card->port + AVMB1_PORTLEN);
 		retval = -EBUSY;
 		goto err_free_dma;
 	}
 
 	card->mbase = ioremap_nocache(card->membase, 64);
 	if (!card->mbase) {
-		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
-					driver->name, card->membase);
+		printk(KERN_NOTICE "b1pci: can't remap memory at 0x%lx\n",
+		       card->membase);
 		retval = -ENOMEM;
 		goto err_release_region;
 	}
@@ -242,8 +223,8 @@ static int b1pciv4_probe(struct capi_driver *driver,
 
 	retval = b1pciv4_detect(card);
 	if (retval) {
-		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-					driver->name, card->port, retval);
+		printk(KERN_NOTICE "b1pci: NO card at 0x%x (%d)\n",
+		       card->port, retval);
 		retval = -ENODEV;
 		goto err_unmap;
 	}
@@ -252,13 +233,13 @@ static int b1pciv4_probe(struct capi_driver *driver,
 
 	retval = request_irq(card->irq, b1dma_interrupt, SA_SHIRQ, card->name, card);
 	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-				driver->name, card->irq);
+		printk(KERN_ERR "b1pci: unable to get IRQ %d.\n",
+		       card->irq);
 		retval = -EBUSY;
 		goto err_unmap;
 	}
 
-	cinfo->capi_ctrl.driver        = driver;
+	cinfo->capi_ctrl.driver_name   = "b1pciv4";
 	cinfo->capi_ctrl.driverdata    = cinfo;
 	cinfo->capi_ctrl.register_appl = b1dma_register_appl;
 	cinfo->capi_ctrl.release_appl  = b1dma_release_appl;
@@ -272,15 +253,13 @@ static int b1pciv4_probe(struct capi_driver *driver,
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
-		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
+		printk(KERN_ERR "b1pci: attach controller failed.\n");
 		goto err_free_irq;
 	}
 	card->cardnr = cinfo->capi_ctrl.cnr;
 
-	printk(KERN_INFO
-		"%s: AVM B1 PCI V4 at i/o %#x, irq %d, mem %#lx, revision %d (dma)\n",
-		driver->name, card->port, card->irq,
-		card->membase, card->revision);
+	printk(KERN_INFO "b1pci: AVM B1 PCI V4 at i/o %#x, irq %d, mem %#lx, revision %d (dma)\n",
+	       card->port, card->irq, card->membase, card->revision);
 
 	pci_set_drvdata(pdev, card);
 	return 0;
@@ -315,64 +294,48 @@ static void b1pciv4_remove(struct pci_dev *pdev)
 	b1_free_card(card);
 }
 
-/* ------------------------------------------------------------- */
-
-
-static struct capi_driver b1pciv4_driver = {
-	name: "b1pciv4",
-	revision: "0.0",
-};
-
 #endif /* CONFIG_ISDN_DRV_AVMB1_B1PCIV4 */
 
 static int __devinit b1pci_pci_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
-	struct capi_driver *driver = &b1pci_driver;
 	struct capicardparams param;
 	int retval;
 
 	if (pci_enable_device(pdev) < 0) {
-		printk(KERN_ERR "%s: failed to enable AVM-B1\n",
-		       driver->name);
+		printk(KERN_ERR "b1pci: failed to enable AVM-B1\n");
 		return -ENODEV;
 	}
 	param.irq = pdev->irq;
 
 	if (pci_resource_start(pdev, 2)) { /* B1 PCI V4 */
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-		driver = &b1pciv4_driver;
-
 		pci_set_master(pdev);
 #endif
 		param.membase = pci_resource_start(pdev, 0);
 		param.port = pci_resource_start(pdev, 2);
 
-		printk(KERN_INFO
-		"%s: PCI BIOS reports AVM-B1 V4 at i/o %#x, irq %d, mem %#x\n",
-		driver->name, param.port, param.irq, param.membase);
+		printk(KERN_INFO "b1pci: PCI BIOS reports AVM-B1 V4 at i/o %#x, irq %d, mem %#x\n",
+		       param.port, param.irq, param.membase);
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-		retval = b1pciv4_probe(driver, &param, pdev);
+		retval = b1pciv4_probe(&param, pdev);
 #else
-		retval = b1pci_probe(driver, &param, pdev);
+		retval = b1pci_probe(&param, pdev);
 #endif
 		if (retval != 0) {
-		        printk(KERN_ERR
-			"%s: no AVM-B1 V4 at i/o %#x, irq %d, mem %#x detected\n",
-			driver->name, param.port, param.irq, param.membase);
+		        printk(KERN_ERR "b1pci: no AVM-B1 V4 at i/o %#x, irq %d, mem %#x detected\n",
+			       param.port, param.irq, param.membase);
 		}
 	} else {
 		param.membase = 0;
 		param.port = pci_resource_start(pdev, 1);
 
-		printk(KERN_INFO
-		"%s: PCI BIOS reports AVM-B1 at i/o %#x, irq %d\n",
-		driver->name, param.port, param.irq);
-		retval = b1pci_probe(driver, &param, pdev);
+		printk(KERN_INFO "b1pci: PCI BIOS reports AVM-B1 at i/o %#x, irq %d\n",
+		       param.port, param.irq);
+		retval = b1pci_probe(&param, pdev);
 		if (retval != 0) {
-		        printk(KERN_ERR
-			"%s: no AVM-B1 at i/o %#x, irq %d detected\n",
-			driver->name, param.port, param.irq);
+		        printk(KERN_ERR "b1pci: no AVM-B1 at i/o %#x, irq %d detected\n",
+			       param.port, param.irq);
 		}
 	}
 	return retval;
@@ -397,42 +360,12 @@ static struct pci_driver b1pci_pci_driver = {
 
 static int __init b1pci_init(void)
 {
-	int retval;
-
-	b1_set_revision(&b1pci_driver, revision);
-        attach_capi_driver(&b1pci_driver);
-
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	b1_set_revision(&b1pciv4_driver, revision);
-        attach_capi_driver(&b1pciv4_driver);
-#endif
-
-	retval = pci_module_init(&b1pci_pci_driver);
-	if (retval < 0) 
-		goto err;
-
-	printk(KERN_INFO "%s: %d B1-PCI card(s) detected\n",
-	       b1pci_driver.name, retval);
-	retval = 0;
-	goto out;
-
- err:
-	detach_capi_driver(&b1pci_driver);
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	detach_capi_driver(&b1pciv4_driver);
-#endif
- out:
-	return retval;
+	return pci_module_init(&b1pci_pci_driver);
 }
 
 static void __exit b1pci_exit(void)
 {
 	pci_unregister_driver(&b1pci_pci_driver);
-
-	detach_capi_driver(&b1pci_driver);
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	detach_capi_driver(&b1pciv4_driver);
-#endif
 }
 
 module_init(b1pci_init);

@@ -59,21 +59,6 @@ int b1_irq_table[16] =
 
 /* ------------------------------------------------------------- */	
 
-void b1_set_revision(struct capi_driver *driver, char *rev)
-{
-	char *p;
-
-	if ((p = strchr(rev, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-}
-
-/* ------------------------------------------------------------- */	
-
 avmcard *b1_alloc_card(int nr_controllers)
 {
 	avmcard *card;
@@ -775,7 +760,6 @@ EXPORT_SYMBOL(avmcard_dma_free);
 
 EXPORT_SYMBOL(b1_irq_table);
 
-EXPORT_SYMBOL(b1_set_revision);
 EXPORT_SYMBOL(b1_alloc_card);
 EXPORT_SYMBOL(b1_free_card);
 EXPORT_SYMBOL(b1_detect);

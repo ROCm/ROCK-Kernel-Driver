@@ -27,8 +27,6 @@
 #include <linux/isdn/capilli.h>
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.16.6.7 $";
-
 /* ------------------------------------------------------------- */
 
 MODULE_DESCRIPTION("CAPI4Linux: Driver for AVM T1 HEMA ISA card");
@@ -36,8 +34,6 @@ MODULE_AUTHOR("Carsten Paeth");
 MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
-
-static struct capi_driver t1isa_driver;
 
 static int hema_irq_table[16] =
 {0,
@@ -329,13 +325,17 @@ void t1isa_reset_ctr(struct capi_ctr *ctrl)
 static void t1isa_remove(struct pci_dev *pdev)
 {
 	avmctrl_info *cinfo = pci_get_drvdata(pdev);
-	avmcard *card = cinfo->card;
-	unsigned int port = card->port;
+	avmcard *card;
+	
+	if (!cinfo)
+		return;
 
-	t1_disable_irq(port);
-	b1_reset(port);
-	b1_reset(port);
-	t1_reset(port);
+	card = cinfo->card;
+
+	t1_disable_irq(card->port);
+	b1_reset(card->port);
+	b1_reset(card->port);
+	t1_reset(card->port);
 
 	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
@@ -356,7 +356,7 @@ static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 
 	card = b1_alloc_card(1);
 	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", t1isa_driver.name);
+		printk(KERN_WARNING "t1isa: no memory.\n");
 		retval = -ENOMEM;
 		goto err;
 	}
@@ -369,41 +369,38 @@ static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 	sprintf(card->name, "t1isa-%x", card->port);
 
 	if (!(((card->port & 0x7) == 0) && ((card->port & 0x30) != 0x30))) {
-		printk(KERN_WARNING "%s: illegal port 0x%x.\n",
-		       t1isa_driver.name, card->port);
+		printk(KERN_WARNING "t1isa: illegal port 0x%x.\n", card->port);
 		retval = -EINVAL;
 		goto err_free;
         }
 	if (hema_irq_table[card->irq & 0xf] == 0) {
-		printk(KERN_WARNING "%s: irq %d not valid.\n",
-		       t1isa_driver.name, card->irq);
+		printk(KERN_WARNING "t1isa: irq %d not valid.\n", card->irq);
 		retval = -EINVAL;
 		goto err_free;
 	}
 	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
-		printk(KERN_INFO "%s: ports 0x%03x-0x%03x in use.\n",
-		       t1isa_driver.name, card->port, card->port + AVMB1_PORTLEN);
+		printk(KERN_INFO "t1isa: ports 0x%03x-0x%03x in use.\n",
+		       card->port, card->port + AVMB1_PORTLEN);
 		retval = -EBUSY;
 		goto err_free;
 	}
 	retval = request_irq(card->irq, t1isa_interrupt, 0, card->name, card);
 	if (retval) {
-		printk(KERN_INFO "%s: unable to get IRQ %d.\n",
-		       t1isa_driver.name, card->irq);
+		printk(KERN_INFO "t1isa: unable to get IRQ %d.\n", card->irq);
 		retval = -EBUSY;
 		goto err_release_region;
 	}
 
         if ((retval = t1_detectandinit(card->port, card->irq, card->cardnr)) != 0) {
-		printk(KERN_INFO "%s: NO card at 0x%x (%d)\n",
-		       t1isa_driver.name, card->port, retval);
+		printk(KERN_INFO "t1isa: NO card at 0x%x (%d)\n",
+		       card->port, retval);
 		retval = -ENODEV;
 		goto err_free_irq;
 	}
 	t1_disable_irq(card->port);
 	b1_reset(card->port);
 
-	cinfo->capi_ctrl.driver        = &t1isa_driver;
+	cinfo->capi_ctrl.driver_name   = "t1isa";
 	cinfo->capi_ctrl.driverdata    = cinfo;
 	cinfo->capi_ctrl.register_appl = b1_register_appl;
 	cinfo->capi_ctrl.release_appl  = b1_release_appl;
@@ -417,13 +414,12 @@ static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
-		printk(KERN_INFO "%s: attach controller failed.\n",
-		       t1isa_driver.name);
+		printk(KERN_INFO "t1isa: attach controller failed.\n");
 		goto err_free_irq;
 	}
 
-	printk(KERN_INFO "%s: AVM T1 ISA at i/o %#x, irq %d, card %d\n",
-		t1isa_driver.name, card->port, card->irq, card->cardnr);
+	printk(KERN_INFO "t1isa: AVM T1 ISA at i/o %#x, irq %d, card %d\n",
+	       card->port, card->irq, card->cardnr);
 
 	pci_set_drvdata(pdev, cinfo);
 	return 0;
@@ -499,11 +495,6 @@ static char *t1isa_procinfo(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver t1isa_driver = {
-	name: "t1isa",
-	revision: "0.0",
-};
-
 #define MAX_CARDS 4
 static struct pci_dev isa_dev[MAX_CARDS];
 static int io[MAX_CARDS];
@@ -519,11 +510,8 @@ MODULE_PARM_DESC(cardnr, "Card number(s) (as jumpered)");
 
 static int __init t1isa_init(void)
 {
-	int i, retval;
+	int i;
 	int found = 0;
-
-	b1_set_revision(&t1isa_driver, revision);
-        attach_capi_driver(&t1isa_driver);
 
 	for (i = 0; i < MAX_CARDS; i++) {
 		if (!io[i])
@@ -535,17 +523,10 @@ static int __init t1isa_init(void)
 		if (t1isa_probe(&isa_dev[i], cardnr[i]) == 0)
 			found++;
 	}
-	if (found == 0) {
-		retval = -ENODEV;
-		goto err;
-	}
-	retval = 0;
-	goto out;
+	if (found == 0)
+		return -ENODEV;
 
- err:
-	detach_capi_driver(&t1isa_driver);
- out:
-	return retval;
+	return 0;
 }
 
 static void __exit t1isa_exit(void)
@@ -558,7 +539,6 @@ static void __exit t1isa_exit(void)
 
 		t1isa_remove(&isa_dev[i]);
 	}
-	detach_capi_driver(&t1isa_driver);
 }
 
 module_init(t1isa_init);

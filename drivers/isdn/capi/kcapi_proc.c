@@ -29,43 +29,6 @@ cardstate2str(unsigned short cardstate)
 // /proc/capi
 // ===========================================================================
 
-// /proc/capi/driver:
-//      driver ncontroller
-// ---------------------------------------------------------------------------
-
-static int proc_driver_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct list_head *l;
-	struct capi_driver *driver;
-	int len = 0;
-
-	spin_lock(&capi_drivers_lock);
-	list_for_each(l, &capi_drivers) {
-		driver = list_entry(l, struct capi_driver, driver_list);
-
-		len += sprintf(page+len, "%-32s %d %s\n",
-					driver->name,
-					driver->ncontroller,
-					driver->revision);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	spin_unlock(&capi_drivers_lock);
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
 // /proc/capi/controller: 
 //      cnr driver cardstate name driverinfo
 // /proc/capi/contrstats:
@@ -101,7 +64,7 @@ static int controller_show(struct seq_file *seq, void *v)
 		return 0;
 
 	seq_printf(seq, "%d %-10s %-8s %-16s %s\n",
-		   ctr->cnr, ctr->driver->name,
+		   ctr->cnr, ctr->driver_name,
 		   cardstate2str(ctr->cardstate),
 		   ctr->name,
 		   ctr->procinfo ?  ctr->procinfo(ctr) : "");
@@ -286,7 +249,6 @@ kcapi_proc_init(void)
 	proc_mkdir("capi",             NULL);
 	proc_mkdir("capi/controllers", NULL);
 	proc_mkdir("capi/drivers",     NULL);
-	create_proc_read_entry("capi/driver", 0, NULL, proc_driver_read_proc, NULL);
 	create_seq_entry("capi/controller",   0, &proc_controller_ops);
 	create_seq_entry("capi/contrstats",   0, &proc_contrstats_ops);
 	create_seq_entry("capi/applications", 0, &proc_applications_ops);
