@@ -5,7 +5,7 @@
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs    	:= fbcon.o
+export-objs    	:= fbcon.o fonts.o
 
 # Each configuration option enables a list of files.
 
@@ -15,8 +15,7 @@ obj-$(CONFIG_PROM_CONSOLE)        += promcon.o promcon_tbl.o
 obj-$(CONFIG_STI_CONSOLE)         += sticon.o sticore.o
 obj-$(CONFIG_VGA_CONSOLE)         += vgacon.o
 obj-$(CONFIG_MDA_CONSOLE)         += mdacon.o
-obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o fonts.o
-
+obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o font.o
 
 obj-$(CONFIG_FONT_SUN8x16)        += font_sun8x16.o
 obj-$(CONFIG_FONT_SUN12x22)       += font_sun12x22.o
@@ -26,6 +25,9 @@ obj-$(CONFIG_FONT_6x11)           += font_6x11.o
 obj-$(CONFIG_FONT_PEARL_8x8)      += font_pearl_8x8.o
 obj-$(CONFIG_FONT_ACORN_8x8)      += font_acorn_8x8.o
 obj-$(CONFIG_FONT_MINI_4x6)       += font_mini_4x6.o
+
+font-objs := fonts.o font_sun8x16.o font_sun12x22.o font_8x8.o font_8x16.o \
+	      font_6x11.o font_pearl_8x8.o font_acorn_8x8.o font_mini_4x6.o	
 
 # Generic Low Level Drivers
 

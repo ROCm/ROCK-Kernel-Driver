@@ -12,8 +12,8 @@
  * for more details.
  */
 
-
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #if defined(__mc68000__) || defined(CONFIG_APUS)
@@ -23,7 +23,7 @@
 
 #define NO_FONTS
 
-static struct fbcon_font_desc *fbcon_fonts[] = {
+static struct font_desc *fonts[] = {
 #ifdef CONFIG_FONT_8x8
 #undef NO_FONTS
     &font_vga_8x8,
@@ -58,7 +58,7 @@ static struct fbcon_font_desc *fbcon_fonts[] = {
 #endif
 };
 
-#define num_fonts (sizeof(fbcon_fonts)/sizeof(*fbcon_fonts))
+#define num_fonts (sizeof(fonts)/sizeof(*fonts))
 
 #ifdef NO_FONTS
 #error No fonts configured.
@@ -66,7 +66,7 @@ static struct fbcon_font_desc *fbcon_fonts[] = {
 
 
 /**
- *	fbcon_find_font - find a font
+ *	find_font - find a font
  *	@name: string name of a font
  *
  *	Find a specified font with string name @name.
@@ -76,19 +76,19 @@ static struct fbcon_font_desc *fbcon_fonts[] = {
  *
  */
 
-struct fbcon_font_desc *fbcon_find_font(char *name)
+struct font_desc *find_font(char *name)
 {
    unsigned int i;
 
    for (i = 0; i < num_fonts; i++)
-      if (!strcmp(fbcon_fonts[i]->name, name))
-	  return fbcon_fonts[i];
+      if (!strcmp(fonts[i]->name, name))
+	  return fonts[i];
    return NULL;
 }
 
 
 /**
- *	fbcon_get_default_font - get default font
+ *	get_default_font - get default font
  *	@xres: screen size of X
  *	@yres: screen size of Y
  *
@@ -100,15 +100,15 @@ struct fbcon_font_desc *fbcon_find_font(char *name)
  *
  */
 
-struct fbcon_font_desc *fbcon_get_default_font(int xres, int yres)
+struct font_desc *get_default_font(int xres, int yres)
 {
     int i, c, cc;
-    struct fbcon_font_desc *f, *g;
+    struct font_desc *f, *g;
 
     g = NULL;
     cc = -10000;
     for(i=0; i<num_fonts; i++) {
-	f = fbcon_fonts[i];
+	f = fonts[i];
 	c = f->pref;
 #if defined(__mc68000__) || defined(CONFIG_APUS)
 #ifdef CONFIG_FONT_PEARL_8x8
@@ -129,3 +129,14 @@ struct fbcon_font_desc *fbcon_get_default_font(int xres, int yres)
     }
     return g;
 }
+
+int init_module(void) { return 0; };
+void cleanup_module(void) {};
+
+EXPORT_SYMBOL(fonts);
+EXPORT_SYMBOL(find_font);
+EXPORT_SYMBOL(get_default_font);
+
+MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
+MODULE_DESCRIPTION("Console Fonts");
+MODULE_LICENSE("GPL");

@@ -3020,9 +3020,13 @@ EXPORT_SYMBOL(default_grn);
 EXPORT_SYMBOL(default_blu);
 EXPORT_SYMBOL(video_font_height);
 EXPORT_SYMBOL(video_scan_lines);
+EXPORT_SYMBOL(vc_cons_allocated);
+EXPORT_SYMBOL(update_region);
+EXPORT_SYMBOL(redraw_screen);
 EXPORT_SYMBOL(vc_resize);
 EXPORT_SYMBOL(fg_console);
 EXPORT_SYMBOL(console_blank_hook);
+EXPORT_SYMBOL(console_blanked);
 EXPORT_SYMBOL(vt_cons);
 EXPORT_SYMBOL(vc_cons);
 #ifndef VT_SINGLE_DRIVER

@@ -4621,7 +4621,7 @@ static unsigned char fontdata_8x16[FONTDATAMAX] = {
 };
 
 
-struct fbcon_font_desc font_vga_8x16 = {
+struct font_desc font_vga_8x16 = {
 	VGA8x16_IDX,
 	"VGA8x16",
 	8,

@@ -41,10 +41,6 @@
 #include <asm/pgtable.h>
 
 #include <linux/fb.h>
-#ifdef CONFIG_VT
-#include <linux/console.h>
-#include "console/fbcon.h"
-#endif
 
     /*
      *  Frame buffer device initialization and setup routines
@@ -358,14 +354,6 @@ static int num_pref_init_funcs __initdata = 0;
 
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
-
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-extern int fbcon_softback_size; 
-
-static int first_fb_vc;
-static int last_fb_vc = MAX_NR_CONSOLES-1;
-static int fbcon_is_default = 1;
-#endif
 
 #ifdef CONFIG_FB_OF
 static int ofonly __initdata = 0;
@@ -797,7 +785,6 @@ register_framebuffer(struct fb_info *fb_info)
 {
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	static int fb_ever_opened[FB_MAX];
-	static int first = 1;
 	int j;
 #endif
 	char name_buf[8];
@@ -831,11 +818,6 @@ register_framebuffer(struct fb_info *fb_info)
 					__MOD_DEC_USE_COUNT(owner);
 			}
 		fb_ever_opened[i] = 1;
-	}
-
-	if (first) {
-		first = 0;
-		take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
 	}
 #endif
 	sprintf (name_buf, "%d", i);
@@ -938,45 +920,6 @@ int __init video_setup(char *options)
     if (!options || !*options)
 	    return 0;
 	   
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE 
-    if (!strncmp(options, "scrollback:", 11)) {
-	    options += 11;
-	    if (*options) {
-		fbcon_softback_size = simple_strtoul(options, &options, 0);
-		if (*options == 'k' || *options == 'K') {
-			fbcon_softback_size *= 1024;
-			options++;
-		}
-		if (*options != ',')
-			return 0;
-		options++;
-	    } else
-	        return 0;
-    }
-
-    if (!strncmp(options, "map:", 4)) {
-	    options += 4;
-	    if (*options)
-		    for (i = 0, j = 0; i < MAX_NR_CONSOLES; i++) {
-			    if (!options[j])
-				    j = 0;
-			    con2fb_map[i] = (options[j++]-'0') % FB_MAX;
-		    }
-	    return 0;
-    }
-    
-    if (!strncmp(options, "vc:", 3)) {
-	    options += 3;
-	    if (*options)
-		first_fb_vc = simple_strtoul(options, &options, 10) - 1;
-	    if (first_fb_vc < 0)
-		first_fb_vc = 0;
-	    if (*options++ == '-')
-		last_fb_vc = simple_strtoul(options, &options, 10) - 1;
-	    fbcon_is_default = 0;
-    }
-#endif
-
 #ifdef CONFIG_FB_OF
     if (!strcmp(options, "ofonly")) {
 	    ofonly = 1;

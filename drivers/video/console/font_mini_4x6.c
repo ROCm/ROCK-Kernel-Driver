@@ -2147,7 +2147,7 @@ static unsigned char fontdata_mini_4x6[FONTDATAMAX] = {
 	/*}*/
 };
 
-struct fbcon_font_desc font_mini_4x6 = {
+struct font_desc font_mini_4x6 = {
 	MINI4x6_IDX,
 	"MINI4x6",
 	4,

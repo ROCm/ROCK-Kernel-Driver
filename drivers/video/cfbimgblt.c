@@ -342,6 +342,9 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 		color_imageblit(image, p, dst1, start_index, pitch_index);
 }
 
+int init_module(void) { return 0; };
+void cleanup_module(void) {};
+
 EXPORT_SYMBOL(cfb_imageblit);
 
 MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");

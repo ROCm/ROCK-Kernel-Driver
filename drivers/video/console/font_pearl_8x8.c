@@ -2577,7 +2577,7 @@ static unsigned char fontdata_pearl8x8[FONTDATAMAX] = {
 
 };
 
-struct fbcon_font_desc font_pearl_8x8 = {
+struct font_desc font_pearl_8x8 = {
 	PEARL8x8_IDX,
 	"PEARL8x8",
 	8,

@@ -13,7 +13,7 @@
 
 #include <linux/types.h>
 
-struct fbcon_font_desc {
+struct font_desc {
     int idx;
     char *name;
     int width, height;
@@ -30,22 +30,22 @@ struct fbcon_font_desc {
 #define ACORN8x8_IDX	6
 #define	MINI4x6_IDX	7
 
-extern struct fbcon_font_desc	font_vga_8x8,
-				font_vga_8x16,
-				font_pearl_8x8,
-				font_vga_6x11,
-				font_sun_8x16,
-				font_sun_12x22,
-				font_acorn_8x8,
-				font_mini_4x6;
+extern struct font_desc	font_vga_8x8,
+			font_vga_8x16,
+			font_pearl_8x8,
+			font_vga_6x11,
+			font_sun_8x16,
+			font_sun_12x22,
+			font_acorn_8x8,
+			font_mini_4x6;
 
 /* Find a font with a specific name */
 
-extern struct fbcon_font_desc *fbcon_find_font(char *name);
+extern struct font_desc *find_font(char *name);
 
 /* Get the default font for a specific screen size */
 
-extern struct fbcon_font_desc *fbcon_get_default_font(int xres, int yres);
+extern struct font_desc *get_default_font(int xres, int yres);
 
 /* Max. length for the name of a predefined font */
 #define MAX_FONT_NAME	32

@@ -3341,7 +3341,7 @@ static unsigned char fontdata_6x11[FONTDATAMAX] = {
 };
 
 
-struct fbcon_font_desc font_vga_6x11 = {
+struct font_desc font_vga_6x11 = {
 	VGA6x11_IDX,
 	"ProFont6x11",
 	6,

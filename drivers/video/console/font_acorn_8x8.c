@@ -263,7 +263,7 @@ static unsigned char acorndata_8x8[] = {
 /* FF */  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-struct fbcon_font_desc font_acorn_8x8 = {
+struct font_desc font_acorn_8x8 = {
 	ACORN8x8_IDX,
 	"Acorn8x8",
 	8,

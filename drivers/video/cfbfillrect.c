@@ -443,6 +443,9 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	}
 }
 
+int init_module(void) { return 0; };
+void cleanup_module(void) {};
+
 EXPORT_SYMBOL(cfb_fillrect);
 
 MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");

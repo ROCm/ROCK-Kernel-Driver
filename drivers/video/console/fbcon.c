@@ -122,6 +122,10 @@ static unsigned long softback_buf, softback_curr;
 static unsigned long softback_in;
 static unsigned long softback_top, softback_end;
 static int softback_lines;
+/* console mappings */
+static int first_fb_vc;
+static int last_fb_vc = MAX_NR_CONSOLES - 1;
+static int fbcon_is_default = 1; 
 
 #define REFCOUNT(fd)	(((int *)(fd))[-1])
 #define FNTSIZE(fd)	(((int *)(fd))[-2])
@@ -220,9 +224,8 @@ static void fbcon_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 
 static void cursor_timer_handler(unsigned long dev_addr);
 
-
 static struct timer_list cursor_timer =
-TIMER_INITIALIZER(cursor_timer_handler, 0, 0);
+	TIMER_INITIALIZER(cursor_timer_handler, 0, 0);
 
 static void cursor_timer_handler(unsigned long dev_addr)
 {
@@ -231,20 +234,57 @@ static void cursor_timer_handler(unsigned long dev_addr)
 	add_timer(&cursor_timer);
 }
 
-static int __init fbconsole_setup(char *options)
+static int __init fbconsole_setup(char *this_opt)
 {
-	char *this_opt;
-	int unit;
+	int unit, i, j;
+	char *options;
 
-	if (!options || !*options)
+	if (!this_opt || !*this_opt)
 		return 0;
 
-	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "font:", 5)) {
+	while ((options = strsep(&this_opt, ",")) != NULL) {
+		if (!strncmp(options, "font:", 5)) {
 			for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
 				strcpy(fb_display[unit].fontname,
-				       this_opt + 5);
+				       options + 5);
 		}
+		
+		if (!strncmp(options, "scrollback:", 11)) {
+			options += 11;
+			if (*options) {
+				fbcon_softback_size = simple_strtoul(options, &options, 0);
+				if (*options == 'k' || *options == 'K') {
+					fbcon_softback_size *= 1024;
+					options++;
+				}
+				if (*options != ',')
+					return 0;
+				options++;
+			} else
+				return 0;
+		}
+		
+		if (!strncmp(options, "map:", 4)) {
+			options += 4;
+			if (*options)
+				for (i = 0, j = 0; i < MAX_NR_CONSOLES; i++) {
+					if (!options[j])
+						j = 0;
+					con2fb_map[i] = (options[j++]-'0') % FB_MAX;
+				}
+			return 0;
+		}
+
+		if (!strncmp(options, "vc:", 3)) {
+			options += 3;
+			if (*options)
+				first_fb_vc = simple_strtoul(options, &options, 10) - 1;
+			if (first_fb_vc < 0)
+				first_fb_vc = 0;
+			if (*options++ == '-')
+				last_fb_vc = simple_strtoul(options, &options, 10) - 1;
+			fbcon_is_default = 0; 
+		}	
 	}
 	return 0;
 }
@@ -510,7 +550,7 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 static const char *fbcon_startup(void)
 {
 	const char *display_desc = "frame buffer device";
-	struct fbcon_font_desc *font = NULL;
+	struct font_desc *font = NULL;
 	struct fb_info *info;
 	struct vc_data *vc;
 	static int done = 0;
@@ -552,7 +592,7 @@ static const char *fbcon_startup(void)
 		softback_lines = 0;
 	}
 
-	font = fbcon_get_default_font(info->var.xres, info->var.yres);	
+	font = get_default_font(info->var.xres, info->var.yres);	
 
 	vc = (struct vc_data *) kmalloc(sizeof(struct vc_data), GFP_ATOMIC); 
 
@@ -690,7 +730,7 @@ static int fbcon_changevar(int con)
 		int old_rows, old_cols;
 		unsigned short *save = NULL, *q;
 		int i, charcnt = 256;
-		struct fbcon_font_desc *font;
+		struct font_desc *font;
 
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
 
@@ -720,11 +760,9 @@ static int fbcon_changevar(int con)
 		}
 
 		if (!p->fontdata) {
-			if (!p->fontname[0] ||
-		    		!(font = fbcon_find_font(p->fontname)))
-				font =
-			    		fbcon_get_default_font(info->var.xres,
-						   	info->var.yres);
+			if (!p->fontname[0] || !(font = find_font(p->fontname)))
+			    	font = get_default_font(info->var.xres,
+						   		info->var.yres);
 			vc->vc_font.width = font->width;
 			vc->vc_font.height = font->height;
 			p->fontdata = font->data;
@@ -832,7 +870,7 @@ static void fbcon_set_display(int con, int init, int logo)
 	int old_rows, old_cols;
 	unsigned short *save = NULL, *r, *q;
 	int i, charcnt = 256;
-	struct fbcon_font_desc *font;
+	struct font_desc *font;
 
 	if (con != fg_console || (info->flags & FBINFO_FLAG_MODULE) ||
 	    info->fix.type == FB_TYPE_TEXT)
@@ -866,10 +904,8 @@ static void fbcon_set_display(int con, int init, int logo)
 	}
 
 	if (!p->fontdata) {
-		if (!p->fontname[0] ||
-		    !(font = fbcon_find_font(p->fontname)))
-			font =
-			    fbcon_get_default_font(info->var.xres,
+		if (!p->fontname[0] || !(font = find_font(p->fontname)))
+			font = get_default_font(info->var.xres,
 						   info->var.yres);
 		vc->vc_font.width = font->width;
 		vc->vc_font.height = font->height;
@@ -2229,17 +2265,17 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 static inline int fbcon_set_def_font(struct vc_data *vc, struct console_font_op *op)
 {
 	char name[MAX_FONT_NAME];
-	struct fbcon_font_desc *f;
+	struct font_desc *f;
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
 
 	if (!op->data)
-		f = fbcon_get_default_font(info->var.xres, info->var.yres);
+		f = get_default_font(info->var.xres, info->var.yres);
 	else if (strncpy_from_user(name, op->data, MAX_FONT_NAME - 1) < 0)
 		return -EFAULT;
 	else {
 		name[MAX_FONT_NAME - 1] = 0;
-		if (!(f = fbcon_find_font(name)))
+		if (!(f = find_font(name)))
 			return -ENOENT;
 	}
 	op->width = f->width;
@@ -2629,18 +2665,18 @@ const struct consw fb_con = {
 	.con_getxy 		= fbcon_getxy,
 };
 
-#ifdef MODULE
-MODULE_LICENSE("GPL");
-
-int init_module(void)
+static int __init fbconsole_init(void)
 {
+	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
 	return 0;
 }
 
-void cleanup_module(void)
+static void __exit fbconsole_exit(void)
 {
-}
-#endif
+}	
+
+module_init(fbconsole_init);
+module_exit(fbconsole_exit);
 
 /*
  *  Visible symbols for modules
