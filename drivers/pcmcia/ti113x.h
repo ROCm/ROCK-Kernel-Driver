@@ -150,6 +150,10 @@
 /* ExCA IO offset registers */
 #define TI113X_IO_OFFSET(map)		(0x36+((map)<<1))
 
+/* EnE test register */
+#define ENE_TEST_C9			0xc9	/* 8bit */
+#define ENE_TEST_C9_TLTENABLE		0x02
+
 #ifdef CONFIG_CARDBUS
 
 /*
@@ -160,6 +164,7 @@
 #define ti_devctl(socket)	((socket)->private[2])
 #define ti_diag(socket)		((socket)->private[3])
 #define ti_mfunc(socket)	((socket)->private[4])
+#define ene_test_c9(socket)	((socket)->private[5])
 
 /*
  * These are the TI specific power management handlers.
@@ -171,6 +176,9 @@ static void ti_save_state(struct yenta_socket *socket)
 	ti_cardctl(socket) = config_readb(socket, TI113X_CARD_CONTROL);
 	ti_devctl(socket) = config_readb(socket, TI113X_DEVICE_CONTROL);
 	ti_diag(socket) = config_readb(socket, TI1250_DIAGNOSTIC);
+
+	if (socket->dev->vendor == PCI_VENDOR_ID_ENE)
+		ene_test_c9(socket) = config_readb(socket, ENE_TEST_C9);
 }
 
 static void ti_restore_state(struct yenta_socket *socket)
@@ -180,6 +188,9 @@ static void ti_restore_state(struct yenta_socket *socket)
 	config_writeb(socket, TI113X_CARD_CONTROL, ti_cardctl(socket));
 	config_writeb(socket, TI113X_DEVICE_CONTROL, ti_devctl(socket));
 	config_writeb(socket, TI1250_DIAGNOSTIC, ti_diag(socket));
+
+	if (socket->dev->vendor == PCI_VENDOR_ID_ENE)
+		config_writeb(socket, ENE_TEST_C9, ene_test_c9(socket));
 }
 
 /*
@@ -589,6 +600,16 @@ static int ti12xx_override(struct yenta_socket *socket)
 		printk(KERN_INFO "Yenta: Enabling burst memory read transactions\n");
 		val |= TI122X_SCR_MRBURSTUP;
 		config_writel(socket, TI113X_SYSTEM_CONTROL, val);
+	}
+
+	/*
+	 * for EnE bridges only: clear testbit TLTEnable. this makes the
+	 * RME Hammerfall DSP sound card working.
+	 */
+	if (socket->dev->vendor == PCI_VENDOR_ID_ENE) {
+		u8 test_c9 = config_readb(socket, ENE_TEST_C9);
+		test_c9 &= ~ENE_TEST_C9_TLTENABLE;
+		config_writeb(socket, ENE_TEST_C9, test_c9);
 	}
 
 	/*
