@@ -45,13 +45,11 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/videodev.h>
-#include <asm/semaphore.h>
 #include <linux/init.h>
-
-#ifdef CONFIG_SMP
-#include <asm/pgtable.h>
 #include <linux/smp_lock.h>
-#endif
+#include <asm/semaphore.h>
+#include <asm/pgtable.h>
+
 /* kernel_thread */
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
@@ -59,18 +57,13 @@
 #include <media/audiochip.h>
 #include "msp3400.h"
 
-/* Addresses to scan */
-static unsigned short normal_i2c[] = {I2C_CLIENT_END};
-static unsigned short normal_i2c_range[] = {0x40,0x40,I2C_CLIENT_END};
-I2C_CLIENT_INSMOD;
-
 /* insmod parameters */
-static int debug   = 0;    /* debug output */
-static int once    = 0;    /* no continous stereo monitoring */
-static int amsound = 0;    /* hard-wire AM sound at 6.5 Hz (france),
+static int debug    = 0;    /* debug output */
+static int once     = 0;    /* no continous stereo monitoring */
+static int amsound  = 0;    /* hard-wire AM sound at 6.5 Hz (france),
 			      the autoscan seems work well only with FM... */
-static int simple  = -1;   /* use short programming (>= msp3410 only) */
-static int dolby   = 0;
+static int simple   = -1;   /* use short programming (>= msp3410 only) */
+static int dolby    = 0;
 
 #define DFP_COUNT 0x41
 static const int bl_dfp[] = {
@@ -79,8 +72,9 @@ static const int bl_dfp[] = {
 };
 
 struct msp3400c {
+	int rev1,rev2;
+	
 	int simple;
-	int nicam;
 	int mode;
 	int norm;
 	int stereo;
@@ -107,6 +101,10 @@ struct msp3400c {
 	struct timer_list    wake_stereo;
 };
 
+#define HAVE_NICAM(msp)   (((msp->rev2>>8) & 0xff) != 00)
+#define HAVE_SIMPLE(msp)  ((msp->rev1      & 0xff) >= 'D'-'@')
+#define HAVE_RADIO(msp)   ((msp->rev1      & 0xff) >= 'G'-'@')
+
 #define MSP3400_MAX 4
 static struct i2c_client *msps[MSP3400_MAX];
 
@@ -124,13 +122,24 @@ MODULE_PARM(dolby,"i");
 
 MODULE_DESCRIPTION("device driver for msp34xx TV sound processor");
 MODULE_AUTHOR("Gerd Knorr");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual BSD/GPL"); /* FreeBSD uses this too */
 
 /* ---------------------------------------------------------------------- */
 
 #define I2C_MSP3400C       0x80
+#define I2C_MSP3400C_ALT   0x88
+
 #define I2C_MSP3400C_DEM   0x10
 #define I2C_MSP3400C_DFP   0x12
+
+/* Addresses to scan */
+static unsigned short normal_i2c[] = {
+	I2C_MSP3400C      >> 1,
+	I2C_MSP3400C_ALT  >> 1,
+	I2C_CLIENT_END
+};
+static unsigned short normal_i2c_range[] = {I2C_CLIENT_END,I2C_CLIENT_END};
+I2C_CLIENT_INSMOD;
 
 /* ----------------------------------------------------------------------- */
 /* functions for talking to the MSP3400C Sound processor                   */
@@ -354,7 +363,8 @@ msp3400c_set_scart(struct i2c_client *client, int in, int out)
 	if (-1 == scarts[out][in])
 		return;
 
-	dprintk("msp34xx: scart switch: %s => %d\n",scart_names[in],out);
+	dprintk(KERN_DEBUG
+		"msp34xx: scart switch: %s => %d\n",scart_names[in],out);
 	msp->acb &= ~scarts[out][SCART_MASK];
 	msp->acb |=  scarts[out][in];
 	msp3400c_write(client,I2C_MSP3400C_DFP, 0x0013, msp->acb);
@@ -384,7 +394,8 @@ static void msp3400c_setvolume(struct i2c_client *client,
 		balance = ((right-left) * 127) / vol;
 	}
 
-	dprintk("msp34xx: setvolume: mute=%s %d:%d  v=0x%02x b=0x%02x\n",
+	dprintk(KERN_DEBUG
+		"msp34xx: setvolume: mute=%s %d:%d  v=0x%02x b=0x%02x\n",
 		muted ? "on" : "off", left, right, val>>8, balance);
 	msp3400c_write(client,I2C_MSP3400C_DFP, 0x0000, val); /* loudspeaker */
 	msp3400c_write(client,I2C_MSP3400C_DFP, 0x0006, val); /* headphones  */
@@ -397,7 +408,7 @@ static void msp3400c_setbass(struct i2c_client *client, int bass)
 {
 	int val = ((bass-32768) * 0x60 / 65535) << 8;
 
-	dprintk("msp34xx: setbass: %d 0x%02x\n",bass, val>>8);
+	dprintk(KERN_DEBUG "msp34xx: setbass: %d 0x%02x\n",bass, val>>8);
 	msp3400c_write(client,I2C_MSP3400C_DFP, 0x0002, val); /* loudspeaker */
 }
 
@@ -405,7 +416,7 @@ static void msp3400c_settreble(struct i2c_client *client, int treble)
 {
 	int val = ((treble-32768) * 0x60 / 65535) << 8;
 
-	dprintk("msp34xx: settreble: %d 0x%02x\n",treble, val>>8);
+	dprintk(KERN_DEBUG "msp34xx: settreble: %d 0x%02x\n",treble, val>>8);
 	msp3400c_write(client,I2C_MSP3400C_DFP, 0x0003, val); /* loudspeaker */
 }
 
@@ -414,7 +425,7 @@ static void msp3400c_setmode(struct i2c_client *client, int type)
 	struct msp3400c *msp = i2c_get_clientdata(client);
 	int i;
 	
-	dprintk("msp3400: setmode: %d\n",type);
+	dprintk(KERN_DEBUG "msp3400: setmode: %d\n",type);
 	msp->mode   = type;
 	msp->stereo = VIDEO_SOUND_MONO;
 
@@ -460,7 +471,7 @@ static void msp3400c_setmode(struct i2c_client *client, int type)
 	msp3400c_write(client,I2C_MSP3400C_DFP, 0x000e,
 		       msp_init_data[type].dfp_matrix);
 
-	if (msp->nicam) {
+	if (HAVE_NICAM(msp)) {
 		/* nicam prescale */
 		msp3400c_write(client,I2C_MSP3400C_DFP, 0x0010, 0x5a00); /* was: 0x3000 */
 	}
@@ -469,8 +480,15 @@ static void msp3400c_setmode(struct i2c_client *client, int type)
 /* turn on/off nicam + stereo */
 static void msp3400c_setstereo(struct i2c_client *client, int mode)
 {
-	static char *strmode[] = { "0", "mono", "stereo", "3",
-				   "lang1", "5", "6", "7", "lang2" };
+	static char *strmode[16] = {
+#if __GNUC__ >= 3
+		[ 0 ... 15 ]           = "invalid",
+#endif
+		[ VIDEO_SOUND_MONO ]   = "mono",
+		[ VIDEO_SOUND_STEREO ] = "stereo",
+		[ VIDEO_SOUND_LANG1  ] = "lang1",
+		[ VIDEO_SOUND_LANG2  ] = "lang2",
+	};
 	struct msp3400c *msp = i2c_get_clientdata(client);
 	int nicam=0; /* channel source: FM/AM or nicam */
 	int src=0;
@@ -478,7 +496,7 @@ static void msp3400c_setstereo(struct i2c_client *client, int mode)
 	/* switch demodulator */
 	switch (msp->mode) {
 	case MSP_MODE_FM_TERRA:
-		dprintk("msp3400: FM setstereo: %s\n",strmode[mode]);
+		dprintk(KERN_DEBUG "msp3400: FM setstereo: %s\n",strmode[mode]);
 		msp3400c_setcarrier(client,msp->second,msp->main);
 		switch (mode) {
 		case VIDEO_SOUND_STEREO:
@@ -492,7 +510,7 @@ static void msp3400c_setstereo(struct i2c_client *client, int mode)
 		}
 		break;
 	case MSP_MODE_FM_SAT:
-		dprintk("msp3400: SAT setstereo: %s\n",strmode[mode]);
+		dprintk(KERN_DEBUG "msp3400: SAT setstereo: %s\n",strmode[mode]);
 		switch (mode) {
 		case VIDEO_SOUND_MONO:
 			msp3400c_setcarrier(client, MSP_CARRIER(6.5), MSP_CARRIER(6.5));
@@ -511,24 +529,24 @@ static void msp3400c_setstereo(struct i2c_client *client, int mode)
 	case MSP_MODE_FM_NICAM1:
 	case MSP_MODE_FM_NICAM2:
 	case MSP_MODE_AM_NICAM:
-		dprintk("msp3400: NICAM setstereo: %s\n",strmode[mode]);
+		dprintk(KERN_DEBUG "msp3400: NICAM setstereo: %s\n",strmode[mode]);
 		msp3400c_setcarrier(client,msp->second,msp->main);
 		if (msp->nicam_on)
 			nicam=0x0100;
 		break;
 	case MSP_MODE_BTSC:
-		dprintk("msp3400: BTSC setstereo: %s\n",strmode[mode]);
+		dprintk(KERN_DEBUG "msp3400: BTSC setstereo: %s\n",strmode[mode]);
 		nicam=0x0300;
 		break;
 	case MSP_MODE_EXTERN:
-		dprintk("msp3400: extern setstereo: %s\n",strmode[mode]);
+		dprintk(KERN_DEBUG "msp3400: extern setstereo: %s\n",strmode[mode]);
 		nicam = 0x0200;
 		break;
 	case MSP_MODE_FM_RADIO:
-		dprintk("msp3400: FM-Radio setstereo: %s\n",strmode[mode]);
+		dprintk(KERN_DEBUG "msp3400: FM-Radio setstereo: %s\n",strmode[mode]);
 		break;
 	default:
-		dprintk("msp3400: mono setstereo\n");
+		dprintk(KERN_DEBUG "msp3400: mono setstereo\n");
 		return;
 	}
 
@@ -557,7 +575,8 @@ static void msp3400c_setstereo(struct i2c_client *client, int mode)
 		src = 0x0010 | nicam;
 		break;
 	}
-	dprintk("msp3400: setstereo final source/matrix = 0x%x\n", src);
+	dprintk(KERN_DEBUG
+		"msp3400: setstereo final source/matrix = 0x%x\n", src);
 
 	if (dolby) {
 		msp3400c_write(client,I2C_MSP3400C_DFP, 0x0008,0x0520);
@@ -576,22 +595,22 @@ static void
 msp3400c_print_mode(struct msp3400c *msp)
 {
 	if (msp->main == msp->second) {
-		printk("msp3400: mono sound carrier: %d.%03d MHz\n",
+		printk(KERN_DEBUG "msp3400: mono sound carrier: %d.%03d MHz\n",
 		       msp->main/910000,(msp->main/910)%1000);
 	} else {
-		printk("msp3400: main sound carrier: %d.%03d MHz\n",
+		printk(KERN_DEBUG "msp3400: main sound carrier: %d.%03d MHz\n",
 		       msp->main/910000,(msp->main/910)%1000);
 	}
 	if (msp->mode == MSP_MODE_FM_NICAM1 ||
 	    msp->mode == MSP_MODE_FM_NICAM2)
-		printk("msp3400: NICAM/FM carrier   : %d.%03d MHz\n",
+		printk(KERN_DEBUG "msp3400: NICAM/FM carrier   : %d.%03d MHz\n",
 		       msp->second/910000,(msp->second/910)%1000);
 	if (msp->mode == MSP_MODE_AM_NICAM)
-		printk("msp3400: NICAM/AM carrier   : %d.%03d MHz\n",
+		printk(KERN_DEBUG "msp3400: NICAM/AM carrier   : %d.%03d MHz\n",
 		       msp->second/910000,(msp->second/910)%1000);
 	if (msp->mode == MSP_MODE_FM_TERRA &&
 	    msp->main != msp->second) {
-		printk("msp3400: FM-stereo carrier : %d.%03d MHz\n",
+		printk(KERN_DEBUG "msp3400: FM-stereo carrier : %d.%03d MHz\n",
 		       msp->second/910000,(msp->second/910)%1000);
 	}
 }
@@ -638,8 +657,8 @@ autodetect_stereo(struct i2c_client *client)
 		val = msp3400c_read(client, I2C_MSP3400C_DFP, 0x18);
 		if (val > 32767)
 			val -= 65536;
-		dprintk("msp34xx: stereo detect register: %d\n",val);
-		
+		dprintk(KERN_DEBUG
+			"msp34xx: stereo detect register: %d\n",val);
 		if (val > 4096) {
 			newstereo = VIDEO_SOUND_STEREO | VIDEO_SOUND_MONO;
 		} else if (val < -4096) {
@@ -653,7 +672,9 @@ autodetect_stereo(struct i2c_client *client)
 	case MSP_MODE_FM_NICAM2:
 	case MSP_MODE_AM_NICAM:
 		val = msp3400c_read(client, I2C_MSP3400C_DEM, 0x23);
-		dprintk("msp34xx: nicam sync=%d, mode=%d\n",val & 1, (val & 0x1e) >> 1);
+		dprintk(KERN_DEBUG
+			"msp34xx: nicam sync=%d, mode=%d\n",
+			val & 1, (val & 0x1e) >> 1);
 
 		if (val & 1) {
 			/* nicam synced */
@@ -685,7 +706,8 @@ autodetect_stereo(struct i2c_client *client)
 		break;
 	case MSP_MODE_BTSC:
 		val = msp3400c_read(client, I2C_MSP3400C_DEM, 0x200);
-		dprintk("msp3410: status=0x%x (pri=%s, sec=%s, %s%s%s)\n",
+		dprintk(KERN_DEBUG
+			"msp3410: status=0x%x (pri=%s, sec=%s, %s%s%s)\n",
 			val,
 			(val & 0x0002) ? "no"     : "yes",
 			(val & 0x0004) ? "no"     : "yes",
@@ -699,13 +721,13 @@ autodetect_stereo(struct i2c_client *client)
 	}
 	if (newstereo != msp->stereo) {
 		update = 1;
-		dprintk("msp34xx: watch: stereo %d => %d\n",
+		dprintk(KERN_DEBUG "msp34xx: watch: stereo %d => %d\n",
 			msp->stereo,newstereo);
 		msp->stereo   = newstereo;
 	}
 	if (newnicam != msp->nicam_on) {
 		update = 1;
-		dprintk("msp34xx: watch: nicam %d => %d\n",
+		dprintk(KERN_DEBUG "msp34xx: watch: nicam %d => %d\n",
 			msp->nicam_on,newnicam);
 		msp->nicam_on = newnicam;
 	}
@@ -734,6 +756,8 @@ static void watch_stereo(struct i2c_client *client)
 			msp3400c_setstereo(client,VIDEO_SOUND_STEREO);
 		else if (msp->stereo & VIDEO_SOUND_LANG1)
 			msp3400c_setstereo(client,VIDEO_SOUND_LANG1);
+		else if (msp->stereo & VIDEO_SOUND_LANG2)
+			msp3400c_setstereo(client,VIDEO_SOUND_LANG2);
 		else
 			msp3400c_setstereo(client,VIDEO_SOUND_MONO);
 	}
@@ -751,17 +775,10 @@ static int msp3400c_thread(void *data)
 	struct CARRIER_DETECT *cd;
 	int count, max1,max2,val1,val2, val,this;
 	
-#ifdef CONFIG_SMP
 	lock_kernel();
-#endif
-	
 	daemonize("msp3400");
-
 	msp->thread = current;
-
-#ifdef CONFIG_SMP
 	unlock_kernel();
-#endif
 
 	printk("msp3400: daemon started\n");
 	if(msp->notify != NULL)
@@ -778,10 +795,6 @@ static int msp3400c_thread(void *data)
 		if (msp->rmmod || signal_pending(current))
 			goto done;
 
-		if (VIDEO_MODE_RADIO == msp->norm ||
-		    MSP_MODE_EXTERN  == msp->mode)
-			continue;  /* nothing to do */
-	
 		msp->active = 1;
 
 		if (msp->watch_stereo) {
@@ -798,8 +811,13 @@ static int msp3400c_thread(void *data)
 		
 	restart:
 		if (VIDEO_MODE_RADIO == msp->norm ||
-		    MSP_MODE_EXTERN  == msp->mode)
-			continue;  /* nothing to do */
+		    MSP_MODE_EXTERN  == msp->mode) {
+			/* no carrier scan, just unmute */
+			printk("msp3400: thread: no carrier scan\n");
+			msp3400c_setvolume(client, msp->muted,
+					   msp->left, msp->right);
+			continue;
+		}
 		msp->restart = 0;
 		msp3400c_setvolume(client, msp->muted, 0, 0);
 		msp3400c_setmode(client, MSP_MODE_AM_DETECT /* +1 */ );
@@ -884,7 +902,7 @@ static int msp3400c_thread(void *data)
 				msp->nicam_on = 0;
 				msp3400c_setstereo(client, VIDEO_SOUND_MONO);
 				msp->watch_stereo = 1;
-			} else if (max2 == 1 && msp->nicam) {
+			} else if (max2 == 1 && HAVE_NICAM(msp)) {
 				/* B/G NICAM */
 				msp->second = carrier_detect_55[max2].cdo;
 				msp3400c_setmode(client, MSP_MODE_FM_NICAM1);
@@ -922,7 +940,7 @@ static int msp3400c_thread(void *data)
 				/* volume prescale for SCART (AM mono input) */
 				msp3400c_write(client,I2C_MSP3400C_DFP, 0x000d, 0x1900);
 				msp->watch_stereo = 1;
-			} else if (max2 == 0 && msp->nicam) {
+			} else if (max2 == 0 && HAVE_NICAM(msp)) {
 				/* D/K NICAM */
 				msp->second = carrier_detect_65[max2].cdo;
 				msp3400c_setmode(client, MSP_MODE_FM_NICAM1);
@@ -959,7 +977,7 @@ static int msp3400c_thread(void *data)
 	}
 
 done:
-	dprintk("msp3400: thread: exit\n");
+	dprintk(KERN_DEBUG "msp3400: thread: exit\n");
 	msp->active = 0;
 	msp->thread = NULL;
 
@@ -1005,17 +1023,10 @@ static int msp3410d_thread(void *data)
 	struct msp3400c *msp = i2c_get_clientdata(client);
 	int mode,val,i,std;
     
-#ifdef CONFIG_SMP
 	lock_kernel();
-#endif
-    
 	daemonize("msp3410 [auto]");
-
 	msp->thread = current;
-
-#ifdef CONFIG_SMP
 	unlock_kernel();
-#endif
 
 	printk("msp3410: daemon started\n");
 	if(msp->notify != NULL)
@@ -1025,16 +1036,13 @@ static int msp3410d_thread(void *data)
 		if (msp->rmmod)
 			goto done;
 		if (debug > 1)
-			printk("msp3410: thread: sleep\n");
+			printk(KERN_DEBUG "msp3410: thread: sleep\n");
 		interruptible_sleep_on(&msp->wq);
 		if (debug > 1)
-			printk("msp3410: thread: wakeup\n");
+			printk(KERN_DEBUG "msp3410: thread: wakeup\n");
 		if (msp->rmmod || signal_pending(current))
 			goto done;
 
-		if (msp->mode == MSP_MODE_EXTERN)
-			continue;
-		
 		msp->active = 1;
 
 		if (msp->watch_stereo) {
@@ -1050,8 +1058,13 @@ static int msp3410d_thread(void *data)
 			goto done;
 
 	restart:
-		if (msp->mode == MSP_MODE_EXTERN)
+		if (msp->mode == MSP_MODE_EXTERN) {
+			/* no carrier scan needed, just unmute */
+			dprintk(KERN_DEBUG "msp3410: thread: no carrier scan\n");
+			msp3400c_setvolume(client, msp->muted,
+					   msp->left, msp->right);
 			continue;
+		}
 		msp->restart = 0;
 		del_timer(&msp->wake_stereo);
 		msp->watch_stereo = 0;
@@ -1073,7 +1086,7 @@ static int msp3410d_thread(void *data)
 			mode = 0x0003;
 			std  = 1;
 			break;
-		case VIDEO_MODE_RADIO: 
+		case VIDEO_MODE_RADIO:
 			mode = 0x0003;
 			std  = 0x0040;
 			break;
@@ -1090,7 +1103,7 @@ static int msp3410d_thread(void *data)
 			for (i = 0; modelist[i].name != NULL; i++)
 				if (modelist[i].retval == std)
 					break;
-			printk("msp3410: setting mode: %s (0x%04x)\n",
+			printk(KERN_DEBUG "msp3410: setting mode: %s (0x%04x)\n",
 			       modelist[i].name ? modelist[i].name : "unknown",std);
 		}
 
@@ -1111,13 +1124,13 @@ static int msp3410d_thread(void *data)
 				val = msp3400c_read(client, I2C_MSP3400C_DEM, 0x7e);
 				if (val < 0x07ff)
 					break;
-				dprintk("msp3410: detection still in progress\n");
+				dprintk(KERN_DEBUG "msp3410: detection still in progress\n");
 			}
 		}
 		for (i = 0; modelist[i].name != NULL; i++)
 			if (modelist[i].retval == val)
 				break;
-		dprintk("msp3410: current mode: %s (0x%04x)\n",
+		dprintk(KERN_DEBUG "msp3410: current mode: %s (0x%04x)\n",
 			modelist[i].name ? modelist[i].name : "unknown",
 			val);
 		msp->main   = modelist[i].main;
@@ -1125,7 +1138,8 @@ static int msp3410d_thread(void *data)
 
 		if (amsound && (msp->norm == VIDEO_MODE_SECAM) && (val != 0x0009)) {
 			/* autodetection has failed, let backup */
-			dprintk("msp3410: autodetection failed, switching to backup mode: %s (0x%04x)\n",
+			dprintk(KERN_DEBUG "msp3410: autodetection failed,"
+				" switching to backup mode: %s (0x%04x)\n",
 				modelist[8].name ? modelist[8].name : "unknown",val);
 			val = 0x0009;
 			msp3400c_write(client, I2C_MSP3400C_DEM, 0x20, val);
@@ -1170,11 +1184,24 @@ static int msp3410d_thread(void *data)
 			msp->stereo = VIDEO_SOUND_STEREO;
 			msp->nicam_on = 0;
 			msp->watch_stereo = 0;
+			/* not needed in theory if HAVE_RADIO(), but
+			   short programming enables carrier mute */
+			msp3400c_setmode(client,MSP_MODE_FM_RADIO);
+			msp3400c_setcarrier(client, MSP_CARRIER(10.7),
+					    MSP_CARRIER(10.7));
 			/* scart routing */
 			msp3400c_set_scart(client,SCART_IN2,0);
+#if 0
+			/* radio from SCART_IN2 */
 			msp3400c_write(client,I2C_MSP3400C_DFP, 0x08, 0x0220);
 			msp3400c_write(client,I2C_MSP3400C_DFP, 0x09, 0x0220);
 			msp3400c_write(client,I2C_MSP3400C_DFP, 0x0b, 0x0220);
+#else
+			/* msp34xx does radio decoding */
+			msp3400c_write(client,I2C_MSP3400C_DFP, 0x08, 0x0020);
+			msp3400c_write(client,I2C_MSP3400C_DFP, 0x09, 0x0020);
+			msp3400c_write(client,I2C_MSP3400C_DFP, 0x0b, 0x0020);
+#endif
 			break;
 		case 0x0003:
 			msp->mode   = MSP_MODE_FM_TERRA;
@@ -1197,7 +1224,7 @@ static int msp3410d_thread(void *data)
 	}
 
 done:
-	dprintk("msp3410: thread: exit\n");
+	dprintk(KERN_DEBUG "msp3410: thread: exit\n");
 	msp->active = 0;
 	msp->thread = NULL;
 
@@ -1225,11 +1252,9 @@ static struct i2c_driver driver = {
 
 static struct i2c_client client_template = 
 {
-	.flags  = I2C_CLIENT_ALLOW_USE,
-        .driver = &driver,
-	.dev	= {
-		.name   = "(unset)",
-	},
+	I2C_DEVNAME("(unset)"),
+	.flags     = I2C_CLIENT_ALLOW_USE,
+        .driver    = &driver,
 };
 
 static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
@@ -1237,7 +1262,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 	DECLARE_MUTEX_LOCKED(sem);
 	struct msp3400c *msp;
         struct i2c_client *c;
-	int              rev1,rev2,i;
+	int i;
 
         client_template.adapter = adap;
         client_template.addr = addr;
@@ -1275,10 +1300,10 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 		return -1;
 	}
     
-	rev1 = msp3400c_read(c, I2C_MSP3400C_DFP, 0x1e);
-	if (-1 != rev1)
-		rev2 = msp3400c_read(c, I2C_MSP3400C_DFP, 0x1f);
-	if ((-1 == rev1) || (0 == rev1 && 0 == rev2)) {
+	msp->rev1 = msp3400c_read(c, I2C_MSP3400C_DFP, 0x1e);
+	if (-1 != msp->rev1)
+		msp->rev2 = msp3400c_read(c, I2C_MSP3400C_DFP, 0x1f);
+	if ((-1 == msp->rev1) || (0 == msp->rev1 && 0 == msp->rev2)) {
 		kfree(msp);
 		kfree(c);
 		printk("msp3400: error while reading chip version\n");
@@ -1292,13 +1317,12 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 	msp3400c_setvolume(c,msp->muted,msp->left,msp->right);
 
 	snprintf(c->dev.name, DEVICE_NAME_SIZE, "MSP34%02d%c-%c%d",
-		(rev2>>8)&0xff, (rev1&0xff)+'@', ((rev1>>8)&0xff)+'@', rev2&0x1f);
-	msp->nicam = (((rev2>>8)&0xff) != 00) ? 1 : 0;
+		 (msp->rev2>>8)&0xff, (msp->rev1&0xff)+'@',
+		 ((msp->rev1>>8)&0xff)+'@', msp->rev2&0x1f);
 
 	if (simple == -1) {
 		/* default mode */
-		/* msp->simple = (((rev2>>8)&0xff) == 0) ? 0 : 1; */
-		msp->simple = ((rev1&0xff)+'@' > 'C');
+		msp->simple = HAVE_SIMPLE(msp);
 	} else {
 		/* use insmod option */
 		msp->simple = simple;
@@ -1310,13 +1334,16 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 	msp->wake_stereo.data     = (unsigned long)msp;
 
 	/* hello world :-) */
-	printk(KERN_INFO "msp34xx: init: chip=%s",c->dev.name);
-	if (msp->nicam)
-		printk(", has NICAM support");
+	printk(KERN_INFO "msp34xx: init: chip=%s",i2c_clientname(c));
+	if (HAVE_NICAM(msp))
+		printk(" +nicam");
+	if (HAVE_SIMPLE(msp))
+		printk(" +simple");
+	if (HAVE_RADIO(msp))
+		printk(" +radio");
 	printk("\n");
 
 	/* startup control thread */
-	MOD_INC_USE_COUNT;
 	msp->notify = &sem;
 	kernel_thread(msp->simple ? msp3410d_thread : msp3400c_thread,
 		      (void *)c, 0);
@@ -1340,7 +1367,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 static int msp_detach(struct i2c_client *client)
 {
 	DECLARE_MUTEX_LOCKED(sem);
-	struct msp3400c *msp = i2c_get_clientdata(client);
+	struct msp3400c *msp  = i2c_get_clientdata(client);
 	int i;
 	
 	/* shutdown control thread */
@@ -1366,7 +1393,6 @@ static int msp_detach(struct i2c_client *client)
 	i2c_detach_client(client);
 	kfree(msp);
 	kfree(client);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1379,7 +1405,7 @@ static int msp_probe(struct i2c_adapter *adap)
 
 static void msp_wake_thread(struct i2c_client *client)
 {
-	struct msp3400c *msp = i2c_get_clientdata(client);
+	struct msp3400c *msp  = i2c_get_clientdata(client);
 
 	msp3400c_setvolume(client,msp->muted,0,0);
 	msp->watch_stereo=0;
@@ -1391,7 +1417,7 @@ static void msp_wake_thread(struct i2c_client *client)
 
 static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
-	struct msp3400c *msp = i2c_get_clientdata(client);
+	struct msp3400c *msp  = i2c_get_clientdata(client);
         __u16           *sarg = arg;
 #if 0
 	int             *iarg = (int*)arg;
@@ -1440,7 +1466,7 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		msp->norm = VIDEO_MODE_RADIO;
 		msp->watch_stereo=0;
 		del_timer(&msp->wake_stereo);
-		dprintk("msp34xx: switching to radio mode\n");
+		dprintk(KERN_DEBUG "msp34xx: switching to radio mode\n");
 		if (msp->simple) {
 			/* the thread will do for us */
 			msp_wake_thread(client);
@@ -1459,11 +1485,11 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	case MSP_SET_DFPREG:
 	{
 		struct msp_dfpreg *r = arg;
-		int i;
+		unsigned int i;
 
 		if (r->reg < 0 || r->reg >= DFP_COUNT)
 			return -EINVAL;
-		for (i = 0; i < sizeof(bl_dfp)/sizeof(int); i++)
+		for (i = 0; i < ARRAY_SIZE(bl_dfp); i++)
 			if (r->reg == bl_dfp[i])
 				return -EINVAL;
 		msp->dfp_regs[r->reg] = r->value;
@@ -1527,11 +1553,11 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		msp3400c_setbass(client,msp->bass);
 		msp3400c_settreble(client,msp->treble);
 
-		if (va->mode != 0) {
+		if (va->mode != 0 && msp->norm != VIDEO_MODE_RADIO) {
 			msp->watch_stereo=0;
 			del_timer(&msp->wake_stereo);
-			msp->stereo = va->mode;
-			msp3400c_setstereo(client,va->mode);
+			msp->stereo = va->mode & 0x0f;
+			msp3400c_setstereo(client,va->mode & 0x0f);
 		}
 		break;
 	}
@@ -1540,7 +1566,6 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		struct video_channel *vc = arg;
 		
 		dprintk(KERN_DEBUG "msp34xx: VIDIOCSCHAN\n");
-		dprintk("msp34xx: switching to TV mode\n");
 		msp->norm = vc->norm;
 		break;
 	}

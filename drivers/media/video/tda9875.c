@@ -161,7 +161,8 @@ static void tda9875_set(struct i2c_client *client)
 	struct tda9875 *tda = i2c_get_clientdata(client);
 	unsigned char a;
 
-	dprintk(KERN_DEBUG "tda9875_set(%04x,%04x,%04x,%04x)\n",tda->lvol,tda->rvol,tda->bass,tda->treble);
+	dprintk(KERN_DEBUG "tda9875_set(%04x,%04x,%04x,%04x)\n",
+		tda->lvol,tda->rvol,tda->bass,tda->treble);
 
 
 	a = tda->lvol & 0xff;
@@ -263,8 +264,6 @@ static int tda9875_attach(struct i2c_adapter *adap, int addr, int kind)
 	}
 	
 	do_tda9875_init(client);
-	MOD_INC_USE_COUNT;
-	strncpy(client->dev.name, "TDA9875", DEVICE_NAME_SIZE);
 	printk(KERN_INFO "tda9875: init\n");
 
 	i2c_attach_client(client);
@@ -280,13 +279,12 @@ static int tda9875_probe(struct i2c_adapter *adap)
 
 static int tda9875_detach(struct i2c_client *client)
 {
-	struct tda9875 *t = i2c_get_clientdata(client);
+	struct tda9875 *t  = i2c_get_clientdata(client);
 
 	do_tda9875_init(client);
 	i2c_detach_client(client);
 	
 	kfree(t);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -395,11 +393,9 @@ static struct i2c_driver driver = {
 
 static struct i2c_client client_template =
 {
-        .id      = -1,
-        .driver  = &driver,
-        .dev	= {
-		.name	= "tda9875",
-	},
+        I2C_DEVNAME("tda9875"),
+        .id        = -1,
+        .driver    = &driver,
 };
 
 static int tda9875_init(void)

@@ -4664,7 +4664,7 @@ mega_is_bios_enabled(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof(mbox));
+	memset(mbox, 0, sizeof(*mbox));
 
 	memset((void *)adapter->mega_buffer, 0, MEGA_BUFFER_SIZE);
 
@@ -4697,7 +4697,7 @@ mega_enum_raid_scsi(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof(mbox));
+	memset(mbox, 0, sizeof(*mbox));
 
 	/*
 	 * issue command to find out what channels are raid/scsi
@@ -4818,7 +4818,7 @@ mega_support_random_del(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof(mbox));
+	memset(mbox, 0, sizeof(*mbox));
 
 	/*
 	 * issue command
@@ -4847,7 +4847,7 @@ mega_support_ext_cdb(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof (mbox));
+	memset(mbox, 0, sizeof(*mbox));
 	/*
 	 * issue command to find out if controller supports extended CDBs.
 	 */

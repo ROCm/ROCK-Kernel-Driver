@@ -902,7 +902,7 @@ asmlinkage long sys_vhangup(void)
 
 /*
  * Called when an inode is about to be open.
- * We use this to disallow opening RW large files on 32bit systems if
+ * We use this to disallow opening large files on 32bit systems if
  * the caller didn't specify O_LARGEFILE.  On 64bit systems we force
  * on this flag in sys_open.
  */

@@ -130,3 +130,6 @@ static void fix_processor_context(void)
 	}
 
 }
+
+EXPORT_SYMBOL(save_processor_state);
+EXPORT_SYMBOL(restore_processor_state);

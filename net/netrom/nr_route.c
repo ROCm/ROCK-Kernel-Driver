@@ -110,7 +110,8 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 				kfree(nr_neigh);
 				return -ENOMEM;
 			}
-			memcpy(nr_neigh->digipeat, ax25_digi, sizeof(ax25_digi));
+			memcpy(nr_neigh->digipeat, ax25_digi,
+					sizeof(*ax25_digi));
 		}
 
 		spin_lock_bh(&nr_neigh_lock);
@@ -387,7 +388,7 @@ static int nr_add_neigh(ax25_address *callsign, ax25_digi *ax25_digi, struct net
 			kfree(nr_neigh);
 			return -ENOMEM;
 		}
-		memcpy(nr_neigh->digipeat, ax25_digi, sizeof(ax25_digi));
+		memcpy(nr_neigh->digipeat, ax25_digi, sizeof(*ax25_digi));
 	}
 
 	spin_lock_bh(&nr_neigh_lock);

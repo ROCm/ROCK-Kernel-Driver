@@ -247,7 +247,7 @@ static unsigned long smp_commenced_mask = 0;
 
 /* This is for the new dynamic CPU boot code */
 volatile unsigned long cpu_callin_map = 0;
-unsigned long cpu_callout_map = 0;
+volatile unsigned long cpu_callout_map = 0;
 
 /* The per processor IRQ masks (these are usually kept in sync) */
 static __u16 vic_irq_mask[NR_CPUS] __cacheline_aligned;

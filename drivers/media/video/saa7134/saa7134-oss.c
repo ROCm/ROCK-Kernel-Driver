@@ -94,8 +94,9 @@ static int dsp_buffer_free(struct saa7134_dev *dev)
 
 static int dsp_rec_start(struct saa7134_dev *dev)
 {
-	int err, fmt, bswap, wswap;
-	unsigned long control,flags;
+	int err, bswap, sign;
+	u32 fmt, control;
+	unsigned long flags;
 
 	/* prepare buffer */
 	if (0 != (err = videobuf_dma_pci_map(dev->pci,&dev->oss.dma)))
@@ -110,45 +111,60 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 
 	/* sample format */
 	switch (dev->oss.afmt) {
-	case AFMT_U8:     fmt = 0x00;         break;
-	case AFMT_S8:     fmt = 0x00 | 0x04;  break;
+	case AFMT_U8:
+	case AFMT_S8:     fmt = 0x00;  break;
 	case AFMT_U16_LE:
-	case AFMT_U16_BE: fmt = 0x01;         break;
+	case AFMT_U16_BE:
 	case AFMT_S16_LE:
-	case AFMT_S16_BE: fmt = 0x01 | 0x04;  break;
-/* 4front API specs mention these ones,
-   the (2.4.15) kernel header hasn't them ... */
-#ifdef AFMT_S32_LE
-	case AFMT_S32_LE:
-	case AFMT_S32_BE: fmt = 0x02 | 0x04;  break;
-#endif
+	case AFMT_S16_BE: fmt = 0x01;  break;
 	default:
 		err = -EINVAL;
 		goto fail2;
 	}
 
 	switch (dev->oss.afmt) {
-	case AFMT_U16_BE:
-	case AFMT_S16_BE: bswap = 1; wswap = 0; break;
-#ifdef AFMT_S32_LE
-	case AFMT_S32_BE: bswap = 1; wswap = 1; break;
-#endif
-	default:          bswap = 0; wswap = 0; break;
+	case AFMT_S8:     
+	case AFMT_S16_LE:
+	case AFMT_S16_BE: sign = 1; break;
+	default:          sign = 0; break;
 	}
 
-	if (1 == dev->oss.channels)
-		fmt |= (1 << 3);
-	if (2 == dev->oss.channels)
-		fmt |= (3 << 3);
-	fmt |= (TV == dev->oss.input) ? 0xc0 : 0x80;
-	
-	saa_writeb(SAA7134_NUM_SAMPLES0, (dev->oss.blksize & 0x0000ff));
-	saa_writeb(SAA7134_NUM_SAMPLES1, (dev->oss.blksize & 0x00ff00) >>  8);
-	saa_writeb(SAA7134_NUM_SAMPLES2, (dev->oss.blksize & 0xff0000) >> 16);
-	saa_writeb(SAA7134_AUDIO_FORMAT_CTRL, fmt);
-	dprintk("rec_start: afmt=%d ch=%d  =>  fmt=0x%x swap=%c%c\n",
+	switch (dev->oss.afmt) {
+	case AFMT_U16_BE:
+	case AFMT_S16_BE: bswap = 1; break;
+	default:          bswap = 0; break;
+	}
+
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+		if (1 == dev->oss.channels)
+			fmt |= (1 << 3);
+		if (2 == dev->oss.channels)
+			fmt |= (3 << 3);
+		if (sign)
+			fmt |= 0x04;
+		fmt |= (TV == dev->oss.input) ? 0xc0 : 0x80;
+		
+		saa_writeb(SAA7134_NUM_SAMPLES0, (dev->oss.blksize & 0x0000ff));
+		saa_writeb(SAA7134_NUM_SAMPLES1, (dev->oss.blksize & 0x00ff00) >>  8);
+		saa_writeb(SAA7134_NUM_SAMPLES2, (dev->oss.blksize & 0xff0000) >> 16);
+		saa_writeb(SAA7134_AUDIO_FORMAT_CTRL, fmt);
+		break;
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		if (1 == dev->oss.channels)
+			fmt |= (1 << 4);
+		if (2 == dev->oss.channels)
+			fmt |= (2 << 4);
+		if (!sign)
+			fmt |= 0x04;
+		saa_writel(0x588 >> 2, dev->oss.blksize);
+		saa_writel(0x58c >> 2, 0x543210 | (fmt << 24));
+		break;
+	}
+	dprintk("rec_start: afmt=%d ch=%d  =>  fmt=0x%x swap=%c\n",
 		dev->oss.afmt, dev->oss.channels, fmt,
-		bswap ? 'b' : '-', wswap ? 'w' : '-');
+		bswap ? 'b' : '-');
 
 	/* dma: setup channel 6 (= AUDIO) */
 	control = SAA7134_RS_CONTROL_BURST_16 |
@@ -156,8 +172,6 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 		(dev->oss.pt.dma >> 12);
 	if (bswap)
 		control |= SAA7134_RS_CONTROL_BSWAP;
-	if (wswap)
-		control |= SAA7134_RS_CONTROL_WSWAP;
 	saa_writel(SAA7134_RS_BA1(6),0);
 	saa_writel(SAA7134_RS_BA2(6),dev->oss.blksize);
 	saa_writel(SAA7134_RS_PITCH(6),0);
@@ -201,7 +215,7 @@ static int dsp_rec_stop(struct saa7134_dev *dev)
 
 static int dsp_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct saa7134_dev *h,*dev = NULL;
 	struct list_head *list;
 	int err;
@@ -259,7 +273,8 @@ static ssize_t dsp_read(struct file *file, char *buffer,
 {
 	struct saa7134_dev *dev = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
-	int bytes,err,ret = 0;
+	unsigned int bytes;
+	int err,ret = 0;
 
 	add_wait_queue(&dev->oss.wq, &wait);
 	down(&dev->oss.lock);
@@ -390,10 +405,6 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		case AFMT_U16_BE:
 		case AFMT_S16_LE:
 		case AFMT_S16_BE:
-#ifdef AFMT_S32_LE
-		case AFMT_S32_LE:
-		case AFMT_S32_BE:
-#endif
 			down(&dev->oss.lock);
 			dev->oss.afmt = val;
 			if (dev->oss.recording) {
@@ -416,11 +427,6 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		case AFMT_S16_LE:
 		case AFMT_S16_BE:
 			return put_user(16, (int*)arg);
-#ifdef AFMT_S32_LE
-		case AFMT_S32_LE:
-		case AFMT_S32_BE:
-			return put_user(20, (int*)arg);
-#endif
 		default:
 			return -EINVAL;
 		}
@@ -499,14 +505,10 @@ struct file_operations saa7134_dsp_fops = {
 /* ------------------------------------------------------------------ */
 
 static int
-mixer_recsrc(struct saa7134_dev *dev, enum saa7134_audio_in src)
+mixer_recsrc_7134(struct saa7134_dev *dev)
 {
-	static const char *iname[] = { "Oops", "TV", "LINE1", "LINE2" };
 	int analog_io,rate;
 	
-	dev->oss.count++;
-	dev->oss.input = src;
-	dprintk("mixer input = %s\n",iname[dev->oss.input]);
 	switch (dev->oss.input) {
 	case TV:
 		saa_andorb(SAA7134_AUDIO_FORMAT_CTRL, 0xc0, 0xc0);
@@ -525,27 +527,78 @@ mixer_recsrc(struct saa7134_dev *dev, enum saa7134_audio_in src)
 }
 
 static int
-mixer_level(struct saa7134_dev *dev, enum saa7134_audio_in src, int level)
+mixer_recsrc_7133(struct saa7134_dev *dev)
 {
-	switch (src) {
+	u32 value = 0xbbbbbb;
+	
+	switch (dev->oss.input) {
 	case TV:
-		/* nothing */
+		value = 0xbbbb10;  /* MAIN */
 		break;
 	case LINE1:
-		saa_andorb(SAA7134_ANALOG_IO_SELECT,  0x10,
-			   (100 == level) ? 0x00 : 0x10);
+		value = 0xbbbb32;  /* AUX1 */
 		break;
 	case LINE2:
-		saa_andorb(SAA7134_ANALOG_IO_SELECT,  0x20,
-			   (100 == level) ? 0x00 : 0x20);
+		value = 0xbbbb54;  /* AUX2 */
+		break;
+	}
+	saa_dsp_writel(dev, 0x46c >> 2, value);
+	return 0;
+}
+
+static int
+mixer_recsrc(struct saa7134_dev *dev, enum saa7134_audio_in src)
+{
+	static const char *iname[] = { "Oops", "TV", "LINE1", "LINE2" };
+
+	dev->oss.count++;
+	dev->oss.input = src;
+	dprintk("mixer input = %s\n",iname[dev->oss.input]);
+
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+		mixer_recsrc_7134(dev);
+		break;
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		mixer_recsrc_7133(dev);
 		break;
 	}
 	return 0;
 }
 
+static int
+mixer_level(struct saa7134_dev *dev, enum saa7134_audio_in src, int level)
+{
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7134:
+		switch (src) {
+		case TV:
+			/* nothing */
+			break;
+		case LINE1:
+			saa_andorb(SAA7134_ANALOG_IO_SELECT,  0x10,
+				   (100 == level) ? 0x00 : 0x10);
+			break;
+		case LINE2:
+			saa_andorb(SAA7134_ANALOG_IO_SELECT,  0x20,
+				   (100 == level) ? 0x00 : 0x20);
+			break;
+		}
+		break;
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		/* nothing */
+		break;
+	}
+	return 0;
+}
+
+/* ------------------------------------------------------------------ */
+
 static int mixer_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct saa7134_dev *h,*dev = NULL;
 	struct list_head *list;
 
@@ -681,13 +734,20 @@ struct file_operations saa7134_mixer_fops = {
 
 int saa7134_oss_init(struct saa7134_dev *dev)
 {
+	/* general */
         init_MUTEX(&dev->oss.lock);
 	init_waitqueue_head(&dev->oss.wq);
-	dev->oss.line1 = 50;
-	dev->oss.line2 = 50;
-	mixer_level(dev,LINE1,dev->oss.line1);
-	mixer_level(dev,LINE2,dev->oss.line2);
-	
+
+	switch (dev->pci->device) {
+	case PCI_DEVICE_ID_PHILIPS_SAA7133:
+	case PCI_DEVICE_ID_PHILIPS_SAA7135:
+		saa_writel(0x588 >> 2, 0x00000fff);
+		saa_writel(0x58c >> 2, 0x00543210);
+		saa_dsp_writel(dev, 0x46c >> 2, 0xbbbbbb);
+		break;
+	}
+
+	/* dsp */
 	dev->oss.rate = 32000;
 	if (oss_rate)
 		dev->oss.rate = oss_rate;
@@ -695,7 +755,13 @@ int saa7134_oss_init(struct saa7134_dev *dev)
 		dev->oss.rate = saa7134_boards[dev->board].i2s_rate;
 	dev->oss.rate = (dev->oss.rate > 40000) ? 48000 : 32000;
 
+	/* mixer */
+	dev->oss.line1 = 50;
+	dev->oss.line2 = 50;
+	mixer_level(dev,LINE1,dev->oss.line1);
+	mixer_level(dev,LINE2,dev->oss.line2);
 	mixer_recsrc(dev, (dev->oss.rate == 32000) ? TV : LINE2);
+	
 	return 0;
 }
 
@@ -710,7 +776,7 @@ void saa7134_irq_oss_done(struct saa7134_dev *dev, unsigned long status)
 	int next_blk, reg = 0;
 
 	spin_lock(&dev->slock);
-	if (-1 == dev->oss.dma_blk) {
+	if (UNSET == dev->oss.dma_blk) {
 		dprintk("irq: recording stopped%s\n","");
 		goto done;
 	}

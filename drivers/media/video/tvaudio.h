@@ -3,7 +3,7 @@
  */
 
 #define I2C_TDA8425        0x82
-#define I2C_TDA9840        0x84
+#define I2C_TDA9840        0x84 /* also used by TA8874Z */
 #define I2C_TDA985x_L      0xb4 /* also used by 9873 */
 #define I2C_TDA985x_H      0xb6
 #define I2C_TDA9874        0xb0 /* also used by 9875 */

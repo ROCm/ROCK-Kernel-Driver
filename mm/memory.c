@@ -1108,17 +1108,12 @@ int vmtruncate(struct inode * inode, loff_t offset)
 	if (inode->i_size < offset)
 		goto do_expand;
 	inode->i_size = offset;
+	pgoff = (offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	down(&mapping->i_shared_sem);
-	if (list_empty(&mapping->i_mmap) && list_empty(&mapping->i_mmap_shared))
-		goto out_unlock;
-
-	pgoff = (offset + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	if (!list_empty(&mapping->i_mmap))
+	if (unlikely(!list_empty(&mapping->i_mmap)))
 		vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (!list_empty(&mapping->i_mmap_shared))
+	if (unlikely(!list_empty(&mapping->i_mmap_shared)))
 		vmtruncate_list(&mapping->i_mmap_shared, pgoff);
-
-out_unlock:
 	up(&mapping->i_shared_sem);
 	truncate_inode_pages(mapping, offset);
 	goto out_truncate;
