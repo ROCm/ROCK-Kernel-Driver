@@ -102,19 +102,6 @@ static const char driver_version[] = "1.13";	/* no spaces */
  */
 static void __apm_get_power_status(struct apm_power_info *info)
 {
-#if 0 && defined(CONFIG_SA1100_H3600) && defined(CONFIG_TOUCHSCREEN_H3600)
-	extern int h3600_apm_get_power_status(u_char *, u_char *, u_char *,
-					      u_char *, u_short *);
-
-	if (machine_is_h3600()) {
-		int dx;
-		h3600_apm_get_power_status(&info->ac_line_status,
-				&info->battery_status, &info->battery_flag,
-				&info->battery_life, &dx);
-		info->time = dx & 0x7fff;
-		info->units = dx & 0x8000 ? 0 : 1;
-	}
-#endif
 }
 
 /*
