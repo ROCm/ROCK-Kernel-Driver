@@ -739,13 +739,19 @@ static inline int compare_keys(struct flowi *fl1, struct flowi *fl2)
 static int rt_intern_hash(unsigned hash, struct rtable *rt, struct rtable **rp)
 {
 	struct rtable	*rth, **rthp;
-	unsigned long	now = jiffies;
-	struct rtable *cand = NULL, **candp = NULL;
-	u32 		min_score = ~(u32)0;
-	int		chain_length = 0;
+	unsigned long	now;
+	struct rtable *cand, **candp;
+	u32 		min_score;
+	int		chain_length;
 	int attempts = !in_softirq();
 
 restart:
+	chain_length = 0;
+	min_score = ~(u32)0;
+	cand = NULL;
+	candp = NULL;
+	now = jiffies;
+
 	rthp = &rt_hash_table[hash].chain;
 
 	spin_lock_bh(&rt_hash_table[hash].lock);
