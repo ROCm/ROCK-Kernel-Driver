@@ -544,7 +544,8 @@ static int uss720_probe(struct usb_interface *intf,
 	int i;
 
 	printk(KERN_DEBUG "uss720: probe: vendor id 0x%x, device id 0x%x\n",
-	       usbdev->descriptor.idVendor, usbdev->descriptor.idProduct);
+	       le16_to_cpu(usbdev->descriptor.idVendor),
+	       le16_to_cpu(usbdev->descriptor.idProduct));
 
 	/* our known interfaces have 3 alternate settings */
 	if (intf->num_altsetting != 3)

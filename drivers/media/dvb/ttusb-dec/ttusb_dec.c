@@ -1447,7 +1447,7 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 
 	memset(dec, 0, sizeof(struct ttusb_dec));
 
-	switch (id->idProduct) {
+	switch (le16_to_cpu(id->idProduct)) {
 		case 0x1006:
 		ttusb_dec_set_model(dec, TTUSB_DEC3000S);
 			break;
@@ -1471,7 +1471,7 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	ttusb_dec_init_dvb(dec);
 
 	dec->adapter->priv = dec;
-	switch (id->idProduct) {
+	switch (le16_to_cpu(id->idProduct)) {
 	case 0x1006:
 		dec->fe = ttusbdecfe_dvbs_attach(&fe_config);
 		break;
@@ -1484,8 +1484,8 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 
 	if (dec->fe == NULL) {
 		printk("dvb-ttusb-dec: A frontend driver was not found for device %04x/%04x\n",
-		       dec->udev->descriptor.idVendor,
-		       dec->udev->descriptor.idProduct);
+		       le16_to_cpu(dec->udev->descriptor.idVendor),
+		       le16_to_cpu(dec->udev->descriptor.idProduct));
 	} else {
 		if (dvb_register_frontend(dec->adapter, dec->fe)) {
 			printk("budget-ci: Frontend registration failed!\n");

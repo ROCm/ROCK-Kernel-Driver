@@ -74,7 +74,7 @@ ioctl_lcd(struct inode *inode, struct file *file, unsigned int cmd,
 	  unsigned long arg)
 {
 	struct lcd_usb_data *lcd = &lcd_instance;
-	int i;
+	u16 bcdDevice;
 	char buf[30];
 
 	/* Sanity check to make sure lcd is connected, powered, etc */
@@ -85,9 +85,12 @@ ioctl_lcd(struct inode *inode, struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case IOCTL_GET_HARD_VERSION:
-		i = (lcd->lcd_dev)->descriptor.bcdDevice;
-		sprintf(buf,"%1d%1d.%1d%1d",(i & 0xF000)>>12,(i & 0xF00)>>8,
-			(i & 0xF0)>>4,(i & 0xF));
+		bcdDevice = le16_to_cpu((lcd->lcd_dev)->descriptor.bcdDevice);
+		sprintf(buf,"%1d%1d.%1d%1d",
+			(bcdDevice & 0xF000)>>12,
+			(bcdDevice & 0xF00)>>8,
+			(bcdDevice & 0xF0)>>4,
+			(bcdDevice & 0xF));
 		if (copy_to_user((void __user *)arg,buf,strlen(buf))!=0)
 			return -EFAULT;
 		break;
@@ -258,7 +261,7 @@ static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 	int i;
 	int retval;
 
-	if (dev->descriptor.idProduct != 0x0001  ) {
+	if (le16_to_cpu(dev->descriptor.idProduct) != 0x0001) {
 		warn(KERN_INFO "USBLCD model not supported.");
 		return -ENODEV;
 	}
@@ -268,7 +271,7 @@ static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 		return -ENODEV;
 	}
 
-	i = dev->descriptor.bcdDevice;
+	i = le16_to_cpu(dev->descriptor.bcdDevice);
 
 	info("USBLCD Version %1d%1d.%1d%1d found at address %d",
 		(i & 0xF000)>>12,(i & 0xF00)>>8,(i & 0xF0)>>4,(i & 0xF),

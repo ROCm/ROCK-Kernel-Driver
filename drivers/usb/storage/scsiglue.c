@@ -118,7 +118,7 @@ static int slave_configure(struct scsi_device *sdev)
 	 * works okay and that's what Windows does.  But we'll be
 	 * conservative; people can always use the sysfs interface to
 	 * increase max_sectors. */
-	if (us->pusb_dev->descriptor.idVendor == USB_VENDOR_ID_GENESYS &&
+	if (le16_to_cpu(us->pusb_dev->descriptor.idVendor) == USB_VENDOR_ID_GENESYS &&
 			sdev->request_queue->max_sectors > 64)
 		blk_queue_max_sectors(sdev->request_queue, 64);
 

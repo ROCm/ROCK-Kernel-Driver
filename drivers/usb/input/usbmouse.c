@@ -180,9 +180,9 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 	mouse->dev.name = mouse->name;
 	mouse->dev.phys = mouse->phys;
 	mouse->dev.id.bustype = BUS_USB;
-	mouse->dev.id.vendor = dev->descriptor.idVendor;
-	mouse->dev.id.product = dev->descriptor.idProduct;
-	mouse->dev.id.version = dev->descriptor.bcdDevice;
+	mouse->dev.id.vendor = le16_to_cpu(dev->descriptor.idVendor);
+	mouse->dev.id.product = le16_to_cpu(dev->descriptor.idProduct);
+	mouse->dev.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 	mouse->dev.dev = &intf->dev;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {

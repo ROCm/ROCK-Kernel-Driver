@@ -120,16 +120,16 @@ DECLARE_WAIT_QUEUE_HEAD(usb_kill_urb_queue);
 static const u8 usb2_rh_dev_descriptor [18] = {
 	0x12,       /*  __u8  bLength; */
 	0x01,       /*  __u8  bDescriptorType; Device */
-	0x00, 0x02, /*  __u16 bcdUSB; v2.0 */
+	0x00, 0x02, /*  __le16 bcdUSB; v2.0 */
 
 	0x09,	    /*  __u8  bDeviceClass; HUB_CLASSCODE */
 	0x00,	    /*  __u8  bDeviceSubClass; */
 	0x01,       /*  __u8  bDeviceProtocol; [ usb 2.0 single TT ]*/
 	0x08,       /*  __u8  bMaxPacketSize0; 8 Bytes */
 
-	0x00, 0x00, /*  __u16 idVendor; */
- 	0x00, 0x00, /*  __u16 idProduct; */
-	KERNEL_VER, KERNEL_REL, /*  __u16 bcdDevice */
+	0x00, 0x00, /*  __le16 idVendor; */
+ 	0x00, 0x00, /*  __le16 idProduct; */
+	KERNEL_VER, KERNEL_REL, /*  __le16 bcdDevice */
 
 	0x03,       /*  __u8  iManufacturer; */
 	0x02,       /*  __u8  iProduct; */
@@ -143,16 +143,16 @@ static const u8 usb2_rh_dev_descriptor [18] = {
 static const u8 usb11_rh_dev_descriptor [18] = {
 	0x12,       /*  __u8  bLength; */
 	0x01,       /*  __u8  bDescriptorType; Device */
-	0x10, 0x01, /*  __u16 bcdUSB; v1.1 */
+	0x10, 0x01, /*  __le16 bcdUSB; v1.1 */
 
 	0x09,	    /*  __u8  bDeviceClass; HUB_CLASSCODE */
 	0x00,	    /*  __u8  bDeviceSubClass; */
 	0x00,       /*  __u8  bDeviceProtocol; [ low/full speeds only ] */
 	0x08,       /*  __u8  bMaxPacketSize0; 8 Bytes */
 
-	0x00, 0x00, /*  __u16 idVendor; */
- 	0x00, 0x00, /*  __u16 idProduct; */
-	KERNEL_VER, KERNEL_REL, /*  __u16 bcdDevice */
+	0x00, 0x00, /*  __le16 idVendor; */
+ 	0x00, 0x00, /*  __le16 idProduct; */
+	KERNEL_VER, KERNEL_REL, /*  __le16 bcdDevice */
 
 	0x03,       /*  __u8  iManufacturer; */
 	0x02,       /*  __u8  iProduct; */

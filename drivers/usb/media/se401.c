@@ -1315,20 +1315,20 @@ static int se401_probe(struct usb_interface *intf,
         interface = &intf->cur_altsetting->desc;
 
         /* Is it an se401? */
-        if (dev->descriptor.idVendor == 0x03e8 &&
-            dev->descriptor.idProduct == 0x0004) {
+        if (le16_to_cpu(dev->descriptor.idVendor) == 0x03e8 &&
+            le16_to_cpu(dev->descriptor.idProduct) == 0x0004) {
                 camera_name="Endpoints/Aox SE401";
-        } else if (dev->descriptor.idVendor == 0x0471 &&
-            dev->descriptor.idProduct == 0x030b) {
+        } else if (le16_to_cpu(dev->descriptor.idVendor) == 0x0471 &&
+            le16_to_cpu(dev->descriptor.idProduct) == 0x030b) {
                 camera_name="Philips PCVC665K";
-        } else if (dev->descriptor.idVendor == 0x047d &&
-	    dev->descriptor.idProduct == 0x5001) {
+        } else if (le16_to_cpu(dev->descriptor.idVendor) == 0x047d &&
+	    le16_to_cpu(dev->descriptor.idProduct) == 0x5001) {
 		camera_name="Kensington VideoCAM 67014";
-        } else if (dev->descriptor.idVendor == 0x047d &&
-	    dev->descriptor.idProduct == 0x5002) {
+        } else if (le16_to_cpu(dev->descriptor.idVendor) == 0x047d &&
+	    le16_to_cpu(dev->descriptor.idProduct) == 0x5002) {
 		camera_name="Kensington VideoCAM 6701(5/7)";
-        } else if (dev->descriptor.idVendor == 0x047d &&
-	    dev->descriptor.idProduct == 0x5003) {
+        } else if (le16_to_cpu(dev->descriptor.idVendor) == 0x047d &&
+	    le16_to_cpu(dev->descriptor.idProduct) == 0x5003) {
 		camera_name="Kensington VideoCAM 67016";
 		button=0;
 	} else
@@ -1354,7 +1354,7 @@ static int se401_probe(struct usb_interface *intf,
         se401->iface = interface->bInterfaceNumber;
         se401->camera_name = camera_name;
 
-	info("firmware version: %02x", dev->descriptor.bcdDevice & 255);
+	info("firmware version: %02x", le16_to_cpu(dev->descriptor.bcdDevice) & 255);
 
         if (se401_init(se401, button)) {
 		kfree(se401);

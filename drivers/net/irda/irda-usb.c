@@ -1360,8 +1360,8 @@ static int irda_usb_probe(struct usb_interface *intf,
 	 * Jean II */
 
 	MESSAGE("IRDA-USB found at address %d, Vendor: %x, Product: %x\n",
-		dev->devnum, dev->descriptor.idVendor,
-		dev->descriptor.idProduct);
+		dev->devnum, le16_to_cpu(dev->descriptor.idVendor),
+		le16_to_cpu(dev->descriptor.idProduct));
 
 	net = alloc_irdadev(sizeof(*self));
 	if (!net) 

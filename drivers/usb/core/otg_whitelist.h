@@ -55,8 +55,8 @@ static int is_targeted(struct usb_device *dev)
 		return 1;
 
 	/* HNP test device is _never_ targeted (see OTG spec 6.6.6) */
-	if (dev->descriptor.idVendor == 0x1a0a
-			&& dev->descriptor.idProduct == 0xbadd)
+	if ((le16_to_cpu(dev->descriptor.idVendor) == 0x1a0a && 
+	     le16_to_cpu(dev->descriptor.idProduct) == 0xbadd))
 		return 0;
 
 	/* NOTE: can't use usb_match_id() since interface caches
@@ -64,21 +64,21 @@ static int is_targeted(struct usb_device *dev)
 	 */
 	for (id = whitelist_table; id->match_flags; id++) {
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_VENDOR) &&
-		    id->idVendor != dev->descriptor.idVendor)
+		    id->idVendor != le16_to_cpu(dev->descriptor.idVendor))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_PRODUCT) &&
-		    id->idProduct != dev->descriptor.idProduct)
+		    id->idProduct != le16_to_cpu(dev->descriptor.idProduct))
 			continue;
 
 		/* No need to test id->bcdDevice_lo != 0, since 0 is never
 		   greater than any unsigned number. */
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_LO) &&
-		    (id->bcdDevice_lo > dev->descriptor.bcdDevice))
+		    (id->bcdDevice_lo > le16_to_cpu(dev->descriptor.bcdDevice)))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_HI) &&
-		    (id->bcdDevice_hi < dev->descriptor.bcdDevice))
+		    (id->bcdDevice_hi < le16_to_cpu(dev->descriptor.bcdDevice)))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_CLASS) &&
@@ -101,8 +101,8 @@ static int is_targeted(struct usb_device *dev)
 
 	/* OTG MESSAGE: report errors here, customize to match your product */
 	dev_err(&dev->dev, "device v%04x p%04x is not supported\n",
-			dev->descriptor.idVendor,
-			dev->descriptor.idProduct);
+		le16_to_cpu(dev->descriptor.idVendor),
+		le16_to_cpu(dev->descriptor.idProduct));
 #ifdef	CONFIG_USB_OTG_WHITELIST
 	return 0;
 #else

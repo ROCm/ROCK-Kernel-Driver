@@ -2496,8 +2496,8 @@ sn9c102_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 
 	n = sizeof(sn9c102_id_table)/sizeof(sn9c102_id_table[0]);
 	for (i = 0; i < n-1; i++)
-		if (udev->descriptor.idVendor==sn9c102_id_table[i].idVendor &&
-		    udev->descriptor.idProduct==sn9c102_id_table[i].idProduct)
+		if (le16_to_cpu(udev->descriptor.idVendor) == sn9c102_id_table[i].idVendor &&
+		    le16_to_cpu(udev->descriptor.idProduct) == sn9c102_id_table[i].idProduct)
 			break;
 	if (i == n-1)
 		return -ENODEV;

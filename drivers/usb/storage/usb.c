@@ -263,16 +263,17 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 			      available from the device."). */
 		memset(data+8,0,28);
 	} else {
+		u16 bcdDevice = le16_to_cpu(us->pusb_dev->descriptor.bcdDevice);
 		memcpy(data+8, us->unusual_dev->vendorName, 
 			strlen(us->unusual_dev->vendorName) > 8 ? 8 :
 			strlen(us->unusual_dev->vendorName));
 		memcpy(data+16, us->unusual_dev->productName, 
 			strlen(us->unusual_dev->productName) > 16 ? 16 :
 			strlen(us->unusual_dev->productName));
-		data[32] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>12) & 0x0F);
-		data[33] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>8) & 0x0F);
-		data[34] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>4) & 0x0F);
-		data[35] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice) & 0x0F);
+		data[32] = 0x30 + ((bcdDevice>>12) & 0x0F);
+		data[33] = 0x30 + ((bcdDevice>>8) & 0x0F);
+		data[34] = 0x30 + ((bcdDevice>>4) & 0x0F);
+		data[35] = 0x30 + ((bcdDevice) & 0x0F);
 	}
 
 	usb_stor_set_xfer_buf(data, data_len, us->srb);
@@ -436,9 +437,9 @@ static int associate_dev(struct us_data *us, struct usb_interface *intf)
 	us->pusb_intf = intf;
 	us->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
 	US_DEBUGP("Vendor: 0x%04x, Product: 0x%04x, Revision: 0x%04x\n",
-			us->pusb_dev->descriptor.idVendor,
-			us->pusb_dev->descriptor.idProduct,
-			us->pusb_dev->descriptor.bcdDevice);
+			le16_to_cpu(us->pusb_dev->descriptor.idVendor),
+			le16_to_cpu(us->pusb_dev->descriptor.idProduct),
+			le16_to_cpu(us->pusb_dev->descriptor.bcdDevice));
 	US_DEBUGP("Interface Subclass: 0x%02x, Protocol: 0x%02x\n",
 			intf->cur_altsetting->desc.bInterfaceSubClass,
 			intf->cur_altsetting->desc.bInterfaceProtocol);
@@ -507,8 +508,9 @@ static void get_device_info(struct us_data *us, int id_index)
 				" has %s in unusual_devs.h\n"
 				"   Please send a copy of this message to "
 				"<linux-usb-devel@lists.sourceforge.net>\n",
-				ddesc->idVendor, ddesc->idProduct,
-				ddesc->bcdDevice,
+				le16_to_cpu(ddesc->idVendor),
+				le16_to_cpu(ddesc->idProduct),
+				le16_to_cpu(ddesc->bcdDevice),
 				idesc->bInterfaceSubClass,
 				idesc->bInterfaceProtocol,
 				msgs[msg]);

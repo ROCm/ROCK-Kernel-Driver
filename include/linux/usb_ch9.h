@@ -156,14 +156,14 @@ struct usb_device_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 bcdUSB;
+	__le16 bcdUSB;
 	__u8  bDeviceClass;
 	__u8  bDeviceSubClass;
 	__u8  bDeviceProtocol;
 	__u8  bMaxPacketSize0;
-	__u16 idVendor;
-	__u16 idProduct;
-	__u16 bcdDevice;
+	__le16 idVendor;
+	__le16 idProduct;
+	__le16 bcdDevice;
 	__u8  iManufacturer;
 	__u8  iProduct;
 	__u8  iSerialNumber;
@@ -297,7 +297,7 @@ struct usb_qualifier_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 bcdUSB;
+	__le16 bcdUSB;
 	__u8  bDeviceClass;
 	__u8  bDeviceSubClass;
 	__u8  bDeviceProtocol;

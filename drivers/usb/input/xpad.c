@@ -226,8 +226,8 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	int i;
 	
 	for (i = 0; xpad_device[i].idVendor; i++) {
-		if ((udev->descriptor.idVendor == xpad_device[i].idVendor) &&
-		    (udev->descriptor.idProduct == xpad_device[i].idProduct))
+		if ((le16_to_cpu(udev->descriptor.idVendor) == xpad_device[i].idVendor) &&
+		    (le16_to_cpu(udev->descriptor.idProduct) == xpad_device[i].idProduct))
 			break;
 	}
 	
@@ -264,9 +264,9 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	xpad->udev = udev;
 	
 	xpad->dev.id.bustype = BUS_USB;
-	xpad->dev.id.vendor = udev->descriptor.idVendor;
-	xpad->dev.id.product = udev->descriptor.idProduct;
-	xpad->dev.id.version = udev->descriptor.bcdDevice;
+	xpad->dev.id.vendor = le16_to_cpu(udev->descriptor.idVendor);
+	xpad->dev.id.product = le16_to_cpu(udev->descriptor.idProduct);
+	xpad->dev.id.version = le16_to_cpu(udev->descriptor.bcdDevice);
 	xpad->dev.dev = &intf->dev;
 	xpad->dev.private = xpad;
 	xpad->dev.name = xpad_device[i].name;

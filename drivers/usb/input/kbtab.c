@@ -175,9 +175,9 @@ static int kbtab_probe(struct usb_interface *intf, const struct usb_device_id *i
 	kbtab->dev.name = "KB Gear Tablet";
 	kbtab->dev.phys = kbtab->phys;
 	kbtab->dev.id.bustype = BUS_USB;
-	kbtab->dev.id.vendor = dev->descriptor.idVendor;
-	kbtab->dev.id.product = dev->descriptor.idProduct;
-	kbtab->dev.id.version = dev->descriptor.bcdDevice;
+	kbtab->dev.id.vendor = le16_to_cpu(dev->descriptor.idVendor);
+	kbtab->dev.id.product = le16_to_cpu(dev->descriptor.idProduct);
+	kbtab->dev.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 	kbtab->dev.dev = &intf->dev;
 	kbtab->usbdev = dev;
 

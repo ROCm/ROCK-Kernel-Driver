@@ -173,9 +173,10 @@ struct mct_u232_private {
  * we do not know how to support. We ignore them for the moment.
  * XXX Rate-limit the error message, it's user triggerable.
  */
-static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value) {
-	if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID
-	  || serial->dev->descriptor.idProduct == MCT_U232_BELKIN_F5U109_PID) {
+static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value)
+{
+	if (le16_to_cpu(serial->dev->descriptor.idProduct) == MCT_U232_SITECOM_PID
+	  || le16_to_cpu(serial->dev->descriptor.idProduct) == MCT_U232_BELKIN_F5U109_PID) {
 		switch (value) {
 		case    B300: return 0x01;
 		case    B600: return 0x02; /* this one not tested */
@@ -403,7 +404,7 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 	 * it seems to be able to accept only 16 bytes (and that's what
 	 * SniffUSB says too...)
 	 */
-	if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID)
+	if (le16_to_cpu(serial->dev->descriptor.idProduct) == MCT_U232_SITECOM_PID)
 		port->bulk_out_size = 16;
 
 	/* Do a defined restart: the normal serial device seems to 

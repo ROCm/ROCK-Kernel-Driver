@@ -3516,11 +3516,11 @@ w9968cf_usb_probe(struct usb_interface* intf, const struct usb_device_id* id)
 	u8 sc = 0; /* number of simultaneous cameras */
 	static unsigned short dev_nr = 0; /* we are handling device number n */
 
-	if (udev->descriptor.idVendor  == winbond_id_table[0].idVendor &&
-	    udev->descriptor.idProduct == winbond_id_table[0].idProduct)
+	if (le16_to_cpu(udev->descriptor.idVendor)  == winbond_id_table[0].idVendor &&
+	    le16_to_cpu(udev->descriptor.idProduct) == winbond_id_table[0].idProduct)
 		mod_id = W9968CF_MOD_CLVBWGP; /* see camlist[] table */
-	else if (udev->descriptor.idVendor  == winbond_id_table[1].idVendor &&
-	         udev->descriptor.idProduct == winbond_id_table[1].idProduct)
+	else if (le16_to_cpu(udev->descriptor.idVendor)  == winbond_id_table[1].idVendor &&
+	         le16_to_cpu(udev->descriptor.idProduct) == winbond_id_table[1].idProduct)
 		mod_id = W9968CF_MOD_GENERIC; /* see camlist[] table */
 	else
 		return -ENODEV;

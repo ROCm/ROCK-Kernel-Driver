@@ -524,12 +524,8 @@ static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	/* Is it an IBM camera? */
-	if ((dev->descriptor.idVendor != ULTRACAM_VENDOR_ID) ||
-	    (dev->descriptor.idProduct != ULTRACAM_PRODUCT_ID))
-		return -ENODEV;
-
-	info("IBM Ultra camera found (rev. 0x%04x)", dev->descriptor.bcdDevice);
+	info("IBM Ultra camera found (rev. 0x%04x)",
+		le16_to_cpu(dev->descriptor.bcdDevice));
 
 	/* Validate found interface: must have one ISO endpoint */
 	nas = intf->num_altsetting;

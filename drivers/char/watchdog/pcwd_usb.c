@@ -571,12 +571,6 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 	char fw_ver_str[20];
 	unsigned char option_switches, dummy;
 
-	/* See if the device offered us matches what we can accept */
-	if ((udev->descriptor.idVendor != USB_PCWD_VENDOR_ID) ||
-	    (udev->descriptor.idProduct != USB_PCWD_PRODUCT_ID)) {
-		return -ENODEV;
-	}
-
 	cards_found++;
 	if (cards_found > 1) {
 		printk(KERN_ERR PFX "This driver only supports 1 device\n");

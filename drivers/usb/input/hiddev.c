@@ -423,9 +423,9 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		dinfo.busnum = dev->bus->busnum;
 		dinfo.devnum = dev->devnum;
 		dinfo.ifnum = hid->ifnum;
-		dinfo.vendor = dev->descriptor.idVendor;
-		dinfo.product = dev->descriptor.idProduct;
-		dinfo.version = dev->descriptor.bcdDevice;
+		dinfo.vendor = le16_to_cpu(dev->descriptor.idVendor);
+		dinfo.product = le16_to_cpu(dev->descriptor.idProduct);
+		dinfo.version = le16_to_cpu(dev->descriptor.bcdDevice);
 		dinfo.num_applications = hid->maxapplication;
 		if (copy_to_user(user_arg, &dinfo, sizeof(dinfo)))
 			return -EFAULT;

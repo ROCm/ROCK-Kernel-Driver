@@ -903,9 +903,9 @@ static int kaweth_probe(
 
 	kaweth_dbg("Kawasaki Device Probe (Device number:%d): 0x%4.4x:0x%4.4x:0x%4.4x",
 		 dev->devnum,
-		 (int)dev->descriptor.idVendor,
-		 (int)dev->descriptor.idProduct,
-		 (int)dev->descriptor.bcdDevice);
+		 le16_to_cpu(dev->descriptor.idVendor),
+		 le16_to_cpu(dev->descriptor.idProduct),
+		 le16_to_cpu(dev->descriptor.bcdDevice));
 
 	kaweth_dbg("Device at %p", dev);
 
@@ -933,7 +933,7 @@ static int kaweth_probe(
 	 * downloaded. Don't try to do it again, or we'll hang the device.
 	 */
 
-	if (dev->descriptor.bcdDevice >> 8) {
+	if (le16_to_cpu(dev->descriptor.bcdDevice) >> 8) {
 		kaweth_info("Firmware present in device.");
 	} else {
 		/* Download the firmware */

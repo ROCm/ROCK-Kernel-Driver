@@ -82,8 +82,8 @@ int hid_ff_init(struct hid_device* hid)
 {
 	struct hid_ff_initializer *init;
 
-	init = hid_get_ff_init(hid->dev->descriptor.idVendor,
-			       hid->dev->descriptor.idProduct);
+	init = hid_get_ff_init(le16_to_cpu(hid->dev->descriptor.idVendor),
+			       le16_to_cpu(hid->dev->descriptor.idProduct));
 
 	if (!init) {
 		dbg("hid_ff_init could not find initializer");

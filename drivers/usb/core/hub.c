@@ -2494,7 +2494,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		}
  
 		/* check for devices running slower than they could */
-		if (udev->descriptor.bcdUSB >= 0x0200
+		if (le16_to_cpu(udev->descriptor.bcdUSB) >= 0x0200
 				&& udev->speed == USB_SPEED_FULL
 				&& highspeed_hubs != 0)
 			check_highspeed (hub, udev, port1);

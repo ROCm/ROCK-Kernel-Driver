@@ -1360,9 +1360,10 @@ static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 //	usb_show_device_descriptor(&dev->descriptor);
 //	usb_show_interface_descriptor(&iface->desc);
 	vend_idx=0xffff;
-	for(i=0;vdata[i].vendor;i++)
-	{
-		if(dev->descriptor.idVendor==vdata[i].vendor && dev->descriptor.idProduct==vdata[i].prod_id) vend_idx=i;
+	for(i=0;vdata[i].vendor;i++) {
+		if (le16_to_cpu(dev->descriptor.idVendor) == vdata[i].vendor && 
+		    le16_to_cpu(dev->descriptor.idProduct) == vdata[i].prod_id)
+			vend_idx = i;
 	}
 	
 

@@ -859,13 +859,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 		info ("udev is NULL.");
 	}
 
-	/* See if the device offered us matches what we can accept */
-	if ((udev->descriptor.idVendor != LEGO_USB_TOWER_VENDOR_ID) ||
-	    (udev->descriptor.idProduct != LEGO_USB_TOWER_PRODUCT_ID)) {
-		return -ENODEV;
-	}
-
-
 	/* allocate memory for our device state and intialize it */
 
 	dev = kmalloc (sizeof(struct lego_usb_tower), GFP_KERNEL);

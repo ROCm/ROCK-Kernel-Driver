@@ -296,9 +296,9 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->dev.name = kbd->name;
 	kbd->dev.phys = kbd->phys;	
 	kbd->dev.id.bustype = BUS_USB;
-	kbd->dev.id.vendor = dev->descriptor.idVendor;
-	kbd->dev.id.product = dev->descriptor.idProduct;
-	kbd->dev.id.version = dev->descriptor.bcdDevice;
+	kbd->dev.id.vendor = le16_to_cpu(dev->descriptor.idVendor);
+	kbd->dev.id.product = le16_to_cpu(dev->descriptor.idProduct);
+	kbd->dev.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 	kbd->dev.dev = &iface->dev;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {

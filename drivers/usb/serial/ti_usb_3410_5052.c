@@ -407,7 +407,10 @@ static int ti_startup(struct usb_serial *serial)
 	int i;
 
 
-	dbg("%s - product 0x%4X, num configurations %d, configuration value %d", __FUNCTION__, dev->descriptor.idProduct, dev->descriptor.bNumConfigurations, dev->actconfig->desc.bConfigurationValue);
+	dbg("%s - product 0x%4X, num configurations %d, configuration value %d",
+	    __FUNCTION__, le16_to_cpu(dev->descriptor.idProduct),
+	    dev->descriptor.bNumConfigurations,
+	    dev->actconfig->desc.bConfigurationValue);
 
 	/* create device structure */
 	tdev = kmalloc(sizeof(struct ti_device), GFP_KERNEL);

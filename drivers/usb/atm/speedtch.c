@@ -594,7 +594,7 @@ static int speedtch_find_firmware(struct speedtch_instance_data
 				  const struct firmware **fw_p)
 {
 	char buf[24];
-	const u16 bcdDevice = instance->u.usb_dev->descriptor.bcdDevice;
+	const u16 bcdDevice = le16_to_cpu(instance->u.usb_dev->descriptor.bcdDevice);
 	const u8 major_revision = bcdDevice >> 8;
 	const u8 minor_revision = bcdDevice & 0xff;
 
@@ -737,11 +737,12 @@ static int speedtch_usb_probe(struct usb_interface *intf,
 	int ret, i;
 	char buf7[SIZE_7];
 
-	dbg("speedtch_usb_probe: trying device with vendor=0x%x, product=0x%x, ifnum %d", dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
+	dbg("speedtch_usb_probe: trying device with vendor=0x%x, product=0x%x, ifnum %d",
+	    le16_to_cpu(dev->descriptor.idVendor),
+	    le16_to_cpu(dev->descriptor.idProduct), ifnum);
 
-	if ((dev->descriptor.bDeviceClass != USB_CLASS_VENDOR_SPEC) ||
-	    (dev->descriptor.idVendor != SPEEDTOUCH_VENDORID) ||
-	    (dev->descriptor.idProduct != SPEEDTOUCH_PRODUCTID) || (ifnum != 1))
+	if ((dev->descriptor.bDeviceClass != USB_CLASS_VENDOR_SPEC) || 
+	    (ifnum != 1))
 		return -ENODEV;
 
 	dbg("speedtch_usb_probe: device accepted");

@@ -636,7 +636,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	}
 
 	/* and sometimes [9.2.6.6] speed dependent descriptors */
-	if (udev->descriptor.bcdUSB == 0x0200) {	/* pre-swapped */
+	if (le16_to_cpu(udev->descriptor.bcdUSB) == 0x0200) {
 		struct usb_qualifier_descriptor		*d = NULL;
 
 		/* device qualifier [9.6.2] */
@@ -1842,13 +1842,13 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 	/* specify devices by module parameters? */
 	if (id->match_flags == 0) {
 		/* vendor match required, product match optional */
-		if (!vendor || udev->descriptor.idVendor != (u16)vendor)
+		if (!vendor || le16_to_cpu(udev->descriptor.idVendor) != (u16)vendor)
 			return -ENODEV;
-		if (product && udev->descriptor.idProduct != (u16)product)
+		if (product && le16_to_cpu(udev->descriptor.idProduct) != (u16)product)
 			return -ENODEV;
 		dbg ("matched module params, vend=0x%04x prod=0x%04x",
-				udev->descriptor.idVendor,
-				udev->descriptor.idProduct);
+				le16_to_cpu(udev->descriptor.idVendor),
+				le16_to_cpu(udev->descriptor.idProduct));
 	}
 #endif
 

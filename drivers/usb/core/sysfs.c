@@ -149,10 +149,11 @@ static ssize_t
 show_version (struct device *dev, char *buf)
 {
 	struct usb_device *udev;
+	u16 bcdUSB;
 
-	udev = to_usb_device (dev);
-	return sprintf (buf, "%2x.%02x\n", udev->descriptor.bcdUSB >> 8, 
-			udev->descriptor.bcdUSB & 0xff);
+	udev = to_usb_device(dev);
+	bcdUSB = le16_to_cpu(udev->descriptor.bcdUSB);
+	return sprintf(buf, "%2x.%02x\n", bcdUSB >> 8, bcdUSB & 0xff);
 }
 static DEVICE_ATTR(version, S_IRUGO, show_version, NULL);
 
@@ -167,6 +168,22 @@ show_maxchild (struct device *dev, char *buf)
 static DEVICE_ATTR(maxchild, S_IRUGO, show_maxchild, NULL);
 
 /* Descriptor fields */
+#define usb_descriptor_attr_le16(field, format_string)			\
+static ssize_t								\
+show_##field (struct device *dev, char *buf)				\
+{									\
+	struct usb_device *udev;					\
+									\
+	udev = to_usb_device (dev);					\
+	return sprintf (buf, format_string, 				\
+			le16_to_cpu(udev->descriptor.field));		\
+}									\
+static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
+
+usb_descriptor_attr_le16(idVendor, "%04x\n")
+usb_descriptor_attr_le16(idProduct, "%04x\n")
+usb_descriptor_attr_le16(bcdDevice, "%04x\n")
+
 #define usb_descriptor_attr(field, format_string)			\
 static ssize_t								\
 show_##field (struct device *dev, char *buf)				\
@@ -178,9 +195,6 @@ show_##field (struct device *dev, char *buf)				\
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
-usb_descriptor_attr (idVendor, "%04x\n")
-usb_descriptor_attr (idProduct, "%04x\n")
-usb_descriptor_attr (bcdDevice, "%04x\n")
 usb_descriptor_attr (bDeviceClass, "%02x\n")
 usb_descriptor_attr (bDeviceSubClass, "%02x\n")
 usb_descriptor_attr (bDeviceProtocol, "%02x\n")

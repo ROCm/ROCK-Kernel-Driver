@@ -796,13 +796,8 @@ int usb_get_device_descriptor(struct usb_device *dev, unsigned int size)
 		return -ENOMEM;
 
 	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, desc, size);
-	if (ret >= 0) {
-		le16_to_cpus(&desc->bcdUSB);
-		le16_to_cpus(&desc->idVendor);
-		le16_to_cpus(&desc->idProduct);
-		le16_to_cpus(&desc->bcdDevice);
+	if (ret >= 0) 
 		memcpy(&dev->descriptor, desc, size);
-	}
 	kfree(desc);
 	return ret;
 }

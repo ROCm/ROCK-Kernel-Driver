@@ -2176,13 +2176,13 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 static int is_big_endian_format(struct usb_device *dev, struct audioformat *fp)
 {
 	/* M-Audio */
-	if (dev->descriptor.idVendor == 0x0763) {
+	if (le16_to_cpu(dev->descriptor.idVendor) == 0x0763) {
 		/* Quattro: captured data only */
-		if (dev->descriptor.idProduct == 0x2001 &&
+		if (le16_to_cpu(dev->descriptor.idProduct) == 0x2001 &&
 		    fp->endpoint & USB_DIR_IN)
 			return 1;
 		/* Audiophile USB */
-		if (dev->descriptor.idProduct == 0x2003)
+		if (le16_to_cpu(dev->descriptor.idProduct) == 0x2003)
 			return 1;
 	}
 	return 0;
@@ -2246,7 +2246,8 @@ static int parse_audio_format_i_type(struct usb_device *dev, struct audioformat 
 		break;
 	case USB_AUDIO_FORMAT_PCM8:
 		/* Dallas DS4201 workaround */
-		if (dev->descriptor.idVendor == 0x04fa && dev->descriptor.idProduct == 0x4201)
+		if (le16_to_cpu(dev->descriptor.idVendor) == 0x04fa &&
+		    le16_to_cpu(dev->descriptor.idProduct) == 0x4201)
 			pcm_format = SNDRV_PCM_FORMAT_S8;
 		else
 			pcm_format = SNDRV_PCM_FORMAT_U8;
@@ -2414,7 +2415,8 @@ static int parse_audio_format(struct usb_device *dev, struct audioformat *fp,
 	/* extigy apparently supports sample rates other than 48k
 	 * but not in ordinary way.  so we enable only 48k atm.
 	 */
-	if (dev->descriptor.idVendor == 0x041e && dev->descriptor.idProduct == 0x3000) {
+	if (le16_to_cpu(dev->descriptor.idVendor) == 0x041e && 
+	    le16_to_cpu(dev->descriptor.idProduct) == 0x3000) {
 		if (fmt[3] == USB_FORMAT_TYPE_I &&
 		    stream == SNDRV_PCM_STREAM_PLAYBACK &&
 		    fp->rates != SNDRV_PCM_RATE_48000)
@@ -2517,8 +2519,8 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		/* some quirks for attributes here */
 
 		/* workaround for AudioTrak Optoplay */
-		if (dev->descriptor.idVendor == 0x0a92 &&
-		    dev->descriptor.idProduct == 0x0053) {
+		if (le16_to_cpu(dev->descriptor.idVendor) == 0x0a92 &&
+		    le16_to_cpu(dev->descriptor.idProduct) == 0x0053) {
 			/* Optoplay sets the sample rate attribute although
 			 * it seems not supporting it in fact.
 			 */
@@ -2526,8 +2528,8 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		}
 
 		/* workaround for M-Audio Audiophile USB */
-		if (dev->descriptor.idVendor == 0x0763 &&
-		    dev->descriptor.idProduct == 0x2003) {
+		if (le16_to_cpu(dev->descriptor.idVendor) == 0x0763 &&
+		    le16_to_cpu(dev->descriptor.idProduct) == 0x2003) {
 			/* doesn't set the sample rate attribute, but supports it */
 			fp->attributes |= EP_CS_ATTR_SAMPLE_RATE;
 		}
@@ -2536,11 +2538,11 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		 * plantronics headset and Griffin iMic have set adaptive-in
 		 * although it's really not...
 		 */
-		if ((dev->descriptor.idVendor == 0x047f &&
-		     dev->descriptor.idProduct == 0x0ca1) ||
+		if ((le16_to_cpu(dev->descriptor.idVendor) == 0x047f &&
+		     le16_to_cpu(dev->descriptor.idProduct) == 0x0ca1) ||
 		    /* Griffin iMic (note that there is an older model 77d:223) */
-		    (dev->descriptor.idVendor == 0x077d &&
-		     dev->descriptor.idProduct == 0x07af)) {
+		    (le16_to_cpu(dev->descriptor.idVendor) == 0x077d &&
+		     le16_to_cpu(dev->descriptor.idProduct) == 0x07af)) {
 			fp->ep_attr &= ~EP_ATTR_MASK;
 			if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 				fp->ep_attr |= EP_ATTR_ADAPTIVE;
@@ -2788,7 +2790,7 @@ static int create_ua700_ua25_quirk(snd_usb_audio_t *chip,
 			.type = QUIRK_MIDI_FIXED_ENDPOINT,
 			.data = &ua25_ep
 		};
-		if (chip->dev->descriptor.idProduct == 0x002b)
+		if (le16_to_cpu(chip->dev->descriptor.idProduct) == 0x002b)
 			return snd_usb_create_midi_interface(chip, iface,
 							     &ua700_quirk);
 		else
@@ -3000,7 +3002,9 @@ static void proc_audio_usbid_read(snd_info_entry_t *entry, snd_info_buffer_t *bu
 {
 	snd_usb_audio_t *chip = entry->private_data;
 	if (! chip->shutdown)
-		snd_iprintf(buffer, "%04x:%04x\n", chip->dev->descriptor.idVendor, chip->dev->descriptor.idProduct);
+		snd_iprintf(buffer, "%04x:%04x\n", 
+			    le16_to_cpu(chip->dev->descriptor.idVendor),
+			    le16_to_cpu(chip->dev->descriptor.idProduct));
 }
 
 static void snd_usb_audio_create_proc(snd_usb_audio_t *chip)
@@ -3081,7 +3085,8 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 
 	strcpy(card->driver, "USB-Audio");
 	sprintf(component, "USB%04x:%04x",
-		dev->descriptor.idVendor, dev->descriptor.idProduct);
+		le16_to_cpu(dev->descriptor.idVendor),
+		le16_to_cpu(dev->descriptor.idProduct));
 	snd_component_add(card, component);
 
 	/* retrieve the device string as shortname */
@@ -3093,7 +3098,8 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
       			       card->shortname, sizeof(card->shortname)) <= 0) {
 			/* no name available from anywhere, so use ID */
 			sprintf(card->shortname, "USB Device %#04x:%#04x",
-				dev->descriptor.idVendor, dev->descriptor.idProduct);
+				le16_to_cpu(dev->descriptor.idVendor),
+				le16_to_cpu(dev->descriptor.idProduct));
 		}
 	}
 
@@ -3160,7 +3166,8 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 
 	/* SB Extigy needs special boot-up sequence */
 	/* if more models come, this will go to the quirk list. */
-	if (dev->descriptor.idVendor == 0x041e && dev->descriptor.idProduct == 0x3000) {
+	if (le16_to_cpu(dev->descriptor.idVendor) == 0x041e && 
+	    le16_to_cpu(dev->descriptor.idProduct) == 0x3000) {
 		if (snd_usb_extigy_boot_quirk(dev, intf) < 0)
 			goto __err_val;
 		config = dev->actconfig;
@@ -3194,8 +3201,8 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		}
 		for (i = 0; i < SNDRV_CARDS; i++)
 			if (enable[i] && ! usb_chip[i] &&
-			    (vid[i] == -1 || vid[i] == dev->descriptor.idVendor) &&
-			    (pid[i] == -1 || pid[i] == dev->descriptor.idProduct)) {
+			    (vid[i] == -1 || vid[i] == le16_to_cpu(dev->descriptor.idVendor)) &&
+			    (pid[i] == -1 || pid[i] == le16_to_cpu(dev->descriptor.idProduct))) {
 				if (snd_usb_audio_create(dev, i, quirk, &chip) < 0) {
 					goto __error;
 				}

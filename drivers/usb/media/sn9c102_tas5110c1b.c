@@ -165,9 +165,9 @@ int sn9c102_probe_tas5110c1b(struct sn9c102_device* cam)
 	sn9c102_attach_sensor(cam, &tas5110c1b);
 
 	/* Sensor detection is based on USB pid/vid */
-	if (tas5110c1b.usbdev->descriptor.idProduct != 0x6001 &&
-	    tas5110c1b.usbdev->descriptor.idProduct != 0x6005 &&
-	    tas5110c1b.usbdev->descriptor.idProduct != 0x60ab)
+	if (le16_to_cpu(tas5110c1b.usbdev->descriptor.idProduct) != 0x6001 &&
+	    le16_to_cpu(tas5110c1b.usbdev->descriptor.idProduct) != 0x6005 &&
+	    le16_to_cpu(tas5110c1b.usbdev->descriptor.idProduct) != 0x60ab)
 		return -ENODEV;
 
 	return 0;

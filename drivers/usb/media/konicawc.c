@@ -732,7 +732,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	info("Konica Webcam (rev. 0x%04x)", dev->descriptor.bcdDevice);
+	info("Konica Webcam (rev. 0x%04x)", le16_to_cpu(dev->descriptor.bcdDevice));
 	RESTRICT_TO_RANGE(speed, 0, MAX_SPEED);
 
 	/* Validate found interface: must have one ISO endpoint */
@@ -846,9 +846,9 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		cam->input.evbit[0] = BIT(EV_KEY);
 		cam->input.keybit[LONG(BTN_0)] = BIT(BTN_0);
 		cam->input.id.bustype = BUS_USB;
-		cam->input.id.vendor = dev->descriptor.idVendor;
-		cam->input.id.product = dev->descriptor.idProduct;
-		cam->input.id.version = dev->descriptor.bcdDevice;
+		cam->input.id.vendor = le16_to_cpu(dev->descriptor.idVendor);
+		cam->input.id.product = le16_to_cpu(dev->descriptor.idProduct);
+		cam->input.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 		input_register_device(&cam->input);
 		
 		usb_make_path(dev, cam->input_physname, 56);

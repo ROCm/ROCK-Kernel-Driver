@@ -67,7 +67,8 @@ static int probe_st5481(struct usb_interface *intf,
 	int retval, i;
 
 	printk(KERN_INFO "st541: found adapter VendorId %04x, ProductId %04x, LEDs %d\n",
-	     dev->descriptor.idVendor, dev->descriptor.idProduct,
+	     le16_to_cpu(dev->descriptor.idVendor),
+	     le16_to_cpu(dev->descriptor.idProduct),
 	     number_of_leds);
 
 	adapter = kmalloc(sizeof(struct st5481_adapter), GFP_KERNEL);

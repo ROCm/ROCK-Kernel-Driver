@@ -5825,7 +5825,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	ov->auto_gain = autogain;
 	ov->auto_exp = autoexp;
 
-	switch (dev->descriptor.idProduct) {
+	switch (le16_to_cpu(dev->descriptor.idProduct)) {
 	case PROD_OV511:
 		ov->bridge = BRG_OV511;
 		ov->bclass = BCL_OV511;
@@ -5843,13 +5843,13 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		ov->bclass = BCL_OV518;
 		break;
 	case PROD_ME2CAM:
-		if (dev->descriptor.idVendor != VEND_MATTEL)
+		if (le16_to_cpu(dev->descriptor.idVendor) != VEND_MATTEL)
 			goto error;
 		ov->bridge = BRG_OV511PLUS;
 		ov->bclass = BCL_OV511;
 		break;
 	default:
-		err("Unknown product ID 0x%04x", dev->descriptor.idProduct);
+		err("Unknown product ID 0x%04x", le16_to_cpu(dev->descriptor.idProduct));
 		goto error;
 	}
 

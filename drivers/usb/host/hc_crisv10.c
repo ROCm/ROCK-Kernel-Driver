@@ -113,17 +113,17 @@ static __u8 root_hub_dev_des[] =
 {
 	0x12,  /*  __u8  bLength; */
 	0x01,  /*  __u8  bDescriptorType; Device */
-	0x00,  /*  __u16 bcdUSB; v1.0 */
+	0x00,  /*  __le16 bcdUSB; v1.0 */
 	0x01,
 	0x09,  /*  __u8  bDeviceClass; HUB_CLASSCODE */
 	0x00,  /*  __u8  bDeviceSubClass; */
 	0x00,  /*  __u8  bDeviceProtocol; */
 	0x08,  /*  __u8  bMaxPacketSize0; 8 Bytes */
-	0x00,  /*  __u16 idVendor; */
+	0x00,  /*  __le16 idVendor; */
 	0x00,
-	0x00,  /*  __u16 idProduct; */
+	0x00,  /*  __le16 idProduct; */
 	0x00,
-	0x00,  /*  __u16 bcdDevice; */
+	0x00,  /*  __le16 bcdDevice; */
 	0x00,
 	0x00,  /*  __u8  iManufacturer; */
 	0x02,  /*  __u8  iProduct; */

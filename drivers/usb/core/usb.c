@@ -423,21 +423,21 @@ usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 	       id->driver_info; id++) {
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_VENDOR) &&
-		    id->idVendor != dev->descriptor.idVendor)
+		    id->idVendor != le16_to_cpu(dev->descriptor.idVendor))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_PRODUCT) &&
-		    id->idProduct != dev->descriptor.idProduct)
+		    id->idProduct != le16_to_cpu(dev->descriptor.idProduct))
 			continue;
 
 		/* No need to test id->bcdDevice_lo != 0, since 0 is never
 		   greater than any unsigned number. */
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_LO) &&
-		    (id->bcdDevice_lo > dev->descriptor.bcdDevice))
+		    (id->bcdDevice_lo > le16_to_cpu(dev->descriptor.bcdDevice)))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_HI) &&
-		    (id->bcdDevice_hi < dev->descriptor.bcdDevice))
+		    (id->bcdDevice_hi < le16_to_cpu(dev->descriptor.bcdDevice)))
 			continue;
 
 		if ((id->match_flags & USB_DEVICE_ID_MATCH_DEV_CLASS) &&
@@ -588,9 +588,9 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	if (add_hotplug_env_var(envp, num_envp, &i,
 				buffer, buffer_size, &length,
 				"PRODUCT=%x/%x/%x",
-				usb_dev->descriptor.idVendor,
-				usb_dev->descriptor.idProduct,
-				usb_dev->descriptor.bcdDevice))
+				le16_to_cpu(usb_dev->descriptor.idVendor),
+				le16_to_cpu(usb_dev->descriptor.idProduct),
+				le16_to_cpu(usb_dev->descriptor.bcdDevice)))
 		return -ENOMEM;
 
 	/* class-based driver binding models */
@@ -959,12 +959,12 @@ static struct usb_device *match_device(struct usb_device *dev,
 	int child;
 
 	dev_dbg(&dev->dev, "check for vendor %04x, product %04x ...\n",
-	    dev->descriptor.idVendor,
-	    dev->descriptor.idProduct);
+	    le16_to_cpu(dev->descriptor.idVendor),
+	    le16_to_cpu(dev->descriptor.idProduct));
 
 	/* see if this device matches */
-	if ((dev->descriptor.idVendor == vendor_id) &&
-	    (dev->descriptor.idProduct == product_id)) {
+	if ((vendor_id == le16_to_cpu(dev->descriptor.idVendor)) &&
+	    (product_id == le16_to_cpu(dev->descriptor.idProduct))) {
 		dev_dbg (&dev->dev, "matched this device!\n");
 		ret_dev = usb_get_dev(dev);
 		goto exit;

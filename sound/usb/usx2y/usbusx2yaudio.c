@@ -1023,10 +1023,10 @@ int usX2Y_audio_create(snd_card_t* card)
 
 	if (0 > (err = usX2Y_audio_stream_new(card, 0xA, 0x8)))
 		return err;
-	if (usX2Y(card)->chip.dev->descriptor.idProduct == USB_ID_US428)
+	if (le16_to_cpu(usX2Y(card)->chip.dev->descriptor.idProduct) == USB_ID_US428)
 	     if (0 > (err = usX2Y_audio_stream_new(card, 0, 0xA)))
 		     return err;
-	if (usX2Y(card)->chip.dev->descriptor.idProduct != USB_ID_US122)
+	if (le16_to_cpu(usX2Y(card)->chip.dev->descriptor.idProduct) != USB_ID_US122)
 		err = usX2Y_rate_set(usX2Y(card), 44100);	// Lets us428 recognize output-volume settings, disturbs us122.
 	return err;
 }

@@ -375,12 +375,13 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 		return -EIO; /* failure */
 	}
 
-	switch (udev->descriptor.idProduct) {
+	switch (le16_to_cpu(udev->descriptor.idProduct)) {
 	case POWERMATE_PRODUCT_NEW: pm->input.name = pm_name_powermate; break;
 	case POWERMATE_PRODUCT_OLD: pm->input.name = pm_name_soundknob; break;
 	default: 
-	  pm->input.name = pm_name_soundknob;
-	  printk(KERN_WARNING "powermate: unknown product id %04x\n", udev->descriptor.idProduct);
+		pm->input.name = pm_name_soundknob;
+		printk(KERN_WARNING "powermate: unknown product id %04x\n",
+		       le16_to_cpu(udev->descriptor.idProduct));
 	}
 
 	pm->input.private = pm;
@@ -389,9 +390,9 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	pm->input.relbit[LONG(REL_DIAL)] = BIT(REL_DIAL);
 	pm->input.mscbit[LONG(MSC_PULSELED)] = BIT(MSC_PULSELED);
 	pm->input.id.bustype = BUS_USB;
-	pm->input.id.vendor = udev->descriptor.idVendor;
-	pm->input.id.product = udev->descriptor.idProduct;
-	pm->input.id.version = udev->descriptor.bcdDevice;
+	pm->input.id.vendor = le16_to_cpu(udev->descriptor.idVendor);
+	pm->input.id.product = le16_to_cpu(udev->descriptor.idProduct);
+	pm->input.id.version = le16_to_cpu(udev->descriptor.bcdDevice);
 	pm->input.event = powermate_input_event;
 	pm->input.dev = &intf->dev;
 

@@ -1931,11 +1931,8 @@ static int auerswald_probe (struct usb_interface *intf,
 	int ret;
 
 	dbg ("probe: vendor id 0x%x, device id 0x%x",
-	     usbdev->descriptor.idVendor, usbdev->descriptor.idProduct);
-
-	/* See if the device offered us matches that we can accept */
-	if (usbdev->descriptor.idVendor != ID_AUERSWALD)
-		return -ENODEV;
+	     le16_to_cpu(usbdev->descriptor.idVendor),
+	     le16_to_cpu(usbdev->descriptor.idProduct));
 
         /* we use only the first -and only- interface */
         if (intf->altsetting->desc.bInterfaceNumber != 0)
@@ -1969,7 +1966,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	cp->dtindex = intf->minor;
 
 	/* Get the usb version of the device */
-	cp->version = cp->usbdev->descriptor.bcdDevice;
+	cp->version = le16_to_cpu(cp->usbdev->descriptor.bcdDevice);
 	dbg ("Version is %X", cp->version);
 
 	/* allow some time to settle the device */

@@ -181,8 +181,8 @@ static int belkin_sa_startup (struct usb_serial *serial)
 	priv->last_lsr = 0;
 	priv->last_msr = 0;
 	/* see comments at top of file */
-	priv->bad_flow_control = (dev->descriptor.bcdDevice <= 0x0206) ? 1 : 0;
-	info("bcdDevice: %04x, bfc: %d", dev->descriptor.bcdDevice, priv->bad_flow_control);
+	priv->bad_flow_control = (le16_to_cpu(dev->descriptor.bcdDevice) <= 0x0206) ? 1 : 0;
+	info("bcdDevice: %04x, bfc: %d", le16_to_cpu(dev->descriptor.bcdDevice), priv->bad_flow_control);
 
 	init_waitqueue_head(&serial->port[0]->write_wait);
 	usb_set_serial_port_data(serial->port[0], priv);

@@ -1348,7 +1348,7 @@ static struct tda8083_config ttusb_novas_grundig_29504_491_config = {
 
 static void frontend_init(struct ttusb* ttusb)
 {
-	switch(ttusb->dev->descriptor.idProduct) {
+	switch(le16_to_cpu(ttusb->dev->descriptor.idProduct)) {
 	case 0x1003: // Hauppauge/TT Nova-USB-S budget (stv0299/ALPS BSRU6(tsa5059)
 		// try the ALPS BSRU6 first
 		ttusb->fe = stv0299_attach(&alps_bsru6_config, &ttusb->i2c_adap);
@@ -1381,8 +1381,8 @@ static void frontend_init(struct ttusb* ttusb)
 
 	if (ttusb->fe == NULL) {
 		printk("dvb-ttusb-budget: A frontend driver was not found for device %04x/%04x\n",
-		       ttusb->dev->descriptor.idVendor,
-		       ttusb->dev->descriptor.idProduct);
+		       le16_to_cpu(ttusb->dev->descriptor.idVendor),
+		       le16_to_cpu(ttusb->dev->descriptor.idProduct));
 	} else {
 		if (dvb_register_frontend(ttusb->adapter, ttusb->fe)) {
 			printk("dvb-ttusb-budget: Frontend registration failed!\n");

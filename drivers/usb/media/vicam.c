@@ -1281,12 +1281,6 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 	const struct usb_endpoint_descriptor *endpoint;
 	struct vicam_camera *cam;
 	
-	/* See if the device offered us matches what we can accept */
-	if ((dev->descriptor.idVendor != USB_VICAM_VENDOR_ID) ||
-	    (dev->descriptor.idProduct != USB_VICAM_PRODUCT_ID)) {
-		return -ENODEV;
-	}
-
 	printk(KERN_INFO "ViCam based webcam connected\n");
 
 	interface = intf->cur_altsetting;

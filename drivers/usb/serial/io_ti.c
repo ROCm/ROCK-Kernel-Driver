@@ -1342,9 +1342,9 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 	if (status)
 		return status;
 
-	if (serial->serial->dev->descriptor.idVendor != USB_VENDOR_ID_ION) {
+	if (le16_to_cpu(serial->serial->dev->descriptor.idVendor) != USB_VENDOR_ID_ION) {
 		dbg ("%s - VID = 0x%x", __FUNCTION__,
-		     serial->serial->dev->descriptor.idVendor);
+		     le16_to_cpu(serial->serial->dev->descriptor.idVendor));
 		serial->TI_I2C_Type = DTK_ADDR_SPACE_I2C_TYPE_II;
 		goto StayInBootMode;
 	}

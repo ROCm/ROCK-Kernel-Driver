@@ -926,8 +926,8 @@ static int treo_attach (struct usb_serial *serial)
 
 	/* Only do this endpoint hack for the Handspring devices with
 	 * interrupt in endpoints, which for now are the Treo devices. */
-	if (!((serial->dev->descriptor.idVendor == HANDSPRING_VENDOR_ID) ||
-	      (serial->dev->descriptor.idVendor == KYOCERA_VENDOR_ID)) ||
+	if (!((le16_to_cpu(serial->dev->descriptor.idVendor) == HANDSPRING_VENDOR_ID) ||
+	      (le16_to_cpu(serial->dev->descriptor.idVendor) == KYOCERA_VENDOR_ID)) ||
 	    (serial->num_interrupt_in == 0))
 		goto generic_startup;
 

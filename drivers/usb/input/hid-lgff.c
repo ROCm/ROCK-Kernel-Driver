@@ -251,8 +251,8 @@ static void hid_lgff_input_init(struct hid_device* hid)
 {
 	struct device_type* dev = devices;
 	signed short* ff;
-	u16 idVendor = hid->dev->descriptor.idVendor;
-	u16 idProduct = hid->dev->descriptor.idProduct;
+	u16 idVendor = le16_to_cpu(hid->dev->descriptor.idVendor);
+	u16 idProduct = le16_to_cpu(hid->dev->descriptor.idProduct);
 	struct hid_input *hidinput = list_entry(hid->inputs.next, struct hid_input, list);
 
 	while (dev->idVendor && (idVendor != dev->idVendor || idProduct != dev->idProduct))

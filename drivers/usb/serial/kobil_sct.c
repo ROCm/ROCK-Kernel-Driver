@@ -155,7 +155,7 @@ static int kobil_startup (struct usb_serial *serial)
 
 	priv->filled = 0;
 	priv->cur_pos = 0;
-	priv->device_type = serial->product;
+	priv->device_type = le16_to_cpu(serial->dev->descriptor.idProduct);
 	priv->line_state = 0;
 
 	switch (priv->device_type){
