@@ -582,6 +582,7 @@ config IP_NF_COMPAT_IPFWADM
 config IP_NF_TARGET_NOTRACK
 	tristate  'NOTRACK target support'
 	depends on IP_NF_RAW
+	depends on IP_NF_CONNTRACK
 	help
 	  The NOTRACK target allows a select rule to specify
 	  which packets *not* to enter the conntrack/NAT
