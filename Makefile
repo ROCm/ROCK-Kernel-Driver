@@ -278,15 +278,6 @@ ifdef CONFIG_MODVERSIONS
 	$(MAKE) update-modverfile
 endif
 
-# FIXME MODVERFILE is unused
-
-ifdef CONFIG_MODVERSIONS
-MODVERFILE := $(TOPDIR)/include/linux/modversions.h
-else
-MODVERFILE :=
-endif
-export	MODVERFILE
-
 # ---------------------------------------------------------------------------
 # Modules
 
@@ -351,28 +342,6 @@ modules modules_install: dummy
 endif # CONFIG_MODULES
 
 # ---------------------------------------------------------------------------
-
-# FIXME unused
-
-ifdef CONFIGURATION
-..$(CONFIGURATION):
-	@echo
-	@echo "You have a bad or nonexistent" .$(CONFIGURATION) ": running 'make" $(CONFIGURATION)"'"
-	@echo
-	$(MAKE) $(CONFIGURATION)
-	@echo
-	@echo "Successful. Try re-making (ignore the error that follows)"
-	@echo
-	exit 1
-
-#dummy: ..$(CONFIGURATION)
-dummy:
-
-else
-
-dummy:
-
-endif
 
 include Rules.make
 
