@@ -412,7 +412,7 @@ struct file_operations read_fifo_fops = {
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_read_open,
 	.release	= pipe_read_release,
-	.fasync         = pipe_read_fasync,
+	.fasync		= pipe_read_fasync,
 };
 
 struct file_operations write_fifo_fops = {
@@ -423,7 +423,7 @@ struct file_operations write_fifo_fops = {
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_write_open,
 	.release	= pipe_write_release,
-	.fasync         = pipe_write_fasync,
+	.fasync		= pipe_write_fasync,
 };
 
 struct file_operations rdwr_fifo_fops = {
@@ -434,7 +434,7 @@ struct file_operations rdwr_fifo_fops = {
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_rdwr_open,
 	.release	= pipe_rdwr_release,
-	.fasync         = pipe_rdwr_fasync,
+	.fasync		= pipe_rdwr_fasync,
 };
 
 struct file_operations read_pipe_fops = {
@@ -445,7 +445,7 @@ struct file_operations read_pipe_fops = {
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_read_open,
 	.release	= pipe_read_release,
-	.fasync         = pipe_read_fasync,
+	.fasync		= pipe_read_fasync,
 };
 
 struct file_operations write_pipe_fops = {
@@ -456,7 +456,7 @@ struct file_operations write_pipe_fops = {
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_write_open,
 	.release	= pipe_write_release,
-	.fasync         = pipe_write_fasync,
+	.fasync		= pipe_write_fasync,
 };
 
 struct file_operations rdwr_pipe_fops = {
@@ -467,7 +467,7 @@ struct file_operations rdwr_pipe_fops = {
 	.ioctl		= pipe_ioctl,
 	.open		= pipe_rdwr_open,
 	.release	= pipe_rdwr_release,
-	.fasync         = pipe_rdwr_fasync,
+	.fasync		= pipe_rdwr_fasync,
 };
 
 struct inode* pipe_new(struct inode* inode)

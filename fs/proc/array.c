@@ -352,7 +352,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		ppid,
 		task->pgrp,
 		task->session,
-	        tty_nr,
+		tty_nr,
 		tty_pgrp,
 		task->flags,
 		task->min_flt,
