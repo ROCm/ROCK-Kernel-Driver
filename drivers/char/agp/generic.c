@@ -539,7 +539,7 @@ void agp_generic_enable(u32 mode)
 		if (agp3 & AGPSTAT_MODE_3_0) {
 			/* If we have 3.5, we can do the isoch stuff. */
 			if (agp_bridge->minor_version >= 5)
-				agp_3_5_enable(agp_bridge, mode);
+				agp_3_5_enable(agp_bridge);
 			agp_device_command(command, TRUE);
 			return;
 		} else {
