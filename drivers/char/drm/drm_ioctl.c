@@ -175,7 +175,7 @@ int drm_getmap( struct inode *inode, struct file *filp,
 	drm_file_t   *priv = filp->private_data;
 	drm_device_t *dev  = priv->dev;
 	drm_map_t    __user *argp = (void __user *)arg;
-	drm_map_priv_t    map;
+	drm_map_t    map;
 	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
 	int          idx;
@@ -183,7 +183,7 @@ int drm_getmap( struct inode *inode, struct file *filp,
 
 	if (copy_from_user(&map, argp, sizeof(map)))
 		return -EFAULT;
-	idx = map.pub.offset;
+	idx = map.offset;
 
 	down(&dev->struct_sem);
 	if (idx < 0) {
@@ -204,12 +204,12 @@ int drm_getmap( struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 
-	map.pub.offset = r_list->map->pub.offset;
-	map.pub.size   = r_list->map->pub.size;
-	map.pub.type   = r_list->map->pub.type;
-	map.pub.flags  = r_list->map->pub.flags;
-	map.pub.pub_handle = r_list->map->pub.pub_handle;
-	map.pub.mtrr   = r_list->map->pub.mtrr;
+	map.offset = r_list->map->offset;
+	map.size   = r_list->map->size;
+	map.type   = r_list->map->type;
+	map.flags  = r_list->map->flags;
+	map.handle = r_list->map->handle;
+	map.mtrr   = r_list->map->mtrr;
 	up(&dev->struct_sem);
 
 	if (copy_to_user(argp, &map, sizeof(map))) return -EFAULT;

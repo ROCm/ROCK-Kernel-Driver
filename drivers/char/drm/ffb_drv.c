@@ -140,13 +140,13 @@ static int ffb_init_one(drm_device_t *dev, int prom_node, int parent_node,
 	return 0;
 }
 
-static drm_map_priv_t *ffb_find_map(struct file *filp, unsigned long off)
+static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 {
 	drm_file_t	*priv	= filp->private_data;
 	drm_device_t	*dev;
 	drm_map_list_t  *r_list;
 	struct list_head *list;
-	drm_map_priv_t	*map;
+	drm_map_t	*map;
 
 	if (!priv || (dev = priv->dev) == NULL)
 		return NULL;
@@ -172,7 +172,7 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 				    unsigned long pgoff,
 				    unsigned long flags)
 {
-	drm_map_priv_t *map = ffb_find_map(filp, pgoff << PAGE_SHIFT);
+	drm_map_t *map = ffb_find_map(filp, pgoff << PAGE_SHIFT);
 	unsigned long addr = -ENOMEM;
 
 	if (!map)
@@ -277,7 +277,7 @@ static void ffb_driver_kernel_context_switch_unlock(struct drm_device *dev, drm_
 	wake_up_interruptible(&dev->lock.lock_queue);
 }
 
-static unsigned long ffb_driver_get_map_ofs(drm_map_priv_t *map)
+static unsigned long ffb_driver_get_map_ofs(drm_map_t *map)
 {
 	return (map->offset & 0xffffffff);
 }

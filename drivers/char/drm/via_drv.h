@@ -40,15 +40,15 @@
 #define VIA_FIRE_BUF_SIZE  2048
 
 typedef struct drm_via_ring_buffer {
-	drm_map_priv_t map;
+	drm_map_t map;
 	char *virtual_start;
 } drm_via_ring_buffer_t;
 
 typedef struct drm_via_private {
 	drm_via_sarea_t *sarea_priv;
-	drm_map_priv_t *sarea;
-	drm_map_priv_t *fb;
-	drm_map_priv_t *mmio;
+	drm_map_t *sarea;
+	drm_map_t *fb;
+	drm_map_t *mmio;
 	unsigned long agpAddr;
 	wait_queue_head_t decoder_queue[VIA_NR_XVMC_LOCKS];
 	char *dma_ptr;

@@ -60,19 +60,19 @@
 /*
  * Find the drm_map that covers the range [offset, offset+size).
  */
-static inline drm_map_priv_t *
+static inline drm_map_t *
 drm_lookup_map (unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	struct list_head *list;
 	drm_map_list_t *r_list;
-	drm_map_priv_t *map;
+	drm_map_t *map;
 
 	list_for_each(list, &dev->maplist->head) {
 		r_list = (drm_map_list_t *) list;
 		map = r_list->map;
 		if (!map)
 			continue;
-		if (map->pub.offset <= offset && (offset + size) <= (map->pub.offset + map->pub.size))
+		if (map->offset <= offset && (offset + size) <= (map->offset + map->size))
 			return map;
 	}
 	return NULL;
@@ -130,7 +130,7 @@ drm_follow_page (void *vaddr)
 
 #else /* __OS_HAS_AGP */
 
-static inline drm_map_pub_t *drm_lookup_map(unsigned long offset, unsigned long size, drm_device_t *dev)
+static inline drm_map_t *drm_lookup_map(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
   return NULL;
 }
@@ -150,9 +150,9 @@ static inline unsigned long drm_follow_page (void *vaddr)
 static inline void *drm_ioremap(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	if (drm_core_has_AGP(dev) && dev->agp && dev->agp->cant_use_aperture) {
-		drm_map_priv_t *map = drm_lookup_map(offset, size, dev);
+		drm_map_t *map = drm_lookup_map(offset, size, dev);
 
-		if (map && map->pub.type == _DRM_AGP)
+		if (map && map->type == _DRM_AGP)
 			return agp_remap(offset, size, dev);
 	}
 	return ioremap(offset, size);
@@ -162,9 +162,9 @@ static inline void *drm_ioremap_nocache(unsigned long offset, unsigned long size
 					drm_device_t *dev)
 {
 	if (drm_core_has_AGP(dev) && dev->agp && dev->agp->cant_use_aperture) {
-		drm_map_priv_t *map = drm_lookup_map(offset, size, dev);
+		drm_map_t *map = drm_lookup_map(offset, size, dev);
 
-		if (map && map->pub.type == _DRM_AGP)
+		if (map && map->type == _DRM_AGP)
 			return agp_remap(offset, size, dev);
 	}
 	return ioremap_nocache(offset, size);
@@ -181,11 +181,11 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 	    && ((unsigned long) pt >= VMALLOC_START && (unsigned long) pt < VMALLOC_END))
 	{
 		unsigned long offset;
-		drm_map_priv_t *map;
+		drm_map_t *map;
 
 		offset = drm_follow_page(pt) | ((unsigned long) pt & ~PAGE_MASK);
 		map = drm_lookup_map(offset, size, dev);
-		if (map && map->pub.type == _DRM_AGP) {
+		if (map && map->type == _DRM_AGP) {
 			vunmap(pt);
 			return;
 		}

@@ -63,9 +63,8 @@ irqreturn_t radeon_driver_irq_handler( DRM_IRQ_ARGS )
 	/* Only consider the bits we're interested in - others could be used
 	 * outside the DRM
 	 */
-	stat = RADEON_READ(RADEON_GEN_INT_STATUS) 
-	        & (RADEON_SW_INT_TEST | RADEON_CRTC_VBLANK_STAT);
-
+	stat = RADEON_READ(RADEON_GEN_INT_STATUS)
+	     & (RADEON_SW_INT_TEST | RADEON_CRTC_VBLANK_STAT);
 	if (!stat)
 		return IRQ_NONE;
 

@@ -75,8 +75,8 @@ typedef struct _drm_i810_ring_buffer{
 } drm_i810_ring_buffer_t;
 
 typedef struct drm_i810_private {
-	drm_map_priv_t *sarea_map;
-	drm_map_priv_t *mmio_map;
+	drm_map_t *sarea_map;
+	drm_map_t *mmio_map;
 
 	drm_i810_sarea_t *sarea_priv;
    	drm_i810_ring_buffer_t ring;

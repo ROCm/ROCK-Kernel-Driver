@@ -526,10 +526,10 @@ typedef struct drm_sigdata {
  */
 typedef struct drm_map_list {
 	struct list_head	head;	/**< list head */
-	drm_map_priv_t		*map;	/**< mapping */
+	drm_map_t		*map;	/**< mapping */
 } drm_map_list_t;
 
-typedef drm_map_priv_t drm_local_map_t;
+typedef drm_map_t drm_local_map_t;
 
 /**
  * Context handle list
@@ -563,8 +563,6 @@ struct drm_driver {
 	int (*postcleanup)(struct drm_device *);
 	int (*presetup)(struct drm_device *);
 	int (*postsetup)(struct drm_device *);
-        int (*register_ioctl32)( void );
-        void (*unregister_ioctl32)( void );
  	int (*dma_ioctl)( DRM_IOCTL_ARGS );
 	int (*open_helper)(struct drm_device *, drm_file_t *);
 	void (*free_filp_priv)(struct drm_device *, drm_file_t *);
@@ -583,7 +581,7 @@ struct drm_driver {
  	void (*irq_postinstall)(struct drm_device *dev);
  	void (*irq_uninstall)(struct drm_device *dev);
 	void (*reclaim_buffers)(struct drm_device *dev, struct file *filp);
-	unsigned long (*get_map_ofs)(drm_map_priv_t *map);
+	unsigned long (*get_map_ofs)(drm_map_t *map);
 	unsigned long (*get_reg_ofs)(struct drm_device *dev);
 	void (*set_version)(struct drm_device *dev, drm_set_version_t *sv);
  	int (*version)(drm_version_t *version);
@@ -648,7 +646,7 @@ typedef struct drm_device {
 	int		  ctx_count;	/**< Number of context handles */
 	struct semaphore  ctxlist_sem;	/**< For ctxlist */
 
-	drm_map_priv_t	  **context_sareas; /**< per-context SAREA's */
+	drm_map_t	  **context_sareas; /**< per-context SAREA's */
 	int		  max_context;
 
 	drm_vma_entry_t	  *vmalist;	/**< List of vmas (for debugging) */
@@ -1009,29 +1007,29 @@ extern void drm_sysfs_device_remove(dev_t dev);
 
 
 /* Inline replacements for DRM_IOREMAP macros */
-static __inline__ void drm_core_ioremap(struct drm_map_priv *map, struct drm_device *dev)
+static __inline__ void drm_core_ioremap(struct drm_map *map, struct drm_device *dev)
 {
-	map->handle = drm_ioremap( map->pub.offset, map->pub.size, dev );
+	map->handle = drm_ioremap( map->offset, map->size, dev );
 }
 
-static __inline__ void drm_core_ioremap_nocache(struct drm_map_priv *map, struct drm_device *dev)
+static __inline__ void drm_core_ioremap_nocache(struct drm_map *map, struct drm_device *dev)
 {
-	map->handle = drm_ioremap_nocache(map->pub.offset, map->pub.size, dev);
+	map->handle = drm_ioremap_nocache(map->offset, map->size, dev);
 }
 
-static __inline__ void drm_core_ioremapfree(struct drm_map_priv *map, struct drm_device *dev)
+static __inline__ void drm_core_ioremapfree(struct drm_map *map, struct drm_device *dev)
 {
-	if ( map->handle && map->pub.size )
-		drm_ioremapfree( map->handle, map->pub.size, dev );
+	if ( map->handle && map->size )
+		drm_ioremapfree( map->handle, map->size, dev );
 }
 
-static __inline__ struct drm_map_priv *drm_core_findmap(struct drm_device *dev, unsigned long offset)
+static __inline__ struct drm_map *drm_core_findmap(struct drm_device *dev, unsigned long offset)
 {
 	struct list_head *_list;
 	list_for_each( _list, &dev->maplist->head ) {
 		drm_map_list_t *_entry = list_entry( _list, drm_map_list_t, head );
 		if ( _entry->map &&
-		     _entry->map->pub.pub_handle == offset ) {
+		     _entry->map->offset == offset ) {
 			return _entry->map;
 		}
 	}
@@ -1061,7 +1059,7 @@ extern void drm_free(void *pt, size_t size, int area);
 
 /*@}*/
 
-extern unsigned long drm_core_get_map_ofs(drm_map_priv_t *map);
+extern unsigned long drm_core_get_map_ofs(drm_map_t *map);
 extern unsigned long drm_core_get_reg_ofs(struct drm_device *dev);
 
 #endif /* __KERNEL__ */

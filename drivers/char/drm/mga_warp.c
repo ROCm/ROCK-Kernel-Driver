@@ -98,13 +98,13 @@ static unsigned int mga_warp_g200_microcode_size( drm_mga_private_t *dev_priv )
 static int mga_warp_install_g400_microcode( drm_mga_private_t *dev_priv )
 {
 	unsigned char *vcbase = dev_priv->warp->handle;
-	unsigned long pcbase = dev_priv->warp->pub.offset;
+	unsigned long pcbase = dev_priv->warp->offset;
 	unsigned int size;
 
 	size = mga_warp_g400_microcode_size( dev_priv );
-	if ( size > dev_priv->warp->pub.size ) {
+	if ( size > dev_priv->warp->size ) {
 		DRM_ERROR( "microcode too large! (%u > %lu)\n",
-			   size, dev_priv->warp->pub.size );
+			   size, dev_priv->warp->size );
 		return DRM_ERR(ENOMEM);
 	}
 
@@ -135,13 +135,13 @@ static int mga_warp_install_g400_microcode( drm_mga_private_t *dev_priv )
 static int mga_warp_install_g200_microcode( drm_mga_private_t *dev_priv )
 {
 	unsigned char *vcbase = dev_priv->warp->handle;
-	unsigned long pcbase = dev_priv->warp->pub.offset;
+	unsigned long pcbase = dev_priv->warp->offset;
 	unsigned int size;
 
 	size = mga_warp_g200_microcode_size( dev_priv );
-	if ( size > dev_priv->warp->pub.size ) {
+	if ( size > dev_priv->warp->size ) {
 		DRM_ERROR( "microcode too large! (%u > %lu)\n",
-			   size, dev_priv->warp->pub.size );
+			   size, dev_priv->warp->size );
 		return DRM_ERR(ENOMEM);
 	}
 

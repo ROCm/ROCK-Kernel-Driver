@@ -323,11 +323,10 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev,
 	 */
 #if __OS_HAS_AGP
 	if ( !dev_priv->is_pci )
-		ring_start = dev_priv->cce_ring->pub.offset - dev->agp->base;
+		ring_start = dev_priv->cce_ring->offset - dev->agp->base;
 	else
 #endif
-		ring_start = dev_priv->cce_ring->pub.offset 
-		    - (unsigned long)dev->sg->virtual;
+		ring_start = dev_priv->cce_ring->offset - dev->sg->handle;
 
 	R128_WRITE( R128_PM4_BUFFER_OFFSET, ring_start | R128_AGP_OFFSET );
 
@@ -527,10 +526,10 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 #endif
 	{
 		dev_priv->cce_ring->handle =
-			(void *)dev_priv->cce_ring->pub.offset;
+			(void *)dev_priv->cce_ring->offset;
 		dev_priv->ring_rptr->handle =
-			(void *)dev_priv->ring_rptr->pub.offset;
-		dev->agp_buffer_map->handle = (void *)dev->agp_buffer_map->pub.offset;
+			(void *)dev_priv->ring_rptr->offset;
+		dev->agp_buffer_map->handle = (void *)dev->agp_buffer_map->offset;
 	}
 
 #if __OS_HAS_AGP
@@ -538,7 +537,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		dev_priv->cce_buffers_offset = dev->agp->base;
 	else
 #endif
-		dev_priv->cce_buffers_offset = (unsigned long)dev->sg->virtual;
+		dev_priv->cce_buffers_offset = dev->sg->handle;
 
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
 	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle

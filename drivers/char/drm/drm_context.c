@@ -98,7 +98,7 @@ int drm_ctxbitmap_next( drm_device_t *dev )
 		if((bit+1) > dev->max_context) {
 			dev->max_context = (bit+1);
 			if(dev->context_sareas) {
-				drm_map_priv_t **ctx_sareas;
+				drm_map_t **ctx_sareas;
 
 				ctx_sareas = drm_realloc(dev->context_sareas,
 						(dev->max_context - 1) * 
@@ -211,7 +211,7 @@ int drm_getsareactx(struct inode *inode, struct file *filp,
 	drm_device_t	*dev	= priv->dev;
 	drm_ctx_priv_map_t __user *argp = (void __user *)arg;
 	drm_ctx_priv_map_t request;
-	drm_map_priv_t *map;
+	drm_map_t *map;
 
 	if (copy_from_user(&request, argp, sizeof(request)))
 		return -EFAULT;
@@ -225,7 +225,7 @@ int drm_getsareactx(struct inode *inode, struct file *filp,
 	map = dev->context_sareas[request.ctx_id];
 	up(&dev->struct_sem);
 
-	request.handle = map->pub.pub_handle;
+	request.handle = map->handle;
 	if (copy_to_user(argp, &request, sizeof(request)))
 		return -EFAULT;
 	return 0;
@@ -249,7 +249,7 @@ int drm_setsareactx(struct inode *inode, struct file *filp,
 	drm_file_t	*priv	= filp->private_data;
 	drm_device_t	*dev	= priv->dev;
 	drm_ctx_priv_map_t request;
-	drm_map_priv_t *map = NULL;
+	drm_map_t *map = NULL;
 	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
 
@@ -262,7 +262,7 @@ int drm_setsareactx(struct inode *inode, struct file *filp,
 	list_for_each(list, &dev->maplist->head) {
 		r_list = list_entry(list, drm_map_list_t, head);
 		if(r_list->map &&
-		   r_list->map->pub.pub_handle == request.handle)
+		   r_list->map->handle == request.handle)
 			goto found;
 	}
 bad:

@@ -204,7 +204,7 @@ static int drm__vm_info(char *buf, char **start, off_t offset, int request,
 {
 	drm_device_t *dev = (drm_device_t *)data;
 	int          len  = 0;
-	drm_map_priv_t    *map;
+	drm_map_t    *map;
 	drm_map_list_t *r_list;
 	struct list_head *list;
 
@@ -230,19 +230,19 @@ static int drm__vm_info(char *buf, char **start, off_t offset, int request,
 		r_list = list_entry(list, drm_map_list_t, head);
 		map = r_list->map;
 		if(!map) continue;
-		if (map->pub.type < 0 || map->pub.type > 4) type = "??";
-		else				    type = types[map->pub.type];
+		if (map->type < 0 || map->type > 4) type = "??";
+		else				    type = types[map->type];
 		DRM_PROC_PRINT("%4d 0x%08lx 0x%08lx %4.4s  0x%02x 0x%08lx ",
 			       i,
-			       map->pub.offset,
-			       map->pub.size,
+			       map->offset,
+			       map->size,
 			       type,
-			       map->pub.flags,
+			       map->flags,
 			       (unsigned long)map->handle);
-		if (map->pub.mtrr < 0) {
+		if (map->mtrr < 0) {
 			DRM_PROC_PRINT("none\n");
 		} else {
-			DRM_PROC_PRINT("%4d\n", map->pub.mtrr);
+			DRM_PROC_PRINT("%4d\n", map->mtrr);
 		}
 		i++;
 	}
