@@ -26,7 +26,7 @@
  *
  * Authors: Rickard E. (Rik) Faith <faith@valinux.com>
  *	    Jeff Hartmann <jhartmann@valinux.com>
- *          Keith Whitwell <keith_whitwell@yahoo.com>
+ *          Keith Whitwell <keith@tungstengraphics.com>
  *
  */
 
@@ -264,44 +264,6 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 	return retcode;
 }
 
-static unsigned long i810_alloc_page(drm_device_t *dev)
-{
-	unsigned long address;
-
-	address = __get_free_page(GFP_KERNEL);
-	if(address == 0UL)
-		return 0;
-
-#if LINUX_VERSION_CODE < 0x020409
-	atomic_inc(&virt_to_page(address)->count);
-	set_bit(PG_locked, &virt_to_page(address)->flags);
-#else
-	get_page(virt_to_page(address));
-#if LINUX_VERSION_CODE < 0x020500
-	LockPage(virt_to_page(address));
-#else
-	SetPageLocked(virt_to_page(address));
-#endif
-#endif
-	return address;
-}
-
-static void i810_free_page(drm_device_t *dev, unsigned long page)
-{
-	if (page) {
-#if LINUX_VERSION_CODE < 0x020409
-		atomic_dec(&virt_to_page(page)->count);
-		clear_bit(PG_locked, &virt_to_page(page)->flags);
-		wake_up(&virt_to_page(page)->wait);
-#else
-		struct page *p = virt_to_page(page);
-		put_page(p);
-		unlock_page(p);
-#endif
-		free_page(page);
-	}
-}
-
 static int i810_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
@@ -316,7 +278,9 @@ static int i810_dma_cleanup(drm_device_t *dev)
 					 dev_priv->ring.Size);
 		}
 	   	if(dev_priv->hw_status_page != 0UL) {
-		   	i810_free_page(dev, dev_priv->hw_status_page);
+		   	pci_free_consistent(dev->pdev, PAGE_SIZE,
+					    (void *)dev_priv->hw_status_page,
+					    dev_priv->dma_status_page);
 		   	/* Need to rewrite hardware status page */
 		   	I810_WRITE(0x02080, 0x1ffff000);
 		}
@@ -476,7 +440,9 @@ static int i810_dma_initialize(drm_device_t *dev,
 	dev_priv->zi1 = init->depth_offset | init->pitch_bits;
 
    	/* Program Hardware Status Page */
-   	dev_priv->hw_status_page = i810_alloc_page(dev);
+   	dev_priv->hw_status_page =
+		(unsigned long) pci_alloc_consistent(dev->pdev, PAGE_SIZE,
+						&dev_priv->dma_status_page);
    	if(dev_priv->hw_status_page == 0UL) {
 		dev->dev_private = (void *)dev_priv;
 		i810_dma_cleanup(dev);
@@ -486,7 +452,7 @@ static int i810_dma_initialize(drm_device_t *dev,
    	memset((void *) dev_priv->hw_status_page, 0, PAGE_SIZE);
    	DRM_DEBUG("hw status page @ %lx\n", dev_priv->hw_status_page);
 
-   	I810_WRITE(0x02080, virt_to_bus((void *)dev_priv->hw_status_page));
+	I810_WRITE(0x02080, dev_priv->dma_status_page);
    	DRM_DEBUG("Enabled hardware status page\n");
 
    	/* Now we need to init our freelist */
