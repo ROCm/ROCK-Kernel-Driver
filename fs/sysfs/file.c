@@ -346,19 +346,22 @@ static struct file_operations sysfs_file_operations = {
 };
 
 
-int sysfs_add_file(struct dentry * dir, const struct attribute * attr)
+int sysfs_add_file(struct dentry * dir, const struct attribute * attr, int type)
 {
 	struct dentry * dentry;
-	int error;
+	struct sysfs_dirent * parent_sd = dir->d_fsdata;
+	umode_t mode = (attr->mode & S_IALLUGO) | S_IFREG;
+	int error = 0;
 
 	down(&dir->d_inode->i_sem);
 	dentry = sysfs_get_dentry(dir,attr->name);
 	if (!IS_ERR(dentry)) {
-		error = sysfs_create(dentry,
-				     (attr->mode & S_IALLUGO) | S_IFREG,
-				     init_file);
+		error = sysfs_create(dentry, mode, init_file);
 		if (!error)
-			dentry->d_fsdata = (void *)attr;
+			error = sysfs_make_dirent(parent_sd, dentry,
+						(void *) attr, mode, type);
+		if (error)
+			d_drop(dentry);
 		dput(dentry);
 	} else
 		error = PTR_ERR(dentry);
@@ -375,9 +378,10 @@ int sysfs_add_file(struct dentry * dir, const struct attribute * attr)
 
 int sysfs_create_file(struct kobject * kobj, const struct attribute * attr)
 {
-	if (kobj && attr)
-		return sysfs_add_file(kobj->dentry,attr);
-	return -EINVAL;
+	BUG_ON(!kobj || !kobj->dentry || !attr);
+
+	return sysfs_add_file(kobj->dentry, attr, SYSFS_KOBJ_ATTR);
+
 }
 
 
@@ -409,7 +413,8 @@ int sysfs_update_file(struct kobject * kobj, const struct attribute * attr)
 			 */
 			dput(victim);
 			res = 0;
-		}
+		} else
+			d_drop(victim);
 		
 		/**
 		 * Drop the reference acquired from sysfs_get_dentry() above.

@@ -12,6 +12,61 @@
 
 DECLARE_RWSEM(sysfs_rename_sem);
 
+static void sysfs_d_iput(struct dentry * dentry, struct inode * inode)
+{
+	struct sysfs_dirent * sd = dentry->d_fsdata;
+
+	if (sd) {
+		BUG_ON(sd->s_dentry != dentry);
+		sd->s_dentry = NULL;
+		release_sysfs_dirent(sd);
+	}
+	iput(inode);
+}
+
+static struct dentry_operations sysfs_dentry_ops = {
+	.d_iput		= sysfs_d_iput,
+};
+
+/*
+ * Allocates a new sysfs_dirent and links it to the parent sysfs_dirent
+ */
+static struct sysfs_dirent * sysfs_new_dirent(struct sysfs_dirent * parent_sd,
+						void * element)
+{
+	struct sysfs_dirent * sd;
+
+	sd = kmalloc(sizeof(*sd), GFP_KERNEL);
+	if (!sd)
+		return ERR_PTR(-ENOMEM);
+
+	memset(sd, 0, sizeof(*sd));
+	atomic_set(&sd->s_count, 1);
+	INIT_LIST_HEAD(&sd->s_children);
+	list_add(&sd->s_sibling, &parent_sd->s_children);
+	sd->s_element = element;
+
+	return sd;
+}
+
+int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
+			void * element, umode_t mode, int type)
+{
+	struct sysfs_dirent * sd;
+
+	sd = sysfs_new_dirent(parent_sd, element);
+	if (!sd)
+		return -ENOMEM;
+
+	sd->s_mode = mode;
+	sd->s_type = type;
+	sd->s_dentry = dentry;
+	dentry->d_fsdata = sd;
+	dentry->d_op = &sysfs_dentry_ops;
+
+	return 0;
+}
+
 static int init_dir(struct inode * inode)
 {
 	inode->i_op = &simple_dir_inode_operations;
@@ -27,17 +82,20 @@ static int create_dir(struct kobject * k, struct dentry * p,
 		      const char * n, struct dentry ** d)
 {
 	int error;
+	umode_t mode = S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO;
 
 	down(&p->d_inode->i_sem);
 	*d = sysfs_get_dentry(p,n);
 	if (!IS_ERR(*d)) {
-		error = sysfs_create(*d,
-					 S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO,
-					 init_dir);
+		error = sysfs_create(*d, mode, init_dir);
 		if (!error) {
-			(*d)->d_fsdata = k;
-			p->d_inode->i_nlink++;
+			error = sysfs_make_dirent(p->d_fsdata, *d, k, mode,
+						SYSFS_DIR);
+			if (!error)
+				p->d_inode->i_nlink++;
 		}
+		if (error)
+			d_drop(*d);
 		dput(*d);
 	} else
 		error = PTR_ERR(*d);
@@ -63,8 +121,7 @@ int sysfs_create_dir(struct kobject * kobj)
 	struct dentry * parent;
 	int error = 0;
 
-	if (!kobj)
-		return -EINVAL;
+	BUG_ON(!kobj);
 
 	if (kobj->parent)
 		parent = kobj->parent->dentry;
@@ -83,8 +140,12 @@ int sysfs_create_dir(struct kobject * kobj)
 static void remove_dir(struct dentry * d)
 {
 	struct dentry * parent = dget(d->d_parent);
+	struct sysfs_dirent * sd;
+
 	down(&parent->d_inode->i_sem);
 	d_delete(d);
+	sd = d->d_fsdata;
+ 	list_del_init(&sd->s_sibling);
 	if (d->d_inode)
 		simple_rmdir(parent->d_inode,d);
 
@@ -130,6 +191,7 @@ restart:
 		node = node->next;
 		pr_debug(" o %s (%d): ",d->d_name.name,atomic_read(&d->d_count));
 		if (!d_unhashed(d) && (d->d_inode)) {
+			struct sysfs_dirent * sd = d->d_fsdata;
 			d = dget_locked(d);
 			pr_debug("removing");
 
@@ -142,8 +204,9 @@ restart:
 			 * a symlink
 			 */
 			if (S_ISLNK(d->d_inode->i_mode))
-				kobject_put(d->d_fsdata);
+				kobject_put(sd->s_element);
 			
+			list_del_init(&sd->s_sibling);
 			simple_unlink(dentry->d_inode,d);
 			dput(d);
 			pr_debug(" done\n");
@@ -184,7 +247,10 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 			error = kobject_set_name(kobj, "%s", new_name);
 			if (!error)
 				d_move(kobj->dentry, new_dentry);
-		}
+			else
+				d_drop(new_dentry);
+		} else
+			error = -EEXIST;
 		dput(new_dentry);
 	}
 	up(&parent->d_inode->i_sem);	

@@ -160,24 +160,26 @@ int sysfs_create_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 {
 	struct dentry * dentry;
 	struct dentry * parent;
+	umode_t mode = (attr->attr.mode & S_IALLUGO) | S_IFREG;
 	int error = 0;
 
-	if (!kobj || !attr)
-		return -EINVAL;
+	BUG_ON(!kobj || !kobj->dentry || !attr);
 
 	parent = kobj->dentry;
 
 	down(&parent->d_inode->i_sem);
 	dentry = sysfs_get_dentry(parent,attr->attr.name);
 	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)attr;
-		error = sysfs_create(dentry,
-				     (attr->attr.mode & S_IALLUGO) | S_IFREG,
-				     NULL);
+		error = sysfs_create(dentry, mode, NULL);
 		if (!error) {
 			dentry->d_inode->i_size = attr->size;
 			dentry->d_inode->i_fop = &bin_fops;
+			error = sysfs_make_dirent(parent->d_fsdata, dentry,
+						  (void *) attr, mode,
+						  SYSFS_KOBJ_BIN_ATTR);
 		}
+		if (error)
+			d_drop(dentry);
 		dput(dentry);
 	} else
 		error = PTR_ERR(dentry);

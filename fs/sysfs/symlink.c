@@ -55,6 +55,36 @@ static void fill_object_path(struct kobject * kobj, char * buffer, int length)
 	}
 }
 
+static int sysfs_add_link(struct dentry * dentry, char * name, struct kobject * target)
+{
+	struct sysfs_dirent * parent_sd = dentry->d_parent->d_fsdata;
+	struct sysfs_symlink * sl;
+	int error = 0;
+
+	error = -ENOMEM;
+	sl = kmalloc(sizeof(*sl), GFP_KERNEL);
+	if (!sl)
+		goto exit1;
+
+	sl->link_name = kmalloc(strlen(name) + 1, GFP_KERNEL);
+	if (!sl->link_name)
+		goto exit2;
+
+	strcpy(sl->link_name, name);
+	sl->target_kobj = kobject_get(target);
+
+	error = sysfs_make_dirent(parent_sd, dentry, sl, S_IFLNK|S_IRWXUGO,
+				SYSFS_KOBJ_LINK);
+	if (!error)
+		return 0;
+
+	kfree(sl->link_name);
+exit2:
+	kfree(sl);
+exit1:
+	return error;
+}
+
 /**
  *	sysfs_create_link - create symlink between two objects.
  *	@kobj:	object whose directory we're creating the link in.
@@ -67,15 +97,16 @@ int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * nam
 	struct dentry * d;
 	int error = 0;
 
+	BUG_ON(!kobj || !kobj->dentry || !name);
+
 	down(&dentry->d_inode->i_sem);
 	d = sysfs_get_dentry(dentry,name);
 	if (!IS_ERR(d)) {
 		error = sysfs_create(d, S_IFLNK|S_IRWXUGO, init_symlink);
 		if (!error)
-			/* 
-			 * associate the link dentry with the target kobject 
-			 */
-			d->d_fsdata = kobject_get(target);
+			error = sysfs_add_link(d, name, target);
+		if (error)
+			d_drop(d);
 		dput(d);
 	} else 
 		error = PTR_ERR(d);

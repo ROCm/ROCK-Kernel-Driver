@@ -4,9 +4,11 @@ extern struct vfsmount * sysfs_mount;
 extern struct inode * sysfs_new_inode(mode_t mode);
 extern int sysfs_create(struct dentry *, int mode, int (*init)(struct inode *));
 
+extern int sysfs_make_dirent(struct sysfs_dirent *, struct dentry *, void *,
+				umode_t, int);
 extern struct dentry * sysfs_get_dentry(struct dentry *, const char *);
 
-extern int sysfs_add_file(struct dentry * dir, const struct attribute * attr);
+extern int sysfs_add_file(struct dentry *, const struct attribute *, int);
 extern void sysfs_hash_and_remove(struct dentry * dir, const char * name);
 
 extern int sysfs_create_subdir(struct kobject *, const char *, struct dentry **);
@@ -16,19 +18,27 @@ extern int sysfs_follow_link(struct dentry *, struct nameidata *);
 extern void sysfs_put_link(struct dentry *, struct nameidata *);
 extern struct rw_semaphore sysfs_rename_sem;
 
+struct sysfs_symlink {
+	char * link_name;
+	struct kobject * target_kobj;
+};
+
 static inline struct kobject * to_kobj(struct dentry * dentry)
 {
-	return ((struct kobject *) dentry->d_fsdata);
+	struct sysfs_dirent * sd = dentry->d_fsdata;
+	return ((struct kobject *) sd->s_element);
 }
 
 static inline struct attribute * to_attr(struct dentry * dentry)
 {
-	return ((struct attribute *) dentry->d_fsdata);
+	struct sysfs_dirent * sd = dentry->d_fsdata;
+	return ((struct attribute *) sd->s_element);
 }
 
 static inline struct bin_attribute * to_bin_attr(struct dentry * dentry)
 {
-	return ((struct bin_attribute *) dentry->d_fsdata);
+	struct sysfs_dirent * sd = dentry->d_fsdata;
+	return ((struct bin_attribute *) sd->s_element);
 }
 
 static inline struct kobject *sysfs_get_kobject(struct dentry *dentry)
@@ -36,10 +46,27 @@ static inline struct kobject *sysfs_get_kobject(struct dentry *dentry)
 	struct kobject * kobj = NULL;
 
 	spin_lock(&dcache_lock);
-	if (!d_unhashed(dentry))
-		kobj = kobject_get(to_kobj(dentry));
+	if (!d_unhashed(dentry)) {
+		struct sysfs_dirent * sd = dentry->d_fsdata;
+		if (sd->s_type & SYSFS_KOBJ_LINK) {
+			struct sysfs_symlink * sl = sd->s_element;
+			kobj = kobject_get(sl->target_kobj);
+		} else
+			kobj = kobject_get(sd->s_element);
+	}
 	spin_unlock(&dcache_lock);
 
 	return kobj;
+}
+
+static inline void release_sysfs_dirent(struct sysfs_dirent * sd)
+{
+	if (sd->s_type & SYSFS_KOBJ_LINK) {
+		struct sysfs_symlink * sl = sd->s_element;
+		kfree(sl->link_name);
+		kobject_put(sl->target_kobj);
+		kfree(sl);
+	}
+	kfree(sd);
 }
 

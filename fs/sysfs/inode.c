@@ -11,6 +11,8 @@
 #include <linux/pagemap.h>
 #include <linux/namei.h>
 #include <linux/backing-dev.h>
+#include "sysfs.h"
+
 extern struct super_block * sysfs_sb;
 
 static struct address_space_operations sysfs_aops = {
@@ -91,6 +93,7 @@ struct dentry * sysfs_get_dentry(struct dentry * parent, const char * name)
 void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 {
 	struct dentry * victim;
+	struct sysfs_dirent * sd;
 
 	down(&dir->d_inode->i_sem);
 	victim = sysfs_get_dentry(dir,name);
@@ -101,14 +104,17 @@ void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
 				 atomic_read(&victim->d_count));
 
+			sd = victim->d_fsdata;
 			d_drop(victim);
 			/* release the target kobject in case of 
 			 * a symlink
 			 */
 			if (S_ISLNK(victim->d_inode->i_mode))
-				kobject_put(victim->d_fsdata);
+				kobject_put(sd->s_element);
+			list_del_init(&sd->s_sibling);
 			simple_unlink(dir->d_inode,victim);
-		}
+		} else
+			d_drop(victim);
 		/*
 		 * Drop reference from sysfs_get_dentry() above.
 		 */
