@@ -20,8 +20,8 @@
 #define I8K_PROC		"/proc/i8k"
 #define I8K_PROC_FMT		"1.0"
 
-#define I8K_BIOS_VERSION	_IOR ('i', 0x80, 4)
-#define I8K_MACHINE_ID		_IOR ('i', 0x81, 16)
+#define I8K_BIOS_VERSION	_IOR ('i', 0x80, int)	/* broken: meant 4 bytes */
+#define I8K_MACHINE_ID		_IOR ('i', 0x81, int)	/* broken: meant 16 bytes */
 #define I8K_POWER_STATUS	_IOR ('i', 0x82, size_t)
 #define I8K_FN_STATUS		_IOR ('i', 0x83, size_t)
 #define I8K_GET_TEMP		_IOR ('i', 0x84, size_t)

@@ -145,9 +145,16 @@ struct video_info {
 /*     If changing this, vgatypes.h must also be changed (for X driver)    */
 
 /* TW: ioctl for identifying and giving some info (esp. memory heap start) */
-#define SISFB_GET_INFO	  	_IOR('n',0xF8,sizeof(__u32))
 
-#define SISFB_GET_VBRSTATUS  	_IOR('n',0xF9,sizeof(__u32))
+/*
+ * NOTE! The ioctl types used to be "size_t" by mistake, but were
+ * really meant to be __u32. Changed to "__u32" even though that
+ * changes the value on 64-bit architectures, because the value
+ * (with a 4-byte size) is also hardwired in vgatypes.h for user
+ * space exports. So "__u32" is actually more compatible, duh!
+ */
+#define SISFB_GET_INFO	  	_IOR('n',0xF8,__u32)
+#define SISFB_GET_VBRSTATUS  	_IOR('n',0xF9,__u32)
 
 /* TW: Structure argument for SISFB_GET_INFO ioctl  */
 typedef struct _SISFB_INFO sisfb_info, *psisfb_info;

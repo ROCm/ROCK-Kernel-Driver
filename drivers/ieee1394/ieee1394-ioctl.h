@@ -60,9 +60,13 @@
 	_IOWR('#', 0x14, struct video1394_mmap)
 #define VIDEO1394_IOC_UNTALK_CHANNEL		\
 	_IOW ('#', 0x15, int)
+/*
+ * This one is broken: it really wanted
+ * "sizeof (struct video1394_wait) + sizeof (struct video1394_queue_variable)"
+ * but got just a "size_t"
+ */
 #define VIDEO1394_IOC_TALK_QUEUE_BUFFER 	\
-	_IOW ('#', 0x16, sizeof (struct video1394_wait) + \
-		sizeof (struct video1394_queue_variable))
+	_IOW ('#', 0x16, size_t)
 #define VIDEO1394_IOC_TALK_WAIT_BUFFER		\
 	_IOW ('#', 0x17, struct video1394_wait)
 #define VIDEO1394_IOC_LISTEN_POLL_BUFFER	\
