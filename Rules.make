@@ -337,7 +337,8 @@ host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
 
 quiet_cmd_host_cc__c  = HOSTCC $(RELDIR)/$@
 cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,.$(subst /,_,$@).d \
-			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -o $@ $<
+			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
+			$(HOST_LOADLIBES) -o $@ $<
 
 $(host-progs-single): %: %.c FORCE
 	$(call if_changed_dep,host_cc__c)
