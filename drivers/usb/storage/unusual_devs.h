@@ -45,11 +45,6 @@
  *
  */
 
-UNUSUAL_DEV(  0x03ee, 0x0000, 0x0000, 0x0245, 
-		"Mitsumi",
-		"CD-R/RW Drive",
-		US_SC_8020, US_PR_CBI, NULL, 0), 
-
 UNUSUAL_DEV(  0x03ee, 0x6901, 0x0000, 0x0100,
 		"Mitsumi",
 		"USB FDD",
@@ -373,6 +368,15 @@ UNUSUAL_DEV(  0x057b, 0x0000, 0x0300, 0x9999,
 		US_SC_DEVICE,  US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN),
 
+/* Reported by Johann Cardon <johann.cardon@free.fr>
+ * This entry is needed only because the device reports
+ * bInterfaceClass = 0xff (vendor-specific)
+ */
+UNUSUAL_DEV(  0x057b, 0x0022, 0x0000, 0x9999, 
+		"Y-E Data",
+		"Silicon Media R/W",
+		US_SC_DEVICE, US_PR_DEVICE, NULL, 0),
+
 /* Fabrizio Fellini <fello@libero.it> */
 UNUSUAL_DEV(  0x0595, 0x4343, 0x0000, 0x2210,
 		"Fujifilm",
@@ -384,11 +388,15 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 		"USB Hard Disk",
 		US_SC_RBC, US_PR_CB, NULL, 0 ), 
 
-/* Submitted by Jol Bourquard <numlock@freesurf.ch> */
+/* Submitted by Joel Bourquard <numlock@freesurf.ch>
+ * Some versions of this device need the SubClass and Protocol overrides
+ * while others don't.
+ */
 UNUSUAL_DEV(  0x05ab, 0x0060, 0x1104, 0x1110,
 		"In-System",
 		"PyroGate External CD-ROM Enclosure (FCD-523)",
-		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_NEED_OVERRIDE ),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
@@ -510,11 +518,13 @@ UNUSUAL_DEV(  0x0781, 0x0001, 0x0200, 0x0200,
 		US_SC_SCSI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN ),
 
+#if !defined(CONFIG_BLK_DEV_UB) && !defined(CONFIG_BLK_DEV_UB_MODULE)
 UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009, 
 		"Sandisk",
 		"ImageMate SDDR-31",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_SER ),
+#endif
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
 		"Sandisk",
@@ -685,7 +695,7 @@ UNUSUAL_DEV(  0x090a, 0x1001, 0x0100, 0x0100,
 		"Trumpion",
 		"t33520 USB Flash Card Controller",
 		US_SC_DEVICE, US_PR_BULK, NULL,
-		US_FL_MODE_XLATE),
+		US_FL_NEED_OVERRIDE | US_FL_MODE_XLATE),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
 UNUSUAL_DEV( 0x090a, 0x1200, 0x0000, 0x9999,

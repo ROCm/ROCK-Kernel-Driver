@@ -818,6 +818,11 @@ extern int vfs_unlink(struct inode *, struct dentry *);
 extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
 
 /*
+ * VFS dentry helper functions.
+ */
+extern void dentry_unhash(struct dentry *dentry);
+
+/*
  * File types
  *
  * NOTE! These match bits 12..15 of stat.st_mode

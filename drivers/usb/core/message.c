@@ -577,8 +577,13 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 				USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 				(type << 8) + index, 0, buf, size,
 				HZ * USB_CTRL_GET_TIMEOUT);
-		if (!(result == 0 || result == -EPIPE))
-			break;
+		if (result == 0 || result == -EPIPE)
+			continue;
+		if (result > 1 && ((u8 *)buf)[1] != type) {
+			result = -EPROTO;
+			continue;
+		}
+		break;
 	}
 	return result;
 }
@@ -854,9 +859,8 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 	 * the copy in usb-storage, for as long as we need two copies.
 	 */
 
-	/* toggle was reset by the clear, then ep was reactivated */
+	/* toggle was reset by the clear */
 	usb_settoggle(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe), 0);
-	usb_endpoint_running(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe));
 
 	return 0;
 }
@@ -870,9 +874,8 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
  * Deallocates hcd/hardware state for this endpoint ... and nukes all
  * pending urbs.
  *
- * If the HCD hasn't registered a disable() function, this marks the
- * endpoint as halted and sets its maxpacket size to 0 to prevent
- * further submissions.
+ * If the HCD hasn't registered a disable() function, this sets the
+ * endpoint's maxpacket size to 0 to prevent further submissions.
  */
 void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr)
 {
@@ -881,13 +884,10 @@ void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr)
 	else {
 		unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
 
-		if (usb_endpoint_out(epaddr)) {
-			usb_endpoint_halt(dev, epnum, 1);
+		if (usb_endpoint_out(epaddr))
 			dev->epmaxpacketout[epnum] = 0;
-		} else {
-			usb_endpoint_halt(dev, epnum, 0);
+		else
 			dev->epmaxpacketin[epnum] = 0;
-		}
 	}
 }
 
@@ -930,7 +930,6 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 		usb_disable_endpoint(dev, i + USB_DIR_IN);
 	}
 	dev->toggle[0] = dev->toggle[1] = 0;
-	dev->halted[0] = dev->halted[1] = 0;
 
 	/* getting rid of interfaces will disconnect
 	 * any drivers bound to them (a key side effect)
@@ -966,9 +965,8 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
  * @dev: the device whose interface is being enabled
  * @epd: pointer to the endpoint descriptor
  *
- * Marks the endpoint as running, resets its toggle, and stores
- * its maxpacket value.  For control endpoints, both the input
- * and output sides are handled.
+ * Resets the endpoint toggle and stores its maxpacket value.
+ * For control endpoints, both the input and output sides are handled.
  */
 void usb_enable_endpoint(struct usb_device *dev,
 		struct usb_endpoint_descriptor *epd)
@@ -980,12 +978,10 @@ void usb_enable_endpoint(struct usb_device *dev,
 				USB_ENDPOINT_XFER_CONTROL);
 
 	if (usb_endpoint_out(epaddr) || is_control) {
-		usb_endpoint_running(dev, epnum, 1);
 		usb_settoggle(dev, epnum, 1, 0);
 		dev->epmaxpacketout[epnum] = maxsize;
 	}
 	if (!usb_endpoint_out(epaddr) || is_control) {
-		usb_endpoint_running(dev, epnum, 0);
 		usb_settoggle(dev, epnum, 0, 0);
 		dev->epmaxpacketin[epnum] = maxsize;
 	}
@@ -1047,6 +1043,9 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	struct usb_host_interface *alt;
 	int ret;
 	int manual = 0;
+
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
@@ -1145,6 +1144,9 @@ int usb_reset_configuration(struct usb_device *dev)
 	int			i, retval;
 	struct usb_host_config	*config;
 
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
+
 	/* caller must own dev->serialize (config won't change)
 	 * and the usb bus readlock (so driver bindings are stable);
 	 * so calls during probe() are fine
@@ -1166,7 +1168,6 @@ int usb_reset_configuration(struct usb_device *dev)
 	}
 
 	dev->toggle[0] = dev->toggle[1] = 0;
-	dev->halted[0] = dev->halted[1] = 0;
 
 	/* re-init hc/hcd interface/endpoint state */
 	for (i = 0; i < config->desc.bNumInterfaces; i++) {
@@ -1257,6 +1258,9 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	 */
 	if (cp && configuration == 0)
 		dev_warn(&dev->dev, "config 0 descriptor??\n");
+
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 
 	/* Allocate memory for new interfaces before doing anything else,
 	 * so that if we run out then nothing will have changed. */

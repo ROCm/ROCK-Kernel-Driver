@@ -559,6 +559,7 @@ struct net2280 {
 	struct usb_gadget_driver 	*driver;
 	unsigned			enabled : 1,
 					protocol_stall : 1,
+					softconnect : 1,
 					got_irq : 1,
 					region : 1;
 	u16				chiprev;

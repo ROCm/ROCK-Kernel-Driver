@@ -39,15 +39,19 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/sched.h>
+#include <linux/errno.h>
+#include <linux/slab.h>
+#include <linux/cdrom.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+
 #include "transport.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
 #include "shuttle_usbat.h"
-
-#include <linux/sched.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
 
 #define short_pack(LSB,MSB) ( ((u16)(LSB)) | ( ((u16)(MSB))<<8 ) )
 #define LSB_of(s) ((s)&0xFF)
@@ -275,7 +279,7 @@ static int usbat_rw_block_test(struct us_data *us,
 			       int minutes)
 {
 	int result;
-	unsigned int pipe = (direction == SCSI_DATA_READ) ?
+	unsigned int pipe = (direction == DMA_FROM_DEVICE) ?
 			us->recv_bulk_pipe : us->send_bulk_pipe;
 
 	// Not really sure the 0x07, 0x17, 0xfc, 0xe7 is necessary here,
@@ -315,9 +319,9 @@ static int usbat_rw_block_test(struct us_data *us,
 		} else
 			cmdlen = 8;
 
-		command[cmdlen-8] = (direction==SCSI_DATA_WRITE ? 0x40 : 0xC0);
+		command[cmdlen-8] = (direction==DMA_TO_DEVICE ? 0x40 : 0xC0);
 		command[cmdlen-7] = access |
-				(direction==SCSI_DATA_WRITE ? 0x05 : 0x04);
+				(direction==DMA_TO_DEVICE ? 0x05 : 0x04);
 		command[cmdlen-6] = data_reg;
 		command[cmdlen-5] = status_reg;
 		command[cmdlen-4] = timeout;
@@ -355,7 +359,7 @@ static int usbat_rw_block_test(struct us_data *us,
 
 
 		//US_DEBUGP("Transfer %s %d bytes, sg buffers %d\n",
-		//	direction == SCSI_DATA_WRITE ? "out" : "in",
+		//	direction == DMA_TO_DEVICE ? "out" : "in",
 		//	len, use_sg);
 
 		result = usb_stor_bulk_transfer_sg(us,
@@ -388,7 +392,7 @@ static int usbat_rw_block_test(struct us_data *us,
 			 * the bulk output pipe only the first time.
 			 */
 
-			if (direction==SCSI_DATA_READ && i==0) {
+			if (direction==DMA_FROM_DEVICE && i==0) {
 				if (usb_stor_clear_halt(us,
 						us->send_bulk_pipe) < 0)
 					return USB_STOR_TRANSPORT_ERROR;
@@ -399,7 +403,7 @@ static int usbat_rw_block_test(struct us_data *us,
 			 */
 
  			result = usbat_read(us, USBAT_ATA, 
-				direction==SCSI_DATA_WRITE ? 0x17 : 0x0E, 
+				direction==DMA_TO_DEVICE ? 0x17 : 0x0E, 
 				status);
 
 			if (result!=USB_STOR_XFER_GOOD)
@@ -410,7 +414,7 @@ static int usbat_rw_block_test(struct us_data *us,
 				return USB_STOR_TRANSPORT_FAILED;
 
 			US_DEBUGP("Redoing %s\n",
-			  direction==SCSI_DATA_WRITE ? "write" : "read");
+			  direction==DMA_TO_DEVICE ? "write" : "read");
 
 		} else if (result != USB_STOR_XFER_GOOD)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -420,7 +424,7 @@ static int usbat_rw_block_test(struct us_data *us,
 	}
 
 	US_DEBUGP("Bummer! %s bulk data 20 times failed.\n",
-		direction==SCSI_DATA_WRITE ? "Writing" : "Reading");
+		direction==DMA_TO_DEVICE ? "Writing" : "Reading");
 
 	return USB_STOR_TRANSPORT_FAILED;
 }
@@ -520,7 +524,7 @@ static int usbat_write_user_io(struct us_data *us,
 static int usbat_handle_read10(struct us_data *us,
 			       unsigned char *registers,
 			       unsigned char *data,
-			       Scsi_Cmnd *srb)
+			       struct scsi_cmnd *srb)
 {
 	int result = USB_STOR_TRANSPORT_GOOD;
 	unsigned char *buffer;
@@ -537,7 +541,7 @@ static int usbat_handle_read10(struct us_data *us,
 		result = usbat_rw_block_test(us, USBAT_ATA, 
 			registers, data, 19,
 			0x10, 0x17, 0xFD, 0x30,
-			SCSI_DATA_READ,
+			DMA_FROM_DEVICE,
 			srb->request_buffer, 
 			srb->request_bufflen, srb->use_sg, 1);
 
@@ -606,7 +610,7 @@ static int usbat_handle_read10(struct us_data *us,
 		result = usbat_rw_block_test(us, USBAT_ATA, 
 			registers, data, 19,
 			0x10, 0x17, 0xFD, 0x30,
-			SCSI_DATA_READ,
+			DMA_FROM_DEVICE,
 			buffer,
 			len, 0, 1);
 
@@ -803,7 +807,7 @@ int init_8200e(struct us_data *us)
 /*
  * Transport for the HP 8200e
  */
-int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
+int hp8200e_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	int result;
 	unsigned char *status = us->iobuf;
@@ -847,12 +851,12 @@ int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (srb->cmnd[0] == TEST_UNIT_READY)
 		transferred = 0;
 
-	if (srb->sc_data_direction == SCSI_DATA_WRITE) {
+	if (srb->sc_data_direction == DMA_TO_DEVICE) {
 
 		result = usbat_rw_block_test(us, USBAT_ATA, 
 			registers, data, 19,
 			0x10, 0x17, 0xFD, 0x30,
-			SCSI_DATA_WRITE,
+			DMA_TO_DEVICE,
 			srb->request_buffer, 
 			len, srb->use_sg, 10);
 
@@ -900,7 +904,7 @@ int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
 	// If there is response data to be read in 
 	// then do it here.
 
-	if (len != 0 && (srb->sc_data_direction == SCSI_DATA_READ)) {
+	if (len != 0 && (srb->sc_data_direction == DMA_FROM_DEVICE)) {
 
 		// How many bytes to read in? Check cylL register
 

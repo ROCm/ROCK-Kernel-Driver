@@ -283,9 +283,8 @@ static char *usb_dump_interface(
 
 /* TBD:
  * 0. TBDs
- * 1. marking active config and ifaces (code lists all, but should mark
+ * 1. marking active interface altsettings (code lists all, but should mark
  *    which ones are active, if any)
- * 2. add <halted> status to each endpoint line
  */
 
 static char *usb_dump_config_descriptor(char *start, char *end, const struct usb_config_descriptor *desc, int active)
@@ -584,7 +583,7 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 
 	/* enumerate busses */
 	down (&usb_bus_list_lock);
-	for (buslist = usb_bus_list.next; buslist != &usb_bus_list; buslist = buslist->next) {
+	list_for_each(buslist, &usb_bus_list) {
 		/* print devices for this bus */
 		bus = list_entry(buslist, struct usb_bus, bus_list);
 

@@ -48,10 +48,9 @@
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
-#include "scsi.h"
-#include <scsi/scsi_host.h>
 
 struct us_data;
+struct scsi_cmnd;
 
 /*
  * Unusual device list definitions 
@@ -102,9 +101,9 @@ struct us_unusual_dev {
 
 #define US_IOBUF_SIZE		64	/* Size of the DMA-mapped I/O buffer */
 
-typedef int (*trans_cmnd)(Scsi_Cmnd*, struct us_data*);
+typedef int (*trans_cmnd)(struct scsi_cmnd *, struct us_data*);
 typedef int (*trans_reset)(struct us_data*);
-typedef void (*proto_cmnd)(Scsi_Cmnd*, struct us_data*);
+typedef void (*proto_cmnd)(struct scsi_cmnd*, struct us_data*);
 typedef void (*extra_data_destructor)(void *);	 /* extra data destructor   */
 
 /* we allocate one of these for every device that we remember */
@@ -144,7 +143,7 @@ struct us_data {
 
 	/* SCSI interfaces */
 	struct Scsi_Host	*host;		 /* our dummy host data */
-	Scsi_Cmnd		*srb;		 /* current srb		*/
+	struct scsi_cmnd	*srb;		 /* current srb		*/
 
 	/* thread information */
 	int			pid;		 /* control thread	 */
@@ -179,5 +178,9 @@ extern void fill_inquiry_response(struct us_data *us,
  * single queue element srb for write access */
 #define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
 #define scsi_lock(host)		spin_lock_irq(host->host_lock)
+
+
+/* Vendor ID list for devices that require special handling */
+#define USB_VENDOR_ID_GENESYS		0x05e3	/* Genesys Logic */
 
 #endif

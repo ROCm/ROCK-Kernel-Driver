@@ -28,7 +28,7 @@
 
 /* Sandisk SDDR-55 stuff */
 
-extern int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us);
+extern int sddr55_transport(struct scsi_cmnd *srb, struct us_data *us);
 extern int sddr55_reset(struct us_data *us);
 
 #endif

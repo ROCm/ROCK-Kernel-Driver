@@ -44,7 +44,7 @@ static int debug;
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0"
+#define DRIVER_VERSION "v1.01"
 #define DRIVER_AUTHOR "Matthias Bruestle"
 #define DRIVER_DESC "REINER SCT cyberJack pinpad/e-com USB Chipcard Reader Driver"
 
@@ -111,6 +111,7 @@ struct cyberjack_private {
 static int cyberjack_startup (struct usb_serial *serial)
 {
 	struct cyberjack_private *priv;
+	int i;
 
 	dbg("%s", __FUNCTION__);
 
@@ -128,6 +129,16 @@ static int cyberjack_startup (struct usb_serial *serial)
 
 	init_waitqueue_head(&serial->port[0]->write_wait);
 
+	for (i = 0; i < serial->num_ports; ++i) {
+		int result;
+		serial->port[i]->interrupt_in_urb->dev = serial->dev;
+		result = usb_submit_urb(serial->port[i]->interrupt_in_urb, 
+					GFP_KERNEL);
+		if (result)
+			err(" usb_submit_urb(read int) failed");
+		dbg("%s - usb_submit_urb(int urb)", __FUNCTION__);
+	}
+
 	return( 0 );
 }
 
@@ -138,6 +149,7 @@ static void cyberjack_shutdown (struct usb_serial *serial)
 	dbg("%s", __FUNCTION__);
 
 	for (i=0; i < serial->num_ports; ++i) {
+		usb_unlink_urb (serial->port[i]->interrupt_in_urb);
 		/* My special items, the standard routines free my urbs */
 		kfree(usb_get_serial_port_data(serial->port[i]));
 		usb_set_serial_port_data(serial->port[i], NULL);
@@ -168,17 +180,6 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 	priv->wrsent = 0;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	/* shutdown any bulk reads that might be going on */
-	usb_unlink_urb (port->write_urb);
-	usb_unlink_urb (port->read_urb);
-	usb_unlink_urb (port->interrupt_in_urb);
-
-	port->interrupt_in_urb->dev = port->serial->dev;
-	result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-	if (result)
-		err(" usb_submit_urb(read int) failed");
-	dbg("%s - usb_submit_urb(int urb)", __FUNCTION__);
-
 	return result;
 }
 
@@ -190,11 +191,6 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 		/* shutdown any bulk reads that might be going on */
 		usb_unlink_urb (port->write_urb);
 		usb_unlink_urb (port->read_urb);
-		usb_unlink_urb (port->interrupt_in_urb);
-		dbg("%s - usb_clear_halt", __FUNCTION__ );
-		usb_clear_halt(port->serial->dev, port->write_urb->pipe);
-		usb_clear_halt(port->serial->dev, port->read_urb->pipe);
-		usb_clear_halt(port->serial->dev, port->interrupt_in_urb->pipe);
 	}
 }
 
@@ -376,6 +372,10 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 	tty = port->tty;
+	if (!tty) {
+		dbg("%s - ignoring since device not open\n", __FUNCTION__);
+		return;
+	}
 	if (urb->actual_length) {
 		for (i = 0; i < urb->actual_length ; ++i) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */

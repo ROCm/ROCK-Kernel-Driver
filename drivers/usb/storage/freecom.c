@@ -29,12 +29,16 @@
  */
 
 #include <linux/config.h>
+#include <linux/hdreg.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+
 #include "transport.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
 #include "freecom.h"
-#include "linux/hdreg.h"
 
 #ifdef CONFIG_USB_STORAGE_DEBUG
 static void pdump (void *, int);
@@ -105,7 +109,7 @@ struct freecom_status {
 #define FCM_STATUS_PACKET_LENGTH	4
 
 static int
-freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
+freecom_readdata (struct scsi_cmnd *srb, struct us_data *us,
 		unsigned int ipipe, unsigned int opipe, int count)
 {
 	struct freecom_xfer_wrap *fxfr =
@@ -139,7 +143,7 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 }
 
 static int
-freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
+freecom_writedata (struct scsi_cmnd *srb, struct us_data *us,
 		int unsigned ipipe, unsigned int opipe, int count)
 {
 	struct freecom_xfer_wrap *fxfr =
@@ -176,7 +180,7 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
  * Transport for the Freecom USB/IDE adaptor.
  *
  */
-int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
+int freecom_transport(struct scsi_cmnd *srb, struct us_data *us)
 {
 	struct freecom_cb_wrap *fcb;
 	struct freecom_status  *fst;
@@ -302,7 +306,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * move in. */
 
 	switch (us->srb->sc_data_direction) {
-	case SCSI_DATA_READ:
+	case DMA_FROM_DEVICE:
 		/* catch bogus "read 0 length" case */
 		if (!length)
 			break;
@@ -334,7 +338,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("Transfer happy\n");
 		break;
 
-	case SCSI_DATA_WRITE:
+	case DMA_TO_DEVICE:
 		/* catch bogus "write 0 length" case */
 		if (!length)
 			break;
@@ -364,7 +368,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		break;
 
 
-	case SCSI_DATA_NONE:
+	case DMA_NONE:
 		/* Easy, do nothing. */
 		break;
 

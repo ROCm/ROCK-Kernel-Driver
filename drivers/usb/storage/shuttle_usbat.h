@@ -53,7 +53,7 @@
 #define USBAT_UIO_ADPRST	0x01 // Reset SCM chip
 
 /* HP 8200e stuff */
-extern int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us);
+extern int hp8200e_transport(struct scsi_cmnd *srb, struct us_data *us);
 extern int init_8200e(struct us_data *us);
 
 #endif

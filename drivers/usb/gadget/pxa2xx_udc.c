@@ -116,7 +116,7 @@ static const char ep0name [] = "ep0";
 
 #ifdef	USE_DMA
 static int use_dma = 1;
-MODULE_PARM (use_dma, "i");
+module_param(use_dma, bool, 0);
 MODULE_PARM_DESC (use_dma, "true to use dma");
 
 static void dma_nodesc_handler (int dmach, void *_ep, struct pt_regs *r);
@@ -146,7 +146,7 @@ static void kick_dma(struct pxa2xx_ep *ep, struct pxa2xx_request *req);
  * ... so mode = 3 (or 7, 15, etc) does it for both
  */
 static ushort fifo_mode = 0;
-MODULE_PARM (fifo_mode, "h");
+module_param(fifo_mode, ushort, 0);
 MODULE_PARM_DESC (fifo_mode, "pxa2xx udc fifo mode");
 #endif
 
@@ -1508,7 +1508,7 @@ static void udc_enable (struct pxa2xx_udc *dev)
 	/* caller must be able to sleep in order to cope
 	 * with startup transients.
 	 */
-	schedule_timeout(HZ/10);
+	msleep(100);
 
 	/* enable suspend/resume and reset irqs */
 	udc_clear_mask_UDCCR(UDCCR_SRM | UDCCR_REM);

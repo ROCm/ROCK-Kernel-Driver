@@ -60,3 +60,14 @@ config USB_DYNAMIC_MINORS
 
 	  If you are unsure about this, say N here.
 
+config USB_SUSPEND
+	bool "USB suspend/resume (EXPERIMENTAL)"
+	depends on USB && PM && EXPERIMENTAL
+	help
+	  If you say Y here, you can use driver calls or the sysfs
+	  "power/state" file to suspend or resume individual USB
+	  peripherals.  There are many related features, such as
+	  remote wakeup and driver-specific suspend processing, that
+	  may not yet work as expected.
+
+	  If you are unsure about this, say N here.

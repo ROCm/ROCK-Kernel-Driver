@@ -41,17 +41,15 @@
 #ifndef _SCSIGLUE_H_
 #define _SCSIGLUE_H_
 
-#include <linux/blkdev.h>
-#include "scsi.h"
 #include <scsi/scsi_host.h>
-#include "usb.h"
+
+struct us_data;
+struct scsi_cmnd;
 
 extern void usb_stor_report_device_reset(struct us_data *us);
 
 extern unsigned char usb_stor_sense_notready[18];
 extern unsigned char usb_stor_sense_invalidCDB[18];
 extern struct scsi_host_template usb_stor_host_template;
-extern int usb_stor_scsiSense10to6(Scsi_Cmnd*);
-extern int usb_stor_scsiSense6to10(Scsi_Cmnd*);
 
 #endif
