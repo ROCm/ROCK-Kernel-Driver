@@ -307,9 +307,6 @@ static int mcdx_setattentuator(struct s_drive_stuff *,
 
 static int mcdx_drive_map[][2] = MCDX_DRIVEMAP;
 static struct s_drive_stuff *mcdx_stuffp[MCDX_NDRIVES];
-static struct s_drive_stuff *mcdx_irq_map[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0
-};
 static spinlock_t mcdx_lock = SPIN_LOCK_UNLOCKED;
 static struct request_queue *mcdx_queue;
 MODULE_PARM(mcdx, "1-4i");
@@ -849,10 +846,8 @@ static void mcdx_delay(struct s_drive_stuff *stuff, long jifs)
 
 static irqreturn_t mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
-	struct s_drive_stuff *stuffp;
+	struct s_drive_stuff *stuffp = dev_id;
 	unsigned char b;
-
-	stuffp = mcdx_irq_map[irq];
 
 	if (stuffp == NULL) {
 		xwarn("mcdx: no device for intr %d\n", irq);
@@ -1199,8 +1194,7 @@ int __init mcdx_init_drive(int drive)
 	}
 
 	xtrace(INIT, "init() subscribe irq and i/o\n");
-	mcdx_irq_map[stuffp->irq] = stuffp;
-	if (request_irq(stuffp->irq, mcdx_intr, SA_INTERRUPT, "mcdx", NULL)) {
+	if (request_irq(stuffp->irq, mcdx_intr, SA_INTERRUPT, "mcdx", stuffp)) {
 		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		xwarn("%s=0x%03x,%d: Init failed. Can't get irq (%d).\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, stuffp->irq);
@@ -1247,8 +1241,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() mcdx_stuffp[%d] = %p\n", drive, stuffp);
 	if (register_cdrom(&stuffp->info) != 0) {
 		printk("Cannot register Mitsumi CD-ROM!\n");
-		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
+		release_region(stuffp->wreg_data, MCDX_IO_SIZE);
 		kfree(stuffp);
 		put_disk(disk);
 		if (unregister_blkdev(MAJOR_NR, "mcdx") != 0)
