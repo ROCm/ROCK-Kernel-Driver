@@ -88,7 +88,9 @@ typedef __s64	Elf64_Sxword;
 
 #define EM_V850		87	/* NEC v850 */
 
-#define EM_H8_300       46      /* Hitachi H8/300,300H,H8S */
+#define EM_M32R		88	/* Renesas M32R */
+
+#define EM_H8_300       46      /* Renesas H8/300,300H,H8S */
 
 /*
  * This is an interim value that we will use until the committee comes
@@ -98,6 +100,9 @@ typedef __s64	Elf64_Sxword;
 
 /* Bogus old v850 magic number, used by old tools.  */
 #define EM_CYGNUS_V850	0x9080
+
+/* Bogus old m32r magic number, used by old tools.  */
+#define EM_CYGNUS_M32R	0x9041
 
 /*
  * This is the old interim value for S/390 architecture

@@ -1064,7 +1064,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 {
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
 	struct ubd *dev = inode->i_bdev->bd_disk->private_data;
-	int err;
 	struct hd_driveid ubd_id = {
 		.cyls		= 0,
 		.heads		= 128,
@@ -1081,32 +1080,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		g.cylinders = dev->size / (128 * 32 * 512);
 		g.start = get_start_sect(inode->i_bdev);
 		return(copy_to_user(loc, &g, sizeof(g)) ? -EFAULT : 0);
-
-	case HDIO_SET_UNMASKINTR:
-		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
-		if((arg > 1) || (inode->i_bdev->bd_contains != inode->i_bdev))
-			return(-EINVAL);
-		return(0);
-
-	case HDIO_GET_UNMASKINTR:
-		if(!arg)  return(-EINVAL);
-		err = verify_area(VERIFY_WRITE, (long *) arg, sizeof(long));
-		if(err)
-			return(err);
-		return(0);
-
-	case HDIO_GET_MULTCOUNT:
-		if(!arg)  return(-EINVAL);
-		err = verify_area(VERIFY_WRITE, (long *) arg, sizeof(long));
-		if(err)
-			return(err);
-		return(0);
-
-	case HDIO_SET_MULTCOUNT:
-		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
-		if(inode->i_bdev->bd_contains != inode->i_bdev)
-			return(-EINVAL);
-		return(0);
 
 	case HDIO_GET_IDENTITY:
 		ubd_id.cyls = dev->size / (128 * 32 * 512);

@@ -100,7 +100,7 @@ static inline void create_pte_mapping(unsigned long start, unsigned long end,
 		int ret;
 
 		if (large)
-			vpn = va >> LARGE_PAGE_SHIFT;
+			vpn = va >> HPAGE_SHIFT;
 		else
 			vpn = va >> PAGE_SHIFT;
 
@@ -332,7 +332,7 @@ void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
 
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
+		vpn = va >> HPAGE_SHIFT;
 	else
 		vpn = va >> PAGE_SHIFT;
 	hash = hpt_hash(vpn, large);

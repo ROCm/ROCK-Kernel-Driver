@@ -18,6 +18,7 @@
 #include <asm/current.h>
 #include <asm/system.h>
 #include <asm/mmsegment.h>
+#include <asm/percpu.h>
 #include <linux/personality.h>
 
 #define TF_MASK		0x00000100
@@ -76,9 +77,6 @@ struct cpuinfo_x86 {
 #define X86_VENDOR_TRANSMETA 7
 #define X86_VENDOR_NUM 8
 #define X86_VENDOR_UNKNOWN 0xff
-
-extern struct cpuinfo_x86 boot_cpu_data;
-extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -229,6 +227,9 @@ struct tss_struct {
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
 } __attribute__((packed)) ____cacheline_aligned;
 
+extern struct cpuinfo_x86 boot_cpu_data;
+DECLARE_PER_CPU(struct tss_struct,init_tss);
+
 #define ARCH_MIN_TASKALIGN	16
 
 struct thread_struct {
@@ -253,6 +254,7 @@ struct thread_struct {
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
 	unsigned long	*io_bitmap_ptr;
+	unsigned io_bitmap_max;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
 } __attribute__((aligned(16)));

@@ -475,10 +475,40 @@ DO_ERROR( 9, SIGFPE,  "coprocessor segment overrun", coprocessor_segment_overrun
 DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
-DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr2())
+DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
+	int cpu = get_cpu();
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+	struct thread_struct *thread = &current->thread;
+
+	/*
+	 * Perform the lazy TSS's I/O bitmap copy. If the TSS has an
+	 * invalid offset set (the LAZY one) and the faulting thread has
+	 * a valid I/O bitmap pointer, we copy the I/O bitmap in the TSS
+	 * and we set the offset field correctly. Then we let the CPU to
+	 * restart the faulting instruction.
+	 */
+	if (tss->io_bitmap_base == INVALID_IO_BITMAP_OFFSET_LAZY &&
+	    thread->io_bitmap_ptr) {
+		memcpy(tss->io_bitmap, thread->io_bitmap_ptr,
+		       thread->io_bitmap_max);
+		/*
+		 * If the previously set map was extending to higher ports
+		 * than the current one, pad extra space with 0xff (no access).
+		 */
+		if (thread->io_bitmap_max < tss->io_bitmap_max)
+			memset((char *) tss->io_bitmap +
+				thread->io_bitmap_max, 0xff,
+				tss->io_bitmap_max - thread->io_bitmap_max);
+		tss->io_bitmap_max = thread->io_bitmap_max;
+		tss->io_bitmap_base = IO_BITMAP_OFFSET;
+		put_cpu();
+		return;
+	}
+	put_cpu();
+
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
 

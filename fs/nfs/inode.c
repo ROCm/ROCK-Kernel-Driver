@@ -57,7 +57,7 @@ static int nfs_update_inode(struct inode *, struct nfs_fattr *, unsigned long);
 
 static struct inode *nfs_alloc_inode(struct super_block *sb);
 static void nfs_destroy_inode(struct inode *);
-static void nfs_write_inode(struct inode *,int);
+static int nfs_write_inode(struct inode *,int);
 static void nfs_delete_inode(struct inode *);
 static void nfs_clear_inode(struct inode *);
 static void nfs_umount_begin(struct super_block *);
@@ -110,12 +110,16 @@ nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
 	return nfs_fileid_to_ino_t(fattr->fileid);
 }
 
-static void
+static int
 nfs_write_inode(struct inode *inode, int sync)
 {
 	int flags = sync ? FLUSH_WAIT : 0;
+	int ret;
 
-	nfs_commit_inode(inode, 0, 0, flags);
+	ret = nfs_commit_inode(inode, 0, 0, flags);
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 static void

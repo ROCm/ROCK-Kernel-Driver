@@ -106,10 +106,10 @@ int jfs_commit_inode(struct inode *inode, int wait)
 	return rc;
 }
 
-void jfs_write_inode(struct inode *inode, int wait)
+int jfs_write_inode(struct inode *inode, int wait)
 {
 	if (test_cflag(COMMIT_Nolink, inode))
-		return;
+		return 0;
 	/*
 	 * If COMMIT_DIRTY is not set, the inode isn't really dirty.
 	 * It has been committed since the last change, but was still
@@ -118,12 +118,14 @@ void jfs_write_inode(struct inode *inode, int wait)
 	 if (!test_cflag(COMMIT_Dirty, inode)) {
 		/* Make sure committed changes hit the disk */
 		jfs_flush_journal(JFS_SBI(inode->i_sb)->log, wait);
-		return;
+		return 0;
 	 }
 
 	if (jfs_commit_inode(inode, wait)) {
 		jfs_err("jfs_write_inode: jfs_commit_inode failed!");
-	}
+		return -EIO;
+	} else
+		return 0;
 }
 
 void jfs_delete_inode(struct inode *inode)

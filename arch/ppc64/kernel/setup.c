@@ -82,8 +82,6 @@ unsigned long decr_overclock_proc0 = 1;
 unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
-int powersave_nap;
-
 unsigned char aux_device_present;
 
 #ifdef CONFIG_MAGIC_SYSRQ
@@ -429,9 +427,9 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_PPC_PSERIES */
 #endif /* CONFIG_SMP */
 
-#if defined(CONFIG_HOTPLUG_CPU) &&  !defined(CONFIG_PPC_PMAC)
+#if defined(CONFIG_HOTPLUG_CPU)
 	rtas_stop_self_args.token = rtas_token("stop-self");
-#endif /* CONFIG_HOTPLUG_CPU && !CONFIG_PPC_PMAC */
+#endif /* CONFIG_HOTPLUG_CPU */
 
 	/* Finish initializing the hash table (do the dynamic
 	 * patching for the fast-path hashtable.S code)

@@ -596,10 +596,15 @@ sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs,
                                 sysrq_requested = jiffies;
                                 sysrq_serial_ptr = sysrq_serial_str;
                         }
-			continue; /* ignore the whole sysrq string */
+			/*
+			 * ignore the whole sysrq string except for the
+			 * leading escape
+			 */
+			if (ch != '\e')
+				continue;
                 }
                 else
-                        sysrq_serial_ptr = sysrq_serial_str;
+			sysrq_serial_ptr = sysrq_serial_str;
 #endif /* CONFIG_MAGIC_SYSRQ */
 
 		/* record the character to pass up to the tty layer */
@@ -610,8 +615,6 @@ sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs,
 			tty->flip.count++;
 			if (tty->flip.count == TTY_FLIPBUF_SIZE)
 				break;
-		}
-		else {
 		}
 		port->sc_port.icount.rx++;
 	}

@@ -13,6 +13,8 @@
 #ifdef CONFIG_MODE_TT
 extern int modify_ldt(int func, void *ptr, unsigned long bytecount);
 
+/* XXX this needs copy_to_user and copy_from_user */
+
 int sys_modify_ldt_tt(int func, void *ptr, unsigned long bytecount)
 {
 	if(verify_area(VERIFY_READ, ptr, bytecount)) return(-EFAULT);

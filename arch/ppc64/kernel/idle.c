@@ -20,6 +20,8 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/cpu.h>
+#include <linux/module.h>
+#include <linux/sysctl.h>
 
 #include <asm/system.h>
 #include <asm/processor.h>
@@ -295,6 +297,38 @@ int cpu_idle(void)
 	idle_loop();
 	return 0;
 }
+
+int powersave_nap;
+
+#ifdef CONFIG_SYSCTL
+/*
+ * Register the sysctl to set/clear powersave_nap.
+ */
+static ctl_table powersave_nap_ctl_table[]={
+	{
+		.ctl_name	= KERN_PPC_POWERSAVE_NAP,
+		.procname	= "powersave-nap",
+		.data		= &powersave_nap,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ 0, },
+};
+static ctl_table powersave_nap_sysctl_root[] = {
+	{ 1, "kernel", NULL, 0, 0755, powersave_nap_ctl_table, },
+ 	{ 0,},
+};
+
+static int __init
+register_powersave_nap_sysctl(void)
+{
+	register_sysctl_table(powersave_nap_sysctl_root, 0);
+
+	return 0;
+}
+__initcall(register_powersave_nap_sysctl);
+#endif
 
 int idle_setup(void)
 {

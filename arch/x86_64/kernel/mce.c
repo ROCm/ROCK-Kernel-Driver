@@ -470,7 +470,7 @@ static struct sys_device device_mce = {
 /* Why are there no generic functions for this? */
 #define ACCESSOR(name, var, start) \
 	static ssize_t show_ ## name(struct sys_device *s, char *buf) { 	   	   \
-		return sprintf(buf, "%lu\n", (unsigned long)var);		   \
+		return sprintf(buf, "%lx\n", (unsigned long)var);		   \
 	} 									   \
 	static ssize_t set_ ## name(struct sys_device *s,const char *buf,size_t siz) { \
 		char *end; 							   \

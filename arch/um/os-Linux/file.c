@@ -187,7 +187,8 @@ int os_sigio_async(int master, int slave)
 
 	if((fcntl(master, F_SETFL, flags | O_NONBLOCK | O_ASYNC) < 0) ||
 	   (fcntl(master, F_SETOWN, os_getpid()) < 0)){
-		printk("fcntl F_SETFL or F_SETOWN failed, errno = %d\n", errno);
+		printk("fcntl F_SETFL or F_SETOWN failed, errno = %d\n",
+		       errno);
 		return(-errno);
 	}
 

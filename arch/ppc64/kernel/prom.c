@@ -1646,7 +1646,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	RELOC(cmd_line[0]) = 0;
 #ifdef CONFIG_CMDLINE
-	strlcpy(RELOC(cmd_line), CONFIG_CMDLINE, sizeof(cmd_line));
+	strlcpy(RELOC(cmd_line), RELOC(CONFIG_CMDLINE), sizeof(cmd_line));
 #endif /* CONFIG_CMDLINE */
 	if ((long)_prom->chosen > 0) {
 		prom_getprop(_prom->chosen, "bootargs", p, sizeof(cmd_line));

@@ -319,8 +319,13 @@ config DUMMY_IOMMU
 	  are doing.
 
 config X86_MCE
-	bool
+	bool "Machine check support" if EMBEDDED
 	default y
+	help
+	   Include a machine check error handler to report hardware errors.
+	   This version will require the mcelog utility to decode some
+	   machine check error logs. See
+	   ftp://ftp.x86-64.org/pub/linux/tools/mcelog
 
 endmenu
 

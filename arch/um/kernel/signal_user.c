@@ -80,6 +80,12 @@ void unblock_signals(void)
 	change_signals(SIG_UNBLOCK);
 }
 
+/* These are the asynchronous signals.  SIGVTALRM and SIGARLM are handled
+ * together under SIGVTALRM_BIT.  SIGPROF is excluded because we want to
+ * be able to profile all of UML, not just the non-critical sections.  If
+ * profiling is not thread-safe, then that is not my problem.  We can disable
+ * profiling when SMP is enabled in that case.
+ */
 #define SIGIO_BIT 0
 #define SIGVTALRM_BIT 1
 
@@ -114,6 +120,11 @@ int set_signals(int enable)
 		sigaddset(&mask, SIGVTALRM);
 		sigaddset(&mask, SIGALRM);
 	}
+
+	/* This is safe - sigprocmask is guaranteed to copy locally the
+	 * value of new_set, do his work and then, at the end, write to
+	 * old_set.
+	 */
 	if(sigprocmask(SIG_UNBLOCK, &mask, &mask) < 0)
 		panic("Failed to enable signals");
 	ret = enable_mask(&mask);

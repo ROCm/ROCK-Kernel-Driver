@@ -330,7 +330,8 @@ int tracer(int (*init_proc)(void *), void *sp)
 					continue;
 				}
 				tracing = 0;
-				if(do_syscall(task, pid)) sig = SIGUSR2;
+				if(do_syscall(task, pid))
+					sig = SIGUSR2;
 				else clear_singlestep(task);
 				break;
 			case SIGPROF:

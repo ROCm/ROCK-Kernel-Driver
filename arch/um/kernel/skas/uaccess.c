@@ -12,6 +12,7 @@
 #include "asm/pgtable.h"
 #include "asm/uaccess.h"
 #include "kern_util.h"
+#include "user_util.h"
 
 extern void *um_virt_to_phys(struct task_struct *task, unsigned long addr,
 			     pte_t *pte_out);
@@ -51,37 +52,67 @@ static int do_op(unsigned long addr, int len, int is_write,
 	return(n);
 }
 
-static int buffer_op(unsigned long addr, int len, int is_write,
-		     int (*op)(unsigned long addr, int len, void *arg),
-		     void *arg)
+static void do_buffer_op(void *jmpbuf, void *arg_ptr)
 {
+	va_list args = *((va_list *) arg_ptr);
+	unsigned long addr = va_arg(args, unsigned long);
+	int len = va_arg(args, int);
+	int is_write = va_arg(args, int);
+	int (*op)(unsigned long, int, void *) = va_arg(args, void *);
+	void *arg = va_arg(args, void *);
+	int *res = va_arg(args, int *);
 	int size = min(PAGE_ALIGN(addr) - addr, (unsigned long) len);
 	int remain = len, n;
 
+	current->thread.fault_catcher = jmpbuf;
 	n = do_op(addr, size, is_write, op, arg);
-	if(n != 0)
-		return(n < 0 ? remain : 0);
+	if(n != 0){
+		*res = (n < 0 ? remain : 0);
+		goto out;
+	}
 
 	addr += size;
 	remain -= size;
-	if(remain == 0)
-		return(0);
+	if(remain == 0){
+		*res = 0;
+		goto out;
+	}
 
 	while(addr < ((addr + remain) & PAGE_MASK)){
 		n = do_op(addr, PAGE_SIZE, is_write, op, arg);
-		if(n != 0)
-			return(n < 0 ? remain : 0);
+		if(n != 0){
+			*res = (n < 0 ? remain : 0);
+			goto out;
+		}
 
 		addr += PAGE_SIZE;
 		remain -= PAGE_SIZE;
 	}
-	if(remain == 0)
-		return(0);
+	if(remain == 0){
+		*res = 0;
+		goto out;
+	}
 
 	n = do_op(addr, remain, is_write, op, arg);
 	if(n != 0)
-		return(n < 0 ? remain : 0);
-	return(0);
+		*res = (n < 0 ? remain : 0);
+	else *res = 0;
+ out:
+	current->thread.fault_catcher = NULL;
+}
+
+static int buffer_op(unsigned long addr, int len, int is_write,
+		     int (*op)(unsigned long addr, int len, void *arg),
+		     void *arg)
+{
+	int faulted, res;
+
+	faulted = setjmp_wrapper(do_buffer_op, addr, len, is_write, op, arg,
+				 &res);
+	if(!faulted)
+		return(res);
+
+	return(addr + len - (unsigned long) current->thread.fault_addr);
 }
 
 static int copy_chunk_from_user(unsigned long from, int len, void *arg)

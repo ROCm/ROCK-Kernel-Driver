@@ -72,7 +72,7 @@ int __do_strnlen_user(const char *str, unsigned long n,
 	struct tt_regs save = TASK_REGS(get_current())->tt;
 	int ret;
 	unsigned long *faddrp = (unsigned long *)fault_addr;
-	jmp_buf jbuf;
+	sigjmp_buf jbuf;
 
 	*fault_catcher = &jbuf;
 	if(sigsetjmp(jbuf, 1) == 0)

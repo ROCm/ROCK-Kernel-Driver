@@ -83,6 +83,7 @@ __uml_setup("xterm=", xterm_setup,
 "    are 'xterm=gnome-terminal,-t,-x'.\n\n"
 );
 
+/* XXX This badly needs some cleaning up in the error paths */
 int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct xterm_chan *data = d;
@@ -141,8 +142,19 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 		goto out;
 	}
 
-	tcgetattr(new, &data->tt);
-	if(data->raw) raw(new, 0);
+	CATCH_EINTR(err = tcgetattr(new, &data->tt));
+	if(err){
+		new = err;
+		goto out;
+	}
+
+	if(data->raw){
+		err = raw(new);
+		if(err){
+			new = err;
+			goto out;
+		}
+	}
 
 	data->pid = pid;
 	*dev_out = NULL;

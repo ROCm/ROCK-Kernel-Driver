@@ -745,7 +745,7 @@ static void __init detect_ht(struct cpuinfo_x86 *c)
 		}
 		if (index_lsb != index_msb )
 			index_msb++;
-		initial_apic_id = ebx >> 24 & 0xff;
+		initial_apic_id = hard_smp_processor_id();
 		phys_proc_id[cpu] = initial_apic_id >> index_msb;
 		
 		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",

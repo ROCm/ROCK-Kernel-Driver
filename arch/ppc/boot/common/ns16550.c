@@ -5,14 +5,14 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/serial.h>
-#include <linux/serialP.h>
 #include <linux/serial_reg.h>
 #include <asm/serial.h>
 
+#include "nonstdio.h"
+#include "serial.h"
+
 #define SERIAL_BAUD	9600
 
-extern void outb(int port, unsigned char val);
-extern unsigned char inb(int port);
 extern unsigned long ISA_io;
 
 static struct serial_state rs_table[RS_TABLE_SIZE] = {

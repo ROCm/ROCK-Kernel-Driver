@@ -237,10 +237,11 @@ void __init cpu_init (void)
 #else
 	int cpu = smp_processor_id();
 #endif
-	struct tss_struct * t = &init_tss[cpu];
+	struct tss_struct *t = &per_cpu(init_tss, cpu);
 	unsigned long v; 
 	char *estacks = NULL; 
 	struct task_struct *me;
+	int i;
 
 	/* CPU 0 is initialised in head64.c */
 	if (cpu != 0) {
@@ -304,12 +305,13 @@ void __init cpu_init (void)
 		t->ist[v] = (unsigned long)estacks;
 	}
 
-	t->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+	t->io_bitmap_base = offsetof(struct tss_struct, io_bitmap);
 	/*
-	 * This is required because the CPU will access up to
+	 * <= is required because the CPU will access up to
 	 * 8 bits beyond the end of the IO permission bitmap.
 	 */
-	t->io_bitmap[IO_BITMAP_LONGS] = ~0UL;
+	for (i = 0; i <= IO_BITMAP_LONGS; i++)
+		t->io_bitmap[i] = ~0UL;
 
 	atomic_inc(&init_mm.mm_count);
 	me->active_mm = &init_mm;

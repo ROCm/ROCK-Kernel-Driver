@@ -115,7 +115,7 @@ extern unsigned long ext2_count_free (struct buffer_head *, unsigned);
 
 /* inode.c */
 extern void ext2_read_inode (struct inode *);
-extern void ext2_write_inode (struct inode *, int);
+extern int ext2_write_inode (struct inode *, int);
 extern void ext2_put_inode (struct inode *);
 extern void ext2_delete_inode (struct inode *);
 extern int ext2_sync_inode (struct inode *);

@@ -2,11 +2,9 @@
 #define __PPC64_MMU_CONTEXT_H
 
 #include <linux/config.h>
-#include <linux/spinlock.h>	
 #include <linux/kernel.h>	
 #include <linux/mm.h>	
 #include <asm/mmu.h>	
-#include <asm/ppcdebug.h>	
 #include <asm/cputable.h>
 
 /*
@@ -33,107 +31,15 @@ static inline int sched_find_first_bit(unsigned long *b)
 	return __ffs(b[2]) + 128;
 }
 
-#define NO_CONTEXT		0
-#define FIRST_USER_CONTEXT	1
-#define LAST_USER_CONTEXT	0x8000  /* Same as PID_MAX for now... */
-#define NUM_USER_CONTEXT	(LAST_USER_CONTEXT-FIRST_USER_CONTEXT)
-
-/* Choose whether we want to implement our context
- * number allocator as a LIFO or FIFO queue.
- */
-#if 1
-#define MMU_CONTEXT_LIFO
-#else
-#define MMU_CONTEXT_FIFO
-#endif
-
-struct mmu_context_queue_t {
-	spinlock_t lock;
-	long head;
-	long tail;
-	long size;
-	mm_context_id_t elements[LAST_USER_CONTEXT];
-};
-
-extern struct mmu_context_queue_t mmu_context_queue;
-
-static inline void
-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
-/*
- * The context number queue has underflowed.
- * Meaning: we tried to push a context number that was freed
- * back onto the context queue and the queue was already full.
- */
-static inline void
-mmu_context_underflow(void)
-{
-	printk(KERN_DEBUG "mmu_context_underflow\n");
-	panic("mmu_context_underflow");
-}
+#define NO_CONTEXT	0
+#define MAX_CONTEXT	(0x100000-1)
 
-/*
- * Set up the context for a new address space.
- */
-static inline int
-init_new_context(struct task_struct *tsk, struct mm_struct *mm)
-{
-	long head;
-	unsigned long flags;
-	/* This does the right thing across a fork (I hope) */
-
-	spin_lock_irqsave(&mmu_context_queue.lock, flags);
-
-	if (mmu_context_queue.size <= 0) {
-		spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
-		return -ENOMEM;
-	}
-
-	head = mmu_context_queue.head;
-	mm->context.id = mmu_context_queue.elements[head];
-
-	head = (head < LAST_USER_CONTEXT-1) ? head+1 : 0;
-	mmu_context_queue.head = head;
-	mmu_context_queue.size--;
-
-	spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
-
-	return 0;
-}
-
-/*
- * We're finished using the context for an address space.
- */
-static inline void
-destroy_context(struct mm_struct *mm)
-{
-	long index;
-	unsigned long flags;
-
-	spin_lock_irqsave(&mmu_context_queue.lock, flags);
-
-	if (mmu_context_queue.size >= NUM_USER_CONTEXT) {
-		spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
-		mmu_context_underflow();
-	}
-
-#ifdef MMU_CONTEXT_LIFO
-	index = mmu_context_queue.head;
-	index = (index > 0) ? index-1 : LAST_USER_CONTEXT-1;
-	mmu_context_queue.head = index;
-#else
-	index = mmu_context_queue.tail;
-	index = (index < LAST_USER_CONTEXT-1) ? index+1 : 0;
-	mmu_context_queue.tail = index;
-#endif
-
-	mmu_context_queue.size++;
-	mmu_context_queue.elements[index] = mm->context.id;
-
-	spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
-}
+extern int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
+extern void destroy_context(struct mm_struct *mm);
 
 extern void switch_stab(struct task_struct *tsk, struct mm_struct *mm);
 extern void switch_slb(struct task_struct *tsk, struct mm_struct *mm);

@@ -815,6 +815,14 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		if (c == ' ' && !memcmp(from, "highmem=", 8))
 			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;
 	
+		/*
+		 * vmalloc=size forces the vmalloc area to be exactly 'size'
+		 * bytes. This can be used to increase (or decrease) the
+		 * vmalloc area - the default is 128m.
+		 */
+		if (c == ' ' && !memcmp(from, "vmalloc=", 8))
+			__VMALLOC_RESERVE = memparse(from+8, &from);
+
 		c = *(from++);
 		if (!c)
 			break;

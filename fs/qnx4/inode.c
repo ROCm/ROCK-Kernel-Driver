@@ -78,7 +78,7 @@ static void qnx4_write_super(struct super_block *sb)
 	unlock_kernel();
 }
 
-static void qnx4_write_inode(struct inode *inode, int unused)
+static int qnx4_write_inode(struct inode *inode, int unused)
 {
 	struct qnx4_inode_entry *raw_inode;
 	int block, ino;
@@ -87,12 +87,12 @@ static void qnx4_write_inode(struct inode *inode, int unused)
 
 	QNX4DEBUG(("qnx4: write inode 1.\n"));
 	if (inode->i_nlink == 0) {
-		return;
+		return 0;
 	}
 	if (!ino) {
 		printk("qnx4: bad inode number on dev %s: %d is out of range\n",
 		       inode->i_sb->s_id, ino);
-		return;
+		return -EIO;
 	}
 	QNX4DEBUG(("qnx4: write inode 2.\n"));
 	block = ino / QNX4_INODES_PER_BLOCK;
@@ -101,7 +101,7 @@ static void qnx4_write_inode(struct inode *inode, int unused)
 		printk("qnx4: major problem: unable to read inode from dev "
 		       "%s\n", inode->i_sb->s_id);
 		unlock_kernel();
-		return;
+		return -EIO;
 	}
 	raw_inode = ((struct qnx4_inode_entry *) bh->b_data) +
 	    (ino % QNX4_INODES_PER_BLOCK);
@@ -117,6 +117,7 @@ static void qnx4_write_inode(struct inode *inode, int unused)
 	mark_buffer_dirty(bh);
 	brelse(bh);
 	unlock_kernel();
+	return 0;
 }
 
 #endif

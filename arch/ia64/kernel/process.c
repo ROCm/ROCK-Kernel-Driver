@@ -228,18 +228,26 @@ cpu_idle (void *unused)
 
 	/* endless idle loop with no priority at all */
 	while (1) {
-		void (*idle)(void) = pm_idle;
-		if (!idle)
-			idle = default_idle;
-
 #ifdef CONFIG_SMP
 		if (!need_resched())
 			min_xtp();
 #endif
 		while (!need_resched()) {
+			void (*idle)(void);
+
 			if (mark_idle)
 				(*mark_idle)(1);
+			/*
+			 * Mark this as an RCU critical section so that
+			 * synchronize_kernel() in the unload path waits
+			 * for our completion.
+			 */
+			rcu_read_lock();
+			idle = pm_idle;
+			if (!idle)
+				idle = default_idle;
 			(*idle)();
+			rcu_read_unlock();
 		}
 
 		if (mark_idle)
