@@ -55,7 +55,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 {
 	pmd_t *pmd_table;
 		
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
 	if (pmd_table != pmd_offset(pgd, 0)) 
@@ -188,7 +188,7 @@ static inline int page_is_ram(unsigned long pagenr)
 	return 0;
 }
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
@@ -265,7 +265,7 @@ static void __init pagetable_init (void)
 	unsigned long vaddr;
 	pgd_t *pgd_base = swapper_pg_dir;
 
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 	int i;
 	/* Init entries of the first-level page table to the zero page */
 	for (i = 0; i < PTRS_PER_PGD; i++)
@@ -295,7 +295,7 @@ static void __init pagetable_init (void)
 
 	permanent_kmaps_init(pgd_base);
 
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 	/*
 	 * Add low memory identity-mappings - SMP needs it when
 	 * starting up on an AP from real-mode. In the non-PAE
@@ -317,7 +317,7 @@ void zap_low_mappings (void)
 	 * us, because pgd_clear() is a no-op on i386.
 	 */
 	for (i = 0; i < USER_PTRS_PER_PGD; i++)
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 		set_pgd(swapper_pg_dir+i, __pgd(1 + __pa(empty_zero_page)));
 #else
 		set_pgd(swapper_pg_dir+i, __pgd(0));
@@ -363,7 +363,7 @@ void __init paging_init(void)
 
 	load_cr3(swapper_pg_dir);
 
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 	/*
 	 * We will bail out later - printk doesn't work right now so
 	 * the user would just see a hanging kernel.
@@ -487,7 +487,7 @@ void __init mem_init(void)
 		(unsigned long) (totalhigh_pages << (PAGE_SHIFT-10))
 	       );
 
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 	if (!cpu_has_pae)
 		panic("cannot execute a PAE-enabled kernel on a PAE-less CPU!");
 #endif
@@ -505,7 +505,7 @@ void __init mem_init(void)
 #endif
 }
 
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 struct kmem_cache_s *pae_pgd_cachep;
 
 void __init pgtable_cache_init(void)
