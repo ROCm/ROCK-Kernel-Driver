@@ -1696,12 +1696,6 @@ M:	dbrownell@users.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
-USB EHCI DRIVER
-P:	David Brownell
-M:	dbrownell@users.sourceforge.net
-L:	linux-usb-devel@lists.sourceforge.net
-S:	Maintained
-
 USB HID/HIDBP/INPUT DRIVERS
 P:	Vojtech Pavlik
 M:	vojtech@suse.cz
