@@ -40,7 +40,9 @@ acpiphp-objs		:=	acpiphp_core.o	\
 				acpiphp_res.o
 
 rpaphp-objs		:=	rpaphp_core.o	\
-				rpaphp_pci.o	
+				rpaphp_pci.o	\
+				rpaphp_slot.o	\
+				rpaphp_vio.o
 
 rpadlpar_io-objs	:=	rpadlpar_core.o \
 				rpadlpar_sysfs.o
