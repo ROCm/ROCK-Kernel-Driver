@@ -1210,6 +1210,39 @@ config IBMVETH
 	  <file:Documentation/networking/net-modules.txt>. The module will
 	  be called ibmveth.
 
+config IBM_EMAC
+       tristate "IBM PPC4xx EMAC driver support"
+       depends on 4xx
+       ---help---
+       This driver supports the IBM PPC4xx EMAC family of on-chip
+       Ethernet controllers.
+
+config IBM_EMAC_ERRMSG
+       bool "Verbose error messages"
+       depends on IBM_EMAC
+
+config IBM_EMAC_RXB
+       int "Number of receive buffers"
+       depends on IBM_EMAC
+       default "128" if IBM_EMAC4
+       default "64"
+
+config IBM_EMAC_TXB
+       int "Number of transmit buffers"
+       depends on IBM_EMAC
+       default "128" if IBM_EMAC4
+       default "8"
+
+config IBM_EMAC_FGAP
+       int "Frame gap"
+       depends on IBM_EMAC
+       default "8"
+
+config IBM_EMAC_SKBRES
+       int "Skb reserve amount"
+       depends on IBM_EMAC
+       default "0"
+
 config NET_PCI
 	bool "EISA, VLB, PCI and on board controllers"
 	depends on NET_ETHERNET && (ISA || EISA || PCI)
