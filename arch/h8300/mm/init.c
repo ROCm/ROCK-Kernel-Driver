@@ -156,7 +156,7 @@ void mem_init(void)
 	/* DAVIDM look at setup memory map generically with reserved area */
 	unsigned long tmp;
 	extern char _etext, _stext, _sdata, _ebss, __init_begin, __init_end;
-	extern unsigned char _ramend, _ramstart;
+	extern unsigned long  _ramend, _ramstart;
 	unsigned long len = &_ramend - &_ramstart;
 	unsigned long start_mem = memory_start; /* DAVIDM - these must start at end of kernel */
 	unsigned long end_mem   = memory_end; /* DAVIDM - this must not include kernel stack at top */

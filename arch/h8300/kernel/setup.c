@@ -135,7 +135,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = (unsigned long) 0; 
 
 #if (defined(CONFIG_H8300H_SIM) || defined(CONFIG_H8S_SIM)) && defined(CONFIG_GDB_MAGICPRINT)
-	register_console(&gdb_console);
+	register_console((struct console *)&gdb_console);
 #endif
 
 	printk("\r\n\nuClinux " CPU "\n");
