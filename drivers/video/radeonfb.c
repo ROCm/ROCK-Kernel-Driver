@@ -679,7 +679,7 @@ static __inline__ int _max(int val1, int val2)
  */
         
 static char *mode_option __initdata;
-static char noaccel = 1;
+static char noaccel = 0;
 static char mirror = 0;
 static int panel_yres __initdata = 0;
 static char force_dfp __initdata = 0;
@@ -1241,9 +1241,6 @@ static void radeon_engine_init (struct radeonfb_info *rinfo)
 	radeon_fifo_wait (1);
 	OUTREG(RB2D_DSTCACHE_MODE, 0);
 
-	/* XXX */
-	rinfo->pitch = ((rinfo->xres_virtual * (rinfo->bpp / 8) + 0x3f)) >> 6;
-
 	radeon_fifo_wait (1);
 	temp = INREG(DEFAULT_PITCH_OFFSET);
 	OUTREG(DEFAULT_PITCH_OFFSET, ((temp & 0xc0000000) | 
@@ -1782,6 +1779,7 @@ static int radeonfb_set_par (struct fb_info *info)
 	int hsync_start, hsync_fudge, bytpp, hsync_wid, vsync_wid;
 	int primary_mon = PRIMARY_MONITOR(rinfo);
 	int depth = var_to_depth(mode);
+        int accel = (mode->accel_flags & FB_ACCELF_TEXT) != 0;
 
 	rinfo->xres = mode->xres;
 	rinfo->yres = mode->yres;
@@ -1878,7 +1876,15 @@ static int radeonfb_set_par (struct fb_info *info)
 	newmode.crtc_v_sync_strt_wid = (((vSyncStart - 1) & 0xfff) |
 					 (vsync_wid << 16) | (v_sync_pol  << 23));
 
-	newmode.crtc_pitch = (mode->xres_virtual >> 3);
+	if (accel) {
+		/* We first calculate the engine pitch */
+		rinfo->pitch = ((mode->xres_virtual * ((mode->bits_per_pixel + 1) / 8) + 0x3f)
+ 				& ~(0x3f)) >> 6;
+
+		/* Then, re-multiply it to get the CRTC pitch */
+		newmode.crtc_pitch = (rinfo->pitch << 3) / ((mode->bits_per_pixel + 1) / 8);
+	} else
+		newmode.crtc_pitch = (mode->xres_virtual >> 3);
 	newmode.crtc_pitch |= (newmode.crtc_pitch << 16);
 
 #if defined(__BIG_ENDIAN)
@@ -2085,18 +2091,21 @@ static int radeonfb_set_par (struct fb_info *info)
 	if (!rinfo->asleep) {
 		radeon_write_mode (rinfo, &newmode);
 		/* (re)initialize the engine */
-		if (!noaccel)
+		if (noaccel)
 			radeon_engine_init (rinfo);
 	
 	}
 	/* Update fix */
-        info->fix.line_length = rinfo->pitch*64;
+	if (accel)
+        	info->fix.line_length = rinfo->pitch*64;
+        else
+		info->fix.line_length = mode->xres_virtual * ((mode->bits_per_pixel + 1) / 8);
         info->fix.visual = rinfo->depth == 8 ? FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
 
 #ifdef CONFIG_BOOTX_TEXT
 	/* Update debug text engine */
 	btext_update_display(rinfo->fb_base_phys, mode->xres, mode->yres,
-			     rinfo->depth, rinfo->pitch*64);
+			     rinfo->depth, info->fix.line_length);
 #endif
 
 	return 0;
@@ -3021,11 +3030,6 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	 * so we can restore this upon __exit
 	 */
 	radeon_save_state (rinfo, &rinfo->init_state);
-
-	if (!noaccel) {
-		/* initialize the engine */
-		radeon_engine_init (rinfo);
-	}
 
 	/* set all the vital stuff */
 	radeon_set_fbinfo (rinfo);
