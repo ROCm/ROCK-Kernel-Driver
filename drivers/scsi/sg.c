@@ -3103,7 +3103,8 @@ sg_proc_host_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 	struct Scsi_Host *shp;
 	int k;
 
-	for (k = 0, shp = scsi_hostlist; shp; shp = shp->next, ++k) {
+	for (k = 0, shp = scsi_host_get_next(NULL); shp;
+	     shp = scsi_host_get_next(shp), ++k) {
 		for (; k < shp->host_no; ++k)
 			PRINT_PROC("-1\t-1\t-1\t-1\t-1\t-1\n");
 		PRINT_PROC("%u\t%hu\t%hd\t%hu\t%d\t%d\n",
@@ -3147,7 +3148,8 @@ sg_proc_hoststrs_info(char *buffer, int *len, off_t * begin,
 	char buff[SG_MAX_HOST_STR_LEN];
 	char *cp;
 
-	for (k = 0, shp = scsi_hostlist; shp; shp = shp->next, ++k) {
+	for (k = 0, shp = scsi_host_get_next(NULL); shp;
+	     shp = scsi_host_get_next(shp), ++k) {
 		for (; k < shp->host_no; ++k)
 			PRINT_PROC("<no active host>\n");
 		strncpy(buff, shp->hostt->info ? shp->hostt->info(shp) :
