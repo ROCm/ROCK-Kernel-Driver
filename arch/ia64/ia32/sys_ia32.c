@@ -277,10 +277,10 @@ ia32_init_pp_list(void)
  * Search for the partial page with @start in partial page list @ppl.
  * If finds the partial page, return the found partial page.
  * Else, return 0 and provide @pprev, @rb_link, @rb_parent to
- * be used by later ia32_insert_pp().
+ * be used by later __ia32_insert_pp().
  */
 static struct partial_page *
-ia32_find_pp(struct partial_page_list *ppl, unsigned int start,
+__ia32_find_pp(struct partial_page_list *ppl, unsigned int start,
 	struct partial_page **pprev, struct rb_node ***rb_link,
 	struct rb_node **rb_parent)
 {
@@ -321,7 +321,7 @@ ia32_find_pp(struct partial_page_list *ppl, unsigned int start,
  * insert @pp into @ppl.
  */
 static void
-ia32_insert_pp(struct partial_page_list *ppl, struct partial_page *pp,
+__ia32_insert_pp(struct partial_page_list *ppl, struct partial_page *pp,
 	 struct partial_page *prev, struct rb_node **rb_link,
 	struct rb_node *rb_parent)
 {
@@ -349,7 +349,7 @@ ia32_insert_pp(struct partial_page_list *ppl, struct partial_page *pp,
  * delete @pp from partial page list @ppl.
  */
 static void
-ia32_delete_pp(struct partial_page_list *ppl, struct partial_page *pp,
+__ia32_delete_pp(struct partial_page_list *ppl, struct partial_page *pp,
 	struct partial_page *prev)
 {
 	if (prev) {
@@ -366,7 +366,7 @@ ia32_delete_pp(struct partial_page_list *ppl, struct partial_page *pp,
 }
 
 static struct partial_page *
-pp_prev(struct partial_page *pp)
+__pp_prev(struct partial_page *pp)
 {
 	struct rb_node *prev = rb_prev(&pp->pp_rb);
 	if (prev)
@@ -376,11 +376,42 @@ pp_prev(struct partial_page *pp)
 }
 
 /*
+ * Delete partial pages with address between @start and @end.
+ * @start and @end are page aligned.
+ */
+static void
+__ia32_delete_pp_range(unsigned int start, unsigned int end)
+{
+	struct partial_page *pp, *prev;
+	struct rb_node **rb_link, *rb_parent;
+
+	if (start >= end)
+		return;
+
+	pp = __ia32_find_pp(current->thread.ppl, start, &prev,
+					&rb_link, &rb_parent);
+	if (pp)
+		prev = __pp_prev(pp);
+	else {
+		if (prev)
+			pp = prev->next;
+		else
+			pp = current->thread.ppl->pp_head;
+	}
+
+	while (pp && pp->base < end) {
+		struct partial_page *tmp = pp->next;
+		__ia32_delete_pp(current->thread.ppl, pp, prev);
+		pp = tmp;
+	}
+}
+
+/*
  * Set the range between @start and @end in bitmap.
  * @start and @end should be IA32 page aligned and in the same IA64 page.
  */
 static int
-__ia32_set_pp(unsigned int start, unsigned int end)
+__ia32_set_pp(unsigned int start, unsigned int end, int flags)
 {
 	struct partial_page *pp, *prev;
 	struct rb_node ** rb_link, *rb_parent;
@@ -391,7 +422,7 @@ __ia32_set_pp(unsigned int start, unsigned int end)
 	end_bit = (end % PAGE_SIZE) / IA32_PAGE_SIZE;
 	if (end_bit == 0)
 		end_bit = PAGE_SIZE / IA32_PAGE_SIZE;
-	pp = ia32_find_pp(current->thread.ppl, pstart, &prev,
+	pp = __ia32_find_pp(current->thread.ppl, pstart, &prev,
 					&rb_link, &rb_parent);
 	if (pp) {
 		for (i = start_bit; i < end_bit; i++)
@@ -402,9 +433,20 @@ __ia32_set_pp(unsigned int start, unsigned int end)
 		 */
 		if (find_first_zero_bit(&pp->bitmap, sizeof(pp->bitmap)*8) >=
 				PAGE_SIZE/IA32_PAGE_SIZE) {
-			ia32_delete_pp(current->thread.ppl, pp, pp_prev(pp));
+			__ia32_delete_pp(current->thread.ppl, pp, __pp_prev(pp));
 		}
 		return 0;
+	}
+
+	/*
+	 * MAP_FIXED may lead to overlapping mmap.
+	 * In this case, the requested mmap area may already mmaped as a full
+	 * page. So check vma before adding a new partial page.
+	 */
+	if (flags & MAP_FIXED) {
+		struct vm_area_struct *vma = find_vma(current->mm, pstart);
+		if (vma && vma->vm_start <= pstart)
+			return 0;
 	}
 
 	/* new a partial_page */
@@ -416,20 +458,35 @@ __ia32_set_pp(unsigned int start, unsigned int end)
 	for (i=start_bit; i<end_bit; i++)
 		set_bit(i, &(pp->bitmap));
 	pp->next = NULL;
-	ia32_insert_pp(current->thread.ppl, pp, prev, rb_link, rb_parent);
+	__ia32_insert_pp(current->thread.ppl, pp, prev, rb_link, rb_parent);
 	return 0;
 }
 
 /*
- * locking version of ia32_set_pp().
- * Use mm->mmap_sem to protect partial_page_list.
+ * @start and @end should be IA32 page aligned, but don't need to be in the
+ * same IA64 page. Split @start and @end to make sure they're in the same IA64
+ * page, then call __ia32_set_pp().
  */
 static void
-ia32_set_pp(unsigned int start, unsigned int end)
+ia32_set_pp(unsigned int start, unsigned int end, int flags)
 {
 	down_write(&current->mm->mmap_sem);
-	{
-		__ia32_set_pp(start, end);
+	if (flags & MAP_FIXED) {
+		/*
+		 * MAP_FIXED may lead to overlapping mmap. When this happens,
+		 * a series of complete IA64 pages results in deletion of
+		 * old partial pages in that range.
+		 */
+		__ia32_delete_pp_range(PAGE_ALIGN(start), PAGE_START(end));
+	}
+
+	if (end < PAGE_ALIGN(start)) {
+		__ia32_set_pp(start, end, flags);
+	} else {
+		if (offset_in_page(start))
+			__ia32_set_pp(start, PAGE_ALIGN(start), flags);
+		if (offset_in_page(end))
+			__ia32_set_pp(PAGE_START(end), end, flags);
 	}
 	up_write(&current->mm->mmap_sem);
 }
@@ -457,13 +514,13 @@ __ia32_unset_pp(unsigned int start, unsigned int end)
 	if (end_bit == 0)
 		end_bit = PAGE_SIZE / IA32_PAGE_SIZE;
 
-	pp = ia32_find_pp(current->thread.ppl, pstart, &prev,
+	pp = __ia32_find_pp(current->thread.ppl, pstart, &prev,
 					&rb_link, &rb_parent);
 	if (pp) {
 		for (i = start_bit; i < end_bit; i++)
 			clear_bit(i, &pp->bitmap);
 		if (pp->bitmap == 0) {
-			ia32_delete_pp(current->thread.ppl, pp, pp_prev(pp));
+			__ia32_delete_pp(current->thread.ppl, pp, __pp_prev(pp));
 			return 1;
 		}
 		return 0;
@@ -485,38 +542,67 @@ __ia32_unset_pp(unsigned int start, unsigned int end)
 	for (i = end_bit; i < PAGE_SIZE / IA32_PAGE_SIZE; i++)
 		set_bit(i, &(pp->bitmap));
 	pp->next = NULL;
-	ia32_insert_pp(current->thread.ppl, pp, prev, rb_link, rb_parent);
+	__ia32_insert_pp(current->thread.ppl, pp, prev, rb_link, rb_parent);
 	return 0;
 }
 
 /*
- * locking version of ia32_unset_pp().
- * Use mm->mmap_sem to protect partial_page_list.
+ * Delete pp between PAGE_ALIGN(start) and PAGE_START(end) by calling
+ * __ia32_delete_pp_range(). Unset possible partial pages by calling
+ * __ia32_unset_pp().
+ * The returned value see __ia32_unset_pp().
  */
 static int
-ia32_unset_pp(unsigned int start, unsigned int end)
+ia32_unset_pp(unsigned int *startp, unsigned int *endp)
 {
-	int ret;
+	unsigned int start = *startp, end = *endp;
+	int ret = 0;
 
 	down_write(&current->mm->mmap_sem);
-	{
-		ret = __ia32_unset_pp(start, end);
-	}
-	up_write(&current->mm->mmap_sem);
 
+	__ia32_delete_pp_range(PAGE_ALIGN(start), PAGE_START(end));
+
+	if (end < PAGE_ALIGN(start)) {
+		ret = __ia32_unset_pp(start, end);
+		if (ret == 1) {
+			*startp = PAGE_START(start);
+			*endp = PAGE_ALIGN(end);
+		}
+		if (ret == 0) {
+			/* to shortcut sys_munmap() in sys32_munmap() */
+			*startp = PAGE_START(start);
+			*endp = PAGE_START(end);
+		}
+	} else {
+		if (offset_in_page(start)) {
+			ret = __ia32_unset_pp(start, PAGE_ALIGN(start));
+			if (ret == 1)
+				*startp = PAGE_START(start);
+			if (ret == 0)
+				*startp = PAGE_ALIGN(start);
+			if (ret < 0)
+				goto out;
+		}
+		if (offset_in_page(end)) {
+			ret = __ia32_unset_pp(PAGE_START(end), end);
+			if (ret == 1)
+				*endp = PAGE_ALIGN(end);
+			if (ret == 0)
+				*endp = PAGE_START(end);
+		}
+	}
+
+ out:
+	up_write(&current->mm->mmap_sem);
 	return ret;
 }
 
 /*
- * Compare the range between @start and @end with bitmap in partial page:
- * Take this as example: the range is the 1st and 2nd 4K page.
- * Return 0 if they fit bitmap exactly, i.e. bitmap = 00000011;
- * Return 1 if the range doesn't cover whole bitmap, e.g. bitmap = 00001111;
- * Return -ENOMEM if the range exceeds the bitmap, e.g. bitmap = 00000001 or
- * 	bitmap = 00000101.
+ * Compare the range between @start and @end with bitmap in partial page.
+ * @start and @end should be IA32 page aligned and in the same IA64 page.
  */
 static int
-ia32_compare_pp(unsigned int start, unsigned int end)
+__ia32_compare_pp(unsigned int start, unsigned int end)
 {
 	struct partial_page *pp, *prev;
 	struct rb_node ** rb_link, *rb_parent;
@@ -525,7 +611,7 @@ ia32_compare_pp(unsigned int start, unsigned int end)
 
 	pstart = PAGE_START(start);
 
-	pp = ia32_find_pp(current->thread.ppl, pstart, &prev,
+	pp = __ia32_find_pp(current->thread.ppl, pstart, &prev,
 					&rb_link, &rb_parent);
 	if (!pp)
 		return 1;
@@ -548,8 +634,54 @@ ia32_compare_pp(unsigned int start, unsigned int end)
 		return 1;
 }
 
+/*
+ * @start and @end should be IA32 page aligned, but don't need to be in the
+ * same IA64 page. Split @start and @end to make sure they're in the same IA64
+ * page, then call __ia32_compare_pp().
+ *
+ * Take this as example: the range is the 1st and 2nd 4K page.
+ * Return 0 if they fit bitmap exactly, i.e. bitmap = 00000011;
+ * Return 1 if the range doesn't cover whole bitmap, e.g. bitmap = 00001111;
+ * Return -ENOMEM if the range exceeds the bitmap, e.g. bitmap = 00000001 or
+ * 	bitmap = 00000101.
+ */
+static int
+ia32_compare_pp(unsigned int *startp, unsigned int *endp)
+{
+	unsigned int start = *startp, end = *endp;
+	int retval = 0;
+
+	down_write(&current->mm->mmap_sem);
+
+	if (end < PAGE_ALIGN(start)) {
+		retval = __ia32_compare_pp(start, end);
+		if (retval == 0) {
+			*startp = PAGE_START(start);
+			*endp = PAGE_ALIGN(end);
+		}
+	} else {
+		if (offset_in_page(start)) {
+			retval = __ia32_compare_pp(start,
+						   PAGE_ALIGN(start));
+			if (retval == 0)
+				*startp = PAGE_START(start);
+			if (retval < 0)
+				goto out;
+		}
+		if (offset_in_page(end)) {
+			retval = __ia32_compare_pp(PAGE_START(end), end);
+			if (retval == 0)
+				*endp = PAGE_ALIGN(end);
+		}
+	}
+
+ out:
+	up_write(&current->mm->mmap_sem);
+	return retval;
+}
+
 static void
-ia32_do_drop_pp_list(struct partial_page_list *ppl)
+__ia32_drop_pp_list(struct partial_page_list *ppl)
 {
 	struct partial_page *pp = ppl->pp_head;
 
@@ -568,14 +700,14 @@ ia32_drop_partial_page_list(struct task_struct *task)
 	struct partial_page_list* ppl = task->thread.ppl;
 
 	if (ppl && atomic_dec_and_test(&ppl->pp_count))
-		ia32_do_drop_pp_list(ppl);
+		__ia32_drop_pp_list(ppl);
 }
 
 /*
  * Copy current->thread.ppl to ppl (already initialized).
  */
 static int
-ia32_do_copy_pp_list(struct partial_page_list *ppl)
+__ia32_copy_pp_list(struct partial_page_list *ppl)
 {
 	struct partial_page *pp, *tmp, *prev;
 	struct rb_node **rb_link, *rb_parent;
@@ -592,7 +724,7 @@ ia32_do_copy_pp_list(struct partial_page_list *ppl)
 		if (!tmp)
 			return -ENOMEM;
 		*tmp = *pp;
-		ia32_insert_pp(ppl, tmp, prev, rb_link, rb_parent);
+		__ia32_insert_pp(ppl, tmp, prev, rb_link, rb_parent);
 		prev = tmp;
 		rb_link = &tmp->pp_rb.rb_right;
 		rb_parent = &tmp->pp_rb;
@@ -614,7 +746,7 @@ ia32_copy_partial_page_list(struct task_struct *p, unsigned long clone_flags)
 			return -ENOMEM;
 		down_write(&current->mm->mmap_sem);
 		{
-			retval = ia32_do_copy_pp_list(p->thread.ppl);
+			retval = __ia32_copy_pp_list(p->thread.ppl);
 		}
 		up_write(&current->mm->mmap_sem);
 	}
@@ -635,6 +767,7 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 	pend = PAGE_ALIGN(end);
 
 	if (flags & MAP_FIXED) {
+		ia32_set_pp((unsigned int)start, (unsigned int)end, flags);
 		if (start > pstart) {
 			if (flags & MAP_SHARED)
 				printk(KERN_INFO
@@ -714,18 +847,9 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 			return -EINVAL;
 	}
 
+	if (!(flags & MAP_FIXED))
+		ia32_set_pp((unsigned int)start, (unsigned int)end, flags);
 out:
-	if (end < PAGE_ALIGN(start)) {
-		ia32_set_pp((unsigned int)start, (unsigned int)end);
-	} else {
-		if (start > PAGE_START(start)) {
-			ia32_set_pp((unsigned int)start, (unsigned int)PAGE_ALIGN(start));
-		}
-		if (end < PAGE_ALIGN(end)) {
-			ia32_set_pp((unsigned int)PAGE_START(end), (unsigned int)end);
-		}
-	}
-
 	return start;
 }
 
@@ -863,8 +987,6 @@ sys32_munmap (unsigned int start, unsigned int len)
 #if PAGE_SHIFT <= IA32_PAGE_SHIFT
 	ret = sys_munmap(start, end - start);
 #else
-	unsigned int pstart, pend;
-
 	if (OFFSET4K(start))
 		return -EINVAL;
 
@@ -872,36 +994,9 @@ sys32_munmap (unsigned int start, unsigned int len)
 	if (start >= end)
 		return -EINVAL;
 
-	pstart = PAGE_ALIGN(start);
-	pend = PAGE_START(end);
-
-	if (end < PAGE_ALIGN(start)) {
-		ret = ia32_unset_pp((unsigned int)start, (unsigned int)end);
-		if (ret == 1) {
-			start = PAGE_START(start);
-			end = PAGE_ALIGN(end);
-		} else
-			return ret;
-	} else {
-		if (offset_in_page(start)) {
-			ret = ia32_unset_pp((unsigned int)start, (unsigned int)PAGE_ALIGN(start));
-			if (ret == 1)
-				start = PAGE_START(start);
-			else if (ret == 0)
-				start = PAGE_ALIGN(start);
-			else
-				return ret;
-		}
-		if (offset_in_page(end)) {
-			ret = ia32_unset_pp((unsigned int)PAGE_START(end), (unsigned int)end);
-			if (ret == 1)
-				end = PAGE_ALIGN(end);
-			else if (ret == 0)
-				end = PAGE_START(end);
-			else
-				return ret;
-		}
-	}
+	ret = ia32_unset_pp(&start, &end);
+	if (ret < 0)
+		return ret;
 
 	if (start >= end)
 		return 0;
@@ -940,7 +1035,7 @@ mprotect_subpage (unsigned long address, int new_prot)
 asmlinkage long
 sys32_mprotect (unsigned int start, unsigned int len, int prot)
 {
-	unsigned long end = start + len;
+	unsigned int end = start + len;
 #if PAGE_SHIFT > IA32_PAGE_SHIFT
 	long retval = 0;
 #endif
@@ -957,53 +1052,13 @@ sys32_mprotect (unsigned int start, unsigned int len, int prot)
 	if (end < start)
 		return -EINVAL;
 
+	retval = ia32_compare_pp(&start, &end);
+
+	if (retval < 0)
+		return retval;
+
 	down(&ia32_mmap_sem);
 	{
-		if (end < PAGE_ALIGN(start)) {
-			/* start and end are in the same IA64 (partial) page */
-			retval = ia32_compare_pp((unsigned int)start, (unsigned int)end);
-			if (retval < 0)	{
-				/* start~end beyond the mapped area */
-				goto out;
-			}
-			else if (retval == 0) {
-				/* start~end fits the mapped area well */
-				start = PAGE_START(start);
-				end = PAGE_ALIGN(end);
-			}
-			else {
-				/* start~end doesn't cover all mapped area in this IA64 page */
-				/* So call mprotect_subpage to deal with new prot issue */
-				goto subpage;
-			}
-		} else {
-			if (offset_in_page(start)) {
-				retval = ia32_compare_pp((unsigned int)start, (unsigned int)PAGE_ALIGN(start));
-				if (retval < 0)	{
-					goto out;
-				}
-				else if (retval == 0) {
-					start = PAGE_START(start);
-				}
-				else {
-					goto subpage;
-				}
-			}
-			if (offset_in_page(end)) {
-				retval = ia32_compare_pp((unsigned int)PAGE_START(end), (unsigned int)end);
-				if (retval < 0)	{
-					goto out;
-				}
-				else if (retval == 0) {
-					end = PAGE_ALIGN(end);
-				}
-				else {
-					goto subpage;
-				}
-			}
-		}
-
-  subpage:
 		if (offset_in_page(start)) {
 			/* start address is 4KB aligned but not page aligned. */
 			retval = mprotect_subpage(PAGE_START(start), prot);
@@ -1054,7 +1109,7 @@ sys32_mremap (unsigned int addr, unsigned int old_len, unsigned int new_len,
 		return -EINVAL;
 
 	if ((flags & MREMAP_FIXED) && (OFFSET4K(new_addr)))
-			return -EINVAL;
+		return -EINVAL;
 
 	if (old_len >= new_len) {
 		ret = sys32_munmap(addr + new_len, old_len - new_len);
@@ -1076,14 +1131,9 @@ sys32_mremap (unsigned int addr, unsigned int old_len, unsigned int new_len,
 	}
 	up(&ia32_mmap_sem);
 
-	if ((ret >= 0) && (old_len < new_len)) {	/* mremap expand successfully */
-		if (new_end <= PAGE_ALIGN(old_end)) {
-			/* old_end and new_end are in the same IA64 page */
-			ia32_set_pp(old_end, new_end);
-		} else {
-			ia32_set_pp((unsigned int)PAGE_START(new_end), new_end);
-			ia32_set_pp(old_end, (unsigned int)PAGE_ALIGN(old_end));
-		}
+	if ((ret >= 0) && (old_len < new_len)) {
+		/* mremap expanded successfully */
+		ia32_set_pp(old_end, new_end, flags);
 	}
 #endif
 	return ret;
