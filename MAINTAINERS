@@ -1189,8 +1189,8 @@ L:	autofs@linux.kernel.org
 S:	Odd Fixes
 
 KERNEL AUTOMOUNTER v4 (AUTOFS4)
-P:	Jeremy Fitzhardinge
-M:	jeremy@goop.org
+P:	Ian Kent
+M:	raven@themaw.net
 L:	autofs@linux.kernel.org
 S:	Maintained
 
