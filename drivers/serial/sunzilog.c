@@ -1482,7 +1482,7 @@ static void __init sunzilog_prepare(void)
 	 * Temporary fix.
 	 */
 	for (channel = 0; channel < NUM_CHANNELS - 1; channel++)
-		spin_lock_init(sunzilog_port_table[channel].port.lock);
+		spin_lock_init(&sunzilog_port_table[channel].port.lock);
 
 	sunzilog_irq_chain = up = &sunzilog_port_table[0];
 	for (channel = 0; channel < NUM_CHANNELS - 1; channel++)
