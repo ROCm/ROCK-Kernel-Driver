@@ -412,7 +412,7 @@ void agp_generic_enable(u32 mode)
 		      agp_bridge->capndx + PCI_AGP_STATUS, &command);
 
 	command = agp_collect_device_status(mode, command);
-	command |= 0x100;
+	command |= AGPSTAT_AGP_ENABLE;
 
 	pci_write_config_dword(agp_bridge->dev,
 		       agp_bridge->capndx + PCI_AGP_COMMAND, command);

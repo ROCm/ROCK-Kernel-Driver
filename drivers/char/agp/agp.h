@@ -413,10 +413,13 @@ void agp_device_command(u32 command, int agp_v3);
 int agp_3_0_node_enable(u32 mode, u32 minor);
 
 #define AGPSTAT_RQ_DEPTH	(0xff000000)
+
+#define AGPSTAT_AGP_ENABLE	(1<<8)
 #define AGPSTAT_SBA		(1<<9)
-#define AGPSTAT_FW		(1<<4)
-#define AGPSTAT2_4X		(1<<2)
+
+#define AGPSTAT2_1X		(1<<0)
 #define AGPSTAT2_2X		(1<<1)
-#define AGPSTAT2_1X		(1)
+#define AGPSTAT2_4X		(1<<2)
+#define AGPSTAT_FW		(1<<4)
 
 #endif				/* _AGP_BACKEND_PRIV_H */
