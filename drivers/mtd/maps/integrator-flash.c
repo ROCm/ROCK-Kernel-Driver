@@ -22,7 +22,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: integrator-flash.c,v 1.16 2004/07/12 21:59:44 dwmw2 Exp $
+   $Id: integrator-flash.c,v 1.17 2004/09/16 23:27:13 gleixner Exp $
 
 ======================================================================*/
 
@@ -110,7 +110,7 @@ static int armflash_probe(struct device *_dev)
 	info->map.size		= size;
 	info->map.bankwidth	= plat->width;
 	info->map.phys		= res->start;
-	info->map.virt		= (unsigned long) base;
+	info->map.virt		= (void __iomem *) base;
 	info->map.name		= dev->dev.bus_id;
 	info->map.set_vpp	= armflash_set_vpp;
 

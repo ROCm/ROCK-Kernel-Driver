@@ -1,6 +1,6 @@
 /* fortunet.c memory map
  *
- * $Id: fortunet.c,v 1.7 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: fortunet.c,v 1.8 2004/09/16 23:27:13 gleixner Exp $
  */
 
 #include <linux/module.h>
@@ -210,7 +210,7 @@ int __init init_fortunet(void)
 			map_regions[ix].map_info.phys =	map_regions[ix].window_addr_physical,
 
 			map_regions[ix].map_info.virt =
-				(int)ioremap_nocache(
+				(void __iomem *)ioremap_nocache(
 				map_regions[ix].window_addr_physical,
 				map_regions[ix].map_info.size);
 			if(!map_regions[ix].map_info.virt)

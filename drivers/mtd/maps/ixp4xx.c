@@ -69,7 +69,7 @@ static void ixp4xx_copy_from(struct map_info *map, void *to,
 		dest[len - 1] = BYTE0(src[i]);
 }
 
-/*
+/* 
  * Unaligned writes are ignored, causing the 8-bit
  * probe to fail and proceed to the 16-bit probe (which succeeds).
  */
@@ -79,7 +79,7 @@ static void ixp4xx_probe_write16(struct map_info *map, map_word d, unsigned long
 	       *(__u16 *) (map->map_priv_1 + adr) = d.x[0];
 }
 
-/*
+/* 
  * Fast write16 function without the probing check above
  */
 static void ixp4xx_write16(struct map_info *map, map_word d, unsigned long adr)
@@ -197,7 +197,7 @@ static int ixp4xx_flash_probe(struct device *_dev)
 	}
 
 	info->map.map_priv_1 =
-	    (void __iomem *) ioremap(dev->resource->start,
+	    (void __iomem *) ioremap(dev->resource->start, 
 				    dev->resource->end - dev->resource->start + 1);
 	if (!info->map.map_priv_1) {
 		printk(KERN_ERR "IXP4XXFlash: Failed to ioremap region\n");
@@ -212,7 +212,7 @@ static int ixp4xx_flash_probe(struct device *_dev)
 		goto Error;
 	}
 	info->mtd->owner = THIS_MODULE;
-
+	
 	/* Use the fast version */
 	info->map.write = ixp4xx_write16,
 

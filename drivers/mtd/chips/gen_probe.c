@@ -2,7 +2,7 @@
  * Routines common to all CFI-type probes.
  * (C) 2001-2003 Red Hat, Inc.
  * GPL'd
- * $Id: gen_probe.c,v 1.19 2004/07/13 22:33:32 dwmw2 Exp $
+ * $Id: gen_probe.c,v 1.21 2004/08/14 15:14:05 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -64,7 +64,7 @@ static struct cfi_private *genprobe_ident_chips(struct map_info *map, struct chi
 	   interleave and device type, etc. */
 	if (!genprobe_new_chip(map, cp, &cfi)) {
 		/* The probe didn't like it */
-		printk(KERN_WARNING "%s: Found no %s device at location zero\n",
+		printk(KERN_DEBUG "%s: Found no %s device at location zero\n",
 		       cp->name, map->name);
 		return NULL;
 	}		
@@ -169,8 +169,12 @@ static int genprobe_new_chip(struct map_info *map, struct chip_probe *cp,
 
 		cfi->interleave = nr_chips;
 
-		for (type = 0; type < 3; type++) {
-			cfi->device_type = 1<<type;
+		/* Minimum device size. Don't look for one 8-bit device
+		   in a 16-bit bus, etc. */
+		type = map_bankwidth(map) / nr_chips;
+
+		for (; type <= CFI_DEVICETYPE_X32; type<<=1) {
+			cfi->device_type = type;
 
 			if (cp->probe_chip(map, 0, NULL, cfi))
 				return 1;

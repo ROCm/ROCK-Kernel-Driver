@@ -10,7 +10,7 @@
  *
  * Based on spia.c by Steven J. Hill
  *
- * $Id: tx4938ndfmc.c,v 1.2 2004/03/27 19:55:53 gleixner Exp $
+ * $Id: tx4938ndfmc.c,v 1.4 2004/10/05 13:50:20 gleixner Exp $
  *
  * Copyright (C) 2000-2001 Toshiba Corporation 
  *
@@ -365,14 +365,6 @@ int __init tx4938ndfmc_init (void)
 		return -ENXIO;
 	}
 
-	/* Allocate memory for internal data buffer */
-	this->data_buf = kmalloc (sizeof(u_char) * (tx4938ndfmc_mtd->oobblock + tx4938ndfmc_mtd->oobsize), GFP_KERNEL);
-	if (!this->data_buf) {
-		printk ("Unable to allocate NAND data buffer for TX4938.\n");
-		kfree (tx4938ndfmc_mtd);
-		return -ENOMEM;
-	}
-
 	if (protected) {
 		printk(KERN_INFO "TX4938 NDFMC: write protected.\n");
 		tx4938ndfmc_mtd->flags &= ~(MTD_WRITEABLE | MTD_ERASEABLE);
@@ -401,19 +393,11 @@ module_init(tx4938ndfmc_init);
  */
 static void __exit tx4938ndfmc_cleanup (void)
 {
-	struct nand_chip *this = (struct nand_chip *) tx4938ndfmc_mtd->priv;
-
-	/* Unregister the device */
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-	del_mtd_partitions(tx4938ndfmc_mtd);
-#endif
-	del_mtd_device (tx4938ndfmc_mtd);
+	/* Release resources, unregister device */
+	nand_release (tx4938ndfmc_mtd);
 
 	/* Free the MTD device structure */
 	kfree (tx4938ndfmc_mtd);
-
-	/* Free internal data buffer */
-	kfree (this->data_buf);
 }
 module_exit(tx4938ndfmc_cleanup);
 

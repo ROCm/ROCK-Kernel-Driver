@@ -39,5 +39,23 @@ config ZLIB_INFLATE
 config ZLIB_DEFLATE
 	tristate
 
+#
+# reed solomon support is select'ed if needed
+#
+config REED_SOLOMON
+	tristate
+	
+config REED_SOLOMON_ENC8
+	boolean
+
+config REED_SOLOMON_DEC8
+	boolean
+
+config REED_SOLOMON_ENC16
+	boolean
+
+config REED_SOLOMON_DEC16
+	boolean
+
 endmenu
 

@@ -1,5 +1,5 @@
 /*
- * $Id: mtd_blkdevs.c,v 1.22 2004/07/12 12:35:28 dwmw2 Exp $
+ * $Id: mtd_blkdevs.c,v 1.23 2004/08/19 01:54:36 tpoynor Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -81,7 +81,7 @@ static int mtd_blktrans_thread(void *arg)
 	struct request_queue *rq = tr->blkcore_priv->rq;
 
 	/* we might get involved when memory gets low, so use PF_MEMALLOC */
-	current->flags |= PF_MEMALLOC;
+	current->flags |= PF_MEMALLOC | PF_NOFREEZE;
 
 	daemonize("%sd", tr->name);
 
