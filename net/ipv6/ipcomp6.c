@@ -1,5 +1,5 @@
 /*
- * IP Payload Compression Protocol (IPComp) for IPv6 - RFC3713
+ * IP Payload Compression Protocol (IPComp) for IPv6 - RFC3173
  *
  * Copyright (C)2003 USAGI/WIDE Project
  *
