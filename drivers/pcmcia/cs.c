@@ -1041,9 +1041,9 @@ int pcmcia_access_configuration_register(client_handle_t handle,
 int pcmcia_bind_device(bind_req_t *req)
 {
     client_t *client;
-    socket_info_t *s;
+    struct pcmcia_socket *s;
 
-    s = SOCKET(req);
+    s = pcmcia_get_socket_by_nr(req->Socket);
     if (!s)
 	    return CS_BAD_SOCKET;
 
@@ -1052,7 +1052,7 @@ int pcmcia_bind_device(bind_req_t *req)
     memset(client, '\0', sizeof(client_t));
     client->client_magic = CLIENT_MAGIC;
     strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
-    client->Socket = req->Socket;
+    client->Socket = s;
     client->Function = req->Function;
     client->state = CLIENT_UNBOUND;
     client->erase_busy.next = &client->erase_busy;
@@ -1079,7 +1079,7 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
     socket_info_t *s;
     memory_handle_t region;
     
-    s = SOCKET(req);
+    s = pcmcia_get_socket_by_nr(req->Socket);
     if (!s)
 	    return CS_BAD_SOCKET;
     
@@ -1109,7 +1109,7 @@ int pcmcia_deregister_client(client_handle_t handle)
     socket_info_t *s;
     memory_handle_t region;
     u_long flags;
-    int i, sn;
+    int i;
     
     DEBUG(1, "cs: deregister_client(%p)\n", handle);
     if (CHECK_HANDLE(handle))
@@ -1130,8 +1130,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	    if (region->mtd == handle) region->mtd = NULL;
     }
     
-    sn = handle->Socket; s = pcmcia_get_socket_by_nr(sn);
-
     if ((handle->state & CLIENT_STALE) ||
 	(handle->Attributes & INFO_MASTER_CLIENT)) {
 	spin_lock_irqsave(&s->lock, flags);
@@ -1282,7 +1280,7 @@ int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req)
     if ((*handle)->next == NULL) {
 	if (req->Attributes & CLIENT_THIS_SOCKET)
 	    return CS_NO_MORE_ITEMS;
-	s = pcmcia_get_socket_by_nr((*handle)->Socket);
+	s = (*handle)->Socket;
 	if (s->clients == NULL)
 	    return CS_NO_MORE_ITEMS;
 	*handle = s->clients;
@@ -1300,7 +1298,7 @@ int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
     int w;
 
     if (idx == 0)
-	s = pcmcia_get_socket_by_nr(((client_handle_t)*handle)->Socket);
+	s = ((client_handle_t)*handle)->Socket;
     else
 	s = (*handle)->sock;
     if (!(s->state & SOCKET_PRESENT))
@@ -1576,7 +1574,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 
     *handle = client;
     client->state &= ~CLIENT_UNBOUND;
-    client->Socket = s->sock;
+    client->Socket = s;
     client->Attributes = req->Attributes;
     client->EventMask = req->EventMask;
     client->event_handler = req->event_handler;
@@ -1777,7 +1775,7 @@ int pcmcia_request_configuration(client_handle_t handle,
     
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
-    i = handle->Socket; s = pcmcia_get_socket_by_nr(i);
+    s = SOCKET(handle);
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     
@@ -2046,7 +2044,7 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     
     if (CHECK_HANDLE(*handle))
 	return CS_BAD_HANDLE;
-    s = pcmcia_get_socket_by_nr((*handle)->Socket);
+    s = (*handle)->Socket;
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     if (req->Attributes & (WIN_PAGED | WIN_SHARED))

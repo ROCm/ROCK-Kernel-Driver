@@ -32,7 +32,7 @@ typedef struct eraseq_t {
 #define CLIENT_MAGIC 	0x51E6
 typedef struct client_t {
     u_short		client_magic;
-    socket_t		Socket;
+    struct pcmcia_socket *Socket;
     u_char		Function;
     dev_info_t		dev_info;
     u_int		Attributes;
@@ -118,7 +118,7 @@ typedef struct pcmcia_socket socket_info_t;
 #define CHECK_SOCKET(s) \
     (((s) >= sockets) || (socket_table[s]->ss_entry == NULL))
 
-#define SOCKET(h) (pcmcia_get_socket_by_nr(h->Socket))
+#define SOCKET(h) (h->Socket)
 #define CONFIG(h) (&SOCKET(h)->config[(h)->Function])
 
 #define CHECK_REGION(r) \

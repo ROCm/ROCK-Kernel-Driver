@@ -533,12 +533,12 @@ int pcmcia_check_erase_queue(eraseq_handle_t eraseq)
 
 int pcmcia_open_memory(client_handle_t *handle, open_mem_t *open, memory_handle_t *mh)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     memory_handle_t region;
     
     if ((handle == NULL) || CHECK_HANDLE(*handle))
 	return CS_BAD_HANDLE;
-    s = pcmcia_get_socket_by_nr((*handle)->Socket);
+    s = (*handle)->Socket;
     if (open->Attributes & MEMORY_TYPE_AM)
 	region = s->a_region;
     else
