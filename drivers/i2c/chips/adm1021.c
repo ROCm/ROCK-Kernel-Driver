@@ -418,7 +418,7 @@ MODULE_AUTHOR ("Frodo Looijaard <frodol@dds.nl> and "
 MODULE_DESCRIPTION("adm1021 driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(read_only, "i");
+module_param(read_only, bool, 0);
 MODULE_PARM_DESC(read_only, "Don't set any values, read only mode");
 
 module_init(sensors_adm1021_init)

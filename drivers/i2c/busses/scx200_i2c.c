@@ -38,9 +38,9 @@ MODULE_AUTHOR("Christer Weinigel <wingel@nano-system.com>");
 MODULE_DESCRIPTION("NatSemi SCx200 I2C Driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(scl, "i");
+module_param(scl, int, 0);
 MODULE_PARM_DESC(scl, "GPIO line for SCL");
-MODULE_PARM(sda, "i");
+module_param(sda, int, 0);
 MODULE_PARM_DESC(sda, "GPIO line for SDA");
 
 static int scl = CONFIG_SCx200_I2C_SCL;

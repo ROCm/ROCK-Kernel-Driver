@@ -164,6 +164,17 @@ config I2C_IXP4XX
 	  This support is also available as a module. If so, the module
 	  will be called i2c-ixp4xx.
 
+config I2C_IXP2000
+	tristate "IXP2000 GPIO-Based I2C Interface"
+	depends on I2C && ARCH_IXP2000
+	select I2C_ALGOBIT
+	help
+	  Say Y here if you have an Intel IXP2000(2400, 2800, 2850) based 
+	  system and are using GPIO lines for an I2C bus.
+
+	  This support is also available as a module. If so, the module
+	  will be called i2c-ixp2000.
+
 config I2C_KEYWEST
 	tristate "Powermac Keywest I2C interface"
 	depends on I2C && PPC_PMAC
@@ -173,6 +184,18 @@ config I2C_KEYWEST
 
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-keywest.
+
+config I2C_MPC
+	tristate "MPC107/824x/85xx/52xx"
+	depends on I2C && FSL_OCP
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in I2C interface on the MPC107/Tsi107/MPC8240/MPC8245 and
+	  MPC85xx family processors. The driver may also work on 52xx
+	  family processors, though interrupts are known not to work.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-mpc.
 
 config I2C_NFORCE2
 	tristate "Nvidia Nforce2"
@@ -395,5 +418,16 @@ config I2C_VOODOO3
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-voodoo3.
+
+config I2C_PCA_ISA
+	tristate "PCA9564 on an ISA bus"
+	depends on I2C
+	select I2C_ALGOPCA
+	help
+	  This driver supports ISA boards using the Philips PCA 9564
+	  Parallel bus to I2C bus controller
+	  
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-pca-isa.
 
 endmenu

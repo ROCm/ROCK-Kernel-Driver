@@ -98,8 +98,8 @@
 
 /* If force_addr is set to anything different from 0, we forcibly enable
    the I801 at the given address. VERY DANGEROUS! */
-static int force_addr = 0;
-MODULE_PARM(force_addr, "i");
+static u16 force_addr;
+module_param(force_addr, ushort, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the I801 at the given address. "
 		 "EXTREMELY DANGEROUS!");

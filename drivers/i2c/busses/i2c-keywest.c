@@ -91,9 +91,9 @@ static const char *__kw_state_names[] = {
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("I2C driver for Apple's Keywest");
 MODULE_LICENSE("GPL");
-MODULE_PARM(probe, "i");
+module_param(probe, bool, 0);
 
-static int probe = 0;
+static int probe;
 
 #ifdef POLLED_MODE
 /* Don't schedule, the g5 fan controller is too
@@ -662,8 +662,7 @@ dispose_iface(struct device *dev)
 	spin_lock_irq(&iface->lock);
 	while (iface->state != state_idle) {
 		spin_unlock_irq(&iface->lock);
-		set_task_state(current,TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/10);
+		msleep(100);
 		spin_lock_irq(&iface->lock);
 	}
 #endif /* POLLED_MODE */

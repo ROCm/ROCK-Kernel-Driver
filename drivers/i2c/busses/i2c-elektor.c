@@ -269,11 +269,11 @@ MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for PCF8584 ISA bus adapter");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(base, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(clock, "i");
-MODULE_PARM(own, "i");
-MODULE_PARM(mmapped, "i");
+module_param(base, int, 0);
+module_param(irq, int, 0);
+module_param(clock, int, 0);
+module_param(own, int, 0);
+module_param(mmapped, int, 0);
 
 module_init(i2c_pcfisa_init);
 module_exit(i2c_pcfisa_exit);

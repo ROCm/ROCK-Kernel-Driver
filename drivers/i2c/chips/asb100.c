@@ -63,9 +63,6 @@ static unsigned short normal_i2c_range[] = { 0x28, 0x2f, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
 static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
-/* default VRM to 9.0 instead of 8.2 */
-#define ASB100_DEFAULT_VRM 90
-
 /* Insmod parameters */
 SENSORS_INSMOD_1(asb100);
 I2C_CLIENT_MODULE_PARM(force_subclients, "List of subclient addresses: "
@@ -959,7 +956,7 @@ static void asb100_init_client(struct i2c_client *client)
 
 	vid = asb100_read_value(client, ASB100_REG_VID_FANDIV) & 0x0f;
 	vid |= (asb100_read_value(client, ASB100_REG_CHIPID) & 0x01) << 4;
-	data->vrm = ASB100_DEFAULT_VRM;
+	data->vrm = i2c_which_vrm();
 	vid = vid_from_reg(vid, data->vrm);
 
 	/* Start monitoring */
