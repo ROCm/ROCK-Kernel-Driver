@@ -92,17 +92,15 @@ static int slave_configure(struct scsi_device *sdev)
 	 * the end, scatter-gather buffers follow page boundaries. */
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 
-	/* Devices using Genesys Logic chips cause a lot of trouble for
-	 * high-speed transfers; they die unpredictably when given more
-	 * than 64 KB of data at a time.  If we detect such a device,
-	 * reduce the maximum transfer size to 64 KB = 128 sectors. */
-
-#define USB_VENDOR_ID_GENESYS	0x05e3		// Needs a standard location
-
+	/* According to the technical support people at Genesys Logic,
+	 * devices using their chips have problems transferring more than
+	 * 32 KB at a time.  In practice people have found that 64 KB
+	 * works okay and that's what Windows does.  But we'll be
+	 * conservative; people can always use the sysfs interface to
+	 * increase max_sectors. */
 	if (us->pusb_dev->descriptor.idVendor == USB_VENDOR_ID_GENESYS &&
-			us->pusb_dev->speed == USB_SPEED_HIGH &&
-			sdev->request_queue->max_sectors > 128)
-		blk_queue_max_sectors(sdev->request_queue, 128);
+			sdev->request_queue->max_sectors > 64)
+		blk_queue_max_sectors(sdev->request_queue, 64);
 
 	/* We can't put these settings in slave_alloc() because that gets
 	 * called before the device type is known.  Consequently these
