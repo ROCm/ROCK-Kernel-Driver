@@ -2920,8 +2920,10 @@ static void md_do_sync(void *data)
 					goto skip;
 				}
 			}
-			if (mddev->curr_resync == 1)
+			if (mddev->curr_resync == 1) {
+				mddev_put(mddev2);
 				break;
+			}
 		}
 	} while (mddev->curr_resync < 2);
 
