@@ -541,6 +541,7 @@ static struct net_device_stats *speedo_get_stats(struct net_device *dev);
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void set_rx_mode(struct net_device *dev);
 static void speedo_show_state(struct net_device *dev);
+static struct ethtool_ops ethtool_ops;
 
 
 
@@ -895,6 +896,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	dev->get_stats = &speedo_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &speedo_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	dev->poll_controller = &poll_speedo;
 #endif
@@ -2010,81 +2012,67 @@ speedo_get_stats(struct net_device *dev)
 	return &sp->stats;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void speedo_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
 	struct speedo_private *sp = netdev_priv(dev);
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-	
-        switch (ethcmd) {
-	/* get driver-specific version/etc. info */
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "eepro100", sizeof(info.driver)-1);
-		strncpy(info.version, version, sizeof(info.version)-1);
-		if (sp && sp->pdev)
-			strcpy(info.bus_info, pci_name(sp->pdev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&sp->lock);
-		mii_ethtool_gset(&sp->mii_if, &ecmd);
-		spin_unlock_irq(&sp->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int r;
-		struct ethtool_cmd ecmd;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&sp->lock);
-		r = mii_ethtool_sset(&sp->mii_if, &ecmd);
-		spin_unlock_irq(&sp->lock);
-		return r;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		return mii_nway_restart(&sp->mii_if);
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		edata.data = mii_link_ok(&sp->mii_if);
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = sp->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		sp->msg_enable = edata.data;
-		return 0;
-	}
-
-        }
-	
-	return -EOPNOTSUPP;
+	strncpy(info->driver, "eepro100", sizeof(info->driver)-1);
+	strncpy(info->version, version, sizeof(info->version)-1);
+	if (sp->pdev)
+		strcpy(info->bus_info, pci_name(sp->pdev));
 }
+
+static int speedo_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct speedo_private *sp = netdev_priv(dev);
+	spin_lock_irq(&sp->lock);
+	mii_ethtool_gset(&sp->mii_if, ecmd);
+	spin_unlock_irq(&sp->lock);
+	return 0;
+}
+
+static int speedo_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct speedo_private *sp = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&sp->lock);
+	res = mii_ethtool_sset(&sp->mii_if, ecmd);
+	spin_unlock_irq(&sp->lock);
+	return res;
+}
+
+static int speedo_nway_reset(struct net_device *dev)
+{
+	struct speedo_private *sp = netdev_priv(dev);
+	return mii_nway_restart(&sp->mii_if);
+}
+
+static u32 speedo_get_link(struct net_device *dev)
+{
+	struct speedo_private *sp = netdev_priv(dev);
+	return mii_link_ok(&sp->mii_if);
+}
+
+static u32 speedo_get_msglevel(struct net_device *dev)
+{
+	struct speedo_private *sp = netdev_priv(dev);
+	return sp->msg_enable;
+}
+
+static void speedo_set_msglevel(struct net_device *dev, u32 v)
+{
+	struct speedo_private *sp = netdev_priv(dev);
+	sp->msg_enable = v;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = speedo_get_drvinfo,
+	.get_settings = speedo_get_settings,
+	.set_settings = speedo_set_settings,
+	.nway_reset = speedo_nway_reset,
+	.get_link = speedo_get_link,
+	.get_msglevel = speedo_get_msglevel,
+	.set_msglevel = speedo_set_msglevel,
+};
 
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -2121,8 +2109,6 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			add_timer(&sp->timer); /* may be set to the past  --SAW */
 		pci_set_power_state(sp->pdev, saved_acpi);
 		return 0;
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}

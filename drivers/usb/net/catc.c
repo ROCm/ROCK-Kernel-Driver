@@ -411,7 +411,7 @@ static void catc_tx_done(struct urb *urb, struct pt_regs *regs)
 
 static int catc_hard_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	unsigned long flags;
 	char *tx_buf;
 
@@ -442,7 +442,7 @@ static int catc_hard_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 static void catc_tx_timeout(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 
 	warn("Transmit timed out.");
 	catc->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
@@ -604,7 +604,7 @@ static void catc_stats_timer(unsigned long data)
 
 static struct net_device_stats *catc_get_stats(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	return &catc->stats;
 }
 
@@ -622,7 +622,7 @@ static void catc_multicast(unsigned char *addr, u8 *multicast)
 
 static void catc_set_multicast_list(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	struct dev_mc_list *mc;
 	u8 broadcast[6];
 	u8 rx = RxEnable | RxPolarity | RxMultiCast;
@@ -664,74 +664,38 @@ static void catc_set_multicast_list(struct net_device *netdev)
 	}
 }
 
-/*
- * ioctl's
- */
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+void catc_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-        struct catc *catc = dev->priv;
-        u32 cmd;
-        
-        if (get_user(cmd, (u32 __user *)useraddr))
-                return -EFAULT;
-
-        switch (cmd) {
-        /* get driver info */
-        case ETHTOOL_GDRVINFO: {
-                struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-                strncpy(info.driver, driver_name, ETHTOOL_BUSINFO_LEN);
-                strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
-		usb_make_path (catc->usbdev, info.bus_info, sizeof info.bus_info);
-                if (copy_to_user(useraddr, &info, sizeof(info)))
-                        return -EFAULT;
-                return 0;
-        }
-
-	/* get settings */
-	case ETHTOOL_GSET:
-		if (catc->is_f5u011) {
-			struct ethtool_cmd ecmd = { ETHTOOL_GSET, 
-						    SUPPORTED_10baseT_Half | SUPPORTED_TP, 
-						    ADVERTISED_10baseT_Half | ADVERTISED_TP, 
-						    SPEED_10, 
-						    DUPLEX_HALF, 
-						    PORT_TP, 
-						    0, 
-						    XCVR_INTERNAL, 
-						    AUTONEG_DISABLE, 
-						    1, 
-						    1 
-			};
-			if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-				return -EFAULT;
-			return 0;
-		} else {
-			return -EOPNOTSUPP;
-		}
-
-        /* get link status */
-        case ETHTOOL_GLINK: {
-                struct ethtool_value edata = {ETHTOOL_GLINK};
-                edata.data = netif_carrier_ok(dev);
-                if (copy_to_user(useraddr, &edata, sizeof(edata)))
-                        return -EFAULT;
-                return 0;
-        }
-	}
-        
-        return -EOPNOTSUPP;
+	struct catc *catc = netdev_priv(dev);
+	strncpy(info->driver, driver_name, ETHTOOL_BUSINFO_LEN);
+	strncpy(info->version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
+	usb_make_path (catc->usbdev, info->bus_info, sizeof info->bus_info);
 }
 
-static int catc_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int catc_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-        switch(cmd) {
-        case SIOCETHTOOL:
-                return netdev_ethtool_ioctl(dev, rq->ifr_data);
-        default:
-                return -EOPNOTSUPP;
-        }
+	struct catc *catc = netdev_priv(dev);
+	if (!catc->is_f5u011)
+		return -EOPNOTSUPP;
+
+	cmd->supported = SUPPORTED_10baseT_Half | SUPPORTED_TP;
+	cmd->advertising = ADVERTISED_10baseT_Half | ADVERTISED_TP;
+	cmd->speed = SPEED_10;
+	cmd->duplex = DUPLEX_HALF;
+	cmd->port = PORT_TP; 
+	cmd->phy_address = 0;
+	cmd->transceiver = XCVR_INTERNAL;
+	cmd->autoneg = AUTONEG_DISABLE;
+	cmd->maxtxpkt = 1;
+	cmd->maxrxpkt = 1;
+	return 0;
 }
 
+static struct ethtool_ops ops = {
+	.get_drvinfo = catc_get_drvinfo,
+	.get_settings = catc_get_settings,
+	.get_link = ethtool_op_get_link
+};
 
 /*
  * Open, close.
@@ -739,7 +703,7 @@ static int catc_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 static int catc_open(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 	int status;
 
 	catc->irq_urb->dev = catc->usbdev;
@@ -758,7 +722,7 @@ static int catc_open(struct net_device *netdev)
 
 static int catc_stop(struct net_device *netdev)
 {
-	struct catc *catc = netdev->priv;
+	struct catc *catc = netdev_priv(netdev);
 
 	netif_stop_queue(netdev);
 
@@ -791,17 +755,11 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		return -EIO;
 	}
 
-	catc = kmalloc(sizeof(struct catc), GFP_KERNEL);
-	if (!catc)
+	netdev = alloc_etherdev(sizeof(struct catc));
+	if (!netdev)
 		return -ENOMEM;
 
-	memset(catc, 0, sizeof(struct catc));
-
-	netdev = alloc_etherdev(0);
-	if (!netdev) {
-		kfree(catc);
-		return -EIO;
-	}
+	catc = netdev_priv(netdev);
 
 	netdev->open = catc_open;
 	netdev->hard_start_xmit = catc_hard_start_xmit;
@@ -810,8 +768,7 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	netdev->tx_timeout = catc_tx_timeout;
 	netdev->watchdog_timeo = TX_TIMEOUT;
 	netdev->set_multicast_list = catc_set_multicast_list;
-	netdev->do_ioctl = catc_ioctl;
-	netdev->priv = catc;
+	SET_ETHTOOL_OPS(netdev, &ops);
 
 	catc->usbdev = usbdev;
 	catc->netdev = netdev;
@@ -839,7 +796,6 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		if (catc->irq_urb)
 			usb_free_urb(catc->irq_urb);
 		free_netdev(netdev);
-		kfree(catc);
 		return -ENOMEM;
 	}
 
@@ -944,7 +900,6 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		usb_free_urb(catc->rx_urb);
 		usb_free_urb(catc->irq_urb);
 		free_netdev(netdev);
-		kfree(catc);
 		return -EIO;
 	}
 	return 0;
@@ -962,7 +917,6 @@ static void catc_disconnect(struct usb_interface *intf)
 		usb_free_urb(catc->rx_urb);
 		usb_free_urb(catc->irq_urb);
 		free_netdev(catc->netdev);
-		kfree(catc);
 	}
 }
 

@@ -279,7 +279,7 @@ static void tulip_set_power_state (struct tulip_private *tp,
 static void tulip_up(struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	int next_tick = 3*HZ;
 	int i;
 
@@ -288,23 +288,23 @@ static void tulip_up(struct net_device *dev)
 
 	/* On some chip revs we must set the MII/SYM port before the reset!? */
 	if (tp->mii_cnt  ||  (tp->mtable  &&  tp->mtable->has_mii))
-		outl(0x00040000, ioaddr + CSR6);
+		iowrite32(0x00040000, ioaddr + CSR6);
 
 	/* Reset the chip, holding bit 0 set at least 50 PCI cycles. */
-	outl(0x00000001, ioaddr + CSR0);
+	iowrite32(0x00000001, ioaddr + CSR0);
 	udelay(100);
 
 	/* Deassert reset.
 	   Wait the specified 50 PCI cycles after a reset by initializing
 	   Tx and Rx queues and the address filter list. */
-	outl(tp->csr0, ioaddr + CSR0);
+	iowrite32(tp->csr0, ioaddr + CSR0);
 	udelay(100);
 
 	if (tulip_debug > 1)
 		printk(KERN_DEBUG "%s: tulip_up(), irq==%d.\n", dev->name, dev->irq);
 
-	outl(tp->rx_ring_dma, ioaddr + CSR3);
-	outl(tp->tx_ring_dma, ioaddr + CSR4);
+	iowrite32(tp->rx_ring_dma, ioaddr + CSR3);
+	iowrite32(tp->tx_ring_dma, ioaddr + CSR4);
 	tp->cur_rx = tp->cur_tx = 0;
 	tp->dirty_rx = tp->dirty_tx = 0;
 
@@ -312,15 +312,15 @@ static void tulip_up(struct net_device *dev)
 		u32 addr_low = le32_to_cpu(get_unaligned((u32 *)dev->dev_addr));
 		u32 addr_high = le16_to_cpu(get_unaligned((u16 *)(dev->dev_addr+4)));
 		if (tp->chip_id == AX88140) {
-			outl(0, ioaddr + CSR13);
-			outl(addr_low,  ioaddr + CSR14);
-			outl(1, ioaddr + CSR13);
-			outl(addr_high, ioaddr + CSR14);
+			iowrite32(0, ioaddr + CSR13);
+			iowrite32(addr_low,  ioaddr + CSR14);
+			iowrite32(1, ioaddr + CSR13);
+			iowrite32(addr_high, ioaddr + CSR14);
 		} else if (tp->flags & COMET_MAC_ADDR) {
-			outl(addr_low,  ioaddr + 0xA4);
-			outl(addr_high, ioaddr + 0xA8);
-			outl(0, ioaddr + 0xAC);
-			outl(0, ioaddr + 0xB0);
+			iowrite32(addr_low,  ioaddr + 0xA4);
+			iowrite32(addr_high, ioaddr + 0xA8);
+			iowrite32(0, ioaddr + 0xAC);
+			iowrite32(0, ioaddr + 0xB0);
 		}
 	} else {
 		/* This is set_rx_mode(), but without starting the transmitter. */
@@ -390,9 +390,9 @@ media_picked:
 		if (tp->chip_id == DC21143  &&
 		    (tulip_media_cap[dev->if_port] & MediaIsMII)) {
 			/* We must reset the media CSRs when we force-select MII mode. */
-			outl(0x0000, ioaddr + CSR13);
-			outl(0x0000, ioaddr + CSR14);
-			outl(0x0008, ioaddr + CSR15);
+			iowrite32(0x0000, ioaddr + CSR13);
+			iowrite32(0x0000, ioaddr + CSR14);
+			iowrite32(0x0008, ioaddr + CSR15);
 		}
 		tulip_select_media(dev, 1);
 	} else if (tp->chip_id == DC21142) {
@@ -402,49 +402,49 @@ media_picked:
 				printk(KERN_INFO "%s: Using MII transceiver %d, status "
 					   "%4.4x.\n",
 					   dev->name, tp->phys[0], tulip_mdio_read(dev, tp->phys[0], 1));
-			outl(csr6_mask_defstate, ioaddr + CSR6);
+			iowrite32(csr6_mask_defstate, ioaddr + CSR6);
 			tp->csr6 = csr6_mask_hdcap;
 			dev->if_port = 11;
-			outl(0x0000, ioaddr + CSR13);
-			outl(0x0000, ioaddr + CSR14);
+			iowrite32(0x0000, ioaddr + CSR13);
+			iowrite32(0x0000, ioaddr + CSR14);
 		} else
 			t21142_start_nway(dev);
 	} else if (tp->chip_id == PNIC2) {
 	        /* for initial startup advertise 10/100 Full and Half */
 	        tp->sym_advertise = 0x01E0;
                 /* enable autonegotiate end interrupt */
-	        outl(inl(ioaddr+CSR5)| 0x00008010, ioaddr + CSR5);
-	        outl(inl(ioaddr+CSR7)| 0x00008010, ioaddr + CSR7);
+	        iowrite32(ioread32(ioaddr+CSR5)| 0x00008010, ioaddr + CSR5);
+	        iowrite32(ioread32(ioaddr+CSR7)| 0x00008010, ioaddr + CSR7);
 		pnic2_start_nway(dev);
 	} else if (tp->chip_id == LC82C168  &&  ! tp->medialock) {
 		if (tp->mii_cnt) {
 			dev->if_port = 11;
 			tp->csr6 = 0x814C0000 | (tp->full_duplex ? 0x0200 : 0);
-			outl(0x0001, ioaddr + CSR15);
-		} else if (inl(ioaddr + CSR5) & TPLnkPass)
+			iowrite32(0x0001, ioaddr + CSR15);
+		} else if (ioread32(ioaddr + CSR5) & TPLnkPass)
 			pnic_do_nway(dev);
 		else {
 			/* Start with 10mbps to do autonegotiation. */
-			outl(0x32, ioaddr + CSR12);
+			iowrite32(0x32, ioaddr + CSR12);
 			tp->csr6 = 0x00420000;
-			outl(0x0001B078, ioaddr + 0xB8);
-			outl(0x0201B078, ioaddr + 0xB8);
+			iowrite32(0x0001B078, ioaddr + 0xB8);
+			iowrite32(0x0201B078, ioaddr + 0xB8);
 			next_tick = 1*HZ;
 		}
 	} else if ((tp->chip_id == MX98713 || tp->chip_id == COMPEX9881)
 			   && ! tp->medialock) {
 		dev->if_port = 0;
 		tp->csr6 = 0x01880000 | (tp->full_duplex ? 0x0200 : 0);
-		outl(0x0f370000 | inw(ioaddr + 0x80), ioaddr + 0x80);
+		iowrite32(0x0f370000 | ioread16(ioaddr + 0x80), ioaddr + 0x80);
 	} else if (tp->chip_id == MX98715 || tp->chip_id == MX98725) {
 		/* Provided by BOLO, Macronix - 12/10/1998. */
 		dev->if_port = 0;
 		tp->csr6 = 0x01a80200;
-		outl(0x0f370000 | inw(ioaddr + 0x80), ioaddr + 0x80);
-		outl(0x11000 | inw(ioaddr + 0xa0), ioaddr + 0xa0);
+		iowrite32(0x0f370000 | ioread16(ioaddr + 0x80), ioaddr + 0x80);
+		iowrite32(0x11000 | ioread16(ioaddr + 0xa0), ioaddr + 0xa0);
 	} else if (tp->chip_id == COMET || tp->chip_id == CONEXANT) {
 		/* Enable automatic Tx underrun recovery. */
-		outl(inl(ioaddr + 0x88) | 1, ioaddr + 0x88);
+		iowrite32(ioread32(ioaddr + 0x88) | 1, ioaddr + 0x88);
 		dev->if_port = tp->mii_cnt ? 11 : 0;
 		tp->csr6 = 0x00040000;
 	} else if (tp->chip_id == AX88140) {
@@ -456,18 +456,18 @@ media_picked:
 	tulip_stop_rxtx(tp);
 	barrier();
 	udelay(5);
-	outl(tp->csr6 | TxOn, ioaddr + CSR6);
+	iowrite32(tp->csr6 | TxOn, ioaddr + CSR6);
 
 	/* Enable interrupts by setting the interrupt mask. */
-	outl(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR5);
-	outl(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR7);
+	iowrite32(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR5);
+	iowrite32(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR7);
 	tulip_start_rxtx(tp);
-	outl(0, ioaddr + CSR2);		/* Rx poll demand */
+	iowrite32(0, ioaddr + CSR2);		/* Rx poll demand */
 
 	if (tulip_debug > 2) {
 		printk(KERN_DEBUG "%s: Done tulip_up(), CSR0 %8.8x, CSR5 %8.8x CSR6 %8.8x.\n",
-			   dev->name, inl(ioaddr + CSR0), inl(ioaddr + CSR5),
-			   inl(ioaddr + CSR6));
+			   dev->name, ioread32(ioaddr + CSR0), ioread32(ioaddr + CSR5),
+			   ioread32(ioaddr + CSR6));
 	}
 
 	/* Set the timer to switch to check for link beat and perhaps switch
@@ -502,7 +502,7 @@ tulip_open(struct net_device *dev)
 static void tulip_tx_timeout(struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave (&tp->lock, flags);
@@ -517,8 +517,8 @@ static void tulip_tx_timeout(struct net_device *dev)
 			   || tp->chip_id == DM910X) {
 		printk(KERN_WARNING "%s: 21140 transmit timed out, status %8.8x, "
 			   "SIA %8.8x %8.8x %8.8x %8.8x, resetting...\n",
-			   dev->name, inl(ioaddr + CSR5), inl(ioaddr + CSR12),
-			   inl(ioaddr + CSR13), inl(ioaddr + CSR14), inl(ioaddr + CSR15));
+			   dev->name, ioread32(ioaddr + CSR5), ioread32(ioaddr + CSR12),
+			   ioread32(ioaddr + CSR13), ioread32(ioaddr + CSR14), ioread32(ioaddr + CSR15));
 		if ( ! tp->medialock  &&  tp->mtable) {
 			do
 				--tp->cur_index;
@@ -536,12 +536,12 @@ static void tulip_tx_timeout(struct net_device *dev)
 	} else if (tp->chip_id == PNIC2) {
 		printk(KERN_WARNING "%s: PNIC2 transmit timed out, status %8.8x, "
 		       "CSR6/7 %8.8x / %8.8x CSR12 %8.8x, resetting...\n",
-		       dev->name, (int)inl(ioaddr + CSR5), (int)inl(ioaddr + CSR6),
-		       (int)inl(ioaddr + CSR7), (int)inl(ioaddr + CSR12));
+		       dev->name, (int)ioread32(ioaddr + CSR5), (int)ioread32(ioaddr + CSR6),
+		       (int)ioread32(ioaddr + CSR7), (int)ioread32(ioaddr + CSR12));
 	} else {
 		printk(KERN_WARNING "%s: Transmit timed out, status %8.8x, CSR12 "
 			   "%8.8x, resetting...\n",
-			   dev->name, inl(ioaddr + CSR5), inl(ioaddr + CSR12));
+			   dev->name, ioread32(ioaddr + CSR5), ioread32(ioaddr + CSR12));
 		dev->if_port = 0;
 	}
 
@@ -576,7 +576,7 @@ static void tulip_tx_timeout(struct net_device *dev)
 
 	tulip_restart_rxtx(tp);
 	/* Trigger an immediate transmit demand. */
-	outl(0, ioaddr + CSR1);
+	iowrite32(0, ioaddr + CSR1);
 
 	tp->stats.tx_errors++;
 
@@ -678,7 +678,7 @@ tulip_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tp->cur_tx++;
 
 	/* Trigger an immediate transmit demand. */
-	outl(0, dev->base_addr + CSR1);
+	iowrite32(0, tp->base_addr + CSR1);
 
 	spin_unlock_irq(&tp->lock);
 
@@ -725,8 +725,8 @@ static void tulip_clean_tx_ring(struct tulip_private *tp)
 
 static void tulip_down (struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
 	struct tulip_private *tp = netdev_priv(dev);
+	void __iomem *ioaddr = tp->base_addr;
 	unsigned long flags;
 
 	del_timer_sync (&tp->timer);
@@ -736,7 +736,7 @@ static void tulip_down (struct net_device *dev)
 	spin_lock_irqsave (&tp->lock, flags);
 
 	/* Disable interrupts by clearing the interrupt mask. */
-	outl (0x00000000, ioaddr + CSR7);
+	iowrite32 (0x00000000, ioaddr + CSR7);
 
 	/* Stop the Tx and Rx processes. */
 	tulip_stop_rxtx(tp);
@@ -747,8 +747,8 @@ static void tulip_down (struct net_device *dev)
 	/* release any unconsumed transmit buffers */
 	tulip_clean_tx_ring(tp);
 
-	if (inl (ioaddr + CSR6) != 0xffffffff)
-		tp->stats.rx_missed_errors += inl (ioaddr + CSR8) & 0xffff;
+	if (ioread32 (ioaddr + CSR6) != 0xffffffff)
+		tp->stats.rx_missed_errors += ioread32 (ioaddr + CSR8) & 0xffff;
 
 	spin_unlock_irqrestore (&tp->lock, flags);
 
@@ -765,8 +765,8 @@ static void tulip_down (struct net_device *dev)
 
 static int tulip_close (struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
 	struct tulip_private *tp = netdev_priv(dev);
+	void __iomem *ioaddr = tp->base_addr;
 	int i;
 
 	netif_stop_queue (dev);
@@ -775,7 +775,7 @@ static int tulip_close (struct net_device *dev)
 
 	if (tulip_debug > 1)
 		printk (KERN_DEBUG "%s: Shutting down ethercard, status was %2.2x.\n",
-			dev->name, inl (ioaddr + CSR5));
+			dev->name, ioread32 (ioaddr + CSR5));
 
 	free_irq (dev->irq, dev);
 
@@ -814,14 +814,14 @@ static int tulip_close (struct net_device *dev)
 static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 
 	if (netif_running(dev)) {
 		unsigned long flags;
 
 		spin_lock_irqsave (&tp->lock, flags);
 
-		tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
+		tp->stats.rx_missed_errors += ioread32(ioaddr + CSR8) & 0xffff;
 
 		spin_unlock_irqrestore(&tp->lock, flags);
 	}
@@ -830,44 +830,29 @@ static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 }
 
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void tulip_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct tulip_private *np = netdev_priv(dev);
-	u32 ethcmd;
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_name(np->pdev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-        }
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pdev));
 }
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = tulip_get_drvinfo
+};
 
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	struct mii_ioctl_data *data = if_mii(rq);
 	const unsigned int phy_idx = 0;
 	int phy = tp->phys[phy_idx] & 0x1f;
 	unsigned int regnum = data->reg_num;
 
 	switch (cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, rq->ifr_data);
-
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		if (tp->mii_cnt)
 			data->phy_id = phy;
@@ -880,8 +865,8 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
 		if (data->phy_id == 32 && (tp->flags & HAS_NWAY)) {
-			int csr12 = inl (ioaddr + CSR12);
-			int csr14 = inl (ioaddr + CSR14);
+			int csr12 = ioread32 (ioaddr + CSR12);
+			int csr14 = ioread32 (ioaddr + CSR14);
 			switch (regnum) {
 			case 0:
                                 if (((csr14<<5) & 0x1000) ||
@@ -901,7 +886,7 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 			case 4:
                                 /* Advertised value, bogus 10baseTx-FD value from CSR6. */
                                 data->val_out =
-					((inl(ioaddr + CSR6) >> 3) & 0x0040) +
+					((ioread32(ioaddr + CSR6) >> 3) & 0x0040) +
 					((csr14 >> 1) & 0x20) + 1;
                                 data->val_out |= ((csr14 >> 9) & 0x03C0);
 				break;
@@ -1026,10 +1011,10 @@ static void build_setup_frame_perfect(u16 *setup_frm, struct net_device *dev)
 static void set_rx_mode(struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	int csr6;
 
-	csr6 = inl(ioaddr + CSR6) & ~0x00D5;
+	csr6 = ioread32(ioaddr + CSR6) & ~0x00D5;
 
 	tp->csr6 &= ~0x00D5;
 	if (dev->flags & IFF_PROMISC) {			/* Set promiscuous. */
@@ -1073,13 +1058,13 @@ static void set_rx_mode(struct net_device *dev)
 				mc_filter[1] == tp->mc_filter[1])
 				;				/* No change. */
 			else if (tp->flags & IS_ASIX) {
-				outl(2, ioaddr + CSR13);
-				outl(mc_filter[0], ioaddr + CSR14);
-				outl(3, ioaddr + CSR13);
-				outl(mc_filter[1], ioaddr + CSR14);
+				iowrite32(2, ioaddr + CSR13);
+				iowrite32(mc_filter[0], ioaddr + CSR14);
+				iowrite32(3, ioaddr + CSR13);
+				iowrite32(mc_filter[1], ioaddr + CSR14);
 			} else if (tp->flags & COMET_MAC_ADDR) {
-				outl(mc_filter[0], ioaddr + 0xAC);
-				outl(mc_filter[1], ioaddr + 0xB0);
+				iowrite32(mc_filter[0], ioaddr + 0xAC);
+				iowrite32(mc_filter[1], ioaddr + 0xB0);
 			}
 			tp->mc_filter[0] = mc_filter[0];
 			tp->mc_filter[1] = mc_filter[1];
@@ -1139,13 +1124,13 @@ static void set_rx_mode(struct net_device *dev)
 				netif_stop_queue(dev);
 
 			/* Trigger an immediate transmit demand. */
-			outl(0, ioaddr + CSR1);
+			iowrite32(0, ioaddr + CSR1);
 		}
 
 		spin_unlock_irqrestore(&tp->lock, flags);
 	}
 
-	outl(csr6, ioaddr + CSR6);
+	iowrite32(csr6, ioaddr + CSR6);
 }
 
 #ifdef CONFIG_TULIP_MWI
@@ -1243,7 +1228,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	unsigned short sum;
 	unsigned char *ee_data;
 	struct net_device *dev;
-	long ioaddr;
+	void __iomem *ioaddr;
 	static int board_idx = -1;
 	int chip_idx = ent->driver_data;
 	const char *chip_name = tulip_tbl[chip_idx].chip_name;
@@ -1338,7 +1323,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		return i;
 	}
 
-	ioaddr = pci_resource_start (pdev, 0);
 	irq = pdev->irq;
 
 	/* alloc_etherdev ensures aligned and zeroed private structures */
@@ -1364,11 +1348,12 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		goto err_out_free_netdev;
 
 #ifndef USE_IO_OPS
-	ioaddr = (unsigned long) ioremap (pci_resource_start (pdev, 1),
-					  tulip_tbl[chip_idx].io_size);
+	ioaddr =  pci_iomap(pdev, 1, tulip_tbl[chip_idx].io_size);
+#else
+	ioaddr =  pci_iomap(pdev, 0, tulip_tbl[chip_idx].io_size);
+#endif
 	if (!ioaddr)
 		goto err_out_free_res;
-#endif
 
 	pci_read_config_byte (pdev, PCI_REVISION_ID, &chip_rev);
 
@@ -1399,7 +1384,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	tp->timer.data = (unsigned long)dev;
 	tp->timer.function = tulip_tbl[tp->chip_id].media_timer;
 
-	dev->base_addr = ioaddr;
+	dev->base_addr = (unsigned long)ioaddr;
 
 #ifdef CONFIG_TULIP_MWI
 	if (!force_csr0 && (tp->flags & HAS_PCI_MWI))
@@ -1433,7 +1418,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #endif
 
 	/* Clear the missed-packet counter. */
-	inl(ioaddr + CSR8);
+	ioread32(ioaddr + CSR8);
 
 	/* The station address ROM is read byte serially.  The register must
 	   be polled, waiting for the value to be read bit serially from the
@@ -1444,17 +1429,17 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	if (chip_idx == LC82C168) {
 		for (i = 0; i < 3; i++) {
 			int value, boguscnt = 100000;
-			outl(0x600 | i, ioaddr + 0x98);
+			iowrite32(0x600 | i, ioaddr + 0x98);
 			do
-				value = inl(ioaddr + CSR9);
+				value = ioread32(ioaddr + CSR9);
 			while (value < 0  && --boguscnt > 0);
 			put_unaligned(le16_to_cpu(value), ((u16*)dev->dev_addr) + i);
 			sum += value & 0xffff;
 		}
 	} else if (chip_idx == COMET) {
 		/* No need to read the EEPROM. */
-		put_unaligned(cpu_to_le32(inl(ioaddr + 0xA4)), (u32 *)dev->dev_addr);
-		put_unaligned(cpu_to_le16(inl(ioaddr + 0xA8)), (u16 *)(dev->dev_addr + 4));
+		put_unaligned(cpu_to_le32(ioread32(ioaddr + 0xA4)), (u32 *)dev->dev_addr);
+		put_unaligned(cpu_to_le16(ioread32(ioaddr + 0xA8)), (u16 *)(dev->dev_addr + 4));
 		for (i = 0; i < 6; i ++)
 			sum += dev->dev_addr[i];
 	} else {
@@ -1644,11 +1629,12 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	dev->poll_controller = &poll_tulip;
 #endif
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	if (register_netdev(dev))
 		goto err_out_free_ring;
 
-	printk(KERN_INFO "%s: %s rev %d at %#3lx,",
+	printk(KERN_INFO "%s: %s rev %d at %p,",
 	       dev->name, chip_name, chip_rev, ioaddr);
 	pci_set_drvdata(pdev, dev);
 
@@ -1671,43 +1657,43 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	case DM910X:
 	default:
 		if (tp->mtable)
-			outl(tp->mtable->csr12dir | 0x100, ioaddr + CSR12);
+			iowrite32(tp->mtable->csr12dir | 0x100, ioaddr + CSR12);
 		break;
 	case DC21142:
 		if (tp->mii_cnt  ||  tulip_media_cap[dev->if_port] & MediaIsMII) {
-			outl(csr6_mask_defstate, ioaddr + CSR6);
-			outl(0x0000, ioaddr + CSR13);
-			outl(0x0000, ioaddr + CSR14);
-			outl(csr6_mask_hdcap, ioaddr + CSR6);
+			iowrite32(csr6_mask_defstate, ioaddr + CSR6);
+			iowrite32(0x0000, ioaddr + CSR13);
+			iowrite32(0x0000, ioaddr + CSR14);
+			iowrite32(csr6_mask_hdcap, ioaddr + CSR6);
 		} else
 			t21142_start_nway(dev);
 		break;
 	case PNIC2:
 	        /* just do a reset for sanity sake */
-		outl(0x0000, ioaddr + CSR13);
-		outl(0x0000, ioaddr + CSR14);
+		iowrite32(0x0000, ioaddr + CSR13);
+		iowrite32(0x0000, ioaddr + CSR14);
 		break;
 	case LC82C168:
 		if ( ! tp->mii_cnt) {
 			tp->nway = 1;
 			tp->nwayset = 0;
-			outl(csr6_ttm | csr6_ca, ioaddr + CSR6);
-			outl(0x30, ioaddr + CSR12);
-			outl(0x0001F078, ioaddr + CSR6);
-			outl(0x0201F078, ioaddr + CSR6); /* Turn on autonegotiation. */
+			iowrite32(csr6_ttm | csr6_ca, ioaddr + CSR6);
+			iowrite32(0x30, ioaddr + CSR12);
+			iowrite32(0x0001F078, ioaddr + CSR6);
+			iowrite32(0x0201F078, ioaddr + CSR6); /* Turn on autonegotiation. */
 		}
 		break;
 	case MX98713:
 	case COMPEX9881:
-		outl(0x00000000, ioaddr + CSR6);
-		outl(0x000711C0, ioaddr + CSR14); /* Turn on NWay. */
-		outl(0x00000001, ioaddr + CSR13);
+		iowrite32(0x00000000, ioaddr + CSR6);
+		iowrite32(0x000711C0, ioaddr + CSR14); /* Turn on NWay. */
+		iowrite32(0x00000001, ioaddr + CSR13);
 		break;
 	case MX98715:
 	case MX98725:
-		outl(0x01a80000, ioaddr + CSR6);
-		outl(0xFFFFFFFF, ioaddr + CSR14);
-		outl(0x00001000, ioaddr + CSR12);
+		iowrite32(0x01a80000, ioaddr + CSR6);
+		iowrite32(0xFFFFFFFF, ioaddr + CSR14);
+		iowrite32(0x00001000, ioaddr + CSR12);
 		break;
 	case COMET:
 		/* No initialization necessary. */
@@ -1728,11 +1714,9 @@ err_out_free_ring:
 err_out_mtable:
 	if (tp->mtable)
 		kfree (tp->mtable);
-#ifndef USE_IO_OPS
-	iounmap((void *)ioaddr);
+	pci_iounmap(pdev, ioaddr);
 
 err_out_free_res:
-#endif
 	pci_release_regions (pdev);
 
 err_out_free_netdev:
@@ -1790,9 +1774,7 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 			     tp->rx_ring, tp->rx_ring_dma);
 	if (tp->mtable)
 		kfree (tp->mtable);
-#ifndef USE_IO_OPS
-	iounmap((void *)dev->base_addr);
-#endif
+	pci_iounmap(pdev, tp->base_addr);
 	free_netdev (dev);
 	pci_release_regions (pdev);
 	pci_set_drvdata (pdev, NULL);

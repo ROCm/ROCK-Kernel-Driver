@@ -335,7 +335,7 @@ struct cp_extra_stats {
 };
 
 struct cp_private {
-	void			*regs;
+	void			__iomem *regs;
 	struct net_device	*dev;
 	spinlock_t		lock;
 	u32			msg_enable;
@@ -1580,11 +1580,11 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 #define EE_READ_CMD		(6)
 #define EE_ERASE_CMD	(7)
 
-static int read_eeprom (void *ioaddr, int location, int addr_len)
+static int read_eeprom (void __iomem *ioaddr, int location, int addr_len)
 {
 	int i;
 	unsigned retval = 0;
-	void *ee_addr = ioaddr + Cfg9346;
+	void __iomem *ee_addr = ioaddr + Cfg9346;
 	int read_cmd = location | (EE_READ_CMD << addr_len);
 
 	writeb (EE_ENB & ~EE_CS, ee_addr);
@@ -1631,7 +1631,7 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct net_device *dev;
 	struct cp_private *cp;
 	int rc;
-	void *regs;
+	void __iomem *regs;
 	long pciaddr;
 	unsigned int addr_len, i, pci_using_dac;
 	u8 pci_rev;

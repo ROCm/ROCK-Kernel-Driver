@@ -97,7 +97,6 @@ static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter,
 static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter);
 #endif
 static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter);
-static int ixgb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static void ixgb_tx_timeout(struct net_device *dev);
 static void ixgb_tx_timeout_task(struct net_device *dev);
 static void ixgb_vlan_rx_register(struct net_device *netdev,
@@ -124,7 +123,7 @@ struct notifier_block ixgb_notifier_reboot = {
 /* Exported from other modules */
 
 extern void ixgb_check_options(struct ixgb_adapter *adapter);
-extern int ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr);
+extern struct ethtool_ops ixgb_ethtool_ops;
 
 static struct pci_driver ixgb_driver = {
 	.name = ixgb_driver_name,
@@ -372,9 +371,9 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netdev->set_multicast_list = &ixgb_set_multi;
 	netdev->set_mac_address = &ixgb_set_mac;
 	netdev->change_mtu = &ixgb_change_mtu;
-	netdev->do_ioctl = &ixgb_ioctl;
 	netdev->tx_timeout = &ixgb_tx_timeout;
 	netdev->watchdog_timeo = HZ;
+	SET_ETHTOOL_OPS(netdev, &ixgb_ethtool_ops);
 #ifdef CONFIG_IXGB_NAPI
 	netdev->poll = &ixgb_clean;
 	netdev->weight = 64;
@@ -1967,25 +1966,6 @@ static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter)
 	}
 
 	rx_ring->next_to_use = i;
-}
-
-/**
- * ixgb_ioctl - perform a command - e.g: ethtool:get_driver_info.
- * @param netdev network interface device structure
- * @param ifr data to be used/filled in by the ioctl command
- * @param cmd ioctl command to execute
- **/
-
-static int ixgb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
-{
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return ixgb_ethtool_ioctl(netdev, ifr);
-	default:
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
 }
 
 /**

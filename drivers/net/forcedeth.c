@@ -438,6 +438,8 @@ struct fe_priv {
 	u32 irqmask;
 	u32 desc_ver;
 
+	void __iomem *base;
+
 	/* rx specific fields.
 	 * Locking: Within irq hander or disable_irq+spin_lock(&np->lock);
 	 */
@@ -472,15 +474,15 @@ static int max_interrupt_work = 5;
 
 static inline struct fe_priv *get_nvpriv(struct net_device *dev)
 {
-	return (struct fe_priv *) dev->priv;
+	return netdev_priv(dev);
 }
 
-static inline u8 *get_hwbase(struct net_device *dev)
+static inline u8 __iomem *get_hwbase(struct net_device *dev)
 {
-	return (u8 *) dev->base_addr;
+	return get_nvpriv(dev)->base;
 }
 
-static inline void pci_push(u8 * base)
+static inline void pci_push(u8 __iomem *base)
 {
 	/* force out pending posted writes */
 	readl(base);
@@ -495,7 +497,7 @@ static inline u32 nv_descr_getlength(struct ring_desc *prd, u32 v)
 static int reg_delay(struct net_device *dev, int offset, u32 mask, u32 target,
 				int delay, int delaymax, const char *msg)
 {
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	pci_push(base);
 	do {
@@ -517,7 +519,7 @@ static int reg_delay(struct net_device *dev, int offset, u32 mask, u32 target,
  */
 static int mii_rw(struct net_device *dev, int addr, int miireg, int value)
 {
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	u32 reg;
 	int retval;
 
@@ -588,7 +590,7 @@ static int phy_reset(struct net_device *dev)
 static int phy_init(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	u32 phyinterface, phy_reserved, mii_status, mii_control, mii_control_1000,reg;
 
 	/* set advertise register */
@@ -665,7 +667,7 @@ static int phy_init(struct net_device *dev)
 static void nv_start_rx(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	dprintk(KERN_DEBUG "%s: nv_start_rx\n", dev->name);
 	/* Already running? Stop it. */
@@ -683,7 +685,7 @@ static void nv_start_rx(struct net_device *dev)
 
 static void nv_stop_rx(struct net_device *dev)
 {
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	dprintk(KERN_DEBUG "%s: nv_stop_rx\n", dev->name);
 	writel(0, base + NvRegReceiverControl);
@@ -697,7 +699,7 @@ static void nv_stop_rx(struct net_device *dev)
 
 static void nv_start_tx(struct net_device *dev)
 {
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	dprintk(KERN_DEBUG "%s: nv_start_tx\n", dev->name);
 	writel(NVREG_XMITCTL_START, base + NvRegTransmitterControl);
@@ -706,7 +708,7 @@ static void nv_start_tx(struct net_device *dev)
 
 static void nv_stop_tx(struct net_device *dev)
 {
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	dprintk(KERN_DEBUG "%s: nv_stop_tx\n", dev->name);
 	writel(0, base + NvRegTransmitterControl);
@@ -721,7 +723,7 @@ static void nv_stop_tx(struct net_device *dev)
 static void nv_txrx_reset(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	dprintk(KERN_DEBUG "%s: nv_txrx_reset\n", dev->name);
 	writel(NVREG_TXRXCTL_BIT2 | NVREG_TXRXCTL_RESET | np->desc_ver, base + NvRegTxRxControl);
@@ -748,90 +750,49 @@ static struct net_device_stats *nv_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-static int nv_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void nv_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
-	u32 ethcmd;
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:
-	{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy(info.driver, "forcedeth");
-		strcpy(info.version, FORCEDETH_VERSION);
-		strcpy(info.bus_info, pci_name(np->pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_GLINK:
-	{
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-
-		edata.data = !!netif_carrier_ok(dev);
-
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_GWOL:
-	{
-		struct ethtool_wolinfo wolinfo;
-		memset(&wolinfo, 0, sizeof(wolinfo));
-		wolinfo.supported = WAKE_MAGIC;
-
-		spin_lock_irq(&np->lock);
-		if (np->wolenabled)
-			wolinfo.wolopts = WAKE_MAGIC;
-		spin_unlock_irq(&np->lock);
-
-		if (copy_to_user(useraddr, &wolinfo, sizeof(wolinfo)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SWOL:
-	{
-		struct ethtool_wolinfo wolinfo;
-		if (copy_from_user(&wolinfo, useraddr, sizeof(wolinfo)))
-			return -EFAULT;
-
-		spin_lock_irq(&np->lock);
-		if (wolinfo.wolopts == 0) {
-			writel(0, base + NvRegWakeUpFlags);
-			np->wolenabled = 0;
-		}
-		if (wolinfo.wolopts & WAKE_MAGIC) {
-			writel(NVREG_WAKEUPFLAGS_ENABLE, base + NvRegWakeUpFlags);
-			np->wolenabled = 1;
-		}
-		spin_unlock_irq(&np->lock);
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, "forcedeth");
+	strcpy(info->version, FORCEDETH_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
 }
-/*
- * nv_ioctl: dev->do_ioctl function
- * Called with rtnl_lock held.
- */
-static int nv_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+
+static void nv_get_wol(struct net_device *dev, struct ethtool_wolinfo *wolinfo)
 {
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return nv_ethtool_ioctl(dev, rq->ifr_data);
+	struct fe_priv *np = get_nvpriv(dev);
+	wolinfo->supported = WAKE_MAGIC;
 
-	default:
-		return -EOPNOTSUPP;
-	}
+	spin_lock_irq(&np->lock);
+	if (np->wolenabled)
+		wolinfo->wolopts = WAKE_MAGIC;
+	spin_unlock_irq(&np->lock);
 }
+
+static int nv_set_wol(struct net_device *dev, struct ethtool_wolinfo *wolinfo)
+{
+	struct fe_priv *np = get_nvpriv(dev);
+	u8 __iomem *base = get_hwbase(dev);
+
+	spin_lock_irq(&np->lock);
+	if (wolinfo->wolopts == 0) {
+		writel(0, base + NvRegWakeUpFlags);
+		np->wolenabled = 0;
+	}
+	if (wolinfo->wolopts & WAKE_MAGIC) {
+		writel(NVREG_WAKEUPFLAGS_ENABLE, base + NvRegWakeUpFlags);
+		np->wolenabled = 1;
+	}
+	spin_unlock_irq(&np->lock);
+	return 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = nv_get_drvinfo,
+	.get_link = ethtool_op_get_link,
+	.get_wol = nv_get_wol,
+	.set_wol = nv_set_wol,
+};
 
 /*
  * nv_alloc_rx: fill rx ring entries.
@@ -1049,7 +1010,7 @@ static void nv_tx_done(struct net_device *dev)
 static void nv_tx_timeout(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	dprintk(KERN_DEBUG "%s: Got tx_timeout. irq: %08x\n", dev->name,
 			readl(base + NvRegIrqStatus) & NVREG_IRQSTAT_MASK);
@@ -1218,7 +1179,7 @@ static int nv_change_mtu(struct net_device *dev, int new_mtu)
 static void nv_set_multicast(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	u32 addr[2];
 	u32 mask[2];
 	u32 pff;
@@ -1278,7 +1239,7 @@ static void nv_set_multicast(struct net_device *dev)
 static int nv_update_linkspeed(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	int adv, lpa;
 	int newls = np->linkspeed;
 	int newdup = np->duplex;
@@ -1413,7 +1374,7 @@ static void nv_linkchange(struct net_device *dev)
 
 static void nv_link_irq(struct net_device *dev)
 {
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	u32 miistat;
 
 	miistat = readl(base + NvRegMIIStatus);
@@ -1429,7 +1390,7 @@ static irqreturn_t nv_nic_irq(int foo, void *data, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	u32 events;
 	int i;
 
@@ -1501,7 +1462,7 @@ static void nv_do_nic_poll(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	disable_irq(dev->irq);
 	/* FIXME: Do we need synchronize_irq(dev->irq) here? */
@@ -1518,7 +1479,7 @@ static void nv_do_nic_poll(unsigned long data)
 static int nv_open(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 	int ret, oom, i;
 
 	dprintk(KERN_DEBUG "nv_open: begin\n");
@@ -1659,7 +1620,7 @@ out_drain:
 static int nv_close(struct net_device *dev)
 {
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base;
+	u8 __iomem *base;
 
 	spin_lock_irq(&np->lock);
 	np->in_shutdown = 1;
@@ -1699,7 +1660,7 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	struct net_device *dev;
 	struct fe_priv *np;
 	unsigned long addr;
-	u8 *base;
+	u8 __iomem *base;
 	int err, i;
 
 	dev = alloc_etherdev(sizeof(struct fe_priv));
@@ -1761,9 +1722,10 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 		np->desc_ver = DESC_VER_2;
 
 	err = -ENOMEM;
-	dev->base_addr = (unsigned long) ioremap(addr, NV_PCI_REGSZ);
-	if (!dev->base_addr)
+	np->base = ioremap(addr, NV_PCI_REGSZ);
+	if (!np->base)
 		goto out_relreg;
+	dev->base_addr = (unsigned long)np->base;
 	dev->irq = pci_dev->irq;
 	np->rx_ring = pci_alloc_consistent(pci_dev, sizeof(struct ring_desc) * (RX_RING + TX_RING),
 						&np->ring_addr);
@@ -1777,7 +1739,7 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	dev->get_stats = nv_get_stats;
 	dev->change_mtu = nv_change_mtu;
 	dev->set_multicast_list = nv_set_multicast;
-	dev->do_ioctl = nv_ioctl;
+	SET_ETHTOOL_OPS(dev, &ops);
 	dev->tx_timeout = nv_tx_timeout;
 	dev->watchdog_timeo = NV_WATCHDOG_TIMEO;
 
@@ -1910,7 +1872,7 @@ static void __devexit nv_remove(struct pci_dev *pci_dev)
 {
 	struct net_device *dev = pci_get_drvdata(pci_dev);
 	struct fe_priv *np = get_nvpriv(dev);
-	u8 *base = get_hwbase(dev);
+	u8 __iomem *base = get_hwbase(dev);
 
 	unregister_netdev(dev);
 

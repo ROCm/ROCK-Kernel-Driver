@@ -510,7 +510,7 @@ static inline void set_rraddr(rraddr *ra, dma_addr_t addr)
 }
 
 
-static inline void set_rxaddr(struct rr_regs *regs, volatile dma_addr_t addr)
+static inline void set_rxaddr(struct rr_regs __iomem *regs, volatile dma_addr_t addr)
 {
 	unsigned long baddr = addr;
 #if (BITS_PER_LONG == 64) && defined(__LITTLE_ENDIAN)
@@ -527,7 +527,7 @@ static inline void set_rxaddr(struct rr_regs *regs, volatile dma_addr_t addr)
 }
 
 
-static inline void set_infoaddr(struct rr_regs *regs, volatile dma_addr_t addr)
+static inline void set_infoaddr(struct rr_regs __iomem *regs, volatile dma_addr_t addr)
 {
 	unsigned long baddr = addr;
 #if (BITS_PER_LONG == 64) && defined(__LITTLE_ENDIAN)
@@ -808,7 +808,7 @@ struct rr_private
 	/* Alignment ok ? */
 	struct sk_buff		*rx_skbuff[RX_RING_ENTRIES];
 	struct sk_buff		*tx_skbuff[TX_RING_ENTRIES];
-	struct rr_regs		*regs;		/* Register base */
+	struct rr_regs		__iomem *regs;		/* Register base */
 	struct ring_ctrl	*rx_ctrl;	/* Receive ring control */
 	struct rr_info		*info;		/* Shared info page */
 	dma_addr_t 		rx_ctrl_dma;
