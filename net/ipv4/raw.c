@@ -383,7 +383,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		 * IP_HDRINCL is much more convenient.
 		 */
 	} else {
-		err = -EINVAL;
+		err = -EDESTADDRREQ;
 		if (sk->sk_state != TCP_ESTABLISHED) 
 			goto out;
 		daddr = inet->daddr;
