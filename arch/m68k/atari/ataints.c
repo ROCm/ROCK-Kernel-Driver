@@ -168,7 +168,7 @@ asmlinkage void IRQ_NAME(n);						   \
 void atari_slow_irq_##n##_dummy (void) {				   \
 __asm__ (__ALIGN_STR "\n"						   \
 "atari_slow_irq_" #n "_handler:\t"					   \
-"	addql	#1,%5\n"		/* local_irq_count++ */		   \
+"	addl	%6,%5\n"	/* preempt_count() += HARDIRQ_OFFSET */	   \
 	SAVE_ALL_INT "\n"						   \
 	GET_CURRENT(%%d0) "\n"						   \
 "	andb	#~(1<<(%c3&7)),%a4:w\n"	/* mask this interrupt */	   \
@@ -194,7 +194,7 @@ __asm__ (__ALIGN_STR "\n"						   \
 	     "n" (PT_OFF_SR), "n" (n),					   \
 	     "i" (n & 8 ? (n & 16 ? &tt_mfp.int_mk_a : &mfp.int_mk_a)	   \
 		        : (n & 16 ? &tt_mfp.int_mk_b : &mfp.int_mk_b)),	   \
-	     "m" (local_irq_count(0))					   \
+	     "m" (preempt_count()), "di" (HARDIRQ_OFFSET)		   \
 );									   \
 	for (;;);			/* fake noreturn */		   \
 }
@@ -276,7 +276,7 @@ __asm__ (__ALIGN_STR "\n"
 "atari_fast_irq_handler:
 	orw 	#0x700,%%sr		/* disable all interrupts */
 atari_prio_irq_handler:\t
-	addql	#1,%2\n"		/* local_irq_count++ */
+	addl	%3,%2\n"		/* preempt_count() += HARDIRQ_OFFSET */
 	SAVE_ALL_INT "\n"
 	GET_CURRENT(%%d0) "
 	/* get vector number from stack frame and convert to source */
@@ -297,7 +297,7 @@ atari_prio_irq_handler:\t
 	addql	#4,%%sp
 	jbra	ret_from_interrupt"
 	 : : "i" (&kstat_cpu(0).irqs), "n" (PT_OFF_FORMATVEC),
-	     "m" (local_irq_count(0))
+	     "m" (preempt_count()), "di" (HARDIRQ_OFFSET)
 );
 	for (;;);
 }
