@@ -75,7 +75,7 @@ extern struct net_device *SK_init(int unit);
 extern struct net_device *seeq8005_probe(int unit);
 extern struct net_device *smc_init(int unit);
 extern int atarilance_probe(struct net_device *);
-extern int sun3lance_probe(struct net_device *);
+extern struct net_device *sun3lance_probe(int unit);
 extern struct net_device *sun3_82586_probe(int unit);
 extern struct net_device *apne_probe(int unit);
 extern struct net_device *bionet_probe(int unit);
@@ -299,13 +299,13 @@ static struct devprobe m68k_probes[] __initdata = {
 #ifdef CONFIG_ATARILANCE	/* Lance-based Atari ethernet boards */
 	{atarilance_probe, 0},
 #endif
-#ifdef CONFIG_SUN3LANCE         /* sun3 onboard Lance chip */
-	{sun3lance_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 m68k_probes2[] __initdata = {
+#ifdef CONFIG_SUN3LANCE         /* sun3 onboard Lance chip */
+	{sun3lance_probe, 0},
+#endif
 #ifdef CONFIG_SUN3_82586        /* sun3 onboard Intel 82586 chip */
 	{sun3_82586_probe, 0},
 #endif
