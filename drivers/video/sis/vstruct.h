@@ -372,6 +372,8 @@ typedef struct _SiS_Private
 	const SiS_LVDSDataStruct  *SiS_LVDS1280x960Data_2;
 	const SiS_LVDSDataStruct  *SiS_LVDS1400x1050Data_1;
 	const SiS_LVDSDataStruct  *SiS_LVDS1400x1050Data_2;
+	const SiS_LVDSDataStruct  *SiS_LVDS1600x1200Data_1;
+	const SiS_LVDSDataStruct  *SiS_LVDS1600x1200Data_2;
 	const SiS_LVDSDataStruct  *SiS_LVDS1280x768Data_1;
 	const SiS_LVDSDataStruct  *SiS_LVDS1280x768Data_2;
 	const SiS_LVDSDataStruct  *SiS_LVDS1024x600Data_1;
@@ -410,6 +412,7 @@ typedef struct _SiS_Private
 	const SiS_LVDSDesStruct  *SiS_PanelType0d_1;
 	const SiS_LVDSDesStruct  *SiS_PanelType0e_1;
 	const SiS_LVDSDesStruct  *SiS_PanelType0f_1;
+	const SiS_LVDSDesStruct  *SiS_PanelTypeNS_1;
 	const SiS_LVDSDesStruct  *SiS_PanelType00_2;
 	const SiS_LVDSDesStruct  *SiS_PanelType01_2;
 	const SiS_LVDSDesStruct  *SiS_PanelType02_2;
@@ -426,6 +429,7 @@ typedef struct _SiS_Private
 	const SiS_LVDSDesStruct  *SiS_PanelType0d_2;
 	const SiS_LVDSDesStruct  *SiS_PanelType0e_2;
 	const SiS_LVDSDesStruct  *SiS_PanelType0f_2;
+	const SiS_LVDSDesStruct  *SiS_PanelTypeNS_2;
 
 	const SiS_LVDSDesStruct  *LVDS1024x768Des_1;
 	const SiS_LVDSDesStruct  *LVDS1280x1024Des_1;

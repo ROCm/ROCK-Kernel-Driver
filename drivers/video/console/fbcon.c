@@ -1044,6 +1044,9 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 		vc->vc_rows = nr_rows;
 	}
 	p->vrows = info->var.yres_virtual / vc->vc_font.height;
+	if(info->var.yres > (vc->vc_font.height * (vc->vc_rows + 1))) {
+		p->vrows -= (info->var.yres - (vc->vc_font.height * vc->vc_rows)) / vc->vc_font.height;
+	}
 	if ((info->var.yres % vc->vc_font.height) &&
 	    (info->var.yres_virtual % vc->vc_font.height <
 	     info->var.yres % vc->vc_font.height))
@@ -1815,14 +1818,16 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	   (y_diff < 0 || y_diff > fh)) {
 		var.activate = FB_ACTIVATE_TEST;
 		err = fb_set_var(&var, info);
-		if (err || width != var.xres/fw ||
-		    height != var.yres/fh)
+		if (err || width > var.xres/fw ||
+		    height > var.yres/fh)
 			return -EINVAL;
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
 		var.activate = FB_ACTIVATE_NOW;
 		fb_set_var(&var, info);
-		p->vrows = info->var.yres_virtual/fh;
 	}
+	p->vrows = var.yres_virtual/fh;
+	if(var.yres > (fh * (height + 1)))
+		p->vrows -= (var.yres - (fh * height)) / fh;
 	return 0;
 }
 
@@ -1857,6 +1862,7 @@ static int fbcon_switch(struct vc_data *vc)
 	}
 	if (info)
 		info->var.yoffset = p->yscroll = 0;
+        fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
 	switch (p->scrollmode & __SCROLL_YMASK) {
 	case __SCROLL_YWRAP:
 		scrollback_phys_max = p->vrows - vc->vc_rows;
@@ -1875,7 +1881,6 @@ static int fbcon_switch(struct vc_data *vc)
 
 	info->currcon = unit;
 	
-        fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
 	update_var(unit, info);
 	fbcon_set_palette(vc, color_table); 	
 
@@ -2094,6 +2099,11 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		/* reset wrap/pan */
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;
 		p->vrows = info->var.yres_virtual / h;
+
+#if 0          /* INCOMPLETE - let the console gurus handle this */
+		if(info->var.yres > (h * (vc->vc_rows + 1))
+			p->vrows -= (info->var.yres - (h * vc->vc_rows)) / h;
+#endif
 		if ((info->var.yres % h)
 		    && (info->var.yres_virtual % h < info->var.yres % h))
 			p->vrows--;

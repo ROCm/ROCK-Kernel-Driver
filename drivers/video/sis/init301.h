@@ -72,8 +72,10 @@ void     SiS_GetCRT2Data(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHOR
 		         USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
 void     SiS_GetCRT2DataLVDS(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                              USHORT RefreshRateTableIndex,PSIS_HW_DEVICE_INFO HwDeviceExtension);
+#ifdef SIS315H			     
 void     SiS_GetCRT2PtrA(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                          USHORT RefreshRateTableIndex,USHORT *CRT2Index,USHORT *ResIndex);
+#endif
 void     SiS_GetCRT2Part2Ptr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
 		             USHORT RefreshRateTableIndex,USHORT *CRT2Index, USHORT *ResIndex);
 void     SiS_GetCRT2Data301(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
@@ -142,8 +144,10 @@ void     SiS_SetCRT2ECLK(SiS_Private *SiS_Pr, UCHAR *ROMAddr, USHORT ModeNo,USHO
 void     SiS_GetLVDSDesPtr(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                            USHORT RefreshRateTableIndex,USHORT *PanelIndex,USHORT *ResIndex,
 			   PSIS_HW_DEVICE_INFO HwDeviceExtension);
+#ifdef SIS315H			   
 void     SiS_GetLVDSDesPtrA(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                             USHORT RefreshRateTableIndex,USHORT *PanelIndex,USHORT *ResIndex);
+#endif			    
 void     SiS_SetTPData(SiS_Private *SiS_Pr);
 void     SiS_WhatIsThis(SiS_Private *SiS_Pr, USHORT myvbinfo);
 void     SiS_ModCRT1CRTC(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
@@ -202,8 +206,10 @@ void     SiS_SetGroup1(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHOR
                        PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
 void     SiS_SetGroup1_LVDS(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                             PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
+#ifdef SIS315H			    
 void     SiS_SetGroup1_LCDA(SiS_Private *SiS_Pr, USHORT  BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                             PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
+#endif			    
 void     SiS_SetGroup1_301(SiS_Private *SiS_Pr, USHORT BaseAddr,UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,
                            PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT RefreshRateTableIndex);
 #ifdef SIS300
@@ -231,18 +237,24 @@ void     SiS_VBWait(SiS_Private *SiS_Pr);
 void     SiS_SiS30xBLOn(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
 void     SiS_SiS30xBLOff(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
 
-/* TW: New functions (with mostly temporary names) */
 void     SiS_Chrontel701xBLOn(SiS_Private *SiS_Pr);
+void     SiS_Chrontel701xBLOff(SiS_Private *SiS_Pr);
+#ifdef SIS315H
 void     SiS_Chrontel701xOn(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,
                             USHORT BaseAddr);
-void     SiS_Chrontel701xBLOff(SiS_Private *SiS_Pr);
 void     SiS_Chrontel701xOff(SiS_Private *SiS_Pr);
-void     SiS_ChrontelResetDB(SiS_Private *SiS_Pr);
+void     SiS_ChrontelResetDB(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 void     SiS_ChrontelDoSomething4(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 void     SiS_ChrontelDoSomething3(SiS_Private *SiS_Pr, USHORT ModeNo, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 void     SiS_ChrontelDoSomething2(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 void     SiS_ChrontelDoSomething1(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 BOOLEAN  SiS_WeHaveBacklightCtrl(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+void     SiS_ChrontelPowerSequencing(SiS_Private *SiS_Pr);
+void     SiS_SetCH701xForLCD(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
+#ifdef NEWCH701x
+void     SiS_ChrontelDoSomething5(SiS_Private *SiS_Pr);
+#endif
+#endif /* 315 */
 #if 0
 BOOLEAN  SiS_IsSomethingCR5F(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 #endif
@@ -250,12 +262,9 @@ BOOLEAN  SiS_IsYPbPr(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,
 BOOLEAN  SiS_IsChScart(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 BOOLEAN  SiS_IsTVOrYPbPrOrScart(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
 BOOLEAN  SiS_IsLCDOrLCDA(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_SetCH701xForLCD(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, USHORT BaseAddr);
-void     SiS_ChrontelPowerSequencing(SiS_Private *SiS_Pr);
 BOOLEAN  SiS_CR36BIOSWord23b(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
 BOOLEAN  SiS_CR36BIOSWord23d(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
 BOOLEAN  SiS_IsSR13_CR30(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension);
-/* TW end */
 
 extern   void     SiS_SetReg1(USHORT, USHORT, USHORT);
 extern   void     SiS_SetReg3(USHORT, USHORT);

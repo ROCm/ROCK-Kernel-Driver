@@ -330,7 +330,7 @@ void sisfb_syncaccel(void)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,34)  /* --- KERNEL 2.5.34 and later --- */
 
-int sisfb_sync(struct fb_info *info)
+int fbcon_sis_sync(struct fb_info *info)
 {
    if(!sisfb_accel) return 0;
    CRITFLAGS
@@ -343,17 +343,17 @@ int sisfb_sync(struct fb_info *info)
    return 0;
 }
 
-void sisfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
+void fbcon_sis_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
    int col=0;
    CRITFLAGS
 
-   TWDEBUG("Inside sisfb_fillrect");
+   TWDEBUG("Inside sis_fillrect");
    if(!rect->width || !rect->height)
    	return;
 
    if(!sisfb_accel) {
-        cfb_fillrect(info, rect);
+	cfb_fillrect(info, rect);
 	return;
    }
    
@@ -382,7 +382,7 @@ void sisfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 
 }
 
-void sisfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
+void fbcon_sis_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
    int xdir, ydir;
    CRITFLAGS

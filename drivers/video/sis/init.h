@@ -261,16 +261,15 @@ void     SiSInitPCIetc(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtensio
 void     SiSDetermineROMUsage(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension, UCHAR *ROMAddr);
 
 #ifdef LINUX_XF86
-USHORT  	SiS_CalcModeIndex(ScrnInfoPtr pScrn, DisplayModePtr mode);
-USHORT  	SiS_CheckCalcModeIndex(ScrnInfoPtr pScrn, DisplayModePtr mode, int VBFlags);
 USHORT 		SiS_CheckBuildCustomMode(ScrnInfoPtr pScrn, DisplayModePtr mode, int VBFlags);
 void    	SiS_SetPitch(SiS_Private *SiS_Pr, ScrnInfoPtr pScrn, UShort BaseAddr);
 void    	SiS_SetPitchCRT1(SiS_Private *SiS_Pr, ScrnInfoPtr pScrn, UShort BaseAddr);
 void    	SiS_SetPitchCRT2(SiS_Private *SiS_Pr, ScrnInfoPtr pScrn, UShort BaseAddr);
-unsigned char 	SiS_GetSetModeID(ScrnInfoPtr pScrn, unsigned char id);
-unsigned char 	SiS_GetSetBIOSScratch(ScrnInfoPtr pScrn, USHORT offset, unsigned char value);
 extern int      SiS_compute_vclk(int Clock, int *out_n, int *out_dn, int *out_div,
 	     	 		    int *out_sbit, int *out_scale);
+extern unsigned char SiS_GetSetBIOSScratch(ScrnInfoPtr pScrn, USHORT offset, unsigned char value);
+extern unsigned char SiS_GetSetModeID(ScrnInfoPtr pScrn, unsigned char id);
+extern USHORT 	     SiS_CalcModeIndex(ScrnInfoPtr pScrn, DisplayModePtr mode);
 #endif
 
 extern USHORT    SiS_GetOffset(SiS_Private *SiS_Pr, UCHAR *ROMAddr,USHORT ModeNo,USHORT ModeIdIndex,

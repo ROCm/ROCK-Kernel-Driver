@@ -8,10 +8,11 @@
  * Minor parts Copyright SiS, Inc.
  *
  * Based on BIOS
- *     1.10.07, 1.10a for SiS650/LVDS+CH7019
+ *     1.10.07, 1.10a for 650/CH7019
+ *     1.11.21a for 740/CH7019
  *     1.11.05 for 650/LVDS (w/o Chrontel)
- *     1.07.1b, 1.11.6s, 1.11.6w, 1.11.7w, 1.11.8r for SiS650/301(B/LV)
- *     2.04.50 (I) and 2.04.5c (II) for SiS630/301(B)
+ *     1.07.1b, 1.11.6s, 1.11.6w, 1.11.7w, 1.11.8r for 650/301(B/LV)
+ *     2.04.50 (I) and 2.04.5c (II) for 630/301(B)
  *     2.06.50 for 630/301B (dual VGA)
  *     2.02.3b, 2.03.02, 2.04.5c, 2.07a and 2.08.b3 for 630/LVDS/LVDS+CH7005
  *     2.04.5c, 2.04.6c for 730+LVDS+CH7005
@@ -91,36 +92,6 @@ static ULONG GetDRAMSize(SiS_Private *SiS_Pr,
 
 static void DelaySeconds(int seconds);
 void SiS_DebugCode(SiS_Private *SiS_Pr, UCHAR code);
-
-#ifdef LINUX_XF86
-/* TW: Mode table for X driver */
-const UShort  ModeIndex_320x480[]      = {0x5a, 0x5b, 0x00, 0x00};  /* DSTN/FSTN */
-const UShort  ModeIndex_512x384[]      = {0x52, 0x58, 0x00, 0x5c};
-const UShort  ModeIndex_640x400[]      = {0x2f, 0x5d, 0x00, 0x5e};
-const UShort  ModeIndex_640x480[]      = {0x2e, 0x44, 0x00, 0x62};
-const UShort  ModeIndex_720x480[]      = {0x31, 0x33, 0x00, 0x35};
-const UShort  ModeIndex_720x576[]      = {0x32, 0x34, 0x00, 0x36};
-const UShort  ModeIndex_800x480[]      = {0x70, 0x7a, 0x00, 0x76};
-const UShort  ModeIndex_800x600[]      = {0x30, 0x47, 0x00, 0x63};
-const UShort  ModeIndex_848x480[]      = {0x39, 0x3b, 0x00, 0x3e};
-const UShort  ModeIndex_856x480[]      = {0x3f, 0x42, 0x00, 0x45};
-const UShort  ModeIndex_1024x768[]     = {0x38, 0x4a, 0x00, 0x64};
-const UShort  ModeIndex_1024x576[]     = {0x71, 0x74, 0x00, 0x77};
-const UShort  ModeIndex_1024x600[]     = {0x20, 0x21, 0x00, 0x22};  /* 300 series only */
-const UShort  ModeIndex_1280x1024[]    = {0x3a, 0x4d, 0x00, 0x65};
-const UShort  ModeIndex_300_1280x960[] = {0x6e, 0x6f, 0x00, 0x7b};
-const UShort  ModeIndex_310_1280x960[] = {0x7c, 0x7d, 0x00, 0x7e};
-const UShort  ModeIndex_1152x768[]     = {0x23, 0x24, 0x00, 0x25};  /* 300 series only */
-const UShort  ModeIndex_1152x864[]     = {0x29, 0x2a, 0x00, 0x2b}; 
-const UShort  ModeIndex_1280x768[]     = {0x23, 0x24, 0x00, 0x25};  /* 310/325 series only */
-const UShort  ModeIndex_1280x720[]     = {0x79, 0x75, 0x00, 0x78};  
-const UShort  ModeIndex_1360x768[]     = {0x48, 0x4b, 0x00, 0x4e};
-const UShort  ModeIndex_1400x1050[]    = {0x26, 0x27, 0x00, 0x28};  /* 310/325 series only */
-const UShort  ModeIndex_1600x1200[]    = {0x3c, 0x3d, 0x00, 0x66};
-const UShort  ModeIndex_1920x1440[]    = {0x68, 0x69, 0x00, 0x6b};
-const UShort  ModeIndex_300_2048x1536[]= {0x6c, 0x6d, 0x00, 0x00};
-const UShort  ModeIndex_310_2048x1536[]= {0x6c, 0x6d, 0x00, 0x6e};
-#endif
 
 static void
 DelaySeconds(int seconds)
@@ -262,6 +233,8 @@ InitTo300Pointer(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
    SiS_Pr->SiS_LVDS1280x960Data_2  = (SiS_LVDSDataStruct *)SiS300_LVDS1280x1024Data_2;
    SiS_Pr->SiS_LVDS1400x1050Data_1 = (SiS_LVDSDataStruct *)SiS300_LVDS1400x1050Data_1;
    SiS_Pr->SiS_LVDS1400x1050Data_2 = (SiS_LVDSDataStruct *)SiS300_LVDS1400x1050Data_2;
+   SiS_Pr->SiS_LVDS1600x1200Data_1 = (SiS_LVDSDataStruct *)SiS300_LVDS1600x1200Data_1;
+   SiS_Pr->SiS_LVDS1600x1200Data_2 = (SiS_LVDSDataStruct *)SiS300_LVDS1600x1200Data_2;
    SiS_Pr->SiS_LVDS1280x768Data_1  = (SiS_LVDSDataStruct *)SiS300_LVDS1280x768Data_1;
    SiS_Pr->SiS_LVDS1280x768Data_2  = (SiS_LVDSDataStruct *)SiS300_LVDS1280x768Data_2;
    SiS_Pr->SiS_LVDS1024x600Data_1  = (SiS_LVDSDataStruct *)SiS300_LVDS1024x600Data_1;
@@ -316,6 +289,8 @@ InitTo300Pointer(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
    SiS_Pr->SiS_PanelType0d_2 = (SiS_LVDSDesStruct *)SiS300_PanelType0d_2;
    SiS_Pr->SiS_PanelType0e_2 = (SiS_LVDSDesStruct *)SiS300_PanelType0e_2;
    SiS_Pr->SiS_PanelType0f_2 = (SiS_LVDSDesStruct *)SiS300_PanelType0f_2;
+   SiS_Pr->SiS_PanelTypeNS_1 = (SiS_LVDSDesStruct *)SiS300_PanelTypeNS_1;
+   SiS_Pr->SiS_PanelTypeNS_2 = (SiS_LVDSDesStruct *)SiS300_PanelTypeNS_2;
    SiS_Pr->SiS_CHTVUNTSCDesData = (SiS_LVDSDesStruct *)SiS300_CHTVUNTSCDesData;
    SiS_Pr->SiS_CHTVONTSCDesData = (SiS_LVDSDesStruct *)SiS300_CHTVONTSCDesData;
    SiS_Pr->SiS_CHTVUPALDesData  = (SiS_LVDSDesStruct *)SiS300_CHTVUPALDesData;
@@ -509,6 +484,8 @@ InitTo310Pointer(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
    SiS_Pr->SiS_LVDS1280x960Data_2  = (SiS_LVDSDataStruct *)SiS310_LVDS1280x960Data_2;
    SiS_Pr->SiS_LVDS1400x1050Data_1 = (SiS_LVDSDataStruct *)SiS310_LVDS1400x1050Data_1;
    SiS_Pr->SiS_LVDS1400x1050Data_2 = (SiS_LVDSDataStruct *)SiS310_LVDS1400x1050Data_2;
+   SiS_Pr->SiS_LVDS1600x1200Data_1 = (SiS_LVDSDataStruct *)SiS310_LVDS1600x1200Data_1;
+   SiS_Pr->SiS_LVDS1600x1200Data_2 = (SiS_LVDSDataStruct *)SiS310_LVDS1600x1200Data_2;
    SiS_Pr->SiS_LVDS1280x768Data_1  = (SiS_LVDSDataStruct *)SiS310_LVDS1280x768Data_1;
    SiS_Pr->SiS_LVDS1280x768Data_2  = (SiS_LVDSDataStruct *)SiS310_LVDS1280x768Data_2;
    SiS_Pr->SiS_LVDS1024x600Data_1  = (SiS_LVDSDataStruct *)SiS310_LVDS1024x600Data_1;
@@ -563,6 +540,8 @@ InitTo310Pointer(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
    SiS_Pr->SiS_PanelType0d_2 = (SiS_LVDSDesStruct *)SiS310_PanelType0d_2;
    SiS_Pr->SiS_PanelType0e_2 = (SiS_LVDSDesStruct *)SiS310_PanelType0e_2;
    SiS_Pr->SiS_PanelType0f_2 = (SiS_LVDSDesStruct *)SiS310_PanelType0f_2;
+   SiS_Pr->SiS_PanelTypeNS_1 = (SiS_LVDSDesStruct *)SiS310_PanelTypeNS_1;
+   SiS_Pr->SiS_PanelTypeNS_2 = (SiS_LVDSDesStruct *)SiS310_PanelTypeNS_2;
 
    SiS_Pr->LVDS1024x768Des_1  = (SiS_LVDSDesStruct *)SiS310_PanelType1076_1;
    SiS_Pr->LVDS1280x1024Des_1 = (SiS_LVDSDesStruct *)SiS310_PanelType1210_1;
@@ -625,6 +604,7 @@ InitTo310Pointer(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
    SiS_Pr->SiS_LVDSCRT11152x768_2_H  = (SiS_LVDSCRT1DataStruct *)SiS310_LVDSCRT11152x768_2_H;
    SiS_Pr->SiS_LVDSCRT11600x1200_2_H = (SiS_LVDSCRT1DataStruct *)SiS310_LVDSCRT11600x1200_2_H;
    SiS_Pr->SiS_LVDSCRT1XXXxXXX_1     = (SiS_LVDSCRT1DataStruct *)SiS310_LVDSCRT1XXXxXXX_1;
+   SiS_Pr->SiS_LVDSCRT1XXXxXXX_1_H   = (SiS_LVDSCRT1DataStruct *)SiS310_LVDSCRT1XXXxXXX_1_H;
    SiS_Pr->SiS_LVDSCRT1320x480_1     = (SiS_LVDSCRT1DataStruct *)SiS310_LVDSCRT1320x480_1;
    SiS_Pr->SiS_CHTVCRT1UNTSC = (SiS_LVDSCRT1DataStruct *)SiS310_CHTVCRT1UNTSC;
    SiS_Pr->SiS_CHTVCRT1ONTSC = (SiS_LVDSCRT1DataStruct *)SiS310_CHTVCRT1ONTSC;
@@ -694,7 +674,7 @@ InitTo310Pointer(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
  *     don't need this otherwise. Under normal
  *     circumstances, the video BIOS has initialized
  *     the adapter for us. BTW, this code is incomplete
- *     and very possibly not functioning on newer chipsets.
+ *     and very possibly not working on newer chipsets.
  */
 BOOLEAN
 SiSInit(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
@@ -3136,7 +3116,7 @@ SiS_ClearExt1Regs(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension)
       SiS_SetReg1(SiS_Pr->SiS_P3c4,i,0x00);      /* Clear SR0A-SR0E */
   }
 
-  /* TW: New from 330, 650/LVDS/301LV BIOSes: */
+  /* TW: 330, 650/LVDS/301LV, 740/LVDS */
   if(HwDeviceExtension->jChipType >= SIS_315H) {
      SiS_SetRegAND(SiS_Pr->SiS_P3c4,0x37,0xFE);
   }
@@ -5009,426 +4989,11 @@ main(int argc, char *argv[])
 }
 #endif /* TC END */
 
-/* ================ LINUX XFREE86 ====================== */
+/* ================ XFREE86 ================= */
 
 /* Helper functions */
 
 #ifdef LINUX_XF86
-USHORT
-SiS_CalcModeIndex(ScrnInfoPtr pScrn, DisplayModePtr mode)
-{
-   SISPtr pSiS = SISPTR(pScrn);
-   UShort i = (pSiS->CurrentLayout.bitsPerPixel+7)/8 - 1;
-   UShort ModeIndex = 0;
-
-   if((pSiS->HaveCustomModes) && (!(mode->type & M_T_DEFAULT))) 
-   	return 0xfe;
-   
-   switch(mode->HDisplay)
-   {
-     case 320:
-          if(mode->VDisplay == 480) {
-                ModeIndex = ModeIndex_320x480[i];
-	  }
-          break;
-     case 512:
-          if(mode->VDisplay == 384) {
-             ModeIndex = ModeIndex_512x384[i];
-	  }
-          break;
-     case 640:
-          if(mode->VDisplay == 480) {
-             ModeIndex = ModeIndex_640x480[i];
-	  } else if(mode->VDisplay == 400) {
-	     ModeIndex = ModeIndex_640x400[i];
-	  }
-          break;
-     case 720:
-          if(mode->VDisplay == 480) {
-                ModeIndex = ModeIndex_720x480[i];
-          } else if(mode->VDisplay == 576) {
-                ModeIndex = ModeIndex_720x576[i];
-          }
-          break;
-     case 800:
-	  if(mode->VDisplay == 600) {
-             ModeIndex = ModeIndex_800x600[i];
-	  } else if(mode->VDisplay == 480) {
-	     ModeIndex = ModeIndex_800x480[i];
-	  }
-          break;
-     case 848:
-	  if(mode->VDisplay == 480) {
-             ModeIndex = ModeIndex_848x480[i];
-	  }
-	  break;
-     case 856:
-	  if(mode->VDisplay == 480) {
-             ModeIndex = ModeIndex_856x480[i];
-	  }
-	  break;
-     case 1024:
-          if(mode->VDisplay == 768) {
-	        ModeIndex = ModeIndex_1024x768[i];
-	  } else if(mode->VDisplay == 576) {
-	        ModeIndex = ModeIndex_1024x576[i];
-	  } else if(pSiS->VGAEngine == SIS_300_VGA) {
-	     if(mode->VDisplay == 600) {
-	        ModeIndex = ModeIndex_1024x600[i];
-             }
-	  }
-          break;
-     case 1152:
-          if(mode->VDisplay == 864) {
-	        ModeIndex = ModeIndex_1152x864[i];
-          } else if(pSiS->VGAEngine == SIS_300_VGA) {
-	     if(mode->VDisplay == 768) {
-	        ModeIndex = ModeIndex_1152x768[i];
-             }
-	  }
-	  break;
-     case 1280:
-          if(mode->VDisplay == 960) {
-             if(pSiS->VGAEngine == SIS_300_VGA) {
-	        ModeIndex = ModeIndex_300_1280x960[i];
-             } else {
-                ModeIndex = ModeIndex_310_1280x960[i];
-             }
-	  } else if (mode->VDisplay == 1024) {
-	     ModeIndex = ModeIndex_1280x1024[i];
-	  } else if (mode->VDisplay == 720) {
-	        ModeIndex = ModeIndex_1280x720[i];
-	  } else if(pSiS->VGAEngine == SIS_315_VGA) {
-	     if (mode->VDisplay == 768) {
-	        ModeIndex = ModeIndex_1280x768[i];
-	     }
-	  }
-          break;
-     case 1360:
-	  if(mode->VDisplay == 768) {
-	     ModeIndex = ModeIndex_1360x768[i];
-	  }
-          break;
-     case 1400:
-          if(pSiS->VGAEngine == SIS_315_VGA) {
-	     if(mode->VDisplay == 1050) {
-	        ModeIndex = ModeIndex_1400x1050[i];
-             }
-	  }
-          break;
-     case 1600:
-          if(mode->VDisplay == 1200) {
-             ModeIndex = ModeIndex_1600x1200[i];
-	  }
-          break;
-     case 1920:
-          if(mode->VDisplay == 1440) {
-             ModeIndex = ModeIndex_1920x1440[i];
-	  }
-          break;
-     case 2048:
-          if(mode->VDisplay == 1536) {
-             if(pSiS->VGAEngine == SIS_300_VGA) {
-	         ModeIndex = ModeIndex_300_2048x1536[i];
-  	     } else {
-	         ModeIndex = ModeIndex_310_2048x1536[i];
-             }
-	  }
-          break;
-   }
-
-   return(ModeIndex);
-}
-
-USHORT
-SiS_CheckCalcModeIndex(ScrnInfoPtr pScrn, DisplayModePtr mode, int VBFlags)
-{
-   SISPtr pSiS = SISPTR(pScrn);
-   UShort i = (pSiS->CurrentLayout.bitsPerPixel+7)/8 - 1;    
-   UShort ModeIndex = 0;
-
-   if(VBFlags & CRT2_LCD) {
-
-      if( (mode->HDisplay <= pSiS->LCDwidth) &&
-          (mode->VDisplay <= pSiS->LCDheight) ) {
-
-        if(VBFlags & (VB_LVDS | VB_30xBDH)) {        		/* LCD on Panel link (LVDS, 301BDH) */
-
-          switch(mode->HDisplay)
-  	  {
-	  case 512:
-		if(mode->VDisplay == 384) {
-		   if(pSiS->LCDwidth != 1024 || pSiS->LCDheight != 600) { /* not supported on 1024x600 panels */
-		      ModeIndex = ModeIndex_512x384[i];
-		   }
-		}
-		break;
-	  case 640:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_640x480[i];
-		} else if(mode->VDisplay == 400) {
-		   ModeIndex = ModeIndex_640x400[i];
-		}
-		break;
-	  case 800:
-		if(mode->VDisplay == 600) {
-		   ModeIndex = ModeIndex_800x600[i];
-		}
-		break;
-	  case 1024:
-		if(mode->VDisplay == 768) {
-		   ModeIndex = ModeIndex_1024x768[i];
-		} else if(pSiS->VGAEngine == SIS_300_VGA) {
-		   if(mode->VDisplay == 600) {
-		      if(pSiS->LCDheight == 600) {  /* This mode only supported on 1024x600 panels */
-		         ModeIndex = ModeIndex_1024x600[i];
-		      }
-		   }
-		}
-		break;
-	  case 1152:
-		if(pSiS->VGAEngine == SIS_300_VGA) {
-		   if(mode->VDisplay == 768) {
-			ModeIndex = ModeIndex_1152x768[i];
-		   }
-		}
-		break;
-	  case 1280:
-		if(mode->VDisplay == 1024) {
-		   ModeIndex = ModeIndex_1280x1024[i];
-		} else if(pSiS->VGAEngine == SIS_315_VGA) {
-		   if(pSiS->LCDheight == 768) {
-		      if(mode->VDisplay == 768) {
-		         ModeIndex = ModeIndex_1280x768[i];
-		      }
-		   }
-		}
-		break;
-	  case 1400:
-	        if(mode->VDisplay == 1050) {
-		   if(pSiS->VGAEngine == SIS_315_VGA) {
-		      ModeIndex = ModeIndex_1400x1050[i];
-		   }
-		}
-		break;
-          }
-
-        } else {                       	 	/* LCD on 301(B/LV) */
-
-          switch(mode->HDisplay)
-	  {
-	  case 512:
-		if(mode->VDisplay == 384) {
-		   ModeIndex = ModeIndex_512x384[i];
-		}
-		break;
-	  case 640:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_640x480[i];
-		} else if(mode->VDisplay == 400) {
-		   ModeIndex = ModeIndex_640x400[i];
-		}
-		break;
-	  case 800:
-		if(mode->VDisplay == 600) {
-		   ModeIndex = ModeIndex_800x600[i];
-		}
-		break;
-	  case 1024:
-		if(mode->VDisplay == 768) {
-		   ModeIndex = ModeIndex_1024x768[i];
-		} 
-		break;
-	  case 1280:
-		if(mode->VDisplay == 960) {
-		   if(pSiS->LCDwidth != 1400) {
-		      if(pSiS->VGAEngine == SIS_300_VGA) {
-		         ModeIndex = ModeIndex_300_1280x960[i];
-		      } else {
-		         ModeIndex = ModeIndex_310_1280x960[i];
-		      }
-		   }  
-                } else if (mode->VDisplay == 1024) {
-	             ModeIndex = ModeIndex_1280x1024[i];
-	        }
-		break;
-	  case 1400:
-	        if(VBFlags & (VB_302B | VB_302LV)) {
-	           if(mode->VDisplay == 1050) {
-		      if(pSiS->VGAEngine == SIS_315_VGA) {
-		         ModeIndex = ModeIndex_1400x1050[i];
-		      }
-		   }
-		}
-		break;
-	  case 1600:
-	        if(VBFlags & (VB_302B | VB_302LV)) {
-		   if(mode->VDisplay == 1200) {
-		      ModeIndex = ModeIndex_1600x1200[i];
-		   }
-		}
-		break;
-	  }
-
-        }
-
-      }
-
-   } else if(VBFlags & CRT2_TV) {
-
-      if(VBFlags & VB_CHRONTEL) {		/* TV on Chrontel */
-
-        switch(mode->HDisplay)
-	{
-      	case 512:
-	        if(pSiS->VGAEngine == SIS_315_VGA) {
-		   if(mode->VDisplay == 384) {
-		      ModeIndex = ModeIndex_512x384[i];
-		   }
-		}
-		break;
-	case 640:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_640x480[i];
-		} else if(mode->VDisplay == 400) {
-		   ModeIndex = ModeIndex_640x400[i];
-		}
-		break;
-	case 800:
-		if(mode->VDisplay == 600) {
-		   ModeIndex = ModeIndex_800x600[i];
-		}
-		break;
-	case 1024:
-		if(mode->VDisplay == 768) {
-		   if(pSiS->VGAEngine == SIS_315_VGA) {
-		      ModeIndex = ModeIndex_1024x768[i];
-		   }
-		}
-		break;
-        }
-
-      } else {				    /* TV on 301(B/LV) */
-
-        switch(mode->HDisplay)
-	{
-      	case 512:
-		if(mode->VDisplay == 384) {
-		   ModeIndex = ModeIndex_512x384[i];
-		}
-		break;
-	case 640:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_640x480[i];
-		}
-		break;
-	case 720:
-                if(mode->VDisplay == 480) {
-                   ModeIndex = ModeIndex_720x480[i];
-                } else if(mode->VDisplay == 576) {
-                   ModeIndex = ModeIndex_720x576[i];
-                }
-                break;
-	case 800:
-		if(mode->VDisplay == 600) {
-		   ModeIndex = ModeIndex_800x600[i];
-		}
-		break;
-	case 1024:  /* Not supported with depth 32 */
-		if((mode->VDisplay == 768) && (i != 3) ) {
-		   if(VBFlags & (VB_301B|VB_302B|VB_301LV|VB_302LV)) {
-		      ModeIndex = ModeIndex_1024x768[i];
-		   }
-		}
-		break;
-        }
-
-      }
-
-   } else if(VBFlags & CRT2_VGA) {		/* CRT2 is VGA2 */
-
-	switch(mode->HDisplay)
-	{
-	case 640:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_640x480[i];
-		} else if(mode->VDisplay == 400) {
-		   ModeIndex = ModeIndex_640x400[i];
-		}
-		break;
-	case 800:
-		if(mode->VDisplay == 600) {
-		   ModeIndex = ModeIndex_800x600[i];
-   	        } else if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_800x480[i];
-		}
-		break;
-	case 848:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_848x480[i];
-		}
-		break;
-	case 856:
-		if(mode->VDisplay == 480) {
-		   ModeIndex = ModeIndex_856x480[i];
-		}
-		break;		
-	case 1024:
-		if(mode->VDisplay == 768) {
-			ModeIndex = ModeIndex_1024x768[i];
-		} else if(mode->VDisplay == 576) {
-			ModeIndex = ModeIndex_1024x576[i];
-		}
-		break;
-	case 1152:
-	        if(mode->VDisplay == 864) {
-		   ModeIndex = ModeIndex_1152x864[i];
-		} else if(pSiS->VGAEngine == SIS_300_VGA) {
-		   if(mode->VDisplay == 768) {
-			ModeIndex = ModeIndex_1152x768[i];
-		   }
-		}
-		break;
-	case 1280:
-		if (mode->VDisplay == 1024) {
-		   ModeIndex = ModeIndex_1280x1024[i];
-		} else if (mode->VDisplay == 720) {
-		   ModeIndex = ModeIndex_1280x720[i];
-		} else if (mode->VDisplay == 960) {
-		   if(pSiS->VGAEngine == SIS_315_VGA) {
-		      ModeIndex = ModeIndex_310_1280x960[i];
-		   } else {
-		      ModeIndex = ModeIndex_300_1280x960[i];
-		   }
-		} else if(pSiS->VGAEngine == SIS_315_VGA) {
-		   if (mode->VDisplay == 768) {
-			ModeIndex = ModeIndex_1280x768[i];
-		   }
-		}
-		break;
-        case 1360:
-	        if(mode->VDisplay == 768) {
-	           ModeIndex = ModeIndex_1360x768[i];
-	        }
-                break;
-        case 1400:
-	        if(mode->VDisplay == 1050) {
-		   if(pSiS->VGAEngine == SIS_315_VGA) {
-		      ModeIndex = ModeIndex_1400x1050[i];
-		   }
-		}
-		break;
-	}
-
-   } else {				/* CRT1 only, no CRT2 */
-
-       ModeIndex = SiS_CalcModeIndex(pScrn, mode);
-
-   }
-
-   return(ModeIndex);
-}
-
 USHORT
 SiS_CheckBuildCustomMode(ScrnInfoPtr pScrn, DisplayModePtr mode, int VBFlags)
 {
@@ -5836,9 +5401,9 @@ SiSBuildBuiltInModeList(ScrnInfoPtr pScrn)
 #endif
 
       if(pSiS->SiS_Pr->SiS_RefIndex[i].Ext_InfoFlag & 0x4000)
-          current->Flags |= H_NHSYNC;
+          current->Flags |= V_NHSYNC;
       else
-          current->Flags |= H_PHSYNC;
+          current->Flags |= V_PHSYNC;
 
       if(pSiS->SiS_Pr->SiS_RefIndex[i].Ext_InfoFlag & 0x8000)
       	  current->Flags |= V_NVSYNC;
@@ -5908,39 +5473,6 @@ SiSBuildBuiltInModeList(ScrnInfoPtr pScrn)
    return first;
 
 }
-
-#define MODEID_OFF 0x449
-
-unsigned char
-SiS_GetSetModeID(ScrnInfoPtr pScrn, unsigned char id)
-{
-    return(SiS_GetSetBIOSScratch(pScrn, MODEID_OFF, id));
-}
-
-unsigned char
-SiS_GetSetBIOSScratch(ScrnInfoPtr pScrn, USHORT offset, unsigned char value)
-{
-    unsigned char ret;
-    unsigned char *base;
-
-    base = xf86MapVidMem(pScrn->scrnIndex, VIDMEM_MMIO, 0, 0x2000);
-    if(!base) {
-	     xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-	          "(init.c: Could not map BIOS scratch area)\n");
-	     return 0;
-    }
-
-    ret = *(base + offset);
-
-    /* value != 0xff means: set register */
-    if (value != 0xff)
-	*(base + offset) = value;
-
-    xf86UnMapVidMem(pScrn->scrnIndex, base, 0x2000);
-
-    return ret;
-}
-
 #endif
 
 #ifdef LINUX_KERNEL
