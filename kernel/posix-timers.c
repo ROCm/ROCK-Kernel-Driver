@@ -948,11 +948,15 @@ void exit_itimers(struct task_struct *tsk)
  */
 static int do_posix_gettime(struct k_clock *clock, struct timespec *tp)
 {
+	struct timeval tv;
+
 	if (clock->clock_get)
 		return clock->clock_get(tp);
 
-	do_gettimeofday((struct timeval *) tp);
-	tp->tv_nsec *= NSEC_PER_USEC;
+	do_gettimeofday(&tv);
+	tp->tv_sec = tv.tv_sec;
+	tp->tv_nsec = tv.tv_usec * NSEC_PER_USEC;
+
 	return 0;
 }
 
