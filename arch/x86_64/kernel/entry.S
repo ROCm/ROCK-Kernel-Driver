@@ -803,9 +803,6 @@ ENTRY(debug)
 	pushq $0
 	CFI_ADJUST_CFA_OFFSET 8		
 	paranoidentry do_debug
-paranoid_stack_switch:	
-	testq %rax,%rax
-	jz paranoid_exit
 	/* switch back to process stack to restore the state ptrace touched */
 	movq %rax,%rsp	
 	jmp paranoid_exit
@@ -870,8 +867,11 @@ ENTRY(reserved)
 
 	/* runs on exception stack */
 ENTRY(double_fault)
+	CFI_STARTPROC
 	paranoidentry do_double_fault
-	jmp paranoid_stack_switch
+	movq %rax,%rsp
+	jmp paranoid_exit
+	CFI_ENDPROC
 
 ENTRY(invalid_TSS)
 	errorentry do_invalid_TSS
@@ -881,8 +881,11 @@ ENTRY(segment_not_present)
 
 	/* runs on exception stack */
 ENTRY(stack_segment)
+	CFI_STARTPROC
 	paranoidentry do_stack_segment
-	jmp paranoid_stack_switch
+	movq %rax,%rsp
+	jmp paranoid_exit
+	CFI_ENDPROC
 
 ENTRY(general_protection)
 	errorentry do_general_protection

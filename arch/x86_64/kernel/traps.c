@@ -477,15 +477,17 @@ DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr
 DO_ERROR(18, SIGSEGV, "reserved", reserved)
 
 #define DO_ERROR_STACK(trapnr, signr, str, name) \
-asmlinkage unsigned long do_##name(struct pt_regs * regs, long error_code) \
+asmlinkage void *do_##name(struct pt_regs * regs, long error_code) \
 { \
 	struct pt_regs *pr = ((struct pt_regs *)(current->thread.rsp0))-1; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
-		return 0; \
-	if (regs->cs & 3) \
+		return regs; \
+	if (regs->cs & 3) { \
 		memcpy(pr, regs, sizeof(struct pt_regs)); \
+		regs = pr; \
+	} \
 	do_trap(trapnr, signr, str, regs, error_code, NULL); \
-	return (regs->cs & 3) ? (unsigned long)pr : 0;		\
+	return regs;		\
 }
 
 DO_ERROR_STACK(12, SIGBUS,  "stack segment", stack_segment)
@@ -605,16 +607,18 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 }
 
 /* runs on IST stack. */
-asmlinkage unsigned long do_debug(struct pt_regs * regs, unsigned long error_code)
+asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 {
-	struct pt_regs *processregs;
+	struct pt_regs *pr;
 	unsigned long condition;
 	struct task_struct *tsk = current;
 	siginfo_t info;
 
-	processregs = (struct pt_regs *)(current->thread.rsp0)-1;
-	if (regs->cs & 3)
-		memcpy(processregs, regs, sizeof(struct pt_regs));
+	pr = (struct pt_regs *)(current->thread.rsp0)-1;
+	if (regs->cs & 3) {
+		memcpy(pr, regs, sizeof(struct pt_regs));
+		regs = pr;
+	}	
 
 #ifdef CONFIG_CHECKING
        { 
@@ -673,8 +677,7 @@ asmlinkage unsigned long do_debug(struct pt_regs * regs, unsigned long error_cod
 clear_dr7:
 	asm volatile("movq %0,%%db7"::"r"(0UL));
 	notify_die(DIE_DEBUG, "debug", regs, condition, 1, SIGTRAP);
-out:
-	return (regs->cs & 3) ? (unsigned long)processregs : 0;
+	return regs;
 
 clear_TF_reenable:
 	printk("clear_tf_reenable\n");
@@ -685,8 +688,7 @@ clear_TF:
 	if (notify_die(DIE_DEBUG, "debug2", regs, condition, 1, SIGTRAP) 
 	    != NOTIFY_BAD)
 	regs->eflags &= ~TF_MASK;
-	
-	goto out;
+	return regs;	
 }
 
 /*
