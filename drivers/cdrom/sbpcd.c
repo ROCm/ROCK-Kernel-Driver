@@ -1307,7 +1307,7 @@ static int cmd_out_T(void)
 	
 	static int cc_DriveReset(void);
 	int i, j, l=0, m, ntries;
-	long flags;
+	unsigned long flags;
 
 	D_S[d].error_state=0;
 	D_S[d].b3=0;
