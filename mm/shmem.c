@@ -28,7 +28,6 @@
 #include <linux/pagemap.h>
 #include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/smp_lock.h>
 #include <linux/backing-dev.h>
 #include <linux/shmem_fs.h>
 

@@ -9,7 +9,6 @@
 
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/smp_lock.h>
 #include <linux/shm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>

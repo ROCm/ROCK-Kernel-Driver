@@ -12,7 +12,6 @@
 #include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
-#include <linux/smp_lock.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>	/* block_sync_page() */
 
