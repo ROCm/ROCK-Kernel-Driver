@@ -567,6 +567,16 @@ static int aha1740_detect(Scsi_Host_Template * tpnt)
     return count;
 }
 
+static int aha1740_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static int aha1740_biosparam(struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int* ip)
 {
@@ -596,6 +606,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_info		= aha1740_proc_info,
 	.name			= "Adaptec 174x (EISA)",
 	.detect			= aha1740_detect,
+	.release		= aha1740_release,
 	.command		= aha1740_command,
 	.queuecommand		= aha1740_queuecommand,
 	.bios_param		= aha1740_biosparam,

@@ -280,6 +280,16 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
     return count;
 }
 
+static int t128_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /*
  * Function : int t128_biosparam(Disk * disk, struct block_device *dev, int *ip)
  *
@@ -403,6 +413,7 @@ MODULE_LICENSE("GPL");
 static Scsi_Host_Template driver_template = {
 	.name           = "Trantor T128/T128F/T228",
 	.detect         = t128_detect,
+	.release        = t128_release,
 	.queuecommand   = t128_queue_command,
 	.eh_abort_handler = t128_abort,
 	.eh_bus_reset_handler    = t128_bus_reset,

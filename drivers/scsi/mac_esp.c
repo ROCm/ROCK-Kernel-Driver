@@ -464,6 +464,16 @@ int mac_esp_detect(Scsi_Host_Template * tpnt)
 	return chipspresent;
 }
 
+static int mac_esp_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /*
  * I've been wondering what this is supposed to do, for some time. Talking 
  * to Allen Briggs: These machines have an extra register someplace where the
@@ -717,6 +727,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_name		= "esp",
 	.name			= "Mac 53C9x SCSI",
 	.detect			= mac_esp_detect,
+	.release		= mac_esp_release,
 	.info			= esp_info,
 	/* .command		= esp_command, */
 	.queuecommand		= esp_queue,

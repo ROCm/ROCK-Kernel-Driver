@@ -34,11 +34,9 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/init.h>
-#include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/completion.h>
 #include <linux/unistd.h>
-#include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -168,28 +166,6 @@ int scsi_tp_for_each_host(Scsi_Host_Template *shost_tp, int
 	}
 
 	spin_unlock(&scsi_host_list_lock);
-
-	return 0;
-}
-
-/**
- * scsi_host_legacy_release - default release function for hosts
- * @shost: 
- * 
- * Description:
- * 	This is the default case for the release function.  Its completely
- *	useless for anything but old ISA adapters
- **/
-static int scsi_host_legacy_release(struct Scsi_Host *shost)
-{
-	if (shost->irq)
-		free_irq(shost->irq, NULL);
-#ifdef CONFIG_GENERIC_ISA_DMA
-	if (shost->dma_channel != 0xff)
-		free_dma(shost->dma_channel);
-#endif
-	if (shost->io_port && shost->n_io_port)
-		release_region(shost->io_port, shost->n_io_port);
 
 	return 0;
 }
@@ -445,7 +421,9 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 		printk(KERN_WARNING
 		    "scsi HBA driver %s didn't set a release method, "
 		    "please fix the template\n", shost_tp->name);
-		shost_tp->release = &scsi_host_legacy_release;
+		dump_stack();
+		return -EINVAL;
+		
 	}
 
 	shost_tp->detect(shost_tp);

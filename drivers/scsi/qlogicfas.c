@@ -739,6 +739,18 @@ int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 	return (__qlogicfas_detect(sht) != NULL);
 }
 
+static int qlogicfas_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /* 
  *	Return bios parameters 
  */
@@ -826,6 +838,7 @@ Scsi_Host_Template qlogicfas_driver_template = {
 	.name			= "qlogicfas",
 	.proc_name		= "qlogicfas",
 	.detect			= qlogicfas_detect,
+	.release		= qlogicfas_release,
 	.info			= qlogicfas_info,
 	.command		= qlogicfas_command,
 	.queuecommand		= qlogicfas_queuecommand,

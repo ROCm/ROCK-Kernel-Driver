@@ -1325,6 +1325,18 @@ unregister:
 	return count;
 }
 
+static int aha1542_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static int aha1542_restart(struct Scsi_Host *shost)
 {
 	int i;
@@ -1817,6 +1829,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_name		= "aha1542",
 	.name			= "Adaptec 1542",
 	.detect			= aha1542_detect,
+	.release		= aha1542_release,
 	.command		= aha1542_command,
 	.queuecommand		= aha1542_queuecommand,
 	.eh_abort_handler	= aha1542_abort,

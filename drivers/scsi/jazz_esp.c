@@ -139,6 +139,18 @@ int jazz_esp_detect(Scsi_Host_Template *tpnt)
     return 0;
 }
 
+static int jazz_esp_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /************************************************************* DMA Functions */
 static int dma_bytes_sent(struct NCR_ESP *esp, int fifo_count)
 {
@@ -278,6 +290,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_info		= &esp_proc_info,
 	.name			= "ESP 100/100a/200",
 	.detect			= jazz_esp_detect,
+	.release		= jazz_esp_release,
 	.info			= esp_info,
 	.command		= esp_command,
 	.queuecommand		= esp_queue,

@@ -1237,6 +1237,17 @@ static int esp_release(struct Scsi_Host *host)
         return 0;
 }
 
+/* this is clearly wrong for esp.. */
+static int esp_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /* The info function will return whatever useful
  * information the developer sees fit.  If not provided, then
  * the name field will be used instead.
@@ -4384,12 +4395,12 @@ static void esp_slave_destroy(Scsi_Device *SDptr)
 	SDptr->hostdata = NULL;
 }
 
-
 static Scsi_Host_Template driver_template = {
 	.proc_name		= "esp",
 	.proc_info		= esp_proc_info,
 	.name			= "Sun ESP 100/100a/200",
 	.detect			= esp_detect,
+	.release		= esp_release,
 	.slave_alloc		= esp_slave_alloc,
 	.slave_destroy		= esp_slave_destroy,
 	.release		= esp_release,

@@ -134,9 +134,22 @@ int __init amiga7xx_detect(Scsi_Host_Template *tpnt)
     return num;
 }
 
+static int amiga7xx_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static Scsi_Host_Template driver_template = {
 	.name			= "Amiga NCR53c710 SCSI",
 	.detect			= amiga7xx_detect,
+	.release		= amiga7xx_release,
 	.queuecommand		= NCR53c7xx_queue_command,
 	.abort			= NCR53c7xx_abort,
 	.reset			= NCR53c7xx_reset,

@@ -1616,6 +1616,15 @@ static int wd7000_detect(Scsi_Host_Template * tpnt)
 	return (present);
 }
 
+static int wd7000_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
 
 /*
  *  I have absolutely NO idea how to do an abort with the WD7000...
@@ -1722,6 +1731,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_info		= wd7000_proc_info,
 	.name			= "Western Digital WD-7000",
 	.detect			= wd7000_detect,
+	.release		= wd7000_release,
 	.command		= wd7000_command,
 	.queuecommand		= wd7000_queuecommand,
 	.eh_bus_reset_handler	= wd7000_bus_reset,

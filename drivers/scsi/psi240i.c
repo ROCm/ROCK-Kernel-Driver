@@ -655,6 +655,17 @@ host_init_failure:
 		}
 	return count;
 	}
+
+static int Psi240i_Release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 /****************************************************************
  *	Name:	Psi240i_Abort
  *
@@ -722,6 +733,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_name		= "psi240i", 
 	.name			= "PSI-240I EIDE Disk Controller",
 	.detect			= Psi240i_Detect,
+	.release		= Psi240i_Release,
 	.command		= Psi240i_Command,
 	.queuecommand		= Psi240i_QueueCommand,
 	.abort	  		= Psi240i_Abort,
