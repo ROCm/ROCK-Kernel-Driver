@@ -119,8 +119,9 @@ export CPPFLAGS EXPORT_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
-noconfig_targets := oldconfig xconfig menuconfig config clean mrproper \
-		    distclean
+noconfig_targets := xconfig menuconfig config oldconfig randconfig \
+		    defconfig allyesconfig allnoconfig allmodconfig \
+		    clean mrproper distclean
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -518,9 +519,6 @@ else # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 .PHONY: oldconfig xconfig menuconfig config \
 	make_with_config
 
-oldconfig:
-	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
-
 xconfig:
 	@$(MAKE) -C scripts kconfig.tk
 	wish -f scripts/kconfig.tk
@@ -531,6 +529,24 @@ menuconfig:
 
 config:
 	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
+
+oldconfig:
+	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+
+randconfig:
+	$(CONFIG_SHELL) scripts/Configure -r arch/$(ARCH)/config.in
+
+allyesconfig:
+	$(CONFIG_SHELL) scripts/Configure -y arch/$(ARCH)/config.in
+
+allnoconfig:
+	$(CONFIG_SHELL) scripts/Configure -n arch/$(ARCH)/config.in
+
+allmodconfig:
+	$(CONFIG_SHELL) scripts/Configure -m arch/$(ARCH)/config.in
+
+defconfig:
+	yes '' | $(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
 
 #	How we generate .config depends on which *config the
 #	user chose when calling make
