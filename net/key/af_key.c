@@ -465,6 +465,20 @@ pfkey_proto2satype(uint16_t proto)
 	/* NOTREACHED */
 }
 
+/* BTW, this scheme means that there is no way with PFKEY2 sockets to
+ * say specifically 'just raw sockets' as we encode them as 255.
+ */
+
+static uint8_t pfkey_proto_to_xfrm(uint8_t proto)
+{
+	return (proto == IPSEC_PROTO_ANY ? 0 : proto);
+}
+
+static uint8_t pfkey_proto_from_xfrm(uint8_t proto)
+{
+	return (proto ? proto : IPSEC_PROTO_ANY);
+}
+
 static xfrm_address_t *pfkey_sadb_addr2xfrm_addr(struct sadb_address *addr,
 						 xfrm_address_t *xaddr)
 {
@@ -745,7 +759,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 			sizeof(uint64_t);
 	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
-	addr->sadb_address_proto = 0;
+	addr->sadb_address_proto = 0; /* XXX IPSEC_PROTO_ANY ?? */
 	addr->sadb_address_prefixlen = 32; /* XXX */ 
 	addr->sadb_address_reserved = 0;
 	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
@@ -758,7 +772,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 			sizeof(uint64_t);
 	addr->sadb_address_exttype = SADB_EXT_ADDRESS_DST;
-	addr->sadb_address_proto = 0;
+	addr->sadb_address_proto = 0; /* XXX IPSEC_PROTO_ANY ?? */
 	addr->sadb_address_prefixlen = 32; /* XXX */ 
 	addr->sadb_address_reserved = 0;
 	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
@@ -772,7 +786,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 			(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 				sizeof(uint64_t);
 		addr->sadb_address_exttype = SADB_EXT_ADDRESS_PROXY;
-		addr->sadb_address_proto = x->sel.proto;
+		addr->sadb_address_proto = pfkey_proto_from_xfrm(x->sel.proto);
 		addr->sadb_address_prefixlen = x->sel.prefixlen_s;
 		addr->sadb_address_reserved = 0;
 		((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
@@ -1437,7 +1451,7 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 		(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 			sizeof(uint64_t);
 	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
-	addr->sadb_address_proto = xp->selector.proto;
+	addr->sadb_address_proto = pfkey_proto_from_xfrm(xp->selector.proto);
 	addr->sadb_address_prefixlen = xp->selector.prefixlen_s;
 	addr->sadb_address_reserved = 0;
 	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
@@ -1452,7 +1466,7 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 		(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 			sizeof(uint64_t);
 	addr->sadb_address_exttype = SADB_EXT_ADDRESS_DST;
-	addr->sadb_address_proto = xp->selector.proto;
+	addr->sadb_address_proto = pfkey_proto_from_xfrm(xp->selector.proto);
 	addr->sadb_address_prefixlen = xp->selector.prefixlen_d; 
 	addr->sadb_address_reserved = 0;
 	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
@@ -1562,7 +1576,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	sa = ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
 	pfkey_sadb_addr2xfrm_addr(sa, &xp->selector.saddr);
 	xp->selector.prefixlen_s = sa->sadb_address_prefixlen;
-	xp->selector.proto = sa->sadb_address_proto;
+	xp->selector.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
 	xp->selector.sport = ((struct sockaddr_in*)(sa+1))->sin_port;
 	if (xp->selector.sport)
 		xp->selector.sport_mask = ~0;
@@ -1570,7 +1584,12 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	sa = ext_hdrs[SADB_EXT_ADDRESS_DST-1], 
 	pfkey_sadb_addr2xfrm_addr(sa, &xp->selector.daddr);
 	xp->selector.prefixlen_d = sa->sadb_address_prefixlen;
-	xp->selector.proto = sa->sadb_address_proto;
+
+	/* Amusing, we set this twice.  KAME apps appear to set same value
+	 * in both addresses.
+	 */
+	xp->selector.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
+
 	xp->selector.dport = ((struct sockaddr_in*)(sa+1))->sin_port;
 	if (xp->selector.dport)
 		xp->selector.dport_mask = ~0;
@@ -1657,7 +1676,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	sa = ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
 	pfkey_sadb_addr2xfrm_addr(sa, &sel.saddr);
 	sel.prefixlen_s = sa->sadb_address_prefixlen;
-	sel.proto = sa->sadb_address_proto;
+	sel.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
 	sel.sport = ((struct sockaddr_in*)(sa+1))->sin_port;
 	if (sel.sport)
 		sel.sport_mask = ~0;
@@ -1665,7 +1684,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	sa = ext_hdrs[SADB_EXT_ADDRESS_DST-1], 
 	pfkey_sadb_addr2xfrm_addr(sa, &sel.daddr);
 	sel.prefixlen_d = sa->sadb_address_prefixlen;
-	sel.proto = sa->sadb_address_proto;
+	sel.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
 	sel.dport = ((struct sockaddr_in*)(sa+1))->sin_port;
 	if (sel.dport)
 		sel.dport_mask = ~0;
@@ -2024,7 +2043,7 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 		(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 			sizeof(uint64_t);
 	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
-	addr->sadb_address_proto = 0;
+	addr->sadb_address_proto = 0; /* XXX IPSEC_PROTO_ANY ?? */
 	addr->sadb_address_prefixlen = 32;
 	addr->sadb_address_reserved = 0;
 	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
@@ -2039,7 +2058,7 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 		(sizeof(struct sadb_address)+sizeof(struct sockaddr_in))/
 			sizeof(uint64_t);
 	addr->sadb_address_exttype = SADB_EXT_ADDRESS_DST;
-	addr->sadb_address_proto = 0;
+	addr->sadb_address_proto = 0; /* XXX IPSEC_PROTO_ANY ?? */
 	addr->sadb_address_prefixlen = 32; 
 	addr->sadb_address_reserved = 0;
 	((struct sockaddr_in*)(addr + 1))->sin_family = AF_INET;
