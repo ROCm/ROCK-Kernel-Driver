@@ -1927,6 +1927,24 @@ static __inline__ void wrap_copy(struct sk_buff *skb, const unsigned char *ring,
 }
 #endif
 
+static void rtl8139_isr_ack(struct rtl8139_private *tp)
+{
+	void *ioaddr = tp->mmio_addr;
+	u16 status;
+
+	status = RTL_R16 (IntrStatus) & RxAckBits;
+
+	/* Clear out errors and receive interrupts */
+	if (likely(status != 0)) {
+		if (unlikely(status & (RxFIFOOver | RxOverflow))) {
+			tp->stats.rx_errors++;
+			if (status & RxFIFOOver)
+				tp->stats.rx_fifo_errors++;
+		}
+		RTL_W16_F (IntrStatus, RxAckBits);
+	}
+}
+
 static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 		      int budget)
 {
@@ -1934,6 +1952,7 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 	int received = 0;
 	unsigned char *rx_ring = tp->rx_ring;
 	unsigned int cur_rx = tp->cur_rx;
+	unsigned int rx_size = 0;
 
 	DPRINTK ("%s: In rtl8139_rx(), current %4.4x BufAddr %4.4x,"
 		 " free to %4.4x, Cmd %2.2x.\n", dev->name, cur_rx,
@@ -1944,10 +1963,8 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 	       && (RTL_R8 (ChipCmd) & RxBufEmpty) == 0) {
 		u32 ring_offset = cur_rx % RX_BUF_LEN;
 		u32 rx_status;
-		unsigned int rx_size;
 		unsigned int pkt_size;
 		struct sk_buff *skb;
-		u16 status;
 
 		rmb();
 
@@ -1977,7 +1994,7 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 		 */
 		if (unlikely(rx_size == 0xfff0)) {
 			tp->xstats.early_rx++;
-			goto done;
+			break;
 		}
 
 		/* If Rx err or invalid rx_size/rx_status received
@@ -1989,7 +2006,8 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 			     (rx_size < 8) ||
 			     (!(rx_status & RxStatusOK)))) {
 			rtl8139_rx_err (rx_status, dev, tp, ioaddr);
-			return -1;
+			received = -1;
+			goto out;
 		}
 
 		/* Malloc up new buffer, compatible with net-2e. */
@@ -2025,19 +2043,11 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 		cur_rx = (cur_rx + rx_size + 4 + 3) & ~3;
 		RTL_W16 (RxBufPtr, (u16) (cur_rx - 16));
 
-		/* Clear out errors and receive interrupts */
-		status = RTL_R16 (IntrStatus) & RxAckBits;
-		if (likely(status != 0)) {
-			if (unlikely(status & (RxFIFOOver | RxOverflow))) {
-				tp->stats.rx_errors++;
-				if (status & RxFIFOOver)
-					tp->stats.rx_fifo_errors++;
-			}
-			RTL_W16_F (IntrStatus, RxAckBits);
-		}
+		rtl8139_isr_ack(tp);
 	}
 
- done:
+	if (unlikely(!received || rx_size == 0xfff0))
+		rtl8139_isr_ack(tp);
 
 #if RTL8139_DEBUG > 1
 	DPRINTK ("%s: Done rtl8139_rx(), current %4.4x BufAddr %4.4x,"
@@ -2047,6 +2057,7 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 #endif
 
 	tp->cur_rx = cur_rx;
+out:
 	return received;
 }
 
