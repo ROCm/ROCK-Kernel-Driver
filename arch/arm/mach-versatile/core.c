@@ -40,9 +40,7 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
 #include <asm/mach/map.h>
-#ifdef CONFIG_MMC
 #include <asm/mach/mmc.h>
-#endif
 
 #include "core.h"
 #include "clock.h"
@@ -308,7 +306,6 @@ static struct platform_device smc91x_device = {
 
 #define VERSATILE_SYSMCI	(IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_MCI_OFFSET)
 
-#ifdef CONFIG_MMC
 unsigned int mmc_status(struct device *dev)
 {
 	struct amba_device *adev = container_of(dev, struct amba_device, dev);
@@ -326,7 +323,6 @@ static struct mmc_platform_data mmc0_plat_data = {
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
-#endif
 
 /*
  * Clock handling
@@ -668,9 +664,7 @@ static struct clcd_board clcd_plat_data = {
 
 /* FPGA Primecells */
 AMBA_DEVICE(aaci,  "fpga:04", AACI,     NULL);
-#ifdef CONFIG_MMC
 AMBA_DEVICE(mmc0,  "fpga:05", MMCI0,    &mmc0_plat_data);
-#endif
 AMBA_DEVICE(kmi0,  "fpga:06", KMI0,     NULL);
 AMBA_DEVICE(kmi1,  "fpga:07", KMI1,     NULL);
 
@@ -706,9 +700,7 @@ static struct amba_device *amba_devs[] __initdata = {
 	&sci0_device,
 	&ssp0_device,
 	&aaci_device,
-#ifdef CONFIG_MMC
 	&mmc0_device,
-#endif
 	&kmi0_device,
 	&kmi1_device,
 };
