@@ -373,6 +373,12 @@ static void noinline rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
+	/*
+	 * Re-enable preemption but disable interrupts to make sure
+	 * we dont get preempted until we schedule() in cpu_idle().
+	 */
+	local_irq_disable();
+	preempt_enable_no_resched();
 	unlock_kernel();
  	cpu_idle();
 } 
@@ -438,6 +444,7 @@ asmlinkage void __init start_kernel(void)
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
+	preempt_disable();
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
