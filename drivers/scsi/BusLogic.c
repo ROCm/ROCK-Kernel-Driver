@@ -86,7 +86,7 @@ static struct BusLogic_DriverOptions BusLogic_DriverOptions[BusLogic_MaxHostAdap
 MODULE_LICENSE("GPL");
 #ifdef MODULE
 static char *BusLogic;
-MODULE_PARM(BusLogic, "s");
+module_param(BusLogic, charp, 0);
 #endif
 
 

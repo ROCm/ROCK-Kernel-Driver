@@ -1233,7 +1233,7 @@ static int aic7xxx_seltime = 0x10;
  */
 #ifdef MODULE
 static char * aic7xxx = NULL;
-MODULE_PARM(aic7xxx, "s");
+module_param(aic7xxx, charp, 0);
 #endif
 
 #define VERBOSE_NORMAL         0x0000
