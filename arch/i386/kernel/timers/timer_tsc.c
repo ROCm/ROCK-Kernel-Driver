@@ -27,6 +27,8 @@ static unsigned long hpet_last;
 struct timer_opts timer_tsc;
 #endif
 
+static inline void cpufreq_delayed_get(void);
+
 int tsc_disable __initdata = 0;
 
 extern spinlock_t i8253_lock;
@@ -241,6 +243,9 @@ static void mark_offset_tsc(void)
 
 			clock_fallback();
 		}
+		/* ... but give the TSC a fair chance */
+		if (lost_count == 50)
+			cpufreq_delayed_get();
 	} else
 		lost_count = 0;
 	/* update the monotonic base value */
@@ -324,6 +329,29 @@ static void mark_offset_tsc_hpet(void)
 
 
 #ifdef CONFIG_CPU_FREQ
+#include <linux/workqueue.h>
+
+static unsigned int cpufreq_init = 0;
+static struct work_struct cpufreq_delayed_get_work;
+
+static void handle_cpufreq_delayed_get(void *v)
+{
+	unsigned int cpu;
+	for_each_online_cpu(cpu) {
+		cpufreq_get(cpu);
+	}
+}
+
+/* if we notice lost ticks, schedule a call to cpufreq_get() as it tries
+ * to verify the CPU frequency the timing core thinks the CPU is running
+ * at is still correct.
+ */
+static inline void cpufreq_delayed_get(void) 
+{
+	if (cpufreq_init)
+		schedule_work(&cpufreq_delayed_get_work);
+}
+
 /* If the CPU frequency is scaled, TSC-based delays will need a different
  * loops_per_jiffy value to function properly. An exception to this
  * are modern Intel Pentium 4 processors, where the TSC runs at a constant
@@ -383,6 +411,8 @@ static struct notifier_block time_cpufreq_notifier_block = {
 
 static int __init cpufreq_tsc(void)
 {
+	INIT_WORK(&cpufreq_delayed_get_work, handle_cpufreq_delayed_get, NULL);
+	cpufreq_init = 1;
 	/* P4 and above CPU TSC freq doesn't change when CPU frequency changes*/
 	if ((boot_cpu_data.x86 >= 15) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL))
 		variable_tsc = 0;
@@ -391,6 +421,8 @@ static int __init cpufreq_tsc(void)
 }
 core_initcall(cpufreq_tsc);
 
+#else /* CONFIG_CPU_FREQ */
+static inline void cpufreq_delayed_get(void) { return; }
 #endif 
 
 
