@@ -49,11 +49,13 @@ struct pci_fixup pcibios_fixups[1];
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
- * synchronization mechanism here.  Not using segment number (yet).
+ * synchronization mechanism here.
  */
 
-#define PCI_SAL_ADDRESS(bus, dev, fn, reg) \
-	((u64)(bus << 16) | (u64)(dev << 11) | (u64)(fn << 8) | (u64)(reg))
+#define PCI_SAL_ADDRESS(seg, bus, dev, fn, reg) \
+	((u64)(seg << 24) | (u64)(bus << 16) | \
+	 (u64)(dev << 11) | (u64)(fn << 8) | (u64)(reg))
+
 
 static int
 __pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
@@ -61,10 +63,10 @@ __pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 	int result = 0;
 	u64 data = 0;
 
-	if (!value || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (seg > 255) || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
 		return -EINVAL;
 
-	result = ia64_sal_pci_config_read(PCI_SAL_ADDRESS(bus, dev, fn, reg), len, &data);
+	result = ia64_sal_pci_config_read(PCI_SAL_ADDRESS(seg, bus, dev, fn, reg), len, &data);
 
 	*value = (u32) data;
 
@@ -74,24 +76,24 @@ __pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 static int
 __pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
-	if ((bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if ((seg > 255) || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
 		return -EINVAL;
 
-	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(bus, dev, fn, reg), len, value);
+	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(seg, bus, dev, fn, reg), len, value);
 }
 
 
 static int
 pci_sal_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return __pci_sal_read(0, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
+	return __pci_sal_read(PCI_SEGMENT(bus), bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
 			      where, size, value);
 }
 
 static int
 pci_sal_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return __pci_sal_write(0, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
+	return __pci_sal_write(PCI_SEGMENT(bus), bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
 			       where, size, value);
 }
 
@@ -114,24 +116,91 @@ pci_acpi_init (void)
 
 subsys_initcall(pci_acpi_init);
 
-/* Called by ACPI when it finds a new root bus.  */
-struct pci_bus *
-pcibios_scan_root (int bus)
+static void __init
+pcibios_fixup_resource(struct resource *res, u64 offset)
 {
-	struct list_head *list;
-	struct pci_bus *pci_bus;
+	res->start += offset;
+	res->end += offset;
+}
 
-	list_for_each(list, &pci_root_buses) {
-		pci_bus = pci_bus_b(list);
-		if (pci_bus->number == bus) {
-			/* Already scanned */
-			printk("PCI: Bus (%02x) already probed\n", bus);
-			return pci_bus;
-		}
+void __init
+pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus)
+{
+	int i;
+
+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+		if (!dev->resource[i].start)
+			continue;
+		if (dev->resource[i].flags & IORESOURCE_MEM)
+			pcibios_fixup_resource(&dev->resource[i],
+			                       PCI_CONTROLLER(dev)->mem_offset);
 	}
+}
 
-	printk("PCI: Probing PCI hardware on bus (%02x)\n", bus);
-	return pci_scan_bus(bus, pci_root_ops, NULL);
+/* Called by ACPI when it finds a new root bus.  */
+
+static struct pci_controller *
+alloc_pci_controller(int seg)
+{
+	struct pci_controller *controller;
+
+	controller = kmalloc(sizeof(*controller), GFP_KERNEL);
+	if (!controller)
+		return NULL;
+
+	memset(controller, 0, sizeof(*controller));
+	controller->segment = seg;
+	return controller;
+}
+
+struct pci_bus *
+scan_root_bus(int bus, struct pci_ops *ops, void *sysdata)
+{
+	struct pci_bus *b;
+
+	/*
+	 * We know this is a new root bus we haven't seen before, so
+	 * scan it, even if we've seen the same bus number in a different
+	 * segment.
+	 */
+	b = kmalloc(sizeof(*b), GFP_KERNEL);
+	if (!b)
+		return NULL;
+
+	memset(b, 0, sizeof(*b));
+	INIT_LIST_HEAD(&b->children);
+	INIT_LIST_HEAD(&b->devices);
+
+	list_add_tail(&b->node, &pci_root_buses);
+
+	b->number = b->secondary = bus;
+	b->resource[0] = &ioport_resource;
+	b->resource[1] = &iomem_resource;
+
+	b->sysdata = sysdata;
+	b->ops = ops;
+	b->subordinate = pci_do_scan_bus(b);
+
+	return b;
+}
+
+struct pci_bus *
+pcibios_scan_root(void *handle, int seg, int bus)
+{
+	struct pci_controller *controller;
+	u64 base, size, offset;
+
+	printk("PCI: Probing PCI hardware on bus (%02x:%02x)\n", seg, bus);
+	controller = alloc_pci_controller(seg);
+	if (!controller)
+		return NULL;
+
+	controller->acpi_handle = handle;
+
+	acpi_get_addr_space(handle, ACPI_MEMORY_RANGE, &base, &size, &offset);
+	controller->mem_offset = offset;
+
+	return scan_root_bus(bus, pci_root_ops, controller);
 }
 
 /*
@@ -140,6 +209,11 @@ pcibios_scan_root (int bus)
 void __devinit
 pcibios_fixup_bus (struct pci_bus *b)
 {
+	struct list_head *ln;
+
+	for (ln = b->devices.next; ln != &b->devices; ln = ln->next)
+		pcibios_fixup_device_resources(pci_dev_b(ln), b);
+
 	return;
 }
 

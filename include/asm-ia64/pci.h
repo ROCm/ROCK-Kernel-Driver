@@ -21,7 +21,7 @@
 #define PCIBIOS_MIN_MEM		0x10000000
 
 void pcibios_config_init(void);
-struct pci_bus * pcibios_scan_root(int bus);
+struct pci_bus * pcibios_scan_root(void *acpi_handle, int segment, int bus);
 
 struct pci_dev;
 
@@ -58,7 +58,6 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 #define pci_unmap_sg			platform_pci_unmap_sg
 #define pci_dma_sync_single		platform_pci_dma_sync_single
 #define pci_dma_sync_sg			platform_pci_dma_sync_sg
-#define sg_dma_address			platform_pci_dma_address
 #define pci_dma_supported		platform_pci_dma_supported
 
 /* pci_unmap_{single,page} is not a nop, thus... */
@@ -92,9 +91,21 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 #define pci_controller_num(PDEV)	(0)
 
 #define sg_dma_len(sg)		((sg)->dma_length)
+#define sg_dma_address(sg)	((sg)->dma_address)
 
 #define HAVE_PCI_MMAP
 extern int pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 				enum pci_mmap_state mmap_state, int write_combine);
+
+struct pci_controller {
+	void *acpi_handle;
+	void *iommu;
+	int segment;
+
+	u64 mem_offset;
+};
+
+#define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
+#define PCI_SEGMENT(busdev)    (PCI_CONTROLLER(busdev)->segment)
 
 #endif /* _ASM_IA64_PCI_H */

@@ -109,8 +109,6 @@ acpi_get_sysname (void)
 	return "sn2";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
-# elif defined (CONFIG_IA64_HP_ZX1)
-	return "hpzx1";
 # else
 #	error Unknown platform.  Fix acpi.c.
 # endif
@@ -176,6 +174,73 @@ acpi_dispose_crs (struct acpi_buffer *buf)
 	kfree(buf->pointer);
 }
 
+void
+acpi_get_crs_addr (struct acpi_buffer *buf, int type, u64 *base, u64 *size, u64 *tra)
+{
+	int offset = 0;
+	struct acpi_resource_address16 *addr16;
+	struct acpi_resource_address32 *addr32;
+	struct acpi_resource_address64 *addr64;
+
+	for (;;) {
+		struct acpi_resource *res = acpi_get_crs_next(buf, &offset);
+		if (!res)
+			return;
+		switch (res->id) {
+			case ACPI_RSTYPE_ADDRESS16:
+				addr16 = (struct acpi_resource_address16 *) &res->data;
+
+				if (type == addr16->resource_type) {
+					*base = addr16->min_address_range;
+					*size = addr16->address_length;
+					*tra = addr16->address_translation_offset;
+					return;
+				}
+				break;
+			case ACPI_RSTYPE_ADDRESS32:
+				addr32 = (struct acpi_resource_address32 *) &res->data;
+				if (type == addr32->resource_type) {
+					*base = addr32->min_address_range;
+					*size = addr32->address_length;
+					*tra = addr32->address_translation_offset;
+					return;
+				}
+				break;
+			case ACPI_RSTYPE_ADDRESS64:
+				addr64 = (struct acpi_resource_address64 *) &res->data;
+				if (type == addr64->resource_type) {
+					*base = addr64->min_address_range;
+					*size = addr64->address_length;
+					*tra = addr64->address_translation_offset;
+					return;
+				}
+				break;
+		}
+	}
+}
+
+int
+acpi_get_addr_space(void *obj, u8 type, u64 *base, u64 *length, u64 *tra)
+{
+	acpi_status status;
+	struct acpi_buffer buf;
+
+	*base = 0;
+	*length = 0;
+	*tra = 0;
+
+	status = acpi_get_crs((acpi_handle)obj, &buf);
+	if (ACPI_FAILURE(status)) {
+		printk(KERN_ERR PREFIX "Unable to get _CRS data on object\n");
+		return status;
+	}
+
+	acpi_get_crs_addr(&buf, type, base, length, tra);
+
+	acpi_dispose_crs(&buf);
+
+	return AE_OK;
+}
 #endif /* CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI_BOOT
@@ -808,6 +873,7 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 
 	list_for_each(node, &acpi_prt.entries) {
 		entry = (struct acpi_prt_entry *)node;
+		vector[i].segment = entry->id.segment;
 		vector[i].bus    = entry->id.bus;
 		vector[i].pci_id = ((u32) entry->id.device << 16) | 0xffff;
 		vector[i].pin    = entry->pin;
