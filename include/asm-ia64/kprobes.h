@@ -42,8 +42,8 @@ extern unsigned long kp_get_gr(unsigned short , struct pt_regs *, struct switch_
 extern void kp_set_gr(unsigned short , unsigned long , struct pt_regs *,  struct switch_stack *);
 #else /* !CONFIG_KPROBES */
 static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr) { return 0; }
-static inline int post_kprobe_handler(struct pt_regs *regs) { return 0; }
-static inline int kprobe_handler(struct pt_regs *regs) { return 0; }
+static inline int post_kprobe_handler(struct pt_regs *regs, unsigned long vector) { return 0; }
+static inline int kprobe_handler(struct pt_regs *regs, unsigned long vector) { return 0; }
 static unsigned long kp_get_gr(unsigned short regnum, struct pt_regs *regs, struct switch_stack *sw) { return 0; }
 static void kp_set_gr(unsigned short regnum, unsigned long val, struct pt_regs *regs,  struct switch_stack *sw) { }
 #endif
