@@ -34,6 +34,7 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
+#include <linux/moduleparam.h>
 
 #include <linux/skbuff.h>
 #include <linux/string.h>
@@ -63,11 +64,11 @@
 
 
 /* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xffff;
+static unsigned int irq_mask = 0xffff;
 static int irq_list[4] = { -1 };
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(irq_mask, uint, 0);
+module_param_array(irq_list, int, NULL, 0);
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>, Jose Orlando Pereira <jop@di.uminho.pt>");
 MODULE_DESCRIPTION("Bluetooth driver for the 3Com Bluetooth PCMCIA card");

@@ -2152,6 +2152,8 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_total_retrans = tp->total_retrans;
 }
 
+EXPORT_SYMBOL_GPL(tcp_get_info);
+
 int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
 		   int __user *optlen)
 {
@@ -2358,8 +2360,6 @@ void __init tcp_init(void)
 	printk(KERN_INFO "TCP: Hash tables configured "
 	       "(established %d bind %d)\n",
 	       tcp_ehash_size << 1, tcp_bhash_size);
-
-	tcpdiag_init();
 }
 
 EXPORT_SYMBOL(tcp_accept);

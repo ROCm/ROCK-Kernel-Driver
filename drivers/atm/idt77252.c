@@ -3820,6 +3820,8 @@ static struct pci_device_id idt77252_pci_tbl[] =
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE(pci, idt77252_pci_tbl);
+
 static struct pci_driver idt77252_driver = {
 	.name		= "idt77252",
 	.id_table	= idt77252_pci_tbl,
