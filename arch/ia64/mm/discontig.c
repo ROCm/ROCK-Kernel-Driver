@@ -285,9 +285,11 @@ discontig_paging_init(void)
 		kaddr = (unsigned long)__va(bdp->node_boot_start);
 		ekaddr = (unsigned long)__va(bdp->node_low_pfn << PAGE_SHIFT);
 		while (kaddr < ekaddr) {
-			bid = BANK_MEM_MAP_INDEX(kaddr);
-			node_data[mynode]->node_id_map[bid] = node;
-			node_data[mynode]->bank_mem_map_base[bid] = page;
+			if (paddr_to_nid(__pa(kaddr)) == node) {
+				bid = BANK_MEM_MAP_INDEX(kaddr);
+				node_data[mynode]->node_id_map[bid] = node;
+				node_data[mynode]->bank_mem_map_base[bid] = page;
+			}
 			kaddr += BANKSIZE;
 			page += BANKSIZE/PAGE_SIZE;
 		}
