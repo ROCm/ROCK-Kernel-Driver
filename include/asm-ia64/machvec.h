@@ -113,6 +113,11 @@ extern void machvec_noop (void);
 #  define platofrm_mmiob        ia64_mv.mmiob
 # endif
 
+/* __attribute__((__aligned__(16))) is required to make size of the
+ * structure multiple of 16 bytes.
+ * This will fillup the holes created because of section 3.3.1 in 
+ * Software Conventions guide.
+ */
 struct ia64_machine_vector {
 	const char *name;
 	ia64_mv_setup_t *setup;
@@ -145,7 +150,7 @@ struct ia64_machine_vector {
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
 	ia64_mv_mmiob_t *mmiob;
-};
+} __attribute__((__aligned__(16)));
 
 #define MACHVEC_INIT(name)			\
 {						\
