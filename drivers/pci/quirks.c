@@ -646,7 +646,7 @@ static void __init quirk_disable_pxb(struct pci_dev *pdev)
  
 int interrupt_line_quirk;
 
-static void __init quirk_via_bridge(struct pci_dev *pdev)
+static void __devinit quirk_via_bridge(struct pci_dev *pdev)
 {
 	if(pdev->devfn == 0)
 		interrupt_line_quirk = 1;

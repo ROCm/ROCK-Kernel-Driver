@@ -1120,8 +1120,11 @@ static int kaweth_probe(
 
 	usb_set_intfdata(intf, kaweth);
 
+#if 0
+// dma_supported() is deeply broken on almost all architectures
 	if (dma_supported (&intf->dev, 0xffffffffffffffffULL))
 		kaweth->net->features |= NETIF_F_HIGHDMA;
+#endif
 
 	SET_NETDEV_DEV(netdev, &intf->dev);
 	if (register_netdev(netdev) != 0) {
