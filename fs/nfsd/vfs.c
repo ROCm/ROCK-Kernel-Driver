@@ -589,8 +589,6 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (err)
 		goto out;
 	err = nfserr_perm;
-	if (!file.f_op->read)
-		goto out_close;
 	inode = file.f_dentry->d_inode;
 #ifdef MSNFS
 	if ((fhp->fh_export->ex_flags & NFSEXP_MSNFS) &&
@@ -602,11 +600,10 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	ra = nfsd_get_raparms(inode->i_dev, inode->i_ino);
 	if (ra)
 		file.f_ra = ra->p_ra;
-	file.f_pos = offset;
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = file.f_op->read(&file, buf, *count, &file.f_pos);
+	err = vfs_read(&file, buf, *count, &offset);
 	set_fs(oldfs);
 
 	/* Write back readahead params */
@@ -648,8 +645,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (!cnt)
 		goto out_close;
 	err = nfserr_perm;
-	if (!file.f_op->write)
-		goto out_close;
+
 #ifdef MSNFS
 	if ((fhp->fh_export->ex_flags & NFSEXP_MSNFS) &&
 		(!lock_may_write(file.f_dentry->d_inode, offset, cnt)))
@@ -679,11 +675,9 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	if (stable && !EX_WGATHER(exp))
 		file.f_flags |= O_SYNC;
 
-	file.f_pos = offset;		/* set write offset */
-
 	/* Write the data. */
 	oldfs = get_fs(); set_fs(KERNEL_DS);
-	err = file.f_op->write(&file, buf, cnt, &file.f_pos);
+	err = vfs_write(&file, buf, cnt, &offset);
 	if (err >= 0)
 		nfsdstats.io_write += cnt;
 	set_fs(oldfs);
