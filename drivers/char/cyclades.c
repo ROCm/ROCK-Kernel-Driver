@@ -5634,8 +5634,10 @@ cy_cleanup_module(void)
 #endif /* CONFIG_CYZ_INTR */
 	    )
 		free_irq(cy_card[i].irq, &cy_card[i]);
+#ifdef CONFIG_PCI
 		if (cy_card[i].pdev)
 			pci_release_regions(cy_card[i].pdev);
+#endif
         }
     }
     if (tmp_buf) {
