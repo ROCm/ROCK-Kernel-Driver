@@ -912,7 +912,7 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 		goto out;
 
 	/*
-	 *	RFC 1970 specifies that redirects should only be
+	 *	RFC 2461 specifies that redirects should only be
 	 *	accepted if they come from the nexthop to the target.
 	 *	Due to the way default routers are chosen, this notion
 	 *	is a bit fuzzy and one might need to check all default

@@ -67,7 +67,7 @@ struct snmp6_item
 #define SNMP6_SENTINEL	{ .name = NULL, .offset = 0 }
 
 static struct snmp6_item snmp6_ipv6_list[] = {
-/* ipv6 mib according to draft-ietf-ipngwg-ipv6-mib-04 */
+/* ipv6 mib according to RFC 2465 */
 #define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct ipv6_mib, x) }
 	SNMP6_GEN(Ip6InReceives),
 	SNMP6_GEN(Ip6InHdrErrors),
@@ -96,7 +96,7 @@ static struct snmp6_item snmp6_ipv6_list[] = {
 };
 
 static struct snmp6_item snmp6_icmp6_list[] = {
-/* icmpv6 mib according to draft-ietf-ipngwg-ipv6-icmp-mib-02
+/* icmpv6 mib according to RFC 2466
 
    Exceptions:  {In|Out}AdminProhibs are removed, because I see
                 no good reasons to account them separately

@@ -666,7 +666,7 @@ static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		goto short_packet;
 
 	if (uh->check == 0) {
-		/* IPv6 draft-v2 section 8.1 says that we SHOULD log
+		/* RFC 2460 section 8.1 says that we SHOULD log
 		   this error. Well, it is reasonable.
 		 */
 		if (net_ratelimit())

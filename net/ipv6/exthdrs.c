@@ -405,7 +405,7 @@ ipv6_invert_rthdr(struct sock *sk, struct ipv6_rt_hdr *hdr)
   Hop-by-hop options.
  **********************************/
 
-/* Router Alert as of draft-ietf-ipngwg-ipv6router-alert-04 */
+/* Router Alert as of RFC 2711 */
 
 static int ipv6_hop_ra(struct sk_buff *skb, int optoff)
 {
@@ -684,7 +684,7 @@ int ipv6_ext_hdr(u8 nexthdr)
 /*
  * Skip any extension headers. This is used by the ICMP module.
  *
- * Note that strictly speaking this conflicts with RFC1883 4.0:
+ * Note that strictly speaking this conflicts with RFC 2460 4.0:
  * ...The contents and semantics of each extension header determine whether 
  * or not to proceed to the next header.  Therefore, extension headers must
  * be processed strictly in the order they appear in the packet; a
