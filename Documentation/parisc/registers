@@ -4,8 +4,6 @@ Register Usage for Linux/PA-RISC
 
 	General Registers as specified by ABI
 
-	FPU Registers must not be used in kernel mode
-
 	Control Registers
 
 CR 0 (Recovery Counter)		used for ptrace
@@ -13,11 +11,15 @@ CR 1-CR 7(undefined)		unused
 CR 8 (Protection ID)		per-process value*
 CR 9, 12, 13 (PIDS)		unused
 CR10 (CCR)			lazy FPU saving*
-CR11				as specified by ABI
+CR11				as specified by ABI (SAR)
 CR14 (interruption vector)	initialized to fault_vector
 CR15 (EIEM)			initialized to all ones*
 CR16 (Interval Timer)		read for cycle count/write starts Interval Tmr
 CR17-CR22			interruption parameters
+CR19				Interrupt Instruction Register
+CR20				Interrupt Space Register
+CR21				Interrupt Offset Register
+CR22				Interrupt PSW
 CR23 (EIRR)			read for pending interrupts/write clears bits
 CR24 (TR 0)			Kernel Space Page Directory Pointer
 CR25 (TR 1)			User   Space Page Directory Pointer

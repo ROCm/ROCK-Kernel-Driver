@@ -54,18 +54,27 @@
 
 #define kDEBUG 0
 
-spinlock_t pa_dbit_lock = SPIN_LOCK_UNLOCKED;
-
 spinlock_t smp_lock = SPIN_LOCK_UNLOCKED;
 
 volatile struct task_struct *smp_init_current_idle_task;
 
 static volatile int cpu_now_booting = 0;	/* track which CPU is booting */
-static int parisc_max_cpus = -1;		/* Command line */
 
 unsigned long cache_decay_ticks;	/* declared by include/linux/sched.h */
+
+static int parisc_max_cpus = 1;
+
+/* online cpus are ones that we've managed to bring up completely
+ * possible cpus are all valid cpu 
+ * present cpus are all detected cpu
+ *
+ * On startup we bring up the "possible" cpus. Since we discover
+ * CPUs later, we add them as hotplug, so the possible cpu mask is
+ * empty in the beginning.
+ */
+
 cpumask_t cpu_online_map = CPU_MASK_NONE;	/* Bitmap of online CPUs */
-cpumask_t cpu_possible_map = CPU_MASK_NONE;	/* Bitmap of Present CPUs */
+cpumask_t cpu_possible_map = CPU_MASK_ALL;	/* Bitmap of Present CPUs */
 
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(cpu_possible_map);
@@ -289,7 +298,7 @@ send_IPI_allbutself(enum ipi_message_type op)
 {
 	int i;
 	
-	for (i = 0; i < parisc_max_cpus; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_online(i) && i != smp_processor_id())
 			send_IPI_single(i, op);
 	}
@@ -324,6 +333,9 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 	struct smp_call_struct data;
 	unsigned long timeout;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+
+	if (num_online_cpus() < 2)
+		return 0;
 
 	/* Can deadlock when called with interrupts disabled */
 	WARN_ON(irqs_disabled());
@@ -376,35 +388,6 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 }
 
 EXPORT_SYMBOL(smp_call_function);
-
-
-
-/*
- *	Setup routine for controlling SMP activation
- *
- *	Command-line option of "nosmp" or "maxcpus=0" will disable SMP
- *	activation entirely (the MPS table probe still happens, though).
- *
- *	Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
- *	greater than 0, limits the maximum number of CPUs activated in
- *	SMP mode to <NUM>.
- */
-
-static int __init nosmp(char *str)
-{
-	parisc_max_cpus = 0;
-	return 1;
-}
-
-__setup("nosmp", nosmp);
-
-static int __init maxcpus(char *str)
-{
-	get_option(&str, &parisc_max_cpus);
-	return 1;
-}
-
-__setup("maxcpus=", maxcpus);
 
 /*
  * Flush all other CPU's tlb and then mine.  Do this with on_each_cpu()
@@ -502,7 +485,6 @@ void __init smp_callin(void)
 	panic("smp_callin() AAAAaaaaahhhh....\n");
 }
 
-#if 0
 /*
  * Create the idle task for a new Slave CPU.  DO NOT use kernel_thread()
  * because that could end up calling schedule(). If it did, the new idle
@@ -524,7 +506,7 @@ static struct task_struct *fork_by_hand(void)
 /*
  * Bring one cpu online.
  */
-int __init smp_boot_one_cpu(int cpuid, int cpunum)
+int __init smp_boot_one_cpu(int cpuid)
 {
 	struct task_struct *idle;
 	long timeout;
@@ -544,14 +526,14 @@ int __init smp_boot_one_cpu(int cpuid, int cpunum)
 		panic("SMP: fork failed for CPU:%d", cpuid);
 
 	wake_up_forked_process(idle);
-	init_idle(idle, cpunum);
+	init_idle(idle, cpuid);
 	unhash_process(idle);
-	idle->thread_info->cpu = cpunum;
+	idle->thread_info->cpu = cpuid;
 
 	/* Let _start know what logical CPU we're booting
 	** (offset into init_tasks[],cpu_data[])
 	*/
-	cpu_now_booting = cpunum;
+	cpu_now_booting = cpuid;
 
 	/* 
 	** boot strap code needs to know the task address since
@@ -560,11 +542,18 @@ int __init smp_boot_one_cpu(int cpuid, int cpunum)
 	smp_init_current_idle_task = idle ;
 	mb();
 
+	printk("Releasing cpu %d now, hpa=%lx\n", cpuid, cpu_data[cpuid].hpa);
+
 	/*
 	** This gets PDC to release the CPU from a very tight loop.
-	** See MEM_RENDEZ comments in head.S.
+	**
+	** From the PA-RISC 2.0 Firmware Architecture Reference Specification:
+	** "The MEM_RENDEZ vector specifies the location of OS_RENDEZ which 
+	** is executed after receiving the rendezvous signal (an interrupt to 
+	** EIR{0}). MEM_RENDEZ is valid only when it is nonzero and the 
+	** contents of memory are valid."
 	*/
-	__raw_writel(IRQ_OFFSET(TIMER_IRQ), cpu_data[cpunum].hpa);
+	__raw_writel(IRQ_OFFSET(TIMER_IRQ), cpu_data[cpuid].hpa);
 	mb();
 
 	/* 
@@ -573,7 +562,7 @@ int __init smp_boot_one_cpu(int cpuid, int cpunum)
 	 * Once the "monarch CPU" sees the bit change, it can move on.
 	 */
 	for (timeout = 0; timeout < 10000; timeout++) {
-		if(cpu_online(cpunum)) {
+		if(cpu_online(cpuid)) {
 			/* Which implies Slave has started up */
 			cpu_now_booting = 0;
 			smp_init_current_idle_task = NULL;
@@ -592,16 +581,14 @@ int __init smp_boot_one_cpu(int cpuid, int cpunum)
 alive:
 	/* Remember the Slave data */
 #if (kDEBUG>=100)
-	printk(KERN_DEBUG "SMP: CPU:%d (num %d) came alive after %ld _us\n",
-		cpuid,  cpunum, timeout * 100);
+	printk(KERN_DEBUG "SMP: CPU:%d came alive after %ld _us\n",
+		cpuid, timeout * 100);
 #endif /* kDEBUG */
 #ifdef ENTRY_SYS_CPUS
-	cpu_data[cpunum].state = STATE_RUNNING;
+	cpu_data[cpuid].state = STATE_RUNNING;
 #endif
 	return 0;
 }
-#endif
-
 
 void __devinit smp_prepare_boot_cpu(void)
 {
@@ -612,15 +599,10 @@ void __devinit smp_prepare_boot_cpu(void)
 #endif
 
 	/* Setup BSP mappings */
-	printk(KERN_DEBUG "SMP: bootstrap CPU ID is %d\n",bootstrap_processor);
-	init_task.thread_info->cpu = bootstrap_processor; 
-	current->thread_info->cpu = bootstrap_processor;
+	printk("SMP: bootstrap CPU ID is %d\n",bootstrap_processor);
 
 	cpu_set(bootstrap_processor, cpu_online_map);
-	cpu_set(bootstrap_processor, cpu_possible_map);
-
-	/* Mark Boostrap processor as present */
-	current->active_mm = &init_mm;
+	cpu_set(bootstrap_processor, cpu_present_map);
 
 	cache_decay_ticks = HZ/100;	/* FIXME very rough.  */
 }
@@ -633,15 +615,12 @@ void __devinit smp_prepare_boot_cpu(void)
 */
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+	cpus_clear(cpu_present_map);
+	cpu_set(0, cpu_present_map);
 
-	if (max_cpus != -1) 
-		printk(KERN_INFO "SMP: Limited to %d CPUs\n", max_cpus);
-
-	printk(KERN_INFO "SMP: Monarch CPU activated (%lu.%02lu BogoMIPS)\n",
-	       (cpu_data[0].loops_per_jiffy + 25) / 5000,
-	       ((cpu_data[0].loops_per_jiffy + 25) / 50) % 100);
-
-	return;
+	parisc_max_cpus = max_cpus;
+	if (!max_cpus)
+		printk(KERN_INFO "SMP mode deactivated.\n");
 }
 
 
@@ -653,6 +632,9 @@ void smp_cpus_done(unsigned int cpu_max)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
+	if (cpu != 0 && cpu < parisc_max_cpus)
+		smp_boot_one_cpu(cpu);
+
 	return cpu_online(cpu) ? 0 : -ENOSYS;
 }
 

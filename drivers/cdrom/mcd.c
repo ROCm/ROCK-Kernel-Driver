@@ -227,7 +227,7 @@ static int mcd_block_release(struct inode *inode, struct file *file)
 static int mcd_block_ioctl(struct inode *inode, struct file *file,
 				unsigned cmd, unsigned long arg)
 {
-	return cdrom_ioctl(&mcd_info, inode, cmd, arg);
+	return cdrom_ioctl(file, &mcd_info, inode, cmd, arg);
 }
 
 static int mcd_block_media_changed(struct gendisk *disk)

@@ -932,13 +932,16 @@ dino_driver_callback(struct parisc_device *dev)
 	struct dino_device *dino_dev;	// Dino specific control struct
 	const char *version = "unknown";
 	const int name_len = 32;
+	char hw_path[64];
 	char *name;
 	int is_cujo = 0;
 	struct pci_bus *bus;
-
+	
 	name = kmalloc(name_len, GFP_KERNEL);
-	if(name)
-		snprintf(name, name_len, "Dino %s", dev->dev.bus_id);
+	if(name) {
+		print_pa_hwpath(dev, hw_path);
+		snprintf(name, name_len, "Dino [%s]", hw_path);
+	} 
 	else
 		name = "Dino";
 

@@ -21,16 +21,20 @@ CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
+# CONFIG_AUDIT is not set
 CONFIG_LOG_BUF_SHIFT=15
 # CONFIG_HOTPLUG is not set
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_ALL is not set
+# CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
 CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
+CONFIG_IOSCHED_CFQ=y
 # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
 
 #
@@ -45,8 +49,9 @@ CONFIG_OBSOLETE_MODPARM=y
 # Processor type and features
 #
 # CONFIG_PA7000 is not set
-# CONFIG_PA7100LC is not set
-CONFIG_PA7200=y
+CONFIG_PA7100LC=y
+# CONFIG_PA7200 is not set
+# CONFIG_PA7300LC is not set
 # CONFIG_PA8X00 is not set
 CONFIG_PA11=y
 # CONFIG_64BIT is not set
@@ -70,7 +75,7 @@ CONFIG_PCI_LEGACY_PROC=y
 CONFIG_PCI_NAMES=y
 CONFIG_GSC_DINO=y
 # CONFIG_PCI_LBA is not set
-# CONFIG_CHASSIS_LCD_LED is not set
+CONFIG_CHASSIS_LCD_LED=y
 # CONFIG_PDC_CHASSIS is not set
 
 #
@@ -86,6 +91,7 @@ CONFIG_BINFMT_ELF=y
 #
 # Generic Driver Options
 #
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 CONFIG_DEBUG_DRIVER=y
 
 #
@@ -121,7 +127,7 @@ CONFIG_PARPORT_GSC=y
 CONFIG_BLK_DEV_LOOP=y
 CONFIG_BLK_DEV_CRYPTOLOOP=y
 # CONFIG_BLK_DEV_NBD is not set
-CONFIG_BLK_DEV_CARMEL=y
+# CONFIG_BLK_DEV_SX8 is not set
 # CONFIG_BLK_DEV_RAM is not set
 
 #
@@ -149,7 +155,6 @@ CONFIG_CHR_DEV_SG=y
 # Some SCSI devices (e.g. CD jukebox) support multiple LUNs
 #
 # CONFIG_SCSI_MULTI_LUN is not set
-# CONFIG_SCSI_REPORT_LUNS is not set
 # CONFIG_SCSI_CONSTANTS is not set
 # CONFIG_SCSI_LOGGING is not set
 
@@ -163,6 +168,7 @@ CONFIG_SCSI_SPI_ATTRS=y
 # SCSI low-level drivers
 #
 # CONFIG_BLK_DEV_3W_XXXX_RAID is not set
+# CONFIG_SCSI_3W_9XXX is not set
 # CONFIG_SCSI_7000FASST is not set
 # CONFIG_SCSI_ACARD is not set
 # CONFIG_SCSI_AHA152X is not set
@@ -171,11 +177,10 @@ CONFIG_SCSI_SPI_ATTRS=y
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_AIC79XX is not set
-# CONFIG_SCSI_ADVANSYS is not set
+# CONFIG_SCSI_DPT_I2O is not set
 # CONFIG_SCSI_IN2000 is not set
 # CONFIG_SCSI_MEGARAID is not set
 # CONFIG_SCSI_BUSLOGIC is not set
-# CONFIG_SCSI_CPQFCTS is not set
 # CONFIG_SCSI_DMX3191D is not set
 # CONFIG_SCSI_DTC3280 is not set
 # CONFIG_SCSI_EATA is not set
@@ -197,6 +202,7 @@ CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE=0
 CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS=16
 CONFIG_SCSI_SYM53C8XX_MAX_TAGS=64
 # CONFIG_SCSI_SYM53C8XX_IOMAPPED is not set
+# CONFIG_SCSI_IPR is not set
 # CONFIG_SCSI_ZALON is not set
 # CONFIG_SCSI_PAS16 is not set
 # CONFIG_SCSI_PSI240I is not set
@@ -278,10 +284,10 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
-# CONFIG_DECNET is not set
-# CONFIG_BRIDGE is not set
 # CONFIG_NETFILTER is not set
+# CONFIG_BRIDGE is not set
 # CONFIG_VLAN_8021Q is not set
+# CONFIG_DECNET is not set
 # CONFIG_LLC2 is not set
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
@@ -290,21 +296,27 @@ CONFIG_IP_PNP_BOOTP=y
 # QoS and/or fair queueing
 #
 # CONFIG_NET_SCHED is not set
+# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
 #
 # CONFIG_NET_PKTGEN is not set
+# CONFIG_NETPOLL is not set
+# CONFIG_NET_POLL_CONTROLLER is not set
+# CONFIG_HAMRADIO is not set
+# CONFIG_IRDA is not set
+# CONFIG_BT is not set
 CONFIG_NETDEVICES=y
+# CONFIG_DUMMY is not set
+# CONFIG_BONDING is not set
+# CONFIG_EQUALIZER is not set
+# CONFIG_TUN is not set
 
 #
 # ARCnet devices
 #
 # CONFIG_ARCNET is not set
-# CONFIG_DUMMY is not set
-# CONFIG_BONDING is not set
-# CONFIG_EQUALIZER is not set
-# CONFIG_TUN is not set
 
 #
 # Ethernet (10 or 100Mbit)
@@ -351,15 +363,12 @@ CONFIG_TULIP=y
 # Ethernet (10000 Mbit)
 #
 # CONFIG_IXGB is not set
-# CONFIG_FDDI is not set
-# CONFIG_PLIP is not set
-CONFIG_PPP=y
-# CONFIG_PPP_FILTER is not set
-# CONFIG_PPP_ASYNC is not set
-# CONFIG_PPP_SYNC_TTY is not set
-# CONFIG_PPP_DEFLATE is not set
-# CONFIG_PPP_BSDCOMP is not set
-# CONFIG_SLIP is not set
+# CONFIG_S2IO is not set
+
+#
+# Token Ring devices
+#
+# CONFIG_TR is not set
 
 #
 # Wireless LAN (non-hamradio)
@@ -385,32 +394,19 @@ CONFIG_NET_RADIO=y
 CONFIG_NET_WIRELESS=y
 
 #
-# Token Ring devices
-#
-# CONFIG_TR is not set
-# CONFIG_NET_FC is not set
-
-#
 # Wan interfaces
 #
 # CONFIG_WAN is not set
-
-#
-# Amateur Radio support
-#
-# CONFIG_HAMRADIO is not set
-
-#
-# IrDA (infrared) support
-#
-# CONFIG_IRDA is not set
-
-#
-# Bluetooth support
-#
-# CONFIG_BT is not set
-# CONFIG_NETPOLL is not set
-# CONFIG_NET_POLL_CONTROLLER is not set
+# CONFIG_FDDI is not set
+# CONFIG_PLIP is not set
+CONFIG_PPP=y
+# CONFIG_PPP_FILTER is not set
+# CONFIG_PPP_ASYNC is not set
+# CONFIG_PPP_SYNC_TTY is not set
+# CONFIG_PPP_DEFLATE is not set
+# CONFIG_PPP_BSDCOMP is not set
+# CONFIG_SLIP is not set
+# CONFIG_NET_FC is not set
 
 #
 # ISDN subsystem
@@ -473,7 +469,6 @@ CONFIG_INPUT_MOUSE=y
 # CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
 CONFIG_INPUT_MISC=y
-# CONFIG_INPUT_PCSPKR is not set
 # CONFIG_INPUT_UINPUT is not set
 # CONFIG_HP_SDC_RTC is not set
 
@@ -543,6 +538,11 @@ CONFIG_GEN_RTC=y
 # CONFIG_I2C is not set
 
 #
+# Dallas's 1-wire bus
+#
+# CONFIG_W1 is not set
+
+#
 # Misc devices
 #
 
@@ -560,8 +560,10 @@ CONFIG_GEN_RTC=y
 # Graphics support
 #
 CONFIG_FB=y
+# CONFIG_FB_CIRRUS is not set
 # CONFIG_FB_PM2 is not set
 # CONFIG_FB_CYBER2000 is not set
+# CONFIG_FB_ASILIANT is not set
 # CONFIG_FB_IMSTT is not set
 CONFIG_FB_STI=y
 # CONFIG_FB_RIVA is not set
@@ -587,7 +589,6 @@ CONFIG_DUMMY_CONSOLE_COLUMNS=160
 CONFIG_DUMMY_CONSOLE_ROWS=64
 CONFIG_DUMMY_CONSOLE=y
 CONFIG_FRAMEBUFFER_CONSOLE=y
-CONFIG_PCI_CONSOLE=y
 # CONFIG_FONTS is not set
 CONFIG_FONT_8x8=y
 CONFIG_FONT_8x16=y
@@ -645,7 +646,8 @@ CONFIG_JOLIET=y
 #
 # DOS/FAT/NT Filesystems
 #
-# CONFIG_FAT_FS is not set
+# CONFIG_MSDOS_FS is not set
+# CONFIG_VFAT_FS is not set
 # CONFIG_NTFS_FS is not set
 
 #
@@ -653,6 +655,7 @@ CONFIG_JOLIET=y
 #
 CONFIG_PROC_FS=y
 CONFIG_PROC_KCORE=y
+CONFIG_SYSFS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
 CONFIG_TMPFS=y
 # CONFIG_HUGETLB_PAGE is not set
@@ -662,6 +665,7 @@ CONFIG_RAMFS=y
 # Miscellaneous filesystems
 #
 # CONFIG_HFSPLUS_FS is not set
+# CONFIG_JFFS2_COMPRESSION_OPTIONS is not set
 # CONFIG_CRAMFS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_HPFS_FS is not set
@@ -676,6 +680,7 @@ CONFIG_NFS_FS=y
 CONFIG_NFS_V3=y
 CONFIG_NFSD=y
 CONFIG_NFSD_V3=y
+CONFIG_NFSD_TCP=y
 CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
@@ -720,6 +725,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # CONFIG_NLS_ISO8859_8 is not set
 # CONFIG_NLS_CODEPAGE_1250 is not set
 # CONFIG_NLS_CODEPAGE_1251 is not set
+# CONFIG_NLS_ASCII is not set
 # CONFIG_NLS_ISO8859_1 is not set
 # CONFIG_NLS_ISO8859_2 is not set
 # CONFIG_NLS_ISO8859_3 is not set
@@ -741,6 +747,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 CONFIG_DEBUG_KERNEL=y
 # CONFIG_DEBUG_SLAB is not set
 CONFIG_MAGIC_SYSRQ=y
+# CONFIG_DEBUG_SPINLOCK is not set
 CONFIG_FRAME_POINTER=y
 # CONFIG_DEBUG_INFO is not set
 
@@ -770,12 +777,16 @@ CONFIG_CRYPTO=y
 # CONFIG_CRYPTO_AES is not set
 # CONFIG_CRYPTO_CAST5 is not set
 # CONFIG_CRYPTO_CAST6 is not set
+# CONFIG_CRYPTO_TEA is not set
 # CONFIG_CRYPTO_ARC4 is not set
 # CONFIG_CRYPTO_DEFLATE is not set
 # CONFIG_CRYPTO_MICHAEL_MIC is not set
+# CONFIG_CRYPTO_CRC32C is not set
 # CONFIG_CRYPTO_TEST is not set
 
 #
 # Library routines
 #
+# CONFIG_CRC_CCITT is not set
 CONFIG_CRC32=y
+# CONFIG_LIBCRC32C is not set

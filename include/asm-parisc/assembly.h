@@ -24,6 +24,7 @@
 #ifdef __LP64__
 #define LDREG	ldd
 #define STREG	std
+#define LDREGX  ldd,s
 #define LDREGM	ldd,mb
 #define STREGM	std,ma
 #define RP_OFFSET	16
@@ -31,10 +32,17 @@
 #else
 #define LDREG	ldw
 #define STREG	stw
+#define LDREGX  ldwx,s
 #define LDREGM	ldwm
 #define STREGM	stwm
 #define RP_OFFSET	20
 #define FRAME_SIZE	64
+#endif
+
+#ifdef CONFIG_PA20
+#define BL		b,l
+#else
+#define BL		bl
 #endif
 
 #ifdef __ASSEMBLY__
@@ -108,6 +116,16 @@
 	/* And the PA 2.0W shift left */
 	.macro shld r, sa, t
 	depd,z	\r, 63-\sa, 64-\sa, \t
+	.endm
+
+	/* Shift Right - note the r and t can NOT be the same! */
+	.macro shr r, sa, t
+	extru \r, 31-\sa, 32-\sa, \t
+	.endm
+
+	/* pa20w version of shift right */
+	.macro shrd r, sa, t
+	extrd,u \r, 63-\sa, 64-\sa, \t
 	.endm
 
 	/* load 32-bit 'value' into 'reg' compensating for the ldil

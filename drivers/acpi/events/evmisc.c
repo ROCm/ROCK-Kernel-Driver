@@ -139,8 +139,7 @@ acpi_ev_queue_notify_request (
 				acpi_notify_value_names[notify_value]));
 	}
 	else {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-				"notify value: 0x%2.2x **Device Specific**\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: 0x%2.2X **Device Specific**\n",
 				notify_value));
 	}
 
@@ -197,8 +196,8 @@ acpi_ev_queue_notify_request (
 		/* There is no per-device notify handler for this device */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"No notify handler for [%4.4s] node %p\n",
-			acpi_ut_get_node_name (node), node));
+			"No notify handler for Notify(%4.4s, %X) node %p\n",
+			acpi_ut_get_node_name (node), notify_value, node));
 	}
 
 	return (status);
@@ -548,7 +547,7 @@ acpi_ev_terminate (void)
 
 		/* Disable all GPEs in all GPE blocks */
 
-		status = acpi_ev_walk_gpe_list (acpi_hw_disable_gpe_block);
+		status = acpi_ev_walk_gpe_list (acpi_hw_disable_gpe_block, ACPI_NOT_ISR);
 
 		/* Remove SCI handler */
 
@@ -557,6 +556,10 @@ acpi_ev_terminate (void)
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not remove SCI handler\n"));
 		}
 	}
+
+	/* Deallocate all handler objects installed within GPE info structs */
+
+	status = acpi_ev_walk_gpe_list (acpi_ev_delete_gpe_handlers, ACPI_NOT_ISR);
 
 	/* Return to original mode if necessary */
 

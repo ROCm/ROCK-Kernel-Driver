@@ -56,20 +56,6 @@ struct acpi_blacklist_item
  */
 static struct acpi_blacklist_item acpi_blacklist[] __initdata =
 {
-	/* Portege 7020, BIOS 8.10 */
-	{"TOSHIB", "7020CT  ", 0x19991112, ACPI_DSDT, all_versions, "Implicit Return", 0},
-	/* Portege 4030 */
-	{"TOSHIB", "4030    ", 0x19991112, ACPI_DSDT, all_versions, "Implicit Return", 0},
-	/* Portege 310/320, BIOS 7.1 */
-	{"TOSHIB", "310     ", 0x19990511, ACPI_DSDT, all_versions, "Implicit Return", 0},
-	/* Seattle 2, old bios rev. */
-	{"INTEL ", "440BX   ", 0x00001000, ACPI_DSDT, less_than_or_equal, "Field beyond end of region", 0},
-	/* ASUS K7M */
-	{"ASUS  ", "K7M     ", 0x00001000, ACPI_DSDT, less_than_or_equal, "Field beyond end of region", 0},
-	/* Intel 810 Motherboard? */
-	{"MNTRAL", "MO81010A", 0x00000012, ACPI_DSDT, less_than_or_equal, "Field beyond end of region", 0},
-	/* Compaq Presario 711FR */
-	{"COMAPQ", "EAGLES", 0x06040000, ACPI_DSDT, less_than_or_equal, "SCI issues (C2 disabled)", 0},
 	/* Compaq Presario 1700 */
 	{"PTLTD ", "  DSDT  ", 0x06040000, ACPI_DSDT, less_than_or_equal, "Multiple problems", 1},
 	/* Sony FX120, FX140, FX150? */

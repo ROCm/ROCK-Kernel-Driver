@@ -23,7 +23,8 @@ extern struct acpi_device		*acpi_root;
 #define ACPI_BUS_DEVICE_NAME		"System Bus"
 
 static LIST_HEAD(acpi_device_list);
-static spinlock_t acpi_device_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t acpi_device_lock = SPIN_LOCK_UNLOCKED;
+LIST_HEAD(acpi_wakeup_device_list);
 
 static void acpi_device_release(struct kobject * kobj)
 {
@@ -115,9 +116,6 @@ acpi_bus_get_power_flags (
 	status = acpi_get_handle(device->handle, "_IRC", &handle);
 	if (ACPI_SUCCESS(status))
 		device->power.flags.inrush_current = 1;
-	status = acpi_get_handle(device->handle, "_PRW", &handle);
-	if (ACPI_SUCCESS(status))
-		device->power.flags.wake_capable = 1;
 
 	/*
 	 * Enumerate supported power management states
@@ -163,6 +161,125 @@ acpi_bus_get_power_flags (
 	return 0;
 }
 
+static int
+acpi_match_ids (
+	struct acpi_device	*device,
+	char			*ids)
+{
+	int error = 0;
+	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+
+	if (device->flags.hardware_id)
+		if (strstr(ids, device->pnp.hardware_id))
+			goto Done;
+
+	if (device->flags.compatible_ids) {
+		struct acpi_compatible_id_list *cid_list = device->pnp.cid_list;
+		int i;
+
+		/* compare multiple _CID entries against driver ids */
+		for (i = 0; i < cid_list->count; i++)
+		{
+			if (strstr(ids, cid_list->id[i].value))
+				goto Done;
+		}
+	}
+	error = -ENOENT;
+
+ Done:
+	if (buffer.pointer)
+		acpi_os_free(buffer.pointer);
+	return error;
+}
+
+static acpi_status
+acpi_bus_extract_wakeup_device_power_package (
+	struct acpi_device	*device,
+	union acpi_object	*package)
+{
+	int 	 i = 0;
+	union acpi_object	*element = NULL;
+
+	if (!device || !package || (package->package.count < 2))
+		return AE_BAD_PARAMETER;
+
+	element = &(package->package.elements[0]);
+	if (element->type == ACPI_TYPE_PACKAGE) {
+		if ((element->package.count < 2) ||
+			(element->package.elements[0].type != ACPI_TYPE_LOCAL_REFERENCE) ||
+			(element->package.elements[1].type != ACPI_TYPE_INTEGER))
+			return AE_BAD_DATA;
+		device->wakeup.gpe_device = element->package.elements[0].reference.handle;
+		device->wakeup.gpe_number = (u32)element->package.elements[1].integer.value;
+	}else if (element->type == ACPI_TYPE_INTEGER) {
+		device->wakeup.gpe_number = element->integer.value;
+	}else
+		return AE_BAD_DATA;
+
+	element = &(package->package.elements[1]);
+	if (element->type != ACPI_TYPE_INTEGER) {
+		return AE_BAD_DATA;
+	}
+	device->wakeup.sleep_state = element->integer.value;
+
+	if ((package->package.count - 2) > ACPI_MAX_HANDLES) {
+		return AE_NO_MEMORY;
+	}
+	device->wakeup.resources.count = package->package.count - 2;
+	for (i=0; i < device->wakeup.resources.count; i++) {
+		element = &(package->package.elements[i + 2]);
+		if (element->type != ACPI_TYPE_ANY ) {
+			return AE_BAD_DATA;
+		}
+
+		device->wakeup.resources.handles[i] = element->reference.handle;
+	}
+
+	return AE_OK;
+}
+
+static int
+acpi_bus_get_wakeup_device_flags (
+	struct acpi_device	*device)
+{
+	acpi_status	status = 0;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object	*package = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_bus_get_wakeup_flags");
+
+	/* _PRW */
+	status = acpi_evaluate_object(device->handle, "_PRW", NULL, &buffer);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRW\n"));
+		goto end;
+	}
+
+	package = (union acpi_object *) buffer.pointer;
+	status = acpi_bus_extract_wakeup_device_power_package(device, package);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error extracting _PRW package\n"));
+		goto end;
+	}
+
+	acpi_os_free(buffer.pointer);
+
+	device->wakeup.flags.valid = 1;
+	/* Power button, Lid switch always enable wakeup*/
+	if (!acpi_match_ids(device, "PNP0C0D,PNP0C0C,PNP0C0E"))
+		device->wakeup.flags.run_wake = 1;
+
+	/* TBD: lock */
+	INIT_LIST_HEAD(&device->wakeup_list);
+	spin_lock(&acpi_device_lock);
+	list_add_tail(&device->wakeup_list, &acpi_wakeup_device_list);
+	spin_unlock(&acpi_device_lock);
+
+end:
+	if (ACPI_FAILURE(status))
+		device->flags.wake_capable = 0;
+	return 0;
+}
 
 /* --------------------------------------------------------------------------
                               Performance Management
@@ -195,30 +312,7 @@ acpi_bus_match (
 	struct acpi_device	*device,
 	struct acpi_driver	*driver)
 {
-	int error = 0;
-	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-
-	if (device->flags.hardware_id)
-		if (strstr(driver->ids, device->pnp.hardware_id))
-			goto Done;
-
-	if (device->flags.compatible_ids) {
-		struct acpi_compatible_id_list *cid_list = device->pnp.cid_list;
-		int i;
-
-		/* compare multiple _CID entries against driver ids */
-		for (i = 0; i < cid_list->count; i++)
-		{
-			if (strstr(driver->ids, cid_list->id[i].value))
-				goto Done;
-		}
-	}
-	error = -ENOENT;
-
- Done:
-	if (buffer.pointer)
-		acpi_os_free(buffer.pointer);
-	return error;
+	return acpi_match_ids(device, driver->ids);
 }
 
 
@@ -276,6 +370,7 @@ acpi_bus_driver_init (
 static int acpi_driver_attach(struct acpi_driver * drv)
 {
 	struct list_head * node, * next;
+	int count = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_driver_attach");
 
@@ -290,6 +385,7 @@ static int acpi_driver_attach(struct acpi_driver * drv)
 		if (!acpi_bus_match(dev, drv)) {
 			if (!acpi_bus_driver_init(dev, drv)) {
 				atomic_inc(&drv->references);
+				count++;
 				ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found driver [%s] for device [%s]\n",
 						  drv->name, dev->pnp.bus_id));
 			}
@@ -297,7 +393,7 @@ static int acpi_driver_attach(struct acpi_driver * drv)
 		spin_lock(&acpi_device_lock);
 	}
 	spin_unlock(&acpi_device_lock);
-	return_VALUE(0);
+	return_VALUE(count);
 }
 
 static int acpi_driver_detach(struct acpi_driver * drv)
@@ -328,28 +424,30 @@ static int acpi_driver_detach(struct acpi_driver * drv)
  * acpi_bus_register_driver 
  * ------------------------ 
  * Registers a driver with the ACPI bus.  Searches the namespace for all
- * devices that match the driver's criteria and binds.
+ * devices that match the driver's criteria and binds.  Returns the
+ * number of devices that were claimed by the driver, or a negative
+ * error status for failure.
  */
 int
 acpi_bus_register_driver (
 	struct acpi_driver	*driver)
 {
-	int error = 0;
+	int count;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_register_driver");
 
 	if (acpi_disabled)
 		return_VALUE(-ENODEV);
 
-	if (driver) {
-		spin_lock(&acpi_device_lock);
-		list_add_tail(&driver->node, &acpi_bus_drivers);
-		spin_unlock(&acpi_device_lock);
-		acpi_driver_attach(driver);
-	} else
-		error = -EINVAL;
+	if (!driver)
+		return_VALUE(-EINVAL);
 
-	return_VALUE(error);
+	spin_lock(&acpi_device_lock);
+	list_add_tail(&driver->node, &acpi_bus_drivers);
+	spin_unlock(&acpi_device_lock);
+	count = acpi_driver_attach(driver);
+
+	return_VALUE(count);
 }
 
 
@@ -468,6 +566,11 @@ acpi_bus_get_flags (
 		status = acpi_get_handle(device->handle, "_PR0", &temp);
 	if (ACPI_SUCCESS(status))
 		device->flags.power_manageable = 1;
+
+	/* Presence of _PRW indicates wake capable */
+	status = acpi_get_handle(device->handle, "_PRW", &temp);
+	if (ACPI_SUCCESS(status))
+		device->flags.wake_capable = 1;
 
 	/* TBD: Peformance management */
 
@@ -736,6 +839,16 @@ acpi_bus_add (
 	 */
 	if (device->flags.power_manageable) {
 		result = acpi_bus_get_power_flags(device);
+		if (result)
+			goto end;
+	}
+
+ 	/*
+	 * Wakeup device management
+	 *-----------------------
+	 */
+	if (device->flags.wake_capable) {
+		result = acpi_bus_get_wakeup_device_flags(device);
 		if (result)
 			goto end;
 	}

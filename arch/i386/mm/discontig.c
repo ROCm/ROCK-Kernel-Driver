@@ -31,6 +31,7 @@
 #include <asm/e820.h>
 #include <asm/setup.h>
 #include <asm/mmzone.h>
+#include <bios_ebda.h>
 
 struct pglist_data *node_data[MAX_NUMNODES];
 bootmem_data_t node0_bdata;
@@ -219,6 +220,17 @@ static unsigned long calculate_numa_remap_pages(void)
 	return reserve_pages;
 }
 
+/*
+ * workaround for Dell systems that neglect to reserve EBDA
+ */
+static void __init reserve_ebda_region_node(void)
+{
+	unsigned int addr;
+	addr = get_bios_ebda();
+	if (addr)
+		reserve_bootmem_node(NODE_DATA(0), addr, PAGE_SIZE);
+}
+
 unsigned long __init setup_memory(void)
 {
 	int nid;
@@ -317,6 +329,9 @@ unsigned long __init setup_memory(void)
 	 * trampoline before removing it. (see the GDT stuff)
 	 */
 	reserve_bootmem_node(NODE_DATA(0), PAGE_SIZE, PAGE_SIZE);
+
+	/* reserve EBDA region, it's a 4K region */
+	reserve_ebda_region_node();
 
 #ifdef CONFIG_ACPI_SLEEP
 	/*

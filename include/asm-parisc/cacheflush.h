@@ -65,18 +65,7 @@ flush_user_icache_range(unsigned long start, unsigned long end)
 #endif
 }
 
-extern void __flush_dcache_page(struct page *page);
-
-static inline void flush_dcache_page(struct page *page)
-{
-	struct address_space *mapping = page_mapping(page);
-
-	if (mapping && !mapping_mapped(mapping)) {
-		set_bit(PG_dcache_dirty, &page->flags);
-	} else {
-		__flush_dcache_page(page);
-	}
-}
+extern void flush_dcache_page(struct page *page);
 
 #define flush_dcache_mmap_lock(mapping) \
 	spin_lock_irq(&(mapping)->tree_lock)
@@ -115,28 +104,29 @@ static inline void flush_cache_range(struct vm_area_struct *vma,
 
 /* Simple function to work out if we have an existing address translation
  * for a user space vma. */
-static inline int translation_exists(struct vm_area_struct *vma,
-				     unsigned long addr)
+static inline pte_t *__translation_exists(struct mm_struct *mm,
+					  unsigned long addr)
 {
-	pgd_t *pgd = pgd_offset(vma->vm_mm, addr);
+	pgd_t *pgd = pgd_offset(mm, addr);
 	pmd_t *pmd;
 	pte_t *pte;
 
 	if(pgd_none(*pgd))
-		return 0;
+		return NULL;
 
 	pmd = pmd_offset(pgd, addr);
 	if(pmd_none(*pmd) || pmd_bad(*pmd))
-		return 0;
+		return NULL;
 
 	pte = pte_offset_map(pmd, addr);
 
 	/* The PA flush mappings show up as pte_none, but they're
 	 * valid none the less */
 	if(pte_none(*pte) && ((pte_val(*pte) & _PAGE_FLUSH) == 0))
-		return 0;
-	return 1;
+		return NULL;
+	return pte;
 }
+#define	translation_exists(vma, addr)	__translation_exists((vma)->vm_mm, addr)
 
 
 /* Private function to flush a page from the cache of a non-current

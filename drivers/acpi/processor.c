@@ -44,6 +44,9 @@
 #include <asm/system.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
+#include <asm/processor.h>
+#include <asm/smp.h>
+#include <asm/acpi.h>
 
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -859,7 +862,6 @@ static void acpi_processor_ppc_exit(void) {
  * _PCT and _PSS structures are read out and written into struct
  * acpi_processor_performance.
  */
-
 static int acpi_processor_set_pdc (struct acpi_processor *pr)
 {
 	acpi_status             status = AE_OK;
@@ -1047,14 +1049,14 @@ acpi_processor_get_performance_info (
 	if (!pr || !pr->performance || !pr->handle)
 		return_VALUE(-EINVAL);
 
+	acpi_processor_set_pdc(pr);
+
 	status = acpi_get_handle(pr->handle, "_PCT", &handle);
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"ACPI-based processor performance control unavailable\n"));
 		return_VALUE(-ENODEV);
 	}
-
-	acpi_processor_set_pdc(pr);
 
 	result = acpi_processor_get_performance_control(pr);
 	if (result)
@@ -2146,6 +2148,37 @@ acpi_processor_remove_fs (
 	return_VALUE(0);
 }
 
+/* Use the acpiid in MADT to map cpus in case of SMP */
+#ifndef CONFIG_SMP
+#define convert_acpiid_to_cpu(acpi_id) (0xff)
+#else
+
+#ifdef CONFIG_IA64
+#define arch_acpiid_to_apicid 	ia64_acpiid_to_sapicid
+#define arch_cpu_to_apicid 	ia64_cpu_to_sapicid
+#define ARCH_BAD_APICID		(0xffff)
+#else
+#define arch_acpiid_to_apicid 	x86_acpiid_to_apicid
+#define arch_cpu_to_apicid 	x86_cpu_to_apicid
+#define ARCH_BAD_APICID		(0xff)
+#endif
+
+static u8 convert_acpiid_to_cpu(u8 acpi_id)
+{
+	u16 apic_id;
+	int i;
+	
+	apic_id = arch_acpiid_to_apicid[acpi_id];
+	if (apic_id == ARCH_BAD_APICID)
+		return -1;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (arch_cpu_to_apicid[i] == apic_id)
+			return i;
+	}
+	return -1;
+}
+#endif
 
 /* --------------------------------------------------------------------------
                                  Driver Interface
@@ -2158,7 +2191,8 @@ acpi_processor_get_info (
 	acpi_status		status = 0;
 	union acpi_object	object = {0};
 	struct acpi_buffer	buffer = {sizeof(union acpi_object), &object};
-	static int		cpu_index = 0;
+	u8			cpu_index;
+	static int		cpu0_initialized;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_info");
 
@@ -2167,13 +2201,6 @@ acpi_processor_get_info (
 
 	if (num_online_cpus() > 1)
 		errata.smp = TRUE;
-
-	/*
-	 *  Extra Processor objects may be enumerated on MP systems with
-	 *  less than the max # of CPUs. They should be ignored.
-	 */
-	if ((cpu_index + 1) > num_online_cpus())
-		return_VALUE(-ENODEV);
 
 	acpi_processor_errata(pr);
 
@@ -2206,8 +2233,26 @@ acpi_processor_get_info (
 	 * TBD: Synch processor ID (via LAPIC/LSAPIC structures) on SMP.
 	 *	>>> 'acpi_get_processor_id(acpi_id, &id)' in arch/xxx/acpi.c
 	 */
-	pr->id = cpu_index++;
 	pr->acpi_id = object.processor.proc_id;
+
+	cpu_index = convert_acpiid_to_cpu(pr->acpi_id);
+
+	if ( !cpu0_initialized && (cpu_index == 0xff)) {
+		/* Handle UP system running SMP kernel, with no LAPIC in MADT */
+		cpu_index = 0;
+	} else if (cpu_index > num_online_cpus()) {
+		/*
+		 *  Extra Processor objects may be enumerated on MP systems with
+		 *  less than the max # of CPUs. They should be ignored.
+		 */
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Error getting cpuindex for acpiid 0x%x\n",
+			pr->acpi_id));
+		return_VALUE(-ENODEV);
+	}
+	cpu0_initialized = 1;
+
+	pr->id = cpu_index;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id, 
 		pr->acpi_id));
@@ -2234,7 +2279,6 @@ acpi_processor_get_info (
 		 * (In particular, allocating the IO range for Cardbus)
 		 */
 		request_region(pr->throttling.address, 6, "ACPI CPU throttle");
-		request_region(acpi_fadt.xpm_tmr_blk.address, 4, "ACPI timer");
 	}
 
 	acpi_processor_get_power_info(pr);
@@ -2373,8 +2417,10 @@ acpi_processor_remove (
 	pr = (struct acpi_processor *) acpi_driver_data(device);
 
 	/* Unregister the idle handler when processor #0 is removed. */
-	if (pr->id == 0)
+	if (pr->id == 0) {
 		pm_idle = pm_idle_save;
+		synchronize_kernel();
+	}
 
 	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY, 
 		acpi_processor_notify);

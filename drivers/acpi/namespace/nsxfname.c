@@ -281,7 +281,7 @@ acpi_get_object_info (
 	if (info.type == ACPI_TYPE_DEVICE) {
 		/*
 		 * Get extra info for ACPI Devices objects only:
-		 * Run the Device _HID, _UID, _CID, _STA, and _ADR methods.
+		 * Run the Device _HID, _UID, _CID, _STA, _ADR and _sx_d methods.
 		 *
 		 * Note: none of these methods are required, so they may or may
 		 * not be present for this device.  The Info.Valid bitfield is used
@@ -330,7 +330,7 @@ acpi_get_object_info (
 
 		status = acpi_ut_execute_sxds (node, info.highest_dstates);
 		if (ACPI_SUCCESS (status)) {
-			info.valid |= ACPI_VALID_STA;
+			info.valid |= ACPI_VALID_SXDS;
 		}
 
 		status = AE_OK;

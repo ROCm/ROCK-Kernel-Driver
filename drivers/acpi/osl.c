@@ -51,7 +51,7 @@ ACPI_MODULE_NAME	("osl")
 
 struct acpi_os_dpc
 {
-    OSD_EXECUTION_CALLBACK  function;
+    acpi_osd_exec_callback  function;
     void		    *context;
 };
 
@@ -64,12 +64,18 @@ extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
 static unsigned int acpi_irq_irq;
-static OSD_HANDLER acpi_irq_handler;
+static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
 static struct workqueue_struct *kacpid_wq;
 
 acpi_status
 acpi_os_initialize(void)
+{
+	return AE_OK;
+}
+
+acpi_status
+acpi_os_initialize1(void)
 {
 	/*
 	 * Initialize PCI configuration space access, as we'll need to access
@@ -246,7 +252,7 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 acpi_status
-acpi_os_install_interrupt_handler(u32 gsi, OSD_HANDLER handler, void *context)
+acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler, void *context)
 {
 	unsigned int irq;
 
@@ -274,7 +280,7 @@ acpi_os_install_interrupt_handler(u32 gsi, OSD_HANDLER handler, void *context)
 }
 
 acpi_status
-acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
+acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
 {
 	if (irq) {
 		free_irq(irq, acpi_irq);
@@ -470,6 +476,8 @@ acpi_os_read_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, void *value
 		return AE_ERROR;
 	}
 
+	BUG_ON(!raw_pci_ops);
+
 	result = raw_pci_ops->read(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, value);
@@ -495,6 +503,8 @@ acpi_os_write_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, acpi_integ
 	default:
 		return AE_ERROR;
 	}
+
+	BUG_ON(!raw_pci_ops);
 
 	result = raw_pci_ops->write(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
@@ -624,7 +634,7 @@ acpi_os_execute_deferred (
 acpi_status
 acpi_os_queue_for_execution(
 	u32			priority,
-	OSD_EXECUTION_CALLBACK	function,
+	acpi_osd_exec_callback	function,
 	void			*context)
 {
 	acpi_status 		status = AE_OK;
@@ -1066,15 +1076,15 @@ __setup("acpi_serialize", acpi_serialize_setup);
  * Run-time events on the same GPE this flag is available
  * to tell Linux to keep the wake-time GPEs enabled at run-time.
  */
-static int __init
-acpi_leave_gpes_disabled_setup(char *str)
+int __init
+acpi_wake_gpes_always_on_setup(char *str)
 {
-	printk(KERN_INFO PREFIX "leave wake GPEs disabled\n");
+	printk(KERN_INFO PREFIX "wake GPEs not disabled\n");
 
-	acpi_gbl_leave_wake_gpes_disabled = TRUE;
+	acpi_gbl_leave_wake_gpes_disabled = FALSE;
 
 	return 1;
 }
 
-__setup("acpi_leave_gpes_disabled", acpi_leave_gpes_disabled_setup);
+__setup("acpi_wake_gpes_always_on", acpi_wake_gpes_always_on_setup);
 

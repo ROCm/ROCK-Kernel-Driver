@@ -49,7 +49,15 @@ iommu_fill_pdir(struct ioc *ioc, struct scatterlist *startsg, int nents,
 			sg_dma_len(startsg) = 0;
 			dma_offset = (unsigned long) pide & ~IOVP_MASK;
 			n_mappings++;
+#if defined(ZX1_SUPPORT)
+			/* Pluto IOMMU IO Virt Address is not zero based */
+			sg_dma_address(dma_sg) = pide | ioc->ibase;
+#else
+			/* SBA, ccio, and dino are zero based.
+			 * Trying to save a few CPU cycles for most users.
+			 */
 			sg_dma_address(dma_sg) = pide;
+#endif
 			pdirp = &(ioc->pdir_base[pide >> IOVP_SHIFT]);
 			prefetchw(pdirp);
 		}

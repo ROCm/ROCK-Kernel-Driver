@@ -204,13 +204,14 @@ struct acpi_object_method
 struct acpi_object_mutex
 {
 	ACPI_OBJECT_COMMON_HEADER
-	u16                                     sync_level;
-	u16                                     acquisition_depth;
-	struct acpi_thread_state                *owner_thread;
-	void                                    *semaphore;
+	u8                                      sync_level;         /* 0-15, specified in Mutex() call */
+	u16                                     acquisition_depth;  /* Allow multiple Acquires, same thread */
+	struct acpi_thread_state                *owner_thread;      /* Current owner of the mutex */
+	void                                    *semaphore;         /* Actual OS synchronization object */
 	union acpi_operand_object               *prev;              /* Link for list of acquired mutexes */
 	union acpi_operand_object               *next;              /* Link for list of acquired mutexes */
-	struct acpi_namespace_node              *node;              /* containing object */
+	struct acpi_namespace_node              *node;              /* Containing namespace node */
+	u8                                      original_sync_level; /* Owner's original sync level (0-15) */
 };
 
 
@@ -220,7 +221,7 @@ struct acpi_object_region
 
 	u8                                      space_id;
 	union acpi_operand_object               *handler;           /* Handler for region access */
-	struct acpi_namespace_node              *node;              /* containing object */
+	struct acpi_namespace_node              *node;              /* Containing namespace node */
 	union acpi_operand_object               *next;
 	u32                                     length;
 	acpi_physical_address                   address;

@@ -51,6 +51,8 @@ char	command_line[COMMAND_LINE_SIZE];
 /* Intended for ccio/sba/cpu statistics under /proc/bus/{runway|gsc} */
 struct proc_dir_entry * proc_runway_root = NULL;
 struct proc_dir_entry * proc_gsc_root = NULL;
+struct proc_dir_entry * proc_mckinley_root = NULL;
+
 
 void __init setup_cmdline(char **cmdline_p)
 {
@@ -206,10 +208,15 @@ static void __init parisc_proc_mkdir(void)
         case pcxw:
         case pcxw_:
         case pcxw2:
-	case mako:	/* XXX : this is really mckinley bus */
                 if (NULL == proc_runway_root)
                 {
                         proc_runway_root = proc_mkdir("bus/runway", 0);
+                }
+                break;
+	case mako:
+                if (NULL == proc_mckinley_root)
+                {
+                        proc_mckinley_root = proc_mkdir("bus/mckinley", 0);
                 }
                 break;
 	default:

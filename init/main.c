@@ -93,6 +93,11 @@ extern void free_initmem(void);
 extern void populate_rootfs(void);
 extern void driver_init(void);
 extern void prepare_namespace(void);
+#ifdef	CONFIG_ACPI
+extern void acpi_early_init(void);
+#else
+static inline acpi_early_init() { }
+#endif
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -529,6 +534,8 @@ asmlinkage void __init start_kernel(void)
 	proc_root_init();
 #endif
 	check_bugs();
+
+	acpi_early_init(); /* before LAPIC and SMP init */
 
 	/* 
 	 *	We count on the initial thread going ok 

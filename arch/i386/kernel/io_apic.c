@@ -32,6 +32,7 @@
 #include <linux/compiler.h>
 #include <linux/acpi.h>
 
+#include <linux/sysdev.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
@@ -2261,6 +2262,98 @@ static int __init io_apic_bug_finalize(void)
 }
 
 late_initcall(io_apic_bug_finalize);
+
+struct sysfs_ioapic_data {
+	struct sys_device dev;
+	struct IO_APIC_route_entry entry[0];
+};
+static struct sysfs_ioapic_data * mp_ioapic_data[MAX_IO_APICS];
+
+static int ioapic_suspend(struct sys_device *dev, u32 state)
+{
+	struct IO_APIC_route_entry *entry;
+	struct sysfs_ioapic_data *data;
+	unsigned long flags;
+	int i;
+	
+	data = container_of(dev, struct sysfs_ioapic_data, dev);
+	entry = data->entry;
+	spin_lock_irqsave(&ioapic_lock, flags);
+	for (i = 0; i < nr_ioapic_registers[dev->id]; i ++, entry ++ ) {
+		*(((int *)entry) + 1) = io_apic_read(dev->id, 0x11 + 2 * i);
+		*(((int *)entry) + 0) = io_apic_read(dev->id, 0x10 + 2 * i);
+	}
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	return 0;
+}
+
+static int ioapic_resume(struct sys_device *dev)
+{
+	struct IO_APIC_route_entry *entry;
+	struct sysfs_ioapic_data *data;
+	unsigned long flags;
+	union IO_APIC_reg_00 reg_00;
+	int i;
+	
+	data = container_of(dev, struct sysfs_ioapic_data, dev);
+	entry = data->entry;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	reg_00.raw = io_apic_read(dev->id, 0);
+	if (reg_00.bits.ID != mp_ioapics[dev->id].mpc_apicid) {
+		reg_00.bits.ID = mp_ioapics[dev->id].mpc_apicid;
+		io_apic_write(dev->id, 0, reg_00.raw);
+	}
+	for (i = 0; i < nr_ioapic_registers[dev->id]; i ++, entry ++ ) {
+		io_apic_write(dev->id, 0x11+2*i, *(((int *)entry)+1));
+		io_apic_write(dev->id, 0x10+2*i, *(((int *)entry)+0));
+	}
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	return 0;
+}
+
+static struct sysdev_class ioapic_sysdev_class = {
+	set_kset_name("ioapic"),
+	.suspend = ioapic_suspend,
+	.resume = ioapic_resume,
+};
+
+static int __init ioapic_init_sysfs(void)
+{
+	struct sys_device * dev;
+	int i, size, error = 0;
+
+	error = sysdev_class_register(&ioapic_sysdev_class);
+	if (error)
+		return error;
+
+	for (i = 0; i < nr_ioapics; i++ ) {
+		size = sizeof(struct sys_device) + nr_ioapic_registers[i] 
+			* sizeof(struct IO_APIC_route_entry);
+		mp_ioapic_data[i] = kmalloc(size, GFP_KERNEL);
+		if (!mp_ioapic_data[i]) {
+			printk(KERN_ERR "Can't suspend/resume IOAPIC %d\n", i);
+			continue;
+		}
+		memset(mp_ioapic_data[i], 0, size);
+		dev = &mp_ioapic_data[i]->dev;
+		dev->id = i; 
+		dev->cls = &ioapic_sysdev_class;
+		error = sysdev_register(dev);
+		if (error) {
+			kfree(mp_ioapic_data[i]);
+			mp_ioapic_data[i] = NULL;
+			printk(KERN_ERR "Can't suspend/resume IOAPIC %d\n", i);
+			continue;
+		}
+	}
+
+	return 0;
+}
+
+device_initcall(ioapic_init_sysfs);
 
 /* --------------------------------------------------------------------------
                           ACPI-based IOAPIC Configuration

@@ -267,7 +267,7 @@ acpi_ns_install_node (
 	else {
 #ifdef ACPI_ALPHABETIC_NAMESPACE
 		/*
-		 * Walk the list whilst searching for the the correct
+		 * Walk the list whilst searching for the correct
 		 * alphabetic placement.
 		 */
 		previous_child_node = NULL;

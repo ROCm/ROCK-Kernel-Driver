@@ -57,10 +57,14 @@
 
 /* This is the size of the initially mapped kernel memory (i.e. currently
  * 0 to 1<<23 == 8MB */
+#ifdef CONFIG_64BIT
+#define KERNEL_INITIAL_ORDER	24
+#else
 #define KERNEL_INITIAL_ORDER	23
+#endif
 #define KERNEL_INITIAL_SIZE	(1 << KERNEL_INITIAL_ORDER)
 
-#ifdef __LP64__
+#ifdef CONFIG_64BIT
 #define PT_NLEVELS	3
 #define PGD_ORDER	1 /* Number of pages per pgd */
 #define PMD_ORDER	1 /* Number of pages per pmd */
@@ -177,6 +181,21 @@ extern  void *vmalloc_start;
 #define _PAGE_CHG_MASK	(PAGE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
 #define _PAGE_KERNEL	(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_WRITE | _PAGE_DIRTY | _PAGE_ACCESSED)
 
+/* The pgd/pmd contains a ptr (in phys addr space); since all pgds/pmds
+ * are page-aligned, we don't care about the PAGE_OFFSET bits, except
+ * for a few meta-information bits, so we shift the address to be
+ * able to effectively address 40-bits of physical address space. */
+#define _PxD_PRESENT_BIT   31
+#define _PxD_ATTACHED_BIT  30
+#define _PxD_VALID_BIT     29
+
+#define PxD_FLAG_PRESENT  (1 << xlate_pabit(_PxD_PRESENT_BIT))
+#define PxD_FLAG_ATTACHED (1 << xlate_pabit(_PxD_ATTACHED_BIT))
+#define PxD_FLAG_VALID    (1 << xlate_pabit(_PxD_VALID_BIT))
+#define PxD_FLAG_MASK     (0xf)
+#define PxD_FLAG_SHIFT    (4)
+#define PxD_VALUE_SHIFT   (8)
+
 #ifndef __ASSEMBLY__
 
 #define PAGE_NONE	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
@@ -244,49 +263,49 @@ extern unsigned long *empty_zero_page;
 #define pte_present(x)	(pte_val(x) & _PAGE_PRESENT)
 #define pte_clear(xp)	do { pte_val(*(xp)) = 0; } while (0)
 
-#ifdef __LP64__
+#define pmd_flag(x)	(pmd_val(x) & PxD_FLAG_MASK)
+#define pmd_address(x)	((unsigned long)(pmd_val(x) &~ PxD_FLAG_MASK) << PxD_VALUE_SHIFT)
+#define pgd_flag(x)	(pgd_val(x) & PxD_FLAG_MASK)
+#define pgd_address(x)	((unsigned long)(pgd_val(x) &~ PxD_FLAG_MASK) << PxD_VALUE_SHIFT)
+
+#ifdef CONFIG_64BIT
 /* The first entry of the permanent pmd is not there if it contains
  * the gateway marker */
-#define pmd_none(x)	(!pmd_val(x) || pmd_val(x) == _PAGE_GATEWAY)
-#define pmd_bad(x)	((pmd_val(x) & ~PAGE_MASK) != _PAGE_TABLE && (pmd_val(x) & ~PAGE_MASK) != (_PAGE_TABLE | _PAGE_GATEWAY))
+#define pmd_none(x)	(!pmd_val(x) || pmd_flag(x) == PxD_FLAG_ATTACHED)
 #else
 #define pmd_none(x)	(!pmd_val(x))
-#define pmd_bad(x)	((pmd_val(x) & ~PAGE_MASK) != _PAGE_TABLE)
 #endif
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+#define pmd_bad(x)	(!(pmd_flag(x) & PxD_FLAG_VALID))
+#define pmd_present(x)	(pmd_flag(x) & PxD_FLAG_PRESENT)
 static inline void pmd_clear(pmd_t *pmd) {
-#ifdef __LP64__
-	if(pmd_val(*pmd) & _PAGE_GATEWAY)
+#ifdef CONFIG_64BIT
+	if (pmd_flag(*pmd) & PxD_FLAG_ATTACHED)
 		/* This is the entry pointing to the permanent pmd
 		 * attached to the pgd; cannot clear it */
-		pmd_val(*pmd) = _PAGE_GATEWAY;
+		__pmd_val_set(*pmd, PxD_FLAG_ATTACHED);
 	else
 #endif
-		pmd_val(*pmd) = 0;
+		__pmd_val_set(*pmd,  0);
 }
 
 
 
 #if PT_NLEVELS == 3
-#define pgd_page(pgd) ((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))
+#define pgd_page(pgd) ((unsigned long) __va(pgd_address(pgd)))
 
 /* For 64 bit we have three level tables */
 
 #define pgd_none(x)     (!pgd_val(x))
-#ifdef __LP64__
-#define pgd_bad(x)      ((pgd_val(x) & ~PAGE_MASK) != _PAGE_TABLE && (pgd_val(x) & ~PAGE_MASK) != (_PAGE_TABLE | _PAGE_GATEWAY))
-#else
-#define pgd_bad(x)      ((pgd_val(x) & ~PAGE_MASK) != _PAGE_TABLE)
-#endif
-#define pgd_present(x)  (pgd_val(x) & _PAGE_PRESENT)
+#define pgd_bad(x)      (!(pgd_flag(x) & PxD_FLAG_VALID))
+#define pgd_present(x)  (pgd_flag(x) & PxD_FLAG_PRESENT)
 static inline void pgd_clear(pgd_t *pgd) {
-#ifdef __LP64__
-	if(pgd_val(*pgd) & _PAGE_GATEWAY)
+#ifdef CONFIG_64BIT
+	if(pgd_flag(*pgd) & PxD_FLAG_ATTACHED)
 		/* This is the permanent pmd attached to the pgd; cannot
 		 * free it */
 		return;
 #endif
-	pgd_val(*pgd) = 0;
+	__pgd_val_set(*pgd, 0);
 }
 #else
 /*
@@ -353,15 +372,11 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #define pte_pfn(x) (pte_val(x) >> PAGE_SHIFT)
 
-#ifdef CONFIG_DISCONTIGMEM
-#define pte_page(x) (phys_to_page(pte_val(x)))
-#else
-#define pte_page(x) (mem_map+(pte_val(x) >> PAGE_SHIFT))
-#endif
+#define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
 
-#define pmd_page_kernel(pmd)	((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pmd_page_kernel(pmd)	((unsigned long) __va(pmd_address(pmd)))
 
-#define __pmd_page(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define __pmd_page(pmd) ((unsigned long) __va(pmd_address(pmd)))
 #define pmd_page(pmd)	virt_to_page((void *)__pmd_page(pmd))
 
 #define pgd_index(address) ((address) >> PGDIR_SHIFT)
@@ -419,7 +434,7 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 #ifdef CONFIG_SMP
 	if (!pte_young(*ptep))
 		return 0;
-	return test_and_clear_bit(xlate_pabit(_PAGE_ACCESSED_BIT), ptep);
+	return test_and_clear_bit(xlate_pabit(_PAGE_ACCESSED_BIT), &pte_val(*ptep));
 #else
 	pte_t pte = *ptep;
 	if (!pte_young(pte))
@@ -434,7 +449,7 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 #ifdef CONFIG_SMP
 	if (!pte_dirty(*ptep))
 		return 0;
-	return test_and_clear_bit(xlate_pabit(_PAGE_DIRTY_BIT), ptep);
+	return test_and_clear_bit(xlate_pabit(_PAGE_DIRTY_BIT), &pte_val(*ptep));
 #else
 	pte_t pte = *ptep;
 	if (!pte_dirty(pte))
@@ -444,11 +459,7 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 #endif
 }
 
-#ifdef CONFIG_SMP
 extern spinlock_t pa_dbit_lock;
-#else
-static int pa_dbit_lock; /* dummy to keep the compilers happy */
-#endif
 
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
 {
@@ -483,7 +494,7 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 static inline void ptep_mkdirty(pte_t *ptep)
 {
 #ifdef CONFIG_SMP
-	set_bit(xlate_pabit(_PAGE_DIRTY_BIT), ptep);
+	set_bit(xlate_pabit(_PAGE_DIRTY_BIT), &pte_val(*ptep));
 #else
 	pte_t old_pte = *ptep;
 	set_pte(ptep, pte_mkdirty(old_pte));

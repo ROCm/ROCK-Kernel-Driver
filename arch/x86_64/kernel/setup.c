@@ -423,6 +423,20 @@ static inline void copy_edd(void)
 }
 #endif
 
+#define EBDA_ADDR_POINTER 0x40E
+static void __init reserve_ebda_region(void)
+{
+	unsigned int addr;
+	/** 
+	 * there is a real-mode segmented pointer pointing to the 
+	 * 4K EBDA area at 0x40E
+	 */
+	addr = *(unsigned short *)phys_to_virt(EBDA_ADDR_POINTER);
+	addr <<= 4;
+	if (addr)
+		reserve_bootmem_generic(addr, PAGE_SIZE);
+}
+
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long low_mem_size;
@@ -486,6 +500,9 @@ void __init setup_arch(char **cmdline_p)
 	 * enabling clean reboots, SMP operation, laptop functions.
 	 */
 	reserve_bootmem_generic(0, PAGE_SIZE);
+
+	/* reserve ebda region */
+	reserve_ebda_region();
 
 #ifdef CONFIG_SMP
 	/*

@@ -3179,7 +3179,7 @@ static int scd_block_release(struct inode *inode, struct file *file)
 static int scd_block_ioctl(struct inode *inode, struct file *file,
 				unsigned cmd, unsigned long arg)
 {
-	return cdrom_ioctl(&scd_info, inode, cmd, arg);
+	return cdrom_ioctl(file, &scd_info, inode, cmd, arg);
 }
 
 static int scd_block_media_changed(struct gendisk *disk)

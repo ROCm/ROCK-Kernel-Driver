@@ -105,6 +105,8 @@ extern int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
 extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
 #endif
 
+extern u16 ia64_acpiid_to_sapicid[];
+
 #endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/
