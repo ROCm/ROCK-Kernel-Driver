@@ -5,6 +5,7 @@
 
 #include "linux/stddef.h"
 #include "linux/sched.h"
+#include "linux/mm.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/mmu.h"
@@ -28,7 +29,7 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 		npgd = pgd_offset(mm, addr);
 		npmd = pmd_offset(npgd, addr);
 		if(pmd_present(*npmd)){
-			npte = pte_offset(npmd, addr);
+			npte = pte_offset_kernel(npmd, addr);
 			r = pte_read(*npte);
 			w = pte_write(*npte);
 			x = pte_exec(*npte);
@@ -80,7 +81,7 @@ static void flush_kernel_vm_range(unsigned long start, unsigned long end)
 		pgd = pgd_offset(mm, addr);
 		pmd = pmd_offset(pgd, addr);
 		if(pmd_present(*pmd)){
-			pte = pte_offset(pmd, addr);
+			pte = pte_offset_kernel(pmd, addr);
 			if(!pte_present(*pte) || pte_newpage(*pte)){
 				updated = 1;
 				err = os_unmap_memory((void *) addr, 
@@ -123,12 +124,12 @@ void __flush_tlb_one_skas(unsigned long addr)
 	flush_kernel_vm_range(addr, addr + PAGE_SIZE);
 }
 
-void flush_tlb_range_skas(struct mm_struct *mm, unsigned long start, 
+void flush_tlb_range_skas(struct vm_area_struct *vma, unsigned long start, 
 		     unsigned long end)
 {
-	if(mm == NULL)
+	if(vma->vm_mm == NULL)
 		flush_kernel_vm_range(start, end);
-	else fix_range(mm, start, end, 0);
+	else fix_range(vma->vm_mm, start, end, 0);
 }
 
 void flush_tlb_mm_skas(struct mm_struct *mm)

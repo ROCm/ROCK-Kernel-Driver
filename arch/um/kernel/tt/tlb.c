@@ -6,6 +6,7 @@
 #include "linux/stddef.h"
 #include "linux/kernel.h"
 #include "linux/sched.h"
+#include "linux/mm.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/uaccess.h"
@@ -130,6 +131,11 @@ void flush_kernel_range(unsigned long start, unsigned long end, int update_seq)
 	if(updated && update_seq) atomic_inc(&vmchange_seq);
 }
 
+void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+        flush_kernel_range(start, end, 1);
+}
+
 static void protect_vm_page(unsigned long addr, int w, int must_succeed)
 {
 	int err;
@@ -166,25 +172,25 @@ void mprotect_kernel_vm(int w)
 
 void flush_tlb_kernel_vm_tt(void)
 {
-        flush_tlb_kernel_vm_range(start_vm, end_vm);
+        flush_tlb_kernel_range(start_vm, end_vm);
 }
 
 void __flush_tlb_one_tt(unsigned long addr)
 {
-        flush_tlb_kernel_vm_range(addr, addr + PAGE_SIZE);
+        flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
 }
   
-void flush_tlb_range_tt(struct mm_struct *mm, unsigned long start, 
+void flush_tlb_range_tt(struct vm_area_struct *vma, unsigned long start, 
 		     unsigned long end)
 {
-	if(mm != current->mm) return;
+	if(vma->vm_mm != current->mm) return;
 
 	/* Assumes that the range start ... end is entirely within
 	 * either process memory or kernel vm
 	 */
 	if((start >= start_vm) && (start < end_vm)) 
-		flush_kernel_vm_range(start, end, 1);
-	else fix_range(mm, start, end, 0);
+		flush_kernel_range(start, end, 1);
+	else fix_range(vma->vm_mm, start, end, 0);
 }
 
 void flush_tlb_mm_tt(struct mm_struct *mm)
@@ -198,13 +204,13 @@ void flush_tlb_mm_tt(struct mm_struct *mm)
 	seq = atomic_read(&vmchange_seq);
 	if(current->thread.mode.tt.vm_seq == seq) return;
 	current->thread.mode.tt.vm_seq = seq;
-	flush_kernel_vm_range(start_vm, end_vm, 0);
+	flush_kernel_range(start_vm, end_vm, 0);
 }
 
 void force_flush_all_tt(void)
 {
 	fix_range(current->mm, 0, STACK_TOP, 1);
-	flush_kernel_vm_range(start_vm, end_vm, 0);
+	flush_kernel_range(start_vm, end_vm, 0);
 }
 
 /*

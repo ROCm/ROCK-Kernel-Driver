@@ -6,18 +6,14 @@
 #include "linux/mm.h"
 #include "asm/page.h"
 #include "asm/pgalloc.h"
+#include "asm/tlbflush.h"
 #include "choose-mode.h"
 #include "mode_kern.h"
-
-void flush_tlb_kernel_range(unsigned long start, unsigned long end)
-{
-	flush_kernel_range(start, end, 1);
-}
 
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long address)
 {
 	address &= PAGE_MASK;
-	flush_tlb_range(vma->vm_mm, address, address + PAGE_SIZE);
+	flush_tlb_range(vma, address, address + PAGE_SIZE);
 }
 
 void flush_tlb_all(void)
@@ -35,10 +31,10 @@ void __flush_tlb_one(unsigned long addr)
 	CHOOSE_MODE_PROC(__flush_tlb_one_tt, __flush_tlb_one_skas, addr);
 }
 
-void flush_tlb_range(struct mm_struct *mm, unsigned long start, 
+void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, 
 		     unsigned long end)
 {
-	CHOOSE_MODE_PROC(flush_tlb_range_tt, flush_tlb_range_skas, mm, start, 
+	CHOOSE_MODE_PROC(flush_tlb_range_tt, flush_tlb_range_skas, vma, start, 
 			 end);
 }
 

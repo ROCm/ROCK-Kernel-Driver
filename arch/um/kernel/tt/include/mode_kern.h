@@ -24,8 +24,8 @@ extern void initial_thread_cb_tt(void (*proc)(void *), void *arg);
 extern void init_idle_tt(void);
 extern void flush_tlb_kernel_vm_tt(void);
 extern void __flush_tlb_one_tt(unsigned long addr);
-extern void flush_tlb_range_tt(struct mm_struct *mm, unsigned long start, 
-			       unsigned long end);
+extern void flush_tlb_range_tt(struct vm_area_struct *vma, 
+			       unsigned long start, unsigned long end);
 extern void flush_tlb_mm_tt(struct mm_struct *mm);
 extern void force_flush_all_tt(void);
 extern long execute_syscall_tt(void *r);
