@@ -748,7 +748,7 @@ static void event_callback(void *context)
 
 	down_write(&md->lock);
 	md->event_nr++;
-	wake_up_interruptible(&md->eventq);
+	wake_up(&md->eventq);
 	up_write(&md->lock);
 }
 
