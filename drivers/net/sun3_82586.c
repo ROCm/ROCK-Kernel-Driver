@@ -277,10 +277,12 @@ static void alloc586(struct net_device *dev)
 	memset((char *)p->scb,0,sizeof(struct scb_struct));
 }
 
-int __init sun3_82586_probe(struct net_device *dev)
+struct net_device * __init sun3_82586_probe(int unit)
 {
+	struct net_device *dev;
 	unsigned long ioaddr;
 	static int found = 0;
+	int err = -ENOMEM;
 	
 	/* check that this machine has an onboard 82586 */
 	switch(idprom->id_machtype) {
@@ -290,31 +292,51 @@ int __init sun3_82586_probe(struct net_device *dev)
 		break;
 
 	default:
-		return(-ENODEV);
+		return ERR_PTR(-ENODEV);
 	}
 
-	if(found)
-		return -ENODEV;
+	if (found)
+		return ERR_PTR(-ENODEV);
 	
 	ioaddr = (unsigned long)ioremap(IE_OBIO, PAGE_SIZE);
+	if (!ioaddr)
+		return ERR_PTR(-ENOMEM);
 	found = 1;
 	
+	dev = alloc_etherdev(sizeof(struct priv));
+	if (!dev)
+		goto out;
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+	}
 	SET_MODULE_OWNER(dev);
 
 	dev->irq = IE_IRQ;
 	dev->base_addr = ioaddr;
-	if(sun3_82586_probe1(dev, ioaddr) == 0)
-		return 0;
+	err = sun3_82586_probe1(dev, ioaddr);
+	if (err)
+		goto out1;
+	err = register_netdev(dev);
+	if (err)
+		goto out2;
+	return dev;
 
-	return -ENODEV;
+out2:
+	release_region(ioaddr, SUN3_82586_TOTAL_SIZE);
+out1:
+	free_netdev(dev);
+out:
+	iounmap(ioaddr);
+	return ERR_PTR(err);
 }
 
 static int __init sun3_82586_probe1(struct net_device *dev,int ioaddr)
 {
 	int i, size, retval;
 
-//	if (!request_region(ioaddr, SUN3_82586_TOTAL_SIZE, dev->name))
-//		return -EBUSY;
+	if (!request_region(ioaddr, SUN3_82586_TOTAL_SIZE, dev->name))
+		return -EBUSY;
 
 	/* copy in the ethernet address from the prom */
 	for(i = 0; i < 6 ; i++)
@@ -341,16 +363,6 @@ static int __init sun3_82586_probe1(struct net_device *dev,int ioaddr)
 		goto out;
 	}
 
-	dev->priv = (void *) kmalloc(sizeof(struct priv),GFP_KERNEL);
-	if(dev->priv == NULL) {
-		printk("%s: Ooops .. can't allocate private driver memory.\n",dev->name);
-		retval = -ENOMEM;
-		goto out;
-	}
-
-	/* warning: we don't free it on errors */
-	memset((char *) dev->priv,0,sizeof(struct priv));
-
 	((struct priv *) (dev->priv))->memtop = (char *)dvma_btov(dev->mem_start);
 	((struct priv *) (dev->priv))->base = (unsigned long) dvma_btov(0);
 	alloc586(dev);
@@ -374,11 +386,9 @@ static int __init sun3_82586_probe1(struct net_device *dev,int ioaddr)
 	dev->set_multicast_list = set_multicast_list;
 
 	dev->if_port 		= 0;
-
-	ether_setup(dev);
-
 	return 0;
 out:
+	release_region(ioaddr, SUN3_82586_TOTAL_SIZE);
 	return retval;
 }
 
@@ -1138,21 +1148,23 @@ static void set_multicast_list(struct net_device *dev)
 
 #ifdef MODULE
 #error This code is not currently supported as a module
-static struct net_device dev_sun3_82586;
+static struct net_device *dev_sun3_82586;
 
 int init_module(void)
 {
-	dev_sun3_82586.init = sun3_82586_probe;
-	if (register_netdev(&dev_sun3_82586) != 0)
-		return -EIO;
+	dev_sun3_82586 = sun3_82586_probe(-1);
+	if (IS_ERR(dev_sun3_82586))
+		return PTR_ERR(dev_sun3_82586);
 	return 0;
 }
 
 void cleanup_module(void)
 {
-	unregister_netdev(&dev_sun3_82586);
-	kfree(dev_sun3_82586.priv);
-	dev_sun3_82586.priv = NULL;
+	unsigned long ioaddr = dev_sun3_82586->base_addr;
+	unregister_netdev(dev_sun3_82586);
+	release_region(ioaddr, SUN3_82586_TOTAL_SIZE);
+	iounmap(ioaddr);
+	free_netdev(dev);
 }
 #endif /* MODULE */
 
