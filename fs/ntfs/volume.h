@@ -26,18 +26,30 @@
 
 #include "types.h"
 
-/* These are used to determine which inode names are returned by readdir(). */
+/*
+ * Defined bits for the flags field in the ntfs_volume structure.
+ */
 typedef enum {
-	SHOW_SYSTEM	= 1,
-	SHOW_WIN32	= 2,
-	SHOW_DOS	= 4,
-	SHOW_POSIX	= SHOW_WIN32 | SHOW_DOS,
-	SHOW_ALL	= SHOW_SYSTEM | SHOW_POSIX,
-} READDIR_OPTIONS;
+	NV_ShowSystemFiles,	/* 1: Return system files in ntfs_readdir(). */
+	NV_CaseSensitive,	/* 1: Treat file names as case sensitive and
+				      create filenames in the POSIX namespace.
+				      Otherwise be case insensitive and create
+				      file names in WIN32 namespace. */
+} ntfs_volume_flags;
 
-#define RHideSystemFiles(x)	(!((x) & SHOW_SYSTEM))
-#define RHideLongNames(x)	(!((x) & SHOW_WIN32))
-#define RHideDosNames(x)	(!((x) & SHOW_DOS))
+#define NVolShowSystemFiles(n_vol)	test_bit(NV_ShowSystemFiles,	\
+							&(n_vol)->flags)
+#define NVolSetShowSystemFiles(n_vol)	set_bit(NV_ShowSystemFiles,	\
+							&(n_vol)->flags)
+#define NVolClearShowSystemFiles(n_vol)	clear_bit(NV_ShowSystemFiles,	\
+							&(n_vol)->flags)
+
+#define NVolCaseSensitive(n_vol)	test_bit(NV_CaseSensitive,	\
+							&(n_vol)->flags)
+#define NVolSetCaseSensitive(n_vol)	set_bit(NV_CaseSensitive,	\
+							&(n_vol)->flags)
+#define NVolClearCaseSensitive(n_vol)	clear_bit(NV_CaseSensitive,	\
+							&(n_vol)->flags)
 
 /*
  * The NTFS in memory super block structure.
@@ -57,13 +69,13 @@ typedef struct {
 	LCN nr_blocks;			/* Number of NTFS_BLOCK_SIZE bytes
 					   sized blocks on the device. */
 	/* Configuration provided by user at mount time. */
+	unsigned long flags;		/* Miscellaneous flags, see above. */
 	uid_t uid;			/* uid that files will be mounted as. */
 	gid_t gid;			/* gid that files will be mounted as. */
 	mode_t fmask;			/* The mask for file permissions. */
 	mode_t dmask;			/* The mask for directory
 					   permissions. */
-	READDIR_OPTIONS readdir_opts;	/* Namespace of inode names to show. */
-	u8 mft_zone_multiplier;	/* Initial mft zone multiplier. */
+	u8 mft_zone_multiplier;		/* Initial mft zone multiplier. */
 	u8 on_errors;			/* What to do on file system errors. */
 	/* NTFS bootsector provided information. */
 	u16 sector_size;		/* in bytes */

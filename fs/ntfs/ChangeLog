@@ -21,8 +21,38 @@ ToDo:
 	  several copies of almost identicall functions and the functions are
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
-	- Want to use dummy inodes for address space i/o. We need some VFS
-	  changes first, which are currently under discussion.
+	- Want to use dummy inodes for address space i/o.
+
+2.0.8 - Major updates for handling of case sensitivity and dcache aliasing.
+
+	Big thanks go to Al Viro and other inhabitants of #kernel for investing
+	their time to discuss the case sensitivity and dcache aliasing issues.
+
+	- Remove unused source file fs/ntfs/attraops.c.
+	- Remove show_inodes mount option(s), thus dropping support for
+	  displaying of short file names.
+	- Remove deprecated mount option posix.
+	- Restore show_sys_files mount option.
+	- Add new mount option case_sensitive, to determine if the driver
+	  treats file names as case sensitive or not. If case sensitive, create
+	  file names in the POSIX namespace. Otherwise create file names in the
+	  LONG/WIN32 namespace. Note, files remain accessible via their short
+	  file name, if it exists.
+	- Remove really dumb logic bug in boot sector recovery code.
+	- Fix dcache aliasing issues wrt short/long file names via changes
+	  to fs/ntfs/dir.c::ntfs_lookup_inode_by_name() and
+	  fs/ntfs/namei.c::ntfs_lookup():
+	  - Add additional argument to ntfs_lookup_inode_by_name() in which we
+	    return information about the matching file name if the case is not
+	    matching or the match is a short file name. See comments above the
+	    function definition for details.
+	  - Change ntfs_lookup() to only create dcache entries for the correctly
+	    cased file name and only for the WIN32 namespace counterpart of DOS
+	    namespace file names. This ensures we have only one dentry per
+	    directory and also removes all dcache aliasing issues between short
+	    and long file names once we add write support. See comments above
+	    function for details.
+	- Fix potential 1 byte overflow in fs/ntfs/unistr.c::ntfs_ucstonls().
 
 2.0.7 - Minor cleanups and updates for changes in core kernel code.
 
