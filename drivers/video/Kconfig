@@ -436,6 +436,13 @@ config FB_RIVA_I2C
        bool "Enable DDC Support"
        depends on FB_RIVA && I2C
        help
+	  This enables I2C support for nVidia Chipsets.  This is used
+	  only for getting EDID information from the attached display
+	  allowing for robust video mode handling and switching.
+
+	  Because fbdev-2.6 requires that drivers must be able to
+	  independently validate video mode parameters, you should say Y
+	  here.
 
 config FB_I810
 	tristate "Intel 810/815 support (EXPERIMENTAL)"
