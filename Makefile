@@ -157,7 +157,7 @@ endif
 
 LOCALVERSION = $(subst $(space),, \
 	       $(shell cat /dev/null $(localversion-files)) \
-	       $(subst ",,$(CONFIG_LOCALVERSION)))
+	       $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
 
