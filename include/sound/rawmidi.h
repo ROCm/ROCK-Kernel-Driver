@@ -46,6 +46,7 @@ typedef struct sndrv_rawmidi_status snd_rawmidi_status_t;
 #define SNDRV_RAWMIDI_LFLG_INPUT	(1<<1)
 #define SNDRV_RAWMIDI_LFLG_OPEN		(3<<0)
 #define SNDRV_RAWMIDI_LFLG_APPEND	(1<<2)
+#define	SNDRV_RAWMIDI_LFLG_NOOPENLOCK	(1<<3)
 
 typedef struct _snd_rawmidi_runtime snd_rawmidi_runtime_t;
 typedef struct _snd_rawmidi_substream snd_rawmidi_substream_t;

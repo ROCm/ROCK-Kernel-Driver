@@ -1358,16 +1358,16 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 		return -EINVAL;
 	}
 
+	for (i = 0; i < num_ins; i++) {
+		if ((err = parse_audio_unit(state, desc[5 + i])) < 0)
+			return err;
+	}
+
 	if (num_ins == 1) /* only one ? nonsense! */
 		return 0;
 
 	if (check_ignored_ctl(state, unitid, 0))
 		return 0;
-
-	for (i = 0; i < num_ins; i++) {
-		if ((err = parse_audio_unit(state, desc[5 + i])) < 0)
-			return err;
-	}
 
 	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
 	if (! cval) {

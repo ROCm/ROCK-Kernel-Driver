@@ -142,7 +142,7 @@ static int snd_pcm_oss_format_from(int format)
 	case AFMT_U16_LE:	return SNDRV_PCM_FORMAT_U16_LE;
 	case AFMT_U16_BE:	return SNDRV_PCM_FORMAT_U16_BE;
 	case AFMT_MPEG:		return SNDRV_PCM_FORMAT_MPEG;
-	default:			return SNDRV_PCM_FORMAT_U8;
+	default:		return SNDRV_PCM_FORMAT_U8;
 	}
 }
 
@@ -554,6 +554,7 @@ static int snd_pcm_oss_prepare(snd_pcm_substream_t *substream)
 	}
 	runtime->oss.prepare = 0;
 	runtime->oss.prev_hw_ptr_interrupt = 0;
+	runtime->oss.period_ptr = 0;
 
 	return 0;
 }
@@ -818,6 +819,8 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char *bu
 					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
 				runtime->oss.buffer_used = 0;
+				runtime->oss.period_ptr += tmp;
+				runtime->oss.period_ptr %= runtime->oss.period_bytes;
 			}
 		} else {
 			tmp = snd_pcm_oss_write2(substream, (char *)buf, runtime->oss.period_bytes, 0);
@@ -941,6 +944,7 @@ static int snd_pcm_oss_sync1(snd_pcm_substream_t *substream, size_t size)
 {
 	snd_pcm_runtime_t *runtime;
 	ssize_t result = 0;
+	long res;
 	wait_queue_t wait;
 
 	runtime = substream->runtime;
@@ -957,12 +961,23 @@ static int snd_pcm_oss_sync1(snd_pcm_substream_t *substream, size_t size)
 			break;
 		result = 0;
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();
+		snd_pcm_stream_lock_irq(substream);
+		res = runtime->status->state;
+		snd_pcm_stream_unlock_irq(substream);
+		if (res != SNDRV_PCM_STATE_RUNNING) {
+			set_current_state(TASK_RUNNING);
+			break;
+		}
+		res = schedule_timeout(10 * HZ);
 		if (signal_pending(current)) {
 			result = -ERESTARTSYS;
 			break;
 		}
-		set_current_state(TASK_RUNNING);
+		if (res == 0) {
+			snd_printk(KERN_ERR "OSS sync error - DMA timeout\n");
+			result = -EIO;
+			break;
+		}
 	}
 	remove_wait_queue(&runtime->sleep, &wait);
 	return result;
@@ -974,31 +989,44 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 	unsigned int saved_f_flags;
 	snd_pcm_substream_t *substream;
 	snd_pcm_runtime_t *runtime;
-	size_t size;
+	snd_pcm_format_t format;
+	unsigned long width;
+	size_t size, size1;
 
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream != NULL) {
 		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
 			return err;
 		runtime = substream->runtime;
+		format = snd_pcm_oss_format_from(runtime->oss.format);
+		width = snd_pcm_format_physical_width(format);
 		if (runtime->oss.buffer_used > 0) {
-			snd_pcm_format_set_silence(runtime->format,
+			size = (8 * (runtime->oss.period_bytes - runtime->oss.buffer_used) + 7) / width;
+			snd_pcm_format_set_silence(format,
 						   runtime->oss.buffer + runtime->oss.buffer_used,
-						   bytes_to_samples(runtime, runtime->oss.period_bytes - runtime->oss.buffer_used));
+						   size);
 			err = snd_pcm_oss_sync1(substream, runtime->oss.period_bytes);
 			if (err < 0)
 				return err;
-		}
-		size = runtime->control->appl_ptr % runtime->period_size;
-		if (size > 0) {
-			size = runtime->period_size - size;
-                        size *= runtime->channels;
-			snd_pcm_format_set_silence(runtime->format,
+		} else if (runtime->oss.period_ptr > 0) {
+			size = runtime->oss.period_bytes - runtime->oss.period_ptr;
+			snd_pcm_format_set_silence(format,
 						   runtime->oss.buffer,
-						   size);
-			err = snd_pcm_oss_sync1(substream, samples_to_bytes(runtime, size));
+						   size * 8 / width);
+			err = snd_pcm_oss_sync1(substream, size);
 			if (err < 0)
 				return err;
+		}
+		size = runtime->oss.period_bytes;
+		size1 = frames_to_bytes(runtime, runtime->period_size);
+		while (size < size1) {
+			snd_pcm_format_set_silence(format,
+						   runtime->oss.buffer,
+						   (8 * runtime->oss.period_bytes + 7) / width);
+			err = snd_pcm_oss_sync1(substream, runtime->oss.period_bytes);
+			if (err < 0)
+				return err;
+			size += runtime->oss.period_bytes;
 		}
 		saved_f_flags = substream->ffile->f_flags;
 		substream->ffile->f_flags &= ~O_NONBLOCK;
@@ -1786,7 +1814,6 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 			break;
 		}
 	}
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&pcm->open_wait, &wait);
 	up(&pcm->open_mutex);
 	if (err < 0)
