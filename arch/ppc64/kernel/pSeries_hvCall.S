@@ -22,7 +22,7 @@
 /*
  * hcall interface to pSeries LPAR
  */
-#define HSC .long 0x44000022
+#define HVSC .long 0x44000022
 
 /* long plpar_hcall(unsigned long opcode,	 R3 
 		 unsigned long arg1,		 R4 
@@ -44,7 +44,7 @@ _GLOBAL(plpar_hcall)
         std     r9,-16(r1)
         std     r10,-24(r1)
 	
-	HSC                     /* invoke the hypervisor */
+	HVSC                    /* invoke the hypervisor */
 
         ld      r10,-8(r1)      /* Fetch r4-r7 ret args. */
         std     r4,0(r10)
@@ -63,7 +63,7 @@ _GLOBAL(plpar_hcall)
 _GLOBAL(plpar_hcall_norets)
 	mfcr	r0
 	std	r0,-8(r1)
-	HSC                     /* invoke the hypervisor */
+	HVSC                    /* invoke the hypervisor */
 	ld	r0,-8(r1)
 	mtcrf	0xff,r0
 	blr                     /* return r3 = status */
@@ -94,7 +94,7 @@ _GLOBAL(plpar_hcall_8arg_2ret)
 
         std     r12,-8(r1)      /* Save out ptr */
 	
-	HSC                    /* invoke the hypervisor */
+	HVSC                    /* invoke the hypervisor */
 
         ld      r10,-8(r1)      /* Fetch r4 ret arg */
         std     r4,0(r10)
@@ -126,7 +126,7 @@ _GLOBAL(plpar_hcall_4out)
 	std     r10,16(r1)
 	std     r14,8(r1)
 	
-	HSC                    /* invoke the hypervisor */
+	HVSC                    /* invoke the hypervisor */
 
 	ld      r14,32(r1)      /* Fetch r4-r7 ret args. */
 	std     r4,0(r14)
