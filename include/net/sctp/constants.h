@@ -6,46 +6,42 @@
  *
  * This file is part of the SCTP kernel reference Implementation
  *
- * This file is part of the implementation of the add-IP extension,
- * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
- * for the SCTP kernel reference Implementation.
- *
- * The SCTP reference implementation  is free software;
+ * The SCTP reference implementation is free software;
  * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
- * the SCTP reference implementation  is distributed in the hope that it
- * will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+ * The SCTP reference implementation is distributed in the hope that it
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
- * Please send any bug reports or fixes you make to one of the following email
- * addresses:
+ * Please send any bug reports or fixes you make to the
+ * email address(es):
+ *    lksctp developers <lksctp-developers@lists.sourceforge.net>
  *
- * La Monte H.P. Yarroll <piggy@acm.org>
- * Karl Knutson <karl@athena.chicago.il.us>
- * Randall Stewart <randall@stewart.chicago.il.us>
- * Ken Morneau <kmorneau@cisco.com>
- * Qiaobing Xie <qxie1@motorola.com>
- * Xingang Guo <xingang.guo@intel.com>
- * Sridhar Samudrala <samudrala@us.ibm.com>
- * Daisy Chang <daisyc@us.ibm.com>
+ * Or submit a bug report through the following website:
+ *    http://www.sf.net/projects/lksctp
+ *
+ * Written or modified by:
+ *   La Monte H.P. Yarroll <piggy@acm.org>
+ *   Karl Knutson          <karl@athena.chicago.il.us>
+ *   Randall Stewart       <randall@stewart.chicago.il.us>
+ *   Ken Morneau           <kmorneau@cisco.com>
+ *   Qiaobing Xie          <qxie1@motorola.com>
+ *   Xingang Guo           <xingang.guo@intel.com>
+ *   Sridhar Samudrala     <samudrala@us.ibm.com>
+ *   Daisy Chang           <daisyc@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
- *
- * There are still LOTS of bugs in this code... I always run on the motto
- * "it is a wonder any code ever works :)"
- *
- *
  */
 
 #ifndef __sctp_constants_h__
@@ -220,7 +216,7 @@ typedef enum {
  * - A socket in SCTP_SS_LISTENING state indicates that it is willing to
  *   accept new associations, but cannot initiate the creation of new ones.
  * - A socket in SCTP_SS_ESTABLISHED state indicates that it has a single 
- *   association in ESTABLISHED state.
+ *   association.
  */
 typedef enum {
 	SCTP_SS_CLOSED         = TCP_CLOSE,
@@ -336,9 +332,17 @@ typedef enum {
 
 #define SCTP_SIGNATURE_SIZE 20	        /* size of a SLA-1 signature */
 
-#define SCTP_COOKIE_MULTIPLE 64 /* Pad out our cookie to make our hash
+#define SCTP_COOKIE_MULTIPLE 32 /* Pad out our cookie to make our hash
 				 * functions simpler to write.
 				 */
+
+#if defined (CONFIG_SCTP_HMAC_MD5)
+#define SCTP_COOKIE_HMAC_ALG "md5"
+#elif defined (CONFIG_SCTP_HMAC_SHA1)
+#define SCTP_COOKIE_HMAC_ALG "sha1"
+#else
+#define SCTP_COOKIE_HMAC_ALG NULL
+#endif
 
 /* These return values describe the success or failure of a number of
  * routines which form the lower interface to SCTP_outqueue.

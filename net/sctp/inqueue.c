@@ -75,17 +75,17 @@ struct sctp_inq *sctp_inq_new(void)
 /* Release the memory associated with an SCTP inqueue.  */
 void sctp_inq_free(struct sctp_inq *queue)
 {
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 
 	/* Empty the queue.  */
-	while ((chunk = (sctp_chunk_t *) skb_dequeue(&queue->in)) != NULL)
-		sctp_free_chunk(chunk);
+	while ((chunk = (struct sctp_chunk *) skb_dequeue(&queue->in)))
+		sctp_chunk_free(chunk);
 
 	/* If there is a packet which is currently being worked on,
 	 * free it as well.
 	 */
 	if (queue->in_progress)
-		sctp_free_chunk(queue->in_progress);
+		sctp_chunk_free(queue->in_progress);
 
 	if (queue->malloced) {
 		/* Dump the master memory segment.  */
@@ -96,7 +96,7 @@ void sctp_inq_free(struct sctp_inq *queue)
 /* Put a new packet in an SCTP inqueue.
  * We assume that packet->sctp_hdr is set and in host byte order.
  */
-void sctp_inq_push(struct sctp_inq *q, sctp_chunk_t *packet)
+void sctp_inq_push(struct sctp_inq *q, struct sctp_chunk *packet)
 {
 	/* Directly call the packet handling routine. */
 
@@ -114,23 +114,23 @@ void sctp_inq_push(struct sctp_inq *q, sctp_chunk_t *packet)
  * WARNING:  If you need to put the chunk on another queue, you need to
  * make a shallow copy (clone) of it.
  */
-sctp_chunk_t *sctp_inq_pop(struct sctp_inq *queue)
+struct sctp_chunk *sctp_inq_pop(struct sctp_inq *queue)
 {
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	sctp_chunkhdr_t *ch = NULL;
 
 	/* The assumption is that we are safe to process the chunks
 	 * at this time.
 	 */
 
-	if ((chunk = queue->in_progress) != NULL) {
+	if ((chunk = queue->in_progress)) {
 		/* There is a packet that we have been working on.
 		 * Any post processing work to do before we move on?
 		 */
 		if (chunk->singleton ||
 		    chunk->end_of_packet ||
 		    chunk->pdiscard) {
-			sctp_free_chunk(chunk);
+			sctp_chunk_free(chunk);
 			chunk = queue->in_progress = NULL;
 		} else {
 			/* Nothing to do. Next chunk in the packet, please. */
@@ -149,7 +149,7 @@ sctp_chunk_t *sctp_inq_pop(struct sctp_inq *queue)
 			return NULL;
 
 		chunk = queue->in_progress =
-			(sctp_chunk_t *) skb_dequeue(&queue->in);
+			(struct sctp_chunk *) skb_dequeue(&queue->in);
 
 		/* This is the first chunk in the packet.  */
 		chunk->singleton = 1;
