@@ -1318,6 +1318,7 @@ get_request(request_queue_t *q, int rw, int gfp_mask, int force)
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw] == q->nr_requests)
 		blk_set_queue_full(q, rw);
+
 	if (blk_queue_full(q, rw) && !force && !elv_may_queue(q, rw)) {
 		spin_unlock_irq(q->queue_lock);
 		goto out;
@@ -2376,6 +2377,93 @@ int __init blk_dev_init(void)
 		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
 }
+
+
+/*
+ * IO Context helper functions
+ */
+void put_io_context(struct io_context *ioc)
+{
+	if (ioc == NULL)
+		return;
+
+	BUG_ON(atomic_read(&ioc->refcount) == 0);
+
+	if (atomic_dec_and_test(&ioc->refcount)) {
+		if (ioc->aic && ioc->aic->dtor)
+			ioc->aic->dtor(ioc->aic);
+		kfree(ioc);
+	}
+}
+
+/* Called by the exitting task */
+void exit_io_context(void)
+{
+	unsigned long flags;
+	struct io_context *ioc;
+
+	local_irq_save(flags);
+	ioc = current->io_context;
+	if (ioc) {
+		if (ioc->aic && ioc->aic->exit)
+			ioc->aic->exit(ioc->aic);
+		put_io_context(ioc);
+		current->io_context = NULL;
+	}
+	local_irq_restore(flags);
+}
+
+/*
+ * If the current task has no IO context then create one and initialise it.
+ * If it does have a context, take a ref on it.
+ *
+ * This is always called in the context of the task which submitted the I/O.
+ * But weird things happen, so we disable local interrupts to ensure exclusive
+ * access to *current.
+ */
+struct io_context *get_io_context(void)
+{
+	struct task_struct *tsk = current;
+	unsigned long flags;
+	struct io_context *ret;
+
+	local_irq_save(flags);
+	ret = tsk->io_context;
+	if (ret == NULL) {
+		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
+		if (ret) {
+			atomic_set(&ret->refcount, 1);
+			ret->pid = tsk->pid;
+			ret->aic = NULL;
+			tsk->io_context = ret;
+		}
+	}
+	local_irq_restore(flags);
+	atomic_inc(&ret->refcount);
+	return ret;
+}
+
+void copy_io_context(struct io_context **pdst, struct io_context **psrc)
+{
+	struct io_context *src = *psrc;
+	struct io_context *dst = *pdst;
+
+	if (src) {
+		BUG_ON(atomic_read(&src->refcount) == 0);
+		atomic_inc(&src->refcount);
+		put_io_context(dst);
+		*pdst = src;
+	}
+}
+
+void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
+{
+	struct io_context *temp;
+	temp = *ioc1;
+	*ioc1 = *ioc2;
+	*ioc2 = temp;
+}
+
 
 /*
  * sysfs parts below

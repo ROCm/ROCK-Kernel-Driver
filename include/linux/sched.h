@@ -321,8 +321,8 @@ struct k_itimer {
 };
 
 
-struct as_io_context;			/* Anticipatory scheduler */
-void exit_as_io_context(void);
+struct io_context;			/* See blkdev.h */
+void exit_io_context(void);
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -452,7 +452,7 @@ struct task_struct {
 	struct dentry *proc_dentry;
 	struct backing_dev_info *backing_dev_info;
 
-	struct as_io_context *as_io_context;
+	struct io_context *io_context;
 
 	unsigned long ptrace_message;
 	siginfo_t *last_siginfo; /* For ptrace use.  */

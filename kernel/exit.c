@@ -682,8 +682,8 @@ NORET_TYPE void do_exit(long code)
 		panic("Attempted to kill the idle task!");
 	if (unlikely(tsk->pid == 1))
 		panic("Attempted to kill init!");
-	if (tsk->as_io_context)
-		exit_as_io_context();
+	if (tsk->io_context)
+		exit_io_context();
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 

@@ -60,14 +60,6 @@
 #define default_antic_expire ((HZ / 150) ? HZ / 150 : 1)
 
 /*
- * This is the per-process anticipatory I/O scheduler state.  It is refcounted
- * and kmalloc'ed.
- *
- * There is no locking protecting the contents of this structure!  Pointers
- * to a single as_io_context may appear in multiple queues at once.
- */
-
-/*
  * Keep track of up to 20ms thinktimes. We can go as big as we like here,
  * however huge values tend to interfere and not decay fast enough. A program
  * might be in a non-io phase of operation. Waiting on user input for example,
@@ -80,28 +72,6 @@
 enum as_io_states {
 	AS_TASK_RUNNING=0,	/* Process has not exitted */
 	AS_TASK_IORUNNING,	/* Process has completed some IO */
-};
-
-struct as_io_context {
-	atomic_t refcount;
-	pid_t pid;
-	unsigned long state;
-	atomic_t nr_queued; /* queued reads & sync writes */
-	atomic_t nr_dispatched; /* number of requests gone to the drivers */
-
-	spinlock_t lock;
-
-	/* IO History tracking */
-	/* Thinktime */
-	unsigned long last_end_request;
-	unsigned long ttime_total;
-	unsigned long ttime_samples;
-	unsigned long ttime_mean;
-	/* Layout pattern */
-	long seek_samples;
-	sector_t last_request_pos;
-	sector_t seek_total;
-	sector_t seek_mean;
 };
 
 enum anticipation_status {
@@ -144,8 +114,8 @@ struct as_data {
 	unsigned long antic_start;	/* jiffies: when it started */
 	struct timer_list antic_timer;	/* anticipatory scheduling timer */
 	struct work_struct antic_work;	/* Deferred unplugging */
-	struct as_io_context *as_io_context;/* Identify the expected process */
-	int aic_finished; /* IO associated with as_io_context finished */
+	struct io_context *io_context;	/* Identify the expected process */
+	int ioc_finished; /* IO associated with io_context is finished */
 	int nr_dispatched;
 
 	/*
@@ -178,7 +148,7 @@ struct as_rq {
 
 	struct request *request;
 
-	struct as_io_context *as_io_context;	/* The submitting task */
+	struct io_context *io_context;	/* The submitting task */
 
 	/*
 	 * request hash, key is the ending offset (for back merge lookup)
@@ -206,99 +176,55 @@ static kmem_cache_t *arq_pool;
 /* Debug */
 static atomic_t nr_as_io_requests = ATOMIC_INIT(0);
 
-static void put_as_io_context(struct as_io_context **paic)
+/* Called to deallocate the as_io_context */
+static void free_as_io_context(struct as_io_context *aic)
 {
-	struct as_io_context *aic = *paic;
-
-	if (aic == NULL)
-		return;
-
-	BUG_ON(atomic_read(&aic->refcount) == 0);
-
-	if (atomic_dec_and_test(&aic->refcount)) {
-		WARN_ON(atomic_read(&nr_as_io_requests) == 0);
-		atomic_dec(&nr_as_io_requests);
-		kfree(aic);
-	}
+	atomic_dec(&nr_as_io_requests);
+	kfree(aic);
 }
 
-/* Called by the exitting task */
-void exit_as_io_context(void)
+/* Called when the task exits */
+static void exit_as_io_context(struct as_io_context *aic)
 {
-	unsigned long flags;
-	struct as_io_context *aic;
-
-	local_irq_save(flags);
-	aic = current->as_io_context;
-	if (aic) {
-		clear_bit(AS_TASK_RUNNING, &aic->state);
-		put_as_io_context(&aic);
-		current->as_io_context = NULL;
-	}
-	local_irq_restore(flags);
+	clear_bit(AS_TASK_RUNNING, &aic->state);
 }
 
-/*
- * If the current task has no IO context then create one and initialise it.
- * If it does have a context, take a ref on it.
- *
- * This is always called in the context of the task which submitted the I/O.
- * But weird things happen, so we disable local interrupts to ensure exclusive
- * access to *current.
- */
-static struct as_io_context *get_as_io_context(void)
+static struct as_io_context *alloc_as_io_context(void)
 {
-	struct task_struct *tsk = current;
-	unsigned long flags;
 	struct as_io_context *ret;
 
-	local_irq_save(flags);
-	ret = tsk->as_io_context;
-	if (ret == NULL) {
-		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
-		if (ret) {
-			atomic_inc(&nr_as_io_requests);
-			atomic_set(&ret->refcount, 1);
-			ret->pid = tsk->pid;
-			ret->state = 1 << AS_TASK_RUNNING;
-			atomic_set(&ret->nr_queued, 0);
-			atomic_set(&ret->nr_dispatched, 0);
-			spin_lock_init(&ret->lock);
-			ret->ttime_total = 0;
-			ret->ttime_samples = 0;
-			ret->ttime_mean = 0;
-			ret->seek_total = 0;
-			ret->seek_samples = 0;
-			ret->seek_mean = 0;
-			tsk->as_io_context = ret;
-		}
+	ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
+	if (ret) {
+		atomic_inc(&nr_as_io_requests);
+		ret->dtor = free_as_io_context;
+		ret->exit = exit_as_io_context;
+		ret->state = 1 << AS_TASK_RUNNING;
+		atomic_set(&ret->nr_queued, 0);
+		atomic_set(&ret->nr_dispatched, 0);
+		spin_lock_init(&ret->lock);
+		ret->ttime_total = 0;
+		ret->ttime_samples = 0;
+		ret->ttime_mean = 0;
+		ret->seek_total = 0;
+		ret->seek_samples = 0;
+		ret->seek_mean = 0;
 	}
-	local_irq_restore(flags);
-	atomic_inc(&ret->refcount);
+
 	return ret;
 }
 
-static void
-copy_as_io_context(struct as_io_context **pdst, struct as_io_context **psrc)
+/*
+ * If the current task has no AS IO context then create one and initialise it.
+ * Then take a ref on the task's io context and return it.
+ */
+static struct io_context *as_get_io_context(void)
 {
-	struct as_io_context *src = *psrc;
-
-	if (src) {
-		BUG_ON(atomic_read(&src->refcount) == 0);
-		atomic_inc(&src->refcount);
-		put_as_io_context(pdst);
-		*pdst = src;
-	}
+	struct io_context *ioc = get_io_context();
+	if (ioc && !ioc->aic)
+		ioc->aic = alloc_as_io_context();
+	return ioc;
 }
 
-static void
-swap_as_io_context(struct as_io_context **aic1, struct as_io_context **aic2)
-{
-	struct as_io_context *temp;
-	temp = *aic1;
-	*aic1 = *aic2;
-	*aic2 = temp;
-}
 
 /*
  * the back merge hash support functions
@@ -662,7 +588,7 @@ static void as_antic_waitreq(struct as_data *ad)
 {
 	BUG_ON(ad->antic_status == ANTIC_FINISHED);
 	if (ad->antic_status == ANTIC_OFF) {
-		if (!ad->as_io_context || ad->aic_finished)
+		if (!ad->io_context || ad->ioc_finished)
 			as_antic_waitnext(ad);
 		else
 			ad->antic_status = ANTIC_WAIT_REQ;
@@ -715,7 +641,7 @@ static int as_close_req(struct as_data *ad, struct as_rq *arq)
 	sector_t next = arq->request->sector;
 	sector_t delta;	/* acceptable close offset (in sectors) */
 
-	if (ad->antic_status == ANTIC_OFF || !ad->aic_finished)
+	if (ad->antic_status == ANTIC_OFF || !ad->ioc_finished)
 		delay = 0;
 	else
 		delay = ((jiffies - ad->antic_start) * 1000) / HZ;
@@ -745,6 +671,7 @@ static int as_close_req(struct as_data *ad, struct as_rq *arq)
  */
 static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 {
+	struct io_context *ioc;
 	struct as_io_context *aic;
 
 	if (arq && arq->is_sync == REQ_SYNC && as_close_req(ad, arq)) {
@@ -752,7 +679,7 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
-	if (ad->aic_finished && as_antic_expired(ad)) {
+	if (ad->ioc_finished && as_antic_expired(ad)) {
 		/*
 		 * In this situation status should really be FINISHED,
 		 * however the timer hasn't had the chance to run yet.
@@ -760,13 +687,17 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
-	aic = ad->as_io_context;
-	BUG_ON(!aic);
+	ioc = ad->io_context;
+	BUG_ON(!ioc);
 
-	if (arq && aic == arq->as_io_context) {
+	if (arq && ioc == arq->io_context) {
 		/* request from same process */
 		return 1;
 	}
+
+	aic = ioc->aic;
+	if (!aic)
+		return 0;
 
 	if (!test_bit(AS_TASK_RUNNING, &aic->state)) {
 		/* process anticipated on has exitted */
@@ -810,7 +741,7 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
  */
 static int as_can_anticipate(struct as_data *ad, struct as_rq *arq)
 {
-	if (!ad->as_io_context)
+	if (!ad->io_context)
 		/*
 		 * Last request submitted was a write
 		 */
@@ -973,12 +904,10 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 {
 	struct as_data *ad = q->elevator.elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
-	struct as_io_context *aic = arq->as_io_context;
+	struct as_io_context *aic;
 
-	if (unlikely(!blk_fs_request(rq))) {
-		WARN_ON(aic);
+	if (unlikely(!blk_fs_request(rq)))
 		return;
-	}
 
 	WARN_ON(blk_fs_request(rq) && arq->state == AS_RQ_NEW);
 
@@ -1004,18 +933,12 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 		ad->changed_batch = 0;
 	}
 
-	if (!aic)
+	if (!arq->io_context)
 		return;
 
-	spin_lock(&aic->lock);
-	if (arq->is_sync == REQ_SYNC) {
-		set_bit(AS_TASK_IORUNNING, &aic->state);
-		aic->last_end_request = jiffies;
-	}
-
-	if (ad->as_io_context == aic) {
+	if (ad->io_context == arq->io_context) {
 		ad->antic_start = jiffies;
-		ad->aic_finished = 1;
+		ad->ioc_finished = 1;
 		if (ad->antic_status == ANTIC_WAIT_REQ) {
 			/*
 			 * We were waiting on this request, now anticipate
@@ -1024,9 +947,19 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 			as_antic_waitnext(ad);
 		}
 	}
+
+	aic = arq->io_context->aic;
+	if (!aic)
+		return;
+
+	spin_lock(&aic->lock);
+	if (arq->is_sync == REQ_SYNC) {
+		set_bit(AS_TASK_IORUNNING, &aic->state);
+		aic->last_end_request = jiffies;
+	}
 	spin_unlock(&aic->lock);
 
-	put_as_io_context(&arq->as_io_context);
+	put_io_context(arq->io_context);
 }
 
 /*
@@ -1047,9 +980,9 @@ static void as_remove_queued_request(request_queue_t *q, struct request *rq)
 
 		WARN_ON(arq->state != AS_RQ_QUEUED);
 
-		if (arq->as_io_context) {
-			BUG_ON(!atomic_read(&arq->as_io_context->nr_queued));
-			atomic_dec(&arq->as_io_context->nr_queued);
+		if (arq->io_context && arq->io_context->aic) {
+			BUG_ON(!atomic_read(&arq->io_context->aic->nr_queued));
+			atomic_dec(&arq->io_context->aic->nr_queued);
 		}
 
 		/*
@@ -1082,10 +1015,12 @@ static void as_remove_dispatched_request(request_queue_t *q, struct request *rq)
 
 	WARN_ON(arq->state != AS_RQ_DISPATCHED);
 	WARN_ON(ON_RB(&arq->rb_node));
-	aic = arq->as_io_context;
-	if (aic) {
-		WARN_ON(!atomic_read(&aic->nr_dispatched));
-		atomic_dec(&aic->nr_dispatched);
+	if (arq->io_context && arq->io_context->aic) {
+		aic = arq->io_context->aic;
+		if (aic) {
+			WARN_ON(!atomic_read(&aic->nr_dispatched));
+			atomic_dec(&aic->nr_dispatched);
+		}
 	}
 }
 /*
@@ -1180,17 +1115,17 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 
 	if (data_dir == REQ_SYNC) {
 		/* In case we have to anticipate after this */
-		copy_as_io_context(&ad->as_io_context, &arq->as_io_context);
+		copy_io_context(&ad->io_context, &arq->io_context);
 	} else {
-		if (ad->as_io_context) {
-			put_as_io_context(&ad->as_io_context);
-			ad->as_io_context = NULL;
+		if (ad->io_context) {
+			put_io_context(ad->io_context);
+			ad->io_context = NULL;
 		}
 
 		if (ad->current_write_count != 0)
 			ad->current_write_count--;
 	}
-	ad->aic_finished = 0;
+	ad->ioc_finished = 0;
 
 	ad->next_arq[data_dir] = as_find_next_arq(ad, arq);
 
@@ -1199,8 +1134,8 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 	 */
 	as_remove_queued_request(ad->q, arq->request);
 	list_add_tail(&arq->request->queuelist, ad->dispatch);
-	if (arq->as_io_context)
-		atomic_inc(&arq->as_io_context->nr_dispatched);
+	if (arq->io_context && arq->io_context->aic)
+		atomic_inc(&arq->io_context->aic->nr_dispatched);
 
 	WARN_ON(arq->state != AS_RQ_QUEUED);
 	arq->state = AS_RQ_DISPATCHED;
@@ -1355,11 +1290,11 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 		arq->is_sync = 0;
 	data_dir = arq->is_sync;
 
-	arq->as_io_context = get_as_io_context();
+	arq->io_context = as_get_io_context();
 
-	if (arq->as_io_context) {
-		atomic_inc(&arq->as_io_context->nr_queued);
-		as_update_iohist(arq->as_io_context, arq->request);
+	if (arq->io_context && arq->io_context->aic) {
+		atomic_inc(&arq->io_context->aic->nr_queued);
+		as_update_iohist(arq->io_context->aic, arq->request);
 	}
 
 	as_add_arq_rb(ad, arq);
@@ -1575,8 +1510,7 @@ as_merged_requests(request_queue_t *q, struct request *req,
 			 * Don't copy here but swap, because when anext is
 			 * removed below, it must contain the unused context
 			 */
-			swap_as_io_context(&arq->as_io_context,
-					&anext->as_io_context);
+			swap_io_context(&arq->io_context, &anext->io_context);
 		}
 	}
 
@@ -1584,7 +1518,7 @@ as_merged_requests(request_queue_t *q, struct request *req,
 	 * kill knowledge of next, this one is a goner
 	 */
 	as_remove_queued_request(q, next);
-	put_as_io_context(&anext->as_io_context);
+	put_io_context(anext->io_context);
 }
 
 /*
@@ -1630,7 +1564,7 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 		RB_CLEAR(&arq->rb_node);
 		arq->request = rq;
 		arq->state = AS_RQ_NEW;
-		arq->as_io_context = NULL;
+		arq->io_context = NULL;
 		INIT_LIST_HEAD(&arq->hash);
 		arq->hash_valid_count = 0;
 		INIT_LIST_HEAD(&arq->fifo);
@@ -1643,16 +1577,18 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 
 static int as_may_queue(request_queue_t *q, int rw)
 {
+	int ret = 0;
 	struct as_data *ad = q->elevator.elevator_data;
-	struct as_io_context *aic;
+	struct io_context *ioc;
 	if (ad->antic_status == ANTIC_WAIT_REQ ||
 			ad->antic_status == ANTIC_WAIT_NEXT) {
-		aic = get_as_io_context();
-		if (ad->as_io_context == aic)
-			return 1;
+		ioc = as_get_io_context();
+		if (ad->io_context == ioc)
+			ret = 1;
+		put_io_context(ioc);
 	}
 
-	return 0;
+	return ret;
 }
 
 static void as_exit(request_queue_t *q, elevator_t *e)
@@ -1666,7 +1602,7 @@ static void as_exit(request_queue_t *q, elevator_t *e)
 	BUG_ON(!list_empty(&ad->fifo_list[REQ_ASYNC]));
 
 	mempool_destroy(ad->arq_pool);
-	put_as_io_context(&ad->as_io_context);
+	put_io_context(ad->io_context);
 	kfree(ad->hash);
 	kfree(ad);
 }

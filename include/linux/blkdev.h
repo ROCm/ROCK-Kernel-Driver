@@ -24,6 +24,50 @@ struct request_pm_state;
 #define BLKDEV_MIN_RQ	4
 #define BLKDEV_MAX_RQ	128	/* Default maximum */
 
+/*
+ * This is the per-process anticipatory I/O scheduler state.
+ */
+struct as_io_context {
+	spinlock_t lock;
+
+	void (*dtor)(struct as_io_context *aic); /* destructor */
+	void (*exit)(struct as_io_context *aic); /* called on task exit */
+
+	unsigned long state;
+	atomic_t nr_queued; /* queued reads & sync writes */
+	atomic_t nr_dispatched; /* number of requests gone to the drivers */
+
+	/* IO History tracking */
+	/* Thinktime */
+	unsigned long last_end_request;
+	unsigned long ttime_total;
+	unsigned long ttime_samples;
+	unsigned long ttime_mean;
+	/* Layout pattern */
+	long seek_samples;
+	sector_t last_request_pos;
+	sector_t seek_total;
+	sector_t seek_mean;
+};
+
+/*
+ * This is the per-process I/O subsystem state.  It is refcounted and
+ * kmalloc'ed. Currently all fields are modified in process io context
+ * (apart from the atomic refcount), so require no locking.
+ */
+struct io_context {
+	atomic_t refcount;
+	pid_t pid;
+
+	struct as_io_context *aic;
+};
+
+void put_io_context(struct io_context *ioc);
+void exit_io_context(void);
+struct io_context *get_io_context(void);
+void copy_io_context(struct io_context **pdst, struct io_context **psrc);
+void swap_io_context(struct io_context **ioc1, struct io_context **ioc2);
+
 struct request_list {
 	int count[2];
 	mempool_t *rq_pool;
