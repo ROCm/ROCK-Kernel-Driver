@@ -1018,6 +1018,66 @@ static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 #define illegal_highdma(dev, skb)	(0)
 #endif
 
+extern void skb_release_data(struct sk_buff *);
+
+/* Keep head the same: replace data */
+int __skb_linearize(struct sk_buff *skb, int gfp_mask)
+{
+	unsigned int size;
+	u8 *data;
+	long offset;
+	struct skb_shared_info *ninfo;
+	int headerlen = skb->data - skb->head;
+	int expand = (skb->tail + skb->data_len) - skb->end;
+
+	if (skb_shared(skb))
+		BUG();
+
+	if (expand <= 0)
+		expand = 0;
+
+	size = skb->end - skb->head + expand;
+	size = SKB_DATA_ALIGN(size);
+	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
+	if (!data)
+		return -ENOMEM;
+
+	/* Copy entire thing */
+	if (skb_copy_bits(skb, -headerlen, data, headerlen + skb->len))
+		BUG();
+
+	/* Set up shinfo */
+	ninfo = (struct skb_shared_info*)(data + size);
+	atomic_set(&ninfo->dataref, 1);
+	ninfo->tso_size = skb_shinfo(skb)->tso_size;
+	ninfo->tso_segs = skb_shinfo(skb)->tso_segs;
+	ninfo->nr_frags = 0;
+	ninfo->frag_list = NULL;
+
+	/* Offset between the two in bytes */
+	offset = data - skb->head;
+
+	/* Free old data. */
+	skb_release_data(skb);
+
+	skb->head = data;
+	skb->end  = data + size;
+
+	/* Set up new pointers */
+	skb->h.raw   += offset;
+	skb->nh.raw  += offset;
+	skb->mac.raw += offset;
+	skb->tail    += offset;
+	skb->data    += offset;
+
+	/* We are no longer a clone, even if we were. */
+	skb->cloned    = 0;
+
+	skb->tail     += skb->data_len;
+	skb->data_len  = 0;
+	return 0;
+}
+
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1039,7 +1099,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 
 	if (skb_shinfo(skb)->frag_list &&
 	    !(dev->features & NETIF_F_FRAGLIST) &&
-	    skb_linearize(skb, GFP_ATOMIC))
+	    __skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree_skb;
 
 	/* Fragmented skb is linearized if device does not support SG,
@@ -1048,7 +1108,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 	 */
 	if (skb_shinfo(skb)->nr_frags &&
 	    (!(dev->features & NETIF_F_SG) || illegal_highdma(dev, skb)) &&
-	    skb_linearize(skb, GFP_ATOMIC))
+	    __skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree_skb;
 
 	/* If packet is not checksummed and device does not support
@@ -1356,7 +1416,7 @@ static int deliver_to_old_ones(struct packet_type *pt,
 		if (!skb)
 			goto out;
 	}
-	if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC))
+	if (skb_is_nonlinear(skb) && __skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree;
 
 #ifdef CONFIG_SMP

@@ -148,7 +148,7 @@ EXPORT_SYMBOL(sock_rfree);
 EXPORT_SYMBOL(sock_wfree);
 EXPORT_SYMBOL(sock_wmalloc);
 EXPORT_SYMBOL(sock_rmalloc);
-EXPORT_SYMBOL(skb_linearize);
+EXPORT_SYMBOL(__skb_linearize);
 EXPORT_SYMBOL(skb_checksum);
 EXPORT_SYMBOL(skb_checksum_help);
 EXPORT_SYMBOL(skb_recv_datagram);
