@@ -456,7 +456,7 @@ void accel_clear_margins(struct vc_data *vc, struct display *p,
 	region.color = attr_bgcol_ec(p, vc);
 	region.rop = ROP_COPY;
 
-	if (rw & !bottom_only) {
+	if (rw && !bottom_only) {
 		region.dx = info->var.xoffset + rs;
 		region.dy = 0;
 		region.width = rw;
