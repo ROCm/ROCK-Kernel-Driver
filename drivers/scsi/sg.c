@@ -1409,7 +1409,6 @@ find_empty_slot:
 	SCSI_LOG_TIMEOUT(3, printk("sg_add: dev=%d \n", k));
 	memset(sdp, 0, sizeof(*sdp));
 	sprintf(disk->disk_name, "sg%d", k);
-	strncpy(cdev->kobj.name, disk->disk_name, KOBJ_NAME_LEN);
 	cdev->owner = THIS_MODULE;
 	cdev->ops = &sg_fops;
 	disk->major = SCSI_GENERIC_MAJOR;
@@ -1439,7 +1438,7 @@ find_empty_slot:
 				MKDEV(SCSI_GENERIC_MAJOR, k), 
 				cl_dev->dev, "%s", 
 				disk->disk_name);
-		if (NULL == sg_class_member)
+		if (IS_ERR(sg_class_member))
 			printk(KERN_WARNING "sg_add: "
 				"class_simple_device_add failed\n");
 		class_set_devdata(sg_class_member, sdp);
@@ -1462,7 +1461,7 @@ find_empty_slot:
 out:
 	put_disk(disk);
 	if (cdev)
-		kobject_put(&cdev->kobj);
+		cdev_del(cdev);
 	return error;
 }
 

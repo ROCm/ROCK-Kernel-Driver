@@ -46,13 +46,10 @@ struct cdev *register_tape_dev(
 	cdev->owner = fops->owner;
 	cdev->ops   = fops;
 	cdev->dev   = dev;
-	strcpy(cdev->kobj.name, devname);
-	for (s = strchr(cdev->kobj.name, '/'); s; s = strchr(s, '/'))
-		*s = '!';
 
 	rc = cdev_add(cdev, cdev->dev, 1);
 	if (rc) {
-		kobject_put(&cdev->kobj);
+		cdev_del(cdev);
 		return ERR_PTR(rc);
 	}
 	class_simple_device_add(tape_class, cdev->dev, device, "%s", devname);

@@ -2746,9 +2746,9 @@ static int __init init_raw1394(void)
 
 	cdev_init(&raw1394_cdev, &raw1394_fops);
 	raw1394_cdev.owner = THIS_MODULE;
-	kobject_set_name(&raw1394_cdev.kobj, RAW1394_DEVICE_NAME);
 	ret = cdev_add(&raw1394_cdev, IEEE1394_RAW1394_DEV, 1);
 	if (ret) {
+		/* jmc: leaves reference to (static) raw1394_cdev */
                 HPSB_ERR("raw1394 failed to register minor device block");
                 devfs_remove(RAW1394_DEVICE_NAME);
                 hpsb_unregister_highlevel(&raw1394_highlevel);

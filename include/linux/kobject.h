@@ -151,6 +151,14 @@ struct subsystem _name##_subsys = { \
 		.hotplug_ops =_hotplug_ops, \
 	} \
 }
+#define decl_subsys_name(_varname,_name,_type,_hotplug_ops) \
+struct subsystem _varname##_subsys = { \
+	.kset = { \
+		.kobj = { .name = __stringify(_name) }, \
+		.ktype = _type, \
+		.hotplug_ops =_hotplug_ops, \
+	} \
+}
 
 
 /**
