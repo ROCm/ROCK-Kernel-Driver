@@ -32,7 +32,7 @@
 
 
 u8		mv64x60_pci_exclude_bridge = 1;
-spinlock_t	mv64x60_lock; /* Only really used by PIC code once init done */
+spinlock_t	mv64x60_lock = SPIN_LOCK_UNLOCKED;
 
 static phys_addr_t 	mv64x60_bridge_pbase = 0;
 static void 		*mv64x60_bridge_vbase = 0;

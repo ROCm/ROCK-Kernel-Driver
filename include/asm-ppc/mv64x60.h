@@ -254,10 +254,12 @@ mv64x60_write(struct mv64x60_handle *bh, u32 offset, u32 val) {
 extern inline u32
 mv64x60_read(struct mv64x60_handle *bh, u32 offset) {
 	ulong	flags;
+	u32     reg;
 
 	spin_lock_irqsave(&mv64x60_lock, flags);
-	return in_le32(bh->v_base + offset);
+	reg = in_le32(bh->v_base + offset);
 	spin_unlock_irqrestore(&mv64x60_lock, flags);
+	return reg;
 }
 
 extern inline void
@@ -267,9 +269,9 @@ mv64x60_modify(struct mv64x60_handle *bh, u32 offs, u32 data, u32 mask)
 	ulong	flags;
 
 	spin_lock_irqsave(&mv64x60_lock, flags);
-	reg = mv64x60_read(bh, offs) & (~mask); /* zero bits we care about */
-	reg |= data & mask; /* set bits from the data */
-	mv64x60_write(bh, offs, reg);
+	reg = in_le32(bh->v_base + offs) & (~mask);
+	reg |= data & mask;
+	out_le32(bh->v_base + offs, reg);
 	spin_unlock_irqrestore(&mv64x60_lock, flags);
 }
 
