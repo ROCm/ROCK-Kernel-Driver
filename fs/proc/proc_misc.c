@@ -130,7 +130,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 {
 	struct sysinfo i;
 	int len;
-	int pg_size ;
 	struct page_state ps;
 
 	get_page_state(&ps);
@@ -140,7 +139,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
 	si_swapinfo(&i);
-	pg_size = get_page_cache_size() - i.bufferram ;
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -149,7 +147,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"MemTotal:     %8lu kB\n"
 		"MemFree:      %8lu kB\n"
 		"MemShared:    %8lu kB\n"
-		"Buffers:      %8lu kB\n"
 		"Cached:       %8lu kB\n"
 		"SwapCached:   %8lu kB\n"
 		"Active:       %8u kB\n"
@@ -165,8 +162,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
-		K(i.bufferram),
-		K(pg_size - swapper_space.nrpages),
+		K(ps.nr_pagecache-swapper_space.nrpages),
 		K(swapper_space.nrpages),
 		K(nr_active_pages),
 		K(nr_inactive_pages),
