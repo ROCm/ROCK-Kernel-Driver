@@ -1133,7 +1133,7 @@ void check_dma_crc (ide_drive_t *drive)
 		if (drive->current_speed >= XFER_SW_DMA_0)
 			(void) HWIF(drive)->ide_dma_on(drive);
 	} else {
-		(void) HWIF(drive)->ide_dma_off(drive);
+		(void)__ide_dma_off(drive);
 	}
 }
 

@@ -303,14 +303,6 @@ sgiioc4_ide_dma_on(ide_drive_t * drive)
 }
 
 static int
-sgiioc4_ide_dma_off(ide_drive_t * drive)
-{
-	printk(KERN_INFO "%s: DMA disabled\n", drive->name);
-
-	return HWIF(drive)->ide_dma_off_quietly(drive);
-}
-
-static int
 sgiioc4_ide_dma_off_quietly(ide_drive_t * drive)
 {
 	drive->using_dma = 0;
@@ -644,7 +636,6 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;
 	hwif->ide_dma_on = &sgiioc4_ide_dma_on;
-	hwif->ide_dma_off = &sgiioc4_ide_dma_off;
 	hwif->ide_dma_off_quietly = &sgiioc4_ide_dma_off_quietly;
 	hwif->ide_dma_test_irq = &sgiioc4_ide_dma_test_irq;
 	hwif->ide_dma_host_on = &sgiioc4_ide_dma_host_on;

@@ -2153,7 +2153,6 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 				    	pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
-	hwif->ide_dma_off = &__ide_dma_off;
 	hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	hwif->ide_dma_on = &__ide_dma_on;
 	hwif->ide_dma_check = &pmac_ide_dma_check;

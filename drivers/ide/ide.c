@@ -839,7 +839,6 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_end		= old_hwif.ide_dma_end;
 	hwif->ide_dma_check		= old_hwif.ide_dma_check;
 	hwif->ide_dma_on		= old_hwif.ide_dma_on;
-	hwif->ide_dma_off		= old_hwif.ide_dma_off;
 	hwif->ide_dma_off_quietly	= old_hwif.ide_dma_off_quietly;
 	hwif->ide_dma_test_irq		= old_hwif.ide_dma_test_irq;
 	hwif->ide_dma_host_on		= old_hwif.ide_dma_host_on;
@@ -1329,7 +1328,8 @@ static int set_using_dma (ide_drive_t *drive, int arg)
 		if (HWIF(drive)->ide_dma_check(drive)) return -EIO;
 		if (HWIF(drive)->ide_dma_on(drive)) return -EIO;
 	} else {
-		if (HWIF(drive)->ide_dma_off(drive)) return -EIO;
+		if (__ide_dma_off(drive))
+			return -EIO;
 	}
 	return 0;
 }

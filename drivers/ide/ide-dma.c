@@ -414,7 +414,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 	if ((id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (__ide_dma_bad_drive(drive))
-			return hwif->ide_dma_off(drive);
+			return __ide_dma_off(drive);
 
 		/*
 		 * Enable DMA on any drive that has
@@ -520,13 +520,14 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(__ide_dma_off_quietly);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 /**
- *	__ide_dma_host_off	-	Generic DMA kill
- *	@drive: drive to control
+ *	__ide_dma_off	-	disable DMA on a device
+ *	@drive: drive to disable DMA on
  *
- *	Turn off the current DMA on this IDE controller. Inform the
- *	user that DMA has been disabled. 
+ *	Disable IDE DMA for a device on this IDE controller.
+ *	Inform the user that DMA has been disabled.
  */
 
 int __ide_dma_off (ide_drive_t *drive)
@@ -537,6 +538,7 @@ int __ide_dma_off (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_off);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	__ide_dma_host_on	-	Enable DMA on a host
  *	@drive: drive to enable for DMA
@@ -1049,8 +1051,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 	if (!(hwif->dma_prdtable))
 		hwif->dma_prdtable	= (hwif->dma_base + 4);
 
-	if (!hwif->ide_dma_off)
-		hwif->ide_dma_off = &__ide_dma_off;
 	if (!hwif->ide_dma_off_quietly)
 		hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	if (!hwif->ide_dma_host_off)
