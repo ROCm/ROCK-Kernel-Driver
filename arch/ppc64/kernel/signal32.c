@@ -189,7 +189,7 @@ static long restore_user_regs(struct pt_regs *regs,
 	elf_greg_t64 *gregs = (elf_greg_t64 *)regs;
 	int i;
 	long err = 0;
-	unsigned int save_r2;
+	unsigned int save_r2 = 0;
 #ifdef CONFIG_ALTIVEC
 	unsigned long msr;
 #endif

@@ -229,7 +229,7 @@ int iommu_map_sg(struct device *dev, struct iommu_table *tbl,
 		struct scatterlist *sglist, int nelems,
 		enum dma_data_direction direction)
 {
-	dma_addr_t dma_next, dma_addr;
+	dma_addr_t dma_next = 0, dma_addr;
 	unsigned long flags;
 	struct scatterlist *s, *outs, *segstart;
 	int outcount;

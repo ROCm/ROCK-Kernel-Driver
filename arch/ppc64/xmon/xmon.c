@@ -2059,7 +2059,7 @@ ppc_inst_dump(unsigned long adr, long count, int praddr)
 {
 	int nr, dotted;
 	unsigned long first_adr;
-	unsigned long inst, last_inst;
+	unsigned long inst, last_inst = 0;
 	unsigned char val[4];
 
 	dotted = 0;

@@ -106,7 +106,7 @@ static char *rtas_event_type(int type)
 static void printk_log_rtas(char *buf, int len)
 {
 
-	int i,j,n;
+	int i,j,n = 0;
 	int perline = 16;
 	char buffer[64];
 	char * str = "RTAS event";
