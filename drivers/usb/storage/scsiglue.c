@@ -386,9 +386,9 @@ Scsi_Host_Template usb_stor_host_template = {
 unsigned char usb_stor_sense_notready[18] = {
 	[0]	= 0x70,			    /* current error */
 	[2]	= 0x02,			    /* not ready */
-	[5]	= 0x0a,			    /* additional length */
-	[10]	= 0x04,			    /* not ready */
-	[11]	= 0x03			    /* manual intervention */
+	[7]	= 0x0a,			    /* additional length */
+	[12]	= 0x04,			    /* not ready */
+	[13]	= 0x03			    /* manual intervention */
 };
 
 #define USB_STOR_SCSI_SENSE_HDRSZ 4
