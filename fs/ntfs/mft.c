@@ -497,12 +497,20 @@ int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
 	kmirr = page_address(page) + page_ofs;
 	/* Copy the mst protected mft record to the mirror. */
 	memcpy(kmirr, m, vol->mft_record_size);
-	/*
-	 * Create buffers if not present and mark the ones belonging to the mft
-	 * mirror record dirty.
-	 */
-	mark_ntfs_record_dirty(page, page_ofs);
-	BUG_ON(!page_has_buffers(page));
+	/* Create uptodate buffers if not present. */
+	if (unlikely(!page_has_buffers(page))) {
+		struct buffer_head *tail;
+
+		bh = head = alloc_page_buffers(page, blocksize, 1);
+		do {
+			set_buffer_uptodate(bh);
+			tail = bh;
+			bh = bh->b_this_page;
+		} while (bh);
+		tail->b_this_page = head;
+		attach_page_buffers(page, head);
+		BUG_ON(!page_has_buffers(page));
+	}
 	bh = head = page_buffers(page);
 	BUG_ON(!bh);
 	rl = NULL;

@@ -819,6 +819,12 @@ static int ntfs_write_mst_block(struct page *page,
 	BUG_ON(!NInoNonResident(ni));
 	BUG_ON(!NInoMstProtected(ni));
 	is_mft = (S_ISREG(vi->i_mode) && !vi->i_ino);
+	/*
+	 * NOTE: ntfs_write_mst_block() would be called for $MFTMirr if a page
+	 * in its page cache were to be marked dirty.  However this should
+	 * never happen with the current driver and considering we do not
+	 * handle this case here we do want to BUG(), at least for now.
+	 */
 	BUG_ON(!(is_mft || S_ISDIR(vi->i_mode) ||
 			(NInoAttr(ni) && ni->type == AT_INDEX_ALLOCATION)));
 	BUG_ON(!max_bhs);
@@ -2282,6 +2288,7 @@ void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs) {
 	struct buffer_head *bh, *head, *buffers_to_free = NULL;
 	unsigned int end, bh_size, bh_ofs;
 
+	BUG_ON(!PageUptodate(page));
 	end = ofs + ni->itype.index.block_size;
 	bh_size = 1 << VFS_I(ni)->i_blkbits;
 	spin_lock(&mapping->private_lock);
