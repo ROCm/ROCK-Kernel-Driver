@@ -2,6 +2,9 @@
 /* Copyright (C) 1998  Kenneth Albanowski <kjahds@kjahds.com>
  *                     The Silver Hammer Group, Ltd.
  * Copyright (C) 2002  David McCullough <davidm@snapgear.com>
+ *
+ * This file provides the definitions and structures needed to
+ * support uClinux flat-format executables.
  */
 
 #ifndef _LINUX_FLAT_H
