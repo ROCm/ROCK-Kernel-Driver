@@ -1383,3 +1383,14 @@ int patch_it2646(ac97_t * ac97)
 	snd_ac97_write_cache(ac97, 0x7A, 0x0808);
 	return 0;
 }
+
+/* Si3036/8 specific registers */
+#define AC97_SI3036_CHIP_ID     0x5a
+
+int mpatch_si3036(ac97_t * ac97)
+{
+	//printk("mpatch_si3036: chip id = %x\n", snd_ac97_read(ac97, 0x5a));
+	snd_ac97_write_cache(ac97, 0x5c, 0xf210 );
+	snd_ac97_write_cache(ac97, 0x68, 0);
+	return 0;
+}

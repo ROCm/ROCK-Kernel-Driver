@@ -207,6 +207,24 @@
 #define AC97_MEA_PRG		0x4000	/* HADC power down (high) */
 #define AC97_MEA_PRH		0x8000	/* HDAC power down (high) */
 
+/* modem gpio status defines */
+#define AC97_GPIO_LINE1_OH      0x0001  /* Off Hook Line1 */
+#define AC97_GPIO_LINE1_RI      0x0002  /* Ring Detect Line1 */
+#define AC97_GPIO_LINE1_CID     0x0004  /* Caller ID path enable Line1 */
+#define AC97_GPIO_LINE1_LCS     0x0008  /* Loop Current Sense Line1 */
+#define AC97_GPIO_LINE1_PULSE   0x0010  /* Opt./ Pulse Dial Line1 (out) */
+#define AC97_GPIO_LINE1_HL1R    0x0020  /* Opt./ Handset to Line1 relay control (out) */
+#define AC97_GPIO_LINE1_HOHD    0x0040  /* Opt./ Handset off hook detect Line1 (in) */
+#define AC97_GPIO_LINE12_AC     0x0080  /* Opt./ Int.bit 1 / Line1/2 AC (out) */
+#define AC97_GPIO_LINE12_DC     0x0100  /* Opt./ Int.bit 2 / Line1/2 DC (out) */
+#define AC97_GPIO_LINE12_RS     0x0200  /* Opt./ Int.bit 3 / Line1/2 RS (out) */
+#define AC97_GPIO_LINE2_OH      0x0400  /* Off Hook Line2 */
+#define AC97_GPIO_LINE2_RI      0x0800  /* Ring Detect Line2 */
+#define AC97_GPIO_LINE2_CID     0x1000  /* Caller ID path enable Line2 */
+#define AC97_GPIO_LINE2_LCS     0x2000  /* Loop Current Sense Line2 */
+#define AC97_GPIO_LINE2_PULSE   0x4000  /* Opt./ Pulse Dial Line2 (out) */
+#define AC97_GPIO_LINE2_HL1R    0x8000  /* Opt./ Handset to Line2 relay control (out) */
+
 /* specific - SigmaTel */
 #define AC97_SIGMATEL_ANALOG	0x6c	/* Analog Special */
 #define AC97_SIGMATEL_DAC2INVERT 0x6e

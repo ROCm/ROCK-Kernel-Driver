@@ -146,7 +146,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x4e534331, 0xffffffff, "LM4549",		NULL,		NULL },
 { 0x4e534350, 0xffffffff, "LM4550",		NULL,		NULL },
 { 0x50534304, 0xffffffff, "UCB1400",		NULL,		NULL },
-{ 0x53494c20, 0xffffffe0, "Si3036/8",		NULL,		NULL },
+{ 0x53494c20, 0xffffffe0, "Si3036/8",		NULL,		mpatch_si3036 },
 { 0x54524102, 0xffffffff, "TR28022",		NULL,		NULL },
 { 0x54524106, 0xffffffff, "TR28026",		NULL,		NULL },
 { 0x54524108, 0xffffffff, "TR28028",		patch_tritech_tr28028,	NULL }, // added by xin jin [07/09/99]
@@ -1517,6 +1517,12 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 static int snd_ac97_modem_build(snd_card_t * card, ac97_t * ac97)
 {
 	/* TODO */
+	//printk("AC97_GPIO_CFG = %x\n",snd_ac97_read(ac97,AC97_GPIO_CFG));
+	snd_ac97_write(ac97, AC97_GPIO_CFG, 0xffff & ~(AC97_GPIO_LINE1_OH));
+	snd_ac97_write(ac97, AC97_GPIO_POLARITY, 0xffff & ~(AC97_GPIO_LINE1_OH));
+	snd_ac97_write(ac97, AC97_GPIO_STICKY, 0xffff);
+	snd_ac97_write(ac97, AC97_GPIO_WAKEUP, 0x0);
+	snd_ac97_write(ac97, AC97_MISC_AFE, 0x0);
 	return 0;
 }
 
