@@ -16,11 +16,11 @@
 /*
  * a maximum of 16 APICs with the current APIC ID architecture.
  */
-#ifdef CONFIG_X86_NUMAQ
+#ifdef CONFIG_X86_NUMA
 #define MAX_APICS 256
-#else /* !CONFIG_X86_NUMAQ */
+#else /* !CONFIG_X86_NUMA */
 #define MAX_APICS 16
-#endif /* CONFIG_X86_NUMAQ */
+#endif /* CONFIG_X86_NUMA */
 
 #define MAX_MPC_ENTRY 1024
 

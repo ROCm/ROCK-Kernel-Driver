@@ -30,4 +30,17 @@ static inline void clustered_apic_check(void)
 		(clustered_apic_mode ? "NUMA-Q" : "Flat"), nr_ioapics);
 }
 
+static inline int cpu_present_to_apicid(int mps_cpu)
+{
+	if (clustered_apic_mode)
+		return ( ((mps_cpu/4)*16) + (1<<(mps_cpu%4)) );
+	else
+		return mps_cpu;
+}
+
+static inline unsigned long apicid_to_cpu_present(int apicid)
+{
+	return (1ul << apicid);
+}
+
 #endif /* __ASM_MACH_APIC_H */

@@ -65,6 +65,7 @@ extern void zap_low_mappings (void);
  * the real APIC ID <-> CPU # mapping.
  */
 #define MAX_APICID 256
+#define BAD_APICID 0xFFu
 extern volatile int cpu_to_physical_apicid[NR_CPUS];
 extern volatile int physical_apicid_to_cpu[MAX_APICID];
 extern volatile int cpu_to_logical_apicid[NR_CPUS];

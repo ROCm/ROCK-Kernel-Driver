@@ -38,4 +38,20 @@ static inline void clustered_apic_check(void)
 		(x86_summit ? "Summit" : "Flat"), nr_ioapics);
 }
 
+static inline int cpu_present_to_apicid(int mps_cpu)
+{
+	if (x86_summit)
+		return (int) raw_phys_apicid[mps_cpu];
+	else
+		return mps_cpu;
+}
+
+static inline unsigned long apicid_to_phys_cpu_present(int apicid)
+{
+	if (x86_summit)
+		return (1ul << (((apicid >> 4) << 2) | (apicid & 0x3)));
+	else
+		return (1ul << apicid);
+}
+
 #endif /* __ASM_MACH_APIC_H */

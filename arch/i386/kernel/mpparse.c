@@ -71,6 +71,7 @@ static unsigned int __initdata num_processors;
 unsigned long phys_cpu_present_map;
 
 int summit_x86 = 0;
+u8 raw_phys_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 /*
  * Intel MP BIOS table parsing routines:
@@ -192,7 +193,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	if (clustered_apic_mode) {
 		phys_cpu_present_map |= (logical_apicid&0xf) << (4*quad);
 	} else {
-		phys_cpu_present_map |= 1 << m->mpc_apicid;
+		phys_cpu_present_map |= apicid_to_cpu_present(m->mpc_apicid);
 	}
 	/*
 	 * Validate version
@@ -202,6 +203,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		ver = 0x10;
 	}
 	apic_version[m->mpc_apicid] = ver;
+	raw_phys_apicid[num_processors - 1] = m->mpc_apicid;
 }
 
 static void __init MP_bus_info (struct mpc_config_bus *m)
