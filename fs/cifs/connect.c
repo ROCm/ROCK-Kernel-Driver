@@ -2684,11 +2684,11 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 		if(rc == 0)
 			pSesInfo->server->tcpStatus = CifsGood;
 	}
-	pSesInfo->capabilities = pSesInfo->server->capabilities;
-	if(linuxExtEnabled == 0)
-		pSesInfo->capabilities &= (~CAP_UNIX);
-	pSesInfo->sequence_number = 0;
 	if (!rc) {
+		pSesInfo->capabilities = pSesInfo->server->capabilities;
+		if(linuxExtEnabled == 0)
+			pSesInfo->capabilities &= (~CAP_UNIX);
+		pSesInfo->sequence_number = 0;
 		cFYI(1,("Security Mode: 0x%x Capabilities: 0x%x Time Zone: %d",
 			pSesInfo->server->secMode,
 			pSesInfo->server->capabilities,

@@ -235,8 +235,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	   due to last connection to this server being unmounted */
 
 	timeout = wait_event_interruptible_timeout(ses->server->response_q,
-				midQ->
-				midState & MID_RESPONSE_RECEIVED,
+				(midQ->midState & MID_RESPONSE_RECEIVED) || 
+				(ses->server->tcpStatus != CifsGood),
 				timeout);
 	if (signal_pending(current)) {
 		cFYI(1, ("CIFS: caught signal"));
@@ -254,8 +254,8 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 				if(ses->server->tcpStatus == CifsExiting)
 					rc = -EHOSTDOWN;
 				else {
-				ses->server->tcpStatus = CifsNeedReconnect;
-				midQ->midState = MID_RETRY_NEEDED;
+					ses->server->tcpStatus = CifsNeedReconnect;
+					midQ->midState = MID_RETRY_NEEDED;
 				}
 			}
 
