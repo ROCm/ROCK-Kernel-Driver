@@ -648,9 +648,9 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 
 	dbg ("udsl_atm_send called (skb 0x%p, len %u)", skb, skb->len);
 
-	if (!instance) {
-		dbg ("NULL instance!");
-		return -EINVAL;
+	if (!instance || !instance->usb_dev) {
+		dbg ("NULL data!");
+		return -ENODEV;
 	}
 
 	if (!instance->firmware_loaded)
@@ -701,6 +701,7 @@ static void udsl_atm_dev_close (struct atm_dev *dev)
 	tasklet_kill (&instance->send_tasklet);
 	dbg ("udsl_atm_dev_close: freeing instance");
 	kfree (instance);
+	dev->dev_data = NULL;
 }
 
 
@@ -776,8 +777,8 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 	dbg ("udsl_atm_open called");
 
-	if (!instance) {
-		dbg ("NULL instance!");
+	if (!instance || !instance->usb_dev) {
+		dbg ("NULL data!");
 		return -ENODEV;
 	}
 
