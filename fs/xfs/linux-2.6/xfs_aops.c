@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2005 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -156,9 +156,7 @@ linvfs_unwritten_convert_direct(
 {
 	ASSERT(!private || inode == (struct inode *)private);
 
-	/* private indicates an unwritten extent lay beneath this IO,
-	 * see linvfs_get_block_core.
-	 */
+	/* private indicates an unwritten extent lay beneath this IO */
 	if (private && size > 0) {
 		vnode_t	*vp = LINVFS_GET_VP(inode);
 		int	error;
@@ -728,11 +726,9 @@ xfs_page_state_convert(
 	pgoff_t                 end_index, last_index, tlast;
 	int			len, err, i, cnt = 0, uptodate = 1;
 	int			flags = startio ? 0 : BMAPI_TRYLOCK;
-	int			page_dirty = 1;
-	int                     delalloc = 0;
+	int			page_dirty, delalloc = 0;
 
-
-	/* Are we off the end of the file ? */
+	/* Is this page beyond the end of the file? */
 	offset = i_size_read(inode);
 	end_index = offset >> PAGE_CACHE_SHIFT;
 	last_index = (offset - 1) >> PAGE_CACHE_SHIFT;
@@ -751,7 +747,13 @@ xfs_page_state_convert(
 	bh = head = page_buffers(page);
 	iomp = NULL;
 
+	/*
+	 * page_dirty is initially a count of buffers on the page and
+	 * is decrememted as we move each into a cleanable state.
+	 */
 	len = bh->b_size;
+	page_dirty = PAGE_CACHE_SIZE / len;
+
 	do {
 		if (offset >= end_offset)
 			break;
@@ -794,7 +796,7 @@ xfs_page_state_convert(
 				}
 				BUG_ON(!buffer_locked(bh));
 				bh_arr[cnt++] = bh;
-				page_dirty = 0;
+				page_dirty--;
 			}
 		/*
 		 * Second case, allocate space for a delalloc buffer.
@@ -821,7 +823,7 @@ xfs_page_state_convert(
 					unlock_buffer(bh);
 					mark_buffer_dirty(bh);
 				}
-				page_dirty = 0;
+				page_dirty--;
 			}
 		} else if ((buffer_uptodate(bh) || PageUptodate(page)) &&
 			   (unmapped || startio)) {
@@ -857,13 +859,13 @@ xfs_page_state_convert(
 						unlock_buffer(bh);
 						mark_buffer_dirty(bh);
 					}
-					page_dirty = 0;
+					page_dirty--;
 				}
 			} else if (startio) {
 				if (buffer_uptodate(bh) &&
 				    !test_and_set_bit(BH_Lock, &bh->b_state)) {
 					bh_arr[cnt++] = bh;
-					page_dirty = 0;
+					page_dirty--;
 				}
 			}
 		}
@@ -907,7 +909,7 @@ error:
 }
 
 STATIC int
-linvfs_get_block_core(
+__linvfs_get_block(
 	struct inode		*inode,
 	sector_t		iblock,
 	unsigned long		blocks,
@@ -977,10 +979,10 @@ linvfs_get_block_core(
 	if (iomap.iomap_flags & IOMAP_DELAY) {
 		BUG_ON(direct);
 		if (create) {
-			set_buffer_mapped(bh_result);
 			set_buffer_uptodate(bh_result);
+			set_buffer_mapped(bh_result);
+			set_buffer_delay(bh_result);
 		}
-		set_buffer_delay(bh_result);
 	}
 
 	if (blocks) {
@@ -999,7 +1001,7 @@ linvfs_get_block(
 	struct buffer_head	*bh_result,
 	int			create)
 {
-	return linvfs_get_block_core(inode, iblock, 0, bh_result,
+	return __linvfs_get_block(inode, iblock, 0, bh_result,
 					create, 0, BMAPI_WRITE);
 }
 
@@ -1011,7 +1013,7 @@ linvfs_get_blocks_direct(
 	struct buffer_head	*bh_result,
 	int			create)
 {
-	return linvfs_get_block_core(inode, iblock, max_blocks, bh_result,
+	return __linvfs_get_block(inode, iblock, max_blocks, bh_result,
 					create, 1, BMAPI_WRITE|BMAPI_DIRECT);
 }
 
