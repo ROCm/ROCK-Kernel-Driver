@@ -1,6 +1,6 @@
 /*  Kernel module help for x86-64
     Copyright (C) 2001 Rusty Russell.
-    Copyright (C) 2002 Andi Kleen, SuSE Labs.
+    Copyright (C) 2002,2003 Andi Kleen, SuSE Labs.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,9 +22,115 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
+
+#include <asm/system.h>
+#include <asm/page.h>
+#include <asm/pgtable.h>
 
 #define DEBUGP(fmt...) 
  
+void module_free(struct module *mod, void *module_region)
+{
+	struct vm_struct **prevp, *map;
+	int i;
+	unsigned long addr = (unsigned long)module_region;
+
+	if (!addr)
+		return;
+	write_lock(&vmlist_lock); 
+	for (prevp = &vmlist ; (map = *prevp) ; prevp = &map->next) {
+		if ((unsigned long)map->addr == addr) {
+			*prevp = map->next;
+			write_unlock(&vmlist_lock); 
+			goto found;
+		}
+	}
+	write_unlock(&vmlist_lock); 
+	printk("Trying to unmap nonexistent module vm area (%lx)\n", addr);
+	return;
+ found:
+	unmap_vm_area(map);
+	if (map->pages) {
+		for (i = 0; i < map->nr_pages; i++)
+			if (map->pages[i])
+				__free_page(map->pages[i]);	
+		kfree(map->pages);
+	}
+	kfree(map);					
+}
+
+void *module_alloc(unsigned long size)
+{
+	struct vm_struct **p, *tmp, *area;
+	struct page **pages;
+	void *addr;
+	unsigned int nr_pages, array_size, i;
+
+	if (!size)
+		return NULL; 
+	size = PAGE_ALIGN(size);
+	if (size > MODULES_LEN)
+		return NULL;
+
+	area = (struct vm_struct *) kmalloc(sizeof(*area), GFP_KERNEL);
+	if (!area)
+		return NULL;
+	memset(area, 0, sizeof(struct vm_struct));
+
+	write_lock(&vmlist_lock);
+	addr = (void *) MODULES_VADDR;
+	for (p = &vmlist; (tmp = *p); p = &tmp->next) {
+		void *next; 
+		DEBUGP("vmlist %p %lu addr %p\n", tmp->addr, tmp->size, addr);
+		if (size + (unsigned long) addr + PAGE_SIZE < (unsigned long) tmp->addr)
+			break;
+		next = (void *) (tmp->size + (unsigned long) tmp->addr);
+		if (next > addr) 
+			addr = next;
+	}
+
+	if ((unsigned long)addr + size >= MODULES_END) {
+		write_unlock(&vmlist_lock);
+		kfree(area); 
+		return NULL;
+	}
+	DEBUGP("addr %p\n", addr);
+
+	area->next = *p;
+	*p = area;
+	area->size = size + PAGE_SIZE;
+	area->addr = addr;
+	write_unlock(&vmlist_lock);
+
+	nr_pages = size >> PAGE_SHIFT;
+	array_size = (nr_pages * sizeof(struct page *));
+
+	area->nr_pages = nr_pages;
+	area->pages = pages = kmalloc(array_size, GFP_KERNEL);
+	if (!area->pages) 
+		goto fail;
+
+	memset(area->pages, 0, array_size);
+	for (i = 0; i < nr_pages; i++) {
+		area->pages[i] = alloc_page(GFP_KERNEL);
+		if (area->pages[i] == NULL)
+			goto fail;
+	}
+	
+	if (map_vm_area(area, PAGE_KERNEL_EXECUTABLE, &pages))
+		goto fail;
+	
+	memset(addr, 0, size);
+	DEBUGP("module_alloc size %lu = %p\n", size, addr);
+	return addr;
+
+fail:
+	module_free(NULL, addr);
+	return NULL;
+}
+
 /* We don't need anything special. */
 int module_frob_arch_sections(Elf_Ehdr *hdr,
 			      Elf_Shdr *sechdrs,

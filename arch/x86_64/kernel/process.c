@@ -537,6 +537,11 @@ int sys_arch_prctl(int code, unsigned long addr)
 
 	switch (code) { 
 	case ARCH_SET_GS:
+#if 1
+		/* For now. We still have one unsolved bug in long gs base context
+		   switch handling. */
+		return -EINVAL; 
+#else
 		if (addr >= TASK_SIZE) 
 			return -EPERM; 
 		get_cpu();
@@ -546,6 +551,7 @@ int sys_arch_prctl(int code, unsigned long addr)
 		ret = checking_wrmsrl(MSR_KERNEL_GS_BASE, addr); 
 		put_cpu();
 		break;
+#endif
 	case ARCH_SET_FS:
 		/* Not strictly needed for fs, but do it for symmetry
 		   with gs */
@@ -594,15 +600,15 @@ static int get_free_idx(void)
  * Set a given TLS descriptor:
  * When you want addresses > 32bit use arch_prctl() 
  */
-asmlinkage int sys_set_thread_area(struct user_desc *u_info)
+int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info)
 {
-	struct thread_struct *t = &current->thread;
 	struct user_desc info;
 	struct n_desc_struct *desc;
 	int cpu, idx;
 
 	if (copy_from_user(&info, u_info, sizeof(info)))
 		return -EFAULT;
+
 	idx = info.entry_number;
 
 	/*
@@ -634,11 +640,18 @@ asmlinkage int sys_set_thread_area(struct user_desc *u_info)
 		desc->a = LDT_entry_a(&info);
 		desc->b = LDT_entry_b(&info);
 	}
+	if (t == &current->thread)
 	load_TLS(t, cpu);
 
 	put_cpu();
 	return 0;
 }
+
+asmlinkage int sys_set_thread_area(struct user_desc *u_info)
+{ 
+	return do_set_thread_area(&current->thread, u_info); 
+} 
+
 
 /*
  * Get the current Thread-Local Storage area:
@@ -661,7 +674,7 @@ asmlinkage int sys_set_thread_area(struct user_desc *u_info)
 #define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
 #define GET_LONGMODE(desc)	(((desc)->b >> 21) & 1)
 
-asmlinkage int sys_get_thread_area(struct user_desc *u_info)
+int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info)
 {
 	struct user_desc info;
 	struct n_desc_struct *desc;
@@ -672,7 +685,7 @@ asmlinkage int sys_get_thread_area(struct user_desc *u_info)
 	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
 		return -EINVAL;
 
-	desc = ((struct n_desc_struct *)current->thread.tls_array) + idx - GDT_ENTRY_TLS_MIN;
+	desc = ((struct n_desc_struct *)t->tls_array) + idx - GDT_ENTRY_TLS_MIN;
 
 	memset(&info, 0, sizeof(struct user_desc));
 	info.entry_number = idx;
@@ -690,6 +703,11 @@ asmlinkage int sys_get_thread_area(struct user_desc *u_info)
 		return -EFAULT;
 	return 0;
 }
+
+asmlinkage int sys_get_thread_area(struct user_desc *u_info)
+{
+	return do_get_thread_area(&current->thread, u_info);
+} 
 
 /* 
  * Capture the user space registers if the task is not running (in user space)

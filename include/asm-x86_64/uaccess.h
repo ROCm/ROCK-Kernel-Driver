@@ -299,8 +299,8 @@ static inline int __copy_to_user(void *dst, const void *src, unsigned size)
 
 long strncpy_from_user(char *dst, const char *src, long count);
 long __strncpy_from_user(char *dst, const char *src, long count);
-#define strlen_user(str) strnlen_user(str, ~0UL >> 1)
 long strnlen_user(const char *str, long n);
+long strlen_user(const char *str);
 unsigned long clear_user(void *mem, unsigned long len);
 unsigned long __clear_user(void *mem, unsigned long len);
 

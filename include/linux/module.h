@@ -437,7 +437,6 @@ static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
 #endif
 }
 #define EXPORT_NO_SYMBOLS
-#define MOD_IN_USE 0
 #define __MODULE_STRING(x) __stringify(x)
 
 /*

@@ -1181,6 +1181,8 @@ config EISA
 
 	  Otherwise, say N.
 
+source "drivers/eisa/Kconfig"
+
 config MCA
 	bool "MCA support"
 	depends on !(X86_VISWS || X86_VOYAGER)

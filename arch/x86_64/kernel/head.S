@@ -66,7 +66,7 @@ startup_32:
 	movl	%eax, %cr4
 
 	/* Setup early boot stage 4 level pagetables */
-	movl	$0x101000, %eax
+	movl	$(init_level4_pgt - __START_KERNEL_map), %eax
 	movl	%eax, %cr3
 
 	/* Setup EFER (Extended Feature Enable Register) */
@@ -89,20 +89,13 @@ startup_32:
 	wrmsr
 
 	xorl	%eax, %eax
-	/* Enable paging and in turn activate Long Mode */
-	btsl	$31, %eax
-	/* Enable protected mode */
-	btsl	$0, %eax
-	/* Enable MP */
-	btsl	$1, %eax
-	/* Enable ET */
-	btsl	$4, %eax
-	/* Enable NE */
-	btsl	$5, %eax
-	/* Enable WP */
-	btsl	$16, %eax
-	/* Enable AM */
-	btsl	$18, %eax
+	btsl	$31, %eax			/* Enable paging and in turn activate Long Mode */
+	btsl	$0, %eax			/* Enable protected mode */
+	btsl	$1, %eax			/* Enable MP */
+	btsl	$4, %eax			/* Enable ET */
+	btsl	$5, %eax			/* Enable NE */
+	btsl	$16, %eax			/* Enable WP */
+	btsl	$18, %eax			/* Enable AM */
 	/* Make changes effective */
 	movl	%eax, %cr0
 	jmp	reach_compatibility_mode
@@ -120,10 +113,10 @@ reach_compatibility_mode:
 	
 	/* Load new GDT with the 64bit segment using 32bit descriptor */
 	/* to avoid 32bit relocations we use fixed adresses here */
-	movl	$0x100F00, %eax
+	movl	$(pGDT32 - __START_KERNEL_map), %eax
 	lgdt	(%eax)
 
-	movl    $0x100F10, %eax
+	movl    $(ljumpvector - __START_KERNEL_map), %eax
 	/* Finally jump in 64bit mode */
 	ljmp	*(%eax)
 
@@ -205,11 +198,11 @@ ENTRY(no_long_mode)
 .org 0xf00
 pGDT32:
 	.word	gdt32_end-gdt_table32
-	.long	gdt_table32-__START_KERNEL+0x100000
+	.long	gdt_table32-__START_KERNEL_map
 
 .org 0xf10	
 ljumpvector:
-	.long	reach_long64-__START_KERNEL+0x100000
+	.long	reach_long64-__START_KERNEL_map
 	.word	__KERNEL_CS
 
 ENTRY(stext)

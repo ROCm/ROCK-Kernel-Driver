@@ -9,10 +9,12 @@
 #include <linux/config.h>
 #include <asm/pgalloc.h>
 
-/* Whee.  IRONGATE, POLARIS, TSUNAMI, TITAN, and WILDFIRE don't have an HAE.
+/* Whee.  These systems don't have an HAE:
+       IRONGATE, MARVEL, POLARIS, TSUNAMI, TITAN, WILDFIRE
    Fix things up for the GENERIC kernel by defining the HAE address
    to be that of the cache. Now we can read and write it as we like.  ;-)  */
 #define IRONGATE_HAE_ADDRESS	(&alpha_mv.hae_cache)
+#define MARVEL_HAE_ADDRESS	(&alpha_mv.hae_cache)
 #define POLARIS_HAE_ADDRESS	(&alpha_mv.hae_cache)
 #define TSUNAMI_HAE_ADDRESS	(&alpha_mv.hae_cache)
 #define TITAN_HAE_ADDRESS	(&alpha_mv.hae_cache)
@@ -31,7 +33,6 @@
 #define JENSEN_IACK_SC		1
 #define T2_IACK_SC		1
 #define WILDFIRE_IACK_SC	1 /* FIXME */
-
 
 /*
  * Some helpful macros for filling in the blanks.
@@ -57,6 +58,13 @@
 	mv_flush_tlb_current_page:	ev5_flush_tlb_current_page
 
 #define DO_EV6_MMU							\
+	max_asn:			EV6_MAX_ASN,			\
+	mv_switch_mm:			ev5_switch_mm,			\
+	mv_activate_mm:			ev5_activate_mm,		\
+	mv_flush_tlb_current:		ev5_flush_tlb_current,		\
+	mv_flush_tlb_current_page:	ev5_flush_tlb_current_page
+
+#define DO_EV7_MMU							\
 	max_asn:			EV6_MAX_ASN,			\
 	mv_switch_mm:			ev5_switch_mm,			\
 	mv_activate_mm:			ev5_activate_mm,		\
@@ -91,6 +99,7 @@
 #define DO_CIA_IO	IO(CIA,cia)
 #define DO_IRONGATE_IO	IO(IRONGATE,irongate)
 #define DO_LCA_IO	IO(LCA,lca)
+#define DO_MARVEL_IO	IO(MARVEL,marvel)
 #define DO_MCPCIA_IO	IO(MCPCIA,mcpcia)
 #define DO_POLARIS_IO	IO(POLARIS,polaris)
 #define DO_T2_IO	IO(T2,t2)
@@ -109,13 +118,13 @@
 #define DO_CIA_BUS	BUS(cia)
 #define DO_IRONGATE_BUS	BUS(irongate)
 #define DO_LCA_BUS	BUS(lca)
+#define DO_MARVEL_BUS	BUS(marvel)
 #define DO_MCPCIA_BUS	BUS(mcpcia)
 #define DO_POLARIS_BUS	BUS(polaris)
 #define DO_T2_BUS	BUS(t2)
 #define DO_TSUNAMI_BUS	BUS(tsunami)
 #define DO_TITAN_BUS	BUS(titan)
 #define DO_WILDFIRE_BUS	BUS(wildfire)
-
 
 /*
  * In a GENERIC kernel, we have lots of these vectors floating about,

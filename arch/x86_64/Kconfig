@@ -13,8 +13,8 @@ config X86_64
 	bool
 	default y
 	help
-	  Port to the x86-64 architecture. x86-64 is an 64bit extension to the
-	  classical 32bit x86 architecture. For details see http://www.x86-64.org
+	  Port to the x86-64 architecture. x86-64 is a 64-bit extension to the
+	  classical 32-bit x86 architecture. For details see http://www.x86-64.org
 
 config X86
 	bool
@@ -68,7 +68,7 @@ config EARLY_PRINTK
 	  for kernel debugging when your machine crashes very early before
 	  the console code is initialized. For normal operation it is not
 	  recommended because it looks ugly and doesn't cooperate with 
-	  klogd/syslogd or the X server.You should normally N here, unless
+	  klogd/syslogd or the X server. You should normally N here, unless
 	  you want to debug such a crash.
 	  
 
@@ -89,8 +89,8 @@ config MK8
 	bool "AMD-Hammer"
 	help
 	  Support for AMD Clawhammer/Sledgehammer CPUs. Only choice for x86-64
-	  currently so you should chose this if you want a x86-64 kernel. In fact
-	  you will have no other choice than to chose this.
+	  currently so you should choose this if you want a x86-64 kernel. In fact
+	  you will have no other choice than to choose this.
 
 config GENERIC_CPU
 	bool "Generic-x86-64"
@@ -165,7 +165,7 @@ config MTRR
 
 	  This code has a reasonably generic interface so that similar
 	  control registers on other processors can be easily supported
-	  as well:
+	  as well.
 
 	  Saying Y here also fixes a problem with buggy SMP BIOSes which only
 	  set the MTRRs for the boot CPU and not for the secondary CPUs. This
@@ -208,7 +208,7 @@ config SMP
 	  See also the <file:Documentation/smp.tex>,
 	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
 	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
 
@@ -252,7 +252,7 @@ config GART_IOMMU
 	bool "IOMMU support"
 	help
 	  Support the K8 IOMMU. Needed to run systems with more than 4GB of memory
-	  properly with 32bit devices. You should probably turn this on.
+	  properly with 32-bit devices. You should probably turn this on.
 	  The iommu can be turned off at runtime with the iommu=off parameter.
 
 config DUMMY_IOMMU
@@ -261,7 +261,7 @@ config DUMMY_IOMMU
 	default y
 	help
 	  Don't use IOMMU code. This will cause problems when you have more than 4GB 
-	  of memory and any 32bit devices. Don't turn on unless you know what you
+	  of memory and any 32-bit devices. Don't turn on unless you know what you
 	  are doing.
 
 config X86_MCE
@@ -287,7 +287,7 @@ config PM
 	  page on the WWW at
 	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
 	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
@@ -297,27 +297,27 @@ config SOFTWARE_SUSPEND
 	bool "Software Suspend (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && PM
 	---help---
-	  Enable the possibilty of suspendig machine. It doesn't need APM.
+	  Enable the possibilty of suspending the machine. It doesn't need APM.
 	  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
 	  (patch for sysvinit needed). 
 
-	  It creates an image which is saved in your active swaps. By the next
-	  booting the, pass 'resume=/path/to/your/swap/file' and kernel will 
-	  detect the saved image, restore the memory from
-	  it and then it continues to run as before you've suspended.
-	  If you don't want the previous state to continue use the 'noresume'
-	  kernel option. However note that your partitions will be fsck'd and
+	  It creates an image which is saved in your active swaps. On the next
+	  boot, pass the 'resume=/path/to/your/swap/file' option and the kernel
+	  will detect the saved image, restore the memory from
+	  it, and then continue to run as before you suspended.
+	  If you don't want the previous state to continue, use the 'noresume'
+	  kernel option. However, note that your partitions will be fsck'd and
 	  you must re-mkswap your swap partitions/files.
 
 	  Right now you may boot without resuming and then later resume but
-	  in meantime you cannot use those swap partitions/files which were
+	  in the meantime you cannot use those swap partitions/files which were
 	  involved in suspending. Also in this case there is a risk that buffers
 	  on disk won't match with saved ones.
 
-	  SMP is supported ``as-is''. There's a code for it but doesn't work.
-	  There have been problems reported relating SCSI.
+	  SMP is supported ``as-is''. There's code for it but doesn't work.
+	  There have been problems reported relating to SCSI.
 
-	  This option is about getting stable. However there is still some
+	  This option is close to getting stable. However there is still some
 	  absence of features.
 
 	  For more information take a look at Documentation/swsusp.txt.
@@ -338,7 +338,7 @@ config PCI
 	  VESA. If you have PCI, say Y, otherwise N.
 
 	  The PCI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
@@ -357,8 +357,8 @@ config HOTPLUG
 	  the system is running, and be able to use them quickly.  In many
 	  cases, the devices can likewise be unplugged at any time too.
 
-	  One well known example of this is PCMCIA- or PC-cards, credit-card
-	  size devices such as network cards, modems or hard drives which are
+	  One well-known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems, or hard drives which are
 	  plugged into slots found on all modern laptop computers.  Another
 	  example, used on modern desktops as well as laptops, is USB.
 
@@ -390,7 +390,7 @@ config KCORE_ELF
 
 	  You have two choices here: ELF and A.OUT. Selecting ELF will make
 	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linking Format specification. Selecting A.OUT will choose the
+	  and Linkable Format specification. Selecting A.OUT will choose the
 	  old "a.out" format which may be necessary for some old versions
 	  of binutils or on some architectures.
 
@@ -416,7 +416,7 @@ config BINFMT_ELF
 	  want to say Y here.
 
 	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you find that after upgrading from Linux kernel 1.2 and saying Y
 	  here, you still can't run any ELF binaries (they just crash), then
@@ -438,7 +438,7 @@ config BINFMT_MISC
 	  programs that need an interpreter to run like Java, Python or
 	  Emacs-Lisp. It's also useful if you often run DOS executables under
 	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  <http://www.tldp.org/docs.html#howto>). Once you have
 	  registered such a binary class with the kernel, you can start one of
 	  those programs simply by typing in its name at a shell prompt; Linux
 	  will automatically feed it to the correct interpreter.
@@ -458,8 +458,8 @@ config BINFMT_MISC
 config IA32_EMULATION
 	bool "IA32 Emulation"
 	help
-	  Include code to run 32bit programs under an 64bit kernel. You should likely
-	  turn this on, unless you're 100% sure that you don't have any 32bit programs
+	  Include code to run 32-bit programs under a 64-bit kernel. You should likely
+	  turn this on, unless you're 100% sure that you don't have any 32-bit programs
 	  left.
 
 config COMPAT
@@ -507,13 +507,13 @@ config IDE
 	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
 	  CD-ROM drives, similar in many respects to the SCSI protocol.
 
-	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  SMART IDE (Self-Monitoring, Analysis and Reporting Technology) was
 	  designed in order to prevent data corruption and disk crash by
-	  detecting pre hardware failure conditions (heat, access time, and
+	  detecting pre-hardware failure conditions (heat, access time, and
 	  the like...). Disks built since June 1995 may follow this standard.
-	  The kernel itself don't manage this; however there are quite a
+	  The kernel itself doesn't manage this; however there are quite a
 	  number of user programs such as smart that can query the status of
-	  SMART parameters disk.
+	  SMART parameters from disk drives.
 
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -563,7 +563,7 @@ source "drivers/message/fusion/Kconfig"
 
 source "drivers/ieee1394/Kconfig"
 
-#Currently not 64bit safe
+#Currently not 64-bit safe
 #source drivers/message/i2o/Config.in
 source "net/Kconfig"
 
@@ -600,11 +600,12 @@ config SOUND
 	  interrupt and DMA channel), because you will be asked for it.
 
 	  You want to read the Sound-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
 	  <file:Documentation/sound/Introduction>.  The file
-	  <file:Documentation/sound/README.OSS> contains some slightly
-	  outdated but still useful information as well.
+	  <file:Documentation/sound/oss/README.OSS> contains some slightly
+	  outdated but still useful information as well.  Newer sound
+	  driver documentation is found in <file:Documentation/sound/alsa/*>.
 
 	  If you have a PnP sound card and you want to configure it at boot
 	  time using the ISA PnP tools (read
@@ -613,7 +614,7 @@ config SOUND
 	  inserted in and removed from the running kernel whenever you want)
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/sound/README.modules>; the module will be
+	  as <file:Documentation/sound/oss/README.modules>; the module will be
 	  called soundcore.o.
 
 	  I'm told that even without a sound card, you can make your computer

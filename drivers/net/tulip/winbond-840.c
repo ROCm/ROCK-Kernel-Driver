@@ -1612,7 +1612,6 @@ static void __devexit w840_remove1 (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	if (dev) {
 		unregister_netdev(dev);
 		pci_release_regions(pdev);

@@ -53,11 +53,13 @@
 			- Additional ethtool features
 		v1.19a 28Oct2002 Davud Ruggiero <jdr@farfalle.com>
 			- Increase *read_eeprom udelay to workaround oops with 2 cards.
+		v1.19b 08Nov2002 Marc Zyngier <maz@wild-wind.fr.eu.org>
+		    - Introduce driver model for EISA cards.
 */
 
 #define DRV_NAME	"3c509"
-#define DRV_VERSION	"1.19a"
-#define DRV_RELDATE	"28Oct2002"
+#define DRV_VERSION	"1.19b"
+#define DRV_RELDATE	"08Nov2002"
 
 /* A few values that may be tweaked. */
 
@@ -84,6 +86,8 @@ static int max_interrupt_work = 10;
 #include <linux/delay.h>	/* for udelay() */
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
+#include <linux/device.h>
+#include <linux/eisa.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -170,6 +174,9 @@ struct el3_private {
 #ifdef __ISAPNP__
 	struct pnp_dev *pnpdev;
 #endif
+#ifdef CONFIG_EISA
+	struct eisa_device *edev;
+#endif
 };
 static int id_port __initdata = 0x110;	/* Start with 0x110 to avoid new sound cards.*/
 static struct net_device *el3_root_dev;
@@ -192,6 +199,26 @@ static void el3_up(struct net_device *dev);
 static int el3_suspend(struct pm_dev *pdev);
 static int el3_resume(struct pm_dev *pdev);
 static int el3_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data);
+#endif
+
+#ifdef CONFIG_EISA
+struct eisa_device_id el3_eisa_ids[] = {
+		{ "TCM5092" },
+		{ "TCM5093" },
+		{ "" }
+};
+
+static int el3_eisa_probe (struct device *device);
+static int el3_eisa_remove (struct device *device);
+
+struct eisa_driver el3_eisa_driver = {
+		.id_table = el3_eisa_ids,
+		.driver   = {
+				.name    = "3c509",
+				.probe   = el3_eisa_probe,
+				.remove  = __devexit_p (el3_eisa_remove)
+		}
+};
 #endif
 
 #ifdef CONFIG_MCA
@@ -240,8 +267,97 @@ static u16 el3_isapnp_phys_addr[8][3];
 #endif /* __ISAPNP__ */
 static int nopnp;
 
-int __init el3_probe(struct net_device *dev, int card_idx)
+/* With the driver model introduction for EISA devices, both init
+ * and cleanup have been split :
+ * - EISA devices probe/remove starts in el3_eisa_probe/el3_eisa_remove
+ * - MCA/ISA still use el3_probe
+ *
+ * Both call el3_common_init/el3_common_remove. */
+
+static int __init el3_common_init (struct net_device *dev)
 {
+	struct el3_private *lp = dev->priv;
+	short i;
+  
+#ifdef CONFIG_EISA
+	if (!lp->edev)				/* EISA devices are not chained */
+#endif
+	{
+			lp->next_dev = el3_root_dev;
+			el3_root_dev = dev;
+	}
+	spin_lock_init(&lp->lock);
+
+	if (dev->mem_start & 0x05) { /* xcvr codes 1/3/4/12 */
+		dev->if_port = (dev->mem_start & 0x0f);
+	} else { /* xcvr codes 0/8 */
+		/* use eeprom value, but save user's full-duplex selection */
+		dev->if_port |= (dev->mem_start & 0x08);
+	}
+
+	{
+		const char *if_names[] = {"10baseT", "AUI", "undefined", "BNC"};
+		printk("%s: 3c5x9 at %#3.3lx, %s port, address ",
+			dev->name, dev->base_addr, if_names[(dev->if_port & 0x03)]);
+	}
+
+	/* Read in the station address. */
+	for (i = 0; i < 6; i++)
+		printk(" %2.2x", dev->dev_addr[i]);
+	printk(", IRQ %d.\n", dev->irq);
+
+	if (el3_debug > 0)
+		printk(KERN_INFO "%s" KERN_INFO "%s", versionA, versionB);
+
+	/* The EL3-specific entries in the device structure. */
+	dev->open = &el3_open;
+	dev->hard_start_xmit = &el3_start_xmit;
+	dev->stop = &el3_close;
+	dev->get_stats = &el3_get_stats;
+	dev->set_multicast_list = &set_multicast_list;
+	dev->tx_timeout = el3_tx_timeout;
+	dev->watchdog_timeo = TX_TIMEOUT;
+	dev->do_ioctl = netdev_ioctl;
+
+#ifdef CONFIG_PM
+	/* register power management */
+	lp->pmdev = pm_register(PM_ISA_DEV, card_idx, el3_pm_callback);
+	if (lp->pmdev) {
+		struct pm_dev *p;
+		p = lp->pmdev;
+		p->data = (struct net_device *)dev;
+	}
+#endif
+
+	return 0;
+}
+
+static void el3_common_remove (struct net_device *dev)
+{
+		struct el3_private *lp = dev->priv;
+
+		(void) lp;				/* Keep gcc quiet... */
+#ifdef CONFIG_MCA		
+		if(lp->mca_slot!=-1)
+			mca_mark_as_unused(lp->mca_slot);
+#endif
+#ifdef CONFIG_PM
+		if (lp->pmdev)
+			pm_unregister(lp->pmdev);
+#endif
+#ifdef __ISAPNP__
+		if (lp->pnpdev)
+			pnp_device_detach(lp->pnpdev);
+#endif
+
+		unregister_netdev (dev);
+		release_region(dev->base_addr, EL3_IO_EXTENT);
+		kfree (dev);
+}
+
+static int __init el3_probe(int card_idx)
+{
+	struct net_device *dev;
 	struct el3_private *lp;
 	short lrs_state = 0xff, i;
 	int ioaddr, irq, if_port;
@@ -252,44 +368,6 @@ int __init el3_probe(struct net_device *dev, int card_idx)
 	static int pnp_cards;
 	struct pnp_dev *idev = NULL;
 #endif /* __ISAPNP__ */
-
-	if (dev) SET_MODULE_OWNER(dev);
-
-	/* First check all slots of the EISA bus.  The next slot address to
-	   probe is kept in 'eisa_addr' to support multiple probe() calls. */
-	if (EISA_bus) {
-		static int eisa_addr = 0x1000;
-		while (eisa_addr < 0x9000) {
-			int device_id;
-
-			ioaddr = eisa_addr;
-			eisa_addr += 0x1000;
-
-			/* Check the standard EISA ID register for an encoded '3Com'. */
-			if (inw(ioaddr + 0xC80) != 0x6d50)
-				continue;
-
-			/* Avoid conflict with 3c590, 3c592, 3c597, etc */
-			device_id = (inb(ioaddr + 0xC82)<<8) + inb(ioaddr + 0xC83);
-			if ((device_id & 0xFF00) == 0x5900) {
-				continue;
-			}
-
-			/* Change the register set to the configuration window 0. */
-			outw(SelectWindow | 0, ioaddr + 0xC80 + EL3_CMD);
-
-			irq = inw(ioaddr + WN0_IRQ) >> 12;
-			if_port = inw(ioaddr + 6)>>14;
-			for (i = 0; i < 3; i++)
-				phys_addr[i] = htons(read_eeprom(ioaddr, i));
-
-			/* Restore the "Product ID" to the EEPROM read register. */
-			read_eeprom(ioaddr, 3);
-
-			/* Was the EISA code an add-on hack?  Nahhhhh... */
-			goto found;
-		}
-	}
 
 #ifdef CONFIG_MCA
 	/* Based on Erik Nygren's (nygren@mit.edu) 3c529 patch, heavily
@@ -469,6 +547,8 @@ no_pnp:
 	}
 	irq = id_read_eeprom(9) >> 12;
 
+#if 0							/* Huh ?
+								   Can someone explain what is this for ? */
 	if (dev) {					/* Set passed-in IRQ or I/O Addr. */
 		if (dev->irq > 1  &&  dev->irq < 16)
 			irq = dev->irq;
@@ -481,6 +561,7 @@ no_pnp:
 				return -ENODEV;
 		}
 	}
+#endif
 
 	if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509"))
 		return -EBUSY;
@@ -500,79 +581,86 @@ no_pnp:
 	/* Free the interrupt so that some other card can use it. */
 	outw(0x0f00, ioaddr + WN0_IRQ);
  found:
+	dev = init_etherdev(NULL, sizeof(struct el3_private));
 	if (dev == NULL) {
-		dev = init_etherdev(dev, sizeof(struct el3_private));
-		if (dev == NULL) {
-			release_region(ioaddr, EL3_IO_EXTENT);
-			return -ENOMEM;
-		}
-		SET_MODULE_OWNER(dev);
+	    release_region(ioaddr, EL3_IO_EXTENT);
+		return -ENOMEM;
 	}
+	SET_MODULE_OWNER(dev);
+
 	memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
-
-	if (dev->mem_start & 0x05) { /* xcvr codes 1/3/4/12 */
-		dev->if_port = (dev->mem_start & 0x0f);
-	} else { /* xcvr codes 0/8 */
-		/* use eeprom value, but save user's full-duplex selection */
-		dev->if_port = (if_port | (dev->mem_start & 0x08) );
-	}
-
-	{
-		const char *if_names[] = {"10baseT", "AUI", "undefined", "BNC"};
-		printk("%s: 3c5x9 at %#3.3lx, %s port, address ",
-			dev->name, dev->base_addr, if_names[(dev->if_port & 0x03)]);
-	}
-
-	/* Read in the station address. */
-	for (i = 0; i < 6; i++)
-		printk(" %2.2x", dev->dev_addr[i]);
-	printk(", IRQ %d.\n", dev->irq);
-
-	/* Make up a EL3-specific-data structure. */
-	if (dev->priv == NULL)
-		dev->priv = kmalloc(sizeof(struct el3_private), GFP_KERNEL);
-	if (dev->priv == NULL)
-		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct el3_private));
-	
+	dev->if_port = if_port;
 	lp = dev->priv;
 #ifdef __ISAPNP__
 	lp->pnpdev = idev;
 #endif
 	lp->mca_slot = mca_slot;
-	lp->next_dev = el3_root_dev;
-	spin_lock_init(&lp->lock);
-	el3_root_dev = dev;
 
-	if (el3_debug > 0)
-		printk(KERN_INFO "%s" KERN_INFO "%s", versionA, versionB);
-
-	/* The EL3-specific entries in the device structure. */
-	dev->open = &el3_open;
-	dev->hard_start_xmit = &el3_start_xmit;
-	dev->stop = &el3_close;
-	dev->get_stats = &el3_get_stats;
-	dev->set_multicast_list = &set_multicast_list;
-	dev->tx_timeout = el3_tx_timeout;
-	dev->watchdog_timeo = TX_TIMEOUT;
-	dev->do_ioctl = netdev_ioctl;
-
-#ifdef CONFIG_PM
-	/* register power management */
-	lp->pmdev = pm_register(PM_ISA_DEV, card_idx, el3_pm_callback);
-	if (lp->pmdev) {
-		struct pm_dev *p;
-		p = lp->pmdev;
-		p->data = (struct net_device *)dev;
-	}
-#endif
-
-	/* Fill in the generic fields of the device structure. */
-	ether_setup(dev);
-	return 0;
+	return el3_common_init (dev);
 }
+
+#ifdef CONFIG_EISA
+static int __init el3_eisa_probe (struct device *device)
+{
+	struct el3_private *lp;
+	short i;
+	int ioaddr, irq, if_port;
+	u16 phys_addr[3];
+	struct net_device *dev = NULL;
+	struct eisa_device *edev;
+
+	/* Yeepee, The driver framework is calling us ! */
+	edev = to_eisa_device (device);
+	ioaddr = edev->base_addr;
+	
+	if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509"))
+		return -EBUSY;
+
+	/* Change the register set to the configuration window 0. */
+	outw(SelectWindow | 0, ioaddr + 0xC80 + EL3_CMD);
+
+	irq = inw(ioaddr + WN0_IRQ) >> 12;
+	if_port = inw(ioaddr + 6)>>14;
+	for (i = 0; i < 3; i++)
+			phys_addr[i] = htons(read_eeprom(ioaddr, i));
+
+	/* Restore the "Product ID" to the EEPROM read register. */
+	read_eeprom(ioaddr, 3);
+
+	dev = init_etherdev(NULL, sizeof(struct el3_private));
+	if (dev == NULL) {
+			release_region(ioaddr, EL3_IO_EXTENT);
+			return -ENOMEM;
+	}
+
+	SET_MODULE_OWNER(dev);
+
+	memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
+	dev->base_addr = ioaddr;
+	dev->irq = irq;
+	dev->if_port = if_port;
+	lp = dev->priv;
+	lp->mca_slot = -1;
+	lp->edev = edev;
+	eisa_set_drvdata (edev, dev);
+
+	return el3_common_init (dev);
+}
+
+static int __devexit el3_eisa_remove (struct device *device)
+{
+		struct eisa_device *edev;
+		struct net_device *dev;
+
+		edev = to_eisa_device (device);
+		dev  = eisa_get_drvdata (edev);
+
+		el3_common_remove (dev);
+		return 0;
+}
+#endif
 
 /* Read a word from the EEPROM using the regular EEPROM access register.
    Assume that we are in register window zero.
@@ -982,7 +1070,8 @@ static int
 el3_close(struct net_device *dev)
 {
 	int ioaddr = dev->base_addr;
-
+	struct el3_private *lp = (struct el3_private *)dev->priv;
+	
 	if (el3_debug > 2)
 		printk("%s: Shutting down ethercard.\n", dev->name);
 
@@ -991,8 +1080,12 @@ el3_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	/* Switching back to window 0 disables the IRQ. */
 	EL3WINDOW(0);
-	/* But we explicitly zero the IRQ line select anyway. */
-	outw(0x0f00, ioaddr + WN0_IRQ);
+	if (!lp->edev) {
+	    /* But we explicitly zero the IRQ line select anyway. Don't do
+	     * it on EISA cards, it prevents the module from getting an
+	     * IRQ after unload+reload... */
+	    outw(0x0f00, ioaddr + WN0_IRQ);
+	}
 
 	return 0;
 }
@@ -1414,7 +1507,6 @@ el3_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data)
 
 #endif /* CONFIG_PM */
 
-#ifdef MODULE
 /* Parameters that may be passed into the module. */
 static int debug = -1;
 static int irq[] = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -1436,8 +1528,7 @@ MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);
 MODULE_DESCRIPTION("3Com Etherlink III (3c509, 3c509B) ISA/PnP ethernet driver");
 MODULE_LICENSE("GPL");
 
-int
-init_module(void)
+static int __init el3_init_module(void)
 {
 	int el3_cards = 0;
 
@@ -1445,7 +1536,7 @@ init_module(void)
 		el3_debug = debug;
 
 	el3_root_dev = NULL;
-	while (el3_probe(0, el3_cards) == 0) {
+	while (el3_probe(el3_cards) == 0) {
 		if (irq[el3_cards] > 1)
 			el3_root_dev->irq = irq[el3_cards];
 		if (xcvr[el3_cards] >= 0)
@@ -1453,38 +1544,35 @@ init_module(void)
 		el3_cards++;
 	}
 
+#ifdef CONFIG_EISA
+	if (eisa_driver_register (&el3_eisa_driver) < 0) {
+			eisa_driver_unregister (&el3_eisa_driver);
+	}
+	else
+			el3_cards++;				/* Found an eisa card */
+#endif
 	return el3_cards ? 0 : -ENODEV;
 }
 
-void
-cleanup_module(void)
+static void __exit el3_cleanup_module(void)
 {
 	struct net_device *next_dev;
 
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	while (el3_root_dev) {
 		struct el3_private *lp = (struct el3_private *)el3_root_dev->priv;
-#ifdef CONFIG_MCA		
-		if(lp->mca_slot!=-1)
-			mca_mark_as_unused(lp->mca_slot);
-#endif
 
-#ifdef CONFIG_PM
-		if (lp->pmdev)
-			pm_unregister(lp->pmdev);
-#endif
 		next_dev = lp->next_dev;
-		unregister_netdev(el3_root_dev);
-		release_region(el3_root_dev->base_addr, EL3_IO_EXTENT);
-#ifdef __ISAPNP__
-		if (lp->pnpdev)
-			pnp_device_detach(lp->pnpdev);
-#endif
-		kfree(el3_root_dev);
+		el3_common_remove (el3_root_dev);
 		el3_root_dev = next_dev;
 	}
+
+#ifdef CONFIG_EISA
+	eisa_driver_unregister (&el3_eisa_driver);
+#endif
 }
-#endif /* MODULE */
+
+module_init (el3_init_module);
+module_exit (el3_cleanup_module);
 
 /*
  * Local variables:
