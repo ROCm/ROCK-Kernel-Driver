@@ -21,6 +21,7 @@ struct rwsem_waiter;
 extern struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_wake(struct rw_semaphore *);
+extern struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem);
 
 /*
  * the semaphore definition
@@ -83,8 +84,24 @@ static inline void __down_read(struct rw_semaphore *sem)
 	:"=&r" (oldcount), "=m" (sem->count), "=&r" (temp)
 	:"Ir" (RWSEM_ACTIVE_READ_BIAS), "m" (sem->count) : "memory");
 #endif
-	if (__builtin_expect(oldcount < 0, 0))
+	if (unlikely(oldcount < 0))
 		rwsem_down_read_failed(sem);
+}
+
+/*
+ * trylock for reading -- returns 1 if successful, 0 if contention
+ */
+static inline int __down_read_trylock(struct rw_semaphore *sem)
+{
+	long res, tmp;
+
+	res = sem->count;
+	do {
+		tmp = res + RWSEM_ACTIVE_READ_BIAS;
+		if (tmp <= 0)
+			break;
+	} while (cmpxchg(&sem->count, res, tmp) != res);
+	return res >= 0 ? 1 : 0;
 }
 
 static inline void __down_write(struct rw_semaphore *sem)
@@ -107,8 +124,20 @@ static inline void __down_write(struct rw_semaphore *sem)
 	:"=&r" (oldcount), "=m" (sem->count), "=&r" (temp)
 	:"Ir" (RWSEM_ACTIVE_WRITE_BIAS), "m" (sem->count) : "memory");
 #endif
-	if (__builtin_expect(oldcount, 0))
+	if (unlikely(oldcount))
 		rwsem_down_write_failed(sem);
+}
+
+/*
+ * trylock for writing -- returns 1 if successful, 0 if contention
+ */
+static inline int __down_write_trylock(struct rw_semaphore *sem)
+{
+	long ret = cmpxchg(&sem->count, RWSEM_UNLOCKED_VALUE,
+			   RWSEM_ACTIVE_WRITE_BIAS);
+	if (ret == RWSEM_UNLOCKED_VALUE)
+		return 1;
+	return 0;
 }
 
 static inline void __up_read(struct rw_semaphore *sem)
@@ -131,7 +160,7 @@ static inline void __up_read(struct rw_semaphore *sem)
 	:"=&r" (oldcount), "=m" (sem->count), "=&r" (temp)
 	:"Ir" (RWSEM_ACTIVE_READ_BIAS), "m" (sem->count) : "memory");
 #endif
-	if (__builtin_expect(oldcount < 0, 0)) 
+	if (unlikely(oldcount < 0))
 		if ((int)oldcount - RWSEM_ACTIVE_READ_BIAS == 0)
 			rwsem_wake(sem);
 }
@@ -157,9 +186,36 @@ static inline void __up_write(struct rw_semaphore *sem)
 	:"=&r" (count), "=m" (sem->count), "=&r" (temp)
 	:"Ir" (RWSEM_ACTIVE_WRITE_BIAS), "m" (sem->count) : "memory");
 #endif
-	if (__builtin_expect(count, 0))
+	if (unlikely(count))
 		if ((int)count == 0)
 			rwsem_wake(sem);
+}
+
+/*
+ * downgrade write lock to read lock
+ */
+static inline void __downgrade_write(struct rw_semaphore *sem)
+{
+	long oldcount;
+#ifndef	CONFIG_SMP
+	oldcount = sem->count;
+	sem->count -= RWSEM_WAITING_BIAS;
+#else
+	long temp;
+	__asm__ __volatile__(
+	"1:	ldq_l	%0,%1\n"
+	"	addq	%0,%3,%2\n"
+	"	stq_c	%2,%1\n"
+	"	beq	%2,2f\n"
+	"	mb\n"
+	".subsection 2\n"
+	"2:	br	1b\n"
+	".previous"
+	:"=&r" (oldcount), "=m" (sem->count), "=&r" (temp)
+	:"Ir" (-RWSEM_WAITING_BIAS), "m" (sem->count) : "memory");
+#endif
+	if (unlikely(oldcount < 0))
+		rwsem_downgrade_wake(sem);
 }
 
 static inline void rwsem_atomic_add(long val, struct rw_semaphore *sem)
