@@ -29,21 +29,35 @@ subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 # Add subdir path
 
 subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
-__clean-files	:= $(wildcard $(addprefix $(obj)/, \
-		   $(extra-y) $(EXTRA_TARGETS) $(always) $(host-progs) \
-		   $(targets) $(clean-files)))
+__clean-files	:= $(extra-y) $(EXTRA_TARGETS) $(always) $(host-progs) \
+		   $(targets) $(clean-files)
+__clean-files   := $(wildcard                                               \
+                   $(addprefix $(obj)/, $(filter-out /%, $(__clean-files))) \
+		   $(filter /%, $(__clean-files)))
+__clean-dirs    := $(wildcard                                               \
+                   $(addprefix $(obj)/, $(filter-out /%, $(clean-dirs)))    \
+		   $(filter /%, $(clean-dirs)))
 
 # ==========================================================================
 
-quiet_cmd_clean = CLEAN   $(obj)
-      cmd_clean = rm -f $(__clean-files); $(clean-rule)
+quiet_cmd_clean    = CLEAN   $(obj)
+      cmd_clean    = rm -f $(__clean-files)
+quiet_cmd_cleandir = CLEAN   $(__clean-dirs)
+      cmd_cleandir = rm -rf $(__clean-dirs)
+
 
 __clean: $(subdir-ymn)
-ifneq ($(strip $(__clean-files) $(clean-rule)),)
+ifneq ($(strip $(__clean-files)),)
 	+$(call cmd,clean)
-else
-	@:
 endif
+ifneq ($(strip $(__clean-dirs)),)
+	+$(call cmd,cleandir)
+endif
+ifneq ($(strip $(clean-rule)),)
+	+$(clean-rule)
+endif
+	@:
+
 
 # ===========================================================================
 # Generic stuff
