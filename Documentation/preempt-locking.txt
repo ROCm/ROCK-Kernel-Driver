@@ -1,7 +1,7 @@
 		  Proper Locking Under a Preemptible Kernel:
 		       Keeping Kernel Code Preempt-Safe
-			  Robert Love <rml@tech9.net>
-			   Last Updated: 22 Jan 2002
+			 Robert Love <rml@tech9.net>
+			  Last Updated: 28 Aug 2002
 
 
 INTRODUCTION
@@ -112,3 +112,24 @@ critical variables.  Another example:
 
 This code is not preempt-safe, but see how easily we can fix it by simply
 moving the spin_lock up two lines.
+
+
+PREVENTING PREEMPTION USING INTERRUPT DISABLING
+
+
+It is possible to prevent a preemption event using local_irq_disable and
+local_irq_save.  Note, when doing so, you must be very careful to not cause
+an event that would set need_resched and result in a preemption check.  When
+in doubt, rely on locking or explicit preemption disabling.
+
+Note in 2.5 interrupt disabling is now only per-CPU (e.g. local).
+
+An additional concern is proper usage of local_irq_disable and local_irq_save.
+These may be used to protect from preemption, however, on exit, if preemption
+may be enabled, a test to see if preemption is required should be done.  If
+these are called from the spin_lock and read/write lock macros, the right thing
+is done.  They may also be called within a spin-lock protected region, however,
+if they are ever called outside of this context, a test for preemption should
+be made. Do note that calls from interrupt context or bottom half/ tasklets
+are also protected by preemption locks and so may use the versions which do
+not check preemption.

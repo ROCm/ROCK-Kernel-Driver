@@ -20,6 +20,7 @@
 
 #define FPU_SAVE							\
   do {									\
+	preempt_disable();						\
 	if (!test_thread_flag(TIF_USEDFPU))				\
 		__asm__ __volatile__ (" clts;\n");			\
 	__asm__ __volatile__ ("fsave %0; fwait": "=m"(fpu_save[0]));	\
@@ -30,6 +31,7 @@
 	__asm__ __volatile__ ("frstor %0": : "m"(fpu_save[0]));		\
 	if (!test_thread_flag(TIF_USEDFPU))				\
 		stts();							\
+	preempt_enable();						\
   } while (0)
 
 #define LD(x,y)		"       movq   8*("#x")(%1), %%mm"#y"   ;\n"
@@ -542,7 +544,8 @@ static struct xor_block_template xor_block_p5_mmx = {
  * Copyright (C) 1999 Zach Brown (with obvious credit due Ingo)
  */
 
-#define XMMS_SAVE				\
+#define XMMS_SAVE do {				\
+	preempt_disable();			\
 	__asm__ __volatile__ ( 			\
 		"movl %%cr0,%0		;\n\t"	\
 		"clts			;\n\t"	\
@@ -552,9 +555,10 @@ static struct xor_block_template xor_block_p5_mmx = {
 		"movups %%xmm3,0x30(%1)	;\n\t"	\
 		: "=&r" (cr0)			\
 		: "r" (xmm_save) 		\
-		: "memory")
+		: "memory");			\
+} while(0)
 
-#define XMMS_RESTORE				\
+#define XMMS_RESTORE do {			\
 	__asm__ __volatile__ ( 			\
 		"sfence			;\n\t"	\
 		"movups (%1),%%xmm0	;\n\t"	\
@@ -564,7 +568,9 @@ static struct xor_block_template xor_block_p5_mmx = {
 		"movl 	%0,%%cr0	;\n\t"	\
 		:				\
 		: "r" (cr0), "r" (xmm_save)	\
-		: "memory")
+		: "memory");			\
+	preempt_enable();			\
+} while(0)
 
 #define ALIGN16 __attribute__((aligned(16)))
 
