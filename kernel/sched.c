@@ -594,28 +594,21 @@ void wait_task_inactive(task_t * p)
 {
 	unsigned long flags;
 	runqueue_t *rq;
+	int preempted;
 
 repeat:
-	preempt_disable();
-	rq = task_rq(p);
-	if (unlikely(task_running(rq, p))) {
-		cpu_relax();
-		/*
-		 * enable/disable preemption just to make this
-		 * a preemption point - we are busy-waiting
-		 * anyway.
-		 */
-		preempt_enable();
-		goto repeat;
-	}
 	rq = task_rq_lock(p, &flags);
-	if (unlikely(task_running(rq, p))) {
+	/* Must be off runqueue entirely, not preempted. */
+	if (unlikely(p->array)) {
+		/* If it's preempted, we yield.  It could be a while. */
+		preempted = !task_running(rq, p);
 		task_rq_unlock(rq, &flags);
-		preempt_enable();
+		cpu_relax();
+		if (preempted)
+			yield();
 		goto repeat;
 	}
 	task_rq_unlock(rq, &flags);
-	preempt_enable();
 }
 
 /***
