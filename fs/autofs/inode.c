@@ -111,8 +111,7 @@ static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid, pid
 	return (*pipefd < 0);
 }
 
-struct super_block *autofs_read_super(struct super_block *s, void *data,
-				      int silent)
+int autofs_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 	struct dentry * root;
@@ -175,7 +174,7 @@ struct super_block *autofs_read_super(struct super_block *s, void *data,
 	 * Success! Install the root dentry now to indicate completion.
 	 */
 	s->s_root = root;
-	return s;
+	return 0;
 
 fail_fput:
 	printk("autofs: pipe file descriptor does not contain proper ops\n");
@@ -189,7 +188,7 @@ fail_iput:
 fail_free:
 	kfree(sbi);
 fail_unlock:
-	return NULL;
+	return -EINVAL;
 }
 
 static int autofs_statfs(struct super_block *sb, struct statfs *buf)

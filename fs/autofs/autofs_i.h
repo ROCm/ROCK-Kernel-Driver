@@ -145,7 +145,7 @@ extern struct file_operations autofs_dir_operations;
 
 /* Initializing function */
 
-struct super_block *autofs_read_super(struct super_block *, void *,int);
+int autofs_fill_super(struct super_block *, void *, int);
 
 /* Queue management functions */
 
