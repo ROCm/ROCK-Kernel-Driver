@@ -391,12 +391,17 @@ struct xfrm_algo_encr_info {
 	u16 defkeybits;
 };
 
+struct xfrm_algo_comp_info {
+	u16 threshold;
+};
+
 struct xfrm_algo_desc {
 	char *name;
 	u8 available:1;
 	union {
 		struct xfrm_algo_auth_info auth;
 		struct xfrm_algo_encr_info encr;
+		struct xfrm_algo_comp_info comp;
 	} uinfo;
 	struct sadb_alg desc;
 };
@@ -453,10 +458,13 @@ extern int xfrm_count_auth_supported(void);
 extern int xfrm_count_enc_supported(void);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx);
+extern struct xfrm_algo_desc *xfrm_calg_get_byidx(unsigned int idx);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
+extern struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name);
+extern struct xfrm_algo_desc *xfrm_calg_get_byname(char *name);
 
 static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
 {

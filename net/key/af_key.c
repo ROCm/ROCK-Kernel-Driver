@@ -667,10 +667,17 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		sa->sadb_sa_auth = a ? a->desc.sadb_alg_id : 0;
 	}
 	sa->sadb_sa_encrypt = 0;
+	BUG_ON(x->ealg && x->calg);
 	if (x->ealg) {
 		struct xfrm_algo_desc *a = xfrm_ealg_get_byname(x->ealg->alg_name);
 		sa->sadb_sa_encrypt = a ? a->desc.sadb_alg_id : 0;
 	}
+	/* KAME compatible: sadb_sa_encrypt is overloaded with calg id */
+	if (x->calg) {
+		struct xfrm_algo_desc *a = xfrm_calg_get_byname(x->calg->alg_name);
+		sa->sadb_sa_encrypt = a ? a->desc.sadb_alg_id : 0;
+	}
+
 	sa->sadb_sa_flags = 0;
 
 	/* hard time */
@@ -896,6 +903,8 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	   Hence, we have to _ignore_ sadb_sa_state, which is also reasonable.
 	 */
 	if (sa->sadb_sa_auth > SADB_AALG_MAX ||
+	    (hdr->sadb_msg_satype == SADB_X_SATYPE_IPCOMP &&
+	     sa->sadb_sa_encrypt > SADB_X_CALG_MAX) ||
 	    sa->sadb_sa_encrypt > SADB_EALG_MAX)
 		return ERR_PTR(-EINVAL);
 	key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_AUTH-1];
@@ -953,24 +962,35 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		x->props.aalgo = sa->sadb_sa_auth;
 		/* x->algo.flags = sa->sadb_sa_flags; */
 	}
-	key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_ENCRYPT-1];
 	if (sa->sadb_sa_encrypt) {
-		int keysize = 0;
-		struct xfrm_algo_desc *a = xfrm_ealg_get_byid(sa->sadb_sa_encrypt);
-		if (!a)
-			goto out;
-		if (key)
-			keysize = (key->sadb_key_bits + 7) / 8;
-		x->ealg = kmalloc(sizeof(*x->ealg) + keysize, GFP_KERNEL);
-		if (!x->ealg)
-			goto out;
-		strcpy(x->ealg->alg_name, a->name);
-		x->ealg->alg_key_len = 0;
-		if (key) {
-			x->ealg->alg_key_len = key->sadb_key_bits;
-			memcpy(x->ealg->alg_key, key+1, keysize);
+		if (hdr->sadb_msg_satype == SADB_X_SATYPE_IPCOMP) {
+			struct xfrm_algo_desc *a = xfrm_calg_get_byid(sa->sadb_sa_encrypt);
+			if (!a)
+				goto out;
+			x->calg = kmalloc(sizeof(*x->calg), GFP_KERNEL);
+			if (!x->calg)
+				goto out;
+			strcpy(x->calg->alg_name, a->name);
+			x->props.calgo = sa->sadb_sa_encrypt;
+		} else {
+			int keysize = 0;
+			struct xfrm_algo_desc *a = xfrm_ealg_get_byid(sa->sadb_sa_encrypt);
+			if (!a)
+				goto out;
+			key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_ENCRYPT-1];
+			if (key)
+				keysize = (key->sadb_key_bits + 7) / 8;
+			x->ealg = kmalloc(sizeof(*x->ealg) + keysize, GFP_KERNEL);
+			if (!x->ealg)
+				goto out;
+			strcpy(x->ealg->alg_name, a->name);
+			x->ealg->alg_key_len = 0;
+			if (key) {
+				x->ealg->alg_key_len = key->sadb_key_bits;
+				memcpy(x->ealg->alg_key, key+1, keysize);
+			}
+			x->props.ealgo = sa->sadb_sa_encrypt;
 		}
-		x->props.ealgo = sa->sadb_sa_encrypt;
 	}
 	/* x->algo.flags = sa->sadb_sa_flags; */
 
@@ -1024,6 +1044,8 @@ out:
 		kfree(x->aalg);
 	if (x->ealg)
 		kfree(x->ealg);
+	if (x->calg)
+		kfree(x->calg);
 	kfree(x);
 	return ERR_PTR(-ENOBUFS);
 }
