@@ -417,13 +417,12 @@ extern void ata_bmdma_irq_clear(struct ata_port *ap);
 extern int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits);
 extern void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat);
 extern void ata_eng_timeout(struct ata_port *ap);
+extern void ata_scsi_simulate(u16 *id, struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *));
 extern int ata_std_bios_param(struct scsi_device *sdev,
 			      struct block_device *bdev,
 			      sector_t capacity, int geom[]);
 extern int ata_scsi_slave_config(struct scsi_device *sdev);
-extern void ata_scsi_simulate(u16 *id,
-			      struct scsi_cmnd *cmd,
-			      void (*done)(struct scsi_cmnd *));
 
 static inline unsigned int ata_tag_valid(unsigned int tag)
 {
