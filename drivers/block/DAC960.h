@@ -2229,7 +2229,7 @@ typedef wait_queue_head_t WaitQueue_T;
 struct DAC960_privdata {
 	DAC960_HardwareType_T	HardwareType;
 	DAC960_FirmwareType_T	FirmwareType;
-	void (*InterruptHandler)(int, void *, Registers_T *);
+	irqreturn_t (*InterruptHandler)(int, void *, Registers_T *);
 	unsigned int		MemoryWindowSize;
 };
 
@@ -4233,12 +4233,12 @@ static void DAC960_FinalizeController(DAC960_Controller_T *);
 static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *);
 static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *); 
 static void DAC960_RequestFunction(RequestQueue_T *);
-static void DAC960_BA_InterruptHandler(int, void *, Registers_T *);
-static void DAC960_LP_InterruptHandler(int, void *, Registers_T *);
-static void DAC960_LA_InterruptHandler(int, void *, Registers_T *);
-static void DAC960_PG_InterruptHandler(int, void *, Registers_T *);
-static void DAC960_PD_InterruptHandler(int, void *, Registers_T *);
-static void DAC960_P_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t DAC960_BA_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t DAC960_LP_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t DAC960_LA_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t DAC960_PG_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t DAC960_PD_InterruptHandler(int, void *, Registers_T *);
+static irqreturn_t DAC960_P_InterruptHandler(int, void *, Registers_T *);
 static void DAC960_V1_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_V2_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_MonitoringTimerFunction(unsigned long);

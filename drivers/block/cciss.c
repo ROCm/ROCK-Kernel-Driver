@@ -1965,7 +1965,7 @@ startio:
 	start_io(h);
 }
 
-static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ctlr_info_t *h = dev_id;
 	CommandList_struct *c;
@@ -1975,7 +1975,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Is this interrupt for us? */
 	if ( h->access.intr_pending(h) == 0)
-		return;
+		return IRQ_NONE;
 
 	/*
 	 * If there are completed commands in the completion queue,
@@ -2023,6 +2023,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 	blk_start_queue(&h->queue);
+	return IRQ_HANDLED;
 }
 /* 
  *  We cannot read the structure directly, for portablity we must use 
