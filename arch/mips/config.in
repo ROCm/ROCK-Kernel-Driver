@@ -50,7 +50,7 @@ bool 'Support for ITE 8172G board' CONFIG_MIPS_ITE8172
        if [ "$CONFIG_QTRONIX_KEYBOARD" = "y" ]; then
 	   define_bool CONFIG_IT8172_CIR y
        else
-           bool '    Enable PS2 Keyboard Support ' CONFIG_PC_KEYB
+           bool '    Enable PS2 Keyboard Support' CONFIG_PC_KEYB
        fi
        bool '    Enable Smart Card Reader 0 Support ' CONFIG_IT8172_SCR0
        bool '    Enable Smart Card Reader 1 Support ' CONFIG_IT8172_SCR1
