@@ -11,6 +11,7 @@
 #include <asm/current.h>
 #include <linux/sched.h>		/* remove ASAP */
 #include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/file.h>
 #include <linux/writeback.h>
 #include <linux/pagemap.h>

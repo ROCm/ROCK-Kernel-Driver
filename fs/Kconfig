@@ -1037,15 +1037,12 @@ config SYSV_FS
 	  If you haven't heard about all of this before, it's safe to say N.
 
 config UDF_FS
-	tristate "UDF file system support (read only)"
+	tristate "UDF file system support"
 	---help---
 	  This is the new file system used on some CD-ROMs and DVDs. Say Y if
 	  you intend to mount DVD discs or CDRW's written in packet mode, or
-	  if written to by other UDF utilities, such as DirectCD. This UDF
-	  file system support is read-only. If you want to write to UDF
-	  file systems on some media, you need to say Y to "UDF read-write
-	  support" below in addition. Please read
-	  <file:Documentation/filesystems/udf.txt>.
+	  if written to by other UDF utilities, such as DirectCD.
+	  Please read <file:Documentation/filesystems/udf.txt>.
 
 	  This file system support is also available as a module ( = code
 	  which can be inserted in and removed from the running kernel
@@ -1054,14 +1051,6 @@ config UDF_FS
 	  <file:Documentation/modules.txt>.
 
 	  If unsure, say N.
-
-config UDF_RW
-	bool "UDF write support (DANGEROUS)"
-	depends on UDF_FS && EXPERIMENTAL
-	help
-	  Say Y if you want to test write support for UDF file systems.
-	  Due to lack of support for writing to CDR/CDRW's, this option
-	  is only supported for hard discs, DVD-RAM, and loopback files.
 
 config UFS_FS
 	tristate "UFS file system support (read only)"

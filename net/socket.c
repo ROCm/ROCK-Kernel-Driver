@@ -77,6 +77,7 @@
 #include <linux/highmem.h>
 #include <linux/wireless.h>
 #include <linux/divert.h>
+#include <linux/mount.h>
 
 #if defined(CONFIG_KMOD) && defined(CONFIG_NET)
 #include <linux/kmod.h>

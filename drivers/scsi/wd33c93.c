@@ -1853,7 +1853,6 @@ char buf[32];
    printk("\n");
    printk("           Version %s - %s, Compiled %s at %s\n",
                WD33C93_VERSION,WD33C93_DATE,__DATE__,__TIME__);
-   MOD_INC_USE_COUNT;
 }
 
 
@@ -2031,7 +2030,6 @@ void cleanup_module(void) {}
 #endif
 void wd33c93_release(void)
 {
-   MOD_DEC_USE_COUNT;
 }
 
 MODULE_LICENSE("GPL");

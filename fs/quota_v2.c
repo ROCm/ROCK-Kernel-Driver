@@ -4,6 +4,7 @@
 
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/dqblk_v2.h>
 #include <linux/quotaio_v2.h>
 #include <linux/kernel.h>

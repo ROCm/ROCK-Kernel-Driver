@@ -28,6 +28,7 @@
 #define PMAP_UNSET		2
 #define PMAP_GETPORT		3
 
+static struct rpc_procinfo	pmap_procedures[];
 static struct rpc_clnt *	pmap_create(char *, struct sockaddr_in *, int);
 static void			pmap_getport_done(struct rpc_task *);
 extern struct rpc_program	pmap_program;
@@ -43,7 +44,7 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 	struct rpc_portmap *map = &clnt->cl_pmap;
 	struct sockaddr_in *sap = &clnt->cl_xprt->addr;
 	struct rpc_message msg = {
-		.rpc_proc	= PMAP_GETPORT,
+		.rpc_proc	= &pmap_procedures[PMAP_GETPORT],
 		.rpc_argp	= map,
 		.rpc_resp	= &clnt->cl_port,
 		.rpc_cred	= NULL
@@ -219,12 +220,6 @@ pmap_create(char *hostname, struct sockaddr_in *srvaddr, int proto)
  * XDR encode/decode functions for PMAP
  */
 static int
-xdr_error(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return -EIO;
-}
-
-static int
 xdr_encode_mapping(struct rpc_rqst *req, u32 *p, struct rpc_portmap *map)
 {
 	dprintk("RPC: xdr_encode_mapping(%d, %d, %d, %d)\n",
@@ -252,26 +247,23 @@ xdr_decode_bool(struct rpc_rqst *req, u32 *p, unsigned int *boolp)
 	return 0;
 }
 
-static struct rpc_procinfo	pmap_procedures[4] = {
-	{ .p_procname		= "pmap_null",
-	  .p_encode		= (kxdrproc_t) xdr_error,	
-	  .p_decode		= (kxdrproc_t) xdr_error,
-	  .p_bufsiz		= 0,
-	  .p_count		= 0,
-	},
-	{ .p_procname		= "pmap_set",
+static struct rpc_procinfo	pmap_procedures[] = {
+[PMAP_SET] = {
+	  .p_proc		= PMAP_SET,
 	  .p_encode		= (kxdrproc_t) xdr_encode_mapping,	
 	  .p_decode		= (kxdrproc_t) xdr_decode_bool,
 	  .p_bufsiz		= 4,
 	  .p_count		= 1,
 	},
-	{ .p_procname		= "pmap_unset",
+[PMAP_UNSET] = {
+	  .p_proc		= PMAP_UNSET,
 	  .p_encode		= (kxdrproc_t) xdr_encode_mapping,	
 	  .p_decode		= (kxdrproc_t) xdr_decode_bool,
 	  .p_bufsiz		= 4,
 	  .p_count		= 1,
 	},
-	{ .p_procname		= "pmap_get",
+[PMAP_GETPORT] = {
+	  .p_proc		= PMAP_GETPORT,
 	  .p_encode		= (kxdrproc_t) xdr_encode_mapping,
 	  .p_decode		= (kxdrproc_t) xdr_decode_port,
 	  .p_bufsiz		= 4,

@@ -56,7 +56,7 @@ void __devinit pci_name_device(struct pci_dev *dev)
 {
 	const struct pci_vendor_info *vendor_p = pci_vendor_list;
 	int i = VENDORS;
-	char *name = dev->name;
+	char *name = dev->dev.name;
 
 	do {
 		if (vendor_p->vendor == dev->vendor)
@@ -80,12 +80,15 @@ void __devinit pci_name_device(struct pci_dev *dev)
 		}
 
 		/* Ok, found the vendor, but unknown device */
-		sprintf(name, "PCI device %04x:%04x (%s)", dev->vendor, dev->device, vendor_p->name);
+		sprintf(name, "PCI device %04x:%04x (%." DEVICE_NAME_HALF "s)",
+				dev->vendor, dev->device, vendor_p->name);
 		return;
 
 		/* Full match */
 		match_device: {
-			char *n = name + sprintf(name, "%s %s", vendor_p->name, device_p->name);
+			char *n = name + sprintf(name, "%." DEVICE_NAME_HALF
+					"s %." DEVICE_NAME_HALF "s",
+					vendor_p->name, device_p->name);
 			int nr = device_p->seen + 1;
 			device_p->seen = nr;
 			if (nr > 1)

@@ -12,6 +12,7 @@
  * ------------------------------------------------------------------------- */
 
 #include "autofs_i.h"
+#include <linux/mount.h>
 
 /*
  * Determine if a subtree of the namespace is busy.

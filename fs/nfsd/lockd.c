@@ -9,6 +9,8 @@
  */
 
 #include <linux/types.h>
+#include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>

@@ -532,7 +532,7 @@ extern void scan_scsis(struct Scsi_Host *, uint, uint, uint, uint);
 
 struct Scsi_Device_Template
 {
-    struct Scsi_Device_Template * next;
+    struct list_head list;
     const char * name;
     const char * tag;
     struct module * module;	  /* Used for loadable modules */

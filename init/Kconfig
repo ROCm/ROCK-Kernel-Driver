@@ -125,6 +125,16 @@ config MODULE_UNLOAD
 	  anyway), which makes your kernel slightly smaller and
 	  simpler.  If unsure, say Y.
 
+config MODULE_FORCE_UNLOAD
+	bool "Forced module unloading"
+	depends on MODULES && EXPERIMENTAL
+	help
+	  This option allows you to force a module to unload, even if the
+	  kernel believes it is unsafe: the kernel will remove the module
+	  without waiting for anyone to stop using it (using the -f option to
+	  rmmod).  This is mainly for kernel developers and desparate users.
+	  If unsure, say N.
+
 config KMOD
 	bool "Kernel module loader"
 	depends on MODULES

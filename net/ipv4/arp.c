@@ -90,6 +90,7 @@
 #include <linux/seq_file.h>
 #include <linux/stat.h>
 #include <linux/init.h>
+#include <linux/net.h>
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif

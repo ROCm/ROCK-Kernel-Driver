@@ -11,7 +11,8 @@
 #define NFSCACHE_H
 
 #ifdef __KERNEL__
-#include <linux/sched.h>
+#include <linux/in.h>
+#include <linux/uio.h>
 
 /*
  * Representation of a reply cache entry. The first two members *must*

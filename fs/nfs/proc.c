@@ -46,6 +46,8 @@
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
+extern struct rpc_procinfo nfs_procedures[];
+
 /*
  * Bare-bones access to getattr: this is for nfs_read_super.
  */
@@ -153,7 +155,7 @@ nfs_proc_read(struct inode *inode, struct rpc_cred *cred,
 		.count		= count
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFSPROC_READ,
+		.rpc_proc	= &nfs_procedures[NFSPROC_READ],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 		.rpc_cred	= cred
@@ -190,7 +192,7 @@ nfs_proc_write(struct inode *inode, struct rpc_cred *cred,
 		.count		= count
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFSPROC_WRITE,
+		.rpc_proc	= &nfs_procedures[NFSPROC_WRITE],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
 		.rpc_cred	= cred
@@ -282,7 +284,7 @@ nfs_proc_remove(struct inode *dir, struct qstr *name)
 		.len		= name->len
 	};
 	struct rpc_message	msg = { 
-		.rpc_proc	= NFSPROC_REMOVE,
+		.rpc_proc	= &nfs_procedures[NFSPROC_REMOVE],
 		.rpc_argp	= &arg,
 		.rpc_resp	= NULL,
 		.rpc_cred	= NULL
@@ -307,7 +309,7 @@ nfs_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr *
 	arg->fh = NFS_FH(dir->d_inode);
 	arg->name = name->name;
 	arg->len = name->len;
-	msg->rpc_proc = NFSPROC_REMOVE;
+	msg->rpc_proc = &nfs_procedures[NFSPROC_REMOVE];
 	msg->rpc_argp = arg;
 	return 0;
 }
@@ -441,7 +443,7 @@ nfs_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 		.pages		= &page
 	};
 	struct rpc_message	msg = {
-		.rpc_proc	= NFSPROC_READDIR,
+		.rpc_proc	= &nfs_procedures[NFSPROC_READDIR],
 		.rpc_argp	= &arg,
 		.rpc_resp	= NULL,
 		.rpc_cred	= cred
@@ -532,7 +534,12 @@ nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	int			flags;
-	struct rpc_message	msg;
+	struct rpc_message	msg = {
+		.rpc_proc	= &nfs_procedures[NFSPROC_READ],
+		.rpc_argp	= &data->u.v3.args,
+		.rpc_resp	= &data->u.v3.res,
+		.rpc_cred	= data->cred,
+	};
 	
 	req = nfs_list_entry(data->pages.next);
 	data->u.v3.args.fh     = NFS_FH(inode);
@@ -553,10 +560,6 @@ nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	/* Release requests */
 	task->tk_release = nfs_readdata_release;
 
-	msg.rpc_proc = NFSPROC_READ;
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
 	rpc_call_setup(&data->task, &msg, 0);
 }
 
@@ -575,7 +578,12 @@ nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	int			flags;
-	struct rpc_message	msg;
+	struct rpc_message	msg = {
+		.rpc_proc	= &nfs_procedures[NFSPROC_WRITE],
+		.rpc_argp	= &data->u.v3.args,
+		.rpc_resp	= &data->u.v3.res,
+		.rpc_cred	= data->cred,
+	};
 
 	/* Note: NFSv2 ignores @stable and always uses NFS_FILE_SYNC */
 	
@@ -599,10 +607,6 @@ nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	/* Release requests */
 	task->tk_release = nfs_writedata_release;
 
-	msg.rpc_proc = NFSPROC_WRITE;
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
 	rpc_call_setup(&data->task, &msg, 0);
 }
 

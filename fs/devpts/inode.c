@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/namei.h>
+#include <linux/mount.h>
 
 #define DEVPTS_SUPER_MAGIC 0x1cd1
 

@@ -18,6 +18,7 @@
 #include <linux/msdos_fs.h>
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
+#include <linux/mount.h>
 #include <asm/unaligned.h>
 
 /*

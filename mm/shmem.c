@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
 #include <linux/shmem_fs.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 

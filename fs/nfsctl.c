@@ -12,6 +12,7 @@
 #include <linux/nfsd/syscall.h>
 #include <linux/linkage.h>
 #include <linux/namei.h>
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 /*

@@ -64,6 +64,7 @@
 #include <net/sock.h>
 #include <linux/gfp.h>
 #include <linux/ip.h>
+#include <linux/net.h>
 #include <net/ip.h>
 #include <net/icmp.h>
 #include <net/udp.h>

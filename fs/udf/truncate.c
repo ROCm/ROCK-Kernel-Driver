@@ -95,7 +95,7 @@ void udf_truncate_extents(struct inode * inode)
 		else
 			lenalloc = extoffset - adsize;
 
-		if (!memcmp(&UDF_I_LOCATION(inode), &bloc, sizeof(lb_addr)))
+		if (!bh)
 			lenalloc -= udf_file_entry_alloc_offset(inode);
 		else
 			lenalloc -= sizeof(struct allocExtDesc);
@@ -108,15 +108,15 @@ void udf_truncate_extents(struct inode * inode)
 				extoffset = 0;
 				if (lelen)
 				{
-					if (!memcmp(&UDF_I_LOCATION(inode), &bloc, sizeof(lb_addr)))
-						memset(bh->b_data, 0x00, udf_file_entry_alloc_offset(inode));
+					if (!bh)
+						BUG();
 					else
 						memset(bh->b_data, 0x00, sizeof(struct allocExtDesc));
 					udf_free_blocks(inode->i_sb, inode, bloc, 0, lelen);
 				}
 				else
 				{
-					if (!memcmp(&UDF_I_LOCATION(inode), &bloc, sizeof(lb_addr)))
+					if (!bh)
 					{
 						UDF_I_LENALLOC(inode) = lenalloc;
 						mark_inode_dirty(inode);
@@ -135,9 +135,9 @@ void udf_truncate_extents(struct inode * inode)
 				}
 
 				udf_release_data(bh);
-				bh = NULL;
-
+				extoffset = sizeof(struct allocExtDesc);
 				bloc = eloc;
+				bh = udf_tread(inode->i_sb, udf_get_lb_pblock(inode->i_sb, bloc, 0));
 				if (elen)
 					lelen = (elen + inode->i_sb->s_blocksize - 1) >>
 						inode->i_sb->s_blocksize_bits;
@@ -153,15 +153,15 @@ void udf_truncate_extents(struct inode * inode)
 
 		if (lelen)
 		{
-			if (!memcmp(&UDF_I_LOCATION(inode), &bloc, sizeof(lb_addr)))
-				memset(bh->b_data, 0x00, udf_file_entry_alloc_offset(inode));
+			if (!bh)
+				BUG();
 			else
 				memset(bh->b_data, 0x00, sizeof(struct allocExtDesc));
 			udf_free_blocks(inode->i_sb, inode, bloc, 0, lelen);
 		}
 		else
 		{
-			if (!memcmp(&UDF_I_LOCATION(inode), &bloc, sizeof(lb_addr)))
+			if (!bh)
 			{
 				UDF_I_LENALLOC(inode) = lenalloc;
 				mark_inode_dirty(inode);

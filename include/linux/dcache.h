@@ -4,11 +4,12 @@
 #ifdef __KERNEL__
 
 #include <asm/atomic.h>
-#include <linux/mount.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <asm/page.h>			/* for BUG() */
+
+struct vfsmount;
 
 /*
  * linux/include/linux/dcache.h

@@ -34,23 +34,11 @@
 #ifndef _UDF_FS_H
 #define _UDF_FS_H 1
 
-#include <linux/config.h>
-
 #define UDF_PREALLOCATE
 #define UDF_DEFAULT_PREALLOC_BLOCKS	8
 
-#define UDFFS_DATE			"2002/03/11"
-#define UDFFS_VERSION			"0.9.6"
-
-#if !defined(UDFFS_RW)
-
-#if defined(CONFIG_UDF_RW)
-#define UDFFS_RW			1
-#else /* !defined(CONFIG_UDF_RW) */
-#define UDFFS_RW			0
-#endif /* defined(CONFIG_UDF_RW) */
-
-#endif /* !defined(UDFFS_RW) */
+#define UDFFS_DATE			"2002/11/15"
+#define UDFFS_VERSION			"0.9.7"
 
 #define UDFFS_DEBUG
 

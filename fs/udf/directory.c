@@ -17,6 +17,7 @@
  */
 
 #include "udfdecl.h"
+#include "udf_i.h"
 
 #include <linux/fs.h>
 #include <linux/string.h>
@@ -84,6 +85,24 @@ udf_fileident_read(struct inode *dir, loff_t *nf_pos,
 	struct buffer_head * tmp, * bha[16];
 
 	fibh->soffset = fibh->eoffset;
+
+	if (UDF_I_ALLOCTYPE(dir) == ICBTAG_FLAG_AD_IN_ICB)
+	{
+		fi = udf_get_fileident(UDF_I_DATA(dir) -
+			(UDF_I_EFE(dir) ?
+				sizeof(struct extendedFileEntry) :
+				sizeof(struct fileEntry)),
+			dir->i_sb->s_blocksize, &(fibh->eoffset));
+
+		if (!fi)
+			return NULL;
+
+		*nf_pos += ((fibh->eoffset - fibh->soffset) >> 2);
+
+		memcpy((uint8_t *)cfi, (uint8_t *)fi, sizeof(struct fileIdentDesc));
+
+		return fi;
+	}
 
 	if (fibh->eoffset == dir->i_sb->s_blocksize)
 	{
@@ -276,53 +295,43 @@ udf_get_fileextent(void * buffer, int bufsize, int * offset)
 }
 
 short_ad *
-udf_get_fileshortad(void * buffer, int maxoffset, int *offset, int inc)
+udf_get_fileshortad(uint8_t *ptr, int maxoffset, int *offset, int inc)
 {
-	short_ad * sa;
-	uint8_t * ptr;
+	short_ad *sa;
 
-	if ( (!buffer) || (!offset) )
+	if ( (!ptr) || (!offset) )
 	{
 		printk(KERN_ERR "udf: udf_get_fileshortad() invalidparms\n");
 		return NULL;
 	}
 
-	ptr = (uint8_t *)buffer;
-
-	if ( (*offset > 0) && (*offset < maxoffset) )
-		ptr += *offset;
-	else
+	if ( (*offset < 0) || ((*offset + sizeof(short_ad)) > maxoffset) )
+		return NULL;
+	else if ((sa = (short_ad *)ptr)->extLength == 0)
 		return NULL;
 
-	if ((sa = (short_ad *)ptr)->extLength == 0)
-		return NULL;
-	else if (inc)
-		(*offset) += sizeof(short_ad);
+	if (inc)
+		*offset += sizeof(short_ad);
 	return sa;
 }
 
 long_ad *
-udf_get_filelongad(void * buffer, int maxoffset, int * offset, int inc)
+udf_get_filelongad(uint8_t *ptr, int maxoffset, int * offset, int inc)
 {
-	long_ad * la;
-	uint8_t * ptr;
+	long_ad *la;
 
-	if ( (!buffer) || !(offset) ) 
+	if ( (!ptr) || (!offset) ) 
 	{
 		printk(KERN_ERR "udf: udf_get_filelongad() invalidparms\n");
 		return NULL;
 	}
 
-	ptr = (uint8_t *)buffer;
-
-	if ( (*offset > 0) && (*offset < maxoffset) )
-		ptr += *offset;
-	else
+	if ( (*offset < 0) || ((*offset + sizeof(long_ad)) > maxoffset) )
+		return NULL;
+	else if ((la = (long_ad *)ptr)->extLength == 0)
 		return NULL;
 
-	if ((la = (long_ad *)ptr)->extLength == 0)
-		return NULL;
-	else if (inc)
-		(*offset) += sizeof(long_ad);
+	if (inc)
+		*offset += sizeof(long_ad);
 	return la;
 }

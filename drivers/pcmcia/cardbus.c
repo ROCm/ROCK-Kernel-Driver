@@ -284,7 +284,6 @@ int cb_alloc(socket_info_t * s)
 
 		pci_setup_device(dev);
 
-		strcpy(dev->dev.name, dev->name);
 		strcpy(dev->dev.bus_id, dev->slot_name);
 
 		/* FIXME: Do we need to enable the expansion ROM? */

@@ -16,10 +16,6 @@
 #include <linux/version.h>
 #endif
 
-#if !defined(CONFIG_UDF_FS) && !defined(CONFIG_UDF_FS_MODULE)
-#define CONFIG_UDF_FS_MODULE
-#endif
-
 #include "udfend.h"
 
 #define udf_fixed_to_variable(x) ( ( ( (x) >> 5 ) * 39 ) + ( (x) & 0x0000001F ) )
@@ -35,9 +31,11 @@
 #define CURRENT_UTIME	(xtime.tv_nsec / 1000)
 
 #define udf_file_entry_alloc_offset(inode)\
-	((UDF_I_EXTENDED_FE(inode) ?\
-		sizeof(struct extendedFileEntry) :\
-		sizeof(struct fileEntry)) + UDF_I_LENEATTR(inode))
+	(UDF_I_USE(inode) ?\
+		sizeof(struct unallocSpaceEntry) :\
+		((UDF_I_EFE(inode) ?\
+			sizeof(struct extendedFileEntry) :\
+			sizeof(struct fileEntry)) + UDF_I_LENEATTR(inode)))
 
 #define udf_ext0_offset(inode)\
 	(UDF_I_ALLOCTYPE(inode) == ICBTAG_FLAG_AD_IN_ICB ?\
@@ -114,6 +112,7 @@ extern void udf_truncate(struct inode *);
 extern void udf_read_inode(struct inode *);
 extern void udf_put_inode(struct inode *);
 extern void udf_delete_inode(struct inode *);
+extern void udf_clear_inode(struct inode *);
 extern void udf_write_inode(struct inode *, int);
 extern long udf_block_map(struct inode *, long);
 extern int8_t inode_bmap(struct inode *, int, lb_addr *, uint32_t *, lb_addr *, uint32_t *, uint32_t *, struct buffer_head **);
@@ -134,6 +133,10 @@ extern struct genericFormat *udf_get_extendedattr(struct inode *, uint32_t, uint
 extern struct buffer_head *udf_read_tagged(struct super_block *, uint32_t, uint32_t, uint16_t *);
 extern struct buffer_head *udf_read_ptagged(struct super_block *, lb_addr, uint32_t, uint16_t *);
 extern void udf_release_data(struct buffer_head *);
+extern uint32_t udf64_low32(uint64_t);
+extern uint32_t udf64_high32(uint64_t);
+extern void udf_update_tag(char *, int);
+extern void udf_new_tag(char *, uint16_t, uint16_t, uint16_t, uint32_t, int);
 
 /* lowlevel.c */
 extern unsigned int udf_get_last_session(struct super_block *);
@@ -148,6 +151,9 @@ extern int udf_relocate_blocks(struct super_block *, long, long *);
 
 /* unicode.c */
 extern int udf_get_filename(struct super_block *, uint8_t *, uint8_t *, int);
+extern int udf_put_filename(struct super_block *, const uint8_t *, uint8_t *, int);
+extern int udf_build_ustr(struct ustr *, dstring *, int);
+extern int udf_CS0toUTF8(struct ustr *, struct ustr *);
 
 /* ialloc.c */
 extern void udf_free_inode(struct inode *);
@@ -168,40 +174,17 @@ extern int udf_fsync_inode(struct inode *, int);
 /* directory.c */
 extern uint8_t * udf_filead_read(struct inode *, uint8_t *, uint8_t, lb_addr, int *, int *, struct buffer_head **, int *);
 extern struct fileIdentDesc * udf_fileident_read(struct inode *, loff_t *, struct udf_fileident_bh *, struct fileIdentDesc *, lb_addr *, uint32_t *, lb_addr *, uint32_t *, uint32_t *, struct buffer_head **);
-
-/* unicode.c */
-extern int udf_ustr_to_dchars(uint8_t *, const struct ustr *, int);
-extern int udf_ustr_to_char(uint8_t *, const struct ustr *, int);
-extern int udf_ustr_to_dstring(dstring *, const struct ustr *, int);
-extern int udf_dchars_to_ustr(struct ustr *, const uint8_t *, int);
-extern int udf_char_to_ustr(struct ustr *, const uint8_t *, int);
-extern int udf_dstring_to_ustr(struct ustr *, const dstring *, int);
-extern int udf_translate_to_linux(uint8_t *, uint8_t *, int, uint8_t *, int);
-extern int udf_build_ustr(struct ustr *, dstring *, int);
-extern int udf_build_ustr_exact(struct ustr *, dstring *, int);
-extern int udf_CS0toUTF8(struct ustr *, struct ustr *);
-extern int udf_UTF8toCS0(dstring *, struct ustr *, int);
-extern int udf_CS0toNLS(struct nls_table *, struct ustr *, struct ustr *);
-extern int udf_NLStoCS0(struct nls_table *, dstring *, struct ustr *, int);
+extern struct fileIdentDesc * udf_get_fileident(void * buffer, int bufsize, int * offset);
+extern extent_ad * udf_get_fileextent(void * buffer, int bufsize, int * offset);
+extern long_ad * udf_get_filelongad(uint8_t *, int, int *, int);
+extern short_ad * udf_get_fileshortad(uint8_t *, int, int *, int);
+extern uint8_t * udf_get_filead(struct fileEntry *, uint8_t *, int, int, int, int *);
 
 /* crc.c */
 extern uint16_t udf_crc(uint8_t *, uint32_t, uint16_t);
 
-/* misc.c */
-extern uint32_t udf64_low32(uint64_t);
-extern uint32_t udf64_high32(uint64_t);
-extern void udf_update_tag(char *, int);
-extern void udf_new_tag(char *, uint16_t, uint16_t, uint16_t, uint32_t, int);
-
 /* udftime.c */
 extern time_t *udf_stamp_to_time(time_t *, long *, timestamp);
 extern timestamp *udf_time_to_stamp(timestamp *, time_t, long);
-
-/* directory.c */
-extern struct fileIdentDesc * udf_get_fileident(void * buffer, int bufsize, int * offset);
-extern extent_ad * udf_get_fileextent(void * buffer, int bufsize, int * offset);
-extern long_ad * udf_get_filelongad(void * buffer, int bufsize, int * offset, int);
-extern short_ad * udf_get_fileshortad(void * buffer, int bufsize, int * offset, int);
-extern uint8_t * udf_get_filead(struct fileEntry *, uint8_t *, int, int, int, int *);
 
 #endif /* __UDF_DECL_H */

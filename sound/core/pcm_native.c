@@ -24,6 +24,7 @@
 #include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/time.h>
+#include <linux/uio.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>

@@ -35,6 +35,7 @@
 #include <xfs_dfrag.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
+#include <linux/mount.h>
 
 
 extern int xfs_change_file_space(bhv_desc_t *, int,

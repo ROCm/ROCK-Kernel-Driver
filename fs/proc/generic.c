@@ -8,15 +8,14 @@
  * Copyright (C) 1997 Theodore Ts'o
  */
 
-#include <asm/uaccess.h>
-
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
-#define __NO_VERSION__
 #include <linux/module.h>
+#include <linux/mount.h>
 #include <linux/smp_lock.h>
+#include <asm/uaccess.h>
 #include <asm/bitops.h>
 
 static ssize_t proc_file_read(struct file * file, char * buf,

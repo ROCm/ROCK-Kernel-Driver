@@ -6,12 +6,15 @@
 /* 2001-09-28...2002-04-17
  * Partition stuff by James_McMechan@hotmail.com
  * old style ubd by setting UBD_SHIFT to 0
+ * 2002-09-27...2002-10-18 massive tinkering for 2.5
+ * partitions have changed in 2.5
  */
 
 #define MAJOR_NR UBD_MAJOR
 #define UBD_SHIFT 4
 
 #include "linux/config.h"
+#include "linux/module.h"
 #include "linux/blk.h"
 #include "linux/blkdev.h"
 #include "linux/hdreg.h"
@@ -51,15 +54,17 @@ static int ubd_open(struct inode * inode, struct file * filp);
 static int ubd_release(struct inode * inode, struct file * file);
 static int ubd_ioctl(struct inode * inode, struct file * file,
 		     unsigned int cmd, unsigned long arg);
-static int ubd_revalidate(struct gendisk *disk);
 
 #define MAX_DEV (8)
+#define MAX_MINOR (MAX_DEV << UBD_SHIFT)
+
+#define DEVICE_NR(n) (minor(n) >> UBD_SHIFT)
 
 static struct block_device_operations ubd_blops = {
+        .owner		= THIS_MODULE,
         .open		= ubd_open,
         .release	= ubd_release,
         .ioctl		= ubd_ioctl,
-        .revalidate_disk= ubd_revalidate,
 };
 
 /* Protected by the queue_lock */
@@ -168,8 +173,6 @@ static void make_ide_entries(char *dev_name)
 {
 	struct proc_dir_entry *dir, *ent;
 	char name[64];
-
-	if(!fake_ide) return;
 
 	if(proc_ide_root == NULL) make_proc_ide();
 
@@ -415,230 +418,15 @@ static int ubd_file_size(struct ubd *dev, __u64 *size_out)
 	return(os_file_size(file, size_out));
 }
 
-/* Initialized in an initcall, and unchanged thereafter */
-devfs_handle_t ubd_dir_handle;
-devfs_handle_t ubd_fake_dir_handle;
-
-static int ubd_add(int n)
-{
- 	devfs_handle_t real, fake;
-	char name[sizeof("nnnnnn\0")];
-	struct ubd *dev = &ubd_dev[n];
-	struct gendisk *disk, *fake_disk = NULL;
-	u64 size;
-
-	if (!dev->file)
-		goto out;
-
-	disk = alloc_disk(1 << UBD_SHIFT);
-	if (!disk)
-		return -1;
-	disk->major = MAJOR_NR;
-	disk->first_minor = n << UBD_SHIFT;
-	disk->fops = &ubd_blops;
-	if (fakehd_set)
-		sprintf(disk->disk_name, "hd%c", n + 'a');
-	else
-		sprintf(disk->disk_name, "ubd%d", n);
-
-	if (fake_major) {
-		fake_disk = alloc_disk(1 << UBD_SHIFT);
-		if (!fake_disk) {
-			put_disk(disk);
-			return -1;
-		}
-		fake_disk->major = fake_major;
-		fake_disk->first_minor = n << UBD_SHIFT;
-		fake_disk->fops = &ubd_blops;
-		sprintf(fake_disk->disk_name, "ubd%d", n);
-		fake_gendisk[n] = fake_disk;
-	}
-
-	ubd_gendisk[n] = disk;
-
-	if (!dev->is_dir && ubd_file_size(dev, &size) == 0) {
-		set_capacity(disk, size/512);
-		if (fake_major)
-			set_capacity(fake_disk, size/512);
-	}
- 
-	sprintf(name, "%d", n);
-	real = devfs_register(ubd_dir_handle, name, DEVFS_FL_REMOVABLE, 
-			      MAJOR_NR, n << UBD_SHIFT,
-			      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
-			      &ubd_blops, NULL);
- 	if(real == NULL) 
- 		goto out;
- 	ubd_dev[n].real = real;
-
-	if (fake_major) {
-		fake = devfs_register(ubd_fake_dir_handle, name, 
-				      DEVFS_FL_REMOVABLE, fake_major,
-				      n << UBD_SHIFT, 
-				      S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
-				      S_IWGRP, &ubd_blops, NULL);
- 		if(fake == NULL)
-			goto out_unregister;
-
- 		ubd_dev[n].fake = fake;
-		fake_disk->private_data = &ubd_dev[n];
-		fake_disk->queue = &ubd_queue;
-		add_disk(fake_disk);
-	}
- 
-	disk->private_data = &ubd_dev[n];
-	disk->queue = &ubd_queue;
-	add_disk(disk);
-	make_ide_entries(disk->disk_name);
-	return(0);
-
- out_unregister:
-	devfs_unregister(real);
-	ubd_dev[n].real = NULL;
- out:
-	return(-1);
-}
-
-static int ubd_config(char *str)
-{
-	int n, err;
-
-	str = uml_strdup(str);
-	if(str == NULL){
-		printk(KERN_ERR "ubd_config failed to strdup string\n");
-		return(1);
-	}
-	err = ubd_setup_common(str, &n);
-	if(err){
-		kfree(str);
-		return(-1);
-	}
-	if(n == -1) return(0);
-
- 	spin_lock(&ubd_lock);
-	err = ubd_add(n);
-	if(err)
-		ubd_dev[n].file = NULL;
- 	spin_unlock(&ubd_lock);
-
-	return(err);
-}
-
-static int ubd_remove(char *str)
-{
-	struct ubd *dev;
-	int n, err;
-
-	if(!isdigit(*str)) 
-		return(-1);
-	n = *str - '0';
-	if(n > MAX_DEV) 
-		return(-1);
-	dev = &ubd_dev[n];
-
-	err = 0;
- 	spin_lock(&ubd_lock);
-	del_gendisk(ubd_gendisk[n]);
-	put_disk(ubd_gendisk[n]);
-	ubd_gendisk[n] = NULL;
-	if (fake_major) {
-		del_gendisk(fake_gendisk[n]);
-		put_disk(fake_gendisk[n]);
-		fake_gendisk[n] = NULL;
-	}
-	if(dev->file == NULL)
-		goto out;
-	err = -1;
-	if(dev->count > 0)
-		goto out;
-	if(dev->real != NULL) 
-		devfs_unregister(dev->real);
-	if(dev->fake != NULL) 
-		devfs_unregister(dev->fake);
-	*dev = ((struct ubd) DEFAULT_UBD);
-	err = 0;
- out:
- 	spin_unlock(&ubd_lock);
-	return(err);
-}
-
-static struct mc_device ubd_mc = {
-	name:		"ubd",
-	config:		ubd_config,
-	remove:		ubd_remove,
-};
-
-static int ubd_mc_init(void)
-{
-	mconsole_register_dev(&ubd_mc);
-	return(0);
-}
-
-__initcall(ubd_mc_init);
-
-int ubd_init(void)
-{
-        int i;
-
-	ubd_dir_handle = devfs_mk_dir (NULL, "ubd", NULL);
-	if(register_blkdev(MAJOR_NR, "ubd", &ubd_blops)){
-		printk(KERN_ERR "ubd: unable to get major %d\n", MAJOR_NR);
-		return -1;
-	}
-	blk_init_queue(&ubd_queue, do_ubd_request, &ubd_io_lock);
-	elevator_init(&ubd_queue, &elevator_noop);
-	if(fake_major != 0){
-		char name[sizeof("ubd_nnn\0")];
-
-		snprintf(name, sizeof(name), "ubd_%d", fake_major);
-		ubd_fake_dir_handle = devfs_mk_dir(NULL, name, NULL);
-		if(register_blkdev(fake_major, "ubd", &ubd_blops)){
-			printk(KERN_ERR "ubd: unable to get major %d\n",
-			       fake_major);
-			return -1;
-		}
-	}
-	for(i = 0; i < MAX_DEV; i++) 
-		ubd_add(i);
-	return(0);
-}
-
-late_initcall(ubd_init);
-
-int ubd_driver_init(void){
-	unsigned long stack;
-	int err;
-
-	if(global_openflags.s){
-		printk(KERN_INFO "ubd : Synchronous mode\n");
-		return(0);
-	}
-	stack = alloc_stack(0, 0);
-	io_pid = start_io_thread(stack + PAGE_SIZE - sizeof(void *), 
-				 &thread_fd);
-	if(io_pid < 0){
-		printk(KERN_ERR 
-		       "ubd : Failed to start I/O thread (errno = %d) - "
-		       "falling back to synchronous I/O\n", -io_pid);
-		return(0);
-	}
-	err = um_request_irq(UBD_IRQ, thread_fd, IRQ_READ, ubd_intr, 
-			     SA_INTERRUPT, "ubd", ubd_dev);
-	if(err != 0) printk(KERN_ERR 
-			    "um_request_irq failed - errno = %d\n", -err);
-	return(err);
-}
-
-device_initcall(ubd_driver_init);
-
 static void ubd_close(struct ubd *dev)
 {
 	os_close_file(dev->fd);
-	if(dev->cow.file != NULL) {
-		os_close_file(dev->cow.fd);
-		vfree(dev->cow.bitmap);
-		dev->cow.bitmap = NULL;
-	}
+	if(dev->cow.file == NULL)
+		return;
+
+	os_close_file(dev->cow.fd);
+	vfree(dev->cow.bitmap);
+	dev->cow.bitmap = NULL;
 }
 
 static int ubd_open_dev(struct ubd *dev)
@@ -691,21 +479,232 @@ static int ubd_open_dev(struct ubd *dev)
 	return(err);
 }
 
+static int ubd_new_disk(int major, u64 size, char *name, int unit,
+			struct gendisk **disk_out, devfs_handle_t dir_handle,
+			devfs_handle_t *handle_out)
+{
+	char devfs_name[sizeof("nnnnnn\0")];
+	struct gendisk *disk;
+	int minor = unit << UBD_SHIFT;
+
+	disk = alloc_disk(1 << UBD_SHIFT);
+	if(disk == NULL)
+		return(-ENOMEM);
+
+	disk->major = major;
+	disk->first_minor = minor;
+	disk->fops = &ubd_blops;
+	set_capacity(disk, size / 512);
+	/* needs to be ubd -> /dev/ubd/discX/disc */
+	sprintf(disk->disk_name, "ubd");
+	*disk_out = disk;
+
+	/* /dev/ubd/N style names */
+	sprintf(devfs_name, "%d", unit);
+	*handle_out = devfs_register(dir_handle, devfs_name,
+				     DEVFS_FL_REMOVABLE, major, minor,
+				     S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
+				     S_IWGRP, &ubd_blops, NULL);
+	disk->private_data = &ubd_dev[unit];
+	disk->queue = &ubd_queue;
+	add_disk(disk);
+	return(0);
+}
+
+/* Initialized in an initcall, and unchanged thereafter */
+devfs_handle_t ubd_dir_handle;
+devfs_handle_t ubd_fake_dir_handle;
+
+static int ubd_add(int n)
+{
+	struct ubd *dev = &ubd_dev[n];
+	int err;
+
+	if (!dev->file || dev->is_dir)
+		return(-ENODEV);
+
+	if (ubd_open_dev(dev))
+		return(-ENODEV);
+
+	err = ubd_file_size(dev, &dev->size);
+	if(err)
+		return(err);
+
+	err = ubd_new_disk(MAJOR_NR, dev->size, "ubd", n, &ubd_gendisk[n], 
+			   ubd_dir_handle, &dev->real);
+	if(err) 
+		return(err);
+ 
+	if(fake_major)
+		ubd_new_disk(fake_major, dev->size, "ubd%d", n, 
+			     &fake_gendisk[n], ubd_fake_dir_handle, 
+			     &dev->fake);
+
+	/* perhaps this should also be under the "if (fake_major)" above */
+	/* using the fake_disk->disk_name and also the fakehd_set name */
+	if (fake_ide)
+		make_ide_entries(ubd_gendisk[n]->disk_name);
+
+	ubd_close(dev);
+	return 0;
+}
+
+static int ubd_config(char *str)
+{
+	int n, err;
+
+	str = uml_strdup(str);
+	if(str == NULL){
+		printk(KERN_ERR "ubd_config failed to strdup string\n");
+		return(1);
+	}
+	err = ubd_setup_common(str, &n);
+	if(err){
+		kfree(str);
+		return(-1);
+	}
+	if(n == -1) return(0);
+
+ 	spin_lock(&ubd_lock);
+	err = ubd_add(n);
+	if(err)
+		ubd_dev[n].file = NULL;
+ 	spin_unlock(&ubd_lock);
+
+	return(err);
+}
+
+static int ubd_remove(char *str)
+{
+	struct ubd *dev;
+	int n, err = -ENODEV;
+
+	if(!isdigit(*str))
+		return(err);	/* it should be a number 0-7/a-h */
+
+	n = *str - '0';
+	if(n > MAX_DEV) 
+		return(err);
+
+	dev = &ubd_dev[n];
+	if(dev->count > 0)
+		return(-EBUSY);	/* you cannot remove a open disk */
+
+	err = 0;
+ 	spin_lock(&ubd_lock);
+
+	if(ubd_gendisk[n] == NULL)
+		goto out;
+
+	del_gendisk(ubd_gendisk[n]);
+	put_disk(ubd_gendisk[n]);
+	ubd_gendisk[n] = NULL;
+	if(dev->real != NULL) 
+		devfs_unregister(dev->real);
+
+	if(fake_gendisk[n] != NULL){
+		del_gendisk(fake_gendisk[n]);
+		put_disk(fake_gendisk[n]);
+		fake_gendisk[n] = NULL;
+		if(dev->fake != NULL) 
+			devfs_unregister(dev->fake);
+	}
+
+	*dev = ((struct ubd) DEFAULT_UBD);
+	err = 0;
+ out:
+ 	spin_unlock(&ubd_lock);
+	return(err);
+}
+
+static struct mc_device ubd_mc = {
+	.name		= "ubd",
+	.config		= ubd_config,
+	.remove		= ubd_remove,
+};
+
+static int ubd_mc_init(void)
+{
+	mconsole_register_dev(&ubd_mc);
+	return(0);
+}
+
+__initcall(ubd_mc_init);
+
+int ubd_init(void)
+{
+        int i;
+
+	ubd_dir_handle = devfs_mk_dir (NULL, "ubd", NULL);
+	if(register_blkdev(MAJOR_NR, "ubd", &ubd_blops)){
+		printk(KERN_ERR "ubd: unable to get major %d\n", MAJOR_NR);
+		return -1;
+	}
+
+	blk_init_queue(&ubd_queue, do_ubd_request, &ubd_io_lock);
+	elevator_init(&ubd_queue, &elevator_noop);
+
+	if(fake_major != 0){
+		char name[sizeof("ubd_nnn\0")];
+
+		snprintf(name, sizeof(name), "ubd_%d", fake_major);
+		ubd_fake_dir_handle = devfs_mk_dir(NULL, name, NULL);
+		if(register_blkdev(fake_major, "ubd", &ubd_blops)){
+			printk(KERN_ERR "ubd: unable to get major %d\n",
+			       fake_major);
+			return -1;
+		}
+	}
+	for(i = 0; i < MAX_DEV; i++) 
+		ubd_add(i);
+	return(0);
+}
+
+late_initcall(ubd_init);
+
+int ubd_driver_init(void){
+	unsigned long stack;
+	int err;
+
+	if(global_openflags.s){
+		printk(KERN_INFO "ubd : Synchronous mode\n");
+		return(0);
+	}
+	stack = alloc_stack(0, 0);
+	io_pid = start_io_thread(stack + PAGE_SIZE - sizeof(void *), 
+				 &thread_fd);
+	if(io_pid < 0){
+		printk(KERN_ERR 
+		       "ubd : Failed to start I/O thread (errno = %d) - "
+		       "falling back to synchronous I/O\n", -io_pid);
+		return(0);
+	}
+	err = um_request_irq(UBD_IRQ, thread_fd, IRQ_READ, ubd_intr, 
+			     SA_INTERRUPT, "ubd", ubd_dev);
+	if(err != 0) printk(KERN_ERR 
+			    "um_request_irq failed - errno = %d\n", -err);
+	return(err);
+}
+
+device_initcall(ubd_driver_init);
+
 static int ubd_open(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct ubd *dev = disk->private_data;
-	int err;
+	int err = -EISDIR;
+
 	if(dev->is_dir == 1)
 		goto out;
 
+	err = 0;
 	if(dev->count == 0){
 		dev->openflags = dev->boot_openflags;
 
 		err = ubd_open_dev(dev);
 		if(err){
-			printk(KERN_ERR "%s: Can't open \"%s\": "
-			       "errno = %d\n", disk->disk_name, dev->file, -err);
+			printk(KERN_ERR "%s: Can't open \"%s\": errno = %d\n",
+			       disk->disk_name, dev->file, -err);
 			goto out;
 		}
 	}
@@ -722,7 +721,8 @@ static int ubd_release(struct inode * inode, struct file * file)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct ubd *dev = disk->private_data;
-	if(dev->count == 0)
+
+	if(--dev->count == 0)
 		ubd_close(dev);
 	return(0);
 }
@@ -772,7 +772,7 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 	__u64 block;
 	int nsect;
 
-	if (req->rq_status == RQ_INACTIVE) return(1);
+	if(req->rq_status == RQ_INACTIVE) return(1);
 
 	if(dev->is_dir){
 		strcpy(req->buffer, "HOSTFS:");
@@ -784,7 +784,8 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 	}
 
 	if((rq_data_dir(req) == WRITE) && !dev->openflags.w){
-		printk("Write attempted on readonly ubd device %s\n", disk->disk_name);
+		printk("Write attempted on readonly ubd device %s\n", 
+		       disk->disk_name);
  		spin_lock(&ubd_io_lock);
 		end_request(req, 0);
  		spin_unlock(&ubd_io_lock);
@@ -848,7 +849,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
 	struct ubd *dev = inode->i_bdev->bd_disk->private_data;
 	int err;
- 	struct ubd *dev;
 	struct hd_driveid ubd_id = {
 		.cyls =		0,
 		.heads =	128,
@@ -868,7 +868,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 	case HDIO_SET_UNMASKINTR:
 		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
-		if((arg > 1) || inode->i_bdev->bd_contains != inode->i_bdev)
+		if((arg > 1) || (inode->i_bdev->bd_contains != inode->i_bdev))
 			return(-EINVAL);
 		return(0);
 
@@ -888,7 +888,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 	case HDIO_SET_MULTCOUNT:
 		if(!capable(CAP_SYS_ADMIN)) return(-EACCES);
-		if (inode->i_bdev->bd_contains != inode->i_bdev)
+		if(inode->i_bdev->bd_contains != inode->i_bdev)
 			return(-EINVAL);
 		return(0);
 
@@ -911,27 +911,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		return(0);
 	}
 	return(-EINVAL);
-}
-
-static int ubd_revalidate(struct gendisk *disk)
-{
-	__u64 size;
-	int err;
-	struct ubd *dev = disk->private_data;
-
-	err = 0;
-	spin_lock(&ubd_lock);
-	if(dev->is_dir) 
-		goto out;
-	
-	err = ubd_file_size(dev, &size);
-	if (!err) {
-		set_capacity(disk, size / 512);
-		dev->size = size;
-	}
- out:
-	spin_unlock(&ubd_lock);
-	return err;
 }
 
 /*

@@ -651,10 +651,11 @@ int timod_getmsg(unsigned int fd, char *ctl_buf, int ctl_maxlen, s32 *ctl_len,
 		SOLD("LISTEN done");
 	}
 	if (!(filp->f_flags & O_NONBLOCK)) {
-		poll_table wait_table, *wait;
+		struct poll_wqueues wait_table;
+		poll_table *wait;
 
 		poll_initwait(&wait_table);
-		wait = &wait_table;
+		wait = &wait_table.pt;
 		for(;;) {
 			SOLD("loop");
 			set_current_state(TASK_INTERRUPTIBLE);

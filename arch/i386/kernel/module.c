@@ -15,7 +15,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#include <linux/module.h>
+#include <linux/moduleloader.h>
 #include <linux/elf.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
@@ -28,22 +28,15 @@
 #define DEBUGP(fmt , ...)
 #endif
 
-static void *alloc_and_zero(unsigned long size)
+void *module_alloc(unsigned long size)
 {
-	void *ret;
-
-	/* We handle the zero case fine, unlike vmalloc */
 	if (size == 0)
 		return NULL;
-
-	ret = vmalloc(size);
-	if (!ret) ret = ERR_PTR(-ENOMEM);
-	else memset(ret, 0, size);
-
-	return ret;
+	return vmalloc(size);
 }
 
-/* Free memory returned from module_core_alloc/module_init_alloc */
+
+/* Free memory returned from module_alloc */
 void module_free(struct module *mod, void *module_region)
 {
 	vfree(module_region);
@@ -51,20 +44,21 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
-void *module_core_alloc(const Elf32_Ehdr *hdr,
-			const Elf32_Shdr *sechdrs,
-			const char *secstrings,
-			struct module *module)
+/* We don't need anything special. */
+long module_core_size(const Elf32_Ehdr *hdr,
+		      const Elf32_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *module)
 {
-	return alloc_and_zero(module->core_size);
+	return module->core_size;
 }
 
-void *module_init_alloc(const Elf32_Ehdr *hdr,
-			const Elf32_Shdr *sechdrs,
-			const char *secstrings,
-			struct module *module)
+long module_init_size(const Elf32_Ehdr *hdr,
+		      const Elf32_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *module)
 {
-	return alloc_and_zero(module->init_size);
+	return module->init_size;
 }
 
 int apply_relocate(Elf32_Shdr *sechdrs,

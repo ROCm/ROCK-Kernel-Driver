@@ -8,6 +8,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/errno.h>
+#include <linux/string.h>
 #include "base.h"
 
 #define to_dev(node) container_of(node,struct device,driver_list)

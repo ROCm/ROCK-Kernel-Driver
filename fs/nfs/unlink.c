@@ -93,14 +93,14 @@ nfs_async_unlink_init(struct rpc_task *task)
 {
 	struct nfs_unlinkdata	*data = (struct nfs_unlinkdata *)task->tk_calldata;
 	struct dentry		*dir = data->dir;
-	struct rpc_message	msg;
+	struct rpc_message	msg = {
+		.rpc_cred	= data->cred,
+	};
 	int			status = -ENOENT;
 
 	if (!data->name.len)
 		goto out_err;
 
-	memset(&msg, 0, sizeof(msg));
-	msg.rpc_cred = data->cred;
 	status = NFS_PROTO(dir->d_inode)->unlink_setup(&msg, dir, &data->name);
 	if (status < 0)
 		goto out_err;

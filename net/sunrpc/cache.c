@@ -23,6 +23,7 @@
 #include <asm/uaccess.h>
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
+#include <linux/net.h>
 #include <asm/ioctls.h>
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/cache.h>

@@ -29,6 +29,7 @@
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/kallsyms.h>
+#include <linux/mount.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.

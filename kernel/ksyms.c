@@ -53,6 +53,7 @@
 #include <linux/percpu.h>
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
+#include <linux/mount.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -268,8 +269,8 @@ EXPORT_SYMBOL(generic_fillattr);
 EXPORT_SYMBOL(generic_file_llseek);
 EXPORT_SYMBOL(remote_llseek);
 EXPORT_SYMBOL(no_llseek);
-EXPORT_SYMBOL(__pollwait);
-EXPORT_SYMBOL(__pollfreewait);
+EXPORT_SYMBOL(poll_initwait);
+EXPORT_SYMBOL(poll_freewait);
 EXPORT_SYMBOL(ROOT_DEV);
 EXPORT_SYMBOL(find_get_page);
 EXPORT_SYMBOL(find_lock_page);

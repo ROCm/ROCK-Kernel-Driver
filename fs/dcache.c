@@ -23,7 +23,7 @@
 #include <linux/smp_lock.h>
 #include <linux/cache.h>
 #include <linux/module.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 #define DCACHE_PARANOIA 1

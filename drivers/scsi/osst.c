@@ -161,6 +161,7 @@ static int osst_dev_max;
 struct Scsi_Device_Template osst_template =
 {
        module:		THIS_MODULE,
+       list:		LIST_HEAD_INIT(osst_template.list),
        name:		"OnStream tape",
        tag:		"osst",
        scsi_type:	TYPE_TAPE,
@@ -4171,14 +4172,12 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 #endif
 		return (-EBUSY);
 	}
+	
+	if (!try_module_get(STp->device->host->hostt->module))
+		return (-ENXIO);
+	STp->device->access_count++;
 	STp->in_use       = 1;
 	STp->rew_at_close = (minor(inode->i_rdev) & 0x80) == 0;
-
-	if (STp->device->host->hostt->module)
-		 __MOD_INC_USE_COUNT(STp->device->host->hostt->module);
-	if (osst_template.module)
-		 __MOD_INC_USE_COUNT(osst_template.module);
-	STp->device->access_count++;
 
 	if (mode != STp->current_mode) {
 #if DEBUG
@@ -4518,10 +4517,7 @@ err_out:
 	STp->header_ok = 0;
 	STp->device->access_count--;
 
-	if (STp->device->host->hostt->module)
-	    __MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
-	if (osst_template.module)
-	    __MOD_DEC_USE_COUNT(osst_template.module);
+	module_put(STp->device->host->hostt->module);
 
 	return retval;
 }
@@ -4649,10 +4645,7 @@ static int os_scsi_tape_close(struct inode * inode, struct file * filp)
 	STp->in_use = 0;
 	STp->device->access_count--;
 
-	if (STp->device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
-	if(osst_template.module)
-		__MOD_DEC_USE_COUNT(osst_template.module);
+	module_put(STp->device->host->hostt->module);
 
 	return result;
 }

@@ -23,14 +23,17 @@
 #ifndef _DEVICE_H_
 #define _DEVICE_H_
 
-#include <linux/types.h>
 #include <linux/config.h>
 #include <linux/ioport.h>
+#include <linux/kobject.h>
 #include <linux/list.h>
 #include <linux/sched.h>
-#include <linux/kobject.h>
+#include <linux/spinlock.h>
+#include <linux/types.h>
+#include <asm/atomic.h>
 
-#define DEVICE_NAME_SIZE	80
+#define DEVICE_NAME_SIZE	50
+#define DEVICE_NAME_HALF	__stringify(20)	/* Less than half to accommodate slop */
 #define DEVICE_ID_SIZE		32
 #define BUS_ID_SIZE		16
 

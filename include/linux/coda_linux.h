@@ -14,7 +14,6 @@
 
 #include <linux/kernel.h>
 #include <linux/param.h>
-#include <linux/sched.h> 
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>

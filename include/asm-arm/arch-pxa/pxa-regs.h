@@ -362,7 +362,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define LSR_OE		(1 << 1)	/* Overrun Error */
 #define LSR_DR		(1 << 0)	/* Data Ready */
 
-#define MCR_LOOP	(1 << 4)	*/
+#define MCR_LOOP	(1 << 4)
 #define MCR_OUT2	(1 << 3)	/* force MSR_DCD in loopback mode */
 #define MCR_OUT1	(1 << 2)	/* force MSR_RI in loopback mode */
 #define MCR_RTS		(1 << 1)	/* Request to Send */

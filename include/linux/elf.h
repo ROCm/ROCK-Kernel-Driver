@@ -1,7 +1,6 @@
 #ifndef _LINUX_ELF_H
 #define _LINUX_ELF_H
 
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <asm/elf.h>
 

@@ -66,9 +66,6 @@ typedef struct tvec_t_base_s tvec_base_t;
 /* Fake initialization */
 static DEFINE_PER_CPU(tvec_base_t, tvec_bases) = { SPIN_LOCK_UNLOCKED };
 
-/* Fake initialization needed to avoid compiler breakage */
-static DEFINE_PER_CPU(struct tasklet_struct, timer_tasklet) = { NULL };
-
 static void check_timer_failed(timer_t *timer)
 {
 	static int whine_count;
@@ -766,9 +763,9 @@ rwlock_t xtime_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
 unsigned long last_time_offset;
 
 /*
- * This function runs timers and the timer-tq in softirq context.
+ * This function runs timers and the timer-tq in bottom half context.
  */
-static void run_timer_tasklet(unsigned long data)
+static void run_timer_softirq(struct softirq_action *h)
 {
 	tvec_base_t *base = &per_cpu(tvec_bases, smp_processor_id());
 
@@ -781,7 +778,7 @@ static void run_timer_tasklet(unsigned long data)
  */
 void run_local_timers(void)
 {
-	tasklet_hi_schedule(&per_cpu(timer_tasklet, smp_processor_id()));
+	raise_softirq(TIMER_SOFTIRQ);
 }
 
 /*
@@ -1140,7 +1137,6 @@ static void __devinit init_timers_cpu(int cpu)
 	}
 	for (j = 0; j < TVR_SIZE; j++)
 		INIT_LIST_HEAD(base->tv1.vec + j);
-	tasklet_init(&per_cpu(timer_tasklet, cpu), run_timer_tasklet, 0UL);
 }
 	
 static int __devinit timer_cpu_notify(struct notifier_block *self, 
@@ -1167,4 +1163,5 @@ void __init init_timers(void)
 	timer_cpu_notify(&timers_nb, (unsigned long)CPU_UP_PREPARE,
 				(void *)(long)smp_processor_id());
 	register_cpu_notifier(&timers_nb);
+	open_softirq(TIMER_SOFTIRQ, run_timer_softirq, NULL);
 }

@@ -44,6 +44,7 @@ extern void free_irq(unsigned int, void *);
 enum
 {
 	HI_SOFTIRQ=0,
+	TIMER_SOFTIRQ,
 	NET_TX_SOFTIRQ,
 	NET_RX_SOFTIRQ,
 	SCSI_SOFTIRQ,

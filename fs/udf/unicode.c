@@ -32,46 +32,9 @@
 
 #include "udf_sb.h"
 
-int udf_ustr_to_dchars(uint8_t *dest, const struct ustr *src, int strlen)
-{
-	if ( (!dest) || (!src) || (!strlen) || (src->u_len > strlen) )
-		return 0;
-	memcpy(dest+1, src->u_name, src->u_len);
-	dest[0] = src->u_cmpID;
-	return src->u_len + 1;
-}
+static int udf_translate_to_linux(uint8_t *, uint8_t *, int, uint8_t *, int);
 
-int udf_ustr_to_char(uint8_t *dest, const struct ustr *src, int strlen)
-{
-	if ( (!dest) || (!src) || (!strlen) || (src->u_len >= strlen) )
-		return 0;
-	memcpy(dest, src->u_name, src->u_len);
-	return src->u_len;
-}
-
-int udf_ustr_to_dstring(dstring *dest, const struct ustr *src, int dlength)
-{
-	if ( udf_ustr_to_dchars(dest, src, dlength-1) )
-	{
-		dest[dlength-1] = src->u_len + 1;
-		return dlength;
-	}
-	else
-		return 0;
-}
-
-int udf_dchars_to_ustr(struct ustr *dest, const uint8_t *src, int strlen)
-{
-	if ( (!dest) || (!src) || (!strlen) || (strlen > UDF_NAME_LEN) )
-		return 0;
-	memset(dest, 0, sizeof(struct ustr));
-	memcpy(dest->u_name, src+1, strlen-1);
-	dest->u_cmpID = src[0];
-	dest->u_len = strlen-1;
-	return strlen-1;
-}
-
-int udf_char_to_ustr(struct ustr *dest, const uint8_t *src, int strlen)
+static int udf_char_to_ustr(struct ustr *dest, const uint8_t *src, int strlen)
 {
 	if ( (!dest) || (!src) || (!strlen) || (strlen >= UDF_NAME_LEN) )
 		return 0;
@@ -80,15 +43,6 @@ int udf_char_to_ustr(struct ustr *dest, const uint8_t *src, int strlen)
 	dest->u_cmpID = 0x08;
 	dest->u_len = strlen;
 	return strlen;
-}
-
-
-int udf_dstring_to_ustr(struct ustr *dest, const dstring *src, int dlength)
-{
-	if ( dlength && udf_dchars_to_ustr(dest, src, src[dlength-1]) )
-		return dlength;
-	else
-		return 0;
 }
 
 /*
@@ -112,7 +66,7 @@ int udf_build_ustr(struct ustr *dest, dstring *ptr, int size)
 /*
  * udf_build_ustr_exact
  */
-int udf_build_ustr_exact(struct ustr *dest, dstring *ptr, int exactsize)
+static int udf_build_ustr_exact(struct ustr *dest, dstring *ptr, int exactsize)
 {
 	if ( (!dest) || (!ptr) || (!exactsize) )
 		return -1;
@@ -224,7 +178,7 @@ int udf_CS0toUTF8(struct ustr *utf_o, struct ustr *ocu_i)
  *	November 12, 1997 - Andrew E. Mileski
  *	Written, tested, and released.
  */
-int udf_UTF8toCS0(dstring *ocu, struct ustr *utf, int length)
+static int udf_UTF8toCS0(dstring *ocu, struct ustr *utf, int length)
 {
 	unsigned c, i, max_val, utf_char;
 	int utf_cnt;
@@ -318,7 +272,7 @@ error_out:
 	return u_len + 1;
 }
 
-int udf_CS0toNLS(struct nls_table *nls, struct ustr *utf_o, struct ustr *ocu_i)
+static int udf_CS0toNLS(struct nls_table *nls, struct ustr *utf_o, struct ustr *ocu_i)
 {
 	uint8_t *ocu;
 	uint32_t c;
@@ -360,7 +314,7 @@ int udf_CS0toNLS(struct nls_table *nls, struct ustr *utf_o, struct ustr *ocu_i)
 	return utf_o->u_len;
 }
 
-int udf_NLStoCS0(struct nls_table *nls, dstring *ocu, struct ustr *uni, int length)
+static int udf_NLStoCS0(struct nls_table *nls, dstring *ocu, struct ustr *uni, int length)
 {
 	unsigned len, i, max_val;
 	uint16_t uni_char;
@@ -434,12 +388,42 @@ int udf_get_filename(struct super_block *sb, uint8_t *sname, uint8_t *dname, int
 	return 0;
 }
 
+int udf_put_filename(struct super_block *sb, const uint8_t *sname, uint8_t *dname, int flen)
+{
+	struct ustr unifilename;
+	int namelen;
+
+	if ( !(udf_char_to_ustr(&unifilename, sname, flen)) )
+	{
+		return 0;
+	}
+
+	if (UDF_QUERY_FLAG(sb, UDF_FLAG_UTF8))
+	{
+		if ( !(namelen = udf_UTF8toCS0(dname, &unifilename, UDF_NAME_LEN)) )
+		{
+			return 0;
+		}
+	}
+	else if (UDF_QUERY_FLAG(sb, UDF_FLAG_NLS_MAP))
+	{
+		if ( !(namelen = udf_NLStoCS0(UDF_SB(sb)->s_nls_map, dname, &unifilename, UDF_NAME_LEN)) )
+		{
+			return 0;
+		}
+	}
+	else
+		return 0;
+
+	return namelen;
+}
+
 #define ILLEGAL_CHAR_MARK	'_'
 #define EXT_MARK			'.'
 #define CRC_MARK			'#'
 #define EXT_SIZE			5
 
-int udf_translate_to_linux(uint8_t *newName, uint8_t *udfName, int udfLen, uint8_t *fidName, int fidNameLen)
+static int udf_translate_to_linux(uint8_t *newName, uint8_t *udfName, int udfLen, uint8_t *fidName, int fidNameLen)
 {
 	int index, newIndex = 0, needsCRC = 0;	
 	int extIndex = 0, newExtIndex = 0, hasExt = 0;

@@ -39,6 +39,7 @@
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/seq_file.h>
+#include <linux/mount.h>
 #include "xfs_version.h"
 
 /* xfs_vfs[ops].c */

@@ -12,7 +12,6 @@
 #include <linux/wait.h>
 #include <linux/types.h>
 #include <linux/vfs.h>
-#include <linux/net.h>
 #include <linux/kdev_t.h>
 #include <linux/ioctl.h>
 #include <linux/list.h>
@@ -27,8 +26,10 @@
 #include <asm/atomic.h>
 
 struct poll_table_struct;
+struct iovec;
 struct nameidata;
-
+struct vm_area_struct;
+struct vfsmount;
 
 /*
  * It's silly to have NR_OPEN bigger than NR_FILE, but you can change
@@ -271,10 +272,9 @@ struct iattr {
 #define ATTR_FLAG_NODIRATIME	16 	/* Don't update atime for directory */
 
 /*
- * Includes for diskquotas and mount structures.
+ * Includes for diskquotas.
  */
 #include <linux/quota.h>
-#include <linux/mount.h>
 
 /*
  * oh the beauties of C type declarations.
@@ -412,21 +412,6 @@ struct inode {
 		void				*generic_ip;
 	} u;
 };
-
-struct socket_alloc {
-	struct socket socket;
-	struct inode vfs_inode;
-};
-
-static inline struct socket *SOCKET_I(struct inode *inode)
-{
-	return &container_of(inode, struct socket_alloc, vfs_inode)->socket;
-}
-
-static inline struct inode *SOCK_INODE(struct socket *socket)
-{
-	return &container_of(socket, struct socket_alloc, socket)->vfs_inode;
-}
 
 /* will die */
 #include <linux/coda_fs_i.h>
@@ -1340,11 +1325,6 @@ extern struct inode_operations simple_dir_inode_operations;
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned int real_root_dev;
 #endif
-
-extern ssize_t char_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t block_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t char_write(struct file *, const char *, size_t, loff_t *);
-extern ssize_t block_write(struct file *, const char *, size_t, loff_t *);
 
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);

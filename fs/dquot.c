@@ -55,6 +55,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/mm.h>
 #include <linux/time.h>
 #include <linux/types.h>
