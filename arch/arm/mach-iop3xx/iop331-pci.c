@@ -1,10 +1,10 @@
 /*
- * arch/arm/mach-iop3xx/iop321-pci.c
+ * arch/arm/mach-iop3xx/iop331-pci.c
  *
- * PCI support for the Intel IOP321 chipset
+ * PCI support for the Intel IOP331 chipset
  *
- * Author: Rory Bolt <rorybolt@pacbell.net>
- * Copyright (C) 2002 Rory Bolt
+ * Author: Dave Jiang (dave.jiang@intel.com)
+ * Copyright (C) 2003 Intel Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -24,9 +24,9 @@
 #include <asm/hardware.h>
 #include <asm/mach/pci.h>
 
-#include <asm/arch/iop321.h>
+#include <asm/arch/iop331.h>
 
-// #define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define  DBG(x...) printk(x)
@@ -36,9 +36,9 @@
 
 /*
  * This routine builds either a type0 or type1 configuration command.  If the
- * bus is on the 80321 then a type0 made, else a type1 is created.
+ * bus is on the 80331 then a type0 made, else a type1 is created.
  */
-static u32 iop321_cfg_address(struct pci_bus *bus, int devfn, int where)
+static u32 iop331_cfg_address(struct pci_bus *bus, int devfn, int where)
 {
 	struct pci_sys_data *sys = bus->sysdata;
 	u32 addr;
@@ -60,7 +60,7 @@ static u32 iop321_cfg_address(struct pci_bus *bus, int devfn, int where)
  * errors occure during a config cycle where there is no device, like during
  * the discovery stage.
  */
-static int iop321_pci_status(void)
+static int iop331_pci_status(void)
 {
 	unsigned int status;
 	int ret = 0;
@@ -68,18 +68,18 @@ static int iop321_pci_status(void)
 	/*
 	 * Check the status registers.
 	 */
-	status = *IOP321_ATUSR;
+	status = *IOP331_ATUSR;
 	if (status & 0xf900)
 	{
 		DBG("\t\t\tPCI: P0 - status = 0x%08x\n", status);
-		*IOP321_ATUSR = status & 0xf900;
+		*IOP331_ATUSR = status & 0xf900;
 		ret = 1;
 	}
-	status = *IOP321_ATUISR;
+	status = *IOP331_ATUISR;
 	if (status & 0x679f)
 	{
 		DBG("\t\t\tPCI: P1 - status = 0x%08x\n", status);
-		*IOP321_ATUISR = status & 0x679f;
+		*IOP331_ATUISR = status & 0x679f;
 		ret = 1;
 	}
 	return ret;
@@ -90,7 +90,7 @@ static int iop321_pci_status(void)
  * data.  Note that the 4 nop's ensure that we are able to handle
  * a delayed abort (in theory.)
  */
-static inline u32 iop321_read(unsigned long addr)
+static inline u32 iop331_read(unsigned long addr)
 {
 	u32 val;
 
@@ -102,7 +102,7 @@ static inline u32 iop321_read(unsigned long addr)
 		"nop\n\t"
 		"nop\n\t"
 		: "=r" (val)
-		: "r" (addr), "r" (IOP321_OCCAR), "r" (IOP321_OCCDR));
+		: "r" (addr), "r" (IOP331_OCCAR), "r" (IOP331_OCCDR));
 
 	return val;
 }
@@ -112,13 +112,13 @@ static inline u32 iop321_read(unsigned long addr)
  * cycle.  If there was an error, the routine returns all hex f's.
  */
 static int
-iop321_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+iop331_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 		int size, u32 *value)
 {
-	unsigned long addr = iop321_cfg_address(bus, devfn, where);
-	u32 val = iop321_read(addr) >> ((where & 3) * 8);
+	unsigned long addr = iop331_cfg_address(bus, devfn, where);
+	u32 val = iop331_read(addr) >> ((where & 3) * 8);
 
-	if( iop321_pci_status() )
+	if( iop331_pci_status() )
 		val = 0xffffffff;
 
 	*value = val;
@@ -127,15 +127,15 @@ iop321_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 }
 
 static int
-iop321_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+iop331_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 		int size, u32 value)
 {
-	unsigned long addr = iop321_cfg_address(bus, devfn, where);
+	unsigned long addr = iop331_cfg_address(bus, devfn, where);
 	u32 val;
 
 	if (size != 4) {
-		val = iop321_read(addr);
-		if (!iop321_pci_status() == 0)
+		val = iop331_read(addr);
+		if (!iop331_pci_status() == 0)
 			return PCIBIOS_SUCCESSFUL;
 
 		where = (where & 3) * 8;
@@ -145,7 +145,7 @@ iop321_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 		else
 			val &= ~(0xffff << where);
 
-		*IOP321_OCCDR = val | value << where;
+		*IOP331_OCCDR = val | value << where;
 	} else {
 		asm volatile(
 			"str	%1, [%2]\n\t"
@@ -156,23 +156,23 @@ iop321_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 			"nop\n\t"
 			:
 			: "r" (value), "r" (addr),
-			  "r" (IOP321_OCCAR), "r" (IOP321_OCCDR));
+			  "r" (IOP331_OCCAR), "r" (IOP331_OCCDR));
 	}
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static struct pci_ops iop321_ops = {
-	.read	= iop321_read_config,
-	.write	= iop321_write_config,
+static struct pci_ops iop331_ops = {
+	.read	= iop331_read_config,
+	.write	= iop331_write_config,
 };
 
 /*
- * When a PCI device does not exist during config cycles, the 80200 gets a
+ * When a PCI device does not exist during config cycles, the XScale gets a
  * bus error instead of returning 0xffffffff. This handler simply returns.
  */
 int
-iop321_pci_abort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+iop331_pci_abort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
 	DBG("PCI abort: address = 0x%08lx fsr = 0x%03x PC = 0x%08lx LR = 0x%08lx\n",
 		addr, fsr, regs->ARM_pc, regs->ARM_lr);
@@ -188,40 +188,32 @@ iop321_pci_abort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 }
 
 /*
- * Scan an IOP321 PCI bus.  sys->bus defines which bus we scan.
+ * Scan an IOP331 PCI bus.  sys->bus defines which bus we scan.
  */
-struct pci_bus *iop321_scan_bus(int nr, struct pci_sys_data *sys)
+struct pci_bus *iop331_scan_bus(int nr, struct pci_sys_data *sys)
 {
-	return pci_scan_bus(sys->busnr, &iop321_ops, sys);
+	return pci_scan_bus(sys->busnr, &iop331_ops, sys);
 }
 
-void iop321_init(void)
+void iop331_init(void)
 {
-#if CONFIG_ARCH_EP80219
-    *IOP321_ATUCR = 0x2;
-    *IOP321_OIOWTVR = 0x90000000;
-    *IOP321_IABAR0  = 0x00000004;
-    *IOP321_IABAR2  = 0xa000000c;
-    *IOP321_IALR2   = 0xe0000000;
-#endif
-
-	DBG("PCI:  Intel 80321 PCI init code.\n");
-	DBG("\tATU: IOP321_ATUCMD=0x%04x\n", *IOP321_ATUCMD);
-	DBG("\tATU: IOP321_OMWTVR0=0x%04x, IOP321_OIOWTVR=0x%04x\n",
-			*IOP321_OMWTVR0,
-			*IOP321_OIOWTVR);
-	DBG("\tATU: IOP321_ATUCR=0x%08x\n", *IOP321_ATUCR);
-	DBG("\tATU: IOP321_IABAR0=0x%08x IOP321_IALR0=0x%08x IOP321_IATVR0=%08x\n", *IOP321_IABAR0, *IOP321_IALR0, *IOP321_IATVR0);
-	DBG("\tATU: IOP321_ERBAR=0x%08x IOP321_ERLR=0x%08x IOP321_ERTVR=%08x\n", *IOP321_ERBAR, *IOP321_ERLR, *IOP321_ERTVR);
-	DBG("\tATU: IOP321_IABAR2=0x%08x IOP321_IALR2=0x%08x IOP321_IATVR2=%08x\n", *IOP321_IABAR2, *IOP321_IALR2, *IOP321_IATVR2);
-	DBG("\tATU: IOP321_IABAR3=0x%08x IOP321_IALR3=0x%08x IOP321_IATVR3=%08x\n", *IOP321_IABAR3, *IOP321_IALR3, *IOP321_IATVR3);
+	DBG("PCI:  Intel 80331 PCI init code.\n");
+	DBG("\tATU: IOP331_ATUCMD=0x%04x\n", *IOP331_ATUCMD);
+	DBG("\tATU: IOP331_OMWTVR0=0x%04x, IOP331_OIOWTVR=0x%04x\n",
+			*IOP331_OMWTVR0,
+			*IOP331_OIOWTVR);
+	DBG("\tATU: IOP331_ATUCR=0x%08x\n", *IOP331_ATUCR);
+	DBG("\tATU: IOP331_IABAR0=0x%08x IOP331_IALR0=0x%08x IOP331_IATVR0=%08x\n", *IOP331_IABAR0, *IOP331_IALR0, *IOP331_IATVR0);
+	DBG("\tATU: IOP331_ERBAR=0x%08x IOP331_ERLR=0x%08x IOP331_ERTVR=%08x\n", *IOP331_ERBAR, *IOP331_ERLR, *IOP331_ERTVR);
+	DBG("\tATU: IOP331_IABAR2=0x%08x IOP331_IALR2=0x%08x IOP331_IATVR2=%08x\n", *IOP331_IABAR2, *IOP331_IALR2, *IOP331_IATVR2);
+	DBG("\tATU: IOP331_IABAR3=0x%08x IOP331_IALR3=0x%08x IOP331_IATVR3=%08x\n", *IOP331_IABAR3, *IOP331_IALR3, *IOP331_IATVR3);
 
 #if 0
-	hook_fault_code(4, iop321_pci_abort, SIGBUS, "external abort on linefetch");
-	hook_fault_code(6, iop321_pci_abort, SIGBUS, "external abort on linefetch");
-	hook_fault_code(8, iop321_pci_abort, SIGBUS, "external abort on non-linefetch");
-	hook_fault_code(10, iop321_pci_abort, SIGBUS, "external abort on non-linefetch");
+	hook_fault_code(4, iop331_pci_abort, SIGBUS, "external abort on linefetch");
+	hook_fault_code(6, iop331_pci_abort, SIGBUS, "external abort on linefetch");
+	hook_fault_code(8, iop331_pci_abort, SIGBUS, "external abort on non-linefetch");
+	hook_fault_code(10, iop331_pci_abort, SIGBUS, "external abort on non-linefetch");
 #endif
-	hook_fault_code(16+6, iop321_pci_abort, SIGBUS, "imprecise external abort");
+	hook_fault_code(16+6, iop331_pci_abort, SIGBUS, "imprecise external abort");
 }
 

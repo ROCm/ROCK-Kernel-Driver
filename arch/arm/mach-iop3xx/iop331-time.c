@@ -1,11 +1,11 @@
 /*
- * arch/arm/mach-iop3xx/iop321-time.c
+ * arch/arm/mach-iop3xx/iop331-time.c
  *
- * Timer code for IOP321 based systems
+ * Timer code for IOP331 based systems
  *
- * Author: Deepak Saxena <dsaxena@mvista.com>
+ * Author: Dave Jiang <dave.jiang@intel.com>
  *
- * Copyright 2002-2003 MontaVista Software Inc.
+ * Copyright 2003 Intel Corp.
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -27,16 +27,16 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
 
-#define IOP321_TIME_SYNC 0
+#undef IOP331_TIME_SYNC
 
-static unsigned long iop321_latch;
+static unsigned long iop331_latch;
 
 static inline unsigned long get_elapsed(void)
 {
-	return iop321_latch - *IOP321_TU_TCR0;
+	return iop331_latch - *IOP331_TU_TCR0;
 }
 
-static unsigned long iop321_gettimeoffset(void)
+static unsigned long iop331_gettimeoffset(void)
 {
 	unsigned long elapsed, usec;
 	u32 tisr1, tisr2;
@@ -55,25 +55,25 @@ static unsigned long iop321_gettimeoffset(void)
 	asm volatile("mrc p6, 0, %0, c6, c1, 0" : "=r" (tisr2));
 
 	if(tisr1 & 1)
-		elapsed += iop321_latch;
+		elapsed += iop331_latch;
 	else if (tisr2 & 1)
-		elapsed = iop321_latch + get_elapsed();
+		elapsed = iop331_latch + get_elapsed();
 
 	/*
 	 * Now convert them to usec.
 	 */
-	usec = (unsigned long)(elapsed * (tick_nsec / 1000)) / iop321_latch;
+	usec = (unsigned long)(elapsed * (tick_nsec / 1000)) / iop331_latch;
 
 	return usec;
 }
 
 static irqreturn_t
-iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+iop331_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 tisr;
-#ifdef IOP321_TIME_SYNC
+#ifdef IOP331_TIME_SYNC
 	u32 passed;
-#define TM_THRESH (iop321_latch*2)
+#define TM_THRESH (iop331_latch*2)
 #endif
 
 	asm volatile("mrc p6, 0, %0, c6, c1, 0" : "=r" (tisr));
@@ -82,16 +82,16 @@ iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	asm volatile("mcr p6, 0, %0, c6, c1, 0" : : "r" (tisr));
 
-#ifdef IOP321_TIME_SYNC
-	passed = 0xffffffff - *IOP321_TU_TCR1;
+#ifdef IOP331_TIME_SYNC
+	passed = 0xffffffff - *IOP331_TU_TCR1;
 
 	do
 	{
 		do_timer(regs);
 		if(passed < TM_THRESH)
 			break;
-		if(passed > iop321_latch)
-			passed -= iop321_latch;
+		if(passed > iop331_latch)
+			passed -= iop331_latch;
 		else
 			passed = 0;
 	} while(1);
@@ -104,34 +104,34 @@ iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static struct irqaction iop321_timer_irq = {
-	.name		= "IOP321 Timer Tick",
-	.handler	= iop321_timer_interrupt,
+static struct irqaction iop331_timer_irq = {
+	.name		= "IOP331 Timer Tick",
+	.handler	= iop331_timer_interrupt,
 	.flags		= SA_INTERRUPT
 };
 
 extern int setup_arm_irq(int, struct irqaction*);
 
-void __init iop321_init_time(void)
+void __init iop331_init_time(void)
 {
 	u32 timer_ctl;
 
-	iop321_latch = (CLOCK_TICK_RATE + HZ / 2) / HZ;
-	gettimeoffset = iop321_gettimeoffset;
-	setup_irq(IRQ_IOP321_TIMER0, &iop321_timer_irq);
+	iop331_latch = (CLOCK_TICK_RATE + HZ / 2) / HZ;
+	gettimeoffset = iop331_gettimeoffset;
+	setup_irq(IRQ_IOP331_TIMER0, &iop331_timer_irq);
 
-	timer_ctl = IOP321_TMR_EN | IOP321_TMR_PRIVILEGED | IOP321_TMR_RELOAD |
-			IOP321_TMR_RATIO_1_1;
+	timer_ctl = IOP331_TMR_EN | IOP331_TMR_PRIVILEGED | IOP331_TMR_RELOAD |
+			IOP331_TMR_RATIO_1_1;
 
-	asm volatile("mcr p6, 0, %0, c4, c1, 0" : : "r" (iop321_latch));
+	asm volatile("mcr p6, 0, %0, c4, c1, 0" : : "r" (iop331_latch));
 
 	asm volatile("mcr p6, 0, %0, c0, c1, 0"	: : "r" (timer_ctl));
 
-#ifdef IOP321_TIME_SYNC
+#ifdef IOP331_TIME_SYNC
         /* Setup second timer */
         /* setup counter */
-        timer_ctl = IOP321_TMR_EN | IOP321_TMR_PRIVILEGED |
-                        IOP321_TMR_RATIO_1_1;
+        timer_ctl = IOP331_TMR_EN | IOP331_TMR_PRIVILEGED |
+                        IOP331_TMR_RATIO_1_1;
         asm volatile("mcr p6, 0, %0, c3, c1, 0" : : "r" (0xffffffff));
         /* setup control */
         asm volatile("mcr p6, 0, %0, c1, c1, 0" : : "r" (timer_ctl));
