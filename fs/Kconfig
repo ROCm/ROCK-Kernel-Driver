@@ -1357,6 +1357,35 @@ config EXPORTFS
 	tristate
 	default NFSD
 
+config SUNRPC
+	tristate
+	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
+	default y if NFS_FS=y || NFSD=y
+
+config SUNRPC_GSS
+	tristate "Provide RPCSEC_GSS authentication (EXPERIMENTAL)"
+	depends on SUNRPC && EXPERIMENTAL
+	default SUNRPC if NFS_V4=y
+	help
+	  Provides cryptographic authentication for NFS rpc requests.  To
+	  make this useful, you must also select at least one rpcsec_gss
+	  mechanism.
+	  Note: You should always select this option if you wish to use
+	  NFSv4.
+
+config RPCSEC_GSS_KRB5
+	tristate "Kerberos V mechanism for RPCSEC_GSS (EXPERIMENTAL)"
+	depends on SUNRPC_GSS && CRYPTO_DES && CRYPTO_MD5
+	default SUNRPC_GSS if NFS_V4=y
+	help
+	  Provides a gss-api mechanism based on Kerberos V5 (this is
+	  mandatory for RFC3010-compliant NFSv4 implementations).
+	  Requires a userspace daemon;
+		see http://www.citi.umich.edu/projects/nfsv4/.
+
+	  Note: If you select this option, please ensure that you also
+	  enable the MD5 and DES crypto ciphers.
+
 config SMB_FS
 	tristate "SMB file system support (to mount Windows shares etc.)"
 	depends on INET
@@ -1460,6 +1489,8 @@ config NCP_FS
 	  will be called ncpfs.  Say N unless you are connected to a Novell
 	  network.
 
+source "fs/ncpfs/Kconfig"
+
 config CODA_FS
 	tristate "Coda file system support (advanced network fs)"
 	depends on INET
@@ -1496,37 +1527,6 @@ config INTERMEZZO_FS
 	  If you say Y or M your kernel or module will provide InterMezzo
 	  support.  You will also need a file server daemon, which you can get
 	  from <http://www.inter-mezzo.org/>.
-
-config SUNRPC
-	tristate
-	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
-	default y if NFS_FS=y || NFSD=y
-
-config SUNRPC_GSS
-	tristate "Provide RPCSEC_GSS authentication (EXPERIMENTAL)"
-	depends on SUNRPC && EXPERIMENTAL
-	default SUNRPC if NFS_V4=y
-	help
-	  Provides cryptographic authentication for NFS rpc requests.  To
-	  make this useful, you must also select at least one rpcsec_gss
-	  mechanism.
-	  Note: You should always select this option if you wish to use
-	  NFSv4.
-
-config RPCSEC_GSS_KRB5
-	tristate "Kerberos V mechanism for RPCSEC_GSS (EXPERIMENTAL)"
-	depends on SUNRPC_GSS && CRYPTO_DES && CRYPTO_MD5
-	default SUNRPC_GSS if NFS_V4=y
-	help
-	  Provides a gss-api mechanism based on Kerberos V5 (this is
-	  mandatory for RFC3010-compliant NFSv4 implementations).
-	  Requires a userspace daemon;
-		see http://www.citi.umich.edu/projects/nfsv4/.
-
-	  Note: If you select this option, please ensure that you also
-	  enable the MD5 and DES crypto ciphers.
-
-source "fs/ncpfs/Kconfig"
 
 config AFS_FS
 # for fs/nls/Config.in
