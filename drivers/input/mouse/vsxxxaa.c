@@ -529,6 +529,7 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 	mouse->dev.name = mouse->name;
 	mouse->dev.phys = mouse->phys;
 	mouse->dev.id.bustype = BUS_RS232;
+	mouse->dev.dev = &serio->dev;
 	mouse->serio = serio;
 
 	if (serio_open (serio, drv)) {

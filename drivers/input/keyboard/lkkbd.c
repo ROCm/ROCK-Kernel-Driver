@@ -685,6 +685,7 @@ lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 	lk->dev.id.vendor = SERIO_LKKBD;
 	lk->dev.id.product = 0;
 	lk->dev.id.version = 0x0100;
+	lk->dev.dev = &serio->dev;
 
 	input_register_device (&lk->dev);
 

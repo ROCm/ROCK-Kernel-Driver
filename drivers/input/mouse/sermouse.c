@@ -280,6 +280,7 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 	sermouse->dev.id.vendor = sermouse->type;
 	sermouse->dev.id.product = c;
 	sermouse->dev.id.version = 0x0100;
+	sermouse->dev.dev = &serio->dev;
 
 	if (serio_open(serio, drv)) {
 		kfree(sermouse);

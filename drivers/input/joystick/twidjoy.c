@@ -210,6 +210,7 @@ static void twidjoy_connect(struct serio *serio, struct serio_driver *drv)
 	twidjoy->dev.id.vendor = SERIO_TWIDJOY;
 	twidjoy->dev.id.product = 0x0001;
 	twidjoy->dev.id.version = 0x0100;
+	twidjoy->dev.dev = &serio->dev;
 
 	twidjoy->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 

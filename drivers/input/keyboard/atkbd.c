@@ -730,6 +730,7 @@ static void atkbd_set_device_attrs(struct atkbd *atkbd)
 	atkbd->dev.id.version = atkbd->id;
 	atkbd->dev.event = atkbd_event;
 	atkbd->dev.private = atkbd;
+	atkbd->dev.dev = &atkbd->ps2dev.serio->dev;
 
 	atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP) | BIT(EV_MSC);
 

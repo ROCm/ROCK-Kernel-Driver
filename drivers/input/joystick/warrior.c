@@ -168,6 +168,7 @@ static void warrior_connect(struct serio *serio, struct serio_driver *drv)
 	warrior->dev.id.vendor = SERIO_WARRIOR;
 	warrior->dev.id.product = 0x0001;
 	warrior->dev.id.version = 0x0100;
+	warrior->dev.dev = &serio->dev;
 
 	for (i = 0; i < 2; i++) {
 		warrior->dev.absmax[ABS_X+i] = -64;
