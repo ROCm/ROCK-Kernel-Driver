@@ -1005,7 +1005,8 @@ void scsi_request_fn(request_queue_t * q)
 		req = NULL;
 		spin_unlock_irq(q->queue_lock);
 
-		if (SCpnt->request->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+		if (!(SCpnt->request->flags & REQ_DONTPREP)
+		    && (SCpnt->request->flags & (REQ_CMD | REQ_BLOCK_PC))) {
 			/*
 			 * This will do a couple of things:
 			 *  1) Fill in the actual SCSI command.
@@ -1026,18 +1027,8 @@ void scsi_request_fn(request_queue_t * q)
 			 * required).
 			 */
 			if (!scsi_init_io(SCpnt)) {
+				scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_DEVICE_BUSY);
 				spin_lock_irq(q->queue_lock);
-				SHpnt->host_busy--;
-				SDpnt->device_busy--;
-				if (SDpnt->device_busy == 0) {
-					SDpnt->starved = 1;
-					SHpnt->some_device_starved = 1;
-				}
-				SCpnt->request->special = SCpnt;
-				SCpnt->request->flags |= REQ_SPECIAL;
-				if(blk_rq_tagged(SCpnt->request))
-					blk_queue_end_tag(q, SCpnt->request);
-				_elv_add_request(q, SCpnt->request, 0, 0);
 				break;
 			}
 
@@ -1058,6 +1049,7 @@ void scsi_request_fn(request_queue_t * q)
 				continue;
 			}
 		}
+		SCpnt->request->flags |= REQ_DONTPREP;
 		/*
 		 * Finally, initialize any error handling parameters, and set up
 		 * the timers for timeouts.

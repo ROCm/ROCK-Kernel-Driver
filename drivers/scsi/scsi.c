@@ -658,7 +658,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
  * Notes:       This could be called either from an interrupt context or a
  *              normal process context.
  */
-static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
+int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 {
 	struct Scsi_Host *host = cmd->host;
 	unsigned long flags;

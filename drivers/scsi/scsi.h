@@ -480,6 +480,7 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			void (*done) (struct scsi_cmnd *),
 			int timeout, int retries);
 extern int scsi_dev_init(void);
+extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
 
 /*
  * Newer request-based interfaces.
