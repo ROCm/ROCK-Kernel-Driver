@@ -19,7 +19,6 @@
  *  This file contains code for allocating/freeing blocks.
  */
 
-#include <linux/locks.h>
 #include "sysv.h"
 
 /* We don't trust the value of

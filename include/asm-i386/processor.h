@@ -173,6 +173,10 @@ static inline unsigned int cpuid_edx(unsigned int op)
 	return edx;
 }
 
+#define load_cr3(pgdir) \
+	asm volatile("movl %0,%%cr3": :"r" (__pa(pgdir)))
+
+
 /*
  * Intel CPU features in CR4
  */

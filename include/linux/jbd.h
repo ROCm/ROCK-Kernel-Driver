@@ -235,6 +235,7 @@ enum jbd_state_bits {
 
 BUFFER_FNS(JBD, jbd)
 BUFFER_FNS(JBDDirty, jbddirty)
+TAS_BUFFER_FNS(JBDDirty, jbddirty)
 
 static inline struct buffer_head *jh2bh(struct journal_head *jh)
 {

@@ -191,15 +191,14 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 {
 	u32 val;
 	unsigned char *dp;
-	int left, retval;
+	int left;
 	u32 loadoff = 0;
 
 	dp = t4file->data;
 	left = t4file->len;
 	while (left >= sizeof(u32)) {
 	        if (t4file->user) {
-			retval = copy_from_user(&val, dp, sizeof(val));
-			if (retval)
+			if (copy_from_user(&val, dp, sizeof(val)))
 				return -EFAULT;
 		} else {
 			memcpy(&val, dp, sizeof(val));
@@ -216,8 +215,7 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 	if (left) {
 		val = 0;
 		if (t4file->user) {
-			retval = copy_from_user(&val, dp, left);
-			if (retval)
+			if (copy_from_user(&val, dp, left))
 				return -EFAULT;
 		} else {
 			memcpy(&val, dp, left);
@@ -808,8 +806,7 @@ static int c4_send_config(avmcard *card, capiloaddatapart * config)
 	left = config->len;
 	while (left >= sizeof(u32)) {
 	        if (config->user) {
-			retval = copy_from_user(val, dp, sizeof(val));
-			if (retval)
+			if (copy_from_user(val, dp, sizeof(val)))
 				return -EFAULT;
 		} else {
 			memcpy(val, dp, sizeof(val));
@@ -822,8 +819,7 @@ static int c4_send_config(avmcard *card, capiloaddatapart * config)
 	if (left) {
 		memset(val, 0, sizeof(val));
 		if (config->user) {
-			retval = copy_from_user(&val, dp, left);
-			if (retval)
+			if (copy_from_user(&val, dp, left))
 				return -EFAULT;
 		} else {
 			memcpy(&val, dp, left);
@@ -1282,8 +1278,6 @@ static int __init c4_init(void)
 {
 	int retval;
 
-	MOD_INC_USE_COUNT;
-
 	b1_set_revision(&c2_driver, revision);
         attach_capi_driver(&c2_driver);
 
@@ -1304,7 +1298,6 @@ static int __init c4_init(void)
 	detach_capi_driver(&c2_driver);
 	detach_capi_driver(&c4_driver);
  out:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 

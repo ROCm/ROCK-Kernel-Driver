@@ -15,7 +15,6 @@
 #include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 #include <linux/fs.h>

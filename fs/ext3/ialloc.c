@@ -19,7 +19,6 @@
 #include <linux/ext3_jbd.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/quotaops.h>
 
 #include <asm/bitops.h>

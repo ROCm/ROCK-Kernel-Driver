@@ -315,17 +315,19 @@ exp_export(struct nfsctl_export *nxp)
 	 * 2:  We must be able to find an inode from a filehandle.
 	 *       This means that s_export_op must be set.
 	 */
-	if (((inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV)
-	     || (nxp->ex_flags & NFSEXP_FSID))
-	    &&
-	    inode->i_sb->s_export_op)
-		/* Ok, we can export it */;
-	else {
+	if (!(inode->i_sb->s_type->fs_flags & FS_REQUIRES_DEV)) {
+		if (!(nxp->ex_flags & NFSEXP_FSID)) {
+			dprintk("exp_export: export of non-dev fs without fsid");
+			goto finish;
+		}
+	}
+	if (!inode->i_sb->s_export_op) {
 		dprintk("exp_export: export of invalid fs type.\n");
 		goto finish;
 	}
-	if (inode->i_sb->s_export_op &&
-	    !inode->i_sb->s_export_op->find_exported_dentry)
+
+	/* Ok, we can export it */;
+	if (!inode->i_sb->s_export_op->find_exported_dentry)
 		inode->i_sb->s_export_op->find_exported_dentry =
 			find_exported_dentry;
 

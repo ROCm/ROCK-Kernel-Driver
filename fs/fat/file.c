@@ -7,7 +7,6 @@
  */
 
 #include <linux/time.h>
-#include <linux/locks.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
 #include <linux/smp_lock.h>

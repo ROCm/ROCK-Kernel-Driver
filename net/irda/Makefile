@@ -22,7 +22,6 @@ endif
 
 obj-$(CONFIG_PROC_FS) += irproc.o
 obj-$(CONFIG_SYSCTL) += irsysctl.o
-obj-$(CONFIG_IRLAN) += irlan/irlan.o
 
 subdir-$(CONFIG_IRLAN) += irlan
 subdir-$(CONFIG_IRNET) += irnet

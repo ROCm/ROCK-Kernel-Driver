@@ -15,7 +15,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/unistd.h>
 
 #include <asm/system.h>
@@ -24,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/string.h>
 #include <asm/uaccess.h>
 #include <linux/slab.h>

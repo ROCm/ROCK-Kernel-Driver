@@ -2526,7 +2526,7 @@ static int via_dsp_ioctl_space (struct via_info *card,
 		info.fragments,
 		info.bytes);
 
-	return copy_to_user (arg, &info, sizeof (info));
+	return copy_to_user(arg, &info, sizeof (info)) ? -EFAULT : 0;
 }
 
 
@@ -2570,7 +2570,7 @@ static int via_dsp_ioctl_ptr (struct via_info *card,
 		info.blocks,
 		info.ptr);
 
-	return copy_to_user (arg, &info, sizeof (info));
+	return copy_to_user(arg, &info, sizeof (info)) ? -EFAULT : 0;
 }
 
 

@@ -21,7 +21,6 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/serial.h>
-#include <linux/locks.h>
 #include <linux/delay.h>
 #include <linux/random.h>
 #include <linux/reboot.h>
@@ -137,7 +136,6 @@ EXPORT_SYMBOL(fput);
 EXPORT_SYMBOL(fget);
 EXPORT_SYMBOL(igrab);
 EXPORT_SYMBOL(iunique);
-EXPORT_SYMBOL(iget4);
 EXPORT_SYMBOL(iput);
 EXPORT_SYMBOL(inode_init_once);
 EXPORT_SYMBOL(force_delete);
@@ -243,6 +241,8 @@ EXPORT_SYMBOL(shrink_dcache_anon);
 EXPORT_SYMBOL(find_inode_number);
 EXPORT_SYMBOL(is_subdir);
 EXPORT_SYMBOL(get_unused_fd);
+EXPORT_SYMBOL(vfs_read);
+EXPORT_SYMBOL(vfs_write);
 EXPORT_SYMBOL(vfs_create);
 EXPORT_SYMBOL(vfs_mkdir);
 EXPORT_SYMBOL(vfs_mknod);
@@ -538,7 +538,7 @@ EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(init_special_inode);
 EXPORT_SYMBOL(__get_hash_table);
 EXPORT_SYMBOL(new_inode);
-EXPORT_SYMBOL(insert_inode_hash);
+EXPORT_SYMBOL(__insert_inode_hash);
 EXPORT_SYMBOL(remove_inode_hash);
 EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);

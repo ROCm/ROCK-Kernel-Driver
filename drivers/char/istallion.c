@@ -2022,7 +2022,8 @@ static int stli_setserial(stliport_t *portp, struct serial_struct *sp)
 	printk("stli_setserial(portp=%x,sp=%x)\n", (int) portp, (int) sp);
 #endif
 
-	copy_from_user(&sio, sp, sizeof(struct serial_struct));
+	if (copy_from_user(&sio, sp, sizeof(struct serial_struct)))
+		return -EFAULT;
 	if (!capable(CAP_SYS_ADMIN)) {
 		if ((sio.baud_base != portp->baud_base) ||
 		    (sio.close_delay != portp->close_delay) ||
@@ -4878,11 +4879,15 @@ static ssize_t stli_memread(struct file *fp, char *buf, size_t count, loff_t *of
 	while (size > 0) {
 		memptr = (void *) EBRDGETMEMPTR(brdp, fp->f_pos);
 		n = MIN(size, (brdp->pagesize - (((unsigned long) fp->f_pos) % brdp->pagesize)));
-		copy_to_user(buf, memptr, n);
+		if (copy_to_user(buf, memptr, n)) {
+			count = -EFAULT;
+			goto out;
+		}
 		fp->f_pos += n;
 		buf += n;
 		size -= n;
 	}
+out:
 	EBRDDISABLE(brdp);
 	restore_flags(flags);
 
@@ -4930,11 +4935,15 @@ static ssize_t stli_memwrite(struct file *fp, const char *buf, size_t count, lof
 	while (size > 0) {
 		memptr = (void *) EBRDGETMEMPTR(brdp, fp->f_pos);
 		n = MIN(size, (brdp->pagesize - (((unsigned long) fp->f_pos) % brdp->pagesize)));
-		copy_from_user(memptr, chbuf, n);
+		if (copy_from_user(memptr, chbuf, n)) {
+			count = -EFAULT;
+			goto out;
+		}
 		fp->f_pos += n;
 		chbuf += n;
 		size -= n;
 	}
+out:
 	EBRDDISABLE(brdp);
 	restore_flags(flags);
 

@@ -22,7 +22,6 @@
 #include "ext2.h"
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/random.h>
 #include <linux/smp_lock.h>

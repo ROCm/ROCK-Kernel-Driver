@@ -490,7 +490,10 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 			retval = -ENOMEM;
 			goto exit;
 		}
-		copy_from_user (temp_buffer, buf, count);
+		if (copy_from_user (temp_buffer, buf, count)) {
+			retval = -EFAULT;
+			goto exit;
+		}
 		current_buffer = temp_buffer;
 	} else {
 		current_buffer = buf;

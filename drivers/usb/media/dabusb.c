@@ -680,7 +680,9 @@ static int dabusb_ioctl (struct inode *inode, struct file *file, unsigned int cm
 
 		ret=dabusb_bulk (s, pbulk);
 		if(ret==0)
-			ret = copy_to_user ((void *) arg, pbulk, sizeof (bulk_transfer_t));
+			if (copy_to_user((void *)arg, pbulk,
+					 sizeof(bulk_transfer_t)))
+				ret = -EFAULT;
 		kfree (pbulk);
 		break;
 

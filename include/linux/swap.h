@@ -91,6 +91,7 @@ struct swap_info_struct {
 	int next;			/* next entry on swap list */
 };
 
+struct inode;
 extern int nr_swap_pages;
 
 /* Swap 50% full? Release swapcache more aggressively.. */

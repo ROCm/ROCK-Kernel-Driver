@@ -22,7 +22,6 @@
 
 #ifdef MAJOR_NR
 
-#include <linux/locks.h>
 #include <asm/semaphore.h>
 
 #define LOCAL_END_REQUEST

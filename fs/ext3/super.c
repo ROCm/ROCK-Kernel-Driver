@@ -26,7 +26,6 @@
 #include <linux/ext3_jbd.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>

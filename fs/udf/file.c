@@ -37,8 +37,8 @@
 #include <linux/kernel.h>
 #include <linux/string.h> /* memset */
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
+#include <linux/pagemap.h>
 
 #include "udf_i.h"
 #include "udf_sb.h"

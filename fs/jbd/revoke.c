@@ -65,7 +65,6 @@
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/list.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>

@@ -20,7 +20,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/locks.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"

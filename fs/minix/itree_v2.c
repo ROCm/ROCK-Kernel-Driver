@@ -1,5 +1,4 @@
 #include "minix.h"
-#include <linux/locks.h>
 
 enum {DIRECT = 7, DEPTH = 4};	/* Have triple indirect */
 

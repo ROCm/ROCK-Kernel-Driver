@@ -13,7 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/file.h>
-#include <linux/locks.h>
+#include <linux/pagemap.h>
 #include <asm/bitops.h>
 #include "autofs_i.h"
 #define __NO_VERSION__

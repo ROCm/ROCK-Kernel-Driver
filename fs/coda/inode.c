@@ -15,7 +15,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
@@ -33,7 +32,6 @@
 #include <linux/coda_cache.h>
 
 /* VFS super_block ops */
-static void coda_read_inode(struct inode *);
 static void coda_clear_inode(struct inode *);
 static void coda_put_super(struct super_block *);
 static int coda_statfs(struct super_block *sb, struct statfs *buf);
@@ -92,7 +90,6 @@ struct super_operations coda_super_operations =
 {
 	alloc_inode:	coda_alloc_inode,
 	destroy_inode:	coda_destroy_inode,
-	read_inode:	coda_read_inode,
 	clear_inode:	coda_clear_inode,
 	put_super:	coda_put_super,
 	statfs:		coda_statfs,
@@ -227,18 +224,6 @@ static void coda_put_super(struct super_block *sb)
 
 	printk("Coda: Bye bye.\n");
 	kfree(sbi);
-}
-
-/* all filling in of inodes postponed until lookup */
-static void coda_read_inode(struct inode *inode)
-{
-	struct coda_sb_info *sbi = coda_sbp(inode->i_sb);
-	struct coda_inode_info *cii;
-
-        if (!sbi) BUG();
-
-	cii = ITOC(inode);
-	list_add(&cii->c_cilist, &sbi->sbi_cihead);
 }
 
 static void coda_clear_inode(struct inode *inode)

@@ -194,7 +194,7 @@ sunos_sys_table:
 	.word sunos_getdirentries, sys32_statfs, sys32_fstatfs
 	.word sys_oldumount, sunos_nosys, sunos_nosys
 	.word sys_getdomainname, sys_setdomainname
-	.word sunos_nosys, sys32_quotactl, sunos_nosys
+	.word sunos_nosys, sys_quotactl, sunos_nosys
 	.word sunos_mount, sys_ustat, sunos_semsys
 	.word sunos_nosys, sunos_shmsys, sunos_audit
 	.word sunos_nosys, sunos_getdents, sys_setsid

@@ -20,10 +20,10 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/qnx4_fs.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/highuid.h>
 #include <linux/smp_lock.h>
+#include <linux/pagemap.h>
 
 #include <asm/uaccess.h>
 

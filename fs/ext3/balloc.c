@@ -17,7 +17,6 @@
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
-#include <linux/locks.h>
 #include <linux/quotaops.h>
 
 /*

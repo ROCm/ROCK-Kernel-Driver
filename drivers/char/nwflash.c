@@ -159,7 +159,8 @@ static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * pp
 		if (ret == 0) {
 			ret = count;
 			*ppos += count;
-		}
+		} else
+			ret = -EFAULT;
 		up(&nwflash_sem);
 	}
 	return ret;

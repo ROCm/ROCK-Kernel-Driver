@@ -21,7 +21,6 @@
  *  the superblock.
  */
 
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
 #include <linux/slab.h>

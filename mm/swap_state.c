@@ -31,17 +31,34 @@ static int swap_writepage(struct page *page)
 	return 0;
 }
 
+/*
+ * swapper_space doesn't have a real inode, so it gets a special vm_writeback()
+ * so we don't need swap special cases in generic_vm_writeback().
+ *
+ * FIXME: swap pages are locked, but not PageWriteback while under writeout.
+ * This will confuse throttling in shrink_cache().  It may be advantageous to
+ * set PG_writeback against swap pages while they're also locked.  Either that,
+ * or special-case swap pages in shrink_cache().
+ */
+static int swap_vm_writeback(struct page *page, int *nr_to_write)
+{
+	struct address_space *mapping = page->mapping;
+
+	unlock_page(page);
+	return generic_writeback_mapping(mapping, nr_to_write);
+}
+
 static struct address_space_operations swap_aops = {
+	vm_writeback: swap_vm_writeback,
 	writepage: swap_writepage,
 	sync_page: block_sync_page,
 };
 
 /*
- * swapper_inode is needed only for for i_bufferlist_lock. This
- * avoid special-casing in other parts of the kernel.
+ * swapper_inode doesn't do anything much.  It is really only here to
+ * avoid some special-casing in other parts of the kernel.
  */
 static struct inode swapper_inode = {
-	i_bufferlist_lock:	SPIN_LOCK_UNLOCKED,
 	i_mapping:		&swapper_space,
 };
 
@@ -55,6 +72,8 @@ struct address_space swapper_space = {
 	host:		&swapper_inode,
 	a_ops:		&swap_aops,
 	i_shared_lock:	SPIN_LOCK_UNLOCKED,
+	private_lock:	SPIN_LOCK_UNLOCKED,
+	private_list:	LIST_HEAD_INIT(swapper_space.private_list),
 };
 
 #ifdef SWAP_CACHE_INFO
@@ -219,8 +238,16 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 				 1 << PG_referenced | 1 << PG_arch_1 |
 				 1 << PG_checked);
+		/*
+		 * ___add_to_page_cache puts the page on ->clean_pages,
+		 * but it's dirty.  If it's on ->clean_pages, it will basically
+		 * never get written out.
+		 */
 		SetPageDirty(page);
 		___add_to_page_cache(page, mapping, index);
+		/* fix that up */
+		list_del(&page->list);
+		list_add(&page->list, &mapping->dirty_pages);
 	}
 
 	write_unlock(&mapping->page_lock);

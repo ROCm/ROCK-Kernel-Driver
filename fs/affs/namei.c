@@ -14,7 +14,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
-#include <linux/locks.h>
 #include <linux/amigaffs.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>

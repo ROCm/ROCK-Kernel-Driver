@@ -12,17 +12,30 @@ EPS-parportbook := $(patsubst %.fig, %.eps, $(IMG-parportbook))
 PNG-parportbook := $(patsubst %.fig, %.png, $(IMG-parportbook))
 C-procfs-example = procfs_example.sgml
 
-books:	$(BOOKS)
+$(TOPDIR)/scripts/docgen: dummy
+	chmod 755 $(TOPDIR)/scripts/docgen
 
-$(BOOKS): $(TOPDIR)/scripts/docproc
+$(TOPDIR)/scripts/gen-all-syms: dummy
+	chmod 755 $(TOPDIR)/scripts/gen-all-syms
 
-.PHONY:	books ps pdf html clean mrproper
+$(TOPDIR)/scripts/kernel-doc: dummy
+	chmod 755 $(TOPDIR)/scripts/kernel-doc
 
-ps:	$(PS)
+$(TOPDIR)/scripts/docproc: dummy
+	$(MAKE) -C $(TOPDIR)/scripts docproc
 
-pdf:	$(PDF)
+$(BOOKS): $(TOPDIR)/scripts/docgen $(TOPDIR)/scripts/gen-all-syms \
+	  $(TOPDIR)/scripts/kernel-doc $(TOPDIR)/scripts/docproc
 
-html:	$(HTML)
+.PHONY:	sgmldocs psdocs pdfdocs htmldocs clean mrproper
+
+sgmldocs: $(BOOKS)
+
+psdocs: $(PS)
+
+pdfdocs: $(PDF)
+
+htmldocs: $(HTML)
 
 %.eps: %.fig
 	fig2dev -Leps $< $@
@@ -38,9 +51,6 @@ html:	$(HTML)
 	    -e "s/>/\\&gt;/g" >> $@
 	echo "</programlisting>" >> $@
 
-
-$(TOPDIR)/scripts/docproc:
-	$(MAKE) -C $(TOPDIR)/scripts docproc
 
 mousedrivers.sgml: mousedrivers.tmpl
 	$(TOPDIR)/scripts/docgen <$< >$@
@@ -131,7 +141,7 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/lib/string.c \
 		$(TOPDIR)/lib/vsprintf.c \
 		$(TOPDIR)/net/netsyms.c
- 
+
 kernel-api.sgml: kernel-api.tmpl $(APISOURCES)
 	$(TOPDIR)/scripts/docgen $(APISOURCES) \
 		<kernel-api.tmpl >kernel-api.sgml

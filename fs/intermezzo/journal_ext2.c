@@ -11,7 +11,6 @@
 #include <linux/vmalloc.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/ext2_fs.h> 

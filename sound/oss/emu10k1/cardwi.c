@@ -304,9 +304,10 @@ void emu10k1_wavein_getxfersize(struct wiinst *wiinst, u32 * size)
 
 static void copy_block(u8 *dst, u8 * src, u32 str, u32 len, u8 cov)
 {
-	if (cov == 1)
-		__copy_to_user(dst, src + str, len);
-	else {
+	if (cov == 1) {
+		if (__copy_to_user(dst, src + str, len))
+			return;
+	} else {
 		u8 byte;
 		u32 i;
 
@@ -314,7 +315,8 @@ static void copy_block(u8 *dst, u8 * src, u32 str, u32 len, u8 cov)
 
 		for (i = 0; i < len; i++) {
 			byte = src[2 * i] ^ 0x80;
-			__copy_to_user(dst + i, &byte, 1);
+			if (__copy_to_user(dst + i, &byte, 1))
+				return;
 		}
 	}
 }

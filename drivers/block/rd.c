@@ -318,7 +318,8 @@ static ssize_t initrd_read(struct file *file, char *buf,
 	left = initrd_end - initrd_start - *ppos;
 	if (count > left) count = left;
 	if (count == 0) return 0;
-	copy_to_user(buf, (char *)initrd_start + *ppos, count);
+	if (copy_to_user(buf, (char *)initrd_start + *ppos, count))
+		return -EFAULT;
 	*ppos += count;
 	return count;
 }

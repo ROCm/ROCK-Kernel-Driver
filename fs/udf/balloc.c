@@ -26,7 +26,6 @@
 
 #include "udfdecl.h"
 
-#include <linux/locks.h>
 #include <linux/quotaops.h>
 #include <asm/bitops.h>
 

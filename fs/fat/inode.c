@@ -12,11 +12,11 @@
 
 #include <linux/module.h>
 #include <linux/time.h>
-#include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
+#include <linux/pagemap.h>
 
 //#include <asm/uaccess.h>
 #include <asm/unaligned.h>

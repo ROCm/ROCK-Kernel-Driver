@@ -20,7 +20,6 @@
 #include <linux/mm.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 #include <linux/ncp_fs.h>

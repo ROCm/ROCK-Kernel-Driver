@@ -19,8 +19,8 @@
 
 #include <linux/slab.h>
 #include <linux/types.h>
-#include <linux/locks.h>
 #include <linux/fs.h>
+#include <linux/sched.h>
 
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>

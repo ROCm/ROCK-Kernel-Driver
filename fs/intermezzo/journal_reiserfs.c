@@ -16,7 +16,6 @@
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
-#include <linux/locks.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #if 0

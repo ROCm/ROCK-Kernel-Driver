@@ -163,9 +163,10 @@ int raw_ctl_ioctl(struct inode *inode,
 
 		/* First, find out which raw minor we want */
 
-		err = copy_from_user(&rq, (void *) arg, sizeof(rq));
-		if (err)
+		if (copy_from_user(&rq, (void *) arg, sizeof(rq))) {
+			err = -EFAULT;
 			break;
+		}
 		
 		minor = rq.raw_minor;
 		if (minor <= 0 || minor > MINORMASK) {
@@ -222,6 +223,8 @@ int raw_ctl_ioctl(struct inode *inode,
 				rq.block_major = rq.block_minor = 0;
 			}
 			err = copy_to_user((void *) arg, &rq, sizeof(rq));
+			if (err)
+				err = -EFAULT;
 		}
 		break;
 		

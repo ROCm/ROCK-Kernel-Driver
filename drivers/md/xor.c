@@ -19,7 +19,6 @@
 #define BH_TRACE 0
 #include <linux/module.h>
 #include <linux/raid/md.h>
-#include <linux/raid/md_compatible.h>
 #include <linux/raid/xor.h>
 #include <asm/xor.h>
 
@@ -27,31 +26,30 @@
 static struct xor_block_template *active_template;
 
 void
-xor_block(unsigned int count, struct buffer_head **bh_ptr)
+xor_block(unsigned int count, unsigned int bytes, void **ptr)
 {
 	unsigned long *p0, *p1, *p2, *p3, *p4;
-	unsigned long bytes = bh_ptr[0]->b_size;
 
-	p0 = (unsigned long *) bh_ptr[0]->b_data;
-	p1 = (unsigned long *) bh_ptr[1]->b_data;
+	p0 = (unsigned long *) ptr[0];
+	p1 = (unsigned long *) ptr[1];
 	if (count == 2) {
 		active_template->do_2(bytes, p0, p1);
 		return;
 	}
 
-	p2 = (unsigned long *) bh_ptr[2]->b_data;
+	p2 = (unsigned long *) ptr[2];
 	if (count == 3) {
 		active_template->do_3(bytes, p0, p1, p2);
 		return;
 	}
 
-	p3 = (unsigned long *) bh_ptr[3]->b_data;
+	p3 = (unsigned long *) ptr[3];
 	if (count == 4) {
 		active_template->do_4(bytes, p0, p1, p2, p3);
 		return;
 	}
 
-	p4 = (unsigned long *) bh_ptr[4]->b_data;
+	p4 = (unsigned long *) ptr[4];
 	active_template->do_5(bytes, p0, p1, p2, p3, p4);
 }
 
@@ -103,7 +101,7 @@ calibrate_xor_block(void)
 	void *b1, *b2;
 	struct xor_block_template *f, *fastest;
 
-	b1 = (void *) md__get_free_pages(GFP_KERNEL, 2);
+	b1 = (void *) __get_free_pages(GFP_KERNEL, 2);
 	if (! b1) {
 		printk("raid5: Yikes!  No memory available.\n");
 		return -ENOMEM;
@@ -137,7 +135,7 @@ calibrate_xor_block(void)
 	return 0;
 }
 
-MD_EXPORT_SYMBOL(xor_block);
+EXPORT_SYMBOL(xor_block);
 MODULE_LICENSE("GPL");
 
 module_init(calibrate_xor_block);

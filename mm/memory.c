@@ -348,11 +348,13 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 
 			pte_clear(ptep);
 			pfn = pte_pfn(pte);
+			tlb_remove_tlb_entry(tlb, pte, address+offset);
 			if (pfn_valid(pfn)) {
 				struct page *page = pfn_to_page(pfn);
 				if (!PageReserved(page)) {
 					if (pte_dirty(pte))
 						set_page_dirty(page);
+					tlb->freed++;
 					tlb_remove_page(tlb, page);
 				}
 			}

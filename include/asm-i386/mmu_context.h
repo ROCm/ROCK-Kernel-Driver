@@ -38,7 +38,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 		set_bit(cpu, &next->cpu_vm_mask);
 
 		/* Re-load page tables */
-		asm volatile("movl %0,%%cr3": :"r" (__pa(next->pgd)));
+		load_cr3(next->pgd);
 
 		/* load_LDT, if either the previous or next thread
 		 * has a non-default LDT.
@@ -53,9 +53,9 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 			BUG();
 		if(!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 
-			 * tlb flush IPI delivery. We must flush our tlb.
+			 * tlb flush IPI delivery. We must reload %cr3.
 			 */
-			local_flush_tlb();
+			load_cr3(next->pgd);
 			load_LDT(&next->context);
 		}
 	}

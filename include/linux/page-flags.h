@@ -62,9 +62,8 @@
 #define PG_arch_1		10
 #define PG_reserved		11
 
-#define PG_launder		12	/* written out by VM pressure.. */
-#define PG_private		13	/* Has something at ->private */
-#define PG_writeback		14	/* Page is under writeback */
+#define PG_private		12	/* Has something at ->private */
+#define PG_writeback		13	/* Page is under writeback */
 
 /*
  * Global page accounting.  One instance per CPU.
@@ -171,10 +170,6 @@ extern void get_page_state(struct page_state *ret);
 #define PageReserved(page)	test_bit(PG_reserved, &(page)->flags)
 #define SetPageReserved(page)	set_bit(PG_reserved, &(page)->flags)
 #define ClearPageReserved(page)	clear_bit(PG_reserved, &(page)->flags)
-
-#define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
-#define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
-#define ClearPageLaunder(page)	clear_bit(PG_launder, &(page)->flags)
 
 #define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
 #define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)

@@ -353,7 +353,8 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 	}
 
 	if (from_user) {
-		copy_from_user(pkt->data, buf, count);
+		if (copy_from_user(pkt->data, buf, count))
+			return -EFAULT;
 	} else {
 		memcpy(pkt->data, buf, count);
 	}
