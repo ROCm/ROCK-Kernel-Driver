@@ -3,9 +3,26 @@
  *
  * Kernel execution entry point code.
  *
- * Matt Porter <mporter@mvista.com>
- *
- * Copyright 2002-2003 MontaVista Software, Inc.
+ *    Copyright (c) 1995-1996 Gary Thomas <gdt@linuxppc.org>
+ *      Initial PowerPC version.
+ *    Copyright (c) 1996 Cort Dougan <cort@cs.nmt.edu>
+ *      Rewritten for PReP
+ *    Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>
+ *      Low-level exception handers, MMU support, and rewrite.
+ *    Copyright (c) 1997 Dan Malek <dmalek@jlc.net>
+ *      PowerPC 8xx modifications.
+ *    Copyright (c) 1998-1999 TiVo, Inc.
+ *      PowerPC 403GCX modifications.
+ *    Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
+ *      PowerPC 403GCX/405GP modifications.
+ *    Copyright 2000 MontaVista Software Inc.
+ *	PPC405 modifications
+ *      PowerPC 403GCX/405GP modifications.
+ * 	Author: MontaVista Software, Inc.
+ *         	frank_rowand@mvista.com or source@mvista.com
+ * 	   	debbie_chu@mvista.com
+ *    Copyright 2002-2004 MontaVista Software, Inc.
+ *      PowerPC 44x support, Matt Porter <mporter@kernel.crashing.org>
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
