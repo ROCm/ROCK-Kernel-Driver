@@ -13,43 +13,45 @@ obj-$(CONFIG_LOGO_SUPERH_MONO)		+= logo_superh_mono.o
 obj-$(CONFIG_LOGO_SUPERH_VGA16)		+= logo_superh_vga16.o
 obj-$(CONFIG_LOGO_SUPERH_CLUT224)	+= logo_superh_clut224.o
 
-# Dependencies on generated files need to be listed explicitly
+# How to generate logo's
 
-$(obj)/%_mono.o: $(src)/%_mono.c
+# Use logo-cfiles to retreive list of .c files to be built
+logo-cfiles = $(notdir $(patsubst %.$(2), %.c, \
+              $(wildcard $(srctree)/$(src)/*$(1).$(2))))
 
-$(obj)/%_vga16.o: $(src)/%_vga16.c
 
-$(obj)/%_clut224.o: $(src)/%_clut224.c
-
-$(obj)/%_gray256.o: $(src)/%_gray256.c
-
-# How to generate them
+# Mono logos
+extra-y += $(call logo-cfiles,_mono,pbm)
 
 quiet_cmd_logo_mono    = MONO    $@
-      cmd_logo_mono    = $(objtree)/scripts/pnmtologo -t mono -n $*_mono -o $@ $<
-
-quiet_cmd_logo_vga16   = VGA16   $@
-      cmd_logo_vga16   = $(objtree)/scripts/pnmtologo -t vga16 -n $*_vga16 -o $@ $<
-
-quiet_cmd_logo_clut224 = CLUT224 $@
-      cmd_logo_clut224 = $(objtree)/scripts/pnmtologo -t clut224 -n $*_clut224 -o $@ $<
-
-quiet_cmd_logo_gray256 = GRAY256 $@
-      cmd_logo_gray256 = $(objtree)/scripts/pnmtologo -t gray256 -n $*_gray256 -o $@ $<
-
+      cmd_logo_mono    = scripts/pnmtologo -t mono -n $*_mono -o $@ $<
 
 $(obj)/%_mono.c: $(src)/%_mono.pbm FORCE
 	$(call if_changed,logo_mono)
 
+# VGA16 logos
+extra-y += $(call logo-cfiles,_vga16,ppm)
+
+quiet_cmd_logo_vga16   = VGA16   $@
+      cmd_logo_vga16   = scripts/pnmtologo -t vga16 -n $*_vga16 -o $@ $<
+
 $(obj)/%_vga16.c: $(src)/%_vga16.ppm FORCE
 	$(call if_changed,logo_vga16)
+
+#224 Logos
+extra-y += $(call logo-cfiles,_clut224,ppm)
+
+quiet_cmd_logo_clut224 = CLUT224 $@
+      cmd_logo_clut224 = scripts/pnmtologo -t clut224 -n $*_clut224 -o $@ $<
 
 $(obj)/%_clut224.c: $(src)/%_clut224.ppm FORCE
 	$(call if_changed,logo_clut224)
 
+# Gray 256
+extra-y += $(call logo-cfiles,_gray256,pgm)
+
+quiet_cmd_logo_gray256 = GRAY256 $@
+      cmd_logo_gray256 = scripts/pnmtologo -t gray256 -n $*_gray256 -o $@ $<
+
 $(obj)/%_gray256.c: $(src)/%_gray256.pgm FORCE
 	$(call if_changed,logo_gray256)
-
-
-# Files generated that shall be removed upon make clean
-targets := *_mono.c *_vga16.c *_clut224.c *_gray256.c
