@@ -1452,10 +1452,8 @@ void __init init_idle(task_t *idle, int cpu)
 	set_tsk_need_resched(idle);
 	__restore_flags(flags);
 
-#ifdef CONFIG_PREEMPT
 	/* Set the preempt count _outside_ the spinlocks! */
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
-#endif
 }
 
 extern void init_timervecs(void);
