@@ -21,6 +21,10 @@ __init void arch_init_sched_domains(void)
 		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
 
 		*cpu_domain = SD_SIBLING_INIT;
+		/* Disable SMT NICE for CMP */
+		/* RED-PEN use a generic flag */ 
+		if (cpu_data[i].x86_vendor == X86_VENDOR_AMD) 
+			cpu_domain->flags &= ~SD_SHARE_CPUPOWER; 
 		cpu_domain->span = cpu_sibling_map[i];
 		cpu_domain->parent = phys_domain;
 		cpu_domain->groups = &sched_group_cpus[i];
