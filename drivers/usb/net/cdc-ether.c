@@ -1216,7 +1216,7 @@ static int CDCEther_probe( struct usb_interface *intf,
 	}
 
 	// Now we need to get a kernel Ethernet interface.
-	net = init_etherdev( NULL, 0 );
+	net = alloc_etherdev(0);
 	if ( !net ) {
 		// Hmm...  The kernel is not sharing today...
 		// Fine, we didn't want it anyway...
@@ -1263,6 +1263,11 @@ static int CDCEther_probe( struct usb_interface *intf,
 	// TODO - last minute HACK
 	ether_dev->comm_ep_in = 5;
 
+	if (register_netdev(net) != 0) {
+		usb_put_dev(usb);
+		goto out;
+	}
+
 /* FIXME!!! This driver needs to be fixed to work with the new USB interface logic
  * this is not the correct thing to be doing here, we need to set the interface
  * driver specific data field.
@@ -1270,6 +1275,13 @@ static int CDCEther_probe( struct usb_interface *intf,
 	// Okay, we are finally done...
 	return 0;
 
+
+out:
+	usb_driver_release_interface( &CDCEther_driver, 
+	                              &(usb->config[ether_dev->configuration_num].interface[ether_dev->comm_interface]) );
+
+	usb_driver_release_interface( &CDCEther_driver, 
+	                              &(usb->config[ether_dev->configuration_num].interface[ether_dev->data_interface]) );
 	// bailing out with our tail between our knees
 error_all:
 	usb_free_urb(ether_dev->tx_urb);

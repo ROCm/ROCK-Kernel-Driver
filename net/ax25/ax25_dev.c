@@ -34,21 +34,6 @@
 ax25_dev *ax25_dev_list;
 spinlock_t ax25_dev_lock = SPIN_LOCK_UNLOCKED;
 
-ax25_dev *ax25_dev_ax25dev(struct net_device *dev)
-{
-	ax25_dev *ax25_dev, *res = NULL;
-
-	spin_lock_bh(&ax25_dev_lock);
-	for (ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
-		if (ax25_dev->dev == dev) {
-			res = ax25_dev;
-			break;
-		}
-	spin_unlock_bh(&ax25_dev_lock);
-
-	return res;
-}
-
 ax25_dev *ax25_addr_ax25dev(ax25_address *addr)
 {
 	ax25_dev *ax25_dev, *res = NULL;
@@ -80,6 +65,7 @@ void ax25_dev_device_up(struct net_device *dev)
 
 	memset(ax25_dev, 0x00, sizeof(*ax25_dev));
 
+	dev->ax25_ptr     = ax25_dev;
 	ax25_dev->dev     = dev;
 	ax25_dev->forward = NULL;
 
@@ -152,6 +138,7 @@ void ax25_dev_device_down(struct net_device *dev)
 		s = s->next;
 	}
 	spin_unlock_bh(&ax25_dev_lock);
+	dev->ax25_ptr = NULL;
 
 	ax25_register_sysctl();
 }
