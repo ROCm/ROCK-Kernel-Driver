@@ -688,7 +688,7 @@ out:
 static void
 typhoon_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct cmd_desc xp_cmd;
 	int err;
 
@@ -726,7 +726,7 @@ typhoon_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 static void
 typhoon_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	spin_lock_bh(&tp->state_lock);
 	if(tp->vlgrp)
 		tp->vlgrp->vlan_devices[vid] = NULL;
@@ -757,7 +757,7 @@ typhoon_tso_fill(struct sk_buff *skb, struct transmit_ring *txRing,
 static int
 typhoon_start_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct transmit_ring *txRing;
 	struct tx_desc *txd, *first_txd;
 	dma_addr_t skb_dma;
@@ -908,7 +908,7 @@ typhoon_start_tx(struct sk_buff *skb, struct net_device *dev)
 static void
 typhoon_set_rx_mode(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct cmd_desc xp_cmd;
 	u32 mc_filter[2];
 	u16 filter;
@@ -1002,7 +1002,7 @@ typhoon_do_get_stats(struct typhoon *tp)
 static struct net_device_stats *
 typhoon_get_stats(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct net_device_stats *stats = &tp->stats;
 	struct net_device_stats *saved = &tp->stats_saved;
 
@@ -1158,7 +1158,7 @@ typhoon_ethtool_sset(struct typhoon *tp, struct ethtool_cmd *cmd)
 static inline int
 typhoon_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	u32 ethcmd;
 
 	if(copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
@@ -1756,7 +1756,7 @@ typhoon_fill_free_ring(struct typhoon *tp)
 static int
 typhoon_poll(struct net_device *dev, int *total_budget)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct typhoon_indexes *indexes = tp->indexes;
 	int orig_budget = *total_budget;
 	int budget, work_done, done;
@@ -2068,7 +2068,7 @@ typhoon_stop_runtime(struct typhoon *tp, int wait_type)
 static void
 typhoon_tx_timeout(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 
 	if(typhoon_reset(dev->base_addr, WaitNoSleep) < 0) {
 		printk(KERN_WARNING "%s: could not reset in tx timeout\n",
@@ -2098,7 +2098,7 @@ truely_dead:
 static int
 typhoon_open(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	int err;
 
 	err = typhoon_wakeup(tp, WaitSleep);
@@ -2140,7 +2140,7 @@ out:
 static int
 typhoon_close(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -2168,7 +2168,7 @@ static int
 typhoon_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 
 	/* If we're down, resume when we are upped.
 	 */
@@ -2200,7 +2200,7 @@ static int
 typhoon_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct cmd_desc xp_cmd;
 
 	/* If we're down, we're already suspended.
@@ -2366,7 +2366,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	dev->irq = pdev->irq;
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 	tp->shared = (struct typhoon_shared *) shared;
 	tp->shared_dma = shared_dma;
 	tp->pdev = pdev;
@@ -2537,7 +2537,7 @@ static void __devexit
 typhoon_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct typhoon *tp = (struct typhoon *) (dev->priv);
+	struct typhoon *tp = netdev_priv(dev);
 
 	unregister_netdev(dev);
 	pci_set_power_state(pdev, 0);

@@ -567,7 +567,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 
-	np = dev->priv;
+	np = netdev_priv(dev);
 	np->pci_dev = pdev;
 	np->chip_id = chip_idx;
 	np->msg_enable = (1 << debug) - 1;
@@ -787,7 +787,7 @@ static void mdio_sync(long mdio_addr)
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long mdio_addr = dev->base_addr + MIICtrl;
 	int mii_cmd = (0xf6 << 10) | (phy_id << 5) | location;
 	int i, retval = 0;
@@ -817,7 +817,7 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long mdio_addr = dev->base_addr + MIICtrl;
 	int mii_cmd = (0x5002 << 16) | (phy_id << 23) | (location<<18) | value;
 	int i;
@@ -846,7 +846,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 
 static int netdev_open(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -916,7 +916,7 @@ static int netdev_open(struct net_device *dev)
 
 static void check_duplex(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int mii_lpa = mdio_read(dev, np->phys[0], MII_LPA);
 	int negotiated = mii_lpa & np->mii_if.advertising;
@@ -945,7 +945,7 @@ static void check_duplex(struct net_device *dev)
 static void netdev_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int next_tick = 10*HZ;
 
@@ -962,7 +962,7 @@ static void netdev_timer(unsigned long data)
 
 static void tx_timeout(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	unsigned long flag;
 	
@@ -1015,7 +1015,7 @@ static void tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void init_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	np->cur_rx = np->cur_tx = 0;
@@ -1058,7 +1058,7 @@ static void init_ring(struct net_device *dev)
 static void tx_poll (unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	unsigned head = np->cur_task % TX_RING_SIZE;
 	struct netdev_desc *txdesc = 
 		&np->tx_ring[(np->cur_tx - 1) % TX_RING_SIZE];
@@ -1085,7 +1085,7 @@ static void tx_poll (unsigned long data)
 static int
 start_tx (struct sk_buff *skb, struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	struct netdev_desc *txdesc;
 	unsigned entry;
 
@@ -1127,7 +1127,7 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 static int
 reset_tx (struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	struct sk_buff *skb;
 	int i;
@@ -1176,7 +1176,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 	int handled = 0;
 
 	ioaddr = dev->base_addr;
-	np = dev->priv;
+	np = netdev_priv(dev);
 
 	do {
 		int intr_status = readw(ioaddr + IntrStatus);
@@ -1301,7 +1301,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 static void rx_poll(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int boguscnt = np->budget;
 	long ioaddr = dev->base_addr;
@@ -1398,7 +1398,7 @@ not_done:
 
 static void refill_rx (struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int entry;
 	int cnt = 0;
 
@@ -1429,7 +1429,7 @@ static void refill_rx (struct net_device *dev)
 static void netdev_error(struct net_device *dev, int intr_status)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 mii_ctl, mii_advertise, mii_lpa;
 	int speed;
 
@@ -1483,7 +1483,7 @@ static void netdev_error(struct net_device *dev, int intr_status)
 
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -1512,7 +1512,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 static void set_rx_mode(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 mc_filter[4];			/* Multicast hash filter */
 	u32 rx_mode;
 	int i;
@@ -1569,7 +1569,7 @@ static int __set_mac_addr(struct net_device *dev)
 
 static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 ethcmd;
 
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
@@ -1649,7 +1649,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int rc;
 	int i;
 	long ioaddr = dev->base_addr;
@@ -1696,7 +1696,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static int netdev_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	struct sk_buff *skb;
 	int i;
 
@@ -1775,7 +1775,7 @@ static void __devexit sundance_remove1 (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev) {
-		struct netdev_private *np = dev->priv;
+		struct netdev_private *np = netdev_priv(dev);
 
 		unregister_netdev(dev);
         	pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring,
