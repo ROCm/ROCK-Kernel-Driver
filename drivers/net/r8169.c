@@ -113,8 +113,6 @@ static int multicast_filter_limit = 32;
 /* MAC address length*/
 #define MAC_ADDR_LEN	6
 
-#define TX_FIFO_THRESH 256	/* In bytes */
-
 #define RX_FIFO_THRESH	7	/* 7 means NO threshold, Rx buffer level before first PCI xfer.  */
 #define RX_DMA_BURST	6	/* Maximum PCI burst, '6' is 1024 */
 #define TX_DMA_BURST	6	/* Maximum PCI burst, '6' is 1024 */
