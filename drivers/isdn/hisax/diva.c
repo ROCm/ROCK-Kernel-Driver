@@ -281,10 +281,20 @@ mem_hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
 		*data++ = memreadreg(cs->hw.diva.cfg_reg, hscx ? 0x40 : 0);
 }
 
+static void
+mem_hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+		memwritereg(cs->hw.diva.cfg_reg, hscx ? 0x40 : 0, *data++);
+}
+
 static struct bc_hw_ops mem_hscx_ops = {
 	.read_reg   = mem_hscx_read,
 	.write_reg  = mem_hscx_write,
 	.read_fifo  = mem_hscx_read_fifo,
+	.write_fifo = mem_hscx_write_fifo,
 };
 
 /* IO-Functions for IPACX type cards */
@@ -425,160 +435,6 @@ Start_IPACISA:
 	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xC0);
 }
 
-static inline void
-MemwaitforCEC(struct IsdnCardState *cs, int hscx)
-{
-	int to = 50;
-
-	while ((mem_hscx_read(cs, hscx, HSCX_STAR) & 0x04) && to) {
-		udelay(1);
-		to--;
-	}
-	if (!to)
-		printk(KERN_WARNING "HiSax: waitforCEC timeout\n");
-}
-
-
-static inline void
-MemwaitforXFW(struct IsdnCardState *cs, int hscx)
-{
-	int to = 50;
-
-	while ((!(mem_hscx_read(cs, hscx, HSCX_STAR) & 0x44) == 0x40) && to) {
-		udelay(1);
-		to--;
-	}
-	if (!to)
-		printk(KERN_WARNING "HiSax: waitforXFW timeout\n");
-}
-
-static inline void
-MemWriteHSCXCMDR(struct BCState *bcs, u8 data)
-{
-	int hscx = bcs->unit;
-
-	MemwaitforCEC(bcs->cs, hscx);
-	mem_hscx_write(bcs->cs, hscx, HSCX_CMDR, data);
-}
-
-static void
-Memhscx_empty_fifo(struct BCState *bcs, int count)
-{
-	recv_empty_fifo_b(bcs, count);
-	MemWriteHSCXCMDR(bcs, 0x80);
-}
-
-static void
-Memhscx_fill_fifo(struct BCState *bcs)
-{
-	struct IsdnCardState *cs = bcs->cs;
-	int more, count;
-	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	unsigned char *p;
-
-	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
-	if (!p)
-		return;
-
-	MemwaitforXFW(cs, bcs->unit);
-	while (count--)
-		memwritereg(cs->hw.diva.cfg_reg, bcs->unit ? 0x40 : 0,
-			*p++);
-	MemWriteHSCXCMDR(bcs, more ? 0x8 : 0xa);
-}
-
-static struct bc_l1_ops mem_hscx_l1_ops = {
-	.fill_fifo = Memhscx_fill_fifo,
-};
-
-static inline void
-Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
-{
-	u8 r;
-	struct BCState *bcs = cs->bcs + hscx;
-	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	int count;
-
-	if (!test_bit(BC_FLG_INIT, &bcs->Flag))
-		return;
-
-	if (val & 0x80) {	/* RME */
-		r = mem_hscx_read(cs, hscx, HSCX_RSTA);
-		if ((r & 0xf0) != 0xa0) {
-			if (!(r & 0x80))
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX invalid frame");
-			if ((r & 0x40) && bcs->mode)
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX RDO mode=%d",
-						bcs->mode);
-			if (!(r & 0x20))
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX CRC error");
-			MemWriteHSCXCMDR(bcs, 0x80);
-			bcs->rcvidx = 0;
-		} else {
-			count = mem_hscx_read(cs, hscx, HSCX_RBCL) & (fifo_size-1);
-			if (count == 0)
-				count = fifo_size;
-
-			Memhscx_empty_fifo(bcs, count);
-			recv_rme_b(bcs);
-		}
-	}
-	if (val & 0x40) {	/* RPF */
-		Memhscx_empty_fifo(bcs, fifo_size);
-		recv_rpf_b(bcs);
-	}
-	if (val & 0x10) {
-		xmit_xpr_b(bcs);/* XPR */
-	}
-}
-
-static void
-Memhscx_reset_xmit(struct BCState *bcs)
-{
-	MemWriteHSCXCMDR(bcs, 0x01);
-}
-
-static inline void
-Memhscx_int_main(struct IsdnCardState *cs, u8 val)
-{
-
-	u8 exval;
-	struct BCState *bcs;
-
-	if (val & 0x01) { // EXB
-		bcs = cs->bcs + 1;
-		exval = mem_hscx_read(cs, 1, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_HSCX)
-				debugl1(cs, "HSCX B EXIR %x", exval);
-			xmit_xdu_b(bcs, Memhscx_reset_xmit);
-		}
-	}
-	if (val & 0xf8) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX B interrupt %x", val);
-		Memhscx_interrupt(cs, val, 1);
-	}
-	if (val & 0x02) {	// EXA
-		bcs = cs->bcs;
-		exval = mem_hscx_read(cs, 0, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_HSCX)
-				debugl1(cs, "HSCX A EXIR %x", exval);
-			xmit_xdu_b(bcs, Memhscx_reset_xmit);
-		}
-	}
-	if (val & 0x04) {	// ICA
-		exval = mem_hscx_read(cs, 0, HSCX_ISTA);
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX A interrupt %x", exval);
-		Memhscx_interrupt(cs, exval, 0);
-	}
-}
-
 static void
 diva_irq_ipac_pci(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -609,7 +465,7 @@ Start_IPACPCI:
 		if (ista & 0x08)
 			val |= 0x04;
 		if (val)
-			Memhscx_int_main(cs, val);
+			hscx_int_main(cs, val);
 	}
 	if (ista & 0x20) {
 		val = 0xfe & memreadreg(cs->hw.diva.cfg_reg, ISAC_ISTA + 0x80);
@@ -1075,7 +931,6 @@ ready:
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
 		cs->dc_hw_ops = &mem_ipac_dc_ops;
 		cs->bc_hw_ops = &mem_hscx_ops;
-		cs->bc_l1_ops = &mem_hscx_l1_ops;
 		cs->irq_func = &diva_irq_ipac_pci;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);

@@ -26,7 +26,7 @@ waitforCEC(struct BCState *bcs)
 }
 
 
-static inline void
+static void
 waitforXFW(struct BCState *bcs)
 {
 	int to = 50;
@@ -136,11 +136,9 @@ reset_xmit(struct BCState *bcs)
 void
 hscx_int_main(struct IsdnCardState *cs, u8 val)
 {
-
 	u8 exval;
 	struct BCState *bcs;
 
-	spin_lock(&cs->lock);
 	if (val & 0x01) {
 		bcs = cs->bcs + 1;
 		exval = hscx_read(bcs, HSCX_EXIR);
@@ -171,5 +169,4 @@ hscx_int_main(struct IsdnCardState *cs, u8 val)
 			debugl1(cs, "HSCX A interrupt %x", exval);
 		hscx_interrupt(cs, exval, 0);
 	}
-	spin_unlock(&cs->lock);
 }
