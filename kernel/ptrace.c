@@ -13,9 +13,47 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/ptrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
+
+/*
+ * ptrace a task: make the debugger its new parent and
+ * move it to the ptrace list.
+ *
+ * Must be called with the tasklist lock write-held.
+ */
+void __ptrace_link(task_t *child, task_t *new_parent)
+{
+	if (!list_empty(&child->ptrace_list))
+		BUG();
+	if (child->parent == new_parent)
+		BUG();
+	list_add(&child->ptrace_list, &child->parent->ptrace_children);
+	REMOVE_LINKS(child);
+	child->parent = new_parent;
+	SET_LINKS(child);
+}
+ 
+/*
+ * unptrace a task: move it back to its original parent and
+ * remove it from the ptrace list.
+ *
+ * Must be called with the tasklist lock write-held.
+ */
+void __ptrace_unlink(task_t *child)
+{
+	if (!child->ptrace)
+		BUG();
+	child->ptrace = 0;
+	if (list_empty(&child->ptrace_list))
+		return;
+	list_del_init(&child->ptrace_list);
+	REMOVE_LINKS(child);
+	child->parent = child->real_parent;
+	SET_LINKS(child);
+}
 
 /*
  * Check that we have indeed attached to the thing..
@@ -75,11 +113,7 @@ int ptrace_attach(struct task_struct *task)
 	task_unlock(task);
 
 	write_lock_irq(&tasklist_lock);
-	if (task->parent != current) {
-		REMOVE_LINKS(task);
-		task->parent = current;
-		SET_LINKS(task);
-	}
+	__ptrace_link(task, current);
 	write_unlock_irq(&tasklist_lock);
 
 	send_sig(SIGSTOP, task, 1);
@@ -99,16 +133,15 @@ int ptrace_detach(struct task_struct *child, unsigned int data)
 	ptrace_disable(child);
 
 	/* .. re-parent .. */
-	child->ptrace = 0;
 	child->exit_code = data;
+
 	write_lock_irq(&tasklist_lock);
-	REMOVE_LINKS(child);
-	child->parent = child->real_parent;
-	SET_LINKS(child);
+	__ptrace_unlink(child);
+	/* .. and wake it up. */
+	if (child->state != TASK_ZOMBIE)
+		wake_up_process(child);
 	write_unlock_irq(&tasklist_lock);
 
-	/* .. and wake it up. */
-	wake_up_process(child);
 	return 0;
 }
 

@@ -27,6 +27,7 @@
 #include <linux/fs.h>
 #include <linux/security.h>
 #include <linux/futex.h>
+#include <linux/ptrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -808,6 +809,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	p->tgid = p->pid;
 	INIT_LIST_HEAD(&p->thread_group);
+	INIT_LIST_HEAD(&p->ptrace_children);
+	INIT_LIST_HEAD(&p->ptrace_list);
 
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
@@ -827,6 +830,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	}
 
 	SET_LINKS(p);
+	ptrace_link(p, p->parent);
 	hash_pid(p);
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);

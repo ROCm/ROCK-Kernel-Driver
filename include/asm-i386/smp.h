@@ -7,7 +7,6 @@
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/ptrace.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
