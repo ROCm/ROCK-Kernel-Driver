@@ -898,13 +898,13 @@ static void hvsi_close(struct tty_struct *tty, struct file *filp)
 		/* hvsi_write_worker will re-schedule itself until outbuf is empty. */
 		hvsi_flush_output(hp);
 
-		spin_lock_irqsave(&hp->lock, flags);
-
 		/* tell FSP to stop sending data */
 		hvsi_close_protocol(hp);
 
 		/* drain anything FSP is still in the middle of sending */
 		hvsi_drain_input(hp);
+
+		spin_lock_irqsave(&hp->lock, flags);
 
 		hp->tty = NULL;
 		hp->inbuf_end = hp->inbuf; /* discard remaining partial packets */
