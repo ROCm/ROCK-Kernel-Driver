@@ -303,23 +303,23 @@ struct smb_hdr {
 		struct {
 			__u8 ErrorClass;
 			__u8 Reserved;
-			__u16 Error;	/* note: treated as little endian (le) on wire */
+			__le16 Error;
 		} DosError;
-		__u32 CifsError;	/* note: le */
+		__le32 CifsError;
 	} Status;
 	__u8 Flags;
 	__u16 Flags2;		/* note: le */
-	__u16 PidHigh;		/* note: le */
+	__le16 PidHigh;
 	union {
 		struct {
-			__u32 SequenceNumber;  /* le */
+			__le32 SequenceNumber;  /* le */
 			__u32 Reserved; /* zero */
 		} Sequence;
 		__u8 SecuritySignature[8];	/* le */
 	} Signature;
 	__u8 pad[2];
 	__u16 Tid;
-	__u16 Pid;		/* note: le */
+	__le16 Pid;
 	__u16 Uid;
 	__u16 Mid;
 	__u8 WordCount;

@@ -189,7 +189,6 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
     )
 {
 	int i;
-	__u32 tmp;
 	struct list_head* temp_item;
 	struct cifsSesInfo * ses;
 	char *temp = (char *) buffer;
@@ -211,10 +210,8 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 	buffer->Command = smb_command;
 	buffer->Flags = 0x00;	/* case sensitive */
 	buffer->Flags2 = SMBFLG2_KNOWS_LONG_NAMES;
-	tmp = cpu_to_le32(current->tgid);
-	buffer->Pid = tmp & 0xFFFF;
-	tmp >>= 16;
-	buffer->PidHigh = tmp & 0xFFFF;
+	buffer->Pid = cpu_to_le16((__u16)current->tgid);
+	buffer->PidHigh = cpu_to_le16((__u16)(current->tgid >> 16));
 	spin_lock(&GlobalMid_Lock);
 	GlobalMid++;
 	buffer->Mid = GlobalMid;

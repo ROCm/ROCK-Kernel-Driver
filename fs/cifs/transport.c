@@ -385,11 +385,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
 			if (out_buf->smb_buf_length > 12)
 				out_buf->Flags2 = le16_to_cpu(out_buf->Flags2);
-			if (out_buf->smb_buf_length > 28)
-				out_buf->Pid = le16_to_cpu(out_buf->Pid);
-			if (out_buf->smb_buf_length > 28)
-				out_buf->PidHigh =
-				    le16_to_cpu(out_buf->PidHigh);
 
 			*pbytes_returned = out_buf->smb_buf_length;
 

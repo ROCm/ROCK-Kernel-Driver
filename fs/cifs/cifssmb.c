@@ -2612,7 +2612,6 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	struct file_end_of_file_info *parm_data;
 	int rc = 0;
 	int bytes_returned = 0;
-	__u32 tmp;
 	__u16 params, param_offset, offset, byte_count, count;
 
 	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",
@@ -2622,11 +2621,8 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	if (rc)
 		return rc;
 
-	tmp = cpu_to_le32(pid_of_opener);  /* override pid of current process
-                                         so network fid will be valid */
-	pSMB->hdr.Pid = tmp & 0xFFFF;
-	tmp >>= 16;
-	pSMB->hdr.PidHigh = tmp & 0xFFFF;
+	pSMB->hdr.Pid = cpu_to_le16((__u16)pid_of_opener);
+	pSMB->hdr.PidHigh = cpu_to_le16((__u16)(pid_of_opener >> 16));
     
 	params = 6;
 	pSMB->MaxSetupCount = 0;

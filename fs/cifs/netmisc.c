@@ -810,16 +810,13 @@ map_smb_to_linux_error(struct smb_hdr *smb)
 
 	if (smb->Flags2 & SMBFLG2_ERR_STATUS) {
 		/* translate the newer STATUS codes to old style errors and then to POSIX errors */
-		smb->Status.CifsError = le32_to_cpu(smb->Status.CifsError);
+		__u32 err = le32_to_cpu(smb->Status.CifsError);
 		if(cifsFYI)
-			cifs_print_status(smb->Status.CifsError);
-		ntstatus_to_dos(smb->Status.CifsError, &smberrclass,
-				&smberrcode);
+			cifs_print_status(err);
+		ntstatus_to_dos(err, &smberrclass, &smberrcode);
 	} else {
 		smberrclass = smb->Status.DosError.ErrorClass;
-		smb->Status.DosError.Error =
-		    le16_to_cpu(smb->Status.DosError.Error);
-		smberrcode = smb->Status.DosError.Error;
+		smberrcode = le16_to_cpu(smb->Status.DosError.Error);
 	}
 
 	/* old style errors */

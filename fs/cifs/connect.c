@@ -2158,7 +2158,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 			 &bytes_returned, 1);
 
 	if (smb_buffer_response->Status.CifsError ==
-	    (NT_STATUS_MORE_PROCESSING_REQUIRED))
+	    cpu_to_le32(NT_STATUS_MORE_PROCESSING_REQUIRED))
 		rc = 0;
 
 	if (rc) {

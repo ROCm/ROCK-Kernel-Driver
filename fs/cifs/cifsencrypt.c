@@ -107,13 +107,11 @@ int cifs_verify_signature(struct smb_hdr * cifs_pdu, const char * mac_key,
 	if(memcmp(cifs_pdu->Signature.SecuritySignature,"BSRSPYL ",8)==0)
 		cFYI(1,("dummy signature received for smb command 0x%x",cifs_pdu->Command));
 
-	expected_sequence_number = cpu_to_le32(expected_sequence_number);
-
 	/* save off the origiginal signature so we can modify the smb and check
 		its signature against what the server sent */
 	memcpy(server_response_sig,cifs_pdu->Signature.SecuritySignature,8);
 
-	cifs_pdu->Signature.Sequence.SequenceNumber = expected_sequence_number;
+	cifs_pdu->Signature.Sequence.SequenceNumber = cpu_to_le32(expected_sequence_number);
 	cifs_pdu->Signature.Sequence.Reserved = 0;
 
 	rc = cifs_calculate_signature(cifs_pdu, mac_key,
