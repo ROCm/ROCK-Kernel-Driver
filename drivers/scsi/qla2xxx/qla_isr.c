@@ -109,7 +109,25 @@ qla2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		} else /* IS_QLA23XX(ha) */ {
 			stat = RD_REG_DWORD(&reg->u.isp2300.host_status);
-			if ((stat & HSR_RISC_INT) == 0)
+			if (stat & HSR_RISC_PAUSED) {
+				hccr = RD_REG_WORD(&reg->hccr);
+				if (hccr & (BIT_15 | BIT_13 | BIT_11 | BIT_8))
+					qla_printk(KERN_INFO, ha,
+					    "Parity error -- HCCR=%x.\n", hccr);
+				else
+					qla_printk(KERN_INFO, ha,
+					    "RISC paused -- HCCR=%x\n", hccr);
+
+				/*
+				 * Issue a "HARD" reset in order for the RISC
+				 * interrupt bit to be cleared.  Schedule a big
+				 * hammmer to get out of the RISC PAUSED state.
+				 */
+				WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
+				RD_REG_WORD(&reg->hccr);
+				set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+				break;
+			} else if ((stat & HSR_RISC_INT) == 0)
 				break;
 
 			mbx = MSW(stat);
@@ -139,29 +157,9 @@ qla2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 				qla2x00_async_event(ha, mbx);
 				break;
 			default:
-				hccr = RD_REG_WORD(&reg->hccr);
-				if (hccr & HCCR_RISC_PAUSE) {
-					qla_printk(KERN_INFO, ha,
-					    "RISC paused, dumping HCCR=%x\n",
-					    hccr);
-
-					/*
-					 * Issue a "HARD" reset in order for
-					 * the RISC interrupt bit to be
-					 * cleared.  Schedule a big hammmer to
-					 * get out of the RISC PAUSED state.
-					 */
-					WRT_REG_WORD(&reg->hccr,
-					    HCCR_RESET_RISC);
-					RD_REG_WORD(&reg->hccr);
-					set_bit(ISP_ABORT_NEEDED,
-					    &ha->dpc_flags);
-					break;
-				} else {
-					DEBUG2(printk("scsi(%ld): Unrecognized "
-					    "interrupt type (%d)\n",
-					    ha->host_no, stat & 0xff));
-				}
+				DEBUG2(printk("scsi(%ld): Unrecognized "
+				    "interrupt type (%d)\n",
+				    ha->host_no, stat & 0xff));
 				break;
 			}
 			WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
@@ -344,7 +342,6 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		break;
 	}
 
-	mb[0] = LSW(mbx);
 	switch (mb[0]) {
 	case MBA_SCSI_COMPLETION:	/* Fast Post */
 		if (!ha->flags.online)
