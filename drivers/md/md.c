@@ -246,6 +246,9 @@ static inline int mddev_trylock(mddev_t * mddev)
 static inline void mddev_unlock(mddev_t * mddev)
 {
 	up(&mddev->reconfig_sem);
+
+	if (mddev->thread)
+		md_wakeup_thread(mddev->thread);
 }
 
 mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr)
@@ -1626,7 +1629,10 @@ static int do_md_run(mddev_t * mddev)
 	mddev->in_sync = 1;
 	
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
-	md_wakeup_thread(mddev->thread);
+	
+	if (mddev->sb_dirty)
+		md_update_sb(mddev);
+
 	set_capacity(disk, mddev->array_size<<1);
 
 	/* If we call blk_queue_make_request here, it will
@@ -1717,7 +1723,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			if (mddev->ro)
 				mddev->ro = 0;
 		}
-		if (mddev->raid_disks) {
+		if (!mddev->in_sync) {
 			/* mark array as shutdown cleanly */
 			mddev->in_sync = 1;
 			md_update_sb(mddev);
@@ -2290,7 +2296,7 @@ abort_export:
 /*
  * set_array_info is used two different ways
  * The original usage is when creating a new array.
- * In this usage, raid_disks is > = and it together with
+ * In this usage, raid_disks is > 0 and it together with
  *  level, size, not_persistent,layout,chunksize determine the
  *  shape of the array.
  *  This will always create an array with a type-0.90.0 superblock.
@@ -2341,6 +2347,7 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 
 	mddev->max_disks     = MD_SB_DISKS;
 
+	mddev->sb_dirty      = 1;
 
 	/*
 	 * Generate a 128 bit UUID
@@ -3104,6 +3111,10 @@ void md_write_end(mddev_t *mddev)
 
 static inline void md_enter_safemode(mddev_t *mddev)
 {
+	if (!mddev->safemode) return;
+	if (mddev->safemode == 2 &&
+	    (atomic_read(&mddev->writes_pending) || mddev->in_sync))
+		return; /* avoid the lock */
 	mddev_lock_uninterruptible(mddev);
 	if (mddev->safemode && !atomic_read(&mddev->writes_pending) &&
 	    !mddev->in_sync && mddev->recovery_cp == MaxSector) {
@@ -3124,8 +3135,7 @@ void md_handle_safemode(mddev_t *mddev)
 		mddev->safemode = 2;
 		flush_signals(current);
 	}
-	if (mddev->safemode)
-		md_enter_safemode(mddev);
+	md_enter_safemode(mddev);
 }
 
 
@@ -3313,8 +3323,7 @@ static void md_do_sync(mddev_t *mddev)
 			mddev->recovery_cp = MaxSector;
 	}
 
-	if (mddev->safemode)
-		md_enter_safemode(mddev);
+	md_enter_safemode(mddev);
  skip:
 	mddev->curr_resync = 0;
 	set_bit(MD_RECOVERY_DONE, &mddev->recovery);
