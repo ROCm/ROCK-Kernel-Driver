@@ -1064,14 +1064,22 @@ static void set_ethernet_addr( ether_dev_t *ether_dev )
 // Used by driver's probe routine ////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-void log_device_info(ether_dev_t *ether_dev)
+static void log_device_info(ether_dev_t *ether_dev)
 {
 	int len;
 	int string_num;
-	unsigned char manu[256];
-	unsigned char prod[256];
-	unsigned char sern[256];
+	unsigned char *manu = NULL;
+	unsigned char *prod = NULL;
+	unsigned char *sern = NULL;
 	unsigned char *mac_addr;
+
+	manu = kmalloc(256, GFP_KERNEL);
+	prod = kmalloc(256, GFP_KERNEL);
+	sern = kmalloc(256, GFP_KERNEL);
+	if (!manu || !prod || !sern) {
+		dbg("no mem for log_device_info");
+		goto fini;
+	}
 
 	// Default empty strings in case we don't find a real one
 	manu[0] = 0x00;
@@ -1113,6 +1121,10 @@ void log_device_info(ether_dev_t *ether_dev)
 	      ether_dev->net->name, manu, prod, sern, mac_addr[0], 
 	      mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], 
 	      mac_addr[5] );
+fini:
+	kfree(manu);
+	kfree(prod);
+	kfree(sern);
 }
 
 /* Forward declaration */
