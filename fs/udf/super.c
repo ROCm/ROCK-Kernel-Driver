@@ -286,7 +286,7 @@ udf_parse_options(char *options, struct udf_options *uopt)
 	if (!options)
 		return 1;
 
-	while ((opt = strsep(&options, ",") != NULL) {
+	while ((opt = strsep(&options, ",")) != NULL) {
 		if (!*opt)
 			continue;
 		/* Make "opt=val" into two strings */
