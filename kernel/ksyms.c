@@ -496,8 +496,6 @@ EXPORT_SYMBOL(loops_per_jiffy);
 #endif
 
 EXPORT_SYMBOL(kstat);
-EXPORT_SYMBOL(nr_running);
-EXPORT_SYMBOL(nr_context_switches);
 
 /* misc */
 EXPORT_SYMBOL(panic);

@@ -1901,7 +1901,7 @@ void __init init_idle(task_t *idle, int cpu)
 typedef struct {
 	list_t list;
 	task_t *task;
-	struct semaphore sem;
+	struct completion done;
 } migration_req_t;
 
 /*
@@ -1945,13 +1945,13 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
-	init_MUTEX_LOCKED(&req.sem);
+	init_completion(&req.done);
 	req.task = p;
 	list_add(&req.list, &rq->migration_queue);
 	task_rq_unlock(rq, &flags);
 	wake_up_process(rq->migration_thread);
 
-	down(&req.sem);
+	wait_for_completion(&req.done);
 out:
 	preempt_enable();
 }
@@ -2032,7 +2032,7 @@ repeat:
 		double_rq_unlock(rq_src, rq_dest);
 		local_irq_restore(flags);
 
-		up(&req->sem);
+		complete(&req->done);
 	}
 }
 
