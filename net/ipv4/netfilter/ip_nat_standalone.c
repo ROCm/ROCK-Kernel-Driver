@@ -308,6 +308,8 @@ module_init(init);
 module_exit(fini);
 
 EXPORT_SYMBOL(ip_nat_setup_info);
+EXPORT_SYMBOL(ip_nat_protocol_register);
+EXPORT_SYMBOL(ip_nat_protocol_unregister);
 EXPORT_SYMBOL(ip_nat_helper_register);
 EXPORT_SYMBOL(ip_nat_helper_unregister);
 EXPORT_SYMBOL(ip_nat_expect_register);
@@ -316,4 +318,5 @@ EXPORT_SYMBOL(ip_nat_cheat_check);
 EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
 EXPORT_SYMBOL(ip_nat_seq_adjust);
 EXPORT_SYMBOL(ip_nat_delete_sack);
+EXPORT_SYMBOL(ip_nat_used_tuple);
 MODULE_LICENSE("GPL");

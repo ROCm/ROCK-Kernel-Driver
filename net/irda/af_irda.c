@@ -1700,7 +1700,7 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 
 		if (sk->state == TCP_ESTABLISHED) {
 			if ((self->tx_flow == FLOW_START) && 
-			    (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE))
+			    sock_writeable(sk))
 			{
 				mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 			}
@@ -1708,13 +1708,13 @@ static unsigned int irda_poll(struct file * file, struct socket *sock,
 		break;
 	case SOCK_SEQPACKET:
 		if ((self->tx_flow == FLOW_START) && 
-		    (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE))
+		    sock_writeable(sk))
 		{	
 			mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 		}
 		break;
 	case SOCK_DGRAM:
-		if (sk->sndbuf - (int)atomic_read(&sk->wmem_alloc) >= SOCK_MIN_WRITE_SPACE)
+		if (sock_writeable(sk))
 			mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 		break;
 	default:

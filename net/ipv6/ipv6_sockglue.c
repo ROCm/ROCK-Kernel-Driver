@@ -79,7 +79,7 @@ int ip6_ra_control(struct sock *sk, int sel, void (*destructor)(struct sock *))
 	struct ip6_ra_chain *ra, *new_ra, **rap;
 
 	/* RA packet may be delivered ONLY to IPPROTO_RAW socket */
-	if (sk->type != SOCK_RAW || sk->num != IPPROTO_RAW)
+	if (sk->type != SOCK_RAW || inet_sk(sk)->num != IPPROTO_RAW)
 		return -EINVAL;
 
 	new_ra = (sel>=0) ? kmalloc(sizeof(*new_ra), GFP_KERNEL) : NULL;
@@ -283,7 +283,7 @@ update:
 			if (opt) {
 				struct tcp_opt *tp = tcp_sk(sk);
 				if (!((1<<sk->state)&(TCPF_LISTEN|TCPF_CLOSE))
-				    && sk->daddr != LOOPBACK4_IPV6) {
+				    && inet_sk(sk)->daddr != LOOPBACK4_IPV6) {
 					tp->ext_header_len = opt->opt_flen + opt->opt_nflen;
 					tcp_sync_mss(sk, tp->pmtu_cookie);
 				}

@@ -65,11 +65,11 @@ static int udp_v6_get_port(struct sock *sk, unsigned short snum)
 		best_size_so_far = 32767;
 		best = result = udp_port_rover;
 		for (i = 0; i < UDP_HTABLE_SIZE; i++, result++) {
-			struct sock *sk;
+			struct sock *sk2;
 			int size;
 
-			sk = udp_hash[result & (UDP_HTABLE_SIZE - 1)];
-			if (!sk) {
+			sk2 = udp_hash[result & (UDP_HTABLE_SIZE - 1)];
+			if (!sk2) {
 				if (result > sysctl_local_port_range[1])
 					result = sysctl_local_port_range[0] +
 						((result - sysctl_local_port_range[0]) &
@@ -80,7 +80,7 @@ static int udp_v6_get_port(struct sock *sk, unsigned short snum)
 			do {
 				if (++size >= best_size_so_far)
 					goto next;
-			} while ((sk = sk->next) != NULL);
+			} while ((sk2 = sk2->next) != NULL);
 			best_size_so_far = size;
 			best = result;
 		next:;
@@ -104,23 +104,24 @@ gotit:
 		for (sk2 = udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
 		     sk2 != NULL;
 		     sk2 = sk2->next) {
+			struct inet_opt *inet2 = inet_sk(sk2);
 			struct ipv6_pinfo *np2 = inet6_sk(sk2);
 
-			if (sk2->num == snum &&
+			if (inet2->num == snum &&
 			    sk2 != sk &&
 			    sk2->bound_dev_if == sk->bound_dev_if &&
-			    (!sk2->rcv_saddr ||
+			    (!inet2->rcv_saddr ||
 			     addr_type == IPV6_ADDR_ANY ||
 			     !ipv6_addr_cmp(&np->rcv_saddr, &np2->rcv_saddr) ||
 			     (addr_type == IPV6_ADDR_MAPPED &&
 			      sk2->family == AF_INET &&
-			      sk->rcv_saddr == sk2->rcv_saddr)) &&
+			      inet_sk(sk)->rcv_saddr == inet2->rcv_saddr)) &&
 			    (!sk2->reuse || !sk->reuse))
 				goto fail;
 		}
 	}
 
-	sk->num = snum;
+	inet_sk(sk)->num = snum;
 	if (sk->pprev == NULL) {
 		struct sock **skp = &udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
 		if ((sk->next = *skp) != NULL)
@@ -151,7 +152,7 @@ static void udp_v6_unhash(struct sock *sk)
 			sk->next->pprev = sk->pprev;
 		*sk->pprev = sk->next;
 		sk->pprev = NULL;
-		sk->num = 0;
+		inet_sk(sk)->num = 0;
 		sock_prot_dec_use(sk->prot);
 		__sock_put(sk);
 	}
@@ -167,12 +168,13 @@ static struct sock *udp_v6_lookup(struct in6_addr *saddr, u16 sport,
 
  	read_lock(&udp_hash_lock);
 	for(sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk != NULL; sk = sk->next) {
-		if((sk->num == hnum)		&&
-		   (sk->family == PF_INET6)) {
+		struct inet_opt *inet = inet_sk(sk);
+
+		if (inet->num == hnum && sk->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
 			int score = 0;
-			if(sk->dport) {
-				if(sk->dport != sport)
+			if (inet->dport) {
+				if (inet->dport != sport)
 					continue;
 				score++;
 			}
@@ -213,6 +215,7 @@ static struct sock *udp_v6_lookup(struct in6_addr *saddr, u16 sport,
 int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in6	*usin = (struct sockaddr_in6 *) uaddr;
+	struct inet_opt      	*inet = inet_sk(sk);
 	struct ipv6_pinfo      	*np = inet6_sk(sk);
 	struct in6_addr		*daddr;
 	struct in6_addr		saddr;
@@ -268,16 +271,16 @@ ipv4_connected:
 		if (err < 0)
 			return err;
 		
-		ipv6_addr_set(&np->daddr, 0, 0, htonl(0x0000ffff), sk->daddr);
+		ipv6_addr_set(&np->daddr, 0, 0, htonl(0x0000ffff), inet->daddr);
 
 		if (ipv6_addr_any(&np->saddr)) {
 			ipv6_addr_set(&np->saddr, 0, 0, htonl(0x0000ffff),
-				      sk->saddr);
+				      inet->saddr);
 		}
 
 		if (ipv6_addr_any(&np->rcv_saddr)) {
 			ipv6_addr_set(&np->rcv_saddr, 0, 0, htonl(0x0000ffff),
-				      sk->rcv_saddr);
+				      inet->rcv_saddr);
 		}
 		return 0;
 	}
@@ -300,7 +303,7 @@ ipv4_connected:
 	ipv6_addr_copy(&np->daddr, daddr);
 	np->flow_label = fl.fl6_flowlabel;
 
-	sk->dport = usin->sin6_port;
+	inet->dport = usin->sin6_port;
 
 	/*
 	 *	Check for a route to destination an obtain the
@@ -311,8 +314,8 @@ ipv4_connected:
 	fl.fl6_dst = &np->daddr;
 	fl.fl6_src = &saddr;
 	fl.oif = sk->bound_dev_if;
-	fl.uli_u.ports.dport = sk->dport;
-	fl.uli_u.ports.sport = sk->sport;
+	fl.uli_u.ports.dport = inet->dport;
+	fl.uli_u.ports.sport = inet->sport;
 
 	if (flowlabel) {
 		if (flowlabel->opt && flowlabel->opt->srcrt) {
@@ -344,7 +347,7 @@ ipv4_connected:
 
 		if (ipv6_addr_any(&np->rcv_saddr)) {
 			ipv6_addr_copy(&np->rcv_saddr, &saddr);
-			sk->rcv_saddr = LOOPBACK4_IPV6;
+			inet->rcv_saddr = LOOPBACK4_IPV6;
 		}
 		sk->state = TCP_ESTABLISHED;
 	}
@@ -528,10 +531,12 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 	struct sock *s = sk;
 	unsigned short num = ntohs(loc_port);
 	for(; s; s = s->next) {
-		if(s->num == num) {
+		struct inet_opt *inet = inet_sk(s);
+
+		if (inet->num == num) {
 			struct ipv6_pinfo *np = inet6_sk(s);
-			if(s->dport) {
-				if(s->dport != rmt_port)
+			if (inet->dport) {
+				if (inet->dport != rmt_port)
 					continue;
 			}
 			if (!ipv6_addr_any(&np->daddr) &&
@@ -757,6 +762,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 {
 	struct ipv6_txoptions opt_space;
 	struct udpv6fakehdr udh;
+	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) msg->msg_name;
 	struct ipv6_txoptions *opt = NULL;
@@ -818,7 +824,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 
-		udh.uh.dest = sk->dport;
+		udh.uh.dest = inet->dport;
 		daddr = &np->daddr;
 		fl.fl6_flowlabel = np->flow_label;
 	}
@@ -867,7 +873,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 	if (opt && opt->srcrt)
 		udh.daddr = daddr;
 
-	udh.uh.source = sk->sport;
+	udh.uh.source = inet->sport;
 	udh.uh.len = len < 0x10000 ? htons(len) : 0;
 	udh.uh.check = 0;
 	udh.iov = msg->msg_iov;
@@ -905,17 +911,18 @@ static struct inet6_protocol udpv6_protocol = {
 
 static void get_udp6_sock(struct sock *sp, char *tmpbuf, int i)
 {
+	struct inet_opt *inet = inet_sk(sp);
 	struct ipv6_pinfo *np = inet6_sk(sp);
 	struct in6_addr *dest, *src;
 	__u16 destp, srcp;
 
 	dest  = &np->daddr;
 	src   = &np->rcv_saddr;
-	destp = ntohs(sp->dport);
-	srcp  = ntohs(sp->sport);
+	destp = ntohs(inet->dport);
+	srcp  = ntohs(inet->sport);
 	sprintf(tmpbuf,
 		"%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
-		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %ld %d %p",
+		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
 		i,
 		src->s6_addr32[0], src->s6_addr32[1],
 		src->s6_addr32[2], src->s6_addr32[3], srcp,

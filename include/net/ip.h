@@ -197,7 +197,8 @@ static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, str
 		 * does not change, they drop every other packet in
 		 * a TCP stream using header compression.
 		 */
-		iph->id = (sk && sk->daddr) ? htons(inet_sk(sk)->id++) : 0;
+		iph->id = (sk && inet_sk(sk)->daddr) ?
+					htons(inet_sk(sk)->id++) : 0;
 	} else
 		__ip_select_ident(iph, dst);
 }

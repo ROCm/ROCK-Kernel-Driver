@@ -75,9 +75,7 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
     dep_tristate '    MARK target support' CONFIG_IP_NF_TARGET_MARK $CONFIG_IP_NF_MANGLE
   fi
   dep_tristate '  LOG target support' CONFIG_IP_NF_TARGET_LOG $CONFIG_IP_NF_IPTABLES
-  if [ "$CONFIG_NETLINK" != "n" ]; then
-     dep_tristate '  ULOG target support' CONFIG_IP_NF_TARGET_ULOG $CONFIG_NETLINK $CONFIG_IP_NF_IPTABLES
-  fi
+  dep_tristate '  ULOG target support' CONFIG_IP_NF_TARGET_ULOG $CONFIG_IP_NF_IPTABLES
   dep_tristate '  TCPMSS target support' CONFIG_IP_NF_TARGET_TCPMSS $CONFIG_IP_NF_IPTABLES
 fi
 

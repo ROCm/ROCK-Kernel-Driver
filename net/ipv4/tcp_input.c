@@ -1329,9 +1329,10 @@ static __inline__ int tcp_packet_delayed(struct tcp_opt *tp)
 #if FASTRETRANS_DEBUG > 1
 static void DBGUNDO(struct sock *sk, struct tcp_opt *tp, const char *msg)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	printk(KERN_DEBUG "Undo %s %u.%u.%u.%u/%u c%u l%u ss%u/%u p%u\n",
 	       msg,
-	       NIPQUAD(sk->daddr), ntohs(sk->dport),
+	       NIPQUAD(inet->daddr), ntohs(inet->dport),
 	       tp->snd_cwnd, tp->left_out,
 	       tp->snd_ssthresh, tp->prior_ssthresh, tp->packets_out);
 }
@@ -2570,15 +2571,12 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 			__set_current_state(TASK_RUNNING);
 
 			local_bh_enable();
-			if (skb_copy_datagram_iovec(skb, 0, tp->ucopy.iov,
-						    chunk)) {
-				sk->err = EFAULT;
-				sk->error_report(sk);
+			if (!skb_copy_datagram_iovec(skb, 0, tp->ucopy.iov, chunk)) {
+				tp->ucopy.len -= chunk;
+				tp->copied_seq += chunk;
+				eaten = (chunk == skb->len && !th->fin);
 			}
 			local_bh_disable();
-			tp->ucopy.len -= chunk;
-			tp->copied_seq += chunk;
-			eaten = (chunk == skb->len && !th->fin);
 		}
 
 		if (eaten <= 0) {
@@ -3178,17 +3176,8 @@ static int tcp_copy_to_iovec(struct sock *sk, struct sk_buff *skb, int hlen)
 						       tp->ucopy.iov);
 
 	if (!err) {
-update:
-		tp->ucopy.len  -= chunk;
+		tp->ucopy.len -= chunk;
 		tp->copied_seq += chunk;
-		local_bh_disable();
-		return 0;
-	}
-
-	if (err == -EFAULT) {
-		sk->err = EFAULT;
-		sk->error_report(sk);
-		goto update;
 	}
 
 	local_bh_disable();
@@ -3327,19 +3316,16 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 			    tp->copied_seq == tp->rcv_nxt &&
 			    len - tcp_header_len <= tp->ucopy.len &&
 			    sk->lock.users) {
-				eaten = 1;
-
-				NET_INC_STATS_BH(TCPHPHitsToUser);
-
 				__set_current_state(TASK_RUNNING);
 
-				if (tcp_copy_to_iovec(sk, skb, tcp_header_len))
-					goto csum_error;
-
-				__skb_pull(skb,tcp_header_len);
-
-				tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
-			} else {
+				if (!tcp_copy_to_iovec(sk, skb, tcp_header_len)) {
+					__skb_pull(skb, tcp_header_len);
+					tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
+					NET_INC_STATS_BH(TCPHPHitsToUser);
+					eaten = 1;
+				}
+			}
+			if (!eaten) {
 				if (tcp_checksum_complete_user(sk, skb))
 					goto csum_error;
 

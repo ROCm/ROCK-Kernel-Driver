@@ -524,6 +524,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 int tcp_listen_start(struct sock *sk)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt;
 
@@ -552,8 +553,8 @@ int tcp_listen_start(struct sock *sk)
 	 * after validation is complete.
 	 */
 	sk->state = TCP_LISTEN;
-	if (sk->prot->get_port(sk, sk->num) == 0) {
-		sk->sport = htons(sk->num);
+	if (!sk->prot->get_port(sk, inet->num)) {
+		inet->sport = htons(inet->num);
 
 		sk_dst_reset(sk);
 		sk->prot->hash(sk);
@@ -1786,8 +1787,8 @@ void tcp_destroy_sock(struct sock *sk)
 	/* It cannot be in hash table! */
 	BUG_TRAP(sk->pprev==NULL);
 
-	/* If it has not 0 sk->num, it must be bound */
-	BUG_TRAP(!sk->num || sk->prev!=NULL);
+	/* If it has not 0 inet_sk(sk)->num, it must be bound */
+	BUG_TRAP(!inet_sk(sk)->num || sk->prev);
 
 #ifdef TCP_DEBUG
 	if (sk->zapped) {
@@ -1988,6 +1989,7 @@ extern __inline__ int tcp_need_reset(int state)
 
 int tcp_disconnect(struct sock *sk, int flags)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	int old_state;
 	int err = 0;
@@ -2015,11 +2017,10 @@ int tcp_disconnect(struct sock *sk, int flags)
   	tcp_writequeue_purge(sk);
   	__skb_queue_purge(&tp->out_of_order_queue);
 
-	sk->dport = 0;
+	inet->dport = 0;
 
 	if (!(sk->userlocks&SOCK_BINDADDR_LOCK)) {
-		sk->rcv_saddr = 0;
-		sk->saddr = 0;
+		inet->rcv_saddr = inet->saddr = 0;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 		if (sk->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
@@ -2049,7 +2050,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_sack_reset(tp);
 	__sk_dst_reset(sk);
 
-	BUG_TRAP(!sk->num || sk->prev);
+	BUG_TRAP(!inet->num || sk->prev);
 
 	sk->error_report(sk);
 	return err;

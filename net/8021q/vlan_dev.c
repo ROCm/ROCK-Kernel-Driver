@@ -38,12 +38,6 @@
 #include <linux/if_vlan.h>
 #include <net/ip.h>
 
-struct net_device_stats *vlan_dev_get_stats(struct net_device *dev)
-{
-	return &(((struct vlan_dev_info *)(dev->priv))->dev_stats);
-}
-
-
 /*
  *	Rebuild the Ethernet MAC header. This is called after an ARP
  *	(or in future other address resolution) has completed on this
@@ -76,6 +70,21 @@ int vlan_dev_rebuild_header(struct sk_buff *skb)
 	};
 
 	return 0;
+}
+
+static inline struct sk_buff *vlan_check_reorder_header(struct sk_buff *skb)
+{
+	if (VLAN_DEV_INFO(skb->dev)->flags & 1) {
+		skb = skb_share_check(skb, GFP_ATOMIC);
+		if (skb) {
+			/* Lifted from Gleb's VLAN code... */
+			memmove(skb->data - ETH_HLEN,
+				skb->data - VLAN_ETH_HLEN, 12);
+			skb->mac.raw += VLAN_HLEN;
+		}
+	}
+
+	return skb;
 }
 
 /*
@@ -113,7 +122,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	/* vlan_TCI = ntohs(get_unaligned(&vhdr->h_vlan_TCI)); */
 	vlan_TCI = ntohs(vhdr->h_vlan_TCI);
 
-	vid = (vlan_TCI & 0xFFF);
+	vid = (vlan_TCI & VLAN_VID_MASK);
 
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG __FUNCTION__ ": skb: %p vlan_id: %hx\n",
@@ -124,11 +133,18 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	 * and then go on as usual.
 	 */
 
-	/* we have 12 bits of vlan ID. */
-	/* If it's NULL, we will tag it to be junked below */
-	skb->dev = find_802_1Q_vlan_dev(dev, vid);
+	/* We have 12 bits of vlan ID.
+	 *
+	 * We must not drop the vlan_group_lock until we hold a
+	 * reference to the device (netif_rx does that) or we
+	 * fail.
+	 */
 
+	spin_lock_bh(&vlan_group_lock);
+	skb->dev = __find_vlan_dev(dev, vid);
 	if (!skb->dev) {
+		spin_unlock_bh(&vlan_group_lock);
+
 #ifdef VLAN_DEBUG
 		printk(VLAN_DBG __FUNCTION__ ": ERROR:	No net_device for VID: %i on dev: %s [%i]\n",
 		       (unsigned int)(vid), dev->name, dev->ifindex);
@@ -136,6 +152,8 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		kfree_skb(skb);
 		return -1;
 	}
+
+	skb->dev->last_rx = jiffies;
 
 	/* Bump the rx counters for the VLAN device. */
 	stats = vlan_dev_get_stats(skb->dev);
@@ -149,6 +167,8 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	 */
 
 	if (dev != VLAN_DEV_INFO(skb->dev)->real_dev) {
+		spin_unlock_bh(&vlan_group_lock);
+
 #ifdef VLAN_DEBUG
 		printk(VLAN_DBG __FUNCTION__ ": dropping skb: %p because came in on wrong device, dev: %s  real_dev: %s, skb_dev: %s\n",
 		       skb, dev->name, VLAN_DEV_INFO(skb->dev)->real_dev->name, skb->dev->name);
@@ -161,7 +181,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	/*
 	 * Deal with ingress priority mapping.
 	 */
-	skb->priority = VLAN_DEV_INFO(skb->dev)->ingress_priority_map[(ntohs(vhdr->h_vlan_TCI) >> 13) & 0x7];
+	skb->priority = vlan_get_ingress_priority(skb->dev, ntohs(vhdr->h_vlan_TCI));
 
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG __FUNCTION__ ": priority: %lu  for TCI: %hu (hbo)\n",
@@ -174,9 +194,12 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	switch (skb->pkt_type) {
 	case PACKET_BROADCAST: /* Yeah, stats collect these together.. */
 		// stats->broadcast ++; // no such counter :-(
+		break;
+
 	case PACKET_MULTICAST:
 		stats->multicast++;
 		break;
+
 	case PACKET_OTHERHOST: 
 		/* Our lower layer thinks this is not local, let's make sure.
 		 * This allows the VLAN to have a different MAC than the underlying
@@ -215,6 +238,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 			/* TODO:  Add a more specific counter here. */
 			stats->rx_errors++;
 		}
+		spin_unlock_bh(&vlan_group_lock);
 		return 0;
 	}
 
@@ -243,6 +267,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 			/* TODO:  Add a more specific counter here. */
 			stats->rx_errors++;
 		}
+		spin_unlock_bh(&vlan_group_lock);
 		return 0;
 	}
 
@@ -264,6 +289,24 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	} else {
 		/* TODO:  Add a more specific counter here. */
 		stats->rx_errors++;
+	}
+	spin_unlock_bh(&vlan_group_lock);
+	return 0;
+}
+
+static inline unsigned short vlan_dev_get_egress_qos_mask(struct net_device* dev,
+							  struct sk_buff* skb)
+{
+	struct vlan_priority_tci_mapping *mp =
+		VLAN_DEV_INFO(dev)->egress_priority_map[(skb->priority & 0xF)];
+
+	while (mp) {
+		if (mp->priority == skb->priority) {
+			return mp->vlan_qos; /* This should already be shifted to mask
+					      * correctly with the VLAN's TCI
+					      */
+		}
+		mp = mp->next;
 	}
 	return 0;
 }
@@ -396,8 +439,9 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 */
 
 	if (veth->h_vlan_proto != __constant_htons(ETH_P_8021Q)) {
+		unsigned short veth_TCI;
+
 		/* This is not a VLAN frame...but we can fix that! */
-		unsigned short veth_TCI = 0;
 		VLAN_DEV_INFO(dev)->cnt_encap_on_xmit++;
 
 #ifdef VLAN_DEBUG
@@ -453,9 +497,30 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	       veth->h_vlan_proto, veth->h_vlan_TCI, veth->h_vlan_encapsulated_proto);
 #endif
 
-	dev_queue_xmit(skb);
 	stats->tx_packets++; /* for statics only */
 	stats->tx_bytes += skb->len;
+
+	dev_queue_xmit(skb);
+
+	return 0;
+}
+
+int vlan_dev_hwaccel_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	struct net_device_stats *stats = vlan_dev_get_stats(dev);
+	struct vlan_skb_tx_cookie *cookie;
+
+	stats->tx_packets++;
+	stats->tx_bytes += skb->len;
+
+	skb->dev = VLAN_DEV_INFO(dev)->real_dev;
+	cookie = VLAN_TX_SKB_CB(skb);
+	cookie->magic = VLAN_TX_COOKIE_MAGIC;
+	cookie->vlan_tag = (VLAN_DEV_INFO(dev)->vlan_id |
+			    vlan_dev_get_egress_qos_mask(dev, skb));
+
+	dev_queue_xmit(skb);
+
 	return 0;
 }
 
@@ -470,48 +535,6 @@ int vlan_dev_change_mtu(struct net_device *dev, int new_mtu)
 	dev->mtu = new_mtu;
 
 	return new_mtu;
-}
-
-int vlan_dev_open(struct net_device *dev)
-{
-	if (!(VLAN_DEV_INFO(dev)->real_dev->flags & IFF_UP))
-		return -ENETDOWN;
-
-	return 0;
-}
-
-int vlan_dev_stop(struct net_device *dev)
-{
-	vlan_flush_mc_list(dev);
-	return 0;
-}
-
-int vlan_dev_init(struct net_device *dev)
-{
-	/* TODO:  figure this out, maybe do nothing?? */
-	return 0;
-}
-
-void vlan_dev_destruct(struct net_device *dev)
-{
-	if (dev) {
-		vlan_flush_mc_list(dev);
-		if (dev->priv) {
-			dev_put(VLAN_DEV_INFO(dev)->real_dev);
-			if (VLAN_DEV_INFO(dev)->dent) {
-				printk(KERN_ERR __FUNCTION__ ": dent is NOT NULL!\n");
-
-				/* If we ever get here, there is a serious bug
-				 * that must be fixed.
-				 */
-			}
-
-			kfree(dev->priv);
-
-			VLAN_FMEM_DBG("dev->priv free, addr: %p\n", dev->priv);
-			dev->priv = NULL;
-		}
-	}
 }
 
 int vlan_dev_set_ingress_priority(char *dev_name, __u32 skb_prio, short vlan_prio)
@@ -642,6 +665,124 @@ int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 	return 0;
 }
 
+static inline int vlan_dmi_equals(struct dev_mc_list *dmi1,
+                                  struct dev_mc_list *dmi2)
+{
+	return ((dmi1->dmi_addrlen == dmi2->dmi_addrlen) &&
+		(memcmp(dmi1->dmi_addr, dmi2->dmi_addr, dmi1->dmi_addrlen) == 0));
+}
+
+/** dmi is a single entry into a dev_mc_list, a single node.  mc_list is
+ *  an entire list, and we'll iterate through it.
+ */
+static int vlan_should_add_mc(struct dev_mc_list *dmi, struct dev_mc_list *mc_list)
+{
+	struct dev_mc_list *idmi;
+
+	for (idmi = mc_list; idmi != NULL; ) {
+		if (vlan_dmi_equals(dmi, idmi)) {
+			if (dmi->dmi_users > idmi->dmi_users)
+				return 1;
+			else
+				return 0;
+		} else {
+			idmi = idmi->next;
+		}
+	}
+
+	return 1;
+}
+
+static inline void vlan_destroy_mc_list(struct dev_mc_list *mc_list)
+{
+	struct dev_mc_list *dmi = mc_list;
+	struct dev_mc_list *next;
+
+	while(dmi) {
+		next = dmi->next;
+		kfree(dmi);
+		dmi = next;
+	}
+}
+
+static void vlan_copy_mc_list(struct dev_mc_list *mc_list, struct vlan_dev_info *vlan_info)
+{
+	struct dev_mc_list *dmi, *new_dmi;
+
+	vlan_destroy_mc_list(vlan_info->old_mc_list);
+	vlan_info->old_mc_list = NULL;
+
+	for (dmi = mc_list; dmi != NULL; dmi = dmi->next) {
+		new_dmi = kmalloc(sizeof(*new_dmi), GFP_ATOMIC);
+		if (new_dmi == NULL) {
+			printk(KERN_ERR "vlan: cannot allocate memory. "
+			       "Multicast may not work properly from now.\n");
+			return;
+		}
+
+		/* Copy whole structure, then make new 'next' pointer */
+		*new_dmi = *dmi;
+		new_dmi->next = vlan_info->old_mc_list;
+		vlan_info->old_mc_list = new_dmi;
+	}
+}
+
+static void vlan_flush_mc_list(struct net_device *dev)
+{
+	struct dev_mc_list *dmi = dev->mc_list;
+
+	while (dmi) {
+		dev_mc_delete(dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
+		printk(KERN_INFO "%s: del %.2x:%.2x:%.2x:%.2x:%.2x:%.2x mcast address from vlan interface\n",
+		       dev->name,
+		       dmi->dmi_addr[0],
+		       dmi->dmi_addr[1],
+		       dmi->dmi_addr[2],
+		       dmi->dmi_addr[3],
+		       dmi->dmi_addr[4],
+		       dmi->dmi_addr[5]);
+		dmi = dev->mc_list;
+	}
+
+	/* dev->mc_list is NULL by the time we get here. */
+	vlan_destroy_mc_list(VLAN_DEV_INFO(dev)->old_mc_list);
+	VLAN_DEV_INFO(dev)->old_mc_list = NULL;
+}
+
+int vlan_dev_open(struct net_device *dev)
+{
+	if (!(VLAN_DEV_INFO(dev)->real_dev->flags & IFF_UP))
+		return -ENETDOWN;
+
+	return 0;
+}
+
+int vlan_dev_stop(struct net_device *dev)
+{
+	vlan_flush_mc_list(dev);
+	return 0;
+}
+
+int vlan_dev_init(struct net_device *dev)
+{
+	/* TODO:  figure this out, maybe do nothing?? */
+	return 0;
+}
+
+void vlan_dev_destruct(struct net_device *dev)
+{
+	if (dev) {
+		vlan_flush_mc_list(dev);
+		if (dev->priv) {
+			if (VLAN_DEV_INFO(dev)->dent)
+				BUG();
+
+			kfree(dev->priv);
+			dev->priv = NULL;
+		}
+	}
+}
+
 /** Taken from Gleb + Lennert's VLAN code, and modified... */
 void vlan_dev_set_multicast_list(struct net_device *vlan_dev)
 {
@@ -706,69 +847,4 @@ void vlan_dev_set_multicast_list(struct net_device *vlan_dev)
 		/* save multicast list */
 		vlan_copy_mc_list(vlan_dev->mc_list, VLAN_DEV_INFO(vlan_dev));
 	}
-}
-
-/** dmi is a single entry into a dev_mc_list, a single node.  mc_list is
- *  an entire list, and we'll iterate through it.
- */
-int vlan_should_add_mc(struct dev_mc_list *dmi, struct dev_mc_list *mc_list)
-{
-	struct dev_mc_list *idmi;
-
-	for (idmi = mc_list; idmi != NULL; ) {
-		if (vlan_dmi_equals(dmi, idmi)) {
-			if (dmi->dmi_users > idmi->dmi_users)
-				return 1;
-			else
-				return 0;
-		} else {
-			idmi = idmi->next;
-		}
-	}
-
-	return 1;
-}
-
-void vlan_copy_mc_list(struct dev_mc_list *mc_list, struct vlan_dev_info *vlan_info)
-{
-	struct dev_mc_list *dmi, *new_dmi;
-
-	vlan_destroy_mc_list(vlan_info->old_mc_list);
-	vlan_info->old_mc_list = NULL;
-
-	for (dmi = mc_list; dmi != NULL; dmi = dmi->next) {
-		new_dmi = kmalloc(sizeof(*new_dmi), GFP_ATOMIC);
-		if (new_dmi == NULL) {
-			printk(KERN_ERR "vlan: cannot allocate memory. "
-			       "Multicast may not work properly from now.\n");
-			return;
-		}
-
-		/* Copy whole structure, then make new 'next' pointer */
-		*new_dmi = *dmi;
-		new_dmi->next = vlan_info->old_mc_list;
-		vlan_info->old_mc_list = new_dmi;
-	}
-}
-
-void vlan_flush_mc_list(struct net_device *dev)
-{
-	struct dev_mc_list *dmi = dev->mc_list;
-
-	while (dmi) {
-		dev_mc_delete(dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
-		printk(KERN_INFO "%s: del %.2x:%.2x:%.2x:%.2x:%.2x:%.2x mcast address from vlan interface\n",
-		       dev->name,
-		       dmi->dmi_addr[0],
-		       dmi->dmi_addr[1],
-		       dmi->dmi_addr[2],
-		       dmi->dmi_addr[3],
-		       dmi->dmi_addr[4],
-		       dmi->dmi_addr[5]);
-		dmi = dev->mc_list;
-	}
-
-	/* dev->mc_list is NULL by the time we get here. */
-	vlan_destroy_mc_list(VLAN_DEV_INFO(dev)->old_mc_list);
-	VLAN_DEV_INFO(dev)->old_mc_list = NULL;
 }

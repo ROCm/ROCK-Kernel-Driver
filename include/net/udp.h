@@ -23,6 +23,7 @@
 #define _UDP_H
 
 #include <linux/udp.h>
+#include <linux/ip.h>
 #include <net/sock.h>
 
 #define UDP_HTABLE_SIZE		128
@@ -41,7 +42,7 @@ static inline int udp_lport_inuse(u16 num)
 	struct sock *sk = udp_hash[num & (UDP_HTABLE_SIZE - 1)];
 
 	for(; sk != NULL; sk = sk->next) {
-		if(sk->num == num)
+		if (inet_sk(sk)->num == num)
 			return 1;
 	}
 	return 0;

@@ -116,17 +116,24 @@ struct ip_options {
 #define optlength(opt) (sizeof(struct ip_options) + opt->optlen)
 
 struct inet_opt {
+	/* Socket demultiplex comparisons on incoming packets. */
+	__u32			daddr;		/* Foreign IPv4 addr */
+	__u32			rcv_saddr;	/* Bound local IPv4 addr */
+	__u16			dport;		/* Destination port */
+	__u16			num;		/* Local port */
+	__u32			saddr;		/* Sending source */
 	int			ttl;		/* TTL setting */
 	int			tos;		/* TOS */
 	unsigned	   	cmsg_flags;
 	struct ip_options	*opt;
+	__u16			sport;		/* Source port */
 	unsigned char		hdrincl;	/* Include headers ? */
 	__u8			mc_ttl;		/* Multicasting TTL */
 	__u8			mc_loop;	/* Loopback */
+	__u8			pmtudisc;
+	__u16			id;		/* ID counter for DF pkts */
 	unsigned		recverr : 1,
 				freebind : 1;
-	__u16			id;		/* ID counter for DF pkts */
-	__u8			pmtudisc;
 	int			mc_index;	/* Multicast device index */
 	__u32			mc_addr;
 	struct ip_mc_socklist	*mc_list;	/* Group array */

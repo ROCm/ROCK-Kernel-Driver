@@ -969,9 +969,12 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 static int
 getorigdst(struct sock *sk, int optval, void *user, int *len)
 {
+	struct inet_opt *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;
-	struct ip_conntrack_tuple tuple = { { sk->rcv_saddr, { sk->sport } },
-					    { sk->daddr, { sk->dport },
+	struct ip_conntrack_tuple tuple = { { inet->rcv_saddr,
+						{ inet->sport } },
+					    { inet->daddr,
+						{ inet->dport },
 					      IPPROTO_TCP } };
 
 	/* We only do TCP at the moment: is there a better way? */
