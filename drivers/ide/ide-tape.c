@@ -6272,11 +6272,6 @@ static int idetape_cleanup (ide_drive_t *drive)
 	devfs_unregister(tape->de_r);
 	devfs_unregister(tape->de_n);
 	kfree (tape);
-	for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++)
-		if (idetape_chrdevs[minor].drive != NULL)
-			return 0;
-	unregister_chrdev(IDETAPE_MAJOR, "ht");
-	idetape_chrdev_present = 0;
 	return 0;
 }
 
@@ -6427,15 +6422,9 @@ MODULE_LICENSE("GPL");
 
 static void __exit idetape_exit (void)
 {
-	ide_drive_t *drive;
-	int minor;
-
-	for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++) {
-		drive = idetape_chrdevs[minor].drive;
-		if (drive != NULL && idetape_cleanup (drive))
-		printk(KERN_ERR "ide-tape: %s: cleanup_module() called while still busy\n", drive->name);
-	}
 	ide_unregister_module(&idetape_module);
+	unregister_chrdev(IDETAPE_MAJOR, "ht");
+	idetape_chrdev_present = 0;
 }
 
 /*
@@ -6443,30 +6432,15 @@ static void __exit idetape_exit (void)
  */
 static int idetape_init (void)
 {
-	ide_drive_t *drive;
-	int minor, failed = 0, supported = 0;
-/* DRIVER(drive)->busy++; */
 	MOD_INC_USE_COUNT;
 	if (!idetape_chrdev_present) {
+		idetape_chrdev_present = 1;
 		if (register_chrdev(IDETAPE_MAJOR, "ht", &idetape_fops)) {
 			printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
 			MOD_DEC_USE_COUNT;
 			return -EBUSY;
 		}
-		for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++)
-			idetape_chrdevs[minor].drive = NULL;
 	}
-
-	while ((drive = ide_scan_devices(NULL, failed++))) {
-		if (idetape_reinit(drive))
-			continue;
-		supported++;
-		failed--;
-	}
-	if (!idetape_chrdev_present && !supported) {
-		unregister_chrdev(IDETAPE_MAJOR, "ht");
-	} else
-		idetape_chrdev_present = 1;
 	ide_register_module(&idetape_module);
 	MOD_DEC_USE_COUNT;
 	return 0;

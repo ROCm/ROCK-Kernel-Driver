@@ -1237,7 +1237,6 @@ int idescsi_reinit (ide_drive_t *drive);
 
 int ide_register_module (ide_module_t *module);
 void ide_unregister_module (ide_module_t *module);
-ide_drive_t *ide_scan_devices(ide_driver_t *driver, int n);
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);

@@ -3150,28 +3150,12 @@ failed:
 
 static void __exit ide_cdrom_exit(void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices (&ide_cdrom_driver, failed)) != NULL)
-		if (ide_cdrom_cleanup (drive)) {
-			printk ("%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
 	ide_unregister_module (&ide_cdrom_module);
 }
  
 static int ide_cdrom_init(void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (NULL, failed++)) != NULL) {
-		if (ide_cdrom_reinit(drive))
-			continue;
-		failed--;
-	}
 	ide_register_module(&ide_cdrom_module);
 	MOD_DEC_USE_COUNT;
 	return 0;

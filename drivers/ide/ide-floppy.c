@@ -2233,21 +2233,6 @@ MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
 
 static void __exit idefloppy_exit (void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices(&idefloppy_driver, failed)) != NULL) {
-		if (idefloppy_cleanup (drive)) {
-			printk ("%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idefloppy_proc);
-#endif
-	}
 	ide_unregister_module(&idefloppy_module);
 }
 
@@ -2256,16 +2241,8 @@ static void __exit idefloppy_exit (void)
  */
 static int idefloppy_init (void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
 	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices(NULL, failed++)) != NULL) {
-		if (idefloppy_reinit(drive))
-			continue;
-		failed--;
-	}
 	ide_register_module(&idefloppy_module);
 	MOD_DEC_USE_COUNT;
 	return 0;

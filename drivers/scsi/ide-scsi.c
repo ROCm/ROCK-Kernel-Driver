@@ -614,8 +614,7 @@ failed:
  */
 static int idescsi_init (void)
 {
-	ide_drive_t *drive;
-	int i, failed;
+	int i;
 
 	if (idescsi_initialized)
 		return 0;
@@ -623,12 +622,6 @@ static int idescsi_init (void)
 	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
 		idescsi_drives[i] = NULL;
 	MOD_INC_USE_COUNT;
-	failed = 0;
-	while ((drive = ide_scan_devices(NULL, failed++)) != NULL) {
-		if (idescsi_reinit(drive))
-			continue;
-		failed--;
-	}
 	ide_register_module(&idescsi_module);
 	MOD_DEC_USE_COUNT;
 	return 0;
@@ -886,16 +879,7 @@ static int __init init_idescsi_module(void)
 
 static void __exit exit_idescsi_module(void)
 {
-	ide_drive_t *drive;
-	int failed;
-
 	scsi_unregister_host(&idescsi_template);
-	failed = 0;
-	while ((drive = ide_scan_devices(&idescsi_driver, failed)) != NULL)
-		if (idescsi_cleanup (drive)) {
-			printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
-			failed++;
-		}
 	ide_unregister_module(&idescsi_module);
 }
 

@@ -3511,7 +3511,7 @@ static void setup_driver_defaults (ide_drive_t *drive)
 	if (d->reinit == NULL)		d->reinit = default_reinit;
 }
 
-ide_drive_t *ide_scan_devices(ide_driver_t *driver, int n)
+static ide_drive_t *ide_scan_devices(ide_driver_t *driver, int n)
 {
 	unsigned int unit, index, i;
 
@@ -3594,12 +3594,20 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 
 int ide_register_module (ide_module_t *module)
 {
-	ide_module_t *p = ide_modules;
+	ide_driver_t *driver = module->info;
+	ide_module_t *p;
+	ide_drive_t *drive;
+	int failed = 0;
 
-	while (p) {
+	while ((drive = ide_scan_devices (NULL, failed++)) != NULL) {
+		if (driver->reinit(drive))
+			continue;
+		failed--;
+	}
+
+	for (p = ide_modules; p; p = p->next) {
 		if (p == module)
 			return 1;
-		p = p->next;
 	}
 	module->next = ide_modules;
 	ide_modules = module;
@@ -3609,7 +3617,23 @@ int ide_register_module (ide_module_t *module)
 
 void ide_unregister_module (ide_module_t *module)
 {
+	ide_driver_t *driver = module->info;
 	ide_module_t **p;
+	ide_drive_t *drive;
+	int failed = 0;
+
+	while ((drive = ide_scan_devices(driver, failed)) != NULL) {
+		if (driver->cleanup(drive)) {
+			printk ("%s: cleanup_module() called while still busy\n", drive->name);
+			failed++;
+		}
+		/* We must remove proc entries defined in this module.
+		   Otherwise we oops while accessing these entries */
+#ifdef CONFIG_PROC_FS
+		if (drive->proc)
+			ide_remove_proc_entries(drive->proc, driver->proc);
+#endif
+	}
 
 	for (p = &ide_modules; (*p) && (*p) != module; p = &((*p)->next));
 	if (*p)
@@ -3648,7 +3672,6 @@ EXPORT_SYMBOL(do_ide_request);
 /*
  * Driver module
  */
-EXPORT_SYMBOL(ide_scan_devices);
 EXPORT_SYMBOL(ide_register_subdriver);
 EXPORT_SYMBOL(ide_unregister_subdriver);
 EXPORT_SYMBOL(ide_replace_subdriver);

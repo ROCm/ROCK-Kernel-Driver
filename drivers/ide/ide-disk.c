@@ -1717,35 +1717,12 @@ failed:
 
 static void __exit idedisk_exit (void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices(&idedisk_driver, failed)) != NULL) {
-		if (idedisk_cleanup (drive)) {
-			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idedisk_proc);
-#endif
-	}
 	ide_unregister_module(&idedisk_module);
 }
 
 static int idedisk_init (void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-	
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices(NULL, failed++)) != NULL) {
-		if (idedisk_reinit(drive))
-			continue;
-		failed--;
-	}
 	ide_register_module(&idedisk_module);
 	MOD_DEC_USE_COUNT;
 	return 0;
