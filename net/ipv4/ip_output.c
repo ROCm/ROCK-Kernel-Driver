@@ -254,7 +254,7 @@ int ip_mc_output(struct sk_buff *skb)
 		    && ((rt->rt_flags&RTCF_LOCAL) || !(IPCB(skb)->flags&IPSKB_FORWARDED))
 #endif
 		) {
-			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
+			struct sk_buff *newskb = skb_copy(skb, GFP_ATOMIC);
 			if (newskb)
 				NF_HOOK(PF_INET, NF_IP_POST_ROUTING, newskb, NULL,
 					newskb->dev, 
@@ -270,7 +270,7 @@ int ip_mc_output(struct sk_buff *skb)
 	}
 
 	if (rt->rt_flags&RTCF_BROADCAST) {
-		struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
+		struct sk_buff *newskb = skb_copy(skb, GFP_ATOMIC);
 		if (newskb)
 			NF_HOOK(PF_INET, NF_IP_POST_ROUTING, newskb, NULL,
 				newskb->dev, ip_dev_loopback_xmit);
