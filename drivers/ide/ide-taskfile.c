@@ -121,13 +121,13 @@ void debug_taskfile (ide_drive_t *drive, ide_task_t *args)
 	printk("TF.6=x%02x ", args->tfRegister[IDE_SELECT_OFFSET]);
 	printk("TF.7=x%02x\n", args->tfRegister[IDE_COMMAND_OFFSET]);
 	printk(KERN_INFO "%s: ", drive->name);
-//	printk("HTF.0=x%02x ", args->hobRegister[IDE_DATA_OFFSET_HOB]);
-	printk("HTF.1=x%02x ", args->hobRegister[IDE_FEATURE_OFFSET_HOB]);
-	printk("HTF.2=x%02x ", args->hobRegister[IDE_NSECTOR_OFFSET_HOB]);
-	printk("HTF.3=x%02x ", args->hobRegister[IDE_SECTOR_OFFSET_HOB]);
-	printk("HTF.4=x%02x ", args->hobRegister[IDE_LCYL_OFFSET_HOB]);
-	printk("HTF.5=x%02x ", args->hobRegister[IDE_HCYL_OFFSET_HOB]);
-	printk("HTF.6=x%02x ", args->hobRegister[IDE_SELECT_OFFSET_HOB]);
+//	printk("HTF.0=x%02x ", args->hobRegister[IDE_DATA_OFFSET]);
+	printk("HTF.1=x%02x ", args->hobRegister[IDE_FEATURE_OFFSET]);
+	printk("HTF.2=x%02x ", args->hobRegister[IDE_NSECTOR_OFFSET]);
+	printk("HTF.3=x%02x ", args->hobRegister[IDE_SECTOR_OFFSET]);
+	printk("HTF.4=x%02x ", args->hobRegister[IDE_LCYL_OFFSET]);
+	printk("HTF.5=x%02x ", args->hobRegister[IDE_HCYL_OFFSET]);
+	printk("HTF.6=x%02x ", args->hobRegister[IDE_SELECT_OFFSET]);
 	printk("HTF.7=x%02x\n", args->hobRegister[IDE_CONTROL_OFFSET_HOB]);
 }
 #endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
@@ -1018,7 +1018,7 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	 */
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA) {
 		if (data_size == 0)
-			rq.nr_sectors = (args->hobRegister[IDE_NSECTOR_OFFSET_HOB] << 8) | args->tfRegister[IDE_NSECTOR_OFFSET];
+			rq.nr_sectors = (args->hobRegister[IDE_NSECTOR_OFFSET] << 8) | args->tfRegister[IDE_NSECTOR_OFFSET];
 		else
 			rq.nr_sectors = data_size / SECTOR_SIZE;
 
