@@ -44,24 +44,22 @@ find_key_inode(int key)
 static struct page *
 alloc_hugetlb_page(void)
 {
-	struct list_head *curr, *head;
+	int i;
 	struct page *page;
 
 	spin_lock(&htlbpage_lock);
-
-	head = &htlbpage_freelist;
-	curr = head->next;
-
-	if (curr == head) {
+	if (list_empty(&htlbpage_freelist)) {
 		spin_unlock(&htlbpage_lock);
 		return NULL;
 	}
-	page = list_entry(curr, struct page, list);
-	list_del(curr);
+
+	page = list_entry(htlbpage_freelist.next, struct page, list);
+	list_del(&page->list);
 	htlbpagemem--;
 	spin_unlock(&htlbpage_lock);
 	set_page_count(page, 1);
-	memset(page_address(page), 0, HPAGE_SIZE);
+	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
+		clear_highpage(&page[i]);
 	return page;
 }
 
