@@ -769,7 +769,7 @@ static void poison_obj(kmem_cache_t *cachep, void *addr, unsigned char val)
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
-static int check_poison_obj (kmem_cache_t *cachep, void *addr)
+static void check_poison_obj(kmem_cache_t *cachep, void *addr)
 {
 	int size = cachep->objsize;
 	void *end;
@@ -779,8 +779,7 @@ static int check_poison_obj (kmem_cache_t *cachep, void *addr)
 	}
 	end = memchr(addr, POISON_END, size);
 	if (end != (addr+size-1))
-		return 1;
-	return 0;
+		slab_error(cachep, "object was modified after freeing");
 }
 #endif
 
@@ -1628,8 +1627,7 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 	if (!objp)	
 		return objp;
 	if (cachep->flags & SLAB_POISON)
-		if (check_poison_obj(cachep, objp))
-			BUG();
+		check_poison_obj(cachep, objp);
 	if (cachep->flags & SLAB_RED_ZONE) {
 		/* Set alloc red-zone, and check old one. */
 		if (xchg((unsigned long *)objp, RED_ACTIVE) != RED_INACTIVE)
