@@ -1396,12 +1396,12 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	if (usb_string(dev, dev->descriptor.iManufacturer, buf, 64) > 0) {
 		strcat(hid->name, buf);
 		if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0)
-			sprintf(hid->name, "%s %s", hid->name, buf);
+			snprintf(hid->name, 64, "%s %s", hid->name, buf);
 	} else
-		sprintf(hid->name, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
+		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
 
-	usb_make_path(dev, buf, 63);
-	sprintf(hid->phys, "%s/input%d", buf, ifnum);
+	usb_make_path(dev, buf, 64);
+	snprintf(hid->phys, 64, "%s/input%d", buf, ifnum);
 
 	if (usb_string(dev, dev->descriptor.iSerialNumber, hid->uniq, 64) <= 0)
 		hid->uniq[0] = 0;
@@ -1477,20 +1477,20 @@ static void hid_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct hid_device *hid = ptr;
 
+	dbg("cleanup called");
 	usb_unlink_urb(hid->urbin);
 	usb_unlink_urb(hid->urbout);
 	usb_unlink_urb(hid->urbctrl);
-
-	if (hid->claimed & HID_CLAIMED_INPUT)
-		hidinput_disconnect(hid);
-	if (hid->claimed & HID_CLAIMED_HIDDEV)
-		hiddev_disconnect(hid);
 
 	usb_free_urb(hid->urbin);
 	usb_free_urb(hid->urbctrl);
 	if (hid->urbout)
 		usb_free_urb(hid->urbout);
 
+	if (hid->claimed & HID_CLAIMED_INPUT)
+		hidinput_disconnect(hid);
+	if (hid->claimed & HID_CLAIMED_HIDDEV)
+		hiddev_disconnect(hid);
 	hid_free_device(hid);
 }
 

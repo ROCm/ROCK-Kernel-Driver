@@ -1899,11 +1899,12 @@ void usb_disconnect(struct usb_device **pdev)
 				down(&driver->serialize);
 				driver->disconnect(dev, interface->private_data);
 				up(&driver->serialize);
-				if (driver->owner)
-					__MOD_DEC_USE_COUNT(driver->owner);
 				/* if driver->disconnect didn't release the interface */
 				if (interface->driver)
 					usb_driver_release_interface(driver, interface);
+				/* we don't need the driver any longer */
+				if (driver->owner)
+					__MOD_DEC_USE_COUNT(driver->owner);
 			}
 			/* remove our device node for this interface */
 			put_device(&interface->dev);
