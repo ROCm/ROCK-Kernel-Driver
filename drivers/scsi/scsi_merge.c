@@ -57,7 +57,7 @@
  */
 int scsi_init_io(Scsi_Cmnd *SCpnt)
 {
-	struct request     *req = &SCpnt->request;
+	struct request     *req = SCpnt->request;
 	struct scatterlist *sgpnt;
 	int count, gfp_mask;
 

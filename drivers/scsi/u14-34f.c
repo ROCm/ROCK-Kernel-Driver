@@ -1206,7 +1206,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    if (linked_comm && SCpnt->device->queue_depth > 2
                                      && TLDEV(SCpnt->device->type)) {
       HD(j)->cp_stat[i] = READY;
-      flush_dev(SCpnt->device, SCpnt->request.sector, j, FALSE);
+      flush_dev(SCpnt->device, SCpnt->request->sector, j, FALSE);
       return 0;
       }
 
@@ -1529,11 +1529,11 @@ static inline int reorder(unsigned int j, unsigned long cursec,
 
       if (!(cpp->xdir == DTD_IN)) input_only = FALSE;
 
-      if (SCpnt->request.sector < minsec) minsec = SCpnt->request.sector;
-      if (SCpnt->request.sector > maxsec) maxsec = SCpnt->request.sector;
+      if (SCpnt->request->sector < minsec) minsec = SCpnt->request->sector;
+      if (SCpnt->request->sector > maxsec) maxsec = SCpnt->request->sector;
 
-      sl[n] = SCpnt->request.sector;
-      ioseek += SCpnt->request.nr_sectors;
+      sl[n] = SCpnt->request->sector;
+      ioseek += SCpnt->request->nr_sectors;
 
       if (!n) continue;
 
@@ -1561,7 +1561,7 @@ static inline int reorder(unsigned int j, unsigned long cursec,
 
    if (!input_only) for (n = 0; n < n_ready; n++) {
       k = il[n]; cpp = &HD(j)->cp[k]; SCpnt = cpp->SCpnt;
-      ll[n] = SCpnt->request.nr_sectors; pl[n] = SCpnt->pid;
+      ll[n] = SCpnt->request->nr_sectors; pl[n] = SCpnt->pid;
 
       if (!n) continue;
 
@@ -1589,7 +1589,7 @@ static inline int reorder(unsigned int j, unsigned long cursec,
                 " cur %ld s:%c r:%c rev:%c in:%c ov:%c xd %d.\n",
                 (ihdlr ? "ihdlr" : "qcomm"), SCpnt->channel, SCpnt->target,
                 SCpnt->lun, SCpnt->pid, k, flushcount, n_ready,
-                SCpnt->request.sector, SCpnt->request.nr_sectors, cursec,
+                SCpnt->request->sector, SCpnt->request->nr_sectors, cursec,
                 YESNO(s), YESNO(r), YESNO(rev), YESNO(input_only),
                 YESNO(overlap), cpp->xdir);
          }
@@ -1718,7 +1718,7 @@ static inline void ihdlr(int irq, unsigned int j) {
 
    if (linked_comm && SCpnt->device->queue_depth > 2
                                      && TLDEV(SCpnt->device->type))
-      flush_dev(SCpnt->device, SCpnt->request.sector, j, TRUE);
+      flush_dev(SCpnt->device, SCpnt->request->sector, j, TRUE);
 
    tstatus = status_byte(spp->target_status);
 

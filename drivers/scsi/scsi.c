@@ -258,10 +258,19 @@ __setup("scsi_logging=", scsi_logging_setup);
  
 static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 {
-	struct request *req;
+	struct request *req = SCpnt->request;
+        struct request_queue *q = &SCpnt->device->request_queue;
+        unsigned long flags;
 
-	req = &SCpnt->request;
+        ASSERT_LOCK(q->queue_lock, 0);
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
+
+        spin_lock_irqsave(q->queue_lock, flags);
+
+        if(blk_rq_tagged(req))
+                blk_queue_end_tag(q, req);
+
+        spin_unlock_irqrestore(q->queue_lock, flags);
 
 	if (req->waiting)
 		complete(req->waiting);
@@ -295,17 +304,19 @@ static spinlock_t device_request_lock = SPIN_LOCK_UNLOCKED;
 Scsi_Request *scsi_allocate_request(Scsi_Device * device)
 {
   	Scsi_Request *SRpnt = NULL;
+        const int offset = ALIGN(sizeof(Scsi_Request), 4);
+        const int size = offset + sizeof(struct request);
   
   	if (!device)
   		panic("No device passed to scsi_allocate_request().\n");
   
-	SRpnt = (Scsi_Request *) kmalloc(sizeof(Scsi_Request), GFP_ATOMIC);
+        SRpnt = (Scsi_Request *) kmalloc(size, GFP_ATOMIC);
 	if( SRpnt == NULL )
 	{
 		return NULL;
 	}
-
-	memset(SRpnt, 0, sizeof(Scsi_Request));
+	memset(SRpnt, 0, size);
+        SRpnt->sr_request = (struct request *)(((char *)SRpnt) + offset);
 	SRpnt->sr_device = device;
 	SRpnt->sr_host = device->host;
 	SRpnt->sr_magic = SCSI_REQ_MAGIC;
@@ -433,7 +444,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 			 * Now we can check for a free command block for this device.
 			 */
 			for (SCpnt = device->device_queue; SCpnt; SCpnt = SCpnt->next) {
-				if (SCpnt->request.rq_status == RQ_INACTIVE)
+				if (SCpnt->request == NULL)
 					break;
 			}
 		}
@@ -502,9 +513,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 		}
 	}
 
-	SCpnt->request.rq_status = RQ_SCSI_BUSY;
-	SCpnt->request.waiting = NULL;	/* And no one is waiting for this
-					 * to complete */
+	SCpnt->request = NULL;
 	atomic_inc(&SCpnt->host->host_active);
 	atomic_inc(&SCpnt->device->device_active);
 
@@ -547,7 +556,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 
         SDpnt = SCpnt->device;
 
-	SCpnt->request.rq_status = RQ_INACTIVE;
+	SCpnt->request = NULL;
 	SCpnt->state = SCSI_STATE_UNUSED;
 	SCpnt->owner = SCSI_OWNER_NOBODY;
 	atomic_dec(&SCpnt->host->host_active);
@@ -770,13 +779,13 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
 	DECLARE_COMPLETION(wait);
 	request_queue_t *q = &SRpnt->sr_device->request_queue;
 	
-	SRpnt->sr_request.waiting = &wait;
-	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
+	SRpnt->sr_request->waiting = &wait;
+	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
 	scsi_do_req (SRpnt, (void *) cmnd,
 		buffer, bufflen, scsi_wait_done, timeout, retries);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
-	SRpnt->sr_request.waiting = NULL;
+	SRpnt->sr_request->waiting = NULL;
 	if( SRpnt->sr_command != NULL )
 	{
 		scsi_release_command(SRpnt->sr_command);
@@ -927,8 +936,7 @@ void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 	SCpnt->cmd_len = SRpnt->sr_cmd_len;
 	SCpnt->use_sg = SRpnt->sr_use_sg;
 
-	memcpy((void *) &SCpnt->request, (const void *) &SRpnt->sr_request,
-	       sizeof(SRpnt->sr_request));
+        SCpnt->request = SRpnt->sr_request;
 	memcpy((void *) SCpnt->data_cmnd, (const void *) SRpnt->sr_cmnd, 
 	       sizeof(SCpnt->data_cmnd));
 	SCpnt->reset_chain = NULL;
@@ -1458,7 +1466,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 		SCpnt->target = SDpnt->id;
 		SCpnt->lun = SDpnt->lun;
 		SCpnt->channel = SDpnt->channel;
-		SCpnt->request.rq_status = RQ_INACTIVE;
+		SCpnt->request = NULL;
 		SCpnt->use_sg = 0;
 		SCpnt->old_use_sg = 0;
 		SCpnt->old_cmd_len = 0;
@@ -1910,6 +1918,11 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 				}
 				printk(KERN_INFO "scsi%d : %s\n",		/* And print a little message */
 				       shpnt->host_no, name);
+				strncpy(shpnt->host_driverfs_dev.name,name,
+					DEVICE_NAME_SIZE-1);
+				sprintf(shpnt->host_driverfs_dev.bus_id,
+					"scsi%d",
+					shpnt->host_no);
 			}
 		}
 
@@ -1918,6 +1931,8 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 		 */
 		for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
 			if (shpnt->hostt == tpnt) {
+				/* first register parent with driverfs */
+				device_register(&shpnt->host_driverfs_dev);
 				scan_scsis(shpnt, 0, 0, 0, 0);
 				if (shpnt->select_queue_depths != NULL) {
 					(shpnt->select_queue_depths) (shpnt, shpnt->host_queue);
@@ -2030,16 +2045,16 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 			     SCpnt = SCpnt->next) {
 				online_status = SDpnt->online;
 				SDpnt->online = FALSE;
-				if (SCpnt->request.rq_status != RQ_INACTIVE) {
+				if (SCpnt->request && SCpnt->request->rq_status != RQ_INACTIVE) {
 					printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, pid=%ld, state=%d, owner=%d.\n",
-					       SCpnt->request.rq_status, SCpnt->target, SCpnt->pid,
+					       SCpnt->request->rq_status, SCpnt->target, SCpnt->pid,
 					     SCpnt->state, SCpnt->owner);
 					for (SDpnt1 = shpnt->host_queue; SDpnt1;
 					     SDpnt1 = SDpnt1->next) {
 						for (SCpnt = SDpnt1->device_queue; SCpnt;
 						     SCpnt = SCpnt->next)
-							if (SCpnt->request.rq_status == RQ_SCSI_DISCONNECTING)
-								SCpnt->request.rq_status = RQ_INACTIVE;
+							if (SCpnt->request->rq_status == RQ_SCSI_DISCONNECTING)
+								SCpnt->request->rq_status = RQ_INACTIVE;
 					}
 					SDpnt->online = online_status;
 					printk(KERN_ERR "Device busy???\n");
@@ -2050,7 +2065,8 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 				 * continue on.
 				 */
 				SCpnt->state = SCSI_STATE_DISCONNECTING;
-				SCpnt->request.rq_status = RQ_SCSI_DISCONNECTING;	/* Mark as busy */
+                                if(SCpnt->request)
+                                        SCpnt->request->rq_status = RQ_SCSI_DISCONNECTING;	/* Mark as busy */
 			}
 		}
 	}
@@ -2072,6 +2088,7 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 				goto err_out;
 			}
 			devfs_unregister (SDpnt->de);
+			put_device(&SDpnt->sdev_driverfs_dev);
 		}
 	}
 
@@ -2122,6 +2139,7 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 		/* Remove the /proc/scsi directory entry */
 		sprintf(name,"%d",shpnt->host_no);
 		remove_proc_entry(name, tpnt->proc_dir);
+		put_device(&shpnt->host_driverfs_dev);
 		if (tpnt->release)
 			(*tpnt->release) (shpnt);
 		else {
@@ -2360,11 +2378,11 @@ static void scsi_dump_status(int level)
 				       SCpnt->target,
 				       SCpnt->lun,
 
-				       kdevname(SCpnt->request.rq_dev),
-				       SCpnt->request.sector,
-				       SCpnt->request.nr_sectors,
-				       (long)SCpnt->request.current_nr_sectors,
-				       SCpnt->request.rq_status,
+				       kdevname(SCpnt->request->rq_dev),
+				       SCpnt->request->sector,
+				       SCpnt->request->nr_sectors,
+				       (long)SCpnt->request->current_nr_sectors,
+				       SCpnt->request->rq_status,
 				       SCpnt->use_sg,
 
 				       SCpnt->retries,
@@ -2470,6 +2488,34 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index)
 	mempool_free(sgl, sgp->pool);
 }
 
+static int scsi_bus_match(struct device *scsi_driverfs_dev, 
+                          struct device_driver *scsi_driverfs_drv)
+{
+        char *p=0;
+
+        if (!strcmp("sd", scsi_driverfs_drv->name)) {
+                if ((p = strstr(scsi_driverfs_dev->bus_id, ":disc")) || 
+		    (p = strstr(scsi_driverfs_dev->bus_id, ":p"))) { 
+                        return 1;
+                }
+        } else if (!strcmp("sg", scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id, ":gen"))
+                        return 1;
+        } else if (!strcmp("sr",scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id,":cd"))
+                        return 1;
+        } else if (!strcmp("st",scsi_driverfs_drv->name)) {
+                if (strstr(scsi_driverfs_dev->bus_id,":mt"))
+                        return 1;
+        }
+        return 0;
+}
+
+struct bus_type scsi_driverfs_bus_type = {
+        name: "scsi",
+        match: scsi_bus_match,
+};
+
 static int __init init_scsi(void)
 {
 	struct proc_dir_entry *generic;
@@ -2515,6 +2561,8 @@ static int __init init_scsi(void)
         if (scsihosts)
 		printk(KERN_INFO "scsi: host order: %s\n", scsihosts);	
 	scsi_host_no_init (scsihosts);
+
+	bus_register(&scsi_driverfs_bus_type);
 
 	/* Where we handle work queued by scsi_done */
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
@@ -2677,16 +2725,18 @@ int
 scsi_reset_provider(Scsi_Device *dev, int flag)
 {
 	Scsi_Cmnd SC, *SCpnt = &SC;
+        struct request req;
 	int rtn;
 
+        SCpnt->request = &req;
 	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
 	SCpnt->host                    	= dev->host;
 	SCpnt->device                  	= dev;
 	SCpnt->target                  	= dev->id;
 	SCpnt->lun                     	= dev->lun;
 	SCpnt->channel                 	= dev->channel;
-	SCpnt->request.rq_status       	= RQ_SCSI_BUSY;
-	SCpnt->request.waiting        	= NULL;
+	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
+	SCpnt->request->waiting        	= NULL;
 	SCpnt->use_sg                  	= 0;
 	SCpnt->old_use_sg              	= 0;
 	SCpnt->old_cmd_len             	= 0;
