@@ -50,9 +50,6 @@
  * have a way to deal with that gracefully. Right now I used straightforward
  * wrappers, but this needs further analysis wrt potential overflows.
  */
-#ifdef CONFIG_MODULES
-extern int get_module_list(char *);
-#endif
 extern int get_device_list(char *);
 extern int get_partition_list(char *, char **, off_t, int);
 extern int get_filesystem_list(char *);
@@ -203,13 +200,17 @@ static struct file_operations proc_cpuinfo_operations = {
 };
 
 #ifdef CONFIG_MODULES
-static int modules_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
+extern struct seq_operations modules_op;
+static int modules_open(struct inode *inode, struct file *file)
 {
-	int len = get_module_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
+	return seq_open(file, &modules_op);
 }
-
+static struct file_operations proc_modules_operations = {
+	open:		modules_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
 extern struct seq_operations ksyms_op;
 static int ksyms_open(struct inode *inode, struct file *file)
 {
@@ -535,9 +536,6 @@ void __init proc_misc_init(void)
 		{"uptime",	uptime_read_proc},
 		{"meminfo",	meminfo_read_proc},
 		{"version",	version_read_proc},
-#ifdef CONFIG_MODULES
-		{"modules",	modules_read_proc},
-#endif
 		{"stat",	kstat_read_proc},
 		{"devices",	devices_read_proc},
 		{"partitions",	partitions_read_proc},
@@ -567,6 +565,7 @@ void __init proc_misc_init(void)
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
 	create_seq_entry("slabinfo",S_IWUSR|S_IRUGO,&proc_slabinfo_operations);
 #ifdef CONFIG_MODULES
+	create_seq_entry("modules", 0, &proc_modules_operations);
 	create_seq_entry("ksyms", 0, &proc_ksyms_operations);
 #endif
 	proc_root_kcore = create_proc_entry("kcore", S_IRUSR, NULL);
