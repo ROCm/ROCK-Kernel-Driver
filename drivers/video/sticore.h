@@ -42,7 +42,7 @@
 
 #define STI_PTR(p)	(p)
 #define PTR_STI(p)	(p)
-static int inline STI_CALL( unsigned long func, 
+static inline int STI_CALL( unsigned long func, 
 		void *flags, void *inptr, void *outptr, void *glob_cfg )
 {
        int (*f)(void *,void *,void *,void *);

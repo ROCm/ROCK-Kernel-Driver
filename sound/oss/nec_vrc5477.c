@@ -882,7 +882,7 @@ static int drain_dac(struct vrc5477_ac97_state *s, int nonblock)
 
 /* --------------------------------------------------------------------- */
 
-static int inline 
+static inline int
 copy_two_channel_adc_to_user(struct vrc5477_ac97_state *s, 
 		             char *buffer, 
 			     int copyCount)
@@ -912,7 +912,7 @@ copy_two_channel_adc_to_user(struct vrc5477_ac97_state *s,
 }
 
 /* return the total bytes that is copied */
-static int inline 
+static inline int
 copy_adc_to_user(struct vrc5477_ac97_state *s,
 		 char * buffer,
 		 size_t count,
@@ -1039,7 +1039,7 @@ vrc5477_ac97_read(struct file *file,
 	return ret;
 }
 
-static int inline 
+static inline int
 copy_two_channel_dac_from_user(struct vrc5477_ac97_state *s, 
 			       const char *buffer, 
 			       int copyCount)
@@ -1073,7 +1073,7 @@ copy_two_channel_dac_from_user(struct vrc5477_ac97_state *s,
 }
 
 /* return the total bytes that is copied */
-static int inline 
+static inline int
 copy_dac_from_user(struct vrc5477_ac97_state *s, 
 		   const char *buffer, 
 		   size_t count, 

@@ -1889,7 +1889,7 @@ void ibmphp_print_test (void)
 	debug_pci ("***********************END***********************\n");
 }
 
-int static range_exists_already (struct range_node * range, struct bus_node * bus_cur, u8 type)
+static int range_exists_already (struct range_node * range, struct bus_node * bus_cur, u8 type)
 {
 	struct range_node * range_cur = NULL;
 	switch (type) {

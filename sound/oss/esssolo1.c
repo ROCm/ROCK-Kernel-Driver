@@ -266,7 +266,7 @@ static inline int read_seq(struct solo1_state *s, unsigned char *data)
         return 0;
 }
 
-static int inline reset_ctrl(struct solo1_state *s)
+static inline int reset_ctrl(struct solo1_state *s)
 {
         int i;
 

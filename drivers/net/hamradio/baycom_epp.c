@@ -342,7 +342,7 @@ static inline int calc_crc_ccitt(const unsigned char *buf, int cnt)
 
 /* --------------------------------------------------------------------- */
 
-static void inline baycom_int_freq(struct baycom_state *bc)
+static inline void baycom_int_freq(struct baycom_state *bc)
 {
 #ifdef BAYCOM_DEBUG
 	unsigned long cur_jiffies = jiffies;
@@ -431,7 +431,7 @@ static void epp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 /* ---------------------------------------------------------------------- */
 
-static void inline do_kiss_params(struct baycom_state *bc,
+static inline void do_kiss_params(struct baycom_state *bc,
 				  unsigned char *data, unsigned long len)
 {
 

@@ -1634,7 +1634,7 @@ static int free_frame_buf(struct cam_data *cam)
 }
 
 
-static void inline free_frames(struct cpia_frame frame[FRAME_NUM])
+static inline void free_frames(struct cpia_frame frame[FRAME_NUM])
 {
 	int i;
 

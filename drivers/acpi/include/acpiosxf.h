@@ -235,14 +235,14 @@ acpi_os_write_memory (
 acpi_status
 acpi_os_read_pci_configuration (
 	acpi_pci_id             *pci_id,
-	u32                     register,
+	u32                     reg,
 	void                    *value,
 	u32                     width);
 
 acpi_status
 acpi_os_write_pci_configuration (
 	acpi_pci_id             *pci_id,
-	u32                     register,
+	u32                     reg,
 	acpi_integer            value,
 	u32                     width);
 

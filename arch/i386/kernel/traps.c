@@ -317,7 +317,7 @@ static inline unsigned long get_cr2(void)
 	return address;
 }
 
-static void inline do_trap(int trapnr, int signr, char *str, int vm86,
+static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
 	if (vm86 && regs->eflags & VM_MASK)

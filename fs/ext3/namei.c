@@ -704,7 +704,7 @@ static inline int ext3_match (int len, const char * const name,
 /*
  * Returns 0 if not found, -1 on failure, and 1 on success
  */
-static int inline search_dirblock(struct buffer_head * bh,
+static inline int search_dirblock(struct buffer_head * bh,
 				  struct inode *dir,
 				  struct dentry *dentry,
 				  unsigned long offset,

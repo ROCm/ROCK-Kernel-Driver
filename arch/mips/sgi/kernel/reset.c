@@ -126,7 +126,7 @@ static inline void power_button(void)
 	add_timer(&power_timer);
 }
 
-void inline sgi_volume_set(unsigned char volume)
+inline void sgi_volume_set(unsigned char volume)
 {
 	sgi_volume = volume;
 
@@ -134,7 +134,7 @@ void inline sgi_volume_set(unsigned char volume)
 	hpc3c0->pbus_extregs[2][1] = sgi_volume;
 }
 
-void inline sgi_volume_get(unsigned char *volume)
+inline void sgi_volume_get(unsigned char *volume)
 {
 	*volume = sgi_volume;
 }
