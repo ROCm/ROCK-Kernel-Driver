@@ -397,8 +397,7 @@ vn_remove(struct vnode *vp)
 	 * After the following purge the vnode
 	 * will no longer exist.
 	 */
-	VMAP(vp, XFS_BHVTOI(vp->v_fbhv), vmap);
-
+	VMAP(vp, vmap);
 	vn_purge(vp, &vmap);
 }
 

@@ -911,7 +911,7 @@ xfs_mountfs(
 	rvp = XFS_ITOV(rip);
 	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
-		VMAP(rvp, rip, vmap);
+		VMAP(rvp, vmap);
 		prdev("Root inode %llu is not a directory",
 		      mp->m_dev, (unsigned long long)rip->i_ino);
 		rvp->v_flag |= VPURGE;
@@ -958,7 +958,7 @@ xfs_mountfs(
 		 */
 		cmn_err(CE_WARN, "XFS: failed to read RT inodes");
 		rvp->v_flag |= VPURGE;
-		VMAP(rvp, rip, vmap);
+		VMAP(rvp, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
 		goto error3;

@@ -1115,7 +1115,7 @@ xfs_syncsub(
 			 * in taking a snapshot of the vnode version number
 			 * for use in calling vn_get().
 			 */
-			VMAP(vp, ip, vmap);
+			VMAP(vp, vmap);
 			IPOINTER_INSERT(ip, mp);
 
 			vp = vn_get(vp, &vmap);

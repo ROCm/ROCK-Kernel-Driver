@@ -1060,7 +1060,7 @@ again:
 			 * Sample vp mapping while holding the mplock, lest
 			 * we come across a non-existent vnode.
 			 */
-			VMAP(vp, ip, vmap);
+			VMAP(vp, vmap);
 			ireclaims = mp->m_ireclaims;
 			topino = mp->m_inodes;
 			XFS_MOUNT_IUNLOCK(mp);

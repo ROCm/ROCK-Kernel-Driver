@@ -629,9 +629,10 @@ typedef struct vnode_map {
 	xfs_ino_t	v_ino;			/* inode #	*/
 } vmap_t;
 
-#define VMAP(vp, ip, vmap)	{(vmap).v_vfsp	 = (vp)->v_vfsp,	\
-				 (vmap).v_number = (vp)->v_number,	\
-				 (vmap).v_ino	 = (ip)->i_ino; }
+#define VMAP(vp, vmap)	{(vmap).v_vfsp	 = (vp)->v_vfsp,	\
+			 (vmap).v_number = (vp)->v_number,	\
+			 (vmap).v_ino	 = (vp)->v_inode.i_ino; }
+
 extern void	vn_purge(struct vnode *, vmap_t *);
 extern vnode_t	*vn_get(struct vnode *, vmap_t *);
 extern int	vn_revalidate(struct vnode *);

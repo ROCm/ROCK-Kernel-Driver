@@ -2322,7 +2322,7 @@ xfs_rtmount_inodes(
 		vmap_t		vmap;		/* vmap to delete vnode */
 
 		rbmvp = XFS_ITOV(mp->m_rbmip);
-		VMAP(rbmvp, mp->m_rbmip, vmap);
+		VMAP(rbmvp, vmap);
 		VN_RELE(rbmvp);
 		vn_purge(rbmvp, &vmap);
 		return error;
