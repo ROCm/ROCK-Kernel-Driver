@@ -1164,6 +1164,66 @@ static BOOL load_and_init_quota(ntfs_volume *vol)
 	return TRUE;
 }
 
+/**
+ * load_and_init_attrdef - load the attribute definitions table for a volume
+ * @vol:	ntfs super block describing device whose attrdef to load
+ *
+ * Return TRUE on success or FALSE on error.
+ */
+static BOOL load_and_init_attrdef(ntfs_volume *vol)
+{
+	struct super_block *sb = vol->sb;
+	struct inode *ino;
+	struct page *page;
+	unsigned long index, max_index;
+	unsigned int size;
+
+	ntfs_debug("Entering.");
+	/* Read attrdef table and setup vol->attrdef and vol->attrdef_size. */
+	ino = ntfs_iget(sb, FILE_AttrDef);
+	if (IS_ERR(ino) || is_bad_inode(ino)) {
+		if (!IS_ERR(ino))
+			iput(ino);
+		goto failed;
+	}
+	/* The size of FILE_AttrDef must be above 0 and fit inside 31 bits. */
+	if (!ino->i_size || ino->i_size > 0x7fffffff)
+		goto iput_failed;
+	vol->attrdef = (ATTR_DEF*)ntfs_malloc_nofs(ino->i_size);
+	if (!vol->attrdef)
+		goto iput_failed;
+	index = 0;
+	max_index = ino->i_size >> PAGE_CACHE_SHIFT;
+	size = PAGE_CACHE_SIZE;
+	while (index < max_index) {
+		/* Read the attrdef table and copy it into the linear buffer. */
+read_partial_attrdef_page:
+		page = ntfs_map_page(ino->i_mapping, index);
+		if (IS_ERR(page))
+			goto free_iput_failed;
+		memcpy((u8*)vol->attrdef + (index++ << PAGE_CACHE_SHIFT),
+				page_address(page), size);
+		ntfs_unmap_page(page);
+	};
+	if (size == PAGE_CACHE_SIZE) {
+		size = ino->i_size & ~PAGE_CACHE_MASK;
+		if (size)
+			goto read_partial_attrdef_page;
+	}
+	vol->attrdef_size = ino->i_size;
+	ntfs_debug("Read %llu bytes from $AttrDef.", ino->i_size);
+	iput(ino);
+	return TRUE;
+free_iput_failed:
+	ntfs_free(vol->attrdef);
+	vol->attrdef = NULL;
+iput_failed:
+	iput(ino);
+failed:
+	ntfs_error(sb, "Failed to initialize attribute definition table.");
+	return FALSE;
+}
+
 #endif /* NTFS_RW */
 
 /**
@@ -1264,7 +1324,7 @@ upcase_failed:
 		return TRUE;
 	}
 	up(&ntfs_lock);
-	ntfs_error(sb, "Failed to initialized upcase table.");
+	ntfs_error(sb, "Failed to initialize upcase table.");
 	return FALSE;
 }
 
@@ -1280,7 +1340,6 @@ upcase_failed:
 static BOOL load_system_files(ntfs_volume *vol)
 {
 	struct super_block *sb = vol->sb;
-	struct inode *tmp_ino;
 	MFT_RECORD *m;
 	VOLUME_INFORMATION *vi;
 	attr_search_context *ctx;
@@ -1324,6 +1383,14 @@ static BOOL load_system_files(ntfs_volume *vol)
 	/* Read upcase table and setup @vol->upcase and @vol->upcase_len. */
 	if (!load_and_init_upcase(vol))
 		goto iput_mftbmp_err_out;
+#ifdef NTFS_RW
+	/*
+	 * Read attribute definitions table and setup @vol->attrdef and
+	 * @vol->attrdef_size.
+	 */
+	if (!load_and_init_attrdef(vol))
+		goto iput_upcase_err_out;
+#endif /* NTFS_RW */
 	/*
 	 * Get the cluster allocation bitmap inode and verify the size, no
 	 * need for any locking at this stage as we are already running
@@ -1339,7 +1406,7 @@ static BOOL load_system_files(ntfs_volume *vol)
 		iput(vol->lcnbmp_ino);
 bitmap_failed:
 		ntfs_error(sb, "Failed to load $Bitmap.");
-		goto iput_mirr_err_out;
+		goto iput_attrdef_err_out;
 	}
 	/*
 	 * Get the volume inode and setup our cache of the volume flags and
@@ -1511,19 +1578,6 @@ get_ctx_vol_failed:
 		NVolSetErrors(vol);
 	}
 #endif /* NTFS_RW */
-	/*
-	 * Get the inode for the attribute definitions file and parse the
-	 * attribute definitions.
-	 */
-	tmp_ino = ntfs_iget(sb, FILE_AttrDef);
-	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
-		if (!IS_ERR(tmp_ino))
-			iput(tmp_ino);
-		ntfs_error(sb, "Failed to load $AttrDef.");
-		goto iput_logfile_err_out;
-	}
-	// FIXME: Parse the attribute definitions.
-	iput(tmp_ino);
 	/* Get the root directory inode. */
 	vol->root_ino = ntfs_iget(sb, FILE_root);
 	if (IS_ERR(vol->root_ino) || is_bad_inode(vol->root_ino)) {
@@ -1619,6 +1673,26 @@ iput_vol_err_out:
 	iput(vol->vol_ino);
 iput_lcnbmp_err_out:
 	iput(vol->lcnbmp_ino);
+iput_attrdef_err_out:
+	vol->attrdef_size = 0;
+	if (vol->attrdef) {
+		ntfs_free(vol->attrdef);
+		vol->attrdef = NULL;
+	}
+#ifdef NTFS_RW
+iput_upcase_err_out:
+#endif /* NTFS_RW */
+	vol->upcase_len = 0;
+	down(&ntfs_lock);
+	if (vol->upcase == default_upcase) {
+		ntfs_nr_upcase_users--;
+		vol->upcase = NULL;
+	}
+	up(&ntfs_lock);
+	if (vol->upcase) {
+		ntfs_free(vol->upcase);
+		vol->upcase = NULL;
+	}
 iput_mftbmp_err_out:
 	iput(vol->mftbmp_ino);
 iput_mirr_err_out:
@@ -1790,14 +1864,18 @@ static void ntfs_put_super(struct super_block *sb)
 	iput(vol->mft_ino);
 	vol->mft_ino = NULL;
 
+	/* Throw away the table of attribute definitions. */
+	vol->attrdef_size = 0;
+	if (vol->attrdef) {
+		ntfs_free(vol->attrdef);
+		vol->attrdef = NULL;
+	}
 	vol->upcase_len = 0;
 	/*
-	 * Decrease the number of mounts and destroy the global default upcase
-	 * table if necessary.  Also decrease the number of upcase users if we
-	 * are a user.
+	 * Destroy the global default upcase table if necessary.  Also decrease
+	 * the number of upcase users if we are a user.
 	 */
 	down(&ntfs_lock);
-	ntfs_nr_mounts--;
 	if (vol->upcase == default_upcase) {
 		ntfs_nr_upcase_users--;
 		vol->upcase = NULL;
@@ -2181,6 +2259,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	memset(vol, 0, sizeof(ntfs_volume));
 	vol->sb = sb;
 	vol->upcase = NULL;
+	vol->attrdef = NULL;
 	vol->mft_ino = NULL;
 	vol->mftbmp_ino = NULL;
 	init_rwsem(&vol->mftbmp_lock);
@@ -2312,14 +2391,13 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		}
 	}
 	/*
-	 * Increment the number of mounts and generate the global default
-	 * upcase table if necessary. Also temporarily increment the number of
-	 * upcase users to avoid race conditions with concurrent (u)mounts.
+	 * Generate the global default upcase table if necessary.  Also
+	 * temporarily increment the number of upcase users to avoid race
+	 * conditions with concurrent (u)mounts.
 	 */
-	if (!ntfs_nr_mounts++)
+	if (!default_upcase)
 		default_upcase = generate_default_upcase();
 	ntfs_nr_upcase_users++;
-
 	up(&ntfs_lock);
 	/*
 	 * From now on, ignore @silent parameter. If we fail below this line,
@@ -2391,10 +2469,23 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		vol->mftmirr_ino = NULL;
 	}
 #endif /* NTFS_RW */
+	/* Throw away the table of attribute definitions. */
+	vol->attrdef_size = 0;
+	if (vol->attrdef) {
+		ntfs_free(vol->attrdef);
+		vol->attrdef = NULL;
+	}
 	vol->upcase_len = 0;
-	if (vol->upcase != default_upcase)
+	down(&ntfs_lock);
+	if (vol->upcase == default_upcase) {
+		ntfs_nr_upcase_users--;
+		vol->upcase = NULL;
+	}
+	up(&ntfs_lock);
+	if (vol->upcase) {
 		ntfs_free(vol->upcase);
-	vol->upcase = NULL;
+		vol->upcase = NULL;
+	}
 	if (vol->nls_map) {
 		unload_nls(vol->nls_map);
 		vol->nls_map = NULL;
@@ -2402,11 +2493,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	/* Error exit code path. */
 unl_upcase_iput_tmp_ino_err_out_now:
 	/*
-	 * Decrease the number of mounts and destroy the global default upcase
-	 * table if necessary.
+	 * Decrease the number of upcase users and destroy the global default
+	 * upcase table if necessary.
 	 */
 	down(&ntfs_lock);
-	ntfs_nr_mounts--;
 	if (!--ntfs_nr_upcase_users && default_upcase) {
 		ntfs_free(default_upcase);
 		default_upcase = NULL;
@@ -2474,9 +2564,6 @@ kmem_cache_t *ntfs_index_ctx_cache;
 /* A global default upcase table and a corresponding reference count. */
 wchar_t *default_upcase = NULL;
 unsigned long ntfs_nr_upcase_users = 0;
-
-/* The number of mounted filesystems. */
-unsigned long ntfs_nr_mounts = 0;
 
 /* Driver wide semaphore. */
 DECLARE_MUTEX(ntfs_lock);

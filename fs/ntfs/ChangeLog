@@ -29,6 +29,10 @@ ToDo/Notes:
 	  runlist element containing a particular vcn.  It also takes care of
 	  mapping any needed runlist fragments.
 	- Implement cluster (de-)allocation code (fs/ntfs/lcnalloc.[hc]).
+	- Load attribute definition table from $AttrDef at mount time.
+	- Fix bugs in mount time error code paths involving (de)allocation of
+	  the default and volume upcase tables.
+	- Remove ntfs_nr_mounts as it is no longer used.
 
 2.1.16 - Implement access time updates, file sync, async io, and read/writev.
 

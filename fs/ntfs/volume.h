@@ -74,6 +74,11 @@ typedef struct {
 	u32 upcase_len;			/* Number of entries in upcase[]. */
 	ntfschar *upcase;		/* The upcase table. */
 
+	s32 attrdef_size;		/* Size of the attribute definition
+					   table in bytes. */
+	ATTR_DEF *attrdef;		/* Table of attribute definitions.
+					   Obtained from FILE_AttrDef. */
+
 #ifdef NTFS_RW
 	/* Variables used by the cluster and mft allocators. */
 	LCN mft_zone_start;		/* First cluster of the mft zone. */
