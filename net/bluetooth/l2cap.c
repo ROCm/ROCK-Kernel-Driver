@@ -134,7 +134,7 @@ static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon, u8 status)
 	conn->dst = &hcon->dst;
 
 	spin_lock_init(&conn->lock);
-	conn->chan_list.lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&conn->chan_list.lock);
 
 	BT_DBG("hcon %p conn %p", hcon, conn);
 	return conn;

@@ -933,7 +933,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 	}
 #endif
 
-	husb->completion_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&husb->completion_lock);
 
 	for (i = 0; i < 4; i++) {
 		skb_queue_head_init(&husb->transmit_q[i]);
