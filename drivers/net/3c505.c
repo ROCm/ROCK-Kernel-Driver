@@ -1037,8 +1037,9 @@ static int send_packet(struct net_device *dev, struct sk_buff *skb)
 	adapter->current_dma.direction = 1;
 	adapter->current_dma.start_time = jiffies;
 
-	if ((unsigned long)(skb->data + nlen) >= MAX_DMA_ADDRESS) {
+	if ((unsigned long)(skb->data + nlen) >= MAX_DMA_ADDRESS || nlen != skb->len) {
 		memcpy(adapter->dma_buffer, skb->data, nlen);
+		memset(adapter->dma_buffer+skb->len, 0, nlen-skb->len);
 		target = isa_virt_to_bus(adapter->dma_buffer);
 	}
 	else {
