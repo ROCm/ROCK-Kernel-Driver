@@ -313,9 +313,15 @@ static int superblock_doinit(struct super_block *sb)
 
 	sbsec->initialized = 1;
 
-	printk(KERN_INFO "SELinux: initialized (dev %s, type %s), %s\n",
-	       sb->s_id, sb->s_type->name,
-	       labeling_behaviors[sbsec->behavior-1]);
+	if (sbsec->behavior > ARRAY_SIZE(labeling_behaviors)) {
+		printk(KERN_INFO "SELinux: initialized (dev %s, type %s), unknown behavior\n",
+		       sb->s_id, sb->s_type->name);
+	}
+	else {
+		printk(KERN_INFO "SELinux: initialized (dev %s, type %s), %s\n",
+		       sb->s_id, sb->s_type->name,
+		       labeling_behaviors[sbsec->behavior-1]);
+	}
 
 	/* Initialize the root inode. */
 	rc = inode_doinit_with_dentry(sb->s_root->d_inode, sb->s_root);
