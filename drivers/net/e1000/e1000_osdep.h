@@ -40,7 +40,9 @@
 #include <asm/io.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
+#include "kcompat.h"
 
+#define usec_delay(x) udelay(x)
 #ifndef msec_delay
 #define msec_delay(x)	do { if(in_interrupt()) { \
 				/* Don't mdelay in interrupt context! */ \

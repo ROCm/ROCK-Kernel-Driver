@@ -107,7 +107,7 @@ E1000_PARAM(Duplex, "Duplex setting");
 
 /* Auto-negotiation Advertisement Override
  *
- * Valid Range: 0x01-0x0F, 0x20-0x2F
+ * Valid Range: 0x01-0x0F, 0x20-0x2F (copper); 0x20 (fiber)
  *
  * The AutoNeg value is a bit mask describing which speed and duplex
  * combinations should be advertised during auto-negotiation.
@@ -117,7 +117,7 @@ E1000_PARAM(Duplex, "Duplex setting");
  * Speed (Mbps)  N/A   N/A   1000   N/A    100   100   10     10
  * Duplex                    Full          Full  Half  Full   Half
  *
- * Default Value: 0x2F
+ * Default Value: 0x2F (copper); 0x20 (fiber)
  */
 
 E1000_PARAM(AutoNeg, "Advertised auto-negotiation setting");

@@ -30,6 +30,7 @@
 
 #include "e1000.h"
 
+#ifdef	SIOCETHTOOL
 #include <asm/uaccess.h>
 
 extern char e1000_driver_name[];
@@ -45,6 +46,10 @@ extern void e1000_free_rx_resources(struct e1000_adapter *adapter);
 extern void e1000_free_tx_resources(struct e1000_adapter *adapter);
 extern void e1000_update_stats(struct e1000_adapter *adapter);
 
+#ifndef ETH_GSTRING_LEN
+#define ETH_GSTRING_LEN 32
+#endif
+#ifdef	ETHTOOL_GSTATS
 struct e1000_stats {
 	char stat_string[ETH_GSTRING_LEN];
 	int sizeof_stat;
@@ -93,12 +98,15 @@ static struct e1000_stats e1000_gstrings_stats[] = {
 };
 #define E1000_STATS_LEN	\
 	sizeof(e1000_gstrings_stats) / sizeof(struct e1000_stats)
+#endif	/* ETHTOOL_GSTATS */
+#ifdef	ETHTOOL_TEST
 static char e1000_gstrings_test[][ETH_GSTRING_LEN] = {
 	"Register test  (offline)", "Eeprom test    (offline)",
 	"Interrupt test (offline)", "Loopback test  (offline)",
 	"Link test   (on/offline)"
 };
 #define E1000_TEST_LEN sizeof(e1000_gstrings_test) / ETH_GSTRING_LEN
+#endif	/* ETHTOOL_TEST */
 
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
@@ -195,6 +203,7 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
+#ifdef	ETHTOOL_GPAUSEPARAM
 static int
 e1000_ethtool_gpause(struct e1000_adapter *adapter,
                      struct ethtool_pauseparam *epause)
@@ -215,7 +224,9 @@ e1000_ethtool_gpause(struct e1000_adapter *adapter,
 	
 	return 0;
 }
+#endif /* ETHTOOL_GPAUSEPARAM */
 
+#ifdef	ETHTOOL_SPAUSEPARAM
 static int
 e1000_ethtool_spause(struct e1000_adapter *adapter,
                      struct ethtool_pauseparam *epause)
@@ -247,7 +258,9 @@ e1000_ethtool_spause(struct e1000_adapter *adapter,
 	
 	return 0;
 }
+#endif /* ETHTOOL_SPAUSEPARAM */
 
+#ifdef	ETHTOOL_GDRVINFO
 static void
 e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
                        struct ethtool_drvinfo *drvinfo)
@@ -256,13 +269,26 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->version, e1000_driver_version, 32);
 	strncpy(drvinfo->fw_version, "N/A", 32);
 	strncpy(drvinfo->bus_info, pci_name(adapter->pdev), 32);
+#ifdef	ETHTOOL_GSTATS
 	drvinfo->n_stats = E1000_STATS_LEN;
+#endif	/* ETHTOOL_GSTATS */
+#ifdef	ETHTOOL_TEST
 	drvinfo->testinfo_len = E1000_TEST_LEN;
+#endif	/* ETHTOOL_TEST */
+#ifdef	ETHTOOL_GEEPROM  /* GREGS broken in earlier ethtool.h */
+#ifdef	ETHTOOL_GREGS
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
+#endif	/* ETHTOOL_GREGS */
+#endif	/* ETHTOOL_GEEPROM */
+#ifdef	ETHTOOL_GEEPROM
 	drvinfo->eedump_len = adapter->hw.eeprom.word_size * 2;
+#endif	/* ETHTOOL_GEEPROM */
 }
+#endif	/* ETHTOOL_GDRVINFO */
 
+#ifdef	ETHTOOL_GEEPROM  /* GREGS broken in earlier ethtool.h */
+#ifdef  ETHTOOL_GREGS
 static void
 e1000_ethtool_gregs(struct e1000_adapter *adapter,
                     struct ethtool_regs *regs, uint32_t *regs_buff)
@@ -345,7 +371,10 @@ e1000_ethtool_gregs(struct e1000_adapter *adapter,
 
 	return;
 }
+#endif  /* ETHTOOL_GREGS */
+#endif	/* ETHTOOL_GEEPROM */
 
+#ifdef	ETHTOOL_GEEPROM
 static int
 e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
@@ -353,6 +382,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	struct e1000_hw *hw = &adapter->hw;
 	int first_word, last_word;
 	int ret_val = 0;
+	uint16_t i;
 
 	if(eeprom->len == 0) {
 		ret_val = -EINVAL;
@@ -377,16 +407,22 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 					    last_word - first_word + 1,
 					    eeprom_buff);
 	else {
-		uint16_t i;
 		for (i = 0; i < last_word - first_word + 1; i++)
 			if((ret_val = e1000_read_eeprom(hw, first_word + i, 1,
 							&eeprom_buff[i])))
 				break;
 	}
+
+	/* Device's eeprom is always little-endian, word addressable */
+	for (i = 0; i < last_word - first_word + 1; i++)
+		le16_to_cpus(&eeprom_buff[i]);
+
 geeprom_error:
 	return ret_val;
 }
+#endif	/* ETHTOOL_GEEPROM */
 
+#ifdef	ETHTOOL_SEEPROM
 static int
 e1000_ethtool_seeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, void *user_data)
@@ -395,6 +431,7 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	uint16_t *eeprom_buff;
 	void *ptr;
 	int max_len, first_word, last_word, ret_val = 0;
+	uint16_t i;
 
 	if(eeprom->len == 0)
 		return -EOPNOTSUPP;
@@ -428,10 +465,18 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 		ret_val = e1000_read_eeprom(hw, last_word, 1,
 		                  &eeprom_buff[last_word - first_word]);
 	}
+
+	/* Device's eeprom is always little-endian, word addressable */
+	for (i = 0; i < last_word - first_word + 1; i++)
+		le16_to_cpus(&eeprom_buff[i]);
+
 	if((ret_val != 0) || copy_from_user(ptr, user_data, eeprom->len)) {
 		ret_val = -EFAULT;
 		goto seeprom_error;
 	}
+
+	for (i = 0; i < last_word - first_word + 1; i++)
+		eeprom_buff[i] = cpu_to_le16(eeprom_buff[i]);
 
 	ret_val = e1000_write_eeprom(hw, first_word,
 				     last_word - first_word + 1, eeprom_buff);
@@ -444,7 +489,9 @@ seeprom_error:
 	kfree(eeprom_buff);
 	return ret_val;
 }
+#endif	/* ETHTOOL_SEEPROM */
 
+#ifdef	ETHTOOL_GRINGPARAM
 static int
 e1000_ethtool_gring(struct e1000_adapter *adapter,
                     struct ethtool_ringparam *ring)
@@ -466,6 +513,8 @@ e1000_ethtool_gring(struct e1000_adapter *adapter,
 
 	return 0;
 }
+#endif /* ETHTOOL_GRINGPARAM */
+#ifdef	ETHTOOL_SRINGPARAM
 static int 
 e1000_ethtool_sring(struct e1000_adapter *adapter,
                     struct ethtool_ringparam *ring)
@@ -474,12 +523,14 @@ e1000_ethtool_sring(struct e1000_adapter *adapter,
 	e1000_mac_type mac_type = adapter->hw.mac_type;
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
 	struct e1000_desc_ring *rxdr = &adapter->rx_ring;
+	struct e1000_desc_ring tx_old, tx_new;
+	struct e1000_desc_ring rx_old, rx_new;
 
-	if(netif_running(adapter->netdev)) {
+	tx_old = adapter->tx_ring;
+	rx_old = adapter->rx_ring;
+	
+	if(netif_running(adapter->netdev))
 		e1000_down(adapter);
-		e1000_free_rx_resources(adapter);
-		e1000_free_tx_resources(adapter);
-	}
 
 	rxdr->count = max(ring->rx_pending,(uint32_t)E1000_MIN_RXD);
 	rxdr->count = min(rxdr->count,(uint32_t)(mac_type < e1000_82544 ?
@@ -492,24 +543,38 @@ e1000_ethtool_sring(struct e1000_adapter *adapter,
 	E1000_ROUNDUP(txdr->count, REQ_TX_DESCRIPTOR_MULTIPLE); 
 
 	if(netif_running(adapter->netdev)) {
+		/* try to get new resources before deleting old */
 		if((err = e1000_setup_rx_resources(adapter)))
 			goto err_setup_rx;
 		if((err = e1000_setup_tx_resources(adapter)))
 			goto err_setup_tx;
-		if((err = e1000_up(adapter)))
-			goto err_up;
-	}
 
+		/* save the new, restore the old in order to free it,
+		 * then restore the new back again */	
+	
+		rx_new = adapter->rx_ring;
+		tx_new = adapter->tx_ring;
+		adapter->rx_ring = rx_old;
+		adapter->tx_ring = tx_old;
+		e1000_free_rx_resources(adapter);
+		e1000_free_tx_resources(adapter);
+		adapter->rx_ring = rx_new;
+		adapter->tx_ring = tx_new;
+		if((err = e1000_up(adapter)))
+			return err;
+	}
 	return 0;
-err_up:
-	e1000_free_tx_resources(adapter);
 err_setup_tx:
 	e1000_free_rx_resources(adapter);
 err_setup_rx:
-	e1000_reset(adapter);
+	adapter->rx_ring = rx_old;
+	adapter->tx_ring = tx_old;
+	e1000_up(adapter);
 	return err;
 }
+#endif /* ETHTOOL_SRINGPARAM */
 
+#ifdef	ETHTOOL_TEST
 #define REG_PATTERN_TEST(R, M, W)                                              \
 {                                                                              \
 	uint32_t pat, value;                                                   \
@@ -974,7 +1039,7 @@ e1000_nonintegrated_phy_loopback(struct e1000_adapter *adapter)
 	e1000_write_phy_reg(&adapter->hw, PHY_CTRL, 0x8100);
 
 	/* Wait for reset to complete. */
-	udelay(500);
+	usec_delay(500);
 
 	/* Have to setup TX_CLK and TX_CRS after software reset */
 	e1000_phy_reset_clk_and_crs(adapter);
@@ -1053,7 +1118,7 @@ e1000_integrated_phy_loopback(struct e1000_adapter *adapter)
 	if(adapter->hw.phy_type == e1000_phy_m88)
 		e1000_phy_disable_receiver(adapter);
 
-	udelay(500);
+	usec_delay(500);
 
 	return 0;
 }
@@ -1191,16 +1256,16 @@ e1000_run_loopback_test(struct e1000_adapter *adapter)
 
 	for(i = 0; i < 64; i++) {
 		e1000_create_lbtest_frame(txdr->buffer_info[i].skb, 1024);
-		pci_dma_sync_single_for_device(pdev, txdr->buffer_info[i].dma,
-					       txdr->buffer_info[i].length,
-					       PCI_DMA_TODEVICE);
+		pci_dma_sync_single(pdev, txdr->buffer_info[i].dma,
+				    txdr->buffer_info[i].length,
+				    PCI_DMA_TODEVICE);
 	}
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
 
 	msec_delay(200);
 
-	pci_dma_sync_single_for_cpu(pdev, rxdr->buffer_info[0].dma,
-				    rxdr->buffer_info[0].length, PCI_DMA_FROMDEVICE);
+	pci_dma_sync_single(pdev, rxdr->buffer_info[0].dma,
+			    rxdr->buffer_info[0].length, PCI_DMA_FROMDEVICE);
 
 	return e1000_check_lbtest_frame(rxdr->buffer_info[0].skb, 1024);
 }
@@ -1279,7 +1344,9 @@ e1000_ethtool_test(struct e1000_adapter *adapter,
 	}
 	return 0;
 }
+#endif	/* ETHTOOL_TEST */
 
+#ifdef	ETHTOOL_GWOL
 static void
 e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
@@ -1320,7 +1387,9 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		return;
 	}
 }
+#endif	/* ETHTOOL_GWOL */
 
+#ifdef	ETHTOOL_SWOL
 static int
 e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
@@ -1358,7 +1427,9 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 
 	return 0;
 }
+#endif	/* ETHTOOL_SWOL */
 
+#ifdef	ETHTOOL_PHYS_ID
 
 /* toggle LED 4 times per second = 2 "blinks" per second */
 #define E1000_ID_INTERVAL	(HZ/4)
@@ -1404,6 +1475,7 @@ e1000_ethtool_led_blink(struct e1000_adapter *adapter, struct ethtool_value *id)
 
 	return 0;
 }
+#endif	/* ETHTOOL_PHYS_ID */
 
 int
 e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
@@ -1429,6 +1501,7 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return e1000_ethtool_sset(adapter, &ecmd);
 	}
+#ifdef	ETHTOOL_GDRVINFO
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo drvinfo = {ETHTOOL_GDRVINFO};
 		e1000_ethtool_gdrvinfo(adapter, &drvinfo);
@@ -1436,6 +1509,8 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GDRVINFO */
+#ifdef	ETHTOOL_GSTRINGS
 	case ETHTOOL_GSTRINGS: {
 		struct ethtool_gstrings gstrings = { ETHTOOL_GSTRINGS };
 		char *strings = NULL;
@@ -1444,6 +1519,7 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		if(copy_from_user(&gstrings, addr, sizeof(gstrings)))
 			return -EFAULT;
 		switch(gstrings.string_set) {
+#ifdef	ETHTOOL_TEST
 		case ETH_SS_TEST:
 			gstrings.len = E1000_TEST_LEN;
 			strings = kmalloc(E1000_TEST_LEN * ETH_GSTRING_LEN,
@@ -1453,6 +1529,8 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			memcpy(strings, e1000_gstrings_test, E1000_TEST_LEN *
 			       ETH_GSTRING_LEN);
 			break;
+#endif	/* ETHTOOL_TEST */
+#ifdef	ETHTOOL_GSTATS
 		case ETH_SS_STATS: {
 			int i;
 			gstrings.len = E1000_STATS_LEN;
@@ -1467,6 +1545,7 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			}
 			break;
 		}
+#endif	/* ETHTOOL_GSTATS */
 		default:
 			return -EOPNOTSUPP;
 		}
@@ -1480,6 +1559,9 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		kfree(strings);
 		return err;
 	}
+#endif	/* ETHTOOL_GSTRINGS */
+#ifdef	ETHTOOL_GEEPROM  /* GREGS broken in earlier ethtool.h */
+#ifdef  ETHTOOL_GREGS
 	case ETHTOOL_GREGS: {
 		struct ethtool_regs regs = {ETHTOOL_GREGS};
 		uint32_t regs_buff[E1000_REGS_LEN];
@@ -1496,6 +1578,9 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 
 		return 0;
 	}
+#endif  /* ETHTOOL_GREGS */
+#endif  /* ETHTOOL_GEEPROM */
+#ifdef	ETHTOOL_NWAY_RST
 	case ETHTOOL_NWAY_RST: {
 		if(netif_running(netdev)) {
 			e1000_down(adapter);
@@ -1503,12 +1588,16 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		}
 		return 0;
 	}
+#endif	/* ETHTOOL_NWAY_RST */
+#ifdef	ETHTOOL_PHYS_ID
 	case ETHTOOL_PHYS_ID: {
 		struct ethtool_value id;
 		if(copy_from_user(&id, addr, sizeof(id)))
 			return -EFAULT;
 		return e1000_ethtool_led_blink(adapter, &id);
 	}
+#endif	/* ETHTOOL_PHYS_ID */
+#ifdef	ETHTOOL_GLINK
 	case ETHTOOL_GLINK: {
 		struct ethtool_value link = {ETHTOOL_GLINK};
 		link.data = netif_carrier_ok(netdev);
@@ -1516,6 +1605,8 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GLINK */
+#ifdef	ETHTOOL_GWOL
 	case ETHTOOL_GWOL: {
 		struct ethtool_wolinfo wol = {ETHTOOL_GWOL};
 		e1000_ethtool_gwol(adapter, &wol);
@@ -1523,12 +1614,16 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GWOL */
+#ifdef	ETHTOOL_SWOL
 	case ETHTOOL_SWOL: {
 		struct ethtool_wolinfo wol;
 		if(copy_from_user(&wol, addr, sizeof(wol)) != 0)
 			return -EFAULT;
 		return e1000_ethtool_swol(adapter, &wol);
 	}
+#endif	/* ETHTOOL_SWOL */
+#ifdef	ETHTOOL_GEEPROM
 	case ETHTOOL_GEEPROM: {
 		struct ethtool_eeprom eeprom = {ETHTOOL_GEEPROM};
 		struct e1000_hw *hw = &adapter->hw;
@@ -1563,6 +1658,8 @@ err_geeprom_ioctl:
 		kfree(eeprom_buff);
 		return err;
 	}
+#endif	/* ETHTOOL_GEEPROM */
+#ifdef	ETHTOOL_SEEPROM
 	case ETHTOOL_SEEPROM: {
 		struct ethtool_eeprom eeprom;
 
@@ -1572,6 +1669,8 @@ err_geeprom_ioctl:
 		addr += offsetof(struct ethtool_eeprom, data);
 		return e1000_ethtool_seeprom(adapter, &eeprom, addr);
 	}
+#endif	/* ETHTOOL_SEEPROM */
+#ifdef	ETHTOOL_GRINGPARAM
 	case ETHTOOL_GRINGPARAM: {
 		struct ethtool_ringparam ering = {ETHTOOL_GRINGPARAM};
 		e1000_ethtool_gring(adapter, &ering);
@@ -1579,12 +1678,16 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GRINGPARAM */
+#ifdef	ETHTOOL_SRINGPARAM
 	case ETHTOOL_SRINGPARAM: {
 		struct ethtool_ringparam ering;
 		if(copy_from_user(&ering, addr, sizeof(ering)))
 			return -EFAULT;
 		return e1000_ethtool_sring(adapter, &ering);
 	}
+#endif	/* ETHTOOL_SRINGPARAM */
+#ifdef	ETHTOOL_GPAUSEPARAM
 	case ETHTOOL_GPAUSEPARAM: {
 		struct ethtool_pauseparam epause = {ETHTOOL_GPAUSEPARAM};
 		e1000_ethtool_gpause(adapter, &epause);
@@ -1592,12 +1695,16 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GPAUSEPARAM */
+#ifdef	ETHTOOL_SPAUSEPARAM
 	case ETHTOOL_SPAUSEPARAM: {
 		struct ethtool_pauseparam epause;
 		if(copy_from_user(&epause, addr, sizeof(epause)))
 			return -EFAULT;
 		return e1000_ethtool_spause(adapter, &epause);
 	}
+#endif	/* ETHTOOL_SPAUSEPARAM */
+#ifdef	ETHTOOL_GSTATS
 	case ETHTOOL_GSTATS: {
 		struct {
 			struct ethtool_stats eth_stats;
@@ -1617,6 +1724,8 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GSTATS */
+#ifdef	ETHTOOL_TEST
 	case ETHTOOL_TEST: {
 		struct {
 			struct ethtool_test eth_test;
@@ -1637,6 +1746,8 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_TEST */
+#ifdef	ETHTOOL_GRXCSUM
 	case ETHTOOL_GRXCSUM: {
 		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
 
@@ -1645,6 +1756,8 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GRXCSUM */
+#ifdef	ETHTOOL_SRXCSUM
 	case ETHTOOL_SRXCSUM: {
 		struct ethtool_value edata;
 
@@ -1658,6 +1771,8 @@ err_geeprom_ioctl:
 			e1000_reset(adapter);
 		return 0;
 	}
+#endif	/* ETHTOOL_SRXCSUM */
+#ifdef	ETHTOOL_GTXCSUM
 	case ETHTOOL_GTXCSUM: {
 		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
 
@@ -1667,6 +1782,8 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GTXCSUM */
+#ifdef	ETHTOOL_STXCSUM
 	case ETHTOOL_STXCSUM: {
 		struct ethtool_value edata;
 
@@ -1686,6 +1803,8 @@ err_geeprom_ioctl:
 
 		return 0;
 	}
+#endif	/* ETHTOOL_STXCSUM */
+#ifdef	ETHTOOL_GSG
 	case ETHTOOL_GSG: {
 		struct ethtool_value edata = { ETHTOOL_GSG };
 
@@ -1695,6 +1814,8 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif	/* ETHTOOL_GSG */
+#ifdef	ETHTOOL_SSG
 	case ETHTOOL_SSG: {
 		struct ethtool_value edata;
 
@@ -1708,7 +1829,9 @@ err_geeprom_ioctl:
 
 		return 0;
 	}
+#endif	/* ETHTOOL_SSG */
 #ifdef NETIF_F_TSO
+#ifdef ETHTOOL_GTSO
 	case ETHTOOL_GTSO: {
 		struct ethtool_value edata = { ETHTOOL_GTSO };
 
@@ -1717,6 +1840,8 @@ err_geeprom_ioctl:
 			return -EFAULT;
 		return 0;
 	}
+#endif /* ETHTOOL_GTSO */
+#ifdef ETHTOOL_STSO
 	case ETHTOOL_STSO: {
 		struct ethtool_value edata;
 
@@ -1737,6 +1862,7 @@ err_geeprom_ioctl:
 
 		return 0;
 	}
+#endif /* ETHTOOL_STSO */
 #endif
 	case ETHTOOL_GMSGLVL: {
 		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
@@ -1757,4 +1883,5 @@ err_geeprom_ioctl:
 	}
 }
 
+#endif	/* SIOCETHTOOL */
 

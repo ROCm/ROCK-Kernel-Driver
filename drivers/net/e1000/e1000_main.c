@@ -31,7 +31,33 @@
 
 /* Change Log
  *
- * 5.2.30.1	1/29/03
+ * 5.2.39	3/12/04
+ *   o Added support to read/write eeprom data in proper order.
+ *     By default device eeprom is always little-endian, word
+ *     addressable 
+ *   o Disable TSO as the default for the driver until hangs
+ *     reported against non-IA acrhs can be root-caused.
+ *   o Back out the CSA fix for 82547 as it continues to cause
+ *     systems lock-ups with production systems.
+ *   o Fixed FC high/low water mark values to actually be in the
+ *     range of the Rx FIFO area.  It was a math error.
+ *     [Dainis Jonitis (dainis_jonitis@exigengroup.lv)]
+ *   o Handle failure to get new resources when doing ethtool
+ *     ring paramater changes.  Previously, driver would free old,
+ *     but fails to allocate new, causing problems.  Now, driver 
+ *     allocates new, and if sucessful, frees old.
+ *   o Changed collision threshold from 16 to 15 to comply with IEEE
+ *     spec.
+ *   o Toggle chip-select when checking ready status on SPI eeproms.
+ *   o Put PHY into class A mode to pass IEEE tests on some designs.
+ *     Designs with EEPROM word 0x7, bit 15 set will have their PHYs
+ *     set to class A mode, rather than the default class AB.
+ *   o Handle failures of register_netdev.  Stephen Hemminger
+ *     [shemminger@osdl.org].
+ *   o updated README & MAN pages, number of Transmit/Receive
+ *     descriptors may be denied depending on system resources.
+ *
+ * 5.2.30	1/14/03
  *   o Set VLAN filtering to IEEE 802.1Q after reset so we don't break
  *     SoL connections that use VLANs.
  *   o Allow 1000/Full setting for AutoNeg param for Fiber connections
@@ -46,30 +72,11 @@
  *   o Added ethtool RINGPARAM support.
  *
  * 5.2.22	10/15/03
- *   o Bug fix: SERDES devices might be connected to a back-plane
- *     switch that doesn't support auto-neg, so add the capability
- *     to force 1000/Full.  Also, since forcing 1000/Full, sample
- *     RxSynchronize bit to detect link state.
- *   o Bug fix: Flow control settings for hi/lo watermark didn't
- *     consider changes in the Rx FIFO size, which could occur with
- *     Jumbo Frames or with the reduced FIFO in 82547.
- *   o Better propagation of error codes. [Janice Girouard 
- *     (janiceg@us.ibm.com)].
- *   o Bug fix: hang under heavy Tx stress when running out of Tx
- *     descriptors; wasn't clearing context descriptor when backing
- *     out of send because of no-resource condition.
- *   o Bug fix: check netif_running in dev->poll so we don't have to
- *     hang in dev->close until all polls are finished.  [Robert
- *     Ollson (robert.olsson@data.slu.se)].
- *   o Revert TxDescriptor ring size back to 256 since change to 1024
- *     wasn't accepted into the kernel.
- *
- * 5.2.16	8/8/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.30.1-k2";
+char e1000_driver_version[] = "5.2.39";
 char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -162,8 +169,10 @@ static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter);
 #endif
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
+#ifdef SIOCGMIIPHY
 static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
 			   int cmd);
+#endif
 static void e1000_enter_82542_rst(struct e1000_adapter *adapter);
 static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
 static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
@@ -175,10 +184,12 @@ static void e1000_smartspeed(struct e1000_adapter *adapter);
 static inline int e1000_82547_fifo_workaround(struct e1000_adapter *adapter,
 					      struct sk_buff *skb);
 
+#ifdef NETIF_F_HW_VLAN_TX
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_restore_vlan(struct e1000_adapter *adapter);
+#endif
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
@@ -274,7 +285,9 @@ e1000_up(struct e1000_adapter *adapter)
 
 	e1000_set_multi(netdev);
 
+#ifdef NETIF_F_HW_VLAN_TX
 	e1000_restore_vlan(adapter);
+#endif
 
 	e1000_configure_tx(adapter);
 	e1000_setup_rctl(adapter);
@@ -446,15 +459,19 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->set_mac_address = &e1000_set_mac;
 	netdev->change_mtu = &e1000_change_mtu;
 	netdev->do_ioctl = &e1000_ioctl;
+#ifdef HAVE_TX_TIMEOUT
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = 5 * HZ;
+#endif
 #ifdef CONFIG_E1000_NAPI
 	netdev->poll = &e1000_clean;
 	netdev->weight = 64;
 #endif
+#ifdef NETIF_F_HW_VLAN_TX
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
+#endif
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	netdev->poll_controller = e1000_netpoll;
 #endif
@@ -470,12 +487,17 @@ e1000_probe(struct pci_dev *pdev,
 	if((err = e1000_sw_init(adapter)))
 		goto err_sw_init;
 
+#ifdef MAX_SKB_FRAGS
 	if(adapter->hw.mac_type >= e1000_82543) {
+#ifdef NETIF_F_HW_VLAN_TX
 		netdev->features = NETIF_F_SG |
 				   NETIF_F_HW_CSUM |
 				   NETIF_F_HW_VLAN_TX |
 				   NETIF_F_HW_VLAN_RX |
 				   NETIF_F_HW_VLAN_FILTER;
+#else
+		netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM;
+#endif
 	} else {
 		netdev->features = NETIF_F_SG;
 	}
@@ -493,6 +515,7 @@ e1000_probe(struct pci_dev *pdev,
 
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
+#endif
 
 	/* before reading the EEPROM, reset the controller to 
 	 * put the device in a known good starting state */
@@ -1563,12 +1586,15 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 	struct e1000_buffer *buffer_info;
 	unsigned int len = skb->len, max_per_txd = E1000_MAX_DATA_PER_TXD;
 	unsigned int offset = 0, size, count = 0, i;
+#ifdef MAX_SKB_FRAGS
 #ifdef NETIF_F_TSO
 	unsigned int mss;
 #endif
 	unsigned int nr_frags;
 	unsigned int f;
+#endif
 
+#ifdef MAX_SKB_FRAGS
 #ifdef NETIF_F_TSO
 	mss = skb_shinfo(skb)->tso_size;
 	/* The controller does a simple calculation to 
@@ -1582,6 +1608,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 #endif
 	nr_frags = skb_shinfo(skb)->nr_frags;
 	len -= skb->data_len;
+#endif
 
 	i = tx_ring->next_to_use;
 
@@ -1615,6 +1642,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		if(++i == tx_ring->count) i = 0;
 	}
 
+#ifdef MAX_SKB_FRAGS
 	for(f = 0; f < nr_frags; f++) {
 		struct skb_frag_struct *frag;
 
@@ -1654,6 +1682,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 			if(++i == tx_ring->count) i = 0;
 		}
 	}
+#endif
 
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2) {
 
@@ -1664,7 +1693,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		 * we mapped the skb, but because of all the workarounds
 		 * (above), it's too difficult to predict how many we're
 		 * going to need.*/
-		i = adapter->tx_ring.next_to_use;
+		i = tx_ring->next_to_use;
 
 		if(i == first) {
 			/* Cleanup after e1000_tx_[csum|tso] scribbling
@@ -1689,7 +1718,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 			if(++i == tx_ring->count) i = 0;
 		}
 
-		adapter->tx_ring.next_to_use = first;
+		tx_ring->next_to_use = first;
 
 		return 0;
 	}
@@ -1697,7 +1726,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 	i = (i == 0) ? tx_ring->count - 1 : i - 1;
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
-
+	
 	return count;
 }
 
@@ -1813,10 +1842,12 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		}
 	}
 
+#ifdef NETIF_F_HW_VLAN_TX
 	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
 		tx_flags |= E1000_TX_FLAGS_VLAN;
 		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
 	}
+#endif
 
 	first = adapter->tx_ring.next_to_use;
 	
@@ -2141,6 +2172,27 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		   !e1000_clean_tx_irq(adapter))
 			break;
 #endif
+#ifdef E1000_COUNT_ICR
+	adapter->icr_txdw += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_txqe += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_lsc += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_rxseq += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_rxdmt += icr & 0x01;
+	icr >>= 2;
+	adapter->icr_rxo += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_rxt += icr & 0x01;
+	icr >>= 2;
+	adapter->icr_mdac += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_rxcfg += icr & 0x01;
+	icr >>= 1;
+	adapter->icr_gpi += icr & 0x01;
+#endif
 
 	return IRQ_HANDLED;
 }
@@ -2342,6 +2394,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 		skb->protocol = eth_type_trans(skb, netdev);
 #ifdef CONFIG_E1000_NAPI
+#ifdef NETIF_F_HW_VLAN_TX
 		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
 			vlan_hwaccel_receive_skb(skb, adapter->vlgrp,
 				le16_to_cpu(rx_desc->special &
@@ -2349,7 +2402,11 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		} else {
 			netif_receive_skb(skb);
 		}
+#else
+		netif_receive_skb(skb);
+#endif
 #else /* CONFIG_E1000_NAPI */
+#ifdef NETIF_F_HW_VLAN_TX
 		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
 			vlan_hwaccel_rx(skb, adapter->vlgrp,
 				le16_to_cpu(rx_desc->special &
@@ -2357,6 +2414,9 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		} else {
 			netif_rx(skb);
 		}
+#else
+		netif_rx(skb);
+#endif
 #endif /* CONFIG_E1000_NAPI */
 		netdev->last_rx = jiffies;
 
@@ -2506,17 +2566,22 @@ static int
 e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 {
 	switch (cmd) {
+#ifdef SIOCGMIIPHY
 	case SIOCGMIIPHY:
 	case SIOCGMIIREG:
 	case SIOCSMIIREG:
 		return e1000_mii_ioctl(netdev, ifr, cmd);
+#endif
+#ifdef SIOCETHTOOL
 	case SIOCETHTOOL:
 		return e1000_ethtool_ioctl(netdev, ifr);
+#endif
 	default:
 		return -EOPNOTSUPP;
 	}
 }
 
+#ifdef SIOCGMIIPHY
 /**
  * e1000_mii_ioctl -
  * @netdev:
@@ -2596,6 +2661,7 @@ e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	}
 	return E1000_SUCCESS;
 }
+#endif
 
 /**
  * e1000_rx_checksum - Receive Checksum Offload for 82543
@@ -2637,7 +2703,13 @@ e1000_pci_set_mwi(struct e1000_hw *hw)
 {
 	struct e1000_adapter *adapter = hw->back;
 
+#ifdef HAVE_PCI_SET_MWI
 	pci_set_mwi(adapter->pdev);
+#else
+	pci_write_config_word(adapter->pdev, PCI_COMMAND,
+			      adapter->hw.pci_cmd_word |
+			      PCI_COMMAND_INVALIDATE);
+#endif
 }
 
 void
@@ -2645,7 +2717,13 @@ e1000_pci_clear_mwi(struct e1000_hw *hw)
 {
 	struct e1000_adapter *adapter = hw->back;
 
+#ifdef HAVE_PCI_SET_MWI
 	pci_clear_mwi(adapter->pdev);
+#else
+	pci_write_config_word(adapter->pdev, PCI_COMMAND,
+			      adapter->hw.pci_cmd_word &
+			      ~PCI_COMMAND_INVALIDATE);
+#endif
 }
 
 void
@@ -2676,6 +2754,7 @@ e1000_io_write(struct e1000_hw *hw, unsigned long port, uint32_t value)
 	outl(value, port);
 }
 
+#ifdef NETIF_F_HW_VLAN_TX
 static void
 e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
 {
@@ -2764,6 +2843,7 @@ e1000_restore_vlan(struct e1000_adapter *adapter)
 		}
 	}
 }
+#endif
 
 int
 e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx)
