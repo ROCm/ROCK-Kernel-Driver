@@ -173,9 +173,11 @@ int dn_fib_rtm_newrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		memcpy(new_r->r_ifname, RTA_DATA(rta[RTA_IIF-1]), IFNAMSIZ);
 		new_r->r_ifname[IFNAMSIZ-1] = 0;
 		new_r->r_ifindex = -1;
-		dev = __dev_get_by_name(new_r->r_ifname);
-		if (dev)
+		dev = dev_get_by_name(new_r->r_ifname);
+		if (dev) {
 			new_r->r_ifindex = dev->ifindex;
+			dev_put(dev);
+		}
 	}
 
 	rp = &dn_fib_rules;

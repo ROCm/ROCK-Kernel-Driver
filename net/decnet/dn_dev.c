@@ -561,7 +561,6 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 	struct dn_dev *dn_db;
 	struct net_device *dev;
 	struct dn_ifaddr *ifa = NULL, **ifap = NULL;
-	int exclusive = 0;
 	int ret = 0;
 
 	if (copy_from_user(ifr, arg, DN_IFREQ_SIZE))
@@ -580,12 +579,12 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 				return -EACCES;
 			if (sdn->sdn_family != AF_DECnet)
 				return -EINVAL;
-			rtnl_lock();
-			exclusive = 1;
 			break;
 		default:
 			return -EINVAL;
 	}
+
+	rtnl_lock();
 
 	if ((dev = __dev_get_by_name(ifr->ifr_name)) == NULL) {
 		ret = -ENODEV;
@@ -626,15 +625,13 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 			ret = dn_dev_set_ifa(dev, ifa);
 	}
 done:
-	if (exclusive)
-		rtnl_unlock();
+	rtnl_unlock();
 
 	return ret;
 rarok:
 	if (copy_to_user(arg, ifr, DN_IFREQ_SIZE))
-		return -EFAULT;
-
-	return 0;
+		ret = -EFAULT;
+	goto done;
 }
 
 static struct dn_dev *dn_dev_by_index(int ifindex)
