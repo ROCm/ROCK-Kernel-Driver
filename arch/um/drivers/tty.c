@@ -30,14 +30,15 @@ void *tty_chan_init(char *str, int device, struct chan_opts *opts)
 	}
 	str++;
 
-	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
+	if((data = um_kmalloc(sizeof(*data))) == NULL) 
+		return(NULL);
 	*data = ((struct tty_chan) { dev :	str,
 				     raw :	opts->raw });
 				     
 	return(data);
 }
 
-int tty_open(int input, int output, int primary, void *d)
+int tty_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct tty_chan *data = d;
 	int fd;
@@ -48,6 +49,8 @@ int tty_open(int input, int output, int primary, void *d)
 		tcgetattr(fd, &data->tt);
 		raw(fd, 0);
 	}
+
+	*dev_out = data->dev;
 	return(fd);
 }
 
@@ -59,6 +62,7 @@ int tty_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops tty_ops = {
+	type:		"tty",
 	init:		tty_chan_init,
 	open:		tty_open,
 	close:		generic_close,

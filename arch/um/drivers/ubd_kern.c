@@ -577,6 +577,44 @@ static int ubd_config(char *str)
 	return(err);
 }
 
+static int ubd_get_config(char *dev, char *str, int size, char **error_out)
+{
+	struct ubd *ubd;
+	char *end;
+	int major, n = 0;
+
+	major = simple_strtoul(dev, &end, 0);
+	if((*end != '\0') || (end == dev)){
+		*error_out = "ubd_get_config : didn't parse major number";
+		return(-1);
+	}
+
+	if((major >= MAX_DEV) || (major < 0)){
+		*error_out = "ubd_get_config : major number out of range";
+		return(-1);
+	}
+
+	ubd = &ubd_dev[major];
+	spin_lock(&ubd_lock);
+
+	if(ubd->file == NULL){
+		CONFIG_CHUNK(str, size, n, "", 1);
+		goto out;
+	}
+
+	CONFIG_CHUNK(str, size, n, ubd->file, 0);
+
+	if(ubd->cow.file != NULL){
+		CONFIG_CHUNK(str, size, n, ",", 0);
+		CONFIG_CHUNK(str, size, n, ubd->cow.file, 1);
+	}
+	else CONFIG_CHUNK(str, size, n, "", 1);
+
+ out:
+	spin_unlock(&ubd_lock);
+	return(n);
+}
+
 static int ubd_remove(char *str)
 {
 	struct ubd *dev;
@@ -623,6 +661,7 @@ static int ubd_remove(char *str)
 static struct mc_device ubd_mc = {
 	.name		= "ubd",
 	.config		= ubd_config,
+ 	.get_config	= ubd_get_config,
 	.remove		= ubd_remove,
 };
 
