@@ -1366,7 +1366,8 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 				 * low power mode.
 				 */
 				tg3_readphy(tp, MII_TG3_CTRL, &gig_ctrl);
-				if (!(gig_ctrl & (MII_TG3_CTRL_ADV_1000_HALF |
+				if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY) &&
+				    !(gig_ctrl & (MII_TG3_CTRL_ADV_1000_HALF |
 						  MII_TG3_CTRL_ADV_1000_FULL))) {
 					current_link_up = 0;
 				}
