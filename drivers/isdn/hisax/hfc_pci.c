@@ -1395,7 +1395,8 @@ hfcpci_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops hfcpci_ops = {
-	.init = hfcpci_init,
+	.init     = hfcpci_init,
+	.irq_func = hfcpci_interrupt,
 };
 
 
@@ -1481,7 +1482,6 @@ setup_hfcpci(struct IsdnCard *card)
 		return (0);	/* no valid card type */
 
 
-	cs->irq_func = &hfcpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 
 	cs->hw.hfcpci.timer.function = (void *) hfcpci_Timer;

@@ -241,7 +241,8 @@ niccy_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops niccy_ops = {
-	.init = niccy_reset,
+	.init     = niccy_reset,
+	.irq_func = niccy_interrupt,
 };
 
 static struct pci_dev *niccy_dev __initdata = NULL;
@@ -385,7 +386,6 @@ setup_niccy(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &niccy_card_msg;
-	cs->irq_func = &niccy_interrupt;
 	cs->card_ops = &niccy_ops;
 	ISACVersion(cs, "Niccy:");
 	if (HscxVersion(cs, "Niccy:")) {

@@ -389,7 +389,7 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-diva_irq_ipac_isa(int intno, void *dev_id, struct pt_regs *regs)
+diva_ipac_isa_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista,val;
@@ -436,7 +436,7 @@ Start_IPACISA:
 }
 
 static void
-diva_irq_ipac_pci(int intno, void *dev_id, struct pt_regs *regs)
+diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista,val;
@@ -489,7 +489,7 @@ Start_IPACPCI:
 }
 
 static void
-diva_irq_ipacx_pci(int intno, void *dev_id, struct pt_regs *regs)
+diva_ipacx_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
@@ -673,25 +673,37 @@ Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static void
-diva_init(struct IsdnCardState *cs)
+diva_ipacx_pci_init(struct IsdnCardState *cs)
 {
-	unsigned int *ireg;
+	writel(PITA_INT0_ENABLE, cs->hw.diva.pci_cfg);
+	init_ipacx(cs, 3); // init chip and enable interrupts
+}
 
-	if (cs->subtyp == DIVA_IPACX_PCI) {
-		ireg = (unsigned int *)cs->hw.diva.pci_cfg;
-		*ireg = PITA_INT0_ENABLE;
-		init_ipacx(cs, 3); // init chip and enable interrupts
-		return;
-	}
-	if (cs->subtyp == DIVA_IPAC_PCI) {
-		ireg = (unsigned int *)cs->hw.diva.pci_cfg;
-		*ireg = PITA_INT0_ENABLE;
-	}
+static void
+diva_ipac_pci_init(struct IsdnCardState *cs)
+{
+	writel(PITA_INT0_ENABLE, cs->hw.diva.pci_cfg);
 	inithscxisac(cs);
 }
 
 static struct card_ops diva_ops = {
-	.init = diva_init,
+	.init     = inithscxisac,
+	.irq_func = diva_interrupt,
+};
+
+static struct card_ops diva_ipac_isa_ops = {
+	.init     = inithscxisac,
+	.irq_func = diva_ipac_isa_irq,
+};
+
+static struct card_ops diva_ipac_pci_ops = {
+	.init     = diva_ipac_pci_init,
+	.irq_func = diva_ipac_pci_irq,
+};
+
+static struct card_ops diva_ipacx_pci_ops = {
+	.init     = diva_ipacx_pci_init,
+	.irq_func = diva_ipacx_pci_irq,
 };
 
 static struct pci_dev *dev_diva __initdata = NULL;
@@ -930,22 +942,21 @@ ready:
 	reset_diva(cs);
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Diva_card_msg;
-	cs->card_ops = &diva_ops;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->irq_func = &diva_irq_ipac_isa;
+		cs->card_ops = &diva_ipac_isa_ops;
 		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
 		cs->dc_hw_ops = &mem_ipac_dc_ops;
 		cs->bc_hw_ops = &mem_hscx_ops;
-		cs->irq_func = &diva_irq_ipac_pci;
+		cs->card_ops = &diva_ipac_pci_ops;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPACX_PCI) {
 		cs->dc_hw_ops = &ipacx_dc_ops;
 		cs->bc_hw_ops = &ipacx_bc_ops;
-		cs->irq_func = &diva_irq_ipacx_pci;
+		cs->card_ops = &diva_ipacx_pci_ops;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
 		       ipacx_dc_read(cs, IPACX_ID) &0x3F);
 	} else { /* DIVA 2.0 */
@@ -953,7 +964,7 @@ ready:
 		cs->hw.diva.tl.data = (long) cs;
 		init_timer(&cs->hw.diva.tl);
 		cs->dc_hw_ops = &isac_ops;
-		cs->irq_func = &diva_interrupt;
+		cs->card_ops = &diva_ops;
 		ISACVersion(cs, "Diva:");
 		if (HscxVersion(cs, "Diva:")) {
 			printk(KERN_WARNING

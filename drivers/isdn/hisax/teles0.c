@@ -222,7 +222,8 @@ Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops teles0_ops = {
-	.init = inithscxisac,
+	.init     = inithscxisac,
+	.irq_func = teles0_interrupt,
 };
 
 int __init
@@ -313,7 +314,6 @@ setup_teles0(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Teles_card_msg;
-	cs->irq_func = &teles0_interrupt;
 	cs->card_ops = &teles0_ops;
 	ISACVersion(cs, "Teles0:");
 	if (HscxVersion(cs, "Teles0:")) {

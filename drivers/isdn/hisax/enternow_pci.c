@@ -221,10 +221,6 @@ enpci_init(struct IsdnCardState *cs)
 	Amd7930_init(cs);
 }
 
-static struct card_ops enpci_ops = {
-	.init = enpci_init,
-};
-
 static void
 enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -272,6 +268,10 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
+static struct card_ops enpci_ops = {
+	.init     = enpci_init,
+	.irq_func = enpci_interrupt,
+};
 
 static struct pci_dev *dev_netjet __initdata = NULL;
 
@@ -377,7 +377,6 @@ setup_enternow_pci(struct IsdnCard *card)
         cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
 
 	cs->cardmsg = &enpci_card_msg;
-	cs->irq_func = &enpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &enpci_ops;
 

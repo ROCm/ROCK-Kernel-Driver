@@ -723,7 +723,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 			/* Transmitter reset, abort transmit */
 			wByteAMD(cs, 0x21, 0x82);
 			wByteAMD(cs, 0x21, 0x02);
-			cs->irq_func(cs->irq, cs, NULL);
+			cs->card_ops->irq_func(cs->irq, cs, NULL); /* FIXME? */
 
                         if (cs->debug & L1_DEB_ISAC)
 				debugl1(cs, "Amd7930: dbusy_timer_handler: Transmitter reset");

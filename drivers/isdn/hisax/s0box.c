@@ -229,7 +229,8 @@ S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops s0box_ops = {
-	.init = inithscxisac,
+	.init     = inithscxisac,
+	.irq_func = s0box_interrupt,
 };
 
 int __init
@@ -269,7 +270,6 @@ setup_s0box(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &S0Box_card_msg;
-	cs->irq_func = &s0box_interrupt;
 	cs->card_ops = &s0box_ops;
 	ISACVersion(cs, "S0Box:");
 	if (HscxVersion(cs, "S0Box:")) {

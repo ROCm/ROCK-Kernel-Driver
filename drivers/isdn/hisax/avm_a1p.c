@@ -226,7 +226,8 @@ avm_a1p_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops avm_a1p_ops = {
-	.init = avm_a1p_init,
+	.init     = avm_a1p_init,
+	.irq_func = avm_a1p_interrupt,
 };
 
 int __devinit
@@ -266,7 +267,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &AVM_card_msg;
-	cs->irq_func = &avm_a1p_interrupt;
 	cs->card_ops = &avm_a1p_ops;
 
 	ISACVersion(cs, "AVM A1 PCMCIA:");

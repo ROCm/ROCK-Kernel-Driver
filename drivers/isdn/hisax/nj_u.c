@@ -18,7 +18,7 @@
 const char *NETjet_U_revision = "$Revision: 2.8.6.6 $";
 
 static void
-netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+nj_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val, sval;
@@ -119,7 +119,8 @@ nj_u_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops nj_u_ops = {
-	.init = nj_u_init,
+	.init     = nj_u_init,
+	.irq_func = nj_u_interrupt,
 };
 
 static struct pci_dev *dev_netjet __initdata = NULL;
@@ -231,7 +232,6 @@ setup_netjet_u(struct IsdnCard *card)
 	reset_netjet_u(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_U_card_msg;
-	cs->irq_func = &netjet_u_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_u_ops;
 	ICCVersion(cs, "NETspider-U:");

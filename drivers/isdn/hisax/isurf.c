@@ -194,7 +194,8 @@ isurf_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops isurf_ops = {
-	.init = isurf_init,
+	.init     = isurf_init,
+	.irq_func = isurf_interrupt,
 };
 
 #ifdef __ISAPNP__
@@ -290,7 +291,6 @@ setup_isurf(struct IsdnCard *card)
 	       cs->irq);
 
 	cs->cardmsg = &ISurf_card_msg;
-	cs->irq_func = &isurf_interrupt;
 	cs->auxcmd = &isurf_auxcmd;
 	cs->card_ops = &isurf_ops;
 	cs->dc_hw_ops = &isac_ops;

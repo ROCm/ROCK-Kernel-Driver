@@ -288,7 +288,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 }
 
 static void
-W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+w6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val, exval, v1;
@@ -498,7 +498,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				debugl1(cs, "D-Channel Busy no skb");
 			}
 			w6692_write_reg(cs, W_D_CMDR, W_D_CMDR_XRST);	/* Transmitter reset */
-			cs->irq_func(cs->irq, cs, NULL);
+			cs->card_ops->irq_func(cs->irq, cs, NULL); /* FIXME? */
 		}
 	}
 }
@@ -663,7 +663,8 @@ w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops w6692_ops = {
-	.init = w6692_init,
+	.init     = w6692_init,
+	.irq_func = w6692_interrupt,
 };
 
 static struct bc_l1_ops w6692_bc_l1_ops = {
@@ -765,7 +766,6 @@ setup_w6692(struct IsdnCard *card)
 	cs->bc_l1_ops = &w6692_bc_l1_ops;
 	cs->DC_Send_Data = &W6692_fill_fifo;
 	cs->cardmsg = &w6692_card_msg;
-	cs->irq_func = &W6692_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &w6692_ops;
 	W6692Version(cs, "W6692:");

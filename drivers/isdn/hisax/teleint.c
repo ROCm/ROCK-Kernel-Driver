@@ -179,7 +179,7 @@ static struct bc_hw_ops hfc_ops = {
 };
 
 static void
-TeleInt_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+teleint_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
@@ -266,7 +266,8 @@ teleint_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops teleint_ops = {
-	.init = teleint_init,
+	.init     = teleint_init,
+	.irq_func = teleint_interrupt,
 };
 
 int __init
@@ -341,7 +342,6 @@ setup_TeleInt(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hfc_ops;
 	cs->cardmsg = &TeleInt_card_msg;
-	cs->irq_func = &TeleInt_interrupt;
 	cs->card_ops = &teleint_ops;
 	ISACVersion(cs, "TeleInt:");
 	return (1);

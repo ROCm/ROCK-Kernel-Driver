@@ -858,6 +858,7 @@ struct IsdnCardState;
 
 struct card_ops {
 	void   (*init)      (struct IsdnCardState *);
+	void   (*irq_func)  (int, void *, struct pt_regs *);
 };
 
 /* Card specific drivers provide methods to access the
@@ -949,7 +950,6 @@ struct IsdnCardState {
 	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);
 	void   (*DC_Send_Data) (struct IsdnCardState *);
 	void   (*DC_Close) (struct IsdnCardState *);
-	void   (*irq_func) (int, void *, struct pt_regs *);
 	int    (*auxcmd) (struct IsdnCardState *, isdn_ctrl *);
 	struct Channel channel[2+MAX_WAITING_CALLS];
 	struct BCState bcs[2+MAX_WAITING_CALLS];

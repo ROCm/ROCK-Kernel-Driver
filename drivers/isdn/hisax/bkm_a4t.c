@@ -261,7 +261,8 @@ bkm_a4t_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops bkm_a4t_ops = {
-	.init = bkm_a4t_init,
+	.init     = bkm_a4t_init,
+	.irq_func = bkm_interrupt,
 };
 
 static struct pci_dev *dev_a4t __initdata = NULL;
@@ -342,7 +343,6 @@ setup_bkm_a4t(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &jade_ops;
 	cs->cardmsg = &BKM_card_msg;
-	cs->irq_func = &bkm_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &bkm_a4t_ops;
 	ISACVersion(cs, "Telekom A4T:");

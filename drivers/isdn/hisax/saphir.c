@@ -245,7 +245,8 @@ saphir_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops saphir_ops = {
-	.init = inithscxisac,
+	.init     = inithscxisac,
+	.irq_func = saphir_interrupt,
 };
 
 int __init
@@ -291,7 +292,6 @@ setup_saphir(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &saphir_card_msg;
-	cs->irq_func = &saphir_interrupt;
 	cs->card_ops = &saphir_ops;
 	ISACVersion(cs, "saphir:");
 	if (HscxVersion(cs, "saphir:")) {

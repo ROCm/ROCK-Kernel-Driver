@@ -18,7 +18,7 @@
 const char *NETjet_S_revision = "$Revision: 2.7.6.6 $";
 
 static void
-netjet_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+nj_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val, sval;
@@ -115,7 +115,8 @@ nj_s_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops nj_s_ops = {
-	.init = nj_s_init,
+	.init     = nj_s_init,
+	.irq_func = nj_s_interrupt,
 };
 
 static struct pci_dev *dev_netjet __initdata = NULL;
@@ -235,7 +236,6 @@ setup_netjet_s(struct IsdnCard *card)
 	reset_netjet_s(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_S_card_msg;
-	cs->irq_func = &netjet_s_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_s_ops;
 	ISACVersion(cs, "NETjet-S:");

@@ -193,7 +193,8 @@ mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops mic_ops = {
-	.init = inithscxisac,
+	.init     = inithscxisac,
+	.irq_func = mic_interrupt,
 };
 
 int __init
@@ -231,7 +232,6 @@ setup_mic(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &mic_card_msg;
-	cs->irq_func = &mic_interrupt;
 	cs->card_ops = &mic_ops;
 	ISACVersion(cs, "mic:");
 	if (HscxVersion(cs, "mic:")) {

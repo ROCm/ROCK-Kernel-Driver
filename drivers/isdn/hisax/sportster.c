@@ -193,7 +193,8 @@ sportster_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops sportster_ops = {
-	.init = sportster_init,
+	.init     = sportster_init,
+	.irq_func = sportster_interrupt,
 };
 
 static int __init
@@ -268,7 +269,6 @@ setup_sportster(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sportster_card_msg;
-	cs->irq_func = &sportster_interrupt;
 	cs->card_ops = &sportster_ops;
 	ISACVersion(cs, "Sportster:");
 	if (HscxVersion(cs, "Sportster:")) {

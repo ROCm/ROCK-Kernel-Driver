@@ -332,7 +332,7 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-sedlbauer_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
+sedlbauer_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista, val, icnt = 5;
@@ -379,7 +379,7 @@ Start_IPAC:
 }
 
 static void
-sedlbauer_interrupt_isar(int intno, void *dev_id, struct pt_regs *regs)
+sedlbauer_isar_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
@@ -511,19 +511,26 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static void
-sedlbauer_init(struct IsdnCardState *cs)
+sedlbauer_isar_init(struct IsdnCardState *cs)
 {
-	if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-		isar_write(cs, 0, ISAR_IRQBIT, 0);
-		initisac(cs);
-		initisar(cs);
-	} else {
-		inithscxisac(cs);
-	}
+	isar_write(cs, 0, ISAR_IRQBIT, 0);
+	initisac(cs);
+	initisar(cs);
 }
 
 static struct card_ops sedlbauer_ops = {
-	.init = sedlbauer_init,
+	.init     = inithscxisac,
+	.irq_func = sedlbauer_interrupt,
+};
+
+static struct card_ops sedlbauer_ipac_ops = {
+	.init     = inithscxisac,
+	.irq_func = sedlbauer_ipac_interrupt,
+};
+
+static struct card_ops sedlbauer_isar_ops = {
+	.init     = sedlbauer_isar_init,
+	.irq_func = sedlbauer_isar_interrupt,
 };
 
 static struct pci_dev *dev_sedl __devinitdata = NULL;
@@ -713,7 +720,6 @@ ready:
 
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sedl_card_msg;
-	cs->card_ops = &sedlbauer_ops;
 
 /*
  * testing ISA and PCMCIA Cards for IPAC, default is ISAC
@@ -759,7 +765,7 @@ ready:
 		}
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->irq_func = &sedlbauer_interrupt_ipac;
+		cs->card_ops = &sedlbauer_ipac_ops;
 
 		val = readreg(cs, cs->hw.sedl.isac, IPAC_ID);
 		printk(KERN_INFO "Sedlbauer: IPAC version %x\n", val);
@@ -790,7 +796,7 @@ ready:
 			cs->bcs[0].hw.isar.reg = &cs->hw.sedl.isar;
 			cs->bcs[1].hw.isar.reg = &cs->hw.sedl.isar;
 			test_and_set_bit(HW_ISAR, &cs->HW_Flags);
-			cs->irq_func = &sedlbauer_interrupt_isar;
+			cs->card_ops = &sedlbauer_isar_ops;
 			cs->auxcmd = &isar_auxcmd;
 			ISACVersion(cs, "Sedlbauer:");
 			cs->bc_hw_ops = &isar_ops;
@@ -815,7 +821,7 @@ ready:
 				cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_ON;
 				cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_OFF;
 			}
-			cs->irq_func = &sedlbauer_interrupt;
+			cs->card_ops = &sedlbauer_ops;
 			ISACVersion(cs, "Sedlbauer:");
 		
 			if (HscxVersion(cs, "Sedlbauer:")) {

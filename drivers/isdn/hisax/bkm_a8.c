@@ -155,7 +155,7 @@ set_ipac_active(struct IsdnCardState *cs, u_int active)
 }
 
 static void
-bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
+bkm_a8_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista, val, icnt = 5;
@@ -271,7 +271,8 @@ bkm_a8_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops bkm_a8_ops = {
-	.init = bkm_a8_init,
+	.init     = bkm_a8_init,
+	.irq_func = bkm_a8_interrupt,
 };
 
 int __init
@@ -436,7 +437,6 @@ setup_sct_quadro(struct IsdnCard *card)
 	cs->dc_hw_ops = &ipac_dc_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &BKM_card_msg;
-	cs->irq_func = &bkm_interrupt_ipac;
 	cs->card_ops = &bkm_a8_ops;
 
 	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",

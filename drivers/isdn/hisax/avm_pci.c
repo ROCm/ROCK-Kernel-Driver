@@ -588,7 +588,7 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static void
-avm_a1_pci_init(struct IsdnCardState *cs)
+avm_pci_init(struct IsdnCardState *cs)
 {
 	initisac(cs);
 	inithdlc(cs);
@@ -598,8 +598,9 @@ avm_a1_pci_init(struct IsdnCardState *cs)
 	     AVM_STATUS0_ENA_IRQ, cs->hw.avm.cfg_reg + 2);
 }
 
-static struct card_ops avm_a1_pci_ops = {
-	.init = avm_a1_pci_init,
+static struct card_ops avm_pci_ops = {
+	.init     = avm_pci_init,
+	.irq_func = avm_pcipnp_interrupt,
 };
 
 static struct pci_dev *dev_avm __initdata = NULL;
@@ -724,8 +725,7 @@ ready:
 	cs->bc_hw_ops = &hdlc_hw_ops;
 	cs->bc_l1_ops = &hdlc_l1_ops;
 	cs->cardmsg = &AVM_card_msg;
-	cs->irq_func = &avm_pcipnp_interrupt;
-	cs->card_ops = &avm_a1_pci_ops;
+	cs->card_ops = &avm_pci_ops;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");
 	return (1);
 }

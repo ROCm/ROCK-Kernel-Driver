@@ -1172,7 +1172,8 @@ hfcsx_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops hfcsx_ops = {
-	.init = hfcsx_init,
+	.init     = hfcsx_init,
+	.irq_func = hfcsx_interrupt,
 };
 
 #ifdef __ISAPNP__
@@ -1292,8 +1293,6 @@ setup_hfcsx(struct IsdnCard *card)
 		Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
 	} else
 		return (0);	/* no valid card type */
-
-	cs->irq_func = &hfcsx_interrupt;
 
 	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;
 	cs->hw.hfcsx.timer.data = (long) cs;

@@ -214,7 +214,8 @@ ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct card_ops ix1_ops = {
-	.init = inithscxisac,
+	.init     = inithscxisac,
+	.irq_func = ix1micro_interrupt,
 };
 
 #ifdef __ISAPNP__
@@ -308,7 +309,6 @@ setup_ix1micro(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &ix1_card_msg;
-	cs->irq_func = &ix1micro_interrupt;
 	cs->card_ops = &ix1_ops;
 	ISACVersion(cs, "ix1-Micro:");
 	if (HscxVersion(cs, "ix1-Micro:")) {

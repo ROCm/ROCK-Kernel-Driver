@@ -188,7 +188,8 @@ avm_a1_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops avm_a1_ops = {
-	.init = avm_a1_init,
+	.init     = avm_a1_init,
+	.irq_func = avm_a1_interrupt,
 };
 
 int __init
@@ -312,7 +313,6 @@ setup_avm_a1(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &AVM_card_msg;
-	cs->irq_func = &avm_a1_interrupt;
 	cs->card_ops = &avm_a1_ops;
 	ISACVersion(cs, "AVM A1:");
 	if (HscxVersion(cs, "AVM A1:")) {

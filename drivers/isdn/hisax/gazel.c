@@ -282,7 +282,7 @@ gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 
 static void
-gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
+gazel_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista, val;
@@ -430,17 +430,20 @@ gazel_init(struct IsdnCardState *cs)
 {
 	int i;
 
-	inithscxisac(cs);
-	if (cs->subtyp == R647 || cs->subtyp == R685) {
-		for (i = 0; i < 2; i++) {
-			cs->bcs[i].hw.hscx.tsaxr0 = 0x1f;
-			cs->bcs[i].hw.hscx.tsaxr1 = 0x23;
-		}
+	for (i = 0; i < 2; i++) {
+		cs->bcs[i].hw.hscx.tsaxr0 = 0x1f;
+		cs->bcs[i].hw.hscx.tsaxr1 = 0x23;
 	}
 }
 
 static struct card_ops gazel_ops = {
-	.init = gazel_init,
+	.init     = gazel_init,
+	.irq_func = gazel_interrupt,
+};
+
+static struct card_ops gazel_ipac_ops = {
+	.init     = inithscxisac,
+	.irq_func = gazel_ipac_interrupt,
 };
 
 static int
@@ -688,12 +691,11 @@ setup_gazel(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Gazel_card_msg;
-	cs->card_ops = &gazel_ops;
 
 	switch (cs->subtyp) {
 		case R647:
 		case R685:
-			cs->irq_func = &gazel_interrupt;
+			cs->card_ops = &gazel_ops;
 			ISACVersion(cs, "Gazel:");
 			if (HscxVersion(cs, "Gazel:")) {
 				printk(KERN_WARNING
@@ -704,7 +706,7 @@ setup_gazel(struct IsdnCard *card)
 			break;
 		case R742:
 		case R753:
-			cs->irq_func = &gazel_interrupt_ipac;
+			cs->card_ops = &gazel_ipac_ops;
 			val = readreg_ipac(cs, IPAC_ID);
 			printk(KERN_INFO "Gazel: IPAC version %x\n", val);
 			break;

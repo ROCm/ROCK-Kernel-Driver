@@ -792,6 +792,12 @@ elsa_init(struct IsdnCardState *cs)
 
 static struct card_ops elsa_ops = {
 	.init = elsa_init,
+	.irq_func = elsa_interrupt,
+};
+
+static struct card_ops elsa_ipac_ops = {
+	.init     = elsa_init,
+	.irq_func = elsa_interrupt_ipac,
 };
 
 static unsigned char
@@ -1176,16 +1182,15 @@ setup_elsa(struct IsdnCard *card)
 	}
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Elsa_card_msg;
-	cs->card_ops = &elsa_ops;
 	reset_elsa(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
 		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->irq_func = &elsa_interrupt_ipac;
+		cs->card_ops = &elsa_ipac_ops;
 		val = readreg(cs, cs->hw.elsa.isac, IPAC_ID);
 		printk(KERN_INFO "Elsa: IPAC version %x\n", val);
 	} else {
 		cs->dc_hw_ops = &isac_ops;
-		cs->irq_func = &elsa_interrupt;
+		cs->card_ops = &elsa_ops;
 		ISACVersion(cs, "Elsa:");
 		if (HscxVersion(cs, "Elsa:")) {
 			printk(KERN_WARNING

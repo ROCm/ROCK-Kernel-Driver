@@ -145,7 +145,8 @@ hfcs_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops hfcs_ops = {
-	.init = hfcs_init,
+	.init     = hfcs_init,
+	.irq_func = hfcs_interrupt,
 };
 
 #ifdef __ISAPNP__
@@ -271,7 +272,6 @@ setup_hfcs(struct IsdnCard *card)
 	init_timer(&cs->hw.hfcD.timer);
 	reset_hfcs(cs);
 	cs->cardmsg = &hfcs_card_msg;
-	cs->irq_func = &hfcs_interrupt;
 	cs->card_ops = &hfcs_ops;
 	return (1);
 }

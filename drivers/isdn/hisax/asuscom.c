@@ -212,7 +212,7 @@ asuscom_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-asuscom_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
+asuscom_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista, val, icnt = 5;
@@ -314,7 +314,13 @@ asuscom_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops asuscom_ops = {
-	.init = asuscom_init,
+	.init     = asuscom_init,
+	.irq_func = asuscom_interrupt,
+};
+
+static struct card_ops asuscom_ipac_ops = {
+	.init     = asuscom_init,
+	.irq_func = asuscom_ipac_interrupt,
 };
 
 #ifdef __ISAPNP__
@@ -405,26 +411,25 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.cfg_reg, cs->irq);
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Asus_card_msg;
-	cs->card_ops = &asuscom_ops;
 	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
 	if ((val == 1) || (val == 2)) {
 		cs->subtyp = ASUS_IPAC;
+		cs->card_ops = &asuscom_ipac_ops;
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->irq_func = &asuscom_interrupt_ipac;
 		printk(KERN_INFO "Asus: IPAC version %x\n", val);
 	} else {
 		cs->subtyp = ASUS_ISACHSCX;
+		cs->card_ops = &asuscom_ops;
 		cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_ADR;
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_ISAC;
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_HSCX;
 		cs->hw.asus.u7 = cs->hw.asus.cfg_reg + ASUS_CTRL_U7;
 		cs->hw.asus.pots = cs->hw.asus.cfg_reg + ASUS_CTRL_POTS;
 		cs->dc_hw_ops = &isac_ops;
-		cs->irq_func = &asuscom_interrupt;
 		ISACVersion(cs, "ISDNLink:");
 		if (HscxVersion(cs, "ISDNLink:")) {
 			printk(KERN_WARNING
