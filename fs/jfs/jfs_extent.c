@@ -337,6 +337,7 @@ exit:
 	up(&JFS_IP(ip)->commit_sem);
 	return (rc);
 }
+#endif			/* _NOTYET */
 
 
 /*
@@ -410,7 +411,6 @@ int extHint(struct inode *ip, s64 offset, xad_t * xp)
 
 	return (0);
 }
-#endif			/* _NOTYET */
 
 
 /*
