@@ -57,6 +57,7 @@
 #include <asm/proto.h>
 #include <asm/setup.h>
 #include <asm/mach_apic.h>
+#include <asm/numa.h>
 
 /*
  * Machine setup..
@@ -688,7 +689,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	} 
 	display_cacheinfo(c);
 
-	if (c->cpuid_level >= 0x80000008) {
+	if (cpuid_eax(0x80000000) >= 0x80000008) {
 		c->x86_num_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
 		if (c->x86_num_cores & (c->x86_num_cores - 1))
 			c->x86_num_cores = 1;
@@ -914,6 +915,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 #ifdef CONFIG_X86_MCE
 	mcheck_init(c);
+#endif
+#ifdef CONFIG_NUMA
+	numa_add_cpu(c - cpu_data);
 #endif
 }
  
