@@ -840,7 +840,7 @@ typedef struct smb_com_delete_file_rsp {
 
 typedef struct smb_com_delete_directory_req {
 	struct smb_hdr hdr;	/* wct = 0 */
-	__u16 ByteCount;
+	__le16 ByteCount;
 	__u8 BufferFormat;	/* 4 = ASCII */
 	unsigned char DirName[1];
 } DELETE_DIRECTORY_REQ;
