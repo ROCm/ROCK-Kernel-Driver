@@ -2,6 +2,7 @@
 #define _ALPHA_BYTEORDER_H
 
 #include <asm/types.h>
+#include <asm/compiler.h>
 
 #ifdef __GNUC__
 
@@ -23,11 +24,8 @@ static __inline __u32 __attribute__((__const)) __arch__swab32(__u32 x)
 
 	__u64 t0, t1, t2, t3;
 
-	__asm__("inslh %1, 7, %0"	/* t0 : 0000000000AABBCC */
-		: "=r"(t0) : "r"(x));
-	__asm__("inswl %1, 3, %0"	/* t1 : 000000CCDD000000 */
-		: "=r"(t1) : "r"(x));
-
+	t0 = __kernel_inslh(x, 7);	/* t0 : 0000000000AABBCC */
+	t1 = __kernel_inswl(x, 3);	/* t1 : 000000CCDD000000 */
 	t1 |= t0;			/* t1 : 000000CCDDAABBCC */
 	t2 = t1 >> 16;			/* t2 : 0000000000CCDDAA */
 	t0 = t1 & 0xFF00FF00;		/* t0 : 00000000DD00BB00 */
