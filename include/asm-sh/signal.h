@@ -165,8 +165,6 @@ typedef struct sigaltstack {
 #ifdef __KERNEL__
 #include <asm/sigcontext.h>
 
-#define sigmask(sig)	(1UL << ((sig) - 1))
-
 #endif /* __KERNEL__ */
 
 #endif /* __ASM_SH_SIGNAL_H */
