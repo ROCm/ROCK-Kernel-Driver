@@ -244,6 +244,9 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
 		search server for EAs or streams to 
 		returns as xattrs */
 
+	if(rc == -EINVAL)
+		rc = -EOPNOTSUPP; 
+
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
