@@ -245,11 +245,8 @@ struct riva_cursor {
  * ------------------------------------------------------------------------- */
 
 /* command line data, set in rivafb_setup() */
-static char fontname[40] __initdata = { 0 };
 static u32  pseudo_palette[17];
 static char nomove = 0;
-static char nohwcursor __initdata = 0;
-static char noblink = 0;
 #ifdef CONFIG_MTRR
 static char nomtrr __initdata = 0;
 #endif
@@ -284,7 +281,7 @@ static struct fb_var_screeninfo rivafb_default_var = {
 	activate:	0,
 	height:		-1,
 	width:		-1,
-	accel_flags:	FB_ACCELF_TEXT,
+	accel_flags:	 FB_ACCELF_TEXT, 
 	pixclock:	39721,
 	left_margin:	40,
 	right_margin:	24,
@@ -400,236 +397,60 @@ static inline unsigned char MISCin(struct riva_par *par)
  * ------------------------------------------------------------------------- */
 
 /**
- * riva_cursor_timer_handler - blink timer
- * @dev_addr: pointer to riva_par object containing info for current riva board
+ * rivafb_load_cursor_image - load cursor image to hardware
+ * @data: address to monochrome bitmap (1 = foreground color, 0 = background)
+ * @mask: address to mask (1 = write image pixel, 0 = do not write pixel)
+ * @par:  pointer to private data
+ * @w:    width of cursor image in pixels
+ * @h:    height of cursor image in scanlines
+ * @bg:   background color (ARGB1555) - alpha bit determines opacity
+ * @fg:   foreground color (ARGB1555)
  *
- * DESCRIPTION:
- * Cursor blink timer.
- */
-static void riva_cursor_timer_handler(unsigned long dev_addr)
-{
-	struct riva_par *par = (struct riva_par *) dev_addr;
-
-	if (!par->cursor) return;
-
-	if (!par->cursor->enable) goto out;
-
-	if (par->cursor->last_move_delay < 1000)
-		par->cursor->last_move_delay++;
-
-	if (par->cursor->vbl_cnt && --par->cursor->vbl_cnt == 0) {
-		par->cursor->on ^= 1;
-		if (par->cursor->on)
-			*(par->riva.CURSORPOS) = (par->cursor->pos.x & 0xFFFF)
-						   | (par->cursor->pos.y << 16);
-		par->riva.ShowHideCursor(&par->riva, par->cursor->on);
-		if (!noblink)
-			par->cursor->vbl_cnt = par->cursor->blink_rate;
-	}
-out:
-	par->cursor->timer->expires = jiffies + (HZ / 100);
-	add_timer(par->cursor->timer);
-}
-
-/**
- * rivafb_init_cursor - allocates cursor structure and starts blink timer
- * @par: pointer to riva_par object containing info for current riva board
- *
- * DESCRIPTION:
- * Allocates cursor structure and starts blink timer.
- *
- * RETURNS:
- * Pointer to allocated cursor structure.
+ * DESCRIPTiON:
+ * Loads cursor image based on a monochrome source and mask bitmap.  The
+ * mask bit determines if the image pixel is to be written to the framebuffer
+ * or not.  The imaage bits determines the color of the pixel, 0 for 
+ * background, 1 for foreground.  Only the affected region (as determined 
+ * by @w and @h parameters) will be updated.
  *
  * CALLED FROM:
- * rivafb_init_one()
+ * rivafb_cursor()
  */
-static struct riva_cursor * __init rivafb_init_cursor(struct riva_par *par)
+static void rivafb_load_cursor_image(u8 *data, u8 *mask, struct riva_par *par, 
+				     int w, int h, u16 bg, u16 fg)
 {
-	struct riva_cursor *cursor;
+	int i, j, k = 0;
+	u32 b, m, tmp;
+       
 
-	cursor = kmalloc(sizeof(struct riva_cursor), GFP_KERNEL);
-	if (!cursor) return 0;
-	memset(cursor, 0, sizeof(*cursor));
+	for (i = 0; i < h; i++) {
+		b = *((u32 *)data)++;
+		m = *((u32 *)mask)++;
+		for (j = 0; j < w/2; j++) {
+			tmp = 0;
+#if defined (__BIG_ENDIAN) 
+			if (m & (1 << 31))
+				tmp = (b & (1 << 31)) ? fg << 16 : bg << 16;
+			b <<= 1;
+			m <<= 1;
 
-	cursor->timer = kmalloc(sizeof(*cursor->timer), GFP_KERNEL);
-	if (!cursor->timer) {
-		kfree(cursor);
-		return 0;
-	}
-	memset(cursor->timer, 0, sizeof(*cursor->timer));
-
-	cursor->blink_rate = DEFAULT_CURSOR_BLINK_RATE;
-
-	init_timer(cursor->timer);
-	cursor->timer->expires = jiffies + (HZ / 100);
-	cursor->timer->data = (unsigned long)par;
-	cursor->timer->function = riva_cursor_timer_handler;
-	add_timer(cursor->timer);
-
-	return cursor;
-}
-
-/**
- * rivafb_exit_cursor - stops blink timer and releases cursor structure
- * @par: pointer to riva_par object containing info for current riva board
- *
- * DESCRIPTION:
- * Stops blink timer and releases cursor structure.
- *
- * CALLED FROM:
- * rivafb_init_one()
- * rivafb_remove_one()
- */
-static void rivafb_exit_cursor(struct riva_par *par)
-{
-	struct riva_cursor *cursor = par->cursor;
-
-	if (cursor) {
-		if (cursor->timer) {
-			del_timer_sync(cursor->timer);
-			kfree(cursor->timer);
+			if (m & (1 << 31))
+				tmp |= (b & (1 << 31)) ? fg : bg;
+			b <<= 1;
+			m <<= 1;
+#else
+			if (m & 1)
+				tmp = (b & 1) ? fg : bg;
+			b >>= 1;
+			m >>= 1;
+			if (m & 1)
+				tmp |= (b & 1) ? fg << 16 : bg << 16;
+			b >>= 1;
+			m >>= 1;
+#endif
+			writel(tmp, par->riva.CURSOR + k++);
 		}
-		kfree(cursor);
-		par->cursor = 0;
-	}
-}
-
-/**
- * rivafb_download_cursor - writes cursor shape into card registers
- * @info: pointer to fb_info object containing info for current riva board
- *
- * DESCRIPTION:
- * Writes cursor shape into card registers.
- *
- * CALLED FROM:
- * riva_load_video_mode()
- */
-static void rivafb_download_cursor(struct fb_info *info)
-{
-	struct riva_par *par = (struct riva_par *) info->par;
-	int i, save;
-	int *image;
-	
-	if (!par->cursor) return;
-
-	image = (int *)par->cursor->image;
-	save = par->riva.ShowHideCursor(&par->riva, 0);
-	for (i = 0; i < (MAX_CURS*MAX_CURS*2)/sizeof(int); i++)
-		writel(image[i], par->riva.CURSOR + i);
-
-	par->riva.ShowHideCursor(&par->riva, save);
-}
-
-/**
- * rivafb_create_cursor - sets rectangular cursor
- * @info: pointer to fb_info object containing info for current riva board
- * @width: cursor width in pixels
- * @height: cursor height in pixels
- *
- * DESCRIPTION:
- * Sets rectangular cursor.
- *
- * CALLED FROM:
- * rivafb_set_font()
- * rivafb_set_var()
- */
-static void rivafb_create_cursor(struct fb_info *info, int width, int height)
-{
-	struct riva_par *par = (struct riva_par *) info->par;
-	struct riva_cursor *c = par->cursor;
-	int i, j, idx;
-
-	if (c) {
-		if (width <= 0 || height <= 0) {
-			width = 8;
-			height = 16;
-		}
-		if (width > MAX_CURS) width = MAX_CURS;
-		if (height > MAX_CURS) height = MAX_CURS;
-
-		c->size.x = width;
-		c->size.y = height;
-		
-		idx = 0;
-
-		for (i = 0; i < height; i++) {
-			for (j = 0; j < width; j++,idx++)
-				c->image[idx] = CURSOR_COLOR;
-			for (j = width; j < MAX_CURS; j++,idx++)
-				c->image[idx] = TRANSPARENT_COLOR;
-		}
-		for (i = height; i < MAX_CURS; i++)
-			for (j = 0; j < MAX_CURS; j++,idx++)
-				c->image[idx] = TRANSPARENT_COLOR;
-	}
-}
-
-/**
- * rivafb_set_font - change font size
- * @p: pointer to display object
- * @width: font width in pixels
- * @height: font height in pixels
- *
- * DESCRIPTION:
- * Callback function called if font settings changed.
- *
- * RETURNS:
- * 1 (Always succeeds.)
- */
-static int rivafb_set_font(struct display *p, int width, int height)
-{
-	rivafb_create_cursor(p->fb_info, width, height);
-	return 1;
-}
-
-/**
- * rivafb_cursor - cursor handler
- * @p: pointer to display object
- * @mode: cursor mode (see CM_*)
- * @x: cursor x coordinate in characters
- * @y: cursor y coordinate in characters
- *
- * DESCRIPTION:
- * Cursor handler.
- */
-static void rivafb_cursor(struct display *p, int mode, int x, int y)
-{
-	struct fb_info *info = p->fb_info;
-	struct riva_par *par = (struct riva_par *) info->par;
-	struct riva_cursor *c = par->cursor;
-
-	if (!c)	return;
-
-	x = x * fontwidth(p) - p->var.xoffset;
-	y = y * fontheight(p) - p->var.yoffset;
-
-	if (c->pos.x == x && c->pos.y == y && (mode == CM_ERASE) == !c->enable)
-		return;
-
-	c->enable = 0;
-	if (c->on) par->riva.ShowHideCursor(&par->riva, 0);
-		
-	c->pos.x = x;
-	c->pos.y = y;
-
-	switch (mode) {
-	case CM_ERASE:
-		c->on = 0;
-		break;
-	case CM_DRAW:
-	case CM_MOVE:
-		if (c->last_move_delay <= 1) { /* rapid cursor movement */
-			c->vbl_cnt = CURSOR_SHOW_DELAY;
-		} else {
-			*(par->riva.CURSORPOS) = (x & 0xFFFF) | (y << 16);
-			par->riva.ShowHideCursor(&par->riva, 1);
-			if (!noblink) c->vbl_cnt = CURSOR_HIDE_DELAY;
-			c->on = 1;
-		}
-		c->last_move_delay = 0;
-		c->enable = 1;
-		break;
+		k += (MAX_CURS - w)/2;
 	}
 }
 
@@ -833,9 +654,6 @@ static void riva_load_video_mode(struct fb_info *info)
 
 	par->current_state = newmode;
 	riva_load_state(par, &par->current_state);
-
-	par->riva.LockUnlock(&par->riva, 0); /* important for HW cursor */
-	rivafb_download_cursor(info);
 }
 
 /**
@@ -961,7 +779,339 @@ void riva_setup_accel(struct riva_par *par)
 	par->riva.Clip->TopLeft     = 0x0;
 	par->riva.Clip->WidthHeight = 0x80008000;
 	riva_setup_ROP(par);
+}
+
+/**
+ * rivafb_fillrect - hardware accelerated color fill function
+ * @info: pointer to fb_info structure
+ * @rect: pointer to fb_fillrect structure
+ * 
+ * DESCRIPTION:
+ * This function fills up a region of framebuffer memory with a solid
+ * color with a choice of two different ROP's, copy or invert.
+ *
+ * CALLED FROM:
+ * framebuffer hook
+ */
+static void rivafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+	u_int color, rop = 0;
+
+	if (info->var.bits_per_pixel == 8)
+		color = rect->color;
+	else
+		color = par->riva_palette[rect->color];
+
+	switch (rect->rop) {
+	case ROP_XOR:
+		rop = 0x66;
+		break;
+	case ROP_COPY:
+	default:
+		rop = 0xCC;
+		break;
+	}
+
+	RIVA_FIFO_FREE(par->riva, Rop, 1);
+	par->riva.Rop->Rop3 = rop;
+
+	RIVA_FIFO_FREE(par->riva, Bitmap, 1);
+	par->riva.Bitmap->Color1A = color;
+
+	RIVA_FIFO_FREE(par->riva, Bitmap, 2);
+	par->riva.Bitmap->UnclippedRectangle[0].TopLeft = 
+		(rect->dx << 16) | rect->dy;
+	par->riva.Bitmap->UnclippedRectangle[0].WidthHeight =
+		(rect->width << 16) | rect->height;
+}
+
+/**
+ * rivafb_copyarea - hardware accelerated blit function
+ * @info: pointer to fb_info structure
+ * @region: pointer to fb_copyarea structure
+ *
+ * DESCRIPTION:
+ * This copies an area of pixels from one location to another
+ *
+ * CALLED FROM:
+ * framebuffer hook
+ */
+static void rivafb_copyarea(struct fb_info *info, struct fb_copyarea *region)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+
+	RIVA_FIFO_FREE(par->riva, Blt, 3);
+	par->riva.Blt->TopLeftSrc  = (region->sy << 16) | region->sx;
+	par->riva.Blt->TopLeftDst  = (region->dy << 16) | region->dx;
+	par->riva.Blt->WidthHeight = (region->height << 16) | region->width;
 	wait_for_idle(par);
+}
+
+static u8 byte_rev[256] = {
+	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0, 
+	0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
+	0x08, 0x88, 0x48, 0xc8, 0x28, 0xa8, 0x68, 0xe8, 
+	0x18, 0x98, 0x58, 0xd8, 0x38, 0xb8, 0x78, 0xf8, 
+	0x04, 0x84, 0x44, 0xc4, 0x24, 0xa4, 0x64, 0xe4, 
+	0x14, 0x94, 0x54, 0xd4, 0x34, 0xb4, 0x74, 0xf4, 
+	0x0c, 0x8c, 0x4c, 0xcc, 0x2c, 0xac, 0x6c, 0xec, 
+	0x1c, 0x9c, 0x5c, 0xdc, 0x3c, 0xbc, 0x7c, 0xfc, 
+	0x02, 0x82, 0x42, 0xc2, 0x22, 0xa2, 0x62, 0xe2, 
+	0x12, 0x92, 0x52, 0xd2, 0x32, 0xb2, 0x72, 0xf2, 
+	0x0a, 0x8a, 0x4a, 0xca, 0x2a, 0xaa, 0x6a, 0xea, 
+	0x1a, 0x9a, 0x5a, 0xda, 0x3a, 0xba, 0x7a, 0xfa, 
+	0x06, 0x86, 0x46, 0xc6, 0x26, 0xa6, 0x66, 0xe6, 
+	0x16, 0x96, 0x56, 0xd6, 0x36, 0xb6, 0x76, 0xf6, 
+	0x0e, 0x8e, 0x4e, 0xce, 0x2e, 0xae, 0x6e, 0xee, 
+	0x1e, 0x9e, 0x5e, 0xde, 0x3e, 0xbe, 0x7e, 0xfe, 
+	0x01, 0x81, 0x41, 0xc1, 0x21, 0xa1, 0x61, 0xe1, 
+	0x11, 0x91, 0x51, 0xd1, 0x31, 0xb1, 0x71, 0xf1, 
+	0x09, 0x89, 0x49, 0xc9, 0x29, 0xa9, 0x69, 0xe9, 
+	0x19, 0x99, 0x59, 0xd9, 0x39, 0xb9, 0x79, 0xf9, 
+	0x05, 0x85, 0x45, 0xc5, 0x25, 0xa5, 0x65, 0xe5, 
+	0x15, 0x95, 0x55, 0xd5, 0x35, 0xb5, 0x75, 0xf5, 
+	0x0d, 0x8d, 0x4d, 0xcd, 0x2d, 0xad, 0x6d, 0xed, 
+	0x1d, 0x9d, 0x5d, 0xdd, 0x3d, 0xbd, 0x7d, 0xfd, 
+	0x03, 0x83, 0x43, 0xc3, 0x23, 0xa3, 0x63, 0xe3,
+	0x13, 0x93, 0x53, 0xd3, 0x33, 0xb3, 0x73, 0xf3, 
+	0x0b, 0x8b, 0x4b, 0xcb, 0x2b, 0xab, 0x6b, 0xeb,
+	0x1b, 0x9b, 0x5b, 0xdb, 0x3b, 0xbb, 0x7b, 0xfb, 
+	0x07, 0x87, 0x47, 0xc7, 0x27, 0xa7, 0x67, 0xe7,
+	0x17, 0x97, 0x57, 0xd7, 0x37, 0xb7, 0x77, 0xf7, 
+	0x0f, 0x8f, 0x4f, 0xcf, 0x2f, 0xaf, 0x6f, 0xef,
+	0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff,
+};
+
+/**
+ * rivafb_imageblit: hardware accelerated color expand function
+ * @info: pointer to fb_info structure
+ * @image: pointer to fb_image structure
+ *
+ * DESCRIPTION:
+ * If the source is a monochrome bitmap, the function fills up a a region
+ * of framebuffer memory with pixels whose color is determined by the bit
+ * setting of the bitmap, 1 - foreground, 0 - background.
+ *
+ * If the source is not a monochrome bitmap, color expansion is not done.
+ * In this case, it is channeled to a software function.
+ *
+ * CALLED FROM:
+ * framebuffer hook
+ */
+static void rivafb_imageblit(struct fb_info *info, struct fb_image *image)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+	u8 *cdat = image->data, *dat;
+	int w, h, dx, dy;
+	volatile u32 *d;
+	u32 fgx = 0, bgx = 0, size, width, mod;
+	int i, j;
+
+	if (image->depth != 1) {
+		wait_for_idle(par);
+		cfb_imageblit(info, image);
+		return;
+	}
+
+	w = image->width;
+	h = image->height;
+	dx = image->dx;
+	dy = image->dy;
+
+	width = (w + 7)/8;
+
+	size = width * h;
+	dat = cdat;
+	for (i = 0; i < size; i++) {
+		*dat = byte_rev[*dat];
+		dat++;
+	}
+
+	switch (info->var.bits_per_pixel) {
+	case 8:
+		fgx = image->fg_color | ~((1 << 8) - 1);
+		bgx = image->bg_color | ~((1 << 8) - 1);
+		
+		break;
+	case 16:
+		/* set alpha bit */
+		if (info->var.green.length == 5) {
+			fgx = 1 << 15;
+			bgx = fgx;
+		}
+        /* Fall through... */
+	case 32:
+		fgx |= par->riva_palette[image->fg_color];
+		bgx |= par->riva_palette[image->bg_color];
+		break;
+	}
+
+        RIVA_FIFO_FREE(par->riva, Bitmap, 7);
+        par->riva.Bitmap->ClipE.TopLeft     = (dy << 16) | (dx & 0xFFFF);
+        par->riva.Bitmap->ClipE.BottomRight = (((dy + h) << 16) | 
+					       ((dx + w) & 0xffff));
+        par->riva.Bitmap->Color0E           = bgx;
+        par->riva.Bitmap->Color1E           = fgx;
+        par->riva.Bitmap->WidthHeightInE    = (h << 16) | ((w + 31) & ~31);
+        par->riva.Bitmap->WidthHeightOutE   = (h << 16) | ((w + 31) & ~31);
+        par->riva.Bitmap->PointE            = (dy << 16) | (dx & 0xFFFF);
+	
+	d = &par->riva.Bitmap->MonochromeData01E;
+
+	mod = width % 4;
+
+	if (width >= 4) {
+		while (h--) {
+			size = width / 4;
+			while (size >= 16) {
+				RIVA_FIFO_FREE(par->riva, Bitmap, 16);
+				for (i = 0; i < 16; i++)
+					d[i] = *((u32 *)cdat)++;
+				size -= 16;
+			}
+			
+			if (size) {
+				RIVA_FIFO_FREE(par->riva, Bitmap, size);
+				for (i = 0; i < size; i++)
+					d[i] = *((u32 *) cdat)++;
+			}
+			
+			if (mod) {
+				u32 tmp;
+				RIVA_FIFO_FREE(par->riva, Bitmap, 1);
+				for (i = 0; i < mod; i++) 
+					((u8 *)&tmp)[i] = *cdat++;
+				d[i] = tmp;
+			}
+		}
+	}
+	else {
+		u32 k, tmp;
+
+		for (i = h; i > 0; i-=16) {
+			if (i >= 16)
+				size = 16;
+			else
+				size = i;
+			RIVA_FIFO_FREE(par->riva, Bitmap, size);
+			for (j = 0; j < size; j++) {
+				for (k = 0; k < width; k++)
+					((u8 *)&tmp)[k] = *cdat++;
+				d[j] = tmp;
+			}
+		}
+	}
+}
+
+/**
+ * rivafb_cursor - hardware cursor function
+ * @info: pointer to info structure
+ * @cursor: pointer to fbcursor structure
+ *
+ * DESCRIPTION:
+ * A cursor function that supports displaying a cursor image via hardware.
+ * Within the kernel, copy and invert rops are supported.  If exported
+ * to user space, only the copy rop will be supported.
+ *
+ * CALLED FROM
+ * framebuffer hook
+ */
+static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor) 
+{
+	static u8 data[MAX_CURS*MAX_CURS/8], mask[MAX_CURS*MAX_CURS/8];
+	struct riva_par *par = (struct riva_par *) info->par;
+	int i, j, d_idx = 0, s_idx = 0;
+	u16 flags = cursor->set, fg, bg;
+
+	/*
+	 * Can't do invert if one of the operands (dest) is missing,
+	 * ie, only opaque cursor supported.  This should be
+	 * standard for GUI apps.
+	 */
+	if (cursor->dest == NULL && cursor->rop == ROP_XOR)
+		return 1;
+
+	if (par->cursor_reset) {
+		flags = FB_CUR_SETALL;
+		par->cursor_reset = 0;
+	}
+
+	par->riva.ShowHideCursor(&par->riva, 0);
+
+	if (flags & FB_CUR_SETPOS) {
+		u32 xx, yy, temp;
+	
+		yy = cursor->image.dy - info->var.yoffset;
+		xx = cursor->image.dx - info->var.xoffset;
+		temp = xx & 0xFFFF;
+		temp |= yy << 16;
+
+		*(par->riva.CURSORPOS) = temp;
+	}
+
+	if (flags & FB_CUR_SETSIZE) {
+		memset(data, 0, MAX_CURS * MAX_CURS/8);
+		memset(mask, 0, MAX_CURS * MAX_CURS/8);
+		memset_io(par->riva.CURSOR, 0, MAX_CURS * MAX_CURS * 2);
+	}
+
+	if (flags & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP | FB_CUR_SETDEST)) { 
+		int bg_idx = cursor->image.bg_color;
+		int fg_idx = cursor->image.fg_color;
+
+		switch (cursor->rop) {
+		case ROP_XOR:
+			for (i = 0; i < cursor->image.height; i++) {
+				for (j = 0; j < (cursor->image.width + 7)/8;
+				     j++) {
+					d_idx = i * MAX_CURS/8  + j;
+					data[d_idx] =  byte_rev[((u8 *)cursor->image.data)[s_idx] ^
+							       ((u8 *)cursor->dest)[s_idx]];
+					mask[d_idx] = byte_rev[((u8 *)cursor->mask)[s_idx]];
+					s_idx++;
+				}
+			}
+			break;
+		case ROP_COPY:
+		default:
+			for (i = 0; i < cursor->image.height; i++) {
+				for (j = 0; j < (cursor->image.width + 7)/8; j++) {
+					d_idx = i * MAX_CURS/8 + j;
+					data[d_idx] = byte_rev[((u8 *)cursor->image.data)[s_idx]];
+					mask[d_idx] = byte_rev[((u8 *)cursor->mask)[s_idx]];
+					s_idx++;
+				}
+			}
+			break;
+		}
+			
+		bg = ((par->cmap[bg_idx].red & 0xf8) << 7) | 
+			((par->cmap[bg_idx].green & 0xf8) << 2) |
+			((par->cmap[bg_idx].blue & 0xf8) >> 3) | 1 << 15;
+		
+		fg = ((par->cmap[fg_idx].red & 0xf8) << 7) | 
+			((par->cmap[fg_idx].green & 0xf8) << 2) |
+			((par->cmap[fg_idx].blue & 0xf8) >> 3) | 1 << 15;
+
+		par->riva.LockUnlock(&par->riva, 0);
+		rivafb_load_cursor_image(data, mask, par, cursor->image.width, 
+					 cursor->image.height, bg, fg);
+	}
+	
+	if (cursor->enable)
+		par->riva.ShowHideCursor(&par->riva, 1);
+
+	return 0;
+}
+
+static int rivafb_sync(struct fb_info *info)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+
+	wait_for_idle(par);
+	
+	return 0;
 }
 
 /* ------------------------------------------------------------------------- *
@@ -992,23 +1142,18 @@ static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
 
 	assert(var != NULL);
 
-	switch (var->bits_per_pixel) {
-	case 8:
-		rc = 256;	/* pseudocolor... 256 entries HW palette */
+	switch (var->green.length) {
+	case 5:
+		rc = 32;	/* fix for 15 bpp depths on Riva 128 based cards */
 		break;
-	case 15:
-		rc = 15;	/* fix for 15 bpp depths on Riva 128 based cards */
-		break;
-	case 16:
-		rc = 16;	/* directcolor... 16 entries SW palette */
-		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
-	case 32:
-		rc = 16;	/* directcolor... 16 entries SW palette */
+	case 6:
+		rc = 64;	/* directcolor... 16 entries SW palette */
 		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
 	default:
-		/* should not occur */
+		rc = 256;	/* pseudocolor... 256 entries HW palette */
 		break;
 	}
+
 	return rc;
 }
 
@@ -1021,8 +1166,13 @@ static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
 static int rivafb_check_var(struct fb_var_screeninfo *var,
                             struct fb_info *info)
 {
+	struct riva_par *par = (struct riva_par *) info->par;
 	int nom, den;		/* translating from pixels->bytes */
 	
+	if (par->riva.Architecture == NV_ARCH_03 &&
+	    var->bits_per_pixel == 16)
+		var->bits_per_pixel = 15;
+
 	switch (var->bits_per_pixel) {
 	case 1 ... 8:
 		var->bits_per_pixel = 8;
@@ -1098,7 +1248,6 @@ static int rivafb_check_var(struct fb_var_screeninfo *var,
 	    var->green.msb_right =
 	    var->blue.msb_right =
 	    var->transp.offset = var->transp.length = var->transp.msb_right = 0;
-	var->accel_flags |= FB_ACCELF_TEXT;
 	return 0;
 }
 
@@ -1108,7 +1257,21 @@ static int rivafb_set_par(struct fb_info *info)
 
 	//rivafb_create_cursor(info, fontwidth(dsp), fontheight(dsp));
 	riva_load_video_mode(info);
-	riva_setup_accel(par);
+	if (info->var.accel_flags) {
+		riva_setup_accel(par);
+		info->fbops->fb_fillrect  = rivafb_fillrect;
+		info->fbops->fb_copyarea  = rivafb_copyarea;
+		info->fbops->fb_imageblit = rivafb_imageblit;
+		info->fbops->fb_cursor    = rivafb_cursor;
+		info->fbops->fb_sync      = rivafb_sync;
+	}
+	else {
+		info->fbops->fb_fillrect  = cfb_fillrect;
+		info->fbops->fb_copyarea  = cfb_copyarea;
+		info->fbops->fb_imageblit = cfb_imageblit;
+		info->fbops->fb_cursor    = soft_cursor;
+		info->fbops->fb_sync      = NULL;
+	}
 
 	info->fix.line_length = (info->var.xres_virtual * (info->var.bits_per_pixel >> 3));
 	info->fix.visual = (info->var.bits_per_pixel == 8) ? 
@@ -1129,7 +1292,7 @@ static int rivafb_set_par(struct fb_info *info)
  *
  * This call looks only at xoffset, yoffset and the FB_VMODE_YWRAP flag
  */
-static int rivafb_pan_display(struct fb_var_screeninfo *var, int con,
+static int rivafb_pan_display(struct fb_var_screeninfo *var,
 			      struct fb_info *info)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
@@ -1152,9 +1315,7 @@ static int rivafb_pan_display(struct fb_var_screeninfo *var, int con,
 
 	base = var->yoffset * info->fix.line_length + var->xoffset;
 
-	if (con == info->currcon) {
-		par->riva.SetStartAddress(&par->riva, base);
-	}
+	par->riva.SetStartAddress(&par->riva, base);
 
 	info->var.xoffset = var->xoffset;
 	info->var.yoffset = var->yoffset;
@@ -1163,6 +1324,15 @@ static int rivafb_pan_display(struct fb_var_screeninfo *var, int con,
 		info->var.vmode |= FB_VMODE_YWRAP;
 	else
 		info->var.vmode &= ~FB_VMODE_YWRAP;
+
+	/*
+	 * HACK: The hardware cursor occasionally disappears during fast scrolling.
+	 *       We just reset the cursor each time we change the start address.
+	 *       This also has a beneficial side effect of restoring the cursor 
+	 *       image when switching from X.
+	 */
+	par->cursor_reset = 1;
+
 	DPRINTK("EXIT, returning 0\n");
 	return 0;
 }
@@ -1231,6 +1401,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	RIVA_HW_INST *chip = &par->riva;
+	int i;
 
 	if (regno >= riva_get_cmap_len(&info->var))
 		return -EINVAL;
@@ -1241,34 +1412,74 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		    (red * 77 + green * 151 + blue * 28) >> 8;
 	}
 
-	switch (info->var.bits_per_pixel) {
-	case 8:
-		/* "transparent" stuff is completely ignored. */
-		riva_wclut(chip, regno, red >> 8, green >> 8, blue >> 8);
-		break;
-	case 16:
-		assert(regno < 16);
-		if (info->var.green.length == 5) {
-			/* 0rrrrrgg gggbbbbb */
-			((u16 *)(info->pseudo_palette))[regno] =
-			    ((red & 0xf800) >> 1) |
-			    ((green & 0xf800) >> 6) | ((blue & 0xf800) >> 11);
-		} else {
-			/* rrrrrggg gggbbbbb */
-			((u16 *)(info->pseudo_palette))[regno] =
-			    ((red & 0xf800) >> 0) |
-			    ((green & 0xf800) >> 5) | ((blue & 0xf800) >> 11);
+	if (!regno) {
+		for (i = 0; i < 256; i++) {
+			par->cmap[i].red = 0;
+			par->cmap[i].green = 0;
+			par->cmap[i].blue = 0;
 		}
-		break;
-	case 32:
-		assert(regno < 16);
-		((u32 *)(info->pseudo_palette))[regno] =
-		    ((red & 0xff00) << 8) |
-		    ((green & 0xff00)) | ((blue & 0xff00) >> 8);
-		break;
-	default:
-		/* do nothing */
-		break;
+	}
+	par->cmap[regno].red   = (u8) red;
+	par->cmap[regno].green = (u8) green;
+	par->cmap[regno].blue  = (u8) blue;
+	
+	if (info->var.green.length == 5) {
+		 /* RGB555: all components have 32 entries, 8 indices apart */
+		for (i = 0; i < 8; i++)
+			riva_wclut(chip, (regno*8)+i, (u8) red, (u8) green, (u8) blue);
+	}
+	else if (info->var.green.length == 6) {
+		/* 
+		 * RGB 565: red and blue have 32 entries, 8 indices apart, while
+		 *          green has 64 entries, 4 indices apart
+		 */
+		if (regno < 32) {
+			for (i = 0; i < 8; i++) {
+				riva_wclut(chip, (regno*8)+i, (u8) red, 
+					   par->cmap[regno*2].green,
+					   (u8) blue);
+			}
+		}
+		for (i = 0; i < 4; i++) {
+			riva_wclut(chip, (regno*4)+i, par->cmap[regno/2].red,
+				   (u8) green, par->cmap[regno/2].blue);
+		
+		}
+	}
+	else {
+		riva_wclut(chip, regno, (u8) red, (u8) green, (u8) blue);
+	}
+
+	if (regno < 16) {
+		switch (info->var.bits_per_pixel) {
+		case 16:
+			if (info->var.green.length == 5) {
+				/* 0rrrrrgg gggbbbbb */
+				((u32 *)(info->pseudo_palette))[regno] =
+					(regno << 10) | (regno << 5) | regno;
+				par->riva_palette[regno] = 
+					((red & 0xf800) >> 1) |
+					((green & 0xf800) >> 6) | ((blue & 0xf800) >> 11);
+
+			} else {
+				/* rrrrrggg gggbbbbb */
+				((u32 *)(info->pseudo_palette))[regno] =
+					(regno << 11) | (regno << 6) | regno;
+				par->riva_palette[regno] = ((red & 0xf800) >> 0) |
+					((green & 0xf800) >> 5) | ((blue & 0xf800) >> 11);
+			}
+			break;
+		case 32:
+			((u32 *)(info->pseudo_palette))[regno] =
+				(regno << 16) | (regno << 8) | regno;
+			par->riva_palette[regno] =
+				((red & 0xff00) << 8) |
+				((green & 0xff00)) | ((blue & 0xff00) >> 8);
+			break;
+		default:
+			/* do nothing */
+			break;
+		}
 	}
 	return 0;
 }
@@ -1281,25 +1492,23 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 /* kernel interface */
 static struct fb_ops riva_fb_ops = {
-	owner:		THIS_MODULE,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_check_var:	rivafb_check_var,
-	fb_set_par:	rivafb_set_par,
-	fb_setcolreg:	rivafb_setcolreg,
-	fb_pan_display:	rivafb_pan_display,
-	fb_blank:	rivafb_blank,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner =	THIS_MODULE,
+	.fb_check_var =	rivafb_check_var,
+	.fb_set_par =	rivafb_set_par,
+	.fb_setcolreg =	rivafb_setcolreg,
+	.fb_pan_display=rivafb_pan_display,
+	.fb_blank =	rivafb_blank,
+	.fb_fillrect =	rivafb_fillrect,
+	.fb_copyarea =	rivafb_copyarea,
+	.fb_imageblit =	rivafb_imageblit,
+	.fb_cursor =    rivafb_cursor,
+	.fb_sync =      rivafb_sync,
 };
 
 static int __devinit riva_set_fbinfo(struct fb_info *info)
 {
 	unsigned int cmap_len;
 
-	strcpy(info->modename, rivafb_fix.id);
 	info->node = NODEV;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->fbops = &riva_fb_ops;
@@ -1309,12 +1518,7 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 	/* FIXME: set monspecs to what??? */
 	info->display_fg = NULL;
 	info->pseudo_palette = pseudo_palette;
-	strncpy(info->fontname, fontname, sizeof(info->fontname));
-	info->fontname[sizeof(info->fontname) - 1] = 0;
 
-	info->changevar = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar = gen_update_var;
 	cmap_len = riva_get_cmap_len(&info->var);
 	fb_alloc_cmap(&info->cmap, cmap_len, 0);
 #ifndef MODULE
@@ -1341,8 +1545,7 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	assert(pd != NULL);
 	assert(rci != NULL);
 
-	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display),
-			 GFP_KERNEL);
+	info = kmalloc(sizeof(struct fb_info), GFP_KERNEL);
 	if (!info)
 		goto err_out;
 
@@ -1350,7 +1553,7 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	if (!default_par) 
 		goto err_out_kfree;
 
-	memset(info, 0, sizeof(struct fb_info) + sizeof(struct display));
+	memset(info, 0, sizeof(struct fb_info));
 	memset(default_par, 0, sizeof(struct riva_par));
 
 	strcat(rivafb_fix.id, rci->name);
@@ -1449,12 +1652,9 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	CRTCout(default_par, 0x11, 0xFF);/* vgaHWunlock() + riva unlock(0x7F) */
 	default_par->riva.LockUnlock(&default_par->riva, 0);
 	
-	info->disp = (struct display *)(info + 1);
 	info->par = default_par;
 
 	riva_save_state(default_par, &default_par->initial_state);
-
-	if (!nohwcursor) default_par->cursor = rivafb_init_cursor(default_par);
 
 	if (riva_set_fbinfo(info) < 0) {
 		printk(KERN_ERR PFX "error setting initial video mode\n");
@@ -1482,7 +1682,6 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 err_out_load_state:
 	riva_load_state(default_par, &default_par->initial_state);
 err_out_cursor:
-	rivafb_exit_cursor(default_par);
 /* err_out_iounmap_fb: */
 	iounmap(info->screen_base);
 err_out_iounmap_ctrl:
@@ -1508,8 +1707,6 @@ static void __devexit rivafb_remove_one(struct pci_dev *pd)
 	riva_load_state(par, &par->initial_state);
 
 	unregister_framebuffer(info);
-
-	rivafb_exit_cursor(par);
 
 #ifdef CONFIG_MTRR
 	if (par->mtrr.vram_valid)
@@ -1545,27 +1742,12 @@ int __init rivafb_setup(char *options)
 	while ((this_opt = strsep(&options, ",")) != NULL) {
 		if (!*this_opt)
 			continue;
-		if (!strncmp(this_opt, "font:", 5)) {
-			char *p;
-			int i;
-
-			p = this_opt + 5;
-			for (i = 0; i < sizeof(fontname) - 1; i++)
-				if (!*p || *p == ' ' || *p == ',')
-					break;
-			memcpy(fontname, this_opt + 5, i);
-			fontname[i] = 0;
-
-		} else if (!strncmp(this_opt, "noblink", 7)) {
-			noblink = 1;
-		} else if (!strncmp(this_opt, "nomove", 6)) {
+		if (!strncmp(this_opt, "nomove", 6)) {
 			nomove = 1;
 #ifdef CONFIG_MTRR
 		} else if (!strncmp(this_opt, "nomtrr", 6)) {
 			nomtrr = 1;
 #endif
-		} else if (!strncmp(this_opt, "nohwcursor", 10)) {
-			nohwcursor = 1;
 		} else
 			mode_option = this_opt;
 	}
@@ -1616,10 +1798,6 @@ MODULE_PARM(noaccel, "i");
 MODULE_PARM_DESC(noaccel, "Disables hardware acceleration (0 or 1=disabled) (default=0)");
 MODULE_PARM(nomove, "i");
 MODULE_PARM_DESC(nomove, "Enables YSCROLL_NOMOVE (0 or 1=enabled) (default=0)");
-MODULE_PARM(nohwcursor, "i");
-MODULE_PARM_DESC(nohwcursor, "Disables hardware cursor (0 or 1=disabled) (default=0)");
-MODULE_PARM(noblink, "i");
-MODULE_PARM_DESC(noblink, "Disables hardware cursor blinking (0 or 1=disabled) (default=0)");
 #ifdef CONFIG_MTRR
 MODULE_PARM(nomtrr, "i");
 MODULE_PARM_DESC(nomtrr, "Disables MTRR support (0 or 1=disabled) (default=0)");

@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 #include <linux/fb.h>
-#include <video/fbcon.h>
 #include "riva_hw.h"
 
 /* GGI compatibility macros */
@@ -23,6 +22,10 @@ struct riva_regs {
 	RIVA_HW_STATE ext;
 };
 
+typedef struct {
+	unsigned char red, green, blue, transp;
+} riva_cfb8_cmap_t;
+
 struct riva_par {
 	RIVA_HW_INST riva;	/* interface to riva_hw.c */
 
@@ -32,7 +35,10 @@ struct riva_par {
 	struct riva_regs initial_state;	/* initial startup video mode */
 	struct riva_regs current_state;
 
-	struct riva_cursor *cursor;
+	riva_cfb8_cmap_t cmap[256];	/* VGA DAC palette cache */
+	u32 riva_palette[16];
+	u32 cursor_data[32 * 32/4];
+	int cursor_reset;
 #ifdef CONFIG_MTRR
 	struct { int vram; int vram_valid; } mtrr;
 #endif

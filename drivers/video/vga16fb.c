@@ -1062,8 +1062,10 @@ void vga_8planes_copyarea(struct fb_info *info, struct fb_copyarea *area)
                 }
         } else {
                 line_ofs = info->fix.line_length - area->width;
-                dest = info->screen_base + area->dx + area->width + (area->dy + height - 1) * info->fix.line_length;
-                src = info->screen_base + area->sx + area->width + (area->sy + height - 1) * info->fix.line_length;
+                dest = info->screen_base + area->dx + area->width +
+			(area->dy + height - 1) * info->fix.line_length;
+                src = info->screen_base + area->sx + area->width +
+			(area->sy + height - 1) * info->fix.line_length;
                 while (height--) {
                         for (x = 0; x < area->width; x++) {
                                 --src;
@@ -1147,8 +1149,10 @@ void vga16fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 					dst += line_ofs;
 				}
 			} else {
-				dst = info->screen_base + (area->dx/8) + width + (area->dy + height - 1) * info->fix.line_length;
-				src = info->screen_base + (area->sx/8) + width + (area->sy + height  - 1) * info->fix.line_length;
+				dst = info->screen_base + (area->dx/8) + width + 
+					(area->dy + height - 1) * info->fix.line_length;
+				src = info->screen_base + (area->sx/8) + width + 
+					(area->sy + height  - 1) * info->fix.line_length;
 				while (height--) {
 					for (x = 0; x < width; x++) {
 						dst--;
@@ -1224,68 +1228,120 @@ void vga_8planes_imageblit(struct fb_info *info, struct fb_image *image)
 
 void vga_imageblit_expand(struct fb_info *info, struct fb_image *image)
 {
-	char *where = info->screen_base + (image->dx/image->width) + image->dy * info->fix.line_length;
+	char *where = info->screen_base + (image->dx/8) + 
+		image->dy * info->fix.line_length;
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
-	u8 *cdat = image->data;
-	int y;
+	u8 *cdat = image->data, *dst;
+	int x, y;
 
 	switch (info->fix.type) {
-		case FB_TYPE_VGA_PLANES:
-			if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
-				if (par->isVGA) {
-					setmode(2);
-					setop(0);
-					setsr(0xf);
-					setcolor(image->fg_color);
-					selectmask();
-
-					setmask(0xff);
-					writeb(image->bg_color, where);
-					rmb();
-					readb(where); /* fill latches */
-					setmode(3);
-					wmb();
-					for (y = 0; y < image->height; y++, where += info->fix.line_length)
-						writeb(cdat[y], where);
-						wmb();
-				} else {
-					setmode(0);
-					setop(0);
-					setsr(0xf);
-					setcolor(image->bg_color);
-					selectmask();
-
-					setmask(0xff);
-					for (y = 0; y < image->height; y++, where += info->fix.line_length)
-						rmw(where);
-
-					where -= info->fix.line_length * y;
-					setcolor(image->fg_color);
-					selectmask();
-					for (y = 0; y < image->height; y++, where += info->fix.line_length)
-					if (cdat[y]) {
-						setmask(cdat[y]);
-						rmw(where);
-					}
+	case FB_TYPE_VGA_PLANES:
+		if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4) {
+			if (par->isVGA) {
+				setmode(2);
+				setop(0);
+				setsr(0xf);
+				setcolor(image->fg_color);
+				selectmask();
+				
+				setmask(0xff);
+				writeb(image->bg_color, where);
+				rmb();
+				readb(where); /* fill latches */
+				setmode(3);
+				wmb();
+				for (y = 0; y < image->height; y++) {
+					dst = where;
+					for (x = image->width/8; x--;) 
+						writeb(*cdat++, dst++);
+					where += info->fix.line_length;
 				}
-			} else 
-				vga_8planes_imageblit(info, image);
-			break;
+				wmb();
+			} else {
+				setmode(0);
+				setop(0);
+				setsr(0xf);
+				setcolor(image->bg_color);
+				selectmask();
+				
+				setmask(0xff);
+				for (y = 0; y < image->height; y++) {
+					dst = where;
+					for (x=image->width/8; x--;){
+						rmw(dst);
+						setcolor(image->fg_color);
+						selectmask();
+						if (*cdat) {
+							setmask(*cdat++);
+							rmw(dst++);
+						}
+					}
+					where += info->fix.line_length;
+				}
+			}
+		} else 
+			vga_8planes_imageblit(info, image);
+		break;
 #ifdef FBCON_HAS_VGA
-		case FB_TYPE_TEXT:
-			break;
+	case FB_TYPE_TEXT:
+		break;
 #endif
-		case FB_TYPE_PACKED_PIXELS:
-		default:
-			cfb_imageblit(info, image);
-			break;
+	case FB_TYPE_PACKED_PIXELS:
+	default:
+		cfb_imageblit(info, image);
+		break;
 	}
 }
 
+void vga_imageblit_color(struct fb_info *info, struct fb_image *image) 
+{
+	/*
+	 * Draw logo 
+	 */
+	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
+	char *where = info->screen_base + image->dy * info->fix.line_length + 
+		image->dx/8;
+	char *cdat = image->data, *dst;
+	int x, y;
+
+	switch (info->fix.type) {
+	case FB_TYPE_VGA_PLANES:
+		if (info->fix.type_aux == FB_AUX_VGA_PLANES_VGA4 &&
+		    par->isVGA) {
+			setsr(0xf);
+			setop(0);
+			setmode(0);
+			
+			for (y = 0; y < image->height; y++) {
+				for (x = 0; x < image->width; x++) {
+					dst = where + x/8;
+
+					setcolor(*cdat);
+					selectmask();
+					setmask(1 << (7 - (x % 8)));
+					fb_readb(dst);
+					fb_writeb(0, dst);
+
+					cdat++;
+				}
+				where += info->fix.line_length;
+			}
+		}
+		break;
+	case FB_TYPE_PACKED_PIXELS:
+		cfb_imageblit(info, image);
+		break;
+	default:
+		break;
+	}
+}
+				
 void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
 {
 	if (image->depth == 1)
 		vga_imageblit_expand(info, image);
+	else if (image->depth == info->var.bits_per_pixel)
+		vga_imageblit_color(info, image);
 }
 
 static struct fb_ops vga16fb_ops = {
@@ -1298,6 +1354,7 @@ static struct fb_ops vga16fb_ops = {
 	.fb_fillrect	= vga16fb_fillrect,
 	.fb_copyarea	= vga16fb_copyarea,
 	.fb_imageblit	= vga16fb_imageblit,
+	.fb_cursor      = soft_cursor,
 };
 
 int vga16fb_setup(char *options)
@@ -1348,6 +1405,11 @@ int __init vga16fb_init(void)
 
 	i = (vga16fb_defined.bits_per_pixel == 8) ? 256 : 16;
 	fb_alloc_cmap(&vga16fb.cmap, i, 0);
+
+	if (vga16fb_check_var(&vga16fb.var, &vga16fb))
+		return -EINVAL;
+
+	vga16fb_update_fix(&vga16fb);
 
 	if (register_framebuffer(&vga16fb) < 0) {
 		iounmap(vga16fb.screen_base);

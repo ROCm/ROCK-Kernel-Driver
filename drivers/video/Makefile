@@ -69,7 +69,7 @@ obj-$(CONFIG_FB_MAXINE)           += maxinefb.o cfbfillrect.o cfbcopyarea.o cfbi
 obj-$(CONFIG_FB_TX3912)           += tx3912fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 
 obj-$(CONFIG_FB_MATROX)		  += matrox/
-obj-$(CONFIG_FB_RIVA)		  += riva/
+obj-$(CONFIG_FB_RIVA)		  += riva/ cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_SIS)		  += sis/
 obj-$(CONFIG_FB_ATY)		  += aty/ cfbimgblt.o
 
