@@ -539,6 +539,7 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.setup_arch();
 
 	paging_init();
+	sort_exception_table();
 	ppc_md.progress("setup_arch: exit", 0x3eab);
 }
 
