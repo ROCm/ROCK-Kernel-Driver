@@ -353,14 +353,19 @@ struct scsi_lun {
 		     ((lun) & 0x07))
 
 /*
- *  SCSI command sets
+ *  struct scsi_device::scsi_level values. For SCSI devices other than those
+ *  prior to SCSI-2 (i.e. over 12 years old) this value is (resp[2] + 1)
+ *  where "resp" is a byte array of the response to an INQUIRY. The scsi_level
+ *  variable is visible to the user via sysfs.
  */
 
 #define SCSI_UNKNOWN    0
 #define SCSI_1          1
 #define SCSI_1_CCS      2
 #define SCSI_2          3
-#define SCSI_3          4
+#define SCSI_3          4        /* SPC */
+#define SCSI_SPC_2      5
+#define SCSI_SPC_3      6
 
 /*
  * INQ PERIPHERAL QUALIFIERS
