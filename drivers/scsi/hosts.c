@@ -338,6 +338,7 @@ void scsi_unregister(struct Scsi_Host *shost)
 	if (shost->ehandler) {
 		DECLARE_COMPLETION(sem);
 		shost->eh_notify = &sem;
+		shost->eh_kill = 1;
 		up(shost->eh_wait);
 		wait_for_completion(&sem);
 		shost->eh_notify = NULL;
