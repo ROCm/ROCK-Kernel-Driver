@@ -726,13 +726,6 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
  out:	
 	spin_unlock_irqrestore(&up->port.lock, flags);
 //	restore_flags(flags);
-#ifdef CONFIG_SERIAL_8250_RSA
-	if (up->port.iobase && up->port.type == PORT_RSA) {
-		release_region(up->port.iobase, 8);
-		request_region(up->port.iobase + UART_RSA_BASE, 16,
-			       "serial_rsa");
-	}
-#endif
 	DEBUG_AUTOCONF("type=%s\n", uart_config[up->port.type].name);
 }
 
