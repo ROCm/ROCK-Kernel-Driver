@@ -180,51 +180,74 @@ static inline char * task_state(struct task_struct *p, char *buffer)
 	return buffer;
 }
 
+static char * render_sigset_t(const char *header, sigset_t *set, char *buffer)
+{
+	int i, len;
+
+	len = strlen(header);
+	memcpy(buffer, header, len);
+	buffer += len;
+
+	i = _NSIG;
+	do {
+		int x = 0;
+
+		i -= 4;
+		if (sigismember(set, i+1)) x |= 1;
+		if (sigismember(set, i+2)) x |= 2;
+		if (sigismember(set, i+3)) x |= 4;
+		if (sigismember(set, i+4)) x |= 8;
+		*buffer++ = (x < 10 ? '0' : 'a' - 10) + x;
+	} while (i >= 4);
+
+	*buffer++ = '\n';
+	*buffer = 0;
+	return buffer;
+}
+
 static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 				    sigset_t *catch)
 {
 	struct k_sigaction *k;
 	int i;
 
-	sigemptyset(ign);
-	sigemptyset(catch);
-
-	read_lock(&tasklist_lock);
-	if (p->sighand) {
-		spin_lock_irq(&p->sighand->siglock);
-		k = p->sighand->action;
-		for (i = 1; i <= _NSIG; ++i, ++k) {
-			if (k->sa.sa_handler == SIG_IGN)
-				sigaddset(ign, i);
-			else if (k->sa.sa_handler != SIG_DFL)
-				sigaddset(catch, i);
-		}
-		spin_unlock_irq(&p->sighand->siglock);
+	k = p->sighand->action;
+	for (i = 1; i <= _NSIG; ++i, ++k) {
+		if (k->sa.sa_handler == SIG_IGN)
+			sigaddset(ign, i);
+		else if (k->sa.sa_handler != SIG_DFL)
+			sigaddset(catch, i);
 	}
-	read_unlock(&tasklist_lock);
 }
 
 static inline char * task_sig(struct task_struct *p, char *buffer)
 {
-	sigset_t ign, catch;
+	sigset_t pending, shpending, blocked, ignored, caught;
 
-	buffer += sprintf(buffer, "SigPnd:\t");
-	buffer = render_sigset_t(&p->pending.signal, buffer);
-	*buffer++ = '\n';
-	buffer += sprintf(buffer, "ShdPnd:\t");
-	buffer = render_sigset_t(&p->signal->shared_pending.signal, buffer);
-	*buffer++ = '\n';
-	buffer += sprintf(buffer, "SigBlk:\t");
-	buffer = render_sigset_t(&p->blocked, buffer);
-	*buffer++ = '\n';
+	sigemptyset(&pending);
+	sigemptyset(&shpending);
+	sigemptyset(&blocked);
+	sigemptyset(&ignored);
+	sigemptyset(&caught);
 
-	collect_sigign_sigcatch(p, &ign, &catch);
-	buffer += sprintf(buffer, "SigIgn:\t");
-	buffer = render_sigset_t(&ign, buffer);
-	*buffer++ = '\n';
-	buffer += sprintf(buffer, "SigCgt:\t"); /* Linux 2.0 uses "SigCgt" */
-	buffer = render_sigset_t(&catch, buffer);
-	*buffer++ = '\n';
+	/* Gather all the data with the appropriate locks held */
+	read_lock(&tasklist_lock);
+	if (p->sighand) {
+		spin_lock_irq(&p->sighand->siglock);
+		pending = p->pending.signal;
+		shpending = p->signal->shared_pending.signal;
+		blocked = p->blocked;
+		collect_sigign_sigcatch(p, &ignored, &caught);
+		spin_unlock_irq(&p->sighand->siglock);
+	}
+	read_unlock(&tasklist_lock);
+
+	/* render them all */
+	buffer = render_sigset_t("SigPnd:\t", &pending, buffer);
+	buffer = render_sigset_t("ShdPnd:\t", &shpending, buffer);
+	buffer = render_sigset_t("SigBlk:\t", &blocked, buffer);
+	buffer = render_sigset_t("SigIgn:\t", &ignored, buffer);
+	buffer = render_sigset_t("SigCgt:\t", &caught, buffer);
 
 	return buffer;
 }
