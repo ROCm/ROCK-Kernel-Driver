@@ -256,7 +256,7 @@
 #define __NR_removexattr		(__NR_SYSCALL_BASE+235)
 #define __NR_lremovexattr		(__NR_SYSCALL_BASE+236)
 #define __NR_fremovexattr		(__NR_SYSCALL_BASE+237)
-#define __NR_tkill			(__NR_SYSCALL_BASE+238
+#define __NR_tkill			(__NR_SYSCALL_BASE+238)
 
 /*
  * The following SWIs are ARM private.
