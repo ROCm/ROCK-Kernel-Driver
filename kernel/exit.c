@@ -783,6 +783,7 @@ static void exit_notify(struct task_struct *tsk)
 asmlinkage NORET_TYPE void do_exit(long code)
 {
 	struct task_struct *tsk = current;
+	int group_dead;
 
 	profile_task_exit(tsk);
 
@@ -807,7 +808,8 @@ asmlinkage NORET_TYPE void do_exit(long code)
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
 	}
 
-	if (atomic_dec_and_test(&tsk->signal->live))
+	group_dead = atomic_dec_and_test(&tsk->signal->live);
+	if (group_dead)
 		acct_process(code);
 	__exit_mm(tsk);
 
@@ -818,7 +820,7 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	exit_thread();
 	exit_keys(tsk);
 
-	if (tsk->signal->leader)
+	if (group_dead && tsk->signal->leader)
 		disassociate_ctty(1);
 
 	module_put(tsk->thread_info->exec_domain->module);
