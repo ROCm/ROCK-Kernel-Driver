@@ -27,6 +27,14 @@ ToDo:
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
 
+2.0.1 - Minor updates.
+
+	- Make default umask correspond to documentation.
+	- Improve documentation.
+	- Set default mode to include execute bit. The {u,f,d}mask can be used
+	  to take it away if desired. This allows binaries to be executed from
+	  a mounted ntfs partition.
+
 2.0.0 - New version number. Remove TNG from the name. Now in the kernel.
 
 	- Add kill_super, just keeping up with the vfs changes in the kernel.

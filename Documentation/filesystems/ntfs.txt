@@ -140,8 +140,11 @@ Features
 
 - This is a complete rewrite of the NTFS driver that used to be in the kernel.
   This new driver implements NTFS read support and is functionally equivalent
-  to the old ntfs driver. And in addition the new driver has full support for
-  sparse files on NTFS 3.x volumes which the old driver isn't happy with.
+  to the old ntfs driver.
+- The new driver has full support for sparse files on NTFS 3.x volumes which
+  the old driver isn't happy with.
+- The new driver supports execution of binaries due to mmap() now being
+  supported.
 - A comparison of the two drivers using:
 	time find . -type f -exec md5sum "{}" \;
   run three times in sequence with each driver (after a reboot) on a 1.4GiB
@@ -162,6 +165,10 @@ ChangeLog
 =========
 
 Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
+
+2.0.1:
+	- Minor updates, primarily set the executable bit by default on files
+	  so they can be executed.
 
 2.0.0:
 	- Started ChangeLog.
