@@ -139,6 +139,7 @@ enum
 	KERN_DEFTIMESLICE=69,	/* int: nice   0 def timeslice */
 	KERN_MINTIMESLICE=70,	/* int: nice +19 min timeslice */
 	KERN_HZ=71,		/* unsigned long: internal kernel HZ */
+	KERN_UNSUPPORTED=72,	/* int: allow loading of unsupported modules */
 };
 
 
