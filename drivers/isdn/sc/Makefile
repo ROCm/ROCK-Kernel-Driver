@@ -6,5 +6,5 @@ obj-$(CONFIG_ISDN_DRV_SC)	+= sc.o
 
 # Multipart objects.
 
-sc-objs		:= shmem.o init.o debug.o packet.o command.o event.o \
-		   ioctl.o interrupt.o message.o timer.o	
+sc-y				:= shmem.o init.o debug.o packet.o command.o event.o \
+		   		   ioctl.o interrupt.o message.o timer.o	
