@@ -217,6 +217,6 @@ int                        cs46xx_dsp_pcm_channel_set_period (cs46xx_t * chip,
 							       int period_size);
 int                        cs46xx_dsp_pcm_ostream_set_period (cs46xx_t * chip,
 							      int period_size);
-int                        cs46xx_dsp_set_dac_volume (cs46xx_t * chip,u16 right,u16 left);
-int                        cs46xx_dsp_set_iec958_volume (cs46xx_t * chip,u16 right,u16 left);
+int                        cs46xx_dsp_set_dac_volume (cs46xx_t * chip,u16 left,u16 right);
+int                        cs46xx_dsp_set_iec958_volume (cs46xx_t * chip,u16 left,u16 right);
 #endif /* __CS46XX_LIB_H__ */

@@ -2109,7 +2109,7 @@ static void cs4281_suspend(cs4281_t *chip)
 	snd_cs4281_pokeBA0(chip, BA0_HICR, BA0_HICR_CHGM);
 
 	/* remember the status registers */
-	for (i = 0; number_of(saved_regs); i++)
+	for (i = 0; i < number_of(saved_regs); i++)
 		if (saved_regs[i])
 			chip->suspend_regs[i] = snd_cs4281_peekBA0(chip, saved_regs[i]);
 
@@ -2153,7 +2153,7 @@ static void cs4281_resume(cs4281_t *chip)
 	snd_cs4281_chip_init(chip, 0);
 
 	/* restore the status registers */
-	for (i = 0; number_of(saved_regs); i++)
+	for (i = 0; i < number_of(saved_regs); i++)
 		if (saved_regs[i])
 			snd_cs4281_pokeBA0(chip, saved_regs[i], chip->suspend_regs[i]);
 
