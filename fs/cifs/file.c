@@ -1032,6 +1032,12 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				read_size, offset,
 				&bytes_read, &smb_read_data);
 			/* BB need to check return code here */
+			if(rc== -EAGAIN) {
+				if(smb_read_data) {
+					cifs_buf_release(smb_read_data);
+					smb_read_data = 0;
+				}
+			}
 		}
 		if ((rc < 0) || (smb_read_data == NULL)) {
 			cFYI(1,("Read error in readpages: %d",rc));
