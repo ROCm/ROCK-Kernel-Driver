@@ -504,6 +504,22 @@ static int try_stop_module(struct module *mod, int flags, int *forced)
 	return stop_machine_run(__try_stop_module, &sref, NR_CPUS);
 }
 
+static int add_attribute(struct module *mod, struct kernel_param *kp)
+{
+	struct module_attribute *a;
+	int retval;
+
+	a = &mod->mkobj->attr[mod->mkobj->num_attributes];
+	a->attr.name = (char *)kp->name;
+	a->attr.owner = mod;
+	a->attr.mode = kp->perm;
+	a->param = kp;
+	retval = sysfs_create_file(&mod->mkobj->kobj, &a->attr);
+	if (!retval)
+		mod->mkobj->num_attributes++;
+	return retval;
+}
+
 unsigned int module_refcount(struct module *mod)
 {
 	unsigned int i, total = 0;
@@ -663,6 +679,23 @@ void symbol_put_addr(void *addr)
 }
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
+static int refcnt_get_fn(char *buffer, struct kernel_param *kp)
+{
+	struct module *mod = container_of(kp, struct module, refcnt_param);
+
+	/* sysfs holds one reference. */
+	return sprintf(buffer, "%u", module_refcount(mod)-1);
+}
+
+static inline int sysfs_unload_setup(struct module *mod)
+{
+	mod->refcnt_param.name = "refcnt";
+	mod->refcnt_param.perm = 0444;
+	mod->refcnt_param.get = refcnt_get_fn;
+
+	return add_attribute(mod, &mod->refcnt_param);
+}
+
 #else /* !CONFIG_MODULE_UNLOAD */
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
@@ -689,6 +722,10 @@ sys_delete_module(const char *name_user, unsigned int flags)
 	return -ENOSYS;
 }
 
+static inline int sysfs_unload_setup(struct module *mod)
+{
+	return 0;
+}
 #endif /* CONFIG_MODULE_UNLOAD */
 
 #ifdef CONFIG_OBSOLETE_MODPARM
@@ -944,6 +981,116 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 	return ret;
 }
 
+#define to_module_attr(n) container_of(n, struct module_attribute, attr);
+
+static ssize_t module_attr_show(struct kobject *kobj,
+				struct attribute *attr,
+				char *buf)
+{
+	int count;
+	struct module_attribute *attribute = to_module_attr(attr);
+
+	if (!attribute->param->get)
+		return -EPERM;
+
+	count = attribute->param->get(buf, attribute->param);
+	if (count > 0) {
+		strcat(buf, "\n");
+		++count;
+	}
+	return count;
+}
+
+/* sysfs always hands a nul-terminated string in buf.  We rely on that. */
+static ssize_t module_attr_store(struct kobject *kobj,
+				 struct attribute *attr,
+				 const char *buf, size_t len)
+{
+	int err;
+	struct module_attribute *attribute = to_module_attr(attr);
+
+	if (!attribute->param->set)
+		return -EPERM;
+
+	err = attribute->param->set(buf, attribute->param);
+	if (!err)
+		return len;
+	return err;
+}
+
+static struct sysfs_ops module_sysfs_ops = {
+	.show = module_attr_show,
+	.store = module_attr_store,
+};
+
+static void module_kobj_release(struct kobject *kobj)
+{
+	kfree(container_of(kobj, struct module_kobject, kobj));
+}
+
+static struct kobj_type module_ktype = {
+	.sysfs_ops =	&module_sysfs_ops,
+	.release =	&module_kobj_release,
+};
+static decl_subsys(module, &module_ktype, NULL);
+
+static int mod_sysfs_setup(struct module *mod,
+			   struct kernel_param *kparam,
+			   unsigned int num_params)
+{
+	unsigned int i;
+	int err;
+
+	/* We overallocate: not every param is in sysfs, and maybe no refcnt */
+	mod->mkobj = kmalloc(sizeof(*mod->mkobj)
+			     + sizeof(mod->mkobj->attr[0]) * (num_params+1),
+			     GFP_KERNEL);
+	if (!mod->mkobj)
+		return -ENOMEM;
+
+	memset(&mod->mkobj->kobj, 0, sizeof(mod->mkobj->kobj));
+	err = kobject_set_name(&mod->mkobj->kobj, mod->name);
+	if (err)
+		goto out;
+	kobj_set_kset_s(mod->mkobj, module_subsys);
+	err = kobject_register(&mod->mkobj->kobj);
+	if (err)
+		goto out;
+
+	mod->mkobj->num_attributes = 0;
+
+	for (i = 0; i < num_params; i++) {
+		if (kparam[i].perm) {
+			err = add_attribute(mod, &kparam[i]);
+			if (err)
+				goto out_unreg;
+		}
+	}
+	err = sysfs_unload_setup(mod);
+	if (err)
+		goto out_unreg;
+	return 0;
+
+out_unreg:
+	for (i = 0; i < mod->mkobj->num_attributes; i++)
+		sysfs_remove_file(&mod->mkobj->kobj,&mod->mkobj->attr[i].attr);
+	/* Calls module_kobj_release */
+	kobject_unregister(&mod->mkobj->kobj);
+	return err;
+out:
+	kfree(mod->mkobj);
+	return err;
+}
+
+static void mod_kobject_remove(struct module *mod)
+{
+	unsigned int i;
+	for (i = 0; i < mod->mkobj->num_attributes; i++)
+		sysfs_remove_file(&mod->mkobj->kobj,&mod->mkobj->attr[i].attr);
+	/* Calls module_kobj_release */
+	kobject_unregister(&mod->mkobj->kobj);
+}
+
 /* Free a module, remove from lists, etc (must hold module mutex). */
 static void free_module(struct module *mod)
 {
@@ -951,6 +1098,8 @@ static void free_module(struct module *mod)
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
 	spin_unlock_irq(&modlist_lock);
+
+	mod_kobject_remove(mod);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
@@ -1556,6 +1705,11 @@ static struct module *load_module(void __user *umod,
 				 / sizeof(struct kernel_param),
 				 NULL);
 	}
+	err = mod_sysfs_setup(mod, 
+			      (struct kernel_param *)
+			      sechdrs[setupindex].sh_addr,
+			      sechdrs[setupindex].sh_size
+			      / sizeof(struct kernel_param));
 	if (err < 0)
 		goto arch_cleanup;
 
@@ -1891,3 +2045,9 @@ struct module *module_text_address(unsigned long addr)
 void struct_module(struct module *mod) { return; }
 EXPORT_SYMBOL(struct_module);
 #endif
+
+static int __init modules_init(void)
+{
+	return subsystem_register(&module_subsys);
+}
+__initcall(modules_init);

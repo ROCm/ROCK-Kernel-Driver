@@ -16,6 +16,8 @@
 #include <linux/kmod.h>
 #include <linux/elf.h>
 #include <linux/stringify.h>
+#include <linux/kobject.h>
+#include <linux/moduleparam.h>
 #include <asm/local.h>
 
 #include <asm/module.h>
@@ -207,6 +209,23 @@ enum module_state
 	MODULE_STATE_GOING,
 };
 
+/* sysfs stuff */
+struct module_attribute
+{
+	struct attribute attr;
+	struct kernel_param *param;
+};
+
+struct module_kobject
+{
+	/* Everyone should have one of these. */
+	struct kobject kobj;
+
+	/* We always have refcnt, we may have others from module_param(). */
+	unsigned int num_attributes;
+	struct module_attribute attr[0];
+};
+
 struct module
 {
 	enum module_state state;
@@ -216,6 +235,9 @@ struct module
 
 	/* Unique handle for this module */
 	char name[MODULE_NAME_LEN];
+
+	/* Sysfs stuff. */
+	struct module_kobject *mkobj;
 
 	/* Exported symbols */
 	const struct kernel_symbol *syms;
@@ -267,6 +289,9 @@ struct module
 
 	/* Destruction function. */
 	void (*exit)(void);
+
+	/* Fake kernel param for refcnt. */
+	struct kernel_param refcnt_param;
 #endif
 
 #ifdef CONFIG_KALLSYMS
