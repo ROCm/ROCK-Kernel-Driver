@@ -77,7 +77,7 @@ static struct resource ixdp425_flash_resource = {
 	.flags		= IORESOURCE_MEM,
 };
 
-static struct platform_device ixdp425_flash_device = {
+static struct platform_device ixdp425_flash = {
 	.name		= "IXP4XX-Flash",
 	.id		= 0,
 	.dev		= {
@@ -101,10 +101,14 @@ static struct platform_device ixdp425_i2c_controller = {
 	.num_resources	= 0
 };
 
+static struct platform_device *ixdp425_devices[] __initdata = {
+	&ixdp425_i2c_controller,
+	&ixdp425_flash
+};
+
 static void __init ixdp425_init(void)
 {
-	platform_add_device(&ixdp425_flash_device);
-	platform_add_device(&ixdp425_i2c_controller);
+	platform_add_devices(&ixdp425_devices, ARRAY_SIZE(ixdp425_devices));
 }
 
 MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
