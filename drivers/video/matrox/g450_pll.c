@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox PCI cards - G450/G550 PLL control.
  *
- * (c) 2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 2001-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2001/11/29
+ * Version: 1.64 2002/06/10
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License. See the file COPYING in the main directory of this archive for
@@ -33,6 +33,10 @@ static unsigned int g450_mnp2vco(CPMINFO unsigned int mnp) {
 	return (ACCESS_FBINFO(features).pll.ref_freq * n + (m >> 1)) / m;
 }
 
+unsigned int g450_mnp2f(CPMINFO unsigned int mnp) {
+	return g450_vco2f(mnp, g450_mnp2vco(PMINFO mnp));
+}
+
 static inline unsigned int pll_freq_delta(unsigned int f1, unsigned int f2) {
 	if (f2 < f1) {
     		f2 = f1 - f2;
@@ -52,40 +56,42 @@ static unsigned int g450_nextpll(CPMINFO const struct matrox_pll_limits* pi, uns
 	m = (mnp >> 16) & 0xFF;
 	p = mnp & 0xFF;
 
-	if (m == 0 || m == 0xFF) {
-		if (m == 0) {
-			if (p & 0x40) {
-				return NO_MORE_MNP;
+	do {
+		if (m == 0 || m == 0xFF) {
+			if (m == 0) {
+				if (p & 0x40) {
+					return NO_MORE_MNP;
+				}
+			        if (p & 3) {
+					p--;
+				} else {
+					p = 0x40;
+				}
+				tvco >>= 1;
+				if (tvco < pi->vcomin) {
+					return NO_MORE_MNP;
+				}
+				*fvco = tvco;
 			}
-		        if (p & 3) {
-				p--;
-			} else {
-				p = 0x40;
-			}
-			tvco >>= 1;
-			if (tvco < pi->vcomin) {
-				return NO_MORE_MNP;
-			}
-			*fvco = tvco;
-		}
 
-		p &= 0x43;
-		if (tvco < 550000) {
-/*			p |= 0x00; */
-		} else if (tvco < 700000) {
-			p |= 0x08;
-		} else if (tvco < 1000000) {
-			p |= 0x10;
-		} else if (tvco < 1150000) {
-			p |= 0x18;
+			p &= 0x43;
+			if (tvco < 550000) {
+/*				p |= 0x00; */
+			} else if (tvco < 700000) {
+				p |= 0x08;
+			} else if (tvco < 1000000) {
+				p |= 0x10;
+			} else if (tvco < 1150000) {
+				p |= 0x18;
+			} else {
+				p |= 0x20;
+			}
+			m = 9;
 		} else {
-			p |= 0x20;
+			m--;
 		}
-		m = 9;
-	} else {
-		m--;
-	}
-        n = ((tvco * (m+1) + ACCESS_FBINFO(features).pll.ref_freq) / (ACCESS_FBINFO(features).pll.ref_freq * 2)) - 2;
+        	n = ((tvco * (m+1) + ACCESS_FBINFO(features).pll.ref_freq) / (ACCESS_FBINFO(features).pll.ref_freq * 2)) - 2;
+	} while (n < 0x03 || n > 0x7A);
 	return (m << 16) | (n << 8) | p;
 }
 
@@ -219,7 +225,7 @@ static void updatehwstate_clk(struct matrox_hw_state* hw, unsigned int mnp, unsi
 	}
 }
 
-static inline void g450_setpll_cond(WPMINFO unsigned int mnp, unsigned int pll) {
+void matroxfb_g450_setpll_cond(WPMINFO unsigned int mnp, unsigned int pll) {
 	if (g450_cmppll(PMINFO mnp, pll)) {
 		g450_setpll(PMINFO mnp, pll);
 	}
@@ -385,10 +391,8 @@ static int __g450_setclk(WPMINFO unsigned int fout, unsigned int pll,
 			unsigned int vco;
 			unsigned int delta;
 
-			if ((mnp & 0xFF00) < 0x0300 || (mnp & 0xFF00) > 0x7A00) {
-				continue;
-			}
 			vco = g450_mnp2vco(PMINFO mnp);
+#if 0			
 			if (pll == M_VIDEO_PLL) {
 				unsigned int big, small;
 
@@ -406,6 +410,7 @@ static int __g450_setclk(WPMINFO unsigned int fout, unsigned int pll,
 					continue;
 				}
 			}
+#endif			
 			delta = pll_freq_delta(fout, g450_vco2f(mnp, vco));
 			for (idx = mnpcount; idx > 0; idx--) {
 				/* == is important; due to nextpll algorithm we get
@@ -426,7 +431,7 @@ static int __g450_setclk(WPMINFO unsigned int fout, unsigned int pll,
 	}
 	/* VideoPLL and PixelPLL matched: do nothing... In all other cases we should get at least one frequency */
 	if (!mnpcount) {
-		return 1;
+		return -EBUSY;
 	}
 	{
 		unsigned long flags;
@@ -435,15 +440,15 @@ static int __g450_setclk(WPMINFO unsigned int fout, unsigned int pll,
 		matroxfb_DAC_lock_irqsave(flags);
 		mnp = g450_checkcache(PMINFO ci, mnparray[0]);
 		if (mnp != NO_MORE_MNP) {
-			g450_setpll_cond(PMINFO mnp, pll);
+			matroxfb_g450_setpll_cond(PMINFO mnp, pll);
 		} else {
 			mnp = g450_findworkingpll(PMINFO pll, mnparray, mnpcount);
 			g450_addcache(ci, mnparray[0], mnp);
 		}
 		updatehwstate_clk(&ACCESS_FBINFO(hw), mnp, pll);
 		matroxfb_DAC_unlock_irqrestore(flags);
+		return mnp;
 	}
-	return 0;
 }
 
 /* It must be greater than number of possible PLL values.
@@ -465,8 +470,10 @@ int matroxfb_g450_setclk(WPMINFO unsigned int fout, unsigned int pll) {
 }
 
 EXPORT_SYMBOL(matroxfb_g450_setclk);
+EXPORT_SYMBOL(g450_mnp2f);
+EXPORT_SYMBOL(matroxfb_g450_setpll_cond);
 
-MODULE_AUTHOR("(c) 2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 2001-2002 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G450/G550 PLL driver");
 
 MODULE_LICENSE("GPL");
