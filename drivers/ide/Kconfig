@@ -521,17 +521,6 @@ config IDEDMA_PCI_WIP
 
 	  It is SAFEST to say N to this question.
 
-config IDEDMA_NEW_DRIVE_LISTINGS
-	bool "Good-Bad DMA Model-Firmware (WIP)"
-	depends on IDEDMA_PCI_WIP
-	help
-	  If you say Y here, the model and firmware revision of your drive
-	  will be compared against a blacklist of buggy drives that claim to
-	  be (U)DMA capable but aren't. This is a blanket on/off test with no
-	  speed limit options.
-
-	  If in doubt, say N.
-
 config BLK_DEV_ADMA
 	bool
 	depends on PCI && BLK_DEV_IDEPCI
