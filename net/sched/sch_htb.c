@@ -297,7 +297,7 @@ static inline u32 htb_classid(struct htb_class *cl)
 	return (cl && cl != HTB_DIRECT) ? cl->classid : TC_H_UNSPEC;
 }
 
-static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
+static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
 	struct htb_class *cl;
@@ -315,9 +315,33 @@ static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
 
 	tcf = q->filter_list;
 	while (tcf && (result = tc_classify(skb, tcf, &res)) >= 0) {
+#ifdef CONFIG_NET_CLS_ACT
+		int terminal = 0;
+		switch (result) {
+		case TC_ACT_SHOT: /* Stop and kfree */
+			*qres = NET_XMIT_DROP;
+			terminal = 1;
+			break;
+		case TC_ACT_QUEUED:
+		case TC_ACT_STOLEN: 
+			terminal = 1;
+			break;
+		case TC_ACT_RECLASSIFY:  /* Things look good */
+		case TC_ACT_OK:
+		case TC_ACT_UNSPEC:
+		default:
+		break;
+		}
+
+		if (terminal) {
+			kfree_skb(skb);
+			return NULL;
+		}
+#else
 #ifdef CONFIG_NET_CLS_POLICE
 		if (result == TC_POLICE_SHOT)
 			return NULL;
+#endif
 #endif
 		if ((cl = (void*)res.class) == NULL) {
 			if (res.classid == sch->handle)
@@ -686,9 +710,24 @@ htb_deactivate(struct htb_sched *q,struct htb_class *cl)
 
 static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 {
+    int ret = NET_XMIT_SUCCESS;
     struct htb_sched *q = (struct htb_sched *)sch->data;
-    struct htb_class *cl = htb_classify(skb,sch);
+    struct htb_class *cl = htb_classify(skb,sch,&ret);
 
+
+#ifdef CONFIG_NET_CLS_ACT
+    if (cl == HTB_DIRECT ) {
+	if (q->direct_queue.qlen < q->direct_qlen ) {
+	    __skb_queue_tail(&q->direct_queue, skb);
+	    q->direct_pkts++;
+	}
+    } else if (!cl) {
+	    if (NET_XMIT_DROP == ret) {
+		    sch->stats.drops++;
+	    }
+	    return ret;
+    }
+#else
     if (cl == HTB_DIRECT || !cl) {
 	/* enqueue to helper queue */
 	if (q->direct_queue.qlen < q->direct_qlen && cl) {
@@ -699,7 +738,9 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	    sch->stats.drops++;
 	    return NET_XMIT_DROP;
 	}
-    } else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
+    }
+#endif
+    else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
 	sch->stats.drops++;
 	cl->stats.drops++;
 	return NET_XMIT_DROP;
@@ -718,9 +759,13 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
     struct htb_sched *q = (struct htb_sched *)sch->data;
-    struct htb_class *cl = htb_classify(skb,sch);
+    int ret =  NET_XMIT_SUCCESS;
+    struct htb_class *cl = htb_classify(skb,sch, &ret);
     struct sk_buff *tskb;
 
+#ifdef CONFIG_NET_CLS_ACT
+	sch->stats.reqs++;
+#endif
     if (cl == HTB_DIRECT || !cl) {
 	/* enqueue to helper queue */
 	if (q->direct_queue.qlen < q->direct_qlen && cl) {

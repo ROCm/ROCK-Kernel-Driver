@@ -238,7 +238,7 @@ cbq_reclassify(struct sk_buff *skb, struct cbq_class *this)
  */
 
 static struct cbq_class *
-cbq_classify(struct sk_buff *skb, struct Qdisc *sch)
+cbq_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
 {
 	struct cbq_sched_data *q = (struct cbq_sched_data*)sch->data;
 	struct cbq_class *head = &q->link;
@@ -256,7 +256,9 @@ cbq_classify(struct sk_buff *skb, struct Qdisc *sch)
 
 	for (;;) {
 		int result = 0;
-
+#ifdef CONFIG_NET_CLS_ACT
+		int terminal = 0;
+#endif
 		defmap = head->defaults;
 
 		/*
@@ -275,6 +277,28 @@ cbq_classify(struct sk_buff *skb, struct Qdisc *sch)
 				goto fallback;
 		}
 
+#ifdef CONFIG_NET_CLS_ACT
+		switch (result) {
+		case TC_ACT_SHOT: /* Stop and kfree */
+			*qres = NET_XMIT_DROP;
+			terminal = 1;
+			break;
+		case TC_ACT_QUEUED:
+		case TC_ACT_STOLEN: 
+			terminal = 1;
+			break;
+		case TC_ACT_RECLASSIFY:  /* Things look good */
+		case TC_ACT_OK: 
+		case TC_ACT_UNSPEC:
+		default:
+			break;
+		}
+
+		if (terminal) {
+			kfree_skb(skb);
+			return NULL;
+		}
+#else
 #ifdef CONFIG_NET_CLS_POLICE
 		switch (result) {
 		case TC_POLICE_RECLASSIFY:
@@ -284,6 +308,7 @@ cbq_classify(struct sk_buff *skb, struct Qdisc *sch)
 		default:
 			break;
 		}
+#endif
 #endif
 		if (cl->level == 0)
 			return cl;
@@ -394,9 +419,9 @@ static int
 cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct cbq_sched_data *q = (struct cbq_sched_data *)sch->data;
-	struct cbq_class *cl = cbq_classify(skb, sch);
 	int len = skb->len;
-	int ret = NET_XMIT_POLICED;
+	int ret = NET_XMIT_SUCCESS;
+	struct cbq_class *cl = cbq_classify(skb, sch,&ret);
 
 #ifdef CONFIG_NET_CLS_POLICE
 	q->rx_class = cl;
@@ -405,17 +430,18 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 #ifdef CONFIG_NET_CLS_POLICE
 		cl->q->__parent = sch;
 #endif
-		if ((ret = cl->q->enqueue(skb, cl->q)) == 0) {
+		if ((ret = cl->q->enqueue(skb, cl->q)) == NET_XMIT_SUCCESS) {
 			sch->q.qlen++;
 			sch->stats.packets++;
 			sch->stats.bytes+=len;
 			cbq_mark_toplevel(q, cl);
 			if (!cl->next_alive)
 				cbq_activate_class(cl);
-			return 0;
+			return ret;
 		}
 	}
 
+#ifndef CONFIG_NET_CLS_ACT
 	sch->stats.drops++;
 	if (cl == NULL)
 		kfree_skb(skb);
@@ -423,6 +449,16 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		cbq_mark_toplevel(q, cl);
 		cl->stats.drops++;
 	}
+#else
+	if ( NET_XMIT_DROP == ret) {
+		sch->stats.drops++;
+	}
+
+	if (cl != NULL) {
+		cbq_mark_toplevel(q, cl);
+		cl->stats.drops++;
+	}
+#endif
 	return ret;
 }
 

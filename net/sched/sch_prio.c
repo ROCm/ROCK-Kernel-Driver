@@ -50,28 +50,33 @@ struct prio_sched_data
 struct Qdisc *prio_classify(struct sk_buff *skb, struct Qdisc *sch,int *r)
 {
 	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
+	u32 band = skb->priority;
 	struct tcf_result res;
-	u32 band;
-	int result = 0;
-
-	band = skb->priority;
 
 	if (TC_H_MAJ(skb->priority) != sch->handle) {
 #ifdef CONFIG_NET_CLS_ACT
-		*r = result = tc_classify(skb, q->filter_list, &res);
+		int result = 0, terminal = 0;
+		result = tc_classify(skb, q->filter_list, &res);
 
 		switch (result) {
 			case TC_ACT_SHOT:
+				*r = NET_XMIT_DROP;
+				terminal = 1;
+				break;
 			case TC_ACT_STOLEN:
 			case TC_ACT_QUEUED:
-				kfree_skb(skb);
-				return NULL;
+				terminal = 1;
+				break;
 			case TC_ACT_RECLASSIFY:
 			case TC_ACT_OK:
 			case TC_ACT_UNSPEC:
 			default:
 			break;
 		};
+		if (terminal) {
+			kfree_skb(skb);
+			return NULL;
+		} 
 
 		if (!q->filter_list ) {
 #else
@@ -94,35 +99,31 @@ static int
 prio_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 {
 	struct Qdisc *qdisc;
-	int ret;
+	int ret = NET_XMIT_SUCCESS;
 
-	/* moving these up here changes things from before
-	 * packets counted now include everything that was ever
-	 * seen
-        */
-	sch->stats.bytes += skb->len;
-	sch->stats.packets++;
 	qdisc = prio_classify(skb, sch, &ret);
+
 	if (NULL == qdisc)
 		goto dropped;
 
-	if ((ret = qdisc->enqueue(skb, qdisc)) == 0) {
+	if ((ret = qdisc->enqueue(skb, qdisc)) == NET_XMIT_SUCCESS) {
+		sch->stats.bytes += skb->len;
+		sch->stats.packets++;
 		sch->q.qlen++;
 		return NET_XMIT_SUCCESS;
 	}
 
 dropped:
 #ifdef CONFIG_NET_CLS_ACT
-	if (TC_ACT_SHOT == ret || NET_XMIT_DROP == ret) {
+	if (NET_XMIT_DROP == ret) {
 #endif
 		sch->stats.drops++;
-		return NET_XMIT_DROP;
 #ifdef CONFIG_NET_CLS_ACT
 	} else {
 		sch->stats.overlimits++; /* abuse, but noone uses it */
-		return NET_XMIT_BYPASS; /* we dont want to confuse TCP */
 	}
 #endif
+	return ret; 
 }
 
 
