@@ -1324,7 +1324,7 @@ static int __init ip_auto_config(void)
 	return 0;
 }
 
-module_init(ip_auto_config);
+late_initcall(ip_auto_config);
 
 
 /*
