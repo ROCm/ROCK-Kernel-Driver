@@ -80,6 +80,8 @@ static struct proto_ops ipx_dgram_ops;
 LIST_HEAD(ipx_interfaces);
 DEFINE_SPINLOCK(ipx_interfaces_lock);
 
+static kmem_cache_t *ipx_sk_slab;
+
 struct ipx_interface *ipx_primary_net;
 struct ipx_interface *ipx_internal_net;
 
@@ -277,7 +279,7 @@ static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
 	spin_lock_bh(&intrfc->if_sklist_lock);
 
 	sk_for_each(s, node, &intrfc->if_sklist) {
-		struct ipx_opt *ipxs = ipx_sk(s);
+		struct ipx_sock *ipxs = ipx_sk(s);
 
 		if (ipxs->port == port &&
 		    !memcmp(ipx_node, ipxs->node, IPX_NODE_LEN))
@@ -302,7 +304,7 @@ static void __ipxitf_down(struct ipx_interface *intrfc)
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	/* error sockets */
 	sk_for_each_safe(s, node, t, &intrfc->if_sklist) {
-		struct ipx_opt *ipxs = ipx_sk(s);
+		struct ipx_sock *ipxs = ipx_sk(s);
 
 		s->sk_err = ENOLINK;
 		s->sk_error_report(s);
@@ -400,7 +402,7 @@ static int ipxitf_demux_socket(struct ipx_interface *intrfc,
 	spin_lock_bh(&intrfc->if_sklist_lock);
 
 	sk_for_each(s, node, &intrfc->if_sklist) {
-		struct ipx_opt *ipxs = ipx_sk(s);
+		struct ipx_sock *ipxs = ipx_sk(s);
 
 		if (ipxs->port == ipx->ipx_dest.sock &&
 		    (is_broadcast || !memcmp(ipx->ipx_dest.node,
@@ -1348,32 +1350,21 @@ out:
 static int ipx_create(struct socket *sock, int protocol)
 {
 	int rc = -ESOCKTNOSUPPORT;
-	struct ipx_opt *ipx = NULL;
 	struct sock *sk;
 
-	switch (sock->type) {
-	case SOCK_DGRAM:
-		sk = sk_alloc(PF_IPX, GFP_KERNEL, 1, NULL);
-        	rc = -ENOMEM;
-		if (!sk)
-			goto out;
-		ipx = sk->sk_protinfo = kmalloc(sizeof(*ipx), GFP_KERNEL);
-		if (!ipx)
-			goto outsk;
-		memset(ipx, 0, sizeof(*ipx));
-                sock->ops = &ipx_dgram_ops;
-                break;
-	case SOCK_SEQPACKET:
-		/*
-		 * SPX support is not anymore in the kernel sources. If
-		 * you want to ressurrect it, completing it and making
-		 * it understand shared skbs, be fully multithreaded,
-		 * etc, grab the sources in an early 2.5 kernel tree.
-		 */
-	case SOCK_STREAM:       /* Allow higher levels to piggyback */
-	default:
+	/*
+	 * SPX support is not anymore in the kernel sources. If you want to
+	 * ressurrect it, completing it and making it understand shared skbs,
+	 * be fully multithreaded, etc, grab the sources in an early 2.5 kernel
+	 * tree.
+	 */
+	if (sock->type != SOCK_DGRAM)
 		goto out;
-	}
+
+	sk = sk_alloc(PF_IPX, GFP_KERNEL, sizeof(struct ipx_sock), ipx_sk_slab);
+       	rc = -ENOMEM;
+	if (!sk)
+		goto out;
 #ifdef IPX_REFCNT_DEBUG
         atomic_inc(&ipx_sock_nr);
         printk(KERN_DEBUG "IPX socket %p created, now we have %d alive\n", sk,
@@ -1382,12 +1373,10 @@ static int ipx_create(struct socket *sock, int protocol)
 	sock_init_data(sock, sk);
 	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_no_check = 1;		/* Checksum off by default */
+	sock->ops = &ipx_dgram_ops;
 	rc = 0;
 out:
 	return rc;
-outsk:
-	sk_free(sk);
-	goto out;
 }
 
 static int ipx_release(struct socket *sock)
@@ -1433,7 +1422,7 @@ static unsigned short ipx_first_free_socketnum(struct ipx_interface *intrfc)
 static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
-	struct ipx_opt *ipxs = ipx_sk(sk);
+	struct ipx_sock *ipxs = ipx_sk(sk);
 	struct ipx_interface *intrfc;
 	struct sockaddr_ipx *addr = (struct sockaddr_ipx *)uaddr;
 	int rc = -EINVAL;
@@ -1529,7 +1518,7 @@ static int ipx_connect(struct socket *sock, struct sockaddr *uaddr,
 	int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
-	struct ipx_opt *ipxs = ipx_sk(sk);
+	struct ipx_sock *ipxs = ipx_sk(sk);
 	struct sockaddr_ipx *addr;
 	int rc = -EINVAL;
 	struct ipx_route *rt;
@@ -1593,7 +1582,7 @@ static int ipx_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct ipx_address *addr;
 	struct sockaddr_ipx sipx;
 	struct sock *sk = sock->sk;
-	struct ipx_opt *ipxs = ipx_sk(sk);
+	struct ipx_sock *ipxs = ipx_sk(sk);
 	int rc;
 
 	*uaddr_len = sizeof(struct sockaddr_ipx);
@@ -1693,7 +1682,7 @@ static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
 	struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
-	struct ipx_opt *ipxs = ipx_sk(sk);
+	struct ipx_sock *ipxs = ipx_sk(sk);
 	struct sockaddr_ipx *usipx = (struct sockaddr_ipx *)msg->msg_name;
 	struct sockaddr_ipx local_sipx;
 	int rc = -EINVAL;
@@ -1758,7 +1747,7 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 		struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
-	struct ipx_opt *ipxs = ipx_sk(sk);
+	struct ipx_sock *ipxs = ipx_sk(sk);
 	struct sockaddr_ipx *sipx = (struct sockaddr_ipx *)msg->msg_name;
 	struct ipxhdr *ipx = NULL;
 	struct sk_buff *skb;
@@ -1965,6 +1954,13 @@ static char ipx_snap_err_msg[] __initdata =
 
 static int __init ipx_init(void)
 {
+	ipx_sk_slab = kmem_cache_create("ipx_sock",
+					sizeof(struct ipx_sock), 0,
+					SLAB_HWCACHE_ALIGN, NULL, NULL);
+
+	if (ipx_sk_slab == NULL)
+		return -ENOMEM;
+
 	sock_register(&ipx_family_ops);
 
 	pEII_datalink = make_EII_client();
@@ -2015,6 +2011,11 @@ static void __exit ipx_proto_finito(void)
 	dev_remove_pack(&ipx_dix_packet_type);
 	destroy_EII_client(pEII_datalink);
 	pEII_datalink = NULL;
+
+	if (ipx_sk_slab != NULL) {
+		kmem_cache_destroy(ipx_sk_slab);
+		ipx_sk_slab = NULL;
+	}
 
 	sock_unregister(ipx_family_ops.family);
 }

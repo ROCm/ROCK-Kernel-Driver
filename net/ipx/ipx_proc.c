@@ -202,7 +202,7 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock* sk, *next;
 	struct ipx_interface *i;
-	struct ipx_opt *ipxs;
+	struct ipx_sock *ipxs;
 
 	++*pos;
 	if (v == SEQ_START_TOKEN) {
@@ -243,7 +243,7 @@ out:
 static int ipx_seq_socket_show(struct seq_file *seq, void *v)
 {
 	struct sock *s;
-	struct ipx_opt *ipxs;
+	struct ipx_sock *ipxs;
 
 	if (v == SEQ_START_TOKEN) {
 #ifdef CONFIG_IPX_INTERN
