@@ -15,24 +15,14 @@
 extern u64 jiffies_64;
 extern unsigned long volatile jiffies;
 
+#if (BITS_PER_LONG < 64)
+u64 get_jiffies_64(void);
+#else
 static inline u64 get_jiffies_64(void)
 {
-#if BITS_PER_LONG < 64
-	extern seqlock_t xtime_lock;
-	unsigned long seq;
-	u64 tmp;
-
-	do {
-		seq = read_seqbegin(&xtime_lock);
-		tmp = jiffies_64;
-	} while (read_seqretry(&xtime_lock, seq));
-
-	return tmp;
-#else
 	return (u64)jiffies;
-#endif
 }
-
+#endif
 
 /*
  *	These inlines deal with timer wrapping correctly. You are 
