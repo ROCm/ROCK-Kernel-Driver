@@ -12,7 +12,7 @@
  * add themselves as children of the system bus.
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/sysdev.h>
 #include <linux/err.h>
