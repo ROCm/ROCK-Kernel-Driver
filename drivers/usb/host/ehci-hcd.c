@@ -190,7 +190,7 @@ static int ehci_reset (struct ehci_hcd *ehci)
 	dbg_cmd (ehci, "reset", command);
 	writel (command, &ehci->regs->command);
 	ehci->hcd.state = USB_STATE_HALT;
-	return handshake (&ehci->regs->command, CMD_RESET, 0, 050);
+	return handshake (&ehci->regs->command, CMD_RESET, 0, 250);
 }
 
 /* idle the controller (from running) */
@@ -368,6 +368,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	 *
 	 * NOTE:  layered drivers can't yet tell when we enable that,
 	 * so they can't pass this info along (like NETIF_F_HIGHDMA)
+	 * (or like Scsi_Host.highmem_io) ... usb_bus.flags?
 	 */
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
@@ -585,6 +586,10 @@ static void ehci_tasklet (unsigned long param)
 {
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
 	unsigned long		flags;
+
+	// FIXME don't pass flags; on sparc they aren't really flags.
+	// qh_completions can just leave irqs blocked,
+	// then have scan_async() allow IRQs if it's very busy 
 
 	spin_lock_irqsave (&ehci->lock, flags);
 
