@@ -748,6 +748,10 @@ fb_blank(struct fb_info *info, int blank)
 	u16 *black = NULL;
 	int err = 0;
 	
+	/* Workaround for broken X servers */
+	if (blank > VESA_POWERDOWN)
+		blank = VESA_POWERDOWN;
+
 	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
 		return 0;
 
