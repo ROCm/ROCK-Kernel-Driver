@@ -454,18 +454,32 @@ static void write_bulk_callback(struct urb *urb)
 void intr_callback(struct urb *urb)
 {
 	rtl8150_t *dev;
+	int status;
 
 	dev = urb->context;
 	if (!dev)
 		return;
 	switch (urb->status) {
-	case 0:
+	case 0:			/* success */
 		break;
+	case -ECONNRESET:	/* unlink */
 	case -ENOENT:
+	case -ESHUTDOWN:
 		return;
+	/* -EPIPE:  should clear the halt */
 	default:
 		info("%s: intr status %d", dev->netdev->name, urb->status);
+		goto resubmit;
 	}
+
+	/* FIXME if this doesn't do anything, don't submit the urb! */
+
+resubmit:
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s/input0, status %d",
+				dev->udev->bus->bus_name,
+				dev->udev->devpath, status);
 }
 
 /*

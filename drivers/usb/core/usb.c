@@ -942,12 +942,27 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	int i;
 	int j;
 
-	/* USB v1.1 5.5.3 */
-	/* We read the first 8 bytes from the device descriptor to get to */
-	/*  the bMaxPacketSize0 field. Then we set the maximum packet size */
-	/*  for the control pipe, and retrieve the rest */
-	dev->epmaxpacketin [0] = 8;
-	dev->epmaxpacketout[0] = 8;
+	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
+	 * it's fixed size except for full speed devices.
+	 */
+	switch (dev->speed) {
+	case USB_SPEED_HIGH:		/* fixed at 64 */
+		i = 64;
+		break;
+	case USB_SPEED_FULL:		/* 8, 16, 32, or 64 */
+		/* to determine the ep0 maxpacket size, read the first 8
+		 * bytes from the device descriptor to get bMaxPacketSize0;
+		 * then correct our initial (small) guess.
+		 */
+		// FALLTHROUGH
+	case USB_SPEED_LOW:		/* fixed at 8 */
+		i = 8;
+		break;
+	default:
+		return -EINVAL;
+	}
+	dev->epmaxpacketin [0] = i;
+	dev->epmaxpacketout[0] = i;
 
 	for (i = 0; i < NEW_DEVICE_RETRYS; ++i) {
 
@@ -967,6 +982,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 		wait_ms(10);	/* Let the SET_ADDRESS settle */
 
+		/* high and low speed devices don't need this... */
 		err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
 		if (err >= 8)
 			break;
@@ -982,8 +998,10 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		dev->devnum = -1;
 		return 1;
 	}
-	dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
-	dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
+	if (dev->speed == USB_SPEED_FULL) {
+		dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
+		dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
+	}
 
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {

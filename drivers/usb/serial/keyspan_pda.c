@@ -229,12 +229,25 @@ static void keyspan_pda_rx_interrupt (struct urb *urb)
        	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int i;
+	int status;
 	struct keyspan_pda_private *priv;
 	priv = (struct keyspan_pda_private *)(port->private);
 
-	/* the urb might have been killed. */
-	if (urb->status)
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
+
 	
 	if (port_paranoia_check (port, "keyspan_pda_rx_interrupt")) {
 		return;
@@ -277,7 +290,11 @@ static void keyspan_pda_rx_interrupt (struct urb *urb)
 		break;
 	}
 
-	/* INT urbs are automatically re-submitted */
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 

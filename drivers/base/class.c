@@ -84,7 +84,8 @@ int devclass_add_device(struct device * dev)
 				interface_add(cls,dev);
 			}
 
-			/* notify userspace (call /sbin/hotplug) here */
+			/* notify userspace (call /sbin/hotplug) */
+			class_hotplug (dev, "add");
 
 			up_write(&cls->rwsem);
 			if (error)
@@ -106,6 +107,10 @@ void devclass_remove_device(struct device * dev)
 				 cls->name,dev->name);
 			interface_remove(cls,dev);
 			unenum_device(cls,dev);
+
+			/* notify userspace (call /sbin/hotplug) */
+			class_hotplug (dev, "remove");
+
 			if (cls->remove_device)
 				cls->remove_device(dev);
 			up_write(&cls->rwsem);

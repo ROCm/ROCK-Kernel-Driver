@@ -187,6 +187,8 @@ struct device_class {
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
+	int	(*hotplug)(struct device *dev, char **envp, 
+			   int num_envp, char *buffer, int buffer_size);
 };
 
 extern int devclass_register(struct device_class *);

@@ -107,6 +107,7 @@ struct us_unusual_dev {
 #define US_FL_DEV_ATTACHED    0x00010000 /* is the device attached?	    */
 #define US_FLIDX_IP_WANTED   17  /* 0x00020000	is an IRQ expected?	    */
 #define US_FLIDX_CAN_CANCEL  18  /* 0x00040000  okay to cancel current_urb? */
+#define US_FLIDX_CANCEL_SG   19  /* 0x00080000	okay to cancel current_sg?  */
 
 
 /* processing state machine states */
@@ -184,6 +185,7 @@ struct us_data {
 	/* control and bulk communications data */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
+	struct usb_sg_request	*current_sg;	 /* scatter-gather USB   */
 
 	/* the semaphore for sleeping the control thread */
 	struct semaphore	sema;		 /* to sleep thread on   */
