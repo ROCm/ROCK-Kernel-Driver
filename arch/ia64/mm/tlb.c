@@ -88,7 +88,7 @@ wrap_mmu_context (struct mm_struct *mm)
 void
 ia64_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbits)
 {
-	static spinlock_t ptcg_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(ptcg_lock);
 
 	/* HW requires global serialization of ptc.ga.  */
 	spin_lock(&ptcg_lock);

@@ -68,7 +68,7 @@
 #define NUM_ROUNDS	64	/* magic value */
 #define NUM_ITERS	5	/* likewise */
 
-static spinlock_t itc_sync_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(itc_sync_lock);
 static volatile unsigned long go[SLAVE + 1];
 
 #define DEBUG_ITC_SYNC	0
