@@ -1716,6 +1716,34 @@ static void rtl8169_schedule_work(struct net_device *dev, void (*task)(void *))
 	schedule_delayed_work(&tp->task, 4);
 }
 
+static void rtl8169_wait_for_quiescence(struct net_device *dev)
+{
+	synchronize_irq(dev->irq);
+
+	/* Wait for any pending NAPI task to complete */
+	netif_poll_disable(dev);
+}
+
+static void rtl8169_reinit_task(void *_data)
+{
+	struct net_device *dev = _data;
+	int ret;
+
+	if (netif_running(dev)) {
+		rtl8169_wait_for_quiescence(dev);
+		rtl8169_close(dev);
+	}
+
+	ret = rtl8169_open(dev);
+	if (unlikely(ret < 0)) {
+		if (net_ratelimit()) {
+			printk(PFX KERN_ERR "%s: reinit failure (status = %d)."
+			       " Rescheduling.\n", dev->name, ret);
+		}
+		rtl8169_schedule_work(dev, rtl8169_reinit_task);
+	}
+}
+
 static void rtl8169_reset_task(void *_data)
 {
 	struct net_device *dev = _data;
@@ -1724,10 +1752,7 @@ static void rtl8169_reset_task(void *_data)
 	if (!netif_running(dev))
 		return;
 
-	synchronize_irq(dev->irq);
-
-	/* Wait for any pending NAPI task to complete */
-	netif_poll_disable(dev);
+	rtl8169_wait_for_quiescence(dev);
 
 	rtl8169_rx_interrupt(dev, tp, tp->mmio_addr);
 	rtl8169_tx_clear(tp);
@@ -1891,6 +1916,46 @@ err_stop:
 err_update_stats:
 	tp->stats.tx_dropped++;
 	goto out;
+}
+
+static void rtl8169_pcierr_interrupt(struct net_device *dev)
+{
+	struct rtl8169_private *tp = netdev_priv(dev);
+	struct pci_dev *pdev = tp->pci_dev;
+	void *ioaddr = tp->mmio_addr;
+	u16 pci_status, pci_cmd;
+
+	pci_read_config_word(pdev, PCI_COMMAND, &pci_cmd);
+	pci_read_config_word(pdev, PCI_STATUS, &pci_status);
+
+	printk(KERN_ERR PFX "%s: PCI error (cmd = 0x%04x, status = 0x%04x).\n",
+	       dev->name, pci_cmd, pci_status);
+
+	/*
+	 * The recovery sequence below admits a very elaborated explanation:
+	 * - it seems to work;
+	 * - I did not see what else could be done.
+	 *
+	 * Feel free to adjust to your needs.
+	 */
+	pci_write_config_word(pdev, PCI_COMMAND,
+			      pci_cmd | PCI_COMMAND_SERR | PCI_COMMAND_PARITY);
+
+	pci_write_config_word(pdev, PCI_STATUS,
+		pci_status & (PCI_STATUS_DETECTED_PARITY |
+		PCI_STATUS_SIG_SYSTEM_ERROR | PCI_STATUS_REC_MASTER_ABORT |
+		PCI_STATUS_REC_TARGET_ABORT | PCI_STATUS_SIG_TARGET_ABORT));
+
+	/* The infamous DAC f*ckup only happens at boot time */
+	if ((tp->cp_cmd & PCIDAC) && (tp->dirty_rx == tp->cur_rx == 0)) {
+		printk(KERN_INFO PFX "%s: disabling PCI DAC.\n", dev->name);
+		tp->cp_cmd &= ~PCIDAC;
+		RTL_W16(CPlusCmd, tp->cp_cmd);
+		dev->features &= ~NETIF_F_HIGHDMA;
+		rtl8169_schedule_work(dev, rtl8169_reinit_task);
+	}
+
+	rtl8169_hw_reset(ioaddr);
 }
 
 static void
@@ -2094,9 +2159,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			break;
 
 		if (unlikely(status & SYSErr)) {
-			printk(KERN_ERR PFX "%s: PCI error (status: 0x%04x)."
-			       " Device disabled.\n", dev->name, status);
-			rtl8169_hw_reset(ioaddr);
+			rtl8169_pcierr_interrupt(dev);
 			break;
 		}
 
