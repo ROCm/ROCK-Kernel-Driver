@@ -107,7 +107,11 @@ extern void iwmmxt_task_release(struct thread_info *);
 
 #endif
 
-#define PREEMPT_ACTIVE	0x04000000
+/*
+ * We use bit 30 of the preempt_count to indicate that kernel
+ * preemption is occuring.  See include/asm-arm/hardirq.h.
+ */
+#define PREEMPT_ACTIVE	0x40000000
 
 /*
  * thread information flags:
@@ -122,15 +126,13 @@ extern void iwmmxt_task_release(struct thread_info *);
 #define TIF_SIGPENDING		1
 #define TIF_NEED_RESCHED	2
 #define TIF_SYSCALL_TRACE	8
-#define TIF_USED_FPU		16
-#define TIF_POLLING_NRFLAG	17
-#define TIF_USING_IWMMXT	18
+#define TIF_POLLING_NRFLAG	16
+#define TIF_USING_IWMMXT	17
 
 #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
-#define _TIF_USED_FPU		(1 << TIF_USED_FPU)
 #define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
 #define _TIF_USING_IWMMXT	(1 << TIF_USING_IWMMXT)
 
