@@ -4,7 +4,7 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_primitive.c,v 1.5 2002/04/24 16:33:39 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_primitive.c,v 1.6 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * These functions implement the SCTP primitive functions from Section 10.
  * 
@@ -44,7 +44,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_primitive.c,v 1.5 2002/04/24 16:33:39 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_primitive.c,v 1.6 2002/08/21 18:34:04 jgrimm Exp $";
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -73,7 +73,7 @@ sctp_primitive_ ## name(sctp_association_t *asoc, \
         ep = asoc ? asoc->ep : NULL; \
         \
         error = sctp_do_sm(event_type, subtype, state, ep, asoc, arg, GFP_KERNEL); \
-        return(error); \
+        return error; \
 } /* sctp_primitive_ ## name() */
 
 /* 10.1 ULP-to-SCTP
@@ -111,6 +111,21 @@ DECLARE_PRIMITIVE(ASSOCIATE)
  */
 
 DECLARE_PRIMITIVE(SHUTDOWN);
+
+/* 10.1 ULP-to-SCTP
+ * C) Abort
+ * 
+ * Format: Abort(association id [, cause code])
+ * -> result 
+ * 
+ * Ungracefully closes an association. Any locally queued user data
+ * will be discarded and an ABORT chunk is sent to the peer. A success
+ * code will be returned on successful abortion of the association. If
+ * attempting to abort the association results in a failure, an error
+ * code shall be returned.
+ */
+
+DECLARE_PRIMITIVE(ABORT);
 
 /* 10.1 ULP-to-SCTP
  * E) Send
@@ -190,6 +205,7 @@ sctp_other_icmp_unreachfrag(sctp_association_t *asoc, void *arg)
         error = sctp_do_sm(event_type, subtype, state, ep, asoc, arg,
                            GFP_ATOMIC);
 
-        return(error);
+        return error;
+
 } /* sctp_other_icmp_unreachfrag() */
 

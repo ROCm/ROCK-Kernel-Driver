@@ -7,7 +7,7 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_sm_statetable.c,v 1.19 2002/08/16 19:30:50 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_sm_statetable.c,v 1.20 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * These are the state tables for the SCTP state machine.
  * 
@@ -45,7 +45,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_sm_statetable.c,v 1.19 2002/08/16 19:30:50 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_sm_statetable.c,v 1.20 2002/08/21 18:34:04 jgrimm Exp $";
 
 #include <linux/skbuff.h>
 #include <net/sctp/sctp.h>
@@ -721,25 +721,32 @@ chunk_event_table_asconf_ack[SCTP_STATE_NUM_STATES] = {
         {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
 \
         /* SCTP_STATE_COOKIE_WAIT */ \
-	{fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+	{fn: sctp_sf_cookie_wait_prm_abort, \
+         name: "sctp_sf_cookie_wait_prm_abort"}, \
 \
         /* SCTP_STATE_COOKIE_ECHOED */ \
-        {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+        {fn: sctp_sf_cookie_echoed_prm_abort, \
+         name: "sctp_sf_cookie_echoed_prm_abort"}, \
 \
         /* SCTP_STATE_ESTABLISHED */ \
-        {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+        {fn: sctp_sf_do_9_1_prm_abort, \
+         name: "sctp_sf_do_9_1_prm_abort"}, \
 \
         /* SCTP_STATE_SHUTDOWN_PENDING */ \
-        {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+        {fn: sctp_sf_do_9_1_prm_abort, \
+         name: "sctp_sf_do_9_1_prm_abort"}, \
 \
         /* SCTP_STATE_SHUTDOWN_SENT */ \
-        {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+        {fn: sctp_sf_do_9_1_prm_abort, \
+         name: "sctp_sf_do_9_1_prm_abort"}, \
 \
         /* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-        {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+        {fn: sctp_sf_do_9_1_prm_abort, \
+         name: "sctp_sf_do_9_1_prm_abort"}, \
 \
         /* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-        {fn: sctp_sf_not_impl, name: "sctp_sf_not_impl"}, \
+        {fn: sctp_sf_do_9_1_prm_abort, \
+         name: "sctp_sf_do_9_1_prm_abort"}, \
 \
 } /* TYPE_SCTP_PRIMITIVE_ABORT */
 

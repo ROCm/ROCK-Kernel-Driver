@@ -6,7 +6,7 @@
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_ulpevent.c,v 1.15 2002/07/12 14:50:26 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_ulpevent.c,v 1.16 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * These functions manipulate an sctp event.   The sctp_ulpevent_t is used
  * to carry notifications and data to the ULP (sockets).  
@@ -41,7 +41,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_ulpevent.c,v 1.15 2002/07/12 14:50:26 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_ulpevent.c,v 1.16 2002/08/21 18:34:04 jgrimm Exp $";
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -79,7 +79,7 @@ sctp_ulpevent_new(int size, int msg_flags, int priority)
 	}
 
 	event->malloced = 1;
-	return(event);
+	return event;
 
  fail_init:
 	kfree_skb(event->parent);
@@ -99,7 +99,7 @@ sctp_ulpevent_init(sctp_ulpevent_t *event,
 	event->msg_flags = msg_flags;
 	event->parent = parent;
 	event->malloced = 0;
-	return(event);
+	return event;
 
 } /* sctp_ulpevent_init() */
 
@@ -119,7 +119,7 @@ sctp_ulpevent_free(sctp_ulpevent_t *event)
 int 
 sctp_ulpevent_is_notification(const sctp_ulpevent_t *event)
 {
-	return(event->msg_flags & MSG_NOTIFICATION);
+	return event->msg_flags & MSG_NOTIFICATION;
 
 } /* sctp_ulpevent_is_notification() */
 
@@ -237,9 +237,9 @@ sctp_ulpevent_make_assoc_change(const sctp_association_t *asoc,
 	 */
 	sac->sac_assoc_id = sctp_assoc2id(asoc);
 
-	return(event);
+	return event;
 fail:		
-	return(NULL);	
+	return NULL;	
 
 } /* sctp_ulpevent_make_assoc_change() */
 
@@ -346,9 +346,9 @@ sctp_ulpevent_make_peer_addr_change(const sctp_association_t *asoc,
 	memcpy(&spc->spc_aaddr, aaddr, sizeof(struct sockaddr_storage));
 
 	
-	return(event);
+	return event;
 fail:
-	return(NULL);
+	return NULL;
 
 } /* sctp_ulpevent_make_peer_addr_change() */
 
@@ -472,9 +472,9 @@ sctp_ulpevent_make_remote_error(const sctp_association_t *asoc,
 	 sre->sre_assoc_id = sctp_assoc2id(asoc);
 
 
-	 return(event);	
+	 return event;	
 fail:
-	 return(NULL);
+	 return NULL;
 
 } /* sctp_ulpevent_make_remote_error () */
 
@@ -585,9 +585,9 @@ sctp_ulpevent_make_send_failed(const sctp_association_t *asoc,
 	ssf->ssf_assoc_id = sctp_assoc2id(asoc);
 	
 	 
-	return(event);
+	return event;
 fail: 
-	return(NULL);
+	return NULL;
 
 } /* sctp_ulpevent_make_send_failed () */
 			       
@@ -651,9 +651,9 @@ sctp_ulpevent_make_shutdown_event(const sctp_association_t *asoc,
 	 */
 	sse->sse_assoc_id = sctp_assoc2id(asoc);
 
-	return(event);
+	return event;
 fail: 
-	return(NULL);
+	return NULL;
 
 } /* sctp_ulpevent_make_shutdown_event () */
 
@@ -802,12 +802,12 @@ sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 
 	info->sinfo_assoc_id = sctp_assoc2id(asoc);	
 
-	return(event);
+	return event;
 
 fail_init:
 	kfree_skb(skb);
 fail:		
-	return(NULL);		
+	return NULL;		
        
 } /* sctp_ulpevent_make_rcvmsg() */
 
@@ -821,7 +821,7 @@ sctp_ulpevent_get_notification_type(const sctp_ulpevent_t *event)
 
 	notification = (union sctp_notification *)event->parent->data;
 	
-	return(notification->h.sn_type);
+	return notification->h.sn_type;
 
 }  /* sctp_ulpevent_get_notification_type() */
 

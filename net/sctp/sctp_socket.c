@@ -7,7 +7,7 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_socket.c,v 1.62 2002/08/16 19:30:50 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_socket.c,v 1.63 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * These functions interface with the sockets layer to implement the
  * SCTP Extensions for the Sockets API.
@@ -53,7 +53,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_socket.c,v 1.62 2002/08/16 19:30:50 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_socket.c,v 1.63 2002/08/21 18:34:04 jgrimm Exp $";
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -838,12 +838,11 @@ sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 			  msg_len, sinfo_flags);
 
 	/* FIXME: Support MSG_ABORT. */
-	/* If MSG_EOF is set, no data can be sent.  Disallow sending 0-length 
-	 * messages when MSG_EOF is not set.
+	/* If MSG_EOF|MSG_ABORT is set, no data can be sent.  Disallow sending 0-length
+	 * messages when MSG_EOF|MSG_ABORT is not set.
 	 */
-        if ((sinfo_flags & MSG_ABORT) 
-	    || ((sinfo_flags & MSG_EOF) && (msg_len > 0))
-	    || (!(sinfo_flags & MSG_EOF) && (msg_len == 0))) {
+        if (((sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len > 0))
+	    || (!(sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len == 0))) {
                 err = -EINVAL;
 		goto out_nounlock;
         }
@@ -886,7 +885,13 @@ sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 			sctp_primitive_SHUTDOWN(asoc, NULL);
 			err = 0;	
 			goto out_unlock;
-		}	
+		}
+		if (sinfo_flags & MSG_ABORT) {
+			SCTP_DEBUG_PRINTK("Aborting association: %p\n",asoc);
+			sctp_primitive_ABORT(asoc, NULL);
+			err = 0;
+			goto out_unlock;
+		}
 	}
        
 
@@ -1394,7 +1399,7 @@ sctp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 int 
 sctp_disconnect(struct sock *sk, int flags)
 {
-        return(-EOPNOTSUPP); /* STUB */
+        return -EOPNOTSUPP; /* STUB */
 
 } /* sctp_disconnect() */
 		
@@ -1414,7 +1419,7 @@ sctp_accept(struct sock *sk, int flags, int *err)
 int 
 sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
-        return(-EOPNOTSUPP); /* STUB */
+        return -EOPNOTSUPP; /* STUB */
 
 } /* sctp_ioctl() */
 
@@ -1505,7 +1510,7 @@ sctp_init_sock(struct sock *sk)
 	sp->autoclose         = 0;
 
 	SCTP_DBG_OBJCNT_INC(sock);
-        return(0);
+        return 0;
 
 } /* sctp_init_sock() */
 
@@ -1522,7 +1527,7 @@ sctp_destroy_sock(struct sock *sk)
 	ep = sctp_sk(sk)->ep;
 	sctp_endpoint_free(ep);   
 
-        return(0);
+        return 0;
 
 } /* sctp_destroy_sock() */
 
@@ -1621,7 +1626,7 @@ sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 	int val;
 
 	if (len < sizeof(int)) {
-		return(-EINVAL);
+		return -EINVAL;
 	}
 
 	len = sizeof(int);
@@ -2218,7 +2223,7 @@ sctp_bucket_create(sctp_bind_hashbucket_t *head, unsigned short snum)
 		pp->pprev = &head->chain;
 	}                                                      
 	SCTP_DEBUG_PRINTK("sctp_bucket_create() ends, pp=%p\n", pp);
-	return(pp);
+	return pp;
 
 } /* sctp_bucket_create() */
 
@@ -2290,7 +2295,7 @@ sctp_autobind(struct sock *sk)
 		break;
 	} /* switch(family) */
 
-	return(sctp_do_bind(sk, &autoaddr, addr_len));
+	return sctp_do_bind(sk, &autoaddr, addr_len);
 
 } /* sctp_autobind() */
 
@@ -2652,32 +2657,32 @@ sctp_sendmsg_verify_name(struct sock *sk, struct msghdr *msg)
 	sockaddr_storage_t *sa;
 
 	if (msg->msg_namelen < sizeof (struct sockaddr) ) {
-		return (-EINVAL);
+		return -EINVAL;
 	}
 	sa = (sockaddr_storage_t *)(msg->msg_name);
 	switch (sa->sa.sa_family) {
 	case AF_INET:
 		if (msg->msg_namelen < sizeof(struct sockaddr_in)) {
-			return(-EINVAL);
+			return -EINVAL;
 		}
 		break;
 	case AF_INET6:
 		if (PF_INET == sk->family) {
-			return(-EINVAL);
+			return -EINVAL;
 		}
 		SCTP_V6(			
 			if (msg->msg_namelen < sizeof(struct sockaddr_in6)) {
-				return(-EINVAL);
+				return -EINVAL;
 			}
 			break;
 		);
 	default:
-		return (-EINVAL);
+		return -EINVAL;
 	}
 
 	/* Disallow any illegal addresses to be used as destinations.  */
 	if (!sctp_addr_is_valid(sa)) {
-		return(-EINVAL);
+		return -EINVAL;
 	}
 
 	return 0;

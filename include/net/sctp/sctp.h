@@ -6,7 +6,7 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Id: sctp.h,v 1.39 2002/08/16 19:30:49 jgrimm Exp $
+ * $Id: sctp.h,v 1.40 2002/08/21 18:34:03 jgrimm Exp $
  * 
  * The base lksctp header. 
  * 
@@ -133,6 +133,7 @@ extern unsigned int sctp_poll(struct file *file, struct socket *sock,
  */
 extern int sctp_primitive_ASSOCIATE(sctp_association_t *, void *arg);
 extern int sctp_primitive_SHUTDOWN(sctp_association_t *, void *arg);
+extern int sctp_primitive_ABORT(sctp_association_t *, void *arg);
 extern int sctp_primitive_SEND(sctp_association_t *, void *arg);
 
 

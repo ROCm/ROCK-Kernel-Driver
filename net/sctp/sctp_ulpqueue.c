@@ -6,7 +6,7 @@
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_ulpqueue.c,v 1.13 2002/07/12 14:50:26 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_ulpqueue.c,v 1.14 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * This abstraction carries sctp events to the ULP (sockets).
  * 
@@ -42,7 +42,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_ulpqueue.c,v 1.13 2002/07/12 14:50:26 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_ulpqueue.c,v 1.14 2002/08/21 18:34:04 jgrimm Exp $";
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -85,7 +85,7 @@ sctp_ulpqueue_new(sctp_association_t *asoc, uint16_t inbound, int priority)
 	}
 
 	ulpq->malloced = 1;
-	return(ulpq);
+	return ulpq;
 	
 fail_init:
 	kfree(ulpq);
@@ -109,7 +109,7 @@ sctp_ulpqueue_init(sctp_ulpqueue_t *ulpq, sctp_association_t *asoc,
 	skb_queue_head_init(&ulpq->lobby);
 	ulpq->malloced = 0;
 
-	return(ulpq);
+	return ulpq;
 
 } /* sctp_ulpqueue_init() */
 
@@ -187,7 +187,7 @@ sctp_ulpqueue_tail_data(sctp_ulpqueue_t *ulpq, sctp_chunk_t *chunk,
 		sctp_ulpqueue_tail_event(ulpq, event);	
 	}
 
-	return(0);
+	return 0;
 
 } /* sctp_ulpqueue_tail_data() */
 
@@ -391,13 +391,13 @@ sctp_ulpqueue_reasm(sctp_ulpqueue_t *ulpq, sctp_ulpevent_t *event)
 
         /* Check if this is part of a fragmented message. */
 	if (SCTP_DATA_NOT_FRAG == (event->chunk_flags & SCTP_DATA_FRAG_MASK)) {
-		return(event);
+		return event;
 	}
 
 	sctp_ulpqueue_store_reasm(ulpq, event);
 	retval = sctp_ulpqueue_retrieve_reassembled(ulpq);
 
-	return(retval);
+	return retval;
 
 } /* sctp_ulpqueue_reasm() */
  
@@ -504,7 +504,7 @@ sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq, sctp_ulpevent_t *event)
 
        /* Check if this message needs ordering. */
        if (SCTP_DATA_UNORDERED & event->chunk_flags) {
-	       return(event);	       
+	       return event;	       
        }       
 
        /* Note: The stream ID must be verified before this routine. */
@@ -521,7 +521,7 @@ sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq, sctp_ulpevent_t *event)
        
 	       sctp_ulpqueue_store_ordered(ulpq, event);
 
-	       return(NULL);
+	       return NULL;
        }
 
        /* Mark that the next chunk has been found. */
@@ -533,7 +533,7 @@ sctp_ulpqueue_order(sctp_ulpqueue_t *ulpq, sctp_ulpevent_t *event)
        
        sctp_ulpqueue_retrieve_ordered(ulpq, event);
 
-       return(event);
+       return event;
  
 } /* sctp_ulpqueue_order() */
 

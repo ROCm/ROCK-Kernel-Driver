@@ -6,7 +6,7 @@
  *
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_sm_statefuns.c,v 1.48 2002/08/16 19:30:50 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/net/sctp/sctp_sm_statefuns.c,v 1.49 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * This is part of the SCTP Linux Kernel Reference Implementation.
  *
@@ -49,7 +49,7 @@
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_sm_statefuns.c,v 1.48 2002/08/16 19:30:50 jgrimm Exp $";
+static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_sm_statefuns.c,v 1.49 2002/08/21 18:34:04 jgrimm Exp $";
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -213,7 +213,7 @@ sctp_sf_pdiscard(const sctp_endpoint_t *ep,
  * We are the side that is being asked for an association.
  * 
  * Section: 5.1 Normal Establishment of an Association, B
- * B) "Z" shall respond immediately with an INIT ACK chunk.  The 
+ * B) "Z" shall respond immediately with an INIT ACK chunk.  The
  *    destination IP address of the INIT ACK MUST be set to the source 
  *    IP address of the INIT to which this INIT ACK is responding.  In 
  *    the response, besides filling in other parameters, "Z" must set the
@@ -3182,7 +3182,80 @@ sctp_sf_do_9_2_prm_shutdown(const sctp_endpoint_t *ep,
 	return disposition;
 
 } /* sctp_sf_do_9_2_prm_shutdown() */
- 
+
+/*
+ * Process the ABORT primitive.
+ *
+ * Section: 10.1:
+ * C) Abort
+ *
+ * Format: Abort(association id [, cause code])
+ * -> result
+ *
+ * Ungracefully closes an association. Any locally queued user data
+ * will be discarded and an ABORT chunk is sent to the peer.  A success code
+ * will be returned on successful abortion of the association. If
+ * attempting to abort the association results in a failure, an error
+ * code shall be returned.
+ *
+ * Mandatory attributes:
+ *
+ *  o association id - local handle to the SCTP association
+ *
+ * Optional attributes:
+ *
+ *  o cause code - reason of the abort to be passed to the peer
+ *
+ * None.
+ *
+ * The return value is the disposition.
+ */
+sctp_disposition_t
+sctp_sf_do_9_1_prm_abort(const sctp_endpoint_t *ep,
+			 const sctp_association_t *asoc,
+			 const sctp_subtype_t type,
+			 void *arg,
+			 sctp_cmd_seq_t *commands)
+{
+
+        /* From 9.1 Abort of an Association
+         * Upon receipt of the ABORT primitive from its upper
+         * layer, the endpoint enters CLOSED state and
+         * discard all outstanding data has been
+         * acknowledged by its peer. The endpoint accepts no new data
+         * from its upper layer, but retransmits data to the far end
+         * if necessary to fill gaps.
+         */
+
+        sctp_chunk_t *abort;
+	sctp_disposition_t retval;
+
+	retval = SCTP_DISPOSITION_CONSUME;
+
+	/* Generate ABORT chunk to send the peer */
+	abort = sctp_make_abort(asoc, NULL, 0);
+	if (!abort) {
+        	retval = SCTP_DISPOSITION_NOMEM;
+	} else {
+		sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(abort)); 
+	}
+
+        /* Even if we can't send the ABORT due to low memory delete the
+	 * TCB.  This is a departure from our typical NOMEM handling.
+	 */
+
+	/* Change to CLOSED state */
+	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
+			SCTP_STATE(SCTP_STATE_CLOSED));
+
+	/* Delete the established association */
+	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
+
+	return retval;
+
+} /* sctp_sf_do_9_1_prm_abort() */
+
+
 /* We tried an illegal operation on an association which is closed.  */
 sctp_disposition_t
 sctp_sf_error_closed(const sctp_endpoint_t *ep,
@@ -3276,6 +3349,64 @@ sctp_sf_cookie_echoed_prm_shutdown(const sctp_endpoint_t *ep,
 	return sctp_sf_cookie_wait_prm_shutdown(ep, asoc, type, arg, commands);
 
 } /* sctp_sf_cookie_echoed_prm_shutdown()  */ 
+
+/*
+ * sctp_cookie_wait_prm_abort
+ *
+ * Section: 4 Note: 2
+ * Verification Tag:
+ * Inputs
+ * (endpoint, asoc)
+ *
+ * The RFC does not explicitly address this issue, but is the route through the
+ * state table when someone issues an abort while in COOKIE_WAIT state.
+ *
+ * Outputs
+ * (timers)
+ */
+sctp_disposition_t
+sctp_sf_cookie_wait_prm_abort(const sctp_endpoint_t *ep,
+			      const sctp_association_t *asoc,
+			      const sctp_subtype_t type,
+			      void *arg,
+			      sctp_cmd_seq_t *commands){
+
+	/* Stop T1-init timer */
+        sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
+
+	return sctp_sf_do_9_1_prm_abort(ep, asoc, type, arg, commands);
+
+} /* sctp_sf_cookie_wait_prm_abort()  */
+
+/*
+ * sctp_cookie_echoed_prm_abort
+ *
+ * Section: 4 Note: 3
+ * Verification Tag:
+ * Inputs
+ * (endpoint, asoc)
+ *
+ * The RFC does not explcitly address this issue, but is the route through the
+ * state table when someone issues an abort while in COOKIE_ECHOED state.
+ *
+ * Outputs
+ * (timers)
+ */
+sctp_disposition_t
+sctp_sf_cookie_echoed_prm_abort(const sctp_endpoint_t *ep,
+				   const sctp_association_t *asoc,
+				   const sctp_subtype_t type,
+				   void *arg,
+				   sctp_cmd_seq_t *commands)
+{
+	
+	/* There is a single T1 timer, so we should be able to use
+	 * common function with the COOKIE-WAIT state.
+	 */
+	return sctp_sf_cookie_wait_prm_abort(ep, asoc, type, arg, commands);
+
+} /* sctp_sf_cookie_echoed_prm_abort()  */
 
 /*
  * Ignore the primitive event

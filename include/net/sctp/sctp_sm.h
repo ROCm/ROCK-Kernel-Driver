@@ -10,7 +10,7 @@
  * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
  * for the SCTP kernel reference Implementation.
  * 
- * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/include/net/sctp/sctp_sm.h,v 1.33 2002/08/16 19:30:49 jgrimm Exp $
+ * $Header: /cvsroot/lksctp/lksctp/sctp_cvs/include/net/sctp/sctp_sm.h,v 1.34 2002/08/21 18:34:04 jgrimm Exp $
  * 
  * These are definitions needed by the state machine.
  * 
@@ -144,6 +144,9 @@ sctp_state_fn_t sctp_sf_do_prm_send;
 sctp_state_fn_t sctp_sf_do_9_2_prm_shutdown;
 sctp_state_fn_t sctp_sf_cookie_wait_prm_shutdown;
 sctp_state_fn_t sctp_sf_cookie_echoed_prm_shutdown;
+sctp_state_fn_t sctp_sf_do_9_1_prm_abort;
+sctp_state_fn_t sctp_sf_cookie_wait_prm_abort;
+sctp_state_fn_t sctp_sf_cookie_echoed_prm_abort;
 sctp_state_fn_t sctp_sf_error_closed;
 sctp_state_fn_t sctp_sf_error_shutdown;
 sctp_state_fn_t sctp_sf_ignore_primitive;
