@@ -109,7 +109,7 @@ int mach_sysrq_shift_mask = 0;
 char *mach_sysrq_xlate = NULL;
 #endif
 
-#if defined(CONFIG_ISA)
+#if defined(CONFIG_ISA) && defined(MULTI_ISA)
 int isa_type;
 int isa_sex;
 #endif
@@ -399,7 +399,7 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 
 /* set ISA defs early as possible */
-#if defined(CONFIG_ISA)
+#if defined(CONFIG_ISA) && defined(MULTI_ISA)
 #if defined(CONFIG_Q40) 
 	if (MACH_IS_Q40) {
 	    isa_type = Q40_ISA;
