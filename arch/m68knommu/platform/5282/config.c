@@ -17,6 +17,7 @@
 #include <linux/sched.h>
 #include <linux/param.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <asm/dma.h>
 #include <asm/traps.h>
 #include <asm/machdep.h>
@@ -27,7 +28,7 @@
 /***************************************************************************/
 
 void coldfire_pit_tick(void);
-void coldfire_pit_init(void (*handler)(int, void *, struct pt_regs *));
+void coldfire_pit_init(irqreturn_t (*handler)(int, void *, struct pt_regs *));
 unsigned long coldfire_pit_offset(void);
 void coldfire_trap_init(void);
 void coldfire_reset(void);
@@ -40,6 +41,8 @@ void coldfire_reset(void);
 unsigned int   dma_base_addr[MAX_M68K_DMA_CHANNELS] = {
         MCF_MBAR + MCFDMA_BASE0,
 };
+
+unsigned int dma_device_address[MAX_M68K_DMA_CHANNELS];
 
 /***************************************************************************/
 
