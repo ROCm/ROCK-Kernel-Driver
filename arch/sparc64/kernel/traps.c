@@ -47,6 +47,7 @@ struct tl1_traplog {
 		unsigned long tstate;
 		unsigned long tpc;
 		unsigned long tnpc;
+		unsigned long tt;
 	} trapstack[4];
 	unsigned long tl;
 };
@@ -58,9 +59,12 @@ static void dump_tl1_traplog(struct tl1_traplog *p)
 	printk("TRAPLOG: Error at trap level 0x%lx, dumping track stack.\n",
 	       p->tl);
 	for (i = 0; i < 4; i++) {
-		printk("TRAPLOG: Trap level %d TSTATE[%016lx] TPC[%016lx] TNPC[%016lx]\n",
+		printk(KERN_CRIT
+		       "TRAPLOG: Trap level %d TSTATE[%016lx] TPC[%016lx] "
+		       "TNPC[%016lx] TT[%lx]\n",
 		       i + 1,
-		       p->trapstack[i].tstate, p->trapstack[i].tpc, p->trapstack[i].tnpc);
+		       p->trapstack[i].tstate, p->trapstack[i].tpc,
+		       p->trapstack[i].tnpc, p->trapstack[i].tt);
 	}
 }
 
