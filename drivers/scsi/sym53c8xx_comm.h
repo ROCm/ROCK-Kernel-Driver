@@ -795,7 +795,7 @@ static m_addr_t ___dma_getp(m_pool_s *mp)
 		dma_addr_t daddr;
 		vp = (m_addr_t) dma_alloc_coherent(mp->bush,
 						PAGE_SIZE<<MEMO_PAGE_ORDER,
-						&daddr, GFP_KERNEL);
+						&daddr, GFP_ATOMIC);
 		if (vp) {
 			int hc = VTOB_HASH_CODE(vp);
 			vbp->vaddr = vp;
@@ -1097,66 +1097,6 @@ static struct ncr_driver_setup
 #define initverbose (driver_setup.verbose)
 #define bootverbose (np->verbose)
 
-
-/*==========================================================
-**
-**	Structures used by the detection routine to transmit 
-**	device configuration to the attach function.
-**
-**==========================================================
-*/
-typedef struct {
-	int	bus;
-	u_char	device_fn;
-	u_long	base;
-	u_long	base_2;
-	u_long	io_port;
-	u_long	base_c;
-	u_long	base_2_c;
-	int	irq;
-/* port and reg fields to use INB, OUTB macros */
-	u_long	base_io;
-	volatile struct ncr_reg	*reg;
-} ncr_slot;
-
-/*==========================================================
-**
-**	Structure used to store the NVRAM content.
-**
-**==========================================================
-*/
-typedef struct {
-	int type;
-#define	SCSI_NCR_SYMBIOS_NVRAM	(1)
-#define	SCSI_NCR_TEKRAM_NVRAM	(2)
-#ifdef	SCSI_NCR_NVRAM_SUPPORT
-	union {
-		Symbios_nvram Symbios;
-		Tekram_nvram Tekram;
-	} data;
-#endif
-} ncr_nvram;
-
-/*==========================================================
-**
-**	Structure used by detection routine to save data on 
-**	each detected board for attach.
-**
-**==========================================================
-*/
-typedef struct {
-	device_t  dev;
-	ncr_slot  slot;
-	ncr_chip  chip;
-	ncr_nvram *nvram;
-	u_char host_id;
-#ifdef	SCSI_NCR_PQS_PDS_SUPPORT
-	u_char pqs_pds;
-#endif
-	int attach_done;
-} ncr_device;
-
-static int ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device);
 
 /*==========================================================
 **

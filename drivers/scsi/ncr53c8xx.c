@@ -82,7 +82,7 @@
 **	    Etc...
 **
 **	Supported NCR/SYMBIOS chips:
-**		53C720		(Wide,   Fast SCSI-2, HP Zalon)
+**		53C720		(Wide,   Fast SCSI-2, intfly problems)
 **		53C810		(8 bits, Fast SCSI-2, no rom BIOS) 
 **		53C815		(8 bits, Fast SCSI-2, on board rom BIOS)
 **		53C820		(Wide,   Fast SCSI-2, no rom BIOS)
@@ -173,31 +173,6 @@
 #endif
 #endif
 
-/*
-**	Define the BSD style u_int32 and u_int64 type.
-**	Are in fact u_int32_t and u_int64_t :-)
-*/
-typedef u32 u_int32;
-typedef u64 u_int64;
-typedef	u_long		vm_offset_t;
-
-#ifdef __hppa__
-/*
- * Yuck.  Current plan is to use ncr58c8xx.c for non-pci big endian
- * chips, and sym53c8xx.c for pci little endian chips.  Define this
- * here so it gets seen by sym53c8xx_defs.h, pulled in via ncr53c8xx.h.
- */
-#define SCSI_NCR_BIG_ENDIAN
-/* INTFLY interrupts don't always seem to get serviced atm..... */
-#define SIMULATED_INTFLY
-#endif
-
-#if defined(CONFIG_SCSI_ZALON) || defined(CONFIG_SCSI_ZALON_MODULE)
-#define ENABLE_SCSI_ZALON
-#include <asm/parisc-device.h>
-#include "zalon.h"
-#endif
-
 #include "ncr53c8xx.h"
 
 /*
@@ -214,6 +189,12 @@ typedef	u_long		vm_offset_t;
 #define DRIVER_SMP_LOCK		ncr53c8xx_lock
 
 #include "sym53c8xx_comm.h"
+
+int ncr53c8xx_slave_configure(Scsi_Device *device);
+int ncr53c8xx_bus_reset(Scsi_Cmnd *cmd);
+int ncr53c8xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *));
+const char *ncr53c8xx_info (struct Scsi_Host *host);
+
 
 /*==========================================================
 **
@@ -397,7 +378,6 @@ static Scsi_Host_Template	*the_template	= NULL;
 
 #define ScsiResult(host_code, scsi_code) (((host_code) << 16) + ((scsi_code) & 0x7f))
 
-static irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ncr53c8xx_timeout(unsigned long np);
 static int ncr53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
 			int length, int func);
@@ -1245,7 +1225,7 @@ struct ncb {
 **	return from the subroutine.
 */
 
-#ifdef ENABLE_SCSI_ZALON
+#ifdef CONFIG_NCR53C8XX_PREFETCH
 #define PREFETCH_FLUSH_CNT	2
 #define PREFETCH_FLUSH		SCR_CALL, PADDRH (wait_dma),
 #else
@@ -1418,8 +1398,6 @@ static	int	ncr_reset_scsi_bus (ncb_p np, int enab_int, int settle_delay);
 #ifdef SCSI_NCR_USER_COMMAND_SUPPORT
 static	void	ncr_usercmd	(ncb_p np);
 #endif
-
-static int ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device);
 
 static void insert_into_waiting_list(ncb_p np, Scsi_Cmnd *cmd);
 static Scsi_Cmnd *retrieve_from_waiting_list(int to_remove, ncb_p np, Scsi_Cmnd *cmd);
@@ -3236,7 +3214,7 @@ static u_long div_10M[] =
  *	ctest4 for others.
  */
 #define burst_code(dmode, ctest0, ctest4, ctest5) \
-	(np->device_id == PSEUDO_ZALON_720_ID) ? \
+	(np->device_id == PSEUDO_720_ID) ? \
 	(ctest0) & 0x80? 0 : (((dmode) & 0xc0) >> 6) + 1 : \
 	(ctest4) & 0x80? 0 : (((dmode) & 0xc0) >> 6) + ((ctest5) & 0x04) + 1
 
@@ -3245,7 +3223,7 @@ static u_long div_10M[] =
  */
 static inline void ncr_init_burst(ncb_p np, u_char bc)
 {
-	u_char *be = (np->device_id == PSEUDO_ZALON_720_ID) ?
+	u_char *be = (np->device_id == PSEUDO_720_ID) ?
 		&np->rv_ctest0 : &np->rv_ctest4;
 	*be		&= ~0x80;
 	np->rv_dmode	&= ~(0x3 << 6);
@@ -3646,7 +3624,7 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 **	start the timer daemon.
 */
 
-static int __init 
+struct Scsi_Host * __init 
 ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 {
         struct host_data *host_data;
@@ -3656,7 +3634,22 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	ncr_nvram *nvram = device->nvram;
 	int i;
 
-#ifndef ENABLE_SCSI_ZALON
+#ifdef SCSI_NCR_PROC_INFO_SUPPORT
+	tpnt->proc_info		= ncr53c8xx_proc_info,
+#endif
+	tpnt->info 		= ncr53c8xx_info;
+	tpnt->queuecommand	= ncr53c8xx_queue_command;
+	tpnt->slave_configure	= ncr53c8xx_slave_configure;
+	tpnt->eh_bus_reset_handler	= ncr53c8xx_bus_reset;
+	tpnt->can_queue		= SCSI_NCR_CAN_QUEUE;
+	tpnt->this_id		= 7;
+	tpnt->sg_tablesize	= SCSI_NCR_SG_TABLESIZE;
+	tpnt->cmd_per_lun	= SCSI_NCR_CMD_PER_LUN;
+	tpnt->use_clustering	= DISABLE_CLUSTERING;
+
+	if(device->differential)
+		driver_setup.diff_support = device->differential;
+
 	printk(KERN_INFO "ncr53c%s-%d: rev 0x%x on pci bus %d device %d function %d "
 #ifdef __sparc__
 		"irq %s\n",
@@ -3671,12 +3664,11 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 #else
 		device->slot.irq);
 #endif
-#endif
 
 	/*
 	**	Allocate host_data structure
 	*/
-        if (!(instance = scsi_register(tpnt, sizeof(*host_data))))
+        if (!(instance = scsi_host_alloc(tpnt, sizeof(*host_data))))
 	        goto attach_error;
 	host_data = (struct host_data *) instance->hostdata;
 
@@ -3744,7 +3736,11 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	np->paddr2	= (np->features & FE_RAM)? device->slot.base_2 : 0;
 
 #ifndef SCSI_NCR_IOMAPPED
-	np->vaddr = remap_pci_mem(device->slot.base_c, (u_long) 128);
+	if(device->slot.base_v)
+		np->vaddr = device->slot.base_v;
+	else
+		np->vaddr = remap_pci_mem(device->slot.base_c, (u_long) 128);
+
 	if (!np->vaddr) {
 		printk(KERN_ERR
 			"%s: can't map memory mapped IO region\n",ncr_name(np));
@@ -3763,16 +3759,14 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 
 	np->reg = (struct ncr_reg*) np->vaddr;
 
-#endif /* !defined SCSI_NCR_IOMAPPED */
+#else
 
 	/*
 	**	Try to map the controller chip into iospace.
 	*/
 
-#ifndef ENABLE_SCSI_ZALON
-	request_region(device->slot.io_port, 128, "ncr53c8xx");
-#endif
 	np->base_io = device->slot.io_port;
+#endif /* !defined SCSI_NCR_IOMAPPED */
 
 #ifdef SCSI_NCR_NVRAM_SUPPORT
 	if (nvram) {
@@ -3898,24 +3892,6 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	**	Install the interrupt handler.
 	*/
 
-	if (request_irq(device->slot.irq, ncr53c8xx_intr,
-			((driver_setup.irqm & 0x10) ? 0 : SA_SHIRQ) |
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,0)
-			((driver_setup.irqm & 0x20) ? 0 : SA_INTERRUPT),
-#else
-			0,
-#endif
-			"ncr53c8xx", np)) {
-#ifdef __sparc__
-		printk(KERN_ERR "%s: request irq %s failure\n",
-			ncr_name(np), __irq_itoa(device->slot.irq));
-#else
-		printk(KERN_ERR "%s: request irq %d failure\n",
-			ncr_name(np), device->slot.irq);
-#endif
-		goto attach_error;
-	}
-
 	np->irq = device->slot.irq;
 
 	/*
@@ -3981,40 +3957,13 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 
 	NCR_UNLOCK_NCB(np, flags);
 
-	return 0;
+	return instance;
 
 attach_error:
-	if (!instance) return -1;
+	if (!instance) return NULL;
 	printk(KERN_INFO "%s: detaching...\n", ncr_name(np));
 	if (!np)
 		goto unregister;
-#ifndef SCSI_NCR_IOMAPPED
-	if (np->vaddr) {
-#ifdef DEBUG_NCR53C8XX
-		printk(KERN_DEBUG "%s: releasing memory mapped IO region %lx[%d]\n", ncr_name(np), (u_long) np->vaddr, 128);
-#endif
-		unmap_pci_mem((vm_offset_t) np->vaddr, (u_long) 128);
-	}
-#endif /* !SCSI_NCR_IOMAPPED */
-	if (np->base_io) {
-#ifdef DEBUG_NCR53C8XX
-		printk(KERN_DEBUG "%s: releasing IO region %x[%d]\n", ncr_name(np), np->base_io, 128);
-#endif
-#ifndef ENABLE_SCSI_ZALON
-		release_region(np->base_io, 128);
-#endif
-	}
-	if (np->irq) {
-#ifdef DEBUG_NCR53C8XX
-#ifdef __sparc__
-	printk(KERN_INFO "%s: freeing irq %s\n", ncr_name(np),
-	       __irq_itoa(np->irq));
-#else
-	printk(KERN_INFO "%s: freeing irq %d\n", ncr_name(np), np->irq);
-#endif
-#endif
-		free_irq(np->irq, np);
-	}
 	if (np->scripth0)
 		m_free_dma(np->scripth0, sizeof(struct scripth), "SCRIPTH");
 	if (np->script0)
@@ -4024,9 +3973,9 @@ attach_error:
 	m_free_dma(np, sizeof(struct ncb), "NCB");
 
 unregister:
-	scsi_unregister(instance);
+	scsi_host_put(instance);
 
-        return -1;
+        return NULL;
 }
 
 
@@ -4823,7 +4772,7 @@ static int ncr_reset_scsi_bus(ncb_p np, int enab_int, int settle_delay)
 	**	properly set IRQ mode, prior to resetting the bus.
 	*/
 	OUTB (nc_stest3, TE);
-	if (np->device_id != PSEUDO_ZALON_720_ID)
+	if (np->device_id != PSEUDO_720_ID)
 		OUTB (nc_dcntl, (np->rv_dcntl & IRQM));
 	OUTB (nc_scntl1, CRST);
 	UDELAY (200);
@@ -5061,19 +5010,6 @@ static int ncr_detach(ncb_p np)
 	OUTW (nc_sien , 0);
 	OUTB (nc_dien , 0);
 
-/*
-**	Free irq
-*/
-
-#ifdef DEBUG_NCR53C8XX
-#ifdef __sparc__
-	printk("%s: freeing irq %s\n", ncr_name(np), __irq_itoa(np->irq));
-#else
-	printk("%s: freeing irq %d\n", ncr_name(np), np->irq);
-#endif
-#endif
-	free_irq(np->irq, np);
-
 	/*
 	**	Reset NCR chip
 	**	Restore bios setting for automatic clock detection.
@@ -5092,24 +5028,6 @@ static int ncr_detach(ncb_p np)
 	OUTB(nc_stest2,	np->sv_stest2);
 
 	ncr_selectclock(np, np->sv_scntl3);
-
-	/*
-	**	Release Memory mapped IO region and IO mapped region
-	*/
-
-#ifndef SCSI_NCR_IOMAPPED
-#ifdef DEBUG_NCR53C8XX
-	printk("%s: releasing memory mapped IO region %lx[%d]\n", ncr_name(np), (u_long) np->vaddr, 128);
-#endif
-	unmap_pci_mem((vm_offset_t) np->vaddr, (u_long) 128);
-#endif /* !SCSI_NCR_IOMAPPED */
-
-#ifdef DEBUG_NCR53C8XX
-	printk("%s: releasing IO region %x[%d]\n", ncr_name(np), np->base_io, 128);
-#endif
-#ifndef ENABLE_SCSI_ZALON
-	release_region(np->base_io, 128);
-#endif
 
 	/*
 	**	Free allocated ccb(s)
@@ -8634,7 +8552,7 @@ static void __init ncr_getclock (ncb_p np, int mult)
 		f1 = ncrgetfreq (np, 11);
 		f2 = ncrgetfreq (np, 11);
 
-		if (bootverbose)
+		if(bootverbose)
 			printk ("%s: NCR clock is %uKHz, %uKHz\n", ncr_name(np), f1, f2);
 
 		if (f1 > f2) f1 = f2;		/* trust lower result	*/
@@ -8774,10 +8692,12 @@ printk("ncr53c8xx : command successfully queued\n");
 **   routine for each host that uses this IRQ.
 */
 
-static irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
+irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
 {
      unsigned long flags;
-     ncb_p np = (ncb_p) dev_id;
+     struct Scsi_Host *shost = (struct Scsi_Host *)dev_id;
+     struct host_data *host_data = (struct host_data *)shost->hostdata;
+     ncb_p np = host_data->ncb;
      Scsi_Cmnd *done_list;
 
 #ifdef DEBUG_NCR53C8XX
@@ -9335,7 +9255,7 @@ __setup("ncr53c8xx=", ncr53c8xx_setup);
 */
 
 static u_short	ncr_chip_ids[]   __initdata = {
-	PSEUDO_ZALON_720_ID,
+	PSEUDO_720_ID,
 	PCI_DEVICE_ID_NCR_53C810,
 	PCI_DEVICE_ID_NCR_53C815,
 	PCI_DEVICE_ID_NCR_53C820,
@@ -9350,73 +9270,6 @@ static u_short	ncr_chip_ids[]   __initdata = {
 	PCI_DEVICE_ID_NCR_53C1510D
 };
 
-#ifdef ENABLE_SCSI_ZALON
-/* Attach a 53c720 interfaced via Zalon chip on HP boxes.  */
-int zalon_attach(Scsi_Host_Template *tpnt, unsigned long io_port,
-		struct parisc_device *dev, int irq, int unit)
-{
-	u_short device_id;
-	u_char revision;
-	int i;
-	ncr_chip *chip;
-	ncr_device device;
-
-	tpnt->proc_name = NAME53C8XX;
-	tpnt->proc_info = ncr53c8xx_proc_info;
-
-#if	defined(SCSI_NCR_BOOT_COMMAND_LINE_SUPPORT) && defined(MODULE)
-	if (ncr53c8xx)
-		ncr53c8xx_setup(ncr53c8xx);
-#endif
-
-#ifdef SCSI_NCR_DEBUG_INFO_SUPPORT
-	ncr_debug = driver_setup.debug;
-#endif
-	if (initverbose >= 2)
-		ncr_print_driver_setup();
-
-	memset(&device, 0, sizeof(ncr_device));
-	chip = 0;
-	device_id = PSEUDO_ZALON_720_ID;
-	revision = 0;
-	for (i = 0; i < sizeof(ncr_chip_table)/sizeof(ncr_chip_table[0]); i++) {		if (device_id != ncr_chip_table[i].device_id)
-			continue;
-		chip = &device.chip;
-		memcpy(chip, &ncr_chip_table[i], sizeof(*chip));
-		chip->revision_id = revision;
-		break;
-	}
-
-	if (!chip) {
-		printk(NAME53C8XX ": not initializing, device not supported\n");		return -1;
-	}
-
-	/* Fix some features according to driver setup. */
-	driver_setup.diff_support = 2;
-
-	/* The following three are needed before any other access. */
-	writeb(0x20, io_port + 0x38); /* DCNTL_REG,  EA  */
-	writeb(0x04, io_port + 0x1b); /* CTEST0_REG, EHP */
-	writeb(0x80, io_port + 0x22); /* CTEST4_REG, MUX */
-
-	/* Initialise ncr_device structure with items required by ncr_attach. */
-	device.host_id		= driver_setup.host_id;
-	device.dev		= &dev->dev;
-	device.slot.bus		= 0;
-	device.slot.device_fn	= 0;
-	device.slot.base	= (u_long)io_port;
-	device.slot.base_c	= (u_long)io_port;
-	device.slot.base_2	= 0;
-	device.slot.base_2_c	= 0;
-	device.slot.io_port	= io_port;
-	device.slot.irq		= irq;
-	device.attach_done	= 0;
-
-	printk(KERN_INFO NAME53C8XX ": 53c%s detected\n", device.chip.name);
-
-	return ncr_attach(tpnt, unit, &device);
-}
-#endif
 
 /*==========================================================
 **
@@ -9445,33 +9298,3 @@ const char *ncr53c8xx_info (struct Scsi_Host *host)
 {
 	return SCSI_NCR_DRIVER_NAME;
 }
-
-/*
-**	Module stuff
-*/
-MODULE_LICENSE("GPL");
-
-static Scsi_Host_Template driver_template =  {
-#ifdef ENABLE_SCSI_ZALON
-	.proc_name		= "zalon720",
-	.detect			= zalon7xx_detect,
-	.release		= zalon7xx_release,
-#else
-	.proc_name		= NAME53C8XX,
-	.detect			= ncr53c8xx_detect,
-	.release		= ncr53c8xx_release,
-#endif
-#ifdef SCSI_NCR_PROC_INFO_SUPPORT
-	.proc_info		= ncr53c8xx_proc_info,
-#endif
-	.info			= ncr53c8xx_info,
-	.queuecommand		= ncr53c8xx_queue_command,
-	.slave_configure	= ncr53c8xx_slave_configure,
-	.eh_bus_reset_handler	= ncr53c8xx_bus_reset,
-	.can_queue		= SCSI_NCR_CAN_QUEUE,
-	.this_id		= 7,
-	.sg_tablesize		= SCSI_NCR_SG_TABLESIZE,
-	.cmd_per_lun		= SCSI_NCR_CMD_PER_LUN,
-	.use_clustering		= DISABLE_CLUSTERING,
-};
-#include "scsi_module.c"

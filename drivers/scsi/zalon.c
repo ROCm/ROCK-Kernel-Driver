@@ -24,30 +24,24 @@
 #include "scsi.h"
 #include "hosts.h"
 
-/*
- * **      Define the BSD style u_int32 and u_int64 type.
- * **      Are in fact u_int32_t and u_int64_t :-)
- * */
-typedef u32 u_int32;
-typedef u64 u_int64;
-typedef u_long          vm_offset_t;
+#include "ncr53c8xx.h"
 
 #include "zalon.h"
 
+MODULE_AUTHOR("Richard Hirst");
+MODULE_DESCRIPTION("Bluefish/Zalon 720 SCSI Driver");
+MODULE_LICENSE("GPL");
 
-/* hosts_* are kluges to pass info between the zalon7xx_detected()
-** and the register_parisc_driver() callbacks.
-*/
-static Scsi_Host_Template *hosts_tptr;
-static int hosts_used=0;
-static int zalon_id = 0;
+static ncr_chip zalon720_chip __initdata = {
+	.device_id =	PSEUDO_720_ID,
+	.revision_id =	0x0f,
+	.name =		"720",
+	.burst_max =	3,
+	.offset_max =	8,
+	.nr_divisor =	4,
+	.features =	FE_WIDE | FE_DIFF | FE_EHP| FE_MUX | FE_EA,
+};
 
-extern int zalon_attach(Scsi_Host_Template *tpnt,
-			unsigned long base_addr,
-			struct parisc_device *dev,
-			int irq_vector,
-			int unit
-			);
 
 
 #if 0
@@ -81,6 +75,11 @@ lasi_scsi_clock(void * hpa, int defaultclock)
 }
 #endif
 
+static Scsi_Host_Template zalon7xx_template = {
+	.module		= THIS_MODULE,
+	.proc_name	= "zalon7xx",
+};
+
 static int __init
 zalon_scsi_callback(struct parisc_device *dev)
 {
@@ -88,6 +87,10 @@ zalon_scsi_callback(struct parisc_device *dev)
 	u32 zalon_vers;
 	int irq;
 	unsigned long zalon = dev->hpa;
+	unsigned long io_port = zalon + GSC_SCSI_ZALON_OFFSET;
+	static int unit = 0;
+	struct Scsi_Host *host;
+	ncr_device device;
 
 	__raw_writel(CMD_RESET, zalon + IO_MODULE_IO_COMMAND);
 	while (!(__raw_readl(zalon + IO_MODULE_IO_STATUS) & IOSTATUS_RY))
@@ -112,17 +115,43 @@ zalon_scsi_callback(struct parisc_device *dev)
 	if ( zalon_vers == 0)
 		printk(KERN_WARNING "%s: Zalon 1.1 or earlier\n", __FUNCTION__);
 
-	/*
-	**  zalon_attach: returns -1 on failure, 0 on success
-	*/
-	hosts_used = zalon_attach(hosts_tptr, dev->hpa + GSC_SCSI_ZALON_OFFSET,
-			dev, irq, zalon_id);
+	memset(&device, 0, sizeof(ncr_device));
 
-	if (hosts_used == 0)
-		zalon_id++;
+	/* The following three are needed before any other access. */
+	writeb(0x20, io_port + 0x38); /* DCNTL_REG,  EA  */
+	writeb(0x04, io_port + 0x1b); /* CTEST0_REG, EHP */
+	writeb(0x80, io_port + 0x22); /* CTEST4_REG, MUX */
 
-	hosts_used = (hosts_used == 0);
-	return (hosts_used == 0);
+	/* Initialise ncr_device structure with items required by ncr_attach. */
+	device.chip		= zalon720_chip;
+	device.host_id		= 7;
+	device.dev		= &dev->dev;
+	device.slot.base	= (u_long)io_port;
+	device.slot.base_c	= (u_long)io_port;
+	device.slot.irq		= irq;
+	device.differential	= 2;
+
+	host = ncr_attach(&zalon7xx_template, unit, &device);
+	if(!host)
+		goto fail;
+
+	strlcpy(dev->dev.name, "zalon7xx", sizeof(dev->dev.name));
+
+	if(request_irq(irq, ncr53c8xx_intr, SA_SHIRQ, dev->dev.name, host)) {
+		printk(KERN_ERR "%s: irq problem with %d, detaching\n ",
+		       dev->dev.name, irq);
+		goto fail;
+	}
+
+	unit++;
+
+	dev_set_drvdata(&dev->dev, host);
+
+	scsi_add_host(host, &dev->dev);
+
+	return 0;
+ fail:
+	return -ENODEV;
 }
 
 static struct parisc_device_id zalon_tbl[] = {
@@ -132,30 +161,35 @@ static struct parisc_device_id zalon_tbl[] = {
 
 MODULE_DEVICE_TABLE(parisc, zalon_tbl);
 
+static int __exit zalon_remove(struct parisc_device *dev)
+{
+	struct Scsi_Host *host = dev_get_drvdata(&dev->dev);
+	int irq = host->irq;
+
+	scsi_remove_host(host);
+	ncr53c8xx_release(host);
+	free_irq(irq, host);
+
+	return 0;
+}
+	
+
 static struct parisc_driver zalon_driver = {
 	.name =		"GSC SCSI (Zalon)",
 	.id_table =	zalon_tbl,
 	.probe =	zalon_scsi_callback,
+	.remove =	__devexit_p(zalon_remove),
 };
 
-int zalon7xx_detect(Scsi_Host_Template *tpnt)
+static int __init zalon7xx_init(void)
 {
-	/* "pass" the parameter to the callback functions */
-	hosts_tptr = tpnt;
-	hosts_used = 0;
-
-	/* claim all zalon cards. */
-	register_parisc_driver(&zalon_driver);
-
-	/* Check if any callbacks actually found/claimed anything. */
-	return (hosts_used != 0);
+	return register_parisc_driver(&zalon_driver);
 }
 
-extern int ncr53c8xx_release(struct Scsi_Host *host);
-
-int zalon7xx_release(struct Scsi_Host *host)
+static void __exit zalon7xx_exit(void)
 {
-	ncr53c8xx_release(host);
 	unregister_parisc_driver(&zalon_driver);
-	return 1;
 }
+
+module_init(zalon7xx_init);
+module_exit(zalon7xx_exit);

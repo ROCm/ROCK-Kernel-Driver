@@ -953,27 +953,6 @@ config SCSI_ZALON
 	  used on the add-in Bluefish, Barracuda & Shrike SCSI cards.
 	  Say Y here if you have one of these machines or cards.
 
-config SCSI_NCR53C8XX
-	tristate "NCR53C8XX SCSI support"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && SCSI_ZALON!=y && SCSI
-	---help---
-	  This is the BSD ncr driver adapted to Linux for the NCR53C8XX family
-	  of PCI-SCSI controllers.  This driver supports parity checking,
-	  tagged command queuing and fast synchronous data transfers up to 80
-	  MB/s with wide FAST-40 LVD devices and controllers.
-
-	  Recent versions of the 53C8XX chips are better supported by the
-	  option "SYM53C8XX SCSI support", below.
-
-	  Note: there is yet another driver for the 53c8xx family of
-	  controllers ("NCR53c7,8xx SCSI support" above).  If you want to use
-	  them both, you need to say M to both and build them as modules, but
-	  only one may be active at a time.  If you have a 53c8xx board, you
-	  probably do not want to use the "NCR53c7,8xx SCSI support".
-
-	  Please read <file:Documentation/scsi/ncr53c8xx.txt> for more
-	  information.
-
 config SCSI_SYM53C8XX
 	tristate "SYM53C8XX SCSI support"
 	depends on PCI && SCSI_SYM53C8XX_2!=y && SCSI
@@ -1002,8 +981,8 @@ config SCSI_SYM53C8XX
 	  information.
 
 config SCSI_NCR53C8XX_DEFAULT_TAGS
-	int "default tagged command queue depth"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
+	int "  default tagged command queue depth"
+	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
 	default "8"
 	---help---
 	  "Tagged command queuing" is a feature of SCSI-2 which improves
@@ -1028,8 +1007,8 @@ config SCSI_NCR53C8XX_DEFAULT_TAGS
 	  There is no safe option other than using good SCSI devices.
 
 config SCSI_NCR53C8XX_MAX_TAGS
-	int "maximum number of queued commands"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
+	int "  maximum number of queued commands"
+	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
 	default "32"
 	---help---
 	  This option allows you to specify the maximum number of commands
@@ -1045,8 +1024,8 @@ config SCSI_NCR53C8XX_MAX_TAGS
 	  There is no safe option and the default answer is recommended.
 
 config SCSI_NCR53C8XX_SYNC
-	int "synchronous transfers frequency in MHz"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
+	int "  synchronous transfers frequency in MHz"
+	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
 	default "20"
 	---help---
 	  The SCSI Parallel Interface-2 Standard defines 5 classes of transfer
@@ -1079,8 +1058,8 @@ config SCSI_NCR53C8XX_SYNC
 	  terminations and SCSI conformant devices.
 
 config SCSI_NCR53C8XX_PROFILE
-	bool "enable profiling"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
+	bool "  enable profiling"
+	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
 	help
 	  This option allows you to enable profiling information gathering.
 	  These statistics are not very accurate due to the low frequency
@@ -1090,8 +1069,8 @@ config SCSI_NCR53C8XX_PROFILE
 	  The normal answer therefore is N.
 
 config SCSI_NCR53C8XX_IOMAPPED
-	bool "use normal IO"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX) && !SCSI_ZALON
+	bool "  use normal IO"
+	depends on SCSI_SYM53C8XX && !(SCSI_ZALON || SCSI_NCR_Q720)
 	help
 	  If you say Y here, the driver will use normal IO, as opposed to
 	  memory mapped IO. Memory mapped IO has less latency than normal IO
@@ -1103,8 +1082,8 @@ config SCSI_NCR53C8XX_IOMAPPED
 	  related problems.
 
 config SCSI_NCR53C8XX_PQS_PDS
-	bool "include support for the NCR PQS/PDS SCSI card"
-	depends on (SCSI_NCR53C8XX || SCSI_SYM53C8XX) && SCSI_SYM53C8XX
+	bool "  include support for the NCR PQS/PDS SCSI card"
+	depends on SCSI_SYM53C8XX
 	help
 	  Say Y here if you have a special SCSI adapter produced by NCR
 	  corporation called a PCI Quad SCSI or PCI Dual SCSI. You do not need
@@ -1115,8 +1094,8 @@ config SCSI_NCR53C8XX_PQS_PDS
 	  The common answer here is N, but answering Y is safe.
 
 config SCSI_NCR53C8XX_NO_DISCONNECT
-	bool "not allow targets to disconnect"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON) && SCSI_NCR53C8XX_DEFAULT_TAGS=0
+	bool "  not allow targets to disconnect"
+	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720) && SCSI_NCR53C8XX_DEFAULT_TAGS=0
 	help
 	  This option is only provided for safety if you suspect some SCSI
 	  device of yours to not support properly the target-disconnect
@@ -1125,8 +1104,8 @@ config SCSI_NCR53C8XX_NO_DISCONNECT
 	  than 1 device on a SCSI bus. The normal answer therefore is N.
 
 config SCSI_NCR53C8XX_SYMBIOS_COMPAT
-	bool "assume boards are SYMBIOS compatible (EXPERIMENTAL)"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON) && EXPERIMENTAL
+	bool "  assume boards are SYMBIOS compatible (EXPERIMENTAL)"
+	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720 ) && EXPERIMENTAL
 	---help---
 	  This option allows you to enable some features depending on GPIO
 	  wiring. These General Purpose Input/Output pins can be used for
