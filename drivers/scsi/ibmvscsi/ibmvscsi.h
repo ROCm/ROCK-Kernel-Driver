@@ -29,19 +29,11 @@
  */
 #ifndef IBMVSCSI_H
 #define IBMVSCSI_H
-#include <linux/types.h>
-#include <linux/kernel.h>
-#include <linux/version.h>   
-#include <linux/string.h>    
-#include <linux/errno.h>     
-#include <linux/init.h>
-#include <linux/module.h>    
-#include <linux/blkdev.h>    
-#include <linux/interrupt.h> 
+#include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
-#include <scsi/scsi.h>
 #include <linux/dma-mapping.h>
+#include <linux/completion.h>
 #include "viosrp.h"
 
 /**
@@ -76,6 +68,7 @@ struct srp_event_struct {
 	/* for the queue case only: */
 	struct SRP_CMD cmd;
 	void (*cmnd_done)(struct scsi_cmnd *);	/* special _done_ passed with scsi cmd */
+	struct completion comp;
 };
 
 /* a pool of event structs for use */

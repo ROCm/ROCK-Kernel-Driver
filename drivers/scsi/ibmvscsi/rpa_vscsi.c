@@ -31,6 +31,7 @@
 #include <asm/pci_dma.h>
 #include <asm/hvcall.h>
 #include "ibmvscsi.h"
+#include <linux/interrupt.h> 
 
 /* ------------------------------------------------------------
  * Routines for managing the command/response queue

@@ -60,7 +60,8 @@ struct VIOSRP_CRQ {
 enum VIOSRP_MAD_TYPES {
 	VIOSRP_EMPTY_IU_TYPE = 0x01,
 	VIOSRP_ERROR_LOG_TYPE = 0x02,
-	VIOSRP_ADAPTER_INFO_TYPE = 0x03
+	VIOSRP_ADAPTER_INFO_TYPE = 0x03,
+	VIOSRP_HOST_CONFIG_TYPE = 0x04
 };
 
 /* 
@@ -96,15 +97,30 @@ struct VIOSRP_ADAPTER_INFO {
 	u64 buffer;
 };
 
+struct VIOSRP_HOST_CONFIG {
+	struct MAD_COMMON common;
+	u64 buffer;
+};
+
 union MAD_IU {
 	struct VIOSRP_EMPTY_IU empty_iu;
 	struct VIOSRP_ERROR_LOG error_log;
 	struct VIOSRP_ADAPTER_INFO adapter_info;
+	struct VIOSRP_HOST_CONFIG host_config;
 };
 
 union VIOSRP_IU {
 	union SRP_IU srp;
 	union MAD_IU mad;
+};
+
+struct MAD_ADAPTER_INFO_DATA {
+    char srp_version[8];
+    char partition_name[96];
+    u32 partition_number;
+    u32 mad_version;
+    u32 os_type;
+    u32 port_max_txu[8]; /* per-port maximum transfer */
 };
 
 #endif

@@ -55,7 +55,7 @@ static hw_irq_controller iSeries_IRQ_handler = {
 	.end = iSeries_end_IRQ
 };
 
-void iSeries_init_irq_desc(irq_desc_t *desc)
+void iSeries_init_irq_desc(int irq, irq_desc_t *desc)
 {
 	desc->handler = &iSeries_IRQ_handler;
 }
@@ -108,13 +108,6 @@ static unsigned int iSeries_startup_IRQ(unsigned int irq)
 				bus, subBus, deviceId, irq);
 	return 0;
 }
-
-#if 0
-/*
- * Temporary hack
- */
-#define get_irq_desc(irq)	&irq_desc[(irq)]
-#endif
 
 /*
  * This is called out of iSeries_fixup to activate interrupt

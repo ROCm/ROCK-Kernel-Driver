@@ -766,9 +766,10 @@ void __init smp_cpus_done(unsigned int max_cpus)
 #ifdef CONFIG_NUMA
 static struct node node_devices[MAX_NUMNODES];
 
-static int register_nodes(void)
+static void register_nodes(void)
 {
 	int i;
+	int ret;
 
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		if (node_online(i)) {
@@ -777,12 +778,16 @@ static int register_nodes(void)
 
 			if (p_node != i)
 				parent = &node_devices[p_node];
-			return register_node(&node_devices[i], i, parent);
+
+			ret = register_node(&node_devices[i], i, parent);
+			if (ret)
+				printk(KERN_WARNING "register_nodes: "
+				       "register_node %d failed (%d)", i, ret);
 		}
 	}
 }
 #else
-static int register_nodes(void)
+static void register_nodes(void)
 {
 	return 0;
 }
@@ -803,6 +808,7 @@ static int __init topology_init(void)
 {
 	int cpu;
 	struct node *parent = NULL;
+	int ret;
 
 	register_nodes();
 
@@ -810,9 +816,16 @@ static int __init topology_init(void)
 #ifdef CONFIG_NUMA
 		parent = &node_devices[cpu_to_node(cpu)];
 #endif
-		register_cpu(&per_cpu(cpu_devices, cpu), cpu, parent);
-		sysdev_create_file(&per_cpu(cpu_devices, cpu).sysdev,
-				   &attr_physical_id);
+		ret = register_cpu(&per_cpu(cpu_devices, cpu), cpu, parent);
+		if (ret) 
+			printk(KERN_WARNING "topology_init: register_cpu %d "
+			       "failed (%d)\n", cpu, ret);
+
+		ret = sysdev_create_file(&per_cpu(cpu_devices, cpu).sysdev,
+					 &attr_physical_id);
+		if (ret) 
+			printk(KERN_WARNING "toplogy_init: sysdev_create_file "
+			       "%d failed (%d)\n", cpu, ret);
 	}
 	return 0;
 }
