@@ -1082,7 +1082,7 @@ static void ip6ip6_tnl_dev_setup(struct net_device *dev)
 {
 	SET_MODULE_OWNER(dev);
 	dev->uninit = ip6ip6_tnl_dev_uninit;
-	dev->destructor = (void (*)(struct net_device *))kfree;
+	dev->destructor = free_netdev;
 	dev->hard_start_xmit = ip6ip6_tnl_xmit;
 	dev->get_stats = ip6ip6_tnl_get_stats;
 	dev->do_ioctl = ip6ip6_tnl_ioctl;
