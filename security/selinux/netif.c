@@ -16,6 +16,7 @@
 #include <linux/stddef.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
 #include <linux/rcupdate.h>
