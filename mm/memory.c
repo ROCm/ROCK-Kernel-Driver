@@ -122,8 +122,10 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++)
+	for (j = 0; j < PTRS_PER_PMD ; j++) {
+		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
 		free_one_pmd(tlb, pmd+j);
+	}
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -681,7 +683,7 @@ static inline struct page *get_page_map(struct page *page)
 }
 
 
-#ifdef FIXADDR_USER_START
+#ifdef FIXADDR_START
 static struct vm_area_struct fixmap_vma = {
 	/* Catch users - if there are any valid
 	   ones, we can make this be "&init_mm" or
