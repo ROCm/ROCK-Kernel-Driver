@@ -3376,9 +3376,11 @@ void md_check_recovery(mddev_t *mddev)
 		if (mddev->sb_dirty)
 			md_update_sb(mddev);
 		if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery) &&
-		    !test_bit(MD_RECOVERY_DONE, &mddev->recovery))
+		    !test_bit(MD_RECOVERY_DONE, &mddev->recovery)) {
 			/* resync/recovery still happening */
+			clear_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			goto unlock;
+		}
 		if (mddev->sync_thread) {
 			/* resync has finished, collect result */
 			md_unregister_thread(mddev->sync_thread);
@@ -3391,11 +3393,13 @@ void md_check_recovery(mddev_t *mddev)
 			}
 			md_update_sb(mddev);
 			mddev->recovery = 0;
+			/* flag recovery needed just to double check */
+			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			wake_up(&resync_wait);
 			goto unlock;
 		}
 		if (mddev->recovery) {
-			/* that's odd.. */
+			/* probably just the RECOVERY_NEEDED flag */
 			mddev->recovery = 0;
 			wake_up(&resync_wait);
 		}
