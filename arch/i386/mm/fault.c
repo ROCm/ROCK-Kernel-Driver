@@ -215,7 +215,7 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
-	struct vm_area_struct * vma;
+	struct vm_area_struct * vma, * prev_vma;
 	unsigned long address;
 	unsigned long page;
 	int write;
@@ -306,7 +306,13 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		if (address + 32 < regs->esp)
 			goto bad_area;
 	}
-	if (expand_stack(vma, address))
+	/*
+	 * find_vma_prev is just a bit slower, because it cannot
+	 * use the mmap_cache, so we run it only in the growsdown
+	 * slow path and we leave find_vma in the fast path.
+	 */
+	find_vma_prev(current->mm, address, &prev_vma);
+	if (expand_stack(vma, address, prev_vma))
 		goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so

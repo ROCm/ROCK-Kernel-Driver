@@ -197,7 +197,7 @@ survive:
 	goto survive;
 
 check_stack:
-	if (vma->vm_flags & VM_GROWSDOWN && !expand_stack(vma, addr))
+	if (vma->vm_flags & VM_GROWSDOWN && !expand_stack(vma, addr, NULL))
 		goto good_area;
 out:
 	return fault;
