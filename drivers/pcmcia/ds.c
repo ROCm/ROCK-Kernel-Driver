@@ -590,8 +590,9 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 {
 	struct pcmcia_bus_socket *s = skt->pcmcia;
+	struct pcmcia_device *p_dev;
+	unsigned long flags;
 	int ret = 0;
-	client_t *client;
 
 	ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
 	       event, priority, s);
@@ -602,8 +603,10 @@ static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 		s->state &= ~DS_SOCKET_PRESENT;
 	    	send_event(skt, event, priority);
 		handle_event(s, event);
-		for (client = skt->clients; client; client = client->next)
-			client->state |= CLIENT_STALE;
+		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+		list_for_each_entry(p_dev, &s->devices_list, socket_device_list)
+			p_dev->client->state |= CLIENT_STALE;
+		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 		break;
 	
 	case CS_EVENT_CARD_INSERTION:
