@@ -810,10 +810,10 @@ typedef struct smb_com_copy_rsp {
 
 typedef struct smb_com_nt_rename_req {	/* A5 - also used for create hardlink */
 	struct smb_hdr hdr;	/* wct = 4 */
-	__u16 SearchAttributes;	/* target file attributes */
-	__u16 Flags;		/* spec says Information Level */
-	__u32 ClusterCount;
-	__u16 ByteCount;
+	__le16 SearchAttributes;	/* target file attributes */
+	__le16 Flags;		/* spec says Information Level */
+	__le32 ClusterCount;
+	__le16 ByteCount;
 	__u8 BufferFormat;	/* 4 = ASCII or Unicode */
 	unsigned char OldFileName[1];
 	/* followed by __u8 BufferFormat2 */
