@@ -28,6 +28,7 @@
 #include <asm/uaccess.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/clksupport.h>
+#include <asm/sn/shub_mmr.h>
 
 MODULE_AUTHOR("Jesse Barnes <jbarnes@sgi.com>");
 MODULE_DESCRIPTION("Multimedia timer support");

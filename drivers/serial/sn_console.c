@@ -52,7 +52,6 @@
 
 #include <asm/io.h>
 #include <asm/sn/simulator.h>
-#include <asm/sn/sn2/sn_private.h>
 #include <asm/sn/sn_sal.h>
 
 /* number of characters we can transmit to the SAL console at a time */
@@ -71,12 +70,12 @@
 
 /* To use dynamic numbers only and not use the assigned major and minor,
  * define the following.. */
-/* #define USE_DYNAMIC_MINOR 1 */ /* use dynamic minor number */
-#define USE_DYNAMIC_MINOR 0 /* Don't rely on misc_register dynamic minor */
+				  /* #define USE_DYNAMIC_MINOR 1 *//* use dynamic minor number */
+#define USE_DYNAMIC_MINOR 0	/* Don't rely on misc_register dynamic minor */
 
 /* Device name we're using */
 #define DEVICE_NAME "ttySG"
-#define DEVICE_NAME_DYNAMIC "ttySG0"  /* need full name for misc_register */
+#define DEVICE_NAME_DYNAMIC "ttySG0"	/* need full name for misc_register */
 /* The major/minor we are using, ignored for USE_DYNAMIC_MINOR */
 #define DEVICE_MAJOR 204
 #define DEVICE_MINOR 40
@@ -107,7 +106,7 @@ struct sn_cons_port {
 static struct sn_cons_port sal_console_port;
 
 /* Only used if USE_DYNAMIC_MINOR is set to 1 */
-static struct miscdevice misc; /* used with misc_register for dynamic */
+static struct miscdevice misc;	/* used with misc_register for dynamic */
 
 extern u64 master_node_bedrock_address;
 extern void early_sn_setup(void);
@@ -169,15 +168,13 @@ static struct sn_sal_ops intr_ops = {
  * output is buffered and sent to the SAL asynchronously (either by
  * timer callback or by UART interrupt) */
 
-
 /* routines for running the console in polling mode */
 
 /**
  * snt_poll_getc - Get a character from the console in polling mode
  *
  */
-static int
-snt_poll_getc(void)
+static int snt_poll_getc(void)
 {
 	int ch;
 
@@ -189,8 +186,7 @@ snt_poll_getc(void)
  * snt_poll_input_pending - Check if any input is waiting - polling mode.
  *
  */
-static int
-snt_poll_input_pending(void)
+static int snt_poll_input_pending(void)
 {
 	int status, input;
 
@@ -206,8 +202,7 @@ snt_poll_input_pending(void)
  * @count: length of string
  *
  */
-static int
-snt_sim_puts(const char *str, int count)
+static int snt_sim_puts(const char *str, int count)
 {
 	int counter = count;
 
@@ -231,8 +226,7 @@ snt_sim_puts(const char *str, int count)
  * snt_sim_getc - Get character from console in simulator mode
  *
  */
-static int
-snt_sim_getc(void)
+static int snt_sim_getc(void)
 {
 	return readb(master_node_bedrock_address + (UART_RX << 3));
 }
@@ -241,8 +235,7 @@ snt_sim_getc(void)
  * snt_sim_input_pending - Check if there is input pending in simulator mode
  *
  */
-static int
-snt_sim_input_pending(void)
+static int snt_sim_input_pending(void)
 {
 	return readb(master_node_bedrock_address +
 		     (UART_LSR << 3)) & UART_LSR_DR;
@@ -254,8 +247,7 @@ snt_sim_input_pending(void)
  * snt_intr_getc - Get a character from the console, interrupt mode
  *
  */
-static int
-snt_intr_getc(void)
+static int snt_intr_getc(void)
 {
 	return ia64_sn_console_readc();
 }
@@ -264,8 +256,7 @@ snt_intr_getc(void)
  * snt_intr_input_pending - Check if input is pending, interrupt mode
  *
  */
-static int
-snt_intr_input_pending(void)
+static int snt_intr_input_pending(void)
 {
 	return ia64_sn_console_intr_status() & SAL_CONSOLE_INTR_RECV;
 }
@@ -278,8 +269,7 @@ snt_intr_input_pending(void)
  * @len: Length
  *
  */
-static int
-snt_hw_puts_raw(const char *s, int len)
+static int snt_hw_puts_raw(const char *s, int len)
 {
 	/* this will call the PROM and not return until this is done */
 	return ia64_sn_console_putb(s, len);
@@ -291,8 +281,7 @@ snt_hw_puts_raw(const char *s, int len)
  * @len: Length
  *
  */
-static int
-snt_hw_puts_buffered(const char *s, int len)
+static int snt_hw_puts_buffered(const char *s, int len)
 {
 	/* queue data to the PROM */
 	return ia64_sn_console_xmit_chars((char *)s, len);
@@ -310,8 +299,7 @@ snt_hw_puts_buffered(const char *s, int len)
  * @port: Port to operate with (we ignore since we only have one port)
  *
  */
-static const char *
-snp_type(struct uart_port *port)
+static const char *snp_type(struct uart_port *port)
 {
 	return ("SGI SN L1");
 }
@@ -321,8 +309,7 @@ snp_type(struct uart_port *port)
  * @port: Port to operate on (we ignore since we only have one port)
  *
  */
-static unsigned int
-snp_tx_empty(struct uart_port *port)
+static unsigned int snp_tx_empty(struct uart_port *port)
 {
 	return 1;
 }
@@ -333,8 +320,7 @@ snp_tx_empty(struct uart_port *port)
  * @tty_stop: Set to 1 if called via uart_stop
  *
  */
-static void
-snp_stop_tx(struct uart_port *port, unsigned int tty_stop)
+static void snp_stop_tx(struct uart_port *port, unsigned int tty_stop)
 {
 }
 
@@ -343,8 +329,7 @@ snp_stop_tx(struct uart_port *port, unsigned int tty_stop)
  * @port: Port to operate on - we ignore - no-op function
  *
  */
-static void
-snp_release_port(struct uart_port *port)
+static void snp_release_port(struct uart_port *port)
 {
 }
 
@@ -353,8 +338,7 @@ snp_release_port(struct uart_port *port)
  * @port: Port to operate on - we ignore - no-op function
  *
  */
-static void
-snp_enable_ms(struct uart_port *port)
+static void snp_enable_ms(struct uart_port *port)
 {
 }
 
@@ -363,8 +347,7 @@ snp_enable_ms(struct uart_port *port)
  * @port: Port to shut down - we ignore
  *
  */
-static void
-snp_shutdown(struct uart_port *port)
+static void snp_shutdown(struct uart_port *port)
 {
 }
 
@@ -374,8 +357,7 @@ snp_shutdown(struct uart_port *port)
  * @mctrl: Lines to set/unset - we ignore
  *
  */
-static void
-snp_set_mctrl(struct uart_port *port, unsigned int mctrl)
+static void snp_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
 }
 
@@ -384,8 +366,7 @@ snp_set_mctrl(struct uart_port *port, unsigned int mctrl)
  * @port: port to operate on - we only have one port so we ignore this
  *
  */
-static unsigned int
-snp_get_mctrl(struct uart_port *port)
+static unsigned int snp_get_mctrl(struct uart_port *port)
 {
 	return TIOCM_CAR | TIOCM_RNG | TIOCM_DSR | TIOCM_CTS;
 }
@@ -395,8 +376,7 @@ snp_get_mctrl(struct uart_port *port)
  * @port: Port to operate on - we ignore
  *
  */
-static void
-snp_stop_rx(struct uart_port *port)
+static void snp_stop_rx(struct uart_port *port)
 {
 }
 
@@ -406,11 +386,11 @@ snp_stop_rx(struct uart_port *port)
  * @tty_stop: Set to 1 if called via uart_start
  *
  */
-static void
-snp_start_tx(struct uart_port *port, unsigned int tty_stop)
+static void snp_start_tx(struct uart_port *port, unsigned int tty_stop)
 {
 	if (sal_console_port.sc_ops->sal_wakeup_transmit)
-		sal_console_port.sc_ops->sal_wakeup_transmit(&sal_console_port, TRANSMIT_BUFFERED);
+		sal_console_port.sc_ops->sal_wakeup_transmit(&sal_console_port,
+							     TRANSMIT_BUFFERED);
 
 }
 
@@ -420,8 +400,7 @@ snp_start_tx(struct uart_port *port, unsigned int tty_stop)
  * @break_state: Break state
  *
  */
-static void
-snp_break_ctl(struct uart_port *port, int break_state)
+static void snp_break_ctl(struct uart_port *port, int break_state)
 {
 }
 
@@ -430,8 +409,7 @@ snp_break_ctl(struct uart_port *port, int break_state)
  * @port: Port to operate on
  *
  */
-static int
-snp_startup(struct uart_port *port)
+static int snp_startup(struct uart_port *port)
 {
 	return 0;
 }
@@ -454,8 +432,7 @@ snp_set_termios(struct uart_port *port, struct termios *termios,
  * @port: port to operate on
  *
  */
-static int
-snp_request_port(struct uart_port *port)
+static int snp_request_port(struct uart_port *port)
 {
 	return 0;
 }
@@ -466,8 +443,7 @@ snp_request_port(struct uart_port *port)
  * @flags: flags used for port setup
  *
  */
-static void
-snp_config_port(struct uart_port *port, int flags)
+static void snp_config_port(struct uart_port *port, int flags)
 {
 }
 
@@ -505,15 +481,14 @@ static struct uart_ops sn_console_ops = {
  * itself may be broken.
  *
  */
-static int
-sn_debug_printf(const char *fmt, ...)
+static int sn_debug_printf(const char *fmt, ...)
 {
 	static char printk_buf[1024];
 	int printed_len;
 	va_list args;
 
 	va_start(args, fmt);
-	printed_len = vsnprintf(printk_buf, sizeof (printk_buf), fmt, args);
+	printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 
 	if (!sal_console_port.sc_ops) {
 		if (IS_RUNNING_ON_SIMULATOR())
@@ -528,12 +503,11 @@ sn_debug_printf(const char *fmt, ...)
 	va_end(args);
 	return printed_len;
 }
-#endif	/* DEBUG */
+#endif				/* DEBUG */
 
 /*
  * Interrupt handling routines.
  */
-
 
 /**
  * sn_receive_chars - Grab characters, pass them to tty layer
@@ -635,8 +609,7 @@ sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs,
  * ignore them until we register with the serial core stuffs.
  *
  */
-static void
-sn_transmit_chars(struct sn_cons_port *port, int raw)
+static void sn_transmit_chars(struct sn_cons_port *port, int raw)
 {
 	int xmit_count, tail, head, loops, ii;
 	int result;
@@ -651,8 +624,7 @@ sn_transmit_chars(struct sn_cons_port *port, int raw)
 	if (port->sc_port.info) {
 		/* We're initilized, using serial core infrastructure */
 		xmit = &port->sc_port.info->xmit;
-	}
-	else {
+	} else {
 		/* Probably sn_sal_switch_to_asynch has been run but serial core isn't
 		 * initilized yet.  Just return.  Writes are going through
 		 * sn_sal_console_write (due to register_console) at this time.
@@ -704,7 +676,7 @@ sn_transmit_chars(struct sn_cons_port *port, int raw)
 		uart_write_wakeup(&port->sc_port);
 
 	if (uart_circ_empty(xmit))
-		snp_stop_tx(&port->sc_port, 0); /* no-op for us */
+		snp_stop_tx(&port->sc_port, 0);	/* no-op for us */
 }
 
 /**
@@ -714,10 +686,9 @@ sn_transmit_chars(struct sn_cons_port *port, int raw)
  * @regs: Saved registers, used by sn_receive_chars for uart_handle_sysrq_char
  *
  */
-static irqreturn_t
-sn_sal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sn_sal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	struct sn_cons_port *port = (struct sn_cons_port *) dev_id;
+	struct sn_cons_port *port = (struct sn_cons_port *)dev_id;
 	unsigned long flags;
 	int status = ia64_sn_console_intr_status();
 
@@ -742,8 +713,7 @@ sn_sal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * returns the console irq if interrupt is successfully registered, else 0
  *
  */
-static int
-sn_sal_connect_interrupt(struct sn_cons_port *port)
+static int sn_sal_connect_interrupt(struct sn_cons_port *port)
 {
 	if (request_irq(SGI_UART_VECTOR, sn_sal_interrupt,
 			SA_INTERRUPT | SA_SHIRQ,
@@ -764,10 +734,9 @@ sn_sal_connect_interrupt(struct sn_cons_port *port)
  * Obviously not used in interrupt mode
  *
  */
-static void
-sn_sal_timer_poll(unsigned long data)
+static void sn_sal_timer_poll(unsigned long data)
 {
-	struct sn_cons_port *port = (struct sn_cons_port *) data;
+	struct sn_cons_port *port = (struct sn_cons_port *)data;
 	unsigned long flags;
 
 	if (!port)
@@ -797,8 +766,7 @@ sn_sal_timer_poll(unsigned long data)
  * if we didn't already come through here via sn_sal_serial_console_init.
  *
  */
-static void __init
-sn_sal_switch_to_asynch(struct sn_cons_port *port)
+static void __init sn_sal_switch_to_asynch(struct sn_cons_port *port)
 {
 	unsigned long flags;
 
@@ -827,7 +795,7 @@ sn_sal_switch_to_asynch(struct sn_cons_port *port)
 	 */
 	init_timer(&port->sc_timer);
 	port->sc_timer.function = sn_sal_timer_poll;
-	port->sc_timer.data = (unsigned long) port;
+	port->sc_timer.data = (unsigned long)port;
 
 	if (IS_RUNNING_ON_SIMULATOR())
 		port->sc_interrupt_timeout = 6;
@@ -854,8 +822,7 @@ sn_sal_switch_to_asynch(struct sn_cons_port *port)
  * We attempt to switch to interrupt mode here by calling
  * sn_sal_connect_interrupt.  If that works out, we enable receive interrupts.
  */
-static void __init
-sn_sal_switch_to_interrupts(struct sn_cons_port *port)
+static void __init sn_sal_switch_to_interrupts(struct sn_cons_port *port)
 {
 	int irq;
 	unsigned long flags;
@@ -893,7 +860,7 @@ static struct console sal_console = {
 	.write = sn_sal_console_write,
 	.device = uart_console_device,
 	.setup = sn_sal_console_setup,
-	.index = -1, /* unspecified */
+	.index = -1,		/* unspecified */
 	.data = &sal_console_uart,
 };
 
@@ -903,9 +870,9 @@ static struct uart_driver sal_console_uart = {
 	.owner = THIS_MODULE,
 	.driver_name = "sn_console",
 	.dev_name = DEVICE_NAME,
-	.major = 0, /* major/minor set at registration time per USE_DYNAMIC_MINOR */
+	.major = 0,		/* major/minor set at registration time per USE_DYNAMIC_MINOR */
 	.minor = 0,
-	.nr = 1,	/* one port */
+	.nr = 1,		/* one port */
 	.cons = SAL_CONSOLE,
 };
 
@@ -918,8 +885,7 @@ static struct uart_driver sal_console_uart = {
  * core and try to enable interrupt driven mode.
  *
  */
-static int __init
-sn_sal_module_init(void)
+static int __init sn_sal_module_init(void)
 {
 	int retval;
 
@@ -933,23 +899,24 @@ sn_sal_module_init(void)
 		misc.name = DEVICE_NAME_DYNAMIC;
 		retval = misc_register(&misc);
 		if (retval != 0) {
-			printk("Failed to register console device using misc_register.\n");
+			printk
+			    ("Failed to register console device using misc_register.\n");
 			return -ENODEV;
 		}
 		sal_console_uart.major = MISC_MAJOR;
 		sal_console_uart.minor = misc.minor;
-	}
-	else {
+	} else {
 		sal_console_uart.major = DEVICE_MAJOR;
 		sal_console_uart.minor = DEVICE_MINOR;
 	}
 
 	/* We register the driver and the port before switching to interrupts
-    * or async above so the proper uart structures are populated */
+	 * or async above so the proper uart structures are populated */
 
 	if (uart_register_driver(&sal_console_uart) < 0) {
-		printk("ERROR sn_sal_module_init failed uart_register_driver, line %d\n",
-		  __LINE__);
+		printk
+		    ("ERROR sn_sal_module_init failed uart_register_driver, line %d\n",
+		     __LINE__);
 		return -ENODEV;
 	}
 
@@ -985,8 +952,7 @@ sn_sal_module_init(void)
  * sn_sal_module_exit - When we're unloaded, remove the driver/port
  *
  */
-static void __exit
-sn_sal_module_exit(void)
+static void __exit sn_sal_module_exit(void)
 {
 	del_timer_sync(&sal_console_port.sc_timer);
 	uart_remove_one_port(&sal_console_uart, &sal_console_port.sc_port);
@@ -1008,7 +974,8 @@ module_exit(sn_sal_module_exit);
  *
  */
 
-static void puts_raw_fixed(int (*puts_raw) (const char *s, int len), const char *s, int count)
+static void puts_raw_fixed(int (*puts_raw) (const char *s, int len),
+			   const char *s, int count)
 {
 	const char *s1;
 
@@ -1056,7 +1023,7 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 	if (port->sc_port.info) {
 
 		/* somebody really wants this output, might be an
-	 	* oops, kdb, panic, etc.  make sure they get it. */
+		 * oops, kdb, panic, etc.  make sure they get it. */
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 		if (spin_is_locked(&port->sc_port.lock)) {
 			int lhead = port->sc_port.info->xmit.head;
@@ -1064,29 +1031,39 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			int counter, got_lock = 0;
 
 			/*
-		 	 * We attempt to determine if someone has died with the
-		 	 * lock. We wait ~20 secs after the head and tail ptrs
-		 	 * stop moving and assume the lock holder is not functional
-		 	 * and plow ahead. If the lock is freed within the time out
-		 	 * period we re-get the lock and go ahead normally. We also
-		 	 * remember if we have plowed ahead so that we don't have
+			 * We attempt to determine if someone has died with the
+			 * lock. We wait ~20 secs after the head and tail ptrs
+			 * stop moving and assume the lock holder is not functional
+			 * and plow ahead. If the lock is freed within the time out
+			 * period we re-get the lock and go ahead normally. We also
+			 * remember if we have plowed ahead so that we don't have
 			 * to wait out the time out period again - the asumption
-		 	 * is that we will time out again.
-		 	 */
+			 * is that we will time out again.
+			 */
 
 			for (counter = 0; counter < 150; mdelay(125), counter++) {
-				if (!spin_is_locked(&port->sc_port.lock) || stole_lock) {
+				if (!spin_is_locked(&port->sc_port.lock)
+				    || stole_lock) {
 					if (!stole_lock) {
-						spin_lock_irqsave(&port->sc_port.lock, flags);
+						spin_lock_irqsave(&port->
+								  sc_port.lock,
+								  flags);
 						got_lock = 1;
 					}
 					break;
-				}
-				else {
+				} else {
 					/* still locked */
-					if ((lhead != port->sc_port.info->xmit.head) || (ltail != port->sc_port.info->xmit.tail)) {
-						lhead = port->sc_port.info->xmit.head;
-						ltail = port->sc_port.info->xmit.tail;
+					if ((lhead !=
+					     port->sc_port.info->xmit.head)
+					    || (ltail !=
+						port->sc_port.info->xmit.
+						tail)) {
+						lhead =
+						    port->sc_port.info->xmit.
+						    head;
+						ltail =
+						    port->sc_port.info->xmit.
+						    tail;
 						counter = 0;
 					}
 				}
@@ -1094,16 +1071,15 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			/* flush anything in the serial core xmit buffer, raw */
 			sn_transmit_chars(port, 1);
 			if (got_lock) {
-				spin_unlock_irqrestore(&port->sc_port.lock, flags);
+				spin_unlock_irqrestore(&port->sc_port.lock,
+						       flags);
 				stole_lock = 0;
-			}
-			else {
+			} else {
 				/* fell thru */
 				stole_lock = 1;
 			}
 			puts_raw_fixed(port->sc_ops->sal_puts_raw, s, count);
-		}
-		else {
+		} else {
 			stole_lock = 0;
 #endif
 			spin_lock_irqsave(&port->sc_port.lock, flags);
@@ -1134,8 +1110,7 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
  * here so providing it is easier.
  *
  */
-static int __init
-sn_sal_console_setup(struct console *co, char *options)
+static int __init sn_sal_console_setup(struct console *co, char *options)
 {
 	return 0;
 }
@@ -1163,7 +1138,7 @@ static struct console sal_console_early __initdata = {
 	.name = "sn_sal",
 	.write = sn_sal_console_write_early,
 	.flags = CON_PRINTBUFFER,
-	.index  = -1,
+	.index = -1,
 };
 
 /**
@@ -1175,8 +1150,7 @@ static struct console sal_console_early __initdata = {
  * sn_sal_serial_console_init is called, this console is unregistered
  * and a new one registered.
  */
-int __init
-sn_serial_console_early_setup(void)
+int __init sn_serial_console_early_setup(void)
 {
 	if (!ia64_platform_is("sn2"))
 		return -1;
@@ -1186,12 +1160,11 @@ sn_serial_console_early_setup(void)
 	else
 		sal_console_port.sc_ops = &poll_ops;
 
-	early_sn_setup(); /* Find SAL entry points */
+	early_sn_setup();	/* Find SAL entry points */
 	register_console(&sal_console_early);
 
 	return 0;
 }
-
 
 /**
  * sn_sal_serial_console_init - Early console output - set up for register
@@ -1205,12 +1178,11 @@ sn_serial_console_early_setup(void)
  * it here doesn't hurt anything.
  *
  */
-static int __init
-sn_sal_serial_console_init(void)
+static int __init sn_sal_serial_console_init(void)
 {
 	if (ia64_platform_is("sn2")) {
 		sn_sal_switch_to_asynch(&sal_console_port);
-		DPRINTF ("sn_sal_serial_console_init : register console\n");
+		DPRINTF("sn_sal_serial_console_init : register console\n");
 		register_console(&sal_console);
 		unregister_console(&sal_console_early);
 	}
