@@ -555,7 +555,6 @@ void __init test_wp_bit(void)
 static void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	highmem_start_page = pfn_to_page(highstart_pfn);
 	max_mapnr = num_physpages = highend_pfn;
 #else
 	max_mapnr = num_physpages = max_low_pfn;

@@ -402,8 +402,6 @@ void __init mem_init(void)
 	int reservedpages = 0;
 	int i;
 
-	highmem_start_page = pfn_to_page(highstart_pfn);
-
 	if (PKMAP_BASE+LAST_PKMAP*PAGE_SIZE >= FIXADDR_START) {
 		prom_printf("BUG: fixmap and pkmap areas overlap\n");
 		prom_printf("pkbase: 0x%lx pkend: 0x%lx fixstart 0x%lx\n",

@@ -49,8 +49,6 @@ static void setup_highmem(unsigned long highmem_start,
 	unsigned long highmem_pfn;
 	int i;
 
-	highmem_start_page = virt_to_page(highmem_start);
-
 	highmem_pfn = __pa(highmem_start) >> PAGE_SHIFT;
 	for(i = 0; i < highmem_len >> PAGE_SHIFT; i++){
 		page = &mem_map[highmem_pfn + i];

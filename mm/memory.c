@@ -76,11 +76,9 @@ unsigned long num_physpages;
  * and ZONE_HIGHMEM.
  */
 void * high_memory;
-struct page *highmem_start_page;
 unsigned long vmalloc_earlyreserve;
 
 EXPORT_SYMBOL(num_physpages);
-EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(high_memory);
 EXPORT_SYMBOL(vmalloc_earlyreserve);
 
