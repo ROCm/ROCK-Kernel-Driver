@@ -40,6 +40,9 @@ allmodconfig: $(obj)/conf
 defconfig: $(obj)/conf
 	$< -d arch/$(ARCH)/Kconfig
 
+%_defconfig: $(obj)/conf
+	$(Q)$< -D arch/$(ARCH)/configs/$@ arch/$(ARCH)/Kconfig
+
 # Help text used by make help
 help:
 	@echo  '  oldconfig	  - Update current config utilising a line-oriented program'
