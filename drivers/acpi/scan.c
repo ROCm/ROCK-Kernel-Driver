@@ -5,7 +5,7 @@
 #include <linux/init.h>
 #include <linux/acpi.h>
 
-#include "acpi_drivers.h"
+#include <acpi/acpi_drivers.h>
 #include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
 
 

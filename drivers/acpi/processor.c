@@ -44,9 +44,9 @@
 #include <asm/system.h>
 #include <asm/delay.h>
 
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
-#include "processor.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
+#include <acpi/processor.h>
 
 
 #define ACPI_PROCESSOR_COMPONENT	0x01000000

@@ -32,8 +32,8 @@
 #ifdef CONFIG_X86
 #include <asm/mpspec.h>
 #endif
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 
 #define _COMPONENT		ACPI_BUS_COMPONENT

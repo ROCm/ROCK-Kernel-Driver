@@ -26,7 +26,7 @@
 #include <linux/module.h>
 #include <linux/acpi.h>
 #include <acpi/acpi.h>
-#include "acpi_bus.h"
+#include <acpi/acpi_bus.h>
 
 
 #ifdef CONFIG_ACPI_INTERPRETER
