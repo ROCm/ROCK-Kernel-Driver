@@ -54,10 +54,10 @@ drv_attr_store(struct driver_dir_entry * dir, struct attribute * attr,
 }
 
 static struct driverfs_ops drv_attr_ops = {
-	open:	drv_attr_open,
-	close:	drv_attr_close,
-	show:	drv_attr_show,
-	store:	drv_attr_store,
+	.open	= drv_attr_open,
+	.close	= drv_attr_close,
+	.show	= drv_attr_show,
+	.store	= drv_attr_store,
 };
 
 int driver_create_file(struct device_driver * drv, struct driver_attribute * attr)

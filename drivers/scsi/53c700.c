@@ -1360,6 +1360,8 @@ NCR_700_flush_fifo(struct Scsi_Host *host) {
 }
 
 
+/* The queue lock with interrupts disabled must be held on entry to
+ * this function */
 STATIC int
 NCR_700_start_command(Scsi_Cmnd *SCp)
 {
@@ -1367,17 +1369,13 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 		(struct NCR_700_command_slot *)SCp->host_scribble;
 	struct NCR_700_Host_Parameters *hostdata =
 		(struct NCR_700_Host_Parameters *)SCp->host->hostdata[0];
-	unsigned long flags;
 	__u16 count = 1;	/* for IDENTIFY message */
 	
-	save_flags(flags);
-	cli();
 	if(hostdata->state != NCR_700_HOST_FREE) {
 		/* keep this inside the lock to close the race window where
 		 * the running command finishes on another CPU while we don't
 		 * change the state to queued on this one */
 		slot->state = NCR_700_SLOT_QUEUED;
-		restore_flags(flags);
 
 		DEBUG(("scsi%d: host busy, queueing command %p, slot %p\n",
 		       SCp->host->host_no, slot->cmnd, slot));
@@ -1443,12 +1441,6 @@ NCR_700_start_command(Scsi_Cmnd *SCp)
 		       SCp->host, SXFER_REG);
 	NCR_700_writel(slot->temp, SCp->host, TEMP_REG);
 	NCR_700_writel(slot->resume_offset, SCp->host, DSP_REG);
-
-	/* allow interrupts here so that if we're selected we can take
-	 * a selection interrupt.  The script start may not be
-	 * effective in this case, but the selection interrupt will
-	 * save our command in that case */
-	restore_flags(flags);
 
 	return 1;
 }

@@ -445,7 +445,6 @@ extern union thread_union init_thread_union;
 extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;
-extern struct task_struct *init_tasks[NR_CPUS];
 
 /* PID hashing. (shouldnt this be dynamic?) */
 #define PIDHASH_SZ (4096 >> 2)

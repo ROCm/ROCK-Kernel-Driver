@@ -71,6 +71,9 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
 		return -ENOENT;
 	}
 	error = add_to_page_cache(page, &swapper_space, entry.val);
+	/*
+	 * Anon pages are already on the LRU, we don't run lru_cache_add here.
+	 */
 	if (error != 0) {
 		swap_free(entry);
 		if (error == -EEXIST)
@@ -275,8 +278,7 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		SetPageDirty(page);
 		___add_to_page_cache(page, mapping, index);
 		/* fix that up */
-		list_del(&page->list);
-		list_add(&page->list, &mapping->dirty_pages);
+		list_move(&page->list, &mapping->dirty_pages);
 		write_unlock(&mapping->page_lock);
 		write_unlock(&swapper_space.page_lock);
 
@@ -381,6 +383,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 			/*
 			 * Initiate read into locked page and return.
 			 */
+			lru_cache_add(new_page);
 			swap_readpage(NULL, new_page);
 			return new_page;
 		}

@@ -57,8 +57,7 @@ struct rpc_timeout {
 	unsigned long		to_current,		/* current timeout */
 				to_initval,		/* initial timeout */
 				to_maxval,		/* max timeout */
-				to_increment,		/* if !exponential */
-				to_resrvval;		/* reserve timeout */
+				to_increment;		/* if !exponential */
 	short			to_retries;		/* max # of retries */
 	unsigned char		to_exponential;
 };
@@ -173,7 +172,7 @@ void			xprt_default_timeout(struct rpc_timeout *, int);
 void			xprt_set_timeout(struct rpc_timeout *, unsigned int,
 					unsigned long);
 
-int			xprt_reserve(struct rpc_task *);
+void			xprt_reserve(struct rpc_task *);
 void			xprt_transmit(struct rpc_task *);
 void			xprt_receive(struct rpc_task *);
 int			xprt_adjust_timeout(struct rpc_timeout *);
