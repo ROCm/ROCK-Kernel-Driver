@@ -167,7 +167,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 {
 	p->thread = (struct thread_struct) INIT_THREAD;
 	p->thread.kernel_stack = 
-		(unsigned long) p->thread_info + THREAD_SIZE;
+		(unsigned long) p->thread_info + 2 * PAGE_SIZE;
 	return(CHOOSE_MODE_PROC(copy_thread_tt, copy_thread_skas, nr, 
 				clone_flags, sp, stack_top, p, regs));
 }

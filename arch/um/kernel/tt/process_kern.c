@@ -412,7 +412,7 @@ static void mprotect_kernel_mem(int w)
 	protect_memory(start, end - start, 1, w, 1, 1);
 
 	start = (unsigned long) UML_ROUND_DOWN(&__bss_start);
-	end = (unsigned long) UML_ROUND_UP(brk_start);
+	end = (unsigned long) UML_ROUND_UP(&_end);
 	protect_memory(start, end - start, 1, w, 1, 1);
 
 	mprotect_kernel_vm(w);

@@ -124,10 +124,14 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 
 	/* Start the process and wait for it to kill itself */
 	new_pid = clone(outer_tramp, (void *) sp, clone_flags, &arg);
-	if(new_pid < 0) return(-errno);
+	if(new_pid < 0)
+		return(new_pid);
+
 	CATCH_EINTR(err = waitpid(new_pid, &status, 0));
-	if(err < 0) panic("Waiting for outer trampoline failed - errno = %d", 
-			  errno);
+	if(err < 0)
+		panic("Waiting for outer trampoline failed - errno = %d",
+		      errno);
+
 	if(!WIFSIGNALED(status) || (WTERMSIG(status) != SIGKILL))
 		panic("outer trampoline didn't exit with SIGKILL, "
 		      "status = %d", status);
