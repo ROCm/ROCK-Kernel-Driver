@@ -2578,6 +2578,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 
 	case ATA_PROT_DMA:
 	case ATA_PROT_ATAPI_DMA:
+	case ATA_PROT_ATAPI:
 		/* check status of DMA engine */
 		host_stat = ata_bmdma_status(ap);
 		VPRINTK("BUS_DMA (host_stat 0x%X)\n", host_stat);
