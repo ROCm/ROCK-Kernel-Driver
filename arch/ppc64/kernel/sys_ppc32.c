@@ -1480,6 +1480,8 @@ do_sys32_shmctl(int first, int second, void *uptr)
 	case IPC_RMID:
 	case SHM_LOCK:
 	case SHM_UNLOCK:
+		if (second == (IPC_INFO|IPC_64))
+			second = IPC_INFO;
 		err = sys_shmctl(first, second, (struct shmid_ds *)uptr);
 		break;
 	case IPC_SET:
