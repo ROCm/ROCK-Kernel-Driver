@@ -109,7 +109,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 						(((unsigned long) ~sz) << 32);
 #else
 			if (l) {
-				printk(KERN_ERR "PCI: Unable to handle 64-bit address for device %s\n", dev->slot_name);
+				printk(KERN_ERR "PCI: Unable to handle 64-bit address for device %s\n", pci_name(dev));
 				res->start = 0;
 				res->flags = 0;
 				continue;
@@ -304,7 +304,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 
 	DBG("Scanning behind PCI bridge %s, config %06x, pass %d\n",
-	    dev->slot_name, buses & 0xffffff, pass);
+	    pci_name(dev), buses & 0xffffff, pass);
 
 	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus) {
 		unsigned int cmax;
@@ -403,8 +403,9 @@ static int pci_setup_device(struct pci_dev * dev)
 {
 	u32 class;
 
-	sprintf(dev->slot_name, "%02x:%02x.%d", dev->bus->number,
-		PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+	dev->slot_name = dev->dev.bus_id;
+	sprintf(pci_name(dev), "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
+		dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 	sprintf(dev->dev.name, "PCI device %04x:%04x",
 		dev->vendor, dev->device);
 
@@ -452,12 +453,12 @@ static int pci_setup_device(struct pci_dev * dev)
 
 	default:				    /* unknown header */
 		printk(KERN_ERR "PCI: device %s has unknown header type %02x, ignoring.\n",
-			dev->slot_name, dev->hdr_type);
+			pci_name(dev), dev->hdr_type);
 		return -1;
 
 	bad:
 		printk(KERN_ERR "PCI: %s: class %x doesn't match header type %02x. Ignoring class.\n",
-		       dev->slot_name, class, dev->hdr_type);
+		       pci_name(dev), class, dev->hdr_type);
 		dev->class = PCI_CLASS_NOT_DEFINED;
 	}
 
@@ -531,9 +532,6 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 
 	pci_name_device(dev);
 
-	/* now put in global tree */
-	sprintf(dev->dev.bus_id, "%04x:%s", pci_domain_nr(bus),
-			dev->slot_name);
 	dev->dev.dma_mask = &dev->dma_mask;
 
 	return dev;
