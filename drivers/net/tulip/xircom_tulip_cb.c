@@ -329,6 +329,9 @@ struct xircom_private {
 	int saved_if_port;
 	struct pci_dev *pdev;
 	spinlock_t lock;
+#ifdef CONFIG_PM
+	u32 pci_state[16];
+#endif
 };
 
 static int mdio_read(struct net_device *dev, int phy_id, int location);
@@ -749,6 +752,7 @@ xircom_up(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	int i;
 
+	xircom_init_ring(dev);
 	/* Clear the tx ring */
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		tp->tx_skbuff[i] = 0;
@@ -800,8 +804,6 @@ xircom_open(struct net_device *dev)
 
 	if (request_irq(dev->irq, &xircom_interrupt, SA_SHIRQ, dev->name, dev))
 		return -EAGAIN;
-
-	xircom_init_ring(dev);
 
 	xircom_up(dev);
 	tp->open = 1;
@@ -1668,6 +1670,11 @@ static int xircom_suspend(struct pci_dev *pdev, u32 state)
 	printk(KERN_INFO "xircom_suspend(%s)\n", dev->name);
 	if (tp->open)
 		xircom_down(dev);
+
+	pci_save_state(pdev, tp->pci_state);
+	pci_disable_device(pdev);
+	pci_set_power_state(pdev, 3);
+
 	return 0;
 }
 
@@ -1677,6 +1684,10 @@ static int xircom_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct xircom_private *tp = dev->priv;
 	printk(KERN_INFO "xircom_resume(%s)\n", dev->name);
+
+	pci_set_power_state(pdev,0);
+	pci_enable_device(pdev);
+	pci_restore_state(pdev, tp->pci_state);
 
 	/* Bring the chip out of sleep mode.
 	   Caution: Snooze mode does not work with some boards! */
