@@ -201,8 +201,6 @@ static int get_ranges (unsigned char *pst)
 		dprintk ("VID: 0x%x (%d.%03dV)\n", vid,	mobile_vid_table[vid]/1000,
 			mobile_vid_table[vid]%1000);
 	}
-	dprintk ("\n");
-
 	powernow_table[number_scales].frequency = CPUFREQ_TABLE_END;
 	powernow_table[number_scales].index = 0;
 
