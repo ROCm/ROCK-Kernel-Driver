@@ -168,6 +168,9 @@ struct ia32_user_fxsr_struct {
 #define IA32_SA_HANDLER(ka)	((unsigned long) (ka)->sa.sa_handler & 0xffffffff)
 #define IA32_SA_RESTORER(ka)	((unsigned long) (ka)->sa.sa_handler >> 32)
 
+#define __IA32_NR_sigreturn 119
+#define __IA32_NR_rt_sigreturn 173
+
 struct sigaction32 {
        unsigned int sa_handler;		/* Really a pointer, but need to deal with 32 bits */
        unsigned int sa_flags;
@@ -324,14 +327,16 @@ struct old_linux32_dirent {
 
 #define IA32_PAGE_OFFSET	0xc0000000
 #define IA32_STACK_TOP		IA32_PAGE_OFFSET
+#define IA32_GATE_OFFSET	IA32_PAGE_OFFSET
+#define IA32_GATE_END		IA32_PAGE_OFFSET + PAGE_SIZE
 
 /*
  * The system segments (GDT, TSS, LDT) have to be mapped below 4GB so the IA-32 engine can
  * access them.
  */
-#define IA32_GDT_OFFSET		(IA32_PAGE_OFFSET)
-#define IA32_TSS_OFFSET		(IA32_PAGE_OFFSET + PAGE_SIZE)
-#define IA32_LDT_OFFSET		(IA32_PAGE_OFFSET + 2*PAGE_SIZE)
+#define IA32_GDT_OFFSET		(IA32_PAGE_OFFSET + PAGE_SIZE)
+#define IA32_TSS_OFFSET		(IA32_PAGE_OFFSET + 2*PAGE_SIZE)
+#define IA32_LDT_OFFSET		(IA32_PAGE_OFFSET + 3*PAGE_SIZE)
 
 #define ELF_EXEC_PAGESIZE	IA32_PAGE_SIZE
 
