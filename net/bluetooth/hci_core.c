@@ -967,6 +967,9 @@ int hci_send_raw(struct sk_buff *skb)
 		/* Queue frame according it's type */
 		switch (skb->pkt_type) {
 		case HCI_COMMAND_PKT:
+			if (cmd_opcode_ogf(__le16_to_cpu(*(__u16 *)skb->data)) == OGF_VENDOR_CMD)
+					break;
+
 			skb_queue_tail(&hdev->cmd_q, skb);
 			hci_sched_cmd(hdev);
 			return 0;
@@ -999,7 +1002,7 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *p
 		BT_ERR("%s Can't allocate memory for HCI command", hdev->name);
 		return -ENOMEM;
 	}
-	
+
 	hdr = (struct hci_command_hdr *) skb_put(skb, HCI_COMMAND_HDR_SIZE);
 	hdr->opcode = __cpu_to_le16(hci_opcode_pack(ogf, ocf));
 	hdr->plen   = plen;
