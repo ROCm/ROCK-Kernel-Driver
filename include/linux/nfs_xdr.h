@@ -88,6 +88,67 @@ struct nfs_pathconf {
 };
 
 /*
+ * Arguments to the open call.
+ */
+struct nfs_openargs {
+	struct nfs_fh *         fh;
+	__u32                   seqid;
+	__u32                   share_access;
+	__u64                   clientid;
+	__u32                   id;
+	__u32                   opentype;
+	__u32                   createmode;
+	union {
+		struct iattr *  attrs;    /* UNCHECKED, GUARDED */
+		nfs4_verifier   verifier; /* EXCLUSIVE */
+	} u;
+	struct qstr *           name;
+	struct nfs4_getattr *   f_getattr;
+	struct nfs4_getattr *   d_getattr;
+	struct nfs_server *     server;	 /* Needed for ID mapping */
+};
+
+struct nfs_openres {
+	__u32                   status;
+	nfs4_stateid            stateid;
+	struct nfs_fh           fh;
+	struct nfs4_change_info * cinfo;
+	__u32                   rflags;
+	struct nfs4_getattr *   f_getattr;
+	struct nfs4_getattr *   d_getattr;
+	struct nfs_server *     server;
+};
+
+/*
+ * Arguments to the open_confirm call.
+ */
+struct nfs_open_confirmargs {
+	struct nfs_fh *         fh;
+	nfs4_stateid            stateid;
+	__u32                   seqid;
+};
+
+struct nfs_open_confirmres {
+	__u32                   status;
+	nfs4_stateid            stateid;
+};
+
+/*
+ * Arguments to the close call.
+ */
+struct nfs_closeargs {
+	struct nfs_fh *         fh;
+	nfs4_stateid            stateid;
+	__u32                   seqid;
+};
+
+struct nfs_closeres {
+	__u32                   status;
+	nfs4_stateid            stateid;
+};
+
+
+/*
  * Arguments to the read call.
  */
 
@@ -98,6 +159,7 @@ struct nfs_pathconf {
 
 struct nfs_readargs {
 	struct nfs_fh *		fh;
+	nfs4_stateid		stateid;
 	__u64			offset;
 	__u32			count;
 	unsigned int		pgbase;
@@ -120,6 +182,7 @@ struct nfs_readres {
 
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
+	nfs4_stateid		stateid;
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;
@@ -180,6 +243,19 @@ struct nfs_renameargs {
 	struct nfs_fh *		tofh;
 	const char *		toname;
 	unsigned int		tolen;
+};
+
+struct nfs_setattrargs {
+	struct nfs_fh *                 fh;
+	nfs4_stateid                    stateid;
+	struct iattr *                  iap;
+	struct nfs4_getattr *           attr;
+	struct nfs_server *             server; /* Needed for name mapping */
+};
+
+struct nfs_setattrres {
+	struct nfs4_getattr *           attr;
+	struct nfs_server *             server;
 };
 
 struct nfs_linkargs {
@@ -597,6 +673,7 @@ struct nfs_rpc_ops {
 	void	(*read_setup)   (struct nfs_read_data *, unsigned int count);
 	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);
 	void	(*commit_setup) (struct nfs_write_data *, u64 start, u32 len, int how);
+	int	(*file_open)   (struct inode *, struct file *);
 };
 
 /*
