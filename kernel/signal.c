@@ -619,6 +619,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
 		t = p;
 		do {
+			unsigned int state;
 			rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
 			
 			/*
@@ -635,9 +636,12 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * Wake up the stopped thread _after_ setting
 			 * TIF_SIGPENDING
 			 */
-			if (!sigismember(&t->blocked, SIGCONT))
+			state = TASK_STOPPED;
+			if (!sigismember(&t->blocked, SIGCONT)) {
 				set_tsk_thread_flag(t, TIF_SIGPENDING);
-			wake_up_state(t, TASK_STOPPED);
+				state |= TASK_INTERRUPTIBLE;
+			}
+			wake_up_state(t, state);
 
 			t = next_thread(t);
 		} while (t != p);
