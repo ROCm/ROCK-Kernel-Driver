@@ -574,7 +574,7 @@ config FB_MATROX_MYSTIQUE
 	  packed pixel and 32 bpp packed pixel. You can also use font widths
 	  different from 8.
 
-config FB_MATROX_G450
+config FB_MATROX_G
 	bool "G100/G200/G400/G450/G550 support"
 	depends on FB_MATROX
 	---help---
@@ -585,10 +585,10 @@ config FB_MATROX_G450
 	  different from 8.
 
 	  If you need support for G400 secondary head, you must first say Y to
-	  "I2C support" and "I2C bit-banging support" in the character devices
-	  section, and then to "Matrox I2C support" and "G400 second head
-	  support" here in the framebuffer section. G450/G550 secondary head
-	  and digital output are supported without additional modules.
+	  "I2C support" in the character devices section, and then to
+	  "Matrox I2C support" and "G400 second head support" here in the
+	  framebuffer section. G450/G550 secondary head and digital output
+	  are supported without additional modules.
 
 	  The driver starts in monitor mode. You must use the matroxset tool 
 	  (available at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to 
@@ -604,26 +604,6 @@ config FB_MATROX_G450
 
 	  G450/G550 hardware can display TV picture only from secondary CRTC,
 	  and it performs no scaling, so picture must have 525 or 625 lines.
-
-config FB_MATROX_G100A
-	bool "G100/G200/G400 support"
-	depends on FB_MATROX && !FB_MATROX_G450
-	---help---
-	  Say Y here if you have a Matrox G100, G200 or G400 based
-	  video card. If you select "Advanced lowlevel driver options", you
-	  should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
-	  pixel and 32 bpp packed pixel. You can also use font widths
-	  different from 8.
-
-	  If you need support for G400 secondary head, you must first say Y to
-	  "I2C support" and "I2C bit-banging support" in the character devices
-	  section, and then to "Matrox I2C support" and "G400 second head
-	  support" here in the framebuffer section.
-
-config FB_MATROX_G100
-	bool
-	depends on FB_MATROX && (FB_MATROX_G450 || FB_MATROX_G100A)
-	default y
 
 config FB_MATROX_I2C
 	tristate "Matrox I2C support"
@@ -644,7 +624,7 @@ config FB_MATROX_I2C
 
 config FB_MATROX_MAVEN
 	tristate "G400 second head support"
-	depends on FB_MATROX_G100 && FB_MATROX_I2C
+	depends on FB_MATROX_G && FB_MATROX_I2C
 	---help---
 	  WARNING !!! This support does not work with G450 !!!
 
