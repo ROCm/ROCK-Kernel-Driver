@@ -85,8 +85,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *ret;
 
-	if ((ret = (pgd_t *)__get_free_pages(GFP_KERNEL, PGDIR_ORDER)) != NULL)
-		clear_pages(ret, PGDIR_ORDER);
+	ret = (pgd_t *)__get_free_pages(GFP_KERNEL|__GFP_ZERO, PGDIR_ORDER);
 	return ret;
 }
 
@@ -102,7 +101,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	extern void *early_get_page(void);
 
 	if (mem_init_done) {
-		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 		if (pte) {
 			struct page *ptepage = virt_to_page(pte);
 			ptepage->mapping = (void *) mm;
@@ -110,8 +109,6 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 		}
 	} else
 		pte = (pte_t *)early_get_page();
-	if (pte)
-		clear_page(pte);
 	return pte;
 }
 

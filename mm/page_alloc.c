@@ -558,6 +558,13 @@ void fastcall free_cold_page(struct page *page)
  * we cheat by calling it from here, in the order > 0 path.  Saves a branch
  * or two.
  */
+static inline void prep_zero_page(struct page *page, int order)
+{
+	int i;
+
+	for(i = 0; i < (1 << order); i++)
+		clear_highpage(page + i);
+}
 
 static struct page *
 buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
@@ -593,6 +600,10 @@ buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 		BUG_ON(bad_range(zone, page));
 		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
+
+		if (gfp_flags & __GFP_ZERO)
+			prep_zero_page(page, order);
+
 		if (order && (gfp_flags & __GFP_COMP))
 			prep_compound_page(page, order);
 	}
@@ -805,12 +816,9 @@ fastcall unsigned long get_zeroed_page(unsigned int gfp_mask)
 	 */
 	BUG_ON(gfp_mask & __GFP_HIGHMEM);
 
-	page = alloc_pages(gfp_mask, 0);
-	if (page) {
-		void *address = page_address(page);
-		clear_page(address);
-		return (unsigned long) address;
-	}
+	page = alloc_pages(gfp_mask | __GFP_ZERO, 0);
+	if (page)
+		return (unsigned long) page_address(page);
 	return 0;
 }
 
