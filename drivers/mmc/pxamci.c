@@ -33,6 +33,8 @@
 #include <asm/irq.h>
 #include <asm/sizes.h>
 
+#include <asm/arch/mmc.h>
+
 #include "pxamci.h"
 
 #ifdef CONFIG_MMC_DEBUG
@@ -52,6 +54,7 @@ struct pxamci_host {
 	unsigned int		cmdat;
 	unsigned int		imask;
 	unsigned int		power_mode;
+	struct pxamci_platform_data *pdata;
 
 	struct mmc_request	*mrq;
 	struct mmc_command	*cmd;
@@ -384,9 +387,8 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if (host->power_mode != ios->power_mode) {
 		host->power_mode = ios->power_mode;
 
-		/*
-		 * power control?  none on the lubbock.
-		 */
+		if (host->pdata && host->pdata->setpower)
+			host->pdata->setpower(mmc->dev, ios->vdd);
 
 		if (ios->power_mode == MMC_POWER_ON)
 			host->cmdat |= CMDAT_INIT;
@@ -405,6 +407,12 @@ static void pxamci_dma_irq(int dma, void *devid, struct pt_regs *regs)
 {
 	printk(KERN_ERR "DMA%d: IRQ???\n", dma);
 	DCSR(dma) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
+}
+
+static irqreturn_t pxamci_detect_irq(int irq, void *devid, struct pt_regs *regs)
+{
+	mmc_detect_change(devid);
+	return IRQ_HANDLED;
 }
 
 static int pxamci_probe(struct device *dev)
@@ -433,11 +441,14 @@ static int pxamci_probe(struct device *dev)
 	mmc->ops = &pxamci_ops;
 	mmc->f_min = 312500;
 	mmc->f_max = 20000000;
-	mmc->ocr_avail = MMC_VDD_32_33;
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
 	host->dma = -1;
+	host->pdata = pdev->dev.platform_data;
+	mmc->ocr_avail = host->pdata ?
+			 host->pdata->ocr_mask :
+			 MMC_VDD_32_33|MMC_VDD_33_34;
 
 	host->sg_cpu = dma_alloc_coherent(dev, PAGE_SIZE, &host->sg_dma, GFP_KERNEL);
 	if (!host->sg_cpu) {
@@ -482,6 +493,9 @@ static int pxamci_probe(struct device *dev)
 
 	dev_set_drvdata(dev, mmc);
 
+	if (host->pdata && host->pdata->init)
+		host->pdata->init(dev, pxamci_detect_irq, mmc);
+
 	mmc_add_host(mmc);
 
 	return 0;
@@ -510,12 +524,17 @@ static int pxamci_remove(struct device *dev)
 	if (mmc) {
 		struct pxamci_host *host = mmc_priv(mmc);
 
+		if (host->pdata && host->pdata->exit)
+			host->pdata->exit(dev, mmc);
+
 		mmc_remove_host(mmc);
 
 		pxamci_stop_clock(host);
 		writel(TXFIFO_WR_REQ|RXFIFO_RD_REQ|CLK_IS_OFF|STOP_CMD|
 		       END_CMD_RES|PRG_DONE|DATA_TRAN_DONE,
 		       host->base + MMC_I_MASK);
+
+		pxa_set_cken(CKEN12_MMC, 0);
 
 		free_irq(host->irq, host);
 		pxa_free_dma(host->dma);
