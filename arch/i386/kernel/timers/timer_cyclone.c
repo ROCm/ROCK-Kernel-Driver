@@ -9,6 +9,7 @@
 #include <linux/spinlock.h>
 #include <linux/init.h>
 #include <linux/timex.h>
+#include <linux/errno.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -81,7 +82,7 @@ static int init_cyclone(void)
 	
 	/*make sure we're on a summit box*/
 	/*XXX need to use proper summit hooks! such as xapic -john*/
-	if(!use_cyclone) return 0; 
+	if(!use_cyclone) return -ENODEV; 
 	
 	printk(KERN_INFO "Summit chipset: Starting Cyclone Counter.\n");
 
@@ -92,12 +93,12 @@ static int init_cyclone(void)
 	reg = (u32*)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 	if(!reg){
 		printk(KERN_ERR "Summit chipset: Could not find valid CBAR register.\n");
-		return 0;
+		return -ENODEV;
 	}
 	base = *reg;	
 	if(!base){
 		printk(KERN_ERR "Summit chipset: Could not find valid CBAR value.\n");
-		return 0;
+		return -ENODEV;
 	}
 	
 	/* setup PMCC */
@@ -107,7 +108,7 @@ static int init_cyclone(void)
 	reg = (u32*)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 	if(!reg){
 		printk(KERN_ERR "Summit chipset: Could not find valid PMCC register.\n");
-		return 0;
+		return -ENODEV;
 	}
 	reg[0] = 0x00000001;
 
@@ -118,7 +119,7 @@ static int init_cyclone(void)
 	reg = (u32*)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 	if(!reg){
 		printk(KERN_ERR "Summit chipset: Could not find valid MPCS register.\n");
-		return 0;
+		return -ENODEV;
 	}
 	reg[0] = 0x00000001;
 
@@ -129,7 +130,7 @@ static int init_cyclone(void)
 	cyclone_timer = (u32*)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 	if(!cyclone_timer){
 		printk(KERN_ERR "Summit chipset: Could not find valid MPMC register.\n");
-		return 0;
+		return -ENODEV;
 	}
 
 	/*quick test to make sure its ticking*/
@@ -140,12 +141,12 @@ static int init_cyclone(void)
 		if(cyclone_timer[0] == old){
 			printk(KERN_ERR "Summit chipset: Counter not counting! DISABLED\n");
 			cyclone_timer = 0;
-			return 0;
+			return -ENODEV;
 		}
 	}
 
 	/* Everything looks good! */
-	return 1;
+	return 0;
 }
 
 
@@ -166,7 +167,7 @@ static void delay_cyclone(unsigned long loops)
 
 /* cyclone timer_opts struct */
 struct timer_opts timer_cyclone = {
-	init: init_cyclone, 
-	mark_offset: mark_offset_cyclone, 
-	get_offset: get_offset_cyclone
+	.init = init_cyclone, 
+	.mark_offset = mark_offset_cyclone, 
+	.get_offset = get_offset_cyclone
 };
