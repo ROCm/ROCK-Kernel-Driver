@@ -1090,7 +1090,7 @@ int __init mipv6_mh_common_init(void)
 
 	sk = mipv6_mh_socket->sk;
 	sk->sk_allocation = GFP_ATOMIC;
-	sk->sk_sndbuf = sysctl_wmem_max;
+	sk->sk_sndbuf = 65536;
 	sk->sk_prot->unhash(sk);
 
 	memset(&mh_rcv, 0, sizeof(mh_rcv));
