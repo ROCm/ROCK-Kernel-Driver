@@ -114,6 +114,7 @@ static const int multicast_filter_limit = 32;
 #include <linux/in6.h>
 #include <asm/checksum.h>
 #include <linux/version.h>
+#include <linux/dma-mapping.h>
 
 #include "typhoon.h"
 #include "typhoon-firmware.h"
