@@ -848,7 +848,7 @@ m32r_sio_request_std_resource(struct uart_sio_port *up, struct resource **res)
 			*res = request_mem_region(up->port.mapbase, size, "serial");
 #else
 			start = up->port.mapbase;
-			start += UARRT_RSA_BASE << up->port.regshift;
+			start += UART_RSA_BASE << up->port.regshift;
 			*res = request_mem_region(start, size, "serial");
 #endif
 			if (!*res)
@@ -1333,7 +1333,7 @@ static int __init m32r_sio_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: M32R SIO driver $Revision: 1.6 $ "
+	printk(KERN_INFO "Serial: M32R SIO driver $Revision: 1.9 $ "
 		"IRQ sharing %sabled\n", share_irqs_sio ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
@@ -1366,8 +1366,8 @@ EXPORT_SYMBOL(m32r_sio_suspend_port);
 EXPORT_SYMBOL(m32r_sio_resume_port);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Generic M32R SIO serial driver $Revision: 1.6 $");
+MODULE_DESCRIPTION("Generic M32R SIO serial driver $Revision: 1.9 $");
 
-MODULE_PARM(share_irqs_sio, "i");
+module_param(share_irqs_sio, bool, 0400);
 MODULE_PARM_DESC(share_irqs_sio, "Share IRQs with other non-M32R SIO devices"
 	" (unsafe)");
