@@ -670,41 +670,38 @@ static void copy_data(int frombio, struct bio *bio,
 	char *pa = page_address(page);
 	struct bio_vec *bvl;
 	int i;
+	int page_offset;
 
-	for (;bio && bio->bi_sector < sector+STRIPE_SECTORS;
-	      bio = r5_next_bio(bio, sector) ) {
-		int page_offset;
-		if (bio->bi_sector >= sector)
-			page_offset = (signed)(bio->bi_sector - sector) * 512;
-		else
-			page_offset = (signed)(sector - bio->bi_sector) * -512;
-		bio_for_each_segment(bvl, bio, i) {
-			int len = bio_iovec_idx(bio,i)->bv_len;
-			int clen;
-			int b_offset = 0;
+	if (bio->bi_sector >= sector)
+		page_offset = (signed)(bio->bi_sector - sector) * 512;
+	else
+		page_offset = (signed)(sector - bio->bi_sector) * -512;
+	bio_for_each_segment(bvl, bio, i) {
+		int len = bio_iovec_idx(bio,i)->bv_len;
+		int clen;
+		int b_offset = 0;
 
-			if (page_offset < 0) {
-				b_offset = -page_offset;
-				page_offset += b_offset;
-				len -= b_offset;
-			}
-
-			if (len > 0 && page_offset + len > STRIPE_SIZE)
-				clen = STRIPE_SIZE - page_offset;
-			else clen = len;
-
-			if (clen > 0) {
-				char *ba = __bio_kmap_atomic(bio, i, KM_USER0);
-				if (frombio)
-					memcpy(pa+page_offset, ba+b_offset, clen);
-				else
-					memcpy(ba+b_offset, pa+page_offset, clen);
-				__bio_kunmap_atomic(ba, KM_USER0);
-			}
-			if (clen < len) /* hit end of page */
-				break;
-			page_offset +=  len;
+		if (page_offset < 0) {
+			b_offset = -page_offset;
+			page_offset += b_offset;
+			len -= b_offset;
 		}
+
+		if (len > 0 && page_offset + len > STRIPE_SIZE)
+			clen = STRIPE_SIZE - page_offset;
+		else clen = len;
+
+		if (clen > 0) {
+			char *ba = __bio_kmap_atomic(bio, i, KM_USER0);
+			if (frombio)
+				memcpy(pa+page_offset, ba+b_offset, clen);
+			else
+				memcpy(ba+b_offset, pa+page_offset, clen);
+			__bio_kunmap_atomic(ba, KM_USER0);
+		}
+		if (clen < len) /* hit end of page */
+			break;
+		page_offset +=  len;
 	}
 }
 
