@@ -1532,7 +1532,7 @@ static snd_kcontrol_new_t snd_ice1712_eeprom __devinitdata = {
 
 /*
  */
-static int snd_ice1712_spdif_default_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+static int snd_ice1712_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
 	uinfo->count = 1;
@@ -1559,19 +1559,12 @@ static int snd_ice1712_spdif_default_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ice1712_spdif_default __devinitdata =
 {
-	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
-	.info =		snd_ice1712_spdif_default_info,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_ice1712_spdif_info,
 	.get =		snd_ice1712_spdif_default_get,
 	.put =		snd_ice1712_spdif_default_put
 };
-
-static int snd_ice1712_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
-	uinfo->count = 1;
-	return 0;
-}
 
 static int snd_ice1712_spdif_maskc_get(snd_kcontrol_t * kcontrol,
 				       snd_ctl_elem_value_t * ucontrol)
@@ -1617,28 +1610,21 @@ static int snd_ice1712_spdif_maskp_get(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ice1712_spdif_maskc __devinitdata =
 {
-	.access =		SNDRV_CTL_ELEM_ACCESS_READ,
-	.iface =		SNDRV_CTL_ELEM_IFACE_MIXER,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
-	.info =		snd_ice1712_spdif_mask_info,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.info =		snd_ice1712_spdif_info,
 	.get =		snd_ice1712_spdif_maskc_get,
 };
 
 static snd_kcontrol_new_t snd_ice1712_spdif_maskp __devinitdata =
 {
-	.access =		SNDRV_CTL_ELEM_ACCESS_READ,
-	.iface =		SNDRV_CTL_ELEM_IFACE_MIXER,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
-	.info =		snd_ice1712_spdif_mask_info,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,PRO_MASK),
+	.info =		snd_ice1712_spdif_info,
 	.get =		snd_ice1712_spdif_maskp_get,
 };
-
-static int snd_ice1712_spdif_stream_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
-	uinfo->count = 1;
-	return 0;
-}
 
 static int snd_ice1712_spdif_stream_get(snd_kcontrol_t * kcontrol,
 					snd_ctl_elem_value_t * ucontrol)
@@ -1660,10 +1646,10 @@ static int snd_ice1712_spdif_stream_put(snd_kcontrol_t * kcontrol,
 
 static snd_kcontrol_new_t snd_ice1712_spdif_stream __devinitdata =
 {
-	.access =		SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
-	.info =		snd_ice1712_spdif_stream_info,
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_ice1712_spdif_info,
 	.get =		snd_ice1712_spdif_stream_get,
 	.put =		snd_ice1712_spdif_stream_put
 };

@@ -191,4 +191,15 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif, unsigned char *buffe
 
 int snd_usb_create_midi_interface(snd_usb_audio_t *chip, struct usb_interface *iface, const snd_usb_audio_quirk_t *quirk);
 
+/*
+ * retrieve usb_interface descriptor from the host interface
+ * (conditional for compatibility with the older API)
+ */
+#ifndef get_iface_desc
+#define get_iface_desc(iface)	(&iface->desc)
+#define get_endpoint(alt,ep)	(&(alt)->endpoint[ep].desc)
+#define get_ep_desc(ep)		(&(ep)->desc)
+#define get_cfg_desc(cfg)	(&(cfg)->desc)
+#endif
+
 #endif /* __USBAUDIO_H */

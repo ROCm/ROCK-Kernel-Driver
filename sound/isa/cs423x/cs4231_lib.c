@@ -124,6 +124,48 @@ static unsigned char snd_cs4231_original_image[32] =
  *  Basic I/O functions
  */
 
+#if !defined(EBUS_SUPPORT) && !defined(SBUS_SUPPORT)
+#define __CS4231_INLINE__ inline
+#else
+#define __CS4231_INLINE__ /* nothing */
+#endif
+
+static __CS4231_INLINE__ void cs4231_outb(cs4231_t *chip, u8 offset, u8 val)
+{
+#ifdef EBUS_SUPPORT
+	if (chip->ebus->flag) {
+		writeb(val, chip->port + (offset << 2));
+	} else {
+#endif
+#ifdef SBUS_SUPPORT
+		sbus_writeb(val, chip->port + (offset << 2));
+#endif
+#ifdef EBUS_SUPPORT
+	}
+#endif
+#ifdef LEGACY_SUPPORT
+	outb(val, chip->port + offset);
+#endif
+}
+
+static __CS4231_INLINE__ u8 cs4231_inb(cs4231_t *chip, u8 offset)
+{
+#ifdef EBUS_SUPPORT
+	if (chip->ebus_flag) {
+		return readb(chip->port + (offset << 2));
+	} else {
+#endif
+#ifdef SBUS_SUPPORT
+		return sbus_writeb(chip->port + (offset << 2));
+#endif
+#ifdef EBUS_SUPPORT
+	}
+#endif
+#ifdef LEGACY_SUPPORT
+	return inb(chip->port + offset);
+#endif
+}
+
 void snd_cs4231_outm(cs4231_t *chip, unsigned char reg,
 		     unsigned char mask, unsigned char value)
 {
@@ -131,21 +173,21 @@ void snd_cs4231_outm(cs4231_t *chip, unsigned char reg,
 	unsigned char tmp;
 
 	for (timeout = 250;
-	     timeout > 0 && (inb(CS4231P(chip, REGSEL)) & CS4231_INIT);
+	     timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT);
 	     timeout--)
 	     	udelay(100);
 #ifdef CONFIG_SND_DEBUG
-	if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
+	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 		snd_printk("outm: auto calibration time out - reg = 0x%x, value = 0x%x\n", reg, value);
 #endif
 	if (chip->calibrate_mute) {
 		chip->image[reg] &= mask;
 		chip->image[reg] |= value;
 	} else {
-		outb(chip->mce_bit | reg, CS4231P(chip, REGSEL));
+		cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | reg);
 		mb();
 		tmp = (chip->image[reg] & mask) | value;
-		outb(tmp, CS4231P(chip, REG));
+		cs4231_outb(chip, CS4231P(REG), tmp);
 		chip->image[reg] = tmp;
 		mb();
 	}
@@ -156,11 +198,11 @@ static void snd_cs4231_dout(cs4231_t *chip, unsigned char reg, unsigned char val
 	int timeout;
 
 	for (timeout = 250;
-	     timeout > 0 && (inb(CS4231P(chip, REGSEL)) & CS4231_INIT);
+	     timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT);
 	     timeout--)
 	     	udelay(10);
-	outb(chip->mce_bit | reg, CS4231P(chip, REGSEL));
-	outb(value, CS4231P(chip, REG));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | reg);
+	cs4231_outb(chip, CS4231P(REG), value);
 	mb();
 }
 
@@ -169,15 +211,15 @@ void snd_cs4231_out(cs4231_t *chip, unsigned char reg, unsigned char value)
 	int timeout;
 
 	for (timeout = 250;
-	     timeout > 0 && (inb(CS4231P(chip, REGSEL)) & CS4231_INIT);
+	     timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT);
 	     timeout--)
 	     	udelay(100);
 #ifdef CONFIG_SND_DEBUG
-	if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
+	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 		snd_printk("out: auto calibration time out - reg = 0x%x, value = 0x%x\n", reg, value);
 #endif
-	outb(chip->mce_bit | reg, CS4231P(chip, REGSEL));
-	outb(value, CS4231P(chip, REG));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | reg);
+	cs4231_outb(chip, CS4231P(REG), value);
 	chip->image[reg] = value;
 	mb();
 #if 0
@@ -190,23 +232,23 @@ unsigned char snd_cs4231_in(cs4231_t *chip, unsigned char reg)
 	int timeout;
 
 	for (timeout = 250;
-	     timeout > 0 && (inb(CS4231P(chip, REGSEL)) & CS4231_INIT);
+	     timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT);
 	     timeout--)
 	     	udelay(100);
 #ifdef CONFIG_SND_DEBUG
-	if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
+	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 		snd_printk("in: auto calibration time out - reg = 0x%x\n", reg);
 #endif
-	outb(chip->mce_bit | reg, CS4231P(chip, REGSEL));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | reg);
 	mb();
-	return inb(CS4231P(chip, REG));
+	return cs4231_inb(chip, CS4231P(REG));
 }
 
 void snd_cs4236_ext_out(cs4231_t *chip, unsigned char reg, unsigned char val)
 {
-	outb(chip->mce_bit | 0x17, CS4231P(chip, REGSEL));
-	outb(reg | (chip->image[CS4236_EXT_REG] & 0x01), CS4231P(chip, REG));
-	outb(val, CS4231P(chip, REG));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | 0x17);
+	cs4231_outb(chip, CS4231P(REG), reg | (chip->image[CS4236_EXT_REG] & 0x01));
+	cs4231_outb(chip, CS4231P(REG), val);
 	chip->eimage[CS4236_REG(reg)] = val;
 #if 0
 	printk("ext out : reg = 0x%x, val = 0x%x\n", reg, val);
@@ -215,14 +257,14 @@ void snd_cs4236_ext_out(cs4231_t *chip, unsigned char reg, unsigned char val)
 
 unsigned char snd_cs4236_ext_in(cs4231_t *chip, unsigned char reg)
 {
-	outb(chip->mce_bit | 0x17, CS4231P(chip, REGSEL));
-	outb(reg | (chip->image[CS4236_EXT_REG] & 0x01), CS4231P(chip, REG));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | 0x17);
+	cs4231_outb(chip, CS4231P(REG), reg | (chip->image[CS4236_EXT_REG] & 0x01));
 #if 1
-	return inb(CS4231P(chip, REG));
+	return cs4231_inb(chip, CS4231P(REG));
 #else
 	{
 		unsigned char res;
-		res = inb(CS4231P(chip, REG));
+		res = cs4231_inb(chip, CS4231P(REG));
 		printk("ext in : reg = 0x%x, val = 0x%x\n", reg, res);
 		return res;
 	}
@@ -233,8 +275,8 @@ unsigned char snd_cs4236_ext_in(cs4231_t *chip, unsigned char reg)
 
 void snd_cs4231_debug(cs4231_t *chip)
 {
-	printk("CS4231 REGS:      INDEX = 0x%02x  ", inb(CS4231P(chip, REGSEL)));
-	printk("                 STATUS = 0x%02x\n", inb(CS4231P(chip, STATUS)));
+	printk("CS4231 REGS:      INDEX = 0x%02x  ", cs4231_inb(chip, CS4231P(REGSEL)));
+	printk("                 STATUS = 0x%02x\n", cs4231_inb(chip, CS4231P(STATUS)));
 	printk("  0x00: left input      = 0x%02x  ", snd_cs4231_in(chip, 0x00));
 	printk("  0x10: alt 1 (CFIG 2)  = 0x%02x\n", snd_cs4231_in(chip, 0x10));
 	printk("  0x01: right input     = 0x%02x  ", snd_cs4231_in(chip, 0x01));
@@ -281,10 +323,10 @@ static void snd_cs4231_busy_wait(cs4231_t *chip)
 
 	/* huh.. looks like this sequence is proper for CS4231A chip (GUS MAX) */
 	for (timeout = 5; timeout > 0; timeout--)
-		inb(CS4231P(chip, REGSEL));
+		cs4231_inb(chip, CS4231P(REGSEL));
 	/* end of cleanup sequence */
 	for (timeout = 250;
-	     timeout > 0 && (inb(CS4231P(chip, REGSEL)) & CS4231_INIT);
+	     timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT);
 	     timeout--)
 	     	udelay(10);
 }
@@ -295,18 +337,18 @@ void snd_cs4231_mce_up(cs4231_t *chip)
 	int timeout;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	for (timeout = 250; timeout > 0 && (inb(CS4231P(chip, REGSEL)) & CS4231_INIT); timeout--)
+	for (timeout = 250; timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT); timeout--)
 		udelay(100);
 #ifdef CONFIG_SND_DEBUG
-	if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
+	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 		snd_printk("mce_up - auto calibration time out (0)\n");
 #endif
 	chip->mce_bit |= CS4231_MCE;
-	timeout = inb(CS4231P(chip, REGSEL));
+	timeout = cs4231_inb(chip, CS4231P(REGSEL));
 	if (timeout == 0x80)
 		snd_printk("mce_up [0x%lx]: serious init problem - codec still busy\n", chip->port);
 	if (!(timeout & CS4231_MCE))
-		outb(chip->mce_bit | (timeout & 0x1f), CS4231P(chip, REGSEL));
+		cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | (timeout & 0x1f));
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
@@ -322,12 +364,12 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 	printk("(1) timeout = %i\n", timeout);
 #endif
 #ifdef CONFIG_SND_DEBUG
-	if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
-		snd_printk("mce_down [0x%lx] - auto calibration time out (0)\n", CS4231P(chip, REGSEL));
+	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
+		snd_printk("mce_down [0x%lx] - auto calibration time out (0)\n", (long)CS4231P(REGSEL));
 #endif
 	chip->mce_bit &= ~CS4231_MCE;
-	timeout = inb(CS4231P(chip, REGSEL));
-	outb(chip->mce_bit | (timeout & 0x1f), CS4231P(chip, REGSEL));
+	timeout = cs4231_inb(chip, CS4231P(REGSEL));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | (timeout & 0x1f));
 	if (timeout == 0x80)
 		snd_printk("mce_down [0x%lx]: serious init problem - codec still busy\n", chip->port);
 	if ((timeout & CS4231_MCE) == 0 ||
@@ -364,7 +406,7 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 	printk("(3) jiffies = %li\n", jiffies);
 #endif
 	time = HZ / 10;
-	while (inb(CS4231P(chip, REGSEL)) & CS4231_INIT) {
+	while (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT) {
 		spin_unlock_irqrestore(&chip->reg_lock, flags);
 		if (time <= 0) {
 			snd_printk("mce_down - auto calibration time out (3)\n");
@@ -377,7 +419,7 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 #if 0
 	printk("(4) jiffies = %li\n", jiffies);
-	snd_printk("mce_down - exit = 0x%x\n", inb(CS4231P(chip, REGSEL)));
+	snd_printk("mce_down - exit = 0x%x\n", cs4231_inb(chip, CS4231P(REGSEL)));
 #endif
 }
 
@@ -403,7 +445,7 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 	int result = 0;
 
 #if 0
-	printk("codec trigger!!! - what = %i, enable = %i, status = 0x%x\n", what, enable, inb(CS4231P(card, STATUS)));
+	printk("codec trigger!!! - what = %i, enable = %i, status = 0x%x\n", what, enable, cs4231_inb(chip, CS4231P(STATUS)));
 #endif
 
 	switch (cmd) {
@@ -423,10 +465,15 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 			s = s->link_next;
 		} while (s != substream);
 		spin_lock(&chip->reg_lock);
-		if (cmd == SNDRV_PCM_TRIGGER_START)
+		if (cmd == SNDRV_PCM_TRIGGER_START) {
 			chip->image[CS4231_IFACE_CTRL] |= what;
-		else
+			if (chip->trigger)
+				chip->trigger(chip, what, 1);
+		} else {
 			chip->image[CS4231_IFACE_CTRL] &= ~what;
+			if (chip->trigger)
+				chip->trigger(chip, what, 0);
+		}
 		snd_cs4231_out(chip, CS4231_IFACE_CTRL, chip->image[CS4231_IFACE_CTRL]);
 		spin_unlock(&chip->reg_lock);
 		break;
@@ -640,7 +687,7 @@ static void snd_cs4231_init(cs4231_t *chip)
 
 	snd_cs4231_mce_down(chip);
 
-#ifdef SNDRV_DEBUG_MCE
+#ifdef SNDRV_DEBUGq_MCE
 	snd_printk("init: (1)\n");
 #endif
 	snd_cs4231_mce_up(chip);
@@ -713,8 +760,8 @@ static int snd_cs4231_open(cs4231_t *chip, unsigned int mode)
 		       CS4231_RECORD_IRQ |
 		       CS4231_TIMER_IRQ);
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, 0);
-	outb(0, CS4231P(chip, STATUS));	/* clear IRQ */
-	outb(0, CS4231P(chip, STATUS));	/* clear IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);	/* clear IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);	/* clear IRQ */
 	chip->image[CS4231_PIN_CTRL] |= CS4231_IRQ_ENABLE;
 	snd_cs4231_out(chip, CS4231_PIN_CTRL, chip->image[CS4231_PIN_CTRL]);
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, CS4231_PLAYBACK_IRQ |
@@ -743,8 +790,8 @@ static void snd_cs4231_close(cs4231_t *chip, unsigned int mode)
 	/* disable IRQ */
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, 0);
-	outb(0, CS4231P(chip, STATUS));	/* clear IRQ */
-	outb(0, CS4231P(chip, STATUS));	/* clear IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);	/* clear IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);	/* clear IRQ */
 	chip->image[CS4231_PIN_CTRL] &= ~CS4231_IRQ_ENABLE;
 	snd_cs4231_out(chip, CS4231_PIN_CTRL, chip->image[CS4231_PIN_CTRL]);
 
@@ -765,8 +812,8 @@ static void snd_cs4231_close(cs4231_t *chip, unsigned int mode)
 
 	/* clear IRQ again */
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, 0);
-	outb(0, CS4231P(chip, STATUS));	/* clear IRQ */
-	outb(0, CS4231P(chip, STATUS));	/* clear IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);	/* clear IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);	/* clear IRQ */
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	snd_cs4231_calibrate_mute(chip, 0);
@@ -829,6 +876,7 @@ static int snd_cs4231_playback_hw_free(snd_pcm_substream_t * substream)
 	return snd_pcm_lib_free_pages(substream);
 }
 
+#ifdef LEGACY_SUPPORT
 static int snd_cs4231_playback_prepare(snd_pcm_substream_t * substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
@@ -850,6 +898,7 @@ static int snd_cs4231_playback_prepare(snd_pcm_substream_t * substream)
 #endif
 	return 0;
 }
+#endif /* LEGACY_SUPPORT */
 
 static int snd_cs4231_capture_hw_params(snd_pcm_substream_t * substream,
 					snd_pcm_hw_params_t * hw_params)
@@ -871,6 +920,7 @@ static int snd_cs4231_capture_hw_free(snd_pcm_substream_t * substream)
 	return snd_pcm_lib_free_pages(substream);
 }
 
+#ifdef LEGACY_SUPPORT
 static int snd_cs4231_capture_prepare(snd_pcm_substream_t * substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
@@ -894,6 +944,7 @@ static int snd_cs4231_capture_prepare(snd_pcm_substream_t * substream)
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	return 0;
 }
+#endif
 
 static void snd_cs4231_overrange(cs4231_t *chip)
 {
@@ -940,6 +991,7 @@ void snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&chip->reg_lock);
 }
 
+#ifdef LEGACY_SUPPORT
 static snd_pcm_uframes_t snd_cs4231_playback_pointer(snd_pcm_substream_t * substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
@@ -961,12 +1013,13 @@ static snd_pcm_uframes_t snd_cs4231_capture_pointer(snd_pcm_substream_t * substr
 	ptr = chip->c_dma_size - snd_dma_residue(chip->dma2);
 	return bytes_to_frames(substream->runtime, ptr);
 }
+#endif /* LEGACY_SUPPORT */
 
 /*
 
  */
 
-static int snd_cs4231_probe(cs4231_t *chip)
+int snd_cs4231_probe(cs4231_t *chip)
 {
 	unsigned long flags;
 	int i, id, rev;
@@ -979,7 +1032,7 @@ static int snd_cs4231_probe(cs4231_t *chip)
 	id = 0;
 	for (i = 0; i < 50; i++) {
 		mb();
-		if (inb(CS4231P(chip, REGSEL)) & CS4231_INIT)
+		if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 			udelay(2000);
 		else {
 			spin_lock_irqsave(&chip->reg_lock, flags);
@@ -1020,8 +1073,8 @@ static int snd_cs4231_probe(cs4231_t *chip)
 		}
 	}
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	inb(CS4231P(chip, STATUS));	/* clear any pendings IRQ */
-	outb(0, CS4231P(chip, STATUS));
+	cs4231_inb(chip, CS4231P(STATUS));	/* clear any pendings IRQ */
+	cs4231_outb(chip, CS4231P(STATUS), 0);
 	mb();
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
@@ -1189,6 +1242,7 @@ static int snd_cs4231_playback_open(snd_pcm_substream_t * substream)
 	    chip->hardware == CS4231_HW_CS4239)
 		runtime->hw.formats = SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE;
 
+#ifdef LEGACY_SUPPORT
 	snd_pcm_limit_isa_dma_size(chip->dma1, &runtime->hw.buffer_bytes_max);
 	snd_pcm_limit_isa_dma_size(chip->dma1, &runtime->hw.period_bytes_max);
 
@@ -1196,14 +1250,20 @@ static int snd_cs4231_playback_open(snd_pcm_substream_t * substream)
 		if ((err = chip->claim_dma(chip, chip->dma_private_data, chip->dma1)) < 0)
 			return err;
 	}
+#endif
 
 	if ((err = snd_cs4231_open(chip, CS4231_MODE_PLAY)) < 0) {
+#ifdef LEGACY_SUPPORT
 		if (chip->release_dma)
 			chip->release_dma(chip, chip->dma_private_data, chip->dma1);
+#endif
 		snd_free_pages(runtime->dma_area, runtime->dma_bytes);
 		return err;
 	}
 	chip->playback_substream = substream;
+#if defined(SBUS_SUPPORT) || defined(EBUS_SUPPORT)
+	chip->p_periods_sent = 0;
+#endif
 	snd_pcm_set_sync(substream);
 	chip->rate_constraint(runtime);
 	return 0;
@@ -1222,21 +1282,28 @@ static int snd_cs4231_capture_open(snd_pcm_substream_t * substream)
 	    chip->hardware == CS4231_HW_CS4239)
 		runtime->hw.formats = SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE;
 
+#ifdef LEGACY_SUPPORT
+	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.buffer_bytes_max);
+	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.period_bytes_max);
+
 	if (chip->claim_dma) {
 		if ((err = chip->claim_dma(chip, chip->dma_private_data, chip->dma2)) < 0)
 			return err;
 	}
-
-	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.buffer_bytes_max);
-	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.period_bytes_max);
+#endif
 
 	if ((err = snd_cs4231_open(chip, CS4231_MODE_RECORD)) < 0) {
+#ifdef LEGACY_SUPPORT
 		if (chip->release_dma)
 			chip->release_dma(chip, chip->dma_private_data, chip->dma2);
+#endif
 		snd_free_pages(runtime->dma_area, runtime->dma_bytes);
 		return err;
 	}
 	chip->capture_substream = substream;
+#if defined(SBUS_SUPPORT) || defined(EBUS_SUPPORT)
+	chip->c_periods_sent = 0;
+#endif
 	snd_pcm_set_sync(substream);
 	chip->rate_constraint(runtime);
 	return 0;
@@ -1301,8 +1368,8 @@ static void snd_cs4231_resume(cs4231_t *chip)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_cs4231_busy_wait(chip);
 	chip->mce_bit &= ~CS4231_MCE;
-	timeout = inb(CS4231P(chip, REGSEL));
-	outb(chip->mce_bit | (timeout & 0x1f), CS4231P(chip, REGSEL));
+	timeout = cs4231_inb(chip, CS4231P(REGSEL));
+	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | (timeout & 0x1f));
 	if (timeout == 0x80)
 		snd_printk("down [0x%lx]: serious init problem - codec still busy\n", chip->port);
 	if ((timeout & CS4231_MCE) == 0 ||
@@ -1333,6 +1400,8 @@ static int snd_cs4231_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *d
 }
 
 #endif /* CONFIG_PM */
+
+#ifdef LEGACY_SUPPORT
 
 static int snd_cs4231_free(cs4231_t *chip)
 {
@@ -1373,6 +1442,8 @@ static int snd_cs4231_dev_free(snd_device_t *device)
 	return snd_cs4231_free(chip);	
 }
 
+#endif /* LEGACY_SUPPORT */
+
 const char *snd_cs4231_chip_id(cs4231_t *chip)
 {
 	switch (chip->hardware) {
@@ -1392,6 +1463,35 @@ const char *snd_cs4231_chip_id(cs4231_t *chip)
 	}
 }
 
+static int snd_cs4231_new(snd_card_t * card,
+			  unsigned short hardware,
+			  unsigned short hwshare,
+			  cs4231_t ** rchip)
+{
+	cs4231_t *chip;
+
+	*rchip = NULL;
+	chip = snd_magic_kcalloc(cs4231_t, 0, GFP_KERNEL);
+	if (chip == NULL)
+		return -ENOMEM;
+	chip->hardware = hardware;
+	chip->hwshare = hwshare;
+
+	spin_lock_init(&chip->reg_lock);
+	init_MUTEX(&chip->mce_mutex);
+	init_MUTEX(&chip->open_mutex);
+	chip->card = card;
+	chip->rate_constraint = snd_cs4231_xrate;
+	chip->set_playback_format = snd_cs4231_playback_format;
+	chip->set_capture_format = snd_cs4231_capture_format;
+        memcpy(&chip->image, &snd_cs4231_original_image, sizeof(snd_cs4231_original_image));
+        
+        *rchip = chip;
+        return 0;
+}
+
+#ifdef LEGACY_SUPPORT
+
 int snd_cs4231_create(snd_card_t * card,
 	              unsigned long port,
 	              unsigned long cport,
@@ -1406,15 +1506,13 @@ int snd_cs4231_create(snd_card_t * card,
 	cs4231_t *chip;
 	int err;
 
-	*rchip = NULL;
-	chip = snd_magic_kcalloc(cs4231_t, 0, GFP_KERNEL);
-	if (chip == NULL)
-		return -ENOMEM;
+	err = snd_cs4231_new(card, hardware, hwshare, &chip);
+	if (err < 0)
+		return err;
+	
 	chip->irq = -1;
 	chip->dma1 = -1;
 	chip->dma2 = -1;
-	chip->hardware = hardware;
-	chip->hwshare = hwshare;
 
 	if ((chip->res_port = request_region(port, 4, "CS4231")) == NULL) {
 		snd_cs4231_free(chip);
@@ -1446,15 +1544,6 @@ int snd_cs4231_create(snd_card_t * card,
 	} else
 		chip->dma2 = dma2;
 
-	spin_lock_init(&chip->reg_lock);
-	init_MUTEX(&chip->mce_mutex);
-	init_MUTEX(&chip->open_mutex);
-	chip->card = card;
-	chip->rate_constraint = snd_cs4231_xrate;
-	chip->set_playback_format = snd_cs4231_playback_format;
-	chip->set_capture_format = snd_cs4231_capture_format;
-        memcpy(&chip->image, &snd_cs4231_original_image, sizeof(snd_cs4231_original_image));
-
 	/* global setup */
 	if (snd_cs4231_probe(chip) < 0) {
 		snd_cs4231_free(chip);
@@ -1485,6 +1574,8 @@ int snd_cs4231_create(snd_card_t * card,
 	*rchip = chip;
 	return 0;
 }
+
+#endif /* LEGACY_SUPPORT */
 
 static snd_pcm_ops_t snd_cs4231_playback_ops = {
 	.open =		snd_cs4231_playback_open,
@@ -1540,7 +1631,23 @@ int snd_cs4231_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
 		pcm->info_flags |= SNDRV_PCM_INFO_JOINT_DUPLEX;
 	strcpy(pcm->name, snd_cs4231_chip_id(chip));
 
+#ifdef LEGACY_SUPPORT
 	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
+#else
+#  ifdef EBUS_SUPPORT
+        if (chip->ebus_flag) {
+                snd_pcm_lib_preallocate_pci_pages_for_all(chip->dev_u.pdev, pcm,
+                                                          64*1024, 128*1024);
+        } else {
+#  endif
+#  ifdef SBUS_SUPPORT
+                snd_pcm_lib_preallocate_sbus_pages_for_all(chip->dev_u.sdev, pcm,
+                                                           64*1024, 128*1024);
+#  endif
+#  ifdef EBUS_SUPPORT
+        }
+#  endif
+#endif
 
 	chip->pcm = pcm;
 	if (rpcm)
