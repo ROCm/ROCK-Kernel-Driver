@@ -115,11 +115,11 @@ prom_entry prom __initdata;
 ihandle prom_chosen __initdata;
 ihandle prom_stdout __initdata;
 
-char *prom_display_paths[FB_MAX] __initdata;
-phandle prom_display_nodes[FB_MAX] __initdata;
-unsigned int prom_num_displays __initdata;
-char *of_stdout_device __initdata;
+static char *prom_display_paths[FB_MAX] __initdata;
+static phandle prom_display_nodes[FB_MAX] __initdata;
+static unsigned int prom_num_displays __initdata;
 static ihandle prom_disp_node __initdata;
+char *of_stdout_device __initdata;
 
 unsigned int rtas_data;   /* physical pointer */
 unsigned int rtas_entry;  /* physical pointer */
@@ -403,6 +403,7 @@ check_display(unsigned long mem)
 
 	for (j=0; j<prom_num_displays; j++) {
 		path = prom_display_paths[j];
+		node = prom_display_nodes[j];
 		prom_print("opening display ");
 		prom_print(path);
 		ih = call_prom("open", 1, 1, path);
@@ -420,6 +421,8 @@ check_display(unsigned long mem)
 			continue;
 		} else {
 			prom_print("... ok\n");
+			call_prom("setprop", 4, 1, node, "linux,opened", 0, NULL);
+
 			/*
 			 * Setup a usable color table when the appropriate
 			 * method is available.
@@ -439,6 +442,19 @@ check_display(unsigned long mem)
 						   clut[1], clut[2]) != 0)
 					break;
 #endif /* CONFIG_LOGO_LINUX_CLUT224 */
+		}
+	}
+	
+	if (prom_stdout) {
+		phandle p;
+		p = call_prom("instance-to-package", 1, 1, prom_stdout);
+		if (p && (int)p != -1) {
+			type[0] = 0;
+			call_prom("getprop", 4, 1, p, "device_type",
+				  type, sizeof(type));
+			if (strcmp(type, "display") == 0)
+				call_prom("setprop", 4, 1, p, "linux,boot-display",
+					  0, NULL);
 		}
 	}
 
