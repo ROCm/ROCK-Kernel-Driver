@@ -904,7 +904,8 @@ static void usb_find_drivers(struct usb_device *dev)
 		
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
-		sprintf (&interface->dev.bus_id[0], "%03d", ifnum);
+		interface->dev.bus = &usb_bus_type;
+		sprintf (&interface->dev.bus_id[0], "%03d%03d", dev->devnum,ifnum);
 		sprintf (&interface->dev.name[0], "figure out some name...");
 		device_register (&interface->dev);
 
