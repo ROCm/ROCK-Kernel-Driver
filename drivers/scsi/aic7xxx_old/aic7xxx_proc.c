@@ -90,8 +90,6 @@ aic7xxx_proc_info ( struct Scsi_Host *HBAptr, char *buffer, char **start, off_t 
   unsigned char i;
   unsigned char tindex;
 
-  HBAptr = NULL;
-
   for(p=first_aic7xxx; p->host != HBAptr; p=p->next)
     ;
 
