@@ -38,6 +38,7 @@
 #include <linux/wait.h>
 #include <linux/smp_lock.h>
 #include <linux/pci.h>
+#include "../pci.h"
 #include "pciehp.h"
 #include "pciehprm.h"
 
@@ -1220,7 +1221,13 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 				pciehp_configure_device(ctrl, new_func);
 			}
 		} while (new_func);
-  		
+
+ 		/* 
+ 		 * Some PCI Express root ports require fixup after hot-plug operation.
+ 		 */
+ 		if (pcie_mch_quirk)
+ 			pci_fixup_device(pci_fixup_final, ctrl->pci_dev);
+ 
   		if (PWR_LED(ctrl->ctrlcap)) {
   			/* Wait for exclusive access to hardware */
   			down(&ctrl->crit_sect);

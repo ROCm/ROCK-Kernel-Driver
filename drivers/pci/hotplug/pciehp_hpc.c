@@ -741,6 +741,8 @@ static void hpc_release_ctlr(struct controller *ctrl)
 		if (php_ctlr->irq) {
 			free_irq(php_ctlr->irq, ctrl);
 			php_ctlr->irq = 0;
+			if (!pcie_mch_quirk) 
+				pci_disable_msi(php_ctlr->pci_dev);
 		}
 	}
 	if (php_ctlr->pci_dev) 
@@ -1402,8 +1404,8 @@ int pcie_init(struct controller * ctrl,
 		start_int_poll_timer( php_ctlr, 10 );   /* start with 10 second delay */
 	} else {
 		/* Installs the interrupt handler */
-		dbg("%s: pciehp_msi_quirk = %x\n", __FUNCTION__, pciehp_msi_quirk);
-		if (!pciehp_msi_quirk) {
+		dbg("%s: pcie_mch_quirk = %x\n", __FUNCTION__, pcie_mch_quirk);
+		if (!pcie_mch_quirk) {
 			rc = pci_enable_msi(pdev);
 			if (rc) {
 				info("Can't get msi for the hotplug controller\n");

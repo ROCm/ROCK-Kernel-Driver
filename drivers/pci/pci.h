@@ -61,7 +61,7 @@ extern int pci_visit_dev(struct pci_visit *fn,
 /* Lock for read/write access to pci device and bus lists */
 extern spinlock_t pci_bus_lock;
 
-extern int pciehp_msi_quirk;
+extern int pcie_mch_quirk;
 extern struct device_attribute pci_dev_attrs[];
 
 /**
