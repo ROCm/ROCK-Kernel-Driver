@@ -45,6 +45,7 @@
 
 #include "scsi.h"
 #include <scsi/scsi_host.h>
+#include "fdomain.h"
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -84,10 +85,6 @@ typedef struct scsi_info_t {
     struct Scsi_Host	*host;
 } scsi_info_t;
 
-extern Scsi_Host_Template fdomain_driver_template;
-extern void fdomain_setup(char *str, int *ints);
-extern struct Scsi_Host *__fdomain_16x0_detect( Scsi_Host_Template *tpnt );
-extern int fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt);
 
 static void fdomain_release(dev_link_t *link);
 static int fdomain_event(event_t event, int priority,
@@ -189,7 +186,7 @@ static void fdomain_config(dev_link_t *link)
     scsi_info_t *info = link->priv;
     tuple_t tuple;
     cisparse_t parse;
-    int i, last_ret, last_fn, ints[3];
+    int i, last_ret, last_fn;
     u_char tuple_data[64];
     char str[16];
     struct Scsi_Host *host;
@@ -229,11 +226,8 @@ static void fdomain_config(dev_link_t *link)
     release_region(link->io.BasePort1, link->io.NumPorts1);
 
     /* Set configuration options for the fdomain driver */
-    ints[0] = 2;
-    ints[1] = link->io.BasePort1;
-    ints[2] = link->irq.AssignedIRQ;
     sprintf(str, "%d,%d", link->io.BasePort1, link->irq.AssignedIRQ);
-    fdomain_setup(str, ints);
+    fdomain_setup(str);
     
     host = __fdomain_16x0_detect(&fdomain_driver_template);
     if (!host) {
