@@ -406,8 +406,8 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	f = w1_family_registered(rn->family);
 	if (!f) {
 		spin_unlock(&w1_flock);
-		dev_info(&dev->dev, "Family %x is not registered.\n",
-			  rn->family);
+		dev_info(&dev->dev, "Family %x for %02x.%012llx.%02x is not registered.\n",
+			  rn->family, rn->family, rn->id, rn->crc);
 		kfree(sl);
 		return -ENODEV;
 	}
@@ -428,7 +428,7 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 
 	dev->slave_count++;
 
-	msg.id.id = *rn;
+	memcpy(&msg.id.id, rn, sizeof(msg.id.id));
 	msg.type = W1_SLAVE_ADD;
 	w1_netlink_send(dev, &msg);
 
@@ -449,7 +449,7 @@ static void w1_slave_detach(struct w1_slave *sl)
 	device_unregister(&sl->dev);
 	w1_family_put(sl->family);
 
-	msg.id.id = sl->reg_num;
+	memcpy(&msg.id.id, &sl->reg_num, sizeof(msg.id.id));
 	msg.type = W1_SLAVE_REMOVE;
 	w1_netlink_send(sl->master, &msg);
 }
