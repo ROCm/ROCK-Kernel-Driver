@@ -25,8 +25,6 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-
-#define BUILDING_PTY_C 1
 #include <linux/devpts_fs.h>
 
 struct pty_struct {
