@@ -838,7 +838,7 @@ int diWrite(tid_t tid, struct inode *ip)
 	 */
 	if (S_ISDIR(ip->i_mode)
 	    && (ip->i_ipmnt->i_mntflag & JFS_DASD_ENABLED))
-		bcopy(&ip->i_DASD, &dp->di_DASD, sizeof(struct dasd));
+		memcpy(&dp->di_DASD, &ip->i_DASD, sizeof(struct dasd));
 #endif				/*  _JFS_FASTDASD */
 
 	/* release the buffer holding the updated on-disk inode. 

@@ -5889,9 +5889,9 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 	/*
 	 *  Copy scripts to controller instance.
 	 */
-	bcopy(fw->a_base, np->scripta0, np->scripta_sz);
-	bcopy(fw->b_base, np->scriptb0, np->scriptb_sz);
-	bcopy(fw->z_base, np->scriptz0, np->scriptz_sz);
+	memcpy(np->scripta0, fw->a_base, np->scripta_sz);
+	memcpy(np->scriptb0, fw->b_base, np->scriptb_sz);
+	memcpy(np->scriptz0, fw->z_base, np->scriptz_sz);
 
 	/*
 	 *  Setup variable parts in scripts and compute
