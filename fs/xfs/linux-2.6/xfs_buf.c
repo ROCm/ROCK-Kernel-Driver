@@ -718,8 +718,8 @@ pagebuf_readahead(
 	if (bdi_write_congested(bdi))
 		return;
 
-	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_READ_AHEAD);
-	xfs_buf_get_flags(target, ioff, isize, flags);
+	flags |= (PBF_TRYLOCK|PBF_ASYNC|PBF_READ_AHEAD);
+	xfs_buf_read_flags(target, ioff, isize, flags);
 }
 
 xfs_buf_t *
