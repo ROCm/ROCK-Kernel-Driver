@@ -735,69 +735,6 @@ InstructionSegment:
 #endif /* CONFIG_PPC64BRIDGE */
 
 /*
- * This code finishes saving the registers to the exception frame
- * and jumps to the appropriate handler for the exception, turning
- * on address translation.
- */
-	.globl	transfer_to_handler
-transfer_to_handler:
-	stw	r22,_NIP(r21)
-	stw	r23,_MSR(r21)
-	SAVE_4GPRS(8, r21)
-	SAVE_8GPRS(12, r21)
-	SAVE_8GPRS(24, r21)
-	andi.	r23,r23,MSR_PR
-	mfspr	r23,SPRG3		/* if from user, fix up THREAD.regs */
-	beq	2f
-	addi	r24,r1,STACK_FRAME_OVERHEAD
-	stw	r24,PT_REGS(r23)
-#ifdef CONFIG_ALTIVEC
-BEGIN_FTR_SECTION
-	mfspr	r22,SPRN_VRSAVE		/* if G4, save vrsave register value */
-	stw	r22,THREAD_VRSAVE(r23)
-END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
-#endif /* CONFIG_ALTIVEC */
-2:	addi	r2,r23,-THREAD		/* set r2 to current */
-	tovirt(r2,r2)
-	mflr	r23
-	andi.	r24,r23,0x3f00		/* get vector offset */
-	stw	r24,TRAP(r21)
-	li	r22,0
-	stw	r22,RESULT(r21)
-	mtspr	SPRG2,r22		/* r1 is now kernel sp */
-	addi	r24,r2,TASK_STRUCT_SIZE	/* check for kernel stack overflow */
-	cmplw	0,r1,r2
-	cmplw	1,r1,r24
-	crand	1,1,4
-	bgt-	stack_ovf		/* if r2 < r1 < r2+TASK_STRUCT_SIZE */
-	lwz	r24,0(r23)		/* virtual address of handler */
-	lwz	r23,4(r23)		/* where to go when done */
-	FIX_SRR1(r20,r22)
-	mtspr	SRR0,r24
-	mtspr	SRR1,r20
-	mtlr	r23
-	SYNC
-	RFI				/* jump to handler, enable MMU */
-
-/*
- * On kernel stack overflow, load up an initial stack pointer
- * and call StackOverflow(regs), which should not return.
- */
-stack_ovf:
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	lis	r1,init_thread_union@ha
-	addi	r1,r1,init_thread_union@l
-	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
-	lis	r24,StackOverflow@ha
-	addi	r24,r24,StackOverflow@l
-	li	r20,MSR_KERNEL
-	FIX_SRR1(r20,r22)
-	mtspr	SRR0,r24
-	mtspr	SRR1,r20
-	SYNC
-	RFI
-
-/*
  * This task wants to use the FPU now.
  * On UP, disable FP for the task which had the FPU previously,
  * and save its floating-point registers in its thread_struct.
@@ -1221,15 +1158,15 @@ __secondary_start:
 	bl	identify_cpu
 	bl	call_setup_cpu		/* Call setup_cpu for this CPU */
 
-	/* get current */
-	lis	r2,current_set@h
-	ori	r2,r2,current_set@l
-	tophys(r2,r2)
-	slwi	r24,r24,2		/* get current_set[cpu#] */
-	lwzx	r2,r2,r24
+	/* get current_thread_info and current */
+	lis	r1,secondary_ti@ha
+	tophys(r1,r1)
+	lwz	r1,secondary_ti@l(r1)
+	tophys(r2,r1)
+	lwz	r2,TI_TASK(r2)
 
 	/* stack */
-	addi	r1,r2,THREAD_SIZE-STACK_FRAME_OVERHEAD
+	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	li	r0,0
 	tophys(r3,r1)
 	stw	r0,0(r3)

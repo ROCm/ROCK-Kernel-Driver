@@ -531,13 +531,17 @@ transfer_to_handler:
 	SAVE_GPR(31, r1)
 
 	andi.	r23,r23,MSR_PR
-	mfspr	r23,SPRG3		/* if from user, fix up THREAD.regs */
-	beq	2f
+	mfspr	r23,SPRG3
+	addi	r2,r23,-THREAD		/* set r2 to current */
+	beq	2f			/* if from user, fix up THREAD.regs */
 	addi	r24,r1,STACK_FRAME_OVERHEAD
 	stw	r24,PT_REGS(r23)
-2:	addi	r2,r23,-THREAD		/* set r2 to current */
-	li	r22,RESULT
-	stwcx.	r22,r22,r1		/* to clear the reservation */
+	b	3f
+2:	/* if from kernel, check for stack overflow */
+	lwz	r22,THREAD_INFO(r2)
+	cmplw	r1,r22			/* if r1 <= current->thread_info */
+	ble-	stack_ovf		/* then the kernel stack overflowed */
+3:
 	li	r22,0
 	stw	r22,RESULT(r1)
 	mfspr	r23,SPRG1		/* Get Paca address */
@@ -545,11 +549,6 @@ transfer_to_handler:
 	mflr	r23
 	andi.	r24,r23,0x3f00		/* get vector offset */
 	stw	r24,TRAP(r1)
-	addi	r24,r2,TASK_STRUCT_SIZE	/* check for kernel stack overflow */
-	cmplw	0,r1,r2
-	cmplw	1,r1,r24
-	crand	1,1,4
-	bgt-	stack_ovf		/* if r2 < r1 < r2+TASK_STRUCT_SIZE */
 	lwz	r24,0(r23)		/* virtual address of handler */
 	lwz	r23,4(r23)		/* where to go when done */
 	li	r20,MSR_KERNEL

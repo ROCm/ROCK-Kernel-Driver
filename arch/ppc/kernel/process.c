@@ -197,9 +197,7 @@ dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 	return 1;
 }
 
-void
-_switch_to(struct task_struct *prev, struct task_struct *new,
-	  struct task_struct **last)
+void switch_to(struct task_struct *prev, struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long s;
@@ -221,7 +219,7 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 	 * every switch, just a save.
 	 *  -- Cort
 	 */
-	if ( prev->thread.regs && (prev->thread.regs->msr & MSR_FP) )
+	if (prev->thread.regs && (prev->thread.regs->msr & MSR_FP))
 		giveup_fpu(prev);
 #ifdef CONFIG_ALTIVEC	
 	/*
@@ -240,8 +238,6 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 #endif /* CONFIG_ALTIVEC */	
 #endif /* CONFIG_SMP */
 
-	current_set[smp_processor_id()] = new;
-
 	/* Avoid the trap.  On smp this this never happens since
 	 * we don't set last_task_used_altivec -- Cort
 	 */
@@ -249,7 +245,7 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 		new->thread.regs->msr |= MSR_VEC;
 	new_thread = &new->thread;
 	old_thread = &current->thread;
-	*last = _switch(old_thread, new_thread);
+	_switch(old_thread, new_thread);
 	__restore_flags(s);
 }
 
@@ -282,7 +278,7 @@ void show_regs(struct pt_regs * regs)
 #endif
 	
 #ifdef CONFIG_SMP
-	printk(" CPU: %d", current->processor);
+	printk(" CPU: %d", smp_processor_id());
 #endif /* CONFIG_SMP */
 	
 	printk("\n");

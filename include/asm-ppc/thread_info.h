@@ -10,11 +10,12 @@
 
 #ifdef __KERNEL__
 
-#ifndef __ASSEMBLY__
 #include <asm/processor.h>
 
+#ifndef __ASSEMBLY__
 /*
  * low level task data.
+ * If you change this, change the TI_* offsets below to match.
  */
 struct thread_info {
 	struct task_struct *task;		/* main task structure */
@@ -51,8 +52,20 @@ static inline struct thread_info *current_thread_info(void)
 #define free_thread_info(ti)	free_pages((unsigned long) (ti), 1)
 #define get_thread_info(ti)	get_task_struct((ti)->task)
 #define put_thread_info(ti)	put_task_struct((ti)->task)
-#define THREAD_SIZE		(2*PAGE_SIZE)
 #endif /* __ASSEMBLY__ */
+
+/*
+ * Size of kernel stack for each process.
+ */
+#define THREAD_SIZE		8192	/* 2 pages */
+
+/*
+ * Offsets in thread_info structure, used in assembly code
+ */
+#define TI_TASK		0
+#define TI_EXECDOMAIN	4
+#define TI_FLAGS	8
+#define TI_CPU		12
 
 /*
  * thread information flag bit numbers

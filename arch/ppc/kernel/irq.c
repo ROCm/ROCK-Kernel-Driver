@@ -586,8 +586,6 @@ atomic_t global_bh_count;
 
 static void show(char * str)
 {
-	int i;
-	unsigned long *stack;
 	int cpu = smp_processor_id();
 
 	printk("\n%s, CPU %d:\n", str, cpu);
@@ -598,13 +596,6 @@ static void show(char * str)
 	       atomic_read(&global_bh_count),
 	       local_bh_count(0),
 	       local_bh_count(1));
-	stack = (unsigned long *) &str;
-	for (i = 40; i ; i--) {
-		unsigned long x = *++stack;
-		if (x > (unsigned long) &init_task_union && x < (unsigned long) &vsprintf) {
-			printk("<[%08lx]> ", x);
-		}
-	}
 }
 
 static inline void wait_on_bh(void)
