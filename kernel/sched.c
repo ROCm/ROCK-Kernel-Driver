@@ -416,11 +416,11 @@ struct file_operations proc_schedstat_operations = {
 	.release = single_release,
 };
 
-# define schedstat_inc(rq, field)	rq->field++;
-# define schedstat_add(rq, field, amt)	rq->field += amt;
+# define schedstat_inc(rq, field)	do { (rq)->field++; } while (0)
+# define schedstat_add(rq, field, amt)	do { (rq)->field += (amt); } while (0)
 #else /* !CONFIG_SCHEDSTATS */
-# define schedstat_inc(rq, field)	do { } while (0);
-# define schedstat_add(rq, field, amt)	do { } while (0);
+# define schedstat_inc(rq, field)	do { } while (0)
+# define schedstat_add(rq, field, amt)	do { } while (0)
 #endif
 
 /*
