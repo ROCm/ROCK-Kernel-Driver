@@ -614,7 +614,8 @@ void netpoll_cleanup(struct netpoll *np)
 		spin_lock_irqsave(&rx_list_lock, flags);
 		list_del(&np->rx_list);
 #ifdef CONFIG_NETPOLL_RX
-		np->dev->netpoll_rx = 0;
+		if (np->dev)
+			np->dev->netpoll_rx = 0;
 #endif
 		spin_unlock_irqrestore(&rx_list_lock, flags);
 	}
