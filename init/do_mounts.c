@@ -194,9 +194,11 @@ dev_t __init name_to_dev_t(char *name)
 	p[-1] = '\0';
 	res = try_name(s, part);
 done:
+#ifdef CONFIG_SYSFS
 	sys_umount("/sys", 0);
 out:
 	sys_rmdir("/sys");
+#endif
 	return res;
 fail:
 	res = 0;
