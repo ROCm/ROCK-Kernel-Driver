@@ -466,7 +466,7 @@
 #define MAXSWINUM                       31
  
 /* ------------------------------------------------------------------------
- *  LED's - The header LED is not accessable via the uHAL API
+ *  LED's - The header LED is not accessible via the uHAL API
  * ------------------------------------------------------------------------
  * 
  */

@@ -18,7 +18,7 @@
 #define	PCI_INT_LINE		0x3C
 
 /*
- *	Registers accessable directly from PCI and local side.
+ *	Registers accessible directly from PCI and local side.
  *	Offset is from PCI side.  Add PLX_LCL_OFFSET for local address.
  */
 #define	PLX_LCL_OFFSET	0x80	/* Offset of regs from local side */

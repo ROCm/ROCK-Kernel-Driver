@@ -1826,7 +1826,7 @@ ahd_dmamem_alloc(struct ahd_softc *ahd, bus_dma_tag_t dmat, void** vaddr,
 	 * At least in 2.2.14, malloc is a slab allocator so all
 	 * allocations are aligned.  We assume for these kernel versions
 	 * that all allocations will be bellow 4Gig, physically contiguous,
-	 * and accessable via DMA by the controller.
+	 * and accessible via DMA by the controller.
 	 */
 	map = NULL; /* No additional information to store */
 	*vaddr = malloc(dmat->maxsize, M_DEVBUF, M_NOWAIT);

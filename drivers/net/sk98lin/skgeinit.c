@@ -1781,7 +1781,7 @@ SK_IOC	IoC)		/* IO context */
  * Returns:
  *	0:	success
  *	1:	Number of MACs exceeds SK_MAX_MACS	( after level 1)
- *	2:	Adapter not present or not accessable
+ *	2:	Adapter not present or not accessible
  *	3:	Illegal initialization level
  *	4:	Initialization Level 1 Call missing
  *	5:	Unexpected PHY type detected
@@ -1808,7 +1808,7 @@ int		Level)		/* initialization level */
 		/* Initialization Level 1 */
 		RetVal = SkGeInit1(pAC, IoC);
 
-		/* Check if the adapter seems to be accessable */
+		/* Check if the adapter seems to be accessible */
 		SK_OUT32(IoC, B2_IRQM_INI, 0x11335577L);
 		SK_IN32(IoC, B2_IRQM_INI, &DWord);
 		SK_OUT32(IoC, B2_IRQM_INI, 0x00000000L);

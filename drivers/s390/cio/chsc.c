@@ -486,7 +486,7 @@ do_process_crw(void *ignore)
 	case 2: /* i/o resource accessibiliy */
 		CIO_CRW_EVENT(4, "chsc_process_crw: "
 			      "channel subsystem reports some I/O "
-			      "devices may have become accessable\n");
+			      "devices may have become accessible\n");
 		pr_debug( KERN_DEBUG "Data received after sei: \n");
 		pr_debug( KERN_DEBUG "Validity flags: %x\n", sei_res->vf);
 

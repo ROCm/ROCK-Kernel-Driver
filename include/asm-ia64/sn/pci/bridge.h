@@ -186,8 +186,8 @@ typedef volatile struct pic_widget_cfg_s {
 
 /*
  * BRIDGE, XBRIDGE, PIC register definitions.  NOTE: Prior to PIC, registers
- * were a 32bit quantity and double word aligned (and only accessable as a
- * 32bit word.  PIC registers are 64bits and accessable as words or double
+ * were a 32bit quantity and double word aligned (and only accessible as a
+ * 32bit word.  PIC registers are 64bits and accessible as words or double
  * words.  PIC registers that have valid bits (ie. not just reserved) in the
  * upper 32bits are defined as a union of one 64bit picreg_t and two 32bit
  * bridgereg_t so we can access them both ways.
