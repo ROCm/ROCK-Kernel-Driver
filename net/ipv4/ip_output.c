@@ -493,7 +493,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 			    goto slow_path;
 
 			/* Correct socket ownership. */
-			if (frag->sk == NULL)
+			if (frag->sk == NULL && skb->sk)
 				goto slow_path;
 
 			/* Partially cloned skb? */

@@ -37,6 +37,7 @@
 #include <net/arp.h>
 #include <net/checksum.h>
 #include <net/inet_ecn.h>
+#include <net/xfrm.h>
 
 #ifdef CONFIG_IPV6
 #include <net/ipv6.h>
@@ -600,6 +601,9 @@ int ipgre_rcv(struct sk_buff *skb)
 
 	read_lock(&ipgre_lock);
 	if ((tunnel = ipgre_tunnel_lookup(iph->saddr, iph->daddr, key)) != NULL) {
+		secpath_put(skb->sp);
+		skb->sp = NULL;
+
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = __pskb_pull(skb, offset);
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
