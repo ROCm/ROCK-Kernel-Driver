@@ -353,6 +353,9 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct socket	*sock = svsk->sk_sock;
 	int		slen;
+	struct { struct cmsghdr cmh;
+		struct in_pktinfo pki;
+	} cm;
 	int		len = 0;
 	int		result;
 	int		size;
@@ -364,15 +367,21 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 	slen = xdr->len;
 
 	if (rqstp->rq_prot == IPPROTO_UDP) {
-		/* set the destination */
+		/* set the source and destination */
 		struct msghdr	msg;
 		msg.msg_name    = &rqstp->rq_addr;
 		msg.msg_namelen = sizeof(rqstp->rq_addr);
 		msg.msg_iov     = NULL;
 		msg.msg_iovlen  = 0;
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
 		msg.msg_flags	= MSG_MORE;
+
+		msg.msg_control = &cm;
+		msg.msg_controllen = sizeof(cm);
+		cm.cmh.cmsg_len = sizeof(cm);
+		cm.cmh.cmsg_level = SOL_IP;
+		cm.cmh.cmsg_type = IP_PKTINFO;
+		cm.pki.ipi_ifindex = 0;
+		cm.pki.ipi_spec_dst.s_addr = rqstp->rq_daddr;
 
 		if (sock_sendmsg(sock, &msg, 0) < 0)
 			goto out;
@@ -594,6 +603,7 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	rqstp->rq_addr.sin_family = AF_INET;
 	rqstp->rq_addr.sin_port = skb->h.uh->source;
 	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
+	rqstp->rq_daddr = skb->nh.iph->daddr;
 
 	svsk->sk_sk->sk_stamp = skb->stamp;
 
