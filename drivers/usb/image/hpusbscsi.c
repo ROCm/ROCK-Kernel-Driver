@@ -22,65 +22,56 @@ static char *states[]={"FREE", "BEGINNING", "WORKING", "ERROR", "WAIT", "PREMATU
 
 #define TRACE_STATE printk(KERN_DEBUG"hpusbscsi->state = %s at line %d\n", states[hpusbscsi->state], __LINE__)
 
-/* global variables */
-
-struct list_head hpusbscsi_devices;
-//LIST_HEAD(hpusbscsi_devices);
-
-/* USB related parts */
+static Scsi_Host_Template hpusbscsi_scsi_host_template = {
+	.module			= THIS_MODULE,
+	.name			= "hpusbscsi",
+	.proc_name		= "hpusbscsi",
+	.queuecommand		= hpusbscsi_scsi_queuecommand,
+	.eh_abort_handler	= hpusbscsi_scsi_abort,
+	.eh_host_reset_handler	= hpusbscsi_scsi_host_reset,
+	.sg_tablesize		= SG_ALL,
+	.can_queue		= 1,
+	.this_id		= -1,
+	.cmd_per_lun		= 1,
+	.use_clustering		= 1,
+	.emulated		= 1,
+};
 
 static int
-hpusbscsi_usb_probe (struct usb_interface *intf,
-		     const struct usb_device_id *id)
+hpusbscsi_usb_probe(struct usb_interface *intf,
+		    const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
+	struct usb_host_interface *altsetting =	intf->altsetting;
 	struct hpusbscsi *new;
-	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usb_host_interface *altsetting =
-		&(intf->altsetting[0]);
-
+	int error = -ENOMEM;
 	int i, result;
-
-	/* basic check */
 
 	if (altsetting->desc.bNumEndpoints != 3) {
 		printk (KERN_ERR "Wrong number of endpoints\n");
 		return -ENODEV;
 	}
 
-	/* descriptor allocation */
-
-	new =
-		(struct hpusbscsi *) kmalloc (sizeof (struct hpusbscsi),
-					      GFP_KERNEL);
-	if (new == NULL)
+	new = kmalloc(sizeof(struct hpusbscsi), GFP_KERNEL);
+	if (!new)
 		return -ENOMEM;
-	DEBUG ("Allocated memory\n");
-	memset (new, 0, sizeof (struct hpusbscsi));
+	memset(new, 0, sizeof(struct hpusbscsi));
 	new->dataurb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!new->dataurb) {
-		kfree (new);
-		return -ENOMEM;
-	}
+	if (!new->dataurb)
+		goto out_kfree;
 	new->controlurb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!new->controlurb) {
-		usb_free_urb (new->dataurb);
-		kfree (new);
-		return -ENOMEM;
-	}
+	if (!new->controlurb)
+		goto out_free_dataurb;
+
 	new->dev = dev;
-	init_waitqueue_head (&new->pending);
-	init_waitqueue_head (&new->deathrow);
-	INIT_LIST_HEAD (&new->lh);
+	init_waitqueue_head(&new->pending);
+	init_waitqueue_head(&new->deathrow);
 
-
-
-	/* finding endpoints */
-
+	error = -ENODEV;
 	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
-		if (
-		    (altsetting->endpoint[i].desc.
+		if ((altsetting->endpoint[i].desc.
 		     bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
-		    USB_ENDPOINT_XFER_BULK) {
+				USB_ENDPOINT_XFER_BULK) {
 			if (altsetting->endpoint[i].desc.
 			    bEndpointAddress & USB_DIR_IN) {
 				new->ep_in =
@@ -97,57 +88,71 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 			new->ep_int =
 				altsetting->endpoint[i].desc.
 				bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-			new->interrupt_interval= altsetting->endpoint[i].desc.bInterval;
+			new->interrupt_interval= altsetting->endpoint[i].desc.
+				bInterval;
 		}
 	}
 
 	/* USB initialisation magic for the simple case */
-
-	result = usb_set_interface (dev, altsetting->desc.bInterfaceNumber, 0);
-
+	result = usb_set_interface(dev, altsetting->desc.bInterfaceNumber, 0);
 	switch (result) {
 	case 0:		/* no error */
 		break;
 	default:
-		printk (KERN_ERR "unknown error %d from usb_set_interface\n",
+		printk(KERN_ERR "unknown error %d from usb_set_interface\n",
 			 result);
-		goto err_out;
+		goto out_free_controlurb;
 	}
 
-	/* making a template for the scsi layer to fake detection of a scsi device */
+	/* build and submit an interrupt URB for status byte handling */
+ 	usb_fill_int_urb(new->controlurb, new->dev,
+			usb_rcvintpipe(new->dev, new->ep_int),
+			&new->scsi_state_byte, 1,
+			control_interrupt_callback,new,
+			new->interrupt_interval);
 
-	memcpy (&(new->ctempl), &hpusbscsi_scsi_host_template,
-		sizeof (hpusbscsi_scsi_host_template));
-	(struct hpusbscsi *) new->ctempl.proc_dir = new;
-	new->ctempl.module = THIS_MODULE;
+	if (usb_submit_urb(new->controlurb, GFP_KERNEL) < 0)
+		goto out_free_controlurb;
 
-	if (scsi_register_host(&new->ctempl))
-		goto err_out;
+	/* In host->hostdata we store a pointer to desc */
+	new->host = scsi_register(&hpusbscsi_scsi_host_template, sizeof(new));
+	if (!new->host)
+		goto out_unlink_controlurb;
+
+	new->host->hostdata[0] = (unsigned long)new;
+	scsi_add_host(new->host, &intf->dev);
 
 	new->sense_command[0] = REQUEST_SENSE;
 	new->sense_command[4] = HPUSBSCSI_SENSE_LENGTH;
 
-	/* adding to list for module unload */
-	list_add (&hpusbscsi_devices, &new->lh);
-
 	usb_set_intfdata(intf, new);
 	return 0;
 
-      err_out:
-	usb_free_urb (new->controlurb);
-	usb_free_urb (new->dataurb);
-	kfree (new);
-	return -ENODEV;
+ out_unlink_controlurb:
+	usb_unlink_urb(new->controlurb);
+ out_free_controlurb:
+	usb_free_urb(new->controlurb);
+ out_free_dataurb:
+	usb_free_urb(new->dataurb);
+ out_kfree:
+	kfree(new);
+	return error;
 }
 
 static void
-hpusbscsi_usb_disconnect (struct usb_interface *intf)
+hpusbscsi_usb_disconnect(struct usb_interface *intf)
 {
 	struct hpusbscsi *desc = usb_get_intfdata(intf);
 
 	usb_set_intfdata(intf, NULL);
-	if (desc)
-		usb_unlink_urb(desc->controlurb);
+
+	scsi_remove_host(desc->host);
+	usb_unlink_urb(desc->controlurb);
+	scsi_unregister(desc->host);
+
+	usb_free_urb(desc->controlurb);
+	usb_free_urb(desc->dataurb);
+	kfree(desc);
 }
 
 static struct usb_device_id hpusbscsi_usb_ids[] = {
@@ -177,100 +182,20 @@ static struct usb_driver hpusbscsi_usb_driver = {
 
 /* module initialisation */
 
-int __init
+static int __init
 hpusbscsi_init (void)
 {
-	int result;
-
-	INIT_LIST_HEAD (&hpusbscsi_devices);
-	DEBUG ("Driver loaded\n");
-
-	if ((result = usb_register (&hpusbscsi_usb_driver)) < 0) {
-		printk (KERN_ERR "hpusbscsi: driver registration failed\n");
-		return -1;
-	} else {
-		return 0;
-	}
+	return usb_register(&hpusbscsi_usb_driver);
 }
 
-void __exit
+static void __exit
 hpusbscsi_exit (void)
 {
-	struct list_head *tmp;
-	struct list_head *old;
-	struct hpusbscsi * o;
-
-	for (tmp = hpusbscsi_devices.next; tmp != &hpusbscsi_devices;/*nothing */) {
-		old = tmp;
-		tmp = tmp->next;
-		o = (struct hpusbscsi *)old;
-		usb_unlink_urb(o->controlurb);
-		scsi_unregister_host(&o->ctempl);
-		usb_free_urb(o->controlurb);
-		usb_free_urb(o->dataurb);
-		kfree(old);
-	}
-
-	usb_deregister (&hpusbscsi_usb_driver);
+	usb_deregister(&hpusbscsi_usb_driver);
 }
 
 module_init (hpusbscsi_init);
 module_exit (hpusbscsi_exit);
-
-/* interface to the scsi layer */
-
-static int
-hpusbscsi_scsi_detect (struct SHT *sht)
-{
-	/* Whole function stolen from usb-storage */
-
-	struct hpusbscsi *desc = (struct hpusbscsi *) sht->proc_dir;
-	/* What a hideous hack! */
-
-	char local_name[48];
-
-
-	/* set up the name of our subdirectory under /proc/scsi/ */
-	sprintf (local_name, "hpusbscsi-%d", desc->number);
-	sht->proc_name = kmalloc (strlen (local_name) + 1, GFP_KERNEL);
-	/* FIXME: where is this freed ? */
-
-	if (!sht->proc_name) {
-		return 0;
-	}
-
-	strcpy (sht->proc_name, local_name);
-
-	sht->proc_dir = NULL;
-
-	/* build and submit an interrupt URB for status byte handling */
- 	usb_fill_int_urb(desc->controlurb,
-			desc->dev,
-			usb_rcvintpipe(desc->dev,desc->ep_int),
-			&desc->scsi_state_byte,
-			1,
-			control_interrupt_callback,
-			desc,
-			desc->interrupt_interval
-	);
-
-	if ( 0  >  usb_submit_urb(desc->controlurb, GFP_KERNEL)) {
-		kfree(sht->proc_name);
-		return 0;
-	}
-
-	/* In host->hostdata we store a pointer to desc */
-	desc->host = scsi_register (sht, sizeof (desc));
-	if (desc->host == NULL) {
-		kfree (sht->proc_name);
-		usb_unlink_urb(desc->controlurb);
-		return 0;
-	}
-	desc->host->hostdata[0] = (unsigned long) desc;
-
-
-	return 1;
-}
 
 static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 {
