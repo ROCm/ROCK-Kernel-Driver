@@ -96,6 +96,7 @@ struct nfsd3_readdirargs {
 	__u32			dircount;
 	__u32			count;
 	__u32 *			verf;
+	u32 *			buffer;
 };
 
 struct nfsd3_commitargs {

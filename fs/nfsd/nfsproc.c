@@ -467,7 +467,6 @@ static int
 nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 					  struct nfsd_readdirres  *resp)
 {
-	u32 *		buffer;
 	int		nfserr, count;
 	loff_t		offset;
 
@@ -475,19 +474,15 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 		SVCFH_fmt(&argp->fh),		
 		argp->count, argp->cookie);
 
-	/* Reserve buffer space for status */
-	svcbuf_reserve(&rqstp->rq_res, &buffer, &count, 1);
-
 	/* Shrink to the client read size */
-	if (count > (argp->count >> 2))
-		count = argp->count >> 2;
+	count = (argp->count >> 2) - 2;
 
 	/* Make sure we've room for the NULL ptr & eof flag */
 	count -= 2;
 	if (count < 0)
 		count = 0;
 
-	resp->buffer = buffer;
+	resp->buffer = argp->buffer;
 	resp->offset = NULL;
 	resp->buflen = count;
 	resp->common.err = nfs_ok;
@@ -496,7 +491,7 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 	nfserr = nfsd_readdir(rqstp, &argp->fh, &offset, 
 			      &resp->common, nfssvc_encode_entry);
 
-	resp->count = resp->buffer - buffer;
+	resp->count = resp->buffer - argp->buffer;
 	if (resp->offset)
 		*resp->offset = (u32)offset;
 

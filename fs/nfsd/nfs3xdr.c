@@ -490,6 +490,12 @@ nfs3svc_decode_readdirargs(struct svc_rqst *rqstp, u32 *p,
 	args->dircount = ~0;
 	args->count  = ntohl(*p++);
 
+	if (args->count > PAGE_SIZE)
+		args->count = PAGE_SIZE;
+
+	svc_take_page(rqstp);
+	args->buffer = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
+
 	return xdr_argsize_check(rqstp, p);
 }
 
@@ -503,6 +509,9 @@ nfs3svc_decode_readdirplusargs(struct svc_rqst *rqstp, u32 *p,
 	args->verf     = p; p += 2;
 	args->dircount = ntohl(*p++);
 	args->count    = ntohl(*p++);
+
+	svc_take_page(rqstp);
+	args->buffer = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
 
 	return xdr_argsize_check(rqstp, p);
 }
@@ -600,7 +609,6 @@ nfs3svc_encode_readres(struct svc_rqst *rqstp, u32 *p,
 		*p++ = htonl(resp->count);	/* xdr opaque count */
 		xdr_ressize_check(rqstp, p);
 		/* now update rqstp->rq_res to reflect data aswell */
-		rqstp->rq_res.page_base = 0;
 		rqstp->rq_res.page_len = resp->count;
 		if (resp->count & 3) {
 			/* need to pad the tail */
@@ -676,12 +684,17 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 	if (resp->status == 0) {
 		/* stupid readdir cookie */
 		memcpy(p, resp->verf, 8); p += 2;
+		xdr_ressize_check(rqstp, p);
 		p = resp->buffer;
 		*p++ = 0;		/* no more entries */
 		*p++ = htonl(resp->common.err == nfserr_eof);
-	}
-
-	return xdr_ressize_check(rqstp, p);
+		rqstp->rq_res.page_len = ((unsigned long)p & ~PAGE_MASK);
+		rqstp->rq_res.len =
+			rqstp->rq_res.head[0].iov_len+
+			rqstp->rq_res.page_len;
+		return 1;
+	} else
+		return xdr_ressize_check(rqstp, p);
 }
 
 /*

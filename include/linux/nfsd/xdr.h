@@ -77,6 +77,7 @@ struct nfsd_readdirargs {
 	struct svc_fh		fh;
 	__u32			cookie;
 	__u32			count;
+	u32 *			buffer;
 };
 
 struct nfsd_attrstat {

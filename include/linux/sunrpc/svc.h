@@ -192,6 +192,19 @@ static void inline svc_pushback_allpages(struct svc_rqst *rqstp)
 	}
 }
 
+static void inline svc_pushback_unused_pages(struct svc_rqst *rqstp)
+{
+        while (rqstp->rq_resused) {
+		if (rqstp->rq_respages[--rqstp->rq_resused] != NULL) {
+			rqstp->rq_argpages[rqstp->rq_arghi++] =
+				rqstp->rq_respages[rqstp->rq_resused];
+			rqstp->rq_respages[rqstp->rq_resused] = NULL;
+		}
+		if (rqstp->rq_res.pages == &rqstp->rq_respages[rqstp->rq_resused])
+			break;
+	}
+}
+
 static void inline svc_free_allpages(struct svc_rqst *rqstp)
 {
         while (rqstp->rq_resused) {
