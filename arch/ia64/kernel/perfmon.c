@@ -3886,8 +3886,10 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 		} else {
 			CTX_USED_DBR(ctx, rnum);
 
-			if (can_access_pmu) ia64_set_dbr(rnum, dbreg.val);
-
+			if (can_access_pmu) {
+				ia64_set_dbr(rnum, dbreg.val);
+				ia64_dv_serialize_data();
+			}
 			ctx->ctx_dbrs[rnum] = dbreg.val;
 
 			DPRINT(("write dbr%u=0x%lx used_dbrs=0x%x is_loaded=%d access_pmu=%d\n",
@@ -5574,7 +5576,7 @@ pfm_proc_info(char *page)
 		p += sprintf(p, "fastctxsw                 : %s\n", pfm_sysctl.fastctxsw > 0 ? "Yes": "No");
 		p += sprintf(p, "expert mode               : %s\n", pfm_sysctl.expert_mode > 0 ? "Yes": "No");
 		p += sprintf(p, "ovfl_mask                 : 0x%lx\n", pmu_conf->ovfl_val);
-		p += sprintf(p, "flags                     : 0x%lx\n", pmu_conf->flags);
+		p += sprintf(p, "flags                     : 0x%x\n", pmu_conf->flags);
 
 	for(i=0; i < NR_CPUS; i++) {
 		if (cpu_online(i) == 0) continue;

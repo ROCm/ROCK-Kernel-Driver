@@ -574,6 +574,10 @@ GLOBAL_ENTRY(fsys_bubble_down)
 	or r29=r8,r29			// construct cr.ipsr value to save
 	addl r22=IA64_RBS_OFFSET,r2	// compute base of RBS
 	;;
+	// GAS reports a spurious RAW hazard on the read of ar.rnat because it thinks
+	// we may be reading ar.itc after writing to psr.l.  Avoid that message with
+	// this directive:
+	dv_serialize_data
 	mov.m r24=ar.rnat		// read ar.rnat (5 cyc lat)
 	lfetch.fault.excl.nt1 [r22]
 	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r2
