@@ -16,7 +16,6 @@
 #include <linux/etherdevice.h>
 #include <linux/mii.h>
 #include <linux/ethtool.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/usb.h>
 #include <asm/uaccess.h>
 
@@ -106,7 +105,6 @@ struct rtl8150 {
 
 typedef struct rtl8150 rtl8150_t;
 
-/* the global usb devfs handle */
 unsigned long multicast_filter_limit = 32;
 
 static void fill_skb_pool(rtl8150_t *);
