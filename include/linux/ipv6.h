@@ -247,27 +247,26 @@ struct ipv6_pinfo {
 	} cork;
 };
 
-struct raw6_opt {
-	__u32			checksum;	/* perform checksum */
-	__u32			offset;		/* checksum offset  */
-
-	struct icmp6_filter	filter;
-};
-
 /* WARNING: don't change the layout of the members in {raw,udp,tcp}6_sock! */
 struct raw6_sock {
-	struct inet_sock  inet;
-	struct raw6_opt   raw6;
-	struct ipv6_pinfo inet6;
+	/* inet_sock has to be the first member of raw6_sock */
+	struct inet_sock	inet;
+	__u32			checksum;	/* perform checksum */
+	__u32			offset;		/* checksum offset  */
+	struct icmp6_filter	filter;
+	/* ipv6_pinfo has to be the last member of raw6_sock, see inet6_sk_generic */
+	struct ipv6_pinfo	inet6;
 };
 
 struct udp6_sock {
 	struct udp_sock	  udp;
+	/* ipv6_pinfo has to be the last member of udp6_sock, see inet6_sk_generic */
 	struct ipv6_pinfo inet6;
 };
 
 struct tcp6_sock {
 	struct tcp_sock	  tcp;
+	/* ipv6_pinfo has to be the last member of tcp6_sock, see inet6_sk_generic */
 	struct ipv6_pinfo inet6;
 };
 
@@ -277,9 +276,9 @@ static inline struct ipv6_pinfo * inet6_sk(const struct sock *__sk)
 	return inet_sk(__sk)->pinet6;
 }
 
-static inline struct raw6_opt * raw6_sk(const struct sock *__sk)
+static inline struct raw6_sock *raw6_sk(const struct sock *sk)
 {
-	return &((struct raw6_sock *)__sk)->raw6;
+	return (struct raw6_sock *)sk;
 }
 
 static inline void inet_sk_copy_descendant(struct sock *sk_to,
@@ -304,7 +303,7 @@ static inline struct ipv6_pinfo * inet6_sk(const struct sock *__sk)
 	return NULL;
 }
 
-static inline struct raw6_opt * raw6_sk(const struct sock *__sk)
+static inline struct raw6_sock *raw6_sk(const struct sock *sk)
 {
 	return NULL;
 }
