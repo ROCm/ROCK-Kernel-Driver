@@ -561,23 +561,14 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/*
 	 * If we're running the CB transport, which is incapable
-	 * of determining status on it's own, we need to auto-sense almost
-	 * every time.
+	 * of determining status on its own, we need to auto-sense
+	 * unless the operation involved a data-in transfer.  Devices
+	 * can signal data-in errors by stalling the bulk-in pipe.
 	 */
-	if (us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) {
+	if ((us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) &&
+			srb->sc_data_direction != SCSI_DATA_READ) {
 		US_DEBUGP("-- CB transport device requiring auto-sense\n");
 		need_auto_sense = 1;
-
-		/* There are some exceptions to this.  Notably, if this is
-		 * a UFI device and the command is REQUEST_SENSE or INQUIRY,
-		 * then it is impossible to truly determine status.
-		 */
-		if (us->subclass == US_SC_UFI &&
-		    ((srb->cmnd[0] == REQUEST_SENSE) ||
-		     (srb->cmnd[0] == INQUIRY))) {
-			US_DEBUGP("** no auto-sense for a special command\n");
-			need_auto_sense = 0;
-		}
 	}
 
 	/*
