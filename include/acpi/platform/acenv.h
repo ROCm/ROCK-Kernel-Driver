@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,6 +57,7 @@
 #define ACPI_DISASSEMBLER
 #define ACPI_NO_METHOD_EXECUTION
 #define ACPI_USE_SYSTEM_CLIBRARY
+#define ACPI_ENABLE_OBJECT_CACHE
 #endif
 
 #ifdef _ACPI_EXEC_APP
@@ -67,6 +68,7 @@
 #define ACPI_DEBUGGER
 #define ACPI_DISASSEMBLER
 #define ACPI_USE_SYSTEM_CLIBRARY
+#define ACPI_ENABLE_OBJECT_CACHE
 #endif
 
 #ifdef _ACPI_ASL_COMPILER
@@ -75,6 +77,7 @@
 #define ACPI_DISASSEMBLER
 #define ACPI_CONSTANT_EVAL_ONLY
 #define ACPI_USE_SYSTEM_CLIBRARY
+#define ACPI_ENABLE_OBJECT_CACHE
 #endif
 
 /*

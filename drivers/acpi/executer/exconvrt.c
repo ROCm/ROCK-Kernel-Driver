@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -136,6 +136,12 @@ acpi_ex_convert_to_integer (
 
 	case ACPI_TYPE_BUFFER:
 
+		/* Check for zero-length buffer */
+
+		if (!count) {
+			return_ACPI_STATUS (AE_AML_BUFFER_LIMIT);
+		}
+
 		/* Transfer no more than an integer's worth of data */
 
 		if (count > acpi_gbl_integer_byte_width) {
@@ -239,8 +245,13 @@ acpi_ex_convert_to_buffer (
 		/*
 		 * Create a new Buffer object
 		 * Size will be the string length
+		 *
+		 * NOTE: Add one to the string length to include the null terminator.
+		 * The ACPI spec is unclear on this subject, but there is existing
+		 * ASL/AML code that depends on the null being transferred to the new
+		 * buffer.
 		 */
-		return_desc = acpi_ut_create_buffer_object ((acpi_size) obj_desc->string.length);
+		return_desc = acpi_ut_create_buffer_object ((acpi_size) obj_desc->string.length + 1);
 		if (!return_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}

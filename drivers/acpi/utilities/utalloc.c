@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -73,9 +73,12 @@ acpi_ut_release_to_cache (
 	ACPI_FUNCTION_ENTRY ();
 
 
+	cache_info = &acpi_gbl_memory_lists[list_id];
+
+#ifdef ACPI_ENABLE_OBJECT_CACHE
+
 	/* If walk cache is full, just free this wallkstate object */
 
-	cache_info = &acpi_gbl_memory_lists[list_id];
 	if (cache_info->cache_depth >= cache_info->max_cache_depth) {
 		ACPI_MEM_FREE (object);
 		ACPI_MEM_TRACKING (cache_info->total_freed++);
@@ -101,6 +104,14 @@ acpi_ut_release_to_cache (
 
 		(void) acpi_ut_release_mutex (ACPI_MTX_CACHES);
 	}
+
+#else
+
+	/* Object cache is disabled; just free the object */
+
+	ACPI_MEM_FREE (object);
+	ACPI_MEM_TRACKING (cache_info->total_freed++);
+#endif
 }
 
 
@@ -130,6 +141,9 @@ acpi_ut_acquire_from_cache (
 
 
 	cache_info = &acpi_gbl_memory_lists[list_id];
+
+#ifdef ACPI_ENABLE_OBJECT_CACHE
+
 	if (ACPI_FAILURE (acpi_ut_acquire_mutex (ACPI_MTX_CACHES))) {
 		return (NULL);
 	}
@@ -174,10 +188,19 @@ acpi_ut_acquire_from_cache (
 		ACPI_MEM_TRACKING (cache_info->total_allocated++);
 	}
 
+#else
+
+	/* Object cache is disabled; just allocate the object */
+
+	object = ACPI_MEM_CALLOCATE (cache_info->object_size);
+	ACPI_MEM_TRACKING (cache_info->total_allocated++);
+#endif
+
 	return (object);
 }
 
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 /******************************************************************************
  *
  * FUNCTION:    acpi_ut_delete_generic_cache
@@ -212,6 +235,7 @@ acpi_ut_delete_generic_cache (
 		cache_info->cache_depth--;
 	}
 }
+#endif
 
 
 /*******************************************************************************

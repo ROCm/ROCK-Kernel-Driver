@@ -5,6 +5,7 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/moduleparam.h>
 #include <asm/uaccess.h>
 #include <acpi/acpi_drivers.h>
@@ -89,7 +90,6 @@ const struct acpi_dlevel acpi_debug_levels[] =
 	ACPI_DEBUG_INIT(ACPI_LV_FULL_TABLES),
 	ACPI_DEBUG_INIT(ACPI_LV_EVENTS),             
 };
-#define NUM_OF(v)	( sizeof(v)/sizeof(v[0]) )
 
 static int
 acpi_system_read_debug (
@@ -102,7 +102,7 @@ acpi_system_read_debug (
 {
 	char			*p = page;
 	int 			size = 0;
-	int			i;
+	unsigned int		i;
 
 	if (off != 0)
 		goto end;
@@ -111,7 +111,7 @@ acpi_system_read_debug (
 
 	switch ((unsigned long) data) {
 	case 0:
-		for (i = 0; i < NUM_OF(acpi_debug_layers); i++) {
+		for (i = 0; i < ARRAY_SIZE(acpi_debug_layers); i++) {
 			p += sprintf(p, "%-25s\t0x%08lX [%c]\n",
 				acpi_debug_layers[i].name,
 				acpi_debug_layers[i].value,
@@ -128,7 +128,7 @@ acpi_system_read_debug (
 			acpi_dbg_layer);
 		break;
 	case 1:
-		for (i = 0; i < NUM_OF(acpi_debug_levels); i++) {
+		for (i = 0; i < ARRAY_SIZE(acpi_debug_levels); i++) {
 			p += sprintf(p, "%-25s\t0x%08lX [%c]\n",
 				acpi_debug_levels[i].name,
 				acpi_debug_levels[i].value,

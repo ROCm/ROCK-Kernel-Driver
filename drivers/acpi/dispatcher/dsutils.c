@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -88,11 +88,13 @@ acpi_ds_is_result_used (
 	}
 
 	/*
-	 * If there is no parent, we are executing at the method level.
-	 * An executing method typically has no parent, since each method
-	 * is parsed separately.
+	 * If there is no parent, or the parent is a scope_op, we are executing
+	 * at the method level. An executing method typically has no parent,
+	 * since each method is parsed separately.  A method invoked externally
+	 * via execute_control_method has a scope_op as the parent.
 	 */
-	if (!op->common.parent) {
+	if ((!op->common.parent) ||
+		(op->common.parent->common.aml_opcode == AML_SCOPE_OP)) {
 		/*
 		 * If this is the last statement in the method, we know it is not a
 		 * Return() operator (would not come here.) The following code is the

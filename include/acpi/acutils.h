@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -683,6 +683,7 @@ void
 acpi_ut_delete_generic_state (
 	union acpi_generic_state        *state);
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 void
 acpi_ut_delete_generic_state_cache (
 	void);
@@ -690,6 +691,7 @@ acpi_ut_delete_generic_state_cache (
 void
 acpi_ut_delete_object_cache (
 	void);
+#endif
 
 /*
  * utmisc
@@ -778,9 +780,11 @@ acpi_ut_release_to_cache (
 	u32                             list_id,
 	void                            *object);
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 void
 acpi_ut_delete_generic_cache (
 	u32                             list_id);
+#endif
 
 acpi_status
 acpi_ut_validate_buffer (
