@@ -61,7 +61,7 @@
 #define TIMEOUT		(HZ / 2)
 
 
-static void *ioaddr;
+static void __iomem *ioaddr;
 
 /* The voo GPIO registers don't have individual masks for each bit
    so we always have to read before writing. */

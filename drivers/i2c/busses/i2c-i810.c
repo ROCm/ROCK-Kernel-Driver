@@ -70,7 +70,7 @@
 #define CYCLE_DELAY		10
 #define TIMEOUT			(HZ / 2)
 
-static void *ioaddr;
+static void __iomem *ioaddr;
 
 /* The i810 GPIO registers have individual masks for each bit
    so we never have to read before writing. Nice. */
