@@ -477,7 +477,7 @@ static struct nfs4_state *nfs4_open_delegated(struct inode *inode, int flags, st
 /*
  * Returns an nfs4_state + an referenced inode
  */
-static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *sattr, struct rpc_cred *cred, struct nfs4_state **res)
+static int _nfs4_do_open(struct inode *dir, struct dentry *dentry, int flags, struct iattr *sattr, struct rpc_cred *cred, struct nfs4_state **res)
 {
 	struct nfs4_state_owner  *sp;
 	struct nfs4_state     *state = NULL;
@@ -491,7 +491,7 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	struct nfs_openargs o_arg = {
 		.fh             = NFS_FH(dir),
 		.open_flags	= flags,
-		.name           = name,
+		.name           = &dentry->d_name,
 		.server         = server,
 		.bitmask = server->attr_bitmask,
 		.claim = NFS4_OPEN_CLAIM_NULL,
@@ -581,14 +581,14 @@ out_err:
 }
 
 
-struct nfs4_state *nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *sattr, struct rpc_cred *cred)
+struct nfs4_state *nfs4_do_open(struct inode *dir, struct dentry *dentry, int flags, struct iattr *sattr, struct rpc_cred *cred)
 {
 	struct nfs4_exception exception = { };
 	struct nfs4_state *res;
 	int status;
 
 	do {
-		status = _nfs4_do_open(dir, name, flags, sattr, cred, &res);
+		status = _nfs4_do_open(dir, dentry, flags, sattr, cred, &res);
 		if (status == 0)
 			break;
 		/* NOTE: BAD_SEQID means the server and client disagree about the
@@ -785,7 +785,7 @@ nfs4_atomic_open(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 	}
 
 	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
-	state = nfs4_do_open(dir, &dentry->d_name, nd->intent.open.flags, &attr, cred);
+	state = nfs4_do_open(dir, dentry, nd->intent.open.flags, &attr, cred);
 	put_rpccred(cred);
 	if (IS_ERR(state))
 		return (struct inode *)state;
@@ -802,7 +802,7 @@ nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
 	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
 	state = nfs4_open_delegated(dentry->d_inode, openflags, cred);
 	if (IS_ERR(state))
-		state = nfs4_do_open(dir, &dentry->d_name, openflags, NULL, cred);
+		state = nfs4_do_open(dir, dentry, openflags, NULL, cred);
 	put_rpccred(cred);
 	if (state == ERR_PTR(-ENOENT) && dentry->d_inode == 0)
 		return 1;
@@ -1026,7 +1026,7 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 					FMODE_WRITE, cred);
 			if (IS_ERR(state))
 				state = nfs4_do_open(dentry->d_parent->d_inode,
-						&dentry->d_name, FMODE_WRITE,
+						dentry, FMODE_WRITE,
 						NULL, cred);
 			need_iput = 1;
 		}
@@ -1335,7 +1335,7 @@ nfs4_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 	struct rpc_cred *cred;
 
 	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
-	state = nfs4_do_open(dir, &dentry->d_name, flags, sattr, cred);
+	state = nfs4_do_open(dir, dentry, flags, sattr, cred);
 	put_rpccred(cred);
 	if (!IS_ERR(state)) {
 		inode = state->inode;
