@@ -371,12 +371,7 @@ void mca_handle_nmi(void)
 		}
 	}
 
-	/* If I recall correctly, there's a whole bunch of other things that
-	 * we can do to check for NMI problems, but that's all I know about
-	 * at the moment.
-	 */
-
-	printk("NMI generated from unknown source!\n");
+	mca_nmi_hook();
 } /* mca_handle_nmi */
 
 /*--------------------------------------------------------------------*/

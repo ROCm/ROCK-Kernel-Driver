@@ -2,6 +2,7 @@
  *	Machine specific setup for generic
  */
 
+#include <linux/config.h>
 #include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/irq.h>
@@ -41,3 +42,15 @@ void __init time_init_hook(void)
 {
 	setup_irq(0, &irq0);
 }
+
+#ifdef CONFIG_MCA
+void __init mca_nmi_hook(void)
+{
+	/* If I recall correctly, there's a whole bunch of other things that
+	 * we can do to check for NMI problems, but that's all I know about
+	 * at the moment.
+	 */
+
+	printk("NMI generated from unknown source!\n");
+}
+#endif
