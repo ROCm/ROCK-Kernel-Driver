@@ -270,7 +270,7 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	if (debug_pci)
 		printk("PCI: Assigning %3s %08lx to %s\n",
 			res->flags & IORESOURCE_IO ? "IO" : "MEM",
-			res->start, dev->name);
+			res->start, dev->dev.name);
 
 	if (resource < 6) {
 		reg = PCI_BASE_ADDRESS_0 + 4*resource;
@@ -303,7 +303,7 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 {
 	if (debug_pci)
-		printk("PCI: Assigning IRQ %02d to %s\n", irq, dev->name);
+		printk("PCI: Assigning IRQ %02d to %s\n", irq, dev->dev.name);
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 }
 
@@ -642,7 +642,7 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			enum pci_mmap_state mmap_state, int write_combine)
 {
 	struct pci_sys_data *root = dev->sysdata;
-	unsigned long prot, phys;
+	unsigned long phys;
 
 	if (mmap_state == pci_mmap_io) {
 		return -EINVAL;
