@@ -2917,9 +2917,6 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->active_tag = ATA_TAG_POISON;
 	ap->last_ctl = 0xFF;
 
-	/* ata_engine init */
-	ap->eng.flags = 0;
-	INIT_LIST_HEAD(&ap->eng.q);
 	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
 	INIT_WORK(&ap->pio_task, ata_pio_task, ap);
 	INIT_WORK(&ap->probe_task, ata_probe_task, ap);

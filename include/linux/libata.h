@@ -114,9 +114,6 @@ enum {
 	ATA_QCFLAG_SG		= (1 << 4), /* have s/g table? */
 	ATA_QCFLAG_POLL		= (1 << 5), /* polling, no interrupts */
 
-	/* struct ata_engine atomic flags (use test_bit, etc.) */
-	ATA_EFLG_ACTIVE		= 0,	/* engine is active */
-
 	/* various lengths of time */
 	ATA_TMOUT_EDD		= 5 * HZ,	/* hueristic */
 	ATA_TMOUT_PIO		= 30 * HZ,
@@ -275,11 +272,6 @@ struct ata_device {
 	u8			write_cmd;	/* opcode to use on write */
 };
 
-struct ata_engine {
-	unsigned long		flags;
-	struct list_head	q;
-};
-
 struct ata_port {
 	struct Scsi_Host	*host;	/* our co-allocated scsi host */
 	struct ata_port_operations	*ops;
@@ -299,8 +291,6 @@ struct ata_port {
 	unsigned int		pio_mask;
 	unsigned int		udma_mask;
 	unsigned int		cbl;	/* cable type; ATA_CBL_xxx */
-
-	struct ata_engine	eng;
 
 	struct ata_device	device[ATA_MAX_DEVICES];
 
