@@ -52,7 +52,7 @@ BOOL ntfs_mark_quotas_out_of_date(ntfs_volume *vol)
 	ictx = ntfs_index_ctx_get(NTFS_I(vol->quota_q_ino));
 	if (!ictx) {
 		ntfs_error(vol->sb, "Failed to get index context.");
-		return FALSE;
+		goto err_out;
 	}
 	err = ntfs_index_lookup(&qid, sizeof(qid), ictx);
 	if (err) {
@@ -108,7 +108,8 @@ done:
 	ntfs_debug("Done.");
 	return TRUE;
 err_out:
-	ntfs_index_ctx_put(ictx);
+	if (ictx)
+		ntfs_index_ctx_put(ictx);
 	up(&vol->quota_q_ino->i_sem);
 	return FALSE;
 }

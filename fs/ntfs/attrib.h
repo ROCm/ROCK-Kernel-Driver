@@ -29,6 +29,7 @@
 #include "layout.h"
 #include "inode.h"
 #include "runlist.h"
+#include "volume.h"
 
 /**
  * ntfs_attr_search_ctx - used in attribute search functions
@@ -83,6 +84,13 @@ extern void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx);
 extern ntfs_attr_search_ctx *ntfs_attr_get_search_ctx(ntfs_inode *ni,
 		MFT_RECORD *mrec);
 extern void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx);
+
+extern int ntfs_attr_size_bounds_check(const ntfs_volume *vol,
+		const ATTR_TYPE type, const s64 size);
+extern int ntfs_attr_can_be_non_resident(const ntfs_volume *vol,
+		const ATTR_TYPE type);
+extern int ntfs_attr_can_be_resident(const ntfs_volume *vol,
+		const ATTR_TYPE type);
 
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
 

@@ -53,7 +53,6 @@ extern kmem_cache_t *ntfs_attr_ctx_cache;
 extern kmem_cache_t *ntfs_index_ctx_cache;
 
 /* The various operations structs defined throughout the driver files. */
-extern struct super_operations ntfs_sops;
 extern struct address_space_operations ntfs_aops;
 extern struct address_space_operations ntfs_mst_aops;
 
@@ -86,8 +85,6 @@ extern void free_compression_buffers(void);
 
 /* From fs/ntfs/super.c */
 #define default_upcase_len 0x10000
-extern ntfschar *default_upcase;
-extern unsigned long ntfs_nr_upcase_users;
 extern struct semaphore ntfs_lock;
 
 typedef struct {

@@ -24,8 +24,10 @@
 
 #include "attrib.h"
 #include "debug.h"
+#include "layout.h"
 #include "mft.h"
 #include "ntfs.h"
+#include "types.h"
 
 /**
  * ntfs_map_runlist - map (a part of) a runlist of an ntfs inode
@@ -248,19 +250,10 @@ static int ntfs_attr_find(const ATTR_TYPE type, const ntfschar *name,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
 	ATTR_RECORD *a;
-	ntfs_volume *vol;
-	ntfschar *upcase;
-	u32 upcase_len;
+	ntfs_volume *vol = ctx->ntfs_ino->vol;
+	ntfschar *upcase = vol->upcase;
+	u32 upcase_len = vol->upcase_len;
 
-	if (ic == IGNORE_CASE) {
-		vol = ctx->ntfs_ino->vol;
-		upcase = vol->upcase;
-		upcase_len = vol->upcase_len;
-	} else {
-		vol = NULL;
-		upcase = NULL;
-		upcase_len = 0;
-	}
 	/*
 	 * Iterate over attributes in mft record starting at @ctx->attr, or the
 	 * attribute following that, if @ctx->is_first is TRUE.
@@ -352,7 +345,7 @@ static int ntfs_attr_find(const ATTR_TYPE type, const ntfschar *name,
 				return -ENOENT;
 		}
 	}
-	ntfs_error(NULL, "Inode is corrupt.  Run chkdsk.");
+	ntfs_error(vol->sb, "Inode is corrupt.  Run chkdsk.");
 	NVolSetErrors(vol);
 	return -EIO;
 }
@@ -662,7 +655,6 @@ static int ntfs_external_attr_find(const ATTR_TYPE type,
 				ctx->mrec = map_extent_mft_record(base_ni,
 						le64_to_cpu(
 						al_entry->mft_reference), &ni);
-				ctx->ntfs_ino = ni;
 				if (IS_ERR(ctx->mrec)) {
 					ntfs_error(vol->sb, "Failed to map "
 							"extent mft record "
@@ -674,8 +666,11 @@ static int ntfs_external_attr_find(const ATTR_TYPE type,
 					err = PTR_ERR(ctx->mrec);
 					if (err == -ENOENT)
 						err = -EIO;
+					/* Cause @ctx to be sanitized below. */
+					ni = NULL;
 					break;
 				}
+				ctx->ntfs_ino = ni;
 			}
 			ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
 					le16_to_cpu(ctx->mrec->attrs_offset));
@@ -747,7 +742,8 @@ do_next_attr:
 		err = -EIO;
 	}
 	if (ni != base_ni) {
-		unmap_extent_mft_record(ni);
+		if (ni)
+			unmap_extent_mft_record(ni);
 		ctx->ntfs_ino = base_ni;
 		ctx->mrec = ctx->base_mrec;
 		ctx->attr = ctx->base_attr;
@@ -947,6 +943,133 @@ void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx)
 		unmap_extent_mft_record(ctx->ntfs_ino);
 	kmem_cache_free(ntfs_attr_ctx_cache, ctx);
 	return;
+}
+
+/**
+ * ntfs_attr_find_in_attrdef - find an attribute in the $AttrDef system file
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to find
+ *
+ * Search for the attribute definition record corresponding to the attribute
+ * @type in the $AttrDef system file.
+ *
+ * Return the attribute type definition record if found and NULL if not found.
+ */
+static ATTR_DEF *ntfs_attr_find_in_attrdef(const ntfs_volume *vol,
+		const ATTR_TYPE type)
+{
+	ATTR_DEF *ad;
+
+	BUG_ON(!vol->attrdef);
+	BUG_ON(!type);
+	for (ad = vol->attrdef; (u8*)ad - (u8*)vol->attrdef <
+			vol->attrdef_size && ad->type; ++ad) {
+		/* We have not found it yet, carry on searching. */
+		if (likely(le32_to_cpu(ad->type) < le32_to_cpu(type)))
+			continue;
+		/* We found the attribute; return it. */
+		if (likely(ad->type == type))
+			return ad;
+		/* We have gone too far already.  No point in continuing. */
+		break;
+	}
+	/* Attribute not found. */
+	ntfs_debug("Attribute type 0x%x not found in $AttrDef.",
+			le32_to_cpu(type));
+	return NULL;
+}
+
+/**
+ * ntfs_attr_size_bounds_check - check a size of an attribute type for validity
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to check
+ * @size:	size which to check
+ *
+ * Check whether the @size in bytes is valid for an attribute of @type on the
+ * ntfs volume @vol.  This information is obtained from $AttrDef system file.
+ *
+ * Return 0 if valid, -ERANGE if not valid, or -ENOENT if the attribute is not
+ * listed in $AttrDef.
+ */
+int ntfs_attr_size_bounds_check(const ntfs_volume *vol, const ATTR_TYPE type,
+		const s64 size)
+{
+	ATTR_DEF *ad;
+
+	BUG_ON(size < 0);
+	/*
+	 * $ATTRIBUTE_LIST has a maximum size of 256kiB, but this is not
+	 * listed in $AttrDef.
+	 */
+	if (unlikely(type == AT_ATTRIBUTE_LIST && size > 256 * 1024))
+		return -ERANGE;
+	/* Get the $AttrDef entry for the attribute @type. */
+	ad = ntfs_attr_find_in_attrdef(vol, type);
+	if (unlikely(!ad))
+		return -ENOENT;
+	/* Do the bounds check. */
+	if (((sle64_to_cpu(ad->min_size) > 0) &&
+			size < sle64_to_cpu(ad->min_size)) ||
+			((sle64_to_cpu(ad->max_size) > 0) && size >
+			sle64_to_cpu(ad->max_size)))
+		return -ERANGE;
+	return 0;
+}
+
+/**
+ * ntfs_attr_can_be_non_resident - check if an attribute can be non-resident
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to check
+ *
+ * Check whether the attribute of @type on the ntfs volume @vol is allowed to
+ * be non-resident.  This information is obtained from $AttrDef system file.
+ *
+ * Return 0 if the attribute is allowed to be non-resident, -EPERM if not, or
+ * -ENOENT if the attribute is not listed in $AttrDef.
+ */
+int ntfs_attr_can_be_non_resident(const ntfs_volume *vol, const ATTR_TYPE type)
+{
+	ATTR_DEF *ad;
+
+	/*
+	 * $DATA is always allowed to be non-resident even if $AttrDef does not
+	 * specify this in the flags of the $DATA attribute definition record.
+	 */
+	if (type == AT_DATA)
+		return 0;
+	/* Find the attribute definition record in $AttrDef. */
+	ad = ntfs_attr_find_in_attrdef(vol, type);
+	if (unlikely(!ad))
+		return -ENOENT;
+	/* Check the flags and return the result. */
+	if (ad->flags & CAN_BE_NON_RESIDENT)
+		return 0;
+	return -EPERM;
+}
+
+/**
+ * ntfs_attr_can_be_resident - check if an attribute can be resident
+ * @vol:	ntfs volume to which the attribute belongs
+ * @type:	attribute type which to check
+ *
+ * Check whether the attribute of @type on the ntfs volume @vol is allowed to
+ * be resident.  This information is derived from our ntfs knowledge and may
+ * not be completely accurate, especially when user defined attributes are
+ * present.  Basically we allow everything to be resident except for index
+ * allocation and $EA attributes.
+ *
+ * Return 0 if the attribute is allowed to be non-resident and -EPERM if not.
+ *
+ * Warning: In the system file $MFT the attribute $Bitmap must be non-resident
+ *	    otherwise windows will not boot (blue screen of death)!  We cannot
+ *	    check for this here as we do not know which inode's $Bitmap is
+ *	    being asked about so the caller needs to special case this.
+ */
+int ntfs_attr_can_be_resident(const ntfs_volume *vol, const ATTR_TYPE type)
+{
+	if (type != AT_INDEX_ALLOCATION && type != AT_EA)
+		return 0;
+	return -EPERM;
 }
 
 /**
