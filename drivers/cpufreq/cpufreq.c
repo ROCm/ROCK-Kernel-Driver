@@ -868,7 +868,7 @@ int cpufreq_update_policy(unsigned int cpu)
 	down(&data->lock);
 
 	memcpy(&policy, 
-	       &data, 
+	       data, 
 	       sizeof(struct cpufreq_policy));
 	policy.min = data->user_policy.min;
 	policy.max = data->user_policy.max;
