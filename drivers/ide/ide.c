@@ -1924,13 +1924,8 @@ int __init ide_setup (char *s)
 				drive->remap_0_to_1 = 2;
 				goto done;
 			case -14: /* "scsi" */
-#if defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI)
 				drive->scsi = 1;
 				goto done;
-#else
-				drive->scsi = 0;
-				goto bad_option;
-#endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
 			case -15: /* "biostimings" */
 				drive->autotune = IDE_TUNE_BIOS;
 				goto done;
