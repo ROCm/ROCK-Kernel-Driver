@@ -358,7 +358,7 @@ static void tun_setup(struct net_device *dev)
 	dev->hard_start_xmit = tun_net_xmit;
 	dev->stop = tun_net_close;
 	dev->get_stats = tun_net_stats;
-	dev->destructor = (void (*)(struct net_device *))kfree;
+	dev->destructor = free_netdev;
 }
 
 static struct tun_struct *tun_get_by_name(const char *name)

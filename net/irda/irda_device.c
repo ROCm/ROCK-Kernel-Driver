@@ -372,11 +372,6 @@ static void irda_task_timer_expired(void *data)
 	irda_task_kick(task);
 }
 
-static void irda_device_destructor(struct net_device *dev)
-{
-	kfree(dev);
-}
-
 /*
  * Function irda_device_setup (dev)
  *
@@ -388,7 +383,7 @@ void irda_device_setup(struct net_device *dev)
         dev->hard_header_len = 0;
         dev->addr_len        = 0;
 
-	dev->destructor      = irda_device_destructor;
+	dev->destructor      = free_netdev;
 
         dev->type            = ARPHRD_IRDA;
         dev->tx_queue_len    = 8; /* Window size + 1 s-frame */
