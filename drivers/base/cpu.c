@@ -6,8 +6,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/cpu.h>
+#include <linux/topology.h>
 
-#include <asm/topology.h>
 
 struct sysdev_class cpu_sysdev_class = {
 	set_kset_name("cpu"),
