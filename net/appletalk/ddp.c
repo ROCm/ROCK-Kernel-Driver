@@ -232,6 +232,7 @@ static void atif_drop_device(struct net_device *dev)
 	while ((tmp = *iface) != NULL) {
 		if (tmp->dev == dev) {
 			*iface = tmp->next;
+			dev_put(dev);
 			kfree(tmp);
 			dev->atalk_ptr = NULL;
 		} else
@@ -248,6 +249,7 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	if (!iface)
 		goto out;
 
+	dev_hold(dev);
 	iface->dev = dev;
 	dev->atalk_ptr = iface;
 	iface->address = *sa;
@@ -609,6 +611,7 @@ static int atrtr_delete(struct atalk_addr * addr)
 		    (!(tmp->flags&RTF_GATEWAY) ||
 		     tmp->target.s_node == addr->s_node)) {
 			*r = tmp->next;
+			dev_put(tmp->dev);
 			kfree(tmp);
 			goto out;
 		}
@@ -633,6 +636,7 @@ void atrtr_device_down(struct net_device *dev)
 	while ((tmp = *r) != NULL) {
 		if (tmp->dev == dev) {
 			*r = tmp->next;
+			dev_put(dev);
 			kfree(tmp);
 		} else
 			r = &tmp->next;
