@@ -1,9 +1,9 @@
 /*
  * A driver for the Griffin Technology, Inc. "PowerMate" USB controller dial.
  *
- * v1.0, (c)2002 William R Sowerbutts <will@sowerbutts.com>
+ * v1.1, (c)2002 William R Sowerbutts <will@sowerbutts.com>
  *
- * This device is a stainless steel knob which connects over USB. It can measure
+ * This device is a anodised aluminium knob which connects over USB. It can measure
  * clockwise and anticlockwise rotation. The dial also acts as a pushbutton with
  * a spring for automatic release. The base contains a pair of LEDs which illuminate
  * the translucent base. It rotates without limit and reports its relative rotation
@@ -15,12 +15,16 @@
  * speeds of up to 7 clicks either clockwise or anticlockwise between pollings from
  * the host. If it counts more than 7 clicks before it is polled, it will wrap back
  * to zero and start counting again. This was at quite high speed, however, almost
- * certainly faster than the human hand could turn it.
+ * certainly faster than the human hand could turn it. Griffin say that it loses a
+ * pulse or two on a direction change; the granularity is so fine that I never
+ * noticed this in practice.
  *
  * The device's microcontroller can be programmed to set the LED to either a constant
  * intensity, or to a rhythmic pulsing. Several patterns and speeds are available.
  *
  * Griffin were very happy to provide documentation and free hardware for development.
+ *
+ * Some userspace tools are available on the web: http://sowerbutts.com/powermate/
  *
  */
 
@@ -116,11 +120,7 @@ static void powermate_sync_state(struct powermate_device *pm)
 	if (pm->config->status == -EINPROGRESS) 
 		return; /* an update is already in progress; it'll issue this update when it completes */
 
-	if (pm->requires_update & UPDATE_STATIC_BRIGHTNESS){
-		pm->configcr->wValue = cpu_to_le16( SET_STATIC_BRIGHTNESS );
-		pm->configcr->wIndex = cpu_to_le16( pm->static_brightness );
-		pm->requires_update &= ~UPDATE_STATIC_BRIGHTNESS;
-	}else if (pm->requires_update & UPDATE_PULSE_ASLEEP){
+	if (pm->requires_update & UPDATE_PULSE_ASLEEP){
 		pm->configcr->wValue = cpu_to_le16( SET_PULSE_ASLEEP );
 		pm->configcr->wIndex = cpu_to_le16( pm->pulse_asleep ? 1 : 0 );
 		pm->requires_update &= ~UPDATE_PULSE_ASLEEP;
@@ -160,6 +160,10 @@ static void powermate_sync_state(struct powermate_device *pm)
 		pm->configcr->wValue = cpu_to_le16( (pm->pulse_table << 8) | SET_PULSE_MODE );
 		pm->configcr->wIndex = cpu_to_le16( (arg << 8) | op );
 		pm->requires_update &= ~UPDATE_PULSE_MODE;
+	}else if (pm->requires_update & UPDATE_STATIC_BRIGHTNESS){
+		pm->configcr->wValue = cpu_to_le16( SET_STATIC_BRIGHTNESS );
+		pm->configcr->wIndex = cpu_to_le16( pm->static_brightness );
+		pm->requires_update &= ~UPDATE_STATIC_BRIGHTNESS;
 	}else{
 		printk(KERN_ERR "powermate: unknown update required");
 		pm->requires_update = 0; /* fudge the bug */
@@ -220,11 +224,11 @@ static void powermate_pulse_led(struct powermate_device *pm, int static_brightne
 	}
 	if (pulse_asleep != pm->pulse_asleep){
 		pm->pulse_asleep = pulse_asleep;
-		pm->requires_update |= UPDATE_PULSE_ASLEEP;
+		pm->requires_update |= (UPDATE_PULSE_ASLEEP | UPDATE_STATIC_BRIGHTNESS);
 	}
 	if (pulse_awake != pm->pulse_awake){
 		pm->pulse_awake = pulse_awake;
-		pm->requires_update |= UPDATE_PULSE_AWAKE;
+		pm->requires_update |= (UPDATE_PULSE_AWAKE | UPDATE_STATIC_BRIGHTNESS);
 	}
 	if (pulse_speed != pm->pulse_speed || pulse_table != pm->pulse_table){
 		pm->pulse_speed = pulse_speed;
