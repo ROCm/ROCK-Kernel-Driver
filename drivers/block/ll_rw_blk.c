@@ -600,9 +600,6 @@ init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
 		__set_bit(i, tags->tag_map);
 
-	INIT_LIST_HEAD(&tags->busy_list);
-	tags->busy = 0;
-	atomic_set(&tags->refcnt, 1);
 	return 0;
 fail:
 	kfree(tags->tag_index);
@@ -628,6 +625,10 @@ int blk_queue_init_tags(request_queue_t *q, int depth,
 
 		if (init_tag_map(q, tags, depth))
 			goto fail;
+
+		INIT_LIST_HEAD(&tags->busy_list);
+		tags->busy = 0;
+		atomic_set(&tags->refcnt, 1);
 	} else if (q->queue_tags) {
 		if ((rc = blk_queue_resize_tags(q, depth)))
 			return rc;
