@@ -164,6 +164,36 @@ acpi_tb_convert_to_xsdt (
 }
 
 
+/******************************************************************************
+ *
+ * FUNCTION:    acpi_tb_init_generic_address
+ *
+ * PARAMETERS:  new_gas_struct      - GAS struct to be initialized
+ *              register_bit_width  - Width of this register
+ *              Address             - Address of the register
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Initialize a GAS structure.
+ *
+ ******************************************************************************/
+
+static void
+acpi_tb_init_generic_address (
+	struct acpi_generic_address     *new_gas_struct,
+	u8                              register_bit_width,
+	acpi_physical_address           address)
+{
+
+	ACPI_STORE_ADDRESS (new_gas_struct->address, address);
+
+	new_gas_struct->address_space_id = ACPI_ADR_SPACE_SYSTEM_IO;
+	new_gas_struct->register_bit_width = register_bit_width;
+	new_gas_struct->register_bit_offset = 0;
+	new_gas_struct->reserved        = 0;
+}
+
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_tb_convert_fadt1
@@ -233,14 +263,34 @@ acpi_tb_convert_fadt1 (
 	/*
 	 * Convert the V1.0 block addresses to V2.0 GAS structures
 	 */
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm2_cnt_blk, local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm_tmr_blk, local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,  0,                     local_fadt->V1_gpe0_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,  0,                     local_fadt->V1_gpe1_blk);
+	acpi_tb_init_generic_address (&local_fadt->xpm1a_evt_blk, local_fadt->pm1_evt_len,
+			  (acpi_physical_address)   local_fadt->V1_pm1a_evt_blk);
+	acpi_tb_init_generic_address (&local_fadt->xpm1b_evt_blk, local_fadt->pm1_evt_len,
+			  (acpi_physical_address)   local_fadt->V1_pm1b_evt_blk);
+	acpi_tb_init_generic_address (&local_fadt->xpm1a_cnt_blk, local_fadt->pm1_cnt_len,
+			  (acpi_physical_address)   local_fadt->V1_pm1a_cnt_blk);
+	acpi_tb_init_generic_address (&local_fadt->xpm1b_cnt_blk, local_fadt->pm1_cnt_len,
+			  (acpi_physical_address)   local_fadt->V1_pm1b_cnt_blk);
+	acpi_tb_init_generic_address (&local_fadt->xpm2_cnt_blk, local_fadt->pm2_cnt_len,
+			  (acpi_physical_address)   local_fadt->V1_pm2_cnt_blk);
+	acpi_tb_init_generic_address (&local_fadt->xpm_tmr_blk, local_fadt->pm_tm_len,
+			  (acpi_physical_address)   local_fadt->V1_pm_tmr_blk);
+	acpi_tb_init_generic_address (&local_fadt->xgpe0_blk, 0,
+			  (acpi_physical_address)   local_fadt->V1_gpe0_blk);
+	acpi_tb_init_generic_address (&local_fadt->xgpe1_blk, 0,
+			  (acpi_physical_address)   local_fadt->V1_gpe1_blk);
+
+	/* Create separate GAS structs for the PM1 Enable registers */
+
+	acpi_tb_init_generic_address (&acpi_gbl_xpm1a_enable,
+		 (u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
+		 (acpi_physical_address) (local_fadt->xpm1a_evt_blk.address +
+			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
+
+	acpi_tb_init_generic_address (&acpi_gbl_xpm1b_enable,
+		 (u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
+		 (acpi_physical_address) (local_fadt->xpm1b_evt_blk.address +
+			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
 }
 
 
@@ -282,44 +332,58 @@ acpi_tb_convert_fadt2 (
 	}
 
 	if (!(local_fadt->xpm1a_evt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_evt_blk,
-			local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
+		acpi_tb_init_generic_address (&local_fadt->xpm1a_evt_blk,
+			local_fadt->pm1_evt_len, (acpi_physical_address) local_fadt->V1_pm1a_evt_blk);
 	}
 
 	if (!(local_fadt->xpm1b_evt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_evt_blk,
-			local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
+		acpi_tb_init_generic_address (&local_fadt->xpm1b_evt_blk,
+			local_fadt->pm1_evt_len, (acpi_physical_address) local_fadt->V1_pm1b_evt_blk);
 	}
 
 	if (!(local_fadt->xpm1a_cnt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_cnt_blk,
-			local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
+		acpi_tb_init_generic_address (&local_fadt->xpm1a_cnt_blk,
+			local_fadt->pm1_cnt_len, (acpi_physical_address) local_fadt->V1_pm1a_cnt_blk);
 	}
 
 	if (!(local_fadt->xpm1b_cnt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_cnt_blk,
-			local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
+		acpi_tb_init_generic_address (&local_fadt->xpm1b_cnt_blk,
+			local_fadt->pm1_cnt_len, (acpi_physical_address) local_fadt->V1_pm1b_cnt_blk);
 	}
 
 	if (!(local_fadt->xpm2_cnt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm2_cnt_blk,
-			local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
+		acpi_tb_init_generic_address (&local_fadt->xpm2_cnt_blk,
+			local_fadt->pm2_cnt_len, (acpi_physical_address) local_fadt->V1_pm2_cnt_blk);
 	}
 
 	if (!(local_fadt->xpm_tmr_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm_tmr_blk,
-			local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
+		acpi_tb_init_generic_address (&local_fadt->xpm_tmr_blk,
+			local_fadt->pm_tm_len, (acpi_physical_address) local_fadt->V1_pm_tmr_blk);
 	}
 
 	if (!(local_fadt->xgpe0_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,
-			0, local_fadt->V1_gpe0_blk);
+		acpi_tb_init_generic_address (&local_fadt->xgpe0_blk,
+			0, (acpi_physical_address) local_fadt->V1_gpe0_blk);
 	}
 
 	if (!(local_fadt->xgpe1_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,
-			0, local_fadt->V1_gpe1_blk);
+		acpi_tb_init_generic_address (&local_fadt->xgpe1_blk,
+			0, (acpi_physical_address) local_fadt->V1_gpe1_blk);
 	}
+
+	/* Create separate GAS structs for the PM1 Enable registers */
+
+	acpi_tb_init_generic_address (&acpi_gbl_xpm1a_enable,
+		(u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
+		(acpi_physical_address) (local_fadt->xpm1a_evt_blk.address +
+			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
+	acpi_gbl_xpm1a_enable.address_space_id = local_fadt->xpm1a_evt_blk.address_space_id;
+
+	acpi_tb_init_generic_address (&acpi_gbl_xpm1b_enable,
+		(u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
+		(acpi_physical_address) (local_fadt->xpm1b_evt_blk.address +
+			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
+	acpi_gbl_xpm1b_enable.address_space_id = local_fadt->xpm1b_evt_blk.address_space_id;
 }
 
 
