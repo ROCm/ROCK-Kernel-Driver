@@ -46,6 +46,12 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
+#warning This file requires GCC 3.3.x or older to build.  Alternatively,
+#warning please talk to GCC people to resolve the issues with the
+#warning assembly clobber list.
+#endif
+
 static unsigned long no_fiq_insn;
 
 /* Default reacquire function
