@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#230 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#231 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -3756,7 +3756,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 
 			cur_seg = (struct scatterlist *)cmd->request_buffer;
 			nseg = pci_map_sg(ahc->dev_softc, cur_seg, cmd->use_sg,
-				 scsi_to_pci_dma_dir(cmd ->sc_data_direction));
+			    scsi_to_pci_dma_dir(cmd->sc_data_direction));
 			end_seg = cur_seg + nseg;
 			/* Copy the segments into the SG list. */
 			sg = scb->sg_list;
@@ -4889,7 +4889,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 			disconnected = FALSE;
 		else if (flag != SCB_ABORT
 		      && ahc_inb(ahc, SAVED_SCSIID) == pending_scb->hscb->scsiid
-		      && ahc_inb(ahc, SAVED_LUN) == pending_scb->hscb->lun)
+		      && ahc_inb(ahc, SAVED_LUN) == SCB_GET_LUN(pending_scb))
 			disconnected = FALSE;
 	}
 
