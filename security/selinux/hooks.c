@@ -43,6 +43,7 @@
 #include <linux/kd.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6.h>
+#include <linux/tty.h>
 #include <net/icmp.h>
 #include <net/ip.h>		/* for sysctl_local_port_range[] */
 #include <net/tcp.h>		/* struct or_callable used in sock_rcv_skb */
@@ -1733,7 +1734,31 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 {
 	struct avc_audit_data ad;
 	struct file *file, *devnull = NULL;
+	struct tty_struct *tty = current->signal->tty;
 	long j = -1;
+
+	if (tty) {
+		file_list_lock();
+		file = list_entry(tty->tty_files.next, typeof(*file), f_list);
+		if (file) {
+			/* Revalidate access to controlling tty.
+			   Use inode_has_perm on the tty inode directly rather
+			   than using file_has_perm, as this particular open
+			   file may belong to another process and we are only
+			   interested in the inode-based check here. */
+			struct inode *inode = file->f_dentry->d_inode;
+			if (inode_has_perm(current, inode,
+					   FILE__READ | FILE__WRITE,
+					   NULL, NULL)) {
+				/* Reset controlling tty. */
+				current->signal->tty = NULL;
+				current->signal->tty_old_pgrp = 0;
+			}
+		}
+		file_list_unlock();
+	}
+
+	/* Revalidate access to inherited open files. */
 
 	AVC_AUDIT_DATA_INIT(&ad,FS);
 
