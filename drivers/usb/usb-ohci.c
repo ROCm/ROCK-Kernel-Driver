@@ -2231,7 +2231,7 @@ static int hc_start (ohci_t * ohci)
 	dev = usb_to_ohci (usb_dev);
 	ohci->bus->root_hub = usb_dev;
 	usb_connect (usb_dev);
-	if (usb_new_device (usb_dev) != 0) {
+	if (usb_register_root_hub (usb_dev, &ohci->ohci_dev->dev) != 0) {
 		usb_free_dev (usb_dev); 
 		ohci->disabled = 1;
 		return -ENODEV;
