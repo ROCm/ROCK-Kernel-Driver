@@ -940,6 +940,7 @@ static int sunsab_console_setup(struct console *con, char *options)
 	writeb(up->interrupt_mask1, &up->regs->w.imr1);
 
 	sunsab_convert_to_sab(up, con->cflag, 0, baud);
+	sunsab_set_mctrl(&up->port, TIOCM_DTR | TIOCM_RTS);
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
 	
