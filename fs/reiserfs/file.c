@@ -1052,7 +1052,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     /* Check if we can write to specified region of file, file
        is not overly big and this kind of stuff. Adjust pos and
        count, if needed */
-    res = generic_write_checks(inode, file, &pos, &count, 0);
+    res = generic_write_checks(file, &pos, &count, 0);
     if (res)
 	goto out;
 

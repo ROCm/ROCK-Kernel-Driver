@@ -1626,9 +1626,9 @@ filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, size_t bytes)
  * Returns appropriate error code that caller should return or
  * zero in case that write should be allowed.
  */
-inline int generic_write_checks(struct inode *inode,
-		struct file *file, loff_t *pos, size_t *count, int isblk)
+inline int generic_write_checks(struct file *file, loff_t *pos, size_t *count, int isblk)
 {
+	struct inode *inode = file->f_mapping->host;
 	unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 
         if (unlikely(*pos < 0))
@@ -1767,7 +1767,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	current->backing_dev_info = mapping->backing_dev_info;
 	written = 0;
 
-	err = generic_write_checks(inode, file, &pos, &count, isblk);
+	err = generic_write_checks(file, &pos, &count, isblk);
 	if (err)
 		goto out;
 

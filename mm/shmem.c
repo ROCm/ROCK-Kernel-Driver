@@ -1186,7 +1186,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 	pos = *ppos;
 	written = 0;
 
-	err = generic_write_checks(inode, file, &pos, &count, 0);
+	err = generic_write_checks(file, &pos, &count, 0);
 	if (err || !count)
 		goto out;
 
