@@ -1950,8 +1950,6 @@ void ata_sg_init_one(struct ata_queued_cmd *qc, void *buf, unsigned int buflen)
 	sg->page = virt_to_page(buf);
 	sg->offset = (unsigned long) buf & ~PAGE_MASK;
 	sg_dma_len(sg) = buflen;
-
-	WARN_ON(buflen > PAGE_SIZE);
 }
 
 void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
@@ -2693,6 +2691,30 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 	VPRINTK("EXIT\n");
 }
 
+static inline int ata_should_dma_map(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+
+	switch (qc->tf.protocol) {
+	case ATA_PROT_DMA:
+	case ATA_PROT_ATAPI_DMA:
+		return 1;
+
+	case ATA_PROT_ATAPI:
+	case ATA_PROT_PIO:
+	case ATA_PROT_PIO_MULT:
+		if (ap->flags & ATA_FLAG_PIO_DMA)
+			return 1;
+
+		/* fall through */
+	
+	default:
+		return 0;
+	}
+
+	/* never reached */
+}
+
 /**
  *	ata_qc_issue - issue taskfile to device
  *	@qc: command to issue to device
@@ -2713,12 +2735,16 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 
-	if (qc->flags & ATA_QCFLAG_SG) {
-		if (ata_sg_setup(qc))
-			goto err_out;
-	} else if (qc->flags & ATA_QCFLAG_SINGLE) {
-		if (ata_sg_setup_one(qc))
-			goto err_out;
+	if (ata_should_dma_map(qc)) {
+		if (qc->flags & ATA_QCFLAG_SG) {
+			if (ata_sg_setup(qc))
+				goto err_out;
+		} else if (qc->flags & ATA_QCFLAG_SINGLE) {
+			if (ata_sg_setup_one(qc))
+				goto err_out;
+		}
+	} else {
+		qc->flags &= ~ATA_QCFLAG_DMAMAP;
 	}
 
 	ap->ops->qc_prep(qc);
