@@ -752,7 +752,7 @@ iosapic_parse_prt (void)
 
 			if (index < 0) {
 				printk(KERN_WARNING"IOSAPIC: GSI 0x%x has no IOSAPIC!\n", gsi);
-				return;
+				continue;
 			}
 			addr = iosapic_lists[index].addr;
 			gsi_base = iosapic_lists[index].gsi_base;
