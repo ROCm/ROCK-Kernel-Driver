@@ -219,11 +219,11 @@ struct switch_stack {
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
 # define user_stack(task,regs)	((long) regs - (long) task == IA64_STK_OFFSET - sizeof(*regs))
-# define fsys_mode(task,regs)				\
-  ({							\
-	  struct task_struct *_task = (task);		\
-	  struct pt_regs *_regs = (regs);		\
-	  !user_mode(regs) && user_stack(task, regs);	\
+# define fsys_mode(task,regs)					\
+  ({								\
+	  struct task_struct *_task = (task);			\
+	  struct pt_regs *_regs = (regs);			\
+	  !user_mode(_regs) && user_stack(_task, _regs);	\
   })
 
   struct task_struct;			/* forward decl */

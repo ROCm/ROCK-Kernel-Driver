@@ -6,7 +6,7 @@
  * Copyright (C) 1999		Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 1997,1998	Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  * Copyright (C) 1997		David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 2000-2002 Hewlett-Packard Co
+ * Copyright (C) 2000-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * These routines maintain argument size conversion between 32bit and 64bit
@@ -2348,7 +2348,7 @@ shmctl32 (int first, int second, void *uptr)
 
 static long
 semtimedop32(int semid, struct sembuf *tsems, int nsems,
-	     const struct timespec32 *timeout32)
+	     const struct compat_timespec *timeout32)
 {
 	struct timespec t;
 	if (get_user (t.tv_sec, &timeout32->tv_sec) ||
@@ -2371,7 +2371,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second, NULL);
 	      case SEMTIMEDOP:
 		return semtimedop32(first, (struct sembuf *)AA(ptr), second,
-				    (const struct timespec32 *)AA(fifth));
+				    (const struct compat_timespec *)AA(fifth));
 	      case SEMGET:
 		return sys_semget(first, second, third);
 	      case SEMCTL:

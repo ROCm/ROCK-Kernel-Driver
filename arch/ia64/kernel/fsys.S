@@ -10,6 +10,28 @@
 #include <asm/offsets.h>
 #include <asm/thread_info.h>
 
+/*
+ * See Documentation/ia64/fsys.txt for details on fsyscalls.
+ *
+ * On entry to an fsyscall handler:
+ *   r10	= 0 (i.e., defaults to "successful syscall return")
+ *   r11	= saved ar.pfs (a user-level value)
+ *   r15	= system call number
+ *   r16	= "current" task pointer (in normal kernel-mode, this is in r13)
+ *   r32-r39	= system call arguments
+ *   b6		= return address (a user-level value)
+ *   ar.pfs	= previous frame-state (a user-level value)
+ *   PSR.be	= cleared to zero (i.e., little-endian byte order is in effect)
+ *   all other registers may contain values passed in from user-mode
+ *
+ * On return from an fsyscall handler:
+ *   r11	= saved ar.pfs (as passed into the fsyscall handler)
+ *   r15	= system call number (as passed into the fsyscall handler)
+ *   r32-r39	= system call arguments (as passed into the fsyscall handler)
+ *   b6		= return address (as passed into the fsyscall handler)
+ *   ar.pfs	= previous frame-state (as passed into the fsyscall handler)
+ */
+
 ENTRY(fsys_ni_syscall)
 	mov r8=ENOSYS
 	mov r10=-1
@@ -31,6 +53,30 @@ ENTRY(fsys_getpid)
 	MCKINLEY_E9_WORKAROUND
 	br.ret.sptk.many b6
 END(fsys_getpid)
+
+ENTRY(fsys_set_tid_address)
+	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
+	;;
+	ld4 r9=[r9]
+	tnat.z p6,p7=r32		// check argument register for being NaT
+	;;
+	and r9=TIF_ALLWORK_MASK,r9
+	add r8=IA64_TASK_PID_OFFSET,r16
+	add r18=IA64_TASK_CLEAR_CHILD_TID_OFFSET,r16
+	;;
+	ld4 r8=[r8]
+	cmp.ne p8,p0=0,r9
+	mov r17=-1
+	;;
+(p6)	st8 [r18]=r32
+(p7)	st8 [r18]=r17
+(p8)	br.spnt.many fsys_fallback_syscall
+	;;
+	mov r17=0			// don't leak kernel bits...
+	mov r18=0			// don't leak kernel bits...
+	MCKINLEY_E9_WORKAROUND
+	br.ret.sptk.many b6
+END(fsys_set_tid_address)
 
 	.rodata
 	.align 8
@@ -245,9 +291,9 @@ fsyscall_table:
 	data8 fsys_fallback_syscall	// futex		// 1230
 	data8 fsys_fallback_syscall	// sched_setaffinity
 	data8 fsys_fallback_syscall	// sched_getaffinity
-	data8 fsys_fallback_syscall	// set_tid_address
-	data8 fsys_fallback_syscall	// alloc_hugepages
-	data8 fsys_fallback_syscall	// free_hugepages	// 1235
+	data8 fsys_set_tid_address	// set_tid_address
+	data8 fsys_fallback_syscall	// unused
+	data8 fsys_fallback_syscall	// unused		// 1235
 	data8 fsys_fallback_syscall	// exit_group
 	data8 fsys_fallback_syscall	// lookup_dcookie
 	data8 fsys_fallback_syscall	// io_setup

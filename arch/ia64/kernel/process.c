@@ -144,12 +144,14 @@ show_regs (struct pt_regs *regs)
 void
 do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 {
+#ifdef CONFIG_FSYS
 	if (fsys_mode(current, &scr->pt)) {
 		/* defer signal-handling etc. until we return to privilege-level 0.  */
 		if (!ia64_psr(&scr->pt)->lp)
 			ia64_psr(&scr->pt)->lp = 1;
 		return;
 	}
+#endif
 
 #ifdef CONFIG_PERFMON
 	if (current->thread.pfm_ovfl_block_reset)

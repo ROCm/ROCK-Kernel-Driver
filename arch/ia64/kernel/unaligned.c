@@ -1294,12 +1294,12 @@ within_logging_rate_limit (void)
 void
 ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 {
-	struct exception_fixup fix = { 0 };
 	struct ia64_psr *ipsr = ia64_psr(regs);
 	mm_segment_t old_fs = get_fs();
 	unsigned long bundle[2];
 	unsigned long opcode;
 	struct siginfo si;
+	const struct exception_table_entry *eh = NULL;
 	union {
 		unsigned long l;
 		load_store_t insn;
@@ -1317,10 +1317,9 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	 * user-level unaligned accesses.  Otherwise, a clever program could trick this
 	 * handler into reading an arbitrary kernel addresses...
 	 */
-	if (!user_mode(regs)) {
-		fix = SEARCH_EXCEPTION_TABLE(regs);
-	}
-	if (user_mode(regs) || fix.cont) {
+	if (!user_mode(regs))
+		eh = SEARCH_EXCEPTION_TABLE(regs);
+	if (user_mode(regs) || eh) {
 		if ((current->thread.flags & IA64_THREAD_UAC_SIGBUS) != 0)
 			goto force_sigbus;
 
@@ -1486,8 +1485,8 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
   failure:
 	/* something went wrong... */
 	if (!user_mode(regs)) {
-		if (fix.cont) {
-			handle_exception(regs, fix);
+		if (eh) {
+			handle_exception(regs, eh);
 			goto done;
 		}
 		die_if_kernel("error during unaligned kernel access\n", regs, ret);

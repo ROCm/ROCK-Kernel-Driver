@@ -44,18 +44,18 @@ name:
 	.previous
 
 #if __GNUC__ >= 3
-# define EX(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y);	\
+# define EX(y,x...)						\
+	.xdata4 "__ex_table", @secrel(99f), @secrel(y);		\
   [99:]	x
-# define EXCLR(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y)+4;	\
+# define EXCLR(y,x...)						\
+	.xdata4 "__ex_table", @secrel(99f), @secrel(y)+4;	\
   [99:]	x
 #else
-# define EX(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y);	\
+# define EX(y,x...)						\
+	.xdata4 "__ex_table", @secrel(99f), @secrel(y);		\
   99:	x
-# define EXCLR(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y)+4;	\
+# define EXCLR(y,x...)						\
+	.xdata4 "__ex_table", @secrel(99f), @secrel(y)+4;	\
   99:	x
 #endif
 

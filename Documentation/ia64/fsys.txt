@@ -4,7 +4,7 @@
 		-----------------------------------
 
 		        Started: 13-Jan-2002
-		    Last update: 15-Jan-2002
+		    Last update: 24-Jan-2002
 
 	              David Mosberger-Tang
 		      <davidm@hpl.hp.com>
@@ -89,6 +89,7 @@ The entry and exit-state of an fsyscall handler is as follows:
 
 ** Machine state on entry to fsyscall handler:
 
+ - r10	  = 0
  - r11	  = saved ar.pfs (a user-level value)
  - r15	  = system call number
  - r16	  = "current" task pointer (in normal kernel-mode, this is in r13)

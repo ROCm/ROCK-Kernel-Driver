@@ -5,7 +5,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1998-2002 by David Mosberger-Tang <davidm@hpl.hp.com>
+# Copyright (C) 1998-2003 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
 NM := $(CROSS_COMPILE)nm -B
@@ -48,30 +48,37 @@ drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
 drivers-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/fakeprom/
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ia64/boot $(1)
-maketool =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ia64/tools $(1)
+boot := arch/ia64/boot
+tools := arch/ia64/tools
 
 .PHONY: boot compressed archclean archmrproper include/asm-ia64/offsets.h
 
-all compressed: vmlinux.gz
+all: vmlinux
+
+compressed: vmlinux.gz
 
 vmlinux.gz: vmlinux
-	$(call makeboot,vmlinux.gz)
+	$(Q)$(MAKE) $(build)=$(boot) vmlinux.gz
 
 check: vmlinux
 	arch/ia64/scripts/unwcheck.sh vmlinux
 
 archmrproper:
 archclean:
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ia64/boot
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ia64/tools
+	$(Q)$(MAKE) $(clean)=$(boot)
+	$(Q)$(MAKE) $(clean)=$(tools)
 
 CLEAN_FILES += include/asm-ia64/offsets.h vmlinux.gz bootloader
 
 prepare: include/asm-ia64/offsets.h
 
 boot:	lib/lib.a vmlinux
-	$(call makeboot,$@)
+	$(Q)$(MAKE) $(build)=$(boot) $@
 
 include/asm-ia64/offsets.h: include/asm include/linux/version.h include/config/MARKER
-	$(call maketool,$@)
+	$(Q)$(MAKE) $(build)=$(tools) $@
+
+define archhelp
+  echo '  compressed	- Build compressed kernel image'
+  echo '  boot		- Build vmlinux and bootloader for Ski simulator'
+endef

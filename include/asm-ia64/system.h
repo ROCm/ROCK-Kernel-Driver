@@ -7,7 +7,7 @@
  * on information published in the Processor Abstraction Layer
  * and the System Abstraction Layer manual.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
@@ -17,6 +17,7 @@
 #include <asm/kregs.h>
 #include <asm/page.h>
 #include <asm/pal.h>
+#include <asm/percpu.h>
 
 #define KERNEL_START		(PAGE_OFFSET + 68*1024*1024)
 

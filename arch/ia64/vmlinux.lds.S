@@ -6,7 +6,7 @@
 
 #define LOAD_OFFSET PAGE_OFFSET
 #include <asm-generic/vmlinux.lds.h>
-	
+
 OUTPUT_FORMAT("elf64-ia64-little")
 OUTPUT_ARCH(ia64)
 ENTRY(phys_start)
@@ -29,9 +29,29 @@ SECTIONS
 
   _text = .;
   _stext = .;
-  .text : AT(ADDR(.text) - PAGE_OFFSET)
+
+  .text.ivt : AT(ADDR(.text.ivt) - PAGE_OFFSET)
     {
 	*(.text.ivt)
+    }
+
+  /*
+   * Due to a linker bug (still present as of binutils 2.13.90.0.10),
+   * the exception table must come before any code that uses the
+   * uaccess.h macros; otherwise, the linker will silently truncate negative @secrel()
+   * values to 0!!  Just love it when bugs like these sneak in...
+   */
+  /* Exception table */
+  . = ALIGN(16);
+  __ex_table : AT(ADDR(__ex_table) - PAGE_OFFSET)
+	{
+	  __start___ex_table = .;
+	  *(__ex_table)
+	  __stop___ex_table = .;
+	}
+
+  .text : AT(ADDR(.text) - PAGE_OFFSET)
+    {
 	*(.text)
     }
   .text2 : AT(ADDR(.text2) - PAGE_OFFSET)
@@ -46,13 +66,6 @@ SECTIONS
 
   /* Global data */
   _data = .;
-
-  /* Exception table */
-  . = ALIGN(16);
-  __start___ex_table = .;
-  __ex_table : AT(ADDR(__ex_table) - PAGE_OFFSET)
-	{ *(__ex_table) }
-  __stop___ex_table = .;
 
 #if defined(CONFIG_IA64_GENERIC)
   /* Machine Vector */

@@ -56,6 +56,7 @@ tab[] =
     { "IA64_TASK_THREAD_ON_USTACK_OFFSET", offsetof (struct task_struct, thread.on_ustack) },
     { "IA64_TASK_PID_OFFSET",		offsetof (struct task_struct, pid) },
     { "IA64_TASK_TGID_OFFSET",		offsetof (struct task_struct, tgid) },
+    { "IA64_TASK_CLEAR_CHILD_TID_OFFSET",offsetof (struct task_struct, clear_child_tid) },
     { "IA64_PT_REGS_CR_IPSR_OFFSET",	offsetof (struct pt_regs, cr_ipsr) },
     { "IA64_PT_REGS_CR_IIP_OFFSET",	offsetof (struct pt_regs, cr_iip) },
     { "IA64_PT_REGS_CR_IFS_OFFSET",	offsetof (struct pt_regs, cr_ifs) },

@@ -128,7 +128,7 @@ acpi_get_sysname (void)
  * with a list of acpi_resource structures.
  */
 acpi_status
-acpi_get_crs (acpi_handle obj, acpi_buffer *buf)
+acpi_get_crs (acpi_handle obj, struct acpi_buffer *buf)
 {
 	acpi_status result;
 	buf->length = 0;
@@ -144,10 +144,10 @@ acpi_get_crs (acpi_handle obj, acpi_buffer *buf)
 	return acpi_get_current_resources(obj, buf);
 }
 
-acpi_resource *
-acpi_get_crs_next (acpi_buffer *buf, int *offset)
+struct acpi_resource *
+acpi_get_crs_next (struct acpi_buffer *buf, int *offset)
 {
-	acpi_resource *res;
+	struct acpi_resource *res;
 
 	if (*offset >= buf->length)
 		return NULL;
@@ -157,11 +157,11 @@ acpi_get_crs_next (acpi_buffer *buf, int *offset)
 	return res;
 }
 
-acpi_resource_data *
-acpi_get_crs_type (acpi_buffer *buf, int *offset, int type)
+union acpi_resource_data *
+acpi_get_crs_type (struct acpi_buffer *buf, int *offset, int type)
 {
 	for (;;) {
-		acpi_resource *res = acpi_get_crs_next(buf, offset);
+		struct acpi_resource *res = acpi_get_crs_next(buf, offset);
 		if (!res)
 			return NULL;
 		if (res->id == type)
@@ -170,7 +170,7 @@ acpi_get_crs_type (acpi_buffer *buf, int *offset, int type)
 }
 
 void
-acpi_dispose_crs (acpi_buffer *buf)
+acpi_dispose_crs (struct acpi_buffer *buf)
 {
 	kfree(buf->pointer);
 }
@@ -638,7 +638,7 @@ static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
-	fadt_descriptor_rev2 *fadt;
+	struct fadt_descriptor_rev2 *fadt;
 	u32 sci_irq, gsi_base;
 	char *iosapic_address;
 
@@ -649,7 +649,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt_header->revision != 3)
 		return -ENODEV;		/* Only deal with ACPI 2.0 FADT */
 
-	fadt = (fadt_descriptor_rev2 *) fadt_header;
+	fadt = (struct fadt_descriptor_rev2 *) fadt_header;
 
 	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
