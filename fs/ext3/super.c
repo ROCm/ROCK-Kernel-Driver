@@ -60,9 +60,11 @@ int journal_no_write[2];
 
 static void make_rdonly(struct block_device *bdev, int *no_write)
 {
+	char b[BDEVNAME_SIZE];
+
 	if (bdev) {
 		printk(KERN_WARNING "Turning device %s read-only\n", 
-		       bdevname(bdev));
+		       bdevname(bdev, b));
 		*no_write = 0xdead0000 + bdev->bd_dev;
 	}
 }
@@ -317,6 +319,7 @@ static struct block_device *ext3_blkdev_get(dev_t dev)
 {
 	struct block_device *bdev;
 	int err = -ENODEV;
+	char b[BDEVNAME_SIZE];
 
 	bdev = bdget(dev);
 	if (bdev == NULL)
@@ -328,7 +331,7 @@ static struct block_device *ext3_blkdev_get(dev_t dev)
 
 fail:
 	printk(KERN_ERR "EXT3: failed to open journal device %s: %d\n",
-			__bdevname(dev), err);
+			__bdevname(dev, b), err);
 	return NULL;
 }
 
@@ -812,8 +815,10 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 	printk(KERN_INFO "EXT3 FS " EXT3FS_VERSION ", " EXT3FS_DATE " on %s, ",
 				sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
+		char b[BDEVNAME_SIZE];
+
 		printk("external journal on %s\n",
-		    bdevname(EXT3_SB(sb)->s_journal->j_dev));
+			bdevname(EXT3_SB(sb)->s_journal->j_dev, b));
 	} else {
 		printk("internal journal\n");
 	}

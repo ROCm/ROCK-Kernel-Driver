@@ -1152,13 +1152,15 @@ static int read_suspend_image(const char * specialfile, int noresume)
 	union diskpage *cur;
 	unsigned long scratch_page = 0;
 	int error;
+	char b[BDEVNAME_SIZE];
 
 	resume_device = name_to_dev_t(specialfile);
 	scratch_page = get_zeroed_page(GFP_ATOMIC);
 	cur = (void *) scratch_page;
 	if (cur) {
 		struct block_device *bdev;
-		printk("Resuming from device %s\n", __bdevname(resume_device));
+		printk("Resuming from device %s\n",
+				__bdevname(resume_device, b));
 		bdev = bdget(resume_device);
 		if (!bdev) {
 			printk("No such block device ?!\n");

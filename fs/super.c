@@ -526,8 +526,10 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		}
 		goto out;
 	} else {
+		char b[BDEVNAME_SIZE];
+
 		s->s_flags = flags;
-		strncpy(s->s_id, bdevname(bdev), sizeof(s->s_id));
+		strncpy(s->s_id, bdevname(bdev, b), sizeof(s->s_id));
 		s->s_old_blocksize = block_size(bdev);
 		sb_set_blocksize(s, s->s_old_blocksize);
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);

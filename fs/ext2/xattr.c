@@ -82,8 +82,9 @@ EXPORT_SYMBOL(ext2_xattr_set);
 		printk("\n"); \
 	} while (0)
 # define ea_bdebug(bh, f...) do { \
+		char b[BDEVNAME_SIZE]; \
 		printk(KERN_DEBUG "block %s:%ld: ", \
-			bdevname(bh->b_bdev), bh->b_blocknr); \
+			bdevname(bh->b_bdev, b), bh->b_blocknr); \
 		printk(f); \
 		printk("\n"); \
 	} while (0)

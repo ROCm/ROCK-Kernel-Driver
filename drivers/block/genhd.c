@@ -55,9 +55,8 @@ static inline int dev_to_index(dev_t dev)
 /*
  * __bdevname may be called from interrupts, and must be atomic
  */
-const char *__bdevname(dev_t dev)
+const char *__bdevname(dev_t dev, char *buffer)
 {
-	static char buffer[40];
 	char *name = "unknown-block";
 	unsigned int major = MAJOR(dev);
 	unsigned int minor = MINOR(dev);
@@ -71,7 +70,7 @@ const char *__bdevname(dev_t dev)
 			break;
 	if (n)
 		name = &(n->name[0]);
-	sprintf(buffer, "%s(%u,%u)", name, major, minor);
+	snprintf(buffer, BDEVNAME_SIZE, "%s(%u,%u)", name, major, minor);
 	spin_unlock_irqrestore(&major_names_lock, flags);
 
 	return buffer;

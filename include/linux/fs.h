@@ -1069,10 +1069,11 @@ extern int unregister_chrdev(unsigned int, const char *);
 extern int chrdev_open(struct inode *, struct file *);
 
 /* fs/block_dev.c */
-extern const char *__bdevname(dev_t);
-extern inline const char *bdevname(struct block_device *bdev)
+#define BDEVNAME_SIZE	32	/* Largest string for a blockdev identifier */
+extern const char *__bdevname(dev_t, char *buffer);
+extern inline const char *bdevname(struct block_device *bdev, char *buffer)
 {
-	return __bdevname(bdev->bd_dev);
+	return __bdevname(bdev->bd_dev, buffer);
 }
 extern struct block_device *lookup_bdev(const char *);
 extern struct block_device *open_bdev_excl(const char *, int, int, void *);
