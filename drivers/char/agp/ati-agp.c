@@ -131,6 +131,7 @@ static int ati_create_gatt_pages(int nr_tables)
 				i--;
 			}
 			kfree (tables);
+			tables = NULL;
 			retval = -ENOMEM;
 			break;
 		}
