@@ -52,8 +52,9 @@
 
 #define VM_ACCT(size)    (PAGE_CACHE_ALIGN(size) >> PAGE_SHIFT)
 
-/* info->flags needs a VM_flag to handle pagein/truncate races efficiently */
+/* info->flags needs VM_flags to handle pagein/truncate races efficiently */
 #define SHMEM_PAGEIN	 VM_READ
+#define SHMEM_TRUNCATE	 VM_WRITE
 
 /* Pretend that each entry is of this size in directory's i_size */
 #define BOGO_DIRENT_SIZE 20
@@ -393,6 +394,7 @@ static void shmem_truncate(struct inode *inode)
 		return;
 
 	spin_lock(&info->lock);
+	info->flags |= SHMEM_TRUNCATE;
 	limit = info->next_index;
 	info->next_index = idx;
 	if (info->swapped && idx < SHMEM_NR_DIRECT) {
@@ -505,6 +507,7 @@ done2:
 		truncate_inode_pages(inode->i_mapping, inode->i_size);
 		spin_lock(&info->lock);
 	}
+	info->flags &= ~SHMEM_TRUNCATE;
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
@@ -730,7 +733,10 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 
 	spin_lock(&info->lock);
 	shmem_recalc_inode(inode);
-	BUG_ON(index >= info->next_index);
+	if (index >= info->next_index) {
+		BUG_ON(!(info->flags & SHMEM_TRUNCATE));
+		goto unlock;
+	}
 	entry = shmem_swp_entry(info, index, NULL);
 	BUG_ON(!entry);
 	BUG_ON(entry->val);
@@ -744,6 +750,7 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 	}
 
 	shmem_swp_unmap(entry);
+unlock:
 	spin_unlock(&info->lock);
 	swap_free(swap);
 redirty:
