@@ -115,13 +115,6 @@ static __inline__ void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi) {;}
 
 #  endif
 
-/*  The following functions are for initialisation: don't use them!  */
-extern int mtrr_init (void);
-#  if defined(CONFIG_SMP) && defined(CONFIG_MTRR)
-extern void mtrr_init_boot_cpu (void);
-extern void mtrr_init_secondary_cpu (void);
-#  endif
-
 #endif
 
 #endif  /*  _LINUX_MTRR_H  */

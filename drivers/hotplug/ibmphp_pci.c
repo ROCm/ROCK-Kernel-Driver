@@ -104,11 +104,15 @@ int ibmphp_configure_card (struct pci_func *func, u8 slotno)
 
 	/* For every function on the card */
 	for (function = 0x00; function < 0x08; function++) {
+		unsigned int devfn = PCI_DEVFN(device, function);
+		ibmphp_pci_bus->number = cur_func->busno;
+
 		cur_func->function = function;
 
-		debug ("inside the loop, cur_func->busno = %x, cur_func->device = %x, cur_func->funcion = %x\n", cur_func->busno, device, function);
+		debug ("inside the loop, cur_func->busno = %x, cur_func->device = %x, cur_func->funcion = %x\n",
+			cur_func->busno, cur_func->device, cur_func->function);
 
-		pci_read_config_word_nodev (ibmphp_pci_root_ops, cur_func->busno, device, function, PCI_VENDOR_ID, &vendor_id);
+		pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_VENDOR_ID, &vendor_id);
 
 		debug ("vendor_id is %x\n", vendor_id);
 		if (vendor_id != PCI_VENDOR_ID_NOTVALID) {
@@ -122,8 +126,8 @@ int ibmphp_configure_card (struct pci_func *func, u8 slotno)
 			 *         |_=> 0 = single function device, 1 = multi-function device
 			 */
 
-			pci_read_config_byte_nodev (ibmphp_pci_root_ops, cur_func->busno, device, function, PCI_HEADER_TYPE, &hdr_type);
-			pci_read_config_dword_nodev (ibmphp_pci_root_ops, cur_func->busno, device, function, PCI_CLASS_REVISION, &class);
+			pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_HEADER_TYPE, &hdr_type);
+			pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_CLASS_REVISION, &class);
 
 			class_code = class >> 24;
 			debug ("hrd_type = %x, class = %x, class_code %x \n", hdr_type, class, class_code);
@@ -195,7 +199,7 @@ int ibmphp_configure_card (struct pci_func *func, u8 slotno)
 						goto error;
 					}
 
-					pci_read_config_byte_nodev (ibmphp_pci_root_ops, cur_func->busno, device, function, PCI_SECONDARY_BUS, &sec_number);
+					pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_number);
 					flag = FALSE;
 					for (i = 0; i < 32; i++) {
 						if (func->devices[i]) {
@@ -267,8 +271,9 @@ int ibmphp_configure_card (struct pci_func *func, u8 slotno)
 						cleanup_count = 2;
 						goto error;
 					}
-					debug ("cur_func->busno = %x, device = %x, function = %x\n", cur_func->busno, device, function);
-					pci_read_config_byte_nodev (ibmphp_pci_root_ops, cur_func->busno, device, function, PCI_SECONDARY_BUS, &sec_number);
+					debug ("cur_func->busno = %x, device = %x, function = %x\n",
+						cur_func->busno, device, function);
+					pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_number);
 					debug ("after configuring bridge..., sec_number = %x\n", sec_number);
 					flag = FALSE;
 					for (i = 0; i < 32; i++) {
@@ -361,13 +366,12 @@ static int configure_device (struct pci_func *func)
 	struct resource_node *mem[6];
 	struct resource_node *mem_tmp;
 	struct resource_node *pfmem[6];
-	u8 device;
-	u8 function;
+	unsigned int devfn;
 
 	debug ("%s - inside\n", __FUNCTION__);
 
-	device = func->device;
-	function = func->function;
+	devfn = PCI_DEVFN(func->device, func->function);
+	ibmphp_pci_bus->number = func->busno;
 
 	for (count = 0; address[count]; count++) {	/* for 6 BARs */
 
@@ -384,8 +388,8 @@ static int configure_device (struct pci_func *func)
 			pcibios_write_config_dword(cur_func->busno, cur_func->device, 
 			PCI_BASE_ADDRESS_0 + 4 * count, 0xFFFFFFFF);
 		 */
-		pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], 0xFFFFFFFF);
-		pci_read_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], &bar[count]);
+		pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0xFFFFFFFF);
+		pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 
 		if (!bar[count])	/* This BAR is not implemented */
 			continue;
@@ -421,11 +425,11 @@ static int configure_device (struct pci_func *func)
 				kfree (io[count]);
 				return -EIO;
 			}
-			pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], func->io[count]->start);
+			pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->io[count]->start);
 	
 			/* _______________This is for debugging purposes only_____________________ */ 
 			debug ("b4 writing, the IO address is %x\n", func->io[count]->start);
-			pci_read_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], &bar[count]);
+			pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 			debug ("after writing.... the start address is %x\n", bar[count]);
 			/* _________________________________________________________________________*/
 
@@ -484,11 +488,11 @@ static int configure_device (struct pci_func *func)
 					}
 				}
 
-				pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], func->pfmem[count]->start);
+				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->pfmem[count]->start);
 
-				/*_______________This if for debugging purposes only______________________________*/				
+				/*_______________This is for debugging purposes only______________________________*/				
 				debug ("b4 writing, start addres is %x\n", func->pfmem[count]->start);
-				pci_read_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], &bar[count]);
+				pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 				debug ("after writing, start address is %x\n", bar[count]);
 				/*_________________________________________________________________________________*/
 
@@ -496,7 +500,7 @@ static int configure_device (struct pci_func *func)
 					debug ("inside the mem 64 case, count %d\n", count);
 					count += 1;
 					/* on the 2nd dword, write all 0s, since we can't handle them n.e.ways */
-					pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], 0x00000000);
+					pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0x00000000);
 				}
 			} else {
 				/* regular memory */
@@ -526,10 +530,10 @@ static int configure_device (struct pci_func *func)
 					kfree (mem[count]);
 					return -EIO;
 				}
-				pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], func->mem[count]->start);
+				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->mem[count]->start);
 				/* _______________________This is for debugging purposes only _______________________*/
 				debug ("b4 writing, start address is %x\n", func->mem[count]->start);
-				pci_read_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], &bar[count]);
+				pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 				debug ("after writing, the address is %x\n", bar[count]);
 				/* __________________________________________________________________________________*/
 
@@ -538,22 +542,22 @@ static int configure_device (struct pci_func *func)
 					debug ("inside mem 64 case, reg. mem, count %d\n", count);
 					count += 1;
 					/* on the 2nd dword, write all 0s, since we can't handle them n.e.ways */
-					pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], 0x00000000);
+					pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0x00000000);
 				}
 			}
 		}		/* end of mem */
 	}			/* end of for */
 
 	func->bus = 0;		/* To indicate that this is not a PPB */
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_INTERRUPT_PIN, &irq);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_INTERRUPT_PIN, &irq);
 	if ((irq > 0x00) && (irq < 0x05))
-		pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_INTERRUPT_LINE, func->irq[irq - 1]);
+		pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_INTERRUPT_LINE, func->irq[irq - 1]);
 
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_CACHE_LINE_SIZE, CACHE);
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_LATENCY_TIMER, LATENCY);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_CACHE_LINE_SIZE, CACHE);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_LATENCY_TIMER, LATENCY);
 
-	pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_ROM_ADDRESS, 0x00L);
-	pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_COMMAND, DEVICEENABLE);
+	pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_ROM_ADDRESS, 0x00L);
+	pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_COMMAND, DEVICEENABLE);
 
 	return 0;
 }
@@ -593,24 +597,23 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		0
 	};
 	struct pci_func *func = *func_passed;
-	u8 function;
-	u8 device;
+	unsigned int devfn;
 	u8 irq;
 	int retval;
 
 	debug ("%s - enter\n", __FUNCTION__);
 
-	function = func->function;
-	device = func->device;
+	devfn = PCI_DEVFN(func->function, func->device);
+	ibmphp_pci_bus->number = func->busno;
 
 	/* Configuring necessary info for the bridge so that we could see the devices
 	 * behind it
 	 */
 
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PRIMARY_BUS, func->busno);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_PRIMARY_BUS, func->busno);
 
 	/* _____________________For debugging purposes only __________________________
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PRIMARY_BUS, &pri_number);
+	pci_bus_config_byte (ibmphp_pci_bus, devfn, PCI_PRIMARY_BUS, &pri_number);
 	debug ("primary # written into the bridge is %x\n", pri_number);
 	 ___________________________________________________________________________*/
 
@@ -624,23 +627,23 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 	debug ("after find_sec_number, the number we got is %x\n", sec_number);
 	debug ("AFTER FIND_SEC_NUMBER, func->busno IS %x\n", func->busno);
 
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_SECONDARY_BUS, sec_number);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, sec_number);
 	
 	/* __________________For debugging purposes only __________________________________
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_SECONDARY_BUS, &sec_number);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_number);
 	debug ("sec_number after write/read is %x\n", sec_number);
 	 ________________________________________________________________________________*/
 
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_SUBORDINATE_BUS, sec_number);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_SUBORDINATE_BUS, sec_number);
 
 	/* __________________For debugging purposes only ____________________________________
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_SUBORDINATE_BUS, &sec_number);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SUBORDINATE_BUS, &sec_number);
 	debug ("subordinate number after write/read is %x\n", sec_number);
 	 __________________________________________________________________________________*/
 
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_CACHE_LINE_SIZE, CACHE);
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_LATENCY_TIMER, LATENCY);
-	pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_SEC_LATENCY_TIMER, LATENCY);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_CACHE_LINE_SIZE, CACHE);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_LATENCY_TIMER, LATENCY);
+	pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_SEC_LATENCY_TIMER, LATENCY);
 
 	debug ("func->busno is %x\n", func->busno);
 	debug ("sec_number after writing is %x\n", sec_number);
@@ -653,8 +656,8 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 
 	/* First we need to allocate mem/io for the bridge itself in case it needs it */
 	for (count = 0; address[count]; count++) {	/* for 2 BARs */
-		pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], 0xFFFFFFFF);
-		pci_read_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], &bar[count]);
+		pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0xFFFFFFFF);
+		pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 
 		if (!bar[count]) {
 			/* This BAR is not implemented */
@@ -694,7 +697,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 				return -EIO;
 			}
 
-			pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], func->io[count]->start);
+			pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->io[count]->start);
 
 		} else {
 			/* This is Memory */
@@ -747,13 +750,13 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 					}
 				}
 
-				pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], func->pfmem[count]->start);
+				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->pfmem[count]->start);
 
 				if (bar[count] & PCI_BASE_ADDRESS_MEM_TYPE_64) {
 					/* takes up another dword */
 					count += 1;
 					/* on the 2nd dword, write all 0s, since we can't handle them n.e.ways */
-					pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], 0x00000000);
+					pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0x00000000);
 
 				}
 			} else {
@@ -784,13 +787,13 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 					return -EIO;
 				}
 
-				pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], func->mem[count]->start);
+				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->mem[count]->start);
 
 				if (bar[count] & PCI_BASE_ADDRESS_MEM_TYPE_64) {
 					/* takes up another dword */
 					count += 1;
 					/* on the 2nd dword, write all 0s, since we can't handle them n.e.ways */
-					pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, address[count], 0x00000000);
+					pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0x00000000);
 
 				}
 			}
@@ -802,6 +805,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 	if (amount_needed == NULL)
 		return -ENOMEM;
 
+	ibmphp_pci_bus->number = func->busno;
 	debug ("after coming back from scan_behind_bridge\n");
 	debug ("amount_needed->not_correct = %x\n", amount_needed->not_correct);
 	debug ("amount_needed->io = %x\n", amount_needed->io);
@@ -920,16 +924,30 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 	debug ("flag_io = %x, flag_mem = %x, flag_pfmem = %x\n", flag_io, flag_mem, flag_pfmem);
 
 	if (flag_io && flag_mem && flag_pfmem) {
-		bus = kmalloc (sizeof (struct bus_node), GFP_KERNEL);
+		/* If on bootup, there was a bridged card in this slot,
+		 * then card was removed and ibmphp got unloaded and loaded
+		 * back again, there's no way for us to remove the bus
+		 * struct, so no need to kmalloc, can use existing node
+		 */
+		bus = ibmphp_find_res_bus (sec_number);
 		if (!bus) {
-			err ("out of system memory \n");
-			retval = -ENOMEM;
+			bus = kmalloc (sizeof (struct bus_node), GFP_KERNEL);
+			if (!bus) {
+				err ("out of system memory \n");
+				retval = -ENOMEM;
+				goto error;
+			}
+			memset (bus, 0, sizeof (struct bus_node));
+			bus->busno = sec_number;
+			debug ("b4 adding new bus\n");
+			rc = add_new_bus (bus, io, mem, pfmem, func->busno);
+		} else if (!(bus->rangeIO) && !(bus->rangeMem) && !(bus->rangePFMem))
+			rc = add_new_bus (bus, io, mem, pfmem, 0xFF);
+		else {
+			err ("expected bus structure not empty? \n");
+			retval = -EIO;
 			goto error;
 		}
-		memset (bus, 0, sizeof (struct bus_node));
-		bus->busno = sec_number;
-		debug ("b4 adding new bus\n");
-		rc = add_new_bus (bus, io, mem, pfmem, func->busno);
 		if (rc) {
 			if (rc == -ENOMEM) {
 				ibmphp_remove_bus (bus, func->busno);
@@ -938,8 +956,8 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 			retval = rc;
 			goto error;
 		}
-		pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_BASE, &io_base);
-		pci_read_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_BASE, &pfmem_base);
+		pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_BASE, &io_base);
+		pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_BASE, &pfmem_base);
 
 		if ((io_base & PCI_IO_RANGE_TYPE_MASK) == PCI_IO_RANGE_TYPE_32) {
 			debug ("io 32\n");
@@ -951,73 +969,73 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		}
 
 		if (bus->noIORanges) {
-			pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_BASE, 0x00 | bus->rangeIO->start >> 8);
-			pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_LIMIT, 0x00 | bus->rangeIO->end >> 8);	
+			pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_IO_BASE, 0x00 | bus->rangeIO->start >> 8);
+			pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_IO_LIMIT, 0x00 | bus->rangeIO->end >> 8);	
 
 			/* _______________This is for debugging purposes only ____________________
-			pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_BASE, &temp);
+			pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_BASE, &temp);
 			debug ("io_base = %x\n", (temp & PCI_IO_RANGE_TYPE_MASK) << 8);
-			pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_LIMIT, &temp);
+			pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_LIMIT, &temp);
 			debug ("io_limit = %x\n", (temp & PCI_IO_RANGE_TYPE_MASK) << 8);
 			 ________________________________________________________________________*/
 
 			if (need_io_upper) {	/* since can't support n.e.ways */
-				pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_BASE_UPPER16, 0x0000);
-				pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_LIMIT_UPPER16, 0x0000);
+				pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_IO_BASE_UPPER16, 0x0000);
+				pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_IO_LIMIT_UPPER16, 0x0000);
 			}
 		} else {
-			pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_BASE, 0x00);
-			pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_IO_LIMIT, 0x00);
+			pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_IO_BASE, 0x00);
+			pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_IO_LIMIT, 0x00);
 		}
 
 		if (bus->noMemRanges) {
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_MEMORY_BASE, 0x0000 | bus->rangeMem->start >> 16);
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_MEMORY_LIMIT, 0x0000 | bus->rangeMem->end >> 16);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_BASE, 0x0000 | bus->rangeMem->start >> 16);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_LIMIT, 0x0000 | bus->rangeMem->end >> 16);
 			
 			/* ____________________This is for debugging purposes only ________________________
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_MEMORY_BASE, &temp);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_BASE, &temp);
 			debug ("mem_base = %x\n", (temp & PCI_MEMORY_RANGE_TYPE_MASK) << 16);
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_MEMORY_LIMIT, &temp);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_LIMIT, &temp);
 			debug ("mem_limit = %x\n", (temp & PCI_MEMORY_RANGE_TYPE_MASK) << 16);
 			 __________________________________________________________________________________*/
 
 		} else {
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_MEMORY_BASE, 0xffff);
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_MEMORY_LIMIT, 0x0000);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_BASE, 0xffff);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_LIMIT, 0x0000);
 		}
 		if (bus->noPFMemRanges) {
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_BASE, 0x0000 | bus->rangePFMem->start >> 16);
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_LIMIT, 0x0000 | bus->rangePFMem->end >> 16);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_BASE, 0x0000 | bus->rangePFMem->start >> 16);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, 0x0000 | bus->rangePFMem->end >> 16);
 
 			/* __________________________This is for debugging purposes only _______________________
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_BASE, &temp);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_BASE, &temp);
 			debug ("pfmem_base = %x", (temp & PCI_MEMORY_RANGE_TYPE_MASK) << 16);
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_LIMIT, &temp);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, &temp);
 			debug ("pfmem_limit = %x\n", (temp & PCI_MEMORY_RANGE_TYPE_MASK) << 16);
 			 ______________________________________________________________________________________*/
 
 			if (need_pfmem_upper) {	/* since can't support n.e.ways */
-				pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_BASE_UPPER32, 0x00000000);
-				pci_write_config_dword_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_LIMIT_UPPER32, 0x00000000);
+				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, PCI_PREF_BASE_UPPER32, 0x00000000);
+				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, PCI_PREF_LIMIT_UPPER32, 0x00000000);
 			}
 		} else {
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_BASE, 0xffff);
-			pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_PREF_MEMORY_LIMIT, 0x0000);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_BASE, 0xffff);
+			pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, 0x0000);
 		}
 
 		debug ("b4 writing control information\n");
 
-		pci_read_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_INTERRUPT_PIN, &irq);
+		pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_INTERRUPT_PIN, &irq);
 		if ((irq > 0x00) && (irq < 0x05))
-			pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_INTERRUPT_LINE, func->irq[irq - 1]);
+			pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_INTERRUPT_LINE, func->irq[irq - 1]);
 		/*    
-		pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_BRIDGE_CONTROL, ctrl);
-		pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_BRIDGE_CONTROL, PCI_BRIDGE_CTL_PARITY);
-		pci_write_config_byte_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_BRIDGE_CONTROL, PCI_BRIDGE_CTL_SERR);
+		pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_BRIDGE_CONTROL, ctrl);
+		pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_BRIDGE_CONTROL, PCI_BRIDGE_CTL_PARITY);
+		pci_bus_write_config_byte (ibmphp_pci_bus, devfn, PCI_BRIDGE_CONTROL, PCI_BRIDGE_CTL_SERR);
 		 */
 
-		pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_COMMAND, DEVICEENABLE);
-		pci_write_config_word_nodev (ibmphp_pci_root_ops, func->busno, device, function, PCI_BRIDGE_CONTROL, 0x07);
+		pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_COMMAND, DEVICEENABLE);
+		pci_bus_write_config_word (ibmphp_pci_bus, devfn, PCI_BRIDGE_CONTROL, 0x07);
 		for (i = 0; i < 32; i++) {
 			if (amount_needed->devices[i]) {
 				debug ("device where devices[i] is 1 = %x\n", i);
@@ -1073,6 +1091,7 @@ static struct res_needed *scan_behind_bridge (struct pci_func * func, u8 busno)
 	u16 vendor_id;
 	u8 hdr_type;
 	u8 device, function;
+	unsigned int devfn;
 	int howmany = 0;	/*this is to see if there are any devices behind the bridge */
 
 	u32 bar[6], class;
@@ -1092,20 +1111,23 @@ static struct res_needed *scan_behind_bridge (struct pci_func * func, u8 busno)
 		return NULL;
 	memset (amount, 0, sizeof (struct res_needed));
 
+	ibmphp_pci_bus->number = busno;
+
 	debug ("the bus_no behind the bridge is %x\n", busno);
 	debug ("scanning devices behind the bridge...\n");
 	for (device = 0; device < 32; device++) {
 		amount->devices[device] = 0;
 		for (function = 0; function < 8; function++) {
+			devfn = PCI_DEVFN(device, function);
 
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_VENDOR_ID, &vendor_id);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_VENDOR_ID, &vendor_id);
 
 			if (vendor_id != PCI_VENDOR_ID_NOTVALID) {
 				/* found correct device!!! */
 				howmany++;
 
-				pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_HEADER_TYPE, &hdr_type);
-				pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_CLASS_REVISION, &class);
+				pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_HEADER_TYPE, &hdr_type);
+				pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_CLASS_REVISION, &class);
 
 				debug ("hdr_type behind the bridge is %x\n", hdr_type);
 				if (hdr_type & PCI_HEADER_TYPE_BRIDGE) {
@@ -1132,14 +1154,14 @@ static struct res_needed *scan_behind_bridge (struct pci_func * func, u8 busno)
 				for (count = 0; address[count]; count++) {
 					/* for 6 BARs */
 					/*
-					pci_read_config_byte_nodev(ibmphp_pci_root_ops, busno, device, function, address[count], &tmp);
+					pci_bus_read_config_byte (ibmphp_pci_bus, devfn, address[count], &tmp);
 					if (tmp & 0x01) // IO
-						pci_write_config_dword_nodev(ibmphp_pci_root_ops, busno, device, function, address[count], 0xFFFFFFFD);
+						pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0xFFFFFFFD);
 					else // MEMORY
-						pci_write_config_dword_nodev(ibmphp_pci_root_ops, busno, device, function, address[count], 0xFFFFFFFF);
+						pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0xFFFFFFFF);
 					*/
-					pci_write_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], 0xFFFFFFFF);
-					pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], &bar[count]);
+					pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0xFFFFFFFF);
+					pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 
 					debug ("what is bar[count]? %x, count = %d\n", bar[count], count);
 
@@ -1223,6 +1245,7 @@ static int unconfigure_boot_device (u8 busno, u8 device, u8 function)
 	u32 temp_end;
 	u32 size;
 	u32 tmp_address;
+	unsigned int devfn;
 
 	debug ("%s - enter\n", __FUNCTION__);
 
@@ -1232,14 +1255,16 @@ static int unconfigure_boot_device (u8 busno, u8 device, u8 function)
 		return -EINVAL;
 	}
 
+	devfn = PCI_DEVFN(device, function);
+	ibmphp_pci_bus->number = busno;
 	for (count = 0; address[count]; count++) {	/* for 6 BARs */
-		pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], &start_address);
+		pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &start_address);
 
 		/* We can do this here, b/c by that time the device driver of the card has been stopped */
 
-		pci_write_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], 0xFFFFFFFF);
-		pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], &size);
-		pci_write_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], start_address);
+		pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], 0xFFFFFFFF);
+		pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &size);
+		pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], start_address);
 
 		debug ("start_address is %x\n", start_address);
 		debug ("busno, device, function %x %x %x\n", busno, device, function);
@@ -1336,13 +1361,16 @@ static int unconfigure_boot_bridge (u8 busno, u8 device, u8 function)
 		PCI_BASE_ADDRESS_1,
 		0
 	};
+	unsigned int devfn;
 
+	devfn = PCI_DEVFN(device, function);
+	ibmphp_pci_bus->number = busno;
 	bus_no = (int) busno;
 	debug ("busno is %x\n", busno);
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PRIMARY_BUS, &pri_number);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_PRIMARY_BUS, &pri_number);
 	debug ("%s - busno = %x, primary_number = %x\n", __FUNCTION__, busno, pri_number);
 
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_SECONDARY_BUS, &sec_number);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_number);
 	debug ("sec_number is %x\n", sec_number);
 	sec_no = (int) sec_number;
 	pri_no = (int) pri_number;
@@ -1351,10 +1379,10 @@ static int unconfigure_boot_bridge (u8 busno, u8 device, u8 function)
 		return -EINVAL;
 	}
 
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_SECONDARY_BUS, &sec_number);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_number);
 	sec_no = (int) sec_no;
 
-	pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_SUBORDINATE_BUS, &sub_number);
+	pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SUBORDINATE_BUS, &sub_number);
 	sub_no = (int) sub_number;
 	debug ("sub_no is %d, sec_no is %d\n", sub_no, sec_no);
 	if (sec_no != sub_number) {
@@ -1374,7 +1402,7 @@ static int unconfigure_boot_bridge (u8 busno, u8 device, u8 function)
 
 	for (count = 0; address[count]; count++) {
 		/* for 2 BARs */
-		pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, address[count], &start_address);
+		pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &start_address);
 
 		if (!start_address) {
 			/* This BAR is not implemented */
@@ -1447,6 +1475,7 @@ static int unconfigure_boot_card (struct slot *slot_cur)
 	u8 busno;
 	u8 function;
 	int rc;
+	unsigned int devfn;
 	u8 valid_device = 0x00; /* To see if we are ever able to find valid device and read it */
 
 	debug ("%s - enter\n", __FUNCTION__);
@@ -1457,8 +1486,10 @@ static int unconfigure_boot_card (struct slot *slot_cur)
 	debug ("b4 for loop, device is %x\n", device);
 	/* For every function on the card */
 	for (function = 0x0; function < 0x08; function++) {
+		devfn = PCI_DEVFN(device, function);
+		ibmphp_pci_bus->number = busno;
 
-		pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_VENDOR_ID, &vendor_id);
+		pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_VENDOR_ID, &vendor_id);
 
 		if (vendor_id != PCI_VENDOR_ID_NOTVALID) {
 			/* found correct device!!! */
@@ -1471,8 +1502,8 @@ static int unconfigure_boot_card (struct slot *slot_cur)
 			 *         |_=> 0 = single function device, 1 = multi-function device
 			 */
 
-			pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_HEADER_TYPE, &hdr_type);
-			pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_CLASS_REVISION, &class);
+			pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_HEADER_TYPE, &hdr_type);
+			pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_CLASS_REVISION, &class);
 
 			debug ("hdr_type %x, class %x\n", hdr_type, class);
 			class >>= 8;	/* to take revision out, class = class.subclass.prog i/f */
@@ -1579,7 +1610,6 @@ int ibmphp_unconfigure_card (struct slot **slot_cur, int the_end)
 	}
 
 	if (sl->func) {
-		debug ("do we come in here? \n");
 		cur_func = sl->func;
 		while (cur_func) {
 			/* TO DO: WILL MOST LIKELY NEED TO GET RID OF THE BUS STRUCTURE FROM RESOURCES AS WELL */
@@ -1619,6 +1649,7 @@ int ibmphp_unconfigure_card (struct slot **slot_cur, int the_end)
 
 	sl->func = NULL;
 	*slot_cur = sl;
+	debug ("%s - exit\n", __FUNCTION__);
 	return 0;
 }
 
@@ -1638,14 +1669,15 @@ static int add_new_bus (struct bus_node *bus, struct resource_node *io, struct r
 	struct bus_node *cur_bus = NULL;
 
 	/* Trying to find the parent bus number */
-	cur_bus	= ibmphp_find_res_bus (parent_busno);
-	if (!cur_bus) {
-		err ("strange, cannot find bus which is supposed to be at the system... something is terribly wrong...\n");
-		return -ENODEV;
+	if (parent_busno != 0xFF) {
+		cur_bus	= ibmphp_find_res_bus (parent_busno);
+		if (!cur_bus) {
+			err ("strange, cannot find bus which is supposed to be at the system... something is terribly wrong...\n");
+			return -ENODEV;
+		}
+	
+		list_add (&bus->bus_list, &cur_bus->bus_list);
 	}
-
-	list_add (&bus->bus_list, &cur_bus->bus_list);
-
 	if (io) {
 		io_range = kmalloc (sizeof (struct range_node), GFP_KERNEL);
 		if (!io_range) {
@@ -1698,6 +1730,7 @@ static u8 find_sec_number (u8 primary_busno, u8 slotno)
 	int min, max;
 	u8 busno;
 	struct bus_info *bus;
+	struct bus_node *bus_cur;
 
 	bus = ibmphp_find_same_bus_num (primary_busno);
 	if (!bus) {
@@ -1712,7 +1745,12 @@ static u8 find_sec_number (u8 primary_busno, u8 slotno)
 	}
 	busno = (u8) (slotno - (u8) min);
 	busno += primary_busno + 0x01;
-	if (!ibmphp_find_res_bus (busno))
+	bus_cur = ibmphp_find_res_bus (busno);
+	/* either there is no such bus number, or there are no ranges, which
+	 * can only happen if we removed the bridged device in previous load
+	 * of the driver, and now only have the skeleton bus struct
+	 */
+	if ((!bus_cur) || (!(bus_cur->rangeIO) && !(bus_cur->rangeMem) && !(bus_cur->rangePFMem)))
 		return busno;
 	return 0xff;
 }

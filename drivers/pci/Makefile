@@ -6,10 +6,8 @@ export-objs	:= access.o hotplug.o pci-driver.o pci.o pool.o \
 			probe.o proc.o search.o compat.o
 
 obj-y		+= access.o probe.o pci.o pool.o quirks.o \
-			compat.o names.o pci-driver.o search.o
+			compat.o names.o pci-driver.o search.o hotplug.o
 obj-$(CONFIG_PM)  += power.o
-obj-$(CONFIG_HOTPLUG)  += hotplug.o
-
 obj-$(CONFIG_PROC_FS) += proc.o
 
 ifndef CONFIG_SPARC64

@@ -634,7 +634,6 @@ void pci_insert_device(struct pci_dev *, struct pci_bus *);
 void pci_remove_device(struct pci_dev *);
 struct pci_driver *pci_dev_driver(const struct pci_dev *);
 const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev);
-void pci_announce_device_to_drivers(struct pci_dev *);
 unsigned int pci_do_scan_bus(struct pci_bus *bus);
 struct pci_bus * pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr);
 
