@@ -57,6 +57,7 @@ static DECLARE_WAIT_QUEUE_HEAD(lockd_exit);
 static unsigned long		nlm_grace_period;
 static unsigned long		nlm_timeout = LOCKD_DFLT_TIMEO;
 static int			nlm_udpport, nlm_tcpport;
+extern int			nlm_use_underlying_lock_ops;
 
 /*
  * Constants needed for the sysctl interface.
@@ -369,6 +370,14 @@ static ctl_table nlm_sysctls[] = {
 		.proc_handler	= &proc_dointvec_minmax,
 		.extra1		= (int *) &nlm_port_min,
 		.extra2		= (int *) &nlm_port_max,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "use_underlying_lock_ops",
+		.data		= &nlm_use_underlying_lock_ops,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 }
 };

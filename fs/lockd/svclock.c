@@ -50,6 +50,11 @@ static void	nlmsvc_notify_blocked(struct file_lock *);
 static struct nlm_block *	nlm_blocked;
 
 /*
+ * Wether to use the underlying locks ops or not
+ */
+int				nlm_use_underlying_lock_ops = 0;
+
+/*
  * Insert a blocked lock into the global list
  */
 static void
@@ -317,7 +322,16 @@ again:
 	down(&file->f_sema);
 
 	if (!(conflock = posix_test_lock(&file->f_file, &lock->fl))) {
-		error = posix_lock_file(&file->f_file, &lock->fl);
+
+		/* If the filesystem defined its own lock operation, invoke it. */
+		error = 0;
+		if (nlm_use_underlying_lock_ops
+		 && (file->f_file.f_op) && (file->f_file.f_op->lock)) {
+			error = file->f_file.f_op->lock(&file->f_file, F_SETLK, &lock->fl);
+			dprintk("nlmsvc_lock: filesystem lock operation returned %d\n", error);
+		}
+		if (error == 0)
+			error = posix_lock_file(&file->f_file, &lock->fl);
 
 		if (block)
 			nlmsvc_delete_block(block, 0);
@@ -388,6 +402,22 @@ nlmsvc_testlock(struct nlm_file *file, struct nlm_lock *lock,
 				(long long)lock->fl.fl_start,
 				(long long)lock->fl.fl_end);
 
+	/* If the filesystem defined its own lock operation, invoke it. */
+	if (nlm_use_underlying_lock_ops
+	 && (file->f_file.f_op) && (file->f_file.f_op->lock)) {
+		int error;
+
+		error = file->f_file.f_op->lock(&file->f_file, F_GETLK, &lock->fl);
+		if ((!error) && (lock->fl.fl_type != F_UNLCK)) {
+			conflock->caller = "somehost";  /* FIXME */
+			conflock->oh.len = 0;   /* don't return OH info */
+			conflock->fl = lock->fl;
+			dprintk("nlmsvc_testlock: filesystem (get)lock operation returned error %d type %d pid %d start %Ld end %Ld\n",
+				error, lock->fl.fl_type, lock->fl.fl_pid, lock->fl.fl_start, lock->fl.fl_end);
+			return nlm_lck_denied;
+		}
+	}
+
 	if ((fl = posix_test_lock(&file->f_file, &lock->fl)) != NULL) {
 		dprintk("lockd: conflicting lock(ty=%d, %Ld-%Ld)\n",
 				fl->fl_type, (long long)fl->fl_start,
@@ -424,7 +454,16 @@ nlmsvc_unlock(struct nlm_file *file, struct nlm_lock *lock)
 	nlmsvc_cancel_blocked(file, lock);
 
 	lock->fl.fl_type = F_UNLCK;
-	error = posix_lock_file(&file->f_file, &lock->fl);
+
+	/* If the filesystem defined its own lock operation, invoke it. */
+	error = 0;
+	if (nlm_use_underlying_lock_ops
+	 && (file->f_file.f_op) && (file->f_file.f_op->lock)) {
+		error = file->f_file.f_op->lock(&file->f_file, F_SETLK, &lock->fl);
+		dprintk("nlmsvc_unlock: filesystem (un)lock operation returned error %d\n", error);
+	}
+	if (error == 0)
+		error = posix_lock_file(&file->f_file, &lock->fl);
 
 	return (error < 0)? nlm_lck_denied_nolocks : nlm_granted;
 }
@@ -515,6 +554,53 @@ nlmsvc_grant_blocked(struct nlm_block *block)
 	}
 
 	/* Try the lock operation again */
+
+	/* If the filesystem defined its own lock operation, invoke it. */
+	if (nlm_use_underlying_lock_ops
+	 && (file->f_file.f_op) && (file->f_file.f_op->lock)) {
+		struct file_lock getlock;
+		unsigned char found_type;
+
+		/* save requestor lock inforation since GETLK will overwrite it */
+		getlock.fl_pid   = lock->fl.fl_pid;
+		getlock.fl_type  = lock->fl.fl_type;
+		getlock.fl_start = lock->fl.fl_start;
+		getlock.fl_end   = lock->fl.fl_end;
+
+		error = file->f_file.f_op->lock(&file->f_file, F_GETLK, &lock->fl);
+		found_type = lock->fl.fl_type;
+
+		/* restore requestor lock inforation.  */
+		lock->fl.fl_pid   = getlock.fl_pid;
+		lock->fl.fl_type  = getlock.fl_type;
+		lock->fl.fl_start = getlock.fl_start;
+		lock->fl.fl_end   = getlock.fl_end;
+
+		if ((!error) && (found_type != F_UNLCK)) {
+			dprintk("nlmsvc_grant_blocked: filesystem (get)lock operation returned error %d type %d pid %d start %Ld end %Ld\n",
+				error, lock->fl.fl_type, lock->fl.fl_pid, lock->fl.fl_start, lock->fl.fl_end);
+			dprintk("lockd: lock still blocked\n");
+	
+			/* If the blocker is local and recorded in the vfs lock structures, use its
+			 * conflock to wait on.  If the lock is denied due to the filesystem call, we
+			 * don't have a conflicting lock so retry in a while.
+			 */
+
+			if ((conflock = posix_test_lock(&file->f_file, &lock->fl)) != NULL) {
+				nlmsvc_insert_block(block, NLM_NEVER);
+				posix_block_lock(conflock, &lock->fl);
+				up(&file->f_sema);
+				return;
+			}
+			else {
+				dprintk("nlmsvc_grant_blocked: NO conflock RECORDED IN THE VFS!\n");
+				nlmsvc_insert_block(block, jiffies + 30 * HZ);
+				up(&file->f_sema);
+				return;
+			}
+		}
+	}
+
 	if ((conflock = posix_test_lock(&file->f_file, &lock->fl)) != NULL) {
 		/* Bummer, we blocked again */
 		dprintk("lockd: lock still blocked\n");
@@ -528,6 +614,21 @@ nlmsvc_grant_blocked(struct nlm_block *block)
 	 * following yields an error, this is most probably due to low
 	 * memory. Retry the lock in a few seconds.
 	 */
+
+	/* If the filesystem defined its own lock operation, invoke it. */
+	if (nlm_use_underlying_lock_ops
+	 && (file->f_file.f_op) && (file->f_file.f_op->lock)) {
+		error = file->f_file.f_op->lock(&file->f_file, F_SETLK, &lock->fl);
+		dprintk("nlmsvc_grant_blocked: filesystem lock operation returned error %d\n", error);
+		if (error) {
+			printk(KERN_WARNING "lockd: unexpected error %d in %s!\n",
+				error, __FUNCTION__);
+			nlmsvc_insert_block(block, jiffies + 10 * HZ);
+			up(&file->f_sema);
+			return;
+		}
+	}
+
 	if ((error = posix_lock_file(&file->f_file, &lock->fl)) < 0) {
 		printk(KERN_WARNING "lockd: unexpected error %d in %s!\n",
 				-error, __FUNCTION__);
