@@ -18,12 +18,11 @@
 #include <asm/mmu_context.h>
 #include <asm/paca.h>
 #include <asm/naca.h>
-#include <asm/pmc.h>
 #include <asm/cputable.h>
 
-int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
-void make_slbe(unsigned long esid, unsigned long vsid, int large,
-	       int kernel_segment);
+static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
+static void make_slbe(unsigned long esid, unsigned long vsid, int large,
+		      int kernel_segment);
 
 /*
  * Build an entry for the base kernel segment and put it into
@@ -69,7 +68,7 @@ DEFINE_PER_CPU(long, stab_cache[NR_STAB_CACHE_ENTRIES]);
 /*
  * Create a segment table entry for the given esid/vsid pair.
  */
-int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
+static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 {
 	unsigned long entry, group, old_esid, castout_entry, i;
 	unsigned int global_entry;
@@ -88,7 +87,7 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 				ste->dw0.dw0.kp = 1;
 				asm volatile("eieio":::"memory");
 				ste->dw0.dw0.v = 1;
-				return(global_entry | entry);
+				return (global_entry | entry);
 			}
 		}
 		/* Now search the secondary group. */
@@ -254,8 +253,6 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 			ste = stab + __get_cpu_var(stab_cache[i]);
 			ste->dw0.dw0.v = 0;
 		}
-
-		asm volatile("sync; slbia; sync":::"memory");
 	} else {
 		unsigned long entry;
 
@@ -273,9 +270,9 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 				ste->dw0.dw0.v = 0;
 			}
 		}
-
-		asm volatile("sync; slbia; sync":::"memory");
 	}
+
+	asm volatile("sync; slbia; sync":::"memory");
 
 	*offset = 0;
 
@@ -292,8 +289,8 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
  * NOTE: A context syncronising instruction is required before and after
  * this, in the common case we use exception entry and rfid.
  */
-void make_slbe(unsigned long esid, unsigned long vsid, int large,
-	       int kernel_segment)
+static void make_slbe(unsigned long esid, unsigned long vsid, int large,
+		      int kernel_segment)
 {
 	unsigned long entry, castout_entry;
 	union {
@@ -350,7 +347,7 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large,
 
 	/*
 	 * No need for an isync before or after this slbmte. The exception
-         * we enter with and the rfid we exit with are context synchronizing.
+	 * we enter with and the rfid we exit with are context synchronizing.
 	 */
 	asm volatile("slbmte  %0,%1" : : "r" (vsid_data), "r" (esid_data)); 
 }
