@@ -823,6 +823,14 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_AL_M1671,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1671,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1671",
+		.chipset_setup	= ali_generic_setup,
+	},
+	{
 		.device_id	= 0,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_GENERIC,
