@@ -51,36 +51,23 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 }
 
 /*
- * Schedule all required I/O operations, then run the disk queue
- * to make sure they are started.  Do not wait for completion.
+ * Schedule all required I/O operations.  Do not wait for completion.
  */
 static long madvise_willneed(struct vm_area_struct * vma,
 			     unsigned long start, unsigned long end)
 {
-	long error = -EBADF;
-	struct file * file;
-	unsigned long size, rlim_rss;
+	struct file *file = vma->vm_file;
 
-	/* Doesn't work if there's no mapped file. */
 	if (!vma->vm_file)
-		return error;
-	file = vma->vm_file;
-	size = (file->f_dentry->d_inode->i_size + PAGE_CACHE_SIZE - 1) >>
-							PAGE_CACHE_SHIFT;
+		return -EBADF;
 
 	start = ((start - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 	if (end > vma->vm_end)
 		end = vma->vm_end;
 	end = ((end - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 
-	/* Make sure this doesn't exceed the process's max rss. */
-	error = -EIO;
-	rlim_rss = current->rlim ?  current->rlim[RLIMIT_RSS].rlim_cur :
-				LONG_MAX; /* default: see resource.h */
-	if ((vma->vm_mm->rss + (end - start)) > rlim_rss)
-		return error;
-
-	do_page_cache_readahead(file->f_dentry->d_inode->i_mapping, file, start, end - start);
+	do_page_cache_readahead(file->f_dentry->d_inode->i_mapping,
+			file, start, max_sane_readahead(end - start));
 	return 0;
 }
 

@@ -897,20 +897,10 @@ static ssize_t
 do_readahead(struct address_space *mapping, struct file *filp,
 	     unsigned long index, unsigned long nr)
 {
-	unsigned long max;
-	unsigned long active;
-	unsigned long inactive;
-
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
-	/* Limit it to a sane percentage of the inactive list.. */
-	get_zone_counts(&active, &inactive);
-	max = inactive / 2;
-	if (nr > max)
-		nr = max;
-
-	do_page_cache_readahead(mapping, filp, index, nr);
+	do_page_cache_readahead(mapping, filp, index, max_sane_readahead(nr));
 	return 0;
 }
 

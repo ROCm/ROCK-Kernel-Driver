@@ -467,3 +467,16 @@ void handle_ra_miss(struct address_space *mapping, struct file_ra_state *ra)
 			ra->next_size = min;
 	}
 }
+
+/*
+ * Given a desired number of PAGE_CACHE_SIZE readahead pages, return a
+ * sensible upper limit.
+ */
+unsigned long max_sane_readahead(unsigned long nr)
+{
+	unsigned long active;
+	unsigned long inactive;
+
+	get_zone_counts(&active, &inactive);
+	return min(nr, inactive / 2);
+}

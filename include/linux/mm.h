@@ -516,6 +516,7 @@ void page_cache_readaround(struct address_space *mapping,
 			   unsigned long offset);
 void handle_ra_miss(struct address_space *mapping, 
 		    struct file_ra_state *ra);
+unsigned long max_sane_readahead(unsigned long nr);
 
 /* Do stack extension */
 extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
