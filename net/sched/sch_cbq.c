@@ -1439,7 +1439,7 @@ static int cbq_init(struct Qdisc *sch, struct rtattr *opt)
 	struct rtattr *tb[TCA_CBQ_MAX];
 	struct tc_ratespec *r;
 
-	if (rtattr_parse(tb, TCA_CBQ_MAX, RTA_DATA(opt), RTA_PAYLOAD(opt)) < 0 ||
+	if (rtattr_parse_nested(tb, TCA_CBQ_MAX, opt) < 0 ||
 	    tb[TCA_CBQ_RTAB-1] == NULL || tb[TCA_CBQ_RATE-1] == NULL ||
 	    RTA_PAYLOAD(tb[TCA_CBQ_RATE-1]) < sizeof(struct tc_ratespec))
 		return -EINVAL;
@@ -1824,8 +1824,7 @@ cbq_change_class(struct Qdisc *sch, u32 classid, u32 parentid, struct rtattr **t
 	struct cbq_class *parent;
 	struct qdisc_rate_table *rtab = NULL;
 
-	if (opt==NULL ||
-	    rtattr_parse(tb, TCA_CBQ_MAX, RTA_DATA(opt), RTA_PAYLOAD(opt)))
+	if (opt==NULL || rtattr_parse_nested(tb, TCA_CBQ_MAX, opt))
 		return -EINVAL;
 
 	if (tb[TCA_CBQ_OVL_STRATEGY-1] &&

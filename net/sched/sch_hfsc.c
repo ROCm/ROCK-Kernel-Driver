@@ -1046,8 +1046,7 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 	struct tc_service_curve *rsc = NULL, *fsc = NULL, *usc = NULL;
 	u64 cur_time;
 
-	if (opt == NULL ||
-	    rtattr_parse(tb, TCA_HFSC_MAX, RTA_DATA(opt), RTA_PAYLOAD(opt)))
+	if (opt == NULL || rtattr_parse_nested(tb, TCA_HFSC_MAX, opt))
 		return -EINVAL;
 
 	if (tb[TCA_HFSC_RSC-1]) {

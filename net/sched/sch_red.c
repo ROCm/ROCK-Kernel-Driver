@@ -364,7 +364,7 @@ static int red_change(struct Qdisc *sch, struct rtattr *opt)
 	struct tc_red_qopt *ctl;
 
 	if (opt == NULL ||
-	    rtattr_parse(tb, TCA_RED_STAB, RTA_DATA(opt), RTA_PAYLOAD(opt)) ||
+	    rtattr_parse_nested(tb, TCA_RED_STAB, opt) ||
 	    tb[TCA_RED_PARMS-1] == 0 || tb[TCA_RED_STAB-1] == 0 ||
 	    RTA_PAYLOAD(tb[TCA_RED_PARMS-1]) < sizeof(*ctl) ||
 	    RTA_PAYLOAD(tb[TCA_RED_STAB-1]) < 256)

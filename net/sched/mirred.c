@@ -84,8 +84,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 	int ret = 0;
 	int ok_push = 0;
 
-	if (rta == NULL || rtattr_parse(tb, TCA_MIRRED_MAX, RTA_DATA(rta),
-	                                RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_MIRRED_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_MIRRED_PARMS-1] == NULL ||
@@ -127,7 +126,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 		}
 	}
 
-	spin_lock(&p->lock);
+	spin_lock_bh(&p->lock);
 	p->action = parm->action;
 	p->eaction = parm->eaction;
 	if (parm->ifindex) {
@@ -138,7 +137,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 		dev_hold(dev);
 		p->ok_push = ok_push;
 	}
-	spin_unlock(&p->lock);
+	spin_unlock_bh(&p->lock);
 	if (ret == ACT_P_CREATED)
 		tcf_hash_insert(p);
 

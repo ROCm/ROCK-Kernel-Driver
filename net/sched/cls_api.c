@@ -130,21 +130,30 @@ static __inline__ u32 tcf_auto_prio(struct tcf_proto *tp)
 
 static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 {
-	struct rtattr **tca = arg;
-	struct tcmsg *t = NLMSG_DATA(n);
-	u32 protocol = TC_H_MIN(t->tcm_info);
-	u32 prio = TC_H_MAJ(t->tcm_info);
-	u32 nprio = prio;
-	u32 parent = t->tcm_parent;
+	struct rtattr **tca;
+	struct tcmsg *t;
+	u32 protocol;
+	u32 prio;
+	u32 nprio;
+	u32 parent;
 	struct net_device *dev;
 	struct Qdisc  *q;
 	struct tcf_proto **back, **chain;
-	struct tcf_proto *tp = NULL;
+	struct tcf_proto *tp;
 	struct tcf_proto_ops *tp_ops;
 	struct Qdisc_class_ops *cops;
-	unsigned long cl = 0;
+	unsigned long cl;
 	unsigned long fh;
 	int err;
+
+replay:
+	tca = arg;
+	t = NLMSG_DATA(n);
+	protocol = TC_H_MIN(t->tcm_info);
+	prio = TC_H_MAJ(t->tcm_info);
+	nprio = prio;
+	parent = t->tcm_parent;
+	cl = 0;
 
 	if (prio == 0) {
 		/* If no priority is given, user wants we allocated it. */
@@ -211,20 +220,29 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		err = -ENOBUFS;
 		if ((tp = kmalloc(sizeof(*tp), GFP_KERNEL)) == NULL)
 			goto errout;
+		err = -EINVAL;
 		tp_ops = tcf_proto_lookup_ops(tca[TCA_KIND-1]);
+		if (tp_ops == NULL) {
 #ifdef CONFIG_KMOD
-		if (tp_ops==NULL && tca[TCA_KIND-1] != NULL) {
 			struct rtattr *kind = tca[TCA_KIND-1];
 			char name[IFNAMSIZ];
 
-			if (rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+			if (kind != NULL &&
+			    rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+				rtnl_unlock();
 				request_module("cls_%s", name);
+				rtnl_lock();
 				tp_ops = tcf_proto_lookup_ops(kind);
+				/* We dropped the RTNL semaphore in order to
+				 * perform the module load.  So, even if we
+				 * succeeded in loading the module we have to
+				 * replay the request.  We indicate this using
+				 * -EAGAIN.
+				 */
+				if (tp_ops != NULL)
+					err = -EAGAIN;
 			}
-		}
 #endif
-		if (tp_ops == NULL) {
-			err = -EINVAL;
 			kfree(tp);
 			goto errout;
 		}
@@ -294,6 +312,9 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 errout:
 	if (cl)
 		cops->put(q, cl);
+	if (err == -EAGAIN)
+		/* Replay the request. */
+		goto replay;
 	return err;
 }
 
@@ -468,7 +489,7 @@ tcf_exts_validate(struct tcf_proto *tp, struct rtattr **tb,
 	int err;
 	struct tc_action *act;
 
-	if (map->police && tb[map->police-1] && rate_tlv) {
+	if (map->police && tb[map->police-1]) {
 		act = tcf_action_init_1(tb[map->police-1], rate_tlv, "police",
 			TCA_ACT_NOREPLACE, TCA_ACT_BIND, &err);
 		if (act == NULL)
@@ -476,7 +497,7 @@ tcf_exts_validate(struct tcf_proto *tp, struct rtattr **tb,
 
 		act->type = TCA_OLD_COMPAT;
 		exts->action = act;
-	} else if (map->action && tb[map->action-1] && rate_tlv) {
+	} else if (map->action && tb[map->action-1]) {
 		act = tcf_action_init(tb[map->action-1], rate_tlv, NULL,
 			TCA_ACT_NOREPLACE, TCA_ACT_BIND, &err);
 		if (act == NULL)
@@ -485,7 +506,7 @@ tcf_exts_validate(struct tcf_proto *tp, struct rtattr **tb,
 		exts->action = act;
 	}
 #elif defined CONFIG_NET_CLS_POLICE
-	if (map->police && tb[map->police-1] && rate_tlv) {
+	if (map->police && tb[map->police-1]) {
 		struct tcf_police *p;
 		
 		p = tcf_police_locate(tb[map->police-1], rate_tlv);
