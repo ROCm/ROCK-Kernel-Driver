@@ -78,23 +78,23 @@ static struct display disp;
 static struct fb_info fb_info;
 
 static struct fb_fix_screeninfo fb_fix __initdata = {
-	id:		"G364 8plane",
-	smem_start:	0x40000000,	/* physical address */
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_PSEUDOCOLOR,
-	ypanstep:	1,
-	accel:		FB_ACCEL_NONE,
+	.id =		"G364 8plane",
+	.smem_start =	0x40000000,	/* physical address */
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_PSEUDOCOLOR,
+	.ypanstep =	1,
+	.accel =	FB_ACCEL_NONE,
 };
 
 static struct fb_var_screeninfo fb_var __initdata = {
-	bits_per_pixel:	8,
-	red:		{ 0, 8, 0 },
+	.bits_per_pixel =8,
+	.red =		{ 0, 8, 0 },
       	green:		{ 0, 8, 0 },
       	blue:		{ 0, 8, 0 },
-      	activate:	FB_ACTIVATE_NOW,
+      	activate:FB_ACTIVATE_NOW,
       	height:		-1,
       	width:		-1,
-      	pixclock:	39722,
+      	pixclock:39722,
       	left_margin:	40,
       	right_margin:	24,
       	upper_margin:	32,
@@ -117,18 +117,16 @@ static int g364fb_setcolreg(u_int regno, u_int red, u_int green,
 static int g364fb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops g364fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	g364fb_setcolreg,
-	fb_pan_display:	g364fb_pan_display,
-	fb_blank:	g364fb_blank,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= g364fb_setcolreg,
+	.fb_pan_display	= g364fb_pan_display,
+	.fb_blank	= g364fb_blank,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 void fbcon_g364fb_cursor(struct display *p, int mode, int x, int y)

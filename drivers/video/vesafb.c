@@ -33,20 +33,20 @@
 /* --------------------------------------------------------------------- */
 
 static struct fb_var_screeninfo vesafb_defined __initdata = {
-	activate:	FB_ACTIVATE_NOW,
-	height:		-1,
-	width:		-1,
-	right_margin:	32,
-	upper_margin:	16,
-	lower_margin:	4,
-	vsync_len:	4,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= -1,
+	.width		= -1,
+	.right_margin	= 32,
+	.upper_margin	= 16,
+	.lower_margin	= 4,
+	.vsync_len	= 4,
+	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo vesafb_fix __initdata = {
-	id:	"VESA VGA",
-	type:	FB_TYPE_PACKED_PIXELS,
-	accel:	FB_ACCEL_NONE,
+	.id	= "VESA VGA",
+	.type	= FB_TYPE_PACKED_PIXELS,
+	.accel	= FB_ACCEL_NONE,
 };
 
 static struct display disp;
@@ -174,17 +174,15 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 static struct fb_ops vesafb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	vesafb_setcolreg,
-	fb_pan_display:	vesafb_pan_display,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= vesafb_setcolreg,
+	.fb_pan_display	= vesafb_pan_display,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 int __init vesafb_setup(char *options)

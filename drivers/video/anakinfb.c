@@ -27,28 +27,28 @@ static struct fb_info fb_info;
 static struct display display;
 
 static struct fb_var_screeninfo anakinfb_var = {
-	xres:		400,
-	yres:		234,
-	xres_virtual:	400,
-	yres_virtual:	234,
-	bits_per_pixel:	16,
-	red:		{ 11, 5, 0 },
-	green:		{  5, 6, 0 }, 
-	blue:		{  0, 5, 0 },
-        activate:       FB_ACTIVATE_NOW,
-        height:         -1,
-        width:          -1,
-        vmode:          FB_VMODE_NONINTERLACED,
+	.xres =		400,
+	.yres =		234,
+	.xres_virtual =	400,
+	.yres_virtual =	234,
+	.bits_per_pixel =16,
+	.red =		{ 11, 5, 0 },
+	.green =	{  5, 6, 0 }, 
+	.blue =		{  0, 5, 0 },
+	.activate	FB_ACTIVATE_NOW,
+	.height		-1,
+	.width		-1,
+	.vmode		FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo anakinfb_fix = {
-	id:		"AnakinFB",
-	smem_start:	VGA_START,
-	smem_len:	VGA_SIZE,
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_TRUECOLOR,
-	line_length:	400*2,
-	accel:		FB_ACCEL_NONE,
+	.id =		"AnakinFB",
+	.smem_start =	VGA_START,
+	.smem_len =	VGA_SIZE,
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_TRUECOLOR,
+	.line_length =	400*2,
+	.accel =	FB_ACCEL_NONE,
 };
 
 static int
@@ -64,16 +64,14 @@ anakinfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 }
 
 static struct fb_ops anakinfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	anakinfb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= anakinfb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 int __init

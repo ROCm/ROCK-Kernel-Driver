@@ -126,9 +126,9 @@ static void matroxfb_g450_remove(struct matrox_fb_info* minfo, void* g450) {
 }
 
 static struct matroxfb_driver g450 = {
-		name:	"Matrox G450 output #2",
-		probe:	matroxfb_g450_probe,
-		remove:	matroxfb_g450_remove };
+		.name =		"Matrox G450 output #2",
+		.probe =	matroxfb_g450_probe,
+		.remove =	matroxfb_g450_remove };
 
 static int matroxfb_g450_init(void) {
 	matroxfb_register_driver(&g450);

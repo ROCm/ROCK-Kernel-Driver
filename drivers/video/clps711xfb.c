@@ -193,19 +193,17 @@ static int clps7111fb_blank(int blank, struct fb_info *info)
 }
 
 static struct fb_ops clps7111fb_ops = {
-	owner:		THIS_MODULE,
-	fb_check_var:	clps7111fb_check_var,
-	fb_set_par:	clps7111fb_set_par,
-	fb_set_var:	gen_set_var,
-	fb_set_cmap:	gen_set_cmap,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_setcolreg:	clps7111fb_setcolreg,
-	fb_blank:	clps7111fb_blank,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_check_var	= clps7111fb_check_var,
+	.fb_set_par	= clps7111fb_set_par,
+	.fb_set_var	= gen_set_var,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_setcolreg	= clps7111fb_setcolreg,
+	.fb_blank	= clps7111fb_blank,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 static int 

@@ -401,15 +401,15 @@ static int igafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
  * Framebuffer option structure
  */
 static struct fb_ops igafb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	igafb_get_fix,
-	fb_get_var:	igafb_get_var,
-	fb_set_var:	igafb_set_var,
-	fb_get_cmap:	igafb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	igafb_setcolreg,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	igafb_get_fix,
+	.fb_get_var =	igafb_get_var,
+	.fb_set_var =	igafb_set_var,
+	.fb_get_cmap =	igafb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	igafb_setcolreg,
 #ifdef __sparc__
-	fb_mmap:	igafb_mmap,
+	.fb_mmap =	igafb_mmap,
 #endif
 };
 

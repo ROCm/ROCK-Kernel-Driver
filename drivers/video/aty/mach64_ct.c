@@ -271,11 +271,11 @@ static int dummy(void)
 }
 
 const struct aty_dac_ops aty_dac_ct = {
-	set_dac:(void *) dummy,
+	.set_dac	= (void *) dummy,
 };
 
 const struct aty_pll_ops aty_pll_ct = {
-	var_to_pll:aty_var_to_pll_ct,
-	pll_to_var:aty_pll_ct_to_var,
-	set_pll:aty_set_pll_ct,
+	.var_to_pll	= aty_var_to_pll_ct,
+	.pll_to_var	= aty_pll_ct_to_var,
+	.set_pll	= aty_set_pll_ct,
 };

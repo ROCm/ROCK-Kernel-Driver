@@ -393,19 +393,16 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = GET_FB_IDX(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
-	struct fb_ops *fb = info->fbops;
-	struct fb_fix_screeninfo fix;
 
-	if (! fb || ! info->disp)
+	if (!info || ! info->screen_base)
 		return -ENODEV;
 
-	fb->fb_get_fix(&fix,PROC_CONSOLE(info), info);
-	if (p >= fix.smem_len)
+	if (p >= info->fix.smem_len)
 	    return 0;
-	if (count >= fix.smem_len)
-	    count = fix.smem_len;
-	if (count + p > fix.smem_len)
-		count = fix.smem_len - p;
+	if (count >= info->fix.smem_len)
+	    count = info->fix.smem_len;
+	if (count + p > info->fix.smem_len)
+		count = info->fix.smem_len - p;
 	if (count) {
 	    char *base_addr;
 
@@ -425,21 +422,18 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = GET_FB_IDX(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
-	struct fb_ops *fb = info->fbops;
-	struct fb_fix_screeninfo fix;
 	int err;
 
-	if (! fb || ! info->disp)
+	if (!info || !info->screen_base)
 		return -ENODEV;
 
-	fb->fb_get_fix(&fix, PROC_CONSOLE(info), info);
-	if (p > fix.smem_len)
+	if (p > info->fix.smem_len)
 	    return -ENOSPC;
-	if (count >= fix.smem_len)
-	    count = fix.smem_len;
+	if (count >= info->fix.smem_len)
+	    count = info->fix.smem_len;
 	err = 0;
-	if (count + p > fix.smem_len) {
-	    count = fix.smem_len - p;
+	if (count + p > info->fix.smem_len) {
+	    count = info->fix.smem_len - p;
 	    err = -ENOSPC;
 	}
 	if (count) {
@@ -482,9 +476,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return -ENODEV;
 	switch (cmd) {
 	case FBIOGET_VSCREENINFO:
-		if ((i = fb->fb_get_var(&var, PROC_CONSOLE(info), info)))
-			return i;
-		return copy_to_user((void *) arg, &var,
+		return copy_to_user((void *) arg, &info->var,
 				    sizeof(var)) ? -EFAULT : 0;
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
@@ -498,10 +490,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		return 0;
 	case FBIOGET_FSCREENINFO:
-		if ((i = fb->fb_get_fix(&fix, PROC_CONSOLE(info), info)))
-			return i;
-		return copy_to_user((void *) arg, &fix, sizeof(fix)) ?
-			-EFAULT : 0;
+		return copy_to_user((void *) arg, &info->fix, sizeof(fix)) ? -EFAULT : 0;
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
@@ -568,8 +557,6 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	struct fb_ops *fb = info->fbops;
 	unsigned long off;
 #if !defined(__sparc__) || defined(__sparc_v9__)
-	struct fb_fix_screeninfo fix;
-	struct fb_var_screeninfo var;
 	unsigned long start;
 	u32 len;
 #endif
@@ -593,23 +580,20 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	return -EINVAL;
 #else
 	/* !sparc32... */
-
 	lock_kernel();
-	fb->fb_get_fix(&fix, PROC_CONSOLE(info), info);
 
 	/* frame buffer memory */
-	start = fix.smem_start;
-	len = PAGE_ALIGN((start & ~PAGE_MASK)+fix.smem_len);
+	start = info->fix.smem_start;
+	len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.smem_len);
 	if (off >= len) {
 		/* memory mapped io */
 		off -= len;
-		fb->fb_get_var(&var, PROC_CONSOLE(info), info);
-		if (var.accel_flags) {
+		if (info->var.accel_flags) {
 			unlock_kernel();
 			return -EINVAL;
 		}
-		start = fix.mmio_start;
-		len = PAGE_ALIGN((start & ~PAGE_MASK)+fix.mmio_len);
+		start = info->fix.mmio_start;
+		len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.mmio_len);
 	}
 	unlock_kernel();
 	start &= PAGE_MASK;
@@ -722,15 +706,15 @@ fb_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations fb_fops = {
-	owner:		THIS_MODULE,
-	read:		fb_read,
-	write:		fb_write,
-	ioctl:		fb_ioctl,
-	mmap:		fb_mmap,
-	open:		fb_open,
-	release:	fb_release,
+	.owner =	THIS_MODULE,
+	.read =		fb_read,
+	.write =	fb_write,
+	.ioctl =	fb_ioctl,
+	.mmap =		fb_mmap,
+	.open =		fb_open,
+	.release =	fb_release,
 #ifdef HAVE_ARCH_FB_UNMAPPED_AREA
-	get_unmapped_area: get_fb_unmapped_area,
+	.get_unmapped_area = get_fb_unmapped_area,
 #endif
 };
 

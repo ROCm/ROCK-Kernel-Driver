@@ -212,17 +212,17 @@ EXPORT_SYMBOL(sa1100fb_blank_helper);
  * IMHO this looks wrong.  In 8BPP, length should be 8.
  */
 static struct sa1100fb_rgb rgb_8 = {
-	red:	{ offset: 0,  length: 4, },
-	green:	{ offset: 0,  length: 4, },
-	blue:	{ offset: 0,  length: 4, },
-	transp:	{ offset: 0,  length: 0, },
+	.red =	{ offset: 0,  length: 4, },
+	.green ={ offset: 0,  length: 4, },
+	.blue =	{ offset: 0,  length: 4, },
+	.transp ={ offset: 0,  length: 0, },
 };
 
 static struct sa1100fb_rgb def_rgb_16 = {
-	red:	{ offset: 11, length: 5, },
-	green:	{ offset: 5,  length: 6, },
-	blue:	{ offset: 0,  length: 5, },
-	transp:	{ offset: 0,  length: 0, },
+	.red =	{ offset: 11, length: 5, },
+	.green ={ offset: 5,  length: 6, },
+	.blue =	{ offset: 0,  length: 5, },
+	.transp ={ offset: 0,  length: 0, },
 };
 
 #ifdef CONFIG_SA1100_ASSABET
@@ -233,101 +233,101 @@ static struct sa1100fb_rgb def_rgb_16 = {
  * instead (def_rgb_16).
  */
 static struct sa1100fb_mach_info lq039q2ds54_info __initdata = {
-	pixclock:	171521,		bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock =	171521,		bpp:		16,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	5,		vsync_len:	1,
-	left_margin:	61,		upper_margin:	3,
-	right_margin:	9,		lower_margin:	0,
+	.hsync_len =	5,		vsync_len:	1,
+	.left_margin =	61,		upper_margin:	3,
+	.right_margin =	9,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #else
 static struct sa1100fb_mach_info pal_info __initdata = {
-	pixclock:	67797,		bpp:		16,
-	xres:		640,		yres:		512,
+	.pixclock =	67797,		bpp:		16,
+	.xres =		640,		yres:		512,
 
-	hsync_len:	64,		vsync_len:	6,
-	left_margin:	125,		upper_margin:	70,
-	right_margin:	115,		lower_margin:	36,
+	.hsync_len =	64,		vsync_len:	6,
+	.left_margin =	125,		upper_margin:	70,
+	.right_margin =	115,		lower_margin:	36,
 
-	sync:		0,
+	.sync =		0,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512),
 };
 #endif
 #endif
 
 #ifdef CONFIG_SA1100_H3XXX
 static struct sa1100fb_mach_info h3800_info __initdata = {
-	pixclock:	174757, 	bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock =	174757, 	bpp:		16,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	12,		upper_margin:	10,
-	right_margin:	17,		lower_margin:	1,
+	.hsync_len =	3,		vsync_len:	3,
+	.left_margin =	12,		upper_margin:	10,
+	.right_margin =	17,		lower_margin:	1,
 
-	sync:		0,		cmap_static:	1,
+	.sync =		0,		cmap_static:	1,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_ACBsCntOff | LCCR3_PixFlEdg | LCCR3_OutEnH,
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_ACBsCntOff | LCCR3_PixFlEdg | LCCR3_OutEnH,
 };
 
 static struct sa1100fb_mach_info h3600_info __initdata = {
-	pixclock:	174757, 	bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock =	174757, 	bpp:		16,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	12,		upper_margin:	10,
-	right_margin:	17,		lower_margin:	1,
+	.hsync_len =	3,		vsync_len:	3,
+	.left_margin =	12,		upper_margin:	10,
+	.right_margin =	17,		lower_margin:	1,
 
-	sync:		0,		cmap_static:	1,
+	.sync =		0,		cmap_static:	1,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_ACBsCntOff | LCCR3_OutEnH | LCCR3_PixFlEdg,
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_ACBsCntOff | LCCR3_OutEnH | LCCR3_PixFlEdg,
 };
 
 static struct sa1100fb_rgb h3600_rgb_16 = {
-	red:	{ offset: 12, length: 4, },
-	green:	{ offset: 7,  length: 4, },
-	blue:	{ offset: 1,  length: 4, },
-	transp: { offset: 0,  length: 0, },
+	.red =	{ offset: 12, length: 4, },
+	.green ={ offset: 7,  length: 4, },
+	.blue =	{ offset: 1,  length: 4, },
+	.transp = { offset: 0,  length: 0, },
 };
 
 static struct sa1100fb_mach_info h3100_info __initdata = {
-	pixclock:	406977, 	bpp:		4,
-	xres:		320,		yres:		240,
+	.pixclock =	406977, 	bpp:		4,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	26,		vsync_len:	41,
-	left_margin:	4,		upper_margin:	0,
-	right_margin:	4,		lower_margin:	0,
+	.hsync_len =	26,		vsync_len:	41,
+	.left_margin =	4,		upper_margin:	0,
+	.right_margin =	4,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	cmap_greyscale: 1,
-	cmap_inverse:	1,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale = 1,
+	.cmap_inverse =	1,
 
-	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+	.lccr0 =	LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #endif
 
 #ifdef CONFIG_SA1100_BRUTUS
 static struct sa1100fb_mach_info brutus_info __initdata = {
-	pixclock:	0,		bpp:		8,
-	xres:		320,		yres:		240,
+	.pixclock =	0,		bpp:		8,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	3,		vsync_len:	1,
-	left_margin:	41,		upper_margin:	0,
-	right_margin:	101,		lower_margin:	0,
+	.hsync_len =	3,		vsync_len:	1,
+	.left_margin =	41,		upper_margin:	0,
+	.right_margin =	101,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
 			LCCR3_PixClkDiv(44),
 };
 #endif
@@ -335,47 +335,47 @@ static struct sa1100fb_mach_info brutus_info __initdata = {
 #ifdef CONFIG_SA1100_CERF
 static struct sa1100fb_mach_info cerf_info __initdata = {
 #if defined(CONFIG_CERF_LCD_72_A)
-	pixclock:       171521,         bpp:            8,
-	xres:		640,		yres:		480,
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+	.pixclock =     171521,         bpp:            8,
+	.xres =		640,		yres:		480,
+	.lccr0 =	LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
 			LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_57_A)
-	pixclock:       171521,         bpp:            8,
-	xres:		320,		yres:		240,
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+	.pixclock =     171521,         bpp:            8,
+	.xres =		320,		yres:		240,
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
 			LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_38_A)
-	pixclock:       171521,         bpp:            8,
-	xres:		240,		yres:		320,
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
+	.pixclock =     171521,         bpp:            8,
+	.xres =		240,		yres:		320,
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
 			LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_38_B)
-	pixclock:	171521, 	bpp:		4,
-	xres:		320,		yres:		240,
-	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
+	.pixclock =	171521, 	bpp:		4,
+	.xres =		320,		yres:		240,
+	.lccr0 =	LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
 			LCCR3_PixClkDiv(38),
 #else
 #error "Must have a CerfBoard LCD form factor selected"
 #endif
 
-	hsync_len:	5,		vsync_len:	1,
-	left_margin:	61,		upper_margin:	3,
-	right_margin:	9,		lower_margin:	0,
+	.hsync_len =	5,		vsync_len:	1,
+	.left_margin =	61,		upper_margin:	3,
+	.right_margin =	9,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
 };
 
 #if 0
 static struct sa1100fb_rgb cerf_rgb_16 = {
-	red:	{ offset: 8,	length: 4, },
-	green:	{ offset: 4,	length: 4, },
-	blue:	{ offset: 0,	length: 4, },
-	transp:	{ offset: 0,	length: 0, },
+	.red =	{ offset: 8,	length: 4, },
+	.green ={ offset: 4,	length: 4, },
+	.blue =	{ offset: 0,	length: 4, },
+	.transp ={ offset: 0,	length: 0, },
 };
 #endif
 #endif
@@ -383,56 +383,56 @@ static struct sa1100fb_rgb cerf_rgb_16 = {
 #ifdef CONFIG_SA1100_FREEBIRD
 #warning Please check this carefully
 static struct sa1100fb_mach_info freebird_info __initdata = {
-	pixclock:	171521,		bpp:		16,
-	xres:		240,		yres:		320,
+	.pixclock =	171521,		bpp:		16,
+	.xres =		240,		yres:		320,
 
-	hsync_len:	3,		vsync_len:	2,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len =	3,		vsync_len:	2,
+	.left_margin =	2,		upper_margin:	0,
+	.right_margin =	2,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(2),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(2),
 };
 
 static struct sa1100fb_rgb freebird_rgb_16 = {
-	red:	{ offset: 8,  length: 4, },
-	green:	{ offset: 4,  length: 4, },
-	blue:	{ offset: 0,  length: 4, },
-	transp:	{ offset: 12, length: 4, },
+	.red =	{ offset: 8,  length: 4, },
+	.green ={ offset: 4,  length: 4, },
+	.blue =	{ offset: 0,  length: 4, },
+	.transp ={ offset: 12, length: 4, },
 };
 #endif
 
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 static struct sa1100fb_mach_info graphicsclient_info __initdata = {
-	pixclock:	53500,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock =	53500,		bpp:		8,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	9,		vsync_len:	9,
-	left_margin:	54,		upper_margin:	24,
-	right_margin:	54,		lower_margin:	32,
+	.hsync_len =	9,		vsync_len:	9,
+	.left_margin =	54,		upper_margin:	24,
+	.right_margin =	54,		lower_margin:	32,
 
-	sync:		0,
+	.sync =		0,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #endif
 
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 static struct sa1100fb_mach_info huw_webpanel_info __initdata = {
-	pixclock:	0,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock =	0,		bpp:		8,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	3,		vsync_len:	1,
-	left_margin:	41,		upper_margin:	0,
-	right_margin:	101,		lower_margin:	0,
+	.hsync_len =	3,		vsync_len:	1,
+	.left_margin =	41,		upper_margin:	0,
+	.right_margin =	101,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) | 8,
+	.lccr0 =	LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) | 8,
 #error FIXME
 	/*
 	 * FIXME: please get rid of the '| 8' in preference to an
@@ -443,98 +443,98 @@ static struct sa1100fb_mach_info huw_webpanel_info __initdata = {
 
 #ifdef LART_GREY_LCD
 static struct sa1100fb_mach_info lart_grey_info __initdata = {
-	pixclock:	150000,		bpp:		4,
-	xres:		320,		yres:		240,
+	.pixclock =	150000,		bpp:		4,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	1,		vsync_len:	1,
-	left_margin:	4,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len =	1,		vsync_len:	1,
+	.left_margin =	4,		upper_margin:	0,
+	.right_margin =	2,		lower_margin:	0,
 
-	cmap_greyscale:	1,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale =1,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_4PixMono,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
+	.lccr0 =	LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_4PixMono,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 #ifdef LART_COLOR_LCD
 static struct sa1100fb_mach_info lart_color_info __initdata = {
-	pixclock:	150000,		bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock =	150000,		bpp:		16,
+	.xres =		320,		yres:		240,
 
-	hsync_len:	2,		vsync_len:	3,
-	left_margin:	69,		upper_margin:	14,
-	right_margin:	8,		lower_margin:	4,
+	.hsync_len =	2,		vsync_len:	3,
+	.left_margin =	69,		upper_margin:	14,
+	.right_margin =	8,		lower_margin:	4,
 
-	sync:		0,
+	.sync =		0,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 #ifdef LART_VIDEO_OUT
 static struct sa1100fb_mach_info lart_video_info __initdata = {
-	pixclock:	39721,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock =	39721,		bpp:		16,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	95,		vsync_len:	2,
-	left_margin:	40,		upper_margin:	32,
-	right_margin:	24,		lower_margin:	11,
+	.hsync_len =	95,		vsync_len:	2,
+	.left_margin =	40,		upper_margin:	32,
+	.right_margin =	24,		lower_margin:	11,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnL | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnL | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 
 #ifdef LART_KIT01_LCD
 static struct sa1100fb_mach_info lart_kit01_info __initdata =
 {
-	pixclock:	63291,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock =	63291,		bpp:		16,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	64,		vsync_len:	3,
-	left_margin:	122,		upper_margin:	45,
-	right_margin:	10,		lower_margin:	10,
+	.hsync_len =	64,		vsync_len:	3,
+	.left_margin =	122,		upper_margin:	45,
+	.right_margin =	10,		lower_margin:	10,
 
-	sync:		0,
+	.sync =		0,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixFlEdg
 };
 #endif
 
 #ifdef CONFIG_SA1100_SHANNON
 static struct sa1100fb_mach_info shannon_info __initdata = {
-	pixclock:	152500,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock =	152500,		bpp:		8,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	4,		vsync_len:	3,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	1,		lower_margin:	0,
+	.hsync_len =	4,		vsync_len:	3,
+	.left_margin =	2,		upper_margin:	0,
+	.right_margin =	1,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, 
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, 
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_ACBsDiv(512),
+	.lccr0 =	LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3 =	LCCR3_ACBsDiv(512),
 };
 #endif
 
 #ifdef CONFIG_SA1100_OMNIMETER
 static struct sa1100fb_mach_info omnimeter_info __initdata = {
-	pixclock:	0,		bpp:		4,
-	xres:		480,		yres:		320,
+	.pixclock =	0,		bpp:		4,
+	.xres =		480,		yres:		320,
 
-	hsync_len:	1,		vsync_len:	1,
-	left_margin:	10,		upper_margin:	0,
-	right_margin:	10,		lower_margin:	0,
+	.hsync_len =	1,		vsync_len:	1,
+	.left_margin =	10,		upper_margin:	0,
+	.right_margin =	10,		lower_margin:	0,
 
-	cmap_greyscale:	1,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale =1,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_8PixMono,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(255) |
+	.lccr0 =	LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_8PixMono,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(255) |
 			LCCR3_PixClkDiv(44),
 #error FIXME: fix pixclock, ACBsDiv
 	/*
@@ -546,17 +546,17 @@ static struct sa1100fb_mach_info omnimeter_info __initdata = {
 
 #ifdef CONFIG_SA1100_PANGOLIN
 static struct sa1100fb_mach_info pangolin_info __initdata = {
-	pixclock:	341521,		bpp:		16,
-	xres:		800,		yres:		600,
+	.pixclock =	341521,		bpp:		16,
+	.xres =		800,		yres:		600,
 
-	hsync_len:	64,		vsync_len:	7,
-	left_margin:	160,		upper_margin:	7,
-	right_margin:	24,		lower_margin:	1,
+	.hsync_len =	64,		vsync_len:	7,
+	.left_margin =	160,		upper_margin:	7,
+	.right_margin =	24,		lower_margin:	1,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsCntOff,
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsCntOff,
 };
 #endif
 
@@ -568,49 +568,49 @@ static struct sa1100fb_mach_info pangolin_info __initdata = {
  * NB likely to be increased to ease bus timings wrt pcmcia interface
  */
 static struct sa1100fb_mach_info stork_tft_info __initdata = {
-	pixclock:	28935,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock =	28935,		bpp:		16,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	64,		vsync_len:	2,
-	left_margin:	48,		upper_margin:	12,
-	right_margin:	48,		lower_margin:	31,
+	.hsync_len =	64,		vsync_len:	2,
+	.left_margin =	48,		upper_margin:	12,
+	.right_margin =	48,		lower_margin:	31,
 
-	sync:		0,
+	.sync =		0,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg,
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg,
 };
 
 static struct sa1100fb_rgb stork_tft_rgb_16 = {
-	red:	{ offset: 11, length: 5, },
-	green:	{ offset: 5,  length: 6, },
-	blue:	{ offset: 0,  length: 5, },
-	transp:	{ offset: 0,  length: 0, },
+	.red =	{ offset: 11, length: 5, },
+	.green ={ offset: 5,  length: 6, },
+	.blue =	{ offset: 0,  length: 5, },
+	.transp ={ offset: 0,  length: 0, },
 };
 
 #else	/* Kyocera DSTN */
 
 static struct sa1100fb_mach_info stork_dstn_info __initdata = {
-	pixclock:	0,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock =	0,		bpp:		16,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	2,		vsync_len:	2,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len =	2,		vsync_len:	2,
+	.left_margin =	2,		upper_margin:	0,
+	.right_margin =	2,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT ,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT ,
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr0 =	LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
 #error Fixme
-	lccr3:		0xff00 |
+	.lccr3 =	0xff00 |
 			0x18		/* ought to be 0x14 but DMA isn't up to that as yet */
 };
 
 static struct sa1100fb_rgb stork_dstn_rgb_16 = {
-	red:	{ offset: 8,  length: 4, },
-	green:	{ offset: 4,  length: 4, },
-	blue:	{ offset: 0,  length: 4, },
-	transp:	{ offset: 0,  length: 0, },
+	.red =	{ offset: 8,  length: 4, },
+	.green ={ offset: 4,  length: 4, },
+	.blue =	{ offset: 0,  length: 4, },
+	.transp ={ offset: 0,  length: 0, },
 };
 #endif
 #endif
@@ -627,34 +627,34 @@ static struct sa1100fb_rgb stork_dstn_rgb_16 = {
  *	=>4.32Mhz => 231481E-12s
  */
 static struct sa1100fb_mach_info system3_info __initdata = {
-	pixclock:	231481,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock =	231481,		bpp:		8,
+	.xres =		640,		yres:		480,
 
-	hsync_len:	2,		vsync_len:	2,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len =	2,		vsync_len:	2,
+	.left_margin =	2,		upper_margin:	0,
+	.right_margin =	2,		lower_margin:	0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync =		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512) |
+	.lccr0 =	LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512) |
 			LCCR3_ACBsCntOff,
 };
 #endif
 
 #ifdef CONFIG_SA1100_XP860
 static struct sa1100fb_mach_info xp860_info __initdata = {
-	pixclock:	0,		bpp:		8,
-	xres:		1024,		yres:		768,
+	.pixclock =	0,		bpp:		8,
+	.xres =		1024,		yres:		768,
 
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	3,		upper_margin:	2,
-	right_margin:	2,		lower_margin:	1,
+	.hsync_len =	3,		vsync_len:	3,
+	.left_margin =	3,		upper_margin:	2,
+	.right_margin =	2,		lower_margin:	1,
 
-	sync:		0,
+	.sync =		0,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_PixClkDiv(6),
+	.lccr0 =	LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3 =	LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_PixClkDiv(6),
 };
 #endif
 
@@ -1326,14 +1326,14 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 }
 
 static struct fb_ops sa1100fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	sa1100fb_get_fix,
-	fb_get_var:	sa1100fb_get_var,
-	fb_set_var:	sa1100fb_set_var,
-	fb_get_cmap:	sa1100fb_get_cmap,
-	fb_set_cmap:	sa1100fb_set_cmap,
-	fb_setcolreg:	sa1100fb_setcolreg,
-	fb_blank:	sa1100fb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	sa1100fb_get_fix,
+	.fb_get_var =	sa1100fb_get_var,
+	.fb_set_var =	sa1100fb_set_var,
+	.fb_get_cmap =	sa1100fb_get_cmap,
+	.fb_set_cmap =	sa1100fb_set_cmap,
+	.fb_setcolreg =	sa1100fb_setcolreg,
+	.fb_blank =	sa1100fb_blank,
 };
 
 /*
