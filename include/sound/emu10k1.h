@@ -837,7 +837,7 @@ typedef struct {
 typedef struct snd_emu10k1_memblk {
 	snd_util_memblk_t mem;
 	/* private part */
-	short first_page, last_page, pages, mapped_page;
+	int first_page, last_page, pages, mapped_page;
 	unsigned int map_locked;
 	struct list_head mapped_link;
 	struct list_head mapped_order_link;
