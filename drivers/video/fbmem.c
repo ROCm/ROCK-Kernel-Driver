@@ -715,9 +715,9 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 			struct fb_videomode mode;
-			info->var = *var;
 			int err = 0;
 
+			info->var = *var;
 			if (info->fbops->fb_set_par)
 				info->fbops->fb_set_par(info);
 
