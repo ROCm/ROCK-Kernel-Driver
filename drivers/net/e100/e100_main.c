@@ -3528,6 +3528,7 @@ e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
 	u32 regs_buff[E100_REGS_LEN];
 	struct ethtool_regs regs = {ETHTOOL_GREGS};
 	void *addr = ifr->ifr_data;
+	u16 mdi_reg;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -3540,6 +3541,8 @@ e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
 	regs_buff[0] = readb(&(bdp->scb->scb_cmd_hi)) << 24 |
 		readb(&(bdp->scb->scb_cmd_low)) << 16 |
 		readw(&(bdp->scb->scb_status));
+	e100_mdi_read(bdp, MII_NCONFIG, bdp->phy_addr, &mdi_reg);
+	regs_buff[1] = mdi_reg;
 
 	if(copy_to_user(addr, &regs, sizeof(regs)))
 		return -EFAULT;
