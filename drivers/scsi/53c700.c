@@ -294,7 +294,8 @@ NCR_700_get_SXFER(struct scsi_device *SDp)
 
 struct Scsi_Host *
 NCR_700_detect(struct scsi_host_template *tpnt,
-	       struct NCR_700_Host_Parameters *hostdata)
+	       struct NCR_700_Host_Parameters *hostdata, struct device *dev,
+	       unsigned long irq, u8 scsi_id)
 {
 	dma_addr_t pScript, pSlots;
 	__u8 *memory;
@@ -321,6 +322,7 @@ NCR_700_detect(struct scsi_host_template *tpnt,
 	 * if this isn't sufficient separation to avoid dma flushing issues */
 	BUG_ON(!dma_is_consistent(pScript) && L1_CACHE_BYTES < dma_get_cache_alignment());
 	hostdata->slots = (struct NCR_700_command_slot *)(memory + SLOTS_OFFSET);
+	hostdata->dev = dev;
 		
 	pSlots = pScript + SLOTS_OFFSET;
 
@@ -387,6 +389,8 @@ NCR_700_detect(struct scsi_host_template *tpnt,
 	host->unique_id = hostdata->base;
 	host->base = hostdata->base;
 	hostdata->eh_complete = NULL;
+	host->irq = irq;
+	host->this_id = scsi_id;
 	host->hostdata[0] = (unsigned long)hostdata;
 	/* kick the chip */
 	NCR_700_writeb(0xff, host, CTEST9_REG);
@@ -404,12 +408,31 @@ NCR_700_detect(struct scsi_host_template *tpnt,
 	       (hostdata->fast ? "53c700-66" : "53c700"),
 	       hostdata->rev, hostdata->differential ?
 	       "(Differential)" : "");
-	spi_signalling(host) = hostdata->differential ? SPI_SIGNAL_HVD :
-		SPI_SIGNAL_SE;
 	/* reset the chip */
 	NCR_700_chip_reset(host);
 
+	if (request_irq(irq, NCR_700_intr, SA_SHIRQ, dev->bus_id, host)) {
+		dev_printk(KERN_ERR, dev, "53c700: irq %lu request failed\n ",
+			   irq);
+		goto out_put_host;
+	}
+
+	if (scsi_add_host(host, dev)) {
+		dev_printk(KERN_ERR, dev, "53c700: scsi_add_host failed\n");
+		goto out_release_irq;
+	}
+
+	spi_signalling(host) = hostdata->differential ? SPI_SIGNAL_HVD :
+		SPI_SIGNAL_SE;
+
 	return host;
+
+ out_release_irq:
+	free_irq(irq, host);
+ out_put_host:
+	scsi_host_put(host);
+
+	return NULL;
 }
 
 int
