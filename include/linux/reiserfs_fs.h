@@ -381,7 +381,7 @@ static inline void set_offset_v2_k_type( struct offset_v2 *v2, int type )
     offset_v2_esafe_overlay *tmp = (offset_v2_esafe_overlay *)v2;
     tmp->linear = le64_to_cpu(tmp->linear);
     tmp->offset_v2.k_type = type;
-    tmp->linear = le64_to_cpu(tmp->linear);
+    tmp->linear = cpu_to_le64(tmp->linear);
 }
  
 static inline loff_t offset_v2_k_offset( const struct offset_v2 *v2 )
@@ -395,7 +395,7 @@ static inline void set_offset_v2_k_offset( struct offset_v2 *v2, loff_t offset )
     offset_v2_esafe_overlay *tmp = (offset_v2_esafe_overlay *)v2;
     tmp->linear = le64_to_cpu(tmp->linear);
     tmp->offset_v2.k_offset = offset;
-    tmp->linear = le64_to_cpu(tmp->linear);
+    tmp->linear = cpu_to_le64(tmp->linear);
 }
 #else
 # define offset_v2_k_type(v2)           ((v2)->k_type)
