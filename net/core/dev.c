@@ -2979,14 +2979,17 @@ void netdev_run_todo(void)
 	struct list_head list = LIST_HEAD_INIT(list);
 	int err;
 
-	/* Safe outside mutex since we only care about entries that
-	 * this cpu put into queue while under RTNL.
-	 */
-	if (list_empty(&net_todo_list))
-		return;
 
 	/* Need to guard against multiple cpu's getting out of order. */
 	down(&net_todo_run_mutex);
+
+	/* Not safe to do outside the semaphore.  We must not return
+	 * until all unregister events invoked by the local processor
+	 * have been completed (either by this todo run, or one on
+	 * another cpu).
+	 */
+	if (list_empty(&net_todo_list))
+		goto out;
 
 	/* Snapshot list, allow later requests */
 	spin_lock(&net_todo_list_lock);
@@ -3034,6 +3037,7 @@ void netdev_run_todo(void)
 		}
 	}
 
+out:
 	up(&net_todo_run_mutex);
 }
 
