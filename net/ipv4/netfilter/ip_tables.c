@@ -471,7 +471,7 @@ find_match_lock(const char *name, int *error, struct semaphore *mutex)
 	return find_inlist_lock(&ipt_match, name, "ipt_", error, mutex);
 }
 
-struct ipt_target *
+static struct ipt_target *
 ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex)
 {
 	return find_inlist_lock(&ipt_target, name, "ipt_", error, mutex);
@@ -1877,7 +1877,6 @@ EXPORT_SYMBOL(ipt_unregister_match);
 EXPORT_SYMBOL(ipt_do_table);
 EXPORT_SYMBOL(ipt_register_target);
 EXPORT_SYMBOL(ipt_unregister_target);
-EXPORT_SYMBOL(ipt_find_target_lock);
 
 module_init(init);
 module_exit(fini);

@@ -419,6 +419,7 @@ static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 		case DN_CI:
 		case DN_CD:
 			scp->state = DN_RJ;
+			sk->sk_err = ECONNREFUSED;
 			break;
 		case DN_RUN:
 			sk->sk_shutdown |= SHUTDOWN_MASK;

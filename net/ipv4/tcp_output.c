@@ -588,7 +588,7 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 	/* Any change of skb->len requires recalculation of tso
 	 * factor and mss.
 	 */
-	if (tcp_skb_mss(skb))
+	if (tcp_skb_pcount(skb) > 1)
 		tcp_set_skb_tso_segs(skb, tcp_skb_mss(skb));
 
 	return 0;
@@ -1720,12 +1720,7 @@ void tcp_send_probe0(struct sock *sk)
 	}
 }
 
-EXPORT_SYMBOL(tcp_acceptable_seq);
 EXPORT_SYMBOL(tcp_connect);
-EXPORT_SYMBOL(tcp_connect_init);
 EXPORT_SYMBOL(tcp_make_synack);
-EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_sync_mss);
-EXPORT_SYMBOL(tcp_write_wakeup);
-EXPORT_SYMBOL(tcp_write_xmit);

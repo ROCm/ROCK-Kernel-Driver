@@ -2369,25 +2369,19 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
-	__u32 mss = tcp_skb_mss(skb);
-	__u32 snd_una = tp->snd_una;
-	__u32 orig_seq, seq;
-	__u32 packets_acked = 0;
+	__u32 seq = tp->snd_una;
+	__u32 packets_acked;
 	int acked = 0;
 
 	/* If we get here, the whole TSO packet has not been
 	 * acked.
 	 */
-	BUG_ON(!after(scb->end_seq, snd_una));
+	BUG_ON(!after(scb->end_seq, seq));
 
-	seq = orig_seq = scb->seq;
-	while (!after(seq + mss, snd_una)) {
-		packets_acked++;
-		seq += mss;
-	}
-
-	if (tcp_trim_head(sk, skb, (seq - orig_seq)))
+	packets_acked = tcp_skb_pcount(skb);
+	if (tcp_trim_head(sk, skb, seq - scb->seq))
 		return 0;
+	packets_acked -= tcp_skb_pcount(skb);
 
 	if (packets_acked) {
 		__u8 sacked = scb->sacked;
@@ -4963,7 +4957,6 @@ discard:
 
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(sysctl_tcp_reordering);
-EXPORT_SYMBOL(tcp_cwnd_application_limited);
 EXPORT_SYMBOL(tcp_parse_options);
 EXPORT_SYMBOL(tcp_rcv_established);
 EXPORT_SYMBOL(tcp_rcv_state_process);

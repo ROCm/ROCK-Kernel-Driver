@@ -121,6 +121,9 @@ struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
 	const struct sctp_association *asoc,
 	__u32 indication, int gfp);
 
+struct sctp_ulpevent *sctp_ulpevent_make_adaption_indication(
+	const struct sctp_association *asoc, int gfp);
+
 struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
 	struct sctp_chunk *chunk,
 	int gfp);

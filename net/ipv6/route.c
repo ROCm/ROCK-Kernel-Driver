@@ -88,7 +88,7 @@ static void		ip6_dst_ifdown(struct dst_entry *, int how);
 static int		 ip6_dst_gc(void);
 
 static int		ip6_pkt_discard(struct sk_buff *skb);
-static int		ip6_pkt_discard_out(struct sk_buff **pskb);
+static int		ip6_pkt_discard_out(struct sk_buff *skb);
 static void		ip6_link_failure(struct sk_buff *skb);
 static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
 
@@ -638,7 +638,7 @@ static inline unsigned int ipv6_advmss(unsigned int mtu)
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,
 				  struct in6_addr *addr,
-				  int (*output)(struct sk_buff **))
+				  int (*output)(struct sk_buff *))
 {
 	struct rt6_info *rt;
 	struct inet6_dev *idev = in6_dev_get(dev);
@@ -1288,20 +1288,14 @@ struct rt6_info *rt6_add_dflt_router(struct in6_addr *gwaddr,
 	return rt6_get_dflt_router(gwaddr, dev);
 }
 
-void rt6_purge_dflt_routers(int last_resort)
+void rt6_purge_dflt_routers(void)
 {
 	struct rt6_info *rt;
-	u32 flags;
-
-	if (last_resort)
-		flags = RTF_ALLONLINK;
-	else
-		flags = RTF_DEFAULT | RTF_ADDRCONF;	
 
 restart:
 	read_lock_bh(&rt6_lock);
 	for (rt = ip6_routing_table.leaf; rt; rt = rt->u.next) {
-		if (rt->rt6i_flags & flags) {
+		if (rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF)) {
 			dst_hold(&rt->u.dst);
 
 			rt6_reset_dflt_pointer(NULL);
@@ -1362,11 +1356,10 @@ int ip6_pkt_discard(struct sk_buff *skb)
 	return 0;
 }
 
-int ip6_pkt_discard_out(struct sk_buff **pskb)
+int ip6_pkt_discard_out(struct sk_buff *skb)
 {
-	(*pskb)->dev = (*pskb)->dst->dev;
-	BUG_ON(!(*pskb)->dev);
-	return ip6_pkt_discard(*pskb);
+	skb->dev = skb->dst->dev;
+	return ip6_pkt_discard(skb);
 }
 
 /*
@@ -1592,7 +1585,7 @@ static int rt6_fill_node(struct sk_buff *skb, struct rt6_info *rt,
 	rtm->rtm_protocol = rt->rt6i_protocol;
 	if (rt->rt6i_flags&RTF_DYNAMIC)
 		rtm->rtm_protocol = RTPROT_REDIRECT;
-	else if (rt->rt6i_flags&(RTF_ADDRCONF|RTF_ALLONLINK))
+	else if (rt->rt6i_flags & RTF_ADDRCONF)
 		rtm->rtm_protocol = RTPROT_KERNEL;
 	else if (rt->rt6i_flags&RTF_DEFAULT)
 		rtm->rtm_protocol = RTPROT_RA;

@@ -70,7 +70,7 @@ extern struct rt6_info		*rt6_lookup(struct in6_addr *daddr,
 extern struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 					 struct neighbour *neigh,
 					 struct in6_addr *addr,
-					 int (*output)(struct sk_buff **));
+					 int (*output)(struct sk_buff *));
 extern int ndisc_dst_gc(int *more);
 extern void fib6_force_start_gc(void);
 
@@ -87,7 +87,7 @@ extern struct rt6_info *	rt6_get_dflt_router(struct in6_addr *addr,
 extern struct rt6_info *	rt6_add_dflt_router(struct in6_addr *gwaddr,
 						    struct net_device *dev);
 
-extern void			rt6_purge_dflt_routers(int lst_resort);
+extern void			rt6_purge_dflt_routers(void);
 
 extern void			rt6_reset_dflt_pointer(struct rt6_info *rt);
 
