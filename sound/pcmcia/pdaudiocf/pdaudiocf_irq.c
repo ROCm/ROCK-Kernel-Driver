@@ -21,7 +21,6 @@
 #include <sound/driver.h>
 #include <sound/core.h>
 #include "pdaudiocf.h"
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 /*

@@ -23,7 +23,6 @@
 #include <sound/core.h>
 #include <sound/info.h>
 #include "pdaudiocf.h"
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 /*
