@@ -1275,9 +1275,14 @@ int hid_wait_io(struct hid_device *hid)
 static int hid_get_class_descriptor(struct usb_device *dev, int ifnum,
 		unsigned char type, void *buf, int size)
 {
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
-		(type << 8), ifnum, buf, size, HZ * USB_CTRL_GET_TIMEOUT);
+	int result, retries = 4;
+	do {
+		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+				USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
+				(type << 8), ifnum, buf, size, HZ * USB_CTRL_GET_TIMEOUT);
+		retries--;
+	} while (result < 0 && retries);
+	return result;
 }
 
 int hid_open(struct hid_device *hid)
