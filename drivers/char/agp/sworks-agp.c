@@ -511,6 +511,11 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	return 0;
 }
 
+static void __exit agp_serverworks_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&serverworks_agp_driver);
+}
+
 static struct pci_device_id agp_serverworks_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -529,6 +534,7 @@ static struct __initdata pci_driver agp_serverworks_pci_driver = {
 	.name		= "agpgart-serverworks",
 	.id_table	= agp_serverworks_pci_table,
 	.probe		= agp_serverworks_probe,
+	.remove		= agp_serverworks_remove,
 };
 
 static int __init agp_serverworks_init(void)
@@ -538,7 +544,6 @@ static int __init agp_serverworks_init(void)
 
 static void __exit agp_serverworks_cleanup(void)
 {
-	agp_unregister_driver(&serverworks_agp_driver);
 	pci_unregister_driver(&agp_serverworks_pci_driver);
 }
 

@@ -448,6 +448,11 @@ found:
 	return 0;
 }
 
+static void __exit agp_amdk7_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&amd_k7_agp_driver);
+}
+
 static struct pci_device_id agp_amdk7_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -466,6 +471,7 @@ static struct __initdata pci_driver agp_amdk7_pci_driver = {
 	.name		= "agpgart-amdk7",
 	.id_table	= agp_amdk7_pci_table,
 	.probe		= agp_amdk7_probe,
+	.remove		= agp_amdk7_remove,
 };
 
 static int __init agp_amdk7_init(void)
@@ -475,7 +481,6 @@ static int __init agp_amdk7_init(void)
 
 static void __exit agp_amdk7_cleanup(void)
 {
-	agp_unregister_driver(&amd_k7_agp_driver);
 	pci_unregister_driver(&agp_amdk7_pci_driver);
 }
 

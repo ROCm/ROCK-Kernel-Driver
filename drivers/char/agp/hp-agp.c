@@ -378,6 +378,11 @@ static int __init agp_hp_probe(struct pci_dev *pdev,
 	return 0;
 }
 
+static void __exit agp_hp_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&hp_agp_driver);
+}
+
 static struct pci_device_id agp_hp_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -396,6 +401,7 @@ static struct __initdata pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",
 	.id_table	= agp_hp_pci_table,
 	.probe		= agp_hp_probe,
+	.remove		= agp_hp_remove,
 };
 
 static int __init agp_hp_init(void)
@@ -405,7 +411,6 @@ static int __init agp_hp_init(void)
 
 static void __exit agp_hp_cleanup(void)
 {
-	agp_unregister_driver(&hp_agp_driver);
 	pci_unregister_driver(&agp_hp_pci_driver);
 }
 

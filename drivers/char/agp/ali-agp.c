@@ -373,6 +373,11 @@ generic:
 	return 0;
 }
 
+static void __exit agp_ali_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&ali_agp_driver);
+}
+
 static struct pci_device_id agp_ali_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -391,6 +396,7 @@ static struct __initdata pci_driver agp_ali_pci_driver = {
 	.name		= "agpgart-ali",
 	.id_table	= agp_ali_pci_table,
 	.probe		= agp_ali_probe,
+	.remove		= agp_ali_remove,
 };
 
 static int __init agp_ali_init(void)
@@ -400,7 +406,6 @@ static int __init agp_ali_init(void)
 
 static void __exit agp_ali_cleanup(void)
 {
-	agp_unregister_driver(&ali_agp_driver);
 	pci_unregister_driver(&agp_ali_pci_driver);
 }
 

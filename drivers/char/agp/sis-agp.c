@@ -218,6 +218,11 @@ found:
 	return 0;
 }
 
+static void __exit agp_sis_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&sis_agp_driver);
+}
+
 static struct pci_device_id agp_sis_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -236,6 +241,7 @@ static struct __initdata pci_driver agp_sis_pci_driver = {
 	.name		= "agpgart-sis",
 	.id_table	= agp_sis_pci_table,
 	.probe		= agp_sis_probe,
+	.remove		= agp_sis_remove,
 };
 
 static int __init agp_sis_init(void)
@@ -245,7 +251,6 @@ static int __init agp_sis_init(void)
 
 static void __exit agp_sis_cleanup(void)
 {
-	agp_unregister_driver(&sis_agp_driver);
 	pci_unregister_driver(&agp_sis_pci_driver);
 }
 

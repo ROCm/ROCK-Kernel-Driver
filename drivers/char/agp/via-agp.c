@@ -459,6 +459,7 @@ static struct __initdata pci_driver agp_via_pci_driver = {
 	.name		= "agpgart-via",
 	.id_table	= agp_via_pci_table,
 	.probe		= agp_via_probe,
+	.remove		= agp_via_remove,
 };
 
 
@@ -467,13 +468,10 @@ static int __init agp_via_init(void)
 	return pci_module_init(&agp_via_pci_driver);
 }
 
-
 static void __exit agp_via_cleanup(void)
 {
-	agp_unregister_driver(&via_agp_driver);
 	pci_unregister_driver(&agp_via_pci_driver);
 }
-
 
 module_init(agp_via_init);
 module_exit(agp_via_cleanup);

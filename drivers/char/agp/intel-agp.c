@@ -1446,6 +1446,11 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	return 0;
 }
 
+static void __exit agp_intel_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&intel_agp_driver);
+}
+
 static struct pci_device_id agp_intel_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -1464,6 +1469,7 @@ static struct __initdata pci_driver agp_intel_pci_driver = {
 	.name		= "agpgart-intel",
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,
+	.remove		= agp_intel_remove,
 };
 
 /* intel_agp_init() must not be declared static for explicit
@@ -1481,7 +1487,6 @@ int __init agp_intel_init(void)
 
 static void __exit agp_intel_cleanup(void)
 {
-	agp_unregister_driver(&intel_agp_driver);
 	pci_unregister_driver(&agp_intel_pci_driver);
 }
 
