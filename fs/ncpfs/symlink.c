@@ -22,8 +22,6 @@
 
 #include <linux/config.h>
 
-#if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
-
 #include <asm/uaccess.h>
 
 #include <linux/errno.h>
@@ -117,11 +115,9 @@ int ncp_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
 
 	DPRINTK("ncp_symlink(dir=%p,dentry=%p,symname=%s)\n",dir,dentry,symname);
 
-#ifdef CONFIG_NCPFS_NFS_NS
 	if (ncp_is_nfs_extras(NCP_SERVER(dir), NCP_FINFO(dir)->volNumber))
 		kludge = 0;
 	else
-#endif
 #ifdef CONFIG_NCPFS_EXTRAS
 	if (NCP_SERVER(dir)->m.flags & NCP_MOUNT_SYMLINKS)
 		kludge = 1;
@@ -182,6 +178,5 @@ failfree:;
 	kfree(rawlink);
 	return err;
 }
-#endif
 
 /* ----- EOF ----- */
