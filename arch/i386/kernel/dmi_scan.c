@@ -528,6 +528,20 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 	}
 	return 0;
 } 
+
+/*
+ * early nForce2 reference BIOS shipped with a
+ * bogus ACPI IRQ0 -> pin2 interrupt override -- ignore it
+ */
+static __init int ignore_timer_override(struct dmi_blacklist *d)
+{
+	extern int acpi_skip_timer_override;
+	printk(KERN_NOTICE "%s detected: BIOS IRQ0 pin2 override"
+		" will be ignored\n", d->ident); 	
+
+	acpi_skip_timer_override = 1;
+	return 0;
+}
 #endif
 
 #ifdef	CONFIG_ACPI_PCI
@@ -545,19 +559,6 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
 }  
 #endif
 
-/*
- * early nForce2 reference BIOS shipped with a
- * bogus ACPI IRQ0 -> pin2 interrupt override -- ignore it
- */
-static __init int ignore_timer_override(struct dmi_blacklist *d)
-{
-	extern int acpi_skip_timer_override;
-	printk(KERN_NOTICE "%s detected: BIOS IRQ0 pin2 override"
-		" will be ignored\n", d->ident); 	
-
-	acpi_skip_timer_override = 1;
-	return 0;
-}
 /*
  *	Process the DMI blacklists
  */
