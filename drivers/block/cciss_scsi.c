@@ -897,6 +897,7 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 			int direction)
 {
 	unsigned long flags;
+	DECLARE_COMPLETION(wait);
 
 	cp->cmd_type = CMD_IOCTL_PEND;		// treat this like an ioctl 
 	cp->scsi_cmd = NULL;
@@ -922,6 +923,8 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 			(unsigned char *) buf, bufsize,
 			scsi_to_pci_dma_dir(SCSI_DATA_READ)); 
 
+	cp->waiting = &wait;
+
 	/* Put the request on the tail of the request queue */
 	spin_lock_irqsave(CCISS_LOCK(c->ctlr), flags);
 	addQ(&c->reqQ, cp);
@@ -929,9 +932,7 @@ cciss_scsi_do_simple_cmd(ctlr_info_t *c,
 	start_io(c);
 	spin_unlock_irqrestore(CCISS_LOCK(c->ctlr), flags);
 
-	/* Wait for the request to complete */
-	while(cp->cmd_type != CMD_IOCTL_DONE)
-		schedule_timeout(1);
+	wait_for_completion(&wait);
 
 	/* undo the dma mapping */
 	cciss_unmap_one(c->pdev, cp, bufsize,

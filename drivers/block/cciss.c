@@ -647,6 +647,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		char 	*buff = NULL;
 		u64bit	temp64;
 		unsigned long flags;
+		DECLARE_COMPLETION(wait);
 
 		if (!arg) return -EINVAL;
 	
@@ -712,6 +713,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			c->SG[0].Len = iocommand.buf_size;
 			c->SG[0].Ext = 0;  // we are not chaining
 		}
+		c->waiting = &wait;
+
 		/* Put the request on the tail of the request queue */
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 		addQ(&h->reqQ, c);
@@ -719,9 +722,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		start_io(h);
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
-		/* Wait for completion */
-		while(c->cmd_type != CMD_IOCTL_DONE)
-			schedule_timeout(1);
+		wait_for_completion(&wait);
 
 		/* unlock the buffers from DMA */
 		temp64.val32.lower = c->SG[0].Addr.lower;
@@ -933,6 +934,7 @@ static int sendcmd_withirq(__u8	cmd,
 	u64bit	buff_dma_handle;
 	unsigned long flags;
 	int return_status = IO_OK;
+	DECLARE_COMPLETION(wait);
 	
 	if ((c = cmd_alloc(h , 0)) == NULL)
 	{
@@ -1026,6 +1028,7 @@ static int sendcmd_withirq(__u8	cmd,
 		c->SG[0].Len = size;
 		c->SG[0].Ext = 0;  // we are not chaining
 	}
+	c->waiting = &wait;
 	
 	/* Put the request on the tail of the queue and send it */
 	spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
@@ -1034,9 +1037,8 @@ static int sendcmd_withirq(__u8	cmd,
 	start_io(h);
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 	
-	/* wait for completion */ 
-	while(c->cmd_type != CMD_IOCTL_DONE)
-		schedule_timeout(1);
+	wait_for_completion(&wait);
+
 	/* unlock the buffers from DMA */
         pci_unmap_single( h->pdev, (dma_addr_t) buff_dma_handle.val,
                 	size, PCI_DMA_BIDIRECTIONAL);
@@ -1959,7 +1961,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 					complete_command(c, 0);
 					cmd_free(h, c, 1);
 				} else if (c->cmd_type == CMD_IOCTL_PEND) {
-					c->cmd_type = CMD_IOCTL_DONE;
+					complete(c->waiting);
 				}
 #				ifdef CONFIG_CISS_SCSI_TAPE
 				else if (c->cmd_type == CMD_SCSI)
