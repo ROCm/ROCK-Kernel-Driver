@@ -40,9 +40,11 @@
 #define DRV_NAME	"sata_via"
 #define DRV_VERSION	"1.0"
 
-enum {
-	via_sata		= 0,
+enum board_ids_enum {
+	vt6420,
+};
 
+enum {
 	SATA_CHAN_ENAB		= 0x40, /* SATA channel enable */
 	SATA_INT_GATE		= 0x41, /* SATA interrupt gating */
 	SATA_NATIVE_MODE	= 0x42, /* Native mode enable */
@@ -50,10 +52,8 @@ enum {
 
 	PORT0			= (1 << 1),
 	PORT1			= (1 << 0),
-
-	ENAB_ALL		= PORT0 | PORT1,
-
-	INT_GATE_ALL		= PORT0 | PORT1,
+	ALL_PORTS		= PORT0 | PORT1,
+	N_PORTS			= 2,
 
 	NATIVE_MODE_ALL		= (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4),
 
@@ -66,7 +66,7 @@ static u32 svia_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void svia_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 
 static struct pci_device_id svia_pci_tbl[] = {
-	{ 0x1106, 0x3149, PCI_ANY_ID, PCI_ANY_ID, 0, 0, via_sata },
+	{ 0x1106, 0x3149, PCI_ANY_ID, PCI_ANY_ID, 0, 0, vt6420 },
 
 	{ }	/* terminate list */
 };
@@ -163,13 +163,67 @@ static unsigned long svia_scr_addr(unsigned long addr, unsigned int port)
 	return addr + (port * 128);
 }
 
+static struct ata_probe_ent *vt6420_init_probe_ent(struct pci_dev *pdev)
+{
+	struct ata_probe_ent *probe_ent;
+	struct ata_port_info *ppi = &svia_port_info;
+
+	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
+	if (!probe_ent)
+		return NULL;
+
+	probe_ent->port[0].scr_addr =
+		svia_scr_addr(pci_resource_start(pdev, 5), 0);
+	probe_ent->port[1].scr_addr =
+		svia_scr_addr(pci_resource_start(pdev, 5), 1);
+
+	return probe_ent;
+}
+
+static void svia_configure(struct pci_dev *pdev)
+{
+	u8 tmp8;
+
+	pci_read_config_byte(pdev, PCI_INTERRUPT_LINE, &tmp8);
+	printk(KERN_INFO DRV_NAME "(%s): routed to hard irq line %d\n",
+	       pci_name(pdev),
+	       (int) (tmp8 & 0xf0) == 0xf0 ? 0 : tmp8 & 0x0f);
+
+	/* make sure SATA channels are enabled */
+	pci_read_config_byte(pdev, SATA_CHAN_ENAB, &tmp8);
+	if ((tmp8 & ALL_PORTS) != ALL_PORTS) {
+		printk(KERN_DEBUG DRV_NAME "(%s): enabling SATA channels (0x%x)\n",
+		       pci_name(pdev), (int) tmp8);
+		tmp8 |= ALL_PORTS;
+		pci_write_config_byte(pdev, SATA_CHAN_ENAB, tmp8);
+	}
+
+	/* make sure interrupts for each channel sent to us */
+	pci_read_config_byte(pdev, SATA_INT_GATE, &tmp8);
+	if ((tmp8 & ALL_PORTS) != ALL_PORTS) {
+		printk(KERN_DEBUG DRV_NAME "(%s): enabling SATA channel interrupts (0x%x)\n",
+		       pci_name(pdev), (int) tmp8);
+		tmp8 |= ALL_PORTS;
+		pci_write_config_byte(pdev, SATA_INT_GATE, tmp8);
+	}
+
+	/* make sure native mode is enabled */
+	pci_read_config_byte(pdev, SATA_NATIVE_MODE, &tmp8);
+	if ((tmp8 & NATIVE_MODE_ALL) != NATIVE_MODE_ALL) {
+		printk(KERN_DEBUG DRV_NAME "(%s): enabling SATA channel native mode (0x%x)\n",
+		       pci_name(pdev), (int) tmp8);
+		tmp8 |= NATIVE_MODE_ALL;
+		pci_write_config_byte(pdev, SATA_NATIVE_MODE, tmp8);
+	}
+}
+
 static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
 	unsigned int i;
 	int rc;
-	struct ata_port_info *ppi;
 	struct ata_probe_ent *probe_ent;
+	const int *bar_sizes;
 	u8 tmp8;
 
 	if (!printed_version++)
@@ -191,9 +245,11 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out_regions;
 	}
 
+	bar_sizes = &svia_bar_sizes[0];
+
 	for (i = 0; i < ARRAY_SIZE(svia_bar_sizes); i++)
 		if ((pci_resource_start(pdev, i) == 0) ||
-		    (pci_resource_len(pdev, i) < svia_bar_sizes[i])) {
+		    (pci_resource_len(pdev, i) < bar_sizes[i])) {
 			printk(KERN_ERR DRV_NAME "(%s): invalid PCI BAR %u (sz 0x%lx, val 0x%lx)\n",
 			       pci_name(pdev), i,
 			       pci_resource_start(pdev, i),
@@ -209,8 +265,7 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_regions;
 
-	ppi = &svia_port_info;
-	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
+	probe_ent = vt6420_init_probe_ent(pdev);
 	if (!probe_ent) {
 		printk(KERN_ERR DRV_NAME "(%s): out of memory\n",
 		       pci_name(pdev));
@@ -218,42 +273,7 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out_regions;
 	}
 
-	probe_ent->port[0].scr_addr =
-		svia_scr_addr(pci_resource_start(pdev, 5), 0);
-	probe_ent->port[1].scr_addr =
-		svia_scr_addr(pci_resource_start(pdev, 5), 1);
-
-	pci_read_config_byte(pdev, PCI_INTERRUPT_LINE, &tmp8);
-	printk(KERN_INFO DRV_NAME "(%s): routed to hard irq line %d\n",
-	       pci_name(pdev),
-	       (int) (tmp8 & 0xf0) == 0xf0 ? 0 : tmp8 & 0x0f);
-
-	/* make sure SATA channels are enabled */
-	pci_read_config_byte(pdev, SATA_CHAN_ENAB, &tmp8);
-	if ((tmp8 & ENAB_ALL) != ENAB_ALL) {
-		printk(KERN_DEBUG DRV_NAME "(%s): enabling SATA channels (0x%x)\n",
-		       pci_name(pdev), (int) tmp8);
-		tmp8 |= ENAB_ALL;
-		pci_write_config_byte(pdev, SATA_CHAN_ENAB, tmp8);
-	}
-
-	/* make sure interrupts for each channel sent to us */
-	pci_read_config_byte(pdev, SATA_INT_GATE, &tmp8);
-	if ((tmp8 & INT_GATE_ALL) != INT_GATE_ALL) {
-		printk(KERN_DEBUG DRV_NAME "(%s): enabling SATA channel interrupts (0x%x)\n",
-		       pci_name(pdev), (int) tmp8);
-		tmp8 |= INT_GATE_ALL;
-		pci_write_config_byte(pdev, SATA_INT_GATE, tmp8);
-	}
-
-	/* make sure native mode is enabled */
-	pci_read_config_byte(pdev, SATA_NATIVE_MODE, &tmp8);
-	if ((tmp8 & NATIVE_MODE_ALL) != NATIVE_MODE_ALL) {
-		printk(KERN_DEBUG DRV_NAME "(%s): enabling SATA channel native mode (0x%x)\n",
-		       pci_name(pdev), (int) tmp8);
-		tmp8 |= NATIVE_MODE_ALL;
-		pci_write_config_byte(pdev, SATA_NATIVE_MODE, tmp8);
-	}
+	svia_configure(pdev);
 
 	pci_set_master(pdev);
 
