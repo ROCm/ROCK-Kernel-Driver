@@ -848,7 +848,6 @@ static void snd_emu10k1x_pcm_free(snd_pcm_t *pcm)
 static int __devinit snd_emu10k1x_pcm(emu10k1x_t *emu, int device, snd_pcm_t **rpcm)
 {
 	snd_pcm_t *pcm;
-	snd_pcm_substream_t *substream;
 	int err;
 	int capture = 0;
   
