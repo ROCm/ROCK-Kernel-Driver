@@ -865,7 +865,7 @@ static int pms_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, pms_do_ioctl);
 }
 
-static int pms_read(struct file *file, char __user *buf,
+static ssize_t pms_read(struct file *file, char __user *buf,
 		    size_t count, loff_t *ppos)
 {
 	struct video_device *v = video_devdata(file);

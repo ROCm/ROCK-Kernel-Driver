@@ -363,7 +363,7 @@ static int blackbird_load_firmware(struct cx8802_dev *dev)
 	}
 
 	if (firmware->size != BLACKBIRD_FIRM_IMAGE_SIZE) {
-		dprintk(0, "ERROR: Firmware size mismatch (have %ld, expected %d)\n",
+		dprintk(0, "ERROR: Firmware size mismatch (have %zd, expected %d)\n",
 			firmware->size, BLACKBIRD_FIRM_IMAGE_SIZE);
 		return -1;
 	}

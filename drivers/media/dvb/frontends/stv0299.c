@@ -1267,7 +1267,8 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 					    state->tuner_type);
 
 	case FE_DISHNETWORK_SEND_LEGACY_CMD:
-		return stv0299_send_legacy_dish_cmd (i2c, (u32) arg,
+		return stv0299_send_legacy_dish_cmd (i2c,
+						    (u32)(unsigned long)arg,
 						     state->tuner_type);
 
 	case FE_GET_TUNE_SETTINGS:
