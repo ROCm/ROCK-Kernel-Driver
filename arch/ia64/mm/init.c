@@ -287,7 +287,8 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_srlz_d();
 
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
-		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)), PAGE_SHIFT);
+		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)),
+		 PERCPU_PAGE_SHIFT);
 
 	ia64_set_psr(psr);
 	ia64_srlz_i();
@@ -454,8 +455,6 @@ mem_init (void)
 		num_pgt_pages = nr_free_pages() / 10;
 	if (num_pgt_pages > pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
-
-	show_mem();
 
 	/* install the gate page in the global page table: */
 	put_gate_page(virt_to_page(__start_gate_section), GATE_ADDR);

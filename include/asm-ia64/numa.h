@@ -21,7 +21,9 @@
 # define NR_MEMBLKS   (NR_NODES * 8)
 #endif
 
-extern char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+#include <linux/cache.h>
+extern volatile char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+extern volatile unsigned long node_to_cpu_mask[NR_NODES] __cacheline_aligned;
 
 /* Stuff below this line could be architecture independent */
 

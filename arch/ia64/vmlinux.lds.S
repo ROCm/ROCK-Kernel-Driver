@@ -137,7 +137,7 @@ SECTIONS
 	{ *(.kstrtab) }
 
   /* Per-cpu data: */
-  . = ALIGN(PAGE_SIZE);
+  . = ALIGN(PERCPU_PAGE_SIZE);
   __phys_per_cpu_start = .;
   .data.percpu PERCPU_ADDR : AT(__phys_per_cpu_start - PAGE_OFFSET)
 	{
@@ -145,7 +145,7 @@ SECTIONS
 		*(.data.percpu)
 		__per_cpu_end = .;
 	}
-  . = __phys_per_cpu_start + 4096;	/* ensure percpu fits into smallest page size (4KB) */
+  . = __phys_per_cpu_start + PERCPU_PAGE_SIZE;	/* ensure percpu data fits into percpu page size */
 
   .data : AT(ADDR(.data) - PAGE_OFFSET)
 	{ *(.data) *(.gnu.linkonce.d*) CONSTRUCTORS }

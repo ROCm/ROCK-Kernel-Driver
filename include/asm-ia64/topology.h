@@ -15,12 +15,22 @@
 
 #include <asm/acpi.h>
 #include <asm/numa.h>
+#include <asm/smp.h>
 
-/* Returns the number of the node containing CPU 'cpu' */
 #ifdef CONFIG_NUMA
-#define __cpu_to_node(cpu) cpu_to_node_map[cpu]
+/*
+ * Returns the number of the node containing CPU 'cpu'
+ */
+#define __cpu_to_node(cpu) (int)(cpu_to_node_map[cpu])
+
+/*
+ * Returns a bitmask of CPUs on Node 'node'.
+ */
+#define __node_to_cpu_mask(node) (node_to_cpu_mask[node])
+
 #else
 #define __cpu_to_node(cpu) (0)
+#define __node_to_cpu_mask(node) (phys_cpu_present_map)
 #endif
 
 /*
@@ -41,34 +51,8 @@
 
 /*
  * Returns the number of the first CPU on Node 'node'.
- * Slow in the current implementation.
- * Who needs this?
  */
-/* #define __node_to_first_cpu(node) pool_cpus[pool_ptr[node]] */
-static inline int __node_to_first_cpu(int node)
-{
-	int i;
-
-	for (i=0; i<NR_CPUS; i++)
-		if (__cpu_to_node(i)==node)
-			return i;
-	BUG(); /* couldn't find a cpu on given node */
-	return -1;
-}
-
-/*
- * Returns a bitmask of CPUs on Node 'node'.
- */
-static inline unsigned long __node_to_cpu_mask(int node)
-{
-	int cpu;
-	unsigned long mask = 0UL;
-
-	for(cpu=0; cpu<NR_CPUS; cpu++)
-		if (__cpu_to_node(cpu) == node)
-			mask |= 1UL << cpu;
-	return mask;
-}
+#define __node_to_first_cpu(node) (__ffs(__node_to_cpu_mask(node)))
 
 /*
  * Returns the number of the first MemBlk on Node 'node'
