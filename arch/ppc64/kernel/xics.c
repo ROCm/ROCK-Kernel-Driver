@@ -384,12 +384,12 @@ void xics_init_IRQ(void)
 	int i;
 	unsigned long intr_size = 0;
 	struct device_node *np;
-	uint *ireg, ilen, indx=0;
+	uint *ireg, ilen, indx = 0;
 	unsigned long intr_base = 0;
 	struct xics_interrupt_node {
-		unsigned long long addr;
-		unsigned long long size;
-	} inodes[NR_CPUS*2]; 
+		unsigned long addr;
+		unsigned long size;
+	} inodes[NR_CPUS]; 
 
 	ppc64_boot_msg(0x20, "XICS Init");
 
