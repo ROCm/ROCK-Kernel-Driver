@@ -66,10 +66,10 @@ __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(extra-y)) \
 	 $(subdir-ym) $(always)
 	@:
 
-# Linus's kernel sanity checking tool
+# Linus' kernel sanity checking tool
 ifneq ($(KBUILD_CHECKSRC),0)
 quiet_cmd_checksrc = CHECK   $<
-      cmd_checksrc = $(CHECK) $(CFLAGS) $< ;
+      cmd_checksrc = $(CHECK) $(c_flags) $< ;
 endif
  
 # Module versioning
