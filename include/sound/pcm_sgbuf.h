@@ -54,15 +54,13 @@ static inline dma_addr_t snd_pcm_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t
 	return sgbuf->table[offset >> PAGE_SHIFT].addr + offset % PAGE_SIZE;
 }
 
-struct snd_sg_buf *snd_pcm_sgbuf_init(struct pci_dev *pci);
-void snd_pcm_sgbuf_delete(struct snd_sg_buf *sgbuf);
-void *snd_pcm_sgbuf_alloc_pages(struct snd_sg_buf *sgbuf, size_t size);
-int snd_pcm_sgbuf_free_pages(struct snd_sg_buf *sgbuf, void *vmaddr);
+void *snd_pcm_sgbuf_alloc_pages(struct pci_dev *pci, size_t size, struct snd_pcm_dma_buffer *dmab);
+int snd_pcm_sgbuf_free_pages(struct snd_pcm_dma_buffer *dmab);
 
-int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci, snd_pcm_substream_t *substream);
-int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci, snd_pcm_t *pcm);
+int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci, snd_pcm_substream_t *substream, size_t size, size_t max);
+int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci, snd_pcm_t *pcm, size_t size, size_t max);
 
-#define _snd_pcm_substream_sgbuf(substream) ((substream)->dma_private)
+#define _snd_pcm_substream_sgbuf(substream) ((substream)->runtime->dma_private)
 #define snd_pcm_substream_sgbuf(substream) snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return -ENXIO)
 
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);

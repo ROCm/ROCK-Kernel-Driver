@@ -15,6 +15,8 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 
+#define SLOT_ADDRESS(r,n) (r->bus_base_addr + (0x1000 * n))
+
 #define EISA_DEVINFO(i,s) { .id = { .sig = i }, .name = s }
 
 struct eisa_device_info {
@@ -95,12 +97,6 @@ struct bus_type eisa_bus_type = {
 	.match = eisa_bus_match,
 };
 
-/* The default EISA device parent (virtual root device). */
-static struct device eisa_bus_root = {
-       .name           = "EISA Bridge",
-       .bus_id         = "eisa",
-};
-
 int eisa_driver_register (struct eisa_driver *edrv)
 {
 	int r;
@@ -109,7 +105,7 @@ int eisa_driver_register (struct eisa_driver *edrv)
 	if ((r = driver_register (&edrv->driver)) < 0)
 		return r;
 
-	return 1;
+	return 0;
 }
 
 void eisa_driver_unregister (struct eisa_driver *edrv)
@@ -125,7 +121,8 @@ static ssize_t eisa_show_sig (struct device *dev, char *buf)
 
 static DEVICE_ATTR(signature, S_IRUGO, eisa_show_sig, NULL);
 
-static void __init eisa_register_device (char *sig, int slot)
+static void __init eisa_register_device (struct eisa_root_device *root,
+					 char *sig, int slot)
 {
 	struct eisa_device *edev;
 
@@ -135,11 +132,11 @@ static void __init eisa_register_device (char *sig, int slot)
 	memset (edev, 0, sizeof (*edev));
 	memcpy (edev->id.sig, sig, 7);
 	edev->slot = slot;
-	edev->base_addr = 0x1000 * slot;
+	edev->base_addr = SLOT_ADDRESS (root, slot);
 	eisa_name_device (edev);
-	edev->dev.parent = &eisa_bus_root;
+	edev->dev.parent = root->dev;
 	edev->dev.bus = &eisa_bus_type;
-	sprintf (edev->dev.bus_id, "00:%02X", slot);
+	sprintf (edev->dev.bus_id, "%02X:%02X", root->bus_nr, slot);
 
 	/* Don't register resource for slot 0, since this will surely
 	 * fail... :-( */
@@ -150,7 +147,7 @@ static void __init eisa_register_device (char *sig, int slot)
 		edev->res.end   = edev->res.start + 0xfff;
 		edev->res.flags = IORESOURCE_IO;
 
-		if (request_resource (&ioport_resource, &edev->res)) {
+		if (request_resource (root->res, &edev->res)) {
 			printk (KERN_WARNING \
 				"Cannot allocate resource for EISA slot %d\n",
 				slot);
@@ -167,16 +164,18 @@ static void __init eisa_register_device (char *sig, int slot)
 	device_create_file (&edev->dev, &dev_attr_signature);
 }
 
-static int __init eisa_probe (void)
+static int __init eisa_probe (struct eisa_root_device *root)
 {
         int i, c;
         char *str;
-        unsigned long slot_addr;
+        unsigned long sig_addr;
 
-        printk (KERN_INFO "EISA: Probing bus...\n");
-        for (c = 0, i = 0; i <= EISA_MAX_SLOTS; i++) {
-                slot_addr = (0x1000 * i) + EISA_VENDOR_ID_OFFSET;
-                if ((str = decode_eisa_sig (slot_addr))) {
+        printk (KERN_INFO "EISA: Probing bus %d at %s\n",
+		root->bus_nr, root->dev->name);
+	
+        for (c = 0, i = 0; i <= root->slots; i++) {
+                sig_addr = SLOT_ADDRESS (root, i) + EISA_VENDOR_ID_OFFSET;
+                if ((str = decode_eisa_sig (sig_addr))) {
 			if (!i)
 				printk (KERN_INFO "EISA: Motherboard %s detected\n",
 					str);
@@ -187,12 +186,37 @@ static int __init eisa_probe (void)
 				c++;
 			}
 
-			eisa_register_device (str, i);
+			eisa_register_device (root, str, i);
                 }
         }
         printk (KERN_INFO "EISA: Detected %d card%s.\n", c, c < 2 ? "" : "s");
 
 	return 0;
+}
+
+
+static LIST_HEAD (eisa_root_head);
+
+static int eisa_bus_count;
+
+int eisa_root_register (struct eisa_root_device *root)
+{
+	struct list_head *node;
+	struct eisa_root_device *tmp_root;
+
+	/* Check if this bus base address has been already
+	 * registered. This prevents the virtual root device from
+	 * registering after the real one has, for example... */
+	
+	list_for_each (node, &eisa_root_head) {
+		tmp_root = list_entry (node, struct eisa_root_device, node);
+		if (tmp_root->bus_base_addr == root->bus_base_addr)
+			return -1; /* Space already taken, buddy... */
+	}
+	
+	root->bus_nr = eisa_bus_count++;
+	list_add_tail (&root->node, &eisa_root_head);
+	return eisa_probe (root);
 }
 
 static int __init eisa_init (void)
@@ -201,14 +225,9 @@ static int __init eisa_init (void)
 	
 	if ((r = bus_register (&eisa_bus_type)))
 		return r;
-	
-	if ((r = device_register (&eisa_bus_root))) {
-		bus_unregister (&eisa_bus_type);
-		return r;
-	}
 
 	printk (KERN_INFO "EISA bus registered\n");
-	return eisa_probe ();
+	return 0;
 }
 
 postcore_initcall (eisa_init);

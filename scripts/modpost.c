@@ -270,6 +270,7 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		   Elf_Sym *sym, const char *symname)
 {
 	struct symbol *s;
+	unsigned int crc;
 
 	switch (sym->st_shndx) {
 	case SHN_COMMON:
@@ -279,7 +280,8 @@ handle_modversions(struct module *mod, struct elf_info *info,
 	case SHN_ABS:
 		/* CRC'd symbol */
 		if (memcmp(symname, "__crc_", 6) == 0) {
-			add_exported_symbol(symname+6, mod, &sym->st_value);
+			crc = (unsigned int) sym->st_value;
+			add_exported_symbol(symname+6, mod, &crc);
 			modversions = 1;
 		}
 		break;

@@ -30,35 +30,67 @@
 #include <sound/pcm_params.h>
 #include <sound/timer.h>
 
-void snd_pcm_playback_silence(snd_pcm_substream_t *substream)
+/*
+ * fill ring buffer with silence
+ * runtime->silenced_start: starting pointer to silence area
+ * runtime->silenced_size: size filled with silence
+ * runtime->silence_threshold: threshold from application
+ * runtime->silence_size: maximal size from application
+ *
+ * when runtime->silence_size >= runtime->boundary - fill processed area with silence immediately
+ */
+void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t new_hw_ptr)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t frames, ofs, transfer;
-	snd_pcm_sframes_t noise_dist;
-	if (runtime->silenced_start != runtime->control->appl_ptr) {
-		snd_pcm_sframes_t n = runtime->control->appl_ptr - runtime->silenced_start;
-		if (n < 0)
-			n += runtime->boundary;
-		if ((snd_pcm_uframes_t)n < runtime->silenced_size)
-			runtime->silenced_size -= n;
-		else
+
+	if (runtime->silence_size < runtime->boundary) {
+		snd_pcm_sframes_t noise_dist, n;
+		if (runtime->silenced_start != runtime->control->appl_ptr) {
+			n = runtime->control->appl_ptr - runtime->silenced_start;
+			if (n < 0)
+				n += runtime->boundary;
+			if ((snd_pcm_uframes_t)n < runtime->silenced_size)
+				runtime->silenced_size -= n;
+			else
+				runtime->silenced_size = 0;
+			runtime->silenced_start = runtime->control->appl_ptr;
+		}
+		if (runtime->silenced_size == runtime->buffer_size)
+			return;
+		snd_assert(runtime->silenced_size <= runtime->buffer_size, return);
+		noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silenced_size;
+		if (noise_dist > (snd_pcm_sframes_t) runtime->silence_threshold)
+			return;
+		frames = runtime->silence_threshold - noise_dist;
+		if (frames > runtime->silence_size)
+			frames = runtime->silence_size;
+	} else {
+		if (new_hw_ptr == ULONG_MAX) {	/* initialization */
 			runtime->silenced_size = 0;
-		runtime->silenced_start = runtime->control->appl_ptr;
+			runtime->silenced_start = runtime->control->appl_ptr;
+		} else {
+			ofs = runtime->status->hw_ptr;
+			frames = new_hw_ptr - ofs;
+			if ((snd_pcm_sframes_t)frames < 0)
+				frames += runtime->boundary;
+			runtime->silenced_size -= frames;
+			if ((snd_pcm_sframes_t)runtime->silenced_size < 0) {
+				runtime->silenced_size = 0;
+				runtime->silenced_start = (ofs + frames) - runtime->buffer_size;
+			} else {
+				runtime->silenced_start = ofs - runtime->silenced_size;
+			}
+			if ((snd_pcm_sframes_t)runtime->silenced_start < 0)
+				runtime->silenced_start += runtime->boundary;
+		}
+		frames = runtime->buffer_size;
 	}
-	if (runtime->silenced_size == runtime->buffer_size)
+	snd_assert(frames >= runtime->silenced_size, return);
+	frames -= runtime->silenced_size;
+	if (frames == 0)
 		return;
-	snd_assert(runtime->silenced_size <= runtime->buffer_size, return);
-	noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silenced_size;
-	if (noise_dist > (snd_pcm_sframes_t) runtime->silence_threshold)
-		return;
-	frames = runtime->silence_threshold - noise_dist;
-	if (frames < runtime->silence_size)
-		frames = runtime->silence_size;
-	if (runtime->silenced_size + frames > runtime->buffer_size)
-		frames = runtime->buffer_size - runtime->silenced_size;
-	ofs = runtime->silenced_start % runtime->buffer_size + runtime->silenced_size;
-	if (ofs >= runtime->buffer_size)
-		ofs -= runtime->buffer_size;
+	ofs = (runtime->silenced_start + runtime->silenced_size) % runtime->buffer_size;
 	while (frames > 0) {
 		transfer = ofs + frames > runtime->buffer_size ? runtime->buffer_size - ofs : frames;
 		if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED ||
@@ -88,9 +120,10 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream)
 				}
 			}
 		}
+		runtime->silenced_size += transfer;
 		frames -= transfer;
+		ofs = 0;
 	}
-	runtime->silenced_size += frames;
 }
 
 int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
@@ -128,16 +161,13 @@ int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 			runtime->hw_ptr_base = 0;
 		new_hw_ptr = runtime->hw_ptr_base + pos;
 	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    runtime->silence_size > 0)
+		snd_pcm_playback_silence(substream, new_hw_ptr);
+
 	runtime->status->hw_ptr = new_hw_ptr;
-	runtime->hw_ptr_interrupt = new_hw_ptr - (runtime->hw_ptr_base + pos) % runtime->period_size;
-
-#if 0
-	if (hw_ptr_interrupt == runtime->boundary)
-		hw_ptr_interrupt = 0;
-
-	if (runtime->hw_ptr_interrupt != hw_ptr_interrupt)
-		snd_printd("Lost interrupt: hw_ptr = %d expected %d\n", runtime->hw_ptr_interrupt, hw_ptr_interrupt);
-#endif
+	runtime->hw_ptr_interrupt = new_hw_ptr - new_hw_ptr % runtime->period_size;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		avail = snd_pcm_playback_avail(runtime);
@@ -153,9 +183,6 @@ int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 	}
 	if (avail >= runtime->control->avail_min)
 		wake_up(&runtime->sleep);
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-	    runtime->silence_size > 0)
-		snd_pcm_playback_silence(substream);
 	return 0;
 }
 
@@ -167,6 +194,7 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 	snd_pcm_uframes_t old_hw_ptr, new_hw_ptr;
 	snd_pcm_uframes_t avail;
 	snd_pcm_sframes_t delta;
+
 	old_hw_ptr = runtime->status->hw_ptr;
 	pos = substream->ops->pointer(substream);
 	if (runtime->tstamp_mode & SNDRV_PCM_TSTAMP_MMAP)
@@ -192,6 +220,9 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 			runtime->hw_ptr_base = 0;
 		new_hw_ptr = runtime->hw_ptr_base + pos;
 	}
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    runtime->silence_size > 0)
+		snd_pcm_playback_silence(substream, new_hw_ptr);
 	runtime->status->hw_ptr = new_hw_ptr;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
@@ -208,9 +239,6 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 	}
 	if (avail >= runtime->control->avail_min)
 		wake_up(&runtime->sleep);
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-	    runtime->silence_size > 0)
-		snd_pcm_playback_silence(substream);
 	return 0;
 }
 
@@ -1901,7 +1929,9 @@ void snd_pcm_tick_prepare(snd_pcm_substream_t *substream)
 	u_int64_t n;
 	u_int32_t r;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		if (runtime->silence_size > 0 &&
+		if (runtime->silence_size >= runtime->boundary) {
+			frames = 1;
+		} else if (runtime->silence_size > 0 &&
 		    runtime->silenced_size < runtime->buffer_size) {
 			snd_pcm_sframes_t noise_dist;
 			noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silenced_size;

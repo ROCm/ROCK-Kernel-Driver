@@ -114,6 +114,7 @@ struct svc_rqst {
 	struct xdr_buf		rq_res;
 	struct page *		rq_argpages[RPCSVC_MAXPAGES];
 	struct page *		rq_respages[RPCSVC_MAXPAGES];
+	int			rq_restailpage;
 	short			rq_argused;	/* pages used for argument */
 	short			rq_arghi;	/* pages available in argument page list */
 	short			rq_resused;	/* pages used for result */

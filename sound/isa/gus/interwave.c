@@ -109,7 +109,7 @@ MODULE_PARM_DESC(dma2, "DMA2 # for InterWave driver.");
 MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 MODULE_PARM(joystick_dac, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick_dac, "Joystick DAC level 0.59V-4.52V or 0.389V-2.98V for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_joystic_dac, SNDRV_ENABLED ",allows:{{0,31}}");
+MODULE_PARM_SYNTAX(joystick_dac, SNDRV_ENABLED ",allows:{{0,31}}");
 MODULE_PARM(midi, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(midi, "MIDI UART enable for InterWave driver.");
 MODULE_PARM_SYNTAX(midi, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);

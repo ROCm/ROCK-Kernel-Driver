@@ -27,7 +27,6 @@
 #include <linux/config.h>
 #include <linux/proc_fs.h>
 #include <linux/types.h>
-#include <linux/pci.h>
 
 struct scsi_host_cmd_pool;
 
@@ -533,13 +532,6 @@ static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 {
         return shost->host_gendev;
 }
-
-static inline void scsi_set_pci_device(struct Scsi_Host *shost,
-                                       struct pci_dev *pdev)
-{
-        scsi_set_device(shost, &pdev->dev);
-}
-
 
 /*
  * Prototypes for functions/data in scsi_scan.c

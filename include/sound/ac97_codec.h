@@ -291,4 +291,14 @@ void snd_ac97_suspend(ac97_t *ac97);
 void snd_ac97_resume(ac97_t *ac97);
 #endif
 
+enum { AC97_TUNE_HP_ONLY, AC97_TUNE_SWAP_HP };
+
+struct ac97_quirk {
+	unsigned short vendor;
+	unsigned short device;
+	int type;
+};
+
+int snd_ac97_tune_hardware(ac97_t *ac97, struct pci_dev *pci, struct ac97_quirk *quirk);
+
 #endif /* __SOUND_AC97_CODEC_H */

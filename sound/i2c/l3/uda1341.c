@@ -9,14 +9,15 @@
  *
  * History:
  *
- * 2002-03-13	Tomas Kasparek	Initial release - based on uda1341.c from OSS
+ * 2002-03-13   Tomas Kasparek  initial release - based on uda1341.c from OSS
  * 2002-03-28   Tomas Kasparek  basic mixer is working (volume, bass, treble)
- * 2002-03-30   Tomas Kasparek  Proc filesystem support, complete mixer and DSP
+ * 2002-03-30   Tomas Kasparek  proc filesystem support, complete mixer and DSP
  *                              features support
- * 2002-04-12	Tomas Kasparek	Proc interface update, code cleanup
+ * 2002-04-12	Tomas Kasparek	proc interface update, code cleanup
+ * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.6 2003/01/07 10:36:28 tiwai Exp $ */
+/* $Id: uda1341.c,v 1.7 2003/02/13 19:19:19 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -25,7 +26,6 @@
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/ioctl.h>
-#include <linux/errno.h>
 
 #include <asm/uaccess.h>
 
@@ -422,7 +422,7 @@ static void __devinit snd_uda1341_proc_init(snd_card_t *card, struct l3_client *
 #define UDA1341_SINGLE(xname, where, reg, shift, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_uda1341_info_single, \
   .get = snd_uda1341_get_single, .put = snd_uda1341_put_single, \
-  .private_value = where | reg << 5 | (shift << 9) | (mask << 12) | (invert << 18) \
+  .private_value = where | (reg << 5) | (shift << 9) | (mask << 12) | (invert << 18) \
 }
 
 static int snd_uda1341_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -484,7 +484,7 @@ static int snd_uda1341_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 #define UDA1341_ENUM(xname, where, reg, shift, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_uda1341_info_enum, \
   .get = snd_uda1341_get_enum, .put = snd_uda1341_put_enum, \
-  .private_value = where | reg << 5 | (shift << 9) | (mask << 12) | (invert << 18) \
+  .private_value = where | (reg << 5) | (shift << 9) | (mask << 12) | (invert << 18) \
 }
 
 static int snd_uda1341_info_enum(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)

@@ -6744,7 +6744,7 @@ ips_register_scsi( int index){
 	kfree(oldha);
 	ips_sh[index] = sh;
 	ips_ha[index] = ha;
-	scsi_set_pci_device(sh, ha->pcidev);
+	scsi_set_device(sh, &ha->pcidev->dev);
 
 	/* Store away needed values for later use */
 	sh->io_port = ha->io_addr;

@@ -348,7 +348,8 @@
 #define __NR_remap_file_pages		410
 #define __NR_set_tid_address		411
 #define __NR_restart_syscall		412
-#define NR_SYSCALLS			413
+#define __NR_fadvise64			413
+#define NR_SYSCALLS			414
 
 #if defined(__GNUC__)
 

@@ -568,9 +568,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
-	resp->tagp = resp->p + 1; /* skip over status */
-	/* reserve space for: status, taglen, tag, and opcnt */
-	resp->p += 3 + XDR_QUADLEN(args->taglen);
+	resp->tagp = resp->p;
+	/* reserve space for: taglen, tag, and opcnt */
+	resp->p += 2 + XDR_QUADLEN(args->taglen);
 	resp->end = rqstp->rq_res.head[0].iov_base + PAGE_SIZE;
 	resp->taglen = args->taglen;
 	resp->tag = args->tag;

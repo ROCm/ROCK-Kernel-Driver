@@ -325,9 +325,9 @@ static int nsphw_init(nsp_hw_data *data)
 static unsigned int nsphw_start_selection(Scsi_Cmnd   *SCpnt,
 					  nsp_hw_data *data)
 {
-	unsigned int  host_id	 = SCpnt->host->this_id;
-	unsigned int  base	 = SCpnt->host->io_port;
-	unsigned char target	 = SCpnt->target;
+	unsigned int  host_id	 = SCpnt->device->host->this_id;
+	unsigned int  base	 = SCpnt->device->host->io_port;
+	unsigned char target	 = SCpnt->device->id;
 	int	      time_out;
 	unsigned char phase, arbit;
 
@@ -405,7 +405,7 @@ static struct nsp_sync_table nsp_sync_table_20M[] = {
  */
 static int nsp_msg(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
-	unsigned char	       target = SCpnt->target;
+	unsigned char	       target = SCpnt->device->id;
 //	unsigned char	       lun    = SCpnt->lun;
 	sync_data	      *sync   = &(data->Sync[target]);
 	struct nsp_sync_table *sync_table;
@@ -462,7 +462,7 @@ static int nsp_msg(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
  */
 static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time)
 {
-	unsigned int base = SCpnt->host->io_port;
+	unsigned int base = SCpnt->device->host->io_port;
 
 	//DEBUG(0, "%s: in SCpnt=0x%p, time=%d\n", __FUNCTION__, SCpnt, time);
 	data->TimerCount = time;
@@ -474,7 +474,7 @@ static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time)
  */
 static int nsp_negate_signal(Scsi_Cmnd *SCpnt, unsigned char mask, char *str)
 {
-	unsigned int  base = SCpnt->host->io_port;
+	unsigned int  base = SCpnt->device->host->io_port;
 	unsigned char reg;
 	int	      time_out;
 
@@ -503,7 +503,7 @@ static int nsp_expect_signal(Scsi_Cmnd	   *SCpnt,
 			     unsigned char  current_phase,
 			     unsigned char  mask)
 {
-	unsigned int  base	 = SCpnt->host->io_port;
+	unsigned int  base	 = SCpnt->device->host->io_port;
 	int	      time_out;
 	unsigned char phase, i_src;
 
@@ -536,7 +536,7 @@ static int nsp_expect_signal(Scsi_Cmnd	   *SCpnt,
  */
 static int nsp_xfer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int phase)
 {
-	unsigned int  base = SCpnt->host->io_port;
+	unsigned int  base = SCpnt->device->host->io_port;
 	char	     *buf  = data->MsgBuffer;
 	int	      len  = MIN(MSGBUF_SIZE, data->MsgLen);
 	int	      ptr;
@@ -606,7 +606,7 @@ static int nsp_dataphase_bypass(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
  */
 static int nsp_reselected(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
-	unsigned int  base = SCpnt->host->io_port;
+	unsigned int  base = SCpnt->device->host->io_port;
 	unsigned char reg;
 
 	//DEBUG(0, "%s:\n", __FUNCTION__);
@@ -626,7 +626,7 @@ static int nsp_reselected(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
  */
 static int nsp_fifo_count(Scsi_Cmnd *SCpnt)
 {
-	unsigned int base = SCpnt->host->io_port;
+	unsigned int base = SCpnt->device->host->io_port;
 	unsigned int count;
 	unsigned int l, m, h, dummy;
 
@@ -653,8 +653,8 @@ static int nsp_fifo_count(Scsi_Cmnd *SCpnt)
  */
 static void nsp_pio_read(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
-	unsigned int  base      = SCpnt->host->io_port;
-	unsigned long mmio_base = SCpnt->host->base;
+	unsigned int  base      = SCpnt->device->host->io_port;
+	unsigned long mmio_base = SCpnt->device->host->base;
 	long	      time_out;
 	int	      ocount, res;
 	unsigned char stat, fifo_stat;
@@ -746,8 +746,8 @@ static void nsp_pio_read(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
  */
 static void nsp_pio_write(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
-	unsigned int  base     = SCpnt->host->io_port;
-	unsigned long mmio_base = SCpnt->host->base;
+	unsigned int  base     = SCpnt->device->host->io_port;
+	unsigned long mmio_base = SCpnt->device->host->base;
 	int	      time_out;
 	int           ocount, res;
 	unsigned char stat;
@@ -838,8 +838,8 @@ static void nsp_pio_write(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
  */
 static int nsp_nexus(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
-	unsigned int   base   = SCpnt->host->io_port;
-	unsigned char  target = SCpnt->target;
+	unsigned int   base   = SCpnt->device->host->io_port;
+	unsigned char  target = SCpnt->device->id;
 //	unsigned char  lun    = SCpnt->lun;
 	sync_data     *sync   = &(data->Sync[target]);
 
@@ -944,8 +944,8 @@ static void nspintr(int irq, void *dev_id, struct pt_regs *regs)
 		return;
 	} else {
 		tmpSC    = data->CurrentSC;
-		target   = tmpSC->target;
-		lun      = tmpSC->lun;
+		target   = tmpSC->device->id;
+		lun      = tmpSC->device->lun;
 		sync_neg = &(data->Sync[target].SyncNegotiation);
 	}
 
@@ -1425,7 +1425,7 @@ static int nsp_eh_device_reset(Scsi_Cmnd *SCpnt)
 static int nsp_eh_bus_reset(Scsi_Cmnd *SCpnt)
 {
 	nsp_hw_data *data = &nsp_data;
-	unsigned int base = SCpnt->host->io_port;
+	unsigned int base = SCpnt->device->host->io_port;
 	int	     i;
 
 	DEBUG(0, "%s: SCpnt=0x%p base=0x%x\n", __FUNCTION__, SCpnt, base);
@@ -1960,7 +1960,7 @@ static int nsp_cs_event(event_t		       event,
 		}
 		info->stop = 0;
 
-		tmp.host = info->host;
+		tmp.device->host = info->host;
 		nsp_eh_host_reset(&tmp);
 		nsp_eh_bus_reset(&tmp);
 

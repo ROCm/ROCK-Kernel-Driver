@@ -170,7 +170,7 @@ Scsi_Cmnd *queue_remove_exclude(Queue_t *queue, unsigned long *exclude)
 	spin_lock_irqsave(&queue->queue_lock, flags);
 	list_for_each(l, &queue->head) {
 		QE_t *q = list_entry(l, QE_t, list);
-		if (!test_bit(q->SCpnt->target * 8 + q->SCpnt->lun, exclude)) {
+		if (!test_bit(q->SCpnt->device->id * 8 + q->SCpnt->device->lun, exclude)) {
 			SCpnt = __queue_remove(queue, l);
 			break;
 		}
@@ -217,7 +217,7 @@ Scsi_Cmnd *queue_remove_tgtluntag (Queue_t *queue, int target, int lun, int tag)
 	spin_lock_irqsave(&queue->queue_lock, flags);
 	list_for_each(l, &queue->head) {
 		QE_t *q = list_entry(l, QE_t, list);
-		if (q->SCpnt->target == target && q->SCpnt->lun == lun &&
+		if (q->SCpnt->device->id == target && q->SCpnt->device->lun == lun &&
 		    q->SCpnt->tag == tag) {
 			SCpnt = __queue_remove(queue, l);
 			break;
@@ -243,7 +243,7 @@ void queue_remove_all_target(Queue_t *queue, int target)
 	spin_lock_irqsave(&queue->queue_lock, flags);
 	list_for_each(l, &queue->head) {
 		QE_t *q = list_entry(l, QE_t, list);
-		if (q->SCpnt->target == target)
+		if (q->SCpnt->device->id == target)
 			__queue_remove(queue, l);
 	}
 	spin_unlock_irqrestore(&queue->queue_lock, flags);
@@ -267,7 +267,7 @@ int queue_probetgtlun (Queue_t *queue, int target, int lun)
 	spin_lock_irqsave(&queue->queue_lock, flags);
 	list_for_each(l, &queue->head) {
 		QE_t *q = list_entry(l, QE_t, list);
-		if (q->SCpnt->target == target && q->SCpnt->lun == lun) {
+		if (q->SCpnt->device->id == target && q->SCpnt->device->lun == lun) {
 			found = 1;
 			break;
 		}

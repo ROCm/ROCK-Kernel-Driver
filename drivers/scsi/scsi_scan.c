@@ -364,62 +364,6 @@ static void print_inquiry(unsigned char *inq_result)
 		printk("\n");
 }
 
-u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
-{
-	if (shost->highmem_io) {
-		struct device *host_dev = scsi_get_device(shost);
-
-		if (PCI_DMA_BUS_IS_PHYS && host_dev && host_dev->dma_mask)
-			return *host_dev->dma_mask;
-
-		/*
-		 * Platforms with virtual-DMA translation
- 		 * hardware have no practical limit.
-		 */
-		return BLK_BOUNCE_ANY;
-	} else if (shost->unchecked_isa_dma)
-		return BLK_BOUNCE_ISA;
-
-	return BLK_BOUNCE_HIGH;
-}
-
-static request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost)
-{
-	request_queue_t *q;
-
-	q = kmalloc(sizeof(*q), GFP_ATOMIC);
-	if (!q)
-		return NULL;
-	memset(q, 0, sizeof(*q));
-
-	if (!shost->max_sectors) {
-		/*
-		 * Driver imposes no hard sector transfer limit.
-		 * start at machine infinity initially.
-		 */
-		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
-	}
-
-	blk_init_queue(q, scsi_request_fn, shost->host_lock);
-	blk_queue_prep_rq(q, scsi_prep_fn);
-
-	blk_queue_max_hw_segments(q, shost->sg_tablesize);
-	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
-	blk_queue_max_sectors(q, shost->max_sectors);
-	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
-
-	if (!shost->use_clustering)
-		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
-
-	return q;
-}
-
-static void scsi_free_queue(request_queue_t *q)
-{
-	blk_cleanup_queue(q);
-	kfree(q);
-}
-
 /**
  * scsi_alloc_sdev - allocate and setup a Scsi_Device
  *

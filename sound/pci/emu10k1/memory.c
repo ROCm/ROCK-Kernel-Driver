@@ -232,7 +232,7 @@ __found_pages:
 static int is_valid_page(dma_addr_t addr)
 {
 	if (addr & ~0x7fffffffUL) {
-		snd_printk("max memory size is 2GB!!\n");
+		snd_printk("max memory size is 2GB (addr = 0x%lx)!!\n", (unsigned long)addr);
 		return 0;
 	}
 	if (addr & (EMUPAGESIZE-1)) {
@@ -312,8 +312,18 @@ snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream)
 	 */
 	idx = 0;
 	for (page = blk->first_page; page <= blk->last_page; page++, idx++) {
-		dma_addr_t addr = sgbuf->table[idx].addr;
+		dma_addr_t addr;
+#ifdef CONFIG_SND_DEBUG
+		if (idx >= sgbuf->pages) {
+			printk(KERN_ERR "emu: pages overflow! (%d-%d) for %d\n",
+			       blk->first_page, blk->last_page, sgbuf->pages);
+			up(&hdr->block_mutex);
+			return NULL;
+		}
+#endif
+		addr = sgbuf->table[idx].addr;
 		if (! is_valid_page(addr)) {
+			printk(KERN_ERR "emu: failure page = %d\n", idx);
 			up(&hdr->block_mutex);
 			return NULL;
 		}

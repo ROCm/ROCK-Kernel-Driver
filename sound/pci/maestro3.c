@@ -2542,13 +2542,9 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->pci = pci;
 	chip->irq = -1;
 
-#ifndef LINUX_2_2
-	subsystem_vendor = pci->subsystem_vendor;
-	subsystem_device = pci->subsystem_device;
-#else
 	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
 	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
-#endif
+
 	for (quirk = m3_quirk_list; quirk->vendor; quirk++) {
 		if (subsystem_vendor == quirk->vendor &&
 		    subsystem_device == quirk->device) {

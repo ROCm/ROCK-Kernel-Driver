@@ -458,7 +458,8 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 	if (params->xfer_align == 0 ||
 	    params->xfer_align % runtime->min_align != 0)
 		return -EINVAL;
-	if (params->silence_threshold + params->silence_size > runtime->buffer_size)
+	if ((params->silence_threshold != 0 || params->silence_size < runtime->boundary) &&
+	    (params->silence_threshold + params->silence_size > runtime->buffer_size))
 		return -EINVAL;
 	spin_lock_irq(&runtime->lock);
 	runtime->tstamp_mode = params->tstamp_mode;
@@ -478,7 +479,7 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 			snd_pcm_tick_set(substream, 0);
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
 		    runtime->silence_size > 0)
-			snd_pcm_playback_silence(substream);
+			snd_pcm_playback_silence(substream, ULONG_MAX);
 		wake_up(&runtime->sleep);
 	}
 	spin_unlock_irq(&runtime->lock);
@@ -671,7 +672,7 @@ static inline void snd_pcm_post_start(snd_pcm_substream_t *substream, int state)
 	runtime->status->state = SNDRV_PCM_STATE_RUNNING;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
 	    runtime->silence_size > 0)
-		snd_pcm_playback_silence(substream);
+		snd_pcm_playback_silence(substream, ULONG_MAX);
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
 }
@@ -938,9 +939,11 @@ static inline int snd_pcm_do_reset(snd_pcm_substream_t * substream, int state)
 	int err = substream->ops->ioctl(substream, SNDRV_PCM_IOCTL1_RESET, 0);
 	if (err < 0)
 		return err;
-	snd_assert(runtime->status->hw_ptr < runtime->buffer_size, );
+	// snd_assert(runtime->status->hw_ptr < runtime->buffer_size, );
 	runtime->hw_ptr_base = 0;
 	runtime->hw_ptr_interrupt = runtime->status->hw_ptr - runtime->status->hw_ptr % runtime->period_size;
+	runtime->silenced_start = runtime->status->hw_ptr;
+	runtime->silenced_size = 0;
 	return 0;
 }
 
@@ -948,7 +951,9 @@ static inline void snd_pcm_post_reset(snd_pcm_substream_t * substream, int state
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	runtime->control->appl_ptr = runtime->status->hw_ptr;
-	
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    runtime->silence_size > 0)
+		snd_pcm_playback_silence(substream, ULONG_MAX);
 }
 
 static int snd_pcm_reset(snd_pcm_substream_t *substream)

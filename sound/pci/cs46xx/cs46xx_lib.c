@@ -677,6 +677,7 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 {
 	/* cs46xx_t *chip = snd_pcm_substream_chip(substream); */
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
 	snd_pcm_sframes_t diff;
 	cs46xx_pcm_t * cpcm;
 	int buffer_size;
@@ -685,14 +686,14 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 
 	buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
-	diff = runtime->control->appl_ptr - cpcm->appl_ptr;
+	diff = appl_ptr - cpcm->appl_ptr;
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
-		cpcm->sw_ready += diff << cpcm->shift;
+		frames += diff;
 	}
 	cpcm->sw_ready += frames << cpcm->shift;
-	cpcm->appl_ptr = runtime->control->appl_ptr + frames;
+	cpcm->appl_ptr = appl_ptr + frames;
 	while (cpcm->hw_ready < buffer_size && 
 	       cpcm->sw_ready > 0) {
 		size_t hw_to_end = buffer_size - cpcm->hw_data;
@@ -724,15 +725,16 @@ static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream,
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_sframes_t diff = runtime->control->appl_ptr - chip->capt.appl_ptr;
+	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
+	snd_pcm_sframes_t diff = appl_ptr - chip->capt.appl_ptr;
 	int buffer_size = runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
-		chip->capt.sw_ready -= diff << chip->capt.shift;
+		frames += diff;
 	}
 	chip->capt.sw_ready -= frames << chip->capt.shift;
-	chip->capt.appl_ptr = runtime->control->appl_ptr + frames;
+	chip->capt.appl_ptr = appl_ptr + frames;
 	while (chip->capt.hw_ready > 0 && 
 	       chip->capt.sw_ready < (int)chip->capt.sw_bufsize) {
 		size_t hw_to_end = buffer_size - chip->capt.hw_data;
