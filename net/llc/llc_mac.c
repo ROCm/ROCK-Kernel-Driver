@@ -15,16 +15,11 @@
 #include <linux/if_arp.h>
 #include <linux/if_tr.h>
 #include <linux/rtnetlink.h>
-#include <net/llc_if.h>
 #include <net/llc_mac.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
-#include <net/llc_conn.h>
-#include <net/sock.h>
 #include <net/llc_main.h>
 #include <net/llc_evnt.h>
-#include <net/llc_c_ev.h>
-#include <net/llc_s_ev.h>
 #include <linux/trdevice.h>
 
 #if 0
@@ -33,14 +28,11 @@
 #define dprintk(args...)
 #endif
 
-u8 llc_mac_null_var[IFHWADDRLEN];
-
 static int fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
-static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
 
-static void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb);
-static void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb);
+extern void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb);
+extern void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb);
 
 /*
  * Packet handlers for LLC_DEST_SAP and LLC_DEST_CONN.
@@ -195,42 +187,6 @@ static void llc_station_rcv(struct sk_buff *skb)
 	llc_station_state_process(&llc_main_station, skb);
 }
 
-
-/**
- *	llc_conn_rcv - sends received pdus to the connection state machine
- *	@sk: current connection structure.
- *	@skb: received frame.
- *
- *	Sends received pdus to the connection state machine.
- */
-int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-
-	if (!llc->dev)
-		llc->dev = skb->dev;
-	ev->type   = LLC_CONN_EV_TYPE_PDU;
-	ev->reason = 0;
-	return llc_conn_state_process(sk, skb);
-}
-
-/**
- *	llc_sap_rcv - sends received pdus to the sap state machine
- *	@sap: current sap component structure.
- *	@skb: received frame.
- *
- *	Sends received pdus to the sap state machine.
- */
-static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
-{
-	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	ev->type   = LLC_SAP_EV_TYPE_PDU;
-	ev->reason = 0;
-	llc_sap_state_process(sap, skb);
-}
-
 /**
  *	lan_hdrs_init - fills MAC header fields
  *	@skb: Address of the frame to initialize its MAC header
@@ -283,74 +239,4 @@ u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 		rc = 1;
 	}
 	return rc;
-}
-
-static void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
-{
-	struct llc_addr laddr;
-	struct sock *sk;
-
-	llc_pdu_decode_da(skb, laddr.mac);
-	llc_pdu_decode_dsap(skb, &laddr.lsap);
-
-	sk = llc_lookup_dgram(sap, &laddr);
-	if (sk) {
-		skb->sk = sk;
-		llc_sap_rcv(sap, skb);
-		sock_put(sk);
-	} else
-		kfree_skb(skb);
-} 
-
-static void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb)
-{
-	struct llc_addr saddr, daddr;
-	struct sock *sk;
-
-	llc_pdu_decode_sa(skb, saddr.mac);
-	llc_pdu_decode_ssap(skb, &saddr.lsap);
-	llc_pdu_decode_da(skb, daddr.mac);
-	llc_pdu_decode_dsap(skb, &daddr.lsap);
-
-	sk = llc_lookup_established(sap, &saddr, &daddr);
-	if (!sk) {
-		/*
-		 * Didn't find an active connection; verify if there
-		 * is a listening socket for this llc addr
-		 */
-		struct llc_opt *llc;
-		struct sock *parent = llc_lookup_listener(sap, &daddr);
-
-		if (!parent) {
-			dprintk("llc_lookup_listener failed!\n");
-			goto drop;
-		}
-
-		sk = llc_sk_alloc(parent->sk_family, GFP_ATOMIC);
-		if (!sk) {
-			sock_put(parent);
-			goto drop;
-		}
-		llc = llc_sk(sk);
-		memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
-		memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
-		llc_sap_assign_sock(sap, sk);
-		sock_hold(sk);
-		sock_put(parent);
-		skb->sk = parent;
-	} else
-		skb->sk = sk;
-	bh_lock_sock(sk);
-	if (!sock_owned_by_user(sk))
-		llc_conn_rcv(sk, skb);
-	else {
-		dprintk("%s: adding to backlog...\n", __FUNCTION__);
-		llc_set_backlog_type(skb, LLC_PACKET);
-		sk_add_backlog(sk, skb);
-	}
-	bh_unlock_sock(sk);
-	sock_put(sk);
-	return;
-drop:
-	kfree_skb(skb);
 }

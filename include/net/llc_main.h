@@ -19,9 +19,6 @@
 #define LLC_ACK_TIME		 1
 #define LLC_REJ_TIME		 3
 #define LLC_BUSY_TIME		 3
-#define LLC_DEST_INVALID	 0	/* Invalid LLC PDU type */
-#define LLC_DEST_SAP		 1	/* Type 1 goes here */
-#define LLC_DEST_CONN		 2	/* Type 2 goes here */
 
 /**
  * struct llc_station - LLC station component
