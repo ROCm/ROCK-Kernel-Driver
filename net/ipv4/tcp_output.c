@@ -326,7 +326,7 @@ static void tcp_queue_skb(struct sock *sk, struct sk_buff *skb)
 	/* Advance write_seq and place onto the write_queue. */
 	tp->write_seq = TCP_SKB_CB(skb)->end_seq;
 	__skb_queue_tail(&sk->sk_write_queue, skb);
-	tcp_charge_skb(sk, skb);
+	sk_charge_skb(sk, skb);
 
 	/* Queue it, remembering where we must start sending. */
 	if (tp->send_head == NULL)
@@ -439,7 +439,7 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	buff = tcp_alloc_skb(sk, nsize, GFP_ATOMIC);
 	if (buff == NULL)
 		return -ENOMEM; /* We'll just try again later. */
-	tcp_charge_skb(sk, buff);
+	sk_charge_skb(sk, buff);
 
 	/* Correct the sequence numbers. */
 	TCP_SKB_CB(buff)->seq = TCP_SKB_CB(skb)->seq + len;
@@ -1169,7 +1169,7 @@ int tcp_send_synack(struct sock *sk)
 			__skb_unlink(skb, &sk->sk_write_queue);
 			__skb_queue_head(&sk->sk_write_queue, nskb);
 			tcp_free_skb(sk, skb);
-			tcp_charge_skb(sk, nskb);
+			sk_charge_skb(sk, nskb);
 			skb = nskb;
 		}
 
@@ -1329,7 +1329,7 @@ int tcp_connect(struct sock *sk)
 	TCP_SKB_CB(buff)->when = tcp_time_stamp;
 	tp->retrans_stamp = TCP_SKB_CB(buff)->when;
 	__skb_queue_tail(&sk->sk_write_queue, buff);
-	tcp_charge_skb(sk, buff);
+	sk_charge_skb(sk, buff);
 	tp->packets_out++;
 	tcp_transmit_skb(sk, skb_clone(buff, GFP_KERNEL));
 	TCP_INC_STATS(TcpActiveOpens);
