@@ -66,8 +66,6 @@
 #include <net/udp.h>
 #include <net/tcp.h>
 
-#include <asm/uaccess.h>
-
 /*
  * Local variables
  */
