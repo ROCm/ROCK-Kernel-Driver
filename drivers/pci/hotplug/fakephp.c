@@ -40,7 +40,7 @@
 #include "pci_hotplug.h"
 #include "../pci.h"
 
-#if !defined(CONFIG_HOTPLUG_PCI_FAKE_MODULE)
+#if !defined(MODULE)
 	#define MY_NAME	"fakephp"
 #else
 	#define MY_NAME	THIS_MODULE->name

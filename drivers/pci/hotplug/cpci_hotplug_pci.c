@@ -32,7 +32,7 @@
 #include "pci_hotplug.h"
 #include "cpci_hotplug.h"
 
-#if !defined(CONFIG_HOTPLUG_CPCI_MODULE)
+#if !defined(MODULE)
 #define MY_NAME	"cpci_hotplug"
 #else
 #define MY_NAME	THIS_MODULE->name

@@ -36,7 +36,7 @@
 #include <asm/io.h>		
 #include "pci_hotplug.h"
 
-#if !defined(CONFIG_HOTPLUG_PCI_SHPC_MODULE)
+#if !defined(MODULE)
 	#define MY_NAME	"shpchp"
 #else
 	#define MY_NAME	THIS_MODULE->name

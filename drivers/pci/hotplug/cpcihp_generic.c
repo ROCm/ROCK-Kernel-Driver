@@ -45,7 +45,7 @@
 #define DRIVER_AUTHOR	"Scott Murray <scottm@somanetworks.com>"
 #define DRIVER_DESC	"Generic port I/O CompactPCI Hot Plug Driver"
 
-#if !defined(CONFIG_HOTPLUG_CPCI_GENERIC_MODULE)
+#if !defined(MODULE)
 #define MY_NAME	"cpcihp_generic"
 #else
 #define MY_NAME	THIS_MODULE->name
