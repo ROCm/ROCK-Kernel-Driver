@@ -21,9 +21,25 @@ static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 	cpumask_t mask = node_dev->cpumap;
 	int len;
 
-	/* FIXME - someone should pass us a buffer size (count) or
-	 * use seq_file or something to avoid buffer overrun risk. */
-	len = cpumask_scnprintf(buf, 99 /* XXX FIXME */, mask);
+	/*
+	 * Serious b**t ugly hack alert:
+	 *  1) The following will overwrite a kernel buf[] if NR_CPUS
+	 *     large enough that cpumask_scnprintf() result too big.
+	 *  2) The following will overwrite users read buffer if it isn't
+	 *     large enough to hold cpumask_scnprintf() result.
+	 *  3) The following may return a count larger than that asked
+	 *     for in the read, possibly confusing unsuspecting user code.
+	 *  4) For the above, someone should pass us a buffer size (count)
+	 *     or use seq_file or something to avoid buffer overrun risks.
+	 *  5) Following hardcodes that mask scnprintf format requires 9
+	 *     chars of output for each 32 bits of mask or fraction.
+	 *  6) Following prints stale node_dev->cpumap value, instead of
+	 *     evaluating afresh node_to_cpumask(node_dev->sysdev.id).
+	 *  7) Why does struct node even has the field cpumap.  Won't it
+	 *     just get stale, especially in the face of cpu hotplug?
+	 *						 -- anon
+	 */
+	len = cpumask_scnprintf(buf, ((NR_CPUS+31)/32)*9 /* XXX FIXME */, mask);
 	len += sprintf(buf + len, "\n");
 	return len;
 }
