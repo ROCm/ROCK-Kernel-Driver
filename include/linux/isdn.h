@@ -16,6 +16,9 @@
 
 #include <linux/ioctl.h>
 
+// FIXME!!!
+#include <../drivers/isdn/i4l/isdn_fsm.h>
+
 #ifdef CONFIG_COBALT_MICRO_SERVER
 /* Save memory */
 #define ISDN_MAX_DRIVERS    2
@@ -282,6 +285,8 @@ struct isdn_net_dev_s;
 struct isdn_net_local_s;
 
 struct isdn_netif_ops {
+	int			(*hard_start_xmit) (struct sk_buff *skb,
+						    struct net_device *dev);
 	int			(*hard_header) (struct sk_buff *skb,
 						struct net_device *dev,
 						unsigned short type,
@@ -294,26 +299,24 @@ struct isdn_netif_ops {
 	unsigned short		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		type;	/* interface hardware type	*/
 	unsigned char		addr_len;/* hardware address length	*/
-	void                    (*receive)(struct isdn_net_dev_s *p,
-					   struct isdn_net_local_s *olp,
-					   struct sk_buff *skb);
-	void                    (*connected)(struct isdn_net_local_s *lp);
-	void                    (*disconnected)(struct isdn_net_local_s *lp);
-	int                     (*bind)(struct isdn_net_local_s *lp);
-	void                    (*unbind)(struct isdn_net_local_s *lp);
-	int                     (*init)(struct isdn_net_local_s *lp);
-	void                    (*cleanup)(struct isdn_net_local_s *lp);
-	int                     (*open)(struct isdn_net_local_s *lp);
-	void                    (*close)(struct isdn_net_local_s *lp);
+	void                    (*receive)(struct isdn_net_local_s *,
+					   struct isdn_net_dev_s *,
+					   struct sk_buff *);
+	void                    (*connected)(struct isdn_net_dev_s *);
+	void                    (*disconnected)(struct isdn_net_dev_s *);
+	int                     (*bind)(struct isdn_net_dev_s *);
+	void                    (*unbind)(struct isdn_net_dev_s *);
+	int                     (*init)(struct isdn_net_local_s *);
+	void                    (*cleanup)(struct isdn_net_local_s *);
+	int                     (*open)(struct isdn_net_local_s *);
+	void                    (*close)(struct isdn_net_local_s *);
 };
 
 /* Local interface-data */
 typedef struct isdn_net_local_s {
   ulong                  magic;
-  spinlock_t             lock;
   struct net_device_stats stats;       /* Ethernet Statistics              */
   int                    flags;        /* Connection-flags                 */
-  int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
   int	        	 dialtimeout;  /* How long shall we try on dialing */
   int			 dialwait;     /* wait after failed attempt        */
@@ -329,26 +332,17 @@ typedef struct isdn_net_local_s {
   u_char                 l2_proto;     /* Layer-2-protocol                 */
   u_char                 l3_proto;     /* Layer-3-protocol                 */
 
-  int                    sqfull;       /* Flag: netdev-queue overloaded    */
-  ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */
   int                    triggercps;   /* BogoCPS needed for trigger slave */
   struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  struct net_device      *master;      /* Ptr to Master device for slaves  */
-  struct net_device      *slave;       /* Ptr to Slave device for masters  */
-  struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
-  struct isdn_net_local_s *last;       /* Ptr to last link in bundle       */
-  struct isdn_net_dev_s  *netdev;      /* Ptr to netdev                    */
-  struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
-	                               /* be transmitted asap              */
-  atomic_t frame_cnt;                  /* number of frames currently       */
-                        	       /* queued in HL driver              */    
-                                       /* Ptr to orig. hard_header_cache   */
-  spinlock_t             xmit_lock;    /* used to protect the xmit path of */
-                                       /* a particular channel (including  */
-                                       /* the frame_cnt                    */
+
+  struct list_head       slaves;       /* list of all bundled channels     */
+  struct list_head       online;       /* circular list of all bundled
+					  channels, which are currently
+					  online                           */
+  spinlock_t             online_lock;  /* lock to protect queue            */
 
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
@@ -361,33 +355,34 @@ typedef struct isdn_net_local_s {
   ulong cisco_last_slarp_in;		/* jiffie of last keepalive packet we received */
   char cisco_line_state;		/* state of line according to keepalive packets */
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
-  struct timer_list cisco_timer;
-  struct work_struct tqueue;
-  struct isdn_netif_ops   *ops;
+
+  struct timer_list       cisco_timer;
+
+  struct isdn_netif_ops  *ops;
+
+  struct net_device       dev;          /* interface to upper levels        */
 } isdn_net_local;
 
 /* the interface itself */
 typedef struct isdn_net_dev_s {
-  isdn_net_local         local;
-
   int                    isdn_slot;    /* Index to isdn device/channel     */
   int                    pre_device;   /* Preselected isdn-device          */
   int                    pre_channel;  /* Preselected isdn-channel         */
   int                    exclusive;    /* -1 if non excl./idx to excl chan */
 
   struct timer_list      dial_timer;   /* dial events timer                */
+  struct fsm_inst        fi;           /* call control state machine       */
   int                    dial_event;   /* event in case of timer expiry    */
-  int                    dialstate;    /* State for dialing                */
   int                    dial;         /* # of phone number just dialed    */
   int                    outgoing;     /* Flag: outgoing call              */
-  unsigned long		 dialstarted;	/* first dialing-attempt           */
-  unsigned long		 dialwait_timer;/* earliest next dialing-attempt   */
+  int                    dialretry;    /* Counter for Dialout-retries      */
 
   int                    cps;          /* current speed of this interface  */
   int                    transcount;   /* byte-counter for cps-calculation */
   int                    last_jiffies; /* when transcount was reset        */
+  int                    sqfull;       /* Flag: netdev-queue overloaded    */
+  ulong                  sqfull_stamp; /* Start-Time of overload           */
 
-  struct timer_list      hup_timer;    /* auto hangup timer                */
   int                    huptimer;     /* Timeout-counter for auto-hangup  */
   int                    charge;       /* Counter for charging units       */
   int                    charge_state; /* ChargeInfo state machine         */
@@ -397,13 +392,22 @@ typedef struct isdn_net_dev_s {
   int                    pppbind;      /* ippp device for bindings         */
   int			 ppp_slot;     /* PPPD device slot number          */
 
-  isdn_net_local         *queue;       /* circular list of all bundled
-					  channels, which are currently
-					  online                           */
-  spinlock_t queue_lock;               /* lock to protect queue            */
+  spinlock_t             xmit_lock;    /* used to protect the xmit path of */
+                                       /* a particular channel (including  */
+                                       /* the frame_cnt                    */
+  struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
+	                               /* be transmitted asap              */
+  atomic_t               frame_cnt;    /* number of frames currently       */
+                        	       /* queued in HL driver              */
+  struct tasklet_struct  tlet;
+
+  isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
+
+  struct list_head       slaves;       /* Members of local->slaves         */
+  struct list_head       online;       /* Members of local->online         */
+
   char                   name[10];     /* Name of device                   */
-  struct list_head global_list;        /* global list of all isdn_net_devs */
-  struct net_device dev;               /* interface to upper levels        */
+  struct list_head       global_list;  /* global list of all isdn_net_devs */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
    			         * with the per-bundle data */
