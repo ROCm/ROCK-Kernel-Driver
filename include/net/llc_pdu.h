@@ -243,7 +243,6 @@ extern void llc_pdu_decode_sa(struct sk_buff *skb, u8 *sa);
 extern void llc_pdu_decode_da(struct sk_buff *skb, u8 *ds);
 extern void llc_pdu_decode_dsap(struct sk_buff *skb, u8 *dsap);
 extern void llc_pdu_decode_ssap(struct sk_buff *skb, u8 *ssap);
-extern void llc_decode_pdu_type(struct sk_buff *skb, u8 *destination);
 extern void llc_pdu_header_init(struct sk_buff *skb, u8 pdu_type, u8 ssap,
 				u8 dsap, u8 cr);
 extern void llc_pdu_init_as_ui_cmd(struct sk_buff *skb);

@@ -533,40 +533,6 @@ static void llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type)
 }
 
 /**
- *	llc_decode_pdu_type - designates component LLC must handle for PDU
- *	@skb: input skb
- *	@dest: destination component
- *
- *	This function designates which component of LLC must handle this PDU.
- */
-void llc_decode_pdu_type(struct sk_buff *skb, u8 *dest)
-{
-	u8 type = LLC_DEST_CONN; /* I-PDU or S-PDU type */
-	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-
-	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) != LLC_PDU_TYPE_U)
-		goto out;
-	switch (LLC_U_PDU_CMD(pdu)) {
-	case LLC_1_PDU_CMD_XID:
-	case LLC_1_PDU_CMD_UI:
-	case LLC_1_PDU_CMD_TEST:
-		type = LLC_DEST_SAP;
-		break;
-	case LLC_2_PDU_CMD_SABME:
-	case LLC_2_PDU_CMD_DISC:
-	case LLC_2_PDU_RSP_UA:
-	case LLC_2_PDU_RSP_DM:
-	case LLC_2_PDU_RSP_FRMR:
-		break;
-	default:
-		type = LLC_DEST_INVALID;
-		break;
-	}
-out:
-	*dest = type;
-}
-
-/**
  *	llc_get_hdr_len - designates LLC header length
  *	@type: type of PDU.
  *

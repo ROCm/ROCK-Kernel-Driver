@@ -53,6 +53,39 @@ static void (*llc_type_handlers[2])(struct llc_sap *sap,
 };
 
 /**
+ *	llc_pdu_type - returns which LLC component must handle for PDU
+ *	@skb: input skb
+ *
+ *	This function returns which LLC component must handle this PDU.
+ */
+static __inline__ int llc_pdu_type(struct sk_buff *skb)
+{
+	int type = LLC_DEST_CONN; /* I-PDU or S-PDU type */
+	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
+
+	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) != LLC_PDU_TYPE_U)
+		goto out;
+	switch (LLC_U_PDU_CMD(pdu)) {
+	case LLC_1_PDU_CMD_XID:
+	case LLC_1_PDU_CMD_UI:
+	case LLC_1_PDU_CMD_TEST:
+		type = LLC_DEST_SAP;
+		break;
+	case LLC_2_PDU_CMD_SABME:
+	case LLC_2_PDU_CMD_DISC:
+	case LLC_2_PDU_RSP_UA:
+	case LLC_2_PDU_RSP_DM:
+	case LLC_2_PDU_RSP_FRMR:
+		break;
+	default:
+		type = LLC_DEST_INVALID;
+		break;
+	}
+out:
+	return type;
+}
+
+/**
  *	llc_rcv - 802.2 entry point from net lower layers
  *	@skb: received pdu
  *	@dev: device that receive pdu
@@ -69,7 +102,7 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 {
 	struct llc_sap *sap;
 	struct llc_pdu_sn *pdu;
-	u8 dest;
+	int dest;
 
 	/*
 	 * When the interface is in promisc. mode, drop all the crap that it
@@ -104,7 +137,7 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		sap->rcv_func(skb, dev, pt);
 		goto out;
 	}
-	llc_decode_pdu_type(skb, &dest);
+	dest = llc_pdu_type(skb);
 	if (unlikely(!dest || !llc_type_handlers[dest - 1]))
 		goto drop;
 	llc_type_handlers[dest - 1](sap, skb);
