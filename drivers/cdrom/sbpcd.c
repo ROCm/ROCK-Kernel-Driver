@@ -625,7 +625,7 @@ static u_char drv_pattern[NR_SBPCD]={speed_auto,speed_auto,speed_auto,speed_auto
  */
 static int d; /* DriveStruct index: drive number */
 
-static struct {
+static struct sbpcd_drive {
 	char drv_id;           /* "jumpered" drive ID or -1 */
 	char drv_sel;          /* drive select lines bits */
 	
@@ -727,6 +727,8 @@ static struct {
 	struct cdrom_device_info *sbpcd_infop;
 
 } D_S[NR_SBPCD];
+
+static struct sbpcd_drive *current_drive = D_S;
 
 /*
  * drive space ends here (needed separate for each unit)
@@ -3579,6 +3581,7 @@ static int __init check_version(void)
 static void switch_drive(int i)
 {
 	d=i;
+	current_drive = D_S + i;
 	OUT(CDo_enable,D_S[d].drv_sel);
 	msg(DBG_DID,"drive %d (ID=%d) activated.\n", i, D_S[d].drv_id);
 	return;
