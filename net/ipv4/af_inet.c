@@ -103,8 +103,6 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <linux/skbuff.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/raw.h>
 #include <net/icmp.h>
