@@ -5,11 +5,13 @@ obj-y		:= dma.o i386.o
 ifdef	CONFIG_VISWS
 obj-y		+= visws.o
 else
+
+obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
+obj-$(CONFIG_PCI_DIRECT)	+= direct.o
+
 ifdef	CONFIG_MULTIQUAD
 obj-y		+= numa.o
 else
-obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
-obj-$(CONFIG_PCI_DIRECT)	+= direct.o
 obj-y		+= fixup.o
 
 ifdef	CONFIG_ACPI_PCI

@@ -3,7 +3,7 @@
  */
 #include <linux/pci.h>
 
-#inclued "pci.h"
+#include "pci.h"
 
 #define BUS2QUAD(global) (mp_bus_id_to_node[global])
 #define BUS2LOCAL(global) (mp_bus_id_to_local[global])
@@ -101,6 +101,9 @@ static int __init pci_numa_init(void)
 {
 	int quad;
 
+	pci_config_read = pci_conf1_read;
+	pci_config_write = pci_conf1_write;
+
 	pci_root_bus = pcibios_scan_root(0);
 	if (clustered_apic_mode && (numnodes > 1)) {
 		for (quad = 1; quad < numnodes; ++quad) {
@@ -112,3 +115,5 @@ static int __init pci_numa_init(void)
 	}
 	return 0;
 }
+
+subsys_initcall(pci_numa_init);
