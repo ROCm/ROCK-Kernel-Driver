@@ -425,7 +425,7 @@ CONFIG_M386
    - "Winchip-C6" for original IDT Winchip.
    - "Winchip-2" for IDT Winchip 2.
    - "Winchip-2A" for IDT Winchips with 3dNow! capabilities.
-   - "CyrixIII" for VIA Cyrix III or VIA C3.
+   - "CyrixIII/VIA C3" for VIA Cyrix III or VIA C3.
 
   If you don't know what to do, choose "386".
 

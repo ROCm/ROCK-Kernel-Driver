@@ -31,7 +31,7 @@ choice 'Processor family' \
 	 Winchip-C6				CONFIG_MWINCHIPC6 \
 	 Winchip-2				CONFIG_MWINCHIP2 \
 	 Winchip-2A/Winchip-3			CONFIG_MWINCHIP3D \
-	 CyrixIII/C3				CONFIG_MCYRIXIII" Pentium-Pro
+	 CyrixIII/VIA-C3			CONFIG_MCYRIXIII" Pentium-Pro
 #
 # Define implied options from the CPU selection here
 #
