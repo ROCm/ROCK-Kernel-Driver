@@ -839,7 +839,9 @@ static int clear_fw_chain(struct ip_chain *chainptr)
 			i->branch->refcount--;
 		kfree(i);
 		i = tmp;
-		MOD_DEC_USE_COUNT;
+		/* We will block in cleanup's unregister sockopt if unloaded,
+		   so this is safe. */
+		module_put(THIS_MODULE);
 	}
 	return 0;
 }
@@ -870,6 +872,11 @@ static int append_to_chain(struct ip_chain *chainptr, struct ip_fwkernel *rule)
 	struct ip_fwkernel *i;
 
 	FWC_HAVE_LOCK(fwc_wlocks);
+
+	/* Are we unloading now?  We will block on nf_unregister_sockopt */
+	if (!try_module_get(THIS_MODULE))
+		return ENOPROTOOPT;
+
 	/* Special case if no rules already present */
 	if (chainptr->chain == NULL) {
 
@@ -886,7 +893,6 @@ static int append_to_chain(struct ip_chain *chainptr, struct ip_fwkernel *rule)
 	if (rule->branch) rule->branch->refcount++;
 
 append_successful:
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -900,6 +906,11 @@ static int insert_in_chain(struct ip_chain *chainptr,
 	struct ip_fwkernel *f = chainptr->chain;
 
 	FWC_HAVE_LOCK(fwc_wlocks);
+
+	/* Are we unloading now?  We will block on nf_unregister_sockopt */
+	if (!try_module_get(THIS_MODULE))
+		return ENOPROTOOPT;
+
 	/* special case if the position is number 1 */
 	if (position == 1) {
 		frwl->next = chainptr->chain;
@@ -917,7 +928,6 @@ static int insert_in_chain(struct ip_chain *chainptr,
 	f->next = frwl;
 
 insert_successful:
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -952,7 +962,9 @@ static int del_num_from_chain(struct ip_chain *chainptr, __u32 rulenum)
 		kfree(tmp);
 	}
 
-	MOD_DEC_USE_COUNT;
+	/* We will block in cleanup's unregister sockopt if unloaded,
+	   so this is safe. */
+	module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -1059,7 +1071,9 @@ static int del_rule_from_chain(struct ip_chain *chainptr,
 		else
 			chainptr->chain = ftmp->next;
 		kfree(ftmp);
-		MOD_DEC_USE_COUNT;
+		/* We will block in cleanup's unregister sockopt if unloaded,
+		   so this is safe. */
+		module_put(THIS_MODULE);
 		break;
 	}
 
@@ -1101,7 +1115,9 @@ static int del_chain(ip_chainlabel label)
 	tmp->next = tmp2->next;
 	kfree(tmp2);
 
-	MOD_DEC_USE_COUNT;
+	/* We will block in cleanup's unregister sockopt if unloaded,
+	   so this is safe. */
+	module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -1149,12 +1165,15 @@ static int create_chain(ip_chainlabel label)
 	if (strcmp(tmp->label,label) == 0)
 		return EEXIST;
 
+	/* Are we unloading now?  We will block on nf_unregister_sockopt */
+	if (!try_module_get(THIS_MODULE))
+		return ENOPROTOOPT;
+
 	tmp->next = ip_init_chain(label, 0, FW_SKIP); /* refcount is
 					      * zero since this is a
 					      * user defined chain *
 					      * and therefore can be
 					      * deleted */
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
