@@ -468,8 +468,7 @@ asmlinkage ssize_t sys32_pread(unsigned int fd, char * buf,
 	if (!(file->f_mode & FMODE_READ))
 		goto out;
 	pos = merge_64(a4, a5);
-	ret = locks_verify_area(FLOCK_VERIFY_READ, file->f_dentry->d_inode,
-				file, pos, count);
+	ret = rw_verify_area(READ, file, &pos, count);
 	if (ret)
 		goto out;
 	ret = -EINVAL;
@@ -504,8 +503,7 @@ asmlinkage ssize_t sys32_pwrite(unsigned int fd, const char * buf,
 	if (!(file->f_mode & FMODE_WRITE))
 		goto out;
 	pos = merge_64(a4, a5);
-	ret = locks_verify_area(FLOCK_VERIFY_WRITE, file->f_dentry->d_inode,
-				file, pos, count);
+	ret = rw_verify_area(WRITE, file, &pos, count);
 	if (ret)
 		goto out;
 	ret = -EINVAL;

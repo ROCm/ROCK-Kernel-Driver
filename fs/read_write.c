@@ -182,6 +182,16 @@ bad:
 }
 #endif
 
+
+int rw_verify_area(int read_write, struct file *file, loff_t *ppos, size_t count)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+
+	if (inode->i_flock && MANDATORY_LOCK(inode))
+		return locks_mandatory_area(read_write == READ ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE, inode, file, *ppos, count);
+	return 0;
+}
+
 ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct kiocb kiocb;
@@ -200,7 +210,6 @@ EXPORT_SYMBOL(do_sync_read);
 
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
-	struct inode *inode = file->f_dentry->d_inode;
 	ssize_t ret;
 
 	if (!(file->f_mode & FMODE_READ))
@@ -208,7 +217,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	if (!file->f_op || (!file->f_op->read && !file->f_op->aio_read))
 		return -EINVAL;
 
-	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
+	ret = rw_verify_area(READ, file, pos, count);
 	if (!ret) {
 		ret = security_file_permission (file, MAY_READ);
 		if (!ret) {
@@ -247,7 +256,6 @@ EXPORT_SYMBOL(do_sync_write);
 
 ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
 {
-	struct inode *inode = file->f_dentry->d_inode;
 	ssize_t ret;
 
 	if (!(file->f_mode & FMODE_WRITE))
@@ -255,7 +263,7 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 	if (!file->f_op || (!file->f_op->write && !file->f_op->aio_write))
 		return -EINVAL;
 
-	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
+	ret = rw_verify_area(WRITE, file, pos, count);
 	if (!ret) {
 		ret = security_file_permission (file, MAY_WRITE);
 		if (!ret) {
@@ -399,7 +407,6 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	int seg;
 	io_fn_t fn;
 	iov_fn_t fnv;
-	struct inode *inode;
 
 	/*
 	 * SuS says "The readv() function *may* fail if the iovcnt argument
@@ -452,11 +459,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		goto out;
 	}
 
-	inode = file->f_dentry->d_inode;
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	ret = locks_verify_area((type == READ 
-				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
-				inode, file, *pos, tot_len);
+	ret = rw_verify_area(type, file, pos, tot_len);
 	if (ret)
 		goto out;
 
@@ -603,7 +606,7 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	else
 		if (!(in_file->f_mode & FMODE_PREAD))
 			goto fput_in;
-	retval = locks_verify_area(FLOCK_VERIFY_READ, in_inode, in_file, *ppos, count);
+	retval = rw_verify_area(READ, in_file, ppos, count);
 	if (retval)
 		goto fput_in;
 
@@ -624,7 +627,7 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	if (!out_file->f_op || !out_file->f_op->sendpage)
 		goto fput_out;
 	out_inode = out_file->f_dentry->d_inode;
-	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
+	retval = rw_verify_area(WRITE, out_file, &out_file->f_pos, count);
 	if (retval)
 		goto fput_out;
 

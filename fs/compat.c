@@ -1126,7 +1126,6 @@ static ssize_t compat_do_readv_writev(int type, struct file *file,
 	int seg;
 	io_fn_t fn;
 	iov_fn_t fnv;
-	struct inode *inode;
 
 	/*
 	 * SuS says "The readv() function *may* fail if the iovcnt argument
@@ -1191,11 +1190,7 @@ static ssize_t compat_do_readv_writev(int type, struct file *file,
 		goto out;
 	}
 
-	inode = file->f_dentry->d_inode;
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	ret = locks_verify_area((type == READ
-				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
-				inode, file, *pos, tot_len);
+	ret = rw_verify_area(type, file, pos, tot_len);
 	if (ret)
 		goto out;
 
