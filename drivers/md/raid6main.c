@@ -1469,13 +1469,13 @@ static void unplug_slaves(mddev_t *mddev)
 	spin_lock_irqsave(&conf->device_lock, flags);
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->disks[i].rdev;
-		if (rdev && atomic_read(&rdev->nr_pending)) {
+		if (rdev && !rdev->faulty && atomic_read(&rdev->nr_pending)) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
 			atomic_inc(&rdev->nr_pending);
 			spin_unlock_irqrestore(&conf->device_lock, flags);
 
-			if (r_queue && r_queue->unplug_fn)
+			if (r_queue->unplug_fn)
 				r_queue->unplug_fn(r_queue);
 
 			spin_lock_irqsave(&conf->device_lock, flags);

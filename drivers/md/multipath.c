@@ -140,7 +140,7 @@ static void unplug_slaves(mddev_t *mddev)
 	spin_lock_irqsave(&conf->device_lock, flags);
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
-		if (rdev && !rdev->faulty) {
+		if (rdev && !rdev->faulty && atomic_read(&rdev->nr_pending)) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
 			atomic_inc(&rdev->nr_pending);
