@@ -14,6 +14,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
+#include <linux/pm.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -68,8 +69,6 @@ long long __ashrdi3(long long, int);
 long long __ashldi3(long long, int);
 long long __lshrdi3(long long, int);
 int abs(int);
-
-extern unsigned char __res[];
 
 extern unsigned long mm_ptov (unsigned long paddr);
 
@@ -269,6 +268,8 @@ EXPORT_SYMBOL(pmac_xpram_read);
 EXPORT_SYMBOL(pmac_xpram_write);
 #endif /* CONFIG_NVRAM */
 EXPORT_SYMBOL(to_tm);
+
+EXPORT_SYMBOL(pm_power_off);
 
 EXPORT_SYMBOL_NOVERS(__ashrdi3);
 EXPORT_SYMBOL_NOVERS(__ashldi3);
