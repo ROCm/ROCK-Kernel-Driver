@@ -32,7 +32,7 @@
 #define RTC_CR_MIE	(1 << 0)
 
 extern int (*set_rtc)(void);
-static void *rtc_base;
+static void __iomem *rtc_base;
 
 static int integrator_set_rtc(void)
 {
@@ -118,7 +118,7 @@ static int rtc_probe(struct amba_device *dev, void *id)
 	xtime.tv_sec = __raw_readl(rtc_base + RTC_DR);
 
 	ret = request_irq(dev->irq[0], rtc_interrupt, SA_INTERRUPT,
-			  "rtc-pl030", rtc_base);
+			  "rtc-pl030", dev);
 	if (ret)
 		goto map_out;
 
@@ -130,7 +130,7 @@ static int rtc_probe(struct amba_device *dev, void *id)
 	return 0;
 
  irq_out:
-	free_irq(dev->irq[0], rtc_base);
+	free_irq(dev->irq[0], dev);
  map_out:
 	iounmap(rtc_base);
 	rtc_base = NULL;
@@ -146,7 +146,7 @@ static int rtc_remove(struct amba_device *dev)
 
 	writel(0, rtc_base + RTC_CR);
 
-	free_irq(dev->irq[0], rtc_base);
+	free_irq(dev->irq[0], dev);
 	unregister_rtc(&rtc_ops);
 
 	iounmap(rtc_base);

@@ -35,7 +35,7 @@ module_param_named(lmid, module_id, int, 0444);
 MODULE_PARM_DESC(lmid, "logic module stack position");
 
 struct impd1_module {
-	void		*base;
+	void __iomem	*base;
 	struct clk	vcos[2];
 };
 
