@@ -768,6 +768,21 @@ static void poison_obj(kmem_cache_t *cachep, void *addr, unsigned char val)
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
+static void *fprob(unsigned char* addr, unsigned int size)
+{
+	unsigned char *end;
+	
+	end = addr + size - 1;
+
+	for (; addr < end; addr++) {
+		if (*addr != POISON_BEFORE && *addr != POISON_AFTER)
+			return addr;
+	}
+	if (*addr != POISON_END)
+		return addr;
+	return NULL;
+}
+
 static void check_poison_obj(kmem_cache_t *cachep, void *addr)
 {
 	int size = cachep->objsize;
@@ -776,9 +791,33 @@ static void check_poison_obj(kmem_cache_t *cachep, void *addr)
 		addr += BYTES_PER_WORD;
 		size -= 2*BYTES_PER_WORD;
 	}
-	end = memchr(addr, POISON_END, size);
-	if (end != (addr+size-1))
+	end = fprob(addr, size);
+	if (end) {
+		int s;
+		printk(KERN_ERR "Slab corruption: start=%p, expend=%p, "
+				"problemat=%p\n", addr, addr+size-1, end);
+		printk(KERN_ERR "Data: ");
+		for (s = 0; s < size; s++) {
+			if (((char*)addr)[s] == POISON_BEFORE)
+				printk(".");
+			else if (((char*)addr)[s] == POISON_AFTER)
+				printk("*");
+			else
+				printk("%02X ", ((unsigned char*)addr)[s]);
+		}
+		printk("\n");
+		printk(KERN_ERR "Next: ");
+		for (; s < size + 32; s++) {
+			if (((char*)addr)[s] == POISON_BEFORE)
+				printk(".");
+			else if (((char*)addr)[s] == POISON_AFTER)
+				printk("*");
+			else
+				printk("%02X ", ((unsigned char*)addr)[s]);
+		}
+		printk("\n");
 		slab_error(cachep, "object was modified after freeing");
+	}
 }
 #endif
 
