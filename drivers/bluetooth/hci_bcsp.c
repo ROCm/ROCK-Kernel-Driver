@@ -617,7 +617,7 @@ static int bcsp_recv(struct hci_uart *hu, void *data, int count)
 					bcsp->rx_count = 0;
 					return 0;
 				}
-				bcsp->rx_skb->dev = (void *) &hu->hdev;
+				bcsp->rx_skb->dev = (void *) hu->hdev;
 				break;
 			}
 			break;

@@ -762,6 +762,27 @@ int hci_get_dev_info(unsigned long arg)
 
 /* ---- Interface to HCI drivers ---- */
 
+/* Alloc HCI device */
+struct hci_dev *hci_alloc_dev(void)
+{
+	struct hci_dev *hdev;
+
+	hdev = kmalloc(sizeof(struct hci_dev), GFP_KERNEL);
+	if (!hdev)
+		return NULL;
+
+	memset(hdev, 0, sizeof(struct hci_dev));
+
+	return hdev;
+}
+
+/* Free HCI device */
+void hci_free_dev(struct hci_dev *hdev)
+{
+	/* will free via class release */
+	class_device_put(&hdev->class_dev);
+}
+
 /* Register HCI device */
 int hci_register_dev(struct hci_dev *hdev)
 {
