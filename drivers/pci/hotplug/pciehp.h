@@ -35,11 +35,7 @@
 #include <asm/io.h>		
 #include "pci_hotplug.h"
 
-#if !defined(CONFIG_HOTPLUG_PCI_PCIE_MODULE)
-	#define MY_NAME	"pciehp"
-#else
-	#define MY_NAME	THIS_MODULE->name
-#endif
+#define MY_NAME	"pciehp"
 
 extern int pciehp_poll_mode;
 extern int pciehp_poll_time;
