@@ -156,12 +156,12 @@ int __init pluto_detect(Scsi_Host_Template *tpnt)
 		
 		pluto->fc = fc;
 	
-		SCpnt->host = host;
 		SCpnt->cmnd[0] = INQUIRY;
 		SCpnt->cmnd[4] = 255;
 		
 		/* FC layer requires this, so that SCpnt->device->tagged_supported is initially 0 */
 		SCpnt->device = &dev;
+		dev.host = host;
 		
 		SCpnt->cmd_len = COMMAND_SIZE(INQUIRY);
 	
@@ -325,16 +325,18 @@ const char *pluto_info(struct Scsi_Host *host)
  */
 static int pluto_encode_addr(Scsi_Cmnd *SCpnt, u16 *addr, fc_channel *fc, fcp_cmnd *fcmd)
 {
-	PLND(("encode addr %d %d %d\n", SCpnt->channel, SCpnt->target, SCpnt->cmnd[1] & 0xe0))
+	PLND(("encode addr %d %d %d\n", SCpnt->device->channel, SCpnt->device->id, SCpnt->cmnd[1] & 0xe0))
 	/* We don't support LUNs - neither does SSA :) */
-	if (SCpnt->cmnd[1] & 0xe0) return -EINVAL;
-	if (!SCpnt->channel) {
-		if (SCpnt->target) return -EINVAL;
+	if (SCpnt->cmnd[1] & 0xe0)
+		return -EINVAL;
+	if (!SCpnt->device->channel) {
+		if (SCpnt->device->id)
+			return -EINVAL;
 		memset (addr, 0, 4 * sizeof(u16));
 	} else {
 		addr[0] = 1;
-		addr[1] = SCpnt->channel - 1;
-		addr[2] = SCpnt->target;
+		addr[1] = SCpnt->device->channel - 1;
+		addr[2] = SCpnt->device->id;
 		addr[3] = 0;
 	}
 	/* We're Point-to-Point, so target it to the default DID */

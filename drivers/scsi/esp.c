@@ -453,7 +453,7 @@ static inline Scsi_Cmnd *remove_SC(Scsi_Cmnd **SC, int target, int lun)
 	Scsi_Cmnd *ptr, *prev;
 
 	for (ptr = *SC, prev = NULL;
-	     ptr && ((ptr->target != target) || (ptr->lun != lun));
+	     ptr && ((ptr->device->id != target) || (ptr->device->lun != lun));
 	     prev = ptr, ptr = (Scsi_Cmnd *) ptr->host_scribble)
 		;
 	if (ptr) {
@@ -1447,7 +1447,7 @@ static void esp_release_dmabufs(struct esp *esp, Scsi_Cmnd *sp)
 
 static void esp_restore_pointers(struct esp *esp, Scsi_Cmnd *sp)
 {
-	struct esp_pointers *ep = &esp->data_pointers[sp->target];
+	struct esp_pointers *ep = &esp->data_pointers[sp->device->id];
 
 	sp->SCp.ptr = ep->saved_ptr;
 	sp->SCp.buffer = ep->saved_buffer;
@@ -1457,7 +1457,7 @@ static void esp_restore_pointers(struct esp *esp, Scsi_Cmnd *sp)
 
 static void esp_save_pointers(struct esp *esp, Scsi_Cmnd *sp)
 {
-	struct esp_pointers *ep = &esp->data_pointers[sp->target];
+	struct esp_pointers *ep = &esp->data_pointers[sp->device->id];
 
 	ep->saved_ptr = sp->SCp.ptr;
 	ep->saved_buffer = sp->SCp.buffer;
@@ -1559,8 +1559,8 @@ static void esp_exec_cmd(struct esp *esp)
 
 	SDptr = SCptr->device;
 	esp_dev = SDptr->hostdata;
-	lun = SCptr->lun;
-	target = SCptr->target;
+	lun = SCptr->device->lun;
+	target = SCptr->device->id;
 
 	esp->snip = 0;
 	esp->msgout_len = 0;
@@ -1621,7 +1621,7 @@ do_sync_known:
 		 * disconnect.
 		 */
 		ESPMISC(("esp: Selecting device for first time. target=%d "
-			 "lun=%d\n", target, SCptr->lun));
+			 "lun=%d\n", target, SCptr->device->lun));
 		if (!SDptr->borken && !esp_dev->disconnect)
 			esp_dev->disconnect = 1;
 
@@ -1731,7 +1731,7 @@ after_nego_msg_built:
 		    SDptr->removable == 0) ||
 		    cdrom_hwbug_wkaround || SDptr->borken) {
 			ESPMISC((KERN_INFO "esp%d: Disabling DISCONNECT for target %d "
-				 "lun %d\n", esp->esp_id, SCptr->target, SCptr->lun));
+				 "lun %d\n", esp->esp_id, SCptr->device->id, SCptr->device->lun));
 			esp_dev->disconnect = 0;
 			*cmdp++ = IDENTIFY(0, lun);
 		} else {
@@ -1822,10 +1822,10 @@ static int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	SCpnt->SCp.phase = not_issued;
 
 	/* We use the scratch area. */
-	ESPQUEUE(("esp_queue: target=%d lun=%d ", SCpnt->target, SCpnt->lun));
-	ESPDISC(("N<%02x,%02x>", SCpnt->target, SCpnt->lun));
+	ESPQUEUE(("esp_queue: target=%d lun=%d ", SCpnt->device->id, SCpnt->device->lun));
+	ESPDISC(("N<%02x,%02x>", SCpnt->device->id, SCpnt->device->lun));
 
-	esp = (struct esp *) SCpnt->host->hostdata;
+	esp = (struct esp *) SCpnt->device->host->hostdata;
 	esp_get_dmabufs(esp, SCpnt);
 	esp_save_pointers(esp, SCpnt); /* FIXME for tag queueing */
 
@@ -1852,7 +1852,7 @@ static int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 /* Only queuing supported in this ESP driver. */
 static int esp_command(Scsi_Cmnd *SCpnt)
 {
-	struct esp *esp = (struct esp *) SCpnt->host->hostdata;
+	struct esp *esp = (struct esp *) SCpnt->device->host->hostdata;
 
 	ESPLOG(("esp%d: esp_command() called...\n", esp->esp_id));
 	return -1;
@@ -1863,7 +1863,7 @@ static void esp_dump_cmd(Scsi_Cmnd *SCptr)
 {
 	ESPLOG(("[tgt<%02x> lun<%02x> "
 		"pphase<%s> cphase<%s>]",
-		SCptr->target, SCptr->lun,
+		SCptr->device->id, SCptr->device->lun,
 		phase_string(SCptr->SCp.sent_command),
 		phase_string(SCptr->SCp.phase)));
 }
@@ -1917,7 +1917,7 @@ static void esp_dump_state(struct esp *esp)
 /* Abort a command.  The host_lock is acquired by caller. */
 static int esp_abort(Scsi_Cmnd *SCptr)
 {
-	struct esp *esp = (struct esp *) SCptr->host->hostdata;
+	struct esp *esp = (struct esp *) SCptr->device->host->hostdata;
 	int don;
 
 	ESPLOG(("esp%d: Aborting command\n", esp->esp_id));
@@ -2049,7 +2049,7 @@ static int esp_do_resetbus(struct esp *esp)
  */
 static int esp_reset(Scsi_Cmnd *SCptr)
 {
-	struct esp *esp = (struct esp *) SCptr->host->hostdata;
+	struct esp *esp = (struct esp *) SCptr->device->host->hostdata;
 
 	(void) esp_do_resetbus(esp);
 
@@ -2474,13 +2474,13 @@ static inline void esp_connect(struct esp *esp, Scsi_Cmnd *sp)
 	if (esp->prev_soff  != esp_dev->sync_max_offset ||
 	    esp->prev_stp   != esp_dev->sync_min_period ||
 	    (esp->erev > esp100a &&
-	     esp->prev_cfg3 != esp->config3[sp->target])) {
+	     esp->prev_cfg3 != esp->config3[sp->device->id])) {
 		esp->prev_soff = esp_dev->sync_max_offset;
 		esp->prev_stp = esp_dev->sync_min_period;
 		sbus_writeb(esp->prev_soff, esp->eregs + ESP_SOFF);
 		sbus_writeb(esp->prev_stp, esp->eregs + ESP_STP);
 		if (esp->erev > esp100a) {
-			esp->prev_cfg3 = esp->config3[sp->target];
+			esp->prev_cfg3 = esp->config3[sp->device->id];
 			sbus_writeb(esp->prev_cfg3, esp->eregs + ESP_CFG3);
 		}
 	}
@@ -2736,7 +2736,7 @@ static int esp_do_data_finale(struct esp *esp)
 			esp->esp_id,
 			SCptr->use_sg, SCptr->SCp.ptr, SCptr->SCp.this_residual));
 		ESPLOG(("esp%d: Forcing async for target %d\n", esp->esp_id, 
-			SCptr->target));
+			SCptr->device->id));
 		SCptr->device->borken = 1;
 		esp_dev->sync = 0;
 		bytes_sent = 0;
@@ -2842,7 +2842,7 @@ static int esp_do_freebus(struct esp *esp)
 
 		if (SCptr->SCp.Status != GOOD &&
 		    SCptr->SCp.Status != CONDITION_GOOD &&
-		    ((1<<SCptr->target) & esp->targets_present) &&
+		    ((1<<SCptr->device->id) & esp->targets_present) &&
 		    esp_dev->sync &&
 		    esp_dev->sync_max_offset) {
 			/* SCSI standard says that the synchronous capabilities
@@ -2853,7 +2853,7 @@ static int esp_do_freebus(struct esp *esp)
 			 * state.
 			 */
 			ESPMISC(("esp: Status <%d> for target %d lun %d\n",
-				 SCptr->SCp.Status, SCptr->target, SCptr->lun));
+				 SCptr->SCp.Status, SCptr->device->id, SCptr->device->lun));
 
 			/* But don't do this when spinning up a disk at
 			 * boot time while we poll for completion as it
@@ -2864,14 +2864,14 @@ static int esp_do_freebus(struct esp *esp)
 			if (esp_should_clear_sync(SCptr) != 0)
 				esp_dev->sync = 0;
 		}
-		ESPDISC(("F<%02x,%02x>", SCptr->target, SCptr->lun));
+		ESPDISC(("F<%02x,%02x>", SCptr->device->id, SCptr->device->lun));
 		esp_done(esp, ((SCptr->SCp.Status & 0xff) |
 			       ((SCptr->SCp.Message & 0xff)<<8) |
 			       (DID_OK << 16)));
 	} else if (esp->prevmsgin == DISCONNECT) {
 		/* Normal disconnect. */
 		esp_cmd(esp, ESP_CMD_ESEL);
-		ESPDISC(("D<%02x,%02x>", SCptr->target, SCptr->lun));
+		ESPDISC(("D<%02x,%02x>", SCptr->device->id, SCptr->device->lun));
 		append_SC(&esp->disconnected_SC, SCptr);
 		esp->current_SC = NULL;
 		if (esp->issue_SC)
@@ -2901,21 +2901,21 @@ static int esp_bad_reconnect(struct esp *esp)
 	sp = esp->issue_SC;
 	ESPLOG(("esp%d: issue_SC[", esp->esp_id));
 	while (sp) {
-		ESPLOG(("<%02x,%02x>", sp->target, sp->lun));
+		ESPLOG(("<%02x,%02x>", sp->device->id, sp->device->lun));
 		sp = (Scsi_Cmnd *) sp->host_scribble;
 	}
 	ESPLOG(("]\n"));
 	sp = esp->current_SC;
 	ESPLOG(("esp%d: current_SC[", esp->esp_id));
 	if (sp)
-		ESPLOG(("<%02x,%02x>", sp->target, sp->lun));
+		ESPLOG(("<%02x,%02x>", sp->device->id, sp->device->lun));
 	else
 		ESPLOG(("<NULL>"));
 	ESPLOG(("]\n"));
 	sp = esp->disconnected_SC;
 	ESPLOG(("esp%d: disconnected_SC[", esp->esp_id));
 	while (sp) {
-		ESPLOG(("<%02x,%02x>", sp->target, sp->lun));
+		ESPLOG(("<%02x,%02x>", sp->device->id, sp->device->lun));
 		sp = (Scsi_Cmnd *) sp->host_scribble;
 	}
 	ESPLOG(("]\n"));
@@ -2959,7 +2959,7 @@ static int esp_do_reconnect(struct esp *esp)
 	esp_cmd(esp, ESP_CMD_MOK);
 
 	if (esp->erev == fashme)
-		sbus_writeb(((SCptr->target & 0xf) |
+		sbus_writeb(((SCptr->device->id & 0xf) |
 			     (ESP_BUSID_RESELID | ESP_BUSID_CTR32BIT)),
 			    esp->eregs + ESP_BUSID);
 
@@ -3246,7 +3246,7 @@ static int esp_select_complete(struct esp *esp)
 	 */
 	if (esp->ireg == (ESP_INTR_FDONE | ESP_INTR_BSERV)) {
 		/* target speaks... */
-		esp->targets_present |= (1<<SCptr->target);
+		esp->targets_present |= (1<<SCptr->device->id);
 
 		/* What if the target ignores the sdtr? */
 		if (esp->snip)
@@ -3275,7 +3275,7 @@ static int esp_select_complete(struct esp *esp)
 			 * XXX for synchronous transfers.
 			 */
 			ESPLOG(("esp%d: STEP_ASEL for tgt %d\n",
-				esp->esp_id, SCptr->target));
+				esp->esp_id, SCptr->device->id));
 
 		case ESP_STEP_SID:
 			/* Arbitration won, target selected, went
@@ -3395,7 +3395,7 @@ static int esp_select_complete(struct esp *esp)
 		if (esp->disconnected_SC)
 			esp_cmd(esp, ESP_CMD_ESEL);
 
-		if (((1<<SCptr->target) & esp->targets_present) &&
+		if (((1<<SCptr->device->id) & esp->targets_present) &&
 		    esp->seqreg != 0 &&
 		    (esp->cur_msgout[0] == EXTENDED_MESSAGE) &&
 		    (SCptr->SCp.phase == in_slct_msg ||
@@ -3403,7 +3403,7 @@ static int esp_select_complete(struct esp *esp)
 			/* shit */
 			esp->snip = 0;
 			ESPLOG(("esp%d: Failed synchronous negotiation for target %d "
-				"lun %d\n", esp->esp_id, SCptr->target, SCptr->lun));
+				"lun %d\n", esp->esp_id, SCptr->device->id, SCptr->device->lun));
 			esp_dev->sync_max_offset = 0;
 			esp_dev->sync_min_period = 0;
 			esp_dev->sync = 1; /* so we don't negotiate again */
@@ -3429,9 +3429,9 @@ static int esp_select_complete(struct esp *esp)
 		 * or whenever when we are scanning the bus for targets.
 		 * But first make sure that is really what is happening.
 		 */
-		if (((1<<SCptr->target) & esp->targets_present)) {
+		if (((1<<SCptr->device->id) & esp->targets_present)) {
 			ESPLOG(("esp%d: Warning, live target %d not responding to "
-				"selection.\n", esp->esp_id, SCptr->target));
+				"selection.\n", esp->esp_id, SCptr->device->id));
 
 			/* This _CAN_ happen.  The SCSI standard states that
 			 * the target is to _not_ respond to selection if
@@ -3444,7 +3444,7 @@ static int esp_select_complete(struct esp *esp)
 			/* Else, there really isn't anyone there. */
 			ESPMISC(("esp: selection failure, maybe nobody there?\n"));
 			ESPMISC(("esp: target %d lun %d\n",
-				 SCptr->target, SCptr->lun));
+				 SCptr->device->id, SCptr->device->lun));
 			esp_done(esp, (DID_BAD_TARGET << 16));
 		}
 		return do_intr_end;
@@ -3517,7 +3517,7 @@ static int check_singlebyte_msg(struct esp *esp)
 
 	case NOP:
 		ESPLOG(("esp%d: target %d sends a nop\n", esp->esp_id,
-			esp->current_SC->target));
+			esp->current_SC->device->id));
 		return 0;
 
 	case RESTORE_POINTERS:
@@ -3600,7 +3600,7 @@ static void sync_report(struct esp *esp)
 		int integer = hz / 1000000;
 		int fraction = (hz - (integer * 1000000)) / 10000;
 		if ((esp->erev == fashme) &&
-		    (esp->config3[esp->current_SC->target] & ESP_CONFIG3_EWIDE)) {
+		    (esp->config3[esp->current_SC->device->id] & ESP_CONFIG3_EWIDE)) {
 			type = "FAST-WIDE";
 			integer <<= 1;
 			fraction <<= 1;
@@ -3615,7 +3615,7 @@ static void sync_report(struct esp *esp)
 		 * sibling call optimization.  -DaveM
 		 */
 		ESPLOG((KERN_INFO "esp%d: target %d ",
-			esp->esp_id, esp->current_SC->target));
+			esp->esp_id, esp->current_SC->device->id));
 		ESPLOG(("[period %dns offset %d %d.%02dMHz ",
 			(int) msg3 * 4, (int) msg4,
 			integer, fraction));
@@ -3623,7 +3623,7 @@ static void sync_report(struct esp *esp)
 			(((msg3 * 4) < 200) ? "-II" : "")));
 	} else {
 		ESPLOG((KERN_INFO "esp%d: target %d asynchronous\n",
-			esp->esp_id, esp->current_SC->target));
+			esp->esp_id, esp->current_SC->device->id));
 	}
 }
 
@@ -3707,11 +3707,11 @@ static int check_multibyte_msg(struct esp *esp)
 					 */
 					if (esp->erev == fashme)
 						esp_dev->sync_max_offset &= ~esp->radelay;
-					esp->config3[SCptr->target] |= bit;
+					esp->config3[SCptr->device->id] |= bit;
 				} else {
-					esp->config3[SCptr->target] &= ~bit;
+					esp->config3[SCptr->device->id] &= ~bit;
 				}
-				esp->prev_cfg3 = esp->config3[SCptr->target];
+				esp->prev_cfg3 = esp->config3[SCptr->device->id];
 				sbus_writeb(esp->prev_cfg3, esp->eregs + ESP_CFG3);
 			}
 			esp->prev_soff = esp_dev->sync_max_offset;
@@ -3721,7 +3721,7 @@ static int check_multibyte_msg(struct esp *esp)
 			ESPSDTR(("soff=%2x stp=%2x cfg3=%2x\n",
 				 esp_dev->sync_max_offset,
 				 esp_dev->sync_min_period,
-				 esp->config3[SCptr->target]));
+				 esp->config3[SCptr->device->id]));
 
 			esp->snip = 0;
 		} else if (esp_dev->sync_max_offset) {
@@ -3740,8 +3740,8 @@ static int check_multibyte_msg(struct esp *esp)
 					bit = ESP_CONFIG3_FAST;
 				else
 					bit = ESP_CONFIG3_FSCSI;
-				esp->config3[SCptr->target] &= ~bit;
-				esp->prev_cfg3 = esp->config3[SCptr->target];
+				esp->config3[SCptr->device->id] &= ~bit;
+				esp->prev_cfg3 = esp->config3[SCptr->device->id];
 				sbus_writeb(esp->prev_cfg3, esp->eregs + ESP_CFG3);
 			}
 		}
@@ -3778,7 +3778,7 @@ static int check_multibyte_msg(struct esp *esp)
 			/* Things look good; let's see what we got. */
 			if (size == 16) {
 				/* Set config 3 register for this target. */
-				esp->config3[SCptr->target] |= ESP_CONFIG3_EWIDE;
+				esp->config3[SCptr->device->id] |= ESP_CONFIG3_EWIDE;
 			} else {
 				/* Just make sure it was one byte sized. */
 				if (size != 8) {
@@ -3788,9 +3788,9 @@ static int check_multibyte_msg(struct esp *esp)
 					goto finish;
 				}
 				/* Pure paranoia. */
-				esp->config3[SCptr->target] &= ~(ESP_CONFIG3_EWIDE);
+				esp->config3[SCptr->device->id] &= ~(ESP_CONFIG3_EWIDE);
 			}
-			esp->prev_cfg3 = esp->config3[SCptr->target];
+			esp->prev_cfg3 = esp->config3[SCptr->device->id];
 			sbus_writeb(esp->prev_cfg3, esp->eregs + ESP_CFG3);
 
 			/* Regardless, next try for sync transfers. */
@@ -4258,7 +4258,7 @@ static void esp_handle(struct esp *esp)
 			 * a nexus is alive on the bus.
 			 */
 			ESPLOG(("esp%d: Forcing async and disabling disconnect for "
-				"target %d\n", esp->esp_id, SCptr->target));
+				"target %d\n", esp->esp_id, SCptr->device->id));
 			SCptr->device->borken = 1; /* foo on you */
 		}
 

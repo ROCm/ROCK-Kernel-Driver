@@ -45,6 +45,19 @@ static __inline__ void __udelay(unsigned long usecs, unsigned long lps)
 	__delay(usecs * HZ);
 }
 
+extern __inline__ void __ndelay(unsigned long usecs, unsigned long lps)
+{
+	usecs *= 0x0000000000000005UL;		/* 2**32 / 10000 */
+
+	__asm__ __volatile__(
+"	mulx	%1, %2, %0\n"
+"	srlx	%0, 32, %0\n"
+	: "=r" (usecs)
+	: "r" (usecs), "r" (lps));
+
+	__delay(usecs * HZ);
+}
+
 #ifdef CONFIG_SMP
 #define __udelay_val cpu_data[smp_processor_id()].udelay_val
 #else
@@ -52,6 +65,7 @@ static __inline__ void __udelay(unsigned long usecs, unsigned long lps)
 #endif
 
 #define udelay(usecs) __udelay((usecs),__udelay_val)
+#define ndelay(usecs) __ndelay((usecs),__udelay_val)
 
 #endif /* !__ASSEMBLY__ */
 
