@@ -244,7 +244,7 @@ void dev_add_pack(struct packet_type *pt)
 
 #ifdef CONFIG_NET_FASTROUTE
 	/* Hack to detect packet socket */
-	if (pt->data && (int)(pt->data) != 1) {
+	if (pt->data && (long)(pt->data) != 1) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
