@@ -731,8 +731,8 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
 		bus_speed = PCI_SPEED_UNKNOWN;
 	}
 
-	info->cur_bus_speed_status = bus_speed;
-	info->max_bus_speed_status = slot_cur->hotplug_slot->info->max_bus_speed_status;
+	info->cur_bus_speed = bus_speed;
+	info->max_bus_speed = slot_cur->hotplug_slot->info->max_bus_speed;
 	// To do: bus_names 
 	
 	rc = pci_hp_change_slot_info (buffer, info);
