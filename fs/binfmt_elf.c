@@ -1084,18 +1084,19 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	jiffies_to_timeval(p->cstime, &prstatus->pr_cstime);
 }
 
-static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p)
+static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
+			struct mm_struct *mm)
 {
 	int i, len;
 	
 	/* first copy the parameters from user space */
 	memset(psinfo, 0, sizeof(struct elf_prpsinfo));
 
-	len = p->mm->arg_end - p->mm->arg_start;
+	len = mm->arg_end - mm->arg_start;
 	if (len >= ELF_PRARGSZ)
 		len = ELF_PRARGSZ-1;
 	copy_from_user(&psinfo->pr_psargs,
-		      (const char *)p->mm->arg_start, len);
+		       (const char *)mm->arg_start, len);
 	for(i = 0; i < len; i++)
 		if (psinfo->pr_psargs[i] == 0)
 			psinfo->pr_psargs[i] = ' ';
@@ -1280,7 +1281,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 
 	fill_note(notes +0, "CORE", NT_PRSTATUS, sizeof(*prstatus), prstatus);
 	
-	fill_psinfo(psinfo, current->group_leader);
+	fill_psinfo(psinfo, current->group_leader, current->mm);
 	fill_note(notes +1, "CORE", NT_PRPSINFO, sizeof(*psinfo), psinfo);
 	
 	fill_note(notes +2, "CORE", NT_TASKSTRUCT, sizeof(*current), current);
