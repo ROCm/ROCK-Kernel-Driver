@@ -524,7 +524,7 @@ void journal_write_revoke_records(journal_t *journal,
 			kmem_cache_free(revoke_record_cache, record);
 		}
 	}
-	if (descriptor) 
+	if (descriptor)
 		flush_descriptor(journal, descriptor, offset);
 	jbd_debug(1, "Wrote %d revoke records\n", count);
 }
@@ -610,7 +610,7 @@ static void flush_descriptor(journal_t *journal,
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
 		BUFFER_TRACE(bh, "write");
-		set_buffer_uptodate(bh);
+		set_buffer_dirty(bh);
 		ll_rw_block (WRITE, 1, &bh);
 	}
 }

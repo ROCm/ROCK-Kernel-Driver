@@ -413,7 +413,8 @@ write_out_data:
 			tagp = &bh->b_data[sizeof(journal_header_t)];
 			space_left = bh->b_size - sizeof(journal_header_t);
 			first_tag = 1;
-			set_bit(BH_JWrite, &bh->b_state);
+			set_buffer_jwrite(bh);
+			set_buffer_dirty(bh);
 			wbuf[bufs++] = bh;
 
 			/* Record it so that we can wait for IO
@@ -649,7 +650,7 @@ wait_for_iobuf:
 		struct buffer_head *bh = jh2bh(descriptor);
 		int ret;
 
-		set_buffer_uptodate(bh);
+		set_buffer_dirty(bh);
 		if (journal->j_flags & JFS_BARRIER)
 			set_buffer_ordered(bh);
 		ret = sync_dirty_buffer(bh);
