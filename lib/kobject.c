@@ -178,7 +178,7 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
 
 	spin_lock(&sequence_lock);
-	seq = hotplug_seqnum++;
+	seq = ++hotplug_seqnum;
 	spin_unlock(&sequence_lock);
 
 	envp [i++] = scratch;
