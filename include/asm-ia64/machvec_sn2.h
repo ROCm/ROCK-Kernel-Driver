@@ -52,6 +52,10 @@ extern ia64_mv_readb_t __sn_readb;
 extern ia64_mv_readw_t __sn_readw;
 extern ia64_mv_readl_t __sn_readl;
 extern ia64_mv_readq_t __sn_readq;
+extern ia64_mv_readb_t __sn_readb_relaxed;
+extern ia64_mv_readw_t __sn_readw_relaxed;
+extern ia64_mv_readl_t __sn_readl_relaxed;
+extern ia64_mv_readq_t __sn_readq_relaxed;
 extern ia64_mv_dma_alloc_coherent	sn_dma_alloc_coherent;
 extern ia64_mv_dma_free_coherent	sn_dma_free_coherent;
 extern ia64_mv_dma_map_single		sn_dma_map_single;
@@ -87,6 +91,10 @@ extern ia64_mv_dma_supported		sn_dma_supported;
 #define platform_readw			__sn_readw
 #define platform_readl			__sn_readl
 #define platform_readq			__sn_readq
+#define platform_readb_relaxed		__sn_readb_relaxed
+#define platform_readw_relaxed		__sn_readw_relaxed
+#define platform_readl_relaxed		__sn_readl_relaxed
+#define platform_readq_relaxed		__sn_readq_relaxed
 #define platform_irq_desc		sn_irq_desc
 #define platform_irq_to_vector		sn_irq_to_vector
 #define platform_local_vector_to_irq	sn_local_vector_to_irq

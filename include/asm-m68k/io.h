@@ -261,6 +261,10 @@ static inline void isa_delay(void)
 #define writeb(val,addr)  out_8((addr),(val))
 #define writew(val,addr)  out_le16((addr),(val))
 
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
+
 #ifndef CONFIG_ISA
 #define inb(port)      in_8(port)
 #define outb(val,port) out_8((port),(val))

@@ -58,6 +58,9 @@ extern unsigned long pci_dram_offset;
 #define writel(b,addr) out_le32((volatile u32 *)(addr),(b))
 #endif /* CONFIG_APUS */
 
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
 
 #define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
 #define __raw_readw(addr)	(*(volatile unsigned short *)(addr))

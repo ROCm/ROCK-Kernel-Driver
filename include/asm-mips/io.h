@@ -264,6 +264,10 @@ extern void iounmap(void *addr);
 #define readw(addr)		__ioswab16(__raw_readw(addr))
 #define readl(addr)		__ioswab32(__raw_readl(addr))
 #define readq(addr)		__ioswab64(__raw_readq(addr))
+#define readb_relaxed(addr)	readb(addr)
+#define readw_relaxed(addr)	readw(addr)
+#define readl_relaxed(addr)	readl(addr)
+#define readq_relaxed(addr)	readq(addr)
 
 #define __raw_writeb(b,addr)	((*(volatile unsigned char *)(addr)) = (b))
 #define __raw_writew(w,addr)	((*(volatile unsigned short *)(addr)) = (w))
