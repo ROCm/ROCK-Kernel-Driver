@@ -107,7 +107,7 @@ MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
 MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
-MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,3}},dialog:list,default:-1");
+MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,4}},dialog:list,default:-1");
 MODULE_PARM(dxs_support, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
 MODULE_PARM_SYNTAX(dxs_support, SNDRV_ENABLED ",allows:{{0,4}},dialog:list");
@@ -1063,7 +1063,6 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 		{48000, SNDRV_PCM_RATE_48000},
 	};
 	int i;
-	u8 val;
 
 	runtime->hw = snd_via82xx_hw;
 	
@@ -1435,8 +1434,6 @@ static int snd_via8233_capture_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	oval = inb(port);
 	val = oval & ~VIA_REG_CAPTURE_CHANNEL_MIC;
-	/* save the spdif flag for rate filtering */
-	chip->spdif_on = ucontrol->value.integer.value[0] ? 1 : 0;
 	if (ucontrol->value.enumerated.item[0])
 		val |= VIA_REG_CAPTURE_CHANNEL_MIC;
 	if (val != oval)
@@ -1481,6 +1478,8 @@ static int snd_via8233_dxs3_spdif_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	val = oval & ~VIA8233_SPDIF_DX3;
 	if (ucontrol->value.integer.value[0])
 		val |= VIA8233_SPDIF_DX3;
+	/* save the spdif flag for rate filtering */
+	chip->spdif_on = ucontrol->value.integer.value[0] ? 1 : 0;
 	if (val != oval) {
 		pci_write_config_byte(chip->pci, VIA8233_SPDIF_CTRL, val);
 		return 1;
