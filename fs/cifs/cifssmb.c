@@ -553,13 +553,13 @@ DelFileRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->fileName, fileName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->fileName, fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->fileName, fileName, name_len);
 	}
@@ -605,13 +605,13 @@ RmDirRetry:
 		return rc;
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
-		name_len = cifs_strtoUCS((wchar_t *) pSMB->DirName, dirName, 530
+		name_len = cifs_strtoUCS((wchar_t *) pSMB->DirName, dirName, PATH_MAX
 				/* find define for this maxpathcomponent */
 				, nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(dirName, 530);
+		name_len = strnlen(dirName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->DirName, dirName, name_len);
 	}
@@ -655,13 +655,13 @@ MkDirRetry:
 		return rc;
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
-		name_len = cifs_strtoUCS((wchar_t *) pSMB->DirName, name, 530
+		name_len = cifs_strtoUCS((wchar_t *) pSMB->DirName, name, PATH_MAX
 					 /* find define for this maxpathcomponent */
 					 , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(name, 530);
+		name_len = strnlen(name, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->DirName, name, name_len);
 	}
@@ -712,7 +712,7 @@ openRetry:
 		count = 1;	/* account for one byte pad to word boundary */
 		name_len =
 		    cifs_strtoUCS((wchar_t *) (pSMB->fileName + 1),
-				  fileName, 530
+				  fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
@@ -720,7 +720,7 @@ openRetry:
 		pSMB->NameLength = cpu_to_le16(name_len);
 	} else {		/* BB improve the check for buffer overruns BB */
 		count = 0;	/* no pad */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		pSMB->NameLength = cpu_to_le16(name_len);
 		strncpy(pSMB->fileName, fileName, name_len);
@@ -1119,7 +1119,7 @@ renameRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->OldFileName, fromName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->OldFileName, fromName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
@@ -1129,15 +1129,15 @@ renameRetry:
 		pSMB->OldFileName[name_len + 1] = 0x00;
 		name_len2 =
 		    cifs_strtoUCS((wchar_t *) & pSMB->
-				  OldFileName[name_len + 2], toName, 530,
+				  OldFileName[name_len + 2], toName, PATH_MAX,
 				  nls_codepage);
 		name_len2 += 1 /* trailing null */  + 1 /* Signature word */ ;
 		name_len2 *= 2;	/* convert to bytes */
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fromName, 530);
+		name_len = strnlen(fromName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->OldFileName, fromName, name_len);
-		name_len2 = strnlen(toName, 530);
+		name_len2 = strnlen(toName, PATH_MAX);
 		name_len2++;	/* trailing null */
 		pSMB->OldFileName[name_len] = 0x04;  /* 2nd buffer format */
 		strncpy(&pSMB->OldFileName[name_len + 1], toName, name_len2);
@@ -1218,7 +1218,7 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 		sprintf(dummy_string,"cifs%x",pSMB->hdr.Mid);
 	        len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, dummy_string, 24, nls_codepage);
 	} else {
-		len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, target_name, 530, nls_codepage);
+		len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, target_name, PATH_MAX, nls_codepage);
 	}
 	rename_info->target_name_len = cpu_to_le32(2 * len_of_str);
 	count = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str) + 2;
@@ -1277,7 +1277,7 @@ copyRetry:
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len = cifs_strtoUCS((wchar_t *) pSMB->OldFileName, 
 				fromName, 
-				530 /* find define for this maxpathcomponent */,
+				PATH_MAX /* find define for this maxpathcomponent */,
 				nls_codepage);
 		name_len++;     /* trailing null */
 		name_len *= 2;
@@ -1285,15 +1285,15 @@ copyRetry:
 		/* protocol requires ASCII signature byte on Unicode string */
 		pSMB->OldFileName[name_len + 1] = 0x00;
 		name_len2 = cifs_strtoUCS((wchar_t *) & pSMB->
-				OldFileName[name_len + 2], toName, 530,
+				OldFileName[name_len + 2], toName, PATH_MAX,
 				nls_codepage);
 		name_len2 += 1 /* trailing null */  + 1 /* Signature word */ ;
 		name_len2 *= 2; /* convert to bytes */
 	} else {                /* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fromName, 530);
+		name_len = strnlen(fromName, PATH_MAX);
 		name_len++;     /* trailing null */
 		strncpy(pSMB->OldFileName, fromName, name_len);
-		name_len2 = strnlen(toName, 530);
+		name_len2 = strnlen(toName, PATH_MAX);
 		name_len2++;    /* trailing null */
 		pSMB->OldFileName[name_len] = 0x04;  /* 2nd buffer format */
 		strncpy(&pSMB->OldFileName[name_len + 1], toName, name_len2);
@@ -1343,14 +1343,14 @@ createSymLinkRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fromName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fromName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fromName, 530);
+		name_len = strnlen(fromName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fromName, name_len);
 	}
@@ -1367,13 +1367,13 @@ createSymLinkRetry:
 	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len_target =
-		    cifs_strtoUCS((wchar_t *) data_offset, toName, 530
+		    cifs_strtoUCS((wchar_t *) data_offset, toName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len_target++;	/* trailing null */
 		name_len_target *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len_target = strnlen(toName, 530);
+		name_len_target = strnlen(toName, PATH_MAX);
 		name_len_target++;	/* trailing null */
 		strncpy(data_offset, toName, name_len_target);
 	}
@@ -1434,14 +1434,14 @@ createHardLinkRetry:
 		return rc;
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
-		name_len = cifs_strtoUCS((wchar_t *) pSMB->FileName, toName, 530
+		name_len = cifs_strtoUCS((wchar_t *) pSMB->FileName, toName, PATH_MAX
 					 /* find define for this maxpathcomponent */
 					 , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(toName, 530);
+		name_len = strnlen(toName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, toName, name_len);
 	}
@@ -1458,13 +1458,13 @@ createHardLinkRetry:
 	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len_target =
-		    cifs_strtoUCS((wchar_t *) data_offset, fromName, 530
+		    cifs_strtoUCS((wchar_t *) data_offset, fromName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len_target++;	/* trailing null */
 		name_len_target *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len_target = strnlen(fromName, 530);
+		name_len_target = strnlen(fromName, PATH_MAX);
 		name_len_target++;	/* trailing null */
 		strncpy(data_offset, fromName, name_len_target);
 	}
@@ -1530,7 +1530,7 @@ winCreateHardLinkRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->OldFileName, fromName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->OldFileName, fromName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
@@ -1539,15 +1539,15 @@ winCreateHardLinkRetry:
 		pSMB->OldFileName[name_len + 1] = 0x04; 
 		name_len2 =
 		    cifs_strtoUCS((wchar_t *) & pSMB->
-				  OldFileName[name_len + 2], toName, 530,
+				  OldFileName[name_len + 2], toName, PATH_MAX,
 				  nls_codepage);
 		name_len2 += 1 /* trailing null */  + 1 /* Signature word */ ;
 		name_len2 *= 2;	/* convert to bytes */
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fromName, 530);
+		name_len = strnlen(fromName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->OldFileName, fromName, name_len);
-		name_len2 = strnlen(toName, 530);
+		name_len2 = strnlen(toName, PATH_MAX);
 		name_len2++;	/* trailing null */
 		pSMB->OldFileName[name_len] = 0x04;	/* 2nd buffer format */
 		strncpy(&pSMB->OldFileName[name_len + 1], toName, name_len2);
@@ -1596,13 +1596,13 @@ querySymLinkRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -1912,7 +1912,7 @@ queryAclRetry:
                                                                                                                                              
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-			cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+			cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				/* BB fixme find define for this maxpathcomponent */
 				, nls_codepage);
 		name_len++;     /* trailing null */
@@ -1920,7 +1920,7 @@ queryAclRetry:
 		pSMB->FileName[name_len] = 0;
 		pSMB->FileName[name_len+1] = 0;
 	} else {                /* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530 /* BB fixme */);
+		name_len = strnlen(searchName, PATH_MAX /* BB fixme */);
 		name_len++;     /* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -1998,13 +1998,13 @@ setAclRetry:
 		return rc;
                                                                                                                	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-			cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+			cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, PATH_MAX
 				/* BB fixme find define for this maxpathcomponent */
 				, nls_codepage);
 		name_len++;     /* trailing null */
 		name_len *= 2;
 	} else {                /* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;     /* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
@@ -2081,13 +2081,13 @@ QPathInfoRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -2164,13 +2164,13 @@ UnixQPathInfoRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -2248,13 +2248,13 @@ findUniqueRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -2331,13 +2331,13 @@ findFirstRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -2592,7 +2592,7 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 		   cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
 		psrch_inf->info_level = SMB_FIND_FILE_DIRECTORY_INFO;
 	} */
-    pSMB->InformationLevel = cpu_to_le16(psrch_inf->info_level);
+	pSMB->InformationLevel = cpu_to_le16(psrch_inf->info_level);
 	pSMB->ResumeKey = psrch_inf->resume_key;
 	pSMB->SearchFlags =
 	      cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
@@ -2882,13 +2882,13 @@ getDFSRetry:
 		pSMB->hdr.Flags2 |= SMBFLG2_UNICODE;
 		name_len =
 		    cifs_strtoUCS((wchar_t *) pSMB->RequestFileName,
-				  searchName, 530
+				  searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->RequestFileName, searchName, name_len);
 	}
@@ -3335,13 +3335,13 @@ SetEOFRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
@@ -3514,13 +3514,13 @@ SetTimesRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
@@ -3594,13 +3594,13 @@ SetTimesRetryLegacy:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
@@ -3677,13 +3677,13 @@ setPermsRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
@@ -3826,13 +3826,13 @@ QAllEAsRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {	/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -3970,13 +3970,13 @@ QEARetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {	/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(searchName, 530);
+		name_len = strnlen(searchName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
@@ -4117,13 +4117,13 @@ SetEARetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len =
-		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, PATH_MAX
 				  /* find define for this maxpathcomponent */
 				  , nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
-		name_len = strnlen(fileName, 530);
+		name_len = strnlen(fileName, PATH_MAX);
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
