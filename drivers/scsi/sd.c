@@ -96,7 +96,7 @@ static int *sd_max_sectors;
 static int check_scsidisk_media_change(kdev_t);
 static int fop_revalidate_scsidisk(kdev_t);
 
-static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr);
+static void sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr);
 
 static int sd_init(void);
 static void sd_finish(void);
@@ -152,22 +152,24 @@ sd_find_target(void *hp, int scsi_id)
 	Scsi_Device *sdp;
 	struct Scsi_Host *shp = hp;
 	int dsk_nr;
+	kdev_t retval = NODEV;
 	unsigned long iflags;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_find_target: host_nr=%d, "
 			    "scsi_id=%d\n", shp->host_no, scsi_id));
 	read_lock_irqsave(&sd_dsk_arr_lock, iflags);
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; ++dsk_nr) {
-		if (NULL == (sdkp = sd_dsk_arr[dsk_nr]))
+		sdkp = sd_dsk_arr[dsk_nr];
+		if (sdkp == NULL)
 			continue;
 		sdp = sdkp->device;
 		if (sdp && (sdp->host == shp) && (sdp->id == scsi_id)) {
-			read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-			return MKDEV_SD(dsk_nr);
+			retval = MKDEV_SD(dsk_nr);
+			break;
 		}
 	}
 	read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-	return NODEV;
+	return retval;
 }
 #endif
 
@@ -222,8 +224,8 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	
 			/* default to most commonly used values */
 	
-		        diskinfo[0] = 0x40;
-	        	diskinfo[1] = 0x20;
+		        diskinfo[0] = 0x40;	/* 1 << 6 */
+	        	diskinfo[1] = 0x20;	/* 1 << 5 */
 	        	diskinfo[2] = sdkp->capacity >> 11;
 	
 			/* override with calculated, extended default, 
@@ -531,7 +533,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 		/*
 		 * If the drive is empty, just let the open fail.
 		 */
-		if ((!sdkp->ready) && !(filp->f_flags & O_NDELAY)) {
+		if ((!sdkp->media_present) && !(filp->f_flags & O_NDELAY)) {
 			retval = -ENOMEDIUM;
 			goto error_out;
 		}
@@ -787,8 +789,7 @@ static int check_scsidisk_media_change(kdev_t full_dev)
 	 * that we would ever take a device offline in the first place.
 	 */
 	if (sdp->online == FALSE) {
-		sdkp->ready = 0;
-		sdp->changed = 1;
+		sd_set_media_not_present(sdkp);
 		return 1;	/* This will force a flush, if called from
 				 * check_disk_change */
 	}
@@ -809,18 +810,17 @@ static int check_scsidisk_media_change(kdev_t full_dev)
 				 * it out later once the drive is available
 				 * again.  */
 
-		sdkp->ready = 0;
-		sdp->changed = 1;
+		sd_set_media_not_present(sdkp);
 		return 1;	/* This will force a flush, if called from
 				 * check_disk_change */
 	}
 	/*
-	 * for removable scsi disk ( FLOPTICAL ) we have to recognise the
-	 * presence of disk in the drive. This is kept in the Scsi_Disk
+	 * For removable scsi disk we have to recognise the presence
+	 * of a disk in the drive. This is kept in the Scsi_Disk
 	 * struct and tested at open !  Daniel Roche ( dan@lectra.fr )
 	 */
 
-	sdkp->ready = 1;	/* FLOPTICAL */
+	sdkp->media_present = 1;
 
 	retval = sdp->changed;
 	if (!flag)
@@ -828,63 +828,38 @@ static int check_scsidisk_media_change(kdev_t full_dev)
 	return retval;
 }
 
-/**
- *	sd_init_onedisk - called the first time a new disk is seen,
- *	performs read_capacity, disk spin up (as required), etc.
- *	@sdkp: pointer to associated Scsi_Disk object
- *	@dsk_nr: disk number within this driver (e.g. 0->/dev/sda,
- *	1->/dev/sdb, etc)
- *
- *	Returns dsk_nr (pointless)
- *
- *	Note: this function is local to this driver.
- **/
-static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr)
-{
+static void
+sd_set_media_not_present(Scsi_Disk *sdkp) {
+	sdkp->media_present = 0;
+	sdkp->capacity = 0;
+	sdkp->device->changed = 1;
+}
+
+static int
+sd_media_not_present(Scsi_Disk *sdkp, Scsi_Request *SRpnt) {
+	int the_result = SRpnt->sr_result;
+
+	if (the_result != 0
+	    && (driver_byte(the_result) & DRIVER_SENSE) != 0
+	    && (SRpnt->sr_sense_buffer[2] == NOT_READY ||
+		SRpnt->sr_sense_buffer[2] == UNIT_ATTENTION)
+	    && SRpnt->sr_sense_buffer[12] == 0x3A /* medium not present */) {
+		sd_set_media_not_present(sdkp);
+		return 1;
+	}
+	return 0;
+}
+
+/*
+ * spinup disk - called only in sd_init_onedisk()
+ */
+static void
+sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
+	       Scsi_Request *SRpnt, unsigned char *buffer) {
 	unsigned char cmd[10];
-	char nbuff[6];
-	unsigned char *buffer;
+	Scsi_Device *sdp = sdkp->device;
 	unsigned long spintime_value = 0;
 	int the_result, retries, spintime;
-	int sector_size;
-	Scsi_Device *sdp;
-	Scsi_Request *SRpnt;
-
-	SCSI_LOG_HLQUEUE(3, printk("sd_init_onedisk: dsk_nr=%d\n", 
-			    dsk_nr));
-	/*
-	 * Get the name of the disk, in case we need to log it somewhere.
-	 */
-	sd_dskname(dsk_nr, nbuff);
-
-	/*
-	 * If the device is offline, don't try and read capacity or any
-	 * of the other niceties.
-	 */
-	sdp = sdkp->device;
-	if (sdp->online == FALSE)
-		return dsk_nr;
-
-	/*
-	 * We need to retry the READ_CAPACITY because a UNIT_ATTENTION is
-	 * considered a fatal error, and many devices report such an error
-	 * just after a scsi bus reset.
-	 */
-
-	SRpnt = scsi_allocate_request(sdp);
-	if (!SRpnt) {
-		printk(KERN_WARNING "(sd_init_onedisk:) Request allocation "
-		       "failure.\n");
-		return dsk_nr;
-	}
-
-	buffer = kmalloc(512, GFP_DMA);
-	if (!buffer) {
-		printk(KERN_WARNING "(sd_init_onedisk:) Memory allocation "
-		       "failure.\n");
-		scsi_release_request(SRpnt);
-		return dsk_nr;
-	}
 
 	spintime = 0;
 
@@ -896,15 +871,16 @@ static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr)
 		while (retries < 3) {
 			cmd[0] = TEST_UNIT_READY;
 			cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-				 ((sdp->lun << 5) & 0xe0) : 0;
+				((sdp->lun << 5) & 0xe0) : 0;
 			memset((void *) &cmd[2], 0, 8);
+
 			SRpnt->sr_cmd_len = 0;
 			SRpnt->sr_sense_buffer[0] = 0;
 			SRpnt->sr_sense_buffer[2] = 0;
 			SRpnt->sr_data_direction = SCSI_DATA_NONE;
 
 			scsi_wait_req (SRpnt, (void *) cmd, (void *) buffer,
-				0/*512*/, SD_TIMEOUT, MAX_RETRIES);
+				       0/*512*/, SD_TIMEOUT, MAX_RETRIES);
 
 			the_result = SRpnt->sr_result;
 			retries++;
@@ -918,16 +894,8 @@ static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr)
 		 * any media in it, don't bother with any of the rest of
 		 * this crap.
 		 */
-		if( the_result != 0
-		    && ((driver_byte(the_result) & DRIVER_SENSE) != 0)
-		    && SRpnt->sr_sense_buffer[2] == UNIT_ATTENTION
-		    && SRpnt->sr_sense_buffer[12] == 0x3A ) {
-			sdkp->capacity = 0x1fffff;
-			sector_size = 512;
-			sdp->changed = 1;
-			sdkp->ready = 0;
-			break;
-		}
+		if (sd_media_not_present(sdkp, SRpnt))
+			return;
 
 		/* Look for non-removable devices that return NOT_READY.
 		 * Issue command to spin up drive for these cases. */
@@ -936,10 +904,10 @@ static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr)
 			unsigned long time1;
 			if (!spintime) {
 				printk(KERN_NOTICE "%s: Spinning up disk...",
-				       nbuff);
+				       diskname);
 				cmd[0] = START_STOP;
 				cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-				 	 ((sdp->lun << 5) & 0xe0) : 0;
+					((sdp->lun << 5) & 0xe0) : 0;
 				cmd[1] |= 1;	/* Return immediately */
 				memset((void *) &cmd[2], 0, 8);
 				cmd[4] = 1;	/* Start spin cycle */
@@ -964,65 +932,63 @@ static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr)
 		}
 	} while (the_result && spintime &&
 		 time_after(spintime_value + 100 * HZ, jiffies));
+
 	if (spintime) {
 		if (the_result)
 			printk("not responding...\n");
 		else
 			printk("ready\n");
 	}
+}
+
+/*
+ * read disk capacity - called only in sd_init_onedisk()
+ */
+static void
+sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
+		 Scsi_Request *SRpnt, unsigned char *buffer) {
+	unsigned char cmd[10];
+	Scsi_Device *sdp = sdkp->device;
+	int the_result, retries;
+	int sector_size;
+
 	retries = 3;
 	do {
 		cmd[0] = READ_CAPACITY;
 		cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-			 ((sdp->lun << 5) & 0xe0) : 0;
+			((sdp->lun << 5) & 0xe0) : 0;
 		memset((void *) &cmd[2], 0, 8);
 		memset((void *) buffer, 0, 8);
+
 		SRpnt->sr_cmd_len = 0;
 		SRpnt->sr_sense_buffer[0] = 0;
 		SRpnt->sr_sense_buffer[2] = 0;
-
 		SRpnt->sr_data_direction = SCSI_DATA_READ;
+
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-			    8, SD_TIMEOUT, MAX_RETRIES);
+			      8, SD_TIMEOUT, MAX_RETRIES);
+
+		if (sd_media_not_present(sdkp, SRpnt))
+			return;
 
 		the_result = SRpnt->sr_result;
 		retries--;
 
 	} while (the_result && retries);
 
-	/*
-	 * The SCSI standard says:
-	 * "READ CAPACITY is necessary for self configuring software"
-	 *  While not mandatory, support of READ CAPACITY is strongly
-	 *  encouraged.
-	 *  We used to die if we couldn't successfully do a READ CAPACITY.
-	 *  But, now we go on about our way.  The side effects of this are
-	 *
-	 *  1. We can't know block size with certainty. I have said
-	 *     "512 bytes is it" as this is most common.
-	 *
-	 *  2. Recovery from when someone attempts to read past the
-	 *     end of the raw device will be slower.
-	 */
-
 	if (the_result) {
 		printk(KERN_NOTICE "%s : READ CAPACITY failed.\n"
 		       "%s : status=%x, message=%02x, host=%d, driver=%02x \n",
-		       nbuff, nbuff,
+		       diskname, diskname,
 		       status_byte(the_result),
 		       msg_byte(the_result),
 		       host_byte(the_result),
-		       driver_byte(the_result)
-		    );
+		       driver_byte(the_result));
+
 		if (driver_byte(the_result) & DRIVER_SENSE)
 			print_req_sense("sd", SRpnt);
 		else
-			printk("%s : sense not available. \n", nbuff);
-
-		printk(KERN_NOTICE "%s : block size assumed to be 512 "
-		       "bytes, disk size 1GB.  \n", nbuff);
-		sdkp->capacity = 0x1fffff;
-		sector_size = 512;
+			printk("%s : sense not available. \n", diskname);
 
 		/* Set dirty bit for removable devices if not ready -
 		 * sometimes drives will not report this properly. */
@@ -1030,130 +996,193 @@ static int sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr)
 		    SRpnt->sr_sense_buffer[2] == NOT_READY)
 			sdp->changed = 1;
 
-	} else {
-		/*
-		 * FLOPTICAL, if read_capa is ok, drive is assumed to be ready
-		 */
-		sdkp->ready = 1;
+		/* Either no media are present but the drive didnt tell us,
+		   or they are present but the read capacity command fails */
+		/* sdkp->media_present = 0; -- not always correct */
+		sdkp->capacity = 0x200000; /* 1 GB - random */
 
-		sdkp->capacity = 1 + ((buffer[0] << 24) |
-				      (buffer[1] << 16) |
-				      (buffer[2] << 8) |
-				      buffer[3]);
-
-		sector_size = (buffer[4] << 24) |
-		    (buffer[5] << 16) | (buffer[6] << 8) | buffer[7];
-
-		if (sector_size == 0) {
-			sector_size = 512;
-			printk(KERN_NOTICE "%s : sector size 0 reported, "
-			       "assuming 512.\n", nbuff);
-		}
-		if (sector_size != 512 &&
-		    sector_size != 1024 &&
-		    sector_size != 2048 &&
-		    sector_size != 4096 &&
-		    sector_size != 256) {
-			printk(KERN_NOTICE "%s : unsupported sector size "
-			       "%d.\n", nbuff, sector_size);
-			/*
-			 * The user might want to re-format the drive with
-			 * a supported sectorsize.  Once this happens, it
-			 * would be relatively trivial to set the thing up.
-			 * For this reason, we leave the thing in the table.
-			 */
-			sdkp->capacity = 0;
-		}
-		{
-			/*
-			 * The msdos fs needs to know the hardware sector size
-			 * So I have created this table. See ll_rw_blk.c
-			 * Jacques Gelinas (Jacques@solucorp.qc.ca)
-			 */
-			int hard_sector = sector_size;
-			int sz = sdkp->capacity * (hard_sector/256);
-			request_queue_t *queue = &sdp->request_queue;
-
-			blk_queue_hardsect_size(queue, hard_sector);
-			printk(KERN_NOTICE "SCSI device %s: "
-			       "%d %d-byte hdwr sectors (%d MB)\n",
-			       nbuff, sdkp->capacity,
-			       hard_sector, (sz/2 - sz/1250 + 974)/1950);
-		}
-
-		/* Rescale capacity to 512-byte units */
-		if (sector_size == 4096)
-			sdkp->capacity <<= 3;
-		if (sector_size == 2048)
-			sdkp->capacity <<= 2;
-		if (sector_size == 1024)
-			sdkp->capacity <<= 1;
-		if (sector_size == 256)
-			sdkp->capacity >>= 1;
+		return;
 	}
 
+	sdkp->capacity = 1 + ((buffer[0] << 24) |
+			      (buffer[1] << 16) |
+			      (buffer[2] << 8) |
+			      buffer[3]);
+
+	sector_size = (buffer[4] << 24) |
+		(buffer[5] << 16) | (buffer[6] << 8) | buffer[7];
+
+	if (sector_size == 0) {
+		sector_size = 512;
+		printk(KERN_NOTICE "%s : sector size 0 reported, "
+		       "assuming 512.\n", diskname);
+	}
+
+	if (sector_size != 512 &&
+	    sector_size != 1024 &&
+	    sector_size != 2048 &&
+	    sector_size != 4096 &&
+	    sector_size != 256) {
+		printk(KERN_NOTICE "%s : unsupported sector size "
+		       "%d.\n", diskname, sector_size);
+		/*
+		 * The user might want to re-format the drive with
+		 * a supported sectorsize.  Once this happens, it
+		 * would be relatively trivial to set the thing up.
+		 * For this reason, we leave the thing in the table.
+		 */
+		sdkp->capacity = 0;
+	}
+	{
+		/*
+		 * The msdos fs needs to know the hardware sector size
+		 * So I have created this table. See ll_rw_blk.c
+		 * Jacques Gelinas (Jacques@solucorp.qc.ca)
+		 */
+		int hard_sector = sector_size;
+		int sz = sdkp->capacity * (hard_sector/256);
+		request_queue_t *queue = &sdp->request_queue;
+
+		blk_queue_hardsect_size(queue, hard_sector);
+		printk(KERN_NOTICE "SCSI device %s: "
+		       "%d %d-byte hdwr sectors (%d MB)\n",
+		       diskname, sdkp->capacity,
+		       hard_sector, (sz/2 - sz/1250 + 974)/1950);
+	}
+
+	/* Rescale capacity to 512-byte units */
+	if (sector_size == 4096)
+		sdkp->capacity <<= 3;
+	if (sector_size == 2048)
+		sdkp->capacity <<= 2;
+	if (sector_size == 1024)
+		sdkp->capacity <<= 1;
+	if (sector_size == 256)
+		sdkp->capacity >>= 1;
+
+	sdkp->device->sector_size = sector_size;
+}
+
+/*
+ * read write protect setting, if possible - called only in sd_init_onedisk()
+ */
+static void
+sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
+			   Scsi_Request *SRpnt, unsigned char *buffer) {
+	Scsi_Device *sdp = sdkp->device;
+	unsigned char cmd[8];
+	int the_result;
 
 	/*
-	 * Unless otherwise specified, this is not write protected.
+	 * For removable scsi disks we have to recognise the
+	 * Write Protect Flag. This flag is kept in the Scsi_Disk
+	 * struct and tested at open !
+	 * Daniel Roche ( dan@lectra.fr )
+	 *
+	 * Changed to get all pages (0x3f) rather than page 1 to
+	 * get around devices which do not have a page 1.  Since
+	 * we're only interested in the header anyway, this should
+	 * be fine.
+	 *   -- Matthew Dharm (mdharm-scsi@one-eyed-alien.net)
+	 *
+	 * As it turns out, some devices return an error for
+	 * every MODE_SENSE request except one for page 0.
+	 * So, we should also try that. --aeb
 	 */
+
+	memset((void *) &cmd[0], 0, 8);
+	cmd[0] = MODE_SENSE;
+	cmd[1] = (sdp->scsi_level <= SCSI_2) ?
+		((sdp->lun << 5) & 0xe0) : 0;
+	cmd[2] = 0x3f;	/* Get all pages */
+	cmd[4] = 255;   /* Ask for 255 bytes, even tho we want just the first 8 */
+	SRpnt->sr_cmd_len = 0;
+	SRpnt->sr_sense_buffer[0] = 0;
+	SRpnt->sr_sense_buffer[2] = 0;
+	SRpnt->sr_data_direction = SCSI_DATA_READ;
+
+	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
+		      512, SD_TIMEOUT, MAX_RETRIES);
+
+	the_result = SRpnt->sr_result;
+
+	if (the_result) {
+		printk("%s: test WP failed, assume Write Enabled\n",
+		       diskname);
+		/* alternatively, try page 0 */
+	} else {
+		sdkp->write_prot = ((buffer[2] & 0x80) != 0);
+		printk(KERN_NOTICE "%s: Write Protect is %s\n", diskname,
+		       sdkp->write_prot ? "on" : "off");
+	}
+}
+
+/**
+ *	sd_init_onedisk - called the first time a new disk is seen,
+ *	performs disk spin up, read_capacity, etc.
+ *	@sdkp: pointer to associated Scsi_Disk object
+ *	@dsk_nr: disk number within this driver (e.g. 0->/dev/sda,
+ *	1->/dev/sdb, etc)
+ *
+ *	Note: this function is local to this driver.
+ **/
+static void
+sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr) {
+	char diskname[40];
+	unsigned char *buffer;
+	Scsi_Device *sdp;
+	Scsi_Request *SRpnt;
+
+	SCSI_LOG_HLQUEUE(3, printk("sd_init_onedisk: dsk_nr=%d\n", dsk_nr));
+
+	/*
+	 * Get the name of the disk, in case we need to log it somewhere.
+	 */
+	sd_dskname(dsk_nr, diskname);
+
+	/*
+	 * If the device is offline, don't try and read capacity or any
+	 * of the other niceties.
+	 */
+	sdp = sdkp->device;
+	if (sdp->online == FALSE)
+		return;
+
+	SRpnt = scsi_allocate_request(sdp);
+	if (!SRpnt) {
+		printk(KERN_WARNING "(sd_init_onedisk:) Request allocation "
+		       "failure.\n");
+		return;
+	}
+
+	buffer = kmalloc(512, GFP_DMA);
+	if (!buffer) {
+		printk(KERN_WARNING "(sd_init_onedisk:) Memory allocation "
+		       "failure.\n");
+		goto leave;
+	}
+
+	/* defaults, until the device tells us otherwise */
+	sdkp->capacity = 0;
+	sdkp->device->sector_size = 512;
+	sdkp->media_present = 1;
 	sdkp->write_prot = 0;
-	if (sdp->removable && sdkp->ready) {
-		/* FLOPTICAL */
 
-		/*
-		 * For removable scsi disk ( FLOPTICAL ) we have to recognise
-		 * the Write Protect Flag. This flag is kept in the Scsi_Disk
-		 * struct and tested at open !
-		 * Daniel Roche ( dan@lectra.fr )
-		 *
-		 * Changed to get all pages (0x3f) rather than page 1 to
-		 * get around devices which do not have a page 1.  Since
-		 * we're only interested in the header anyway, this should
-		 * be fine.
-		 *   -- Matthew Dharm (mdharm-scsi@one-eyed-alien.net)
-		 *
-		 * As it turns out, some devices return an error for
-		 * every MODE_SENSE request except one for page 0.
-		 * So, we should also try that. --aeb
-		 */
+	sd_spinup_disk(sdkp, diskname, SRpnt, buffer);
 
-		memset((void *) &cmd[0], 0, 8);
-		cmd[0] = MODE_SENSE;
-		cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-			 ((sdp->lun << 5) & 0xe0) : 0;
-		cmd[2] = 0x3f;	/* Get all pages */
-		cmd[4] = 255;   /* Ask for 255 bytes, even tho we want just the first 8 */
-		SRpnt->sr_cmd_len = 0;
-		SRpnt->sr_sense_buffer[0] = 0;
-		SRpnt->sr_sense_buffer[2] = 0;
+	if (sdkp->media_present)
+		sd_read_capacity(sdkp, diskname, SRpnt, buffer);
 
-		/* same code as READCAPA !! */
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
-		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-			    512, SD_TIMEOUT, MAX_RETRIES);
+	if (sdp->removable && sdkp->media_present)
+		sd_read_write_protect_flag(sdkp, diskname, SRpnt, buffer);
 
-		the_result = SRpnt->sr_result;
-
-		if (the_result) {
-			printk("%s: test WP failed, assume Write Enabled\n",
-			       nbuff);
-			/* alternatively, try page 0 */
-		} else {
-			sdkp->write_prot = ((buffer[2] & 0x80) != 0);
-			printk(KERN_NOTICE "%s: Write Protect is %s\n", nbuff,
-			       sdkp->write_prot ? "on" : "off");
-		}
-
-	}			/* check for write protect */
 	SRpnt->sr_device->ten = 1;
 	SRpnt->sr_device->remap = 1;
-	SRpnt->sr_device->sector_size = sector_size;
-	/* Wake up a process waiting for device */
+
+ leave:
 	scsi_release_request(SRpnt);
-	SRpnt = NULL;
 
 	kfree(buffer);
-	return dsk_nr;
 }
 
 /*
@@ -1276,18 +1305,15 @@ cleanup_gendisks:
 		vfree(sd_gendisks[k].flags);
 	}
 cleanup_mem:
-	if (sd_gendisks) vfree(sd_gendisks);
+	vfree(sd_gendisks);
 	sd_gendisks = NULL;
-	if (sd) vfree(sd);
+	vfree(sd);
 	sd = NULL;
-	if (sd_sizes) vfree(sd_sizes);
+	vfree(sd_sizes);
 	sd_sizes = NULL;
 	if (sd_dsk_arr) {
-                for (k = 0; k < sd_template.dev_max; ++k) {
-			sdkp = sd_dsk_arr[k];
-			if (sdkp)
-				vfree(sdkp);
-		}
+                for (k = 0; k < sd_template.dev_max; ++k)
+			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 		sd_dsk_arr = NULL;
 	}
@@ -1322,12 +1348,12 @@ static void sd_finish()
 		sdkp = sd_get_sdisk(k);
 		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
 			sd_init_onedisk(sdkp, k);
-			if (!sdkp->has_part_table) {
+			if (!sdkp->has_been_registered) {
 				sd_sizes[k << 4] = sdkp->capacity;
 				register_disk(&SD_GENDISK(k), MKDEV_SD(k),
 						1<<4, &sd_fops,
 						sdkp->capacity);
-				sdkp->has_part_table = 1;
+				sdkp->has_been_registered = 1;
 			}
 		}
 	}
@@ -1373,7 +1399,7 @@ static int sd_attach(Scsi_Device * sdp)
         unsigned int devnum;
 	Scsi_Disk *sdkp;
 	int dsk_nr;
-	char nbuff[6];
+	char diskname[6];
 	unsigned long iflags;
 
 	if ((NULL == sdp) ||
@@ -1394,8 +1420,8 @@ static int sd_attach(Scsi_Device * sdp)
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
 		sdkp = sd_dsk_arr[dsk_nr];
 		if (!sdkp->device) {
+			memset(sdkp, 0, sizeof(Scsi_Disk));
 			sdkp->device = sdp;
-			sdkp->has_part_table = 0;
 			break;
 		}
 	}
@@ -1413,10 +1439,10 @@ static int sd_attach(Scsi_Device * sdp)
         SD_GENDISK(dsk_nr).de_arr[devnum] = sdp->de;
         if (sdp->removable)
 		SD_GENDISK(dsk_nr).flags[devnum] |= GENHD_FL_REMOVABLE;
-	sd_dskname(dsk_nr, nbuff);
+	sd_dskname(dsk_nr, diskname);
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
 	       "id %d, lun %d\n", sdp->removable ? "removable " : "",
-	       nbuff, sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
+	       diskname, sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
 	return 0;
 }
 
@@ -1437,8 +1463,8 @@ int revalidate_scsidisk(kdev_t dev, int maxusage)
 	Scsi_Disk * sdkp;
 	Scsi_Device * sdp;
 
-	 SCSI_LOG_HLQUEUE(3, printk("revalidate_scsidisk: dsk_nr=%d\n", 
-			     DEVICE_NR(dev)));
+	SCSI_LOG_HLQUEUE(3, printk("revalidate_scsidisk: dsk_nr=%d\n", 
+				   DEVICE_NR(dev)));
 	sdkp = sd_get_sdisk(dsk_nr);
 	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device)))
 		return -ENODEV;
@@ -1458,6 +1484,7 @@ int revalidate_scsidisk(kdev_t dev, int maxusage)
 	sd_init_onedisk(sdkp, dsk_nr);
 
 	grok_partitions(dev, sdkp->capacity);
+
 leave:
 	sdp->busy = 0;
 	return res;
@@ -1495,7 +1522,7 @@ static void sd_detach(Scsi_Device * sdp)
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
 		sdkp = sd_dsk_arr[dsk_nr];
 		if (sdkp->device == sdp) {
-			sdkp->has_part_table = 0;
+			sdkp->has_been_registered = 0;
 			sdkp->device = NULL;
 			sdkp->capacity = 0;
 			/* sdkp->detaching = 1; */
