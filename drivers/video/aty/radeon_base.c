@@ -566,8 +566,9 @@ static int __devinit radeon_probe_pll_params(struct radeonfb_info *rinfo)
 		break;
 	}
 
-	do_div(vclk, 1000);
-	xtal = (xtal * denom) / num;
+	vclk *= denom;
+	do_div(vclk, 1000 * num);
+	xtal = vclk;
 
 	if ((xtal > 26900) && (xtal < 27100))
 		xtal = 2700;
