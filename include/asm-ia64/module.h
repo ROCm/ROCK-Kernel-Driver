@@ -18,7 +18,8 @@ struct mod_arch_specific {
 	struct elf64_shdr *unwind;	/* unwind-table section */
 	unsigned long gp;		/* global-pointer for module */
 
-	void *unw_table;		/* unwind-table cookie returned by unwinder */
+	void *core_unw_table;		/* core unwind-table cookie returned by unwinder */
+	void *init_unw_table;		/* init unwind-table cookie returned by unwinder */
 	unsigned int next_got_entry;	/* index of next available got entry */
 };
 

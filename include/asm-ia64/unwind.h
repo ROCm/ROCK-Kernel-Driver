@@ -93,6 +93,12 @@ struct unw_frame_info {
  * The official API follows below:
  */
 
+struct unw_table_entry {
+	u64 start_offset;
+	u64 end_offset;
+	u64 info_offset;
+};
+
 /*
  * Initialize unwind support.
  */
