@@ -203,7 +203,7 @@ ia64_sn_get_master_baseio_nasid(void)
 	return ret_stuff.v0;
 }
 
-static inline u64
+static inline char *
 ia64_sn_get_klconfig_addr(nasid_t nasid)
 {
 	struct ia64_sal_retval ret_stuff;
@@ -223,7 +223,7 @@ ia64_sn_get_klconfig_addr(nasid_t nasid)
 	if (ret_stuff.status != 0) {
 		panic("ia64_sn_get_klconfig_addr: Returned error %lx\n", ret_stuff.status);
 	}
-	return(ret_stuff.v0);
+	return ret_stuff.v0 ? __va(ret_stuff.v0) : NULL;
 }
 
 /*
