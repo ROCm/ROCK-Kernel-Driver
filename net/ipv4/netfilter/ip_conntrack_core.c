@@ -659,6 +659,9 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		__set_bit(IPS_EXPECTED_BIT, &conntrack->status);
 		conntrack->master = expected;
 		expected->sibling = conntrack;
+#if CONFIG_IP_NF_CONNTRACK_MARK
+		conntrack->mark = expected->expectant->mark;
+#endif
 		LIST_DELETE(&ip_conntrack_expect_list, expected);
 		expected->expectant->expecting--;
 		nf_conntrack_get(&master_ct(conntrack)->infos[0]);

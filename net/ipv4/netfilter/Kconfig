@@ -660,5 +660,15 @@ config IP_NF_CT_PROTO_SCTP
 	tristate  'SCTP protocol connection tracking support (EXPERIMENTAL)'
 	depends on IP_NF_CONNTRACK && EXPERIMENTAL
 
+config IP_NF_CONNTRACK_MARK
+	bool  'Connection mark tracking support'
+config IP_NF_TARGET_CONNMARK
+	tristate  'CONNMARK target support'
+	depends on IP_NF_MANGLE
+config IP_NF_MATCH_CONNMARK
+	tristate  ' Connection mark match support'
+	depends on IP_NF_IPTABLES
+	  help
+
 endmenu
 

@@ -169,7 +169,13 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 		if (seq_printf(s, "[ASSURED] "))
 			return 1;
 
-	if (seq_printf(s, "use=%u\n", atomic_read(&conntrack->ct_general.use)))
+	if (seq_printf(s, "use=%u ", atomic_read(&conntrack->ct_general.use)))
+		return 1;
+#if defined(CONFIG_IP_NF_CONNTRACK_MARK)
+	if (seq_printf(s, "mark=%ld", conntrack->mark))
+		return 1;
+#endif
+	if (seq_printf(s, "\n"))
 		return 1;
 
 	return 0;
