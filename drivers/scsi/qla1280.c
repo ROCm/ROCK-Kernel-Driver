@@ -480,9 +480,7 @@ static inline void scsi_host_put(struct Scsi_Host *h)
 #endif
 
 static int qla1280_probe_one(struct pci_dev *, const struct pci_device_id *);
-#if defined(CONFIG_SCSI_QLOGIC_1280_MODULE) || (LINUX_VERSION_CODE < 0x020600)
 static void qla1280_remove_one(struct pci_dev *);
-#endif
 
 /*
  *  QLogic Driver Support Function Prototypes.
@@ -4807,7 +4805,6 @@ qla1280_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 }
 
 
-#if defined(CONFIG_SCSI_QLOGIC_1280_MODULE) || (LINUX_VERSION_CODE < 0x020600)
 static void __devexit
 qla1280_remove_one(struct pci_dev *pdev)
 {
@@ -4839,7 +4836,6 @@ qla1280_remove_one(struct pci_dev *pdev)
 
 	scsi_host_put(host);
 }
-#endif
 
 #if LINUX_VERSION_CODE >= 0x020600
 static struct pci_driver qla1280_pci_driver = {
