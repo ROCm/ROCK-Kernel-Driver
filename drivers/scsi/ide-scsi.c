@@ -289,6 +289,7 @@ static int idescsi_check_condition(ide_drive_t *drive, struct request *failed_co
 	pc->timeout = jiffies + WAIT_READY;
 	/* NOTE! Save the failed packet command in "rq->buffer" */
 	rq->buffer = (void *) failed_command->special;
+	pc->scsi_cmd = ((idescsi_pc_t *) failed_command->special)->scsi_cmd;
 	if (test_bit(IDESCSI_LOG_CMD, &scsi->log)) {
 		printk ("ide-scsi: %s: queue cmd = ", drive->name);
 		hexdump(pc->c, 6);
@@ -590,6 +591,7 @@ static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi, int id)
 	set_bit(IDESCSI_LOG_CMD, &scsi->log);
 #endif /* IDESCSI_DEBUG_LOG */
 	idescsi_add_settings(drive);
+	DRIVER(drive)->busy--;
 }
 
 static int idescsi_cleanup (ide_drive_t *drive)
@@ -876,7 +878,8 @@ int idescsi_abort (Scsi_Cmnd *cmd)
 			/* is cmd active?
 			 *  need to lock so this stuff doesn't change under us */
 			spin_lock_irqsave(&ide_lock, flags);
-			if (scsi->pc && scsi->pc->scsi_cmd->serial_number == cmd->serial_number) {
+			if (scsi->pc && scsi->pc->scsi_cmd && 
+					scsi->pc->scsi_cmd->serial_number == cmd->serial_number) {
 				/* yep - let's give it some more time - 
 				 * we can do that, we're in _our_ error kernel thread */
 				spin_unlock_irqrestore(&ide_lock, flags);
@@ -995,7 +998,7 @@ static void __exit exit_idescsi_module(void)
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES; id++) {
 		drive = idescsi_drives[id];
 		if (drive)
-			DRIVER(drive)->busy--;
+			DRIVER(drive)->busy = 0;
 	}
 	scsi_unregister   (idescsi_host);
 	device_unregister(&idescsi_primary);
