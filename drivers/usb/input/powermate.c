@@ -54,7 +54,11 @@
 #define UPDATE_PULSE_AWAKE       (1<<2)
 #define UPDATE_PULSE_MODE        (1<<3)
 
-#define POWERMATE_PAYLOAD_SIZE 3
+/* at least two versions of the hardware exist, with differing payload
+   sizes. the first three bytes always contain the "interesting" data in
+   the relevant format. */
+#define POWERMATE_PAYLOAD_SIZE_MAX 6
+#define POWERMATE_PAYLOAD_SIZE_MIN 3
 struct powermate_device {
 	signed char *data;
 	dma_addr_t data_dma;
@@ -269,7 +273,7 @@ static int powermate_input_event(struct input_dev *dev, unsigned int type, unsig
 
 static int powermate_alloc_buffers(struct usb_device *udev, struct powermate_device *pm)
 {
-	pm->data = usb_buffer_alloc(udev, POWERMATE_PAYLOAD_SIZE,
+	pm->data = usb_buffer_alloc(udev, POWERMATE_PAYLOAD_SIZE_MAX,
 				    SLAB_ATOMIC, &pm->data_dma);
 	if (!pm->data)
 		return -1;
@@ -284,7 +288,7 @@ static int powermate_alloc_buffers(struct usb_device *udev, struct powermate_dev
 static void powermate_free_buffers(struct usb_device *udev, struct powermate_device *pm)
 {
 	if (pm->data)
-		usb_buffer_free(udev, POWERMATE_PAYLOAD_SIZE,
+		usb_buffer_free(udev, POWERMATE_PAYLOAD_SIZE_MAX,
 				pm->data, pm->data_dma);
 	if (pm->configcr)
 		usb_buffer_free(udev, sizeof(*(pm->configcr)),
@@ -347,12 +351,14 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	pipe = usb_rcvintpipe(udev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(udev, pipe, usb_pipeout(pipe));
 
-	if (maxp != POWERMATE_PAYLOAD_SIZE)
-		printk("powermate: Expected payload of %d bytes, found %d bytes!\n", POWERMATE_PAYLOAD_SIZE, maxp);
-
+	if(maxp < POWERMATE_PAYLOAD_SIZE_MIN || maxp > POWERMATE_PAYLOAD_SIZE_MAX){
+		printk("powermate: Expected payload of %d--%d bytes, found %d bytes!\n",
+			POWERMATE_PAYLOAD_SIZE_MIN, POWERMATE_PAYLOAD_SIZE_MAX, maxp);
+		maxp = POWERMATE_PAYLOAD_SIZE_MAX;
+	}
 
 	usb_fill_int_urb(pm->irq, udev, pipe, pm->data,
-			 POWERMATE_PAYLOAD_SIZE, powermate_irq,
+			 maxp, powermate_irq,
 			 pm, endpoint->bInterval);
 	pm->irq->transfer_dma = pm->data_dma;
 	pm->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
