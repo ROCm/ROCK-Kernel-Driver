@@ -134,7 +134,7 @@ nfsd3_proc_access(struct svc_rqst *rqstp, struct nfsd3_accessargs *argp,
 
 	fh_copy(&resp->fh, &argp->fh);
 	resp->access = argp->access;
-	nfserr = nfsd_access(rqstp, &resp->fh, &resp->access);
+	nfserr = nfsd_access(rqstp, &resp->fh, &resp->access, NULL);
 	RETURN_STATUS(nfserr);
 }
 

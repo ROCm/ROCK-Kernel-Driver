@@ -348,12 +348,12 @@ static struct accessmap	nfs3_anyaccess[] = {
 };
 
 int
-nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access)
+nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access, u32 *supported)
 {
 	struct accessmap	*map;
 	struct svc_export	*export;
 	struct dentry		*dentry;
-	u32			query, result = 0;
+	u32			query, result = 0, sresult = 0;
 	unsigned int		error;
 
 	error = fh_verify(rqstp, fhp, 0, MAY_NOP);
@@ -375,6 +375,9 @@ nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access)
 	for  (; map->access; map++) {
 		if (map->access & query) {
 			unsigned int err2;
+
+			sresult |= map->access;
+
 			err2 = nfsd_permission(export, dentry, map->how);
 			switch (err2) {
 			case nfs_ok:
@@ -395,6 +398,8 @@ nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access)
 		}
 	}
 	*access = result;
+	if (supported)
+		*supported = sresult;
 
  out:
 	return error;
