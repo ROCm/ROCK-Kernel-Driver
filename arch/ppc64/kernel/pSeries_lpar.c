@@ -523,10 +523,11 @@ void make_pte_LPAR(HPTE *htab,
 	local_hpte.dw0.dword0 = 0;
 	local_hpte.dw0.dw0.avpn = va >> 23;
 	local_hpte.dw0.dw0.bolted = 1;				/* bolted */
+	if (large)
+		local_hpte.dw0.dw0.l = 1;  /* large page */
 	local_hpte.dw0.dw0.v = 1;
 
 	/* Set CEC cookie to 0                   */
-	/* Large page = 0                        */
 	/* Zero page = 0                         */
 	/* I-cache Invalidate = 0                */
 	/* I-cache synchronize = 0               */
