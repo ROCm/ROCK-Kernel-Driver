@@ -59,6 +59,12 @@ ToDo/Notes:
 	- Lock all page cache pages belonging to mst protected attributes while
 	  accessing them to ensure we never see corrupt data while the page is
 	  under writeout.
+	- Add framework for generic ntfs collation (fs/ntfs/collation.[hc]).
+	  We have ntfs_is_collation_rule_supported() to check if the collation
+	  rule you want to use is supported and ntfs_collation() which actually
+	  collates two data items.  We currently only support COLLATION_BINARY
+	  and COLLATION_NTOFS_ULONG but support for other collation rules will
+	  be added as the need arises.
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 

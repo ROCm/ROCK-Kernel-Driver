@@ -459,21 +459,21 @@ typedef enum {
  *	equal then the second u32 values would be compared, etc.
  */
 typedef enum {
-	COLLATION_BINARY	 = const_cpu_to_le32(0), /* Collate by binary
-					compare where the first byte is most
-					significant. */
-	COLLATION_FILE_NAME	 = const_cpu_to_le32(1), /* Collate file names
-					as Unicode strings. */
-	COLLATION_UNICODE_STRING = const_cpu_to_le32(2), /* Collate Unicode
+	COLLATION_BINARY	 = const_cpu_to_le32(0x00), /* Collate by
+					binary compare where the first byte is
+					most significant. */
+	COLLATION_FILE_NAME	 = const_cpu_to_le32(0x01), /* Collate file
+					names as Unicode strings. */
+	COLLATION_UNICODE_STRING = const_cpu_to_le32(0x02), /* Collate Unicode
 					strings by comparing their binary
 					Unicode values, except that when a
 					character can be uppercased, the upper
 					case value collates before the lower
 					case one. */
-	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(16),
-	COLLATION_NTOFS_SID		= const_cpu_to_le32(17),
-	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(18),
-	COLLATION_NTOFS_ULONGS		= const_cpu_to_le32(19),
+	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(0x10),
+	COLLATION_NTOFS_SID		= const_cpu_to_le32(0x11),
+	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(0x12),
+	COLLATION_NTOFS_ULONGS		= const_cpu_to_le32(0x13),
 } COLLATION_RULES;
 
 /*
