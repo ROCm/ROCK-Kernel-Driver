@@ -336,8 +336,7 @@ ip6t_do_table(struct sk_buff **pskb,
 	read_lock_bh(&table->lock);
 	IP_NF_ASSERT(table->valid_hooks & (1 << hook));
 	table_base = (void *)table->private->entries
-		+ TABLE_OFFSET(table->private, 
-				cpu_number_map(smp_processor_id()));
+		+ TABLE_OFFSET(table->private, smp_processor_id());
 	e = get_entry(table_base, table->private->hook_entry[hook]);
 
 #ifdef CONFIG_NETFILTER_DEBUG
@@ -913,7 +912,7 @@ translate_table(const char *name,
 	}
 
 	/* And one copy for every other CPU */
-	for (i = 1; i < smp_num_cpus; i++) {
+	for (i = 1; i < NR_CPUS; i++) {
 		memcpy(newinfo->entries + SMP_ALIGN(newinfo->size)*i,
 		       newinfo->entries,
 		       SMP_ALIGN(newinfo->size));
@@ -935,7 +934,7 @@ replace_table(struct ip6t_table *table,
 		struct ip6t_entry *table_base;
 		unsigned int i;
 
-		for (i = 0; i < smp_num_cpus; i++) {
+		for (i = 0; i < NR_CPUS; i++) {
 			table_base =
 				(void *)newinfo->entries
 				+ TABLE_OFFSET(newinfo, i);
@@ -982,7 +981,7 @@ get_counters(const struct ip6t_table_info *t,
 	unsigned int cpu;
 	unsigned int i;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		i = 0;
 		IP6T_ENTRY_ITERATE(t->entries + TABLE_OFFSET(t, cpu),
 				  t->size,
@@ -1116,7 +1115,7 @@ do_replace(void *user, unsigned int len)
 		return -ENOMEM;
 
 	newinfo = vmalloc(sizeof(struct ip6t_table_info)
-			  + SMP_ALIGN(tmp.size) * smp_num_cpus);
+			  + SMP_ALIGN(tmp.size) * NR_CPUS);
 	if (!newinfo)
 		return -ENOMEM;
 
@@ -1429,7 +1428,7 @@ int ip6t_register_table(struct ip6t_table *table)
 
 	MOD_INC_USE_COUNT;
 	newinfo = vmalloc(sizeof(struct ip6t_table_info)
-			  + SMP_ALIGN(table->table->size) * smp_num_cpus);
+			  + SMP_ALIGN(table->table->size) * NR_CPUS);
 	if (!newinfo) {
 		ret = -ENOMEM;
 		MOD_DEC_USE_COUNT;

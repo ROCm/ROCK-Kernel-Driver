@@ -81,8 +81,9 @@ int __init check_nmi_watchdog (void)
 	sti();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
-	for (j = 0; j < smp_num_cpus; j++) {
-		cpu = cpu_logical_map(j);
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
 		if (nmi_count(cpu) - tmp[cpu].__nmi_count <= 5) {
 			printk("CPU#%d: NMI appears to be stuck!\n", cpu);
 			return -1;
@@ -330,7 +331,7 @@ void touch_nmi_watchdog (void)
 	 * Just reset the alert counters, (other CPUs might be
 	 * spinning on locks we hold):
 	 */
-	for (i = 0; i < smp_num_cpus; i++)
+	for (i = 0; i < NR_CPUS; i++)
 		alert_counter[i] = 0;
 }
 

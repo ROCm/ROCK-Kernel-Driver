@@ -39,14 +39,25 @@ extern char no_int_routing __initdata;
 extern volatile unsigned long cpu_online_map;
 extern unsigned long ipi_base_addr;
 extern unsigned char smp_int_redirect;
-extern int smp_num_cpus;
 
 extern volatile int ia64_cpu_to_sapicid[];
 #define cpu_physical_id(i)	ia64_cpu_to_sapicid[i]
-#define cpu_number_map(i)	(i)
-#define cpu_logical_map(i)	(i)
 
 extern unsigned long ap_wakeup_vector;
+
+#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
+extern inline unsigned int num_online_cpus(void)
+{
+	return hweight64(cpu_online_map);
+}
+
+extern inline int any_online_cpu(unsigned int mask)
+{
+	if (mask & cpu_online_map)
+		return __ffs(mask & cpu_online_map);
+
+	return -1;
+}
 
 /*
  * Function to map hard smp processor id to logical id.  Slow, so
@@ -57,7 +68,7 @@ cpu_logical_id (int cpuid)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; ++i)
+	for (i = 0; i < NR_CPUS; ++i)
 		if (cpu_physical_id(i) == (__u32) cpuid)
 			break;
 	return i;
@@ -107,6 +118,11 @@ hard_smp_processor_id (void)
 	lid.bits = ia64_get_lid();
 	return lid.f.id << 8 | lid.f.eid;
 }
+
+/* Upping and downing of CPUs */
+extern int __cpu_disable(void);
+extern void __cpu_die(unsigned int cpu);
+extern int __cpu_up(unsigned int cpu);
 
 #define NO_PROC_ID		0xffffffff	/* no processor magic marker */
 

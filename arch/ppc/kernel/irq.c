@@ -370,8 +370,9 @@ int show_interrupts(struct seq_file *p, void *v)
 	struct irqaction * action;
 
 	seq_puts(p, "           ");
-	for (j=0; j<smp_num_cpus; j++)
-		seq_printf(p, "CPU%d       ", j);
+	for (j=0; j<NR_CPUS; j++)
+		if (cpu_online(j))
+			seq_printf(p, "CPU%d       ", j);
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
@@ -380,9 +381,10 @@ int show_interrupts(struct seq_file *p, void *v)
 			continue;
 		seq_printf(p, "%3d: ", i);		
 #ifdef CONFIG_SMP
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-				   kstat.irqs[cpu_logical_map(j)][i]);
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ",
+					   kstat.irqs[j][i]);
 #else		
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
@@ -399,8 +401,9 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifdef CONFIG_TAU_INT
 	if (tau_initialized){
 		seq_puts(p, "TAU: ");
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ", tau_interrupts(j));
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", tau_interrupts(j));
 		seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
 	}
 #endif

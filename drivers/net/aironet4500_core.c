@@ -2669,10 +2669,8 @@ char name[] = "ElmerLinux";
 	 * but without it card gets screwed up 
 	 */ 
 #ifdef CONFIG_SMP
-	if(smp_num_cpus > 1){
 		both_bap_lock = 1;
 		bap_setup_spinlock = 1;
-	}
 #endif
 	//awc_dump_registers(dev);
 

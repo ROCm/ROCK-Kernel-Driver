@@ -280,12 +280,10 @@ done:
 static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	unsigned int dst_entries = atomic_read(&ipv4_dst_ops.entries);
-	int i, lcpu;
+	int i;
 	int len = 0;
 
-        for (lcpu = 0; lcpu < smp_num_cpus; lcpu++) {
-                i = cpu_logical_map(lcpu);
-
+	for (i = 0; i < NR_CPUS; i++) {
 		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x \n",
 			       dst_entries,		       
 			       rt_cache_stat[i].in_hit,
@@ -2437,19 +2435,16 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 		memcpy(dst, src, length);
 
 #ifdef CONFIG_SMP
-		if (smp_num_cpus > 1 || cpu_logical_map(0) != 0) {
+		/* Alexey, be ashamed: speed gained, horror unleashed. --RR */
+		if (num_online_cpus() > 1 || !cpu_online(0)) {
 			int i;
 			int cnt = length / 4;
 
-			for (i = 0; i < smp_num_cpus; i++) {
-				int cpu = cpu_logical_map(i);
+			for (i = 1; i < NR_CPUS; i++) {
 				int k;
 
-				if (cpu == 0)
-					continue;
-
 				src = (u32*)(((u8*)ip_rt_acct) + offset +
-					cpu * 256 * sizeof(struct ip_rt_acct));
+					i * 256 * sizeof(struct ip_rt_acct));
 
 				for (k = 0; k < cnt; k++)
 					dst[k] += src[k];

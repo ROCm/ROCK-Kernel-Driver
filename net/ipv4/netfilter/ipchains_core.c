@@ -125,8 +125,8 @@
  * UP.
  *
  * For backchains and counters, we use an array, indexed by
- * [cpu_number_map[smp_processor_id()]*2 + !in_interrupt()]; the array is of
- * size [smp_num_cpus*2].  For v2.0, smp_num_cpus is effectively 1.  So,
+ * [smp_processor_id()*2 + !in_interrupt()]; the array is of
+ * size [NR_CPUS*2].  For v2.0, NR_CPUS is effectively 1.  So,
  * confident of uniqueness, we modify counters even though we only
  * have a read lock (to read the counters, you need a write lock,
  * though).  */
@@ -151,11 +151,11 @@ static struct sock *ipfwsk;
 #endif
 
 #ifdef CONFIG_SMP
-#define SLOT_NUMBER() (cpu_number_map(smp_processor_id())*2 + !in_interrupt())
+#define SLOT_NUMBER() (smp_processor_id()*2 + !in_interrupt())
 #else /* !SMP */
 #define SLOT_NUMBER() (!in_interrupt())
 #endif /* CONFIG_SMP */
-#define NUM_SLOTS (smp_num_cpus*2)
+#define NUM_SLOTS (NR_CPUS*2)
 
 #define SIZEOF_STRUCT_IP_CHAIN (sizeof(struct ip_chain) \
 				+ NUM_SLOTS*sizeof(struct ip_reent))
@@ -1122,7 +1122,7 @@ static struct ip_chain *ip_init_chain(ip_chainlabel name,
 	label->chain = NULL;
 	label->refcount = ref;
 	label->policy = policy;
-	for (i = 0; i < smp_num_cpus*2; i++) {
+	for (i = 0; i < NUM_SLOTS; i++) {
 		label->reent[i].counters.pcnt = label->reent[i].counters.bcnt
 			= 0;
 		label->reent[i].prevchain = NULL;

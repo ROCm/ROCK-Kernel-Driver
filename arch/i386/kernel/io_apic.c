@@ -232,14 +232,14 @@ static unsigned long move(int curr_cpu, unsigned long allowed_mask, unsigned lon
 inside:
 		if (direction == 1) {
 			cpu++;
-			if (cpu >= smp_num_cpus)
+			if (cpu >= NR_CPUS)
 				cpu = 0;
 		} else {
 			cpu--;
 			if (cpu == -1)
-				cpu = smp_num_cpus-1;
+				cpu = NR_CPUS-1;
 		}
-	} while (!IRQ_ALLOWED(cpu,allowed_mask) ||
+	} while (!cpu_online(cpu) || !IRQ_ALLOWED(cpu,allowed_mask) ||
 			(search_idle && !IDLE_ENOUGH(cpu,now)));
 
 	return cpu;

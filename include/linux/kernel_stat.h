@@ -43,8 +43,8 @@ static inline int kstat_irqs (int irq)
 {
 	int i, sum=0;
 
-	for (i = 0 ; i < smp_num_cpus ; i++)
-		sum += kstat.irqs[cpu_logical_map(i)][irq];
+	for (i = 0 ; i < NR_CPUS ; i++)
+		sum += kstat.irqs[i][irq];
 
 	return sum;
 }

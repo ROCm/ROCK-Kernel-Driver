@@ -228,7 +228,6 @@ EXPORT_SYMBOL(_raw_write_unlock);
 #endif
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_hw_index);
-EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(synchronize_irq);
 #endif
 

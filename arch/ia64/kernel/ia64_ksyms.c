@@ -85,9 +85,6 @@ EXPORT_SYMBOL(smp_call_function_single);
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(ia64_cpu_to_sapicid);
 
-#include <linux/smp.h>
-EXPORT_SYMBOL(smp_num_cpus);
-
 #include <asm/smplock.h>
 EXPORT_SYMBOL(kernel_flag);
 

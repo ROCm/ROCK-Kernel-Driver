@@ -519,8 +519,9 @@ static inline u32 physmask(u32 cpumask)
 	int i;
 	u32 mask = 0;
 
-	for (i = 0; i < smp_num_cpus; ++i, cpumask >>= 1)
-		mask |= (cpumask & 1) << smp_hw_index[i];
+	for (i = 0; i < NR_CPUS; ++i, cpumask >>= 1)
+		if (cpu_online(i))
+			mask |= (cpumask & 1) << smp_hw_index[i];
 	return mask;
 }
 #else
