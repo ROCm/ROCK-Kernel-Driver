@@ -1785,77 +1785,9 @@ static int __initdata is_chipset_set[MAX_HWIFS];
 
 /*
  * ide_setup() gets called VERY EARLY during initialization,
- * to handle kernel "command line" strings beginning with "hdx="
- * or "ide".  Here is the complete set currently supported:
+ * to handle kernel "command line" strings beginning with "hdx=" or "ide".
  *
- * "hdx="  is recognized for all "x" from "a" to "h", such as "hdc".
- * "idex=" is recognized for all "x" from "0" to "3", such as "ide1".
- *
- * "hdx=noprobe"	: drive may be present, but do not probe for it
- * "hdx=none"		: drive is NOT present, ignore cmos and do not probe
- * "hdx=nowerr"		: ignore the WRERR_STAT bit on this drive
- * "hdx=cdrom"		: drive is present, and is a cdrom drive
- * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
- * "hdx=remap63"	: add 63 to all sector numbers (for OnTrack DM)
- * "hdx=remap"		: remap 0->1 (for EZDrive)
- * "hdx=autotune"	: driver will attempt to tune interface speed
- *				to the fastest PIO mode supported,
- *				if possible for this drive only.
- *				Not fully supported by all chipset types,
- *				and quite likely to cause trouble with
- *				older/odd IDE drives.
- * "hdx=swapdata"	: when the drive is a disk, byte swap all data
- * "hdx=bswap"		: same as above..........
- * "hdxlun=xx"          : set the drive last logical unit.
- * "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
- *				allowing ide-floppy, ide-tape, and ide-cdrom|writers
- *				to use ide-scsi emulation on a device specific option.
- * "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
- *				where "xx" is between 20 and 66 inclusive,
- *				used when tuning chipset PIO modes.
- *				For PCI bus, 25 is correct for a P75 system,
- *				30 is correct for P90,P120,P180 systems,
- *				and 33 is used for P100,P133,P166 systems.
- *				If in doubt, use idebus=33 for PCI.
- *				As for VLB, it is safest to not specify it.
- *
- * "idex=noprobe"	: do not attempt to access/use this interface
- * "idex=base"		: probe for an interface at the addr specified,
- *				where "base" is usually 0x1f0 or 0x170
- *				and "ctl" is assumed to be "base"+0x206
- * "idex=base,ctl"	: specify both base and ctl
- * "idex=base,ctl,irq"	: specify base, ctl, and irq number
- * "idex=autotune"	: driver will attempt to tune interface speed
- *				to the fastest PIO mode supported,
- *				for all drives on this interface.
- *				Not fully supported by all chipset types,
- *				and quite likely to cause trouble with
- *				older/odd IDE drives.
- * "idex=noautotune"	: driver will NOT attempt to tune interface speed
- *				This is the default for most chipsets,
- *				except the cmd640.
- * "idex=serialize"	: do not overlap operations on idex and ide(x^1)
- * "idex=four"		: four drives on idex and ide(x^1) share same ports
- * "idex=reset"		: reset interface before first use
- * "idex=dma"		: enable DMA by default on both drives if possible
- * "idex=ata66"		: informs the interface that it has an 80c cable
- *				for chipsets that are ATA-66 capable, but
- *				the ablity to bit test for detection is
- *				currently unknown.
- * "ide=reverse"	: Formerly called to pci sub-system, but now local.
- *
- * The following are valid ONLY on ide0, (except dc4030)
- * and the defaults for the base,ctl ports must not be altered.
- *
- * "ide0=dtc2278"	: probe/support DTC2278 interface
- * "ide0=ht6560b"	: probe/support HT6560B interface
- * "ide0=cmd640_vlb"	: *REQUIRED* for VLB cards with the CMD640 chip
- *			  (not for PCI -- automatically detected)
- * "ide0=qd65xx"	: probe/support qd65xx interface
- * "ide0=ali14xx"	: probe/support ali14xx chipsets (ALI M1439, M1443, M1445)
- * "ide0=umc8672"	: probe/support umc8672 chipsets
- * "idex=dc4030"	: probe/support Promise DC4030VL interface
- * "ide=doubler"	: probe/support IDE doublers on Amiga
+ * Remember to update Documentation/ide.txt if you change something here.
  */
 int __init ide_setup (char *s)
 {
