@@ -67,7 +67,7 @@ static unsigned long DRM(ati_alloc_pcigart_table)( void )
 	page = virt_to_page( address );
 
 	for ( i = 0 ; i < ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
-		atomic_inc( &page->count );
+		get_page(page);
 		SetPageReserved( page );
 	}
 
@@ -84,7 +84,7 @@ static void DRM(ati_free_pcigart_table)( unsigned long address )
 	page = virt_to_page( address );
 
 	for ( i = 0 ; i < ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
-		atomic_dec( &page->count );
+		__put_page(page);
 		ClearPageReserved( page );
 	}
 

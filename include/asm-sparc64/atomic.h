@@ -40,6 +40,16 @@ extern int __atomic64_sub(__s64, atomic64_t *);
 #define atomic_inc_return(v) __atomic_add(1, v)
 #define atomic64_inc_return(v) __atomic64_add(1, v)
 
+/*
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.
+ */
+#define atomic_inc_and_test(v) (atomic_inc_return(v) == 0)
+
 #define atomic_sub_and_test(i, v) (__atomic_sub(i, v) == 0)
 #define atomic64_sub_and_test(i, v) (__atomic64_sub(i, v) == 0)
 

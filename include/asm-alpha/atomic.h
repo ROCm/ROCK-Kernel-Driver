@@ -115,6 +115,8 @@ static __inline__ long atomic_add_return(int i, atomic_t * v)
 	return result;
 }
 
+#define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
+
 static __inline__ long atomic64_add_return(long i, atomic64_t * v)
 {
 	long temp, result;

@@ -25,6 +25,7 @@ static __inline__ int atomic_add_return(int i, atomic_t *v)
 }
 
 #define atomic_add(i, v) atomic_add_return(i, v)
+#define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
 
 static __inline__ int atomic_sub_return(int i, atomic_t *v)
 {
@@ -48,6 +49,16 @@ static __inline__ int atomic_inc_return(atomic_t *v)
 }
 
 #define atomic_inc(v) atomic_inc_return(v)
+
+/*
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.
+ */
+#define atomic_inc_and_test(v) (atomic_inc_return(v) == 0)
 
 static __inline__ int atomic_dec_return(atomic_t *v)
 {

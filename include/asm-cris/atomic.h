@@ -56,6 +56,8 @@ extern __inline__ int atomic_add_return(int i, volatile atomic_t *v)
 	return retval;
 }
 
+#define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
+
 extern __inline__ int atomic_sub_return(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
