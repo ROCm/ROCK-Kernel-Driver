@@ -88,10 +88,10 @@
 #include <net/arp.h>
 
 struct shaper_cb { 
+	unsigned long	shapeclock;		/* Time it should go out */
+	unsigned long	shapestamp;		/* Stamp for shaper    */
 	__u32		shapelatency;		/* Latency on frame */
-	__u32		shapeclock;		/* Time it should go out */
 	__u32		shapelen;		/* Frame length in clocks */
-	__u32		shapestamp;		/* Stamp for shaper    */
 	__u16		shapepend;		/* Pending */
 }; 
 #define SHAPERCB(skb) ((struct shaper_cb *) ((skb)->cb))
@@ -335,7 +335,7 @@ static void shaper_kick(struct shaper *shaper)
 		 */
 		 
 		if(sh_debug)
-			printk("Clock = %d, jiffies = %ld\n", SHAPERCB(skb)->shapeclock, jiffies);
+			printk("Clock = %ld, jiffies = %ld\n", SHAPERCB(skb)->shapeclock, jiffies);
 		if(time_before_eq(SHAPERCB(skb)->shapeclock - jiffies, SHAPER_BURST))
 		{
 			/*

@@ -74,6 +74,8 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
+#include <linux/ioctl32.h>
+#include <linux/compat.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
@@ -1262,8 +1264,11 @@ MODULE_LICENSE("GPL");
 
 static int __init amdtp_init_module (void)
 {
-	if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_AMDTP,
-				      THIS_MODULE, &amdtp_fops)) {
+	int ret;
+
+	ret = ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_AMDTP,
+					THIS_MODULE, &amdtp_fops);
+	if (ret) {
 		HPSB_ERR("amdtp: unable to get minor device block");
  		return -EIO;
  	}
@@ -1276,6 +1281,15 @@ static int __init amdtp_init_module (void)
 		return -EIO;
 	}
 
+#ifdef CONFIG_COMPAT
+	ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
+	ret |= register_ioctl32_conversion(AMDTP_IOC_PLUG, NULL);
+	ret |= register_ioctl32_conversion(AMDTP_IOC_PING, NULL);
+	ret |= register_ioctl32_conversion(AMDTP_IOC_ZAP, NULL);
+	if (ret)
+		HPSB_ERR("amdtp: Error registering ioctl32 translations");
+#endif
+
 	HPSB_INFO("Loaded AMDTP driver");
 
 	return 0;
@@ -1283,6 +1297,17 @@ static int __init amdtp_init_module (void)
 
 static void __exit amdtp_exit_module (void)
 {
+#ifdef CONFIG_COMPAT
+	int ret;
+
+	ret = unregister_ioctl32_conversion(AMDTP_IOC_CHANNEL);
+	ret |= unregister_ioctl32_conversion(AMDTP_IOC_PLUG);
+	ret |= unregister_ioctl32_conversion(AMDTP_IOC_PING);
+	ret |= unregister_ioctl32_conversion(AMDTP_IOC_ZAP);
+	if (ret)
+		HPSB_ERR("amdtp: Error unregistering ioctl32 translations");
+#endif
+
         hpsb_unregister_highlevel(amdtp_highlevel);
         ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
 

@@ -138,13 +138,12 @@ struct bus_type system_bus_type = {
 	.name		= "system",
 };
 
-static int sys_bus_init(void)
+int __init sys_bus_init(void)
 {
 	bus_register(&system_bus_type);
 	return device_register(&system_bus);
 }
 
-postcore_initcall(sys_bus_init);
 EXPORT_SYMBOL(system_bus_type);
 EXPORT_SYMBOL(sys_device_register);
 EXPORT_SYMBOL(sys_device_unregister);

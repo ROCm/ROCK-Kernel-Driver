@@ -266,12 +266,10 @@ void devclass_unregister(struct device_class * cls)
 	subsystem_unregister(&cls->subsys);
 }
 
-static int __init class_subsys_init(void)
+int __init classes_init(void)
 {
 	return subsystem_register(&class_subsys);
 }
-
-core_initcall(class_subsys_init);
 
 EXPORT_SYMBOL(devclass_create_file);
 EXPORT_SYMBOL(devclass_remove_file);

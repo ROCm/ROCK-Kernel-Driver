@@ -111,6 +111,8 @@
 #include <linux/wrapper.h>
 #include <linux/vmalloc.h>
 #include <linux/string.h>
+#include <linux/ioctl32.h>
+#include <linux/compat.h>
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -2701,7 +2703,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	struct ti_ohci *ohci;
 	struct video_card *video = NULL;
 	unsigned long flags;
-	struct list_head *lh;
+	struct list_head *lh, *templh;
 	char buf[32];
 	int	n;
 	
@@ -2715,7 +2717,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	/* find the corresponding video_cards */
 	spin_lock_irqsave(&dv1394_cards_lock, flags);
 	if(!list_empty(&dv1394_cards)) {
-		list_for_each(lh, &dv1394_cards) {
+		list_for_each_safe(lh, templh, &dv1394_cards) {
 			video = list_entry(lh, struct video_card, list);
 			if((video->id >> 2) == ohci->id)
 				dv1394_un_init(video);
@@ -2907,6 +2909,98 @@ static struct hpsb_highlevel_ops hl_ops = {
 	.host_reset =   dv1394_host_reset,
 };
 
+#ifdef CONFIG_COMPAT
+
+#define DV1394_IOC32_INIT       _IOW('#', 0x06, struct dv1394_init32)
+#define DV1394_IOC32_GET_STATUS _IOR('#', 0x0c, struct dv1394_status32)
+
+struct dv1394_init32 {
+	u32 api_version;
+	u32 channel;
+	u32 n_frames;
+	u32 format;
+	u32 cip_n;
+	u32 cip_d;
+	u32 syt_offset;
+};
+
+struct dv1394_status32 {
+	struct dv1394_init32 init;
+	s32 active_frame;
+	u32 first_clear_frame;
+	u32 n_clear_frames;
+	u32 dropped_frames;
+};
+
+static int handle_dv1394_init(unsigned int fd, unsigned int cmd, unsigned long arg,
+			      struct file *file)
+{
+	struct dv1394_init32 dv32;
+	struct dv1394_init dv;
+	mm_segment_t old_fs;
+	int ret;
+
+	if (file->f_op->ioctl != dv1394_ioctl)
+		return -EFAULT;
+
+	if (copy_from_user(&dv32, (void *)arg, sizeof(dv32)))
+		return -EFAULT;
+
+	dv.api_version = dv32.api_version;
+	dv.channel = dv32.channel;
+	dv.n_frames = dv32.n_frames;
+	dv.format = dv32.format;
+	dv.cip_n = (unsigned long)dv32.cip_n;
+	dv.cip_d = (unsigned long)dv32.cip_d;
+	dv.syt_offset = dv32.syt_offset;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = dv1394_ioctl(file->f_dentry->d_inode, file,
+			   DV1394_IOC_INIT, (unsigned long)&dv);
+	set_fs(old_fs);
+
+	return ret;
+}
+
+static int handle_dv1394_get_status(unsigned int fd, unsigned int cmd, unsigned long arg,
+				    struct file *file)
+{
+	struct dv1394_status32 dv32;
+	struct dv1394_status dv;
+	mm_segment_t old_fs;
+	int ret;
+
+	if (file->f_op->ioctl != dv1394_ioctl)
+		return -EFAULT;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = dv1394_ioctl(file->f_dentry->d_inode, file,
+			   DV1394_IOC_GET_STATUS, (unsigned long)&dv);
+	set_fs(old_fs);
+
+	if (!ret) {
+		dv32.init.api_version = dv.init.api_version;
+		dv32.init.channel = dv.init.channel;
+		dv32.init.n_frames = dv.init.n_frames;
+		dv32.init.format = dv.init.format;
+		dv32.init.cip_n = (u32)dv.init.cip_n;
+		dv32.init.cip_d = (u32)dv.init.cip_d;
+		dv32.init.syt_offset = dv.init.syt_offset;
+		dv32.active_frame = dv.active_frame;
+		dv32.first_clear_frame = dv.first_clear_frame;
+		dv32.n_clear_frames = dv.n_clear_frames;
+		dv32.dropped_frames = dv.dropped_frames;
+
+		if (copy_to_user((struct dv1394_status32 *)arg, &dv32, sizeof(dv32)))
+			ret = -EFAULT;
+	}
+
+	return ret;
+}
+#endif /* CONFIG_COMPAT */
+
 
 /*** KERNEL MODULE HANDLERS ************************************************/
 
@@ -2917,6 +3011,20 @@ MODULE_LICENSE("GPL");
 
 static void __exit dv1394_exit_module(void)
 {
+#ifdef CONFIG_COMPAT
+	int ret;
+
+	ret = unregister_ioctl32_conversion(DV1394_IOC_SHUTDOWN);
+	ret |= unregister_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES);
+	ret |= unregister_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES);
+	ret |= unregister_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES);
+	ret |= unregister_ioctl32_conversion(DV1394_IOC_START_RECEIVE);
+	ret |= unregister_ioctl32_conversion(DV1394_IOC32_INIT);
+	ret |= unregister_ioctl32_conversion(DV1394_IOC32_GET_STATUS);
+	if (ret)
+		printk(KERN_ERR "dv1394: Error unregistering ioctl32 translations\n");
+#endif
+
 	hpsb_unregister_highlevel (hl_handle);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 #ifdef CONFIG_DEVFS_FS
@@ -2929,14 +3037,18 @@ static void __exit dv1394_exit_module(void)
 
 static int __init dv1394_init_module(void)
 {
-	if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_DV1394,
-				      THIS_MODULE, &dv1394_fops)) {
+	int ret;
+
+	ret = ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_DV1394,
+					THIS_MODULE, &dv1394_fops);
+	if (ret) {
 		printk(KERN_ERR "dv1394: unable to register character device\n");
 		return -EIO;
 	}
 
 #ifdef CONFIG_DEVFS_FS
-	if (dv1394_devfs_add_dir("dv", NULL, NULL) < 0) {
+	ret = dv1394_devfs_add_dir("dv", NULL, NULL);
+	if (ret < 0) {
 		printk(KERN_ERR "dv1394: unable to create /dev/ieee1394/dv\n");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 		return -ENOMEM;
@@ -2944,7 +3056,8 @@ static int __init dv1394_init_module(void)
 #endif
 
 #ifdef CONFIG_PROC_FS
-	if (dv1394_procfs_add_dir("dv",NULL,NULL) < 0) {
+	ret = dv1394_procfs_add_dir("dv",NULL,NULL);
+	if (ret < 0) {
 		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/dv\n");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 #ifdef CONFIG_DEVFS_FS
@@ -2967,9 +3080,23 @@ static int __init dv1394_init_module(void)
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_COMPAT
+	/* First compatible ones */
+	ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
+	ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);
+	ret |= register_ioctl32_conversion(DV1394_IOC_WAIT_FRAMES, NULL);
+	ret |= register_ioctl32_conversion(DV1394_IOC_RECEIVE_FRAMES, NULL);
+	ret |= register_ioctl32_conversion(DV1394_IOC_START_RECEIVE, NULL);
+
+	/* These need to be handled by translation */
+	ret |= register_ioctl32_conversion(DV1394_IOC32_INIT, handle_dv1394_init);
+	ret |= register_ioctl32_conversion(DV1394_IOC32_GET_STATUS, handle_dv1394_get_status);
+	if (ret)
+		printk(KERN_ERR "dv1394: Error registering ioctl32 translations\n");
+#endif
+
 	return 0;
 }
 
 module_init(dv1394_init_module);
 module_exit(dv1394_exit_module);
-

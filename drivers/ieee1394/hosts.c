@@ -71,9 +71,6 @@ int hpsb_ref_host(struct hpsb_host *host)
         list_for_each(lh, &hosts) {
                 if (host == list_entry(lh, struct hpsb_host, host_list)) {
 			if (try_module_get(host->driver->owner)) {
-				/* we're doing this twice and don't seem
-				   to undo it..  --hch */
-				(void)try_module_get(host->driver->owner);
 				host->refcount++;
 				retval = 1;
 			}

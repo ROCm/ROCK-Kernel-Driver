@@ -66,7 +66,7 @@ static struct file_system_type sysfs_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
-static int __init sysfs_init(void)
+int __init sysfs_init(void)
 {
 	int err;
 
@@ -81,5 +81,3 @@ static int __init sysfs_init(void)
 	}
 	return err;
 }
-
-core_initcall(sysfs_init);
