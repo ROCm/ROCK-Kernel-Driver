@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#134 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#135 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -150,8 +150,8 @@ typedef Scsi_Cmnd      *ahc_io_ctx_t;
 #endif /* BYTE_ORDER */
 
 /************************* Configuration Data *********************************/
-extern int aic7xxx_no_probe;
-extern int aic7xxx_allow_memio;
+extern u_int aic7xxx_no_probe;
+extern u_int aic7xxx_allow_memio;
 extern int aic7xxx_detect_complete;
 extern Scsi_Host_Template aic7xxx_driver_template;
 
@@ -1250,5 +1250,5 @@ void	ahc_platform_dump_card_state(struct ahc_softc *ahc);
 #define AHC_PCI_CONFIG 0
 #endif
 #define bootverbose aic7xxx_verbose
-extern int aic7xxx_verbose;
+extern u_int aic7xxx_verbose;
 #endif /* _AIC7XXX_LINUX_H_ */

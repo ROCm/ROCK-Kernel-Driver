@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#153 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#154 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -357,14 +357,14 @@ static uint32_t aic79xx_no_reset;
  * disabled at the very end.  That should fix everyone up unless there are
  * really strange cirumstances.
  */
-static int aic79xx_reverse_scan = 0;
+static uint32_t aic79xx_reverse_scan;
 
 /*
  * Should we force EXTENDED translation on a controller.
  *     0 == Use whatever is in the SEEPROM or default to off
  *     1 == Use whatever is in the SEEPROM or default to on
  */
-static uint32_t aic79xx_extended = 0;
+static uint32_t aic79xx_extended;
 
 /*
  * PCI bus parity checking of the Adaptec controllers.  This is somewhat
@@ -372,16 +372,15 @@ static uint32_t aic79xx_extended = 0;
  * solved a PCI parity problem, but on certain machines with broken PCI
  * chipset configurations, it can generate tons of false error messages.
  * It's included in the driver for completeness.
- *   0 = Shut off PCI parity check
- *  -1 = Normal polarity pci parity checking
- *   1 = reverse polarity pci parity checking
+ *   0	   = Shut off PCI parity check
+ *   non-0 = Enable PCI parity check
  *
  * NOTE: you can't actually pass -1 on the lilo prompt.  So, to set this
  * variable to -1 you would actually want to simply pass the variable
  * name without a number.  That will invert the 0 which will result in
  * -1.
  */
-static int aic79xx_pci_parity = 0;
+static uint32_t aic79xx_pci_parity = ~0;
 
 /*
  * There are lots of broken chipsets in the world.  Some of them will
@@ -389,7 +388,7 @@ static int aic79xx_pci_parity = 0;
  * controller.  I/O mapped register access, if allowed by the given
  * platform, will work in almost all cases.
  */
-int aic79xx_allow_memio = 1;
+uint32_t aic79xx_allow_memio = ~0;
 
 /*
  * aic79xx_detect() has been run, so register all device arrivals
@@ -408,7 +407,7 @@ int aic79xx_detect_complete;
  * We default to 256ms because some older devices need a longer time
  * to respond to initial selection.
  */
-static int aic79xx_seltime = 0x00;
+static uint32_t aic79xx_seltime;
 
 /*
  * Certain devices do not perform any aging on commands.  Should the
@@ -418,7 +417,7 @@ static int aic79xx_seltime = 0x00;
  * force all outstanding transactions to be serviced prior to a new
  * transaction.
  */
-int aic79xx_periodic_otag;
+uint32_t aic79xx_periodic_otag;
 
 /*
  * Module information and settable options.
@@ -2094,7 +2093,7 @@ aic79xx_setup(char *s)
 		} else if (!strncmp(p, "verbose", n)) {
 			*(options[i].flag) = 1;
 		} else {
-			*(options[i].flag) = ~(*(options[i].flag));
+			*(options[i].flag) ^= 0xFFFFFFFF;
 		}
 	}
 	return 1;
@@ -2104,7 +2103,7 @@ aic79xx_setup(char *s)
 __setup("aic79xx=", aic79xx_setup);
 #endif
 
-int aic79xx_verbose;
+uint32_t aic79xx_verbose;
 
 int
 ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)

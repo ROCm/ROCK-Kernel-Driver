@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#215 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#216 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -366,31 +366,26 @@ static uint32_t aic7xxx_no_reset;
  * disabled at the very end.  That should fix everyone up unless there are
  * really strange cirumstances.
  */
-static int aic7xxx_reverse_scan = 0;
+static uint32_t aic7xxx_reverse_scan;
 
 /*
  * Should we force EXTENDED translation on a controller.
  *     0 == Use whatever is in the SEEPROM or default to off
  *     1 == Use whatever is in the SEEPROM or default to on
  */
-static uint32_t aic7xxx_extended = 0;
+static uint32_t aic7xxx_extended;
 
 /*
  * PCI bus parity checking of the Adaptec controllers.  This is somewhat
  * dubious at best.  To my knowledge, this option has never actually
  * solved a PCI parity problem, but on certain machines with broken PCI
- * chipset configurations, it can generate tons of false error messages.
+ * chipset configurations where stray PCI transactions with bad parity are
+ * the norm rather than the exception, the error messages can be overwelming.
  * It's included in the driver for completeness.
- *   0 = Shut off PCI parity check
- *  -1 = Normal polarity pci parity checking
- *   1 = reverse polarity pci parity checking
- *
- * NOTE: you can't actually pass -1 on the lilo prompt.  So, to set this
- * variable to -1 you would actually want to simply pass the variable
- * name without a number.  That will invert the 0 which will result in
- * -1.
+ *   0	   = Shut off PCI parity check
+ *   non-0 = reverse polarity pci parity checking
  */
-static int aic7xxx_pci_parity = 0;
+static uint32_t aic7xxx_pci_parity = ~0;
 
 /*
  * Certain newer motherboards have put new PCI based devices into the
@@ -406,9 +401,9 @@ static int aic7xxx_pci_parity = 0;
 #define CONFIG_AIC7XXX_PROBE_EISA_VL n
 #endif
 #if CONFIG_AIC7XXX_PROBE_EISA_VL == n
-static int aic7xxx_no_probe = 1;
+static uint32_t aic7xxx_probe_eisa_vl;
 #else
-static int aic7xxx_no_probe;
+static uint32_t aic7xxx_probe_eisa_vl = ~0;
 #endif
 
 /*
@@ -417,7 +412,7 @@ static int aic7xxx_no_probe;
  * controller.  I/O mapped register access, if allowed by the given
  * platform, will work in almost all cases.
  */
-int aic7xxx_allow_memio = 1;
+uint32_t aic7xxx_allow_memio = ~0;
 
 /*
  * aic7xxx_detect() has been run, so register all device arrivals
@@ -436,7 +431,7 @@ int aic7xxx_detect_complete;
  * We default to 256ms because some older devices need a longer time
  * to respond to initial selection.
  */
-static int aic7xxx_seltime = 0x00;
+static uint32_t aic7xxx_seltime;
 
 /*
  * Certain devices do not perform any aging on commands.  Should the
@@ -446,7 +441,7 @@ static int aic7xxx_seltime = 0x00;
  * force all outstanding transactions to be serviced prior to a new
  * transaction.
  */
-int aic7xxx_periodic_otag;
+uint32_t aic7xxx_periodic_otag;
 
 /*
  * Module information and settable options.
@@ -471,7 +466,8 @@ MODULE_PARM_DESC(aic7xxx,
 "	verbose			Enable verbose/diagnostic logging\n"
 "	allow_memio		Allow device registers to be memory mapped\n"
 "	debug			Bitmask of debug values to enable\n"
-"	no_probe		Disable EISA/VLB controller probing\n"
+"	no_probe		Toggle EISA/VLB controller probing\n"
+"	eisa_vl_probe		Toggle EISA/VLB controller probing\n"
 "	no_reset		Supress initial bus resets\n"
 "	extended		Enable extended geometry on all controllers\n"
 "	periodic_otag		Send an ordered tagged transaction\n"
@@ -488,10 +484,10 @@ MODULE_PARM_DESC(aic7xxx,
 "\n"
 "	Sample /etc/modules.conf line:\n"
 "		Toggle EISA/VLB probing\n"
-"		Set tag depth on Controller 1/Target 2 to 10 tags\n"
+"		Set tag depth on Controller 1/Target 1 to 10 tags\n"
 "		Shorten the selection timeout to 128ms\n"
 "\n"
-"	options aic7xxx 'aic7xxx=no_probe.tag_info:{{}.{..10}}.seltime:1'\n"
+"	options aic7xxx 'aic7xxx=eisa_vl_probe.tag_info:{{}.{.10}}.seltime:1'\n"
 );
 #endif
 
@@ -926,7 +922,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	ahc_linux_pci_init();
 #endif
 
-	if (aic7xxx_no_probe == 0)
+	if (aic7xxx_probe_eisa_vl != 0)
 		aic7770_linux_probe(template);
 
 	/*
@@ -1687,7 +1683,8 @@ aic7xxx_setup(char *s)
 		{ "debug", &ahc_debug },
 #endif
 		{ "reverse_scan", &aic7xxx_reverse_scan },
-		{ "no_probe", &aic7xxx_no_probe },
+		{ "no_probe", &aic7xxx_probe_eisa_vl },
+		{ "probe_eisa_vlb", &aic7xxx_probe_eisa_vl },
 		{ "periodic_otag", &aic7xxx_periodic_otag },
 		{ "pci_parity", &aic7xxx_pci_parity },
 		{ "seltime", &aic7xxx_seltime },
@@ -1729,7 +1726,7 @@ aic7xxx_setup(char *s)
 		} else if (strncmp(p, "verbose", n) == 0) {
 			*(options[i].flag) = 1;
 		} else {
-			*(options[i].flag) = ~(*(options[i].flag));
+			*(options[i].flag) ^= 0xFFFFFFFF;
 		}
 	}
 	return 1;
@@ -1739,7 +1736,7 @@ aic7xxx_setup(char *s)
 __setup("aic7xxx=", aic7xxx_setup);
 #endif
 
-int aic7xxx_verbose;
+uint32_t aic7xxx_verbose;
 
 int
 ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)

@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#124 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#126 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -139,7 +139,7 @@ typedef Scsi_Cmnd      *ahd_io_ctx_t;
 #endif /* BYTE_ORDER */
 
 /************************* Configuration Data *********************************/
-extern int aic79xx_allow_memio;
+extern uint32_t aic79xx_allow_memio;
 extern int aic79xx_detect_complete;
 extern Scsi_Host_Template aic79xx_driver_template;
 
@@ -293,7 +293,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHD_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.6"
+#define AIC79XX_DRIVER_VERSION "1.3.7"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -1296,5 +1296,5 @@ void	ahd_platform_dump_card_state(struct ahd_softc *ahd);
 #define AHD_PCI_CONFIG 0
 #endif
 #define bootverbose aic79xx_verbose
-extern int aic79xx_verbose;
+extern uint32_t aic79xx_verbose;
 #endif /* _AIC79XX_LINUX_H_ */
