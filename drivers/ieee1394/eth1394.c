@@ -411,7 +411,7 @@ static int eth1394_remove(struct device *dev)
 	return 0;
 }
 
-static void eth1394_update(struct unit_directory *ud)
+static int eth1394_update(struct unit_directory *ud)
 {
 	struct eth1394_host_info *hi;
 	struct eth1394_priv *priv;
@@ -420,7 +420,7 @@ static void eth1394_update(struct unit_directory *ud)
 
 	hi = hpsb_get_hostinfo(&eth1394_highlevel, ud->ne->host);
 	if (!hi)
-		return;
+		return -ENOENT;
 
 	priv = (struct eth1394_priv *)hi->dev->priv;
 
@@ -430,7 +430,7 @@ static void eth1394_update(struct unit_directory *ud)
 		node = kmalloc(sizeof(struct eth1394_node_ref),
 			       in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
 		if (!node)
-			return;
+			return -ENOMEM;
 
 
 		node_info = kmalloc(sizeof(struct eth1394_node_info),
@@ -446,6 +446,8 @@ static void eth1394_update(struct unit_directory *ud)
 		priv = (struct eth1394_priv *)hi->dev->priv;
 		list_add_tail(&node->list, &priv->ip_node_list);
 	}
+
+	return 0;
 }
 
 

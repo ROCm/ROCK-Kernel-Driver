@@ -234,6 +234,10 @@ const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
 static void sbp2_remove_host(struct hpsb_host *host);
 static void sbp2_host_reset(struct hpsb_host *host);
 
+static int sbp2_probe(struct device *dev);
+static int sbp2_remove(struct device *dev);
+static int sbp2_update(struct unit_directory *ud);
+
 static struct hpsb_highlevel sbp2_highlevel = {
 	.name =		SBP2_DEVICE_NAME,
 	.remove_host =	sbp2_remove_host,
@@ -638,28 +642,26 @@ static int sbp2_remove(struct device *dev)
 	return 0;
 }
 
-static void sbp2_update(struct unit_directory *ud)
+static int sbp2_update(struct unit_directory *ud)
 {
 	struct scsi_id_instance_data *scsi_id = ud->device.driver_data;
-	struct sbp2scsi_host_info *hi = scsi_id->hi;
 
 	SBP2_DEBUG("sbp2_update");
-
-	hi = scsi_id->hi;
 
 	if (sbp2_reconnect_device(scsi_id)) {
 		
 		/* 
 		 * Ok, reconnect has failed. Perhaps we didn't
-		 * reconnect fast enough. Try doing a regular login.
+		 * reconnect fast enough. Try doing a regular login, but
+		 * first do a logout just in case of any weirdness.
 		 */
 		sbp2_logout_device(scsi_id);
 
 		if (sbp2_login_device(scsi_id)) {
-			/* Login failed too, just remove the device. */
+			/* Login failed too, just fail, and the backend
+			 * will call our sbp2_remove for us */
 			SBP2_ERR("sbp2_reconnect_device failed!");
-			sbp2_remove_device(scsi_id);
-			return;
+			return -EBUSY;
 		}
 	}
 
@@ -676,6 +678,8 @@ static void sbp2_update(struct unit_directory *ud)
 	 * retried) and remove them from our queue
 	 */
 	sbp2scsi_complete_all_commands(scsi_id, DID_BUS_BUSY);
+
+	return 0;
 }
 
 /* This functions is called by the sbp2_probe, for each new device. We now
