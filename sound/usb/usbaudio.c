@@ -2422,7 +2422,6 @@ static void snd_usb_stream_disconnect(struct list_head *head, struct usb_driver 
 	int idx;
 	snd_usb_stream_t *as;
 	snd_usb_substream_t *subs;
-	struct list_head *p;
 
 	as = list_entry(head, snd_usb_stream_t, list);
 	for (idx = 0; idx < 2; idx++) {
@@ -2431,11 +2430,6 @@ static void snd_usb_stream_disconnect(struct list_head *head, struct usb_driver 
 			return;
 		release_substream_urbs(subs, 1);
 		subs->interface = -1;
-		/* release interfaces */
-		list_for_each(p, &subs->fmt_list) {
-			struct audioformat *fp = list_entry(p, struct audioformat, list);
-			usb_driver_release_interface(driver, usb_ifnum_to_if(subs->dev, fp->iface));
-		}
 	}
 }
 
