@@ -22,6 +22,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <linux/delay.h>
@@ -450,9 +451,6 @@ nm256_get_new_block (struct nm256_info *card)
     }
 }
 
-/* Ultra cheez-whiz.  But I'm too lazy to grep headers. */
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
-
 /* 
  * Read the last-recorded block from the ring buffer, copy it into the
  * saved buffer pointer, and invoke DMAuf_inputintr() with the recording
@@ -480,7 +478,7 @@ nm256_read_block (struct nm256_info *card)
 	/* If we wrapped around, copy everything from the start of our
 	   recording buffer to the end of the buffer. */
 	if (currptr < card->curRecPos) {
-	    u32 amt = MIN (ringsize - card->curRecPos, amtToRead);
+	    u32 amt = min (ringsize - card->curRecPos, amtToRead);
 
 	    nm256_readBuffer8 (card, card->recBuf, 1,
 				 card->abuf2 + card->curRecPos,
@@ -493,7 +491,7 @@ nm256_read_block (struct nm256_info *card)
 	}
 
 	if ((card->curRecPos < currptr) && (amtToRead > 0)) {
-	    u32 amt = MIN (currptr - card->curRecPos, amtToRead);
+	    u32 amt = min (currptr - card->curRecPos, amtToRead);
 	    nm256_readBuffer8 (card, card->recBuf, 1,
 				 card->abuf2 + card->curRecPos, amt);
 	    card->curRecPos = ((card->curRecPos + amt) % ringsize);
@@ -503,9 +501,8 @@ nm256_read_block (struct nm256_info *card)
 	DMAbuf_inputintr (card->dev_for_record);
     }
 }
-#undef MIN
 
-/* 
+/*
  * Initialize the hardware. 
  */
 static void
