@@ -12,7 +12,7 @@ config CAPI_AVM
 
 config ISDN_DRV_AVMB1_B1ISA
 	tristate "AVM B1 ISA support"
-	depends on CAPI_AVM && ISDN_CAPI && SA
+	depends on CAPI_AVM && ISDN_CAPI && ISA
 	help
 	  Enable support for the ISA version of the AVM B1 card.
 
