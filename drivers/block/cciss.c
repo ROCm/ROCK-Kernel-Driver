@@ -1309,7 +1309,7 @@ cciss_read_capacity(int ctlr, int logvol, ReadCapdata_struct *buf,
 		*total_size = 0;
 		*block_size = BLOCK_SIZE;
 	}
-	printk(KERN_INFO "      blocks= %d block_size= %d\n",
+	printk(KERN_INFO "      blocks= %u block_size= %d\n",
 		*total_size, *block_size);
 	return;
 }
