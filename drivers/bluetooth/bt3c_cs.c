@@ -28,6 +28,7 @@
 #include <linux/kmod.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
@@ -42,6 +43,9 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
+
+#include <linux/device.h>
+#include <linux/firmware.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -379,7 +383,8 @@ static irqreturn_t bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 		} else if ((stat & 0xff) != 0xff) {
 			if (stat & 0x0020) {
 				int stat = bt3c_read(iobase, 0x7002) & 0x10;
-				BT_ERR("Antenna %s", stat ? "out" : "in");
+				BT_INFO("%s: Antenna %s", info->hdev->name,
+							stat ? "out" : "in");
 			}
 			if (stat & 0x0001)
 				bt3c_receive(info);
@@ -481,36 +486,101 @@ static int bt3c_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long 
 
 
 
-/* ======================== User mode firmware loader ======================== */
+/* ======================== Card services HCI interaction ======================== */
 
 
-#define FW_LOADER  "/sbin/bluefw"
+static struct device bt3c_device = {
+	.bus_id = "pcmcia",
+};
 
 
-static int bt3c_firmware_load(bt3c_info_t *info)
+static int bt3c_load_firmware(bt3c_info_t *info, unsigned char *firmware, int count)
 {
-	char dev[16];
-	int err;
+	char *ptr = (char *) firmware;
+	char b[9];
+	unsigned int iobase, size, addr, fcs, tmp;
+	int i, err = 0;
 
-	char *argv[] = { FW_LOADER, "pccard", dev, NULL };
-	char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
+	iobase = info->link.io.BasePort1;
 
-	sprintf(dev, "%04x", info->link.io.BasePort1);
+	/* Reset */
+	bt3c_io_write(iobase, 0x8040, 0x0404);
+	bt3c_io_write(iobase, 0x8040, 0x0400);
 
-	err = call_usermodehelper(FW_LOADER, argv, envp, 1);
-	if (err)
-		BT_ERR("Failed to run \"%s pccard %s\" (errno=%d)", FW_LOADER, dev, err);
+	udelay(1);
+
+	bt3c_io_write(iobase, 0x8040, 0x0404);
+
+	udelay(17);
+
+	/* Load */
+	while (count) {
+		if (ptr[0] != 'S') {
+			BT_ERR("Bad address in firmware");
+			err = -EFAULT;
+			goto error;
+		}
+
+		memset(b, 0, sizeof(b));
+		memcpy(b, ptr + 2, 2);
+		size = simple_strtol(b, NULL, 16);
+
+		memset(b, 0, sizeof(b));
+		memcpy(b, ptr + 4, 8);
+		addr = simple_strtol(b, NULL, 16);
+
+		memset(b, 0, sizeof(b));
+		memcpy(b, ptr + (size * 2) + 2, 2);
+		fcs = simple_strtol(b, NULL, 16);
+
+		memset(b, 0, sizeof(b));
+		for (tmp = 0, i = 0; i < size; i++) {
+			memcpy(b, ptr + (i * 2) + 2, 2);
+			tmp += simple_strtol(b, NULL, 16);
+		}
+
+		if (((tmp + fcs) & 0xff) != 0xff) {
+			BT_ERR("Checksum error in firmware");
+			err = -EILSEQ;
+			goto error;
+		}
+
+		if (ptr[1] == '3') {
+			bt3c_address(iobase, addr);
+
+			memset(b, 0, sizeof(b));
+			for (i = 0; i < (size - 4) / 2; i++) {
+				memcpy(b, ptr + (i * 4) + 12, 4);
+				tmp = simple_strtol(b, NULL, 16);
+				bt3c_put(iobase, tmp);
+			}
+		}
+
+		ptr   += (size * 2) + 6;
+		count -= (size * 2) + 6;
+	}
+
+	udelay(17);
+
+	/* Boot */
+	bt3c_address(iobase, 0x3000);
+	outb(inb(iobase + CONTROL) | 0x40, iobase + CONTROL);
+
+error:
+	udelay(17);
+
+	/* Clear */
+	bt3c_io_write(iobase, 0x7006, 0x0000);
+	bt3c_io_write(iobase, 0x7005, 0x0000);
+	bt3c_io_write(iobase, 0x7001, 0x0000);
 
 	return err;
 }
 
 
-
-/* ======================== Card services HCI interaction ======================== */
-
-
 int bt3c_open(bt3c_info_t *info)
 {
+	const struct firmware *firmware;
 	struct hci_dev *hdev;
 	int err;
 
@@ -544,29 +614,47 @@ int bt3c_open(bt3c_info_t *info)
 	hdev->owner = THIS_MODULE;
 
 	/* Load firmware */
+	err = request_firmware(&firmware, "BT3CPCC.bin", &bt3c_device);
+	if (err < 0) {
+		BT_ERR("Firmware request failed");
+		goto error;
+	}
 
-	if ((err = bt3c_firmware_load(info)) < 0)
-		return err;
+	err = bt3c_load_firmware(info, firmware->data, firmware->size);
+
+	release_firmware(firmware);
+
+	if (err < 0) {
+		BT_ERR("Firmware loading failed");
+		goto error;
+	}
 
 	/* Timeout before it is safe to send the first HCI packet */
-
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ);
 
 	/* Register HCI device */
-	if (hci_register_dev(hdev) < 0) {
+	err = hci_register_dev(hdev);
+	if (err < 0) {
 		BT_ERR("Can't register HCI device");
-		hci_free_dev(hdev);
-		return -ENODEV;
+		goto error;
 	}
 
 	return 0;
+
+error:
+	info->hdev = NULL;
+	hci_free_dev(hdev);
+	return err;
 }
 
 
 int bt3c_close(bt3c_info_t *info)
 {
 	struct hci_dev *hdev = info->hdev;
+
+	if (!hdev)
+		return -ENODEV;
 
 	bt3c_hci_close(hdev);
 
