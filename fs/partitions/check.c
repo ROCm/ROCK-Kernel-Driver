@@ -13,15 +13,11 @@
  *  Added needed MAJORS for new pairs, {hdi,hdj}, {hdk,hdl}
  */
 
-#include <linux/config.h>
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/blk.h>
 #include <linux/init.h>
-#include <linux/raid/md.h>
+#include <linux/fs.h>
+#include <linux/blk.h>
 #include <linux/buffer_head.h>	/* for invalidate_bdev() */
+#include <linux/kmod.h>
 
 #include "check.h"
 
@@ -225,6 +221,136 @@ void add_gd_partition(struct gendisk *hd, int minor, int start, int size)
 #endif
 }
 
+/* Driverfs file support */
+static ssize_t partition_device_kdev_read(struct device *driverfs_dev, 
+			char *page, size_t count, loff_t off)
+{
+	kdev_t kdev; 
+	kdev.value=(int)driverfs_dev->driver_data;
+	return off ? 0 : sprintf (page, "%x\n",kdev.value);
+}
+static struct driver_file_entry partition_device_kdev_file = {
+	name: "kdev",
+	mode: S_IRUGO,
+	show: partition_device_kdev_read,
+};
+
+static ssize_t partition_device_type_read(struct device *driverfs_dev, 
+			char *page, size_t count, loff_t off) 
+{
+	return off ? 0 : sprintf (page, "BLK\n");
+}
+static struct driver_file_entry partition_device_type_file = {
+	name: "type",
+	mode: S_IRUGO,
+	show: partition_device_type_read,
+};
+
+void driverfs_create_partitions(struct gendisk *hd, int minor)
+{
+	int pos = -1;
+	int devnum = minor >> hd->minor_shift;
+	char dirname[256];
+	struct device *parent = 0;
+	int max_p;
+	int part;
+	devfs_handle_t dir = 0;
+	
+	/* get parent driverfs device structure */
+	if (hd->driverfs_dev_arr)
+		parent = hd->driverfs_dev_arr[devnum];
+	else /* if driverfs not supported by subsystem, skip partitions */
+		return;
+	
+	/* get parent device node directory name */
+	if (hd->de_arr) {
+		dir = hd->de_arr[devnum];
+		if (dir)
+			pos = devfs_generate_path (dir, dirname, 
+						   sizeof dirname);
+	}
+	
+	if (pos < 0) {
+		disk_name(hd, minor, dirname);
+		pos = 0;
+	}
+	
+	max_p = (1 << hd->minor_shift);
+	
+	/* for all partitions setup parents and device node names */
+	for(part=0; part < max_p; part++) {
+		if ((part == 0) || (hd->part[minor + part].nr_sects >= 1)) {
+			struct device * current_driverfs_dev = 
+				&hd->part[minor+part].hd_driverfs_dev;
+			current_driverfs_dev->parent = parent;
+			/* handle disc case */
+			current_driverfs_dev->driver_data =
+					(void *)__mkdev(hd->major, minor+part);
+			if (part == 0) {
+				if (parent)  {
+					sprintf(current_driverfs_dev->name,
+						"%sdisc", parent->name);
+					sprintf(current_driverfs_dev->bus_id,
+						"%s:disc", parent->bus_id);
+				} else {
+					sprintf(current_driverfs_dev->name, 
+						"disc");
+					sprintf(current_driverfs_dev->bus_id,
+						"disc");
+				}
+			} else { /* this is a partition */
+				if (parent) {
+					sprintf(current_driverfs_dev->name,
+						"%spart%d", parent->name, part);
+					sprintf(current_driverfs_dev->bus_id,
+						"%s:p%d", parent->bus_id, part);
+				} else {
+					sprintf(current_driverfs_dev->name, 
+						"part%d", part);
+					sprintf(current_driverfs_dev->bus_id, 
+						"p%d" ,part);
+				}
+			}
+			if (parent) current_driverfs_dev->bus = parent->bus;
+			device_register(current_driverfs_dev);
+			device_create_file(current_driverfs_dev,
+					&partition_device_type_file);
+			device_create_file(current_driverfs_dev,
+					&partition_device_kdev_file);
+		}
+	}
+	return;
+}
+
+void driverfs_remove_partitions(struct gendisk *hd, int minor)
+{
+	int max_p;
+	int part;
+	struct device * current_driverfs_dev;
+	
+	max_p=(1 << hd->minor_shift);
+	
+	/* for all parts setup parent relationships and device node names */
+	for(part=1; part < max_p; part++) {
+		if ((hd->part[minor + part].nr_sects >= 1)) {
+			current_driverfs_dev = 
+				&hd->part[minor + part].hd_driverfs_dev;
+			device_remove_file(current_driverfs_dev,
+					partition_device_type_file.name);
+			device_remove_file(current_driverfs_dev,
+					partition_device_kdev_file.name);
+			put_device(current_driverfs_dev);	
+		}
+	}
+	current_driverfs_dev = &hd->part[minor].hd_driverfs_dev;
+	device_remove_file(current_driverfs_dev, 
+				partition_device_type_file.name);
+	device_remove_file(current_driverfs_dev, 
+				partition_device_kdev_file.name);
+	put_device(current_driverfs_dev);	
+	return;
+}
+
 static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor)
 {
 	devfs_handle_t de = NULL;
@@ -285,6 +411,13 @@ setup_devfs:
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 	bdput(bdev);
 	i = first_part_minor - 1;
+
+	/* Setup driverfs tree */
+	if (hd->sizes)
+		driverfs_create_partitions(hd, i);
+	else
+		driverfs_remove_partitions(hd, i);
+
 	devfs_register_partitions (hd, i, hd->sizes ? 0 : 1);
 }
 

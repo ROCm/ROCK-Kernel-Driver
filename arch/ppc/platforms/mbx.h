@@ -88,11 +88,33 @@ typedef struct bd_info {
 #define ISA_BRIDGE_INT	SIU_IRQ3	/* All those PC things */
 #define COMM_L_INT	SIU_IRQ6	/* MBX Comm expansion connector pin */
 #define STOP_ABRT_INT	SIU_IRQ7	/* Stop/Abort header pin */
-#endif /* !__ASSEMBLY__ */
+
+/* CPM Ethernet through SCCx.
+ *
+ * Bits in parallel I/O port registers that have to be set/cleared
+ * to configure the pins for SCC1 use.  The TCLK and RCLK seem unique
+ * to the MBX860 board.  Any two of the four available clocks could be
+ * used, and the MPC860 cookbook manual has an example using different
+ * clock pins.
+ */
+#define PA_ENET_RXD	((ushort)0x0001)
+#define PA_ENET_TXD	((ushort)0x0002)
+#define PA_ENET_TCLK	((ushort)0x0200)
+#define PA_ENET_RCLK	((ushort)0x0800)
+#define PC_ENET_TENA	((ushort)0x0001)
+#define PC_ENET_CLSN	((ushort)0x0010)
+#define PC_ENET_RENA	((ushort)0x0020)
+
+/* Control bits in the SICR to route TCLK (CLK2) and RCLK (CLK4) to
+ * SCC1.  Also, make sure GR1 (bit 24) and SC1 (bit 25) are zero.
+ */
+#define SICR_ENET_MASK	((uint)0x000000ff)
+#define SICR_ENET_CLKRT	((uint)0x0000003d)
 
 /* The MBX uses the 8259.
 */
 #define NR_8259_INTS	16
 
-#endif
+#endif /* !__ASSEMBLY__ */
+#endif /* __MACH_MBX_DEFS */
 #endif /* __KERNEL__ */

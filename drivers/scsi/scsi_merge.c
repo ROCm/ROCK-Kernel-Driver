@@ -57,7 +57,7 @@
  */
 int scsi_init_io(Scsi_Cmnd *SCpnt)
 {
-	struct request     *req = &SCpnt->request;
+	struct request     *req = SCpnt->request;
 	struct scatterlist *sgpnt;
 	int count, gfp_mask;
 
@@ -74,8 +74,10 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	SCpnt->use_sg = count;
 
 	gfp_mask = GFP_NOIO;
-	if (in_interrupt())
+	if (in_interrupt()) {
 		gfp_mask &= ~__GFP_WAIT;
+		gfp_mask |= __GFP_HIGH;
+	}
 
 	/*
 	 * if sg table allocation fails, requeue request later.

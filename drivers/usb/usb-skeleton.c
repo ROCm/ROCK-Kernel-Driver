@@ -189,9 +189,6 @@ static struct usb_driver skel_driver = {
 	name:		"skeleton",
 	probe:		skel_probe,
 	disconnect:	skel_disconnect,
-	fops:		&skel_fops,
-	minor:		USB_SKEL_MINOR_BASE,
-	num_minors:	MAX_DEVICES,
 	id_table:	skel_table,
 };
 
@@ -532,29 +529,18 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	}
 
 	down (&minor_table_mutex);
-	retval = usb_register_dev (&skel_driver, 1, &minor);
+	retval = usb_register_dev (&skel_fops, USB_SKEL_MINOR_BASE, 1, &minor);
 	if (retval) {
-		if (retval != -ENODEV) {
-			/* something prevented us from registering this driver */
-			err ("Not able to get a minor for this device.");
-			goto exit;
-		}
-		/* we could not get a dynamic minor, so lets find one of our own */
-		for (minor = 0; minor < MAX_DEVICES; ++minor) {
-			if (minor_table[minor] == NULL)
-				break;
-		}
-		if (minor >= MAX_DEVICES) {
-			err ("Too many devices plugged in, can not handle this device.");
-			goto exit;
-		}
+		/* something prevented us from registering this driver */
+		err ("Not able to get a minor for this device.");
+		goto exit;
 	}
 
 	/* allocate memory for our device state and intialize it */
 	dev = kmalloc (sizeof(struct usb_skel), GFP_KERNEL);
 	if (dev == NULL) {
 		err ("Out of memory");
-		goto exit;
+		goto exit_minor;
 	}
 	memset (dev, 0x00, sizeof (*dev));
 	minor_table[minor] = dev;
@@ -628,6 +614,9 @@ error:
 	skel_delete (dev);
 	dev = NULL;
 
+exit_minor:
+	usb_deregister_dev (1, minor);
+
 exit:
 	up (&minor_table_mutex);
 	return dev;
@@ -655,7 +644,7 @@ static void skel_disconnect(struct usb_device *udev, void *ptr)
 	devfs_unregister (dev->devfs);
 
 	/* give back our dynamic minor */
-	usb_deregister_dev (&skel_driver, 1, minor);
+	usb_deregister_dev (1, minor);
 	
 	/* if the device is not opened, then we clean up right now */
 	if (!dev->open_count) {

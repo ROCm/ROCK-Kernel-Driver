@@ -230,6 +230,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
 
     retval->select_queue_depths = tpnt->select_queue_depths;
     retval->max_sectors = tpnt->max_sectors;
+    retval->use_blk_tcq = tpnt->use_blk_tcq;
 
     if(!scsi_hostlist)
 	scsi_hostlist = retval;

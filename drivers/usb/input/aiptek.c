@@ -296,9 +296,8 @@ aiptek_probe(struct usb_device *dev, unsigned int ifnum,
 
 	input_register_device(&aiptek->dev);
 
-	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\n",
-	       aiptek->dev.number, aiptek->features->name, dev->bus->busnum,
-	       dev->devnum, ifnum);
+	printk(KERN_INFO "input: %s on usb%d:%d.%d\n",
+	       aiptek->features->name, dev->bus->busnum, dev->devnum, ifnum);
 
 	return aiptek;
 }

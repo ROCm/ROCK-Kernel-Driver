@@ -48,7 +48,7 @@ int post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
 	usa_ofs = le16_to_cpu(b->usa_ofs);
 	/* Decrement usa_count to get number of fixups. */
 	usa_count = le16_to_cpu(b->usa_count) - 1;
-	/* Size and alignement checks. */
+	/* Size and alignment checks. */
 	if ( size & (NTFS_BLOCK_SIZE - 1)	||
 	     usa_ofs & 1			||
 	     usa_ofs + (usa_count * 2) > size	||
@@ -132,7 +132,7 @@ int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 	usa_ofs = le16_to_cpu(b->usa_ofs);
 	/* Decrement usa_count to get number of fixups. */
 	usa_count = le16_to_cpu(b->usa_count) - 1;
-	/* Size and alignement checks. */
+	/* Size and alignment checks. */
 	if ( size & (NTFS_BLOCK_SIZE - 1)	||
 	     usa_ofs & 1			||
 	     usa_ofs + (usa_count * 2) > size	||

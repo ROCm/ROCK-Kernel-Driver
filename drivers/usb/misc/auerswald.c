@@ -1948,23 +1948,11 @@ static void *auerswald_probe (struct usb_device *usbdev, unsigned int ifnum,
 	init_waitqueue_head (&cp->bufferwait);
 
 	down (&dev_table_mutex);
-	ret = usb_register_dev (&auerswald_driver, 1, &dtindex);
+	ret = usb_register_dev (&auerswald_fops, AUER_MINOR_BASE, 1, &dtindex);
 	if (ret) {
-		if (ret != -ENODEV) {
-			err ("Not able to get a minor for this device.");
-			up (&dev_table_mutex);
-			goto pfail;
-		}
-		/* find a free slot in the device table */
-		for (dtindex = 0; dtindex < AUER_MAX_DEVICES; ++dtindex) {
-			if (dev_table[dtindex] == NULL)
-				break;
-		}
-		if ( dtindex >= AUER_MAX_DEVICES) {
-			err ("more than %d devices plugged in, can not handle this device", AUER_MAX_DEVICES);
-			up (&dev_table_mutex);
-			goto pfail;
-		}
+		err ("Not able to get a minor for this device.");
+		up (&dev_table_mutex);
+		goto pfail;
 	}
 
 	/* Give the device a name */
@@ -2096,7 +2084,7 @@ static void auerswald_disconnect (struct usb_device *usbdev, void *driver_contex
 	devfs_unregister (cp->devfs);
 
 	/* give back our USB minor number */
-	usb_deregister_dev (&auerswald_driver, 1, cp->dtindex);
+	usb_deregister_dev (1, cp->dtindex);
 
 	/* Stop the interrupt endpoint */
 	auerswald_int_release (cp);
@@ -2153,9 +2141,6 @@ static struct usb_driver auerswald_driver = {
 	name:		"auerswald",
 	probe:		auerswald_probe,
 	disconnect:	auerswald_disconnect,
-	fops:		&auerswald_fops,
-	minor:		AUER_MINOR_BASE,
-	num_minors:	AUER_MAX_DEVICES,
 	id_table:	auerswald_ids,
 };
 

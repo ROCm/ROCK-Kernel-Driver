@@ -359,7 +359,7 @@ struct inode {
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
 	atomic_t		i_count;
-	kdev_t			i_dev;
+	dev_t			i_dev;
 	umode_t			i_mode;
 	nlink_t			i_nlink;
 	uid_t			i_uid;
@@ -701,6 +701,9 @@ extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct de
 
 /*
  * File types
+ *
+ * NOTE! These match bits 12..15 of stat.st_mode
+ * (ie "(i_mode >> 12) & 15").
  */
 #define DT_UNKNOWN	0
 #define DT_FIFO		1
@@ -1220,7 +1223,6 @@ extern void ll_rw_block(int, int, struct buffer_head * bh[]);
 extern int submit_bh(int, struct buffer_head *);
 struct bio;
 extern int submit_bio(int, struct bio *);
-extern int is_read_only(kdev_t);
 extern int bdev_read_only(struct block_device *);
 extern int set_blocksize(struct block_device *, int);
 extern int sb_set_blocksize(struct super_block *, int);

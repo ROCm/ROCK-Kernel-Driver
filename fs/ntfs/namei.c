@@ -38,8 +38,8 @@
  * supplying the name of the inode in @dent->d_name.name. ntfs_lookup()
  * converts the name to Unicode and walks the contents of the directory inode
  * @dir_ino looking for the converted Unicode name. If the name is found in the
- * directory, the corresponding inode is loaded by calling iget() on its inode
- * number and the inode is associated with the dentry @dent via a call to
+ * directory, the corresponding inode is loaded by calling ntfs_iget() on its
+ * inode number and the inode is associated with the dentry @dent via a call to
  * d_add().
  *
  * If the name is not found in the directory, a NULL inode is inserted into the
@@ -111,9 +111,9 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 	kmem_cache_free(ntfs_name_cache, uname);
 	if (!IS_ERR_MREF(mref)) {
 		dent_ino = MREF(mref);
-		ntfs_debug("Found inode 0x%lx. Calling iget.", dent_ino);
-		dent_inode = iget(vol->sb, dent_ino);
-		if (dent_inode) {
+		ntfs_debug("Found inode 0x%lx. Calling ntfs_iget.", dent_ino);
+		dent_inode = ntfs_iget(vol->sb, dent_ino);
+		if (likely(!IS_ERR(dent_inode))) {
 			/* Consistency check. */
 			if (MSEQNO(mref) == NTFS_I(dent_inode)->seq_no ||
 					dent_ino == FILE_MFT) {
@@ -132,16 +132,19 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 			ntfs_error(vol->sb, "Found stale reference to inode "
 					"0x%lx (reference sequence number = "
 					"0x%x, inode sequence number = 0x%x, "
-					"returning -EACCES. Run chkdsk.",
+					"returning -EIO. Run chkdsk.",
 					dent_ino, MSEQNO(mref),
 					NTFS_I(dent_inode)->seq_no);
 			iput(dent_inode);
+			dent_inode = ERR_PTR(-EIO);
 		} else
-			ntfs_error(vol->sb, "iget(0x%lx) failed, returning "
-					"-EACCES.", dent_ino);
+			ntfs_error(vol->sb, "ntfs_iget(0x%lx) failed with "
+				   "error code %li.", dent_ino,
+				   PTR_ERR(dent_inode));
 		if (name)
 			kfree(name);
-		return ERR_PTR(-EACCES);
+		/* Return the error code. */
+		return (struct dentry *)dent_inode;
 	}
 	/* It is guaranteed that name is no longer allocated at this point. */
 	if (MREF_ERR(mref) == -ENOENT) {
@@ -256,7 +259,8 @@ handle_name:
 		BUG_ON(real_dent->d_inode != dent_inode);
 		/*
 		 * Already have the inode and the dentry attached, decrement
-		 * the reference count to balance the iget() we did earlier on.
+		 * the reference count to balance the ntfs_iget() we did
+		 * earlier on.
 		 */
 		iput(dent_inode);
 		return real_dent;

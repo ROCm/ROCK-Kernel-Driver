@@ -122,11 +122,9 @@ Things to implement
   interrupts AFAIK..
 - We should only make a copy of data related to kernel segment, since any
   process data won't be changed.
-- By copying pages back to their original position, copy_page caused General
-  Protection Fault. Why?
 - Hardware state restoring.  Now there's support for notifying via the notify
   chain, event handlers are welcome. Some devices may have microcodes loaded
-  into them. We should have event handlers for them aswell.
+  into them. We should have event handlers for them as well.
 - We should support other architectures (There are really only some arch
   related functions..)
 - We should also restore original state of swaps if the ``noresume'' kernel
@@ -148,6 +146,15 @@ Not so important ideas for implementing
   go there anyway..
 - If X is active while suspending then by resuming calling svgatextmode
   corrupts the virtual console of X.. (Maybe this has been fixed AFAIK).
+
+Drivers we support
+- IDE disks are okay
+- vesafb
+
+Drivers that need support
+- pc_keyb -- perhaps we can wait for vojtech's input patches
+- do IDE cdroms need some kind of support?
+- IDE CD-RW -- how to deal with that?
 
 Any other idea you might have tell me!
 

@@ -134,6 +134,8 @@ static unsigned count_bitmaps(struct super_block *s)
 
 int hpfs_statfs(struct super_block *s, struct statfs *buf)
 {
+	lock_kernel();
+
 	/*if (s->s_hpfs_n_free == -1) {*/
 		s->s_hpfs_n_free = count_bitmaps(s);
 		s->s_hpfs_n_free_dnodes = hpfs_count_one_bitmap(s, s->s_hpfs_dmap);
@@ -146,6 +148,9 @@ int hpfs_statfs(struct super_block *s, struct statfs *buf)
 	buf->f_files = s->s_hpfs_dirband_size / 4;
 	buf->f_ffree = s->s_hpfs_n_free_dnodes;
 	buf->f_namelen = 254;
+
+	unlock_kernel();
+
 	return 0;
 }
 

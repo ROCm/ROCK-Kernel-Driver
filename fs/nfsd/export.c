@@ -68,17 +68,17 @@ static svc_client *		clients;
  * Find the client's export entry matching xdev/xino.
  */
 svc_export *
-exp_get(svc_client *clp, kdev_t dev, ino_t ino)
+exp_get(svc_client *clp, dev_t dev, ino_t ino)
 {
 	struct list_head *head, *p;
 	
 	if (!clp)
 		return NULL;
 
-	head = &clp->cl_export[EXPORT_HASH(kdev_t_to_nr(dev))];
+	head = &clp->cl_export[EXPORT_HASH(dev)];
 	list_for_each(p, head) {
 		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
+		if (exp->ex_ino == ino && exp->ex_dev ==  dev)
 			return exp;
 	}
 	return NULL;
@@ -250,7 +250,7 @@ exp_export(struct nfsctl_export *nxp)
 	struct nameidata nd;
 	struct inode	*inode = NULL;
 	int		err;
-	kdev_t		dev;
+	dev_t		dev;
 	ino_t		ino;
 
 	/* Consistency check */
@@ -276,7 +276,7 @@ exp_export(struct nfsctl_export *nxp)
 	if (err)
 		goto out_unlock;
 	inode = nd.dentry->d_inode;
-	dev = inode->i_dev;
+	dev = inode->i_sb->s_dev;
 	ino = inode->i_ino;
 	err = -EINVAL;
 
@@ -364,7 +364,7 @@ exp_export(struct nfsctl_export *nxp)
 	if (parent)
 		exp_change_parents(clp, parent, exp);
 
-	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(kdev_t_to_nr(dev)));
+	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(dev));
 	list_add_tail(&exp->ex_list, &clp->cl_list);
 
 	exp_fsid_hash(clp, exp);
@@ -398,7 +398,7 @@ exp_do_unexport(svc_export *unexp)
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
 	inode = dentry->d_inode;
-	if (!kdev_same(unexp->ex_dev, inode->i_dev) || unexp->ex_ino != inode->i_ino)
+	if (unexp->ex_dev != inode->i_sb->s_dev || unexp->ex_ino != inode->i_ino)
 		printk(KERN_WARNING "nfsd: bad dentry in unexport!\n");
 	dput(dentry);
 	mntput(mnt);
@@ -440,8 +440,7 @@ exp_unexport(struct nfsctl_export *nxp)
 	err = -EINVAL;
 	clp = exp_getclientbyname(nxp->ex_client);
 	if (clp) {
-		kdev_t ex_dev = to_kdev_t(nxp->ex_dev);
-		svc_export *exp = exp_get(clp, ex_dev, nxp->ex_ino);
+		svc_export *exp = exp_get(clp, nxp->ex_dev, nxp->ex_ino);
 		if (exp) {
 			exp_do_unexport(exp);
 			err = 0;

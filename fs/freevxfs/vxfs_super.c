@@ -98,7 +98,7 @@ vxfs_put_super(struct super_block *sbp)
  *   Zero.
  *
  * Locking:
- *   We are under bkl and @sbp->s_lock.
+ *   No locks held.
  *
  * Notes:
  *   This is everything but complete...

@@ -694,7 +694,7 @@ static int scsi_debug_read(Scsi_Cmnd * SCpnt, int upper_blk, int block,
 	{
 		int delay = SCSI_SETUP_LATENCY;
 
-		delay += SCpnt->request.nr_sectors * SCSI_DATARATE;
+		delay += SCpnt->request->nr_sectors * SCSI_DATARATE;
 		if (delay)
 			usleep(delay);
 	}

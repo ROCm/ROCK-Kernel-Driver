@@ -143,13 +143,13 @@ static inline __u32 kdev_t_to_u32(kdev_t dev)
 	return udev;
 }
 
-static inline kdev_t u32_to_kdev_t(__u32 udev)
+static inline dev_t u32_to_dev_t(__u32 udev)
 {
 	unsigned int minor, major;
 
 	minor = (udev & 0xff) | ((udev >> 8) & 0xfff00);
 	major = ((udev >> 8) & 0xff) | ((udev >> 20) & 0xf00);
-	return mk_kdev(major, minor);
+	return MKDEV(major, minor);
 }
 
 static inline __u32 ino_t_to_u32(ino_t ino)

@@ -123,6 +123,7 @@ MachineCheckException(struct pt_regs *regs)
 	unsigned long msr = regs->msr;
 
 	if (user_mode(regs)) {
+		regs->msr |= MSR_RI;
 		_exception(SIGSEGV, regs);
 		return;
 	}
@@ -134,6 +135,7 @@ MachineCheckException(struct pt_regs *regs)
 #endif
 	if (debugger_fault_handler) {
 		debugger_fault_handler(regs);
+		regs->msr |= MSR_RI;
 		return;
 	}
 

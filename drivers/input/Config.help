@@ -64,6 +64,18 @@ CONFIG_INPUT_JOYDEV
   The module will be called joydev.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_INPUT_TSDEV
+  Say Y here if you have an application that only can understand the
+  Compaq touchscreen protocol for absolute pointer data. This is
+  useful namely for embedded configurations.
+
+  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tsdev.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_INPUT_EVDEV
   Say Y here if you want your input device events be accessible
   under char device 13:64+ - /dev/input/eventX in a generic way.
@@ -71,4 +83,18 @@ CONFIG_INPUT_EVDEV
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called evdev.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_INPUT_EVBUG
+  Say Y here if you have a problem with the input subsystem and
+  want all events (keypresses, mouse movements), to be output to
+  the system log. While this is useful for debugging, it's also
+  a security threat - your keypresses include your passwords, of
+  course.
+
+  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called joydev.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.

@@ -245,6 +245,11 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 	}
 
 	if (arg & O_DIRECT) {
+		if (inode->i_mapping && inode->i_mapping->a_ops) {
+			if (!inode->i_mapping->a_ops->direct_IO)
+				return -EINVAL;
+		}
+
 		/*
 		 * alloc_kiovec() can sleep and we are only serialized by
 		 * the big kernel lock here, so abuse the i_sem to serialize

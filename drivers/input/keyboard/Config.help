@@ -1,0 +1,66 @@
+CONFIG_INPUT_KEYBOARD
+  Say Y here, and a list of supported keyboards will be displayed.
+  This option doesn't affect the kernel.
+
+  If unsure, say Y.
+
+CONFIG_KEYBOARD_ATKBD
+  Say Y here if you want to use the standard AT keyboard. Usually
+  you'll need this, unless you have a different type keyboard (USB,
+  ADB or other).
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called atkbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_KEYBOARD_SUNKBD
+  Say Y here if you want to use a Sun Type 4 or Type 5 keyboard,
+  connected either to the Sun keyboard connector or to an serial
+  (RS-232) port via a simple adapter.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called sunkbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_KEYBOARD_PS2SERKBD
+  Say Y here if you want to use a PS/2 to Serial converter with a
+  keyboard attached to it.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ps2serkbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_KEYBOARD_XTKBD
+  Say Y here if you want to use the old IBM PC/XT keyboard (or
+  compatible) on your system. This is only possible with a
+  parallel port keyboard adapter, you cannot connect it to the
+  keyboard port on a PC that runs Linux. 
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called xtkbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_KEYBOARD_MAPLE  
+  Say Y here if you have a DreamCast console running Linux and have
+  a keyboard attached to its Maple bus.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called maple_keyb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_KEYBOARD_AMIGA
+  Say Y here if you are running Linux on any AMIGA and have a keyboard
+  attached.	
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called amikbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+

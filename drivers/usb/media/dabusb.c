@@ -742,14 +742,9 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 	if (ifnum != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
 		return NULL;
 
-	retval = usb_register_dev (&dabusb_driver, 1, &devnum);
-	if (retval) {
-		if (retval != -ENODEV)
-			return NULL;
-		devnum = dabusb_find_struct ();
-		if (devnum == -1)
-			return NULL;
-	}
+	retval = usb_register_dev (&dabusb_fops, DABUSB_MINOR, 1, &devnum);
+	if (retval)
+		return NULL;
 
 	s = &dabusb[devnum];
 
@@ -791,7 +786,7 @@ static void dabusb_disconnect (struct usb_device *usbdev, void *ptr)
 
 	dbg("dabusb_disconnect");
 
-	usb_deregister_dev (&dabusb_driver, 1, s->devnum);
+	usb_deregister_dev (1, s->devnum);
 	s->remove_pending = 1;
 	wake_up (&s->wait);
 	if (s->state == _started)
@@ -814,9 +809,6 @@ static struct usb_driver dabusb_driver =
 	name:		"dabusb",
 	probe:		dabusb_probe,
 	disconnect:	dabusb_disconnect,
-	fops:		&dabusb_fops,
-	minor:		DABUSB_MINOR,
-	num_minors:	NRDABUSB,
 	id_table:	dabusb_ids,
 };
 

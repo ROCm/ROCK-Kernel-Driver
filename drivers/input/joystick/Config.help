@@ -1,4 +1,4 @@
-CONFIG_JOYSTICK
+CONFIG_INPUT_JOYSTICK
   If you have a joystick, 6dof controller, gamepad, steering wheel,
   weapon control system or something like that you can say Y here
   and the list of supported devices will be displayed. This option
@@ -65,6 +65,15 @@ CONFIG_JOYSTICK_GRIP
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called grip.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_JOYSTICK_GUILLEMOT
+  Say Y here if you have a Guillemot joystick using a digital
+  protocol over the PC gameport. 
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called guillemot.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_JOYSTICK_INTERACT
@@ -158,6 +167,15 @@ CONFIG_JOYSTICK_STINGER
   The module will be called stinger.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_JOYSTICK_TWIDDLER
+  Say Y here if you have a Handykey Twiddler connected to your
+  computer's serial port and want to use it as a joystick.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called twidjoy.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_JOYSTICK_DB9
   Say Y here if you have a Sega Master System gamepad, Sega Genesis
   gamepad, Sega Saturn gamepad, or a Multisystem -- Atari, Amiga,
@@ -203,3 +221,12 @@ CONFIG_JOYSTICK_AMIJOY
   The module will be called joy-amiga.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_INPUT_JOYDUMP
+  Say Y here if you want to dump data from your joystick into the system
+  log for debugging purposes. Say N if you are making a production
+  configuration or aren't sure. 
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called joydump.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.

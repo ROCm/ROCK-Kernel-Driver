@@ -30,7 +30,10 @@
 
 struct file;
 
-#define CTL_MAXNAME 10
+#define CTL_MAXNAME 10		/* how many path components do we allow in a
+				   call to sysctl?   In other words, what is
+				   the largest acceptable value for the nlen
+				   member of a struct __sysctl_args to have? */
 
 struct __sysctl_args {
 	int *name;
@@ -145,6 +148,7 @@ enum
 	VM_DIRTY_SYNC=13,	/* dirty_sync_ratio */
 	VM_DIRTY_WB_CS=14,	/* dirty_writeback_centisecs */
 	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
+	VM_NR_PDFLUSH_THREADS=16, /* nr_pdflush_threads */
 };
 
 

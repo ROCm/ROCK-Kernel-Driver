@@ -1,5 +1,5 @@
 /*
- * $Id: db9.c,v 1.12 2002/01/22 20:27:05 vojtech Exp $
+ * $Id: db9.c,v 1.13 2002/04/07 20:13:37 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
@@ -199,7 +199,7 @@ static void db9_timer(unsigned long private)
 			data=parport_read_data(port);
 
 			input_report_key(dev, BTN_A, ~data & DB9_FIRE1);
-			input_report_key(dev, BTN_X, ~data & DB9_FIRE2);
+			input_report_key(dev, BTN_START, ~data & DB9_FIRE2);
 
 			parport_write_control(port, DB9_NOSELECT); /* 2 */
 			udelay(DB9_GENESIS6_DELAY);
@@ -209,10 +209,10 @@ static void db9_timer(unsigned long private)
 			udelay(DB9_GENESIS6_DELAY);
 			data=parport_read_data(port);
 
-			input_report_key(dev, BTN_Y,     ~data & DB9_LEFT);
-			input_report_key(dev, BTN_Z,     ~data & DB9_DOWN);
-			input_report_key(dev, BTN_MODE,  ~data & DB9_UP);
-			input_report_key(dev, BTN_START, ~data & DB9_RIGHT);
+			input_report_key(dev, BTN_X,    ~data & DB9_LEFT);
+			input_report_key(dev, BTN_Y,    ~data & DB9_DOWN);
+			input_report_key(dev, BTN_Z,    ~data & DB9_UP);
+			input_report_key(dev, BTN_MODE, ~data & DB9_RIGHT);
 
 			parport_write_control(port, DB9_NORMAL);
 			udelay(DB9_GENESIS6_DELAY);

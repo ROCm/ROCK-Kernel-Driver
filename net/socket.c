@@ -465,7 +465,7 @@ struct socket *sock_alloc(void)
 	if (!inode)
 		return NULL;
 
-	inode->i_dev = NODEV;
+	inode->i_dev = 0;
 	sock = SOCKET_I(inode);
 
 	inode->i_mode = S_IFSOCK|S_IRWXUGO;

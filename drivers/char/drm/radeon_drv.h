@@ -31,6 +31,9 @@
 #ifndef __RADEON_DRV_H__
 #define __RADEON_DRV_H__
 
+#define GET_RING_HEAD(ring)		readl( (volatile u32 *) (ring)->head )
+#define SET_RING_HEAD(ring,val)		writel( (val), (volatile u32 *) (ring)->head )
+
 typedef struct drm_radeon_freelist {
    	unsigned int age;
    	drm_buf_t *buf;
@@ -141,7 +144,7 @@ extern int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n );
 static inline void
 radeon_update_ring_snapshot( drm_radeon_ring_buffer_t *ring )
 {
-	ring->space = (*(volatile int *)ring->head - ring->tail) * sizeof(u32);
+	ring->space = (GET_RING_HEAD(ring) - ring->tail) * sizeof(u32);
 	if ( ring->space <= 0 )
 		ring->space += ring->size;
 }
@@ -248,6 +251,12 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #	define RADEON_ISYNC_TRIG3D_IDLE2D	(1 << 3)
 #	define RADEON_ISYNC_WAIT_IDLEGUI	(1 << 4)
 #	define RADEON_ISYNC_CPSCRATCH_IDLEGUI	(1 << 5)
+
+#define RADEON_RBBM_GUICNTL		0x172c
+#	define RADEON_HOST_DATA_SWAP_NONE	(0 << 0)
+#	define RADEON_HOST_DATA_SWAP_16BIT	(1 << 0)
+#	define RADEON_HOST_DATA_SWAP_32BIT	(2 << 0)
+#	define RADEON_HOST_DATA_SWAP_HDW	(3 << 0)
 
 #define RADEON_MC_AGP_LOCATION		0x014c
 #define RADEON_MC_FB_LOCATION		0x0148
@@ -424,6 +433,7 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 
 #define RADEON_CP_RB_BASE		0x0700
 #define RADEON_CP_RB_CNTL		0x0704
+#	define RADEON_BUF_SWAP_32BIT		(2 << 16)
 #define RADEON_CP_RB_RPTR_ADDR		0x070c
 #define RADEON_CP_RB_RPTR		0x0710
 #define RADEON_CP_RB_WPTR		0x0714
@@ -467,6 +477,7 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #	define RADEON_CNTL_HOSTDATA_BLT		0x00009400
 #	define RADEON_CNTL_PAINT_MULTI		0x00009A00
 #	define RADEON_CNTL_BITBLT_MULTI		0x00009B00
+#	define RADEON_CNTL_SET_SCISSORS		0xC0001E00
 
 #define RADEON_CP_PACKET_MASK		0xC0000000
 #define RADEON_CP_PACKET_COUNT_MASK	0x3fff0000
@@ -533,41 +544,11 @@ extern int radeon_cp_flip( struct inode *inode, struct file *filp,
 #define RADEON_BASE(reg)	((unsigned long)(dev_priv->mmio->handle))
 #define RADEON_ADDR(reg)	(RADEON_BASE( reg ) + reg)
 
-#define RADEON_DEREF(reg)	*(volatile u32 *)RADEON_ADDR( reg )
-#ifdef __alpha__
-#define RADEON_READ(reg)	(_RADEON_READ((u32 *)RADEON_ADDR( reg )))
-static inline u32 _RADEON_READ(u32 *addr)
-{
-	mb();
-	return *(volatile u32 *)addr;
-}
-#define RADEON_WRITE(reg,val)						\
-do {									\
-	wmb();								\
-	RADEON_DEREF(reg) = val;					\
-} while (0)
-#else
-#define RADEON_READ(reg)	RADEON_DEREF( reg )
-#define RADEON_WRITE(reg, val)	do { RADEON_DEREF( reg ) = val; } while (0)
-#endif
+#define RADEON_READ(reg)	readl( (volatile u32 *) RADEON_ADDR(reg) )
+#define RADEON_WRITE(reg,val)	writel( (val), (volatile u32 *) RADEON_ADDR(reg) )
 
-#define RADEON_DEREF8(reg)	*(volatile u8 *)RADEON_ADDR( reg )
-#ifdef __alpha__
-#define RADEON_READ8(reg)	_RADEON_READ8((u8 *)RADEON_ADDR( reg ))
-static inline u8 _RADEON_READ8(u8 *addr)
-{
-	mb();
-	return *(volatile u8 *)addr;
-}
-#define RADEON_WRITE8(reg,val)						\
-do {									\
-	wmb();								\
-	RADEON_DEREF8( reg ) = val;					\
-} while (0)
-#else
-#define RADEON_READ8(reg)	RADEON_DEREF8( reg )
-#define RADEON_WRITE8(reg, val)	do { RADEON_DEREF8( reg ) = val; } while (0)
-#endif
+#define RADEON_READ8(reg)	readb( (volatile u8 *) RADEON_ADDR(reg) )
+#define RADEON_WRITE8(reg,val)	writeb( (val), (volatile u8 *) RADEON_ADDR(reg) )
 
 #define RADEON_WRITE_PLL( addr, val )					\
 do {									\
@@ -664,6 +645,15 @@ do {									\
 				goto __ring_space_done;			\
 			udelay( 1 );					\
 		}							\
+		DRM_ERROR( "ring space check from memory failed, reading register...\n" );	\
+		/* If ring space check fails from RAM, try reading the	\
+		   register directly */					\
+		ring->space = 4 * ( RADEON_READ( RADEON_CP_RB_RPTR ) - ring->tail );	\
+		if ( ring->space <= 0 )					\
+			ring->space += ring->size;			\
+		if ( ring->space >= ring->high_mark )			\
+			goto __ring_space_done;				\
+									\
 		DRM_ERROR( "ring space check failed!\n" );		\
 		return -EBUSY;						\
 	}								\
@@ -701,7 +691,11 @@ do {									\
  * Ring control
  */
 
+#if defined(__powerpc__)
+#define radeon_flush_write_combine()	(void) GET_RING_HEAD( &dev_priv->ring )
+#else
 #define radeon_flush_write_combine()	mb()
+#endif
 
 
 #define RADEON_VERBOSE	0
@@ -737,8 +731,9 @@ do {									\
 		dev_priv->ring.tail = write;				\
 } while (0)
 
-#define COMMIT_RING() do {					    \
-	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		    \
+#define COMMIT_RING() do {						\
+	radeon_flush_write_combine();					\
+	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		\
 } while (0)
 
 #define OUT_RING( x ) do {						\

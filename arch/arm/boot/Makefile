@@ -115,15 +115,15 @@ endif
 export	SYSTEM ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
 Image:	$(SYSTEM)
-	$(OBJCOPY) -O binary -R .note -R .comment -S $(SYSTEM) $@
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 bzImage: zImage
 
 zImage:	compressed/vmlinux
-	$(OBJCOPY) -O binary -R .note -R .comment -S compressed/vmlinux $@
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 bootpImage: bootp/bootp
-	$(OBJCOPY) -O binary -R .note -R .comment -S bootp/bootp $@
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 compressed/vmlinux: $(TOPDIR)/vmlinux
 	@$(MAKE) -C compressed vmlinux

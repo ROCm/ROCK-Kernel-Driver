@@ -15,6 +15,9 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
+#include <linux/sched.h>	// Needed by writeback.h
+#include <linux/fs.h>		// Needed by writeback.h
+#include <linux/writeback.h>	// Prototypes pdflush_operation()
 
 
 /*
@@ -44,8 +47,11 @@ static spinlock_t pdflush_lock = SPIN_LOCK_UNLOCKED;
 /*
  * The count of currently-running pdflush threads.  Protected
  * by pdflush_lock.
+ *
+ * Readable by sysctl, but not writable.  Published to userspace at
+ * /proc/sys/vm/nr_pdflush_threads.
  */
-static int nr_pdflush_threads = 0;
+int nr_pdflush_threads = 0;
 
 /*
  * The time at which the pdflush thread pool last went empty

@@ -145,7 +145,6 @@ smb_get_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	fattr->f_ino	= inode->i_ino;
 	fattr->f_uid	= inode->i_uid;
 	fattr->f_gid	= inode->i_gid;
-	fattr->f_rdev	= inode->i_rdev;
 	fattr->f_size	= inode->i_size;
 	fattr->f_mtime	= inode->i_mtime;
 	fattr->f_ctime	= inode->i_ctime;
@@ -183,7 +182,6 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	inode->i_nlink	= fattr->f_nlink;
 	inode->i_uid	= fattr->f_uid;
 	inode->i_gid	= fattr->f_gid;
-	inode->i_rdev	= fattr->f_rdev;
 	inode->i_ctime	= fattr->f_ctime;
 	inode->i_blksize= fattr->f_blksize;
 	inode->i_blocks = fattr->f_blocks;
@@ -604,7 +602,13 @@ out_no_server:
 static int
 smb_statfs(struct super_block *sb, struct statfs *buf)
 {
-	int result = smb_proc_dskattr(sb, buf);
+	int result;
+	
+	lock_kernel();
+
+	result = smb_proc_dskattr(sb, buf);
+
+	unlock_kernel();
 
 	buf->f_type = SMB_SUPER_MAGIC;
 	buf->f_namelen = SMB_MAXPATHLEN;

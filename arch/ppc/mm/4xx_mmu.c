@@ -54,11 +54,6 @@
 #include <asm/machdep.h>
 #include <asm/setup.h>
 
-/* Used by the 4xx TLB replacement exception handler.
- * Just needed it declared someplace (and initialized to zero).
- */
-unsigned int tlb_4xx_index;
-
 /*
  * MMU_init_hw does the chip-specific initialization of the MMU hardware.
  */

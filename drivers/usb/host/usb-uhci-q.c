@@ -541,22 +541,6 @@ static void uhci_clean_iso_step1(struct uhci_hcd *uhci, urb_priv_t *urb_priv)
 	}
 }
 /*-------------------------------------------------------------------*/
-static void uhci_clean_iso_step2(struct uhci_hcd *uhci, urb_priv_t *urb_priv)
-{
-	struct list_head *p;
-	uhci_desc_t *td;
-	int now=UHCI_GET_CURRENT_FRAME(uhci);
-
-	dbg("uhci_clean_iso_step2");
-	while ((p = urb_priv->desc_list.next) != &urb_priv->desc_list) {
-				td = list_entry (p, uhci_desc_t, desc_list);
-				list_del (p);
-				INIT_LIST_HEAD(&td->horizontal);
-				list_add_tail (&td->horizontal, &uhci->free_desc_td);
-				td->last_used=now;
-	}
-}
-/*-------------------------------------------------------------------*/
 /* mode: CLEAN_TRANSFER_NO_DELETION: unlink but no deletion mark (step 1 of async_unlink)
          CLEAN_TRANSFER_REGULAR: regular (unlink/delete-mark)
          CLEAN_TRANSFER_DELETION_MARK: deletion mark for QH (step 2 of async_unlink)
@@ -759,44 +743,6 @@ static int uhci_unlink_urb_async (struct uhci_hcd *uhci, struct urb *urb, int mo
 	return 0;  // completion will follow
 }
 /*-------------------------------------------------------------------*/
-// kills an urb by unlinking descriptors and waiting for at least one frame
-static int uhci_unlink_urb_sync (struct uhci_hcd *uhci, struct urb *urb)
-{
-	uhci_desc_t *qh;
-	urb_priv_t *urb_priv;
-	unsigned long flags=0;
-
-	spin_lock_irqsave (&uhci->urb_list_lock, flags);
-//	err("uhci_unlink_urb_sync %p, %i",urb,urb->status);
-
-	// move descriptors out the the running chains, dequeue urb
-	uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_DONT_STORE);
-
-	urb_priv = urb->hcpriv;
-
-	spin_unlock_irqrestore (&uhci->urb_list_lock, flags);
-		
-	// cleanup the rest
-	switch (usb_pipetype (urb->pipe)) {
-	case PIPE_INTERRUPT:
-	case PIPE_ISOCHRONOUS:
-		uhci_wait_ms(1);
-		uhci_clean_iso_step2(uhci, urb_priv);
-		break;
-
-	case PIPE_BULK:
-	case PIPE_CONTROL:
-		qh = list_entry (urb_priv->desc_list.next, uhci_desc_t, desc_list);
-		uhci_clean_transfer(uhci, urb, qh, CLEAN_TRANSFER_DELETION_MARK);
-		uhci_wait_ms(1);
-	}
-	urb->status = -ENOENT;	// mark urb as killed		
-		
-	finish_urb(uhci,urb);
-	
-	return 0;
-}
-/*-------------------------------------------------------------------*/
 // unlink urbs for specific device or all devices
 static void uhci_unlink_urbs(struct uhci_hcd *uhci, struct usb_device *usb_dev, int remove_all)
 {
@@ -816,8 +762,6 @@ static void uhci_unlink_urbs(struct uhci_hcd *uhci, struct usb_device *usb_dev, 
 
 //		err("unlink urb: %p, dev %p, ud %p", urb, usb_dev,urb->dev);
 		
-		//urb->transfer_flags |=USB_ASYNC_UNLINK;
-			
 		if (remove_all || (usb_dev == urb->dev)) {
 			spin_unlock_irqrestore (&uhci->urb_list_lock, flags);
 			err("forced removing of queued URB %p due to disconnect",urb);
@@ -850,7 +794,7 @@ static void uhci_check_timeouts(struct uhci_hcd *uhci)
 		type = usb_pipetype (urb->pipe);
 
 		if ( urb->timeout && time_after(jiffies, hcpriv->started + urb->timeout)) {
-			urb->transfer_flags |= USB_TIMEOUT_KILLED | USB_ASYNC_UNLINK;
+			urb->transfer_flags |= USB_TIMEOUT_KILLED;
 			async_dbg("uhci_check_timeout: timeout for %p",urb);
 			uhci_unlink_urb_async(uhci, urb, UNLINK_ASYNC_STORE_URB);
 		}
