@@ -142,6 +142,10 @@ static void __init mace_probe1(struct device_node *mace)
 		}
 	}
 
+	/*
+	 * lazy allocation - it's a driver-wide thing and it will live until
+	 * the unload, but we don't allocate it until it's needed
+	 */
 	if (dummy_buf == NULL) {
 		dummy_buf = kmalloc(RX_BUFLEN+2, GFP_KERNEL);
 		if (dummy_buf == NULL) {
@@ -150,7 +154,7 @@ static void __init mace_probe1(struct device_node *mace)
 		}
 	}
 
-	dev = init_etherdev(0, PRIV_BYTES);
+	dev = alloc_etherdev(PRIV_BYTES);
 	if (!dev)
 		return;
 	SET_MODULE_OWNER(dev);
@@ -160,16 +164,16 @@ static void __init mace_probe1(struct device_node *mace)
 	
 	if (!request_OF_resource(mace, 0, " (mace)")) {
 		printk(KERN_ERR "MACE: can't request IO resource !\n");
-		goto err_out;
+		goto out1;
 	}
 	if (!request_OF_resource(mace, 1, " (mace tx dma)")) {
 		printk(KERN_ERR "MACE: can't request TX DMA resource !\n");
-		goto err_out;
+		goto out2;
 	}
 
 	if (!request_OF_resource(mace, 2, " (mace tx dma)")) {
 		printk(KERN_ERR "MACE: can't request RX DMA resource !\n");
-		goto err_out;
+		goto out3;
 	}
 
 	dev->base_addr = mace->addrs[0].address;
@@ -229,30 +233,42 @@ static void __init mace_probe1(struct device_node *mace)
 	dev->set_multicast_list = mace_set_multicast;
 	dev->set_mac_address = mace_set_address;
 
-	ether_setup(dev);
-
 	mace_reset(dev);
 
-	if (request_irq(dev->irq, mace_interrupt, 0, "MACE", dev))
+	if (request_irq(dev->irq, mace_interrupt, 0, "MACE", dev)) {
 		printk(KERN_ERR "MACE: can't get irq %d\n", dev->irq);
+		goto out4;
+	}
 	if (request_irq(mace->intrs[1].line, mace_txdma_intr, 0, "MACE-txdma",
-			dev))
+			dev)) {
 		printk(KERN_ERR "MACE: can't get irq %d\n", mace->intrs[1].line);
+		goto out5;
+	}
 	if (request_irq(mace->intrs[2].line, mace_rxdma_intr, 0, "MACE-rxdma",
-			dev))
+			dev)) {
 		printk(KERN_ERR "MACE: can't get irq %d\n", mace->intrs[2].line);
+		goto out6;
+	}
+	if (register_netdev(dev) != 0)
+		goto out7;
 
 	mp->next_mace = mace_devs;
 	mace_devs = dev;
 	return;
 	
-err_out:
-	unregister_netdev(dev);
-	if (mp->of_node) {
-		release_OF_resource(mp->of_node, 0);
-		release_OF_resource(mp->of_node, 1);
-		release_OF_resource(mp->of_node, 2);
-	}
+out7:
+	free_irq(mp->rx_dma_intr, dev);
+out6:
+	free_irq(mp->tx_dma_intr, dev);
+out5:
+	free_irq(dev->irq, dev);
+out4:
+	release_OF_resource(mp->of_node, 2);
+out3:
+	release_OF_resource(mp->of_node, 1);
+out2:
+	release_OF_resource(mp->of_node, 0);
+out1:
 	free_netdev(dev);
 }
 
@@ -975,7 +991,7 @@ static void __exit mace_cleanup (void)
 		release_OF_resource(mp->of_node, 1);
 		release_OF_resource(mp->of_node, 2);
 
-		kfree(dev);
+		free_netdev(dev);
     }
     if (dummy_buf != NULL) {
 		kfree(dummy_buf);
