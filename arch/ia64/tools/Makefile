@@ -38,6 +38,7 @@ $(obj)/offsets.h: $(obj)/print_offsets
 comma	:= ,
 
 $(obj)/print_offsets: $(src)/print_offsets.c FORCE
+	[ ! -r $(TARGET) ] || echo "#define IA64_TASK_SIZE 0" > $(TARGET)
 	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
 		$(src)/print_offsets.c -o $@
 
@@ -49,6 +50,7 @@ $(obj)/offsets.h: $(obj)/print_offsets.s
 	$(AWK) -f $(src)/print_offsets.awk $^ > $@
 
 $(obj)/print_offsets.s: $(src)/print_offsets.c
+	[ ! -r $(TARGET) ] || echo "#define IA64_TASK_SIZE 0" > $(TARGET)
 	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -S $^ -o $@
 
 endif
