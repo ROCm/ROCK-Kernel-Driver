@@ -19,17 +19,18 @@ struct svc_sock {
 	struct list_head	sk_list;	/* list of all sockets */
 	struct socket *		sk_sock;	/* berkeley socket layer */
 	struct sock *		sk_sk;		/* INET layer */
-	spinlock_t		sk_lock;
 
 	struct svc_serv *	sk_server;	/* service for this socket */
 	unsigned char		sk_inuse;	/* use count */
-	unsigned char		sk_busy;	/* enqueued/receiving */
-	unsigned char		sk_conn;	/* conn pending */
-	unsigned char		sk_close;	/* dead or dying */
-	int			sk_data;	/* data pending */
-	unsigned int		sk_temp : 1,	/* temp socket */
-				sk_qued : 1,	/* on serv->sk_sockets */
-				sk_dead : 1;	/* socket closed */
+	unsigned int		sk_flags;
+#define	SK_BUSY		0			/* enqueued/receiving */
+#define	SK_CONN		1			/* conn pending */
+#define	SK_CLOSE	2			/* dead or dying */
+#define	SK_DATA		3			/* data pending */
+#define	SK_TEMP		4			/* temp (TCP) socket */
+#define	SK_QUED		5			/* on serv->sk_sockets */
+#define	SK_DEAD		6			/* socket closed */
+
 	int			(*sk_recvfrom)(struct svc_rqst *rqstp);
 	int			(*sk_sendto)(struct svc_rqst *rqstp);
 
@@ -40,9 +41,6 @@ struct svc_sock {
 	/* private TCP part */
 	int			sk_reclen;	/* length of record */
 	int			sk_tcplen;	/* current read length */
-
-	/* Debugging */
-	struct svc_rqst *	sk_rqstp;
 };
 
 /*
