@@ -106,8 +106,8 @@ int usb_register(struct usb_driver *new_driver)
  *	Goes through all unclaimed USB interfaces, and offers them to all
  *	registered USB drivers through the 'probe' function.
  *	This will automatically be called after usb_register is called.
- *	It is called by some of the USB subsystems after one of their subdrivers
- *	are registered.
+ *	It is called by some of the subsystems layered over USB
+ *	after one of their subdrivers are registered.
  */
 void usb_scan_devices(void)
 {
@@ -292,7 +292,7 @@ static long usb_calc_bus_time (int low_speed, int input_dir, int isoc, int bytec
  * bustime is from calc_bus_time(), but converted to microseconds.
  *
  * returns <bustime in us> if successful,
- * or USB_ST_BANDWIDTH_ERROR if bandwidth request fails.
+ * or -ENOSPC if bandwidth request fails.
  *
  * FIXME:
  * This initial implementation does not use Endpoint.bInterval
@@ -333,7 +333,7 @@ int usb_check_bandwidth (struct usb_device *dev, struct urb *urb)
 
 	if (!usb_bandwidth_option)	/* don't enforce it */
 		return (bustime);
-	return (new_alloc <= FRAME_TIME_MAX_USECS_ALLOC) ? bustime : USB_ST_BANDWIDTH_ERROR;
+	return (new_alloc <= FRAME_TIME_MAX_USECS_ALLOC) ? bustime : -ENOSPC;
 }
 
 void usb_claim_bandwidth (struct usb_device *dev, struct urb *urb, int bustime, int isoc)
@@ -1121,7 +1121,10 @@ void usb_free_urb(urb_t* urb)
  * any transfer flags.
  *
  * Successful submissions return 0; otherwise this routine returns a
- * negative error number.
+ * negative error number.  If the submission is successful, the complete
+ * fuction of the urb will be called when the USB host driver is
+ * finished with the urb (either a successful transmission, or some
+ * error case.)
  *
  * Unreserved Bandwidth Transfers:
  *
@@ -1198,12 +1201,14 @@ int usb_unlink_urb(urb_t *urb)
 		return -ENODEV;
 }
 /*-------------------------------------------------------------------*
- *                     COMPLETION HANDLERS                           *
+ *                         SYNCHRONOUS CALLS                         *
  *-------------------------------------------------------------------*/
 
-/*-------------------------------------------------------------------*
- * completion handler for compatibility wrappers (sync control/bulk) *
- *-------------------------------------------------------------------*/
+struct usb_api_data {
+	wait_queue_head_t wqh;
+	int done;
+};
+
 static void usb_api_blocking_completion(urb_t *urb)
 {
 	struct usb_api_data *awd = (struct usb_api_data *)urb->context;
@@ -1212,10 +1217,6 @@ static void usb_api_blocking_completion(urb_t *urb)
 	wmb();
 	wake_up(&awd->wqh);
 }
-
-/*-------------------------------------------------------------------*
- *                         SYNCHRONOUS CALLS                         *
- *-------------------------------------------------------------------*/
 
 // Starts urb and waits for completion or timeout
 static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
@@ -1723,7 +1724,8 @@ int usb_parse_configuration(struct usb_config_descriptor *config, char *buffer)
 	return size;
 }
 
-// usbcore-internal:  enumeration/hub only!!
+// hub-only!! ... and only exported for reset/reinit path.
+// otherwise used internally on disconnect/destroy path
 void usb_destroy_configuration(struct usb_device *dev)
 {
 	int c, i, j, k;
@@ -1955,18 +1957,14 @@ void usb_connect(struct usb_device *dev)
  * These are the actual routines to send
  * and receive control messages.
  */
-#ifdef CONFIG_USB_LONG_TIMEOUT
-#define GET_TIMEOUT 4
-#else
-#define GET_TIMEOUT 3
-#endif
-#define SET_TIMEOUT 3
 
-// hub driver only!!! for enumeration
+// hub-only!! ... and only exported for reset/reinit path.
+// otherwise used internally, for usb_new_device()
 int usb_set_address(struct usb_device *dev)
 {
 	return usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
-		0, dev->devnum, 0, NULL, 0, HZ * GET_TIMEOUT);
+		// FIXME USB_CTRL_SET_TIMEOUT
+		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_GET_TIMEOUT);
 }
 
 /**
@@ -1984,7 +1982,7 @@ int usb_set_address(struct usb_device *dev)
  * Configuration descriptors (USB_DT_CONFIG) are part of the device
  * structure, at least for the current configuration.
  * In addition to a number of USB-standard descriptors, some
- * devices also use vendor-specific descriptors.
+ * devices also use class-specific or vendor-specific descriptors.
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
@@ -1999,22 +1997,15 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 	memset(buf,0,size);	// Make sure we parse really received data
 
 	while (i--) {
+		/* retries if the returned length was 0; flakey device */
 		if ((result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-			USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
-			(type << 8) + index, 0, buf, size, HZ * GET_TIMEOUT)) > 0 ||
-		     result == -EPIPE)
-			break;	/* retry if the returned length was 0; flaky device */
+				    USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+				    (type << 8) + index, 0, buf, size,
+				    HZ * USB_CTRL_GET_TIMEOUT)) > 0
+				|| result == -EPIPE)
+			break;
 	}
 	return result;
-}
-
-// FIXME  Doesn't use USB_DT_CLASS ... but hid-core.c expects it this way
-int usb_get_class_descriptor(struct usb_device *dev, int ifnum,
-		unsigned char type, unsigned char id, void *buf, int size)
-{
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
-		(type << 8) + id, ifnum, buf, size, HZ * GET_TIMEOUT);
 }
 
 /**
@@ -2042,7 +2033,8 @@ int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char 
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
-		(USB_DT_STRING << 8) + index, langid, buf, size, HZ * GET_TIMEOUT);
+		(USB_DT_STRING << 8) + index, langid, buf, size,
+		HZ * USB_CTRL_GET_TIMEOUT);
 }
 
 /**
@@ -2100,40 +2092,13 @@ int usb_get_device_descriptor(struct usb_device *dev)
 int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, data, 2, HZ * GET_TIMEOUT);
+		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, data, 2,
+		HZ * USB_CTRL_GET_TIMEOUT);
 }
 
-// FIXME hid-specific !!  DOES NOT BELONG HERE
-int usb_get_protocol(struct usb_device *dev, int ifnum)
-{
-	unsigned char type;
-	int ret;
 
-	if ((ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-	    USB_REQ_GET_PROTOCOL, USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-	    0, ifnum, &type, 1, HZ * GET_TIMEOUT)) < 0)
-		return ret;
-
-	return type;
-}
-
-// FIXME hid-specific !!  DOES NOT BELONG HERE
-int usb_set_protocol(struct usb_device *dev, int ifnum, int protocol)
-{
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		USB_REQ_SET_PROTOCOL, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		protocol, ifnum, NULL, 0, HZ * SET_TIMEOUT);
-}
-
-// FIXME hid-specific !!  DOES NOT BELONG HERE
-int usb_set_idle(struct usb_device *dev, int ifnum, int duration, int report_id)
-{
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		USB_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		(duration << 8) | report_id, ifnum, NULL, 0, HZ * SET_TIMEOUT);
-}
-
-// hub-only!!
+// hub-only!! ... and only exported for reset/reinit path.
+// otherwise used internally, for config/altsetting reconfig.
 void usb_set_maxpacket(struct usb_device *dev)
 {
 	int i, b;
@@ -2197,7 +2162,8 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 */
 
 	result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0, endp, NULL, 0, HZ * SET_TIMEOUT);
+		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0, endp, NULL, 0,
+		HZ * USB_CTRL_SET_TIMEOUT);
 
 	/* don't clear if failed */
 	if (result < 0)
@@ -2211,7 +2177,8 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 
 	result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RECIP_ENDPOINT, 0, endp,
-		buffer, sizeof(status), HZ * SET_TIMEOUT);
+		// FIXME USB_CTRL_GET_TIMEOUT, yes?  why not usb_get_status() ?
+		buffer, sizeof(status), HZ * USB_CTRL_SET_TIMEOUT);
 
 	memcpy(&status, buffer, sizeof(status));
 	kfree(buffer);
@@ -2327,7 +2294,8 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	}
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-	    USB_REQ_SET_CONFIGURATION, 0, configuration, 0, NULL, 0, HZ * SET_TIMEOUT)) < 0)
+			USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
+			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0)
 		return ret;
 
 	dev->actconfig = cp;
@@ -2338,23 +2306,8 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	return 0;
 }
 
-// FIXME hid-specific !!  DOES NOT BELONG HERE
-int usb_get_report(struct usb_device *dev, int ifnum, unsigned char type, unsigned char id, void *buf, int size)
-{
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_REPORT, USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		(type << 8) + id, ifnum, buf, size, HZ * GET_TIMEOUT);
-}
-
-// FIXME hid-specific !!  DOES NOT BELONG HERE
-int usb_set_report(struct usb_device *dev, int ifnum, unsigned char type, unsigned char id, void *buf, int size)
-{
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		USB_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		(type << 8) + id, ifnum, buf, size, HZ);
-}
-
-// hub driver only !!
+// hub-only!! ... and only in reset path, or usb_new_device()
+// (used by real hubs and virtual root hubs)
 int usb_get_configuration(struct usb_device *dev)
 {
 	int result;
@@ -2761,33 +2714,28 @@ EXPORT_SYMBOL(usb_check_bandwidth);
 EXPORT_SYMBOL(usb_claim_bandwidth);
 EXPORT_SYMBOL(usb_release_bandwidth);
 
-EXPORT_SYMBOL(usb_set_address);
-EXPORT_SYMBOL(usb_get_descriptor);
-EXPORT_SYMBOL(usb_get_class_descriptor);
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
-EXPORT_SYMBOL(usb_get_device_descriptor);
-EXPORT_SYMBOL(usb_get_string);
-EXPORT_SYMBOL(usb_string);
-EXPORT_SYMBOL(usb_get_protocol);
-EXPORT_SYMBOL(usb_set_protocol);
-EXPORT_SYMBOL(usb_get_report);
-EXPORT_SYMBOL(usb_set_report);
-EXPORT_SYMBOL(usb_set_idle);
-EXPORT_SYMBOL(usb_clear_halt);
-EXPORT_SYMBOL(usb_set_interface);
-EXPORT_SYMBOL(usb_get_configuration);
-EXPORT_SYMBOL(usb_set_configuration);
-EXPORT_SYMBOL(usb_get_status);
 
 EXPORT_SYMBOL(usb_get_current_frame_number);
 
+// asynchronous request completion model
 EXPORT_SYMBOL(usb_alloc_urb);
 EXPORT_SYMBOL(usb_free_urb);
 EXPORT_SYMBOL(usb_submit_urb);
 EXPORT_SYMBOL(usb_unlink_urb);
 
+// synchronous request completion model
 EXPORT_SYMBOL(usb_control_msg);
 EXPORT_SYMBOL(usb_bulk_msg);
+// synchronous control message convenience routines
+EXPORT_SYMBOL(usb_get_descriptor);
+EXPORT_SYMBOL(usb_get_device_descriptor);
+EXPORT_SYMBOL(usb_get_status);
+EXPORT_SYMBOL(usb_get_string);
+EXPORT_SYMBOL(usb_string);
+EXPORT_SYMBOL(usb_clear_halt);
+EXPORT_SYMBOL(usb_set_configuration);
+EXPORT_SYMBOL(usb_set_interface);
 
 EXPORT_SYMBOL(usb_devfs_handle);
 MODULE_LICENSE("GPL");

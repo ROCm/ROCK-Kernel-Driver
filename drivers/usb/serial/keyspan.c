@@ -468,7 +468,7 @@ static void	usa2x_outdat_callback(struct urb *urb)
 	p_priv = (struct keyspan_port_private *)(port->private);
 	dbg (__FUNCTION__ " urb %d\n", urb == p_priv->out_urbs[1]); 
 
-	if (port->active) {
+	if (port->open_count) {
 		queue_task(&port->tqueue, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
 	}
@@ -880,9 +880,8 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	MOD_INC_USE_COUNT;
 
 	down (&port->sem);
+	already_active = port->open_count;
 	++port->open_count;
-	already_active = port->active;
-	port->active = 1;
 	up (&port->sem);
 
 	if (already_active)
@@ -948,18 +947,15 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	down (&port->sem);
 
 	if (--port->open_count <= 0) {
-		if (port->active) {
-			if (serial->dev) {
-				/* Stop reading/writing urbs */
-				stop_urb(p_priv->inack_urb);
-				stop_urb(p_priv->outcont_urb);
-				for (i = 0; i < 2; i++) {
-					stop_urb(p_priv->in_urbs[i]);
-					stop_urb(p_priv->out_urbs[i]);
-				}
+		if (serial->dev) {
+			/* Stop reading/writing urbs */
+			stop_urb(p_priv->inack_urb);
+			stop_urb(p_priv->outcont_urb);
+			for (i = 0; i < 2; i++) {
+				stop_urb(p_priv->in_urbs[i]);
+				stop_urb(p_priv->out_urbs[i]);
 			}
 		}
-		port->active = 0;
 		port->open_count = 0;
 		port->tty = 0;
 	}

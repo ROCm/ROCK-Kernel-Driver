@@ -562,6 +562,7 @@ void blk_cleanup_queue(request_queue_t * q)
 
 static int blk_init_free_list(request_queue_t *q)
 {
+	struct request_list *rl;
 	struct request *rq;
 	int i;
 
@@ -573,20 +574,22 @@ static int blk_init_free_list(request_queue_t *q)
 	/*
 	 * Divide requests in half between read and write
 	 */
+	rl = &q->rq[READ];
 	for (i = 0; i < queue_nr_requests; i++) {
 		rq = kmem_cache_alloc(request_cachep, SLAB_KERNEL);
 		if (!rq)
 			goto nomem;
 
+		/*
+		 * half way through, switch to WRITE list
+		 */
+		if (i == queue_nr_requests / 2)
+			rl = &q->rq[WRITE];
+
 		memset(rq, 0, sizeof(struct request));
 		rq->rq_status = RQ_INACTIVE;
-		if (i < queue_nr_requests >> 1) {
-			list_add(&rq->queuelist, &q->rq[READ].free);
-			q->rq[READ].count++;
-		} else {
-			list_add(&rq->queuelist, &q->rq[WRITE].free);
-			q->rq[WRITE].count++;
-		}
+		list_add(&rq->queuelist, &rl->free);
+		rl->count++;
 	}
 
 	init_waitqueue_head(&q->rq[READ].wait);
@@ -692,21 +695,22 @@ static inline struct request *get_request(request_queue_t *q, int rw)
 static struct request *get_request_wait(request_queue_t *q, int rw)
 {
 	DECLARE_WAITQUEUE(wait, current);
+	struct request_list *rl = &q->rq[rw];
 	struct request *rq;
 
 	spin_lock_prefetch(&q->queue_lock);
 
 	generic_unplug_device(q);
-	add_wait_queue(&q->rq[rw].wait, &wait);
+	add_wait_queue(&rl->wait, &wait);
 	do {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		if (q->rq[rw].count < batch_requests)
+		if (rl->count < batch_requests)
 			schedule();
 		spin_lock_irq(&q->queue_lock);
 		rq = get_request(q, rw);
 		spin_unlock_irq(&q->queue_lock);
 	} while (rq == NULL);
-	remove_wait_queue(&q->rq[rw].wait, &wait);
+	remove_wait_queue(&rl->wait, &wait);
 	current->state = TASK_RUNNING;
 	return rq;
 }
@@ -1234,7 +1238,6 @@ int submit_bio(int rw, struct bio *bio)
 	 */
 	BUG_ON(!bio->bi_end_io);
 
-	BIO_BUG_ON(bio_offset(bio) > PAGE_SIZE);
 	BIO_BUG_ON(!bio->bi_size);
 	BIO_BUG_ON(!bio->bi_io_vec);
 
@@ -1397,6 +1400,28 @@ sorry:
 extern int stram_device_init (void);
 #endif
 
+inline void blk_recalc_request(struct request *rq, int nsect)
+{
+	rq->hard_sector += nsect;
+	rq->hard_nr_sectors -= nsect;
+	rq->sector = rq->hard_sector;
+	rq->nr_sectors = rq->hard_nr_sectors;
+
+	rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
+	rq->hard_cur_sectors = rq->current_nr_sectors;
+
+	/*
+	 * if total number of sectors is less than the first segment
+	 * size, something has gone terribly wrong
+	 */
+	if (rq->nr_sectors < rq->current_nr_sectors) {
+		printk("blk: request botched\n");
+		rq->nr_sectors = rq->current_nr_sectors;
+	}
+
+	rq->buffer = bio_data(rq->bio);
+}
+
 /**
  * end_that_request_first - end I/O on one buffer.
  * @req:      the request being processed
@@ -1414,53 +1439,55 @@ extern int stram_device_init (void);
 
 int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 {
-	struct bio *bio, *nxt;
-	int nsect, total_nsect = 0;
+	int nsect, total_nsect;
+	struct bio *bio;
 
 	req->errors = 0;
 	if (!uptodate)
 		printk("end_request: I/O error, dev %s, sector %lu\n",
 			kdevname(req->rq_dev), req->sector);
 
-	if ((bio = req->bio) != NULL) {
-next_chunk:
+	total_nsect = 0;
+	while ((bio = req->bio)) {
 		nsect = bio_iovec(bio)->bv_len >> 9;
+
+		bio->bi_size -= bio_iovec(bio)->bv_len;
+
+		/*
+		 * not a complete bvec done
+		 */
+		if (unlikely(nsect > nr_sectors)) {
+			int residual = (nsect - nr_sectors) << 9;
+
+			bio_iovec(bio)->bv_offset += residual;
+			bio_iovec(bio)->bv_len -= residual;
+			blk_recalc_request(req, nr_sectors);
+			return 1;
+		}
 
 		nr_sectors -= nsect;
 		total_nsect += nsect;
 
 		if (++bio->bi_idx >= bio->bi_vcnt) {
-			nxt = bio->bi_next;
-			if (!bio_endio(bio, uptodate, total_nsect)) {
-				total_nsect = 0;
-				req->bio = nxt;
-			} else
+			req->bio = bio->bi_next;
+
+			if (unlikely(bio_endio(bio, uptodate, total_nsect)))
 				BUG();
+
+			total_nsect = 0;
 		}
 
-		if ((bio = req->bio) != NULL) {
-			req->hard_sector += nsect;
-			req->hard_nr_sectors -= nsect;
-			req->sector = req->hard_sector;
-			req->nr_sectors = req->hard_nr_sectors;
+		if ((bio = req->bio)) {
+			blk_recalc_request(req, nsect);
 
-			req->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
-			req->hard_cur_sectors = req->current_nr_sectors;
-			if (req->nr_sectors < req->current_nr_sectors) {
-				printk("end_request: buffer-list destroyed\n");
-				req->nr_sectors = req->current_nr_sectors;
-			}
-
-			req->buffer = bio_data(bio);
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
-			if (nr_sectors > 0)
-				goto next_chunk;
-
-			return 1;
+			if (unlikely(nr_sectors <= 0))
+				return 1;
 		}
 	}
+
 	return 0;
 }
 
@@ -1544,3 +1571,4 @@ EXPORT_SYMBOL(blk_queue_hardsect_size);
 EXPORT_SYMBOL(blk_rq_map_sg);
 EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
+EXPORT_SYMBOL(submit_bio);

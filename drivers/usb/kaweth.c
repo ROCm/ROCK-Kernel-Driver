@@ -944,6 +944,13 @@ static void kaweth_disconnect(struct usb_device *dev, void *ptr)
 }
 
 
+// FIXME this completion stuff is a modified clone of
+// an OLD version of some stuff in usb.c ... 
+struct usb_api_data {
+	wait_queue_head_t wqh;
+	int done;
+};
+
 /*-------------------------------------------------------------------*
  * completion handler for compatibility wrappers (sync control/bulk) *
  *-------------------------------------------------------------------*/

@@ -1535,7 +1535,7 @@ static void tx_complete (struct urb *urb)
 	struct skb_data		*entry = (struct skb_data *) skb->cb;
 	struct usbnet		*dev = entry->dev;
 
-	if (urb->status == USB_ST_STALL) {
+	if (urb->status == -EPIPE) {
 		if (dev->ctrl_task.sync == 0) {
 			dev->ctrl_task.routine = tx_clear_halt;
 			dev->ctrl_task.data = dev;
@@ -1868,6 +1868,11 @@ static const struct usb_device_id	products [] = {
 #ifdef	CONFIG_USB_AN2720
 {
 	USB_DEVICE (0x0547, 0x2720),	// AnchorChips defaults
+	driver_info:	(unsigned long) &an2720_info,
+},
+
+{
+	USB_DEVICE (0x0547, 0x2727),	// Xircom PGUNET
 	driver_info:	(unsigned long) &an2720_info,
 },
 #endif

@@ -276,7 +276,7 @@ static void destroy_all_async(struct dev_state *ps)
                 list_del(&as->asynclist);
                 INIT_LIST_HEAD(&as->asynclist);
                 spin_unlock_irqrestore(&ps->lock, flags);
-                /* usb_unlink_urb calls the completion handler with status == USB_ST_URB_KILLED */
+                /* usb_unlink_urb calls the completion handler with status == -ENOENT */
                 usb_unlink_urb(&as->urb);
                 spin_lock_irqsave(&ps->lock, flags);
         }
@@ -299,11 +299,12 @@ static void driver_disconnect(struct usb_device *dev, void *context)
 {
 	struct dev_state *ps = (struct dev_state *)context;
 
-	ps->ifclaimed = 0;
+	if (ps)
+		ps->ifclaimed = 0;
 }
 
 struct usb_driver usbdevfs_driver = {
-	name:		"usbdevfs",
+	name:		"usbfs",
 	probe:		driver_probe,
 	disconnect:	driver_disconnect,
 };

@@ -654,7 +654,13 @@ struct super_block *usbdevfs_read_super(struct super_block *s, void *data, int s
         return NULL;
 }
 
+/*
+ * The usbdevfs name is now depreciated (as of 2.5.1).
+ * It will be removed when the 2.7.x development cycle is started.
+ * You have been warned :)
+ */
 static DECLARE_FSTYPE(usbdevice_fs_type, "usbdevfs", usbdevfs_read_super, FS_SINGLE);
+static DECLARE_FSTYPE(usb_fs_type, "usbfs", usbdevfs_read_super, FS_SINGLE);
 
 /* --------------------------------------------------------------------- */
 
@@ -747,7 +753,12 @@ int __init usbdevfs_init(void)
 	}
 	if ((ret = usb_register(&usbdevfs_driver)))
 		return ret;
+	if ((ret = register_filesystem(&usb_fs_type))) {
+		usb_deregister(&usbdevfs_driver);
+		return ret;
+	}
 	if ((ret = register_filesystem(&usbdevice_fs_type))) {
+		unregister_filesystem(&usb_fs_type);
 		usb_deregister(&usbdevfs_driver);
 		return ret;
 	}
@@ -761,6 +772,7 @@ int __init usbdevfs_init(void)
 void __exit usbdevfs_cleanup(void)
 {
 	usb_deregister(&usbdevfs_driver);
+	unregister_filesystem(&usb_fs_type);
 	unregister_filesystem(&usbdevice_fs_type);
 #ifdef CONFIG_PROC_FS	
         if (usbdir)
@@ -768,7 +780,3 @@ void __exit usbdevfs_cleanup(void)
 #endif
 }
 
-#if 0
-module_init(usbdevfs_init);
-module_exit(usbdevfs_cleanup);
-#endif

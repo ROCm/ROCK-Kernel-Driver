@@ -1423,7 +1423,6 @@ static int i2ob_init_iop(unsigned int unit)
 	atomic_set(&i2ob_queues[unit]->queue_depth, 0);
 
 	blk_init_queue(&i2ob_queues[unit]->req_queue, i2ob_request);
-	blk_queue_headactive(&i2ob_queues[unit]->req_queue, 0);
 	i2ob_queues[unit]->req_queue.queuedata = &i2ob_queues[unit];
 
 	return 0;
@@ -1822,7 +1821,6 @@ int i2o_block_init(void)
 	blk_dev[MAJOR_NR].queue = i2ob_get_queue;
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), i2ob_request);
-	blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR), 0);
 
 	for (i = 0; i < MAX_I2OB << 4; i++) {
 		i2ob_dev[i].refcnt = 0;

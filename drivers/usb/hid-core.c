@@ -897,7 +897,7 @@ void hid_read_report(struct hid_device *hid, struct hid_report *report)
 	u8 data[len];
 	int read;
 
-	if ((read = usb_get_report(hid->dev, hid->ifnum, report->type + 1, report->id, data, len)) != len) {
+	if ((read = hid_get_report(hid->dev, hid->ifnum, report->type + 1, report->id, data, len)) != len) {
 		dbg("reading report type %d id %d failed len %d read %d", report->type + 1, report->id, len, read);
 		return;
 	}
@@ -1064,7 +1064,7 @@ void hid_init_reports(struct hid_device *hid)
 			list = report_enum->report_list.next;
 			while (list != &report_enum->report_list) {
 				report = (struct hid_report *) list;
-				usb_set_idle(hid->dev, hid->ifnum, 0, report->id);
+				hid_set_idle(hid->dev, hid->ifnum, 0, report->id);
 				hid_read_report(hid, report);
 				list = list->next;
 			}
@@ -1089,6 +1089,16 @@ struct hid_blacklist {
 	{ 0, 0 }
 };
 
+static int get_class_descriptor(struct usb_device *dev, int ifnum,
+		unsigned char type, void *buf, int size)
+{
+	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+		USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
+		(type << 8), ifnum, buf, size,
+		HZ * USB_CTRL_GET_TIMEOUT);
+}
+
+
 static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 {
 	struct usb_interface_descriptor *interface = dev->actconfig->interface[ifnum].altsetting + 0;
@@ -1102,14 +1112,14 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 		if ((hid_blacklist[n].idVendor == dev->descriptor.idVendor) &&
 			(hid_blacklist[n].idProduct == dev->descriptor.idProduct)) return NULL;
 
-	if (usb_get_extra_descriptor(interface, USB_DT_HID, &hdesc) && ((!interface->bNumEndpoints) ||
-		usb_get_extra_descriptor(&interface->endpoint[0], USB_DT_HID, &hdesc))) {
+	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) && ((!interface->bNumEndpoints) ||
+		usb_get_extra_descriptor(&interface->endpoint[0], HID_DT_HID, &hdesc))) {
 			dbg("class descriptor not present\n");
 			return NULL;
 	}
 
 	for (n = 0; n < hdesc->bNumDescriptors; n++)
-		if (hdesc->desc[n].bDescriptorType == USB_DT_REPORT)
+		if (hdesc->desc[n].bDescriptorType == HID_DT_REPORT)
 			rsize = le16_to_cpu(hdesc->desc[n].wDescriptorLength);
 
 	if (!rsize || rsize > HID_MAX_DESCRIPTOR_SIZE) {
@@ -1120,7 +1130,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	{
 		__u8 rdesc[rsize];
 
-		if ((n = usb_get_class_descriptor(dev, interface->bInterfaceNumber, USB_DT_REPORT, 0, rdesc, rsize)) < 0) {
+		if ((n = get_class_descriptor(dev, interface->bInterfaceNumber, HID_DT_REPORT, rdesc, rsize)) < 0) {
 			dbg("reading report descriptor failed");
 			return NULL;
 		}
@@ -1170,7 +1180,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 
 	for (n = 0; n < HID_CONTROL_FIFO_SIZE; n++) {
 		hid->out[n].dr.requesttype = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
-		hid->out[n].dr.request = USB_REQ_SET_REPORT;
+		hid->out[n].dr.request = HID_REQ_SET_REPORT;
 		hid->out[n].dr.index = cpu_to_le16(hid->ifnum);
 	}
 
@@ -1198,7 +1208,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 
 #if 0
 	if (interface->bInterfaceSubClass == 1)
-		usb_set_protocol(dev, hid->ifnum, 1);
+		hid_set_protocol(dev, hid->ifnum, 1);
 #endif
 
 	return hid;
@@ -1236,7 +1246,7 @@ static void* hid_probe(struct usb_device *dev, unsigned int ifnum,
 
 	c = "Device";
 	for (i = 0; i < hid->maxapplication; i++)
-		if (IS_INPUT_APPLICATION(hid->application[i])) {
+		if ((hid->application[i] & 0xffff) < ARRAY_SIZE(hid_types)) {
 			c = hid_types[hid->application[i] & 0xffff];
 			break;
 		}

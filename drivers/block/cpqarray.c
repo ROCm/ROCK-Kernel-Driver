@@ -468,7 +468,6 @@ int __init cpqarray_init(void)
 		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
 		q->queuedata = hba[i];
 		blk_init_queue(q, do_ida_request);
-		blk_queue_headactive(q, 0);
 		blk_queue_bounce_limit(q, hba[i]->pci_dev->dma_mask);
 		blk_queue_max_segments(q, SG_MAX);
 		blksize_size[MAJOR_NR+i] = ida_blocksizes + (i*256);

@@ -324,7 +324,7 @@ write_rio(struct file *file, const char *buffer,
 			dbg("write stats: result:%d thistime:%lu partial:%u",
 			     result, thistime, partial);
 
-			if (result == USB_ST_TIMEOUT) {	/* NAK - so hold for a while */
+			if (result == -ETIMEDOUT) {	/* NAK - so hold for a while */
 				if (!maxretry--) {
 					errn = -ETIME;
 					goto error;
@@ -403,7 +403,7 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 
 		if (partial) {
 			count = this_read = partial;
-		} else if (result == USB_ST_TIMEOUT || result == 15) {	/* FIXME: 15 ??? */
+		} else if (result == -ETIMEDOUT || result == 15) {	/* FIXME: 15 ??? */
 			if (!maxretry--) {
 				up(&(rio->lock));
 				err("read_rio: maxretry timeout");
@@ -412,7 +412,7 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 			interruptible_sleep_on_timeout(&rio->wait_q,
 						       NAK_TIMEOUT);
 			continue;
-		} else if (result != USB_ST_DATAUNDERRUN) {
+		} else if (result != -EREMOTEIO) {
 			up(&(rio->lock));
 			err("Read Whoops - result:%u partial:%u this_read:%u",
 			     result, partial, this_read);

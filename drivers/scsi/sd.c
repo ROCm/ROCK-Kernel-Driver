@@ -286,6 +286,12 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	char nbuff[6];
 #endif
 
+	/*
+	 * don't support specials for nwo
+	 */
+	if (!(SCpnt->request.flags & REQ_CMD))
+		return 0;
+
 	devm = SD_PARTITION(SCpnt->request.rq_dev);
 	dev = DEVICE_NR(SCpnt->request.rq_dev);
 

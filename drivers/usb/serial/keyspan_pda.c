@@ -675,9 +675,7 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 	MOD_INC_USE_COUNT;
 	++port->open_count;
 
-	if (!port->active) {
-		port->active = 1;
- 
+	if (port->open_count == 1) {
 		/* find out how much room is in the Tx ring */
 		rc = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 				     6, /* write_room */
@@ -723,7 +721,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 	return rc;
 error:
 	--port->open_count;
-	port->active = 0;
 	MOD_DEC_USE_COUNT;
 	up (&port->sem);
 	return rc;
@@ -748,7 +745,6 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 			usb_unlink_urb (port->write_urb);
 			usb_unlink_urb (port->interrupt_in_urb);
 		}
-		port->active = 0;
 		port->open_count = 0;
 	}
 

@@ -168,7 +168,7 @@ static void usb_b_out_complete(struct urb *urb)
 	test_and_clear_bit(buf_nr, &b_out->busy);
 
 	if (urb->status < 0) {
-		if (urb->status != USB_ST_URB_KILLED) {
+		if (urb->status != -ENOENT) {
 			WARN("urb status %d",urb->status);
 			if (b_out->busy == 0) {
 				st5481_usb_pipe_reset(adapter, (bcs->channel+1)*2 | USB_DIR_OUT, NULL, NULL);

@@ -30,8 +30,11 @@
 #define MCT_U232_SITECOM_PID		0x0230	/* Sitecom Product Id */
 
 /* DU-H3SP USB BAY hub */
-
 #define MCT_U232_DU_H3SP_PID		0x0200	/* D-Link DU-H3SP USB BAY */
+
+/* Belkin badge the MCT U232-P9 as the F5U109 */
+#define MCT_U232_BELKIN_F5U109_VID	0x050d	/* Vendor Id */
+#define MCT_U232_BELKIN_F5U109_PID	0x0109	/* Product Id */
 
 /*
  * Vendor Request Interface
@@ -363,6 +366,25 @@
  * 	  bmAttributes        =   03 (Interrupt)
  * 	  wMaxPacketSize      = 0002
  * 	  bInterval           =   02
+ *
+ *
+ * Hardware details (added by Martin Hamilton, 2001/12/06)
+ * -----------------------------------------------------------------
+ *
+ * This info was gleaned from opening a Belkin F5U109 DB9 USB serial
+ * adaptor, which turns out to simply be a re-badged U232-P9.  We
+ * know this because there is a sticky label on the circuit board
+ * which says "U232-P9" ;-)
+ * 
+ * The circuit board inside the adaptor contains a Philips PDIUSBD12
+ * USB endpoint chip and a Phillips P87C52UBAA microcontroller with
+ * embedded UART.  Exhaustive documentation for these is available at:
+ *
+ *   http://www.semiconductors.philips.com/pip/p87c52ubaa
+ *   http://www.semiconductors.philips.com/pip/pdiusbd12
+ *
+ * Thanks to Julian Highfield for the pointer to the Philips database.
+ * 
  */
 
 #endif /* __LINUX_USB_SERIAL_MCT_U232_H */

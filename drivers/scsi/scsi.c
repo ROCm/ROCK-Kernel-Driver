@@ -183,7 +183,6 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 	request_queue_t *q = &SDpnt->request_queue;
 
 	blk_init_queue(q, scsi_request_fn);
-	blk_queue_headactive(q, 0);
 	q->queuedata = (void *) SDpnt;
 #ifdef DMA_CHUNK_SIZE
 	blk_queue_max_segments(q, 64);
@@ -231,7 +230,8 @@ static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 	req = &SCpnt->request;
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
 
-	complete(req->waiting);
+	if (req->waiting)
+		complete(req->waiting);
 }
 
 /*

@@ -3343,7 +3343,6 @@ dasd_setup_blkdev (dasd_device_t *device )
         device->request_queue = kmalloc(sizeof(request_queue_t),GFP_KERNEL);
         device->request_queue->queuedata = device;
         blk_init_queue (device->request_queue, do_dasd_request);
-        blk_queue_headactive (device->request_queue, 0);
         elevator_init (&(device->request_queue->elevator),ELEVATOR_NOOP);
 
         for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {

@@ -211,9 +211,7 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 	++port->open_count;
 	MOD_INC_USE_COUNT;
 	
-	if (!port->active) {
-		port->active = 1;
-
+	if (port->open_count == 1) {
 		/*Start reading from the device*/
 		/* TODO: Look at possibility of submitting mulitple URBs to device to
 		 *       enhance buffering.  Win trace shows 16 initial read URBs.
@@ -262,7 +260,7 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 			usb_unlink_urb (port->read_urb);
 			usb_unlink_urb (port->interrupt_in_urb);
 		}
-		port->active = 0;
+		port->open_count = 0;
 	}
 	
 	up (&port->sem);

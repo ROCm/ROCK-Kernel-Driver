@@ -11,22 +11,22 @@
 static int cc_to_error[16] = { 
 
 /* mapping of the OHCI CC status to error codes */ 
-	/* No  Error  */               USB_ST_NOERROR,
-	/* CRC Error  */               USB_ST_CRC,
-	/* Bit Stuff  */               USB_ST_BITSTUFF,
-	/* Data Togg  */               USB_ST_CRC,
-	/* Stall      */               USB_ST_STALL,
-	/* DevNotResp */               USB_ST_NORESPONSE,
-	/* PIDCheck   */               USB_ST_BITSTUFF,
-	/* UnExpPID   */               USB_ST_BITSTUFF,
-	/* DataOver   */               USB_ST_DATAOVERRUN,
-	/* DataUnder  */               USB_ST_DATAUNDERRUN,
-	/* reservd    */               USB_ST_NORESPONSE,
-	/* reservd    */               USB_ST_NORESPONSE,
-	/* BufferOver */               USB_ST_BUFFEROVERRUN,
-	/* BuffUnder  */               USB_ST_BUFFERUNDERRUN,
-	/* Not Access */               USB_ST_NORESPONSE,
-	/* Not Access */               USB_ST_NORESPONSE 
+	/* No  Error  */	0,
+	/* CRC Error  */	-EILSEQ,
+	/* Bit Stuff  */	-EPROTO,
+	/* Data Togg  */	-EILSEQ,
+	/* Stall      */	-EPIPE,
+	/* DevNotResp */	-ETIMEDOUT,
+	/* PIDCheck   */	-EPROTO,
+	/* UnExpPID   */	-EPROTO,
+	/* DataOver   */	-EOVERFLOW,
+	/* DataUnder  */	-EREMOTEIO,
+	/* reservd    */	-ETIMEDOUT,
+	/* reservd    */	-ETIMEDOUT,
+	/* BufferOver */	-ECOMM,
+	/* BuffUnder  */	-ENOSR,
+	/* Not Access */	-ETIMEDOUT,
+	/* Not Access */	-ETIMEDOUT 
 };
 
 #include <linux/config.h>

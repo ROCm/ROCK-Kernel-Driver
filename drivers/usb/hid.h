@@ -30,6 +30,88 @@
  * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
  */
 
+/*
+ * HID class requests
+ */
+#define HID_REQ_GET_REPORT		0x01
+#define HID_REQ_GET_IDLE		0x02
+#define HID_REQ_GET_PROTOCOL		0x03
+#define HID_REQ_SET_REPORT		0x09
+#define HID_REQ_SET_IDLE		0x0A
+#define HID_REQ_SET_PROTOCOL		0x0B
+
+/*
+ * HID class descriptor types
+ */
+#define HID_DT_HID			(USB_TYPE_CLASS | 0x01)
+#define HID_DT_REPORT			(USB_TYPE_CLASS | 0x02)
+#define HID_DT_PHYSICAL			(USB_TYPE_CLASS | 0x03)
+
+/*
+ * Utilities for class control messaging
+ */
+static inline int
+hid_set_idle(struct usb_device *dev, int ifnum, int duration, int report_id)
+{
+	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+		HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+		(duration << 8) | report_id, ifnum, NULL, 0,
+		HZ * USB_CTRL_SET_TIMEOUT);
+}
+
+static inline int
+hid_get_protocol(struct usb_device *dev, int ifnum)
+{
+	unsigned char type;
+	int ret;
+
+	if ((ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+			HID_REQ_GET_PROTOCOL,
+			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			0, ifnum, &type, 1, 
+			HZ * USB_CTRL_GET_TIMEOUT)) < 0)
+		return ret;
+
+	return type;
+}
+
+static inline int
+hid_set_protocol(struct usb_device *dev, int ifnum, int protocol)
+{
+	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+		HID_REQ_SET_PROTOCOL, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+		protocol, ifnum, NULL, 0, 
+		HZ * USB_CTRL_SET_TIMEOUT);
+}
+
+static inline int
+hid_get_report(struct usb_device *dev, int ifnum, unsigned char type,
+	unsigned char id, void *buf, int size)
+{
+	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+		HID_REQ_GET_REPORT,
+		USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+		(type << 8) + id, ifnum, buf, size, 
+		HZ * USB_CTRL_GET_TIMEOUT);
+}
+
+static inline int
+hid_set_report(struct usb_device *dev, int ifnum, unsigned char type,
+	unsigned char id, void *buf, int size)
+{
+	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+		HID_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+		(type << 8) + id, ifnum, buf, size, HZ);
+		// FIXME USB_CTRL_SET_TIMEOUT
+}
+
+
+/*
+ * "Boot Protocol" keyboard/mouse drivers use don't use all of HID;
+ * they're a lot smaller but can't support all the device features.
+ */
+#ifndef	_HID_BOOT_PROTOCOL
+
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/list.h>
@@ -359,9 +441,7 @@ void hidinput_disconnect(struct hid_device *);
 #else
 #define hid_dump_input(a,b)	do { } while (0)
 #define hid_dump_device(c)	do { } while (0)
-#endif
-
-#endif
+#endif /* DEBUG */
 
 #define IS_INPUT_APPLICATION(a) (((a >= 0x00010000) && (a <= 0x00010008)) || (a == 0x00010080) || ( a == 0x000c0001))
 
@@ -372,3 +452,8 @@ int hid_set_field(struct hid_field *, unsigned, __s32);
 void hid_write_report(struct hid_device *, struct hid_report *);
 void hid_read_report(struct hid_device *, struct hid_report *);
 void hid_init_reports(struct hid_device *hid);
+
+#endif	/* !_HID_BOOT_PROTOCOL */
+
+#endif	/* !__HID_H */
+

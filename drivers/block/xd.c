@@ -121,7 +121,6 @@ static unsigned int xd_bases[] __initdata =
 static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
 static int xd_sizes[XD_MAXDRIVES << 6], xd_access[XD_MAXDRIVES];
 static int xd_blocksizes[XD_MAXDRIVES << 6];
-static int xd_maxsect[XD_MAXDRIVES << 6];
 
 extern struct block_device_operations xd_fops;
 
@@ -246,8 +245,7 @@ static void __init xd_geninit (void)
 	}
 
 	/* xd_maxsectors depends on controller - so set after detection */
-	for(i=0; i<(XD_MAXDRIVES << 6); i++) xd_maxsect[i] = xd_maxsectors;
-	max_sectors[MAJOR_NR] = xd_maxsect;
+	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), xd_maxsectors);
 
 	for (i = 0; i < xd_drives; i++) {
 		xd_valid[i] = 1;
@@ -294,11 +292,11 @@ static void do_xd_request (request_queue_t * q)
 			block = CURRENT->sector;
 			count = CURRENT->nr_sectors;
 
-			switch (CURRENT->cmd) {
+			switch (rq_data_dir(CURRENT)) {
 				case READ:
 				case WRITE:
 					for (retry = 0; (retry < XD_RETRIES) && !code; retry++)
-						code = xd_readwrite(CURRENT->cmd,CURRENT_DEV,CURRENT->buffer,block,count);
+						code = xd_readwrite(rq_data_dir(CURRENT),CURRENT_DEV,CURRENT->buffer,block,count);
 					break;
 				default:
 					printk("do_xd_request: unknown request\n");

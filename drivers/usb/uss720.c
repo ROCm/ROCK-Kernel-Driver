@@ -193,7 +193,7 @@ static int uss720_irq(int usbstatus, void *buffer, int len, void *dev_id)
 	struct parport *pp = (struct parport *)dev_id;
 	struct parport_uss720_private *priv = pp->private_data;	
 
-	if (usbstatus != USB_ST_NOERROR || len < 4 || !buffer)
+	if (usbstatus != 0 || len < 4 || !buffer)
 		return 1;
 	memcpy(priv->reg, buffer, 4);
 	/* if nAck interrupts are enabled and we have an interrupt, call the interrupt procedure */

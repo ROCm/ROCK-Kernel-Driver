@@ -278,6 +278,28 @@
  *    - Users are now notified to consult the Documentation/usb/scanner.txt
  *      for common error messages rather than the maintainer.
  *
+ * 0.4.7  11/28/2001
+ *    - Fixed typo in Documentation/scanner.txt.  Thanks to
+ *      Karel <karel.vervaeke@pandora.be> for pointing it out.
+ *    - Added ID's for a Memorex 6136u. Thanks to =C1lvaro Gaspar de
+ *      Valenzuela" <agaspard@utsi.edu>.
+ *    - Added ID's for Agfa e25.  Thanks to Heinrich 
+ *      Rust <Heinrich.Rust@gmx.de>.  Also reported to work with
+ *      Linux and SANE (?).
+ *    - Added Canon FB620U, D646U, and 1220U ID's.  Thanks to Paul
+ *      Rensing <Paul_Rensing@StanfordAlumni.org>.  For more info
+ *      on Linux support for these models, contact 
+ *      salvestrini@users.sourceforge.net.
+ *    - Added Plustek OpticPro UT12, OpticPro U24, KYE/Genius
+ *      ColorPage-HR6 V2 ID's in addition to many "Unknown" models
+ *      under those vendors.  Thanks to
+ *      Jaeger, Gerhard" <g.jaeger@earthling.net>.  These scanner are
+ *      apparently based upon the LM983x IC's.
+ *    - Applied Frank's patch that addressed some locking and module
+ *      referencing counts.  Thanks to both
+ *      Frank Zago <fzago@greshamstorage.com> and
+ *      Oliver Neukum <520047054719-0001@t-online.de> for reviewing/testing.
+ *
  * TODO
  *    - Performance
  *    - Select/poll methods
@@ -324,17 +346,16 @@ irq_scanner(struct urb *urb)
 	struct scn_usb_data *scn;
 	unsigned char *data;
 	scn = urb->context;
-	down(&(scn->sem));
+
 	data = &scn->button;
 	data += 0;		/* Keep gcc from complaining about unused var */
 
 	if (urb->status) {
-		up(&(scn->sem));
 		return;
 	}
 
 	dbg("irq_scanner(%d): data:%x", scn->scn_minor, *data);
-	up(&(scn->sem));
+
 	return;
 }
 
@@ -358,6 +379,7 @@ open_scanner(struct inode * inode, struct file * file)
 
 	if (!p_scn_table[scn_minor]) {
 		up(&scn_mutex);
+		MOD_DEC_USE_COUNT;
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
 		return -ENODEV;
 	}
@@ -606,7 +628,7 @@ read_scanner(struct file * file, char * buffer,
 			}
 			ret = result;
 			break;
-		} else if ((result < 0) && (result != USB_ST_DATAUNDERRUN)) {
+		} else if ((result < 0) && (result != -EREMOTEIO)) {
 			warn("read_scanner(%d): funky result:%d. Consult Documentation/usb/scanner.txt.", scn_minor, (int)result);
 			ret = -EIO;
 			break;
@@ -939,6 +961,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 /* Check to make sure that the last slot isn't already taken */
 	if (p_scn_table[scn_minor]) {
 		err("probe_scanner: No more minor devices remaining.");
+		up(&scn_mutex);
 		return NULL;
 	}
 
@@ -946,6 +969,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	if (!(scn = kmalloc (sizeof (struct scn_usb_data), GFP_KERNEL))) {
 		err("probe_scanner: Out of memory.");
+		up(&scn_mutex);
 		return NULL;
 	}
 	memset (scn, 0, sizeof(struct scn_usb_data));
@@ -1028,9 +1052,11 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	if (scn->devfs == NULL)
 		dbg("scanner%d: device node registration failed", scn_minor);
 
+	p_scn_table[scn_minor] = scn;
+
 	up(&scn_mutex);
 
-	return p_scn_table[scn_minor] = scn;
+	return scn;
 }
 
 static void

@@ -321,9 +321,7 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 	MOD_INC_USE_COUNT;
 	++port->open_count;
 
-	if (!port->active){
-		port->active = 1;
-
+	if (port->open_count == 1){
 		/* This will push the characters through immediately rather 
 		   than queue a task to deliver them */
 		port->tty->low_latency = 1;
@@ -404,7 +402,6 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 			usb_unlink_urb (port->write_urb);
 			usb_unlink_urb (port->read_urb);
 		}
-		port->active = 0;
 		port->open_count = 0;
 	} else {  
 		/* Send a HUP if necessary */

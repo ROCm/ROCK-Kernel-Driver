@@ -156,8 +156,7 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 
 	++port->open_count;
 
-	if (!port->active) {
-		port->active = 1;
+	if (port->open_count == 1) {
 		/* force low_latency on so that our tty_push actually forces
 		 * the data through, otherwise it is scheduled, and with high
 		 * data rates (like with OHCI) data can get lost.
@@ -201,8 +200,6 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 			usb_unlink_urb (port->read_urb);
 			usb_unlink_urb (port->interrupt_in_urb);
 		}
-
-		port->active = 0;
 		port->open_count = 0;
 	}
 

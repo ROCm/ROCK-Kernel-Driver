@@ -662,7 +662,6 @@ int jsfd_init(void) {
 	blk_size[JSFD_MAJOR] = jsfd_sizes;
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
-	/* blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR), 0); */
 	for (i = 0; i < JSF_MAX; i++) {
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
 		jsf = &jsf0;	/* actually, &jsfv[i >> JSF_PART_BITS] */

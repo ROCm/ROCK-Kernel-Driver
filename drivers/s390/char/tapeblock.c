@@ -77,7 +77,6 @@ tapeblock_setup(tape_info_t* ti) {
     blksize_size[tapeblock_major][ti->blk_minor]=2048; // blocks are 2k by default.
     hardsect_size[tapeblock_major][ti->blk_minor]=512;
     blk_init_queue (&ti->request_queue, tape_request_fn); 
-    blk_queue_headactive (&ti->request_queue, 0); 
 #ifdef CONFIG_DEVFS_FS
     tapeblock_mkdevfstree(ti);
 #endif

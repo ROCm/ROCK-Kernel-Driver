@@ -569,6 +569,7 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 {
 	struct shmid_kernel *shp;
 	unsigned long addr;
+	unsigned long size;
 	struct file * file;
 	int    err;
 	unsigned long flags;
@@ -588,8 +589,12 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 				return -EINVAL;
 		}
 		flags = MAP_SHARED | MAP_FIXED;
-	} else
+	} else {
+		if ((shmflg & SHM_REMAP))
+			return -EINVAL;
+
 		flags = MAP_SHARED;
+	}
 
 	if (shmflg & SHM_RDONLY) {
 		prot = PROT_READ;
@@ -603,7 +608,7 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 
 	/*
 	 * We cannot rely on the fs check since SYSV IPC does have an
-	 * aditional creator id...
+	 * additional creator id...
 	 */
 	shp = shm_lock(shmid);
 	if(shp == NULL)
@@ -618,11 +623,27 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 		return -EACCES;
 	}
 	file = shp->shm_file;
+	size = file->f_dentry->d_inode->i_size;
 	shp->shm_nattch++;
 	shm_unlock(shmid);
 
 	down_write(&current->mm->mmap_sem);
-	user_addr = (void *) do_mmap (file, addr, file->f_dentry->d_inode->i_size, prot, flags, 0);
+	if (addr && !(shmflg & SHM_REMAP)) {
+		user_addr = ERR_PTR(-EINVAL);
+		if (find_vma_intersection(current->mm, addr, addr + size))
+			goto invalid;
+		/*
+		 * If shm segment goes below stack, make sure there is some
+		 * space left for the stack to grow (at least 4 pages).
+		 */
+		if (addr < current->mm->start_stack &&
+		    addr > current->mm->start_stack - size - PAGE_SIZE * 5)
+			goto invalid;
+	}
+		
+	user_addr = (void*) do_mmap (file, addr, size, prot, flags, 0);
+
+invalid:
 	up_write(&current->mm->mmap_sem);
 
 	down (&shm_ids.sem);

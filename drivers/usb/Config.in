@@ -9,7 +9,7 @@ if [ "$CONFIG_USB" = "y" -o  "$CONFIG_USB" = "m" ]; then
    bool '  USB verbose debug messages' CONFIG_USB_DEBUG
 
 comment 'Miscellaneous USB options'
-   bool '  Preliminary USB device filesystem' CONFIG_USB_DEVICEFS
+   bool '  USB device filesystem' CONFIG_USB_DEVICEFS
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       bool '  Enforce USB bandwidth allocation (EXPERIMENTAL)' CONFIG_USB_BANDWIDTH
    else

@@ -27,6 +27,9 @@
  * 10-Nov-2001 Wolfgang Grandegger
  *   - Fixed an endianess problem with the baudrate selection for PowerPC.
  *
+ * 06-Dec-2001 Martin Hamilton <martinh@gnu.org>
+ *	Added support for the Belkin F5U109 DB9 adaptor
+ *
  * 30-May-2001 Greg Kroah-Hartman
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
  *
@@ -133,6 +136,7 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(MCT_U232_VID, MCT_U232_PID) },
 	{ USB_DEVICE(MCT_U232_VID, MCT_U232_SITECOM_PID) },
 	{ USB_DEVICE(MCT_U232_VID, MCT_U232_DU_H3SP_PID) },
+	{ USB_DEVICE(MCT_U232_BELKIN_F5U109_VID, MCT_U232_BELKIN_F5U109_PID) },
 	{ }		/* Terminating entry */
 };
 
@@ -175,7 +179,8 @@ struct mct_u232_private {
 #define WDR_TIMEOUT (HZ * 5 ) /* default urb timeout */
 
 static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value) {
-	if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID) {
+	if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID
+	  || serial->dev->descriptor.idProduct == MCT_U232_BELKIN_F5U109_PID) {
 		switch (value) {
 			case    300: return 0x01;
 			case    600: return 0x02; /* this one not tested */
@@ -340,9 +345,7 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 	++port->open_count;
 	MOD_INC_USE_COUNT;
 
-	if (!port->active) {
-		port->active = 1;
-
+	if (port->open_count == 1) {
 		/* Compensate for a hardware bug: although the Sitecom U232-P25
 		 * device reports a maximum output packet size of 32 bytes,
 		 * it seems to be able to accept only 16 bytes (and that's what
@@ -416,7 +419,7 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 			usb_unlink_urb (port->read_urb);
 			usb_unlink_urb (port->interrupt_in_urb);
 		}
-		port->active = 0;
+		port->open_count = 0;
 	}
 	
 	up (&port->sem);

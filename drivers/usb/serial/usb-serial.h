@@ -11,6 +11,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (12/03/2001) gkh
+ *	removed active from the port structure.
+ *	added documentation to the usb_serial_device_type structure
+ *
  * (10/10/2001) gkh
  *	added vendor and product to serial structure.  Needed to determine device
  *	owner when the device is disconnected.
@@ -65,7 +69,6 @@ struct usb_serial_port {
 	struct usb_serial	*serial;	/* pointer back to the owner of this port */
 	struct tty_struct *	tty;		/* the coresponding tty for this port */
 	unsigned char		number;
-	char			active;		/* someone has this device open */
 
 	unsigned char *		interrupt_in_buffer;
 	struct urb *		interrupt_in_urb;
@@ -111,21 +114,40 @@ struct usb_serial {
 #define NUM_DONT_CARE	(-1)
 
 
-/* This structure defines the individual serial converter. */
+/**
+ * usb_serial_device_type - a structure that defines a usb serial device
+ * @name: pointer to a string that describes this device.  This string used
+ *	in the syslog messages when a device is inserted or removed.
+ * @id_table: pointer to a list of usb_device_id structures that define all
+ *	of the devices this structure can support.
+ * @num_interrupt_in: the number of interrupt in endpoints this device will
+ *	have.
+ * @num_bulk_in: the number of bulk in endpoints this device will have.
+ * @num_bulk_out: the number of bulk out endpoints this device will have.
+ * @num_ports: the number of different ports this device will have.
+ * @startup: pointer to the driver's startup function.  This will be called
+ *	when the driver is inserted into the system.  Return 0 to continue
+ *	on with the initialization sequence.  Anything else will abort it.
+ * @shutdown: pointer to the driver's shutdown function.  This will be
+ *	called when the device is removed from the system.
+ *
+ * This structure is defines a USB Serial device.  It provides all of
+ * the information that the USB serial core code needs.  If the function
+ * pointers are defined, then the USB serial core code will call them when
+ * the corresponding tty port functions are called.  If they are not
+ * called, the generic serial function will be used instead.
+ */
 struct usb_serial_device_type {
 	char	*name;
 	const struct usb_device_id *id_table;
 	char	num_interrupt_in;
 	char	num_bulk_in;
 	char	num_bulk_out;
-	char	num_ports;		/* number of serial ports this device has */
+	char	num_ports;
 
 	struct list_head	driver_list;
 	
-	/* function call to make before accepting driver */
-	/* return 0 to continue initialization, anything else to abort */
 	int (*startup) (struct usb_serial *serial);
-	
 	void (*shutdown) (struct usb_serial *serial);
 
 	/* serial function calls */

@@ -72,7 +72,13 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 
 	ASSERT_LOCK(&q->queue_lock, 0);
 
-	rq->flags = REQ_SPECIAL | REQ_NOMERGE | REQ_BARRIER;
+	/*
+	 * tell I/O scheduler that this isn't a regular read/write (ie it
+	 * must not attempt merges on this) and that it acts as a soft
+	 * barrier
+	 */
+	rq->flags = REQ_SPECIAL | REQ_BARRIER;
+
 	rq->special = data;
 	rq->q = NULL;
 	rq->bio = rq->biotail = NULL;
@@ -86,12 +92,7 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	 * device, or a host that is unable to accept a particular command.
 	 */
 	spin_lock_irqsave(&q->queue_lock, flags);
-
-	if (at_head)
-		list_add(&rq->queuelist, &q->queue_head);
-	else
-		list_add_tail(&rq->queuelist, &q->queue_head);
-
+	__elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(&q->queue_lock, flags);
 }
@@ -261,10 +262,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 		 * the bad sector.
 		 */
 		SCpnt->request.special = (void *) SCpnt;
-#if 0
-		SCpnt->request.flags |= REQ_SPECIAL;
-#endif
-		list_add(&SCpnt->request.queuelist, &q->queue_head);
+		__elv_add_request(q, &SCpnt->request, 0, 0);
 	}
 
 	/*
@@ -360,23 +358,15 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 				     int frequeue)
 {
 	request_queue_t *q = &SCpnt->device->request_queue;
-	struct request *req;
+	struct request *req = &SCpnt->request;
 
 	ASSERT_LOCK(&q->queue_lock, 0);
-
-	req = &SCpnt->request;
-	while (end_that_request_first(req, 1, sectors)) {
-		if (!req->bio) {
-			printk("scsi_end_request: missing bio\n");
-			break;
-		}
-	}
 
 	/*
 	 * If there are blocks left over at the end, set up the command
 	 * to queue the remainder of them.
 	 */
-	if (req->bio) {
+	if (end_that_request_first(req, 1, sectors)) {
 		if (!requeue)
 			return SCpnt;
 
@@ -834,13 +824,6 @@ void scsi_request_fn(request_queue_t * q)
 		 */
 		if (SHpnt->in_recovery || blk_queue_plugged(q))
 			return;
-
-		/*
-		 * if we are at the max queue depth, don't attempt to queue
-		 * more
-		 */
-		if (SHpnt->host_busy == SDpnt->queue_depth)
-			break;
 
 		/*
 		 * If the device cannot accept another request, then quit.

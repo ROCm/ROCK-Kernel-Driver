@@ -37,7 +37,7 @@ int blk_do_rq(request_queue_t *q, struct request *rq)
 
 	rq->flags |= REQ_BARRIER;
 	rq->waiting = &wait;
-	elv_add_request(q, rq);
+	elv_add_request(q, rq, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
 

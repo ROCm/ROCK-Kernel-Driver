@@ -485,7 +485,7 @@ static int sohci_return_urb (struct ohci *hc, urb_t * urb)
 
 			/* implicitly requeued */
   			urb->actual_length = 0;
-  			urb->status = USB_ST_URB_PENDING;
+  			urb->status = -EINPROGRESS;
   			if (urb_priv->state != URB_DEL)
   				td_submit_urb (urb);
   			break;
@@ -502,7 +502,7 @@ static int sohci_return_urb (struct ohci *hc, urb_t * urb)
 				urb->complete (urb);
 				spin_lock_irqsave (&usb_ed_lock, flags);
 				urb->actual_length = 0;
-  				urb->status = USB_ST_URB_PENDING;
+  				urb->status = -EINPROGRESS;
   				urb->start_frame = urb_priv->ed->last_iso + 1;
   				if (urb_priv->state != URB_DEL) {
   					for (i = 0; i < urb->number_of_packets; i++) {
@@ -673,7 +673,7 @@ static int sohci_submit_urb (urb_t * urb)
 
 	urb->actual_length = 0;
 	urb->hcpriv = urb_priv;
-	urb->status = USB_ST_URB_PENDING;
+	urb->status = -EINPROGRESS;
 
 	/* link the ed into a chain if is not already */
 	if (ed->state != ED_OPER)
@@ -737,7 +737,7 @@ static int sohci_unlink_urb (urb_t * urb)
 	if (usb_pipedevice (urb->pipe) == ohci->rh.devnum)
 		return rh_unlink_urb (urb);
 
-	if (urb->hcpriv && (urb->status == USB_ST_URB_PENDING)) { 
+	if (urb->hcpriv && (urb->status == -EINPROGRESS)) { 
 		if (!ohci->disabled) {
 			urb_priv_t  * urb_priv;
 
@@ -777,11 +777,11 @@ static int sohci_unlink_urb (urb_t * urb)
 
 				/* wait until all TDs are deleted */
 				set_current_state(TASK_UNINTERRUPTIBLE);
-				while (timeout && (urb->status == USB_ST_URB_PENDING))
+				while (timeout && (urb->status == -EINPROGRESS))
 					timeout = schedule_timeout (timeout);
 				set_current_state(TASK_RUNNING);
 				remove_wait_queue (&unlink_wakeup, &wait); 
-				if (urb->status == USB_ST_URB_PENDING) {
+				if (urb->status == -EINPROGRESS) {
 					err ("unlink URB timeout");
 					return -ETIMEDOUT;
 				}

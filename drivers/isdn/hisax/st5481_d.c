@@ -382,7 +382,7 @@ static void usb_d_out_complete(struct urb *urb)
 	test_and_clear_bit(buf_nr, &d_out->busy);
 
 	if (urb->status < 0) {
-		if (urb->status != USB_ST_URB_KILLED) {
+		if (urb->status != -ENOENT) {
 			WARN("urb status %d",urb->status);
 			if (d_out->busy == 0) {
 				st5481_usb_pipe_reset(adapter, EP_D_OUT | USB_DIR_OUT, fifo_reseted, adapter);

@@ -161,12 +161,11 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 	++port->open_count;
 	MOD_INC_USE_COUNT;
 
-	if (!port->active) {
+	if (port->open_count == 1) {
 
 		/* Force default termio settings */
 		empeg_set_termios (port, NULL) ;
 
-		port->active = 1;
 		bytes_in = 0;
 		bytes_out = 0;
 
@@ -218,7 +217,6 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 			/* shutdown our bulk read */
 			usb_unlink_urb (port->read_urb);
 		}
-		port->active = 0;
 		port->open_count = 0;
 	}
 

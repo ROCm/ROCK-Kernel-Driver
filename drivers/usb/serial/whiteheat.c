@@ -309,9 +309,7 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 	++port->open_count;
 	MOD_INC_USE_COUNT;
 	
-	if (!port->active) {
-		port->active = 1;
-
+	if (port->open_count == 1) {
 		/* set up some stuff for our command port */
 		command_port = &port->serial->port[COMMAND_PORT];
 		if (command_port->private == NULL) {
@@ -391,7 +389,7 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 		/* shutdown our bulk reads and writes */
 		usb_unlink_urb (port->write_urb);
 		usb_unlink_urb (port->read_urb);
-		port->active = 0;
+		port->open_count = 0;
 	}
 	MOD_DEC_USE_COUNT;
 	up (&port->sem);

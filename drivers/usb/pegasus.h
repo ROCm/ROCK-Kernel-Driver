@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 1999,2000 Petko Manolov - Petkan (petkan@dce.bg)
+ *  Copyright (c) 1999,2000 Petko Manolov - Petkan (pmanolov@lnxw.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -138,6 +138,7 @@ struct usb_eth_dev {
 #define	VENDOR_DLINK		0x2001
 #define	VENDOR_ELSA		0x05cc
 #define	VENDOR_IODATA		0x04bb
+#define	VENDOR_KINGSTON		0x0951
 #define	VENDOR_LANEED		0x056e
 #define	VENDOR_LINKSYS		0x066b
 #define	VENDOR_MELCO		0x0411
@@ -210,6 +211,8 @@ PEGASUS_DEV( "Elsa Micolink USB2Ethernet", VENDOR_ELSA, 0x3000,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "IO DATA USB ET/TX", VENDOR_IODATA, 0x0904,
 		DEFAULT_GPIO_RESET )
+PEGASUS_DEV( "Kingston KNU101TX Ethernet", VENDOR_KINGSTON, 0x000a,
+		DEFAULT_GPIO_RESET)
 PEGASUS_DEV( "LANEED USB Ethernet LD-USB/TX", VENDOR_LANEED, 0x4002,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "LANEED USB Ethernet LD-USB/TX", VENDOR_LANEED, 0x400b,

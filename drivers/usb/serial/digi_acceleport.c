@@ -14,6 +14,10 @@
 *  Peter Berger (pberger@brimson.com)
 *  Al Borchers (borchers@steinerpoint.com)
 * 
+* (12/03/2001) gkh
+*	switched to using port->open_count instead of private version.
+*	Removed port->active
+*
 * (04/08/2001) gb
 *	Identify version on module load.
 *
@@ -429,7 +433,6 @@ typedef struct digi_port {
 	int dp_write_urb_in_use;
 	unsigned int dp_modem_signals;
 	wait_queue_head_t dp_modem_change_wait;
-	int dp_open_count;			/* inc on open, dec on close */
 	int dp_transmit_idle;
 	wait_queue_head_t dp_transmit_idle_wait;
 	int dp_throttled;
@@ -1380,7 +1383,7 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 	/* try to send any buffered data on this port, if it is open */
 	spin_lock( &priv->dp_port_lock );
 	priv->dp_write_urb_in_use = 0;
-	if( priv->dp_open_count && port->write_urb->status != -EINPROGRESS
+	if( port->open_count && port->write_urb->status != -EINPROGRESS
 	&& priv->dp_out_buf_len > 0 ) {
 
 		*((unsigned char *)(port->write_urb->transfer_buffer))
@@ -1474,7 +1477,7 @@ static int digi_open( struct usb_serial_port *port, struct file *filp )
 	unsigned long flags = 0;
 
 
-dbg( "digi_open: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, port->active, priv->dp_open_count );
+dbg( "digi_open: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_count );
 
 	/* be sure the device is started up */
 	if( digi_startup_device( port->serial ) != 0 )
@@ -1489,7 +1492,7 @@ dbg( "digi_open: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, por
 	}
 
 	/* inc module use count before sleeping to wait for closes */
-	++priv->dp_open_count;
+	++port->open_count;
 	MOD_INC_USE_COUNT;
 
 	/* wait for a close in progress to finish */
@@ -1498,7 +1501,7 @@ dbg( "digi_open: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, por
 			&priv->dp_close_wait, DIGI_RETRY_TIMEOUT,
 			&priv->dp_port_lock, flags );
 		if( signal_pending(current) ) {
-			--priv->dp_open_count;
+			--port->open_count;
 			MOD_DEC_USE_COUNT;
 			return( -EINTR );
 		}
@@ -1507,13 +1510,11 @@ dbg( "digi_open: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, por
 
 	/* if port is already open, just return */
 	/* be sure exactly one open proceeds */
-	if( port->active ) {
+	if( port->open_count != 1)  {
 		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 		return( 0 );
 	}
 
-	/* first open, mark port as active */
-	port->active = 1;
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
  
 	/* read modem signals automatically whenever they change */
@@ -1554,17 +1555,17 @@ static void digi_close( struct usb_serial_port *port, struct file *filp )
 	unsigned long flags = 0;
 
 
-dbg( "digi_close: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, port->active, priv->dp_open_count );
+dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_count );
 
 
 	/* do cleanup only after final close on this port */
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
-	if( priv->dp_open_count > 1 ) {
-		--priv->dp_open_count;
+	if( port->open_count > 1 ) {
+		--port->open_count;
 		MOD_DEC_USE_COUNT;
 		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 		return;
-	} else if( priv->dp_open_count <= 0 ) {
+	} else if( port->open_count <= 0 ) {
 		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 		return;
 	}
@@ -1638,10 +1639,9 @@ dbg( "digi_close: TOP: port=%d, active=%d, open_count=%d", priv->dp_port_num, po
 	tty->closing = 0;
 
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
-	port->active = 0;
 	priv->dp_write_urb_in_use = 0;
 	priv->dp_in_close = 0;
-	--priv->dp_open_count;
+	--port->open_count;
 	MOD_DEC_USE_COUNT;
 	wake_up_interruptible( &priv->dp_close_wait );
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
@@ -1710,8 +1710,6 @@ dbg( "digi_startup: TOP" );
 	/* number of regular ports + 1 for the out-of-band port */
 	for( i=0; i<serial->type->num_ports+1; i++ ) {
 
-		serial->port[i].active = 0;
-
 		/* allocate port private structure */
 		priv = serial->port[i].private =
 			(digi_port_t *)kmalloc( sizeof(digi_port_t),
@@ -1730,7 +1728,6 @@ dbg( "digi_startup: TOP" );
 		priv->dp_write_urb_in_use = 0;
 		priv->dp_modem_signals = 0;
 		init_waitqueue_head( &priv->dp_modem_change_wait );
-		priv->dp_open_count = 0;
 		priv->dp_transmit_idle = 0;
 		init_waitqueue_head( &priv->dp_transmit_idle_wait );
 		priv->dp_throttled = 0;
@@ -1789,9 +1786,9 @@ dbg( "digi_shutdown: TOP, in_interrupt()=%d", in_interrupt() );
 	for( i=0; i<serial->type->num_ports; i++ ) {
 		priv = serial->port[i].private;
 		spin_lock_irqsave( &priv->dp_port_lock, flags );
-		while( priv->dp_open_count > 0 ) {
+		while( serial->port[i].open_count > 0 ) {
 			MOD_DEC_USE_COUNT;
-			--priv->dp_open_count;
+			--serial->port[i].open_count;
 		}
 		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 	}
@@ -1883,7 +1880,7 @@ static int digi_read_inb_callback( struct urb *urb )
 
 	/* do not process callbacks on closed ports */
 	/* but do continue the read chain */
-	if( priv->dp_open_count == 0 )
+	if( port->open_count == 0 )
 		return( 0 );
 
 	/* short/multiple packet check */
@@ -2017,7 +2014,7 @@ opcode, line, status, val );
 			if( val & DIGI_READ_INPUT_SIGNALS_CTS ) {
 				priv->dp_modem_signals |= TIOCM_CTS;
 				/* port must be open to use tty struct */
-				if( priv->dp_open_count
+				if( port->open_count
 				&& port->tty->termios->c_cflag & CRTSCTS ) {
 					port->tty->hw_stopped = 0;
 					digi_wakeup_write( port );
@@ -2025,7 +2022,7 @@ opcode, line, status, val );
 			} else {
 				priv->dp_modem_signals &= ~TIOCM_CTS;
 				/* port must be open to use tty struct */
-				if( priv->dp_open_count
+				if( port->open_count
 				&& port->tty->termios->c_cflag & CRTSCTS ) {
 					port->tty->hw_stopped = 1;
 				}

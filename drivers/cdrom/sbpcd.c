@@ -5870,7 +5870,6 @@ int __init SBPCD_INIT(void)
 	(BLK_DEFAULT_QUEUE(MAJOR_NR))->front_merge_fn = dont_bh_merge_fn;
 	(BLK_DEFAULT_QUEUE(MAJOR_NR))->merge_requests_fn = dont_merge_requests_fn;
 #endif
-	blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR), 0);
 	read_ahead[MAJOR_NR] = buffers * (CD_FRAMESIZE / 512);
 	
 	request_region(CDo_command,4,major_name);

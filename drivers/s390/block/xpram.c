@@ -1041,7 +1041,6 @@ int xpram_init(void)
 #elif (XPRAM_VERSION == 24)
 	q = BLK_DEFAULT_QUEUE (major);
 	blk_init_queue (q, xpram_request);
-	blk_queue_headactive (BLK_DEFAULT_QUEUE (major), 0);
 #endif /* V22/V24 */
 	read_ahead[major] = xpram_rahead;
 

@@ -35,6 +35,9 @@
 #include <linux/init.h>
 #include <linux/usb.h>
 
+#define	_HID_BOOT_PROTOCOL
+#include "hid.h"
+
 /*
  * Version Information
  */
@@ -118,7 +121,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
-	usb_set_idle(dev, interface->bInterfaceNumber, 0, 0);
+	hid_set_idle(dev, interface->bInterfaceNumber, 0, 0);
 
 	if (!(mouse = kmalloc(sizeof(struct usb_mouse), GFP_KERNEL))) return NULL;
 	memset(mouse, 0, sizeof(struct usb_mouse));

@@ -168,6 +168,7 @@ extern void bio_put(struct bio *);
 
 extern int bio_endio(struct bio *, int, int);
 
+extern inline void __bio_clone(struct bio *, struct bio *);
 extern struct bio *bio_clone(struct bio *, int);
 extern struct bio *bio_copy(struct bio *, int, int);
 

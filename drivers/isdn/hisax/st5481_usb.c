@@ -130,7 +130,7 @@ static void usb_ctrl_complete(struct urb *urb)
 	struct ctrl_msg *ctrl_msg;
 	
 	if (urb->status < 0) {
-		if (urb->status != USB_ST_URB_KILLED) {
+		if (urb->status != -ENOENT) {
 			WARN("urb status %d",urb->status);
 		} else {
 			DBG(1,"urb killed");
@@ -184,7 +184,7 @@ static void usb_int_complete(struct urb *urb)
 	int j;
 
 	if (urb->status < 0) {
-		if (urb->status != USB_ST_URB_KILLED) {
+		if (urb->status != -ENOENT) {
 			WARN("urb status %d",urb->status);
 			urb->actual_length = 0;
 		} else {
@@ -470,7 +470,7 @@ static void usb_in_complete(struct urb *urb)
 	int len, count, status;
 
 	if (urb->status < 0) {
-		if (urb->status != USB_ST_URB_KILLED) {
+		if (urb->status != -ENOENT) {
 			WARN("urb status %d",urb->status);
 		} else {
 			DBG(1,"urb killed");

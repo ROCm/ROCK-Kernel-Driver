@@ -1615,7 +1615,7 @@ static ide_startstop_t cdrom_start_write(ide_drive_t *drive, struct request *rq)
 /*
  * just wrap this around cdrom_do_packet_command
  */
-static int cdrom_do_block_pc(ide_drive_t *drive, struct request *rq)
+static ide_startstop_t cdrom_do_block_pc(ide_drive_t *drive, struct request *rq)
 {
 	struct packet_command pc;
 	ide_startstop_t startstop;
@@ -2145,7 +2145,8 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	pc.timeout = cgc->timeout;
 	pc.sense = cgc->sense;
 	cgc->stat = cdrom_queue_packet_command(drive, &pc);
-	cgc->buflen -= pc.buflen;
+	if (!cgc->stat)
+		cgc->buflen -= pc.buflen;
 	return cgc->stat;
 }
 

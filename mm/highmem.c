@@ -387,9 +387,9 @@ void create_bounce(unsigned long pfn, struct bio **bio_orig)
 			char *vto, *vfrom;
 
 			vto = page_address(to->bv_page) + to->bv_offset;
-			vfrom = kmap(from->bv_page);
-			memcpy(vto, vfrom + from->bv_offset, to->bv_len);
-			kunmap(to->bv_page);
+			vfrom = kmap(from->bv_page) + from->bv_offset;
+			memcpy(vto, vfrom, to->bv_len);
+			kunmap(from->bv_page);
 		}
 	}
 

@@ -199,7 +199,7 @@ static ssize_t camera_read (struct file *file,
 				retval = count;
 			break;
 		}
-		if (retval != USB_ST_TIMEOUT)
+		if (retval != -ETIMEDOUT)
 			break;
 		interruptible_sleep_on_timeout (&camera->wait, RETRY_TIMEOUT);
 
@@ -267,7 +267,7 @@ static ssize_t camera_write (struct file *file,
 			} else if (!result)
 				break;
 				
-			if (result == USB_ST_TIMEOUT) {	/* NAK - delay a bit */
+			if (result == -ETIMEDOUT) {	/* NAK - delay a bit */
 				if (!maxretry--) {
 					if (!bytes_written)
 						bytes_written = -ETIME;

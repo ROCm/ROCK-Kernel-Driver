@@ -351,7 +351,8 @@ skip_nfs:
 		mount("devfs", ".", "devfs", 0, NULL);
 retry:
 	for (p = fs_names; *p; p += strlen(p)+1) {
-		err = mount(name,"/root",p,root_mountflags,root_mount_data);
+		int err;
+		err = sys_mount(name,"/root",p,root_mountflags,root_mount_data);
 		switch (err) {
 			case 0:
 				goto done;

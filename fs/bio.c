@@ -47,7 +47,6 @@ static unsigned int bio_pool_free;
 struct biovec_pool {
 	int bp_size;
 	kmem_cache_t *bp_cachep;
-	wait_queue_head_t bp_wait;
 };
 
 static struct biovec_pool bvec_list[BIOVEC_NR_POOLS];
@@ -161,32 +160,22 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 	if ((bvl = kmem_cache_alloc(bp->bp_cachep, gfp_mask)))
 		goto out_gotit;
 
-	/*
-	 * we need slab reservations for this to be completely
-	 * deadlock free...
-	 */
-	if (BIO_CAN_WAIT(gfp_mask)) {
-		DECLARE_WAITQUEUE(wait, current);
+	if (!BIO_CAN_WAIT(gfp_mask))
+		return NULL;
 
-		add_wait_queue_exclusive(&bp->bp_wait, &wait);
-		for (;;) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			bvl = kmem_cache_alloc(bp->bp_cachep, gfp_mask);
-			if (bvl)
-				goto out_gotit;
+	do {
+		bvl = kmem_cache_alloc(bp->bp_cachep, gfp_mask);
+		if (bvl)
+			break;
 
-			run_task_queue(&tq_disk);
-			schedule();
-		}
-		remove_wait_queue(&bp->bp_wait, &wait);
+		run_task_queue(&tq_disk);
 		__set_current_state(TASK_RUNNING);
-	}
+		current->policy |= SCHED_YIELD;
+		schedule();
+	} while (1);
 
-	if (bvl) {
 out_gotit:
-		memset(bvl, 0, bp->bp_size);
-	}
-
+	memset(bvl, 0, bp->bp_size);
 	return bvl;
 }
 
@@ -202,10 +191,8 @@ void bio_destructor(struct bio *bio)
 	/*
 	 * cloned bio doesn't own the veclist
 	 */
-	if (!(bio->bi_flags & (1 << BIO_CLONED))) {
+	if (!(bio->bi_flags & (1 << BIO_CLONED)))
 		kmem_cache_free(bp->bp_cachep, bio->bi_io_vec);
-		wake_up_nr(&bp->bp_wait, 1);
-	}
 
 	bio_pool_put(bio);
 }
@@ -326,31 +313,46 @@ void bio_put(struct bio *bio)
 }
 
 /**
- *	bio_clone	-	duplicate a bio
+ * 	__bio_clone	-	clone a bio
+ * 	@bio: destination bio
+ * 	@bio_src: bio to clone
+ *
+ *	Clone a &bio. Caller will own the returned bio, but not
+ *	the actual data it points to. Reference count of returned
+ * 	bio will be one.
+ */
+inline void __bio_clone(struct bio *bio, struct bio *bio_src)
+{
+	bio->bi_io_vec = bio_src->bi_io_vec;
+
+	bio->bi_sector = bio_src->bi_sector;
+	bio->bi_dev = bio_src->bi_dev;
+	bio->bi_flags |= 1 << BIO_CLONED;
+	bio->bi_rw = bio_src->bi_rw;
+
+	/*
+	 * notes -- maybe just leave bi_idx alone. bi_max has no used
+	 * on a cloned bio
+	 */
+	bio->bi_vcnt = bio_src->bi_vcnt;
+	bio->bi_idx = bio_src->bi_idx;
+	bio->bi_size = bio_src->bi_size;
+	bio->bi_max = bio_src->bi_max;
+}
+
+/**
+ *	bio_clone	-	clone a bio
  *	@bio: bio to clone
  *	@gfp_mask: allocation priority
  *
- *	Duplicate a &bio. Caller will own the returned bio, but not
- *	the actual data it points to. Reference count of returned
- * 	bio will be one.
+ * 	Like __bio_clone, only also allocates the returned bio
  */
 struct bio *bio_clone(struct bio *bio, int gfp_mask)
 {
 	struct bio *b = bio_alloc(gfp_mask, 0);
 
-	if (b) {
-		b->bi_io_vec = bio->bi_io_vec;
-
-		b->bi_sector = bio->bi_sector;
-		b->bi_dev = bio->bi_dev;
-		b->bi_flags |= 1 << BIO_CLONED;
-		b->bi_rw = bio->bi_rw;
-
-		b->bi_vcnt = bio->bi_vcnt;
-		b->bi_idx = bio->bi_idx;
-		b->bi_size = bio->bi_size;
-		b->bi_max = bio->bi_max;
-	}
+	if (b)
+		__bio_clone(b, bio);
 
 	return b;
 }
@@ -667,7 +669,6 @@ static void __init biovec_init_pool(void)
 			panic("biovec: can't init slab pools\n");
 
 		bp->bp_size = size;
-		init_waitqueue_head(&bp->bp_wait);
 	}
 }
 
@@ -696,4 +697,5 @@ EXPORT_SYMBOL(ll_rw_kio);
 EXPORT_SYMBOL(bio_endio);
 EXPORT_SYMBOL(bio_init);
 EXPORT_SYMBOL(bio_copy);
+EXPORT_SYMBOL(__bio_clone);
 EXPORT_SYMBOL(bio_clone);

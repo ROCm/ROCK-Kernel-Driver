@@ -86,12 +86,23 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x06bd, 0x2061) },	/* Another SnapScan 1212U (?)*/
 	{ USB_DEVICE(0x06bd, 0x0100) },	/* SnapScan Touch */
 	{ USB_DEVICE(0x06bd, 0x2091) }, /* SnapScan e20 */
+	{ USB_DEVICE(0x06bd, 0x2095) }, /* SnapScan e25 */
 	{ USB_DEVICE(0x06bd, 0x2097) }, /* SnapScan e26 */
 	{ USB_DEVICE(0x06bd, 0x208d) }, /* Snapscan e40 */
+	/* Canon */
+	{ USB_DEVICE(0x04a9, 0x2202) }, /* FB620U */
+	{ USB_DEVICE(0x04a9, 0x220b) }, /* D646U */
+	{ USB_DEVICE(0x04a9, 0x2207) }, /* 1220U */
 	/* Colorado -- See Primax/Colorado below */
 	/* Epson -- See Seiko/Epson below */
 	/* Genius */
 	{ USB_DEVICE(0x0458, 0x2001) },	/* ColorPage-Vivid Pro */
+	{ USB_DEVICE(0x0458, 0x2007) },	/* ColorPage HR6 V2 */
+	{ USB_DEVICE(0x0458, 0x2008) },	/* Unknown */
+	{ USB_DEVICE(0x0458, 0x2009) },	/* Unknown */
+	{ USB_DEVICE(0x0458, 0x2013) },	/* Unknown */
+	{ USB_DEVICE(0x0458, 0x2015) },	/* Unknown  */
+	{ USB_DEVICE(0x0458, 0x2016) },	/* Unknown  */
 	/* Hewlett Packard */
 	{ USB_DEVICE(0x03f0, 0x0205) },	/* 3300C */
 	{ USB_DEVICE(0x03f0, 0x0405) }, /* 3400C */
@@ -108,6 +119,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0638, 0x0268) }, /* 1200U */
 	/* Lifetec */
 	{ USB_DEVICE(0x05d8, 0x4002) }, /* Lifetec LT9385 */
+	/* Memorex */
+	{ USB_DEVICE(0x0461, 0x0346) }, /* 6136u - repackaged Primax ? */
 	/* Microtek -- No longer supported - Enable SCSI and USB Microtek in kernel config */
 	//	{ USB_DEVICE(0x05da, 0x0099) },	/* ScanMaker X6 - X6U */
 	//	{ USB_DEVICE(0x05da, 0x0094) },	/* Phantom 336CX - C3 */
@@ -128,6 +141,19 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0400, 0x1001) }, /* BearPaw 2400 */
 	{ USB_DEVICE(0x055f, 0x0008) }, /* 1200 CU Plus */
 	{ USB_DEVICE(0x0ff5, 0x0010) }, /* BearPaw 1200F */
+	/* Plustek */
+	{ USB_DEVICE(0x07b3, 0x0017) }, /* OpticPro UT12 */
+	{ USB_DEVICE(0x07b3, 0x0011) }, /* OpticPro UT24 */
+	{ USB_DEVICE(0x07b3, 0x0005) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0007) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x000F) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0010) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0012) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0013) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0014) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0015) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0016) }, /* Unknown */
+	{ USB_DEVICE(0x07b3, 0x0012) }, /* Unknown */
 	/* Primax/Colorado */
 	{ USB_DEVICE(0x0461, 0x0300) },	/* G2-300 #1 */
 	{ USB_DEVICE(0x0461, 0x0380) },	/* G2-600 #1 */

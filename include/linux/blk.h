@@ -77,12 +77,21 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 	return rq;
 }
 
-extern inline void elv_add_request(request_queue_t *q, struct request *rq)
-{
-	blk_plug_device(q);
-	q->elevator.elevator_add_req_fn(q, rq, q->queue_head.prev);
-}
+#define __elv_add_request_core(q, rq, where, plug)			\
+	do {								\
+		if ((plug))						\
+			blk_plug_device((q));				\
+		(q)->elevator.elevator_add_req_fn((q), (rq), (where));	\
+	} while (0)
 
+#define __elv_add_request(q, rq, back, p)				      \
+	if ((back))							      \
+		__elv_add_request_core((q), (rq), (q)->queue_head.prev, (p)); \
+	else								      \
+		__elv_add_request_core((q), (rq), &(q)->queue_head, 0);	      \
+
+#define elv_add_request(q, rq, back) __elv_add_request((q), (rq), (back), 1)
+	
 #if defined(MAJOR_NR) || defined(IDE_DRIVER)
 
 #undef DEVICE_ON

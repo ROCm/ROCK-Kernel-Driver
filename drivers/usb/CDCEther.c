@@ -82,9 +82,9 @@ static void read_bulk_callback( struct urb *urb )
 	ether_dev->flags |= CDC_ETHER_RX_BUSY;
 
 	switch ( urb->status ) {
-		case USB_ST_NOERROR:
+		case 0:
 			break;
-		case USB_ST_NORESPONSE:
+		case -ETIMEDOUT:
 			dbg( "no repsonse in BULK IN" );
 			ether_dev->flags &= ~CDC_ETHER_RX_BUSY;
 			break;
@@ -179,9 +179,9 @@ static void write_bulk_callback( struct urb *urb )
 //		return;
 //		
 //	switch ( urb->status ) {
-//		case USB_ST_NOERROR:
+//		case 0:
 //			break;
-//		case USB_ST_URB_KILLED:
+//		case -ENOENT:
 //			return;
 //		default:
 //			info("intr status %d", urb->status);
@@ -337,13 +337,9 @@ static int CDCEther_open(struct net_device *net)
 	ether_dev_t *ether_dev = (ether_dev_t *)net->priv;
 	int	res;
 
-	// We are finally getting used!
-	MOD_INC_USE_COUNT;
-
 	// Turn on the USB and let the packets flow!!!
 	if ( (res = enable_net_traffic( ether_dev )) ) {
 		err( __FUNCTION__ "can't enable_net_traffic() - %d", res );
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
@@ -391,9 +387,6 @@ static int CDCEther_close( struct net_device *net )
 	usb_unlink_urb( &ether_dev->tx_urb );
 	usb_unlink_urb( &ether_dev->intr_urb );
 	
-	// We are not being used now.
-	MOD_DEC_USE_COUNT;
-
 	// That's it.  I'm done.
 	return 0;
 }
@@ -480,6 +473,7 @@ static void CDCEther_set_multicast( struct net_device *net )
                      i++, mclist = mclist->next) {
 			memcpy(&mclist->dmi_addr, &buff[i * 6], 6);
 		}
+#if 0
 		usb_control_msg(ether_dev->usb,
 				usb_sndctrlpipe(ether_dev->usb, 0),
 				SET_ETHERNET_MULTICAST_FILTER, /* request */
@@ -489,11 +483,13 @@ static void CDCEther_set_multicast( struct net_device *net )
 				buff,
 				(6* net->mc_count), /* size */
 				HZ); /* timeout */
+#endif
 		kfree(buff);
 	}
- 
+
+#if 0 
 	CDC_SetEthernetPacketFilter(ether_dev);
-	
+#endif	
         // Tell the kernel to start giving frames to us again.
 	netif_wake_queue(net);
 }
@@ -1210,6 +1206,7 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	// Now that we have an ethernet device, let's set it up
 	// (And I don't mean "set [it] up the bomb".)
 	net->priv = ether_dev;
+	SET_MODULE_OWNER(net);
 	net->open = CDCEther_open;
 	net->stop = CDCEther_close;
 	net->watchdog_timeo = CDC_ETHER_TX_TIMEOUT;

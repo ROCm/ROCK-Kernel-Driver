@@ -256,7 +256,7 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self)
 
 	/* Grab the speed URB */
 	purb = &self->speed_urb;
-	if (purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		WARNING(__FUNCTION__ "(), URB still in use!\n");
 		return;
 	}
@@ -301,7 +301,7 @@ static void speed_bulk_callback(purb_t purb)
 	}
 
 	/* Check for timeout and other USB nasties */
-	if(purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		/* I get a lot of -ECONNABORTED = -103 here - Jean II */
 		IRDA_DEBUG(0, __FUNCTION__ "(), URB complete status %d, transfer_flags 0x%04X\n", purb->status, purb->transfer_flags);
 
@@ -314,7 +314,7 @@ static void speed_bulk_callback(purb_t purb)
 	}
 
 	/* urb is now available */
-	purb->status = USB_ST_NOERROR;
+	purb->status = 0;
 
 	/* If it was the speed URB, allow the stack to send more packets */
 	if(purb == &self->speed_urb) {
@@ -372,7 +372,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 		}
 	}
 
-	if (purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		WARNING(__FUNCTION__ "(), URB still in use!\n");
 		dev_kfree_skb(skb);
 		return 0;
@@ -490,7 +490,7 @@ static void write_bulk_callback(purb_t purb)
 	purb->context = NULL;
 
 	/* Check for timeout and other USB nasties */
-	if(purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		/* I get a lot of -ECONNABORTED = -103 here - Jean II */
 		IRDA_DEBUG(0, __FUNCTION__ "(), URB complete status %d, transfer_flags 0x%04X\n", purb->status, purb->transfer_flags);
 
@@ -504,7 +504,7 @@ static void write_bulk_callback(purb_t purb)
 	}
 
 	/* urb is now available */
-	purb->status = USB_ST_NOERROR;
+	purb->status = 0;
 
 	/* If the network is closed, stop everything */
 	if ((!self->netopen) || (!self->present)) {
@@ -547,11 +547,11 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 
 	/* Check speed URB */
 	purb = &(self->speed_urb);
-	if (purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		IRDA_DEBUG(0, "%s: Speed change timed out, urb->status=%d, urb->transfer_flags=0x%04X\n", netdev->name, purb->status, purb->transfer_flags);
 
 		switch (purb->status) {
-		case USB_ST_URB_PENDING:	/* -EINPROGRESS == -115 */
+		case -EINPROGRESS:
 			usb_unlink_urb(purb);
 			/* Note : above will  *NOT* call netif_wake_queue()
 			 * in completion handler, we will come back here.
@@ -563,7 +563,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 		case -ETIMEDOUT:		/* -110 */
 		case -ENOENT:			/* -2 (urb unlinked by us)  */
 		default:			/* ??? - Play safe */
-			purb->status = USB_ST_NOERROR;
+			purb->status = 0;
 			netif_wake_queue(self->netdev);
 			done = 1;
 			break;
@@ -572,7 +572,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 
 	/* Check Tx URB */
 	purb = &(self->tx_urb);
-	if (purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		struct sk_buff *skb = purb->context;
 
 		IRDA_DEBUG(0, "%s: Tx timed out, urb->status=%d, urb->transfer_flags=0x%04X\n", netdev->name, purb->status, purb->transfer_flags);
@@ -590,7 +590,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 #endif /* IU_BUG_KICK_TIMEOUT */
 
 		switch (purb->status) {
-		case USB_ST_URB_PENDING:	/* -EINPROGRESS == -115 */
+		case -EINPROGRESS:
 			usb_unlink_urb(purb);
 			/* Note : above will  *NOT* call netif_wake_queue()
 			 * in completion handler, because purb->status will
@@ -610,7 +610,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 				dev_kfree_skb_any(skb);
 				purb->context = NULL;
 			}
-			purb->status = USB_ST_NOERROR;
+			purb->status = 0;
 			netif_wake_queue(self->netdev);
 			done = 1;
 			break;
@@ -727,7 +727,7 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, purb_
 	purb->transfer_flags = USB_QUEUE_BULK;
 	/* Note : unlink *must* be synchronous because of the code in 
 	 * irda_usb_net_close() -> free the skb - Jean II */
-	purb->status = USB_ST_NOERROR;
+	purb->status = 0;
 	purb->next = NULL;	/* Don't auto resubmit URBs */
 	
 	ret = usb_submit_urb(purb);
@@ -768,9 +768,9 @@ static void irda_usb_receive(purb_t purb)
 	}
 	
 	/* Check the status */
-	if(purb->status != USB_ST_NOERROR) {
+	if (purb->status != 0) {
 		switch (purb->status) {
-		case USB_ST_CRC:		/* -EILSEQ */
+		case -EILSEQ:
 			self->stats.rx_errors++;
 			self->stats.rx_crc_errors++;	
 			break;
@@ -1442,9 +1442,9 @@ static void *irda_usb_probe(struct usb_device *dev, unsigned int ifnum,
 	ret = usb_set_interface(dev, ifnum, 0);
 	IRDA_DEBUG(1, "usb-irda: set interface %d result %d\n", ifnum, ret);
 	switch (ret) {
-		case USB_ST_NOERROR:		/* 0 */
+		case 0:
 			break;
-		case USB_ST_STALL:		/* -EPIPE = -32 */
+		case -EPIPE:		/* -EPIPE = -32 */
 			usb_clear_halt(dev, usb_sndctrlpipe(dev, 0));
 			IRDA_DEBUG(0, __FUNCTION__ "(), Clearing stall on control interface\n" );
 			break;

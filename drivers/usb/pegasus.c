@@ -53,7 +53,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.4.21 (2001/08/27)"
+#define DRIVER_VERSION "v0.4.22 (2001/12/07)"
 #define DRIVER_AUTHOR "Petko Manolov <pmanolov@lnxw.com>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
@@ -102,7 +102,7 @@ static void ctrl_callback( urb_t *urb )
 		return;
 
 	switch ( urb->status ) {
-		case USB_ST_NOERROR:
+		case 0:
 			if ( pegasus->flags & ETH_REGS_CHANGE ) {
 				pegasus->flags &= ~ETH_REGS_CHANGE;
 				pegasus->flags |= ETH_REGS_CHANGED;
@@ -110,9 +110,9 @@ static void ctrl_callback( urb_t *urb )
 				return;
 			}
 			break;
-		case USB_ST_URB_PENDING:
+		case -EINPROGRESS:
 			return;
-		case USB_ST_URB_KILLED:
+		case -ENOENT:
 			break;
 		default:
 			warn( __FUNCTION__ " status %d", urb->status);
@@ -526,9 +526,9 @@ static void read_bulk_callback( struct urb *urb )
 	pegasus->flags |= PEGASUS_RX_BUSY;
 
 	switch ( urb->status ) {
-		case USB_ST_NOERROR:
+		case 0:
 			break;
-		case USB_ST_NORESPONSE:
+		case -ETIMEDOUT:
 			dbg( "reset MAC" );
 			pegasus->flags &= ~PEGASUS_RX_BUSY;
 			break;
@@ -607,9 +607,9 @@ static void intr_callback( struct urb *urb )
 		return;
 		
 	switch ( urb->status ) {
-		case USB_ST_NOERROR:
+		case 0:
 			break;
-		case USB_ST_URB_KILLED:
+		case -ENOENT:
 			return;
 		default:
 			info("intr status %d", urb->status);
@@ -713,10 +713,8 @@ static int pegasus_open(struct net_device *net)
 	pegasus_t *pegasus = (pegasus_t *)net->priv;
 	int	res;
 
-	MOD_INC_USE_COUNT;
 	if ( (res = enable_net_traffic(net, pegasus->usb)) ) {
 		err("can't enable_net_traffic() - %d", res);
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 	FILL_BULK_URB( &pegasus->rx_urb, pegasus->usb,
@@ -755,7 +753,6 @@ static int pegasus_close( struct net_device *net )
 #ifdef	PEGASUS_USE_INTR
 	usb_unlink_urb( &pegasus->intr_urb );
 #endif
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -867,6 +864,7 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 	
 	pegasus->usb = dev;
 	pegasus->net = net;
+	SET_MODULE_OWNER(net);
 	net->priv = pegasus;
 	net->open = pegasus_open;
 	net->stop = pegasus_close;

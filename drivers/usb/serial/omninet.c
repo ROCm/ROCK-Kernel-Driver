@@ -161,14 +161,11 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 	MOD_INC_USE_COUNT;
 	++port->open_count;
 
-	if (!port->active) {
-		port->active = 1;
-
+	if (port->open_count == 1) {
 		od = kmalloc( sizeof(struct omninet_data), GFP_KERNEL );
 		if( !od ) {
 			err(__FUNCTION__"- kmalloc(%Zd) failed.", sizeof(struct omninet_data));
-			--port->open_count;
-			port->active = 0;
+			port->open_count = 0;
 			up (&port->sem);
 			MOD_DEC_USE_COUNT;
 			return -ENOMEM;
@@ -219,7 +216,6 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 			usb_unlink_urb (port->read_urb);
 		}
 
-		port->active = 0;
 		port->open_count = 0;
 		od = (struct omninet_data *)port->private;
 		if (od)

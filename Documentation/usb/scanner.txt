@@ -83,7 +83,7 @@ If you intend to use more than one scanner at a time w/o devfs support:
 	`mknod /dev/usbscanner1 c 180 49`
                       . 
                       .
-	`mknod /dev/usbscanner15 180 63`
+	`mknod /dev/usbscanner15 c 180 63`
 
 
 If you foresee using only one scanner it is best to:

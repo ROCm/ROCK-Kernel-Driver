@@ -124,11 +124,6 @@ int imm_detect(Scsi_Host_Template * host)
     int i, nhosts, try_again;
     struct parport *pb;
 
-    /*
-     * unlock to allow the lowlevel parport driver to probe
-     * the irqs
-     */
-    spin_unlock_irq(&io_request_lock);
     pb = parport_enumerate();
 
     printk("imm: Version %s\n", IMM_VERSION);
@@ -137,7 +132,6 @@ int imm_detect(Scsi_Host_Template * host)
 
     if (!pb) {
 	printk("imm: parport reports no devices.\n");
-	spin_lock_irq(&io_request_lock);
 	return 0;
     }
   retry_entry:
@@ -163,7 +157,6 @@ int imm_detect(Scsi_Host_Template * host)
 		      "pardevice is owning the port for too longtime!\n",
 			   i);
 		    parport_unregister_device (imm_hosts[i].dev);
-		    spin_lock_irq(&io_request_lock);
 		    return 0;
 		}
 	    }
@@ -219,13 +212,11 @@ int imm_detect(Scsi_Host_Template * host)
     }
     if (nhosts == 0) {
 	if (try_again == 1) {
-	    spin_lock_irq(&io_request_lock);
 	    return 0;
 	}
 	try_again = 1;
 	goto retry_entry;
     } else {
-	spin_lock_irq (&io_request_lock);
 	return 1;		/* return number of hosts detected */
     }
 }
@@ -834,7 +825,7 @@ static int imm_completion(Scsi_Cmnd * cmd)
 	    if (cmd->SCp.buffers_residual--) {
 		cmd->SCp.buffer++;
 		cmd->SCp.this_residual = cmd->SCp.buffer->length;
-		cmd->SCp.ptr = cmd->SCp.buffer->address;
+		cmd->SCp.ptr = page_address(cmd->SCp.buffer->page) + cmd->SCp.buffer->offset;
 
 		/*
 		 * Make sure that we transfer even number of bytes
@@ -897,6 +888,7 @@ static void imm_interrupt(void *data)
 {
     imm_struct *tmp = (imm_struct *) data;
     Scsi_Cmnd *cmd = tmp->cur_cmd;
+    struct Scsi_Host *host = cmd->host;
     unsigned long flags;
 
     if (!cmd) {
@@ -948,10 +940,10 @@ static void imm_interrupt(void *data)
     if (cmd->SCp.phase > 0)
 	imm_pb_release(cmd->host->unique_id);
 
-    spin_lock_irqsave(&io_request_lock, flags);
+    spin_lock_irqsave(&host->host_lock, flags);
     tmp->cur_cmd = 0;
     cmd->scsi_done(cmd);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(&host->host_lock, flags);
     return;
 }
 
@@ -1008,7 +1000,7 @@ static int imm_engine(imm_struct * tmp, Scsi_Cmnd * cmd)
 	    /* if many buffers are available, start filling the first */
 	    cmd->SCp.buffer = (struct scatterlist *) cmd->request_buffer;
 	    cmd->SCp.this_residual = cmd->SCp.buffer->length;
-	    cmd->SCp.ptr = cmd->SCp.buffer->address;
+	    cmd->SCp.ptr = page_address(cmd->SCp.buffer->page) + cmd->SCp.buffer->offset;
 	} else {
 	    /* else fill the only available buffer */
 	    cmd->SCp.buffer = NULL;

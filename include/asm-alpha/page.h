@@ -67,18 +67,6 @@ do {										\
 
 #define PAGE_BUG(page)	BUG()
 
-#define BUG_ON(condition)			\
-	do {					\
-		if (unlikely((long)(condition)))\
-			BUG();			\
-	} while (0)
-
-#define BUG_ON(condition)			\
-	do {					\
-		if (unlikely((int)(condition)))	\
-			BUG();			\
-	} while (0)
-
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)
 {

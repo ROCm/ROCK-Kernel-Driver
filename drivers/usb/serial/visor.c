@@ -127,7 +127,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.6"
+#define DRIVER_VERSION "v1.7"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB HandSpring Visor, Palm m50x, Sony Clié driver"
 
@@ -251,8 +251,7 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	++port->open_count;
 	MOD_INC_USE_COUNT;
 	
-	if (!port->active) {
-		port->active = 1;
+	if (port->open_count == 1) {
 		bytes_in = 0;
 		bytes_out = 0;
 
@@ -262,10 +261,12 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 		port->tty->low_latency = 1;
 		
 		/* Start reading from the device */
-		FILL_BULK_URB(port->read_urb, serial->dev, 
-			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-			      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
-			      visor_read_bulk_callback, port);
+		usb_fill_bulk_urb (port->read_urb, serial->dev,
+				   usb_rcvbulkpipe (serial->dev, 
+						    port->bulk_in_endpointAddress),
+				   port->read_urb->transfer_buffer,
+				   port->read_urb->transfer_buffer_length,
+				   visor_read_bulk_callback, port);
 		result = usb_submit_urb(port->read_urb);
 		if (result)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
@@ -314,7 +315,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 			/* shutdown our bulk read */
 			usb_unlink_urb (port->read_urb);
 		}
-		port->active = 0;
 		port->open_count = 0;
 	}
 	up (&port->sem);
@@ -375,8 +375,11 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 		usb_serial_debug_data (__FILE__, __FUNCTION__, transfer_size, urb->transfer_buffer);
 
 		/* build up our urb */
-		FILL_BULK_URB (urb, serial->dev, usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress), 
-				urb->transfer_buffer, transfer_size, visor_write_bulk_callback, port);
+		usb_fill_bulk_urb (urb, serial->dev,
+				   usb_sndbulkpipe (serial->dev,
+						    port->bulk_out_endpointAddress),
+				   urb->transfer_buffer, transfer_size, 
+				   visor_write_bulk_callback, port);
 		urb->transfer_flags |= USB_QUEUE_BULK;
 
 		/* send it down the pipe */
@@ -506,10 +509,12 @@ static void visor_read_bulk_callback (struct urb *urb)
 	}
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
-		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
-		      visor_read_bulk_callback, port);
+	usb_fill_bulk_urb (port->read_urb, serial->dev,
+			   usb_rcvbulkpipe (serial->dev,
+					    port->bulk_in_endpointAddress),
+			   port->read_urb->transfer_buffer,
+			   port->read_urb->transfer_buffer_length,
+			   visor_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
@@ -647,11 +652,8 @@ static void visor_shutdown (struct usb_serial *serial)
 	dbg (__FUNCTION__);
 
 	/* stop reads and writes on all ports */
-	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			visor_close (&serial->port[i], NULL);
-		}
-	}
+	for (i=0; i < serial->num_ports; ++i)
+		serial->port[i].open_count = 0;
 }
 
 

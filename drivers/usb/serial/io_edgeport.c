@@ -987,9 +987,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	++port->open_count;
 	MOD_INC_USE_COUNT;
 	
-	if (!port->active) {
-		port->active = 1;
-
+	if (port->open_count == 1) {
 		/* force low_latency on so that our tty_push actually forces the data through, 
 		   otherwise it is scheduled, and with high data rates (like with OHCI) data
 		   can get lost. */
@@ -1000,7 +998,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		serial = port->serial;
 		edge_serial = (struct edgeport_serial *)serial->private;
 		if (edge_serial == NULL) {
-			port->active = 0;
 			port->open_count = 0;
 			MOD_DEC_USE_COUNT;
 			return -ENODEV;
@@ -1064,7 +1061,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		if (response < 0) {
 			err(__FUNCTION__" - error sending open port command");
 			edge_port->openPending = FALSE;
-			port->active = 0;
 			port->open_count = 0;
 			MOD_DEC_USE_COUNT;
 			return -ENODEV;
@@ -1080,7 +1076,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 			/* open timed out */
 			dbg(__FUNCTION__" - open timedout");
 			edge_port->openPending = FALSE;
-			port->active = 0;
 			port->open_count = 0;
 			MOD_DEC_USE_COUNT;
 			return -ENODEV;
@@ -1285,7 +1280,6 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 		if (edge_port->txfifo.fifo) {
 			kfree(edge_port->txfifo.fifo);
 		}
-		port->active = 0;
 		port->open_count = 0;
 	}
 
