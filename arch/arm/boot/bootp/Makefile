@@ -2,21 +2,23 @@
 # linux/arch/arm/boot/bootp/Makefile
 #
 
-ZSYSTEM		= arch/arm/boot/zImage
-ZLDFLAGS	=-p -X -T $(obj)/bootp.lds \
+LDFLAGS_bootp	:=-p --no-undefined -X \
 		 --defsym initrd_phys=$(INITRD_PHYS) \
-		 --defsym params_phys=$(PARAMS_PHYS)
+		 --defsym params_phys=$(PARAMS_PHYS) -T
+AFLAGS_initrd.o :=-DINITRD=\"$(INITRD)\"
 
-extra-y := bootp
+targets	:= bootp bootp.lds init.o kernel.o initrd.o
 
 # Note that bootp.lds picks up kernel.o and initrd.o
-$(obj)/bootp:	$(addprefix $(obj)/,init.o kernel.o initrd.o bootp.lds)
-		$(LD) $(ZLDFLAGS) -o $@ $(obj)/init.o
+$(obj)/bootp:	$(addprefix $(obj)/,bootp.lds init.o kernel.o initrd.o) FORCE
+	$(call if_changed,ld)
+	@:
 
-$(obj)/kernel.o: $(ZSYSTEM)
-		$(LD) -r -s -o $@ -b binary $(ZSYSTEM)
+# kernel.o and initrd.o includes a binary image using
+# .incbin, a dependency which is not tracked automatically
 
-$(obj)/initrd.o: $(INITRD)
-		$(LD) -r -s -o $@ -b binary $(INITRD)
+$(obj)/kernel.o: arch/arm/boot/zImage FORCE
 
-.PHONY:		$(INITRD) $(ZSYSTEM)
+$(obj)/initrd.o: $(INITRD) FORCE
+
+.PHONY:	$(INITRD) FORCE
