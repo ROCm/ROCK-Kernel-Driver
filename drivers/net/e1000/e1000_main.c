@@ -786,7 +786,7 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 	int size;
 
 	size = sizeof(struct e1000_buffer) * txdr->count;
-	txdr->buffer_info = kmalloc(size, GFP_KERNEL);
+	txdr->buffer_info = vmalloc(size);
 	if(!txdr->buffer_info) {
 		return -ENOMEM;
 	}
@@ -799,7 +799,7 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 
 	txdr->desc = pci_alloc_consistent(pdev, txdr->size, &txdr->dma);
 	if(!txdr->desc) {
-		kfree(txdr->buffer_info);
+		vfree(txdr->buffer_info);
 		return -ENOMEM;
 	}
 	memset(txdr->desc, 0, txdr->size);
@@ -903,7 +903,7 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	int size;
 
 	size = sizeof(struct e1000_buffer) * rxdr->count;
-	rxdr->buffer_info = kmalloc(size, GFP_KERNEL);
+	rxdr->buffer_info = vmalloc(size);
 	if(!rxdr->buffer_info) {
 		return -ENOMEM;
 	}
@@ -917,7 +917,7 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	rxdr->desc = pci_alloc_consistent(pdev, rxdr->size, &rxdr->dma);
 
 	if(!rxdr->desc) {
-		kfree(rxdr->buffer_info);
+		vfree(rxdr->buffer_info);
 		return -ENOMEM;
 	}
 	memset(rxdr->desc, 0, rxdr->size);
@@ -1041,7 +1041,7 @@ e1000_free_tx_resources(struct e1000_adapter *adapter)
 
 	e1000_clean_tx_ring(adapter);
 
-	kfree(adapter->tx_ring.buffer_info);
+	vfree(adapter->tx_ring.buffer_info);
 	adapter->tx_ring.buffer_info = NULL;
 
 	pci_free_consistent(pdev, adapter->tx_ring.size,
@@ -1110,7 +1110,7 @@ e1000_free_rx_resources(struct e1000_adapter *adapter)
 
 	e1000_clean_rx_ring(adapter);
 
-	kfree(rx_ring->buffer_info);
+	vfree(rx_ring->buffer_info);
 	rx_ring->buffer_info = NULL;
 
 	pci_free_consistent(pdev, rx_ring->size, rx_ring->desc, rx_ring->dma);
