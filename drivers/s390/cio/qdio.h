@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.8 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.11 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -47,6 +47,10 @@
 
 #define QDIO_STATS_CLASSES 2
 #define QDIO_STATS_COUNT_NEEDED 2*/
+
+#define QDIO_ACTIVATE_DELAY 5 /* according to brenton belmar and paul
+				 gioquindo it can take up to 5ms before
+				 queues are really active */
 
 #define QDIO_NO_USE_COUNT_TIME 10
 #define QDIO_NO_USE_COUNT_TIMEOUT 1000 /* wait for 1 sec on each q before
@@ -579,6 +583,7 @@ struct qdio_q {
 
 	int is_input_q;
 	int irq;
+	struct ccw_device *cdev;
 
 	unsigned int is_iqdio_q;
 
@@ -670,7 +675,7 @@ struct qdio_irq {
 	unsigned int sync_done_on_outb_pcis;
 
 	unsigned int state;
-	spinlock_t setting_up_lock;
+	struct semaphore setting_up_sema;
 
 	unsigned int no_input_qs;
 	unsigned int no_output_qs;

@@ -21,6 +21,7 @@
 
 extern void css_process_crw(int);
 extern void chsc_process_crw(void);
+extern void chp_process_crw(int);
 
 static void
 s390_handle_damage(char *msg)
@@ -53,29 +54,25 @@ s390_collect_crw_info(void)
 		    crw.erc, crw.rsid);
 		switch (crw.rsc) {
 		case CRW_RSC_SCH:
-			pr_debug(KERN_NOTICE, "source is subchannel %04X\n",
-				 crw.rsid);
+			pr_debug("source is subchannel %04X\n", crw.rsid);
 			css_process_crw (crw.rsid);
 			break;
 		case CRW_RSC_MONITOR:
-			pr_debug(KERN_NOTICE,
-				 "source is monitoring facility\n");
+			pr_debug("source is monitoring facility\n");
 			break;
 		case CRW_RSC_CPATH:
-			pr_debug(KERN_NOTICE,
-				 "source is channel path %02X\n",
-				 pcrwe->crw.rsid);
+			pr_debug("source is channel path %02X\n", crw.rsid);
+			chp_process_crw(crw.rsid);
 			break;
 		case CRW_RSC_CONFIG:
-			pr_debug(KERN_NOTICE,
-				 "source is configuration-alert facility\n");
+			pr_debug("source is configuration-alert facility\n");
 			break;
 		case CRW_RSC_CSS:
-			pr_debug(KERN_NOTICE, "source is channel subsystem\n");
+			pr_debug("source is channel subsystem\n");
 			chsc_process_crw();
 			break;
 		default:
-			pr_debug(KERN_NOTICE, "unknown source\n");
+			pr_debug("unknown source\n");
 			break;
 		}
 	} while (crw.chn);

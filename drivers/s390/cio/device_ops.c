@@ -48,7 +48,8 @@ ccw_device_clear(struct ccw_device *cdev, unsigned long intparm)
 	if (!cdev)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
-	    cdev->private->state != DEV_STATE_W4SENSE)
+	    cdev->private->state != DEV_STATE_W4SENSE &&
+	    cdev->private->state != DEV_STATE_QDIO_ACTIVE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
@@ -122,6 +123,15 @@ ccw_device_call_handler(struct ccw_device *cdev)
 {
 	struct subchannel *sch;
 	unsigned int stctl;
+	void (*handler)(struct ccw_device *, unsigned long, struct irb *);
+
+	if (cdev->private->state == DEV_STATE_QDIO_ACTIVE) {
+		if (cdev->private->qdio_data)
+			handler = cdev->private->qdio_data->handler;
+		else
+			handler = NULL;
+	} else
+		handler = cdev->handler;
 
 	sch = to_subchannel(cdev->dev.parent);
 
@@ -144,13 +154,9 @@ ccw_device_call_handler(struct ccw_device *cdev)
 	/*
 	 * Now we are ready to call the device driver interrupt handler.
 	 */
-	if (cdev->private->state == DEV_STATE_QDIO_ACTIVE) {
-		if (cdev->private->qdio_data &&
-		    cdev->private->qdio_data->handler)
-			cdev->private->qdio_data->handler(cdev, sch->u_intparm,
-							  &cdev->private->irb);
-	} else
-		cdev->handler (cdev, sch->u_intparm, &cdev->private->irb);
+	if (handler)
+		handler(cdev, sch->u_intparm, &cdev->private->irb);
+
 	/*
 	 * Clear the old and now useless interrupt response block.
 	 */
@@ -245,6 +251,8 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 			wait_event(cdev->private->wait_q,
 				   sch->schib.scsw.actl == 0);
 			spin_lock_irqsave(&sch->lock, flags);
+			/* FIXME: Check if we got sensible stuff. */
+			break;
 		}
 	}
 	/* Restore interrupt handler. */
@@ -317,6 +325,8 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 		spin_unlock_irqrestore(&sch->lock, flags);
 		wait_event(cdev->private->wait_q, sch->schib.scsw.actl == 0);
 		spin_lock_irqsave(&sch->lock, flags);
+		/* FIXME: Check if we got sensible stuff. */
+		break;
 	}
 	/* Restore interrupt handler. */
 	cdev->handler = handler;

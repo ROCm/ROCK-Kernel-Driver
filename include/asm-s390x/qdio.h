@@ -50,11 +50,11 @@ struct qdio_buffer{
 } __attribute__ ((packed,aligned(256)));
 
 
-/* params are: irq, status, qdio_error, siga_error,
+/* params are: ccw_device, status, qdio_error, siga_error,
    queue_number, first element processed, number of elements processed,
    int_parm */
-typedef void qdio_handler_t(int,unsigned int,unsigned int,unsigned int,
-			    unsigned int,int,int,unsigned long);
+typedef void qdio_handler_t(struct ccw_device *,unsigned int,unsigned int,
+			    unsigned int,unsigned int,int,int,unsigned long);
 
 
 #define QDIO_STATUS_INBOUND_INT 0x01
@@ -100,6 +100,8 @@ struct qdio_initialize{
 	void **output_sbal_addr_array; /* addr of n*128 void ptrs */
 };
 extern int qdio_initialize(struct qdio_initialize *init_data);
+extern int qdio_allocate(struct qdio_initialize *init_data);
+extern int qdio_establish(struct ccw_device *);
 
 extern int qdio_activate(struct ccw_device *,int flags);
 
@@ -127,6 +129,8 @@ extern int qdio_synchronize(struct ccw_device*, unsigned int flags,
 			    unsigned int queue_number);
 
 extern int qdio_cleanup(struct ccw_device*, int how);
+extern int qdio_shutdown(struct ccw_device*, int how);
+extern int qdio_free(struct ccw_device*);
 
 unsigned char qdio_get_slsb_state(struct ccw_device*, unsigned int flag,
 				  unsigned int queue_number,

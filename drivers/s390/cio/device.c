@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.45 $
+ *   $Revision: 1.50 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -215,6 +215,8 @@ online_show (struct device *dev, char *buf)
 void
 ccw_device_set_offline(struct ccw_device *cdev)
 {
+	int ret;
+
 	if (!cdev)
 		return;
 	if (!cdev->online || !cdev->drv)
@@ -226,23 +228,36 @@ ccw_device_set_offline(struct ccw_device *cdev)
 
 	cdev->online = 0;
 	spin_lock_irq(cdev->ccwlock);
-	ccw_device_offline(cdev);
+	ret = ccw_device_offline(cdev);
 	spin_unlock_irq(cdev->ccwlock);
-	wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	if (ret == 0)
+		wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	else
+		//FIXME: we can't fail!
+		pr_debug("ccw_device_offline returned %d, device %s\n",
+			 ret, cdev->dev.bus_id);
 }
 
 void
 ccw_device_set_online(struct ccw_device *cdev)
 {
-	if (!cdev || !cdev->handler)
+	int ret;
+
+	if (!cdev)
 		return;
 	if (cdev->online || !cdev->drv)
 		return;
 
 	spin_lock_irq(cdev->ccwlock);
-	ccw_device_online(cdev);
+	ret = ccw_device_online(cdev);
 	spin_unlock_irq(cdev->ccwlock);
-	wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	if (ret == 0)
+		wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	else {
+		pr_debug("ccw_device_online returned %d, device %s\n",
+			 ret, cdev->dev.bus_id);
+		return;
+	}
 	if (cdev->private->state != DEV_STATE_ONLINE)
 		return;
 	if (!cdev->drv->set_online || cdev->drv->set_online(cdev) == 0) {
@@ -250,9 +265,13 @@ ccw_device_set_online(struct ccw_device *cdev)
 		return;
 	}
 	spin_lock_irq(cdev->ccwlock);
-	ccw_device_offline(cdev);
+	ret = ccw_device_offline(cdev);
 	spin_unlock_irq(cdev->ccwlock);
-	wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	if (ret == 0)
+		wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	else 
+		pr_debug("ccw_device_offline returned %d, device %s\n",
+			 ret, cdev->dev.bus_id);
 }
 
 static ssize_t
@@ -574,7 +593,7 @@ ccw_device_remove (struct device *dev)
 	 * doubled code.
 	 * This is safe because of the checks in ccw_device_set_offline.
 	 */
-	pr_debug(KERN_INFO "removing device %s, sch %d, devno %x\n",
+	pr_debug("removing device %s, sch %d, devno %x\n",
 		 cdev->dev.name,
 		 cdev->private->irq,
 		 cdev->private->devno);
