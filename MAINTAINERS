@@ -244,10 +244,10 @@ S:	Maintained
 ALPHA PORT
 P:	Richard Henderson
 M:	rth@twiddle.net
-S:	Odd Fixes for 2.4; Maintained for 2.5.
+S:	Odd Fixes for 2.4; Maintained for 2.6.
 P:	Ivan Kokshaysky
 M:	ink@jurassic.park.msu.ru
-S:	Maintained for 2.4; PCI support for 2.5.
+S:	Maintained for 2.4; PCI support for 2.6.
 
 APM DRIVER
 P:	Stephen Rothwell
@@ -1857,7 +1857,7 @@ P:	Andrey Panin
 M:	pazke@donpac.ru
 L:	linux-visws-devel@lists.sf.net
 W:	http://linux-visws.sf.net
-S:	Maintained for 2.5.
+S:	Maintained for 2.6.
 
 SIS 5513 IDE CONTROLLER DRIVER
 P:	Lionel Bouton
