@@ -37,6 +37,10 @@ EXPORT_SYMBOL(sirdev_set_dongle);
 EXPORT_SYMBOL(sirdev_write_complete);
 EXPORT_SYMBOL(sirdev_receive);
 
+EXPORT_SYMBOL(sirdev_raw_write);
+EXPORT_SYMBOL(sirdev_raw_read);
+EXPORT_SYMBOL(sirdev_set_dtr_rts);
+
 static int __init sir_core_init(void)
 {
 	return irda_thread_create();

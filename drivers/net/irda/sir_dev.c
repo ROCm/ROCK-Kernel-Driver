@@ -117,6 +117,14 @@ int sirdev_raw_read(struct sir_dev *dev, char *buf, int len)
 	return count;
 }
 
+int sirdev_set_dtr_rts(struct sir_dev *dev, int dtr, int rts)
+{
+	int ret = -ENXIO;
+	if (dev->drv->set_dtr_rts != 0)
+		ret =  dev->drv->set_dtr_rts(dev, dtr, rts);
+	return ret;
+}
+	
 /**********************************************************************/
 
 /* called from client driver - likely with bh-context - to indicate
