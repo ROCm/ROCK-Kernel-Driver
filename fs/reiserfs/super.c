@@ -709,13 +709,11 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 		char *p = 0;
 		int val = simple_strtoul (arg, &p, 0);
 		/* commit=NNN (time in seconds) */
-		if ( *p != '\0' || val == 0) {
+		if ( *p != '\0' || val < 0) {
 			printk ("reiserfs_parse_options: bad value %s\n", arg);
 			return 0;
 		}
-		if ( val > 0 ) {
-			*commit_max_age = val;
-		}
+		*commit_max_age = val;
 	}
 
 	if ( c == 'w' ) {
@@ -821,8 +819,14 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   REISERFS_SB(s)->s_mount_opt = (REISERFS_SB(s)->s_mount_opt & ~safe_mask) |  (mount_options & safe_mask);
 
   if(commit_max_age != 0) {
-	  SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
-	  SB_JOURNAL_MAX_TRANS_AGE(s) = commit_max_age;
+    SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
+    SB_JOURNAL_MAX_TRANS_AGE(s) = commit_max_age;
+  }
+  else
+  {
+    /* 0 means restore defaults. */
+    SB_JOURNAL_MAX_COMMIT_AGE(s) = SB_JOURNAL_DEFAULT_MAX_COMMIT_AGE(s);
+    SB_JOURNAL_MAX_TRANS_AGE(s) = JOURNAL_MAX_TRANS_AGE;
   }
 
   if(blocks) {
