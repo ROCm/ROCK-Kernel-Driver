@@ -1,15 +1,15 @@
 /*
  *
- * linux/drivers/s390/net/ctcdbug.h ($Revision: 1.1 $)
+ * linux/drivers/s390/net/ctcdbug.h ($Revision: 1.2 $)
  *
- * Linux on zSeries OSA Express and HiperSockets support
+ * CTC / ESCON network driver - s390 dbf exploit.
  *
  * Copyright 2000,2003 IBM Corporation
  *
  *    Author(s): Original Code written by
  *			  Peter Tiedemann (ptiedem@de.ibm.com)
  *
- *    $Revision: 1.1 $	 $Date: 2004/07/02 16:31:22 $
+ *    $Revision: 1.2 $	 $Date: 2004/07/15 16:03:08 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

@@ -217,21 +217,21 @@ static inline void mga_memcpy_toio(vaddr_t va, unsigned int offs, const void* sr
 #ifdef MEMCPYTOIO_WORKS
 	memcpy_toio(va.vaddr + offs, src, len);
 #elif defined(MEMCPYTOIO_WRITEL)
-#define srcd ((const u_int32_t*)src)
 	if (offs & 3) {
 		while (len >= 4) {
-			mga_writel(va, offs, get_unaligned(srcd++));
+			mga_writel(va, offs, get_unaligned((u32 *)src));
 			offs += 4;
 			len -= 4;
+			src += 4;
 		}
 	} else {
 		while (len >= 4) {
-			mga_writel(va, offs, *srcd++);
+			mga_writel(va, offs, *(u32 *)src);
 			offs += 4;
 			len -= 4;
+			src += 4;
 		}
 	}
-#undef srcd
 	if (len) {
 		u_int32_t tmp;
 

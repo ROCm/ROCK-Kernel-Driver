@@ -448,13 +448,13 @@ xmon_init_scc(void)
 	scc_initialized = 1;
 	if (via_modem) {
 		for (;;) {
-			xmon_write(0, "ATE1V1\r", 7);
+			xmon_write(NULL, "ATE1V1\r", 7);
 			if (xmon_expect("OK", 5)) {
-				xmon_write(0, "ATA\r", 4);
+				xmon_write(NULL, "ATA\r", 4);
 				if (xmon_expect("CONNECT", 40))
 					break;
 			}
-			xmon_write(0, "+++", 3);
+			xmon_write(NULL, "+++", 3);
 			xmon_expect("OK", 3);
 		}
 	}
@@ -618,7 +618,7 @@ xmon_fgets(char *str, int nb, void *f)
 	c = xmon_getchar();
 	if (c == -1) {
 	    if (p == str)
-		return 0;
+		return NULL;
 	    break;
 	}
 	*p++ = c;

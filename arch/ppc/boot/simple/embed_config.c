@@ -97,7 +97,7 @@ embed_config(bd_t **bdp)
 #endif /* CONFIG_MBX */
 
 #if defined(CONFIG_RPXLITE) || defined(CONFIG_RPXCLASSIC) || \
-	defined(CONFIG_RPX6) || defined(CONFIG_EP405)
+	defined(CONFIG_RPX8260) || defined(CONFIG_EP405)
 /* Helper functions for Embedded Planet boards.
 */
 /* Because I didn't find anything that would do this.......
@@ -147,7 +147,7 @@ rpx_eth(bd_t *bd, u_char *cp)
 	}
 }
 
-#ifdef CONFIG_RPX6
+#ifdef CONFIG_RPX8260
 static uint
 rpx_baseten(u_char *cp)
 {
@@ -588,7 +588,7 @@ embed_config(bd_t **bdp)
 }
 #endif /* SBS8260 */
 
-#ifdef CONFIG_RPX6
+#ifdef CONFIG_RPX8260
 void
 embed_config(bd_t **bdp)
 {

@@ -13,7 +13,7 @@
 
 #ifdef CONFIG_X86_IO_APIC
 
-#ifdef CONFIG_PCI_USE_VECTOR
+#ifdef CONFIG_PCI_MSI
 static inline int use_pci_vector(void)	{return 1;}
 static inline void disable_edge_ioapic_vector(unsigned int vector) { }
 static inline void mask_and_ack_level_ioapic_vector(unsigned int vector) { }

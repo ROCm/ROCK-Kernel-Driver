@@ -2480,7 +2480,7 @@ static int cs_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 {
 	struct cs_card *card = (struct cs_card *)file->private_data;
 	struct cs_state *state;
-	struct dmabuf *dmabuf=0;
+	struct dmabuf *dmabuf=NULL;
 	unsigned long flags;
 	audio_buf_info abinfo;
 	count_info cinfo;
@@ -4271,7 +4271,7 @@ static int __init cs_ac97_init(struct cs_card *card)
 			CS_DBGOUT(CS_FUNCTION | CS_INIT, 2, printk(KERN_INFO 
 				"cs46xx: cs_ac97_init()- codec number %d not found\n",
 					num_ac97) );
-			card->ac97_codec[num_ac97] = 0;
+			card->ac97_codec[num_ac97] = NULL;
 			break;
 		}
 		CS_DBGOUT(CS_FUNCTION | CS_INIT, 2, printk(KERN_INFO 

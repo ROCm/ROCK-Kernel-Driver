@@ -419,7 +419,7 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 	__put_user_error(NULL, &frame->uc.uc_link, err);
 
 	memset(&stack, 0, sizeof(stack));
-	stack.ss_sp = (void *)current->sas_ss_sp;
+	stack.ss_sp = (void __user *)current->sas_ss_sp;
 	stack.ss_flags = sas_ss_flags(regs->ARM_sp);
 	stack.ss_size = current->sas_ss_size;
 	err |= __copy_to_user(&frame->uc.uc_stack, &stack, sizeof(stack));

@@ -74,10 +74,10 @@ static unsigned int zftc_rd_compressed   = 0;
 /* forward */
 static int  zftc_write(int *write_cnt,
 		       __u8 *dst_buf, const int seg_sz,
-		       const __u8 *src_buf, const int req_len,
+		       const __u8 __user *src_buf, const int req_len,
 		       const zft_position *pos, const zft_volinfo *volume);
 static int  zftc_read(int *read_cnt,
-		      __u8  *dst_buf, const int to_do,
+		      __u8  __user *dst_buf, const int to_do,
 		      const __u8 *src_buf, const int seg_sz,
 		      const zft_position *pos, const zft_volinfo *volume);
 static int  zftc_seek(unsigned int new_block_pos, 
@@ -539,7 +539,7 @@ static int start_new_cseg(cmpr_info *cluster,
  */
 static int zftc_write(int *write_cnt,
 		      __u8 *dst_buf, const int seg_sz,
-		      const __u8 *src_buf, const int req_len,
+		      const __u8 __user *src_buf, const int req_len,
 		      const zft_position *pos, const zft_volinfo *volume)
 {
 	int req_len_left = req_len;
@@ -656,7 +656,7 @@ static int zftc_write(int *write_cnt,
  * be set to 0 
  */
 static int zftc_read (int *read_cnt, 
-		      __u8  *dst_buf, const int to_do, 
+		      __u8  __user *dst_buf, const int to_do, 
 		      const __u8 *src_buf, const int seg_sz, 
 		      const zft_position *pos, const zft_volinfo *volume)
 {          

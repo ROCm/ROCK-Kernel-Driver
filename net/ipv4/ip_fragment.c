@@ -263,7 +263,7 @@ static void ip_evictor(void)
 		spin_unlock(&qp->lock);
 
 		ipq_put(qp);
-		IP_INC_STATS_BH(ReasmFails);
+		IP_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 	}
 }
 
@@ -281,8 +281,8 @@ static void ip_expire(unsigned long arg)
 
 	ipq_kill(qp);
 
-	IP_INC_STATS_BH(ReasmTimeout);
-	IP_INC_STATS_BH(ReasmFails);
+	IP_INC_STATS_BH(IPSTATS_MIB_REASMTIMEOUT);
+	IP_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 
 	if ((qp->last_in&FIRST_IN) && qp->fragments != NULL) {
 		struct sk_buff *head = qp->fragments;
@@ -609,7 +609,7 @@ static struct sk_buff *ip_frag_reasm(struct ipq *qp, struct net_device *dev)
 	iph = head->nh.iph;
 	iph->frag_off = 0;
 	iph->tot_len = htons(len);
-	IP_INC_STATS_BH(ReasmOKs);
+	IP_INC_STATS_BH(IPSTATS_MIB_REASMOKS);
 	qp->fragments = NULL;
 	return head;
 
@@ -625,7 +625,7 @@ out_oversize:
 			"Oversized IP packet from %d.%d.%d.%d.\n",
 			NIPQUAD(qp->saddr));
 out_fail:
-	IP_INC_STATS_BH(ReasmFails);
+	IP_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 	return NULL;
 }
 
@@ -636,7 +636,7 @@ struct sk_buff *ip_defrag(struct sk_buff *skb)
 	struct ipq *qp;
 	struct net_device *dev;
 	
-	IP_INC_STATS_BH(ReasmReqds);
+	IP_INC_STATS_BH(IPSTATS_MIB_REASMREQDS);
 
 	/* Start by cleaning up the memory. */
 	if (atomic_read(&ip_frag_mem) > sysctl_ipfrag_high_thresh)
@@ -661,7 +661,7 @@ struct sk_buff *ip_defrag(struct sk_buff *skb)
 		return ret;
 	}
 
-	IP_INC_STATS_BH(ReasmFails);
+	IP_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 	kfree_skb(skb);
 	return NULL;
 }

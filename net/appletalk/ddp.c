@@ -908,12 +908,12 @@ static int atrtr_ioctl(unsigned int cmd, void __user *arg)
 
 		case SIOCADDRT: {
 			struct net_device *dev = NULL;
-			/*
-			 * FIXME: the name of the device is still in user
-			 * space, isn't it?
-			 */
 			if (rt.rt_dev) {
-				dev = __dev_get_by_name(rt.rt_dev);
+				char name[IFNAMSIZ];
+				if (copy_from_user(name, rt.rt_dev, IFNAMSIZ-1))
+					return -EFAULT;
+				name[IFNAMSIZ-1] = '\0';
+				dev = __dev_get_by_name(name);
 				if (!dev)
 					return -ENODEV;
 			}			

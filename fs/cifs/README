@@ -31,7 +31,7 @@ the cifs download to your kernel build directory e.g.
 5) make dep
 6) make modules (or "make" if CIFS VFS not to be built as a module)
 
-For Linux 2.5:
+For Linux 2.6:
 1) Download the kernel (e.g. from http://www.kernel.org or from bitkeeper
 at bk://linux.bkbits.net/linux-2.5) and change directory into the top
 of the kernel directory tree (e.g. /usr/src/linux-2.5.73)
@@ -56,13 +56,24 @@ the CIFS VFS web site) copy it to the same directory in which mount.smbfs and
 similar files reside (usually /sbin).  Although the helper software is not  
 required, mount.cifs is recommended.  Eventually the Samba 3.0 utility program 
 "net" may also be helpful since it may someday provide easier mount syntax for
-users who are used to Windows e.g.  net use <mount point> <UNC name or cifs URL>  
+users who are used to Windows e.g.  net use <mount point> <UNC name or cifs URL>
 Note that running the Winbind pam/nss module (logon service) on all of your
 Linux clients is useful in mapping Uids and Gids consistently across the
 domain to the proper network user.  The mount.cifs mount helper can be
 trivially built from Samba 3.0 or later source e.g. by executing:
 
 	gcc samba/source/client/mount.cifs.c -o mount.cifs
+
+Allowing User Mounts
+====================
+To permit users to mount and unmount over directories they own is possible
+with the cifs vfs.  A way to enable such mounting is to mark the mount.cifs
+utility as suid (e.g. "chmod +s /sbin/mount/cifs). To enable users to 
+umount shares they mount requires
+1) mount.cifs version 1.4 or later
+2) an entry for the share in /etc/fstab indicating that a user may
+unmount it e.g.
+//server/usersharename  /mnt/username cifs user 0 0
 
 Note that when the mount.cifs utility is run suid (allowing user mounts), 
 in order to reduce risks, the "nosuid" mount flag is passed in on mount to
@@ -99,21 +110,27 @@ Linux:
 	delete readonly = yes 
 	ea support = yes
 
-Note that ea support is required for supporting Linux xattrs. 
-Some administrators also change the "map archive" and the "create mask" 
-parameters from their default values.  Creating special devices (mknod) 
+Note that server ea support is required for supporting xattrs from the Linux
+cifs client, and that EA support is present in later versions of Samba (e.g. 
+3.0.6 and later (also EA support works in all versions of Windows, at least to
+shares on NTFS filesystems).  Extended Attribute (xattr) support is an optional
+feature of most Linux filesystems which may require enabling via
+make menuconfig
+ 
+Some administrators may want to change Samba's smb.conf "map archive" and 
+"create mask" parameters from the default.  Creating special devices (mknod) 
 remotely may require specifying a mkdev function to Samba if you are not using 
-Samba 3.0.5 or later.  For more information on these see the manual pages
+Samba 3.0.6 or later.  For more information on these see the manual pages
 ("man smb.conf") on the Samba server system.  Note that the cifs vfs,
 unlike the smbfs vfs, does not read the smb.conf on the client system 
 (the few optional settings are passed in on mount via -o parameters instead).  
 Note that Samba 2.2.7 or later includes a fix that allows the CIFS VFS to delete
 open files (required for strict POSIX compliance).  Windows Servers already 
 supported this feature. Samba server does not allow symlinks that refer to files
-outside of the share, so in Samba versions prior to 3.0.5, most symlinks to
+outside of the share, so in Samba versions prior to 3.0.6, most symlinks to
 files with absolute paths (ie beginning with slash) such as:
 	 ln -s /mnt/foo bar
-would be forbidden. Samba 3.0.5 server or later includes the ability to create 
+would be forbidden. Samba 3.0.6 server or later includes the ability to create 
 such symlinks safely by converting unsafe symlinks (ie symlinks to server 
 files that are outside of the share) to a samba specific format on the server
 that is ignored by local server applications and non-cifs clients and that will
@@ -147,6 +164,12 @@ cifs signing enabled (and the physical network is insecure), consider use
 of the standard mount options "noexec" and "nosuid" to reduce the risk of 
 running an altered binary on your local system (downloaded from a hostile server
 or altered by a hostile router).
+
+Although mounting using format corresponding to the CIFS URL specification is
+not possible in mount.cifs yet, it is possible to use an alternate format
+for the server and sharename (which is somewhat similar to NFS style mount
+syntax) instead of the more widely used UNC format (i.e. \\server\share):
+  mount -t cifs tcp_name_of_server:share_name /mnt -o user=myname,pass=mypasswd
 
 When using the mount helper mount.cifs, passwords may be specified via alternate
 mechanisms, instead of specifying it after -o using the normal "pass=" syntax
@@ -255,7 +278,33 @@ A partial list of the supported mount options follows:
 		mount helper will not prompt the user for a password
 		if guest is specified on the mount options.  If no
 		password is specified a null password will be used.
-
+  perm          Client does permission checks (vfs_permission check of uid
+		and gid of the file against the mode and desired operation),
+		Note that this is in addition to the normal ACL check on the
+		target machine done by the server software. 
+		Client permission checking is enabled by default.
+  noperm        Client does not do permission checks.  This can expose
+		files on this mount to access by other users on the local
+		client system. It is typically only needed when the server
+		supports the CIFS Unix Extensions but the UIDs/GIDs on the
+		client and server system do not match closely enough to allow
+		access by the user doing the mount.
+		Note that this does not affect the normal ACL check on the
+		target machine done by the server software (of the server
+		ACL against the user name provided at mount time).
+  setuids       If the CIFS Unix extensions are negotiated with the server
+		the client will attempt to set the effective uid and gid of
+		the local process on newly created files, directories, and
+		devices (create, mkdir, mknod).
+  nosetuids     The client will not attempt to set the uid and gid on
+		on newly created files, directories, and devices (create, 
+		mkdir, mknod) which will result in the server setting the
+		uid and gid to the default (usually the server uid of the
+		usern who mounted the share).  Letting the server (rather than
+		the client) set the uid and gid is the default. This
+		parameter has no effect if the CIFS Unix Extensions are not
+		negotiated.
+		
 The mount.cifs mount helper also accepts a few mount options before -o
 including:
 
@@ -325,12 +374,10 @@ and for more extensive tracing including the start of smb requests and responses
 
 	echo 1 > /proc/fs/cifs/traceSMB
 
-Three other experimental features are under development and to test 
+Two other experimental features are under development and to test 
 require enabling an ifdef (e.g. by  adding "#define CIFS_FCNTL" in cifsglob.h)
 
 	CONFIG_CIFS_QUOTA
-
-	CONFIG_CIFS_XATTR
 
 	CONFIG_CIFS_FCNTL  (fcntl needed for support of directory change 
 			    notification and perhaps later for file leases)

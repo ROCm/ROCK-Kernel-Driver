@@ -59,7 +59,7 @@ snd_gf1_mem_block_t *snd_gf1_mem_xalloc(snd_gf1_mem_t * alloc,
 			else
 				nblock->prev->next = nblock;
 			up(&alloc->memory_mutex);
-			return 0;
+			return NULL;
 		}
 		pblock = pblock->next;
 	}

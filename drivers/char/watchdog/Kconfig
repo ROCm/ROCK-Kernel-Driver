@@ -95,6 +95,17 @@ config IXP4XX_WATCHDOG
 
 	  Say N if you are unsure.
 
+config IXP2000_WATCHDOG
+	tristate "IXP2000 Watchdog"
+	depends on WATCHDOG && ARCH_IXP2000
+	help
+	  Say Y here if to include support for the watchdog timer
+	  in the Intel IXP2000(2400, 2800, 2850) network processors.
+	  This driver can be built as a module by choosing M. The module
+	  will be called ixp2000_wdt.
+
+	  Say N if you are unsure.
+
 config SA1100_WATCHDOG
 	tristate "SA1100/PXA2xx watchdog"
 	depends on WATCHDOG && ( ARCH_SA1100 || ARCH_PXA )

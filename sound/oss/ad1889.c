@@ -338,7 +338,7 @@ int ad1889_read_proc (char *page, char **start, off_t off,
 		{ "AC97_3D_CONTROL", 0x100 + AC97_3D_CONTROL, 16 },
 		{ "AC97_MODEM_RATE", 0x100 + AC97_MODEM_RATE, 16 },
 		{ "AC97_POWER_CONTROL", 0x100 + AC97_POWER_CONTROL, 16 },
-		{ 0 }
+		{ NULL }
 	};
 
 	if (dev == NULL)
@@ -1017,7 +1017,7 @@ static int __devinit ad1889_probe(struct pci_dev *pcidev, const struct pci_devic
 	if ((err = ad1889_ac97_init(dev, 0)) != 0)
 		goto err_free_dsp;
 
-	if (((proc_root = proc_mkdir("driver/ad1889", 0)) == NULL) ||
+	if (((proc_root = proc_mkdir("driver/ad1889", NULL)) == NULL) ||
 	    create_proc_read_entry("ac97", S_IFREG|S_IRUGO, proc_root, ac97_read_proc, dev->ac97_codec) == NULL ||
 	    create_proc_read_entry("info", S_IFREG|S_IRUGO, proc_root, ad1889_read_proc, dev) == NULL) 
 		goto err_free_dsp;
@@ -1038,7 +1038,7 @@ err_free_irq:
 
 err_free_mem:
 	ad1889_free_dev(dev);
-	pci_set_drvdata(pcidev, 0);
+	pci_set_drvdata(pcidev, NULL);
 
 	return -ENODEV;
 }

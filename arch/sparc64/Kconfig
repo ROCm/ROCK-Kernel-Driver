@@ -139,7 +139,7 @@ config CPU_FREQ
 	  fly.  Currently there are only sparc64 drivers for UltraSPARC-III
 	  and UltraSPARC-IIe processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
 
@@ -159,7 +159,7 @@ config US3_FREQ
 	help
 	  This adds the CPUFreq driver for UltraSPARC-III processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
 
@@ -169,7 +169,7 @@ config US2E_FREQ
 	help
 	  This adds the CPUFreq driver for UltraSPARC-IIe processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
 
@@ -382,6 +382,7 @@ source "fs/Kconfig.binfmt"
 
 config SUNOS_EMUL
 	bool "SunOS binary emulation"
+	depends on BINFMT_AOUT32
 	help
 	  This allows you to run most SunOS binaries.  If you want to do this,
 	  say Y here and place appropriate files in /usr/gnemul/sunos. See
@@ -391,7 +392,7 @@ config SUNOS_EMUL
 
 config SOLARIS_EMUL
 	tristate "Solaris binary emulation (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on SPARC32_COMPAT && EXPERIMENTAL
 	help
 	  This is experimental code which will enable you to run (many)
 	  Solaris binaries on your SPARC Linux machine.

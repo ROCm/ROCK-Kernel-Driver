@@ -104,9 +104,7 @@ extern rwlock_t rt6_lock;
 
 /*
  *	Store a destination cache entry in a socket
- *	For UDP/RAW sockets this is done on udp_connect.
  */
-
 static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
 				     struct in6_addr *daddr)
 {

@@ -77,7 +77,6 @@ static void vgacon_deinit(struct vc_data *c);
 static void vgacon_cursor(struct vc_data *c, int mode);
 static int vgacon_switch(struct vc_data *c);
 static int vgacon_blank(struct vc_data *c, int blank, int mode_switch);
-static int vgacon_font_op(struct vc_data *c, struct console_font_op *op);
 static int vgacon_set_palette(struct vc_data *vc, unsigned char *table);
 static int vgacon_scrolldelta(struct vc_data *c, int lines);
 static int vgacon_set_origin(struct vc_data *c);
@@ -908,38 +907,43 @@ static int vgacon_adjust_height(struct vc_data *vc, unsigned fontheight)
 	return 0;
 }
 
-static int vgacon_font_op(struct vc_data *c, struct console_font_op *op)
+static int vgacon_font_set(struct vc_data *c, struct console_font *font, unsigned flags)
 {
+	unsigned charcount = font->charcount;
 	int rc;
 
 	if (vga_video_type < VIDEO_TYPE_EGAM)
 		return -EINVAL;
 
-	if (op->op == KD_FONT_OP_SET) {
-		if (op->width != 8
-		    || (op->charcount != 256 && op->charcount != 512))
-			return -EINVAL;
-		rc = vgacon_do_font_op(&state, op->data, 1, op->charcount == 512);
-		if (!rc && !(op->flags & KD_FONT_FLAG_DONT_RECALC))
-			rc = vgacon_adjust_height(c, op->height);
-	} else if (op->op == KD_FONT_OP_GET) {
-		op->width = 8;
-		op->height = c->vc_font.height;
-		op->charcount = vga_512_chars ? 512 : 256;
-		if (!op->data)
-			return 0;
-		rc = vgacon_do_font_op(&state, op->data, 0, 0);
-	} else
-		rc = -ENOSYS;
+	if (font->width != 8 || (charcount != 256 && charcount != 512))
+		return -EINVAL;
+
+	rc = vgacon_do_font_op(&state, font->data, 1, charcount == 512);
+	if (rc)
+		return rc;
+
+	if (!(flags & KD_FONT_FLAG_DONT_RECALC))
+		rc = vgacon_adjust_height(c, font->height);
 	return rc;
+}
+
+static int vgacon_font_get(struct vc_data *c, struct console_font *font)
+{
+	if (vga_video_type < VIDEO_TYPE_EGAM)
+		return -EINVAL;
+
+	font->width = 8;
+	font->height = c->vc_font.height;
+	font->charcount = vga_512_chars ? 512 : 256;
+	if (!font->data)
+		return 0;
+	return vgacon_do_font_op(&state, font->data, 0, 0);
 }
 
 #else
 
-static int vgacon_font_op(struct vc_data *c, struct console_font_op *op)
-{
-	return -ENOSYS;
-}
+#define vgacon_font_set NULL
+#define vgacon_font_get NULL
 
 #endif
 
@@ -1079,7 +1083,8 @@ const struct consw vga_con = {
 	.con_bmove = DUMMY,
 	.con_switch = vgacon_switch,
 	.con_blank = vgacon_blank,
-	.con_font_op = vgacon_font_op,
+	.con_font_set = vgacon_font_set,
+	.con_font_get = vgacon_font_get,
 	.con_set_palette = vgacon_set_palette,
 	.con_scrolldelta = vgacon_scrolldelta,
 	.con_set_origin = vgacon_set_origin,

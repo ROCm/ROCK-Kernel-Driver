@@ -109,6 +109,9 @@ extern ssize_t		ip_append_page(struct sock *sk, struct page *page,
 extern int		ip_push_pending_frames(struct sock *sk);
 extern void		ip_flush_pending_frames(struct sock *sk);
 
+/* datagram.c */
+extern int		ip4_datagram_connect(struct sock *sk, 
+					     struct sockaddr *uaddr, int addr_len);
 
 /*
  *	Map a multicast IP onto multicast MAC for type Token Ring.

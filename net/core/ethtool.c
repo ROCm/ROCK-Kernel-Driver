@@ -157,7 +157,7 @@ static int ethtool_get_regs(struct net_device *dev, char __user *useraddr)
 	if (copy_to_user(useraddr, &regs, sizeof(regs)))
 		goto out;
 	useraddr += offsetof(struct ethtool_regs, data);
-	if (copy_to_user(useraddr, regbuf, reglen))
+	if (copy_to_user(useraddr, regbuf, regs.len))
 		goto out;
 	ret = 0;
 

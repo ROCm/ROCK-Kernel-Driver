@@ -1121,15 +1121,9 @@ static int shmem_populate(struct vm_area_struct *vma,
 				return err;
 			}
 		} else if (nonblock) {
-	    		/*
-		 	 * If a nonlinear mapping then store the file page
-			 * offset in the pte.
-			 */
-			if (pgoff != linear_page_index(vma, addr)) {
-	    			err = install_file_pte(mm, vma, addr, pgoff, prot);
-				if (err)
-		    			return err;
-			}
+    			err = install_file_pte(mm, vma, addr, pgoff, prot);
+			if (err)
+	    			return err;
 		}
 
 		len -= PAGE_SIZE;

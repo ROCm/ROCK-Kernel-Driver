@@ -1322,7 +1322,7 @@ static unsigned int dv1394_poll(struct file *file, struct poll_table_struct *wai
 static int dv1394_fasync(int fd, struct file *file, int on)
 {
 	/* I just copied this code verbatim from Alan Cox's mouse driver example
-	   (linux/Documentation/DocBook/) */
+	   (Documentation/DocBook/) */
 
 	struct video_card *video = file_to_video_card(file);
 
@@ -2518,7 +2518,7 @@ static int handle_dv1394_init(unsigned int fd, unsigned int cmd, unsigned long a
 	if (file->f_op->ioctl != dv1394_ioctl)
 		return -EFAULT;
 
-	if (copy_from_user(&dv32, (void *)arg, sizeof(dv32)))
+	if (copy_from_user(&dv32, (void __user *)arg, sizeof(dv32)))
 		return -EFAULT;
 
 	dv.api_version = dv32.api_version;
@@ -2568,7 +2568,7 @@ static int handle_dv1394_get_status(unsigned int fd, unsigned int cmd, unsigned 
 		dv32.n_clear_frames = dv.n_clear_frames;
 		dv32.dropped_frames = dv.dropped_frames;
 
-		if (copy_to_user((struct dv1394_status32 *)arg, &dv32, sizeof(dv32)))
+		if (copy_to_user((struct dv1394_status32 __user *)arg, &dv32, sizeof(dv32)))
 			ret = -EFAULT;
 	}
 

@@ -1075,7 +1075,7 @@ static struct s_fpmc* mac_get_mc_table(struct s_smc *smc,
 		for (i = 0 ; i < 6 ; i++, p++)
 			*p = canonical[*p] ;
 	}
-	slot = 0 ;
+	slot = NULL;
 	for (i = 0, tb = smc->hw.fp.mc.table ; i < FPMAX_MULTICAST ; i++, tb++){
 		if (!tb->n) {		/* not used */
 			if (!del && !slot)	/* if !del save first free */

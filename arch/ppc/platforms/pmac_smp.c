@@ -421,7 +421,7 @@ static void __init smp_psurge_setup_cpu(int cpu_nr)
 		/* reset the entry point so if we get another intr we won't
 		 * try to startup again */
 		out_be32(psurge_start, 0x100);
-		if (request_irq(30, psurge_primary_intr, SA_INTERRUPT, "primary IPI", 0))
+		if (request_irq(30, psurge_primary_intr, SA_INTERRUPT, "primary IPI", NULL))
 			printk(KERN_ERR "Couldn't get primary IPI interrupt");
 	}
 

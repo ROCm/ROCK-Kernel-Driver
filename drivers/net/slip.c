@@ -954,7 +954,7 @@ slip_close(struct tty_struct *tty)
 	if (!sl || sl->magic != SLIP_MAGIC || sl->tty != tty)
 		return;
 
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	sl->tty = NULL;
 	if (!sl->leased)
 		sl->line = 0;

@@ -924,7 +924,7 @@ static void __init aty128_get_pllinfo(struct aty128fb_par *par, unsigned char *b
 
 }           
 
-#ifdef __i386__
+#ifdef CONFIG_X86
 static void *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
 {
 	/* I simplified this code as we used to miss the signatures in
@@ -946,7 +946,7 @@ static void *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
         }
 	return rom_base;
 }
-#endif /* __i386__ */
+#endif
 #endif /* ndef(__sparc__) */
 
 /* fill in known card constants if pll_block is not available */
@@ -1950,7 +1950,7 @@ static int __init aty128_probe(struct pci_dev *pdev, const struct pci_device_id 
 
 #ifndef __sparc__
 	bios = aty128_map_ROM(par, pdev);
-#ifdef __i386__
+#ifdef CONFIG_X86
 	if (bios == NULL)
 		bios = aty128_find_mem_vbios(par);
 #endif
@@ -2149,7 +2149,7 @@ static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	case FBIO_ATY128_SET_MIRROR:
 		if (par->chip_gen != rage_M3)
 			return -EINVAL;
-		rc = get_user(value, (__u32*)arg);
+		rc = get_user(value, (__u32 __user *)arg);
 		if (rc)
 			return rc;
 		par->lcd_on = (value & 0x01) != 0;
@@ -2163,7 +2163,7 @@ static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		if (par->chip_gen != rage_M3)
 			return -EINVAL;
 		value = (par->crt_on << 1) | par->lcd_on;
-		return put_user(value, (__u32*)arg);
+		return put_user(value, (__u32 __user *)arg);
 	}
 #endif
 	return -EINVAL;
@@ -2419,7 +2419,7 @@ static int aty128_pci_resume(struct pci_dev *pdev)
 	wait_for_idle(par);
 	aty128fb_set_par(info);
 	fb_pan_display(info, &info->var);
-	fb_set_cmap(&info->cmap, 1, info);
+	fb_set_cmap(&info->cmap, info);
 
 	/* Refresh */
 	fb_set_suspend(info, 0);

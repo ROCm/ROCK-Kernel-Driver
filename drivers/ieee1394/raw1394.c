@@ -55,13 +55,8 @@
 #include "raw1394.h"
 #include "raw1394-private.h"
 
-#if BITS_PER_LONG == 64
-#define int2ptr(x) ((void __user *)x)
+#define int2ptr(x) ((void __user *)(unsigned long)x)
 #define ptr2int(x) ((u64)(unsigned long)(void __user *)x)
-#else
-#define int2ptr(x) ((void __user *)(u32)x)
-#define ptr2int(x) ((u64)(unsigned long)(void __user *)x)
-#endif
 
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 #define RAW1394_DEBUG
@@ -1629,7 +1624,7 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
         if (another_host) {
                 DBGMSG("another hosts entry is valid -> SUCCESS");
                 if (copy_to_user(int2ptr(req->req.recvb),
-                        int2ptr(&addr->start),sizeof(u64))) {
+                        &addr->start,sizeof(u64))) {
                         printk(KERN_ERR "raw1394: arm_register failed "
                               " address-range-entry is invalid -> EFAULT !!!\n");
                         vfree(addr->addr_space_buffer);

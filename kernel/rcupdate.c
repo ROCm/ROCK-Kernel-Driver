@@ -210,16 +210,18 @@ static void rcu_check_quiescent_state(void)
  * locking requirements, the list it's pulling from has to belong to a cpu
  * which is dead and hence not processing interrupts.
  */
-static void rcu_move_batch(struct list_head *list)
+static void rcu_move_batch(struct rcu_head *list)
 {
-	struct list_head *entry;
-	int cpu = smp_processor_id();
+	int cpu;
 
 	local_irq_disable();
-	while (!list_empty(list)) {
-		entry = list->next;
-		list_del(entry);
-		list_add_tail(entry, &RCU_nxtlist(cpu));
+
+	cpu = smp_processor_id();
+
+	while (list != NULL) {
+		*RCU_nxttail(cpu) = list;
+		RCU_nxttail(cpu) = &list->next;
+		list = list->next;
 	}
 	local_irq_enable();
 }
@@ -233,11 +235,10 @@ static void rcu_offline_cpu(int cpu)
 	spin_lock_bh(&rcu_state.mutex);
 	if (rcu_ctrlblk.cur != rcu_ctrlblk.completed)
 		cpu_quiet(cpu);
-unlock:
 	spin_unlock_bh(&rcu_state.mutex);
 
-	rcu_move_batch(&RCU_curlist(cpu));
-	rcu_move_batch(&RCU_nxtlist(cpu));
+	rcu_move_batch(RCU_curlist(cpu));
+	rcu_move_batch(RCU_nxtlist(cpu));
 
 	tasklet_kill_immediate(&RCU_tasklet(cpu), cpu);
 }

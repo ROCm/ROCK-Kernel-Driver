@@ -2892,7 +2892,7 @@ static int velocity_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd
 	struct velocity_info *vptr = dev->priv;
 	struct mac_regs * regs = vptr->mac_regs;
 	unsigned long flags;
-	struct mii_ioctl_data *miidata = (struct mii_ioctl_data *) &(ifr->ifr_data);
+	struct mii_ioctl_data *miidata = if_mii(ifr);
 	int err;
 	
 	switch (cmd) {

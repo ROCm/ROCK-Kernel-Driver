@@ -714,7 +714,7 @@ static inline void soc_init(struct sbus_dev *sdev, int no)
 static int __init soc_probe(void)
 {
 	struct sbus_bus *sbus;
-	struct sbus_dev *sdev = 0;
+	struct sbus_dev *sdev = NULL;
 	struct soc *s;
 	int cards = 0;
 

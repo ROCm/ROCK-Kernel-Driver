@@ -32,14 +32,10 @@
 #define TRUE 1
 #endif
 
-extern int map_cifs_error(int error_class, int error_code,
-			  int status_codes_negotiated);
-
 extern struct address_space_operations cifs_addr_ops;
 
 /* Functions related to super block operations */
 extern struct super_operations cifs_super_ops;
-extern void cifs_put_inode(struct inode *);
 extern void cifs_read_inode(struct inode *);
 extern void cifs_delete_inode(struct inode *);
 /* extern void cifs_write_inode(struct inode *); *//* BB not needed yet */

@@ -49,10 +49,10 @@ anslcd_write_byte_data ( unsigned char c )
 }
 
 static ssize_t __pmac
-anslcd_write( struct file * file, const char * buf, 
+anslcd_write( struct file * file, const char __user * buf, 
 				size_t count, loff_t *ppos )
 {
-	const char * p = buf;
+	const char __user *p = buf;
 	int i;
 
 #ifdef DEBUG
@@ -75,7 +75,7 @@ static int __pmac
 anslcd_ioctl( struct inode * inode, struct file * file,
 				unsigned int cmd, unsigned long arg )
 {
-	char ch, *temp;
+	char ch, __user *temp;
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "LCD: ioctl(%d,%d)\n",cmd,arg);
@@ -91,7 +91,7 @@ anslcd_ioctl( struct inode * inode, struct file * file,
 		anslcd_write_byte_ctrl ( 0x02 );
 		return 0;
 	case ANSLCD_SENDCTRL:
-		temp = (char *) arg;
+		temp = (char __user *) arg;
 		__get_user(ch, temp);
 		for (; ch; temp++) { /* FIXME: This is ugly, but should work, as a \0 byte is not a valid command code */
 			anslcd_write_byte_ctrl ( ch );
@@ -136,7 +136,7 @@ const char anslcd_logo[] =	"********************"  /* Line #1 */
 				"*    Welcome to    *"  /* Line #2 */
 				"********************"; /* Line #4 */
 
-int __init
+static int __init
 anslcd_init(void)
 {
 	int a;
@@ -173,5 +173,12 @@ anslcd_init(void)
 	return 0;
 }
 
-__initcall(anslcd_init);
+static void __exit
+anslcd_exit(void)
+{
+	misc_deregister(&anslcd_dev);
+	iounmap(anslcd_ptr);
+}
 
+module_init(anslcd_init);
+module_exit(anslcd_exit);

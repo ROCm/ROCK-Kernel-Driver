@@ -278,7 +278,7 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct cg14_par *par = (struct cg14_par *) info->par;
 	struct cg14_regs *regs = par->regs;
-	struct mdi_cfginfo kmdi, *mdii;
+	struct mdi_cfginfo kmdi, __user *mdii;
 	unsigned long flags;
 	int cur_mode, mode, ret = 0;
 
@@ -301,13 +301,13 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		kmdi.mdi_size = par->ramsize;
 		spin_unlock_irqrestore(&par->lock, flags);
 
-		mdii = (struct mdi_cfginfo *) arg;
+		mdii = (struct mdi_cfginfo __user *) arg;
 		if (copy_to_user(mdii, &kmdi, sizeof(kmdi)))
 			ret = -EFAULT;
 		break;
 
 	case MDI_SET_PIXELMODE:
-		if (get_user(mode, (int *) arg)) {
+		if (get_user(mode, (int __user *) arg)) {
 			ret = -EFAULT;
 			break;
 		}

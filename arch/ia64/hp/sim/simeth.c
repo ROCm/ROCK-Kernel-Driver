@@ -527,13 +527,4 @@ set_multicast_list(struct net_device *dev)
 	printk(KERN_WARNING "%s: set_multicast_list called\n", dev->name);
 }
 
-#ifdef CONFIG_NET_FASTROUTE
-static int
-simeth_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
-{
-	printk(KERN_WARNING "%s: simeth_accept_fastpath called\n", dev->name);
-	return -1;
-}
-#endif
-
 __initcall(simeth_probe);

@@ -14,7 +14,10 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/compat.h>
+
+#ifdef CONFIG_COMPAT
 
 typedef union sigval32 {
 	int sival_int;
@@ -72,6 +75,7 @@ typedef struct siginfo32 {
 		} _sigpoll;
 	} _sifields;
 } siginfo_t32;
+#endif /* CONFIG_COMPAT */
 
 #endif /* __KERNEL__ */
 
@@ -84,6 +88,8 @@ typedef struct siginfo32 {
 #define NSIGEMT		1
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 
 typedef struct sigevent32 {
 	sigval_t32 sigev_value;
@@ -100,6 +106,8 @@ typedef struct sigevent32 {
 } sigevent_t32;
 
 extern int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from);
+
+#endif /* CONFIG_COMPAT */
 
 #endif /* __KERNEL__ */
 

@@ -52,12 +52,51 @@
 #include <asm/rtas.h>
 #include <asm/ppcdebug.h>
 
+static unsigned char ras_log_buf[RTAS_ERROR_LOG_MAX];
+static spinlock_t ras_log_buf_lock = SPIN_LOCK_UNLOCKED;
+
+static int ras_get_sensor_state_token;
+static int ras_check_exception_token;
+
+#define EPOW_SENSOR_TOKEN	9
+#define EPOW_SENSOR_INDEX	0
+#define RAS_VECTOR_OFFSET	0x500
+
 static irqreturn_t ras_epow_interrupt(int irq, void *dev_id,
 					struct pt_regs * regs);
 static irqreturn_t ras_error_interrupt(int irq, void *dev_id,
 					struct pt_regs * regs);
 
 /* #define DEBUG */
+
+static void request_ras_irqs(struct device_node *np, char *propname,
+			irqreturn_t (*handler)(int, void *, struct pt_regs *),
+			const char *name)
+{
+	unsigned int *ireg, len, i;
+	int virq, n_intr;
+
+	ireg = (unsigned int *)get_property(np, propname, &len);
+	if (ireg == NULL)
+		return;
+	n_intr = prom_n_intr_cells(np);
+	len /= n_intr * sizeof(*ireg);
+
+	for (i = 0; i < len; i++) {
+		virq = virt_irq_create_mapping(*ireg);
+		if (virq == NO_IRQ) {
+			printk(KERN_ERR "Unable to allocate interrupt "
+			       "number for %s\n", np->full_name);
+			return;
+		}
+		if (request_irq(irq_offset_up(virq), handler, 0, name, NULL)) {
+			printk(KERN_ERR "Unable to request interrupt %d for "
+			       "%s\n", irq_offset_up(virq), np->full_name);
+			return;
+		}
+		ireg += n_intr;
+	}
+}
 
 /*
  * Initialize handlers for the set of interrupts caused by hardware errors
@@ -66,51 +105,33 @@ static irqreturn_t ras_error_interrupt(int irq, void *dev_id,
 static int __init init_ras_IRQ(void)
 {
 	struct device_node *np;
-	unsigned int *ireg, len, i;
-	int virq;
 
-	if ((np = of_find_node_by_path("/event-sources/internal-errors")) &&
-	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
-						 &len))) {
-		for (i=0; i<(len / sizeof(*ireg)); i++) {
-			virq = virt_irq_create_mapping(*(ireg));
-			if (virq == NO_IRQ) {
-				printk(KERN_ERR "Unable to allocate interrupt "
-				       "number for %s\n", np->full_name);
-				break;
-			}
-			request_irq(irq_offset_up(virq),
-				    ras_error_interrupt, 0, 
-				    "RAS_ERROR", NULL);
-			ireg++;
-		}
-	}
-	of_node_put(np);
+	ras_get_sensor_state_token = rtas_token("get-sensor-state");
+	ras_check_exception_token = rtas_token("check-exception");
 
-	if ((np = of_find_node_by_path("/event-sources/epow-events")) &&
-	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
-						 &len))) {
-		for (i=0; i<(len / sizeof(*ireg)); i++) {
-			virq = virt_irq_create_mapping(*(ireg));
-			if (virq == NO_IRQ) {
-				printk(KERN_ERR "Unable to allocate interrupt "
-				       " number for %s\n", np->full_name);
-				break;
-			}
-			request_irq(irq_offset_up(virq),
-				    ras_epow_interrupt, 0, 
-				    "RAS_EPOW", NULL);
-			ireg++;
-		}
+	/* Internal Errors */
+	np = of_find_node_by_path("/event-sources/internal-errors");
+	if (np != NULL) {
+		request_ras_irqs(np, "open-pic-interrupt", ras_error_interrupt,
+				 "RAS_ERROR");
+		request_ras_irqs(np, "interrupts", ras_error_interrupt,
+				 "RAS_ERROR");
+		of_node_put(np);
 	}
-	of_node_put(np);
+
+	/* EPOW Events */
+	np = of_find_node_by_path("/event-sources/epow-events");
+	if (np != NULL) {
+		request_ras_irqs(np, "open-pic-interrupt", ras_epow_interrupt,
+				 "RAS_EPOW");
+		request_ras_irqs(np, "interrupts", ras_epow_interrupt,
+				 "RAS_EPOW");
+		of_node_put(np);
+	}
 
 	return 1;
 }
 __initcall(init_ras_IRQ);
-
-static struct rtas_error_log log_buf;
-static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Handle power subsystem events (EPOW).
@@ -122,30 +143,35 @@ static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
 static irqreturn_t
 ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
-	struct rtas_error_log log_entry;
-	unsigned int size = sizeof(log_entry);
 	int status = 0xdeadbeef;
+	int state = 0;
+	int critical;
 
-	spin_lock(&log_lock);
+	status = rtas_call(ras_get_sensor_state_token, 2, 2, &state,
+			   EPOW_SENSOR_TOKEN, EPOW_SENSOR_INDEX);
 
-	status = rtas_call(rtas_token("check-exception"), 6, 1, NULL, 
-			   0x500, irq, 
-			   RTAS_EPOW_WARNING | RTAS_POWERMGM_EVENTS, 
-			   1,  /* Time Critical */
-			   __pa(&log_buf), size);
+	if (state > 3)
+		critical = 1;  /* Time Critical */
+	else
+		critical = 0;
 
-	log_entry = log_buf;
+	spin_lock(&ras_log_buf_lock);
 
-	spin_unlock(&log_lock);
+	status = rtas_call(ras_check_exception_token, 6, 1, NULL,
+			   RAS_VECTOR_OFFSET,
+			   virt_irq_to_real(irq_offset_down(irq)),
+			   RTAS_EPOW_WARNING | RTAS_POWERMGM_EVENTS,
+			   critical, __pa(&ras_log_buf), RTAS_ERROR_LOG_MAX);
 
-	udbg_printf("EPOW <0x%lx 0x%x>\n",
-		    *((unsigned long *)&log_entry), status); 
-	printk(KERN_WARNING 
-		"EPOW <0x%lx 0x%x>\n",*((unsigned long *)&log_entry), status);
+	udbg_printf("EPOW <0x%lx 0x%x 0x%x>\n",
+		    *((unsigned long *)&ras_log_buf), status, state);
+	printk(KERN_WARNING "EPOW <0x%lx 0x%x 0x%x>\n",
+	       *((unsigned long *)&ras_log_buf), status, state);
 
 	/* format and print the extended information */
-	log_error((char *)&log_entry, ERR_TYPE_RTAS_LOG, 0);
-	
+	log_error(ras_log_buf, ERR_TYPE_RTAS_LOG, 0);
+
+	spin_unlock(&ras_log_buf_lock);
 	return IRQ_HANDLED;
 }
 
@@ -160,37 +186,33 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 static irqreturn_t
 ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
-	struct rtas_error_log log_entry;
-	unsigned int size = sizeof(log_entry);
+	struct rtas_error_log *rtas_elog;
 	int status = 0xdeadbeef;
 	int fatal;
 
-	spin_lock(&log_lock);
+	spin_lock(&ras_log_buf_lock);
 
-	status = rtas_call(rtas_token("check-exception"), 6, 1, NULL, 
-			   0x500, irq, 
-			   RTAS_INTERNAL_ERROR, 
-			   1, /* Time Critical */
-			   __pa(&log_buf), size);
+	status = rtas_call(ras_check_exception_token, 6, 1, NULL,
+			   RAS_VECTOR_OFFSET,
+			   virt_irq_to_real(irq_offset_down(irq)),
+			   RTAS_INTERNAL_ERROR, 1 /*Time Critical */,
+			   __pa(&ras_log_buf), RTAS_ERROR_LOG_MAX);
 
-	log_entry = log_buf;
+	rtas_elog = (struct rtas_error_log *)ras_log_buf;
 
-	spin_unlock(&log_lock);
-
-	if ((status == 0) && (log_entry.severity >= SEVERITY_ERROR_SYNC)) 
+	if ((status == 0) && (rtas_elog->severity >= SEVERITY_ERROR_SYNC))
 		fatal = 1;
 	else
 		fatal = 0;
 
 	/* format and print the extended information */
-	log_error((char *)&log_entry, ERR_TYPE_RTAS_LOG, fatal); 
+	log_error(ras_log_buf, ERR_TYPE_RTAS_LOG, fatal);
 
 	if (fatal) {
-		udbg_printf("HW Error <0x%lx 0x%x>\n",
-			    *((unsigned long *)&log_entry), status);
-		printk(KERN_EMERG 
-		       "Error: Fatal hardware error <0x%lx 0x%x>\n",
-		       *((unsigned long *)&log_entry), status);
+		udbg_printf("Fatal HW Error <0x%lx 0x%x>\n",
+			    *((unsigned long *)&ras_log_buf), status);
+		printk(KERN_EMERG "Error: Fatal hardware error <0x%lx 0x%x>\n",
+		       *((unsigned long *)&ras_log_buf), status);
 
 #ifndef DEBUG
 		/* Don't actually power off when debugging so we can test
@@ -201,10 +223,12 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 	} else {
 		udbg_printf("Recoverable HW Error <0x%lx 0x%x>\n",
-			    *((unsigned long *)&log_entry), status); 
-		printk(KERN_WARNING 
+			    *((unsigned long *)&ras_log_buf), status);
+		printk(KERN_WARNING
 		       "Warning: Recoverable hardware error <0x%lx 0x%x>\n",
-		       *((unsigned long *)&log_entry), status);
+		       *((unsigned long *)&ras_log_buf), status);
 	}
+
+	spin_unlock(&ras_log_buf_lock);
 	return IRQ_HANDLED;
 }

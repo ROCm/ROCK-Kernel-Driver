@@ -30,6 +30,94 @@
  */
 
 #include <linux/types.h>
+#include <asm/debug.h>
+
+/**
+ * Debug Facility stuff
+ */
+#define IUCV_DBF_SETUP_NAME "iucv_setup"
+#define IUCV_DBF_SETUP_LEN 32
+#define IUCV_DBF_SETUP_INDEX 1
+#define IUCV_DBF_SETUP_NR_AREAS 1
+#define IUCV_DBF_SETUP_LEVEL 3
+
+#define IUCV_DBF_DATA_NAME "iucv_data"
+#define IUCV_DBF_DATA_LEN 128
+#define IUCV_DBF_DATA_INDEX 1
+#define IUCV_DBF_DATA_NR_AREAS 1
+#define IUCV_DBF_DATA_LEVEL 2
+
+#define IUCV_DBF_TRACE_NAME "iucv_trace"
+#define IUCV_DBF_TRACE_LEN 16
+#define IUCV_DBF_TRACE_INDEX 2
+#define IUCV_DBF_TRACE_NR_AREAS 1
+#define IUCV_DBF_TRACE_LEVEL 3
+
+#define IUCV_DBF_TEXT(name,level,text) \
+	do { \
+		debug_text_event(iucv_dbf_##name,level,text); \
+	} while (0)
+
+#define IUCV_DBF_HEX(name,level,addr,len) \
+	do { \
+		debug_event(iucv_dbf_##name,level,(void*)(addr),len); \
+	} while (0)
+
+extern DEFINE_PER_CPU(char[256], iucv_dbf_txt_buf);
+
+#define IUCV_DBF_TEXT_(name,level,text...)				\
+	do {								\
+		char* iucv_dbf_txt_buf = get_cpu_var(iucv_dbf_txt_buf);	\
+		sprintf(iucv_dbf_txt_buf, text);		  	\
+		debug_text_event(iucv_dbf_##name,level,iucv_dbf_txt_buf); \
+		put_cpu_var(iucv_dbf_txt_buf);				\
+	} while (0)
+
+#define IUCV_DBF_SPRINTF(name,level,text...) \
+	do { \
+		debug_sprintf_event(iucv_dbf_trace, level, ##text ); \
+		debug_sprintf_event(iucv_dbf_trace, level, text ); \
+	} while (0)
+
+/**
+ * some more debug stuff
+ */
+#define IUCV_HEXDUMP16(importance,header,ptr) \
+PRINT_##importance(header "%02x %02x %02x %02x  %02x %02x %02x %02x  " \
+		   "%02x %02x %02x %02x  %02x %02x %02x %02x\n", \
+		   *(((char*)ptr)),*(((char*)ptr)+1),*(((char*)ptr)+2), \
+		   *(((char*)ptr)+3),*(((char*)ptr)+4),*(((char*)ptr)+5), \
+		   *(((char*)ptr)+6),*(((char*)ptr)+7),*(((char*)ptr)+8), \
+		   *(((char*)ptr)+9),*(((char*)ptr)+10),*(((char*)ptr)+11), \
+		   *(((char*)ptr)+12),*(((char*)ptr)+13), \
+		   *(((char*)ptr)+14),*(((char*)ptr)+15)); \
+PRINT_##importance(header "%02x %02x %02x %02x  %02x %02x %02x %02x  " \
+		   "%02x %02x %02x %02x  %02x %02x %02x %02x\n", \
+		   *(((char*)ptr)+16),*(((char*)ptr)+17), \
+		   *(((char*)ptr)+18),*(((char*)ptr)+19), \
+		   *(((char*)ptr)+20),*(((char*)ptr)+21), \
+		   *(((char*)ptr)+22),*(((char*)ptr)+23), \
+		   *(((char*)ptr)+24),*(((char*)ptr)+25), \
+		   *(((char*)ptr)+26),*(((char*)ptr)+27), \
+		   *(((char*)ptr)+28),*(((char*)ptr)+29), \
+		   *(((char*)ptr)+30),*(((char*)ptr)+31));
+
+static inline void
+iucv_hex_dump(unsigned char *buf, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++) {
+		if (i && !(i % 16))
+			printk("\n");
+		printk("%02x ", *(buf + i));
+	}
+	printk("\n");
+}
+/**
+ * end of debug stuff
+ */
+
 #define uchar  unsigned char
 #define ushort unsigned short
 #define ulong  unsigned long

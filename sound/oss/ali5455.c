@@ -1583,7 +1583,7 @@ static ssize_t ali_read(struct file *file, char __user *buffer,
 			size_t count, loff_t * ppos)
 {
 	struct ali_state *state = (struct ali_state *) file->private_data;
-	struct ali_card *card = state ? state->card : 0;
+	struct ali_card *card = state ? state->card : NULL;
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;
@@ -1724,7 +1724,7 @@ static ssize_t ali_write(struct file *file,
 			 const char __user *buffer, size_t count, loff_t * ppos)
 {
 	struct ali_state *state = (struct ali_state *) file->private_data;
-	struct ali_card *card = state ? state->card : 0;
+	struct ali_card *card = state ? state->card : NULL;
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;

@@ -247,10 +247,10 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		loff_t pos = fd_offset;
 		/* Fuck me plenty... */
 		error = do_brk(N_TXTADDR(ex), ex.a_text);
-		bprm->file->f_op->read(bprm->file, (char *) N_TXTADDR(ex),
+		bprm->file->f_op->read(bprm->file, (char __user *)N_TXTADDR(ex),
 			  ex.a_text, &pos);
 		error = do_brk(N_DATADDR(ex), ex.a_data);
-		bprm->file->f_op->read(bprm->file, (char *) N_DATADDR(ex),
+		bprm->file->f_op->read(bprm->file, (char __user *)N_DATADDR(ex),
 			  ex.a_data, &pos);
 		goto beyond_if;
 	}
@@ -259,7 +259,7 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		loff_t pos = fd_offset;
 		do_brk(N_TXTADDR(ex) & PAGE_MASK,
 			ex.a_text+ex.a_data + PAGE_SIZE - 1);
-		bprm->file->f_op->read(bprm->file, (char *) N_TXTADDR(ex),
+		bprm->file->f_op->read(bprm->file, (char __user *)N_TXTADDR(ex),
 			  ex.a_text+ex.a_data, &pos);
 	} else {
 		static unsigned long error_time;
@@ -273,7 +273,8 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		if (!bprm->file->f_op->mmap) {
 			loff_t pos = fd_offset;
 			do_brk(0, ex.a_text+ex.a_data);
-			bprm->file->f_op->read(bprm->file,(char *)N_TXTADDR(ex),
+			bprm->file->f_op->read(bprm->file,
+				  (char __user *)N_TXTADDR(ex),
 				  ex.a_text+ex.a_data, &pos);
 			goto beyond_if;
 		}

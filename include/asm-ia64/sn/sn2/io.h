@@ -8,10 +8,11 @@
 
 #ifndef _ASM_SN_SN2_IO_H
 #define _ASM_SN_SN2_IO_H
-
-extern void * sn_io_addr(unsigned long port); /* Forward definition */
-extern void sn_mmiob(void); /* Forward definition */
+#include <linux/compiler.h>
 #include <asm/intrinsics.h>
+
+extern void * sn_io_addr(unsigned long port) __attribute_const__; /* Forward definition */
+extern void sn_mmiob(void); /* Forward definition */
 
 #define __sn_mf_a()   ia64_mfa()
 

@@ -89,7 +89,7 @@ process_line(struct conf_writedata *cnf)
 /* write conf file -> boot or send cfg line to card */
 /****************************************************/
 static ssize_t
-hysdn_conf_write(struct file *file, const char *buf, size_t count, loff_t * off)
+hysdn_conf_write(struct file *file, const char __user *buf, size_t count, loff_t * off)
 {
 	struct conf_writedata *cnf;
 	int i;
@@ -209,7 +209,7 @@ hysdn_conf_write(struct file *file, const char *buf, size_t count, loff_t * off)
 /* read conf file -> output card info data */
 /*******************************************/
 static ssize_t
-hysdn_conf_read(struct file *file, char *buf, size_t count, loff_t * off)
+hysdn_conf_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 {
 	char *cp;
 	int i;

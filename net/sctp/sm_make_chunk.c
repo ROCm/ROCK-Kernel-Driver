@@ -1846,9 +1846,8 @@ int sctp_process_init(struct sctp_association *asoc, sctp_cid_t cid,
 		if (unlikely(!idr_pre_get(&sctp_assocs_id, gfp)))
 			goto clean_up;
 		spin_lock_bh(&sctp_assocs_id_lock);
-		error = idr_get_new(&sctp_assocs_id,
-				    (void *)asoc,
-				    &assoc_id);
+		error = idr_get_new_above(&sctp_assocs_id, (void *)asoc, 1,
+					  &assoc_id);
 		spin_unlock_bh(&sctp_assocs_id_lock);
 		if (error == -EAGAIN)
 			goto retry;

@@ -15,6 +15,7 @@
 	.text
 	.align	4
 
+#ifdef CONFIG_COMPAT
 	/* First, the 32-bit Linux native syscall table. */
 
 	.globl sys_call_table32
@@ -53,13 +54,13 @@ sys_call_table32:
 	.word compat_sys_fcntl64, sys_ni_syscall, compat_sys_statfs, compat_sys_fstatfs, sys_oldumount
 /*160*/	.word compat_sys_sched_setaffinity, compat_sys_sched_getaffinity, sys32_getdomainname, sys32_setdomainname, sys_nis_syscall
 	.word sys_quotactl, sys_set_tid_address, compat_sys_mount, sys_ustat, sys32_setxattr
-/*170*/	.word sys32_lsetxattr, sys32_fsetxattr, sys_getxattr, sys_lgetxattr, sys32_getdents
+/*170*/	.word sys32_lsetxattr, sys32_fsetxattr, sys_getxattr, sys_lgetxattr, compat_sys_getdents
 	.word sys_setsid, sys_fchdir, sys32_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.word sys32_flistxattr, sys_removexattr, sys_lremovexattr, compat_sys_sigpending, sys_ni_syscall
 	.word sys32_setpgid, sys32_fremovexattr, sys32_tkill, sys32_exit_group, sparc64_newuname
 /*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys32_epoll_create, sys32_epoll_ctl
 	.word sys32_epoll_wait, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
-/*200*/	.word sys32_ssetmask, sys_sigsuspend, compat_sys_newlstat, sys_uselib, old32_readdir
+/*200*/	.word sys32_ssetmask, sys_sigsuspend, compat_sys_newlstat, sys_uselib, compat_old_readdir
 	.word sys32_readahead, sys32_socketcall, sys32_syslog, sys32_lookup_dcookie, sys32_fadvise64
 /*210*/	.word sys32_fadvise64_64, sys32_tgkill, sys32_waitpid, sys_swapoff, sys32_sysinfo
 	.word sys32_ipc, sys32_sigreturn, sys_clone, sys_nis_syscall, sys32_adjtimex
@@ -77,6 +78,8 @@ sys_call_table32:
 	.word sys_mq_timedsend, sys_mq_timedreceive, compat_sys_mq_notify, compat_sys_mq_getsetattr, sys_ni_syscall
 /*280*/	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
 
+#endif /* CONFIG_COMPAT */
+
 	/* Now the 64-bit native Linux syscall table. */
 
 	.align	4
@@ -85,7 +88,7 @@ sys_call_table64:
 sys_call_table:
 /*0*/	.word sys_restart_syscall, sparc_exit, sys_fork, sys_read, sys_write
 /*5*/	.word sys_open, sys_close, sys_wait4, sys_creat, sys_link
-/*10*/  .word sys_unlink, sunos_execv, sys_chdir, sys_chown, sys_mknod
+/*10*/  .word sys_unlink, sys_nis_syscall, sys_chdir, sys_chown, sys_mknod
 /*15*/	.word sys_chmod, sys_lchown, sparc_brk, sys_perfctr, sys_lseek
 /*20*/	.word sys_getpid, sys_capget, sys_capset, sys_setuid, sys_getuid
 /*25*/	.word sys_nis_syscall, sys_ptrace, sys_alarm, sys_sigaltstack, sys_nis_syscall

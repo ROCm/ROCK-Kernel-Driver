@@ -1302,7 +1302,7 @@ static void sym_log_hard_error(hcb_p np, u_short sist, u_char dstat)
 	} else {
 		script_ofs	= dsp;
 		script_size	= 0;
-		script_base	= 0;
+		script_base	= NULL;
 		script_name	= "mem";
 	}
 
@@ -1440,7 +1440,7 @@ sym_lookup_pci_chip_table (u_short device_id, u_char revision)
 		return chip;
 	}
 
-	return 0;
+	return NULL;
 }
 
 #if SYM_CONF_DMA_ADDRESSING_MODE == 2
@@ -2490,7 +2490,7 @@ static void sym_int_ma (hcb_p np)
 	 *  try to find the interrupted script command,
 	 *  and the address at which to continue.
 	 */
-	vdsp	= 0;
+	vdsp	= NULL;
 	nxtdsp	= 0;
 	if	(dsp >  np->scripta_ba &&
 		 dsp <= np->scripta_ba + np->scripta_sz) {
@@ -3400,7 +3400,7 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 		 *  we are not in race.
 		 */
 		i = 0;
-		cp = 0;
+		cp = NULL;
 		FOR_EACH_QUEUED_ELEMENT(&np->busy_ccbq, qp) {
 			cp = sym_que_entry(qp, struct sym_ccb, link_ccbq);
 			if (cp->host_status != HS_BUSY &&
@@ -3516,7 +3516,7 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 		 *  abort for this target.
 		 */
 		i = 0;
-		cp = 0;
+		cp = NULL;
 		FOR_EACH_QUEUED_ELEMENT(&np->busy_ccbq, qp) {
 			cp = sym_que_entry(qp, struct sym_ccb, link_ccbq);
 			if (cp->host_status != HS_DISCONNECT)
@@ -3698,7 +3698,7 @@ static int sym_evaluate_dp(hcb_p np, ccb_p cp, u32 scr, int *ofs)
 	else if (dp_scr == SCRIPTA_BA (np, pm1_data))
 		pm = &cp->phys.pm1;
 	else
-		pm = 0;
+		pm = NULL;
 
 	if (pm) {
 		dp_scr  = scr_to_cpu(pm->ret);
@@ -4946,7 +4946,7 @@ void sym_free_ccb (hcb_p np, ccb_p cp)
 	 *  used for negotiation, clear this info in the tcb.
 	 */
 	if (cp == tp->nego_cp)
-		tp->nego_cp = 0;
+		tp->nego_cp = NULL;
 
 #ifdef SYM_CONF_IARB_SUPPORT
 	/*
@@ -4965,7 +4965,7 @@ void sym_free_ccb (hcb_p np, ccb_p cp)
 	/*
 	 *  Make this CCB available.
 	 */
-	cp->cam_ccb = 0;
+	cp->cam_ccb = NULL;
 	cp->host_status = HS_IDLE;
 	sym_remque(&cp->link_ccbq);
 	sym_insque_head(&cp->link_ccbq, &np->free_ccbq);
@@ -4997,7 +4997,7 @@ void sym_free_ccb (hcb_p np, ccb_p cp)
  */
 static ccb_p sym_alloc_ccb(hcb_p np)
 {
-	ccb_p cp = 0;
+	ccb_p cp = NULL;
 	int hcode;
 
 	/*
@@ -5005,7 +5005,7 @@ static ccb_p sym_alloc_ccb(hcb_p np)
 	 *  queue to the controller.
 	 */
 	if (np->actccbs >= SYM_CONF_MAX_START)
-		return 0;
+		return NULL;
 
 	/*
 	 *  Allocate memory for this CCB.
@@ -5076,7 +5076,7 @@ out_free:
 			sym_mfree_dma(cp->sns_bbuf,SYM_SNS_BBUF_LEN,"SNS_BBUF");
 		sym_mfree_dma(cp, sizeof(*cp), "CCB");
 	}
-	return 0;
+	return NULL;
 }
 
 /*
@@ -5134,7 +5134,7 @@ lcb_p sym_alloc_lcb (hcb_p np, u_char tn, u_char ln)
 	 *  allocation for not probed LUNs.
 	 */
 	if (!sym_is_bit(tp->lun_map, ln))
-		return 0;
+		return NULL;
 
 	/*
 	 *  Initialize the target control block if not yet.
@@ -5242,7 +5242,7 @@ static void sym_alloc_lcb_tags (hcb_p np, u_char tn, u_char ln)
 	lp->cb_tags = sym_calloc(SYM_CONF_MAX_TASK, "CB_TAGS");
 	if (!lp->cb_tags) {
 		sym_mfree_dma(lp->itlq_tbl, SYM_CONF_MAX_TASK*4, "ITLQ_TBL");
-		lp->itlq_tbl = 0;
+		lp->itlq_tbl = NULL;
 		goto fail;
 	}
 
@@ -5471,7 +5471,7 @@ int sym_abort_scsiio(hcb_p np, cam_ccb_p ccb, int timed_out)
 	/*
 	 *  Look up our CCB control block.
 	 */
-	cp = 0;
+	cp = NULL;
 	FOR_EACH_QUEUED_ELEMENT(&np->busy_ccbq, qp) {
 		ccb_p cp2 = sym_que_entry(qp, struct sym_ccb, link_ccbq);
 		if (cp2->cam_ccb == ccb) {

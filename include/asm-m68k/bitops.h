@@ -52,14 +52,14 @@ static inline int __generic_test_and_set_bit(int nr, unsigned long *vaddr)
 
 #define __set_bit(nr,vaddr) set_bit(nr,vaddr)
 
-static inline void __constant_set_bit(int nr, unsigned long *vaddr)
+static inline void __constant_set_bit(int nr, volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
 	__asm__ __volatile__ ("bset %1,%0"
 			: "+m" (*p) : "di" (nr & 7));
 }
 
-static inline void __generic_set_bit(int nr, unsigned long *vaddr)
+static inline void __generic_set_bit(int nr, volatile unsigned long *vaddr)
 {
 	__asm__ __volatile__ ("bfset %1{%0:#1}"
 			: : "d" (nr^31), "o" (*vaddr) : "memory");
@@ -106,14 +106,14 @@ static inline int __generic_test_and_clear_bit(int nr, unsigned long *vaddr)
    __generic_clear_bit(nr, vaddr))
 #define __clear_bit(nr,vaddr) clear_bit(nr,vaddr)
 
-static inline void __constant_clear_bit(int nr, unsigned long *vaddr)
+static inline void __constant_clear_bit(int nr, volatile unsigned long *vaddr)
 {
 	char *p = (char *)vaddr + (nr ^ 31) / 8;
 	__asm__ __volatile__ ("bclr %1,%0"
 			: "+m" (*p) : "di" (nr & 7));
 }
 
-static inline void __generic_clear_bit(int nr, unsigned long *vaddr)
+static inline void __generic_clear_bit(int nr, volatile unsigned long *vaddr)
 {
 	__asm__ __volatile__ ("bfclr %1{%0:#1}"
 			: : "d" (nr^31), "o" (*vaddr) : "memory");

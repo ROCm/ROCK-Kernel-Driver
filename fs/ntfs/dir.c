@@ -1222,7 +1222,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	 * or signals an error (both covered by the rc test).
 	 */
 	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
-		ntfs_debug("In index root, offset 0x%x.", (u8*)ie - (u8*)ir);
+		ntfs_debug("In index root, offset 0x%zx.", (u8*)ie - (u8*)ir);
 		/* Bounds checks. */
 		if (unlikely((u8*)ie < (u8*)ir || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||

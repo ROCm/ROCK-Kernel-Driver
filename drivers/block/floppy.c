@@ -4190,7 +4190,7 @@ static int __init floppy_setup(char *str)
 		printk("\n");
 	} else
 		DPRINT("botched floppy option\n");
-	DPRINT("Read linux/Documentation/floppy.txt\n");
+	DPRINT("Read Documentation/floppy.txt\n");
 	return 0;
 }
 

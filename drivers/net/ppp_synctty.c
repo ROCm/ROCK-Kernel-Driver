@@ -259,7 +259,7 @@ ppp_sync_close(struct tty_struct *tty)
 
 	write_lock_irq(&disc_data_lock);
 	ap = tty->disc_data;
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	write_unlock_irq(&disc_data_lock);
 	if (ap == 0)
 		return;
@@ -656,7 +656,7 @@ ppp_sync_push(struct syncppp *ap)
 				tty_stuffed = 1;
 			} else {
 				kfree_skb(ap->tpkt);
-				ap->tpkt = 0;
+				ap->tpkt = NULL;
 				clear_bit(XMIT_FULL, &ap->xmit_flags);
 				done = 1;
 			}
@@ -675,7 +675,7 @@ ppp_sync_push(struct syncppp *ap)
 flush:
 	if (ap->tpkt != 0) {
 		kfree_skb(ap->tpkt);
-		ap->tpkt = 0;
+		ap->tpkt = NULL;
 		clear_bit(XMIT_FULL, &ap->xmit_flags);
 		done = 1;
 	}
@@ -695,7 +695,7 @@ ppp_sync_flush_output(struct syncppp *ap)
 	spin_lock_bh(&ap->xmit_lock);
 	if (ap->tpkt != NULL) {
 		kfree_skb(ap->tpkt);
-		ap->tpkt = 0;
+		ap->tpkt = NULL;
 		clear_bit(XMIT_FULL, &ap->xmit_flags);
 		done = 1;
 	}

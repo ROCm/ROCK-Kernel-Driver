@@ -139,10 +139,9 @@ static void printADBreply(struct adb_request *req)
 static __inline__ void adb_wait_ms(unsigned int ms)
 {
 	if (current->pid && adb_probe_task_pid &&
-	  adb_probe_task_pid == current->pid) {
-		set_task_state(current, TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1 + ms * HZ / 1000);
-	} else
+	  adb_probe_task_pid == current->pid)
+		msleep(ms);
+	else
 		mdelay(ms);
 }
 
@@ -561,7 +560,7 @@ adb_unregister(int index)
 			write_lock_irq(&adb_handler_lock);
 		}
 		ret = 0;
-		adb_handler[index].handler = 0;
+		adb_handler[index].handler = NULL;
 	}
 	write_unlock_irq(&adb_handler_lock);
 	up(&adb_handler_sem);

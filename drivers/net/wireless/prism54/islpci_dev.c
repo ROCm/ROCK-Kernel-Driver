@@ -82,7 +82,7 @@ isl_upload_firmware(islpci_private *priv)
 	mdelay(50);
 
 	{
-		const struct firmware *fw_entry = 0;
+		const struct firmware *fw_entry = NULL;
 		long fw_len;
 		const u32 *fw_ptr;
 
@@ -716,7 +716,7 @@ islpci_free_memory(islpci_private *priv)
 
 	if (priv->device_base)
 		iounmap(priv->device_base);
-	priv->device_base = 0;
+	priv->device_base = NULL;
 
 	/* free consistent DMA area... */
 	if (priv->driver_mem_address)
@@ -725,10 +725,10 @@ islpci_free_memory(islpci_private *priv)
 				    priv->device_host_address);
 
 	/* clear some dangling pointers */
-	priv->driver_mem_address = 0;
+	priv->driver_mem_address = NULL;
 	priv->device_host_address = 0;
 	priv->device_psm_buffer = 0;
-	priv->control_block = 0;
+	priv->control_block = NULL;
 
         /* clean up mgmt rx buffers */
         for (counter = 0; counter < ISL38XX_CB_MGMT_QSIZE; counter++) {
@@ -754,7 +754,7 @@ islpci_free_memory(islpci_private *priv)
 
 		if (priv->data_low_rx[counter])
 			dev_kfree_skb(priv->data_low_rx[counter]);
-		priv->data_low_rx[counter] = 0;
+		priv->data_low_rx[counter] = NULL;
 	}
 
 	/* Free the acces control list and the WPA list */
@@ -880,9 +880,9 @@ islpci_setup(struct pci_dev *pdev)
       do_islpci_free_memory:
 	islpci_free_memory(priv);
       do_free_netdev:
-	pci_set_drvdata(pdev, 0);
+	pci_set_drvdata(pdev, NULL);
 	free_netdev(ndev);
-	priv = 0;
+	priv = NULL;
 	return NULL;
 }
 

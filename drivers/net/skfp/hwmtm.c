@@ -1981,7 +1981,7 @@ void mac_drv_clear_txd(struct s_smc *smc)
 {
 	struct s_smt_tx_queue *queue ;
 	struct s_smt_fp_txd volatile *t1 ;
-	struct s_smt_fp_txd volatile *t2=0 ;
+	struct s_smt_fp_txd volatile *t2 = NULL ;
 	SMbuf *mb ;
 	u_long	tbctrl ;
 	int i ;

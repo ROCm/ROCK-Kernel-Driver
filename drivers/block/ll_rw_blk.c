@@ -1813,54 +1813,53 @@ EXPORT_SYMBOL(blk_insert_request);
  *
  *    A matching blk_rq_unmap_user() must be issued at the end of io, while
  *    still in process context.
+ *
+ *    Note: The mapped bio may need to be bounced through blk_queue_bounce()
+ *    before being submitted to the device, as pages mapped may be out of
+ *    reach. It's the callers responsibility to make sure this happens. The
+ *    original bio must be passed back in to blk_rq_unmap_user() for proper
+ *    unmapping.
  */
 struct request *blk_rq_map_user(request_queue_t *q, int rw, void __user *ubuf,
 				unsigned int len)
 {
-	struct request *rq = NULL;
-	char *buf = NULL;
+	unsigned long uaddr;
+	struct request *rq;
 	struct bio *bio;
-	int ret;
+
+	if (len > (q->max_sectors << 9))
+		return ERR_PTR(-EINVAL);
+	if ((!len && ubuf) || (len && !ubuf))
+		return ERR_PTR(-EINVAL);
 
 	rq = blk_get_request(q, rw, __GFP_WAIT);
 	if (!rq)
 		return ERR_PTR(-ENOMEM);
 
-	bio = bio_map_user(q, NULL, (unsigned long) ubuf, len, rw == READ);
-	if (!bio) {
-		int bytes = (len + 511) & ~511;
+	/*
+	 * if alignment requirement is satisfied, map in user pages for
+	 * direct dma. else, set up kernel bounce buffers
+	 */
+	uaddr = (unsigned long) ubuf;
+	if (!(uaddr & queue_dma_alignment(q)) && !(len & queue_dma_alignment(q)))
+		bio = bio_map_user(q, NULL, uaddr, len, rw == READ);
+	else
+		bio = bio_copy_user(q, uaddr, len, rw == READ);
 
-		buf = kmalloc(bytes, q->bounce_gfp | GFP_USER);
-		if (!buf) {
-			ret = -ENOMEM;
-			goto fault;
-		}
-
-		if (rw == WRITE) {
-			if (copy_from_user(buf, ubuf, len)) {
-				ret = -EFAULT;
-				goto fault;
-			}
-		} else
-			memset(buf, 0, len);
-	}
-
-	rq->bio = rq->biotail = bio;
-	if (rq->bio)
+	if (!IS_ERR(bio)) {
+		rq->bio = rq->biotail = bio;
 		blk_rq_bio_prep(q, rq, bio);
 
-	rq->buffer = rq->data = buf;
-	rq->data_len = len;
-	return rq;
-fault:
-	if (buf)
-		kfree(buf);
-	if (bio)
-		bio_unmap_user(bio, 1);
-	if (rq)
-		blk_put_request(rq);
+		rq->buffer = rq->data = NULL;
+		rq->data_len = len;
+		return rq;
+	}
 
-	return ERR_PTR(ret);
+	/*
+	 * bio is the err-ptr
+	 */
+	blk_put_request(rq);
+	return (struct request *) bio;
 }
 
 EXPORT_SYMBOL(blk_rq_map_user);
@@ -1874,18 +1873,15 @@ EXPORT_SYMBOL(blk_rq_map_user);
  * Description:
  *    Unmap a request previously mapped by blk_rq_map_user().
  */
-int blk_rq_unmap_user(struct request *rq, void __user *ubuf, struct bio *bio,
-		      unsigned int ulen)
+int blk_rq_unmap_user(struct request *rq, struct bio *bio, unsigned int ulen)
 {
-	const int read = rq_data_dir(rq) == READ;
 	int ret = 0;
 
-	if (bio)
-		bio_unmap_user(bio, read);
-	if (rq->buffer) {
-		if (read && copy_to_user(ubuf, rq->buffer, ulen))
-			ret = -EFAULT;
-		kfree(rq->buffer);
+	if (bio) {
+		if (bio_flagged(bio, BIO_USER_MAPPED))
+			bio_unmap_user(bio);
+		else
+			ret = bio_uncopy_user(bio);
 	}
 
 	blk_put_request(rq);

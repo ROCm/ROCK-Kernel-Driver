@@ -204,7 +204,7 @@ struct mtftseg
 	unsigned mt_segno;   /* the segment to read or write */
 	unsigned mt_mode;    /* modes for read/write (sync/async etc.) */
 	int      mt_result;  /* result of r/w request, not of the ioctl */
-	void    *mt_data;    /* User space buffer: must be 29kb */
+	void    __user *mt_data;    /* User space buffer: must be 29kb */
 };
 
 /* get tape capacity (ftape/zftape)

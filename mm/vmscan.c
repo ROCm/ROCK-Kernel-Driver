@@ -169,22 +169,25 @@ EXPORT_SYMBOL(remove_shrinker);
  * slab to avoid swapping.
  *
  * We do weird things to avoid (scanned*seeks*entries) overflowing 32 bits.
+ *
+ * `lru_pages' represents the number of on-LRU pages in all the zones which
+ * are eligible for the caller's allocation attempt.  It is used for balancing
+ * slab reclaim versus page reclaim.
  */
-static int shrink_slab(unsigned long scanned, unsigned int gfp_mask)
+static int shrink_slab(unsigned long scanned, unsigned int gfp_mask,
+			unsigned long lru_pages)
 {
 	struct shrinker *shrinker;
-	long pages;
 
 	if (down_trylock(&shrinker_sem))
 		return 0;
 
-	pages = nr_used_zone_pages();
 	list_for_each_entry(shrinker, &shrinker_list, list) {
 		unsigned long long delta;
 
 		delta = (4 * scanned) / shrinker->seeks;
 		delta *= (*shrinker->shrinker)(0, gfp_mask);
-		do_div(delta, pages + 1);
+		do_div(delta, lru_pages + 1);
 		shrinker->nr += delta;
 		if (shrinker->nr < 0)
 			shrinker->nr = LONG_MAX;	/* It wrapped! */
@@ -896,6 +899,7 @@ int try_to_free_pages(struct zone **zones,
 	int total_scanned = 0, total_reclaimed = 0;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
 	struct scan_control sc;
+	unsigned long lru_pages = 0;
 	int i;
 
 	sc.gfp_mask = gfp_mask;
@@ -903,8 +907,12 @@ int try_to_free_pages(struct zone **zones,
 
 	inc_page_state(allocstall);
 
-	for (i = 0; zones[i] != 0; i++)
-		zones[i]->temp_priority = DEF_PRIORITY;
+	for (i = 0; zones[i] != NULL; i++) {
+		struct zone *zone = zones[i];
+
+		zone->temp_priority = DEF_PRIORITY;
+		lru_pages += zone->nr_active + zone->nr_inactive;
+	}
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		sc.nr_mapped = read_page_state(nr_mapped);
@@ -912,7 +920,7 @@ int try_to_free_pages(struct zone **zones,
 		sc.nr_reclaimed = 0;
 		sc.priority = priority;
 		shrink_caches(zones, &sc);
-		shrink_slab(sc.nr_scanned, gfp_mask);
+		shrink_slab(sc.nr_scanned, gfp_mask, lru_pages);
 		if (reclaim_state) {
 			sc.nr_reclaimed += reclaim_state->reclaimed_slab;
 			reclaim_state->reclaimed_slab = 0;
@@ -941,7 +949,7 @@ int try_to_free_pages(struct zone **zones,
 			blk_congestion_wait(WRITE, HZ/10);
 	}
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
-		out_of_memory();
+		out_of_memory(gfp_mask);
 out:
 	for (i = 0; zones[i] != 0; i++)
 		zones[i]->prev_priority = zones[i]->temp_priority;
@@ -997,7 +1005,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages)
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int all_zones_ok = 1;
 		int end_zone = 0;	/* Inclusive.  0 = ZONE_DMA */
-
+		unsigned long lru_pages = 0;
 
 		if (nr_pages == 0) {
 			/*
@@ -1021,6 +1029,12 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages)
 			end_zone = pgdat->nr_zones - 1;
 		}
 scan:
+		for (i = 0; i <= end_zone; i++) {
+			struct zone *zone = pgdat->node_zones + i;
+
+			lru_pages += zone->nr_active + zone->nr_inactive;
+		}
+
 		/*
 		 * Now scan the zone in the dma->highmem direction, stopping
 		 * at the last zone which needs scanning.
@@ -1048,7 +1062,7 @@ scan:
 			sc.priority = priority;
 			shrink_zone(zone, &sc);
 			reclaim_state->reclaimed_slab = 0;
-			shrink_slab(sc.nr_scanned, GFP_KERNEL);
+			shrink_slab(sc.nr_scanned, GFP_KERNEL, lru_pages);
 			sc.nr_reclaimed += reclaim_state->reclaimed_slab;
 			total_reclaimed += sc.nr_reclaimed;
 			if (zone->all_unreclaimable)

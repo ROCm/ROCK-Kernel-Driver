@@ -120,6 +120,7 @@ struct bio {
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
 #define BIO_BOUNCED	5	/* bio is a bounce bio */
+#define BIO_USER_MAPPED 6	/* contains user pages */
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
 
 /*
@@ -264,9 +265,11 @@ extern int bio_add_page(struct bio *, struct page *, unsigned int,unsigned int);
 extern int bio_get_nr_vecs(struct block_device *);
 extern struct bio *bio_map_user(struct request_queue *, struct block_device *,
 				unsigned long, unsigned int, int);
-extern void bio_unmap_user(struct bio *, int);
+extern void bio_unmap_user(struct bio *);
 extern void bio_set_pages_dirty(struct bio *bio);
 extern void bio_check_pages_dirty(struct bio *bio);
+extern struct bio *bio_copy_user(struct request_queue *, unsigned long, unsigned int, int);
+extern int bio_uncopy_user(struct bio *);
 
 #ifdef CONFIG_HIGHMEM
 /*

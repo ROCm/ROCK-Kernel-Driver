@@ -479,7 +479,7 @@ remove_rx_bufs(struct net_device *dev) {
 		kfree(rfd);
 	} while (rfd != lp->rx_tail);
 
-	lp->rx_tail = 0;
+	lp->rx_tail = NULL;
 
 #if 0
 	for (lp->rbd_list) {

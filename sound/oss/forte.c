@@ -1847,15 +1847,15 @@ forte_proc_read (char *page, char **start, off_t off, int count,
 static int __init 
 forte_proc_init (void)
 {
-	if (!proc_mkdir ("driver/forte", 0))
+	if (!proc_mkdir ("driver/forte", NULL))
 		return -EIO;
 
-	if (!create_proc_read_entry ("driver/forte/chip", 0, 0, forte_proc_read, forte)) {
+	if (!create_proc_read_entry ("driver/forte/chip", 0, NULL, forte_proc_read, forte)) {
 		remove_proc_entry ("driver/forte", NULL);
 		return -EIO;
 	}
 
-	if (!create_proc_read_entry("driver/forte/ac97", 0, 0, ac97_read_proc, forte->ac97)) {
+	if (!create_proc_read_entry("driver/forte/ac97", 0, NULL, ac97_read_proc, forte->ac97)) {
 		remove_proc_entry ("driver/forte/chip", NULL);
 		remove_proc_entry ("driver/forte", NULL);
 		return -EIO;

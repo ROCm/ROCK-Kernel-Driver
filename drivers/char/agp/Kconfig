@@ -82,7 +82,7 @@ config AGP_INTEL
 	  This option gives you AGP support for the GLX component of XFree86 4.x
 	  on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860, 875,
 	  E7205 and E7505 chipsets and full support for the 810, 815, 830M, 845G,
-	  852GM, 855GM and 865G integrated graphics chipsets.
+	  852GM, 855GM, 865G and I915 integrated graphics chipsets.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI, or if you have any Intel integrated graphics

@@ -123,7 +123,8 @@ int sn_salinfo_platform_oemdata(const u8 *sect_header, u8 **oemdata, u64 *oemdat
 	*oemdata_size = 0;
 	vfree(*oemdata);
 	*oemdata = NULL;
-	if (efi_guidcmp(guid, SAL_PLAT_SPECIFIC_ERR_SECT_GUID) == 0)
+	if (efi_guidcmp(guid, SAL_PLAT_SPECIFIC_ERR_SECT_GUID) == 0 ||
+	    efi_guidcmp(guid, SAL_PLAT_MEM_DEV_ERR_SECT_GUID) == 0)
 		return sn_platform_plat_specific_err_print(sect_header, oemdata, oemdata_size);
 	return 0;
 }

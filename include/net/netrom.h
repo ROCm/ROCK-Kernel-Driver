@@ -112,9 +112,6 @@ struct nr_node {
  *	nr_node & nr_neigh lists, refcounting and locking
  *********************************************************************/
 
-extern struct hlist_head nr_node_list;
-extern struct hlist_head nr_neigh_list;
-
 #define nr_node_hold(__nr_node) \
 	atomic_inc(&((__nr_node)->refcount))
 

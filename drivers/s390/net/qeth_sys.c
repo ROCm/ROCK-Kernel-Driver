@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.32 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.33 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.32 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.33 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -476,7 +476,7 @@ qeth_dev_add_hhlen_store(struct device *dev, const char *buf, size_t count)
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
 
-	i = simple_strtoul(buf, &tmp, 16);
+	i = simple_strtoul(buf, &tmp, 10);
 	if ((i < 0) || (i > MAX_ADD_HHLEN)) {
 		PRINT_WARN("add_hhlen out of range\n");
 		return -EINVAL;

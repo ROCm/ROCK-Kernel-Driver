@@ -616,16 +616,6 @@ out:
 	return error;
 }
 
-void
-ia64_set_personality (struct elf64_hdr *elf_ex, int ibcs2_interpreter)
-{
-	set_personality(PER_LINUX);
-	if (elf_ex->e_flags & EF_IA_64_LINUX_EXECUTABLE_STACK)
-		current->thread.flags |= IA64_THREAD_XSTACK;
-	else
-		current->thread.flags &= ~IA64_THREAD_XSTACK;
-}
-
 pid_t
 kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 {

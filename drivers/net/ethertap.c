@@ -13,7 +13,7 @@
  
 #include <linux/config.h>
 #include <linux/module.h>
-
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
 #include <linux/slab.h>
@@ -45,7 +45,7 @@ static void set_multicast_list(struct net_device *dev);
 static int ethertap_debug;
 
 static int max_taps = 1;
-MODULE_PARM(max_taps, "i");
+module_param(max_taps, int, 0);
 MODULE_PARM_DESC(max_taps,"Max number of ethernet tap devices");
 
 static struct net_device **tap_map;	/* Returns the tap device for a given netlink */

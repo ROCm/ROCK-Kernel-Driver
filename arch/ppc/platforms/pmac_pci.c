@@ -72,7 +72,7 @@ fixup_one_level_bus_range(struct device_node *node, int higher)
 		int len;
 
 		/* For PCI<->PCI bridges or CardBus bridges, we go down */
-		class_code = (unsigned int *) get_property(node, "class-code", 0);
+		class_code = (unsigned int *) get_property(node, "class-code", NULL);
 		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
 			continue;
@@ -124,9 +124,9 @@ fixup_bus_range(struct device_node *bridge)
  * (iBook, G4, new IMacs, and all the recent Apple machines).
  * It contains 3 controllers in one ASIC.
  *
- * The U3 is the bridge used on G5 machines. It contains on
+ * The U3 is the bridge used on G5 machines. It contains an
  * AGP bus which is dealt with the old UniNorth access routines
- * and an HyperTransport bus which uses its own set of access
+ * and a HyperTransport bus which uses its own set of access
  * functions.
  */
 
@@ -509,7 +509,7 @@ fixup_nec_usb2(void)
 			continue;
 		if (0x0035 != *prop)
 			continue;
-		prop = (u32 *)get_property(nec, "reg", 0);
+		prop = (u32 *)get_property(nec, "reg", NULL);
 		if (prop == NULL)
 			continue;
 		devfn = (prop[0] >> 8) & 0xff;
@@ -705,7 +705,7 @@ setup_u3_ht(struct pci_controller* hose, struct reg_property *addr)
 	 * any of the 0xfxxxxxxx "fine" memory regions to /ht.
 	 * We need to fix that sooner or later by either parsing all child "ranges"
 	 * properties or figuring out the U3 address space decoding logic and
-	 * then read it's configuration register (if any).
+	 * then read its configuration register (if any).
 	 */
 	hose->io_base_phys = 0xf4000000 + 0x00400000;
 	hose->io_base_virt = ioremap(hose->io_base_phys, 0x00400000);
@@ -939,8 +939,8 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 		 * default, gmac is not powered up, and so will be absent
 		 * from the kernel initial PCI lookup.
 		 *
-		 * Should be replaced by 2.4 new PCI mecanisms and really
-		 * regiser the device.
+		 * Should be replaced by 2.4 new PCI mechanisms and really
+		 * register the device.
 		 */
 		pci_read_config_word(dev, PCI_COMMAND, &cmd);
 		cmd |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;

@@ -19,6 +19,7 @@
 #include <linux/ctype.h>
 #include <linux/threads.h>
 #include <linux/smp_lock.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -30,11 +31,9 @@
 #include <asm/system.h>
 #include <asm/reg.h>
 
-static ssize_t ppc_htab_read(struct file * file, char __user * buf,
-			     size_t count, loff_t *ppos);
+static int ppc_htab_show(struct seq_file *m, void *v);
 static ssize_t ppc_htab_write(struct file * file, const char __user * buffer,
 			      size_t count, loff_t *ppos);
-static long long ppc_htab_lseek(struct file * file, loff_t offset, int orig);
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 		  void __user *buffer, size_t *lenp);
 
@@ -49,10 +48,17 @@ extern unsigned long pte_errors;
 extern unsigned int primary_pteg_full;
 extern unsigned int htab_hash_searches;
 
+static int ppc_htab_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ppc_htab_show, NULL);
+}
+
 struct file_operations ppc_htab_operations = {
-        .llseek =       ppc_htab_lseek,
-        .read =         ppc_htab_read,
-        .write =        ppc_htab_write,
+	.open		= ppc_htab_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.write		= ppc_htab_write,
+	.release	= single_release,
 };
 
 static char *pmc1_lookup(unsigned long mmcr0)
@@ -96,31 +102,25 @@ static char *pmc2_lookup(unsigned long mmcr0)
  * is _REALLY_ slow (see the nested for loops below) but nothing
  * in here should be really timing critical. -- Cort
  */
-static ssize_t ppc_htab_read(struct file * file, char __user * buf,
-			     size_t count, loff_t *ppos)
+static int ppc_htab_show(struct seq_file *m, void *v)
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
-	int n = 0;
 #if defined(CONFIG_PPC_STD_MMU) && !defined(CONFIG_PPC64BRIDGE)
 	unsigned int kptes = 0, uptes = 0;
 	PTE *ptr;
 #endif /* CONFIG_PPC_STD_MMU */
-	char buffer[512];
-
-	if (count < 0)
-		return -EINVAL;
 
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 		mmcr0 = mfspr(SPRN_MMCR0);
 		pmc1 = mfspr(SPRN_PMC1);
 		pmc2 = mfspr(SPRN_PMC2);
-		n += sprintf( buffer + n,
+		seq_printf(m,
 			      "604 Performance Monitoring\n"
 			      "MMCR0\t\t: %08lx %s%s ",
 			      mmcr0,
 			      ( mmcr0>>28 & 0x2 ) ? "(user mode counted)" : "",
 			      ( mmcr0>>28 & 0x4 ) ? "(kernel mode counted)" : "");
-		n += sprintf( buffer + n,
+		seq_printf(m,
 			      "\nPMC1\t\t: %08lx (%s)\n"
 			      "PMC2\t\t: %08lx (%s)\n",
 			      pmc1, pmc1_lookup(mmcr0),
@@ -129,10 +129,9 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 
 #ifdef CONFIG_PPC_STD_MMU
 	/* if we don't have a htab */
-	if ( Hash_size == 0 )
-	{
-		n += sprintf( buffer + n, "No Hash Table used\n");
-		goto return_string;
+	if ( Hash_size == 0 ) {
+		seq_printf(m, "No Hash Table used\n");
+		return 0;
 	}
 
 #ifndef CONFIG_PPC64BRIDGE
@@ -151,7 +150,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 	}
 #endif
 
-	n += sprintf( buffer + n,
+	seq_printf(m,
 		      "PTE Hash Table Information\n"
 		      "Size\t\t: %luKb\n"
 		      "Buckets\t\t: %lu\n"
@@ -173,7 +172,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 #endif
 		);
 
-	n += sprintf( buffer + n,
+	seq_printf(m,
 		      "Reloads\t\t: %lu\n"
 		      "Preloads\t: %lu\n"
 		      "Searches\t: %u\n"
@@ -181,23 +180,13 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		      "Evicts\t\t: %lu\n",
 		      htab_reloads, htab_preloads, htab_hash_searches,
 		      primary_pteg_full, htab_evicts);
-return_string:
 #endif /* CONFIG_PPC_STD_MMU */
 
-	n += sprintf( buffer + n,
+	seq_printf(m,
 		      "Non-error misses: %lu\n"
 		      "Error misses\t: %lu\n",
 		      pte_misses, pte_errors);
-	if (*ppos >= strlen(buffer))
-		return 0;
-	if (n > strlen(buffer) - *ppos)
-		n = strlen(buffer) - *ppos;
-	if (n > count)
-		n = count;
-	if (copy_to_user(buf, buffer + *ppos, n))
-		return -EFAULT;
-	*ppos += n;
-	return n;
+	return 0;
 }
 
 /*
@@ -210,7 +199,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	unsigned long tmp;
 	char buffer[16];
 
-	if ( current->uid != 0 )
+	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 	if (strncpy_from_user(buffer, ubuffer, 15))
 		return -EFAULT;
@@ -330,26 +319,6 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 #endif /* CONFIG_PPC_STD_MMU */
 }
 
-
-static long long
-ppc_htab_lseek(struct file * file, loff_t offset, int orig)
-{
-    long long ret = -EINVAL;
-
-    lock_kernel();
-    switch (orig) {
-    case 0:
-	file->f_pos = offset;
-	ret = file->f_pos;
-	break;
-    case 1:
-	file->f_pos += offset;
-	ret = file->f_pos;
-    }
-    unlock_kernel();
-    return ret;
-}
-
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 		  void __user *buffer_arg, size_t *lenp)
 {
@@ -448,15 +417,15 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 	}
 
 	if (!write && !first && left) {
-		if(put_user('\n', (char *) buffer))
+		if(put_user('\n', (char __user *) buffer))
 			return -EFAULT;
 		left--, buffer++;
 	}
 	if (write) {
-		p = (char *) buffer;
+		char __user *s = (char __user *) buffer;
 		while (left) {
 			char c;
-			if(get_user(c, p++))
+			if(get_user(c, s++))
 				return -EFAULT;
 			if (!isspace(c))
 				break;

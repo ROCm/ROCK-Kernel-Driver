@@ -349,15 +349,15 @@ int sctp_outq_tail(struct sctp_outq *q, struct sctp_chunk *chunk)
 
 			sctp_outq_tail_data(q, chunk);
 			if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-				SCTP_INC_STATS(SctpOutUnorderChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTUNORDERCHUNKS);
 			else
-				SCTP_INC_STATS(SctpOutOrderChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTORDERCHUNKS);
 			q->empty = 0;
 			break;
 		};
 	} else {
 		__skb_queue_tail(&q->control, (struct sk_buff *) chunk);
-		SCTP_INC_STATS(SctpOutCtrlChunks);
+		SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 	}
 
 	if (error < 0)
@@ -525,10 +525,10 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 			       int rtx_timeout, int *start_timer)
 {
 	struct list_head *lqueue;
-	struct list_head *lchunk;
+	struct list_head *lchunk, *lchunk1;
 	struct sctp_transport *transport = pkt->transport;
 	sctp_xmit_t status;
-	struct sctp_chunk *chunk;
+	struct sctp_chunk *chunk, *chunk1;
 	struct sctp_association *asoc;
 	int error = 0;
 
@@ -615,6 +615,12 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 			 * the transmitted list.
 			 */
 			list_add_tail(lchunk, &transport->transmitted);
+
+			/* Mark the chunk as ineligible for fast retransmit 
+			 * after it is retransmitted.
+			 */
+			chunk->fast_retransmit = 0;
+
 			*start_timer = 1;
 			q->empty = 0;
 
@@ -622,6 +628,18 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 			lchunk = sctp_list_dequeue(lqueue);
 			break;
 		};
+
+		/* If we are here due to a retransmit timeout or a fast
+		 * retransmit and if there are any chunks left in the retransmit
+		 * queue that could not fit in the PMTU sized packet, they need			 * to be marked as ineligible for a subsequent fast retransmit.
+		 */
+		if (rtx_timeout && !lchunk) {
+			list_for_each(lchunk1, lqueue) {
+				chunk1 = list_entry(lchunk1, struct sctp_chunk,
+						    transmitted_list);
+				chunk1->fast_retransmit = 0;
+			}
+		}
 	}
 
 	return error;
@@ -1725,6 +1743,6 @@ static void sctp_generate_fwdtsn(struct sctp_outq *q, __u32 ctsn)
 
 	if (ftsn_chunk) {
 		__skb_queue_tail(&q->control, (struct sk_buff *)ftsn_chunk);
-		SCTP_INC_STATS(SctpOutCtrlChunks);
+		SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 	}
 }

@@ -13,7 +13,7 @@ config W1
 
 config W1_MATROX
 	tristate "Matrox G400 transport layer for 1-wire"
-	depends on W1
+	depends on W1 && PCI
 	help
 	  Say Y here if you want to communicate with your 1-wire devices
 	  using Matrox's G400 GPIO pins.

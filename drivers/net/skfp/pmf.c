@@ -558,8 +558,8 @@ void smt_add_para(struct s_smc *smc, struct s_pcon *pcon, u_short para,
 {
 	struct smt_para	*pa ;
 	const struct s_p_tab	*pt ;
-	struct fddi_mib_m *mib_m = 0 ;
-	struct fddi_mib_p *mib_p = 0 ;
+	struct fddi_mib_m *mib_m = NULL;
+	struct fddi_mib_p *mib_p = NULL;
 	int		len ;
 	int		plen ;
 	char		*from ;
@@ -644,7 +644,7 @@ void smt_add_para(struct s_smc *smc, struct s_pcon *pcon, u_short para,
 	/*
 	 * check special paras
 	 */
-	swap = 0 ;
+	swap = NULL;
 	switch (para) {
 	case SMT_P10F0 :
 	case SMT_P10F1 :
@@ -1091,9 +1091,9 @@ int smt_set_para(struct s_smc *smc, struct smt_para *pa, int index, int local,
 	char		c ;
 	char		*mib_addr ;
 	struct fddi_mib	*mib ;
-	struct fddi_mib_m	*mib_m = 0 ;
-	struct fddi_mib_a	*mib_a = 0 ;
-	struct fddi_mib_p	*mib_p = 0 ;
+	struct fddi_mib_m	*mib_m = NULL;
+	struct fddi_mib_a	*mib_a = NULL;
+	struct fddi_mib_p	*mib_p = NULL;
 	int		mac ;
 	int		path ;
 	int		port ;
@@ -1533,7 +1533,7 @@ static const struct s_p_tab *smt_get_ptab(u_short para)
 	const struct s_p_tab	*pt ;
 	for (pt = p_tab ; pt->p_num && pt->p_num != para ; pt++)
 		;
-	return(pt->p_num ? pt : 0) ;
+	return(pt->p_num ? pt : NULL) ;
 }
 
 static int smt_mib_phys(struct s_smc *smc)

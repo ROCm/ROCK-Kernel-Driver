@@ -39,10 +39,14 @@ cpm_cpm2_t	*cpmp;		/* Pointer to comm processor space */
  */
 cpm2_map_t *cpm2_immr;
 
+#define CPM_MAP_SIZE	(0x40000)	/* 256k - the PQ3 reserve this amount
+					   of space for CPM as it is larger
+					   than on PQ2 */
+
 void
 cpm2_reset(void)
 {
-	cpm2_immr = (cpm2_map_t *)CPM_MAP_ADDR;
+	cpm2_immr = (cpm2_map_t *)ioremap(CPM_MAP_ADDR, CPM_MAP_SIZE);
 
 	/* Reclaim the DP memory for our use.
 	 */
@@ -70,7 +74,7 @@ cpm2_reset(void)
  * oversampled clock.
  */
 void
-cpm2_setbrg(uint brg, uint rate)
+cpm_setbrg(uint brg, uint rate)
 {
 	volatile uint	*bp;
 
@@ -119,8 +123,6 @@ static rh_info_t cpm_dpmem_info;
 
 static void cpm2_dpinit(void)
 {
-	void *dprambase = &((cpm2_map_t *)CPM_MAP_ADDR)->im_dprambase;
-
 	spin_lock_init(&cpm_dpmem_lock);
 
 	/* initialize the info header */
@@ -135,15 +137,13 @@ static void cpm2_dpinit(void)
 	 * varies with the processor and the microcode patches activated.
 	 * But the following should be at least safe.
 	 */
-	rh_attach_region(&cpm_dpmem_info, dprambase + CPM_DATAONLY_BASE,
+	rh_attach_region(&cpm_dpmem_info, (void *)CPM_DATAONLY_BASE,
 			CPM_DATAONLY_SIZE);
 }
 
-/* This function used to return an index into the DPRAM area.
- * Now it returns the actuall physical address of that area.
- * use cpm2_dpram_offset() to get the index
+/* This function returns an index into the DPRAM area.
  */
-void *cpm2_dpalloc(uint size, uint align)
+uint cpm_dpalloc(uint size, uint align)
 {
 	void *start;
 	unsigned long flags;
@@ -153,53 +153,46 @@ void *cpm2_dpalloc(uint size, uint align)
 	start = rh_alloc(&cpm_dpmem_info, size, "commproc");
 	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
 
-	return start;
+	return (uint)start;
 }
-EXPORT_SYMBOL(cpm2_dpalloc);
+EXPORT_SYMBOL(cpm_dpalloc);
 
-int cpm2_dpfree(void *addr)
+int cpm_dpfree(uint offset)
 {
 	int ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&cpm_dpmem_lock, flags);
-	ret = rh_free(&cpm_dpmem_info, addr);
+	ret = rh_free(&cpm_dpmem_info, (void *)offset);
 	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
 
 	return ret;
 }
-EXPORT_SYMBOL(cpm2_dpfree);
+EXPORT_SYMBOL(cpm_dpfree);
 
 /* not sure if this is ever needed */
-void *cpm2_dpalloc_fixed(void *addr, uint size, uint align)
+uint cpm_dpalloc_fixed(uint offset, uint size, uint align)
 {
 	void *start;
 	unsigned long flags;
 
 	spin_lock_irqsave(&cpm_dpmem_lock, flags);
 	cpm_dpmem_info.alignment = align;
-	start = rh_alloc_fixed(&cpm_dpmem_info, addr, size, "commproc");
+	start = rh_alloc_fixed(&cpm_dpmem_info, (void *)offset, size, "commproc");
 	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
 
-	return start;
+	return (uint)start;
 }
-EXPORT_SYMBOL(cpm2_dpalloc_fixed);
+EXPORT_SYMBOL(cpm_dpalloc_fixed);
 
-void cpm2_dpdump(void)
+void cpm_dpdump(void)
 {
 	rh_dump(&cpm_dpmem_info);
 }
-EXPORT_SYMBOL(cpm2_dpdump);
+EXPORT_SYMBOL(cpm_dpdump);
 
-uint cpm2_dpram_offset(void *addr)
+void *cpm_dpram_addr(uint offset)
 {
-	return (uint)((u_char *)addr -
-			((uint)((cpm2_map_t *)CPM_MAP_ADDR)->im_dprambase));
+	return (void *)&cpm2_immr->im_dprambase[offset];
 }
-EXPORT_SYMBOL(cpm2_dpram_offset);
-
-void *cpm2_dpram_addr(int offset)
-{
-	return (void *)&((cpm2_map_t *)CPM_MAP_ADDR)->im_dprambase[offset];
-}
-EXPORT_SYMBOL(cpm2_dpram_addr);
+EXPORT_SYMBOL(cpm_dpram_addr);

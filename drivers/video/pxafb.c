@@ -386,7 +386,7 @@ static int pxafb_blank(int blank, struct fb_info *info)
 		//TODO if (pxafb_blank_helper) pxafb_blank_helper(blank);
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
-			fb_set_cmap(&fbi->fb.cmap, 1, info);
+			fb_set_cmap(&fbi->fb.cmap, info);
 		pxafb_schedule_work(fbi, C_ENABLE);
 	}
 	return 0;

@@ -132,18 +132,18 @@ asmlinkage int solaris_getsockopt(int fd, int level, int optname, u32 optval, u3
 	return sunos_getsockopt(fd, level, optname, optval, optlen);
 }
 
-asmlinkage int solaris_connect(int fd, struct sockaddr *addr, int addrlen)
+asmlinkage int solaris_connect(int fd, struct sockaddr __user *addr, int addrlen)
 {
-	int (*sys_connect)(int, struct sockaddr *, int) =
-		(int (*)(int, struct sockaddr *, int))SYS(connect);
+	int (*sys_connect)(int, struct sockaddr __user *, int) =
+		(int (*)(int, struct sockaddr __user *, int))SYS(connect);
 
 	return sys_connect(fd, addr, addrlen);
 }
 
-asmlinkage int solaris_accept(int fd, struct sockaddr *addr, int *addrlen)
+asmlinkage int solaris_accept(int fd, struct sockaddr __user *addr, int __user *addrlen)
 {
-	int (*sys_accept)(int, struct sockaddr *, int *) =
-		(int (*)(int, struct sockaddr *, int *))SYS(accept);
+	int (*sys_accept)(int, struct sockaddr __user *, int __user *) =
+		(int (*)(int, struct sockaddr __user *, int __user *))SYS(accept);
 
 	return sys_accept(fd, addr, addrlen);
 }
@@ -197,28 +197,28 @@ static int linux_to_solaris_msgflags(int flags)
 	return fl;
 }
 
-asmlinkage int solaris_recvfrom(int s, char *buf, int len, int flags, u32 from, u32 fromlen)
+asmlinkage int solaris_recvfrom(int s, char __user *buf, int len, int flags, u32 from, u32 fromlen)
 {
-	int (*sys_recvfrom)(int, void *, size_t, unsigned, struct sockaddr *, int *) =
-		(int (*)(int, void *, size_t, unsigned, struct sockaddr *, int *))SYS(recvfrom);
+	int (*sys_recvfrom)(int, void __user *, size_t, unsigned, struct sockaddr __user *, int __user *) =
+		(int (*)(int, void __user *, size_t, unsigned, struct sockaddr __user *, int __user *))SYS(recvfrom);
 	
-	return sys_recvfrom(s, buf, len, solaris_to_linux_msgflags(flags), (struct sockaddr *)A(from), (int *)A(fromlen));
+	return sys_recvfrom(s, buf, len, solaris_to_linux_msgflags(flags), A(from), A(fromlen));
 }
 
-asmlinkage int solaris_recv(int s, char *buf, int len, int flags)
+asmlinkage int solaris_recv(int s, char __user *buf, int len, int flags)
 {
-	int (*sys_recvfrom)(int, void *, size_t, unsigned, struct sockaddr *, int *) =
-		(int (*)(int, void *, size_t, unsigned, struct sockaddr *, int *))SYS(recvfrom);
+	int (*sys_recvfrom)(int, void __user *, size_t, unsigned, struct sockaddr __user *, int __user *) =
+		(int (*)(int, void __user *, size_t, unsigned, struct sockaddr __user *, int __user *))SYS(recvfrom);
 	
 	return sys_recvfrom(s, buf, len, solaris_to_linux_msgflags(flags), NULL, NULL);
 }
 
-asmlinkage int solaris_sendto(int s, char *buf, int len, int flags, u32 to, u32 tolen)
+asmlinkage int solaris_sendto(int s, char __user *buf, int len, int flags, u32 to, u32 tolen)
 {
-	int (*sys_sendto)(int, void *, size_t, unsigned, struct sockaddr *, int *) =
-		(int (*)(int, void *, size_t, unsigned, struct sockaddr *, int *))SYS(sendto);
+	int (*sys_sendto)(int, void __user *, size_t, unsigned, struct sockaddr __user *, int __user *) =
+		(int (*)(int, void __user *, size_t, unsigned, struct sockaddr __user *, int __user *))SYS(sendto);
 	
-	return sys_sendto(s, buf, len, solaris_to_linux_msgflags(flags), (struct sockaddr *)A(to), (int *)A(tolen));
+	return sys_sendto(s, buf, len, solaris_to_linux_msgflags(flags), A(to), A(tolen));
 }
 
 asmlinkage int solaris_send(int s, char *buf, int len, int flags)
@@ -269,7 +269,7 @@ struct sol_cmsghdr {
 };
 
 static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
-					     struct sol_nmsghdr *umsg)
+					     struct sol_nmsghdr __user *umsg)
 {
 	u32 tmp1, tmp2, tmp3;
 	int err;
@@ -280,9 +280,9 @@ static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
 	if (err)
 		return -EFAULT;
 
-	kmsg->msg_name = (void *)A(tmp1);
-	kmsg->msg_iov = (struct iovec *)A(tmp2);
-	kmsg->msg_control = (void *)A(tmp3);
+	kmsg->msg_name = A(tmp1);
+	kmsg->msg_iov = A(tmp2);
+	kmsg->msg_control = A(tmp3);
 
 	err = get_user(kmsg->msg_namelen, &umsg->msg_namelen);
 	err |= get_user(kmsg->msg_controllen, &umsg->msg_controllen);
@@ -293,7 +293,7 @@ static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
 	return err;
 }
 
-asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned user_flags)
+asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr __user *user_msg, unsigned user_flags)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -313,7 +313,7 @@ asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned us
 	total_len = err;
 
 	if(kern_msg.msg_controllen) {
-		struct sol_cmsghdr *ucmsg = (struct sol_cmsghdr *)kern_msg.msg_control;
+		struct sol_cmsghdr __user *ucmsg = kern_msg.msg_control;
 		unsigned long *kcmsg;
 		compat_size_t cmlen;
 
@@ -356,15 +356,15 @@ out:
 	return err;
 }
 
-asmlinkage int solaris_recvmsg(int fd, struct sol_nmsghdr *user_msg, unsigned int user_flags)
+asmlinkage int solaris_recvmsg(int fd, struct sol_nmsghdr __user *user_msg, unsigned int user_flags)
 {
 	struct iovec iovstack[UIO_FASTIOV];
 	struct msghdr kern_msg;
 	char addr[MAX_SOCK_ADDR];
 	struct socket *sock;
 	struct iovec *iov = iovstack;
-	struct sockaddr *uaddr;
-	int *uaddr_len;
+	struct sockaddr __user *uaddr;
+	int __user *uaddr_len;
 	unsigned long cmsg_ptr;
 	int err, total_len, len = 0;
 

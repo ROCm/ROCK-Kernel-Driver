@@ -126,7 +126,7 @@ static struct mii_chip_info {
 	{ "NS 83851 PHY",			0x2000, 0x5C20, MIX },
 	{ "Realtek RTL8201 PHY",		0x0000, 0x8200, LAN },
 	{ "VIA 6103 PHY",			0x0101, 0x8f20, LAN },
-	{0,},
+	{NULL,},
 };
 
 struct mii_phy {
@@ -1452,7 +1452,7 @@ static void sis900_tx_timeout(struct net_device *net_dev)
 				sis_priv->tx_ring[i].bufptr, skb->len,
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq(skb);
-			sis_priv->tx_skbuff[i] = 0;
+			sis_priv->tx_skbuff[i] = NULL;
 			sis_priv->tx_ring[i].cmdsts = 0;
 			sis_priv->tx_ring[i].bufptr = 0;
 			sis_priv->stats.tx_dropped++;
@@ -1847,7 +1847,7 @@ sis900_close(struct net_device *net_dev)
 				sis_priv->rx_ring[i].bufptr,
 				RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(skb);
-			sis_priv->rx_skbuff[i] = 0;
+			sis_priv->rx_skbuff[i] = NULL;
 		}
 	}
 	for (i = 0; i < NUM_TX_DESC; i++) {
@@ -1857,7 +1857,7 @@ sis900_close(struct net_device *net_dev)
 				sis_priv->tx_ring[i].bufptr, skb->len,
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb(skb);
-			sis_priv->tx_skbuff[i] = 0;
+			sis_priv->tx_skbuff[i] = NULL;
 		}
 	}
 

@@ -1,6 +1,6 @@
 #ifndef _dmasound_h_
 /*
- *  linux/drivers/sound/dmasound/dmasound.h
+ *  linux/sound/oss/dmasound/dmasound.h
  *
  *
  *  Minor numbers for the sound driver.
@@ -44,12 +44,12 @@
 #define le2be16dbl(x)	(((x)<<8 & 0xff00ff00) | ((x)>>8 & 0x00ff00ff))
 
 #define IOCTL_IN(arg, ret) \
-	do { int error = get_user(ret, (int *)(arg)); \
+	do { int error = get_user(ret, (int __user *)(arg)); \
 		if (error) return error; \
 	} while (0)
-#define IOCTL_OUT(arg, ret)	ioctl_return((int *)(arg), ret)
+#define IOCTL_OUT(arg, ret)	ioctl_return((int __user *)(arg), ret)
 
-static inline int ioctl_return(int *addr, int value)
+static inline int ioctl_return(int __user *addr, int value)
 {
 	return value < 0 ? value : put_user(value, addr);
 }
@@ -153,14 +153,14 @@ typedef struct {
      */
 
 typedef struct {
-    ssize_t (*ct_ulaw)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_alaw)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_s8)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_u8)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_s16be)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_u16be)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_s16le)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
-    ssize_t (*ct_u16le)(const u_char *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_ulaw)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_alaw)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_s8)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_u8)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_s16be)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_u16be)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_s16le)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
+    ssize_t (*ct_u16le)(const u_char __user *, size_t, u_char *, ssize_t *, ssize_t);
 } TRANS;
 
 struct sound_settings {

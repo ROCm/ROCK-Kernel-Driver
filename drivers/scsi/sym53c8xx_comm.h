@@ -210,7 +210,7 @@ static inline struct xpt_quehead *xpt_remque_head(struct xpt_quehead *head)
 	if (elem != head)
 		__xpt_que_del(head, elem->flink);
 	else
-		elem = 0;
+		elem = NULL;
 	return elem;
 }
 
@@ -375,7 +375,7 @@ static void *___m_alloc(m_pool_s *mp, int size)
 	m_link_s *h = mp->h;
 
 	if (size > (PAGE_SIZE << MEMO_PAGE_ORDER))
-		return 0;
+		return NULL;
 
 	while (size > s) {
 		s <<= 1;
@@ -387,7 +387,7 @@ static void *___m_alloc(m_pool_s *mp, int size)
 		if (s == (PAGE_SIZE << MEMO_PAGE_ORDER)) {
 			h[j].next = (m_link_s *) M_GETP();
 			if (h[j].next)
-				h[j].next->next = 0;
+				h[j].next->next = NULL;
 			break;
 		}
 		++j;
@@ -400,7 +400,7 @@ static void *___m_alloc(m_pool_s *mp, int size)
 			j -= 1;
 			s >>= 1;
 			h[j].next = (m_link_s *) (a+s);
-			h[j].next->next = 0;
+			h[j].next->next = NULL;
 		}
 	}
 #ifdef DEBUG
@@ -503,7 +503,7 @@ static void ___mp0_freep(m_pool_s *mp, m_addr_t m)
 	--mp->nump;
 }
 
-static m_pool_s mp0 = {0, ___mp0_getp, ___mp0_freep};
+static m_pool_s mp0 = {NULL, ___mp0_getp, ___mp0_freep};
 
 /*
  * DMAable pools.
@@ -595,7 +595,7 @@ static void *__m_calloc_dma(m_bush_t bush, int size, char *name)
 {
 	u_long flags;
 	struct m_pool *mp;
-	void *m = 0;
+	void *m = NULL;
 
 	NCR_LOCK_DRIVER(flags);
 	mp = ___get_dma_pool(bush);
@@ -629,7 +629,7 @@ static m_addr_t __vtobus(m_bush_t bush, void *m)
 	u_long flags;
 	m_pool_s *mp;
 	int hc = VTOB_HASH_CODE(m);
-	m_vtob_s *vp = 0;
+	m_vtob_s *vp = NULL;
 	m_addr_t a = ((m_addr_t) m) & ~MEMO_CLUSTER_MASK;
 
 	NCR_LOCK_DRIVER(flags);

@@ -235,7 +235,7 @@ static int offb_blank(int blank, struct fb_info *info)
 				break;
 			}
 	} else
-		fb_set_cmap(&info->cmap, 1, info);
+		fb_set_cmap(&info->cmap, info);
 	return 0;
 }
 

@@ -467,7 +467,7 @@ nvram_init(void)
 		    NVRAM_MINOR);
 		goto out;
 	}
-	if (!create_proc_read_entry("driver/nvram", 0, 0, nvram_read_proc,
+	if (!create_proc_read_entry("driver/nvram", 0, NULL, nvram_read_proc,
 		NULL)) {
 		printk(KERN_ERR "nvram: can't create /proc/driver/nvram\n");
 		ret = -ENOMEM;
@@ -485,7 +485,7 @@ nvram_init(void)
 static void __exit
 nvram_cleanup_module(void)
 {
-	remove_proc_entry("driver/nvram", 0);
+	remove_proc_entry("driver/nvram", NULL);
 	misc_deregister(&nvram_dev);
 }
 

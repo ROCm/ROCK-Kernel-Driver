@@ -13,6 +13,7 @@
 #include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
+#include <net/icmp.h>
 
 /* Add encapsulation header.
  *
@@ -65,6 +66,30 @@ static void xfrm4_encap(struct sk_buff *skb)
 	top_iph->protocol = IPPROTO_IPIP;
 
 	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
+}
+
+static int xfrm4_tunnel_check_size(struct sk_buff *skb)
+{
+	int mtu, ret = 0;
+	struct dst_entry *dst;
+	struct iphdr *iph = skb->nh.iph;
+
+	if (IPCB(skb)->flags & IPSKB_XFRM_TUNNEL_SIZE)
+		goto out;
+
+	IPCB(skb)->flags |= IPSKB_XFRM_TUNNEL_SIZE;
+	
+	if (!(iph->frag_off & htons(IP_DF)))
+		goto out;
+
+	dst = skb->dst;
+	mtu = dst_pmtu(dst) - dst->header_len - dst->trailer_len;
+	if (skb->len > mtu) {
+		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
+		ret = -EMSGSIZE;
+	}
+out:
+	return ret;
 }
 
 int xfrm4_output(struct sk_buff **pskb)

@@ -54,8 +54,8 @@ struct solaris_shmid_ds {
 
 asmlinkage long solaris_shmsys(int cmd, u32 arg1, u32 arg2, u32 arg3)
 {
-	int (*sys_ipc)(unsigned,int,int,unsigned long,void *,long) = 
-		(int (*)(unsigned,int,int,unsigned long,void *,long))SYS(ipc);
+	int (*sys_ipc)(unsigned,int,int,unsigned long,void __user *,long) = 
+		(int (*)(unsigned,int,int,unsigned long,void __user *,long))SYS(ipc);
 	mm_segment_t old_fs;
 	unsigned long raddr;
 	int ret;
@@ -64,7 +64,7 @@ asmlinkage long solaris_shmsys(int cmd, u32 arg1, u32 arg2, u32 arg3)
 	case 0: /* shmat */
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		ret = sys_ipc(SHMAT, arg1, arg3 & ~0x4000, (unsigned long)&raddr, (void *)A(arg2), 0);
+		ret = sys_ipc(SHMAT, arg1, arg3 & ~0x4000, (unsigned long)&raddr, A(arg2), 0);
 		set_fs(old_fs);
 		if (ret >= 0) return (u32)raddr;
 		else return ret;
@@ -78,10 +78,11 @@ asmlinkage long solaris_shmsys(int cmd, u32 arg1, u32 arg2, u32 arg3)
 		case 11: /* IPC_SET */
 			{
 				struct shmid_ds s;
+				struct solaris_shmid_ds __user *p = A(arg3);
 				
-				if (get_user (s.shm_perm.uid, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.uid)) ||
-				    __get_user (s.shm_perm.gid, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.gid)) || 
-				    __get_user (s.shm_perm.mode, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.mode)))
+				if (get_user (s.shm_perm.uid, &p->shm_perm.uid) ||
+				    __get_user (s.shm_perm.gid, &p->shm_perm.gid) || 
+				    __get_user (s.shm_perm.mode, &p->shm_perm.mode))
 					return -EFAULT;
 				old_fs = get_fs();
 				set_fs(KERNEL_DS);
@@ -92,32 +93,33 @@ asmlinkage long solaris_shmsys(int cmd, u32 arg1, u32 arg2, u32 arg3)
 		case 12: /* IPC_STAT */
 			{
 				struct shmid_ds s;
+				struct solaris_shmid_ds __user *p = A(arg3);
 				
 				old_fs = get_fs();
 				set_fs(KERNEL_DS);
 				ret = sys_ipc(SHMCTL, arg1, IPC_SET, 0, &s, 0);
 				set_fs(old_fs);
-				if (get_user (s.shm_perm.uid, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.uid)) ||
-				    __get_user (s.shm_perm.gid, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.gid)) || 
-				    __get_user (s.shm_perm.cuid, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.cuid)) ||
-				    __get_user (s.shm_perm.cgid, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.cgid)) || 
-				    __get_user (s.shm_perm.mode, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.mode)) ||
-				    __get_user (s.shm_perm.seq, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.seq)) ||
-				    __get_user (s.shm_perm.key, &(((struct solaris_shmid_ds *)A(arg3))->shm_perm.key)) ||
-				    __get_user (s.shm_segsz, &(((struct solaris_shmid_ds *)A(arg3))->shm_segsz)) ||
-				    __get_user (s.shm_lpid, &(((struct solaris_shmid_ds *)A(arg3))->shm_lpid)) ||
-				    __get_user (s.shm_cpid, &(((struct solaris_shmid_ds *)A(arg3))->shm_cpid)) ||
-				    __get_user (s.shm_nattch, &(((struct solaris_shmid_ds *)A(arg3))->shm_nattch)) ||
-				    __get_user (s.shm_atime, &(((struct solaris_shmid_ds *)A(arg3))->shm_atime)) ||
-				    __get_user (s.shm_dtime, &(((struct solaris_shmid_ds *)A(arg3))->shm_dtime)) ||
-				    __get_user (s.shm_ctime, &(((struct solaris_shmid_ds *)A(arg3))->shm_ctime)))
+				if (put_user (s.shm_perm.uid, &(p->shm_perm.uid)) ||
+				    __put_user (s.shm_perm.gid, &(p->shm_perm.gid)) || 
+				    __put_user (s.shm_perm.cuid, &(p->shm_perm.cuid)) ||
+				    __put_user (s.shm_perm.cgid, &(p->shm_perm.cgid)) || 
+				    __put_user (s.shm_perm.mode, &(p->shm_perm.mode)) ||
+				    __put_user (s.shm_perm.seq, &(p->shm_perm.seq)) ||
+				    __put_user (s.shm_perm.key, &(p->shm_perm.key)) ||
+				    __put_user (s.shm_segsz, &(p->shm_segsz)) ||
+				    __put_user (s.shm_lpid, &(p->shm_lpid)) ||
+				    __put_user (s.shm_cpid, &(p->shm_cpid)) ||
+				    __put_user (s.shm_nattch, &(p->shm_nattch)) ||
+				    __put_user (s.shm_atime, &(p->shm_atime)) ||
+				    __put_user (s.shm_dtime, &(p->shm_dtime)) ||
+				    __put_user (s.shm_ctime, &(p->shm_ctime)))
 					return -EFAULT;
 				return ret;
 			}
 		default: return -EINVAL;
 		}
 	case 2: /* shmdt */
-		return sys_ipc(SHMDT, 0, 0, 0, (void *)A(arg1), 0);
+		return sys_ipc(SHMDT, 0, 0, 0, A(arg1), 0);
 	case 3: /* shmget */
 		return sys_ipc(SHMGET, arg1, arg2, arg3, NULL, 0);
 	}

@@ -4,6 +4,7 @@ menu "IEEE 1394 (FireWire) support"
 
 config IEEE1394
 	tristate "IEEE 1394 (FireWire) support"
+	depends on PCI || BROKEN
 	help
 	  IEEE 1394 describes a high performance serial bus, which is also
 	  known as FireWire(tm) or i.Link(tm) and is used for connecting all
@@ -113,7 +114,7 @@ config IEEE1394_VIDEO1394
 
 config IEEE1394_SBP2
 	tristate "SBP-2 support (Harddisks etc.)"
-	depends on IEEE1394 && SCSI
+	depends on IEEE1394 && SCSI && (PCI || BROKEN)
 	help
 	  This option enables you to use SBP-2 devices connected to your IEEE
 	  1394 bus.  SBP-2 devices include harddrives and DVD devices.

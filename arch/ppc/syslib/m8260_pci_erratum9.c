@@ -89,9 +89,8 @@ void idma_pci9_init(void)
 	volatile cpm2_map_t *immap = cpm2_immr;
 
 	/* allocate IDMA dpram */
-	dpram_offset = cpm2_dpalloc(sizeof(idma_dpram_t), 64);
-	idma_dpram = 
-		(volatile idma_dpram_t *)&immap->im_dprambase[dpram_offset];
+	dpram_offset = cpm_dpalloc(sizeof(idma_dpram_t), 64);
+	idma_dpram = cpm_dpram_addr(dpram_offset); 
 
 	/* initialize the IDMA parameter RAM */
 	memset((void *)idma_dpram, 0, sizeof(idma_dpram_t));

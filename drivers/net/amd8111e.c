@@ -701,7 +701,7 @@ static int amd8111e_tx(struct net_device *dev)
 				  	lp->tx_skbuff[tx_index]->len,
 					PCI_DMA_TODEVICE);
 			dev_kfree_skb_irq (lp->tx_skbuff[tx_index]);
-			lp->tx_skbuff[tx_index] = 0;
+			lp->tx_skbuff[tx_index] = NULL;
 			lp->tx_dma_addr[tx_index] = 0;
 		}
 		lp->tx_complete_idx++;
@@ -1544,7 +1544,7 @@ static void amd8111e_set_multicast_list(struct net_device *dev)
 	if( dev->mc_count == 0 ){
 		/* get only own packets */
 		mc_filter[1] = mc_filter[0] = 0;
-		lp->mc_list = 0;
+		lp->mc_list = NULL;
 		lp->options &= ~OPTION_MULTICAST_ENABLE;
 		amd8111e_writeq(*(u64*)mc_filter,lp->mmio + LADRF);
 		/* disable promiscous mode */

@@ -137,6 +137,7 @@ static inline const char * get_task_state(struct task_struct *tsk)
 					   TASK_INTERRUPTIBLE |
 					   TASK_UNINTERRUPTIBLE |
 					   TASK_ZOMBIE |
+					   TASK_DEAD |
 					   TASK_STOPPED);
 	const char **p = &task_state_array[0];
 

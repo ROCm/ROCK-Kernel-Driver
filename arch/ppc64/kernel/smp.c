@@ -300,6 +300,10 @@ void __cpu_die(unsigned int cpu)
 void cpu_die(void)
 {
 	local_irq_disable();
+	/* Some hardware requires clearing the CPPR, while other hardware does not
+	 * it is safe either way
+	 */
+	pSeriesLP_cppr_info(0, 0);
 	rtas_stop_self();
 	/* Should never get here... */
 	BUG();
@@ -385,8 +389,6 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 
 	/* Fixup atomic count: it exited inside IRQ handler. */
 	paca[lcpu].__current->thread_info->preempt_count	= 0;
-	/* Fixup SLB round-robin so next segment (kernel) goes in segment 0 */
-	paca[lcpu].stab_next_rr = 0;
 
 	/* At boot this is done in prom.c. */
 	paca[lcpu].hw_cpu_id = pcpu;
@@ -422,7 +424,11 @@ static inline void look_for_more_cpus(void)
 	}
 
 	maxcpus = ireg[num_addr_cell + num_size_cell];
-	/* DRENG need to account for threads here too */
+
+	/* Double maxcpus for processors which have SMT capability */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		maxcpus *= 2;
+
 
 	if (maxcpus > NR_CPUS) {
 		printk(KERN_WARNING
@@ -715,7 +721,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			printk("smp_call_function on cpu %d: other cpus not "
 			       "responding (%d)\n", smp_processor_id(),
 			       atomic_read(&data.started));
-			debugger(0);
+			debugger(NULL);
 			goto out;
 		}
 	}
@@ -730,7 +736,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
-				debugger(0);
+				debugger(NULL);
 				goto out;
 			}
 		}
@@ -927,7 +933,11 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	if (smp_ops->give_timebase)
 		smp_ops->give_timebase();
-	cpu_set(cpu, cpu_online_map);
+
+	/* Wait until cpu puts itself in the online map */
+	while (!cpu_online(cpu))
+		cpu_relax();
+
 	return 0;
 }
 
@@ -962,6 +972,10 @@ int __devinit start_secondary(void *unused)
 	rtas_set_indicator(9005, default_distrib_server, 1);
 #endif
 #endif
+
+	spin_lock(&call_lock);
+	cpu_set(cpu, cpu_online_map);
+	spin_unlock(&call_lock);
 
 	local_irq_enable();
 

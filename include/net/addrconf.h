@@ -160,8 +160,8 @@ static inline void in6_ifa_put(struct inet6_ifaddr *ifp)
 		inet6_ifa_finish_destroy(ifp);
 }
 
-#define __in6_ifa_put(idev)  atomic_dec(&(idev)->refcnt)
-#define in6_ifa_hold(idev)   atomic_inc(&(idev)->refcnt)
+#define __in6_ifa_put(ifp)	atomic_dec(&(ifp)->refcnt)
+#define in6_ifa_hold(ifp)	atomic_inc(&(ifp)->refcnt)
 
 
 extern void			addrconf_forwarding_on(void);
@@ -178,8 +178,8 @@ static __inline__ u8 ipv6_addr_hash(const struct in6_addr *addr)
 	 * This will include the IEEE address token on links that support it.
 	 */
 
-	word = addr->s6_addr[2] ^ addr->s6_addr32[3];
-	word  ^= (word>>16);
+	word = addr->s6_addr32[2] ^ addr->s6_addr32[3];
+	word ^= (word >> 16);
 	word ^= (word >> 8);
 
 	return ((word ^ (word >> 4)) & 0x0f);

@@ -20,8 +20,8 @@
  */
 
 #include <asm/io.h>
-#include <asm/delay.h>
 
+#include <linux/delay.h>
 #include <linux/moduleparam.h>
 
 #include "w1.h"

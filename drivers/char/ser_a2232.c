@@ -109,12 +109,6 @@
 /************************* End of Includes **************************/
 
 /***************************** Prototypes ***************************/
-/* Helper functions */
-static __inline__ volatile struct a2232status *a2232stat(unsigned int board,
-						unsigned int portonboard);
-static __inline__ volatile struct a2232memory *a2232mem (unsigned int board); 
-static __inline__ void a2232_receive_char(	struct a2232_port *port,
-						int ch, int err );
 /* The interrupt service routine */
 static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
 /* Initialize the port structures */
@@ -177,6 +171,51 @@ static int nr_a2232;
 /* zorro_dev structs for the A2232's */
 static struct zorro_dev *zd_a2232[MAX_A2232_BOARDS]; 
 /***************************** End of Global variables **************/
+
+/* Helper functions */
+
+static inline volatile struct a2232memory *a2232mem(unsigned int board)
+{
+	return (volatile struct a2232memory *)ZTWO_VADDR(zd_a2232[board]->resource.start);
+}
+
+static inline volatile struct a2232status *a2232stat(unsigned int board,
+						     unsigned int portonboard)
+{
+	volatile struct a2232memory *mem = a2232mem(board);
+	return &(mem->Status[portonboard]);
+}
+
+static inline void a2232_receive_char(struct a2232_port *port, int ch, int err)
+{
+/* 	Mostly stolen from other drivers.
+	Maybe one could implement a more efficient version by not only
+	transferring one character at a time.
+*/
+	struct tty_struct *tty = port->gs.tty;
+
+	if (tty->flip.count >= TTY_FLIPBUF_SIZE)
+		return;
+
+	tty->flip.count++;
+
+#if 0
+	switch(err) {
+	case TTY_BREAK:
+		break;
+	case TTY_PARITY:
+		break;
+	case TTY_OVERRUN:
+		break;
+	case TTY_FRAME:
+		break;
+	}
+#endif
+
+	*tty->flip.flag_buf_ptr++ = err;
+	*tty->flip.char_buf_ptr++ = ch;
+	tty_flip_buffer_push(tty);
+}
 
 /***************************** Functions ****************************/
 /*** BEGIN OF REAL_DRIVER FUNCTIONS ***/
@@ -469,49 +508,6 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 	return 0;
 }
 /*** END OF FUNCTIONS EXPECTED BY TTY DRIVER STRUCTS ***/
-
-static __inline__ volatile struct a2232status *a2232stat(unsigned int board, unsigned int portonboard)
-{
-	volatile struct a2232memory *mem = a2232mem(board);
-	return &(mem->Status[portonboard]);
-}
-
-static __inline__ volatile struct a2232memory *a2232mem (unsigned int board)
-{
-	return (volatile struct a2232memory *) ZTWO_VADDR( zd_a2232[board]->resource.start );
-}
-
-static __inline__ void a2232_receive_char(	struct a2232_port *port,
-						int ch, int err )
-{
-/* 	Mostly stolen from other drivers.
-	Maybe one could implement a more efficient version by not only
-	transferring one character at a time.
-*/
-	struct tty_struct *tty = port->gs.tty;
-	
-	if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-		return;
-
-	tty->flip.count++;
-
-#if 0
-	switch(err) {
-	case TTY_BREAK:
-		break;
-	case TTY_PARITY:
-		break;
-	case TTY_OVERRUN:
-		break;
-	case TTY_FRAME:
-		break;
-	}
-#endif
-
-	*tty->flip.flag_buf_ptr++ = err;
-	*tty->flip.char_buf_ptr++ = ch;
-	tty_flip_buffer_push(tty);
-}
 
 static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
 {

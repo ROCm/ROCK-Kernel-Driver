@@ -193,7 +193,7 @@ config SENSORS_MAX1619
 
 config SENSORS_VIA686A
 	tristate "VIA686A"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
 	select I2C_SENSOR
 	select I2C_ISA
 	help

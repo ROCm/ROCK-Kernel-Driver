@@ -90,6 +90,7 @@ bte_error_handler(unsigned long _nodepda)
 	ii_icrb0_d_u_t icrbd;	/* II CRB Register D */
 	ii_ibcr_u_t ibcr;
 	ii_icmr_u_t icmr;
+	ii_ieclr_u_t ieclr;
 
 
 	BTE_PRINTK(("bte_error_handler(%p) - %d\n", err_nodepda,
@@ -176,6 +177,14 @@ bte_error_handler(unsigned long _nodepda)
 	imem.ii_imem_regval = REMOTE_HUB_L(nasid, IIO_IMEM);
 	imem.ii_imem_fld_s.i_b0_esd = imem.ii_imem_fld_s.i_b1_esd = 1;
 	REMOTE_HUB_S(nasid, IIO_IMEM, imem.ii_imem_regval);
+
+	/* Clear IBLS0/1 error bits */
+	ieclr.ii_ieclr_regval = 0;
+	if (err_nodepda->bte_if[0].bh_error != BTE_SUCCESS)
+		ieclr.ii_ieclr_fld_s.i_e_bte_0 = 1;
+	if (err_nodepda->bte_if[1].bh_error != BTE_SUCCESS)
+                ieclr.ii_ieclr_fld_s.i_e_bte_1 = 1;
+	REMOTE_HUB_S(nasid, IIO_IECLR, ieclr.ii_ieclr_regval);
 
 	/* Reinitialize both BTE state machines. */
 	ibcr.ii_ibcr_regval = REMOTE_HUB_L(nasid, IIO_IBCR);
