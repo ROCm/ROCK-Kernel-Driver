@@ -2279,9 +2279,12 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		par->dac_ops = &aty_dac_ct;
 		par->pll_ops = &aty_pll_ct;
 		par->bus_type = PCI;
+#ifdef CONFIG_FB_ATY_XL_INIT
+		if (IS_XL(par->pci_id))
+			atyfb_xl_init(info);
+#endif
 		par->ram_type = (aty_ld_le32(CONFIG_STAT0, par) & 0x07);
 		ramname = aty_ct_ram[par->ram_type];
-
 		/* for many chips, the mclk is 67 MHz for SDRAM, 63 MHz otherwise */
 		if (par->pll_limits.mclk == 67 && par->ram_type < SDRAM)
 			par->pll_limits.mclk = 63;
