@@ -400,6 +400,7 @@ void __init mem_init(void)
 	int codepages = 0;
 	int datapages = 0;
 	int initpages = 0; 
+	int reservedpages = 0;
 	int i;
 
 	highmem_start_page = pfn_to_page(highstart_pfn);
@@ -434,11 +435,13 @@ void __init mem_init(void)
 	max_mapnr = last_valid_pfn - pfn_base;
 	high_memory = __va(max_low_pfn << PAGE_SHIFT);
 
-	num_physpages = totalram_pages = free_all_bootmem();
+	totalram_pages = free_all_bootmem();
 
 	for (i = 0; sp_banks[i].num_bytes != 0; i++) {
 		unsigned long start_pfn = sp_banks[i].base_addr >> PAGE_SHIFT;
 		unsigned long end_pfn = (sp_banks[i].base_addr + sp_banks[i].num_bytes) >> PAGE_SHIFT;
+
+		num_physpages += sp_banks[i].num_bytes >> PAGE_SHIFT;
 
 		if (end_pfn <= highstart_pfn)
 			continue;
@@ -458,13 +461,20 @@ void __init mem_init(void)
 	initpages = (((unsigned long) &__init_end) - ((unsigned long) &__init_begin));
 	initpages = PAGE_ALIGN(initpages) >> PAGE_SHIFT;
 
-	printk(KERN_INFO "Memory: %dk available (%dk kernel code, %dk data, %dk init, %ldk highmem) [%08lx,%08lx]\n",
-	       nr_free_pages() << (PAGE_SHIFT-10),
+	/* Ignore memory holes for the purpose of counting reserved pages */
+	for (i=0; i < max_low_pfn; i++)
+		if (test_bit(i >> (20 - PAGE_SHIFT), sparc_valid_addr_bitmap)
+		    && PageReserved(pfn_to_page(i)))
+			reservedpages++;
+
+	printk(KERN_INFO "Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init, %ldk highmem)\n",
+	       (unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
+	       num_physpages << (PAGE_SHIFT - 10),
 	       codepages << (PAGE_SHIFT-10),
+	       reservedpages << (PAGE_SHIFT - 10),
 	       datapages << (PAGE_SHIFT-10), 
 	       initpages << (PAGE_SHIFT-10),
-	       totalhigh_pages << (PAGE_SHIFT-10),
-	       (unsigned long)PAGE_OFFSET, (last_valid_pfn << PAGE_SHIFT));
+	       totalhigh_pages << (PAGE_SHIFT-10));
 }
 
 void free_initmem (void)
