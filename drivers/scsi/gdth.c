@@ -5573,11 +5573,11 @@ static int ioc_general(void __user *arg, char *cmnd)
  
 static int ioc_hdrlist(void __user *arg, char *cmnd)
 {
-    gdth_ioctl_rescan rsc;
-    gdth_cmd_str cmd;
+    gdth_ioctl_rescan *rsc;
+    gdth_cmd_str *cmd;
     gdth_ha_str *ha;
     unchar i;
-    int hanum;
+    int hanum, rc = -ENOMEM;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     Scsi_Request *srp;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
@@ -5586,23 +5586,30 @@ static int ioc_hdrlist(void __user *arg, char *cmnd)
     Scsi_Cmnd scp;
 #endif
         
-    if (copy_from_user(&rsc, arg, sizeof(gdth_ioctl_rescan)) ||
-        rsc.ionode >= gdth_ctr_count)
-        return -EFAULT;
-    hanum = rsc.ionode;
+    rsc = kmalloc(sizeof(*rsc), GFP_KERNEL);
+    cmd = kmalloc(sizeof(*cmd), GFP_KERNEL);
+    if (!rsc || !cmd)
+	goto free_fail;
+
+    if (copy_from_user(rsc, arg, sizeof(gdth_ioctl_rescan)) ||
+        rsc->ionode >= gdth_ctr_count) {
+        rc = -EFAULT;
+	goto free_fail;
+    }
+    hanum = rsc->ionode;
     ha = HADATA(gdth_ctr_tab[hanum]);
-    memset(&cmd, 0, sizeof(gdth_cmd_str));
+    memset(cmd, 0, sizeof(gdth_cmd_str));
    
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     srp  = scsi_allocate_request(ha->sdev, GFP_KERNEL);
     if (!srp)
-        return -ENOMEM;
+        goto free_fail;
     srp->sr_cmd_len = 12;
     srp->sr_use_sg = 0;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
     scp  = scsi_allocate_device(ha->sdev, 1, FALSE);
     if (!scp)
-        return -ENOMEM;
+        goto free_fail;
     scp->cmd_len = 12;
     scp->use_sg = 0;
 #else
@@ -5615,32 +5622,32 @@ static int ioc_hdrlist(void __user *arg, char *cmnd)
 
     for (i = 0; i < MAX_HDRIVES; ++i) { 
         if (!ha->hdr[i].present) {
-            rsc.hdr_list[i].bus = 0xff; 
+            rsc->hdr_list[i].bus = 0xff; 
             continue;
         } 
-        rsc.hdr_list[i].bus = ha->virt_bus;
-        rsc.hdr_list[i].target = i;
-        rsc.hdr_list[i].lun = 0;
-        rsc.hdr_list[i].cluster_type = ha->hdr[i].cluster_type;
+        rsc->hdr_list[i].bus = ha->virt_bus;
+        rsc->hdr_list[i].target = i;
+        rsc->hdr_list[i].lun = 0;
+        rsc->hdr_list[i].cluster_type = ha->hdr[i].cluster_type;
         if (ha->hdr[i].cluster_type & CLUSTER_DRIVE) { 
-            cmd.Service = CACHESERVICE;
-            cmd.OpCode = GDT_CLUST_INFO;
+            cmd->Service = CACHESERVICE;
+            cmd->OpCode = GDT_CLUST_INFO;
             if (ha->cache_feat & GDT_64BIT)
-                cmd.u.cache64.DeviceNo = i;
+                cmd->u.cache64.DeviceNo = i;
             else
-                cmd.u.cache.DeviceNo = i;
+                cmd->u.cache.DeviceNo = i;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-            gdth_do_req(srp, &cmd, cmnd, 30);
+            gdth_do_req(srp, cmd, cmnd, 30);
             if (srp->sr_command->SCp.Status == S_OK)
-                rsc.hdr_list[i].cluster_type = srp->sr_command->SCp.Message;
+                rsc->hdr_list[i].cluster_type = srp->sr_command->SCp.Message;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-            gdth_do_cmd(scp, &cmd, cmnd, 30);
+            gdth_do_cmd(scp, cmd, cmnd, 30);
             if (scp->SCp.Status == S_OK)
-                rsc.hdr_list[i].cluster_type = scp->SCp.Message;
+                rsc->hdr_list[i].cluster_type = scp->SCp.Message;
 #else
-            gdth_do_cmd(&scp, &cmd, cmnd, 30);
+            gdth_do_cmd(&scp, cmd, cmnd, 30);
             if (scp.SCp.Status == S_OK)
-                rsc.hdr_list[i].cluster_type = scp.SCp.Message;
+                rsc->hdr_list[i].cluster_type = scp.SCp.Message;
 #endif
         }
     } 
@@ -5650,18 +5657,25 @@ static int ioc_hdrlist(void __user *arg, char *cmnd)
     scsi_release_command(scp);
 #endif       
  
-    if (copy_to_user(arg, &rsc, sizeof(gdth_ioctl_rescan)))
-        return -EFAULT;
-    return 0;
+    if (copy_to_user(arg, rsc, sizeof(gdth_ioctl_rescan)))
+        rc = -EFAULT;
+    else
+	rc = 0;
+
+free_fail:
+    kfree(rsc);
+    kfree(cmd);
+    return rc;
 }
 
 static int ioc_rescan(void __user *arg, char *cmnd)
 {
-    gdth_ioctl_rescan rsc;
-    gdth_cmd_str cmd;
+    gdth_ioctl_rescan *rsc;
+    gdth_cmd_str *cmd;
     ushort i, status, hdr_cnt;
     ulong32 info;
     int hanum, cyls, hds, secs;
+    int rc = -ENOMEM;
     ulong flags;
     gdth_ha_str *ha; 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -5671,24 +5685,31 @@ static int ioc_rescan(void __user *arg, char *cmnd)
 #else
     Scsi_Cmnd scp;
 #endif
-        
-    if (copy_from_user(&rsc, arg, sizeof(gdth_ioctl_rescan)) ||
-        rsc.ionode >= gdth_ctr_count)
-        return -EFAULT;
-    hanum = rsc.ionode;
+
+    rsc = kmalloc(sizeof(*rsc), GFP_KERNEL);
+    cmd = kmalloc(sizeof(*cmd), GFP_KERNEL);
+    if (!cmd || !rsc)
+	goto free_fail;
+
+    if (copy_from_user(rsc, arg, sizeof(gdth_ioctl_rescan)) ||
+        rsc->ionode >= gdth_ctr_count) {
+	rc = -EFAULT;
+	goto free_fail;
+    }
+    hanum = rsc->ionode;
     ha = HADATA(gdth_ctr_tab[hanum]);
-    memset(&cmd, 0, sizeof(gdth_cmd_str));
+    memset(cmd, 0, sizeof(gdth_cmd_str));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     srp  = scsi_allocate_request(ha->sdev, GFP_KERNEL);
     if (!srp)
-        return -ENOMEM;
+        goto free_fail;
     srp->sr_cmd_len = 12;
     srp->sr_use_sg = 0;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
     scp  = scsi_allocate_device(ha->sdev, 1, FALSE);
     if (!scp)
-        return -ENOMEM;
+        goto free_fail;
     scp->cmd_len = 12;
     scp->use_sg = 0;
 #else
@@ -5699,59 +5720,60 @@ static int ioc_rescan(void __user *arg, char *cmnd)
     scp.device = &ha->sdev;
 #endif
      
-    if (rsc.flag == 0) {
+    if (rsc->flag == 0) {
         /* old method: re-init. cache service */
-        cmd.Service = CACHESERVICE;
+        cmd->Service = CACHESERVICE;
         if (ha->cache_feat & GDT_64BIT) {
-            cmd.OpCode = GDT_X_INIT_HOST;
-            cmd.u.cache64.DeviceNo = LINUX_OS;
+            cmd->OpCode = GDT_X_INIT_HOST;
+            cmd->u.cache64.DeviceNo = LINUX_OS;
         } else {
-            cmd.OpCode = GDT_INIT;
-            cmd.u.cache.DeviceNo = LINUX_OS;
+            cmd->OpCode = GDT_INIT;
+            cmd->u.cache.DeviceNo = LINUX_OS;
         }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        gdth_do_req(srp, &cmd, cmnd, 30);
+        gdth_do_req(srp, cmd, cmnd, 30);
         status = (ushort)srp->sr_command->SCp.Status;
         info = (ulong32)srp->sr_command->SCp.Message;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-        gdth_do_cmd(scp, &cmd, cmnd, 30);
+        gdth_do_cmd(scp, cmd, cmnd, 30);
         status = (ushort)scp->SCp.Status;
         info = (ulong32)scp->SCp.Message;
 #else
-        gdth_do_cmd(&scp, &cmd, cmnd, 30);
+        gdth_do_cmd(&scp, cmd, cmnd, 30);
         status = (ushort)scp.SCp.Status;
         info = (ulong32)scp.SCp.Message;
 #endif
         i = 0;
         hdr_cnt = (status == S_OK ? (ushort)info : 0);
     } else {
-        i = rsc.hdr_no;
+        i = rsc->hdr_no;
         hdr_cnt = i + 1;
     }
+
     for (; i < hdr_cnt && i < MAX_HDRIVES; ++i) {
-        cmd.Service = CACHESERVICE;
-        cmd.OpCode = GDT_INFO;
+        cmd->Service = CACHESERVICE;
+        cmd->OpCode = GDT_INFO;
         if (ha->cache_feat & GDT_64BIT) 
-            cmd.u.cache64.DeviceNo = i;
+            cmd->u.cache64.DeviceNo = i;
         else 
-            cmd.u.cache.DeviceNo = i;
+            cmd->u.cache.DeviceNo = i;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        gdth_do_req(srp, &cmd, cmnd, 30);
+        gdth_do_req(srp, cmd, cmnd, 30);
         status = (ushort)srp->sr_command->SCp.Status;
         info = (ulong32)srp->sr_command->SCp.Message;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-        gdth_do_cmd(scp, &cmd, cmnd, 30);
+        gdth_do_cmd(scp, cmd, cmnd, 30);
         status = (ushort)scp->SCp.Status;
         info = (ulong32)scp->SCp.Message;
 #else
-        gdth_do_cmd(&scp, &cmd, cmnd, 30);
+        gdth_do_cmd(&scp, cmd, cmnd, 30);
         status = (ushort)scp.SCp.Status;
         info = (ulong32)scp.SCp.Message;
 #endif
         GDTH_LOCK_HA(ha, flags);
-        rsc.hdr_list[i].bus = ha->virt_bus;
-        rsc.hdr_list[i].target = i;
-        rsc.hdr_list[i].lun = 0;
+        rsc->hdr_list[i].bus = ha->virt_bus;
+        rsc->hdr_list[i].target = i;
+        rsc->hdr_list[i].lun = 0;
         if (status != S_OK) {
             ha->hdr[i].present = FALSE;
         } else {
@@ -5773,22 +5795,22 @@ static int ioc_rescan(void __user *arg, char *cmnd)
         /* but we need ha->info2, not yet stored in scp->SCp */
 
         /* devtype, cluster info, R/W attribs */
-        cmd.Service = CACHESERVICE;
-        cmd.OpCode = GDT_DEVTYPE;
+        cmd->Service = CACHESERVICE;
+        cmd->OpCode = GDT_DEVTYPE;
         if (ha->cache_feat & GDT_64BIT) 
-            cmd.u.cache64.DeviceNo = i;
+            cmd->u.cache64.DeviceNo = i;
         else
-            cmd.u.cache.DeviceNo = i;
+            cmd->u.cache.DeviceNo = i;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        gdth_do_req(srp, &cmd, cmnd, 30);
+        gdth_do_req(srp, cmd, cmnd, 30);
         status = (ushort)srp->sr_command->SCp.Status;
         info = (ulong32)srp->sr_command->SCp.Message;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-        gdth_do_cmd(scp, &cmd, cmnd, 30);
+        gdth_do_cmd(scp, cmd, cmnd, 30);
         status = (ushort)scp->SCp.Status;
         info = (ulong32)scp->SCp.Message;
 #else
-        gdth_do_cmd(&scp, &cmd, cmnd, 30);
+        gdth_do_cmd(&scp, cmd, cmnd, 30);
         status = (ushort)scp.SCp.Status;
         info = (ulong32)scp.SCp.Message;
 #endif
@@ -5796,22 +5818,22 @@ static int ioc_rescan(void __user *arg, char *cmnd)
         ha->hdr[i].devtype = (status == S_OK ? (ushort)info : 0);
         GDTH_UNLOCK_HA(ha, flags);
 
-        cmd.Service = CACHESERVICE;
-        cmd.OpCode = GDT_CLUST_INFO;
+        cmd->Service = CACHESERVICE;
+        cmd->OpCode = GDT_CLUST_INFO;
         if (ha->cache_feat & GDT_64BIT) 
-            cmd.u.cache64.DeviceNo = i;
+            cmd->u.cache64.DeviceNo = i;
         else
-            cmd.u.cache.DeviceNo = i;
+            cmd->u.cache.DeviceNo = i;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        gdth_do_req(srp, &cmd, cmnd, 30);
+        gdth_do_req(srp, cmd, cmnd, 30);
         status = (ushort)srp->sr_command->SCp.Status;
         info = (ulong32)srp->sr_command->SCp.Message;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-        gdth_do_cmd(scp, &cmd, cmnd, 30);
+        gdth_do_cmd(scp, cmd, cmnd, 30);
         status = (ushort)scp->SCp.Status;
         info = (ulong32)scp->SCp.Message;
 #else
-        gdth_do_cmd(&scp, &cmd, cmnd, 30);
+        gdth_do_cmd(&scp, cmd, cmnd, 30);
         status = (ushort)scp.SCp.Status;
         info = (ulong32)scp.SCp.Message;
 #endif
@@ -5819,24 +5841,24 @@ static int ioc_rescan(void __user *arg, char *cmnd)
         ha->hdr[i].cluster_type = 
             ((status == S_OK && !shared_access) ? (ushort)info : 0);
         GDTH_UNLOCK_HA(ha, flags);
-        rsc.hdr_list[i].cluster_type = ha->hdr[i].cluster_type;
+        rsc->hdr_list[i].cluster_type = ha->hdr[i].cluster_type;
 
-        cmd.Service = CACHESERVICE;
-        cmd.OpCode = GDT_RW_ATTRIBS;
+        cmd->Service = CACHESERVICE;
+        cmd->OpCode = GDT_RW_ATTRIBS;
         if (ha->cache_feat & GDT_64BIT) 
-            cmd.u.cache64.DeviceNo = i;
+            cmd->u.cache64.DeviceNo = i;
         else
-            cmd.u.cache.DeviceNo = i;
+            cmd->u.cache.DeviceNo = i;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        gdth_do_req(srp, &cmd, cmnd, 30);
+        gdth_do_req(srp, cmd, cmnd, 30);
         status = (ushort)srp->sr_command->SCp.Status;
         info = (ulong32)srp->sr_command->SCp.Message;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-        gdth_do_cmd(scp, &cmd, cmnd, 30);
+        gdth_do_cmd(scp, cmd, cmnd, 30);
         status = (ushort)scp->SCp.Status;
         info = (ulong32)scp->SCp.Message;
 #else
-        gdth_do_cmd(&scp, &cmd, cmnd, 30);
+        gdth_do_cmd(&scp, cmd, cmnd, 30);
         status = (ushort)scp.SCp.Status;
         info = (ulong32)scp.SCp.Message;
 #endif
@@ -5850,9 +5872,15 @@ static int ioc_rescan(void __user *arg, char *cmnd)
     scsi_release_command(scp);
 #endif       
  
-    if (copy_to_user(arg, &rsc, sizeof(gdth_ioctl_rescan)))
-        return -EFAULT;
-    return 0;
+    if (copy_to_user(arg, rsc, sizeof(gdth_ioctl_rescan)))
+        rc = -EFAULT;
+    else
+	rc = 0;
+
+free_fail:
+    kfree(rsc);
+    kfree(cmd);
+    return rc;
 }
   
 static int gdth_ioctl(struct inode *inode, struct file *filep,
