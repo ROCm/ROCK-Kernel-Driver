@@ -195,9 +195,10 @@ static void fb_flashcursor(void *private)
 {
 	struct fb_info *info = (struct fb_info *) private;
 
-	if (!info || !info->cursor.enable)
+	/* Test to see if the cursor is erased but still on */
+	if (!info || (info->cursor.rop == ROP_COPY))
 		return;
-	info->cursor.set = FB_CUR_SETCUR;
+	info->cursor.enable ^= 1;
 	info->fbops->fb_cursor(info, &info->cursor);
 }
 
@@ -1007,20 +1008,21 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
  	c = scr_readw((u16 *) vc->vc_pos);
 
 	cursor.image.data = vc->vc_font.data + ((c & charmask) * (w * vc->vc_font.height));
+	cursor.set = FB_CUR_SETCUR;
 	cursor.image.depth = 1;
-
+	
 	switch (mode) {
 	case CM_ERASE:
 		if (info->cursor.rop == ROP_XOR) {
-			cursor.set = 0;
-			cursor.rop = ROP_COPY;
+			info->cursor.enable = 0;
+			info->cursor.rop = ROP_COPY;
 			info->fbops->fb_cursor(info, &cursor);
 		}	
 		break;
 	case CM_MOVE:
 	case CM_DRAW:
-		cursor.set = FB_CUR_SETCUR;
-
+		info->cursor.enable = 1;
+		
 		if (info->cursor.image.fg_color != attr_fgcol(fgshift, c) ||
 	    	    info->cursor.image.bg_color != attr_bgcol(bgshift, c)) {
 			cursor.image.fg_color = attr_fgcol(fgshift, c);
@@ -1033,8 +1035,8 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			cursor.image.dx = vc->vc_font.width * vc->vc_x;
 			cursor.image.dy = vc->vc_font.height * y;
 			cursor.set |= FB_CUR_SETPOS;
-		}			
-	
+		}
+
 		if (info->cursor.image.height != vc->vc_font.height ||
 		    info->cursor.image.width != vc->vc_font.width) {
 			cursor.image.height = vc->vc_font.height;
@@ -1042,7 +1044,7 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			cursor.set |= FB_CUR_SETSIZE;
 		}
 
-		if ((vc->vc_cursor_type & 0x0f) != p->cursor_shape) {
+		if ((cursor.set & FB_CUR_SETSIZE) || ((vc->vc_cursor_type & 0x0f) != p->cursor_shape)) {
 			int cur_height, size, i = 0;
 
 			mask = kmalloc(w*vc->vc_font.height, GFP_ATOMIC);
@@ -1080,7 +1082,7 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 				mask[i++] = 0xff;
         		cursor.mask = mask;
 		}
-        	cursor.rop = ROP_XOR;
+        	info->cursor.rop = ROP_XOR;
 
 		info->fbops->fb_cursor(info, &cursor);
 		if (mask)	

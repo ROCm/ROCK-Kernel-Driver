@@ -456,8 +456,7 @@ u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 	u32 align = info->pixmap.buf_align - 1;
 	u32 offset, count = 1000;
 
-	spin_lock_irqsave(&info->pixmap.lock,
-			  info->pixmap.lock_flags);
+	spin_lock(&info->pixmap.lock);
 	offset = info->pixmap.offset + align;
 	offset &= ~align;
 	if (offset + size > info->pixmap.size) {
@@ -472,8 +471,7 @@ u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 	atomic_inc(&info->pixmap.count);	
 	smp_mb__after_atomic_inc();
 
-	spin_unlock_irqrestore(&info->pixmap.lock,
-			       info->pixmap.lock_flags);
+	spin_unlock(&info->pixmap.lock);
 	return offset;
 }
 
@@ -855,6 +853,9 @@ fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
 	if (copy_from_user(&cursor, sprite, sizeof(struct fb_cursor)))
 		return -EFAULT;
 
+	if (cursor.set & FB_CUR_SETCUR)
+		info->cursor.enable = 1;
+	
 	if (cursor.set & FB_CUR_SETCMAP) {
 		err = fb_copy_cmap(&cursor.image.cmap, &sprite->image.cmap, 1);
 		if (err)
@@ -884,6 +885,8 @@ fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
 			return -EFAULT;
 		}
 	}
+	info->cursor.set = cursor.set;
+	info->cursor.rop = cursor.rop;
 	err = info->fbops->fb_cursor(info, &cursor);
 	return err;
 }

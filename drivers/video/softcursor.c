@@ -24,9 +24,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	unsigned int i, size, dsize, s_pitch, d_pitch;
 	u8 *dst, src[64];
 
-	info->cursor.enable = (cursor->set & FB_CUR_SETCUR) ? 1 : 0;
-	info->cursor.rop = cursor->rop;
-	
 	if (cursor->set & FB_CUR_SETSIZE) {
 		info->cursor.image.height = cursor->image.height;
 		info->cursor.image.width = cursor->image.width;
@@ -59,12 +56,13 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
 
 	if (cursor->set & FB_CUR_SETSHAPE) {
-		if (!cursor->mask)	return -EINVAL;
-		if (info->cursor.mask)
-			kfree(info->cursor.mask);
-		info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
-		if (!info->cursor.mask)
-			return -ENOMEM;
+		if (cursor->set & FB_CUR_SETSIZE) {
+			if (info->cursor.mask)
+				kfree(info->cursor.mask);
+			info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
+			if (!info->cursor.mask)
+				return -ENOMEM;
+		}
 		memcpy(info->cursor.mask, cursor->mask, dsize);			
 	}
 	
@@ -80,17 +78,16 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 				src[i] = cursor->image.data[i] & info->cursor.mask[i];
 			break;
 		}
-	} else {
-		for (i = 0; i < size; i++)
-			src[i] = cursor->image.data[i];
-	}
+	} else 
+		memcpy(src, cursor->image.data, size);
+	
 	move_buf_aligned(info, dst, src, d_pitch, s_pitch,info->cursor.image.height);
 	
 	info->cursor.image.data = dst;
 	
 	info->fbops->fb_imageblit(info, &info->cursor.image);
 	atomic_dec(&info->pixmap.count);
-	smp_mb__after_atomic_dec();	
+	smp_mb__after_atomic_dec();
 	return 0;
 }
 

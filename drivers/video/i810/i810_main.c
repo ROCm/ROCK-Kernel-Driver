@@ -1338,16 +1338,14 @@ static int i810fb_check_var(struct fb_var_screeninfo *var,
 
 static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	static u8 data[64 * 8];
 	struct i810fb_par *par = (struct i810fb_par *)info->par;
 	u8 *mmio = par->mmio_start_virtual;	
-	u16 flags = cursor->set;
-
+	static u8 data[64 * 8];
+	
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP) 
 		return soft_cursor(info, cursor);
 
-	if (cursor->image.width > 64 || cursor->image.height > 64 ||
-	    (cursor->dest == NULL && cursor->rop == ROP_XOR))
+	if (cursor->image.width > 64 || cursor->image.height > 64)
 		return 1;
 
 	if ((i810_readl(CURBASE, mmio) & 0xf) != par->cursor_heap.physical) {
@@ -1356,60 +1354,64 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	}
 
 	if (par->cursor_reset) {
-		flags = FB_CUR_SETALL;
+		cursor->set = FB_CUR_SETALL;
 		par->cursor_reset = 0;
 	}
 	
 	i810_enable_cursor(mmio, OFF);
 
-	if (flags & FB_CUR_SETPOS) {
+	if (cursor->set & FB_CUR_SETHOT)
+		info->cursor.hot = cursor->hot;
+	
+	if (cursor->set & FB_CUR_SETPOS) {
 		u32 tmp;
 
+		info->cursor.image.dx = cursor->image.dx;
+		info->cursor.image.dy = cursor->image.dy;
+		
 		tmp = cursor->image.dx - info->var.xoffset;
 		tmp |= (cursor->image.dy - info->var.yoffset) << 16;
 	    
 		i810_writel(CURPOS, mmio, tmp);
 	}
 
-	if (flags & FB_CUR_SETSIZE) {
+	if (cursor->set & FB_CUR_SETSIZE) {
+		info->cursor.image.height = cursor->image.height;
+		info->cursor.image.width = cursor->image.width;
 		i810_reset_cursor_image(par);
 	}
 
-	if (flags & FB_CUR_SETCMAP) {
+	if (cursor->set & FB_CUR_SETCMAP) {
+		info->cursor.image.fg_color = cursor->image.fg_color;
+		info->cursor.image.bg_color = cursor->image.bg_color;
 		i810_load_cursor_colors(cursor->image.fg_color,
 					cursor->image.bg_color,
 					info);
 	}
 
-	if (flags & (FB_CUR_SETDEST | FB_CUR_SETSHAPE)) {
-		int size = ((cursor->image.width + 7)/8) * 
-			cursor->image.height;
+	if (cursor->set & FB_CUR_SETSHAPE) {
+		int size = ((info->cursor.image.width + 7) >> 3) * 
+			     info->cursor.image.height;
 		int i;
 
-		switch (cursor->rop) {
+		switch (info->cursor.rop) {
 		case ROP_XOR:
-			for (i = 0; i < size; i++) {
-				data[i] = ((cursor->image.data[i] & 
-					    cursor->mask[i]) ^
-					   cursor->dest[i]);
-			}
+			for (i = 0; i < size; i++)
+				data[i] = cursor->image.data[i] ^ cursor->mask[i]; 
 			break;
 		case ROP_COPY:
 		default:
-			for (i = 0; i < size; i++) {
-				data[i] = cursor->image.data[i] & 
-					cursor->mask[i];
-			}
+			for (i = 0; i < size; i++)
+				data[i] = cursor->image.data[i] & cursor->mask[i]; 
 			break;
 		}
-		i810_load_cursor_image(cursor->image.width, 
-				       cursor->image.height, data,
+		i810_load_cursor_image(info->cursor.image.width, 
+				       info->cursor.image.height, data,
 				       par);
 	}
 
-	if (cursor->enable)
+	if (info->cursor.enable)
 		i810_enable_cursor(mmio, ON);
-		
 	return 0;
 }
 

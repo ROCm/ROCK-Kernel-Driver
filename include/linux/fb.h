@@ -340,7 +340,6 @@ struct fb_pixmap {
 	__u32 flags;                      /* see FB_PIXMAP_*               */
 	void (*outbuf)(u8 dst, u8 *addr); /* access methods                */
 	u8   (*inbuf) (u8 *addr);
-	unsigned long lock_flags;         /* flags for locking             */
 	spinlock_t lock;                  /* spinlock                      */
 	atomic_t count;
 };
