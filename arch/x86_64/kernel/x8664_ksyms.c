@@ -208,13 +208,6 @@ EXPORT_SYMBOL(init_level4_pgt);
 extern unsigned long __supported_pte_mask;
 EXPORT_SYMBOL(__supported_pte_mask);
 
-#ifdef CONFIG_DISCONTIGMEM
-EXPORT_SYMBOL(memnode_shift);
-EXPORT_SYMBOL(memnodemap);
-EXPORT_SYMBOL(node_data);
-EXPORT_SYMBOL(fake_node);
-#endif
-
 EXPORT_SYMBOL(clear_page);
 
 #ifdef CONFIG_SMP

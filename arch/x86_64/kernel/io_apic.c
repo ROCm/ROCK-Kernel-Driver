@@ -250,12 +250,14 @@ void __init check_ioapic(void)
 				vendor &= 0xffff;
 				switch (vendor) { 
 				case PCI_VENDOR_ID_VIA:
+#ifdef CONFIG_GART_IOMMU
 					if (end_pfn >= (0xffffffff>>PAGE_SHIFT) &&
 					    !iommu_aperture_allowed) {
 						printk(KERN_INFO
     "Looks like a VIA chipset. Disabling IOMMU. Overwrite with \"iommu=allowed\"\n");
 						iommu_aperture_disabled = 1;
 					}
+#endif
 					/* FALL THROUGH */
 				case PCI_VENDOR_ID_NVIDIA:
 #ifndef CONFIG_SMP

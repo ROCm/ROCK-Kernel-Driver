@@ -290,9 +290,11 @@ config GART_IOMMU
 	  Normally the kernel will take the right choice by itself.
 	  If unsure say Y 
 
+# need this always enabled with GART_IOMMU for the VIA workaround
 config SWIOTLB
-       select GART_IOMMU
-       bool "Software IOTLB support"
+       bool
+       depends on GART_IOMMU
+       default y
 
 config DUMMY_IOMMU
 	bool
