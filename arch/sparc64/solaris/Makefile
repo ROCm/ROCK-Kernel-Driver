@@ -7,15 +7,12 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
+USE_STANDARD_AS_RULE := true
+EXTRA_AFLAGS := -ansi
+
 ifeq ($(CONFIG_SOLARIS_EMUL),m)
-CPPFLAGS = $(MODFLAGS)
+  EXTRA_AFLAGS += $(MODFLAGS)
 endif
-
-.S.s:
-	$(CPP) $(AFLAGS) $(CPPFLAGS) -ansi $< -o $*.s
-
-.S.o:
-	$(CC) $(AFLAGS) $(CPPFLAGS) -ansi -c $< -o $*.o
 
 list-multi := solaris.o
 
