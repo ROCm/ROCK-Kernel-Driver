@@ -165,13 +165,8 @@ static void qlogic_detach(dev_link_t * link)
 	if (*linkp == NULL)
 		return;
 
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 		qlogic_release(link);
-		if (link->state & DEV_STALE_CONFIG) {
-			link->state |= DEV_STALE_LINK;
-			return;
-		}
-	}
 
 	if (link->handle)
 		CardServices(DeregisterClient, link->handle);
@@ -296,9 +291,7 @@ static void qlogic_release(dev_link_t *link)
 	scsi_unregister(info->host);
 
 	link->state &= ~DEV_CONFIG;
-	if (link->state & DEV_STALE_LINK)
-		qlogic_detach(link);
-}				/* qlogic_release */
+}
 
 /*====================================================================*/
 

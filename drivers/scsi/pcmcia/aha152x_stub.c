@@ -177,13 +177,8 @@ static void aha152x_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	aha152x_release_cs(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
-	    return;
-	}
-    }
 
     if (link->handle)
 	CardServices(DeregisterClient, link->handle);
@@ -302,9 +297,6 @@ static void aha152x_release_cs(dev_link_t *link)
     
 	link->state &= ~DEV_CONFIG;
 	scsi_unregister(info->host);
-
-	if (link->state & DEV_STALE_LINK)
-		aha152x_detach(link);
 }
 
 static int aha152x_event(event_t event, int priority,
