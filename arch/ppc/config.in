@@ -244,7 +244,7 @@ if [ "$CONFIG_40x" = "y" ]; then
    fi
 
    bool 'Blue Logic DMA' CONFIG_405_DMA
-   dep_bool 'Power Management support (experimental)' CONFIG_PM $CONFIG_EXPERIMENTAL
+   dep_bool 'Power Management support (EXPERIMENTAL)' CONFIG_PM $CONFIG_EXPERIMENTAL
 
    choice 'TTYS0 device and default console'	\
 	"UART0  CONFIG_UART0_TTYS0		\

@@ -341,7 +341,7 @@ comment 'Processor Features'
 if [ "$CONFIG_CPU_ARM720T" = "y" -o "$CONFIG_CPU_ARM920T" = "y" -o \
      "$CONFIG_CPU_ARM922T" = "y" -o "$CONFIG_CPU_ARM926T" = "y" -o \
      "$CONFIG_CPU_ARM1020" = "y" -o "$CONFIG_CPU_XSCALE" = "y" ]; then
-   dep_bool 'Support Thumb instructions (experimental)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
+   dep_bool 'Support Thumb instructions (EXPERIMENTAL)' CONFIG_ARM_THUMB $CONFIG_EXPERIMENTAL
 fi
 if [ "$CONFIG_CPU_ARM920T" = "y" -o "$CONFIG_CPU_ARM922T" = "y" -o \
      "$CONFIG_CPU_ARM926T" = "y" -o "$CONFIG_CPU_ARM1020" = "y" ]; then
@@ -449,7 +449,7 @@ fi
 comment 'At least one math emulation must be selected'
 tristate 'NWFPE math emulation' CONFIG_FPE_NWFPE
 if [ "$CONFIG_CPU_26" = "n" -a "$CONFIG_CPU_32v3" = "n" ]; then
-   dep_tristate 'FastFPE math emulation (experimental)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
+   dep_tristate 'FastFPE math emulation (EXPERIMENTAL)' CONFIG_FPE_FASTFPE $CONFIG_EXPERIMENTAL
 fi
 choice 'Kernel core (/proc/kcore) format' \
 	"ELF		CONFIG_KCORE_ELF	\
@@ -458,7 +458,7 @@ tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 bool 'Power Management support' CONFIG_PM
-dep_bool 'Preemptible Kernel (experimental)' CONFIG_PREEMPT $CONFIG_CPU_32 $CONFIG_EXPERIMENTAL
+dep_bool 'Preemptible Kernel (EXPERIMENTAL)' CONFIG_PREEMPT $CONFIG_CPU_32 $CONFIG_EXPERIMENTAL
 dep_tristate 'Advanced Power Management Emulation' CONFIG_APM $CONFIG_PM
 dep_tristate 'RISC OS personality' CONFIG_ARTHUR $CONFIG_CPU_32
 string 'Default kernel command string' CONFIG_CMDLINE ""
