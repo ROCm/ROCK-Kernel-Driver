@@ -197,9 +197,11 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 
 static void scsi_disk_put(struct scsi_disk *sdkp)
 {
+	struct scsi_device *sdev = sdkp->device;
+
 	down(&sd_ref_sem);
 	kref_put(&sdkp->kref, scsi_disk_release);
-	scsi_device_put(sdkp->device);
+	scsi_device_put(sdev);
 	up(&sd_ref_sem);
 }
 
