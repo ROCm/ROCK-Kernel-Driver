@@ -395,7 +395,7 @@ static int chkSuper(struct super_block *sb)
 	if (sbi->mntflag & JFS_INLINELOG)
 		sbi->logpxd = j_sb->s_logpxd;
 	else {
-		sbi->logdev = old_decode_dev(le32_to_cpu(j_sb->s_logdev));
+		sbi->logdev = new_decode_dev(le32_to_cpu(j_sb->s_logdev));
 		memcpy(sbi->uuid, j_sb->s_uuid, sizeof(sbi->uuid));
 		memcpy(sbi->loguuid, j_sb->s_loguuid, sizeof(sbi->uuid));
 	}
@@ -444,7 +444,7 @@ int updateSuper(struct super_block *sb, uint state)
 
 	if (state == FM_MOUNT) {
 		/* record log's dev_t and mount serial number */
-		j_sb->s_logdev = cpu_to_le32(old_encode_dev(sbi->log->bdev->bd_dev));
+		j_sb->s_logdev = cpu_to_le32(new_encode_dev(sbi->log->bdev->bd_dev));
 		j_sb->s_logserial = cpu_to_le32(sbi->log->serial);
 	} else if (state == FM_CLEAN) {
 		/*
@@ -507,7 +507,7 @@ static int logMOUNT(struct super_block *sb)
 	lrd.backchain = 0;
 	lrd.type = cpu_to_le16(LOG_MOUNT);
 	lrd.length = 0;
-	lrd.aggregate = cpu_to_le32(old_encode_dev(sb->s_bdev->bd_dev));
+	lrd.aggregate = cpu_to_le32(new_encode_dev(sb->s_bdev->bd_dev));
 	lmLog(log, NULL, &lrd, NULL);
 
 	return 0;

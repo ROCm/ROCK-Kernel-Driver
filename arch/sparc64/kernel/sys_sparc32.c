@@ -1304,7 +1304,8 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
-	if (stat->size > MAX_NON_LFS)
+	if (stat->size > MAX_NON_LFS || !old_valid_dev(stat->dev) ||
+	    !old_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
 	err  = put_user(old_encode_dev(stat->dev), &statbuf->st_dev);

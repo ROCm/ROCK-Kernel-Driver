@@ -76,11 +76,13 @@ static dev_t __init try_name(char *name, int part)
 		 * Try the %u:%u format -- see print_dev_t()
 		 */
 		res = MKDEV(maj, min);
+		if (maj != MAJOR(res) || min != MINOR(res))
+			goto fail;
 	} else {
 		/*
 		 * Nope.  Try old-style "0321"
 		 */
-		res = old_decode_dev(simple_strtoul(buf, &s, 16));
+		res = new_decode_dev(simple_strtoul(buf, &s, 16));
 		if (*s)
 			goto fail;
 	}
@@ -145,8 +147,10 @@ dev_t name_to_dev_t(char *name)
 
 		if (sscanf(name, "%u:%u", &maj, &min) == 2) {
 			res = MKDEV(maj, min);
+			if (maj != MAJOR(res) || min != MINOR(res))
+				goto fail;
 		} else {
-			res = old_decode_dev(simple_strtoul(name, &p, 16));
+			res = new_decode_dev(simple_strtoul(name, &p, 16));
 			if (*p)
 				goto fail;
 		}

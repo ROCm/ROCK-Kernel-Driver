@@ -1473,7 +1473,7 @@ asmlinkage long sys_mknod(const char __user * filename, int mode, unsigned dev)
 			break;
 		case S_IFCHR: case S_IFBLK:
 			error = vfs_mknod(nd.dentry->d_inode,dentry,mode,
-					old_decode_dev(dev));
+					new_decode_dev(dev));
 			break;
 		case S_IFIFO: case S_IFSOCK:
 			error = vfs_mknod(nd.dentry->d_inode,dentry,mode,0);

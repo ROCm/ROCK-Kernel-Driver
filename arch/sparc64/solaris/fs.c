@@ -248,11 +248,14 @@ asmlinkage int solaris_mknod(u32 path, u32 mode, s32 dev)
 {
 	int (*sys_mknod)(const char *,int,unsigned) = 
 		(int (*)(const char *,int,unsigned))SYS(mknod);
-	int major, minor;
+	int major = sysv_major(dev);
+	int minor = sysv_minor(dev);
 
-	if ((major = sysv_major(dev)) > 255 || 
-	    (minor = sysv_minor(dev)) > 255) return -EINVAL;
-	return sys_mknod((const char *)A(path), mode, old_encode_dev(MKDEV(major,minor)));
+	/* minor is guaranteed to be OK for MKDEV, major might be not */
+	if (major > 0xfff)
+		return -EINVAL;
+	return sys_mknod((const char *)A(path), mode,
+				new_encode_dev(MKDEV(major,minor)));
 }
 
 asmlinkage int solaris_xmknod(int vers, u32 path, u32 mode, s32 dev)

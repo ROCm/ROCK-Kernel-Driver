@@ -184,7 +184,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	struct inode	*inode;
 	struct dentry	*dchild;
 	int		nfserr, type, mode;
-	dev_t		rdev = 0, wanted = old_decode_dev(attr->ia_size);
+	dev_t		rdev = 0, wanted = new_decode_dev(attr->ia_size);
 
 	dprintk("nfsd: CREATE   %s %.*s\n",
 		SVCFH_fmt(dirfhp), argp->len, argp->name);
@@ -282,11 +282,6 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		} else if (type == S_IFCHR && !(attr->ia_valid & ATTR_SIZE)) {
 			/* If you think you've seen the worst, grok this. */
 			type = S_IFIFO;
-		} else if (!rdev && attr->ia_size != old_encode_dev(wanted)) {
-			/* dev got truncated because of 16bit Linux dev_t */
-			/* may need to change when we widen dev_t */
-			nfserr = nfserr_inval;
-			goto out_unlock;
 		} else {
 			/* Okay, char or block special */
 			is_borc = 1;

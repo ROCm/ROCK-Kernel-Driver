@@ -277,7 +277,7 @@ nfs_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 		sattr->ia_valid &= ~ATTR_SIZE;
 	} else if (S_ISCHR(mode) || S_ISBLK(mode)) {
 		sattr->ia_valid |= ATTR_SIZE;
-		sattr->ia_size = old_encode_dev(rdev);/* get out your barf bag */
+		sattr->ia_size = new_encode_dev(rdev);/* get out your barf bag */
 	}
 
 	fattr->valid = 0;

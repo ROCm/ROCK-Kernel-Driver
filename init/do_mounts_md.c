@@ -124,7 +124,7 @@ static void __init md_setup_drive(void)
 		for (i = 0; i < MD_SB_DISKS && devname != 0; i++) {
 			char *p;
 			char comp_name[64];
-			struct stat buf;
+			u32 rdev;
 
 			p = strchr(devname, ',');
 			if (p)
@@ -134,9 +134,9 @@ static void __init md_setup_drive(void)
 			if (strncmp(devname, "/dev/", 5) == 0)
 				devname += 5;
 			snprintf(comp_name, 63, "/dev/%s", devname);
-			if (sys_newstat(comp_name, &buf) == 0 &&
-							S_ISBLK(buf.st_mode))
-				dev = old_decode_dev(buf.st_rdev);
+			rdev = bstat(comp_name);
+			if (rdev)
+				dev = new_decode_dev(rdev);
 			if (!dev) {
 				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);
 				break;

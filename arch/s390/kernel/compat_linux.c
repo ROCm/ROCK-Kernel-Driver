@@ -1316,6 +1316,9 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
+	if (!old_valid_dev(stat->dev) || !old_valid_dev(stat->rdev))
+		return -EOVERFLOW;
+
 	err = put_user(old_encode_dev(stat->dev), &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
@@ -2573,14 +2576,14 @@ static int cp_stat64(struct stat64_emu31 *ubuf, struct kstat *stat)
 
 	memset(&tmp, 0, sizeof(tmp));
 
-	tmp.st_dev = old_encode_dev(stat->dev);
+	tmp.st_dev = huge_encode_dev(stat->dev);
 	tmp.st_ino = stat->ino;
 	tmp.__st_ino = (u32)stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = (unsigned int)stat->nlink;
 	tmp.uid = stat->uid;
 	tmp.gid = stat->gid;
-	tmp.st_rdev = old_encode_dev(stat->rdev);
+	tmp.st_rdev = huge_encode_dev(stat->rdev);
 	tmp.st_size = stat->st_size;
 	tmp.st_blksize = (u32)stat->blksize;
 	tmp.st_blocks = (u32)stat->blocks;

@@ -113,7 +113,7 @@ static void __init parse_header(char *s)
 	body_len = parsed[6];
 	major = parsed[7];
 	minor = parsed[8];
-	rdev = old_encode_dev(MKDEV(parsed[9], parsed[10]));
+	rdev = new_encode_dev(MKDEV(parsed[9], parsed[10]));
 	name_len = parsed[11];
 }
 

@@ -189,7 +189,7 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	if (is_fsid(fhp, rqstp->rq_reffh))
 		p = xdr_encode_hyper(p, (u64) fhp->fh_export->ex_fsid);
 	else
-		p = xdr_encode_hyper(p, (u64) old_encode_dev(stat.dev));
+		p = xdr_encode_hyper(p, (u64) huge_encode_dev(stat.dev));
 	p = xdr_encode_hyper(p, (u64) stat.ino);
 	p = encode_time3(p, &stat.atime);
 	lease_get_mtime(dentry->d_inode, &time); 
@@ -223,7 +223,7 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	if (is_fsid(fhp, rqstp->rq_reffh))
 		p = xdr_encode_hyper(p, (u64) fhp->fh_export->ex_fsid);
 	else
-		p = xdr_encode_hyper(p, (u64)old_encode_dev(inode->i_sb->s_dev));
+		p = xdr_encode_hyper(p, (u64)huge_encode_dev(inode->i_sb->s_dev));
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
 	p = encode_time3(p, &fhp->fh_post_atime);
 	p = encode_time3(p, &fhp->fh_post_mtime);

@@ -412,7 +412,7 @@ asmlinkage long sys_ustat(unsigned dev, struct ustat __user * ubuf)
         struct kstatfs sbuf;
 	int err = -EINVAL;
 
-        s = user_get_super(old_decode_dev(dev));
+        s = user_get_super(new_decode_dev(dev));
         if (s == NULL)
                 goto out;
 	err = vfs_statfs(s, &sbuf);

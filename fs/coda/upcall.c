@@ -345,7 +345,7 @@ int venus_create(struct super_block *sb, struct CodaFid *dirfid,
 
         inp->coda_create.VFid = *dirfid;
         inp->coda_create.attr.va_mode = mode;
-        inp->coda_create.attr.va_rdev = old_encode_dev(rdev);
+        inp->coda_create.attr.va_rdev = huge_encode_dev(rdev);
 	inp->coda_create.excl = excl;
         inp->coda_create.mode = mode;
         inp->coda_create.name = offset;

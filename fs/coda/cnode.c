@@ -38,7 +38,7 @@ static void coda_fill_inode(struct inode *inode, struct coda_vattr *attr)
 		inode->i_data.a_ops = &coda_symlink_aops;
 		inode->i_mapping = &inode->i_data;
 	} else
-                init_special_inode(inode, inode->i_mode, old_decode_dev(attr->va_rdev));
+                init_special_inode(inode, inode->i_mode, huge_decode_dev(attr->va_rdev));
 }
 
 static int coda_test_inode(struct inode *inode, void *data)

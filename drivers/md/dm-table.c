@@ -426,6 +426,8 @@ static int __table_get_device(struct dm_table *t, struct dm_target *ti,
 	if (sscanf(path, "%u:%u", &major, &minor) == 2) {
 		/* Extract the major/minor numbers */
 		dev = MKDEV(major, minor);
+		if (MAJOR(dev) != major || MINOR(dev) != minor)
+			return -EOVERFLOW;
 	} else {
 		/* convert the path to a device */
 		if ((r = lookup_device(path, &dev)))

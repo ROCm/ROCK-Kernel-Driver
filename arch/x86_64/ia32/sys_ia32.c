@@ -91,6 +91,8 @@ extern int overflowuid,overflowgid;
 
 int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 {
+	if (!old_valid_dev(kbuf->dev) || !old_valid_dev(kbuf->rdev))
+		return -EOVERFLOW;
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct compat_stat)) ||
 	    __put_user (old_encode_dev(kbuf->dev), &ubuf->st_dev) ||
 	    __put_user (kbuf->ino, &ubuf->st_ino) ||
@@ -119,14 +121,14 @@ static int
 cp_stat64(struct stat64 *ubuf, struct kstat *stat)
 {
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct stat64)) ||
-	    __put_user(old_encode_dev(stat->dev), &ubuf->st_dev) ||
+	    __put_user(huge_encode_dev(stat->dev), &ubuf->st_dev) ||
 	    __put_user (stat->ino, &ubuf->__st_ino) ||
 	    __put_user (stat->ino, &ubuf->st_ino) ||
 	    __put_user (stat->mode, &ubuf->st_mode) ||
 	    __put_user (stat->nlink, &ubuf->st_nlink) ||
 	    __put_user (stat->uid, &ubuf->st_uid) ||
 	    __put_user (stat->gid, &ubuf->st_gid) ||
-	    __put_user (old_encode_dev(stat->rdev), &ubuf->st_rdev) ||
+	    __put_user (huge_encode_dev(stat->rdev), &ubuf->st_rdev) ||
 	    __put_user (stat->size, &ubuf->st_size) ||
 	    __put_user (stat->atime.tv_sec, &ubuf->st_atime) ||
 	    __put_user (stat->atime.tv_nsec, &ubuf->st_atime_nsec) ||
