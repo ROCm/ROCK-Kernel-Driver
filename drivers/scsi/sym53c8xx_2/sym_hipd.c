@@ -3,6 +3,7 @@
  * of PCI-SCSI IO processors.
  *
  * Copyright (C) 1999-2001  Gerard Roudier <groudier@free.fr>
+ * Copyright (c) 2003-2004  Matthew Wilcox <matthew@wil.cx>
  *
  * This driver is derived from the Linux sym53c8xx driver.
  * Copyright (C) 1998-2000  Gerard Roudier
@@ -22,32 +23,19 @@
  *
  *-----------------------------------------------------------------------------
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Where this Software is combined with software released under the terms of 
- * the GNU Public License ("GPL") and the terms of the GPL would require the 
- * combined work to also be released under the terms of the GPL, the terms
- * and conditions of this License will apply in addition to those of the
- * GPL with the exception of any terms or conditions of this License that
- * conflict with, or are expressly prohibited by, the GPL.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include "sym_glue.h"
 #include "sym_nvram.h"
@@ -299,7 +287,6 @@ int sym_reset_scsi_bus(hcb_p np, int enab_int)
 	}
 out:
 	OUTB (nc_scntl1, 0);
-	/* MDELAY(100); */
 	return retv;
 }
 
@@ -1955,7 +1942,7 @@ void sym_start_up (hcb_p np, int reason)
 	if (np->features & (FE_ULTRA2|FE_ULTRA3)) {
 		OUTONW (nc_sien, SBMC);
 		if (reason == 0) {
-			MDELAY(100);
+			mdelay(100);
 			INW (nc_sist);
 		}
 		np->scsi_mode = INB (nc_stest4) & SMODE;
@@ -5518,7 +5505,6 @@ void sym_complete_error (hcb_p np, ccb_p cp)
 		printf ("CCB=%lx STAT=%x/%x/%x DEV=%d/%d\n", (unsigned long)cp,
 			cp->host_status, cp->ssss_status, cp->host_flags,
 			cp->target, cp->lun);
-		MDELAY(100);
 	}
 
 	/*
@@ -5746,15 +5732,8 @@ if (resid)
 /*
  *  Soft-attach the controller.
  */
-#ifdef SYM_OPT_NVRAM_PRE_READ
 int sym_hcb_attach(hcb_p np, struct sym_fw *fw, struct sym_nvram *nvram)
-#else
-int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
-#endif
 {
-#ifndef SYM_OPT_NVRAM_PRE_READ
-	struct sym_nvram nvram_buf, *nvram = &nvram_buf;
-#endif
 	int i;
 
 	/*
@@ -5779,13 +5758,6 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 	 *  if the chip is currently active.
 	 */
 	sym_chip_reset (np);
-
-	/*
-	 *  Try to read the user set-up.
-	 */
-#ifndef SYM_OPT_NVRAM_PRE_READ
-	(void) sym_read_nvram(np, nvram);
-#endif
 
 	/*
 	 *  Prepare controller and devices settings, according 
