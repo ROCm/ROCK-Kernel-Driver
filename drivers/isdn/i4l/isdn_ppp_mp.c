@@ -165,15 +165,6 @@ ippp_mp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 #define MP_GT(a,b) 	((b-a)&MP_LONGSEQ_MAXBIT)
 #define MP_GE(a,b)	!((a-b)&MP_LONGSEQ_MAXBIT)
 
-static void
-print_recv_pkt(int slot, struct sk_buff *skb)
-{
-	printk(KERN_DEBUG "mp_recv: %d/%d -> %02x %02x %02x %02x %02x %02x\n", 
-	       slot, skb->len, 
-	       skb->data[0], skb->data[1], skb->data[2],
-	       skb->data[3], skb->data[4], skb->data[5]);
-}
-
 #define MP_SEQUENCE(skb) (skb)->priority
 #define MP_FLAGS(skb)    (skb)->cb[0]
 
@@ -237,7 +228,6 @@ mp_complete_seq(isdn_net_local *lp, struct sk_buff *b, struct sk_buff *e)
 
 	if (b->next == e) {
 		/* sequence with only one frag */
-		HERE;
 		skb_unlink(b);
 		return b;
 	}
@@ -319,8 +309,6 @@ mp_receive(isdn_net_dev *idev, struct sk_buff *skb)
 	struct sk_buff_head *frags = &inl_ppp->mp_frags;
 	u32 seq;
 	u16 proto;
-
-	print_recv_pkt(-1, skb);
 
 	if (skb->len < (inl_ppp->mp_cfg & SC_IN_SHORT_SEQ ? 2 : 4))
 		goto drop;

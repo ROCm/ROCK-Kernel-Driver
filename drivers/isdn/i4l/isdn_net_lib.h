@@ -50,9 +50,7 @@ void isdn_net_lib_init(void);
 void isdn_net_lib_exit(void);
 void isdn_net_hangup_all(void);
 int  isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
-int  isdn_net_stat_callback(int, isdn_ctrl *);
 int  isdn_net_find_icall(int, int, int, setup_parm *);
-int  isdn_net_rcv_skb(int, struct sk_buff *);
 
 /* provided for interface types to use */
 void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);

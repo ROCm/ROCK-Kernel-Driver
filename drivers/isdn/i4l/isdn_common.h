@@ -19,7 +19,7 @@
 #undef  ISDN_DEBUG_MODEM_DUMP
 #undef  ISDN_DEBUG_MODEM_VOICE
 #undef  ISDN_DEBUG_AT
-#define  ISDN_DEBUG_NET_DUMP
+#undef  ISDN_DEBUG_NET_DUMP
 #define  ISDN_DEBUG_NET_DIAL
 #define  ISDN_DEBUG_NET_ICALL
 #define  ISDN_DEBUG_STATCALLB
@@ -66,7 +66,7 @@ extern int isdn_msncmp( const char *,  const char *);
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
 extern void isdn_dumppkt(char *, u_char *, int, int);
 #else
-static inline void isdn_dumppkt(char *s, u_char *d, int l, int m) { }
+static inline void isdn_dumppkt(char *s, char *ss, u_char *d, int l, int m) { }
 #endif
 
 struct dial_info {
@@ -95,12 +95,13 @@ extern void  isdn_slot_set_usage(int slot, int usage);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
 extern void  isdn_slot_set_m_idx(int slot, int midx);
-extern void  isdn_slot_set_priv(int sl, void *);
+extern void  isdn_slot_set_priv(int sl, void *priv, int (*stat_cb)(int sl, isdn_ctrl *ctrl), int (*recv_cb)(int sl, struct sk_buff *skb));
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
 
-int   isdn_drv_queue_empty(int di, int ch);
-void  isdn_drv_queue_tail(int di, int ch, struct sk_buff *skb, int len);
+int   isdn_slot_queue_empty(int sl);
+void  isdn_slot_queue_tail(int sl, struct sk_buff *skb, int len);
+void  isdn_slot_queue_purge(int sl);
 int   isdn_drv_maxbufsize(int di);
 int   isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
 int   isdn_drv_hdrlen(int di);

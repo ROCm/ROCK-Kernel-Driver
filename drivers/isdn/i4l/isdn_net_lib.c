@@ -264,7 +264,7 @@ static int
 isdn_net_bind(isdn_net_dev *idev, isdn_net_ioctl_cfg *cfg)
 {
 	isdn_net_local *mlp = idev->mlp;
-	int i, retval;
+	int retval;
 	int drvidx = -1;
 	int chidx = -1;
 	char drvid[25];
@@ -287,14 +287,7 @@ isdn_net_bind(isdn_net_dev *idev, isdn_net_ioctl_cfg *cfg)
 		/* The channel-number is appended to the driver-Id with a comma */
 		*c = 0;
 		chidx = simple_strtol(c + 1, NULL, 10);
-
-		for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
-			/* Lookup driver-Id in array */
-			if (!strcmp(dev->drvid[i], drvid)) {
-				drvidx = i;
-				break;
-			}
-		}
+		drvidx = isdn_drv_lookup(drvid);
 		if (drvidx == -1 || chidx == -1) {
 			/* Either driver-Id or channel-number invalid */
 			retval = -ENODEV;
@@ -380,7 +373,6 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 	idev->pre_channel = -1;
 	idev->exclusive = -1;
 
-	idev->ipppd = NULL;
 	idev->pppbind = -1;
 
 	init_timer(&idev->dial_timer);
@@ -547,8 +539,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 {
 	isdn_net_dev *idev = isdn_net_findif(cfg->name);
 	isdn_net_local *mlp;
-	ulong features;
-	int i, retval;
+	int retval;
 
 	if (!idev)
 		return -ENODEV;
@@ -559,19 +550,6 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 
 	if (netif_running(&mlp->dev)) {
 		retval = -EBUSY;
-		goto out;
-	}
-	/* See if any registered driver supports the features we want */
-	features = ((1 << cfg->l2_proto) << ISDN_FEATURE_L2_SHIFT) |
-		   ((1 << cfg->l3_proto) << ISDN_FEATURE_L3_SHIFT);
-	for (i = 0; i < ISDN_MAX_DRIVERS; i++)
-		if (dev->drv[i] &&
-		    (dev->drv[i]->interface->features & features) == features)
-				break;
-
-	if (i == ISDN_MAX_DRIVERS) {
-		printk(KERN_WARNING "isdn_net: No driver with selected features\n");
-		retval = -ENODEV;
 		goto out;
 	}
 
@@ -667,7 +645,7 @@ isdn_net_getcfg(isdn_net_ioctl_cfg *cfg)
 	strcpy(cfg->eaz, mlp->msn);
 	cfg->exclusive = idev->exclusive >= 0;
 	if (idev->pre_device >= 0) {
-		sprintf(cfg->drvid, "%s,%d", dev->drvid[idev->pre_device],
+		sprintf(cfg->drvid, "%s,%d", isdn_drv_drvid(idev->pre_device),
 			idev->pre_channel);
 	} else {
 		cfg->drvid[0] = '\0';
@@ -1224,7 +1202,7 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 	if (mlp->ops->unbind)
 		mlp->ops->unbind(idev);
 
-	isdn_slot_set_idev(idev->isdn_slot, NULL);
+	isdn_slot_set_priv(idev->isdn_slot, NULL, NULL, NULL);
 
 	skb_queue_purge(&idev->super_tx_queue);
 
@@ -1239,6 +1217,9 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 	}
 }
 
+static int isdn_net_stat_callback(int, isdn_ctrl *);
+static int isdn_net_rcv_skb(int, struct sk_buff *);
+
 /*
  * Assign an ISDN-channel to a net-interface
  */
@@ -1249,7 +1230,8 @@ isdn_net_bind_channel(isdn_net_dev *idev, int slot)
 	int retval = 0;
 
 	idev->isdn_slot = slot;
-	isdn_slot_set_idev(idev->isdn_slot, idev);
+	isdn_slot_set_priv(idev->isdn_slot, idev, isdn_net_stat_callback,
+			   isdn_net_rcv_skb);
 
 	if (mlp->ops->bind)
 		retval = mlp->ops->bind(idev);
@@ -1889,10 +1871,10 @@ isdn_net_hangup(isdn_net_dev *idev)
  * isdn_status_callback, which itself is called from the low-level driver.
  * Return: 1 = event handled, 0 = not handled
  */
-int
+static int
 isdn_net_stat_callback(int idx, isdn_ctrl *c)
 {
-	isdn_net_dev *idev = isdn_slot_idev(idx);
+	isdn_net_dev *idev = isdn_slot_priv(idx);
 
 	if (!idev) {
 		return 0;
@@ -2285,10 +2267,10 @@ isdn_net_write_super(isdn_net_dev *idev, struct sk_buff *skb)
  * interface. If found, deliver packet to receiver-function and return 1,
  * else return 0.
  */
-int
+static int
 isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 {
-	isdn_net_dev *idev = isdn_slot_idev(idx);
+	isdn_net_dev *idev = isdn_slot_priv(idx);
 	isdn_net_local *mlp;
 
 	if (!idev) {
@@ -2359,7 +2341,5 @@ isdn_net_lib_init(void)
 void
 isdn_net_lib_exit(void)
 {
-
-
 	fsm_free(&isdn_net_fsm);
 }

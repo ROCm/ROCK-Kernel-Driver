@@ -43,7 +43,7 @@ isdn_ppp_set_compressor(isdn_net_dev *idev, struct isdn_ppp_comp_data *);
  * idev->ipppd is safe without further locking.
  */
 
-#define IPPPD_DEBUG
+#undef IPPPD_DEBUG
 
 #ifdef IPPPD_DEBUG
 #define ipppd_debug(i, fmt, arg...) \
