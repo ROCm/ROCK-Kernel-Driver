@@ -222,9 +222,7 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 
 	sctp_addto_chunk(retval, sizeof(sctp_paramhdr_t), &sat_param);
 	sctp_addto_chunk(retval, sizeof(sat_addr_types), sat_addr_types);
-
 	sctp_addto_chunk(retval, sizeof(ecap_param), &ecap_param);
-
 nodata:
 	if (addrs.v)
 		kfree(addrs.v);
@@ -587,14 +585,12 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 	sctp_gap_ack_block_t gab;
 	int length;
 	__u32 ctsn;
-	sctp_tsnmap_iter_t iter;
-	__u16 num_gabs;
-	__u16 num_dup_tsns = asoc->peer.next_dup_tsn;
-	const sctp_tsnmap_t *map = &asoc->peer.tsn_map;
+	struct sctp_tsnmap_iter iter;
+	__u16 num_gabs, num_dup_tsns;
+	struct sctp_tsnmap *map = (struct sctp_tsnmap *)&asoc->peer.tsn_map;
 
 	ctsn = sctp_tsnmap_get_ctsn(map);
-	SCTP_DEBUG_PRINTK("make_sack: sackCTSNAck sent is 0x%x.\n",
-			  ctsn);
+	SCTP_DEBUG_PRINTK("sackCTSNAck sent is 0x%x.\n", ctsn);
 
 	/* Count the number of Gap Ack Blocks.  */
 	sctp_tsnmap_iter_init(map, &iter);
@@ -604,15 +600,17 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 		/* Do nothing. */
 	}
 
+	num_dup_tsns = sctp_tsnmap_num_dups(map);
+
 	/* Initialize the SACK header.  */
 	sack.cum_tsn_ack	    = htonl(ctsn);
 	sack.a_rwnd 		    = htonl(asoc->rwnd);
 	sack.num_gap_ack_blocks     = htons(num_gabs);
-	sack.num_dup_tsns  = htons(num_dup_tsns);
+	sack.num_dup_tsns           = htons(num_dup_tsns);
 
 	length = sizeof(sack)
 		+ sizeof(sctp_gap_ack_block_t) * num_gabs
-		+ sizeof(sctp_dup_tsn_t) * num_dup_tsns;
+		+ sizeof(__u32) * num_dup_tsns;
 
 	/* Create the chunk.  */
 	retval = sctp_make_chunk(asoc, SCTP_CID_SACK, 0, length);
@@ -659,21 +657,18 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 	while(sctp_tsnmap_next_gap_ack(map, &iter, &gab.start, &gab.end)) {
 		gab.start = htons(gab.start);
 		gab.end = htons(gab.end);
-		sctp_addto_chunk(retval,
-				 sizeof(sctp_gap_ack_block_t),
-				 &gab);
+		sctp_addto_chunk(retval, sizeof(sctp_gap_ack_block_t), &gab);
 	}
 
 	/* Register the duplicates.  */
-	sctp_addto_chunk(retval,
-			 sizeof(sctp_dup_tsn_t) * num_dup_tsns,
-			 &asoc->peer.dup_tsns);
+	sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
+			 sctp_tsnmap_get_dups(map));
 
 nodata:
 	return retval;
 }
 
-/* FIXME: Comments. */
+/* Make a SHUTDOWN chunk. */
 sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc)
 {
 	sctp_chunk_t *retval;
@@ -690,7 +685,6 @@ sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc)
 
 	retval->subh.shutdown_hdr =
 		sctp_addto_chunk(retval, sizeof(shut), &shut);
-
 nodata:
 	return retval;
 }

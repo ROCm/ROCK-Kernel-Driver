@@ -260,7 +260,6 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 
 	/* Set up the tsn tracking. */
 	sctp_tsnmap_init(&asoc->peer.tsn_map, SCTP_TSN_MAP_SIZE, 0);
-	asoc->peer.next_dup_tsn = 0;
 
 	skb_queue_head_init(&asoc->addip_chunks);
 
@@ -848,7 +847,6 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
 	/* Copy in new parameters of peer. */
 	asoc->c = new->c;
 	asoc->peer.rwnd = new->peer.rwnd;
-	asoc->peer.next_dup_tsn = new->peer.next_dup_tsn;
 	asoc->peer.sack_needed = new->peer.sack_needed;
 	asoc->peer.i = new->peer.i;
 	sctp_tsnmap_init(&asoc->peer.tsn_map, SCTP_TSN_MAP_SIZE,
@@ -990,9 +988,9 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 		asoc->rwnd += len;
 	}
 
-	SCTP_DEBUG_PRINTK("%s: asoc %p rwnd increased by %d to (%u, %u) - %u\n",
-			  __FUNCTION__, asoc, len, asoc->rwnd, asoc->rwnd_over,
-			  asoc->a_rwnd);
+	SCTP_DEBUG_PRINTK("%s: asoc %p rwnd increased by %d to (%u, %u) "
+			  "- %u\n", __FUNCTION__, asoc, len, asoc->rwnd,
+			  asoc->rwnd_over, asoc->a_rwnd);
 
 	/* Send a window update SACK if the rwnd has increased by at least the
 	 * minimum of the association's PMTU and half of the receive buffer.
@@ -1014,7 +1012,6 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
-		asoc->peer.next_dup_tsn = 0;
 
 		sctp_outq_tail(&asoc->outqueue, sack);
 

@@ -4295,6 +4295,9 @@ sctp_sackhdr_t *sctp_sm_pull_sack(sctp_chunk_t *chunk)
 	__u16 num_blocks;
 	__u16 num_dup_tsns;
 
+	/* FIXME:  Protect ourselves from reading too far into
+	 * the skb from a bogus sender.
+	 */
 	sack = (sctp_sackhdr_t *) chunk->skb->data;
 	skb_pull(chunk->skb, sizeof(sctp_sackhdr_t));
 
