@@ -549,7 +549,6 @@ static struct bio *__bio_map_user(request_queue_t *q, struct block_device *bdev,
 		bio->bi_rw |= (1 << BIO_RW);
 
 	bio->bi_flags |= (1 << BIO_USER_MAPPED);
-	blk_queue_bounce(q, &bio);
 	return bio;
 out:
 	kfree(pages);
