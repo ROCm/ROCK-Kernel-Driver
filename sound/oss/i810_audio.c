@@ -1498,15 +1498,6 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 
 		if (cnt > count)
 			cnt = count;
-		/* Lop off the last two bits to force the code to always
-		 * write in full samples.  This keeps software that sets
-		 * O_NONBLOCK but doesn't check the return value of the
-		 * write call from getting things out of state where they
-		 * think a full 4 byte sample was written when really only
-		 * a portion was, resulting in odd sound and stereo
-		 * hysteresis.
-		 */
-		cnt &= ~0x3;
 		if (cnt <= 0) {
 			unsigned long tmo;
 			/*
@@ -1654,15 +1645,6 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 #endif
 		if (cnt > count)
 			cnt = count;
-		/* Lop off the last two bits to force the code to always
-		 * write in full samples.  This keeps software that sets
-		 * O_NONBLOCK but doesn't check the return value of the
-		 * write call from getting things out of state where they
-		 * think a full 4 byte sample was written when really only
-		 * a portion was, resulting in odd sound and stereo
-		 * hysteresis.
-		 */
-		cnt &= ~0x3;
 		if (cnt <= 0) {
 			unsigned long tmo;
 			// There is data waiting to be played
