@@ -105,11 +105,20 @@ unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 
 #include <asm/serial.h>
 
+/*
+ * SERIAL_PORT_DFNS tells us about built-in ports that have no
+ * standard enumeration mechanism.   Platforms that can find all
+ * serial ports via mechanisms like ACPI or PCI need not supply it.
+ */
+#ifndef SERIAL_PORT_DFNS
+#define SERIAL_PORT_DFNS
+#endif
+
 static struct old_serial_port old_serial_port[] = {
 	SERIAL_PORT_DFNS /* defined in asm/serial.h */
 };
 
-#define UART_NR	ARRAY_SIZE(old_serial_port)
+#define UART_NR	(ARRAY_SIZE(old_serial_port) + CONFIG_SERIAL_8250_NR_UARTS)
 
 #if defined(CONFIG_SERIAL_8250_RSA) && defined(MODULE)
 
@@ -2136,7 +2145,8 @@ static int __init serial8250_init(void)
 	int ret, i;
 
 	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
-		"IRQ sharing %sabled\n", share_irqs ? "en" : "dis");
+		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
+		share_irqs ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
 		spin_lock_init(&irq_lists[i].lock);
