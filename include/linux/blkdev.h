@@ -60,6 +60,12 @@ struct request {
 	int tag;
 	void *special;
 	char *buffer;
+
+	/* For packet commands */
+	unsigned int data_len;
+	void *data, *sense;
+
+	unsigned int timeout;
 	struct completion *waiting;
 	struct bio *bio, *biotail;
 	request_queue_t *q;
@@ -85,6 +91,8 @@ enum rq_flag_bits {
 	__REQ_BLOCK_PC,	/* queued down pc from block layer */
 	__REQ_SENSE,	/* sense retrival */
 
+	__REQ_FAILED,	/* set if the request failed */
+	__REQ_QUIET,	/* don't worry about errors */
 	__REQ_SPECIAL,	/* driver suplied command */
 	__REQ_DRIVE_CMD,
 	__REQ_DRIVE_TASK,
@@ -103,6 +111,8 @@ enum rq_flag_bits {
 #define REQ_PC		(1 << __REQ_PC)
 #define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)
 #define REQ_SENSE	(1 << __REQ_SENSE)
+#define REQ_FAILED	(1 << __REQ_FAILED)
+#define REQ_QUIET	(1 << __REQ_QUIET)
 #define REQ_SPECIAL	(1 << __REQ_SPECIAL)
 #define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
 #define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
@@ -301,7 +311,7 @@ extern int blk_remove_plug(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
-extern int block_ioctl(struct block_device *, unsigned int, unsigned long);
+extern int scsi_cmd_ioctl(struct block_device *, unsigned int, unsigned long);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
