@@ -163,6 +163,16 @@ struct dm_name_list {
 };
 
 /*
+ * Used to retrieve the target versions
+ */
+struct dm_target_versions {
+        uint32_t next;
+        uint32_t version[3];
+
+        char name[0];
+};
+
+/*
  * If you change this make sure you make the corresponding change
  * to dm-ioctl.c:lookup_ioctl()
  */
@@ -185,6 +195,9 @@ enum {
 	DM_TABLE_CLEAR_CMD,
 	DM_TABLE_DEPS_CMD,
 	DM_TABLE_STATUS_CMD,
+
+	/* Added later */
+	DM_LIST_VERSIONS_CMD,
 };
 
 #define DM_IOCTL 0xfd
@@ -205,10 +218,12 @@ enum {
 #define DM_TABLE_DEPS    _IOWR(DM_IOCTL, DM_TABLE_DEPS_CMD, struct dm_ioctl)
 #define DM_TABLE_STATUS  _IOWR(DM_IOCTL, DM_TABLE_STATUS_CMD, struct dm_ioctl)
 
+#define DM_LIST_VERSIONS _IOWR(DM_IOCTL, DM_LIST_VERSIONS_CMD, struct dm_ioctl)
+
 #define DM_VERSION_MAJOR	4
-#define DM_VERSION_MINOR	0
+#define DM_VERSION_MINOR	1
 #define DM_VERSION_PATCHLEVEL	0
-#define DM_VERSION_EXTRA	"-ioctl (2003-06-04)"
+#define DM_VERSION_EXTRA	"-ioctl (2003-12-10)"
 
 /* Status bits */
 #define DM_READONLY_FLAG	(1 << 0) /* In/Out */

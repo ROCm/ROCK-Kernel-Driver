@@ -96,6 +96,20 @@ static struct tt_internal *alloc_target(struct target_type *t)
 	return ti;
 }
 
+
+int dm_target_iterate(void (*iter_func)(struct target_type *tt,
+					void *param), void *param)
+{
+	struct tt_internal *ti;
+
+	down_read(&_lock);
+	list_for_each_entry (ti, &_targets, list)
+		iter_func(&ti->tt, param);
+	up_read(&_lock);
+
+	return 0;
+}
+
 int dm_register_target(struct target_type *t)
 {
 	int rv = 0;
@@ -161,6 +175,7 @@ static int io_err_map(struct dm_target *ti, struct bio *bio,
 
 static struct target_type error_target = {
 	.name = "error",
+	.version = {1, 0, 1},
 	.ctr  = io_err_ctr,
 	.dtr  = io_err_dtr,
 	.map  = io_err_map,

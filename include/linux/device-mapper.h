@@ -74,6 +74,7 @@ void dm_put_device(struct dm_target *ti, struct dm_dev *d);
 struct target_type {
 	const char *name;
 	struct module *module;
+        unsigned version[3];
 	dm_ctr_fn ctr;
 	dm_dtr_fn dtr;
 	dm_map_fn map;
@@ -104,7 +105,7 @@ struct dm_target {
 	sector_t split_io;
 
 	/*
-	 * These are automaticall filled in by
+	 * These are automatically filled in by
 	 * dm_table_get_device.
 	 */
 	struct io_restrictions limits;

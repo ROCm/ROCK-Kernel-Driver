@@ -740,6 +740,7 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 
 static struct target_type crypt_target = {
 	.name   = "crypt",
+	.version= {1, 0, 0},
 	.module = THIS_MODULE,
 	.ctr    = crypt_ctr,
 	.dtr    = crypt_dtr,
