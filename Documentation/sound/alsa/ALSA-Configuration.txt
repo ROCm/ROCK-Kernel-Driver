@@ -203,6 +203,15 @@ Module parameters
 
     Module supports up to 8 cards.
 
+  Module snd-bt87x
+  ----------------
+
+    Module for video cards based on Bt87x chips.
+
+    digital_rate - Override the default digital rate (Hz)
+
+    Module supports up to 8 cards.
+
   Module snd-cmi8330
   ------------------
 
