@@ -7,11 +7,6 @@
 #ifndef _IGA1682_H
 #define _IGA1682_H 1
 
-struct iga1682_info
-{
-    unsigned int total_vram;
-};
-
 #define IGA_ATTR_CTL			0x3C0
 #define   IGA_IDX_VGA_OVERSCAN		0x11
 #define DAC_W_INDEX                     0x03C8
