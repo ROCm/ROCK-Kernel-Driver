@@ -33,6 +33,7 @@
 #include <linux/pci.h>
 #include <asm/naca.h>
 #include <asm/tlbflush.h>
+#include <asm/tlb.h>
 
 /* Status return values */
 #define H_Success	0
@@ -775,15 +776,14 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 				   int local)
 {
 	int i;
-	struct tlb_batch_data *ptes =
-		&tlb_batch_array[smp_processor_id()][0];
 	unsigned long flags;
+	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
 
 	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
-	for (i = 0; i < number; i++) {
-		flush_hash_page(context, ptes->addr, ptes->pte, local);
-		ptes++;
-	}
+
+	for (i = 0; i < number; i++)
+		flush_hash_page(context, batch->addr[i], batch->pte[i], local);
+
 	spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
 }
 

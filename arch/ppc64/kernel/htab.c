@@ -46,6 +46,7 @@
 #include <asm/abs_addr.h>
 #include <asm/tlbflush.h>
 #include <asm/eeh.h>
+#include <asm/tlb.h>
 
 /*
  * Note:  pte   --> Linux PTE
@@ -415,12 +416,11 @@ void flush_hash_range(unsigned long context, unsigned long number, int local)
 		ppc_md.flush_hash_range(context, number, local);
 	} else {
 		int i;
-		struct tlb_batch_data *ptes =
-			&tlb_batch_array[smp_processor_id()][0];
+		struct ppc64_tlb_batch *batch =
+			&ppc64_tlb_batch[smp_processor_id()];
 
-		for (i = 0; i < number; i++) {
-			flush_hash_page(context, ptes->addr, ptes->pte, local);
-			ptes++;
-		}
+		for (i = 0; i < number; i++)
+			flush_hash_page(context, batch->addr[i], batch->pte[i],
+					local);
 	}
 }

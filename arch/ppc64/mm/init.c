@@ -295,7 +295,7 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 	}
 }
 
-struct tlb_batch_data tlb_batch_array[NR_CPUS][MAX_BATCH_FLUSH];
+struct ppc64_tlb_batch ppc64_tlb_batch[NR_CPUS];
 
 void
 __flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
@@ -305,81 +305,69 @@ __flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 	pte_t *ptep;
 	pte_t pte;
 	unsigned long pgd_end, pmd_end;
-	unsigned long context;
-	int i = 0;
-	struct tlb_batch_data *ptes = &tlb_batch_array[smp_processor_id()][0];
+	unsigned long context = 0;
+	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
+	unsigned long i = 0;
 	int local = 0;
 
-	if ( start >= end )
-		panic("flush_tlb_range: start (%016lx) greater than end (%016lx)\n", start, end );
-
-	if ( REGION_ID(start) != REGION_ID(end) )
-		panic("flush_tlb_range: start (%016lx) and end (%016lx) not in same region\n", start, end );
-	
-	context = 0;
-
-	switch( REGION_ID(start) ) {
+	switch(REGION_ID(start)) {
 	case VMALLOC_REGION_ID:
-		pgd = pgd_offset_k( start );
+		pgd = pgd_offset_k(start);
 		break;
 	case IO_REGION_ID:
-		pgd = pgd_offset_i( start );
+		pgd = pgd_offset_i(start);
 		break;
 	case USER_REGION_ID:
-		pgd = pgd_offset( mm, start );
+		pgd = pgd_offset(mm, start);
 		context = mm->context;
 
 		/* XXX are there races with checking cpu_vm_mask? - Anton */
-		if (mm->cpu_vm_mask == (1 << smp_processor_id())) {
+		if (mm->cpu_vm_mask == (1 << smp_processor_id()))
 			local = 1;
-		}
 
 		break;
 	default:
 		panic("flush_tlb_range: invalid region for start (%016lx) and end (%016lx)\n", start, end);
-	
 	}
 
 	do {
 		pgd_end = (start + PGDIR_SIZE) & PGDIR_MASK;
-		if ( pgd_end > end ) 
+		if (pgd_end > end)
 			pgd_end = end;
-		if ( !pgd_none( *pgd ) ) {
-			pmd = pmd_offset( pgd, start );
+		if (!pgd_none(*pgd)) {
+			pmd = pmd_offset(pgd, start);
 			do {
-				pmd_end = ( start + PMD_SIZE ) & PMD_MASK;
-				if ( pmd_end > end )
+				pmd_end = (start + PMD_SIZE) & PMD_MASK;
+				if (pmd_end > end)
 					pmd_end = end;
-				if ( !pmd_none( *pmd ) ) {
-					ptep = pte_offset_kernel( pmd, start );
+				if (!pmd_none(*pmd)) {
+					ptep = pte_offset_kernel(pmd, start);
 					do {
-						if ( pte_val(*ptep) & _PAGE_HASHPTE ) {
+						if (pte_val(*ptep) & _PAGE_HASHPTE) {
 							pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
-							if ( pte_val(pte) & _PAGE_HASHPTE ) {
-								ptes->pte = pte;
-								ptes->addr = start;
-								ptes++;
+							if (pte_val(pte) & _PAGE_HASHPTE) {								
+								batch->pte[i] = pte;
+								batch->addr[i] = start;
 								i++;
-								if (i == MAX_BATCH_FLUSH) {
-									flush_hash_range(context, MAX_BATCH_FLUSH, local);
+								if (i == PPC64_TLB_BATCH_NR) {
+									flush_hash_range(context, i, local);
 									i = 0;
-									ptes = &tlb_batch_array[smp_processor_id()][0];
 								}
 							}
 						}
 						start += PAGE_SIZE;
 						++ptep;
-					} while ( start < pmd_end );
-				}
-				else
+					} while (start < pmd_end);
+				} else {
 					start = pmd_end;
+				}
 				++pmd;
-			} while ( start < pgd_end );
-		}
-		else
+			} while (start < pgd_end);
+		} else {
 			start = pgd_end;
+		}
 		++pgd;
-	} while ( start < end );
+	} while (start < end);
 
 	if (i)
 		flush_hash_range(context, i, local);
