@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#155 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#156 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -67,12 +67,10 @@
 #include <linux/unistd.h>
 static int errno;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 /*
  * Lock protecting manipulation of the ahd softc list.
  */
 spinlock_t ahd_list_spinlock;
-#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 struct proc_dir_entry proc_scsi_aic79xx = {

@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#135 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#138 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -549,9 +549,7 @@ struct ahc_platform_data {
 	TAILQ_HEAD(, ahc_linux_device) device_runq;
 	struct ahc_completeq	 completeq;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t		 spin_lock;
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	struct tasklet_struct	 runq_tasklet;
 #endif
@@ -710,7 +708,6 @@ static __inline void ahc_list_lockinit(void);
 static __inline void ahc_list_lock(unsigned long *flags);
 static __inline void ahc_list_unlock(unsigned long *flags);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 static __inline void
 ahc_lockinit(struct ahc_softc *ahc)
 {
@@ -796,65 +793,6 @@ ahc_list_unlock(unsigned long *flags)
 	spin_unlock_irqrestore(&ahc_list_spinlock, *flags);
 }
 
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,93) */
-
-static __inline void
-ahc_lockinit(struct ahc_softc *ahc)
-{
-}
-
-static __inline void
-ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
-{
-	save_flags(*flags);
-	cli();
-}
-
-static __inline void
-ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
-{
-	restore_flags(*flags);
-}
-
-static __inline void
-ahc_done_lockinit(struct ahc_softc *ahc)
-{
-}
-
-static __inline void
-ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
-{
-	/*
-	 * The done lock is always held while
-	 * the ahc lock is held so blocking
-	 * interrupts again would have no effect.
-	 */
-}
-
-static __inline void
-ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
-{
-}
-
-static __inline void
-ahc_list_lockinit()
-{
-}
-
-static __inline void
-ahc_list_lock(unsigned long *flags)
-{
-	save_flags(*flags);
-	cli();
-}
-
-static __inline void
-ahc_list_unlock(unsigned long *flags)
-{
-	restore_flags(*flags);
-}
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
-
 /******************************* PCI Definitions ******************************/
 /*
  * PCIM_xxx: mask to locate subfield in register
@@ -913,16 +851,6 @@ int			 aic7770_map_registers(struct ahc_softc *ahc,
 int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 
 /******************************* PCI Routines *********************************/
-/*
- * We need to use the bios32.h routines if we are kernel version 2.1.92 or less.
- */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
-#if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
-#endif
-#include <linux/bios32.h>
-#endif
-
 int			 ahc_linux_pci_init(void);
 void			 ahc_linux_pci_exit(void);
 int			 ahc_pci_map_registers(struct ahc_softc *ahc);

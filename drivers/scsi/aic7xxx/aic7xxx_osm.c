@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#216 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#217 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -146,12 +146,10 @@
 #include <linux/unistd.h>
 static int errno;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 /*
  * Lock protecting manipulation of the ahc softc list.
  */
 spinlock_t ahc_list_spinlock;
-#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 /* For dynamic sglist size calculation. */
