@@ -1667,11 +1667,6 @@ int radeon_cp_vertex( DRM_IOCTL_ARGS )
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
-		return DRM_ERR(EINVAL);
-	}
-
 	DRM_GET_PRIV_WITH_RETURN( filp_priv, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( vertex, (drm_radeon_vertex_t __user *)data,
