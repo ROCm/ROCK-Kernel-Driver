@@ -216,7 +216,7 @@ int DRM(agp_alloc)(struct inode *inode, struct file *filp,
 		return -ENOMEM;
 	}
 
-	entry->handle    = (unsigned long)memory->key;
+	entry->handle    = (unsigned long)memory->key + 1;
 	entry->memory    = memory;
 	entry->bound     = 0;
 	entry->pages     = pages;
