@@ -247,8 +247,8 @@ static ssize_t wait_on_page_writeback_range_wq(struct address_space *mapping,
 			spin_unlock_irq(&mapping->tree_lock);
 			ret = wait_on_page_writeback_wq(page, wait);
 			if (ret == -EIOCBRETRY) {
-				if (curr > start)
-					ret = curr - start;
+				if (curr > end)
+printk(KERN_CRIT "retry with cur %ld ned %ld\n", curr, end);
 				done = 1;
 				break;
 			}

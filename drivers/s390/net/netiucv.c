@@ -60,7 +60,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/ebcdic.h>
 
 #include "iucv.h"
 #include "fsm.h"
@@ -167,10 +166,10 @@ static __inline__ int netiucv_test_and_set_busy(struct net_device *dev)
 }
 
 static __u8 iucv_host[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-//static __u8 iucvMagic[16] = {
-//	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
-//	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
-//};
+static __u8 iucvMagic[16] = {
+	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
+};
 
 /**
  * This mask means the 16-byte IUCV "magic" and the origin userid must
@@ -769,18 +768,10 @@ conn_action_start(fsm_instance *fi, int event, void *arg)
 	struct iucv_event *ev = (struct iucv_event *)arg;
 	struct iucv_connection *conn = ev->conn;
 	__u16 msglimit;
-	int rc, len;
-	__u8 iucvMagic[16] = {
-	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
-        0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
-	};
+	int rc;
 
 	pr_debug("%s() called\n", __FUNCTION__);
 
-	len = (IFNAMSIZ < sizeof(conn->netdev->name)) ?
-		IFNAMSIZ : sizeof(conn->netdev->name);
-	memcpy(iucvMagic, conn->netdev->name, len);
-	ASCEBC (iucvMagic, len);
 	if (conn->handle == 0) {
 		conn->handle =
 			iucv_register_program(iucvMagic, conn->userid, mask,
