@@ -743,25 +743,23 @@ struct sa1111_save_data {
 static int sa1111_suspend(struct device *dev, u32 state, u32 level)
 {
 	struct sa1111 *sachip = dev_get_drvdata(dev);
+	struct sa1111_save_data *save;
 	unsigned long flags;
 	char *base;
+
+	if (!dev->saved_state && level == SUSPEND_NOTIFY)
+		dev->saved_state = kmalloc(sizeof(struct sa1111_save_data), GFP_KERNEL);
+	if (!dev->saved_state)
+		return -ENOMEM;
+
+	save = (struct sa1111_save_data *)dev->saved_state;
+
+	spin_lock_irqsave(&sachip->lock, flags);
 
 	/*
 	 * Save state.
 	 */
-	if (level == SUSPEND_SAVE_STATE ||
-	    level == SUSPEND_DISABLE ||
-	    level == SUSPEND_POWER_DOWN) {
-		struct sa1111_save_data *save;
-
-		if (!dev->saved_state)
-			dev->saved_state = kmalloc(sizeof(struct sa1111_save_data), GFP_KERNEL);
-		if (!dev->saved_state)
-			return -ENOMEM;
-
-		save = (struct sa1111_save_data *)dev->saved_state;
-
-		spin_lock_irqsave(&sachip->lock, flags);
+	if (level == SUSPEND_SAVE_STATE) {
 		base = sachip->base;
 		save->skcr     = sa1111_readl(base + SA1111_SKCR);
 		save->skpcr    = sa1111_readl(base + SA1111_SKPCR);
@@ -779,25 +777,20 @@ static int sa1111_suspend(struct device *dev, u32 state, u32 level)
 		save->wakepol1 = sa1111_readl(base + SA1111_WAKEPOL1);
 		save->wakeen0  = sa1111_readl(base + SA1111_WAKEEN0);
 		save->wakeen1  = sa1111_readl(base + SA1111_WAKEEN1);
-		spin_unlock_irqrestore(&sachip->lock, flags);
 	}
 
 	/*
 	 * Disable.
 	 */
-	if (level == SUSPEND_DISABLE && state == 4) {
-		unsigned int val;
+	if (level == SUSPEND_POWER_DOWN && state == 4) {
+		unsigned int val = sa1111_readl(sachip->base + SA1111_SKCR);
 
-		spin_lock_irqsave(&sachip->lock, flags);
-		base = sachip->base;
-
-		sa1111_writel(0, base + SA1111_SKPWM0);
-		sa1111_writel(0, base + SA1111_SKPWM1);
-		val = sa1111_readl(base + SA1111_SKCR);
-		sa1111_writel(val | SKCR_SLEEP, base + SA1111_SKCR);
-
-		spin_unlock_irqrestore(&sachip->lock, flags);
+		sa1111_writel(val | SKCR_SLEEP, sachip->base + SA1111_SKCR);
+		sa1111_writel(0, sachip->base + SA1111_SKPWM0);
+		sa1111_writel(0, sachip->base + SA1111_SKPWM1);
 	}
+
+	spin_unlock_irqrestore(&sachip->lock, flags);
 
 	return 0;
 }
@@ -819,17 +812,15 @@ static int sa1111_resume(struct device *dev, u32 level)
 	unsigned long flags, id;
 	char *base;
 
-	if (level != RESUME_RESTORE_STATE && level != RESUME_ENABLE)
-		return 0;
-
 	save = (struct sa1111_save_data *)dev->saved_state;
 	if (!save)
 		return 0;
 
-	dev->saved_state = NULL;
+	spin_lock_irqsave(&sachip->lock, flags);
 
 	/*
 	 * Ensure that the SA1111 is still here.
+	 * FIXME: shouldn't do this here.
 	 */
 	id = sa1111_readl(sachip->base + SA1111_SKID);
 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
@@ -839,29 +830,42 @@ static int sa1111_resume(struct device *dev, u32 level)
 		return 0;
 	}
 
-	spin_lock_irqsave(&sachip->lock, flags);
-	sa1111_wake(sachip);
+	/*
+	 * First of all, wake up the chip.
+	 */
+	if (level == RESUME_POWER_ON) {
+		sa1111_wake(sachip);
 
-	base = sachip->base;
-	sa1111_writel(save->skcr,     base + SA1111_SKCR);
-	sa1111_writel(save->skpcr,    base + SA1111_SKPCR);
-	sa1111_writel(save->skcdr,    base + SA1111_SKCDR);
-	sa1111_writel(save->skaud,    base + SA1111_SKAUD);
-	sa1111_writel(save->skpwm0,   base + SA1111_SKPWM0);
-	sa1111_writel(save->skpwm1,   base + SA1111_SKPWM1);
+		sa1111_writel(0, sachip->base + SA1111_INTC + SA1111_INTEN0);
+		sa1111_writel(0, sachip->base + SA1111_INTC + SA1111_INTEN1);
+	}
 
-	base = sachip->base + SA1111_INTC;
-	sa1111_writel(save->intpol0,  base + SA1111_INTPOL0);
-	sa1111_writel(save->intpol1,  base + SA1111_INTPOL1);
-	sa1111_writel(save->inten0,   base + SA1111_INTEN0);
-	sa1111_writel(save->inten1,   base + SA1111_INTEN1);
-	sa1111_writel(save->wakepol0, base + SA1111_WAKEPOL0);
-	sa1111_writel(save->wakepol1, base + SA1111_WAKEPOL1);
-	sa1111_writel(save->wakeen0,  base + SA1111_WAKEEN0);
-	sa1111_writel(save->wakeen1,  base + SA1111_WAKEEN1);
+	if (level == RESUME_RESTORE_STATE) {
+		base = sachip->base;
+		sa1111_writel(save->skcr,     base + SA1111_SKCR);
+		sa1111_writel(save->skpcr,    base + SA1111_SKPCR);
+		sa1111_writel(save->skcdr,    base + SA1111_SKCDR);
+		sa1111_writel(save->skaud,    base + SA1111_SKAUD);
+		sa1111_writel(save->skpwm0,   base + SA1111_SKPWM0);
+		sa1111_writel(save->skpwm1,   base + SA1111_SKPWM1);
+
+		base = sachip->base + SA1111_INTC;
+		sa1111_writel(save->intpol0,  base + SA1111_INTPOL0);
+		sa1111_writel(save->intpol1,  base + SA1111_INTPOL1);
+		sa1111_writel(save->inten0,   base + SA1111_INTEN0);
+		sa1111_writel(save->inten1,   base + SA1111_INTEN1);
+		sa1111_writel(save->wakepol0, base + SA1111_WAKEPOL0);
+		sa1111_writel(save->wakepol1, base + SA1111_WAKEPOL1);
+		sa1111_writel(save->wakeen0,  base + SA1111_WAKEEN0);
+		sa1111_writel(save->wakeen1,  base + SA1111_WAKEEN1);
+	}
+
 	spin_unlock_irqrestore(&sachip->lock, flags);
 
-	kfree(save);
+	if (level == RESUME_ENABLE) {
+		dev->saved_state = NULL;
+		kfree(save);
+	}
 
 	return 0;
 }

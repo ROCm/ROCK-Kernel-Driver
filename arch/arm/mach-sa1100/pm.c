@@ -45,10 +45,9 @@ enum {	SLEEP_SAVE_SP = 0,
 	SLEEP_SAVE_OSCR, SLEEP_SAVE_OIER,
 	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
 
-	SLEEP_SAVE_GPDR, SLEEP_SAVE_GRER, SLEEP_SAVE_GFER, SLEEP_SAVE_GAFR,
+	SLEEP_SAVE_GPDR, SLEEP_SAVE_GAFR,
 	SLEEP_SAVE_PPDR, SLEEP_SAVE_PPSR, SLEEP_SAVE_PPAR, SLEEP_SAVE_PSDR,
 
-	SLEEP_SAVE_ICMR,
 	SLEEP_SAVE_Ser1SDCR0,
 
 	SLEEP_SAVE_SIZE
@@ -71,8 +70,6 @@ int pm_do_suspend(void)
 	SAVE(OIER);
 
 	SAVE(GPDR);
-	SAVE(GRER);
-	SAVE(GFER);
 	SAVE(GAFR);
 
 	SAVE(PPDR);
@@ -81,13 +78,6 @@ int pm_do_suspend(void)
 	SAVE(PSDR);
 
 	SAVE(Ser1SDCR0);
-
-	SAVE(ICMR);
-
-	/* ... maybe a global variable initialized by arch code to set this? */
-	GRER = PWER;
-	GFER = 0;
-	GEDR = GEDR;
 
 	/* Clear previous reset status */
 	RCSR = RCSR_HWR | RCSR_SWR | RCSR_WDR | RCSR_SMR;
@@ -98,21 +88,22 @@ int pm_do_suspend(void)
 	/* go zzz */
 	sa1100_cpu_suspend();
 
-	/* ensure not to come back here if it wasn't intended */
+	/*
+	 * Ensure not to come back here if it wasn't intended
+	 */
 	PSPR = 0;
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "*** made it back from resume\n");
-#endif
+	/*
+	 * Ensure interrupt sources are disabled; we will re-init
+	 * the interrupt subsystem via the device manager.
+	 */
+	ICLR = 0;
+	ICCR = 1;
+	ICMR = 0;
 
 	/* restore registers */
 	RESTORE(GPDR);
-	RESTORE(GRER);
-	RESTORE(GFER);
 	RESTORE(GAFR);
-
-	/* clear any edge detect bit */
-	GEDR = GEDR;
 
 	RESTORE(PPDR);
 	RESTORE(PPSR);
@@ -121,6 +112,9 @@ int pm_do_suspend(void)
 
 	RESTORE(Ser1SDCR0);
 
+	/*
+	 * Clear the peripheral sleep-hold bit.
+	 */
 	PSSR = PSSR_PH;
 
 	RESTORE(OSMR0);
@@ -129,10 +123,6 @@ int pm_do_suspend(void)
 	RESTORE(OSMR3);
 	RESTORE(OSCR);
 	RESTORE(OIER);
-
-	ICLR = 0;
-	ICCR = 1;
-	RESTORE(ICMR);
 
 	/* restore current time */
 	xtime.tv_sec = RCNR;

@@ -68,7 +68,7 @@ static int sa1100_gpio_type(unsigned int irq, unsigned int type)
 }
 
 /*
- * GPIO IRQs must be acknoledged.  This is for IRQs from 0 to 10.
+ * GPIO IRQs must be acknowledged.  This is for IRQs from 0 to 10.
  */
 static void sa1100_low_gpio_ack(unsigned int irq)
 {
@@ -210,6 +210,99 @@ static struct resource irq_resource = {
 	.start	= 0x90050000,
 	.end	= 0x9005ffff,
 };
+
+struct sa1100irq_state {
+	unsigned int	saved;
+	unsigned int	icmr;
+	unsigned int	iclr;
+	unsigned int	iccr;
+};
+
+static int sa1100irq_suspend(struct device *dev, u32 state, u32 level)
+{
+	struct sa1100irq_state *st;
+
+	if (!dev->saved_state && level == SUSPEND_NOTIFY)
+		dev->saved_state = kmalloc(sizeof(struct sa1100irq_state),
+					   GFP_KERNEL);
+	if (!dev->saved_state)
+		return -ENOMEM;
+
+	if (level == SUSPEND_POWER_DOWN) {
+		st = (struct sa1100irq_state *)dev->saved_state;
+
+		st->saved = 1;
+		st->icmr = ICMR;
+		st->iclr = ICLR;
+		st->iccr = ICCR;
+
+		/*
+		 * Disable all GPIO-based interrupts.
+		 */
+		ICMR &= ~(IC_GPIO11_27|IC_GPIO10|IC_GPIO9|IC_GPIO8|IC_GPIO7|
+			  IC_GPIO6|IC_GPIO5|IC_GPIO4|IC_GPIO3|IC_GPIO2|
+			  IC_GPIO1|IC_GPIO0);
+
+		/*
+		 * Set the appropriate edges for wakeup.
+		 */
+		GRER = PWER & GPIO_IRQ_rising_edge;
+		GFER = PWER & GPIO_IRQ_falling_edge;
+
+		/*
+		 * Clear any pending GPIO interrupts.
+		 */
+		GEDR = GEDR;
+	}
+	return 0;
+}
+
+static int sa1100irq_resume(struct device *dev, u32 level)
+{
+	struct sa1100irq_state *st;
+
+	if (level == RESUME_POWER_ON) {
+		st = (struct sa1100irq_state *)dev->saved_state;
+		dev->saved_state = NULL;
+
+		if (st->saved) {
+			ICCR = st->iccr;
+			ICLR = st->iclr;
+
+			GRER = GPIO_IRQ_rising_edge & GPIO_IRQ_mask;
+			GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;
+
+			ICMR = st->icmr;
+		}
+
+		kfree(st);
+	}
+	return 0;
+}
+
+static struct device_driver sa1100irq_driver = {
+	.name		= "sa11x0-irq",
+	.bus		= &system_bus_type,
+	.suspend	= sa1100irq_suspend,
+	.resume		= sa1100irq_resume,
+};
+
+static struct sys_device sa1100irq_device = {
+	.name		= "irq",
+	.id		= 0,
+	.dev = {
+		.name	= "Intel SA11x0 [Interrupt Controller]",
+		.driver	= &sa1100irq_driver,
+	},
+};
+
+static int __init sa1100irq_init_devicefs(void)
+{
+	driver_register(&sa1100irq_driver);
+	return sys_device_register(&sa1100irq_device);
+}
+
+device_initcall(sa1100irq_init_devicefs);
 
 void __init sa1100_init_irq(void)
 {
