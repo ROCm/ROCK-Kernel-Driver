@@ -416,7 +416,8 @@ Module parameters
 	* Creative Card w/Digital out + Digital I/O 2	[0x0fc3/0x1f0f]
 	* Creative Card w/Digital CD in + Digital I/O 2	[0x0fcf/0x1f0f]
         * Creative Card 5.1/w Digital out + LiveDrive	[0x3fc3/0x1fff]
-        * Creative Card all ins and outs		[0x3fff/0x1fff]
+	* Creative Card 5.1 (c) 2003			[0x3fc3/0x7cff]
+        * Creative Card all ins and outs		[0x3fff/0x7fff]
     
   Module snd-ens1370
   ------------------

@@ -650,7 +650,8 @@
 #define SPBYPASS_FORMAT		0x00000f00      /* If 1, SPDIF XX uses 24 bit, if 0 - 20 bit	*/
 
 #define AC97SLOT		0x5f            /* additional AC97 slots enable bits		*/
-#define AC97SLOT_10K2		0x03
+#define AC97SLOT_REAR_RIGHT	0x01		/* Rear left */
+#define AC97SLOT_REAR_LEFT	0x02		/* Rear right */
 #define AC97SLOT_CNTR		0x10            /* Center enable */
 #define AC97SLOT_LFE		0x20            /* LFE enable */
 
@@ -937,7 +938,8 @@ struct _snd_emu10k1 {
 	struct resource *res_port;
 	int APS: 1,				/* APS flag */
 	    no_ac97: 1,				/* no AC'97 */
-	    tos_link: 1;			/* tos link detected */
+	    tos_link: 1,			/* tos link detected */
+	    rear_ac97: 1;			/* rear channels are on AC'97 */
 	unsigned int audigy;			/* is Audigy? */
 	unsigned int revision;			/* chip revision */
 	unsigned int serial;			/* serial number */
@@ -1184,8 +1186,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define EXTOUT_AC97_R	   0x01	/* AC'97 playback channel - right */
 #define EXTOUT_TOSLINK_L   0x02	/* LiveDrive - TOSLink Optical - left */
 #define EXTOUT_TOSLINK_R   0x03	/* LiveDrive - TOSLink Optical - right */
-#define EXTOUT_CENTER      0x04	/* SB Live 5.1 - center */
-#define EXTOUT_LFE         0x05 /* SB Live 5.1 - LFE */
+#define EXTOUT_AC97_CENTER 0x04	/* SB Live 5.1 - center */
+#define EXTOUT_AC97_LFE	   0x05 /* SB Live 5.1 - LFE */
 #define EXTOUT_HEADPHONE_L 0x06	/* LiveDrive - Headphone - left */
 #define EXTOUT_HEADPHONE_R 0x07	/* LiveDrive - Headphone - right */
 #define EXTOUT_REAR_L	   0x08	/* Rear channel - left */
@@ -1193,6 +1195,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define EXTOUT_ADC_CAP_L   0x0a	/* ADC Capture buffer - left */
 #define EXTOUT_ADC_CAP_R   0x0b	/* ADC Capture buffer - right */
 #define EXTOUT_MIC_CAP	   0x0c	/* MIC Capture buffer */
+#define EXTOUT_AC97_REAR_L 0x0d	/* SB Live 5.1 (c) 2003 - Rear Left */
+#define EXTOUT_AC97_REAR_R 0x0e	/* SB Live 5.1 (c) 2003 - Rear Right */
 #define EXTOUT_ACENTER	   0x11 /* Analog Center */
 #define EXTOUT_ALFE	   0x12 /* Analog LFE */
 

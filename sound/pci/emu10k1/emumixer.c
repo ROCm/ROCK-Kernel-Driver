@@ -34,6 +34,8 @@
 
 #define chip_t emu10k1_t
 
+#define AC97_ID_STAC9758	0x83847658
+
 static int snd_emu10k1_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
@@ -531,6 +533,10 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
 			c = audigy_remove_ctls;
 		} else {
+			if (emu->ac97->id == AC97_ID_STAC9758) {
+				emu->rear_ac97 = 1;
+				snd_emu10k1_ptr_write(emu, AC97SLOT, 0, AC97SLOT_CNTR|AC97SLOT_LFE|AC97SLOT_REAR_LEFT|AC97SLOT_REAR_RIGHT);
+			}
 			/* remove unused AC97 controls */
 			snd_ac97_write(emu->ac97, AC97_SURROUND_MASTER, 0x0202);
 			snd_ac97_write(emu->ac97, AC97_CENTER_LFE_MASTER, 0x0202);
