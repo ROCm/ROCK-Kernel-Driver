@@ -354,7 +354,7 @@ int acct_process(long exitcode)
 		file = acct_file;
 		get_file(file);
 		unlock_kernel();
-		do_acct_process(exitcode, acct_file);
+		do_acct_process(exitcode, file);
 		fput(file);
 	} else
 		unlock_kernel();
