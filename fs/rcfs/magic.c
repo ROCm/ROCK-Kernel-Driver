@@ -243,8 +243,8 @@ target_write(struct file *file, const char __user *buf,
 
 	up(&(ri->vfs_inode.i_sem));
 	kfree(optbuf);
-	return !rc ? count : rc;
 
+	return (!rc ? count : rc);
 }
 
 struct file_operations target_fileops = {
