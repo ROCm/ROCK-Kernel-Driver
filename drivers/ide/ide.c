@@ -1619,18 +1619,6 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			return 0;
 		}
 
-		case HDIO_GETGEO_BIG_RAW:
-		{
-			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
-			if (!loc || (drive->media != ide_disk && drive->media != ide_floppy)) return -EINVAL;
-			if (put_user(drive->head, (u8 *) &loc->heads)) return -EFAULT;
-			if (put_user(drive->sect, (u8 *) &loc->sectors)) return -EFAULT;
-			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(bdev),
-				(unsigned long *) &loc->start)) return -EFAULT;
-			return 0;
-		}
-
 		case HDIO_OBSOLETE_IDENTITY:
 		case HDIO_GET_IDENTITY:
 			if (bdev != bdev->bd_contains)

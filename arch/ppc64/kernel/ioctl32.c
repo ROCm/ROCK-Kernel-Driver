@@ -28,34 +28,6 @@
 #define CODE
 #include "compat_ioctl.c"
 
-struct hd_big_geometry32 {
-	unsigned char heads;
-	unsigned char sectors;
-	unsigned int cylinders;
-	u32 start;
-};
-                        
-static int hdio_getgeo_big(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	mm_segment_t old_fs = get_fs();
-	struct hd_big_geometry geo;
-	int err;
-	
-	set_fs (KERNEL_DS);
-	err = sys_ioctl(fd, cmd, (unsigned long)&geo);
-	set_fs (old_fs);
-	if (!err) {
-		struct hd_big_geometry32 *up = (struct hd_big_geometry32 *) arg;
-
-		if (put_user(geo.heads, &up->heads) ||
-		    __put_user(geo.sectors, &up->sectors) ||
-		    __put_user(geo.cylinders, &up->cylinders) ||
-		    __put_user(((u32) geo.start), &up->start))
-			err = -EFAULT;
-	}
-	return err;
-}
-
 struct ncp_ioctl_request_32 {
 	unsigned int function;
 	unsigned int size;
@@ -773,7 +745,6 @@ COMPATIBLE_IOCTL(_IOR('p', 20, int[7])) /* RTCGET */
 COMPATIBLE_IOCTL(_IOW('p', 21, int[7])) /* RTCSET */
 
 /* And these ioctls need translation */
-HANDLE_IOCTL(HDIO_GETGEO_BIG_RAW, hdio_getgeo_big)
 
 /* NCPFS */
 HANDLE_IOCTL(NCP_IOC_NCPREQUEST_32, do_ncp_ncprequest)

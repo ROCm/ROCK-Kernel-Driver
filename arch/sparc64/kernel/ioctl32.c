@@ -40,34 +40,6 @@ static __inline__ void *alloc_user_space(long len)
 #define CODE
 #include "compat_ioctl.c"
 
-struct hd_big_geometry32 {
-	unsigned char heads;
-	unsigned char sectors;
-	unsigned int cylinders;
-	u32 start;
-};
-                        
-static int hdio_getgeo_big(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	mm_segment_t old_fs = get_fs();
-	struct hd_big_geometry geo;
-	int err;
-	
-	set_fs (KERNEL_DS);
-	err = sys_ioctl(fd, cmd, (unsigned long)&geo);
-	set_fs (old_fs);
-	if (!err) {
-		struct hd_big_geometry32 *up = (struct hd_big_geometry32 *) arg;
-
-		if (put_user(geo.heads, &up->heads) ||
-		    __put_user(geo.sectors, &up->sectors) ||
-		    __put_user(geo.cylinders, &up->cylinders) ||
-		    __put_user(((u32) geo.start), &up->start))
-			err = -EFAULT;
-	}
-	return err;
-}
-
 struct  fbcmap32 {
 	int             index;          /* first element (0 origin) */
 	int             count;
@@ -1574,7 +1546,6 @@ COMPATIBLE_IOCTL(DM_TARGET_STATUS)
 COMPATIBLE_IOCTL(DM_TARGET_WAIT)
 #endif
 /* And these ioctls need translation */
-HANDLE_IOCTL(HDIO_GETGEO_BIG_RAW, hdio_getgeo_big)
 /* NCPFS */
 HANDLE_IOCTL(NCP_IOC_NCPREQUEST_32, do_ncp_ncprequest)
 HANDLE_IOCTL(NCP_IOC_GETMOUNTUID2_32, do_ncp_getmountuid2)
