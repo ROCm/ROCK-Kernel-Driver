@@ -1156,7 +1156,7 @@ static int __init ip_auto_config(void)
 	/* Give hardware a chance to settle */
 	jiff = jiffies + CONF_PRE_OPEN;
 	while (time_before(jiffies, jiff))
-		;
+		cpu_relax();
 
 	/* Setup all network devices */
 	if (ic_open_devs() < 0)
@@ -1165,7 +1165,7 @@ static int __init ip_auto_config(void)
 	/* Give drivers a chance to settle */
 	jiff = jiffies + CONF_POST_OPEN;
 	while (time_before(jiffies, jiff))
-			;
+		cpu_relax();
 
 	/*
 	 * If the config information is insufficient (e.g., our IP address or
