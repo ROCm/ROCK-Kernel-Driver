@@ -478,7 +478,7 @@ xprt_reconnect(struct rpc_task *task)
 		if (inet->state != TCP_ESTABLISHED) {
 			task->tk_timeout = xprt->timeout.to_maxval;
 			/* if the socket is already closing, delay 5 secs */
-			if ((1<<inet->state) & ~(TCP_SYN_SENT|TCP_SYN_RECV))
+			if ((1<<inet->state) & ~(TCPF_SYN_SENT|TCPF_SYN_RECV))
 				task->tk_timeout = 5*HZ;
 			rpc_sleep_on(&xprt->pending, task, xprt_reconn_status, NULL);
 			release_sock(inet);
