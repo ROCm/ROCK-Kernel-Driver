@@ -46,17 +46,17 @@ search_one_table (const struct exception_table_entry *first,
 const struct exception_table_entry *
 search_exception_table (unsigned long addr)
 {
-#ifndef CONFIG_MODULE
+#ifndef CONFIG_MODULES
 	/* There is only the kernel to search.  */
 	return search_one_table(__start___ex_table, 
                                 __stop___ex_table - 1, 
                                 addr);
 #else
-	struct exception_table_entry *ret;
 	/* The kernel is the last "module" -- no need to treat it special. */
 	struct module *mp;
 
 	for (mp = module_list; mp ; mp = mp->next) {
+		const struct exception_table_entry *ret;
 		if (!mp->ex_table_start)
 			continue;
 		ret = search_one_table(mp->ex_table_start, mp->ex_table_end - 1,
