@@ -887,7 +887,7 @@ static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 #endif
 }
 
-int ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr)
+int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 {
 	u16 offset = sizeof(struct ipv6hdr);
 	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.ipv6h + 1);
@@ -929,7 +929,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	u8 *prevhdr, nexthdr = 0;
 
 	dev = rt->u.dst.dev;
-	hlen = ip6_found_nexthdr(skb, &prevhdr);
+	hlen = ip6_find_1stfragopt(skb, &prevhdr);
 	nexthdr = *prevhdr;
 
 	mtu = dst_pmtu(&rt->u.dst) - hlen - sizeof(struct frag_hdr);

@@ -39,57 +39,6 @@
 
 #define MAX_SG_ONSTACK 4
 
-/* BUGS:
- * - we assume replay seqno is always present.
- */
-
-/* Move to common area: it is shared with AH. */
-/* Common with AH after some work on arguments. */
-
-static int get_offset(u8 *packet, u32 packet_len, u8 *nexthdr, struct ipv6_opt_hdr **prevhdr)
-{
-	u16 offset = sizeof(struct ipv6hdr);
-	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(packet + offset);
-	u8 nextnexthdr;
-
-	*nexthdr = ((struct ipv6hdr*)packet)->nexthdr;
-
-	while (offset + 1 < packet_len) {
-
-		switch (*nexthdr) {
-
-		case NEXTHDR_HOP:
-		case NEXTHDR_ROUTING:
-			offset += ipv6_optlen(exthdr);
-			*nexthdr = exthdr->nexthdr;
-			*prevhdr = exthdr;
-			exthdr = (struct ipv6_opt_hdr*)(packet + offset);
-			break;
-
-		case NEXTHDR_DEST:
-			nextnexthdr =
-				((struct ipv6_opt_hdr*)(packet + offset + ipv6_optlen(exthdr)))->nexthdr;
-			/* XXX We know the option is inner dest opt
-			   with next next header check. */
-			if (nextnexthdr != NEXTHDR_HOP &&
-		    	    nextnexthdr != NEXTHDR_ROUTING &&
-			    nextnexthdr != NEXTHDR_DEST) {
-					return offset;
-			}
-			offset += ipv6_optlen(exthdr);
-			*nexthdr = exthdr->nexthdr;
-			*prevhdr = exthdr;
-			exthdr = (struct ipv6_opt_hdr*)(packet + offset);
-			break;
-
-		default :
-			return offset;
-		}
-	}
-
-	return offset;
-}
-
 int esp6_output(struct sk_buff *skb)
 {
 	int err;
@@ -101,12 +50,12 @@ int esp6_output(struct sk_buff *skb)
 	struct crypto_tfm *tfm;
 	struct esp_data *esp;
 	struct sk_buff *trailer;
-	struct ipv6_opt_hdr *prevhdr = NULL;
 	int blksize;
 	int clen;
 	int alen;
 	int nfrags;
-	u8 nexthdr;
+	u8 *prevhdr;
+	u8 nexthdr = 0;
 
 	/* First, if the skb is not checksummed, complete checksum. */
 	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
@@ -123,7 +72,9 @@ int esp6_output(struct sk_buff *skb)
 	/* Strip IP header in transport mode. Save it. */
 
 	if (!x->props.mode) {
-		hdr_len = get_offset(skb->nh.raw, skb->len, &nexthdr, &prevhdr);
+		hdr_len = ip6_find_1stfragopt(skb, &prevhdr);
+		nexthdr = *prevhdr;
+		*prevhdr = IPPROTO_ESP;
 		iph = kmalloc(hdr_len, GFP_ATOMIC);
 		if (!iph) {
 			err = -ENOMEM;
@@ -178,18 +129,12 @@ int esp6_output(struct sk_buff *skb)
 		ipv6_addr_copy(&top_iph->daddr,
 			       (struct in6_addr *)&x->id.daddr);
 	} else { 
-		/* XXX exthdr */
 		esph = (struct ipv6_esp_hdr*)skb_push(skb, x->props.header_len);
 		skb->h.raw = (unsigned char*)esph;
 		top_iph = (struct ipv6hdr*)skb_push(skb, hdr_len);
 		memcpy(top_iph, iph, hdr_len);
 		kfree(iph);
 		top_iph->payload_len = htons(skb->len + alen - sizeof(struct ipv6hdr));
-		if (prevhdr) {
-			prevhdr->nexthdr = IPPROTO_ESP;
-		} else {
-			top_iph->nexthdr = IPPROTO_ESP;
-		}
 		*(u8*)(trailer->tail - 1) = nexthdr;
 	}
 
@@ -302,6 +247,7 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 		struct scatterlist sgbuf[nfrags>MAX_SG_ONSTACK ? 0 : nfrags];
 		struct scatterlist *sg = sgbuf;
 		u8 padlen;
+		u8 *prevhdr;
 
 		if (unlikely(nfrags > MAX_SG_ONSTACK)) {
 			sg = kmalloc(sizeof(struct scatterlist)*nfrags, GFP_ATOMIC);
@@ -325,11 +271,13 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 		}
 		/* ... check padding bits here. Silly. :-) */ 
 
-		ret_nexthdr = ((struct ipv6hdr*)tmp_hdr)->nexthdr = nexthdr[1];
 		pskb_trim(skb, skb->len - alen - padlen - 2);
 		skb->h.raw = skb_pull(skb, sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen);
 		skb->nh.raw += sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen;
 		memcpy(skb->nh.raw, tmp_hdr, hdr_len);
+		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
+		ip6_find_1stfragopt(skb, &prevhdr);
+		ret_nexthdr = *prevhdr = nexthdr[1];
 	}
 	kfree(tmp_hdr);
 	return ret_nexthdr;
