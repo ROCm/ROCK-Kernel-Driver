@@ -26,6 +26,7 @@
 #include <linux/security.h>
 #include <net/sock.h>
 #include <net/xfrm.h>
+#include <asm/uaccess.h>
 
 static struct sock *xfrm_nl;
 

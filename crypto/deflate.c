@@ -32,6 +32,7 @@
 #include <linux/interrupt.h>
 #include <linux/mm.h>
 #include <linux/net.h>
+#include <linux/slab.h>
 
 #define DEFLATE_DEF_LEVEL		Z_DEFAULT_COMPRESSION
 #define DEFLATE_DEF_WINBITS		11
@@ -181,7 +182,18 @@ static int deflate_decompress(void *ctx, const u8 *src, unsigned int slen,
 	stream->next_out = (u8 *)dst;
 	stream->avail_out = *dlen;
 
-	ret = zlib_inflate(stream, Z_FINISH);
+	ret = zlib_inflate(stream, Z_SYNC_FLUSH);
+	/*
+	 * Work around a bug in zlib, which sometimes wants to taste an extra
+	 * byte when being used in the (undocumented) raw deflate mode.
+	 * (From USAGI).
+	 */
+	if (ret == Z_OK && !stream->avail_in && stream->avail_out) {
+		u8 zerostuff = 0;
+		stream->next_in = &zerostuff;
+		stream->avail_in = 1; 
+		ret = zlib_inflate(stream, Z_FINISH);
+	}
 	if (ret != Z_STREAM_END) {
 		ret = -EINVAL;
 		goto out;
