@@ -9,6 +9,7 @@
 #define _ASM_STATFS_H
 
 #include <linux/posix_types.h>
+#include <asm/sgidefs.h>
 
 #ifndef __KERNEL_STRICT_NAMES
 
@@ -35,8 +36,10 @@ struct statfs {
 	long		f_spare[6];
 };
 
+#if (_MIPS_SIM == _MIPS_SIM_ABI32) || (_MIPS_SIM == _MIPS_SIM_NABI32)
+
 /*
- * Unlike the 32-bit version the 64-bit version has none of the ABI baggage.
+ * Unlike the traditional version the LFAPI version has none of the ABI junk
  */
 struct statfs64 {
 	__u32	f_type;
@@ -51,5 +54,27 @@ struct statfs64 {
 	__u32	f_frsize;
 	__u32	f_spare[5];
 };
+
+#endif /* _MIPS_SIM == _MIPS_SIM_ABI32 */
+ 
+#if _MIPS_SIM == _MIPS_SIM_ABI64
+
+struct statfs64 {			/* Same as struct statfs */
+	long		f_type;
+	long		f_bsize;
+	long		f_frsize;	/* Fragment size - unsupported */
+	long		f_blocks;
+	long		f_bfree;
+	long		f_files;
+	long		f_ffree;
+
+	/* Linux specials */
+	long	f_bavail;
+	__kernel_fsid_t	f_fsid;
+	long		f_namelen;
+	long		f_spare[6];
+};
+
+#endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
 
 #endif /* _ASM_STATFS_H */

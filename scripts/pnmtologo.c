@@ -73,7 +73,7 @@ static unsigned int logo_width;
 static unsigned int logo_height;
 static struct color **logo_data;
 static struct color logo_clut[MAX_LINUX_LOGO_COLORS];
-static unsigned int logo_clutsize = 0;
+static unsigned int logo_clutsize;
 
 static void die(const char *fmt, ...)
     __attribute__ ((noreturn)) __attribute ((format (printf, 1, 2)));
@@ -259,7 +259,7 @@ static void write_footer(void)
 	fclose(out);
 }
 
-static int write_hex_cnt = 0;
+static int write_hex_cnt;
 
 static void write_hex(unsigned char byte)
 {

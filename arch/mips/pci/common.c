@@ -1,6 +1,9 @@
+#include <linux/config.h>
+#include <linux/init.h>
+#include <linux/pci.h>
+
 void __init pcibios_fixup_bus(struct pci_bus *b)
 {
-	Dprintk("pcibios_fixup_bus()\n");
 }
 
 static int pcibios_enable_resources(struct pci_dev *dev, int mask)
@@ -20,7 +23,7 @@ static int pcibios_enable_resources(struct pci_dev *dev, int mask)
 		if (!r->start && r->end) {
 			printk(KERN_ERR
 			       "PCI: Device %s not available because of resource collisions\n",
-			       dev->slot_name);
+			       pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -32,7 +35,7 @@ static int pcibios_enable_resources(struct pci_dev *dev, int mask)
 		cmd |= PCI_COMMAND_MEMORY;
 	if (cmd != old_cmd) {
 		printk("PCI: Enabling device %s (%04x -> %04x)\n",
-		       dev->slot_name, old_cmd, cmd);
+		       pci_name(dev), old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;

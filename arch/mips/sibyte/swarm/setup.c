@@ -38,7 +38,6 @@
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_genbus.h>
-#include <asm/sibyte/64bit.h>
 #include <asm/sibyte/board.h>
 
 extern struct rtc_ops *rtc_ops;

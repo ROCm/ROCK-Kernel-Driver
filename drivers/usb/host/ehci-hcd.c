@@ -318,27 +318,21 @@ ehci_reboot (struct notifier_block *self, unsigned long code, void *null)
 
 /* called by khubd or root hub init threads */
 
-static int ehci_start (struct usb_hcd *hcd)
+static int ehci_hc_reset (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			temp;
-	struct usb_device	*udev;
-	struct usb_bus		*bus;
-	int			retval;
-	u32			hcc_params;
-	u8                      tempbyte;
 
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = (struct ehci_caps *) hcd->regs;
-	ehci->regs = (struct ehci_regs *) (hcd->regs + ehci->caps->length);
-	dbg_hcs_params (ehci, "ehci_start");
-	dbg_hcc_params (ehci, "ehci_start");
-
-	hcc_params = readl (&ehci->caps->hcc_params);
+	ehci->regs = (struct ehci_regs *) (hcd->regs +
+				readb (&ehci->caps->length));
+	dbg_hcs_params (ehci, "reset");
+	dbg_hcc_params (ehci, "reset");
 
 	/* EHCI 0.96 and later may have "extended capabilities" */
-	temp = HCC_EXT_CAPS (hcc_params);
+	temp = HCC_EXT_CAPS (readl (&ehci->caps->hcc_params));
 	while (temp) {
 		u32		cap;
 
@@ -363,8 +357,18 @@ static int ehci_start (struct usb_hcd *hcd)
 	ehci->hcs_params = readl (&ehci->caps->hcs_params);
 
 	/* force HC to halt state */
-	if ((retval = ehci_halt (ehci)) != 0)
-		return retval;
+	return ehci_halt (ehci);
+}
+
+static int ehci_start (struct usb_hcd *hcd)
+{
+	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
+	u32			temp;
+	struct usb_device	*udev;
+	struct usb_bus		*bus;
+	int			retval;
+	u32			hcc_params;
+	u8                      tempbyte;
 
 	/*
 	 * hw default: 1K periodic list heads, one per frame.
@@ -375,6 +379,7 @@ static int ehci_start (struct usb_hcd *hcd)
 		return retval;
 
 	/* controllers may cache some of the periodic schedule ... */
+	hcc_params = readl (&ehci->caps->hcc_params);
 	if (HCC_ISOC_CACHE (hcc_params)) 	// full frame cache
 		ehci->i_thresh = 8;
 	else					// N microframes cached
@@ -496,7 +501,6 @@ done2:
 	 * Before this point the HC was idle/ready.  After, khubd
 	 * and device drivers may start it running.
 	 */
-	usb_connect (udev);
 	udev->speed = USB_SPEED_HIGH;
 	if (hcd_register_root (hcd) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
@@ -937,6 +941,7 @@ static const struct hc_driver ehci_driver = {
 	/*
 	 * basic lifecycle operations
 	 */
+	.reset =		ehci_hc_reset,
 	.start =		ehci_start,
 #ifdef	CONFIG_PM
 	.suspend =		ehci_suspend,
@@ -974,7 +979,7 @@ static const struct hc_driver ehci_driver = {
 /* EHCI spec says PCI is required. */
 
 /* PCI driver selection metadata; PCI hotplugging uses this */
-static struct pci_device_id __devinitdata pci_ids [] = { {
+static struct pci_device_id pci_ids [] = { {
 
 	/* handle any USB 2.0 EHCI controller */
 

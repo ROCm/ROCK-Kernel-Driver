@@ -489,6 +489,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		if (retval) {
 			port->open_count = 0;
 			module_put(serial->type->owner);
+			kobject_put(&serial->kobj);
 		}
 	}
 bailout:
@@ -1055,9 +1056,9 @@ int usb_serial_probe(struct usb_interface *interface,
 	     (dev->descriptor.idProduct == PL2303_PRODUCT_ID)) ||
 	    ((dev->descriptor.idVendor == ATEN_VENDOR_ID) &&
 	     (dev->descriptor.idProduct == ATEN_PRODUCT_ID))) {
-		if (interface != &dev->actconfig->interface[0]) {
+		if (interface != dev->actconfig->interface[0]) {
 			/* check out the endpoints of the other interface*/
-			iface_desc = &dev->actconfig->interface[0].altsetting[0];
+			iface_desc = &dev->actconfig->interface[0]->altsetting[0];
 			for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 				endpoint = &iface_desc->endpoint[i].desc;
 				if ((endpoint->bEndpointAddress & 0x80) &&

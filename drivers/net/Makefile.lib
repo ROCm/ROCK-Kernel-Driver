@@ -70,5 +70,5 @@ obj-$(CONFIG_ES3210)		+= crc32.o
 obj-$(CONFIG_LNE390)		+= crc32.o
 obj-$(CONFIG_NE3210)		+= crc32.o
 obj-$(CONFIG_AC3200)		+= crc32.o
-obj-$(CONFIG_ARIADNE2)		+= crc32.o
+obj-$(CONFIG_ZORRO8390)		+= crc32.o
 obj-$(CONFIG_HYDRA)		+= crc32.o

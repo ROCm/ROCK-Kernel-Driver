@@ -11,8 +11,6 @@
 extern int cfe_cons_handle;
 static kdev_t cfe_consdev;
 
-#define SB1250_DUART_MINOR_BASE		192
-
 static void cfe_console_write(struct console *cons, const char *str,
 		       unsigned int count)
 {
@@ -44,9 +42,10 @@ static void cfe_console_write(struct console *cons, const char *str,
 			
 }
 
-static kdev_t cfe_console_device(struct console *c)
+static struct tty_driver *cfe_console_device(struct console *c, int *index)
 {
-	return cfe_consdev;
+	*index = -1;
+	return NULL;
 }
 
 static int cfe_console_setup(struct console *cons, char *str)
@@ -58,17 +57,15 @@ static int cfe_console_setup(struct console *cons, char *str)
 #ifdef CONFIG_SIBYTE_SB1250_DUART
 		if (!strcmp(consdev, "uart0")) {
 			setleds("u0cn");
-			cfe_consdev = MKDEV(TTY_MAJOR, SB1250_DUART_MINOR_BASE + 0);
-#ifndef CONFIG_SIBYTE_SB1250_DUART_NO_PORT_1
+//			cfe_consdev = MKDEV(TTY_MAJOR, SB1250_DUART_MINOR_BASE + 0);
 		} else if (!strcmp(consdev, "uart1")) {
 			setleds("u1cn");
-			cfe_consdev = MKDEV(TTY_MAJOR, SB1250_DUART_MINOR_BASE + 1);
-#endif
+//			cfe_consdev = MKDEV(TTY_MAJOR, SB1250_DUART_MINOR_BASE + 1);
 #endif
 #ifdef CONFIG_VGA_CONSOLE
 		} else if (!strcmp(consdev, "pcconsole0")) {
 			setleds("pccn");
-			cfe_consdev = MKDEV(TTY_MAJOR, 0);
+//			cfe_consdev = MKDEV(TTY_MAJOR, 0);
 #endif
 		} else
 			return -ENODEV;
@@ -85,7 +82,10 @@ static struct console sb1250_cfe_cons = {
 	index:		-1,
 };
 
-void __init sb1250_cfe_console_init(void)
+static int __init sb1250_cfe_console_init(void)
 {
 	register_console(&sb1250_cfe_cons);
+	return 0;
 }
+
+console_initcall(sb1250_cfe_console_init);

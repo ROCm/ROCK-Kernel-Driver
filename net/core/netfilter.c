@@ -557,6 +557,18 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 
 	rcu_read_lock();
 
+	/* Release those devices we held, or Alexey will kill me. */
+	if (info->indev) dev_put(info->indev);
+	if (info->outdev) dev_put(info->outdev);
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	if (skb->nf_bridge) {
+		if (skb->nf_bridge->physindev)
+			dev_put(skb->nf_bridge->physindev);
+		if (skb->nf_bridge->physoutdev)
+			dev_put(skb->nf_bridge->physoutdev);
+	}
+#endif
+
 	/* Drop reference to owner of hook which queued us. */
 	module_put(info->elem->owner);
 
@@ -598,19 +610,6 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 		break;
 	}
 	rcu_read_unlock();
-
-	/* Release those devices we held, or Alexey will kill me. */
-	if (info->indev) dev_put(info->indev);
-	if (info->outdev) dev_put(info->outdev);
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	if (skb->nf_bridge) {
-		if (skb->nf_bridge->physindev)
-			dev_put(skb->nf_bridge->physindev);
-		if (skb->nf_bridge->physoutdev)
-			dev_put(skb->nf_bridge->physoutdev);
-	}
-#endif
-
 
 	if (verdict == NF_DROP)
 		kfree_skb(skb);

@@ -53,7 +53,7 @@ MODULE_LICENSE("GPL");
 #define VRC4173_SYSINT1REG	0x060
 #define VRC4173_MSYSINT1REG	0x06c
 
-static struct pci_device_id vrc4173_table[] __devinitdata = {
+static struct pci_device_id vrc4173_table[] = {
 	{PCI_VENDOR_ID_NEC, PCI_DEVICE_ID_NEC_VRC4173, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0, }
 };

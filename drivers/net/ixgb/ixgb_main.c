@@ -44,7 +44,7 @@ char ixgb_copyright[] = "Copyright (c) 2001-2003 Intel Corporation.";
  * { Vendor ID, Device ID, SubVendor ID, SubDevice ID,
  *   Class, Class Mask, String Index }
  */
-static struct pci_device_id ixgb_pci_tbl[] __devinitdata = {
+static struct pci_device_id ixgb_pci_tbl[] = {
 	/* Intel(R) PRO/10GbE Network Connection */
 	{INTEL_VENDOR_ID, IXGB_DEVICE_ID_82597EX,
 	 INTEL_SUBVENDOR_ID, IXGB_SUBDEVICE_ID_A11F, 0, 0, 0},

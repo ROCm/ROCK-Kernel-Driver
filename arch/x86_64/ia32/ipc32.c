@@ -687,9 +687,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return sys_shmget(first, second, third);
 	      case SHMCTL:
 		return shmctl32(first, second, (void *)AA(ptr));
-	      default:
-		return -EINVAL;
 	}
-	return -EINVAL;
+	return -ENOSYS;
 }
 

@@ -62,7 +62,7 @@ void LPCSetConfig(char LdnNumber, char Index, char data)
 	LPCEnterMBPnP();				// Enter IT8712 MB PnP mode
 	outb(0x07, LPC_KEY_ADDR);
 	outb(LdnNumber, LPC_DATA_ADDR);
-	outb(Index, LPC_KEY_ADDR);	
+	outb(Index, LPC_KEY_ADDR);
 	outb(data, LPC_DATA_ADDR);
 	LPCExitMBPnP();
 }
@@ -74,7 +74,7 @@ char LPCGetConfig(char LdnNumber, char Index)
 	LPCEnterMBPnP();				// Enter IT8712 MB PnP mode
 	outb(0x07, LPC_KEY_ADDR);
 	outb(LdnNumber, LPC_DATA_ADDR);
-	outb(Index, LPC_KEY_ADDR);	
+	outb(Index, LPC_KEY_ADDR);
 	rtn = inb(LPC_DATA_ADDR);
 	LPCExitMBPnP();
 	return rtn;
@@ -92,7 +92,7 @@ int SearchIT8712(void)
 	Id2 = inb(LPC_DATA_ADDR);
 	Id = (Id1 << 8) | Id2;
 	LPCExitMBPnP();
-	if (Id == 0x8712) 
+	if (Id == 0x8712)
 		return TRUE;
 	else
 		return FALSE;
@@ -104,30 +104,30 @@ void InitLPCInterface(void)
 	unsigned long data;
 
 	bus = 0;
-	dev_fn = 1<<3 | 4; 
+	dev_fn = 1<<3 | 4;
 
 
 	/* pci cmd, SERR# Enable */
-	IT_WRITE(IT_CONFADDR,  
+	IT_WRITE(IT_CONFADDR,
 		 (bus         << IT_BUSNUM_SHF)   |
 		 (dev_fn      << IT_FUNCNUM_SHF) |
 		 ((0x4 / 4) << IT_REGNUM_SHF));
 	IT_READ(IT_CONFDATA, data);
 	data |= 0x0100;
-	IT_WRITE(IT_CONFADDR,  
+	IT_WRITE(IT_CONFADDR,
 		 (bus         << IT_BUSNUM_SHF)   |
 		 (dev_fn      << IT_FUNCNUM_SHF) |
 		 ((0x4 / 4) << IT_REGNUM_SHF));
 	IT_WRITE(IT_CONFDATA, data);
 
 	/* setup serial irq control register */
-	IT_WRITE(IT_CONFADDR,  
+	IT_WRITE(IT_CONFADDR,
 		 (bus         << IT_BUSNUM_SHF)   |
 		 (dev_fn      << IT_FUNCNUM_SHF) |
 		 ((0x48 / 4) << IT_REGNUM_SHF));
 	IT_READ(IT_CONFDATA, data);
 	data  = (data & 0xffff00ff) | 0xc400;
-	IT_WRITE(IT_CONFADDR,  
+	IT_WRITE(IT_CONFADDR,
 		 (bus         << IT_BUSNUM_SHF)   |
 		 (dev_fn      << IT_FUNCNUM_SHF) |
 		 ((0x48 / 4) << IT_REGNUM_SHF));
@@ -136,7 +136,7 @@ void InitLPCInterface(void)
 
 	/* Enable I/O Space Subtractive Decode */
 	/* default 0x4C is 0x3f220000 */
-	IT_WRITE(IT_CONFADDR,  
+	IT_WRITE(IT_CONFADDR,
 		 (bus         << IT_BUSNUM_SHF)   |
 		 (dev_fn      << IT_FUNCNUM_SHF) |
 		 ((0x4C / 4) << IT_REGNUM_SHF));

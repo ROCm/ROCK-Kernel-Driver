@@ -407,7 +407,7 @@ UNUSUAL_DEV(  0x0781, 0x0001, 0x0200, 0x0200,
 UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009, 
 		"Sandisk",
 		"ImageMate SDDR-31",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_SER ),
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
@@ -604,6 +604,13 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
 		0 ),
 #endif
+
+/* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
+UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
+		"USB",
+		"Solid state disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.

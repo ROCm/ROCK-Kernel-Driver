@@ -2,12 +2,13 @@
  * offset.c: Calculate pt_regs and task_struct offsets.
  *
  * Copyright (C) 1996 David S. Miller
- * Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002 Ralf Baechle
+ * Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003 Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  *
  * Kevin Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 2000 MIPS Technologies, Inc.
  */
+#include <linux/compat.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -18,7 +19,6 @@
 
 #define text(t) __asm__("\n@@@" t)
 #define _offset(type, member) (&(((type *)NULL)->member))
-
 #define offset(string, ptr, member) \
 	__asm__("\n@@@" string "%0" : : "i" (_offset(ptr, member)))
 #define constant(string, member) \
@@ -94,6 +94,9 @@ void output_thread_info_defines(void)
 	offset("#define TI_PRE_COUNT       ", struct thread_info, preempt_count);
 	offset("#define TI_ADDR_LIMIT      ", struct thread_info, addr_limit);
 	offset("#define TI_RESTART_BLOCK   ", struct thread_info, restart_block);
+	constant("#define _THREAD_SIZE_ORDER ", THREAD_SIZE_ORDER);
+	constant("#define _THREAD_SIZE       ", THREAD_SIZE);
+	constant("#define _THREAD_MASK       ", THREAD_MASK);
 	linefeed;
 }
 
@@ -111,9 +114,10 @@ void output_thread_defines(void)
 	offset("#define THREAD_REG29   ", struct task_struct, thread.reg29);
 	offset("#define THREAD_REG30   ", struct task_struct, thread.reg30);
 	offset("#define THREAD_REG31   ", struct task_struct, thread.reg31);
-	offset("#define THREAD_STATUS  ", struct task_struct, \
+	offset("#define THREAD_STATUS  ", struct task_struct,
 	       thread.cp0_status);
 	offset("#define THREAD_FPU     ", struct task_struct, thread.fpu);
+
 	offset("#define THREAD_BVADDR  ", struct task_struct, \
 	       thread.cp0_badvaddr);
 	offset("#define THREAD_BUADDR  ", struct task_struct, \
@@ -129,6 +133,77 @@ void output_thread_defines(void)
 	linefeed;
 }
 
+void output_thread_fpu_defines(void)
+{
+	offset("#define THREAD_FPR0    ",
+	       struct task_struct, thread.fpu.hard.fpr[0]);
+	offset("#define THREAD_FPR1    ",
+	       struct task_struct, thread.fpu.hard.fpr[1]);
+	offset("#define THREAD_FPR2    ",
+	       struct task_struct, thread.fpu.hard.fpr[2]);
+	offset("#define THREAD_FPR3    ",
+	       struct task_struct, thread.fpu.hard.fpr[3]);
+	offset("#define THREAD_FPR4    ",
+	       struct task_struct, thread.fpu.hard.fpr[4]);
+	offset("#define THREAD_FPR5    ",
+	       struct task_struct, thread.fpu.hard.fpr[5]);
+	offset("#define THREAD_FPR6    ",
+	       struct task_struct, thread.fpu.hard.fpr[6]);
+	offset("#define THREAD_FPR7    ",
+	       struct task_struct, thread.fpu.hard.fpr[7]);
+	offset("#define THREAD_FPR8    ",
+	       struct task_struct, thread.fpu.hard.fpr[8]);
+	offset("#define THREAD_FPR9    ",
+	       struct task_struct, thread.fpu.hard.fpr[9]);
+	offset("#define THREAD_FPR10   ",
+	       struct task_struct, thread.fpu.hard.fpr[10]);
+	offset("#define THREAD_FPR11   ",
+	       struct task_struct, thread.fpu.hard.fpr[11]);
+	offset("#define THREAD_FPR12   ",
+	       struct task_struct, thread.fpu.hard.fpr[12]);
+	offset("#define THREAD_FPR13   ",
+	       struct task_struct, thread.fpu.hard.fpr[13]);
+	offset("#define THREAD_FPR14   ",
+	       struct task_struct, thread.fpu.hard.fpr[14]);
+	offset("#define THREAD_FPR15   ",
+	       struct task_struct, thread.fpu.hard.fpr[15]);
+	offset("#define THREAD_FPR16   ",
+	       struct task_struct, thread.fpu.hard.fpr[16]);
+	offset("#define THREAD_FPR17   ",
+	       struct task_struct, thread.fpu.hard.fpr[17]);
+	offset("#define THREAD_FPR18   ",
+	       struct task_struct, thread.fpu.hard.fpr[18]);
+	offset("#define THREAD_FPR19   ",
+	       struct task_struct, thread.fpu.hard.fpr[19]);
+	offset("#define THREAD_FPR20   ",
+	       struct task_struct, thread.fpu.hard.fpr[20]);
+	offset("#define THREAD_FPR21   ",
+	       struct task_struct, thread.fpu.hard.fpr[21]);
+	offset("#define THREAD_FPR22   ",
+	       struct task_struct, thread.fpu.hard.fpr[22]);
+	offset("#define THREAD_FPR23   ",
+	       struct task_struct, thread.fpu.hard.fpr[23]);
+	offset("#define THREAD_FPR24   ",
+	       struct task_struct, thread.fpu.hard.fpr[24]);
+	offset("#define THREAD_FPR25   ",
+	       struct task_struct, thread.fpu.hard.fpr[25]);
+	offset("#define THREAD_FPR26   ",
+	       struct task_struct, thread.fpu.hard.fpr[26]);
+	offset("#define THREAD_FPR27   ",
+	       struct task_struct, thread.fpu.hard.fpr[27]);
+	offset("#define THREAD_FPR28   ",
+	       struct task_struct, thread.fpu.hard.fpr[28]);
+	offset("#define THREAD_FPR29   ",
+	       struct task_struct, thread.fpu.hard.fpr[29]);
+	offset("#define THREAD_FPR30   ",
+	       struct task_struct, thread.fpu.hard.fpr[30]);
+	offset("#define THREAD_FPR31   ",
+	       struct task_struct, thread.fpu.hard.fpr[31]);
+
+	offset("#define THREAD_FCR31   ",
+	       struct task_struct, thread.fpu.hard.fcr31);
+}
+
 void output_mm_defines(void)
 {
 	text("/* Linux mm_struct offsets. */");
@@ -137,8 +212,17 @@ void output_mm_defines(void)
 	offset("#define MM_CONTEXT    ", struct mm_struct, context);
 	linefeed;
 	constant("#define _PAGE_SIZE     ", PAGE_SIZE);
-	constant("#define _PGD_ORDER     ", PGD_ORDER);
+	constant("#define _PAGE_SHIFT    ", PAGE_SHIFT);
+	linefeed;
 	constant("#define _PGDIR_SHIFT   ", PGDIR_SHIFT);
+	constant("#define _PMD_SHIFT     ", PMD_SHIFT);
+	linefeed;
+	constant("#define _PGD_ORDER     ", PGD_ORDER);
+	constant("#define _PMD_ORDER     ", PMD_ORDER);
+	constant("#define _PTE_ORDER     ", PTE_ORDER);
+	linefeed;
+	constant("#define _PTRS_PER_PGD  ", PTRS_PER_PGD);
+	constant("#define _PTRS_PER_PMD  ", PTRS_PER_PMD);
 	linefeed;
 }
 
@@ -157,6 +241,17 @@ void output_sc_defines(void)
 	offset("#define SC_BADVADDR   ", struct sigcontext, sc_badvaddr);
 	linefeed;
 }
+
+#ifdef CONFIG_MIPS32_COMPAT
+void output_sc32_defines(void)
+{
+	text("/* Linux 32-bit sigcontext offsets. */");
+	offset("#define SC32_FPREGS     ", struct sigcontext32, sc_fpregs);
+	offset("#define SC32_FPC_CSR    ", struct sigcontext32, sc_fpc_csr);
+	offset("#define SC32_FPC_EIR    ", struct sigcontext32, sc_fpc_eir);
+	linefeed;
+}
+#endif
 
 void output_signal_defined(void)
 {
@@ -200,8 +295,6 @@ void output_irq_cpustat_t_defines(void)
 {
 	text("/* Linux irq_cpustat_t offsets. */");
 	offset("#define IC_SOFTIRQ_PENDING ", irq_cpustat_t, __softirq_pending);
-	offset("#define IC_SYSCALL_COUNT   ", irq_cpustat_t, __syscall_count);
-	offset("#define IC_KSOFTIRQD_TASK  ", irq_cpustat_t, __ksoftirqd_task);
 	size("#define IC_IRQ_CPUSTAT_T   ", irq_cpustat_t);
 	linefeed;
 }

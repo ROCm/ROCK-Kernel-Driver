@@ -90,18 +90,18 @@ spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
 
 /* Variables to be preserved over suspend */
 static int new_loglevel = 7;
-static int orig_loglevel = 0;
+static int orig_loglevel;
 static int orig_fgconsole, orig_kmsg;
 static int pagedir_order_check;
 static int nr_copy_pages_check;
 
-static int resume_status = 0;
+static int resume_status;
 static char resume_file[256] = "";			/* For resume= kernel option */
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;
 
-static int pm_suspend_state = 0;
+static int pm_suspend_state;
 
 /* Suspend pagedir is allocated before final copy, therefore it
    must be freed after resume 

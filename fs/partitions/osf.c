@@ -67,9 +67,10 @@ int osf_partition(struct parsed_partitions *state, struct block_device *bdev)
 		if (slot == state->limit)
 		        break;
 		if (le32_to_cpu(partition->p_size))
-			put_partition(state, slot++,
+			put_partition(state, slot,
 				le32_to_cpu(partition->p_offset),
 				le32_to_cpu(partition->p_size));
+		slot++;
 	}
 	printk("\n");
 	put_dev_sector(sect);

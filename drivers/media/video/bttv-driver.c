@@ -2310,7 +2310,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
                 strcpy(cap->driver,"bttv");
                 strlcpy(cap->card,btv->video_dev.name,sizeof(cap->card));
-		sprintf(cap->bus_info,"PCI:%s",btv->dev->slot_name);
+		sprintf(cap->bus_info,"PCI:%s",pci_name(btv->dev));
 		cap->version = BTTV_VERSION_CODE;
 		cap->capabilities =
 			V4L2_CAP_VIDEO_CAPTURE |
@@ -2948,16 +2948,16 @@ static void bttv_print_irqbits(u32 print, u32 mark)
 static void bttv_print_riscaddr(struct bttv *btv)
 {
 	printk("  main: %08Lx\n",
-	       (u64)btv->main.dma);
+	       (unsigned long long)btv->main.dma);
 	printk("  vbi : o=%08Lx e=%08Lx\n",
-	       btv->vcurr ? (u64)btv->vcurr->top.dma : 0,
-	       btv->vcurr ? (u64)btv->vcurr->bottom.dma : 0);
+	       btv->vcurr ? (unsigned long long)btv->vcurr->top.dma : 0,
+	       btv->vcurr ? (unsigned long long)btv->vcurr->bottom.dma : 0);
 	printk("  cap : o=%08Lx e=%08Lx\n",
-	       btv->top    ? (u64)btv->top->top.dma : 0,
-	       btv->bottom ? (u64)btv->bottom->bottom.dma : 0);
+	       btv->top    ? (unsigned long long)btv->top->top.dma : 0,
+	       btv->bottom ? (unsigned long long)btv->bottom->bottom.dma : 0);
 	printk("  scr : o=%08Lx e=%08Lx\n",
-	       btv->screen ? (u64)btv->screen->top.dma  : 0,
-	       btv->screen ? (u64)btv->screen->bottom.dma : 0);
+	       btv->screen ? (unsigned long long)btv->screen->top.dma  : 0,
+	       btv->screen ? (unsigned long long)btv->screen->bottom.dma : 0);
 }
 
 static void bttv_irq_timeout(unsigned long data)
@@ -3351,7 +3351,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
         pci_read_config_byte(dev, PCI_CLASS_REVISION, &btv->revision);
         pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
         printk(KERN_INFO "bttv%d: Bt%d (rev %d) at %s, ",
-               bttv_num,btv->id, btv->revision, dev->slot_name);
+               bttv_num,btv->id, btv->revision, pci_name(dev));
         printk("irq: %d, latency: %d, mmio: 0x%lx\n",
 	       btv->dev->irq, lat, pci_resource_start(dev,0));
 	
@@ -3496,7 +3496,7 @@ static void __devexit bttv_remove(struct pci_dev *pci_dev)
         return;
 }
 
-static struct pci_device_id bttv_pci_tbl[] __devinitdata = {
+static struct pci_device_id bttv_pci_tbl[] = {
         {PCI_VENDOR_ID_BROOKTREE, PCI_DEVICE_ID_BT848,
          PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{PCI_VENDOR_ID_BROOKTREE, PCI_DEVICE_ID_BT849,

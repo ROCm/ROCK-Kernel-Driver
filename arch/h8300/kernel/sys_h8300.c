@@ -281,9 +281,8 @@ asmlinkage int sys_getpagesize(void)
 #if defined(CONFIG_SYSCALL_PRINT)
 asmlinkage void syscall_print(void *dummy,...)
 {
-	struct pt_regs *regs = (struct pt_regs *) ((unsigned char *)&dummy);
-	unsigned long *usp=rdusp()+8;
-	printk("call %06x:%d 1:%08x,2:%08x,3:%08x,ret:%08x\n",
-               ((*usp) & 0xffffff)-2,regs->orig_er0,regs->er1,regs->er2,regs->er3,regs->er0);
+	struct pt_regs *regs = (struct pt_regs *) ((unsigned char *)&dummy-4);
+	printk("call %06lx:%ld 1:%08lx,2:%08lx,3:%08lx,ret:%08lx\n",
+               ((regs->pc)&0xffffff)-2,regs->orig_er0,regs->er1,regs->er2,regs->er3,regs->er0);
 }
 #endif

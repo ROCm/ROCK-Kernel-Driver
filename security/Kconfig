@@ -44,5 +44,7 @@ config SECURITY_ROOTPLUG
 	  
 	  If you are unsure how to answer this question, answer N.
 
+source security/selinux/Kconfig
+
 endmenu
 

@@ -2007,7 +2007,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		strncpy(info.driver, "eepro100", sizeof(info.driver)-1);
 		strncpy(info.version, version, sizeof(info.version)-1);
 		if (sp && sp->pdev)
-			strcpy(info.bus_info, sp->pdev->slot_name);
+			strcpy(info.bus_info, pci_name(sp->pdev));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -2381,7 +2381,7 @@ static void __devexit eepro100_remove_one (struct pci_dev *pdev)
 	kfree(dev);
 }
 
-static struct pci_device_id eepro100_pci_tbl[] __devinitdata = {
+static struct pci_device_id eepro100_pci_tbl[] = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82557,
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82559ER,

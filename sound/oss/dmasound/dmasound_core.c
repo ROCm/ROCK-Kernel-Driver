@@ -351,8 +351,9 @@ static int mixer_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	    case SOUND_MIXER_INFO:
 		{
 		    mixer_info info;
-		    strncpy(info.id, dmasound.mach.name2, sizeof(info.id));
-		    strncpy(info.name, dmasound.mach.name2, sizeof(info.name));
+		    memset(&info, 0, sizeof(info));
+		    strlcpy(info.id, dmasound.mach.name2, sizeof(info.id));
+		    strlcpy(info.name, dmasound.mach.name2, sizeof(info.name));
 		    info.modify_counter = mixer.modify_counter;
 		    if (copy_to_user((int *)arg, &info, sizeof(info)))
 			    return -EFAULT;
@@ -1210,6 +1211,8 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			shared_resources_initialised = 0 ;
 		return result ;
 		break ;
+	case SOUND_PCM_READ_RATE:
+		return IOCTL_OUT(arg, dmasound.soft.speed);
 	case SNDCTL_DSP_SPEED:
 		/* changing this on the fly will have weird effects on the sound.
 		   Where there are rate conversions implemented in soft form - it

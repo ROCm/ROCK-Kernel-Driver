@@ -406,14 +406,6 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define	XFS_ITRUNC_DEFINITE	0x1
 #define	XFS_ITRUNC_MAYBE	0x2
 
-/*
- * max file offset is 2^(31+PAGE_SHIFT) - 1 (due to linux page cache)
- *
- * NOTE: XFS itself can handle 2^63 - 1 (largest positive value of xfs_fsize_t)
- * but this is the Linux limit.
- */
-#define XFS_MAX_FILE_OFFSET	MAX_LFS_FILESIZE
-
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOV)
 struct vnode *xfs_itov(xfs_inode_t *ip);
 #define	XFS_ITOV(ip)		xfs_itov(ip)

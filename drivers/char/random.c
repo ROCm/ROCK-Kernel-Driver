@@ -251,6 +251,8 @@
 #include <linux/fs.h>
 #include <linux/workqueue.h>
 #include <linux/genhd.h>
+#include <linux/interrupt.h>
+#include <linux/spinlock.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -2056,7 +2058,7 @@ static unsigned int ip_cnt;
 static struct keydata *__check_and_rekey(time_t time)
 {
 	struct keydata *keyptr;
-	spin_lock(&ip_lock);
+	spin_lock_bh(&ip_lock);
 	keyptr = &ip_keydata[ip_cnt&1];
 	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
 		keyptr = &ip_keydata[1^(ip_cnt&1)];
@@ -2066,7 +2068,7 @@ static struct keydata *__check_and_rekey(time_t time)
 		mb();
 		ip_cnt++;
 	}
-	spin_unlock(&ip_lock);
+	spin_unlock_bh(&ip_lock);
 	return keyptr;
 }
 

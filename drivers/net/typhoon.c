@@ -192,7 +192,7 @@ static struct typhoon_card_info typhoon_card_info[] __devinitdata = {
  * bit 8 indicates if this is a (0) copper or (1) fiber card
  * bits 12-16 indicate card type: (0) client and (1) server
  */
-static struct pci_device_id typhoon_pci_tbl[] __devinitdata = {
+static struct pci_device_id typhoon_pci_tbl[] = {
 	{ PCI_VENDOR_ID_3COM, PCI_DEVICE_ID_3COM_3CR990,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0,TYPHOON_TX },
 	{ PCI_VENDOR_ID_3COM, PCI_DEVICE_ID_3COM_3CR990_TX_95,
@@ -1049,7 +1049,7 @@ typhoon_ethtool_gdrvinfo(struct typhoon *tp, struct ethtool_drvinfo *info)
 
 	strcpy(info->driver, DRV_MODULE_NAME);
 	strcpy(info->version, DRV_MODULE_VERSION);
-	strcpy(info->bus_info, pci_dev->slot_name);
+	strcpy(info->bus_info, pci_name(pci_dev));
 }
 
 static inline void
@@ -2261,7 +2261,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev = alloc_etherdev(sizeof(*tp));
 	if(dev == NULL) {
 		printk(ERR_PFX "%s: unable to alloc new net device\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -ENOMEM;
 		goto error_out;
 	}
@@ -2271,7 +2271,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	err = pci_enable_device(pdev);
 	if(err < 0) {
 		printk(ERR_PFX "%s: unable to enable device\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		goto error_out_dev;
 	}
 
@@ -2284,7 +2284,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	err = pci_set_dma_mask(pdev, 0xffffffffULL);
 	if(err < 0) {
 		printk(ERR_PFX "%s: No usable DMA configuration\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		goto error_out_dev;
 	}
 
@@ -2293,13 +2293,13 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if(!(pci_resource_flags(pdev, 1) & IORESOURCE_MEM)) {
 		printk(ERR_PFX
 		       "%s: region #1 not a PCI MMIO resource, aborting\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -ENODEV;
 		goto error_out_dev;
 	}
 	if(pci_resource_len(pdev, 1) < 128) {
 		printk(ERR_PFX "%s: Invalid PCI MMIO region size, aborting\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -ENODEV;
 		goto error_out_dev;
 	}
@@ -2307,7 +2307,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	err = pci_request_regions(pdev, "typhoon");
 	if(err < 0) {
 		printk(ERR_PFX "%s: could not request regions\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		goto error_out_dev;
 	}
 
@@ -2320,7 +2320,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ioaddr = (unsigned long) ioremap(ioaddr, 128);
 	if(!ioaddr) {
 		printk(ERR_PFX "%s: cannot remap MMIO, aborting\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -EIO;
 		goto error_out_regions;
 	}
@@ -2332,7 +2332,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 				      &shared_dma);
 	if(!shared) {
 		printk(ERR_PFX "%s: could not allocate DMA memory\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -ENOMEM;
 		goto error_out_remap;
 	}
@@ -2358,7 +2358,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * 5) Put the card to sleep.
 	 */
 	if(typhoon_reset(ioaddr, WaitSleep) < 0) {
-		printk(ERR_PFX "%s: could not reset 3XP\n", pdev->slot_name);
+		printk(ERR_PFX "%s: could not reset 3XP\n", pci_name(pdev));
 		err = -EIO;
 		goto error_out_dma;
 	}
@@ -2367,14 +2367,14 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * use some common routines to initialize the card. So that those
 	 * routines print the right name, we keep our oun pointer to the name
 	 */
-	tp->name = pdev->slot_name;
+	tp->name = pci_name(pdev);
 
 	typhoon_init_interface(tp);
 	typhoon_init_rings(tp);
 
 	if(typhoon_boot_3XP(tp, TYPHOON_STATUS_WAITING_FOR_HOST) < 0) {
 		printk(ERR_PFX "%s: cannot boot 3XP sleep image\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -EIO;
 		goto error_out_reset;
 	}
@@ -2382,7 +2382,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	INIT_COMMAND_WITH_RESPONSE(&xp_cmd, TYPHOON_CMD_READ_MAC_ADDRESS);
 	if(typhoon_issue_command(tp, 1, &xp_cmd, 1, &xp_resp) < 0) {
 		printk(ERR_PFX "%s: cannot read MAC address\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -EIO;
 		goto error_out_reset;
 	}
@@ -2392,13 +2392,13 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if(!is_valid_ether_addr(dev->dev_addr)) {
 		printk(ERR_PFX "%s: Could not obtain valid ethernet address, "
-		       "aborting\n", pdev->slot_name);
+		       "aborting\n", pci_name(pdev));
 		goto error_out_reset;
 	}
 
 	if(typhoon_sleep(tp, 3, 0) < 0) {
 		printk(ERR_PFX "%s: cannot put adapter to sleep\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -EIO;
 		goto error_out_reset;
 	}

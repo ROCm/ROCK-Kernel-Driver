@@ -221,7 +221,7 @@ config DEBUG_SLAB
 config DEBUG_SPINLOCK
 	bool "Debug spinlocks usage"
 
-config DEBUGSYM
+config DEBUG_INFO
 	bool "Enable kernel debugging symbols"
 	help
         When this is enabled, the User-Mode Linux binary will include
@@ -234,15 +234,15 @@ config DEBUGSYM
 
 config FRAME_POINTER
 	bool
-	default y if DEBUGSYM
+	default y if DEBUG_INFO
 
 config PT_PROXY
 	bool "Enable ptrace proxy"
-	depends on XTERM_CHAN && DEBUGSYM
+	depends on XTERM_CHAN && DEBUG_INFO
 
 config GPROF
 	bool "Enable gprof support"
-	depends on DEBUGSYM
+	depends on DEBUG_INFO
 	help
         This allows profiling of a User-Mode Linux kernel with the gprof
         utility.
@@ -255,7 +255,7 @@ config GPROF
 
 config GCOV
 	bool "Enable gcov support"
-	depends on DEBUGSYM
+	depends on DEBUG_INFO
 	help
         This option allows developers to retrieve coverage data from a UML
         session.

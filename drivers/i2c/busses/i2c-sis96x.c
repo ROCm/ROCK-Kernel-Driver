@@ -99,13 +99,6 @@ static inline void sis96x_write(u8 reg, u8 data)
 	outb(data, sis96x_smbus_base + reg) ;
 }
 
-/* Internally used pause function */
-static void sis96x_do_pause(unsigned int amount)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(amount);
-}
-
 /* Execute a SMBus transaction.
    int size is from SIS96x_QUICK to SIS96x_BLOCK_DATA
  */
@@ -147,7 +140,7 @@ static int sis96x_transaction(int size)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		sis96x_do_pause(1);
+		i2c_delay(1);
 		temp = sis96x_read(SMB_STS);
 	} while (!(temp & 0x0e) && (timeout++ < MAX_TIMEOUT));
 
@@ -276,7 +269,7 @@ static struct i2c_adapter sis96x_adapter = {
 	},
 };
 
-static struct pci_device_id sis96x_ids[] __devinitdata = {
+static struct pci_device_id sis96x_ids[] = {
 
 	{
 		.vendor	=	PCI_VENDOR_ID_SI,

@@ -5,6 +5,8 @@
 
 #ifdef CONFIG_DISCONTIGMEM
 
+#include <asm/mpspec.h>
+
 /* Map the K8 CPU local memory controllers to a simple 1:1 CPU:NODE topology */
 
 extern int fake_node;
@@ -16,6 +18,11 @@ extern unsigned long cpu_online_map;
 #define node_to_first_cpu(node) 	(fake_node ? 0 : (node))
 #define node_to_cpu_mask(node)	(fake_node ? cpu_online_map : (1UL << (node)))
 #define node_to_memblk(node)		(node)
+
+static inline unsigned long pcibus_to_cpumask(int bus)
+{
+	return mp_bus_to_cpumask[bus] & cpu_online_map;
+}
 
 #define NODE_BALANCE_RATE 30	/* CHECKME */ 
 

@@ -19,6 +19,10 @@
    stack during a system call. */
 
 struct pt_regs {
+	long     retpc;
+	long     er4;
+	long     er5;
+	long     er6;
 	long     er3;
 	long     er2;
 	long     er1;
@@ -26,19 +30,11 @@ struct pt_regs {
 	unsigned short ccr;
 	long     er0;
 	long     vector;
+#if defined(CONFIG_CPU_H8S)
+	unsigned short exr;
+#endif
 	unsigned long  pc;
 } __attribute__((aligned(2),packed));
-
-/*
- * This is the extended stack used by signal handlers and the context
- * switcher: it's pushed after the normal "struct pt_regs".
- */
-struct switch_stack {
-	unsigned long  er6;
-	unsigned long  er5;
-	unsigned long  er4;
-	unsigned long  retpc;
-};
 
 #define PTRACE_GETREGS            12
 #define PTRACE_SETREGS            13

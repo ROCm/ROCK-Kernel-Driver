@@ -59,7 +59,7 @@ static inline struct thread_info *current_thread_info(void)
 		"mov.l	sp, %0 \n\t"
 		"and.l	%1, %0"
 		: "=&r"(ti)
-		: "r" (~(THREAD_SIZE-1))
+		: "g" (~(THREAD_SIZE-1))
 		);
 	return ti;
 }

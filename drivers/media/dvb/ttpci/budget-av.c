@@ -64,6 +64,19 @@ static u8 i2c_readreg (struct dvb_i2c_bus *i2c, u8 id, u8 reg)
 	return mm2[0];
 }
 
+static int i2c_readregs(struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 *buf, u8 len)
+{
+        u8 mm1[] = { reg };
+        struct i2c_msg msgs[2] = {
+		{ addr: id/2, flags: 0, buf: mm1, len: 1 },
+		{ addr: id/2, flags: I2C_M_RD, buf: buf, len: len }
+	};
+
+        if (i2c->xfer(i2c, msgs, 2) != 2)
+		return -EIO;
+	return 0;
+}
+
 
 static int i2c_writereg (struct dvb_i2c_bus *i2c, u8 id, u8 reg, u8 val)
 {
@@ -177,6 +190,7 @@ static int budget_av_attach (struct saa7146_dev* dev,
 {
 	struct budget_av *budget_av;
 	struct budget_info *bi = info->ext_priv;
+	u8 *mac;
 	int err;
 
 	DEB_EE(("dev: %p\n",dev));
@@ -243,6 +257,16 @@ static int budget_av_attach (struct saa7146_dev* dev,
 	/* fixme: find some sane values here... */
 	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 
+	mac = budget_av->budget.dvb_adapter->proposed_mac;
+	if (i2c_readregs(budget_av->budget.i2c_bus, 0xa0, 0x30, mac, 6)) {
+		printk("KNC1-%d: Could not read MAC from KNC1 card\n",
+				budget_av->budget.dvb_adapter->num);
+		memset(mac, 0, 6);
+	}
+	else
+		printk("KNC1-%d: MAC addr = %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+				budget_av->budget.dvb_adapter->num,
+				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 	return 0;
 }
 

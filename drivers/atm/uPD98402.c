@@ -27,6 +27,7 @@ struct uPD98402_priv {
 	struct k_sonet_stats sonet_stats;/* link diagnostics */
 	unsigned char framing;		/* SONET/SDH framing */
 	int loop_mode;			/* loopback mode */
+	spinlock_t lock;
 };
 
 
@@ -71,14 +72,13 @@ static int set_framing(struct atm_dev *dev,unsigned char framing)
 		default:
 			return -EINVAL;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&PRIV(dev)->lock, flags);
 	PUT(set[0],C11T);
 	PUT(set[1],C12T);
 	PUT(set[2],C13T);
 	PUT((GET(MDR) & ~uPD98402_MDR_SS_MASK) | (set[3] <<
 	    uPD98402_MDR_SS_SHIFT),MDR);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&PRIV(dev)->lock, flags);
 	return 0;
 }
 
@@ -88,12 +88,11 @@ static int get_sense(struct atm_dev *dev,u8 *arg)
 	unsigned long flags;
 	unsigned char s[3];
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&PRIV(dev)->lock, flags);
 	s[0] = GET(C11R);
 	s[1] = GET(C12R);
 	s[2] = GET(C13R);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&PRIV(dev)->lock, flags);
 	return (put_user(s[0], arg) || put_user(s[1], arg+1) ||
 	    put_user(s[2], arg+2) || put_user(0xff, arg+3) ||
 	    put_user(0xff, arg+4) || put_user(0xff, arg+5)) ? -EFAULT : 0;
@@ -214,6 +213,7 @@ static int uPD98402_start(struct atm_dev *dev)
 	DPRINTK("phy_start\n");
 	if (!(PRIV(dev) = kmalloc(sizeof(struct uPD98402_priv),GFP_KERNEL)))
 		return -ENOMEM;
+	spin_lock_init(&PRIV(dev)->lock);
 	memset(&PRIV(dev)->sonet_stats,0,sizeof(struct k_sonet_stats));
 	(void) GET(PCR); /* clear performance events */
 	PUT(uPD98402_PFM_FJ,PCMR); /* ignore frequency adj */

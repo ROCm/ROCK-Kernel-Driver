@@ -33,7 +33,7 @@
 
 #include <asm/addrspace.h>
 
-#define IT8172_BASE			0x18000000	
+#define IT8172_BASE			0x18000000
 #define IT8172_PCI_IO_BASE		0x14000000
 #define IT8172_PCI_MEM_BASE		0x10000000
 
@@ -99,18 +99,18 @@
 
 // PCI to Internal/LPC Bus Bridge configuration header register offset
 #define IT_P2I_BCR				0x4C
-#define IT_P2I_D0IOSC				0x50 
+#define IT_P2I_D0IOSC				0x50
 #define IT_P2I_D1IOSC				0x54
-#define IT_P2I_D2IOSC				0x58 
-#define IT_P2I_D3IOSC				0x5C 
-#define IT_P2I_D4IOSC				0x60 
-#define IT_P2I_D5IOSC				0x64 
-#define IT_P2I_D6IOSC				0x68 
-#define IT_P2I_D7IOSC				0x6C 
-#define IT_P2I_D8IOSC				0x70 
-#define IT_P2I_D9IOSC				0x74 
-#define IT_P2I_D10IOSC				0x78 
-#define IT_P2I_D11IOSC				0x7C 
+#define IT_P2I_D2IOSC				0x58
+#define IT_P2I_D3IOSC				0x5C
+#define IT_P2I_D4IOSC				0x60
+#define IT_P2I_D5IOSC				0x64
+#define IT_P2I_D6IOSC				0x68
+#define IT_P2I_D7IOSC				0x6C
+#define IT_P2I_D8IOSC				0x70
+#define IT_P2I_D9IOSC				0x74
+#define IT_P2I_D10IOSC				0x78
+#define IT_P2I_D11IOSC				0x7C
 
 // Memory controller register offsets from IT8172_BASE
 #define IT_MC_SDRMR					0x1000
@@ -134,10 +134,10 @@
 #define IT_M68K_BSR					0x5D
 #define IT_M68K_DTR					0x5F
 
-// Register offset from IT8172_PCI_IO_BASE 
+// Register offset from IT8172_PCI_IO_BASE
 // These registers are accessible through 8172 PCI IO window.
 
-// INTC 
+// INTC
 #define IT_INTC_BASE				0x10000
 #define IT_INTC_LBDNIRR				0x10000
 #define IT_INTC_LBDNIMR				0x10002
@@ -193,6 +193,8 @@
 
 // IT8172 RTC
 #define IT_RTC_BASE				0x14800
+#define IT_RTC_CENTURY				0x14808
+
 #define IT_RTC_RIR0				0x00
 #define IT_RTC_RTR0				0x01
 #define IT_RTC_RIR1				0x02

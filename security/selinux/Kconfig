@@ -1,0 +1,34 @@
+config SECURITY_SELINUX
+	bool "NSA SELinux Support"
+	depends on SECURITY
+	default n
+	help
+	  This enables NSA Security-Enhanced Linux (SELinux).
+	  You will also need a policy configuration and a labeled filesystem.
+	  You can obtain the policy compiler (checkpolicy), the utility for
+	  labeling filesystems (setfiles), and an example policy configuration
+	  from http://www.nsa.gov/selinux.
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_SELINUX_DEVELOP
+	bool "NSA SELinux Development Support"
+	depends on SECURITY_SELINUX
+	default y
+	help
+	  This enables the development support option of NSA SELinux,
+	  which is useful for experimenting with SELinux and developing
+	  policies.  If unsure, say Y.  With this option enabled, the
+	  kernel will start in permissive mode (log everything, deny nothing)
+	  unless you specify enforcing=1 on the kernel command line.  You
+	  can interactively toggle the kernel between enforcing mode and
+	  permissive mode (if permitted by the policy) via /selinux/enforce.
+
+config SECURITY_SELINUX_MLS
+	bool "NSA SELinux MLS policy (EXPERIMENTAL)"
+	depends on SECURITY_SELINUX && EXPERIMENTAL
+	default n
+	help
+	  This enables the NSA SELinux Multi-Level Security (MLS) policy in
+	  addition to the default RBAC/TE policy.  This policy is
+	  experimental and has not been configured for use.  Unless you
+	  specifically want to experiment with MLS, say N.

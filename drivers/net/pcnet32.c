@@ -55,7 +55,7 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers
  */
-static struct pci_device_id pcnet32_pci_tbl[] __devinitdata = {
+static struct pci_device_id pcnet32_pci_tbl[] = {
     { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE_HOME, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
     { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
     { 0, }
@@ -1588,7 +1588,7 @@ static int pcnet32_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
 		if (lp->pci_dev)
-			strcpy (info.bus_info, lp->pci_dev->slot_name);
+			strcpy (info.bus_info, pci_name(lp->pci_dev));
 		else
 			sprintf(info.bus_info, "VLB 0x%lx", dev->base_addr);
 		if (copy_to_user (useraddr, &info, sizeof (info)))

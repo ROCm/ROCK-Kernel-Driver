@@ -120,7 +120,7 @@ static const char *version =
 /*====================================================================*/
 
 socket_state_t dead_socket = {
-    0, SS_DETECT, 0, 0, 0
+	.csc_mask	= SS_DETECT,
 };
 
 
@@ -1958,6 +1958,9 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	    irq = req->IRQInfo1 & IRQ_MASK;
 	    ret = try_irq(req->Attributes, irq, 1);
 	}
+#else
+    } else {
+	ret = CS_UNSUPPORTED_MODE;
 #endif
     }
     if (ret != 0) return ret;

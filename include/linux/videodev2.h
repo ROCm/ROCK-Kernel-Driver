@@ -130,7 +130,7 @@ struct v4l2_capability
 {
 	__u8	driver[16];	/* i.e. "bttv" */
 	__u8	card[32];	/* i.e. "Hauppauge WinTV" */
-	__u8	bus_info[32];	/* "PCI:" + pci_dev->slot_name */
+	__u8	bus_info[32];	/* "PCI:" + pci_name(pci_dev) */
 	__u32   version;        /* should use KERNEL_VERSION() */
 	__u32	capabilities;	/* Device capabilities */
 	__u32	reserved[4];

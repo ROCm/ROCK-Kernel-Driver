@@ -106,7 +106,7 @@ void ext2_discard_prealloc (struct inode * inode)
 static int ext2_alloc_block (struct inode * inode, unsigned long goal, int *err)
 {
 #ifdef EXT2FS_DEBUG
-	static unsigned long alloc_hits = 0, alloc_attempts = 0;
+	static unsigned long alloc_hits, alloc_attempts;
 #endif
 	unsigned long result;
 
@@ -662,7 +662,7 @@ ext2_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
 	return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
-				offset, nr_segs, ext2_get_blocks);
+				offset, nr_segs, ext2_get_blocks, NULL);
 }
 
 static int

@@ -327,7 +327,7 @@ static void __devexit maxiradio_remove_one(struct pci_dev *pdev)
 	release_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
 }
 
-static struct pci_device_id maxiradio_pci_tbl[] __devinitdata = {
+static struct pci_device_id maxiradio_pci_tbl[] = {
 	{ PCI_VENDOR_ID_GUILLEMOT, PCI_DEVICE_ID_GUILLEMOT_MAXIRADIO,
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0,}

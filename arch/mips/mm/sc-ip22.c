@@ -59,7 +59,7 @@ static inline void indy_sc_wipe(unsigned long first, unsigned long last)
 static void indy_sc_wback_invalidate(unsigned long addr, unsigned long size)
 {
 	unsigned long first_line, last_line;
-	unsigned int flags;
+	unsigned long flags;
 
 #ifdef DEBUG_CACHE
 	printk("indy_sc_wback_invalidate[%08lx,%08lx]", addr, size);
@@ -152,7 +152,7 @@ static inline int __init indy_sc_probe(void)
 		return 0;
 
 	size <<= PAGE_SHIFT;
-	printk(KERN_INFO "R4600/R5000 SCACHE size %ldK, linesize 32 bytes.\n",
+	printk(KERN_INFO "R4600/R5000 SCACHE size %dK, linesize 32 bytes.\n",
 	       size >> 10);
 	scache_size = size;
 

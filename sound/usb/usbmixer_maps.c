@@ -89,6 +89,28 @@ static struct usbmix_name_map extigy_map[] = {
 	{ 0 } /* terminator */
 };
 
+/* Section "justlink_map" below added by James Courtier-Dutton <James@superbug.demon.co.uk>
+ * sourced from Maplin Electronics (http://www.maplin.co.uk), part number A56AK
+ * Part has 2 connectors that act as a single output. (TOSLINK Optical for digital out, and 3.5mm Jack for Analogue out.)
+ * The USB Mixer publishes a Microphone and extra Volume controls for it, but none exist on the device,
+ * so this map removes all unwanted sliders from alsamixer
+ */
+
+static struct usbmix_name_map justlink_map[] = {
+	/* 1: IT pcm playback */
+	/* 2: Not present */
+	{ 3, NULL}, /* IT mic (No mic input on device) */
+	/* 4: Not present */
+	/* 5: OT speacker */
+	/* 6: OT pcm capture */
+	{ 7, "Master Playback" }, /* Mute/volume for speaker */
+	{ 8, NULL }, /* Capture Switch (No capture inputs on device) */
+	{ 9, NULL }, /* Capture Mute/volume (No capture inputs on device */
+	/* 0xa: Not present */
+	/* 0xb: MU (w/o controls) */
+	{ 0xc, NULL }, /* Mic feedback Mute/volume (No capture inputs on device) */
+	{ 0 } /* terminator */
+};
 
 /*
  * Control map entries
@@ -96,6 +118,7 @@ static struct usbmix_name_map extigy_map[] = {
 
 static struct usbmix_ctl_map usbmix_ctl_maps[] = {
 	{ 0x41e, 0x3000, extigy_map },
+	{ 0xc45, 0x1158, justlink_map },
 	{ 0 } /* terminator */
 };
 

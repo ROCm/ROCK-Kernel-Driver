@@ -46,6 +46,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,11,12,15 */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
+static int thinkpad[SNDRV_CARDS];			/* Thinkpad special case */
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for AD1848 soundcard.");
@@ -65,6 +66,9 @@ MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(dma1, "DMA1 # for AD1848 driver.");
 MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
+MODULE_PARM(thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(thinkpad, "Enable only for the onboard CS4248 of IBM Thinkpad 360/750/755 series.");
+MODULE_PARM_SYNTAX(thinkpad,  SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static snd_card_t *snd_ad1848_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -77,15 +81,15 @@ static int __init snd_card_ad1848_probe(int dev)
 	int err;
 
 	if (port[dev] == SNDRV_AUTO_PORT) {
-		snd_printk("specify port\n");
+		snd_printk(KERN_ERR "ad1848: specify port\n");
 		return -EINVAL;
 	}
 	if (irq[dev] == SNDRV_AUTO_IRQ) {
-		snd_printk("specify irq\n");
+		snd_printk(KERN_ERR "ad1848: specify irq\n");
 		return -EINVAL;
 	}
 	if (dma1[dev] == SNDRV_AUTO_DMA) {
-		snd_printk("specify dma1\n");
+		snd_printk(KERN_ERR "ad1848: specify dma1\n");
 		return -EINVAL;
 	}
 
@@ -96,7 +100,7 @@ static int __init snd_card_ad1848_probe(int dev)
 	if ((err = snd_ad1848_create(card, port[dev],
 				     irq[dev],
 				     dma1[dev],
-				     AD1848_HW_DETECT,
+				     thinkpad[dev] ? AD1848_HW_THINKPAD : AD1848_HW_DETECT,
 				     &chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -115,6 +119,10 @@ static int __init snd_card_ad1848_probe(int dev)
 
 	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
 		pcm->name, chip->port, irq[dev], dma1[dev]);
+
+	if (thinkpad[dev]) {
+		strcat(card->longname, " [Thinkpad]");
+	}
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -168,7 +176,8 @@ static int __init alsa_card_ad1848_setup(char *str)
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&dma1[nr_dev]) == 2);
+	       get_option(&str,&dma1[nr_dev]) == 2 &&
+	       get_option(&str,&thinkpad[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

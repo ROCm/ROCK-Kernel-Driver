@@ -68,7 +68,7 @@ static void *ckey;
 static void *skey;
 
 /* Module parameters */
-static int eth = 0; /* Use "eth" or "irlan" name for devices */
+static int eth;   /* Use "eth" or "irlan" name for devices */
 static int access = ACCESS_PEER; /* PEER, DIRECT or HOSTED */
 
 #ifdef CONFIG_PROC_FS

@@ -47,8 +47,8 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 		return ret;
 	count = ret;
 
-	if (copy_to_user(userbuf, buffer + offs, count) != 0)
-		return -EINVAL;
+	if (copy_to_user(userbuf, buffer + offs, count))
+		return -EFAULT;
 
 	pr_debug("offs = %lld, *off = %lld, count = %zd\n", offs, *off, count);
 

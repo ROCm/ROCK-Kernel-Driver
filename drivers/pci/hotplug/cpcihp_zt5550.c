@@ -187,8 +187,7 @@ int zt5550_hc_disable_irq(void)
 	return 0;
 }
 
-static int __devinit zt5550_hc_init_one (struct pci_dev *pdev,
-					 const struct pci_device_id *ent)
+static int zt5550_hc_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	int status;
 
@@ -262,7 +261,7 @@ static void __devexit zt5550_hc_remove_one(struct pci_dev *pdev)
 }
 
 
-static struct pci_device_id zt5550_hc_pci_tbl[] __devinitdata = {
+static struct pci_device_id zt5550_hc_pci_tbl[] = {
 	{ PCI_VENDOR_ID_ZIATECH, PCI_DEVICE_ID_ZIATECH_5550_HC, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, }
 };

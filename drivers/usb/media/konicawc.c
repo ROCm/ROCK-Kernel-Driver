@@ -383,7 +383,7 @@ static int konicawc_start_data(struct uvd *uvd)
 	int pktsz;
 	struct usb_host_interface *interface;
 
-	interface = &dev->actconfig->interface[uvd->iface].altsetting[spd_to_iface[cam->speed]];
+	interface = &dev->actconfig->interface[uvd->iface]->altsetting[spd_to_iface[cam->speed]];
 	pktsz = interface->endpoint[1].desc.wMaxPacketSize;
 	DEBUG(1, "pktsz = %d", pktsz);
 	if (!CAMERA_IS_OPERATIONAL(uvd)) {

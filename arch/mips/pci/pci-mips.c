@@ -291,16 +291,20 @@ static int mips_pcibios_write(struct pci_bus *bus, unsigned int devfn,
 	else if ((size == 4) && (where & 3))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 
-	if (mips_pcibios_config_access(PCI_ACCESS_READ, bus, devfn, where,
-				       &data))
-		return -1;
+	if (size == 4)
+		data = val;
+	else {
+		if (mips_pcibios_config_access(PCI_ACCESS_READ, bus, devfn,
+		                               where, &data))
+			return -1;
 
-	if (size == 1)
-		data = (data & ~(0xff << ((where & 3) << 3))) |
-		    (val << ((where & 3) << 3));
-	else if (size == 2)
-		data = (data & ~(0xffff << ((where & 3) << 3))) |
-		    (val << ((where & 3) << 3));
+		if (size == 1)
+			data = (data & ~(0xff << ((where & 3) << 3))) |
+				(val << ((where & 3) << 3));
+		else if (size == 2)
+			data = (data & ~(0xffff << ((where & 3) << 3))) |
+				(val << ((where & 3) << 3));
+	}
 
 	if (mips_pcibios_config_access(PCI_ACCESS_WRITE, bus, devfn, where,
 				       &data))

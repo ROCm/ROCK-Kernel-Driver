@@ -6,8 +6,8 @@
  * Copyright (C) 1994, 95, 96, 97, 98, 99, 2000, 01, 02, 03 by Ralf Baechle
  * Copyright (C) 1999, 2000, 2001 Silicon Graphics, Inc.
  */
-#ifndef __ASM_CACHEFLUSH_H
-#define __ASM_CACHEFLUSH_H
+#ifndef _ASM_CACHEFLUSH_H
+#define _ASM_CACHEFLUSH_H
 
 #include <linux/config.h>
 
@@ -62,4 +62,4 @@ extern void (*flush_data_cache_page)(unsigned long addr);
 #define ClearPageDcacheDirty(page)	\
 	clear_bit(PG_dcache_dirty, &(page)->flags)
 
-#endif /* __ASM_CACHEFLUSH_H */
+#endif /* _ASM_CACHEFLUSH_H */

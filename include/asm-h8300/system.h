@@ -36,17 +36,20 @@
  * H8/300 Porting 2002/09/04 Yoshinori Sato
  */
 asmlinkage void resume(void);
-#define switch_to(prev,next,last) { \
-  void *_last;								        \
-  __asm__ __volatile__(								\
-  			"mov.l	%1, er0\n\t"					\
-			"mov.l	%2, er1\n\t"					\
-			"jsr @_resume"                                          \
-		       : "=r" (_last)						\
-		       : "r" (&(prev->thread)),				        \
-			 "r" (&(next->thread))				        \
-		       : "cc", "er0", "er1", "er2", "er3");	                \
-  (last) = _last; 								\
+#define switch_to(prev,next,last) {                         \
+  void *_last;						    \
+  __asm__ __volatile__(					    \
+  			"mov.l	%1, er0\n\t"		    \
+			"mov.l	%2, er1\n\t"		    \
+                        "mov.l  %3, er2\n\t"                \
+			"jsr @_resume\n\t"                  \
+                        "mov.l  er2,%0\n\t"                 \
+		       : "=r" (_last)			    \
+		       : "r" (&(prev->thread)),		    \
+			 "r" (&(next->thread)),		    \
+                         "g" (prev)                         \
+		       : "cc", "er0", "er1", "er2", "er3"); \
+  (last) = _last; 					    \
 }
 
 #if defined(__H8300H__)
@@ -54,17 +57,25 @@ asmlinkage void resume(void);
 #define __cli() asm volatile ("orc  #0x80,ccr")
 
 #define __save_flags(x) \
-       asm volatile ("sub.l er0,er0\n\tstc ccr,r0l\n\tmov.l er0,%0":"=r" (x) : : "er0")
+       asm volatile ("stc ccr,r0l\n\tmov.l er0,%0":"=r" (x) : : "er0")
 
 #define __restore_flags(x) \
        asm volatile ("mov.l %0,er0\n\tldc r0l,ccr": :"r" (x) : "er0")
+
+#define	irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	__save_flags(flags);	        \
+	((flags & 0x80) == 0x80);	\
+})
+
 #endif
 #if defined(__H8300S__)
 #define __sti() asm volatile ("andc #0xf8,exr")
 #define __cli() asm volatile ("orc  #0x07,exr")
 
 #define __save_flags(x) \
-       asm volatile ("sub.l er0,er0\n\tstc exr,r0l\n\tmov.l er0,%0":"=r" (x) : : "er0")
+       asm volatile ("stc exr,r0l\n\tmov.l er0,%0":"=r" (x) : : "er0")
 
 #define __restore_flags(x) \
        asm volatile ("mov.l %0,er0\n\tldc r0l,exr": :"r" (x) : "er0")
@@ -73,22 +84,22 @@ asmlinkage void resume(void);
 #define	irqs_disabled()			\
 ({					\
 	unsigned long flags;		\
-	__save_flags(flags);	\
-	((flags & 0x80) == 0x80);	\
+	__save_flags(flags);	        \
+	((flags & 0x07) == 0x07);	\
 })
 
 #define iret() __asm__ __volatile__ ("rte": : :"memory", "sp", "cc")
 
 /* For spinlocks etc */
-#define local_irq_disable()	asm volatile ("orc  #0x80,ccr")
-#define local_irq_enable()      asm volatile ("andc #0x7f,ccr")
+#define local_irq_disable()	__cli()
+#define local_irq_enable()      __sti()
 #define local_irq_save(x)	({ __save_flags(x); local_irq_disable(); })
 #define local_irq_restore(x)	__restore_flags(x)
 #define local_save_flags(x)     __save_flags(x)
 
 /*
  * Force strict CPU ordering.
- * Not really required on m68k...
+ * Not really required on H8...
  */
 #define nop()  asm volatile ("nop"::)
 #define mb()   asm volatile (""   : : :"memory")

@@ -74,6 +74,9 @@ typedef struct client_port_t {
 	void *private_data;
 	unsigned int callback_all : 1;
 	unsigned int closing : 1;
+	unsigned int timestamping: 1;
+	unsigned int time_real: 1;
+	int time_queue;
 	
 	/* capability, inport, output, sync */
 	unsigned int capability;	/* port capability bits */

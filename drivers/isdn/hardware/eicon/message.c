@@ -4487,7 +4487,7 @@ void control_rc(PLCI   * plci, byte req, byte rc, byte ch, byte global_req, byte
           if(rc==WRONG_IE)
           {
             Info = 0x2007; /* Illegal message parameter coding */
-            dbug(1,dprintf("MWI_REQ illegal parameter"));
+            dbug(1,dprintf("MWI_REQ invalid parameter"));
           }
           else
           {

@@ -35,6 +35,7 @@ struct address_space swapper_space = {
 	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),
 	.i_mmap_shared	= LIST_HEAD_INIT(swapper_space.i_mmap_shared),
 	.i_shared_sem	= __MUTEX_INITIALIZER(swapper_space.i_shared_sem),
+	.truncate_count  = ATOMIC_INIT(0),
 	.private_lock	= SPIN_LOCK_UNLOCKED,
 	.private_list	= LIST_HEAD_INIT(swapper_space.private_list),
 };

@@ -107,7 +107,7 @@
       #define IPS_SCSI_SET_DEVICE(sh,ha)   scsi_set_pci_device(sh, (ha)->pcidev)
       #define IPS_PRINTK(level, pcidev, format, arg...)                 \
             printk(level "%s %s:" format , (pcidev)->driver->name ,     \
-            (pcidev)->slot_name , ## arg)
+            pci_name(pcidev) , ## arg)
    #else
       #define IPS_REGISTER_HOSTS(SHT)      (!ips_detect(SHT))
       #define IPS_UNREGISTER_HOSTS(SHT)

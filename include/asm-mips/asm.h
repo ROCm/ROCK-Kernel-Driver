@@ -3,8 +3,9 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997 by Ralf Baechle
- * Copyright (C) 2002  Maciej W. Rozycki
+ * Copyright (C) 1995, 1996, 1997, 1999, 2001 by Ralf Baechle
+ * Copyright (C) 1999 by Silicon Graphics, Inc.
+ * Copyright (C) 2001 MIPS Technologies, Inc.
  *
  * Some useful macros for MIPS assembler code
  *
@@ -12,8 +13,8 @@
  * away by gas in -O mode. These nops are however required to fill delay
  * slots in noreorder mode.
  */
-#ifndef	__ASM_ASM_H
-#define	__ASM_ASM_H
+#ifndef	_ASM_ASM_H
+#define	_ASM_ASM_H
 
 #include <linux/config.h>
 #include <asm/sgidefs.h>
@@ -136,7 +137,7 @@ symbol		=	value
  * MIPS IV implementations are free to treat this as a nop.  The R5000
  * is one of them.  So we should have an option not to use this instruction.
  */
-#if CONFIG_CPU_HAS_PREFETCH
+#ifdef CONFIG_CPU_HAS_PREFETCH
 
 #define PREF(hint,addr)                                 \
 		.set	push;				\
@@ -301,6 +302,11 @@ symbol		=	value
 #define LONG_SRLV	srlv
 #define LONG_SRA	sra
 #define LONG_SRAV	srav
+
+#define LONG		.word
+#define LONGSIZE	4
+#define LONGMASK	3
+#define LONGLOG		2
 #endif
 
 #if (_MIPS_SZLONG == 64)
@@ -318,6 +324,11 @@ symbol		=	value
 #define LONG_SRLV	dsrlv
 #define LONG_SRA	dsra
 #define LONG_SRAV	dsrav
+
+#define LONG		.dword
+#define LONGSIZE	8
+#define LONGMASK	7
+#define LONGLOG		3
 #endif
 
 /*
@@ -387,4 +398,4 @@ symbol		=	value
 
 #define SSNOP		sll zero,zero,1
 
-#endif /* __ASM_ASM_H */
+#endif /* _ASM_ASM_H */

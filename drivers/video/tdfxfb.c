@@ -1,3 +1,4 @@
+
 /*
  *
  * tdfxfb.c
@@ -128,7 +129,7 @@ static struct fb_var_screeninfo tdfx_var __initdata = {
 static int tdfxfb_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 static void tdfxfb_remove(struct pci_dev *pdev);
 
-static struct pci_device_id tdfxfb_id_table[] __devinitdata = {
+static struct pci_device_id tdfxfb_id_table[] = {
 	{ PCI_VENDOR_ID_3DFX, PCI_DEVICE_ID_3DFX_BANSHEE,
 	  PCI_ANY_ID, PCI_ANY_ID, PCI_BASE_CLASS_DISPLAY << 16,
 	  0xff0000, 0 },
@@ -177,7 +178,7 @@ static struct fb_ops tdfxfb_ops = {
 	.fb_pan_display	= tdfxfb_pan_display,
 	.fb_fillrect	= tdfxfb_fillrect,
 	.fb_copyarea	= tdfxfb_copyarea,
-	.fb_imageblit	= cfb_imageblit,
+	.fb_imageblit	= tdfxfb_imageblit,
 	.fb_sync	= banshee_wait_idle,
 	.fb_cursor	= soft_cursor,
 };
@@ -316,7 +317,9 @@ static inline void tdfx_outl(struct tdfx_par *par, unsigned int reg, u32 val)
 
 static inline void banshee_make_room(struct tdfx_par *par, int size)
 {
-	while((tdfx_inl(par, STATUS) & 0x1f) < size);
+	/* Note: The Voodoo3's onboard FIFO has 32 slots. This loop
+	 * won't quit if you ask for more. */
+	while((tdfx_inl(par, STATUS) & 0x1f) < size-1);
 }
  
 static int banshee_wait_idle(struct fb_info *info)
@@ -746,6 +749,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 #if defined(__BIG_ENDIAN)
 	switch (info->var.bits_per_pixel) {
 		case 8:
+		case 24:
 			reg.miscinit0 &= ~(1 << 30);
 			reg.miscinit0 &= ~(1 << 31);
 			break;
@@ -753,7 +757,6 @@ static int tdfxfb_set_par(struct fb_info *info)
 			reg.miscinit0 |= (1 << 30);
 			reg.miscinit0 |= (1 << 31);
 			break;
-		case 24:
 		case 32:
 			reg.miscinit0 |= (1 << 30);
 			reg.miscinit0 &= ~(1 << 31);
@@ -770,6 +773,9 @@ static int tdfxfb_set_par(struct fb_info *info)
 	DPRINTK("Graphics mode is now set at %dx%d depth %d\n", info->var.xres, info->var.yres, info->var.bits_per_pixel);
 	return 0;	
 }
+
+/* A handy macro shamelessly pinched from matroxfb */
+#define CNVT_TOHW(val,width) ((((val)<<(width))+0x7FFF-(val))>>16)
 
 static int tdfxfb_setcolreg(unsigned regno, unsigned red, unsigned green,  
 			    unsigned blue,unsigned transp,struct fb_info *info) 
@@ -788,13 +794,10 @@ static int tdfxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			break;
 		/* Truecolor has no hardware color palettes. */
 		case FB_VISUAL_TRUECOLOR:
-			rgbcol = (red << info->var.red.offset) |
-				 (green << info->var.green.offset) |
-				 (blue << info->var.blue.offset) |
-				 (transp << info->var.transp.offset);
-			if (info->var.bits_per_pixel <= 16)
-				((u16*)(info->pseudo_palette))[regno] = rgbcol;
-			else
+			rgbcol = (CNVT_TOHW( red, info->var.red.length) << info->var.red.offset) |
+				 (CNVT_TOHW( green, info->var.green.length) << info->var.green.offset) |
+				 (CNVT_TOHW( blue, info->var.blue.length) << info->var.blue.offset) |
+				 (CNVT_TOHW( transp, info->var.transp.length) << info->var.transp.offset);
 				((u32*)(info->pseudo_palette))[regno] = rgbcol;
 			break;
 		default:
@@ -934,6 +937,7 @@ static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	int size = image->height * ((image->width * image->depth + 7)>>3);
+	int fifo_free;
 	int i, stride = info->fix.line_length;
 	u32 bpp = info->var.bits_per_pixel;
 	u32 dstfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13); 
@@ -946,10 +950,22 @@ static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image)
 		cfb_imageblit(info, image);
 		return;
 	} else {
-		banshee_make_room(par, 8 + ((size + 3) >> 2));
+		banshee_make_room(par, 8);
+		switch (info->fix.visual) {
+			case FB_VISUAL_PSEUDOCOLOR:
 		tdfx_outl(par, COLORFORE, image->fg_color);
 		tdfx_outl(par, COLORBACK, image->bg_color);
+				break;
+			case FB_VISUAL_TRUECOLOR:
+			default:
+				tdfx_outl(par, COLORFORE, ((u32*)(info->pseudo_palette))[image->fg_color]);
+				tdfx_outl(par, COLORBACK, ((u32*)(info->pseudo_palette))[image->bg_color]);
+		}
+#ifdef __BIG_ENDIAN
+		srcfmt = 0x400000 | BIT(20);
+#else
 		srcfmt = 0x400000;
+#endif
 	}	
 
 	tdfx_outl(par,	SRCXY,     0);
@@ -959,13 +975,22 @@ static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image)
 	tdfx_outl(par,	DSTFORMAT, dstfmt);
 	tdfx_outl(par,	DSTSIZE,   image->width | (image->height << 16));
 
+	/* A count of how many free FIFO entries we've requested.
+	 * When this goes negative, we need to request more. */
+	fifo_free = 0;
+
 	/* Send four bytes at a time of data */	
 	for (i = (size >> 2) ; i > 0; i--) { 
+		if(--fifo_free < 0) {
+			fifo_free=31;
+			banshee_make_room(par,fifo_free);
+		}
 		tdfx_outl(par,	LAUNCH_2D,*(u32*)chardata);
 		chardata += 4; 
 	}	
 
 	/* Send the leftovers now */	
+	banshee_make_room(par,3);
 	i = size%4;	
 	switch (i) {
 		case 0: break;

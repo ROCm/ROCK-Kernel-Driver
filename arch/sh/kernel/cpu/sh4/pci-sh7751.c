@@ -226,7 +226,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 	 */
 	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
 		return;
-	PCIDBG(3,"PCI: IDE base address fixup for %s\n", d->slot_name);
+	PCIDBG(3,"PCI: IDE base address fixup for %s\n", pci_name(d));
 	for(i=0; i<4; i++) {
 		struct resource *r = &d->resource[i];
 		if ((r->start & ~0x80) == 0x374) {
@@ -370,7 +370,7 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 					continue;
 				pr = pci_find_parent_resource(dev, r);
 				if (!pr || request_resource(pr, r) < 0)
-					printk(KERN_ERR "PCI: Cannot allocate resource region %d of bridge %s\n", idx, dev->slot_name);
+					printk(KERN_ERR "PCI: Cannot allocate resource region %d of bridge %s\n", idx, pci_name(dev));
 			}
 		}
 		pcibios_allocate_bus_resources(&bus->children);
@@ -402,7 +402,7 @@ static void __init pcibios_allocate_resources(int pass)
 				    r->start, r->end, r->flags, disabled, pass);
 				pr = pci_find_parent_resource(dev, r);
 				if (!pr || request_resource(pr, r) < 0) {
-					printk(KERN_ERR "PCI: Cannot allocate resource region %d of device %s\n", idx, dev->slot_name);
+					printk(KERN_ERR "PCI: Cannot allocate resource region %d of device %s\n", idx, pci_name(dev));
 					/* We'll assign a new address later */
 					r->end -= r->start;
 					r->start = 0;
@@ -414,7 +414,7 @@ static void __init pcibios_allocate_resources(int pass)
 			if (r->flags & PCI_ROM_ADDRESS_ENABLE) {
 				/* Turn the ROM off, leave the resource region, but keep it unregistered. */
 				u32 reg;
-				PCIDBG(3,"PCI: Switching off ROM of %s\n", dev->slot_name);
+				PCIDBG(3,"PCI: Switching off ROM of %s\n", pci_name(dev));
 				r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
 				pci_read_config_dword(dev, dev->rom_base_reg, &reg);
 				pci_write_config_dword(dev, dev->rom_base_reg, reg & ~PCI_ROM_ADDRESS_ENABLE);
@@ -497,7 +497,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		return irq;
 	}
 	
-	PCIDBG(2,"Setting IRQ for slot %s to %d\n", dev->slot_name, irq);
+	PCIDBG(2,"Setting IRQ for slot %s to %d\n", pci_name(dev), irq);
 
 	return irq;
 }

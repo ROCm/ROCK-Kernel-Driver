@@ -428,6 +428,7 @@ linvfs_follow_link(
 	return error;
 }
 
+#ifdef CONFIG_XFS_POSIX_ACL
 STATIC int
 linvfs_permission(
 	struct inode	*inode,
@@ -441,6 +442,9 @@ linvfs_permission(
 	VOP_ACCESS(vp, mode, NULL, error);
 	return -error;
 }
+#else
+#define linvfs_permission NULL
+#endif
 
 STATIC int
 linvfs_getattr(
@@ -642,7 +646,7 @@ linvfs_setxattr(
 }
 
 STATIC ssize_t
-__linvfs_getxattr(
+linvfs_getxattr(
 	struct dentry	*dentry,
 	const char	*name,
 	void		*data,
@@ -698,23 +702,7 @@ __linvfs_getxattr(
 }
 
 STATIC ssize_t
-linvfs_getxattr(
-	struct dentry	*dentry,
-	const char	*name,
-	void		*data,
-	size_t		size)
-{
-	int error;
-
-	down(&dentry->d_inode->i_sem);
-	error = __linvfs_getxattr(dentry, name, data, size);
-	up(&dentry->d_inode->i_sem);
-
-	return error;
-}
-
-STATIC ssize_t
-__linvfs_listxattr(
+linvfs_listxattr(
 	struct dentry		*dentry,
 	char			*data,
 	size_t			size)
@@ -754,21 +742,6 @@ __linvfs_listxattr(
 		}
 	}
 	return result;
-}
-
-STATIC ssize_t
-linvfs_listxattr(
-	struct dentry		*dentry,
-	char			*data,
-	size_t			size)
-{
-	int error;
-
-	down(&dentry->d_inode->i_sem);
-	error = __linvfs_listxattr(dentry, data, size);
-	up(&dentry->d_inode->i_sem);
-
-	return error;
 }
 
 STATIC int

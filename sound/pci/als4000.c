@@ -107,7 +107,7 @@ typedef struct {
 	unsigned long gcr;
 } snd_card_als4000_t;
 
-static struct pci_device_id snd_als4000_ids[] __devinitdata = {
+static struct pci_device_id snd_als4000_ids[] = {
 	{ 0x4005, 0x4000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* ALS4000 */
 	{ 0, }
 };

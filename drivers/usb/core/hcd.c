@@ -734,14 +734,20 @@ EXPORT_SYMBOL (usb_deregister_bus);
  * The USB host controller calls this function to register the root hub
  * properly with the USB subsystem.  It sets up the device properly in
  * the driverfs tree, and then calls usb_new_device() to register the
- * usb device.
+ * usb device.  It also assigns the root hub's USB address (always 1).
  */
 int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev)
 {
+	const int devnum = 1;
 	int retval;
 
 	sprintf (&usb_dev->dev.bus_id[0], "usb%d", usb_dev->bus->busnum);
 	usb_dev->state = USB_STATE_DEFAULT;
+
+	usb_dev->devnum = devnum;
+	usb_dev->bus->devnum_next = devnum + 1;
+	set_bit (devnum, usb_dev->bus->devmap.devicemap);
+
 	retval = usb_new_device (usb_dev, parent_dev);
 	if (retval)
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
@@ -1273,7 +1279,6 @@ bye:
  */
 static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 {
-	unsigned long	flags;
 	struct hcd_dev	*dev;
 	struct usb_hcd	*hcd;
 	struct urb	*urb;
@@ -1281,6 +1286,8 @@ static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 
 	dev = udev->hcpriv;
 	hcd = udev->bus->hcpriv;
+
+	local_irq_disable ();
 
 rescan:
 	/* (re)block new requests, as best we can */
@@ -1293,7 +1300,6 @@ rescan:
 	}
 
 	/* then kill any current requests */
-	local_irq_save (flags);
 	spin_lock (&hcd_data_lock);
 	list_for_each_entry (urb, &dev->urb_list, urb_list) {
 		int	tmp = urb->pipe;
@@ -1342,7 +1348,7 @@ rescan:
 		goto rescan;
 	}
 	spin_unlock (&hcd_data_lock);
-	local_irq_restore (flags);
+	local_irq_enable ();
 
 	/* synchronize with the hardware, so old configuration state
 	 * clears out immediately (and will be freed).

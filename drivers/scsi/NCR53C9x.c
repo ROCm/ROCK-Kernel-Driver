@@ -911,7 +911,7 @@ static void esp_get_dmabufs(struct NCR_ESP *esp, Scsi_Cmnd *sp)
 		if (esp->dma_mmu_get_scsi_one)
 			esp->dma_mmu_get_scsi_one(esp, sp);
 		else
-			sp->SCp.have_data_in = (int) sp->SCp.ptr =
+			sp->SCp.ptr =
 				(char *) virt_to_phys(sp->request_buffer);
 	} else {
 		sp->SCp.buffer = (struct scatterlist *) sp->buffer;
@@ -3470,7 +3470,7 @@ void esp_handle(struct NCR_ESP *esp)
 		 * for reselection.  See esp100_reconnect_hwbug()
 		 * to see how we try very hard to avoid this.
 		 */
-		ESPLOG(("esp%d: illegal command\n", esp->esp_id));
+		ESPLOG(("esp%d: invalid command\n", esp->esp_id));
 
 		esp_dump_state(esp, eregs);
 

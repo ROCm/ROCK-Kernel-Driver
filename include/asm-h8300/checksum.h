@@ -49,15 +49,15 @@ unsigned short ip_fast_csum(unsigned char *iph, unsigned int ihl);
 static inline unsigned int csum_fold(unsigned int sum)
 {
 	__asm__("mov.l %0,er0\n\t"
-	        "sub.w r1,r1\n\t"
 		"add.w e0,r0\n\t"
-		"addx #0,r1l\n\t"
-		"add.w r1,r0\n\t"
+		"xor.w e0,e0\n\t"
+		"rotxl.w e0\n\t"
+		"add.w e0,r0\n\t"
 		"sub.w e0,e0\n\t"
 		"mov.l er0,%0"
 		: "=r"(sum)
 		: "0"(sum)
-		: "er0","er1");
+		: "er0");
 	return ~sum;
 }
 

@@ -339,7 +339,7 @@ static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-static struct pci_device_id hpt34x_pci_tbl[] __devinitdata = {
+static struct pci_device_id hpt34x_pci_tbl[] = {
 	{ PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT343, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };

@@ -68,7 +68,7 @@ void mips_timer_interrupt(struct pt_regs *regs)
 	irq_enter();
 
 	do {
-		kstat_cpu(cpu).irqs[irq]++;
+		kstat_this_cpu.irqs[irq]++;
 		do_timer(regs);
 
 		if ((timer_tick_count++ % HZ) == 0) {
@@ -84,8 +84,6 @@ void mips_timer_interrupt(struct pt_regs *regs)
 	         - r4k_cur) < 0x7fffffff);
 
 	irq_exit();
-	if (softirq_pending(cpu))
-		do_softirq();
 }
 
 /*

@@ -1243,6 +1243,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		dst_hold(&rt->u.dst);
 		np->cork.rt = rt;
 		np->cork.fl = fl;
+		np->cork.hop_limit = hlimit;
 		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.length = 0;
 		inet->sndmsg_page = NULL;
@@ -1465,7 +1466,7 @@ int ip6_push_pending_frames(struct sock *sk)
 		hdr->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	else
 		hdr->payload_len = 0;
-	hdr->hop_limit = np->hop_limit;
+	hdr->hop_limit = np->cork.hop_limit;
 	hdr->nexthdr = proto;
 	ipv6_addr_copy(&hdr->saddr, &fl->fl6_src);
 	ipv6_addr_copy(&hdr->daddr, final_dst);

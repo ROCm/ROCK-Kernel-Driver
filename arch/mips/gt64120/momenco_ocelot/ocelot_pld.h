@@ -1,14 +1,10 @@
 /*
- * $Id$
- *
  * Ocelot Board Register Definitions
  *
  * (C) 2001 Red Hat, Inc.
  *
  * GPL'd
- *
  */
-
 #ifndef __MOMENCO_OCELOT_PLD_H__
 #define __MOMENCO_OCELOT_PLD_H__
 

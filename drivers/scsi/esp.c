@@ -4256,7 +4256,7 @@ static void esp_handle(struct esp *esp)
 		 * for reselection.  See esp100_reconnect_hwbug()
 		 * to see how we try very hard to avoid this.
 		 */
-		ESPLOG(("esp%d: illegal command\n", esp->esp_id));
+		ESPLOG(("esp%d: invalid command\n", esp->esp_id));
 
 		esp_dump_state(esp);
 

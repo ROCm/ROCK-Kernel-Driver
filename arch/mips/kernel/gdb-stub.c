@@ -11,6 +11,9 @@
  *  Send complaints, suggestions etc. to <andy@waldorf-gmbh.de>
  *
  *  Copyright (C) 1995 Andreas Busse
+ *
+ *  Copyright (C) 2003 MontaVista Software Inc.
+ *  Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
  */
 
 /*
@@ -125,6 +128,8 @@
 #include <linux/mm.h>
 #include <linux/console.h>
 #include <linux/init.h>
+#include <linux/smp.h>
+#include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/reboot.h>
 
@@ -148,6 +153,8 @@ extern void trap_low(void);
  */
 extern void breakpoint(void);
 extern void breakinst(void);
+extern void async_breakpoint(void);
+extern void async_breakinst(void);
 extern void adel(void);
 
 /*
@@ -159,8 +166,15 @@ static void putpacket(char *buffer);
 static int computeSignal(int tt);
 static int hex(unsigned char ch);
 static int hexToInt(char **ptr, int *intValue);
+static int hexToLong(char **ptr, long *longValue);
 static unsigned char *mem2hex(char *mem, char *buf, int count, int may_fault);
 void handle_exception(struct gdb_regs *regs);
+
+/*
+ * spin locks for smp case
+ */
+static spinlock_t kgdb_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t kgdb_cpulock[NR_CPUS] = { [0 ... NR_CPUS-1] = SPIN_LOCK_UNLOCKED};
 
 /*
  * BUFMAX defines the maximum number of characters in inbound/outbound buffers
@@ -171,6 +185,7 @@ void handle_exception(struct gdb_regs *regs);
 static char input_buffer[BUFMAX];
 static char output_buffer[BUFMAX];
 static int initialized;	/* !0 means we've been initialized */
+static int kgdb_started;
 static const char hexchars[]="0123456789abcdef";
 
 /* Used to prevent crashes in memory access.  Note that they'll crash anyway if
@@ -394,6 +409,17 @@ void set_debug_traps(void)
 	local_irq_restore(flags);
 }
 
+void restore_debug_traps(void)
+{
+	struct hard_trap_info *ht;
+	unsigned long flags;
+
+	save_and_cli(flags);
+	for (ht = hard_trap_info; ht->tt && ht->signo; ht++)
+		set_except_vector(ht->tt, saved_vectors[ht->tt]);
+	restore_flags(flags);
+}
+
 /*
  * Convert the MIPS hardware trap type code to a Unix signal number.
  */
@@ -431,6 +457,27 @@ static int hexToInt(char **ptr, int *intValue)
 	}
 
 	return (numChars);
+}
+
+static int hexToLong(char **ptr, long *longValue)
+{
+	int numChars = 0;
+	int hexValue;
+
+	*longValue = 0;
+
+	while (**ptr) {
+		hexValue = hex(**ptr);
+		if (hexValue < 0)
+			break;
+
+		*longValue = (*longValue << 4) | hexValue;
+		numChars ++;
+
+		(*ptr)++;
+	}
+
+	return numChars;
 }
 
 
@@ -473,8 +520,8 @@ void show_gdbregs(struct gdb_regs * regs)
  * This is where we save the original instructions.
  */
 static struct gdb_bp_save {
-	unsigned int addr;
-        unsigned int val;
+	unsigned long addr;
+	unsigned int val;
 } step_bp[2];
 
 #define BP 0x0000000d  /* break opcode */
@@ -485,7 +532,7 @@ static struct gdb_bp_save {
 static void single_step(struct gdb_regs *regs)
 {
 	union mips_instruction insn;
-	unsigned int targ;
+	unsigned long targ;
 	int is_branch, is_cond, i;
 
 	targ = regs->cp0_epc;
@@ -572,12 +619,39 @@ static void single_step(struct gdb_regs *regs)
  */
 static struct gdb_bp_save async_bp;
 
-void set_async_breakpoint(unsigned int epc)
+/*
+ * Swap the interrupted EPC with our asynchronous breakpoint routine.
+ * This is safer than stuffing the breakpoint in-place, since no cache
+ * flushes (or resulting smp_call_functions) are required.  The
+ * assumption is that only one CPU will be handling asynchronous bp's,
+ * and only one can be active at a time.
+ */
+extern spinlock_t smp_call_lock;
+void set_async_breakpoint(unsigned long *epc)
 {
-	async_bp.addr = epc;
-	async_bp.val  = *(unsigned *)epc;
-	*(unsigned *)epc = BP;
-	__flush_cache_all();
+	/* skip breaking into userland */
+	if ((*epc & 0x80000000) == 0)
+		return;
+
+	/* avoid deadlock if someone is make IPC */
+	if (spin_is_locked(&smp_call_lock))
+		return;
+
+	async_bp.addr = *epc;
+	*epc = (unsigned long)async_breakpoint;
+}
+
+void kgdb_wait(void *arg)
+{
+	unsigned flags;
+	int cpu = smp_processor_id();
+
+	local_irq_save(flags);
+
+	spin_lock(&kgdb_cpulock[cpu]);
+	spin_unlock(&kgdb_cpulock[cpu]);
+
+	local_irq_restore(flags);
 }
 
 
@@ -590,10 +664,45 @@ void handle_exception (struct gdb_regs *regs)
 {
 	int trap;			/* Trap type */
 	int sigval;
-	int addr;
+	long addr;
 	int length;
 	char *ptr;
 	unsigned long *stack;
+	int i;
+
+	kgdb_started = 1;
+
+	/*
+	 * acquire the big kgdb spinlock
+	 */
+	if (!spin_trylock(&kgdb_lock)) {
+		/* 
+		 * some other CPU has the lock, we should go back to 
+		 * receive the gdb_wait IPC
+		 */
+		return;
+	}
+
+	/*
+	 * If we're in async_breakpoint(), restore the real EPC from
+	 * the breakpoint.
+	 */
+	if (regs->cp0_epc == (unsigned long)async_breakinst) {
+		regs->cp0_epc = async_bp.addr;
+		async_bp.addr = 0;
+	}
+
+	/* 
+	 * acquire the CPU spinlocks
+	 */
+	for (i=0; i< smp_num_cpus; i++) 
+		if (spin_trylock(&kgdb_cpulock[i]) == 0)
+			panic("kgdb: couldn't get cpulock %d\n", i);
+
+	/*
+	 * force other cpus to enter kgdb
+	 */
+	smp_call_function(kgdb_wait, NULL, 0, 0);
 
 	/*
 	 * If we're in breakpoint() increment the PC
@@ -614,16 +723,6 @@ void handle_exception (struct gdb_regs *regs)
 			*(unsigned *)step_bp[1].addr = step_bp[1].val;
 			step_bp[1].addr = 0;
 		}
-	}
-
-	/*
-	 * If we were interrupted asynchronously by gdb, then a
-	 * breakpoint was set at the EPC of the interrupt so
-	 * that we'd wind up here with an interesting stack frame.
-	 */
-	if (async_bp.addr) {
-		*(unsigned *)async_bp.addr = async_bp.val;
-		async_bp.addr = 0;
 	}
 
 	stack = (long *)regs->reg29;			/* stack ptr */
@@ -647,7 +746,7 @@ void handle_exception (struct gdb_regs *regs)
 	*ptr++ = hexchars[REG_EPC >> 4];
 	*ptr++ = hexchars[REG_EPC & 0xf];
 	*ptr++ = ':';
-	ptr = mem2hex((char *)&regs->cp0_epc, ptr, 4, 0);
+	ptr = mem2hex((char *)&regs->cp0_epc, ptr, sizeof(long), 0);
 	*ptr++ = ';';
 
 	/*
@@ -656,7 +755,7 @@ void handle_exception (struct gdb_regs *regs)
 	*ptr++ = hexchars[REG_FP >> 4];
 	*ptr++ = hexchars[REG_FP & 0xf];
 	*ptr++ = ':';
-	ptr = mem2hex((char *)&regs->reg30, ptr, 4, 0);
+	ptr = mem2hex((char *)&regs->reg30, ptr, sizeof(long), 0);
 	*ptr++ = ';';
 
 	/*
@@ -665,7 +764,7 @@ void handle_exception (struct gdb_regs *regs)
 	*ptr++ = hexchars[REG_SP >> 4];
 	*ptr++ = hexchars[REG_SP & 0xf];
 	*ptr++ = ':';
-	ptr = mem2hex((char *)&regs->reg29, ptr, 4, 0);
+	ptr = mem2hex((char *)&regs->reg29, ptr, sizeof(long), 0);
 	*ptr++ = ';';
 
 	*ptr++ = 0;
@@ -687,10 +786,13 @@ void handle_exception (struct gdb_regs *regs)
 			output_buffer[3] = 0;
 			break;
 
+		/*
+		 * Detach debugger; let CPU run
+		 */
 		case 'D':
-			/* detach; let CPU run */
 			putpacket(output_buffer);
-			return;
+			goto finish_kgdb;
+			break;
 
 		case 'd':
 			/* toggle debug flag */
@@ -701,12 +803,12 @@ void handle_exception (struct gdb_regs *regs)
 		 */
 		case 'g':
 			ptr = output_buffer;
-			ptr = mem2hex((char *)&regs->reg0, ptr, 32*4, 0); /* r0...r31 */
-			ptr = mem2hex((char *)&regs->cp0_status, ptr, 6*4, 0); /* cp0 */
-			ptr = mem2hex((char *)&regs->fpr0, ptr, 32*4, 0); /* f0...31 */
-			ptr = mem2hex((char *)&regs->cp1_fsr, ptr, 2*4, 0); /* cp1 */
-			ptr = mem2hex((char *)&regs->frame_ptr, ptr, 2*4, 0); /* frp */
-			ptr = mem2hex((char *)&regs->cp0_index, ptr, 16*4, 0); /* cp0 */
+			ptr = mem2hex((char *)&regs->reg0, ptr, 32*sizeof(long), 0); /* r0...r31 */
+			ptr = mem2hex((char *)&regs->cp0_status, ptr, 6*sizeof(long), 0); /* cp0 */
+			ptr = mem2hex((char *)&regs->fpr0, ptr, 32*sizeof(long), 0); /* f0...31 */
+			ptr = mem2hex((char *)&regs->cp1_fsr, ptr, 2*sizeof(long), 0); /* cp1 */
+			ptr = mem2hex((char *)&regs->frame_ptr, ptr, 2*sizeof(long), 0); /* frp */
+			ptr = mem2hex((char *)&regs->cp0_index, ptr, 16*sizeof(long), 0); /* cp0 */
 			break;
 
 		/*
@@ -715,17 +817,17 @@ void handle_exception (struct gdb_regs *regs)
 		case 'G':
 		{
 			ptr = &input_buffer[1];
-			hex2mem(ptr, (char *)&regs->reg0, 32*4, 0);
-			ptr += 32*8;
-			hex2mem(ptr, (char *)&regs->cp0_status, 6*4, 0);
-			ptr += 6*8;
-			hex2mem(ptr, (char *)&regs->fpr0, 32*4, 0);
-			ptr += 32*8;
-			hex2mem(ptr, (char *)&regs->cp1_fsr, 2*4, 0);
-			ptr += 2*8;
-			hex2mem(ptr, (char *)&regs->frame_ptr, 2*4, 0);
-			ptr += 2*8;
-			hex2mem(ptr, (char *)&regs->cp0_index, 16*4, 0);
+			hex2mem(ptr, (char *)&regs->reg0, 32*sizeof(long), 0);
+			ptr += 32*(2*sizeof(long));
+			hex2mem(ptr, (char *)&regs->cp0_status, 6*sizeof(long), 0);
+			ptr += 6*(2*sizeof(long));
+			hex2mem(ptr, (char *)&regs->fpr0, 32*sizeof(long), 0);
+			ptr += 32*(2*sizeof(long));
+			hex2mem(ptr, (char *)&regs->cp1_fsr, 2*sizeof(long), 0);
+			ptr += 2*(2*sizeof(long));
+			hex2mem(ptr, (char *)&regs->frame_ptr, 2*sizeof(long), 0);
+			ptr += 2*(2*sizeof(long));
+			hex2mem(ptr, (char *)&regs->cp0_index, 16*sizeof(long), 0);
 			strcpy(output_buffer,"OK");
 		 }
 		break;
@@ -736,7 +838,7 @@ void handle_exception (struct gdb_regs *regs)
 		case 'm':
 			ptr = &input_buffer[1];
 
-			if (hexToInt(&ptr, &addr)
+			if (hexToLong(&ptr, &addr)
 				&& *ptr++ == ','
 				&& hexToInt(&ptr, &length)) {
 				if (mem2hex((char *)addr, output_buffer, length, 1))
@@ -752,7 +854,7 @@ void handle_exception (struct gdb_regs *regs)
 		case 'M':
 			ptr = &input_buffer[1];
 
-			if (hexToInt(&ptr, &addr)
+			if (hexToLong(&ptr, &addr)
 				&& *ptr++ == ','
 				&& hexToInt(&ptr, &length)
 				&& *ptr++ == ':') {
@@ -772,23 +874,11 @@ void handle_exception (struct gdb_regs *regs)
 			/* try to read optional parameter, pc unchanged if no parm */
 
 			ptr = &input_buffer[1];
-			if (hexToInt(&ptr, &addr))
+			if (hexToLong(&ptr, &addr))
 				regs->cp0_epc = addr;
-
-			/*
-			 * Need to flush the instruction cache here, as we may
-			 * have deposited a breakpoint, and the icache probably
-			 * has no way of knowing that a data ref to some location
-			 * may have changed something that is in the instruction
-			 * cache.
-			 * NB: We flush both caches, just to be sure...
-			 */
-
-			__flush_cache_all();
-			return;
-			/* NOTREACHED */
+	  
+			goto exit_kgdb_exception;
 			break;
-
 
 		/*
 		 * kill the program; let us try to restart the machine
@@ -808,9 +898,9 @@ void handle_exception (struct gdb_regs *regs)
 			 * use breakpoints and continue, instead.
 			 */
 			single_step(regs);
-			__flush_cache_all();
-			return;
+			goto exit_kgdb_exception;
 			/* NOTREACHED */
+			break;
 
 		/*
 		 * Set baud rate (bBB)
@@ -865,6 +955,20 @@ void handle_exception (struct gdb_regs *regs)
 		putpacket(output_buffer);
 
 	} /* while */
+
+	return;
+
+finish_kgdb:
+	restore_debug_traps();
+
+exit_kgdb_exception:
+	/* release locks so other CPUs can go */
+	for (i=0; i < smp_num_cpus; i++) 
+		spin_unlock(&kgdb_cpulock[i]);
+	spin_unlock(&kgdb_lock);
+
+	__flush_cache_all();
+	return;
 }
 
 /*
@@ -888,12 +992,25 @@ void breakpoint(void)
 			);
 }
 
+/* Nothing but the break; don't pollute any registers */
+void async_breakpoint(void)
+{
+	__asm__ __volatile__(
+			".globl	async_breakinst\n\t" 
+			".set\tnoreorder\n\t"
+			"nop\n\t"
+			"async_breakinst:\tbreak\n\t"
+			"nop\n\t"
+			".set\treorder"
+			);
+}
+
 void adel(void)
 {
 	__asm__ __volatile__(
 			".globl\tadel\n\t"
-			"la\t$8,0x80000001\n\t"
-			"lw\t$9,0($8)\n\t"
+			"lui\t$8,0x8000\n\t"
+			"lw\t$9,1($8)\n\t"
 			);
 }
 
@@ -916,6 +1033,9 @@ static void free(void *where)
 void gdb_putsn(const char *str, int l)
 {
 	char outbuf[18];
+
+	if (!kgdb_started)
+		return;
 
 	outbuf[0]='O';
 

@@ -30,6 +30,7 @@
 #include <linux/kmod.h>
 #include <linux/init.h>
 #include <linux/pci.h>
+#include <linux/vmalloc.h>
 
 #include <asm/io.h>
 

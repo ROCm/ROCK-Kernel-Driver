@@ -847,7 +847,7 @@ static void destroy_scanner (struct kobject *kobj)
 	down (&(scn->sem));
 
 	usb_driver_release_interface(&scanner_driver,
-		&scn->scn_dev->actconfig->interface[scn->ifnum]);
+		scn->scn_dev->actconfig->interface[scn->ifnum]);
 
 	kfree(scn->ibuf);
 	kfree(scn->obuf);

@@ -12,15 +12,11 @@ obj-y :=	open.o read_write.o file_table.o buffer.o \
 		filesystems.o namespace.o seq_file.o xattr.o libfs.o \
 		fs-writeback.o mpage.o direct-io.o aio.o
 
-obj-$(CONFIG_EPOLL)	+= eventpoll.o
+obj-$(CONFIG_EPOLL)		+= eventpoll.o
+obj-$(CONFIG_COMPAT)		+= compat.o
 
-obj-$(CONFIG_COMPAT) += compat.o
-
-ifneq ($(CONFIG_NFSD),n)
-ifneq ($(CONFIG_NFSD),)
-obj-y += nfsctl.o
-endif
-endif
+nfsd-$(CONFIG_NFSD)		:= nfsctl.o
+obj-y				+= $(nfsd-y) $(nfsd-m)
 
 obj-$(CONFIG_BINFMT_AOUT)	+= binfmt_aout.o
 obj-$(CONFIG_BINFMT_EM86)	+= binfmt_em86.o
@@ -74,7 +70,7 @@ obj-$(CONFIG_LOCKD)		+= lockd/
 obj-$(CONFIG_NLS)		+= nls/
 obj-$(CONFIG_SYSV_FS)		+= sysv/
 obj-$(CONFIG_SMB_FS)		+= smbfs/
-obj-$(CONFIG_CIFS)             += cifs/
+obj-$(CONFIG_CIFS)		+= cifs/
 obj-$(CONFIG_NCP_FS)		+= ncpfs/
 obj-$(CONFIG_HPFS_FS)		+= hpfs/
 obj-$(CONFIG_NTFS_FS)		+= ntfs/

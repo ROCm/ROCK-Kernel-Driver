@@ -16,6 +16,7 @@
  */
  
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
@@ -222,7 +223,7 @@ MODULE_AUTHOR("Phil Blundell <pb@nexus.co.uk>");
 MODULE_DESCRIPTION("Footbridge watchdog driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(soft_margin,"i");
+module_param(soft_margin, int, 0);
 MODULE_PARM_DESC(soft_margin,"Watchdog timeout in seconds");
 
 module_init(footbridge_watchdog_init);

@@ -309,7 +309,7 @@ static char *usb_dump_config (
 		return start + sprintf(start, "(null Cfg. desc.)\n");
 	start = usb_dump_config_descriptor(start, end, &config->desc, active);
 	for (i = 0; i < config->desc.bNumInterfaces; i++) {
-		interface = config->interface + i;
+		interface = config->interface[i];
 		if (!interface)
 			break;
 		for (j = 0; j < interface->num_altsetting; j++) {

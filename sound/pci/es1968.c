@@ -602,7 +602,7 @@ struct snd_es1968 {
 
 static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-static struct pci_device_id snd_es1968_ids[] __devinitdata = {
+static struct pci_device_id snd_es1968_ids[] = {
 	/* Maestro 1 */
         { 0x1285, 0x0100, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, TYPE_MAESTRO },
 	/* Maestro 2 */
@@ -654,6 +654,11 @@ inline static u16 maestro_read(es1968_t *chip, u16 reg)
 	return result;
 }
 
+#define big_mdelay(msec) do {\
+	set_current_state(TASK_UNINTERRUPTIBLE);\
+	schedule_timeout(((msec) * HZ + 999) / 1000);\
+} while (0)
+	
 /* Wait for the codec bus to be free */
 static int snd_es1968_ac97_wait(es1968_t *chip)
 {
@@ -2109,7 +2114,7 @@ static void snd_es1968_ac97_reset(es1968_t *chip)
 	outw(0x0000, ioaddr + 0x60);	/* write 0 to gpio 0 */
 	udelay(20);
 	outw(0x0001, ioaddr + 0x60);	/* write 1 to gpio 1 */
-	mdelay(20);
+	big_mdelay(20);
 
 	outw(save_68 | 0x1, ioaddr + 0x68);	/* now restore .. */
 	outw((inw(ioaddr + 0x38) & 0xfffc) | 0x1, ioaddr + 0x38);
@@ -2125,7 +2130,7 @@ static void snd_es1968_ac97_reset(es1968_t *chip)
 	outw(0x0001, ioaddr + 0x60);	/* write 1 to gpio */
 	udelay(20);
 	outw(0x0009, ioaddr + 0x60);	/* write 9 to gpio */
-	mdelay(500);		/* .. ouch.. */
+	big_mdelay(500);
 	//outw(inw(ioaddr + 0x38) & 0xfffc, ioaddr + 0x38);
 	outw(inw(ioaddr + 0x3a) & 0xfffc, ioaddr + 0x3a);
 	outw(inw(ioaddr + 0x3c) & 0xfffc, ioaddr + 0x3c);
@@ -2151,7 +2156,7 @@ static void snd_es1968_ac97_reset(es1968_t *chip)
 
 		if (w > 10000) {
 			outb(inb(ioaddr + 0x37) | 0x08, ioaddr + 0x37);	/* do a software reset */
-			mdelay(500);	/* oh my.. */
+			big_mdelay(500);	/* oh my.. */
 			outb(inb(ioaddr + 0x37) & ~0x08,
 				ioaddr + 0x37);
 			udelay(1);
@@ -2340,11 +2345,6 @@ static void snd_es1968_chip_init(es1968_t *chip)
 	outb(3, iobase + ASSP_CONTROL_A);	/* M: Reserved bits... */
 	outb(0, iobase + ASSP_CONTROL_C);	/* M: Disable ASSP, ASSP IRQ's and FM Port */
 
-	/* Enable IRQ's */
-	w = ESM_HIRQ_DSIE | ESM_HIRQ_MPU401 | ESM_HIRQ_HW_VOLUME;
-	outw(w, iobase + ESM_PORT_HOST_IRQ);
-
-
 	/*
 	 * set up wavecache
 	 */
@@ -2414,6 +2414,14 @@ static void snd_es1968_chip_init(es1968_t *chip)
 	}
 }
 
+/* Enable IRQ's */
+static void snd_es1968_start_irq(es1968_t *chip)
+{
+	unsigned short w;
+	w = ESM_HIRQ_DSIE | ESM_HIRQ_MPU401 | ESM_HIRQ_HW_VOLUME;
+	outw(w, chip->io_port + ESM_PORT_HOST_IRQ);
+}
+
 #ifdef CONFIG_PM
 /*
  * PM support
@@ -2453,16 +2461,18 @@ static void es1968_resume(es1968_t *chip)
 		wave_set_register(chip, 0x01FC, chip->dma.addr >> 12);
 	}
 
+	snd_es1968_start_irq(chip);
+
 	/* restore ac97 state */
 	snd_ac97_resume(chip->ac97);
 
 	/* start timer again */
 	if (atomic_read(&chip->bobclient))
 		snd_es1968_bob_start(chip);
+
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
 
-#ifndef PCI_OLD_SUSPEND
 static int snd_es1968_suspend(struct pci_dev *dev, u32 state)
 {
 	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return -ENXIO);
@@ -2475,18 +2485,6 @@ static int snd_es1968_resume(struct pci_dev *dev)
 	es1968_resume(chip);
 	return 0;
 }
-#else
-static void snd_es1968_suspend(struct pci_dev *dev)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return);
-	es1968_suspend(chip);
-}
-static void snd_es1968_resume(struct pci_dev *dev)
-{
-	es1968_t *chip = snd_magic_cast(es1968_t, pci_get_drvdata(dev), return);
-	es1968_resume(chip);
-}
-#endif
 
 /* callback */
 static int snd_es1968_set_power_state(snd_card_t *card, unsigned int power_state)
@@ -2612,9 +2610,9 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 		/* disable power-management if not maestro2e or
 		 * if not on the whitelist
 		 */
-		unsigned int vend;
-		pci_read_config_dword(chip->pci, PCI_SUBSYSTEM_VENDOR_ID, &vend);
-		if (chip->type != TYPE_MAESTRO2E || (vend & 0xffff) != 0x1028) {
+		unsigned short vend;
+		pci_read_config_word(chip->pci, PCI_SUBSYSTEM_VENDOR_ID, &vend);
+		if (chip->type != TYPE_MAESTRO2E || (vend != 0x1028 && vend != 0x1179)) {
 			printk(KERN_INFO "es1968: not attempting power management.\n");
 			do_pm = 0;
 		}
@@ -2768,6 +2766,8 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 			return err;
 		}
 	}
+
+	snd_es1968_start_irq(chip);
 
 	chip->clock = clock[dev];
 	if (! chip->clock)

@@ -71,6 +71,7 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
 	return ret == 0;
 }
 
+#if defined(__H8300H__)
 static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *v)
 {
 	__asm__ __volatile__("stc ccr,r2l\n\t"
@@ -94,14 +95,37 @@ static __inline__ void atomic_set_mask(unsigned long mask, unsigned long *v)
 	                     "ldc r2l,ccr" 
                              : "=m" (*v) : "ir" (mask) :"er0","er1","er2");
 }
+#endif
+#if defined(__H8300S__)
+static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *v)
+{
+	__asm__ __volatile__("stc exr,r2l\n\t"
+	                     "orc #0x07,exr\n\t"
+	                     "mov.l %0,er0\n\t"
+	                     "mov.l %1,er1\n\t"
+	                     "and.l er1,er0\n\t"
+	                     "mov.l er0,%0\n\t"
+	                     "ldc r2l,exr" 
+                             : "=m" (*v) : "ir" (~(mask)) :"er0","er1","er2");
+}
+
+static __inline__ void atomic_set_mask(unsigned long mask, unsigned long *v)
+{
+	__asm__ __volatile__("stc exr,r2l\n\t"
+	                     "orc #0x07,exr\n\t"
+	                     "mov.l %0,er0\n\t"
+	                     "mov.l %1,er1\n\t"
+	                     "or.l er1,er0\n\t"
+	                     "mov.l er0,%0\n\t"
+	                     "ldc r2l,exr" 
+                             : "=m" (*v) : "ir" (mask) :"er0","er1","er2");
+}
+#endif
 
 /* Atomic operations are already serializing */
 #define smp_mb__before_atomic_dec()    barrier()
 #define smp_mb__after_atomic_dec() barrier()
 #define smp_mb__before_atomic_inc()    barrier()
 #define smp_mb__after_atomic_inc() barrier()
-
-#define atomic_sub_and_test(i,v) (atomic_sub_return((i), (v)) == 0)
-#define atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
 
 #endif /* __ARCH_H8300_ATOMIC __ */

@@ -1,6 +1,4 @@
 /*
- *	include/asm-mips/traps.h
- *
  *	Trap handling definitions.
  *
  *	Copyright (C) 2002, 2003  Maciej W. Rozycki
@@ -10,8 +8,8 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
-#ifndef __ASM_MIPS_TRAPS_H
-#define __ASM_MIPS_TRAPS_H
+#ifndef _ASM_TRAPS_H
+#define _ASM_TRAPS_H
 
 /*
  * Possible status responses for a board_be_handler backend.
@@ -23,4 +21,4 @@
 extern void (*board_be_init)(void);
 extern int (*board_be_handler)(struct pt_regs *regs, int is_fixup);
 
-#endif /* __ASM_MIPS_TRAPS_H */
+#endif /* _ASM_TRAPS_H */

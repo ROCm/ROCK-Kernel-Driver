@@ -1524,7 +1524,7 @@ static int set_format_in(struct usb_audiodev *as)
 
 	if (u->interface < 0 || u->interface >= config->desc.bNumInterfaces)
 		return 0;
-	iface = &config->interface[u->interface];
+	iface = config->interface[u->interface];
 
 	fmtnr = find_format(as->fmtin, as->numfmtin, d->format, d->srate);
 	if (fmtnr < 0) {
@@ -1612,7 +1612,7 @@ static int set_format_out(struct usb_audiodev *as)
 
 	if (u->interface < 0 || u->interface >= config->desc.bNumInterfaces)
 		return 0;
-	iface = &config->interface[u->interface];
+	iface = config->interface[u->interface];
 
 	fmtnr = find_format(as->fmtout, as->numfmtout, d->format, d->srate);
 	if (fmtnr < 0) {
@@ -2704,7 +2704,7 @@ static int usb_audio_release(struct inode *inode, struct file *file)
 	if (file->f_mode & FMODE_WRITE) {
 		usbout_stop(as);
 		if (dev && as->usbout.interface >= 0) {
-			iface = &dev->actconfig->interface[as->usbout.interface];
+			iface = dev->actconfig->interface[as->usbout.interface];
 			usb_set_interface(dev, iface->altsetting->desc.bInterfaceNumber, 0);
 		}
 		dmabuf_release(&as->usbout.dma);
@@ -2713,7 +2713,7 @@ static int usb_audio_release(struct inode *inode, struct file *file)
 	if (file->f_mode & FMODE_READ) {
 		usbin_stop(as);
 		if (dev && as->usbin.interface >= 0) {
-			iface = &dev->actconfig->interface[as->usbin.interface];
+			iface = dev->actconfig->interface[as->usbin.interface];
 			usb_set_interface(dev, iface->altsetting->desc.bInterfaceNumber, 0);
 		}
 		dmabuf_release(&as->usbin.dma);
@@ -2866,7 +2866,7 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 	/* search for input formats */
 	if (asifin >= 0) {
 		as->usbin.flags = FLG_CONNECTED;
-		iface = &config->interface[asifin];
+		iface = config->interface[asifin];
 		for (i = 0; i < iface->num_altsetting; i++) {
 			alts = &iface->altsetting[i];
 			if (alts->desc.bInterfaceClass != USB_CLASS_AUDIO || alts->desc.bInterfaceSubClass != 2)
@@ -2947,12 +2947,14 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 	/* search for output formats */
 	if (asifout >= 0) {
 		as->usbout.flags = FLG_CONNECTED;
-		iface = &config->interface[asifout];
+		iface = config->interface[asifout];
 		for (i = 0; i < iface->num_altsetting; i++) {
 			alts = &iface->altsetting[i];
 			if (alts->desc.bInterfaceClass != USB_CLASS_AUDIO || alts->desc.bInterfaceSubClass != 2)
 				continue;
 			if (alts->desc.bNumEndpoints < 1) {
+				/* altsetting 0 should never have iso EPs */
+				if (alts->desc.bAlternateSetting != 0)
 				printk(KERN_ERR "usbaudio: device %u interface %u altsetting %u does not have an endpoint\n", 
 				       dev->devnum, asifout, i);
 				continue;
@@ -3684,7 +3686,7 @@ static struct usb_audio_state *usb_audio_parsecontrol(struct usb_device *dev, un
 			       dev->devnum, ctrlif, j);
 			continue;
 		}
-		iface = &config->interface[j];
+		iface = config->interface[j];
 		if (iface->altsetting[0].desc.bInterfaceClass != USB_CLASS_AUDIO) {
 			printk(KERN_ERR "usbaudio: device %d audiocontrol interface %u interface %u is not an AudioClass interface\n",
 			       dev->devnum, ctrlif, j);
@@ -3872,9 +3874,10 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 
 static int __init usb_audio_init(void)
 {
-	usb_register(&usb_audio_driver);
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+	int result = usb_register(&usb_audio_driver);
+	if (result == 0) 
+		info(DRIVER_VERSION ":" DRIVER_DESC);
+	return result;
 }
 
 

@@ -156,14 +156,15 @@ static struct cpufreq_frequency_table op_1700[] =
 };
 #undef OP
 
-#define CPU(max)	\
-	{ "Intel(R) Pentium(R) M processor " #max "MHz", (max)*1000, op_##max }
+#define _CPU(max, name)	\
+	{ "Intel(R) Pentium(R) M processor " name "MHz", (max)*1000, op_##max }
+#define CPU(max)	_CPU(max, #max)
 
 /* CPU models, their operating frequency range, and freq/voltage
    operating points */
 static const struct cpu_model models[] = 
 {
-	CPU( 900),
+       _CPU( 900, " 900"),
 	CPU(1100),
 	CPU(1200),
 	CPU(1300),

@@ -513,7 +513,7 @@ struct snd_cs4281 {
 
 static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-static struct pci_device_id snd_cs4281_ids[] __devinitdata = {
+static struct pci_device_id snd_cs4281_ids[] = {
 	{ 0x1013, 0x6005, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* CS4281 */
 	{ 0, }
 };
@@ -530,36 +530,27 @@ MODULE_DEVICE_TABLE(pci, snd_cs4281_ids);
  *  common I/O routines
  */
 
-static void snd_cs4281_delay(unsigned int delay, int can_schedule)
+static void snd_cs4281_delay(unsigned int delay)
 {
 	if (delay > 999) {
-		if (can_schedule) {
-			unsigned long end_time;
-			delay = (delay * HZ) / 1000000;
-			if (delay < 1)
-				delay = 1;
-			end_time = jiffies + delay;
-			do {
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(1);
-			} while (time_after_eq(end_time, jiffies));
-		} else {
-			delay += 999;
-			delay /= 1000;
-			mdelay(delay > 0 ? delay : 1);
-		}
+		unsigned long end_time;
+		delay = (delay * HZ) / 1000000;
+		if (delay < 1)
+			delay = 1;
+		end_time = jiffies + delay;
+		do {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1);
+		} while (time_after_eq(end_time, jiffies));
 	} else {
 		udelay(delay);
 	}
 }
 
-inline static void snd_cs4281_delay_long(int can_schedule)
+inline static void snd_cs4281_delay_long(void)
 {
-	if (can_schedule) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-	} else
-		mdelay(10);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(1);
 }
 
 static inline void snd_cs4281_pokeBA0(cs4281_t *chip, unsigned long offset, unsigned int val)
@@ -1267,7 +1258,7 @@ static void __devinit snd_cs4281_proc_init(cs4281_t * chip)
  * joystick support
  */
 
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 
 typedef struct snd_cs4281_gameport {
 	struct gameport info;
@@ -1359,7 +1350,7 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 
 #else
 #define snd_cs4281_gameport(chip) /*NOP*/
-#endif /* CONFIG_GAMEPORT || CONFIG_GAMEPORT_MODULE */
+#endif /* CONFIG_GAMEPORT || (MODULE && CONFIG_GAMEPORT_MODULE) */
 
 
 /*
@@ -1368,7 +1359,7 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 
 static int snd_cs4281_free(cs4281_t *chip)
 {
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	if (chip->gameport) {
 		gameport_unregister_port(&chip->gameport->info);
 		kfree(chip->gameport);
@@ -1411,7 +1402,7 @@ static int snd_cs4281_dev_free(snd_device_t *device)
 	return snd_cs4281_free(chip);
 }
 
-static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule); /* defined below */
+static int snd_cs4281_chip_init(cs4281_t *chip); /* defined below */
 #ifdef CONFIG_PM
 static int snd_cs4281_set_power_state(snd_card_t *card, unsigned int power_state);
 #endif
@@ -1471,7 +1462,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 		return -ENOMEM;
 	}
 	
-	tmp = snd_cs4281_chip_init(chip, 1);
+	tmp = snd_cs4281_chip_init(chip);
 	if (tmp) {
 		snd_cs4281_free(chip);
 		return tmp;
@@ -1493,7 +1484,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	return 0;
 }
 
-static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
+static int snd_cs4281_chip_init(cs4281_t *chip)
 {
 	unsigned int tmp;
 	int timeout;
@@ -1547,7 +1538,7 @@ static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
 	snd_cs4281_pokeBA0(chip, BA0_SPMC, 0);
 	udelay(50);
 	snd_cs4281_pokeBA0(chip, BA0_SPMC, BA0_SPMC_RSTN);
-	snd_cs4281_delay(50000, can_schedule);
+	snd_cs4281_delay(50000);
 
 	if (chip->dual_codec)
 		snd_cs4281_pokeBA0(chip, BA0_SPMC, BA0_SPMC_RSTN | BA0_SPMC_ASDI2E);
@@ -1563,7 +1554,7 @@ static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
 	 *  Start the DLL Clock logic.
 	 */
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, BA0_CLKCR1_DLLP);
-	snd_cs4281_delay(50000, can_schedule);
+	snd_cs4281_delay(50000);
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, BA0_CLKCR1_SWCE | BA0_CLKCR1_DLLP);
 
 	/*
@@ -1577,7 +1568,7 @@ static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
 		 */
 		if (snd_cs4281_peekBA0(chip, BA0_CLKCR1) & BA0_CLKCR1_DLLRDY)
 			goto __ok0;
-		snd_cs4281_delay_long(can_schedule);
+		snd_cs4281_delay_long();
 	} while (timeout-- > 0);
 
 	snd_printk(KERN_ERR "DLLRDY not seen\n");
@@ -1603,7 +1594,7 @@ static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
 		 */
 		if (snd_cs4281_peekBA0(chip, BA0_ACSTS) & BA0_ACSTS_CRDY)
 			goto __ok1;
-		snd_cs4281_delay_long(can_schedule);
+		snd_cs4281_delay_long();
 	} while (timeout-- > 0);
 
 	snd_printk(KERN_ERR "never read codec ready from AC'97 (0x%x)\n", snd_cs4281_peekBA0(chip, BA0_ACSTS));
@@ -1615,7 +1606,7 @@ static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
 		do {
 			if (snd_cs4281_peekBA0(chip, BA0_ACSTS2) & BA0_ACSTS_CRDY)
 				goto __codec2_ok;
-			snd_cs4281_delay_long(can_schedule);
+			snd_cs4281_delay_long();
 		} while (timeout-- > 0);
 		snd_printk(KERN_INFO "secondary codec doesn't respond. disable it...\n");
 		chip->dual_codec = 0;
@@ -1642,7 +1633,7 @@ static int snd_cs4281_chip_init(cs4281_t *chip, int can_schedule)
 		 */
                 if ((snd_cs4281_peekBA0(chip, BA0_ACISV) & (BA0_ACISV_SLV(3) | BA0_ACISV_SLV(4))) == (BA0_ACISV_SLV(3) | BA0_ACISV_SLV(4)))
                         goto __ok2;
-		snd_cs4281_delay_long(can_schedule);
+		snd_cs4281_delay_long();
 	} while (timeout-- > 0);
 
 	snd_printk(KERN_ERR "never read ISV3 and ISV4 from AC'97\n");
@@ -2109,7 +2100,7 @@ static void cs4281_resume(cs4281_t *chip)
 	ulCLK |= CLKCR1_CKRA;
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
-	snd_cs4281_chip_init(chip, 0);
+	snd_cs4281_chip_init(chip);
 
 	/* restore the status registers */
 	for (i = 0; i < number_of(saved_regs); i++)
@@ -2128,7 +2119,6 @@ static void cs4281_resume(cs4281_t *chip)
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
 
-#ifndef PCI_OLD_SUSPEND
 static int snd_cs4281_suspend(struct pci_dev *dev, u32 state)
 {
 	cs4281_t *chip = snd_magic_cast(cs4281_t, pci_get_drvdata(dev), return -ENXIO);
@@ -2141,18 +2131,6 @@ static int snd_cs4281_resume(struct pci_dev *dev)
 	cs4281_resume(chip);
 	return 0;
 }
-#else
-static void snd_cs4281_suspend(struct pci_dev *dev)
-{
-	cs4281_t *chip = snd_magic_cast(cs4281_t, pci_get_drvdata(dev), return);
-	cs4281_suspend(chip);
-}
-static void snd_cs4281_resume(struct pci_dev *dev)
-{
-	cs4281_t *chip = snd_magic_cast(cs4281_t, pci_get_drvdata(dev), return);
-	cs4281_resume(chip);
-}
-#endif
 
 /* callback */
 static int snd_cs4281_set_power_state(snd_card_t *card, unsigned int power_state)

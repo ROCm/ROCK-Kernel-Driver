@@ -78,7 +78,7 @@ static int __init b1isa_probe(struct pci_dev *pdev)
 
 	if (   card->port != 0x150 && card->port != 0x250
 	    && card->port != 0x300 && card->port != 0x340) {
-		printk(KERN_WARNING "b1isa: illegal port 0x%x.\n", card->port);
+		printk(KERN_WARNING "b1isa: invalid port 0x%x.\n", card->port);
 		retval = -EINVAL;
 		goto err_free;
 	}

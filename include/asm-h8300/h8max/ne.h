@@ -1,5 +1,8 @@
 /* H8MAX RTL8019AS Config */
 
+#ifndef __H8300_H8MAX_NE__
+#define __H8300_H8MAX_NE__
+
 #define NE2000_ADDR		0x800600
 #define NE2000_IRQ              4
 #define NE2000_IRQ_VECTOR	(12 + NE2000_IRQ)
@@ -33,6 +36,14 @@
 # undef insw
 #endif
 #define insw(a,p,l)             h8max_insw((a) - NE2000_ADDR,(unsigned short *)p,l)
+#if defined(outsb)
+# undef outsb
+#endif
+#define outsb(a,p,l)            h8max_outsb((a) - NE2000_ADDR,(unsigned char *)p,l)
+#if defined(insb)
+# undef insb
+#endif
+#define insb(a,p,l)             h8max_insb((a) - NE2000_ADDR,(unsigned char *)p,l)
 
 #define H8300_INIT_NE()                  \
 do {                                     \
@@ -69,3 +80,18 @@ static inline void h8max_insw(unsigned char a,unsigned short *p,unsigned long l)
 	}
 }
 
+static inline void h8max_outsb(unsigned char a,unsigned char *p,unsigned long l)
+{
+	for (; l != 0; --l, p++) {
+		*(unsigned short *)(NE2000_ADDR + (a << 1)) = *p;
+	}
+}
+
+static inline void h8max_insb(unsigned char a,unsigned char *p,unsigned long l)
+{
+	for (; l != 0; --l, p++) {
+		*p = *((unsigned char *)(NE2000_ADDR + (a << 1))+1);
+	}
+}
+
+#endif

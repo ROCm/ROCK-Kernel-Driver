@@ -1,5 +1,5 @@
 /*
- * drivers/char/shwdt.c
+ * drivers/char/watchdog/shwdt.c
  *
  * Watchdog driver for integrated watchdog in the SuperH processors.
  *
@@ -19,6 +19,7 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
@@ -395,9 +396,11 @@ static void __exit sh_wdt_exit(void)
 MODULE_AUTHOR("Paul Mundt <lethal@linux-sh.org>");
 MODULE_DESCRIPTION("SuperH watchdog driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(clock_division_ratio, "i");
+
+module_param(clock_division_ratio, int, 0);
 MODULE_PARM_DESC(clock_division_ratio, "Clock division ratio. Valid ranges are from 0x5 (1.31ms) to 0x7 (5.25ms). Defaults to 0x7.");
-MODULE_PARM(nowayout,"i");
+
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 module_init(sh_wdt_init);

@@ -16,7 +16,7 @@ static int min_timer[]  = {1 * HZ};
 static int max_timer[]  = {300 * HZ};
 static int min_idle[]   = {0 * HZ};
 static int max_idle[]   = {65535 * HZ};
-static int min_route[]  = {0}, max_route[] = {1};
+static int min_route[1],       max_route[] = {1};
 static int min_ftimer[] = {60 * HZ};
 static int max_ftimer[] = {600 * HZ};
 static int min_maxvcs[] = {1}, max_maxvcs[] = {254};

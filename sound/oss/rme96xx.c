@@ -1072,7 +1072,7 @@ static void __devinit rme96xx_remove(struct pci_dev *dev)
 #define PCI_ANY_ID 0
 #endif
 
-static struct pci_device_id id_table[] __devinitdata = {
+static struct pci_device_id id_table[] = {
 	{
 		.vendor	   = PCI_VENDOR_ID_RME,
 		.device	   = PCI_DEVICE_ID_RME9652,

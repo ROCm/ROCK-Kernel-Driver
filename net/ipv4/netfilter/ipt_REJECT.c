@@ -433,7 +433,7 @@ static int check(const char *tablename,
 		/* Must specify that it's a TCP packet */
 		if (e->ip.proto != IPPROTO_TCP
 		    || (e->ip.invflags & IPT_INV_PROTO)) {
-			DEBUGP("REJECT: TCP_RESET illegal for non-tcp\n");
+			DEBUGP("REJECT: TCP_RESET invalid for non-tcp\n");
 			return 0;
 		}
 	}

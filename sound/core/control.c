@@ -504,8 +504,10 @@ static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t *_list)
 			offset = 0;
 		}
 		up_read(&card->controls_rwsem);
-		if (list.used > 0 && copy_to_user(list.pids, dst, list.used * sizeof(snd_ctl_elem_id_t)))
+		if (list.used > 0 && copy_to_user(list.pids, dst, list.used * sizeof(snd_ctl_elem_id_t))) {
+			vfree(dst);
 			return -EFAULT;
+		}
 		vfree(dst);
 	} else {
 		down_read(&card->controls_rwsem);

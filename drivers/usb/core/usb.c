@@ -80,25 +80,8 @@ static struct device_driver usb_generic_driver = {
 
 static int usb_generic_driver_data;
 
-/* deallocate hcd/hardware state ... and nuke all pending urbs */
-static void nuke_urbs(struct usb_device *dev)
-{
-	void (*disable)(struct usb_device *, int);
-	int i;
-
-	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->disable)
-		return;
-	dbg("nuking urbs assigned to %s", dev->dev.bus_id);
-
-	disable = dev->bus->op->disable;
-	for (i = 0; i < 15; i++) {
-		disable(dev, i);
-		disable(dev, USB_DIR_IN | i);
-	}
-}
-
 /* needs to be called with BKL held */
-int usb_device_probe(struct device *dev)
+int usb_probe_interface(struct device *dev)
 {
 	struct usb_interface * intf = to_usb_interface(dev);
 	struct usb_driver * driver = to_usb_driver(dev->driver);
@@ -123,25 +106,21 @@ int usb_device_probe(struct device *dev)
 	return error;
 }
 
-int usb_device_remove(struct device *dev)
+int usb_unbind_interface(struct device *dev)
 {
-	struct usb_interface *intf;
-	struct usb_driver *driver;
-
-	intf = list_entry(dev,struct usb_interface,dev);
-	driver = to_usb_driver(dev->driver);
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct usb_driver *driver = to_usb_driver(dev->driver);
 
 	down(&driver->serialize);
 
-	/* release all urbs for this device */
-	nuke_urbs(interface_to_usbdev(intf));
+	/* release all urbs for this interface */
+	usb_disable_interface(interface_to_usbdev(intf), intf);
 
 	if (intf->driver && intf->driver->disconnect)
 		intf->driver->disconnect(intf);
 
-	/* if driver->disconnect didn't release the interface */
-	if (intf->driver)
-		usb_driver_release_interface(driver, intf);
+	/* force a release and re-initialize the interface */
+	usb_driver_release_interface(driver, intf);
 
 	up(&driver->serialize);
 
@@ -170,8 +149,8 @@ int usb_register(struct usb_driver *new_driver)
 
 	new_driver->driver.name = (char *)new_driver->name;
 	new_driver->driver.bus = &usb_bus_type;
-	new_driver->driver.probe = usb_device_probe;
-	new_driver->driver.remove = usb_device_remove;
+	new_driver->driver.probe = usb_probe_interface;
+	new_driver->driver.remove = usb_unbind_interface;
 
 	init_MUTEX(&new_driver->serialize);
 
@@ -229,9 +208,9 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 	int i;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
-		if (dev->actconfig->interface[i].altsetting[0]
+		if (dev->actconfig->interface[i]->altsetting[0]
 				.desc.bInterfaceNumber == ifnum)
-			return &dev->actconfig->interface[i];
+			return dev->actconfig->interface[i];
 
 	return NULL;
 }
@@ -256,14 +235,14 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 	int i, j, k;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
-		for (j = 0; j < dev->actconfig->interface[i].num_altsetting; j++)
-			for (k = 0; k < dev->actconfig->interface[i]
-				.altsetting[j].desc.bNumEndpoints; k++)
-				if (epnum == dev->actconfig->interface[i]
-						.altsetting[j].endpoint[k]
+		for (j = 0; j < dev->actconfig->interface[i]->num_altsetting; j++)
+			for (k = 0; k < dev->actconfig->interface[i]->
+				altsetting[j].desc.bNumEndpoints; k++)
+				if (epnum == dev->actconfig->interface[i]->
+						altsetting[j].endpoint[k]
 						.desc.bEndpointAddress)
-					return &dev->actconfig->interface[i]
-						.altsetting[j].endpoint[k]
+					return &dev->actconfig->interface[i]->
+						altsetting[j].endpoint[k]
 						.desc;
 
 	return NULL;
@@ -325,24 +304,31 @@ int usb_interface_claimed(struct usb_interface *iface)
  * usb_driver_release_interface - unbind a driver from an interface
  * @driver: the driver to be unbound
  * @iface: the interface from which it will be unbound
+ *
+ * In addition to unbinding the driver, this re-initializes the interface
+ * by selecting altsetting 0, the default alternate setting.
  * 
- * This should be used by drivers to release their claimed interfaces.
- * It is normally called in their disconnect() methods, and only for
- * drivers that bound to more than one interface in their probe().
+ * This can be used by drivers to release an interface without waiting
+ * for their disconnect() methods to be called.
  *
  * When the USB subsystem disconnect()s a driver from some interface,
  * it automatically invokes this method for that interface.  That
  * means that even drivers that used usb_driver_claim_interface()
  * usually won't need to call this.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
  */
 void usb_driver_release_interface(struct usb_driver *driver, struct usb_interface *iface)
 {
 	/* this should never happen, don't release something that's not ours */
-	if (!iface || iface->driver != driver)
+	if (iface->driver && iface->driver != driver)
 		return;
 
 	iface->driver = NULL;
 	usb_set_intfdata(iface, NULL);
+	usb_set_interface(interface_to_usbdev(iface),
+			iface->altsetting[0].desc.bInterfaceNumber,
+			0);
 }
 
 /**
@@ -654,6 +640,26 @@ static int usb_hotplug (struct device *dev, char **envp,
 #endif	/* CONFIG_HOTPLUG */
 
 /**
+ * usb_release_dev - free a usb device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this usb device are
+ * done.
+ */
+static void usb_release_dev(struct device *dev)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device(dev);
+
+	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
+		udev->bus->op->deallocate(udev);
+	usb_destroy_configuration(udev);
+	usb_bus_put(udev->bus);
+	kfree (udev);
+}
+
+/**
  * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
  * @parent: hub to which device is connected
  * @bus: bus used to access the device
@@ -681,6 +687,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	}
 
 	device_initialize(&dev->dev);
+	dev->dev.release = usb_release_dev;
 	dev->state = USB_STATE_ATTACHED;
 
 	if (!parent)
@@ -735,27 +742,6 @@ void usb_put_dev(struct usb_device *dev)
 	if (dev)
 		put_device(&dev->dev);
 }
-
-/**
- * usb_release_dev - free a usb device structure when all users of it are finished.
- * @dev: device that's been disconnected
- *
- * Will be called only by the device core when all users of this usb device are
- * done.
- */
-static void usb_release_dev(struct device *dev)
-{
-	struct usb_device *udev;
-
-	udev = to_usb_device(dev);
-
-	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
-		udev->bus->op->deallocate(udev);
-	usb_destroy_configuration (udev);
-	usb_bus_put (udev->bus);
-	kfree (udev);
-}
-
 
 static struct usb_device *match_device(struct usb_device *dev,
 				       u16 vendor_id, u16 product_id)
@@ -917,7 +903,7 @@ void usb_disconnect(struct usb_device **pdev)
 	}
 
 	/* deallocate hcd/hardware state ... and nuke all pending urbs */
-	nuke_urbs(dev);
+	usb_disable_device(dev, 0);
 
 	/* disconnect() drivers from interfaces (a key side effect) */
 	dev_dbg (&dev->dev, "unregistering interfaces\n");
@@ -926,7 +912,7 @@ void usb_disconnect(struct usb_device **pdev)
 			struct usb_interface	*interface;
 
 			/* remove this interface */
-			interface = &dev->actconfig->interface[i];
+			interface = dev->actconfig->interface[i];
 			device_unregister(&interface->dev);
 		}
 	}
@@ -945,25 +931,21 @@ void usb_disconnect(struct usb_device **pdev)
 }
 
 /**
- * usb_connect - pick device address (usbcore-internal)
+ * usb_choose_address - pick device address (usbcore-internal)
  * @dev: newly detected device (in DEFAULT state)
  *
  * Picks a device address.  It's up to the hub (or root hub) driver
  * to handle and manage enumeration, starting from the DEFAULT state.
- * Only hub drivers (including virtual root hub drivers for host
+ * Only hub drivers (but not virtual root hub drivers for host
  * controllers) should ever call this.
  */
-void usb_connect(struct usb_device *dev)
+void usb_choose_address(struct usb_device *dev)
 {
 	int devnum;
 	// FIXME needs locking for SMP!!
 	/* why? this is called only from the hub thread, 
 	 * which hopefully doesn't run on multiple CPU's simultaneously 8-)
-	 * ... it's also called from modprobe/rmmod/apmd threads as part
-	 * of virtual root hub init/reinit.  In the init case, the hub code 
-	 * won't have seen this, but not so for reinit ... 
 	 */
-	dev->descriptor.bMaxPacketSize0 = 8;  /* Start off at 8 bytes  */
 
 	/* Try to allocate the next devnum beginning at bus->devnum_next. */
 	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, dev->bus->devnum_next);
@@ -1090,7 +1072,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.parent = parent;
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
-	dev->dev.release = usb_release_dev;
 	dev->dev.driver_data = &usb_generic_driver_data;
 	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
@@ -1216,7 +1197,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* Register all of the interfaces for this device with the driver core.
 	 * Remember, interfaces get bound to drivers, not devices. */
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *interface = &dev->actconfig->interface[i];
+		struct usb_interface *interface = dev->actconfig->interface[i];
 		struct usb_interface_descriptor *desc;
 
 		desc = &interface->altsetting [interface->act_altsetting].desc;
@@ -1591,9 +1572,6 @@ EXPORT_SYMBOL(usb_register);
 EXPORT_SYMBOL(usb_deregister);
 EXPORT_SYMBOL(usb_disabled);
 
-EXPORT_SYMBOL(usb_device_probe);
-EXPORT_SYMBOL(usb_device_remove);
-
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_put_dev);
 EXPORT_SYMBOL(usb_get_dev);
@@ -1608,7 +1586,6 @@ EXPORT_SYMBOL(usb_ifnum_to_if);
 
 EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
-EXPORT_SYMBOL(usb_connect);
 EXPORT_SYMBOL(usb_disconnect);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);

@@ -37,7 +37,7 @@ static void usb_show_config(struct usb_host_config *config)
 
 	usb_show_config_descriptor(&config->desc);
 	for (i = 0; i < config->desc.bNumInterfaces; i++) {
-		ifp = config->interface + i;
+		ifp = config->interface[i];
 
 		if (!ifp)
 			break;

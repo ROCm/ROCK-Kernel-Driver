@@ -42,7 +42,7 @@
 #define IDX7		27333
 #define IDX8		3000
 
-static int mode = 0;
+static int mode;
 static char *xbuf;
 static char *tvmem;
 

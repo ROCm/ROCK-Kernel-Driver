@@ -120,7 +120,7 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 	ino = ip->i_ino;
 	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
 		jfs_err("jfs_create: dtInsert returned %d", rc);
-		if (rc == EIO)
+		if (rc == -EIO)
 			txAbort(tid, 1);	/* Marks Filesystem dirty */
 		else
 			txAbort(tid, 0);	/* Filesystem full */
@@ -247,7 +247,7 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
 		jfs_err("jfs_mkdir: dtInsert returned %d", rc);
 
-		if (rc == EIO)
+		if (rc == -EIO)
 			txAbort(tid, 1);	/* Marks Filesystem dirty */
 		else
 			txAbort(tid, 0);	/* Filesystem full */
@@ -353,7 +353,7 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 	ino = ip->i_ino;
 	if ((rc = dtDelete(tid, dip, &dname, &ino, JFS_REMOVE))) {
 		jfs_err("jfs_rmdir: dtDelete returned %d", rc);
-		if (rc == EIO)
+		if (rc == -EIO)
 			txAbort(tid, 1);
 		txEnd(tid);
 		up(&JFS_IP(dip)->commit_sem);
@@ -469,7 +469,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	ino = ip->i_ino;
 	if ((rc = dtDelete(tid, dip, &dname, &ino, JFS_REMOVE))) {
 		jfs_err("jfs_unlink: dtDelete returned %d", rc);
-		if (rc == EIO)
+		if (rc == -EIO)
 			txAbort(tid, 1);	/* Marks FS Dirty */
 		txEnd(tid);
 		up(&JFS_IP(dip)->commit_sem);
@@ -535,7 +535,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 		new_size = xtTruncate_pmap(tid, ip, new_size);
 		if (new_size < 0) {
 			txAbort(tid, 1);	/* Marks FS Dirty */
-			rc = -new_size;		/* We return -rc */
+			rc = new_size;
 		} else
 			rc = txCommit(tid, 2, &iplist[0], COMMIT_SYNC);
 		txEnd(tid);

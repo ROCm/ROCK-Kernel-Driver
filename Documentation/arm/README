@@ -30,9 +30,9 @@ Compilation of kernel
 	eg.
     CROSS_COMPILE=arm-linux-
 
-  Do a 'make config', followed by 'make dep', and finally 'make Image' to
-  build the kernel (arch/arm/boot/Image).  A compressed image can be built
-  by doing a 'make zImage' instead of 'make Image'.
+  Do a 'make config', followed by 'make Image' to build the kernel 
+  (arch/arm/boot/Image).  A compressed image can be built by doing a 
+  'make zImage' instead of 'make Image'.
 
 
 Bug reports etc

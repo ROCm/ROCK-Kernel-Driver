@@ -66,12 +66,14 @@ static struct serio q40kbd_port =
 	.close	= q40kbd_close,
 };
 
-static void q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t q40kbd_interrupt(int irq, void *dev_id,
+				    struct pt_regs *regs)
 {
 	if (Q40_IRQ_KEYB_MASK & master_inb(INTERRUPT_REG))
 		serio_interrupt(&q40kbd_port, master_inb(KEYCODE_REG), 0, regs);
 
 	master_outb(-1, KEYBOARD_UNLOCK_REG);
+	return IRQ_HANDLED;
 }
 
 static int __init q40kbd_init(void)

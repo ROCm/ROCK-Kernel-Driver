@@ -172,7 +172,7 @@ struct mem_dqinfo {
 #define DQF_INFO_DIRTY_B 16
 #define DQF_ANY_DQUOT_DIRTY_B 17
 #define DQF_INFO_DIRTY (1 << DQF_INFO_DIRTY_B)	/* Is info dirty? */
-#define DQF_ANY_DQUOT_DIRTY (1 << DQF_ANY_DQUOT_DIRTY B)	/* Is any dquot dirty? */
+#define DQF_ANY_DQUOT_DIRTY (1 << DQF_ANY_DQUOT_DIRTY_B) /* Is any dquot dirty? */
 
 extern inline void mark_info_dirty(struct mem_dqinfo *info)
 {

@@ -44,13 +44,13 @@ typedef struct {
 	char	name[8];
 } openprom_property;
 
-static openpromfs_node *nodes = NULL;
-static int alloced = 0;
-static u16 last_node = 0;
-static u16 first_prop = 0;
+static openpromfs_node *nodes;
+static int alloced;
+static u16 last_node;
+static u16 first_prop;
 static u16 options = 0xffff;
 static u16 aliases = 0xffff;
-static int aliases_nodes = 0;
+static int aliases_nodes;
 static char *alias_names [ALIASES_NNODES];
 
 #define OPENPROM_ROOT_INO	16

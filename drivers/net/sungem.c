@@ -84,7 +84,7 @@ MODULE_LICENSE("GPL");
 #define GEM_MODULE_NAME	"gem"
 #define PFX GEM_MODULE_NAME ": "
 
-static struct pci_device_id gem_pci_tbl[] __devinitdata = {
+static struct pci_device_id gem_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_GEM,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 
@@ -2101,17 +2101,14 @@ static int gem_open(struct net_device *dev)
 		gp->hw_running = 1;
 	}
 
-	spin_lock_irq(&gp->lock);
-
 	/* We can now request the interrupt as we know it's masked
 	 * on the controller
 	 */
 	if (request_irq(gp->pdev->irq, gem_interrupt,
 			SA_SHIRQ, dev->name, (void *)dev)) {
-		spin_unlock_irq(&gp->lock);
-
 		printk(KERN_ERR "%s: failed to request irq !\n", gp->dev->name);
 
+		spin_lock_irq(&gp->lock);
 #ifdef CONFIG_PPC_PMAC
 		if (!hw_was_up && gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
 			gem_apple_powerdown(gp);
@@ -2120,9 +2117,12 @@ static int gem_open(struct net_device *dev)
 		gp->pm_timer.expires = jiffies + 10*HZ;
 		add_timer(&gp->pm_timer);
 		up(&gp->pm_sem);
+		spin_unlock_irq(&gp->lock);
 
 		return -EAGAIN;
 	}
+
+       	spin_lock_irq(&gp->lock);
 
 	/* Allocate & setup ring buffers */
 	gem_init_rings(gp);
@@ -2338,7 +2338,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 		strncpy(info.driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
 		strncpy(info.version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
 		info.fw_version[0] = '\0';
-		strncpy(info.bus_info, gp->pdev->slot_name, ETHTOOL_BUSINFO_LEN);
+		strncpy(info.bus_info, pci_name(gp->pdev), ETHTOOL_BUSINFO_LEN);
 		info.regdump_len = 0; /*SUNGEM_NREGS;*/
 
 		if (copy_to_user(ep_user, &info, sizeof(info)))

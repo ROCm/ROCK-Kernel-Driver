@@ -1040,7 +1040,7 @@ xfs_iread_extents(
 	size = XFS_IFORK_NEXTENTS(ip, whichfork) * (uint)sizeof(xfs_bmbt_rec_t);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	/*
-	 * We know that the size is legal (it's checked in iformat_btree)
+	 * We know that the size is valid (it's checked in iformat_btree)
 	 */
 	ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
 	ASSERT(ifp->if_u1.if_extents != NULL);
@@ -1265,7 +1265,7 @@ xfs_isize_check(
 	 */
 	if (xfs_bmapi(NULL, ip, map_first,
 			 (XFS_B_TO_FSB(mp,
-				       (xfs_ufsize_t)XFS_MAX_FILE_OFFSET) -
+				       (xfs_ufsize_t)XFS_MAXIOFFSET(mp)) -
 			  map_first),
 			 XFS_BMAPI_ENTIRE, NULL, 0, imaps, &nimaps,
 			 NULL))
@@ -1319,11 +1319,11 @@ xfs_file_last_byte(
 
 	last_byte = XFS_FSB_TO_B(mp, last_block);
 	if (last_byte < 0) {
-		return XFS_MAX_FILE_OFFSET;
+		return XFS_MAXIOFFSET(mp);
 	}
 	last_byte += (1 << mp->m_writeio_log);
 	if (last_byte < 0) {
-		return XFS_MAX_FILE_OFFSET;
+		return XFS_MAXIOFFSET(mp);
 	}
 	return last_byte;
 }
@@ -1613,7 +1613,7 @@ xfs_itruncate_finish(
 	 * beyond the maximum file size (ie it is the same as last_block),
 	 * then there is nothing to do.
 	 */
-	last_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
+	last_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAXIOFFSET(mp));
 	ASSERT(first_unmap_block <= last_block);
 	done = 0;
 	if (last_block == first_unmap_block) {

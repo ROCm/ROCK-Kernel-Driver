@@ -32,7 +32,6 @@
 #ifndef __XFS_SUPPORT_MRLOCK_H__
 #define __XFS_SUPPORT_MRLOCK_H__
 
-#include <linux/version.h>
 #include <linux/time.h>
 #include <linux/wait.h>
 #include <asm/atomic.h>

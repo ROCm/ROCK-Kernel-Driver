@@ -63,7 +63,7 @@ int nr_ioapic_registers[MAX_IO_APICS];
  */
 
 static struct irq_pin_list {
-	int apic, pin, next;
+	short apic, pin, next;
 } irq_2_pin[PIN_MAP_SIZE];
 
 /*
@@ -1781,3 +1781,21 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq)
 }
 
 #endif /*CONFIG_ACPI_BOOT*/
+
+#ifndef CONFIG_SMP
+void send_IPI_self(int vector)
+{
+	unsigned int cfg;
+
+       /*
+        * Wait for idle.
+        */
+	apic_wait_icr_idle();
+	cfg = APIC_DM_FIXED | APIC_DEST_SELF | vector | APIC_DEST_LOGICAL;
+
+	/*
+	 * Send the IPI. The write to APIC_ICR fires this off.
+	 */
+	apic_write_around(APIC_ICR, cfg);
+}
+#endif

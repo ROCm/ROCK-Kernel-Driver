@@ -19,7 +19,7 @@
 #include <asm/byteorder.h>		/* for cpu_to_le32() */
 
 /*
- * PCI address allocation 
+ * PCI address allocation
  */
 #define GT_PCI_MEM_BASE    (0x22000000)
 #define GT_PCI_MEM_SIZE    GT_DEF_PCI0_MEM0_SIZE

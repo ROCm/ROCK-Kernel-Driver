@@ -32,12 +32,14 @@
 #define AT_SYSINFO 32
 #define AT_SYSINFO_EHDR		33
 
-#if 0 /* disabled for now because the code has still problems */
+int sysctl_vsyscall32;
+
 #define ARCH_DLINFO do {  \
+	if (sysctl_vsyscall32) { \
 	NEW_AUX_ENT(AT_SYSINFO, (u32)(u64)VSYSCALL32_VSYSCALL); \
 	NEW_AUX_ENT(AT_SYSINFO_EHDR, VSYSCALL32_BASE);    \
+	}	\
 } while(0)
-#endif
 
 struct file;
 struct elf_phdr; 
@@ -202,7 +204,7 @@ static inline int elf_core_copy_task_regs(struct task_struct *t, elf_gregset_t* 
 }
 
 static inline int 
-elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
+elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *xregs, elf_fpregset_t *fpu)
 {
 	struct _fpstate_ia32 *fpstate = (void*)fpu; 
 	struct pt_regs *regs = (struct pt_regs *)(tsk->thread.rsp0); 

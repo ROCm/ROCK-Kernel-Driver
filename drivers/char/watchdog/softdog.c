@@ -37,6 +37,7 @@
  */
  
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
@@ -56,8 +57,8 @@ static int soft_noboot = 1;
 static int soft_noboot = 0;
 #endif  /* ONLY_TESTING */
 
-MODULE_PARM(soft_margin,"i");
-MODULE_PARM(soft_noboot,"i");
+module_param(soft_margin, int, 0);
+module_param(soft_noboot, int, 0);
 MODULE_LICENSE("GPL");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -66,7 +67,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
 
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*

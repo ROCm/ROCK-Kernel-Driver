@@ -561,7 +561,7 @@ static unsigned int __init init_chipset_via82cxxx(struct pci_dev *dev, const cha
 		"controller on pci%s\n",
 		via_config->name, t,
 		via_dma[via_config->flags & VIA_UDMA],
-		dev->slot_name);
+		pci_name(dev));
 
 	/*
 	 * Setup /proc/ide/via entry.
@@ -638,7 +638,7 @@ static int __devinit via_init_one(struct pci_dev *dev, const struct pci_device_i
 	return 0;
 }
 
-static struct pci_device_id via_pci_tbl[] __devinitdata = {
+static struct pci_device_id via_pci_tbl[] = {
 	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C576_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
 	{ 0, },

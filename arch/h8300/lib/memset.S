@@ -17,9 +17,6 @@
 ;; c   = er1(r1l)
 ;; count = er2
 SYMBOL_NAME_LABEL(memset)
-	mov.l	er2,er2
-	beq	7f
-	mov.l	er0,@-sp
 	btst	#0,r0l
 	beq	2f
 
@@ -36,8 +33,13 @@ SYMBOL_NAME_LABEL(memset)
 	cmp.l	#4,er2
 	blo	4f
 	;; count>=4 -> count/4
+#if defined(__H8300H__)
 	shlr.l	er2
 	shlr.l	er2
+#endif
+#if defined(__H8300S__)
+	shlr.l	#2,er2
+#endif
 	;; byte -> long
 	mov.b	r1l,r1h
 	mov.w	r1,e1
@@ -56,6 +58,4 @@ SYMBOL_NAME_LABEL(memset)
 	dec.b	r3l
 	bne	5b
 6:
-	mov.l	@sp+,er0
-7:
 	rts

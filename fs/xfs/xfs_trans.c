@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -200,6 +200,7 @@ xfs_trans_dup(
 	tp->t_blk_res = tp->t_blk_res_used;
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
+	PFLAGS_DUP(&tp->t_pflags, &ntp->t_pflags);
 
 	XFS_TRANS_DUP_DQINFO(tp->t_mountp, tp, ntp);
 
@@ -238,7 +239,7 @@ xfs_trans_reserve(
 	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 
 	/* Mark this thread as being in a transaction */
-	current->flags |= PF_FSTRANS;
+        PFLAGS_SET_FSTRANS(&tp->t_pflags);
 
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
@@ -249,7 +250,7 @@ xfs_trans_reserve(
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
 					  -blocks, rsvd);
 		if (error != 0) {
-			current->flags &= ~PF_FSTRANS;
+                        PFLAGS_RESTORE(&tp->t_pflags);
 			return (XFS_ERROR(ENOSPC));
 		}
 		tp->t_blk_res += blocks;
@@ -322,7 +323,7 @@ undo_blocks:
 		tp->t_blk_res = 0;
 	}
 
-	current->flags &= ~PF_FSTRANS;
+        PFLAGS_RESTORE(&tp->t_pflags);
 
 	return (error);
 }
@@ -671,7 +672,7 @@ xfs_trans_unreserve_and_mod_sb(
  * be inconsistent. In such cases, this returns an error, and the
  * caller may assume that all locked objects joined to the transaction
  * have already been unlocked as if the commit had succeeded.
- * It's illegal to reference the transaction structure after this call.
+ * Do not reference the transaction structure after this call.
  */
  /*ARGSUSED*/
 int
@@ -734,13 +735,13 @@ shut_us_down:
 			if (commit_lsn == -1 && !shutdown)
 				shutdown = XFS_ERROR(EIO);
 		}
+                PFLAGS_RESTORE(&tp->t_pflags);
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free_busy(tp);
 		xfs_trans_free(tp);
 		XFS_STATS_INC(xfsstats.xs_trans_empty);
 		if (commit_lsn_p)
 			*commit_lsn_p = commit_lsn;
-		current->flags &= ~PF_FSTRANS;
 		return (shutdown);
 	}
 #if defined(XLOG_NOLOG) || defined(DEBUG)
@@ -823,8 +824,8 @@ shut_us_down:
 	 * had pinned, clean up, free trans structure, and return error.
 	 */
 	if (error || commit_lsn == -1) {
+                PFLAGS_RESTORE(&tp->t_pflags);
 		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
-		current->flags &= ~PF_FSTRANS;
 		return XFS_ERROR(EIO);
 	}
 
@@ -861,6 +862,9 @@ shut_us_down:
 	 */
 	error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
 
+	/* mark this thread as no longer being in a transaction */
+        PFLAGS_RESTORE(&tp->t_pflags);
+
 	/*
 	 * Once all the items of the transaction have been copied
 	 * to the in core log and the callback is attached, the
@@ -895,9 +899,6 @@ shut_us_down:
 	} else {
 		XFS_STATS_INC(xfsstats.xs_trans_async);
 	}
-
-	/* mark this thread as no longer being in a transaction */
-	current->flags &= ~PF_FSTRANS;
 
 	return (error);
 }
@@ -1098,12 +1099,13 @@ xfs_trans_cancel(
 		}
 		xfs_log_done(tp->t_mountp, tp->t_ticket, NULL, log_flags);
 	}
+
+	/* mark this thread as no longer being in a transaction */
+        PFLAGS_RESTORE(&tp->t_pflags);
+
 	xfs_trans_free_items(tp, flags);
 	xfs_trans_free_busy(tp);
 	xfs_trans_free(tp);
-
-	/* mark this thread as no longer being in a transaction */
-	current->flags &= ~PF_FSTRANS;
 }
 
 

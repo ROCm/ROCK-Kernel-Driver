@@ -45,6 +45,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/config.h>
@@ -87,7 +88,7 @@ static int timeout_val = WD_TIMEOUT;
 static int timeout = 2;
 static int expect_close = 0;
 
-MODULE_PARM(timeout,"i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)"); 
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -96,7 +97,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
 
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997, 1998, 1999 by Ralf Baechle
+ * Copyright (C) 1995, 96, 97, 98, 99, 2003 by Ralf Baechle
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SIGNAL_H
@@ -13,7 +13,7 @@
 #include <linux/types.h>
 
 #define _NSIG		128
-#define _NSIG_BPW	32
+#define _NSIG_BPW	(sizeof(unsigned long) * 8)
 #define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
 
 typedef struct {
@@ -87,7 +87,7 @@ typedef unsigned long old_sigset_t;		/* at least 32 bits */
 #define SA_ONESHOT	SA_RESETHAND
 #define SA_INTERRUPT	0x20000000	/* dummy -- ignored */
 
-#define SA_RESTORER	0x04000000
+#define SA_RESTORER	0x04000000	/* Only for o32 */
 
 /*
  * sigaltstack controls

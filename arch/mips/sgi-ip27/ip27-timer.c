@@ -107,7 +107,7 @@ again:
 	if (LOCAL_HUB_L(PI_RT_COUNT) >= ct_cur[cpu])
 		goto again;
 
-	kstat_cpu(cpu).irqs[irq]++;		/* kstat only for bootcpu? */
+	kstat_this_cpu.irqs[irq]++;		/* kstat only for bootcpu? */
 
 	if (cpu == 0)
 		do_timer(regs);
@@ -135,9 +135,6 @@ again:
 
 	write_sequnlock(&xtime_lock);
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
 }
 
 unsigned long ip27_do_gettimeoffset(void)

@@ -124,7 +124,6 @@ CONFIG_INET=y
 # ATA/IDE/MFM/RLL support
 #
 # CONFIG_IDE is not set
-# CONFIG_BLK_DEV_IDE_MODES is not set
 # CONFIG_BLK_DEV_HD is not set
 
 #
@@ -177,7 +176,7 @@ CONFIG_NETDEVICES=y
 # CONFIG_PPP is not set
 # CONFIG_EQUALIZER is not set
 # CONFIG_ARIADNE is not set
-# CONFIG_ARIADNE2 is not set
+# CONFIG_ZORRO8390 is not set
 # CONFIG_A2065 is not set
 # CONFIG_HYDRA is not set
 

@@ -408,7 +408,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	pci_read_config_word(dev, PCI_STATUS, &status);
-	printk("PCI: Enabling device %s (%04x  %04x)\n", dev->slot_name,
+	printk("PCI: Enabling device %s (%04x  %04x)\n", pci_name(dev),
 	       cmd, status);
 	/* We'll sort this out when we know it isn't enabled ;) */
 

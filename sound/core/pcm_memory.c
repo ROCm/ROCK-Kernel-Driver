@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/time.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
@@ -568,3 +569,18 @@ struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned lon
 }
 
 #endif /* CONFIG_PCI */
+
+#ifndef MODULE
+
+/* format is: snd-pcm=preallocate_dma,maximum_substreams */
+
+static int __init alsa_pcm_setup(char *str)
+{
+	(void)(get_option(&str,&preallocate_dma) == 2 &&
+	       get_option(&str,&maximum_substreams) == 2);
+	return 1;
+}
+
+__setup("snd-pcm=", alsa_pcm_setup);
+
+#endif /* ifndef MODULE */

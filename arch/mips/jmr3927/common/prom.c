@@ -78,11 +78,6 @@ void  __init prom_init_cmdline(void)
 	*cp = '\0';
 }
 
-int __init page_is_ram(unsigned long pagenr)
-{
-    return 1;
-}
-
 void prom_free_prom_memory (void)
 {
 }

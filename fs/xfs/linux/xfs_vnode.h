@@ -158,11 +158,11 @@ typedef enum vchange {
 
 
 typedef int	(*vop_open_t)(bhv_desc_t *, struct cred *);
-typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *,
-				const struct iovec *, unsigned long,
+typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct kiocb *,
+				const struct iovec *, unsigned int,
 				loff_t *, struct cred *);
-typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *,
-				const struct iovec *, unsigned long,
+typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct kiocb *,
+				const struct iovec *, unsigned int,
 				loff_t *, struct cred *);
 typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
 				loff_t *, size_t, read_actor_t,

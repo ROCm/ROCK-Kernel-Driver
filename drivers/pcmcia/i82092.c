@@ -44,7 +44,7 @@ MODULE_DEVICE_TABLE(pci, i82092aa_pci_ids);
 
 static int i82092aa_socket_suspend (struct pci_dev *dev, u32 state)
 {
-	return pcmcia_socket_dev_suspend(&dev->dev, state, 0);
+	return pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
 }
 
 static int i82092aa_socket_resume (struct pci_dev *dev)

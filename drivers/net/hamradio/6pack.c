@@ -67,11 +67,11 @@
 #define SIXP_DAMA_OFF		0
 
 /* default level 2 parameters */
-#define SIXP_TXDELAY			25	/* in 10 ms */
+#define SIXP_TXDELAY			(HZ/4)	/* in 1 s */
 #define SIXP_PERSIST			50	/* in 256ths */
-#define SIXP_SLOTTIME			10	/* in 10 ms */
-#define SIXP_INIT_RESYNC_TIMEOUT	150	/* in 10 ms */
-#define SIXP_RESYNC_TIMEOUT		500	/* in 10 ms */
+#define SIXP_SLOTTIME			(HZ/10)	/* in 1 s */
+#define SIXP_INIT_RESYNC_TIMEOUT	(3*HZ/2) /* in 1 s */
+#define SIXP_RESYNC_TIMEOUT		5*HZ	/* in 1 s */
 
 /* 6pack configuration. */
 #define SIXP_NRUNIT			31      /* MAX number of 6pack channels */

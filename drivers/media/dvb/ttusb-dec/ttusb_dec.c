@@ -124,14 +124,10 @@ static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 
 	ttusb_dec_send_command(dec, 0x50, sizeof(b), b, NULL, NULL);
 
-	if (!down_interruptible(&dec->pes2ts_sem)) {
 		dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
 				       ttusb_dec_av_pes2ts_cb, dec->demux.feed);
 		dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
 				       ttusb_dec_av_pes2ts_cb, dec->demux.feed);
-
-		up(&dec->pes2ts_sem);
-	}
 }
 
 static int ttusb_dec_i2c_master_xfer(struct dvb_i2c_bus *i2c,
@@ -196,14 +192,8 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 				memcpy(&dec->v_pes[dec->v_pes_length],
 				       &av_pes[12], prebytes);
 
-				if (!down_interruptible(&dec->pes2ts_sem)) {
-					dvb_filter_pes2ts(&dec->v_pes2ts,
-							  dec->v_pes,
-							  dec->v_pes_length +
-							  prebytes);
-
-					up(&dec->pes2ts_sem);
-				}
+				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+						  dec->v_pes_length + prebytes);
 			}
 
 			if (av_pes[5] & 0x10) {
@@ -246,15 +236,9 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 						     postbytes);
 			memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
 
-			if (postbytes == 0) {
-				if (!down_interruptible(&dec->pes2ts_sem)) {
-					dvb_filter_pes2ts(&dec->v_pes2ts,
-							  dec->v_pes,
+			if (postbytes == 0)
+				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
 							  dec->v_pes_length);
-
-					up(&dec->pes2ts_sem);
-				}
-			}
 
 			break;
 		}
@@ -357,6 +341,31 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 	}
 }
 
+static void ttusb_dec_process_urb_frame_list(unsigned long data)
+{
+	struct ttusb_dec *dec = (struct ttusb_dec *)data;
+	struct list_head *item;
+	struct urb_frame *frame;
+	unsigned long flags;
+
+	while (1) {
+		spin_lock_irqsave(&dec->urb_frame_list_lock, flags);
+		if ((item = dec->urb_frame_list.next) != &dec->urb_frame_list) {
+			frame = list_entry(item, struct urb_frame,
+					   urb_frame_list);
+			list_del(&frame->urb_frame_list);
+		} else {
+			spin_unlock_irqrestore(&dec->urb_frame_list_lock,
+					       flags);
+			return;
+		}
+		spin_unlock_irqrestore(&dec->urb_frame_list_lock, flags);
+
+		ttusb_dec_process_urb_frame(dec, frame->data, frame->length);
+		kfree(frame);
+	}
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 static void ttusb_dec_process_urb(struct urb *urb)
 #else
@@ -372,12 +381,28 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 			struct usb_iso_packet_descriptor *d;
 			u8 *b;
 			int length;
+			struct urb_frame *frame;
 
 			d = &urb->iso_frame_desc[i];
 			b = urb->transfer_buffer + d->offset;
 			length = d->actual_length;
 
-			ttusb_dec_process_urb_frame(dec, b, length);
+			if ((frame = kmalloc(sizeof(struct urb_frame),
+					     GFP_ATOMIC))) {
+				unsigned long flags;
+
+				memcpy(frame->data, b, length);
+				frame->length = length;
+
+				spin_lock_irqsave(&dec->urb_frame_list_lock,
+						     flags);
+				list_add_tail(&frame->urb_frame_list,
+					      &dec->urb_frame_list);
+				spin_unlock_irqrestore(&dec->urb_frame_list_lock,
+						       flags);
+
+				tasklet_schedule(&dec->urb_tasklet);
+			}
 		}
 	} else {
 		 /* -ENOENT is expected when unlinking urbs */
@@ -653,6 +678,14 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 	return 0;
 }
 
+static void ttusb_dec_init_tasklet(struct ttusb_dec *dec)
+{
+	dec->urb_frame_list_lock = SPIN_LOCK_UNLOCKED;
+	INIT_LIST_HEAD(&dec->urb_frame_list);
+	tasklet_init(&dec->urb_tasklet, ttusb_dec_process_urb_frame_list,
+		     (unsigned long)dec);
+}
+
 static void ttusb_dec_init_v_pes(struct ttusb_dec *dec)
 {
 	dprintk("%s\n", __FUNCTION__);
@@ -834,8 +867,6 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 		return result;
 	}
 
-	sema_init(&dec->pes2ts_sem, 1);
-
 	dvb_net_init(dec->adapter, &dec->dvb_net, &dec->demux.dmx);
 
 	return 0;
@@ -868,6 +899,20 @@ static void ttusb_dec_exit_usb(struct ttusb_dec *dec)
 	ttusb_dec_free_iso_urbs(dec);
 }
 
+static void ttusb_dec_exit_tasklet(struct ttusb_dec *dec)
+{
+	struct list_head *item;
+	struct urb_frame *frame;
+
+	tasklet_kill(&dec->urb_tasklet);
+
+	while ((item = dec->urb_frame_list.next) != &dec->urb_frame_list) {
+		frame = list_entry(item, struct urb_frame, urb_frame_list);
+		list_del(&frame->urb_frame_list);
+		kfree(frame);
+	}
+}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 static void *ttusb_dec_probe(struct usb_device *udev, unsigned int ifnum,
 			     const struct usb_device_id *id)
@@ -892,6 +937,7 @@ static void *ttusb_dec_probe(struct usb_device *udev, unsigned int ifnum,
 	ttusb_dec_init_stb(dec);
 	ttusb_dec_init_dvb(dec);
 	ttusb_dec_init_v_pes(dec);
+	ttusb_dec_init_tasklet(dec);
 
 	return (void *)dec;
 }
@@ -919,6 +965,7 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	ttusb_dec_init_stb(dec);
 	ttusb_dec_init_dvb(dec);
 	ttusb_dec_init_v_pes(dec);
+	ttusb_dec_init_tasklet(dec);
 
 	usb_set_intfdata(intf, (void *)dec);
 	ttusb_dec_set_streaming_interface(dec);
@@ -941,6 +988,7 @@ static void ttusb_dec_disconnect(struct usb_interface *intf)
 
 	dprintk("%s\n", __FUNCTION__);
 
+	ttusb_dec_exit_tasklet(dec);
 	ttusb_dec_exit_usb(dec);
 	ttusb_dec_exit_dvb(dec);
 

@@ -624,15 +624,11 @@ xfs_ioctl(
 
 	case XFS_IOC_DIOINFO: {
 		struct dioattr	da;
+		pb_target_t	*target =
+			(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
+			mp->m_rtdev_targp : mp->m_ddev_targp;
 
-
-		/*
-		 * this only really needs to be BBSIZE.
-		 * it is set to the file system block size to
-		 * avoid having to do block zeroing on short writes.
-		 */
-		da.d_miniosz = mp->m_sb.sb_blocksize;
-		da.d_mem = mp->m_sb.sb_blocksize;
+		da.d_mem = da.d_miniosz = 1 << target->pbr_sshift;
 		/* The size dio will do in one go */
 		da.d_maxiosz = 64 * PAGE_CACHE_SIZE;
 

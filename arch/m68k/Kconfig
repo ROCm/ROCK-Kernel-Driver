@@ -1126,37 +1126,8 @@ config SOFT_WATCHDOG
 	  <file:Documentation/modules.txt>. The module will be called
 	  softdog.
 
-config RTC
-	bool "Enhanced Real Time Clock Support"
-	depends on ATARI
-	---help---
-	  If you say Y here and create a character special file /dev/rtc with
-	  major number 10 and minor number 135 using mknod ("man mknod"), you
-	  will get access to the real time clock (or hardware clock) built
-	  into your computer.
-
-	  Every PC has such a clock built in. It can be used to generate
-	  signals from as low as 1Hz up to 8192Hz, and can also be used
-	  as a 24 hour alarm. It reports status information via the file
-	  /proc/driver/rtc and its behaviour is set by various ioctls on
-	  /dev/rtc.
-
-	  If you run Linux on a multiprocessor machine and said Y to
-	  "Symmetric Multi Processing" above, you should say Y here to read
-	  and set the RTC in an SMP compatible fashion.
-
-	  If you think you have a use for such a device (such as periodic data
-	  sampling), then say Y here, and read <file:Documentation/rtc.txt>
-	  for details.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
-
 config GEN_RTC
 	tristate "Generic /dev/rtc emulation" if !SUN3
-	depends on !ATARI
 	default y if SUN3
 	---help---
 	  If you say Y here and create a character special file /dev/rtc with
@@ -1228,15 +1199,7 @@ config UNIX98_PTY_COUNT
 
 endmenu
 
-
-menu "Sound support"
-
-config SOUND
-	tristate "Sound card support"
-
-source "sound/oss/dmasound/Kconfig"
-
-endmenu
+source "sound/Kconfig"
 
 source "fs/Kconfig"
 
@@ -1269,6 +1232,15 @@ config DEBUG_BUGVERBOSE
 	bool "Verbose BUG() reporting"
 	depends on DEBUG_KERNEL
 
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
+	help
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
+	  
 endmenu
 
 source "security/Kconfig"

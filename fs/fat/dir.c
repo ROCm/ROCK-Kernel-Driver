@@ -688,32 +688,6 @@ int fat_dir_ioctl(struct inode * inode, struct file * filp,
 	return ret;
 }
 
-/***** See if directory is empty */
-int fat_dir_empty(struct inode *dir)
-{
-	loff_t pos, i_pos;
-	struct buffer_head *bh;
-	struct msdos_dir_entry *de;
-	int result = 0;
-
-	pos = 0;
-	bh = NULL;
-	while (fat_get_entry(dir,&pos,&bh,&de,&i_pos) > -1) {
-		/* Ignore vfat longname entries */
-		if (de->attr == ATTR_EXT)
-			continue;
-		if (!IS_FREE(de->name) && 
-		    strncmp(de->name,MSDOS_DOT   , MSDOS_NAME) &&
-		    strncmp(de->name,MSDOS_DOTDOT, MSDOS_NAME)) {
-			result = -ENOTEMPTY;
-			break;
-		}
-	}
-
-	brelse(bh);
-	return result;
-}
-
 /* This assumes that size of cluster is above the 32*slots */
 
 int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
@@ -790,19 +764,75 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 	return 0;
 }
 
+static int fat_get_short_entry(struct inode *dir, loff_t *pos,
+			       struct buffer_head **bh,
+			       struct msdos_dir_entry **de, loff_t *i_pos)
+{
+	while (fat_get_entry(dir, pos, bh, de, i_pos) >= 0) {
+		/* free entry or long name entry or volume label */
+		if (!IS_FREE((*de)->name) && !((*de)->attr & ATTR_VOLUME))
+			return 0;
+	}
+	return -ENOENT;
+}
+
+/* See if directory is empty */
+int fat_dir_empty(struct inode *dir)
+{
+	struct buffer_head *bh;
+	struct msdos_dir_entry *de;
+	loff_t cpos, i_pos;
+	int result = 0;
+
+	bh = NULL;
+	cpos = 0;
+	while (fat_get_short_entry(dir, &cpos, &bh, &de, &i_pos) >= 0) {
+		if (strncmp(de->name, MSDOS_DOT   , MSDOS_NAME) &&
+		    strncmp(de->name, MSDOS_DOTDOT, MSDOS_NAME)) {
+			result = -ENOTEMPTY;
+			break;
+		}
+	}
+	brelse(bh);
+	return result;
+}
+
 /*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 8
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -8
- * c-argdecl-indent: 8
- * c-label-offset: -8
- * c-continued-statement-offset: 8
- * c-continued-brace-offset: 0
- * End:
+ * fat_subdirs counts the number of sub-directories of dir. It can be run
+ * on directories being created.
  */
+int fat_subdirs(struct inode *dir)
+{
+	struct buffer_head *bh;
+	struct msdos_dir_entry *de;
+	loff_t cpos, i_pos;
+	int count = 0;
+
+	bh = NULL;
+	cpos = 0;
+	while (fat_get_short_entry(dir, &cpos, &bh, &de, &i_pos) >= 0) {
+		if (de->attr & ATTR_DIR)
+			count++;
+	}
+	brelse(bh);
+	return count;
+}
+
+/*
+ * Scans a directory for a given file (name points to its formatted name).
+ * Returns an error code or zero.
+ */
+int fat_scan(struct inode *dir, const unsigned char *name,
+	     struct buffer_head **bh, struct msdos_dir_entry **de,
+	     loff_t *i_pos)
+{
+	loff_t cpos;
+
+	*bh = NULL;
+	cpos = 0;
+	while (fat_get_short_entry(dir, &cpos, bh, de, i_pos) >= 0) {
+		if (!strncmp((*de)->name, name, MSDOS_NAME))
+			return 0;
+	}
+	return -ENOENT;
+}

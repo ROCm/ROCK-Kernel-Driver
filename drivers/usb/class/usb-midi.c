@@ -1524,10 +1524,10 @@ static int get_alt_setting( struct usb_device *d, int ifnum )
 	int epin, epout;
 	int i;
 
-	alts = d->actconfig->interface[ifnum].num_altsetting;
+	alts = d->actconfig->interface[ifnum]->num_altsetting;
 
 	for ( alt=0 ; alt<alts ; alt++ ) {
-		interface = &d->actconfig->interface[ifnum].altsetting[alt];
+		interface = &d->actconfig->interface[ifnum]->altsetting[alt];
 		epin = -1;
 		epout = -1;
 
@@ -1795,8 +1795,8 @@ static int detect_yamaha_device( struct usb_device *d, unsigned int ifnum, struc
 		return -EINVAL;
 	}
 
-	for ( i=0 ; i < c->interface[ifnum].num_altsetting; i++ ) {
-		interface = c->interface[ifnum].altsetting + i;
+	for ( i=0 ; i < c->interface[ifnum]->num_altsetting; i++ ) {
+		interface = c->interface[ifnum]->altsetting + i;
 
 		if ( interface->desc.bInterfaceClass != 255 ||
 		     interface->desc.bInterfaceSubClass != 0 )
@@ -1889,8 +1889,8 @@ static int detect_midi_subclass(struct usb_device *d, unsigned int ifnum, struct
 	int alts=-1;
 	int ret;
 
-	for ( i=0 ; i < c->interface[ifnum].num_altsetting; i++ ) {
-		interface = c->interface[ifnum].altsetting + i;
+	for ( i=0 ; i < c->interface[ifnum]->num_altsetting; i++ ) {
+		interface = c->interface[ifnum]->altsetting + i;
 
 		if ( interface->desc.bInterfaceClass != USB_CLASS_AUDIO ||
 		     interface->desc.bInterfaceSubClass != USB_SUBCLASS_MIDISTREAMING )

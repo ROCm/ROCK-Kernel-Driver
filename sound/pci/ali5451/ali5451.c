@@ -277,7 +277,7 @@ struct snd_stru_ali {
 #endif
 };
 
-static struct pci_device_id snd_ali_ids[] __devinitdata = {
+static struct pci_device_id snd_ali_ids[] = {
 	{0x10b9, 0x5451, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
 	{0, }
 };
@@ -1891,27 +1891,14 @@ static int __devinit snd_ali_mixer(ali_t * codec)
 }
 
 #ifdef CONFIG_PM
-#ifndef PCI_OLD_SUSPEND
-static int snd_ali_suspend(struct pci_dev *dev, u32 state)
-#else
-static void snd_ali_suspend(struct pci_dev *dev)
-#endif
+static void ali_suspend(ali_t *chip)
 {
-#ifndef PCI_OLD_SUSPEND
-	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return -ENXIO);
-#else
-	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return);
-#endif
 	ali_image_t *im;
 	int i, j;
 
 	im = chip->image;
 	if (! im)
-#ifndef PCI_OLD_SUSPEND
-		return -ENXIO;
-#else
 		return;
-#endif
 
 	spin_lock_irq(&chip->reg_lock);
 	
@@ -1938,32 +1925,16 @@ static void snd_ali_suspend(struct pci_dev *dev)
 	outl(0xffffffff, ALI_REG(chip, ALI_STOP));
 
 	spin_unlock_irq(&chip->reg_lock);
-#ifndef PCI_OLD_SUSPEND
-	return 0;
-#endif
 }
 
-#ifndef PCI_OLD_SUSPEND
-static int snd_ali_resume(struct pci_dev *dev)
-#else
-static void snd_ali_resume(struct pci_dev *dev)
-#endif
+static void ali_resume(ali_t *chip)
 {
-#ifndef PCI_OLD_SUSPEND
-	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return -ENXIO);
-#else
-	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return);
-#endif
 	ali_image_t *im;
 	int i, j;
 
 	im = chip->image;
 	if (! im)
-#ifndef PCI_OLD_SUSPEND
-		return -ENXIO;
-#else
 		return;
-#endif
 
 	pci_enable_device(chip->pci);
 
@@ -1989,11 +1960,22 @@ static void snd_ali_resume(struct pci_dev *dev)
 	outl(im->regs[ALI_MISCINT >> 2], ALI_REG(chip, ALI_MISCINT));
 	
 	spin_unlock_irq(&chip->reg_lock);
-#ifndef PCI_OLD_SUSPEND
-	return 0;
-#endif
+	return;
 }
-#endif
+
+static int snd_ali_suspend(struct pci_dev *dev, u32 state)
+{
+	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return -ENXIO);
+	ali_suspend(chip);
+	return 0;
+}
+static int snd_ali_resume(struct pci_dev *dev)
+{
+	ali_t *chip = snd_magic_cast(ali_t, pci_get_drvdata(dev), return -ENXIO);
+	ali_resume(chip);
+	return 0;
+}
+#endif /* CONFIG_PM */
 
 static int snd_ali_free(ali_t * codec)
 {
@@ -2181,7 +2163,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 	/* M7101: power management */
        	pci_dev = pci_find_device(0x10b9, 0x7101, NULL);
 	codec->pci_m7101 = pci_dev;
-	if (! codec->pci_m7101) {
+	if (! codec->pci_m7101 && codec->revision == ALI_5451_V02) {
 		snd_printk(KERN_ERR "ali5451: cannot find ALi 7101 chip.\n");
 		snd_ali_free(codec);
 		return -ENODEV;

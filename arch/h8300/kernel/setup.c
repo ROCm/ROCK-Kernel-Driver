@@ -1,5 +1,5 @@
 /*
- *  linux/arch/h8300h/kernel/setup.c
+ *  linux/arch/h8300/kernel/setup.c
  *
  *  Copyleft  ()) 2000       James D. Schettine {james@telos-systems.com}
  *  Copyright (C) 1999,2000  Greg Ungerer (gerg@snapgear.com)
@@ -9,7 +9,7 @@
  *  Copyright (C) 2000       Lineo Inc. (www.lineo.com) 
  *  Copyright (C) 2001 	     Lineo, Inc. <www.lineo.com>
  *
- *  H8/300H porting Yoshinori Sato <ysato@users.sourceforge.jp>
+ *  H8/300 porting Yoshinori Sato <ysato@users.sourceforge.jp>
  */
 
 /*
@@ -38,9 +38,21 @@
 #include <asm/pgtable.h>
 #endif
 
-#if defined(CONFIG_CPU_H8300H)
+#if defined(__H8300H__)
 #define CPU "H8/300H"
 #endif
+
+#if defined(__H8300S__)
+#define CPU "H8S"
+#endif
+
+#if defined(CONFIG_INTELFLASH)
+#define BLKOFFSET 512
+#else
+#define BLKOFFSET 0
+#endif
+
+#define STUBSIZE 0xc000;
 
 unsigned long rom_length;
 unsigned long memory_start;
@@ -54,10 +66,12 @@ char saved_command_line[512];
 extern int _stext, _etext, _sdata, _edata, _sbss, _ebss, _end;
 extern int _ramstart, _ramend;
 extern char _target_name[];
+extern void h8300_gpio_init(void);
 
-#if defined(CONFIG_H8300H_SIM) && defined(CONFIG_GDB_MAGICPRINT)
+#if (defined(CONFIG_H8300H_SIM) || defined(CONFIG_H8S_SIM)) \
+    && defined(CONFIG_GDB_MAGICPRINT)
 /* printk with gdb service */
-static void gdb_console_output(struct console *c, char *msg, unsigned len)
+static void gdb_console_output(struct console *c, const char *msg, unsigned len)
 {
 	for (; len > 0; len--) {
 		asm("mov.w %0,r2\n\t"
@@ -77,7 +91,7 @@ static int __init gdb_console_setup(struct console *co, char *options)
 }
 
 static const struct console gdb_console = {
-	name:		"gdb",
+	name:		"gdb_con",
 	write:		gdb_console_output,
 	device:		NULL,
 	setup:		gdb_console_setup,
@@ -86,26 +100,48 @@ static const struct console gdb_console = {
 };
 #endif
 
-void setup_arch(char **cmdline_p)
+void __init setup_arch(char **cmdline_p)
 {
 	int bootmap_size;
 
-	memory_start = PAGE_ALIGN((unsigned long)(&_ramstart));
-	memory_end = &_ramend; /* by now the stack is part of the init task */
+	memory_start = (unsigned long) &_ramstart;
+
+	/* allow for ROMFS on the end of the kernel */
+	if (memcmp((void *)(memory_start + BLKOFFSET), "-rom1fs-", 8) == 0) {
+#if defined(CONFIG_BLK_DEV_INITRD)
+		initrd_start = memory_start += BLKOFFSET;
+		initrd_end = memory_start += be32_to_cpu(((unsigned long *) (memory_start))[2]);
+#else
+		memory_start += BLKOFFSET;
+		memory_start += be32_to_cpu(((unsigned long *) memory_start)[2]);
+#endif
+	}
+	memory_start = PAGE_ALIGN(memory_start);
+#if !defined(CONFIG_BLKDEV_RESERVE)
+	memory_end = (unsigned long) &_ramend; /* by now the stack is part of the init task */
+#if defined(CONFIG_GDB_DEBUG)
+	memory_end -= STUBSIZE;
+#endif
+#else
+	if ((memory_end < CONFIG_BLKDEV_RESERVE_ADDRESS) && 
+	    (memory_end > CONFIG_BLKDEV_RESERVE_ADDRESS)
+	    /* overlap userarea */
+	    memory_end = CONFIG_BLKDEV_RESERVE_ADDRESS; 
+#endif
 
 	init_mm.start_code = (unsigned long) &_stext;
 	init_mm.end_code = (unsigned long) &_etext;
 	init_mm.end_data = (unsigned long) &_edata;
 	init_mm.brk = (unsigned long) 0; 
 
-#if defined(CONFIG_H8300H_SIM) && defined(CONFIG_GDB_MAGICPRINT)
+#if (defined(CONFIG_H8300H_SIM) || defined(CONFIG_H8S_SIM)) && defined(CONFIG_GDB_MAGICPRINT)
 	register_console(&gdb_console);
 #endif
 
-	printk("\x0F\r\n\nuClinux " CPU "\n");
+	printk("\r\n\nuClinux " CPU "\n");
 	printk("Target Hardware: %s\n",_target_name);
 	printk("Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne\n");
-	printk("H8/300H support by Yoshinori Sato <ysato@users.sourceforge.jp>\n");
+	printk("H8/300 series support by Yoshinori Sato <ysato@users.sourceforge.jp>\n");
 
 #ifdef DEBUG
 	printk("KERNEL -> TEXT=0x%06x-0x%06x DATA=0x%06x-0x%06x "
@@ -157,6 +193,7 @@ void setup_arch(char **cmdline_p)
 	 * get kmalloc into gear
 	 */
 	paging_init();
+	h8300_gpio_init();
 #ifdef DEBUG
 	printk("Done setup_arch\n");
 #endif

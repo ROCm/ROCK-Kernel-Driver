@@ -171,7 +171,7 @@ MODULE_PARM(message_level, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ;
 static int network_monitor[OLYMPIC_MAX_ADAPTERS] = {0,};
 MODULE_PARM(network_monitor, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i");
 
-static struct pci_device_id olympic_pci_tbl[] __devinitdata = {
+static struct pci_device_id olympic_pci_tbl[] = {
 	{PCI_VENDOR_ID_IBM,PCI_DEVICE_ID_IBM_TR_WAKE,PCI_ANY_ID,PCI_ANY_ID,},
 	{ } 	/* Terminating Entry */
 };

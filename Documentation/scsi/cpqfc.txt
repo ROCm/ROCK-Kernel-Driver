@@ -102,7 +102,6 @@ using "qa_test" (esp. io_test script) suite modified from Unix tests.
 Installation:
 make menuconfig
   (select SCSI low-level, Compaq FC HBA)
-make dep
 make modules
 make modules_install
 

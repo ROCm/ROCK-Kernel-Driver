@@ -1,10 +1,24 @@
+/*
+ * Processor capabilities determination functions.
+ *
+ * Copyright (C) 1994 - 2003 Ralf Baechle
+ * Copyright (C) 2001 MIPS Inc.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
+ */
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/ptrace.h>
 #include <linux/stddef.h>
+
 #include <asm/bugs.h>
 #include <asm/cpu.h>
 #include <asm/fpu.h>
 #include <asm/mipsregs.h>
+#include <asm/system.h>
 
 /*
  * Not all of the MIPS CPUs have the "wait" instruction available. Moreover,
@@ -96,7 +110,7 @@ static inline void check_wait(void)
 	}
 }
 
-void __init check_bugs(void)
+void __init check_bugs32(void)
 {
 	check_wait();
 }
@@ -493,7 +507,6 @@ __init void cpu_probe(void)
 		break;
 	default:
 		c->cputype = CPU_UNKNOWN;
-		c->tlbsize = ((config1 >> 25) & 0x3f) + 1;
 	}
 	if (c->options & MIPS_CPU_FPU)
 		c->fpu_id = cpu_get_fpu_id();

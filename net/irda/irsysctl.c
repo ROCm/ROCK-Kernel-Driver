@@ -67,7 +67,7 @@ static int min_slot_timeout = 20;
 static int max_max_baud_rate = 16000000;	/* See qos.c - IrLAP spec */
 static int min_max_baud_rate = 2400;
 static int max_min_tx_turn_time = 10000;	/* See qos.c - IrLAP spec */
-static int min_min_tx_turn_time = 0;
+static int min_min_tx_turn_time;
 static int max_max_tx_data_size = 2048;		/* See qos.c - IrLAP spec */
 static int min_max_tx_data_size = 64;
 static int max_max_tx_window = 7;		/* See qos.c - IrLAP spec */

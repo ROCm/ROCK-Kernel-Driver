@@ -1,7 +1,7 @@
 /* Driver for Philips webcam
    Functions that send various control messages to the webcam, including
    video modes.
-   (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
+   (C) 1999-2003 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -452,7 +452,7 @@ int pwc_set_video_mode(struct pwc_device *pdev, int width, int height, int frame
 	pdev->view.x = width;
 	pdev->view.y = height;
 	pwc_set_image_buffer_size(pdev);
-	Trace(TRACE_SIZE, "Set viewport to %dx%d, image size is %dx%d, palette = %d.\n", width, height, pwc_image_sizes[size].x, pwc_image_sizes[size].y, pdev->vpalette);
+	Trace(TRACE_SIZE, "Set viewport to %dx%d, image size is %dx%d.\n", width, height, pwc_image_sizes[size].x, pwc_image_sizes[size].y);
 	return 0;
 }
 
@@ -461,38 +461,8 @@ void pwc_set_image_buffer_size(struct pwc_device *pdev)
 {
 	int factor, i, filler = 0;
 
-	switch(pdev->vpalette) {
-	case VIDEO_PALETTE_RGB32 | 0x80:
-	case VIDEO_PALETTE_RGB32:
-		factor = 16;
-		filler = 0;
-		break;
-	case VIDEO_PALETTE_RGB24 | 0x80:
-	case VIDEO_PALETTE_RGB24:
-		factor = 12;
-		filler = 0;
-		break;
-	case VIDEO_PALETTE_YUYV:
-	case VIDEO_PALETTE_YUV422:
-		factor = 8;
-		filler = 128;
-		break;
-	case VIDEO_PALETTE_YUV420:
-	case VIDEO_PALETTE_YUV420P:
-		factor = 6;
-		filler = 128;
-		break;
-#if PWC_DEBUG		
-	case VIDEO_PALETTE_RAW:
-		pdev->image.size = pdev->frame_size;
-		pdev->view.size = pdev->frame_size;
-		return;
-		break;
-#endif	
-	default:
-		factor = 0;
-		break;
-	}
+	factor = 6;
+	filler = 128;
 
 	/* Set sizes in bytes */
 	pdev->image.size = pdev->image.x * pdev->image.y * factor / 4;
@@ -1355,7 +1325,7 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 	{
 		struct pwc_probe *probe = arg;
 		
-		strcpy(probe->name, pdev->vdev->name);
+		strcpy(probe->name, pdev->vdev.name);
 		probe->type = pdev->type;
 		break;
 	}

@@ -15,9 +15,9 @@
 /*
  *	Values taken from NET/ROM documentation.
  */
-static int min_quality[] = {0}, max_quality[] = {255};
-static int min_obs[]     = {0}, max_obs[]     = {255};
-static int min_ttl[]     = {0}, max_ttl[]     = {255};
+static int min_quality[1],       max_quality[] = {255};
+static int min_obs[1],           max_obs[]     = {255};
+static int min_ttl[1],           max_ttl[]     = {255};
 static int min_t1[]      = {5 * HZ};
 static int max_t1[]      = {600 * HZ};
 static int min_n2[]      = {2}, max_n2[]      = {127};
@@ -28,7 +28,7 @@ static int max_t4[]      = {1000 * HZ};
 static int min_window[]  = {1}, max_window[]  = {127};
 static int min_idle[]    = {0 * HZ};
 static int max_idle[]    = {65535 * HZ};
-static int min_route[]   = {0}, max_route[]   = {1};
+static int min_route[1],        max_route[]   = {1};
 static int min_fails[]   = {1}, max_fails[]   = {10};
 
 static struct ctl_table_header *nr_table_header;

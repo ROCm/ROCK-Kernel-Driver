@@ -102,7 +102,7 @@ MODULE_PARM_DESC(coalesce, "Enable or Disable interrupt coalescing, 1: Enable, 0
 MODULE_PARM(dynamic_ipg, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM_DESC(dynamic_ipg, "Enable or Disable dynamic IPG, 1: Enable, 0: Disable");
 
-static struct pci_device_id amd8111e_pci_tbl[] __devinitdata = {
+static struct pci_device_id amd8111e_pci_tbl[] = {
 		
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD8111E_7462,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -1405,7 +1405,7 @@ static int amd8111e_ethtool_ioctl(struct net_device* dev, void* useraddr)
 		strcpy (info.version, MODULE_VERSION);
 		memset(&info.fw_version, 0, sizeof(info.fw_version));
 		sprintf(info.fw_version,"%u",chip_version);
-		strcpy (info.bus_info, pci_dev->slot_name);
+		strcpy (info.bus_info, pci_name(pci_dev));
 		info.eedump_len = 0;
 		info.regdump_len = AMD8111E_REG_DUMP_LEN;
 		if (copy_to_user (useraddr, &info, sizeof(info)))

@@ -77,7 +77,7 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define PCI_DEVICE_ID_VT1724		0x1724
 #endif
 
-static struct pci_device_id snd_vt1724_ids[] __devinitdata = {
+static struct pci_device_id snd_vt1724_ids[] = {
 	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_VT1724, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, }
 };
@@ -1583,8 +1583,8 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice)
 	struct snd_ice1712_card_info **tbl, *c;
 
 	if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) == 0) {
-		snd_printk("ICE1724 has not detected EEPROM\n");
-		return -EIO;
+		snd_printk(KERN_WARNING "ICE1724 has not detected EEPROM\n");
+		// return -EIO;
 	}
 	ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
 				(snd_vt1724_read_i2c(ice, dev, 0x01) << 8) | 

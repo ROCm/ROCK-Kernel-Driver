@@ -699,7 +699,6 @@ skip_commit: /* The journal should be unlocked by now. */
 		cp_transaction = jh->b_cp_transaction;
 		if (cp_transaction) {
 			JBUFFER_TRACE(jh, "remove from old cp transaction");
-			J_ASSERT_JH(jh, commit_transaction != cp_transaction);
 			__journal_remove_checkpoint(jh);
 		}
 

@@ -51,7 +51,7 @@ struct proc_dir_entry *jffs_proc_root;
  * Linked list of 'jffs_partition_dirs' to help us track
  * the mounted JFFS partitions in the system
  */
-static struct jffs_partition_dir *jffs_part_dirs = 0;
+static struct jffs_partition_dir *jffs_part_dirs;
 
 /*
  * Read functions for entries

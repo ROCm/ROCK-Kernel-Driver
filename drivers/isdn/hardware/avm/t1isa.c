@@ -370,7 +370,7 @@ static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 	sprintf(card->name, "t1isa-%x", card->port);
 
 	if (!(((card->port & 0x7) == 0) && ((card->port & 0x30) != 0x30))) {
-		printk(KERN_WARNING "t1isa: illegal port 0x%x.\n", card->port);
+		printk(KERN_WARNING "t1isa: invalid port 0x%x.\n", card->port);
 		retval = -EINVAL;
 		goto err_free;
         }

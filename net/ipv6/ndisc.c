@@ -1161,7 +1161,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	if (ndopts.nd_opts_tgt_lladdr || ndopts.nd_opts_rh) {
 		if (net_ratelimit())
 			ND_PRINTK0(KERN_WARNING
-				   "ICMP6 RA: got illegal option with RA");
+				   "ICMP6 RA: got invalid option with RA");
 	}
 out:
 	if (rt)

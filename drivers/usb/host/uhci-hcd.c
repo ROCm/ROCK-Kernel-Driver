@@ -2346,7 +2346,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 	/* disable legacy emulation */
 	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
 
-	usb_connect(udev);
 	udev->speed = USB_SPEED_FULL;
 
 	if (usb_register_root_hub(udev, &hcd->pdev->dev) != 0) {
@@ -2503,7 +2502,7 @@ static const struct hc_driver uhci_driver = {
 	.hub_control =		uhci_hub_control,
 };
 
-static const struct pci_device_id __devinitdata uhci_pci_ids[] = { {
+static const struct pci_device_id uhci_pci_ids[] = { {
 
 	/* handle any USB UHCI controller */
 	.class = 		((PCI_CLASS_SERIAL_USB << 8) | 0x00),

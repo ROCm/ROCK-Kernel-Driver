@@ -3173,7 +3173,7 @@ int __init stl_init(void)
 	for (i = 0; i < 4; i++) {
 		devfs_mk_cdev(MKDEV(STL_SIOMEMMAJOR, i),
 				S_IFCHR|S_IRUSR|S_IWUSR,
-				&stl_fsiomem, NULL, "staliomem/%d", i);
+				"staliomem/%d", i);
 	}
 
 	stl_serial->owner = THIS_MODULE;

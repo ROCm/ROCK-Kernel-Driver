@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000, 2001, 2002 Broadcom Corporation
+ * Copyright (C) 2000, 2001, 2002, 2003 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -66,6 +66,10 @@ extern unsigned char __rd_end;
 
 #ifdef CONFIG_SMP
 static int reboot_smp = 0;
+#endif
+
+#ifdef CONFIG_KGDB
+extern int kgdb_port;
 #endif
 
 static void cfe_linux_exit(void)
@@ -185,6 +189,18 @@ static __init void prom_meminit(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 static int __init initrd_setup(char *str)
 {
+	char rdarg[64];
+	int idx;
+
+	/* Make a copy of the initrd argument so we can smash it up here */
+	for (idx = 0; idx < sizeof(rdarg)-1; idx++) {
+		if (!str[idx] || (str[idx] == ' ')) break;
+		rdarg[idx] = str[idx];
+	}
+
+	rdarg[idx] = 0;
+	str = rdarg;
+
 	/*
 	 *Initrd location comes in the form "<hex size of ramdisk in bytes>@<location in memory>"
 	 *  e.g. initrd=3abfd@80010000.  This is set up by the loader.
@@ -212,10 +228,10 @@ static int __init initrd_setup(char *str)
 		goto fail;
 	}
 	initrd_end = initrd_start + initrd_size;
-	printk("Found initrd of %lx@%lx\n", initrd_size, initrd_start);
+	prom_printf("Found initrd of %lx@%lx\n", initrd_size, initrd_start);
 	return 1;
  fail:
-	printk("Bad initrd argument.  Disabling initrd\n");
+	prom_printf("Bad initrd argument.  Disabling initrd\n");
 	initrd_start = 0;
 	initrd_end = 0;
 	return 1;
@@ -230,6 +246,9 @@ __init int prom_init(int argc, char **argv, char **envp, int *prom_vec)
 {
 	uint64_t cfe_ept, cfe_handle;
 	unsigned int cfe_eptseal;
+#ifdef CONFIG_KGDB
+	char *arg;
+#endif
 
 	_machine_restart   = (void (*)(char *))cfe_linux_exit;
 	_machine_halt      = cfe_linux_exit;
@@ -265,7 +284,9 @@ __init int prom_init(int argc, char **argv, char **envp, int *prom_vec)
 		}
 	}
 	if (cfe_eptseal != CFE_EPTSEAL) {
-		/* XXXKW what?  way too early to panic... */
+		/* too early for panic to do any good */
+		prom_printf("CFE's entrypoint seal doesn't match. Spinning.");
+		while (1) ;
 	}
 	cfe_init(cfe_handle, cfe_ept);
 	/* 
@@ -285,9 +306,18 @@ __init int prom_init(int argc, char **argv, char **envp, int *prom_vec)
 #endif
 		} else {
 			/* The loader should have set the command line */
-			panic("LINUX_CMDLINE not defined in cfe.");
+			/* too early for panic to do any good */
+			prom_printf("LINUX_CMDLINE not defined in cfe.");
+			while (1) ;
 		}
 	}
+
+#ifdef CONFIG_KGDB
+	if ((arg = strstr(arcs_cmdline,"kgdb=duart")) != NULL)
+		kgdb_port = (arg[10] == '0') ? 0 : 1;
+	else
+		kgdb_port = 1;
+#endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	{
@@ -322,19 +352,6 @@ __init int prom_init(int argc, char **argv, char **envp, int *prom_vec)
 void prom_free_prom_memory(void)
 {
 	/* Not sure what I'm supposed to do here.  Nothing, I think */
-}
-
-int page_is_ram(unsigned long pagenr)
-{
-	phys_t addr = pagenr << PAGE_SHIFT;
-	int i;
-	for (i = 0; i < board_mem_region_count; i++) {
-		if ((addr >= board_mem_region_addrs[i])
-		    && (addr < (board_mem_region_addrs[i] + board_mem_region_sizes[i]))) {
-			return 1;
-		}
-	}
-	return 0;
 }
 
 void prom_putchar(char c)

@@ -37,7 +37,6 @@
 #ifndef __PAGE_BUF_H__
 #define __PAGE_BUF_H__
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/list.h>
 #include <linux/types.h>
@@ -79,8 +78,9 @@ typedef enum {				/* pbm_flags values */
 	PBMF_EOF =		0x01,	/* mapping contains EOF		*/
 	PBMF_HOLE =		0x02,	/* mapping covers a hole	*/
 	PBMF_DELAY =		0x04,	/* mapping covers delalloc region  */
-	PBMF_UNWRITTEN =	0x20	/* mapping covers allocated	*/
+	PBMF_UNWRITTEN =	0x20,	/* mapping covers allocated	*/
 					/* but uninitialized file data	*/
+	PBMF_NEW =		0x40	/* just allocated		*/
 } bmap_flags_t;
 
 typedef enum {
@@ -95,6 +95,7 @@ typedef enum {
 	BMAP_MMAP = (1 << 6),		/* allocate for mmap write */
 	BMAP_SYNC = (1 << 7),		/* sync write */
 	BMAP_TRYLOCK = (1 << 8),	/* non-blocking request */
+	BMAP_DEVICE = (1 << 9),		/* we only want to know the device */
 } bmapi_flags_t;
 
 typedef enum page_buf_flags_e {		/* pb_flags values */
@@ -267,6 +268,7 @@ extern page_buf_t *pagebuf_lookup(
 
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with	*/
 					/*  no memory or disk address	*/
+		size_t len,
 		struct pb_target *);	/* mount point "fake" inode	*/
 
 extern page_buf_t *pagebuf_get_no_daddr(/* allocate pagebuf struct	*/

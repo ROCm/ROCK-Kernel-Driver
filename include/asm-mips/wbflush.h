@@ -8,8 +8,8 @@
  * Copyright (c) 1998 Harald Koerfgen
  * Copyright (C) 2002 Maciej W. Rozycki
  */
-#ifndef __ASM_MIPS_WBFLUSH_H
-#define __ASM_MIPS_WBFLUSH_H
+#ifndef _ASM_WBFLUSH_H
+#define _ASM_WBFLUSH_H
 
 #include <linux/config.h>
 
@@ -32,4 +32,4 @@ extern void wbflush_setup(void);
 
 #endif /* !CONFIG_CPU_HAS_WB */
 
-#endif /* __ASM_MIPS_WBFLUSH_H */
+#endif /* _ASM_WBFLUSH_H */

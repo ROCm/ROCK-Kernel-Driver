@@ -177,7 +177,7 @@ static __inline__ void tx_dump_ring(struct happy_meal *hp)
 /* This happy_pci_ids is declared __initdata because it is only used
    as an advisory to depmod.  If this is ported to the new PCI interface
    where it could be referenced at any time due to hot plugging,
-   it should be changed to __devinitdata. */
+   the __initdata reference should be removed. */
 
 struct pci_device_id happymeal_pci_ids[] __initdata = {
 	{

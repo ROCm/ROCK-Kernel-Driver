@@ -33,6 +33,7 @@
 #include <linux/videodev.h>
 #include <linux/pci.h>
 #include <asm/scatterlist.h>
+#include <asm/io.h>
 
 #include <media/video-buf.h>
 #include <media/audiochip.h>

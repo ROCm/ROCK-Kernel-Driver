@@ -57,13 +57,11 @@ not yet in use. This is done using the I/O memory space resource management
 functions:
 
     request_mem_region()
-    check_mem_region()		(deprecated)
     release_mem_region()
 
 Shortcuts to claim the whole device's address space are provided as well:
 
     zorro_request_device
-    zorro_check_device		(deprecated)
     zorro_release_device
 
 

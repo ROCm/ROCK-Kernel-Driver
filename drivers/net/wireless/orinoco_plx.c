@@ -236,7 +236,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 
 	printk(KERN_DEBUG
 	       "Detected Orinoco/Prism2 PLX device at %s irq:%d, io addr:0x%lx\n",
-	       pdev->slot_name, pdev->irq, pccard_ioaddr);
+	       pci_name(pdev), pdev->irq, pccard_ioaddr);
 
 	hermes_struct_init(&(priv->hw), dev->base_addr,
 			HERMES_IO, HERMES_16BIT_REGSPACING);
@@ -299,7 +299,7 @@ static void __devexit orinoco_plx_remove_one(struct pci_dev *pdev)
 }
 
 
-static struct pci_device_id orinoco_plx_pci_id_table[] __devinitdata = {
+static struct pci_device_id orinoco_plx_pci_id_table[] = {
 	{0x111a, 0x1023, PCI_ANY_ID, PCI_ANY_ID,},	/* Siemens SpeedStream SS1023 */
 	{0x1385, 0x4100, PCI_ANY_ID, PCI_ANY_ID,},	/* Netgear MA301 */
 	{0x15e8, 0x0130, PCI_ANY_ID, PCI_ANY_ID,},	/* Correga  - does this work? */

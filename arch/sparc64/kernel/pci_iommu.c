@@ -825,5 +825,8 @@ int pci_dma_supported(struct pci_dev *pdev, u64 device_mask)
 		}
 	}
 
+	if (device_mask >= (1UL << 32UL))
+		return 0;
+
 	return (device_mask & dma_addr_mask) == dma_addr_mask;
 }

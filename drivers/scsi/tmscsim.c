@@ -274,7 +274,7 @@
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,99)
-static struct pci_device_id tmscsim_pci_tbl[] __initdata = {
+static struct pci_device_id tmscsim_pci_tbl[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_AMD,
 		.device		= PCI_DEVICE_ID_AMD53C974,
@@ -2815,7 +2815,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
    return (length);
 
  einv_dev:
-   printk (KERN_WARNING "DC390: Ignore cmnd to illegal Dev(Idx) %i. Valid range: 0 - %i.\n", 
+   printk (KERN_WARNING "DC390: Ignore cmnd to invalid Dev(Idx) %i. Valid range: 0 - %i.\n", 
 	   dev, pACB->DCBCnt - 1);
    DC390_UNLOCK_ACB;
    DC390_UNLOCK_IO(pACB.pScsiHost);

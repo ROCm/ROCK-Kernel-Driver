@@ -147,6 +147,7 @@ extern int r128_do_cleanup_pageflip( drm_device_t *dev );
 				/* r128_state.c */
 extern int r128_cce_clear( DRM_IOCTL_ARGS );
 extern int r128_cce_swap( DRM_IOCTL_ARGS );
+extern int r128_cce_flip( DRM_IOCTL_ARGS );
 extern int r128_cce_vertex( DRM_IOCTL_ARGS );
 extern int r128_cce_indices( DRM_IOCTL_ARGS );
 extern int r128_cce_blit( DRM_IOCTL_ARGS );
