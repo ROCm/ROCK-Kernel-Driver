@@ -5662,9 +5662,10 @@ static int airo_get_power(struct net_device *dev,
 			  char *extra)
 {
 	struct airo_info *local = dev->priv;
+	int mode;
 
 	readConfigRid(local, 1);
-	int mode = local->config.powerSaveMode;
+	mode = local->config.powerSaveMode;
 	if ((vwrq->disabled = (mode == POWERSAVE_CAM)))
 		return 0;
 	if ((vwrq->flags & IW_POWER_TYPE) == IW_POWER_TIMEOUT) {
