@@ -514,7 +514,7 @@ smp_boot_cpus (unsigned int max_cpus)
 		} else {
 			unsigned long bogosum = 0;
   			for (cpu = 0; cpu < NR_CPUS; cpu++)
-				if (cpu_online_map & (1<<cpu))
+				if (cpu_online_map & (1UL << cpu))
 					bogosum += cpu_data(cpu)->loops_per_jiffy;
 
 			printk(KERN_INFO"Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
