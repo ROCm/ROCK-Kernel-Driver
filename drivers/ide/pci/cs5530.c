@@ -421,6 +421,8 @@ static struct pci_device_id cs5530_pci_tbl[] = {
 	{ 0, },
 };
 
+MODULE_DEVICE_TABLE(pci, cs5530_pci_tbl);
+
 static struct pci_driver driver = {
 	.name		= "CS5530 IDE",
 	.id_table	= cs5530_pci_tbl,

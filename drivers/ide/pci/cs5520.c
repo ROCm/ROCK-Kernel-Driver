@@ -300,6 +300,8 @@ static struct pci_device_id cs5520_pci_tbl[] = {
 	{ 0, },
 };
 
+MODULE_DEVICE_TABLE(pci, cs5520_pci_tbl);
+
 static struct pci_driver driver = {
 	.name		= "CyrixIDE",
 	.id_table	= cs5520_pci_tbl,
