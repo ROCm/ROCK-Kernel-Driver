@@ -420,7 +420,9 @@ struct pci_dev {
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
 	unsigned int	multifunction:1;/* Part of multi-function device */
 #ifdef CONFIG_PCI_NAMES
-	char		pretty_name[DEVICE_NAME_SIZE];	/* pretty name for users to see */
+#define PCI_NAME_SIZE	50
+#define PCI_NAME_HALF	__stringify(20)	/* less than half to handle slop */
+	char		pretty_name[PCI_NAME_SIZE];	/* pretty name for users to see */
 #endif
 };
 
