@@ -72,7 +72,8 @@ xfs_open(
 	 */
 	if (vp->v_type == VDIR && ip->i_d.di_nextents > 0) {
 		mode = xfs_ilock_map_shared(ip);
-		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
+		if (ip->i_d.di_nextents > 0)
+			(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
 		xfs_iunlock(ip, mode);
 	}
 	return 0;
