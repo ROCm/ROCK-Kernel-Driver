@@ -900,7 +900,7 @@ void __init setup_arch(char **cmdline_p)
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	if (!acpi_disabled)
-		acpi_boot_init(*cmdline_p);
+		acpi_boot_init();
 #endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
