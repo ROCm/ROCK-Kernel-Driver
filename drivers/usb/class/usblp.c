@@ -133,6 +133,7 @@ struct usblp {
 	wait_queue_head_t	wait;			/* Zzzzz ... */
 	int			readcount;		/* Counter for reads */
 	int			ifnum;			/* Interface number */
+	struct usb_interface	*intf;			/* The interface */
 	/* Alternate-setting numbers and endpoints for each protocol
 	 * (7/1/{index=1,2,3}) that the device supports: */
 	struct {
@@ -837,7 +838,8 @@ static int usblp_probe(struct usb_interface *intf,
 	usblp->dev = dev;
 	init_MUTEX (&usblp->sem);
 	init_waitqueue_head(&usblp->wait);
-	usblp->ifnum = intf->altsetting->desc.bInterfaceNumber;
+	usblp->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
+	usblp->intf = intf;
 
 	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!usblp->writeurb) {
@@ -973,7 +975,7 @@ static int usblp_select_alts(struct usblp *usblp)
 	struct usb_endpoint_descriptor *epd, *epwrite, *epread;
 	int p, i, e;
 
-	if_alt = usblp->dev->actconfig->interface[usblp->ifnum];
+	if_alt = usblp->intf;
 
 	for (p = 0; p < USBLP_MAX_PROTOCOLS; p++)
 		usblp->protocol[p].alt_setting = -1;
@@ -1022,7 +1024,8 @@ static int usblp_select_alts(struct usblp *usblp)
 			epread = NULL;
 		}
 
-		usblp->protocol[ifd->desc.bInterfaceProtocol].alt_setting = i;
+		usblp->protocol[ifd->desc.bInterfaceProtocol].alt_setting =
+				ifd->desc.bAlternateSetting;
 		usblp->protocol[ifd->desc.bInterfaceProtocol].epwrite = epwrite;
 		usblp->protocol[ifd->desc.bInterfaceProtocol].epread = epread;
 	}
