@@ -868,6 +868,43 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 }
 #endif /* CONFIG_SCSI_SATA */
 
+
+#define UHCI_USBLEGSUP		0xc0		/* legacy support */
+#define UHCI_USBLEGSUP_DEFAULT	0x2000		/* only PIRQ enable set */
+
+#define OHCI_CONTROL		0x04
+#define OHCI_CMDSTATUS		0x08
+#define OHCI_INTRENABLE		0x10
+#define OHCI_OCR		(1 << 3)	/* ownership change request */
+#define OHCI_CTRL_IR		(1 << 8)	/* interrupt routing */
+#define OHCI_INTR_OC		(1 << 30)	/* ownership change */
+
+static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
+{
+
+	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x00)) { /* UHCI */
+		pci_write_config_word(pdev, UHCI_USBLEGSUP, UHCI_USBLEGSUP_DEFAULT);
+	}
+
+	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x10)) { /* OHCI */
+		char *base = ioremap_nocache(pci_resource_start(pdev, 0),
+							pci_resource_len(pdev, 0));
+		if (base == NULL) return;
+
+		if (readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
+			int temp = 500;     /* arbitrary: five seconds */
+			writel(OHCI_INTR_OC, base + OHCI_INTRENABLE);
+			writel(OHCI_OCR, base + OHCI_CMDSTATUS);
+			while (temp && readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
+				temp--;
+				set_current_state(TASK_UNINTERRUPTIBLE);
+			        schedule_timeout( HZ / 100);
+			}
+		}
+		iounmap(base);
+	}
+}
+
 /*
  *  The main table of quirks.
  *
@@ -983,6 +1020,8 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,      PCI_VENDOR_ID_INTEL,    PCI_ANY_ID,
 	  quirk_intel_ide_combined },
 #endif /* CONFIG_SCSI_SATA */
+
+	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			quirk_usb_disable_smm_bios },
 
 	{ 0 }
 };
