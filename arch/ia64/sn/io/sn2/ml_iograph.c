@@ -518,6 +518,14 @@ io_init_node(cnodeid_t cnodeid)
 	ASSERT(hubv != GRAPH_VERTEX_NONE);
 
 	/* 
+	 * attach our hub_provider information to hubv,
+	 * so we can use it as a crosstalk provider "master"
+	 * vertex.
+	 */
+	xtalk_provider_register(hubv, &hub_provider);
+	xtalk_provider_startup(hubv);
+
+	/* 
 	 * If nothing connected to this hub's xtalk port, we're done.
 	 */
 	early_probe_for_widget(hubv, &hwid);
@@ -526,14 +534,6 @@ io_init_node(cnodeid_t cnodeid)
 		return;
 		/* NOTREACHED */
 	}
-
-	/* 
-	 * attach our hub_provider information to hubv,
-	 * so we can use it as a crosstalk provider "master"
-	 * vertex.
-	 */
-	xtalk_provider_register(hubv, &hub_provider);
-	xtalk_provider_startup(hubv);
 
 	/*
 	 * Create a vertex to represent the crosstalk bus
