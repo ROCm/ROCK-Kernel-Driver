@@ -74,7 +74,7 @@ MODULE_PARM(pc98bm_irq, "i");
 static int pc98bm_irq = PC98BM_IRQ;
 static int pc98bm_used = 0;
 
-static void pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static int pc98bm_open(struct input_dev *dev)
 {
@@ -113,7 +113,7 @@ static struct input_dev pc98bm_dev = {
 	},
 };
 
-static void pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	char dx, dy;
 	unsigned char buttons;
@@ -137,6 +137,8 @@ static void pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	input_sync(&pc98bm_dev);
 
 	outb(PC98BM_ENABLE_IRQ, PC98BM_CONTROL_PORT);
+
+	return IRQ_HANDLED;
 }
 
 #ifndef MODULE
