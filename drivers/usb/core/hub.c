@@ -1436,8 +1436,8 @@ static int hub_port_suspend(struct usb_device *hdev, int port)
 	int			status;
 	struct usb_device	*udev;
 
-	udev = hdev->children[port - 1];
-	// dev_dbg(hubdev(hdev), "suspend port %d\n", port);
+	udev = hdev->children[port];
+	// dev_dbg(hubdev(hdev), "suspend port %d\n", port + 1);
 
 	/* enable remote wakeup when appropriate; this lets the device
 	 * wake up the upstream hub (including maybe the root hub).
@@ -1462,11 +1462,11 @@ static int hub_port_suspend(struct usb_device *hdev, int port)
 	}
 
 	/* see 7.1.7.6 */
-	status = set_port_feature(hdev, port, USB_PORT_FEAT_SUSPEND);
+	status = set_port_feature(hdev, port + 1, USB_PORT_FEAT_SUSPEND);
 	if (status) {
 		dev_dbg(hubdev(hdev),
 			"can't suspend port %d, status %d\n",
-			port, status);
+			port + 1, status);
 		/* paranoia:  "should not happen" */
 		(void) usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 				USB_REQ_CLEAR_FEATURE, USB_RECIP_DEVICE,
@@ -1585,7 +1585,7 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 		else
 			status = -EOPNOTSUPP;
 	} else
-		status = hub_port_suspend(udev->parent, port + 1);
+		status = hub_port_suspend(udev->parent, port);
 
 	if (status == 0)
 		udev->dev.power.power_state = state;
@@ -1710,15 +1710,15 @@ hub_port_resume(struct usb_device *hdev, int port)
 	int			status;
 	struct usb_device	*udev;
 
-	udev = hdev->children[port - 1];
-	// dev_dbg(hubdev(hdev), "resume port %d\n", port);
+	udev = hdev->children[port];
+	// dev_dbg(hubdev(hdev), "resume port %d\n", port + 1);
 
 	/* see 7.1.7.7; affects power usage, but not budgeting */
-	status = clear_port_feature(hdev, port, USB_PORT_FEAT_SUSPEND);
+	status = clear_port_feature(hdev, port + 1, USB_PORT_FEAT_SUSPEND);
 	if (status) {
 		dev_dbg(&hdev->actconfig->interface[0]->dev,
 			"can't resume port %d, status %d\n",
-			port, status);
+			port + 1, status);
 	} else {
 		u16		devstatus;
 		u16		portchange;
@@ -1736,7 +1736,7 @@ hub_port_resume(struct usb_device *hdev, int port)
 		 * sequence.
 		 */
 		devstatus = portchange = 0;
-		status = hub_port_status(hdev, port - 1,
+		status = hub_port_status(hdev, port,
 				&devstatus, &portchange);
 		if (status < 0
 				|| (devstatus & LIVE_FLAGS) != LIVE_FLAGS
@@ -1744,7 +1744,7 @@ hub_port_resume(struct usb_device *hdev, int port)
 				) {
 			dev_dbg(&hdev->actconfig->interface[0]->dev,
 				"port %d status %04x.%04x after resume, %d\n",
-				port, portchange, devstatus, status);
+				port + 1, portchange, devstatus, status);
 		} else {
 			/* TRSMRCY = 10 msec */
 			msleep(10);
@@ -1752,7 +1752,7 @@ hub_port_resume(struct usb_device *hdev, int port)
 		}
 	}
 	if (status < 0)
-		hub_port_logical_disconnect(hdev, port - 1);
+		hub_port_logical_disconnect(hdev, port);
 
 	return status;
 }
@@ -1796,7 +1796,7 @@ int usb_resume_device(struct usb_device *udev)
 					->actconfig->interface[0]);
 		}
 	} else if (udev->state == USB_STATE_SUSPENDED) {
-		status = hub_port_resume(udev->parent, port + 1);
+		status = hub_port_resume(udev->parent, port);
 	} else {
 		status = 0;
 		udev->dev.power.power_state = PM_SUSPEND_ON;
@@ -1889,7 +1889,7 @@ static int hub_resume(struct usb_interface *intf)
 			continue;
 		down (&udev->serialize);
 		if (portstat & USB_PORT_STAT_SUSPEND)
-			status = hub_port_resume(hdev, port + 1);
+			status = hub_port_resume(hdev, port);
 		else {
 			status = finish_port_resume(udev);
 			if (status < 0) {
