@@ -628,10 +628,9 @@ W:	http://www.debian.org/~dz/i8k/
 S:	Maintained
 
 DEVICE-MAPPER
-P:	Joe Thornber
-M:	dm@uk.sistina.com
-L:	linux-lvm@sistina.com
-W:	http://www.sistina.com/lvm
+P:	Alasdair Kergon
+L:	dm-devel@redhat.com
+W:	http://sources.redhat.com/dm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY
