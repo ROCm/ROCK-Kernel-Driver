@@ -1313,20 +1313,6 @@ void unregister_serial(int line)
 	uart_unregister_port(&serial8250_reg, line);
 }
 
-/*
- * This is for ISAPNP only.
- */
-void serial8250_get_irq_map(unsigned int *map)
-{
-	int i;
-
-	for (i = 0; i < UART_NR; i++) {
-		if (serial8250_ports[i].port.type != PORT_UNKNOWN &&
-		    serial8250_ports[i].port.irq < 16)
-			*map |= 1 << serial8250_ports[i].port.irq;
-	}
-}
-
 /**
  *	serial8250_suspend_port - suspend one serial port
  *	@line:  serial line number
@@ -1382,7 +1368,6 @@ module_exit(serial8250_exit);
 
 EXPORT_SYMBOL(register_serial);
 EXPORT_SYMBOL(unregister_serial);
-EXPORT_SYMBOL(serial8250_get_irq_map);
 EXPORT_SYMBOL(serial8250_suspend_port);
 EXPORT_SYMBOL(serial8250_resume_port);
 
