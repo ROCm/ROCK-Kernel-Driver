@@ -246,15 +246,6 @@ purge_addresses(void)
 	}
 }
 
-/*
- *	Locking model:
- *
- *	Buffers associated with inodes for which buffer locking
- *	is not enabled are not protected by semaphores, and are
- *	assumed to be exclusively owned by the caller.  There is
- *	spinlock in the buffer, for use by the caller when concurrent
- *	access is possible.
- */
 
 /*
  *	Internal pagebuf object manipulation
@@ -1039,6 +1030,95 @@ pagebuf_rele(
 	} else if (h) {
 		spin_unlock(&h->pb_hash_lock);
 	}
+}
+
+
+/*
+ *	Mutual exclusion on buffers.  Locking model:
+ *
+ *	Buffers associated with inodes for which buffer locking
+ *	is not enabled are not protected by semaphores, and are
+ *	assumed to be exclusively owned by the caller.  There is a
+ *	spinlock in the buffer, used by the caller when concurrent
+ *	access is possible.
+ */
+
+/*
+ *	pagebuf_cond_lock
+ *
+ *	pagebuf_cond_lock locks a buffer object, if it is not already locked.
+ *	Note that this in no way
+ *	locks the underlying pages, so it is only useful for synchronizing
+ *	concurrent use of page buffer objects, not for synchronizing independent
+ *	access to the underlying pages.
+ */
+int
+pagebuf_cond_lock(			/* lock buffer, if not locked	*/
+					/* returns -EBUSY if locked)	*/
+	page_buf_t		*pb)
+{
+	int			locked;
+
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
+	locked = down_trylock(&pb->pb_sema) == 0;
+	if (locked) {
+		PB_SET_OWNER(pb);
+	}
+	PB_TRACE(pb, PB_TRACE_REC(condlck), locked);
+	return(locked ? 0 : -EBUSY);
+}
+
+/*
+ *	pagebuf_lock_value
+ *
+ *	Return lock value for a pagebuf
+ */
+int
+pagebuf_lock_value(
+	page_buf_t		*pb)
+{
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
+	return(atomic_read(&pb->pb_sema.count));
+}
+
+/*
+ *	pagebuf_lock
+ *
+ *	pagebuf_lock locks a buffer object.  Note that this in no way
+ *	locks the underlying pages, so it is only useful for synchronizing
+ *	concurrent use of page buffer objects, not for synchronizing independent
+ *	access to the underlying pages.
+ */
+int
+pagebuf_lock(
+	page_buf_t		*pb)
+{
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
+
+	PB_TRACE(pb, PB_TRACE_REC(lock), 0);
+	if (atomic_read(&pb->pb_io_remaining))
+		blk_run_queues();
+	down(&pb->pb_sema);
+	PB_SET_OWNER(pb);
+	PB_TRACE(pb, PB_TRACE_REC(locked), 0);
+	return 0;
+}
+
+/*
+ *	pagebuf_unlock
+ *
+ *	pagebuf_unlock releases the lock on the buffer object created by
+ *	pagebuf_lock or pagebuf_cond_lock (not any
+ *	pinning of underlying pages created by pagebuf_pin).
+ */
+void
+pagebuf_unlock(				/* unlock buffer		*/
+	page_buf_t		*pb)	/* buffer to unlock		*/
+{
+	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
+	PB_CLEAR_OWNER(pb);
+	up(&pb->pb_sema);
+	PB_TRACE(pb, PB_TRACE_REC(unlock), 0);
 }
 
 

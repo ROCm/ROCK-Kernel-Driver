@@ -128,9 +128,7 @@ xfs-y				+= xfs_alloc.o \
 xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 # Objects in pagebuf/
-xfs-y				+= $(addprefix pagebuf/, \
-				   page_buf.o \
-				   page_buf_locking.o)
+xfs-y				+= pagebuf/page_buf.o
 
 # Objects in linux/
 xfs-y				+= $(addprefix linux/, \
