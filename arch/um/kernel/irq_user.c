@@ -188,7 +188,8 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 		pollfds_size++;
 	}
 
-	if(type == IRQ_WRITE) events = 0;
+	if(type == IRQ_WRITE) 
+		fd = -1;
 
 	pollfds[pollfds_num] = ((struct pollfd) { fd :	fd,
 						  events :	events,
