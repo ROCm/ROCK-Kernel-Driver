@@ -22,7 +22,6 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
-#include <linux/smp_lock.h>
 #include <linux/delay.h>
 
 #include <scsi/scsi.h>
@@ -1601,8 +1600,6 @@ int scsi_error_handler(void *data)
 	int rtn;
 	DECLARE_MUTEX_LOCKED(sem);
 
-	lock_kernel();
-
 	/*
 	 *    Flush resources
 	 */
@@ -1613,8 +1610,6 @@ int scsi_error_handler(void *data)
 
 	shost->eh_wait = &sem;
 	shost->ehandler = current;
-
-	unlock_kernel();
 
 	/*
 	 * Wake up the thread that created us.
