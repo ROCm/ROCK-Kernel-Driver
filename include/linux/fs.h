@@ -1246,6 +1246,7 @@ extern int page_follow_link(struct dentry *, struct nameidata *);
 extern int page_symlink(struct inode *inode, const char *symname, int len);
 extern struct inode_operations page_symlink_inode_operations;
 extern void generic_fillattr(struct inode *, struct kstat *);
+extern int vfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 

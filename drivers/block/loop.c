@@ -826,17 +826,22 @@ static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
 
 static int loop_get_status(struct loop_device *lo, struct loop_info *arg)
 {
-	struct loop_info	info;
 	struct file *file = lo->lo_backing_file;
+	struct loop_info info;
+	struct kstat stat;
+	int error;
 
 	if (lo->lo_state != Lo_bound)
 		return -ENXIO;
 	if (!arg)
 		return -EINVAL;
+	error = vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
+	if (error)
+		return error;
 	memset(&info, 0, sizeof(info));
 	info.lo_number = lo->lo_number;
-	info.lo_device = kdev_t_to_nr(file->f_dentry->d_inode->i_dev);
-	info.lo_inode = file->f_dentry->d_inode->i_ino;
+	info.lo_device = stat.dev;
+	info.lo_inode = stat.ino;
 	info.lo_rdevice = lo->lo_device->bd_dev;
 	info.lo_offset = lo->lo_offset;
 	info.lo_flags = lo->lo_flags;

@@ -256,6 +256,7 @@ EXPORT_SYMBOL(vfs_statfs);
 EXPORT_SYMBOL(vfs_fstat);
 EXPORT_SYMBOL(vfs_stat);
 EXPORT_SYMBOL(vfs_lstat);
+EXPORT_SYMBOL(vfs_getattr);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(unlock_rename);
 EXPORT_SYMBOL(generic_read_dir);
