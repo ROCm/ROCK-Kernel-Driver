@@ -225,9 +225,9 @@ int snd_card_pci_resume(struct pci_dev *dev);
 static inline int snd_power_wait(snd_card_t *card, unsigned int state, struct file *file) { return 0; }
 #define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
-#define snd_card_set_pm_callback(card,suspend,resume,data) -EINVAL
-#define snd_card_set_dev_pm_callback(card,suspend,resume,data) -EINVAL
-#define snd_card_set_isa_pm_callback(card,suspend,resume,data) -EINVAL
+#define snd_card_set_pm_callback(card,suspend,resume,data)
+#define snd_card_set_dev_pm_callback(card,suspend,resume,data)
+#define snd_card_set_isa_pm_callback(card,suspend,resume,data)
 #ifdef CONFIG_PCI
 #define SND_PCI_PM_CALLBACKS
 #endif
