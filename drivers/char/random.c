@@ -170,9 +170,7 @@
  *		touch $random_seed
  *	fi
  *	chmod 600 $random_seed
- *	poolfile=/proc/sys/kernel/random/poolsize
- *	[ -r $poolfile ] && bytes=`cat $poolfile` || bytes=512
- *	dd if=/dev/urandom of=$random_seed count=1 bs=$bytes
+ *	dd if=/dev/urandom of=$random_seed count=1 bs=512
  *
  * and the following lines in an appropriate script which is run as
  * the system is shutdown:
@@ -183,9 +181,7 @@
  *	random_seed=/var/run/random-seed
  *	touch $random_seed
  *	chmod 600 $random_seed
- *	poolfile=/proc/sys/kernel/random/poolsize
- *	[ -r $poolfile ] && bytes=`cat $poolfile` || bytes=512
- *	dd if=/dev/urandom of=$random_seed count=1 bs=$bytes
+ *	dd if=/dev/urandom of=$random_seed count=1 bs=512
  *
  * For example, on most modern systems using the System V init
  * scripts, such code fragments would be found in
@@ -554,14 +550,6 @@ static void clear_entropy_store(struct entropy_store *r)
 	memset(r->pool, 0, r->poolinfo.POOLBYTES);
 }
 
-#ifdef CONFIG_SYSCTL
-static void free_entropy_store(struct entropy_store *r)
-{
-	if (r->pool)
-		kfree(r->pool);
-	kfree(r);
-}
-#endif
 /*
  * This function adds a byte into the entropy "pool".  It does not
  * update the entropy estimate.  The caller should call
@@ -1853,76 +1841,9 @@ EXPORT_SYMBOL(generate_random_uuid);
 
 #include <linux/sysctl.h>
 
-static int sysctl_poolsize;
 static int min_read_thresh, max_read_thresh;
 static int min_write_thresh, max_write_thresh;
 static char sysctl_bootid[16];
-
-/*
- * This function handles a request from the user to change the pool size
- * of the primary entropy store.
- */
-static int change_poolsize(int poolsize)
-{
-	struct entropy_store *new_store, *old_store;
-	int ret;
-
-	if ((ret = create_entropy_store(poolsize, random_state->name,
-					&new_store)))
-		return ret;
-
-	add_entropy_words(new_store, random_state->pool,
-			  random_state->poolinfo.poolwords);
-	credit_entropy_store(new_store, random_state->entropy_count);
-
-	sysctl_init_random(new_store);
-	old_store = random_state;
-	random_state = batch_work.data = new_store;
-	free_entropy_store(old_store);
-	return 0;
-}
-
-static int proc_do_poolsize(ctl_table *table, int write, struct file *filp,
-			    void __user *buffer, size_t *lenp, loff_t *ppos)
-{
-	int ret;
-
-	sysctl_poolsize = random_state->poolinfo.POOLBYTES;
-
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-	if (ret || !write ||
-	    (sysctl_poolsize == random_state->poolinfo.POOLBYTES))
-		return ret;
-
-	return change_poolsize(sysctl_poolsize);
-}
-
-static int poolsize_strategy(ctl_table *table, int __user *name, int nlen,
-			     void __user *oldval, size_t __user *oldlenp,
-			     void __user *newval, size_t newlen, void **context)
-{
-	int len;
-
-	sysctl_poolsize = random_state->poolinfo.POOLBYTES;
-
-	/*
-	 * We only handle the write case, since the read case gets
-	 * handled by the default handler (and we don't care if the
-	 * write case happens twice; it's harmless).
-	 */
-	if (newval && newlen) {
-		len = newlen;
-		if (len > table->maxlen)
-			len = table->maxlen;
-		if (copy_from_user(table->data, newval, len))
-			return -EFAULT;
-	}
-
-	if (sysctl_poolsize != random_state->poolinfo.POOLBYTES)
-		return change_poolsize(sysctl_poolsize);
-
-	return 0;
-}
 
 /*
  * These functions is used to return both the bootid UUID, and random
@@ -1989,15 +1910,15 @@ static int uuid_strategy(ctl_table *table, int __user *name, int nlen,
 	return 1;
 }
 
+static int sysctl_poolsize = DEFAULT_POOL_SIZE;
 ctl_table random_table[] = {
 	{
 		.ctl_name 	= RANDOM_POOLSIZE,
 		.procname	= "poolsize",
 		.data		= &sysctl_poolsize,
 		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_do_poolsize,
-		.strategy	= &poolsize_strategy,
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
 	},
 	{
 		.ctl_name	= RANDOM_ENTROPY_COUNT,
