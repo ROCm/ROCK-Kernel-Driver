@@ -39,7 +39,7 @@ if [ "$CONFIG_WAN" = "y" ]; then
 # The Etinc driver has not been tested as non-modular yet.
 #
 
-   dep_tristate '  Etinc PCISYNC serial board support (EXPERIMENTAL)' CONFIG_DSCC4 m
+   dep_tristate '  Etinc PCISYNC serial board support' CONFIG_DSCC4 m
 
 
 #
