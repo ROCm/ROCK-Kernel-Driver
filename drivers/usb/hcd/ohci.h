@@ -2,15 +2,121 @@
  * OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
- * This file is licenced under GPL
+ * This file is licenced under the GPL.
  * $Id: ohci.h,v 1.5 2002/01/19 00:24:01 dbrownell Exp $
  */
  
-static const int cc_to_error [16] = { 
+/*
+ * OHCI Endpoint Descriptor (ED) ... holds TD queue
+ * See OHCI spec, section 4.2
+ */
+struct ed {
+	/* first fields are hardware-specified, le32 */
+	__u32			hwINFO;       	/* endpoint config bitmap */
+#define ED_ISO		__constant_cpu_to_le32(1 << 15)
+#define ED_SKIP		__constant_cpu_to_le32(1 << 14)
+#define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
+#define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
+#define ED_IN		__constant_cpu_to_le32(0x10 << 11)
+	__u32			hwTailP;	/* tail of TD list */
+	__u32			hwHeadP;	/* head of TD list */
+#define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
+#define ED_H		__constant_cpu_to_le32(0x01)	/* halted */
+	__u32			hwNextED;	/* next ED in list */
 
-/* map OHCI status to errno values */ 
+	/* rest are purely for the driver's use */
+	struct ed		*ed_prev;  
+	__u8			int_period;
+	__u8			int_branch;
+	__u8			int_load; 
+	__u8			int_interval;
+	__u8			state;			// ED_{NEW,UNLINK,OPER}
+#define ED_NEW 		0x00		/* unused, no dummy td */
+#define ED_UNLINK 	0x01		/* dummy td, maybe linked to hc */
+#define ED_OPER		0x02		/* dummy td, _is_ linked to hc */
+#define ED_URB_DEL  	0x08		/* for unlinking; masked in */
+
+	__u8			type; 
+	__u16			last_iso;
+	struct ed		*ed_rm_list;
+
+	dma_addr_t		dma;			/* addr of ED */
+} __attribute__ ((aligned(16)));
+
+#define ED_MASK	((u32)~0x0f)		/* strip hw status in low addr bits */
+
+ 
+/*
+ * OHCI Transfer Descriptor (TD) ... one per transfer segment
+ * See OHCI spec, sections 4.3.1 (general = control/bulk/interrupt)
+ * and 4.3.2 (iso)
+ */
+struct td {
+	/* first fields are hardware-specified, le32 */
+	__u32		hwINFO;		/* transfer info bitmask */
+#define TD_CC       0xf0000000			/* condition code */
+#define TD_CC_GET(td_p) ((td_p >>28) & 0x0f)
+//#define TD_CC_SET(td_p, cc) (td_p) = ((td_p) & 0x0fffffff) | (((cc) & 0x0f) << 28)
+#define TD_EC       0x0C000000			/* error count */
+#define TD_T        0x03000000			/* data toggle state */
+#define TD_T_DATA0  0x02000000				/* DATA0 */
+#define TD_T_DATA1  0x03000000				/* DATA1 */
+#define TD_T_TOGGLE 0x00000000				/* uses ED_C */
+#define TD_DI       0x00E00000			/* frames before interrupt */
+//#define TD_DI_SET(X) (((X) & 0x07)<< 21)
+#define TD_DP       0x00180000			/* direction/pid */
+#define TD_DP_SETUP 0x00000000			/* SETUP pid */
+#define TD_DP_IN    0x00100000				/* IN pid */
+#define TD_DP_OUT   0x00080000				/* OUT pid */
+							/* 0x00180000 rsvd */
+#define TD_R        0x00040000			/* round: short packets OK? */
+					/* bits 0x1ffff are defined by HCD */
+#define TD_ISO	    0x00010000			/* copy of ED_ISO */
+
+  	__u32		hwCBP;		/* Current Buffer Pointer (or 0) */
+  	__u32		hwNextTD;	/* Next TD Pointer */
+  	__u32		hwBE;		/* Memory Buffer End Pointer */
+
+	/* PSW is only for ISO */
+#define MAXPSW 1		/* hardware allows 8 */
+  	__u16		hwPSW [MAXPSW];
+
+	/* rest are purely for the driver's use */
+  	__u8		index;
+  	struct ed	*ed;
+  	struct td	*next_dl_td;
+  	struct urb	*urb;
+
+	dma_addr_t	td_dma;		/* addr of this TD */
+	dma_addr_t	data_dma;	/* addr of data it points to */
+} __attribute__ ((aligned(32)));	/* c/b/i need 16; only iso needs 32 */
+
+#define TD_MASK	((u32)~0x1f)		/* strip hw status in low addr bits */
+
+/*
+ * Hardware transfer status codes -- CC from td->hwINFO or td->hwPSW
+ */
+#define TD_CC_NOERROR      0x00
+#define TD_CC_CRC          0x01
+#define TD_CC_BITSTUFFING  0x02
+#define TD_CC_DATATOGGLEM  0x03
+#define TD_CC_STALL        0x04
+#define TD_DEVNOTRESP      0x05
+#define TD_PIDCHECKFAIL    0x06
+#define TD_UNEXPECTEDPID   0x07
+#define TD_DATAOVERRUN     0x08
+#define TD_DATAUNDERRUN    0x09
+    /* 0x0A, 0x0B reserved for hardware */
+#define TD_BUFFEROVERRUN   0x0C
+#define TD_BUFFERUNDERRUN  0x0D
+    /* 0x0E, 0x0F reserved for HCD */
+#define TD_NOTACCESSED     0x0F
+
+
+/* map OHCI TD status codes (CC) to errno values */ 
+static const int cc_to_error [16] = { 
 	/* No  Error  */               0,
 	/* CRC Error  */               -EILSEQ,
 	/* Bit Stuff  */               -EPROTO,
@@ -30,126 +136,29 @@ static const int cc_to_error [16] = {
 };
 
 
-/* ED States */
-
-#define ED_NEW 		0x00		/* unused, no dummy td */
-#define ED_UNLINK 	0x01		/* dummy td, maybe linked to hc */
-#define ED_OPER		0x02		/* dummy td, _is_ linked to hc */
-
-#define ED_URB_DEL  	0x08		/* masked in */
-
-/* usb_ohci_ed */
-struct ed {
-	/* first fields are hardware-specified */
-	__u32 hwINFO;       
-	__u32 hwTailP;
-	__u32 hwHeadP;
-	__u32 hwNextED;
-
-	struct ed * ed_prev;  
-	__u8 int_period;
-	__u8 int_branch;
-	__u8 int_load; 
-	__u8 int_interval;
-	__u8 state;			// ED_{NEW,UNLINK,OPER}
-	__u8 type; 
-	__u16 last_iso;
-	struct ed * ed_rm_list;
-
-	dma_addr_t dma;
-	__u32 unused [3];
-} __attribute((aligned(16)));
-
- 
-/* TD info field */
-#define TD_CC       0xf0000000
-#define TD_CC_GET(td_p) ((td_p >>28) & 0x0f)
-#define TD_CC_SET(td_p, cc) (td_p) = ((td_p) & 0x0fffffff) | (((cc) & 0x0f) << 28)
-#define TD_EC       0x0C000000
-#define TD_T        0x03000000
-#define TD_T_DATA0  0x02000000
-#define TD_T_DATA1  0x03000000
-#define TD_T_TOGGLE 0x00000000
-#define TD_R        0x00040000
-#define TD_DI       0x00E00000
-#define TD_DI_SET(X) (((X) & 0x07)<< 21)
-#define TD_DP       0x00180000
-#define TD_DP_SETUP 0x00000000
-#define TD_DP_IN    0x00100000
-#define TD_DP_OUT   0x00080000
-
-#define TD_ISO	    0x00010000
-#define TD_DEL      0x00020000
-
-/* CC Codes */
-#define TD_CC_NOERROR      0x00
-#define TD_CC_CRC          0x01
-#define TD_CC_BITSTUFFING  0x02
-#define TD_CC_DATATOGGLEM  0x03
-#define TD_CC_STALL        0x04
-#define TD_DEVNOTRESP      0x05
-#define TD_PIDCHECKFAIL    0x06
-#define TD_UNEXPECTEDPID   0x07
-#define TD_DATAOVERRUN     0x08
-#define TD_DATAUNDERRUN    0x09
-    /* 0x0A, 0x0B reserved for hardware */
-#define TD_BUFFEROVERRUN   0x0C
-#define TD_BUFFERUNDERRUN  0x0D
-    /* 0x0E, 0x0F reserved for HCD */
-#define TD_NOTACCESSED     0x0F
-
-
-#define MAXPSW 1
-
-struct td {
-	/* first hardware fields are in all tds */
-	__u32		hwINFO;
-  	__u32		hwCBP;		/* Current Buffer Pointer */
-  	__u32		hwNextTD;	/* Next TD Pointer */
-  	__u32		hwBE;		/* Memory Buffer End Pointer */
-
-  	__u16		hwPSW [MAXPSW];	/* PSW is only for ISO */
-
-  	__u8		unused;
-  	__u8		index;
-  	struct ed	*ed;
-  	struct td	*next_dl_td;
-  	struct urb	*urb;
-
-	dma_addr_t	td_dma;
-	dma_addr_t	data_dma;
-	__u32		unused2 [2];
-} __attribute((aligned(32)));		/* iso needs 32 */
-
-#define OHCI_ED_SKIP	(1 << 14)
-
 /*
  * The HCCA (Host Controller Communications Area) is a 256 byte
- * structure defined in the OHCI spec. The host controller is
+ * structure defined section 4.4.1 of the OHCI spec. The HC is
  * told the base address of it.  It must be 256-byte aligned.
  */
-#define NUM_INTS 32	/* part of the OHCI standard */
 struct ohci_hcca {
-	__u32	int_table [NUM_INTS];	/* Interrupt ED table */
+#define NUM_INTS 32
+	__u32	int_table [NUM_INTS];	/* periodic schedule */
 	__u16	frame_no;		/* current frame number */
 	__u16	pad1;			/* set to 0 on each frame_no change */
 	__u32	done_head;		/* info returned for an interrupt */
 	u8	reserved_for_hc [116];
-} __attribute((aligned(256)));
+	u8	what [4];		/* spec only identifies 252 bytes :) */
+} __attribute__ ((aligned(256)));
 
   
 /*
- * Maximum number of root hub ports.  
- */
-#define MAX_ROOT_PORTS	15	/* maximum OHCI root hub ports */
-
-/*
- * This is the structure of the OHCI controller's memory mapped I/O
- * region.  This is Memory Mapped I/O.  You must use the readl() and
- * writel() macros defined in asm/io.h to access these!!
+ * This is the structure of the OHCI controller's memory mapped I/O region.
+ * You must use readl() and writel() (in <asm/io.h>) to access these fields!!
+ * Layout is in section 7 (and appendix B) of the spec.
  */
 struct ohci_regs {
-	/* control and status registers */
+	/* control and status registers (section 7.1) */
 	__u32	revision;
 	__u32	control;
 	__u32	cmdstatus;
@@ -157,7 +166,7 @@ struct ohci_regs {
 	__u32	intrenable;
 	__u32	intrdisable;
 
-	/* memory pointers */
+	/* memory pointers (section 7.2) */
 	__u32	hcca;
 	__u32	ed_periodcurrent;
 	__u32	ed_controlhead;
@@ -166,23 +175,25 @@ struct ohci_regs {
 	__u32	ed_bulkcurrent;
 	__u32	donehead;
 
-	/* frame counters */
+	/* frame counters (section 7.3) */
 	__u32	fminterval;
 	__u32	fmremaining;
 	__u32	fmnumber;
 	__u32	periodicstart;
 	__u32	lsthresh;
 
-	/* Root hub ports */
+	/* Root hub ports (section 7.4) */
 	struct	ohci_roothub_regs {
 		__u32	a;
 		__u32	b;
 		__u32	status;
+#define MAX_ROOT_PORTS	15	/* maximum OHCI root hub ports (RH_A_NDP) */
 		__u32	portstatus [MAX_ROOT_PORTS];
 	} roothub;
 
-	/* and some optional registers for legacy compatibility */
-} __attribute((aligned(32)));
+	/* and optional "legacy support" registers (appendix B) at 0x0100 */
+
+} __attribute__ ((aligned(32)));
 
 
 /* OHCI CONTROL AND STATUS REGISTER MASKS */
@@ -270,9 +281,8 @@ struct ohci_regs {
 #define	RH_A_POTPGT	(0xff << 24)		/* power on to power good time */
 
 
-/* urb */
-typedef struct urb_priv
-{
+/* hcd-private per-urb state */
+typedef struct urb_priv {
 	struct ed		*ed;
 	__u16			length;		// # tds in this request
 	__u16			td_cnt;		// tds already serviced
@@ -345,7 +355,6 @@ struct ohci_hcd {
 	int			sleeping;
 	int			ohci_int_load [NUM_INTS];
 	u32 			hc_control;	/* copy of hc control reg */
-	struct usb_device	*dev [128];
 
 	unsigned long		flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */

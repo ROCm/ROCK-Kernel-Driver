@@ -2,7 +2,7 @@
  * OHCI HCD (Host Controller Driver) for USB.
  *
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * [ Initialisation is based on Linus'  ]
  * [ uhci code and gregs ohci fragments ]
@@ -55,7 +55,7 @@
  * v2.0 1999/05/04 
  * v1.0 1999/04/27 initial release
  *
- * This file is licenced under GPL
+ * This file is licenced under the GPL.
  * $Id: ohci-hcd.c,v 1.7 2002/01/19 00:20:56 dbrownell Exp $
  */
  
@@ -73,10 +73,6 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>  /* for in_interrupt () */
-
-#ifndef CONFIG_USB_DEBUG
-	#define CONFIG_USB_DEBUG	/* this is still experimental! */
-#endif
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
@@ -258,7 +254,9 @@ static int ohci_urb_enqueue (
 	if (ed->state != ED_OPER)
 		ep_link (ohci, ed);
 
-	/* fill the TDs and link it to the ed */
+	/* fill the TDs and link them to the ed; and
+	 * enable that part of the schedule, if needed
+	 */
 	td_submit_urb (urb);
 
 	spin_unlock_irqrestore (&ohci->lock, flags);
@@ -357,7 +355,9 @@ static int ohci_get_frame (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
+#ifdef	OHCI_VERBOSE_DEBUG
 	dbg ("%s: ohci_get_frame", hcd->bus_name);
+#endif
 	return le16_to_cpu (ohci->hcca->frame_no);
 }
 
@@ -841,9 +841,10 @@ static int ohci_resume (struct usb_hcd *hcd)
 			dl_done_list (ohci, dl_reverse_done_list (ohci));
 		writel (OHCI_INTR_WDH, &ohci->regs->intrenable); 
 
-//		writel (OHCI_BLF, &ohci->regs->cmdstatus);
-//		writel (OHCI_CLF, &ohci->regs->cmdstatus);
-ohci_dump_status (ohci);
+		/* assume there are TDs on the bulk and control lists */
+		writel (OHCI_BLF | OHCI_CLF, &ohci->regs->cmdstatus);
+
+// ohci_dump_status (ohci);
 dbg ("sleeping = %d, disabled = %d", ohci->sleeping, ohci->disabled);
 		break;
 

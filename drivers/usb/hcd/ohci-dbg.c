@@ -2,9 +2,9 @@
  * OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
- * This file is licenced under GPL
+ * This file is licenced under the GPL.
  * $Id: ohci-dbg.c,v 1.2 2002/01/19 00:15:45 dbrownell Exp $
  */
  
@@ -74,27 +74,34 @@ static void urb_print (struct urb * urb, char * str, int small)
 static inline struct ed *
 dma_to_ed (struct ohci_hcd *hc, dma_addr_t ed_dma);
 
+#ifdef OHCI_VERBOSE_DEBUG
 /* print non-empty branches of the periodic ed tree */
-void ep_print_int_eds (struct ohci_hcd *ohci, char * str)
+void ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
 {
 	int i, j;
-	 __u32 * ed_p;
+	u32 *ed_p;
+	int printed = 0;
+
 	for (i= 0; i < 32; i++) {
 		j = 5;
 		ed_p = &(ohci->hcca->int_table [i]);
 		if (*ed_p == 0)
-		    continue;
-		printk (KERN_DEBUG __FILE__ ": %s branch int %2d(%2x):",
-				str, i, i);
+			continue;
+		printed = 1;
+		printk (KERN_DEBUG "%s, ohci %s frame %2d:",
+				label, ohci->hcd.bus_name, i);
 		while (*ed_p != 0 && j--) {
 			struct ed *ed = dma_to_ed (ohci, le32_to_cpup(ed_p));
-			printk (" ed: %4x;", ed->hwINFO);
+			printk (" %p/%08x;", ed, ed->hwINFO);
 			ed_p = &ed->hwNextED;
 		}
 		printk ("\n");
 	}
+	if (!printed)
+		printk (KERN_DEBUG "%s, ohci %s, empty periodic schedule\n",
+				label, ohci->hcd.bus_name);
 }
-
+#endif
 
 static void ohci_dump_intr_mask (char *label, __u32 mask)
 {
@@ -137,8 +144,9 @@ static void ohci_dump_status (struct ohci_hcd *controller)
 	__u32			temp;
 
 	temp = readl (&regs->revision) & 0xff;
-	if (temp != 0x10)
-		dbg ("spec %d.%d", (temp >> 4), (temp & 0x0f));
+	dbg ("OHCI %d.%d, %s legacy support registers",
+		0x03 & (temp >> 4), (temp & 0x0f),
+		(temp & 0x10) ? "with" : "NO");
 
 	temp = readl (&regs->control);
 	dbg ("control: 0x%08x%s%s%s HCFS=%s%s%s%s%s CBSR=%d", temp,
@@ -225,8 +233,10 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 
 	// dumps some of the state we know about
 	ohci_dump_status (controller);
+#ifdef OHCI_VERBOSE_DEBUG
 	if (verbose)
-		ep_print_int_eds (controller, "hcca");
+		ohci_dump_periodic (controller, "hcca");
+#endif
 	dbg ("hcca frame #%04x", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
 }

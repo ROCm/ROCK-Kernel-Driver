@@ -2,7 +2,7 @@
  * OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under GPL
  * $Id: ohci-hub.c,v 1.2 2002/01/19 00:21:49 dbrownell Exp $

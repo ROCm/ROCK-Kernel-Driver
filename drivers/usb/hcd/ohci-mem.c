@@ -2,9 +2,9 @@
  * OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
- * This file is licenced under GPL
+ * This file is licenced under the GPL.
  * $Id: ohci-mem.c,v 1.2 2002/01/19 00:22:13 dbrownell Exp $
  */
 
@@ -42,7 +42,7 @@ static void ohci_hcd_free (struct usb_hcd *hcd)
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef DEBUG
+#ifdef	CONFIG_DEBUG_SLAB
 #	define OHCI_MEM_FLAGS	SLAB_POISON
 #else
 #	define OHCI_MEM_FLAGS	0
@@ -64,16 +64,17 @@ dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)
 	return scan->virt;
 }
 
-static inline struct ed *
+static struct ed *
 dma_to_ed (struct ohci_hcd *hc, dma_addr_t ed_dma)
 {
 	return (struct ed *) dma_to_ed_td(&(hc->ed_hash [ED_HASH_FUNC(ed_dma)]),
 				      ed_dma);
 }
 
-static inline struct td *
+static struct td *
 dma_to_td (struct ohci_hcd *hc, dma_addr_t td_dma)
 {
+	td_dma &= TD_MASK;
 	return (struct td *) dma_to_ed_td(&(hc->td_hash [TD_HASH_FUNC(td_dma)]),
 				      td_dma);
 }
@@ -214,7 +215,7 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 	return td;
 }
 
-static inline void
+static void
 td_free (struct ohci_hcd *hc, struct td *td)
 {
 	hash_free_td (hc, td);
@@ -242,7 +243,7 @@ ed_alloc (struct ohci_hcd *hc, int mem_flags)
 	return ed;
 }
 
-static inline void
+static void
 ed_free (struct ohci_hcd *hc, struct ed *ed)
 {
 	hash_free_ed (hc, ed);

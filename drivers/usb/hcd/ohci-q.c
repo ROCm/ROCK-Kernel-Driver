@@ -2,9 +2,9 @@
  * OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
- * This file is licenced under GPL
+ * This file is licenced under the GPL.
  * $Id: ohci-q.c,v 1.6 2002/01/19 00:23:15 dbrownell Exp $
  */
  
@@ -95,11 +95,11 @@ static int return_urb (struct ohci_hcd *hc, struct urb *urb)
 	urb_print (urb, "RET", usb_pipeout (urb->pipe));
 #endif
 
-// FIXME:  but if urb->status says it was was unlinked ...
-
 	switch (usb_pipetype (urb->pipe)) {
   		case PIPE_INTERRUPT:
 #ifdef CONFIG_PCI
+// FIXME rewrite this resubmit path.  use pci_dma_sync_single()
+// and requeue more cheaply, and only if needed.
 			pci_unmap_single (hc->hcd.pdev,
 				urb_priv->td [0]->data_dma,
 				urb->transfer_buffer_length,
@@ -107,16 +107,22 @@ static int return_urb (struct ohci_hcd *hc, struct urb *urb)
 					? PCI_DMA_TODEVICE
 					: PCI_DMA_FROMDEVICE);
 #endif
+			/* FIXME: MP race.  If another CPU partially unlinks
+			 * this URB (urb->status was updated, hasn't yet told
+			 * us to dequeue) before we call complete() here, an
+			 * extra "unlinked" completion will be reported...
+			 */
 			urb->complete (urb);
 
-			/* implicitly requeued */
+			/* always requeued, but ED_SKIP if complete() unlinks.
+			 * removed from periodic table only at SOF intr.
+			 */
   			urb->actual_length = 0;
-  			urb->status = -EINPROGRESS;
-  			if (urb_priv->state != URB_DEL) {
-				spin_lock_irqsave (&hc->lock, flags);
-  				td_submit_urb (urb);
-  				spin_unlock_irqrestore (&hc->lock, flags);
-			}
+			if (urb_priv->state != URB_DEL)
+				urb->status = -EINPROGRESS;
+			spin_lock_irqsave (&hc->lock, flags);
+			td_submit_urb (urb);
+			spin_unlock_irqrestore (&hc->lock, flags);
   			break;
 
 		case PIPE_ISOCHRONOUS:
@@ -126,7 +132,7 @@ static int return_urb (struct ohci_hcd *hc, struct urb *urb)
 				continue;
 			if (urbt) { /* send the reply and requeue URB */	
 #ifdef CONFIG_PCI
-// FIXME this style unmap is only done on this route ...
+// FIXME rewrite this resubmit path too
 				pci_unmap_single (hc->hcd.pdev,
 					urb_priv->td [0]->data_dma,
 					urb->transfer_buffer_length,
@@ -290,8 +296,8 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 			ed->hwNextED = *ed_p; 
 			*ed_p = cpu_to_le32 (ed->dma);
 		}
-#ifdef DEBUG
-		ep_print_int_eds (ohci, "LINK_INT");
+#ifdef OHCI_VERBOSE_DEBUG
+		ohci_dump_periodic (ohci, "LINK_INT");
 #endif
 		break;
 
@@ -313,8 +319,8 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 			ed->ed_prev = NULL;
 		}	
 		ohci->ed_isotail = edi;  
-#ifdef DEBUG
-		ep_print_int_eds (ohci, "LINK_ISO");
+#ifdef OHCI_VERBOSE_DEBUG
+		ohci_dump_periodic (ohci, "LINK_ISO");
 #endif
 		break;
 	}	 	
@@ -336,7 +342,7 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	int	interval;
 	__u32	*ed_p;
 
-	ed->hwINFO |= __constant_cpu_to_le32 (OHCI_ED_SKIP);
+	ed->hwINFO |= ED_SKIP;
 
 	switch (ed->type) {
 	case PIPE_CONTROL:
@@ -394,8 +400,8 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		for (i = int_branch; i < NUM_INTS; i += interval)
 		    ohci->ohci_int_load [i] -= ed->int_load;
-#ifdef DEBUG
-		ep_print_int_eds (ohci, "UNLINK_INT");
+#ifdef OHCI_VERBOSE_DEBUG
+		ohci_dump_periodic (ohci, "UNLINK_INT");
 #endif
 		break;
 
@@ -421,11 +427,15 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 				}
 			}	
 		}	
-#ifdef DEBUG
-		ep_print_int_eds (ohci, "UNLINK_ISO");
+#ifdef OHCI_VERBOSE_DEBUG
+		ohci_dump_periodic (ohci, "UNLINK_ISO");
 #endif
 		break;
 	}
+
+	/* FIXME ED's "unlink" state is indeterminate;
+	 * the HC might still be caching it (till SOF).
+	 */
 	ed->state = ED_UNLINK;
 	return 0;
 }
@@ -478,7 +488,7 @@ static struct ed *ep_add_ed (
 	}
 
 	if (ed->state == ED_NEW) {
-		ed->hwINFO = __constant_cpu_to_le32 (OHCI_ED_SKIP);
+		ed->hwINFO = ED_SKIP;
   		/* dummy td; end of td list for ed */
 		td = td_alloc (ohci, SLAB_ATOMIC);
  		if (!td) {
@@ -491,8 +501,6 @@ static struct ed *ep_add_ed (
 		ed->state = ED_UNLINK;
 		ed->type = usb_pipetype (pipe);
 	}
-
-	ohci->dev [usb_pipedevice (pipe)] = udev;
 
 // FIXME:  don't do this if it's linked to the HC,
 // we might clobber data toggle or other state ...
@@ -531,7 +539,7 @@ static void ed_unlink (struct usb_device *usb_dev, struct ed *ed)
 		return;
 	ed->state |= ED_URB_DEL;
 
-	ed->hwINFO |= __constant_cpu_to_le32 (OHCI_ED_SKIP);
+	ed->hwINFO |= ED_SKIP;
 
 	switch (ed->type) {
 		case PIPE_CONTROL: /* stop control list */
@@ -582,7 +590,7 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 
 	/* fill the old dummy TD */
 	td = urb_priv->td [index] = dma_to_td (ohci,
-			le32_to_cpup (&urb_priv->ed->hwTailP) & ~0xf);
+			le32_to_cpup (&urb_priv->ed->hwTailP));
 
 	td->ed = urb_priv->ed;
 	td->next_dl_td = NULL;
@@ -795,7 +803,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
   	spin_lock_irqsave (&ohci->lock, flags);
 
-	td_list_hc = le32_to_cpup (&ohci->hcca->done_head) & 0xfffffff0;
+	td_list_hc = le32_to_cpup (&ohci->hcca->done_head);
 	ohci->hcca->done_head = 0;
 
 	while (td_list_hc) {		
@@ -806,26 +814,24 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 			dbg (" USB-error/status: %x : %p", 
 				TD_CC_GET (le32_to_cpup (&td_list->hwINFO)),
 				td_list);
-			if (td_list->ed->hwHeadP
-					& __constant_cpu_to_le32 (0x1)) {
+			/* typically the endpoint halted too */
+			if (td_list->ed->hwHeadP & ED_H) {
 				if (urb_priv && ((td_list->index + 1)
 						< urb_priv->length)) {
 					td_list->ed->hwHeadP = 
 			    (urb_priv->td [urb_priv->length - 1]->hwNextTD
-				    & __constant_cpu_to_le32 (0xfffffff0))
-			    | (td_list->ed->hwHeadP
-				    & __constant_cpu_to_le32 (0x2));
+				    & __constant_cpu_to_le32 (TD_MASK))
+			    | (td_list->ed->hwHeadP & ED_C);
 					urb_priv->td_cnt += urb_priv->length
 						- td_list->index - 1;
 				} else 
-					td_list->ed->hwHeadP &=
-					__constant_cpu_to_le32 (0xfffffff2);
+					td_list->ed->hwHeadP &= ~ED_H;
 			}
 		}
 
 		td_list->next_dl_td = td_rev;	
 		td_rev = td_list;
-		td_list_hc = le32_to_cpup (&td_list->hwNextTD) & 0xfffffff0;	
+		td_list_hc = le32_to_cpup (&td_list->hwNextTD);
 	}	
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return td_list;
@@ -851,10 +857,8 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 
 	for (ed = ohci->ed_rm_list [frame]; ed != NULL; ed = ed->ed_rm_list) {
 
-		tdTailP = dma_to_td (ohci,
-			le32_to_cpup (&ed->hwTailP) & 0xfffffff0);
-		tdHeadP = dma_to_td (ohci,
-			le32_to_cpup (&ed->hwHeadP) & 0xfffffff0);
+		tdTailP = dma_to_td (ohci, le32_to_cpup (&ed->hwTailP));
+		tdHeadP = dma_to_td (ohci, le32_to_cpup (&ed->hwHeadP));
 		edINFO = le32_to_cpup (&ed->hwINFO);
 		td_p = &ed->hwHeadP;
 
@@ -863,7 +867,7 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 			urb_priv_t *urb_priv = td->urb->hcpriv;
 
 			td_next = dma_to_td (ohci,
-				le32_to_cpup (&td->hwNextTD) & 0xfffffff0);
+				le32_to_cpup (&td->hwNextTD));
 			if ((urb_priv->state == URB_DEL)) {
 				tdINFO = le32_to_cpup (&td->hwINFO);
 				if (TD_CC_GET (tdINFO) < 0xE)
@@ -882,17 +886,16 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 		}
 
 		ed->state &= ~ED_URB_DEL;
-		tdHeadP = dma_to_td (ohci,
-			le32_to_cpup (&ed->hwHeadP) & 0xfffffff0);
+		tdHeadP = dma_to_td (ohci, le32_to_cpup (&ed->hwHeadP));
 
 		if (tdHeadP == tdTailP) {
 			if (ed->state == ED_OPER)
 				ep_unlink (ohci, ed);
 			td_free (ohci, tdTailP);
-			ed->hwINFO = __constant_cpu_to_le32 (OHCI_ED_SKIP);
+			ed->hwINFO = ED_SKIP;
 			ed->state = ED_NEW;
 		} else
-			ed->hwINFO &= ~__constant_cpu_to_le32 (OHCI_ED_SKIP);
+			ed->hwINFO &= ~ED_SKIP;
 
 		switch (ed->type) {
 			case PIPE_CONTROL:
@@ -938,7 +941,7 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td_list)
 	int		cc = 0;
 	struct urb	*urb;
 	urb_priv_t	*urb_priv;
- 	__u32		tdINFO, edHeadP, edTailP;
+ 	__u32		tdINFO;
 
  	unsigned long flags;
 
@@ -968,7 +971,7 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td_list)
 			/*
 			 * Except for periodic transfers, both branches do
 			 * the same thing.  Periodic urbs get reissued until
-			 * they're "deleted" with usb_unlink_urb.
+			 * they're "deleted" (in SOF intr) by usb_unlink_urb.
 			 */
 			if ((ed->state & (ED_OPER | ED_UNLINK))
 					&& (urb_priv->state != URB_DEL)) {
@@ -983,13 +986,11 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td_list)
 
   		spin_lock_irqsave (&ohci->lock, flags);
   		if (ed->state != ED_NEW) { 
-  			edHeadP = le32_to_cpup (&ed->hwHeadP) & 0xfffffff0;
-  			edTailP = le32_to_cpup (&ed->hwTailP);
-
-// FIXME:  ED_UNLINK is very fuzzy w.r.t. what the hc knows...
+  			u32 edHeadP = ed->hwHeadP;
 
 			/* unlink eds if they are not busy */
-     			if ((edHeadP == edTailP) && (ed->state == ED_OPER)) 
+			edHeadP &= __constant_cpu_to_le32 (ED_MASK);
+     			if ((edHeadP == ed->hwTailP) && (ed->state == ED_OPER)) 
      				ep_unlink (ohci, ed);
      		}	
      		spin_unlock_irqrestore (&ohci->lock, flags);
