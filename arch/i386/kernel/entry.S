@@ -471,10 +471,12 @@ ENTRY(page_fault)
 	pushl $do_page_fault
 	jmp error_code
 
+#ifdef CONFIG_X86_MCE
 ENTRY(machine_check)
 	pushl $0
 	pushl $do_machine_check
 	jmp error_code
+#endif
 
 ENTRY(spurious_interrupt_bug)
 	pushl $0

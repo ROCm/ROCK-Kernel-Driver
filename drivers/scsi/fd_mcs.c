@@ -1325,118 +1325,115 @@ static int fd_mcs_host_reset(Scsi_Cmnd * SCpnt)
 	return FAILED;
 }
 
-static int fd_mcs_device_reset(Scsi_Cmnd * SCpnt) {
-		return FAILED;
-	}
+static int fd_mcs_device_reset(Scsi_Cmnd * SCpnt) 
+{
+	return FAILED;
+}
 
-	static int fd_mcs_bus_reset(Scsi_Cmnd * SCpnt) {
-		struct Scsi_Host *shpnt = SCpnt->host;
-		unsigned long flags;
+static int fd_mcs_bus_reset(Scsi_Cmnd * SCpnt) {
+	struct Scsi_Host *shpnt = SCpnt->host;
 
 #if DEBUG_RESET
-		static int called_once = 0;
+	static int called_once = 0;
 #endif
 
 #if ERRORS_ONLY
-		if (SCpnt)
-			printk("fd_mcs: SCSI Bus Reset\n");
+	if (SCpnt)
+		printk("fd_mcs: SCSI Bus Reset\n");
 #endif
 
 #if DEBUG_RESET
-		if (called_once)
-			fd_mcs_print_info(current_SC);
-		called_once = 1;
+	if (called_once)
+		fd_mcs_print_info(current_SC);
+	called_once = 1;
 #endif
 
-		spin_lock_irqsave(shpnt->host_lock, flags);
+	outb(1, SCSI_Cntl_port);
+	do_pause(2);
+	outb(0, SCSI_Cntl_port);
+	do_pause(115);
+	outb(0, SCSI_Mode_Cntl_port);
+	outb(PARITY_MASK, TMC_Cntl_port);
 
-		outb(1, SCSI_Cntl_port);
-		do_pause(2);
-		outb(0, SCSI_Cntl_port);
-		do_pause(115);
-		outb(0, SCSI_Mode_Cntl_port);
-		outb(PARITY_MASK, TMC_Cntl_port);
-
-		/* Unless this is the very first call (i.e., SCPnt == NULL), everything
-		   is probably hosed at this point.  We will, however, try to keep
-		   things going by informing the high-level code that we need help. */
-
-		spin_unlock_irqrestore(shpnt->host_lock, flags);
+	/* Unless this is the very first call (i.e., SCPnt == NULL), everything
+	   is probably hosed at this point.  We will, however, try to keep
+	   things going by informing the high-level code that we need help. */
 		return SUCCESS;
-	}
+}
 
 #include <scsi/scsi_ioctl.h>
 
-	static int fd_mcs_biosparam(Scsi_Disk * disk, struct block_device *bdev,
-				    sector_t capacity, int *info_array) {
-		unsigned char buf[512 + sizeof(int) * 2];
-		int size = capacity;
-		int *sizes = (int *) buf;
-		unsigned char *data = (unsigned char *) (sizes + 2);
-		unsigned char do_read[] = { READ_6, 0, 0, 0, 1, 0 };
-		int retcode;
+static int fd_mcs_biosparam(struct scsi_device * disk, struct block_device *bdev,
+			    sector_t capacity, int *info_array) 
+{
+	unsigned char buf[512 + sizeof(int) * 2];
+	int size = capacity;
+	int *sizes = (int *) buf;
+	unsigned char *data = (unsigned char *) (sizes + 2);
+	unsigned char do_read[] = { READ_6, 0, 0, 0, 1, 0 };
+	int retcode;
 
-		/* BIOS >= 3.4 for MCA cards */
-		/* This algorithm was provided by Future Domain (much thanks!). */
+	/* BIOS >= 3.4 for MCA cards */
+	/* This algorithm was provided by Future Domain (much thanks!). */
 
-		sizes[0] = 0;	/* zero bytes out */
-		sizes[1] = 512;	/* one sector in */
-		memcpy(data, do_read, sizeof(do_read));
-		retcode = kernel_scsi_ioctl(disk->device, SCSI_IOCTL_SEND_COMMAND, (void *) buf);
-		if (!retcode	/* SCSI command ok */
-		    && data[511] == 0xaa && data[510] == 0x55	/* Partition table valid */
-		    && data[0x1c2]) {	/* Partition type */
+	sizes[0] = 0;	/* zero bytes out */
+	sizes[1] = 512;	/* one sector in */
+	memcpy(data, do_read, sizeof(do_read));
+	retcode = kernel_scsi_ioctl(disk, SCSI_IOCTL_SEND_COMMAND, (void *) buf);
+	if (!retcode	/* SCSI command ok */
+	    && data[511] == 0xaa && data[510] == 0x55	/* Partition table valid */
+	    && data[0x1c2]) {	/* Partition type */
+		/* The partition table layout is as follows:
 
-			/* The partition table layout is as follows:
+		   Start: 0x1b3h
+		   Offset: 0 = partition status
+		   1 = starting head
+		   2 = starting sector and cylinder (word, encoded)
+		   4 = partition type
+		   5 = ending head
+		   6 = ending sector and cylinder (word, encoded)
+		   8 = starting absolute sector (double word)
+		   c = number of sectors (double word)
+		   Signature: 0x1fe = 0x55aa
 
-			   Start: 0x1b3h
-			   Offset: 0 = partition status
-			   1 = starting head
-			   2 = starting sector and cylinder (word, encoded)
-			   4 = partition type
-			   5 = ending head
-			   6 = ending sector and cylinder (word, encoded)
-			   8 = starting absolute sector (double word)
-			   c = number of sectors (double word)
-			   Signature: 0x1fe = 0x55aa
+		   So, this algorithm assumes:
+		   1) the first partition table is in use,
+		   2) the data in the first entry is correct, and
+		   3) partitions never divide cylinders
 
-			   So, this algorithm assumes:
-			   1) the first partition table is in use,
-			   2) the data in the first entry is correct, and
-			   3) partitions never divide cylinders
+		   Note that (1) may be FALSE for NetBSD (and other BSD flavors),
+		   as well as for Linux.  Note also, that Linux doesn't pay any
+		   attention to the fields that are used by this algorithm -- it
+		   only uses the absolute sector data.  Recent versions of Linux's
+		   fdisk(1) will fill this data in correctly, and forthcoming
+		   versions will check for consistency.
 
-			   Note that (1) may be FALSE for NetBSD (and other BSD flavors),
-			   as well as for Linux.  Note also, that Linux doesn't pay any
-			   attention to the fields that are used by this algorithm -- it
-			   only uses the absolute sector data.  Recent versions of Linux's
-			   fdisk(1) will fill this data in correctly, and forthcoming
-			   versions will check for consistency.
+		   Checking for a non-zero partition type is not part of the
+		   Future Domain algorithm, but it seemed to be a reasonable thing
+		   to do, especially in the Linux and BSD worlds. */
 
-			   Checking for a non-zero partition type is not part of the
-			   Future Domain algorithm, but it seemed to be a reasonable thing
-			   to do, especially in the Linux and BSD worlds. */
-
-			info_array[0] = data[0x1c3] + 1;	/* heads */
-			info_array[1] = data[0x1c4] & 0x3f;	/* sectors */
+		info_array[0] = data[0x1c3] + 1;	/* heads */
+		info_array[1] = data[0x1c4] & 0x3f;	/* sectors */
+	} else {
+		/* Note that this new method guarantees that there will always be
+		   less than 1024 cylinders on a platter.  This is good for drives
+		   up to approximately 7.85GB (where 1GB = 1024 * 1024 kB). */
+		if ((unsigned int) size >= 0x7e0000U) 
+		{
+			info_array[0] = 0xff;	/* heads   = 255 */
+			info_array[1] = 0x3f;	/* sectors =  63 */
+		} else if ((unsigned int) size >= 0x200000U) {
+			info_array[0] = 0x80;	/* heads   = 128 */
+			info_array[1] = 0x3f;	/* sectors =  63 */
 		} else {
-
-			/* Note that this new method guarantees that there will always be
-			   less than 1024 cylinders on a platter.  This is good for drives
-			   up to approximately 7.85GB (where 1GB = 1024 * 1024 kB). */
-
-			if ((unsigned int) size >= 0x7e0000U) {
-				info_array[0] = 0xff;	/* heads   = 255 */
-				info_array[1] = 0x3f;	/* sectors =  63 */
-			} else if ((unsigned int) size >= 0x200000U) {
-				info_array[0] = 0x80;	/* heads   = 128 */
-				info_array[1] = 0x3f;	/* sectors =  63 */
-			} else {
-				info_array[0] = 0x40;	/* heads   =  64 */
-				info_array[1] = 0x20;	/* sectors =  32 */
-			}
+			info_array[0] = 0x40;	/* heads   =  64 */
+			info_array[1] = 0x20;	/* sectors =  32 */
 		}
-		/* For both methods, compute the cylinders */
-		info_array[2] = (unsigned int) size / (info_array[0] * info_array[1]);
+	}
+	/* For both methods, compute the cylinders */
+	info_array[2] = (unsigned int) size / (info_array[0] * info_array[1]);
+	return 0;
+}
 
 /* Eventually this will go into an include file, but this will be later */
 	static Scsi_Host_Template driver_template = FD_MCS;

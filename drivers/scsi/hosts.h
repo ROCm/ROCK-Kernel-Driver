@@ -192,7 +192,7 @@ typedef struct	SHT
 
     /*
      * Old EH handlers, no longer used. Make them warn the user of old
-     * drivers by using a wrogn type
+     * drivers by using a wrong type
      */
     int (*abort)(int);
     int (*reset)(int,int);
