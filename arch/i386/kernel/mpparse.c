@@ -269,7 +269,7 @@ static void __init MP_lintsrc_info (struct mpc_config_lintsrc *m)
 			BUG();
 }
 
-#if 0
+#ifdef CONFIG_X86_NUMAQ
 static void __init MP_translation_info (struct mpc_config_translation *m)
 {
 	printk("Translation: record %d, type %d, quad %d, global %d, local %d\n", mpc_record, m->trans_type, m->trans_quad, m->trans_global, m->trans_local);
@@ -328,7 +328,7 @@ static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
 		}
        }
 }
-#endif
+#endif	/* CONFIG_X86_NUMAQ */
 
 /*
  * Read/parse the MPC

@@ -28,6 +28,7 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
+extern struct pnp_protocol isapnp_protocol;
 
 static struct proc_dir_entry *isapnp_proc_bus_dir = NULL;
 

@@ -12,6 +12,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/compat.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
@@ -69,11 +70,6 @@ static inline int hd_geometry_ioctl(unsigned int fd, unsigned int cmd, unsigned 
 
 	return ret;
 }
-
-struct timeval32 {
-	int tv_sec;
-	int tv_usec;
-};
 
 #define EXT2_IOC32_GETFLAGS               _IOR('f', 1, int)
 #define EXT2_IOC32_SETFLAGS               _IOW('f', 2, int)
@@ -383,9 +379,9 @@ static int do_ext2_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 struct loop_info32 {
 	int			lo_number;      /* ioctl r/o */
-	__kernel_dev_t32	lo_device;      /* ioctl r/o */
+	compat_dev_t	lo_device;      /* ioctl r/o */
 	unsigned int		lo_inode;       /* ioctl r/o */
-	__kernel_dev_t32	lo_rdevice;     /* ioctl r/o */
+	compat_dev_t	lo_rdevice;     /* ioctl r/o */
 	int			lo_offset;
 	int			lo_encrypt_type;
 	int			lo_encrypt_key_size;    /* ioctl w/o */

@@ -351,6 +351,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		smp_ops->space_timers(num_cpus);
 }
 
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	set_bit(smp_processor_id(), &cpu_possible_map);
+}
+
 int __init setup_profiling_timer(unsigned int multiplier)
 {
 	return 0;

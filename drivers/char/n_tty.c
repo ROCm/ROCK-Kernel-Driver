@@ -48,10 +48,6 @@
 #define IS_CONSOLE_DEV(dev)	(kdev_val(dev) == __mkdev(TTY_MAJOR,0))
 #define IS_SYSCONS_DEV(dev)	(kdev_val(dev) == __mkdev(TTYAUX_MAJOR,1))
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /* number of characters left in xmit buffer before select has we have room */
 #define WAKEUP_CHARS 256
 
@@ -725,16 +721,18 @@ static void n_tty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 
 	if (tty->real_raw) {
 		spin_lock_irqsave(&tty->read_lock, cpuflags);
-		i = MIN(count, MIN(N_TTY_BUF_SIZE - tty->read_cnt,
-				   N_TTY_BUF_SIZE - tty->read_head));
+		i = min(N_TTY_BUF_SIZE - tty->read_cnt,
+			N_TTY_BUF_SIZE - tty->read_head);
+		i = min(count, i);
 		memcpy(tty->read_buf + tty->read_head, cp, i);
 		tty->read_head = (tty->read_head + i) & (N_TTY_BUF_SIZE-1);
 		tty->read_cnt += i;
 		cp += i;
 		count -= i;
 
-		i = MIN(count, MIN(N_TTY_BUF_SIZE - tty->read_cnt,
-			       N_TTY_BUF_SIZE - tty->read_head));
+		i = min(N_TTY_BUF_SIZE - tty->read_cnt,
+			N_TTY_BUF_SIZE - tty->read_head);
+		i = min(count, i);
 		memcpy(tty->read_buf + tty->read_head, cp, i);
 		tty->read_head = (tty->read_head + i) & (N_TTY_BUF_SIZE-1);
 		tty->read_cnt += i;
@@ -915,7 +913,8 @@ static inline int copy_from_read_buf(struct tty_struct *tty,
 
 	retval = 0;
 	spin_lock_irqsave(&tty->read_lock, flags);
-	n = MIN(*nr, MIN(tty->read_cnt, N_TTY_BUF_SIZE - tty->read_tail));
+	n = min(tty->read_cnt, N_TTY_BUF_SIZE - tty->read_tail);
+	n = min((ssize_t)*nr, n);
 	spin_unlock_irqrestore(&tty->read_lock, flags);
 	if (n) {
 		mb();

@@ -42,7 +42,7 @@ static int snd_gus_init_dma_irq(snd_gus_card_t * gus, int latches);
 int snd_gus_use_inc(snd_gus_card_t * gus)
 {
 	MOD_INC_USE_COUNT;
-	if (!try_inc_mod_count(gus->card->module)) {
+	if (!try_module_get(gus->card->module)) {
 		MOD_DEC_USE_COUNT;
 		return 0;
 	}

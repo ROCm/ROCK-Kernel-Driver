@@ -192,6 +192,7 @@ struct pnp_dev * pnp_request_card_device(struct pnp_card *card, const char *id, 
 {
 	struct list_head *pos;
 	struct pnp_dev *dev;
+	struct pnpc_driver *cdrv;
 	if (!card || !id)
 		goto done;
 	if (!from) {
@@ -212,9 +213,16 @@ done:
 	return NULL;
 
 found:
-	if (dev->active == 0)
-		if(pnp_activate_dev(dev)<0)
-			return NULL;
+	cdrv = to_pnpc_driver(card->dev.driver);
+	if (dev->active == 0) {
+		if (!(cdrv->flags & PNPC_DRIVER_DO_NOT_ACTIVATE)) {
+			if(pnp_activate_dev(dev,NULL)<0)
+				return NULL;
+		}
+	} else {
+		if ((cdrv->flags & PNPC_DRIVER_DO_NOT_ACTIVATE))
+			pnp_disable_dev(dev);
+	}
 	spin_lock(&pnp_lock);
 	list_add_tail(&dev->rdev_list, &card->rdevs);
 	spin_unlock(&pnp_lock);

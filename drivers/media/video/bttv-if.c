@@ -194,16 +194,6 @@ static int bttv_bit_getsda(void *data)
 	return state;
 }
 
-static void bttv_inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void bttv_dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static int attach_inform(struct i2c_client *client)
 {
         struct bttv *btv = (struct bttv*)client->adapter->data;
@@ -272,10 +262,9 @@ static struct i2c_algo_bit_data bttv_i2c_algo_template = {
 };
 
 static struct i2c_adapter bttv_i2c_adap_template = {
+	.owner		   = THIS_MODULE,
 	.name              = "bt848",
 	.id                = I2C_HW_B_BT848,
-	.inc_use           = bttv_inc_use,
-	.dec_use           = bttv_dec_use,
 	.client_register   = attach_inform,
 	.client_unregister = detach_inform,
 };

@@ -233,7 +233,7 @@ void rxrpc_krxsecd_process_incoming_call(struct rxrpc_message *msg)
 	spin_lock(&trans->lock);
 	list_for_each(_p,&trans->services) {
 		srv = list_entry(_p,struct rxrpc_service,link);
-		if (srv->service_id==sid && try_inc_mod_count(srv->owner)) {
+		if (srv->service_id==sid && try_module_get(srv->owner)) {
 			/* found a match (made sure it won't vanish) */
 			_debug("found service '%s'",srv->name);
 			call->owner = srv->owner;

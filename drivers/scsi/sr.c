@@ -434,6 +434,17 @@ static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			  unsigned long arg)
 {
 	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
+	struct scsi_device *sdev = cd->device;
+
+        /*
+         * Send SCSI addressing ioctls directly to mid level, send other
+         * ioctls to cdrom/block level.
+         */
+        switch (cmd) {
+                case SCSI_IOCTL_GET_IDLUN:
+                case SCSI_IOCTL_GET_BUS_NUMBER:
+                        return scsi_ioctl(sdev, cmd, (void *)arg);
+	}
 	return cdrom_ioctl(&cd->cdi, inode, cmd, arg);
 }
 

@@ -355,14 +355,6 @@ typedef struct {
 	todc_info->flags         = clock_type ##_FLAGS;			\
 }
 
-#ifndef BCD_TO_BIN
-#define BCD_TO_BIN(val) ((val)=((val)&15) + ((val)>>4)*10)
-#endif
-
-#ifndef BIN_TO_BCD
-#define BIN_TO_BCD(val) ((val)=(((val)/10)<<4) + (val)%10)
-#endif
-
 extern todc_info_t *todc_info;
 
 unsigned char todc_direct_read_val(int addr);

@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/time.h>
 #include <linux/timex.h>
+#include <linux/bcd.h>
 
 #include <asm/machdep.h>
 #include <asm/io.h>

@@ -295,12 +295,28 @@ pnp_set_current_resources(struct device * dmdev, const char * buf, size_t count,
 	num_args = sscanf(buf,"%10s %i %10s",command,&depnum,type);
 	if (!num_args)
 		goto done;
+	if (!strnicmp(command,"lock",4)) {
+		if (dev->active) {
+			dev->lock_resources = 1;
+		} else {
+			error = -EINVAL;
+		}
+		goto done;
+	}
+	if (!strnicmp(command,"unlock",6)) {
+		if (dev->lock_resources) {
+			dev->lock_resources = 0;
+		} else {
+			error = -EINVAL;
+		}
+		goto done;
+	}
 	if (!strnicmp(command,"disable",7)) {
 		error = pnp_disable_dev(dev);
 		goto done;
 	}
 	if (!strnicmp(command,"auto",4)) {
-		error = pnp_activate_dev(dev);
+		error = pnp_activate_dev(dev,NULL);
 		goto done;
 	}
 	if (!strnicmp(command,"manual",6)) {
@@ -308,7 +324,7 @@ pnp_set_current_resources(struct device * dmdev, const char * buf, size_t count,
 			goto done;
 		if (!strnicmp(type,"static",6))
 			mode = PNP_STATIC;
-		error = pnp_raw_set_dev(dev,depnum,mode);
+		error = pnp_raw_set_dev(dev,depnum,NULL,mode);
 		goto done;
 	}
  done:

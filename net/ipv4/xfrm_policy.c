@@ -192,7 +192,7 @@ struct xfrm_type *xfrm_get_type(u8 proto)
 
 	read_lock(&xfrm_type_lock);
 	type = xfrm_type_map[proto];
-	if (type && !try_inc_mod_count(type->owner))
+	if (type && !try_module_get(type->owner))
 		type = NULL;
 	read_unlock(&xfrm_type_lock);
 	return type;

@@ -11,6 +11,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
 #include <linux/rtc.h>
+#include <linux/bcd.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -36,9 +37,6 @@
 #define C_SIGN    0x20
 #define C_CALIB   0x1f
 
-#define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
-#define BIN_TO_BCD(val) (((val/10) << 4) | (val % 10))
-
 int sun3x_hwclk(int set, struct rtc_time *t)
 {
 	volatile struct mostek_dt *h = 
@@ -49,23 +47,23 @@ int sun3x_hwclk(int set, struct rtc_time *t)
 	
 	if(set) {
 		h->csr |= C_WRITE;
-		h->sec = BIN_TO_BCD(t->tm_sec);
-		h->min = BIN_TO_BCD(t->tm_min);
-		h->hour = BIN_TO_BCD(t->tm_hour);
-		h->wday = BIN_TO_BCD(t->tm_wday);
-		h->mday = BIN_TO_BCD(t->tm_mday);
-		h->month = BIN_TO_BCD(t->tm_mon);
-		h->year = BIN_TO_BCD(t->tm_year);
+		h->sec = BIN2BCD(t->tm_sec);
+		h->min = BIN2BCD(t->tm_min);
+		h->hour = BIN2BCD(t->tm_hour);
+		h->wday = BIN2BCD(t->tm_wday);
+		h->mday = BIN2BCD(t->tm_mday);
+		h->month = BIN2BCD(t->tm_mon);
+		h->year = BIN2BCD(t->tm_year);
 		h->csr &= ~C_WRITE;
 	} else {
 		h->csr |= C_READ;
-		t->tm_sec = BCD_TO_BIN(h->sec);
-		t->tm_min = BCD_TO_BIN(h->min);
-		t->tm_hour = BCD_TO_BIN(h->hour);
-		t->tm_wday = BCD_TO_BIN(h->wday);
-		t->tm_mday = BCD_TO_BIN(h->mday);
-		t->tm_mon = BCD_TO_BIN(h->month);
-		t->tm_year = BCD_TO_BIN(h->year);
+		t->tm_sec = BCD2BIN(h->sec);
+		t->tm_min = BCD2BIN(h->min);
+		t->tm_hour = BCD2BIN(h->hour);
+		t->tm_wday = BCD2BIN(h->wday);
+		t->tm_mday = BCD2BIN(h->mday);
+		t->tm_mon = BCD2BIN(h->month);
+		t->tm_year = BCD2BIN(h->year);
 		h->csr &= ~C_READ;
 	}
 

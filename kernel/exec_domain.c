@@ -82,7 +82,7 @@ lookup_exec_domain(u_long personality)
 	read_lock(&exec_domains_lock);
 	for (ep = exec_domains; ep; ep = ep->next) {
 		if (pers >= ep->pers_low && pers <= ep->pers_high)
-			if (try_inc_mod_count(ep->module))
+			if (try_module_get(ep->module))
 				goto out;
 	}
 
@@ -97,7 +97,7 @@ lookup_exec_domain(u_long personality)
 
 	for (ep = exec_domains; ep; ep = ep->next) {
 		if (pers >= ep->pers_low && pers <= ep->pers_high)
-			if (try_inc_mod_count(ep->module))
+			if (try_module_get(ep->module))
 				goto out;
 	}
 #endif

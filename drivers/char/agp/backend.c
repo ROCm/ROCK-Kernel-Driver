@@ -73,7 +73,7 @@ struct agp_max_table {
 	int agp;
 };
 
-static struct agp_max_table maxes_table[9] __initdata =
+static struct agp_max_table maxes_table[9] =
 {
 	{0, 0},
 	{32, 4},
@@ -86,7 +86,7 @@ static struct agp_max_table maxes_table[9] __initdata =
 	{4096, 3932}
 };
 
-static int __init agp_find_max (void)
+static int agp_find_max (void)
 {
 	long memory, index, result;
 

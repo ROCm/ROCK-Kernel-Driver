@@ -66,7 +66,7 @@ static const struct pnp_device_id * match_device(struct pnp_driver *drv, struct 
 
 static int pnp_device_probe(struct device *dev)
 {
-	int error = 0;
+	int error;
 	struct pnp_driver *pnp_drv;
 	struct pnp_dev *pnp_dev;
 	const struct pnp_device_id *dev_id = NULL;
@@ -75,9 +75,17 @@ static int pnp_device_probe(struct device *dev)
 
 	pnp_dbg("pnp: match found with the PnP device '%s' and the driver '%s'", dev->bus_id,pnp_drv->name);
 
-	if (pnp_dev->active == 0)
-		if(pnp_activate_dev(pnp_dev)<0)
-			return -1;
+	if (pnp_dev->active == 0) {
+		if (!(pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE)) {
+			error = pnp_activate_dev(pnp_dev, NULL);
+			if (error < 0)
+				return error;
+		}
+	} else {
+		if ((pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE))
+			pnp_disable_dev(pnp_dev);
+	}
+	error = 0;
 	if (pnp_drv->probe && pnp_dev->active) {
 		dev_id = match_device(pnp_drv, pnp_dev);
 		if (dev_id != NULL)

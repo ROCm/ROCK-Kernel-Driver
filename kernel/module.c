@@ -569,24 +569,19 @@ static int param_set_byte(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-static int param_string(const char *name, const char *val,
-			unsigned int min, unsigned int max,
-			char *dest)
+/* Bounds checking done below */
+static int obsparm_copy_string(const char *val, struct kernel_param *kp)
 {
-	if (strlen(val) < min || strlen(val) > max) {
-		printk(KERN_ERR
-		       "Parameter %s length must be %u-%u characters\n",
-		       name, min, max);
-		return -EINVAL;
-	}
-	strcpy(dest, val);
+	strcpy(kp->arg, val);
 	return 0;
 }
 
 extern int set_obsolete(const char *val, struct kernel_param *kp)
 {
 	unsigned int min, max;
-	char *p, *endp;
+	unsigned int size, maxsize;
+	char *endp;
+	const char *p;
 	struct obsolete_modparm *obsparm = kp->arg;
 
 	if (!val) {
@@ -618,9 +613,31 @@ extern int set_obsolete(const char *val, struct kernel_param *kp)
 		return param_array(kp->name, val, min, max, obsparm->addr,
 				   sizeof(long), param_set_long);
 	case 's':
-		return param_string(kp->name, val, min, max, obsparm->addr);
+		return param_array(kp->name, val, min, max, obsparm->addr,
+				   sizeof(char *), param_set_charp);
+
+	case 'c':
+		/* Undocumented: 1-5c50 means 1-5 strings of up to 49 chars,
+		   and the decl is "char xxx[5][50];" */
+		p = endp+1;
+		maxsize = simple_strtol(p, &endp, 10);
+		/* We check lengths here (yes, this is a hack). */
+		p = val;
+		while (p[size = strcspn(p, ",")]) {
+			if (size >= maxsize) 
+				goto oversize;
+			p += size+1;
+		}
+		if (size >= maxsize) 
+			goto oversize;
+		return param_array(kp->name, val, min, max, obsparm->addr,
+				   maxsize, obsparm_copy_string);
 	}
 	printk(KERN_ERR "Unknown obsolete parameter type %s\n", obsparm->type);
+	return -EINVAL;
+ oversize:
+	printk(KERN_ERR
+	       "Parameter %s doesn't fit in %u chars.\n", kp->name, maxsize);
 	return -EINVAL;
 }
 

@@ -1303,9 +1303,6 @@ static void cache_init_objs (kmem_cache_t * cachep,
 
 static void kmem_flagcheck(kmem_cache_t *cachep, int flags)
 {
-	if (flags & __GFP_WAIT)
-		might_sleep();
-
 	if (flags & SLAB_DMA) {
 		if (!(cachep->gfpflags & GFP_DMA))
 			BUG();
@@ -1595,14 +1592,19 @@ must_grow:
 	return ac_entry(ac)[--ac->avail];
 }
 
-static inline void cache_alloc_debugcheck_before(kmem_cache_t *cachep, int flags)
+static inline void
+cache_alloc_debugcheck_before(kmem_cache_t *cachep, int flags)
 {
+	if (flags & __GFP_WAIT)
+		might_sleep();
 #if DEBUG
 	kmem_flagcheck(cachep, flags);
 #endif
 }
 
-static inline void *cache_alloc_debugcheck_after (kmem_cache_t *cachep, unsigned long flags, void *objp)
+static inline void *
+cache_alloc_debugcheck_after(kmem_cache_t *cachep,
+			unsigned long flags, void *objp)
 {
 #if DEBUG
 	if (!objp)	
@@ -1826,6 +1828,54 @@ void * kmalloc (size_t size, int flags)
 	return NULL;
 }
 
+#ifdef CONFIG_SMP
+/**
+ * kmalloc_percpu - allocate one copy of the object for every present
+ * cpu in the system.
+ * Objects should be dereferenced using per_cpu_ptr/get_cpu_ptr
+ * macros only.
+ *
+ * @size: how many bytes of memory are required.
+ * @flags: the type of memory to allocate.
+ * The @flags argument may be one of:
+ *
+ * %GFP_USER - Allocate memory on behalf of user.  May sleep.
+ *
+ * %GFP_KERNEL - Allocate normal kernel ram.  May sleep.
+ *
+ * %GFP_ATOMIC - Allocation will not sleep.  Use inside interrupt handlers.
+ */
+void *
+kmalloc_percpu(size_t size, int flags)
+{
+	int i;
+	struct percpu_data *pdata = kmalloc(sizeof (*pdata), flags);
+
+	if (!pdata)
+		return NULL;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
+		pdata->ptrs[i] = kmalloc(size, flags);
+		if (!pdata->ptrs[i])
+			goto unwind_oom;
+	}
+
+	/* Catch derefs w/o wrappers */
+	return (void *) (~(unsigned long) pdata);
+
+unwind_oom:
+	while (--i >= 0) {
+		if (!cpu_possible(i))
+			continue;
+		kfree(pdata->ptrs[i]);
+	}
+	kfree(pdata);
+	return NULL;
+}
+#endif
+
 /**
  * kmem_cache_free - Deallocate an object
  * @cachep: The cache the allocation was from.
@@ -1863,6 +1913,28 @@ void kfree (const void *objp)
 	__cache_free(c, (void*)objp);
 	local_irq_restore(flags);
 }
+
+#ifdef CONFIG_SMP
+/**
+ * kfree_percpu - free previously allocated percpu memory
+ * @objp: pointer returned by kmalloc_percpu.
+ *
+ * Don't free memory not originally allocated by kmalloc_percpu()
+ * The complemented objp is to check for that.
+ */
+void
+kfree_percpu(const void *objp)
+{
+	int i;
+	struct percpu_data *p = (struct percpu_data *) (~(unsigned long) objp);
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
+		kfree(p->ptrs[i]);
+	}
+}
+#endif
 
 unsigned int kmem_cache_size(kmem_cache_t *cachep)
 {

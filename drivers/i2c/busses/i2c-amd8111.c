@@ -320,16 +320,6 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 	return 0;
 }
 
-void amd8111_inc(struct i2c_adapter *adapter)
-{
-	MOD_INC_USE_COUNT;
-}
-
-void amd8111_dec(struct i2c_adapter *adapter)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 u32 amd8111_func(struct i2c_adapter *adapter)
 {
 	return	I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE | I2C_FUNC_SMBUS_BYTE_DATA |
@@ -368,12 +358,11 @@ static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_
 		return -1;
 	}
 
+	smbus->adapter.owner = THIS_MODULE;
 	sprintf(smbus->adapter.name, "SMBus2 AMD8111 adapter at %04x", smbus->base);
 	smbus->adapter.id = I2C_ALGO_SMBUS | I2C_HW_SMBUS_AMD8111;
 	smbus->adapter.algo = &smbus_algorithm;
 	smbus->adapter.algo_data = smbus;
-	smbus->adapter.inc_use = amd8111_inc;
-	smbus->adapter.dec_use = amd8111_dec;
 
 	if (i2c_add_adapter(&smbus->adapter)) {
 		printk(KERN_WARNING "i2c-amd8111.c: Failed to register adapter.\n");

@@ -73,9 +73,9 @@ urb_print (struct urb * urb, char * str, int small)
 #endif
 }
 
-static void ohci_dump_intr_mask (char *label, __u32 mask)
+static void ohci_dump_intr_mask (struct device *dev, char *label, __u32 mask)
 {
-	dbg ("%s: 0x%08x%s%s%s%s%s%s%s%s%s",
+	dev_dbg (*dev, "%s: 0x%08x%s%s%s%s%s%s%s%s%s\n",
 		label,
 		mask,
 		(mask & OHCI_INTR_MIE) ? " MIE" : "",
@@ -90,10 +90,10 @@ static void ohci_dump_intr_mask (char *label, __u32 mask)
 		);
 }
 
-static void maybe_print_eds (char *label, __u32 value)
+static void maybe_print_eds (struct device *dev, char *label, __u32 value)
 {
 	if (value)
-		dbg ("%s %08x", label, value);
+		dev_dbg (*dev, "%s %08x\n", label, value);
 }
 
 static char *hcfs2string (int state)
@@ -111,15 +111,16 @@ static char *hcfs2string (int state)
 static void ohci_dump_status (struct ohci_hcd *controller)
 {
 	struct ohci_regs	*regs = controller->regs;
+	struct device		*dev = controller->hcd.controller;
 	__u32			temp;
 
 	temp = readl (&regs->revision) & 0xff;
-	dbg ("OHCI %d.%d, %s legacy support registers",
+	dev_dbg (*dev, "OHCI %d.%d, %s legacy support registers\n",
 		0x03 & (temp >> 4), (temp & 0x0f),
 		(temp & 0x10) ? "with" : "NO");
 
 	temp = readl (&regs->control);
-	dbg ("control: 0x%08x%s%s%s HCFS=%s%s%s%s%s CBSR=%d", temp,
+	dev_dbg (*dev, "control: 0x%08x%s%s%s HCFS=%s%s%s%s%s CBSR=%d\n", temp,
 		(temp & OHCI_CTRL_RWE) ? " RWE" : "",
 		(temp & OHCI_CTRL_RWC) ? " RWC" : "",
 		(temp & OHCI_CTRL_IR) ? " IR" : "",
@@ -132,7 +133,7 @@ static void ohci_dump_status (struct ohci_hcd *controller)
 		);
 
 	temp = readl (&regs->cmdstatus);
-	dbg ("cmdstatus: 0x%08x SOC=%d%s%s%s%s", temp,
+	dev_dbg (*dev, "cmdstatus: 0x%08x SOC=%d%s%s%s%s\n", temp,
 		(temp & OHCI_SOC) >> 16,
 		(temp & OHCI_OCR) ? " OCR" : "",
 		(temp & OHCI_BLF) ? " BLF" : "",
@@ -140,20 +141,20 @@ static void ohci_dump_status (struct ohci_hcd *controller)
 		(temp & OHCI_HCR) ? " HCR" : ""
 		);
 
-	ohci_dump_intr_mask ("intrstatus", readl (&regs->intrstatus));
-	ohci_dump_intr_mask ("intrenable", readl (&regs->intrenable));
+	ohci_dump_intr_mask (dev, "intrstatus", readl (&regs->intrstatus));
+	ohci_dump_intr_mask (dev, "intrenable", readl (&regs->intrenable));
 	// intrdisable always same as intrenable
-	// ohci_dump_intr_mask ("intrdisable", readl (&regs->intrdisable));
+	// ohci_dump_intr_mask (dev, "intrdisable", readl (&regs->intrdisable));
 
-	maybe_print_eds ("ed_periodcurrent", readl (&regs->ed_periodcurrent));
+	maybe_print_eds (dev, "ed_periodcurrent", readl (&regs->ed_periodcurrent));
 
-	maybe_print_eds ("ed_controlhead", readl (&regs->ed_controlhead));
-	maybe_print_eds ("ed_controlcurrent", readl (&regs->ed_controlcurrent));
+	maybe_print_eds (dev, "ed_controlhead", readl (&regs->ed_controlhead));
+	maybe_print_eds (dev, "ed_controlcurrent", readl (&regs->ed_controlcurrent));
 
-	maybe_print_eds ("ed_bulkhead", readl (&regs->ed_bulkhead));
-	maybe_print_eds ("ed_bulkcurrent", readl (&regs->ed_bulkcurrent));
+	maybe_print_eds (dev, "ed_bulkhead", readl (&regs->ed_bulkhead));
+	maybe_print_eds (dev, "ed_bulkcurrent", readl (&regs->ed_bulkcurrent));
 
-	maybe_print_eds ("donehead", readl (&regs->donehead));
+	maybe_print_eds (dev, "donehead", readl (&regs->donehead));
 }
 
 static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
@@ -166,7 +167,8 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 	ndp = (temp & RH_A_NDP);
 
 	if (verbose) {
-		dbg ("roothub.a: %08x POTPGT=%d%s%s%s%s%s NDP=%d", temp,
+		dev_dbg (*controller->hcd.controller,
+			"roothub.a: %08x POTPGT=%d%s%s%s%s%s NDP=%d\n", temp,
 			((temp & RH_A_POTPGT) >> 24) & 0xff,
 			(temp & RH_A_NOCP) ? " NOCP" : "",
 			(temp & RH_A_OCPM) ? " OCPM" : "",
@@ -176,13 +178,15 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 			ndp
 			);
 		temp = roothub_b (controller);
-		dbg ("roothub.b: %08x PPCM=%04x DR=%04x",
+		dev_dbg (*controller->hcd.controller,
+			"roothub.b: %08x PPCM=%04x DR=%04x\n",
 			temp,
 			(temp & RH_B_PPCM) >> 16,
 			(temp & RH_B_DR)
 			);
 		temp = roothub_status (controller);
-		dbg ("roothub.status: %08x%s%s%s%s%s%s",
+		dev_dbg (*controller->hcd.controller,
+			"roothub.status: %08x%s%s%s%s%s%s\n",
 			temp,
 			(temp & RH_HS_CRWE) ? " CRWE" : "",
 			(temp & RH_HS_OCIC) ? " OCIC" : "",
@@ -201,12 +205,14 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 
 static void ohci_dump (struct ohci_hcd *controller, int verbose)
 {
-	dbg ("OHCI controller %s state", controller->hcd.self.bus_name);
+	dev_dbg (*controller->hcd.controller,
+		"OHCI controller state\n");
 
 	// dumps some of the state we know about
 	ohci_dump_status (controller);
 	if (controller->hcca)
-		dbg ("hcca frame #%04x", controller->hcca->frame_no);
+		dev_dbg (*controller->hcd.controller,
+			"hcca frame #%04x\n", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
 }
 
@@ -312,15 +318,12 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	}
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,32)
-#	define DRIVERFS_DEBUG_FILES
-#endif
+#else
+static inline void ohci_dump (struct ohci_hcd *controller, int verbose) {}
 
 #endif /* DEBUG */
 
 /*-------------------------------------------------------------------------*/
-
-#ifdef DRIVERFS_DEBUG_FILES
 
 static ssize_t
 show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
@@ -510,7 +513,7 @@ static inline void create_debug_files (struct ohci_hcd *bus)
 	device_create_file (bus->hcd.controller, &dev_attr_async);
 	device_create_file (bus->hcd.controller, &dev_attr_periodic);
 	// registers
-	dbg ("%s: created debug files", bus->hcd.self.bus_name);
+	dev_dbg (*bus->hcd.controller, "created debug files\n");
 }
 
 static inline void remove_debug_files (struct ohci_hcd *bus)
@@ -518,13 +521,6 @@ static inline void remove_debug_files (struct ohci_hcd *bus)
 	device_remove_file (bus->hcd.controller, &dev_attr_async);
 	device_remove_file (bus->hcd.controller, &dev_attr_periodic);
 }
-
-#else /* empty stubs for creating those files */
-
-static inline void create_debug_files (struct ohci_hcd *bus) { }
-static inline void remove_debug_files (struct ohci_hcd *bus) { }
-
-#endif /* DRIVERFS_DEBUG_FILES */
 
 /*-------------------------------------------------------------------------*/
 

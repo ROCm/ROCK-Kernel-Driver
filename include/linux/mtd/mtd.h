@@ -215,10 +215,8 @@ static inline struct mtd_info *get_mtd_device(struct mtd_info *mtd, int num)
 	struct mtd_info *ret;
 	
 	ret = __get_mtd_device(mtd, num);
-
-	if (ret && ret->module && !try_inc_mod_count(ret->module))
+	if (ret && !try_module_get(ret->module))
 		return NULL;
-
 	return ret;
 }
 
@@ -226,7 +224,6 @@ static inline void put_mtd_device(struct mtd_info *mtd)
 {
 	module_put(mtd->module);
 }
-
 
 struct mtd_notifier {
 	void (*add)(struct mtd_info *mtd);

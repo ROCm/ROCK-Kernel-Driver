@@ -474,10 +474,6 @@ int i2c_pcf_add_bus(struct i2c_adapter *adap)
 		return i;
 	}
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-
 	i2c_add_adapter(adap);
 
 	/* scan bus */
@@ -509,15 +505,7 @@ int i2c_pcf_add_bus(struct i2c_adapter *adap)
 
 int i2c_pcf_del_bus(struct i2c_adapter *adap)
 {
-	int res;
-	if ((res = i2c_del_adapter(adap)) < 0)
-		return res;
-	DEB2(printk(KERN_DEBUG "i2c-algo-pcf.o: adapter unregistered: %s\n",adap->name));
-
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-	return 0;
+	return i2c_del_adapter(adap);
 }
 
 EXPORT_SYMBOL(i2c_pcf_add_bus);

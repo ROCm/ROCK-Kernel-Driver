@@ -242,8 +242,6 @@
 #define __NR_io_getevents	229
 #define __NR_io_submit		230
 #define __NR_io_cancel		231
-#define __NR_alloc_hugepages	232
-#define __NR_free_hugepages	233
 #define __NR_exit_group		234
 #define __NR_lookup_dcookie	235
 #define __NR_sys_epoll_create	236

@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#111 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#114 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -65,6 +65,7 @@
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
+#include <linux/smp_lock.h>
 #include <linux/version.h>
 #ifndef AHC_MODVERSION_FILE
 #define __NO_VERSION__
@@ -300,7 +301,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.24"
+#define AIC7XXX_DRIVER_VERSION "6.2.25"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -437,16 +438,19 @@ struct ahc_linux_device {
 };
 
 typedef enum {
-	AHC_DV_REQUIRED		 = 0x01
+	AHC_DV_REQUIRED		 = 0x01,
+	AHC_INQ_VALID		 = 0x02,
+	AHC_BASIC_DV		 = 0x04,
+	AHC_ENHANCED_DV		 = 0x08
 } ahc_linux_targ_flags;
 
 /* DV States */
 typedef enum {
 	AHC_DV_STATE_EXIT = 0,
 	AHC_DV_STATE_INQ_SHORT_ASYNC,
-	AHC_DV_STATE_TUR,
 	AHC_DV_STATE_INQ_ASYNC,
 	AHC_DV_STATE_INQ_ASYNC_VERIFY,
+	AHC_DV_STATE_TUR,
 	AHC_DV_STATE_REBD,
 	AHC_DV_STATE_INQ_VERIFY,
 	AHC_DV_STATE_WEB,

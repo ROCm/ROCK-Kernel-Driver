@@ -2682,9 +2682,9 @@ static int __init rs_init(void)
 		       (state->flags & ASYNC_FOURPORT) ? " FourPort" : "",
 		       state->port, state->irq,
 		       uart_config[state->type].name);
-		tty_register_devfs(&serial_driver, 0,
+		tty_register_device(&serial_driver,
 				   serial_driver.minor_start + state->line);
-		tty_register_devfs(&callout_driver, 0,
+		tty_register_device(&callout_driver,
 				   callout_driver.minor_start + state->line);
 	}
 	return 0;
@@ -2772,9 +2772,9 @@ int register_serial(struct serial_struct *req)
 	      state->iomem_base ? "iomem" : "port",
 	      state->iomem_base ? (unsigned long)state->iomem_base :
 	      state->port, state->irq, uart_config[state->type].name);
-	tty_register_devfs(&serial_driver, 0,
+	tty_register_device(&serial_driver,
 			   serial_driver.minor_start + state->line); 
-	tty_register_devfs(&callout_driver, 0,
+	tty_register_device(&callout_driver,
 			   callout_driver.minor_start + state->line);
 	return state->line + SERIAL_DEV_OFFSET;
 }
@@ -2801,9 +2801,9 @@ void unregister_serial(int line)
 	/* These will be hidden, because they are devices that will no longer
 	 * be available to the system. (ie, PCMCIA modems, once ejected)
 	 */
-	tty_unregister_devfs(&serial_driver,
+	tty_unregister_device(&serial_driver,
 			     serial_driver.minor_start + state->line);
-	tty_unregister_devfs(&callout_driver,
+	tty_unregister_device(&callout_driver,
 			     callout_driver.minor_start + state->line);
 	restore_flags(flags);
 }

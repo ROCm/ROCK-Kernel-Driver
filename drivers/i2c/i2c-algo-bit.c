@@ -529,14 +529,11 @@ static u32 bit_func(struct i2c_adapter *adap)
 /* -----exported algorithm data: -------------------------------------	*/
 
 static struct i2c_algorithm i2c_bit_algo = {
-	"Bit-shift algorithm",
-	I2C_ALGO_BIT,
-	bit_xfer,
-	NULL,
-	NULL,				/* slave_xmit		*/
-	NULL,				/* slave_recv		*/
-	algo_control,			/* ioctl		*/
-	bit_func,			/* functionality	*/
+	.name		= "Bit-shift algorithm",
+	.id		= I2C_ALGO_BIT,
+	.master_xfer	= bit_xfer,
+	.algo_control	= algo_control,
+	.functionality	= bit_func,
 };
 
 /* 
@@ -581,11 +578,7 @@ int i2c_bit_add_bus(struct i2c_adapter *adap)
 		printk("\n");
 	}
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
 	i2c_add_adapter(adap);
-
 	return 0;
 }
 
@@ -599,9 +592,6 @@ int i2c_bit_del_bus(struct i2c_adapter *adap)
 
 	DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: adapter unregistered: %s\n",adap->name));
 
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

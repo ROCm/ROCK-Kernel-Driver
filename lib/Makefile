@@ -31,3 +31,11 @@ include $(TOPDIR)/drivers/net/Makefile.lib
 include $(TOPDIR)/drivers/usb/class/Makefile.lib
 include $(TOPDIR)/fs/Makefile.lib
 include $(TOPDIR)/net/bluetooth/bnep/Makefile.lib
+
+host-progs := gen_crc32table
+clean-files := crc32table.h
+
+$(obj)/crc32.o: $(obj)/crc32table.h
+
+$(obj)/crc32table.h: $(obj)/gen_crc32table
+	./$< > $@

@@ -1,6 +1,6 @@
 #
 # AIC79XX 2.5.X Kernel configuration File.
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Kconfig.aic79xx#2 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Kconfig.aic79xx#3 $
 #
 config SCSI_AIC79XX
 	tristate "Adaptec AIC79xx U320 support"
@@ -76,20 +76,20 @@ config AIC79XX_DEBUG_ENABLE
 	driver errors.
 
 config AIC79XX_DEBUG_MASK
-        int "Debug code enable mask (16383 for all debugging)"
-        depends on SCSI_AIC79XX
-        default "0"
-        help
+	int "Debug code enable mask (16383 for all debugging)"
+	depends on SCSI_AIC79XX
+	default "0"
+	help
 	Bit mask of debug options that is only valid if the
 	CONFIG_AIC79XX_DEBUG_ENBLE option is enabled.  The bits in this mask
 	are defined in the drivers/scsi/aic7xxx/aic79xx.h - search for the
 	variable ahd_debug in that file to find them.
 
 config AIC79XX_REG_PRETTY_PRINT
-        bool "Decode registers during diagnostics"
-        depends on SCSI_AIC79XX && SCSI_AIC7XXX_BUILD_FIRMWARE
+	bool "Decode registers during diagnostics"
+	depends on SCSI_AIC79XX
 	default y
-        help
+	help
 	Compile in register value tables for the output of expanded register
 	contents in diagnostics.  This make it much easier to understand debug
 	output without having to refer to a data book and/or the aic7xxx.reg

@@ -537,9 +537,20 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 		return sd_hdio_getgeo(bdev, (struct hd_geometry *)arg);
 	}
 
-	error = scsi_cmd_ioctl(bdev, cmd, arg);
-	if (error != -ENOTTY)
-		return error;
+	/*
+	 * Send SCSI addressing ioctls directly to mid level, send other
+	 * ioctls to block level and then onto mid level if they can't be
+	 * resolved.
+	 */
+	switch (cmd) {
+		case SCSI_IOCTL_GET_IDLUN:
+		case SCSI_IOCTL_GET_BUS_NUMBER:
+			return scsi_ioctl(sdp, cmd, (void *)arg);
+		default:
+			error = scsi_cmd_ioctl(bdev, cmd, arg);
+			if (error != -ENOTTY)
+				return error;
+	}
 	return scsi_ioctl(sdp, cmd, (void *)arg);
 }
 

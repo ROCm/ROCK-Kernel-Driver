@@ -25,31 +25,17 @@
 
 /* $Id: i2c.h,v 1.59 2002/07/19 20:53:45 phil Exp $ */
 
-#ifndef I2C_H
-#define I2C_H
+#ifndef _LINUX_I2C_H
+#define _LINUX_I2C_H
 
 #define I2C_DATE "20020719"
 #define I2C_VERSION "2.6.4"
 
 #include <linux/i2c-id.h>	/* id values of adapters et. al. 	*/
 #include <linux/types.h>
-
-
-struct i2c_msg;
-
-
-#ifdef __KERNEL__
-
-/* --- Includes and compatibility declarations ------------------------ */
-
-#include <linux/version.h>
-#ifndef KERNEL_VERSION
-#define KERNEL_VERSION(a,b,c) (((a) << 16) | ((b) << 8) | (c))
-#endif
-
-#include <asm/page.h>			/* for 2.2.xx 			*/
-#include <asm/semaphore.h>
 #include <linux/config.h>
+#include <asm/semaphore.h>
+
 
 /* --- General options ------------------------------------------------	*/
 
@@ -59,6 +45,7 @@ struct i2c_msg;
 #define I2C_CLIENT_MAX	32
 #define I2C_DUMMY_MAX 4
 
+struct i2c_msg;
 struct i2c_algorithm;
 struct i2c_adapter;
 struct i2c_client;
@@ -132,6 +119,7 @@ extern s32 i2c_smbus_write_i2c_block_data(struct i2c_client * client,
  */
 
 struct i2c_driver {
+	struct module *owner;
 	char name[32];
 	int id;
 	unsigned int flags;		/* div., see below		*/
@@ -155,18 +143,6 @@ struct i2c_driver {
 	 * with the device.
 	 */
 	int (*command)(struct i2c_client *client,unsigned int cmd, void *arg);
-	
-	/* These two are mainly used for bookkeeping & dynamic unloading of 
-	 * kernel modules. inc_use tells the driver that a client is being  
-	 * used by another module & that it should increase its ref. counter.
-	 * dec_use is the inverse operation.
-	 * NB: Make sure you have no circular dependencies, or else you get a 
-	 * deadlock when trying to unload the modules.
-	* You should use the i2c_{inc,dec}_use_client functions instead of
-	* calling this function directly.
-	 */
-	void (*inc_use)(struct i2c_client *client);
-	void (*dec_use)(struct i2c_client *client);
 };
 
 /*
@@ -223,24 +199,17 @@ struct i2c_algorithm {
 	u32 (*functionality) (struct i2c_adapter *);
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,29)
-struct proc_dir_entry;
-#endif
-
 /*
  * i2c_adapter is the structure used to identify a physical i2c bus along
  * with the access algorithms necessary to access it.
  */
 struct i2c_adapter {
+	struct module *owner;
 	char name[32];	/* some useful name to identify the adapter	*/
 	unsigned int id;/* == is algo->id | hwdep.struct->id, 		*/
 			/* for registered values see below		*/
 	struct i2c_algorithm *algo;/* the algorithm to access the bus	*/
 	void *algo_data;
-
-	/* --- These may be NULL, but should increase the module use count */
-	void (*inc_use)(struct i2c_adapter *);
-	void (*dec_use)(struct i2c_adapter *);
 
 	/* --- administration stuff. */
 	int (*client_register)(struct i2c_client *);
@@ -264,9 +233,6 @@ struct i2c_adapter {
 #ifdef CONFIG_PROC_FS 
 	/* No need to set this when you initialize the adapter          */
 	int inode;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,29)
-	struct proc_dir_entry *proc_entry;
-#endif
 #endif /* def CONFIG_PROC_FS */
 };
 
@@ -319,12 +285,6 @@ extern int i2c_del_driver(struct i2c_driver *);
 extern int i2c_attach_client(struct i2c_client *);
 extern int i2c_detach_client(struct i2c_client *);
 
-/* Only call these if you grab a resource that makes unloading the
-   client and the adapter it is on completely impossible. Like when a
-   /proc directory is entered. */
-extern void i2c_inc_use_client(struct i2c_client *);
-extern void i2c_dec_use_client(struct i2c_client *);
-
 /* New function: This is to get an i2c_client-struct for controlling the 
    client either by using i2c_control-function or having the 
    client-module export functions that can be used with the i2c_client
@@ -375,8 +335,6 @@ extern u32 i2c_get_functionality (struct i2c_adapter *adap);
 /* Return 1 if adapter supports everything we need, 0 if not. */
 extern int i2c_check_functionality (struct i2c_adapter *adap, u32 func);
 
-#endif /* __KERNEL__ */
-
 /*
  * I2C Message - used for pure i2c transaction, also from /dev interface
  */
@@ -387,6 +345,8 @@ struct i2c_msg {
 #define I2C_M_RD	0x01
 #define I2C_M_NOSTART	0x4000
 #define I2C_M_REV_DIR_ADDR	0x2000
+#define I2C_M_IGNORE_NAK	0x1000
+#define I2C_M_NO_RD_ACK		0x0800
 	short len;		/* msg length				*/
 	char *buf;		/* pointer to msg data			*/
 };
@@ -395,7 +355,7 @@ struct i2c_msg {
 
 #define I2C_FUNC_I2C			0x00000001
 #define I2C_FUNC_10BIT_ADDR		0x00000002
-#define I2C_FUNC_PROTOCOL_MANGLING	0x00000004 /* I2C_M_{REV_DIR_ADDR,NOSTART} */
+#define I2C_FUNC_PROTOCOL_MANGLING	0x00000004 /* I2C_M_{REV_DIR_ADDR,NOSTART,..} */
 #define I2C_FUNC_SMBUS_HWPEC_CALC	0x00000008 /* SMBus 2.0 */
 #define I2C_FUNC_SMBUS_READ_WORD_DATA_PEC  0x00000800 /* SMBus 2.0 */ 
 #define I2C_FUNC_SMBUS_WRITE_WORD_DATA_PEC 0x00001000 /* SMBus 2.0 */ 
@@ -524,8 +484,6 @@ union i2c_smbus_data {
 
 #define I2C_MAJOR	89		/* Device major number		*/
 
-#ifdef __KERNEL__
-
 #  ifndef NULL
 #    define NULL ( (void *) 0 )
 #  endif
@@ -595,5 +553,4 @@ union i2c_smbus_data {
 #define i2c_is_isa_adapter(adapptr) \
         ((adapptr)->algo->id == I2C_ALGO_ISA)
 
-#endif /* def __KERNEL__ */
-#endif /* I2C_H */
+#endif /* _LINUX_I2C_H */

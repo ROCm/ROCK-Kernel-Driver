@@ -604,6 +604,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	smp_space_timers(max_cpus);
 }
 
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	/* FIXME: what about cpu_possible()? */
+}
+
 int __devinit __cpu_up(unsigned int cpu)
 {
 	struct pt_regs regs;
