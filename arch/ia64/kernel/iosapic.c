@@ -88,7 +88,7 @@ static struct {
 
 static struct iosapic_irq {
 	char *addr;			/* base address of IOSAPIC */
-	unsigned char base_irq;		/* first irq assigned to this IOSAPIC */
+	unsigned int base_irq;		/* first irq assigned to this IOSAPIC */
 	char pin;			/* IOSAPIC pin (-1 => not an IOSAPIC irq) */
 	unsigned char dmode	: 3;	/* delivery mode (see iosapic.h) */
 	unsigned char polarity	: 1;	/* interrupt polarity (see iosapic.h) */
@@ -97,9 +97,9 @@ static struct iosapic_irq {
 
 static struct iosapic {
 	char *addr;			/* base address of IOSAPIC */
-	unsigned char	pcat_compat;	/* 8259 compatibility flag */
-	unsigned char 	base_irq;	/* first irq assigned to this IOSAPIC */
+	unsigned int 	base_irq;	/* first irq assigned to this IOSAPIC */
 	unsigned short 	max_pin;	/* max input pin supported in this IOSAPIC */
+	unsigned char	pcat_compat;	/* 8259 compatibility flag */
 } iosapic_lists[256] __initdata;
 
 static int num_iosapic = 0;
