@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/misc.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -42,23 +42,23 @@ _GetXid(void)
 {
 	unsigned int xid;
 
-	write_lock(&GlobalMid_Lock);
+	spin_lock(&GlobalMid_Lock);
 	GlobalTotalActiveXid++;
 	if (GlobalTotalActiveXid > GlobalMaxActiveXid)
 		GlobalMaxActiveXid = GlobalTotalActiveXid;	/* keep high water mark for number of simultaneous vfs ops in our filesystem */
 	xid = GlobalCurrentXid++;
-	write_unlock(&GlobalMid_Lock);
+	spin_unlock(&GlobalMid_Lock);
 	return xid;
 }
 
 void
 _FreeXid(unsigned int xid)
 {
-	write_lock(&GlobalMid_Lock);
+	spin_lock(&GlobalMid_Lock);
 	/* if(GlobalTotalActiveXid == 0)
 		BUG(); */
 	GlobalTotalActiveXid--;
-	write_unlock(&GlobalMid_Lock);
+	spin_unlock(&GlobalMid_Lock);
 }
 
 struct cifsSesInfo *
@@ -217,10 +217,10 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 	buffer->Pid = tmp & 0xFFFF;
 	tmp >>= 16;
 	buffer->PidHigh = tmp & 0xFFFF;
-	write_lock(&GlobalMid_Lock);
+	spin_lock(&GlobalMid_Lock);
 	GlobalMid++;
 	buffer->Mid = GlobalMid;
-	write_unlock(&GlobalMid_Lock);
+	spin_unlock(&GlobalMid_Lock);
 	if (treeCon) {
 		buffer->Tid = treeCon->tid;
 		if (treeCon->ses) {
