@@ -577,6 +577,8 @@ static inline unsigned long page_nodenum(struct page *page)
 {
 	return (page->flags >> (NODEZONE_SHIFT + ZONES_SHIFT));
 }
+/* truncate.c */
+extern void truncate_complete_page(struct address_space *mapping,struct page *);
 
 struct zone;
 extern struct zone *zone_table[];

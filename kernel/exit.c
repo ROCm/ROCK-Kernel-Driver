@@ -265,6 +265,8 @@ void reparent_to_init(void)
 	write_unlock_irq(&tasklist_lock);
 }
 
+EXPORT_SYMBOL(reparent_to_init);
+
 void __set_special_pids(pid_t session, pid_t pgrp)
 {
 	struct task_struct *curr = current;
@@ -433,6 +435,8 @@ void exit_files(struct task_struct *tsk)
 {
 	__exit_files(tsk);
 }
+
+EXPORT_SYMBOL(exit_files);
 
 static inline void __put_fs_struct(struct fs_struct *fs)
 {

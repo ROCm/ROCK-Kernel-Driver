@@ -129,7 +129,7 @@ struct path_info {
 	struct path *path;
 };
 
-static struct path_info *path_lookup(struct list_head *head, struct path *p)
+static struct path_info *md_path_lookup(struct list_head *head, struct path *p)
 {
 	struct path_info *pi;
 
@@ -235,9 +235,9 @@ static void rr_fail_path(struct path_selector *ps, struct path *p)
 	 * mind the expense of these searches.
 	 */
 	spin_lock_irqsave(&s->lock, flags);
-	pi = path_lookup(&s->valid_paths, p);
+	pi = md_path_lookup(&s->valid_paths, p);
 	if (!pi)
-		pi = path_lookup(&s->invalid_paths, p);
+		pi = md_path_lookup(&s->invalid_paths, p);
 
 	if (!pi)
 		DMWARN("asked to change the state of an unknown path");

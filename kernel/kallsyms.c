@@ -323,3 +323,4 @@ __initcall(kallsyms_init);
 
 EXPORT_SYMBOL(kallsyms_lookup);
 EXPORT_SYMBOL(__print_symbol);
+EXPORT_SYMBOL(kernel_text_address);
