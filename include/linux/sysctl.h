@@ -128,7 +128,6 @@ enum
 	KERN_TAINTED=53,	/* int: various kernel tainted flags */
 	KERN_CADPID=54,		/* int: PID of the process to notify on CAD */
 	KERN_PIDMAX=55,		/* int: PID # limit */
-	KERN_HUGETLB_PAGE_NUM=56, /* int: Number of available Huge Pages */
 };
 
 
@@ -152,6 +151,7 @@ enum
 	VM_NR_PDFLUSH_THREADS=15, /* nr_pdflush_threads */
 	VM_OVERCOMMIT_RATIO=16, /* percent of RAM to allow overcommit in */
 	VM_PAGEBUF=17,		/* struct: Control pagebuf parameters */
+	VM_HUGETLB_PAGES=18,	/* int: Number of available Huge Pages */
 };
 
 
