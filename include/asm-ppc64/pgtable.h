@@ -98,6 +98,7 @@
 #define _PAGE_BUSY	0x0800 /* software: PTE & hash are busy */ 
 #define _PAGE_SECONDARY 0x8000 /* software: HPTE is in secondary group */
 #define _PAGE_GROUP_IX  0x7000 /* software: HPTE index within group */
+#define _PAGE_HUGE	0x10000 /* 16MB page */
 /* Bits 0x7000 identify the index within an HPT Group */
 #define _PAGE_HPTEFLAGS (_PAGE_BUSY | _PAGE_HASHPTE | _PAGE_SECONDARY | _PAGE_GROUP_IX)
 /* PAGE_MASK gives the right answer below, but only by accident */
@@ -157,19 +158,19 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #endif /* __ASSEMBLY__ */
 
 /* shift to put page number into pte */
-#define PTE_SHIFT (16)
+#define PTE_SHIFT (17)
 
 /* We allow 2^41 bytes of real memory, so we need 29 bits in the PMD
  * to give the PTE page number.  The bottom two bits are for flags. */
 #define PMD_TO_PTEPAGE_SHIFT (2)
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define _PMD_HUGEPAGE	0x00000001U
-#define HUGEPTE_BATCH_SIZE (1<<(HPAGE_SHIFT-PMD_SHIFT))
 
 #ifndef __ASSEMBLY__
 int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		   unsigned long ea, unsigned long vsid, int local);
+
+void hugetlb_mm_free_pgd(struct mm_struct *mm);
 #endif /* __ASSEMBLY__ */
 
 #define HAVE_ARCH_UNMAPPED_AREA
@@ -177,7 +178,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 #else
 
 #define hash_huge_page(mm,a,ea,vsid,local)	-1
-#define _PMD_HUGEPAGE	0
+#define hugetlb_mm_free_pgd(mm)			do {} while (0)
 
 #endif
 
@@ -213,10 +214,8 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 #define pmd_set(pmdp, ptep) 	\
 	(pmd_val(*(pmdp)) = (__ba_to_bpn(ptep) << PMD_TO_PTEPAGE_SHIFT))
 #define pmd_none(pmd)		(!pmd_val(pmd))
-#define	pmd_hugepage(pmd)	(!!(pmd_val(pmd) & _PMD_HUGEPAGE))
-#define	pmd_bad(pmd)		(((pmd_val(pmd)) == 0) || pmd_hugepage(pmd))
-#define	pmd_present(pmd)	((!pmd_hugepage(pmd)) \
-				 && (pmd_val(pmd) & ~_PMD_HUGEPAGE) != 0)
+#define	pmd_bad(pmd)		(pmd_val(pmd) == 0)
+#define	pmd_present(pmd)	(pmd_val(pmd) != 0)
 #define	pmd_clear(pmdp)		(pmd_val(*(pmdp)) = 0)
 #define pmd_page_kernel(pmd)	\
 	(__bpn_to_ba(pmd_val(pmd) >> PMD_TO_PTEPAGE_SHIFT))
@@ -269,6 +268,7 @@ static inline int pte_exec(pte_t pte)  { return pte_val(pte) & _PAGE_EXEC;}
 static inline int pte_dirty(pte_t pte) { return pte_val(pte) & _PAGE_DIRTY;}
 static inline int pte_young(pte_t pte) { return pte_val(pte) & _PAGE_ACCESSED;}
 static inline int pte_file(pte_t pte) { return pte_val(pte) & _PAGE_FILE;}
+static inline int pte_huge(pte_t pte) { return pte_val(pte) & _PAGE_HUGE;}
 
 static inline void pte_uncache(pte_t pte) { pte_val(pte) |= _PAGE_NO_CACHE; }
 static inline void pte_cache(pte_t pte)   { pte_val(pte) &= ~_PAGE_NO_CACHE; }
@@ -294,6 +294,8 @@ static inline pte_t pte_mkdirty(pte_t pte) {
 	pte_val(pte) |= _PAGE_DIRTY; return pte; }
 static inline pte_t pte_mkyoung(pte_t pte) {
 	pte_val(pte) |= _PAGE_ACCESSED; return pte; }
+static inline pte_t pte_mkhuge(pte_t pte) {
+	pte_val(pte) |= _PAGE_HUGE; return pte; }
 
 /* Atomic PTE updates */
 static inline unsigned long pte_update(pte_t *p, unsigned long clr)
@@ -463,6 +465,10 @@ extern pgd_t swapper_pg_dir[1024];
 extern pgd_t ioremap_dir[1024];
 
 extern void paging_init(void);
+
+struct mmu_gather;
+void hugetlb_free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
+			   unsigned long start, unsigned long end);
 
 /*
  * This gets called at the end of handling a page fault, when
