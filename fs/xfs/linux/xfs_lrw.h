@@ -58,6 +58,9 @@ extern ssize_t xfs_read (struct bhv_desc *, struct file *,
 extern ssize_t xfs_write (struct bhv_desc *, struct file *,
 				const struct iovec *, unsigned long,
 				loff_t *, struct cred *);
+extern ssize_t xfs_sendfile (struct bhv_desc *, struct file *,
+				loff_t *, size_t, read_actor_t,
+				void *, struct cred *);
 
 extern int xfs_dev_is_read_only (struct xfs_mount *, char *);
 
