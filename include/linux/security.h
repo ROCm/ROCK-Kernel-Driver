@@ -46,7 +46,6 @@ extern void cap_capset_set (struct task_struct *target, kernel_cap_t *effective,
 extern int cap_bprm_set_security (struct linux_binprm *bprm);
 extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
-extern void cap_task_kmod_set_label (void);
 extern void cap_task_reparent_to_init (struct task_struct *p);
 extern int cap_syslog (int type);
 
@@ -607,10 +606,6 @@ struct swap_info_struct;
  *	@arg4 contains a argument.
  *	@arg5 contains a argument.
  *	Return 0 if permission is granted.
- * @task_kmod_set_label:
- *	Set the security attributes in current->security for the kernel module
- *	loader thread, so that it has the permissions needed to perform its
- *	function.
  * @task_reparent_to_init:
  * 	Set the security attributes in @p->security for a kernel thread that
  * 	is being reparented to the init task.
@@ -1111,7 +1106,6 @@ struct security_operations {
 	int (*task_prctl) (int option, unsigned long arg2,
 			   unsigned long arg3, unsigned long arg4,
 			   unsigned long arg5);
-	void (*task_kmod_set_label) (void);
 	void (*task_reparent_to_init) (struct task_struct * p);
 	void (*task_to_inode)(struct task_struct *p, struct inode *inode);
 
@@ -1690,11 +1684,6 @@ static inline int security_task_prctl (int option, unsigned long arg2,
 				       unsigned long arg5)
 {
 	return security_ops->task_prctl (option, arg2, arg3, arg4, arg5);
-}
-
-static inline void security_task_kmod_set_label (void)
-{
-	security_ops->task_kmod_set_label ();
 }
 
 static inline void security_task_reparent_to_init (struct task_struct *p)
@@ -2319,11 +2308,6 @@ static inline int security_task_prctl (int option, unsigned long arg2,
 				       unsigned long arg5)
 {
 	return 0;
-}
-
-static inline void security_task_kmod_set_label (void)
-{
-	cap_task_kmod_set_label ();
 }
 
 static inline void security_task_reparent_to_init (struct task_struct *p)

@@ -94,7 +94,6 @@ static struct security_operations rootplug_security_ops = {
 	.bprm_set_security =		cap_bprm_set_security,
 
 	.task_post_setuid =		cap_task_post_setuid,
-	.task_kmod_set_label =		cap_task_kmod_set_label,
 	.task_reparent_to_init =	cap_task_reparent_to_init,
 
 	.bprm_check_security =		rootplug_bprm_check_security,

@@ -517,11 +517,6 @@ static int dummy_task_prctl (int option, unsigned long arg2, unsigned long arg3,
 	return 0;
 }
 
-static void dummy_task_kmod_set_label (void)
-{
-	return;
-}
-
 static void dummy_task_reparent_to_init (struct task_struct *p)
 {
 	p->euid = p->fsuid = 0;
@@ -871,7 +866,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, task_wait);
 	set_to_dummy_if_null(ops, task_kill);
 	set_to_dummy_if_null(ops, task_prctl);
-	set_to_dummy_if_null(ops, task_kmod_set_label);
 	set_to_dummy_if_null(ops, task_reparent_to_init);
  	set_to_dummy_if_null(ops, task_to_inode);
 	set_to_dummy_if_null(ops, ipc_permission);
