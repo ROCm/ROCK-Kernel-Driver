@@ -231,14 +231,16 @@ static inline struct inode *VFS_I(ntfs_inode *ni)
 	return &((big_ntfs_inode*)ni)->vfs_inode;
 }
 
+extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
+
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);
 extern void ntfs_clear_big_inode(struct inode *vi);
 
-extern ntfs_inode *ntfs_new_extent_inode(struct super_block *sb);
+extern ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
+		unsigned long mft_no);
 extern void ntfs_clear_extent_inode(ntfs_inode *ni);
 
-extern void ntfs_read_inode(struct inode *vi);
 extern void ntfs_read_inode_mount(struct inode *vi);
 
 extern void ntfs_dirty_inode(struct inode *vi);
