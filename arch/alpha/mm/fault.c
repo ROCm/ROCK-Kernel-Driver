@@ -196,8 +196,7 @@ no_context:
  */
 out_of_memory:
 	if (current->pid == 1) {
-		current->policy |= SCHED_YIELD;
-		schedule();
+		yield();
 		down_read(&mm->mmap_sem);
 		goto survive;
 	}
