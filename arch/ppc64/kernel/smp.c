@@ -459,8 +459,7 @@ int __devinit __cpu_up(unsigned int cpu)
 		 * hotplug case.  Wait five seconds.
 		 */
 		for (c = 25; c && !cpu_callin_map[cpu]; c--) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/5);
+			msleep(200);
 		}
 #endif
 
