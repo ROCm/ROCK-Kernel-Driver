@@ -756,6 +756,7 @@ extern void sched_exec(void);
 #endif
 
 extern void sched_idle_next(void);
+extern void idle_task_exit(void);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(const task_t *p);
 extern int task_nice(const task_t *p);
