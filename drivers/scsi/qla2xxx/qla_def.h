@@ -2126,11 +2126,9 @@ typedef struct scsi_qla_host {
 
 	spinlock_t		hardware_lock ____cacheline_aligned;
 
-	device_reg_t	*iobase;		/* Base I/O address */
+	device_reg_t __iomem *iobase;		/* Base I/O address */
 	unsigned long	pio_address;
 	unsigned long	pio_length;
-	void *		mmio_address;
-	unsigned long	mmio_length;
 #define MIN_IOBASE_LEN		0x100
 
 	/* ISP ring lock, rings, and indexes */

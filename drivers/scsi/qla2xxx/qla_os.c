@@ -845,11 +845,9 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		was_empty = add_to_pending_queue(ha, sp);
 
 	if ((IS_QLA2100(ha) || IS_QLA2200(ha)) && ha->flags.online) {
-		unsigned long flags;
-		device_reg_t *reg;
-		reg = ha->iobase;
-		
 		if (ha->response_ring_ptr->signature != RESPONSE_PROCESSED) {
+			unsigned long flags;
+
 			spin_lock_irqsave(&ha->hardware_lock, flags);	
 			qla2x00_process_response_queue(ha);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -1890,15 +1888,13 @@ qla2x00_iospace_config(scsi_qla_host_t *ha)
 
 	ha->pio_address = pio;
 	ha->pio_length = pio_len;
-	ha->mmio_address = ioremap(mmio, MIN_IOBASE_LEN);
-	if (!ha->mmio_address) {
+	ha->iobase = ioremap(mmio, MIN_IOBASE_LEN);
+	if (!ha->iobase) {
 		qla_printk(KERN_ERR, ha,
 		    "cannot remap MMIO (%s), aborting\n", ha->pdev->slot_name);
 
 		goto iospace_error_exit;
 	}
-	ha->mmio_length = mmio_len;
-	ha->iobase = (device_reg_t *) ha->mmio_address;
 
 	return (0);
 
@@ -1912,7 +1908,7 @@ iospace_error_exit:
 int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 {
 	int	ret;
-	device_reg_t *reg;
+	device_reg_t __iomem *reg;
 	struct Scsi_Host *host;
 	scsi_qla_host_t *ha;
 	unsigned long	flags = 0;
@@ -2225,14 +2221,11 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 		free_irq(ha->pdev->irq, ha);
 
 	/* release io space registers  */
+	if (ha->iobase)
+		iounmap(ha->iobase);
 	pci_release_regions(ha->pdev);
 
 	pci_disable_device(ha->pdev);
-
-#if MEMORY_MAPPED_IO
-	if (ha->mmio_address)
-		iounmap(ha->mmio_address);
-#endif
 }
 
 

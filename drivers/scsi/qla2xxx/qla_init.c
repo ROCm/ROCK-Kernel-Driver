@@ -385,7 +385,7 @@ static void
 qla2x00_reset_chip(scsi_qla_host_t *ha) 
 {
 	unsigned long   flags = 0;
-	device_reg_t	*reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	uint32_t	cnt;
 	unsigned long	mbx_flags = 0;
 	uint16_t	cmd;
@@ -539,7 +539,7 @@ static int
 qla2x00_chip_diag(scsi_qla_host_t *ha)
 {
 	int		rval;
-	device_reg_t	*reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	unsigned long	flags = 0;
 	uint16_t	data;
 	uint32_t	cnt;
@@ -905,7 +905,7 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 	int	rval;
 	unsigned long flags = 0;
 	int cnt;
-	device_reg_t *reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -1192,7 +1192,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	init_cb_t *icb   = ha->init_cb;
 	nvram_t *nv    = (nvram_t *)ha->request_ring;
 	uint16_t  *wptr  = (uint16_t *)ha->request_ring;
-	device_reg_t *reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 	uint8_t  timer_mode;
 
 	rval = QLA_SUCCESS;
@@ -4271,7 +4271,7 @@ static int
 qla2x00_restart_isp(scsi_qla_host_t *ha)
 {
 	uint8_t		status = 0;
-	device_reg_t	*reg;
+	device_reg_t __iomem *reg = ha->iobase;
 	unsigned long	flags = 0;
 	uint32_t wait_time;
 
@@ -4356,7 +4356,7 @@ static void
 qla2x00_reset_adapter(scsi_qla_host_t *ha)
 {
 	unsigned long flags = 0;
-	device_reg_t *reg = ha->iobase;
+	device_reg_t __iomem *reg = ha->iobase;
 
 	ha->flags.online = 0;
 	qla2x00_disable_intrs(ha);

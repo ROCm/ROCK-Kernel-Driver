@@ -105,12 +105,14 @@ ahd_linux_pci_dev_remove(struct pci_dev *pdev)
 	if (ahd != NULL) {
 		u_long s;
 
+		TAILQ_REMOVE(&ahd_tailq, ahd, links);
+		ahd_list_unlock(&l);
 		ahd_lock(ahd, &s);
 		ahd_intr_enable(ahd, FALSE);
 		ahd_unlock(ahd, &s);
 		ahd_free(ahd);
-	}
-	ahd_list_unlock(&l);
+	} else
+		ahd_list_unlock(&l);
 }
 
 static int

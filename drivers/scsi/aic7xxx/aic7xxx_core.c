@@ -3973,7 +3973,6 @@ ahc_free(struct ahc_softc *ahc)
 	default:
 	case 5:
 		ahc_shutdown(ahc);
-		TAILQ_REMOVE(&ahc_tailq, ahc, links);
 		/* FALLTHROUGH */
 	case 4:
 		ahc_dmamap_unload(ahc, ahc->shared_data_dmat,

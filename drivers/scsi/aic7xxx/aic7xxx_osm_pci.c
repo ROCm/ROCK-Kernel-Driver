@@ -160,12 +160,14 @@ ahc_linux_pci_dev_remove(struct pci_dev *pdev)
 	if (ahc != NULL) {
 		u_long s;
 
+		TAILQ_REMOVE(&ahc_tailq, ahc, links);
+		ahc_list_unlock(&l);
 		ahc_lock(ahc, &s);
 		ahc_intr_enable(ahc, FALSE);
 		ahc_unlock(ahc, &s);
 		ahc_free(ahc);
-	}
-	ahc_list_unlock(&l);
+	} else
+		ahc_list_unlock(&l);
 }
 #endif /* !LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0) */
 

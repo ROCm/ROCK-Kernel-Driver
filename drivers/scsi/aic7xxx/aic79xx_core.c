@@ -5270,7 +5270,6 @@ ahd_free(struct ahd_softc *ahd)
 	default:
 	case 5:
 		ahd_shutdown(ahd);
-		TAILQ_REMOVE(&ahd_tailq, ahd, links);
 		/* FALLTHROUGH */
 	case 4:
 		ahd_dmamap_unload(ahd, ahd->shared_data_dmat,
