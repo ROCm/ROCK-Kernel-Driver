@@ -126,16 +126,21 @@ void pxa_gpio_mode(int gpio_mode)
 EXPORT_SYMBOL(pxa_gpio_mode);
 
 /*
- * Note that 0xfffe0000-0xffffffff is reserved for the vector table and
- * cache flush area.
+ * Intel PXA2xx internal register mapping.
+ *
+ * Note 1: not all PXA2xx variants implement all those addresses.
+ *
+ * Note 2: virtual 0xfffe0000-0xffffffff is reserved for the vector table
+ *         and cache flush area.
  */
 static struct map_desc standard_io_desc[] __initdata = {
  /* virtual     physical    length      type */
-  { 0xf6000000, 0x20000000, 0x01000000, MT_DEVICE }, /* PCMCIA0 IO */
-  { 0xf7000000, 0x30000000, 0x01000000, MT_DEVICE }, /* PCMCIA1 IO */
-  { 0xf8000000, 0x40000000, 0x01400000, MT_DEVICE }, /* Devs */
-  { 0xfa000000, 0x44000000, 0x00100000, MT_DEVICE }, /* LCD */
-  { 0xfc000000, 0x48000000, 0x00100000, MT_DEVICE }, /* Mem Ctl */
+  { 0xf2000000, 0x40000000, 0x01800000, MT_DEVICE }, /* Devs */
+  { 0xf4000000, 0x44000000, 0x00100000, MT_DEVICE }, /* LCD */
+  { 0xf6000000, 0x48000000, 0x00100000, MT_DEVICE }, /* Mem Ctl */
+  { 0xf8000000, 0x4c000000, 0x00100000, MT_DEVICE }, /* USB host */
+  { 0xfa000000, 0x50000000, 0x00100000, MT_DEVICE }, /* Camera */
+  { 0xfe000000, 0x58000000, 0x00100000, MT_DEVICE }, /* IMem ctl */
   { 0xff000000, 0x00000000, 0x00100000, MT_DEVICE }  /* UNCACHED_PHYS_0 */
 };
 
