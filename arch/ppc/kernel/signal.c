@@ -361,7 +361,7 @@ handle_rt_signal(unsigned long sig, struct k_sigaction *ka,
 	return;
 
 badframe:
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("badframe in handle_rt_signal, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
 #endif
@@ -513,7 +513,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	return;
 
 badframe:
-#if DEBUG_SIG
+#ifdef DEBUG_SIG
 	printk("badframe in handle_signal, regs=%p frame=%lx newsp=%lx\n",
 	       regs, frame, *newspp);
 #endif

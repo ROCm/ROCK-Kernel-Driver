@@ -1,5 +1,5 @@
 /*
- * arch/ppc/syslib/pplus_common.c
+ * arch/ppc/syslib/hawk_common.c
  *
  * Common Motorola PowerPlus Platform--really Falcon/Raven or HAWK.
  *
@@ -44,7 +44,7 @@
  * 'OpenPIC_Addr' will be set correctly by this routine.
  */
 int __init
-pplus_init(struct pci_controller *hose,
+hawk_init(struct pci_controller *hose,
 	     uint ppc_reg_base,
 	     ulong processor_pci_mem_start,
 	     ulong processor_pci_mem_end,
@@ -59,14 +59,14 @@ pplus_init(struct pci_controller *hose,
 	 */
 	if (((processor_pci_mem_start&0xffff0000) != processor_pci_mem_start) ||
 	    ((processor_pci_io_start &0xffff0000) != processor_pci_io_start)) {
-		printk("pplus_init: %s\n",
+		printk("hawk_init: %s\n",
 			"PPC to PCI mappings must start on 64 KB boundaries");
 		return -1;
 	}
 
 	if (((processor_pci_mem_end  &0x0000ffff) != 0x0000ffff) ||
 	    ((processor_pci_io_end   &0x0000ffff) != 0x0000ffff)) {
-		printk("pplus_init: PPC to PCI mappings %s\n",
+		printk("hawk_init: PPC to PCI mappings %s\n",
 			"must end just before a 64 KB boundaries");
 		return -1;
 	}
@@ -75,19 +75,19 @@ pplus_init(struct pci_controller *hose,
 	     (hose->mem_space.end - hose->mem_space.start)) ||
 	    ((processor_pci_io_end - processor_pci_io_start) !=
 	     (hose->io_space.end - hose->io_space.start))) {
-		printk("pplus_init: %s\n",
+		printk("hawk_init: %s\n",
 			"PPC and PCI memory or I/O space sizes don't match");
 		return -1;
 	}
 
 	if ((processor_mpic_base & 0xfffc0000) != processor_mpic_base) {
-		printk("pplus_init: %s\n",
+		printk("hawk_init: %s\n",
 			"MPIC address must start on 256 MB boundary");
 		return -1;
 	}
 
 	if ((pci_dram_offset & 0xffff0000) != pci_dram_offset) {
-		printk("pplus_init: %s\n",
+		printk("hawk_init: %s\n",
 			"pci_dram_offset must be multiple of 64 KB");
 		return -1;
 	}
@@ -226,7 +226,7 @@ static uint hawk_size_table[] __initdata = {
  * into virtual memory--too early to use ioremap().
  */
 unsigned long __init
-pplus_get_mem_size(uint smc_base)
+hawk_get_mem_size(uint smc_base)
 {
 	unsigned long	total;
 	int		i, size_table_entries, reg_limit;
@@ -238,7 +238,7 @@ pplus_get_mem_size(uint smc_base)
 	vend_dev_id = in_be32((uint *)smc_base + PCI_VENDOR_ID);
 
 	if (((vend_dev_id & 0xffff0000) >> 16) != PCI_VENDOR_ID_MOTOROLA) {
-		printk("pplus_get_mem_size: %s (0x%x)\n",
+		printk("hawk_get_mem_size: %s (0x%x)\n",
 			"Not a Motorola Memory Controller", vend_dev_id);
 		return 0;
 	}
@@ -259,7 +259,7 @@ pplus_get_mem_size(uint smc_base)
 		reg_limit = HAWK_SMC_REG_COUNT;
 	}
 	else {
-		printk("pplus_get_mem_size: %s (0x%x)\n",
+		printk("hawk_get_mem_size: %s (0x%x)\n",
 			"Not a Falcon or HAWK", vend_dev_id);
 		return 0;
 	}
@@ -284,36 +284,4 @@ pplus_get_mem_size(uint smc_base)
 	}
 
 	return total;
-}
-
-int __init
-pplus_mpic_init(unsigned int pci_mem_offset)
-{
-	unsigned short	devid;
-	unsigned int	pci_membase;
-
-	/* Check the first PCI device to see if it is a Raven or Hawk. */
-	early_read_config_word(0, 0, 0, PCI_DEVICE_ID, &devid);
-
-	switch (devid) {
-	case PCI_DEVICE_ID_MOTOROLA_RAVEN:
-	case PCI_DEVICE_ID_MOTOROLA_HAWK:
-		break;
-	default:
-		OpenPIC_Addr = NULL;
-		return 1;
-	}
-
-	/* Read the memory base register. */
-	early_read_config_dword(0, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
-
-	if (pci_membase == 0) {
-		OpenPIC_Addr = NULL;
-		return 1;
-	}
-
-	/* Map the MPIC registers to virtual memory. */
-	OpenPIC_Addr = ioremap(pci_membase + pci_mem_offset, 0x22000);
-
-	return 0;
 }

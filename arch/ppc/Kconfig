@@ -609,7 +609,7 @@ config PPC_OF
 
 config PPC_GEN550
 	bool
-	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS
+	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE
 	default y
 
 config FORCE
@@ -627,9 +627,14 @@ config EPIC_SERIAL_MODE
 	depends on 6xx && (LOPEC || SANDPOINT)
 	default y
 
+config MPC10X_BRIDGE
+	bool
+	depends on PCORE || POWERPMC250 || LOPEC || SANDPOINT
+	default y
+
 config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
-	depends on FORCE || SANDPOINT
+	depends on MPC10X_BRIDGE
 
 config CPC710_DATA_GATHERING
 	bool "Enable CPC710 data gathering"

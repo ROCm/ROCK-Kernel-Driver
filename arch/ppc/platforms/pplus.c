@@ -513,7 +513,7 @@ void __init pplus_find_bridges(void)
 	hose->mem_space.start = PPLUS_PCI_MEM_START;
 	hose->mem_space.end = PPLUS_PCI_MEM_END - HAWK_MPIC_SIZE;
 
-	if (pplus_init(hose, PPLUS_HAWK_PPC_REG_BASE, PPLUS_PROC_PCI_MEM_START,
+	if (hawk_init(hose, PPLUS_HAWK_PPC_REG_BASE, PPLUS_PROC_PCI_MEM_START,
 				PPLUS_PROC_PCI_MEM_END - HAWK_MPIC_SIZE,
 				PPLUS_PROC_PCI_IO_START, PPLUS_PROC_PCI_IO_END,
 				PPLUS_PROC_PCI_MEM_END - HAWK_MPIC_SIZE + 1)
@@ -816,7 +816,7 @@ static unsigned long __init pplus_find_end_of_memory(void)
 	dump_dbats();
 #endif
 
-	total = pplus_get_mem_size(PPLUS_HAWK_SMC_BASE);
+	total = hawk_get_mem_size(PPLUS_HAWK_SMC_BASE);
 	return (total);
 }
 

@@ -323,7 +323,7 @@ prep_carolina_cpuinfo(struct seq_file *m)
 		/* L2 size */
 		if ((l2_reg & 0x60) == 0)
 			seq_printf(m, "256KiB");
-		else if ((l2_reg & 0x60) == 1)
+		else if ((l2_reg & 0x60) == 0x20)
 			seq_printf(m, "512KiB");
 		else
 			seq_printf(m, "unknown size");
@@ -725,6 +725,7 @@ prep_setup_arch(void)
 			case PREP_IBM_CAROLINA_IDE_0:
 			case PREP_IBM_CAROLINA_IDE_1:
 			case PREP_IBM_CAROLINA_IDE_2:
+			case PREP_IBM_CAROLINA_IDE_3:
 				is_ide = 1;
 			case PREP_IBM_CAROLINA_SCSI_0:
 			case PREP_IBM_CAROLINA_SCSI_1:

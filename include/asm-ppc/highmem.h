@@ -87,7 +87,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 
 	idx = type + KM_TYPE_NR*smp_processor_id();
 	vaddr = KMAP_FIX_BEGIN + idx * PAGE_SIZE;
-#if HIGHMEM_DEBUG
+#ifdef HIGHMEM_DEBUG
 	BUG_ON(!pte_none(*(kmap_pte+idx)));
 #endif
 	set_pte(kmap_pte+idx, mk_pte(page, kmap_prot));
@@ -98,7 +98,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 
 static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 {
-#if HIGHMEM_DEBUG
+#ifdef HIGHMEM_DEBUG
 	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
 	unsigned int idx = type + KM_TYPE_NR*smp_processor_id();
 
