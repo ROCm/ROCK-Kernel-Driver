@@ -157,7 +157,12 @@ struct	itimerval {
 #define CLOCK_REALTIME_HR	 4
 #define CLOCK_MONOTONIC_HR	  5
 
-#define MAX_CLOCKS 6
+/*
+ * The IDs of various hardware clocks
+ */
+
+
+#define MAX_CLOCKS 16
 #define CLOCKS_MASK  (CLOCK_REALTIME | CLOCK_MONOTONIC | \
                      CLOCK_REALTIME_HR | CLOCK_MONOTONIC_HR)
 #define CLOCKS_MONO (CLOCK_MONOTONIC & CLOCK_MONOTONIC_HR)

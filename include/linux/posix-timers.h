@@ -33,9 +33,10 @@ struct k_clock {
 	struct k_clock_abs *abs_struct;
 	int (*clock_set) (struct timespec * tp);
 	int (*clock_get) (struct timespec * tp);
-	int (*nsleep) (int flags,
-		       struct timespec * new_setting,
-		       struct itimerspec * old_setting);
+	int (*timer_create) (int which_clock, struct sigevent __user *timer_event_spec,
+			timer_t __user * created_timer_id);
+	int (*nsleep) (int which_clock, int flags,
+		       struct timespec * t);
 	int (*timer_set) (struct k_itimer * timr, int flags,
 			  struct itimerspec * new_setting,
 			  struct itimerspec * old_setting);
@@ -43,6 +44,17 @@ struct k_clock {
 	void (*timer_get) (struct k_itimer * timr,
 			   struct itimerspec * cur_setting);
 };
+
+void register_posix_clock(int clock_id, struct k_clock *new_clock);
+
+/* Error handlers for timer_create, nanosleep and settime */
+int do_posix_clock_notimer_create(int which_clock,
+                struct sigevent __user *time_event_spec,
+                timer_t __user *created_timer_id);
+
+int do_posix_clock_nonanosleep(int which_clock, int flags, struct timespec * t);
+int do_posix_clock_nosettime(struct timespec *tp);
+
 struct now_struct {
 	unsigned long jiffies;
 };
@@ -62,3 +74,4 @@ struct now_struct {
               }								\
             }while (0)
 #endif
+
