@@ -305,7 +305,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 							       mid_q_entry,
 							       qhead);
 
-					if (mid_entry->mid == smb_buffer->Mid) {
+					if ((mid_entry->mid == smb_buffer->Mid) && (mid_entry->midState == MID_REQUEST_SUBMITTED)) {
 						cFYI(1,
 						     (" Mid 0x%x matched - waking up ",mid_entry->mid));
 						task_to_wake = mid_entry->tsk;

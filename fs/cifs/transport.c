@@ -228,22 +228,34 @@ cifs_dead_ses_retry:
 				midState & MID_RESPONSE_RECEIVED,
 				timeout);
 	if (signal_pending(current)) {
-		cERROR(1, ("CIFS: caught signal"));
+		cFYI(1, ("CIFS: caught signal"));
 		DeleteMidQEntry(midQ);
 		return -EINTR;
-	} else {
-		if (midQ->resp_buf)
+	} else {  /* BB spinlock protect this against races with demux thread */
+		spin_lock(&GlobalMid_Lock);
+		if (midQ->resp_buf) {
+			spin_unlock(&GlobalMid_Lock);
 			receive_len =
 			    be32_to_cpu(midQ->resp_buf->smb_buf_length);
-		else {
+		} else {
 			cFYI(1,("No response buffer"));
-			if(midQ->midState != MID_RETRY_NEEDED) {
+			if(midQ->midState == MID_REQUEST_SUBMITTED) {
 				ses->server->tcpStatus = CifsNeedReconnect;
+				midQ->midState = MID_RETRY_NEEDED;
+                                spin_unlock(&GlobalMid_Lock);
 				DeleteMidQEntry(midQ);
+				cFYI(1,("retrying after setting session need reconnectd"));
 				goto cifs_dead_ses_retry;
+			} else if(midQ->midState == MID_RETRY_NEEDED) {
+				spin_unlock(&GlobalMid_Lock);
+				DeleteMidQEntry(midQ);
+				cFYI(1,("retrying MID_RETRY"));
+				goto cifs_dead_ses_retry;
+			} else {
+				spin_unlock(&GlobalMid_Lock);
+				DeleteMidQEntry(midQ);
+				return -EIO;
 			}
-			DeleteMidQEntry(midQ);
-			return -EIO;
 		}
 	}
 
