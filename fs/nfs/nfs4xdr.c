@@ -113,6 +113,9 @@ static int nfs_stat_to_errno(int);
 				1 + ((3 + NFS4_FHSIZE) >> 2))
 #define encode_remove_maxsz	(op_encode_hdr_maxsz + \
 				1 + ((3 + NFS4_MAXNAMLEN) >> 2))
+#define encode_rename_maxsz	(op_encode_hdr_maxsz + \
+				2 * (1 + ((3 + NFS4_MAXNAMLEN) >> 2)))
+#define decode_rename_maxsz	(op_decode_hdr_maxsz + 5 + 5)
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
@@ -278,6 +281,16 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_remove_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 5)
+#define NFS4_enc_rename_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_savefh_maxsz + \
+				encode_putfh_maxsz + \
+				encode_rename_maxsz)
+#define NFS4_dec_rename_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				decode_savefh_maxsz + \
+				decode_putfh_maxsz + \
+				decode_rename_maxsz)
 
 
 
@@ -947,19 +960,18 @@ static int encode_remove(struct xdr_stream *xdr, const struct qstr *name)
 	return 0;
 }
 
-static int
-encode_rename(struct xdr_stream *xdr, struct nfs4_rename *rename)
+static int encode_rename(struct xdr_stream *xdr, const struct qstr *oldname, const struct qstr *newname)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(8 + rename->rn_oldnamelen);
+	RESERVE_SPACE(8 + oldname->len);
 	WRITE32(OP_RENAME);
-	WRITE32(rename->rn_oldnamelen);
-	WRITEMEM(rename->rn_oldname, rename->rn_oldnamelen);
+	WRITE32(oldname->len);
+	WRITEMEM(oldname->name, oldname->len);
 	
-	RESERVE_SPACE(4 + rename->rn_newnamelen);
-	WRITE32(rename->rn_newnamelen);
-	WRITEMEM(rename->rn_newname, rename->rn_newnamelen);
+	RESERVE_SPACE(4 + newname->len);
+	WRITE32(newname->len);
+	WRITEMEM(newname->name, newname->len);
 
 	return 0;
 }
@@ -1115,9 +1127,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_REMOVE:
 			status = encode_remove(xdr, cp->ops[i].u.remove.name);
 			break;
-		case OP_RENAME:
-			status = encode_rename(xdr, &cp->ops[i].u.rename);
-			break;
 		case OP_RESTOREFH:
 			status = encode_restorefh(xdr);
 			break;
@@ -1230,6 +1239,30 @@ static int nfs4_xdr_enc_remove(struct rpc_rqst *req, uint32_t *p, const struct n
 	encode_compound_hdr(&xdr, &hdr);
 	if ((status = encode_putfh(&xdr, args->fh)) == 0)
 		status = encode_remove(&xdr, args->name);
+	return status;
+}
+
+/*
+ * Encode RENAME request
+ */
+static int nfs4_xdr_enc_rename(struct rpc_rqst *req, uint32_t *p, const struct nfs4_rename_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->old_dir)) != 0)
+		goto out;
+	if ((status = encode_savefh(&xdr)) != 0)
+		goto out;
+	if ((status = encode_putfh(&xdr, args->new_dir)) != 0)
+		goto out;
+	status = encode_rename(&xdr, args->old_name, args->new_name);
+out:
 	return status;
 }
 
@@ -2095,7 +2128,6 @@ decode_create(struct xdr_stream *xdr, struct nfs4_create *create)
 	return 0;
 }
 
-extern uint32_t nfs4_fattr_bitmap[2];
 extern uint32_t nfs4_fsstat_bitmap[2];
 extern uint32_t nfs4_pathconf_bitmap[2];
 
@@ -2800,18 +2832,17 @@ out:
 	return status;
 }
 
-static int
-decode_rename(struct xdr_stream *xdr, struct nfs4_rename *rename)
+static int decode_rename(struct xdr_stream *xdr, struct nfs4_change_info *old_cinfo,
+	      struct nfs4_change_info *new_cinfo)
 {
 	int status;
 
 	status = decode_op_hdr(xdr, OP_RENAME);
 	if (status)
 		goto out;
-	if ((status = decode_change_info(xdr, rename->rn_src_cinfo)))
+	if ((status = decode_change_info(xdr, old_cinfo)))
 		goto out;
-	if ((status = decode_change_info(xdr, rename->rn_dst_cinfo)))
-		goto out;
+	status = decode_change_info(xdr, new_cinfo);
 out:
 	return status;
 }
@@ -2964,9 +2995,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_REMOVE:
 			status = decode_remove(xdr, op->u.remove.rm_cinfo);
 			break;
-		case OP_RENAME:
-			status = decode_rename(xdr, &op->u.rename);
-			break;
 		case OP_SAVEFH:
 			status = decode_savefh(xdr);
 			break;
@@ -3103,6 +3131,29 @@ static int nfs4_xdr_dec_remove(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_
 		goto out;
 	if ((status = decode_putfh(&xdr)) == 0)
 		status = decode_remove(&xdr, cinfo);
+out:
+	return status;
+}
+
+/*
+ * Decode RENAME response
+ */
+static int nfs4_xdr_dec_rename(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_rename_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) != 0)
+		goto out;
+	if ((status = decode_savefh(&xdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) != 0)
+		goto out;
+	status = decode_rename(&xdr, &res->old_cinfo, &res->new_cinfo);
 out:
 	return status;
 }
@@ -3619,6 +3670,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(LOOKUP,		enc_lookup,	dec_lookup),
   PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root),
   PROC(REMOVE,		enc_remove,	dec_remove),
+  PROC(RENAME,		enc_rename,	dec_rename),
 };
 
 struct rpc_version		nfs_version4 = {

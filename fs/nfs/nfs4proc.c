@@ -348,23 +348,6 @@ nfs4_setup_remove(struct nfs4_compound *cp, struct qstr *name, struct nfs4_chang
 }
 
 static void
-nfs4_setup_rename(struct nfs4_compound *cp, struct qstr *old, struct qstr *new,
-		  struct nfs4_change_info *old_cinfo, struct nfs4_change_info *new_cinfo)
-{
-	struct nfs4_rename *rename = GET_OP(cp, rename);
-
-	rename->rn_oldnamelen = old->len;
-	rename->rn_oldname = old->name;
-	rename->rn_newnamelen = new->len;
-	rename->rn_newname = new->name;
-	rename->rn_src_cinfo = old_cinfo;
-	rename->rn_dst_cinfo = new_cinfo;
-
-	OPNUM(cp) = OP_RENAME;
-	cp->req_nops++;
-}
-
-static void
 nfs4_setup_restorefh(struct nfs4_compound *cp)
 {
         OPNUM(cp) = OP_RESTOREFH;
@@ -1291,34 +1274,28 @@ nfs4_proc_unlink_done(struct dentry *dir, struct rpc_task *task)
 	return 0;
 }
 
-static int
-nfs4_proc_rename(struct inode *old_dir, struct qstr *old_name,
-		 struct inode *new_dir, struct qstr *new_name)
+static int nfs4_proc_rename(struct inode *old_dir, struct qstr *old_name,
+		struct inode *new_dir, struct qstr *new_name)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[7];
-	struct nfs4_change_info	old_cinfo, new_cinfo;
-	struct nfs_fattr	old_dir_attr, new_dir_attr;
+	struct nfs4_rename_arg arg = {
+		.old_dir = NFS_FH(old_dir),
+		.new_dir = NFS_FH(new_dir),
+		.old_name = old_name,
+		.new_name = new_name,
+	};
+	struct nfs4_rename_res res = { };
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_RENAME],
+		.rpc_argp = &arg,
+		.rpc_resp = &res,
+	};
 	int			status;
-
-	old_dir_attr.valid = 0;
-	new_dir_attr.valid = 0;
 	
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(old_dir), "rename");
-	nfs4_setup_putfh(&compound, NFS_FH(old_dir));
-	nfs4_setup_savefh(&compound);
-	nfs4_setup_putfh(&compound, NFS_FH(new_dir));
-	nfs4_setup_rename(&compound, old_name, new_name, &old_cinfo, &new_cinfo);
-	nfs4_setup_getattr(&compound, &new_dir_attr);
-	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &old_dir_attr);
-	status = nfs4_call_compound(&compound, NULL, 0);
+	status = rpc_call_sync(NFS_CLIENT(old_dir), &msg, 0);
 
 	if (!status) {
-		process_cinfo(&old_cinfo, &old_dir_attr);
-		process_cinfo(&new_cinfo, &new_dir_attr);
-		nfs_refresh_inode(old_dir, &old_dir_attr);
-		nfs_refresh_inode(new_dir, &new_dir_attr);
+		update_changeattr(old_dir, &res.old_cinfo);
+		update_changeattr(new_dir, &res.new_cinfo);
 	}
 	return nfs4_map_errors(status);
 }

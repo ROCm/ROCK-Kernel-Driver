@@ -616,13 +616,16 @@ struct nfs4_remove_arg {
 	const struct qstr *		name;
 };
 
-struct nfs4_rename {
-	u32				rn_oldnamelen;    /* request */
-	const char *			rn_oldname;       /* request */
-	u32				rn_newnamelen;    /* request */
-	const char *			rn_newname;       /* request */
-	struct nfs4_change_info	*	rn_src_cinfo;     /* response */
-	struct nfs4_change_info *	rn_dst_cinfo;     /* response */
+struct nfs4_rename_arg {
+	const struct nfs_fh *		old_dir;
+	const struct nfs_fh *		new_dir;
+	const struct qstr *		old_name;
+	const struct qstr *		new_name;
+};
+
+struct nfs4_rename_res {
+	struct nfs4_change_info		old_cinfo;
+	struct nfs4_change_info		new_cinfo;
 };
 
 struct nfs4_setattr {
@@ -654,7 +657,6 @@ struct nfs4_op {
 		struct nfs4_readdir	readdir;
 		struct nfs4_readlink	readlink;
 		struct nfs4_remove	remove;
-		struct nfs4_rename	rename;
 		struct nfs4_client *	renew;
 		struct nfs4_setattr	setattr;
 	} u;
