@@ -814,11 +814,10 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memset(args.hobRegister, 0, sizeof(struct hd_drive_hob_hdr));
-	/* We can't call ide_cmd_type_parser here, since it won't understand
-	   our command, but that doesn't matter, since we don't use the
-	   generic interrupt handlers either. Setup the bits of args that we
-	   do need.
-	*/
+	/*
+	 * Setup the bits of args that we do need.
+	 * Note that we don't use the generic interrupt handlers.
+	 */
 	args.handler		= NULL;
 	args.rq			= (struct request *) rq;
 	rq->special		= (ide_task_t *)&args;

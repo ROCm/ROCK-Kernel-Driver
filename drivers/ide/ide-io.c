@@ -197,7 +197,7 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 			if (args->tf_in_flags.b.data) {
 				u16 data				= hwif->INW(IDE_DATA_REG);
 				args->tfRegister[IDE_DATA_OFFSET]	= (data) & 0xFF;
-				args->hobRegister[IDE_DATA_OFFSET_HOB]	= (data >> 8) & 0xFF;
+				args->hobRegister[IDE_DATA_OFFSET]	= (data >> 8) & 0xFF;
 			}
 			args->tfRegister[IDE_ERROR_OFFSET]   = err;
 			args->tfRegister[IDE_NSECTOR_OFFSET] = hwif->INB(IDE_NSECTOR_REG);
@@ -208,12 +208,12 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 			args->tfRegister[IDE_STATUS_OFFSET]  = stat;
 
 			if (drive->addressing == 1) {
-				hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG_HOB);
-				args->hobRegister[IDE_FEATURE_OFFSET_HOB] = hwif->INB(IDE_FEATURE_REG);
-				args->hobRegister[IDE_NSECTOR_OFFSET_HOB] = hwif->INB(IDE_NSECTOR_REG);
-				args->hobRegister[IDE_SECTOR_OFFSET_HOB]  = hwif->INB(IDE_SECTOR_REG);
-				args->hobRegister[IDE_LCYL_OFFSET_HOB]    = hwif->INB(IDE_LCYL_REG);
-				args->hobRegister[IDE_HCYL_OFFSET_HOB]    = hwif->INB(IDE_HCYL_REG);
+				hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
+				args->hobRegister[IDE_FEATURE_OFFSET]	= hwif->INB(IDE_FEATURE_REG);
+				args->hobRegister[IDE_NSECTOR_OFFSET]	= hwif->INB(IDE_NSECTOR_REG);
+				args->hobRegister[IDE_SECTOR_OFFSET]	= hwif->INB(IDE_SECTOR_REG);
+				args->hobRegister[IDE_LCYL_OFFSET]	= hwif->INB(IDE_LCYL_REG);
+				args->hobRegister[IDE_HCYL_OFFSET]	= hwif->INB(IDE_HCYL_REG);
 			}
 		}
 	} else if (blk_pm_request(rq)) {
