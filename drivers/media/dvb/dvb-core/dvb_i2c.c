@@ -239,8 +239,10 @@ int dvb_register_i2c_device (struct module *owner,
 	if (down_interruptible (&dvb_i2c_mutex))
 		return -ERESTARTSYS;
 
-	if (!(entry = kmalloc (sizeof (struct dvb_i2c_device), GFP_KERNEL)))
+	if (!(entry = kmalloc (sizeof (struct dvb_i2c_device), GFP_KERNEL))) {
+		up(&dvb_i2c_mutex);
 		return -ENOMEM;
+	}
 
 	entry->owner = owner;
 	entry->attach = attach;
