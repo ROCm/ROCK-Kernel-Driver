@@ -21,7 +21,6 @@
 #define solaris_semsys		solaris_unimplemented
 
         .data
-        .align  1024
 	.globl		solaris_sys_table
 solaris_sys_table:
 	.word solaris_unimplemented	/* nosys		0	*/
