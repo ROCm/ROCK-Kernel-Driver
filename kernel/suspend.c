@@ -300,7 +300,8 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 static void do_suspend_sync(void)
 {
 	while (1) {
-		run_task_queue(&tq_disk);
+		blk_run_queues();
+#error this is broken, FIXME
 		if (!TQ_ACTIVE(tq_disk))
 			break;
 		printk(KERN_ERR "Hm, tq_disk is not empty after run_task_queue\n");

@@ -909,8 +909,7 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 		mod_timer(&channel->timer, sleep);
 		/* we purposely leave hwgroup busy while sleeping */
 	} else {
-		/* Ugly, but how can we sleep for the lock otherwise? perhaps
-		 * from tq_disk? */
+		/* Ugly, but how can we sleep for the lock otherwise? */
 		ide_release_lock(&irq_lock);/* for atari only */
 		clear_bit(IDE_BUSY, channel->active);
 	}

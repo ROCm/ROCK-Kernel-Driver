@@ -1813,7 +1813,7 @@ static int lbmRead(log_t * log, int pn, lbuf_t ** bpp)
 	bio->bi_end_io = lbmIODone;
 	bio->bi_private = bp;
 	submit_bio(READ, bio);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	wait_event(bp->l_ioevent, (bp->l_flag != lbmREAD));
 
@@ -1958,7 +1958,7 @@ void lbmStartIO(lbuf_t * bp)
 	submit_bio(WRITE, bio);
 
 	INCREMENT(lmStat.submitted);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	jFYI(1, ("lbmStartIO done\n"));
 }

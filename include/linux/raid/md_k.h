@@ -355,7 +355,7 @@ do {									\
 		if (condition)						\
 			break;						\
 		spin_unlock_irq(&lock);					\
-		run_task_queue(&tq_disk);				\
+		blk_run_queues();					\
 		schedule();						\
 		spin_lock_irq(&lock);					\
 	}								\
@@ -381,7 +381,7 @@ do {									\
 		set_current_state(TASK_UNINTERRUPTIBLE);		\
 		if (condition)						\
 			break;						\
-		run_task_queue(&tq_disk);				\
+		blk_run_queues();					\
 		schedule();						\
 	}								\
 	current->state = TASK_RUNNING;					\
