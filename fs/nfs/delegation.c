@@ -57,6 +57,24 @@ again:
 /*
  * Set up a delegation on an inode
  */
+void nfs_inode_reclaim_delegation(struct inode *inode, struct rpc_cred *cred, struct nfs_openres *res)
+{
+	struct nfs_delegation *delegation = NFS_I(inode)->delegation;
+
+	if (delegation == NULL)
+		return;
+	memcpy(delegation->stateid.data, res->delegation.data,
+			sizeof(delegation->stateid.data));
+	delegation->type = res->delegation_type;
+	delegation->maxsize = res->maxsize;
+	put_rpccred(cred);
+	delegation->cred = get_rpccred(cred);
+	delegation->flags &= ~NFS_DELEGATION_NEED_RECLAIM;
+}
+
+/*
+ * Set up a delegation on an inode
+ */
 int nfs_inode_set_delegation(struct inode *inode, struct rpc_cred *cred, struct nfs_openres *res)
 {
 	struct nfs4_client *clp = NFS_SERVER(inode)->nfs4_state;
@@ -257,4 +275,38 @@ struct inode *nfs_delegation_find_inode(struct nfs4_client *clp, const struct nf
 	}
 	spin_unlock(&clp->cl_lock);
 	return res;
+}
+
+/*
+ * Mark all delegations as needing to be reclaimed
+ */
+void nfs_delegation_mark_reclaim(struct nfs4_client *clp)
+{
+	struct nfs_delegation *delegation;
+	spin_lock(&clp->cl_lock);
+	list_for_each_entry(delegation, &clp->cl_delegations, super_list)
+		delegation->flags |= NFS_DELEGATION_NEED_RECLAIM;
+	spin_unlock(&clp->cl_lock);
+}
+
+/*
+ * Reap all unclaimed delegations after reboot recovery is done
+ */
+void nfs_delegation_reap_unclaimed(struct nfs4_client *clp)
+{
+	struct nfs_delegation *delegation, *n;
+	LIST_HEAD(head);
+	spin_lock(&clp->cl_lock);
+	list_for_each_entry_safe(delegation, n, &clp->cl_delegations, super_list) {
+		if ((delegation->flags & NFS_DELEGATION_NEED_RECLAIM) == 0)
+			continue;
+		list_move(&delegation->super_list, &head);
+		NFS_I(delegation->inode)->delegation = NULL;
+	}
+	spin_unlock(&clp->cl_lock);
+	while(!list_empty(&head)) {
+		delegation = list_entry(head.next, struct nfs_delegation, super_list);
+		list_del(&delegation->super_list);
+		nfs_free_delegation(delegation);
+	}
 }

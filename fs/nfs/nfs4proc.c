@@ -196,6 +196,7 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 {
 	struct inode *inode = state->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_delegation *delegation = NFS_I(inode)->delegation;
 	struct nfs_openargs o_arg = {
 		.fh = NFS_FH(inode),
 		.seqid = sp->so_seqid,
@@ -216,17 +217,27 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 	};
 	int status;
 
+	if (delegation != NULL) {
+		if (!(delegation->flags & NFS_DELEGATION_NEED_RECLAIM)) {
+			memcpy(&state->stateid, &delegation->stateid,
+					sizeof(state->stateid));
+			set_bit(NFS_DELEGATED_STATE, &state->flags);
+			return 0;
+		}
+		o_arg.u.delegation_type = delegation->type;
+	}
 	status = rpc_call_sync(server->client, &msg, 0);
 	nfs4_increment_seqid(status, sp);
 	if (status == 0) {
 		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
 		if (o_res.delegation_type != 0) {
-			nfs_inode_set_delegation(inode, sp->so_cred, &o_res);
+			nfs_inode_reclaim_delegation(inode, sp->so_cred, &o_res);
 			/* Did the server issue an immediate delegation recall? */
 			if (o_res.do_recall)
 				nfs_async_inode_return_delegation(inode, &o_res.stateid);
 		}
 	}
+	clear_bit(NFS_DELEGATED_STATE, &state->flags);
 	/* Ensure we update the inode attributes */
 	NFS_CACHEINV(inode);
 	return status;

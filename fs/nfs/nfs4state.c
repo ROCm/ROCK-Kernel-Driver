@@ -47,6 +47,7 @@
 #include <linux/bitops.h>
 
 #include "callback.h"
+#include "delegation.h"
 
 #define OPENOWNER_POOL_SIZE	8
 
@@ -862,6 +863,8 @@ restart_loop:
 	status = nfs4_init_client(clp);
 	if (status)
 		goto out_error;
+	/* Mark all delagations for reclaim */
+	nfs_delegation_mark_reclaim(clp);
 	/* Note: list is protected by exclusive lock on cl->cl_sem */
 	list_for_each_entry(sp, &clp->cl_state_owners, so_list) {
 		status = nfs4_reclaim_open_state(sp);
@@ -871,6 +874,7 @@ restart_loop:
 			goto out_error;
 		}
 	}
+	nfs_delegation_reap_unclaimed(clp);
 out:
 	set_bit(NFS4CLNT_OK, &clp->cl_state);
 	up_write(&clp->cl_sem);
