@@ -92,6 +92,9 @@ kdba_db_trap(kdb_eframe_t ef, int error_unused)
 	unsigned long primary;
 	unsigned long extended;
 
+	if (KDB_NULL_REGS(ef))
+		return KDB_DB_NOBPT;
+
 	msr = get_msr();
 	trap = ef->trap;
 	if (KDB_DEBUG(BP))
@@ -187,9 +190,6 @@ kdba_db_trap(kdb_eframe_t ef, int error_unused)
 	if (rv > 0)
 		goto handled;
 	
-	goto handle;
-
-
 handle:
 
 	/*
@@ -271,6 +271,8 @@ kdba_bp_trap(kdb_eframe_t ef, int error_unused)
 	kdb_dbtrap_t rv;
 	kdb_bp_t *bp;
 
+	if (KDB_NULL_REGS(ef))
+		return KDB_DB_NOBPT;
 	/*
 	 * Determine which breakpoint was encountered.
 	 */
@@ -294,6 +296,13 @@ kdba_bp_trap(kdb_eframe_t ef, int error_unused)
 			kdb_id1(ef->nip);
 			rv = KDB_DB_BPT;
 			bp->bp_delay = 1;
+			/* SSBPT is set when the kernel debugger must single
+			 * step a task in order to re-establish an instruction
+			 * breakpoint which uses the instruction replacement
+			 * mechanism. It is cleared by any action that removes
+			 * the need to single-step the breakpoint
+			 */
+			KDB_STATE_SET(SSBPT);
 			break;
 		}
 	}
@@ -324,7 +333,7 @@ kdba_bp_trap(kdb_eframe_t ef, int error_unused)
 static void
 kdba_handle_bp(kdb_eframe_t ef, kdb_bp_t *bp)
 {
-	if (!ef) {
+	if (KDB_NULL_REGS(ef)) {
 		kdb_printf("kdba_handle_bp: ef == NULL\n");
 		return;
 	}
@@ -336,12 +345,6 @@ kdba_handle_bp(kdb_eframe_t ef, kdb_bp_t *bp)
 	 * Setup single step
 	 */
 	kdba_setsinglestep(ef);
-
-	/* KDB_STATE_SSBPT is set when the kernel debugger must single step
-	 * a task in order to re-establish an instruction breakpoint which
-	 * uses the instruction replacement mechanism. 
-	 */
-	KDB_STATE_SET(SSBPT);
 
 	/*
 	 * Reset delay attribute
@@ -665,7 +668,9 @@ kdba_initbp(void)
  *
  *	For instruction replacement breakpoints, we must single-step
  *	over the replaced instruction at this point so we can re-install
- *	the breakpoint instruction after the single-step.
+ *	the breakpoint instruction after the single-step. SSBPT is set 
+ *	when the breakpoint is initially hit and is cleared by any action
+ *	that removes the need for single-step over the breakpoint.
  */
 
 int
@@ -679,6 +684,8 @@ kdba_installbp(kdb_eframe_t ef, kdb_bp_t *bp)
 	if (KDB_DEBUG(BP)) {
 		kdb_printf("kdba_installbp bp_installed %d\n", bp->bp_installed);
 	}
+	if (!KDB_STATE(SSBPT))
+		bp->bp_delay = 0;
 	if (!bp->bp_installed) {
 		if (bp->bp_hardtype) {
 			kdba_installdbreg(bp); 
@@ -695,14 +702,15 @@ kdba_installbp(kdb_eframe_t ef, kdb_bp_t *bp)
 		    if (KDB_DEBUG(BP))
 			kdb_printf("0x%lx 0x%lx 0x%lx\n",bp->bp_inst,bp->bp_addr,sizeof(bp->bp_addr));
 		    rc = kdb_getword(&bp->bp_inst, bp->bp_addr,sizeof(bp->bp_addr));
-		    kdb_putword(bp->bp_addr, PPC64_BREAKPOINT_INSTRUCTION,sizeof(PPC64_BREAKPOINT_INSTRUCTION));
+		    if (kdb_putword(bp->bp_addr, PPC64_BREAKPOINT_INSTRUCTION,sizeof(PPC64_BREAKPOINT_INSTRUCTION)))
+			return (1);
 		    if (KDB_DEBUG(BP))
 			kdb_printf("kdba_installbp instruction 0x%x at " kdb_bfd_vma_fmt "\n",
 				   PPC64_BREAKPOINT_INSTRUCTION, bp->bp_addr);
 		    bp->bp_installed = 1;
 		}
 	}
-return 0;
+	return 0;
 }
 
 /*

@@ -516,7 +516,9 @@ kdba_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 		ef = &regs;
 	}
 	cpus_in_kdb++;
+	kdb_save_running(ef);
 	rv = kdb_main_loop(reason, reason2, error, db_result, ef);
+	kdb_unsave_running(ef);
 	cpus_in_kdb--;
 	return rv;
 }

@@ -194,8 +194,6 @@ kdba_dis_getmem(bfd_vma addr, bfd_byte *buf, unsigned int length, disassemble_in
 int
 kdba_id_parsemode(const char *mode, disassemble_info *dip)
 {
-
-
 	return 0;
 }
 

@@ -113,12 +113,6 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 	unsigned long symsize,symoffset;
 	char *symmodname;
 
-	if (!regs && !addr)
-	{
-		kdb_printf(" invalid regs pointer \n");
-		return 0;
-	}
-
 	/*
 	 * The caller may have supplied an address at which the
 	 * stack traceback operation should begin.  This address
@@ -129,12 +123,29 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 	 * entitled '<unknown>' was called from the function which
 	 * contains return-address.
 	 */
-	if (addr) {
+	if (!addr)
+		addr = (kdb_machreg_t *)p->thread.ksp;
+
+	if (addr && !task_curr(p)) {
 		eip = 0;
 		esp = *addr;
-		ebp=0;
+		ebp = 0;
 	} else {
-		ebp=regs->link;
+		if (task_curr(p)) {
+			struct kdb_running_process *krp = kdb_running_process + task_cpu(p);
+			if (!krp->seqno) {
+				kdb_printf("Process did not save state, cannot backtrace \n");
+				kdb_ps1(p);
+				return 0;
+			}
+			regs = krp->regs;
+		} else {
+			if (!regs)
+				regs = p->thread.regs;
+		}
+		if (KDB_NULL_REGS(regs))
+			return KDB_BADREG;
+		ebp = regs->link;
 		eip = regs->nip;
 		if (regs_esp)
 			esp = regs->gpr[1];
@@ -318,5 +329,5 @@ kdba_bt_address(kdb_machreg_t addr, int argcount)
 int
 kdba_bt_process(struct task_struct *p, int argcount)
 {
-	return (kdba_bt_stack_ppc(p->thread.regs, (kdb_machreg_t *) p->thread.ksp, argcount, p, 0));
+	return (kdba_bt_stack_ppc(NULL, NULL, argcount, p, 0));
 }
