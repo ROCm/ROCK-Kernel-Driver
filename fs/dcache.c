@@ -983,8 +983,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		struct dentry *dentry; 
 		unsigned long move_count;
 		struct qstr * qstr;
-		
-		prefetch(node->next);
 
 		smp_read_barrier_depends();
 		dentry = hlist_entry(node, struct dentry, d_hash);
@@ -1072,7 +1070,6 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 	spin_lock(&dcache_lock);
 	base = d_hash(dparent, dentry->d_name.hash);
 	hlist_for_each(lhp,base) { 
-		prefetch(lhp->next);
 		/* read_barrier_depends() not required for d_hash list
 		 * as it is parsed under dcache_lock
 		 */
