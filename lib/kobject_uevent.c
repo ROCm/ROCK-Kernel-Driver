@@ -222,7 +222,7 @@ void kobject_hotplug(const char *action, struct kobject *kobj)
 	spin_unlock(&sequence_lock);
 
 	envp [i++] = scratch;
-	scratch += sprintf(scratch, "SEQNUM=%lld", seq) + 1;
+	scratch += sprintf(scratch, "SEQNUM=%lld", (long long)seq) + 1;
 
 	envp [i++] = scratch;
 	scratch += sprintf(scratch, "SUBSYSTEM=%s", name) + 1;
