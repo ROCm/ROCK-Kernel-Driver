@@ -917,29 +917,19 @@ static void do_ccupdate_local(void *info)
 
 static void free_block (kmem_cache_t* cachep, void** objpp, int len);
 
+static void do_drain(void *arg)
+{
+	kmem_cache_t *cachep = (kmem_cache_t*)arg;
+	cpucache_t *cc;
+
+	cc = cc_data(cachep);
+	free_block(cachep, &cc_entry(cc)[0], cc->avail);
+	cc->avail = 0;
+}
+
 static void drain_cpu_caches(kmem_cache_t *cachep)
 {
-	ccupdate_struct_t new;
-	int i;
-
-	memset(&new.new,0,sizeof(new.new));
-
-	new.cachep = cachep;
-
-	down(&cache_chain_sem);
-	smp_call_function_all_cpus(do_ccupdate_local, (void *)&new);
-
-	for (i = 0; i < NR_CPUS; i++) {
-		cpucache_t* ccold = new.new[i];
-		if (!ccold || (ccold->avail == 0))
-			continue;
-		local_irq_disable();
-		free_block(cachep, cc_entry(ccold), ccold->avail);
-		local_irq_enable();
-		ccold->avail = 0;
-	}
-	smp_call_function_all_cpus(do_ccupdate_local, (void *)&new);
-	up(&cache_chain_sem);
+	smp_call_function_all_cpus(do_drain, cachep);
 }
 
 static int __cache_shrink(kmem_cache_t *cachep)
