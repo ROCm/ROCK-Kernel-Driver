@@ -11,7 +11,9 @@
 #include <linux/acpi.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/tty.h>
 #include <linux/serial.h>
+#include <linux/serial_core.h>
 
 #include <acpi/acpi_bus.h>
 
@@ -112,11 +114,12 @@ static int acpi_serial_add(struct acpi_device *device)
 	}
 
 	serial_req.baud_base = BASE_BAUD;
-	serial_req.flags = ASYNC_SKIP_TEST|ASYNC_BOOT_AUTOCONF|ASYNC_AUTO_IRQ;
+	serial_req.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF | UPF_AUTO_IRQ |
+			   UPF_RESOURCES;
 
 	line = register_serial(&serial_req);
 	if (line < 0) {
-		printk(KERN_WARNING "Couldn't register serial port %s: %d",
+		printk(KERN_WARNING "Couldn't register serial port %s: %d\n",
 			device->pnp.bus_id, line);
 		return -ENODEV;
 	}

@@ -185,7 +185,7 @@ setup_serial_hcdp(void *tablep)
 #else
 		port.irq = gsi;
 #endif
-		port.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF;
+		port.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF | UPF_RESOURCES;
 		if (gsi)
 			port.flags |= ASYNC_AUTO_IRQ;
 
