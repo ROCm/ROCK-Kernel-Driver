@@ -1066,6 +1066,13 @@ static unsigned long long idedisk_set_max_address_ext(ide_drive_t *drive, unsign
 
 #endif /* CONFIG_IDEDISK_STROKE */
 
+static unsigned long long sectors_to_MB(unsigned long long n)
+{
+	n <<= 9;		/* make it bytes */
+	do_div(n, 1000000);	/* make it MB */
+	return n;
+}
+
 /*
  * Tests if the drive supports Host Protected Area feature.
  * Returns true if supported, false otherwise.
@@ -1166,7 +1173,7 @@ static void init_idedisk_capacity (ide_drive_t  *drive)
 	}
 }
 
-static unsigned long idedisk_capacity (ide_drive_t *drive)
+static sector_t idedisk_capacity (ide_drive_t *drive)
 {
 	if (drive->id->cfs_enable_2 & 0x0400)
 		return (drive->capacity48 - drive->sect0);
@@ -1565,7 +1572,7 @@ static ide_startstop_t idedisk_start_power_step (ide_drive_t *drive, struct requ
 static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
-	unsigned long capacity;
+	unsigned long long capacity;
 
 	idedisk_add_settings(drive);
 
@@ -1629,14 +1636,23 @@ static void idedisk_setup (ide_drive_t *drive)
 	 * by correcting bios_cyls:
 	 */
 	capacity = idedisk_capacity (drive);
-	if ((capacity >= (drive->bios_cyl * drive->bios_sect * drive->bios_head)) &&
-	    (!drive->forced_geom) && drive->bios_sect && drive->bios_head)
-		drive->bios_cyl = (capacity / drive->bios_sect) / drive->bios_head;
-	printk (KERN_INFO "%s: %ld sectors", drive->name, capacity);
+	if (!drive->forced_geom && drive->bios_sect && drive->bios_head) {
+		unsigned int cap0 = capacity;	/* truncate to 32 bits */
+		unsigned int cylsz, cyl;
 
-	/* Give size in megabytes (MB), not mebibytes (MiB). */
-	/* We compute the exact rounded value, avoiding overflow. */
-	printk (" (%ld MB)", (capacity - capacity/625 + 974)/1950);
+		if (cap0 != capacity)
+			drive->bios_cyl = 65535;
+		else {
+			cylsz = drive->bios_sect * drive->bios_head;
+			cyl = cap0 / cylsz;
+			if (cyl > 65535)
+				cyl = 65535;
+			if (cyl > drive->bios_cyl)
+				drive->bios_cyl = cyl;
+		}
+	}
+	printk(KERN_INFO "%s: %llu sectors (%llu MB)",
+			 drive->name, capacity, sectors_to_MB(capacity));
 
 	/* Only print cache size when it was specified */
 	if (id->buf_size)

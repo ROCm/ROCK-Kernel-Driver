@@ -1226,7 +1226,7 @@ typedef struct ide_driver_s {
 	ide_startstop_t	(*abort)(ide_drive_t *, const char *);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	void		(*pre_reset)(ide_drive_t *);
-	unsigned long	(*capacity)(ide_drive_t *);
+	sector_t	(*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t	*proc;
 	int		(*attach)(ide_drive_t *);
@@ -1359,7 +1359,7 @@ extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long
 /*
  * Return the current idea about the total capacity of this drive.
  */
-extern unsigned long current_capacity (ide_drive_t *drive);
+extern sector_t current_capacity (ide_drive_t *drive);
 
 /*
  * Start a reset operation for an IDE interface.

@@ -1626,7 +1626,7 @@ static int idefloppy_get_format_progress(ide_drive_t *drive, int *arg)
 /*
  *	Return the current floppy capacity to ide.c.
  */
-static unsigned long idefloppy_capacity (ide_drive_t *drive)
+static sector_t idefloppy_capacity (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	unsigned long capacity = floppy->blocks * floppy->bs_factor;

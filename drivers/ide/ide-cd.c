@@ -3228,7 +3228,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 }
 
 static
-unsigned long ide_cdrom_capacity (ide_drive_t *drive)
+sector_t ide_cdrom_capacity (ide_drive_t *drive)
 {
 	unsigned long capacity;
 

@@ -351,7 +351,7 @@ int ide_system_bus_speed (void)
  * current_capacity() returns the capacity (in sectors) of a drive
  * according to its current geometry/LBA settings.
  */
-unsigned long current_capacity (ide_drive_t *drive)
+sector_t current_capacity (ide_drive_t *drive)
 {
 	if (!drive->present)
 		return 0;
@@ -2410,7 +2410,7 @@ static void default_pre_reset (ide_drive_t *drive)
 {
 }
 
-static unsigned long default_capacity (ide_drive_t *drive)
+static sector_t default_capacity (ide_drive_t *drive)
 {
 	return 0x7fffffff;
 }
