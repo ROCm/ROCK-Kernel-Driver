@@ -16,13 +16,11 @@
 #include <linux/string.h>
 #include "base.h"
 
-static DECLARE_MUTEX(bus_sem);
-
 #define to_dev(node) container_of(node,struct device,bus_list)
 #define to_drv(node) container_of(node,struct device_driver,kobj.entry)
 
 #define to_bus_attr(_attr) container_of(_attr,struct bus_attribute,attr)
-#define to_bus(obj) container_of(obj,struct bus_type,subsys.kobj)
+#define to_bus(obj) container_of(obj,struct bus_type,subsys.kset.kobj)
 
 /*
  * sysfs bindings for drivers
@@ -70,6 +68,11 @@ static void driver_release(struct kobject * kobj)
 	up(&drv->unload_sem);
 }
 
+static struct kobj_type ktype_driver = {
+	.sysfs_ops	= &driver_sysfs_ops,
+	.release	= driver_release,
+};
+
 
 /*
  * sysfs bindings for buses
@@ -111,7 +114,7 @@ int bus_create_file(struct bus_type * bus, struct bus_attribute * attr)
 {
 	int error;
 	if (get_bus(bus)) {
-		error = sysfs_create_file(&bus->subsys.kobj,&attr->attr);
+		error = sysfs_create_file(&bus->subsys.kset.kobj,&attr->attr);
 		put_bus(bus);
 	} else
 		error = -EINVAL;
@@ -121,16 +124,17 @@ int bus_create_file(struct bus_type * bus, struct bus_attribute * attr)
 void bus_remove_file(struct bus_type * bus, struct bus_attribute * attr)
 {
 	if (get_bus(bus)) {
-		sysfs_remove_file(&bus->subsys.kobj,&attr->attr);
+		sysfs_remove_file(&bus->subsys.kset.kobj,&attr->attr);
 		put_bus(bus);
 	}
 }
 
-struct subsystem bus_subsys = {
-	.kobj	= { .name = "bus" },
+static struct kobj_type ktype_bus = {
 	.sysfs_ops	= &bus_sysfs_ops,
+
 };
 
+decl_subsys(bus,&ktype_bus);
 
 /**
  *	bus_for_each_dev - device iterator.
@@ -160,7 +164,7 @@ int bus_for_each_dev(struct bus_type * bus, struct device * start,
 	if (!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->bus_list : &bus->devices;
+	head = start ? &start->bus_list : &bus->devices.list;
 
 	down_read(&bus->subsys.rwsem);
 	list_for_each(entry,head) {
@@ -203,9 +207,9 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 	if(!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->kobj.entry : &bus->drvsubsys.list;
+	head = start ? &start->kobj.entry : &bus->drivers.list;
 
-	down_read(&bus->drvsubsys.rwsem);
+	down_read(&bus->subsys.rwsem);
 	list_for_each(entry,head) {
 		struct device_driver * drv = get_driver(to_drv(entry));
 		error = fn(drv,data);
@@ -213,7 +217,7 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 		if(error)
 			break;
 	}
-	up_read(&bus->drvsubsys.rwsem);
+	up_read(&bus->subsys.rwsem);
 	return error;
 }
 
@@ -287,7 +291,7 @@ static int device_attach(struct device * dev)
 	if (!bus->match)
 		return 0;
 
-	list_for_each(entry,&bus->drvsubsys.list) {
+	list_for_each(entry,&bus->drivers.list) {
 		struct device_driver * drv = to_drv(entry);
 		if (!(error = bus_match(dev,drv)))
 			break;
@@ -315,7 +319,7 @@ static int driver_attach(struct device_driver * drv)
 	if (!bus->match)
 		return 0;
 
-	list_for_each(entry,&bus->devices) {
+	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
 			if (!bus_match(dev,drv) && dev->driver)
@@ -388,10 +392,10 @@ int bus_add_device(struct device * dev)
 	if (bus) {
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
-		list_add_tail(&dev->bus_list,&dev->bus->devices);
+		list_add_tail(&dev->bus_list,&dev->bus->devices.list);
 		device_attach(dev);
 		up_write(&dev->bus->subsys.rwsem);
-		sysfs_create_link(&bus->devsubsys.kobj,&dev->kobj,dev->bus_id);
+		sysfs_create_link(&bus->devices.kobj,&dev->kobj,dev->bus_id);
 	}
 	return 0;
 }
@@ -408,7 +412,7 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
-		sysfs_remove_link(&dev->bus->devsubsys.kobj,dev->bus_id);
+		sysfs_remove_link(&dev->bus->devices.kobj,dev->bus_id);
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
 		device_detach(dev);
@@ -428,13 +432,13 @@ int bus_add_driver(struct device_driver * drv)
 {
 	struct bus_type * bus = get_bus(drv->bus);
 	if (bus) {
-		down_write(&bus->subsys.rwsem);
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
-		drv->kobj.subsys = &bus->drvsubsys;
+		drv->kobj.kset = &bus->drivers;
 		kobject_register(&drv->kobj);
 
+		down_write(&bus->subsys.rwsem);
 		devclass_add_driver(drv);
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
@@ -459,8 +463,8 @@ void bus_remove_driver(struct device_driver * drv)
 		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
 		driver_detach(drv);
 		devclass_remove_driver(drv);
-		kobject_unregister(&drv->kobj);
 		up_write(&drv->bus->subsys.rwsem);
+		kobject_unregister(&drv->kobj);
 		put_bus(drv->bus);
 	}
 }
@@ -479,33 +483,26 @@ void put_bus(struct bus_type * bus)
  *	bus_register - register a bus with the system.
  *	@bus:	bus.
  *
- *	We take bus_sem here to protect against the bus being 
- *	unregistered during the registration process.
  *	Once we have that, we registered the bus with the kobject
  *	infrastructure, then register the children subsystems it has:
  *	the devices and drivers that belong to the bus. 
  */
 int bus_register(struct bus_type * bus)
 {
-	INIT_LIST_HEAD(&bus->devices);
-
-	down(&bus_sem);
-	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
-	bus->subsys.parent = &bus_subsys;
+	strncpy(bus->subsys.kset.kobj.name,bus->name,KOBJ_NAME_LEN);
+	subsys_set_kset(bus,bus_subsys);
 	subsystem_register(&bus->subsys);
 
-	snprintf(bus->devsubsys.kobj.name,KOBJ_NAME_LEN,"devices");
-	bus->devsubsys.parent = &bus->subsys;
-	subsystem_register(&bus->devsubsys);
+	snprintf(bus->devices.kobj.name,KOBJ_NAME_LEN,"devices");
+	bus->devices.subsys = &bus->subsys;
+	kset_register(&bus->devices);
 
-	snprintf(bus->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
-	bus->drvsubsys.parent = &bus->subsys;
-	bus->drvsubsys.sysfs_ops = &driver_sysfs_ops;
-	bus->drvsubsys.release = driver_release;
-	subsystem_register(&bus->drvsubsys);
+	snprintf(bus->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
+	bus->drivers.subsys = &bus->subsys;
+	bus->drivers.ktype = &ktype_driver;
+	kset_register(&bus->drivers);
 
 	pr_debug("bus type '%s' registered\n",bus->name);
-	up(&bus_sem);
 	return 0;
 }
 
@@ -514,19 +511,15 @@ int bus_register(struct bus_type * bus)
  *	bus_unregister - remove a bus from the system 
  *	@bus:	bus.
  *
- *	Take bus_sem, in case the bus we're registering hasn't 
- *	finished registering. Once we have it, unregister the child
- *	subsystems and the bus itself.
+ *	Unregister the child subsystems and the bus itself.
  *	Finally, we call put_bus() to release the refcount
  */
 void bus_unregister(struct bus_type * bus)
 {
-	down(&bus_sem);
 	pr_debug("bus %s: unregistering\n",bus->name);
-	subsystem_unregister(&bus->drvsubsys);
-	subsystem_unregister(&bus->devsubsys);
+	kset_unregister(&bus->drivers);
+	kset_unregister(&bus->devices);
 	subsystem_unregister(&bus->subsys);
-	up(&bus_sem);
 }
 
 static int __init bus_subsys_init(void)

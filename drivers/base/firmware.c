@@ -6,13 +6,11 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-static struct subsystem firmware_subsys = {
-	.kobj	= { .name = "firmware" },
-};
+static decl_subsys(firmware,NULL);
 
 int firmware_register(struct subsystem * s)
 {
-	s->parent = &firmware_subsys;
+	kset_set_kset_s(s,firmware_subsys);
 	return subsystem_register(s);
 }
 

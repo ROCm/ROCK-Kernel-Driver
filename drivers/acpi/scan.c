@@ -31,10 +31,16 @@ static void acpi_device_release(struct kobject * kobj)
 	kfree(dev);
 }
 
-static struct subsystem acpi_namespace_subsys = {
-	.kobj		= { .name = "namespace" },
-	.parent		= &acpi_subsys,
+static struct kobj_type ktype_acpi_ns = {
 	.release	= acpi_device_release,
+};
+
+static struct kset acpi_namespace_kset = {
+	.kobj		= { 
+		.name = "namespace",
+	},
+	.subsys = &acpi_subsys,
+	.ktype	= &ktype_acpi_ns,
 };
 
 
@@ -61,7 +67,8 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 	strncpy(device->kobj.name,device->pnp.bus_id,KOBJ_NAME_LEN);
 	if (parent)
 		device->kobj.parent = &parent->kobj;
-	device->kobj.subsys = &acpi_namespace_subsys;
+	device->kobj.ktype = &ktype_acpi_ns;
+	device->kobj.kset = &acpi_namespace_kset;
 	kobject_register(&device->kobj);
 }
 
@@ -920,7 +927,7 @@ static int __init acpi_scan_init(void)
 	if (acpi_disabled)
 		return_VALUE(0);
 
-	subsystem_register(&acpi_namespace_subsys);
+	kset_register(&acpi_namespace_kset);
 
 	/*
 	 * Create the root device in the bus's device tree

@@ -145,7 +145,7 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	return error;
 }
 
-#define to_subsys(k) container_of(k,struct subsystem,kobj)
+#define to_subsys(k) container_of(k,struct subsystem,kset.kobj)
 #define to_sattr(a) container_of(a,struct subsys_attribute,attr)
 
 /**
@@ -303,11 +303,13 @@ static int check_perm(struct inode * inode, struct file * file)
 	if (!kobj || !attr)
 		goto Einval;
 
-	/* if the kobject has no subsystem, then it is a subsystem itself,
-	 * so give it the subsys_sysfs_ops.
+	/* if the kobject has no ktype, then we assume that it is a subsystem
+	 * itself, and use ops for it.
 	 */
-	if (kobj->subsys)
-		ops = kobj->subsys->sysfs_ops;
+	if (kobj->kset && kobj->kset->ktype)
+		ops = kobj->kset->ktype->sysfs_ops;
+	else if (kobj->ktype)
+		ops = kobj->ktype->sysfs_ops;
 	else
 		ops = &subsys_sysfs_ops;
 
