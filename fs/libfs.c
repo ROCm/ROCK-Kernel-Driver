@@ -332,14 +332,3 @@ int simple_commit_write(struct file *file, struct page *page,
 	set_page_dirty(page);
 	return 0;
 }
-
-/*
- * Print device name (in decimal, hexadecimal or symbolic)
- * Note: returns pointer to static data!
- */
-const char * kdevname(kdev_t dev)
-{
-	static char buffer[32];
-	sprintf(buffer, "%02x:%02x", major(dev), minor(dev));
-	return buffer;
-}

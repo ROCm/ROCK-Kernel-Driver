@@ -511,7 +511,6 @@ EXPORT_SYMBOL(sscanf);
 EXPORT_SYMBOL(vsprintf);
 EXPORT_SYMBOL(vsnprintf);
 EXPORT_SYMBOL(vsscanf);
-EXPORT_SYMBOL(kdevname);
 EXPORT_SYMBOL(__bdevname);
 EXPORT_SYMBOL(cdevname);
 EXPORT_SYMBOL(simple_strtoull);
