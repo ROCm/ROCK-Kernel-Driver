@@ -5,7 +5,7 @@
  * (C) 2000 Red Hat. GPL'd
  *
  * $Id: cfi_cmdset_0001.c,v 1.160 2004/11/01 06:02:24 nico Exp $
- *
+ * (+ suspend fix from v1.162)
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
  * 	- completely revamped method functions so they are aware and
@@ -1714,9 +1714,18 @@ static int cfi_intelext_suspend(struct mtd_info *mtd)
 				 * as the whole point is that nobody can do anything
 				 * with the chip now anyway.
 				 */
+			} else {
+				/* There seems to be an operation pending. We must wait for it. */
+				printk(KERN_NOTICE "Flash device refused suspend due to pending operation (oldstate %d)\n", chip->oldstate);
+				ret = -EAGAIN;
 			}
 			break;
 		default:
+			/* Should we actually wait? Once upon a time these routines weren't
+			   allowed to. Or should we return -EAGAIN, because the upper layers
+			   ought to have already shut down anything which was using the device
+			   anyway? The latter for now. */
+			printk(KERN_NOTICE "Flash device refused suspend due to active operation (state %d)\n", chip->oldstate);
 			ret = -EAGAIN;
 		case FL_PM_SUSPENDED:
 			break;
@@ -1737,6 +1746,7 @@ static int cfi_intelext_suspend(struct mtd_info *mtd)
 				   because we're returning failure, and it didn't
 				   get power cycled */
 				chip->state = chip->oldstate;
+				chip->oldstate = FL_READY;
 				wake_up(&chip->wq);
 			}
 			spin_unlock(chip->mutex);
@@ -1762,7 +1772,7 @@ static void cfi_intelext_resume(struct mtd_info *mtd)
 		/* Go to known state. Chip may have been power cycled */
 		if (chip->state == FL_PM_SUSPENDED) {
 			map_write(map, CMD(0xFF), cfi->chips[i].start);
-			chip->state = FL_READY;
+			chip->oldstate = chip->state = FL_READY;
 			wake_up(&chip->wq);
 		}
 
