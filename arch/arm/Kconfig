@@ -97,14 +97,6 @@ config ARCH_ANAKIN
 	  Bosch DAB module
 	  * An audio card ( 4 * 40W, AC97 Codec, I2S)
 
-config ARCH_ARCA5K
-	bool "Archimedes/A5000"
-	help
-	  This selects what ARM system you wish to build the kernel for. It
-	  also selects to some extent the CPU type. If you are unsure what
-	  to set this option to, please consult any information supplied with
-	  your system.
-
 config ARCH_CLPS7500
 	bool "Cirrus-CL-PS7500FE"
 
@@ -167,8 +159,6 @@ config ARCH_SHARK
 
 endchoice
 
-source "arch/arm/mach-arc/Kconfig"
-
 source "arch/arm/mach-clps711x/Kconfig"
 
 source "arch/arm/mach-epxa10db/Kconfig"
@@ -184,7 +174,7 @@ source "arch/arm/mach-sa1100/Kconfig"
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
-	depends on ARCH_ARCA5K || ARCH_RPC
+	depends on ARCH_RPC
 	default y
 
 #####################################################################
@@ -226,12 +216,6 @@ comment "Processor Type"
 # Figure out whether this system uses 26-bit or 32-bit CPUs.
 config CPU_32
 	bool
-	depends on !ARCH_ARCA5K
-	default y
-
-config CPU_26
-	bool
-	depends on ARCH_ARCA5K
 	default y
 
 # Select CPU types depending on the architecture selected.  This selects
@@ -656,7 +640,7 @@ config FPE_NWFPE_XP
 
 config FPE_FASTFPE
 	bool "FastFPE math emulation (EXPERIMENTAL)"
-	depends on !CPU_26 && !CPU_32v3 && EXPERIMENTAL
+	depends on !CPU_32v3 && EXPERIMENTAL
 	---help---
 	  Say Y here to include the FAST floating point emulator in the kernel.
 	  This is an experimental much faster emulator which now also has full
