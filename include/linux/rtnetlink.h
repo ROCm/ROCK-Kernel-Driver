@@ -577,6 +577,17 @@ struct rtnl_link_stats
 	__u32	tx_compressed;
 };
 
+/* The struct should be in sync with struct ifmap */
+struct rtnl_link_ifmap
+{
+	__u64	mem_start;
+	__u64	mem_end;
+	__u64	base_addr;
+	__u16	irq;
+	__u8	dma;
+	__u8	port;
+};
+
 enum
 {
 	IFLA_UNSPEC,
