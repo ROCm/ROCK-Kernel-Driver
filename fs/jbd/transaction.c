@@ -1749,13 +1749,13 @@ static int dispose_buffer(struct journal_head *jh,
 }
 
 /*
- * journal_flushpage 
+ * journal_invalidatepage 
  *
  * This code is tricky.  It has a number of cases to deal with.
  *
  * There are two invariants which this code relies on:
  *
- * i_size must be updated on disk before we start calling flushpage on the
+ * i_size must be updated on disk before we start calling invalidatepage on the
  * data.
  * 
  *  This is done in ext3 by defining an ext3_setattr method which
@@ -1891,7 +1891,7 @@ zap_buffer:
 /*
  * Return non-zero if the page's buffers were successfully reaped
  */
-int journal_flushpage(journal_t *journal, 
+int journal_invalidatepage(journal_t *journal, 
 		      struct page *page, 
 		      unsigned long offset)
 {

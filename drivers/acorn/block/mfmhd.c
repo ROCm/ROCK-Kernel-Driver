@@ -570,7 +570,7 @@ static void mfm_rw_intr(void)
 		DBG("mfm_rw_intr: returned from cont->done\n");
 	} else {
 		/* Its going to generate another interrupt */
-		SET_INTR(mfm_rw_intr);
+		DEVICE_INTR = mfm_rw_intr;
 	};
 }
 
@@ -578,7 +578,7 @@ static void mfm_setup_rw(void)
 {
 	DBG("setting up for rw...\n");
 
-	SET_INTR(mfm_rw_intr);
+	DEVICE_INTR = mfm_rw_intr;
 	issue_command(raw_cmd.cmdcode, raw_cmd.cmddata, raw_cmd.cmdlen);
 }
 
@@ -608,7 +608,7 @@ static void mfm_recal_intr(void)
 	/* Command end without seek end (see data sheet p.20) for parallel seek
 	   - we have to send a POL command to wait for the seek */
 	if (mfm_status & STAT_CED) {
-		SET_INTR(mfm_recal_intr);
+		DEVICE_INTR = mfm_recal_intr;
 		issue_command(CMD_POL, NULL, 0);
 		return;
 	}
@@ -638,7 +638,7 @@ static void mfm_seek_intr(void)
 		return;
 	}
 	if (mfm_status & STAT_CED) {
-		SET_INTR(mfm_seek_intr);
+		DEVICE_INTR = mfm_seek_intr;
 		issue_command(CMD_POL, NULL, 0);
 		return;
 	}
@@ -696,7 +696,7 @@ static void mfm_seek(void)
 
 	DBG("seeking...\n");
 	if (MFM_DRV_INFO.cylinder < 0) {
-		SET_INTR(mfm_recal_intr);
+		DEVICE_INTR = mfm_recal_intr;
 		DBG("mfm_seek: about to call specify\n");
 		mfm_specify ();	/* DAG added this */
 
@@ -712,7 +712,7 @@ static void mfm_seek(void)
 		cmdb[2] = raw_cmd.cylinder >> 8;
 		cmdb[3] = raw_cmd.cylinder;
 
-		SET_INTR(mfm_seek_intr);
+		DEVICE_INTR = mfm_seek_intr;
 		issue_command(CMD_SEK, cmdb, 4);
 	} else
 		mfm_setup_rw();
@@ -907,7 +907,7 @@ static void mfm_request(void)
 
 		if (blk_queue_empty(QUEUE)) {
 			printk("mfm_request: Exiting due to empty queue (pre)\n");
-			CLEAR_INTR;
+			DEVICE_INTR = NULL;
 			Busy = 0;
 			return;
 		}
@@ -971,7 +971,7 @@ static void mfm_interrupt_handler(int unused, void *dev_id, struct pt_regs *regs
 {
 	void (*handler) (void) = DEVICE_INTR;
 
-	CLEAR_INTR;
+	DEVICE_INTR = NULL;
 
 	DBG("mfm_interrupt_handler (handler=0x%p)\n", handler);
 

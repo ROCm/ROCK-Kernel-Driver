@@ -86,13 +86,13 @@ int sysctl_ieee_emulation_warnings=1;
 
 #define mathemu_copy_from_user(d, s, n)\
         do { \
-                if (copy_from_user((d),(s),(n)) == -EFAULT) \
+                if (copy_from_user((d),(s),(n)) != 0) \
                         return SIGSEGV; \
         } while (0)
 
 #define mathemu_copy_to_user(d, s, n) \
         do { \
-                if (copy_to_user((d),(s),(n)) == -EFAULT) \
+                if (copy_to_user((d),(s),(n)) != 0) \
                         return SIGSEGV; \
         } while (0)
 

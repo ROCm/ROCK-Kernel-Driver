@@ -171,7 +171,7 @@ static int driverfs_symlink(struct inode * dir, struct dentry *dentry, const cha
 	inode = driverfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
 	if (inode) {
 		int l = strlen(symname)+1;
-		error = block_symlink(inode, symname, l);
+		error = page_symlink(inode, symname, l);
 		if (!error) {
 			d_instantiate(dentry, inode);
 			dget(dentry);

@@ -290,7 +290,7 @@ static int config_chipset_for_dma(struct ata_device *drive)
 	return !svwks_tune_chipset(drive, mode);
 }
 
-static int config_drive_xfer_rate(struct ata_device *drive)
+static int svwks_udma_setup(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	int on = 1;
@@ -386,11 +386,6 @@ static int svwks_udma_stop(struct ata_device *drive)
 	udma_destroy_table(ch);			/* purge DMA mappings */
 
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
-}
-
-static int svwks_dmaproc(struct ata_device *drive)
-{
-	return config_drive_xfer_rate(drive);
 }
 #endif
 
@@ -506,7 +501,7 @@ static void __init ide_init_svwks(struct ata_channel *hwif)
 			hwif->autodma = 1;
 #endif
 		hwif->udma_stop = svwks_udma_stop;
-		hwif->XXX_udma = svwks_dmaproc;
+		hwif->udma_setup = svwks_udma_setup;
 		hwif->highmem = 1;
 	} else {
 		hwif->autodma = 0;

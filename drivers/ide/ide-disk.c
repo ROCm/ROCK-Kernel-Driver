@@ -170,7 +170,7 @@ static ide_startstop_t chs_do_request(struct ata_device *drive, struct request *
 
 	args.taskfile.device_head = head;
 	args.taskfile.device_head |= drive->select.all;
-	args.taskfile.command =  get_command(drive, rq_data_dir(rq));
+	args.cmd =  get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
 	printk("%s: %sing: ", drive->name,
@@ -211,7 +211,7 @@ static ide_startstop_t lba28_do_request(struct ata_device *drive, struct request
 
 	args.taskfile.device_head = ((block >> 8) & 0x0f);
 	args.taskfile.device_head |= drive->select.all;
-	args.taskfile.command = get_command(drive, rq_data_dir(rq));
+	args.cmd = get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
 	printk("%s: %sing: ", drive->name,
@@ -257,15 +257,14 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
 	args.taskfile.sector_number = block;		/* low lba */
 	args.taskfile.low_cylinder = (block >>= 8);	/* mid lba */
 	args.taskfile.high_cylinder = (block >>= 8);	/* hi  lba */
+	args.taskfile.device_head = drive->select.all;
 
 	args.hobfile.sector_number = (block >>= 8);	/* low lba */
 	args.hobfile.low_cylinder = (block >>= 8);	/* mid lba */
 	args.hobfile.high_cylinder = (block >>= 8);	/* hi  lba */
+	args.hobfile.device_head = drive->select.all;
 
-	args.taskfile.device_head = drive->select.all;
-	args.hobfile.device_head = args.taskfile.device_head;
-	args.hobfile.control = (drive->ctl|0x80);
-	args.taskfile.command = get_command(drive, rq_data_dir(rq));
+	args.cmd = get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
 	printk("%s: %sing: ", drive->name,
@@ -356,7 +355,7 @@ static int idedisk_open (struct inode *inode, struct file *filp, struct ata_devi
 
 		memset(&args, 0, sizeof(args));
 
-		args.taskfile.command = WIN_DOORLOCK;
+		args.cmd = WIN_DOORLOCK;
 		ide_cmd_type_parser(&args);
 
 		/*
@@ -378,9 +377,9 @@ static int idedisk_flushcache(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 
 	if (drive->id->cfs_enable_2 & 0x2400)
-		args.taskfile.command = WIN_FLUSH_CACHE_EXT;
+		args.cmd = WIN_FLUSH_CACHE_EXT;
 	else
-		args.taskfile.command = WIN_FLUSH_CACHE;
+		args.cmd = WIN_FLUSH_CACHE;
 
 	ide_cmd_type_parser(&args);
 
@@ -396,7 +395,7 @@ static void idedisk_release(struct inode *inode, struct file *filp, struct ata_d
 		invalidate_bdev(inode->i_bdev, 0);
 
 		memset(&args, 0, sizeof(args));
-		args.taskfile.command = WIN_DOORUNLOCK;
+		args.cmd = WIN_DOORUNLOCK;
 		ide_cmd_type_parser(&args);
 
 		if (drive->doorlocking &&
@@ -445,7 +444,7 @@ static int set_multcount(struct ata_device *drive, int arg)
 
 	memset(&args, 0, sizeof(args));
 	args.taskfile.sector_count = arg;
-	args.taskfile.command	= WIN_SETMULT;
+	args.cmd = WIN_SETMULT;
 	ide_cmd_type_parser(&args);
 
 	if (!ide_raw_taskfile(drive, &args)) {
@@ -476,7 +475,7 @@ static int write_cache(struct ata_device *drive, int arg)
 
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature	= (arg) ? SETFEATURES_EN_WCACHE : SETFEATURES_DIS_WCACHE;
-	args.taskfile.command	= WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 	ide_raw_taskfile(drive, &args);
 
@@ -490,7 +489,7 @@ static int idedisk_standby(struct ata_device *drive)
 	struct ata_taskfile args;
 
 	memset(&args, 0, sizeof(args));
-	args.taskfile.command = WIN_STANDBYNOW1;
+	args.cmd = WIN_STANDBYNOW1;
 	ide_cmd_type_parser(&args);
 
 	return ide_raw_taskfile(drive, &args);
@@ -503,7 +502,7 @@ static int set_acoustic(struct ata_device *drive, int arg)
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = (arg)?SETFEATURES_EN_AAM:SETFEATURES_DIS_AAM;
 	args.taskfile.sector_count = arg;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 	ide_raw_taskfile(drive, &args);
 
@@ -518,7 +517,7 @@ static int set_using_tcq(struct ata_device *drive, int arg)
 	if (!drive->driver)
 		return -EPERM;
 
-	if (!drive->channel->XXX_udma)
+	if (!drive->channel->udma_setup)
 		return -EPERM;
 
 	if (arg == drive->queue_depth && drive->using_tcq)
@@ -623,14 +622,14 @@ static unsigned long native_max_address(struct ata_device *drive)
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(args));
 	args.taskfile.device_head = 0x40;
-	args.taskfile.command = WIN_READ_NATIVE_MAX;
+	args.cmd = WIN_READ_NATIVE_MAX;
 	args.handler = task_no_data_intr;
 
 	/* submit command request */
 	ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		addr = ((args.taskfile.device_head & 0x0f) << 24)
 		     | (args.taskfile.high_cylinder << 16)
 		     | (args.taskfile.low_cylinder <<  8)
@@ -651,14 +650,14 @@ static u64 native_max_address_ext(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 
 	args.taskfile.device_head = 0x40;
-	args.taskfile.command = WIN_READ_NATIVE_MAX_EXT;
+	args.cmd = WIN_READ_NATIVE_MAX_EXT;
 	args.handler = task_no_data_intr;
 
         /* submit command request */
         ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		u32 high = (args.hobfile.high_cylinder << 16) |
 			   (args.hobfile.low_cylinder << 8) |
 			    args.hobfile.sector_number;
@@ -692,12 +691,12 @@ static sector_t set_max_address(struct ata_device *drive, sector_t addr_req)
 	args.taskfile.high_cylinder = (addr_req >> 16);
 
 	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
-	args.taskfile.command = WIN_SET_MAX;
+	args.cmd = WIN_SET_MAX;
 	args.handler = task_no_data_intr;
 	/* submit command request */
 	ide_raw_taskfile(drive, &args);
 	/* if OK, read new maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
 			 | (args.taskfile.high_cylinder << 16)
 			 | (args.taskfile.low_cylinder <<  8)
@@ -720,20 +719,19 @@ static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 	args.taskfile.low_cylinder = (addr_req >>= 8);
 	args.taskfile.high_cylinder = (addr_req >>= 8);
 	args.taskfile.device_head = 0x40;
-	args.taskfile.command = WIN_SET_MAX_EXT;
+	args.cmd = WIN_SET_MAX_EXT;
 
 	args.hobfile.sector_number = (addr_req >>= 8);
 	args.hobfile.low_cylinder = (addr_req >>= 8);
 	args.hobfile.high_cylinder = (addr_req >>= 8);
 
 	args.hobfile.device_head = 0x40;
-	args.hobfile.control = (drive->ctl | 0x80);
 
         args.handler = task_no_data_intr;
 	/* submit command request */
 	ide_raw_taskfile(drive, &args);
 	/* if OK, compute maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		u32 high = (args.hobfile.high_cylinder << 16) |
 			   (args.hobfile.low_cylinder << 8) |
 			    args.hobfile.sector_number;

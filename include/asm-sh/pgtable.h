@@ -294,11 +294,11 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
  * NOTE: We should set ZEROs at the position of _PAGE_PRESENT
  *       and _PAGE_PROTONOE bits
  */
-#define SWP_TYPE(x)		((x).val & 0xff)
-#define SWP_OFFSET(x)		((x).val >> 10)
-#define SWP_ENTRY(type, offset)	((swp_entry_t) { (type) | ((offset) << 10) })
-#define pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)	((pte_t) { (x).val })
+#define __swp_type(x)		((x).val & 0xff)
+#define __swp_offset(x)		((x).val >> 10)
+#define __swp_entry(type, offset) ((swp_entry_t) { (type) | ((offset) << 10) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 /*
  * Routines for update of PTE 
@@ -312,8 +312,6 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
 
 #endif /* !__ASSEMBLY__ */
 
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)		(0)
 #define kern_addr_valid(addr)	(1)
 
 #define io_remap_page_range remap_page_range

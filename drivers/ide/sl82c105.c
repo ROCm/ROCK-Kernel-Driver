@@ -130,7 +130,7 @@ static int config_for_dma(struct ata_device *drive)
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_check_drive(struct ata_device *drive)
+static int sl82c105_dma_setup(struct ata_device *drive)
 {
 	int on = 0;
 
@@ -173,15 +173,6 @@ static int sl82c105_check_drive(struct ata_device *drive)
 }
 
 /*
- * Our very own dmaproc.  We need to intercept various calls
- * to fix up the SL82C105 specific behaviour.
- */
-static int sl82c105_dmaproc(struct ata_device *drive)
-{
-	return sl82c105_check_drive(drive);
-}
-
-/*
  * The SL82C105 holds off all IDE interrupts while in DMA mode until
  * all DMA activity is completed.  Sometimes this causes problems (eg,
  * when the drive wants to report an error condition).
@@ -215,16 +206,10 @@ static void sl82c105_dma_enable(struct ata_device *drive, int on, int verbose)
  * The generic IDE core will have disabled the BMEN bit before this
  * function is called.
  */
-static int sl82c105_dma_read(struct ata_device *drive, struct request *rq)
+static int sl82c105_dma_init(struct ata_device *drive, struct request *rq)
 {
 	sl82c105_reset_host(drive->channel->pci_dev);
-	return udma_pci_read(drive, rq);
-}
-
-static int sl82c105_dma_write(struct ata_device *drive, struct request *rq)
-{
-	sl82c105_reset_host(drive->channel->pci_dev);
-	return udma_pci_write(drive, rq);
+	return udma_pci_init(drive, rq);
 }
 
 static void sl82c105_timeout(struct ata_device *drive)
@@ -354,12 +339,11 @@ static void __init sl82c105_init_dma(struct ata_channel *ch, unsigned long dma_b
 	ata_init_dma(ch, dma_base);
 
 	if (bridge_rev <= 5)
-		ch->XXX_udma = NULL;
+		ch->udma_setup = NULL;
 	else {
-		ch->XXX_udma      = sl82c105_dmaproc;
+		ch->udma_setup    = sl82c105_dma_setup;
 		ch->udma_enable   = sl82c105_dma_enable;
-		ch->udma_read     = sl82c105_dma_read;
-		ch->udma_write    = sl82c105_dma_write;
+		ch->udma_init	  = sl82c105_dma_init;
 		ch->udma_timeout  = sl82c105_timeout;
 		ch->udma_irq_lost = sl82c105_lostirq;
 	}

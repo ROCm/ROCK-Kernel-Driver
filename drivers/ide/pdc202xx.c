@@ -563,7 +563,7 @@ chipset_is_set:
 	return !(hwif->speedproc(drive, mode));
 }
 
-static int config_drive_xfer_rate(struct ata_device *drive)
+static int pdc202xx_udma_setup(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -670,7 +670,7 @@ static int pdc202xx_udma_irq_status(struct ata_device *drive)
 	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 }
 
-static void pdc202xx_bug (struct ata_device *drive)
+static void pdc202xx_bug(struct ata_device *drive)
 {
 	if (!drive->channel->resetproc)
 		return;
@@ -678,17 +678,15 @@ static void pdc202xx_bug (struct ata_device *drive)
 	drive->channel->resetproc(drive);
 }
 
-static int pdc202xx_dmaproc(struct ata_device *drive)
-{
-	return config_drive_xfer_rate(drive);
-}
 #endif
 
 void pdc202xx_new_reset(struct ata_device *drive)
 {
-	set_reg_and_wait(0x04,IDE_CONTROL_REG, 1000);
-	set_reg_and_wait(0x00,IDE_CONTROL_REG, 1000);
-	printk("PDC202XX: %s channel reset.\n",
+	ata_reset(drive->channel);
+	mdelay(1000);
+	ata_irq_enable(drive, 1);
+	mdelay(1000);
+	printk(KERN_INFO "PDC202XX: %s channel reset.\n",
 		drive->channel->unit ? "Secondary" : "Primary");
 }
 
@@ -836,7 +834,7 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 	if (hwif->dma_base) {
 		hwif->udma_irq_lost = pdc202xx_bug;
 		hwif->udma_timeout = pdc202xx_bug;
-		hwif->XXX_udma = pdc202xx_dmaproc;
+		hwif->udma_setup = pdc202xx_udma_setup;
 		hwif->highmem = 1;
 		if (!noautodma)
 			hwif->autodma = 1;

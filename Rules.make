@@ -291,9 +291,6 @@ script:
 #
 ifdef CONFIG_MODULES
 
-multi-objs	:= $(foreach m, $(obj-y) $(obj-m), $($(basename $(m))-objs))
-active-objs	:= $(sort $(multi-objs) $(obj-y) $(obj-m))
-
 ifdef CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
@@ -311,37 +308,36 @@ else
 	genksyms_smp_prefix := 
 endif
 
-$(MODINCL)/$(MODPREFIX)%.ver: %.c
-	@if [ ! -r $(MODINCL)/$(MODPREFIX)$*.stamp -o $(MODINCL)/$(MODPREFIX)$*.stamp -ot $< ]; then \
-		echo '$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $<'; \
-		echo '| $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp'; \
-		$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< \
-		| $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp; \
-		if [ -r $@ ] && cmp -s $@ $@.tmp; then echo $@ is unchanged; rm -f $@.tmp; \
-		else echo mv $@.tmp $@; mv -f $@.tmp $@; fi; \
-	fi; touch $(MODINCL)/$(MODPREFIX)$*.stamp
+# We don't track dependencies for .ver files, so we FORCE to check
+# them always (i.e. always at "make dep" time).
 
-$(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver)): $(TOPDIR)/include/linux/autoconf.h
+cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
+		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
+
+$(MODINCL)/$(MODPREFIX)%.ver: %.c FORCE
+	@echo $(cmd_create_ver)
+	@$(cmd_create_ver)
+	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
+	  echo $@ is unchanged; rm -f $@.tmp; \
+	else \
+	  echo mv $@.tmp $@; mv -f $@.tmp $@; \
+	fi
 
 # updates .ver files but not modversions.h
 fastdep: $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver))
 
 endif # export-objs 
 
-$(active-objs): $(TOPDIR)/include/linux/modversions.h
+# make dep cannot correctly figure out the dependency on the generated
+# modversions.h, so we list them here:
+# o files which export symbols and are compiled into the kernel include
+#   it (to generate a correct symbol table)
+# o all modules get compiled with -include modversions.h
 
-else
-
-$(TOPDIR)/include/linux/modversions.h:
-	@echo "#include <linux/modsetver.h>" > $@
+$(filter $(export-objs),$(real-objs-y)): $(TOPDIR)/include/linux/modversions.h
+$(real-objs-m): $(TOPDIR)/include/linux/modversions.h
 
 endif # CONFIG_MODVERSIONS
-
-ifneq "$(strip $(export-objs))" ""
-
-$(export-objs): $(TOPDIR)/include/linux/modversions.h
-
-endif
 
 endif # CONFIG_MODULES
 
@@ -400,4 +396,3 @@ if_changed = $(if $(strip $? \
 		          $(filter-out $($(1)),$(cmd_$(@F)))\
 			  $(filter-out $(cmd_$(@F)),$($(1)))),\
 	       @echo '$($(1))' && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
-

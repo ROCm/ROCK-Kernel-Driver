@@ -253,7 +253,7 @@ static void piix_tune_drive(struct ata_device *drive, unsigned char pio)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
-int piix_dmaproc(struct ata_device *drive)
+static int piix_udma_setup(struct ata_device *drive)
 {
 	short w80 = drive->channel->udma_four;
 
@@ -399,7 +399,7 @@ static void __init piix_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->XXX_udma = piix_dmaproc;
+		hwif->udma_setup = piix_udma_setup;
 # ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			hwif->autodma = 1;

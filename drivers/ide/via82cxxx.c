@@ -223,7 +223,7 @@ static void via82cxxx_tune_drive(struct ata_device *drive, unsigned char pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int via82cxxx_dmaproc(struct ata_device *drive)
+static int via82cxxx_udma_setup(struct ata_device *drive)
 {
 	short w80 = drive->channel->udma_four;
 
@@ -368,7 +368,7 @@ static void __init via82cxxx_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->XXX_udma = &via82cxxx_dmaproc;
+		hwif->udma_setup = via82cxxx_udma_setup;
 # ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			hwif->autodma = 1;

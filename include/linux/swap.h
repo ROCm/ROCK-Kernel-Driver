@@ -11,7 +11,16 @@
 #define SWAP_FLAG_PRIO_MASK	0x7fff
 #define SWAP_FLAG_PRIO_SHIFT	0
 
-#define MAX_SWAPFILES 32
+/*
+ * MAX_SWAPFILES defines the maximum number of swaptypes: things which can
+ * be swapped to.  The swap type and the offset into that swap type are
+ * encoded into pte's and into pgoff_t's in the swapcache.  Using five bits
+ * for the type means that the maximum number of swapcache pages is 27 bits
+ * on 32-bit-pgoff_t architectures.  And that assumes that the architecture packs
+ * the type/offset into the pte as 5/27 as well.
+ */
+#define MAX_SWAPFILES_SHIFT	5
+#define MAX_SWAPFILES		(1 << MAX_SWAPFILES_SHIFT)
 
 /*
  * Magic header for a swap area. The first part of the union is

@@ -215,7 +215,7 @@ static int snd_sb_csp_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cm
 		info.run_width = p->run_width;
 		info.version = p->version;
 		info.state = p->running;
-		err = copy_to_user((void *) arg, &info, sizeof(info));
+		err = copy_to_user((void *) arg, &info, sizeof(info)) ? -EFAULT : 0;
 		break;
 
 		/* load CSP microcode */

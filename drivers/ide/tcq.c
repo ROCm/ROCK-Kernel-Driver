@@ -55,23 +55,12 @@
 static ide_startstop_t ide_dmaq_intr(struct ata_device *drive, struct request *rq);
 static ide_startstop_t service(struct ata_device *drive, struct request *rq);
 
-static inline void drive_ctl_nien(struct ata_device *drive, int set)
-{
-#ifdef IDE_TCQ_NIEN
-	if (IDE_CONTROL_REG) {
-		int mask = set ? 0x02 : 0x00;
-
-		OUT_BYTE(drive->ctl | mask, IDE_CONTROL_REG);
-	}
-#endif
-}
-
 static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request *rq)
 {
 	struct ata_taskfile *args = rq->special;
 
 	ide__sti();
-	ide_end_drive_cmd(drive, rq, GET_ERR());
+	ide_end_drive_cmd(drive, rq);
 	kfree(args);
 
 	return ide_stopped;
@@ -129,18 +118,17 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	BUG_ON(!rq);
 
 	rq->special = args;
-	args->taskfile.command = WIN_NOP;
+	args->cmd = WIN_NOP;
 	args->handler = tcq_nop_handler;
 	args->command_type = IDE_DRIVE_TASK_NO_DATA;
 
 	rq->rq_dev = mk_kdev(drive->channel->major, (drive->select.b.unit)<<PARTN_BITS);
 	_elv_add_request(q, rq, 0, 0);
 
-	/*
-	 * make sure that nIEN is cleared
-	 */
 out:
-	drive_ctl_nien(drive, 0);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 1);
+#endif
 
 	/*
 	 * start doing stuff again
@@ -250,8 +238,9 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	if (drive != drive->channel->drive)
 		ata_select(drive, 10);
 
-	drive_ctl_nien(drive, 1);
-
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 0);
+#endif
 	/*
 	 * send SERVICE, wait 400ns, wait for BUSY_STAT to clear
 	 */
@@ -265,7 +254,9 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 		return ide_stopped;
 	}
 
-	drive_ctl_nien(drive, 0);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 1);
+#endif
 
 	/*
 	 * FIXME, invalidate queue
@@ -416,7 +407,7 @@ static int check_autopoll(struct ata_device *drive)
 	memset(&args, 0, sizeof(args));
 
 	args.taskfile.feature = 0x01;
-	args.taskfile.command = WIN_NOP;
+	args.cmd = WIN_NOP;
 	ide_cmd_type_parser(&args);
 
 	/*
@@ -451,7 +442,7 @@ static int configure_tcq(struct ata_device *drive)
 
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_WCACHE;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
 	if (ide_raw_taskfile(drive, &args)) {
@@ -465,7 +456,7 @@ static int configure_tcq(struct ata_device *drive)
 	 */
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_DIS_RI;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
 	if (ide_raw_taskfile(drive, &args)) {
@@ -479,7 +470,7 @@ static int configure_tcq(struct ata_device *drive)
 	 */
 	memset(&args, 0, sizeof(args));
 	args.taskfile.feature = SETFEATURES_EN_SI;
-	args.taskfile.command = WIN_SETFEATURES;
+	args.cmd = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
 	if (ide_raw_taskfile(drive, &args)) {
@@ -559,9 +550,11 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	 * set nIEN, tag start operation will enable again when
 	 * it is safe
 	 */
-	drive_ctl_nien(drive, 1);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 0);
+#endif
 
-	OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+	OUT_BYTE(args->cmd, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
 		ide_dump_status(drive, rq, "queued start", stat);
@@ -569,7 +562,9 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 		return ide_stopped;
 	}
 
-	drive_ctl_nien(drive, 0);
+#ifdef IDE_TCQ_NIEN
+	ata_irq_enable(drive, 1);
+#endif
 
 	if (stat & ERR_STAT) {
 		ide_dump_status(drive, rq, "tcq_start", stat);

@@ -15,6 +15,9 @@
 /*
  * Common low leved device access code. This is the lowest layer of hardware
  * access.
+ *
+ * This is the place where register set access portability will be handled in
+ * the future.
  */
 
 #include <linux/module.h>
@@ -23,11 +26,9 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/ioport.h>
-#include <linux/blkdev.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <linux/cdrom.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 
@@ -91,5 +92,71 @@ int ata_status(struct ata_device *drive, u8 good, u8 bad)
 }
 
 EXPORT_SYMBOL(ata_status);
+
+/*
+ * Handle the nIEN - negated Interrupt ENable of the drive.
+ * This is controlling whatever the drive will acnowlenge commands
+ * with interrupts or not.
+ */
+int ata_irq_enable(struct ata_device *drive, int on)
+{
+	struct ata_channel *ch = drive->channel;
+
+	if (!ch->io_ports[IDE_CONTROL_OFFSET])
+		return 0;
+
+	/* 0x08 is for legacy ATA-1 devices */
+	if (on)
+		OUT_BYTE(0x08 | 0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
+	else {
+		if (!ch->intrproc)
+			OUT_BYTE(0x08 | 0x02, ch->io_ports[IDE_CONTROL_OFFSET]);
+		else
+			ch->intrproc(drive);
+	}
+
+	return 1;
+}
+
+EXPORT_SYMBOL(ata_irq_enable);
+
+/*
+ * Perform a reset operation on the currently selected drive.
+ */
+void ata_reset(struct ata_channel *ch)
+{
+	unsigned long timeout = jiffies + WAIT_WORSTCASE;
+	u8 stat;
+
+	if (!ch->io_ports[IDE_CONTROL_OFFSET])
+		return;
+
+	printk("%s: reset\n", ch->name);
+	/* 0x08 is for legacy ATA-1 devices */
+	OUT_BYTE(0x08 | 0x04, ch->io_ports[IDE_CONTROL_OFFSET]);
+	udelay(10);
+	/* 0x08 is for legacy ATA-1 devices */
+	OUT_BYTE(0x08 | 0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
+	do {
+		mdelay(50);
+		stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
+	} while ((stat & BUSY_STAT) && time_before(jiffies, timeout));
+}
+
+EXPORT_SYMBOL(ata_reset);
+
+/*
+ * Output a complete register file.
+ */
+void ata_out_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
+{
+	struct ata_channel *ch = drive->channel;
+
+	OUT_BYTE(rf->feature, ch->io_ports[IDE_FEATURE_OFFSET]);
+	OUT_BYTE(rf->sector_count, ch->io_ports[IDE_NSECTOR_OFFSET]);
+	OUT_BYTE(rf->sector_number, ch->io_ports[IDE_SECTOR_OFFSET]);
+	OUT_BYTE(rf->low_cylinder, ch->io_ports[IDE_LCYL_OFFSET]);
+	OUT_BYTE(rf->high_cylinder, ch->io_ports[IDE_HCYL_OFFSET]);
+}
 
 MODULE_LICENSE("GPL");

@@ -641,7 +641,8 @@ extern int	 journal_dirty_metadata (handle_t *, struct buffer_head *);
 extern void	 journal_release_buffer (handle_t *, struct buffer_head *);
 extern void	 journal_forget (handle_t *, struct buffer_head *);
 extern void	 journal_sync_buffer (struct buffer_head *);
-extern int	 journal_flushpage(journal_t *, struct page *, unsigned long);
+extern int	 journal_invalidatepage(journal_t *,
+				struct page *, unsigned long);
 extern int	 journal_try_to_free_buffers(journal_t *, struct page *, int);
 extern int	 journal_stop(handle_t *);
 extern int	 journal_flush (journal_t *);

@@ -813,35 +813,30 @@ static void hpt3xx_intrproc(struct ata_device *drive)
 	if (drive->quirk_list) {
 		/* drives in the quirk_list may not like intr setups/cleanups */
 	} else {
-		OUT_BYTE((drive)->ctl|2, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
+		OUT_BYTE(0x02, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
 	}
 }
 
 static void hpt3xx_maskproc(struct ata_device *drive)
 {
 	struct pci_dev *dev = drive->channel->pci_dev;
-	const int mask = 0;
+	struct ata_channel *ch = drive->channel;
 
 	if (drive->quirk_list) {
 		if (hpt_min_rev(dev, 3)) {
 			u8 reg5a;
 			pci_read_config_byte(dev, 0x5a, &reg5a);
-			if (((reg5a & 0x10) >> 4) != mask)
-				pci_write_config_byte(dev, 0x5a, mask ? (reg5a | 0x10) : (reg5a & ~0x10));
-		} else {
-			if (mask) {
-				disable_irq(drive->channel->irq);
-			} else {
-				enable_irq(drive->channel->irq);
-			}
-		}
+			if ((reg5a & 0x10) >> 4)
+				pci_write_config_byte(dev, 0x5a, reg5a & ~0x10);
+		} else
+			enable_irq(drive->channel->irq);
 	} else {
-		if (IDE_CONTROL_REG)
-			OUT_BYTE(mask ? (drive->ctl | 2) : (drive->ctl & ~2), IDE_CONTROL_REG);
+		if (ch->io_ports[IDE_CONTROL_OFFSET])
+			OUT_BYTE(0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
 	}
 }
 
-static int config_drive_xfer_rate(struct ata_device *drive)
+static int hpt3xx_udma_setup(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	int on = 1;
@@ -906,15 +901,6 @@ static void hpt366_udma_irq_lost(struct ata_device *drive)
 			drive->name, __FUNCTION__, reg50h, reg52h, reg5ah);
 	if (reg5ah & 0x10)
 		pci_write_config_byte(drive->channel->pci_dev, 0x5a, reg5ah & ~0x10);
-}
-
-/*
- * This is specific to the HPT366 UDMA bios chipset
- * by HighPoint|Triones Technologies, Inc.
- */
-static int hpt366_dmaproc(struct ata_device *drive)
-{
-	return config_drive_xfer_rate(drive);
 }
 
 static void do_udma_start(struct ata_device *drive)
@@ -997,11 +983,6 @@ static int hpt370_udma_stop(struct ata_device *drive)
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 }
 
-static int hpt370_dmaproc(struct ata_device *drive)
-{
-	return config_drive_xfer_rate(drive);
-}
-
 static int hpt374_udma_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
@@ -1023,11 +1004,6 @@ static int hpt374_udma_stop(struct ata_device *drive)
 	udma_destroy_table(ch);			/* purge DMA mappings */
 
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
-}
-
-static int hpt374_dmaproc(struct ata_device *drive)
-{
-	return config_drive_xfer_rate(drive);
 }
 #endif
 
@@ -1369,27 +1345,27 @@ static void __init hpt366_init_channel(struct ata_channel *ch)
 
 			if (hpt_min_rev(dev, 7)) {
 				ch->udma_stop = hpt374_udma_stop;
-				ch->XXX_udma = hpt374_dmaproc;
+				ch->udma_setup = hpt3xx_udma_setup;
 			} else if (hpt_min_rev(dev, 5)) {
 				ch->udma_stop = hpt374_udma_stop;
-				ch->XXX_udma = hpt374_dmaproc;
+				ch->udma_setup = hpt3xx_udma_setup;
 			} else if (hpt_min_rev(dev, 3)) {
 			        ch->udma_start = hpt370_udma_start;
 				ch->udma_stop = hpt370_udma_stop;
 				ch->udma_timeout = hpt370_udma_timeout;
 				ch->udma_irq_lost = hpt370_udma_irq_lost;
-				ch->XXX_udma = hpt370_dmaproc;
+				ch->udma_setup = hpt3xx_udma_setup;
 			}
 		} else if (hpt_min_rev(dev, 2)) {
 			ch->udma_irq_lost = hpt366_udma_irq_lost;
 //			ch->resetproc = hpt3xx_reset;
 //			ch->busproc = hpt3xx_tristate;
-			ch->XXX_udma = hpt366_dmaproc;
+			ch->udma_setup = hpt3xx_udma_setup;
 		} else {
 			ch->udma_irq_lost = hpt366_udma_irq_lost;
 //			ch->resetproc = hpt3xx_reset;
 //			ch->busproc = hpt3xx_tristate;
-			ch->XXX_udma = hpt366_dmaproc;
+			ch->udma_setup = hpt3xx_udma_setup;
 		}
 		if (!noautodma)
 			ch->autodma = 1;

@@ -139,7 +139,7 @@ int copyin (int arg, caddr_t dp, int siz)
 
   rio_dprintk (RIO_DEBUG_CTRL, "Copying %d bytes from user %p to %p.\n", siz, (void *)arg, dp);
   rv = copy_from_user (dp, (void *)arg, siz);
-  if (rv < 0) return COPYFAIL;
+  if (rv) return COPYFAIL;
   else return rv;
 }
 
@@ -150,7 +150,7 @@ int copyout (caddr_t dp, int arg, int siz)
 
   rio_dprintk (RIO_DEBUG_CTRL, "Copying %d bytes to user %p from %p.\n", siz, (void *)arg, dp);
   rv = copy_to_user ((void *)arg, dp, siz);
-  if (rv < 0) return COPYFAIL;
+  if (rv) return COPYFAIL;
   else return rv;
 }
 

@@ -695,6 +695,7 @@ extern struct file_operations ext3_file_operations;
 
 /* inode.c */
 extern struct address_space_operations ext3_aops;
+extern struct address_space_operations ext3_writeback_aops;
 
 /* namei.c */
 extern struct inode_operations ext3_dir_inode_operations;

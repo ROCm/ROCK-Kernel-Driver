@@ -50,6 +50,8 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
+#include <linux/swapops.h>
+
 unsigned long max_mapnr;
 unsigned long num_physpages;
 void * high_memory;
@@ -1128,7 +1130,7 @@ void swapin_readahead(swp_entry_t entry)
 	num = valid_swaphandles(entry, &offset);
 	for (i = 0; i < num; offset++, i++) {
 		/* Ok, do the async read-ahead now */
-		new_page = read_swap_cache_async(SWP_ENTRY(SWP_TYPE(entry), offset));
+		new_page = read_swap_cache_async(swp_entry(swp_type(entry), offset));
 		if (!new_page)
 			break;
 		page_cache_release(new_page);

@@ -117,7 +117,7 @@ int main(int argc, const char * argv [])
 	str_config += sizeof("CONFIG_") - 1;
 	for (itarget = 0; !isspace(str_config[itarget]); itarget++)
 	{
-	    char c = str_config[itarget];
+	    int c = (unsigned char) str_config[itarget];
 	    if (isupper(c)) c = tolower(c);
 	    if (c == '_')   c = '/';
 	    ptarget[itarget] = c;

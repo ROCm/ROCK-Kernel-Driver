@@ -4,7 +4,6 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <linux/buffer_head.h>	/* for block_symlink() */
 #include "minix.h"
 
 static inline void inc_count(struct inode *inode)
@@ -111,7 +110,7 @@ static int minix_symlink(struct inode * dir, struct dentry *dentry,
 
 	inode->i_mode = S_IFLNK | 0777;
 	minix_set_inode(inode, 0);
-	err = block_symlink(inode, symname, i);
+	err = page_symlink(inode, symname, i);
 	if (err)
 		goto out_fail;
 

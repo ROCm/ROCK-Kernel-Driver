@@ -236,7 +236,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 /*
  * used to set DMA mode for CY82C693 (single and multi modes)
  */
-static int cy82c693_dmaproc(struct ata_device *drive)
+static int cy82c693_udma_setup(struct ata_device *drive)
 {
 	/*
 	 * Set dma mode for drive everything else is done by the defaul func.
@@ -443,7 +443,7 @@ static void __init ide_init_cy82c693(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->XXX_udma = cy82c693_dmaproc;
+		hwif->udma_setup = cy82c693_udma_setup;
 		if (!noautodma)
 			hwif->autodma = 1;
 	}

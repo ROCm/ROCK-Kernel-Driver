@@ -242,7 +242,11 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
-	ide_end_drive_cmd(drive, rq, 0);
+
+	blkdev_dequeue_request(rq);
+	drive->rq = NULL;
+	end_that_request_last(rq);
+
 	if (rq->errors >= ERROR_MAX) {
 		pc->s.scsi_cmd->result = DID_ERROR << 16;
 		if (log)
@@ -403,19 +407,14 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 	pc->current_position=pc->buffer;
 	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
-	if (drive->using_dma && rq->bio) {
-		if (test_bit (PC_WRITING, &pc->flags))
-			dma_ok = !udma_write(drive, rq);
-		else
-			dma_ok = !udma_read(drive, rq);
-	}
+	if (drive->using_dma && rq->bio)
+		dma_ok = !udma_init(drive, rq);
 
 	ata_select(drive, 10);
-	if (IDE_CONTROL_REG)
-		OUT_BYTE (drive->ctl,IDE_CONTROL_REG);
-	OUT_BYTE (dma_ok,IDE_FEATURE_REG);
-	OUT_BYTE (bcount >> 8,IDE_BCOUNTH_REG);
-	OUT_BYTE (bcount & 0xff,IDE_BCOUNTL_REG);
+	ata_irq_enable(drive, 1);
+	OUT_BYTE(dma_ok,IDE_FEATURE_REG);
+	OUT_BYTE(bcount >> 8,IDE_BCOUNTH_REG);
+	OUT_BYTE(bcount & 0xff,IDE_BCOUNTL_REG);
 
 	if (dma_ok) {
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
@@ -663,17 +662,20 @@ static int idescsi_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 		}
 	}
 
-	ide_init_drive_cmd (rq);
+	memset(rq, 0, sizeof(*rq));
+	rq->flags = REQ_SPECIAL;
 	rq->special = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
-	rq->flags = REQ_SPECIAL;
 	spin_unlock_irq(cmd->host->host_lock);
-	(void) ide_do_drive_cmd (drive, rq, ide_end);
+	ide_do_drive_cmd (drive, rq, ide_end);
 	spin_lock_irq(cmd->host->host_lock);
+
 	return 0;
 abort:
-	if (pc) kfree (pc);
-	if (rq) kfree (rq);
+	if (pc)
+		kfree (pc);
+	if (rq)
+		kfree (rq);
 	cmd->result = DID_ERROR << 16;
 	done(cmd);
 

@@ -117,7 +117,7 @@ static int sysv_symlink(struct inode * dir, struct dentry * dentry,
 		goto out;
 	
 	sysv_set_inode(inode, 0);
-	err = block_symlink(inode, symname, l);
+	err = page_symlink(inode, symname, l);
 	if (err)
 		goto out_fail;
 

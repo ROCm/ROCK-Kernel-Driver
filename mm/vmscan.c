@@ -27,6 +27,7 @@
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <linux/swapops.h>
 
 /*
  * The "priority" of VM scanning is how much of the queues we

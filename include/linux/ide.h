@@ -38,11 +38,6 @@
 # define SUPPORT_SLOW_DATA_PORTS	1	/* 0 to reduce kernel size */
 #endif
 
-/* Right now this is only needed by a promise controlled.
- */
-#ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
-# define OK_TO_RESET_CONTROLLER	0	/* 0 for use with AH2372A/B interface */
-#endif
 #ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
 # define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
 #endif
@@ -73,21 +68,22 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 
 enum {
-	IDE_DATA_OFFSET	    = 0,
-	IDE_ERROR_OFFSET    = 1,
-	IDE_NSECTOR_OFFSET  = 2,
-	IDE_SECTOR_OFFSET   = 3,
-	IDE_LCYL_OFFSET	    = 4,
-	IDE_HCYL_OFFSET	    = 5,
-	IDE_SELECT_OFFSET   = 6,
-	IDE_STATUS_OFFSET   = 7,
-	IDE_CONTROL_OFFSET  = 8,
-	IDE_IRQ_OFFSET	    = 9,
-	IDE_NR_PORTS	    = 10
+	IDE_DATA_OFFSET		= 0,
+	IDE_ERROR_OFFSET	= 1,
+	IDE_FEATURE_OFFSET	= 1,
+	IDE_NSECTOR_OFFSET	= 2,
+	IDE_SECTOR_OFFSET	= 3,
+	IDE_LCYL_OFFSET		= 4,
+	IDE_HCYL_OFFSET		= 5,
+	IDE_SELECT_OFFSET	= 6,
+	IDE_STATUS_OFFSET	= 7,
+	IDE_COMMAND_OFFSET	= 7,
+	IDE_CONTROL_OFFSET	= 8,
+	IDE_ALTSTATUS_OFFSET	= 8,
+	IDE_IRQ_OFFSET		= 9,
+	IDE_NR_PORTS		= 10
 };
 
-#define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
-#define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
 
 #define IDE_DATA_REG		(drive->channel->io_ports[IDE_DATA_OFFSET])
 #define IDE_ERROR_REG		(drive->channel->io_ports[IDE_ERROR_OFFSET])
@@ -96,20 +92,16 @@ enum {
 #define IDE_LCYL_REG		(drive->channel->io_ports[IDE_LCYL_OFFSET])
 #define IDE_HCYL_REG		(drive->channel->io_ports[IDE_HCYL_OFFSET])
 #define IDE_SELECT_REG		(drive->channel->io_ports[IDE_SELECT_OFFSET])
-#define IDE_STATUS_REG		(drive->channel->io_ports[IDE_STATUS_OFFSET])
-#define IDE_CONTROL_REG		(drive->channel->io_ports[IDE_CONTROL_OFFSET])
+#define IDE_COMMAND_REG		(drive->channel->io_ports[IDE_STATUS_OFFSET])
 #define IDE_IRQ_REG		(drive->channel->io_ports[IDE_IRQ_OFFSET])
 
 #define IDE_FEATURE_REG		IDE_ERROR_REG
-#define IDE_COMMAND_REG		IDE_STATUS_REG
-#define IDE_ALTSTATUS_REG	IDE_CONTROL_REG
 #define IDE_IREASON_REG		IDE_NSECTOR_REG
 #define IDE_BCOUNTL_REG		IDE_LCYL_REG
 #define IDE_BCOUNTH_REG		IDE_HCYL_REG
 
 #define GET_ERR()		IN_BYTE(IDE_ERROR_REG)
-#define GET_STAT()		IN_BYTE(IDE_STATUS_REG)
-#define GET_ALTSTAT()		IN_BYTE(IDE_CONTROL_REG)
+#define GET_ALTSTAT()		IN_BYTE(drive->channel->io_ports[IDE_CONTROL_OFFSET])
 #define GET_FEAT()		IN_BYTE(IDE_NSECTOR_REG)
 
 #define BAD_R_STAT		(BUSY_STAT   | ERR_STAT)
@@ -278,29 +270,6 @@ typedef union {
 	} b;
 } select_t;
 
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-		unsigned bit0		: 1;
-		unsigned nIEN		: 1;	/* device INTRQ to host */
-		unsigned SRST		: 1;	/* host soft reset bit */
-		unsigned bit3		: 1;	/* ATA-2 thingy */
-		unsigned reserved456	: 3;
-		unsigned HOB		: 1;	/* 48-bit address ordering */
-#elif defined(__BIG_ENDIAN_BITFIELD)
-		unsigned HOB		: 1;
-		unsigned reserved456	: 3;
-		unsigned bit3		: 1;
-		unsigned SRST		: 1;
-		unsigned nIEN		: 1;
-		unsigned bit0		: 1;
-#else
-#error "Please fix <asm/byteorder.h>"
-#endif
-	} b;
-} control_t;
-
 /*
  * ATA/ATAPI device structure :
  */
@@ -346,8 +315,6 @@ struct ata_device {
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 
 	select_t	select;		/* basic drive/head select reg value */
-
-	u8		ctl;		/* "normal" value for IDE_CONTROL_REG */
 	u8		status;		/* last retrived status value for device */
 
 	byte		ready_stat;	/* min status value for drive ready */
@@ -458,7 +425,7 @@ struct ata_channel {
 	 * mode itself.
 	 */
 
-	/* setup disk on a channel for a particular transfer mode */
+	/* setup disk on a channel for a particular PIO transfer mode */
 	void (*tuneproc) (struct ata_device *, byte pio);
 
 	/* setup the chipset timing for a particular transfer mode */
@@ -488,18 +455,13 @@ struct ata_channel {
 	void (*atapi_read)(struct ata_device *, void *, unsigned int);
 	void (*atapi_write)(struct ata_device *, void *, unsigned int);
 
-	int (*XXX_udma)(struct ata_device *);
+	int (*udma_setup)(struct ata_device *);
 
 	void (*udma_enable)(struct ata_device *, int, int);
-
 	int (*udma_start) (struct ata_device *, struct request *rq);
 	int (*udma_stop) (struct ata_device *);
-
-	int (*udma_read) (struct ata_device *, struct request *rq);
-	int (*udma_write) (struct ata_device *, struct request *rq);
-
+	int (*udma_init) (struct ata_device *, struct request *rq);
 	int (*udma_irq_status) (struct ata_device *);
-
 	void (*udma_timeout) (struct ata_device *);
 	void (*udma_irq_lost) (struct ata_device *);
 
@@ -540,7 +502,7 @@ struct ata_channel {
  * Register new hardware with ide
  */
 extern int ide_register_hw(hw_regs_t *hw);
-extern void ide_unregister(struct ata_channel *hwif);
+extern void ide_unregister(struct ata_channel *);
 
 struct ata_taskfile;
 
@@ -653,25 +615,10 @@ extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
  */
 extern u8 ide_dump_status(struct ata_device *, struct request *rq, const char *, u8);
 
-extern ide_startstop_t ide_error(struct ata_device *, struct request *rq,
-		const char *, byte);
+extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
-/*
- * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
- * removing leading/trailing blanks and compressing internal blanks.
- * It is primarily used to tidy up the model name/number fields as
- * returned by the WIN_[P]IDENTIFY commands.
- */
-void ide_fixstring(byte *s, const int bytecount, const int byteswap);
+extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
 
-/*
- * This routine busy-waits for the drive status to be not "busy".
- * It then checks the status for all of the "good" bits and none
- * of the "bad" bits, and if all is okay it returns 0.  All other
- * cases return 1 after doing "*startstop = ide_error()", and the
- * caller should return the updated value of "startstop" in this case.
- * "startstop" is unchanged when the function returns 0;
- */
 extern int ide_wait_stat(ide_startstop_t *,
 		struct ata_device *, struct request *rq,
 		byte, byte, unsigned long);
@@ -696,11 +643,6 @@ struct ata_device *get_info_ptr(kdev_t i_rdev);
 ide_startstop_t restart_request(struct ata_device *);
 
 /*
- * This function is intended to be used prior to invoking ide_do_drive_cmd().
- */
-extern void ide_init_drive_cmd(struct request *rq);
-
-/*
  * "action" parameter type for ide_do_drive_cmd() below.
  */
 typedef enum {
@@ -719,11 +661,12 @@ extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t)
 /*
  * Clean up after success/failure of an explicit drive cmd.
  */
-extern void ide_end_drive_cmd(struct ata_device *, struct request *, u8);
+extern void ide_end_drive_cmd(struct ata_device *, struct request *);
 
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr  hobfile;
+	struct hd_drive_task_hdr  hobfile;
+	u8 cmd;					/* actual ATA command */
 	int command_type;
 	ide_startstop_t (*prehandler)(struct ata_device *, struct request *);
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);
@@ -742,20 +685,17 @@ extern ide_startstop_t ata_taskfile(struct ata_device *,
 extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
 extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 
-
-/* This is setting up all fields in args, which depend upon the command type.
- */
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
-extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
 
-extern int system_bus_speed;
 
 extern void ide_stall_queue(struct ata_device *, unsigned long);
+
+extern int system_bus_speed;
 
 /*
  * CompactFlash cards and their brethern pretend to be removable hard disks,
@@ -825,14 +765,12 @@ static inline int udma_stop(struct ata_device *drive)
 	return drive->channel->udma_stop(drive);
 }
 
-static inline int udma_read(struct ata_device *drive, struct request *rq)
+/*
+ * Initiate actual DMA data transfer. The direction is encoded in the request.
+ */
+static inline int udma_init(struct ata_device *drive, struct request *rq)
 {
-	return drive->channel->udma_read(drive, rq);
-}
-
-static inline int udma_write(struct ata_device *drive, struct request *rq)
-{
-	return drive->channel->udma_write(drive, rq);
+	return drive->channel->udma_init(drive, rq);
 }
 
 static inline int udma_irq_status(struct ata_device *drive)
@@ -852,14 +790,14 @@ static inline void udma_irq_lost(struct ata_device *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
-void udma_pci_enable(struct ata_device *drive, int on, int verbose);
-int udma_pci_start(struct ata_device *drive, struct request *rq);
-int udma_pci_stop(struct ata_device *drive);
-int udma_pci_read(struct ata_device *drive, struct request *rq);
-int udma_pci_write(struct ata_device *drive, struct request *rq);
-int udma_pci_irq_status(struct ata_device *drive);
-void udma_pci_timeout(struct ata_device *drive);
-void udma_pci_irq_lost(struct ata_device *);
+extern void udma_pci_enable(struct ata_device *drive, int on, int verbose);
+extern int udma_pci_start(struct ata_device *drive, struct request *rq);
+extern int udma_pci_stop(struct ata_device *drive);
+extern int udma_pci_init(struct ata_device *drive, struct request *rq);
+extern int udma_pci_irq_status(struct ata_device *drive);
+extern void udma_pci_timeout(struct ata_device *drive);
+extern void udma_pci_irq_lost(struct ata_device *);
+extern int udma_pci_setup(struct ata_device *);
 
 extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
@@ -868,14 +806,11 @@ extern void udma_print(struct ata_device *);
 extern int udma_black_list(struct ata_device *);
 extern int udma_white_list(struct ata_device *);
 
-extern int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
-
 extern ide_startstop_t udma_tcq_taskfile(struct ata_device *, struct request *);
 extern int udma_tcq_enable(struct ata_device *, int);
 
 extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
 extern int check_drive_lists(struct ata_device *, int good_bad);
-extern int XXX_ide_dmaproc(struct ata_device *);
 extern void ide_release_dma(struct ata_channel *);
 extern int ata_start_dma(struct ata_device *, struct request *rq);
 
@@ -896,5 +831,8 @@ extern int drive_is_ready(struct ata_device *drive);
 extern void ata_select(struct ata_device *, unsigned long);
 extern void ata_mask(struct ata_device *);
 extern int ata_status(struct ata_device *, u8, u8);
+extern int ata_irq_enable(struct ata_device *, int);
+extern void ata_reset(struct ata_channel *);
+extern void ata_out_regfile(struct ata_device *, struct hd_drive_task_hdr *);
 
 #endif

@@ -14,6 +14,9 @@
 #include <linux/writeback.h>
 #include <linux/module.h>
 #include <linux/backing-dev.h>
+#include <linux/wait.h>
+#include <linux/hash.h>
+
 /*
  * This is needed for the following functions:
  *  - inode_has_buffers
@@ -149,7 +152,6 @@ static void destroy_inode(struct inode *inode)
 void inode_init_once(struct inode *inode)
 {
 	memset(inode, 0, sizeof(*inode));
-	init_waitqueue_head(&inode->i_wait);
 	INIT_LIST_HEAD(&inode->i_hash);
 	INIT_LIST_HEAD(&inode->i_data.clean_pages);
 	INIT_LIST_HEAD(&inode->i_data.dirty_pages);
@@ -174,21 +176,6 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR)
 		inode_init_once(inode);
-}
-
-void __wait_on_inode(struct inode * inode)
-{
-	DECLARE_WAITQUEUE(wait, current);
-
-	add_wait_queue(&inode->i_wait, &wait);
-repeat:
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	if (inode->i_state & I_LOCK) {
-		schedule();
-		goto repeat;
-	}
-	remove_wait_queue(&inode->i_wait, &wait);
-	current->state = TASK_RUNNING;
 }
 
 /*
@@ -538,7 +525,7 @@ void unlock_new_inode(struct inode *inode)
 	 * that haven't tested I_LOCK).
 	 */
 	inode->i_state &= ~(I_LOCK|I_NEW);
-	wake_up(&inode->i_wait);
+	wake_up_inode(inode);
 }
 
 
@@ -899,59 +886,6 @@ int bmap(struct inode * inode, int block)
 	return res;
 }
 
-/*
- * Initialize the hash tables.
- */
-void __init inode_init(unsigned long mempages)
-{
-	struct list_head *head;
-	unsigned long order;
-	unsigned int nr_hash;
-	int i;
-
-	mempages >>= (14 - PAGE_SHIFT);
-	mempages *= sizeof(struct list_head);
-	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
-		;
-
-	do {
-		unsigned long tmp;
-
-		nr_hash = (1UL << order) * PAGE_SIZE /
-			sizeof(struct list_head);
-		i_hash_mask = (nr_hash - 1);
-
-		tmp = nr_hash;
-		i_hash_shift = 0;
-		while ((tmp >>= 1UL) != 0UL)
-			i_hash_shift++;
-
-		inode_hashtable = (struct list_head *)
-			__get_free_pages(GFP_ATOMIC, order);
-	} while (inode_hashtable == NULL && --order >= 0);
-
-	printk("Inode-cache hash table entries: %d (order: %ld, %ld bytes)\n",
-			nr_hash, order, (PAGE_SIZE << order));
-
-	if (!inode_hashtable)
-		panic("Failed to allocate inode hash table\n");
-
-	head = inode_hashtable;
-	i = nr_hash;
-	do {
-		INIT_LIST_HEAD(head);
-		head++;
-		i--;
-	} while (i);
-
-	/* inode slab cache */
-	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
-					 0, SLAB_HWCACHE_ALIGN, init_once,
-					 NULL);
-	if (!inode_cachep)
-		panic("cannot create inode slab cache");
-}
-
 static inline void do_atime_update(struct inode *inode)
 {
 	unsigned long time = CURRENT_TIME;
@@ -1044,3 +978,104 @@ void remove_dquot_ref(struct super_block *sb, int type)
 }
 
 #endif
+
+/*
+ * Hashed waitqueues for wait_on_inode().  The table is pretty small - the
+ * kernel doesn't lock many inodes at the same time.
+ */
+#define I_WAIT_TABLE_ORDER	3
+static struct i_wait_queue_head {
+	wait_queue_head_t wqh;
+} ____cacheline_aligned_in_smp i_wait_queue_heads[1<<I_WAIT_TABLE_ORDER];
+
+/*
+ * Return the address of the waitqueue_head to be used for this inode
+ */
+static wait_queue_head_t *i_waitq_head(struct inode *inode)
+{
+	return &i_wait_queue_heads[hash_ptr(inode, I_WAIT_TABLE_ORDER)].wqh;
+}
+
+void __wait_on_inode(struct inode *inode)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	wait_queue_head_t *wq = i_waitq_head(inode);
+
+	add_wait_queue(wq, &wait);
+repeat:
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	if (inode->i_state & I_LOCK) {
+		schedule();
+		goto repeat;
+	}
+	remove_wait_queue(wq, &wait);
+	current->state = TASK_RUNNING;
+}
+
+void wake_up_inode(struct inode *inode)
+{
+	wait_queue_head_t *wq = i_waitq_head(inode);
+
+	/*
+	 * Prevent speculative execution through spin_unlock(&inode_lock);
+	 */
+	smp_mb();
+	if (waitqueue_active(wq))
+		wake_up_all(wq);
+}
+
+/*
+ * Initialize the waitqueues and inode hash table.
+ */
+void __init inode_init(unsigned long mempages)
+{
+	struct list_head *head;
+	unsigned long order;
+	unsigned int nr_hash;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(i_wait_queue_heads); i++)
+		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
+
+	mempages >>= (14 - PAGE_SHIFT);
+	mempages *= sizeof(struct list_head);
+	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
+		;
+
+	do {
+		unsigned long tmp;
+
+		nr_hash = (1UL << order) * PAGE_SIZE /
+			sizeof(struct list_head);
+		i_hash_mask = (nr_hash - 1);
+
+		tmp = nr_hash;
+		i_hash_shift = 0;
+		while ((tmp >>= 1UL) != 0UL)
+			i_hash_shift++;
+
+		inode_hashtable = (struct list_head *)
+			__get_free_pages(GFP_ATOMIC, order);
+	} while (inode_hashtable == NULL && --order >= 0);
+
+	printk("Inode-cache hash table entries: %d (order: %ld, %ld bytes)\n",
+			nr_hash, order, (PAGE_SIZE << order));
+
+	if (!inode_hashtable)
+		panic("Failed to allocate inode hash table\n");
+
+	head = inode_hashtable;
+	i = nr_hash;
+	do {
+		INIT_LIST_HEAD(head);
+		head++;
+		i--;
+	} while (i);
+
+	/* inode slab cache */
+	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
+					 0, SLAB_HWCACHE_ALIGN, init_once,
+					 NULL);
+	if (!inode_cachep)
+		panic("cannot create inode slab cache");
+}

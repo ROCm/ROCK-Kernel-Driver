@@ -336,8 +336,10 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	struct blk_queue_tag *tags;
 	int bits, i;
 
-	if (depth > queue_nr_requests)
+	if (depth > queue_nr_requests) {
 		depth = queue_nr_requests;
+		printk("blk_queue_init_tags: adjusted depth to %d\n", depth);
+	}
 
 	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
 	if (!tags)
@@ -362,7 +364,7 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	 * set the upper bits if the depth isn't a multiple of the word size
 	 */
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		set_bit(i, tags->tag_map);
+		__set_bit(i, tags->tag_map);
 
 	/*
 	 * assign it, all done
@@ -478,23 +480,39 @@ int blk_queue_start_tag(request_queue_t *q, struct request *rq)
 void blk_queue_invalidate_tags(request_queue_t *q)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
-	struct list_head *tmp;
+	struct list_head *tmp, *n;
 	struct request *rq;
 
-	list_for_each(tmp, &bqt->busy_list) {
+	list_for_each_safe(tmp, n, &bqt->busy_list) {
 		rq = list_entry_rq(tmp);
 
-		blk_queue_end_tag(q, rq);
+		if (rq->tag == -1) {
+			printk("bad tag found on list\n");
+			list_del(&rq->queuelist);
+			rq->flags &= ~REQ_QUEUED;
+		} else
+			blk_queue_end_tag(q, rq);
+
 		rq->flags &= ~REQ_STARTED;
 		elv_add_request(q, rq, 0);
 	}
 }
 
-static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
-			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
-			   "REQ_DONTPREP", "REQ_QUEUED", "REQ_DRIVE_CMD",
-			   "REQ_DRIVE_ACB", "REQ_PC", "REQ_BLOCK_PC",
-			   "REQ_SENSE", "REQ_SPECIAL" };
+static char *rq_flags[] = {
+	"REQ_RW",
+	"REQ_RW_AHEAD",
+	"REQ_BARRIER",
+	"REQ_CMD",
+	"REQ_NOMERGE",
+	"REQ_STARTED",
+	"REQ_DONTPREP",
+	"REQ_QUEUED",
+	"REQ_DRIVE_ACB",
+	"REQ_PC",
+	"REQ_BLOCK_PC",
+	"REQ_SENSE",
+	"REQ_SPECIAL"
+};
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
 {
@@ -838,9 +856,15 @@ void generic_unplug_device(void *data)
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
-/*
- * clear stop flag and run queue
- */
+/**
+ * blk_start_queue - restart a previously stopped queue
+ * @q:    The &request_queue_t in question
+ *
+ * Description:
+ *   blk_start_queue() will clear the stop flag on the queue, and call
+ *   the request_fn for the queue if it was in a stopped state when
+ *   entered. Also see blk_stop_queue()
+ **/
 void blk_start_queue(request_queue_t *q)
 {
 	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
@@ -853,17 +877,33 @@ void blk_start_queue(request_queue_t *q)
 	}
 }
 
-/*
- * set stop bit, queue won't be run until blk_start_queue() is called
- */
+/**
+ * blk_stop_queue - stop a queue
+ * @q:    The &request_queue_t in question
+ *
+ * Description:
+ *   The Linux block layer assumes that a block driver will consume all
+ *   entries on the request queue when the request_fn strategy is called.
+ *   Often this will not happen, because of hardware limitations (queue
+ *   depth settings). If a device driver gets a 'queue full' response,
+ *   or if it simply chooses not to queue more I/O at one point, it can
+ *   call this function to prevent the request_fn from being called until
+ *   the driver has signalled it's ready to go again. This happens by calling
+ *   blk_start_queue() to restart queue operations.
+ **/
 void blk_stop_queue(request_queue_t *q)
 {
 	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
-/*
- * the equivalent of the previous tq_disk run
- */
+/**
+ * blk_run_queues - fire all plugged queues
+ *
+ * Description:
+ *   Start I/O on all plugged queues known to the block layer. Queues that
+ *   are currently stopped are ignored. This is equivalent to the older
+ *   tq_disk task queue run.
+ **/
 void blk_run_queues(void)
 {
 	struct list_head *n, *tmp, local_plug_list;

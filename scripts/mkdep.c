@@ -267,7 +267,7 @@ void use_config(const char * name, int len)
 	pc += 7;
 
 	for (i = 0; i < len; i++) {
-	    char c = name[i];
+	    int c = (unsigned char) name[i];
 	    if (isupper(c)) c = tolower(c);
 	    if (c == '_')   c = '/';
 	    pc[i] = c;

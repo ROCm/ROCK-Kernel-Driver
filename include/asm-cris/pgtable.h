@@ -500,14 +500,12 @@ static inline void update_mmu_cache(struct vm_area_struct * vma,
 /* Encode and de-code a swap entry (must be !pte_none(e) && !pte_present(e)) */
 /* Since the PAGE_PRESENT bit is bit 4, we can use the bits above */
 
-#define SWP_TYPE(x)                     (((x).val >> 5) & 0x7f)
-#define SWP_OFFSET(x)                   ((x).val >> 12)
-#define SWP_ENTRY(type, offset)         ((swp_entry_t) { ((type) << 5) | ((offset) << 12) })
-#define pte_to_swp_entry(pte)           ((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)             ((pte_t) { (x).val })
+#define __swp_type(x)			(((x).val >> 5) & 0x7f)
+#define __swp_offset(x)			((x).val >> 12)
+#define __swp_entry(type, offset)	((swp_entry_t) { ((type) << 5) | ((offset) << 12) })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)          (0)
 #define kern_addr_valid(addr)   (1)
 
 #include <asm-generic/pgtable.h>

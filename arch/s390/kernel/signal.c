@@ -141,7 +141,7 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 
 
 
-
+/* Returns non-zero on fault. */
 static int save_sigregs(struct pt_regs *regs,_sigregs *sregs)
 {
 	int err;
@@ -157,6 +157,7 @@ static int save_sigregs(struct pt_regs *regs,_sigregs *sregs)
 	
 }
 
+/* Returns positive number on error */
 static int restore_sigregs(struct pt_regs *regs,_sigregs *sregs)
 {
 	int err;

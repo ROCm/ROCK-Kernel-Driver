@@ -880,7 +880,7 @@ static ssize_t mem_read(struct file *file, char *buffer, size_t count,
         retval = copy_to_user(buffer, md->lynx->mem_dma_buffer, count);
         up(&md->lynx->mem_dma_mutex);
 
-        if (retval < 0) return retval;
+        if (retval) return -EFAULT;
         *offset += count;
         return count;
 }

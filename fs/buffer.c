@@ -1341,22 +1341,21 @@ int try_to_release_page(struct page *page, int gfp_mask)
 }
 
 /**
- * block_flushpage - invalidate part of all of a buffer-backed page
+ * block_invalidatepage - invalidate part of all of a buffer-backed page
  *
  * @page: the page which is affected
  * @offset: the index of the truncation point
  *
- * block_flushpage() should be called block_invalidatepage().  It is
- * called when all or part of the page has become invalidatedby a truncate
- * operation.
+ * block_invalidatepage() is called when all or part of the page has become
+ * invalidatedby a truncate operation.
  *
- * block_flushpage() does not have to release all buffers, but it must
+ * block_invalidatepage() does not have to release all buffers, but it must
  * ensure that no dirty buffer is left outside @offset and that no I/O
  * is underway against any of the blocks which are outside the truncation
  * point.  Because the caller is about to free (and possibly reuse) those
  * blocks on-disk.
  */
-int block_flushpage(struct page *page, unsigned long offset)
+int block_invalidatepage(struct page *page, unsigned long offset)
 {
 	struct buffer_head *head, *bh, *next;
 	unsigned int curr_off = 0;
@@ -1393,7 +1392,7 @@ int block_flushpage(struct page *page, unsigned long offset)
 
 	return 1;
 }
-EXPORT_SYMBOL(block_flushpage);
+EXPORT_SYMBOL(block_invalidatepage);
 
 /*
  * We attach and possibly dirty the buffers atomically wrt
@@ -2276,10 +2275,11 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
  *        some of the bmap kludges and interface ugliness here.
  *
  * NOTE: unlike file pages, swap pages are locked while under writeout.
- * This is to avoid a deadlock which occurs when free_swap_and_cache()
- * calls block_flushpage() under spinlock and hits a locked buffer, and
- * schedules under spinlock.   Another approach would be to teach
- * find_trylock_page() to also trylock the page's writeback flags.
+ * This is to throttle processes which reuse their swapcache pages while
+ * they are under writeout, and to ensure that there is no I/O going on
+ * when the page has been successfully locked.  Functions such as
+ * free_swap_and_cache() need to guarantee that there is no I/O in progress
+ * because they will be freeing up swap blocks, which may then be reused.
  *
  * Swap pages are also marked PageWriteback when they are being written
  * so that memory allocators will throttle on them.
@@ -2325,46 +2325,6 @@ int brw_page(int rw, struct page *page,
 		bh = next;
 	} while (bh != head);
 	return 0;
-}
-
-int block_symlink(struct inode *inode, const char *symname, int len)
-{
-	struct address_space *mapping = inode->i_mapping;
-	struct page *page = grab_cache_page(mapping, 0);
-	int err = -ENOMEM;
-	char *kaddr;
-
-	if (!page)
-		goto fail;
-	err = mapping->a_ops->prepare_write(NULL, page, 0, len-1);
-	if (err)
-		goto fail_map;
-	kaddr = page_address(page);
-	memcpy(kaddr, symname, len-1);
-	mapping->a_ops->commit_write(NULL, page, 0, len-1);
-	/*
-	 * Notice that we are _not_ going to block here - end of page is
-	 * unmapped, so this will only try to map the rest of page, see
-	 * that it is unmapped (typically even will not look into inode -
-	 * ->i_size will be enough for everything) and zero it out.
-	 * OTOH it's obviously correct and should make the page up-to-date.
-	 */
-	if (!PageUptodate(page)) {
-		err = mapping->a_ops->readpage(NULL, page);
-		wait_on_page_locked(page);
-	} else {
-		unlock_page(page);
-	}
-	page_cache_release(page);
-	if (err < 0)
-		goto fail;
-	mark_inode_dirty(inode);
-	return 0;
-fail_map:
-	unlock_page(page);
-	page_cache_release(page);
-fail:
-	return err;
 }
 
 /*

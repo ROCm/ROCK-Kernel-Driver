@@ -74,30 +74,10 @@
  * Example: #define SOUND_BASE 0x220 enables the sound card's CD channels
  *          #define SOUND_BASE 0     leaves the soundcard untouched
  */
-#if !(SBPCD_ISSUE-1)     /* first (or if you have only one) interface board: */
 #define CDROM_PORT 0x340 /* <-----------<< port address                      */
 #define SBPRO      0     /* <-----------<< interface type                    */
 #define MAX_DRIVES 4     /* set to 1 if the card does not use "drive select" */
 #define SOUND_BASE 0x220 /* <-----------<< sound address of this card or 0   */
-#endif
-#if !(SBPCD_ISSUE-2)     /* ==================== second interface board: === */
-#define CDROM_PORT 0x344 /* <-----------<< port address                      */
-#define SBPRO      0     /* <-----------<< interface type                    */
-#define MAX_DRIVES 4     /* set to 1 if the card does not use "drive select" */
-#define SOUND_BASE 0x000 /* <-----------<< sound address of this card or 0   */
-#endif
-#if !(SBPCD_ISSUE-3)     /* ===================== third interface board: === */
-#define CDROM_PORT 0x630 /* <-----------<< port address                      */
-#define SBPRO      1     /* <-----------<< interface type                    */
-#define MAX_DRIVES 4     /* set to 1 if the card does not use "drive select" */
-#define SOUND_BASE 0x240 /* <-----------<< sound address of this card or 0   */
-#endif
-#if !(SBPCD_ISSUE-4)     /* ==================== fourth interface board: === */
-#define CDROM_PORT 0x634 /* <-----------<< port address                      */
-#define SBPRO      0     /* <-----------<< interface type                    */
-#define MAX_DRIVES 4     /* set to 1 if the card does not use "drive select" */
-#define SOUND_BASE 0x000 /* <-----------<< sound address of this card or 0   */
-#endif
 
 /*
  * some more or less user dependent definitions - service them!

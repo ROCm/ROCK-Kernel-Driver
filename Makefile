@@ -1,7 +1,23 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 19
+SUBLEVEL = 20
 EXTRAVERSION =
+
+# We are using a recursive build, so we need to do a little thinking
+# to get the ordering right.
+#
+# Most importantly: sub-Makefiles should only ever modify files in
+# their own directory. If in some directory we have a dependency on
+# a file in another dir (which doesn't happen often, but it's of
+# unavoidable when linking the built-in.o targets which finally
+# turn into vmlinux), we will call a sub make in that other dir, and
+# after that we are sure that everything which is in that other dir
+# is now up to date.
+#
+# The only cases where we need to modify files which have global
+# effects are thus separated out and done before the recursive
+# descending is started. They are now explicitly listed as the
+# prepare rule.
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -62,12 +78,7 @@ all:	do-it-all
 
 ifeq (.config,$(wildcard .config))
 include .config
-ifeq (.hdepend,$(wildcard .hdepend))
 do-it-all:	vmlinux
-else
-CONFIGURATION = depend
-do-it-all:	depend
-endif
 else
 CONFIGURATION = config
 do-it-all:	config
@@ -172,8 +183,15 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
+$(SUBDIRS): prepare
 	@$(MAKE) -C $@
+
+#	Things we need done before we even start the actual build.
+#	The dependency on .hdepend will in turn take care of
+#	include/asm, include/linux/version etc.
+
+.PHONY: prepare
+prepare: .hdepend include/config/MARKER
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -189,69 +207,70 @@ $(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
 %.o: %.S FORCE
 	@$(MAKE) -C $(@D) $(@F)
 
-# Configuration
-# ---------------------------------------------------------------------------
+# 	FIXME: The asm symlink changes when $(ARCH) changes. That's
+#	hard to detect, but I suppose "make mrproper" is a good idea
+#	before switching between archs anyway.
 
-oldconfig: symlinks
-	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+include/asm:
+	@echo 'Making asm->asm-$(ARCH) symlink'
+	@ln -s asm-$(ARCH) $@
+	@echo 'Making directory include/linux/modules'
+	@mkdir include/linux/modules
 
-xconfig: symlinks
-	@$(MAKE) -C scripts kconfig.tk
-	wish -f scripts/kconfig.tk
-
-menuconfig: include/linux/version.h symlinks
-	@$(MAKE) -C scripts/lxdialog all
-	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
-
-config: symlinks
-	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
-
-# make asm->asm-$(ARCH) symlink
-
-symlinks:
-	rm -f include/asm
-	( cd include ; ln -sf asm-$(ARCH) asm)
-	@if [ ! -d include/linux/modules ]; then \
-		mkdir include/linux/modules; \
-	fi
-
-# split autoconf.h into include/linux/config/*
+# 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
 
 # Generate some files
+# ---------------------------------------------------------------------------
 
-$(TOPDIR)/include/linux/version.h: include/linux/version.h
+#	version.h changes when $(KERNELRELEASE) etc change, as defined in
+#	this Makefile
 
-include/linux/version.h: ./Makefile
+include/linux/version.h: Makefile
 	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
-# helpers built in scripts/
+# Helpers built in scripts/
+# ---------------------------------------------------------------------------
 
 scripts/mkdep scripts/split-include : FORCE
 	@$(MAKE) -C scripts
 
-# ---------------------------------------------------------------------------
 # Generate dependencies
+# ---------------------------------------------------------------------------
 
-depend dep: dep-files
+# 	In the same pass, generate module versions, that's why it's
+#	all mixed up here.
 
-dep-files: scripts/mkdep archdep include/linux/version.h
-	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
+.PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
+
+depend dep: .hdepend
+
+#	.hdepend is missing prerequisites - in fact dependencies need
+#	to be redone basically each time anything changed - since
+#	that's too expensive, we traditionally rely on the user to
+#	run "make dep" manually whenever necessary. In this case,
+#	we make "FORCE" a prequisite, to force redoing the
+#	dependencies. Yeah, that's ugly, and it'll go away soon.
+
+.hdepend: scripts/mkdep include/linux/version.h include/asm \
+	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 ifdef CONFIG_MODVERSIONS
-	$(MAKE) update-modverfile
+	@$(MAKE) include/linux/modversions.h
 endif
+	@$(MAKE) archdep
 
-.PHONY: $(patsubst %,_sfdep_%,$(SUBDIRS))
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
 	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
 
-# update modversions.h, but only if it would change
-update-modverfile:
+# 	Update modversions.h, but only if it would change.
+
+include/linux/modversions.h: FORCE
 	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
 	  echo "#define _LINUX_MODVERSIONS_H"; \
 	  echo "#include <linux/modsetver.h>"; \
@@ -260,13 +279,13 @@ update-modverfile:
 	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
 	  done; \
 	  echo "#endif"; \
-	) > $(TOPDIR)/include/linux/modversions.h.tmp
-	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
-		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
-		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
+	) > $@.tmp
+	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
+		echo $@ was not updated; \
+		rm -f $@.tmp; \
 	else \
-		echo $(TOPDIR)/include/linux/modversions.h was updated; \
-		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
+		echo $@ was updated; \
+		mv -f $@.tmp $@; \
 	fi
 
 # ---------------------------------------------------------------------------
@@ -277,7 +296,7 @@ ifdef CONFIG_MODULES
 #	Build modules
 
 ifdef CONFIG_MODVERSIONS
-MODFLAGS += -DMODVERSIONS -include $(HPATH)/linux/modversions.h
+MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
@@ -331,6 +350,90 @@ modules modules_install: FORCE
 	@exit 1
 
 endif # CONFIG_MODULES
+
+# Scripts to check various things for consistency
+# ---------------------------------------------------------------------------
+
+checkconfig:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+
+checkhelp:
+	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+
+checkincludes:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+
+# Generate tags for editors
+# ---------------------------------------------------------------------------
+
+TAGS: FORCE
+	{ find include/asm-${ARCH} -name '*.h' -print ; \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
+	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
+
+# 	Exuberant ctags works better with -I
+tags: FORCE
+	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
+	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
+	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+
+# Assorted miscellaneous targets
+# ---------------------------------------------------------------------------
+
+# Documentation targets
+
+sgmldocs psdocs pdfdocs htmldocs:
+	@$(MAKE) -C Documentation/DocBook $@
+
+
+# RPM target
+#
+#	If you do a make spec before packing the tarball you can rpm -ta it
+
+spec:
+	. scripts/mkspec >kernel.spec
+
+#	Build a tar ball, generate an rpm from it and pack the result
+#	There arw two bits of magic here
+#	1) The use of /. to avoid tar packing just the symlink
+#	2) Removing the .dep files as they have source paths in them that
+#	   will become invalid
+
+rpm:	clean spec
+	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
+	set -e; \
+	cd $(TOPDIR)/.. ; \
+	ln -sf $(TOPDIR) $(KERNELPATH) ; \
+	tar -cvz --exclude CVS -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
+	rm $(KERNELPATH) ; \
+	cd $(TOPDIR) ; \
+	. scripts/mkversion > .version ; \
+	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
+	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
+
+# Targets which don't need .config
+# ===========================================================================
+
+# Kernel configuration
+# ---------------------------------------------------------------------------
+
+.PHONY: oldconfig xconfig menuconfig config
+
+oldconfig:
+	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+
+xconfig:
+	@$(MAKE) -C scripts kconfig.tk
+	wish -f scripts/kconfig.tk
+
+menuconfig:
+	@$(MAKE) -C scripts/lxdialog all
+	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
+
+config:
+	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
+
 
 # Cleaning up
 # ---------------------------------------------------------------------------
@@ -409,80 +512,19 @@ distclean: mrproper
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
 
-# Assorted miscellaneous targets
-# ---------------------------------------------------------------------------
-
-# Documentation targets
-
-sgmldocs psdocs pdfdocs htmldocs:
-	@$(MAKE) -C Documentation/DocBook $@
-
-
-# RPM target
-#
-#	If you do a make spec before packing the tarball you can rpm -ta it
-
-spec:
-	. scripts/mkspec >kernel.spec
-
-#	Build a tar ball, generate an rpm from it and pack the result
-#	There arw two bits of magic here
-#	1) The use of /. to avoid tar packing just the symlink
-#	2) Removing the .dep files as they have source paths in them that
-#	   will become invalid
-
-rpm:	clean spec
-	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
-	set -e; \
-	cd $(TOPDIR)/.. ; \
-	ln -sf $(TOPDIR) $(KERNELPATH) ; \
-	tar -cvz --exclude CVS -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
-	rm $(KERNELPATH) ; \
-	cd $(TOPDIR) ; \
-	. scripts/mkversion > .version ; \
-	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
-	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
-
-# Scripts to check various things for consistency
-
-checkconfig:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
-
-checkhelp:
-	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
-
-checkincludes:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
-
-# Generate tags for editors
-
-TAGS: FORCE
-	{ find include/asm-${ARCH} -name '*.h' -print ; \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
-
-# 	Exuberant ctags works better with -I
-tags: FORCE
-	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
-
-# Make a backup
-# FIXME anybody still using this?
-
-backup: mrproper
-	cd .. && tar cf - linux/ | gzip -9 > backup.gz
-	sync
-
-# Make checksums
-# FIXME anybody still using this?
-
-sums:
-	find . -type f -print | sort | xargs sum > .SUMS
-
 # FIXME Should go into a make.lib or something 
-# ---------------------------------------------------------------------------
+# ===========================================================================
+
+# read all saved command lines
+
+cmd_files := $(wildcard .*.cmd)
+ifneq ($(cmd_files),)
+  include $(cmd_files)
+endif
+
+# Usage: $(call if_changed_rule,foo)
+# will check if $(cmd_foo) changed, or any of the prequisites changed,
+# and if so will execute $(rule_foo)
 
 if_changed_rule = $(if $(strip $? \
 		               $(filter-out $(cmd_$(1)),$(cmd_$(@F)))\

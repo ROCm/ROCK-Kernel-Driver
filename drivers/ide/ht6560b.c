@@ -123,16 +123,16 @@
 static void ht6560b_selectproc(struct ata_device *drive)
 {
 	unsigned long flags;
-	static byte current_select = 0;
-	static byte current_timing = 0;
-	byte select, timing;
-	
+	static u8 current_select = 0;
+	static u8 current_timing = 0;
+	u8 select, timing;
+
 	__save_flags (flags);	/* local CPU only */
 	__cli();		/* local CPU only */
-	
+
 	select = HT_CONFIG(drive);
 	timing = HT_TIMING(drive);
-	
+
 	if (select != current_select || timing != current_timing) {
 		current_select = select;
 		current_timing = timing;
@@ -147,7 +147,7 @@ static void ht6560b_selectproc(struct ata_device *drive)
 		 * Set timing for this drive:
 		 */
 		outb(timing, IDE_SELECT_REG);
-		(void) inb(IDE_STATUS_REG);
+		ata_status(drive, 0, 0);
 #ifdef DEBUG
 		printk("ht6560b: %s: select=%#x timing=%#x\n", drive->name, select, timing);
 #endif
@@ -160,13 +160,13 @@ static void ht6560b_selectproc(struct ata_device *drive)
  */
 static int __init try_to_init_ht6560b(void)
 {
-	byte orig_value;
+	u8 orig_value;
 	int i;
-	
+
 	/* Autodetect ht6560b */
 	if ((orig_value=inb(HT_CONFIG_PORT)) == 0xff)
 		return 0;
-	
+
 	for (i=3;i>0;i--) {
 		outb(0x00, HT_CONFIG_PORT);
 		if (!( (~inb(HT_CONFIG_PORT)) & 0x3f )) {
@@ -183,9 +183,9 @@ static int __init try_to_init_ht6560b(void)
 	 * Ht6560b autodetected
 	 */
 	outb(HT_CONFIG_DEFAULT, HT_CONFIG_PORT);
-	outb(HT_TIMING_DEFAULT, 0x1f6);  /* IDE_SELECT_REG */
-	(void) inb(0x1f7);               /* IDE_STATUS_REG */
-	
+	outb(HT_TIMING_DEFAULT, 0x1f6);  /* SELECT */
+	(void) inb(0x1f7);               /* STATUS */
+
 	printk("\nht6560b " HT6560B_VERSION
 	       ": chipset detected and initialized"
 #ifdef DEBUG
@@ -228,19 +228,19 @@ static byte ht_pio2timings(struct ata_device *drive, byte pio)
 		if (recovery_cycles < 2)  recovery_cycles = 2;
 		if (active_cycles   > 15) active_cycles   = 15;
 		if (recovery_cycles > 15) recovery_cycles = 0;  /* 0==16 */
-		
+
 #ifdef DEBUG
 		printk("ht6560b: drive %s setting pio=%d recovery=%d (%dns) active=%d (%dns)\n",
 			drive->name, pio - XFER_PIO_0, recovery_cycles, recovery_time, active_cycles, active_time);
 #endif
-		
+
 		return (byte)((recovery_cycles << 4) | active_cycles);
 	} else {
-		
+
 #ifdef DEBUG
 		printk("ht6560b: drive %s setting pio=0\n", drive->name);
 #endif
-		
+
 		return HT_TIMING_DEFAULT;    /* default setting */
 	}
 }
@@ -252,10 +252,10 @@ static void ht_set_prefetch(struct ata_device *drive, byte state)
 {
 	unsigned long flags;
 	int t = HT_PREFETCH_MODE << 8;
-	
+
 	save_flags (flags);	/* all CPUs */
 	cli();		        /* all CPUs */
-	
+
 	/*
 	 *  Prefetch mode and unmask irq seems to conflict
 	 */
@@ -267,9 +267,9 @@ static void ht_set_prefetch(struct ata_device *drive, byte state)
 		drive->drive_data &= ~t;  /* disable prefetch mode */
 		drive->channel->no_unmask = 0;
 	}
-	
+
 	restore_flags (flags);	/* all CPUs */
-	
+
 #ifdef DEBUG
 	printk("ht6560b: drive %s prefetch mode %sabled\n", drive->name, (state ? "en" : "dis"));
 #endif
@@ -279,24 +279,24 @@ static void tune_ht6560b(struct ata_device *drive, byte pio)
 {
 	unsigned long flags;
 	byte timing;
-	
+
 	switch (pio) {
 	case 8:         /* set prefetch off */
 	case 9:         /* set prefetch on */
 		ht_set_prefetch(drive, pio & 1);
 		return;
 	}
-	
+
 	timing = ht_pio2timings(drive, pio);
-	
+
 	save_flags (flags);	/* all CPUs */
 	cli();		        /* all CPUs */
-	
+
 	drive->drive_data &= 0xff00;
 	drive->drive_data |= timing;
-	
+
 	restore_flags (flags);	/* all CPUs */
-	
+
 #ifdef DEBUG
 	printk("ht6560b: drive %s tuned to pio mode %#x timing=%#x\n", drive->name, pio, timing);
 #endif
@@ -305,7 +305,7 @@ static void tune_ht6560b(struct ata_device *drive, byte pio)
 void __init init_ht6560b (void)
 {
 	int t;
-	
+
 	if (check_region(HT_CONFIG_PORT,1)) {
 		printk(KERN_ERR "ht6560b: PORT %#x ALREADY IN USE\n", HT_CONFIG_PORT);
 	} else {

@@ -199,7 +199,7 @@ static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 	return !ali15x3_tune_chipset(drive, mode);
 }
 
-static int ali15x3_config_drive_for_dma(struct ata_device *drive)
+static int ali15x3_udma_setup(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -261,17 +261,12 @@ no_dma_set:
 	return 0;
 }
 
-static int ali15x3_udma_write(struct ata_device *drive, struct request *rq)
+static int ali15x3_udma_init(struct ata_device *drive, struct request *rq)
 {
 	if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
 		return 1;	/* try PIO instead of DMA */
 
-	return ata_do_udma(0, drive, rq);
-}
-
-static int ali15x3_dmaproc(struct ata_device *drive)
-{
-	return ali15x3_config_drive_for_dma(drive);
+	return udma_pci_init(drive, rq);
 }
 #endif
 
@@ -447,8 +442,8 @@ static void __init ali15x3_init_channel(struct ata_channel *hwif)
 		/*
 		 * M1543C or newer for DMAing
 		 */
-		hwif->udma_write = ali15x3_udma_write;
-		hwif->XXX_udma = ali15x3_dmaproc;
+		hwif->udma_init = ali15x3_udma_init;
+		hwif->udma_setup = ali15x3_udma_setup;
 		hwif->autodma = 1;
 	}
 

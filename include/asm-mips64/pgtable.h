@@ -553,14 +553,12 @@ extern void (*update_mmu_cache)(struct vm_area_struct *vma,
 extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 { pte_t pte; pte_val(pte) = (type << 32) | (offset << 40); return pte; }
 
-#define SWP_TYPE(x)		(((x).val >> 32) & 0xff)
-#define SWP_OFFSET(x)		((x).val >> 40)
-#define SWP_ENTRY(type,offset)	((swp_entry_t) { pte_val(mk_swap_pte((type),(offset))) })
-#define pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)	((pte_t) { (x).val })
+#define __swp_type(x)		(((x).val >> 32) & 0xff)
+#define __swp_offset(x)		((x).val >> 40)
+#define __swp_entry(type,offset) ((swp_entry_t) { pte_val(mk_swap_pte((type),(offset))) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
-/* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
-#define PageSkip(page)		(0)
 #ifndef CONFIG_DISCONTIGMEM
 #define kern_addr_valid(addr)	(1)
 #endif
