@@ -527,8 +527,6 @@ static inline int pci_present(void)
 	return !list_empty(&pci_devices);
 }
 
-#define pci_for_each_dev_reverse(dev) \
-	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
 #define pci_for_each_bus(bus) \
 	for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
 
