@@ -30,6 +30,7 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <linux/ptrace.h>
+#include <linux/kallsyms.h>
 
 #include <asm/setup.h>
 #include <asm/fpu.h>
@@ -825,9 +826,12 @@ void show_trace(unsigned long *stack)
 		 * out the call path that was taken.
 		 */
 		if (kernel_text_address(addr)) {
-			if (i % 4 == 0)
+#ifndef CONFIG_KALLSYMS
+			if (i % 5 == 0)
 				printk("\n       ");
+#endif
 			printk(" [<%08lx>]", addr);
+			print_symbol(" %s\n", addr);
 			i++;
 		}
 	}
@@ -1098,8 +1102,10 @@ void die_if_kernel (char *str, struct pt_regs *fp, int nr)
 
 	console_verbose();
 	printk("%s: %08x\n",str,nr);
-	printk("PC: [<%08lx>]\nSR: %04x  SP: %p  a2: %08lx\n",
-	       fp->pc, fp->sr, fp, fp->a2);
+	printk("PC: [<%08lx>]",fp->pc);
+	print_symbol(" %s\n", fp->pc);
+	printk("\nSR: %04x  SP: %p  a2: %08lx\n",
+	       fp->sr, fp, fp->a2);
 	printk("d0: %08lx    d1: %08lx    d2: %08lx    d3: %08lx\n",
 	       fp->d0, fp->d1, fp->d2, fp->d3);
 	printk("d4: %08lx    d5: %08lx    a0: %08lx    a1: %08lx\n",
