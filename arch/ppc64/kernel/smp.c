@@ -31,6 +31,8 @@
 #include <linux/dump.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
+#include <linux/notifier.h>
+#include <linux/stop_machine.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -1068,7 +1070,7 @@ static struct sched_group sched_group_nodes[MAX_NUMNODES];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
-__init void arch_init_sched_domains(void)
+__devinit void arch_init_sched_domains(void)
 {
 	int i;
 	struct sched_group *first = NULL, *last = NULL;
@@ -1198,7 +1200,7 @@ static struct sched_group sched_group_cpus[NR_CPUS];
 static struct sched_group sched_group_phys[NR_CPUS];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 static DEFINE_PER_CPU(struct sched_domain, phys_domains);
-__init void arch_init_sched_domains(void)
+__devinit void arch_init_sched_domains(void)
 {
 	int i;
 	struct sched_group *first = NULL, *last = NULL;
@@ -1276,4 +1278,50 @@ __init void arch_init_sched_domains(void)
 	}
 }
 #endif /* CONFIG_NUMA */
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+static int arch_reinit_sched_domains(void *unused)
+{
+	arch_init_sched_domains();
+	printk("Refreshing topology...\n");
+	sched_domain_debug();
+	return 0;
+}
+
+static int cpu_sched_domain_callback(struct notifier_block *nfb,
+			     unsigned long action,
+			     void *hcpu)
+{
+	struct task_struct *p;
+
+	printk("Running %s for cpu %lu\n", __FUNCTION__, (unsigned long)hcpu);
+	if (action != CPU_UP_PREPARE && action != CPU_DEAD
+	    && action != CPU_UP_CANCELED)
+		return NOTIFY_OK;
+
+	/* 
+	 * Can't use stop_machine_run; the cpucontrol semaphore is
+	 * already held.
+	 */
+	p = __stop_machine_run(arch_reinit_sched_domains, NULL, NR_CPUS);
+
+	if (IS_ERR(p))
+		return NOTIFY_BAD; /* perhaps a nasty message is ok */
+
+	kthread_stop(p);
+
+	return NOTIFY_OK;
+}
+#endif
+
+static int __init register_sched_domain_notifier(void)
+{
+	/* We want this notifier to run after the numa one */
+	hotcpu_notifier(cpu_sched_domain_callback, 0);
+	return 0;
+}
+__initcall(register_sched_domain_notifier);
+
 #endif /* CONFIG_SCHED_SMT */
+
