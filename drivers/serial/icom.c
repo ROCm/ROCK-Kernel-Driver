@@ -68,7 +68,7 @@
 /*#define ICOM_TRACE		 enable port trace capabilities */
 
 #define ICOM_DRIVER_NAME "icom"
-#define ICOM_VERSION_STR "1.3.0"
+#define ICOM_VERSION_STR "1.3.1"
 #define ICOM_DEV_ID_1    0x0031
 #define ICOM_DEV_ID_2    0x0219
 #define NR_PORTS	       128

@@ -564,7 +564,6 @@ config SERIAL_PMACZILOG_CONSOLE
 
 config SERIAL_ICOM
 	tristate "IBM Multiport Serial Adapter"
-	depends on PPC_ISERIES
 	select SERIAL_CORE
 	help
 	  This driver is for a family of multiport serial adapters

@@ -84,7 +84,7 @@
 #define PORT_IRDA	54
 
 /* IBM icom */
-#define PORT_ICOM	52
+#define PORT_ICOM	55
 
 #ifdef __KERNEL__
 
