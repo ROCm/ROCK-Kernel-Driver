@@ -468,6 +468,10 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	if (rc)
 		goto err_out;
 
+	rc = pci_set_dma_mask(pdev, 0xffffffffULL);
+	if (rc)
+		goto err_out;
+
 	mmio_start = pci_resource_start(pdev, 0);
 	mmio_end = pci_resource_end(pdev, 0);
 	mmio_flags = pci_resource_flags(pdev, 0);
@@ -519,7 +523,6 @@ err_out_free_res:
 
 err_out:
 	pci_disable_device(pdev);
-	unregister_netdev(dev);
 	kfree(dev);
 	return rc;
 }
