@@ -190,6 +190,7 @@
  *		Feb 2001			Skb allocation fixes
  *		Feb 2001	davej		PCI enable cleanups.
  *		04 Aug 2003	macro		Converted to the DMA API.
+ *		14 Aug 2004	macro		Fix device names reported.
  */
 
 /* Include files */
@@ -214,12 +215,14 @@
 
 #include "defxx.h"
 
-/* Version information string - should be updated prior to each new release!!! */
+/* Version information string should be updated prior to each new release!  */
+#define DRV_NAME "defxx"
+#define DRV_VERSION "v1.07"
+#define DRV_RELDATE "2004/08/14"
 
 static char version[] __devinitdata =
-	"defxx.c:v1.06 2003/08/04  Lawrence V. Stefani and others\n";
-
-#define DRV_NAME "defxx"
+	DRV_NAME ": " DRV_VERSION " " DRV_RELDATE
+	"  Lawrence V. Stefani and others\n";
 
 #define DYNAMIC_BUFFERS 1
 
@@ -235,7 +238,7 @@ static char version[] __devinitdata =
 static void		dfx_bus_init(struct net_device *dev);
 static void		dfx_bus_config_check(DFX_board_t *bp);
 
-static int		dfx_driver_init(struct net_device *dev);
+static int		dfx_driver_init(struct net_device *dev, const char *print_name);
 static int		dfx_adap_init(DFX_board_t *bp, int get_buffers);
 
 static int		dfx_open(struct net_device *dev);
@@ -404,24 +407,25 @@ static inline void dfx_port_read_long(
  */
 static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 {
+	static int version_disp;
+	char *print_name = DRV_NAME;
 	struct net_device *dev;
 	DFX_board_t	  *bp;			/* board pointer */
 	int alloc_size;				/* total buffer size used */
 	int err;
 
-#ifndef MODULE
-	static int version_disp;
-
-	if (!version_disp)	/* display version info if adapter is found */
-	{
+	if (!version_disp) {	/* display version info if adapter is found */
 		version_disp = 1;	/* set display flag to TRUE so that */
 		printk(version);	/* we only display this string ONCE */
 	}
-#endif
+
+	if (pdev != NULL)
+		print_name = pdev->slot_name;
 
 	dev = alloc_fddidev(sizeof(*bp));
 	if (!dev) {
-		printk (KERN_ERR "defxx: unable to allocate fddidev, aborting\n");
+		printk(KERN_ERR "%s: unable to allocate fddidev, aborting\n",
+		       print_name);
 		return -ENOMEM;
 	}
 
@@ -437,9 +441,12 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 
 	bp = dev->priv;
 
-	if (!request_region (ioaddr, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, DRV_NAME)) {
-		printk (KERN_ERR "%s: Cannot reserve I/O resource 0x%x @ 0x%lx, aborting\n",
-			DRV_NAME, pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, ioaddr);
+	if (!request_region(ioaddr,
+			    pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN,
+			    print_name)) {
+		printk(KERN_ERR "%s: Cannot reserve I/O resource "
+		       "0x%x @ 0x%lx, aborting\n", print_name,
+		       pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN, ioaddr);
 		err = -EBUSY;
 		goto err_out;
 	}
@@ -468,7 +475,7 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 		pci_set_master (pdev);
 	}
 
-	if (dfx_driver_init(dev) != DFX_K_SUCCESS) {
+	if (dfx_driver_init(dev, print_name) != DFX_K_SUCCESS) {
 		err = -ENODEV;
 		goto err_out_region;
 	}
@@ -477,6 +484,7 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 	if (err)
 		goto err_out_kfree;
 
+	printk("%s: registered as %s\n", print_name, dev->name);
 	return 0;
 
 err_out_kfree:
@@ -770,6 +778,7 @@ static void __devinit dfx_bus_config_check(DFX_board_t *bp)
  *       
  * Arguments:
  *   dev - pointer to device information
+ *   print_name - printable device name
  *
  * Functional Description:
  *   This function allocates additional resources such as the host memory
@@ -792,7 +801,8 @@ static void __devinit dfx_bus_config_check(DFX_board_t *bp)
  *   returning from this routine.
  */
 
-static int __devinit dfx_driver_init(struct net_device *dev)
+static int __devinit dfx_driver_init(struct net_device *dev,
+				     const char *print_name)
 {
 	DFX_board_t *bp = dev->priv;
 	int			alloc_size;			/* total buffer size needed */
@@ -841,26 +851,20 @@ static int __devinit dfx_driver_init(struct net_device *dev)
 
 	/*  Read the factory MAC address from the adapter then save it */
 
-	if (dfx_hw_port_ctrl_req(bp,
-							PI_PCTRL_M_MLA,
-							PI_PDATA_A_MLA_K_LO,
-							0,
-							&data) != DFX_K_SUCCESS)
-		{
-		printk("%s: Could not read adapter factory MAC address!\n", dev->name);
+	if (dfx_hw_port_ctrl_req(bp, PI_PCTRL_M_MLA, PI_PDATA_A_MLA_K_LO, 0,
+				 &data) != DFX_K_SUCCESS) {
+		printk("%s: Could not read adapter factory MAC address!\n",
+		       print_name);
 		return(DFX_K_FAILURE);
-		}
+	}
 	memcpy(&bp->factory_mac_addr[0], &data, sizeof(u32));
 
-	if (dfx_hw_port_ctrl_req(bp,
-							PI_PCTRL_M_MLA,
-							PI_PDATA_A_MLA_K_HI,
-							0,
-							&data) != DFX_K_SUCCESS)
-		{
-		printk("%s: Could not read adapter factory MAC address!\n", dev->name);
+	if (dfx_hw_port_ctrl_req(bp, PI_PCTRL_M_MLA, PI_PDATA_A_MLA_K_HI, 0,
+				 &data) != DFX_K_SUCCESS) {
+		printk("%s: Could not read adapter factory MAC address!\n",
+		       print_name);
 		return(DFX_K_FAILURE);
-		}
+	}
 	memcpy(&bp->factory_mac_addr[4], &data, sizeof(u16));
 
 	/*
@@ -872,27 +876,19 @@ static int __devinit dfx_driver_init(struct net_device *dev)
 
 	memcpy(dev->dev_addr, bp->factory_mac_addr, FDDI_K_ALEN);
 	if (bp->bus_type == DFX_BUS_TYPE_EISA)
-		printk("%s: DEFEA at I/O addr = 0x%lX, IRQ = %d, Hardware addr = %02X-%02X-%02X-%02X-%02X-%02X\n",
-				dev->name,
-				dev->base_addr,
-				dev->irq,
-				dev->dev_addr[0],
-				dev->dev_addr[1],
-				dev->dev_addr[2],
-				dev->dev_addr[3],
-				dev->dev_addr[4],
-				dev->dev_addr[5]);
+		printk("%s: DEFEA at I/O addr = 0x%lX, IRQ = %d, "
+		       "Hardware addr = %02X-%02X-%02X-%02X-%02X-%02X\n",
+		       print_name, dev->base_addr, dev->irq,
+		       dev->dev_addr[0], dev->dev_addr[1],
+		       dev->dev_addr[2], dev->dev_addr[3],
+		       dev->dev_addr[4], dev->dev_addr[5]);
 	else
-		printk("%s: DEFPA at I/O addr = 0x%lX, IRQ = %d, Hardware addr = %02X-%02X-%02X-%02X-%02X-%02X\n",
-				dev->name,
-				dev->base_addr,
-				dev->irq,
-				dev->dev_addr[0],
-				dev->dev_addr[1],
-				dev->dev_addr[2],
-				dev->dev_addr[3],
-				dev->dev_addr[4],
-				dev->dev_addr[5]);
+		printk("%s: DEFPA at I/O addr = 0x%lX, IRQ = %d, "
+		       "Hardware addr = %02X-%02X-%02X-%02X-%02X-%02X\n",
+		       print_name, dev->base_addr, dev->irq,
+		       dev->dev_addr[0], dev->dev_addr[1],
+		       dev->dev_addr[2], dev->dev_addr[3],
+		       dev->dev_addr[4], dev->dev_addr[5]);
 
 	/*
 	 * Get memory for descriptor block, consumer block, and other buffers
@@ -909,11 +905,11 @@ static int __devinit dfx_driver_init(struct net_device *dev)
 					(PI_ALIGN_K_DESC_BLK - 1);
 	bp->kmalloced = top_v = pci_alloc_consistent(bp->pci_dev, alloc_size,
 						     &bp->kmalloced_dma);
-	if (top_v == NULL)
-		{
-		printk("%s: Could not allocate memory for host buffers and structures!\n", dev->name);
+	if (top_v == NULL) {
+		printk("%s: Could not allocate memory for host buffers "
+		       "and structures!\n", print_name);
 		return(DFX_K_FAILURE);
-		}
+	}
 	memset(top_v, 0, alloc_size);	/* zero out memory before continuing */
 	top_p = bp->kmalloced_dma;	/* get physical address of buffer */
 
@@ -970,14 +966,20 @@ static int __devinit dfx_driver_init(struct net_device *dev)
 
 	/* Display virtual and physical addresses if debug driver */
 
-	DBG_printk("%s: Descriptor block virt = %0lX, phys = %0X\n",				dev->name, (long)bp->descr_block_virt,	bp->descr_block_phys);
-	DBG_printk("%s: Command Request buffer virt = %0lX, phys = %0X\n",			dev->name, (long)bp->cmd_req_virt,		bp->cmd_req_phys);
-	DBG_printk("%s: Command Response buffer virt = %0lX, phys = %0X\n",			dev->name, (long)bp->cmd_rsp_virt,		bp->cmd_rsp_phys);
-	DBG_printk("%s: Receive buffer block virt = %0lX, phys = %0X\n",			dev->name, (long)bp->rcv_block_virt,	bp->rcv_block_phys);
-	DBG_printk("%s: Consumer block virt = %0lX, phys = %0X\n",				dev->name, (long)bp->cons_block_virt,	bp->cons_block_phys);
+	DBG_printk("%s: Descriptor block virt = %0lX, phys = %0X\n",
+		   print_name,
+		   (long)bp->descr_block_virt, bp->descr_block_phys);
+	DBG_printk("%s: Command Request buffer virt = %0lX, phys = %0X\n",
+		   print_name, (long)bp->cmd_req_virt, bp->cmd_req_phys);
+	DBG_printk("%s: Command Response buffer virt = %0lX, phys = %0X\n",
+		   print_name, (long)bp->cmd_rsp_virt, bp->cmd_rsp_phys);
+	DBG_printk("%s: Receive buffer block virt = %0lX, phys = %0X\n",
+		   print_name, (long)bp->rcv_block_virt, bp->rcv_block_phys);
+	DBG_printk("%s: Consumer block virt = %0lX, phys = %0X\n",
+		   print_name, (long)bp->cons_block_virt, bp->cons_block_phys);
 
 	return(DFX_K_SUCCESS);
-	}
+}
 
 
 /*
@@ -3426,11 +3428,6 @@ static int __init dfx_init(void)
 {
 	int rc_pci, rc_eisa;
 
-/* when a module, this is printed whether or not devices are found in probe */
-#ifdef MODULE
-	printk(version);
-#endif
-
 	rc_pci = pci_module_init(&dfx_driver);
 	if (rc_pci >= 0) dfx_have_pci = 1;
 	
@@ -3451,6 +3448,9 @@ static void __exit dfx_cleanup(void)
 
 module_init(dfx_init);
 module_exit(dfx_cleanup);
+MODULE_AUTHOR("Lawrence V. Stefani");
+MODULE_DESCRIPTION("DEC FDDIcontroller EISA/PCI (DEFEA/DEFPA) driver "
+		   DRV_VERSION " " DRV_RELDATE);
 MODULE_LICENSE("GPL");
 
 
