@@ -73,6 +73,7 @@ extern void do_magic_suspend_2(void);
 /* Communication between acpi and arch/i386/suspend.c */
 
 extern void do_suspend_lowlevel(int resume);
+extern void do_suspend_lowlevel_s4bios(int resume);
 
 #else
 static inline void software_suspend(void)
