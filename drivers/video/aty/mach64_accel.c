@@ -179,6 +179,12 @@ void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 
 	if (!area->width || !area->height)
 		return;
+	if (!par->accel_flags) {
+		if (par->blitter_may_be_busy)
+			wait_for_idle(par);
+		cfb_copyarea(info, area);
+		return;
+	}
 
 	pitch_value = info->var.xres_virtual;
 	if (info->var.bits_per_pixel == 24) {
@@ -216,6 +222,12 @@ void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 
 	if (!rect->width || !rect->height)
 		return;
+	if (!par->accel_flags) {
+		if (par->blitter_may_be_busy)
+			wait_for_idle(par);
+		cfb_fillrect(info, rect);
+		return;
+	}
 
 	rect->color |= (rect->color << 8);
 	rect->color |= (rect->color << 16);

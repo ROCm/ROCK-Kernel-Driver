@@ -173,9 +173,6 @@ static int aty_var_to_crtc(const struct fb_info *info,
 			   struct crtc *crtc);
 static int aty_crtc_to_var(const struct crtc *crtc,
 			   struct fb_var_screeninfo *var);
-static int atyfb_encode_var(struct fb_var_screeninfo *var,
-			    const struct atyfb_par *par,
-			    const struct fb_info *info);
 static void set_off_pitch(struct atyfb_par *par,
 			  const struct fb_info *info);
 #ifdef CONFIG_PPC
@@ -772,11 +769,17 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 static int atyfb_set_par(struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
-	int accelmode;
+	struct fb_var_screeninfo *var = &info->var;
 	u8 tmp;
 	u32 i;
+	int err;
 
-	accelmode = info->var.accel_flags;	/* hack */
+	if ((err = aty_var_to_crtc(info, var, &par->crtc)) ||
+	    (err = par->pll_ops->var_to_pll(info, var->pixclock,
+					var->bits_per_pixel, &par->pll)))
+		return err;
+
+	par->accel_flags = var->accel_flags;	/* hack */
 
 	if (par->blitter_may_be_busy)
 		wait_for_idle(par);
@@ -786,13 +789,14 @@ static int atyfb_set_par(struct fb_info *info)
 	/* better call aty_StrobeClock ?? */
 	aty_st_8(CLOCK_CNTL + par->clk_wr_offset, CLOCK_STROBE, par);
 
-	par->dac_ops->set_dac(info, &par->pll, info->var.bits_per_pixel, accelmode);
+	par->dac_ops->set_dac(info, &par->pll, var->bits_per_pixel,
+			      par->accel_flags);
 	par->pll_ops->set_pll(info, &par->pll);
 
 	if (!M64_HAS(INTEGRATED)) {
 		/* Don't forget MEM_CNTL */
 		i = aty_ld_le32(MEM_CNTL, par) & 0xf0ffffff;
-		switch (info->var.bits_per_pixel) {
+		switch (var->bits_per_pixel) {
 		case 8:
 			i |= 0x02000000;
 			break;
@@ -808,7 +812,7 @@ static int atyfb_set_par(struct fb_info *info)
 		i = aty_ld_le32(MEM_CNTL, par) & 0xf00fffff;
 		if (!M64_HAS(MAGIC_POSTDIV))
 			i |= par->mem_refresh_rate << 20;
-		switch (info->var.bits_per_pixel) {
+		switch (var->bits_per_pixel) {
 		case 8:
 		case 24:
 			i |= 0x00000000;
@@ -841,20 +845,20 @@ static int atyfb_set_par(struct fb_info *info)
 	}
 	aty_st_8(DAC_MASK, 0xff, par);
 
-	info->fix.line_length = info->var.xres_virtual * info->var.bits_per_pixel/8;
-	info->fix.visual = info->var.bits_per_pixel <= 8 ? FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
+	info->fix.line_length = var->xres_virtual * var->bits_per_pixel/8;
+	info->fix.visual = var->bits_per_pixel <= 8 ?
+		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
 
 	/* Initialize the graphics engine */
-	if (info->var.accel_flags & FB_ACCELF_TEXT)
+	if (par->accel_flags & FB_ACCELF_TEXT)
 		aty_init_engine(par, info);
 
 #ifdef CONFIG_BOOTX_TEXT
 	btext_update_display(info->fix.smem_start,
-			     (((par->crtc.h_tot_disp >> 16) & 0xff) +
-			      1) * 8,
+			     (((par->crtc.h_tot_disp >> 16) & 0xff) + 1) * 8,
 			     ((par->crtc.v_tot_disp >> 16) & 0x7ff) + 1,
-			     info->var.bits_per_pixel,
-			     par->crtc.vxres * info->var.bits_per_pixel / 8);
+			     var->bits_per_pixel,
+			     par->crtc.vxres * var->bits_per_pixel / 8);
 #endif				/* CONFIG_BOOTX_TEXT */
 	return 0;
 }
@@ -863,40 +867,23 @@ static int atyfb_check_var(struct fb_var_screeninfo *var,
 			   struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	struct crtc crtc;
+	union aty_pll pll;
 	int err;
 
-	if ((err = aty_var_to_crtc(info, var, &par->crtc)) ||
-	    (err =
-	     par->pll_ops->var_to_pll(info, var->pixclock, var->bits_per_pixel,
-				       &par->pll)))
+	if ((err = aty_var_to_crtc(info, var, &crtc)) ||
+	    (err = par->pll_ops->var_to_pll(info, var->pixclock,
+					var->bits_per_pixel, &pll)))
 		return err;
 
-#if 0				/* fbmon is not done. uncomment for 2.5.x -brad */
+#if 0	/* fbmon is not done. uncomment for 2.5.x -brad */
 	if (!fbmon_valid_timings(var->pixclock, htotal, vtotal, info))
 		return -EINVAL;
 #endif
-	atyfb_encode_var(var, par, info);
+	aty_crtc_to_var(&crtc, var);
+	var->pixclock = par->pll_ops->pll_to_var(info, &pll);
 	return 0;
 }
-
-static int atyfb_encode_var(struct fb_var_screeninfo *var,
-			    const struct atyfb_par *par,
-			    const struct fb_info *info)
-{
-	int err;
-
-	memset(var, 0, sizeof(struct fb_var_screeninfo));
-
-	if ((err = aty_crtc_to_var(&par->crtc, var)))
-		return err;
-	var->pixclock = par->pll_ops->pll_to_var(info, &par->pll);
-
-	var->height = -1;
-	var->width = -1;
-	return 0;
-}
-
-
 
 static void set_off_pitch(struct atyfb_par *par,
 			  const struct fb_info *info)
@@ -1409,7 +1396,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	for (info = first_display; info != NULL; info = par->next) {
 		int nb;
 
-		par = (struct atyfb_par *) info->fb.par;
+		par = (struct atyfb_par *) info->par;
 		nb = info->var.yres * info->fix.line_length;
 
 		switch (when) {
@@ -1428,7 +1415,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			if (par->blitter_may_be_busy)
 				wait_for_idle(par);
 			/* Stop accel engine (stop bus mastering) */
-			if (info->accel_flags & FB_ACCELF_TEXT)
+			if (par->accel_flags & FB_ACCELF_TEXT)
 				aty_reset_engine(par);
 
 			/* Backup fb content */
@@ -2305,9 +2292,7 @@ int __init atyfb_init(void)
 
 #ifdef CONFIG_PMAC_PBOOK
 			if (first_display == NULL)
-				pmu_register_sleep_notifier
-				    (&aty_sleep_notifier);
-			/* FIXME info->next = first_display; */
+				pmu_register_sleep_notifier(&aty_sleep_notifier);
 			default_par->next = first_display;
 #endif
 		}
@@ -2345,7 +2330,7 @@ int __init atyfb_init(void)
 		info->fix.smem_start = info->screen_base;	/* Fake! */
 		default_par->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
 							  0x10000) + 0xFC00ul;
-		info->fix.mmio_start = par->ati_regbase; /* Fake! */
+		info->fix.mmio_start = default_par->ati_regbase; /* Fake! */
 
 		aty_st_le32(CLOCK_CNTL, 0x12345678, default_par);
 		clock_r = aty_ld_le32(CLOCK_CNTL, default_par);
@@ -2543,6 +2528,7 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	int i, scale;
+	u32 *pal = info->pseudo_palette;
 
 	if (regno > 255)
 		return 1;
@@ -2569,17 +2555,14 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	if (regno < 16)
 		switch (info->var.bits_per_pixel) {
 		case 16:
-			((u16 *) (info->pseudo_palette))[regno] =
-			    (regno << 10) | (regno << 5) | regno;
+			pal[regno] = (regno << 10) | (regno << 5) | regno;
 			break;
 		case 24:
-			((u32 *) (info->pseudo_palette))[regno] =
-			    (regno << 16) | (regno << 8) | regno;
+			pal[regno] = (regno << 16) | (regno << 8) | regno;
 			break;
 		case 32:
 			i = (regno << 8) | regno;
-			((u32 *) (info->pseudo_palette))[regno] =
-			    (i << 16) | i;
+			pal[regno] = (i << 16) | i;
 			break;
 		}
 	return 0;
