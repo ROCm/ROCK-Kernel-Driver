@@ -722,28 +722,22 @@ static int obsolete_params(const char *name,
 }
 #endif /* CONFIG_OBSOLETE_MODPARM */
 
-/* Find an symbol for this module (ie. resolve internals first).
-   It we find one, record usage.  Must be holding module_mutex. */
-unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
-				   unsigned int symindex,
-				   const char *strtab,
-				   const char *name,
-				   struct module *mod,
-				   struct kernel_symbol_group **ksg)
+/* Resolve a symbol for this module.  I.e. if we find one, record usage.
+   Must be holding module_mutex. */
+static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
+				    unsigned int symindex,
+				    const char *strtab,
+				    const char *name,
+				    struct module *mod)
 {
+	struct kernel_symbol_group *ksg;
 	unsigned long ret;
 
-	ret = find_local_symbol(sechdrs, symindex, strtab, name);
-	if (ret) {
-		*ksg = NULL;
-		return ret;
-	}
-	/* Look in other modules... */
 	spin_lock_irq(&modlist_lock);
-	ret = __find_symbol(name, ksg, mod->license_gplok);
+	ret = __find_symbol(name, &ksg, mod->license_gplok);
 	if (ret) {
 		/* This can fail due to OOM, or module unloading */
-		if (!use_module(mod, (*ksg)->owner))
+		if (!use_module(mod, ksg->owner))
 			ret = 0;
 	}
 	spin_unlock_irq(&modlist_lock);
@@ -832,21 +826,19 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			    unsigned int strindex,
 			    struct module *mod)
 {
-	unsigned int i;
-	Elf_Sym *sym;
+	Elf_Sym *sym = (void *)sechdrs[symindex].sh_addr;
+	const char *strtab = (char *)sechdrs[strindex].sh_addr;
+	unsigned int i, n = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
+	int ret = 0;
 
-	/* First simplify defined symbols, so if they become the
-           "answer" to undefined symbols, copying their st_value us
-           correct. */
-	for (sym = (void *)sechdrs[symindex].sh_addr, i = 0;
-	     i < sechdrs[symindex].sh_size / sizeof(Elf_Sym);
-	     i++) {
+	for (i = 1; i < n; i++) {
 		switch (sym[i].st_shndx) {
 		case SHN_COMMON:
 			/* We compiled with -fno-common.  These are not
 			   supposed to happen.  */
 			DEBUGP("Common symbol: %s\n", strtab + sym[i].st_name);
-			return -ENOEXEC;
+			ret = -ENOEXEC;
+			break;
 
 		case SHN_ABS:
 			/* Don't need to do anything */
@@ -855,6 +847,20 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			break;
 
 		case SHN_UNDEF:
+			sym[i].st_value
+			  = resolve_symbol(sechdrs, symindex, strtab,
+					   strtab + sym[i].st_name, mod);
+
+			/* Ok if resolved.  */
+			if (sym[i].st_value != 0)
+				break;
+			/* Ok if weak.  */
+			if (ELF_ST_BIND(sym[i].st_info) == STB_WEAK)
+				break;
+
+			printk(KERN_WARNING "%s: Unknown symbol %s\n",
+			       mod->name, strtab + sym[i].st_name);
+			ret = -ENOENT;
 			break;
 
 		default:
@@ -862,30 +868,11 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 				= (unsigned long)
 				(sechdrs[sym[i].st_shndx].sh_addr
 				 + sym[i].st_value);
+			break;
 		}
 	}
 
-	/* Now try to resolve undefined symbols */
-	for (sym = (void *)sechdrs[symindex].sh_addr, i = 0;
-	     i < sechdrs[symindex].sh_size / sizeof(Elf_Sym);
-	     i++) {
-		if (sym[i].st_shndx == SHN_UNDEF) {
-			/* Look for symbol */
-			struct kernel_symbol_group *ksg = NULL;
-			const char *strtab 
-				= (char *)sechdrs[strindex].sh_addr;
-
-			sym[i].st_value
-				= find_symbol_internal(sechdrs,
-						       symindex,
-						       strtab,
-						       strtab + sym[i].st_name,
-						       mod,
-						       &ksg);
-		}
-	}
-
-	return 0;
+	return ret;
 }
 
 /* Update size with this section: return offset. */
