@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/raid/multipath.h>
+#include <linux/bio.h>
 #include <linux/buffer_head.h>
 #include <asm/atomic.h>
 

@@ -18,6 +18,7 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/config.h>
+#include <linux/bio.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/init.h>

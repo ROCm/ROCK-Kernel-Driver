@@ -120,7 +120,7 @@ EXPORT_SYMBOL(vmtruncate);
 EXPORT_SYMBOL(find_vma);
 EXPORT_SYMBOL(get_unmapped_area);
 EXPORT_SYMBOL(init_mm);
-EXPORT_SYMBOL(create_bounce);
+EXPORT_SYMBOL(blk_queue_bounce);
 #ifdef CONFIG_HIGHMEM
 EXPORT_SYMBOL(kmap_high);
 EXPORT_SYMBOL(kunmap_high);

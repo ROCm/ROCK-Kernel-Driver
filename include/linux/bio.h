@@ -21,6 +21,8 @@
 #define __LINUX_BIO_H
 
 #include <linux/kdev_t.h>
+#include <linux/highmem.h>
+
 /* Platforms may set this to teach the BIO layer about IOMMU hardware. */
 #include <asm/io.h>
 #ifndef BIO_VMERGE_BOUNDARY
@@ -47,9 +49,6 @@ struct bio_vec {
 	unsigned int	bv_offset;
 };
 
-/*
- * weee, c forward decl...
- */
 struct bio;
 typedef void (bio_end_io_t) (struct bio *);
 typedef void (bio_destructor_t) (struct bio *);
@@ -205,5 +204,50 @@ extern struct bio *bio_copy(struct bio *, int, int);
 extern inline void bio_init(struct bio *);
 
 extern int bio_ioctl(kdev_t, unsigned int, unsigned long);
+
+#ifdef CONFIG_HIGHMEM
+/*
+ * remember to add offset! and never ever reenable interrupts between a
+ * bio_kmap_irq and bio_kunmap_irq!!
+ *
+ * This function MUST be inlined - it plays with the CPU interrupt flags.
+ * Hence the `extern inline'.
+ */
+extern inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
+{
+	unsigned long addr;
+
+	__save_flags(*flags);
+
+	/*
+	 * could be low
+	 */
+	if (!PageHighMem(bio_page(bio)))
+		return bio_data(bio);
+
+	/*
+	 * it's a highmem page
+	 */
+	__cli();
+	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_SRC_IRQ);
+
+	if (addr & ~PAGE_MASK)
+		BUG();
+
+	return (char *) addr + bio_offset(bio);
+}
+
+extern inline void bio_kunmap_irq(char *buffer, unsigned long *flags)
+{
+	unsigned long ptr = (unsigned long) buffer & PAGE_MASK;
+
+	kunmap_atomic((void *) ptr, KM_BIO_SRC_IRQ);
+	__restore_flags(*flags);
+}
+
+#else
+#define bio_kmap_irq(bio, flags)	(bio_data(bio))
+#define bio_kunmap_irq(buf, flags)	do { *(flags) = 0; } while (0)
+#endif
 
 #endif /* __LINUX_BIO_H */

@@ -17,6 +17,7 @@
  *
  */
 #include <linux/mm.h>
+#include <linux/bio.h>
 #include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/iobuf.h>

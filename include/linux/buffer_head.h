@@ -108,12 +108,7 @@ BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
 BUFFER_FNS(Boundary, boundary)
 
-/*
- * FIXME: this is used only by bh_kmap, which is used only by RAID5.
- * Move all that stuff into raid5.c
- */
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
-
 #define touch_buffer(bh)	mark_page_accessed(bh->b_page)
 
 /* If we *know* page->private refers to buffer_heads */

@@ -24,6 +24,7 @@
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/bio.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>

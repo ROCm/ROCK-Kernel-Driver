@@ -60,6 +60,7 @@
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/file.h>
+#include <linux/bio.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/major.h>

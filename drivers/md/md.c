@@ -33,6 +33,7 @@
 #include <linux/linkage.h>
 #include <linux/raid/md.h>
 #include <linux/sysctl.h>
+#include <linux/bio.h>
 #include <linux/raid/xor.h>
 #include <linux/devfs_fs_kernel.h>
 

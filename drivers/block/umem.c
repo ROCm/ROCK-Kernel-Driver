@@ -37,6 +37,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <linux/bio.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/mman.h>

@@ -23,6 +23,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/bio.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/stat.h>
