@@ -188,6 +188,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	usb_set_serial_port_data(port, priv);
 	priv->active = 0;
 	priv->queue_len = 0;
+	priv->free_len = 0;
 	INIT_LIST_HEAD(&priv->queue);
 	INIT_LIST_HEAD(&priv->freelist);
 
