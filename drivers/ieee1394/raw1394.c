@@ -2163,7 +2163,8 @@ static ssize_t raw1394_write(struct file *file, const char *buffer, size_t count
         }
         req->file_info = fi;
 
-        if (copy_from_user(&req->req, buffer, sizeof(struct raw1394_request))) {
+        if (copy_from_user(&req->req, buffer, sizeof(struct raw1394_request))
+	    || (ssize_t)req->req->length < 0) {
                 free_pending_request(req);
                 return -EFAULT;
         }
