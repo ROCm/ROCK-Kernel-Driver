@@ -323,6 +323,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 	switch (cmd) {
 	case LINUX_REBOOT_CMD_RESTART:
 		notifier_call_chain(&reboot_notifier_list, SYS_RESTART, NULL);
+		system_running = 0;
 		device_shutdown();
 		printk(KERN_EMERG "Restarting system.\n");
 		machine_restart(NULL);
@@ -338,6 +339,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 
 	case LINUX_REBOOT_CMD_HALT:
 		notifier_call_chain(&reboot_notifier_list, SYS_HALT, NULL);
+		system_running = 0;
 		device_shutdown();
 		printk(KERN_EMERG "System halted.\n");
 		machine_halt();
@@ -346,6 +348,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
 		notifier_call_chain(&reboot_notifier_list, SYS_POWER_OFF, NULL);
+		system_running = 0;
 		device_shutdown();
 		printk(KERN_EMERG "Power down.\n");
 		machine_power_off();
@@ -360,6 +363,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 		buffer[sizeof(buffer) - 1] = '\0';
 
 		notifier_call_chain(&reboot_notifier_list, SYS_RESTART, buffer);
+		system_running = 0;
 		device_shutdown();
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", buffer);
 		machine_restart(buffer);
