@@ -782,8 +782,6 @@ udp_data_ready(struct sock *sk, int len)
  dropit:
 	skb_free_datagram(sk, skb);
  out:
-	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
-		wake_up_interruptible(sk->sk_sleep);
 	read_unlock(&sk->sk_callback_lock);
 }
 
@@ -1043,8 +1041,6 @@ tcp_state_change(struct sock *sk)
 		break;
 	}
  out:
-	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
-		wake_up_interruptible_all(sk->sk_sleep);
 	read_unlock(&sk->sk_callback_lock);
 }
 
@@ -1084,8 +1080,6 @@ xprt_write_space(struct sock *sk)
 	if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
 		rpc_wake_up_task(xprt->snd_task);
 	spin_unlock_bh(&xprt->sock_lock);
-	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
-		wake_up_interruptible(sk->sk_sleep);
 out:
 	read_unlock(&sk->sk_callback_lock);
 }
@@ -1626,8 +1620,7 @@ xprt_shutdown(struct rpc_xprt *xprt)
 	rpc_wake_up(&xprt->resend);
 	rpc_wake_up(&xprt->pending);
 	rpc_wake_up(&xprt->backlog);
-	if (waitqueue_active(&xprt->cong_wait))
-		wake_up(&xprt->cong_wait);
+	wake_up(&xprt->cong_wait);
 	del_timer_sync(&xprt->timer);
 }
 
@@ -1637,8 +1630,7 @@ xprt_shutdown(struct rpc_xprt *xprt)
 int
 xprt_clear_backlog(struct rpc_xprt *xprt) {
 	rpc_wake_up_next(&xprt->backlog);
-	if (waitqueue_active(&xprt->cong_wait))
-		wake_up(&xprt->cong_wait);
+	wake_up(&xprt->cong_wait);
 	return 1;
 }
 

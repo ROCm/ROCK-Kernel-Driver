@@ -255,13 +255,11 @@ rpc_make_runnable(struct rpc_task *task)
 				return;
 			}
 			rpc_clear_sleeping(task);
-			if (waitqueue_active(&rpciod_idle))
-				wake_up(&rpciod_idle);
+			wake_up(&rpciod_idle);
 		}
 	} else {
 		rpc_clear_sleeping(task);
-		if (waitqueue_active(&task->tk_wait))
-			wake_up(&task->tk_wait);
+		wake_up(&task->tk_wait);
 	}
 }
 
@@ -287,8 +285,7 @@ void rpciod_wake_up(void)
 {
 	if(rpciod_pid==0)
 		printk(KERN_ERR "rpciod: wot no daemon?\n");
-	if (waitqueue_active(&rpciod_idle))
-		wake_up(&rpciod_idle);
+	wake_up(&rpciod_idle);
 }
 
 /*

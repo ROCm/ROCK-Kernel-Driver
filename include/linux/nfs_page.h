@@ -100,8 +100,7 @@ nfs_unlock_request(struct nfs_page *req)
 	smp_mb__before_clear_bit();
 	clear_bit(PG_BUSY, &req->wb_flags);
 	smp_mb__after_clear_bit();
-	if (waitqueue_active(&req->wb_wait))
-		wake_up_all(&req->wb_wait);
+	wake_up_all(&req->wb_wait);
 	nfs_release_request(req);
 }
 
