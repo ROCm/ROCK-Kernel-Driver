@@ -30,12 +30,6 @@ endif
 check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
 comma = ,
 
-# Select CPU dependent flags.  Note that order of declaration is important;
-# the options further down the list override previous items.
-#
-apcs-$(CONFIG_CPU_32)		:=-mapcs-32
-apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3
-
 # This selects which instruction set is used.
 # Note that GCC does not numerically define an architecture version
 # macro, but instead defines a whole series of macros which makes
@@ -55,11 +49,9 @@ tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 tune-$(CONFIG_CPU_XSCALE)	:=$(call check_gcc,-mtune=xscale,-mtune=strongarm110)
 
-# Force -mno-fpu to be passed to the assembler.  Some versions of gcc don't
-# do this with -msoft-float
-CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
+CFLAGS_BOOT	:=-mapcs-32 $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
+CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
+AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 
 #Default value
 DATAADDR	:= .
@@ -146,16 +138,10 @@ include/asm-arm/.arch: $(wildcard include/config/arch/*.h)
 	@ln -sf arch-$(INCDIR) include/asm-arm/arch
 	@touch $@
 
-include/asm-arm/.proc: $(wildcard include/config/cpu/32.h)
-	@echo '  Making asm-arm/proc -> asm-arm/proc-armv symlink'
-	@rm -f include/asm-arm/proc
-	@ln -sf proc-armv include/asm-arm/proc
-	@touch $@
-
 prepare: maketools
 
 .PHONY: maketools FORCE
-maketools: include/asm-arm/.arch include/asm-arm/.proc \
+maketools: include/asm-arm/.arch \
 	   include/asm-arm/constants.h include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
@@ -171,7 +157,6 @@ zinstall install: vmlinux
 
 MRPROPER_FILES	+= \
 	include/asm-arm/arch include/asm-arm/.arch \
-	include/asm-arm/proc include/asm-arm/.proc \
 	include/asm-arm/constants.h* \
 	include/asm-arm/mach-types.h
 
@@ -203,7 +188,7 @@ zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
 	)
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
-				   include/asm-arm/.arch include/asm-arm/.proc \
+				   include/asm-arm/.arch \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s

@@ -15,10 +15,12 @@
  */
 #include <linux/config.h>
 #include <linux/init.h>
-#include "entry-header.S"
+
 #include <asm/thread_info.h>
 #include <asm/glue.h>
+#include <asm/ptrace.h>
 
+#include "entry-header.S"
 
 #ifdef IOC_BASE
 /* IOC / IOMD based hardware */
