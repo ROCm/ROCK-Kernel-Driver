@@ -956,9 +956,6 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 	int retval;
 	char *p;
 
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
 	lock_kernel();
 	if (minor == ISDN_MINOR_STATUS) {
 		if (!file->private_data) {
@@ -1060,9 +1057,6 @@ isdn_write(struct file *file, const char __user *buf, size_t count, loff_t * off
 	int drvidx;
 	int chidx;
 	int retval;
-
-	if (off != &file->f_pos)
-		return -ESPIPE;
 
 	if (minor == ISDN_MINOR_STATUS)
 		return -EPERM;
@@ -1669,6 +1663,7 @@ isdn_open(struct inode *ino, struct file *filep)
 	}
 #endif
  out:
+	nonseekable_open(ino, filep);
 	return retval;
 }
 

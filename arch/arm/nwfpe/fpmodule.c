@@ -131,7 +131,7 @@ void float_raise(signed char flags)
 
 #ifdef CONFIG_DEBUG_USER
 	printk(KERN_DEBUG
-	       "NWFPE: %s[%d] takes exception %08x at %p from %08x\n",
+	       "NWFPE: %s[%d] takes exception %08x at %p from %08lx\n",
 	       current->comm, current->pid, flags,
 	       __builtin_return_address(0), GET_USERREG()[15]);
 #endif

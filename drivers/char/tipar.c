@@ -262,7 +262,7 @@ tipar_open(struct inode *inode, struct file *file)
 	init_ti_parallel(minor);
 	parport_release(table[minor].dev);
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int
@@ -315,9 +315,6 @@ tipar_read(struct file *file, char __user *buf, size_t count, loff_t * ppos)
 
 	if (count == 0)
 		return 0;
-
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	parport_claim_or_block(table[minor].dev);
 

@@ -56,9 +56,7 @@ extern int piranha_simulator;
  *	ioctls.
  */
 
-static loff_t rtc_llseek(struct file *file, loff_t offset, int origin);
-
-static ssize_t rtc_read(struct file *file, char *buf,
+static ssize_t rtc_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos);
 
 static int rtc_ioctl(struct inode *inode, struct file *file,
@@ -81,12 +79,7 @@ static const unsigned char days_in_mo[] =
  *	Now all the various file operations that we export.
  */
 
-static loff_t rtc_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-static ssize_t rtc_read(struct file *file, char *buf,
+static ssize_t rtc_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	return -EIO;
@@ -113,7 +106,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (!capable(CAP_SYS_TIME))
 			return -EACCES;
 
-		if (copy_from_user(&rtc_tm, (struct rtc_time*)arg,
+		if (copy_from_user(&rtc_tm, (struct rtc_time __user *)arg,
 				   sizeof(struct rtc_time)))
 			return -EFAULT;
 
@@ -147,7 +140,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	}
 	case RTC_EPOCH_READ:	/* Read the epoch.	*/
 	{
-		return put_user (epoch, (unsigned long *)arg);
+		return put_user (epoch, (unsigned long __user *)arg);
 	}
 	case RTC_EPOCH_SET:	/* Set the epoch.	*/
 	{
@@ -166,11 +159,12 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	default:
 		return -EINVAL;
 	}
-	return copy_to_user((void *)arg, &wtime, sizeof wtime) ? -EFAULT : 0;
+	return copy_to_user((void __user *)arg, &wtime, sizeof wtime) ? -EFAULT : 0;
 }
 
 static int rtc_open(struct inode *inode, struct file *file)
 {
+	nonseekable_open(inode, file);
 	return 0;
 }
 
@@ -184,7 +178,7 @@ static int rtc_release(struct inode *inode, struct file *file)
  */
 static struct file_operations rtc_fops = {
 	.owner =	THIS_MODULE,
-	.llseek =	rtc_llseek,
+	.llseek =	no_llseek,
 	.read =		rtc_read,
 	.ioctl =	rtc_ioctl,
 	.open =		rtc_open,

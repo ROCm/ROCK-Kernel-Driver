@@ -656,9 +656,6 @@ capi_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	struct sk_buff *skb;
 	size_t copied;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (!cdev->ap.applid)
 		return -ENODEV;
 
@@ -698,9 +695,6 @@ capi_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos
 	struct capidev *cdev = (struct capidev *)file->private_data;
 	struct sk_buff *skb;
 	u16 mlen;
-
-        if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	if (!cdev->ap.applid)
 		return -ENODEV;
@@ -965,7 +959,7 @@ capi_open(struct inode *inode, struct file *file)
 	if ((file->private_data = capidev_alloc()) == 0)
 		return -ENOMEM;
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int

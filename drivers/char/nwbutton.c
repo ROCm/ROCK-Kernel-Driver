@@ -170,7 +170,7 @@ static irqreturn_t button_handler (int irq, void *dev_id, struct pt_regs *regs)
  * device at any one time.
  */
 
-static int button_read (struct file *filp, char *buffer,
+static int button_read (struct file *filp, char __user *buffer,
 			size_t count, loff_t *ppos)
 {
 	interruptible_sleep_on (&button_wait_queue);

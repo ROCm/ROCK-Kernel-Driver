@@ -1454,6 +1454,7 @@ static int rme96xx_open(struct inode *in, struct file *f)
 
 	DBG(printk("device num %d open\n",devnum));
 
+	nonseekable_open(in, f);
 	for (list = devs.next; ; list = list->next) {
 		if (list == &devs)
 			return -ENODEV;
@@ -1543,9 +1544,6 @@ static ssize_t rme96xx_write(struct file *file, const char __user *buffer, size_
 	if(dma == NULL || (dma->s) == NULL) 
 		return -ENXIO;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (dma->mmapped || !dma->opened)
 		return -ENXIO;
 
@@ -1610,9 +1608,6 @@ static ssize_t rme96xx_read(struct file *file, char __user *buffer, size_t count
 
 	if(dma == NULL || (dma->s) == NULL) 
 		return -ENXIO;
-
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	if (dma->mmapped || !dma->opened)
 		return -ENXIO;
@@ -1775,6 +1770,7 @@ static int rme96xx_mixer_open(struct inode *inode, struct file *file)
 
 	COMM  ("mixer open");
 
+	nonseekable_open(inode, file);
 	for (list = devs.next; ; list = list->next) {
 		if (list == &devs)
 			return -ENODEV;

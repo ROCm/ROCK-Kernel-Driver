@@ -1434,8 +1434,6 @@ static ssize_t i810_read(struct file *file, char __user *buffer, size_t count, l
 	printk("i810_audio: i810_read called, count = %d\n", count);
 #endif
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (dmabuf->mapped)
 		return -ENXIO;
 	if (dmabuf->enable & DAC_RUNNING)
@@ -1574,8 +1572,6 @@ static ssize_t i810_write(struct file *file, const char __user *buffer, size_t c
 	printk("i810_audio: i810_write called, count = %d\n", count);
 #endif
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (dmabuf->mapped)
 		return -ENXIO;
 	if (dmabuf->enable & ADC_RUNNING)
@@ -2518,7 +2514,7 @@ found_virt:
 
 	state->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int i810_release(struct inode *inode, struct file *file)
@@ -2685,7 +2681,7 @@ static int i810_open_mixdev(struct inode *inode, struct file *file)
 			if (card->ac97_codec[i] != NULL &&
 			    card->ac97_codec[i]->dev_mixer == minor) {
 				file->private_data = card->ac97_codec[i];
-				return 0;
+				return nonseekable_open(inode, file);
 			}
 	}
 	return -ENODEV;

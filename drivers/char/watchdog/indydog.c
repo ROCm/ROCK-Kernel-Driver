@@ -81,7 +81,7 @@ static int indydog_open(struct inode *inode, struct file *file)
 	indydog_alive = 1;
 	printk(KERN_INFO "Started watchdog timer.\n");
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int indydog_release(struct inode *inode, struct file *file)
@@ -98,10 +98,6 @@ static int indydog_release(struct inode *inode, struct file *file)
 
 static ssize_t indydog_write(struct file *file, const char *data, size_t len, loff_t *ppos)
 {
-	/* Can't seek (pwrite) on this device */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* Refresh the timer. */
 	if (len) {
 		indydog_ping();

@@ -452,9 +452,6 @@ static ssize_t ad1889_write(struct file *file, const char __user *buffer, size_t
 	ssize_t ret = 0;
 	DECLARE_WAITQUEUE(wait, current);
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	down(&state->sem);
 #if 0
 	if (dmabuf->mapped) {
@@ -764,7 +761,7 @@ static int ad1889_open(struct inode *inode, struct file *file)
 	ad1889_set_wav_rate(ad1889_dev, 44100);
 	ad1889_set_wav_fmt(ad1889_dev, AFMT_S16_LE);
 	AD1889_WRITEW(ad1889_dev, AD_DSWADA, 0x0404); /* attenuation */
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int ad1889_release(struct inode *inode, struct file *file)
