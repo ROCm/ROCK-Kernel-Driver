@@ -168,9 +168,6 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 		}
 		printk (" drive\n");
 		drive->type = type;
-
-		goto init_queue;
-
 		return;
 	}
 
@@ -200,22 +197,6 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	/* Initialize our quirk list. */
 	if (drive->channel->quirkproc)
 		drive->quirk_list = drive->channel->quirkproc(drive);
-
-init_queue:
-	/*
-	 * it's an ata drive, build command list
-	 */
-	drive->queue_depth = 1;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
-	drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
-#else
-	drive->queue_depth = drive->id->queue_depth + 1;
-#endif
-	if (drive->queue_depth < 1 || drive->queue_depth > IDE_MAX_TAG)
-		drive->queue_depth = IDE_MAX_TAG;
-
-	if (ide_init_commandlist(drive))
-		goto err_misc;
 
 	return;
 

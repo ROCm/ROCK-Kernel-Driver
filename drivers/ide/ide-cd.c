@@ -558,10 +558,6 @@ static void cdrom_end_request(ide_drive_t *drive, int uptodate)
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
-#if 0
-	/* FIXME --mdcki */
-	HWGROUP(drive)->rq->special = NULL;
-#endif
 	ide_end_request(drive, uptodate);
 }
 
@@ -1217,21 +1213,12 @@ static void restore_request (struct request *rq)
 /*
  * Start a read request from the CD-ROM.
  */
-static ide_startstop_t cdrom_start_read(struct ata_device *drive, struct ata_request *ar, unsigned int block)
+static ide_startstop_t cdrom_start_read (ide_drive_t *drive, unsigned int block)
 {
 	struct cdrom_info *info = drive->driver_data;
-	struct request *rq = ar->ar_rq;
-
-	if (ar->ar_flags & ATA_AR_QUEUED) {
-//		spin_lock_irqsave(DRIVE_LOCK(drive), flags);
-		blkdev_dequeue_request(rq);
-//		spin_unlock_irqrestore(DRIVE_LOCK(drive), flags);
-	}
-
+	struct request *rq = HWGROUP(drive)->rq;
 
 	restore_request(rq);
-
-	rq->special = ar;
 
 	/* Satisfy whatever we can of this request from our cached sector. */
 	if (cdrom_read_from_buffer(drive))
@@ -1665,30 +1652,8 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap)
 			action = cdrom_start_seek (drive, block);
 		else {
-			unsigned long flags;
-			struct ata_request *ar;
-
-			/*
-			 * get a new command (push ar further down to avoid grabbing lock here
-			 */
-			spin_lock_irqsave(DRIVE_LOCK(drive), flags);
-
-			ar = ata_ar_get(drive);
-
-			/*
-			 * we've reached maximum queue depth, bail
-			 */
-			if (!ar) {
-				spin_unlock_irqrestore(DRIVE_LOCK(drive), flags);
-
-				return ide_started;
-			}
-
-			ar->ar_rq = rq;
-			spin_unlock_irqrestore(DRIVE_LOCK(drive), flags);
-
 			if (rq_data_dir(rq) == READ)
-				action = cdrom_start_read(drive, ar, block);
+				action = cdrom_start_read(drive, block);
 			else
 				action = cdrom_start_write(drive, rq);
 		}

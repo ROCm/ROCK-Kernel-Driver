@@ -308,8 +308,7 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 
 static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *rq)
 {
-	struct ata_request *ar = rq->special;
-	struct ata_taskfile *args = &ar->ar_task;
+	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
 	/*
@@ -464,35 +463,11 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
-		ide_dma_action_t dmaaction;
-		u8 command;
-
-		if (!drive->using_dma)
-			return ide_started;
-
-		command = args->taskfile.command;
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		if (drive->using_tcq) {
-			if (command == WIN_READDMA_QUEUED
-			    || command == WIN_READDMA_QUEUED_EXT
-			    || command == WIN_WRITEDMA_QUEUED
-			    || command == WIN_READDMA_QUEUED_EXT)
-				return ide_start_tag(ide_dma_queued_start, drive, rq->special);
-		}
-#endif
-
-		if (command == WIN_WRITEDMA || command == WIN_WRITEDMA_EXT)
-			dmaaction = ide_dma_write;
-		else if (command == WIN_READDMA || command == WIN_READDMA_EXT)
-			dmaaction = ide_dma_read;
-		else
-			return ide_stopped;
-
-		if (!drive->channel->dmaproc(dmaaction, drive))
-			return ide_started;
-
-		return ide_stopped;
+		/* for dma commands we down set the handler */
+		if (drive->using_dma &&
+		!(drive->channel->dmaproc(((args->taskfile.command == WIN_WRITEDMA)
+					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
+					? ide_dma_write : ide_dma_read, drive)));
 	}
 
 	return ide_started;
@@ -545,30 +520,12 @@ ide_startstop_t recal_intr(ide_drive_t *drive)
 }
 
 /*
- * Quiet handler for commands without a data phase -- handy instead of
- * task_no_data_intr() for commands we _know_ will fail (such as WIN_NOP)
- */
-ide_startstop_t task_no_data_quiet_intr(ide_drive_t *drive)
-{
-	struct ata_request *ar = IDE_CUR_AR(drive);
-	struct ata_taskfile *args = &ar->ar_task;
-
-	ide__sti();	/* local CPU only */
-
-	if (args)
-		ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
-
-	return ide_stopped;
-}
-
-/*
  * Handler for commands without a data phase
  */
 ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 {
-	struct ata_request *ar = IDE_CUR_AR(drive);
-	struct ata_taskfile *args = &ar->ar_task;
-	u8 stat = GET_STAT();
+	struct ata_taskfile *args = HWGROUP(drive)->rq->special;
+	byte stat		= GET_STAT();
 
 	ide__sti();	/* local CPU only */
 
@@ -628,8 +585,7 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 
 static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 {
-	struct ata_request *ar = rq->special;
-	struct ata_taskfile *args = &ar->ar_task;
+	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
@@ -909,7 +865,6 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			return;
 
 		case WIN_NOP:
-			args->handler = task_no_data_quiet_intr;
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
@@ -927,7 +882,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
-void init_taskfile_request(struct request *rq)
+static void init_taskfile_request(struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
 	rq->flags = REQ_DRIVE_TASKFILE;
@@ -936,29 +891,18 @@ void init_taskfile_request(struct request *rq)
 int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
-	struct ata_request star;
-	int ret;
-
-	ata_ar_init(drive, &star);
 	init_taskfile_request(&rq);
-	rq.buffer = buf;
 
-	memcpy(&star.ar_task, args, sizeof(*args));
+	rq.buffer = buf;
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors
 			= (args->hobfile.sector_count << 8)
 			| args->taskfile.sector_count;
 
-	rq.special = &star;
+	rq.special = args;
 
-	ret = ide_do_drive_cmd(drive, &rq, ide_wait);
-
-	/*
-	 * copy back status etc
-	 */
-	memcpy(args, &star.ar_task, sizeof(*args));
-	return ret;
+	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
 /*

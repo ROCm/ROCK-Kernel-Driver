@@ -368,40 +368,6 @@ int drive_is_flashcard (ide_drive_t *drive)
 	return 0;	/* no, it is not a flash memory card */
 }
 
-void ide_end_queued_request(ide_drive_t *drive, int uptodate, struct request *rq)
-{
-	unsigned long flags;
-
-	BUG_ON(!(rq->flags & REQ_STARTED));
-	BUG_ON(!rq->special);
-
-	if (!end_that_request_first(rq, uptodate, rq->hard_nr_sectors)) {
-		struct ata_request *ar = rq->special;
-
-		add_blkdev_randomness(major(rq->rq_dev));
-
-		spin_lock_irqsave(&ide_lock, flags);
-
-		if ((jiffies - ar->ar_time > ATA_AR_MAX_TURNAROUND) && drive->queue_depth > 1) {
-			printk(KERN_INFO "%s: exceeded max command turn-around time (%d seconds)\n", drive->name, ATA_AR_MAX_TURNAROUND / HZ);
-			drive->queue_depth >>= 1;
-		}
-
-		if (jiffies - ar->ar_time > drive->tcq->oldest_command)
-			drive->tcq->oldest_command = jiffies - ar->ar_time;
-
-		ata_ar_put(drive, ar);
-		end_that_request_last(rq);
-		/*
-		 * IDE_SET_CUR_TAG(drive, IDE_INACTIVE_TAG) will do this
-		 * too, but it really belongs here. assumes that the
-		 * ended request is the active one.
-		 */
-		HWGROUP(drive)->rq = NULL;
-		spin_unlock_irqrestore(&ide_lock, flags);
-	}
-}
-
 int __ide_end_request(ide_drive_t *drive, int uptodate, int nr_secs)
 {
 	struct request *rq;
@@ -430,17 +396,9 @@ int __ide_end_request(ide_drive_t *drive, int uptodate, int nr_secs)
 	}
 
 	if (!end_that_request_first(rq, uptodate, nr_secs)) {
-		struct ata_request *ar = rq->special;
-
 		add_blkdev_randomness(major(rq->rq_dev));
-		/*
-		 * request with ATA_AR_QUEUED set have already been
-		 * dequeued, but doing it twice is ok
-		 */
 		blkdev_dequeue_request(rq);
 		HWGROUP(drive)->rq = NULL;
-		if (ar)
-			ata_ar_put(drive, ar);
 		end_that_request_last(rq);
 		ret = 0;
 	}
@@ -776,11 +734,8 @@ void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
 			args[6] = IN_BYTE(IDE_SELECT_REG);
 		}
 	} else if (rq->flags & REQ_DRIVE_TASKFILE) {
-		struct ata_request *ar = rq->special;
-		struct ata_taskfile *args = &ar->ar_task;
-
+		struct ata_taskfile *args = rq->special;
 		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
-
 		if (args) {
 			args->taskfile.feature = err;
 			args->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
@@ -803,7 +758,6 @@ void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
 				args->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			}
 		}
-		ata_ar_put(drive, ar);
 	}
 
 	blkdev_dequeue_request(rq);
@@ -919,11 +873,6 @@ ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, byte stat)
 {
 	struct request *rq;
 	byte err;
-
-	/*
-	 * FIXME: remember to invalidate tcq queue when drive->using_tcq
-	 * and atomic_read(&drive->tcq->queued) /jens
-	 */
 
 	err = ide_dump_status(drive, msg, stat);
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
@@ -1127,13 +1076,10 @@ static ide_startstop_t start_request(ide_drive_t *drive, struct request *rq)
 			 */
 
 			if (rq->flags & REQ_DRIVE_TASKFILE) {
-				struct ata_request *ar = rq->special;
-				struct ata_taskfile *args;
+				struct ata_taskfile *args = rq->special;
 
-				if (!ar)
+				if (!(args))
 					goto args_error;
-
-				args = &ar->ar_task;
 
 				ata_taskfile(drive, args, NULL);
 
@@ -1258,170 +1204,25 @@ void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 /*
  * Select the next drive which will be serviced.
  */
-static ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
+static inline ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 {
-	ide_drive_t *tmp;
-	ide_drive_t *drive = NULL;
-	unsigned long sleep = 0;
+	ide_drive_t *drive, *best;
 
-	tmp = hwgroup->drive;
-	do {
-		if (!list_empty(&tmp->queue.queue_head)
-		&& (!tmp->PADAM_sleep || time_after_eq(tmp->PADAM_sleep, jiffies))) {
-			if (!drive
-			 || (tmp->PADAM_sleep && (!drive->PADAM_sleep || time_after(drive->PADAM_sleep, tmp->PADAM_sleep)))
-			 || (!drive->PADAM_sleep && time_after(drive->PADAM_service_start + 2 * drive->PADAM_service_time, tmp->PADAM_service_start + 2 * tmp->PADAM_service_time)))
-			{
-				if (!blk_queue_plugged(&tmp->queue))
-					drive = tmp;
-			}
-		}
-		tmp = tmp->next;
-	} while (tmp != hwgroup->drive);
-
-	if (drive)
-		return drive;
-
-	hwgroup->rq = NULL;
+	best = NULL;
 	drive = hwgroup->drive;
 	do {
-		if (drive->PADAM_sleep && (!sleep || time_after(sleep, drive->PADAM_sleep)))
-			sleep = drive->PADAM_sleep;
+		if (!list_empty(&drive->queue.queue_head)
+		&& (!drive->PADAM_sleep	|| time_after_eq(drive->PADAM_sleep, jiffies))) {
+			if (!best
+			 || (drive->PADAM_sleep && (!best->PADAM_sleep || time_after(best->PADAM_sleep, drive->PADAM_sleep)))
+			 || (!best->PADAM_sleep && time_after(best->PADAM_service_start + 2 * best->PADAM_service_time, drive->PADAM_service_start + 2 * drive->PADAM_service_time)))
+			{
+				if (!blk_queue_plugged(&drive->queue))
+					best = drive;
+			}
+		}
 	} while ((drive = drive->next) != hwgroup->drive);
-
-	if (sleep) {
-		/*
-		 * Take a short snooze, and then wake up this hwgroup
-		 * again.  This gives other hwgroups on the same a
-		 * chance to play fairly with us, just in case there
-		 * are big differences in relative throughputs.. don't
-		 * want to hog the cpu too much.
-		 */
-		if (0 < (signed long)(jiffies + WAIT_MIN_SLEEP - sleep))
-			sleep = jiffies + WAIT_MIN_SLEEP;
-
-		if (timer_pending(&hwgroup->timer))
-			printk("ide_set_handler: timer already active\n");
-
-		set_bit(IDE_SLEEP, &hwgroup->flags);
-		mod_timer(&hwgroup->timer, sleep);
-		/* we purposely leave hwgroup busy while
-		 * sleeping */
-	} else {
-		/* Ugly, but how can we sleep for the lock
-		 * otherwise? perhaps from tq_disk? */
-		ide_release_lock(&ide_intr_lock);/* for atari only */
-		clear_bit(IDE_BUSY, &hwgroup->flags);
-	}
-
-	return NULL;
-}
-
-/*
- * feed commands to a drive until it barfs. used to be part of ide_do_request.
- * called with ide_lock/DRIVE_LOCK held and busy hwgroup
- */
-static void ide_queue_commands(ide_drive_t *drive, int masked_irq)
-{
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	ide_startstop_t startstop = -1;
-	struct request *rq;
-
-	do {
-		rq = NULL;
-
-		if (!test_bit(IDE_BUSY, &hwgroup->flags))
-			printk("%s: hwgroup not busy while queueing\n", drive->name);
-
-		/*
-		 * abort early if we can't queue another command. for non
-		 * tcq, ide_can_queue is always 1 since we never get here
-		 * unless the drive is idle.
-		 */
-		if (!ide_can_queue(drive)) {
-			if (!ide_pending_commands(drive))
-				clear_bit(IDE_BUSY, &hwgroup->flags);
-			break;
-		}
-
-		drive->PADAM_sleep = 0;
-		drive->PADAM_service_start = jiffies;
-
-		if (test_bit(IDE_DMA, &hwgroup->flags)) {
-			printk("ide_do_request: DMA in progress...\n");
-			break;
-		}
-
-		/*
-		 * there's a small window between where the queue could be
-		 * replugged while we are in here when using tcq (in which
-		 * case the queue is probably empty anyways...), so check
-		 * and leave if appropriate. When not using tcq, this is
-		 * still a severe BUG!
-		 */
-		if (blk_queue_plugged(&drive->queue)) {
-			BUG_ON(!drive->using_tcq);
-			break;
-		}
-
-		if (!(rq = elv_next_request(&drive->queue))) {
-			if (!ide_pending_commands(drive))
-				clear_bit(IDE_BUSY, &hwgroup->flags);
-			hwgroup->rq = NULL;
-			break;
-		}
-
-		/*
-		 * if there are queued commands, we can't start a non-fs
-		 * request (really, a non-queuable command) until the
-		 * queue is empty
-		 */
-		if (!(rq->flags & REQ_CMD) && ide_pending_commands(drive))
-			break;
-
-		hwgroup->rq = rq;
-
-		/*
-		 * Some systems have trouble with IDE IRQs arriving while
-		 * the driver is still setting things up.  So, here we disable
-		 * the IRQ used by this interface while the request is being
-		 * started.  This may look bad at first, but pretty much the
-		 * same thing happens anyway when any interrupt comes in, IDE
-		 * or otherwise -- the kernel masks the IRQ while it is being
-		 * handled.
-		 */
-		if (masked_irq && HWIF(drive)->irq != masked_irq)
-			disable_irq_nosync(HWIF(drive)->irq);
-
-		spin_unlock(&ide_lock);
-		ide__sti();	/* allow other IRQs while we start this request */
-		startstop = start_request(drive, rq);
-
-		spin_lock_irq(&ide_lock);
-		if (masked_irq && HWIF(drive)->irq != masked_irq)
-			enable_irq(HWIF(drive)->irq);
-
-		/*
-		 * command started, we are busy
-		 */
-		if (startstop == ide_started)
-			break;
-
-		/*
-		 * start_request() can return either ide_stopped (no command
-		 * was started), ide_started (command started, don't queue
-		 * more), or ide_released (command started, try and queue
-		 * more).
-		 */
-#if 0
-		if (startstop == ide_stopped)
-			set_bit(IDE_BUSY, &hwgroup->flags);
-#endif
-
-	} while (1);
-
-	if (startstop == ide_started)
-		return;
+	return best;
 }
 
 /*
@@ -1458,34 +1259,86 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 {
 	ide_drive_t *drive;
 	struct ata_channel *hwif;
+	ide_startstop_t	startstop;
+	struct request	*rq;
 
 	ide_get_lock(&ide_intr_lock, ide_intr, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
 
 	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
 
 	while (!test_and_set_bit(IDE_BUSY, &hwgroup->flags)) {
-
-		/*
-		 * will clear IDE_BUSY, if appropriate
-		 */
-		if ((drive = choose_drive(hwgroup)) == NULL)
-			break;
-
+		drive = choose_drive(hwgroup);
+		if (drive == NULL) {
+			unsigned long sleep = 0;
+			hwgroup->rq = NULL;
+			drive = hwgroup->drive;
+			do {
+				if (drive->PADAM_sleep && (!sleep || time_after(sleep, drive->PADAM_sleep)))
+					sleep = drive->PADAM_sleep;
+			} while ((drive = drive->next) != hwgroup->drive);
+			if (sleep) {
+				/*
+				 * Take a short snooze, and then wake up this hwgroup again.
+				 * This gives other hwgroups on the same a chance to
+				 * play fairly with us, just in case there are big differences
+				 * in relative throughputs.. don't want to hog the cpu too much.
+				 */
+				if (0 < (signed long)(jiffies + WAIT_MIN_SLEEP - sleep))
+					sleep = jiffies + WAIT_MIN_SLEEP;
+#if 1
+				if (timer_pending(&hwgroup->timer))
+					printk("ide_set_handler: timer already active\n");
+#endif
+				set_bit(IDE_SLEEP, &hwgroup->flags);
+				mod_timer(&hwgroup->timer, sleep);
+				/* we purposely leave hwgroup busy while sleeping */
+			} else {
+				/* Ugly, but how can we sleep for the lock otherwise? perhaps from tq_disk? */
+				ide_release_lock(&ide_intr_lock);/* for atari only */
+				clear_bit(IDE_BUSY, &hwgroup->flags);
+			}
+			return;		/* no more work for this hwgroup (for now) */
+		}
 		hwif = drive->channel;
-		if (hwgroup->hwif->sharing_irq && hwif != hwgroup->hwif && IDE_CONTROL_REG) {
+		if (hwgroup->hwif->sharing_irq && hwif != hwgroup->hwif && hwif->io_ports[IDE_CONTROL_OFFSET]) {
 			/* set nIEN for previous hwif */
+
 			if (hwif->intrproc)
 				hwif->intrproc(drive);
 			else
-				OUT_BYTE(drive->ctl|2, IDE_CONTROL_REG);
+				OUT_BYTE((drive)->ctl|2, hwif->io_ports[IDE_CONTROL_OFFSET]);
 		}
 		hwgroup->hwif = hwif;
 		hwgroup->drive = drive;
+		drive->PADAM_sleep = 0;
+		drive->PADAM_service_start = jiffies;
+
+		if (blk_queue_plugged(&drive->queue))
+			BUG();
 
 		/*
-		 * main queueing loop
+		 * just continuing an interrupted request maybe
 		 */
-		ide_queue_commands(drive, masked_irq);
+		rq = hwgroup->rq = elv_next_request(&drive->queue);
+
+		/*
+		 * Some systems have trouble with IDE IRQs arriving while
+		 * the driver is still setting things up.  So, here we disable
+		 * the IRQ used by this interface while the request is being started.
+		 * This may look bad at first, but pretty much the same thing
+		 * happens anyway when any interrupt comes in, IDE or otherwise
+		 *  -- the kernel masks the IRQ while it is being handled.
+		 */
+		if (masked_irq && hwif->irq != masked_irq)
+			disable_irq_nosync(hwif->irq);
+		spin_unlock(&ide_lock);
+		ide__sti();	/* allow other IRQs while we start this request */
+		startstop = start_request(drive, rq);
+		spin_lock_irq(&ide_lock);
+		if (masked_irq && hwif->irq != masked_irq)
+			enable_irq(hwif->irq);
+		if (startstop == ide_stopped)
+			clear_bit(IDE_BUSY, &hwgroup->flags);
 	}
 }
 
@@ -1512,39 +1365,21 @@ void do_ide_request(request_queue_t *q)
  * un-busy the hwgroup etc, and clear any pending DMA status. we want to
  * retry the current request in PIO mode instead of risking tossing it
  * all away
- *
- * FIXME: needs a bit of tcq work
  */
 void ide_dma_timeout_retry(ide_drive_t *drive)
 {
 	struct ata_channel *hwif = drive->channel;
-	struct request *rq = NULL;
-	struct ata_request *ar = NULL;
-
-	if (drive->using_tcq) {
-		if (drive->tcq->active_tag != -1) {
-			ar = IDE_CUR_AR(drive);
-			rq = ar->ar_rq;
-		}
-	} else {
-		rq = HWGROUP(drive)->rq;
-		ar = rq->special;
-	}
+	struct request *rq;
 
 	/*
 	 * end current dma transaction
 	 */
-	if (rq)
-		hwif->dmaproc(ide_dma_end, drive);
+	hwif->dmaproc(ide_dma_end, drive);
 
 	/*
 	 * complain a little, later we might remove some of this verbosity
 	 */
-	printk("%s: timeout waiting for DMA", drive->name);
-	if (drive->using_tcq)
-		printk(" queued, active tag %d", drive->tcq->active_tag);
-	printk("\n");
-
+	printk("%s: timeout waiting for DMA\n", drive->name);
 	hwif->dmaproc(ide_dma_timeout, drive);
 
 	/*
@@ -1560,24 +1395,14 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
 	 * un-busy drive etc (hwgroup->busy is cleared on return) and
 	 * make sure request is sane
 	 */
+	rq = HWGROUP(drive)->rq;
 	HWGROUP(drive)->rq = NULL;
-
-	if (!rq)
-		return;
 
 	rq->errors = 0;
 	if (rq->bio) {
 		rq->sector = rq->bio->bi_sector;
 		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 		rq->buffer = NULL;
-	}
-
-	/*
-	 *  this request was not on the queue any more
-	 */
-	if (ar->ar_flags & ATA_AR_QUEUED) {
-		ata_ar_put(drive, ar);
-		_elv_add_request(&drive->queue, rq, 0, 0);
 	}
 }
 
@@ -1814,16 +1639,13 @@ void ide_intr(int irq, void *dev_id, struct pt_regs *regs)
 	set_recovery_timer(drive->channel);
 	drive->PADAM_service_time = jiffies - drive->PADAM_service_start;
 	if (startstop == ide_stopped) {
-		if (hwgroup->handler == NULL) { /* paranoia */
+		if (hwgroup->handler == NULL) {	/* paranoia */
 			clear_bit(IDE_BUSY, &hwgroup->flags);
-			if (test_bit(IDE_DMA, &hwgroup->flags))
-				printk("ide_intr: illegal clear\n");
 			ide_do_request(hwgroup, hwif->irq);
 		} else {
 			printk("%s: ide_intr: huh? expected NULL handler on exit\n", drive->name);
 		}
-	} else if (startstop == ide_released)
-		ide_queue_commands(drive, hwif->irq);
+	}
 
 out_lock:
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -1898,7 +1720,6 @@ int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action
 	if (drive->channel->chipset == ide_pdc4030 && rq->buffer != NULL)
 		return -ENOSYS;  /* special drive cmds not supported */
 #endif
-	rq->flags |= REQ_STARTED;
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
 	rq->rq_dev = mk_kdev(major,(drive->select.b.unit)<<PARTN_BITS);
@@ -2222,7 +2043,6 @@ void ide_unregister(struct ata_channel *channel)
 		}
 		drive->present = 0;
 		blk_cleanup_queue(&drive->queue);
-		ide_teardown_commandlist(drive);
 	}
 	if (d->present)
 		hwgroup->drive = d;
@@ -2772,86 +2592,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (ata_ops(drive) && ata_ops(drive)->ioctl)
 				return ata_ops(drive)->ioctl(drive, inode, file, cmd, arg);
 			return -EINVAL;
-	}
-}
-
-int ide_build_commandlist(ide_drive_t *drive)
-{
-#ifdef CONFIG_BLK_DEV_IDEPCI
-	struct pci_dev *pdev = drive->channel->pci_dev;
-#else
-	struct pci_dev *pdev = NULL;
-#endif
-	struct list_head *p;
-	unsigned long flags;
-	struct ata_request *ar;
-	int i, cur;
-
-	spin_lock_irqsave(&ide_lock, flags);
-
-	cur = 0;
-	list_for_each(p, &drive->free_req)
-		cur++;
-
-	/*
-	 * for now, just don't shrink it...
-	 */
-	if (drive->queue_depth <= cur) {
-		spin_unlock_irqrestore(&ide_lock, flags);
-		return 0;
-	}
-
-	for (i = cur; i < drive->queue_depth; i++) {
-		ar = kmalloc(sizeof(*ar), GFP_ATOMIC);
-		if (!ar)
-			break;
-
-		memset(ar, 0, sizeof(*ar));
-		INIT_LIST_HEAD(&ar->ar_queue);
-
-		ar->ar_sg_table = kmalloc(PRD_SEGMENTS * sizeof(struct scatterlist), GFP_ATOMIC);
-		if (!ar->ar_sg_table) {
-			kfree(ar);
-			break;
-		}
-
-		ar->ar_dmatable_cpu = pci_alloc_consistent(pdev, PRD_SEGMENTS * PRD_BYTES, &ar->ar_dmatable);
-		if (!ar->ar_dmatable_cpu) {
-			kfree(ar->ar_sg_table);
-			kfree(ar);
-			break;
-		}
-
-		/*
-		 * pheew, all done, add to list
-		 */
-		list_add_tail(&ar->ar_queue, &drive->free_req);
-		++cur;
-	}
-	drive->queue_depth = cur;
-	spin_unlock_irqrestore(&ide_lock, flags);
-	return 0;
-}
-
-int ide_init_commandlist(ide_drive_t *drive)
-{
-	INIT_LIST_HEAD(&drive->free_req);
-
-	return ide_build_commandlist(drive);
-}
-
-void ide_teardown_commandlist(ide_drive_t *drive)
-{
-	struct pci_dev *pdev= drive->channel->pci_dev;
-	struct list_head *entry;
-
-	list_for_each(entry, &drive->free_req) {
-		struct ata_request *ar = list_ata_entry(entry);
-
-		list_del(&ar->ar_queue);
-		kfree(ar->ar_sg_table);
-		pci_free_consistent(pdev, PRD_SEGMENTS * PRD_BYTES, ar->ar_dmatable_cpu, ar->ar_dmatable);
-		kfree(ar);
 	}
 }
 
@@ -3426,9 +3166,6 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 
 			drive->channel->dmaproc(ide_dma_off_quietly, drive);
 			drive->channel->dmaproc(ide_dma_check, drive);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-			drive->channel->dmaproc(ide_dma_queued_on, drive);
-#endif /* CONFIG_BLK_DEV_IDE_TCQ_DEFAULT */
 		}
 		/* Only CD-ROMs and tape drives support DSC overlap. */
 		drive->dsc_overlap = (drive->next != drive
