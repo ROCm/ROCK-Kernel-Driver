@@ -789,6 +789,10 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 				cpc_writel(card->hw.scabase + DRX_REG(EDAL, ch), 
 						RX_BD_ADDR(ch, pc300chan->rx_last_bd)); 
 			}
+			if (new) {
+				kfree(new);
+				new = NULL;
+			}
 			return; 
 		}
 		
@@ -834,7 +838,8 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 						cpc_tty->name);
 				cpc_tty_rx_disc_frame(pc300chan);
 				rx_len = 0;
-				kfree((unsigned char *)new);
+				kfree(new);
+				new = NULL;
 				break; /* read next frame - while(1) */
 			}
 
@@ -843,7 +848,8 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 				cpc_tty_rx_disc_frame(pc300chan);
 				stats->rx_dropped++; 
 				rx_len = 0; 
-				kfree((unsigned char *)new);
+				kfree(new);
+				new = NULL;
 				break; /* read next frame - while(1) */
 			}
 
