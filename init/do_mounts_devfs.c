@@ -54,7 +54,7 @@ static void * __init read_dir(char *path, int *len)
 	if (fd < 0)
 		return NULL;
 
-	for (size = 1 << 9; size <= (1 << MAX_ORDER); size <<= 1) {
+	for (size = 1 << 9; size <= (PAGE_SIZE << MAX_ORDER); size <<= 1) {
 		void *p = kmalloc(size, GFP_KERNEL);
 		int n;
 		if (!p)
