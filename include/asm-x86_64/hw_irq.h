@@ -106,8 +106,6 @@ extern unsigned long io_apic_irqs;
 extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
-extern char _stext, _etext;
-
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
 
 #define __STR(x) #x

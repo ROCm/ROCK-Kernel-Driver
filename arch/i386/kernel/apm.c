@@ -844,6 +844,8 @@ recalc:
 		idle_percentage *= 100;
 		idle_percentage /= jiffies_since_last_check;
 		use_apm_idle = (idle_percentage > idle_threshold);
+		if (apm_info.forbid_idle)
+			use_apm_idle = 0;
 		last_jiffies = jiffies;
 		last_stime = current->stime;
 	}

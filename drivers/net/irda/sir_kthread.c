@@ -311,15 +311,9 @@ static void irda_config_fsm(void *data)
 			break;
 
 		case SIRDEV_STATE_SET_DTR_RTS:
-			if (dev->drv->set_dtr_rts) {
-				int	dtr, rts;
-
-				dtr = (fsm->param&0x02) ? TRUE : FALSE;
-				rts = (fsm->param&0x01) ? TRUE : FALSE;
-				ret = dev->drv->set_dtr_rts(dev,dtr,rts);
-			}
-			else
-				ret = -EINVAL;
+			ret = sirdev_set_dtr_rts(dev,
+				(fsm->param&0x02) ? TRUE : FALSE,
+				(fsm->param&0x01) ? TRUE : FALSE);
 			next_state = SIRDEV_STATE_DONE;
 			break;
 

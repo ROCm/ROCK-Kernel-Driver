@@ -4,6 +4,7 @@
  * Copyright 2000-2002 Andi Kleen, SuSE Labs.
  */		 
 
+#include <asm/dwarf2.h>
 #include <asm/calling.h>
 #include <asm/offset.h>
 #include <asm/current.h>
@@ -45,6 +46,7 @@
  * with the int 0x80 path.	
  */ 	
 ENTRY(ia32_cstar_target)
+	CFI_STARTPROC
 	swapgs
 	movl	%esp,%r8d
 	movq	%gs:pda_kernelstack,%rsp
@@ -105,6 +107,7 @@ cstar_tracesys:
 cstar_badarg:
 	movq $-EFAULT,%rax
 	jmp cstar_sysret
+	CFI_ENDPROC
 
 /* 
  * Emulated IA32 system calls via int 0x80. 
@@ -128,6 +131,7 @@ cstar_badarg:
  */ 				
 
 ENTRY(ia32_syscall)
+	CFI_STARTPROC
 	swapgs	
 	sti
 	movl %eax,%eax
@@ -168,6 +172,7 @@ ni_syscall:
 quiet_ni_syscall:
 	movq $-ENOSYS,%rax
 	ret
+	CFI_ENDPROC
 	
 	.macro PTREGSCALL label, func
 	.globl \label
@@ -188,6 +193,7 @@ quiet_ni_syscall:
 	PTREGSCALL stub32_rt_sigsuspend, sys_rt_sigsuspend
 
 ENTRY(ia32_ptregs_common)
+	CFI_STARTPROC
 	popq %r11
 	SAVE_REST
 	movq %r11, %r15
@@ -198,6 +204,7 @@ ENTRY(ia32_ptregs_common)
 	je   int_ret_from_sys_call /* misbalances the call/ret stack. sorry */
 	pushq %r11
 	ret
+	CFI_ENDPROC
 
 	.data
 	.align 8
@@ -326,7 +333,7 @@ ia32_sys_call_table:
 	.quad stub32_clone		/* 120 */
 	.quad sys_setdomainname
 	.quad sys_uname
-	.quad sys32_modify_ldt
+	.quad sys_modify_ldt
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
 	.quad compat_sys_sigprocmask
@@ -334,10 +341,10 @@ ia32_sys_call_table:
 	.quad sys_init_module
 	.quad sys_delete_module
 	.quad quiet_ni_syscall		/* 130  get_kernel_syms */
-	.quad ni_syscall	/* quotactl */ 
+	.quad sys32_quotactl		/* quotactl */ 
 	.quad sys_getpgid
 	.quad sys_fchdir
-	.quad ni_syscall	/* bdflush */
+	.quad quiet_ni_syscall	/* bdflush */
 	.quad sys_sysfs		/* 135 */
 	.quad sys_personality
 	.quad ni_syscall	/* for afs_syscall */
@@ -425,8 +432,8 @@ ia32_sys_call_table:
 	.quad sys_madvise
 	.quad sys_getdents64	/* 220 getdents64 */ 
 	.quad compat_sys_fcntl64	
-	.quad sys_ni_syscall	/* tux */
-	.quad sys_ni_syscall    /* security */
+	.quad quiet_ni_syscall		/* tux */
+	.quad quiet_ni_syscall    	/* security */
 	.quad sys_gettid	
 	.quad sys_readahead	/* 225 */
 	.quad sys_setxattr
@@ -454,7 +461,7 @@ ia32_sys_call_table:
 	.quad sys32_io_submit
 	.quad sys_io_cancel
 	.quad sys_fadvise64
-	.quad sys_ni_syscall /* free_huge_pages */
+	.quad quiet_ni_syscall /* free_huge_pages */
 	.quad sys_exit_group /* exit_group */
 	.quad sys_lookup_dcookie
 	.quad sys_epoll_create

@@ -98,7 +98,7 @@ EXPORT_SYMBOL(irport_change_speed);
 EXPORT_SYMBOL(irport_net_open);
 EXPORT_SYMBOL(irport_net_close);
 
-int __init irport_init(void)
+static int __init irport_init(void)
 {
  	int i;
 

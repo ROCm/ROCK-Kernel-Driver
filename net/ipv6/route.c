@@ -785,7 +785,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 			/* IPv6 strictly inhibits using not link-local
 			   addresses as nexthop address.
 			   Otherwise, router will not able to send redirects.
-			   It is very good, but in some (rare!) curcumstances
+			   It is very good, but in some (rare!) circumstances
 			   (SIT, PtP, NBMA NOARP links) it is handy to allow
 			   some exceptions. --ANK
 			 */
@@ -1365,10 +1365,10 @@ static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 	 */
 	/*
 	   If new MTU is less than route PMTU, this new MTU will be the
-	   lowest MTU in the path, update the route PMTU to refect PMTU
+	   lowest MTU in the path, update the route PMTU to reflect PMTU
 	   decreases; if new MTU is greater than route PMTU, and the
 	   old MTU is the lowest MTU in the path, update the route PMTU
-	   to refect the increase. In this case if the other nodes' MTU
+	   to reflect the increase. In this case if the other nodes' MTU
 	   also have the lowest MTU, TOO BIG MESSAGE will be lead to
 	   PMTU discouvery.
 	 */

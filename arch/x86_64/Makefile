@@ -49,7 +49,7 @@ CFLAGS += -fno-reorder-blocks
 # CFLAGS += -finline-limit=2000
 CFLAGS += -Wno-sign-compare
 # don't enable this when you use kgdb:
-ifneq ($(CONFIG_X86_REMOTE_DEBUG),y)
+ifneq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS += -fno-asynchronous-unwind-tables
 endif
 #CFLAGS += $(call check_gcc,-funit-at-a-time,)

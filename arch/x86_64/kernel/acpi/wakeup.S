@@ -41,7 +41,19 @@ wakeup_code:
 	cmpl	$0x12345678, %eax
 	jne	bogus_real_magic
 
+	testl	$1, video_flags - wakeup_code
+	jz	1f
 	lcall   $0xc000,$3
+	movw	%cs, %ax
+	movw	%ax, %ds					# Bios might have played with that
+	movw	%ax, %ss
+1:
+
+	testl	$2, video_flags - wakeup_code
+	jz	1f
+	mov	video_mode - wakeup_code, %ax
+	call	mode_seta
+1:
 
  	movw	$0xb800, %ax
 	movw	%ax,%fs
@@ -250,6 +262,7 @@ real_save_gdt:	.word 0
 		.quad 0
 real_magic:	.quad 0
 video_mode:	.quad 0
+video_flags:	.quad 0
 
 bogus_real_magic:
 	movb	$0xba,%al	;  outb %al,$0x80		
@@ -382,8 +395,10 @@ ENTRY(acpi_copy_wakeup_routine)
 	movl	%eax, saved_efer
 	movl	%edx, saved_efer2
 
-#	movq	saved_videomode, %rdx				# FIXME:	 videomode
-	movq	%rdx, video_mode - wakeup_start (,%rdi)
+	movl	saved_video_mode, %edx
+	movl	%edx, video_mode - wakeup_start (,%rdi)
+	movl	acpi_video_flags, %edx
+	movl	%edx, video_flags - wakeup_start (,%rdi)
 	movq	$0x12345678, real_magic - wakeup_start (,%rdi)
 	movq	$0x123456789abcdef0, %rdx
 	movq	%rdx, saved_magic

@@ -65,43 +65,78 @@ out:
 	return error;
 }
 
-unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
+static void find_start_end(unsigned long flags, unsigned long *begin,
+			   unsigned long *end)
 {
-	struct vm_area_struct *vma;
-	unsigned long end = TASK_SIZE;
-
 #ifdef CONFIG_IA32_EMULATION
 	if (test_thread_flag(TIF_IA32)) { 
-		if (!addr) 
-			addr = TASK_UNMAPPED_32;
-		end = IA32_PAGE_OFFSET; 
+		*begin = TASK_UNMAPPED_32;
+		*end = IA32_PAGE_OFFSET; 
 	} else 
 #endif
 	if (flags & MAP_32BIT) { 
-		/* This is usually used needed to map code in small model, so it needs to 
-		   be in the first 31bit. Limit it to that.
-		   This means we need to move the unmapped base down for this case. This can 
-		   give conflicts with the heap, but we assume that glibc malloc knows how 
-		   to fall back to mmap. Give it 1GB of playground for now. -AK */ 
-		if (!addr) 
-			addr = 0x40000000; 
-		end = 0x80000000;		
+		/* This is usually used needed to map code in small
+		   model, so it needs to be in the first 31bit. Limit
+		   it to that.  This means we need to move the
+		   unmapped base down for this case. This can give
+		   conflicts with the heap, but we assume that glibc
+		   malloc knows how to fall back to mmap. Give it 1GB
+		   of playground for now. -AK */ 
+		*begin = 0x40000000; 
+		*end = 0x80000000;		
 	} else { 
-		if (!addr) 
-			addr = TASK_UNMAPPED_64; 
-		end = TASK_SIZE; 
+		*begin = TASK_UNMAPPED_64; 
+		*end = TASK_SIZE; 
 		}
+} 
+
+unsigned long
+arch_get_unmapped_area(struct file *filp, unsigned long addr,
+		unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
+	unsigned long start_addr;
+	unsigned long begin, end;
+	
+	find_start_end(flags, &begin, &end); 
 
 	if (len > end)
 		return -ENOMEM;
-	addr = PAGE_ALIGN(addr);
 
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
-		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (end - len < addr)
-			return -ENOMEM;
-		if (!vma || addr + len <= vma->vm_start)
+	if (addr) {
+	addr = PAGE_ALIGN(addr);
+		vma = find_vma(mm, addr);
+		if (end - len >= addr &&
+		    (!vma || addr + len <= vma->vm_start))
 			return addr;
+	}
+	addr = mm->free_area_cache;
+	if (addr < begin) 
+		addr = begin; 
+	start_addr = addr;
+
+full_search:
+	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
+		if (end - len < addr) {
+			/*
+			 * Start a new search - just in case we missed
+			 * some holes.
+			 */
+			if (start_addr != begin) {
+				start_addr = addr = begin;
+				goto full_search;
+			}
+			return -ENOMEM;
+		}
+		if (!vma || addr + len <= vma->vm_start) {
+			/*
+			 * Remember the place where we stopped the search:
+			 */
+			mm->free_area_cache = addr + len;
+			return addr;
+		}
 		addr = vma->vm_end;
 	}
 }

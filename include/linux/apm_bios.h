@@ -53,6 +53,7 @@ struct apm_info {
 	int			get_power_status_broken;
 	int			get_power_status_swabinminutes;
 	int			allow_ints;
+	int			forbid_idle;
 	int			realmode_power_off;
 	int			disabled;
 };

@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux aic7xxx SCSI driver.
 #
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#7 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#8 $
 #
 
 # Let kbuild descend into aicasm when cleaning
@@ -61,6 +61,13 @@ aicasm-7xxx-opts-$(CONFIG_AIC7XXX_REG_PRETTY_PRINT) := \
 	-p $(obj)/aic7xxx_reg_print.c -i aic7xxx_osm.h
 
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
+# Create a dependency chain in generated files
+# to avoid concurrent invocations of the single
+# rule that builds them all.
+aic7xxx_seq.h: aic7xxx_reg.h
+ifeq ($(CONFIG_AIC7XXX_REG_PRETTY_PRINT),y)
+aic7xxx_reg.h: aic7xxx_reg_print.c
+endif
 $(aic7xxx-gen-y): $(src)/aic7xxx.seq $(src)/aic7xxx.reg $(obj)/aicasm/aicasm
 	$(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
 			      $(aicasm-7xxx-opts-y) -o $(obj)/aic7xxx_seq.h \
@@ -75,6 +82,13 @@ aicasm-79xx-opts-$(CONFIG_AIC79XX_REG_PRETTY_PRINT) := \
 	-p $(obj)/aic79xx_reg_print.c -i aic79xx_osm.h
 
 ifeq ($(CONFIG_AIC79XX_BUILD_FIRMWARE),y)
+# Create a dependency chain in generated files
+# to avoid concurrent invocations of the single
+# rule that builds them all.
+aic79xx_seq.h: aic79xx_reg.h
+ifeq ($(CONFIG_AIC79XX_REG_PRETTY_PRINT),y)
+aic79xx_reg.h: aic79xx_reg_print.c
+endif
 $(aic79xx-gen-y): $(src)/aic79xx.seq $(src)/aic79xx.reg $(obj)/aicasm/aicasm
 	$(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \
 			      $(aicasm-79xx-opts-y) -o $(obj)/aic79xx_seq.h \

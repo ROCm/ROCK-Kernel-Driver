@@ -149,13 +149,11 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 #undef strncpy
 #undef strchr	
 #undef strcmp 
-#undef bcopy
 #undef strcpy 
 #undef strcat
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
-extern void bcopy(const char * src, char * dest, int count);
 extern void * memmove(void * dest,const void *src,size_t count);
 extern char * strcpy(char * dest,const char *src);
 extern int strcmp(const char * cs,const char * ct);
@@ -178,7 +176,6 @@ EXPORT_SYMBOL_NOVERS(memchr);
 EXPORT_SYMBOL_NOVERS(strrchr);
 EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(bcopy);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(__memcpy);
 

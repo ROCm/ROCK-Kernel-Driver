@@ -2426,7 +2426,7 @@ static int get_raw32_request(struct raw_config_request *req, struct raw32_config
         __get_user(hi_min, ((__u32*)(&user_req->block_minor) + 1));
 
         req->block_major = lo_maj | (((__u64)hi_maj) << 32);
-        req->block_minor = lo_min | (((__u64)lo_min) << 32);
+        req->block_minor = lo_min | (((__u64)hi_min) << 32);
 
         return ret;
 }
