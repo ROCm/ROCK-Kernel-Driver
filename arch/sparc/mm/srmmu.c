@@ -1963,7 +1963,7 @@ extern unsigned long srmmu_fault;
 		iaddr = &(insn); \
 		daddr = &(dest); \
 		*iaddr = SPARC_BRANCH((unsigned long) daddr, (unsigned long) iaddr); \
-	} while(0);
+	} while(0)
 
 static void __init patch_window_trap_handlers(void)
 {

@@ -1832,6 +1832,6 @@ static inline int tcp_paws_check(struct tcp_opt *tp, int rst)
 	return 1;
 }
 
-#define TCP_CHECK_TIMER(sk) do { } while (0);
+#define TCP_CHECK_TIMER(sk) do { } while (0)
 
 #endif	/* _TCP_H */

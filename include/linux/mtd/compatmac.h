@@ -190,8 +190,8 @@ static inline int try_inc_mod_count(struct module *mod)
 
 #if LINUX_VERSION_CODE < 0x20300
 #include <linux/interrupt.h>
-#define spin_lock_bh(lock) do {start_bh_atomic();spin_lock(lock);}while(0);
-#define spin_unlock_bh(lock) do {spin_unlock(lock);end_bh_atomic();}while(0);
+#define spin_lock_bh(lock) do {start_bh_atomic();spin_lock(lock);} while(0)
+#define spin_unlock_bh(lock) do {spin_unlock(lock);end_bh_atomic();} while(0)
 #else
 #include <asm/softirq.h>
 #include <linux/spinlock.h>

@@ -10,8 +10,8 @@
 #include <asm/mach-types.h>
 #include <asm/arch/assabet.h>
 
-#define kbd_disable_irq()	do { } while(0);
-#define kbd_enable_irq()	do { } while(0);
+#define kbd_disable_irq()	do { } while(0)
+#define kbd_enable_irq()	do { } while(0)
 
 extern int sa1111_kbd_init_hw(void);
 extern void gc_kbd_init_hw(void);
