@@ -514,6 +514,8 @@ static inline int make_private_signals(void)
 	spin_lock_init(&newsig->siglock);
 	atomic_set(&newsig->count, 1);
 	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
+	init_sigpending(&newsig->shared_pending);
+
 	spin_lock_irq(&current->sigmask_lock);
 	current->sig = newsig;
 	spin_unlock_irq(&current->sigmask_lock);
