@@ -24,12 +24,13 @@
 #include <linux/delay.h>
 #include <linux/init.h> /* For __init, __exit */
 
+#include "prismcompat.h"
 #include "islpci_dev.h"
 #include "islpci_mgt.h"		/* for pc_debug */
 #include "isl_oid.h"
 
 #define DRV_NAME	"prism54"
-#define DRV_VERSION	"1.1"
+#define DRV_VERSION	"1.2"
 
 MODULE_AUTHOR("[Intersil] R.Bastings and W.Termorshuizen, The prism54.org Development Team <prism54-devel@prism54.org>");
 MODULE_DESCRIPTION("The Prism54 802.11 Wireless LAN adapter");
