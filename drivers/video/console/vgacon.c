@@ -963,6 +963,8 @@ static int vgacon_scrolldelta(struct vc_data *c, int lines)
 		p = (c->vc_visible_origin - vga_vram_base - ul + we) % we +
 		    lines * c->vc_size_row;
 		st = (c->vc_origin - vga_vram_base - ul + we) % we;
+		if (st < 2 * margin)
+			margin = 0;
 		if (p < margin)
 			p = 0;
 		if (p > st - margin)
