@@ -183,10 +183,10 @@ typedef enum {
 struct mpt_pci_driver{
 	int  (*probe) (struct pci_dev *dev, const struct pci_device_id *id);
 	void (*remove) (struct pci_dev *dev);
-	int  (*suspend) (struct pci_dev *dev, u32 state);
-#ifdef CONFIG_PM
-	int  (*resume) (struct pci_dev *dev);
 	void (*shutdown) (struct device * dev);
+#ifdef CONFIG_PM
+	int  (*suspend) (struct pci_dev *dev, u32 state);
+	int  (*resume) (struct pci_dev *dev);
 #endif
 };
 
