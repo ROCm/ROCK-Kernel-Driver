@@ -424,8 +424,7 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 	/* It's a directory, or we are required to confirm the file's
 	 * location in the tree.
 	 */
-	dprintk("nfs_fh: need to look harder for %02x:%02x/%d\n",
-		major(sb->s_dev), minor(sb->s_dev), datap[0]);
+	dprintk("nfs_fh: need to look harder for %s/%d\n", sb->s_id, datap[0]);
 
 	if (!S_ISDIR(result->d_inode->i_mode)) {
 		nfsdstats.fh_nocache_nondir++;
