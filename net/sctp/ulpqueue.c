@@ -118,7 +118,7 @@ void sctp_ulpq_free(struct sctp_ulpq *ulpq)
 }
 
 /* Process an incoming DATA chunk.  */
-int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
+int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
 			int gfp)
 {
 	struct sk_buff_head temp;

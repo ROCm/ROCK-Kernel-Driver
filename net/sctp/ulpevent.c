@@ -316,7 +316,7 @@ fail:
  * error formats.
  */
 struct sctp_ulpevent *sctp_ulpevent_make_remote_error(
-	const struct sctp_association *asoc, sctp_chunk_t *chunk,
+	const struct sctp_association *asoc, struct sctp_chunk *chunk,
 	__u16 flags, int gfp)
 {
 	struct sctp_ulpevent *event;
@@ -420,7 +420,7 @@ fail:
  * 5.3.1.4 SCTP_SEND_FAILED
  */
 struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
-	const struct sctp_association *asoc, sctp_chunk_t *chunk,
+	const struct sctp_association *asoc, struct sctp_chunk *chunk,
 	__u16 flags, __u32 error, int gfp)
 {
 	struct sctp_ulpevent *event;
@@ -588,7 +588,8 @@ fail:
  * 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
  */
 struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
-		   sctp_chunk_t *chunk, int gfp)
+						struct sctp_chunk *chunk, 
+						int gfp)
 {
 	struct sctp_ulpevent *event;
 	struct sctp_sndrcvinfo *info;

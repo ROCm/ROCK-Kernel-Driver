@@ -81,11 +81,11 @@ static void sctp_do_ecn_ce_work(struct sctp_association *asoc,
  * This element represents the lowest TSN number in the datagram
  * that was originally marked with the CE bit.
  */
-static sctp_chunk_t *sctp_do_ecn_ecne_work(struct sctp_association *asoc,
+static struct sctp_chunk *sctp_do_ecn_ecne_work(struct sctp_association *asoc,
 					   __u32 lowest_tsn,
-					   sctp_chunk_t *chunk)
+					   struct sctp_chunk *chunk)
 {
-	sctp_chunk_t *repl;
+	struct sctp_chunk *repl;
 
 	/* Our previously transmitted packet ran into some congestion
 	 * so we should take action by reducing cwnd and ssthresh
@@ -528,7 +528,7 @@ static void sctp_cmd_hb_timer_update(sctp_cmd_seq_t *cmds,
 static void sctp_cmd_transport_on(sctp_cmd_seq_t *cmds,
 				  struct sctp_association *asoc,
 				  struct sctp_transport *t,
-				  sctp_chunk_t *chunk)
+				  struct sctp_chunk *chunk)
 {
 	sctp_sender_hb_info_t *hbinfo;
 
@@ -596,7 +596,7 @@ static int sctp_cmd_process_sack(sctp_cmd_seq_t *cmds,
  */
 static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds, 
 			      struct sctp_association *asoc,
-			      sctp_chunk_t *chunk)
+			      struct sctp_chunk *chunk)
 {
 	struct sctp_transport *t;
 
@@ -836,8 +836,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	int error = 0;
 	int force;
 	sctp_cmd_t *cmd;
-	sctp_chunk_t *new_obj;
-	sctp_chunk_t *chunk = NULL;
+	struct sctp_chunk *new_obj;
+	struct sctp_chunk *chunk = NULL;
 	struct sctp_packet *packet;
 	struct list_head *pos;
 	struct timer_list *timer;
@@ -845,8 +845,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	struct sctp_transport *t;
 	sctp_sackhdr_t sackh;
 
-	if(SCTP_EVENT_T_TIMEOUT != event_type)
-		chunk = (sctp_chunk_t *) event_arg;
+	if (SCTP_EVENT_T_TIMEOUT != event_type)
+		chunk = (struct sctp_chunk *) event_arg;
 
 	/* Note:  This whole file is a huge candidate for rework.
 	 * For example, each command could either have its own handler, so
@@ -935,7 +935,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			new_obj = sctp_make_cookie_echo(asoc, chunk);
 			if (!new_obj) {
 				if (cmd->obj.ptr)
-					sctp_free_chunk(cmd->obj.ptr);
+					sctp_chunk_free(cmd->obj.ptr);
 				goto nomem;
 			}
 			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,

@@ -106,7 +106,7 @@ int sctp_rcv(struct sk_buff *skb)
 	struct sctp_endpoint *ep = NULL;
 	struct sctp_ep_common *rcvr;
 	struct sctp_transport *transport = NULL;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sctphdr *sh;
 	union sctp_addr src;
 	union sctp_addr dest;
@@ -250,13 +250,13 @@ discard_release:
  */
 int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sctp_inq *inqueue;
 
 	/* One day chunk will live inside the skb, but for
 	 * now this works.
 	 */
-	chunk = (sctp_chunk_t *) skb;
+	chunk = (struct sctp_chunk *) skb;
 	inqueue = &chunk->rcvr->inqueue;
 
 	sctp_inq_push(inqueue, chunk);

@@ -315,7 +315,7 @@ int sctp_endpoint_is_peeled_off(struct sctp_endpoint *ep,
 {
 	struct list_head *pos;
 	struct sockaddr_storage_list *addr;
-	sctp_bind_addr_t *bp;
+	struct sctp_bind_addr *bp;
 
 	sctp_read_lock(&ep->base.addr_lock);
 	bp = &ep->base.bind_addr;
@@ -339,7 +339,7 @@ static void sctp_endpoint_bh_rcv(struct sctp_endpoint *ep)
 	struct sctp_association *asoc;
 	struct sock *sk;
 	struct sctp_transport *transport;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sctp_inq *inqueue;
 	sctp_subtype_t subtype;
 	sctp_state_t state;

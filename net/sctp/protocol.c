@@ -393,7 +393,7 @@ struct dst_entry *sctp_v4_get_dst(struct sctp_association *asoc,
 {
 	struct rtable *rt;
 	struct flowi fl;
-	sctp_bind_addr_t *bp;
+	struct sctp_bind_addr *bp;
 	rwlock_t *addr_lock;
 	struct sockaddr_storage_list *laddr;
 	struct list_head *pos;

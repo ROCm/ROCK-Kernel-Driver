@@ -143,14 +143,14 @@ void sctp_outq_teardown(struct sctp_outq *q)
 {
 	struct sctp_transport *transport;
 	struct list_head *lchunk, *pos, *temp;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sctp_ulpevent *ev;
 
 	/* Throw away unacknowledged chunks. */
 	list_for_each(pos, &q->asoc->peer.transport_addr_list) {
 		transport = list_entry(pos, struct sctp_transport, transports);
 		while ((lchunk = sctp_list_dequeue(&transport->transmitted))) {
-			chunk = list_entry(lchunk, sctp_chunk_t,
+			chunk = list_entry(lchunk, struct sctp_chunk,
 					   transmitted_list);
 
 			/* Generate a SEND FAILED event. */
@@ -160,22 +160,24 @@ void sctp_outq_teardown(struct sctp_outq *q)
 			if (ev)
 				sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
 
-			sctp_free_chunk(chunk);
+			sctp_chunk_free(chunk);
 		}
 	}
 
 	/* Throw away chunks that have been gap ACKed.  */
 	list_for_each_safe(lchunk, temp, &q->sacked) {
 		list_del(lchunk);
-		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
-		sctp_free_chunk(chunk);
+		chunk = list_entry(lchunk, struct sctp_chunk,
+				   transmitted_list);
+		sctp_chunk_free(chunk);
 	}
 
 	/* Throw away any chunks in the retransmit queue. */
 	list_for_each_safe(lchunk, temp, &q->retransmit) {
 		list_del(lchunk);
-		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
-		sctp_free_chunk(chunk);
+		chunk = list_entry(lchunk, struct sctp_chunk,
+				   transmitted_list);
+		sctp_chunk_free(chunk);
 	}
 
 	/* Throw away any leftover data chunks. */
@@ -188,14 +190,14 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		if (ev)
 			sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
 
-		sctp_free_chunk(chunk);
+		sctp_chunk_free(chunk);
 	}
 
 	q->error = 0;
 
 	/* Throw away any leftover control chunks. */
-	while ((chunk = (sctp_chunk_t *) skb_dequeue(&q->control)))
-		sctp_free_chunk(chunk);
+	while ((chunk = (struct sctp_chunk *) skb_dequeue(&q->control)))
+		sctp_chunk_free(chunk);
 }
 
 /* Free the outqueue structure and any related pending chunks.  */
@@ -210,7 +212,7 @@ void sctp_outq_free(struct sctp_outq *q)
 }
 
 /* Put a new chunk in an sctp_outq.  */
-int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
+int sctp_outq_tail(struct sctp_outq *q, struct sctp_chunk *chunk)
 {
 	int error = 0;
 
@@ -276,15 +278,16 @@ int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
 void sctp_retransmit_insert(struct list_head *tlchunk, struct sctp_outq *q)
 {
 	struct list_head *rlchunk;
-	sctp_chunk_t *tchunk, *rchunk;
+	struct sctp_chunk *tchunk, *rchunk;
 	__u32 ttsn, rtsn;
 	int done = 0;
 
-	tchunk = list_entry(tlchunk, sctp_chunk_t, transmitted_list);
+	tchunk = list_entry(tlchunk, struct sctp_chunk, transmitted_list);
 	ttsn = ntohl(tchunk->subh.data_hdr->tsn);
 
 	list_for_each(rlchunk, &q->retransmit) {
-		rchunk = list_entry(rlchunk, sctp_chunk_t, transmitted_list);
+		rchunk = list_entry(rlchunk, struct sctp_chunk,
+				    transmitted_list);
 		rtsn = ntohl(rchunk->subh.data_hdr->tsn);
 		if (TSN_lt(ttsn, rtsn)) {
 			list_add(tlchunk, rlchunk->prev);
@@ -303,11 +306,12 @@ void sctp_retransmit_mark(struct sctp_outq *q,
 			  __u8 fast_retransmit)
 {
 	struct list_head *lchunk, *ltemp;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 
 	/* Walk through the specified transmitted queue.  */
 	list_for_each_safe(lchunk, ltemp, &transport->transmitted) {
-		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		chunk = list_entry(lchunk, struct sctp_chunk,
+				   transmitted_list);
 
 		/* If we are doing retransmission due to a fast retransmit,
 		 * only the chunk's that are marked for fast retransmit
@@ -416,7 +420,7 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 	struct list_head *lchunk;
 	struct sctp_transport *transport = pkt->transport;
 	sctp_xmit_t status;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sctp_association *asoc;
 	int error = 0;
 
@@ -442,7 +446,8 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 	lchunk = sctp_list_dequeue(lqueue);
 
 	while (lchunk) {
-		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		chunk = list_entry(lchunk, struct sctp_chunk,
+				   transmitted_list);
 
 		/* Make sure that Gap Acked TSNs are not retransmitted.  A
 		 * simple approach is just to move such TSNs out of the
@@ -582,7 +587,7 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sctp_chunk *pos,
  * of all the other fragments in the 'frag_list' field.
  */
 void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
-				 sctp_chunk_t *frag)
+				 struct sctp_chunk *frag)
 {
 	struct sctp_association *asoc = frag->asoc;
 	struct list_head *lfrag, *frag_list;
@@ -606,7 +611,7 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
 	/* Transmit the rest of fragments. */
 	frag_list = &frag->frag_list;
 	list_for_each(lfrag, frag_list) {
-		frag = list_entry(lfrag, sctp_chunk_t, frag_list);
+		frag = list_entry(lfrag, struct sctp_chunk, frag_list);
 		sctp_xmit_frag(q, pos, pkt, frag, tsn++);
 	}
 }
@@ -615,7 +620,7 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
  * fragments.  It returns the first fragment with the frag_list field holding
  * the remaining fragments.
  */
-sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
+struct sctp_chunk *sctp_fragment_chunk(struct sctp_chunk *chunk,
 				  size_t max_frag_data_len)
 {
 	struct sctp_association *asoc = chunk->asoc;
@@ -623,7 +628,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 	struct sctp_sndrcvinfo *sinfo = &chunk->sinfo;
 	__u16 chunk_data_len = sctp_data_size(chunk);
 	__u16 ssn = ntohs(chunk->subh.data_hdr->ssn);
-	sctp_chunk_t *first_frag, *frag;
+	struct sctp_chunk *first_frag, *frag;
 	struct list_head *frag_list;
 	int nfrags;
 	__u8 old_flags, flags;
@@ -648,6 +653,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 
 	if (!first_frag)
 		goto err;
+	sctp_datamsg_assign(chunk->msg, first_frag);
 	first_frag->has_ssn = 1;
 	/* All the fragments are added to the frag_list of the first chunk. */
 	frag_list = &first_frag->frag_list;
@@ -662,6 +668,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 					  ssn);
 		if (!frag)
 			goto err;
+		sctp_datamsg_assign(chunk->msg, frag);
 		frag->has_ssn = 1;
 		/* Add the middle fragment to the first fragment's
 		 * frag_list.
@@ -682,13 +689,14 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 				  flags, ssn);
 	if (!frag)
 		goto err;
+	sctp_datamsg_assign(chunk->msg, frag);
 	frag->has_ssn = 1;
 
 	/* Add the last fragment to the first fragment's frag_list. */
 	list_add_tail(&frag->frag_list, frag_list);
 
 	/* Free the original chunk. */
-	sctp_free_chunk(chunk);
+	sctp_chunk_free(chunk);
 
 	return first_frag;
 
@@ -700,12 +708,11 @@ err:
 		/* Free all the fragments off the first one. */
 		flist = &first_frag->frag_list;
 		while (NULL != (lfrag = sctp_list_dequeue(flist))) {
-			frag = list_entry(lfrag, sctp_chunk_t, frag_list);
-			sctp_free_chunk(frag);
+			frag = list_entry(lfrag, struct sctp_chunk, frag_list);
+			sctp_chunk_free(frag);
 		}
-
 		/* Free the first fragment. */
-		sctp_free_chunk(first_frag);
+		sctp_chunk_free(first_frag);
 	}
 
 	return NULL;
@@ -735,7 +742,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	struct sk_buff_head *queue;
 	struct sctp_transport *transport = NULL;
 	struct sctp_transport *new_transport;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	sctp_xmit_t status;
 	int error = 0;
 	int start_timer = 0;
@@ -762,7 +769,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	}
 
 	queue = &q->control;
-	while ((chunk = (sctp_chunk_t *)skb_dequeue(queue))) {
+	while ((chunk = (struct sctp_chunk *)skb_dequeue(queue))) {
 		/* Pick the right transport to use. */
 		new_transport = chunk->transport;
 
@@ -912,7 +919,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					sctp_ulpq_tail_event(&asoc->ulpq, ev);
 
 				/* Free the chunk. */
-				sctp_free_chunk(chunk);
+				sctp_chunk_free(chunk);
 				continue;
 			}
 
@@ -980,7 +987,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 				break;
 
 			case SCTP_XMIT_MUST_FRAG: {
-				sctp_chunk_t *frag;
+				struct sctp_chunk *frag;
 
 				frag = sctp_fragment_chunk(chunk,
 					packet->transport->asoc->frag_point);
@@ -989,7 +996,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					 * memory condition. Free the original
 					 * chunk and return ENOMEM.
 					 */
-					sctp_free_chunk(chunk);
+					sctp_chunk_free(chunk);
 					error = -ENOMEM;
 					return error;
 				}
@@ -1101,7 +1108,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 {
 	struct list_head *ltransport, *lchunk;
 	struct sctp_transport *transport;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	__u32 highest_new_tsn, tsn;
 	struct list_head *transport_list = &asoc->peer.transport_addr_list;
 
@@ -1111,7 +1118,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 		transport = list_entry(ltransport, struct sctp_transport,
 				       transports);
 		list_for_each(lchunk, &transport->transmitted) {
-			chunk = list_entry(lchunk, sctp_chunk_t,
+			chunk = list_entry(lchunk, struct sctp_chunk,
 					   transmitted_list);
 			tsn = ntohl(chunk->subh.data_hdr->tsn);
 
@@ -1134,7 +1141,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 {
 	struct sctp_association *asoc = q->asoc;
 	struct sctp_transport *transport;
-	sctp_chunk_t *tchunk;
+	struct sctp_chunk *tchunk;
 	struct list_head *lchunk, *transport_list, *pos;
 	sctp_sack_variable_t *frags = sack->variable;
 	__u32 sack_ctsn, ctsn, tsn;
@@ -1149,7 +1156,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 
 	/* Get the highest TSN in the sack. */
 	highest_tsn = sack_ctsn +
-		      ntohs(frags[ntohs(sack->num_gap_ack_blocks) - 1].gab.end);
+		ntohs(frags[ntohs(sack->num_gap_ack_blocks) - 1].gab.end);
 
 	if (TSN_lt(asoc->highest_sacked, highest_tsn)) {
 		highest_new_tsn = highest_tsn;
@@ -1191,11 +1198,12 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 
 	/* Throw away stuff rotting on the sack queue.  */
 	list_for_each(lchunk, &q->sacked) {
-		tchunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		tchunk = list_entry(lchunk, struct sctp_chunk,
+				    transmitted_list);
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
 		if (TSN_lte(tsn, ctsn)) {
 			lchunk = lchunk->prev;
-			sctp_free_chunk(tchunk);
+			sctp_chunk_free(tchunk);
 		}
 	}
 
@@ -1264,7 +1272,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 				   __u32 highest_new_tsn_in_sack)
 {
 	struct list_head *lchunk;
-	sctp_chunk_t *tchunk;
+	struct sctp_chunk *tchunk;
 	struct list_head tlist;
 	__u32 tsn;
 	__u32 sack_ctsn;
@@ -1294,7 +1302,8 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 
 	/* The while loop will skip empty transmitted queues. */
 	while (NULL != (lchunk = sctp_list_dequeue(transmitted_queue))) {
-		tchunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		tchunk = list_entry(lchunk, struct sctp_chunk,
+				    transmitted_list);
 
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
 		if (sctp_acked(sack, tsn)) {
@@ -1315,9 +1324,9 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 				 * first instance of the packet or a later
 				 * instance).
 				 */
-			   	if ((!tchunk->tsn_gap_acked) &&
-				    (1 == tchunk->num_times_sent) &&
-				    (tchunk->rtt_in_progress)) {
+			   	if (!tchunk->tsn_gap_acked &&
+				    !tchunk->resent &&
+				    tchunk->rtt_in_progress) {
 					rtt = jiffies - tchunk->sent_at;
 					sctp_transport_update_rto(transport,
 								  rtt);
@@ -1524,8 +1533,8 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 			 * receiver's advertised window is zero, and there is
 			 * only one data chunk in flight to the receiver.
 			 */
-			if ((0 == q->asoc->peer.rwnd) &&
-			    (!list_empty(&tlist)) &&
+			if (!q->asoc->peer.rwnd &&
+			    !list_empty(&tlist) &&
 			    (sack_ctsn+2 == q->asoc->next_tsn)) {
 				SCTP_DEBUG_PRINTK("%s: SACK received for zero "
 						  "window probe: %u\n",
@@ -1557,7 +1566,8 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 	 * acked by the Cumulative TSN Ack.
 	 */
         while (NULL != (lchunk = sctp_list_dequeue(&tlist))) {
-		tchunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
+		tchunk = list_entry(lchunk, struct sctp_chunk,
+				    transmitted_list);
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
 
 		/* RFC 2960 7.2.4, sctpimpguide-05 2.8.2 M3) Examine all

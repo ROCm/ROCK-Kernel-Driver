@@ -664,7 +664,7 @@ int sctp_cmp_addr_exact(const union sctp_addr *ss1,
  * Note:  We are sly and return a shared, prealloced chunk.  FIXME:
  * No we don't, but we could/should.
  */
-sctp_chunk_t *sctp_get_ecne_prepend(struct sctp_association *asoc)
+struct sctp_chunk *sctp_get_ecne_prepend(struct sctp_association *asoc)
 {
 	struct sctp_chunk *chunk;
 
@@ -682,7 +682,7 @@ sctp_chunk_t *sctp_get_ecne_prepend(struct sctp_association *asoc)
 /* Use this function for the packet prepend callback when no ECNE
  * packet is desired (e.g. some packets don't like to be bundled).
  */
-sctp_chunk_t *sctp_get_no_prepend(struct sctp_association *asoc)
+struct sctp_chunk *sctp_get_no_prepend(struct sctp_association *asoc)
 {
 	return NULL;
 }
@@ -690,13 +690,14 @@ sctp_chunk_t *sctp_get_no_prepend(struct sctp_association *asoc)
 /*
  * Find which transport this TSN was sent on.
  */
-struct sctp_transport *sctp_assoc_lookup_tsn(struct sctp_association *asoc, __u32 tsn)
+struct sctp_transport *sctp_assoc_lookup_tsn(struct sctp_association *asoc,
+					     __u32 tsn)
 {
 	struct sctp_transport *active;
 	struct sctp_transport *match;
 	struct list_head *entry, *pos;
 	struct sctp_transport *transport;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	__u32 key = htonl(tsn);
 
 	match = NULL;
@@ -719,7 +720,7 @@ struct sctp_transport *sctp_assoc_lookup_tsn(struct sctp_association *asoc, __u3
 	active = asoc->peer.active_path;
 
 	list_for_each(entry, &active->transmitted) {
-		chunk = list_entry(entry, sctp_chunk_t, transmitted_list);
+		chunk = list_entry(entry, struct sctp_chunk, transmitted_list);
 
 		if (key == chunk->subh.data_hdr->tsn) {
 			match = active;
@@ -734,7 +735,7 @@ struct sctp_transport *sctp_assoc_lookup_tsn(struct sctp_association *asoc, __u3
 		if (transport == active)
 			break;
 		list_for_each(entry, &transport->transmitted) {
-			chunk = list_entry(entry, sctp_chunk_t,
+			chunk = list_entry(entry, struct sctp_chunk,
 					   transmitted_list);
 			if (key == chunk->subh.data_hdr->tsn) {
 				match = transport;
@@ -776,7 +777,7 @@ out:
 static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 {
 	struct sctp_endpoint *ep;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sock *sk;
 	struct sctp_inq *inqueue;
 	int state, subtype;
@@ -852,7 +853,8 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 }
 
 /* Update an association (possibly from unexpected COOKIE-ECHO processing).  */
-void sctp_assoc_update(struct sctp_association *asoc, struct sctp_association *new)
+void sctp_assoc_update(struct sctp_association *asoc,
+		       struct sctp_association *new)
 {
 	/* Copy in new parameters of peer. */
 	asoc->c = new->c;
@@ -946,7 +948,8 @@ void sctp_assoc_update_retran_path(struct sctp_association *asoc)
 }
 
 /* Choose the transport for sending a SHUTDOWN packet.  */
-struct sctp_transport *sctp_assoc_choose_shutdown_transport(struct sctp_association *asoc)
+struct sctp_transport *sctp_assoc_choose_shutdown_transport(
+	struct sctp_association *asoc)
 {
 	/* If this is the first time SHUTDOWN is sent, use the active path,
 	 * else use the retran path. If the last SHUTDOWN was sent over the
@@ -1011,7 +1014,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 /* Increase asoc's rwnd by len and send any window update SACK if needed. */
 void sctp_assoc_rwnd_increase(struct sctp_association *asoc, int len)
 {
-	sctp_chunk_t *sack;
+	struct sctp_chunk *sack;
 	struct timer_list *timer;
 
 	if (asoc->rwnd_over) {
