@@ -36,7 +36,7 @@ $(error Sorry, you need a newer version of the assember, one that is built from	
 endif
 
 ifneq ($(GCC_VERSION),2)
-	cflags-$(CONFIG_ITANIUM) += -frename-registers
+$(error Sorry, your compiler is too old.  GCC v2.96 is known to generate bad code.)
 endif
 
 ifeq ($(GCC_VERSION),3)

@@ -1636,10 +1636,6 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 	unsigned int cnum, reg_flags = 0;
 	int i, ret = 0;
 
-#if __GNUC__ < 3
-	int foo;
-#endif
-
 	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
 
 	/*
@@ -1655,15 +1651,9 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 
 	for (i = 0; i < count; i++, req++) {
 		int me;
-#if __GNUC__ < 3
-		foo = __get_user(cnum, &req->reg_num);
-		if (foo) return -EFAULT;
-		foo = __get_user(reg_flags, &req->reg_flags);
-		if (foo) return -EFAULT;
-#else
+
 		if (__get_user(cnum, &req->reg_num)) return -EFAULT;
 		if (__get_user(reg_flags, &req->reg_flags)) return -EFAULT;
-#endif
 		lval = 0UL;
 
 		if (!PMD_IS_IMPL(cnum)) goto abort_mission;

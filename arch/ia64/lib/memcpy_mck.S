@@ -15,11 +15,7 @@
 #include <asm/asmmacro.h>
 #include <asm/page.h>
 
-#if __GNUC__ >= 3
-# define EK(y...) EX(y)
-#else
-# define EK(y,x...)  x
-#endif
+#define EK(y...) EX(y)
 
 GLOBAL_ENTRY(bcopy)
 	.regstk 3,0,0,0

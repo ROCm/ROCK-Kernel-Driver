@@ -43,21 +43,12 @@ name:
 	.section "__ex_table", "a"		// declare section & section attributes
 	.previous
 
-#if __GNUC__ >= 3
 # define EX(y,x...)				\
 	.xdata4 "__ex_table", 99f-., y-.;	\
   [99:]	x
 # define EXCLR(y,x...)				\
 	.xdata4 "__ex_table", 99f-., y-.+4;	\
   [99:]	x
-#else
-# define EX(y,x...)				\
-	.xdata4 "__ex_table", 99f-., y-.;	\
-  99:	x
-# define EXCLR(y,x...)				\
-	.xdata4 "__ex_table", 99f-., y-.+4;	\
-  99:	x
-#endif
 
 /*
  * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,

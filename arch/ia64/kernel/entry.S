@@ -829,11 +829,7 @@ skip_rbs_switch:
 	ssm  psr.i		// enable interrupts
 #endif
 
-#if __GNUC__ < 3
-	br.call.spnt.many rp=invoke_schedule
-#else
 	br.call.spnt.many rp=schedule
-#endif
 .ret9:	cmp.eq p6,p0=r0,r0				// p6 <- 1
 	rsm psr.i		// disable interrupts
 	;;
@@ -891,31 +887,6 @@ GLOBAL_ENTRY(ia64_invoke_schedule_tail)
 	mov rp=loc0
 	br.ret.sptk.many rp
 END(ia64_invoke_schedule_tail)
-
-#if __GNUC__ < 3
-
-	/*
-	 * Invoke schedule() while preserving in0-in7, which may be needed
-	 * in case a system call gets restarted.  Note that declaring schedule()
-	 * with asmlinkage() is NOT enough because that will only preserve as many
-	 * registers as there are formal arguments.
-	 *
-	 * XXX fix me: with gcc 3.0, we won't need this anymore because syscall_linkage
-	 *	renders all eight input registers (in0-in7) as "untouchable".
-	 */
-ENTRY(invoke_schedule)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
-	alloc loc1=ar.pfs,8,2,0,0
-	mov loc0=rp
-	;;
-	.body
-	br.call.sptk.many rp=schedule
-.ret14:	mov ar.pfs=loc1
-	mov rp=loc0
-	br.ret.sptk.many rp
-END(invoke_schedule)
-
-#endif /* __GNUC__ < 3 */
 
 	/*
 	 * Setup stack and call do_notify_resume_user().  Note that pSys and pNonSys need to
