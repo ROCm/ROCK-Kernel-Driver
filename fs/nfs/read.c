@@ -24,7 +24,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/pagemap.h>
-#include <linux/mempool.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_page.h>
@@ -39,25 +38,11 @@ static void nfs_readpage_result_partial(struct nfs_read_data *, int);
 static void nfs_readpage_result_full(struct nfs_read_data *, int);
 
 static kmem_cache_t *nfs_rdata_cachep;
-static mempool_t *nfs_rdata_mempool;
+mempool_t *nfs_rdata_mempool;
 
 #define MIN_POOL_READ	(32)
 
-static struct nfs_read_data *nfs_readdata_alloc(void)
-{
-	struct nfs_read_data   *p;
-	p = (struct nfs_read_data *)mempool_alloc(nfs_rdata_mempool, SLAB_NOFS);
-	if (p)
-		memset(p, 0, sizeof(*p));
-	return p;
-}
-
-static __inline__ void nfs_readdata_free(struct nfs_read_data *p)
-{
-	mempool_free(p, nfs_rdata_mempool);
-}
-
-static void nfs_readdata_release(struct rpc_task *task)
+void nfs_readdata_release(struct rpc_task *task)
 {
         struct nfs_read_data   *data = (struct nfs_read_data *)task->tk_calldata;
         nfs_readdata_free(data);

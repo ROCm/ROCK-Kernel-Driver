@@ -478,6 +478,26 @@ extern int  nfs_pagein_list(struct list_head *, int);
 extern void nfs_readpage_result(struct rpc_task *);
 
 /*
+ * Allocate and free nfs_read_data structures
+ */
+extern mempool_t *nfs_rdata_mempool;
+
+static inline struct nfs_read_data *nfs_readdata_alloc(void)
+{
+	struct nfs_read_data *p = mempool_alloc(nfs_rdata_mempool, SLAB_NOFS);
+	if (p)
+		memset(p, 0, sizeof(*p));
+	return p;
+}
+
+static inline void nfs_readdata_free(struct nfs_read_data *p)
+{
+	mempool_free(p, nfs_rdata_mempool);
+}
+
+extern void  nfs_readdata_release(struct rpc_task *task);
+
+/*
  * linux/fs/mount_clnt.c
  * (Used only by nfsroot module)
  */

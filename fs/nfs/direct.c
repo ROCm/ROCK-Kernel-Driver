@@ -124,34 +124,35 @@ nfs_direct_read_seg(struct inode *inode, struct nfs_open_context *ctx,
 	const unsigned int rsize = NFS_SERVER(inode)->rsize;
 	int tot_bytes = 0;
 	int curpage = 0;
-	struct nfs_read_data	rdata = {
-		.inode		= inode,
-		.cred		= ctx->cred,
-		.args		= {
-			.fh		= NFS_FH(inode),
-			.context	= ctx,
-		},
-		.res		= {
-			.fattr		= &rdata.fattr,
-		},
-	};
+	struct nfs_read_data *rdata;
 
-	rdata.args.pgbase = user_addr & ~PAGE_MASK;
-	rdata.args.offset = file_offset;
-        do {
+	rdata = nfs_readdata_alloc();
+	if (!rdata)
+		return -ENOMEM;
+
+	memset(rdata, 0, sizeof(*rdata));
+	rdata->inode = inode;
+	rdata->cred = ctx->cred;
+	rdata->args.fh = NFS_FH(inode);
+	rdata->args.context = ctx;
+	rdata->res.fattr = &rdata->fattr;
+
+	rdata->args.pgbase = user_addr & ~PAGE_MASK;
+	rdata->args.offset = file_offset;
+	do {
 		int result;
 
-		rdata.args.count = count;
-                if (rdata.args.count > rsize)
-                        rdata.args.count = rsize;
-		rdata.args.pages = &pages[curpage];
+		rdata->args.count = count;
+		if (rdata->args.count > rsize)
+			rdata->args.count = rsize;
+		rdata->args.pages = &pages[curpage];
 
 		dprintk("NFS: direct read: c=%u o=%Ld ua=%lu, pb=%u, cp=%u\n",
-			rdata.args.count, (long long) rdata.args.offset,
-			user_addr + tot_bytes, rdata.args.pgbase, curpage);
+			rdata->args.count, (long long) rdata->args.offset,
+			user_addr + tot_bytes, rdata->args.pgbase, curpage);
 
 		lock_kernel();
-		result = NFS_PROTO(inode)->read(&rdata);
+		result = NFS_PROTO(inode)->read(rdata);
 		unlock_kernel();
 
 		if (result <= 0) {
@@ -159,23 +160,22 @@ nfs_direct_read_seg(struct inode *inode, struct nfs_open_context *ctx,
 				break;
 			if (result == -EISDIR)
 				result = -EINVAL;
+			nfs_readdata_free(rdata);
 			return result;
 		}
 
-                tot_bytes += result;
-		if (rdata.res.eof)
+		tot_bytes += result;
+		if (rdata->res.eof)
 			break;
 
-                rdata.args.offset += result;
-		rdata.args.pgbase += result;
-		curpage += rdata.args.pgbase >> PAGE_SHIFT;
-		rdata.args.pgbase &= ~PAGE_MASK;
+		rdata->args.offset += result;
+		rdata->args.pgbase += result;
+		curpage += rdata->args.pgbase >> PAGE_SHIFT;
+		rdata->args.pgbase &= ~PAGE_MASK;
 		count -= result;
 	} while (count != 0);
 
-	/* XXX: should we zero the rest of the user's buffer if we
-	 *      hit eof? */
-
+	nfs_readdata_free(rdata);
 	return tot_bytes;
 }
 
@@ -188,9 +188,8 @@ nfs_direct_read_seg(struct inode *inode, struct nfs_open_context *ctx,
  * file_offset: offset in file to begin the operation
  * nr_segs: size of iovec array
  *
- * generic_file_direct_IO has already pushed out any non-direct
- * writes so that this read will see them when we read from the
- * server.
+ * We've already pushed out any non-direct writes so that this read
+ * will see them when we read from the server.
  */
 static ssize_t
 nfs_direct_read(struct inode *inode, struct nfs_open_context *ctx,
