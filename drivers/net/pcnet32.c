@@ -1008,9 +1008,10 @@ pcnet32_init_ring(struct net_device *dev)
 	}
 
 	if (lp->rx_dma_addr[i] == 0)
-		lp->rx_dma_addr[i] = pci_map_single(lp->pci_dev, rx_skbuff->tail, rx_skbuff->len, PCI_DMA_FROMDEVICE);
+		lp->rx_dma_addr[i] = pci_map_single(lp->pci_dev,
+			rx_skbuff->tail, PKT_BUF_SZ-2, PCI_DMA_FROMDEVICE);
 	lp->rx_ring[i].base = (u32)le32_to_cpu(lp->rx_dma_addr[i]);
-	lp->rx_ring[i].buf_length = le16_to_cpu(-PKT_BUF_SZ);
+	lp->rx_ring[i].buf_length = le16_to_cpu(2-PKT_BUF_SZ);
 	lp->rx_ring[i].status = le16_to_cpu(0x8000);
     }
     /* The Tx buffer address is filled in as needed, but we do need to clear
@@ -1346,13 +1347,14 @@ pcnet32_rx(struct net_device *dev)
 		    if ((newskb = dev_alloc_skb (PKT_BUF_SZ))) {
 			skb_reserve (newskb, 2);
 			skb = lp->rx_skbuff[entry];
-			pci_unmap_single(lp->pci_dev, lp->rx_dma_addr[entry], skb->len, PCI_DMA_FROMDEVICE);
+			pci_unmap_single(lp->pci_dev, lp->rx_dma_addr[entry],
+				PKT_BUF_SZ-2, PCI_DMA_FROMDEVICE);
 			skb_put (skb, pkt_len);
 			lp->rx_skbuff[entry] = newskb;
 			newskb->dev = dev;
                         lp->rx_dma_addr[entry] = 
 				pci_map_single(lp->pci_dev, newskb->tail,
-					newskb->len, PCI_DMA_FROMDEVICE);
+					PKT_BUF_SZ-2, PCI_DMA_FROMDEVICE);
 			lp->rx_ring[entry].base = le32_to_cpu(lp->rx_dma_addr[entry]);
 			rx_in_place = 1;
 		    } else
@@ -1381,7 +1383,7 @@ pcnet32_rx(struct net_device *dev)
 		    skb_put(skb,pkt_len);	/* Make room */
 		    pci_dma_sync_single(lp->pci_dev,
 		                        lp->rx_dma_addr[entry],
-		                        PKT_BUF_SZ,
+		                        PKT_BUF_SZ-2,
 		                        PCI_DMA_FROMDEVICE);
 		    eth_copy_and_sum(skb,
 				     (unsigned char *)(lp->rx_skbuff[entry]->tail),
@@ -1398,7 +1400,7 @@ pcnet32_rx(struct net_device *dev)
 	 * The docs say that the buffer length isn't touched, but Andrew Boyd
 	 * of QNX reports that some revs of the 79C965 clear it.
 	 */
-	lp->rx_ring[entry].buf_length = le16_to_cpu(-PKT_BUF_SZ);
+	lp->rx_ring[entry].buf_length = le16_to_cpu(2-PKT_BUF_SZ);
 	lp->rx_ring[entry].status |= le16_to_cpu(0x8000);
 	entry = (++lp->cur_rx) & RX_RING_MOD_MASK;
     }
@@ -1438,7 +1440,8 @@ pcnet32_close(struct net_device *dev)
     for (i = 0; i < RX_RING_SIZE; i++) {
 	lp->rx_ring[i].status = 0;			    
 	if (lp->rx_skbuff[i]) {
-            pci_unmap_single(lp->pci_dev, lp->rx_dma_addr[i], lp->rx_skbuff[i]->len, PCI_DMA_FROMDEVICE);
+            pci_unmap_single(lp->pci_dev, lp->rx_dma_addr[i], PKT_BUF_SZ-2,
+		    PCI_DMA_FROMDEVICE);
 	    dev_kfree_skb(lp->rx_skbuff[i]);
         }
 	lp->rx_skbuff[i] = NULL;
