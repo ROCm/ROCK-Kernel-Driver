@@ -23,6 +23,9 @@ CPP		= $(CC) -E $(CFLAGS)
 cflags-$(CONFIG_4xx)		+= -Wa,-m405
 cflags-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
 
+# 601 cpus throw exceptions during unaligned lswi access
+cflags-$(CONFIG_PPC601_SYNC_FIX)	+= -mno-string
+
 CFLAGS += $(cflags-y)
 
 
