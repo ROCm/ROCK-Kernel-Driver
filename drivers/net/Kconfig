@@ -1798,7 +1798,7 @@ config SGISEEQ
 
 config DECLANCE
 	tristate "DEC LANCE ethernet controller support"
-	depends on NET_ETHERNET && DECSTATION
+	depends on NET_ETHERNET && MACH_DECSTATION
 	select CRC32
 	help
 	  This driver is for the series of Ethernet controllers produced by
