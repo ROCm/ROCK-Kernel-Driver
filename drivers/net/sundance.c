@@ -84,11 +84,13 @@
 	- Fix bug of custom mac address 
 	(StationAddr register only accept word write) 
 
+	Version LK1.09 (D-Link);
+	- Fix the flowctrl bug.	
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.08a"
-#define DRV_RELDATE	"23-Apr-2003"
+#define DRV_VERSION	"1.01+LK1.09"
+#define DRV_RELDATE	"8-May-2003"
 
 
 /* The user-configurable values.
@@ -671,8 +673,8 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 				np->an_enable = 1;
 			}
 		}
-		if (flowctrl == 0)
-			np->flowctrl = 0;
+		if (flowctrl == 1)
+			np->flowctrl = 1;
 	}
 
 	/* Fibre PHY? */
@@ -935,7 +937,7 @@ static void check_duplex(struct net_device *dev)
 			printk(KERN_INFO "%s: Setting %s-duplex based on MII #%d "
 				   "negotiated capability %4.4x.\n", dev->name,
 				   duplex ? "full" : "half", np->phys[0], negotiated);
-		writew(duplex ? 0x20 : 0, ioaddr + MACCtrl0);
+		writew(readw(ioaddr + MACCtrl0) | duplex ? 0x20 : 0, ioaddr + MACCtrl0);
 	}
 }
 
@@ -1455,9 +1457,12 @@ static void netdev_error(struct net_device *dev, int intr_status)
 				"full" : "half");
 		}
 		check_duplex (dev);
-		if (np->flowctrl == 0)
-			writew(readw(ioaddr + MACCtrl0) & ~EnbFlowCtrl,
+		if (np->flowctrl && np->mii_if.full_duplex) {
+			writew(readw(ioaddr + MulticastFilter1+2) | 0x0200,
+				ioaddr + MulticastFilter1+2);
+			writew(readw(ioaddr + MACCtrl0) | EnbFlowCtrl,
 				ioaddr + MACCtrl0);
+		}
 	}
 	if (intr_status & StatsMax) {
 		get_stats(dev);
@@ -1500,6 +1505,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 static void set_rx_mode(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
+	struct netdev_private *np = dev->priv;
 	u16 mc_filter[4];			/* Multicast hash filter */
 	u32 rx_mode;
 	int i;
@@ -1532,6 +1538,9 @@ static void set_rx_mode(struct net_device *dev)
 		writeb(AcceptBroadcast | AcceptMyPhys, ioaddr + RxMode);
 		return;
 	}
+	if (np->mii_if.full_duplex && np->flowctrl)
+		mc_filter[3] |= 0x0200;
+
 	for (i = 0; i < 4; i++)
 		writew(mc_filter[i], ioaddr + MulticastFilter0 + i*2);
 	writeb(rx_mode, ioaddr + RxMode);
