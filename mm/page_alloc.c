@@ -506,6 +506,7 @@ rebalance:
 			if (page)
 				return page;
 		}
+		goto nopage;
 	}
 
 	/* Atomic allocations - we can't balance anything */
