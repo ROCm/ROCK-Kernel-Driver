@@ -24,16 +24,10 @@
 #include <net/llc_pdu.h>
 #include <net/llc_mac.h>
 
-static void llc_station_ack_tmr_callback(unsigned long timeout_data);
-
 int llc_station_ac_start_ack_timer(struct llc_station *station,
 				   struct sk_buff *skb)
 {
-	del_timer(&station->ack_timer);
-	station->ack_timer.expires  = jiffies + LLC_ACK_TIME * HZ;
-	station->ack_timer.data     = (unsigned long)station;
-	station->ack_timer.function = llc_station_ack_tmr_callback;
-	add_timer(&station->ack_timer);
+	mod_timer(&station->ack_timer, jiffies + LLC_ACK_TIME * HZ);
 	return 0;
 }
 
@@ -130,7 +124,7 @@ int llc_station_ac_report_status(struct llc_station *station,
 	return 0;
 }
 
-static void llc_station_ack_tmr_callback(unsigned long timeout_data)
+void llc_station_ack_tmr_cb(unsigned long timeout_data)
 {
 	struct llc_station *station = (struct llc_station *)timeout_data;
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);

@@ -135,6 +135,7 @@ struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
 	struct bio *bio;
 	struct bio_vec *bvl = NULL;
+	int pf_flags = current->flags;
 
 	current->flags |= PF_NOWARN;
 	bio = mempool_alloc(bio_pool, gfp_mask);
@@ -151,7 +152,7 @@ struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 	mempool_free(bio, bio_pool);
 	bio = NULL;
 out:
-	current->flags &= ~PF_NOWARN;
+	current->flags = pf_flags;
 	return bio;
 }
 

@@ -471,10 +471,12 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 	int nr_copy_pages = 0;
 	int pfn;
 	struct page *page;
-	
+
+#ifndef CONFIG_DISCONTIGMEM	
 	if (max_mapnr != num_physpages)
 		panic("mapnr is not expected");
-	for (pfn = 0; pfn < max_mapnr; pfn++) {
+#endif
+	for (pfn = 0; pfn < num_physpages; pfn++) {
 		page = pfn_to_page(pfn);
 		if (PageHighMem(page))
 			panic("Swsusp not supported on highmem boxes. Send 1GB of RAM to <pavel@ucw.cz> and try again ;-).");
@@ -514,19 +516,20 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 
 static void free_suspend_pagedir(unsigned long this_pagedir)
 {
-	struct page *page = mem_map;
-	int i;
+	struct page *page;
+	int pfn;
 	unsigned long this_pagedir_end = this_pagedir +
 		(PAGE_SIZE << pagedir_order);
 
-	for(i=0; i < num_physpages; i++, page++) {
+	for(pfn = 0; pfn < num_physpages; pfn++) {
+		page = pfn_to_page(pfn);
 		if (!TestClearPageNosave(page))
 			continue;
 
-		if (ADDRESS(i) >= this_pagedir && ADDRESS(i) < this_pagedir_end)
+		if (ADDRESS(pfn) >= this_pagedir && ADDRESS(pfn) < this_pagedir_end)
 			continue; /* old pagedir gets freed in one */
 		
-		free_page(ADDRESS(i));
+		free_page(ADDRESS(pfn));
 	}
 	free_pages(this_pagedir, pagedir_order);
 }

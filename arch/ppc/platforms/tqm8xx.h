@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.tqm8xx.h 1.8 08/30/01 09:01:04 trini
- */
-/*
  * TQM8xx(L) board specific definitions
  * 
  * Copyright (c) 1999,2000,2001 Wolfgang Denk (wd@denx.de)

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.ppc-dis.c 1.5 05/17/01 18:14:23 cort
- */
 /* ppc-dis.c -- Disassemble PowerPC instructions
    Copyright 1994 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support

@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  arch/ppc/kernel/gemini_prom.S
+ *  arch/ppc/platforms/gemini_prom.S
  *
  *  Not really prom support code (yet), but sort of anti-prom code.  The current
  *  bootloader does a number of things it shouldn't and doesn't do things that it

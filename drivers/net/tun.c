@@ -275,7 +275,7 @@ static __inline__ ssize_t tun_put_user(struct tun_struct *tun,
 		total += sizeof(pi);
 	}       
 
-	len = min(skb->len, len);
+	len = min_t(int, skb->len, len);
 
 	skb_copy_datagram_iovec(skb, 0, iv, len);
 	total += len;
@@ -306,6 +306,8 @@ static ssize_t tun_chr_readv(struct file *file, const struct iovec *iv,
 			return -EFAULT;
 		len += iv[i].iov_len;
 	}
+	if (len < 0)
+		return -EINVAL;
 
 	add_wait_queue(&tun->read_wait, &wait);
 	while (len) {

@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 #
 # Makefile for the linux MPC8xx ppc-specific parts of comm processor
 #

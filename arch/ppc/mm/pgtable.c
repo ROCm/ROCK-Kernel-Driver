@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * This file contains the routines setting up the linux page tables.
  *  -- paulus
  * 

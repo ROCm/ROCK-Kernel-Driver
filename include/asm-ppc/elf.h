@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifndef __PPC_ELF_H
 #define __PPC_ELF_H
 

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.find_name.c 1.5 05/17/01 18:14:21 cort
- */
 #include <stdio.h>
 #include <asm/page.h>
 #include <sys/mman.h>

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * PowerPC-specific semaphore code.
  *
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>

@@ -1,18 +1,11 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Split from af_ax25.c.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -88,16 +81,16 @@ int ax25_encapsulate(struct sk_buff *skb, struct net_device *dev, unsigned short
 
   	/* Append a suitable AX.25 PID */
   	switch (type) {
-  		case ETH_P_IP:
-  			*buff++ = AX25_P_IP;
- 			break;
-  		case ETH_P_ARP:
-  			*buff++ = AX25_P_ARP;
-  			break;
-  		default:
-  			printk(KERN_ERR "AX.25: ax25_encapsulate - wrong protocol type 0x%2.2x\n", type);
-  			*buff++ = 0;
-  			break;
+  	case ETH_P_IP:
+  		*buff++ = AX25_P_IP;
+ 		break;
+  	case ETH_P_ARP:
+  		*buff++ = AX25_P_ARP;
+  		break;
+  	default:
+  		printk(KERN_ERR "AX.25: ax25_encapsulate - wrong protocol type 0x%2.2x\n", type);
+  		*buff++ = 0;
+  		break;
  	}
 
 	if (daddr != NULL)
@@ -112,8 +105,8 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	unsigned char *bp  = skb->data;
 	struct net_device *dev;
 	ax25_address *src, *dst;
-	ax25_route *route;
 	ax25_dev *ax25_dev;
+	ax25_route _route, *route = &_route;
 
 	dst = (ax25_address *)(bp + 1);
 	src = (ax25_address *)(bp + 8);
@@ -121,14 +114,15 @@ int ax25_rebuild_header(struct sk_buff *skb)
   	if (arp_find(bp + 1, skb))
   		return 1;
 
-	route    = ax25_rt_find_route(dst, NULL);
+	route = ax25_rt_find_route(route, dst, NULL);
 	dev      = route->dev;
 
 	if (dev == NULL)
 		dev = skb->dev;
 
-        if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
-                return 1;
+        if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL) {
+                goto put;
+	}
 
 	if (bp[16] == AX25_P_IP) {
 		if (route->ip_mode == 'V' || (route->ip_mode == ' ' && ax25_dev->values[AX25_VALUES_IPDEFMODE])) {
@@ -153,7 +147,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 
 			if ((ourskb = skb_copy(skb, GFP_ATOMIC)) == NULL) {
 				kfree_skb(skb);
-				return 1;
+				goto put;
 			}
 
 			if (skb->sk != NULL)
@@ -167,10 +161,10 @@ int ax25_rebuild_header(struct sk_buff *skb)
 			skb_pull(ourskb, AX25_HEADER_LEN - 1);	/* Keep PID */
 			ourskb->nh.raw = ourskb->data;
 
-			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c, 
+			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c,
 &dst_c, route->digipeat, dev);
 
-			return 1;
+			goto put;
 		}
 	}
 
@@ -187,7 +181,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	if (route->digipeat != NULL) {
 		if ((ourskb = ax25_rt_build_path(skb, src, dst, route->digipeat)) == NULL) {
 			kfree_skb(skb);
-			return 1;
+			goto put;
 		}
 
 		skb = ourskb;
@@ -196,6 +190,9 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	skb->dev      = dev;
 
 	ax25_queue_xmit(skb);
+
+put:
+	ax25_put_route(route);
 
   	return 1;
 }

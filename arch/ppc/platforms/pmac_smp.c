@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * SMP support for power macintosh.
  *
  * We support both the old "powersurge" SMP architecture

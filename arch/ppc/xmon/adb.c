@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.adb.c 1.5 05/17/01 18:14:23 cort
- */
-/*
  * Copyright (C) 1996 Paul Mackerras.
  */
 #include "nonstdio.h"

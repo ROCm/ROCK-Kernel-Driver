@@ -46,6 +46,9 @@
 #include <asm/sbus.h>
 #include <asm/dma.h>
 #endif
+#ifdef CONFIG_PCI
+#include <asm/ebus.h>
+#endif
 #include <asm/a.out.h>
 #include <asm/io-unit.h>
 
@@ -183,10 +186,7 @@ EXPORT_SYMBOL(sbus_iounmap);
 EXPORT_SYMBOL(sbus_ioremap);
 #endif
 #if CONFIG_PCI
-/* Actually, ioremap/iounmap are not PCI specific. But it is ok for drivers. */
-EXPORT_SYMBOL(ioremap);
-EXPORT_SYMBOL(iounmap);
-
+EXPORT_SYMBOL(ebus_chain);
 EXPORT_SYMBOL(insl);
 EXPORT_SYMBOL(outsl);
 EXPORT_SYMBOL(pci_alloc_consistent);
@@ -194,6 +194,9 @@ EXPORT_SYMBOL(pci_free_consistent);
 EXPORT_SYMBOL(pci_map_single);
 EXPORT_SYMBOL(pci_unmap_single);
 EXPORT_SYMBOL(pci_dma_sync_single);
+/* Actually, ioremap/iounmap are not PCI specific. But it is ok for drivers. */
+EXPORT_SYMBOL(ioremap);
+EXPORT_SYMBOL(iounmap);
 #endif
 
 /* Solaris/SunOS binary compatibility */

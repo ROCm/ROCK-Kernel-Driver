@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  linux/arch/ppc/kernel/traps.c
+ *  arch/ppc/kernel/traps.c
  *
  *  Copyright (C) 1995-1996  Gary Thomas (gdt@linuxppc.org)
  *

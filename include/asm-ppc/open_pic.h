@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  arch/ppc/kernel/open_pic.h -- OpenPIC Interrupt Handling
+ *  include/asm-ppc/open_pic.h -- OpenPIC Interrupt Handling
  *
  *  Copyright (C) 1997 Geert Uytterhoeven
  *

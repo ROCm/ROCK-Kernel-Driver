@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef _PPC_PGTABLE_H
 #define _PPC_PGTABLE_H

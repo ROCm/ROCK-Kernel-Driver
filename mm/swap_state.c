@@ -12,7 +12,6 @@
 #include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
-#include <linux/smp_lock.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>	/* block_sync_page() */
 
@@ -119,7 +118,7 @@ void __delete_from_swap_cache(struct page *page)
 int add_to_swap(struct page * page)
 {
 	swp_entry_t entry;
-	int flags;
+	int pf_flags;
 
 	if (!PageLocked(page))
 		BUG();
@@ -142,7 +141,7 @@ int add_to_swap(struct page * page)
 		 * just not all of them.
 		 */
 
-		flags = current->flags;
+		pf_flags = current->flags;
 		current->flags &= ~PF_MEMALLOC;
 		current->flags |= PF_NOWARN;
 		ClearPageUptodate(page);		/* why? */
@@ -154,20 +153,20 @@ int add_to_swap(struct page * page)
 		 */
 		switch (add_to_swap_cache(page, entry)) {
 		case 0:				/* Success */
-			current->flags = flags;
+			current->flags = pf_flags;
 			SetPageUptodate(page);
 			set_page_dirty(page);
 			swap_free(entry);
 			return 1;
 		case -ENOMEM:			/* radix-tree allocation */
-			current->flags = flags;
+			current->flags = pf_flags;
 			swap_free(entry);
 			return 0;
 		default:			/* ENOENT: raced */
 			break;
 		}
 		/* Raced with "speculative" read_swap_cache_async */
-		current->flags = flags;
+		current->flags = pf_flags;
 		swap_free(entry);
 	}
 }

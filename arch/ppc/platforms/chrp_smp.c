@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Smp support for CHRP machines.
  *
  * Written by Cort Dougan (cort@cs.nmt.edu) borrowing a great

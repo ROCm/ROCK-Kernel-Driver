@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 #include <linux/keyboard.h>
 
 #include "defkeymap.c"	/* yeah I know it's bad -- Cort */

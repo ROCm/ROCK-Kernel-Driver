@@ -254,10 +254,6 @@ void __init paging_init(void)
 		zones_size[ZONE_DMA] = end_pfn + 1 - start_pfn;
 		free_area_init_node(node, NODE_DATA(node), 0, zones_size, 
 						start_pfn, 0);
-		if ((PLAT_NODE_DATA_STARTNR(node) + 
-					PLAT_NODE_DATA_SIZE(node)) > pagenr)
-			pagenr = PLAT_NODE_DATA_STARTNR(node) +
-					PLAT_NODE_DATA_SIZE(node);
 	}
 }
 
@@ -271,7 +267,6 @@ void __init mem_init(void)
 	unsigned long codesize, datasize, initsize;
 	int slot, numslots;
 	struct page *pg, *pslot;
-	pfn_t pgnr;
 
 	num_physpages = numpages;	/* memory already sized by szmem */
 	max_mapnr = pagenr;		/* already found during paging_init */
@@ -293,7 +288,6 @@ void __init mem_init(void)
 		 * We need to manually do the other slots.
 		 */
 		pg = NODE_DATA(nid)->node_mem_map + slot_getsize(nid, 0);
-		pgnr = PLAT_NODE_DATA_STARTNR(nid) + slot_getsize(nid, 0);
 		numslots = node_getlastslot(nid);
 		for (slot = 1; slot <= numslots; slot++) {
 			pslot = NODE_DATA(nid)->node_mem_map + 
@@ -304,7 +298,7 @@ void __init mem_init(void)
 			 * free up the pages that hold the memmap entries.
 			 */
 			while (pg < pslot) {
-				pg++; pgnr++;
+				pg++;
 			}
 
 			/*
@@ -312,8 +306,8 @@ void __init mem_init(void)
 			 */
 			pslot += slot_getsize(nid, slot);
 			while (pg < pslot) {
-				if (!page_is_ram(pgnr))
-					continue;
+				/* if (!page_is_ram(pgnr)) continue; */
+				/* commented out until page_is_ram works */
 				ClearPageReserved(pg);
 				atomic_set(&pg->count, 1);
 				__free_page(pg);

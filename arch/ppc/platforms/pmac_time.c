@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Support for periodic interrupts (100 per second) and for getting
  * the current time from the RTC on Power Macintoshes.
  *

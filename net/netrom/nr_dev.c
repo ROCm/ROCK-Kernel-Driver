@@ -1,23 +1,11 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	Cloned from loopback.c
- *	NET/ROM 002	Steve Whitehouse(GW7RRM) fixed the set_mac_address
- *	NET/ROM 003	Jonathan(G4KLX)	Put nr_rebuild_header into line with
- *					ax25_rebuild_header
- *	NET/ROM 004	Jonathan(G4KLX)	Callsign registration with AX.25.
- *	NET/ROM 006	Hans(PE1AYX)	Fixed interface to IP layer.
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/config.h>
 #define __NO_VERSION__
 #include <linux/module.h>
@@ -115,7 +103,7 @@ static int nr_rebuild_header(struct sk_buff *skb)
 	kfree_skb(skb);
 
 	len = skbn->len;
-	
+
 	if (!nr_route_frame(skbn, NULL)) {
 		kfree_skb(skbn);
 		stats->tx_errors++;

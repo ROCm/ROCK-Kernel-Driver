@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.errno.h 1.7 05/17/01 18:14:24 cort
- */
 #ifndef _PPC_ERRNO_H
 #define _PPC_ERRNO_H
 

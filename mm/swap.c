@@ -124,9 +124,9 @@ void release_pages(struct page **pages, int nr)
 		if (page_count(page) == 0) {
 			if (!pagevec_add(&pages_to_free, page)) {
 				spin_unlock_irq(&zone->lru_lock);
-				pagevec_free(&pages_to_free);
+				__pagevec_free(&pages_to_free);
 				pagevec_init(&pages_to_free);
-				spin_lock_irq(&zone->lru_lock);
+				zone = NULL;	/* No lock is held */
 			}
 		}
 	}
@@ -165,8 +165,8 @@ void __pagevec_release_nonlru(struct pagevec *pvec)
 }
 
 /*
- * Move all the inactive pages to the head of the inactive list
- * and release them.  Reinitialises the caller's pagevec.
+ * Move all the inactive pages to the head of the inactive list and release
+ * them.  Reinitialises the caller's pagevec.
  */
 void pagevec_deactivate_inactive(struct pagevec *pvec)
 {
@@ -180,8 +180,6 @@ void pagevec_deactivate_inactive(struct pagevec *pvec)
 		struct zone *pagezone = page_zone(page);
 
 		if (pagezone != zone) {
-			if (PageActive(page) || !PageLRU(page))
-				continue;
 			if (zone)
 				spin_unlock_irq(&zone->lru_lock);
 			zone = pagezone;

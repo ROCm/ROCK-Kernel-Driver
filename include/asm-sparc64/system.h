@@ -152,24 +152,6 @@ do {	spin_unlock_irq(&(prev)->switch_lock);	\
 #define task_running(rq, p) \
 	((rq)->curr == (p) || spin_is_locked(&(p)->switch_lock))
 
-#ifndef CONFIG_DEBUG_SPINLOCK
-#define CHECK_LOCKS(PREV)	do { } while(0)
-#else /* CONFIG_DEBUG_SPINLOCK */
-#define CHECK_LOCKS(PREV)						\
-if ((PREV)->thread.smp_lock_count) {					\
-	unsigned long rpc;						\
-	__asm__ __volatile__("mov %%i7, %0" : "=r" (rpc));		\
-	printk(KERN_CRIT "(%s)[%d]: Sleeping with %d locks held!\n",	\
-	       (PREV)->comm, (PREV)->pid,				\
-	       (PREV)->thread.smp_lock_count);				\
-	printk(KERN_CRIT "(%s)[%d]: Last lock at %08x\n",		\
-	       (PREV)->comm, (PREV)->pid,				\
-	       (PREV)->thread.smp_lock_pc);				\
-	printk(KERN_CRIT "(%s)[%d]: Sched caller %016lx\n",		\
-	       (PREV)->comm, (PREV)->pid, rpc);				\
-}
-#endif /* !(CONFIG_DEBUG_SPINLOCK) */
-
 	/* See what happens when you design the chip correctly?
 	 *
 	 * We tell gcc we clobber all non-fixed-usage registers except
@@ -180,8 +162,7 @@ if ((PREV)->thread.smp_lock_count) {					\
 	 * and 2 stores in this critical code path.  -DaveM
 	 */
 #define switch_to(prev, next, last)					\
-do {	CHECK_LOCKS(prev);						\
-	if (test_thread_flag(TIF_PERFCTR)) {				\
+do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 		unsigned long __tmp;					\
 		read_pcr(__tmp);					\
 		current_thread_info()->pcr_reg = __tmp;			\

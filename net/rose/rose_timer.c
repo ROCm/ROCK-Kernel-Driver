@@ -1,20 +1,12 @@
 /*
- *	ROSE release 003
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	ROSE 001	Jonathan(G4KLX)	Cloned from nr_timer.c
- *	ROSE 003	Jonathan(G4KLX)	New timer architecture.
- *					Implemented idle timer.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) 2002 Ralf Baechle DO1GRB (ralf@gnu.org)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -139,34 +131,35 @@ static void rose_heartbeat_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 	rose_cb *rose = rose_sk(sk);
 
+	bh_lock_sock(sk);
 	switch (rose->state) {
+	case ROSE_STATE_0:
+		/* Magic here: If we listen() and a new link dies before it
+		   is accepted() it isn't 'dead' so doesn't get removed. */
+		if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
+			rose_destroy_socket(sk);
+			return;
+		}
+		break;
 
-		case ROSE_STATE_0:
-			/* Magic here: If we listen() and a new link dies before it
-			   is accepted() it isn't 'dead' so doesn't get removed. */
-			if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
-				rose_destroy_socket(sk);
-				return;
-			}
+	case ROSE_STATE_3:
+		/*
+		 * Check for the state of the receive buffer.
+		 */
+		if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+		    (rose->condition & ROSE_COND_OWN_RX_BUSY)) {
+			rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
+			rose->condition &= ~ROSE_COND_ACK_PENDING;
+			rose->vl         = rose->vr;
+			rose_write_internal(sk, ROSE_RR);
+			rose_stop_timer(sk);	/* HB */
 			break;
-
-		case ROSE_STATE_3:
-			/*
-			 * Check for the state of the receive buffer.
-			 */
-			if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
-			    (rose->condition & ROSE_COND_OWN_RX_BUSY)) {
-				rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
-				rose->condition &= ~ROSE_COND_ACK_PENDING;
-				rose->vl         = rose->vr;
-				rose_write_internal(sk, ROSE_RR);
-				rose_stop_timer(sk);	/* HB */
-				break;
-			}
-			break;
+		}
+		break;
 	}
 
 	rose_start_heartbeat(sk);
+	bh_unlock_sock(sk);
 }
 
 static void rose_timer_expiry(unsigned long param)
@@ -174,33 +167,35 @@ static void rose_timer_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 	rose_cb *rose = rose_sk(sk);
 
+	bh_lock_sock(sk);
 	switch (rose->state) {
+	case ROSE_STATE_1:	/* T1 */
+	case ROSE_STATE_4:	/* T2 */
+		rose_write_internal(sk, ROSE_CLEAR_REQUEST);
+		rose->state = ROSE_STATE_2;
+		rose_start_t3timer(sk);
+		break;
 
-		case ROSE_STATE_1:	/* T1 */
-		case ROSE_STATE_4:	/* T2 */
-			rose_write_internal(sk, ROSE_CLEAR_REQUEST);
-			rose->state = ROSE_STATE_2;
-			rose_start_t3timer(sk);
-			break;
+	case ROSE_STATE_2:	/* T3 */
+		rose->neighbour->use--;
+		rose_disconnect(sk, ETIMEDOUT, -1, -1);
+		break;
 
-		case ROSE_STATE_2:	/* T3 */
-			rose->neighbour->use--;
-			rose_disconnect(sk, ETIMEDOUT, -1, -1);
-			break;
-
-		case ROSE_STATE_3:	/* HB */
-			if (rose->condition & ROSE_COND_ACK_PENDING) {
-				rose->condition &= ~ROSE_COND_ACK_PENDING;
-				rose_enquiry_response(sk);
-			}
-			break;
+	case ROSE_STATE_3:	/* HB */
+		if (rose->condition & ROSE_COND_ACK_PENDING) {
+			rose->condition &= ~ROSE_COND_ACK_PENDING;
+			rose_enquiry_response(sk);
+		}
+		break;
 	}
+	bh_unlock_sock(sk);
 }
 
 static void rose_idletimer_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
 
+	bh_lock_sock(sk);
 	rose_clear_queues(sk);
 
 	rose_write_internal(sk, ROSE_CLEAR_REQUEST);
@@ -210,10 +205,11 @@ static void rose_idletimer_expiry(unsigned long param)
 
 	sk->state     = TCP_CLOSE;
 	sk->err       = 0;
-	sk->shutdown |= SEND_SHUTDOWN;	
+	sk->shutdown |= SEND_SHUTDOWN;
 
 	if (!sk->dead)
 		sk->state_change(sk);
 
 	sk->dead = 1;
+	bh_unlock_sock(sk);
 }

@@ -1,8 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
-/*
  * A collection of structures, addresses, and values associated with
  * the Bright Star Engineering ip-Engine board.  Copied from the MBX stuff.
  *

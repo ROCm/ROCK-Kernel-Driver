@@ -131,12 +131,12 @@ out:
  * Swap pages are !PageLocked and PageWriteback while under writeout so that
  * memory allocators will throttle against them.
  */
-static int swap_vm_writeback(struct page *page, int *nr_to_write)
+static int swap_vm_writeback(struct page *page, struct writeback_control *wbc)
 {
 	struct address_space *mapping = page->mapping;
 
 	unlock_page(page);
-	return generic_writepages(mapping, nr_to_write);
+	return generic_writepages(mapping, wbc);
 }
 
 struct address_space_operations swap_aops = {

@@ -360,11 +360,11 @@ static int llc_ui_release(struct socket *sock)
 		llc->laddr.lsap, llc->daddr.lsap);
 	if (!llc_send_disc(sk))
 		llc_ui_wait_for_disc(sk, sk->rcvtimeo);
-	release_sock(sk);
 	if (!sk->zapped) {
 		llc_sap_unassign_sock(llc->sap, sk);
 		llc_ui_remove_socket(sk);
 	}
+	release_sock(sk);
 	if (llc->sap && list_empty(&llc->sap->sk_list.list))
 		llc_sap_close(llc->sap);
 	sock_put(sk);
@@ -484,10 +484,10 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 	llc->daddr.lsap = addr->sllc_dsap;
 	memcpy(llc->daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
 	memcpy(&llc->addr, addr, sizeof(llc->addr));
-	rc = sk->zapped = 0;
 	llc_ui_insert_socket(sk);
 	/* assign new connection to it's SAP */
 	llc_sap_assign_sock(sap, sk);
+	rc = sk->zapped = 0;
 out:
 	return rc;
 }
@@ -952,7 +952,9 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if (size > dev->mtu)
 		size = dev->mtu;
 	copied = size - hdrlen;
+	release_sock(sk);
 	skb = sock_alloc_send_skb(sk, size, noblock, &rc);
+	lock_sock(sk);
 	if (!skb)
 		goto release;
 	skb->sk	      = sk;

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Non-machine dependent bootinfo structure.  Basic idea
  * borrowed from the m68k.
  *

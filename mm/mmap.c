@@ -11,7 +11,6 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
-#include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -444,6 +443,11 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	 */
 	vm_flags = calc_vm_flags(prot,flags) | mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
+	if (flags & MAP_LOCKED) {
+		if (!capable(CAP_IPC_LOCK))
+			return -EPERM;
+		vm_flags |= VM_LOCKED;
+	}
 	/* mlock MCL_FUTURE? */
 	if (vm_flags & VM_LOCKED) {
 		unsigned long locked = mm->locked_vm << PAGE_SHIFT;
@@ -1073,7 +1077,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
- * Jeremy Fitzhardine <jeremy@sw.oz.au>
+ * Jeremy Fitzhardinge <jeremy@goop.org>
  */
 int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {

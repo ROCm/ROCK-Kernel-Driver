@@ -525,11 +525,11 @@ void release_console_sem(void)
 {
 	unsigned long flags;
 	unsigned long _con_start, _log_end;
-	unsigned long must_wake_klogd = 0;
+	unsigned long wake_klogd = 0;
 
 	for ( ; ; ) {
 		spin_lock_irqsave(&logbuf_lock, flags);
-		must_wake_klogd |= log_start - log_end;
+		wake_klogd |= log_start - log_end;
 		if (con_start == log_end)
 			break;			/* Nothing to print */
 		_con_start = con_start;
@@ -541,7 +541,7 @@ void release_console_sem(void)
 	console_may_schedule = 0;
 	up(&console_sem);
 	spin_unlock_irqrestore(&logbuf_lock, flags);
-	if (must_wake_klogd && !oops_in_progress)
+	if (wake_klogd && !oops_in_progress && waitqueue_active(&log_wait))
 		wake_up_interruptible(&log_wait);
 }
 

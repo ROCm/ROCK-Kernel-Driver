@@ -525,7 +525,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
 	if (iov->iov_len < hdrlen) {
 		printk(KERN_WARNING "NFS: READDIR reply header overflowed:"
-				"length %d > %d\n", hdrlen, iov->iov_len);
+				"length %d > %Zu\n", hdrlen, iov->iov_len);
 		return -errno_NFSERR_IO;
 	} else if (iov->iov_len != hdrlen) {
 		dprintk("NFS: READDIR header is short. iovec will be shifted.\n");
@@ -808,7 +808,7 @@ nfs3_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
 	if (iov->iov_len < hdrlen) {
 		printk(KERN_WARNING "NFS: READ reply header overflowed:"
-				"length %d > %d\n", hdrlen, iov->iov_len);
+				"length %d > %Zu\n", hdrlen, iov->iov_len);
        		return -errno_NFSERR_IO;
 	} else if (iov->iov_len != hdrlen) {
 		dprintk("NFS: READ header is short. iovec will be shifted.\n");

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.module.h 1.5 05/17/01 18:14:25 cort
- */
 #ifndef _ASM_PPC_MODULE_H
 #define _ASM_PPC_MODULE_H
 /*

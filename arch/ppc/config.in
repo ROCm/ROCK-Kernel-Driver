@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
@@ -7,7 +5,6 @@ define_bool CONFIG_UID16 n
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 define_bool CONFIG_HAVE_DEC_LOCK y
-define_bool CONFIG_GENERIC_ISA_DMA y
 
 mainmenu_name "Linux/PowerPC Kernel Configuration"
 
@@ -30,9 +27,13 @@ fi
 
 if [ "$CONFIG_6xx" = "y" ]; then
    bool 'MPC8260 CPM Support' CONFIG_8260
+   if [ "$CONFIG_8260" = "n" ]; then
+      define_bool CONFIG_GENERIC_ISA_DMA y
+   fi
 fi
 
 if [ "$CONFIG_POWER3" = "y" ]; then
+   define_bool CONFIG_GENERIC_ISA_DMA y
    define_bool CONFIG_PPC64BRIDGE y
    define_bool CONFIG_ALL_PPC y
 fi
@@ -264,38 +265,6 @@ mainmenu_option next_comment
 comment 'General setup'
 
 bool 'High memory support' CONFIG_HIGHMEM
-bool 'Prompt for advanced kernel configuration options' CONFIG_ADVANCED_OPTIONS
-if [ "$CONFIG_ADVANCED_OPTIONS" = "y" ]; then
-   if [ "$CONFIG_HIGHMEM" = "y" ]; then
-      bool "  Set high memory pool address" CONFIG_HIGHMEM_START_BOOL
-      if [ "$CONFIG_HIGHMEM_START_BOOL" = "y" ]; then
-         hex "    Virtual start address of high memory pool" CONFIG_HIGHMEM_START 0xfe000000
-      fi
-      bool "  Set maximum low memory" CONFIG_LOWMEM_SIZE_BOOL
-      if [ "$CONFIG_LOWMEM_SIZE_BOOL" = "y" ]; then
-         hex "    Maximum low memory size (in bytes)" CONFIG_LOWMEM_SIZE 0x20000000
-      fi
-   fi
-
-   bool "Set custom kernel base address" CONFIG_KERNEL_START_BOOL
-   if [ "$CONFIG_KERNEL_START_BOOL" = "y" ]; then
-      hex "  Virtual address of kernel base" CONFIG_KERNEL_START 0xc0000000
-   fi
-   bool "Set custom user task size" CONFIG_TASK_SIZE_BOOL
-   if [ "$CONFIG_TASK_SIZE_BOOL" = "y" ]; then
-      hex "  Size of user task space" CONFIG_TASK_SIZE 0x80000000
-   fi
-   if [ "$CONFIG_8xx" = "y" ]; then
-      bool "Pinned Kernel TLBs (860 ONLY)" CONFIG_PIN_TLB
-   fi
-   if [ "$CONFIG_ALL_PPC" != "y" ]; then
-      bool "Set the boot link/load address" CONFIG_BOOT_LOAD_BOOL
-      if [ "$CONFIG_BOOT_LOAD_BOOL" = "y" ]; then
-         hex "  Link/load address for booting" CONFIG_BOOT_LOAD 0x00400000
-      fi
-   fi
-fi
-
 if [ "$CONFIG_ALL_PPC" = "y" ]; then
    bool 'Support for ISA-bus hardware' CONFIG_ISA
 else
@@ -349,14 +318,6 @@ fi
 
 source drivers/parport/Config.in
 
-if [ "$CONFIG_PPC_ISERIES" != "y" ]; then
-   if [ "$CONFIG_APUS" != "y" ]; then
-      tristate 'Support for /dev/rtc' CONFIG_PPC_RTC
-   else
-      bool 'Generic /dev/rtc emulation' CONFIG_GEN_RTC
-   fi
-fi
-
 if [ "$CONFIG_ALL_PPC" = "y" -a "$CONFIG_POWER3" = "n" ] ; then
    bool 'Workarounds for PPC601 bugs' CONFIG_PPC601_SYNC_FIX
 fi
@@ -381,11 +342,7 @@ if [ "$CONFIG_APUS" = "y" ]; then
    define_bool CONFIG_FB_CONSOLE y
    define_bool CONFIG_AMIGA y
    define_bool CONFIG_ZORRO y
-   define_bool CONFIG_AMIGAMOUSE y
    define_bool CONFIG_ABSTRACT_CONSOLE y
-   define_bool CONFIG_FB y
-   define_bool CONFIG_MOUSE y
-   define_bool CONFIG_BUSMOUSE y
    define_bool CONFIG_APUS_FAST_EXCEPT y
 
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
@@ -412,8 +369,43 @@ if [ "$CONFIG_APUS" = "y" ]; then
    bool '/proc/hardware support' CONFIG_PROC_HARDWARE
    source drivers/zorro/Config.in
 fi
-
 endmenu
+
+mainmenu_option next_comment
+comment 'Advanced setup'
+bool 'Prompt for advanced kernel configuration options' CONFIG_ADVANCED_OPTIONS
+if [ "$CONFIG_ADVANCED_OPTIONS" = "y" ]; then
+   if [ "$CONFIG_HIGHMEM" = "y" ]; then
+      bool "  Set high memory pool address" CONFIG_HIGHMEM_START_BOOL
+      if [ "$CONFIG_HIGHMEM_START_BOOL" = "y" ]; then
+         hex "    Virtual start address of high memory pool" CONFIG_HIGHMEM_START 0xfe000000
+      fi
+      bool "  Set maximum low memory" CONFIG_LOWMEM_SIZE_BOOL
+      if [ "$CONFIG_LOWMEM_SIZE_BOOL" = "y" ]; then
+         hex "    Maximum low memory size (in bytes)" CONFIG_LOWMEM_SIZE 0x20000000
+      fi
+   fi
+
+   bool "Set custom kernel base address" CONFIG_KERNEL_START_BOOL
+   if [ "$CONFIG_KERNEL_START_BOOL" = "y" ]; then
+      hex "  Virtual address of kernel base" CONFIG_KERNEL_START 0xc0000000
+   fi
+   bool "Set custom user task size" CONFIG_TASK_SIZE_BOOL
+   if [ "$CONFIG_TASK_SIZE_BOOL" = "y" ]; then
+      hex "  Size of user task space" CONFIG_TASK_SIZE 0x80000000
+   fi
+   if [ "$CONFIG_8xx" = "y" ]; then
+      bool "Pinned Kernel TLBs (860 ONLY)" CONFIG_PIN_TLB
+   fi
+   if [ "$CONFIG_ALL_PPC" != "y" ]; then
+      bool "Set the boot link/load address" CONFIG_BOOT_LOAD_BOOL
+      if [ "$CONFIG_BOOT_LOAD_BOOL" = "y" ]; then
+         hex "  Link/load address for booting" CONFIG_BOOT_LOAD 0x00400000
+      fi
+   fi
+fi
+endmenu
+
 source drivers/mtd/Config.in
 source drivers/pnp/Config.in
 source drivers/block/Config.in
@@ -467,14 +459,6 @@ source net/irda/Config.in
 source drivers/isdn/Config.in
 
 mainmenu_option next_comment
-comment 'Old CD-ROM drivers (not SCSI, not IDE)'
-bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-   source drivers/cdrom/Config.in
-fi
-endmenu
-
-mainmenu_option next_comment
 comment 'Console drivers'
 if [ "$CONFIG_4xx" != "y" -a "$CONFIG_8xx" != "y" ]; then
    bool 'VGA text console' CONFIG_VGA_CONSOLE
@@ -504,6 +488,14 @@ if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
    if [ "$CONFIG_VIOCD" = "y" ]; then
       define_bool CONFIG_CD_NO_IDESCSI y
       define_bool CONFIG_BLK_DEV_IDECD y
+   fi
+   endmenu
+else
+   mainmenu_option next_comment
+   comment 'Old CD-ROM drivers (not SCSI, not IDE)'
+   bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+   if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+      source drivers/cdrom/Config.in
    fi
    endmenu
 fi
