@@ -621,7 +621,7 @@ int enable_local_apic __initdata = -1; /* -1=force-disable, +1=force-enable */
 int enable_local_apic __initdata = 0;
 #endif
 
-static int __init lapic_disable(char *str)
+int __init lapic_disable(char *str)
 {
 	enable_local_apic = -1;
 	clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
@@ -629,7 +629,7 @@ static int __init lapic_disable(char *str)
 }
 __setup("nolapic", lapic_disable);
 
-static int __init lapic_enable(char *str)
+int __init lapic_enable(char *str)
 {
 	enable_local_apic = 1;
 	return 0;
@@ -638,6 +638,8 @@ __setup("lapic", lapic_enable);
 
 int __init apic_enable(char *str)
 {
+	printk("apic_enable\n");
+	
 #ifdef CONFIG_X86_IO_APIC
 	extern int skip_ioapic_setup;
 	skip_ioapic_setup = 0;

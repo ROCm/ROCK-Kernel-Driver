@@ -636,12 +636,20 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 
 #ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */
-		else if (!memcmp(from, "noapic", 6))
+		else if (c == ' ' && !memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
-		else if (!memcmp(from, "apic", 4)) {
+		else if (c == ' ' && !memcmp(from, "apic", 4)) {
 		     extern int apic_enable(char *);
 		     apic_enable(from); 
-		} 		     	
+		}
+		else if (c == ' ' && !memcmp(from, "lapic", 5)) { 
+		     extern int lapic_enable(char *str);
+		     lapic_enable(from);
+		} 
+		else if (c == ' ' && !memcmp(from, "nolapic", 7)) { 
+		     extern int lapic_enable(char *str);
+		     lapic_disable(from);
+		}
 #endif /* CONFIG_X86_LOCAL_APIC */
 #endif /* CONFIG_ACPI_BOOT */
 
