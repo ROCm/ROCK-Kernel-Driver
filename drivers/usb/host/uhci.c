@@ -1842,10 +1842,6 @@ static int uhci_fsbr_timeout(struct uhci *uhci, struct urb *urb)
 
 	uhci_dec_fsbr(uhci, urb);
 
-	/* There is a race with updating IOC in here, but it's not worth */
-	/*  trying to fix since this is merely an optimization. The only */
-	/*  time we'd lose is if the status of the packet got updated */
-	/*  and we'd be turning on FSBR next frame anyway, so it's a wash */
 	urbp->fsbr_timeout = 1;
 
 	head = &urbp->td_list;
@@ -2009,23 +2005,23 @@ static void rh_int_timer_do(unsigned long ptr)
 	tmp = head->next;
 	while (tmp != head) {
 		struct urb *u = list_entry(tmp, struct urb, urb_list);
-		struct urb_priv *urbp = (struct urb_priv *)u->hcpriv;
+		struct urb_priv *up = (struct urb_priv *)u->hcpriv;
 
 		tmp = tmp->next;
 
-		spin_lock(&urb->lock);
+		spin_lock(&u->lock);
 
 		/* Check if the FSBR timed out */
-		if (urbp->fsbr && !urbp->fsbr_timeout && time_after_eq(jiffies, urbp->fsbrtime + IDLE_TIMEOUT))
+		if (up->fsbr && !up->fsbr_timeout && time_after_eq(jiffies, up->fsbrtime + IDLE_TIMEOUT))
 			uhci_fsbr_timeout(uhci, u);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, urbp->inserttime + u->timeout)) {
+		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout)) {
 			list_del(&u->urb_list);
 			list_add_tail(&u->urb_list, &list);
 		}
 
-		spin_unlock(&urb->lock);
+		spin_unlock(&u->lock);
 	}
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
