@@ -594,7 +594,7 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 		pc = (struct packet_command *) rq->special;
 		pc->stat = 1;
 		cdrom_end_request(drive, rq, 1);
-		*startstop = ide_error (drive, "request sense failure", stat);
+		*startstop = ide_error (drive, rq, "request sense failure", stat);
 
 		return 1;
 	} else if (rq->flags & (REQ_PC | REQ_BLOCK_PC)) {
@@ -614,7 +614,7 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 			return 0;
 		} else if (!pc->quiet) {
 			/* Otherwise, print an error. */
-			ide_dump_status(drive, "packet command error", stat);
+			ide_dump_status(drive, rq, "packet command error", stat);
 		}
 
 		/* Set the error flag and complete the request.
@@ -662,18 +662,18 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 			   sense_key == DATA_PROTECT) {
 			/* No point in retrying after an illegal
 			   request or data protect error.*/
-			ide_dump_status (drive, "command error", stat);
+			ide_dump_status(drive, rq, "command error", stat);
 			cdrom_end_request(drive, rq,  0);
 		} else if (sense_key == MEDIUM_ERROR) {
 			/* No point in re-trying a zillion times on a bad
 			 * sector.  The error is not correctable at all.
 			 */
-			ide_dump_status (drive, "media error (bad sector)", stat);
+			ide_dump_status(drive, rq, "media error (bad sector)", stat);
 			cdrom_end_request(drive, rq, 0);
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
-			*startstop = ide_error (drive, __FUNCTION__, stat);
+			*startstop = ide_error(drive, rq, __FUNCTION__, stat);
 			return 1;
 		} else if ((++rq->errors > ERROR_MAX)) {
 			/* We've racked up too many retries.  Abort. */
@@ -732,7 +732,7 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 	struct cdrom_info *info = drive->driver_data;
 
 	/* Wait for the controller to be idle. */
-	if (ide_wait_stat(&startstop, drive, 0, BUSY_STAT, WAIT_READY))
+	if (ide_wait_stat(&startstop, drive, rq, 0, BUSY_STAT, WAIT_READY))
 		return startstop;
 
 	if (info->dma) {
@@ -789,7 +789,7 @@ static ide_startstop_t cdrom_transfer_packet_command(struct ata_device *drive,
 			return startstop;
 	} else {
 		/* Otherwise, we must wait for DRQ to get set. */
-		if (ide_wait_stat(&startstop, drive, DRQ_STAT, BUSY_STAT, WAIT_READY))
+		if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY))
 			return startstop;
 	}
 
@@ -917,7 +917,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 			__ide_end_request(drive, rq, 1, rq->nr_sectors);
 			return ide_stopped;
 		} else
-			return ide_error (drive, "dma error", stat);
+			return ide_error (drive, rq, "dma error", stat);
 	}
 
 	/* Read the interrupt reason and the transfer length. */
@@ -1496,7 +1496,7 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 	 */
 	if (dma) {
 		if (dma_error)
-			return ide_error(drive, "dma error", stat);
+			return ide_error(drive, rq, "dma error", stat);
 
 		__ide_end_request(drive, rq, 1, rq->nr_sectors);
 		return ide_stopped;
@@ -2659,12 +2659,6 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	return nslots;
 }
 
-static void ide_cdrom_add_settings(ide_drive_t *drive)
-{
-	ide_add_setting(drive, "dsc_overlap",
-			SETTING_RW, -1, -1, TYPE_BYTE, 0, 1, 1,	1, &drive->dsc_overlap, NULL);
-}
-
 static
 int ide_cdrom_setup(ide_drive_t *drive)
 {
@@ -2798,7 +2792,7 @@ int ide_cdrom_setup(ide_drive_t *drive)
 		info->devinfo.handle = NULL;
 		return 1;
 	}
-	ide_cdrom_add_settings(drive);
+
 	return 0;
 }
 

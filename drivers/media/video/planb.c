@@ -2079,7 +2079,6 @@ static int init_planb(struct planb *pb)
 #endif
 	pb->tab_size = PLANB_MAXLINES + 40;
 	pb->suspend = 0;
-	pb->lock = 0;
 	init_MUTEX(&pb->lock);
 	pb->ch1_cmd = 0;
 	pb->ch2_cmd = 0;
