@@ -34,7 +34,7 @@ PREV       := set -e; cd ..;
 # rpm-pkg
 .PHONY: rpm-pkg rpm
 
-$(objtree)/kernel.spec: $(MKSPEC)
+$(objtree)/kernel.spec: $(MKSPEC) $(srctree)/Makefile
 	$(CONFIG_SHELL) $(MKSPEC) > $@
 
 rpm-pkg rpm: $(objtree)/kernel.spec
@@ -55,7 +55,7 @@ clean-rule +=  rm -f $(objtree)/kernel.spec
 
 # binrpm-pkg
 .PHONY: binrpm-pkg
-$(objtree)/binkernel.spec: $(MKSPEC)
+$(objtree)/binkernel.spec: $(MKSPEC) $(srctree)/Makefile
 	$(CONFIG_SHELL) $(MKSPEC) prebuilt > $@
 	
 binrpm-pkg: $(objtree)/binkernel.spec
