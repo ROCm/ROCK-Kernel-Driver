@@ -209,17 +209,17 @@ extern void (*sa1100fb_lcd_power)(int on);
  * IMHO this looks wrong.  In 8BPP, length should be 8.
  */
 static struct sa1100fb_rgb rgb_8 = {
-	red:	{ offset: 0,  length: 4, },
-	green:	{ offset: 0,  length: 4, },
-	blue:	{ offset: 0,  length: 4, },
-	transp:	{ offset: 0,  length: 0, },
+	.red	= { .offset = 0,  .length = 4, },
+	.green	= { .offset = 0,  .length = 4, },
+	.blue	= { .offset = 0,  .length = 4, },
+	.transp	= { .offset = 0,  .length = 0, },
 };
 
 static struct sa1100fb_rgb def_rgb_16 = {
-	red:	{ offset: 11, length: 5, },
-	green:	{ offset: 5,  length: 6, },
-	blue:	{ offset: 0,  length: 5, },
-	transp:	{ offset: 0,  length: 0, },
+	.red	= { .offset = 11, .length = 5, },
+	.green	= { .offset = 5,  .length = 6, },
+	.blue	= { .offset = 0,  .length = 5, },
+	.transp	= { .offset = 0,  .length = 0, },
 };
 
 #ifdef CONFIG_SA1100_ASSABET
@@ -230,155 +230,151 @@ static struct sa1100fb_rgb def_rgb_16 = {
  * instead (def_rgb_16).
  */
 static struct sa1100fb_mach_info lq039q2ds54_info __initdata = {
-	pixclock:	171521,		bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock	= 171521,	.bpp		= 16,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	5,		vsync_len:	1,
-	left_margin:	61,		upper_margin:	3,
-	right_margin:	9,		lower_margin:	0,
+	.hsync_len	= 5,		.vsync_len	= 1,
+	.left_margin	= 61,		.upper_margin	= 3,
+	.right_margin	= 9,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #else
 static struct sa1100fb_mach_info pal_info __initdata = {
-	pixclock:	67797,		bpp:		16,
-	xres:		640,		yres:		512,
+	.pixclock	= 67797,	.bpp		= 16,
+	.xres		= 640,		.yres		= 512,
 
-	hsync_len:	64,		vsync_len:	6,
-	left_margin:	125,		upper_margin:	70,
-	right_margin:	115,		lower_margin:	36,
+	.hsync_len	= 64,		.vsync_len	= 6,
+	.left_margin	= 125,		.upper_margin	= 70,
+	.right_margin	= 115,		.lower_margin	= 36,
 
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 #endif
 
 #ifdef CONFIG_SA1100_H3800
 static struct sa1100fb_mach_info h3800_info __initdata = {
-	pixclock:	174757, 	bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock	= 174757, 	.bpp		= 16,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	12,		upper_margin:	10,
-	right_margin:	17,		lower_margin:	1,
+	.hsync_len	= 3,		.vsync_len	= 3,
+	.left_margin	= 12,		.upper_margin	= 10,
+	.right_margin	= 17,		.lower_margin	= 1,
 
-	sync:		0,		cmap_static:	1,
+	.cmap_static	= 1,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_ACBsDiv(2) | LCCR3_PixRsEdg | LCCR3_OutEnH |
-			LCCR3_ACBsCntOff,
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #endif
 
 #ifdef CONFIG_SA1100_H3600
 static struct sa1100fb_mach_info h3600_info __initdata = {
-	pixclock:	174757, 	bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock	= 174757, 	.bpp		= 16,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	12,		upper_margin:	10,
-	right_margin:	17,		lower_margin:	1,
+	.hsync_len	= 3,		.vsync_len	= 3,
+	.left_margin	= 12,		.upper_margin	= 10,
+	.right_margin	= 17,		.lower_margin	= 1,
 
-	sync:		0,		cmap_static:	1,
+	.cmap_static	= 1,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_ACBsDiv(2) | LCCR3_PixRsEdg | LCCR3_OutEnH |
-			LCCR3_ACBsCntOff,
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 
 static struct sa1100fb_rgb h3600_rgb_16 = {
-	red:	{ offset: 12, length: 4, },
-	green:	{ offset: 7,  length: 4, },
-	blue:	{ offset: 1,  length: 4, },
-	transp: { offset: 0,  length: 0, },
+	.red	= { .offset = 12, .length = 4, },
+	.green	= { .offset = 7,  .length = 4, },
+	.blue	= { .offset = 1,  .length = 4, },
+	.transp	= { .offset = 0,  .length = 0, },
 };
 #endif
 
 #ifdef CONFIG_SA1100_H3100
 static struct sa1100fb_mach_info h3100_info __initdata = {
-	pixclock:	406977, 	bpp:		4,
-	xres:		320,		yres:		240,
+	.pixclock	= 406977, 	.bpp		= 4,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	26,		vsync_len:	41,
-	left_margin:	4,		upper_margin:	0,
-	right_margin:	4,		lower_margin:	0,
+	.hsync_len	= 26,		.vsync_len	= 41,
+	.left_margin	= 4,		.upper_margin	= 0,
+	.right_margin	= 4,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	cmap_greyscale: 1,
-	cmap_inverse:	1,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale	= 1,
+	.cmap_inverse	= 1,
 
-	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+	.lccr0		= LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #endif
 
 #ifdef CONFIG_SA1100_BRUTUS
 static struct sa1100fb_mach_info brutus_info __initdata = {
-	pixclock:	0,		bpp:		8,
-	xres:		320,		yres:		240,
+	.pixclock	= 0,		.bpp		= 8,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	3,		vsync_len:	1,
-	left_margin:	41,		upper_margin:	0,
-	right_margin:	101,		lower_margin:	0,
+	.hsync_len	= 3,		.vsync_len	= 1,
+	.left_margin	= 41,		.upper_margin	= 0,
+	.right_margin	= 101,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			LCCR3_PixClkDiv(44),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+			  LCCR3_PixClkDiv(44),
 };
 #endif
 
 #ifdef CONFIG_SA1100_CERF
 static struct sa1100fb_mach_info cerf_info __initdata = {
 #if defined(CONFIG_CERF_LCD_72_A)
-	pixclock:       171521,         bpp:            8,
-	xres:		640,		yres:		480,
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			LCCR3_PixClkDiv(38),
+	.pixclock	= 171521, 	.bpp		= 8,
+	.xres		= 640,		.yres		= 480,
+	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+			  LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_57_A)
-	pixclock:       171521,         bpp:            8,
-	xres:		320,		yres:		240,
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			LCCR3_PixClkDiv(38),
+	.pixclock	= 171521, 	.bpp		= 8,
+	.xres		= 320,		.yres		= 240,
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+			  LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_38_A)
-	pixclock:       171521,         bpp:            8,
-	xres:		240,		yres:		320,
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
-			LCCR3_PixClkDiv(38),
+	.pixclock	= 171521, 	.bpp		= 8,
+	.xres		= 240,		.yres		= 320,
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
+			  LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_38_B)
-	pixclock:	171521, 	bpp:		4,
-	xres:		320,		yres:		240,
-	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
-			LCCR3_PixClkDiv(38),
+	.pixclock	= 171521,	.bpp		= 4,
+	.xres		= 320,		.yres		= 240,
+	.lccr0		= LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
+			  LCCR3_PixClkDiv(38),
 #else
 #error "Must have a CerfBoard LCD form factor selected"
 #endif
 
-	hsync_len:	5,		vsync_len:	1,
-	left_margin:	61,		upper_margin:	3,
-	right_margin:	9,		lower_margin:	0,
+	.hsync_len	= 5,		.vsync_len	= 1,
+	.left_margin	= 61,		.upper_margin	= 3,
+	.right_margin	= 9,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
 };
 
 #if 0
 static struct sa1100fb_rgb cerf_rgb_16 = {
-	red:	{ offset: 8,	length: 4, },
-	green:	{ offset: 4,	length: 4, },
-	blue:	{ offset: 0,	length: 4, },
-	transp:	{ offset: 0,	length: 0, },
+	.red	= { .offset = 8,	.length = 4, },
+	.green	= { .offset = 4,	.length = 4, },
+	.blue	= { .offset = 0,	.length = 4, },
+	.transp	= { .offset = 0,	.length = 0, },
 };
 #endif
 #endif
@@ -386,56 +382,54 @@ static struct sa1100fb_rgb cerf_rgb_16 = {
 #ifdef CONFIG_SA1100_FREEBIRD
 #warning Please check this carefully
 static struct sa1100fb_mach_info freebird_info __initdata = {
-	pixclock:	171521,		bpp:		16,
-	xres:		240,		yres:		320,
+	.pixclock	= 171521,	.bpp		= 16,
+	.xres		= 240,		.yres		= 320,
 
-	hsync_len:	3,		vsync_len:	2,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len	= 3,		.vsync_len	= 2,
+	.left_margin	= 2,		.upper_margin	= 0,
+	.right_margin	= 2,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(2),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(2),
 };
 
 static struct sa1100fb_rgb freebird_rgb_16 = {
-	red:	{ offset: 8,  length: 4, },
-	green:	{ offset: 4,  length: 4, },
-	blue:	{ offset: 0,  length: 4, },
-	transp:	{ offset: 12, length: 4, },
+	.red	= { .offset = 8,  .length = 4, },
+	.green	= { .offset = 4,  .length = 4, },
+	.blue	= { .offset = 0,  .length = 4, },
+	.transp	= { .offset = 12, .length = 4, },
 };
 #endif
 
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 static struct sa1100fb_mach_info graphicsclient_info __initdata = {
-	pixclock:	53500,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock	= 53500,	.bpp		= 8,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	9,		vsync_len:	9,
-	left_margin:	54,		upper_margin:	24,
-	right_margin:	54,		lower_margin:	32,
+	.hsync_len	= 9,		.vsync_len	= 9,
+	.left_margin	= 54,		.upper_margin	= 24,
+	.right_margin	= 54,		.lower_margin	= 32,
 
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #endif
 
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 static struct sa1100fb_mach_info huw_webpanel_info __initdata = {
-	pixclock:	0,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock	= 0,		.bpp		= 8,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	3,		vsync_len:	1,
-	left_margin:	41,		upper_margin:	0,
-	right_margin:	101,		lower_margin:	0,
+	.hsync_len	= 3,		.vsync_len	= 1,
+	.left_margin	= 41,		.upper_margin	= 0,
+	.right_margin	= 101,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) | 8,
+	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) | 8,
 #error FIXME
 	/*
 	 * FIXME: please get rid of the '| 8' in preference to an
@@ -446,99 +440,94 @@ static struct sa1100fb_mach_info huw_webpanel_info __initdata = {
 
 #ifdef LART_GREY_LCD
 static struct sa1100fb_mach_info lart_grey_info __initdata = {
-	pixclock:	150000,		bpp:		4,
-	xres:		320,		yres:		240,
+	.pixclock	= 150000,	.bpp		= 4,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	1,		vsync_len:	1,
-	left_margin:	4,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len	= 1,		.vsync_len	= 1,
+	.left_margin	= 4,		.upper_margin	= 0,
+	.right_margin	= 2,		.lower_margin	= 0,
 
-	cmap_greyscale:	1,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale	= 1,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_4PixMono,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
+	.lccr0		= LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_4PixMono,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 #ifdef LART_COLOR_LCD
 static struct sa1100fb_mach_info lart_color_info __initdata = {
-	pixclock:	150000,		bpp:		16,
-	xres:		320,		yres:		240,
+	.pixclock	= 150000,	.bpp		= 16,
+	.xres		= 320,		.yres		= 240,
 
-	hsync_len:	2,		vsync_len:	3,
-	left_margin:	69,		upper_margin:	14,
-	right_margin:	8,		lower_margin:	4,
+	.hsync_len	= 2,		.vsync_len	= 3,
+	.left_margin	= 69,		.upper_margin	= 14,
+	.right_margin	= 8,		.lower_margin	= 4,
 
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 #ifdef LART_VIDEO_OUT
 static struct sa1100fb_mach_info lart_video_info __initdata = {
-	pixclock:	39721,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock	= 39721,	.bpp		= 16,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	95,		vsync_len:	2,
-	left_margin:	40,		upper_margin:	32,
-	right_margin:	24,		lower_margin:	11,
+	.hsync_len	= 95,		.vsync_len	= 2,
+	.left_margin	= 40,		.upper_margin	= 32,
+	.right_margin	= 24,		.lower_margin	= 11,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnL | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnL | LCCR3_PixFlEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 
 #ifdef LART_KIT01_LCD
-static struct sa1100fb_mach_info lart_kit01_info __initdata =
-{
-	pixclock:	63291,		bpp:		16,
-	xres:		640,		yres:		480,
+static struct sa1100fb_mach_info lart_kit01_info __initdata = {
+	.pixclock	= 63291,	.bpp		= 16,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	64,		vsync_len:	3,
-	left_margin:	122,		upper_margin:	45,
-	right_margin:	10,		lower_margin:	10,
+	.hsync_len	= 64,		.vsync_len	= 3,
+	.left_margin	= 122,		.upper_margin	= 45,
+	.right_margin	= 10,		.lower_margin	= 10,
 
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixFlEdg
 };
 #endif
 
 #ifdef CONFIG_SA1100_SHANNON
 static struct sa1100fb_mach_info shannon_info __initdata = {
-	pixclock:	152500,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock	= 152500,	.bpp		= 8,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	4,		vsync_len:	3,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	1,		lower_margin:	0,
+	.hsync_len	= 4,		.vsync_len	= 3,
+	.left_margin	= 2,		.upper_margin	= 0,
+	.right_margin	= 1,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, 
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, 
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_ACBsDiv(512),
+	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3		= LCCR3_ACBsDiv(512),
 };
 #endif
 
 #ifdef CONFIG_SA1100_OMNIMETER
 static struct sa1100fb_mach_info omnimeter_info __initdata = {
-	pixclock:	0,		bpp:		4,
-	xres:		480,		yres:		320,
+	.pixclock	= 0,		.bpp		= 4,
+	.xres		= 480,		.yres		= 320,
 
-	hsync_len:	1,		vsync_len:	1,
-	left_margin:	10,		upper_margin:	0,
-	right_margin:	10,		lower_margin:	0,
+	.hsync_len	= 1,		.vsync_len	= 1,
+	.left_margin	= 10,		.upper_margin	= 0,
+	.right_margin	= 10,		.lower_margin	= 0,
 
-	cmap_greyscale:	1,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.cmap_greyscale	= 1,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_8PixMono,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(255) |
-			LCCR3_PixClkDiv(44),
+	.lccr0		= LCCR0_Mono | LCCR0_Sngl | LCCR0_Pas | LCCR0_8PixMono,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(255) |
+			  LCCR3_PixClkDiv(44),
 #error FIXME: fix pixclock, ACBsDiv
 	/*
 	 * FIXME: I think ACBsDiv is wrong above - should it be 512 (disabled)?
@@ -549,17 +538,17 @@ static struct sa1100fb_mach_info omnimeter_info __initdata = {
 
 #ifdef CONFIG_SA1100_PANGOLIN
 static struct sa1100fb_mach_info pangolin_info __initdata = {
-	pixclock:	341521,		bpp:		16,
-	xres:		800,		yres:		600,
+	.pixclock	= 341521,	.bpp		= 16,
+	.xres		= 800,		.yres		= 600,
 
-	hsync_len:	64,		vsync_len:	7,
-	left_margin:	160,		upper_margin:	7,
-	right_margin:	24,		lower_margin:	1,
+	.hsync_len	= 64,		.vsync_len	= 7,
+	.left_margin	= 160,		.upper_margin	= 7,
+	.right_margin	= 24,		.lower_margin	= 1,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsCntOff,
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixFlEdg | LCCR3_ACBsCntOff,
 };
 #endif
 
@@ -571,49 +560,47 @@ static struct sa1100fb_mach_info pangolin_info __initdata = {
  * NB likely to be increased to ease bus timings wrt pcmcia interface
  */
 static struct sa1100fb_mach_info stork_tft_info __initdata = {
-	pixclock:	28935,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock	= 28935,	.bpp		= 16,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	64,		vsync_len:	2,
-	left_margin:	48,		upper_margin:	12,
-	right_margin:	48,		lower_margin:	31,
+	.hsync_len	= 64,		.vsync_len	= 2,
+	.left_margin	= 48,		.upper_margin	= 12,
+	.right_margin	= 48,		.lower_margin	= 31,
 
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg,
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsCntOff,
 };
 
 static struct sa1100fb_rgb stork_tft_rgb_16 = {
-	red:	{ offset: 11, length: 5, },
-	green:	{ offset: 5,  length: 6, },
-	blue:	{ offset: 0,  length: 5, },
-	transp:	{ offset: 0,  length: 0, },
+	.red	= { .offset = 11, .length = 5, },
+	.green	= { .offset = 5,  .length = 6, },
+	.blue	= { .offset = 0,  .length = 5, },
+	.transp	= { .offset = 0,  .length = 0, },
 };
 
 #else	/* Kyocera DSTN */
 
 static struct sa1100fb_mach_info stork_dstn_info __initdata = {
-	pixclock:	0,		bpp:		16,
-	xres:		640,		yres:		480,
+	.pixclock	= 0,		.bpp		= 16,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	2,		vsync_len:	2,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len	= 2,		.vsync_len	= 2,
+	.left_margin	= 2,		.upper_margin	= 0,
+	.right_margin	= 2,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT ,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT ,
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
 #error Fixme
-	lccr3:		0xff00 |
+	.lccr3		= 0xff00 |
 			0x18		/* ought to be 0x14 but DMA isn't up to that as yet */
 };
 
 static struct sa1100fb_rgb stork_dstn_rgb_16 = {
-	red:	{ offset: 8,  length: 4, },
-	green:	{ offset: 4,  length: 4, },
-	blue:	{ offset: 0,  length: 4, },
-	transp:	{ offset: 0,  length: 0, },
+	.red	= { .offset = 8,  .length = 4, },
+	.green	= { .offset = 4,  .length = 4, },
+	.blue	= { .offset = 0,  .length = 4, },
+	.transp	= { .offset = 0,  .length = 0, },
 };
 #endif
 #endif
@@ -630,34 +617,31 @@ static struct sa1100fb_rgb stork_dstn_rgb_16 = {
  *	=>4.32Mhz => 231481E-12s
  */
 static struct sa1100fb_mach_info system3_info __initdata = {
-	pixclock:	231481,		bpp:		8,
-	xres:		640,		yres:		480,
+	.pixclock	= 231481,	.bpp		= 8,
+	.xres		= 640,		.yres		= 480,
 
-	hsync_len:	2,		vsync_len:	2,
-	left_margin:	2,		upper_margin:	0,
-	right_margin:	2,		lower_margin:	0,
+	.hsync_len	= 2,		.vsync_len	= 2,
+	.left_margin	= 2,		.upper_margin	= 0,
+	.right_margin	= 2,		.lower_margin	= 0,
 
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
-	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512) |
-			LCCR3_ACBsCntOff,
+	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(512),
 };
 #endif
 
 #ifdef CONFIG_SA1100_XP860
 static struct sa1100fb_mach_info xp860_info __initdata = {
-	pixclock:	0,		bpp:		8,
-	xres:		1024,		yres:		768,
+	.pixclock	= 0,		.bpp		= 8,
+	.xres		= 1024,		.yres		= 768,
 
-	hsync_len:	3,		vsync_len:	3,
-	left_margin:	3,		upper_margin:	2,
-	right_margin:	2,		lower_margin:	1,
+	.hsync_len	= 3,		.vsync_len	= 3,
+	.left_margin	= 3,		.upper_margin	= 2,
+	.right_margin	= 2,		.lower_margin	= 1,
 
-	sync:		0,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_PixClkDiv(6),
+	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_PixClkDiv(6),
 };
 #endif
 
@@ -808,33 +792,7 @@ static inline void sa1100fb_schedule_task(struct sa1100fb_info *fbi, u_int state
 	local_irq_restore(flags);
 }
 
-/*
- * Get the VAR structure pointer for the specified console
- */
-static inline struct fb_var_screeninfo *get_con_var(struct fb_info *info, int con)
-{
-	return (con == info->currcon || con == -1) ? &info->var : &fb_display[con].var;
-}
-
-/*
- * Get the DISPLAY structure pointer for the specified console
- */
-static inline struct display *get_con_display(struct fb_info *info, int con)
-{
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	return (con < 0) ? fbi->fb.disp : &fb_display[con];
-}
-
-/*
- * Get the CMAP pointer for the specified console
- */
-static inline struct fb_cmap *get_con_cmap(struct fb_info *info, int con)
-{
-	return (con == info->currcon || con == -1) ? &info->cmap : &fb_display[con].cmap;
-}
-
-static inline u_int
-chan_to_field(u_int chan, struct fb_bitfield *bf)
+static inline u_int chan_to_field(u_int chan, struct fb_bitfield *bf)
 {
 	chan &= 0xffff;
 	chan >>= 16 - bf->length;
@@ -844,8 +802,7 @@ chan_to_field(u_int chan, struct fb_bitfield *bf)
 /*
  * Convert bits-per-pixel to a hardware palette PBS value.
  */
-static inline u_int
-palette_pbs(struct fb_var_screeninfo *var)
+static inline u_int palette_pbs(struct fb_var_screeninfo *var)
 {
 	int ret = 0;
 	switch (var->bits_per_pixel) {
@@ -888,8 +845,7 @@ sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		   u_int trans, struct fb_info *info)
 {
 	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	struct display *disp = get_con_display(info, info->currcon);
-	u_int val;
+	unsigned int val;
 	int ret = 1;
 
 	/*
@@ -898,7 +854,7 @@ sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	 * is what you poke into the framebuffer to produce the
 	 * colour you requested.
 	 */
-	if (disp->inverse) {
+	if (fbi->cmap_inverse) {
 		red   = 0xffff - red;
 		green = 0xffff - green;
 		blue  = 0xffff - blue;
@@ -912,7 +868,7 @@ sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		red = green = blue = (19595 * red + 38470 * green +
 					7471 * blue) >> 16;
 
-	switch (fbi->fb.disp->visual) {
+	switch (fbi->fb.fix.visual) {
 	case FB_VISUAL_TRUECOLOR:
 		/*
 		 * 12 or 16-bit True Colour.  We encode the RGB value
@@ -942,38 +898,29 @@ sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 /*
  *  sa1100fb_display_dma_period()
  *    Calculate the minimum period (in picoseconds) between two DMA
- *    requests for the LCD controller.
+ *    requests for the LCD controller.  If we hit this, it means we're
+ *    doing nothing but LCD DMA.
  */
-static unsigned int
-sa1100fb_display_dma_period(struct fb_var_screeninfo *var)
+static unsigned int sa1100fb_display_dma_period(struct fb_var_screeninfo *var)
 {
-	unsigned int mem_bits_per_pixel;
-
-	mem_bits_per_pixel = var->bits_per_pixel;
-	if (mem_bits_per_pixel == 12)
-		mem_bits_per_pixel = 16;
-
 	/*
 	 * Period = pixclock * bits_per_byte * bytes_per_transfer
 	 *		/ memory_bits_per_pixel;
 	 */
-	return var->pixclock * 8 * 16 / mem_bits_per_pixel;
+	return var->pixclock * 8 * 16 / var->bits_per_pixel;
 }
 
 /*
- *  sa1100fb_decode_var():
- *    Get the video params out of 'var'. If a value doesn't fit, round it up,
- *    if it's too big, return -EINVAL.
- *
- *    Suggestion: Round up in the following order: bits_per_pixel, xres,
+ *  sa1100fb_check_var():
+ *    Round up in the following order: bits_per_pixel, xres,
  *    yres, xres_virtual, yres_virtual, xoffset, yoffset, grayscale,
  *    bitfields, horizontal timing, vertical timing.
  */
 static int
-sa1100fb_validate_var(struct fb_var_screeninfo *var,
-		      struct sa1100fb_info *fbi)
+sa1100fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	int ret = -EINVAL;
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	int rgbidx;
 
 	if (var->xres < MIN_XRES)
 		var->xres = MIN_XRES;
@@ -983,25 +930,46 @@ sa1100fb_validate_var(struct fb_var_screeninfo *var,
 		var->xres = fbi->max_xres;
 	if (var->yres > fbi->max_yres)
 		var->yres = fbi->max_yres;
-	var->xres_virtual =
-	    var->xres_virtual < var->xres ? var->xres : var->xres_virtual;
-	var->yres_virtual =
-	    var->yres_virtual < var->yres ? var->yres : var->yres_virtual;
+	var->xres_virtual = max(var->xres_virtual, var->xres);
+	var->yres_virtual = max(var->yres_virtual, var->yres);
 
 	DPRINTK("var->bits_per_pixel=%d\n", var->bits_per_pixel);
 	switch (var->bits_per_pixel) {
 #ifdef FBCON_HAS_CFB4
-	case 4:		ret = 0; break;
+	case 4:
+		rgbidx = RGB_8;
+		break;
 #endif
 #ifdef FBCON_HAS_CFB8
-	case 8:		ret = 0; break;
+	case 8:
+		rgbidx = RGB_8;
+		break;
 #endif
 #ifdef FBCON_HAS_CFB16
-	case 16:	ret = 0; break;
+	case 16:
+		rgbidx = RGB_16;
+		break;
 #endif
 	default:
-		break;
+		return -EINVAL;
 	}
+
+	/*
+	 * Copy the RGB parameters for this display
+	 * from the machine specific parameters.
+	 */
+	var->red    = fbi->rgb[rgbidx]->red;
+	var->green  = fbi->rgb[rgbidx]->green;
+	var->blue   = fbi->rgb[rgbidx]->blue;
+	var->transp = fbi->rgb[rgbidx]->transp;
+
+	DPRINTK("RGBT length = %d:%d:%d:%d\n",
+		var->red.length, var->green.length, var->blue.length,
+		var->transp.length);
+
+	DPRINTK("RGBT offset = %d:%d:%d:%d\n",
+		var->red.offset, var->green.offset, var->blue.offset,
+		var->transp.offset);
 
 #ifdef CONFIG_CPU_FREQ
 	printk(KERN_DEBUG "dma period = %d ps, clock = %d kHz\n",
@@ -1009,16 +977,13 @@ sa1100fb_validate_var(struct fb_var_screeninfo *var,
 		cpufreq_get(smp_processor_id()));
 #endif
 
-	return ret;
+	return 0;
 }
 
 static inline void sa1100fb_set_truecolor(u_int is_true_color)
 {
-	DPRINTK("true_color = %d\n", is_true_color);
-
 	if (machine_is_assabet()) {
-#if 1
-		// phase 4 or newer Assabet's
+#if 1		// phase 4 or newer Assabet's
 		if (is_true_color)
 			ASSABET_BCR_set(ASSABET_BCR_LCD_12RGB);
 		else
@@ -1033,10 +998,30 @@ static inline void sa1100fb_set_truecolor(u_int is_true_color)
 	}
 }
 
-static void
-sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
+/*
+ * sa1100fb_set_par():
+ *	Set the user defined part of the display for the specified console
+ */
+static int sa1100fb_set_par(struct fb_info *info)
 {
-	u_long palette_mem_size;
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct fb_var_screeninfo *var = &info->var;
+	unsigned long palette_mem_size;
+
+	DPRINTK("set_par\n");
+
+	if (var->bits_per_pixel == 16)
+		fbi->fb.fix.visual = FB_VISUAL_TRUECOLOR;
+	else if (!fbi->cmap_static)
+		fbi->fb.fix.visual = FB_VISUAL_PSEUDOCOLOR;
+	else {
+		/*
+		 * Some people have weird ideas about wanting static
+		 * pseudocolor maps.  I suspect their user space
+		 * applications are broken.
+		 */
+		fbi->fb.fix.visual = FB_VISUAL_STATIC_PSEUDOCOLOR;
+	}
 
 	fbi->palette_size = var->bits_per_pixel == 8 ? 256 : 16;
 
@@ -1047,10 +1032,10 @@ sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 	fbi->palette_cpu = (u16 *)(fbi->map_cpu + PAGE_SIZE - palette_mem_size);
 	fbi->palette_dma = fbi->map_dma + PAGE_SIZE - palette_mem_size;
 
-	fb_set_cmap(&fbi->fb.cmap, 1, &fbi->fb);
-
-	/* Set board control register to handle new color depth */
-	sa1100fb_set_truecolor(var->bits_per_pixel >= 16);
+	/*
+	 * Set (any) board control register to handle new color depth
+	 */
+	sa1100fb_set_truecolor(fbi->fb.fix.visual == FB_VISUAL_TRUECOLOR);
 
 #ifdef CONFIG_SA1100_OMNIMETER
 #error Do we have to do this here?   We already do it at init time.
@@ -1060,9 +1045,7 @@ sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 
 	sa1100fb_activate_var(var, fbi);
 
-	fbi->palette_cpu[0] = (fbi->palette_cpu[0] &
-					 0xcfff) | palette_pbs(var);
-
+	return 0;
 }
 
 /*
@@ -1072,197 +1055,38 @@ sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 static int
 sa1100fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 {
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	struct fb_var_screeninfo *dvar = get_con_var(&fbi->fb, con);
-	struct display *display = get_con_display(&fbi->fb, con);
-	int err, chgvar = 0, rgbidx;
+	int ret, act;
 
-	DPRINTK("set_var\n");
+	act = var->activate & FB_ACTIVATE_MASK;
 
-	/*
-	 * Decode var contents into a par structure, adjusting any
-	 * out of range values.
-	 */
-	err = sa1100fb_validate_var(var, fbi);
-	if (err)
-		return err;
+	ret = gen_set_var(var, con, info);
 
-	if (var->activate & FB_ACTIVATE_TEST)
-		return 0;
+	if (ret == 0 && act & FB_ACTIVATE_NOW) {
+		struct display *display = (con < 0) ? info->disp : fb_display + con;
 
-	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
-		return -EINVAL;
-
-	if (dvar->xres != var->xres)
-		chgvar = 1;
-	if (dvar->yres != var->yres)
-		chgvar = 1;
-	if (dvar->xres_virtual != var->xres_virtual)
-		chgvar = 1;
-	if (dvar->yres_virtual != var->yres_virtual)
-		chgvar = 1;
-	if (dvar->bits_per_pixel != var->bits_per_pixel)
-		chgvar = 1;
-	if (con < 0)
-		chgvar = 0;
-
-	switch (var->bits_per_pixel) {
-#ifdef FBCON_HAS_CFB4
-	case 4:
-		if (fbi->cmap_static)
-			display->visual	= FB_VISUAL_STATIC_PSEUDOCOLOR;
-		else
-			display->visual	= FB_VISUAL_PSEUDOCOLOR;
-		display->line_length	= var->xres / 2;
-		display->dispsw		= &fbcon_cfb4;
-		rgbidx			= RGB_8;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB8
-	case 8:
-		if (fbi->cmap_static)
-			display->visual	= FB_VISUAL_STATIC_PSEUDOCOLOR;
-		else
-			display->visual	= FB_VISUAL_PSEUDOCOLOR;
-		display->line_length	= var->xres;
-		display->dispsw		= &fbcon_cfb8;
-		rgbidx			= RGB_8;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB16
-	case 16:
-		display->visual		= FB_VISUAL_TRUECOLOR;
-		display->line_length	= var->xres * 2;
-		display->dispsw		= &fbcon_cfb16;
-		display->dispsw_data	= fbi->fb.pseudo_palette;
-		rgbidx			= RGB_16;
-		break;
-#endif
-	default:
-		rgbidx = 0;
-		display->dispsw = &fbcon_dummy;
-		break;
+		/*
+		 * fbcon assumes too much.
+		 */
+		display->can_soft_blank = 1;
 	}
 
-	display->next_line	= display->line_length;
-	display->type		= fbi->fb.fix.type;
-	display->type_aux	= fbi->fb.fix.type_aux;
-	display->ypanstep	= fbi->fb.fix.ypanstep;
-	display->ywrapstep	= fbi->fb.fix.ywrapstep;
-	display->can_soft_blank	= 1;
-	display->inverse	= fbi->cmap_inverse;
-
-	*dvar			= *var;
-	dvar->activate		&= ~FB_ACTIVATE_ALL;
-
-	/*
-	 * Copy the RGB parameters for this display
-	 * from the machine specific parameters.
-	 */
-	dvar->red		= fbi->rgb[rgbidx]->red;
-	dvar->green		= fbi->rgb[rgbidx]->green;
-	dvar->blue		= fbi->rgb[rgbidx]->blue;
-	dvar->transp		= fbi->rgb[rgbidx]->transp;
-
-	DPRINTK("RGBT length = %d:%d:%d:%d\n",
-		dvar->red.length, dvar->green.length, dvar->blue.length,
-		dvar->transp.length);
-
-	DPRINTK("RGBT offset = %d:%d:%d:%d\n",
-		dvar->red.offset, dvar->green.offset, dvar->blue.offset,
-		dvar->transp.offset);
-
-	/*
-	 * Update the old var.  The fbcon drivers still use this.
-	 * Once they are using fbi->fb.var, this can be dropped.
-	 */
-	display->var = *dvar;
-
-	/*
-	 * If we are setting all the virtual consoles, also set the
-	 * defaults used to create new consoles.
-	 */
-	if (var->activate & FB_ACTIVATE_ALL)
-		fbi->fb.disp->var = *dvar;
-
-	/*
-	 * If the console has changed and the console has defined
-	 * a changevar function, call that function.
-	 */
-	if (chgvar && info && fbi->fb.changevar)
-		fbi->fb.changevar(con);
-
-	/* If the current console is selected, activate the new var. */
-	if (con != fbi->fb.currcon)
-		return 0;
-
-	sa1100fb_hw_set_var(dvar, fbi);
-
-	return 0;
-}
-
-static int
-__do_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-	      struct fb_info *info)
-{
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	struct fb_cmap *dcmap = get_con_cmap(info, con);
-	int err = 0;
-
-	if (con == -1)
-		con = info->currcon;
-
-	/* no colormap allocated? (we always have "this" colour map allocated) */
-	if (con >= 0)
-		err = fb_alloc_cmap(&fb_display[con].cmap, fbi->palette_size, 0);
-
-	if (!err && con == info->currcon)
-		err = fb_set_cmap(cmap, kspc, info);
-
-	if (!err)
-		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
-
-	return err;
+	return ret;
 }
 
 static int
 sa1100fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		  struct fb_info *info)
 {
-	struct display *disp = get_con_display(info, con);
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct display *disp = (con < 0) ? info->disp : (fb_display + con);
 
-	if (disp->visual == FB_VISUAL_TRUECOLOR ||
-	    disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
+	/*
+	 * Make sure the user isn't doing something stupid.
+	 */
+	if (!kspc && (disp->var.bits_per_pixel == 16 || fbi->cmap_static))
 		return -EINVAL;
 
-	return __do_set_cmap(cmap, kspc, con, info);
-}
-
-static int
-sa1100fb_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	struct display *display = get_con_display(info, con);
-
-	*fix = info->fix;
-
-	fix->line_length = display->line_length;
-	fix->visual	 = display->visual;
-	return 0;
-}
-
-static int
-sa1100fb_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	*var = *get_con_var(info, con);
-	return 0;
-}
-
-static int
-sa1100fb_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
-{
-	struct fb_cmap *dcmap = get_con_cmap(info, con);
-	fb_copy_cmap(dcmap, cmap, kspc ? 0 : 2);
-	return 0;
+	return gen_set_cmap(cmap, kspc, con, info);
 }
 
 /*
@@ -1312,16 +1136,16 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 	case VESA_POWERDOWN:
 	case VESA_VSYNC_SUSPEND:
 	case VESA_HSYNC_SUSPEND:
-		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
-		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
+		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
+		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			for (i = 0; i < fbi->palette_size; i++)
 				sa1100fb_setpalettereg(i, 0, 0, 0, 0, info);
 		sa1100fb_schedule_task(fbi, C_DISABLE);
 		break;
 
 	case VESA_NO_BLANKING:
-		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
-		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
+		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
+		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			fb_set_cmap(&fbi->fb.cmap, 1, info);
 		sa1100fb_schedule_task(fbi, C_ENABLE);
 	}
@@ -1329,71 +1153,19 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 }
 
 static struct fb_ops sa1100fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	sa1100fb_get_fix,
-	fb_get_var:	sa1100fb_get_var,
-	fb_set_var:	sa1100fb_set_var,
-	fb_get_cmap:	sa1100fb_get_cmap,
-	fb_set_cmap:	sa1100fb_set_cmap,
-	fb_setcolreg:	sa1100fb_setcolreg,
-	fb_blank:	sa1100fb_blank,
+	.owner		= THIS_MODULE,
+	.fb_check_var	= sa1100fb_check_var,
+	.fb_set_par	= sa1100fb_set_par,
+	.fb_set_var	= sa1100fb_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= sa1100fb_set_cmap,
+	.fb_setcolreg	= sa1100fb_setcolreg,
+	.fb_blank	= sa1100fb_blank,
 };
-
-/*
- *  sa1100fb_switch():       
- *	Change to the specified console.  Palette and video mode
- *      are changed to the console's stored parameters.
- *
- *	Uh oh, this can be called from a tasklet (IRQ)
- */
-static int sa1100fb_switch(int con, struct fb_info *info)
-{
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	struct display *disp;
-	struct fb_cmap *cmap;
-
-	DPRINTK("con=%d info->modename=%s\n", con, fbi->fb.modename);
-
-	if (con == info->currcon)
-		return 0;
-
-	if (info->currcon >= 0) {
-		disp = fb_display + info->currcon;
-
-		/*
-		 * Save the old colormap and video mode.
-		 */
-		disp->var = fbi->fb.var;
-
-		if (disp->cmap.len)
-			fb_copy_cmap(&fbi->fb.cmap, &disp->cmap, 0);
-	}
-
-	info->currcon = con;
-	disp = fb_display + con;
-
-	/*
-	 * Make sure that our colourmap contains 256 entries.
-	 */
-	fb_alloc_cmap(&fbi->fb.cmap, 256, 0);
-
-	if (disp->cmap.len)
-		cmap = &disp->cmap;
-	else
-		cmap = fb_default_cmap(1 << disp->var.bits_per_pixel);
-
-	fb_copy_cmap(cmap, &fbi->fb.cmap, 0);
-
-	fbi->fb.var = disp->var;
-	fbi->fb.var.activate = FB_ACTIVATE_NOW;
-
-	sa1100fb_set_var(&fbi->fb.var, con, info);
-	return 0;
-}
 
 static int sa1100fb_updatevar(int con, struct fb_info *info)
 {
-	DPRINTK("entered\n");
+	/* we don't support panning nor scrolling */
 	return 0;
 }
 
@@ -1401,34 +1173,14 @@ static int sa1100fb_updatevar(int con, struct fb_info *info)
  * Calculate the PCD value from the clock rate (in picoseconds).
  * We take account of the PPCR clock setting.
  */
-static inline int get_pcd(unsigned int pixclock)
+static inline unsigned int get_pcd(unsigned int pixclock, unsigned int cpuclock)
 {
-	unsigned int pcd;
+	unsigned int pcd = cpuclock / 100;
 
-	if (pixclock) {
-		pcd = cpufreq_get(0) / 100;
-		pcd *= pixclock;
-		pcd /= 10000000;
-		pcd += 1;	/* make up for integer math truncations */
-	} else {
-		/*
-		 * People seem to be missing this message.  Make it big.
-		 * Make it stand out.  Make sure people see it.
-		 */
-		printk(KERN_WARNING "******************************************************\n");
-		printk(KERN_WARNING "**            ZERO PIXEL CLOCK DETECTED             **\n");
-		printk(KERN_WARNING "** You are using a zero pixclock.  This means that  **\n");
-		printk(KERN_WARNING "** clock scaling will not be able to adjust your    **\n");
-		printk(KERN_WARNING "** your timing parameters appropriately, and the    **\n");
-		printk(KERN_WARNING "** bandwidth calculations will fail to work.  This  **\n");
-		printk(KERN_WARNING "** will shortly become an error condition, which    **\n");
-		printk(KERN_WARNING "** will prevent your LCD display working.  Please   **\n");
-		printk(KERN_WARNING "** send your patches in as soon as possible to shut **\n");
-		printk(KERN_WARNING "** this message up.                                 **\n");
-		printk(KERN_WARNING "******************************************************\n");
-		pcd = 0;
-	}
-	return pcd;
+	pcd *= pixclock;
+	pcd /= 10000000;
+
+	return pcd + 1;	/* make up for integer math truncations */
 }
 
 /*
@@ -1439,7 +1191,7 @@ static inline int get_pcd(unsigned int pixclock)
 static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 {
 	struct sa1100fb_lcd_reg new_regs;
-	u_int half_screen_size, yres, pcd = get_pcd(var->pixclock);
+	u_int half_screen_size, yres, pcd;
 	u_long flags;
 
 	DPRINTK("Configuring SA1100 LCD\n");
@@ -1502,13 +1254,10 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
 		LCCR2_BegFrmDel(var->upper_margin) +
 		LCCR2_EndFrmDel(var->lower_margin);
 
-	new_regs.lccr3 = fbi->lccr3 |
+	pcd = get_pcd(var->pixclock, cpufreq_get(0));
+	new_regs.lccr3 = LCCR3_PixClkDiv(pcd) | fbi->lccr3 |
 		(var->sync & FB_SYNC_HOR_HIGH_ACT ? LCCR3_HorSnchH : LCCR3_HorSnchL) |
-		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL) |
-		LCCR3_ACBsCntOff;
-
-	if (pcd)
-		new_regs.lccr3 |= LCCR3_PixClkDiv(pcd);
+		(var->sync & FB_SYNC_VERT_HIGH_ACT ? LCCR3_VrtSnchH : LCCR3_VrtSnchL);
 
 	DPRINTK("nlccr0 = 0x%08x\n", new_regs.lccr0);
 	DPRINTK("nlccr1 = 0x%08x\n", new_regs.lccr1);
@@ -1547,61 +1296,20 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
  * to ensure that things happen in the right way 100% of time time.
  *	-- rmk
  */
-
-/*
- * FIXME: move LCD power stuff into sa1100fb_power_up_lcd()
- * Also, I'm expecting that the backlight stuff should
- * be handled differently.
- */
-static inline void sa1100fb_backlight_on(struct sa1100fb_info *fbi)
+static inline void __sa1100fb_backlight_power(struct sa1100fb_info *fbi, int on)
 {
-	DPRINTK("backlight on\n");
+	DPRINTK("backlight o%s\n", on ? "n" : "ff");
 
 	if (sa1100fb_backlight_power)
-		sa1100fb_backlight_power(1);
+		sa1100fb_backlight_power(on);
 }
 
-/*
- * FIXME: move LCD power stuf into sa1100fb_power_down_lcd()
- * Also, I'm expecting that the backlight stuff should
- * be handled differently.
- */
-static inline void sa1100fb_backlight_off(struct sa1100fb_info *fbi)
+static inline void __sa1100fb_lcd_power(struct sa1100fb_info *fbi, int on)
 {
-	DPRINTK("backlight off\n");
-
-	if (sa1100fb_backlight_power)
-		sa1100fb_backlight_power(0);
-}
-
-static inline void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
-{
-	DPRINTK("LCD power on\n");
+	DPRINTK("LCD power o%s\n", on ? "n" : "ff");
 
 	if (sa1100fb_lcd_power)
-		sa1100fb_lcd_power(1);
-
-#ifdef CONFIG_SA1100_STORK
-	if (machine_is_stork()) {
-		storkSetLCDCPLD(0, 1);
-		storkSetLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
- 	}
-#endif
-}
-
-static inline void sa1100fb_power_down_lcd(struct sa1100fb_info *fbi)
-{
-	DPRINTK("LCD power off\n");
-
-	if (sa1100fb_lcd_power)
-		sa1100fb_lcd_power(0);
-
-#ifdef CONFIG_SA1100_STORK
-	if (machine_is_stork()) {
-		storkSetLCDCPLD(0, 0);
-		storkClearLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
-	}
-#endif
+		sa1100fb_lcd_power(on);
 }
 
 static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
@@ -1630,38 +1338,9 @@ static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
 
 	}
 
-	if (machine_is_cerf()) {
-		/* GPIO15 is used as a bypass for 3.8" displays */
+	/* GPIO15 is used as a bypass for 3.8" displays */
+	if (machine_is_cerf())
 		mask |= GPIO_GPIO15;
-#ifdef CONFIG_SA1100_CERF
-#warning Read Me Now!
-#endif
-#if 0 /* if this causes you problems, mail <rmk@arm.linux.org.uk> please. */
-      /*
-       * This was enabled for the 72_A version only, which is a _color_
-       * _dual_ LCD.  Now look at the generic test above, and calculate
-       * the mask value for a colour dual display...
-       *
-       * I therefore conclude that the code below is redundant, and will
-       * be killed at the start of November 2001.
-       */
-		/* FIXME: why is this? The Cerf's display doesn't seem
-		 * to be dual scan or active. I just leave it here,
-		 * but in my opinion this is definitively wrong.
-		 *  -- Erik <J.A.K.Mouw@its.tudelft.nl>
-		 */
-
-		/* REPLY: Umm.. Well to be honest, the 5.7" LCD which
-		 * this was used for does not use these pins, but
-		 * apparently all hell breaks loose if they are not
-		 * set on the Cerf, so we decided to leave them in ;)
-		 *  -- Daniel Chemko <dchemko@intrinsyc.com>
-		 */
-		/* color {dual/single} passive */
-		mask |= GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12 |
-			GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9  | GPIO_LDD8;
-#endif
-	}
 
 	if (mask) {
 		GPDR |= mask;
@@ -1733,7 +1412,7 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 	}
 #endif
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
-#error Move me into sa1100fb_power_up_lcd and/or sa1100fb_backlight_on
+#error Move me into __sa1100fb_lcd_power and/or __sa1100fb_backlight_power
 	if (machine_is_huw_webpanel()) {
 		// dont forget to set the control lines to zero (?)
 		DPRINTK("ShutDown HuW LCD controller\n");
@@ -1806,10 +1485,10 @@ static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state)
 		if (old_state != C_DISABLE) {
 			fbi->state = state;
 
-			sa1100fb_backlight_off(fbi);
+			__sa1100fb_backlight_power(fbi, 0);
 			if (old_state != C_DISABLE_CLKCHANGE)
 				sa1100fb_disable_controller(fbi);
-			sa1100fb_power_down_lcd(fbi);
+			__sa1100fb_lcd_power(fbi, 0);
 		}
 		break;
 
@@ -1855,9 +1534,9 @@ static void set_ctrlr_state(struct sa1100fb_info *fbi, u_int state)
 		if (old_state != C_ENABLE) {
 			fbi->state = C_ENABLE;
 			sa1100fb_setup_gpio(fbi);
-			sa1100fb_power_up_lcd(fbi);
+			__sa1100fb_lcd_power(fbi, 1);
 			sa1100fb_enable_controller(fbi);
-			sa1100fb_backlight_on(fbi);
+			__sa1100fb_backlight_power(fbi, 1);
 		}
 		break;
 	}
@@ -1888,18 +1567,19 @@ static unsigned int sa1100fb_min_dma_period(struct sa1100fb_info *fbi)
 	int i;
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
+		struct display *disp = &fb_display[i];
 		unsigned int period;
 
 		/*
 		 * Do we own this display?
 		 */
-		if (fb_display[i].fb_info != &fbi->fb)
+		if (disp->fb_info != &fbi->fb)
 			continue;
 
 		/*
 		 * Ok, calculate its DMA period
 		 */
-		period = sa1100fb_display_dma_period(get_con_var(&fbi->fb, i));
+		period = sa1100fb_display_dma_period(&disp->var);
 		if (period < min_period)
 			min_period = period;
 	}
@@ -1933,7 +1613,7 @@ sa1100fb_clkchg_notifier(struct notifier_block *nb, unsigned long val,
 		break;
 
 	case CPUFREQ_POSTCHANGE:
-		pcd = get_pcd(fbi->fb.var.pixclock);
+		pcd = get_pcd(fbi->fb.var.pixclock, cpufreq_get(0));
 		fbi->reg_lccr3 = (fbi->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
 		set_ctrlr_state(fbi, C_ENABLE_CLKCHANGE);
 		break;
@@ -2015,8 +1695,6 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 
 	memset(fbi, 0, sizeof(struct sa1100fb_info) + sizeof(struct display));
 
-	fbi->fb.currcon		= -1;
-
 	strcpy(fbi->fb.fix.id, SA1100_NAME);
 
 	fbi->fb.fix.type	= FB_TYPE_PACKED_PIXELS;
@@ -2024,6 +1702,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->fb.fix.xpanstep	= 0;
 	fbi->fb.fix.ypanstep	= 0;
 	fbi->fb.fix.ywrapstep	= 0;
+	fbi->fb.fix.line_length	= 0;
 	fbi->fb.fix.accel	= FB_ACCEL_NONE;
 
 	fbi->fb.var.nonstd	= 0;
@@ -2038,7 +1717,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 
 	fbi->fb.fbops		= &sa1100fb_ops;
 	fbi->fb.changevar	= NULL;
-	fbi->fb.switch_con	= sa1100fb_switch;
+	fbi->fb.switch_con	= gen_switch;
 	fbi->fb.updatevar	= sa1100fb_updatevar;
 	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
 	fbi->fb.node		= NODEV;
@@ -2051,6 +1730,16 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->rgb[RGB_16]	= &def_rgb_16;
 
 	inf = sa1100fb_get_machine_info(fbi);
+
+	/*
+	 * People just don't seem to get this.  We don't support
+	 * anything but correct entries now, so panic if someone
+	 * does something stupid.
+	 */
+	if (inf->lccr3 & (LCCR3_VrtSnchL|LCCR3_HorSnchL|0xff) ||
+	    inf->pixclock == 0)
+		panic("sa1100fb error: invalid LCCR3 fields set or zero "
+			"pixclock.");
 
 	fbi->max_xres			= inf->xres;
 	fbi->fb.var.xres		= inf->xres;
@@ -2077,6 +1766,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->task_state			= (u_char)-1;
 	fbi->fb.fix.smem_len		= fbi->max_xres * fbi->max_yres *
 					  fbi->max_bpp / 8;
+	fbi->fb.disp->inverse		= inf->cmap_inverse;
 
 	init_waitqueue_head(&fbi->ctrlr_wait);
 	INIT_TQUEUE(&fbi->task, sa1100fb_task, fbi);
@@ -2116,7 +1806,7 @@ int __init sa1100fb_init(void)
 #endif
 
 #ifdef CONFIG_SA1100_FREEBIRD
-#error Please move this into sa1100fb_power_up_lcd
+#error Please move this into __sa1100fb_lcd_power
 	if (machine_is_freebird()) {
 		BCR_set(BCR_FREEBIRD_LCD_DISP);
 		mdelay(20);
