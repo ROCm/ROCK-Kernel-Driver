@@ -776,7 +776,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		/*
 		 * Do the final lookup.
 		 */
-		dentry = __lookup_hash(&nd.last, nd.dentry, &nd);
+		dentry = lookup_hash(&nd.last, nd.dentry);
 		err = PTR_ERR(dentry);
 		if (IS_ERR(dentry))
 			goto out_mknod_unlock;
