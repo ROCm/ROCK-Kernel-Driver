@@ -43,6 +43,8 @@
 #include <net/sock.h>
 #include <net/ip_fib.h>
 
+#include "fib_lookup.h"
+
 static kmem_cache_t *fn_hash_kmem;
 static kmem_cache_t *fn_alias_kmem;
 
@@ -51,17 +53,6 @@ struct fib_node {
 	struct list_head	fn_alias;
 	u32			fn_key;
 };
-
-struct fib_alias {
-	struct list_head	fa_list;
-	struct fib_info		*fa_info;
-	u8			fa_tos;
-	u8			fa_type;
-	u8			fa_scope;
-	u8			fa_state;
-};
-
-#define FN_S_ACCESSED	1
 
 struct fn_zone {
 	struct fn_zone		*fz_next;	/* Next not empty zone	*/
@@ -277,7 +268,7 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 				if (fa->fa_scope < flp->fl4_scope)
 					continue;
 
-				fa->fa_state |= FN_S_ACCESSED;
+				fa->fa_state |= FA_S_ACCESSED;
 
 				err = fib_semantic_match(fa->fa_type,
 							 fa->fa_info,
@@ -358,7 +349,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 			if (!next_fi->fib_nh[0].nh_gw ||
 			    next_fi->fib_nh[0].nh_scope != RT_SCOPE_LINK)
 				continue;
-			fa->fa_state |= FN_S_ACCESSED;
+			fa->fa_state |= FA_S_ACCESSED;
 
 			if (fi == NULL) {
 				if (next_fi != res->fi)
@@ -521,11 +512,11 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 			fa->fa_type = type;
 			fa->fa_scope = r->rtm_scope;
 			state = fa->fa_state;
-			fa->fa_state &= ~FN_S_ACCESSED;
+			fa->fa_state &= ~FA_S_ACCESSED;
 			write_unlock_bh(&fib_hash_lock);
 
 			fib_release_info(fi_drop);
-			if (state & FN_S_ACCESSED)
+			if (state & FA_S_ACCESSED)
 				rt_cache_flush(-1);
 			return 0;
 		}
@@ -669,7 +660,7 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		}
 		write_unlock_bh(&fib_hash_lock);
 
-		if (fa->fa_state & FN_S_ACCESSED)
+		if (fa->fa_state & FA_S_ACCESSED)
 			rt_cache_flush(-1);
 		fn_free_alias(fa);
 		if (kill_fn) {
