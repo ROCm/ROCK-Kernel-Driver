@@ -140,7 +140,7 @@ badge4_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 
 		need5V = ((conf->vcc == 50) || (conf->vpp == 50));
 
-		badge4_set_5V(BADGE4_5V_PCMCIA_SOCK(conf->sock), need5V);
+		badge4_set_5V(BADGE4_5V_PCMCIA_SOCK(sock), need5V);
 
 		local_irq_restore(flags);
 	}

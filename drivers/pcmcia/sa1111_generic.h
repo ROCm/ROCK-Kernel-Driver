@@ -6,9 +6,13 @@ extern int sa1111_pcmcia_socket_init(int);
 extern int sa1111_pcmcia_socket_suspend(int);
 
 
+extern int pcmcia_badge4_init(struct device *);
+extern void pcmcia_badge4_exit(struct device *);
+
 extern int pcmcia_jornada720_init(struct device *);
 extern void pcmcia_jornada720_exit(struct device *);
 
 extern int pcmcia_neponset_init(struct device *);
 extern void pcmcia_neponset_exit(struct device *);
+
 
