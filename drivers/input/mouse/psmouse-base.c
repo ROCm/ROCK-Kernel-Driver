@@ -84,13 +84,6 @@ static psmouse_ret_t psmouse_process_byte(struct psmouse *psmouse, struct pt_reg
 	input_regs(dev, regs);
 
 /*
- * The PS2++ protocol is a little bit complex
- */
-
-	if (psmouse->type == PSMOUSE_PS2PP)
-		ps2pp_process_packet(psmouse);
-
-/*
  * Scroll wheel on IntelliMice, scroll buttons on NetMice
  */
 

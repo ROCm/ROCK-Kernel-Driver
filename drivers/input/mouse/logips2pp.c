@@ -38,13 +38,23 @@ struct ps2pp_info {
  * Process a PS2++ or PS2T++ packet.
  */
 
-void ps2pp_process_packet(struct psmouse *psmouse)
+static psmouse_ret_t ps2pp_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 {
 	struct input_dev *dev = &psmouse->dev;
-        unsigned char *packet = psmouse->packet;
+	unsigned char *packet = psmouse->packet;
+
+	if (psmouse->pktcnt < 3)
+		return PSMOUSE_GOOD_DATA;
+
+/*
+ * Full packet accumulated, process it
+ */
+
+	input_regs(dev, regs);
 
 	if ((packet[0] & 0x48) == 0x48 && (packet[1] & 0x02) == 0x02) {
 
+		/* Logitech extended packet */
 		switch ((packet[1] >> 4) | (packet[0] & 0x30)) {
 
 			case 0x0d: /* Mouse extra info */
@@ -79,11 +89,20 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 					(packet[1] >> 4) | (packet[0] & 0x30));
 #endif
 		}
-
-		packet[0] &= 0x0f;
-		packet[1] = 0;
-		packet[2] = 0;
+	} else {
+		/* Standard PS/2 motion data */
+		input_report_rel(dev, REL_X, packet[1] ? (int) packet[1] - (int) ((packet[0] << 4) & 0x100) : 0);
+		input_report_rel(dev, REL_Y, packet[2] ? (int) ((packet[0] << 3) & 0x100) - (int) packet[2] : 0);
 	}
+
+	input_report_key(dev, BTN_LEFT,    packet[0]       & 1);
+	input_report_key(dev, BTN_MIDDLE, (packet[0] >> 2) & 1);
+	input_report_key(dev, BTN_RIGHT,  (packet[0] >> 1) & 1);
+
+	input_sync(dev);
+
+	return PSMOUSE_FULL_PACKET;
+
 }
 
 /*
@@ -334,11 +353,15 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 		psmouse->vendor = "Logitech";
 		psmouse->model = model;
 
-		if (use_ps2pp && model_info->kind != PS2PP_KIND_TP3) {
-			psmouse->set_resolution = ps2pp_set_resolution;
-			psmouse->disconnect = ps2pp_disconnect;
+		if (use_ps2pp) {
+			psmouse->protocol_handler = ps2pp_process_byte;
 
-			device_create_file(&psmouse->ps2dev.serio->dev, &psmouse_attr_smartscroll);
+			if (model_info->kind != PS2PP_KIND_TP3) {
+				psmouse->set_resolution = ps2pp_set_resolution;
+				psmouse->disconnect = ps2pp_disconnect;
+
+				device_create_file(&psmouse->ps2dev.serio->dev, &psmouse_attr_smartscroll);
+			}
 		}
 
 		if (buttons < 3)
