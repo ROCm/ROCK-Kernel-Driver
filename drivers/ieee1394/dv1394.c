@@ -2420,24 +2420,6 @@ static struct file_operations dv1394_fops=
 };
 
 
-#ifdef CONFIG_DEVFS_FS
-static int dv1394_devfs_add_entry(struct video_card *video)
-{
-	char buf[64];
-
-	snprintf(buf, sizeof(buf), "ieee1394/dv/host%d/%s/%s",
-		(video->id>>2),
-		(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"),
-		(video->mode == MODE_RECEIVE ? "in" : "out"));
-
-	devfs_register(NULL, buf, 0, IEEE1394_MAJOR,
-			IEEE1394_MINOR_BLOCK_DV1394*16 + video->id,
-			S_IFCHR | S_IRUGO | S_IWUGO, &dv1394_fops, video);
-	return 0;
-}
-#endif /* CONFIG_DEVFS_FS */
-
-
 /*** HOTPLUG STUFF **********************************************************/
 /*
  * Export information about protocols/devices supported by this driver.
@@ -2536,10 +2518,14 @@ static int dv1394_init(struct ti_ohci *ohci, enum pal_or_ntsc format, enum modes
 	list_add_tail(&video->list, &dv1394_cards);
 	spin_unlock_irqrestore(&dv1394_cards_lock, flags);
 	
-#ifdef CONFIG_DEVFS_FS
-	if (dv1394_devfs_add_entry(video) < 0)
+	if (devfs_mk_cdev(MKDEV(IEEE1394_MAJOR,
+				IEEE1394_MINOR_BLOCK_DV1394*16 + video->id),
+			S_IFCHR|S_IRUGO|S_IWUGO,
+			 "ieee1394/dv/host%d/%s/%s",
+			 (video->id>>2),
+			 (video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"),
+			 (video->mode == MODE_RECEIVE ? "in" : "out")) < 0)
 			goto err_free;
-#endif
 
 	debug_printk("dv1394: dv1394_init() OK on ID %d\n", video->id);
 	
@@ -2562,9 +2548,7 @@ static void dv1394_un_init(struct video_card *video)
 		(video->mode == MODE_RECEIVE ? "in" : "out")
 		);
 
-#ifdef CONFIG_DEVFS_FS
 	devfs_remove("ieee1394/%s", buf);
-#endif
 #ifdef CONFIG_PROC_FS
 	dv1394_procfs_del(buf);
 #endif
@@ -2602,11 +2586,9 @@ static void dv1394_remove_host (struct hpsb_host *host)
 
 	n = (video->id >> 2);
 
-#ifdef CONFIG_DEVFS_FS
 	devfs_remove("ieee1394/dv/host%d/NTSC", n);
 	devfs_remove("ieee1394/dv/host%d/PAL", n);
 	devfs_remove("ieee1394/dv/host%d", n);
-#endif
 
 #ifdef CONFIG_PROC_FS
 	snprintf(buf, sizeof(buf), "dv/host%d/NTSC", n);
@@ -2642,11 +2624,9 @@ static void dv1394_add_host (struct hpsb_host *host)
 }
 #endif
 
-#ifdef CONFIG_DEVFS_FS
 	devfs_mk_dir("ieee1394/dv/host%d", ohci->id);
 	devfs_mk_dir("ieee1394/dv/host%d/NTSC", ohci->id);
 	devfs_mk_dir("ieee1394/dv/host%d/PAL", ohci->id);
-#endif
 	
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);
 	dv1394_init(ohci, DV1394_NTSC, MODE_TRANSMIT);
@@ -2901,9 +2881,7 @@ static void __exit dv1394_exit_module(void)
 
 	hpsb_unregister_highlevel(&dv1394_highlevel);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-#ifdef CONFIG_DEVFS_FS
 	devfs_remove("ieee1394/dv");
-#endif
 #ifdef CONFIG_PROC_FS
 	dv1394_procfs_del("dv");
 #endif
@@ -2920,18 +2898,14 @@ static int __init dv1394_init_module(void)
 		return -EIO;
 	}
 
-#ifdef CONFIG_DEVFS_FS
 	devfs_mk_dir("ieee1394/dv");
-#endif
 
 #ifdef CONFIG_PROC_FS
 	ret = dv1394_procfs_add_dir("dv",NULL,NULL);
 	if (ret < 0) {
 		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/dv\n");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-#ifdef CONFIG_DEVFS_FS
 		devfs_remove("ieee1394/dv");
-#endif
 		return -ENOMEM;
 	}
 #endif

@@ -712,12 +712,19 @@ static struct file_operations dabusb_fops =
 	.release =	dabusb_release,
 };
 
+static struct usb_class_driver dabusb_class = {
+	.name =		"usb/dabusb%d",
+	.fops =		&dabusb_fops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+	.minor_base =	DABUSB_MINOR,
+};
+
+
 /* --------------------------------------------------------------------- */
 static int dabusb_probe (struct usb_interface *intf, 
 			 const struct usb_device_id *id)
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
-	int devnum;
 	int retval;
 	pdabusb_t s;
 
@@ -731,16 +738,16 @@ static int dabusb_probe (struct usb_interface *intf,
 	if (intf->altsetting->desc.bInterfaceNumber != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
 		return -ENODEV;
 
-	retval = usb_register_dev (&dabusb_fops, DABUSB_MINOR, 1, &devnum);
+	retval = usb_register_dev(intf, &dabusb_class);
 	if (retval)
 		return -ENOMEM;
 
-	s = &dabusb[devnum];
+	s = &dabusb[intf->minor];
 
 	down (&s->mutex);
 	s->remove_pending = 0;
 	s->usbdev = usbdev;
-	s->devnum = devnum;
+	s->devnum = intf->minor;
 
 	if (usb_set_configuration (usbdev, usbdev->config[0].desc.bConfigurationValue) < 0) {
 		err("set_configuration failed");
@@ -778,7 +785,7 @@ static void dabusb_disconnect (struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 	if (s) {
-		usb_deregister_dev (1, s->devnum);
+		usb_deregister_dev (intf, &dabusb_class);
 		s->remove_pending = 1;
 		wake_up (&s->wait);
 		if (s->state == _started)

@@ -143,8 +143,6 @@ int init_vfc_devstruct(struct vfc_dev *dev, int instance)
 
 int init_vfc_device(struct sbus_dev *sdev,struct vfc_dev *dev, int instance)
 {
-	char devname[16];
-
 	if(dev == NULL) {
 		printk(KERN_ERR "VFC: Bogus pointer passed\n");
 		return -ENOMEM;
@@ -167,11 +165,9 @@ int init_vfc_device(struct sbus_dev *sdev,struct vfc_dev *dev, int instance)
 	if (init_vfc_hw(dev))
 		return -EIO;
 
-	sprintf (devname, "vfc/%d", instance);
-	dev->de = devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-				  VFC_MAJOR, instance,
-				  S_IFCHR | S_IRUSR | S_IWUSR,
-				  &vfc_fops, NULL);
+	devfs_mk_cdev(MKDEV(VFC_MAJOR, instance),
+			S_IFCHR | S_IRUSR | S_IWUSR,
+			"vfc/%d", instance);
 	return 0;
 }
 

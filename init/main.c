@@ -417,7 +417,6 @@ asmlinkage void __init start_kernel(void)
 	 */
 	console_init();
 	profile_init();
-	kmem_cache_init();
 	local_irq_enable();
 	calibrate_delay();
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -430,7 +429,7 @@ asmlinkage void __init start_kernel(void)
 #endif
 	page_address_init();
 	mem_init();
-	kmem_cache_sizes_init();
+	kmem_cache_init();
 	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();

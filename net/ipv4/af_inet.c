@@ -926,6 +926,7 @@ struct proto_ops inet_dgram_ops = {
 struct net_proto_family inet_family_ops = {
 	.family = PF_INET,
 	.create = inet_create,
+	.owner	= THIS_MODULE,
 };
 
 

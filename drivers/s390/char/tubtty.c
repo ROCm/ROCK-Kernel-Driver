@@ -90,9 +90,7 @@ tty3270_init(void)
 	td->subtype = SYSTEM_TYPE_TTY;
 	td->init_termios = tty_std_termios;
 	td->flags = TTY_DRIVER_RESET_TERMIOS;
-#ifdef CONFIG_DEVFS_FS
 	td->flags |= TTY_DRIVER_NO_DEVFS;
-#endif
 	td->refcount = &tty3270_refcount;
 	td->table = tty3270_table;
 	td->termios = tty3270_termios;

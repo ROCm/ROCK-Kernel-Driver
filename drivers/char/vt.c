@@ -124,7 +124,9 @@ const struct consw *conswitchp;
 #define DEFAULT_BELL_PITCH	750
 #define DEFAULT_BELL_DURATION	(HZ/8)
 
-extern void vcs_make_devfs (unsigned int index, int unregister);
+extern void vcs_make_devfs(struct tty_struct *tty);
+extern void vcs_remove_devfs(struct tty_struct *tty);
+
 extern void console_map_init(void);
 #ifdef CONFIG_PROM_CONSOLE
 extern void prom_con_init(void);
@@ -158,7 +160,6 @@ static void set_cursor(int currcons);
 static void hide_cursor(int currcons);
 static void unblank_screen_t(unsigned long dummy);
 static void console_callback(void *ignored);
-static void __init con_init_devfs (void);
 
 static int printable;		/* Is console ready for printing? */
 
@@ -2410,7 +2411,7 @@ static int con_open(struct tty_struct *tty, struct file * filp)
 		tty->winsize.ws_col = video_num_columns;
 	}
 	if (tty->count == 1)
-		vcs_make_devfs (currcons, 0);
+		vcs_make_devfs(tty);
 	return 0;
 }
 
@@ -2418,10 +2419,10 @@ static void con_close(struct tty_struct *tty, struct file * filp)
 {
 	struct vt_struct *vt;
 	
-	if (!tty)
+	if (!tty || tty->count != 1)
 		return;
-	if (tty->count != 1) return;
-	vcs_make_devfs (tty->index, 1);
+
+	vcs_remove_devfs(tty);
 	vt = (struct vt_struct*)tty->driver_data;
 	if (vt)
 		vc_cons[vt->vc_num].d->vc_tty = NULL;
@@ -2525,11 +2526,6 @@ int __init vty_init(void)
 	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
 	console_driver.init_termios = tty_std_termios;
 	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	/* Tell tty_register_driver() to skip consoles because they are
-	 * registered before kmalloc() is ready. We'll patch them in later. 
-	 * See comments at console_init(); see also con_init_devfs(). 
-	 */
-	console_driver.flags |= TTY_DRIVER_NO_DEVFS;
 	console_driver.refcount = &console_refcount;
 	console_driver.table = console_table;
 	console_driver.termios = console_termios;
@@ -2562,7 +2558,6 @@ int __init vty_init(void)
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	fb_console_init();
 #endif	
-	con_init_devfs();
 	vcs_init();
 	return 0;
 }
@@ -2655,18 +2650,6 @@ static void set_vesa_blanking(unsigned long arg)
     unsigned int mode;
     get_user(mode, argp);
     vesa_blank_mode = (mode < 4) ? mode : 0;
-}
-
-/* We can't register the console with devfs during con_init(), because it
- * is called before kmalloc() works.  This function is called later to
- * do the registration.
- */
-static void __init con_init_devfs (void)
-{
-	int i;
-
-	for (i = 0; i < console_driver.num; i++)
-		tty_register_device (&console_driver, i);
 }
 
 /*

@@ -141,7 +141,7 @@ struct edd_device_params {
 			u32 array_number;
 			u32 reserved1;
 			u64 reserved2;
-		} __attribute((packed)) raid;
+		} __attribute__ ((packed)) raid;
 		struct {
 			u8 device;
 			u8 reserved1;

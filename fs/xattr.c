@@ -79,15 +79,16 @@ setxattr(struct dentry *d, char *name, void *value, size_t size, int flags)
 
 	error = -EOPNOTSUPP;
 	if (d->d_inode->i_op && d->d_inode->i_op->setxattr) {
+		down(&d->d_inode->i_sem);
 		error = security_inode_setxattr(d, kname, kvalue, size, flags);
 		if (error)
 			goto out;
-		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->setxattr(d, kname, kvalue, size, flags);
+		if (!error)
+			security_inode_post_setxattr(d, kname, kvalue, size, flags);
+out:
 		up(&d->d_inode->i_sem);
 	}
-
-out:
 	xattr_free(kvalue, size);
 	return error;
 }

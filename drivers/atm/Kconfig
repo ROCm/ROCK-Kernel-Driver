@@ -440,5 +440,19 @@ config ATM_FORE200E
 	default m if ATM_FORE200E_MAYBE!=y
 	default y if ATM_FORE200E_MAYBE=y
 
+config ATM_HE
+	tristate "ForeRunner HE Series"
+	depends on PCI && ATM
+	help
+	  This is a driver for the Marconi ForeRunner HE-series ATM adapter
+	  cards. It simultaneously supports the 155 and 622 versions.
+
+config ATM_HE_USE_SUNI
+	bool "Use S/UNI PHY driver"
+	depends on ATM_HE
+	help
+	  Support for the S/UNI-Ultra and S/UNI-622 found in the ForeRunner
+	  HE cards.  This driver provides carrier detection some statistics.
+
 endmenu
 

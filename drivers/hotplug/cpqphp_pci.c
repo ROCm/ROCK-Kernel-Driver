@@ -85,18 +85,20 @@ int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)
 {
 	unsigned char bus;
 	struct pci_bus *child;
-	int rc = 0;
+	int num;
 
 	if (func->pci_dev == NULL)
-		func->pci_dev = pci_find_slot(func->bus, (func->device << 3) | (func->function & 0x7));
+		func->pci_dev = pci_find_slot(func->bus, PCI_DEVFN(func->device, func->function));
 
-	//Still NULL ? Well then scan for it !
+	/* No pci device, we need to create it then */
 	if (func->pci_dev == NULL) {
 		dbg("INFO: pci_dev still null\n");
 
-		//this will generate pci_dev structures for all functions, but we will only call this case when lookup fails
-		func->pci_dev = pci_scan_slot(ctrl->pci_dev->bus,
-				 (func->device << 3) + (func->function & 0x7));
+		num = pci_scan_slot(ctrl->pci_dev->bus, PCI_DEVFN(func->device, func->function));
+		if (num)
+			pci_bus_add_devices(ctrl->pci_dev->bus);
+
+		func->pci_dev = pci_find_slot(func->bus, PCI_DEVFN(func->device, func->function));
 		if (func->pci_dev == NULL) {
 			dbg("ERROR: pci_dev still null\n");
 			return 0;
@@ -107,10 +109,9 @@ int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)
 		pci_read_config_byte(func->pci_dev, PCI_SECONDARY_BUS, &bus);
 		child = (struct pci_bus*) pci_add_new_bus(func->pci_dev->bus, (func->pci_dev), bus);
 		pci_do_scan_bus(child);
-
 	}
 
-	return rc;
+	return 0;
 }
 
 
@@ -1209,11 +1210,11 @@ int cpqhp_find_available_resources (struct controller *ctrl, void *rom_start)
 	temp = 0;
 
 	if (!cpqhp_nic_irq) {
-		cpqhp_nic_irq = ctrl->interrupt;
+		cpqhp_nic_irq = ctrl->cfgspc_irq;
 	}
 
 	if (!cpqhp_disk_irq) {
-		cpqhp_disk_irq = ctrl->interrupt;
+		cpqhp_disk_irq = ctrl->cfgspc_irq;
 	}
 
 	dbg("cpqhp_disk_irq, cpqhp_nic_irq= %d, %d\n", cpqhp_disk_irq, cpqhp_nic_irq);

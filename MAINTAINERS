@@ -679,7 +679,7 @@ S:	Maintained
 
 EXT3 FILE SYSTEM
 P:	Stephen Tweedie, Andrew Morton
-M:	sct@redhat.com, akpm@zip.com.au, adilger@clusterfs.com
+M:	sct@redhat.com, akpm@digeo.com, adilger@clusterfs.com
 L:	ext3-users@redhat.com
 S:	Maintained
 
@@ -801,20 +801,13 @@ P:	Oliver Neukum
 M:	drivers@neukum.org
 S:	Maintained
 
-I2C DRIVERS
-P:	Simon Vogl
-M:	simon@tk.uni-linz.ac.at
-P:	Frodo Looijaard
-M:	frodol@dds.nl
-L:	linux-i2c@pelican.tk.uni-linz.ac.at
-W:	http://www.tk.uni-linz.ac.at/~simon/private/i2c
-S:	Maintained
-
-SENSORS DRIVERS
+I2C AND SENSORS DRIVERS
 P:      Frodo Looijaard
 M:      frodol@dds.nl
 P:      Philip Edelbrock
 M:      phil@netroedge.com
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
 L:      sensors@stimpy.netroedge.com
 W:      http://www.lm-sensors.nu/
 S:      Maintained
@@ -1264,7 +1257,7 @@ S:	Maintained
 
 NETWORK DEVICE DRIVERS
 P:	Andrew Morton
-M:	akpm@zip.com.au
+M:	akpm@digeo.com
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
 L:	linux-net@vger.kernel.org

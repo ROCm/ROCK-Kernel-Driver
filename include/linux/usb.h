@@ -73,13 +73,22 @@ struct usb_host_interface {
 /**
  * struct usb_interface - what usb device drivers talk to
  * @altsetting: array of interface descriptors, one for each alternate
- * 	setting that may be selected.  each one includes a set of
- * 	endpoint configurations.
+ * 	setting that may be selected.  Each one includes a set of
+ * 	endpoint configurations and will be in numberic order,
+ * 	0..num_altsetting.
  * @num_altsetting: number of altsettings defined.
  * @act_altsetting: index of current altsetting.  this number is always
  *	less than num_altsetting.  after the device is configured, each
  *	interface uses its default setting of zero.
+ * @max_altsetting:
+ * @minor: the minor number assigned to this interface, if this
+ *	interface is bound to a driver that uses the USB major number.
+ *	If this interface does not use the USB major, this field should
+ *	be unused.  The driver should set this value in the probe()
+ *	function of the driver, after it has been assigned a minor
+ *	number from the USB core by calling usb_register_dev().
  * @dev: driver model's view of this device
+ * @class_dev: driver model's class view of this device.
  *
  * USB device drivers attach to interfaces on a physical device.  Each
  * interface encapsulates a single high level function, such as feeding
@@ -111,10 +120,12 @@ struct usb_interface {
 	unsigned max_altsetting;	/* total memory allocated */
 
 	struct usb_driver *driver;	/* driver */
-	kdev_t kdev;			/* node this interface is bound to */
+	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
+	struct class_device class_dev;
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
+#define class_dev_to_usb_interface(d) container_of(d, struct usb_interface, class_dev)
 #define	interface_to_usbdev(intf) \
 	container_of(intf->dev.parent, struct usb_device, dev)
 
@@ -279,7 +290,7 @@ extern void usb_driver_release_interface(struct usb_driver *driver,
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
 					 const struct usb_device_id *id);
 
-extern struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev);
+extern struct usb_interface *usb_find_interface(struct usb_driver *drv, int minor);
 extern struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum);
 
 
@@ -433,6 +444,25 @@ struct usb_driver {
 
 extern struct bus_type usb_bus_type;
 
+/**
+ * struct usb_class_driver - identifies a USB driver that wants to use the USB major number
+ * @name: devfs name for this driver.  Will also be used by the driver
+ *	class code to create a usb class device.
+ * @fops: pointer to the struct file_operations of this driver.
+ * @mode: the mode for the devfs file to be created for this driver.
+ * @minor_base: the start of the minor range for this driver.
+ *
+ * This structure is used for the usb_register_dev() and
+ * usb_unregister_dev() functions, to consolodate a number of the
+ * paramaters used for them.
+ */
+struct usb_class_driver {
+	char *name;
+	struct file_operations *fops;
+	mode_t mode;
+	int minor_base;	
+};
+
 /*
  * use these in module_init()/module_exit()
  * and don't forget MODULE_DEVICE_TABLE(usb, ...)
@@ -440,8 +470,10 @@ extern struct bus_type usb_bus_type;
 extern int usb_register(struct usb_driver *);
 extern void usb_deregister(struct usb_driver *);
 
-extern int usb_register_dev(struct file_operations *fops, int minor, int num_minors, int *start_minor);
-extern void usb_deregister_dev(int num_minors, int start_minor);
+extern int usb_register_dev(struct usb_interface *intf,
+			    struct usb_class_driver *class_driver);
+extern void usb_deregister_dev(struct usb_interface *intf,
+			       struct usb_class_driver *class_driver);
 
 extern int usb_device_probe(struct device *dev);
 extern int usb_device_remove(struct device *dev);

@@ -96,9 +96,8 @@ NORET_TYPE void panic(const char * fmt, ...)
         disabled_wait(caller);
 #endif
 	local_irq_enable();
-	for(;;) {
-		CHECK_EMERGENCY_SYNC
-	}
+	for (;;)
+		;
 }
 
 /**

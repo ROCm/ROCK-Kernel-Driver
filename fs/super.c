@@ -31,6 +31,7 @@
 #include <linux/mount.h>
 #include <linux/security.h>
 #include <linux/vfs.h>
+#include <linux/writeback.h>		/* for the emergency remount stuff */
 #include <asm/uaccess.h>
 
 
@@ -431,6 +432,18 @@ out:
 	return err;
 }
 
+static void mark_files_ro(struct super_block *sb)
+{
+	struct file *f;
+
+	file_list_lock();
+	list_for_each_entry(f, &sb->s_files, f_list) {
+		if (S_ISREG(f->f_dentry->d_inode->i_mode) && file_count(f))
+			f->f_mode &= ~FMODE_WRITE;
+	}
+	file_list_unlock();
+}
+
 /**
  *	do_remount_sb	-	asks filesystem to change mount options.
  *	@sb:	superblock in question
@@ -439,21 +452,25 @@ out:
  *
  *	Alters the mount options of a mounted file system.
  */
-int do_remount_sb(struct super_block *sb, int flags, void *data)
+int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 {
 	int retval;
 	
 	if (!(flags & MS_RDONLY) && bdev_read_only(sb->s_bdev))
 		return -EACCES;
-		/*flags |= MS_RDONLY;*/
 	if (flags & MS_RDONLY)
 		acct_auto_close(sb);
 	shrink_dcache_sb(sb);
 	fsync_super(sb);
+
 	/* If we are remounting RDONLY, make sure there are no rw files open */
-	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY))
-		if (!fs_may_remount_ro(sb))
+	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY)) {
+		if (force)
+			mark_files_ro(sb);
+		else if (!fs_may_remount_ro(sb))
 			return -EBUSY;
+	}
+
 	if (sb->s_op->remount_fs) {
 		lock_super(sb);
 		retval = sb->s_op->remount_fs(sb, &flags, data);
@@ -463,6 +480,28 @@ int do_remount_sb(struct super_block *sb, int flags, void *data)
 	}
 	sb->s_flags = (sb->s_flags & ~MS_RMT_MASK) | (flags & MS_RMT_MASK);
 	return 0;
+}
+
+static void do_emergency_remount(unsigned long foo)
+{
+	struct super_block *sb;
+
+	spin_lock(&sb_lock);
+	list_for_each_entry(sb, &super_blocks, s_list) {
+		sb->s_count++;
+		spin_unlock(&sb_lock);
+		down_read(&sb->s_umount);
+		if (sb->s_root && sb->s_bdev && !(sb->s_flags & MS_RDONLY))
+			do_remount_sb(sb, MS_RDONLY, NULL, 1);
+		drop_super(sb);
+		spin_lock(&sb_lock);
+	}
+	spin_unlock(&sb_lock);
+}
+
+void emergency_remount(void)
+{
+	pdflush_operation(do_emergency_remount, 0);
 }
 
 /*
@@ -618,7 +657,7 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 		}
 		s->s_flags |= MS_ACTIVE;
 	}
-	do_remount_sb(s, flags, data);
+	do_remount_sb(s, flags, data, 0);
 	return s;
 }
 

@@ -342,38 +342,24 @@ KERN_INFO
 	TRACE_CATCH(register_chrdev(QIC117_TAPE_MAJOR, "zft", &zft_cdev),);
 
 	for (i = 0; i < 4; i++) {
-		char devname[9];
-
-		sprintf (devname, "qft%i", i);
-		devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-			        QIC117_TAPE_MAJOR, i,
+		devfs_mk_cdev(MKDEV(QIC117_TAPE_MAJOR, i),
 				S_IFCHR | S_IRUSR | S_IWUSR,
-				&zft_cdev, NULL);
-		sprintf (devname, "nqft%i", i);
-		devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-				QIC117_TAPE_MAJOR, i + 4,
+				"qft%i", i);
+		devfs_mk_cdev(MKDEV(QIC117_TAPE_MAJOR, i + 4),
 				S_IFCHR | S_IRUSR | S_IWUSR,
-				&zft_cdev, NULL);
-		sprintf (devname, "zqft%i", i);
-		devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-				QIC117_TAPE_MAJOR, i + 16,
+				"nqft%i", i);
+		devfs_mk_cdev(MKDEV(QIC117_TAPE_MAJOR, i + 16),
 				S_IFCHR | S_IRUSR | S_IWUSR,
-				&zft_cdev, NULL);
-		sprintf (devname, "nzqft%i", i);
-		devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-				QIC117_TAPE_MAJOR, i + 20,
+				"zqft%i", i);
+		devfs_mk_cdev(MKDEV(QIC117_TAPE_MAJOR, i + 20),
 				S_IFCHR | S_IRUSR | S_IWUSR,
-				&zft_cdev, NULL);
-		sprintf (devname, "rawqft%i", i);
-		devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-				QIC117_TAPE_MAJOR, i + 32,
+				"nzqft%i", i);
+		devfs_mk_cdev(MKDEV(QIC117_TAPE_MAJOR, i + 32),
 				S_IFCHR | S_IRUSR | S_IWUSR,
-				&zft_cdev, NULL);
-		sprintf (devname, "nrawqft%i", i);
-		devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
-				QIC117_TAPE_MAJOR, i + 36,
+				"rawqft%i", i);
+		devfs_mk_cdev(MKDEV(QIC117_TAPE_MAJOR, i + 36),
 				S_IFCHR | S_IRUSR | S_IWUSR,
-				&zft_cdev, NULL);
+				"nrawqft%i", i);
 	}
 
 #ifdef CONFIG_ZFT_COMPRESSOR

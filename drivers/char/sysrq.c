@@ -101,131 +101,19 @@ static void sysrq_handle_reboot(int key, struct pt_regs *pt_regs,
 {
 	machine_restart(NULL);
 }
+
 static struct sysrq_key_op sysrq_reboot_op = {
 	.handler	= sysrq_handle_reboot,
 	.help_msg	= "reBoot",
 	.action_msg	= "Resetting",
 };
 
-
-
-/* SYNC SYSRQ HANDLERS BLOCK */
-
-/* do_emergency_sync helper function */
-/* Guesses if the device is a local hard drive */
-static int is_local_disk(struct block_device *bdev)
-{
-	switch (MAJOR(bdev->bd_dev)) {
-	case IDE0_MAJOR:
-	case IDE1_MAJOR:
-	case IDE2_MAJOR:
-	case IDE3_MAJOR:
-	case IDE4_MAJOR:
-	case IDE5_MAJOR:
-	case IDE6_MAJOR:
-	case IDE7_MAJOR:
-	case IDE8_MAJOR:
-	case IDE9_MAJOR:
-	case SCSI_DISK0_MAJOR:
-	case SCSI_DISK1_MAJOR:
-	case SCSI_DISK2_MAJOR:
-	case SCSI_DISK3_MAJOR:
-	case SCSI_DISK4_MAJOR:
-	case SCSI_DISK5_MAJOR:
-	case SCSI_DISK6_MAJOR:
-	case SCSI_DISK7_MAJOR:
-	case XT_DISK_MAJOR:
-		return 1;
-	default:
-		return 0;
-	}
-}
-
-/* do_emergency_sync helper function */
-static void go_sync(struct super_block *sb, int remount_flag)
-{
-	int orig_loglevel;
-	orig_loglevel = console_loglevel;
-	console_loglevel = 7;
-	printk(KERN_INFO "%sing device %s ... ",
-	       remount_flag ? "Remount" : "Sync",
-	       sb->s_id);
-
-	if (remount_flag) { /* Remount R/O */
-		int ret, flags;
-		struct file *file;
-
-		if (sb->s_flags & MS_RDONLY) {
-			printk("R/O\n");
-			return;
-		}
-
-		file_list_lock();
-		list_for_each_entry(file, &sb->s_files, f_list) {
-			if (file->f_dentry && file_count(file)
-				&& S_ISREG(file->f_dentry->d_inode->i_mode))
-				file->f_mode &= ~2;
-		}
-		file_list_unlock();
-		DQUOT_OFF(sb);
-		fsync_bdev(sb->s_bdev);
-		flags = MS_RDONLY;
-		if (sb->s_op && sb->s_op->remount_fs) {
-			ret = sb->s_op->remount_fs(sb, &flags, NULL);
-			if (ret)
-				printk("error %d\n", ret);
-			else {
-				sb->s_flags = (sb->s_flags & ~MS_RMT_MASK) | (flags & MS_RMT_MASK);
-				printk("OK\n");
-			}
-		} else
-			printk("nothing to do\n");
-	} else { /* Sync only */
-		fsync_bdev(sb->s_bdev);
-		printk("OK\n");
-	}
-	console_loglevel = orig_loglevel;
-}
-/*
- * Emergency Sync or Unmount. We cannot do it directly, so we set a special
- * flag and wake up the bdflush kernel thread which immediately calls this function.
- * We process all mounted hard drives first to recover from crashed experimental
- * block devices and malfunctional network filesystems.
- */
-
-int emergency_sync_scheduled;
-
-void do_emergency_sync(void) {
-	struct super_block *sb;
-	int remount_flag;
-	int orig_loglevel;
-
-	lock_kernel();
-	remount_flag = (emergency_sync_scheduled == EMERG_REMOUNT);
-	emergency_sync_scheduled = 0;
-
-	list_for_each_entry(sb, &super_blocks, s_list)
-		if (sb->s_bdev && is_local_disk(sb->s_bdev))
-			go_sync(sb, remount_flag);
-
-	list_for_each_entry(sb, &super_blocks, s_list)
-		if (sb->s_bdev && !is_local_disk(sb->s_bdev))
-			go_sync(sb, remount_flag);
-
-	unlock_kernel();
-
-	orig_loglevel = console_loglevel;
-	console_loglevel = 7;
-	printk(KERN_INFO "Done.\n");
-	console_loglevel = orig_loglevel;
-}
-
 static void sysrq_handle_sync(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
-	emergency_sync_scheduled = EMERG_SYNC;
-	wakeup_bdflush(0);
+	emergency_sync();
 }
+
 static struct sysrq_key_op sysrq_sync_op = {
 	.handler	= sysrq_handle_sync,
 	.help_msg	= "Sync",
@@ -235,9 +123,9 @@ static struct sysrq_key_op sysrq_sync_op = {
 static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
 				 struct tty_struct *tty) 
 {
-	emergency_sync_scheduled = EMERG_REMOUNT;
-	wakeup_bdflush(0);
+	emergency_remount();
 }
+
 static struct sysrq_key_op sysrq_mountro_op = {
 	.handler	= sysrq_handle_mountro,
 	.help_msg	= "Unmount",

@@ -327,7 +327,6 @@ tiglusb_probe (struct usb_interface *intf,
 	int minor = -1;
 	int i;
 	ptiglusb_t s;
-	char name[32];
 
 	dbg ("probing vendor id 0x%x, device id 0x%x",
 	     dev->descriptor.idVendor, dev->descriptor.idProduct);
@@ -371,12 +370,9 @@ tiglusb_probe (struct usb_interface *intf,
 	up (&s->mutex);
 	dbg ("bound to interface");
 
-	sprintf (name, "ticables/usb/%d", s->minor);
-	dbg ("registering to devfs : major = %d, minor = %d, node = %s",
-	     TIUSB_MAJOR, (TIUSB_MINOR + s->minor), name);
-	devfs_register(NULL, name, DEVFS_FL_DEFAULT, TIUSB_MAJOR,
-		       TIUSB_MINOR + s->minor, S_IFCHR | S_IRUGO | S_IWUGO,
-		       &tiglusb_fops, NULL);
+	devfs_mk_cdev(MKDEV(TIUSB_MAJOR, TIUSB_MINOR) + s->minor,
+			S_IFCHR | S_IRUGO | S_IWUGO,
+			"ticables/usb/%d", s->minor);
 
 	/* Display firmware version */
 	info ("firmware revision %i.%02x",
@@ -390,8 +386,6 @@ tiglusb_probe (struct usb_interface *intf,
 static void
 tiglusb_disconnect (struct usb_interface *intf)
 {
-	char name[32];
-
 	ptiglusb_t s = usb_get_intfdata (intf);
 
 	usb_set_intfdata (intf, NULL);
@@ -408,7 +402,7 @@ tiglusb_disconnect (struct usb_interface *intf)
 	s->dev = NULL;
 	s->opened = 0;
 
-	devfs_remove (name, "ticables/usb/%d", s->minor);
+	devfs_remove("ticables/usb/%d", s->minor);
 
 	info ("device %d removed", s->minor);
 

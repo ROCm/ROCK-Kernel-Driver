@@ -15,18 +15,28 @@
 
 static inline int apic_id_registered(void)
 {
-	        return (1);
+	return (1);
 }
 
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
-#define TARGET_CPUS	((cpu_online_map < 0xf)?cpu_online_map:0xf)
+static inline unsigned long target_cpus(void)
+{ 
+	return ((cpu_online_map < 0xf)?cpu_online_map:0xf);
+}
+#define TARGET_CPUS	(target_cpus())
 
 #define INT_DELIVERY_MODE dest_LowestPrio
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
 #define APIC_BROADCAST_ID     (0x0f)
-#define check_apicid_used(bitmap, apicid) (0)
-#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
+static inline unsigned long check_apicid_used(unsigned long bitmap, int apicid) 
+{ 
+	return 0;
+} 
+static inline unsigned long check_apicid_present(int bit) 
+{ 
+	return (phys_cpu_present_map & (1 << bit));
+}
 
 static inline unsigned long calculate_ldr(unsigned long old)
 {
@@ -114,5 +124,14 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return (1);
 }
+
+#define		APIC_ID_MASK		(0x0F<<24)
+
+static inline unsigned get_apic_id(unsigned long x) 
+{ 
+	return (((x)>>24)&0x0F);
+} 
+
+#define		GET_APIC_ID(x)	get_apic_id(x)
 
 #endif /* __ASM_MACH_APIC_H */

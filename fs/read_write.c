@@ -115,9 +115,10 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 {
 	off_t retval;
 	struct file * file;
+	int fput_needed;
 
 	retval = -EBADF;
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (!file)
 		goto bad;
 
@@ -128,7 +129,7 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 		if (res != (loff_t)retval)
 			retval = -EOVERFLOW;	/* LFS: should only happen on 32 bit platforms */
 	}
-	fput(file);
+	fput_light(file, fput_needed);
 bad:
 	return retval;
 }
@@ -141,9 +142,10 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 	int retval;
 	struct file * file;
 	loff_t offset;
+	int fput_needed;
 
 	retval = -EBADF;
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (!file)
 		goto bad;
 
@@ -161,7 +163,7 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 			retval = 0;
 	}
 out_putf:
-	fput(file);
+	fput_light(file, fput_needed);
 bad:
 	return retval;
 }
@@ -251,11 +253,12 @@ asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+	int fput_needed;
 
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_read(file, buf, count, &file->f_pos);
-		fput(file);
+		fput_light(file, fput_needed);
 	}
 
 	return ret;
@@ -265,11 +268,12 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char __user * buf, size_t co
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+	int fput_needed;
 
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_write(file, buf, count, &file->f_pos);
-		fput(file);
+		fput_light(file, fput_needed);
 	}
 
 	return ret;
@@ -280,14 +284,15 @@ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+	int fput_needed;
 
 	if (pos < 0)
 		return -EINVAL;
 
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_read(file, buf, count, &pos);
-		fput(file);
+		fput_light(file, fput_needed);
 	}
 
 	return ret;
@@ -298,14 +303,15 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+	int fput_needed;
 
 	if (pos < 0)
 		return -EINVAL;
 
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_write(file, buf, count, &pos);
-		fput(file);
+		fput_light(file, fput_needed);
 	}
 
 	return ret;
@@ -479,11 +485,12 @@ sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+	int fput_needed;
 
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_readv(file, vec, vlen, &file->f_pos);
-		fput(file);
+		fput_light(file, fput_needed);
 	}
 
 	return ret;
@@ -494,11 +501,12 @@ sys_writev(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+	int fput_needed;
 
-	file = fget(fd);
+	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = vfs_writev(file, vec, vlen, &file->f_pos);
-		fput(file);
+		fput_light(file, fput_needed);
 	}
 
 	return ret;
@@ -511,12 +519,13 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	struct inode * in_inode, * out_inode;
 	loff_t pos;
 	ssize_t retval;
+	int fput_needed_in, fput_needed_out;
 
 	/*
 	 * Get input file, and verify that it is ok..
 	 */
 	retval = -EBADF;
-	in_file = fget(in_fd);
+	in_file = fget_light(in_fd, &fput_needed_in);
 	if (!in_file)
 		goto out;
 	if (!(in_file->f_mode & FMODE_READ))
@@ -539,7 +548,7 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	 * Get output file, and verify that it is ok..
 	 */
 	retval = -EBADF;
-	out_file = fget(out_fd);
+	out_file = fget_light(out_fd, &fput_needed_out);
 	if (!out_file)
 		goto fput_in;
 	if (!(out_file->f_mode & FMODE_WRITE))
@@ -579,9 +588,9 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		retval = -EOVERFLOW;
 
 fput_out:
-	fput(out_file);
+	fput_light(out_file, fput_needed_out);
 fput_in:
-	fput(in_file);
+	fput_light(in_file, fput_needed_in);
 out:
 	return retval;
 }

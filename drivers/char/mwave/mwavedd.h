@@ -50,9 +50,11 @@
 #define _LINUX_MWAVEDD_H
 #include "3780i.h"
 #include "tp3780i.h"
+#include "smapi.h"
 #include "mwavepub.h"
 #include <linux/ioctl.h>
 #include <asm/uaccess.h>
+#include <linux/wait.h>
 
 extern int mwave_debug;
 extern int mwave_3780i_irq;

@@ -50,7 +50,6 @@ static const char longbanner[] = {
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/poll.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/brlvger.h>
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
@@ -180,12 +179,6 @@ struct brlvger_priv {
 
 /* Globals */
 
-/* Table of connected devices, a different minor for each. */
-static struct brlvger_priv *display_table[ MAX_NR_BRLVGER_DEVS ];
-
-/* Mutex for the operation of removing a device from display_table */
-static DECLARE_MUTEX(disconnect_sem);
-
 /* For blocking open */
 static DECLARE_WAIT_QUEUE_HEAD(open_wait);
 
@@ -237,6 +230,13 @@ static struct file_operations brlvger_fops =
 	.poll =		brlvger_poll,
 };
 
+static struct usb_class_driver brlvger_class = {
+	.name =		"usb/brlvger%d",
+	.fops =		&brlvger_fops,
+	.mode =		S_IFCHR | S_IRUSR |S_IWUSR | S_IRGRP | S_IWGRP,
+	.minor_base =	BRLVGER_MINOR,
+};
+
 static struct usb_driver brlvger_driver =
 {
 	.owner =	THIS_MODULE,
@@ -253,8 +253,6 @@ __init brlvger_init (void)
 
 	if(stall_tries < 1 || write_repeats < 1)
 	  return -EINVAL;
-
-	memset(display_table, 0, sizeof(display_table));
 
 	if (usb_register(&brlvger_driver)) {
 		err("USB registration failed");
@@ -284,14 +282,12 @@ brlvger_probe (struct usb_interface *intf,
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct brlvger_priv *priv = NULL;
-	int i;
 	int retval;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_host_interface *actifsettings;
 	/* protects against reentrance: once we've found a free slot
 	   we reserve it.*/
 	static DECLARE_MUTEX(reserve_sem);
-        char devfs_name[20];
 
 	actifsettings = dev->actconfig->interface->altsetting;
 
@@ -311,7 +307,7 @@ brlvger_probe (struct usb_interface *intf,
 
 	down(&reserve_sem);
 
-	retval = usb_register_dev(&brlvger_fops, BRLVGER_MINOR, 1, &i);
+	retval = usb_register_dev(intf, &brlvger_class);
 	if (retval) {
 		err("Not able to get a minor for this device.");
 		goto error;
@@ -331,7 +327,7 @@ brlvger_probe (struct usb_interface *intf,
 	init_MUTEX(&priv->open_sem);
 	init_MUTEX(&priv->dev_sem);
 
-	priv->subminor = i;
+	priv->subminor = intf->minor;
 
 	/* we found a interrupt in endpoint */
 	priv->in_interrupt = endpoint;
@@ -372,17 +368,9 @@ brlvger_probe (struct usb_interface *intf,
 	};
 	dbg("Display length: %d", priv->plength);
 
-	sprintf(devfs_name, "usb/brlvger%d", priv->subminor);
-	devfs_register(NULL, devfs_name,
-				     DEVFS_FL_DEFAULT, USB_MAJOR,
-				     BRLVGER_MINOR+priv->subminor,
-				     S_IFCHR |S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP,
-				     &brlvger_fops, NULL);
-
-	display_table[i] = priv;
-
+	usb_set_intfdata (intf, priv);
 	info( "Braille display %d is device major %d minor %d",
-				i, USB_MAJOR, BRLVGER_MINOR + i);
+				intf->minor, USB_MAJOR, BRLVGER_MINOR + intf->minor);
 
 	/* Tell anyone waiting on a blocking open */
 	wake_up_interruptible(&open_wait);
@@ -414,12 +402,7 @@ brlvger_disconnect(struct usb_interface *intf)
 	if(priv){
 		info("Display %d disconnecting", priv->subminor);
 
-		devfs_remove("usb/brlvger%d", priv->subminor);
-		usb_deregister_dev(1, priv->subminor);
-
-		down(&disconnect_sem);
-		display_table[priv->subminor] = NULL;
-		up(&disconnect_sem);
+		usb_deregister_dev(intf, &brlvger_class);
 
 		down(&priv->open_sem);
 		down(&priv->dev_sem);
@@ -450,21 +433,18 @@ static int
 brlvger_open(struct inode *inode, struct file *file)
 {
 	int devnum = minor (inode->i_rdev);
-	struct brlvger_priv *priv;
+	struct usb_interface *intf = NULL;
+	struct brlvger_priv *priv = NULL;
 	int n, ret;
 
-	if (devnum < BRLVGER_MINOR
-	    || devnum >= (BRLVGER_MINOR + MAX_NR_BRLVGER_DEVS))
+	if (devnum < 0)
 		return -ENXIO;
 
 	n = devnum - BRLVGER_MINOR;
 
 	do {
-		down(&disconnect_sem);
-		priv = display_table[n];
-		
-		if(!priv) {
-			up(&disconnect_sem);
+		intf = usb_find_interface(&brlvger_driver, devnum);
+		if (!intf) {
 			if (file->f_flags & O_NONBLOCK) {
 				dbg3("Failing non-blocking open: "
 				     "device %d not connected", n);
@@ -475,19 +455,18 @@ brlvger_open(struct inode *inode, struct file *file)
 			   minor is connected. */
 			dbg2("Waiting for device %d to be connected", n);
 			ret = wait_event_interruptible(open_wait,
-						       display_table[n]
-						       != NULL);
-			if(ret) {
+						       (intf = usb_find_interface(&brlvger_driver, devnum)));
+			if (ret) {
 				dbg2("Interrupted wait for device %d", n);
 				return ret;
 			}
 		}
-	} while(!priv);
-	/* We grabbed an existing device. */
+	} while(!intf);
+	priv = usb_get_intfdata(intf);
 
+	/* We grabbed an existing device. */
 	if(down_interruptible(&priv->open_sem))
 		return -ERESTARTSYS;
-	up(&disconnect_sem);
 
 	/* Only one process can open each device, no sharing. */
 	ret = -EBUSY;

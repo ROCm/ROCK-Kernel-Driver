@@ -770,12 +770,12 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 void d_instantiate(struct dentry *entry, struct inode * inode)
 {
 	if (!list_empty(&entry->d_alias)) BUG();
-	security_d_instantiate(entry, inode);
 	spin_lock(&dcache_lock);
 	if (inode)
 		list_add(&entry->d_alias, &inode->i_dentry);
 	entry->d_inode = inode;
 	spin_unlock(&dcache_lock);
+	security_d_instantiate(entry, inode);
 }
 
 /**
@@ -903,12 +903,12 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 	struct dentry *new = NULL;
 
 	if (inode && S_ISDIR(inode->i_mode)) {
-		security_d_instantiate(dentry, inode);
 		spin_lock(&dcache_lock);
 		if (!list_empty(&inode->i_dentry)) {
 			new = list_entry(inode->i_dentry.next, struct dentry, d_alias);
 			__dget_locked(new);
 			spin_unlock(&dcache_lock);
+			security_d_instantiate(dentry, inode);
 			d_rehash(dentry);
 			d_move(new, dentry);
 			iput(inode);
@@ -917,6 +917,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 			list_add(&dentry->d_alias, &inode->i_dentry);
 			dentry->d_inode = inode;
 			spin_unlock(&dcache_lock);
+			security_d_instantiate(dentry, inode);
 			d_rehash(dentry);
 		}
 	} else

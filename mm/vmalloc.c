@@ -97,8 +97,7 @@ static int map_area_pte(pte_t *pte, unsigned long address,
 	do {
 		struct page *page = **pages;
 
-		if (!pte_none(*pte))
-			printk(KERN_ERR "alloc_area_pte: page already exists\n");
+		WARN_ON(!pte_none(*pte));
 		if (!page)
 			return -ENOMEM;
 

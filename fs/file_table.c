@@ -141,7 +141,7 @@ void close_private_file(struct file *file)
 	security_file_free(file);
 }
 
-void fput(struct file * file)
+void fput(struct file *file)
 {
 	if (atomic_dec_and_test(&file->f_count))
 		__fput(file);
@@ -189,6 +189,34 @@ struct file *fget(unsigned int fd)
 	spin_unlock(&files->file_lock);
 	return file;
 }
+
+/*
+ * Lightweight file lookup - no refcnt increment if fd table isn't shared. 
+ * You can use this only if it is guranteed that the current task already 
+ * holds a refcnt to that file. That check has to be done at fget() only
+ * and a flag is returned to be passed to the corresponding fput_light().
+ * There must not be a cloning between an fget_light/fput_light pair.
+ */
+struct file *fget_light(unsigned int fd, int *fput_needed)
+{
+	struct file *file;
+	struct files_struct *files = current->files;
+
+	*fput_needed = 0;
+	if (likely((atomic_read(&files->count) == 1))) {
+		file = fcheck(fd);
+	} else {
+		spin_lock(&files->file_lock);
+		file = fcheck(fd);
+		if (file) {
+			get_file(file);
+			*fput_needed = 1;
+		}
+		spin_unlock(&files->file_lock);
+	}
+	return file;
+}
+
 
 void put_filp(struct file *file)
 {

@@ -427,8 +427,8 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 	up(&videodev_lock);
 
 	sprintf(vfd->devfs_name, "v4l/%s%d", name_base, i - base);
-	devfs_register(NULL, vfd->devfs_name, 0, VIDEO_MAJOR, vfd->minor,
-			S_IFCHR | S_IRUSR | S_IWUSR, &video_fops, NULL);
+	devfs_mk_cdev(MKDEV(VIDEO_MAJOR, vfd->minor),
+			S_IFCHR | S_IRUSR | S_IWUSR, vfd->devfs_name);
 	init_MUTEX(&vfd->lock);
 	
 #ifdef CONFIG_VIDEO_PROC_FS

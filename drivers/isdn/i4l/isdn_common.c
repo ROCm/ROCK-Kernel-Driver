@@ -37,9 +37,6 @@ isdn_dev *dev;
 static void isdn_lock_driver(struct isdn_driver *drv);
 static void isdn_unlock_driver(struct isdn_driver *drv);
 
-static void isdn_register_devfs(int);
-static void isdn_unregister_devfs(int);
-
 /* ====================================================================== */
 
 /* Description of hardware-level-driver */
@@ -2157,85 +2154,37 @@ isdn_hard_header_len(void)
 	return max;
 }
 
-/*
- *****************************************************************************
- * And now the modules code.
- *****************************************************************************
- */
-
-#ifdef CONFIG_DEVFS_FS
-
-static void isdn_register_devfs(int k)
-{
-	char buf[16];
-
-	sprintf (buf, "isdn/isdnctrl%d", k);
-	devfs_register(NULL, buf, DEVFS_FL_DEFAULT,
-		       ISDN_MAJOR, ISDN_MINOR_CTRL + k, 0600 | S_IFCHR,
-		       &isdn_fops, NULL);
-}
-
-static void isdn_unregister_devfs(int k)
-{
-	devfs_remove("isdn/isdnctrl%d", k);
-}
-
 static void isdn_init_devfs(void)
 {
-#  ifdef CONFIG_ISDN_PPP
-	int i;
-#  endif
-
 	devfs_mk_dir("isdn");
-#  ifdef CONFIG_ISDN_PPP
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		char buf[16];
 
-		sprintf (buf, "isdn/ippp%d", i);
-		devfs_register(NULL, buf, DEVFS_FL_DEFAULT,
-			       ISDN_MAJOR, ISDN_MINOR_PPP + i,
-			       0600 | S_IFCHR, &isdn_fops, NULL);
-	}
-#  endif
+#ifdef CONFIG_ISDN_PPP
+{
+	int i;
 
-	devfs_register(NULL, "isdn/isdninfo", DEVFS_FL_DEFAULT,
-		       ISDN_MAJOR, ISDN_MINOR_STATUS, 0600 | S_IFCHR,
-		       &isdn_fops, NULL);
-	devfs_register(NULL, "isdn/isdnctrl", DEVFS_FL_DEFAULT,
-		       ISDN_MAJOR, ISDN_MINOR_CTRL, 0600 | S_IFCHR, 
-		       &isdn_fops, NULL);
+	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
+		devfs_mk_cdev(MKDEV(ISDN_MAJOR, ISDN_MINOR_PPP + i),
+				0600 | S_IFCHR, "isdn/ippp%d", i);
+}
+#endif
+
+	devfs_mk_cdev(MKDEV(ISDN_MAJOR, ISDN_MINOR_STATUS),
+			0600 | S_IFCHR, "isdn/isdninfo");
+	devfs_mk_cdev(MKDEV(ISDN_MAJOR, ISDN_MINOR_CTRL),
+			0600 | S_IFCHR, "isdn/isdnctrl");
 }
 
 static void isdn_cleanup_devfs(void)
 {
-#  ifdef CONFIG_ISDN_PPP
+#ifdef CONFIG_ISDN_PPP
 	int i;
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) 
 		devfs_remove("isdn/ippp%d", i);
-#  endif
+#endif
 	devfs_remove("isdn/isdninfo");
 	devfs_remove("isdn/isdnctrl");
 	devfs_remove("isdn");
 }
-
-#else   /* CONFIG_DEVFS_FS */
-static void isdn_register_devfs(int dummy)
-{
-}
-
-static void isdn_unregister_devfs(int dummy)
-{
-}
-
-static void isdn_init_devfs(void)
-{
-}
-
-static void isdn_cleanup_devfs(void)
-{
-}
-
-#endif  /* CONFIG_DEVFS_FS */
 
 /*
  * Allocate and initialize all data, register modem-devices

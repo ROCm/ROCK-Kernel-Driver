@@ -61,7 +61,6 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/usb.h>
 
 #define DRIVER_VERSION "v0.0.5"

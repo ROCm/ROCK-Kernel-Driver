@@ -49,6 +49,10 @@ ifeq ($(CONFIG_ATM_FORE200E_SBA),y)
     CONFIG_ATM_FORE200E_SBA_FW	:= $(obj)/sba200e_ecd.bin2
   endif
 endif
+obj-$(CONFIG_ATM_HE)		+= he.o
+ifeq ($(CONFIG_ATM_HE_USE_SUNI),y)
+  obj-$(CONFIG_ATM_HE)		+= suni.o
+endif
 
 # FORE Systems 200E-series firmware magic
 $(obj)/fore200e_pca_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_PCA_FW)) \

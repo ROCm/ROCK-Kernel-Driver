@@ -23,18 +23,6 @@
 
 #include "usb-serial.h"
 
-static ssize_t show_dev (struct device *dev, char *buf)
-{
-	struct usb_serial_port *port= to_usb_serial_port(dev);
-	dev_t base;
-
-	port = to_usb_serial_port(dev);
-
-	base = MKDEV(SERIAL_TTY_MAJOR, port->number);
-	return sprintf(buf, "%04x\n", base);
-}
-static DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
 static int usb_serial_device_match (struct device *dev, struct device_driver *drv)
 {
 	struct usb_serial_device_type *driver;
@@ -88,10 +76,7 @@ static int usb_serial_device_probe (struct device *dev)
 	}
 
 	minor = port->number;
-
-	tty_register_device (&usb_serial_tty_driver, minor);
-	device_create_file (dev, &dev_attr_dev);
-
+	tty_register_device (&usb_serial_tty_driver, minor, dev);
 	dev_info(&port->serial->dev->dev, 
 		 "%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)\n",
 		 driver->name, minor, minor);

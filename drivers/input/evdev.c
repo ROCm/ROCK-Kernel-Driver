@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/major.h>
 #include <linux/smp_lock.h>
 #include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
@@ -400,7 +401,9 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 	sprintf(evdev->name, "event%d", minor);
 
 	evdev_table[minor] = evdev;
-	input_register_minor("input/event%d", minor, EVDEV_MINOR_BASE);
+
+	devfs_mk_cdev(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
+			S_IFCHR|S_IRUGO|S_IWUSR, "input/event%d", minor);
 
 	return &evdev->handle;
 }
