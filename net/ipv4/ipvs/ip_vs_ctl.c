@@ -1692,7 +1692,8 @@ static int ip_vs_stats_show(struct seq_file *seq, void *v)
 	spin_lock_bh(&ip_vs_stats.lock);
 	seq_printf(seq, "%8X %8X %8X %16LX %16LX\n\n", ip_vs_stats.conns,
 		   ip_vs_stats.inpkts, ip_vs_stats.outpkts,
-		   ip_vs_stats.inbytes, ip_vs_stats.outbytes);
+		   (unsigned long long) ip_vs_stats.inbytes,
+		   (unsigned long long) ip_vs_stats.outbytes);
 
 /*                 01234567 01234567 01234567 0123456701234567 0123456701234567 */
 	seq_puts(seq,
