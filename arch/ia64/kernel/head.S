@@ -60,22 +60,42 @@ start_ap:
 	mov r4=r0
 	.body
 
-	/*
-	 * Initialize the region register for region 7 and install a translation register
-	 * that maps the kernel's text and data:
-	 */
 	rsm psr.i | psr.ic
-	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET) << 8) | (IA64_GRANULE_SHIFT << 2))
 	;;
 	srlz.i
+	;;
+	/*
+	 * Initialize kernel region registers:
+	 *	rr[5]: VHPT enabled, page size = PAGE_SHIFT
+	 *	rr[6]: VHPT disabled, page size = IA64_GRANULE_SHIFT
+	 *	rr[5]: VHPT disabled, page size = IA64_GRANULE_SHIFT
+	 */
+	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, (5<<61)) << 8) | (PAGE_SHIFT << 2) | 1)
+	movl r17=(5<<61)
+	mov r18=((ia64_rid(IA64_REGION_ID_KERNEL, (6<<61)) << 8) | (IA64_GRANULE_SHIFT << 2))
+	movl r19=(6<<61)
+	mov r20=((ia64_rid(IA64_REGION_ID_KERNEL, (7<<61)) << 8) | (IA64_GRANULE_SHIFT << 2))
+	movl r21=(7<<61)
+	;;
+	mov rr[r17]=r16
+	mov rr[r19]=r18
+	mov rr[r21]=r20
+	;;
+	/*
+	 * Now pin mappings into the TLB for kernel text and data
+	 */
 	mov r18=KERNEL_TR_PAGE_SHIFT<<2
 	movl r17=KERNEL_START
 	;;
-	mov rr[r17]=r16
 	mov cr.itir=r18
 	mov cr.ifa=r17
 	mov r16=IA64_TR_KERNEL
-	movl r18=((1 << KERNEL_TR_PAGE_SHIFT) | PAGE_KERNEL)
+	mov r3=ip
+	movl r18=PAGE_KERNEL
+	;;
+	dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
+	;;
+	or r18=r2,r18
 	;;
 	srlz.i
 	;;
@@ -113,16 +133,6 @@ start_ap:
 	mov ar.fpsr=r2
 	;;
 
-#ifdef CONFIG_IA64_EARLY_PRINTK
-	mov r3=(6<<8) | (IA64_GRANULE_SHIFT<<2)
-	movl r2=6<<61
-	;;
-	mov rr[r2]=r3
-	;;
-	srlz.i
-	;;
-#endif
-
 #define isAP	p2	// are we an Application Processor?
 #define isBP	p3	// are we the Bootstrap Processor?
 
@@ -143,12 +153,36 @@ start_ap:
 	movl r2=init_thread_union
 	cmp.eq isBP,isAP=r0,r0
 #endif
-	mov r16=KERNEL_TR_PAGE_NUM
 	;;
+	tpa r3=r2		// r3 == phys addr of task struct
+	// load mapping for stack (virtaddr in r2, physaddr in r3)
+	rsm psr.ic
+	movl r17=PAGE_KERNEL
+	;;
+	srlz.d
+	dep r18=0,r3,0,12
+	;;
+	or r18=r17,r18
+	dep r2=-1,r3,61,3	// IMVA of task
+	;;
+	mov r17=rr[r2]
+	shr.u r16=r3,IA64_GRANULE_SHIFT
+	;;
+	dep r17=0,r17,8,24
+	;;
+	mov cr.itir=r17
+	mov cr.ifa=r2
+
+	mov r19=IA64_TR_CURRENT_STACK
+	;;
+	itr.d dtr[r19]=r18
+	;;
+	ssm psr.ic
+	srlz.d
+  	;;
 
 	// load the "current" pointer (r13) and ar.k6 with the current task
 	mov IA64_KR(CURRENT)=r2		// virtual address
-	// initialize k4 to a safe value (64-128MB is mapped by TR_KERNEL)
 	mov IA64_KR(CURRENT_STACK)=r16
 	mov r13=r2
 	/*
@@ -665,14 +699,14 @@ GLOBAL_ENTRY(__ia64_init_fpu)
 END(__ia64_init_fpu)
 
 /*
- * Switch execution mode from virtual to physical or vice versa.
+ * Switch execution mode from virtual to physical
  *
  * Inputs:
  *	r16 = new psr to establish
  *
  * Note: RSE must already be in enforced lazy mode
  */
-GLOBAL_ENTRY(ia64_switch_mode)
+GLOBAL_ENTRY(ia64_switch_mode_phys)
  {
 	alloc r2=ar.pfs,0,0,0,0
 	rsm psr.i | psr.ic		// disable interrupts and interrupt collection
@@ -682,35 +716,86 @@ GLOBAL_ENTRY(ia64_switch_mode)
  {
 	flushrs				// must be first insn in group
 	srlz.i
-	shr.u r19=r15,61		// r19 <- top 3 bits of current IP
  }
 	;;
 	mov cr.ipsr=r16			// set new PSR
-	add r3=1f-ia64_switch_mode,r15
-	xor r15=0x7,r19			// flip the region bits
+	add r3=1f-ia64_switch_mode_phys,r15
 
 	mov r17=ar.bsp
 	mov r14=rp			// get return address into a general register
+	;;
 
-	// switch RSE backing store:
+	// going to physical mode, use tpa to translate virt->phys
+	tpa r17=r17
+	tpa r3=r3
+	tpa sp=sp
+	tpa r14=r14
 	;;
-	dep r17=r15,r17,61,3		// make ar.bsp physical or virtual
+
 	mov r18=ar.rnat			// save ar.rnat
-	;;
 	mov ar.bspstore=r17		// this steps on ar.rnat
-	dep r3=r15,r3,61,3		// make rfi return address physical or virtual
-	;;
 	mov cr.iip=r3
 	mov cr.ifs=r0
-	dep sp=r15,sp,61,3		// make stack pointer physical or virtual
 	;;
 	mov ar.rnat=r18			// restore ar.rnat
-	dep r14=r15,r14,61,3		// make function return address physical or virtual
 	rfi				// must be last insn in group
 	;;
 1:	mov rp=r14
 	br.ret.sptk.many rp
-END(ia64_switch_mode)
+END(ia64_switch_mode_phys)
+
+/*
+ * Switch execution mode from physical to virtual
+ *
+ * Inputs:
+ *	r16 = new psr to establish
+ *
+ * Note: RSE must already be in enforced lazy mode
+ */
+GLOBAL_ENTRY(ia64_switch_mode_virt)
+ {
+	alloc r2=ar.pfs,0,0,0,0
+	rsm psr.i | psr.ic		// disable interrupts and interrupt collection
+	mov r15=ip
+ }
+	;;
+ {
+	flushrs				// must be first insn in group
+	srlz.i
+ }
+	;;
+	mov cr.ipsr=r16			// set new PSR
+	add r3=1f-ia64_switch_mode_virt,r15
+
+	mov r17=ar.bsp
+	mov r14=rp			// get return address into a general register
+	;;
+
+	// going to virtual
+	//   - for code addresses, set upper bits of addr to KERNEL_START
+	//   - for stack addresses, set upper 3 bits to 0xe.... Dont change any of the
+	//     lower bits since we want it to stay identity mapped
+	movl r18=KERNEL_START
+	dep r3=0,r3,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
+	dep r14=0,r14,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
+	dep r17=-1,r17,61,3
+	dep sp=-1,sp,61,3
+	;;
+	or r3=r3,r18
+	or r14=r14,r18
+	;;
+
+	mov r18=ar.rnat			// save ar.rnat
+	mov ar.bspstore=r17		// this steps on ar.rnat
+	mov cr.iip=r3
+	mov cr.ifs=r0
+	;;
+	mov ar.rnat=r18			// restore ar.rnat
+	rfi				// must be last insn in group
+	;;
+1:	mov rp=r14
+	br.ret.sptk.many rp
+END(ia64_switch_mode_virt)
 
 #ifdef CONFIG_IA64_BRL_EMU
 

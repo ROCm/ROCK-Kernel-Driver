@@ -19,7 +19,7 @@
 #include <asm/pal.h>
 #include <asm/percpu.h>
 
-#define KERNEL_START		(PAGE_OFFSET + 68*1024*1024)
+#define KERNEL_START		(0xa000000100000000)
 
 /* 0xa000000000000000 - 0xa000000000000000+PERCPU_MAX_SIZE remain unmapped */
 #define PERCPU_ADDR		(0xa000000000000000 + PERCPU_PAGE_SIZE)

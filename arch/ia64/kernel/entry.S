@@ -178,15 +178,12 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 	st8 [r22]=sp			// save kernel stack pointer of old task
 	shr.u r26=r20,IA64_GRANULE_SHIFT
-	shr.u r17=r20,KERNEL_TR_PAGE_SHIFT
-	;;
-	cmp.ne p6,p7=KERNEL_TR_PAGE_NUM,r17
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	;;
 	/*
 	 * If we've already mapped this task's page, we can skip doing it again.
 	 */
-(p6)	cmp.eq p7,p6=r26,r27
+	cmp.eq p7,p6=r26,r27
 (p6)	br.cond.dpnt .map
 	;;
 .done:
