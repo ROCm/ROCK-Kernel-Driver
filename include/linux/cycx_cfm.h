@@ -74,14 +74,14 @@ struct cycx_fw_info {
 };
 
 /**
- * struct cycx_firmware - CYCX firmware file structure
- * @signature - CFM file signature
- * @version - file format version
- * @checksum - info + image
- * @reserved - reserved
- * @descr - description string
- * @info - firmware module info
- * @image - code image (variable size)
+ *	struct cycx_firmware - CYCX firmware file structure
+ *	@signature - CFM file signature
+ *	@version - file format version
+ *	@checksum - info + image
+ *	@reserved - reserved
+ *	@descr - description string
+ *	@info - firmware module info
+ *	@image - code image (variable size)
  */
 struct cycx_firmware {
 	char		    signature[80];

@@ -141,18 +141,21 @@ static struct net_device_stats *if_stats(struct net_device *dev);
 
 /* Interrupt handlers */
 static void cyx_isr(struct cycx_device *card),
-	    tx_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    rx_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    log_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    stat_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    connect_confirm_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    disconnect_confirm_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    connect_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    disconnect_intr(struct cycx_device *card, TX25Cmd *cmd),
-	    spur_intr(struct cycx_device *card, TX25Cmd *cmd);
+	    tx_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd),
+	    rx_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd),
+	    log_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd),
+	    stat_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd),
+	    connect_confirm_intr(struct cycx_device *card,
+				 struct cycx_x25_cmd *cmd),
+	    disconnect_confirm_intr(struct cycx_device *card,
+				    struct cycx_x25_cmd *cmd),
+	    connect_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd),
+	    disconnect_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd),
+	    spur_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd);
 
 /* X.25 firmware interface functions */
-static int x25_configure(struct cycx_device *card, TX25Config *conf),
+static int x25_configure(struct cycx_device *card,
+			 struct cycx_x25_config *conf),
 	   x25_get_stats(struct cycx_device *card),
 	   x25_send(struct cycx_device *card, u8 link, u8 lcn, u8 bitm, int len,
 		    void *buf),
@@ -185,8 +188,8 @@ static struct net_device *get_dev_by_dte_addr(struct wan_device *wandev,
 
 #ifdef CYCLOMX_X25_DEBUG
 static void hex_dump(char *msg, unsigned char *p, int len);
-static void x25_dump_config(TX25Config *conf);
-static void x25_dump_stats(TX25Stats *stats);
+static void x25_dump_config(struct cycx_x25_config *conf);
+static void x25_dump_stats(struct cycx_x25_stats *stats);
 static void x25_dump_devs(struct wan_device *wandev);
 #else
 #define hex_dump(msg, p, len)
@@ -207,7 +210,7 @@ static void x25_dump_devs(struct wan_device *wandev);
  *		< 0	failure.  */
 int cyx_init(struct cycx_device *card, wandev_conf_t *conf)
 {
-	TX25Config cfg;
+	struct cycx_x25_config cfg;
 
 	/* Verify configuration ID */
 	if (conf->config_id != WANCONFIG_X25) {
@@ -658,7 +661,7 @@ static struct net_device_stats *if_stats(struct net_device *dev)
 /* X.25 Interrupt Service Routine. */
 static void cyx_isr(struct cycx_device *card)
 {
-	TX25Cmd cmd;
+	struct cycx_x25_cmd cmd;
 	u16 z = 0;
 
 	card->in_isr = 1;
@@ -708,7 +711,7 @@ static void cyx_isr(struct cycx_device *card)
 /* Transmit interrupt handler.
  *	o Release socket buffer
  *	o Clear 'tbusy' flag */
-static void tx_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void tx_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 	struct net_device *dev;
 	struct wan_device *wandev = &card->wandev;
@@ -739,7 +742,7 @@ static void tx_intr(struct cycx_device *card, TX25Cmd *cmd)
  *    expected on this channel.
  * 2. If something goes wrong and X.25 packet has to be dropped (e.g. no
  *    socket buffers available) the whole packet sequence must be discarded. */
-static void rx_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void rx_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 	struct wan_device *wandev = &card->wandev;
 	struct net_device *dev;
@@ -823,7 +826,7 @@ static void rx_intr(struct cycx_device *card, TX25Cmd *cmd)
 }
 
 /* Connect interrupt handler. */
-static void connect_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void connect_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 	struct wan_device *wandev = &card->wandev;
 	struct net_device *dev = NULL;
@@ -865,7 +868,8 @@ static void connect_intr(struct cycx_device *card, TX25Cmd *cmd)
 }
 
 /* Connect confirm interrupt handler. */
-static void connect_confirm_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void connect_confirm_intr(struct cycx_device *card,
+				 struct cycx_x25_cmd *cmd)
 {
 	struct wan_device *wandev = &card->wandev;
 	struct net_device *dev;
@@ -892,7 +896,8 @@ static void connect_confirm_intr(struct cycx_device *card, TX25Cmd *cmd)
 }
 
 /* Disconnect confirm interrupt handler. */
-static void disconnect_confirm_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void disconnect_confirm_intr(struct cycx_device *card,
+				    struct cycx_x25_cmd *cmd)
 {
 	struct wan_device *wandev = &card->wandev;
 	struct net_device *dev;
@@ -912,7 +917,7 @@ static void disconnect_confirm_intr(struct cycx_device *card, TX25Cmd *cmd)
 }
 
 /* disconnect interrupt handler. */
-static void disconnect_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void disconnect_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 	struct wan_device *wandev = &card->wandev;
 	struct net_device *dev;
@@ -931,7 +936,7 @@ static void disconnect_intr(struct cycx_device *card, TX25Cmd *cmd)
 }
 
 /* LOG interrupt handler. */
-static void log_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void log_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 #if CYCLOMX_X25_DEBUG
 	char bf[20];
@@ -959,7 +964,7 @@ static void log_intr(struct cycx_device *card, TX25Cmd *cmd)
 }
 
 /* STATISTIC interrupt handler. */
-static void stat_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void stat_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 	cycx_peek(&card->hw, cmd->buf, &card->u.x.stats,
 		  sizeof(card->u.x.stats));
@@ -972,7 +977,7 @@ static void stat_intr(struct cycx_device *card, TX25Cmd *cmd)
 /* Spurious interrupt handler.
  * o print a warning
  * If number of spurious interrupts exceeded some limit, then ??? */
-static void spur_intr(struct cycx_device *card, TX25Cmd *cmd)
+static void spur_intr(struct cycx_device *card, struct cycx_x25_cmd *cmd)
 {
 	printk(KERN_INFO "%s: spurious interrupt (0x%X)!\n",
 			 card->devname, cmd->command);
@@ -1000,7 +1005,7 @@ static void hex_dump(char *msg, unsigned char *p, int len)
 static int x25_exec(struct cycx_device *card, int command, int link,
 		    void *d1, int len1, void *d2, int len2)
 {
-	TX25Cmd c;
+	struct cycx_x25_cmd c;
 	unsigned long flags;
 	u32 addr = 0x1200 + 0x2E0 * link + 0x1E2;
 	u8 retry = MAX_CMD_RETRY;
@@ -1045,11 +1050,11 @@ static int x25_exec(struct cycx_device *card, int command, int link,
 }
 
 /* Configure adapter. */
-static int x25_configure(struct cycx_device *card, TX25Config *conf)
+static int x25_configure(struct cycx_device *card, struct cycx_x25_config *conf)
 {
 	struct {
 		u16 nlinks;
-		TX25Config conf[2];
+		struct cycx_x25_config conf[2];
 	} x25_cmd_conf;
 
 	memset(&x25_cmd_conf, 0, sizeof(x25_cmd_conf));
@@ -1520,7 +1525,7 @@ static void reset_timer(struct net_device *dev)
 		mod_timer(&chan->timer, jiffies+chan->idle_tmout*HZ);
 }
 #ifdef CYCLOMX_X25_DEBUG
-static void x25_dump_config(TX25Config *conf)
+static void x25_dump_config(struct cycx_x25_config *conf)
 {
 	printk(KERN_INFO "X.25 configuration\n");
 	printk(KERN_INFO "-----------------\n");
@@ -1542,7 +1547,7 @@ static void x25_dump_config(TX25Config *conf)
 	printk(KERN_INFO "flags=0x%x\n", conf->flags);
 }
 
-static void x25_dump_stats(TX25Stats *stats)
+static void x25_dump_stats(struct cycx_x25_stats *stats)
 {
 	printk(KERN_INFO "X.25 statistics\n");
 	printk(KERN_INFO "--------------\n");
