@@ -1530,6 +1530,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
     struct pcmcia_socket *s;
     config_t *c;
     int ret = CS_IN_USE, irq = 0;
+    struct pcmcia_device *p_dev = handle_to_pdev(handle);
     
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
@@ -1579,7 +1580,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 			    ((req->Attributes & IRQ_TYPE_DYNAMIC_SHARING) || 
 			     (s->functions > 1) ||
 			     (irq == s->pci_irq)) ? SA_SHIRQ : 0,
-			    handle->dev_info, req->Instance))
+			     p_dev->dev.bus_id, req->Instance))
 	    return CS_IN_USE;
     }
 

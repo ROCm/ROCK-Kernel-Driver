@@ -221,8 +221,10 @@ int pcmcia_report_error(client_handle_t handle, error_info_t *err)
 
 	if (CHECK_HANDLE(handle))
 		printk(KERN_NOTICE);
-	else
-		printk(KERN_NOTICE "%s: ", handle->dev_info);
+	else {
+		struct pcmcia_device *p_dev = handle_to_pdev(handle);
+		printk(KERN_NOTICE "%s: ", p_dev->dev.bus_id);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(service_table); i++)
 		if (service_table[i].key == err->func)
@@ -608,7 +610,6 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	p_dev->client.Socket = s->parent;
 	p_dev->client.Function = bind_info->function;
 	p_dev->client.state = CLIENT_UNBOUND;
-	strlcpy(p_dev->client.dev_info, p_drv->drv.name, DEV_NAME_LEN);
 
 	ret = device_register(&p_dev->dev);
 	if (ret) {
@@ -683,14 +684,22 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 			continue;
 		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
 		list_for_each_entry(p_dev, &skt->devices_list, socket_device_list) {
-			if ((p_dev->client.state & CLIENT_UNBOUND) &&
-			    (!strcmp(p_dev->client.dev_info, (char *)req->dev_info))) {
-				p_dev = pcmcia_get_dev(p_dev);
-				if (p_dev)
-					client = &p_dev->client;
+			struct pcmcia_driver *p_drv;
+			p_dev = pcmcia_get_dev(p_dev);
+			if (!p_dev)
+				continue;
+			if ((!p_dev->client.state & CLIENT_UNBOUND) ||
+			    (!p_dev->dev.driver)) {
+				pcmcia_put_dev(p_dev);
+				continue;
+			}
+			p_drv = to_pcmcia_drv(p_dev->dev.driver);
+			if (!strncmp(p_drv->drv.name, (char *)req->dev_info, DEV_NAME_LEN)) {
+				client = &p_dev->client;
 				spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 				goto found;
 			}
+			pcmcia_put_dev(p_dev);
 		}
 		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 		pcmcia_put_bus_socket(skt);
@@ -733,7 +742,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	}
 
 	ds_dbg(1, "register_client(): client 0x%p, dev %s\n",
-	       client, client->dev_info);
+	       client, p_dev->dev.bus_id);
 	if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
 		EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
 
