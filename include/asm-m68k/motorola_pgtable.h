@@ -263,7 +263,7 @@ static inline unsigned long pte_to_pgoff(pte_t pte)
 	return ((pte.pte >> 12) << 7) + ((pte.pte >> 2) & 0x1ff);
 }
 
-static inline pte_t pgoff_to_pte(inline unsigned off)
+static inline pte_t pgoff_to_pte(unsigned off)
 {
 	pte_t pte = { ((off >> 7) << 12) + ((off & 0x1ff) << 2) + _PAGE_FILE };
 	return pte;
