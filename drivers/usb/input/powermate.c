@@ -83,6 +83,7 @@ static void powermate_irq(struct urb *urb)
 	/* handle updates to device state */
 	input_report_key(&pm->input, BTN_0, pm->data[0] & 0x01);
 	input_report_rel(&pm->input, REL_DIAL, pm->data[1]);
+	input_sync(&pm->input);
 }
 
 /* Decide if we need to issue a control message and do so. Must be called with pm->lock down */

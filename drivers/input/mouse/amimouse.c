@@ -68,6 +68,8 @@ static void amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
 	input_report_key(&amimouse_dev, BTN_LEFT,   ciaa.pra & 0x40);
 	input_report_key(&amimouse_dev, BTN_MIDDLE, potgor & 0x0100);
 	input_report_key(&amimouse_dev, BTN_RIGHT,  potgor & 0x0400);
+
+	input_sync(&amimouse_dev);
 }
 
 static int amimouse_open(struct input_dev *dev)

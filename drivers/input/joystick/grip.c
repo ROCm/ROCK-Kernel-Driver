@@ -276,6 +276,8 @@ static void grip_timer(unsigned long private)
 
 
 		}
+
+		input_sync(dev);
 	}
 
 	mod_timer(&grip->timer, jiffies + GRIP_REFRESH_TIME);

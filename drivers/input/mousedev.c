@@ -94,9 +94,10 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 	struct mousedev *mousedevs[3] = { handle->private, &mousedev_mix, NULL };
 	struct mousedev **mousedev = mousedevs;
 	struct mousedev_list *list;
-	int index, size;
+	int index, size, wake;
 
 	while (*mousedev) {
+		wake = 0;
 		list = (*mousedev)->list;
 		while (list) {
 			switch (type) {
@@ -158,16 +159,20 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 						case 2: return;
 					}
 					break;
+
+				case EV_SYN:
+					switch (code) {
+						case SYN_REPORT:
+							list->ready = 1;
+							kill_fasync(&list->fasync, SIGIO, POLL_IN);
+							wake = 1;
+							break;
+					}
 			}
-					
-			list->ready = 1;
-
-			kill_fasync(&list->fasync, SIGIO, POLL_IN);
-
 			list = list->next;
 		}
-
-		wake_up_interruptible(&((*mousedev)->wait));
+		if (wake)
+			wake_up_interruptible(&((*mousedev)->wait));
 		mousedev++;
 	}
 }

@@ -197,6 +197,8 @@ static void gf2k_read(struct gf2k *gf2k, unsigned char *data)
 
 	for (i = 0; i < gf2k_pads[gf2k->id]; i++)
 		input_report_key(dev, gf2k_btn_pad[i], (t >> i) & 1);
+
+	input_sync(dev);
 }
 
 /*

@@ -130,6 +130,8 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 			input_report_key(dev, BTN_LEFT,   data[3] & 2);
 			input_report_key(dev, BTN_MIDDLE, data[3] & 4);
 
+			input_sync(dev);
+
 			a3d->axes[0] = ((signed char)((data[11] << 6) | (data[12] << 3) | (data[13]))) + 128;
 			a3d->axes[1] = ((signed char)((data[14] << 6) | (data[15] << 3) | (data[16]))) + 128;
 			a3d->axes[2] = ((signed char)((data[17] << 6) | (data[18] << 3) | (data[19]))) + 128;
@@ -164,6 +166,8 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 			input_report_key(dev, BTN_THUMB,   data[8] & 2);
 			input_report_key(dev, BTN_TOP,     data[8] & 4);
 			input_report_key(dev, BTN_PINKIE,  data[7] & 1);
+
+			input_sync(dev);
 
 			return;
 	}

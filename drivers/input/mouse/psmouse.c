@@ -167,6 +167,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 	input_report_rel(dev, REL_X, packet[1] ? (int) packet[1] - (int) ((packet[0] << 4) & 0x100) : 0);
 	input_report_rel(dev, REL_Y, packet[2] ? (int) ((packet[0] << 3) & 0x100) - (int) packet[2] : 0);
 
+	input_sync(dev);
 }
 
 /*

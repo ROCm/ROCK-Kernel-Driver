@@ -128,6 +128,8 @@ static void logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	input_report_key(&logibm_dev, BTN_RIGHT,  buttons & 1);
 	input_report_key(&logibm_dev, BTN_MIDDLE, buttons & 2);
 	input_report_key(&logibm_dev, BTN_LEFT,   buttons & 4);
+	input_sync(&logibm_dev);
+
 	outb(LOGIBM_ENABLE_IRQ, LOGIBM_CONTROL_PORT);
 }
 

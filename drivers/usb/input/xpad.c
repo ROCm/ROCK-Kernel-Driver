@@ -158,6 +158,8 @@ static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *d
 	/* "analog" buttons black, white */
 	input_report_key(dev, BTN_C, data[8]);
 	input_report_key(dev, BTN_Z, data[9]);
+
+	input_sync(dev);
 }
 
 static void xpad_irq_in(struct urb *urb)

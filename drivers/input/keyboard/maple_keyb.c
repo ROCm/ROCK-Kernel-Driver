@@ -76,6 +76,8 @@ static void dc_scan_kbd(struct dc_kbd *kbd)
 		}
 	}
 
+	input_sync(dev);
+
 	memcpy(kbd->old, kbd->new, 8);
 }
 

@@ -57,10 +57,10 @@ struct input_event {
  */
 
 struct input_devinfo {
-	uint16_t bustype;
-	uint16_t vendor;
-	uint16_t product;
-	uint16_t version;
+	__u16 bustype;
+	__u16 vendor;
+	__u16 product;
+	__u16 version;
 };
 
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
@@ -89,7 +89,7 @@ struct input_devinfo {
  * Event types
  */
 
-#define EV_RST			0x00
+#define EV_SYN			0x00
 #define EV_KEY			0x01
 #define EV_REL			0x02
 #define EV_ABS			0x03
@@ -101,6 +101,13 @@ struct input_devinfo {
 #define EV_PWR			0x16
 #define EV_FF_STATUS		0x17
 #define EV_MAX			0x1f
+
+/*
+ * Synchronization events.
+ */
+
+#define SYN_REPORT		0
+#define SYN_CONFIG		1
 
 /*
  * Keys and buttons
@@ -769,6 +776,8 @@ struct input_dev {
 	struct pm_dev *pm_dev;
 	int state;
 
+	int sync;
+
 	int abs[ABS_MAX + 1];
 	int rep[REP_MAX + 1];
 
@@ -883,6 +892,7 @@ void input_unregister_minor(devfs_handle_t handle);
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value);
 
+#define input_sync(a)		input_event(a, EV_SYN, SYN_REPORT, 0)
 #define input_report_key(a,b,c) input_event(a, EV_KEY, b, !!(c))
 #define input_report_rel(a,b,c) input_event(a, EV_REL, b, c)
 #define input_report_abs(a,b,c) input_event(a, EV_ABS, b, c)

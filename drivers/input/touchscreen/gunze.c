@@ -74,6 +74,7 @@ static void gunze_process_packet(struct gunze* gunze)
 	input_report_abs(dev, ABS_X, simple_strtoul(gunze->data + 1, NULL, 10) * 4);
 	input_report_abs(dev, ABS_Y, 3072 - simple_strtoul(gunze->data + 6, NULL, 10) * 3);
 	input_report_key(dev, BTN_TOUCH, gunze->data[0] == 'T');
+	input_sync(dev);
 }
 
 static void gunze_interrupt(struct serio *serio, unsigned char data, unsigned int flags)

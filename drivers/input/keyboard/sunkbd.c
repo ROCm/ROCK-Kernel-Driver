@@ -121,6 +121,7 @@ static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned i
 		default:
 			if (sunkbd->keycode[data & SUNKBD_KEY]) {
                                 input_report_key(&sunkbd->dev, sunkbd->keycode[data & SUNKBD_KEY], !(data & SUNKBD_RELEASE));
+				input_sync(&sunkbd->dev);
                         } else {
                                 printk(KERN_WARNING "sunkbd.c: Unknown key (scancode %#x) %s.\n",
                                         data & SUNKBD_KEY, data & SUNKBD_RELEASE ? "released" : "pressed");

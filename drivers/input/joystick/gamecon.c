@@ -328,6 +328,8 @@ static void gc_timer(unsigned long private)
 
 				for (j = 0; j < 10; j++)
 					input_report_key(dev + i, gc_n64_btn[j], s & data[gc_n64_bytes[j]]);
+
+				input_sync(dev + i);
 			}
 		}
 	}
@@ -356,6 +358,8 @@ static void gc_timer(unsigned long private)
 			if (s & gc->pads[GC_SNES])
 				for (j = 0; j < 8; j++)
 					input_report_key(dev + i, gc_snes_btn[j], s & data[gc_snes_bytes[j]]);
+
+			input_sync(dev + i);
 		}
 	}
 
@@ -379,6 +383,8 @@ static void gc_timer(unsigned long private)
 
 			if (s & gc->pads[GC_MULTI2])
 				input_report_key(dev + i, BTN_THUMB, s & data[5]);
+
+			input_sync(dev + i);
 		}
 	}
 
@@ -398,6 +404,7 @@ static void gc_timer(unsigned long private)
 
 				input_report_key(dev + i, BTN_THUMBL, ~data[0] & 0x04);
 				input_report_key(dev + i, BTN_THUMBR, ~data[0] & 0x02);
+				input_sync(dev + i);
 
 			case GC_PSX_NEGCON:
 			case GC_PSX_ANALOG:
@@ -414,6 +421,8 @@ static void gc_timer(unsigned long private)
 				input_report_key(dev + i, BTN_START,  ~data[0] & 0x08);
 				input_report_key(dev + i, BTN_SELECT, ~data[0] & 0x01);
 
+				input_sync(dev + i);
+
 				break;
 
 			case GC_PSX_NORMAL:
@@ -426,6 +435,8 @@ static void gc_timer(unsigned long private)
 
 				input_report_key(dev + i, BTN_START,  ~data[0] & 0x08);
 				input_report_key(dev + i, BTN_SELECT, ~data[0] & 0x01);
+
+				input_sync(dev + i);
 
 				break;
 		}

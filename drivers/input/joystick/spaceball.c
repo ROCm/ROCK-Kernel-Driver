@@ -137,6 +137,8 @@ static void spaceball_process_packet(struct spaceball* spaceball)
 			printk(KERN_ERR "spaceball: Bad command. [%s]\n", spaceball->data + 1);
 			break;
 	}
+
+	input_sync(dev);
 }
 
 /*

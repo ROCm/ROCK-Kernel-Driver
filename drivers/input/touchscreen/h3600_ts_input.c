@@ -109,6 +109,7 @@ static void action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	struct input_dev *dev = (struct input_dev *) dev_id;
 
 	input_report_key(dev, KEY_ENTER, down);
+	input_sync(dev);
 }
 
 static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
@@ -122,6 +123,7 @@ static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	 */ 	
 	input_report_key(dev, KEY_SUSPEND, 1);
 	input_report_key(dev, KEY_SUSPEND, down); 	
+	input_sync(dev);
 }
 
 #ifdef CONFIG_PM
@@ -267,6 +269,8 @@ static void h3600ts_process_packet(struct h3600_dev *ts)
 			/* Send a non input event elsewhere */
 			break;
         }
+
+	input_sync(dev);
 }
 
 /*

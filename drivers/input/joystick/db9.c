@@ -266,6 +266,8 @@ static void db9_timer(unsigned long private)
 			break;
 		}
 
+	input_sync(dev);
+
 	mod_timer(&db9->timer, jiffies + DB9_REFRESH_TIME);
 }
 

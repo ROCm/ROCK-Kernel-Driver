@@ -147,6 +147,8 @@ static void guillemot_timer(unsigned long private)
 			input_report_key(dev, guillemot->type->btn[i], (data[2 + (i >> 3)] >> (i & 7)) & 1);
 	}
 
+	input_sync(dev);
+
 	mod_timer(&guillemot->timer, jiffies + GUILLEMOT_REFRESH_TIME);
 }
 

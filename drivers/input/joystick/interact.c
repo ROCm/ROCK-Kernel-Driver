@@ -176,6 +176,8 @@ static void interact_timer(unsigned long private)
 		}
 	}
 
+	input_sync(dev);
+
 	mod_timer(&interact->timer, jiffies + INTERACT_REFRESH_TIME);
 
 }

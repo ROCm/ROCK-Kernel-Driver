@@ -127,6 +127,8 @@ static void twidjoy_process_packet(struct twidjoy *twidjoy)
 
 		input_report_abs(dev, ABS_X, -abs_x);
 		input_report_abs(dev, ABS_Y, +abs_y);
+
+		input_sync(dev);
 	}
 
 	return;

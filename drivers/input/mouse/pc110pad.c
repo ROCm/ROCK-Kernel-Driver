@@ -78,6 +78,7 @@ static void pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 		pc110pad_data[1] | ((pc110pad_data[0] << 3) & 0x80) | ((pc110pad_data[0] << 1) & 0x100));
 	input_report_abs(&pc110pad_dev, ABS_Y,
 		pc110pad_data[2] | ((pc110pad_data[0] << 4) & 0x80));
+	input_sync(&pc110pad_dev);
 
 	pc110pad_count = 0;
 }
@@ -90,8 +91,6 @@ static void pc110pad_close(struct input_dev *dev)
 
 static int pc110pad_open(struct input_dev *dev)
 {
-	unsigned long flags;
-	
 	if (pc110pad_used++)
 		return 0;
 

@@ -104,6 +104,8 @@ static void usb_kbd_irq(struct urb *urb)
 		}
 	}
 
+	input_sync(&kbd->dev);
+
 	memcpy(kbd->old, kbd->new, 8);
 }
 
@@ -236,7 +238,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 	kbd->dev.name = kbd->name;
 	kbd->dev.phys = kbd->phys;	
-	kbd->dev.id.bus = BUS_USB;
+	kbd->dev.id.bustype = BUS_USB;
 	kbd->dev.id.vendor = dev->descriptor.idVendor;
 	kbd->dev.id.product = dev->descriptor.idProduct;
 	kbd->dev.id.version = dev->descriptor.bcdDevice;

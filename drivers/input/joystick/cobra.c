@@ -136,6 +136,8 @@ static void cobra_timer(unsigned long private)
 			for (j = 0; cobra_btn[j]; j++)
 				input_report_key(dev, cobra_btn[j], data[i] & (0x20 << j));
 
+			input_sync(dev);
+
 		}
 
 	mod_timer(&cobra->timer, jiffies + COBRA_REFRESH_TIME);	

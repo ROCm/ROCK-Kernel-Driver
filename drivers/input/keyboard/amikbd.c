@@ -88,10 +88,12 @@ static void amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
 		if (scancode == KEY_CAPS) {	/* CapsLock is a toggle switch key on Amiga */
 			input_report_key(&amikbd_dev, scancode, 1);
 			input_report_key(&amikbd_dev, scancode, 0);
+			input_sync(&amikbd_dev);
 			return;
 		}
 		
 		input_report_key(&amikbd_dev, scancode, down);
+		input_sync(&amikbd_dev);
 
 		return;
 	}

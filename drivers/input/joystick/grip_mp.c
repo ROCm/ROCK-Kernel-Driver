@@ -515,6 +515,10 @@ static void report_slot(struct grip_mp *grip, int slot)
 	input_report_abs(dev, ABS_X, grip->xaxes[slot]);
 	input_report_abs(dev, ABS_Y, grip->yaxes[slot]);
 
+	/* Tell the receiver of the events to process them */
+
+	input_sync(dev);
+
 	grip->dirty[slot] = 0;
 }
 

@@ -161,6 +161,7 @@ static void ps2serkbd_interrupt(struct serio *serio, unsigned char data, unsigne
         break;
     default:
         input_report_key(&ps2serkbd->dev, ps2serkbd->keycode[code], !ps2serkbd->release);
+	input_sync(&ps2serkbd->dev);
     }
 
     ps2serkbd->release = 0;

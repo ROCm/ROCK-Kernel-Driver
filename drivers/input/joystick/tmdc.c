@@ -214,6 +214,8 @@ static void tmdc_timer(unsigned long private)
 						((data[j][tmdc_byte_d[k]] >> (i + tmdc->btno[j][k])) & 1));
 				l += tmdc->btnc[j][k];
 			}
+
+			input_sync(dev);
 	}
 
 	tmdc->bads += bad;

@@ -162,6 +162,7 @@ int mac_hid_mouse_emulate_buttons(int caller, unsigned int keycode, int down)
 			 	input_report_key(&emumousebtn,
 						 keycode == mouse_button2_keycode ? BTN_MIDDLE : BTN_RIGHT,
 						 down);
+				input_sync(&emumousebtn);
 				return 1;
 			}
 			mouse_last_keycode = down ? keycode : 0;

@@ -215,6 +215,8 @@ static void analog_decode(struct analog *analog, int *axes, int *initial, int bu
 			input_report_abs(dev, analog_hats[j++],
 				((buttons >> ((i << 2) + 8)) & 1) - ((buttons >> ((i << 2) + 6)) & 1));
 		}
+
+	input_sync(dev);
 }
 
 /*

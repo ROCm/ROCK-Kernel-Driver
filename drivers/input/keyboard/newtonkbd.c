@@ -72,6 +72,8 @@ void nkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
 
 	else if (data == 0xe7) /* end of init sequence */
 		printk(KERN_INFO "input: %s on %s\n", nkbd_name, serio->phys);
+
+	input_sync(&nkbd->dev);
 }
 
 void nkbd_connect(struct serio *serio, struct serio_dev *dev)

@@ -72,15 +72,8 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 {
 	struct input_handle *handle = dev->handle;
 
-/*
- * Wake up the device if it is sleeping.
- */
 	if (dev->pm_dev)
 		pm_access(dev->pm_dev);
-
-/*
- * Filter non-events, and bad input values out.
- */
 
 	if (type > EV_MAX || !test_bit(type, dev->evbit))
 		return;
@@ -88,6 +81,19 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 	add_mouse_randomness((type << 4) ^ code ^ (code >> 4) ^ value);
 
 	switch (type) {
+
+		case EV_SYN:
+			switch (code) {
+				case SYN_CONFIG:
+					if (dev->event) dev->event(dev, type, code, value);
+					break;
+
+				case SYN_REPORT:
+					if (dev->sync) return;
+					dev->sync = 1;
+					break;
+			}
+			break;
 
 		case EV_KEY:
 
@@ -185,9 +191,8 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 			break;
 	}
 
-/*
- * Distribute the event to handler modules.
- */
+	if (type != EV_SYN) 
+		dev->sync = 0;
 
 	while (handle) {
 		if (handle->open)
@@ -200,6 +205,7 @@ static void input_repeat_key(unsigned long data)
 {
 	struct input_dev *dev = (void *) data;
 	input_event(dev, EV_KEY, dev->repeat_key, 2);
+	input_sync(dev);
 	mod_timer(&dev->timer, jiffies + dev->rep[REP_PERIOD]);
 }
 
@@ -437,6 +443,12 @@ void input_register_device(struct input_dev *dev)
 	struct input_handler *handler = input_handler;
 	struct input_handle *handle;
 	struct input_device_id *id;
+
+/*
+ * Add the EV_SYN capability.
+ */
+
+	set_bit(EV_SYN, dev->evbit);
 
 /*
  * Initialize repeat timer to default values.

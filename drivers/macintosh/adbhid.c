@@ -163,6 +163,8 @@ adbhid_input_keycode(int id, int keycode, int repeat)
 	else
 		printk(KERN_INFO "Unhandled ADB key (scancode %#02x) %s.\n", keycode,
 		       up_flag ? "released" : "pressed");
+
+	input_sync(&adbhid[id]->input);
 }
 
 static void
@@ -259,6 +261,8 @@ adbhid_mouse_input(unsigned char *data, int nb, struct pt_regs *regs, int autopo
 			 ((data[2]&0x7f) < 64 ? (data[2]&0x7f) : (data[2]&0x7f)-128 ));
 	input_report_rel(&adbhid[id]->input, REL_Y,
 			 ((data[1]&0x7f) < 64 ? (data[1]&0x7f) : (data[1]&0x7f)-128 ));
+
+	input_sync(&adbhid[id]->input);
 }
 
 static void
@@ -363,6 +367,8 @@ adbhid_buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int auto
 	  }
 	  break;
 	}
+
+	input_sync(&adbhid[id]->input);
 }
 
 static struct adb_request led_request;

@@ -75,6 +75,7 @@ void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags
 
 			if (xtkbd->keycode[data & XTKBD_KEY]) {
 				input_report_key(&xtkbd->dev, xtkbd->keycode[data & XTKBD_KEY], !(data & XTKBD_RELEASE));
+				input_sync(&xtkbd->dev);
 			} else {
 				printk(KERN_WARNING "xtkbd.c: Unknown key (scancode %#x) %s.\n",
 					data & XTKBD_KEY, data & XTKBD_RELEASE ? "released" : "pressed");

@@ -40,6 +40,7 @@ static void dc_mouse_callback(struct mapleq *mq)
 	input_report_rel(dev, REL_X,      relx);
 	input_report_rel(dev, REL_Y,      rely);
 	input_report_rel(dev, REL_WHEEL,  relz);
+	input_sync(dev);
 }
 
 

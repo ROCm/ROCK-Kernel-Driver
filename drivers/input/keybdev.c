@@ -132,11 +132,10 @@ void keybdev_ledfunc(unsigned int led)
 	struct input_handle *handle;	
 
 	for (handle = keybdev_handler.handle; handle; handle = handle->hnext) {
-
 		input_event(handle->dev, EV_LED, LED_SCROLLL, !!(led & 0x01));
 		input_event(handle->dev, EV_LED, LED_NUML,    !!(led & 0x02));
 		input_event(handle->dev, EV_LED, LED_CAPSL,   !!(led & 0x04));
-
+		input_sync(handle->dev);
 	}
 }
 

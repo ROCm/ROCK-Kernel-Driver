@@ -249,6 +249,8 @@ static int adi_decode(struct adi *adi)
 
 	for (i = 63; i < adi->buttons; i++)
 		input_report_key(dev, *key++, adi_get_bits(adi, 1));
+	
+	input_sync(dev);
 
 	return 0;
 }

@@ -107,6 +107,8 @@ static void magellan_process_packet(struct magellan* magellan)
 			for (i = 0; i < 9; i++) input_report_key(dev, magellan_buttons[i], (t >> i) & 1);
 			break;
 	}
+
+	input_sync(dev);
 }
 
 static void magellan_interrupt(struct serio *serio, unsigned char data, unsigned int flags)

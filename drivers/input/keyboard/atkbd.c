@@ -195,6 +195,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 			break;
 		default:
 			input_report_key(&atkbd->dev, atkbd->keycode[code], !atkbd->release);
+			input_sync(&atkbd->dev);
 	}
 		
 	atkbd->release = 0;

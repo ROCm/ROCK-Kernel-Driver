@@ -161,6 +161,8 @@ aiptek_irq(struct urb *urb)
 		input_report_key(dev, BTN_STYLUS2, data[5] & 0x10);
 	}
 
+	input_sync(dev);
+
 }
 
 struct aiptek_features aiptek_features[] = {

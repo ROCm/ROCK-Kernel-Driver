@@ -124,6 +124,8 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb)
 			printk("]\n");
 			break;
 	}
+
+	input_sync(dev);
 }
 
 static void spaceorb_interrupt(struct serio *serio, unsigned char data, unsigned int flags)

@@ -101,6 +101,8 @@ static void tgfx_timer(unsigned long private)
 			input_report_key(dev, BTN_THUMB2,  (data2 & TGFX_THUMB2 ));
 			input_report_key(dev, BTN_TOP,     (data2 & TGFX_TOP    ));
 			input_report_key(dev, BTN_TOP2,    (data2 & TGFX_TOP2   ));
+
+			input_sync(dev);
 		}
 
 	mod_timer(&tgfx->timer, jiffies + TGFX_REFRESH_TIME);

@@ -903,6 +903,9 @@ static int hid_input_report(int type, struct urb *urb)
 	for (n = 0; n < report->maxfield; n++)
 		hid_input_field(hid, report->field[n], data);
 
+	if (hid->claimed & HID_CLAIMED_INPUT)
+		hidinput_report_event(hid, report);
+
 	return 0;
 }
 

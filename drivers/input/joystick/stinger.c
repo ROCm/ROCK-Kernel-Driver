@@ -85,6 +85,8 @@ static void stinger_process_packet(struct stinger *stinger)
 	input_report_abs(dev, ABS_X, (data[1] & 0x3F) - ((data[0] & 0x01) << 6));
 	input_report_abs(dev, ABS_Y, ((data[0] & 0x02) << 5) - (data[2] & 0x3F));
 
+	input_sync(dev);
+
 	return;
 }
 

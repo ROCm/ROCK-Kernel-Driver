@@ -89,6 +89,8 @@ static void sermouse_process_msc(struct sermouse *sermouse, signed char data)
 			break;
 	}
 
+	input_sync(dev);
+
 	if (++sermouse->count == (5 - ((sermouse->type == SERIO_SUN) << 1)))
 		sermouse->count = 0;
 }
@@ -187,6 +189,8 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data)
 
 			break;
 	}
+
+	input_sync(dev);
 
 	sermouse->count++;
 }

@@ -63,6 +63,8 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	input_report_key(&rpcmouse_dev, BTN_LEFT,   b & 0x10);
 	input_report_key(&rpcmouse_dev, BTN_MIDDLE, b & 0x20);
 	input_report_key(&rpcmouse_dev, BTN_RIGHT,  b & 0x40);
+
+	input_sync(&rpcmouse_dev);
 }
 
 static int __init rpcmouse_init(void)

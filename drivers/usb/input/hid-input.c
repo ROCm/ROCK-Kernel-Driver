@@ -428,6 +428,11 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 		input_event(input, usage->type, usage->code, 0);
 }
 
+void hidinput_report_event(struct hid_device *hid, struct hid_report *report)
+{
+	input_sync(&hid->input);
+}
+
 static int hidinput_input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	struct hid_device *hid = dev->private;
