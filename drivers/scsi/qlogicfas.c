@@ -27,7 +27,6 @@
    SCSI driver cleanup and audit. This driver still needs work on the
    following
    	-	Non terminating hardware waits
-   	-	Support multiple cards at a time
    	-	Some layering violations with its pcmcia stub
 
    Redistributable under terms of the GNU General Public License
@@ -139,16 +138,10 @@
 
 #include "scsi.h"
 #include "hosts.h"
+#include "qlogicfas.h"
 
 /*----------------------------------------------------------------*/
 /* driver state info, local to driver */
-static int qbase;		/* Port */
-static int qinitid;		/* initiator ID */
-static int qabort;		/* Flag to cause an abort */
-static int qlirq = -1;		/* IRQ being used */
-static char qinfo[80];		/* description */
-static Scsi_Cmnd *qlcmd;	/* current command being processed */
-
 static int qlcfg5 = (XTALFREQ << 5);	/* 15625/512 */
 static int qlcfg6 = SYNCXFRPD;
 static int qlcfg7 = SYNCOFFST;
@@ -184,9 +177,10 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
 
 /* error recovery - reset everything */
 
-static void ql_zap(void)
+static void ql_zap(qlogicfas_priv_t priv)
 {
 	int x;
+	int qbase = priv->qbase;
 
 	x = inb(qbase + 0xd);
 	REG0;
@@ -200,9 +194,10 @@ static void ql_zap(void)
  *	Do a pseudo-dma tranfer
  */
  
-static int ql_pdma(int phase, char *request, int reqlen)
+static int ql_pdma(qlogicfas_priv_t priv, int phase, char *request, int reqlen)
 {
 	int j;
+	int qbase = priv->qbase;
 	j = 0;
 	if (phase & 1) {	/* in */
 #if QL_TURBO_PDMA
@@ -284,23 +279,25 @@ static int ql_pdma(int phase, char *request, int reqlen)
  *	Wait for interrupt flag (polled - not real hardware interrupt) 
  */
 
-static int ql_wai(void)
+static int ql_wai(qlogicfas_priv_t priv)
 {
 	int k;
+	int qbase = priv->qbase;
 	unsigned long i;
 
 	k = 0;
 	i = jiffies + WATCHDOG;
-	while (time_before(jiffies, i) && !qabort && !((k = inb(qbase + 4)) & 0xe0)) {
+	while (time_before(jiffies, i) && !priv->qabort &&
+					!((k = inb(qbase + 4)) & 0xe0)) {
 		barrier();
 		cpu_relax();
 	}
 	if (time_after_eq(jiffies, i))
 		return (DID_TIME_OUT);
-	if (qabort)
-		return (qabort == 1 ? DID_ABORT : DID_RESET);
+	if (priv->qabort)
+		return (priv->qabort == 1 ? DID_ABORT : DID_RESET);
 	if (k & 0x60)
-		ql_zap();
+		ql_zap(priv);
 	if (k & 0x20)
 		return (DID_PARITY);
 	if (k & 0x40)
@@ -315,9 +312,11 @@ static int ql_wai(void)
 
 static void ql_icmd(Scsi_Cmnd * cmd)
 {
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(cmd->device->host->hostdata[0]);
+	int 	qbase = priv->qbase;
 	unsigned int i;
 
-	qabort = 0;
+	priv->qabort = 0;
 
 	REG0;
 	/* clearing of interrupts and the fifo is needed */
@@ -338,7 +337,7 @@ static void ql_icmd(Scsi_Cmnd * cmd)
 	/* configurables */
 	outb(qlcfgc, qbase + 0xc);
 	/* config: no reset interrupt, (initiator) bus id */
-	outb(0x40 | qlcfg8 | qinitid, qbase + 8);
+	outb(0x40 | qlcfg8 | priv->qinitid, qbase + 8);
 	outb(qlcfg7, qbase + 7);
 	outb(qlcfg6, qbase + 6);
 	 /**/ outb(qlcfg5, qbase + 5);	/* select timer */
@@ -349,7 +348,7 @@ static void ql_icmd(Scsi_Cmnd * cmd)
 	for (i = 0; i < cmd->cmd_len; i++)
 		outb(cmd->cmnd[i], qbase + 2);
 
-	qlcmd = cmd;
+	priv->qlcmd = cmd;
 	outb(0x41, qbase + 3);	/* select and send command */
 }
 
@@ -369,6 +368,8 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	struct scatterlist *sglist;	/* scatter-gather list pointer */
 	unsigned int sgcount;	/* sg counter */
 	char *buf;
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(cmd->device->host->hostdata[0]);
+	int qbase = priv->qbase;
 
 	rtrc(1)
 	j = inb(qbase + 6);
@@ -379,7 +380,7 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	i |= inb(qbase + 5);	/* the 0x10 bit can be set after the 0x08 */
 	if (i != 0x18) {
 		printk(KERN_ERR "Ql:Bad Interrupt status:%02x\n", i);
-		ql_zap();
+		ql_zap(priv);
 		return (DID_BAD_INTR << 16);
 	}
 	j &= 7;			/* j = inb( qbase + 7 ) >> 5; */
@@ -392,7 +393,7 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	if (j != 3 && j != 4) {
 		printk(KERN_ERR "Ql:Bad sequence for command %d, int %02X, cmdleft = %d\n",
 		     j, i, inb(qbase + 7) & 0x1f);
-		ql_zap();
+		ql_zap(priv);
 		return (DID_ERROR << 16);
 	}
 	result = DID_OK;
@@ -410,18 +411,19 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 		/* PIO pseudo DMA to buffer or sglist */
 		REG1;
 		if (!cmd->use_sg)
-			ql_pdma(phase, cmd->request_buffer,
+			ql_pdma(priv, phase, cmd->request_buffer,
 				cmd->request_bufflen);
 		else {
 			sgcount = cmd->use_sg;
 			sglist = cmd->request_buffer;
 			while (sgcount--) {
-				if (qabort) {
+				if (priv->qabort) {
 					REG0;
-					return ((qabort == 1 ? DID_ABORT : DID_RESET) << 16);
+					return ((priv->qabort == 1 ?
+						DID_ABORT : DID_RESET) << 16);
 				}
 				buf = page_address(sglist->page) + sglist->offset;
-				if (ql_pdma(phase, buf, sglist->length))
+				if (ql_pdma(priv, phase, buf, sglist->length))
 					break;
 				sglist++;
 			}
@@ -432,7 +434,7 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 		 *	Wait for irq (split into second state of irq handler
 		 *	if this can take time) 
 		 */
-		if ((k = ql_wai()))
+		if ((k = ql_wai(priv)))
 			return (k << 16);
 		k = inb(qbase + 5);	/* should be 0x10, bus service */
 	}
@@ -443,11 +445,12 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	 
 	k = jiffies + WATCHDOG;
 
-	while (time_before(jiffies, k) && !qabort && !(inb(qbase + 4) & 6))
+	while (time_before(jiffies, k) && !priv->qabort &&
+						!(inb(qbase + 4) & 6))
 		cpu_relax();	/* wait for status phase */
 
 	if (time_after_eq(jiffies, k)) {
-		ql_zap();
+		ql_zap(priv);
 		return (DID_TIME_OUT << 16);
 	}
 
@@ -455,11 +458,11 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	while (inb(qbase + 5))
 		cpu_relax();	/* clear pending ints */
 
-	if (qabort)
-		return ((qabort == 1 ? DID_ABORT : DID_RESET) << 16);
+	if (priv->qabort)
+		return ((priv->qabort == 1 ? DID_ABORT : DID_RESET) << 16);
 
 	outb(0x11, qbase + 3);	/* get status and message */
-	if ((k = ql_wai()))
+	if ((k = ql_wai(priv)))
 		return (k << 16);
 	i = inb(qbase + 5);	/* get chip irq stat */
 	j = inb(qbase + 7) & 0x1f;	/* and bytes rec'd */
@@ -476,7 +479,7 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	}
 	outb(0x12, qbase + 3);	/* done, disconnect */
 	rtrc(1)
-	if ((k = ql_wai()))
+	if ((k = ql_wai(priv)))
 		return (k << 16);
 
 	/*
@@ -484,15 +487,15 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 	 */
 	 
 	i = inb(qbase + 5);	/* should be bus service */
-	while (!qabort && ((i & 0x20) != 0x20)) {
+	while (!priv->qabort && ((i & 0x20) != 0x20)) {
 		barrier();
 		cpu_relax();
 		i |= inb(qbase + 5);
 	}
 	rtrc(0)
 
-	if (qabort)
-		return ((qabort == 1 ? DID_ABORT : DID_RESET) << 16);
+	if (priv->qabort)
+		return ((priv->qabort == 1 ? DID_ABORT : DID_RESET) << 16);
 		
 	return (result << 16) | (message << 8) | (status & STATUS_MASK);
 }
@@ -504,20 +507,23 @@ static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 static void ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 {
 	Scsi_Cmnd *icmd;
+	struct Scsi_Host *host = (struct Scsi_Host *)dev_id;
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(host->hostdata[0]);
+	int qbase = priv->qbase;
 	REG0;
 
 	if (!(inb(qbase + 4) & 0x80))	/* false alarm? */
 		return;
 
-	if (qlcmd == NULL) {	/* no command to process? */
+	if (priv->qlcmd == NULL) {	/* no command to process? */
 		int i;
 		i = 16;
 		while (i-- && inb(qbase + 5));	/* maybe also ql_zap() */
 		return;
 	}
-	icmd = qlcmd;
+	icmd = priv->qlcmd;
 	icmd->result = ql_pcmd(icmd);
-	qlcmd = NULL;
+	priv->qlcmd = NULL;
 	/*
 	 *	If result is CHECK CONDITION done calls qcommand to request 
 	 *	sense 
@@ -542,7 +548,8 @@ static irqreturn_t do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 
 int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 {
-	if (cmd->device->id == qinitid) {
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(cmd->device->host->hostdata[0]);
+	if (cmd->device->id == priv->qinitid) {
 		cmd->result = DID_BAD_TARGET << 16;
 		done(cmd);
 		return 0;
@@ -550,7 +557,7 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 
 	cmd->scsi_done = done;
 	/* wait for the last command's interrupt to finish */
-	while (qlcmd != NULL) {
+	while (priv->qlcmd != NULL) {
 		barrier();
 		cpu_relax();
 	}
@@ -558,30 +565,18 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	return 0;
 }
 
-#ifdef PCMCIA
-
-/*
- *	Allow PCMCIA code to preset the port
- *	port should be 0 and irq to -1 respectively for autoprobing 
- */
-
-void qlogicfas_preset(int port, int irq)
-{
-	qbase = port;
-	qlirq = irq;
-}
-
-#endif
-
 /*
  *	Look for qlogic card and init if found 
  */
  
-struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
+struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host, int qbase,
+								int qlirq)
 {
 	int i, j;		/* these are only used by IRQ detect */
 	int qltyp;		/* type of chip */
+	int qinitid;
 	struct Scsi_Host *hreg;	/* registered host structure */
+	qlogicfas_priv_t priv;
 
 	/*	Qlogic Cards only exist at 0x230 or 0x330 (the chip itself
 	 *	decodes the address - I check 230 first since MIDI cards are
@@ -652,16 +647,20 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 	} else
 		printk(KERN_INFO "Ql: Using preset IRQ %d\n", qlirq);
 
-	hreg = scsi_host_alloc(host, 0);	/* no host data */
+	hreg = scsi_host_alloc(host, sizeof(struct qlogicfas_priv));
 	if (!hreg)
 		goto err_release_mem;
+	priv = (qlogicfas_priv_t)&(hreg->hostdata[0]);
 	hreg->io_port = qbase;
 	hreg->n_io_port = 16;
 	hreg->dma_channel = -1;
 	if (qlirq != -1)
 		hreg->irq = qlirq;
+	priv->qbase = qbase;
+	priv->qlirq = qlirq;
+	priv->qinitid = qinitid;
 
-	sprintf(qinfo,
+	sprintf(priv->qinfo,
 		"Qlogicfas Driver version 0.46, chip %02X at %03X, IRQ %d, TPdma:%d",
 		qltyp, qbase, qlirq, QL_TURBO_PDMA);
 	host->name = qlogicfas_name;
@@ -687,13 +686,35 @@ err_release_mem:
 	return NULL;
 }
 
+#define MAX_QLOGICFAS	8
+static int iobase[MAX_QLOGICFAS];
+static int irq[MAX_QLOGICFAS] = { [0 ... MAX_QLOGICFAS-1] = -1 };
+MODULE_PARM(iobase, "1-" __MODULE_STRING(MAX_QLOGICFAS) "i");
+MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_QLOGICFAS) "i");
+MODULE_PARM_DESC(iobase, "I/O address");
+MODULE_PARM_DESC(irq, "IRQ");
+
 int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 {
-	return (__qlogicfas_detect(sht) != NULL);
+	int	i,
+		num = 0;
+
+	for (i = 0; i < MAX_QLOGICFAS; i++) {
+		if (__qlogicfas_detect(sht, iobase[num], irq[num]) == NULL) {
+			/* no more devices */
+			break;
+		}
+		num++;
+	}
+
+	return num;
 }
 
 static int qlogicfas_release(struct Scsi_Host *shost)
 {
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(shost->hostdata[0]);
+	int qbase = priv->qbase;
+
 	if (shost->irq) {
 		REG1;
 		outb(0, qbase + 0xb);	/* disable ints */
@@ -740,8 +761,9 @@ int qlogicfas_biosparam(struct scsi_device * disk,
  
 static int qlogicfas_abort(Scsi_Cmnd * cmd)
 {
-	qabort = 1;
-	ql_zap();
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(cmd->device->host->hostdata[0]);
+	priv->qabort = 1;
+	ql_zap(priv);
 	return SUCCESS;
 }
 
@@ -753,8 +775,9 @@ static int qlogicfas_abort(Scsi_Cmnd * cmd)
 
 int qlogicfas_bus_reset(Scsi_Cmnd * cmd)
 {
-	qabort = 2;
-	ql_zap();
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(cmd->device->host->hostdata[0]);
+	priv->qabort = 2;
+	ql_zap(priv);
 	return SUCCESS;
 }
 
@@ -782,7 +805,8 @@ static int qlogicfas_device_reset(Scsi_Cmnd * cmd)
 
 static const char *qlogicfas_info(struct Scsi_Host *host)
 {
-	return qinfo;
+	qlogicfas_priv_t priv = (qlogicfas_priv_t)&(host->hostdata[0]);
+	return priv->qinfo;
 }
 
 MODULE_AUTHOR("Tom Zerucha, Michael Griffith");
