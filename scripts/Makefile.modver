@@ -5,6 +5,7 @@
 .PHONY: __modversions
 __modversions:
 
+include .config
 include scripts/Makefile.lib
 
 #
@@ -28,7 +29,7 @@ quiet_cmd_ld_ko_o = LD [M]  $@
 
 init/vermagic.o: ;
 
-$(modules): %.ko :%.o $(if $(CONFIG_MODVERSIONS),%.ver.o) init/vermagic.o FORCE
+$(modules): %.ko :%.o %.ver.o FORCE
 	$(call if_changed,ld_ko_o)
 
 targets += $(modules)
@@ -45,12 +46,19 @@ targets += $(modules:.ko=.ver.o)
 
 # Generate C source with version info for unresolved symbols
 
+ifdef CONFIG_MODVERSIONS
+
 define rule_mkver_o_c
 	echo '  MKVER   $@';						\
 	( echo "#include <linux/module.h>";				\
+	  echo "#include <linux/vermagic.h>";				\
+	  echo "";							\
+	  echo "const char vermagic[]";					\
+	  echo "__attribute__((section(\"__vermagic\"))) =";		\
+	  echo "VERMAGIC_STRING;";					\
 	  echo "";							\
 	  echo "static const struct modversion_info ____versions[]";	\
-	  echo "__attribute__((section(\"__versions\"))) = {"; 	\
+	  echo "__attribute__((section(\"__versions\"))) = {"; 		\
 	  for sym in `nm -u $<`; do					\
 		grep "\"$$sym\"" .tmp_all-versions			\
 		|| echo "*** Warning: $(<:.o=.ko): \"$$sym\" unresolved!" >&2;\
@@ -59,8 +67,34 @@ define rule_mkver_o_c
 	) > $@
 endef
 
-$(modules:.ko=.ver.c): %.ver.c: %.o .tmp_all-versions FORCE
+# We have a fake dependency on compile.h to make sure that we notice
+# if the compiler version changes under us.
+
+$(modules:.ko=.ver.c):							\
+%.ver.c: %.o .tmp_all-versions include/linux/compile.h FORCE
 	$(call if_changed_rule,mkver_o_c)
+
+else
+
+define rule_mkver_o_c
+	echo '  MKVER   $@';						\
+	( echo "#include <linux/module.h>";				\
+	  echo "#include <linux/vermagic.h>";				\
+	  echo "";							\
+	  echo "const char vermagic[]";					\
+	  echo "__attribute__((section(\"__vermagic\"))) =";		\
+	  echo "VERMAGIC_STRING;";					\
+	) > $@
+endef
+
+# We have a fake dependency on compile.h to make sure that we notice
+# if the compiler version changes under us.
+
+$(modules:.ko=.ver.c):							\
+%.ver.c: %.o include/linux/compile.h FORCE
+	$(call if_changed_rule,mkver_o_c)
+
+endif
 
 targets += $(modules:.ko=.ver.c))
 

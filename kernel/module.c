@@ -30,6 +30,7 @@
 #include <linux/moduleparam.h>
 #include <linux/errno.h>
 #include <linux/err.h>
+#include <linux/vermagic.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -725,6 +726,8 @@ static int obsolete_params(const char *name,
 }
 #endif /* CONFIG_OBSOLETE_MODPARM */
 
+static const char vermagic[] = VERMAGIC_STRING;
+
 #ifdef CONFIG_MODVERSIONS
 static int check_version(Elf_Shdr *sechdrs,
 			 unsigned int versindex,
@@ -1035,9 +1038,6 @@ static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
 		tainted |= TAINT_PROPRIETARY_MODULE;
 	}
 }
-
-/* From init/vermagic.o */
-extern char vermagic[];
 
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
