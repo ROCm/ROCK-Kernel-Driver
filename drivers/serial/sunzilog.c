@@ -1586,8 +1586,9 @@ static void __init sunzilog_init_hw(void)
 		} else {
 			/* Normal serial TTY. */
 			up->parity_mask = 0xff;
-			up->curregs[R3] = RxENAB;
-			up->curregs[R5] = TxENAB;
+			up->curregs[R4] = PAR_EVEN | X16CLK | SB1;
+			up->curregs[R3] = RxENAB | Rx8;
+			up->curregs[R5] = TxENAB | Tx8;
 			up->curregs[R9] = NV | MIE;
 			up->curregs[R10] = NRZ;
 			up->curregs[R11] = TCBR | RCBR;
