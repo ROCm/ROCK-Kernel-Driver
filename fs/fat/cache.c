@@ -12,12 +12,6 @@
 #include <linux/msdos_fs.h>
 #include <linux/buffer_head.h>
 
-#if 0
-#define debug_pr(fmt, args...)	printk(fmt, ##args)
-#else
-#define debug_pr(fmt, args...)
-#endif
-
 /* this must be > 0. */
 #define FAT_MAX_CACHE	8
 
@@ -96,18 +90,14 @@ static int fat_cache_lookup(struct inode *inode, int fclus,
 	int offset = -1;
 
 	spin_lock(&MSDOS_I(inode)->cache_lru_lock);
-	debug_pr("FAT: %s, fclus %d", __FUNCTION__, fclus);
 	list_for_each_entry(p, &MSDOS_I(inode)->cache_lru, cache_list) {
+		/* Find the cache of "fclus" or nearest cache. */
 		if (p->fcluster <= fclus && hit->fcluster < p->fcluster) {
 			hit = p;
-			debug_pr(", fclus %d, dclus %d, cont %d",
-				 p->fcluster, p->dcluster, p->nr_contig);
 			if ((hit->fcluster + hit->nr_contig) < fclus) {
 				offset = hit->nr_contig;
-				debug_pr(" (off %d, hit)", offset);
 			} else {
 				offset = fclus - hit->fcluster;
-				debug_pr(" (off %d, full hit)", offset);
 				break;
 			}
 		}
@@ -122,7 +112,6 @@ static int fat_cache_lookup(struct inode *inode, int fclus,
 		*cached_fclus = cid->fcluster + offset;
 		*cached_dclus = cid->dcluster + offset;
 	}
-	debug_pr("\n");
 	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 
 	return offset;
@@ -131,30 +120,23 @@ static int fat_cache_lookup(struct inode *inode, int fclus,
 static struct fat_cache *fat_cache_merge(struct inode *inode,
 					 struct fat_cache_id *new)
 {
-	struct fat_cache *p, *hit = NULL;
+	struct fat_cache *p;
 
 	list_for_each_entry(p, &MSDOS_I(inode)->cache_lru, cache_list) {
+		/* Find the same part as "new" in cluster-chain. */
 		if (p->fcluster == new->fcluster) {
 			BUG_ON(p->dcluster != new->dcluster);
-			debug_pr("FAT: %s: merged fclus %d, dclus %d, "
-				 "cur cont %d => new cont %d\n", __FUNCTION__,
-				 p->fcluster, p->dcluster, p->nr_contig,
-				 new->nr_contig);
 			if (new->nr_contig > p->nr_contig)
 				p->nr_contig = new->nr_contig;
-			hit = p;
-			break;
+			return p;
 		}
 	}
-	return hit;
+	return NULL;
 }
 
 static void fat_cache_add(struct inode *inode, struct fat_cache_id *new)
 {
 	struct fat_cache *cache, *tmp;
-
-	debug_pr("FAT: %s: fclus %d, dclus %d, cont %d\n", __FUNCTION__,
-		 new->fcluster, new->dcluster, new->nr_contig);
 
 	if (new->fcluster == -1) /* dummy cache */
 		return;
@@ -191,12 +173,6 @@ static void fat_cache_add(struct inode *inode, struct fat_cache_id *new)
 out_update_lru:
 	fat_cache_update_lru(inode, cache);
 out:
-	debug_pr("FAT: ");
-	list_for_each_entry(cache, &MSDOS_I(inode)->cache_lru, cache_list) {
-		debug_pr("(fclus %d, dclus %d, cont %d), ",
-		       cache->fcluster, cache->dcluster, cache->nr_contig);
-	}
-	debug_pr("\n");
 	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 }
 
@@ -219,7 +195,6 @@ static void __fat_cache_inval_inode(struct inode *inode)
 	i->cache_valid_id++;
 	if (i->cache_valid_id == FAT_CACHE_VALID)
 		i->cache_valid_id++;
-	debug_pr("FAT: %s\n", __FUNCTION__);
 }
 
 void fat_cache_inval_inode(struct inode *inode)
