@@ -31,7 +31,10 @@ struct list_head inactive_list;
 struct list_head active_list;
 pg_data_t *pgdat_list;
 
-/* Used to look up the address of the struct zone encoded in page->zone */
+/*
+ * Used by page_zone() to look up the address of the struct zone whose
+ * id is encoded in the upper bits of page->flags
+ */
 zone_t *zone_table[MAX_NR_ZONES*MAX_NR_NODES];
 EXPORT_SYMBOL(zone_table);
 
