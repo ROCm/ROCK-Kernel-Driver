@@ -19,8 +19,13 @@ config MMU
 	default y
 
 config SWAP
-	bool
+	bool "Support for paging of anonymous memory"
 	default y
+	help
+	  This option allows you to choose whether you want to have support
+	  for socalled swap devices or swap files in your kernel that are
+	  used to provide more virtual memory than the actual RAM present
+	  in your computer.  If unusre say Y.
 
 config SBUS
 	bool

@@ -33,19 +33,20 @@ static struct backing_dev_info swap_backing_dev_info = {
 extern struct address_space_operations swap_aops;
 
 struct address_space swapper_space = {
-	.page_tree		= RADIX_TREE_INIT(GFP_ATOMIC),
-	.page_lock		= RW_LOCK_UNLOCKED,
-	.clean_pages		= LIST_HEAD_INIT(swapper_space.clean_pages),
-	.dirty_pages		= LIST_HEAD_INIT(swapper_space.dirty_pages),
-	.io_pages		= LIST_HEAD_INIT(swapper_space.io_pages),
-	.locked_pages		= LIST_HEAD_INIT(swapper_space.locked_pages),
-	.host			= &swapper_inode,
-	.a_ops			= &swap_aops,
-	.backing_dev_info	= &swap_backing_dev_info,
-	.i_mmap			= LIST_HEAD_INIT(swapper_space.i_mmap),
-	.i_mmap_shared		= LIST_HEAD_INIT(swapper_space.i_mmap_shared),
-	.private_lock		= SPIN_LOCK_UNLOCKED,
-	.private_list		= LIST_HEAD_INIT(swapper_space.private_list),
+	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
+	.page_lock	= RW_LOCK_UNLOCKED,
+	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
+	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
+	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
+	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
+	.host		= &swapper_inode,
+	.a_ops		= &swap_aops,
+	.backing_dev_info = &swap_backing_dev_info,
+	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),
+	.i_mmap_shared	= LIST_HEAD_INIT(swapper_space.i_mmap_shared),
+	.i_shared_sem	= __MUTEX_INITIALIZER(swapper_space.i_shared_sem),
+	.private_lock	= SPIN_LOCK_UNLOCKED,
+	.private_list	= LIST_HEAD_INIT(swapper_space.private_list),
 };
 
 #define INC_CACHE_INFO(x)	do { swap_cache_info.x++; } while (0)
