@@ -90,7 +90,7 @@ if( !( cond ) ) 								\
 #define RFALSE( cond, format, args... ) do {;} while( 0 )
 #endif
 
-#define CONSTF __attribute__( ( const ) )
+#define CONSTF __attribute_const__
 /*
  * Disk Data Structures
  */
