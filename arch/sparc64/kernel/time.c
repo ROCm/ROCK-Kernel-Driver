@@ -68,6 +68,19 @@ struct sparc64_tick_ops *tick_ops;
 
 #define TICK_PRIV_BIT	(1UL << 63)
 
+#ifdef CONFIG_SMP
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+
+	if (pc >= (unsigned long)&__lock_text_start &&
+	    pc <= (unsigned long)&__lock_text_end)
+		return regs->u_regs[UREG_RETPC];
+	return pc;
+}
+EXPORT_SYMBOL(profile_pc);
+#endif
+
 static void tick_disable_protection(void)
 {
 	/* Set things up so user can access tick register for profiling

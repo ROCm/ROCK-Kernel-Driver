@@ -41,8 +41,20 @@ typedef unsigned char spinlock_t;
 do {	membar("#LoadLoad");	\
 } while(*((volatile unsigned char *)lock))
 
-/* arch/sparc64/lib/spinlock.S */
-extern void _raw_spin_lock(spinlock_t *lock);
+static __inline__ void _raw_spin_lock(spinlock_t *lock)
+{
+
+	__asm__ __volatile__("1: ldstub	[%0], %%g7\n\t"
+			     "brnz,pn	%%g7, 2f\n\t"
+			     "membar	#StoreLoad | #StoreStore\n\t"
+			     "b 3f\n\t"
+			     "2: ldub	[%0], %%g7\n\t"
+			     "brnz,pt	%%g7, 2b\n\t"
+			     "membar	#LoadLoad\n\t"
+			     "ba,a,pt	%%xcc, 1b\n\t"
+			     "3:\n\t"
+			     : : "r" (lock) : "memory");
+}
 
 static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 {
@@ -64,7 +76,22 @@ static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 			     : "memory");
 }
 
-extern void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags);
+static __inline__ void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags)
+{
+	__asm__ __volatile__ ("1:ldstub	[%0], %%g7\n\t"
+			      "brnz,pn	%%g7, 2f\n\t"
+			      "membar	#StoreLoad | #StoreStore\n\t"
+			      "b 4f\n\t"
+			      "2: rdpr	%%pil, %%g2	! Save PIL\n\t"
+			      "wrpr	%1, %%pil	! Set previous PIL\n\t"
+			      "3:ldub	[%0], %%g7	! Spin on lock set\n\t"
+			      "brnz,pt	%%g7, 3b\n\t"
+			      "membar	#LoadLoad\n\t"
+			      "ba,pt	%%xcc, 1b	! Retry lock acquire\n\t"
+			      "wrpr	%%g2, %%pil	! Restore PIL\n\t"
+			      "4:\n\t"
+				: : "r"(lock), "r"(flags) : "memory");
+}
 
 #else /* !(CONFIG_DEBUG_SPINLOCK) */
 
@@ -86,9 +113,9 @@ do { \
 
 extern void _do_spin_lock (spinlock_t *lock, char *str);
 extern void _do_spin_unlock (spinlock_t *lock);
-extern int _spin_trylock (spinlock_t *lock);
+extern int _do_spin_trylock (spinlock_t *lock);
 
-#define _raw_spin_trylock(lp)	_spin_trylock(lp)
+#define _raw_spin_trylock(lp)	_do_spin_trylock(lp)
 #define _raw_spin_lock(lock)	_do_spin_lock(lock, "spin_lock")
 #define _raw_spin_unlock(lock)	_do_spin_unlock(lock)
 #define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
@@ -104,11 +131,86 @@ typedef unsigned int rwlock_t;
 #define rwlock_init(lp) do { *(lp) = RW_LOCK_UNLOCKED; } while(0)
 #define rwlock_is_locked(x) (*(x) != RW_LOCK_UNLOCKED)
 
-extern void __read_lock(rwlock_t *);
-extern void __read_unlock(rwlock_t *);
-extern void __write_lock(rwlock_t *);
-extern void __write_unlock(rwlock_t *);
-extern int __write_trylock(rwlock_t *);
+static void __inline__ __read_lock(rwlock_t *lock)
+{
+	__asm__ __volatile__ ("b 1f\n\t"
+			      "99:\n\t"
+			      "ldsw	[%0], %%g5\n\t"
+			      "brlz,pt	%%g5, 99b\n\t"
+			      "membar	#LoadLoad\n\t"
+			      "ba,a,pt	%%xcc, 4f\n\t"
+			      "1: ldsw	[%0], %%g5\n\t"
+			      "brlz,pn	%%g5, 99b\n\t"
+			      "4:add	%%g5, 1, %%g7\n\t"
+			      "cas	[%0], %%g5, %%g7\n\t"
+			      "cmp	%%g5, %%g7\n\t"
+			      "bne,pn	%%icc, 1b\n\t"
+			      "membar	#StoreLoad | #StoreStore\n\t"
+				: : "r"(lock) : "memory");
+}
+
+static void __inline__ __read_unlock(rwlock_t *lock)
+{
+	__asm__ __volatile__ ("1: lduw	[%0], %%g5\n\t"
+			      "sub	%%g5, 1, %%g7\n\t"
+			      "cas	[%0], %%g5, %%g7\n\t"
+			      "cmp	%%g5, %%g7\n\t"
+			      "be,pt	%%xcc, 2f\n\t"
+			      "membar	#StoreLoad | #StoreStore\n\t"
+			      "ba,a,pt	%%xcc, 1b\n\t"
+			      "2:\n\t"
+				: : "r" (lock) : "memory");
+}
+
+static void __inline__ __write_lock(rwlock_t *lock)
+{
+	__asm__ __volatile__ ("sethi	%%hi(0x80000000), %%g2\n\t"
+			      "b 1f\n\t"
+			      "99:\n\t"
+			      "lduw	[%0], %%g5\n\t"
+			      "brnz,pt	%%g5, 99b\n\t"
+			      "membar	#LoadLoad\n\t"
+			      "ba,a,pt	%%xcc, 4f\n\t"
+			      "1: lduw	[%0], %%g5\n\t"
+			      "brnz,pn	%%g5, 99b\n\t"
+			      "4: or	%%g5, %%g2, %%g7\n\t"
+			      "cas	[%0], %%g5, %%g7\n\t"
+			      "cmp	%%g5, %%g7\n\t"
+			      "be,pt	%%icc, 2f\n\t"
+			      "membar	#StoreLoad | #StoreStore\n\t"
+			      "ba,a,pt	%%xcc, 1b\n\t"
+			      "2:\n\t"
+				: : "r"(lock) : "memory");
+}
+
+static void __inline__ __write_unlock(rwlock_t *lock)
+{
+	__asm__ __volatile__ ("membar	#LoadStore | #StoreStore\n\t"
+			      "retl\n\t"
+			      "stw	%%g0, [%0]\n\t"
+				: : "r"(lock) : "memory");
+}
+
+static int __inline__ __write_trylock(rwlock_t *lock)
+{
+	__asm__ __volatile__ ("sethi	%%hi(0x80000000), %%g2\n\t"
+			      "1: lduw	[%0], %%g5\n\t"
+			      "brnz,pn	%%g5, 100f\n\t"
+			      "4: or	%%g5, %%g2, %%g7\n\t"
+			      "cas	[%0], %%g5, %%g7\n\t"
+			      "cmp	%%g5, %%g7\n\t"
+			      "be,pt	%%icc, 99f\n\t"
+			      "membar	#StoreLoad | #StoreStore\n\t"
+			      "ba,pt	%%xcc, 1b\n\t"
+			      "99:\n\t"
+			      "retl\n\t"
+			      "mov	1, %0\n\t"
+			      "100:\n\t"
+			      "retl\n\t"
+			      "mov	0, %0\n\t"
+				: : "r"(lock) : "memory");
+	return rwlock_is_locked(lock);
+}
 
 #define _raw_read_lock(p)	__read_lock(p)
 #define _raw_read_unlock(p)	__read_unlock(p)

@@ -84,7 +84,7 @@ again:
 	put_cpu();
 }
 
-int _spin_trylock(spinlock_t *lock)
+int _do_spin_trylock(spinlock_t *lock)
 {
 	unsigned long val, caller;
 	int cpu = get_cpu();
