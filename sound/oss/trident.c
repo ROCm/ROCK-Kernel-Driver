@@ -3930,9 +3930,11 @@ static int ali_reset_5451(struct trident_card *card)
 		wReg = ali_ac97_get(card, 0, AC97_POWER_CONTROL);
 		if((wReg & 0x000f) == 0x000f)
 			return 0;
-		udelay(500);
+		udelay(5000);
 	}
-	return 0;
+
+	printk(KERN_ERR "ALi 5451 did not come out of reset.\n");
+	return 1;
 }
 
 /* AC97 codec initialisation. */
