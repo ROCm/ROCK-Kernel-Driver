@@ -364,6 +364,11 @@ static void __init ps2esdi_geninit(void)
 	else
 		io_base = PRIMARY_IO_BASE;
 
+	if (!request_region(io_base, 4, "ed")) {
+		printk(KERN_WARNING"Unable to request region 0x%x\n", io_base);
+		free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
+		return;
+	}
 	/* get the dma arbitration level */
 	dma_arb_level = (status >> 2) & 0xf;
 
@@ -413,7 +418,7 @@ static void __init ps2esdi_geninit(void)
 	ps2esdi_gendisk.nr_real = ps2esdi_drives;
 
 	request_dma(dma_arb_level, "ed");
-	request_region(io_base, 4, "ed");
+
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
 	for (i = 0; i < ps2esdi_drives; i++) {
