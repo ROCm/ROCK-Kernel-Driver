@@ -960,10 +960,9 @@ running once the system is up.
 			(param: profile step/bucket size as a power of 2 for
 				statistical time based profiling)
 
-	processor.c2=	[HW, ACPI]
-	processor.c3=	[HW, ACPI]
-			0 - disable C2 or C3 idle power saving state.
-			1 - enable C2 or C3 (default unless DMI blacklist entry)
+	processor.max_cstate=   [HW, ACPI]
+			Limit processor to maximum C-state
+			max_cstate=9 overrides any DMI blacklist limit.
 
 	prompt_ramdisk=	[RAM] List of RAM disks to prompt for floppy disk
 			before loading.
