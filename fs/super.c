@@ -805,7 +805,7 @@ static struct super_block *__get_sb_nodev(struct file_system_type *fs_type,
 static struct super_block *__get_sb_single(struct file_system_type *fs_type,
 	int flags, char *dev_name, void * data)
 {
-	return get_sb_nodev(fs_type, flags, data, fill_super);
+	return get_sb_single(fs_type, flags, data, fill_super);
 }
 
 struct vfsmount *
