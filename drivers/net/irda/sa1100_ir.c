@@ -636,13 +636,14 @@ static void sa1100_irda_fir_irq(struct net_device *dev)
 	sa1100_irda_rx_dma_start(si);
 }
 
-static void sa1100_irda_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sa1100_irda_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	if (IS_FIR(((struct sa1100_irda *)dev->priv)))
 		sa1100_irda_fir_irq(dev);
 	else
 		sa1100_irda_hpsir_irq(dev);
+	return IRQ_HANDLED;
 }
 
 /*
