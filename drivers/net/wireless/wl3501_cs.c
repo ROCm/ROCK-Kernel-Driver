@@ -1828,7 +1828,7 @@ static int wl3501_get_retry(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
 {
-	u16 retry; /* size checked: it is u16 */
+	u8 retry; /* size checked: it is u8 */
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int rc = wl3501_get_mib_value(this,
 				      WL3501_MIB_ATTR_LONG_RETRY_LIMIT,
