@@ -1264,6 +1264,8 @@ endmenu
 
 source "drivers/char/Kconfig"
 
+source "drivers/i2c/Kconfig"
+
 source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
