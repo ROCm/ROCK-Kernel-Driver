@@ -13,12 +13,18 @@
 #ifndef _SERIAL_SUN_H
 #define _SERIAL_SUN_H
 
-#include <linux/config.h>
+/* Serial keyboard defines for L1-A processing... */
+#define SUNKBD_RESET		0xff
+#define SUNKBD_L1		0x01
+#define SUNKBD_UP		0x80
+#define SUNKBD_A		0x4d
 
 extern void sun_do_break(void);
 
 extern unsigned int suncore_mouse_baud_cflag_next(unsigned int, int *);
 extern int suncore_mouse_baud_detection(unsigned char, int);
+
+extern struct pt_regs *kbd_pt_regs;
 
 extern int serial_console;
 extern int stop_a_enabled;

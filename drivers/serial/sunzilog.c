@@ -286,7 +286,8 @@ static void sunzilog_change_mouse_baud(struct uart_sunzilog_port *up)
 }
 
 static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
-					 unsigned char ch, int is_break)
+					 unsigned char ch, int is_break,
+					 struct pt_regs *regs)
 {
 	if (ZS_IS_KEYB(up)) {
 		if (ch == SUNKBD_RESET) {
@@ -304,6 +305,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 			up->kbd_id = 0;
 			return;
 		}
+		kbd_pt_regs = regs;
 #ifdef CONFIG_SERIO
 		serio_interrupt(&up->serio, ch, 0);
 #endif
@@ -363,7 +365,7 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 		ch &= up->parity_mask;
 
 		if (unlikely(ZS_IS_KEYB(up)) || unlikely(ZS_IS_MOUSE(up))) {
-			sunzilog_kbdms_receive_chars(up, ch, 0);
+			sunzilog_kbdms_receive_chars(up, ch, 0, regs);
 			goto next_char;
 		}
 
@@ -440,7 +442,8 @@ static void sunzilog_receive_chars(struct uart_sunzilog_port *up,
 }
 
 static void sunzilog_status_handle(struct uart_sunzilog_port *up,
-				   struct zilog_channel *channel)
+				   struct zilog_channel *channel,
+				   struct pt_regs *regs)
 {
 	unsigned char status;
 
@@ -452,7 +455,7 @@ static void sunzilog_status_handle(struct uart_sunzilog_port *up,
 	ZS_WSYNC(channel);
 
 	if ((status & BRK_ABRT) && ZS_IS_MOUSE(up))
-		sunzilog_kbdms_receive_chars(up, 0, 1);
+		sunzilog_kbdms_receive_chars(up, 0, 1, regs);
 
 	if (ZS_WANTS_MODEM_STATUS(up)) {
 		if (status & SYNC)
@@ -558,7 +561,7 @@ static void sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			if (r3 & CHARxIP)
 				sunzilog_receive_chars(up, channel, regs);
 			if (r3 & CHAEXT)
-				sunzilog_status_handle(up, channel);
+				sunzilog_status_handle(up, channel, regs);
 			if (r3 & CHATxIP)
 				sunzilog_transmit_chars(up, channel);
 		}
@@ -577,7 +580,7 @@ static void sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			if (r3 & CHBRxIP)
 				sunzilog_receive_chars(up, channel, regs);
 			if (r3 & CHBEXT)
-				sunzilog_status_handle(up, channel);
+				sunzilog_status_handle(up, channel, regs);
 			if (r3 & CHBTxIP)
 				sunzilog_transmit_chars(up, channel);
 		}
