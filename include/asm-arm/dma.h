@@ -6,7 +6,6 @@ typedef unsigned int dmach_t;
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <asm/system.h>
-#include <asm/memory.h>
 #include <asm/scatterlist.h>
 #include <asm/arch/dma.h>
 
@@ -131,10 +130,6 @@ extern int  get_dma_residue(dmach_t channel);
 extern int isa_dma_bridge_buggy;
 #else
 #define isa_dma_bridge_buggy    (0)
-#endif
-
-#ifndef arch_adjust_zones
-#define arch_adjust_zones(node,size,holes)
 #endif
 
 #endif /* _ARM_DMA_H */

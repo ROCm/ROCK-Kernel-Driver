@@ -60,6 +60,20 @@
 #ifndef __ASSEMBLY__
 
 /*
+ * The DMA mask corresponding to the maximum bus address allocatable
+ * using GFP_DMA.  The default here places no restriction on DMA
+ * allocations.  This must be the smallest DMA mask in the system,
+ * so a successful GFP_DMA allocation will always satisfy this.
+ */
+#ifndef ISA_DMA_THRESHOLD
+#define ISA_DMA_THRESHOLD	(0xffffffffULL)
+#endif
+
+#ifndef arch_adjust_zones
+#define arch_adjust_zones(node,size,holes) do { } while (0)
+#endif
+
+/*
  * PFNs are used to describe any physical page; this means
  * PFN 0 == physical address 0.
  *

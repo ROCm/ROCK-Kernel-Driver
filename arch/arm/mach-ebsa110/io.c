@@ -139,7 +139,11 @@ EXPORT_SYMBOL(__writel);
 	 ((p) >> 3) == (0x2f8 >> 3) || \
 	 ((p) >> 3) == (0x378 >> 3))
 
-u8 __inb(int port)
+/*
+ * We're addressing an 8 or 16-bit peripheral which tranfers
+ * odd addresses on the low ISA byte lane.
+ */
+u8 __inb8(unsigned int port)
 {
 	u32 ret;
 
@@ -162,7 +166,31 @@ u8 __inb(int port)
 	return ret;
 }
 
-u16 __inw(int port)
+/*
+ * We're addressing a 16-bit peripheral which transfers odd
+ * addresses on the high ISA byte lane.
+ */
+u8 __inb16(unsigned int port)
+{
+	u32 ret;
+
+	/*
+	 * The SuperIO registers use sane addressing techniques...
+	 */
+	if (SUPERIO_PORT(port))
+		ret = __raw_readb(ISAIO_BASE + (port << 2));
+	else {
+		u32 a = ISAIO_BASE + ((port & ~1) << 1);
+
+		/*
+		 * Shame nothing else does
+		 */
+		ret = __raw_readb(a + (port & 1));
+	}
+	return ret;
+}
+
+u16 __inw(unsigned int port)
 {
 	u32 ret;
 
@@ -185,17 +213,27 @@ u16 __inw(int port)
 	return ret;
 }
 
-u32 __inl(int port)
+/*
+ * Fake a 32-bit read with two 16-bit reads.  Needed for 3c589.
+ */
+u32 __inl(unsigned int port)
 {
-	BUG();
-	return 0;
+	u32 a;
+
+	if (SUPERIO_PORT(port) || port & 3)
+		BUG();
+
+	a = ISAIO_BASE + (port << 1);
+
+	return __raw_readw(a) | __raw_readw(a + 4) << 16;
 }
 
-EXPORT_SYMBOL(__inb);
+EXPORT_SYMBOL(__inb8);
+EXPORT_SYMBOL(__inb16);
 EXPORT_SYMBOL(__inw);
 EXPORT_SYMBOL(__inl);
 
-void __outb(u8 val, int port)
+void __outb8(u8 val, unsigned int port)
 {
 	/*
 	 * The SuperIO registers use sane addressing techniques...
@@ -215,7 +253,24 @@ void __outb(u8 val, int port)
 	}
 }
 
-void __outw(u16 val, int port)
+void __outb16(u8 val, unsigned int port)
+{
+	/*
+	 * The SuperIO registers use sane addressing techniques...
+	 */
+	if (SUPERIO_PORT(port))
+		__raw_writeb(val, ISAIO_BASE + (port << 2));
+	else {
+		u32 a = ISAIO_BASE + ((port & ~1) << 1);
+
+		/*
+		 * Shame nothing else does
+		 */
+		__raw_writeb(val, a + (port & 1));
+	}
+}
+
+void __outw(u16 val, unsigned int port)
 {
 	u32 off;
 
@@ -225,7 +280,7 @@ void __outw(u16 val, int port)
 	if (SUPERIO_PORT(port))
 		off = port << 2;
 	else {
-		off = (port & ~1) << 1;
+		off = port << 1;
 		if (port & 1)
 			BUG();
 
@@ -233,12 +288,13 @@ void __outw(u16 val, int port)
 	__raw_writew(val, ISAIO_BASE + off);
 }
 
-void __outl(u32 val, int port)
+void __outl(u32 val, unsigned int port)
 {
 	BUG();
 }
 
-EXPORT_SYMBOL(__outb);
+EXPORT_SYMBOL(__outb8);
+EXPORT_SYMBOL(__outb16);
 EXPORT_SYMBOL(__outw);
 EXPORT_SYMBOL(__outl);
 
@@ -315,12 +371,29 @@ void insw(unsigned int port, void *from, int len)
 EXPORT_SYMBOL(outsw);
 EXPORT_SYMBOL(insw);
 
+/*
+ * We implement these as 16-bit insw/outsw, mainly for
+ * 3c589 cards.
+ */
 void outsl(unsigned int port, const void *from, int len)
 {
-	panic("outsl not supported on this architecture");
+	u32 off = port << 1;
+
+	if (SUPERIO_PORT(port) || port & 3)
+		BUG();
+
+	__raw_writesw(ISAIO_BASE + off, from, len << 1);
 }
 
 void insl(unsigned int port, void *from, int len)
 {
-	panic("insl not supported on this architecture");
+	u32 off = port << 1;
+
+	if (SUPERIO_PORT(port) || port & 3)
+		BUG();
+
+	__raw_readsw(ISAIO_BASE + off, from, len << 1);
 }
+
+EXPORT_SYMBOL(outsl);
+EXPORT_SYMBOL(insl);

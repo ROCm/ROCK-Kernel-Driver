@@ -11,9 +11,6 @@ OUTPUT_ARCH(arm)
 ENTRY(_start)
 SECTIONS
 {
-  . = LOAD_ADDR;
-  _load_addr = .;
-
   . = TEXT_START;
   _text = .;
 
@@ -27,9 +24,7 @@ SECTIONS
     *(.rodata.*)
     *(.glue_7)
     *(.glue_7t)
-    input_data = .;
-    arch/arm/boot/compressed/piggy.o
-    input_data_end = .;
+    *(.piggydata)
     . = ALIGN(4);
   }
 
