@@ -377,7 +377,7 @@ static int unix_release_sock (struct sock *sk, int embrion)
 	skpair=unix_peer(sk);
 
 	if (skpair!=NULL) {
-		if (sk->sk_type == SOCK_STREAM) {
+		if (sk->sk_type == SOCK_STREAM || sk->sk_type == SOCK_SEQPACKET) {
 			unix_state_wlock(skpair);
 			/* No more writes */
 			skpair->sk_shutdown = SHUTDOWN_MASK;
@@ -435,8 +435,8 @@ static int unix_listen(struct socket *sock, int backlog)
 	struct unix_sock *u = unix_sk(sk);
 
 	err = -EOPNOTSUPP;
-	if (sock->type!=SOCK_STREAM)
-		goto out;			/* Only stream sockets accept */
+	if (sock->type!=SOCK_STREAM && sock->type!=SOCK_SEQPACKET)
+		goto out;			/* Only stream/seqpacket sockets accept */
 	err = -EINVAL;
 	if (!u->addr)
 		goto out;			/* No listens on an unbound socket */
@@ -461,6 +461,7 @@ out:
 
 extern struct proto_ops unix_stream_ops;
 extern struct proto_ops unix_dgram_ops;
+extern struct proto_ops unix_seqpacket_ops;
 
 static struct sock * unix_create1(struct socket *sock)
 {
@@ -514,6 +515,9 @@ static int unix_create(struct socket *sock, int protocol)
 		sock->type=SOCK_DGRAM;
 	case SOCK_DGRAM:
 		sock->ops = &unix_dgram_ops;
+		break;
+	case SOCK_SEQPACKET:
+		sock->ops = &unix_seqpacket_ops;
 		break;
 	default:
 		return -ESOCKTNOSUPPORT;
@@ -982,7 +986,7 @@ restart:
 	sock_hold(sk);
 	unix_peer(newsk)	= sk;
 	newsk->sk_state		= TCP_ESTABLISHED;
-	newsk->sk_type		= SOCK_STREAM;
+	newsk->sk_type		= sk->sk_type;
 	newsk->sk_peercred.pid	= current->tgid;
 	newsk->sk_peercred.uid	= current->euid;
 	newsk->sk_peercred.gid	= current->egid;
@@ -1066,7 +1070,7 @@ static int unix_accept(struct socket *sock, struct socket *newsock, int flags)
 	int err;
 
 	err = -EOPNOTSUPP;
-	if (sock->type!=SOCK_STREAM)
+	if (sock->type!=SOCK_STREAM && sock->type!=SOCK_SEQPACKET)
 		goto out;
 
 	err = -EINVAL;
@@ -1711,7 +1715,9 @@ static int unix_shutdown(struct socket *sock, int mode)
 		unix_state_wunlock(sk);
 		sk->sk_state_change(sk);
 
-		if (other && sk->sk_type == SOCK_STREAM) {
+		if (other &&
+			(sk->sk_type == SOCK_STREAM || sk->sk_type == SOCK_SEQPACKET)) {
+
 			int peer_mode = 0;
 
 			if (mode&RCV_SHUTDOWN)
@@ -1791,7 +1797,7 @@ static unsigned int unix_poll(struct file * file, struct socket *sock, poll_tabl
 		mask |= POLLIN | POLLRDNORM;
 
 	/* Connection-based need to check for termination and startup */
-	if (sk->sk_type == SOCK_STREAM && sk->sk_state == TCP_CLOSE)
+	if ((sk->sk_type == SOCK_STREAM || sk->sk_type == SOCK_SEQPACKET) && sk->sk_state == TCP_CLOSE)
 		mask |= POLLHUP;
 
 	/*
@@ -1958,6 +1964,27 @@ struct proto_ops unix_dgram_ops = {
 	.poll =		datagram_poll,
 	.ioctl =	unix_ioctl,
 	.listen =	sock_no_listen,
+	.shutdown =	unix_shutdown,
+	.setsockopt =	sock_no_setsockopt,
+	.getsockopt =	sock_no_getsockopt,
+	.sendmsg =	unix_dgram_sendmsg,
+	.recvmsg =	unix_dgram_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
+};
+
+struct proto_ops unix_seqpacket_ops = {
+	.family =	PF_UNIX,
+	.owner =	THIS_MODULE,
+	.release =	unix_release,
+	.bind =		unix_bind,
+	.connect =	unix_stream_connect,
+	.socketpair =	unix_socketpair,
+	.accept =	unix_accept,
+	.getname =	unix_getname,
+	.poll =		datagram_poll,
+	.ioctl =	unix_ioctl,
+	.listen =	unix_listen,
 	.shutdown =	unix_shutdown,
 	.setsockopt =	sock_no_setsockopt,
 	.getsockopt =	sock_no_getsockopt,
