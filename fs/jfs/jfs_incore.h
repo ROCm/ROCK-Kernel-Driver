@@ -152,8 +152,6 @@ struct jfs_sb_info {
         /* Formerly in ipbmap */
 	struct bmap	*bmap;		/* 4: incore bmap descriptor	*/
 	struct nls_table *nls_tab;	/* 4: current codepage		*/
-	struct inode	*direct_inode;	/* 4: inode for physical I/O	*/
-	struct address_space *direct_mapping; /* 4: mapping for physical I/O */
 	uint		state;		/* 4: mount/recovery state	*/
 };
 
