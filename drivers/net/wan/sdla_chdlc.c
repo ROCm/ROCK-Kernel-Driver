@@ -186,8 +186,8 @@ extern void enable_irq(unsigned int);
 
 /****** Function Prototypes *************************************************/
 /* WAN link driver entry points. These are called by the WAN router module. */
-static int update (wan_device_t* wandev);
-static int new_if (wan_device_t* wandev, netdevice_t* dev,
+static int update(struct wan_device* wandev);
+static int new_if(struct wan_device* wandev, netdevice_t* dev,
 	wanif_conf_t* conf);
 
 /* Network device interface */
@@ -598,7 +598,7 @@ int wpc_init (sdla_t* card, wandev_conf_t* conf)
  * as to minimize the time that we are inside the interrupt handler.
  *
  */
-static int update (wan_device_t* wandev)
+static int update(struct wan_device* wandev)
 {
 	sdla_t* card = wandev->private;
  	netdevice_t* dev;
@@ -666,7 +666,8 @@ static int update (wan_device_t* wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
+static int new_if(struct wan_device* wandev, netdevice_t* dev,
+		  wanif_conf_t* conf)
 {
 	sdla_t* card = wandev->private;
 	chdlc_private_area_t* chdlc_priv_area;
@@ -898,10 +899,10 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
  * registration.
  */
 static int if_init (netdevice_t* dev)
-	{
+{
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;

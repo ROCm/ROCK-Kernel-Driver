@@ -184,9 +184,9 @@ int init_module (void);
 void cleanup_module (void);
 
 /* WAN link driver entry points */
-static int setup    (wan_device_t* wandev, wandev_conf_t* conf);
-static int shutdown (wan_device_t* wandev);
-static int ioctl    (wan_device_t* wandev, unsigned cmd, unsigned long arg);
+static int setup(struct wan_device* wandev, wandev_conf_t* conf);
+static int shutdown(struct wan_device* wandev);
+static int ioctl(struct wan_device* wandev, unsigned cmd, unsigned long arg);
 
 /* IOCTL handlers */
 static int ioctl_dump	(sdla_t* card, sdla_dump_t* u_dump);
@@ -279,7 +279,7 @@ int wanpipe_init(void)
 	/* Register adapters with WAN router */
 	for (cnt = 0; cnt < ncards; ++ cnt) {
 		sdla_t* card = &card_array[cnt];
-		wan_device_t* wandev = &card->wandev;
+		struct wan_device* wandev = &card->wandev;
 
 		card->next = NULL;
 		sprintf(card->devname, "%s%d", drvname, cnt + 1);
@@ -352,7 +352,7 @@ void cleanup_module (void)
  * any).
  */
  
-static int setup (wan_device_t* wandev, wandev_conf_t* conf)
+static int setup(struct wan_device* wandev, wandev_conf_t* conf)
 {
 	sdla_t* card;
 	int err = 0;
@@ -779,7 +779,7 @@ static int check_s514_conflicts(sdla_t* card,wandev_conf_t* conf, int *irq)
  * This function is called by the router when device is being unregistered or
  * when it handles ROUTER_DOWN IOCTL.
  */
-static int shutdown (wan_device_t* wandev)
+static int shutdown(struct wan_device* wandev)
 {
 	sdla_t *card;
 	int err=0;
@@ -888,7 +888,7 @@ static void release_hw (sdla_t *card)
  * This function is called when router handles one of the reserved user
  * IOCTLs.  Note that 'arg' stil points to user address space.
  */
-static int ioctl (wan_device_t* wandev, unsigned cmd, unsigned long arg)
+static int ioctl(struct wan_device* wandev, unsigned cmd, unsigned long arg)
 {
 	sdla_t* card;
 	int err;

@@ -323,9 +323,10 @@ static int Intr_test_counter;
 /****** Function Prototypes *************************************************/
 
 /* WAN link driver entry points. These are called by the WAN router module. */
-static int update(wan_device_t *wandev);
-static int new_if(wan_device_t *wandev, netdevice_t *dev, wanif_conf_t *conf);
-static int del_if(wan_device_t *wandev, netdevice_t *dev);
+static int update(struct wan_device *wandev);
+static int new_if(struct wan_device *wandev, netdevice_t *dev,
+		  wanif_conf_t *conf);
+static int del_if(struct wan_device *wandev, netdevice_t *dev);
 static void disable_comm (sdla_t *card);
 
 /* WANPIPE-specific entry points */
@@ -746,7 +747,7 @@ int wpf_init(sdla_t *card, wandev_conf_t *conf)
 /*============================================================================
  * Update device status & statistics.
  */
-static int update (wan_device_t* wandev)
+static int update(struct wan_device* wandev)
 {
 	volatile sdla_t* card;
 	unsigned long timeout;
@@ -791,7 +792,8 @@ static int update (wan_device_t* wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
+static int new_if(struct wan_device* wandev, netdevice_t* dev,
+		  wanif_conf_t* conf)
 {
 	sdla_t* card = wandev->private;
 	fr_channel_t* chan;
@@ -1020,7 +1022,7 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 /*============================================================================
  * Delete logical channel.
  */
-static int del_if (wan_device_t* wandev, netdevice_t* dev)
+static int del_if(struct wan_device* wandev, netdevice_t* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	unsigned long smp_flags=0;
@@ -1120,7 +1122,7 @@ static int if_init (netdevice_t* dev)
 {
 	fr_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;

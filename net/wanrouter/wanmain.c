@@ -127,18 +127,18 @@ static void dbg_kfree(void * v, int line) {
  *	WAN device IOCTL handlers
  */
 
-static int device_setup(wan_device_t *wandev, wandev_conf_t *u_conf);
-static int device_stat(wan_device_t *wandev, wandev_stat_t *u_stat);
-static int device_shutdown(wan_device_t *wandev);
-static int device_new_if(wan_device_t *wandev, wanif_conf_t *u_conf);
-static int device_del_if(wan_device_t *wandev, char *u_name);
+static int device_setup(struct wan_device *wandev, wandev_conf_t *u_conf);
+static int device_stat(struct wan_device *wandev, wandev_stat_t *u_stat);
+static int device_shutdown(struct wan_device *wandev);
+static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf);
+static int device_del_if(struct wan_device *wandev, char *u_name);
 
 /*
  *	Miscellaneous
  */
 
-static wan_device_t *find_device (char *name);
-static int delete_interface (wan_device_t *wandev, char *name);
+static struct wan_device *find_device (char *name);
+static int delete_interface (struct wan_device *wandev, char *name);
 void lock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
 void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
 
@@ -148,11 +148,11 @@ void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
  *	Global Data
  */
 
-static char fullname[]		= "Sangoma WANPIPE Router";
-static char copyright[]		= "(c) 1995-2000 Sangoma Technologies Inc.";
-static char modname[]		= ROUTER_NAME;	/* short module name */
-wan_device_t* router_devlist 	= NULL;	/* list of registered devices */
-static int devcnt 		= 0;
+static char fullname[]	= "Sangoma WANPIPE Router";
+static char copyright[]	= "(c) 1995-2000 Sangoma Technologies Inc.";
+static char modname[]   = ROUTER_NAME;	/* short module name */
+struct wan_device* router_devlist;	/* list of registered devices */
+static int devcnt;
 
 /*
  *	Organize Unique Identifiers for encapsulation/decapsulation
@@ -262,7 +262,7 @@ void cleanup_module (void)
  */
 
 
-int register_wan_device(wan_device_t *wandev)
+int register_wan_device(struct wan_device *wandev)
 {
 	int err, namelen;
 
@@ -322,7 +322,7 @@ int register_wan_device(wan_device_t *wandev)
 
 int unregister_wan_device(char *name)
 {
-	wan_device_t *wandev, *prev;
+	struct wan_device *wandev, *prev;
 
 	if (name == NULL)
 		return -EINVAL;
@@ -457,7 +457,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 {
 	int err = 0;
 	struct proc_dir_entry *dent;
-	wan_device_t *wandev;
+	struct wan_device *wandev;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -519,7 +519,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
  *	o call driver's setup() entry point
  */
 
-static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
+static int device_setup(struct wan_device *wandev, wandev_conf_t *u_conf)
 {
 	void *data = NULL;
 	wandev_conf_t *conf;
@@ -595,7 +595,7 @@ static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
  *	o call driver's shutdown() entry point
  */
 
-static int device_shutdown (wan_device_t *wandev)
+static int device_shutdown(struct wan_device *wandev)
 {
 	netdevice_t *dev;
 	int err=0;
@@ -628,7 +628,7 @@ static int device_shutdown (wan_device_t *wandev)
  *	Get WAN device status & statistics.
  */
 
-static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
+static int device_stat(struct wan_device *wandev, wandev_stat_t *u_stat)
 {
 	wandev_stat_t stat;
 
@@ -658,7 +658,7 @@ static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
  *	o register network interface
  */
 
-static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
+static int device_new_if(struct wan_device *wandev, wanif_conf_t *u_conf)
 {
 	wanif_conf_t conf;
 	netdevice_t *dev=NULL;
@@ -774,7 +774,7 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
  *	 o copy configuration data to kernel address space
  */
 
-static int device_del_if (wan_device_t *wandev, char *u_name)
+static int device_del_if(struct wan_device *wandev, char *u_name)
 {
 	char name[WAN_IFNAME_SZ + 1];
         int err = 0;
@@ -815,9 +815,9 @@ static int device_del_if (wan_device_t *wandev, char *u_name)
  *	Return pointer to the WAN device data space or NULL if device not found.
  */
 
-static wan_device_t *find_device(char *name)
+static struct wan_device *find_device(char *name)
 {
-	wan_device_t *wandev;
+	struct wan_device *wandev;
 
 	for (wandev = router_devlist;wandev && strcmp(wandev->name, name);
 		wandev = wandev->next);
@@ -841,7 +841,7 @@ static wan_device_t *find_device(char *name)
  *	sure that opened interfaces are not removed!
  */
 
-static int delete_interface (wan_device_t *wandev, char *name)
+static int delete_interface(struct wan_device *wandev, char *name)
 {
 	netdevice_t *dev=NULL, *prev=NULL;
 	unsigned long smp_flags=0;

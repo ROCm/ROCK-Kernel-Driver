@@ -330,10 +330,10 @@ typedef struct x25_call_info
  * WAN link driver entry points. These are 
  * called by the WAN router module.
  */
-static int update (wan_device_t* wandev);
-static int new_if (wan_device_t* wandev, netdevice_t* dev,
-	wanif_conf_t* conf);
-static int del_if (wan_device_t* wandev, netdevice_t* dev);
+static int update(struct wan_device* wandev);
+static int new_if(struct wan_device* wandev, netdevice_t* dev,
+		  wanif_conf_t* conf);
+static int del_if(struct wan_device* wandev, netdevice_t* dev);
 static void disable_comm (sdla_t* card);
 static void disable_comm_shutdown(sdla_t *card);
 
@@ -425,7 +425,7 @@ static int restart_event (sdla_t* card, int cmd, int lcn, TX25Mbox* mb);
  */
 static int connect (sdla_t* card);
 static int disconnect (sdla_t* card);
-static netdevice_t* get_dev_by_lcn(wan_device_t* wandev, unsigned lcn);
+static netdevice_t* get_dev_by_lcn(struct wan_device* wandev, unsigned lcn);
 static int chan_connect (netdevice_t* dev);
 static int chan_disc (netdevice_t* dev);
 static void set_chan_state (netdevice_t* dev, int state);
@@ -830,7 +830,7 @@ int wpx_init (sdla_t* card, wandev_conf_t* conf)
  * 		<0	Failed (or busy).
  */
 
-static int update (wan_device_t* wandev)
+static int update(struct wan_device* wandev)
 {
 	volatile sdla_t* card;
 	TX25Status* status;
@@ -895,7 +895,8 @@ static int update (wan_device_t* wandev)
  * Return: 	0 	Ok
  *		<0 	Failed (channel will not be created)
  */
-static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
+static int new_if(struct wan_device* wandev, netdevice_t* dev,
+		  wanif_conf_t* conf)
 {
 	sdla_t* card = wandev->private;
 	x25_channel_t* chan;
@@ -1029,7 +1030,7 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 
 //FIXME Del IF Should be taken out now.
 
-static int del_if (wan_device_t* wandev, netdevice_t* dev)
+static int del_if(struct wan_device* wandev, netdevice_t* dev)
 {
 	return 0;
 }
@@ -1099,7 +1100,7 @@ static int if_init (netdevice_t* dev)
 {
 	x25_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;
@@ -3101,7 +3102,7 @@ dflt_2:
 
 static int incoming_call (sdla_t* card, int cmd, int lcn, TX25Mbox* mb)
 {
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 	int new_lcn = mb->cmd.lcn;
 	netdevice_t* dev = get_dev_by_lcn(wandev, new_lcn);
 	x25_channel_t* chan = NULL;
@@ -3336,7 +3337,7 @@ static int call_cleared (sdla_t* card, int cmd, int lcn, TX25Mbox* mb)
 
 static int restart_event (sdla_t* card, int cmd, int lcn, TX25Mbox* mb)
 {
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 	netdevice_t* dev;
 	x25_channel_t *chan;
 	unsigned char old_state;
@@ -3447,7 +3448,7 @@ static int disconnect (sdla_t* card)
  * Find network device by its channel number.
  */
 
-static netdevice_t* get_dev_by_lcn (wan_device_t* wandev, unsigned lcn)
+static netdevice_t* get_dev_by_lcn(struct wan_device* wandev, unsigned lcn)
 {
 	netdevice_t* dev;
 

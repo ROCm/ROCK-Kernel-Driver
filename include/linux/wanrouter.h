@@ -462,8 +462,7 @@ typedef struct wanif_conf
 /*----------------------------------------------------------------------------
  * WAN device data space.
  */
-typedef struct wan_device
-{
+struct wan_device {
 	unsigned magic;			/* magic number */
 	char* name;			/* -> WAN device name (ASCIIZ) */
 	void* private;			/* -> driver private data */
@@ -514,10 +513,10 @@ typedef struct wan_device
 	netdevice_t* dev;		/* list of network interfaces */
 	unsigned ndev;			/* number of interfaces */
 	struct proc_dir_entry *dent;	/* proc filesystem entry */
-} wan_device_t;
+};
 
 /* Public functions available for device drivers */
-extern int register_wan_device(wan_device_t *wandev);
+extern int register_wan_device(struct wan_device *wandev);
 extern int unregister_wan_device(char *name);
 unsigned short wanrouter_type_trans(struct sk_buff *skb, netdevice_t *dev);
 int wanrouter_encapsulate(struct sk_buff *skb, netdevice_t *dev,unsigned short type);
@@ -525,8 +524,8 @@ int wanrouter_encapsulate(struct sk_buff *skb, netdevice_t *dev,unsigned short t
 /* Proc interface functions. These must not be called by the drivers! */
 extern int wanrouter_proc_init(void);
 extern void wanrouter_proc_cleanup(void);
-extern int wanrouter_proc_add(wan_device_t *wandev);
-extern int wanrouter_proc_delete(wan_device_t *wandev);
+extern int wanrouter_proc_add(struct wan_device *wandev);
+extern int wanrouter_proc_delete(struct wan_device *wandev);
 extern int wanrouter_ioctl( struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 
 extern void lock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
@@ -535,7 +534,7 @@ extern void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
 
 
 /* Public Data */
-extern wan_device_t *router_devlist;	/* list of registered devices */
+extern struct wan_device *router_devlist;	/* list of registered devices */
 
 #endif	/* __KERNEL__ */
 #endif	/* _ROUTER_H */

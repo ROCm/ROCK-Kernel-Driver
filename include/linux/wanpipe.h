@@ -286,7 +286,7 @@ typedef struct sdla
 {
 	char devname[WAN_DRVNAME_SZ+1];	/* card name */
 	sdlahw_t hw;			/* hardware configuration */
-	wan_device_t wandev;		/* WAN device data space */
+	struct wan_device wandev;	/* WAN device data space */
 	
 	unsigned open_cnt;		/* number of open interfaces */
 	unsigned long state_tick;	/* link state timestamp */

@@ -130,10 +130,10 @@ extern void enable_irq(unsigned int);
 
 /****** Function Prototypes *************************************************/
 /* WAN link driver entry points. These are called by the WAN router module. */
-static int update (wan_device_t* wandev);
-static int new_if (wan_device_t* wandev, netdevice_t* dev,
+static int update(struct wan_device* wandev);
+static int new_if(struct wan_device* wandev, netdevice_t* dev,
 	wanif_conf_t* conf);
-static int del_if (wan_device_t* wandev, netdevice_t* dev);
+static int del_if(struct wan_device* wandev, netdevice_t* dev);
 
 /* Network device interface */
 static int if_init   (netdevice_t* dev);
@@ -456,7 +456,7 @@ int wsppp_init (sdla_t* card, wandev_conf_t* conf)
  * as to minimize the time that we are inside the interrupt handler.
  *
  */
-static int update (wan_device_t* wandev)
+static int update(struct wan_device* wandev)
 {
 	sdla_t* card = wandev->private;
  	netdevice_t* dev;
@@ -522,7 +522,8 @@ static int update (wan_device_t* wandev)
  * Return:	0	o.k.
  *		< 0	failure (channel will not be created)
  */
-static int new_if (wan_device_t* wandev, netdevice_t* pdev, wanif_conf_t* conf)
+static int new_if(struct wan_device* wandev, netdevice_t* pdev,
+		  wanif_conf_t* conf)
 {
 
 	struct ppp_device *pppdev = (struct ppp_device *)pdev;
@@ -616,7 +617,7 @@ static int new_if (wan_device_t* wandev, netdevice_t* pdev, wanif_conf_t* conf)
 /*============================================================================
  * Delete logical channel.
  */
-static int del_if (wan_device_t* wandev, netdevice_t* dev)
+static int del_if(struct wan_device* wandev, netdevice_t* dev)
 {
 	chdlc_private_area_t *chdlc_priv_area = dev->priv;
 	sdla_t *card = chdlc_priv_area->card;
@@ -655,7 +656,7 @@ static int if_init (netdevice_t* dev)
 	{
 	chdlc_private_area_t* chdlc_priv_area = dev->priv;
 	sdla_t* card = chdlc_priv_area->card;
-	wan_device_t* wandev = &card->wandev;
+	struct wan_device* wandev = &card->wandev;
 	
 	/* NOTE: Most of the dev initialization was
          *       done in sppp_attach(), called by new_if() 
