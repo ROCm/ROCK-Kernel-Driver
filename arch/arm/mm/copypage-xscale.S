@@ -39,11 +39,25 @@ ENTRY(xscale_mc_copy_user_page)
 	mov	r0, r1
 	bl	map_page_minicache
 	mov	r1, r5
-	mov	lr, #PAGE_SZ/32
+	mov	lr, #PAGE_SZ/64-1
 
-1:	mov	ip, r1
-	ldrd	r2, [r0], #8
+	/*
+	 * Strangely enough, best performance is achieved
+	 * when prefetching destination as well.  (NP)
+	 */
+	pld	[r0, #0]
+	pld	[r0, #32]
+	pld	[r1, #0]
+	pld	[r1, #32]
+
+1:	pld	[r0, #64]
+	pld	[r0, #96]
+	pld	[r1, #64]
+	pld	[r1, #96]
+
+2:	ldrd	r2, [r0], #8
 	ldrd	r4, [r0], #8
+	mov	ip, r1
 	strd	r2, [r1], #8
 	ldrd	r2, [r0], #8
 	strd	r4, [r1], #8
@@ -51,9 +65,21 @@ ENTRY(xscale_mc_copy_user_page)
 	strd	r2, [r1], #8
 	strd	r4, [r1], #8
 	mcr	p15, 0, ip, c7, c10, 1		@ clean D line
+	ldrd	r2, [r0], #8
 	mcr	p15, 0, ip, c7, c6, 1		@ invalidate D line
+	ldrd	r4, [r0], #8
+	mov	ip, r1
+	strd	r2, [r1], #8
+	ldrd	r2, [r0], #8
+	strd	r4, [r1], #8
+	ldrd	r4, [r0], #8
+	strd	r2, [r1], #8
+	strd	r4, [r1], #8
+	mcr	p15, 0, ip, c7, c10, 1		@ clean D line
 	subs	lr, lr, #1
-	bne	1b
+	mcr	p15, 0, ip, c7, c6, 1		@ invalidate D line
+	bgt	1b
+	beq	2b
 
 	ldmfd	sp!, {r4, r5, pc}
 
@@ -64,7 +90,6 @@ ENTRY(xscale_mc_copy_user_page)
  *  r1 = virtual user address of ultimate destination page
  */
 ENTRY(xscale_mc_clear_user_page)
-	str	lr, [sp, #-4]!
 	mov	r1, #PAGE_SZ/32
 	mov	r2, #0
 	mov	r3, #0
@@ -74,10 +99,10 @@ ENTRY(xscale_mc_clear_user_page)
 	strd	r2, [r0], #8
 	strd	r2, [r0], #8
 	mcr	p15, 0, ip, c7, c10, 1		@ clean D line
-	mcr	p15, 0, ip, c7, c6, 1		@ invalidate D line
 	subs	r1, r1, #1
+	mcr	p15, 0, ip, c7, c6, 1		@ invalidate D line
 	bne	1b
-	ldr	pc, [sp], #4
+	mov	pc, lr
 
 	__INIT
 
