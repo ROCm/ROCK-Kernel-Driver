@@ -727,13 +727,15 @@ struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
  *
  * Arguments:   SCpnt   - Command descriptor we wish to initialize
  *
- * Returns:     1 on success.
+ * Returns:     0 on success
+ *		BLKPREP_DEFER if the failure is retryable
+ *		BLKPREP_KILL if the failure is fatal
  */
 static int scsi_init_io(Scsi_Cmnd *SCpnt)
 {
 	struct request     *req = SCpnt->request;
 	struct scatterlist *sgpnt;
-	int count, gfp_mask;
+	int count, gfp_mask, ret = 0;
 
 	/*
 	 * if this is a rq->data based REQ_BLOCK_PC, setup for a non-sg xfer
@@ -743,7 +745,7 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 		SCpnt->request_buffer = req->data;
 		req->buffer = req->data;
 		SCpnt->use_sg = 0;
-		return 1;
+		return 0;
 	}
 
 	/*
@@ -763,8 +765,11 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	 * if sg table allocation fails, requeue request later.
 	 */
 	sgpnt = scsi_alloc_sgtable(SCpnt, gfp_mask);
-	if (unlikely(!sgpnt))
+	if (unlikely(!sgpnt)) {
+		req->flags |= REQ_SPECIAL;
+		ret = BLKPREP_DEFER;
 		goto out;
+	}
 
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = req->nr_sectors << 9;
@@ -781,12 +786,11 @@ static int scsi_init_io(Scsi_Cmnd *SCpnt)
 	/*
 	 * mapped well, send it off
 	 */
-	if (unlikely(count > SCpnt->use_sg))
-		goto incorrect;
-	SCpnt->use_sg = count;
-	return 1;
+	if (count <= SCpnt->use_sg) {
+		SCpnt->use_sg = count;
+		return 0;
+	}
 
-incorrect:
 	printk(KERN_ERR "Incorrect number of segments after building list\n");
 	printk(KERN_ERR "counted %d, received %d\n", count, SCpnt->use_sg);
 	printk(KERN_ERR "req nr_sec %lu, cur_nr_sec %u\n", req->nr_sectors,
@@ -797,8 +801,9 @@ incorrect:
 	 */
 	SCpnt = scsi_end_request(SCpnt, 0, req->nr_sectors);
 	BUG_ON(SCpnt);
+	ret = BLKPREP_KILL;
 out:
-	return 0;
+	return ret;
 }
 
 int scsi_prep_fn(struct request_queue *q, struct request *req)
@@ -872,6 +877,8 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 	 */
 
 	if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+		int ret;
+
 		/*
 		 * This will do a couple of things:
 		 *  1) Fill in the actual SCSI command.
@@ -891,12 +898,8 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		 * This sets up the scatter-gather table (allocating if
 		 * required).
 		 */
-		if (!scsi_init_io(SCpnt)) {
-			/* Mark it as special --- We already have an
-			 * allocated command associated with it */
-			req->flags |= REQ_SPECIAL;
-			return BLKPREP_DEFER;
-		}
+		if ((ret = scsi_init_io(SCpnt)))
+			return ret;
 		
 		/*
 		 * Initialize the actual SCSI command for this request.
