@@ -6,7 +6,7 @@
  *
  * (C) 2000 Red Hat. GPLd.
  *
- * $Id: flashchip.h,v 1.14 2004/06/15 16:44:59 nico Exp $
+ * $Id: flashchip.h,v 1.15 2004/11/05 22:41:06 nico Exp $
  *
  */
 
@@ -37,6 +37,8 @@ typedef enum {
 	FL_LOCKING,
 	FL_UNLOCKING,
 	FL_POINT,
+	FL_XIP_WHILE_ERASING,
+	FL_XIP_WHILE_WRITING,
 	FL_UNKNOWN
 } flstate_t;
 

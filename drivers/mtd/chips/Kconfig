@@ -1,5 +1,5 @@
 # drivers/mtd/chips/Kconfig
-# $Id: Kconfig,v 1.9 2004/07/16 15:32:14 dwmw2 Exp $
+# $Id: Kconfig,v 1.10 2004/11/05 22:41:04 nico Exp $
 
 menu "RAM/ROM/Flash chip drivers"
 	depends on MTD!=n
@@ -271,6 +271,15 @@ config MTD_JEDEC
 	  only called JEDEC because the JEDEC association
 	  <http://www.jedec.org/> distributes the identification codes for the
 	  chips.
+
+config MTD_XIP
+	bool "XIP aware MTD support"
+	depends on !SMP && MTD_CFI_INTELEXT && EXPERIMENTAL
+	default y if XIP_KERNEL
+	help
+	  This allows MTD support to work with flash memory which is also
+	  used for XIP purposes.  If you're not sure what this is all about
+	  then say N.
 
 endmenu
 

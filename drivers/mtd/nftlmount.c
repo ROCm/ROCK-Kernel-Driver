@@ -4,7 +4,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: nftlmount.c,v 1.39 2004/11/05 22:51:41 kalev Exp $
+ * $Id: nftlmount.c,v 1.40 2004/11/22 14:38:29 kalev Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 
 #define SECTORSIZE 512
 
-char nftlmountrev[]="$Revision: 1.39 $";
+char nftlmountrev[]="$Revision: 1.40 $";
 
 /* find_boot_record: Find the NFTL Media Header and its Spare copy which contains the
  *	various device information of the NFTL partition and Bad Unit Table. Update
@@ -302,8 +302,6 @@ int NFTL_formatblock(struct NFTLrecord *nftl, int block)
 	struct nftl_uci1 uci;
 	struct erase_info *instr = &nftl->instr;
 
-	instr->mtd = nftl->mbd.mtd;
-
 	/* Read the Unit Control Information #1 for Wear-Leveling */
 	if (MTD_READOOB(nftl->mbd.mtd, block * nftl->EraseSize + SECTORSIZE + 8,
 			8, &retlen, (char *)&uci) < 0)
@@ -320,6 +318,7 @@ int NFTL_formatblock(struct NFTLrecord *nftl, int block)
 	memset(instr, 0, sizeof(struct erase_info));
 
 	/* XXX: use async erase interface, XXX: test return code */
+	instr->mtd = nftl->mbd.mtd;
 	instr->addr = block * nftl->EraseSize;
 	instr->len = nftl->EraseSize;
 	MTD_ERASE(nftl->mbd.mtd, instr);

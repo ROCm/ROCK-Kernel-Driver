@@ -3,12 +3,12 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in the 
  * jffs2 directory.
  *
- * $Id: jffs2.h,v 1.33 2004/05/25 11:31:55 havasi Exp $
+ * $Id: jffs2.h,v 1.34 2004/11/16 20:36:14 dwmw2 Exp $
  *
  */
 
