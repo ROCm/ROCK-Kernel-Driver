@@ -88,6 +88,8 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	for (group = 0; group < 2; group++) {
 		for (entry = 0; entry < 8; entry++, ste++) {
 			if (!(ste->dw0.dw0.v)) {
+				ste->dw0.dword0 = 0;
+				ste->dw1.dword1 = 0;
 				ste->dw1.dw1.vsid = vsid;
 				ste->dw0.dw0.esid = esid;
 				ste->dw0.dw0.kp = 1;
@@ -135,6 +137,9 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 
 	castout_ste->dw0.dw0.v = 0;
 	asm volatile("sync" : : : "memory");    /* Order update */
+
+	castout_ste->dw0.dword0 = 0;
+	castout_ste->dw1.dword1 = 0;
 	castout_ste->dw1.dw1.vsid = vsid;
 	old_esid = castout_ste->dw0.dw0.esid;
 	castout_ste->dw0.dw0.esid = esid;
