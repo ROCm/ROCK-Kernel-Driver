@@ -431,8 +431,6 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 		return(-ENODEV);
 	}
 
-	/* flag the kernel that there is somebody using this guy */
-	MOD_INC_USE_COUNT;
 	/*
 	 * If the device is in the middle of being closed, then block
 	 * until it's done, and then try again.
@@ -576,7 +574,6 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 
 		if(tty_hung_up_p(filp)) {
 			/* flag that somebody is done with this module */
-			MOD_DEC_USE_COUNT;
 			restore_flags(flags);
 			return;
 		}
@@ -594,7 +591,6 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 		}
 		if (info->count-- > 1) {
 			restore_flags(flags);
-			MOD_DEC_USE_COUNT;
 			return;
 		}
 		if (info->count < 0) {
@@ -651,7 +647,6 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 		info->asyncflags &= ~(ASYNC_NORMAL_ACTIVE|
 							  ASYNC_CALLOUT_ACTIVE|ASYNC_CLOSING);
 		wake_up_interruptible(&info->close_wait);
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 	}
 }
@@ -1228,6 +1223,7 @@ int __init pcxe_init(void)
 
 	memset(&pcxe_driver, 0, sizeof(struct tty_driver));
 	pcxe_driver.magic = TTY_DRIVER_MAGIC;
+	pcxe_driver.owner = THIS_MODULE;
 	pcxe_driver.name = "ttyD";
 	pcxe_driver.major = DIGI_MAJOR; 
 	pcxe_driver.minor_start = 0;
