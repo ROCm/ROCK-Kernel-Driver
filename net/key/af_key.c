@@ -2420,7 +2420,8 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	return pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL);
 }
 
-static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int *dir)
+static struct xfrm_policy *pfkey_compile_policy(u16 family, int opt,
+                                                u8 *data, int len, int *dir)
 {
 	struct xfrm_policy *xp;
 	struct sadb_x_policy *pol = (struct sadb_x_policy*)data;
@@ -2451,6 +2452,7 @@ static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int 
 	xp->lft.hard_byte_limit = XFRM_INF;
 	xp->lft.soft_packet_limit = XFRM_INF;
 	xp->lft.hard_packet_limit = XFRM_INF;
+	xp->family = family;
 
 	xp->xfrm_nr = 0;
 	if (pol->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&
