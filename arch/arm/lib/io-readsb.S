@@ -9,7 +9,6 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
-#include <asm/hardware.h>
 
 .insb_align:	rsb	ip, ip, #4
 		cmp	ip, r2
@@ -38,31 +37,35 @@ ENTRY(__raw_readsb)
 .insb_16_lp:	ldrb	r3, [r0]
 		ldrb	r4, [r0]
 		ldrb	r5, [r0]
+		mov	r3, r3,     lsl #byte(0)
 		ldrb	r6, [r0]
-		orr	r3, r3, r4, lsl #8
-		orr	r3, r3, r5, lsl #16
-		orr	r3, r3, r6, lsl #24
+		orr	r3, r3, r4, lsl #byte(1)
 		ldrb	r4, [r0]
+		orr	r3, r3, r5, lsl #byte(2)
 		ldrb	r5, [r0]
+		orr	r3, r3, r6, lsl #byte(3)
 		ldrb	r6, [r0]
+		mov	r4, r4,     lsl #byte(0)
 		ldrb	ip, [r0]
-		orr	r4, r4, r5, lsl #8
-		orr	r4, r4, r6, lsl #16
-		orr	r4, r4, ip, lsl #24
+		orr	r4, r4, r5, lsl #byte(1)
 		ldrb	r5, [r0]
+		orr	r4, r4, r6, lsl #byte(2)
 		ldrb	r6, [r0]
+		orr	r4, r4, ip, lsl #byte(3)
 		ldrb	ip, [r0]
+		mov	r5, r5,     lsl #byte(0)
 		ldrb	lr, [r0]
-		orr	r5, r5, r6, lsl #8
-		orr	r5, r5, ip, lsl #16
-		orr	r5, r5, lr, lsl #24
+		orr	r5, r5, r6, lsl #byte(1)
 		ldrb	r6, [r0]
+		orr	r5, r5, ip, lsl #byte(2)
 		ldrb	ip, [r0]
+		orr	r5, r5, lr, lsl #byte(3)
 		ldrb	lr, [r0]
-		orr	r6, r6, ip, lsl #8
+		mov	r6, r6,     lsl #byte(0)
+		orr	r6, r6, ip, lsl #byte(1)
 		ldrb	ip, [r0]
-		orr	r6, r6, lr, lsl #16
-		orr	r6, r6, ip, lsl #24
+		orr	r6, r6, lr, lsl #byte(2)
+		orr	r6, r6, ip, lsl #byte(3)
 		stmia	r1!, {r3 - r6}
 
 		subs	r2, r2, #16
@@ -77,17 +80,19 @@ ENTRY(__raw_readsb)
 		ldrb	r3, [r0]
 		ldrb	r4, [r0]
 		ldrb	r5, [r0]
+		mov	r3, r3,     lsl #byte(0)
 		ldrb	r6, [r0]
-		orr	r3, r3, r4, lsl #8
-		orr	r3, r3, r5, lsl #16
-		orr	r3, r3, r6, lsl #24
+		orr	r3, r3, r4, lsl #byte(1)
 		ldrb	r4, [r0]
+		orr	r3, r3, r5, lsl #byte(2)
 		ldrb	r5, [r0]
+		orr	r3, r3, r6, lsl #byte(3)
 		ldrb	r6, [r0]
+		mov	r4, r4,     lsl #byte(0)
 		ldrb	ip, [r0]
-		orr	r4, r4, r5, lsl #8
-		orr	r4, r4, r6, lsl #16
-		orr	r4, r4, ip, lsl #24
+		orr	r4, r4, r5, lsl #byte(1)
+		orr	r4, r4, r6, lsl #byte(2)
+		orr	r4, r4, ip, lsl #byte(3)
 		stmia	r1!, {r3, r4}
 
 .insb_no_8:	tst	r2, #4
@@ -97,9 +102,10 @@ ENTRY(__raw_readsb)
 		ldrb	r4, [r0]
 		ldrb	r5, [r0]
 		ldrb	r6, [r0]
-		orr	r3, r3, r4, lsl #8
-		orr	r3, r3, r5, lsl #16
-		orr	r3, r3, r6, lsl #24
+		mov	r3, r3,     lsl #byte(0)
+		orr	r3, r3, r4, lsl #byte(1)
+		orr	r3, r3, r5, lsl #byte(2)
+		orr	r3, r3, r6, lsl #byte(3)
 		str	r3, [r1], #4
 
 .insb_no_4:	ands	r2, r2, #3
