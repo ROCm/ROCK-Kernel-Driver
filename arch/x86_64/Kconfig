@@ -370,11 +370,6 @@ endmenu
 
 menu "Executable file formats / Emulations"
 
-config KCORE_ELF
-	bool
-	depends on PROC_FS
-	default y
-
 source "fs/Kconfig.binfmt"
 
 config IA32_EMULATION

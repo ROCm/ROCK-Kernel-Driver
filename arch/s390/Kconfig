@@ -217,10 +217,6 @@ config IPL_VM
 
 endchoice
 
-config KCORE_ELF
-	bool
-	default y
-
 source "fs/Kconfig.binfmt"
 
 config PROCESS_DEBUG
