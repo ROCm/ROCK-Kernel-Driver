@@ -5,6 +5,7 @@
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/svcauth.h>
 #include <linux/err.h>
+#include <linux/seq_file.h>
 
 #define RPCDBG_FACILITY	RPCDBG_AUTH
 
@@ -210,6 +211,33 @@ static int ip_map_parse(struct cache_detail *cd,
 	return 0;
 }
 
+static int ip_map_show(struct seq_file *m,
+		       struct cache_detail *cd,
+		       struct cache_head *h,
+		       char *pbuf)
+{
+	struct ip_map *im;
+	struct in_addr addr;
+
+	if (h == NULL) {
+		seq_puts(m, "#class IP domain\n");
+		return 0;
+	}
+	im = container_of(h, struct ip_map, h);
+	/* class addr domain */
+	addr = im->m_addr;
+	seq_printf(m, "%s %d.%d.%d.%d %s\n",
+		   im->m_class,
+		   htonl(addr.s_addr) >> 24 & 0xff,
+		   htonl(addr.s_addr) >> 16 & 0xff,
+		   htonl(addr.s_addr) >>  8 & 0xff,
+		   htonl(addr.s_addr) >>  0 & 0xff,
+		   im->m_client->h.name
+		   );
+	return 0;
+}
+	
+
 struct cache_detail ip_map_cache = {
 	.hash_size	= IP_HASHMAX,
 	.hash_table	= ip_table,
@@ -217,6 +245,7 @@ struct cache_detail ip_map_cache = {
 	.cache_put	= ip_map_put,
 	.cache_request	= ip_map_request,
 	.cache_parse	= ip_map_parse,
+	.cache_show	= ip_map_show,
 };
 
 static DefineSimpleCacheLookup(ip_map)
