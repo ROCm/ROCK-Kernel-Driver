@@ -178,6 +178,20 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
+		psmouse->error++;
+		/*
+		 * this maybe come from a internal resetted mouse e.g. a IMPS2 mouse
+		 * which falled back into PS2 mode, so if resetafter parameter is set
+		 * try a reconnect
+		 */
+		if (psmouse_resetafter && (psmouse->error >= psmouse_resetafter)) {
+			psmouse->error = 0;
+			psmouse->state = PSMOUSE_IGNORE;
+			printk(KERN_NOTICE "psmouse.c: %s at %s issuing reconnect request\n",
+				psmouse->name, psmouse->phys);
+			serio_reconnect(psmouse->serio);
+			goto out;
+		}
 	}
 
 	psmouse->last = jiffies;
