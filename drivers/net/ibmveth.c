@@ -598,7 +598,7 @@ static void netdev_get_drvinfo (struct net_device *dev, struct ethtool_drvinfo *
 }
 
 static u32 netdev_get_link(struct net_device *dev) {
-	return 0;
+	return 1;
 }
 
 static struct ethtool_ops netdev_ethtool_ops = {
