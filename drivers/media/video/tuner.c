@@ -1041,6 +1041,7 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 
         i2c_attach_client(client);
 	if (type < TUNERS) {
+ 		t->type = type;
 		printk("tuner: type forced to %d (%s) [insmod]\n",
 		       t->type,tuners[t->type].name);
 		set_type(client,type);
