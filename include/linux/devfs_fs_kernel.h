@@ -77,9 +77,6 @@ extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
 extern void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
 				       unsigned int major, unsigned int minor,
 				       char type, int traverse_symlinks);
-extern devfs_handle_t devfs_find_handle (devfs_handle_t dir, const char *name,
-					 unsigned int major,unsigned int minor,
-					 char type, int traverse_symlinks);
 extern int devfs_get_flags (devfs_handle_t de, unsigned int *flags);
 extern int devfs_set_flags (devfs_handle_t de, unsigned int flags);
 extern int devfs_get_maj_min (devfs_handle_t de, 
@@ -173,15 +170,6 @@ static inline void devfs_find_and_unregister (devfs_handle_t dir,
 					      unsigned int minor,
 					      char type, int traverse_symlinks)
 {
-}
-static inline devfs_handle_t devfs_find_handle (devfs_handle_t dir,
-						const char *name,
-						unsigned int major,
-						unsigned int minor,
-						char type,
-						int traverse_symlinks)
-{
-    return NULL;
 }
 static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
 {
