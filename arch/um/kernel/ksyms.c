@@ -75,7 +75,6 @@ EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
-EXPORT_SYMBOL(smp_num_cpus);
 #endif
 
 #ifdef CONFIG_HIGHMEM

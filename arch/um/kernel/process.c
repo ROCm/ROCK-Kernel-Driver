@@ -256,27 +256,27 @@ int can_do_skas(void)
 	void *stack;
 	int pid, n, ret = 1;
 
-	printk("Checking for the skas3 patch in the host...");
+	printf("Checking for the skas3 patch in the host...");
 	pid = start_ptraced_child(&stack);
 
 	n = ptrace(PTRACE_FAULTINFO, pid, 0, &fi);
 	if(n < 0){
 		if(errno == EIO)
-			printk("not found\n");
-		else printk("No (unexpected errno - %d)\n", errno);
+			printf("not found\n");
+		else printf("No (unexpected errno - %d)\n", errno);
 		ret = 0;
 	}
-	else printk("found\n");
+	else printf("found\n");
 
 	init_registers(pid);
 	stop_ptraced_child(pid, stack, 1);
 
-	printk("Checking for /proc/mm...");
+	printf("Checking for /proc/mm...");
 	if(access("/proc/mm", W_OK)){
-		printk("not found\n");
+		printf("not found\n");
 		ret = 0;
 	}
-	else printk("found\n");
+	else printf("found\n");
 
 	return(ret);
 #else
