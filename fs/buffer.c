@@ -659,8 +659,7 @@ void buffer_insert_list(spinlock_t *lock,
 		struct buffer_head *bh, struct list_head *list)
 {
 	spin_lock(lock);
-	list_del(&bh->b_assoc_buffers);
-	list_add(&bh->b_assoc_buffers, list);
+	list_move_tail(&bh->b_assoc_buffers, list);
 	spin_unlock(lock);
 }
 

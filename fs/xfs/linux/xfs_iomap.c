@@ -120,7 +120,13 @@ xfs_iomap(
 	case PBF_FILE_ALLOCATE:
 		lockmode = XFS_ILOCK_SHARED|XFS_EXTSIZE_RD;
 		bmap_flags = XFS_BMAPI_ENTIRE;
-		XFS_ILOCK(mp, io, lockmode);
+		/* Attempt non-blocking lock */
+		if (flags & PBF_TRYLOCK) {
+			if (!XFS_ILOCK_NOWAIT(mp, io, lockmode))
+				return XFS_ERROR(EAGAIN);
+		} else {
+			XFS_ILOCK(mp, io, lockmode);
+		}
 		break;
 	case PBF_FILE_UNWRITTEN:
 		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;

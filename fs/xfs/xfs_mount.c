@@ -272,7 +272,7 @@ xfs_mount_validate_sb(
 		cmn_err(CE_WARN,
 		"XFS: Only page-sized (%d) or less blocksizes currently work.",
 			PAGE_SIZE);
-		return XFS_ERROR(EWRONGFS);
+		return XFS_ERROR(ENOSYS);
 	}
 
 	return 0;
@@ -459,10 +459,22 @@ xfs_readsb(xfs_mount_t *mp)
 	}
 
 	/*
-	 * Re-read the superblock so that our buffer is correctly sized.
-	 * We only need to do this if sector size on-disk is different.
+	 * We must be able to do sector-sized and sector-aligned IO.
 	 */
-	if (sector_size != mp->m_sb.sb_sectsize) {
+	if (sector_size > mp->m_sb.sb_sectsize) {
+		cmn_err(CE_WARN,
+			"XFS: device supports only %u byte sectors (not %u)",
+			sector_size, mp->m_sb.sb_sectsize);
+		XFS_BUF_UNMANAGE(bp);
+		xfs_buf_relse(bp);
+		return XFS_ERROR(ENOSYS);
+	}
+
+	/*
+	 * If device sector size is smaller than the superblock size,
+	 * re-read the superblock so the buffer is correctly sized.
+	 */
+	if (sector_size < mp->m_sb.sb_sectsize) {
 		XFS_BUF_UNMANAGE(bp);
 		xfs_buf_relse(bp);
 		sector_size = mp->m_sb.sb_sectsize;
