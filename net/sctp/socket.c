@@ -2878,9 +2878,18 @@ cleanup:
 unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
+	struct sctp_opt *sp = sctp_sk(sk);
 	unsigned int mask;
 
 	poll_wait(file, sk->sleep, wait);
+
+	/* A TCP-style listening socket becomes readable when the accept queue
+	 * is not empty.
+	 */
+	if ((SCTP_SOCKET_TCP == sp->type) && (SCTP_SS_LISTENING == sk->state))
+		return (!list_empty(&sp->ep->asocs)) ?
+		       	(POLLIN | POLLRDNORM) : 0;
+
 	mask = 0;
 
 	/* Is there any exceptional events?  */
@@ -2894,15 +2903,7 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	    (sk->shutdown & RCV_SHUTDOWN))
 		mask |= POLLIN | POLLRDNORM;
 
-	/*
-	 * FIXME: We need to set SCTP_SS_DISCONNECTING for TCP-style and
-	 * peeled off sockets.  Additionally, TCP-style needs to consider
-	 * other establishment conditions.
-	 */
 	if (SCTP_SOCKET_UDP != sctp_sk(sk)->type) {
-		/* The association is going away.  */
-		if (SCTP_SS_DISCONNECTING == sk->state)
-			mask |= POLLHUP;
 		/* The association is either gone or not ready.  */
 		if (SCTP_SS_CLOSED == sk->state)
 			return mask;
