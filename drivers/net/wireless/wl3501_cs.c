@@ -221,14 +221,12 @@ static int iw_default_channel(int reg_domain)
 }
 
 static void iw_set_mgmt_info_element(enum iw_mgmt_info_element_ids id,
-				     struct iw_mgmt_info_element *element,
+				     struct iw_mgmt_info_element *el,
 				     void *value, int len)
 {
-	int real_len = min_t(int, len, sizeof(element->data));
-
-	element->id  = id;
-	element->len = real_len;
-	memcpy(element->data, value, real_len);
+	el->id  = id;
+	el->len = len;
+	memcpy(el->data, value, len);
 }
 
 static void iw_copy_mgmt_info_element(struct iw_mgmt_info_element *to,
@@ -640,10 +638,12 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 	struct wl3501_join_req sig = {
 		.sig_id		  = WL3501_SIG_JOIN_REQ,
 		.timeout	  = 10,
-		.ds_parameter_set = {
-			.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-			.len = 1,
-			.data[0] = this->chan,
+		.ds_pset = {
+			.el = {
+				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+				.len = 1,
+			},
+			.chan = this->chan,
 		},
 	};
 
@@ -657,10 +657,12 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.sig_id			= WL3501_SIG_START_REQ,
 		.beacon_period		= 400,
 		.dtim_period		= 1,
-		.ds_parameter_set = {
-			.id   = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-			.len  = 1,
-			.data = { [0] = this->chan, },
+		.ds_pset = {
+			.el = {
+				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+				.len = 1,
+			},
+			.chan = this->chan,
 		},
 		.bss_basic_rate_set	= {
 			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
@@ -675,8 +677,8 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.cap_info		= wl3501_fw_cap_info(this),
 	};
 
-	iw_copy_mgmt_info_element(&sig.ssid, &this->essid);
-	iw_copy_mgmt_info_element(&this->keep_essid, &this->essid);
+	iw_copy_mgmt_info_element(&sig.ssid.el, &this->essid.el);
+	iw_copy_mgmt_info_element(&this->keep_essid.el, &this->essid.el);
 	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
@@ -695,15 +697,15 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 		    (this->net_type == IW_MODE_ADHOC &&
 		     (sig.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
 		    this->net_type == IW_MODE_AUTO) {
-			if (!this->essid.len)
+			if (!this->essid.el.len)
 				matchflag = 1;
-			else if (this->essid.len == 3 &&
-				 !memcmp(this->essid.data, "ANY", 3))
+			else if (this->essid.el.len == 3 &&
+				 !memcmp(this->essid.essid, "ANY", 3))
 				matchflag = 1;
-			else if (this->essid.len != sig.ssid.len)
+			else if (this->essid.el.len != sig.ssid.el.len)
 				matchflag = 0;
-			else if (memcmp(this->essid.data, sig.ssid.data,
-					this->essid.len))
+			else if (memcmp(this->essid.essid, sig.ssid.essid,
+					this->essid.el.len))
 				matchflag = 0;
 			else
 				matchflag = 1;
@@ -915,19 +917,18 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 				const int i = this->join_sta_bss;
 				memcpy(this->bssid,
 				       this->bss_set[i].bssid, ETH_ALEN);
-				this->chan =
-				      this->bss_set[i].ds_parameter_set.data[0];
-				iw_copy_mgmt_info_element(&this->keep_essid,
-							&this->bss_set[i].ssid);
+				this->chan = this->bss_set[i].ds_pset.chan;
+				iw_copy_mgmt_info_element(&this->keep_essid.el,
+						     &this->bss_set[i].ssid.el);
 				wl3501_mgmt_auth(this);
 			}
 		} else {
 			const int i = this->join_sta_bss;
 
 			memcpy(&this->bssid, &this->bss_set[i].bssid, ETH_ALEN);
-			this->chan = this->bss_set[i].ds_parameter_set.data[0];
-			iw_copy_mgmt_info_element(&this->keep_essid,
-						  &this->bss_set[i].ssid);
+			this->chan = this->bss_set[i].ds_pset.chan;
+			iw_copy_mgmt_info_element(&this->keep_essid.el,
+						  &this->bss_set[i].ssid.el);
 			wl3501_online(dev);
 		}
 	} else {
@@ -1719,11 +1720,11 @@ static int wl3501_set_essid(struct net_device *dev,
 
 	if (wrqu->data.flags) {
 		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
-					 &this->essid,
+					 &this->essid.el,
 					 extra, wrqu->data.length);
 	} else { /* We accept any ESSID */
 		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
-					 &this->essid, "ANY", 3);
+					 &this->essid.el, "ANY", 3);
 	}
 	return wl3501_reset(dev);
 }
@@ -1737,8 +1738,8 @@ static int wl3501_get_essid(struct net_device *dev,
 
 	spin_lock_irqsave(&this->lock, flags);
 	wrqu->essid.flags  = 1;
-	wrqu->essid.length = this->essid.len;
-	memcpy(extra, this->essid.data, this->essid.len);
+	wrqu->essid.length = this->essid.el.len;
+	memcpy(extra, this->essid.essid, this->essid.el.len);
 	spin_unlock_irqrestore(&this->lock, flags);
 	return 0;
 }
@@ -2143,7 +2144,7 @@ static void wl3501_config(dev_link_t *link)
 	this->bss_cnt		= 0;
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;
-	iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID, &this->essid,
+	iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID, &this->essid.el,
 				 "ANY", 3);
 	this->card_name[0]	= '\0';
 	this->firmware_date[0]	= '\0';

@@ -217,13 +217,21 @@ enum iw_mgmt_info_element_ids {
 	/* 32-255 Reserved, unused */
 };
 
-/* FIXME: check if it need to be bigger */
-#define IW_MGMT_INFO_ELEMENT_MAX_DATA IW_ESSID_MAX_SIZE
-
 struct iw_mgmt_info_element {
-	enum iw_mgmt_info_element_ids id;
-	u8			      len;
-	u8			      data[IW_MGMT_INFO_ELEMENT_MAX_DATA];
+	u8 id; /* one of enum iw_mgmt_info_element_ids,
+		  but sizeof(enum) > sizeof(u8) :-( */
+	u8 len;
+	u8 data[0];
+} __attribute__ ((packed));
+
+struct iw_mgmt_essid_pset {
+	struct iw_mgmt_info_element el;
+	u8 			    essid[IW_ESSID_MAX_SIZE];
+} __attribute__ ((packed));
+
+struct iw_mgmt_ds_pset {
+	struct iw_mgmt_info_element el;
+	u8 			    chan;
 } __attribute__ ((packed));
 
 struct wl3501_tx_hdr {
@@ -272,11 +280,11 @@ struct wl3501_start_req {
 	u16			    dtim_period;
 	u16			    probe_delay;
 	u16			    cap_info;
-	struct iw_mgmt_info_element ssid;
+	struct iw_mgmt_essid_pset   ssid;
 	u8			    bss_basic_rate_set[10];
 	u8			    operational_rate_set[10];
 	u8			    cf_pset[8];
-	struct iw_mgmt_info_element ds_parameter_set;
+	struct iw_mgmt_ds_pset	    ds_pset;
 	u8			    ibss_pset[4];
 };
 
@@ -352,8 +360,8 @@ struct wl3501_join_req {
 	u16			    cap_info;
 	u8			    bss_type;
 	u8			    bssid[ETH_ALEN];
-	struct iw_mgmt_info_element ssid;
-	struct iw_mgmt_info_element ds_parameter_set;
+	struct iw_mgmt_essid_pset   ssid;
+	struct iw_mgmt_ds_pset	    ds_pset;
 	u8			    cf_pset[8];
 	u8			    ibss_pset[4];
 	u8			    bss_basic_rate_set[10];
@@ -390,7 +398,7 @@ struct wl3501_scan_req {
 	u16			    max_chan_time;
 	u8			    chan_list[14];
 	u8			    bssid[ETH_ALEN];
-	struct iw_mgmt_info_element ssid;
+	struct iw_mgmt_essid_pset   ssid;
 	enum wl3501_scan_type	    scan_type;
 };
 
@@ -406,8 +414,8 @@ struct wl3501_scan_confirm {
 	u16			    cap_info;
 	u8			    bss_type;
 	u8			    bssid[ETH_ALEN];
-	struct iw_mgmt_info_element ssid;
-	struct iw_mgmt_info_element ds_parameter_set;
+	struct iw_mgmt_essid_pset   ssid;
+	struct iw_mgmt_ds_pset	    ds_pset;
 	u8			    cf_pset[8];
 	u8			    ibss_pset[4];
 	u8			    bss_basic_rate_set[10];
@@ -548,8 +556,8 @@ struct wl3501_card {
 	u16				esbq_confirm_start;
 	u16				esbq_confirm_end;
 	u16				esbq_confirm;
-	struct iw_mgmt_info_element	essid;
-	struct iw_mgmt_info_element	keep_essid;
+	struct iw_mgmt_essid_pset  	essid;
+	struct iw_mgmt_essid_pset  	keep_essid;
 	u8				bssid[ETH_ALEN];
 	int				net_type;
 	char				nick[32];
