@@ -120,6 +120,11 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 
+/* enable PIO instead of MMIO, if CONFIG_EEPRO100_PIO is selected */
+#ifdef CONFIG_EEPRO100_PIO
+#define USE_IO 1
+#endif
+
 static int debug = -1;
 #define DEBUG_DEFAULT		(NETIF_MSG_DRV		| \
 				 NETIF_MSG_HW		| \
