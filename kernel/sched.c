@@ -763,7 +763,8 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	this_load = target_load(this_cpu);
 
 	/* Don't pull the task off an idle CPU to a busy one */
-	if (load < SCHED_LOAD_SCALE/2 && this_load > SCHED_LOAD_SCALE/2)
+	if (load < SCHED_LOAD_SCALE && load + this_load > SCHED_LOAD_SCALE
+			&& this_load > load)
 		goto out_set_cpu;
 
 	new_cpu = this_cpu; /* Wake to this CPU if we can */
@@ -1625,8 +1626,7 @@ nextgroup:
 	return busiest;
 
 out_balanced:
-	if (busiest && (idle == NEWLY_IDLE ||
-			(idle == IDLE && max_load > SCHED_LOAD_SCALE)) ) {
+	if (busiest && idle != NOT_IDLE && max_load > SCHED_LOAD_SCALE) {
 		*imbalance = 1;
 		return busiest;
 	}

@@ -323,8 +323,10 @@ pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
 	struct pci_controller *controller = PCI_CONTROLLER(dev);
 	struct pci_window *window;
 	int i, j;
+	int limit = (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) ? \
+		PCI_ROM_RESOURCE : PCI_NUM_RESOURCES;
 
-	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+	for (i = 0; i < limit; i++) {
 		if (!dev->resource[i].start)
 			continue;
 

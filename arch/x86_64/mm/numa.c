@@ -124,7 +124,7 @@ void __init setup_node_zones(int nodeid)
 	start_pfn = node_start_pfn(nodeid);
 	end_pfn = node_end_pfn(nodeid);
 
-	printk(KERN_INFO "setting up node %d %lx-%lx\n", nodeid, start_pfn, end_pfn); 
+	Dprintk(KERN_INFO "setting up node %d %lx-%lx\n", nodeid, start_pfn, end_pfn);
 	
 	/* All nodes > 0 have a zero length zone DMA */ 
 	dma_end_pfn = __pa(MAX_DMA_ADDRESS) >> PAGE_SHIFT; 

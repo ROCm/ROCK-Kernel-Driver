@@ -21,7 +21,7 @@
  * Jonathan Nicklin	<nicklin@missioncriticallinux.com>
  * Patrick O'Rourke	<orourke@missioncriticallinux.com>
  * 11/07/2000
- /
+ */
 /*
  * Global (preserved) predicate usage on syscall entry/exit path:
  *

@@ -495,15 +495,13 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		gen_clid(new);
 		gen_confirm(new);
 		add_to_unconfirmed(new, strhashval);
-	} else if (!cmp_clid(&conf->cl_clientid, &unconf->cl_clientid) &&
-	      !cmp_verf(&conf->cl_confirm, &unconf->cl_confirm)) {
+	} else if (!cmp_verf(&conf->cl_confirm, &unconf->cl_confirm)) {
 		/*	
 		 * CASE3:
 		 * confirmed found (name, principal match)
 		 * confirmed verifier does not match input clverifier
 		 *
 		 * unconfirmed found (name match)
-		 * confirmed->cl_clientid != unconfirmed->cl_clientid and
 		 * confirmed->cl_confirm != unconfirmed->cl_confirm
 		 *
 		 * remove unconfirmed.
@@ -2334,28 +2332,27 @@ nfsd4_release_lockowner(struct svc_rqst *rqstp, struct nfsd4_release_lockowner *
 
 	/* find the lockowner */
         status = nfs_ok;
-	for (i=0; i < LOCK_HASH_SIZE; i++) {
-		list_for_each_entry(local, &lock_ownerstr_hashtbl[i], so_strhash) {
-			if(cmp_owner_str(local, owner, clid))
-				break;
-		}
-	}
-	if (local) {
-		struct nfs4_stateid *stp;
+	for (i=0; i < LOCK_HASH_SIZE; i++)
+		list_for_each_entry(local, &lock_ownerstr_hashtbl[i], so_strhash)
+			if(cmp_owner_str(local, owner, clid)) {
+				struct nfs4_stateid *stp;
 
-		/* check for any locks held by any stateid associated with the
-		 * (lock) stateowner */
-		status = nfserr_locks_held;
-		list_for_each_entry(stp, &local->so_perfilestate, st_perfilestate) {
-			if(stp->st_vfs_set) {
-				if (check_for_locks(&stp->st_vfs_file, local))
-					goto out;
+				/* check for any locks held by any stateid
+				 * associated with the (lock) stateowner */
+				status = nfserr_locks_held;
+				list_for_each_entry(stp, &local->so_perfilestate,
+						    st_perfilestate) {
+					if(stp->st_vfs_set) {
+						if (check_for_locks(&stp->st_vfs_file,
+								    local))
+							goto out;
+					}
+				}
+				/* no locks held by (lock) stateowner */
+				status = nfs_ok;
+				release_stateowner(local);
+				goto out;
 			}
-		}
-		/* no locks held by (lock) stateowner */
-		status = nfs_ok;
-		release_stateowner(local);
-	}
 out:
 	nfs4_unlock_state();
 	return status;
