@@ -234,6 +234,24 @@ static struct platform_device serial_device = {
 	},
 };
 
+/* MTD NOR Flash */
+
+static struct resource vr1000_nor_resource[] = {
+	[0] = {
+		.start	= S3C2410_CS1 + 0x4000000,
+		.end	= S3C2410_CS1 + 0x4000000 + SZ_16M - 1,
+		.flags	= IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device vr1000_nor = {
+	.name		= "bast-nor",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(vr1000_nor_resource),
+	.resource	= vr1000_nor_resource,
+};
+
+
 static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_usb,
 	&s3c_device_lcd,
@@ -241,6 +259,7 @@ static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_i2c,
 	&s3c_device_iis,
 	&serial_device,
+	&vr1000_nor,
 };
 
 static struct clk *vr1000_clocks[] = {
