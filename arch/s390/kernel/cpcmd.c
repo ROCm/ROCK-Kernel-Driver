@@ -13,6 +13,7 @@
 #include <linux/spinlock.h>
 #include <asm/cpcmd.h>
 #include <asm/system.h>
+#include <linux/slab.h>
 #include <asm/errno.h>
 
 static spinlock_t cpcmd_lock = SPIN_LOCK_UNLOCKED;
@@ -90,7 +91,7 @@ int cpint_cpcmd(CPCmd_Dev *devExt)
 
     while (cc != 0)
     {
-        asm volatile ("LRA   2,0(%3)\t/* Get cmd address */\n\t"
+        asm volatile("LRA   2,0(%3)\t/* Get cmd address */\n\t"
 		      "LR    4,%4\t/* Get length of command */\n\t"
 		      "O     4,%7\t/* Set flags */\n\t"
 		      "LRA   3,0(%5)\t/* Get response address */\n\t"
@@ -116,7 +117,19 @@ int cpint_cpcmd(CPCmd_Dev *devExt)
 		        "a" (devExt->data), "d" (devExt->size),
 		        "m" (mask)
 		      : "cc", "2", "3", "4", "5");
+	if (cc != 0) {
+	    if (rspSize <= 65536) {
+		devExt->size += rspSize + 1;
+		devExt->data = kmalloc(devExt->size, GFP_DMA);
+		if (devExt->data) {
+		    memset(devExt->data, 0, devExt->size);
+		    continue;
+		}
+	    }
+	    return -ENOMEM;
+	}
     }
+    devExt->size = rspSize;
 out:
     return rspSize;
 }
