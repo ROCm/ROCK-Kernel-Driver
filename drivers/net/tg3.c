@@ -493,7 +493,8 @@ static void tg3_switch_clocks(struct tg3 *tp)
 static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 {
 	u32 frame_val;
-	int loops, ret;
+	unsigned int loops;
+	int ret;
 
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
 		tw32_f(MAC_MI_MODE,
@@ -512,7 +513,7 @@ static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 	tw32_f(MAC_MI_COM, frame_val);
 
 	loops = PHY_BUSY_LOOPS;
-	while (loops-- > 0) {
+	while (loops != 0) {
 		udelay(10);
 		frame_val = tr32(MAC_MI_COM);
 
@@ -521,10 +522,11 @@ static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 			frame_val = tr32(MAC_MI_COM);
 			break;
 		}
+		loops -= 1;
 	}
 
 	ret = -EBUSY;
-	if (loops > 0) {
+	if (loops != 0) {
 		*val = frame_val & MI_COM_DATA_MASK;
 		ret = 0;
 	}
@@ -540,7 +542,8 @@ static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 {
 	u32 frame_val;
-	int loops, ret;
+	unsigned int loops;
+	int ret;
 
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
 		tw32_f(MAC_MI_MODE,
@@ -558,7 +561,7 @@ static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 	tw32_f(MAC_MI_COM, frame_val);
 
 	loops = PHY_BUSY_LOOPS;
-	while (loops-- > 0) {
+	while (loops != 0) {
 		udelay(10);
 		frame_val = tr32(MAC_MI_COM);
 		if ((frame_val & MI_COM_BUSY) == 0) {
@@ -566,10 +569,11 @@ static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 			frame_val = tr32(MAC_MI_COM);
 			break;
 		}
+		loops -= 1;
 	}
 
 	ret = -EBUSY;
-	if (loops > 0)
+	if (loops != 0)
 		ret = 0;
 
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
