@@ -373,20 +373,27 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 
 	if (next && !insert) {
 		if (end >= next->vm_end) {
+			/*
+			 * vma expands, overlapping all the next, and
+			 * perhaps the one after too (mprotect case 6).
+			 */
 again:			remove_next = 1 + (end > next->vm_end);
 			end = next->vm_end;
 			anon_vma = next->anon_vma;
-		} else if (end < vma->vm_end || end > next->vm_start) {
+		} else if (end > next->vm_start) {
+			/*
+			 * vma expands, overlapping part of the next:
+			 * mprotect case 5 shifting the boundary up.
+			 */
+			adjust_next = (end - next->vm_start) >> PAGE_SHIFT;
+			anon_vma = next->anon_vma;
+		} else if (end < vma->vm_end) {
 			/*
 			 * vma shrinks, and !insert tells it's not
-			 * split_vma inserting another: so it must
-			 * be mprotect shifting the boundary down.
-			 *   Or:
-			 * vma expands, overlapping part of the next:
-			 * must be mprotect shifting the boundary up.
+			 * split_vma inserting another: so it must be
+			 * mprotect case 4 shifting the boundary down.
 			 */
-			BUG_ON(vma->vm_end != next->vm_start);
-			adjust_next = end - next->vm_start;
+			adjust_next = - ((vma->vm_end - end) >> PAGE_SHIFT);
 			anon_vma = next->anon_vma;
 		}
 	}
@@ -418,8 +425,8 @@ again:			remove_next = 1 + (end > next->vm_end);
 	vma->vm_end = end;
 	vma->vm_pgoff = pgoff;
 	if (adjust_next) {
-		next->vm_start += adjust_next;
-		next->vm_pgoff += adjust_next >> PAGE_SHIFT;
+		next->vm_start += adjust_next << PAGE_SHIFT;
+		next->vm_pgoff += adjust_next;
 	}
 
 	if (root) {
