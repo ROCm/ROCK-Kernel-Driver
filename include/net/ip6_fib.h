@@ -70,14 +70,6 @@ struct rt6_info
 	u8				rt6i_hoplimit;
 	atomic_t			rt6i_ref;
 
-	union {
-		struct flow_rule	*rt6iu_flowr;
-		struct flow_filter	*rt6iu_filter;
-	} flow_u;
-
-#define rt6i_flowr			flow_u.rt6iu_flowr
-#define rt6i_filter			flow_u.rt6iu_filter
-
 	struct rt6key			rt6i_dst;
 	struct rt6key			rt6i_src;
 };

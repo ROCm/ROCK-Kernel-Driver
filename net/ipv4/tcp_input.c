@@ -60,6 +60,7 @@
  *		Pasi Sarolahti,
  *		Panu Kuhlberg:		Experimental audit of TCP (re)transmission
  *					engine. Lots of bugs are found.
+ *		Pasi Sarolahti:		F-RTO for dealing with spurious RTOs
  */
 
 #include <linux/config.h>
@@ -86,6 +87,7 @@ int sysctl_tcp_adv_win_scale = 2;
 int sysctl_tcp_stdurg = 0;
 int sysctl_tcp_rfc1337 = 0;
 int sysctl_tcp_max_orphans = NR_FILE;
+int sysctl_tcp_frto = 0;
 
 #define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
 #define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
@@ -968,6 +970,89 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 	return flag;
 }
 
+/* RTO occurred, but do not yet enter loss state. Instead, transmit two new
+ * segments to see from the next ACKs whether any data was really missing.
+ * If the RTO was spurious, new ACKs should arrive.
+ */
+void tcp_enter_frto(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	struct sk_buff *skb;
+
+	tp->frto_counter = 1;
+
+	if (tp->ca_state <= TCP_CA_Disorder ||
+            tp->snd_una == tp->high_seq ||
+            (tp->ca_state == TCP_CA_Loss && !tp->retransmits)) {
+		tp->prior_ssthresh = tcp_current_ssthresh(tp);
+		tp->snd_ssthresh = tcp_recalc_ssthresh(tp);
+	}
+
+	/* Have to clear retransmission markers here to keep the bookkeeping
+	 * in shape, even though we are not yet in Loss state.
+	 * If something was really lost, it is eventually caught up
+	 * in tcp_enter_frto_loss.
+	 */
+	tp->retrans_out = 0;
+	tp->undo_marker = tp->snd_una;
+	tp->undo_retrans = 0;
+
+	for_retrans_queue(skb, sk, tp) {
+		TCP_SKB_CB(skb)->sacked &= ~TCPCB_RETRANS;
+	}
+	tcp_sync_left_out(tp);
+
+	tp->ca_state = TCP_CA_Open;
+	tp->frto_highmark = tp->snd_nxt;
+}
+
+/* Enter Loss state after F-RTO was applied. Dupack arrived after RTO,
+ * which indicates that we should follow the traditional RTO recovery,
+ * i.e. mark everything lost and do go-back-N retransmission.
+ */
+void tcp_enter_frto_loss(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	struct sk_buff *skb;
+	int cnt = 0;
+
+	tp->sacked_out = 0;
+	tp->lost_out = 0;
+	tp->fackets_out = 0;
+
+	for_retrans_queue(skb, sk, tp) {
+		cnt++;
+		TCP_SKB_CB(skb)->sacked &= ~TCPCB_LOST;
+		if (!(TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_ACKED)) {
+
+			/* Do not mark those segments lost that were
+			 * forward transmitted after RTO
+			 */
+			if(!after(TCP_SKB_CB(skb)->end_seq,
+				   tp->frto_highmark)) {
+				TCP_SKB_CB(skb)->sacked |= TCPCB_LOST;
+				tp->lost_out++;
+			}
+		} else {
+			tp->sacked_out++;
+			tp->fackets_out = cnt;
+		}
+	}
+	tcp_sync_left_out(tp);
+
+	tp->snd_cwnd = tp->frto_counter + tcp_packets_in_flight(tp)+1;
+	tp->snd_cwnd_cnt = 0;
+	tp->snd_cwnd_stamp = tcp_time_stamp;
+	tp->undo_marker = 0;
+	tp->frto_counter = 0;
+
+	tp->reordering = min_t(unsigned int, tp->reordering,
+					     sysctl_tcp_reordering);
+	tp->ca_state = TCP_CA_Loss;
+	tp->high_seq = tp->frto_highmark;
+	TCP_ECN_queue_cwr(tp);
+}
+
 void tcp_clear_retrans(struct tcp_opt *tp)
 {
 	tp->left_out = 0;
@@ -1539,7 +1624,8 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 	/* E. Check state exit conditions. State can be terminated
 	 *    when high_seq is ACKed. */
 	if (tp->ca_state == TCP_CA_Open) {
-		BUG_TRAP(tp->retrans_out == 0);
+		if (!sysctl_tcp_frto)
+			BUG_TRAP(tp->retrans_out == 0);
 		tp->retrans_stamp = 0;
 	} else if (!before(tp->snd_una, tp->high_seq)) {
 		switch (tp->ca_state) {
@@ -1910,6 +1996,41 @@ static int tcp_ack_update_window(struct sock *sk, struct tcp_opt *tp,
 	return flag;
 }
 
+static void tcp_process_frto(struct sock *sk, u32 prior_snd_una)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	
+	tcp_sync_left_out(tp);
+	
+	if (tp->snd_una == prior_snd_una ||
+	    !before(tp->snd_una, tp->frto_highmark)) {
+		/* RTO was caused by loss, start retransmitting in
+		 * go-back-N slow start
+		 */
+		tcp_enter_frto_loss(sk);
+		return;
+	}
+
+	if (tp->frto_counter == 1) {
+		/* First ACK after RTO advances the window: allow two new
+		 * segments out.
+		 */
+		tp->snd_cwnd = tcp_packets_in_flight(tp) + 2;
+	} else {
+		/* Also the second ACK after RTO advances the window.
+		 * The RTO was likely spurious. Reduce cwnd and continue
+		 * in congestion avoidance
+		 */
+		tp->snd_cwnd = min(tp->snd_cwnd, tp->snd_ssthresh);
+		tcp_moderate_cwnd(tp);
+	}
+
+	/* F-RTO affects on two new ACKs following RTO.
+	 * At latest on third ACK the TCP behavor is back to normal.
+	 */
+	tp->frto_counter = (tp->frto_counter + 1) % 3;
+}
+
 /* This routine deals with incoming acks, but not outgoing ones. */
 static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 {
@@ -1967,6 +2088,9 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 
 	/* See if we can take anything off of the retransmit queue. */
 	flag |= tcp_clean_rtx_queue(sk);
+
+	if (tp->frto_counter)
+		tcp_process_frto(sk, prior_snd_una);
 
 	if (tcp_ack_is_dubious(tp, flag)) {
 		/* Advanve CWND, if state allows this. */

@@ -260,16 +260,10 @@ int sctp_v4_get_dst_mtu(const sockaddr_storage_t *address)
 {
 	int dst_mtu = SCTP_DEFAULT_MAXSEGMENT;
 	struct rtable *rt;
-	struct rt_key key = {
-		.dst   = address->v4.sin_addr.s_addr,
-		.src   = 0,
-		.iif   = 0,
-		.oif   = 0,
-		.tos   = 0,
-		.scope = 0
-	};
+	struct flowi fl = { .nl_u = { .ip4_u =
+				      { .daddr = address->v4.sin_addr.s_addr } } };
 
-	if (ip_route_output_key(&rt, &key)) {
+	if (ip_route_output_key(&rt, &fl)) {
 		SCTP_DEBUG_PRINTK("sctp_v4_get_dst_mtu:ip_route_output_key"
 				  " failed, returning %d as dst_mtu\n",
 				  dst_mtu);

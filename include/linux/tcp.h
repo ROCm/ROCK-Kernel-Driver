@@ -366,6 +366,9 @@ struct tcp_opt {
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 	int			linger2;
 
+	int                     frto_counter; /* Number of new acks after RTO */
+	__u32                   frto_highmark; /* snd_nxt when RTO occurred */
+
 	unsigned long last_synq_overflow; 
 };
 
