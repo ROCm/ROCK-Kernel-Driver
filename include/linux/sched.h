@@ -92,7 +92,6 @@ extern unsigned long nr_running(void);
 #define TASK_UNINTERRUPTIBLE	2
 #define TASK_ZOMBIE		4
 #define TASK_STOPPED		8
-#define PREEMPT_ACTIVE		0x4000000
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
