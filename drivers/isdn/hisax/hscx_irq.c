@@ -170,3 +170,56 @@ hscx_int_main(struct IsdnCardState *cs, u8 val)
 		hscx_interrupt(cs, exval, 0);
 	}
 }
+
+/* ====================================================================== */
+
+static inline u8
+isac_read(struct IsdnCardState *cs, u8 addr)
+{
+	return cs->dc_hw_ops->read_reg(cs, addr);
+}
+
+static inline void
+isac_write(struct IsdnCardState *cs, u8 addr, u8 val)
+{
+	cs->dc_hw_ops->write_reg(cs, addr, val);
+}
+
+void
+hscxisac_irq(int intno, void *dev_id, struct pt_regs *regs)
+{
+	struct IsdnCardState *cs = dev_id;
+	u8 val;
+	int count = 0;
+
+	spin_lock(&cs->lock);
+	val = hscx_read(&cs->bcs[1], HSCX_ISTA);
+      Start_HSCX:
+	if (val)
+		hscx_int_main(cs, val);
+	val = isac_read(cs, ISAC_ISTA);
+      Start_ISAC:
+	if (val)
+		isac_interrupt(cs, val);
+	count++;
+	val = hscx_read(&cs->bcs[1], HSCX_ISTA);
+	if (val && count < 5) {
+		if (cs->debug & L1_DEB_HSCX)
+			debugl1(cs, "HSCX IntStat after IntRoutine");
+		goto Start_HSCX;
+	}
+	val = isac_read(cs, ISAC_ISTA);
+	if (val && count < 5) {
+		if (cs->debug & L1_DEB_ISAC)
+			debugl1(cs, "ISAC IntStat after IntRoutine");
+		goto Start_ISAC;
+	}
+	hscx_write(&cs->bcs[0], HSCX_MASK, 0xFF);
+	hscx_write(&cs->bcs[1], HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(&cs->bcs[0], HSCX_MASK, 0x0);
+	hscx_write(&cs->bcs[1], HSCX_MASK, 0x0);
+	spin_unlock(&cs->lock);
+}
+

@@ -141,42 +141,6 @@ static struct bc_hw_ops hscx_ops = {
 };
 
 static void
-ix1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
-static void
 ix1_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.ix1.cfg_reg)
@@ -208,7 +172,7 @@ static struct card_ops ix1_ops = {
 	.init     = inithscxisac,
 	.reset    = ix1_reset,
 	.release  = ix1_release,
-	.irq_func = ix1_interrupt,
+	.irq_func = hscxisac_irq,
 };
 
 #ifdef __ISAPNP__

@@ -113,47 +113,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
-teles3_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-#define MAXCOUNT 5
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-	int count = 0;
-
-	spin_lock(&cs->lock);
-	val = readreg(cs->hw.teles3.hscx[1], HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = readreg(cs->hw.teles3.isac, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	count++;
-	val = readreg(cs->hw.teles3.hscx[1], HSCX_ISTA);
-	if (val && count < MAXCOUNT) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = readreg(cs->hw.teles3.isac, ISAC_ISTA);
-	if (val && count < MAXCOUNT) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	if (count >= MAXCOUNT)
-		printk(KERN_WARNING "Teles3: more than %d loops in teles3_interrupt\n", count);
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
 inline static void
 release_ioregs(struct IsdnCardState *cs, int mask)
 {
@@ -248,7 +207,7 @@ static struct card_ops teles3_ops = {
 	.init     = inithscxisac,
 	.reset    = teles3_reset,
 	.release  = teles3_release,
-	.irq_func = teles3_interrupt,
+	.irq_func = hscxisac_irq,
 };
 
 #ifdef __ISAPNP__

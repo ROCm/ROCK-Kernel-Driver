@@ -38,3 +38,4 @@ extern int HscxVersion(struct IsdnCardState *cs, char *s);
 extern void modehscx(struct BCState *bcs, int mode, int bc);
 extern void inithscxisac(struct IsdnCardState *cs);
 extern void hscx_int_main(struct IsdnCardState *cs, u8 val);
+extern void hscxisac_irq(int intno, void *dev_id, struct pt_regs *regs);

@@ -289,12 +289,6 @@ static void
 sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 val;
-
-	if (!cs) {
-		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
-		return;
-	}
 
 	if ((cs->hw.sedl.bus == SEDL_BUS_PCMCIA) && (*cs->busy_flag == 1)) {
 		/* The card tends to generate interrupts while being removed
@@ -302,33 +296,7 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "Sedlbauer: card not available!\n");
 		return;
 	}
-
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
+	hscxisac_irq(intno, dev_id, regs);
 }
 
 static void

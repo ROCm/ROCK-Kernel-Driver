@@ -315,53 +315,26 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
-	int icnt=5;
 
-	spin_lock(&cs->lock);
 	if ((cs->typ == ISDN_CTYPE_ELSA_PCMCIA) && (*cs->busy_flag == 1)) {
 	/* The card tends to generate interrupts while being removed
 	   causing us to just crash the kernel. bad. */
 		printk(KERN_WARNING "Elsa: card not available!\n");
-		goto unlock;
+		return;
 	}
 #if ARCOFI_USE
 	if (cs->hw.elsa.MFlag) {
 		val = serial_inp(cs, UART_IIR);
 		if (!(val & UART_IIR_NO_INT)) {
 			debugl1(cs,"IIR %02x", val);
+			spin_lock(&cs->lock);
 			rs_interrupt_elsa(intno, cs);
+			spin_unlock(&cs->lock);
 		}
 	}
 #endif
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val) {
-		hscx_int_main(cs, val);
-	}
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val) {
-		isac_interrupt(cs, val);
-	}
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val && icnt) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		icnt--;
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val && icnt) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		icnt--;
-		goto Start_ISAC;
-	}
-	if (!icnt)
-		printk(KERN_WARNING"ELSA IRQ LOOP\n");
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
+	hscxisac_irq(intno, dev_id, regs);
+
 	if (cs->hw.elsa.status & ELSA_TIMER_AKTIV) {
 		if (!TimerRun(cs)) {
 			/* Timer Restart */
@@ -381,11 +354,6 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 #endif
 	if (cs->hw.elsa.trig)
 		byteout(cs->hw.elsa.trig, 0x00);
-	hscx_write(cs, 0, HSCX_MASK, 0x00);
-	hscx_write(cs, 1, HSCX_MASK, 0x00);
-	isac_write(cs, ISAC_MASK, 0x00);
- unlock:
-	spin_unlock(&cs->lock);
 }
 
 static void

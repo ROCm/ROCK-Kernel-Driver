@@ -115,32 +115,9 @@ static void
 sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 val;
 
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	/* get a new irq impulse if there any pending */
+	hscxisac_irq(intno, dev_id, regs);
 	bytein(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ +1);
-	spin_unlock(&cs->lock);
 }
 
 static void

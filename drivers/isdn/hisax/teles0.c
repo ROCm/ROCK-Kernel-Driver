@@ -111,44 +111,6 @@ static struct bc_hw_ops hscx_ops = {
 };
 
 static void
-teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-	int count = 0;
-
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	count++;
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val && count < 5) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val && count < 5) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
-static void
 teles0_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.teles0.cfg_reg)
@@ -215,7 +177,7 @@ static struct card_ops teles0_ops = {
 	.init     = inithscxisac,
 	.reset    = teles0_reset,
 	.release  = teles0_release,
-	.irq_func = teles0_interrupt,
+	.irq_func = hscxisac_irq,
 };
 
 int __init
