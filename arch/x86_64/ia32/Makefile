@@ -13,4 +13,6 @@ $(obj)/vsyscall.so: $(src)/vsyscall.lds $(obj)/vsyscall.o
 	$(CC) -m32 -nostdlib -shared -s -Wl,-soname=linux-vsyscall.so.1 \
 		-o $@ -Wl,-T,$^
 
+clean-files += vsyscall.so
+
 AFLAGS_vsyscall.o = -m32

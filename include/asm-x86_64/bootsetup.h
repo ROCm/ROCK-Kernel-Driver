@@ -25,6 +25,7 @@ extern char x86_boot_params[2048];
 #define KERNEL_START (*(unsigned int *) (PARAM+0x214))
 #define INITRD_START (*(unsigned int *) (PARAM+0x218))
 #define INITRD_SIZE (*(unsigned int *) (PARAM+0x21c))
+#define EDID_INFO (*(struct edid_info *) (PARAM+0x440))
 #define COMMAND_LINE saved_command_line
 #define COMMAND_LINE_SIZE 256
 

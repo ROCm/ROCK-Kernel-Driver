@@ -70,7 +70,7 @@
 #define cpu_has_tsc            1
 #define cpu_has_pae            ___BUG___
 #define cpu_has_pge            1
-#define cpu_has_apic           1
+#define cpu_has_apic           boot_cpu_has(X86_FEATURE_APIC)
 #define cpu_has_mtrr           1
 #define cpu_has_mmx            1
 #define cpu_has_fxsr           1

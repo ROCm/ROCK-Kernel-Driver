@@ -51,6 +51,10 @@ extern void acpi_reserve_bootmem(void);
 
 extern void swap_low_mappings(void);
 
+extern void oops_begin(void);
+extern void die(const char *,struct pt_regs *,long);
+extern void __die(const char * str, struct pt_regs * regs, long err);
+
 extern int map_syscall32(struct mm_struct *mm, unsigned long address);
 extern char *syscall32_page;
 

@@ -41,7 +41,7 @@ extern unsigned long saved_context_eflags;
 #define loaddebug(thread,register) \
                __asm__("movq %0,%%db" #register  \
                        : /* no output */ \
-                       :"r" ((thread)->debugreg[register]))
+                       :"r" ((thread)->debugreg##register))
 
 extern void fix_processor_context(void);
 extern void do_magic(int resume);

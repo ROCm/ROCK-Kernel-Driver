@@ -425,7 +425,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	return 0;
 }
 
-static void stop_this_cpu (void * dummy)
+void smp_stop_cpu(void)
 {
 	/*
 	 * Remove this CPU:
@@ -433,21 +433,20 @@ static void stop_this_cpu (void * dummy)
 	clear_bit(smp_processor_id(), &cpu_online_map);
 	local_irq_disable();
 	disable_local_APIC();
-	for(;;) __asm__("hlt");
-	for (;;);
+	local_irq_enable(); 
 }
 
-/*
- * this function calls the 'stop' function on all other CPUs in the system.
- */
+static void smp_really_stop_cpu(void *dummy)
+{
+	smp_stop_cpu(); 
+	for (;;) 
+		asm("hlt"); 
+} 
 
 void smp_send_stop(void)
 {
-	smp_call_function(stop_this_cpu, NULL, 1, 0);
-
-	local_irq_disable();
-	disable_local_APIC();
-	local_irq_enable();
+	smp_call_function(smp_really_stop_cpu, NULL, 1, 0);
+	smp_stop_cpu();
 }
 
 /*
