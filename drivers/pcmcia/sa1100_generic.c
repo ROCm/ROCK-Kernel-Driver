@@ -1052,6 +1052,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	pcmcia_low_level = NULL;
 	return ret;
 }
+EXPORT_SYMBOL(sa1100_register_pcmcia);
 
 /* sa1100_unregister_pcmcia()
  * ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1091,6 +1092,7 @@ void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops)
 
 	pcmcia_low_level = NULL;
 }
+EXPORT_SYMBOL(sa1100_unregister_pcmcia);
 
 /* sa1100_pcmcia_init()
  * ^^^^^^^^^^^^^^^^^^^^

@@ -91,9 +91,10 @@ static struct map_desc standard_io_desc[] __initdata = {
  /* virtual     physical    length      type */
   { 0xf6000000, 0x20000000, 0x01000000, MT_DEVICE }, /* PCMCIA0 IO */
   { 0xf7000000, 0x30000000, 0x01000000, MT_DEVICE }, /* PCMCIA1 IO */
-  { 0xfc000000, 0x40000000, 0x01400000, MT_DEVICE }, /* Devs */
-  { 0xfe000000, 0x44000000, 0x00200000, MT_DEVICE }, /* LCD */
-  { 0xff000000, 0x48000000, 0x00200000, MT_DEVICE }  /* Mem Ctl */
+  { 0xf8000000, 0x40000000, 0x01400000, MT_DEVICE }, /* Devs */
+  { 0xfa000000, 0x44000000, 0x00100000, MT_DEVICE }, /* LCD */
+  { 0xfc000000, 0x48000000, 0x00100000, MT_DEVICE }, /* Mem Ctl */
+  { 0xff000000, 0x00000000, 0x00100000, MT_DEVICE }  /* UNCACHED_PHYS_0 */
 };
 
 void __init pxa_map_io(void)

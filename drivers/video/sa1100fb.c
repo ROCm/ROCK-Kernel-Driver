@@ -205,9 +205,6 @@
 extern void (*sa1100fb_backlight_power)(int on);
 extern void (*sa1100fb_lcd_power)(int on);
 
-void (*sa1100fb_blank_helper)(int blank);
-EXPORT_SYMBOL(sa1100fb_blank_helper);
-
 /*
  * IMHO this looks wrong.  In 8BPP, length should be 8.
  */
@@ -262,7 +259,7 @@ static struct sa1100fb_mach_info pal_info __initdata = {
 #endif
 #endif
 
-#ifdef CONFIG_SA1100_H3XXX
+#ifdef CONFIG_SA1100_H3800
 static struct sa1100fb_mach_info h3800_info __initdata = {
 	pixclock:	174757, 	bpp:		16,
 	xres:		320,		yres:		240,
@@ -274,9 +271,12 @@ static struct sa1100fb_mach_info h3800_info __initdata = {
 	sync:		0,		cmap_static:	1,
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_ACBsCntOff | LCCR3_PixFlEdg | LCCR3_OutEnH,
+	lccr3:		LCCR3_ACBsDiv(2) | LCCR3_PixRsEdg | LCCR3_OutEnH |
+			LCCR3_ACBsCntOff,
 };
+#endif
 
+#ifdef CONFIG_SA1100_H3600
 static struct sa1100fb_mach_info h3600_info __initdata = {
 	pixclock:	174757, 	bpp:		16,
 	xres:		320,		yres:		240,
@@ -288,7 +288,8 @@ static struct sa1100fb_mach_info h3600_info __initdata = {
 	sync:		0,		cmap_static:	1,
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_ACBsCntOff | LCCR3_OutEnH | LCCR3_PixFlEdg,
+	lccr3:		LCCR3_ACBsDiv(2) | LCCR3_PixRsEdg | LCCR3_OutEnH |
+			LCCR3_ACBsCntOff,
 };
 
 static struct sa1100fb_rgb h3600_rgb_16 = {
@@ -297,7 +298,9 @@ static struct sa1100fb_rgb h3600_rgb_16 = {
 	blue:	{ offset: 1,  length: 4, },
 	transp: { offset: 0,  length: 0, },
 };
+#endif
 
+#ifdef CONFIG_SA1100_H3100
 static struct sa1100fb_mach_info h3100_info __initdata = {
 	pixclock:	406977, 	bpp:		4,
 	xres:		320,		yres:		240,
@@ -680,14 +683,18 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #endif
 	}
 #endif
-#ifdef CONFIG_SA1100_H3XXX
+#ifdef CONFIG_SA1100_H3100
+	if (machine_is_h3100()) {
+		inf = &h3100_info;
+	}
+#endif
+#ifdef CONFIG_SA1100_H3600
 	if (machine_is_h3600()) {
 		inf = &h3600_info;
 		fbi->rgb[RGB_16] = &h3600_rgb_16;
 	}
-	if (machine_is_h3100()) {
-		inf = &h3100_info;
-	}
+#endif
+#ifdef CONFIG_SA1100_H3800
 	if (machine_is_h3800()) {
 		inf = &h3800_info;
 	}
@@ -1310,13 +1317,9 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 			for (i = 0; i < fbi->palette_size; i++)
 				sa1100fb_setpalettereg(i, 0, 0, 0, 0, info);
 		sa1100fb_schedule_task(fbi, C_DISABLE);
-		if (sa1100fb_blank_helper)
-			sa1100fb_blank_helper(blank);
 		break;
 
 	case VESA_NO_BLANKING:
-		if (sa1100fb_blank_helper)
-			sa1100fb_blank_helper(blank);
 		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			fb_set_cmap(&fbi->fb.cmap, 1, info);
