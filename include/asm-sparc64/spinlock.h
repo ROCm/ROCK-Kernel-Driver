@@ -144,6 +144,7 @@ extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
 extern void _do_write_lock(rwlock_t *rw, char *str);
 extern void _do_write_unlock(rwlock_t *rw);
+extern int _do_write_trylock(rwlock_t *rw, char *str);
 
 #define _raw_read_lock(lock) \
 do {	unsigned long flags; \
@@ -172,6 +173,15 @@ do {	unsigned long flags; \
 	_do_write_unlock(lock); \
 	local_irq_restore(flags); \
 } while(0)
+
+#define _raw_write_trylock(lock) \
+({	unsigned long flags; \
+	int val; \
+	local_irq_save(flags); \
+	val = _do_write_trylock(lock, "write_trylock"); \
+	local_irq_restore(flags); \
+	val; \
+})
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 
