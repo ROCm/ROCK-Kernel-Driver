@@ -270,7 +270,7 @@ int __init nettel_init(void)
 	maxsize = AMD_WINDOW_MAXSIZE;
 
 	*amdpar = SC520_PAR(SC520_PAR_BOOTCS, amdaddr, maxsize);
-	__asm__ ("wbinvd");
+	wbinvd();
 
 	nettel_amd_map.phys = amdaddr;
 	nettel_amd_map.virt = ioremap_nocache(amdaddr, maxsize);
@@ -380,7 +380,7 @@ int __init nettel_init(void)
 	 */
 	intel1addr = intel0addr + intel0size;
 	*intel1par = SC520_PAR(intel1cs, intel1addr, maxsize);
-	__asm__ ("wbinvd");
+	wbinvd();
 
 	maxsize += intel0size;
 
@@ -405,7 +405,7 @@ int __init nettel_init(void)
 	intel1size = intel_mtd->size - intel0size;
 	if (intel1size > 0) {
 		*intel1par = SC520_PAR(intel1cs, intel1addr, intel1size);
-		__asm__ ("wbinvd");
+		wbinvd();
 	} else {
 		*intel1par = 0;
 	}

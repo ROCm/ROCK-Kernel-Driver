@@ -642,7 +642,7 @@ static ctl_table kern_table[] = {
 		.proc_handler   = &proc_unknown_nmi_panic,
 	},
 #endif
-#if defined(CONFIG_X86)
+#if defined(CONFIG_X86) && !defined(CONFIG_XEN)
 	{
 		.ctl_name	= KERN_BOOTLOADER_TYPE,
 		.procname	= "bootloader_type",
