@@ -12,7 +12,6 @@
 #include <linux/if_ether.h>
 #include <linux/etherdevice.h>
 #include <linux/pci.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 

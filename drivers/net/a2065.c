@@ -37,29 +37,27 @@
  *	  both 10BASE-2 (thin coax) and AUI (DB-15) connectors
  */
 
+#include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
+#include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
+#include <linux/zorro.h>
 
 #include <asm/bitops.h>
 #include <asm/irq.h>
-#include <linux/errno.h>
-
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
-#include <linux/zorro.h>
 
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 #include "a2065.h"
 
 

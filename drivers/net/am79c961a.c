@@ -14,7 +14,6 @@
  * note that this can not be built as a module (it doesn't make sense).
  */
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>

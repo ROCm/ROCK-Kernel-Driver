@@ -25,7 +25,6 @@
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
@@ -38,6 +37,7 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h> 
+
 #include <asm/irq.h>
 #include <asm/m68360.h>
 /* #include <asm/8xx_immap.h> */
