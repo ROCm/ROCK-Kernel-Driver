@@ -51,13 +51,14 @@ sclp_conbuf_callback(struct sclp_buffer *buffer, int rc)
 	struct sclp_buffer *next;
 	void *page;
 
-	/* FIXME: what if rc != 0x0020 */
+	/* Ignore return code - because console-writes aren't critical,
+	   we do without a sophisticated error recovery mechanism.  */
 	page = sclp_unmake_buffer(buffer);
 	spin_lock_irqsave(&sclp_con_lock, flags);
-	list_add_tail((struct list_head *) page, &sclp_con_pages);
-	sclp_con_buffer_count--;
 	/* Remove buffer from outqueue */
 	list_del(&buffer->list);
+	sclp_con_buffer_count--;
+	list_add_tail((struct list_head *) page, &sclp_con_pages);
 	/* Check if there is a pending buffer on the out queue. */
 	next = NULL;
 	if (!list_empty(&sclp_con_outqueue))
@@ -104,7 +105,7 @@ sclp_console_write(struct console *console, const char *message,
 	void *page;
 	int written;
 
-	if (count <= 0)
+	if (count == 0)
 		return;
 	spin_lock_irqsave(&sclp_con_lock, flags);
 	/*
@@ -125,7 +126,8 @@ sclp_console_write(struct console *console, const char *message,
 						       sclp_con_width_htab);
 		}
 		/* try to write the string to the current output buffer */
-		written = sclp_write(sclp_conbuf, message, count, 0);
+		written = sclp_write(sclp_conbuf, (const unsigned char *)
+				     message, count, 0);
 		if (written == -EFAULT || written == count)
 			break;
 		/*
@@ -232,6 +234,6 @@ sclp_console_init(void)
 		sclp_con_columns = 80;
 	sclp_con_width_htab = 8;
 
-	/* enable printk´s access to this driver */
+	/* enable printk-access to this driver */
 	register_console(&sclp_console);
 }

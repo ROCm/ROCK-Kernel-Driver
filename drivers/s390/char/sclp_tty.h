@@ -18,9 +18,9 @@ struct sclp_ioctls {
 	unsigned short htab;
 	unsigned char echo;
 	unsigned short columns;
-	signed char final_nl;
+	unsigned char final_nl;
 	unsigned short max_sccb;
-	unsigned short kmem_sccb;	/* can´t be modified at run time */
+	unsigned short kmem_sccb;	/* can't be modified at run time */
 	unsigned char tolower;
 	unsigned char delim;
 };
