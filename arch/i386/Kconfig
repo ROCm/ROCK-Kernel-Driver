@@ -1336,12 +1336,6 @@ config X86_TRAMPOLINE
 	depends on X86_SMP || (X86_VOYAGER && SMP)
 	default y
 
-# std_resources is overridden for pc9800, but that's not
-# a currently selectable arch choice
-config X86_STD_RESOURCES
-	bool
-	default y
-
 config PC
 	bool
 	depends on X86 && !EMBEDDED
