@@ -1256,7 +1256,7 @@ extern int mod_unreg_security	(const char *name, struct security_operations *ops
 #define COND_SECURITY(seop, def) 	\
 	(unlikely(security_enabled))? security_ops->seop: def
 #define COND_SECURITY_NOT_PRIVATE(inode, seop, def) 	\
-	(unlikely(security_enabled) && likely (!IS_PRIVATE(inode)) )? security_ops->seop: def
+	(unlikely(security_enabled) && likely (inode) && likely (!IS_PRIVATE(inode)) )? security_ops->seop: def
 
 #else /* CONFIG_SECURITY */
 static inline int security_init(void)
