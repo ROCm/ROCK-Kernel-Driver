@@ -253,7 +253,8 @@ struct nfs_readres {
 
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
-	nfs4_stateid		stateid;
+	fl_owner_t		lockowner;
+	struct nfs4_state *	state;
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;
@@ -681,7 +682,6 @@ struct nfs_write_data {
 	struct rpc_task		task;
 	struct inode		*inode;
 	struct rpc_cred		*cred;
-	fl_owner_t		lockowner;
 	struct nfs_fattr	fattr;
 	struct nfs_writeverf	verf;
 	struct list_head	pages;		/* Coalesced requests we wish to flush */
@@ -742,8 +742,8 @@ struct nfs_rpc_ops {
 			     struct nfs_pathconf *);
 	u32 *	(*decode_dirent)(u32 *, struct nfs_entry *, int plus);
 	void	(*read_setup)   (struct nfs_read_data *);
-	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);
-	void	(*commit_setup) (struct nfs_write_data *, u64 start, u32 len, int how);
+	void	(*write_setup)  (struct nfs_write_data *, int how);
+	void	(*commit_setup) (struct nfs_write_data *, int how);
 	int	(*file_open)   (struct inode *, struct file *);
 	int	(*file_release) (struct inode *, struct file *);
 	void	(*request_init)(struct nfs_page *, struct file *);

@@ -590,11 +590,10 @@ nfs_write_done(struct rpc_task *task)
 }
 
 static void
-nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
+nfs_proc_write_setup(struct nfs_write_data *data, int how)
 {
 	struct rpc_task		*task = &data->task;
 	struct inode		*inode = data->inode;
-	struct nfs_page		*req;
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs_procedures[NFSPROC_WRITE],
@@ -604,32 +603,18 @@ nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	};
 
 	/* Note: NFSv2 ignores @stable and always uses NFS_FILE_SYNC */
-	
-	req = nfs_list_entry(data->pages.next);
-	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req);
-	data->args.pgbase = req->wb_pgbase;
-	data->args.count  = count;
 	data->args.stable = NFS_FILE_SYNC;
-	data->args.pages  = data->pagevec;
-	data->res.fattr   = &data->fattr;
-	data->res.count   = count;
-	data->res.verf    = &data->verf;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
 	rpc_init_task(task, NFS_CLIENT(inode), nfs_write_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_writedata_release;
-
-	rpc_call_setup(&data->task, &msg, 0);
+	rpc_call_setup(task, &msg, 0);
 }
 
 static void
-nfs_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
+nfs_proc_commit_setup(struct nfs_write_data *data, int how)
 {
 	BUG();
 }

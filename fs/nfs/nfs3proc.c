@@ -763,11 +763,10 @@ nfs3_write_done(struct rpc_task *task)
 }
 
 static void
-nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
+nfs3_proc_write_setup(struct nfs_write_data *data, int how)
 {
 	struct rpc_task		*task = &data->task;
 	struct inode		*inode = data->inode;
-	struct nfs_page		*req;
 	int			stable;
 	int			flags;
 	struct rpc_message	msg = {
@@ -784,28 +783,14 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 			stable = NFS_DATA_SYNC;
 	} else
 		stable = NFS_UNSTABLE;
-	
-	req = nfs_list_entry(data->pages.next);
-	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req);
-	data->args.pgbase = req->wb_pgbase;
-	data->args.count  = count;
 	data->args.stable = stable;
-	data->args.pages  = data->pagevec;
-	data->res.fattr   = &data->fattr;
-	data->res.count   = count;
-	data->res.verf    = &data->verf;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
 	rpc_init_task(task, NFS_CLIENT(inode), nfs3_write_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_writedata_release;
-
-	rpc_call_setup(&data->task, &msg, 0);
+	rpc_call_setup(task, &msg, 0);
 }
 
 static void
@@ -822,7 +807,7 @@ nfs3_commit_done(struct rpc_task *task)
 }
 
 static void
-nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
+nfs3_proc_commit_setup(struct nfs_write_data *data, int how)
 {
 	struct rpc_task		*task = &data->task;
 	struct inode		*inode = data->inode;
@@ -834,23 +819,12 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 		.rpc_cred	= data->cred,
 	};
 
-	data->args.fh     = NFS_FH(data->inode);
-	data->args.offset = start;
-	data->args.count  = len;
-	data->res.count   = len;
-	data->res.fattr   = &data->fattr;
-	data->res.verf    = &data->verf;
-	
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
 	rpc_init_task(task, NFS_CLIENT(inode), nfs3_commit_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_commit_release;
-	
-	rpc_call_setup(&data->task, &msg, 0);
+	rpc_call_setup(task, &msg, 0);
 }
 
 /*

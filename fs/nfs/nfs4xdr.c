@@ -1075,9 +1075,12 @@ encode_write(struct xdr_stream *xdr, struct nfs_writeargs *args)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(36);
+	RESERVE_SPACE(4);
 	WRITE32(OP_WRITE);
-	WRITEMEM(args->stateid.data, sizeof(args->stateid.data));
+
+	encode_stateid(xdr, args->state, args->lockowner);
+
+	RESERVE_SPACE(16);
 	WRITE64(args->offset);
 	WRITE32(args->stable);
 	WRITE32(args->count);

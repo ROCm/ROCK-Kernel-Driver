@@ -1134,10 +1134,10 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		nfs4_copy_stateid(&wdata->args.stateid, state, wdata->lockowner);
+		wdata->args.state = state;
 		msg.rpc_cred = state->owner->so_cred;
 	} else {
-		memcpy(&wdata->args.stateid, &zero_stateid, sizeof(wdata->args.stateid));
+		wdata->args.state = NULL;
 		msg.rpc_cred = NFS_I(inode)->mm_cred;
 	}
 
@@ -1166,15 +1166,10 @@ nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 	/*
 	 * Try first to use O_WRONLY, then O_RDWR stateid.
 	 */
-	if (filp) {
-		struct nfs4_state *state;
-		state = (struct nfs4_state *)filp->private_data;
-		nfs4_copy_stateid(&cdata->args.stateid, state, cdata->lockowner);
-		msg.rpc_cred = state->owner->so_cred;
-	} else {
-		memcpy(&cdata->args.stateid, &zero_stateid, sizeof(cdata->args.stateid));
+	if (filp)
+		msg.rpc_cred = ((struct nfs4_state *)filp->private_data)->owner->so_cred;
+	else
 		msg.rpc_cred = NFS_I(inode)->mm_cred;
-	}
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, 0);
@@ -1549,27 +1544,13 @@ nfs4_proc_read_setup(struct nfs_read_data *data)
 }
 
 static void
-nfs4_restart_write(struct rpc_task *task)
-{
-	struct nfs_write_data *data = (struct nfs_write_data *)task->tk_calldata;
-	struct nfs_page *req;
-
-	rpc_restart_call(task);
-	req = nfs_list_entry(data->pages.next);
-	if (req->wb_state)
-		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
-	else
-		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
-}
-
-static void
 nfs4_write_done(struct rpc_task *task)
 {
 	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
 	struct inode *inode = data->inode;
 	
 	if (nfs4_async_handle_error(task, NFS_SERVER(inode)) == -EAGAIN) {
-		task->tk_action = nfs4_restart_write;
+		rpc_restart_call(task);
 		return;
 	}
 	if (task->tk_status >= 0)
@@ -1579,7 +1560,7 @@ nfs4_write_done(struct rpc_task *task)
 }
 
 static void
-nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
+nfs4_proc_write_setup(struct nfs_write_data *data, int how)
 {
 	struct rpc_task	*task = &data->task;
 	struct rpc_message msg = {
@@ -1589,7 +1570,6 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 		.rpc_cred = data->cred,
 	};
 	struct inode *inode = data->inode;
-	struct nfs_page *req = nfs_list_entry(data->pages.next);
 	int stable;
 	int flags;
 	
@@ -1600,33 +1580,15 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 			stable = NFS_DATA_SYNC;
 	} else
 		stable = NFS_UNSTABLE;
-
-	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req);
-	data->args.pgbase = req->wb_pgbase;
-	data->args.count  = count;
 	data->args.stable = stable;
-	data->args.pages  = data->pagevec;
-	data->res.fattr   = &data->fattr;
-	data->res.count   = count;
-	data->res.verf    = &data->verf;
-	data->timestamp   = jiffies;
 
-	data->lockowner = req->wb_lockowner;
-	if (req->wb_state)
-		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
-	else
-		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
+	data->timestamp   = jiffies;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
 	rpc_init_task(task, NFS_CLIENT(inode), nfs4_write_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_writedata_release;
-
 	rpc_call_setup(task, &msg, 0);
 }
 
@@ -1637,7 +1599,7 @@ nfs4_commit_done(struct rpc_task *task)
 	struct inode *inode = data->inode;
 	
 	if (nfs4_async_handle_error(task, NFS_SERVER(inode)) == -EAGAIN) {
-		task->tk_action = nfs4_restart_write;
+		rpc_restart_call(task);
 		return;
 	}
 	/* Call back common NFS writeback processing */
@@ -1645,7 +1607,7 @@ nfs4_commit_done(struct rpc_task *task)
 }
 
 static void
-nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
+nfs4_proc_commit_setup(struct nfs_write_data *data, int how)
 {
 	struct rpc_task	*task = &data->task;
 	struct rpc_message msg = {
@@ -1657,22 +1619,11 @@ nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	struct inode *inode = data->inode;
 	int flags;
 	
-	data->args.fh     = NFS_FH(data->inode);
-	data->args.offset = start;
-	data->args.count  = len;
-	data->res.count   = len;
-	data->res.fattr   = &data->fattr;
-	data->res.verf    = &data->verf;
-	
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
 	rpc_init_task(task, NFS_CLIENT(inode), nfs4_commit_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_commit_release;
-	
 	rpc_call_setup(task, &msg, 0);	
 }
 
