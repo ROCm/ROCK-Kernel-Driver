@@ -1437,7 +1437,7 @@ static int snd_timer_user_gstatus(struct file *file, snd_timer_gstatus_t *_gstat
 		err = -ENODEV;
 	}
 	up(&register_mutex);
-	if (err >= 0 && copy_from_user(_gstatus, &gstatus, sizeof(gstatus)))
+	if (err >= 0 && copy_to_user(_gstatus, &gstatus, sizeof(gstatus)))
 		err = -EFAULT;
 	return err;
 }
