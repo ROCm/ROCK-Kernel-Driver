@@ -168,7 +168,6 @@ struct notifier_block e1000_notifier_reboot = {
 	.priority	= 0
 };
 
-
 /* Exported from other modules */
 
 extern void e1000_check_options(struct e1000_adapter *adapter);
@@ -207,8 +206,9 @@ e1000_init_module(void)
 	printk(KERN_INFO "%s\n", e1000_copyright);
 
 	ret = pci_module_init(&e1000_driver);
-	if(ret >= 0)
+	if(ret >= 0) {
 		register_reboot_notifier(&e1000_notifier_reboot);
+	}
 	return ret;
 }
 
@@ -538,7 +538,6 @@ e1000_remove(struct pci_dev *pdev)
 	unregister_netdev(netdev);
 
 	e1000_phy_hw_reset(&adapter->hw);
-
 
 	iounmap(adapter->hw.hw_addr);
 	pci_release_regions(pdev);
@@ -2206,7 +2205,6 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			netif_rx(skb);
 		}
 #endif /* CONFIG_E1000_NAPI */
-
 		netdev->last_rx = jiffies;
 
 		rx_desc->status = 0;
@@ -2658,7 +2656,6 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 	}
 	return NOTIFY_DONE;
 }
-
 
 static int
 e1000_suspend(struct pci_dev *pdev, uint32_t state)

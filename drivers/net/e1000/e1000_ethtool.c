@@ -322,7 +322,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 		uint16_t i;
 		for (i = 0; i < last_word - first_word + 1; i++)
 			if((ret_val = e1000_read_eeprom(hw, first_word + i, 1,
-						       &eeprom_buff[i])))
+							&eeprom_buff[i])))
 				break;
 	}
 geeprom_error:
@@ -352,7 +352,7 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
 	eeprom_buff = kmalloc(max_len, GFP_KERNEL);
-	if(eeprom_buff == NULL)
+	if(!eeprom_buff)
 		return -ENOMEM;
 
 	ptr = (void *)eeprom_buff;

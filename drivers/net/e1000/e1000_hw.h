@@ -603,7 +603,7 @@ struct e1000_ffvt_entry {
 #define E1000_EECD     0x00010  /* EEPROM/Flash Control - RW */
 #define E1000_EERD     0x00014  /* EEPROM Read - RW */
 #define E1000_CTRL_EXT 0x00018  /* Extended Device Control - RW */
-#define E1000_FLA      0x0001C  /* Flash Access Register - RW */
+#define E1000_FLA      0x0001C  /* Flash Access - RW */
 #define E1000_MDIC     0x00020  /* MDI Control - RW */
 #define E1000_FCAL     0x00028  /* Flow Control Address Low - RW */
 #define E1000_FCAH     0x0002C  /* Flow Control Address High -RW */
@@ -732,6 +732,7 @@ struct e1000_ffvt_entry {
  * the registers function in the same manner.
  */
 #define E1000_82542_CTRL     E1000_CTRL
+#define E1000_82542_CTRL_DUP E1000_CTRL_DUP
 #define E1000_82542_STATUS   E1000_STATUS
 #define E1000_82542_EECD     E1000_EECD
 #define E1000_82542_EERD     E1000_EERD
