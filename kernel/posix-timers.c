@@ -574,7 +574,7 @@ static struct k_itimer * lock_timer(timer_t timer_id, unsigned long *flags)
  * it is the same as a requeue pending timer WRT to what we should
  * report.
  */
-inline void
+static void
 do_timer_gettime(struct k_itimer *timr, struct itimerspec *cur_setting)
 {
 	unsigned long expires;
