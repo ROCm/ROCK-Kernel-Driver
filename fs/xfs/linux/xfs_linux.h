@@ -89,18 +89,6 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_panic_mask		xfs_params.panic_mask
 #define xfs_error_level		xfs_params.error_level
 
-typedef struct xfs_dirent {		/* data from readdir() */
-	xfs_ino_t	d_ino;		/* inode number of entry */
-	xfs_off_t	d_off;		/* offset of disk directory entry */
-	unsigned short	d_reclen;	/* length of this record */
-	char		d_name[1];	/* name of file */
-} xfs_dirent_t;
-
-#define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
-#define DIRENTSIZE(namelen)	\
-	((DIRENTBASESIZE + (namelen) + \
-		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
-
 #define NBPP		PAGE_SIZE
 #define DPPSHFT		(PAGE_SHIFT - 9)
 #define NDPP		(1 << (PAGE_SHIFT - 9))
