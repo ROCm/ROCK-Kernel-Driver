@@ -106,6 +106,7 @@ extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
 extern void _do_write_lock(rwlock_t *rw, char *str);
 extern void _do_write_unlock(rwlock_t *rw);
+extern int _do_write_trylock(rwlock_t *rw, char *str);
 #endif
 
 extern unsigned long phys_base;
@@ -158,6 +159,7 @@ EXPORT_SYMBOL(_do_read_lock);
 EXPORT_SYMBOL(_do_read_unlock);
 EXPORT_SYMBOL(_do_write_lock);
 EXPORT_SYMBOL(_do_write_unlock);
+EXPORT_SYMBOL(_do_write_trylock);
 #endif
 
 EXPORT_SYMBOL(smp_call_function);
