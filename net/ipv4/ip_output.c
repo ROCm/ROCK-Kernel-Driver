@@ -1314,7 +1314,6 @@ void __init ip_init(void)
 	inet_initpeers();
 
 #ifdef CONFIG_IP_MULTICAST
-	proc_net_create("igmp", 0, ip_mc_procinfo);
+	igmp_mc_proc_init();
 #endif
-	proc_net_create("mcfilter", 0, ip_mcf_procinfo);
 }

@@ -657,7 +657,25 @@ static struct seq_operations ip6fl_seq_ops = {
 
 static int ip6fl_seq_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &ip6fl_seq_ops);
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct ip6fl_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &ip6fl_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
 }
 
 static struct file_operations ip6fl_seq_fops = {
@@ -665,7 +683,7 @@ static struct file_operations ip6fl_seq_fops = {
 	.open		=	ip6fl_seq_open,
 	.read		=	seq_read,
 	.llseek		=	seq_lseek,
-	.release	=	seq_release,
+	.release	=	seq_release_private,
 };
 #endif
 
