@@ -2,7 +2,7 @@
  * This file contains the McKinley PMU register description tables
  * and pmc checker used by perfmon.c.
  *
- * Copyright (C) 2002  Hewlett Packard Co
+ * Copyright (C) 2002-2003  Hewlett Packard Co
  *               Stephane Eranian <eranian@hpl.hp.com>
  */
 
@@ -12,9 +12,8 @@
 #error "This file is only valid when CONFIG_MCKINLEY is defined"
 #endif
 
-static int pfm_mck_reserved(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
-static int pfm_mck_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
-static int pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, struct pt_regs *regs);
+static int pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
+static int pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs);
 
 static pfm_reg_desc_t pfm_mck_pmc_desc[PMU_MAX_PMCS]={
 /* pmc0  */ { PFM_REG_CONTROL , 0, 0x1UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -22,17 +21,17 @@ static pfm_reg_desc_t pfm_mck_pmc_desc[PMU_MAX_PMCS]={
 /* pmc2  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc3  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc4  */ { PFM_REG_COUNTING, 6, 0x0000000000800000UL, 0xfffff7fUL, NULL, pfm_mck_pmc_check, {RDEP(4),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc5  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_reserved, {RDEP(5),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc6  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_reserved, {RDEP(6),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc7  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_reserved, {RDEP(7),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc8  */ { PFM_REG_CONFIG  , 0, 0xffffffff3fffffffUL, 0xffffffff3fffffffUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc9  */ { PFM_REG_CONFIG  , 0, 0xffffffff3ffffffcUL, 0xffffffff3fffffffUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc10 */ { PFM_REG_MONITOR , 4, 0x0UL, 0xffffUL, NULL, pfm_mck_reserved, {RDEP(0)|RDEP(1),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc11 */ { PFM_REG_MONITOR , 6, 0x0UL, 0x30f01cf, NULL,  pfm_mck_reserved, {RDEP(2)|RDEP(3)|RDEP(17),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc12 */ { PFM_REG_MONITOR , 6, 0x0UL, 0xffffUL, NULL,  pfm_mck_reserved, {RDEP(8)|RDEP(9)|RDEP(10)|RDEP(11)|RDEP(12)|RDEP(13)|RDEP(14)|RDEP(15)|RDEP(16),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc5  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_pmc_check, {RDEP(5),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc6  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_pmc_check, {RDEP(6),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc7  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_pmc_check, {RDEP(7),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc8  */ { PFM_REG_CONFIG  , 0, 0xffffffff3fffffffUL, 0xffffffff3ffffffbUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc9  */ { PFM_REG_CONFIG  , 0, 0xffffffff3ffffffcUL, 0xffffffff3ffffffbUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc10 */ { PFM_REG_MONITOR , 4, 0x0UL, 0xffffUL, NULL, pfm_mck_pmc_check, {RDEP(0)|RDEP(1),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc11 */ { PFM_REG_MONITOR , 6, 0x0UL, 0x30f01cf, NULL,  pfm_mck_pmc_check, {RDEP(2)|RDEP(3)|RDEP(17),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc12 */ { PFM_REG_MONITOR , 6, 0x0UL, 0xffffUL, NULL,  pfm_mck_pmc_check, {RDEP(8)|RDEP(9)|RDEP(10)|RDEP(11)|RDEP(12)|RDEP(13)|RDEP(14)|RDEP(15)|RDEP(16),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc13 */ { PFM_REG_CONFIG  , 0, 0x00002078fefefefeUL, 0x1e00018181818UL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc14 */ { PFM_REG_CONFIG  , 0, 0x0db60db60db60db6UL, 0x2492UL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc15 */ { PFM_REG_CONFIG  , 0, 0x00000000fffffff0UL, 0xfUL, NULL, pfm_mck_reserved, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc15 */ { PFM_REG_CONFIG  , 0, 0x00000000fffffff0UL, 0xfUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 	    { PFM_REG_END     , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}}, /* end marker */
 };
 
@@ -62,20 +61,22 @@ static pfm_reg_desc_t pfm_mck_pmd_desc[PMU_MAX_PMDS]={
  * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
  */
 static pmu_config_t pmu_conf={
-	.disabled = 1,
-	.ovfl_val = (1UL << 47) - 1,
-	.num_ibrs = 8,
-	.num_dbrs = 8,
-	.pmd_desc = pfm_mck_pmd_desc,
-	.pmc_desc = pfm_mck_pmc_desc
+	.pmu_name      = "Itanium 2",
+	.pmu_family    = 0x1f,
+	.enabled       = 0,
+	.ovfl_val      = (1UL << 47) - 1,
+	.pmd_desc      = pfm_mck_pmd_desc,
+	.pmc_desc      = pfm_mck_pmc_desc,
+	.num_ibrs       = 8,
+	.num_dbrs       = 8,
+	.use_rr_dbregs = 1 /* debug register are use for range retrictions */
 };
-
 
 /*
  * PMC reserved fields must have their power-up values preserved
  */
 static int
-pfm_mck_reserved(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
+pfm_mck_reserved(unsigned int cnum, unsigned long *val, struct pt_regs *regs)
 {
 	unsigned long tmp1, tmp2, ival = *val;
 
@@ -87,52 +88,51 @@ pfm_mck_reserved(struct task_struct *task, unsigned int cnum, unsigned long *val
 
 	*val = tmp1 | tmp2;
 
-	DBprintk(("pmc[%d]=0x%lx, mask=0x%lx, reset=0x%lx, val=0x%lx\n", 
-		  cnum, ival, PMC_RSVD_MASK(cnum), PMC_DFL_VAL(cnum), *val)); 
+	DPRINT(("pmc[%d]=0x%lx, mask=0x%lx, reset=0x%lx, val=0x%lx\n",
+		  cnum, ival, PMC_RSVD_MASK(cnum), PMC_DFL_VAL(cnum), *val));
 	return 0;
 }
 
 static int
-pfm_mck_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
+pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
 {
-	struct thread_struct *th = &task->thread;
-	pfm_context_t *ctx = task->thread.pfm_context;
 	int ret = 0, check_case1 = 0;
+	struct thread_struct *th = &task->thread;
 	unsigned long val8 = 0, val14 = 0, val13 = 0;
 
 	/* first preserve the reserved fields */
-	pfm_mck_reserved(task, cnum, val, regs);
+	pfm_mck_reserved(cnum, val, regs);
 
 	/*
-	 * we must clear the debug registers if any pmc13.ena_dbrpX bit is enabled 
-	 * before they are written (fl_using_dbreg==0) to avoid picking up stale information. 
+	 * we must clear the debug registers if any pmc13.ena_dbrpX bit is enabled
+	 * before they are written (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
 	if (cnum == 13 && (*val & (0xfUL << 45)) && ctx->ctx_fl_using_dbreg == 0) {
 
 		/* don't mix debug with perfmon */
-		if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
+		if (task && (task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
 
-		/* 
+		/*
 		 * a count of 0 will mark the debug registers as in use and also
 		 * ensure that they are properly cleared.
 		 */
-		ret = pfm_write_ibr_dbr(1, task, NULL, 0, regs);
+		ret = pfm_write_ibr_dbr(1, ctx, NULL, 0, regs);
 		if (ret) return ret;
 	}
-	/* 
-	 * we must clear the (instruction) debug registers if any pmc14.ibrpX bit is enabled 
-	 * before they are (fl_using_dbreg==0) to avoid picking up stale information. 
+	/*
+	 * we must clear the (instruction) debug registers if any pmc14.ibrpX bit is enabled
+	 * before they are (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
 	if (cnum == 14 && ((*val & 0x2222) != 0x2222) && ctx->ctx_fl_using_dbreg == 0) {
 
 		/* don't mix debug with perfmon */
-		if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
+		if (task && (task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
 
-		/* 
+		/*
 		 * a count of 0 will mark the debug registers as in use and also
 		 * ensure that they are properly cleared.
 		 */
-		ret = pfm_write_ibr_dbr(0, task, NULL, 0, regs);
+		ret = pfm_write_ibr_dbr(0, ctx, NULL, 0, regs);
 		if (ret) return ret;
 
 	}
@@ -141,17 +141,17 @@ pfm_mck_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *va
 		case  4: *val |= 1UL << 23; /* force power enable bit */
 			 break;
 		case  8: val8 = *val;
-			 val13 = th->pmc[13];
-			 val14 = th->pmc[14];
+			 val13 = th->pmcs[13];
+			 val14 = th->pmcs[14];
 			 check_case1 = 1;
 			 break;
-		case 13: val8  = th->pmc[8];
+		case 13: val8  = th->pmcs[8];
 			 val13 = *val;
-			 val14 = th->pmc[14];
+			 val14 = th->pmcs[14];
 			 check_case1 = 1;
 			 break;
-		case 14: val8  = th->pmc[13];
-			 val13 = th->pmc[13];
+		case 14: val8  = th->pmcs[13];
+			 val13 = th->pmcs[13];
 			 val14 = *val;
 			 check_case1 = 1;
 			 break;
@@ -165,7 +165,7 @@ pfm_mck_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *va
 		   && ((((val14>>1) & 0x3) == 0x2 || ((val14>>1) & 0x3) == 0x0)
 		       ||(((val14>>4) & 0x3) == 0x2 || ((val14>>4) & 0x3) == 0x0));
 
-		if (ret) printk(KERN_DEBUG "perfmon: failure check_case1\n");
+		if (ret) printk("perfmon: failure check_case1\n");
 	}
 
 	return ret ? -EINVAL : 0;

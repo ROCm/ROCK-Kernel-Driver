@@ -258,20 +258,14 @@ struct thread_struct {
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
 #ifdef CONFIG_PERFMON
-	__u64 pmc[IA64_NUM_PMC_REGS];
-	__u64 pmd[IA64_NUM_PMD_REGS];
-	unsigned long pfm_ovfl_block_reset;/* non-zero if we need to block or reset regs on ovfl */
-	void *pfm_context;		/* pointer to detailed PMU context */
-	atomic_t pfm_notifiers_check;	/* when >0, will cleanup ctx_notify_task in tasklist */
-	atomic_t pfm_owners_check;	/* when >0, will cleanup ctx_owner in tasklist */
-	void *pfm_smpl_buf_list;	/* list of sampling buffers to vfree */
-# define INIT_THREAD_PM		.pmc =			{0, },	\
-				.pmd =			{0, },	\
-				.pfm_ovfl_block_reset =	0,	\
-				.pfm_context =		NULL,	\
-				.pfm_notifiers_check =	{ 0 },	\
-				.pfm_owners_check =	{ 0 },	\
-				.pfm_smpl_buf_list =	NULL,
+	__u64 pmcs[IA64_NUM_PMC_REGS];
+	__u64 pmds[IA64_NUM_PMD_REGS];
+	void *pfm_context;		     /* pointer to detailed PMU context */
+	unsigned long pfm_needs_checking;    /* when >0, pending perfmon work on kernel exit */
+# define INIT_THREAD_PM		.pmcs =			{0UL, },  \
+				.pmds =			{0UL, },  \
+				.pfm_context =		NULL,     \
+				.pfm_needs_checking =	0UL,
 #else
 # define INIT_THREAD_PM
 #endif
@@ -326,11 +320,7 @@ struct task_struct;
  * parent of DEAD_TASK has collected the exist status of the task via
  * wait().
  */
-#ifdef CONFIG_PERFMON
-  extern void release_thread (struct task_struct *task);
-#else
-# define release_thread(dead_task)
-#endif
+#define release_thread(dead_task)
 
 /* Prepare to copy thread state - unlazy all lazy status */
 #define prepare_to_copy(tsk)	do { } while (0)

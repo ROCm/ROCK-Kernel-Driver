@@ -376,7 +376,8 @@ GLOBAL_ENTRY(fsys_bubble_down)
 	 *	- r29: psr
 	 */
 #	define PSR_PRESERVED_BITS	(IA64_PSR_UP | IA64_PSR_MFL | IA64_PSR_MFH | IA64_PSR_PK \
-					 | IA64_PSR_DT | IA64_PSR_PP | IA64_PSR_RT | IA64_PSR_IC)
+					 | IA64_PSR_DT | IA64_PSR_PP | IA64_PSR_SP | IA64_PSR_RT \
+					 | IA64_PSR_IC)
 	/*
 	 * Reading psr.l gives us only bits 0-31, psr.it, and psr.mc.  The rest we have
 	 * to synthesize.

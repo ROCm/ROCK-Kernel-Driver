@@ -148,8 +148,8 @@ do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall
 #endif
 
 #ifdef CONFIG_PERFMON
-	if (current->thread.pfm_ovfl_block_reset)
-		pfm_ovfl_block_reset();
+	if (current->thread.pfm_needs_checking)
+		pfm_handle_work();
 #endif
 
 	/* deal with pending signal delivery */
@@ -387,16 +387,8 @@ copy_thread (int nr, unsigned long clone_flags,
 #endif
 
 #ifdef CONFIG_PERFMON
-	/*
-	 * reset notifiers and owner check (may not have a perfmon context)
-	 */
-	atomic_set(&p->thread.pfm_notifiers_check, 0);
-	atomic_set(&p->thread.pfm_owners_check, 0);
-	/* clear list of sampling buffer to free for new task */
-	p->thread.pfm_smpl_buf_list = NULL;
-
 	if (current->thread.pfm_context)
-		retval = pfm_inherit(p, child_ptregs);
+		pfm_inherit(p, child_ptregs);
 #endif
 	return retval;
 }
@@ -609,34 +601,6 @@ flush_thread (void)
 	ia64_drop_fpu(current);
 }
 
-#ifdef CONFIG_PERFMON
-/*
- * by the time we get here, the task is detached from the tasklist. This is important
- * because it means that no other tasks can ever find it as a notified task, therfore there
- * is no race condition between this code and let's say a pfm_context_create().
- * Conversely, the pfm_cleanup_notifiers() cannot try to access a task's pfm context if this
- * other task is in the middle of its own pfm_context_exit() because it would already be out of
- * the task list. Note that this case is very unlikely between a direct child and its parents
- * (if it is the notified process) because of the way the exit is notified via SIGCHLD.
- */
-
-void
-release_thread (struct task_struct *task)
-{
-	if (task->thread.pfm_context)
-		pfm_context_exit(task);
-
-	if (atomic_read(&task->thread.pfm_notifiers_check) > 0)
-		pfm_cleanup_notifiers(task);
-
-	if (atomic_read(&task->thread.pfm_owners_check) > 0)
-		pfm_cleanup_owners(task);
-
-	if (task->thread.pfm_smpl_buf_list)
-		pfm_cleanup_smpl_buf(task);
-}
-#endif
-
 /*
  * Clean up state associated with current thread.  This is called when
  * the thread calls exit().
@@ -648,7 +612,7 @@ exit_thread (void)
 #ifdef CONFIG_PERFMON
        /* if needed, stop monitoring and flush state to perfmon context */
 	if (current->thread.pfm_context)
-		pfm_flush_regs(current);
+		pfm_exit_thread(current);
 
 	/* free debug register resources */
 	if (current->thread.flags & IA64_THREAD_DBG_VALID)

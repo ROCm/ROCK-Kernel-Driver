@@ -189,24 +189,15 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 			err |= __put_user(from->si_addr, &to->si_addr);
 			err |= __put_user(from->si_imm, &to->si_imm);
 			break;
-		      case __SI_CHLD >> 16:
-			err |= __put_user(from->si_utime, &to->si_utime);
-			err |= __put_user(from->si_stime, &to->si_stime);
-			err |= __put_user(from->si_status, &to->si_status);
-		      case __SI_PROF >> 16:
-			err |= __put_user(from->si_uid, &to->si_uid);
-			err |= __put_user(from->si_pid, &to->si_pid);
-			if (from->si_code == PROF_OVFL) {
-				err |= __put_user(from->si_pfm_ovfl[0], &to->si_pfm_ovfl[0]);
-				err |= __put_user(from->si_pfm_ovfl[1], &to->si_pfm_ovfl[1]);
-				err |= __put_user(from->si_pfm_ovfl[2], &to->si_pfm_ovfl[2]);
-				err |= __put_user(from->si_pfm_ovfl[3], &to->si_pfm_ovfl[3]);
-			}
 		      case __SI_TIMER >> 16:
 			err |= __put_user(from->si_tid, &to->si_tid);
 			err |= __put_user(from->si_overrun, &to->si_overrun);
 			err |= __put_user(from->si_value, &to->si_value);
 			break;
+		      case __SI_CHLD >> 16:
+			err |= __put_user(from->si_utime, &to->si_utime);
+			err |= __put_user(from->si_stime, &to->si_stime);
+			err |= __put_user(from->si_status, &to->si_status);
 		      default:
 			err |= __put_user(from->si_uid, &to->si_uid);
 			err |= __put_user(from->si_pid, &to->si_pid);
@@ -241,10 +232,6 @@ copy_siginfo_from_user (siginfo_t *to, siginfo_t *from)
 
 		      case SIGPOLL:
 			to->si_code |= __SI_POLL;
-			break;
-
-		      case SIGPROF:
-			to->si_code |= __SI_PROF;
 			break;
 
 		      default:

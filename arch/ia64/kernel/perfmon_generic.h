@@ -1,10 +1,12 @@
 /*
- * This file contains the architected PMU register description tables
+ * This file contains the generic PMU register description tables
  * and pmc checker used by perfmon.c.
  *
- * Copyright (C) 2002  Hewlett Packard Co
+ * Copyright (C) 2002-2003  Hewlett Packard Co
  *               Stephane Eranian <eranian@hpl.hp.com>
  */
+
+
 #define RDEP(x)	(1UL<<(x))
 
 #if defined(CONFIG_ITANIUM) || defined (CONFIG_MCKINLEY)
@@ -39,10 +41,13 @@ static pfm_reg_desc_t pmd_gen_desc[PMU_MAX_PMDS]={
  * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
  */
 static pmu_config_t pmu_conf={
-	.disabled = 1,
-	.ovfl_val = (1UL << 32) - 1,
-	.num_ibrs = 8,
-	.num_dbrs = 8,
-	.pmd_desc = pfm_gen_pmd_desc,
-	.pmc_desc = pfm_gen_pmc_desc
+	.pmu_name   = "Generic",
+	.pmu_family = 0xff, /* any */
+	.enabled    = 0,
+	.ovfl_val   = (1UL << 32) - 1,
+	.num_ibrs   = 0, /* does not use */
+	.num_dbrs   = 0, /* does not use */
+	.pmd_desc   = pfm_gen_pmd_desc,
+	.pmc_desc   = pfm_gen_pmc_desc
 };
+

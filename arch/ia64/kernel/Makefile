@@ -5,8 +5,8 @@
 extra-y	:= head.o init_task.o
 
 obj-y := acpi.o entry.o efi.o efi_stub.o gate.o ia64_ksyms.o irq.o irq_ia64.o irq_lsapic.o	\
-	 ivt.o machvec.o pal.o perfmon.o process.o ptrace.o sal.o semaphore.o setup.o signal.o	\
-	 sys_ia64.o time.o traps.o unaligned.o unwind.o
+	 ivt.o machvec.o pal.o perfmon.o perfmon_default_smpl.o process.o ptrace.o sal.o \
+	 semaphore.o setup.o signal.o sys_ia64.o time.o traps.o unaligned.o unwind.o
 
 obj-$(CONFIG_EFI_VARS)		+= efivars.o
 obj-$(CONFIG_FSYS)		+= fsys.o

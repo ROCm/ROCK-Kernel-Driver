@@ -162,8 +162,11 @@ EXPORT_SYMBOL(machvec_noop);
 EXPORT_SYMBOL(zero_page_memmap_ptr);
 #ifdef CONFIG_PERFMON
 #include <asm/perfmon.h>
-EXPORT_SYMBOL(pfm_install_alternate_syswide_subsystem);
-EXPORT_SYMBOL(pfm_remove_alternate_syswide_subsystem);
+EXPORT_SYMBOL(pfm_register_buffer_fmt);
+EXPORT_SYMBOL(pfm_unregister_buffer_fmt);
+EXPORT_SYMBOL(pfm_mod_fast_read_pmds);
+EXPORT_SYMBOL(pfm_mod_read_pmds);
+EXPORT_SYMBOL(pfm_mod_write_pmcs);
 #endif
 
 #ifdef CONFIG_NUMA
