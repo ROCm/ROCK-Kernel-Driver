@@ -62,18 +62,21 @@ extern kmem_cache_t *ntfs_big_inode_cache;
 extern kmem_cache_t *ntfs_attr_ctx_cache;
 
 /* The various operations structs defined throughout the driver files. */
-extern struct super_operations ntfs_mount_sops;
 extern struct super_operations ntfs_sops;
-extern struct file_operations ntfs_file_ops;
-extern struct inode_operations ntfs_file_inode_ops;
-extern struct address_space_operations ntfs_file_aops;
-extern struct file_operations ntfs_dir_ops;
-extern struct inode_operations ntfs_dir_inode_ops;
-extern struct address_space_operations ntfs_dir_aops;
-extern struct file_operations ntfs_empty_file_ops;
-extern struct inode_operations ntfs_empty_inode_ops;
+extern struct super_operations ntfs_mount_sops;
+
+extern struct address_space_operations ntfs_aops;
 extern struct address_space_operations ntfs_mft_aops;
 extern struct address_space_operations ntfs_mftbmp_aops;
+
+extern struct  file_operations ntfs_file_ops;
+extern struct inode_operations ntfs_file_inode_ops;
+
+extern struct  file_operations ntfs_dir_ops;
+extern struct inode_operations ntfs_dir_inode_ops;
+
+extern struct  file_operations ntfs_empty_file_ops;
+extern struct inode_operations ntfs_empty_inode_ops;
 
 /* Generic macro to convert pointers to values for comparison purposes. */
 #ifndef p2n

@@ -135,6 +135,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 	}
 	if (!opt || !*opt)
 		goto no_mount_options;
+	ntfs_debug("Entering with mount options string: %s", opt);
 	while ((p = strsep(&opt, ","))) {
 		if ((v = strchr(p, '=')))
 			*v++ = '\0';
@@ -217,7 +218,7 @@ no_mount_options:
 		}
 	}
 	if (nls_map) {
-		if (vol->nls_map) {
+		if (vol->nls_map && vol->nls_map != nls_map) {
 			ntfs_error(vol->sb, "Cannot change NLS character set "
 					"on remount.");
 			return FALSE;
@@ -249,8 +250,8 @@ no_mount_options:
 			mft_zone_multiplier = 1;
 		}
 		vol->mft_zone_multiplier = mft_zone_multiplier;
-	} if (!vol->mft_zone_multiplier)
-		/* Not specified and it is the first mount, so set default. */
+	}
+	if (!vol->mft_zone_multiplier)
 		vol->mft_zone_multiplier = 1;
 	if (on_errors != -1)
 		vol->on_errors = on_errors;
@@ -304,7 +305,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 {
 	ntfs_volume *vol = NTFS_SB(sb);
 
-	ntfs_debug("Entering.");
+	ntfs_debug("Entering with remount options string: %s", opt);
 
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
 	// ro->rw, as well as with sync->async and vice versa remounts.
@@ -1799,7 +1800,7 @@ static int __init init_ntfs_fs(void)
 #ifdef MODULE
 			" MODULE"
 #endif
-			"]. Copyright (c) 2001,2002 Anton Altaparmakov.\n");
+			"].\n");
 
 	ntfs_debug("Debug messages are enabled.");
 
@@ -1899,7 +1900,7 @@ static void __exit exit_ntfs_fs(void)
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver");
+MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2002 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(debug_msgs, "i");

@@ -247,6 +247,11 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.15:
+	- Bug fix in parsing of remount options.
+	- Internal changes implementing attribute (fake) inodes allowing all
+	  attribute i/o to go via the page cache and to use all the normal
+	  vfs/mm functionality.
 2.0.14:
 	- Internal changes improving run list merging code and minor locking
 	  change to not rely on BKL in ntfs_statfs().

@@ -27,31 +27,6 @@
 #include "types.h"
 
 /*
- * Defined bits for the flags field in the ntfs_volume structure.
- */
-typedef enum {
-	NV_ShowSystemFiles,	/* 1: Return system files in ntfs_readdir(). */
-	NV_CaseSensitive,	/* 1: Treat file names as case sensitive and
-				      create filenames in the POSIX namespace.
-				      Otherwise be case insensitive and create
-				      file names in WIN32 namespace. */
-} ntfs_volume_flags;
-
-#define NVolShowSystemFiles(n_vol)	test_bit(NV_ShowSystemFiles,	\
-							&(n_vol)->flags)
-#define NVolSetShowSystemFiles(n_vol)	set_bit(NV_ShowSystemFiles,	\
-							&(n_vol)->flags)
-#define NVolClearShowSystemFiles(n_vol)	clear_bit(NV_ShowSystemFiles,	\
-							&(n_vol)->flags)
-
-#define NVolCaseSensitive(n_vol)	test_bit(NV_CaseSensitive,	\
-							&(n_vol)->flags)
-#define NVolSetCaseSensitive(n_vol)	set_bit(NV_CaseSensitive,	\
-							&(n_vol)->flags)
-#define NVolClearCaseSensitive(n_vol)	clear_bit(NV_CaseSensitive,	\
-							&(n_vol)->flags)
-
-/*
  * The NTFS in memory super block structure.
  */
 typedef struct {
@@ -123,6 +98,39 @@ typedef struct {
 					   only, otherwise NULL). */
 	struct nls_table *nls_map;
 } ntfs_volume;
+
+/*
+ * Defined bits for the flags field in the ntfs_volume structure.
+ */
+typedef enum {
+	NV_ShowSystemFiles,	/* 1: Return system files in ntfs_readdir(). */
+	NV_CaseSensitive,	/* 1: Treat file names as case sensitive and
+				      create filenames in the POSIX namespace.
+				      Otherwise be case insensitive and create
+				      file names in WIN32 namespace. */
+} ntfs_volume_flags;
+
+/*
+ * Macro tricks to expand the NVolFoo(), NVolSetFoo(), and NVolClearFoo()
+ * functions.
+ */
+#define NVOL_FNS(flag)					\
+static inline int NVol##flag(ntfs_volume *vol)		\
+{							\
+	return test_bit(NV_##flag, &(vol)->flags);	\
+}							\
+static inline void NVolSet##flag(ntfs_volume *vol)	\
+{							\
+	set_bit(NV_##flag, &(vol)->flags);		\
+}							\
+static inline void NVolClear##flag(ntfs_volume *vol)	\
+{							\
+	clear_bit(NV_##flag, &(vol)->flags);		\
+}
+
+/* Emit the ntfs volume bitops functions. */
+NVOL_FNS(ShowSystemFiles)
+NVOL_FNS(CaseSensitive)
 
 #endif /* _LINUX_NTFS_VOLUME_H */
 

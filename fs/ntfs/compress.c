@@ -462,6 +462,11 @@ int ntfs_file_read_compressed_block(struct page *page)
 
 	ntfs_debug("Entering, page->index = 0x%lx, cb_size = 0x%x, nr_pages = "
 			"%i.", index, cb_size, nr_pages);
+	/*
+	 * Bad things happen if we get here for anything that is not an
+	 * unnamed $DATA attribute.
+	 */
+	BUG_ON(ni->type != AT_DATA || ni->name_len);
 
 	pages = kmalloc(nr_pages * sizeof(struct page *), GFP_NOFS);
 

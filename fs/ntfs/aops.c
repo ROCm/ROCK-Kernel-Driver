@@ -30,7 +30,7 @@
 #include "ntfs.h"
 
 /**
- * end_buffer_read_attr_async - async io completion for reading attributes
+ * ntfs_end_buffer_read_async - async io completion for reading attributes
  * @bh:		buffer head on which io is completed
  * @uptodate:	whether @bh is now uptodate or not
  *
@@ -45,7 +45,7 @@
  * record size, and index_block_size_bits, to the log(base 2) of the ntfs
  * record size.
  */
-static void end_buffer_read_attr_async(struct buffer_head *bh, int uptodate)
+static void ntfs_end_buffer_read_async(struct buffer_head *bh, int uptodate)
 {
 	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
@@ -143,12 +143,12 @@ still_busy:
 }
 
 /**
- * ntfs_attr_read_block - fill a @page of an address space with data
+ * ntfs_read_block - fill a @page of an address space with data
  * @page:	page cache page to fill with data
  *
  * Fill the page @page of the address space belonging to the @page->host inode.
  * We read each buffer asynchronously and when all buffers are read in, our io
- * completion handler end_buffer_read_attr_async(), if required, automatically
+ * completion handler ntfs_end_buffer_read_async(), if required, automatically
  * applies the mst fixups to the page before finally marking it uptodate and
  * unlocking it.
  *
@@ -156,7 +156,7 @@ still_busy:
  *
  * Contains an adapted version of fs/buffer.c::block_read_full_page().
  */
-static int ntfs_attr_read_block(struct page *page)
+static int ntfs_read_block(struct page *page)
 {
 	VCN vcn;
 	LCN lcn;
@@ -267,7 +267,7 @@ handle_zblock:
 		for (i = 0; i < nr; i++) {
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
-			tbh->b_end_io = end_buffer_read_attr_async;
+			tbh->b_end_io = ntfs_end_buffer_read_async;
 			set_buffer_async_read(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
@@ -285,27 +285,27 @@ handle_zblock:
 }
 
 /**
- * ntfs_file_readpage - fill a @page of a @file with data from the device
+ * ntfs_readpage - fill a @page of a @file with data from the device
  * @file:	open file to which the page @page belongs or NULL
  * @page:	page cache page to fill with data
  *
- * For non-resident attributes, ntfs_file_readpage() fills the @page of the open
+ * For non-resident attributes, ntfs_readpage() fills the @page of the open
  * file @file by calling the ntfs version of the generic block_read_full_page()
- * function provided by the kernel, ntfs_attr_read_block(), which in turn
- * creates and reads in the buffers associated with the page asynchronously.
+ * function, ntfs_read_block(), which in turn creates and reads in the buffers
+ * associated with the page asynchronously.
  *
- * For resident attributes, OTOH, ntfs_file_readpage() fills @page by copying
- * the data from the mft record (which at this stage is most likely in memory)
- * and fills the remainder with zeroes. Thus, in this case, I/O is synchronous,
- * as even if the mft record is not cached at this point in time, we need to
- * wait for it to be read in before we can do the copy.
+ * For resident attributes, OTOH, ntfs_readpage() fills @page by copying the
+ * data from the mft record (which at this stage is most likely in memory) and
+ * fills the remainder with zeroes. Thus, in this case, I/O is synchronous, as
+ * even if the mft record is not cached at this point in time, we need to wait
+ * for it to be read in before we can do the copy.
  *
- * Return 0 on success or -errno on error.
+ * Return 0 on success and -errno on error.
  */
-static int ntfs_file_readpage(struct file *file, struct page *page)
+int ntfs_readpage(struct file *file, struct page *page)
 {
 	s64 attr_pos;
-	ntfs_inode *ni;
+	ntfs_inode *ni, *base_ni;
 	char *addr;
 	attr_search_context *ctx;
 	MFT_RECORD *mrec;
@@ -317,40 +317,45 @@ static int ntfs_file_readpage(struct file *file, struct page *page)
 
 	ni = NTFS_I(page->mapping->host);
 
-	/* Is the unnamed $DATA attribute resident? */
 	if (NInoNonResident(ni)) {
-		/* Attribute is not resident. */
-
-		/* If the file is encrypted, we deny access, just like NT4. */
-		if (NInoEncrypted(ni)) {
-			err = -EACCES;
-			goto unl_err_out;
+		/*
+		 * Only unnamed $DATA attributes can be compressed or
+		 * encrypted.
+		 */
+		if (ni->type == AT_DATA && !ni->name_len) {
+			/* If file is encrypted, deny access, just like NT4. */
+			if (NInoEncrypted(ni)) {
+				err = -EACCES;
+				goto err_out;
+			}
+			/* Compressed data streams are handled in compress.c. */
+			if (NInoCompressed(ni))
+				return ntfs_file_read_compressed_block(page);
 		}
-		/* Compressed data stream. Handled in compress.c. */
-		if (NInoCompressed(ni))
-			return ntfs_file_read_compressed_block(page);
 		/* Normal data stream. */
-		return ntfs_attr_read_block(page);
+		return ntfs_read_block(page);
 	}
 	/* Attribute is resident, implying it is not compressed or encrypted. */
+	if (!NInoAttr(ni))
+		base_ni = ni;
+	else
+		base_ni = ni->_INE(base_ntfs_ino);
 
 	/* Map, pin and lock the mft record for reading. */
-	mrec = map_mft_record(READ, ni);
+	mrec = map_mft_record(READ, base_ni);
 	if (unlikely(IS_ERR(mrec))) {
 		err = PTR_ERR(mrec);
-		goto unl_err_out;
+		goto err_out;
 	}
-
-	ctx = get_attr_search_ctx(ni, mrec);
+	ctx = get_attr_search_ctx(base_ni, mrec);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
-		goto unm_unl_err_out;
+		goto unm_err_out;
 	}
-
-	/* Find the data attribute in the mft record. */
-	if (unlikely(!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx))) {
+	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
+			IGNORE_CASE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
-		goto put_unm_unl_err_out;
+		goto put_unm_err_out;
 	}
 
 	/* Starting position of the page within the attribute value. */
@@ -377,32 +382,13 @@ static int ntfs_file_readpage(struct file *file, struct page *page)
 	kunmap(page);
 
 	SetPageUptodate(page);
-put_unm_unl_err_out:
+put_unm_err_out:
 	put_attr_search_ctx(ctx);
-unm_unl_err_out:
-	unmap_mft_record(READ, ni);
-unl_err_out:
+unm_err_out:
+	unmap_mft_record(READ, base_ni);
+err_out:
 	unlock_page(page);
 	return err;
-}
-
-/**
- * ntfs_mst_readpage - fill a @page of the mft or a directory with data
- * @file:	open file/directory to which the @page belongs or NULL
- * @page:	page cache page to fill with data
- *
- * Readpage method for the VFS address space operations of directory inodes
- * and the $MFT/$DATA attribute.
- *
- * We just call ntfs_attr_read_block() here, in fact we only need this wrapper
- * because of the difference in function parameters.
- */
-int ntfs_mst_readpage(struct file *file, struct page *page)
-{
-	if (unlikely(!PageLocked(page)))
-		PAGE_BUG(page);
-
-	return ntfs_attr_read_block(page);
 }
 
 /**
@@ -473,7 +459,7 @@ still_busy:
 /**
  * ntfs_mftbmp_readpage -
  *
- * Readpage for accessing mft bitmap. Adapted from ntfs_mst_readpage().
+ * Readpage for accessing mft bitmap.
  */
 static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 {
@@ -587,11 +573,11 @@ handle_zblock:
 }
 
 /**
- * ntfs_file_aops - address space operations for accessing normal file data
+ * ntfs_aops - general address space operations for inodes and attributes
  */
-struct address_space_operations ntfs_file_aops = {
+struct address_space_operations ntfs_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_file_readpage,	/* Fill page with data. */
+	readpage:	ntfs_readpage,		/* Fill page with data. */
 	sync_page:	block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
@@ -607,23 +593,6 @@ struct address_space_operations ntfs_mftbmp_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
 	readpage:	(readpage_t*)ntfs_mftbmp_readpage, /* Fill page with
 							      data. */
-	sync_page:	block_sync_page,	/* Currently, just unplugs the
-						   disk request queue. */
-	prepare_write:	NULL,			/* . */
-	commit_write:	NULL,			/* . */
-};
-
-/**
- * ntfs_dir_aops -
- *
- * Address space operations for accessing normal directory data (i.e. index
- * allocation attribute). We can't just use the same operations as for files
- * because 1) the attribute is different and even more importantly 2) the index
- * records have to be multi sector transfer deprotected (i.e. fixed-up).
- */
-struct address_space_operations ntfs_dir_aops = {
-	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_mst_readpage,	/* Fill page with data. */
 	sync_page:	block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */

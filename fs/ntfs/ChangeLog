@@ -26,7 +26,34 @@ ToDo:
 	  callers, i.e. ntfs_iget(), to pass that error code up instead of just
 	  using -EIO.
 	- Enable NFS exporting of NTFS.
-	- Use fake inodes for address space i/o.
+
+2.0.15 - Fake inodes based attribute i/o via the pagecache, fixes and cleanups.
+
+	- Fix silly bug in fs/ntfs/super.c::parse_options() which was causing
+	  remounts to fail when the partition had an entry in /etc/fstab and
+	  the entry specified the nls= option.
+	- Apply same macro magic used in fs/ntfs/inode.h to fs/ntfs/volume.h to
+	  expand all the helper functions NVolFoo(), NVolSetFoo(), and
+	  NVolClearFoo().
+	- Move copyright statement from driver initialisation message to
+	  module description (fs/super.c). This makes the initialisation
+	  message fit on one line and fits in better with rest of kernel.
+	- Update fs/ntfs/attrib.c::map_run_list() to work on both real and
+	  attribute inodes, and both for files and directories.
+	- Implement fake attribute inodes allowing all attribute i/o to go via
+	  the page cache and to use all the normal vfs/mm functionality:
+	  - Add ntfs_attr_iget() and its helper ntfs_read_locked_attr_inode()
+	    to fs/ntfs/inode.c.
+	  - Add needed cleanup code to ntfs_clear_big_inode().
+	- Merge address space operations for files and directories (aops.c),
+	  now just have ntfs_aops:
+	  - Rename:
+		end_buffer_read_attr_async() ->	ntfs_end_buffer_read_async(),
+		ntfs_attr_read_block()	     ->	ntfs_read_block(),
+		ntfs_file_read_page()	     ->	ntfs_readpage().
+	  - Rewrite fs/ntfs/aops.c::ntfs_readpage() to work on both real and
+	    attribute inodes, and both for files and directories.
+	  - Remove obsolete fs/ntfs/aops.c::ntfs_mst_readpage().
 
 2.0.14 - Run list merging code cleanup, minor locking changes, typo fixes.
 
