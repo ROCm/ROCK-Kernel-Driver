@@ -439,9 +439,9 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		break;
 	}
 	old = inb(ICEMT1724(ice, RATE));
-	val |= (old & 0xf0);
-	outb(val, ICEMT1724(ice, RATE));
-	if (rate == ice->cur_rate) {
+	if (old != val)
+		outb(val, ICEMT1724(ice, RATE));
+	else if (rate == ice->cur_rate) {
 		spin_unlock_irqrestore(&ice->reg_lock, flags);
 		return;
 	}
