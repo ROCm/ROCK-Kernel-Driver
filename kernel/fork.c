@@ -214,6 +214,8 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	struct thread_info *ti;
 	int cpu = get_cpu();
 
+	prepare_to_copy(orig);
+
 	tsk = task_cache[cpu];
 	task_cache[cpu] = NULL;
 	put_cpu();

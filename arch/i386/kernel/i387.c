@@ -54,9 +54,11 @@ void init_fpu(struct task_struct *tsk)
 
 void kernel_fpu_begin(void)
 {
+	struct thread_info *thread = current_thread_info();
+
 	preempt_disable();
-	if (test_thread_flag(TIF_USEDFPU)) {
-		__save_init_fpu(current);
+	if (thread->status & TS_USEDFPU) {
+		__save_init_fpu(thread->task);
 		return;
 	}
 	clts();

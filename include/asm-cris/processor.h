@@ -123,6 +123,9 @@ static inline void release_thread(struct task_struct *dead_task)
         /* Nothing needs to be done.  */
 }
 
+/* Prepare to copy thread state - unlazy all lazy status */
+#define prepare_to_copy(tsk)	do { } while (0)
+
 /*
  * Return saved PC of a blocked thread.
  */
