@@ -20,8 +20,6 @@
  * - Revision 0.1.3 (22 Jan 2000): modified for the new fb_info structure
  *                                 screen is cleared after rmmod
  *                                 virtual resolutions
- *                                 kernel parameter 'video=hga:font:{fontname}'
- *                                 module parameter 'font={fontname}'
  *                                 module parameter 'nologo={0|1}'
  *                                 the most important: boot logo :)
  * - Revision 0.1.0  (6 Dec 1999): faster scrolling and minor fixes
@@ -47,12 +45,8 @@
 #include <asm/io.h>
 #include <asm/vga.h>
 
-#ifdef MODULE
-
 #define INCLUDE_LINUX_LOGO_DATA
 #include <linux/linux_logo.h>
-
-#endif /* MODULE */
 
 #if 0
 #define DPRINTK(args...) printk(KERN_DEBUG __FILE__": " ##args)
@@ -145,11 +139,7 @@ static struct fb_info fb_info;
 /* Don't assume that tty1 will be the initial current console. */
 static int release_io_port = 0;
 static int release_io_ports = 0;
-
-#ifdef MODULE
-static char *font = NULL;
 static int nologo = 0;
-#endif
 
 /* -------------------------------------------------------------------------
  *
@@ -192,7 +182,6 @@ static void hga_clear_screen(void)
 		isa_memset_io(hga_vram_base, fillchar, hga_vram_len);
 }
 
-#ifdef MODULE
 static void hga_txt_mode(void)
 {
 	unsigned long flags;
@@ -223,7 +212,6 @@ static void hga_txt_mode(void)
 	hga_mode = HGA_TXT;
 	spin_unlock_irqrestore(&hga_reg_lock, flags);
 }
-#endif /* MODULE */
 
 static void hga_gfx_mode(void)
 {
@@ -256,16 +244,16 @@ static void hga_gfx_mode(void)
 	spin_unlock_irqrestore(&hga_reg_lock, flags);
 }
 
-#ifdef MODULE
 static void hga_show_logo(struct fb_info *info)
 {
-	int x, y;
+	unsigned long dest = hga_vram_base;
 	char *logo = linux_logo_bw;
+	int x, y;
+	
 	for (y = 134; y < 134 + 80 ; y++) /* this needs some cleanup */
 		for (x = 0; x < 10 ; x++)
 			isa_writeb(~*(logo++),(dest + HGA_ROWADDR(y) + x + 40));
 }
-#endif /* MODULE */	
 
 static void hga_pan(unsigned int xoffset, unsigned int yoffset)
 {
@@ -365,6 +353,33 @@ static int __init hga_card_detect(void)
 }
 
 /**
+ *	hgafb_open - open the framebuffer device
+ *	@info:pointer to fb_info object containing info for current hga board
+ *	@int:open by console system or userland.
+ */
+
+static int hgafb_open(struct fb_info *info, int init)
+{
+	hga_gfx_mode();
+	hga_clear_screen();
+	if (!nologo) hga_show_logo(info);
+	return 0;
+}
+
+/**
+ *	hgafb_open - open the framebuffer device
+ *	@info:pointer to fb_info object containing info for current hga board
+ *	@int:open by console system or userland.
+ */
+
+static int hgafb_release(struct fb_info *info, int init)
+{
+	hga_txt_mode();
+	hga_clear_screen();
+	return 0;
+}
+
+/**
  *	hgafb_setcolreg - set color registers
  *	@regno:register index to set
  *	@red:red value, unused
@@ -412,13 +427,6 @@ int hgafb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	}
 
 	hga_pan(var->xoffset, var->yoffset);
-
-	info->var.xoffset = var->xoffset;
-	info->var.yoffset = var->yoffset;
-	if (var->vmode & FB_VMODE_YWRAP)
-		info->var.vmode |= FB_VMODE_YWRAP;
-	else
-		info->var.vmode &= ~FB_VMODE_YWRAP;
 	return 0;
 }
 
@@ -452,7 +460,7 @@ static void hgafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 		dest = rowaddr(info, y) + (rect->dx >> 3);
 		switch (rect->rop) {
 		case ROP_COPY:
-			fb_memset(dest, rect->color, (rect->width >> 3));
+			//fb_memset(dest, rect->color, (rect->width >> 3));
 			break;
 		case ROP_XOR:
 			*dest = ~*dest;
@@ -473,7 +481,7 @@ static void hgafb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 		for (rows = area->height; rows--; ) {
 			src = rowaddr(info, y1) + (area->sx >> 3);
 			dest = rowaddr(info, y2) + (area->dx >> 3);
-			fb_memmove(dest, src, (area->width >> 3));
+			//fb_memmove(dest, src, (area->width >> 3));
 			y1++;
 			y2++;
 		}
@@ -484,7 +492,7 @@ static void hgafb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 		for (rows = area->height; rows--;) {
 			src = rowaddr(info, y1) + (area->sx >> 3);
 			dest = rowaddr(info, y2) + (area->dx >> 3);
-			fb_memmove(dest, src, (area->width >> 3));
+			//fb_memmove(dest, src, (area->width >> 3));
 			y1--;
 			y2--;
 		}
@@ -507,12 +515,14 @@ static void hgafb_imageblit(struct fb_info *info, struct fb_image *image)
 
 static struct fb_ops hgafb_ops = {
 	.owner		= THIS_MODULE,
+	.fb_open	= hgafb_open,
+	.fb_release	= hgafb_release,
 	.fb_setcolreg	= hgafb_setcolreg,
 	.fb_pan_display	= hgafb_pan_display,
 	.fb_blank	= hgafb_blank,
-	.fb_fillrect	= hgafb_fillrect,
-	.fb_copyarea	= hgafb_copyarea,
-	.fb_imageblit	= hgafb_imageblit,
+	.fb_fillrect	= cfb_fillrect, //hgafb_fillrect,
+	.fb_copyarea	= cfb_copyarea,	//hgafb_copyarea,
+	.fb_imageblit	= cfb_imageblit,//hgafb_imageblit,
 };
 		
 /* ------------------------------------------------------------------------- *
@@ -537,9 +547,6 @@ int __init hgafb_init(void)
 	printk(KERN_INFO "hgafb: %s with %ldK of memory detected.\n",
 		hga_type_name, hga_vram_len/1024);
 
-	hga_gfx_mode();
-	hga_clear_screen();
-
 	hga_fix.smem_start = VGA_MAP_MEM(hga_vram_base);
 	hga_fix.smem_len = hga_vram_len;
 
@@ -557,10 +564,6 @@ int __init hgafb_init(void)
 
         if (register_framebuffer(&fb_info) < 0)
                 return -EINVAL;
-
-#ifdef MODULE
-	if (!nologo) hga_show_logo(&fb_info);
-#endif /* MODULE */
 
         printk(KERN_INFO "fb%d: %s frame buffer device\n",
                minor(fb_info.node), fb_info.fix.id);

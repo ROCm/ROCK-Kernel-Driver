@@ -1222,7 +1222,7 @@ void vga_8planes_imageblit(struct fb_info *info, struct fb_image *image)
         setindex(oldindex);
 }
 
-void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
+void vga_imageblit_expand(struct fb_info *info, struct fb_image *image)
 {
 	char *where = info->screen_base + (image->dx/image->width) + image->dy * info->fix.line_length;
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
@@ -1280,6 +1280,12 @@ void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
 			cfb_imageblit(info, image);
 			break;
 	}
+}
+
+void vga16fb_imageblit(struct fb_info *info, struct fb_image *image)
+{
+	if (image->depth == 1)
+		vga_imageblit_expand(info, image);
 }
 
 static struct fb_ops vga16fb_ops = {

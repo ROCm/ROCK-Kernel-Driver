@@ -165,6 +165,7 @@ static int tdfxfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *inf
 static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
 static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area);  
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image); 
+static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 
 static struct fb_ops tdfxfb_ops = {
 	.owner		= THIS_MODULE,
@@ -176,6 +177,7 @@ static struct fb_ops tdfxfb_ops = {
 	.fb_fillrect	= tdfxfb_fillrect,
 	.fb_copyarea	= tdfxfb_copyarea,
 	.fb_imageblit	= tdfxfb_imageblit,
+	.fb_sync	= banshee_wait_idle,
 	.fb_cursor	= soft_cursor,
 };
 
@@ -183,7 +185,7 @@ static struct fb_ops tdfxfb_ops = {
  * do_xxx: Hardware-specific functions
  */
 static u32 do_calc_pll(int freq, int *freq_out);
-static void  do_write_regs(struct tdfx_par *par, struct banshee_reg *reg);
+static void  do_write_regs(struct fb_info *info, struct banshee_reg *reg);
 static unsigned long do_lfb_size(struct tdfx_par *par, unsigned short);
 
 /*
@@ -316,8 +318,9 @@ static inline void banshee_make_room(struct tdfx_par *par, int size)
 	while((tdfx_inl(par, STATUS) & 0x1f) < size);
 }
  
-static inline void banshee_wait_idle(struct tdfx_par *par)
+static inline void banshee_wait_idle(struct fb_info *info)
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par; 
 	int i = 0;
 
 	banshee_make_room(par, 1);
@@ -368,11 +371,12 @@ static u32 do_calc_pll(int freq, int* freq_out)
 	return (n << 8) | (m << 2) | k;
 }
 
-static void do_write_regs(struct tdfx_par *par, struct banshee_reg* reg) 
+static void do_write_regs(struct fb_info *info, struct banshee_reg* reg) 
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par; 
 	int i;
 
-	banshee_wait_idle(par);
+	banshee_wait_idle(info);
 
 	tdfx_outl(par, MISCINIT1, tdfx_inl(par, MISCINIT1) | 0x01);
 
@@ -429,7 +433,7 @@ static void do_write_regs(struct tdfx_par *par, struct banshee_reg* reg)
 	tdfx_outl(par,	CLIP1MAX,        0x0fff0fff);
 	tdfx_outl(par,	SRCXY,	   0);
 
-	banshee_wait_idle(par);
+	banshee_wait_idle(info);
 }
 
 static unsigned long do_lfb_size(struct tdfx_par *par, unsigned short dev_id) 
@@ -753,7 +757,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 			reg.miscinit0 &= ~(1 << 31);
 			break;
 	}
-#endif             
+#endif 
 	do_write_regs(par, &reg);
 
 	/* Now change fb_fix_screeninfo according to changes in par */
@@ -885,7 +889,7 @@ static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 	tdfx_outl(par,	COMMAND_2D, COMMAND_2D_FILLRECT | (tdfx_rop << 24));
 	tdfx_outl(par,	DSTSIZE,    rect->width | (rect->height << 16));
 	tdfx_outl(par,	LAUNCH_2D,  rect->dx | (rect->dy << 16));
-	banshee_wait_idle(par);
+	banshee_wait_idle(info);
 }
 
 /*
@@ -920,7 +924,7 @@ static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	tdfx_outl(par,	DSTSIZE,   area->width | (area->height << 16));
 	tdfx_outl(par,	DSTXY,     area->dx | (area->dy << 16));
 	tdfx_outl(par,	LAUNCH_2D, area->sx | (area->sy << 16)); 
-	banshee_wait_idle(par);
+	banshee_wait_idle(info);
 }
 
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap) 
@@ -939,8 +943,8 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 		tdfx_outl(par, COLORBACK, pixmap->bg_color);
 		srcfmt = 0x400000;
 	} else {
-		banshee_make_room(par, 6 + ((size + 3) >> 2));
-		srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
+		//banshee_make_room(par, 6 + ((size + 3) >> 2));
+		//srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
 	}	
 
 	tdfx_outl(par,	SRCXY,     0);
@@ -964,7 +968,144 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 		case 2:  tdfx_outl(par,	LAUNCH_2D,*(u16*)chardata); break;
 		case 3:  tdfx_outl(par,	LAUNCH_2D,*(u16*)chardata | ((chardata[3]) << 24)); break;
 	}
-	banshee_wait_idle(par);
+	banshee_wait_idle(info);
+}
+
+static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
+{
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
+	unsigned long flags;
+
+	/*
+	 * If the cursor is not be changed this means either we want the 
+	 * current cursor state (if enable is set) or we want to query what
+	 * we can do with the cursor (if enable is not set) 
+ 	 */
+	if (!cursor->set) return 0;
+
+	/* Too large of a cursor :-( */
+	if (cursor->image.width > 64 || cursor->image.height > 64)
+		return -ENXIO;
+
+	/* 
+	 * If we are going to be changing things we should disable
+	 * the cursor first 
+	 */
+	if (info->cursor.enable) {
+		spin_lock_irqsave(&par->DAClock, flags);
+		info->cursor.enable = 0;
+		del_timer(&(par->hwcursor.timer));
+		tdfx_outl(par, VIDPROCCFG, par->hwcursor.disable);
+		spin_unlock_irqrestore(&par->DAClock, flags);
+	}
+
+	/* Disable the Cursor */
+	if ((cursor->set && FB_CUR_SETCUR) && !cursor->enable)
+		return 0;
+
+	/* fix cursor color - XFree86 forgets to restore it properly */
+	if (cursor->set && FB_CUR_SETCMAP) {
+		struct fb_cmap cmap = cursor->image.cmap;
+		unsigned long bg_color, fg_color;
+
+		cmap.len = 2;/* Voodoo 3+ only support 2 color cursors*/
+		fg_color = ((cmap.red[cmap.start] << 16) |
+			    (cmap.green[cmap.start] << 8)  |
+			    (cmap.blue[cmap.start]));
+		bg_color = ((cmap.red[cmap.start+1] << 16) |
+			    (cmap.green[cmap.start+1] << 8) |
+			    (cmap.blue[cmap.start+1]));
+		fb_copy_cmap(&cmap, &info->cursor.image.cmap, 0);
+		spin_lock_irqsave(&par->DAClock, flags);
+		banshee_make_room(par, 2);
+		tdfx_outl(par, HWCURC0, bg_color);
+		tdfx_outl(par, HWCURC1, fg_color);
+		spin_unlock_irqrestore(&par->DAClock, flags);
+	}
+
+	if (cursor->set && FB_CUR_SETPOS) {
+		int x, y;
+
+		x = cursor->image.dx;
+		y = cursor->image.dy;
+		y -= info->var.yoffset;
+		info->cursor.image.dx = x;
+		info->cursor.image.dy = y;
+		x += 63;
+		y += 63;
+		spin_lock_irqsave(&par->DAClock, flags);
+		banshee_make_room(par, 1);
+		tdfx_outl(par, HWCURLOC, (y << 16) + x);
+		spin_unlock_irqrestore(&par->DAClock, flags);
+	}
+
+	/* Not supported so we fake it */
+	if (cursor->set && FB_CUR_SETHOT) {
+		info->cursor.hot.x = cursor->hot.x;
+		info->cursor.hot.y = cursor->hot.y;
+	}
+
+	if (cursor->set && FB_CUR_SETSHAPE) {
+		/*
+	 	 * Voodoo 3 and above cards use 2 monochrome cursor patterns.
+		 *    The reason is so the card can fetch 8 words at a time
+		 * and are stored on chip for use for the next 8 scanlines.
+		 * This reduces the number of times for access to draw the
+		 * cursor for each screen refresh.
+		 *    Each pattern is a bitmap of 64 bit wide and 64 bit high
+		 * (total of 8192 bits or 1024 Kbytes). The two patterns are
+		 * stored in such a way that pattern 0 always resides in the
+		 * lower half (least significant 64 bits) of a 128 bit word
+		 * and pattern 1 the upper half. If you examine the data of
+		 * the cursor image the graphics card uses then from the
+		 * begining you see line one of pattern 0, line one of
+		 * pattern 1, line two of pattern 0, line two of pattern 1,
+		 * etc etc. The linear stride for the cursor is always 16 bytes
+		 * (128 bits) which is the maximum cursor width times two for
+		 * the two monochrome patterns.
+		 */
+		u8 *cursorbase = (u8 *) info->cursor.image.data;
+		char *bitmap = cursor->image.data;
+		char *mask = cursor->mask;
+		int i, j, k, h = 0;
+
+		for (i = 0; i < 64; i++) {
+			if (i < cursor->image.height) {
+				j = (cursor->image.width + 7) >> 3;
+				k = 8 - j;
+
+				for (;j > 0; j--) {
+				/* Pattern 0. Copy the cursor bitmap to it */
+					fb_writeb(*bitmap, cursorbase + h);
+					bitmap++;
+				/* Pattern 1. Copy the cursor mask to it */
+					fb_writeb(*mask, cursorbase + h + 8);
+					mask++;
+					h++;
+				}
+				for (;k > 0; k--) {
+					fb_writeb(0, cursorbase + h);
+					fb_writeb(~0, cursorbase + h + 8);
+					h++;
+				}
+			} else {
+				fb_writel(0, cursorbase + h);
+				fb_writel(0, cursorbase + h + 4);
+				fb_writel(~0, cursorbase + h + 8);
+				fb_writel(~0, cursorbase + h + 12);
+				h += 16;
+			}
+		}
+	}
+	/* Turn the cursor on */
+	cursor->enable = 1;
+	info->cursor = *cursor;
+	mod_timer(&par->hwcursor.timer, jiffies+HZ/2);
+	spin_lock_irqsave(&par->DAClock, flags);
+	banshee_make_room(par, 1);
+	tdfx_outl(par, VIDPROCCFG, par->hwcursor.enable);
+	spin_unlock_irqrestore(&par->DAClock, flags);
+	return 0;
 }
 
 /**
@@ -988,14 +1129,15 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 		return err;
 	}
 
-	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
-			sizeof(u32) * 16, GFP_KERNEL);
+	size = sizeof(struct fb_info)+sizeof(struct tdfx_par)+16*sizeof(u32);
+
+	info = kmalloc(size, GFP_KERNEL);
 
 	if (!info)	return -ENOMEM;
 		
-	memset(info, 0, sizeof(info) + sizeof(struct display) + sizeof(u32) * 16);
+	memset(info, 0, size);
     
-	default_par = kmalloc(sizeof(struct tdfx_par), GFP_KERNEL);
+	default_par = (struct tdfx_par *) (info + 1);
  
 	/* Configure the default fb_fix_screeninfo first */
 	switch (pdev->device) {
@@ -1078,7 +1220,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->fbops		= &tdfxfb_ops;
 	info->fix		= tdfx_fix; 	
 	info->par		= default_par;
-	info->pseudo_palette	= (void *)(info + 1); 
+	info->pseudo_palette	= (void *)(default_par + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
 
 	if (!mode_option)
