@@ -74,6 +74,7 @@ struct list_head *ip_conntrack_hash;
 static kmem_cache_t *ip_conntrack_cachep;
 static kmem_cache_t *ip_conntrack_expect_cachep;
 struct ip_conntrack ip_conntrack_untracked;
+unsigned int ip_ct_log_invalid;
 
 DEFINE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
