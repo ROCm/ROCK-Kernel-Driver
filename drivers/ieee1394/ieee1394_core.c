@@ -400,30 +400,34 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
 void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
                       int ackcode)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->pending_packet_queue.lock, flags);
+
 	packet->ack_code = ackcode;
 
-	if (packet->no_waiter) {
-		/* must not have a tlabel allocated */
+	if (packet->no_waiter || packet->state == hpsb_complete) {
+		/* if packet->no_waiter, must not have a tlabel allocated */
+		spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
 		hpsb_free_packet(packet);
 		return;
 	}
 
+	atomic_dec(&packet->refcnt);	/* drop HC's reference */
+	/* here the packet must be on the host->pending_packet_queue */
+
 	if (ackcode != ACK_PENDING || !packet->expect_response) {
-		atomic_dec(&packet->refcnt);
-		skb_unlink(packet->skb);
 		packet->state = hpsb_complete;
+		__skb_unlink(packet->skb, &host->pending_packet_queue);
+		spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
 		queue_packet_complete(packet);
 		return;
 	}
 
-	if (packet->state == hpsb_complete) {
-		hpsb_free_packet(packet);
-		return;
-	}
-
-	atomic_dec(&packet->refcnt);
 	packet->state = hpsb_pending;
 	packet->sendtime = jiffies;
+
+	spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
 
 	mod_timer(&host->timeout, jiffies + host->timeout_interval);
 }
@@ -658,14 +662,13 @@ static void handle_packet_response(struct hpsb_host *host, int tcode,
         }
 
         if (!tcode_match) {
+		spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
                 HPSB_INFO("unsolicited response packet received - tcode mismatch");
                 dump_packet("contents:", data, 16);
-		spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
                 return;
         }
 
 	__skb_unlink(skb, skb->list);
-	spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
 
 	if (packet->state == hpsb_queued) {
 		packet->sendtime = jiffies;
@@ -673,6 +676,8 @@ static void handle_packet_response(struct hpsb_host *host, int tcode,
 	}
 
 	packet->state = hpsb_complete;
+	spin_unlock_irqrestore(&host->pending_packet_queue.lock, flags);
+
 	queue_packet_complete(packet);
 }
 
@@ -1002,6 +1007,10 @@ static DECLARE_MUTEX_LOCKED(khpsbpkt_sig);
 
 static void queue_packet_complete(struct hpsb_packet *packet)
 {
+	if (packet->no_waiter) {
+		hpsb_free_packet(packet);
+		return;
+	}
 	if (packet->complete_routine != NULL) {
 		skb_queue_tail(&hpsbpkt_queue, packet->skb);
 
