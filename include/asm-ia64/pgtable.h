@@ -496,6 +496,6 @@ extern void update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, p
 
 /* These tell get_user_pages() that the first gate page is accessible from user-level.  */
 #define FIXADDR_USER_START	GATE_ADDR
-#define FIXADDR_USER_END	(GATE_ADDR + 2*PAGE_SIZE)
+#define FIXADDR_USER_END	(GATE_ADDR + 2*PERCPU_PAGE_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */

@@ -859,10 +859,10 @@ static int irttp_udata_indication(void *instance, void *sap,
 		err = self->notify.udata_indication(self->notify.instance,
 						    self,skb);
 		/* Same comment as in irttp_do_data_indication() */
-		if (err != -ENOMEM) 
+		if (!err) 
 			return 0;
 	}
-	/* Either no handler, or -ENOMEM */
+	/* Either no handler, or handler returns an error */
 	dev_kfree_skb(skb);
 
 	return 0;
@@ -1620,7 +1620,7 @@ void irttp_do_data_indication(struct tsap_cb *self, struct sk_buff *skb)
 	 * be difficult, so it can instead just refuse to eat it and just
 	 * give an error back
 	 */
-	if (err == -ENOMEM) {
+	if (err) {
 		IRDA_DEBUG(0, "%s() requeueing skb!\n", __FUNCTION__);
 
 		/* Make sure we take a break */

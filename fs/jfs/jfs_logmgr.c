@@ -1415,8 +1415,8 @@ void jfs_flush_journal(struct jfs_log *log, int wait)
 	int i;
 	struct tblock *target;
 
+	/* jfs_write_inode may call us during read-only mount */
 	if (!log)
-		/* jfs_write_inode may call us during read-only mount */
 		return;
 
 	jfs_info("jfs_flush_journal: log:0x%p wait=%d", log, wait);

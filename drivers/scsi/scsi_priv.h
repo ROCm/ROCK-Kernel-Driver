@@ -130,7 +130,6 @@ extern void scsi_exit_procfs(void);
 extern int scsi_scan_host_selected(struct Scsi_Host *, unsigned int,
 				   unsigned int, unsigned int, int);
 extern void scsi_forget_host(struct Scsi_Host *);
-extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_rescan_device(struct device *);
 
 /* scsi_sysctl.c */
@@ -143,7 +142,8 @@ extern void scsi_exit_sysctl(void);
 #endif /* CONFIG_SYSCTL */
 
 /* scsi_sysfs.c */
-extern int scsi_device_register(struct scsi_device *);
+extern void scsi_device_dev_release(struct device *);
+extern int scsi_sysfs_add_sdev(struct scsi_device *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
