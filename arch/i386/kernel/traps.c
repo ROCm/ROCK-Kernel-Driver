@@ -162,7 +162,6 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 			break;
 		printk(" =======================\n");
 	}
-	printk("\n");
 }
 
 void show_stack(struct task_struct *task, unsigned long *esp)
