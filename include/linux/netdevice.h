@@ -711,7 +711,8 @@ enum {
 
 static inline int netif_rx_schedule_prep(struct net_device *dev)
 {
-	return !test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state);
+	return netif_running(dev) &&
+		!test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state);
 }
 
 /* Add interface to tail of rx poll list. This assumes that _prep has
