@@ -1920,8 +1920,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	if (ac97_clock >= 8000 && ac97_clock <= 48000)
 		pbus->clock = ac97_clock;
 	/* FIXME: my test board doesn't work well with VRA... */
-	if (chip->device_type != DEVICE_ALI)
-		pbus->vra = 1;
+	if (chip->device_type == DEVICE_ALI)
+		pbus->no_vra = 1;
 	chip->ac97_bus = pbus;
 
 	ac97.pci = chip->pci;

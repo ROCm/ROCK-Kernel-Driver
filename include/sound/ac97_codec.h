@@ -423,7 +423,7 @@ struct _snd_ac97_bus {
 	/* --- */
 	snd_card_t *card;
 	unsigned short num;	/* bus number */
-	unsigned short vra: 1,	/* bridge supports VRA */
+	unsigned short no_vra: 1, /* bridge doesn't support VRA */
 		       isdin: 1;/* independent SDIN */
 	unsigned int clock;	/* AC'97 base clock (usually 48000Hz) */
 	spinlock_t bus_lock;	/* used mainly for slot allocation */
