@@ -38,6 +38,7 @@
 #include <linux/version.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/vmalloc.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/devfs_fs_kernel.h>

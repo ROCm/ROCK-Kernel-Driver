@@ -251,6 +251,8 @@ static void init_hwif_data (unsigned int index)
 	hwif->mwdma_mask = 0x80;	/* disable all mwdma */
 	hwif->swdma_mask = 0x80;	/* disable all swdma */
 
+	sema_init(&hwif->gendev_rel_sem, 0);
+
 	default_hwif_iops(hwif);
 	default_hwif_transport(hwif);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
@@ -273,6 +275,7 @@ static void init_hwif_data (unsigned int index)
 		drive->driver			= &idedefault_driver;
 		drive->vdma			= 0;
 		INIT_LIST_HEAD(&drive->list);
+		sema_init(&drive->gendev_rel_sem, 0);
 	}
 }
 
@@ -745,6 +748,7 @@ void ide_unregister (unsigned int index)
 		spin_unlock_irq(&ide_lock);
 		blk_cleanup_queue(drive->queue);
 		device_unregister(&drive->gendev);
+		down(&drive->gendev_rel_sem);
 		spin_lock_irq(&ide_lock);
 		drive->queue = NULL;
 	}
@@ -774,6 +778,7 @@ void ide_unregister (unsigned int index)
 	/* More messed up locking ... */
 	spin_unlock_irq(&ide_lock);
 	device_unregister(&hwif->gendev);
+	down(&hwif->gendev_rel_sem);
 
 	/*
 	 * Remove us from the kernel's knowledge

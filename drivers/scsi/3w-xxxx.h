@@ -59,42 +59,37 @@
 
 /* AEN strings */
 static char *tw_aen_string[] = {
-	"INFO: AEN queue empty",                       // 0x000
-	"INFO: Soft reset occurred",                   // 0x001
-	"ERROR: Unit degraded: Unit #",                // 0x002
-	"ERROR: Controller error",                     // 0x003 
-	"ERROR: Rebuild failed: Unit #",               // 0x004
-	"INFO: Rebuild complete: Unit #",              // 0x005
-	"ERROR: Incomplete unit detected: Unit #",     // 0x006
-	"INFO: Initialization complete: Unit #",       // 0x007
-	"WARNING: Unclean shutdown detected: Unit #",  // 0x008
-	"WARNING: ATA port timeout: Port #",           // 0x009
-	"ERROR: Drive error: Port #",                  // 0x00A
-	"INFO: Rebuild started: Unit #",               // 0x00B 
-	"INFO: Initialization started: Unit #",        // 0x00C
-	"ERROR: Logical unit deleted: Unit #",         // 0x00D
-	NULL,                                          // 0x00E unused
-	"WARNING: SMART threshold exceeded: Port #",   // 0x00F
-	NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL,                                    // 0x010-0x020 unused
-	"WARNING: ATA UDMA downgrade: Port #",         // 0x021
-	"WARNING: ATA UDMA upgrade: Port #",           // 0x022
-	"WARNING: Sector repair occurred: Port #",     // 0x023
-	"ERROR: SBUF integrity check failure",         // 0x024
-	"ERROR: Lost cached write: Port #",            // 0x025
-	"ERROR: Drive ECC error detected: Port #",     // 0x026
-	"ERROR: DCB checksum error: Port #",           // 0x027
-	"ERROR: DCB unsupported version: Port #",      // 0x028
-	"INFO: Verify started: Unit #",                // 0x029
-	"ERROR: Verify failed: Port #",                // 0x02A
-	"INFO: Verify complete: Unit #",               // 0x02B
-	"WARNING: Overwrote bad sector during rebuild: Port #",  //0x02C
-	"ERROR: Encountered bad sector during rebuild: Port #",  //0x02D
-	"ERROR: Replacement drive is too small: Port #",         //0x02E
-	"WARNING: Verify error: Unit not previously initialized: Unit #", //0x02F
-	"ERROR: Drive not supported: Port #"           // 0x030
+	[0x000] = "INFO: AEN queue empty",
+	[0x001] = "INFO: Soft reset occurred",
+	[0x002] = "ERROR: Unit degraded: Unit #",
+	[0x003] = "ERROR: Controller error",
+	[0x004] = "ERROR: Rebuild failed: Unit #",
+	[0x005] = "INFO: Rebuild complete: Unit #",
+	[0x006] = "ERROR: Incomplete unit detected: Unit #",
+	[0x007] = "INFO: Initialization complete: Unit #",
+	[0x008] = "WARNING: Unclean shutdown detected: Unit #",
+	[0x009] = "WARNING: ATA port timeout: Port #",
+	[0x00A] = "ERROR: Drive error: Port #",
+	[0x00B] = "INFO: Rebuild started: Unit #",
+	[0x00C] = "INFO: Initialization started: Unit #",
+	[0x00D] = "ERROR: Logical unit deleted: Unit #",
+	[0x00F] = "WARNING: SMART threshold exceeded: Port #",
+	[0x021] = "WARNING: ATA UDMA downgrade: Port #",
+	[0x021] = "WARNING: ATA UDMA upgrade: Port #",
+	[0x023] = "WARNING: Sector repair occurred: Port #",
+	[0x024] = "ERROR: SBUF integrity check failure",
+	[0x025] = "ERROR: Lost cached write: Port #",
+	[0x026] = "ERROR: Drive ECC error detected: Port #",
+	[0x027] = "ERROR: DCB checksum error: Port #",
+	[0x028] = "ERROR: DCB unsupported version: Port #",
+	[0x029] = "INFO: Verify started: Unit #",
+	[0x02A] = "ERROR: Verify failed: Port #",
+	[0x02B] = "INFO: Verify complete: Unit #",
+	[0x02C] = "WARNING: Overwrote bad sector during rebuild: Port #",
+	[0x02D] = "ERROR: Encountered bad sector during rebuild: Port #",
+	[0x02E] = "ERROR: Replacement drive is too small: Port #",
+	[0x02F] = "WARNING: Verify error: Unit not previously initialized: Unit #",
+	[0x030] = "ERROR: Drive not supported: Port #",
 };
 
 /*
