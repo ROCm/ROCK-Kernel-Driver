@@ -3165,7 +3165,7 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 	struct config_rom_ptr cr;
 
 	memset(&cr, 0, sizeof(cr));
-	memset(ohci->csr_config_rom_cpu, 0, sizeof (ohci->csr_config_rom_cpu));
+	memset(ohci->csr_config_rom_cpu, 0, sizeof(*ohci->csr_config_rom_cpu));
 
 	cr.data = ohci->csr_config_rom_cpu;
 
