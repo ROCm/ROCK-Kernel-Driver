@@ -26,6 +26,7 @@
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/bootmem.h>
+#include <linux/mm.h>
 #include <asm/paca.h>
 #include <asm/processor.h>
 #include <asm/naca.h>
