@@ -116,19 +116,19 @@ find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 		range_start = max(start, free_start);
 		range_end   = min(end, rsvd_region[i].start & PAGE_MASK);
 
+		free_start = PAGE_ALIGN(rsvd_region[i].end);
+
 		if (range_end <= range_start)
 			continue; /* skip over empty range */
 
-	       	if (range_end - range_start >= needed) {
+		if (range_end - range_start >= needed) {
 			bootmap_start = __pa(range_start);
-			return 1;	/* done */
+			return -1;	/* done */
 		}
 
 		/* nothing more available in this segment */
 		if (range_end == end)
 			return 0;
-
-		free_start = PAGE_ALIGN(rsvd_region[i].end);
 	}
 	return 0;
 }

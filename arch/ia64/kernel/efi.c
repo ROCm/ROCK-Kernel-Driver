@@ -357,8 +357,10 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 			if (total_mem >= mem_limit)
 				continue;
 			total_mem += (md->num_pages << EFI_PAGE_SHIFT);
-			if (total_mem > mem_limit)
+			if (total_mem > mem_limit) {
 				md->num_pages -= ((total_mem - mem_limit) >> EFI_PAGE_SHIFT);
+				max_addr = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+			}
 
 			if (md->num_pages == 0)
 				continue;
