@@ -195,8 +195,8 @@ cFYI(1,("rcv csocket %p with rc 0x%x smb len of 0x%x tcpStatus %d",csocket,lengt
 			cifs_reconnect(server);
 			csocket = server->ssocket;
 			continue;
-		} else if (length == -ERESTARTSYS) {
-			cFYI(1,("ERESTARTSYS returned from sock_recvmsg"));
+		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {
+			cFYI(0,("ERESTARTSYS returned from sock_recvmsg"));
 			schedule_timeout(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
 				tcpStatus CifsNeedReconnect if server hung */
@@ -772,20 +772,14 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	int rc = 0;
 
 	if(*csocket == NULL) {
-	    rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
-	    if (rc < 0) {
+		rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
+		if (rc < 0) {
 			cERROR(1, ("Error %d creating socket",rc));
 			*csocket = NULL;
 			return rc;
-	    } else {
+		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
-			struct timeval tval;
-			tval.tv_sec = 10;
-			tval.tv_usec = 0;
 			cFYI(1,("Socket created"));
-		        sock_setsockopt(*csocket, SOL_SOCKET, SO_RCVTIMEO,
-                	        (char*)&tval, sizeof(struct timeval));
-
 		}
 	}
 
@@ -819,6 +813,11 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		}
 	}
 
+	/* Eventually check for other socket options to change from 
+		the default. sock_setsockopt not used because it expects 
+		user space buffer */
+	(*csocket)->sk->sk_rcvtimeo = 8 * HZ;
+		
 	return rc;
 }
 
