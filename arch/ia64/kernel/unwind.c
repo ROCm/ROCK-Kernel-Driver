@@ -78,7 +78,7 @@
 # define STAT(x...)
 #endif
 
-#define alloc_reg_state()	kmalloc(sizeof(struct unw_state_record), GFP_ATOMIC)
+#define alloc_reg_state()	kmalloc(sizeof(struct unw_reg_state), GFP_ATOMIC)
 #define free_reg_state(usr)	kfree(usr)
 #define alloc_labeled_state()	kmalloc(sizeof(struct unw_labeled_state), GFP_ATOMIC)
 #define free_labeled_state(usr)	kfree(usr)
