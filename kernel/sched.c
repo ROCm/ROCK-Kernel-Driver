@@ -742,7 +742,7 @@ static inline void finish_task_switch(task_t *prev)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
-	int drop_task_ref;
+	unsigned long prev_task_flags;
 
 	rq->prev_mm = NULL;
 
@@ -757,14 +757,11 @@ static inline void finish_task_switch(task_t *prev)
 	 * be dropped twice.
 	 * 		Manfred Spraul <manfred@colorfullife.com>
 	 */
-	drop_task_ref = 0;
-	if (unlikely(prev->state & (TASK_DEAD | TASK_ZOMBIE)))
-		drop_task_ref = 1;
-
+	prev_task_flags = prev->flags;
 	finish_arch_switch(rq, prev);
 	if (mm)
 		mmdrop(mm);
-	if (drop_task_ref)
+	if (unlikely(prev_task_flags & PF_DEAD))
 		put_task_struct(prev);
 }
 

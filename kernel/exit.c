@@ -688,6 +688,7 @@ static void exit_notify(struct task_struct *tsk)
 	}
 
 	tsk->state = TASK_ZOMBIE;
+	tsk->flags |= PF_DEAD;
 	/*
 	 * In the preemption case it must be impossible for the task
 	 * to get runnable again, so use "_raw_" unlock to keep
