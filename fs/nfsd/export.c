@@ -71,12 +71,15 @@ static DECLARE_WAIT_QUEUE_HEAD(	hash_wait );
 svc_export *
 exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 {
-	svc_export *	exp;
+	struct list_head *head, *p;
+	svc_export *exp = NULL;
 
 	if (!clp)
 		return NULL;
 
-	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next) {
+	head = &clp->cl_export[EXPORT_HASH(dev)];
+	list_for_each(p, head) {
+		exp = list_entry(p, svc_export, ex_hash);
 		if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
 			break;
 	}
@@ -86,13 +89,16 @@ exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 svc_export *
 exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 {
+	struct list_head *head, *p;
 	int hash = EXPORT_HASH(mnt->mnt_sb->s_dev);
-	svc_export *exp;
+	svc_export *exp = NULL;
 
 	if (!clp)
 		return NULL;
 
-	for (exp = clp->cl_export[hash]; exp; exp = exp->ex_next) {
+	head = &clp->cl_export[hash];
+	list_for_each(p, head) {
+		exp = list_entry(p, svc_export, ex_hash);
 		if (exp->ex_dentry == dentry && exp->ex_mnt == mnt)
 			break;
 	}
@@ -105,14 +111,15 @@ exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 static svc_export *
 exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
-	svc_export      *exp;
+	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
+	struct list_head *p;
+	svc_export *exp = NULL;
 
-	if (clp == NULL)
-		return NULL;
-
-	for (exp = clp->cl_export[EXPORT_HASH(sb->s_dev)]; exp; exp = exp->ex_next)
+	list_for_each(p, head) {
+		exp = list_entry(p, svc_export, ex_hash);
 		if (is_subdir(dentry, exp->ex_dentry))
 			break;
+	}
 	return exp;
 }
 
@@ -124,17 +131,33 @@ exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 static svc_export *
 exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
-	svc_export      *exp;
+	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
+	struct list_head *p;
+	svc_export *exp = NULL;
+	struct dentry *ndentry;
 
-	if (clp == NULL)
-		return NULL;
-
-	for (exp = clp->cl_export[EXPORT_HASH(sb->s_dev)]; exp; exp = exp->ex_next) {
-		struct dentry	*ndentry = exp->ex_dentry;
+	list_for_each(p, head) {
+		exp = list_entry(p, svc_export, ex_hash);
+		ndentry = exp->ex_dentry;
 		if (ndentry && is_subdir(ndentry->d_parent, dentry))
 			break;
 	}
 	return exp;
+}
+
+/* Update parent pointers of all exports */
+static void exp_change_parents(svc_client *clp, svc_export *old, svc_export *new)
+{
+	int i;
+	for (i = 0; i < NFSCLNT_EXPMAX; i++) {
+		struct list_head *head = &clp->cl_export[i];
+		struct list_head *p;
+		list_for_each(p, head) {
+			svc_export *exp = list_entry(p, svc_export, ex_hash);
+			if (exp->ex_parent == old)
+				exp->ex_parent = new;
+		}
+	}
 }
 
 /*
@@ -145,10 +168,9 @@ exp_export(struct nfsctl_export *nxp)
 {
 	svc_client	*clp;
 	svc_export	*exp, *parent;
-	svc_export	**head;
 	struct nameidata nd;
 	struct inode	*inode = NULL;
-	int		i, err;
+	int		err;
 	kdev_t		dev;
 	ino_t		ino;
 
@@ -244,21 +266,10 @@ exp_export(struct nfsctl_export *nxp)
 	exp->ex_anon_gid = nxp->ex_anon_gid;
 
 	/* Update parent pointers of all exports */
-	if (parent) {
-		for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-			svc_export *temp = clp->cl_export[i];
+	if (parent)
+		exp_change_parents(clp, parent, exp);
 
-			while (temp) {
-				if (temp->ex_parent == parent)
-					temp->ex_parent = exp;
-				temp = temp->ex_next;
-			}
-		}
-	}
-
-	head = clp->cl_export + EXPORT_HASH(dev);
-	exp->ex_next = *head;
-	*head = exp;
+	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(dev));
 
 	err = 0;
 
@@ -281,21 +292,12 @@ finish:
 static void
 exp_do_unexport(svc_export *unexp)
 {
-	svc_export	*exp;
-	svc_client	*clp;
 	struct dentry	*dentry;
 	struct vfsmount *mnt;
 	struct inode	*inode;
-	int		i;
 
 	/* Update parent pointers. */
-	clp = unexp->ex_client;
-	for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-		for (exp = clp->cl_export[i]; exp; exp = exp->ex_next)
-			if (exp->ex_parent == unexp)
-				exp->ex_parent = unexp->ex_parent;
-	}
-
+	exp_change_parents(unexp->ex_client, unexp, unexp->ex_parent);
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
 	inode = dentry->d_inode;
@@ -315,17 +317,17 @@ exp_do_unexport(svc_export *unexp)
 static void
 exp_unexport_all(svc_client *clp)
 {
-	svc_export	*exp;
 	int		i;
 
 	dprintk("unexporting all fs's for clnt %p\n", clp);
 	for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-		exp = clp->cl_export[i];
-		clp->cl_export[i] = NULL;
-		while (exp) {
-			svc_export *next = exp->ex_next;
+		struct list_head *p = &clp->cl_export[i];
+		svc_export *exp;
+
+		while (!list_empty(p)) {
+			exp = list_entry(p->next, svc_export, ex_hash);
+			list_del(&exp->ex_hash);
 			exp_do_unexport(exp);
-			exp = next;
 		}
 	}
 }
@@ -337,7 +339,6 @@ int
 exp_unexport(struct nfsctl_export *nxp)
 {
 	svc_client	*clp;
-	svc_export	**expp, *exp = NULL;
 	int		err;
 
 	/* Consistency check */
@@ -351,17 +352,11 @@ exp_unexport(struct nfsctl_export *nxp)
 	clp = exp_getclientbyname(nxp->ex_client);
 	if (clp) {
 		kdev_t ex_dev = to_kdev_t(nxp->ex_dev);
-		expp = clp->cl_export + EXPORT_HASH(ex_dev);
-		while ((exp = *expp) != NULL) {
-			if (kdev_same(exp->ex_dev, ex_dev)) {
-				if (exp->ex_ino == nxp->ex_ino) {
-					*expp = exp->ex_next;
-					exp_do_unexport(exp);
-					err = 0;
-					break;
-				}
-			}
-			expp = &(exp->ex_next);
+		svc_export *exp = exp_get(clp, ex_dev, nxp->ex_ino);
+		if (exp) {
+			list_del(&exp->ex_hash);
+			exp_do_unexport(exp);
+			err = 0;
 		}
 	}
 
@@ -611,9 +606,13 @@ exp_procfs_exports(char *buffer, char **start, off_t offset,
 
 	for (clp = clients; clp; clp = clp->cl_next) {
 		for (i = 0; i < NFSCLNT_EXPMAX; i++) {
-			exp = clp->cl_export[i];
-			while (exp) {
+			struct list_head *list = &clp->cl_export[i];
+			struct list_head *p;
+
+			list_for_each(p, list) {
 				int first = 0;
+
+				exp = list_entry(p, svc_export, ex_hash);
 				MANGLE(exp->ex_path);
 				buffer[len++]='\t';
 				MANGLE(clp->cl_ident);
@@ -641,7 +640,6 @@ exp_procfs_exports(char *buffer, char **start, off_t offset,
 						}
 					}
 				}
-				exp = exp->ex_next;
 
 				buffer[len++]='\n';
 
@@ -701,6 +699,8 @@ exp_addclient(struct nfsctl_client *ncp)
 		if (!(clp = kmalloc(sizeof(*clp), GFP_KERNEL)))
 			goto out_unlock;
 		memset(clp, 0, sizeof(*clp));
+		for (i = 0; i < NFSCLNT_EXPMAX; i++)
+			INIT_LIST_HEAD(&clp->cl_export[i]);
 
 		dprintk("created client %s (%p)\n", ncp->cl_ident, clp);
 
