@@ -333,8 +333,6 @@ static int dtlk_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static devfs_handle_t devfs_handle;
-
 static int __init dtlk_init(void)
 {
 	dtlk_port_lpc = 0;
@@ -347,10 +345,10 @@ static int __init dtlk_init(void)
 	}
 	if (dtlk_dev_probe() == 0)
 		printk(", MAJOR %d\n", dtlk_major);
-	devfs_handle = devfs_register (NULL, "dtlk", DEVFS_FL_DEFAULT,
-				       dtlk_major, DTLK_MINOR,
-				       S_IFCHR | S_IRUSR | S_IWUSR,
-				       &dtlk_fops, NULL);
+	devfs_register(NULL, "dtlk", DEVFS_FL_DEFAULT,
+		       dtlk_major, DTLK_MINOR,
+		       S_IFCHR | S_IRUSR | S_IWUSR,
+		       &dtlk_fops, NULL);
 
 	init_timer(&dtlk_timer);
 	dtlk_timer.function = dtlk_timer_tick;
@@ -370,7 +368,7 @@ static void __exit dtlk_cleanup (void)
 
 	dtlk_write_tts(DTLK_CLEAR);
 	unregister_chrdev(dtlk_major, "dtlk");
-	devfs_unregister(devfs_handle);
+	devfs_remove("dtlk");
 	release_region(dtlk_port_lpc, DTLK_IO_EXTENT);
 }
 
