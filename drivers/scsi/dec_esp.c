@@ -120,7 +120,7 @@ static int dec_esp_release(struct Scsi_Host *shost)
 }
 
 static Scsi_Host_Template driver_template = {
-	.proc_name		= "esp",
+	.proc_name		= "dec_esp",
 	.proc_info		= &esp_proc_info,
 	.name			= "NCR53C94",
 	.detect			= dec_esp_detect,
