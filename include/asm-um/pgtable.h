@@ -155,12 +155,6 @@ extern pte_t * __bad_pagetable(void);
 #define pud_newpage(x)  (pud_val(x) & _PAGE_NEWPAGE)
 #define pud_mkuptodate(x) (pud_val(x) &= ~_PAGE_NEWPAGE)
 
-static inline pud_t fastcall *__pud_alloc(struct mm_struct *mm, pgd_t *pgd,
-					  unsigned long addr)
-{
-	BUG();
-}
-
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
 #define pmd_page(pmd) phys_to_page(pmd_val(pmd) & PAGE_MASK)
