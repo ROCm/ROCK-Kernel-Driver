@@ -99,7 +99,7 @@ static int generic_NCR5380_biosparam(struct scsi_device *, struct block_device *
 #define NCR5380_region_size 0x3a00
 
 #define NCR5380_read(reg) isa_readb(NCR5380_map_name + NCR53C400_mem_base + (reg))
-#define NCR5380_write(reg, value) isa_writeb(NCR5380_map_name + NCR53C400_mem_base + (reg), value)
+#define NCR5380_write(reg, value) isa_writeb(value, NCR5380_map_name + NCR53C400_mem_base + (reg))
 #endif
 
 #define NCR5380_implementation_fields \
