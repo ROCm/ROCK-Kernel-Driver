@@ -122,7 +122,7 @@ config I2C_ISA
 
 config I2C_ITE
 	tristate "ITE I2C Adapter"
-	depends on I2C
+	depends on I2C && MIPS_ITE8172
 	select I2C_ALGOITE
 	help
 	  This supports the ITE8172 I2C peripheral found on some MIPS
