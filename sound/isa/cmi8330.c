@@ -439,7 +439,7 @@ static int __devinit snd_cmi8330_pcm(snd_card_t *card, struct snd_cmi8330 *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &chip->streams[SNDRV_PCM_STREAM_CAPTURE].ops);
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_ISA,
-					      snd_pcm_isa_flags(0),
+					      snd_pcm_dma_flags(0),
 					      64*1024, 128*1024);
 	chip->pcm = pcm;
 

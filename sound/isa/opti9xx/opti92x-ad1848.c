@@ -1400,7 +1400,7 @@ int snd_opti93x_pcm(opti93x_t *codec, int device, snd_pcm_t **rpcm)
 	strcpy(pcm->name, snd_opti93x_chip_id(codec));
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_ISA,
-					      snd_pcm_isa_flags(0),
+					      snd_pcm_dma_flags(0),
 					      64*1024, codec->dma1 > 3 || codec->dma2 > 3 ? 128*1024 : 64*1024);
 
 	codec->pcm = pcm;
