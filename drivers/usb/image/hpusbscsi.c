@@ -130,7 +130,7 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 	/* adding to list for module unload */
 	list_add (&hpusbscsi_devices, &new->lh);
 
-	dev_set_drvdata(&intf->dev, new);
+	usb_set_intfdata(intf, new);
 	return 0;
 
       err_out:
@@ -143,9 +143,9 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 static void
 hpusbscsi_usb_disconnect (struct usb_interface *intf)
 {
-	struct hpusbscsi *desc = dev_get_drvdata(&intf->dev);
+	struct hpusbscsi *desc = usb_get_intfdata(intf);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (desc)
 		usb_unlink_urb(desc->controlurb);
 }
