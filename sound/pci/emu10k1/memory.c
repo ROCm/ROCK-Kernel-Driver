@@ -62,7 +62,7 @@ static inline void set_silent_ptb(emu10k1_t *emu, int page)
 	page *= UNIT_PAGES;
 	for (i = 0; i < UNIT_PAGES; i++, page++)
 		/* do not increment ptr */
-		__set_ptb_entry(emu, page, emu->silent_page_dmaaddr);
+		__set_ptb_entry(emu, page, emu->silent_page.addr);
 }
 #endif /* PAGE_SIZE */
 
