@@ -149,9 +149,9 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	};
 
 	lock_page(page);
-
-	BUG_ON(page_mapping(page));
-	add_to_page_cache(page, &swapper_space, entry.val, GFP_NOIO);
+	ret = add_to_swap_cache(page, entry);
+	if (unlikely(ret))
+		goto out_unlock;
 
 	if (rw == READ) {
 		ret = swap_readpage(NULL, page);
@@ -162,9 +162,9 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	}
 
 	lock_page(page);
-	remove_from_page_cache(page);
+	delete_from_swap_cache(page);
+ out_unlock:
 	unlock_page(page);
-	page_cache_release(page);	/* For add_to_page_cache() */
 
 	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
 		ret = -EIO;
