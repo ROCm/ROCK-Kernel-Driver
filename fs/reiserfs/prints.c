@@ -264,20 +264,43 @@ prepare_error_buf( const char *fmt, va_list args )
     va_end( args );\
 }
 
-void reiserfs_warning (const char * fmt, ...)
+void reiserfs_warning (struct super_block *sb, const char * fmt, ...)
 {
   do_reiserfs_warning(fmt);
-  /* console_print (error_buf); */
-  printk (KERN_WARNING "%s", error_buf);
+  if (sb)
+      printk (KERN_WARNING "ReiserFS: %s: warning: %s\n",
+             reiserfs_bdevname (sb), error_buf);
+  else
+      printk (KERN_WARNING "ReiserFS: warning: %s\n", error_buf);
+}
+
+/* No newline.. reiserfs_info calls can be followed by printk's */
+void reiserfs_info (struct super_block *sb, const char * fmt, ...)
+{
+  do_reiserfs_warning(fmt);
+  if (sb)
+      printk (KERN_NOTICE "ReiserFS: %s: %s",
+             reiserfs_bdevname (sb), error_buf);
+  else
+      printk (KERN_NOTICE "ReiserFS: %s", error_buf);
+}
+
+/* No newline.. reiserfs_printk calls can be followed by printk's */
+void reiserfs_printk (const char * fmt, ...)
+{
+  do_reiserfs_warning(fmt);
+  printk (error_buf);
 }
 
 void reiserfs_debug (struct super_block *s, int level, const char * fmt, ...)
 {
 #ifdef CONFIG_REISERFS_CHECK
   do_reiserfs_warning(fmt);
-  printk (KERN_DEBUG "%s", error_buf);
-#else
-  ; 
+  if (s)
+      printk (KERN_DEBUG "ReiserFS: %s: %s\n",
+             reiserfs_bdevname (s), error_buf);
+  else
+      printk (KERN_DEBUG "ReiserFS: %s\n", error_buf);
 #endif
 }
 
@@ -334,7 +357,8 @@ extern struct tree_balance * cur_tb;
 void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 {
   do_reiserfs_warning(fmt);
-  printk ( KERN_EMERG "%s", error_buf);
+  printk (KERN_EMERG "REISERFS: panic (device %s): %s\n",
+          reiserfs_bdevname (sb), error_buf);
   BUG ();
 
   /* this is not actually called, but makes reiserfs_panic() "noreturn" */
@@ -413,13 +437,13 @@ static int print_internal (struct buffer_head * bh, int first, int last)
 	to = last < B_NR_ITEMS (bh) ? last : B_NR_ITEMS (bh);
     }
 
-    reiserfs_warning ("INTERNAL NODE (%ld) contains %z\n",  bh->b_blocknr, bh);
+    reiserfs_printk ("INTERNAL NODE (%ld) contains %z\n",  bh->b_blocknr, bh);
     
     dc = B_N_CHILD (bh, from);
-    reiserfs_warning ("PTR %d: %y ", from, dc);
+    reiserfs_printk ("PTR %d: %y ", from, dc);
     
     for (i = from, key = B_N_PDELIM_KEY (bh, from), dc ++; i < to; i ++, key ++, dc ++) {
-	reiserfs_warning ("KEY %d: %k PTR %d: %y ", i, key, i + 1, dc);
+	reiserfs_printk ("KEY %d: %k PTR %d: %y ", i, key, i + 1, dc);
 	if (i && i % 4 == 0)
 	    printk ("\n");
     }
@@ -448,10 +472,10 @@ static int print_leaf (struct buffer_head * bh, int print_mode, int first, int l
     nr = blkh_nr_item(blkh);
 
     printk ("\n===================================================================\n");
-    reiserfs_warning ("LEAF NODE (%ld) contains %z\n", bh->b_blocknr, bh);
+    reiserfs_printk ("LEAF NODE (%ld) contains %z\n", bh->b_blocknr, bh);
 
     if (!(print_mode & PRINT_LEAF_ITEMS)) {
-	reiserfs_warning ("FIRST ITEM_KEY: %k, LAST ITEM KEY: %k\n",
+	reiserfs_printk ("FIRST ITEM_KEY: %k, LAST ITEM KEY: %k\n",
 			  &(ih->ih_key), &((ih + nr - 1)->ih_key));
 	return 0;
     }
@@ -471,7 +495,7 @@ static int print_leaf (struct buffer_head * bh, int print_mode, int first, int l
     printk ("|##|   type    |           key           | ilen | free_space | version | loc  |\n");
     for (i = from; i < to; i++, ih ++) {
 	printk ("-------------------------------------------------------------------------------\n");
-	reiserfs_warning ("|%2d| %h |\n", i, ih);
+	reiserfs_printk ("|%2d| %h |\n", i, ih);
 	if (print_mode & PRINT_LEAF_ITEMS)
 	    op_print_item (ih, B_I_PITEM (bh, ih));
     }

@@ -50,9 +50,9 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 
     // FIXME: we could avoid this 
     if ( search_for_position_by_key (sb, &end_key, path) == POSITION_FOUND ) {
-	reiserfs_warning ("PAP-14030: direct2indirect: "
+	reiserfs_warning (sb, "PAP-14030: direct2indirect: "
 			"pasted or inserted byte exists in the tree %K. "
-			"Use fsck to repair.\n", &end_key);
+			"Use fsck to repair.", &end_key);
 	pathrelse(path);
 	return -EIO;
     }
