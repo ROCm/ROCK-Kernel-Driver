@@ -983,6 +983,8 @@ static int atalk_create(struct socket *sock, int protocol)
 	rc = 0;
 	sock->ops = &atalk_dgram_ops;
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
+
 	/* Checksums on by default */
 	sk->sk_zapped = 1;
 out:
