@@ -913,6 +913,9 @@ ckrm_class_set_config(struct ckrm_core_class *core, const char *resname, const c
 	return rc;
 }
 
+#define legalshare(a)   \
+         ( ((a) >=0) || ((a) == CKRM_SHARE_UNCHANGED) || ((a) == CKRM_SHARE_DONTCARE) ) 
+
 int
 ckrm_class_set_shares(struct ckrm_core_class *core, const char *resname,
 		      struct ckrm_shares *shares)
@@ -921,7 +924,11 @@ ckrm_class_set_shares(struct ckrm_core_class *core, const char *resname,
 	struct ckrm_res_ctlr *rcbs;
 	int rc;
 
-	printk("ckrm_class_set_shares(%s,%s)\n",core->name,resname);
+	// Check for legal values
+	if ( !legalshare(shares->my_guarantee) || !legalshare(shares->my_limit) || 
+	     !legalshare(shares->total_guarantee) || !legalshare(shares->max_limit)) 
+		return -EINVAL;
+
 	rcbs = ckrm_resctlr_lookup(clstype,resname);
 	if (rcbs == NULL || rcbs->set_share_values == NULL)
 		return -EINVAL; 

@@ -186,16 +186,20 @@ int
 sock_rmdir(struct inode *p, struct dentry *me)
 {
 	struct dentry *mftmp, *mfdentry ;
+	int ret = 0;
 
 	// delete all magic sub directories
 	list_for_each_entry_safe(mfdentry, mftmp, &me->d_subdirs, d_child) {
-		if (S_ISDIR(mfdentry->d_inode->i_mode))
-			rcfs_rmdir(me->d_inode, mfdentry);
+		if (S_ISDIR(mfdentry->d_inode->i_mode)){
+			ret = rcfs_rmdir(me->d_inode, mfdentry);
+			if (ret)
+				return ret;
+		}
 	}
 	// delete ourselves
-	rcfs_rmdir(p,me);
+	ret = rcfs_rmdir(p,me);
 
-	return 0;
+	return ret;
 }
 
 #ifdef NUM_ACCEPT_QUEUES
@@ -243,6 +247,7 @@ sock_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		retval = rcfs_create_coredir(dentry->d_inode, pentry);
 		if (retval)
 			goto mkdir_err;
+		pentry->d_fsdata = &RCFS_IS_MAGIC;
 		for (j=0; j < LAQ_MAX_SUBMAGF; j++) {
 			mfdentry = rcfs_create_internal(pentry, &sub_magf[j],0);
 			mfdentry->d_fsdata = &RCFS_IS_MAGIC;

@@ -210,7 +210,7 @@ rcfs_rmdir(struct inode * dir, struct dentry * dentry)
 	
 	if (!rcfs_empty(dentry)) {
 		printk(KERN_ERR "rcfs_rmdir: directory not empty\n");
-		goto out;
+		return -ENOTEMPTY;
 	}
 
 	// Core class removal 
