@@ -210,12 +210,7 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-#include "drm_auth.h"
-#include "drm_bufs.h"
-#include "drm_context.h"
-#include "drm_dma.h"
-#include "drm_drawable.h"
-#include "drm_drv.h"
+#include "drm_core.h"
 
 /* This functions must be here since it references DRM(numdevs)
  * which drm_drv.h declares.
@@ -253,18 +248,6 @@ static int ffb_presetup(drm_device_t *dev)
 			   i);
 	return ret;
 }
-
-#include "drm_fops.h"
-#include "drm_init.h"
-#include "drm_ioctl.h"
-#include "drm_irq.h"
-#include "drm_lock.h"
-#include "drm_memory.h"
-#include "drm_proc.h"
-#include "drm_vm.h"
-#include "drm_stub.h"
-#include "drm_scatter.h"
-
 
 static void ffb_driver_release(drm_device_t *dev, struct file *filp)
 {
