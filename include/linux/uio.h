@@ -1,6 +1,7 @@
 #ifndef __LINUX_UIO_H
 #define __LINUX_UIO_H
 
+#include <linux/compiler.h>
 #include <linux/types.h>
 
 /*
