@@ -119,7 +119,7 @@ static int jffs2_sb_set(struct super_block *sb, void *data)
 	   device */
 	sb->u.generic_sbp = p;
 	p->os_priv = sb;
-	sb->s_dev = mk_kdev(MTD_BLOCK_MAJOR, p->mtd->index);
+	sb->s_dev = MKDEV(MTD_BLOCK_MAJOR, p->mtd->index);
 
 	return 0;
 }

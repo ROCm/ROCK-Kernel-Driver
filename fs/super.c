@@ -327,7 +327,7 @@ rescan:
 	spin_lock(&sb_lock);
 	list_for_each(p, &super_blocks) {
 		struct super_block *s = sb_entry(p);
-		if (kdev_t_to_nr(s->s_dev) ==  dev) {
+		if (s->s_dev ==  dev) {
 			s->s_count++;
 			spin_unlock(&sb_lock);
 			down_read(&s->s_umount);
@@ -419,13 +419,13 @@ int set_anon_super(struct super_block *s, void *data)
 	}
 	set_bit(dev, unnamed_dev_in_use);
 	spin_unlock(&unnamed_dev_lock);
-	s->s_dev = mk_kdev(0, dev);
+	s->s_dev = MKDEV(0, dev);
 	return 0;
 }
 
 void kill_anon_super(struct super_block *sb)
 {
-	int slot = minor(sb->s_dev);
+	int slot = MINOR(sb->s_dev);
 	generic_shutdown_super(sb);
 	spin_lock(&unnamed_dev_lock);
 	clear_bit(slot, unnamed_dev_in_use);
@@ -442,7 +442,7 @@ void kill_litter_super(struct super_block *sb)
 static int set_bdev_super(struct super_block *s, void *data)
 {
 	s->s_bdev = data;
-	s->s_dev = to_kdev_t(s->s_bdev->bd_dev);
+	s->s_dev = s->s_bdev->bd_dev;
 	return 0;
 }
 

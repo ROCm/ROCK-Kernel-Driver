@@ -627,7 +627,7 @@ extern spinlock_t sb_lock;
 #define S_BIAS (1<<30)
 struct super_block {
 	struct list_head	s_list;		/* Keep this first */
-	kdev_t			s_dev;
+	dev_t			s_dev;		/* search index; _not_ kdev_t */
 	unsigned long		s_blocksize;
 	unsigned long		s_old_blocksize;
 	unsigned char		s_blocksize_bits;

@@ -329,7 +329,7 @@ retry:
 out:
 	putname(fs_names);
 	sys_chdir("/root");
-	ROOT_DEV = kdev_t_to_nr(current->fs->pwdmnt->mnt_sb->s_dev);
+	ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
 	printk("VFS: Mounted root (%s filesystem)%s.\n",
 		current->fs->pwdmnt->mnt_sb->s_type->name,
 		(current->fs->pwdmnt->mnt_sb->s_flags & MS_RDONLY) ? " readonly" : "");
@@ -703,7 +703,7 @@ static void __init mount_root(void)
 	if (MAJOR(ROOT_DEV) == UNNAMED_MAJOR) {
 		if (mount_nfs_root()) {
 			sys_chdir("/root");
-			ROOT_DEV = kdev_t_to_nr(current->fs->pwdmnt->mnt_sb->s_dev);
+			ROOT_DEV = current->fs->pwdmnt->mnt_sb->s_dev;
 			printk("VFS: Mounted root (nfs filesystem).\n");
 			return;
 		}

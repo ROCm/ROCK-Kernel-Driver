@@ -1951,7 +1951,7 @@ static int journal_init_dev( struct super_block *super,
 	journal -> j_dev_bd = NULL;
 	journal -> j_dev_file = NULL;
 	jdev = SB_ONDISK_JOURNAL_DEVICE( super ) ?
-		SB_ONDISK_JOURNAL_DEVICE( super ) : kdev_t_to_nr(super->s_dev);	
+		SB_ONDISK_JOURNAL_DEVICE( super ) : super->s_dev;	
 	/* there is no "jdev" option and journal is on separate device */
 	if( ( !jdev_name || !jdev_name[ 0 ] ) ) {
 		journal -> j_dev_bd = bdget(jdev);
