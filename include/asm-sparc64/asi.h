@@ -51,6 +51,7 @@
 #define ASI_INTR_DISPATCH_STAT	0x48 /* IRQ vector dispatch status		*/
 #define ASI_INTR_RECEIVE	0x49 /* IRQ vector receive status		*/
 #define ASI_UPA_CONFIG		0x4a /* UPA config space			*/
+#define ASI_JBUS_CONFIG		0x4a /* (IIIi) JBUS Config Register		*/
 #define ASI_SAFARI_CONFIG	0x4a /* (III) Safari Config Register		*/
 #define ASI_SAFARI_ADDRESS	0x4a /* (III) Safari Address Register		*/
 #define ASI_ESTATE_ERROR_EN	0x4b /* E-cache error enable space		*/

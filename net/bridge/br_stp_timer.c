@@ -43,8 +43,7 @@ static void br_hello_timer_expired(unsigned long arg)
 	if (br->dev->flags & IFF_UP) {
 		br_config_bpdu_generation(br);
 
-		br->hello_timer.expires = jiffies + br->hello_time;
-		add_timer(&br->hello_timer);
+		mod_timer(&br->hello_timer, jiffies + br->hello_time);
 	}
 	spin_unlock_bh(&br->lock);
 }
@@ -73,6 +72,8 @@ static void br_message_age_timer_expired(unsigned long arg)
 	 * check is redundant. I'm leaving it in for now, though.
 	 */
 	spin_lock_bh(&br->lock);
+	if (p->state == BR_STATE_DISABLED)
+		goto unlock;
 	was_root = br_is_root_bridge(br);
 
 	br_become_designated_port(p);
@@ -80,6 +81,7 @@ static void br_message_age_timer_expired(unsigned long arg)
 	br_port_state_selection(br);
 	if (br_is_root_bridge(br) && !was_root)
 		br_become_root_bridge(br);
+ unlock:
 	spin_unlock_bh(&br->lock);
 }
 
@@ -93,8 +95,8 @@ static void br_forward_delay_timer_expired(unsigned long arg)
 	spin_lock_bh(&br->lock);
 	if (p->state == BR_STATE_LISTENING) {
 		p->state = BR_STATE_LEARNING;
-		p->forward_delay_timer.expires = jiffies + br->forward_delay;
-		add_timer(&p->forward_delay_timer);
+		mod_timer(&p->forward_delay_timer,
+			  jiffies + br->forward_delay);
 	} else if (p->state == BR_STATE_LEARNING) {
 		p->state = BR_STATE_FORWARDING;
 		if (br_is_designated_for_some_port(br))
@@ -113,8 +115,7 @@ static void br_tcn_timer_expired(unsigned long arg)
 	if (br->dev->flags & IFF_UP) {
 		br_transmit_tcn(br);
 	
-		br->tcn_timer.expires = jiffies + br->bridge_hello_time;
-		add_timer(&br->tcn_timer);
+		mod_timer(&br->tcn_timer,jiffies + br->bridge_hello_time);
 	}
 	spin_unlock_bh(&br->lock);
 }

@@ -54,6 +54,7 @@ struct elevator_s
 
 	struct kobject kobj;
 	struct kobj_type *elevator_ktype;
+	const char *elevator_name;
 };
 
 /*

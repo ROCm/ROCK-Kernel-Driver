@@ -162,10 +162,13 @@ static int __init flash_init(void)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev = 0;
+#ifdef CONFIG_PCI
 	struct linux_ebus *ebus;
 	struct linux_ebus_device *edev = 0;
 	struct linux_prom_registers regs[2];
-	int len, err, nregs;
+	int len, nregs;
+#endif
+	int err;
 
 	for_all_sbusdev(sdev, sbus) {
 		if (!strcmp(sdev->prom_name, "flashprom")) {

@@ -1,7 +1,7 @@
 /*
  * dv1394.c - DV input/output over IEEE 1394 on OHCI chips
  *   Copyright (C)2001 Daniel Maas <dmaas@dcine.com>
- *     receive, proc_fs by Dan Dennedy <dan@dennedy.org>
+ *     receive by Dan Dennedy <dan@dennedy.org>
  *
  * based on:
  *  video1394.c - video driver for OHCI 1394 boards
@@ -80,7 +80,6 @@
   - add proc fs interface to set cip_n, cip_d, syt_offset, and video signal
   - expose xmit and recv as separate devices (not exclusive)
   - expose NTSC and PAL as separate devices (can be overridden)
-  - read/edit channel in procfs
 
 */
      
@@ -102,7 +101,6 @@
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
@@ -1103,7 +1101,7 @@ static int do_dv1394_init_default(struct video_card *video)
 
 	init.api_version = DV1394_API_VERSION;
 	init.n_frames = DV1394_MAX_FRAMES / 4;
-	/* the following are now set via proc_fs or devfs */
+	/* the following are now set via devfs */
 	init.channel = video->channel;
 	init.format = video->pal_or_ntsc;
 	init.cip_n = video->cip_n; 
@@ -1857,244 +1855,6 @@ static int dv1394_release(struct inode *inode, struct file *file)
 }
 
 
-/*** PROC_FS INTERFACE ******************************************************/
-#ifdef CONFIG_PROC_FS
-static LIST_HEAD(dv1394_procfs);
-struct dv1394_procfs_entry {
-	struct list_head list;
-    struct proc_dir_entry *procfs;
-	char name[32];
-	struct dv1394_procfs_entry *parent;
-};
-static spinlock_t dv1394_procfs_lock = SPIN_LOCK_UNLOCKED;
-
-static int dv1394_procfs_read( char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	struct video_card *video = (struct video_card*) data;
-
-	snprintf( page, count, 
-		"\
-format=%s\n\
-channel=%d\n\
-cip_n=%lu\n\
-cip_d=%lu\n\
-syt_offset=%u\n",
-		(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"),
-		video->channel,
-		video->cip_n, video->cip_d, video->syt_offset );
-	return strlen(page);
-}
-
-/* lifted from the stallion.c driver */
-#undef  TOLOWER
-#define TOLOWER(x)      ((((x) >= 'A') && ((x) <= 'Z')) ? ((x) + 0x20) : (x))
-static unsigned long atol(char *str)
-{
-	unsigned long   val;
-	int             base, c;
-	char            *sp;
-
-	val = 0;
-	sp = str;
-	if ((*sp == '0') && (*(sp+1) == 'x')) {
-		base = 16;
-		sp += 2;
-	} else if (*sp == '0') {
-		base = 8;
-		sp++;
-	} else {
-		base = 10;
-	}
-
-	for (; (*sp != 0); sp++) {
-		c = (*sp > '9') ? (TOLOWER(*sp) - 'a' + 10) : (*sp - '0');
-		if ((c < 0) || (c >= base)) {
-			printk(KERN_ERR "dv1394: atol() invalid argument %s\n", str);
-			val = 0;
-			break;
-		}
-		val = (val * base) + c;
-	}
-	return(val);
-}
-
-static int dv1394_procfs_write( struct file *file,
-			const char *buffer, unsigned long count, void *data)
-{
-	int len = 0;
-	char new_value[65];
-	char *pos;
-	struct video_card *video = (struct video_card*) data;
-	
-	if (count > 64)
-		len = 64;
-	else
-		len = count;
-				
-	if (copy_from_user( new_value, buffer, len))
-		return -EFAULT;
-	
-	new_value[len] = 0;
-	pos = strchr(new_value, '=');
-	if (pos != NULL) {
-		int val_len = len - (pos-new_value) - 1;
-		char buf[65];
-		memset(buf, 0, 65);
-		strncpy(buf, pos+1, val_len);
-		if (buf[val_len-1] == '\n') buf[val_len-1] = 0;
-		
-		if (strnicmp( new_value, "format", (pos-new_value)) == 0) {
-			if (strnicmp( buf, "NTSC", val_len) == 0)
-				video->pal_or_ntsc = DV1394_NTSC;
-			else if (strnicmp( buf, "PAL", val_len) == 0)
-				video->pal_or_ntsc = DV1394_PAL;
-				
-		} else if (strnicmp( new_value, "cip_n", (pos-new_value)) == 0) {
-			video->cip_n = atol(buf);
-		} else if (strnicmp( new_value, "cip_d", (pos-new_value)) == 0) {
-			video->cip_d = atol(buf);
-		} else if (strnicmp( new_value, "syt_offset", (pos-new_value)) == 0) {
-			video->syt_offset = atol(buf);
-		} else if (strnicmp( new_value, "channel", (pos-new_value)) == 0) {
-			video->channel = atol(buf);
-		}
-	}
-	
-	return len;
-}
-
-struct dv1394_procfs_entry *
-dv1394_procfs_find( char *name)
-{
-	struct list_head *lh;
-	struct dv1394_procfs_entry *p;
-		
-	spin_lock( &dv1394_procfs_lock);
-	if (!list_empty(&dv1394_procfs)) {
-		list_for_each(lh, &dv1394_procfs) {
-			p = list_entry(lh, struct dv1394_procfs_entry, list);
-			if (!strncmp(p->name, name, sizeof(p->name))) {
-				spin_unlock( &dv1394_procfs_lock);
-				return p;
-			}
-		}
-	}
-	spin_unlock( &dv1394_procfs_lock);
-	return NULL;
-}
-
-static int dv1394_procfs_add_entry(struct video_card *video)
-{
-	char buf[32];
-	struct dv1394_procfs_entry *p;
-	struct dv1394_procfs_entry *parent;
-
-	p = kmalloc(sizeof(struct dv1394_procfs_entry), GFP_KERNEL);
-	if (!p) {
-		printk(KERN_ERR "dv1394: cannot allocate dv1394_procfs_entry\n");
-		goto err;
-	}
-	memset(p, 0, sizeof(struct dv1394_procfs_entry));
-	
-	snprintf(buf, sizeof(buf), "dv/host%d/%s", (video->id>>2),
-						(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"));
-		
-	parent = dv1394_procfs_find(buf);
-	if (parent == NULL) {
-		printk(KERN_ERR "dv1394: unable to locate parent procfs of %s\n", buf);
-		goto err_free;
-	}
-	
-	p->procfs = create_proc_entry( 
-						(video->mode == MODE_RECEIVE ? "in" : "out"),
-						0666, parent->procfs);
-
-	if (p->procfs == NULL) {
-		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/%s/%s\n",
-			parent->name,
-			(video->mode == MODE_RECEIVE ? "in" : "out"));
-		goto err_free;
-	}
-	
-	p->procfs->owner = THIS_MODULE;
-	p->procfs->data = video;
-	p->procfs->read_proc = dv1394_procfs_read;
-	p->procfs->write_proc = dv1394_procfs_write;
-
-	spin_lock( &dv1394_procfs_lock);
-	INIT_LIST_HEAD(&p->list);
-	list_add_tail(&p->list, &dv1394_procfs);
-	spin_unlock( &dv1394_procfs_lock);
-	
-	return 0;
-	
- err_free:
-	kfree(p);
- err:
-	return -ENOMEM;
-}
-
-static int
-dv1394_procfs_add_dir( char *name,
-					struct dv1394_procfs_entry *parent, 
-					struct dv1394_procfs_entry **out)
-{
-	struct dv1394_procfs_entry *p;
-
-	p = kmalloc(sizeof(struct dv1394_procfs_entry), GFP_KERNEL);
-	if (!p) {
-		printk(KERN_ERR "dv1394: cannot allocate dv1394_procfs_entry\n");
-		goto err;
-	}
-	memset(p, 0, sizeof(struct dv1394_procfs_entry));
-	
-	if (parent == NULL) {
-		snprintf(p->name, sizeof(p->name), "%s", name);
-		p->procfs = proc_mkdir( name, ieee1394_procfs_entry);
-	} else {
-		snprintf(p->name, sizeof(p->name), "%s/%s", parent->name, name);
-		p->procfs = proc_mkdir( name, parent->procfs);
-	}
-	if (p->procfs == NULL) {
-		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/%s\n", p->name);
-		goto err_free;
-	}
-
-	p->procfs->owner = THIS_MODULE;
-	p->parent = parent;
-	if (out != NULL) *out = p;
-
-	spin_lock( &dv1394_procfs_lock);
-	INIT_LIST_HEAD(&p->list);
-	list_add_tail(&p->list, &dv1394_procfs);
-	spin_unlock( &dv1394_procfs_lock);
-
-	return 0;
-	
- err_free:
-	kfree(p);
- err:
-	return -ENOMEM;
-}
-
-void dv1394_procfs_del( char *name)
-{
-	struct dv1394_procfs_entry *p = dv1394_procfs_find(name);
-	if (p != NULL) {
-		if (p->parent == NULL)
-			remove_proc_entry(p->name, ieee1394_procfs_entry);
-		else
-			remove_proc_entry(p->name, p->parent->procfs);
-		
-		spin_lock( &dv1394_procfs_lock);
-		list_del(&p->list);
-		spin_unlock( &dv1394_procfs_lock);
-		kfree(p);
-	}
-}
-#endif /* CONFIG_PROC_FS */
-
 /*** DEVICE DRIVER HANDLERS ************************************************/
 
 static void it_tasklet_func(unsigned long data)
@@ -2485,17 +2245,12 @@ static int dv1394_init(struct ti_ohci *ohci, enum pal_or_ntsc format, enum modes
 	video->channel = 63; /* default to broadcast channel */
 	video->active_frame = -1;
 	
-	/* initialize the following for proc_fs */
+	/* initialize the following */
 	video->pal_or_ntsc = format;
 	video->cip_n = 0; /* 0 = use builtin default */
 	video->cip_d = 0;
 	video->syt_offset = 0;
 	video->mode = mode;
-
-#ifdef CONFIG_PROC_FS
-	if ( dv1394_procfs_add_entry(video) < 0 )
-		goto err_free;
-#endif
 
 	for (i = 0; i < DV1394_MAX_FRAMES; i++)
 		video->frames[i] = NULL;
@@ -2548,9 +2303,6 @@ static void dv1394_un_init(struct video_card *video)
 		);
 
 	devfs_remove("ieee1394/%s", buf);
-#ifdef CONFIG_PROC_FS
-	dv1394_procfs_del(buf);
-#endif
 	list_del(&video->list);
 	kfree(video);
 }
@@ -2562,7 +2314,6 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	struct video_card *video = NULL;
 	unsigned long flags;
 	struct list_head *lh, *templh;
-	char buf[32];
 	int	n;
 	
 	/* We only work with the OHCI-1394 driver */
@@ -2588,40 +2339,17 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	devfs_remove("ieee1394/dv/host%d/NTSC", n);
 	devfs_remove("ieee1394/dv/host%d/PAL", n);
 	devfs_remove("ieee1394/dv/host%d", n);
-
-#ifdef CONFIG_PROC_FS
-	snprintf(buf, sizeof(buf), "dv/host%d/NTSC", n);
-	dv1394_procfs_del(buf);
-	snprintf(buf, sizeof(buf), "dv/host%d/PAL", n);
-	dv1394_procfs_del(buf);
-	snprintf(buf, sizeof(buf), "dv/host%d", n);
-	dv1394_procfs_del(buf);
-#endif	
 }
 
 static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
-	char buf[16];
 
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
 		return;
 
 	ohci = (struct ti_ohci *)host->hostdata;
-
-#ifdef CONFIG_PROC_FS
-{
-	struct dv1394_procfs_entry *p;
-	p = dv1394_procfs_find("dv");
-	if (p != NULL) {
-		snprintf(buf, sizeof(buf), "host%d", ohci->id);
-		dv1394_procfs_add_dir(buf, p, &p);
-		dv1394_procfs_add_dir("NTSC", p, NULL);
-		dv1394_procfs_add_dir("PAL", p, NULL);
-	}
-}
-#endif
 
 	devfs_mk_dir("ieee1394/dv/host%d", ohci->id);
 	devfs_mk_dir("ieee1394/dv/host%d/NTSC", ohci->id);
@@ -2881,9 +2609,6 @@ static void __exit dv1394_exit_module(void)
 	hpsb_unregister_highlevel(&dv1394_highlevel);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 	devfs_remove("ieee1394/dv");
-#ifdef CONFIG_PROC_FS
-	dv1394_procfs_del("dv");
-#endif
 }
 
 static int __init dv1394_init_module(void)
@@ -2898,16 +2623,6 @@ static int __init dv1394_init_module(void)
 	}
 
 	devfs_mk_dir("ieee1394/dv");
-
-#ifdef CONFIG_PROC_FS
-	ret = dv1394_procfs_add_dir("dv",NULL,NULL);
-	if (ret < 0) {
-		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/dv\n");
-		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-		devfs_remove("ieee1394/dv");
-		return -ENOMEM;
-	}
-#endif
 
 	hpsb_register_highlevel(&dv1394_highlevel);
 

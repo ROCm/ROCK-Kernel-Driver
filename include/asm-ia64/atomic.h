@@ -47,7 +47,7 @@ ia64_atomic_add (int i, atomic_t *v)
 }
 
 static __inline__ int
-ia64_atomic64_add (int i, atomic64_t *v)
+ia64_atomic64_add (__s64 i, atomic64_t *v)
 {
 	__s64 old, new;
 	CMPXCHG_BUGCHECK_DECL
@@ -75,7 +75,7 @@ ia64_atomic_sub (int i, atomic_t *v)
 }
 
 static __inline__ int
-ia64_atomic64_sub (int i, atomic64_t *v)
+ia64_atomic64_sub (__s64 i, atomic64_t *v)
 {
 	__s64 old, new;
 	CMPXCHG_BUGCHECK_DECL
@@ -123,7 +123,7 @@ atomic_add_negative (int i, atomic_t *v)
 }
 
 static __inline__ int
-atomic64_add_negative (int i, atomic64_t *v)
+atomic64_add_negative (__s64 i, atomic64_t *v)
 {
 	return atomic64_add_return(i, v) < 0;
 }

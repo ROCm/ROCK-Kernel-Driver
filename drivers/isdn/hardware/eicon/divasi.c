@@ -192,8 +192,6 @@ static int DIVA_INIT_FUNCTION divasi_init(void)
 	char tmprev[50];
 	int ret = 0;
 
-	MOD_INC_USE_COUNT;
-
 	printk(KERN_INFO "%s\n", DRIVERNAME);
 	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
 	strcpy(tmprev, main_revision);
@@ -223,7 +221,6 @@ static int DIVA_INIT_FUNCTION divasi_init(void)
 	}
 
       out:
-	MOD_DEC_USE_COUNT;
 	return (ret);
 }
 

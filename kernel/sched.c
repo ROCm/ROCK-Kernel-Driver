@@ -1151,6 +1151,8 @@ static inline void rebalance_tick(runqueue_t *this_rq, int idle)
 
 DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 
+EXPORT_PER_CPU_SYMBOL(kstat);
+
 /*
  * We place interactive tasks back into the active array, if possible.
  *

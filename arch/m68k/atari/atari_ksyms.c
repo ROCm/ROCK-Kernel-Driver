@@ -28,16 +28,8 @@ EXPORT_SYMBOL(stdma_islocked);
 EXPORT_SYMBOL(atari_stram_alloc);
 EXPORT_SYMBOL(atari_stram_free);
 
-EXPORT_SYMBOL(atari_mouse_buttons);
-EXPORT_SYMBOL(atari_mouse_interrupt_hook);
-EXPORT_SYMBOL(atari_MIDI_interrupt_hook);
 EXPORT_SYMBOL(atari_MFP_init_done);
 EXPORT_SYMBOL(atari_SCC_init_done);
 EXPORT_SYMBOL(atari_SCC_reset_done);
-EXPORT_SYMBOL(ikbd_write);
-EXPORT_SYMBOL(ikbd_mouse_y0_top);
-EXPORT_SYMBOL(ikbd_mouse_thresh);
-EXPORT_SYMBOL(ikbd_mouse_rel_pos);
-EXPORT_SYMBOL(ikbd_mouse_disable);
 
 EXPORT_SYMBOL(atari_microwire_cmd);

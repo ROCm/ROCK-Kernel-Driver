@@ -35,7 +35,7 @@ static int ebt_target_mark_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_mark_t_info *info = (struct ebt_mark_t_info *)data;
 
-	if (datalen != sizeof(struct ebt_mark_t_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_mark_t_info)))
 		return -EINVAL;
 	if (BASE_CHAIN && info->target == EBT_RETURN)
 		return -EINVAL;

@@ -182,9 +182,6 @@ extern struct zorro_dev *zorro_find_device(zorro_id id,
 #define zorro_request_device(z, name) \
     request_mem_region((z)->resource.start, \
 		       (z)->resource.end-(z)->resource.start+1, (name))
-#define zorro_check_device(z) \
-    check_mem_region((z)->resource.start, \
-		     (z)->resource.end-(z)->resource.start+1)
 #define zorro_release_device(z) \
     release_mem_region((z)->resource.start, \
 		       (z)->resource.end-(z)->resource.start+1)

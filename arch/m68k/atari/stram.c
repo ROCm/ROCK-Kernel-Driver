@@ -21,6 +21,7 @@
 #include <linux/pagemap.h>
 #include <linux/shm.h>
 #include <linux/bootmem.h>
+#include <linux/mount.h>
 
 #include <asm/setup.h>
 #include <asm/machdep.h>

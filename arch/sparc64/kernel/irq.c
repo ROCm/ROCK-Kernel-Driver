@@ -162,12 +162,24 @@ void enable_irq(unsigned int irq)
 		return;
 
 	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
-		/* We set it to our Safari AID. */
-		__asm__ __volatile__("ldxa [%%g0] %1, %0"
-				     : "=r" (tid)
-				     : "i" (ASI_SAFARI_CONFIG));
-		tid = ((tid & (0x3ffUL<<17)) << 9);
-		tid &= IMAP_AID_SAFARI;
+		unsigned long ver;
+
+		__asm__ ("rdpr %%ver, %0" : "=r" (ver));
+		if ((ver >> 32) == 0x003e0016) {
+			/* We set it to our JBUS ID. */
+			__asm__ __volatile__("ldxa [%%g0] %1, %0"
+					     : "=r" (tid)
+					     : "i" (ASI_JBUS_CONFIG));
+			tid = ((tid & (0x1fUL<<17)) << 9);
+			tid &= IMAP_TID_JBUS;
+		} else {
+			/* We set it to our Safari AID. */
+			__asm__ __volatile__("ldxa [%%g0] %1, %0"
+					     : "=r" (tid)
+					     : "i" (ASI_SAFARI_CONFIG));
+			tid = ((tid & (0x3ffUL<<17)) << 9);
+			tid &= IMAP_AID_SAFARI;
+		}
 	} else if (this_is_starfire == 0) {
 		/* We set it to our UPA MID. */
 		__asm__ __volatile__("ldxa [%%g0] %1, %0"

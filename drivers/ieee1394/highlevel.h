@@ -21,6 +21,7 @@ struct hpsb_address_serve {
  */
 
 struct hpsb_highlevel {
+	struct module *owner;
 	const char *name;
 
         /* Any of the following pointers can legally be NULL, except for

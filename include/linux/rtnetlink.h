@@ -168,6 +168,7 @@ enum rt_scope_t
 #define RTM_F_NOTIFY		0x100	/* Notify user of route change	*/
 #define RTM_F_CLONED		0x200	/* This route is cloned		*/
 #define RTM_F_EQUALIZE		0x400	/* Multipath equalizer: NI	*/
+#define RTM_F_PREFIX		0x800	/* Prefix addresses		*/
 
 /* Reserved table identifiers */
 
@@ -458,6 +459,40 @@ struct ifinfomsg
 	unsigned	ifi_change;		/* IFF_* change mask */
 };
 
+/* The struct should be in sync with struct net_device_stats */
+struct rtnl_link_stats
+{
+	__u32	rx_packets;		/* total packets received	*/
+	__u32	tx_packets;		/* total packets transmitted	*/
+	__u32	rx_bytes;		/* total bytes received 	*/
+	__u32	tx_bytes;		/* total bytes transmitted	*/
+	__u32	rx_errors;		/* bad packets received		*/
+	__u32	tx_errors;		/* packet transmit problems	*/
+	__u32	rx_dropped;		/* no space in linux buffers	*/
+	__u32	tx_dropped;		/* no space available in linux	*/
+	__u32	multicast;		/* multicast packets received	*/
+	__u32	collisions;
+
+	/* detailed rx_errors: */
+	__u32	rx_length_errors;
+	__u32	rx_over_errors;		/* receiver ring buff overflow	*/
+	__u32	rx_crc_errors;		/* recved pkt with crc error	*/
+	__u32	rx_frame_errors;	/* recv'd frame alignment error */
+	__u32	rx_fifo_errors;		/* recv'r fifo overrun		*/
+	__u32	rx_missed_errors;	/* receiver missed packet	*/
+
+	/* detailed tx_errors */
+	__u32	tx_aborted_errors;
+	__u32	tx_carrier_errors;
+	__u32	tx_fifo_errors;
+	__u32	tx_heartbeat_errors;
+	__u32	tx_window_errors;
+	
+	/* for cslip etc */
+	__u32	rx_compressed;
+	__u32	tx_compressed;
+};
+
 enum
 {
 	IFLA_UNSPEC,
@@ -598,6 +633,22 @@ extern void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const voi
 #define RTA_PUT(skb, attrtype, attrlen, data) \
 ({ if (skb_tailroom(skb) < (int)RTA_SPACE(attrlen)) goto rtattr_failure; \
    __rta_fill(skb, attrtype, attrlen, data); })
+
+static inline struct rtattr *
+__rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
+{
+	struct rtattr *rta;
+	int size = RTA_LENGTH(attrlen);
+
+	rta = (struct rtattr*)skb_put(skb, RTA_ALIGN(size));
+	rta->rta_type = attrtype;
+	rta->rta_len = size;
+	return rta;
+}
+
+#define __RTA_PUT(skb, attrtype, attrlen) \
+({ if (skb_tailroom(skb) < (int)RTA_SPACE(attrlen)) goto rtattr_failure; \
+   __rta_reserve(skb, attrtype, attrlen); })
 
 extern void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change);
 

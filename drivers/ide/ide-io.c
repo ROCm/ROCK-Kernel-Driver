@@ -58,8 +58,7 @@
 
 #if (DISK_RECOVERY_TIME > 0)
 
-Error So the User Has To Fix the Compilation And Stop Hacking Port 0x43
-Does anyone ever use this anyway ??
+#error So the User Has To Fix the Compilation And Stop Hacking Port 0x43. Does anyone ever use this anyway ??
 
 /*
  * For really screwy hardware (hey, at least it *can* be used with Linux)
@@ -112,6 +111,13 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 
 	if (!nr_sectors)
 		nr_sectors = rq->hard_cur_sectors;
+
+	/*
+	 * if failfast is set on a request, override number of sectors and
+	 * complete the whole request right now
+	 */
+	if (blk_noretry_request(rq) && !uptodate)
+		nr_sectors = rq->hard_nr_sectors;
 
 	/*
 	 * decide whether to reenable DMA -- 3 is a random magic for now,

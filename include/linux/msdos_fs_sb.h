@@ -36,8 +36,9 @@ struct fat_cache {
 };
 
 struct msdos_sb_info {
-	unsigned short cluster_size; /* sectors/cluster */
-	unsigned short cluster_bits; /* sectors/cluster */
+	unsigned short sec_per_clus; /* sectors/cluster */
+	unsigned short cluster_bits; /* log2(cluster_size) */
+	unsigned int cluster_size;   /* cluster size */
 	unsigned char fats,fat_bits; /* number of FATs, FAT bits (12 or 16) */
 	unsigned short fat_start;
 	unsigned long fat_length;    /* FAT start & length (sec.) */

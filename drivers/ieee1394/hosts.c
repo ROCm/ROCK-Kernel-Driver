@@ -16,7 +16,6 @@
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/workqueue.h>
 
 #include "ieee1394_types.h"
 #include "hosts.h"
@@ -67,7 +66,7 @@ int hpsb_ref_host(struct hpsb_host *host)
         list_for_each(lh, &hpsb_hosts) {
                 if (host == list_entry(lh, struct hpsb_host, host_list)) {
 			if (try_module_get(host->driver->owner)) {
-				host->refcount++;
+				atomic_inc(&host->refcount);
 				retval = 1;
 			}
 			break;
@@ -92,9 +91,7 @@ void hpsb_unref_host(struct hpsb_host *host)
 	module_put(host->driver->owner);
 
 	down(&hpsb_hosts_lock);
-        host->refcount--;
-
-        if (!host->refcount && host->is_shutdown)
+        if (atomic_dec_and_test(&host->refcount) && host->is_shutdown)
                 kfree(host);
 	up(&hpsb_hosts_lock);
 }
@@ -131,7 +128,7 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 
 	h->hostdata = h + 1;
         h->driver = drv;
-	h->refcount = 1;
+	atomic_set(&h->refcount, 1);
 
         INIT_LIST_HEAD(&h->pending_packets);
         spin_lock_init(&h->pending_pkt_lock);
@@ -141,7 +138,10 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 
 	atomic_set(&h->generation, 0);
 
-	INIT_WORK(&h->timeout_tq, (void (*)(void*))abort_timedouts, h);
+	init_timer(&h->timeout);
+	h->timeout.data = (unsigned long) h;
+	h->timeout.function = abort_timedouts;
+	h->timeout_interval = HZ / 20; // 50ms by default
 
         h->topology_map = h->csr.topology_map + 3;
         h->speed_map = (u8 *)(h->csr.speed_map + 2);

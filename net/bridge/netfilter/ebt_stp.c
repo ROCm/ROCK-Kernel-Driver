@@ -150,7 +150,7 @@ static int ebt_stp_check(const char *tablename, unsigned int hookmask,
    const struct ebt_entry *e, void *data, unsigned int datalen)
 {
 	struct ebt_stp_info *info = (struct ebt_stp_info *)data;
-	int len = sizeof(struct ebt_stp_info);
+	int len = EBT_ALIGN(sizeof(struct ebt_stp_info));
 	uint8_t bridge_ula[6] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
 	uint8_t msk[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 

@@ -1,5 +1,5 @@
 /*
- *  Amiga Linux/m68k and Linux/PPC Ariadne II and X-Surf Ethernet Driver
+ *  Amiga Linux/m68k and Linux/PPC Zorro NS8390 Ethernet Driver
  *
  *  (C) Copyright 1998-2000 by some Elitist 680x0 Users(TM)
  *
@@ -60,7 +60,7 @@
 #define WORDSWAP(a)	((((a)>>8)&0xff) | ((a)<<8))
 
 #ifdef MODULE
-static struct net_device *root_ariadne2_dev;
+static struct net_device *root_zorro8390_dev;
 #endif
 
 static const struct card_info {
@@ -72,22 +72,22 @@ static const struct card_info {
     { ZORRO_PROD_INDIVIDUAL_COMPUTERS_X_SURF, "X-Surf", 0x8600 },
 };
 
-static int __init ariadne2_probe(void);
-static int __init ariadne2_init(struct net_device *dev, unsigned long board,
-				const char *name, unsigned long ioaddr);
-static int ariadne2_open(struct net_device *dev);
-static int ariadne2_close(struct net_device *dev);
-static void ariadne2_reset_8390(struct net_device *dev);
-static void ariadne2_get_8390_hdr(struct net_device *dev,
-				  struct e8390_pkt_hdr *hdr, int ring_page);
-static void ariadne2_block_input(struct net_device *dev, int count,
-				 struct sk_buff *skb, int ring_offset);
-static void ariadne2_block_output(struct net_device *dev, const int count,
-				  const unsigned char *buf,
-				  const int start_page);
-static void __exit ariadne2_cleanup(void);
+static int __init zorro8390_probe(void);
+static int __init zorro8390_init(struct net_device *dev, unsigned long board,
+				 const char *name, unsigned long ioaddr);
+static int zorro8390_open(struct net_device *dev);
+static int zorro8390_close(struct net_device *dev);
+static void zorro8390_reset_8390(struct net_device *dev);
+static void zorro8390_get_8390_hdr(struct net_device *dev,
+				   struct e8390_pkt_hdr *hdr, int ring_page);
+static void zorro8390_block_input(struct net_device *dev, int count,
+				  struct sk_buff *skb, int ring_offset);
+static void zorro8390_block_output(struct net_device *dev, const int count,
+				   const unsigned char *buf,
+				   const int start_page);
+static void __exit zorro8390_cleanup(void);
 
-static int __init ariadne2_probe(void)
+static int __init zorro8390_probe(void)
 {
     struct net_device *dev;
     struct zorro_dev *z = NULL;
@@ -111,8 +111,8 @@ static int __init ariadne2_probe(void)
 	    kfree(dev);
 	    continue;
 	}
-	if ((err = ariadne2_init(dev, board, cards[i].name,
-				 ZTWO_VADDR(ioaddr)))) {
+	if ((err = zorro8390_init(dev, board, cards[i].name,
+				  ZTWO_VADDR(ioaddr)))) {
 	    release_mem_region(ioaddr, NE_IO_EXTENT*2);
 	    kfree(dev);
 	    return err;
@@ -125,13 +125,13 @@ static int __init ariadne2_probe(void)
     return err;
 }
 
-static int __init ariadne2_init(struct net_device *dev, unsigned long board,
-				const char *name, unsigned long ioaddr)
+static int __init zorro8390_init(struct net_device *dev, unsigned long board,
+				 const char *name, unsigned long ioaddr)
 {
     int i;
     unsigned char SA_prom[32];
     int start_page, stop_page;
-    static u32 ariadne2_offsets[16] = {
+    static u32 zorro8390_offsets[16] = {
 	0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
 	0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
     };
@@ -220,28 +220,28 @@ static int __init ariadne2_init(struct net_device *dev, unsigned long board,
 
     ei_status.rx_start_page = start_page + TX_PAGES;
 
-    ei_status.reset_8390 = &ariadne2_reset_8390;
-    ei_status.block_input = &ariadne2_block_input;
-    ei_status.block_output = &ariadne2_block_output;
-    ei_status.get_8390_hdr = &ariadne2_get_8390_hdr;
-    ei_status.reg_offset = ariadne2_offsets;
-    dev->open = &ariadne2_open;
-    dev->stop = &ariadne2_close;
+    ei_status.reset_8390 = &zorro8390_reset_8390;
+    ei_status.block_input = &zorro8390_block_input;
+    ei_status.block_output = &zorro8390_block_output;
+    ei_status.get_8390_hdr = &zorro8390_get_8390_hdr;
+    ei_status.reg_offset = zorro8390_offsets;
+    dev->open = &zorro8390_open;
+    dev->stop = &zorro8390_close;
 #ifdef MODULE
-    ei_status.priv = (unsigned long)root_ariadne2_dev;
-    root_ariadne2_dev = dev;
+    ei_status.priv = (unsigned long)root_zorro8390_dev;
+    root_zorro8390_dev = dev;
 #endif
     NS8390_init(dev, 0);
     return 0;
 }
 
-static int ariadne2_open(struct net_device *dev)
+static int zorro8390_open(struct net_device *dev)
 {
     ei_open(dev);
     return 0;
 }
 
-static int ariadne2_close(struct net_device *dev)
+static int zorro8390_close(struct net_device *dev)
 {
     if (ei_debug > 1)
 	printk("%s: Shutting down ethercard.\n", dev->name);
@@ -251,7 +251,7 @@ static int ariadne2_close(struct net_device *dev)
 
 /* Hard reset the card.  This used to pause for the same period that a
    8390 reset command required, but that shouldn't be necessary. */
-static void ariadne2_reset_8390(struct net_device *dev)
+static void zorro8390_reset_8390(struct net_device *dev)
 {
     unsigned long reset_start_time = jiffies;
 
@@ -276,8 +276,8 @@ static void ariadne2_reset_8390(struct net_device *dev)
    we don't need to be concerned with ring wrap as the header will be at
    the start of a page, so we optimize accordingly. */
 
-static void ariadne2_get_8390_hdr(struct net_device *dev,
-				  struct e8390_pkt_hdr *hdr, int ring_page)
+static void zorro8390_get_8390_hdr(struct net_device *dev,
+				   struct e8390_pkt_hdr *hdr, int ring_page)
 {
     int nic_base = dev->base_addr;
     int cnt;
@@ -316,7 +316,7 @@ static void ariadne2_get_8390_hdr(struct net_device *dev,
    The NEx000 doesn't share the on-board packet memory -- you have to put
    the packet out through the "remote DMA" dataport using z_writeb. */
 
-static void ariadne2_block_input(struct net_device *dev, int count,
+static void zorro8390_block_input(struct net_device *dev, int count,
 				 struct sk_buff *skb, int ring_offset)
 {
     int nic_base = dev->base_addr;
@@ -349,9 +349,9 @@ static void ariadne2_block_input(struct net_device *dev, int count,
     ei_status.dmaing &= ~0x01;
 }
 
-static void ariadne2_block_output(struct net_device *dev, int count,
-				  const unsigned char *buf,
-				  const int start_page)
+static void zorro8390_block_output(struct net_device *dev, int count,
+				   const unsigned char *buf,
+				   const int start_page)
 {
     int nic_base = NE_BASE;
     unsigned long dma_start;
@@ -393,7 +393,7 @@ static void ariadne2_block_output(struct net_device *dev, int count,
     while ((z_readb(NE_BASE + NE_EN0_ISR) & ENISR_RDC) == 0)
 	if (jiffies - dma_start > 2*HZ/100) {		/* 20ms */
 		printk("%s: timeout waiting for Tx RDC.\n", dev->name);
-		ariadne2_reset_8390(dev);
+		zorro8390_reset_8390(dev);
 		NS8390_init(dev,1);
 		break;
 	}
@@ -403,23 +403,23 @@ static void ariadne2_block_output(struct net_device *dev, int count,
     return;
 }
 
-static void __exit ariadne2_cleanup(void)
+static void __exit zorro8390_cleanup(void)
 {
 #ifdef MODULE
     struct net_device *dev, *next;
 
-    while ((dev = root_ariadne2_dev)) {
+    while ((dev = root_zorro8390_dev)) {
 	next = (struct net_device *)(ei_status.priv);
 	unregister_netdev(dev);
 	free_irq(IRQ_AMIGA_PORTS, dev);
 	release_mem_region(ZTWO_PADDR(dev->base_addr), NE_IO_EXTENT*2);
 	kfree(dev);
-	root_ariadne2_dev = next;
+	root_zorro8390_dev = next;
     }
 #endif
 }
 
-module_init(ariadne2_probe);
-module_exit(ariadne2_cleanup);
+module_init(zorro8390_probe);
+module_exit(zorro8390_cleanup);
 
 MODULE_LICENSE("GPL");

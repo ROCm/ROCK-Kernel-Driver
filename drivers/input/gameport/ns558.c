@@ -243,7 +243,7 @@ static struct pnp_driver ns558_pnp_driver = {
 
 #else
 
-static const struct pnp_driver ns558_pnp_driver;
+static struct pnp_driver ns558_pnp_driver;
 
 #endif
 

@@ -16,7 +16,6 @@
  *    SDL Inc. PPP/HDLC/CISCO driver
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -34,8 +33,11 @@
 #include "hd64570.h"
 
 
-static const char* version = "SDL RISCom/N2 driver version: 1.14";
+static const char* version = "SDL RISCom/N2 driver version: 1.15";
 static const char* devname = "RISCom/N2";
+
+#undef DEBUG_PKT
+#define DEBUG_RINGS
 
 #define USE_WINDOWSIZE 16384
 #define USE_BUS16BITS 1
@@ -48,6 +50,7 @@ static const char* devname = "RISCom/N2";
 #endif
 #define N2_IOPORTS 0x10
 #define NEED_DETECT_RAM
+#define NEED_SCA_MSCI_INTR
 #define MAX_TX_BUFFERS 10
 
 static char *hw = NULL;	/* pointer to hw=xxx command line string */
@@ -257,7 +260,7 @@ static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
 
-#ifdef CONFIG_HDLC_DEBUG_RINGS
+#ifdef DEBUG_RINGS
 	if (cmd == SIOCDEVPRIVATE) {
 		sca_dump_rings(hdlc);
 		return 0;
@@ -415,7 +418,7 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 	card->buff_offset = (valid0 + valid1) * sizeof(pkt_desc) *
 		(card->tx_ring_buffers + card->rx_ring_buffers);
 
-	printk(KERN_DEBUG "n2: RISCom/N2 %u KB RAM, IRQ%u, "
+	printk(KERN_INFO "n2: RISCom/N2 %u KB RAM, IRQ%u, "
 	       "using %u TX + %u RX packets rings\n", card->ram_size / 1024,
 	       card->irq, card->tx_ring_buffers, card->rx_ring_buffers);
 
@@ -447,7 +450,7 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 		SET_MODULE_OWNER(dev);
 		dev->irq = irq;
 		dev->mem_start = winbase;
-		dev->mem_end = winbase + USE_WINDOWSIZE-1;
+		dev->mem_end = winbase + USE_WINDOWSIZE - 1;
 		dev->tx_queue_len = 50;
 		dev->do_ioctl = n2_ioctl;
 		dev->open = n2_open;

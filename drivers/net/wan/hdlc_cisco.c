@@ -9,7 +9,6 @@
  * as published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -24,6 +23,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/hdlc.h>
 
+#undef DEBUG_HARD_HEADER
 
 #define CISCO_MULTICAST		0x8F	/* Cisco multicast address */
 #define CISCO_UNICAST		0x0F	/* Cisco unicast address */
@@ -39,7 +39,7 @@ static int cisco_hard_header(struct sk_buff *skb, struct net_device *dev,
 			     unsigned int len)
 {
 	hdlc_header *data;
-#ifdef CONFIG_HDLC_DEBUG_HARD_HEADER
+#ifdef DEBUG_HARD_HEADER
 	printk(KERN_DEBUG "%s: cisco_hard_header called\n", dev->name);
 #endif
 
@@ -182,7 +182,7 @@ static void cisco_rx(struct sk_buff *skb)
 
 		case CISCO_KEEPALIVE_REQ:
 			hdlc->state.cisco.rxseq = ntohl(cisco_data->par1);
-			if (ntohl(cisco_data->par2) == hdlc->state.cisco.txseq) {
+			if (ntohl(cisco_data->par2)==hdlc->state.cisco.txseq) {
 				hdlc->state.cisco.last_poll = jiffies;
 				if (!hdlc->state.cisco.up) {
 					u32 sec, min, hrs, days;
@@ -219,11 +219,12 @@ static void cisco_timer(unsigned long arg)
 {
 	hdlc_device *hdlc = (hdlc_device*)arg;
 
-	if (hdlc->state.cisco.up &&
-	    jiffies - hdlc->state.cisco.last_poll >=
+	if (hdlc->state.cisco.up && jiffies - hdlc->state.cisco.last_poll >=
 	    hdlc->state.cisco.settings.timeout * HZ) {
 		hdlc->state.cisco.up = 0;
 		printk(KERN_INFO "%s: Link down\n", hdlc_to_name(hdlc));
+		if (netif_carrier_ok(&hdlc->netdev))
+			netif_carrier_off(&hdlc->netdev);
 	}
 
 	cisco_keepalive_send(hdlc, CISCO_KEEPALIVE_REQ,
@@ -238,7 +239,7 @@ static void cisco_timer(unsigned long arg)
 
 
 
-static int cisco_open(hdlc_device *hdlc)
+static void cisco_start(hdlc_device *hdlc)
 {
 	hdlc->state.cisco.last_poll = 0;
 	hdlc->state.cisco.up = 0;
@@ -249,14 +250,15 @@ static int cisco_open(hdlc_device *hdlc)
 	hdlc->state.cisco.timer.function = cisco_timer;
 	hdlc->state.cisco.timer.data = (unsigned long)hdlc;
 	add_timer(&hdlc->state.cisco.timer);
-	return 0;
 }
 
 
 
-static void cisco_close(hdlc_device *hdlc)
+static void cisco_stop(hdlc_device *hdlc)
 {
 	del_timer_sync(&hdlc->state.cisco.timer);
+	if (netif_carrier_ok(&hdlc->netdev))
+		netif_carrier_off(&hdlc->netdev);
 }
 
 
@@ -301,12 +303,13 @@ int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		hdlc_proto_detach(hdlc);
 		memcpy(&hdlc->state.cisco.settings, &new_settings, size);
+		memset(&hdlc->proto, 0, sizeof(hdlc->proto));
 
-		hdlc->open = cisco_open;
-		hdlc->stop = cisco_close;
-		hdlc->netif_rx = cisco_rx;
-		hdlc->type_trans = cisco_type_trans;
-		hdlc->proto = IF_PROTO_CISCO;
+		hdlc->proto.start = cisco_start;
+		hdlc->proto.stop = cisco_stop;
+		hdlc->proto.netif_rx = cisco_rx;
+		hdlc->proto.type_trans = cisco_type_trans;
+		hdlc->proto.id = IF_PROTO_CISCO;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = cisco_hard_header;
 		dev->type = ARPHRD_CISCO;

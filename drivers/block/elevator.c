@@ -420,6 +420,7 @@ elevator_t elevator_noop = {
 	.elevator_merge_req_fn		= elevator_noop_merge_requests,
 	.elevator_next_req_fn		= elevator_noop_next_request,
 	.elevator_add_req_fn		= elevator_noop_add_request,
+	.elevator_name			= "noop",
 };
 
 module_init(elevator_global_init);
