@@ -101,6 +101,13 @@ struct pt_regs * save_v86_state(struct kernel_vm86_regs * regs)
 	struct pt_regs *ret;
 	unsigned long tmp;
 
+	/*
+	 * This gets called from entry.S with interrupts disabled, but
+	 * from process context. Enable interrupts here, before trying
+	 * to access user space.
+	 */
+	local_irq_enable();
+
 	if (!current->thread.vm86_info) {
 		printk("no vm86_info: BAD\n");
 		do_exit(SIGSEGV);
