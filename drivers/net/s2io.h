@@ -612,7 +612,6 @@ typedef struct s2io_nic {
 	atomic_t rx_bufs_left[MAX_RX_RINGS];
 
 	spinlock_t tx_lock;
-	spinlock_t isr_lock;
 
 #define PROMISC     1
 #define ALL_MULTI   2

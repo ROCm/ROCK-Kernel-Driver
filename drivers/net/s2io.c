@@ -80,10 +80,11 @@ static char s2io_driver_version[] = "Version 1.7.5.1";
 static inline int rx_buffer_level(nic_t * sp, int rxb_size, int ring)
 {
 	int level = 0;
-	if ((sp->pkt_cnt[ring] - rxb_size) > 128) {
+	if ((sp->pkt_cnt[ring] - rxb_size) > 16) {
 		level = LOW;
-		if (rxb_size < sp->pkt_cnt[ring] / 8)
+		if ((sp->pkt_cnt[ring] - rxb_size) < MAX_RXDS_PER_BLOCK) {
 			level = PANIC;
+		}
 	}
 
 	return level;
@@ -1916,12 +1917,8 @@ int wait_for_cmd_complete(nic_t * sp)
 	u64 val64;
 
 	while (TRUE) {
-		val64 =
-		    RMAC_ADDR_CMD_MEM_RD | RMAC_ADDR_CMD_MEM_STROBE_NEW_CMD
-		    | RMAC_ADDR_CMD_MEM_OFFSET(0);
-		writeq(val64, &bar0->rmac_addr_cmd_mem);
 		val64 = readq(&bar0->rmac_addr_cmd_mem);
-		if (!val64) {
+		if (!(val64 & RMAC_ADDR_CMD_MEM_STROBE_CMD_EXECUTING)) {
 			ret = SUCCESS;
 			break;
 		}
@@ -2192,13 +2189,10 @@ int s2io_close(struct net_device *dev)
 	register u64 val64 = 0;
 	u16 cnt = 0;
 
-	spin_lock(&sp->isr_lock);
 	netif_stop_queue(dev);
 
 	/* disable Tx and Rx traffic on the NIC */
 	stop_nic(sp);
-
-	spin_unlock(&sp->isr_lock);
 
 	/* 
 	 * If the device tasklet is running, wait till its done 
@@ -2398,14 +2392,12 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev = (struct net_device *) dev_id;
 	nic_t *sp = dev->priv;
 	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
-	u64 reason = 0, general_mask = 0;
+	u64 reason = 0;
 	mac_info_t *mac_control;
 	struct config_param *config;
 
 	mac_control = &sp->mac_control;
 	config = &sp->config;
-
-	spin_lock(&sp->isr_lock);
 
 	/* 
 	 * Identify the cause for interrupt and call the appropriate
@@ -2419,13 +2411,8 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!reason) {
 		/* The interrupt was not raised by Xena. */
-		spin_unlock(&sp->isr_lock);
 		return IRQ_NONE;
 	}
-
-	/* Mask the Interrupts on the NIC. */
-	general_mask = readq(&bar0->general_int_mask);
-	writeq(0xFFFFFFFFFFFFFFFFULL, &bar0->general_int_mask);
 
 	/* If Intr is because of Tx Traffic */
 	if (reason & GEN_INTR_TXTRAFFIC) {
@@ -2441,11 +2428,6 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 		if (netif_rx_schedule_prep(dev)) {
 			en_dis_able_nic_intrs(sp, RX_TRAFFIC_INTR,
 					      DISABLE_INTRS);
-			/* 
-			 * Here we take a snap shot of the general 
-			 * Intr Register.
-			 */
-			general_mask = readq(&bar0->general_int_mask);
 			__netif_rx_schedule(dev);
 		}
 	}
@@ -2481,9 +2463,9 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 						  "%s:Out of memory",
 						  dev->name);
 					DBG_PRINT(ERR_DBG, " in ISR!!\n");
-					writeq(general_mask,
-					       &bar0->general_int_mask);
-					spin_unlock(&sp->isr_lock);
+					clear_bit(0,
+						  (unsigned long *) (&sp->
+								     tasklet_status));
 					return IRQ_HANDLED;
 				}
 				clear_bit(0,
@@ -2501,10 +2483,6 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 	tasklet_schedule(&sp->task);
 #endif
 
-	/* Unmask all previously enabled interrupts on the NIC. */
-	writeq(general_mask, &bar0->general_int_mask);
-
-	spin_unlock(&sp->isr_lock);
 	return IRQ_HANDLED;
 }
 
@@ -3626,6 +3604,17 @@ static int s2io_ethtool_get_stats_count(struct net_device *dev)
 	return (S2IO_STAT_LEN);
 }
 
+int s2io_ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
+{
+	if (data)
+		dev->features |= NETIF_F_IP_CSUM;
+	else
+		dev->features &= ~NETIF_F_IP_CSUM;
+
+	return 0;
+}
+
+
 static struct ethtool_ops netdev_ethtool_ops = {
 	.get_settings = s2io_ethtool_gset,
 	.set_settings = s2io_ethtool_sset,
@@ -3641,7 +3630,7 @@ static struct ethtool_ops netdev_ethtool_ops = {
 	.get_rx_csum = s2io_ethtool_get_rx_csum,
 	.set_rx_csum = s2io_ethtool_set_rx_csum,
 	.get_tx_csum = ethtool_op_get_tx_csum,
-	.set_tx_csum = ethtool_op_set_tx_csum,
+	.set_tx_csum = s2io_ethtool_op_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
 	.set_sg = ethtool_op_set_sg,
 #ifdef NETIF_F_TSO
@@ -3902,6 +3891,12 @@ static int rx_osm_handler(nic_t * sp, u16 len, RxD_t * rxdp, int ring_no)
 		skb->ip_summed = CHECKSUM_NONE;
 	}
 
+	if (rxdp->Control_1 & RXD_T_CODE) {
+		unsigned long long err = rxdp->Control_1 & RXD_T_CODE;
+		DBG_PRINT(ERR_DBG, "%s: Rx error Value: 0x%llx\n",
+			  dev->name, err);
+	}
+
 	skb->dev = dev;
 	skb_put(skb, len);
 	skb->protocol = eth_type_trans(skb, dev);
@@ -3920,25 +3915,6 @@ static int rx_osm_handler(nic_t * sp, u16 len, RxD_t * rxdp, int ring_no)
 	atomic_dec(&sp->rx_bufs_left[ring_no]);
 	rxdp->Host_Control = 0;
 	return SUCCESS;
-}
-
-int check_for_tx_space(nic_t * sp)
-{
-	u32 put_off, get_off, queue_len;
-	int ret = TRUE, i;
-
-	for (i = 0; i < sp->config.tx_fifo_num; i++) {
-		queue_len = sp->mac_control.tx_curr_put_info[i].fifo_len
-		    + 1;
-		put_off = sp->mac_control.tx_curr_put_info[i].offset;
-		get_off = sp->mac_control.tx_curr_get_info[i].offset;
-		if (((put_off + 1) % queue_len) == get_off) {
-			ret = FALSE;
-			break;
-		}
-	}
-
-	return ret;
 }
 
 /**
@@ -3962,17 +3938,9 @@ void s2io_link(nic_t * sp, int link)
 		if (link == LINK_DOWN) {
 			DBG_PRINT(ERR_DBG, "%s: Link down\n", dev->name);
 			netif_carrier_off(dev);
-			netif_stop_queue(dev);
 		} else {
 			DBG_PRINT(ERR_DBG, "%s: Link Up\n", dev->name);
 			netif_carrier_on(dev);
-			if (check_for_tx_space(sp) == TRUE) {
-				/*
-				 * Dont wake the queue if we know there
-				 * are no free TxDs available.
-				 */
-				netif_wake_queue(dev);
-			}
 		}
 	}
 	sp->last_link_state = link;
@@ -4357,7 +4325,6 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 
 	/* Initialize spinlocks */
 	spin_lock_init(&sp->tx_lock);
-	spin_lock_init(&sp->isr_lock);
 
 	/* 
 	 * SXE-002: Configure link and activity LED to init state 
