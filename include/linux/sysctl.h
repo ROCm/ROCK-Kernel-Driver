@@ -163,6 +163,7 @@ enum
 	VM_MAX_MAP_COUNT=22,	/* int: Maximum number of mmaps/address-space */
 	VM_LAPTOP_MODE=23,	/* vm laptop mode */
 	VM_BLOCK_DUMP=24,	/* block dump mode */
+	VM_HUGETLB_GROUP=25,	/* permitted hugetlb group */
 };
 
 

@@ -738,6 +738,14 @@ static ctl_table vm_table[] = {
 		.extra1		= (void *)&hugetlb_zero,
 		.extra2		= (void *)&hugetlb_infinity,
 	 },
+	 {
+		.ctl_name	= VM_HUGETLB_GROUP,
+		.procname	= "hugetlb_shm_group",
+		.data		= &sysctl_hugetlb_shm_group,
+		.maxlen		= sizeof(gid_t),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	 },
 #endif
 	{
 		.ctl_name	= VM_LOWER_ZONE_PROTECTION,
