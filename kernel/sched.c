@@ -3038,8 +3038,6 @@ int task_nice(const task_t *p)
 	return TASK_NICE(p);
 }
 
-EXPORT_SYMBOL(task_nice);
-
 /**
  * idle_cpu - is a given cpu idle currently?
  * @cpu: the processor in question.
@@ -4637,5 +4635,4 @@ void normalize_rt_tasks(void)
 	read_unlock_irq(&tasklist_lock);
 }
 
-EXPORT_SYMBOL(normalize_rt_tasks);
 #endif /* CONFIG_MAGIC_SYSRQ */
