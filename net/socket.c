@@ -1894,6 +1894,8 @@ int sock_register(struct net_proto_family *ops)
 		err = 0;
 	}
 	net_family_write_unlock();
+	printk(KERN_INFO "NET: Registered protocol family %d\n",
+	       ops->family);
 	return err;
 }
 
@@ -1911,6 +1913,8 @@ int sock_unregister(int family)
 	net_family_write_lock();
 	net_families[family]=NULL;
 	net_family_write_unlock();
+	printk(KERN_INFO "NET: Unregistered protocol family %d\n",
+	       family);
 	return 0;
 }
 
