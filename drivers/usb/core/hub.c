@@ -943,7 +943,9 @@ static void usb_hub_events(void)
 
 		list_del_init(tmp);
 
-		down(&hub->khubd_sem); /* never blocks, we were on list */
+		if (unlikely(down_trylock(&hub->khubd_sem)))
+			BUG();	/* never blocks, we were on list */
+
 		spin_unlock_irqrestore(&hub_event_lock, flags);
 
 		if (hub->error) {
