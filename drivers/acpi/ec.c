@@ -113,7 +113,7 @@ acpi_ec_wait (
 	switch (event) {
 	case ACPI_EC_EVENT_OBF:
 		do {
-			acpi_hw_low_level_read(8, &acpi_ec_status, &ec->status_addr, 0);
+			acpi_hw_low_level_read(8, &acpi_ec_status, &ec->status_addr);
 			if (acpi_ec_status & ACPI_EC_FLAG_OBF)
 				return 0;
 			udelay(ACPI_EC_UDELAY);
@@ -121,7 +121,7 @@ acpi_ec_wait (
 		break;
 	case ACPI_EC_EVENT_IBE:
 		do {
-			acpi_hw_low_level_read(8, &acpi_ec_status, &ec->status_addr, 0);
+			acpi_hw_low_level_read(8, &acpi_ec_status, &ec->status_addr);
 			if (!(acpi_ec_status & ACPI_EC_FLAG_IBF))
 				return 0;
 			udelay(ACPI_EC_UDELAY);
@@ -161,18 +161,18 @@ acpi_ec_read (
 	
 	spin_lock_irqsave(&ec->lock, flags);
 
-	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_READ, &ec->command_addr, 0);
+	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_READ, &ec->command_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
 	if (result)
 		goto end;
 
-	acpi_hw_low_level_write(8, address, &ec->data_addr, 0);
+	acpi_hw_low_level_write(8, address, &ec->data_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF);
 	if (result)
 		goto end;
 
 
-	acpi_hw_low_level_read(8, data, &ec->data_addr, 0);
+	acpi_hw_low_level_read(8, data, &ec->data_addr);
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Read [%02x] from address [%02x]\n",
 		*data, address));
@@ -211,17 +211,17 @@ acpi_ec_write (
 
 	spin_lock_irqsave(&ec->lock, flags);
 
-	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_WRITE, &ec->command_addr, 0);
+	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_WRITE, &ec->command_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
 	if (result)
 		goto end;
 
-	acpi_hw_low_level_write(8, address, &ec->data_addr, 0);
+	acpi_hw_low_level_write(8, address, &ec->data_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
 	if (result)
 		goto end;
 
-	acpi_hw_low_level_write(8, data, &ec->data_addr, 0);
+	acpi_hw_low_level_write(8, data, &ec->data_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
 	if (result)
 		goto end;
@@ -310,12 +310,12 @@ acpi_ec_query (
 	 */
 	spin_lock_irqsave(&ec->lock, flags);
 
-	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_QUERY, &ec->command_addr, 0);
+	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_QUERY, &ec->command_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF);
 	if (result)
 		goto end;
 	
-	acpi_hw_low_level_read(8, data, &ec->data_addr, 0);
+	acpi_hw_low_level_read(8, data, &ec->data_addr);
 	if (!*data)
 		result = -ENODATA;
 
@@ -355,7 +355,7 @@ acpi_ec_gpe_query (
 		goto end;	
 
 	spin_lock_irqsave(&ec->lock, flags);
-	acpi_hw_low_level_read(8, &value, &ec->command_addr, 0);
+	acpi_hw_low_level_read(8, &value, &ec->command_addr);
 	spin_unlock_irqrestore(&ec->lock, flags);
 
 	/* TBD: Implement asynch events!

@@ -379,24 +379,30 @@ acpi_resource_to_address64 (
 {
 	struct acpi_resource_address16      *address16;
 	struct acpi_resource_address32      *address32;
-	struct acpi_resource_address64      *address64;
 
 
 	switch (resource->id) {
 	case ACPI_RSTYPE_ADDRESS16:
+
 		address16 = (struct acpi_resource_address16 *) &resource->data;
 		ACPI_COPY_ADDRESS(out, address16);
 		break;
 
+
 	case ACPI_RSTYPE_ADDRESS32:
+
 		address32 = (struct acpi_resource_address32 *) &resource->data;
 		ACPI_COPY_ADDRESS(out, address32);
 		break;
 
+
 	case ACPI_RSTYPE_ADDRESS64:
-		address64 = (struct acpi_resource_address64 *) &resource->data;
-		ACPI_COPY_ADDRESS(out, address64);
+
+		/* Simple copy for 64 bit source */
+
+		ACPI_MEMCPY (out, &resource->data, sizeof (struct acpi_resource_address64));
 		break;
+
 
 	default:
 		return (AE_BAD_PARAMETER);

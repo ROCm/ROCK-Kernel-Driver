@@ -157,7 +157,7 @@ acpi_tb_match_signature (
 acpi_status
 acpi_tb_recognize_table (
 	struct acpi_table_desc          *table_info,
-	u8                             search_type);
+	u8                              search_type);
 
 acpi_status
 acpi_tb_init_table_descriptor (
@@ -170,11 +170,11 @@ acpi_tb_init_table_descriptor (
  */
 
 void
-acpi_tb_delete_acpi_tables (
+acpi_tb_delete_all_tables (
 	void);
 
 void
-acpi_tb_delete_acpi_table (
+acpi_tb_delete_tables_by_type (
 	acpi_table_type                 type);
 
 void
@@ -184,10 +184,6 @@ acpi_tb_delete_single_table (
 struct acpi_table_desc *
 acpi_tb_uninstall_table (
 	struct acpi_table_desc          *table_desc);
-
-void
-acpi_tb_free_acpi_tables_of_type (
-	struct acpi_table_desc          *table_info);
 
 
 /*
