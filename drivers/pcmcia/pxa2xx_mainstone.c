@@ -24,6 +24,7 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 
+#include <asm/arch/pxa-regs.h>
 #include <asm/arch/mainstone.h>
 
 #include "soc_common.h"

@@ -15,17 +15,6 @@
 
 #include <linux/config.h>
 
-// FIXME hack so that SA-1111.h will work [cb]
-
-#ifndef __ASSEMBLY__
-typedef unsigned short  Word16 ;
-typedef unsigned int    Word32 ;
-typedef Word32          Word ;
-typedef Word            Quad [4] ;
-typedef void            *Address ;
-typedef void            (*ExcpHndlr) (void) ;
-#endif
-
 /*
  * PXA Chip selects
  */

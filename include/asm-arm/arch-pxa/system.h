@@ -11,6 +11,7 @@
  */
 
 #include "hardware.h"
+#include "pxa-regs.h"
 
 static inline void arch_idle(void)
 {
