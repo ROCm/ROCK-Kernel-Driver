@@ -922,10 +922,10 @@ C_DATA(sys_call_table):
 	.long CSYM(sys_adjtimex)
 	.long CSYM(sys_ni_syscall)	// 125 - sys_mprotect
 	.long CSYM(sys_sigprocmask)
-	.long CSYM(sys_create_module)
+	.long CSYM(sys_ni_syscall)	// sys_create_module
 	.long CSYM(sys_init_module)
 	.long CSYM(sys_delete_module)
-	.long CSYM(sys_get_kernel_syms) // 130
+	.long CSYM(sys_ni_syscall)	// 130 - sys_get_kernel_syms
 	.long CSYM(sys_quotactl)
 	.long CSYM(sys_getpgid)
 	.long CSYM(sys_fchdir)
@@ -962,7 +962,7 @@ C_DATA(sys_call_table):
 	.long CSYM(sys_setresuid)
 	.long CSYM(sys_getresuid)	// 165
 	.long CSYM(sys_ni_syscall)	// for vm86
-	.long CSYM(sys_query_module)
+	.long CSYM(sys_ni_syscall)	// sys_query_module
 	.long CSYM(sys_poll)
 	.long CSYM(sys_nfsservctl)
 	.long CSYM(sys_setresgid)	// 170

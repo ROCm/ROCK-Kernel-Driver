@@ -15,7 +15,7 @@ obj-y += intv.o entry.o process.o syscalls.o time.o semaphore.o setup.o \
 	 signal.o irq.o mach.o ptrace.o bug.o
 export-objs += v850_ksyms.o rte_mb_a_pci.o
 
-obj-$(CONFIG_MODULES)		+= v850_ksyms.o
+obj-$(CONFIG_MODULES)		+= module.o v850_ksyms.o
 # chip-specific code
 obj-$(CONFIG_V850E_MA1)		+= ma.o	nb85e_utils.o nb85e_timer_d.o
 obj-$(CONFIG_V850E_NB85E)	+= nb85e_intc.o
