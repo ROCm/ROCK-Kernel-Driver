@@ -1784,7 +1784,7 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 			    struct rtl8139_private *tp, void *ioaddr)
 {
 	u8 tmp8;
-#ifndef CONFIG_8139_NEW_RX_RESET
+#ifdef CONFIG_8139_OLD_RX_RESET
 	int tmp_work;
 #endif
 
@@ -1807,7 +1807,7 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 		tp->xstats.rx_lost_in_ring++;
 	}
 
-#ifdef CONFIG_8139_NEW_RX_RESET
+#ifndef CONFIG_8139_OLD_RX_RESET
 	tmp8 = RTL_R8 (ChipCmd);
 	RTL_W8 (ChipCmd, tmp8 & ~CmdRxEnb);
 	RTL_W8 (ChipCmd, tmp8);
