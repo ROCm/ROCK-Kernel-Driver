@@ -55,7 +55,7 @@ int coda_fsync(struct file *, struct dentry *dentry, int datasync);
 
 int coda_hasmknod;
 
-struct dentry_operations coda_dentry_operations =
+static struct dentry_operations coda_dentry_operations =
 {
 	.d_revalidate	= coda_dentry_revalidate,
 	.d_delete	= coda_dentry_delete,
