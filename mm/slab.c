@@ -1042,6 +1042,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 			BUG();
 
 #if DEBUG
+	WARN_ON(strchr(name, ' '));	/* It confuses parsers */
 	if ((flags & SLAB_DEBUG_INITIAL) && !ctor) {
 		/* No constructor, but inital state check requested */
 		printk("%sNo con, but init state check requested - %s\n", func_nm, name);
