@@ -23,6 +23,8 @@
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 
+#include <asm/unistd.h>
+
 int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int retval = -ENODEV;
@@ -335,7 +337,7 @@ asmlinkage long sys_ftruncate64(unsigned int fd, loff_t length)
 }
 #endif
 
-#if !(defined(__alpha__) || defined(__ia64__))
+#ifdef __ARCH_WANT_SYS_UTIME
 
 /*
  * sys_utime() can be implemented in user-level using sys_utimes().

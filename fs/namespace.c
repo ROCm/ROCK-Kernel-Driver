@@ -22,6 +22,7 @@
 #include <linux/security.h>
 #include <linux/mount.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 extern int __init init_rootfs(void);
 
@@ -465,6 +466,8 @@ out:
 	return retval;
 }
 
+#ifdef __ARCH_WANT_SYS_OLDUMOUNT
+
 /*
  *	The 2.0 compatible umount. No flags. 
  */
@@ -473,6 +476,8 @@ asmlinkage long sys_oldumount(char __user * name)
 {
 	return sys_umount(name,0);
 }
+
+#endif
 
 static int mount_is_safe(struct nameidata *nd)
 {

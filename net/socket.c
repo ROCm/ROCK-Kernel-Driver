@@ -87,6 +87,8 @@
 #endif	/* CONFIG_NET_RADIO */
 
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
+
 #include <net/compat.h>
 
 #include <net/sock.h>
@@ -1817,6 +1819,8 @@ out:
 	return err;
 }
 
+#ifdef __ARCH_WANT_SYS_SOCKETCALL
+
 /* Argument list sizes for sys_socketcall */
 #define AL(x) ((x) * sizeof(unsigned long))
 static unsigned char nargs[18]={AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
@@ -1909,6 +1913,8 @@ asmlinkage long sys_socketcall(int call, unsigned long __user *args)
 	}
 	return err;
 }
+
+#endif /* __ARCH_WANT_SYS_SOCKETCALL */
 
 /*
  *	This function is called by a protocol handler that wants to

@@ -29,6 +29,7 @@
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 /* 
  * The timezone where the local system is located.  Used as a default by some
@@ -38,7 +39,7 @@ struct timezone sys_tz;
 
 EXPORT_SYMBOL(sys_tz);
 
-#if !defined(__alpha__) && !defined(__ia64__)
+#ifdef __ARCH_WANT_SYS_TIME
 
 /*
  * sys_time() can be implemented in user-level using
@@ -84,7 +85,7 @@ asmlinkage long sys_stime(time_t *tptr)
 	return 0;
 }
 
-#endif
+#endif /* __ARCH_WANT_SYS_TIME */
 
 asmlinkage long sys_gettimeofday(struct timeval __user *tv, struct timezone __user *tz)
 {
