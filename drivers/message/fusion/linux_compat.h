@@ -93,7 +93,7 @@ typedef void (*__cleanup_module_func_t)(void);
  * Used prior to schedule_timeout calls..
  */
 #define __set_current_state(state_value)	do { current->state = state_value; } while (0)
-#ifdef __SMP__
+#ifdef CONFIG_SMP
 #define set_current_state(state_value)		do { __set_current_state(state_value); mb(); } while (0)
 #else
 #define set_current_state(state_value)		__set_current_state(state_value)

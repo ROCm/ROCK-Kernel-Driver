@@ -174,7 +174,7 @@
 #include <linux/module.h>
 
 MODULE_AUTHOR ("3ware Inc.");
-#ifdef __SMP__
+#ifdef CONFIG_SMP
 MODULE_DESCRIPTION ("3ware Storage Controller Linux Driver (SMP)");
 #else
 MODULE_DESCRIPTION ("3ware Storage Controller Linux Driver");

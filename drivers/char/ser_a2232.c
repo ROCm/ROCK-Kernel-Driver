@@ -731,7 +731,7 @@ int a2232board_init(void)
 	volatile u_char *to;
 	volatile struct a2232memory *mem;
 
-#ifdef __SMP__
+#ifdef CONFIG_SMP
 	return -ENODEV;	/* This driver is not SMP aware. Is there an SMP ZorroII-bus-machine? */
 #endif
 
