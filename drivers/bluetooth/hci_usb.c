@@ -29,9 +29,7 @@
  *    Copyright (c) 2000 Greg Kroah-Hartman        <greg@kroah.com>
  *    Copyright (c) 2000 Mark Douglas Corner       <mcorner@umich.edu>
  *
- * $Id: hci_usb.c,v 1.8 2002/07/18 17:23:09 maxk Exp $    
  */
-#define VERSION "2.5"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -57,15 +55,17 @@
 
 #ifndef CONFIG_BT_HCIUSB_DEBUG
 #undef  BT_DBG
-#define BT_DBG( A... )
+#define BT_DBG(D...)
 #undef  BT_DMP
-#define BT_DMP( A... )
+#define BT_DMP(D...)
 #endif
 
 #ifndef CONFIG_BT_HCIUSB_ZERO_PACKET
 #undef  URB_ZERO_PACKET
 #define URB_ZERO_PACKET 0
 #endif
+
+#define VERSION "2.6"
 
 static struct usb_driver hci_usb_driver; 
 
@@ -100,7 +100,10 @@ static struct usb_device_id blacklist_ids[] = {
 	/* Digianswer device */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
 
-	{ }     /* Terminating entry */
+	/* RTX Telecom based adapter with buggy SCO support */
+	{ USB_DEVICE(0x0400, 0x0807), .driver_info = HCI_BROKEN_ISOC },
+
+	{ }	/* Terminating entry */
 };
 
 struct _urb *_urb_alloc(int isoc, int gfp)
@@ -393,7 +396,7 @@ static int hci_usb_close(struct hci_dev *hdev)
 {
 	struct hci_usb *husb = (struct hci_usb *) hdev->driver_data;
 	unsigned long flags;
-	
+
 	if (!test_and_clear_bit(HCI_RUNNING, &hdev->flags))
 		return 0;
 
@@ -402,7 +405,7 @@ static int hci_usb_close(struct hci_dev *hdev)
 	/* Synchronize with completion handlers */
 	write_lock_irqsave(&husb->completion_lock, flags);
 	write_unlock_irqrestore(&husb->completion_lock, flags);
-	
+
 	hci_usb_unlink_urbs(husb);
 	hci_usb_flush(hdev);
 	return 0;
@@ -414,7 +417,7 @@ static int __tx_submit(struct hci_usb *husb, struct _urb *_urb)
 	int err;
 
 	BT_DBG("%s urb %p type %d", husb->hdev->name, urb, _urb->type);
-	
+
 	_urb_queue_tail(__pending_q(husb, _urb->type), _urb);
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
@@ -551,7 +554,7 @@ static void hci_usb_tx_process(struct hci_usb *husb)
 				skb_queue_head(q, skb);
 		}
 #endif
-		
+
 		/* Process ACL queue */
 		q = __transmit_q(husb, HCI_ACLDATA_PKT);
 		while (atomic_read(__pending_tx(husb, HCI_ACLDATA_PKT)) < HCI_MAX_BULK_TX &&
@@ -656,7 +659,7 @@ static inline int __recv_frame(struct hci_usb *husb, int type, void *data, int c
 				if (count >= HCI_SCO_HDR_SIZE) {
 					struct hci_sco_hdr *h = data;
 					len = HCI_SCO_HDR_SIZE + h->dlen;
-				} else 
+				} else
 					return -EILSEQ;
 				break;
 #endif
@@ -702,7 +705,7 @@ static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs)
 	struct _urb *_urb = container_of(urb, struct _urb, urb);
 	struct hci_usb *husb = (void *) urb->context;
 	struct hci_dev *hdev = husb->hdev;
-	int    err, count = urb->actual_length;
+	int err, count = urb->actual_length;
 
 	BT_DBG("%s urb %p type %d status %d count %d flags %x", hdev->name, urb,
 			_urb->type, urb->status, count, urb->transfer_flags);
@@ -743,7 +746,7 @@ static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs)
 
 resubmit:
 	urb->dev = husb->udev;
-	err      = usb_submit_urb(urb, GFP_ATOMIC);
+	err = usb_submit_urb(urb, GFP_ATOMIC);
 	BT_DBG("%s urb %p type %d resubmit status %d", hdev->name, urb,
 			_urb->type, err);
 
@@ -779,7 +782,7 @@ static void hci_usb_tx_complete(struct urb *urb, struct pt_regs *regs)
 	_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 
 	hci_usb_tx_wakeup(husb);
-	
+
 	read_unlock(&husb->completion_lock);
 }
 
@@ -819,9 +822,8 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	if (intf->cur_altsetting->desc.bInterfaceNumber > 0)
 		return -ENODEV;
-	
-	/* Find endpoints that we need */
 
+	/* Find endpoints that we need */
 	uif = intf->cur_altsetting;
 	for (e = 0; e < uif->desc.bNumEndpoints; e++) {
 		ep = &uif->endpoint[e];
@@ -862,16 +864,17 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		husb->ctrl_req = HCI_DIGI_REQ;
 	else
 		husb->ctrl_req = HCI_CTRL_REQ;
-	
-	/* Find isochronous endpoints that we can use */
 
+	/* Find isochronous endpoints that we can use */
 	size = 0; 
 	isoc_iface = NULL;
 	isoc_alts  = 0;
 	isoc_ifnum = 1;
 
 #ifdef CONFIG_BT_HCIUSB_SCO
-	isoc_iface = usb_ifnum_to_if(udev, isoc_ifnum);
+	if (!(id->driver_info & HCI_BROKEN_ISOC))
+		isoc_iface = usb_ifnum_to_if(udev, isoc_ifnum);
+
 	if (isoc_iface) {
 		int a;
 		struct usb_host_endpoint *isoc_out_ep = NULL;
@@ -917,10 +920,10 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		}
 	}
 #endif
-	
+
 	husb->completion_lock = RW_LOCK_UNLOCKED;
 
-	for (i = 0; i < 4; i++) {	
+	for (i = 0; i < 4; i++) {
 		skb_queue_head_init(&husb->transmit_q[i]);
 		_urb_queue_init(&husb->pending_q[i]);
 		_urb_queue_init(&husb->completed_q[i]);
@@ -939,10 +942,10 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev->driver_data = husb;
 	SET_HCIDEV_DEV(hdev, &intf->dev);
 
-	hdev->open  = hci_usb_open;
-	hdev->close = hci_usb_close;
-	hdev->flush = hci_usb_flush;
-	hdev->send  = hci_usb_send_frame;
+	hdev->open     = hci_usb_open;
+	hdev->close    = hci_usb_close;
+	hdev->flush    = hci_usb_flush;
+	hdev->send     = hci_usb_send_frame;
 	hdev->destruct = hci_usb_destruct;
 
 	hdev->owner = THIS_MODULE;
@@ -993,11 +996,11 @@ static void hci_usb_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver hci_usb_driver = {
-	.owner      =  THIS_MODULE,
-	.name       =  "hci_usb",
-	.probe      =  hci_usb_probe,
-	.disconnect =  hci_usb_disconnect,
-	.id_table   =  bluetooth_ids,
+	.owner		= THIS_MODULE,
+	.name		= "hci_usb",
+	.probe		= hci_usb_probe,
+	.disconnect	= hci_usb_disconnect,
+	.id_table	= bluetooth_ids,
 };
 
 static int __init hci_usb_init(void)
