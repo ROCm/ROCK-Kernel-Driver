@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.25 $
+ * $Revision: 1.26 $
  */
 
 #include <linux/config.h>
@@ -680,6 +680,13 @@ dasd_add_sysfs_files(struct ccw_device *cdev)
 {
 	return sysfs_create_group(&cdev->dev.kobj, &dasd_attr_group);
 }
+
+void
+dasd_remove_sysfs_files(struct ccw_device *cdev)
+{
+	sysfs_remove_group(&cdev->dev.kobj, &dasd_attr_group);
+}
+
 
 int
 dasd_devmap_init(void)

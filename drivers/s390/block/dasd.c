@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.129 $
+ * $Revision: 1.133 $
  */
 
 #include <linux/config.h>
@@ -1655,11 +1655,24 @@ dasd_open(struct inode *inp, struct file *filp)
 {
 	struct gendisk *disk = inp->i_bdev->bd_disk;
 	struct dasd_device *device = disk->private_data;
-	int rc;
+	int old_count, rc;
 
-	if (!try_module_get(device->discipline->owner))
-		return -EINVAL;
-	
+	/*
+	 * We use a negative value in open_count to indicate that
+	 * the device must not be used.
+	 */
+	do {
+		old_count = atomic_read(&device->open_count);
+		if (old_count < 0)
+			return -ENODEV;
+	} while (atomic_compare_and_swap(old_count, old_count + 1,
+					 &device->open_count));
+
+	if (!try_module_get(device->discipline->owner)) {
+		rc = -EINVAL;
+		goto unlock;
+	}
+
 	if (dasd_probeonly) {
 		MESSAGE(KERN_INFO,
 			"No access to device %s due to probeonly mode",
@@ -1676,11 +1689,12 @@ dasd_open(struct inode *inp, struct file *filp)
 		goto out;
 	}
 
-	atomic_inc(&device->open_count);
 	return 0;
 
 out:
 	module_put(device->discipline->owner);
+unlock:
+	atomic_dec(&device->open_count);
 	return rc;
 }
 
@@ -1741,7 +1755,7 @@ dasd_generic_probe (struct ccw_device *cdev,
 	ret = dasd_add_sysfs_files(cdev);
 	if (ret) {
 		printk(KERN_WARNING
-		       "dasd_generic_probe: could not add driverfs entries"
+		       "dasd_generic_probe: could not add sysfs entries "
 		       "for %s\n", cdev->dev.bus_id);
 	}
 
@@ -1757,8 +1771,15 @@ dasd_generic_remove (struct ccw_device *cdev)
 {
 	struct dasd_device *device;
 
+	dasd_remove_sysfs_files(cdev);
 	device = dasd_device_from_cdev(cdev);
 	if (!IS_ERR(device)) {
+		/*
+		 * This device is removed unconditionally. Set open_count
+		 * to -1 to prevent dasd_open from opening it while it is
+		 * no quite down yet.
+		 */
+		atomic_set(&device->open_count,-1);
 		dasd_set_target_state(device, DASD_STATE_NEW);
 		/* dasd_delete_device destroys the device reference. */
 		dasd_delete_device(device);
@@ -1830,15 +1851,23 @@ dasd_generic_set_offline (struct ccw_device *cdev)
 	struct dasd_device *device;
 
 	device = dasd_device_from_cdev(cdev);
-	if (atomic_read(&device->open_count) > 0) {
+	/*
+	 * We must make sure that this device is currently not in use
+	 * (current open_count == 0 ). We set open_count to -1 to indicate
+	 * that from now on set_offline is in progress and the device must
+	 * not be used otherwise.
+	 */
+	if (atomic_compare_and_swap(0, -1, &device->open_count)) {
 		printk (KERN_WARNING "Can't offline dasd device with open"
 			" count = %i.\n",
 			atomic_read(&device->open_count));
 		dasd_put_device(device);
 		return -EBUSY;
 	}
-	dasd_put_device(device);
-	dasd_generic_remove (cdev);
+	dasd_set_target_state(device, DASD_STATE_NEW);
+	/* dasd_delete_device destroys the device reference. */
+	dasd_delete_device(device);
+
 	return 0;
 }
 
