@@ -522,7 +522,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			set_con2fb_map(i, con2fb.framebuffer);
 		return 0;
 	case FBIOBLANK:
-		if (fb->fb_blank == 0)
+		if (fb->fb_blank == NULL)
 			return -EINVAL;
 		return fb->fb_blank(arg, info);
 	default:

@@ -375,7 +375,7 @@ static int platinum_blank(int blank,  struct fb_info *fb)
 	out_le32(&info->platinum_regs->ctrl.r, ctrl);
 */
 /* TODO: Figure out how the heck to powerdown this thing! */
-    return 0;
+	return 0;
 }
 
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green,
