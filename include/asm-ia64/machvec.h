@@ -4,7 +4,7 @@
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Srinivasa Thirumalachar <sprasad@engr.sgi.com>
  * Copyright (C) Vijay Chander <vijay@engr.sgi.com>
- * Copyright (C) 1999-2001, 2003 Hewlett-Packard Co.
+ * Copyright (C) 1999-2001, 2003-2004 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_MACHVEC_H
@@ -21,12 +21,8 @@ struct irq_desc;
 struct page;
 
 typedef void ia64_mv_setup_t (char **);
-typedef void ia64_mv_cpu_init_t(void);
+typedef void ia64_mv_cpu_init_t (void);
 typedef void ia64_mv_irq_init_t (void);
-typedef void ia64_mv_mca_init_t (void);
-typedef void ia64_mv_mca_handler_t (void);
-typedef void ia64_mv_cmci_handler_t (int, void *, struct pt_regs *);
-typedef void ia64_mv_log_print_t (void);
 typedef void ia64_mv_send_ipi_t (int, int, int, int);
 typedef void ia64_mv_timer_interrupt_t (int, void *, struct pt_regs *);
 typedef void ia64_mv_global_tlb_purge_t (unsigned long, unsigned long, unsigned long);
@@ -46,6 +42,7 @@ typedef void ia64_mv_dma_sync_single_for_cpu (struct device *, dma_addr_t, size_
 typedef void ia64_mv_dma_sync_sg_for_cpu (struct device *, struct scatterlist *, int, int);
 typedef void ia64_mv_dma_sync_single_for_device (struct device *, dma_addr_t, size_t, int);
 typedef void ia64_mv_dma_sync_sg_for_device (struct device *, struct scatterlist *, int, int);
+typedef int ia64_mv_dma_mapping_error (dma_addr_t dma_addr);
 typedef int ia64_mv_dma_supported (struct device *, u64);
 
 /*
@@ -73,7 +70,10 @@ typedef unsigned int ia64_mv_readl_relaxed_t (void *);
 typedef unsigned long ia64_mv_readq_relaxed_t (void *);
 
 extern void machvec_noop (void);
-extern void machvec_memory_fence (void);
+extern void machvec_setup (char **);
+extern void machvec_timer_interrupt (int, void *, struct pt_regs *);
+extern void machvec_dma_sync_single (struct device *, dma_addr_t, size_t, int);
+extern void machvec_dma_sync_sg (struct device *, struct scatterlist *, int, int);
 
 # if defined (CONFIG_IA64_HP_SIM)
 #  include <asm/machvec_hpsim.h>
@@ -92,10 +92,6 @@ extern void machvec_memory_fence (void);
 #  define platform_setup	ia64_mv.setup
 #  define platform_cpu_init	ia64_mv.cpu_init
 #  define platform_irq_init	ia64_mv.irq_init
-#  define platform_mca_init	ia64_mv.mca_init
-#  define platform_mca_handler	ia64_mv.mca_handler
-#  define platform_cmci_handler	ia64_mv.cmci_handler
-#  define platform_log_print	ia64_mv.log_print
 #  define platform_send_ipi	ia64_mv.send_ipi
 #  define platform_timer_interrupt	ia64_mv.timer_interrupt
 #  define platform_global_tlb_purge	ia64_mv.global_tlb_purge
@@ -110,6 +106,7 @@ extern void machvec_memory_fence (void);
 #  define platform_dma_sync_sg_for_cpu	ia64_mv.dma_sync_sg_for_cpu
 #  define platform_dma_sync_single_for_device ia64_mv.dma_sync_single_for_device
 #  define platform_dma_sync_sg_for_device ia64_mv.dma_sync_sg_for_device
+#  define platform_dma_mapping_error		ia64_mv.dma_mapping_error
 #  define platform_dma_supported	ia64_mv.dma_supported
 #  define platform_irq_desc		ia64_mv.irq_desc
 #  define platform_irq_to_vector	ia64_mv.irq_to_vector
@@ -140,10 +137,6 @@ struct ia64_machine_vector {
 	ia64_mv_setup_t *setup;
 	ia64_mv_cpu_init_t *cpu_init;
 	ia64_mv_irq_init_t *irq_init;
-	ia64_mv_mca_init_t *mca_init;
-	ia64_mv_mca_handler_t *mca_handler;
-	ia64_mv_cmci_handler_t *cmci_handler;
-	ia64_mv_log_print_t *log_print;
 	ia64_mv_send_ipi_t *send_ipi;
 	ia64_mv_timer_interrupt_t *timer_interrupt;
 	ia64_mv_global_tlb_purge_t *global_tlb_purge;
@@ -158,6 +151,7 @@ struct ia64_machine_vector {
 	ia64_mv_dma_sync_sg_for_cpu *dma_sync_sg_for_cpu;
 	ia64_mv_dma_sync_single_for_device *dma_sync_single_for_device;
 	ia64_mv_dma_sync_sg_for_device *dma_sync_sg_for_device;
+	ia64_mv_dma_mapping_error *dma_mapping_error;
 	ia64_mv_dma_supported *dma_supported;
 	ia64_mv_irq_desc *irq_desc;
 	ia64_mv_irq_to_vector *irq_to_vector;
@@ -184,10 +178,6 @@ struct ia64_machine_vector {
 	platform_setup,				\
 	platform_cpu_init,			\
 	platform_irq_init,			\
-	platform_mca_init,			\
-	platform_mca_handler,			\
-	platform_cmci_handler,			\
-	platform_log_print,			\
 	platform_send_ipi,			\
 	platform_timer_interrupt,		\
 	platform_global_tlb_purge,		\
@@ -202,6 +192,7 @@ struct ia64_machine_vector {
 	platform_dma_sync_sg_for_cpu,		\
 	platform_dma_sync_single_for_device,	\
 	platform_dma_sync_sg_for_device,	\
+	platform_dma_mapping_error,			\
 	platform_dma_supported,			\
 	platform_irq_desc,			\
 	platform_irq_to_vector,			\
@@ -243,6 +234,7 @@ extern ia64_mv_dma_sync_single_for_cpu	swiotlb_sync_single_for_cpu;
 extern ia64_mv_dma_sync_sg_for_cpu	swiotlb_sync_sg_for_cpu;
 extern ia64_mv_dma_sync_single_for_device swiotlb_sync_single_for_device;
 extern ia64_mv_dma_sync_sg_for_device	swiotlb_sync_sg_for_device;
+extern ia64_mv_dma_mapping_error		swiotlb_dma_mapping_error;
 extern ia64_mv_dma_supported		swiotlb_dma_supported;
 
 /*
@@ -250,31 +242,20 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
  * to update the machvec files for all existing platforms.
  */
 #ifndef platform_setup
-# define platform_setup		((ia64_mv_setup_t *) machvec_noop)
+# define platform_setup			machvec_setup
 #endif
 #ifndef platform_cpu_init
-# define platform_cpu_init	((ia64_mv_cpu_init_t *) machvec_noop)
+# define platform_cpu_init		machvec_noop
 #endif
 #ifndef platform_irq_init
-# define platform_irq_init	((ia64_mv_irq_init_t *) machvec_noop)
+# define platform_irq_init		machvec_noop
 #endif
-#ifndef platform_mca_init
-# define platform_mca_init	((ia64_mv_mca_init_t *) machvec_noop)
-#endif
-#ifndef platform_mca_handler
-# define platform_mca_handler	((ia64_mv_mca_handler_t *) machvec_noop)
-#endif
-#ifndef platform_cmci_handler
-# define platform_cmci_handler	((ia64_mv_cmci_handler_t *) machvec_noop)
-#endif
-#ifndef platform_log_print
-# define platform_log_print	((ia64_mv_log_print_t *) machvec_noop)
-#endif
+
 #ifndef platform_send_ipi
-# define platform_send_ipi	ia64_send_ipi	/* default to architected version */
+# define platform_send_ipi		ia64_send_ipi	/* default to architected version */
 #endif
 #ifndef platform_timer_interrupt
-# define platform_timer_interrupt 	((ia64_mv_timer_interrupt_t *) machvec_noop)
+# define platform_timer_interrupt 	machvec_timer_interrupt
 #endif
 #ifndef platform_global_tlb_purge
 # define platform_global_tlb_purge	ia64_global_tlb_purge /* default to architected version */
@@ -311,6 +292,9 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
 #endif
 #ifndef platform_dma_sync_sg_for_device
 # define platform_dma_sync_sg_for_device	swiotlb_sync_sg_for_device
+#endif
+#ifndef platform_dma_mapping_error
+# define platform_dma_mapping_error		swiotlb_dma_mapping_error
 #endif
 #ifndef platform_dma_supported
 # define  platform_dma_supported	swiotlb_dma_supported

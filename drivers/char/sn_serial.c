@@ -352,7 +352,7 @@ synch_flush_xmit(void)
 		if (xmit_count > 0) {
 			result = sn_func->sal_puts((char *)start, xmit_count);
 			if (!result)
-				sn_debug_printf("\n*** synch_flush_xmit failed to flush\n");
+				DPRINTF("\n*** synch_flush_xmit failed to flush\n");
 			if (result > 0) {
 				xmit_count -= result;
 				sn_total_tx_count += result;
@@ -389,12 +389,12 @@ sn_poll_transmit_chars(void)
 	xmit_count = (head < tail) ?  (SN_SAL_BUFFER_SIZE - tail) : (head - tail);
 
 	if (xmit_count == 0)
-		sn_debug_printf("\n*** empty xmit_count\n");
+		DPRINTF("\n*** empty xmit_count\n");
 
 	/* use the ops, as we could be on the simulator */
 	result = sn_func->sal_puts((char *)start, xmit_count);
 	if (!result)
-		sn_debug_printf("\n*** error in synchronous sal_puts\n");
+		DPRINTF("\n*** error in synchronous sal_puts\n");
 	/* XXX chadt clean this up */
 	if (result > 0) {
 		xmit_count -= result;
@@ -447,7 +447,7 @@ sn_intr_transmit_chars(void)
 			result = ia64_sn_console_xmit_chars((char *)start, xmit_count);
 #ifdef DEBUG
 			if (!result)
-				sn_debug_printf("`");
+				DPRINTF("`");
 #endif
 			if (result > 0) {
 				xmit_count -= result;
@@ -511,7 +511,7 @@ sn_sal_connect_interrupt(void)
 	if (result >= 0)
 		return console_irq;
 
-	printk(KERN_INFO "sn_serial: console proceeding in polled mode\n");
+	printk(KERN_WARNING "sn_serial: console proceeding in polled mode\n");
 	return 0;
 }
 
@@ -823,7 +823,7 @@ sn_sal_switch_to_asynch(void)
 		return;
 	}
 
-	sn_debug_printf("sn_serial: switch to asynchronous console\n");
+	DPRINTF("sn_serial: switch to asynchronous console\n");
 
 	/* early_printk invocation may have done this for us */
 	if (!sn_func) {
@@ -859,7 +859,7 @@ sn_sal_switch_to_interrupts(void)
 {
 	int irq;
 
-	sn_debug_printf("sn_serial: switching to interrupt driven console\n");
+	DPRINTF("sn_serial: switching to interrupt driven console\n");
 
 	irq = sn_sal_connect_interrupt();
 	if (irq) {
@@ -883,7 +883,7 @@ sn_sal_module_init(void)
 {
 	int retval;
 
-	printk("sn_serial: sn_sal_module_init\n");
+	DPRINTF("sn_serial: sn_sal_module_init\n");
 
 	if (!ia64_platform_is("sn2"))
 		return -ENODEV;
@@ -1016,7 +1016,7 @@ sn_sal_serial_console_init(void)
 {
 	if (ia64_platform_is("sn2")) {
 		sn_sal_switch_to_asynch();
-		sn_debug_printf("sn_sal_serial_console_init : register console\n");
+		DPRINTF("sn_sal_serial_console_init : register console\n");
 		register_console(&sal_console);
 	}
 	return 0;

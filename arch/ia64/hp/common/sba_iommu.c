@@ -1678,6 +1678,7 @@ struct ioc_iommu {
 
 static struct ioc_iommu ioc_iommu_info[] __initdata = {
 	{ ZX1_IOC_ID, "zx1", ioc_zx1_init },
+	{ SX1000_IOC_ID, "sx1000", NULL },
 };
 
 static struct ioc * __init
@@ -1979,6 +1980,12 @@ sba_dma_supported (struct device *dev, u64 mask)
 	return ((mask & 0xFFFFFFFFUL) == 0xFFFFFFFFUL);
 }
 
+int
+sba_dma_mapping_error (dma_addr_t dma_addr)
+{
+	return 0;
+}
+
 __setup("nosbagart", nosbagart);
 
 static int __init
@@ -2004,6 +2011,7 @@ sba_page_override(char *str)
 
 __setup("sbapagesize=",sba_page_override);
 
+EXPORT_SYMBOL(sba_dma_mapping_error);
 EXPORT_SYMBOL(sba_map_single);
 EXPORT_SYMBOL(sba_unmap_single);
 EXPORT_SYMBOL(sba_map_sg);
