@@ -376,7 +376,7 @@ static void do_acct_process(long exitcode, struct file *file)
 	ac.ac_rw = encode_comp_t(ac.ac_io / 1024);
 	ac.ac_minflt = encode_comp_t(current->min_flt);
 	ac.ac_majflt = encode_comp_t(current->maj_flt);
-	ac.ac_swaps = encode_comp_t(current->nswap);
+	ac.ac_swaps = encode_comp_t(0);
 	ac.ac_exitcode = exitcode;
 
 	/*

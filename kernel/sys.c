@@ -1532,7 +1532,6 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 			r.ru_nivcsw = p->nivcsw;
 			r.ru_minflt = p->min_flt;
 			r.ru_majflt = p->maj_flt;
-			r.ru_nswap = p->nswap;
 			break;
 		case RUSAGE_CHILDREN:
 			jiffies_to_timeval(p->cutime, &r.ru_utime);
@@ -1541,7 +1540,6 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 			r.ru_nivcsw = p->cnivcsw;
 			r.ru_minflt = p->cmin_flt;
 			r.ru_majflt = p->cmaj_flt;
-			r.ru_nswap = p->cnswap;
 			break;
 		default:
 			jiffies_to_timeval(p->utime + p->cutime, &r.ru_utime);
@@ -1550,7 +1548,6 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 			r.ru_nivcsw = p->nivcsw + p->cnivcsw;
 			r.ru_minflt = p->min_flt + p->cmin_flt;
 			r.ru_majflt = p->maj_flt + p->cmaj_flt;
-			r.ru_nswap = p->nswap + p->cnswap;
 			break;
 	}
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
