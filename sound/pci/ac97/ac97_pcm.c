@@ -392,8 +392,12 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	rpcms = snd_kcalloc(sizeof(struct ac97_pcm), GFP_KERNEL);
 	if (rpcms == NULL)
 		return -ENOMEM;
+	memset(avail_slots, 0, sizeof(avail_slots));
+	memset(all_slots, 0, sizeof(all_slots));
 	for (i = 0; i < 4; i++) {
 		codec = bus->codec[i];
+		if (! codec)
+			continue;
 		avail_slots[0][i] = get_pslots(codec, &rate_table[0][i]);
 		avail_slots[1][i] = get_cslots(codec);
 		if (!(codec->scaps & AC97_SCAP_INDEP_SDIN)) {
