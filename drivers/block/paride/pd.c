@@ -215,21 +215,25 @@ static struct request *pd_req;	/* current request */
 
 static void run_fsm(void)
 {
-	enum action res;
+	while (1) {
+		enum action res;
 
-	switch(res = phase()) {
-		case Ok: case Fail:
-			pi_unclaim(pi_current);
-			next_request(res);
-			break;
-		case Wait:
-			pi_unclaim(pi_current);
-			/* fallthrough */
-		case Claim:
-			pi_do_claimed(pi_current, run_fsm);
-			break;
-		case Hold:
-			ps_set_intr();
+		switch(res = phase()) {
+			case Ok: case Fail:
+				pi_unclaim(pi_current);
+				next_request(res);
+				return;
+			case Wait:
+				pi_unclaim(pi_current);
+				/* fallthrough */
+			case Claim:
+				if (!pi_schedule_claimed(pi_current, run_fsm))
+					return;
+				break;
+			case Hold:
+				ps_set_intr();
+				return;
+		}
 	}
 }
 
