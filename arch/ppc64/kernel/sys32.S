@@ -44,14 +44,10 @@ _GLOBAL(sys32_getsockopt)
 	clrldi		r7, r7, 32	/* int *optlen parm */
 	b		.sys_getsockopt
 
-_GLOBAL(sys32_bdflush)
-	extsw		r4,r4		/* sign extend long data parm */
-	b		.sys_bdflush
-
-_GLOBAL(sys32_mmap2)
+_GLOBAL(ppc32_mmap2)
 	clrldi		r7, r7, 32	/* unsigned long fd parm */
-	extsw		r8, r8		/* off_t offset */
-	b		.sys_mmap
+	clrldi		r8, r8, 32	/* unsigned long pgoff */
+	b		.sys32_mmap2
 
 _GLOBAL(sys32_socketcall)	/* r3=call, r4=args */
 	cmpwi		r3, 1
