@@ -418,6 +418,14 @@ extern inline int pte_young(pte_t pte)
 	return 0;
 }
 
+extern inline int pte_read(pte_t pte)
+{
+	/* All pages are readable since we don't use the fetch
+	 * protection bit in the storage key.
+	 */
+	return 1;
+}
+
 /*
  * pgd/pmd/pte modification functions
  */
