@@ -254,6 +254,18 @@ config REISERFS_FS_XATTR
 
 	  If unsure, say N.
 
+config REISERFS_FS_POSIX_ACL
+	bool "ReiserFS POSIX Access Control Lists"
+	depends on REISERFS_FS_XATTR
+	help
+	  Posix Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N
+
 config JFS_FS
 	tristate "JFS filesystem support"
 	select NLS
@@ -292,13 +304,13 @@ config JFS_STATISTICS
 	  to be made available to the user in the /proc/fs/jfs/ directory.
 
 config FS_POSIX_ACL
-# Posix ACL utility routines (for now, only ext2/ext3/jfs)
+# Posix ACL utility routines (for now, only ext2/ext3/jfs/reiserfs)
 #
 # NOTE: you can implement Posix ACLs without these helpers (XFS does).
 # 	Never use this symbol for ifdefs.
 #
 	bool
-	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL || REISERFS_FS_POSIX_ACL
 	default y
 
 config XFS_FS

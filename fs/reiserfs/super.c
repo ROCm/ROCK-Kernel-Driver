@@ -17,6 +17,7 @@
 #include <linux/time.h>
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_acl.h>
 #include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
@@ -433,6 +434,8 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	    SLAB_CTOR_CONSTRUCTOR) {
 		INIT_LIST_HEAD(&ei->i_prealloc_list) ;
 		inode_init_once(&ei->vfs_inode);
+		ei->i_acl_access = NULL;
+		ei->i_acl_default = NULL;
 	}
 }
  
@@ -473,6 +476,22 @@ static void reiserfs_dirty_inode (struct inode * inode) {
     reiserfs_write_unlock(inode->i_sb);
 }
 
+static void reiserfs_clear_inode (struct inode *inode)
+{
+    struct posix_acl *acl;
+
+    acl = REISERFS_I(inode)->i_acl_access;
+    if (acl && !IS_ERR (acl))
+        posix_acl_release (acl);
+    REISERFS_I(inode)->i_acl_access = NULL;
+
+    acl = REISERFS_I(inode)->i_acl_default;
+    if (acl && !IS_ERR (acl))
+        posix_acl_release (acl);
+    REISERFS_I(inode)->i_acl_default = NULL;
+}
+
+
 struct super_operations reiserfs_sops = 
 {
   .alloc_inode = reiserfs_alloc_inode,
@@ -480,6 +499,7 @@ struct super_operations reiserfs_sops =
   .write_inode = reiserfs_write_inode,
   .dirty_inode = reiserfs_dirty_inode,
   .delete_inode = reiserfs_delete_inode,
+  .clear_inode  = reiserfs_clear_inode,
   .put_super = reiserfs_put_super,
   .write_super = reiserfs_write_super,
   .write_super_lockfs = reiserfs_write_super_lockfs,
@@ -682,6 +702,10 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"noattrs", 0, 0, 0, 1<<REISERFS_ATTRS},
 	{"user_xattr", 0, 0, 1<<REISERFS_XATTRS_USER, 0},
 	{"nouser_xattr", 0, 0, 0, 1<<REISERFS_XATTRS_USER},
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
+	{"acl", 0, 0, 1<<REISERFS_POSIXACL, 0},
+	{"noacl", 0, 0, 0, 1<<REISERFS_POSIXACL},
+#endif
 	{"nolog", 0, 0, 0, 0}, /* This is unsupported */
 	{"replayonly", 0, 0, 1<<REPLAYONLY, 0},
 	{"block-allocator", 'a', balloc, 0, 0},
@@ -827,6 +851,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   safe_mask |= 1 << REISERFS_TEST4;
   safe_mask |= 1 << REISERFS_ATTRS;
   safe_mask |= 1 << REISERFS_XATTRS_USER;
+  safe_mask |= 1 << REISERFS_POSIXACL;
 
   /* Update the bitmask, taking care to keep
    * the bits we're not allowed to change here */

@@ -13,6 +13,10 @@ ifeq ($(CONFIG_REISERFS_FS_XATTR),y)
 reiserfs-objs += xattr.o xattr_user.o
 endif
 
+ifeq ($(CONFIG_REISERFS_FS_POSIX_ACL),y)
+reiserfs-objs += xattr_acl.o
+endif
+
 # gcc -O2 (the kernel default)  is overaggressive on ppc32 when many inline
 # functions are used.  This causes the compiler to advance the stack
 # pointer out of the available stack space, corrupting kernel space,

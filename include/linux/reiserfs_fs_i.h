@@ -52,6 +52,9 @@ struct reiserfs_inode_info {
     ** flushed */
     unsigned long i_trans_id ;
     struct reiserfs_journal_list *i_jl;
+
+    struct posix_acl *i_acl_access;
+    struct posix_acl *i_acl_default;
     struct inode vfs_inode;
 };
 

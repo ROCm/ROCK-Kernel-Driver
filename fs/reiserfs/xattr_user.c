@@ -6,6 +6,10 @@
 #include <linux/reiserfs_xattr.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
+# include <linux/reiserfs_acl.h>
+#endif
+
 #define XATTR_USER_PREFIX "user."
 
 static int
@@ -20,7 +24,7 @@ user_get (struct inode *inode, const char *name, void *buffer, size_t size)
     if (!reiserfs_xattrs_user (inode->i_sb))
         return -EOPNOTSUPP;
 
-    error = permission (inode, MAY_READ, NULL);
+    error = reiserfs_permission_locked (inode, MAY_READ, NULL);
     if (error)
         return error;
 
@@ -44,7 +48,7 @@ user_set (struct inode *inode, const char *name, const void *buffer,
         (!S_ISDIR (inode->i_mode) || inode->i_mode & S_ISVTX))
         return -EPERM;
 
-    error = permission (inode, MAY_WRITE, NULL);
+    error = reiserfs_permission_locked (inode, MAY_WRITE, NULL);
     if (error)
         return error;
 
@@ -66,7 +70,7 @@ user_del (struct inode *inode, const char *name)
         (!S_ISDIR (inode->i_mode) || inode->i_mode & S_ISVTX))
         return -EPERM;
 
-    error = permission (inode, MAY_WRITE, NULL);
+    error = reiserfs_permission_locked (inode, MAY_WRITE, NULL);
     if (error)
         return error;
 

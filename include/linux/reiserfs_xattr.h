@@ -42,6 +42,7 @@ int reiserfs_delete_xattrs (struct inode *inode);
 int reiserfs_chown_xattrs (struct inode *inode, struct iattr *attrs);
 int reiserfs_xattr_init (struct super_block *sb, int mount_flags);
 int reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd);
+int reiserfs_permission_locked (struct inode *inode, int mask, struct nameidata *nd);
 
 int reiserfs_xattr_del (struct inode *, const char *);
 int reiserfs_xattr_get (const struct inode *, const char *, void *, size_t);
@@ -94,7 +95,11 @@ reiserfs_read_unlock_xattrs(struct super_block *sb)
 
 static inline int reiserfs_delete_xattrs (struct inode *inode) { return 0; };
 static inline int reiserfs_chown_xattrs (struct inode *inode, struct iattr *attrs) { return 0; };
-static inline int reiserfs_xattr_init (struct super_block *sb, int mount_flags) { return 0; };
+static inline int reiserfs_xattr_init (struct super_block *sb, int mount_flags)
+{
+    sb->s_flags = (sb->s_flags & ~MS_POSIXACL); /* to be sure */
+    return 0;
+};
 #endif
 
 #endif  /* __KERNEL__ */

@@ -15,6 +15,7 @@
 #include <linux/time.h>
 #include <linux/bitops.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_acl.h>
 #include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 
@@ -579,6 +580,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     struct inode * inode;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 ;
     struct reiserfs_transaction_handle th ;
+    int locked;
 
     if (!(inode = new_inode(dir->i_sb))) {
 	return -ENOMEM ;
@@ -587,9 +589,19 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
+
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     if (retval) {
         goto out_failed;
     }
@@ -625,6 +637,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    int locked;
 
     if (!new_valid_dev(rdev))
 	return -EINVAL;
@@ -636,10 +649,20 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
+
     journal_begin(&th, dir->i_sb, jbegin_count) ;
 
     retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     if (retval) {
         goto out_failed;
     }
@@ -678,6 +701,7 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    int locked;
 
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
     /* set flag that new packing locality created and new blocks for the content     * of that directory are not displaced yet */
@@ -691,7 +715,11 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
     journal_begin(&th, dir->i_sb, jbegin_count) ;
 
     /* inc the link count now, so another writer doesn't overflow it while
@@ -703,6 +731,9 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
 				old_format_only (dir->i_sb) ? 
 				EMPTY_DIR_SIZE_V1 : EMPTY_DIR_SIZE,
 				dentry, inode);
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     if (retval) {
 	dir->i_nlink-- ;
 	goto out_failed;
@@ -944,6 +975,8 @@ static int reiserfs_symlink (struct inode * parent_dir,
     }
     memcpy (name, symname, strlen (symname));
     padd_item (name, item_len, strlen (symname));
+
+    /* We would inherit the default ACL here, but symlinks don't get ACLs */
 
     journal_begin(&th, parent_dir->i_sb, jbegin_count) ;
 

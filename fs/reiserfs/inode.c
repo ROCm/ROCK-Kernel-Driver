@@ -5,6 +5,7 @@
 #include <linux/config.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_acl.h>
 #include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 #include <linux/pagemap.h>
@@ -976,6 +977,8 @@ static void init_inode (struct inode * inode, struct path * path)
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
     REISERFS_I(inode)->i_jl = NULL;
+    REISERFS_I(inode)->i_acl_access = NULL;
+    REISERFS_I(inode)->i_acl_default = NULL;
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -1637,6 +1640,8 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_attrs =
 	REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
     sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
+    REISERFS_I(inode)->i_acl_access = NULL;
+    REISERFS_I(inode)->i_acl_default = NULL;
 
     if (old_format_only (sb))
 	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
@@ -1719,6 +1724,19 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 	reiserfs_check_path(&path_to_key) ;
 	journal_end(th, th->t_super, th->t_blocks_allocated);
 	goto out_inserted_sd;
+    }
+
+    /* XXX CHECK THIS */
+    if (reiserfs_posixacl (inode->i_sb)) {
+        retval = reiserfs_inherit_default_acl (dir, dentry, inode);
+        if (retval) {
+            err = retval;
+            reiserfs_check_path(&path_to_key) ;
+            journal_end(th, th->t_super, th->t_blocks_allocated);
+            goto out_inserted_sd;
+        }
+    } else if (inode->i_sb->s_flags & MS_POSIXACL) {
+        reiserfs_warning ("ACLs aren't enabled in the fs, but vfs thinks they are!\n");
     }
 
     insert_inode_hash (inode);
@@ -2564,6 +2582,11 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
             inode_setattr(inode, attr) ;
     }
 
+
+    if (!error && reiserfs_posixacl (inode->i_sb)) {
+        if (attr->ia_valid & ATTR_MODE)
+            error = reiserfs_acl_chmod (inode);
+    }
 
 out:
     reiserfs_write_unlock(inode->i_sb);

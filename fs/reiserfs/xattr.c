@@ -6,7 +6,7 @@
  */
 
 /*
- * In order to implement EAs in a clean, backwards compatible manner,
+ * In order to implement EA/ACLs in a clean, backwards compatible manner,
  * they are implemented as files in a "private" directory.
  * Each EA is in it's own file, with the directory layout like so (/ is assumed
  * to be relative to fs root). Inside the /.reiserfs_priv/xattrs directory,
@@ -15,12 +15,18 @@
  * named with the name of the extended attribute.
  *
  * So, for objectid 12648430, we could have:
+ * /.reiserfs_priv/xattrs/C0FFEE.0/system.posix_acl_access
+ * /.reiserfs_priv/xattrs/C0FFEE.0/system.posix_acl_default
  * /.reiserfs_priv/xattrs/C0FFEE.0/user.Content-Type
  * .. or similar.
  *
  * The file contents are the text of the EA. The size is known based on the
  * stat data describing the file.
  *
+ * In the case of system.posix_acl_access and system.posix_acl_default, since
+ * these are special cases for filesystem ACLs, they are interpreted by the
+ * kernel, in addition, they are negatively and positively cached and attached
+ * to the inode so that unnecessary lookups are avoided.
  */
 
 #include <linux/reiserfs_fs.h>
@@ -32,6 +38,7 @@
 #include <linux/pagemap.h>
 #include <linux/xattr.h>
 #include <linux/reiserfs_xattr.h>
+#include <linux/reiserfs_acl.h>
 #include <linux/mbcache.h>
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
@@ -1169,6 +1176,10 @@ reiserfs_xattr_register_handlers (void)
 
     /* Add the handlers */
     list_add_tail (&user_handler.handlers, &xattr_handlers);
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
+    list_add_tail (&posix_acl_access_handler.handlers, &xattr_handlers);
+    list_add_tail (&posix_acl_default_handler.handlers, &xattr_handlers);
+#endif
 
     /* Run initializers, if available */
     list_for_each (p, &xattr_handlers) {
@@ -1231,7 +1242,7 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
   } else if (reiserfs_xattrs_optional (s)) {
     /* Old format filesystem, but optional xattrs have been enabled
      * at mount time. Error out. */
-    reiserfs_warning ("reiserfs: xattrs not supported on pre v3.6 "
+    reiserfs_warning ("reiserfs: xattrs/ACLs not supported on pre v3.6 "
                       "format filesystem. Failing mount.\n");
     err = -EOPNOTSUPP;
     goto error;
@@ -1276,7 +1287,7 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
           /* If we're read-only it just means that the dir hasn't been
            * created. Not an error -- just no xattrs on the fs. We'll
            * check again if we go read-write */
-          reiserfs_warning ("reiserfs: xattrs enabled and couldn't "
+          reiserfs_warning ("reiserfs: xattrs/ACLs enabled and couldn't "
                             "find/create .reiserfs_priv. Failing mount.\n");
           err = -EOPNOTSUPP;
       }
@@ -1288,12 +1299,20 @@ error:
     if (err) {
           clear_bit (REISERFS_XATTRS, &(REISERFS_SB(s)->s_mount_opt));
           clear_bit (REISERFS_XATTRS_USER, &(REISERFS_SB(s)->s_mount_opt));
+          clear_bit (REISERFS_POSIXACL, &(REISERFS_SB(s)->s_mount_opt));
     }
+
+    /* The super_block MS_POSIXACL must mirror the (no)acl mount option. */
+    s->s_flags = s->s_flags & ~MS_POSIXACL;
+    if (reiserfs_posixacl (s))
+	s->s_flags |= MS_POSIXACL;
+
     return err;
 }
 
-int
-reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd)
+static int
+__reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd,
+                       int need_lock)
 {
 	umode_t			mode = inode->i_mode;
 
@@ -1317,10 +1336,45 @@ reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd)
         if (is_reiserfs_priv_object (inode))
 		return 0;
 
-	if (current->fsuid == inode->i_uid)
+	if (current->fsuid == inode->i_uid) {
 		mode >>= 6;
-	else if (in_group_p(inode->i_gid))
-		mode >>= 3;
+#ifdef CONFIG_REISERFS_FS_POSIX_ACL
+	} else if (reiserfs_posixacl(inode->i_sb) &&
+                   get_inode_sd_version (inode) != STAT_DATA_V1) {
+                struct posix_acl *acl;
+
+		/* ACL can't contain additional permissions if
+		   the ACL_MASK entry is 0 */
+		if (!(mode & S_IRWXG))
+			goto check_groups;
+
+                if (need_lock)
+                    reiserfs_read_lock_xattrs (inode->i_sb);
+                acl = reiserfs_get_acl (inode, ACL_TYPE_ACCESS);
+                if (need_lock)
+                    reiserfs_read_unlock_xattrs (inode->i_sb);
+                if (IS_ERR (acl)) {
+                    if (PTR_ERR (acl) == -ENODATA)
+                        goto check_groups;
+                    return PTR_ERR (acl);
+                }
+
+                if (acl) {
+                    int err = posix_acl_permission (inode, acl, mask);
+                    posix_acl_release (acl);
+                    if (err == -EACCES) {
+                        goto check_capabilities;
+                    }
+                    return err;
+		} else {
+			goto check_groups;
+                }
+#endif
+	} else {
+check_groups:
+		if (in_group_p(inode->i_gid))
+			mode >>= 3;
+	}
 
 	/*
 	 * If the DACs are ok we don't need any capability check.
@@ -1328,6 +1382,7 @@ reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd)
 	if (((mode & mask & (MAY_READ|MAY_WRITE|MAY_EXEC)) == mask))
 		return 0;
 
+check_capabilities:
 	/*
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
@@ -1344,5 +1399,16 @@ reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd)
 			return 0;
 
 	return -EACCES;
+}
 
+int
+reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd)
+{
+    return __reiserfs_permission (inode, mask, nd, 1);
+}
+
+int
+reiserfs_permission_locked (struct inode *inode, int mask, struct nameidata *nd)
+{
+    return __reiserfs_permission (inode, mask, nd, 0);
 }
