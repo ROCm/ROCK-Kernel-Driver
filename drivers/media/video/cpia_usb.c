@@ -201,7 +201,7 @@ static int cpia_usb_open(void *privdata)
 	ucpia->workbuff = ucpia->buffers[1];
 
 	/* We double buffer the Iso lists */
-	urb = usb_alloc_urb(FRAMES_PER_DESC);
+	urb = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 	if (!urb) {
 		printk(KERN_ERR "cpia_init_isoc: usb_alloc_urb 0\n");
 		retval = -ENOMEM;
@@ -222,7 +222,7 @@ static int cpia_usb_open(void *privdata)
 		urb->iso_frame_desc[fx].length = FRAME_SIZE_PER_DESC;
 	}
 
-	urb = usb_alloc_urb(FRAMES_PER_DESC);
+	urb = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 	if (!urb) {
 		printk(KERN_ERR "cpia_init_isoc: usb_alloc_urb 1\n");
 		retval = -ENOMEM;

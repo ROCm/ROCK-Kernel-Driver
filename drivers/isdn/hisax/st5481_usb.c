@@ -265,7 +265,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	}
 
 	// Allocate URB for control endpoint
-	urb = usb_alloc_urb(0);
+	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) {
 		return -ENOMEM;
 	}
@@ -280,7 +280,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	fifo_init(&ctrl->msg_fifo.f, ARRAY_SIZE(ctrl->msg_fifo.data));
 
 	// Allocate URBs and buffers for interrupt endpoint
-	urb = usb_alloc_urb(0);
+	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb) { 
 		return -ENOMEM;
 	}
@@ -416,7 +416,7 @@ st5481_setup_isocpipes(struct urb* urb[2], struct usb_device *dev,
 
 	for (j = 0; j < 2; j++) {
 		retval = -ENOMEM;
-		urb[j] = usb_alloc_urb(num_packets);
+		urb[j] = usb_alloc_urb(num_packet, GFP_KERNEL);
 		if (!urb[j])
 			goto err;
 

@@ -1024,18 +1024,18 @@ static void *iforce_usb_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!(iforce = kmalloc(sizeof(struct iforce) + 32, GFP_KERNEL))) return NULL;
 	memset(iforce, 0, sizeof(struct iforce));
 
-	iforce->irq = usb_alloc_urb(0);
+	iforce->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!iforce->irq) {
 		kfree(iforce);
 		return NULL;
 	}
-	iforce->out = usb_alloc_urb(0);
+	iforce->out = usb_alloc_urb(0, GFP_KERNEL);
 	if (!iforce->out) {
 		usb_free_urb(iforce->irq);
 		kfree(iforce);
 		return NULL;
 	}
-	iforce->ctrl = usb_alloc_urb(0);
+	iforce->ctrl = usb_alloc_urb(0, GFP_KERNEL);
 	if (!iforce->ctrl) {
 		usb_free_urb(iforce->out);
 		usb_free_urb(iforce->irq);
