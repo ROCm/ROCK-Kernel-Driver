@@ -285,13 +285,14 @@ static int __init longhaul_get_ranges (void)
 		break;
 	}
 
+	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
+		 minmult/10, minmult%10, maxmult/10, maxmult%10);
+
 	if (fsb == -1) {
 		printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
 		return -EINVAL;
 	}
 
-	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
-		 minmult/10, minmult%10, maxmult/10, maxmult%10);
 	highest_speed = calc_speed (maxmult, fsb);
 	lowest_speed = calc_speed (minmult,fsb);
 	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
