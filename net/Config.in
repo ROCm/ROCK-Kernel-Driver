@@ -71,10 +71,10 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 #   fi
    if [ "$CONFIG_INET" = "y" ]; then
       tristate 'Acorn Econet/AUN protocols (EXPERIMENTAL)' CONFIG_ECONET
-   fi
-   if [ "$CONFIG_ECONET" != "n" ]; then
-      bool '  AUN over UDP' CONFIG_ECONET_AUNUDP
-      bool '  Native Econet' CONFIG_ECONET_NATIVE
+      if [ "$CONFIG_ECONET" != "n" ]; then
+	 bool '  AUN over UDP' CONFIG_ECONET_AUNUDP
+	 bool '  Native Econet' CONFIG_ECONET_NATIVE
+      fi
    fi
    tristate 'WAN router' CONFIG_WAN_ROUTER
    bool 'Fast switching (read help!)' CONFIG_NET_FASTROUTE
