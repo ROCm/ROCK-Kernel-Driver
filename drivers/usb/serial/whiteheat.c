@@ -156,6 +156,7 @@ static void whiteheat_write_callback	(struct urb *urb, struct pt_regs *regs);
 static struct usb_serial_device_type whiteheat_fake_device = {
 	.owner =		THIS_MODULE,
 	.name =			"Connect Tech - WhiteHEAT - (prerenumeration)",
+	.short_name =		"whiteheatnofirm",
 	.id_table =		id_table_prerenumeration,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		NUM_DONT_CARE,
@@ -168,6 +169,7 @@ static struct usb_serial_device_type whiteheat_fake_device = {
 static struct usb_serial_device_type whiteheat_device = {
 	.owner =		THIS_MODULE,
 	.name =			"Connect Tech - WhiteHEAT",
+	.short_name =		"whiteheat",
 	.id_table =		id_table_std,
 	.num_interrupt_in =	NUM_DONT_CARE,
 	.num_bulk_in =		NUM_DONT_CARE,
@@ -512,9 +514,11 @@ no_rx_wrap:
 no_rx_buf:
 			usb_free_urb(urb);
 no_rx_urb:
+			;
 		}
 		kfree(info);
 no_private:
+		;
 	}
 	return -ENOMEM;
 }

@@ -87,7 +87,7 @@ typedef struct {
 } ibmcam_t;
 #define	IBMCAM_T(uvd)	((ibmcam_t *)((uvd)->user_data))
 
-usbvideo_t *cams = NULL;
+struct usbvideo *cams = NULL;
 
 static int debug = 0;
 
@@ -249,7 +249,7 @@ static videosize_t ibmcam_size_to_videosize(int size)
  * History:
  * 1/21/00  Created.
  */
-static ParseState_t ibmcam_find_header(struct uvd *uvd) /* FIXME: Add frame here */
+static enum ParseState ibmcam_find_header(struct uvd *uvd) /* FIXME: Add frame here */
 {
 	struct usbvideo_frame *frame;
 	ibmcam_t *icam;
@@ -397,7 +397,7 @@ case IBMCAM_MODEL_4:
  * 21-Jan-2000 Created.
  * 12-Oct-2000 Reworked to reflect interlaced nature of the data.
  */
-static ParseState_t ibmcam_parse_lines(
+static enum ParseState ibmcam_parse_lines(
 	struct uvd *uvd,
 	struct usbvideo_frame *frame,
 	long *pcopylen)
@@ -662,7 +662,7 @@ static ParseState_t ibmcam_parse_lines(
  * them both as R component in attempt to at least partially recover the
  * lost resolution.
  */
-static ParseState_t ibmcam_model2_320x240_parse_lines(
+static enum ParseState ibmcam_model2_320x240_parse_lines(
 	struct uvd *uvd,
 	struct usbvideo_frame *frame,
 	long *pcopylen)
@@ -816,7 +816,7 @@ static ParseState_t ibmcam_model2_320x240_parse_lines(
 		return scan_Continue;
 }
 
-static ParseState_t ibmcam_model3_parse_lines(
+static enum ParseState ibmcam_model3_parse_lines(
 	struct uvd *uvd,
 	struct usbvideo_frame *frame,
 	long *pcopylen)
@@ -961,7 +961,7 @@ static ParseState_t ibmcam_model3_parse_lines(
  * History:
  * 10-Feb-2001 Created.
  */
-static ParseState_t ibmcam_model4_128x96_parse_lines(
+static enum ParseState ibmcam_model4_128x96_parse_lines(
 	struct uvd *uvd,
 	struct usbvideo_frame *frame,
 	long *pcopylen)
@@ -1051,7 +1051,7 @@ static ParseState_t ibmcam_model4_128x96_parse_lines(
  */
 void ibmcam_ProcessIsocData(struct uvd *uvd, struct usbvideo_frame *frame)
 {
-	ParseState_t newstate;
+	enum ParseState newstate;
 	long copylen = 0;
 	int mod = IBMCAM_T(uvd)->camera_model;
 

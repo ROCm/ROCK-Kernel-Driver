@@ -77,7 +77,7 @@ static struct usb_device_id pwc_device_table [] = {
 	{ USB_DEVICE(0x0471, 0x0312) },
 	{ USB_DEVICE(0x069A, 0x0001) }, /* Askey */
 	{ USB_DEVICE(0x046D, 0x08b0) }, /* Logitech QuickCam Pro 3000 */
-	{ USB_DEVICE(0x046D, 0x08b1) }, /* Logitech QuickCam for Notebooks */
+	{ USB_DEVICE(0x046D, 0x08b1) }, /* Logitech QuickCam Notebook Pro */
 	{ USB_DEVICE(0x046D, 0x08b2) }, /* Logitech QuickCam Pro 4000 */
 	{ USB_DEVICE(0x046D, 0x08b3) }, /* Logitech QuickCam Zoom */
 	{ USB_DEVICE(0x055D, 0x9000) }, /* Samsung */
@@ -992,7 +992,7 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 			case 0x40:  sensor_type = "UPA 1021 sensor"; break;
 			case 0x100: sensor_type = "VGA sensor"; break;
 			case 0x101: sensor_type = "PAL MR sensor"; break;
-			default:   sensor_type = "unknown type of sensor"; break;
+			default:    sensor_type = "unknown type of sensor"; break;
 			}
 			if (sensor_type != NULL)
 				Info("This %s camera is equipped with a %s (%d).\n", pdev->vdev->name, sensor_type, i);
@@ -1064,7 +1064,6 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 	i = pwc_isoc_init(pdev);
 	if (i) {
 		Trace(TRACE_OPEN, "Failed to init ISOC stuff = %d.\n", i);
-		MOD_DEC_USE_COUNT;
 		up(&pdev->modlock);
 		return i;
 	}
@@ -1689,8 +1688,8 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 			type_id = 730;
 			break;
 		case 0x08b1:
-			Info("Logitech QuickCam for Noteboos USB webcam detected.\n");
-			name = "Logitech QuickCam Notebook";
+			Info("Logitech QuickCam Notebook Pro USB webcam detected.\n");
+			name = "Logitech QuickCam Notebook Pro";
 			type_id = 740; /* ?? unknown sensor */
 			break;
 		case 0x08b2:

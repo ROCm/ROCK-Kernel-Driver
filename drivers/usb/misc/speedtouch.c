@@ -144,8 +144,9 @@ struct udsl_instance_data *minor_data[MAX_UDSL];
 static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
 
 /* data thread */
-static int datapid = 0;
 DECLARE_WAIT_QUEUE_HEAD (udsl_wqh);
+static DECLARE_COMPLETION(thread_grave);
+static unsigned int datapid;
 
 #ifdef DEBUG_PACKET
 int udsl_print_packet (const unsigned char *data, int len);
@@ -431,21 +432,36 @@ int udsl_atm_processqueue_thread (void *data)
 	strcpy (current->comm, "kSpeedSARd");
 
 	add_wait_queue (&udsl_wqh, &wait);
+	set_current_state(TASK_INTERRUPTIBLE);
 
 	for (;;) {
-		interruptible_sleep_on (&udsl_wqh);
+		schedule();
 		if (signal_pending (current))
 			break;
 		PDEBUG ("SpeedSARd awoke\n");
+retry:
 		for (i = 0; i < MAX_UDSL; i++)
 			if (minor_data[i])
 				udsl_atm_processqueue (minor_data[i]);
+		set_current_state(TASK_INTERRUPTIBLE);
+		/* we must check for data recieved and restart processing if there's any */
+		for (i = 0; i < MAX_UDSL; i++) {
+			spin_lock_irq(&minor_data[i]->recvqlock);
+			if (!skb_queue_empty(&minor_data[i]->recvqueue)) {
+				spin_unlock_irq(&minor_data[i]->recvqlock);
+				set_current_state(TASK_RUNNING);
+				goto retry;
+			} else {
+				spin_unlock_irq(&minor_data[i]->recvqlock);
+			}
+		}
 	};
 
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue (&udsl_wqh, &wait);
-	datapid = 0;
 	PDEBUG ("SpeedSARd is exiting\n");
-	return 0;
+	complete_and_exit(&thread_grave, 0);
+	return 0; //never reached
 }
 
 
@@ -461,16 +477,7 @@ void udsl_atm_sar_stop (void)
 	/* Kill the thread */
 	ret = kill_proc (datapid, SIGTERM, 1);
 	if (!ret) {
-		/* Wait 10 seconds */
-		int count = 10 * 100;
-
-		while (datapid && --count) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout (1);
-		}
-
-		if (!count)
-			err ("giving up on killing SpeedSAR thread.");
+		wait_for_completion(&thread_grave);
 	}
 }
 
@@ -598,7 +605,7 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 		       (unsigned char *) ctx->skb->data,
 		       ctx->skb->len, udsl_usb_send_data_complete, ctx);
 
-	err = usb_submit_urb (urb, GFP_KERNEL);
+	err = usb_submit_urb (urb, GFP_ATOMIC);
 
 	PDEBUG ("udsl_usb_send_data_completion (send packet %p with length %d), retval = %d\n",
 		ctx->skb, ctx->skb->len, err);
@@ -747,7 +754,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 		       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 		       (unsigned char *) ctx->skb->data,
 		       UDSL_RECEIVE_BUFFER_SIZE, udsl_usb_data_receive, ctx);
-	usb_submit_urb (urb, GFP_KERNEL);
+	usb_submit_urb (urb, GFP_ATOMIC);
 	return;
 };
 
@@ -845,8 +852,7 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 		if ((!ctx->urb) || (!ctx->skb))
 			continue;
 
-		if (ctx->urb->status == -EINPROGRESS)
-			usb_unlink_urb (ctx->urb);
+		usb_unlink_urb (ctx->urb);
 
 		usb_free_urb (ctx->urb);
 		kfree_skb (ctx->skb);
@@ -856,8 +862,7 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
 		struct udsl_usb_send_data_context *ctx = &(instance->send_ctx[i]);
 
-		if (ctx->urb->status == -EINPROGRESS)
-			usb_unlink_urb (ctx->urb);
+		usb_unlink_urb (ctx->urb);
 
 		if (ctx->skb)
 			ctx->vcc->pop (ctx->vcc, ctx->skb);
