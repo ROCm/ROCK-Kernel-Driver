@@ -739,6 +739,8 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	WRITE_REQ *pSMB = NULL;
 	WRITE_RSP *pSMBr = NULL;
 	int bytes_returned;
+	unsigned bytes_sent;
+	__u16 byte_count;
 
 	rc = smb_init(SMB_COM_WRITE_ANDX, 14, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
@@ -753,21 +755,20 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	pSMB->OffsetLow = cpu_to_le32(offset & 0xFFFFFFFF);
 	pSMB->OffsetHigh = cpu_to_le32(offset >> 32);
 	pSMB->Remaining = 0;
-	if (count > ((tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFF00))
-		pSMB->DataLengthLow =
-		    (tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFF00;
-	else
-		pSMB->DataLengthLow = count;
+	bytes_sent = (tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & ~0xFF;
+	if (bytes_sent > count)
+		bytes_sent = count;
 	pSMB->DataLengthHigh = 0;
 	pSMB->DataOffset =
 	    cpu_to_le16(offsetof(struct smb_com_write_req,Data) - 4);
 
-	memcpy(pSMB->Data,buf,pSMB->DataLengthLow);
+	memcpy(pSMB->Data,buf,bytes_sent);
 
-	pSMB->ByteCount += pSMB->DataLengthLow + 1 /* pad */ ;
-	pSMB->DataLengthLow = cpu_to_le16(pSMB->DataLengthLow);
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	byte_count = bytes_sent + 1 /* pad */ ;
+	pSMB->DataLengthLow = cpu_to_le16(bytes_sent);
+	pSMB->DataLengthHigh = 0;
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, long_op);

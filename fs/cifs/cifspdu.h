@@ -670,17 +670,17 @@ typedef struct smb_com_write_req {
 	struct smb_hdr hdr;	/* wct = 14 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
+	__le16 AndXOffset;
 	__u16 Fid;
-	__u32 OffsetLow;
+	__le32 OffsetLow;
 	__u32 Reserved;
-	__u16 WriteMode;
-	__u16 Remaining;
-	__u16 DataLengthHigh;
-	__u16 DataLengthLow;
-	__u16 DataOffset;
-	__u32 OffsetHigh;
-	__u16 ByteCount;
+	__le16 WriteMode;
+	__le16 Remaining;
+	__le16 DataLengthHigh;
+	__le16 DataLengthLow;
+	__le16 DataOffset;
+	__le32 OffsetHigh;
+	__le16 ByteCount;
 	__u8 Pad;		/* BB check for whether padded to DWORD boundary and optimum performance here */
 	char Data[1];
 } WRITE_REQ;
@@ -689,10 +689,10 @@ typedef struct smb_com_write_rsp {
 	struct smb_hdr hdr;	/* wct = 6 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
-	__u16 Count;
-	__u16 Remaining;
-	__u32 Reserved;
+	__le16 AndXOffset;
+	__le16 Count;
+	__le16 Remaining;
+	__le32 Reserved;
 	__u16 ByteCount;
 } WRITE_RSP;
 
