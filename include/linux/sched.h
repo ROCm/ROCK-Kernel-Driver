@@ -250,7 +250,7 @@ struct task_struct {
 	unsigned long cpus_allowed;
 	unsigned int time_slice;
 
-	struct task_struct *next_task, *prev_task;
+	struct list_head tasks;
 
 	struct mm_struct *mm, *active_mm;
 	struct list_head local_pages;
@@ -718,18 +718,17 @@ do {									\
 	__ret;								\
 })
 
+#define remove_parent(p)	list_del_init(&(p)->sibling)
+#define add_parent(p, parent)	list_add_tail(&(p)->sibling,&(parent)->children)
+
 #define REMOVE_LINKS(p) do {				\
-	(p)->next_task->prev_task = (p)->prev_task;	\
-	(p)->prev_task->next_task = (p)->next_task;	\
-	list_del_init(&(p)->sibling);			\
+	list_del_init(&(p)->tasks);			\
+	remove_parent(p);				\
 	} while (0)
 
-#define SET_LINKS(p) do {					\
-	(p)->next_task = &init_task;				\
-	(p)->prev_task = init_task.prev_task;			\
-	init_task.prev_task->next_task = (p);			\
-	init_task.prev_task = (p);				\
-	list_add_tail(&(p)->sibling,&(p)->parent->children);	\
+#define SET_LINKS(p) do {				\
+	list_add_tail(&(p)->tasks,&init_task.tasks);	\
+	add_parent(p, (p)->parent);			\
 	} while (0)
 
 static inline struct task_struct *eldest_child(struct task_struct *p)
@@ -756,8 +755,11 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 	return list_entry(p->sibling.next,struct task_struct,sibling);
 }
 
+#define next_task(p)	list_entry((p)->tasks.next, struct task_struct, tasks)
+#define prev_task(p)	list_entry((p)->tasks.prev, struct task_struct, tasks)
+
 #define for_each_task(p) \
-	for (p = &init_task ; (p = p->next_task) != &init_task ; )
+	for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
 #define for_each_thread(task) \
 	for (task = next_thread(current) ; task != current ; task = next_thread(task))

@@ -53,8 +53,7 @@
     active_mm:		&init_mm,					\
     run_list:		LIST_HEAD_INIT(tsk.run_list),			\
     time_slice:		HZ,						\
-    next_task:		&tsk,						\
-    prev_task:		&tsk,						\
+    tasks:		LIST_HEAD_INIT(tsk.tasks),			\
     real_parent:	&tsk,						\
     parent:		&tsk,						\
     children:		LIST_HEAD_INIT(tsk.children),			\

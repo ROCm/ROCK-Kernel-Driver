@@ -612,9 +612,9 @@ repeat:
 				retval = p->pid;
 				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
-					REMOVE_LINKS(p);
+					remove_parent(p);
 					p->parent = p->real_parent;
-					SET_LINKS(p);
+					add_parent(p, p->parent);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
 				} else
