@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device_ops.c
  *
- *   $Revision: 1.50 $
+ *   $Revision: 1.53 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -54,6 +54,7 @@ ccw_device_clear(struct ccw_device *cdev, unsigned long intparm)
 	if (cdev->private->state == DEV_STATE_NOT_OPER)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
+	    cdev->private->state != DEV_STATE_WAIT4IO &&
 	    cdev->private->state != DEV_STATE_W4SENSE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
@@ -120,6 +121,7 @@ ccw_device_halt(struct ccw_device *cdev, unsigned long intparm)
 	if (cdev->private->state == DEV_STATE_NOT_OPER)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
+	    cdev->private->state != DEV_STATE_WAIT4IO &&
 	    cdev->private->state != DEV_STATE_W4SENSE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
