@@ -8,7 +8,7 @@
  * This hopefully works with any (fixed) IA-64 page-size, as defined
  * in <asm/page.h> (currently 8192).
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -204,7 +204,6 @@ ia64_phys_addr_valid (unsigned long addr)
 #define set_pte(ptep, pteval)	(*(ptep) = (pteval))
 
 #define RGN_SIZE	(1UL << 61)
-#define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
 #define RGN_KERNEL	7
 
 #define VMALLOC_START		0xa000000200000000

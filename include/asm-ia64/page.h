@@ -33,6 +33,8 @@
 #define PERCPU_PAGE_SHIFT	16	/* log2() of max. size of per-CPU area */
 #define PERCPU_PAGE_SIZE	(__IA64_UL_CONST(1) << PERCPU_PAGE_SHIFT)
 
+#define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
+
 #ifdef CONFIG_HUGETLB_PAGE
 
 # if defined(CONFIG_HUGETLB_PAGE_SIZE_4GB)
