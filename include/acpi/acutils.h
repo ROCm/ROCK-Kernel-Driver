@@ -178,6 +178,12 @@ acpi_ut_strncpy (
 	acpi_size                       count);
 
 int
+acpi_ut_memcmp (
+	const char                      *buffer1,
+	const char                      *buffer2,
+	acpi_size                       count);
+
+int
 acpi_ut_strncmp (
 	const char                      *string1,
 	const char                      *string2,

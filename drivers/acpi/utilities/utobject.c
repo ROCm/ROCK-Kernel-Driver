@@ -192,9 +192,9 @@ acpi_ut_create_buffer_object (
  *
  * FUNCTION:    acpi_ut_create_string_object
  *
- * PARAMETERS:  string_size            - Size of string to be created, plus one
- *                                       for the NULL terminater.  Actual sting
- *                                       length will be this size minus one.
+ * PARAMETERS:  string_size            - Size of string to be created.  Does not
+ *                                       include NULL terminator, this is added
+ *                                       automatically.
  *
  * RETURN:      Pointer to a new String object
  *
@@ -207,7 +207,7 @@ acpi_ut_create_string_object (
 	acpi_size                       string_size)
 {
 	union acpi_operand_object       *string_desc;
-	char                            *string = NULL;
+	char                            *string;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ut_create_string_object", string_size);
@@ -220,24 +220,22 @@ acpi_ut_create_string_object (
 		return_PTR (NULL);
 	}
 
-	/* Create an actual string only if size > 0 */
-
-	if (string_size > 0) {
-		/* Allocate the actual string */
-
-		string = ACPI_MEM_CALLOCATE (string_size);
-		if (!string) {
-			ACPI_REPORT_ERROR (("create_string: could not allocate size %X\n",
-				(u32) string_size));
-			acpi_ut_remove_reference (string_desc);
-			return_PTR (NULL);
-		}
+	/*
+	 * Allocate the actual string buffer -- (Size + 1) for NULL terminator.
+	 * NOTE: Zero-length strings are NULL terminated
+	 */
+	string = ACPI_MEM_CALLOCATE (string_size + 1);
+	if (!string) {
+		ACPI_REPORT_ERROR (("create_string: could not allocate size %X\n",
+			(u32) string_size));
+		acpi_ut_remove_reference (string_desc);
+		return_PTR (NULL);
 	}
 
 	/* Complete string object initialization */
 
 	string_desc->string.pointer = string;
-	string_desc->string.length = (u32) string_size - 1;
+	string_desc->string.length = (u32) string_size;
 
 	/* Return the new string descriptor */
 

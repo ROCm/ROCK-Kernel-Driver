@@ -731,7 +731,7 @@ acpi_ps_get_opcode_info (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown extended opcode [%X]\n", opcode));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown AML opcode [%4.4X]\n", opcode));
 		break;
 	}
 

@@ -312,7 +312,7 @@ acpi_ds_method_data_set_value (
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-		"obj %p op %X, ref count = %d [%s]\n", object,
+		"new_obj %p Opcode %X, Refs=%d [%s]\n", object,
 		opcode, object->common.reference_count,
 		acpi_ut_get_type_name (object->common.type)));
 
@@ -572,7 +572,7 @@ acpi_ds_store_object_to_local (
 
 
 	ACPI_FUNCTION_TRACE ("ds_store_object_to_local");
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode=%d Idx=%d Obj=%p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode=%X Index=%d Obj=%p\n",
 		opcode, index, obj_desc));
 
 	/* Parameter validation */

@@ -375,9 +375,9 @@ acpi_ex_opcode_2A_1T_1R (
 			}
 		}
 
-		/* Allocate a new string (Length + 1 for null terminator) */
+		/* Allocate a new string object */
 
-		return_desc = acpi_ut_create_string_object (length + 1);
+		return_desc = acpi_ut_create_string_object (length);
 		if (!return_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;

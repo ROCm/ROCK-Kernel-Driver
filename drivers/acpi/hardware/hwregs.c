@@ -727,7 +727,7 @@ acpi_hw_low_level_read (
 
 	/* Get a local copy of the address.  Handles possible alignment issues */
 
-	address = ACPI_MOVE_64_TO_64 (&address, &reg->address);
+	ACPI_MOVE_64_TO_64 (&address, &reg->address);
 	if (!address) {
 		return (AE_OK);
 	}
@@ -806,7 +806,7 @@ acpi_hw_low_level_write (
 
 	/* Get a local copy of the address.  Handles possible alignment issues */
 
-	address = ACPI_MOVE_64_TO_64 (&address, &reg->address);
+	ACPI_MOVE_64_TO_64 (&address, &reg->address);
 	if (!address) {
 		return (AE_OK);
 	}

@@ -437,9 +437,9 @@ acpi_ex_convert_to_string (
 
 		/*
 		 * Create a new String
-		 * Need enough space for one ASCII integer plus null terminator
+		 * Need enough space for one ASCII integer (plus null terminator)
 		 */
-		return_desc = acpi_ut_create_string_object ((acpi_size) string_length + 1);
+		return_desc = acpi_ut_create_string_object ((acpi_size) string_length);
 		if (!return_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -495,7 +495,7 @@ acpi_ex_convert_to_string (
 
 			/* Create a new string object and string buffer */
 
-			return_desc = acpi_ut_create_string_object ((acpi_size) string_length);
+			return_desc = acpi_ut_create_string_object ((acpi_size) string_length -1);
 			if (!return_desc) {
 				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
@@ -517,6 +517,10 @@ acpi_ex_convert_to_string (
 
 			new_buf--;
 			*new_buf = 0;
+
+			/* Recalculate length */
+
+			return_desc->string.length = ACPI_STRLEN (return_desc->string.pointer);
 			break;
 
 		default:

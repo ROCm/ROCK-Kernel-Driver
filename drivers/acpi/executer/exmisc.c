@@ -244,6 +244,7 @@ acpi_ex_do_concatenate (
 	union acpi_operand_object       *return_desc;
 	char                            *new_buf;
 	acpi_status                     status;
+	acpi_size                       new_length;
 
 
 	ACPI_FUNCTION_TRACE ("ex_do_concatenate");
@@ -325,9 +326,14 @@ acpi_ex_do_concatenate (
 
 		/* Result of two Strings is a String */
 
-		return_desc = acpi_ut_create_string_object (
-				   (acpi_size) operand0->string.length +
-				   (acpi_size) local_operand1->string.length + 1);
+		new_length = (acpi_size) operand0->string.length +
+				 (acpi_size) local_operand1->string.length;
+		if (new_length > ACPI_MAX_STRING_CONVERSION) {
+			status = AE_AML_STRING_LIMIT;
+			goto cleanup;
+		}
+
+		return_desc = acpi_ut_create_string_object (new_length);
 		if (!return_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
@@ -649,14 +655,15 @@ acpi_ex_do_logical_op (
 		/*
 		 * 2) Both operands are Strings or both are Buffers
 		 *    Note: Code below takes advantage of common Buffer/String
-		 *          object fields. local_operand1 may have changed above
+		 *          object fields. local_operand1 may have changed above. Use
+		 *          memcmp to handle nulls in buffers.
 		 */
 		length0 = operand0->buffer.length;
 		length1 = local_operand1->buffer.length;
 
 		/* Lexicographic compare: compare the data bytes */
 
-		compare = ACPI_STRNCMP ((const char * ) operand0->buffer.pointer,
+		compare = ACPI_MEMCMP ((const char * ) operand0->buffer.pointer,
 				 (const char * ) local_operand1->buffer.pointer,
 				 (length0 > length1) ? length1 : length0);
 

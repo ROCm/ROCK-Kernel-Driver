@@ -285,7 +285,7 @@ acpi_ex_opcode_1A_1T_1R (
 	union acpi_operand_object       *return_desc2 = NULL;
 	u32                             temp32;
 	u32                             i;
-	u32                             power_of_ten;
+	acpi_integer                    power_of_ten;
 	acpi_integer                    digit;
 
 
@@ -325,7 +325,8 @@ acpi_ex_opcode_1A_1T_1R (
 			 * Acpi specification describes Integer type as a little
 			 * endian unsigned value, so this boundary condition is valid.
 			 */
-			for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
+			for (temp32 = 0; return_desc->integer.value &&
+					   temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
 				return_desc->integer.value >>= 1;
 			}
 
@@ -341,13 +342,15 @@ acpi_ex_opcode_1A_1T_1R (
 			 * The Acpi specification describes Integer type as a little
 			 * endian unsigned value, so this boundary condition is valid.
 			 */
-			for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
+			for (temp32 = 0; return_desc->integer.value &&
+					   temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
 				return_desc->integer.value <<= 1;
 			}
 
 			/* Since the bit position is one-based, subtract from 33 (65) */
 
-			return_desc->integer.value = temp32 == 0 ? 0 : (ACPI_INTEGER_BIT_SIZE + 1) - temp32;
+			return_desc->integer.value = temp32 == 0 ? 0 :
+					  (ACPI_INTEGER_BIT_SIZE + 1) - temp32;
 			break;
 
 
@@ -382,7 +385,8 @@ acpi_ex_opcode_1A_1T_1R (
 
 				/* Sum the digit into the result with the current power of 10 */
 
-				return_desc->integer.value += (((acpi_integer) temp32) * power_of_ten);
+				return_desc->integer.value += (((acpi_integer) temp32) *
+						 power_of_ten);
 
 				/* Shift to next BCD digit */
 
@@ -407,14 +411,16 @@ acpi_ex_opcode_1A_1T_1R (
 
 				/* Insert the BCD digit that resides in the remainder from above */
 
-				return_desc->integer.value |= (((acpi_integer) temp32) << ACPI_MUL_4 (i));
+				return_desc->integer.value |= (((acpi_integer) temp32) <<
+						   ACPI_MUL_4 (i));
 			}
 
 			/* Overflow if there is any data left in Digit */
 
 			if (digit > 0) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Integer too large to convert to BCD: %8.8X%8.8X\n",
-						ACPI_FORMAT_UINT64 (operand[0]->integer.value)));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Integer too large to convert to BCD: %8.8X%8.8X\n",
+					ACPI_FORMAT_UINT64 (operand[0]->integer.value)));
 				status = AE_AML_NUMERIC_OVERFLOW;
 				goto cleanup;
 			}
@@ -524,8 +530,8 @@ acpi_ex_opcode_1A_1T_1R (
 		break;
 
 
-	case AML_SHIFT_LEFT_BIT_OP:     /*  shift_left_bit (Source, bit_num) */
-	case AML_SHIFT_RIGHT_BIT_OP:    /*  shift_right_bit (Source, bit_num) */
+	case AML_SHIFT_LEFT_BIT_OP:     /* shift_left_bit (Source, bit_num) */
+	case AML_SHIFT_RIGHT_BIT_OP:    /* shift_right_bit (Source, bit_num) */
 
 		/*
 		 * These are two obsolete opcodes
@@ -619,41 +625,61 @@ acpi_ex_opcode_1A_0T_1R (
 	case AML_INCREMENT_OP:          /* Increment (Operand)  */
 
 		/*
-		 * Since we are expecting a Reference operand, it
-		 * can be either a NS Node or an internal object.
+		 * Create a new integer.  Can't just get the base integer and
+		 * increment it because it may be an Arg or Field.
 		 */
-		return_desc = operand[0];
-		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_OPERAND) {
-			/* Internal reference object - prevent deletion */
-
-			acpi_ut_add_reference (return_desc);
+		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+		if (!return_desc) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
 		}
 
 		/*
-		 * Convert the return_desc Reference to a Number
-		 * (This removes a reference on the return_desc object)
+		 * Since we are expecting a Reference operand, it can be either a
+		 * NS Node or an internal object.
 		 */
-		status = acpi_ex_resolve_operands (AML_LNOT_OP, &return_desc, walk_state);
+		temp_desc = operand[0];
+		if (ACPI_GET_DESCRIPTOR_TYPE (temp_desc) == ACPI_DESC_TYPE_OPERAND) {
+			/* Internal reference object - prevent deletion */
+
+			acpi_ut_add_reference (temp_desc);
+		}
+
+		/*
+		 * Convert the Reference operand to an Integer (This removes a
+		 * reference on the Operand[0] object)
+		 *
+		 * NOTE:  We use LNOT_OP here in order to force resolution of the
+		 * reference operand to an actual integer.
+		 */
+		status = acpi_ex_resolve_operands (AML_LNOT_OP, &temp_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s: bad operand(s) %s\n",
-				acpi_ps_get_opcode_name (walk_state->opcode), acpi_format_exception(status)));
+				acpi_ps_get_opcode_name (walk_state->opcode),
+				acpi_format_exception(status)));
 
 			goto cleanup;
 		}
 
 		/*
-		 * return_desc is now guaranteed to be an Integer object
-		 * Do the actual increment or decrement
+		 * temp_desc is now guaranteed to be an Integer object --
+		 * Perform the actual increment or decrement
 		 */
-		if (AML_INCREMENT_OP == walk_state->opcode) {
-			return_desc->integer.value++;
+		if (walk_state->opcode == AML_INCREMENT_OP) {
+			return_desc->integer.value = temp_desc->integer.value +1;
 		}
 		else {
-			return_desc->integer.value--;
+			return_desc->integer.value = temp_desc->integer.value -1;
 		}
 
-		/* Store the result back in the original descriptor */
+		/* Finished with this Integer object */
 
+		acpi_ut_remove_reference (temp_desc);
+
+		/*
+		 * Store the result back (indirectly) through the original
+		 * Reference object
+		 */
 		status = acpi_ex_store (return_desc, operand[0], walk_state);
 		break;
 
@@ -707,7 +733,8 @@ acpi_ex_opcode_1A_0T_1R (
 			break;
 
 		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "size_of, Not Buf/Str/Pkg - found type %s\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"size_of, Not Buf/Str/Pkg - found type %s\n",
 				acpi_ut_get_type_name (type)));
 			status = AE_AML_OPERAND_TYPE;
 			goto cleanup;
@@ -877,7 +904,8 @@ acpi_ex_opcode_1A_0T_1R (
 						 * an uninitialized package element and is thus a
 						 * severe error.
 						 */
-						ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "NULL package element obj %p\n",
+						ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+							"NULL package element obj %p\n",
 							operand[0]));
 						status = AE_AML_UNINITIALIZED_ELEMENT;
 						goto cleanup;
@@ -889,7 +917,8 @@ acpi_ex_opcode_1A_0T_1R (
 
 				default:
 
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Index target_type %X in obj %p\n",
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+						"Unknown Index target_type %X in obj %p\n",
 						operand[0]->reference.target_type, operand[0]));
 					status = AE_AML_OPERAND_TYPE;
 					goto cleanup;
@@ -913,7 +942,8 @@ acpi_ex_opcode_1A_0T_1R (
 
 
 			default:
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode in ref(%p) - %X\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Unknown opcode in ref(%p) - %X\n",
 					operand[0], operand[0]->reference.opcode));
 
 				status = AE_TYPE;

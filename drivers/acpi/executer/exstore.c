@@ -129,7 +129,8 @@ acpi_ex_store (
 		/* Destination is not a Reference object */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Destination is not a Reference or Constant object [%p]\n", dest_desc));
+			"Target is not a Reference or Constant object - %s [%p]\n",
+			acpi_ut_get_object_type_name (dest_desc), dest_desc));
 
 		ACPI_DUMP_STACK_ENTRY (source_desc);
 		ACPI_DUMP_STACK_ENTRY (dest_desc);
@@ -182,10 +183,18 @@ acpi_ex_store (
 		 * Storing to the Debug object causes the value stored to be
 		 * displayed and otherwise has no effect -- see ACPI Specification
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "**** Write to Debug Object: ****:\n\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+			"**** Write to Debug Object: Object %p %s ****:\n\n",
+			source_desc, acpi_ut_get_object_type_name (source_desc)));
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[ACPI Debug] %s: ",
 			acpi_ut_get_object_type_name (source_desc)));
+
+		if (!acpi_ut_valid_internal_object (source_desc)) {
+		   ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT,
+			   "%X, Invalid Internal Object!\n", source_desc));
+		   break;
+		}
 
 		switch (ACPI_GET_OBJECT_TYPE (source_desc)) {
 		case ACPI_TYPE_INTEGER:
