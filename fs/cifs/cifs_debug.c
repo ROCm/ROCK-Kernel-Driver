@@ -227,7 +227,7 @@ cifs_proc_init(void)
 	if (pde)
 		pde->write_proc = traceSMB_write;
 
-	pde = create_proc_read_entry("oplockEnabled", 0, proc_fs_cifs,
+	pde = create_proc_read_entry("OplockEnabled", 0, proc_fs_cifs,
 				     oplockEnabled_read, 0);
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
@@ -269,7 +269,7 @@ cifs_proc_clean(void)
 	remove_proc_entry("SimultaneousOps", proc_fs_cifs);
 	remove_proc_entry("TotalOps", proc_fs_cifs);
 	remove_proc_entry("MultiuserMount", proc_fs_cifs);
-	remove_proc_entry("oplockEnabled", proc_fs_cifs);
+	remove_proc_entry("OplockEnabled", proc_fs_cifs);
 	remove_proc_entry("NTLMV2Enabled",proc_fs_cifs);
 	remove_proc_entry("ExtendedSecurity",proc_fs_cifs);
 	remove_proc_entry("PacketSigningEnabled",proc_fs_cifs);

@@ -276,6 +276,7 @@ static int __init us3freq_init(void)
 		driver->target = us3freq_target;
 		driver->init = us3freq_cpu_init;
 		driver->exit = us3freq_cpu_exit;
+		driver->owner = THIS_MODULE,
 		strcpy(driver->name, "UltraSPARC-III");
 
 		cpufreq_us3_driver = driver;

@@ -1792,7 +1792,7 @@ static int __init fs_init (struct fs_dev *dev)
 		write_fs (dev, RAC, 0);
 
 		/* Manual (AN9, page 6) says ASF1=0 means compare Utopia address
-		 * too.  I can't find ASF1 anywhere. Anyway, we AND with just hte
+		 * too.  I can't find ASF1 anywhere. Anyway, we AND with just the
 		 * other bits, then compare with 0, which is exactly what we
 		 * want. */
 		write_fs (dev, RAM, (1 << (28 - FS155_VPI_BITS - FS155_VCI_BITS)) - 1);

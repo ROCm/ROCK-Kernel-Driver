@@ -73,7 +73,7 @@ zdisk: $(BOOTIMAGE) $(obj)/mtools.conf
 		MTOOLSRC=$(src)/mtools.conf mcopy - a:syslinux.cfg
 	MTOOLSRC=$(src)/mtools.conf mcopy $(BOOTIMAGE) a:linux	; sync
 
-# These require being root or having syslinux run setuid
+# These require being root or having syslinux 2.02 or higher installed
 fdimage fdimage144: $(BOOTIMAGE) $(src)/mtools.conf
 	dd if=/dev/zero of=$(obj)/fdimage bs=1024 count=1440
 	MTOOLSRC=$(src)/mtools.conf mformat v:			; sync

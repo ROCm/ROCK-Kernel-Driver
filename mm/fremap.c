@@ -1,5 +1,5 @@
 /*
- *   linux/mm/mpopulate.c
+ *   linux/mm/fremap.c
  * 
  * Explicit pagetable population and nonlinear (random) mappings support.
  *

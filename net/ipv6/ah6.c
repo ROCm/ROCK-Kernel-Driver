@@ -28,6 +28,7 @@
 #include <linux/module.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
+#include <net/ah.h>
 #include <linux/crypto.h>
 #include <linux/pfkeyv2.h>
 #include <net/icmp.h>

@@ -1159,6 +1159,74 @@ static struct card_ops hfcsx_ops = {
 	.irq_func = hfcsx_interrupt,
 };
 
+static int __init
+hfcsx_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	int rc;
+	char c;
+
+	cs->irq = card->para[0];
+	cs->hw.hfcsx.base = card->para[1] & 0xfffe;
+
+	cs->hw.hfcsx.fifo = 255;
+	cs->hw.hfcsx.int_s1 = 0;
+	cs->dc.hfcsx.ph_state = 0;
+
+	rc = -EBUSY;
+	if (!request_io(&cs->rs, cs->hw.hfcsx.base, 2, "HFCSX isdn"))
+		goto err;
+
+	rc = -ENODEV;
+	byteout(cs->hw.hfcsx.base, cs->hw.hfcsx.base & 0xFF);
+	byteout(cs->hw.hfcsx.base + 1, ((cs->hw.hfcsx.base >> 8) & 3) | 0x54);
+	udelay(10);
+	cs->hw.hfcsx.chip = Read_hfc(cs,HFCSX_CHIP_ID);
+	switch (cs->hw.hfcsx.chip >> 4) {
+	case 1: 
+		c ='+';
+		break;
+	case 9: 
+		c ='P';
+		break;
+	default:
+		printk(KERN_WARNING "HFC-SX: invalid chip id 0x%x\n",
+		       cs->hw.hfcsx.chip >> 4);
+		goto err;
+	}  
+	if (!ccd_sp_irqtab[cs->irq & 0xF]) {
+		printk(KERN_WARNING "HFC_SX: invalid irq %d specified\n",
+		       cs->irq & 0xF);
+		goto err;
+	}
+	rc = -ENOMEM;
+	cs->hw.hfcsx.extra = kmalloc(sizeof(struct hfcsx_extra), GFP_ATOMIC);
+	if (!cs->hw.hfcsx.extra) {
+		printk(KERN_WARNING "HFC-SX: unable to allocate memory\n");
+		goto err;
+	}
+	printk(KERN_INFO "HFC-S%c chip detected at base 0x%x IRQ %d\n",
+	       c, (u_int) cs->hw.hfcsx.base, cs->irq);
+
+	cs->hw.hfcsx.int_m2 = 0;	/* disable alle interrupts */
+	cs->hw.hfcsx.int_m1 = 0;
+	Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
+	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
+
+	init_timer(&cs->hw.hfcsx.timer);
+	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;
+	cs->hw.hfcsx.timer.data = (long) cs;
+	cs->hw.hfcsx.b_fifo_size = 0; /* fifo size still unknown */
+	cs->hw.hfcsx.cirm = ccd_sp_irqtab[cs->irq & 0xF]; /* RAM not eval. */
+
+	hfcsx_reset(cs);
+	cs->auxcmd = &hfcsx_auxcmd;
+	cs->card_ops = &hfcsx_ops;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return rc;
+}
+
 #ifdef __ISAPNP__
 static struct isapnp_device_id hfc_ids[] __initdata = {
 	{ ISAPNP_VENDOR('T', 'A', 'G'), ISAPNP_FUNCTION(0x2620),
@@ -1174,7 +1242,6 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __devinit
 setup_hfcsx(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, hfcsx_revision);
@@ -1227,62 +1294,7 @@ setup_hfcsx(struct IsdnCard *card)
 		}
 	}
 #endif
-	cs->hw.hfcsx.base = card->para[1] & 0xfffe;
-	cs->irq = card->para[0];
-	cs->hw.hfcsx.int_s1 = 0;
-	cs->dc.hfcsx.ph_state = 0;
-	cs->hw.hfcsx.fifo = 255;
-
-	if (!request_io(&cs->rs, cs->hw.hfcsx.base, 2, "HFCSX isdn"))
+	if (hfcsx_probe(card->cs, card) < 0)
 		return 0;
-	byteout(cs->hw.hfcsx.base, cs->hw.hfcsx.base & 0xFF);
-	byteout(cs->hw.hfcsx.base + 1,
-		((cs->hw.hfcsx.base >> 8) & 3) | 0x54);
-	udelay(10);
-	cs->hw.hfcsx.chip = Read_hfc(cs,HFCSX_CHIP_ID);
-	switch (cs->hw.hfcsx.chip >> 4) {
-	case 1: 
-		tmp[0] ='+';
-		break;
-	case 9: 
-		tmp[0] ='P';
-		break;
-	default:
-		printk(KERN_WARNING "HFC-SX: invalid chip id 0x%x\n",
-		       cs->hw.hfcsx.chip >> 4);
-		hisax_release_resources(cs);
-		return 0;
-	}  
-	if (!ccd_sp_irqtab[cs->irq & 0xF]) {
-		printk(KERN_WARNING "HFC_SX: invalid irq %d specified\n",
-		       cs->irq & 0xF);
-		hisax_release_resources(cs);
-		return 0;
-	}  
-	cs->hw.hfcsx.extra = kmalloc(sizeof(struct hfcsx_extra), 
-				     GFP_ATOMIC);
-	if (!cs->hw.hfcsx.extra) {
-		hisax_release_resources(cs);
-		printk(KERN_WARNING "HFC-SX: unable to allocate memory\n");
-		return 0;
-	}
-	
-	printk(KERN_INFO "HFC-S%c chip detected at base 0x%x IRQ %d HZ %d\n",
-	       tmp[0], (u_int) cs->hw.hfcsx.base,
-	       cs->irq, HZ);
-	cs->hw.hfcsx.int_m2 = 0;	/* disable alle interrupts */
-	cs->hw.hfcsx.int_m1 = 0;
-	Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
-	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
-
-	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;
-	cs->hw.hfcsx.timer.data = (long) cs;
-	cs->hw.hfcsx.b_fifo_size = 0; /* fifo size still unknown */
-	cs->hw.hfcsx.cirm = ccd_sp_irqtab[cs->irq & 0xF]; /* RAM not evaluated */
-	init_timer(&cs->hw.hfcsx.timer);
-
-	hfcsx_reset(cs);
-	cs->auxcmd = &hfcsx_auxcmd;
-	cs->card_ops = &hfcsx_ops;
 	return 1;
 }

@@ -38,9 +38,11 @@
  * Version 1.15		convert all calls to ide_raw_taskfile
  *				since args will return register content.
  * Version 1.16		added suspend-resume-checkpower
+ * Version 1.17		do flush on standy, do flush on ATA < ATA6
+ *			fix wcache setup.
  */
 
-#define IDEDISK_VERSION	"1.16"
+#define IDEDISK_VERSION	"1.17"
 
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
@@ -140,7 +142,7 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 static ide_startstop_t read_intr (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
-	int i = 0, nsect	= 0, msect = drive->mult_count;
+	u32 i = 0, nsect	= 0, msect = drive->mult_count;
 	struct request *rq;
 	unsigned long flags;
 	u8 stat;
@@ -157,7 +159,7 @@ static ide_startstop_t read_intr (ide_drive_t *drive)
 		ide_set_handler(drive, &read_intr, WAIT_CMD, NULL);
 		return ide_started;
 	}
-
+	
 read_next:
 	rq = HWGROUP(drive)->rq;
 	if (msect) {
@@ -203,7 +205,7 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= hwgroup->rq;
-	int i = 0;
+	u32 i = 0;
 	u8 stat;
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),
@@ -506,14 +508,10 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, secto
 		if (drive->using_dma && !hwif->ide_dma_read(drive))
 			return ide_started;
 
-		if (HWGROUP(drive)->handler != NULL)
-			BUG();
-		ide_set_handler(drive, &read_intr, WAIT_CMD, NULL);
-
 		command = ((drive->mult_count) ?
 			   ((lba48) ? WIN_MULTREAD_EXT : WIN_MULTREAD) :
 			   ((lba48) ? WIN_READ_EXT : WIN_READ));
-		hwif->OUTB(command, IDE_COMMAND_REG);
+		ide_execute_command(drive, command, &read_intr, WAIT_CMD, NULL);
 		return ide_started;
 	} else if (rq_data_dir(rq) == WRITE) {
 		ide_startstop_t startstop;
@@ -628,11 +626,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, secto
 
 static task_ioreg_t get_command (ide_drive_t *drive, int cmd)
 {
-	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
-
-#if 1
-	lba48bit = (drive->addressing == 1) ? 1 : 0;
-#endif
+	int lba48bit = (drive->addressing == 1) ? 1 : 0;
 
 	if ((cmd == READ) && drive->using_tcq)
 		return lba48bit ? WIN_READDMA_QUEUED_EXT : WIN_READDMA_QUEUED;
@@ -1412,32 +1406,6 @@ static int do_idedisk_standby (ide_drive_t *drive)
 	return call_idedisk_standby(drive, 0);
 }
 
-#if 0
-static int call_idedisk_checkpower (ide_drive_t *drive, int arg)
-{
-	ide_task_t args;
-	u8 ckpw = (arg) ? WIN_CHECKPOWERMODE2 : WIN_CHECKPOWERMODE1;
-	memset(&args, 0, sizeof(ide_task_t));
-	args.tfRegister[IDE_COMMAND_OFFSET]	= ckpw;
-	args.command_type			= ide_cmd_type_parser(&args);
-	ide_raw_taskfile(drive, &args, NULL);
-#if 0
-if (errno != EIO || args[0] != 0 || args[1] != 0)
-   state = "unknown";
-else
-   state = "sleeping";
-} else {
-   state = (args[2] == 255) ? "active/idle" : "standby";
-#endif
-	return 0;
-}
-
-static int do_idedisk_checkpower (ide_drive_t *drive)
-{
-	return call_idedisk_checkpower(drive, 0);
-}
-#endif
-
 static int do_idedisk_flushcache (ide_drive_t *drive)
 {
 	ide_task_t args;
@@ -1596,13 +1564,8 @@ static void idedisk_setup (ide_drive_t *drive)
 			drive->doorlocking = 1;
 		}
 	}
-#if 1
+
 	(void) probe_lba_addressing(drive, 1);
-#else
-	/* if using 48-bit addressing bump the request size up */
-	if (probe_lba_addressing(drive, 1))
-		blk_queue_max_sectors(&drive->queue, 2048);
-#endif
 
 	/* Extract geometry if we did not already have one for the drive */
 	if (!drive->cyl || !drive->head || !drive->sect) {
@@ -1675,13 +1638,9 @@ static void idedisk_setup (ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
+	static int ide_cacheflush_p(ide_drive_t *drive);
 	struct gendisk *g = drive->disk;
-
-	do_idedisk_standby(drive);
-	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (do_idedisk_flushcache(drive))
-			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
-				drive->name);
+	ide_cacheflush_p(drive);
 	if (ide_unregister_subdriver(drive))
 		return 1;
 	del_gendisk(g);
@@ -1725,6 +1684,7 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 	drive->usage++;
 	if (drive->removable && drive->usage == 1) {
 		ide_task_t args;
+		u8 cf;
 		memset(&args, 0, sizeof(ide_task_t));
 		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORLOCK;
 		args.command_type = ide_cmd_type_parser(&args);
@@ -1736,6 +1696,32 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 		 */
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
+		drive->wcache = 0;
+		/* Cache enabled ? */
+		if (drive->id->csfo & 1)
+		drive->wcache = 1;
+		/* Cache command set available ? */
+		if (drive->id->cfs_enable_1 & (1<<5))
+			drive->wcache = 1;
+		/* ATA6 cache extended commands */
+		cf = drive->id->command_set_2 >> 24;
+		if((cf & 0xC0) == 0x40 && (cf & 0x30) != 0)
+			drive->wcache = 1;
+	}
+	return 0;
+}
+
+static int ide_cacheflush_p(ide_drive_t *drive)
+{
+	if(drive->wcache)
+	{
+		if (do_idedisk_flushcache(drive))
+		{
+			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
+				drive->name);
+			return -EIO;
+		}
+		return 1;
 	}
 	return 0;
 }
@@ -1752,10 +1738,7 @@ static int idedisk_release(struct inode *inode, struct file *filp)
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
 	}
-	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (do_idedisk_flushcache(drive))
-			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
-				drive->name);
+	ide_cacheflush_p(drive);
 	drive->usage--;
 	return 0;
 }

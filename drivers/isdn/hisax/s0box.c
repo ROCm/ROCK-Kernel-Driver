@@ -172,14 +172,9 @@ static struct card_ops s0box_ops = {
 	.irq_func = hscxisac_irq,
 };
 
-int __init
-setup_s0box(struct IsdnCard *card)
+static int __init
+s0box_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
-
-	strcpy(tmp, s0box_revision);
-	printk(KERN_INFO "HiSax: S0Box IO driver Rev. %s\n", HiSax_getrev(tmp));
 	cs->hw.teles3.cfg_reg = card->para[1];
 	cs->hw.teles3.hscx[0] = -0x20;
 	cs->hw.teles3.hscx[1] = 0x0;
@@ -200,8 +195,20 @@ setup_s0box(struct IsdnCard *card)
 	cs->card_ops = &s0box_ops;
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	return 1;
+	return 0;
  err:
 	hisax_release_resources(cs);
-	return 0;
+	return -EBUSY;
+}
+
+int __init
+setup_s0box(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, s0box_revision);
+	printk(KERN_INFO "HiSax: S0Box IO driver Rev. %s\n", HiSax_getrev(tmp));
+	if (s0box_probe(card->cs, card))
+		return 0;
+	return 1;
 }

@@ -114,9 +114,9 @@ the processor shall run at.
 ------------------------------
 
 The preferred interface is located in the sysfs filesystem. If you
-mounted it at /sys, the cpufreq interface is located in the 
-cpu-device directory (e.g. /sys/devices/sys/cpu0/ for the first
-CPU).
+mounted it at /sys, the cpufreq interface is located in a subdirectory
+"cpufreq" within the cpu-device directory
+(e.g. /sys/devices/sys/cpu0/cpufreq/ for the first CPU).
 
 cpuinfo_min_freq :		this file shows the minimum operating
 				frequency the processor can run at(in kHz) 
@@ -125,7 +125,7 @@ cpuinfo_max_freq :		this file shows the maximum operating
 scaling_driver :		this file shows what cpufreq driver is
 				used to set the frequency on this CPU
 
-available_scaling_governors :	this file shows the CPUfreq governors
+scaling_available_governors :	this file shows the CPUfreq governors
 				available in this kernel. You can see the
 				currently activated governor in
 

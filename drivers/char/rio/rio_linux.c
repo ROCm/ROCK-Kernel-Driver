@@ -59,7 +59,6 @@
 #include <linux/miscdevice.h>
 #include <linux/init.h>
 
-#include <linux/compatmac.h>
 #include <linux/generic_serial.h>
 
 #if BITS_PER_LONG != 32
@@ -725,14 +724,14 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
   switch (cmd) {
 #if 0
   case TIOCGSOFTCAR:
-    rc = Put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
+    rc = put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
                   (unsigned int *) arg);
     break;
 #endif
   case TIOCSSOFTCAR:
     if ((rc = verify_area(VERIFY_READ, (void *) arg,
                           sizeof(int))) == 0) {
-      Get_user(ival, (unsigned int *) arg);
+      get_user(ival, (unsigned int *) arg);
       tty->termios->c_cflag =
         (tty->termios->c_cflag & ~CLOCAL) |
         (ival ? CLOCAL : 0);
@@ -784,7 +783,7 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
   case TIOCMBIS:
     if ((rc = verify_area(VERIFY_READ, (void *) arg,
                           sizeof(unsigned int))) == 0) {
-      Get_user(ival, (unsigned int *) arg);
+      get_user(ival, (unsigned int *) arg);
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 1 : -1),
                            ((ival & TIOCM_RTS) ? 1 : -1));
     }
@@ -792,7 +791,7 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
   case TIOCMBIC:
     if ((rc = verify_area(VERIFY_READ, (void *) arg,
                           sizeof(unsigned int))) == 0) {
-      Get_user(ival, (unsigned int *) arg);
+      get_user(ival, (unsigned int *) arg);
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 0 : -1),
                            ((ival & TIOCM_RTS) ? 0 : -1));
     }
@@ -800,7 +799,7 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
   case TIOCMSET:
     if ((rc = verify_area(VERIFY_READ, (void *) arg,
                           sizeof(unsigned int))) == 0) {
-      Get_user(ival, (unsigned int *) arg);
+      get_user(ival, (unsigned int *) arg);
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 1 : 0),
                            ((ival & TIOCM_RTS) ? 1 : 0));
     }
@@ -1126,7 +1125,7 @@ void fix_rio_pci (PDEV)
             t, CNTRL_REG_GOODVALUE); 
     writel (CNTRL_REG_GOODVALUE, rebase + CNTRL_REG_OFFSET);  
   }
-  my_iounmap (hwbase, rebase);
+  iounmap((char*) rebase);
 }
 #endif
 
@@ -1201,7 +1200,7 @@ static int __init rio_init(void)
 
       hp = &p->RIOHosts[p->RIONumHosts];
       hp->PaddrP =  tint & PCI_BASE_ADDRESS_MEM_MASK;
-      hp->Ivec = get_irq (pdev);
+      hp->Ivec = pdev->irq;
       if (((1 << hp->Ivec) & rio_irqmask) == 0)
               hp->Ivec = 0;
       hp->CardP	= (struct DpRam *)
@@ -1234,8 +1233,7 @@ static int __init rio_init(void)
               p->RIONumHosts++;
               found++;
       } else {
-              my_iounmap (p->RIOHosts[p->RIONumHosts].PaddrP, 
-                          p->RIOHosts[p->RIONumHosts].Caddr);
+              iounmap((char*) (p->RIOHosts[p->RIONumHosts].Caddr));
       }
       
 #ifdef TWO_ZERO
@@ -1272,7 +1270,7 @@ static int __init rio_init(void)
 
       hp = &p->RIOHosts[p->RIONumHosts];
       hp->PaddrP =  tint & PCI_BASE_ADDRESS_MEM_MASK;
-      hp->Ivec = get_irq (pdev);
+      hp->Ivec = pdev->irq;
       if (((1 << hp->Ivec) & rio_irqmask) == 0) 
       	hp->Ivec = 0;
       hp->Ivec |= 0x8000; /* Mark as non-sharable */
@@ -1307,8 +1305,7 @@ static int __init rio_init(void)
         p->RIONumHosts++;
         found++;
       } else {
-        my_iounmap (p->RIOHosts[p->RIONumHosts].PaddrP, 
-                    p->RIOHosts[p->RIONumHosts].Caddr);
+        iounmap((char*) (p->RIOHosts[p->RIONumHosts].Caddr));
       }
 #else
       printk (KERN_ERR "Found an older RIO PCI card, but the driver is not "
@@ -1361,7 +1358,7 @@ static int __init rio_init(void)
       }
 
     if (!okboard)
-      my_iounmap (hp->PaddrP, hp->Caddr);
+      iounmap ((char*) (hp->Caddr));
     }
   }
 

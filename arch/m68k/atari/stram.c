@@ -1052,8 +1052,7 @@ int __init stram_device_init(void)
 	if (!stram_disk)
 		return -ENOMEM;
 
-	if (register_blkdev( STRAM_MAJOR, "stram", &stram_fops)) {
-		printk(KERN_ERR "stram: Unable to get major %d\n", STRAM_MAJOR);
+	if (register_blkdev(STRAM_MAJOR, "stram")) {
 		put_disk(stram_disk);
 		return -ENXIO;
 	}

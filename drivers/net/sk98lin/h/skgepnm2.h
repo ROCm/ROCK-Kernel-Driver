@@ -341,7 +341,7 @@ typedef struct s_PnmiStatAddr {
 #if SK_TICKS_PER_SEC == 100
 #define SK_PNMI_HUNDREDS_SEC(t)	(t)
 #else
-#define SK_PNMI_HUNDREDS_SEC(t)	(((t) * 100) / (SK_TICKS_PER_SEC))
+#define SK_PNMI_HUNDREDS_SEC(t)	((((long)t) * 100) / (SK_TICKS_PER_SEC))
 #endif
 
 /*

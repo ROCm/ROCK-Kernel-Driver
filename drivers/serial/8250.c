@@ -1982,11 +1982,13 @@ static struct console serial8250_console = {
 	.index		= -1,
 };
 
-void __init serial8250_console_init(void)
+static int __init serial8250_console_init(void)
 {
 	serial8250_isa_init_ports();
 	register_console(&serial8250_console);
+	return 0;
 }
+console_initcall(serial8250_console_init);
 
 #define SERIAL8250_CONSOLE	&serial8250_console
 #else

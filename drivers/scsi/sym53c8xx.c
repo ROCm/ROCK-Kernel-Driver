@@ -112,8 +112,8 @@
 #include <asm/spinlock.h>
 #endif
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/string.h>
@@ -7214,7 +7214,6 @@ static int ncr_abort_command (ncb_p np, Scsi_Cmnd *cmd)
 **==========================================================
 */
 
-#ifdef MODULE
 static int ncr_detach(ncb_p np)
 {
 	int i;
@@ -7260,7 +7259,6 @@ static int ncr_detach(ncb_p np)
 
 	return 1;
 }
-#endif
 
 /*==========================================================
 **
@@ -12958,6 +12956,7 @@ if (sym53c8xx)
 		}
 		if (i != count)	/* Ignore this device if we already have it */
 			continue;
+		pci_set_master(pcidev);
 		devp = &devtbl[count];
 		devp->host_id = driver_setup.host_id;
 		devp->attach_done = 0;
@@ -13798,7 +13797,6 @@ out:
 }
 
 
-#ifdef MODULE
 int sym53c8xx_release(struct Scsi_Host *host)
 {
 #ifdef DEBUG_SYM53C8XX
@@ -13808,7 +13806,6 @@ printk("sym53c8xx : release\n");
 
      return 1;
 }
-#endif
 
 
 /*

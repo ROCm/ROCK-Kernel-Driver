@@ -348,7 +348,6 @@ extern int fg_console, last_console, want_console;
 
 extern int kmsg_redirect;
 
-extern void con_init(void);
 extern void console_init(void);
 
 extern int lp_init(void);

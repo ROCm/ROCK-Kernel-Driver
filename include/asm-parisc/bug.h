@@ -2,10 +2,7 @@
 #define _PARISC_BUG_H
 
 /*
- * Tell the user there is some problem. Beep too, so we can
- * see^H^H^Hhear bugs in early bootup as well!
- *
- * We don't beep yet.  prumpf
+ * Tell the user there is some problem.
  */
 #define BUG() do { \
 	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \

@@ -55,7 +55,11 @@
 #include <pcmcia/ds.h>
 #include <pcmcia/ciscode.h>
 
+
+extern Scsi_Host_Template qlogicfas_driver_template;
 extern void qlogicfas_preset(int port, int irq);
+extern struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *);
+extern int qlogicfas_bus_reset(Scsi_Cmnd *);
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
@@ -81,6 +85,7 @@ MODULE_PARM(irq_list, "1-4i");
 
 typedef struct scsi_info_t {
 	dev_link_t link;
+	struct Scsi_Host *host;
 	unsigned short manf_id;
 	int ndev;
 	dev_node_t node[8];
@@ -92,9 +97,6 @@ static int qlogic_event(event_t event, int priority, event_callback_args_t * arg
 static dev_link_t *qlogic_attach(void);
 static void qlogic_detach(dev_link_t *);
 
-/* Import our driver template */
-extern Scsi_Host_Template qlogicfas_driver_template;
-#define driver_template qlogicfas_driver_template
 
 static dev_link_t *dev_list = NULL;
 
@@ -233,7 +235,6 @@ static void qlogic_config(dev_link_t * link)
 		info->manf_id = le16_to_cpu(tuple.TupleData[0]);
 
 	/* Configure card */
-	driver_template.module = &__this_module;
 	link->state |= DEV_CONFIG;
 
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
@@ -272,46 +273,52 @@ static void qlogic_config(dev_link_t * link)
 	else
 		qlogicfas_preset(link->io.BasePort1, link->irq.AssignedIRQ);
 
-	scsi_register_host(&driver_template);
-
 	tail = &link->dev;
 	info->ndev = 0;
-	for (host = scsi_host_get_next(NULL); host; host = scsi_host_get_next(host))
-		if (host->hostt == &driver_template)
-			list_for_each_entry (dev, &host->my_devices, siblings) {
-				u_long arg[2], id;
-				kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
-				id = (arg[0] & 0x0f) + ((arg[0] >> 4) & 0xf0) + ((arg[0] >> 8) & 0xf00) + ((arg[0] >> 12) & 0xf000);
-				node = &info->node[info->ndev];
-				node->minor = 0;
-				switch (dev->type) {
-				case TYPE_TAPE:
-					node->major = SCSI_TAPE_MAJOR;
-					sprintf(node->dev_name, "st#%04lx", id);
-					break;
-				case TYPE_DISK:
-				case TYPE_MOD:
-					node->major = SCSI_DISK0_MAJOR;
-					sprintf(node->dev_name, "sd#%04lx", id);
-					break;
-				case TYPE_ROM:
-				case TYPE_WORM:
-					node->major = SCSI_CDROM_MAJOR;
-					sprintf(node->dev_name, "sr#%04lx", id);
-					break;
-				default:
-					node->major = SCSI_GENERIC_MAJOR;
-					sprintf(node->dev_name, "sg#%04lx", id);
-					break;
-				}
-				*tail = node;
-				tail = &node->next;
-				info->ndev++;
-			}
-	*tail = NULL;
-	if (info->ndev == 0)
-		printk(KERN_INFO "qlogic_cs: no SCSI devices found\n");
 
+	host = __qlogicfas_detect(&qlogicfas_driver_template);
+	if (!host) {
+		printk(KERN_INFO "qlogic_cs: no SCSI devices found\n");
+		goto out;
+	}
+
+	scsi_add_host(host, NULL);
+
+	list_for_each_entry(dev, &host->my_devices, siblings) {
+		u_long arg[2], id;
+		kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
+		id = (arg[0] & 0x0f) + ((arg[0] >> 4) & 0xf0) + ((arg[0] >> 8) & 0xf00) + ((arg[0] >> 12) & 0xf000);
+		node = &info->node[info->ndev];
+		node->minor = 0;
+		switch (dev->type) {
+		case TYPE_TAPE:
+			node->major = SCSI_TAPE_MAJOR;
+			sprintf(node->dev_name, "st#%04lx", id);
+			break;
+		case TYPE_DISK:
+		case TYPE_MOD:
+			node->major = SCSI_DISK0_MAJOR;
+			sprintf(node->dev_name, "sd#%04lx", id);
+			break;
+		case TYPE_ROM:
+		case TYPE_WORM:
+			node->major = SCSI_CDROM_MAJOR;
+			sprintf(node->dev_name, "sr#%04lx", id);
+			break;
+		default:
+			node->major = SCSI_GENERIC_MAJOR;
+			sprintf(node->dev_name, "sg#%04lx", id);
+			break;
+		}
+		*tail = node;
+		tail = &node->next;
+		info->ndev++;
+	}
+
+	*tail = NULL;
+	info->host = host;
+
+out:
 	link->state &= ~DEV_CONFIG_PENDING;
 	return;
 
@@ -327,29 +334,22 @@ cs_failed:
 static void qlogic_release(u_long arg)
 {
 	dev_link_t *link = (dev_link_t *) arg;
+	scsi_info_t *info = link->priv;
 
 	DEBUG(0, "qlogic_release(0x%p)\n", link);
 
-#warning This does not protect you.  You need some real fix for your races.
-#if 0
-	if (GET_USE_COUNT(&__this_module) != 0) {
-		DEBUG(0, "qlogic_cs: release postponed, device still open\n");
-		link->state |= DEV_STALE_CONFIG;
-		return;
-	}
-#endif
-
-	scsi_unregister_host(&driver_template);
+	scsi_remove_host(info->host);
 	link->dev = NULL;
 
 	CardServices(ReleaseConfiguration, link->handle);
 	CardServices(ReleaseIO, link->handle, &link->io);
 	CardServices(ReleaseIRQ, link->handle, &link->irq);
 
+	scsi_unregister(info->host);
+
 	link->state &= ~DEV_CONFIG;
 	if (link->state & DEV_STALE_LINK)
 		qlogic_detach(link);
-
 }				/* qlogic_release */
 
 /*====================================================================*/
@@ -390,7 +390,7 @@ static int qlogic_event(event_t event, int priority, event_callback_args_t * arg
 				outb(0x04, link->io.BasePort1 + 0xd);
 			}
 			/* Ugggglllyyyy!!! */
-			driver_template.eh_bus_reset_handler(NULL);
+			qlogicfas_bus_reset(NULL);
 		}
 		break;
 	}

@@ -333,12 +333,10 @@ tapeblock_init(void)
 	int rc;
 
 	/* Register the tape major number to the kernel */
-	rc = register_blkdev(tapeblock_major, "tBLK", &tapeblock_fops);
-	if (rc < 0) {
-		PRINT_ERR("can't get major %d for block device\n",
-			  tapeblock_major);
+	rc = register_blkdev(tapeblock_major, "tBLK");
+	if (rc < 0)
 		return rc;
-	}
+
 	if (tapeblock_major == 0)
 		tapeblock_major = rc;
 	PRINT_INFO("tape gets major %d for block device\n", tapeblock_major);

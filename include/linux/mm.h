@@ -558,6 +558,7 @@ int write_one_page(struct page *page, int wait);
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
+
 int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read);
 void page_cache_readahead(struct address_space *mapping, 
@@ -569,7 +570,7 @@ void page_cache_readaround(struct address_space *mapping,
 			   struct file *filp,
 			   unsigned long offset);
 void handle_ra_miss(struct address_space *mapping, 
-		    struct file_ra_state *ra);
+		    struct file_ra_state *ra, pgoff_t offset);
 unsigned long max_sane_readahead(unsigned long nr);
 
 /* Do stack extension */

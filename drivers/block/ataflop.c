@@ -1929,10 +1929,8 @@ int __init atari_floppy_init (void)
 		/* Hades doesn't have Atari-compatible floppy */
 		return -ENXIO;
 
-	if (register_blkdev(FLOPPY_MAJOR,"fd",&floppy_fops)) {
-		printk(KERN_ERR "Unable to get major %d for floppy\n",FLOPPY_MAJOR);
+	if (register_blkdev(FLOPPY_MAJOR,"fd"))
 		return -EBUSY;
-	}
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].disk = alloc_disk(1);

@@ -904,17 +904,29 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 			break;
 		}
 	}
-	if (!cp) {
+	if ((!cp && configuration != 0) || (cp && configuration == 0)) {
 		warn("selecting invalid configuration %d", configuration);
 		return -EINVAL;
+	}
+
+	/* if it's already configured, clear out old state first. */
+	if (dev->state != USB_STATE_ADDRESS) {
+		/* FIXME unbind drivers from all "old" interfaces.
+		 * handshake with hcd to reset cached hc endpoint state.
+		 */
 	}
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0)
 		return ret;
-
+	if (configuration)
+		dev->state = USB_STATE_CONFIGURED;
+	else
+		dev->state = USB_STATE_ADDRESS;
 	dev->actconfig = cp;
+
+	/* reset more hc/hcd endpoint state */
 	dev->toggle[0] = 0;
 	dev->toggle[1] = 0;
 	usb_set_maxpacket(dev);

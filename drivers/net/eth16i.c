@@ -1404,7 +1404,6 @@ static int irq[MAX_ETH16I_CARDS];
 static char* mediatype[MAX_ETH16I_CARDS];
 static int debug = -1;
 
-#if (LINUX_VERSION_CODE >= 0x20115) 
 MODULE_AUTHOR("Mika Kuoppala <miku@iki.fi>");
 MODULE_DESCRIPTION("ICL EtherTeam 16i/32 driver");
 MODULE_LICENSE("GPL");
@@ -1423,7 +1422,6 @@ MODULE_PARM_DESC(mediatype, "eth16i media type of interface(s) (bnc,tp,dix,auto,
 
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "eth16i debug level (0-6)");
-#endif
 
 int init_module(void)
 {

@@ -1754,10 +1754,9 @@ int __init amiga_floppy_init(void)
 	if (!AMIGAHW_PRESENT(AMI_FLOPPY))
 		return -ENXIO;
 
-	if (register_blkdev(FLOPPY_MAJOR,"fd",&floppy_fops)) {
-		printk("fd: Unable to get major %d for floppy\n",FLOPPY_MAJOR);
+	if (register_blkdev(FLOPPY_MAJOR,"fd"))
 		return -EBUSY;
-	}
+
 	/*
 	 *  We request DSKPTR, DSKLEN and DSKDATA only, because the other
 	 *  floppy registers are too spreaded over the custom register space

@@ -22,11 +22,7 @@ config MMU
 	bool
 	default y
 
-config SWAP
-	bool
-	default y
-
-config RWSEM_GENERIC_SPINLOCK
+config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
@@ -423,6 +419,18 @@ config SMP
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
+
+config PREEMPT
+	bool "Preemptible Kernel"
+        help
+          This option reduces the latency of the kernel when reacting to
+          real-time or interactive events by allowing a low priority process to
+          be preempted even if it is in kernel mode executing a system call.
+          This allows applications to run more reliably even when the system is
+          under load.
+
+          Say Y here if you are building a kernel for a desktop, embedded
+          or real-time system.  Say N if you are unsure.
 
 config IA32_SUPPORT
 	bool "Support running of Linux/x86 binaries"
@@ -874,6 +882,12 @@ config DEBUG_SPINLOCK
 	  and certain other kinds of spinlock errors commonly made.  This is
 	  best used in conjunction with the NMI watchdog so that spinlock
 	  deadlocks are also debuggable.
+
+config DEBUG_SPINLOCK_SLEEP
+	  bool "Sleep-inside-spinlock checking"
+	  help
+	    If you say Y here, various routines which may sleep will become very
+	    noisy if they are called with a spinlock held.
 
 config IA64_DEBUG_CMPXCHG
 	bool "Turn on compare-and-exchange bug checking (slow!)"

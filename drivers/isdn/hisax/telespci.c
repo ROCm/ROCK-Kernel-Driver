@@ -231,36 +231,23 @@ static struct card_ops telespci_ops = {
 	.irq_func = telespci_interrupt,
 };
 
-static struct pci_dev *dev_tel __initdata = NULL;
-
-int __init
-setup_telespci(struct IsdnCard *card)
+static int __init
+telespci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
 {
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
+	int rc;
 
-#ifdef __BIG_ENDIAN
-#error "not running on big endian machines now"
-#endif
-	strcpy(tmp, telespci_revision);
-	printk(KERN_INFO "HiSax: Teles/PCI driver Rev. %s\n", HiSax_getrev(tmp));
-	if ((dev_tel = pci_find_device (PCI_VENDOR_ID_ZORAN, PCI_DEVICE_ID_ZORAN_36120, dev_tel))) {
-		if (pci_enable_device(dev_tel))
-			return(0);
-		cs->irq = dev_tel->irq;
-		if (!cs->irq) {
-			printk(KERN_WARNING "Teles: No IRQ for PCI card found\n");
-			return(0);
-		}
-		cs->hw.teles0.membase = request_mmio(&cs->rs, pci_resource_start(dev_tel, 0), 4096, "telespci");
-		if (!cs->hw.teles0.membase)
-			goto err;
-		printk(KERN_INFO "Found: Zoran, base-address: 0x%lx, irq: 0x%x\n",
-			pci_resource_start(dev_tel, 0), dev_tel->irq);
-	} else {
-		printk(KERN_WARNING "TelesPCI: No PCI card found\n");
-		return(0);
-	}
+	printk(KERN_INFO "TelesPCI: defined at %#lx IRQ %d\n",
+	       pci_resource_start(pdev, 0), pdev->irq);
+	
+	rc = -EBUSY;
+	if (pci_enable_device(pdev))
+		goto err;
+			
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.teles0.membase = request_mmio(&cs->rs, pci_resource_start(pdev, 0), 4096, "telespci");
+	if (!cs->hw.teles0.membase)
+		goto err;
 
 	/* Initialize Zoran PCI controller */
 	writel(0x00000000, cs->hw.teles0.membase + 0x28);
@@ -270,17 +257,36 @@ setup_telespci(struct IsdnCard *card)
 	writel(0x70000000, cs->hw.teles0.membase + 0x3C);
 	writel(0x61000000, cs->hw.teles0.membase + 0x40);
 	/* writel(0x00800000, cs->hw.teles0.membase + 0x200); */
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d mem:%p\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.teles0.membase);
 
-	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &telespci_ops;
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	return 1;
+	return 0;
  err:
 	hisax_release_resources(cs);
+	return rc;
+}
+
+static struct pci_dev *dev_tel __initdata = NULL;
+
+int __init
+setup_telespci(struct IsdnCard *card)
+{
+	char tmp[64];
+
+#ifdef __BIG_ENDIAN
+#error "not running on big endian machines now"
+#endif
+	strcpy(tmp, telespci_revision);
+	printk(KERN_INFO "HiSax: Teles/PCI driver Rev. %s\n",
+	       HiSax_getrev(tmp));
+	dev_tel = pci_find_device(PCI_VENDOR_ID_ZORAN, 
+				  PCI_DEVICE_ID_ZORAN_36120, dev_tel);
+	if (dev_tel) {
+		if (telespci_probe(card->cs, dev_tel) < 0)
+			return 0;
+		return 1;
+	}
+	printk(KERN_WARNING "TelesPCI: No PCI card found\n");
 	return 0;
 }

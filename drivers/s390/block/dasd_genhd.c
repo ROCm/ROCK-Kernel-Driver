@@ -60,11 +60,8 @@ dasd_register_major(int major)
 	}
 
 	/* Register block device. */
-	new_major = register_blkdev(major, "dasd", &dasd_device_operations);
+	new_major = register_blkdev(major, "dasd");
 	if (new_major < 0) {
-		MESSAGE(KERN_WARNING,
-			"Cannot register to major no %d, rc = %d",
-			major, new_major);
 		kfree(mi);
 		return new_major;
 	}

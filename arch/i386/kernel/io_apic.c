@@ -221,8 +221,9 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 #  define Dprintk(x...) 
 # endif
 
-extern unsigned long irq_affinity [NR_IRQS];
-int __cacheline_aligned pending_irq_balance_apicid [NR_IRQS];
+extern unsigned long irq_affinity[NR_IRQS];
+
+static int __cacheline_aligned pending_irq_balance_apicid[NR_IRQS];
 static int irqbalance_disabled = NO_BALANCE_IRQ;
 static int physical_balance = 0;
 
@@ -251,8 +252,54 @@ struct irq_cpu_info {
 #define BALANCED_IRQ_LESS_DELTA		(HZ)
 
 long balanced_irq_interval = MAX_BALANCED_IRQ_INTERVAL;
-					 
-static inline void balance_irq(int cpu, int irq);
+
+static unsigned long move(int curr_cpu, unsigned long allowed_mask,
+			unsigned long now, int direction)
+{
+	int search_idle = 1;
+	int cpu = curr_cpu;
+
+	goto inside;
+
+	do {
+		if (unlikely(cpu == curr_cpu))
+			search_idle = 0;
+inside:
+		if (direction == 1) {
+			cpu++;
+			if (cpu >= NR_CPUS)
+				cpu = 0;
+		} else {
+			cpu--;
+			if (cpu == -1)
+				cpu = NR_CPUS-1;
+		}
+	} while (!cpu_online(cpu) || !IRQ_ALLOWED(cpu,allowed_mask) ||
+			(search_idle && !IDLE_ENOUGH(cpu,now)));
+
+	return cpu;
+}
+
+static inline void balance_irq(int cpu, int irq)
+{
+	unsigned long now = jiffies;
+	unsigned long allowed_mask;
+	unsigned int new_cpu;
+		
+	if (irqbalance_disabled)
+		return;
+
+	allowed_mask = cpu_online_map & irq_affinity[irq];
+	new_cpu = move(cpu, allowed_mask, now, 1);
+	if (cpu != new_cpu) {
+		irq_desc_t *desc = irq_desc + irq;
+		unsigned long flags;
+
+		spin_lock_irqsave(&desc->lock, flags);
+		pending_irq_balance_apicid[irq]=cpu_to_logical_apicid(new_cpu);
+		spin_unlock_irqrestore(&desc->lock, flags);
+	}
+}
 
 static inline void rotate_irqs_among_cpus(unsigned long useful_load_threshold)
 {
@@ -263,7 +310,8 @@ static inline void rotate_irqs_among_cpus(unsigned long useful_load_threshold)
 			if (!irq_desc[j].action)
 				continue;
 			/* Is it a significant load ?  */
-			if (IRQ_DELTA(CPU_TO_PACKAGEINDEX(i),j) < useful_load_threshold)
+			if (IRQ_DELTA(CPU_TO_PACKAGEINDEX(i),j) <
+						useful_load_threshold)
 				continue;
 			balance_irq(i, j);
 		}
@@ -430,7 +478,8 @@ tryanotherirq:
 	 * We seek the least loaded sibling by making the comparison
 	 * (A+B)/2 vs B
 	 */
-	if (physical_balance && (CPU_IRQ(min_loaded) >> 1) > CPU_IRQ(cpu_sibling_map[min_loaded]))
+	if (physical_balance && (CPU_IRQ(min_loaded) >> 1) >
+					CPU_IRQ(cpu_sibling_map[min_loaded]))
 		min_loaded = cpu_sibling_map[min_loaded];
 
 	allowed_mask = cpu_online_map & irq_affinity[selected_irq];
@@ -438,11 +487,15 @@ tryanotherirq:
 
 	if (target_cpu_mask & allowed_mask) {
 		irq_desc_t *desc = irq_desc + selected_irq;
-		Dprintk("irq = %d moved to cpu = %d\n", selected_irq, min_loaded);
+		unsigned long flags;
+
+		Dprintk("irq = %d moved to cpu = %d\n",
+				selected_irq, min_loaded);
 		/* mark for change destination */
-		spin_lock(&desc->lock);
-		pending_irq_balance_apicid[selected_irq] = cpu_to_logical_apicid(min_loaded);
-		spin_unlock(&desc->lock);
+		spin_lock_irqsave(&desc->lock, flags);
+		pending_irq_balance_apicid[selected_irq] =
+				cpu_to_logical_apicid(min_loaded);
+		spin_unlock_irqrestore(&desc->lock, flags);
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
 		 */
@@ -453,56 +506,14 @@ tryanotherirq:
 	goto tryanotherirq;
 
 not_worth_the_effort:
-	/* if we did not find an IRQ to move, then adjust the time interval upward */
+	/*
+	 * if we did not find an IRQ to move, then adjust the time interval
+	 * upward
+	 */
 	balanced_irq_interval = min((long)MAX_BALANCED_IRQ_INTERVAL,
 		balanced_irq_interval + BALANCED_IRQ_MORE_DELTA);	
 	Dprintk("IRQ worth rotating not found\n");
 	return;
-}
-
-static unsigned long move(int curr_cpu, unsigned long allowed_mask, unsigned long now, int direction)
-{
-	int search_idle = 1;
-	int cpu = curr_cpu;
-
-	goto inside;
-
-	do {
-		if (unlikely(cpu == curr_cpu))
-			search_idle = 0;
-inside:
-		if (direction == 1) {
-			cpu++;
-			if (cpu >= NR_CPUS)
-				cpu = 0;
-		} else {
-			cpu--;
-			if (cpu == -1)
-				cpu = NR_CPUS-1;
-		}
-	} while (!cpu_online(cpu) || !IRQ_ALLOWED(cpu,allowed_mask) ||
-			(search_idle && !IDLE_ENOUGH(cpu,now)));
-
-	return cpu;
-}
-
-static inline void balance_irq (int cpu, int irq)
-{
-	unsigned long now = jiffies;
-	unsigned long allowed_mask;
-	unsigned int new_cpu;
-		
-	if (irqbalance_disabled)
-		return;
-
-	allowed_mask = cpu_online_map & irq_affinity[irq];
-	new_cpu = move(cpu, allowed_mask, now, 1);
-	if (cpu != new_cpu) {
-		irq_desc_t *desc = irq_desc + irq;
-		spin_lock(&desc->lock);
-		pending_irq_balance_apicid[irq] = cpu_to_logical_apicid(new_cpu);
-		spin_unlock(&desc->lock);
-	}
 }
 
 int balanced_irq(void *unused)
@@ -516,26 +527,32 @@ int balanced_irq(void *unused)
 	/* push everything to CPU 0 to give us a starting point.  */
 	for (i = 0 ; i < NR_IRQS ; i++)
 		pending_irq_balance_apicid[i] = cpu_to_logical_apicid(0);
-	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		time_remaining = schedule_timeout(time_remaining);
-		if (time_after(jiffies, prev_balance_time+balanced_irq_interval)) {
-			Dprintk("balanced_irq: calling do_irq_balance() %lu\n", jiffies);
-			do_irq_balance();
-			prev_balance_time = jiffies;
-			time_remaining = balanced_irq_interval;
-		}
-        }
+
+repeat:
+	set_current_state(TASK_INTERRUPTIBLE);
+	time_remaining = schedule_timeout(time_remaining);
+	if (time_after(jiffies, prev_balance_time+balanced_irq_interval)) {
+		Dprintk("balanced_irq: calling do_irq_balance() %lu\n",
+					jiffies);
+		do_irq_balance();
+		prev_balance_time = jiffies;
+		time_remaining = balanced_irq_interval;
+	}
+	goto repeat;
 }
 
 static int __init balanced_irq_init(void)
 {
 	int i;
 	struct cpuinfo_x86 *c;
+
         c = &boot_cpu_data;
 	if (irqbalance_disabled)
 		return 0;
-	/* Enable physical balance only if more than 1 physical processor is present */
+	/*
+	 * Enable physical balance only if more than 1 physical processor
+	 * is present
+	 */
 	if (smp_num_siblings > 1 && cpu_online_map >> 2)
 		physical_balance = 1;
 
@@ -1150,11 +1167,8 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	enable_8259A_irq(0);
 }
 
-void __init UNEXPECTED_IO_APIC(void)
+static inline void UNEXPECTED_IO_APIC(void)
 {
-	printk(KERN_WARNING "INFO: unexpected IO-APIC, please file a report at\n");
-	printk(KERN_WARNING "      http://bugzilla.kernel.org\n");
-	printk(KERN_WARNING "      if your kernel is less than 3 months old.\n");
 }
 
 void __init print_IO_APIC(void)
@@ -1566,7 +1580,7 @@ static void __init setup_ioapic_ids_from_mpc(void) { }
  */
 static int __init timer_irq_works(void)
 {
-	unsigned int t1 = jiffies;
+	unsigned long t1 = jiffies;
 
 	local_irq_enable();
 	/* Let ten ticks pass... */

@@ -960,7 +960,6 @@ leave:
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: host %d channel %d"
 	    " id %d lun %d name/id: '%s'\n", sdev->host->host_no,
 	    sdev->channel, sdev->id, sdev->lun, sdev->sdev_driverfs_dev.name));
-	return;
 }
 
 /**

@@ -32,6 +32,8 @@
 
 #undef DEBUG
 
+static struct cpufreq_driver sa1110_driver;
+
 struct sdram_params {
 	u_char  rows;		/* bits				 */
 	u_char  cas_latency;	/* cycles			 */
@@ -208,11 +210,11 @@ sdram_update_refresh(u_int cpu_khz, struct sdram_params *sdram)
 }
 
 /*
- * Ok, set the CPU frequency.  Since we've done the validation
- * above, we can match for an exact frequency.  If we don't find
- * an exact match, we will to set the lowest frequency to be safe.
+ * Ok, set the CPU frequency.  
  */
-static int sa1110_setspeed(struct cpufreq_policy *policy)
+static int sa1110_target(struct cpufreq_policy *policy,
+			 unsigned int target_freq,
+			 unsigned int relation)
 {
 	struct sdram_params *sdram = &sdram_params;
 	struct cpufreq_freqs freqs;
@@ -220,8 +222,25 @@ static int sa1110_setspeed(struct cpufreq_policy *policy)
 	unsigned long flags;
 	unsigned int ppcr, unused;
 
-	ppcr = sa11x0_freq_to_ppcr(policy->max);
-	sdram_calculate_timing(&sd, policy->max, sdram);
+	switch(relation){
+	case CPUFREQ_RELATION_L:
+		ppcr = sa11x0_freq_to_ppcr(target_freq);
+		if (sa11x0_ppcr_to_freq(ppcr) > policy->max)
+			ppcr--;
+		break;
+	case CPUFREQ_RELATION_H:
+		ppcr = sa11x0_freq_to_ppcr(target_freq);
+		if (ppcr && (sa11x0_ppcr_to_freq(ppcr) > target_freq) &&
+		    (sa11x0_ppcr_to_freq(ppcr-1) >= policy->min))
+			ppcr--;
+		break;
+	}
+
+	freqs.old = sa11x0_getspeed();
+	freqs.new = sa11x0_ppcr_to_freq(ppcr);
+	freqs.cpu = 0;
+
+	sdram_calculate_timing(&sd, freqs.new, sdram);
 
 #if 0
 	/*
@@ -239,10 +258,6 @@ static int sa1110_setspeed(struct cpufreq_policy *policy)
 	sd.mdcas[1] = 0xaaaaaaaa;
 	sd.mdcas[2] = 0xaaaaaaaa;
 #endif
-
-	freqs.old = sa11x0_getspeed();
-	freqs.new = policy->max;
-	freqs.cpu = 0;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
@@ -288,27 +303,29 @@ static int sa1110_setspeed(struct cpufreq_policy *policy)
 	/*
 	 * Now, return the SDRAM refresh back to normal.
 	 */
-	sdram_update_refresh(policy->max, sdram);
+	sdram_update_refresh(freqs.new, sdram);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return 0;
 }
 
-static struct cpufreq_policy sa1110_policy = {
-	.cpu		= 0,
-	.policy		= CPUFREQ_POLICY_POWERSAVE,
-	.cpuinfo	= {
-		.max_freq		= 287000,
-		.min_freq		= 59000,
-		.transition_latency	= CPUFREQ_ETERNAL,
-	},
-};
+static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
+{
+	if (policy->cpu != 0)
+		return -EINVAL;
+	policy->cur = policy->min = policy->max = sa11x0_getspeed();
+	policy->policy = CPUFREQ_POLICY_POWERSAVE;
+	policy->cpuinfo.min_freq = 59000;
+	policy->cpuinfo.max_freq = 287000;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+	return 0;
+}
 
 static struct cpufreq_driver sa1110_driver = {
-	.verify		 = sa11x0_verify_speed,
-	.setpolicy	 = sa1110_setspeed,
-	.policy		 = &sa1110_policy,
+	.verify		= sa11x0_verify_speed,
+	.target		= sa1110_target,
+	.init		= sa1110_cpu_init,
 	.name		= "sa1110",
 };
 
@@ -331,15 +348,11 @@ static int __init sa1110_clk_init(void)
 			sdram->tck, sdram->trcd, sdram->trp,
 			sdram->twr, sdram->refresh, sdram->cas_latency);
 
+		cpufreq_gov_userspace_init();
+ 
 		memcpy(&sdram_params, sdram, sizeof(sdram_params));
 
-		sa1110_driver.cpu_cur_freq[0] =
-		sa1110_policy.min =
-		sa1110_policy.max = sa11x0_getspeed();
-
-		sa1110_setspeed(&sa1110_policy);
-
-		return cpufreq_register(&sa1110_driver);
+		return cpufreq_register_driver(&sa1110_driver);
 	}
 
 	return 0;

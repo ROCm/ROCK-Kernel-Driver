@@ -22,8 +22,6 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <stdarg.h>
-
 #include <asm/bitops.h>
 #include <asm/ioctls.h>
 #include <asm/uaccess.h>

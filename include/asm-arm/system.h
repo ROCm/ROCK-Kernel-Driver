@@ -14,16 +14,6 @@ extern unsigned int system_serial_low;
 extern unsigned int system_serial_high;
 extern unsigned int mem_fclk_21285;
 
-/*
- * This tells us if we have an ISA bridge
- * present in a PCI system.
- */
-#ifdef CONFIG_PCI
-extern int have_isa_bridge;
-#else
-#define have_isa_bridge		(0)
-#endif
-
 struct pt_regs;
 
 void die(const char *msg, struct pt_regs *regs, int err)
@@ -75,7 +65,7 @@ extern int cpu_architecture(void);
  * The `mb' is to tell GCC not to cache `current' across this call.
  */
 struct thread_info;
-extern struct task_struct *__switch_to(struct thread_info *, struct thread_info *);
+extern struct thread_info *__switch_to(struct thread_info *, struct thread_info *);
 
 #define switch_to(prev,next,last)					\
 	do {			 					\

@@ -18,15 +18,6 @@ config MMU
 	bool
 	default y
 
-config SWAP
-	bool "Support for paging of anonymous memory"
-	default y
-	help
-	  This option allows you to choose whether you want to have support
-	  for socalled swap devices or swap files in your kernel that are
-	  used to provide more virtual memory than the actual RAM present
-	  in your computer.  If unusre say Y.
-
 config SBUS
 	bool
 
@@ -488,7 +479,7 @@ config NR_CPUS
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"
-	depends on (HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY)))
+	depends on (HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))) || X86_PC
 
 config DISCONTIGMEM
 	bool

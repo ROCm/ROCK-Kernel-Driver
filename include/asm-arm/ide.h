@@ -26,16 +26,10 @@
 #define ide_default_io_base(i)		((ide_ioreg_t)0)
 #define ide_default_irq(b)		(0)
 
-#define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
-#define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
-#define ide_check_region(from,extent)		check_region((from), (extent))
-#define ide_request_region(from,extent,name)	request_region((from), (extent), (name))
-#define ide_release_region(from,extent)		release_region((from), (extent))
-
-/*
- * The following are not needed for the non-m68k ports
- */
-#define ide_ack_intr(hwif)		(1)
+#define __ide_mm_insw(port,addr,len)	readsw(port,addr,len)
+#define __ide_mm_insl(port,addr,len)	readsl(port,addr,len)
+#define __ide_mm_outsw(port,addr,len)	writesw(port,addr,len)
+#define __ide_mm_outsl(port,addr,len)	writesl(port,addr,len)
 
 #endif /* __KERNEL__ */
 

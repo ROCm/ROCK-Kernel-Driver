@@ -4,7 +4,7 @@
 		-----------------------------------
 
 		        Started: 13-Jan-2003
-		    Last update: 24-Jan-2003
+		    Last update: 11-Feb-2003
 
 	              David Mosberger-Tang
 		      <davidm@hpl.hp.com>
@@ -42,9 +42,9 @@ In contrast, fsys-mode has the following special properties:
     can disable interrupts and avoid all other interruption-sources
     to avoid preemption)
 
-  - neither the memory nor the register stack can be trusted while
+  - neither the memory-stack nor the register-stack can be trusted while
     in fsys-mode (they point to the user-level stacks, which may
-    be invalid)
+    be invalid, or completely bogus addresses)
 
 In summary, fsys-mode is much more similar to running in user-mode
 than it is to running in kernel-mode.  Of course, given that the

@@ -136,6 +136,12 @@ static int read_pages(struct address_space *mapping, struct file *filp,
  * ahead_size:  Together, these form the "ahead window".
  * ra_pages:	The externally controlled max readahead for this fd.
  *
+ * When readahead is in the "maximally shrunk" state (next_size == -1UL),
+ * readahead is disabled.  In this state, prev_page and size are used, inside
+ * handle_ra_miss(), to detect the resumption of sequential I/O.  Once there
+ * has been a decent run of sequential I/O (defined by get_min_readahead),
+ * readahead is reenabled.
+ *
  * The readahead code manages two windows - the "current" and the "ahead"
  * windows.  The intent is that while the application is walking the pages
  * in the current window, I/O is underway on the ahead window.  When the
@@ -167,6 +173,8 @@ static int read_pages(struct address_space *mapping, struct file *filp,
  * good assumption that an application which has built a good readahead window
  * will continue to perform linear reads.  Either at the new file position, or
  * at the old one after another seek.
+ *
+ * After enough misses, readahead is fully disabled. (next_size = -1UL).
  *
  * There is a special-case: if the first page which the application tries to
  * read happens to be the first page of the file, it is assumed that a linear
@@ -253,14 +261,19 @@ int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 	int ret = 0;
 
 	while (nr_to_read) {
+		int err;
+
 		unsigned long this_chunk = (2 * 1024 * 1024) / PAGE_CACHE_SIZE;
 
 		if (this_chunk > nr_to_read)
 			this_chunk = nr_to_read;
-		ret = __do_page_cache_readahead(mapping, filp,
+		err = __do_page_cache_readahead(mapping, filp,
 						offset, this_chunk);
-		if (ret < 0)
+		if (err < 0) {
+			ret = err;
 			break;
+		}
+		ret += err;
 		offset += this_chunk;
 		nr_to_read -= this_chunk;
 	}
@@ -286,6 +299,7 @@ check_ra_success(struct file_ra_state *ra, pgoff_t attempt,
 				ra->ahead_size = ra->next_size;
 		} else {
 			ra->next_size = -1UL;
+			ra->size = 0;
 		}
 	}
 }
@@ -345,16 +359,19 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 		ra->next_size += 2;
 	} else {
 		/*
-		 * A miss - lseek, pread, etc.  Shrink the readahead
+		 * A miss - lseek, pagefault, pread, etc.  Shrink the readahead
 		 * window by 25%.
 		 */
-		ra->next_size -= ra->next_size / 4;
+		ra->next_size -= ra->next_size / 4 + 2;
 	}
 
-	if (ra->next_size > max)
+	if ((long)ra->next_size > (long)max)
 		ra->next_size = max;
-	if (ra->next_size < min)
-		ra->next_size = min;
+	if ((long)ra->next_size <= 0L) {
+		ra->next_size = -1UL;
+		ra->size = 0;
+		goto out;		/* Readahead is off */
+	}
 
 	/*
 	 * Is this request outside the current window?
@@ -374,6 +391,7 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 			ra->prev_page = ra->start;
 			ra->ahead_start = 0;
 			ra->ahead_size = 0;
+
 			/*
 			 * Control now returns, probably to sleep until I/O
 			 * completes against the first ahead page.
@@ -394,7 +412,6 @@ do_io:
 		ra->size = ra->next_size;
 		ra->ahead_start = 0;		/* Invalidate these */
 		ra->ahead_size = 0;
-
 		actual = do_page_cache_readahead(mapping, filp, offset,
 						 ra->size);
 		check_ra_success(ra, ra->size, actual, orig_next_size);
@@ -455,21 +472,37 @@ page_cache_readaround(struct address_space *mapping, struct file_ra_state *ra,
  * not found.  This will happen if it was evicted by the VM (readahead
  * thrashing) or if the readahead window is maximally shrunk.
  *
- * If the window has been maximally shrunk (next_size == 0) then bump it up
- * again to resume readahead.
+ * If the window has been maximally shrunk (next_size == -1UL) then look to see
+ * if we are getting misses against sequential file offsets.  If so, and this
+ * persists then resume readahead.
  *
  * Otherwise we're thrashing, so shrink the readahead window by three pages.
  * This is because it is grown by two pages on a readahead hit.  Theory being
  * that the readahead window size will stabilise around the maximum level at
  * which there is no thrashing.
  */
-void handle_ra_miss(struct address_space *mapping, struct file_ra_state *ra)
+void handle_ra_miss(struct address_space *mapping,
+		struct file_ra_state *ra, pgoff_t offset)
 {
-	const unsigned long min = get_min_readahead(ra);
-
 	if (ra->next_size == -1UL) {
-		ra->next_size = min;
+		const unsigned long max = get_max_readahead(ra);
+
+		if (offset != ra->prev_page + 1) {
+			ra->size = 0;			/* Not sequential */
+		} else {
+			ra->size++;			/* A sequential read */
+			if (ra->size >= max) {		/* Resume readahead */
+				ra->start = offset - max;
+				ra->next_size = max;
+				ra->size = max;
+				ra->ahead_start = 0;
+				ra->ahead_size = 0;
+			}
+		}
+		ra->prev_page = offset;
 	} else {
+		const unsigned long min = get_min_readahead(ra);
+
 		ra->next_size -= 3;
 		if (ra->next_size < min)
 			ra->next_size = min;

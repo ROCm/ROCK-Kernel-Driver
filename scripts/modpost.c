@@ -293,6 +293,9 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		/* undefined symbol */
 		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL)
 			break;
+		/* ignore global offset table */
+		if (strcmp(symname, "_GLOBAL_OFFSET_TABLE_") == 0)
+			break;
 		
 		if (memcmp(symname, MODULE_SYMBOL_PREFIX,
 			   strlen(MODULE_SYMBOL_PREFIX)) == 0) {

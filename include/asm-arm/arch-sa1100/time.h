@@ -75,15 +75,12 @@ static unsigned long sa1100_gettimeoffset (void)
 static void sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int next_match;
-	unsigned long flags;
 
 	do {
 		do_leds();
-		local_irq_save(flags);
 		do_timer(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
-		local_irq_restore(flags);
 		do_set_rtc();
 	} while ((signed long)(next_match - OSCR) <= 0);
 

@@ -55,6 +55,7 @@ asm (".weak iosapic_register_intr");
 asm (".weak iosapic_override_isa_irq");
 asm (".weak iosapic_register_platform_intr");
 asm (".weak iosapic_init");
+asm (".weak iosapic_system_init");
 asm (".weak iosapic_version");
 
 void (*pm_idle) (void);
@@ -182,7 +183,9 @@ acpi_dispose_crs (struct acpi_buffer *buf)
 #define ACPI_MAX_PLATFORM_INTERRUPTS	256
 
 /* Array to record platform interrupt vectors for generic interrupt routing. */
-int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = { [0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1 };
+int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
+	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
+};
 
 enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
 
@@ -291,40 +294,6 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_find_iosapic (unsigned int gsi, u32 *gsi_base, char **iosapic_address)
-{
-	struct acpi_table_iosapic *iosapic;
-	int ver;
-	int max_pin;
-	char *p;
-	char *end;
-
-	if (!gsi_base || !iosapic_address)
-		return -ENODEV;
-
-	p = (char *) (acpi_madt + 1);
-	end = p + (acpi_madt->header.length - sizeof(struct acpi_table_madt));
-
-	while (p < end) {
-		if (*p == ACPI_MADT_IOSAPIC) {
-			iosapic = (struct acpi_table_iosapic *) p;
-
-			*gsi_base = iosapic->global_irq_base;
-			*iosapic_address = ioremap(iosapic->address, 0);
-
-			ver = iosapic_version(*iosapic_address);
-			max_pin = (ver >> 16) & 0xff;
-
-			if ((gsi - *gsi_base) <= max_pin)
-				return 0;	/* Found it! */
-		}
-		p += p[1];
-	}
-	return -ENODEV;
-}
-
-
-static int __init
 acpi_parse_iosapic (acpi_table_entry_header *header)
 {
 	struct acpi_table_iosapic *iosapic;
@@ -335,16 +304,9 @@ acpi_parse_iosapic (acpi_table_entry_header *header)
 
 	acpi_table_print_madt_entry(header);
 
-	if (iosapic_init) {
-#ifndef CONFIG_ITANIUM
-		/* PCAT_COMPAT flag indicates dual-8259 setup */
-		iosapic_init(iosapic->address, iosapic->global_irq_base,
-			     acpi_madt->flags.pcat_compat);
-#else
-		/* Firmware on old Itanium systems is broken */
-		iosapic_init(iosapic->address, iosapic->global_irq_base, 1);
-#endif
-	}
+	if (iosapic_init)
+		iosapic_init(iosapic->address, iosapic->global_irq_base);
+
 	return 0;
 }
 
@@ -354,8 +316,6 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 {
 	struct acpi_table_plat_int_src *plintsrc;
 	int vector;
-	u32 gsi_base;
-	char *iosapic_address;
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
 	if (!plintsrc)
@@ -368,11 +328,6 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 		return -ENODEV;
 	}
 
-	if (acpi_find_iosapic(plintsrc->global_irq, &gsi_base, &iosapic_address)) {
-		printk(KERN_WARNING PREFIX "IOSAPIC not found\n");
-		return -ENODEV;
-	}
-
 	/*
 	 * Get vector assignment for this interrupt, set attributes,
 	 * and program the IOSAPIC routing table.
@@ -382,10 +337,8 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 						plintsrc->iosapic_vector,
 						plintsrc->eid,
 						plintsrc->id,
-						(plintsrc->flags.polarity == 1) ? 1 : 0,
-						(plintsrc->flags.trigger == 1) ? 1 : 0,
-						gsi_base,
-						iosapic_address);
+						(plintsrc->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+						(plintsrc->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 
 	platform_intr_list[plintsrc->type] = vector;
 	return 0;
@@ -408,8 +361,8 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 		return 0;
 
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
-				 (p->flags.polarity == 1) ? 1 : 0,
-				 (p->flags.trigger == 1) ? 1 : 0);
+				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 	return 0;
 }
 
@@ -439,7 +392,13 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
 
 	/* remember the value for reference after free_initmem() */
+#ifdef CONFIG_ITANIUM
+	has_8259 = 1; /* Firmware on old Itanium systems is broken */
+#else
 	has_8259 = acpi_madt->flags.pcat_compat;
+#endif
+	if (iosapic_system_init)
+		iosapic_system_init(has_8259);
 
 	/* Get base address of IPI Message Block */
 
@@ -571,7 +530,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 }
 
 void __init
-acpi_numa_arch_fixup(void)
+acpi_numa_arch_fixup (void)
 {
 	int i, j, node_from, node_to;
 
@@ -618,7 +577,7 @@ acpi_numa_arch_fixup(void)
 			if (!pxm_bit_test(j))
 				continue;
 			node_to = pxm_to_nid_map[j];
-			node_distance(node_from, node_to) = 
+			node_distance(node_from, node_to) =
 				slit_table->entry[i*slit_table->localities + j];
 		}
 	}
@@ -639,8 +598,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
 	struct fadt_descriptor_rev2 *fadt;
-	u32 sci_irq, gsi_base;
-	char *iosapic_address;
+	u32 sci_irq;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -662,8 +620,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (has_8259 && sci_irq < 16)
 		return 0;	/* legacy, no setup required */
 
-	if (!acpi_find_iosapic(sci_irq, &gsi_base, &iosapic_address))
-		iosapic_register_intr(sci_irq, 0, 0, gsi_base, iosapic_address);
+	iosapic_register_intr(sci_irq, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
 	return 0;
 }
 
@@ -717,8 +674,6 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	if ((spcr->base_addr.space_id != ACPI_SERIAL_PCICONF_SPACE) &&
 	    (spcr->int_type == ACPI_SERIAL_INT_SAPIC))
 	{
-		u32 gsi_base;
-		char *iosapic_address;
 		int vector;
 
 		/* We have a UART in memory space with an SAPIC interrupt */
@@ -728,11 +683,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 			 (spcr->global_int[1] << 8)  |
 			 (spcr->global_int[0])  );
 
-		/* Which iosapic does this interrupt belong to? */
-
-		if (!acpi_find_iosapic(gsi, &gsi_base, &iosapic_address))
-			vector = iosapic_register_intr(gsi, 1, 1,
-						       gsi_base, iosapic_address);
+		vector = iosapic_register_intr(gsi, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
 	}
 	return 0;
 }
@@ -741,7 +692,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 
 
 int __init
-acpi_boot_init (char *cmdline)
+acpi_boot_init (void)
 {
 
 	/*
@@ -812,20 +763,20 @@ acpi_boot_init (char *cmdline)
 	smp_boot_data.cpu_count = total_cpus;
 
 	smp_build_cpu_map();
-#ifdef CONFIG_NUMA
+# ifdef CONFIG_NUMA
 	build_cpu_to_node_map();
-#endif
+# endif
 #endif
 	/* Make boot-up look pretty */
 	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 	return 0;
 }
 
+/*
+ * PCI Interrupt Routing
+ */
 
-/* --------------------------------------------------------------------------
-                             PCI Interrupt Routing
-   -------------------------------------------------------------------------- */
-
+#ifdef CONFIG_PCI
 int __init
 acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 {
@@ -866,6 +817,7 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	*count = acpi_prt.count;
 	return 0;
 }
+#endif /* CONFIG_PCI */
 
 /* Assume IA64 always use I/O SAPIC */
 
@@ -888,12 +840,10 @@ acpi_irq_to_vector (u32 irq)
 	return gsi_to_vector(irq);
 }
 
-int __init
+int
 acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
 	int vector = 0;
-	u32 irq_base;
-	char *iosapic_address;
 
 	if (acpi_madt->flags.pcat_compat && (gsi < 16))
 		return isa_irq_to_vector(gsi);
@@ -901,12 +851,9 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 	if (!iosapic_register_intr)
 		return 0;
 
-	/* Find the IOSAPIC */
-	if (!acpi_find_iosapic(gsi, &irq_base, &iosapic_address)) {
-		/* Turn it on */
-		vector = iosapic_register_intr (gsi, polarity, trigger,
-						irq_base, iosapic_address);
-	}
+	/* Turn it on */
+	vector = iosapic_register_intr (gsi, polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+			trigger ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 	return vector;
 }
 

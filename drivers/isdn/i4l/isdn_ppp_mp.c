@@ -91,12 +91,13 @@ ippp_mp_disconnected(isdn_net_dev *idev)
 }
 
 void
-ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
+ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb)
 {
 	struct ind_ppp *ind_ppp = idev->ind_priv;
 	struct inl_ppp *inl_ppp = idev->mlp->inl_priv;
 	unsigned char *p;
-	long txseq;
+	u32 txseq;
+	u16 proto;
 
 	if (!(inl_ppp->mp_cfg & SC_MP_PROT)) {
 		return ippp_xmit(idev, skb);

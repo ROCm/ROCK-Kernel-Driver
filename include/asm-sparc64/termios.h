@@ -91,7 +91,7 @@ struct winsize {
 	reprint=^R	discard=^U	werase=^W	lnext=^V
 	vmin=\1         vtime=\0
 */
-#define INIT_C_CC "\003\034\177\025\004\000\000\000\021\023\032\031\022\025\027\026\001\000"
+#define INIT_C_CC "\003\034\177\025\004\000\000\000\021\023\032\031\022\025\027\026\001"
 
 /*
  * Translate a "termio" structure into a "termios". Ugh.

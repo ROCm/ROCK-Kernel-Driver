@@ -43,27 +43,10 @@
 * Jan 16, 1997	Gene Kozin	router_devlist made public
 * Jan 02, 1997	Gene Kozin	Initial version (based on wanpipe.h).
 *****************************************************************************/
-#include <linux/version.h>
 
-#ifndef KERNEL_VERSION
-  #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#endif
+#define netdevice_t struct net_device
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
- #define LINUX_2_4
- #define netdevice_t struct net_device
- #include <linux/spinlock.h>       /* Support for SMP Locking */
-
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
- #define LINUX_2_1
- #define netdevice_t struct device
- #include <asm/spinlock.h>       /* Support for SMP Locking */
-
-#else
- #define LINUX_2_0
- #define netdevice_t struct device
- #define spinlock_t int
-#endif
+#include <linux/spinlock.h>       /* Support for SMP Locking */
 
 #ifndef	_ROUTER_H
 #define	_ROUTER_H
@@ -512,11 +495,7 @@ typedef struct wan_device
 					/****** status and statistics *******/
 	char state;			/* device state */
 	char api_status;		/* device api status */
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct net_device_stats stats; 	/* interface statistics */
-#else
-	struct enet_statistics stats;	/* interface statistics */
-#endif
 	unsigned reserved[16];		/* reserved for future use */
 	unsigned long critical;		/* critical section flag */
 	spinlock_t lock;                /* Support for SMP Locking */
@@ -534,11 +513,7 @@ typedef struct wan_device
 	struct wan_device* next;	/* -> next device */
 	netdevice_t* dev;		/* list of network interfaces */
 	unsigned ndev;			/* number of interfaces */
-#ifdef LINUX_2_4
 	struct proc_dir_entry *dent;	/* proc filesystem entry */
-#else
-	struct proc_dir_entry dent;	/* proc filesystem entry */
-#endif
 } wan_device_t;
 
 /* Public functions available for device drivers */

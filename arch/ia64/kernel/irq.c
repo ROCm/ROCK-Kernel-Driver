@@ -154,6 +154,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	int i, j;
 	struct irqaction * action;
 	irq_desc_t *idesc;
+	unsigned long flags;
 
 	seq_puts(p, "           ");
 	for (j=0; j<NR_CPUS; j++)
@@ -163,9 +164,10 @@ int show_interrupts(struct seq_file *p, void *v)
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
 		idesc = irq_desc(i);
+		spin_lock_irqsave(&idesc->lock, flags);
 		action = idesc->action;
 		if (!action)
-			continue;
+			goto skip;
 		seq_printf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -176,10 +178,12 @@ int show_interrupts(struct seq_file *p, void *v)
 #endif
 		seq_printf(p, " %14s", idesc->handler->typename);
 		seq_printf(p, "  %s", action->name);
-
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
+		
 		seq_putc(p, '\n');
+skip:
+		spin_unlock_irqrestore(&idesc->lock, flags);
 	}
 	seq_puts(p, "NMI: ");
 	for (j = 0; j < NR_CPUS; j++)
@@ -340,12 +344,14 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 	 * 0 return value means that this irq is already being
 	 * handled by some other CPU. (or is disabled)
 	 */
-	int cpu = smp_processor_id();
+	int cpu;
 	irq_desc_t *desc = irq_desc(irq);
 	struct irqaction * action;
 	unsigned int status;
 
 	irq_enter();
+	cpu = smp_processor_id();
+
 	kstat_cpu(cpu).irqs[irq]++;
 
 	if (desc->status & IRQ_PER_CPU) {

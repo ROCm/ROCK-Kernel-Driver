@@ -60,6 +60,7 @@ struct unw_frame_info {
 	unsigned long ip;		/* instruction pointer value */
 	unsigned long pr;		/* current predicate values */
 	unsigned long *cfm_loc;		/* cfm save location (or NULL) */
+	unsigned long pt;		/* struct pt_regs location */
 
 	struct task_struct *task;
 	struct switch_stack *sw;

@@ -645,10 +645,11 @@ static struct console uart00_console = {
 	.index		= 0,
 };
 
-void __init uart00_console_init(void)
+static void __init uart00_console_init(void)
 {
 	register_console(&uart00_console);
 }
+console_initcall(uart00_console_init);
 
 #define UART00_CONSOLE	&uart00_console
 #else

@@ -98,26 +98,26 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
-	int pgd_ofs, pmd_ofs;
+	int pgd_idx, pmd_idx;
 	unsigned long vaddr;
 
 	vaddr = start;
-	pgd_ofs = __pgd_offset(vaddr);
-	pmd_ofs = __pmd_offset(vaddr);
-	pgd = pgd_base + pgd_ofs;
+	pgd_idx = pgd_index(vaddr);
+	pmd_idx = pmd_index(vaddr);
+	pgd = pgd_base + pgd_idx;
 
-	for ( ; (pgd_ofs < PTRS_PER_PGD) && (vaddr != end); pgd++, pgd_ofs++) {
+	for ( ; (pgd_idx < PTRS_PER_PGD) && (vaddr != end); pgd++, pgd_idx++) {
 		if (pgd_none(*pgd)) 
 			one_md_table_init(pgd);
 
 		pmd = pmd_offset(pgd, vaddr);
-		for (; (pmd_ofs < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_ofs++) {
+		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_idx++) {
 			if (pmd_none(*pmd)) 
 				one_page_table_init(pmd);
 
 			vaddr += PMD_SIZE;
 		}
-		pmd_ofs = 0;
+		pmd_idx = 0;
 	}
 }
 
@@ -132,17 +132,17 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
-	int pgd_ofs, pmd_ofs, pte_ofs;
+	int pgd_idx, pmd_idx, pte_ofs;
 
-	pgd_ofs = __pgd_offset(PAGE_OFFSET);
-	pgd = pgd_base + pgd_ofs;
+	pgd_idx = pgd_index(PAGE_OFFSET);
+	pgd = pgd_base + pgd_idx;
 	pfn = 0;
 
-	for (; pgd_ofs < PTRS_PER_PGD; pgd++, pgd_ofs++) {
+	for (; pgd_idx < PTRS_PER_PGD; pgd++, pgd_idx++) {
 		pmd = one_md_table_init(pgd);
 		if (pfn >= max_low_pfn)
 			continue;
-		for (pmd_ofs = 0; pmd_ofs < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_ofs++) {
+		for (pmd_idx = 0; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {
 				set_pmd(pmd, pfn_pmd(pfn, PAGE_KERNEL_LARGE));
@@ -214,7 +214,7 @@ void __init permanent_kmaps_init(pgd_t *pgd_base)
 	vaddr = PKMAP_BASE;
 	page_table_range_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
 
-	pgd = swapper_pg_dir + __pgd_offset(vaddr);
+	pgd = swapper_pg_dir + pgd_index(vaddr);
 	pmd = pmd_offset(pgd, vaddr);
 	pte = pte_offset_kernel(pmd, vaddr);
 	pkmap_page_table = pte;	

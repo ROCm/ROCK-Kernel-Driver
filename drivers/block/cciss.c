@@ -2064,7 +2064,7 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	unchar cache_line_size, latency_timer;
 	unchar irq, revision;
 	uint addr[6];
-	__u32 board_id;
+	__u32 board_id, scratchpad = 0;
 	int cfg_offset;
 	int cfg_base_addr;
 	int cfg_base_addr_index;
@@ -2155,6 +2155,20 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	printk("address 0 = %x\n", c->paddr);
 #endif /* CCISS_DEBUG */ 
 	c->vaddr = remap_pci_mem(c->paddr, 200);
+
+	/* Wait for the board to become ready.  (PCI hotplug needs this.)
+	 * We poll for up to 120 secs, once per 100ms. */
+	for (i=0; i < 1200; i++) {
+		scratchpad = readl(c->vaddr + SA5_SCRATCHPAD_OFFSET);
+		if (scratchpad == CCISS_FIRMWARE_READY)
+			break;
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ / 10); /* wait 100ms */
+	}
+	if (scratchpad != CCISS_FIRMWARE_READY) {
+		printk(KERN_WARNING "cciss: Board not ready.  Timed out.\n");
+		return -1;
+	}
 
 	/* get the address index number */
 	cfg_base_addr = readl(c->vaddr + SA5_CTCFG_OFFSET);
@@ -2437,14 +2451,12 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	if( register_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname, &cciss_fops))
-	{
-		printk(KERN_ERR "cciss:  Unable to get major number "
-			"%d for %s\n", COMPAQ_CISS_MAJOR+i, hba[i]->devname);
+	if (register_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname)) {
 		release_io_mem(hba[i]);
 		free_hba(i);
-		return(-1);
+		return -1;
 	}
+
 	/* make sure the board interrupts are off */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_OFF);
 	if( request_irq(hba[i]->intr, do_cciss_intr, 

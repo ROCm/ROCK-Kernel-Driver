@@ -679,7 +679,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	memset(dev, 0, sizeof(*dev));
 
 	device_initialize(&dev->dev);
-	dev->present = 1;
+	dev->state = USB_STATE_ATTACHED;
 
 	usb_bus_get(bus);
 
@@ -828,6 +828,11 @@ void usb_disconnect(struct usb_device **pdev)
 
 	*pdev = NULL;
 
+	/* mark the device as inactive, so any further urb submissions for
+	 * this device will fail.
+	 */
+	dev->state = USB_STATE_NOTATTACHED;
+
 	dev_info (&dev->dev, "USB disconnect, address %d\n", dev->devnum);
 
 	/* Free up all the children before we remove this device */
@@ -854,10 +859,6 @@ void usb_disconnect(struct usb_device **pdev)
 		usbfs_remove_device(dev);
 	}
 	device_unregister(&dev->dev);
-
-	/* mark the device as not present so any further urb submissions for
-	 * this device will fail. */
-	dev->present = 0;
 
 	/* Decrement the reference count, it'll auto free everything when */
 	/* it hits 0 which could very well be now */
@@ -906,9 +907,17 @@ void usb_connect(struct usb_device *dev)
 // otherwise used internally, for usb_new_device()
 int usb_set_address(struct usb_device *dev)
 {
-	return usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
-		// FIXME USB_CTRL_SET_TIMEOUT
-		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_GET_TIMEOUT);
+	int retval;
+
+	if (dev->devnum == 0)
+		return -EINVAL;
+	if (dev->state != USB_STATE_DEFAULT && dev->state != USB_STATE_ADDRESS)
+		return -EINVAL;
+	retval = usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
+		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+	if (retval == 0)
+		dev->state = USB_STATE_ADDRESS;
+	return retval;
 }
 
 
@@ -1014,7 +1023,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* dma masks come from the controller; readonly, except to hcd */
 	dev->dev.dma_mask = parent->dma_mask;
 
-	/* USB device state == default ... it's not usable yet */
+	/* it's not usable yet */
+	dev->state = USB_STATE_DEFAULT;
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
@@ -1049,6 +1059,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		if (err < 0) {
 			dev_err(&dev->dev, "USB device not accepting new address=%d (error=%d)\n",
 				dev->devnum, err);
+			dev->state = USB_STATE_DEFAULT;
 			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
 			return 1;

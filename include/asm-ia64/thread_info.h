@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002 Hewlett-Packard Co
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_THREAD_INFO_H
@@ -15,7 +15,8 @@
 #define TI_ADDR_LIMIT	0x10
 #define TI_PRE_COUNT	0x18
 
-#define PREEMPT_ACTIVE	0x4000000
+#define PREEMPT_ACTIVE_BIT 30
+#define PREEMPT_ACTIVE	(1 << PREEMPT_ACTIVE_BIT)
 
 #ifndef __ASSEMBLY__
 
@@ -50,6 +51,7 @@ struct thread_info {
 
 /* how to get the thread information struct from C */
 #define current_thread_info() ((struct thread_info *) ((char *) current + IA64_TASK_SIZE))
+#define free_thread_info(ti)	/* nothing */
 
 #endif /* !__ASSEMBLY */
 

@@ -64,7 +64,7 @@ static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 	pmd_t *pmd;
 	pte_t *pte;
 
-	pgd = swapper_pg_dir + __pgd_offset(vaddr);
+	pgd = swapper_pg_dir + pgd_index(vaddr);
 	if (pgd_none(*pgd)) {
 		BUG();
 		return;
@@ -104,7 +104,7 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 		printk ("set_pmd_pfn: pfn misaligned\n");
 		return; /* BUG(); */
 	}
-	pgd = swapper_pg_dir + __pgd_offset(vaddr);
+	pgd = swapper_pg_dir + pgd_index(vaddr);
 	if (pgd_none(*pgd)) {
 		printk ("set_pmd_pfn: pgd_none\n");
 		return; /* BUG(); */

@@ -1890,42 +1890,6 @@ uart_set_options(struct uart_port *port, struct console *co,
 
 	return 0;
 }
-
-extern void ambauart_console_init(void);
-extern void anakin_console_init(void);
-extern void clps711xuart_console_init(void);
-extern void rs285_console_init(void);
-extern void sa1100_rs_console_init(void);
-extern void serial8250_console_init(void);
-extern void uart00_console_init(void);
-
-/*
- * Central "initialise all serial consoles" container.  Needs to be killed.
- */
-void __init uart_console_init(void)
-{
-#ifdef CONFIG_SERIAL_AMBA_CONSOLE
-	ambauart_console_init();
-#endif
-#ifdef CONFIG_SERIAL_ANAKIN_CONSOLE
-	anakin_console_init();
-#endif
-#ifdef CONFIG_SERIAL_CLPS711X_CONSOLE
-	clps711xuart_console_init();
-#endif
-#ifdef CONFIG_SERIAL_21285_CONSOLE
-	rs285_console_init();
-#endif
-#ifdef CONFIG_SERIAL_SA1100_CONSOLE
-	sa1100_rs_console_init();
-#endif
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-	serial8250_console_init();
-#endif
-#ifdef CONFIG_SERIAL_UART00_CONSOLE
-	uart00_console_init();
-#endif
-}
 #endif /* CONFIG_SERIAL_CORE_CONSOLE */
 
 #ifdef CONFIG_PM

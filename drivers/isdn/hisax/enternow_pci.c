@@ -263,13 +263,65 @@ static struct card_ops enpci_ops = {
 	.irq_func    = enpci_interrupt,
 };
 
+static int __init
+enpci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+			
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.njet.base = pci_resource_start(pdev, 0);
+	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "Fn_ISDN"))
+		goto err;
+
+	cs->hw.njet.auxa = cs->hw.njet.base + NETJET_AUXDATA;
+	cs->hw.njet.isac = cs->hw.njet.base + 0xC0; // Fenster zum AMD
+
+	/* Reset an */
+	cs->hw.njet.ctrl_reg = 0x07;  // geändert von 0xff
+	OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
+	
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	/* 50 ms Pause */
+	schedule_timeout((50*HZ)/1000);
+	
+	cs->hw.njet.ctrl_reg = 0x30;  /* Reset Off and status read clear */
+	OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
+	
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);	/* Timeout 10ms */
+	
+	cs->hw.njet.auxd = 0x00; // war 0xc0
+	cs->hw.njet.dmactrl = 0;
+	
+	OutByte(cs->hw.njet.base + NETJET_AUXCTRL, ~TJ_AMD_IRQ);
+	OutByte(cs->hw.njet.base + NETJET_IRQMASK1, TJ_AMD_IRQ);
+	OutByte(cs->hw.njet.auxa, cs->hw.njet.auxd);
+	
+	printk(KERN_INFO
+	       "enter:now PCI: PCI card configured at 0x%lx IRQ %d\n",
+	       cs->hw.njet.base, cs->irq);
+	reset_enpci(cs);
+	cs->hw.njet.last_is0 = 0;
+	cs->hw.njet.bc_activate = enpci_bc_activate;
+	cs->hw.njet.bc_deactivate = enpci_bc_deactivate;
+	amd7930_setup(cs, &amd7930_ops, &enpci_setIrqMask);
+
+	cs->card_ops = &enpci_ops;
+
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 static struct pci_dev *dev_netjet __initdata = NULL;
 
 /* called by config.c */
 int __init
 setup_enternow_pci(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 #ifdef __BIG_ENDIAN
@@ -278,72 +330,22 @@ setup_enternow_pci(struct IsdnCard *card)
         strcpy(tmp, enternow_pci_rev);
 	printk(KERN_INFO "HiSax: Formula-n Europe AG enter:now ISDN PCI driver Rev. %s\n", HiSax_getrev(tmp));
 
-	for ( ;; ) {
-		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
-			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
-			if (pci_enable_device(dev_netjet))
-				return(0);
-			cs->irq = dev_netjet->irq;
-			if (!cs->irq) {
-				printk(KERN_WARNING "enter:now PCI: No IRQ for PCI card found\n");
-				return(0);
-			}
-			cs->hw.njet.base = pci_resource_start(dev_netjet, 0);
-			if (!cs->hw.njet.base) {
-				printk(KERN_WARNING "enter:now PCI: No IO-Adr for PCI card found\n");
-				return(0);
-			}
-                        /* checks Sub-Vendor ID because system crashes with Traverse-Card */
-			if ((dev_netjet->subsystem_vendor != 0x55) ||
-				(dev_netjet->subsystem_device != 0x02)) {
-				printk(KERN_WARNING "enter:now: You tried to load this driver with an incompatible TigerJet-card\n");
-                                printk(KERN_WARNING "Use type=20 for Traverse NetJet PCI Card.\n");
-                                return(0);
-                        }
-		} else {
-                        printk(KERN_WARNING "enter:now PCI: No PCI card found\n");
-			return(0);
+	dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
+				     PCI_DEVICE_ID_TIGERJET_300, dev_netjet);
+	if (dev_netjet) {
+		if (dev_netjet->subsystem_vendor != 0x55 ||
+		    dev_netjet->subsystem_device != 0x02) {
+			printk(KERN_WARNING "enter:now: You tried to load "
+			       "this driver with an incompatible "
+			       "TigerJet-card\n");
+			printk(KERN_WARNING "Use type=20 for Traverse "
+			       "NetJet PCI Card.\n");
+			return 0;
 		}
-
-		cs->hw.njet.auxa = cs->hw.njet.base + NETJET_AUXDATA;
-		cs->hw.njet.isac = cs->hw.njet.base + 0xC0; // Fenster zum AMD
-
-		/* Reset an */
-		cs->hw.njet.ctrl_reg = 0x07;  // geändert von 0xff
-		OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
-
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		/* 50 ms Pause */
-		schedule_timeout((50*HZ)/1000);
-
-		cs->hw.njet.ctrl_reg = 0x30;  /* Reset Off and status read clear */
-		OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
-
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);	/* Timeout 10ms */
-
-		cs->hw.njet.auxd = 0x00; // war 0xc0
-		cs->hw.njet.dmactrl = 0;
-
-		OutByte(cs->hw.njet.base + NETJET_AUXCTRL, ~TJ_AMD_IRQ);
-		OutByte(cs->hw.njet.base + NETJET_IRQMASK1, TJ_AMD_IRQ);
-		OutByte(cs->hw.njet.auxa, cs->hw.njet.auxd);
-
-			   break;
-	}
-	printk(KERN_INFO
-		"enter:now PCI: PCI card configured at 0x%lx IRQ %d\n",
-		cs->hw.njet.base, cs->irq);
-	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "Fn_ISDN"))
+		if (enpci_probe(card->cs, dev_netjet))
+			return 1;
 		return 0;
-	reset_enpci(cs);
-	cs->hw.njet.last_is0 = 0;
-	cs->hw.njet.bc_activate = enpci_bc_activate;
-	cs->hw.njet.bc_deactivate = enpci_bc_deactivate;
-	amd7930_setup(cs, &amd7930_ops, &enpci_setIrqMask);
-
-	cs->irq_flags |= SA_SHIRQ;
-	cs->card_ops = &enpci_ops;
-
-        return 1;
+	}
+	printk(KERN_WARNING "enter:now PCI: No PCI card found\n");
+	return 0;
 }

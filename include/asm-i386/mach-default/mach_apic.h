@@ -4,7 +4,7 @@
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
 #ifdef CONFIG_SMP
- #define TARGET_CPUS (cpu_online_map)
+ #define TARGET_CPUS (cpu_callout_map)
 #else
  #define TARGET_CPUS 0x01
 #endif
