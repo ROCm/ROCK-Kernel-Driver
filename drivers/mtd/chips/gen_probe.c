@@ -65,8 +65,9 @@ struct cfi_private *genprobe_ident_chips(struct map_info *map, struct chip_probe
 	   interleave and device type, etc. */
 	if (!genprobe_new_chip(map, cp, &cfi)) {
 		/* The probe didn't like it */
-		printk(KERN_WARNING "%s: Found no %s device at location zero\n",
-		       cp->name, map->name);
+		DEBUG(MTD_DEBUG_LEVEL3,
+		      "MTD %s(): %s: Found no %s device at location zero\n",
+		      __func__, cp->name, map->name);
 		return NULL;
 	}		
 

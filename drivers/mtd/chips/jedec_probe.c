@@ -1627,8 +1627,10 @@ static int jedec_probe_chip(struct map_info *map, __u32 base,
 		
 		cfi->mfr = jedec_read_mfr(map, base, cfi);
 		cfi->id = jedec_read_id(map, base, cfi);
-		printk(KERN_INFO "Search for id:(%02x %02x) interleave(%d) type(%d)\n", 
-			cfi->mfr, cfi->id, cfi->interleave, cfi->device_type);
+		DEBUG(MTD_DEBUG_LEVEL3,
+		      "MTD %s(): Search for id:(%02x %02x) interleave(%d) type(%d)\n", 
+		      __func__, cfi->mfr, cfi->id, cfi->interleave,
+		      cfi->device_type);
 		for (i=0; i<sizeof(jedec_table)/sizeof(jedec_table[0]); i++) {
 			if ( jedec_match( base, map, cfi, &jedec_table[i] ) ) {
 				DEBUG( MTD_DEBUG_LEVEL3,
