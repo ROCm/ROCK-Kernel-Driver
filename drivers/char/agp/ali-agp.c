@@ -233,42 +233,34 @@ struct agp_device_ids ali_agp_device_ids[] __initdata =
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1621,
-		.chipset	= ALI_M1621,
 		.chipset_name	= "M1621",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1631,
-		.chipset	= ALI_M1631,
 		.chipset_name	= "M1631",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1632,
-		.chipset	= ALI_M1632,
 		.chipset_name	= "M1632",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1641,
-		.chipset	= ALI_M1641,
 		.chipset_name	= "M1641",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1644,
-		.chipset	= ALI_M1644,
 		.chipset_name	= "M1644",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1647,
-		.chipset	= ALI_M1647,
 		.chipset_name	= "M1647",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1651,
-		.chipset	= ALI_M1651,
 		.chipset_name	= "M1651",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1671,
-		.chipset	= ALI_M1671,
 		.chipset_name	= "M1671",
 	},
 	{ }, /* dummy final entry, always present */
@@ -311,9 +303,11 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 				}
 			}
 
-			printk (KERN_INFO PFX "Detected ALi %s chipset\n",
-				devs[j].chipset_name);
-			agp_bridge->type = devs[j].chipset;
+			printk (KERN_INFO PFX "Detected ALi %s chipset\n", devs[j].chipset_name);
+			if (devs[j].chipset != 0)
+				agp_bridge->type = devs[j].chipset;
+			else
+				agp_bridge->type = ALI_GENERIC;
 
 			if (devs[j].chipset_setup != NULL)
 				return devs[j].chipset_setup(pdev);
