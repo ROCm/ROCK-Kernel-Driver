@@ -106,6 +106,7 @@ struct cpufreq_freqs {
 	unsigned int cpu;	/* cpu nr */
 	unsigned int old;
 	unsigned int new;
+	u8 flags;		/* flags of cpufreq_driver, see below. */
 };
 
 

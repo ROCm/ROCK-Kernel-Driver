@@ -51,6 +51,7 @@ enum {
 
 static int has_N44_O17_errata[NR_CPUS];
 static unsigned int stock_freq;
+static struct cpufreq_driver p4clockmod_driver;
 
 static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 {
@@ -192,6 +193,10 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 		printk(KERN_WARNING PFX "Unknown p4-clockmod-capable CPU. Please send an e-mail to <linux@brodo.de>\n");
 		return 0;
 	}
+
+	/* on P-4s, the TSC runs with constant frequency independent wether
+	 * throttling is active or not. */
+	p4clockmod_driver.flags |= CPUFREQ_CONST_LOOPS;
 
 	if (speedstep_detect_processor() == SPEEDSTEP_PROCESSOR_P4M) {
 		printk(KERN_WARNING PFX "Warning: Pentium 4-M detected. "

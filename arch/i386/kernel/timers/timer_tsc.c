@@ -353,14 +353,11 @@ static inline void cpufreq_delayed_get(void)
 }
 
 /* If the CPU frequency is scaled, TSC-based delays will need a different
- * loops_per_jiffy value to function properly. An exception to this
- * are modern Intel Pentium 4 processors, where the TSC runs at a constant
- * speed independent of frequency scaling. 
+ * loops_per_jiffy value to function properly.
  */
 
 static unsigned int  ref_freq = 0;
 static unsigned long loops_per_jiffy_ref = 0;
-static unsigned int  variable_tsc = 1;
 
 #ifndef CONFIG_SMP
 static unsigned long fast_gettimeoffset_ref = 0;
@@ -386,13 +383,13 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
 	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
 	    (val == CPUFREQ_RESUMECHANGE)) {
-		if (variable_tsc)
+		if (!freq->flags & CPUFREQ_CONST_LOOPS)
 			cpu_data[freq->cpu].loops_per_jiffy = cpufreq_scale(loops_per_jiffy_ref, ref_freq, freq->new);
 #ifndef CONFIG_SMP
 		if (cpu_khz)
 			cpu_khz = cpufreq_scale(cpu_khz_ref, ref_freq, freq->new);
 		if (use_tsc) {
-			if (variable_tsc) {
+			if (!freq->flags & CPUFREQ_CONST_LOOPS) {
 				fast_gettimeoffset_quotient = cpufreq_scale(fast_gettimeoffset_ref, freq->new, ref_freq);
 				set_cyc2ns_scale(cpu_khz/1000);
 			}
@@ -411,13 +408,12 @@ static struct notifier_block time_cpufreq_notifier_block = {
 
 static int __init cpufreq_tsc(void)
 {
+	int ret;
 	INIT_WORK(&cpufreq_delayed_get_work, handle_cpufreq_delayed_get, NULL);
-	cpufreq_init = 1;
-	/* P4 and above CPU TSC freq doesn't change when CPU frequency changes*/
-	if ((boot_cpu_data.x86 >= 15) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL))
-		variable_tsc = 0;
-
-	return cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+	ret = cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+	if (!ret)
+		cpufreq_init = 1;
+	return ret;
 }
 core_initcall(cpufreq_tsc);
 

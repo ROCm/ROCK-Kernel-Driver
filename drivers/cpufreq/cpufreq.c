@@ -1018,7 +1018,7 @@ static unsigned int  l_p_j_ref_freq;
 
 static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 {
-	if (cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)
+	if (ci->flags & CPUFREQ_CONST_LOOPS)
 		return;
 
 	if (!l_p_j_ref_freq) {
@@ -1044,6 +1044,8 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci) {
 void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 {
 	BUG_ON(irqs_disabled());
+
+	freqs->flags = cpufreq_driver->flags;
 
 	down_read(&cpufreq_notifier_rwsem);
 	switch (state) {
