@@ -124,7 +124,7 @@ int esp_output(struct sk_buff **pskb)
 		uh = (struct udphdr *)esph;
 		uh->source = encap->encap_sport;
 		uh->dest = encap->encap_dport;
-		uh->len = htons((*pskb)->len + alen - sizeof(struct iphdr));
+		uh->len = htons((*pskb)->len + alen - iph->ihl*4);
 		uh->check = 0;
 
 		switch (encap->encap_type) {
