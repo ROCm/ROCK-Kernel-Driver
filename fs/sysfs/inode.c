@@ -154,27 +154,27 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
  * These operations allow subsystems to have files that can be 
  * read/written. 
  */
-ssize_t subsys_attr_show(struct kobject * kobj, struct attribute * attr, 
-			 char * page, size_t count, loff_t off)
+static ssize_t 
+subsys_attr_show(struct kobject * kobj, struct attribute * attr, char * page)
 {
 	struct subsystem * s = to_subsys(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = 0;
 
 	if (sattr->show)
-		ret = sattr->show(s,page,count,off);
+		ret = sattr->show(s,page,PAGE_SIZE,0);
 	return ret;
 }
 
-ssize_t subsys_attr_store(struct kobject * kobj, struct attribute * attr,
-			  const char * page, size_t count, loff_t off)
+static ssize_t 
+subsys_attr_store(struct kobject * kobj, struct attribute * attr, const char * page)
 {
 	struct subsystem * s = to_subsys(kobj);
 	struct subsys_attribute * sattr = to_sattr(attr);
 	ssize_t ret = 0;
 
 	if (sattr->store)
-		ret = sattr->store(s,page,count,off);
+		ret = sattr->store(s,page,PAGE_SIZE,0);
 	return ret;
 }
 
@@ -215,7 +215,7 @@ static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
 	if (!buffer->page)
 		return -ENOMEM;
 
-	count = ops->show(kobj,attr,buffer->page,PAGE_SIZE,0);
+	count = ops->show(kobj,attr,buffer->page);
 	if (count >= 0)
 		buffer->count = count;
 	else
@@ -328,7 +328,7 @@ static int flush_write_buffer(struct file * file, struct sysfs_buffer * buffer)
 	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	struct sysfs_ops * ops = buffer->ops;
 
-	return ops->store(kobj,attr,buffer->page,PAGE_SIZE,0);
+	return ops->store(kobj,attr,buffer->page);
 }
 
 
