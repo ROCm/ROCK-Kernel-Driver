@@ -24,7 +24,8 @@
 /* debug| print the main components of an URB     
  * small: 0) header + data packets 1) just header
  */
-static void urb_print (struct urb * urb, char * str, int small)
+static void __attribute__((unused))
+urb_print (struct urb * urb, char * str, int small)
 {
 	unsigned int pipe= urb->pipe;
 	
@@ -204,10 +205,6 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 
 	// dumps some of the state we know about
 	ohci_dump_status (controller);
-#ifdef OHCI_VERBOSE_DEBUG
-	if (verbose)
-		ohci_dump_periodic (controller, "hcca");
-#endif
 	if (controller->hcca)
 		dbg ("hcca frame #%04x", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
@@ -510,16 +507,16 @@ static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
 
 static inline void create_debug_files (struct ohci_hcd *bus)
 {
-	device_create_file (bus->hcd.parent, &dev_attr_async);
-	device_create_file (bus->hcd.parent, &dev_attr_periodic);
+	device_create_file (bus->hcd.controller, &dev_attr_async);
+	device_create_file (bus->hcd.controller, &dev_attr_periodic);
 	// registers
 	dbg ("%s: created debug files", bus->hcd.self.bus_name);
 }
 
 static inline void remove_debug_files (struct ohci_hcd *bus)
 {
-	device_remove_file (bus->hcd.parent, &dev_attr_async);
-	device_remove_file (bus->hcd.parent, &dev_attr_periodic);
+	device_remove_file (bus->hcd.controller, &dev_attr_async);
+	device_remove_file (bus->hcd.controller, &dev_attr_periodic);
 }
 
 #else /* empty stubs for creating those files */

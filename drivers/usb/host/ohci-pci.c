@@ -80,8 +80,6 @@ ohci_pci_start (struct usb_hcd *hcd)
 	}
 	ohci->regs = hcd->regs;
 
-	ohci->parent_dev = &ohci->hcd.pdev->dev;
-
 	if (hc_reset (ohci) < 0) {
 		ohci_stop (hcd);
 		return -ENODEV;
