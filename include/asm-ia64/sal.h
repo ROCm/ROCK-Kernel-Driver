@@ -35,6 +35,7 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/bcd.h>
 #include <linux/spinlock.h>
 #include <linux/efi.h>
 
@@ -228,6 +229,10 @@ typedef struct ia64_sal_desc_ap_wakeup {
 
 extern ia64_sal_handler ia64_sal;
 extern struct ia64_sal_desc_ptc *ia64_ptc_domain_info;
+
+extern unsigned short sal_revision;	/* supported SAL spec revision */
+extern unsigned short sal_version;	/* SAL version; OEM dependent */
+#define SAL_VERSION_CODE(major, minor) ((BIN2BCD(major) << 8) | BIN2BCD(minor))
 
 extern const char *ia64_sal_strerror (long status);
 extern void ia64_sal_init (struct ia64_sal_systab *sal_systab);
