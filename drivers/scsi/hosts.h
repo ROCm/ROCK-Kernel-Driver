@@ -554,7 +554,6 @@ struct Scsi_Device_Template
     const char * tag;
     struct module * module;	  /* Used for loadable modules */
     unsigned char scsi_type;
-    int (*detect)(Scsi_Device *); /* Returns 1 if we can attach this device */
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 

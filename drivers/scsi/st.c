@@ -170,7 +170,6 @@ static int sgl_map_user_pages(struct scatterlist *, const unsigned int,
 static int sgl_unmap_user_pages(struct scatterlist *, const unsigned int, int);
 
 static int st_attach(Scsi_Device *);
-static int st_detect(Scsi_Device *);
 static void st_detach(Scsi_Device *);
 
 static struct Scsi_Device_Template st_template = {
@@ -178,7 +177,6 @@ static struct Scsi_Device_Template st_template = {
 	.name =		"tape", 
 	.tag =		"st", 
 	.scsi_type =	TYPE_TAPE,
-	.detect =	st_detect, 
 	.attach =	st_attach, 
 	.detach =	st_detach
 };
@@ -3884,13 +3882,6 @@ static int st_attach(Scsi_Device * SDp)
 
 	return 0;
 };
-
-static int st_detect(Scsi_Device * SDp)
-{
-	if (SDp->type != TYPE_TAPE || st_incompatible(SDp))
-		return 0;
-	return 1;
-}
 
 static void st_detach(Scsi_Device * SDp)
 {
