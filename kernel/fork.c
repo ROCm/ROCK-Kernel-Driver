@@ -608,22 +608,20 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 }
 
 /*
- *  Ok, this is the main fork-routine. It copies the system process
- * information (task[nr]) and sets up the necessary registers. It also
- * copies the data segment in its entirety.  The "stack_start" and
- * "stack_top" arguments are simply passed along to the platform
- * specific copy_thread() routine.  Most platforms ignore stack_top.
- * For an example that's using stack_top, see
- * arch/ia64/kernel/process.c.
+ * This creates a new process as a copy of the old one,
+ * but does not actually start it yet.
+ *
+ * It copies the registers, and all the appropriate
+ * parts of the process environment (as per the clone
+ * flags). The actual kick-off is left to the caller.
  */
-struct task_struct *do_fork(unsigned long clone_flags,
+static struct task_struct *copy_process(unsigned long clone_flags,
 			    unsigned long stack_start,
 			    struct pt_regs *regs,
 			    unsigned long stack_size)
 {
 	int retval;
 	struct task_struct *p = NULL;
-	struct completion vfork;
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
@@ -680,10 +678,6 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	INIT_LIST_HEAD(&p->sibling);
 	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
-	if (clone_flags & CLONE_VFORK) {
-		p->vfork_done = &vfork;
-		init_completion(&vfork);
-	}
 	spin_lock_init(&p->alloc_lock);
 	spin_lock_init(&p->switch_lock);
 
@@ -803,20 +797,6 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	hash_pid(p);
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);
-
-	if (p->ptrace & PT_PTRACED)
-		send_sig(SIGSTOP, p, 1);
-
-	wake_up_forked_process(p);		/* do this last */
-	++total_forks;
-	if (clone_flags & CLONE_VFORK)
-		wait_for_completion(&vfork);
-	else
-		/*
-		 * Let the child process run first, to avoid most of the
-		 * COW overhead when the child exec()s afterwards.
-		 */
-		set_need_resched();
 	retval = 0;
 
 fork_out:
@@ -848,6 +828,45 @@ bad_fork_cleanup_count:
 bad_fork_free:
 	put_task_struct(p);
 	goto fork_out;
+}
+
+/*
+ *  Ok, this is the main fork-routine.
+ *
+ * It copies the process, and if successful kick-starts
+ * it and waits for it to finish using the VM if required.
+ */
+struct task_struct *do_fork(unsigned long clone_flags,
+			    unsigned long stack_start,
+			    struct pt_regs *regs,
+			    unsigned long stack_size)
+{
+	struct task_struct *p;
+
+	p = copy_process(clone_flags, stack_start, regs, stack_size);
+	if (!IS_ERR(p)) {
+		struct completion vfork;
+
+		if (clone_flags & CLONE_VFORK) {
+			p->vfork_done = &vfork;
+			init_completion(&vfork);
+		}
+
+		if (p->ptrace & PT_PTRACED)
+			send_sig(SIGSTOP, p, 1);
+
+		wake_up_forked_process(p);		/* do this last */
+		++total_forks;
+		if (clone_flags & CLONE_VFORK)
+			wait_for_completion(&vfork);
+		else
+			/*
+			 * Let the child process run first, to avoid most of the
+			 * COW overhead when the child exec()s afterwards.
+			 */
+			set_need_resched();
+	}
+	return p;
 }
 
 /* SLAB cache for signal_struct structures (tsk->sig) */
