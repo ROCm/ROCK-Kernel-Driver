@@ -705,7 +705,7 @@ static int dn_dev_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	ifa->ifa_scope = ifm->ifa_scope;
 	ifa->ifa_dev = dn_db;
 	if (rta[IFA_LABEL-1])
-		memcpy(ifa->ifa_label, RTA_DATA(rta[IFA_LABEL-1]), IFNAMSIZ);
+		rtattr_strlcpy(ifa->ifa_label, rta[IFA_LABEL-1], IFNAMSIZ);
 	else
 		memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 

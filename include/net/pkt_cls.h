@@ -152,14 +152,8 @@ extern int tcf_exts_dump_stats(struct sk_buff *skb, struct tcf_exts *exts,
 static inline int
 tcf_change_indev(struct tcf_proto *tp, char *indev, struct rtattr *indev_tlv)
 {
-	if (RTA_PAYLOAD(indev_tlv) >= IFNAMSIZ) {
-		printk("cls: bad indev name %s\n", (char *) RTA_DATA(indev_tlv));
+	if (rtattr_strlcpy(indev, indev_tlv, IFNAMSIZ) >= IFNAMSIZ)
 		return -EINVAL;
-	}
-
-	memset(indev, 0, IFNAMSIZ);
-	sprintf(indev, "%s", (char *) RTA_DATA(indev_tlv));
-
 	return 0;
 }
 

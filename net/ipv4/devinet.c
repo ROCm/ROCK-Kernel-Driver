@@ -456,7 +456,7 @@ static int inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg
 	in_dev_hold(in_dev);
 	ifa->ifa_dev   = in_dev;
 	if (rta[IFA_LABEL - 1])
-		memcpy(ifa->ifa_label, RTA_DATA(rta[IFA_LABEL - 1]), IFNAMSIZ);
+		rtattr_strlcpy(ifa->ifa_label, rta[IFA_LABEL - 1], IFNAMSIZ);
 	else
 		memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 

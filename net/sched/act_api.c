@@ -272,7 +272,7 @@ struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *est,
 {
 	struct tc_action *a;
 	struct tc_action_ops *a_o;
-	char act_name[4 + IFNAMSIZ + 1];
+	char act_name[IFNAMSIZ];
 	struct rtattr *tb[TCA_ACT_MAX+1];
 	struct rtattr *kind;
 
@@ -284,12 +284,9 @@ struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *est,
 			goto err_out;
 		kind = tb[TCA_ACT_KIND-1];
 		if (kind != NULL) {
-			sprintf(act_name, "%s", (char*)RTA_DATA(kind));
-			if (RTA_PAYLOAD(kind) >= IFNAMSIZ) {
-				printk("Action %s bad\n",
-				        (char*)RTA_DATA(kind));
+			if (rtattr_strlcpy(act_name, kind,
+			                   IFNAMSIZ) >= IFNAMSIZ)
 				goto err_out;
-			}
 		} else {
 			printk("Action bad kind\n");
 			goto err_out;
@@ -492,7 +489,7 @@ static int tcf_action_get_1(struct rtattr *rta, struct tc_action *a,
                             struct nlmsghdr *n, u32 pid)
 {
 	struct tc_action_ops *a_o;
-	char act_name[4 + IFNAMSIZ + 1];
+	char act_name[IFNAMSIZ];
 	struct rtattr *tb[TCA_ACT_MAX+1];
 	struct rtattr *kind;
 	int index;
@@ -502,12 +499,8 @@ static int tcf_action_get_1(struct rtattr *rta, struct tc_action *a,
 		goto err_out;
 	kind = tb[TCA_ACT_KIND-1];
 	if (kind != NULL) {
-		sprintf(act_name, "%s", (char*)RTA_DATA(kind));
-		if (RTA_PAYLOAD(kind) >= IFNAMSIZ) {
-			printk("tcf_action_get_1: action %s bad\n",
-			       (char*)RTA_DATA(kind));
+		if (rtattr_strlcpy(act_name, kind, IFNAMSIZ) >= IFNAMSIZ)
 			goto err_out;
-		}
 	} else {
 		printk("tcf_action_get_1: action bad kind\n");
 		goto err_out;
@@ -562,16 +555,12 @@ static void cleanup_a(struct tc_action *act)
 
 static struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 {
-	char act_name[4 + IFNAMSIZ + 1];
+	char act_name[IFNAMSIZ];
 	struct tc_action_ops *a_o;
 
 	if (kind != NULL) {
-		sprintf(act_name, "%s", (char*)RTA_DATA(kind));
-		if (RTA_PAYLOAD(kind) >= IFNAMSIZ) {
-			printk("get_ao: action %s bad\n",
-			       (char*)RTA_DATA(kind));
+		if (rtattr_strlcpy(act_name, kind, IFNAMSIZ) >= IFNAMSIZ)
 			return NULL;
-		}
 	} else {
 		printk("get_ao: action bad kind\n");
 		return NULL;

@@ -748,6 +748,7 @@ struct tcamsg
 
 #include <linux/config.h>
 
+extern size_t rtattr_strlcpy(char *dest, const struct rtattr *rta, size_t size);
 static __inline__ int rtattr_strcmp(const struct rtattr *rta, const char *str)
 {
 	int len = strlen(str) + 1;

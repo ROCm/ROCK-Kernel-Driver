@@ -215,9 +215,10 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 #ifdef CONFIG_KMOD
 		if (tp_ops==NULL && tca[TCA_KIND-1] != NULL) {
 			struct rtattr *kind = tca[TCA_KIND-1];
+			char name[IFNAMSIZ];
 
-			if (RTA_PAYLOAD(kind) <= IFNAMSIZ) {
-				request_module("cls_%s", (char*)RTA_DATA(kind));
+			if (rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+				request_module("cls_%s", name);
 				tp_ops = tcf_proto_lookup_ops(kind);
 			}
 		}

@@ -209,8 +209,7 @@ int inet_rtm_newrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 	new_r->r_table = table_id;
 	if (rta[RTA_IIF-1]) {
 		struct net_device *dev;
-		memcpy(new_r->r_ifname, RTA_DATA(rta[RTA_IIF-1]), IFNAMSIZ);
-		new_r->r_ifname[IFNAMSIZ-1] = 0;
+		rtattr_strlcpy(new_r->r_ifname, rta[RTA_IIF-1], IFNAMSIZ);
 		new_r->r_ifindex = -1;
 		dev = __dev_get_by_name(new_r->r_ifname);
 		if (dev)
