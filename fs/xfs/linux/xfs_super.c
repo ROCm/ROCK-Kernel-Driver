@@ -542,10 +542,6 @@ linvfs_put_super(
 	}
 
 	vfs_deallocate(vfsp);
-
-	/* Reset device block size */
-	sector_size = bdev_hardsect_size(sb->s_bdev);
-	set_blocksize(sb->s_bdev, sector_size);
 }
 
 void
