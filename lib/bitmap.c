@@ -439,7 +439,7 @@ int bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
 
 	/* run up the bitmap pages bits at a time */
 	for (i = 0; i < bits; i += pages) {
-		int index = BITS_TO_LONGS(i);
+		int index = i/BITS_PER_LONG;
 		int offset = i - (index * BITS_PER_LONG);
 		if((bitmap[index] & (mask << offset)) == 0) {
 			/* set region in bimap */
@@ -464,7 +464,7 @@ void bitmap_release_region(unsigned long *bitmap, int pos, int order)
 {
 	int pages = 1 << order;
 	unsigned long mask = (1ul << (pages - 1));
-	int index = BITS_TO_LONGS(pos);
+	int index = pos/BITS_PER_LONG;
 	int offset = pos - (index * BITS_PER_LONG);
 	mask += mask - 1;
 	bitmap[index] &= ~(mask << offset);
@@ -475,8 +475,14 @@ int bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
 {
 	int pages = 1 << order;
 	unsigned long mask = (1ul << (pages - 1));
-	int index = BITS_TO_LONGS(pos);
+	int index = pos/BITS_PER_LONG;
 	int offset = pos - (index * BITS_PER_LONG);
+
+	/* We don't do regions of pages > BITS_PER_LONG.  The
+	 * algorithm would be a simple look for multiple zeros in the
+	 * array, but there's no driver today that needs this.  If you
+	 * trip this BUG(), you get to code it... */
+	BUG_ON(pages > BITS_PER_LONG);
 	mask += mask - 1;
 	if (bitmap[index] & (mask << offset))
 		return -EBUSY;
