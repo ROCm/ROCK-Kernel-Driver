@@ -805,33 +805,41 @@ deadline_var_store(unsigned int *var, const char *page, size_t count)
 	return count;
 }
 
-#define SHOW_FUNCTION(__FUNC, __VAR)					\
+#define SHOW_FUNCTION(__FUNC, __VAR, __CONV)				\
 static ssize_t __FUNC(struct deadline_data *dd, char *page)		\
 {									\
-	return deadline_var_show(__VAR, (page));			\
+	unsigned int __data = __VAR;					\
+	if (__CONV)							\
+		__data = jiffies_to_msecs(__data);			\
+	return deadline_var_show(__data, (page));			\
 }
-SHOW_FUNCTION(deadline_readexpire_show, dd->fifo_expire[READ]);
-SHOW_FUNCTION(deadline_writeexpire_show, dd->fifo_expire[WRITE]);
-SHOW_FUNCTION(deadline_writesstarved_show, dd->writes_starved);
-SHOW_FUNCTION(deadline_frontmerges_show, dd->front_merges);
-SHOW_FUNCTION(deadline_fifobatch_show, dd->fifo_batch);
+SHOW_FUNCTION(deadline_readexpire_show, dd->fifo_expire[READ], 1);
+SHOW_FUNCTION(deadline_writeexpire_show, dd->fifo_expire[WRITE], 1);
+SHOW_FUNCTION(deadline_writesstarved_show, dd->writes_starved, 0);
+SHOW_FUNCTION(deadline_frontmerges_show, dd->front_merges, 0);
+SHOW_FUNCTION(deadline_fifobatch_show, dd->fifo_batch, 0);
 #undef SHOW_FUNCTION
 
-#define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX)				\
+#define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX, __CONV)			\
 static ssize_t __FUNC(struct deadline_data *dd, const char *page, size_t count)	\
 {									\
-	int ret = deadline_var_store(__PTR, (page), count);		\
-	if (*(__PTR) < (MIN))						\
-		*(__PTR) = (MIN);					\
-	else if (*(__PTR) > (MAX))					\
-		*(__PTR) = (MAX);					\
+	unsigned int __data;						\
+	int ret = deadline_var_store(&__data, (page), count);		\
+	if (__data < (MIN))						\
+		__data = (MIN);						\
+	else if (__data > (MAX))					\
+		__data = (MAX);						\
+	if (__CONV)							\
+		*(__PTR) = msecs_to_jiffies(__data);			\
+	else								\
+		*(__PTR) = __data;					\
 	return ret;							\
 }
-STORE_FUNCTION(deadline_readexpire_store, &dd->fifo_expire[READ], 0, INT_MAX);
-STORE_FUNCTION(deadline_writeexpire_store, &dd->fifo_expire[WRITE], 0, INT_MAX);
-STORE_FUNCTION(deadline_writesstarved_store, &dd->writes_starved, INT_MIN, INT_MAX);
-STORE_FUNCTION(deadline_frontmerges_store, &dd->front_merges, 0, 1);
-STORE_FUNCTION(deadline_fifobatch_store, &dd->fifo_batch, 0, INT_MAX);
+STORE_FUNCTION(deadline_readexpire_store, &dd->fifo_expire[READ], 0, INT_MAX, 1);
+STORE_FUNCTION(deadline_writeexpire_store, &dd->fifo_expire[WRITE], 0, INT_MAX, 1);
+STORE_FUNCTION(deadline_writesstarved_store, &dd->writes_starved, INT_MIN, INT_MAX, 0);
+STORE_FUNCTION(deadline_frontmerges_store, &dd->front_merges, 0, 1, 0);
+STORE_FUNCTION(deadline_fifobatch_store, &dd->fifo_batch, 0, INT_MAX, 0);
 #undef STORE_FUNCTION
 
 static struct deadline_fs_entry deadline_readexpire_entry = {

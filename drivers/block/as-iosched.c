@@ -1962,10 +1962,10 @@ static ssize_t as_est_show(struct as_data *ad, char *page)
 	return pos;
 }
 
-#define SHOW_FUNCTION(__FUNC, __VAR)					\
+#define SHOW_FUNCTION(__FUNC, __VAR)				\
 static ssize_t __FUNC(struct as_data *ad, char *page)		\
-{									\
-	return as_var_show(__VAR, (page));			\
+{								\
+	return as_var_show(jiffies_to_msecs((__VAR)), (page));	\
 }
 SHOW_FUNCTION(as_readexpire_show, ad->fifo_expire[REQ_SYNC]);
 SHOW_FUNCTION(as_writeexpire_show, ad->fifo_expire[REQ_ASYNC]);
@@ -1982,6 +1982,7 @@ static ssize_t __FUNC(struct as_data *ad, const char *page, size_t count)	\
 		*(__PTR) = (MIN);					\
 	else if (*(__PTR) > (MAX))					\
 		*(__PTR) = (MAX);					\
+	*(__PTR) = msecs_to_jiffies(*(__PTR));				\
 	return ret;							\
 }
 STORE_FUNCTION(as_readexpire_store, &ad->fifo_expire[REQ_SYNC], 0, INT_MAX);

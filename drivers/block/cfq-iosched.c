@@ -1732,39 +1732,47 @@ cfq_status_show(struct cfq_data *cfqd, char *page)
 	return len;
 }
 
-#define SHOW_FUNCTION(__FUNC, __VAR)					\
+#define SHOW_FUNCTION(__FUNC, __VAR, __CONV)				\
 static ssize_t __FUNC(struct cfq_data *cfqd, char *page)		\
 {									\
-	return cfq_var_show(__VAR, (page));				\
+	unsigned int __data = __VAR;					\
+	if (__CONV)							\
+		__data = jiffies_to_msecs(__data);			\
+	return cfq_var_show(__data, (page));				\
 }
-SHOW_FUNCTION(cfq_quantum_show, cfqd->cfq_quantum);
-SHOW_FUNCTION(cfq_queued_show, cfqd->cfq_queued);
-SHOW_FUNCTION(cfq_fifo_expire_r_show, cfqd->cfq_fifo_expire_r);
-SHOW_FUNCTION(cfq_fifo_expire_w_show, cfqd->cfq_fifo_expire_w);
-SHOW_FUNCTION(cfq_fifo_batch_expire_show, cfqd->cfq_fifo_batch_expire);
-SHOW_FUNCTION(cfq_find_best_show, cfqd->find_best_crq);
-SHOW_FUNCTION(cfq_back_max_show, cfqd->cfq_back_max);
-SHOW_FUNCTION(cfq_back_penalty_show, cfqd->cfq_back_penalty);
+SHOW_FUNCTION(cfq_quantum_show, cfqd->cfq_quantum, 0);
+SHOW_FUNCTION(cfq_queued_show, cfqd->cfq_queued, 0);
+SHOW_FUNCTION(cfq_fifo_expire_r_show, cfqd->cfq_fifo_expire_r, 1);
+SHOW_FUNCTION(cfq_fifo_expire_w_show, cfqd->cfq_fifo_expire_w, 1);
+SHOW_FUNCTION(cfq_fifo_batch_expire_show, cfqd->cfq_fifo_batch_expire, 1);
+SHOW_FUNCTION(cfq_find_best_show, cfqd->find_best_crq, 0);
+SHOW_FUNCTION(cfq_back_max_show, cfqd->cfq_back_max, 0);
+SHOW_FUNCTION(cfq_back_penalty_show, cfqd->cfq_back_penalty, 0);
 #undef SHOW_FUNCTION
 
-#define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX)				\
+#define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX, __CONV)			\
 static ssize_t __FUNC(struct cfq_data *cfqd, const char *page, size_t count)	\
 {									\
-	int ret = cfq_var_store(__PTR, (page), count);			\
-	if (*(__PTR) < (MIN))						\
-		*(__PTR) = (MIN);					\
-	else if (*(__PTR) > (MAX))					\
-		*(__PTR) = (MAX);					\
+	unsigned int __data;						\
+	int ret = cfq_var_store(&__data, (page), count);		\
+	if (__data < (MIN))						\
+		__data = (MIN);						\
+	else if (__data > (MAX))					\
+		__data = (MAX);						\
+	if (__CONV)							\
+		*(__PTR) = msecs_to_jiffies(__data);			\
+	else								\
+		*(__PTR) = __data;					\
 	return ret;							\
 }
-STORE_FUNCTION(cfq_quantum_store, &cfqd->cfq_quantum, 1, UINT_MAX);
-STORE_FUNCTION(cfq_queued_store, &cfqd->cfq_queued, 1, UINT_MAX);
-STORE_FUNCTION(cfq_fifo_expire_r_store, &cfqd->cfq_fifo_expire_r, 1, UINT_MAX);
-STORE_FUNCTION(cfq_fifo_expire_w_store, &cfqd->cfq_fifo_expire_w, 1, UINT_MAX);
-STORE_FUNCTION(cfq_fifo_batch_expire_store, &cfqd->cfq_fifo_batch_expire, 0, UINT_MAX);
-STORE_FUNCTION(cfq_find_best_store, &cfqd->find_best_crq, 0, 1);
-STORE_FUNCTION(cfq_back_max_store, &cfqd->cfq_back_max, 0, UINT_MAX);
-STORE_FUNCTION(cfq_back_penalty_store, &cfqd->cfq_back_penalty, 1, UINT_MAX);
+STORE_FUNCTION(cfq_quantum_store, &cfqd->cfq_quantum, 1, UINT_MAX, 0);
+STORE_FUNCTION(cfq_queued_store, &cfqd->cfq_queued, 1, UINT_MAX, 0);
+STORE_FUNCTION(cfq_fifo_expire_r_store, &cfqd->cfq_fifo_expire_r, 1, UINT_MAX, 1);
+STORE_FUNCTION(cfq_fifo_expire_w_store, &cfqd->cfq_fifo_expire_w, 1, UINT_MAX, 1);
+STORE_FUNCTION(cfq_fifo_batch_expire_store, &cfqd->cfq_fifo_batch_expire, 0, UINT_MAX, 1);
+STORE_FUNCTION(cfq_find_best_store, &cfqd->find_best_crq, 0, 1, 0);
+STORE_FUNCTION(cfq_back_max_store, &cfqd->cfq_back_max, 0, UINT_MAX, 0);
+STORE_FUNCTION(cfq_back_penalty_store, &cfqd->cfq_back_penalty, 1, UINT_MAX, 0);
 #undef STORE_FUNCTION
 
 static struct cfq_fs_entry cfq_quantum_entry = {
