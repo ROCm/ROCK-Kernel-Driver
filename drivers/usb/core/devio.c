@@ -298,15 +298,15 @@ static void destroy_all_async(struct dev_state *ps)
  * they're also undone when devices disconnect.
  */
 
-static void *driver_probe(struct usb_device *dev, unsigned int intf,
-			  const struct usb_device_id *id)
+static int driver_probe (struct usb_interface *intf,
+			 const struct usb_device_id *id)
 {
-	return NULL;
+	return -ENODEV;
 }
 
-static void driver_disconnect(struct usb_device *dev, void *context)
+static void driver_disconnect(struct usb_interface *intf)
 {
-	struct dev_state *ps = (struct dev_state *)context;
+	struct dev_state *ps = dev_get_drvdata (&intf->dev);
 
 	if (!ps)
 		return;
@@ -317,6 +317,7 @@ static void driver_disconnect(struct usb_device *dev, void *context)
 	/* prevent new I/O requests */
 	ps->dev = 0;
 	ps->ifclaimed = 0;
+	dev_set_drvdata (&intf->dev, NULL);
 
 	/* force async requests to complete */
 	destroy_all_async (ps);
@@ -426,30 +427,6 @@ static int findintfif(struct usb_device *dev, unsigned int ifn)
 	}
 	return -ENOENT; 
 }
-
-extern struct list_head usb_driver_list;
-
-#if 0
-static int finddriver(struct usb_driver **driver, char *name)
-{
-	struct list_head *tmp;
-
-	tmp = usb_driver_list.next;
-	while (tmp != &usb_driver_list) {
-		struct usb_driver *d = list_entry(tmp, struct usb_driver,
-							driver_list);
-
-		if (!strcmp(d->name, name)) {
-			*driver = d;
-			return 0;
-		}
-
-		tmp = tmp->next;
-	}
-
-	return -EINVAL;
-}
-#endif
 
 static int check_ctrlrecip(struct dev_state *ps, unsigned int requesttype, unsigned int index)
 {
@@ -723,11 +700,10 @@ static int proc_resetdevice(struct dev_state *ps)
 		if (test_bit(i, &ps->ifclaimed))
 			continue;
 
-		lock_kernel();
+		err ("%s - this function is broken", __FUNCTION__);
 		if (intf->driver && ps->dev) {
-			usb_bind_driver (intf->driver, intf);
+			usb_device_probe (&intf->dev);
 		}
-		unlock_kernel();
 	}
 
 	return 0;
@@ -1090,22 +1066,19 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 
        /* disconnect kernel driver from interface, leaving it unbound.  */
        case USBDEVFS_DISCONNECT:
-       	/* this function is voodoo. without locking it is a maybe thing */
-		lock_kernel();
-               driver = ifp->driver;
-               if (driver) {
-                       dbg ("disconnect '%s' from dev %d interface %d",
-                               driver->name, ps->dev->devnum, ctrl.ifno);
-		       usb_unbind_driver(ps->dev, ifp);
-                       usb_driver_release_interface (driver, ifp);
-               } else
+		/* this function is voodoo. */
+		driver = ifp->driver;
+		if (driver) {
+			dbg ("disconnect '%s' from dev %d interface %d",
+			     driver->name, ps->dev->devnum, ctrl.ifno);
+			usb_device_remove(&ifp->dev);
+		} else
 			retval = -EINVAL;
-		unlock_kernel();
-               break;
+		break;
 
 	/* let kernel drivers try to (re)bind to the interface */
 	case USBDEVFS_CONNECT:
-		usb_find_interface_driver (ps->dev, ifp);
+		retval = usb_device_probe (&ifp->dev);
 		break;
 
        /* talk directly to the interface's driver */

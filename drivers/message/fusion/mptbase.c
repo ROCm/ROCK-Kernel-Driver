@@ -49,7 +49,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.c,v 1.119 2002/06/20 13:28:15 pdelaney Exp $
+ *  $Id: mptbase.c,v 1.121 2002/07/23 18:56:59 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -437,8 +437,9 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 			pa = 0;					/* No reply flush! */
 		}
 
+#ifdef MPT_DEBUG_IRQ
 		if ((int)ioc->chip_type > (int)FC929) {
-			/* Verify mf, mf are reasonable.
+			/* Verify mf, mr are reasonable.
 			 */
 			if ((mf) && ((mf >= MPT_INDEX_2_MFPTR(ioc, ioc->req_depth))
 				|| (mf < ioc->req_frames)) ) {
@@ -464,6 +465,7 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 				freeme = 0;
 			}
 		}
+#endif
 
 		/*  Check for (valid) IO callback!  */
 		if (cb_idx) {
@@ -1602,7 +1604,7 @@ mpt_do_ioc_recovery(MPT_ADAPTER *ioc, u32 reason, int sleepFlag)
 
 	if (reason == MPT_HOSTEVENT_IOC_BRINGUP){
 		if (ioc->upload_fw) {
-			dprintk((MYIOC_s_INFO_FMT
+			ddlprintk((MYIOC_s_INFO_FMT
 				"firmware upload required!\n", ioc->name));
 
 			r = mpt_do_upload(ioc, sleepFlag);
@@ -1787,6 +1789,16 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 			if (SendIocReset(this, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, NO_SLEEP) != 0)
 				(void) KickStart(this, 1, NO_SLEEP);
 		}
+
+		if (this->cached_fw != NULL) {
+			ddlprintk((KERN_INFO MYNAM ": Pushing FW onto adapter\n"));
+
+			if ((state = mpt_downloadboot(this, NO_SLEEP)) < 0) {
+				printk(KERN_WARNING MYNAM 
+					": firmware downloadboot failure (%d)!\n", state);
+			}
+		}
+
 
 		/* Disable adapter interrupts! */
 		CHIPREG_WRITE32(&this->chip->IntMask, 0xFFFFFFFF);
@@ -1994,8 +2006,19 @@ MakeIocReady(MPT_ADAPTER *ioc, int force, int sleepFlag)
 	}
 
 	/* Is it already READY? */
-	if (!statefault && (ioc_state & MPI_IOC_STATE_MASK) == MPI_IOC_STATE_READY)
-		return 0;
+	if (!statefault && (ioc_state & MPI_IOC_STATE_MASK) == MPI_IOC_STATE_READY) {
+		if ((int)ioc->chip_type <= (int)FC929)
+			return 0;
+		else {
+			/* Workaround from broken 1030 FW.
+			 * Force a diagnostic reset if fails.
+			 */
+			if ((r = SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, sleepFlag)) == 0)
+				return 0;
+			else
+				statefault = 4;
+		}
+	} 
 
 	/*
 	 *	Check to see if IOC is in FAULT state.
@@ -2376,6 +2399,8 @@ SendIocInit(MPT_ADAPTER *ioc, int sleepFlag)
 		else 
 			ioc->upload_fw = 1;
 	}
+	ddlprintk((MYIOC_s_INFO_FMT "flags %d, upload_fw %d \n", 
+		   ioc->name, ioc_init.Flags, ioc->upload_fw));
 
 	if ((int)ioc->chip_type <= (int)FC929) {
 		ioc_init.MaxDevices = MPT_MAX_FC_DEVICES;
@@ -2688,7 +2713,7 @@ mpt_do_upload(MPT_ADAPTER *ioc, int sleepFlag)
 	}
 	ioc->alloc_total += alloc_sz;
 
-	dprintk((KERN_INFO MYNAM ": FW Image  @ %p, sz=%d bytes\n",
+	ddlprintk((KERN_INFO MYNAM ": FW Image  @ %p, sz=%d bytes\n",
 		 (void *)(ulong)ioc->cached_fw, ioc->facts.FWImageSize));
 
 	prequest = (FWUpload_t *)&request;
@@ -2748,7 +2773,7 @@ mpt_do_upload(MPT_ADAPTER *ioc, int sleepFlag)
 				cmdStatus = 0;
 		}
 	}
-	dprintk((MYIOC_s_INFO_FMT ": do_upload status %d \n",
+	ddlprintk((MYIOC_s_INFO_FMT ": do_upload status %d \n",
 			ioc->name, cmdStatus));
 
 	/* Check to see if we have a copy of this image in
@@ -2766,7 +2791,7 @@ mpt_do_upload(MPT_ADAPTER *ioc, int sleepFlag)
 	 */
 	if (cmdStatus || freeMem) {
 
-		dprintk((MYIOC_s_INFO_FMT ": do_upload freeing %s image \n",
+		ddlprintk((MYIOC_s_INFO_FMT ": do_upload freeing %s image \n",
 			ioc->name, cmdStatus ? "incomplete" : "duplicate"));
 		mpt_free_fw_memory(ioc, NULL);
 		ioc->cached_fw = NULL;
@@ -2809,20 +2834,20 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 	int			 max_idx, fw_idx, ext_idx;
 	int			 left_u32s;
 
-	dprintk((MYIOC_s_INFO_FMT "DbGb0: downloadboot entered.\n",
+	ddlprintk((MYIOC_s_INFO_FMT "DbGb0: downloadboot entered.\n",
 				ioc->name));
 #ifdef MPT_DEBUG
 	diag0val = CHIPREG_READ32(&ioc->chip->Diagnostic);
 	if (ioc->alt_ioc)
 		diag1val = CHIPREG_READ32(&ioc->alt_ioc->chip->Diagnostic);
-	dprintk((MYIOC_s_INFO_FMT "DbGb1: diag0=%08x, diag1=%08x\n",
+	ddlprintk((MYIOC_s_INFO_FMT "DbGb1: diag0=%08x, diag1=%08x\n",
 				ioc->name, diag0val, diag1val));
 #endif
 
-	dprintk((MYIOC_s_INFO_FMT "fw size 0x%x, ioc FW Ptr %p\n",
+	ddlprintk((MYIOC_s_INFO_FMT "fw size 0x%x, ioc FW Ptr %p\n",
 				ioc->name, ioc->facts.FWImageSize, ioc->cached_fw));
 	if (ioc->alt_ioc)
-		dprintk((MYIOC_s_INFO_FMT "alt ioc FW Ptr %p\n",
+		ddlprintk((MYIOC_s_INFO_FMT "alt ioc FW Ptr %p\n",
 				ioc->name, ioc->alt_ioc->cached_fw));
 
 	/* Get dma_addr and data transfer size.
@@ -2831,13 +2856,13 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 		return -1;
 
 	/* Get the DMA from ioc or ioc->alt_ioc */
-	if (ioc->cached_fw == NULL)
+	if (ioc->cached_fw != NULL)
 		pCached = (fw_image_t **)ioc->cached_fw;
-	else if (ioc->alt_ioc && ioc->alt_ioc->cached_fw)
+	else if (ioc->alt_ioc && (ioc->alt_ioc->cached_fw != NULL))
 		pCached = (fw_image_t **)ioc->alt_ioc->cached_fw;
 
-	dprintk((MYIOC_s_INFO_FMT "DbGb2: FW Image @ %p\n",
-			ioc->name, FwHdr));
+	ddlprintk((MYIOC_s_INFO_FMT "DbGb2: FW Image @ %p\n",
+			ioc->name, pCached));
 	if (!pCached)
 		return -2;
 
@@ -2872,10 +2897,10 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 #ifdef MPT_DEBUG
 		if (ioc->alt_ioc)
 			diag1val = CHIPREG_READ32(&ioc->alt_ioc->chip->Diagnostic);
-		dprintk((MYIOC_s_INFO_FMT "DbGb3: diag0=%08x, diag1=%08x\n",
+		ddlprintk((MYIOC_s_INFO_FMT "DbGb3: diag0=%08x, diag1=%08x\n",
 				ioc->name, diag0val, diag1val));
 #endif
-		dprintk((MYIOC_s_INFO_FMT "Wrote magic DiagWriteEn sequence (%x)\n",
+		ddlprintk((MYIOC_s_INFO_FMT "Wrote magic DiagWriteEn sequence (%x)\n",
 				ioc->name, diag0val));
 	}
 
@@ -2886,17 +2911,10 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 #ifdef MPT_DEBUG
 	if (ioc->alt_ioc)
 		diag1val = CHIPREG_READ32(&ioc->alt_ioc->chip->Diagnostic);
-	dprintk((MYIOC_s_INFO_FMT "DbGb3: diag0=%08x, diag1=%08x\n",
+
+	ddlprintk((MYIOC_s_INFO_FMT "DbGb3: diag0=%08x, diag1=%08x\n",
 			ioc->name, diag0val, diag1val));
 #endif
-
-	/* Write the LoadStartAddress to the DiagRw Address Register
-	 * using Programmed IO
-	 */
-	CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwAddress, FwHdr->LoadStartAddress);
-	dprintk((MYIOC_s_INFO_FMT "LoadStart addr written 0x%x \n",
-		ioc->name, FwHdr->LoadStartAddress));
-#if 1
 
 	/* max_idx = 1 + maximum valid buffer index
 	 */
@@ -2910,7 +2928,14 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 	count = (FwHdr->ImageSize + 3)/4;
 	nextImage = FwHdr->NextImageHeaderOffset;
 
-	dprintk((MYIOC_s_INFO_FMT "Write FW Image: 0x%x u32's @ %p\n",
+	/* Write the LoadStartAddress to the DiagRw Address Register
+	 * using Programmed IO
+	 */
+	CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwAddress, FwHdr->LoadStartAddress);
+	ddlprintk((MYIOC_s_INFO_FMT "LoadStart addr written 0x%x \n",
+		ioc->name, FwHdr->LoadStartAddress));
+
+	ddlprintk((MYIOC_s_INFO_FMT "Write FW Image: 0x%x u32's @ %p\n",
 				ioc->name, count, ptru32));
 	left_u32s = pCached[fw_idx]->size/4;
 	while (count--) {
@@ -2997,7 +3022,7 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 			count = (count +3)/4;
 		}
 
-		dprintk((MYIOC_s_INFO_FMT "Write Ext Image: 0x%x u32's @ %p\n",
+		ddlprintk((MYIOC_s_INFO_FMT "Write Ext Image: 0x%x u32's @ %p\n",
 						ioc->name, count, ptru32));
 		CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwAddress, load_addr);
 
@@ -3019,35 +3044,12 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 		}
 	}
 
-#else
-	while (nextImage) {
-
-		/* Set the pointer to the extended image
-		 */
-		ExtHdr = (MpiExtImageHeader_t *) ((char *) FwHdr + nextImage);
-
-		CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwAddress, ExtHdr->LoadStartAddress);
-
-		count = (ExtHdr->ImageSize + 3 )/4;
-
-		ptru32 = (u32 *) ExtHdr;
-		dprintk((MYIOC_s_INFO_FMT "Write Ext Image: 0x%x u32's @ %p\n",
-				ioc->name, count, ptru32));
-		while (count-- ) {
-			CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwData, *ptru32);
-			ptru32++;
-		}
-		nextImage = ExtHdr->NextImageHeaderOffset;
-	}
-#endif
-
-
 	/* Write the IopResetVectorRegAddr */
-	dprintk((MYIOC_s_INFO_FMT "Write IopResetVector Addr! \n", ioc->name));
+	ddlprintk((MYIOC_s_INFO_FMT "Write IopResetVector Addr! \n", ioc->name));
 	CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwAddress, FwHdr->IopResetRegAddr);
 
 	/* Write the IopResetVectorValue */
-	dprintk((MYIOC_s_INFO_FMT "Write IopResetVector Value! \n", ioc->name));
+	ddlprintk((MYIOC_s_INFO_FMT "Write IopResetVector Value! \n", ioc->name));
 	CHIPREG_PIO_WRITE32(&ioc->pio_chip->DiagRwData, FwHdr->IopResetVectorValue);
 
 	/* Clear the internal flash bad bit - autoincrementing register,
@@ -3182,6 +3184,7 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 			/* Write magic sequence to WriteSequence register
 			 * Loop until in diagnostic mode
 			 */
+			CHIPREG_WRITE32(&ioc->chip->WriteSequence, 0xFF);
 			CHIPREG_WRITE32(&ioc->chip->WriteSequence, MPI_WRSEQ_1ST_KEY_VALUE);
 			CHIPREG_WRITE32(&ioc->chip->WriteSequence, MPI_WRSEQ_2ND_KEY_VALUE);
 			CHIPREG_WRITE32(&ioc->chip->WriteSequence, MPI_WRSEQ_3RD_KEY_VALUE);
@@ -3217,7 +3220,11 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 				ioc->name, diag0val, diag1val));
 #endif
 		/* Write the PreventIocBoot bit */
+#if 1
+		if ((ioc->cached_fw) || (ioc->alt_ioc && ioc->alt_ioc->cached_fw)) {
+#else
 		if (ioc->facts.Flags & MPI_IOCFACTS_FLAGS_FW_DOWNLOAD_BOOT) {
+#endif
 			diag0val |= MPI_DIAG_PREVENT_IOC_BOOT;
 			CHIPREG_WRITE32(&ioc->chip->Diagnostic, diag0val);
 		}
@@ -3263,7 +3270,11 @@ mpt_diag_reset(MPT_ADAPTER *ioc, int ignore, int sleepFlag)
 			/* FIXME?  Examine results here? */
 		}
 
+#if 1
+		if ((ioc->cached_fw) || (ioc->alt_ioc && ioc->alt_ioc->cached_fw)) {
+#else
 		if (ioc->facts.Flags & MPI_IOCFACTS_FLAGS_FW_DOWNLOAD_BOOT) {
+#endif
 			/* If the DownloadBoot operation fails, the
 			 * IOC will be left unusable. This is a fatal error
 			 * case.  _diag_reset will return < 0
@@ -5274,6 +5285,9 @@ mpt_HardResetHandler(MPT_ADAPTER *ioc, int sleepFlag)
 		printk(KERN_WARNING MYNAM ": WARNING - (%d) Cannot recover %s\n",
 			rc, ioc->name);
 	}
+	ioc->reload_fw = 0;
+	if (ioc->alt_ioc)
+		ioc->alt_ioc->reload_fw = 0;
 
 	spin_lock_irqsave(&ioc->diagLock, flags);
 	ioc->diagPending = 0;
@@ -5612,8 +5626,46 @@ mpt_fc_log_info(MPT_ADAPTER *ioc, u32 log_info)
 static void
 mpt_sp_log_info(MPT_ADAPTER *ioc, u32 log_info)
 {
-	/* FIXME! */
-	printk(MYIOC_s_INFO_FMT "LogInfo(0x%08x)\n", ioc->name, log_info);
+	u32 info = log_info & 0x00FF0000;
+	char *desc = "unknown";
+
+	switch (info) {
+	case 0x00010000:
+		desc = "bug! MID not found";
+		if (ioc->reload_fw == 0)
+			ioc->reload_fw++;
+		break;
+
+	case 0x00020000:
+		desc = "Parity Error";
+		break;
+
+	case 0x00030000:
+		desc = "ASYNC Outbound Overrun";
+		break;
+
+	case 0x00040000:
+		desc = "SYNC Offset Error";
+		break;
+
+	case 0x00050000:
+		desc = "BM Change";
+		break;
+
+	case 0x00060000:
+		desc = "Msg In Overflow";
+		break;
+
+	case 0x00070000:
+		desc = "DMA Error";
+		break;
+
+	case 0x00080000:
+		desc = "Outbound DMA Overrun";
+		break;
+	}
+
+	printk(MYIOC_s_INFO_FMT "LogInfo(0x%08x): F/W: %s\n", ioc->name, log_info, desc);
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

@@ -177,20 +177,20 @@ struct udsl_atm_dev_data {
 /*
  * usb driver prototypes and structures
  */
-static void *udsl_usb_probe (struct usb_device *dev, unsigned int ifnum,
-			     const struct usb_device_id *id);
-static void udsl_usb_disconnect (struct usb_device *dev, void *ptr);
+static int udsl_usb_probe (struct usb_interface *intf,
+			   const struct usb_device_id *id);
+static void udsl_usb_disconnect (struct usb_interface *intf);
 int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc,
 			struct sk_buff *skb);
 static int udsl_usb_ioctl (struct usb_device *hub, unsigned int code, void *user_data);
 static int udsl_usb_cancelsends (struct udsl_instance_data *instance, struct atm_vcc *vcc);
 
 static struct usb_driver udsl_usb_driver = {
-	name:udsl_driver_name,
-	probe:udsl_usb_probe,
-	disconnect:udsl_usb_disconnect,
-	ioctl:udsl_usb_ioctl,
-	id_table:udsl_usb_ids,
+	.name =		udsl_driver_name,
+	.probe =	udsl_usb_probe,
+	.disconnect =	udsl_usb_disconnect,
+	.ioctl =	udsl_usb_ioctl,
+	.id_table =	udsl_usb_ids,
 };
 
 /************
@@ -828,7 +828,7 @@ int udsl_usb_data_init (struct udsl_instance_data *instance)
 	return 0;
 }
 
-int udsl_usb_data_exit (struct udsl_instance_data *instance)
+static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 {
 	int i;
 
@@ -913,8 +913,10 @@ static int udsl_usb_ioctl (struct usb_device *dev, unsigned int code, void *user
 	return -EINVAL;
 }
 
-void *udsl_usb_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
+static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
+	int ifnum = intf->altsetting->bInterfaceNumber;
 	int i;
 	unsigned char mac[6];
 	unsigned char mac_str[13];
@@ -926,7 +928,7 @@ void *udsl_usb_probe (struct usb_device *dev, unsigned int ifnum, const struct u
 	if ((dev->descriptor.bDeviceClass != USB_CLASS_VENDOR_SPEC) ||
 	    (dev->descriptor.idVendor != SPEEDTOUCH_VENDORID) ||
 	    (dev->descriptor.idProduct != SPEEDTOUCH_PRODUCTID) || (ifnum != 1))
-		return NULL;
+		return -ENODEV;
 
 	MOD_INC_USE_COUNT;
 
@@ -936,7 +938,7 @@ void *udsl_usb_probe (struct usb_device *dev, unsigned int ifnum, const struct u
 
 	if (i >= MAX_UDSL) {
 		printk (KERN_INFO "No minor table space available for SpeedTouch USB\n");
-		return NULL;
+		return -ENOMEM;
 	};
 
 	PDEBUG ("Device Accepted, assigning minor %d\n", i);
@@ -945,7 +947,7 @@ void *udsl_usb_probe (struct usb_device *dev, unsigned int ifnum, const struct u
 	instance = kmalloc (sizeof (struct udsl_instance_data), GFP_KERNEL);
 	if (!instance) {
 		PDEBUG ("No memory for Instance data!\n");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	/* initialize structure */
@@ -969,32 +971,37 @@ void *udsl_usb_probe (struct usb_device *dev, unsigned int ifnum, const struct u
 
 	minor_data[instance->minor] = instance;
 
-	return instance;
+	dev_set_drvdata (&intf->dev, instance);
+	return 0;
 }
 
-void udsl_usb_disconnect (struct usb_device *dev, void *ptr)
+static void udsl_usb_disconnect (struct usb_interface *intf)
 {
-	struct udsl_instance_data *instance = (struct udsl_instance_data *) ptr;
-	int i = instance->minor;
+	struct udsl_instance_data *instance = dev_get_drvdata (&intf->dev);
+	int i;
 
-	/* unlinking receive buffers */
-	udsl_usb_data_exit (instance);
+	dev_set_drvdata (&intf->dev, NULL);
+	if (instance) {
+		i = instance->minor;
+		/* unlinking receive buffers */
+		udsl_usb_data_exit (instance);
 
-	/* removing atm device */
-	if (instance->atm_dev)
-		udsl_atm_stopdevice (instance);
+		/* removing atm device */
+		if (instance->atm_dev)
+			udsl_atm_stopdevice (instance);
 
-	PDEBUG ("disconnecting minor %d\n", i);
+		PDEBUG ("disconnecting minor %d\n", i);
 
-	while (MOD_IN_USE > 1) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout (1);
+		while (MOD_IN_USE > 1) {
+			current->state = TASK_INTERRUPTIBLE;
+			schedule_timeout (1);
+		}
+
+		kfree (instance);
+		minor_data[i] = NULL;
+
+		MOD_DEC_USE_COUNT;
 	}
-
-	kfree (instance);
-	minor_data[i] = NULL;
-
-	MOD_DEC_USE_COUNT;
 }
 
 /***************************************************************************

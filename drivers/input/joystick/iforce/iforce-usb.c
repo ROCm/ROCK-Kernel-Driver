@@ -106,14 +106,15 @@ static void iforce_usb_ctrl(struct urb *urb)
 		wake_up(&iforce->wait);
 }
 
-static void *iforce_usb_probe(struct usb_device *dev, unsigned int ifnum,
+static int iforce_usb_probe(struct usb_interface *intf,
 				const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_endpoint_descriptor *epirq, *epout;
 	struct iforce *iforce;
 
-	epirq = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;
-	epout = dev->config[0].interface[ifnum].altsetting[0].endpoint + 1;
+	epirq = intf->altsetting[0].endpoint + 0;
+	epout = intf->altsetting[0].endpoint + 1;
 
 	if (!(iforce = kmalloc(sizeof(struct iforce) + 32, GFP_KERNEL)))
 		goto fail;
@@ -150,7 +151,8 @@ static void *iforce_usb_probe(struct usb_device *dev, unsigned int ifnum,
 
 	if (iforce_init_device(iforce)) goto fail;
 
-	return iforce;
+	dev_set_drvdata (&intf->dev, iforce);
+	return 0;
 
 fail:
 	if (iforce) {
@@ -160,7 +162,7 @@ fail:
 		kfree(iforce);
 	}
 
-	return NULL;
+	return -ENODEV;
 }
 
 /* Called by iforce_delete() */
@@ -176,17 +178,20 @@ void iforce_usb_delete(struct iforce* iforce)
 	usb_free_urb(iforce->ctrl);
 }
 
-static void iforce_usb_disconnect(struct usb_device *dev, void *ptr)
+static void iforce_usb_disconnect(struct usb_interface *intf)
 {
-	struct iforce *iforce = ptr;
+	struct iforce *iforce = dev_get_drvdata (&intf->dev);
 	int open = 0; /* FIXME! iforce->dev.handle->open; */
 
-	iforce->usbdev = NULL;
-	input_unregister_device(&iforce->dev);
+	dev_set_drvdata (&intf->dev, NULL);
+	if (iforce) {
+		iforce->usbdev = NULL;
+		input_unregister_device(&iforce->dev);
 
-	if (!open) {
-		iforce_delete_device(iforce);
-		kfree(iforce);
+		if (!open) {
+			iforce_delete_device(iforce);
+			kfree(iforce);
+		}
 	}
 }
 

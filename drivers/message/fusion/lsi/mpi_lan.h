@@ -1,12 +1,12 @@
 /*
- *  Copyright (c) 2000-2001 LSI Logic Corporation.
+ *  Copyright (c) 2000-2002 LSI Logic Corporation.
  *
  *
  *           Name:  MPI_LAN.H
  *          Title:  MPI LAN messages and structures
  *  Creation Date:  June 30, 2000
  *
- *    MPI Version:  01.02.01
+ *    MPI_LAN.H Version:  01.02.01
  *
  *  Version History
  *  ---------------

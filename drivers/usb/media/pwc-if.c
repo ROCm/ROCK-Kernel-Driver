@@ -86,8 +86,8 @@ static struct usb_device_id pwc_device_table [] = {
 };
 MODULE_DEVICE_TABLE(usb, pwc_device_table);
 
-static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id);
-static void usb_pwc_disconnect(struct usb_device *udev, void *ptr);
+static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id *id);
+static void usb_pwc_disconnect(struct usb_interface *intf);
 
 static struct usb_driver pwc_driver =
 {
@@ -1539,8 +1539,9 @@ static int pwc_video_mmap(struct file *file, struct vm_area_struct *vma)
  * is loaded.
  */
 
-static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
+static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	struct pwc_device *pdev = NULL;
 	struct video_device *vdev;
 	int vendor_id, product_id, type_id;
@@ -1551,14 +1552,14 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 	free_mem_leak();
 	
 	/* Check if we can handle this device */
-	Trace(TRACE_PROBE, "probe() called [%04X %04X], if %d\n", udev->descriptor.idVendor, udev->descriptor.idProduct, ifnum);
+	Trace(TRACE_PROBE, "probe() called [%04X %04X], if %d\n", udev->descriptor.idVendor, udev->descriptor.idProduct, intf->altsetting->bInterfaceNumber);
 
 	/* the interfaces are probed one by one. We are only interested in the
 	   video interface (0) now.
 	   Interface 1 is the Audio Control, and interface 2 Audio itself.
 	 */
-	if (ifnum > 0) 
-		return NULL;
+	if (intf->altsetting->bInterfaceNumber > 0)
+		return -ENODEV;
 
 	vendor_id = udev->descriptor.idVendor;
 	product_id = udev->descriptor.idProduct;
@@ -1602,7 +1603,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 750;
 			break;
 		default:
-			return NULL;
+			return -ENODEV;
 			break;
 		}
 	}
@@ -1613,7 +1614,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 645;
 			break;
 		default:
-			return NULL;
+			return -ENODEV;
 			break;
 		}
 	}
@@ -1624,7 +1625,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 730;
         		break;
         	default:
-        		return NULL;
+			return -ENODEV;
         		break;
         	}
         }
@@ -1643,7 +1644,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 675;
 			break;
 		default:
-			return NULL;
+			return -ENODEV;
 			break;
 		}
 	}
@@ -1654,7 +1655,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 730;
 			break;
 		default:
-			return NULL;
+			return -ENODEV;
 			break;
 		}
 	}
@@ -1665,11 +1666,11 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 			type_id = 730;
 			break;  
 		default:
-			return NULL;
+			return -ENODEV;
 			break;
 		}
 	}
-	else return NULL; /* Not Philips, Askey, Logitech, Samsung, Creative or SOTEC, for sure. */
+	else return -ENODEV; /* Not Philips, Askey, Logitech, Samsung, Creative or SOTEC, for sure. */
 
 	memset(serial_number, 0, 30);
 	usb_string(udev, udev->descriptor.iSerialNumber, serial_number, 29);
@@ -1682,7 +1683,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 	pdev = kmalloc(sizeof(struct pwc_device), GFP_KERNEL);
 	if (pdev == NULL) {
 		Err("Oops, could not allocate memory for pwc_device.\n");
-		return NULL;
+		return -ENOMEM;
 	}
 	memset(pdev, 0, sizeof(struct pwc_device));
 	pdev->type = type_id;
@@ -1700,7 +1701,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 	vdev = kmalloc(sizeof(struct video_device), GFP_KERNEL);
 	if (vdev == NULL) {
 		Err("Oops, could not allocate memory for video_device.\n");
-		return NULL;
+		return -ENOMEM;
 	}
 	memcpy(vdev, &pwc_template, sizeof(pwc_template));
 	sprintf(vdev->name, "Philips %d webcam", pdev->type);
@@ -1729,7 +1730,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 	i = video_register_device(vdev, VFL_TYPE_GRABBER, video_nr);
 	if (i < 0) {
 		Err("Failed to register as video device (%d).\n", i);
-		return NULL;
+		return -EIO;
 	}
 	else {
 		Trace(TRACE_PROBE, "Registered video struct at 0x%p.\n", vdev);
@@ -1740,11 +1741,12 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 		device_hint[hint].pdev = pdev;
 
 	Trace(TRACE_PROBE, "probe() function returning struct at 0x%p.\n", pdev);
-	return pdev;
+	dev_set_drvdata (&intf->dev, pdev);
+	return 0;
 }
 
 /* The user janked out the cable... */
-static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
+static void usb_pwc_disconnect(struct usb_interface *intf)
 {
 	struct pwc_device *pdev;
 	int hint;
@@ -1753,7 +1755,8 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 	lock_kernel();
 	free_mem_leak();
 
-	pdev = (struct pwc_device *)ptr;
+	pdev = dev_get_drvdata (&intf->dev);
+	dev_set_drvdata (&intf->dev, NULL);
 	if (pdev == NULL) {
 		Err("pwc_disconnect() Called without private pointer.\n");
 		goto out_err;
@@ -1762,7 +1765,7 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 		Err("pwc_disconnect() already called for %p\n", pdev);
 		goto out_err;
 	}
-	if (pdev->udev != udev) {
+	if (pdev->udev != interface_to_usbdev(intf)) {
 		Err("pwc_disconnect() Woops: pointer mismatch udev/pdev.\n");
 		goto out_err;
 	}

@@ -3656,39 +3656,41 @@ static void ibmcam_configure_video(struct uvd *uvd)
  * 12-Nov-2000 Reworked to comply with new probe() signature.
  * 23-Jan-2001 Added compatibility with 2.2.x kernels.
  */
-static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *devid)
+static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *devid)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct uvd *uvd = NULL;
 	int i, nas, model=0, canvasX=0, canvasY=0;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
+	__u8 ifnum = intf->altsetting->bInterfaceNumber;
 	unsigned char video_ep = 0;
 
 	if (debug >= 1)
-		info("ibmcam_probe(%p,%u.)", dev, ifnum);
+		info("ibmcam_probe(%p,%u.)", intf, ifnum);
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
 	/* Is it an IBM camera? */
 	if (dev->descriptor.idVendor != IBMCAM_VENDOR_ID)
-		return NULL;
+		return -ENODEV;
 	if ((dev->descriptor.idProduct != IBMCAM_PRODUCT_ID) &&
 	    (dev->descriptor.idProduct != VEO_800C_PRODUCT_ID) &&
 	    (dev->descriptor.idProduct != VEO_800D_PRODUCT_ID) &&
 	    (dev->descriptor.idProduct != NETCAM_PRODUCT_ID))
-		return NULL;
+		return -ENODEV;
 
 	/* Check the version/revision */
 	switch (dev->descriptor.bcdDevice) {
 	case 0x0002:
 		if (ifnum != 2)
-			return NULL;
+			return -ENODEV;
 		model = IBMCAM_MODEL_1;
 		break;
 	case 0x030A:
 		if (ifnum != 0)
-			return NULL;
+			return -ENODEV;
 		if ((dev->descriptor.idProduct == NETCAM_PRODUCT_ID) ||
 		    (dev->descriptor.idProduct == VEO_800D_PRODUCT_ID))
 			model = IBMCAM_MODEL_4;
@@ -3697,13 +3699,13 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 		break;
 	case 0x0301:
 		if (ifnum != 0)
-			return NULL;
+			return -ENODEV;
 		model = IBMCAM_MODEL_3;
 		break;
 	default:
 		err("IBM camera with revision 0x%04x is not supported.",
 			dev->descriptor.bcdDevice);
-		return NULL;
+		return -ENODEV;
 	}
 
 	/* Print detailed info on what we found so far */
@@ -3734,7 +3736,7 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 		info("Number of alternate settings=%d.", nas);
 	if (nas < 2) {
 		err("Too few alternate settings for this camera!");
-		return NULL;
+		return -ENODEV;
 	}
 	/* Validate all alternate settings */
 	for (i=0; i < nas; i++) {
@@ -3745,29 +3747,29 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 		if (interface->bNumEndpoints != 1) {
 			err("Interface %d. has %u. endpoints!",
 			    ifnum, (unsigned)(interface->bNumEndpoints));
-			return NULL;
+			return -ENODEV;
 		}
 		endpoint = &interface->endpoint[0];
 		if (video_ep == 0)
 			video_ep = endpoint->bEndpointAddress;
 		else if (video_ep != endpoint->bEndpointAddress) {
 			err("Alternate settings have different endpoint addresses!");
-			return NULL;
+			return -ENODEV;
 		}
 		if ((endpoint->bmAttributes & 0x03) != 0x01) {
 			err("Interface %d. has non-ISO endpoint!", ifnum);
-			return NULL;
+			return -ENODEV;
 		}
 		if ((endpoint->bEndpointAddress & 0x80) == 0) {
 			err("Interface %d. has ISO OUT endpoint!", ifnum);
-			return NULL;
+			return -ENODEV;
 		}
 		if (endpoint->wMaxPacketSize == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
 				err("More than one inactive alt. setting!");
-				return NULL;
+				return -ENODEV;
 			}
 		} else {
 			if (actInterface < 0) {
@@ -3781,7 +3783,7 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 	}
 	if ((maxPS <= 0) || (actInterface < 0) || (inactInterface < 0)) {
 		err("Failed to recognize the camera!");
-		return NULL;
+		return -ENODEV;
 	}
 
 	/* Validate options */
@@ -3861,7 +3863,7 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 		break;
 	default:
 		err("IBM camera: Model %d. not supported!", model);
-		return NULL;
+		return -ENODEV;
 	}
 
 	/* Code below may sleep, need to lock module while we are here */
@@ -3896,7 +3898,8 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 		}
 	}
 	MOD_DEC_USE_COUNT;
-	return uvd;
+	dev_set_drvdata (&intf->dev, uvd);
+	return 0;
 }
 
 

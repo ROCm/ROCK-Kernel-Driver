@@ -114,12 +114,11 @@ MODULE_AUTHOR("Michael Zappe <zapman@interlan.net>, Stephane Alnet <stephane@u-p
 MODULE_DESCRIPTION("KL5USB101 USB Ethernet driver");
 MODULE_LICENSE("GPL");
 
-static void *kaweth_probe(
-            struct usb_device *dev,             /* the device */
-            unsigned ifnum,                     /* what interface */
-            const struct usb_device_id *id      /* from id_table */
+static int kaweth_probe(
+		struct usb_interface *intf,
+		const struct usb_device_id *id	/* from id_table */
 	);
-static void kaweth_disconnect(struct usb_device *dev, void *ptr);
+static void kaweth_disconnect(struct usb_interface *intf);
 int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 				struct usb_ctrlrequest *cmd, void *data,
 				int len, int timeout);
@@ -847,12 +846,12 @@ static void kaweth_tx_timeout(struct net_device *net)
 /****************************************************************
  *     kaweth_probe
  ****************************************************************/
-static void *kaweth_probe(
-            struct usb_device *dev,             /* the device */
-            unsigned ifnum,                      /* what interface */
-            const struct usb_device_id *id      /* from id_table */
+static int kaweth_probe(
+		struct usb_interface *intf,
+		const struct usb_device_id *id      /* from id_table */
 	)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct kaweth_device *kaweth;
 	struct net_device *netdev;
 	const eth_addr_t bcast_addr = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
@@ -871,7 +870,7 @@ static void *kaweth_probe(
 		 (int)dev->descriptor.bDescriptorType);
 
 	if(!(kaweth = kmalloc(sizeof(struct kaweth_device), GFP_KERNEL)))
-		return NULL;
+		return -ENOMEM;
 
 	memset(kaweth, 0, sizeof(struct kaweth_device));
 
@@ -902,7 +901,7 @@ static void *kaweth_probe(
 			kaweth_err("Error downloading firmware (%d)", result);
 			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
-			return NULL;
+			return -EIO;
 		}
 
 		if ((result = kaweth_download_firmware(kaweth,
@@ -913,7 +912,7 @@ static void *kaweth_probe(
 			kaweth_err("Error downloading firmware fix (%d)", result);
 			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
-			return NULL;
+			return -EIO;
 		}
 
 		if ((result = kaweth_download_firmware(kaweth,
@@ -924,7 +923,7 @@ static void *kaweth_probe(
 			kaweth_err("Error downloading trigger code (%d)", result);
 			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
-			return NULL;
+			return -EIO;
 		}
 
 		if ((result = kaweth_download_firmware(kaweth,
@@ -935,7 +934,7 @@ static void *kaweth_probe(
 			kaweth_err("Error downloading trigger code fix (%d)", result);
 			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
-			return NULL;
+			return -EIO;
 		}
 
 
@@ -943,14 +942,14 @@ static void *kaweth_probe(
 			kaweth_err("Error triggering firmware (%d)", result);
 			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
-			return NULL;
+			return -EIO;
 		}
 
 		/* Device will now disappear for a moment...  */
 		kaweth_info("Firmware loaded.  I'll be back...");
 		free_page((unsigned long)kaweth->firmware_buf);
 		kfree(kaweth);
-		return NULL;
+		return -EIO;
 	}
 
 	result = kaweth_read_configuration(kaweth);
@@ -958,7 +957,7 @@ static void *kaweth_probe(
 	if(result < 0) {
 		kaweth_err("Error reading configuration (%d), no net device created", result);
 		kfree(kaweth);
-		return NULL;
+		return -EIO;
 	}
 
 	kaweth_info("Statistics collection: %x", kaweth->configuration.statistics_mask);
@@ -977,17 +976,17 @@ static void *kaweth_probe(
 		   sizeof(bcast_addr))) {
 		kaweth_err("Firmware not functioning properly, no net device created");
 		kfree(kaweth);
-		return NULL;
+		return -EIO;
 	}
 
 	if(kaweth_set_urb_size(kaweth, KAWETH_BUF_SIZE) < 0) {
 		kaweth_dbg("Error setting URB size");
-		return kaweth;
+		goto err_no_netdev;
 	}
 
 	if(kaweth_set_sofs_wait(kaweth, KAWETH_SOFS_TO_WAIT) < 0) {
 		kaweth_err("Error setting SOFS wait");
-		return kaweth;
+		goto err_no_netdev;
 	}
 
 	result = kaweth_set_receive_filter(kaweth,
@@ -998,14 +997,14 @@ static void *kaweth_probe(
 	if(result < 0) {
 		kaweth_err("Error setting receive filter");
 		kfree(kaweth);
-		return NULL;
+		return -EIO;
 	}
 
 	kaweth_dbg("Initializing net device.");
 
 	if(!(netdev = kmalloc(sizeof(struct net_device), GFP_KERNEL))) {
 		kfree(kaweth);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	kaweth->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -1050,27 +1049,30 @@ static void *kaweth_probe(
 
 	kaweth_dbg("Kaweth probe returning.");
 
-	return kaweth;
+	dev_set_drvdata (&intf->dev, kaweth);
+	return 0;
 
 err_tx_and_rx:
 	usb_free_urb(kaweth->rx_urb);
 err_only_tx:
 	usb_free_urb(kaweth->tx_urb);
 err_no_urb:
-	kfree(kaweth);
 	kfree(netdev);
-	return NULL;
+err_no_netdev:
+	kfree(kaweth);
+	return -EIO;
 }
 
 /****************************************************************
  *     kaweth_disconnect
  ****************************************************************/
-static void kaweth_disconnect(struct usb_device *dev, void *ptr)
+static void kaweth_disconnect(struct usb_interface *intf)
 {
-	struct kaweth_device *kaweth = ptr;
+	struct kaweth_device *kaweth = dev_get_drvdata (&intf->dev);
 
 	kaweth_info("Unregistering");
 
+	dev_set_drvdata (&intf->dev, NULL);
 	if (!kaweth) {
 		kaweth_warn("unregistering non-existant device");
 		return;

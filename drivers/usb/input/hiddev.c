@@ -751,10 +751,10 @@ void hiddev_disconnect(struct hid_device *hid)
 /* We never attach in this manner, and rely on HID to connect us.  This
  * is why there is no disconnect routine defined in the usb_driver either.
  */
-static void *hiddev_usbd_probe(struct usb_device *dev, unsigned int ifnum,
-			  const struct usb_device_id *hiddev_info)
+static int hiddev_usbd_probe(struct usb_interface *intf, 
+			     const struct usb_device_id *hiddev_info)
 {
-	return NULL;
+	return -ENODEV;
 }
 
 

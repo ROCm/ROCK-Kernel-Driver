@@ -54,7 +54,7 @@ static int usbvideo_default_procfs_write_proc(
 	unsigned long count, void *data);
 #endif
 
-static void usbvideo_Disconnect(struct usb_device *dev, void *ptr);
+static void usbvideo_Disconnect(struct usb_interface *intf);
 static void usbvideo_CameraRelease(struct uvd *uvd);
 
 static int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
@@ -966,18 +966,21 @@ EXPORT_SYMBOL(usbvideo_Deregister);
  * 24-May-2000 Corrected to prevent race condition (MOD_xxx_USE_COUNT).
  * 19-Oct-2000 Moved to usbvideo module.
  */
-static void usbvideo_Disconnect(struct usb_device *dev, void *ptr)
+static void usbvideo_Disconnect(struct usb_interface *intf)
 {
-	struct uvd *uvd = (struct uvd *) ptr;
+	struct uvd *uvd = dev_get_drvdata (&intf->dev);
 	int i;
 
-	if ((dev == NULL) || (uvd == NULL)) {
-		err("%s($%p,$%p): Illegal call.", __FUNCTION__, dev, ptr);
+	if (uvd == NULL) {
+		err("%s($%p): Illegal call.", __FUNCTION__, intf);
 		return;
 	}
+
+	dev_set_drvdata (&intf->dev, NULL);
+
 	usbvideo_ClientIncModCount(uvd);
 	if (uvd->debug > 0)
-		info("%s(%p,%p.)", __FUNCTION__, dev, ptr);
+		info("%s(%p.)", __FUNCTION__, intf);
 
 	down(&uvd->lock);
 	uvd->remove_pending = 1; /* Now all ISO data will be ignored */

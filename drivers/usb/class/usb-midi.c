@@ -2020,13 +2020,16 @@ static int detect_by_hand(struct usb_device *d, unsigned int ifnum, struct usb_m
 
 /* ------------------------------------------------------------------------- */
 
-static void *usb_midi_probe(struct usb_device *dev, unsigned int ifnum,
-			    const struct usb_device_id *id)
+static int usb_midi_probe(struct usb_interface *intf, 
+			  const struct usb_device_id *id)
 {
 	struct usb_midi_state *s;
+	struct usb_device *dev = interface_to_usbdev(intf);
+	int ifnum = intf->altsetting->bInterfaceNumber;
 
 	s = (struct usb_midi_state *)kmalloc(sizeof(struct usb_midi_state), GFP_KERNEL);
-	if ( !s ) { return NULL; }
+	if ( !s )
+		return -ENOMEM;
 
 	memset( s, 0, sizeof(struct usb_midi_state) );
 	INIT_LIST_HEAD(&s->midiDevList);
@@ -2042,7 +2045,7 @@ static void *usb_midi_probe(struct usb_device *dev, unsigned int ifnum,
 		detect_vendor_specific_device( dev, ifnum, s ) &&
 		detect_yamaha_device( dev, ifnum, s) ) {
 		kfree(s);
-		return NULL;
+		return -EIO;
 	}
 
 	down(&open_sem);
@@ -2053,15 +2056,19 @@ static void *usb_midi_probe(struct usb_device *dev, unsigned int ifnum,
 	MOD_INC_USE_COUNT;
 #endif
 
-	return s;
+	dev_set_drvdata (&intf->dev, s);
+	return 0;
 }
 
 
-static void usb_midi_disconnect(struct usb_device *dev, void *ptr)
+static void usb_midi_disconnect(struct usb_interface *intf)
 {
-	struct usb_midi_state *s = (struct usb_midi_state *)ptr;
+	struct usb_midi_state *s = dev_get_drvdata (&intf->dev);
 	struct list_head      *list;
 	struct usb_mididev    *m;
+
+	if ( !s )
+		return;
 
 	if ( s == (struct usb_midi_state *)-1 ) {
 		return;
@@ -2073,6 +2080,7 @@ static void usb_midi_disconnect(struct usb_device *dev, void *ptr)
 	list_del(&s->mididev);
 	INIT_LIST_HEAD(&s->mididev);
 	s->usbdev = NULL;
+	dev_set_drvdata (&intf->dev, NULL);
 
 	for ( list = s->midiDevList.next; list != &s->midiDevList; list = list->next ) {
 		m = list_entry(list, struct usb_mididev, list);
@@ -2092,14 +2100,17 @@ static void usb_midi_disconnect(struct usb_device *dev, void *ptr)
 	return;
 }
 
-
+/* we want to look at all devices by hand */
+static struct usb_device_id id_table[] = {
+	{.driver_info = 42},
+	{}
+};
 
 static struct usb_driver usb_midi_driver = {
-	.name = "midi",
-	.probe = usb_midi_probe,
-	.disconnect = usb_midi_disconnect,
-	.id_table =	NULL, 			/* check all devices */
-	.driver_list = LIST_HEAD_INIT(usb_midi_driver.driver_list)
+	.name =		"midi",
+	.probe =	usb_midi_probe,
+	.disconnect =	usb_midi_disconnect,
+	.id_table =	id_table,
 };
 
 /* ------------------------------------------------------------------------- */

@@ -1123,9 +1123,10 @@ static struct usb_driver CDCEther_driver ;
 // claims interfaces if they are for an Ethernet CDC /////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
-			     const struct usb_device_id *id)
+static int CDCEther_probe( struct usb_interface *intf,
+			   const struct usb_device_id *id)
 {
+	struct usb_device	*usb = interface_to_usbdev(intf);
 	struct net_device	*net;
 	ether_dev_t		*ether_dev;
 	int 			rc;
@@ -1135,7 +1136,7 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	if ( check_for_claimed_interfaces( usb->actconfig ) ) {
 		// Someone has already put there grubby paws on this device.
 		// We don't want it now...
-		return NULL;
+		return -ENODEV;
 	}
 
 	// We might be finding a device we can use.
@@ -1144,7 +1145,7 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	// we are going to need later.
 	if(!(ether_dev = kmalloc(sizeof(ether_dev_t), GFP_KERNEL))) {
 		err("out of memory allocating device structure");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	// Zero everything out.
@@ -1153,20 +1154,20 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	ether_dev->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ether_dev->rx_urb) {
 		kfree(ether_dev);
-		return NULL;
+		return -ENOMEM;
 	}
 	ether_dev->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ether_dev->tx_urb) {
 		usb_free_urb(ether_dev->rx_urb);
 		kfree(ether_dev);
-		return NULL;
+		return -ENOMEM;
 	}
 	ether_dev->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ether_dev->intr_urb) {
 		usb_free_urb(ether_dev->tx_urb);
 		usb_free_urb(ether_dev->rx_urb);
 		kfree(ether_dev);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	// Let's see if we can find a configuration we can use.
@@ -1261,8 +1262,12 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	// TODO - last minute HACK
 	ether_dev->comm_ep_in = 5;
 
+/* FIXME!!! This driver needs to be fixed to work with the new USB interface logic
+ * this is not the correct thing to be doing here, we need to set the interface
+ * driver specific data field.
+ */
 	// Okay, we are finally done...
-	return NULL;
+	return 0;
 
 	// bailing out with our tail between our knees
 error_all:
@@ -1270,7 +1275,7 @@ error_all:
 	usb_free_urb(ether_dev->rx_urb);
 	usb_free_urb(ether_dev->intr_urb);
 	kfree( ether_dev );
-	return	NULL;
+	return -EIO;
 }
 
 
@@ -1280,9 +1285,12 @@ error_all:
 // (Whichever happens first assuming the driver suceeded at its probe) ///////
 //////////////////////////////////////////////////////////////////////////////
 
-static void CDCEther_disconnect( struct usb_device *usb, void *ptr )
+static void CDCEther_disconnect( struct usb_interface *intf )
 {
-	ether_dev_t *ether_dev = ptr;
+	ether_dev_t *ether_dev = dev_get_drvdata (&intf->dev);
+	struct usb_device *usb;
+
+	dev_set_drvdata (&intf->dev, NULL);
 
 	// Sanity check!!!
 	if ( !ether_dev || !ether_dev->usb ) {
@@ -1294,6 +1302,8 @@ static void CDCEther_disconnect( struct usb_device *usb, void *ptr )
 	// Make sure we fail the sanity check if we try this again.
 	ether_dev->usb = NULL;
 	
+	usb = interface_to_usbdev(intf);
+
 	// It is possible that this function is called before
 	// the "close" function.
 	// This tells the close function we are already disconnected

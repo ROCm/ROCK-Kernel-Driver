@@ -105,28 +105,12 @@ MODULE PARAMETERS:
           4=most function calls and data parsing messages
           5=highly repetitive mesgs
 
-  NAME: fix_rgb_offset
-  TYPE: integer (Boolean)
-  DEFAULT: 0
-  DESC: Some people have reported that the blue component of the image is one
-        or so lines higher than the red component. This is only apparent in 
-        images with white objects on black backgrounds at 640x480. Setting this
-        to 1 will realign the color planes correctly. NOTE: You will likely
-        need a fast (500 MHz) CPU.
-
   NAME: snapshot
   TYPE: integer (Boolean)
   DEFAULT: 0
   DESC: Set to 1 to enable snapshot mode. read()/VIDIOCSYNC will block until
 	the snapshot button is pressed. Note: enabling this mode disables
 	/proc/video/ov511/<minor#>/button
-
-  NAME: force_rgb	(Deprecated; may be removed in the future)
-  TYPE: integer (Boolean)
-  DEFAULT: 0
-  DESC: Force image to be read in RGB instead of BGR. This option allow
-        programs that expect RGB data (e.g. gqcam) to work with this driver. If
-        your colors look VERY wrong, you may want to change this.
 
   NAME: cams
   TYPE: integer (1-4 for OV511, 1-31 for OV511+)
@@ -234,12 +218,7 @@ MODULE PARAMETERS:
 	greyscale mode with a color camera, for example. Supported modes are:
 		0                           (Allows all the following formats)
 		1   VIDEO_PALETTE_GREY      (Linear greyscale)
-		3   VIDEO_PALETTE_RGB565    (565 16 bit RGB)
-		4   VIDEO_PALETTE_RGB24     (24bit RGB)
-		7   VIDEO_PALETTE_YUV422    (YUV422 capture)
-		8   VIDEO_PALETTE_YUYV      (YUV422 capture; same as 7)
 		10  VIDEO_PALETTE_YUV420    (YUV 4:2:0 Planar)
-		13  VIDEO_PALETTE_YUV422P   (YUV 4:2:2 Planar)
 		15  VIDEO_PALETTE_YUV420P   (YUV 4:2:0 Planar, same as 10)
 
   NAME: backlight
@@ -278,29 +257,17 @@ MODULE PARAMETERS:
 
 WORKING FEATURES:
  o Color streaming/capture at most widths and heights that are multiples of 8.
- o RGB24, RGB565, YUV420/YUV420P, YUV422/YUYV, and YUV422P color
  o Monochrome (use force_palette=1 to enable)
  o Setting/getting of saturation, contrast, brightness, and hue (only some of
    them work the OV7620 and OV7620AE)
  o /proc status reporting
  o SAA7111A video capture support at 320x240 and 640x480
  o Compression support
-
-EXPERIMENTAL FEATURES:
- o OV518/OV518+ support
- o OV6630 sensor support
- o Banding filter
  o SMP compatibility
-
-TO-DO:
- o V4L2 support (This will be done after the next kernel patch release)
- o Setting of hue not working with OV7620
- o Setting of contrast and hue not working with OV7620AE
- o OV8600 sensor support (Not used in anything yet)
 
 HOW TO CONTACT ME:
 
-You can email me at mmcclell@bigfoot.com . Please prefix the subject line
+You can email me at mark@alpha.dyndns.org . Please prefix the subject line
 with "OV511: " so that I am certain to notice your message.
 
 CREDITS:

@@ -268,18 +268,21 @@ static void powermate_free_buffers(struct usb_device *udev, struct powermate_dev
 }
 
 /* Called whenever a USB device matching one in our supported devices table is connected */
-static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
+static int powermate_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev (intf);
 	struct usb_interface_descriptor *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct powermate_device *pm;
 	int pipe, maxp;
 	char path[64];
 
-	interface = udev->config[0].interface[ifnum].altsetting + 0;
+	interface = intf->altsetting + 0;
 	endpoint = interface->endpoint + 0;
-	if (!(endpoint->bEndpointAddress & 0x80)) return NULL;
-	if ((endpoint->bmAttributes & 3) != 3) return NULL;
+	if (!(endpoint->bEndpointAddress & 0x80))
+		return -EIO;
+	if ((endpoint->bmAttributes & 3) != 3)
+		return -EIO;
 
 	usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 		0x0a, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
@@ -287,7 +290,7 @@ static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const 
 		HZ * USB_CTRL_SET_TIMEOUT);
 
 	if (!(pm = kmalloc(sizeof(struct powermate_device), GFP_KERNEL)))
-		return NULL;
+		return -ENOMEM;
 
 	memset(pm, 0, sizeof(struct powermate_device));
 	pm->udev = udev;
@@ -295,14 +298,14 @@ static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const 
 	if (powermate_alloc_buffers(udev, pm)) {
 		powermate_free_buffers(udev, pm);
 		kfree(pm);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	pm->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!pm->irq) {
 		powermate_free_buffers(udev, pm);
 		kfree(pm);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	pm->config = usb_alloc_urb(0, GFP_KERNEL);
@@ -310,7 +313,7 @@ static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const 
 		usb_free_urb(pm->irq);
 		powermate_free_buffers(udev, pm);
 		kfree(pm);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	init_MUTEX(&pm->lock);
@@ -333,7 +336,7 @@ static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const 
 	if (usb_submit_urb(pm->irq, GFP_KERNEL)) {
 		powermate_free_buffers(udev, pm);
 		kfree(pm);
-		return NULL; /* failure */
+		return -EIO; /* failure */
 	}
 
 	switch (udev->descriptor.idProduct) {
@@ -365,22 +368,27 @@ static void *powermate_probe(struct usb_device *udev, unsigned int ifnum, const 
 	pm->requires_update = UPDATE_PULSE_ASLEEP | UPDATE_PULSE_AWAKE | UPDATE_PULSE_MODE | UPDATE_STATIC_BRIGHTNESS;
 	powermate_pulse_led(pm, 0x80, 255, 0, 1, 0); // set default pulse parameters
   
-	return pm;
+	dev_set_drvdata(&intf->dev, pm);
+	return 0;
 }
 
 /* Called when a USB device we've accepted ownership of is removed */
-static void powermate_disconnect(struct usb_device *dev, void *ptr)
+static void powermate_disconnect(struct usb_interface *intf)
 {
-	struct powermate_device *pm = ptr;
-	down(&pm->lock);
-	pm->requires_update = 0;
-	usb_unlink_urb(pm->irq);
-	input_unregister_device(&pm->input);
-	usb_free_urb(pm->irq);
-	usb_free_urb(pm->config);
-	powermate_free_buffers(dev, pm);
-  
-	kfree(pm);
+	struct powermate_device *pm = dev_get_drvdata(&intf->dev);
+
+	dev_set_drvdata(&intf->dev, NULL);
+	if (pm) {
+		down(&pm->lock);
+		pm->requires_update = 0;
+		usb_unlink_urb(pm->irq);
+		input_unregister_device(&pm->input);
+		usb_free_urb(pm->irq);
+		usb_free_urb(pm->config);
+		powermate_free_buffers(interface_to_usbdev(intf), pm);
+
+		kfree(pm);
+	}
 }
 
 static struct usb_device_id powermate_devices [] = {

@@ -195,8 +195,9 @@ static void xpad_close (struct input_dev *dev)
 		usb_unlink_urb(xpad->irq_in);
 }
 
-static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
+static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev (intf);
 	struct usb_xpad *xpad = NULL;
 	struct usb_endpoint_descriptor *ep_irq_in;
 	char path[64];
@@ -210,7 +211,7 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	
 	if ((xpad = kmalloc (sizeof(struct usb_xpad), GFP_KERNEL)) == NULL) {
 		err("cannot allocate memory for new pad");
-		return NULL;
+		return -ENOMEM;
 	}
 	memset(xpad, 0, sizeof(struct usb_xpad));
 	
@@ -218,7 +219,7 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 				       SLAB_ATOMIC, &xpad->idata_dma);
 	if (!xpad->idata) {
 		kfree(xpad);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	xpad->irq_in = usb_alloc_urb(0, GFP_KERNEL);
@@ -226,10 +227,10 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 		err("cannot allocate memory for new pad irq urb");
 		usb_buffer_free(udev, XPAD_PKT_LEN, xpad->idata, xpad->idata_dma);
                 kfree(xpad);
-                return NULL;
+		return -ENOMEM;
         }
 	
-	ep_irq_in = udev->actconfig->interface[ifnum].altsetting[0].endpoint + 0;
+	ep_irq_in = intf->altsetting[0].endpoint + 0;
 	
 	usb_fill_int_urb(xpad->irq_in, udev,
 			 usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),
@@ -291,18 +292,22 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	
 	printk(KERN_INFO "input: %s on %s", xpad->dev.name, path);
 	
-	return xpad;
+	dev_set_drvdata(&intf->dev, xpad);
+	return 0;
 }
 
-static void xpad_disconnect(struct usb_device *udev, void *ptr)
+static void xpad_disconnect(struct usb_interface *intf)
 {
-	struct usb_xpad *xpad = ptr;
+	struct usb_xpad *xpad = dev_get_drvdata(&intf->dev);
 	
-	usb_unlink_urb(xpad->irq_in);
-	input_unregister_device(&xpad->dev);
-	usb_free_urb(xpad->irq_in);
-	usb_buffer_free(udev, XPAD_PKT_LEN, xpad->idata, xpad->idata_dma);
-	kfree(xpad);
+	dev_set_drvdata(&intf->dev, NULL);
+	if (xpad) {
+		usb_unlink_urb(xpad->irq_in);
+		input_unregister_device(&xpad->dev);
+		usb_free_urb(xpad->irq_in);
+		usb_buffer_free(interface_to_usbdev(intf), XPAD_PKT_LEN, xpad->idata, xpad->idata_dma);
+		kfree(xpad);
+	}
 }
 
 static struct usb_driver xpad_driver = {
