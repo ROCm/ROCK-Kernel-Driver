@@ -227,7 +227,9 @@ xfs_getattr(
 		((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 			XFS_XFLAG_REALTIME : 0) |
 		((ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ?
-			XFS_XFLAG_PREALLOC : 0);
+			XFS_XFLAG_PREALLOC : 0) |
+		(XFS_IFORK_Q(ip) ?
+			XFS_XFLAG_HASATTR : 0);
 	vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 	vap->va_nextents =
 		(ip->i_df.if_flags & XFS_IFEXTENTS) ?
