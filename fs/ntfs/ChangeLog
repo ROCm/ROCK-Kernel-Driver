@@ -28,6 +28,7 @@ ToDo:
 
 	- Fix a stupid bug introduced in 2.0.15 where we were unmapping the
 	  wrong inode in fs/ntfs/inode.c::ntfs_attr_iget().
+	- Fix debugging check in fs/ntfs/aops.c::ntfs_read_block().
 	- Convert $MFT/$BITMAP access to attribute inode API and remove all
 	  remnants of the ugly mftbmp address space and operations hack. This
 	  means we finally have only one readpage function as well as only one

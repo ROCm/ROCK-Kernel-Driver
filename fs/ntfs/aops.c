@@ -186,7 +186,7 @@ static int ntfs_read_block(struct page *page)
 	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
 
 #ifdef DEBUG
-	if (unlikely(!ni->run_list.rl && !ni->mft_no))
+	if (unlikely(!ni->run_list.rl && !ni->mft_no && !NInoAttr(ni)))
 		panic("NTFS: $MFT/$DATA run list has been unmapped! This is a "
 				"very serious bug! Cannot continue...");
 #endif
