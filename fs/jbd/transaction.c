@@ -1861,6 +1861,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 		 * running transaction if that is set, but nothing
 		 * else. */
 		JBUFFER_TRACE(jh, "on committing transaction");
+		set_buffer_freed(bh);
 		if (jh->b_next_transaction) {
 			J_ASSERT(jh->b_next_transaction ==
 					journal->j_running_transaction);
