@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.5)
+ * Driver for USB Scanners (linux-2.6)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  * Copyright (C) 2002, 2003 Henning Meier-Geinitz
@@ -369,13 +369,15 @@
  *    - Added vendor/product ids for Avision, Canon, HP, Microtek and Relisys scanners.
  *    - Clean up irq urb when not enough memory is available.
  *
- * 0.4.15  2003-09-12
+ * 0.4.15  2003-09-22
  *    - Use static declarations for usb_scanner_init/usb_scanner_exit 
  *      (Daniele Bellucci).
  *    - Report back return codes of usb_register and usb_usbmit_urb instead of -1 or
  *      -ENONMEM (Daniele Bellucci).
  *    - Balancing usb_register_dev/usb_deregister_dev in probe_scanner when a fail 
  *      condition occours (Daniele Bellucci).
+ *    - Added vendor/product ids for Canon, HP, Microtek, Mustek, Siemens, UMAX, and
+ *      Visioneer scanners.
  *
  *
  * TODO
