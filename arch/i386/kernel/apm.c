@@ -724,13 +724,13 @@ static int set_power_state(u_short what, u_short state)
 }
 
 /**
- *	apm_set_power_state - set system wide power state
+ *	set_system_power_state - set system wide power state
  *	@state: which state to enter
  *
  *	Transition the entire system into a new APM power state.
  */
  
-static int apm_set_power_state(u_short state)
+static int set_system_power_state(u_short state)
 {
 	return set_power_state(APM_DEVICE_ALL, state);
 }
@@ -912,7 +912,7 @@ static void apm_power_off(void)
 	if (apm_info.realmode_power_off)
 		machine_real_restart(po_bios_call, sizeof(po_bios_call));
 	else
-		(void) apm_set_power_state(APM_STATE_OFF);
+		(void) set_system_power_state(APM_STATE_OFF);
 }
 
 /**
@@ -1198,7 +1198,7 @@ static int suspend(int vetoable)
 		/* Vetoed */
 		if (vetoable) {
 			if (apm_info.connection_version > 0x100)
-				apm_set_power_state(APM_STATE_REJECT);
+				set_system_power_state(APM_STATE_REJECT);
 			err = -EBUSY;
 			ignore_sys_suspend = 0;
 			printk(KERN_WARNING "apm: suspend was vetoed.\n");
@@ -1208,7 +1208,7 @@ static int suspend(int vetoable)
 	}
 	get_time_diff();
 	cli();
-	err = apm_set_power_state(APM_STATE_SUSPEND);
+	err = set_system_power_state(APM_STATE_SUSPEND);
 	reinit_timer();
 	set_time();
 	ignore_normal_resume = 1;
@@ -1237,7 +1237,7 @@ static void standby(void)
 
 	/* If needed, notify drivers here */
 	get_time_diff();
-	err = apm_set_power_state(APM_STATE_STANDBY);
+	err = set_system_power_state(APM_STATE_STANDBY);
 	if ((err != APM_SUCCESS) && (err != APM_NO_ERROR))
 		apm_error("standby", err);
 }
@@ -1291,13 +1291,13 @@ static void check_events(void)
 		case APM_USER_SUSPEND:
 #ifdef CONFIG_APM_IGNORE_USER_SUSPEND
 			if (apm_info.connection_version > 0x100)
-				apm_set_power_state(APM_STATE_REJECT);
+				set_system_power_state(APM_STATE_REJECT);
 			break;
 #endif
 		case APM_SYS_SUSPEND:
 			if (ignore_bounce) {
 				if (apm_info.connection_version > 0x100)
-					apm_set_power_state(APM_STATE_REJECT);
+					set_system_power_state(APM_STATE_REJECT);
 				break;
 			}
 			/*
@@ -1363,7 +1363,7 @@ static void apm_event_handler(void)
 			pending_count = 4;
 			if (debug)
 				printk(KERN_DEBUG "apm: setting state busy\n");
-			err = apm_set_power_state(APM_STATE_BUSY);
+			err = set_system_power_state(APM_STATE_BUSY);
 			if (err)
 				apm_error("busy", err);
 		}
