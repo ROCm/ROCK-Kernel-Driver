@@ -3046,12 +3046,10 @@ S: Sevilla 41005
 S: Spain
 
 N: Linus Torvalds
-E: torvalds@transmeta.com
-W: http://www.cs.helsinki.fi/Linus.Torvalds
-P: 1024/A86B35C5 96 54 50 29 EC 11 44 7A  BE 67 3C 24 03 13 62 C8
+E: torvalds@osdl.org
 D: Original kernel hacker
-S: 3990 Freedom Circle
-S: Santa Clara, California 95054
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, Oregon 97005
 S: USA
 
 N: Marcelo W. Tosatti
