@@ -230,6 +230,7 @@ void reparent_to_init(void)
 	/* signals? */
 	security_task_reparent_to_init(current);
 	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
+	atomic_inc(&(INIT_USER->__count));
 	switch_uid(INIT_USER);
 
 	write_unlock_irq(&tasklist_lock);
@@ -682,6 +683,8 @@ NORET_TYPE void do_exit(long code)
 		panic("Attempted to kill the idle task!");
 	if (unlikely(tsk->pid == 1))
 		panic("Attempted to kill init!");
+	if (tsk->io_context)
+		exit_io_context();
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 

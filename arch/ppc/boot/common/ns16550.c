@@ -95,8 +95,3 @@ serial_tstc(unsigned long com_port)
 {
 	return ((inb(com_port + (UART_LSR << shift)) & UART_LSR_DR) != 0);
 }
-
-void
-serial_close(unsigned long com_port)
-{
-}

@@ -759,17 +759,18 @@ int flush_old_exec(struct linux_binprm * bprm)
 	char * name;
 	int i, ch, retval;
 
-	/* 
-	 * Release all of the old mmap stuff
-	 */
-	retval = exec_mmap(bprm->mm);
-	if (retval)
-		goto out;
 	/*
 	 * Make sure we have a private signal table and that
 	 * we are unassociated from the previous thread group.
 	 */
 	retval = de_thread(current);
+	if (retval)
+		goto out;
+
+	/*
+	 * Release all of the old mmap stuff
+	 */
+	retval = exec_mmap(bprm->mm);
 	if (retval)
 		goto out;
 

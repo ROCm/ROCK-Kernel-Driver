@@ -851,14 +851,4 @@ kgdb_output_string (const char* s, unsigned int count)
 	putpacket(buffer);
 
 	return 1;
- }
-
-#if defined(CONFIG_6xx) || defined(CONFIG_POWER3)
-
-/* This is used on arches which don't have a serial driver that maps
- * the ports for us */
-void
-kgdb_map_scc(void)
-{
 }
-#endif

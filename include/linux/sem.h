@@ -109,7 +109,6 @@ struct sem_queue {
 	int			id;	 /* internal sem id */
 	struct sembuf *		sops;	 /* array of pending operations */
 	int			nsops;	 /* number of operations */
-	int			alter;	 /* operation will alter semaphore */
 };
 
 /* Each task has a list of undo requests. They are executed automatically
