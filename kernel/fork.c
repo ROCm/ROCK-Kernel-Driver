@@ -477,20 +477,34 @@ void mmput(struct mm_struct *mm)
 	}
 }
 
-/*
- * Checks if the use count of an mm is non-zero and if so
- * returns a reference to it after bumping up the use count.
- * If the use count is zero, it means this mm is going away,
- * so return NULL.
+/**
+ * get_task_mm - acquire a reference to the task's mm
+ *
+ * Returns %NULL if the task has no mm.  Checks if the use count
+ * of the mm is non-zero and if so returns a reference to it, after
+ * bumping up the use count.  User must release the mm via mmput()
+ * after use.  Typically used by /proc and ptrace.
+ *
+ * If the use count is zero, it means that this mm is going away,
+ * so return %NULL.  This only happens in the case of an AIO daemon
+ * which has temporarily adopted an mm (see use_mm), in the course
+ * of its final mmput, before exit_aio has completed.
  */
-struct mm_struct *mmgrab(struct mm_struct *mm)
+struct mm_struct *get_task_mm(struct task_struct *task)
 {
-	spin_lock(&mmlist_lock);
-	if (!atomic_read(&mm->mm_users))
-		mm = NULL;
-	else
-		atomic_inc(&mm->mm_users);
-	spin_unlock(&mmlist_lock);
+	struct mm_struct *mm;
+
+	task_lock(task);
+	mm = task->mm;
+	if (mm) {
+		spin_lock(&mmlist_lock);
+		if (!atomic_read(&mm->mm_users))
+			mm = NULL;
+		else
+			atomic_inc(&mm->mm_users);
+		spin_unlock(&mmlist_lock);
+	}
+	task_unlock(task);
 	return mm;
 }
 

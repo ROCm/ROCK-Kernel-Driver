@@ -788,8 +788,8 @@ static inline void mmdrop(struct mm_struct * mm)
 
 /* mmput gets rid of the mappings and all user-space */
 extern void mmput(struct mm_struct *);
-/* Grab a reference to the mm if its not already going away */
-extern struct mm_struct *mmgrab(struct mm_struct *);
+/* Grab a reference to a task's mm, if it is not already going away */
+extern struct mm_struct *get_task_mm(struct task_struct *task);
 /* Remove the current tasks stale references to the old mm_struct */
 extern void mm_release(struct task_struct *, struct mm_struct *);
 
@@ -890,27 +890,7 @@ static inline void task_unlock(struct task_struct *p)
 {
 	spin_unlock(&p->alloc_lock);
 }
- 
-/**
- * get_task_mm - acquire a reference to the task's mm
- *
- * Returns %NULL if the task has no mm. User must release
- * the mm via mmput() after use.
- */
-static inline struct mm_struct * get_task_mm(struct task_struct * task)
-{
-	struct mm_struct * mm;
- 
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		mm = mmgrab(mm);
-	task_unlock(task);
 
-	return mm;
-}
- 
- 
 /* set thread flags in other task's structures
  * - see asm/thread_info.h for TIF_xxxx flags available
  */
