@@ -53,14 +53,16 @@ is_aoe_netif(struct net_device *ifp)
 }
 
 int
-set_aoe_iflist(char *str)
+set_aoe_iflist(const char __user *user_str, size_t size)
 {
-	int len = strlen(str);
-
-	if (len >= IFLISTSZ)
+	if (size >= IFLISTSZ)
 		return -EINVAL;
 
-	strcpy(aoe_iflist, str);
+	if (copy_from_user(aoe_iflist, user_str, size)) {
+		printk(KERN_INFO "aoe: %s: copy from user failed\n", __FUNCTION__);
+		return -EFAULT;
+	}
+	aoe_iflist[size] = 0x00;
 	return 0;
 }
 

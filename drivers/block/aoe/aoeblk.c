@@ -170,7 +170,7 @@ aoeblk_ioctl(struct inode *inode, struct file *filp, uint cmd, ulong arg)
 
 	if (cmd == HDIO_GETGEO) {
 		d->geo.start = get_start_sect(inode->i_bdev);
-		if (!copy_to_user((void *) arg, &d->geo, sizeof d->geo))
+		if (!copy_to_user((void __user *) arg, &d->geo, sizeof d->geo))
 			return 0;
 		return -EFAULT;
 	}
@@ -227,7 +227,7 @@ aoeblk_gdalloc(void *vp)
 	
 	printk(KERN_INFO "aoe: %012llx e%lu.%lu v%04x has %llu "
 		"sectors\n", mac_addr(d->addr), d->aoemajor, d->aoeminor,
-		d->fw_ver, d->ssize);
+		d->fw_ver, (long long)d->ssize);
 }
 
 void __exit

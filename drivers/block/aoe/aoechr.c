@@ -51,9 +51,9 @@ discover(void)
 }
 
 static int
-interfaces(char *str)
+interfaces(const char __user *str, size_t size)
 {
-	if (set_aoe_iflist(str)) {
+	if (set_aoe_iflist(str, size)) {
 		printk(KERN_CRIT
 		       "%s: could not set interface list: %s\n",
 		       __FUNCTION__, "too many interfaces");
@@ -135,24 +135,10 @@ aoechr_hdump(char *buf, int n)
 }
 
 static ssize_t
-aoechr_write(struct file *filp, const char *buf, size_t cnt, loff_t *offp)
+aoechr_write(struct file *filp, const char __user *buf, size_t cnt, loff_t *offp)
 {
-	char *str = kcalloc(1, cnt+1, GFP_KERNEL);
-	int ret;
+	int ret = -EINVAL;
 
-	if (!str) {
-		printk(KERN_CRIT "aoe: aoechr_write: cannot allocate memory\n");
-		return -ENOMEM;
-	}
-
-	ret = -EFAULT;
-	if (copy_from_user(str, buf, cnt)) {
-		printk(KERN_INFO "aoe: aoechr_write: copy from user failed\n");
-		goto out;
-	}
-
-	str[cnt] = '\0';
-	ret = -EINVAL;
 	switch ((unsigned long) filp->private_data) {
 	default:
 		printk(KERN_INFO "aoe: aoechr_write: can't write to that file.\n");
@@ -161,13 +147,11 @@ aoechr_write(struct file *filp, const char *buf, size_t cnt, loff_t *offp)
 		ret = discover();
 		break;
 	case MINOR_INTERFACES:
-		ret = interfaces(str);
+		ret = interfaces(buf, cnt);
 		break;
 	}
 	if (ret == 0)
 		ret = cnt;
- out:
-	kfree(str);
 	return ret;
 }
 
@@ -192,7 +176,7 @@ aoechr_rel(struct inode *inode, struct file *filp)
 }
 
 static ssize_t
-aoechr_read(struct file *filp, char *buf, size_t cnt, loff_t *off)
+aoechr_read(struct file *filp, char __user *buf, size_t cnt, loff_t *off)
 {
 	int n;
 	char *mp;
