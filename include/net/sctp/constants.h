@@ -216,7 +216,7 @@ typedef enum {
  * - A socket in SCTP_SS_LISTENING state indicates that it is willing to
  *   accept new associations, but cannot initiate the creation of new ones.
  * - A socket in SCTP_SS_ESTABLISHED state indicates that it has a single 
- *   association in ESTABLISHED state.
+ *   association.
  */
 typedef enum {
 	SCTP_SS_CLOSED         = TCP_CLOSE,

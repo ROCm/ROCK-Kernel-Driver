@@ -1545,6 +1545,9 @@ struct sctp_association {
 	 * after reaching 4294967295.
 	 */
 	__u32 addip_serial;
+
+	/* Is it a temporary association? */ 
+	__u8 temp;
 };
 
 

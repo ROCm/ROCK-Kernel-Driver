@@ -1308,6 +1308,7 @@ struct sctp_association *sctp_make_temp_asoc(const struct sctp_endpoint *ep,
 	asoc = sctp_association_new(ep, ep->base.sk, scope, gfp);
 	if (!asoc)
 		goto nodata;
+	asoc->temp = 1;
 	skb = chunk->skb;
 	/* Create an entry for the source address of the packet.  */
 	/* FIXME: Use the af specific helpers. */

@@ -688,7 +688,17 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	/* Walk all associations on a socket, not on an endpoint.  */
 	list_for_each_safe(pos, temp, &ep->asocs) {
 		asoc = list_entry(pos, struct sctp_association, asocs);
-		sctp_primitive_SHUTDOWN(asoc, NULL);
+
+		/* A closed association can still be in the list if it
+		 * belongs to a TCP-style listening socket that is not
+		 * yet accepted.
+		 */
+		if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
+		    (SCTP_STATE_CLOSED == asoc->state)) {
+			sctp_unhash_established(asoc);
+			sctp_association_free(asoc);
+		} else
+			sctp_primitive_SHUTDOWN(asoc, NULL);
 	}
 
 	/* Clean up any skbs sitting on the receive queue.  */
@@ -716,6 +726,16 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	sock_put(sk);
 
 	SCTP_DBG_OBJCNT_DEC(sock);
+}
+
+/* Handle EPIPE error. */
+static int sctp_error(struct sock *sk, int flags, int err)
+{
+	if (err == -EPIPE)
+		err = sock_error(sk) ? : -EPIPE;
+	if (err == -EPIPE && !(flags & MSG_NOSIGNAL))
+		send_sig(SIGPIPE, current, 0);
+	return err;
 }
 
 /* API 3.1.3 sendmsg() - UDP Style Syntax
@@ -763,6 +783,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	long timeo;
 	__u16 sinfo_flags = 0;
 	struct sk_buff_head chunks;
+	int msg_flags = msg->msg_flags;
 
 	SCTP_DEBUG_PRINTK("sctp_sendmsg(sk: %p, msg: %p, msg_len: %d)\n",
 			  sk, msg, msg_len);
@@ -772,6 +793,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	ep = sp->ep;
 
 	SCTP_DEBUG_PRINTK("Using endpoint: %s.\n", ep->debug_name);
+
+	if ((SCTP_SOCKET_TCP == sp->type) &&
+	    (SCTP_SS_ESTABLISHED != sk->state)) {
+		err = -EPIPE;
+		goto out_nounlock;
+	}
 
 	/* Parse out the SCTP CMSGs.  */
 	err = sctp_msghdr_parse(msg, &cmsgs);
@@ -859,6 +886,18 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	if (asoc) {
 		SCTP_DEBUG_PRINTK("Just looked up association: "
 				  "%s. \n", asoc->debug_name);
+
+		/* We cannot send a message on a TCP-style SCTP_SS_ESTABLISHED 
+		 * socket that has an association in CLOSED state. This can
+		 * happen when an accepted socket has an association that is
+		 * already CLOSED. 
+		 */
+		if ((SCTP_STATE_CLOSED == asoc->state) &&
+		    (SCTP_SOCKET_TCP == sp->type)) {
+			err = -EPIPE;
+			goto out_unlock;
+		}
+
 		if (sinfo_flags & MSG_EOF) {
 			SCTP_DEBUG_PRINTK("Shutting down association: %p\n",
 					  asoc);
@@ -1067,7 +1106,7 @@ out_unlock:
 	sctp_release_sock(sk);
 
 out_nounlock:
-	return err;
+	return sctp_error(sk, msg_flags, err);
 
 #if 0
 do_sock_err:

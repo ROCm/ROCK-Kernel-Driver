@@ -651,6 +651,24 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *as
 	}
 }
 
+/* Helper function to delete an association. */
+static void sctp_cmd_delete_tcb(sctp_cmd_seq_t *cmds,
+				struct sctp_association *asoc)
+{
+	struct sock *sk = asoc->base.sk;
+
+	/* If it is a non-temporary association belonging to a TCP-style
+	 * listening socket, do not free it so that accept() can pick it
+	 * up later.
+	 */ 
+	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
+	    (SCTP_SS_LISTENING == sk->state) && (!asoc->temp))
+		return;
+
+	sctp_unhash_established(asoc);
+	sctp_association_free(asoc);
+}
+
 /* These three macros allow us to pull the debugging code out of the
  * main flow of sctp_do_sm() to keep attention focused on the real
  * functionality there.
@@ -861,8 +879,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_DELETE_TCB:
 			/* Delete the current association.  */
-			sctp_unhash_established(asoc);
-			sctp_association_free(asoc);
+			sctp_cmd_delete_tcb(commands, asoc);
 			asoc = NULL;
 			break;
 
