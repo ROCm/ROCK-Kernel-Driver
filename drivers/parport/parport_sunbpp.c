@@ -349,11 +349,7 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	return 1;
 }
 
-#ifdef MODULE
-int init_module(void)
-#else
-int __init parport_sunbpp_init(void)
-#endif
+static int __init parport_sunbpp_init(void)
 {
         struct sbus_bus *sbus;
         struct sbus_dev *sdev;
@@ -368,13 +364,7 @@ int __init parport_sunbpp_init(void)
 	return count ? 0 : -ENODEV;
 }
 
-#ifdef MODULE
-MODULE_AUTHOR("Derrick J Brashear");
-MODULE_DESCRIPTION("Parport Driver for Sparc bidirectional Port");
-MODULE_SUPPORTED_DEVICE("Sparc Bidirectional Parallel Port");
-
-void
-cleanup_module(void)
+static void __exit parport_sunbpp_exit(void)
 {
 	struct parport *p = parport_enumerate();
 
@@ -396,6 +386,11 @@ cleanup_module(void)
 		p = next;
 	}
 }
-#endif
 
+MODULE_AUTHOR("Derrick J Brashear");
+MODULE_DESCRIPTION("Parport Driver for Sparc bidirectional Port");
+MODULE_SUPPORTED_DEVICE("Sparc Bidirectional Parallel Port");
 MODULE_LICENSE("GPL");
+
+module_init(parport_sunbpp_init)
+module_exit(parport_sunbpp_exit)

@@ -234,7 +234,7 @@ static struct parport_operations pp_amiga_ops = {
 
 /* ----------- Initialisation code --------------------------------- */
 
-int __init parport_amiga_init(void)
+static int __init parport_amiga_init(void)
 {
 	struct parport *p;
 	int err;
@@ -276,7 +276,7 @@ out_mem:
 	return err;
 }
 
-void __exit parport_amiga_exit(void)
+static void __exit parport_amiga_exit(void)
 {
 	if (this_port->irq != PARPORT_IRQ_NONE)
 		free_irq(IRQ_AMIGA_CIAA_FLG, this_port);

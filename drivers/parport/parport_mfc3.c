@@ -320,7 +320,7 @@ static struct parport_operations pp_mfc3_ops = {
 
 /* ----------- Initialisation code --------------------------------- */
 
-int __init parport_mfc3_init(void)
+static int __init parport_mfc3_init(void)
 {
 	struct parport *p;
 	int pias = 0;
@@ -378,7 +378,7 @@ int __init parport_mfc3_init(void)
 	return pias ? 0 : -ENODEV;
 }
 
-void __exit parport_mfc3_exit(void)
+static void __exit parport_mfc3_exit(void)
 {
 	int i;
 
@@ -403,4 +403,3 @@ MODULE_LICENSE("GPL");
 
 module_init(parport_mfc3_init)
 module_exit(parport_mfc3_exit)
-

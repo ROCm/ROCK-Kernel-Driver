@@ -104,7 +104,7 @@ static struct parport_operations parport_arc_ops =
 
 /* --- Initialisation code -------------------------------- */
 
-int parport_arc_init(void)
+static int parport_arc_init(void)
 {
 	/* Archimedes hardware provides only one port, at a fixed address */
 	struct parport *p;
@@ -136,3 +136,5 @@ int parport_arc_init(void)
 
 	return 1;
 }
+
+module_init(parport_arc_init)
