@@ -294,7 +294,7 @@ int synaptics_pt_init(struct psmouse *psmouse)
 	port->driver = psmouse;
 
 	printk(KERN_INFO "serio: %s port at %s\n", port->name, psmouse->phys);
-	serio_register_slave_port(port);
+	__serio_register_port(port);	/* already have serio_sem */
 
 	/* adjust the touchpad to child's choice of protocol */
 	child = port->private;
@@ -406,7 +406,7 @@ void synaptics_disconnect(struct psmouse *psmouse)
 	if (psmouse->type == PSMOUSE_SYNAPTICS && priv) {
 		synaptics_mode_cmd(psmouse, 0);
 		if (priv->ptport) {
-			serio_unregister_slave_port(priv->ptport);
+			__serio_unregister_port(priv->ptport); /* already have serio_sem */
 			kfree(priv->ptport);
 		}
 		kfree(priv);

@@ -61,9 +61,9 @@ void serio_rescan(struct serio *serio);
 irqreturn_t serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs);
 
 void serio_register_port(struct serio *serio);
-void serio_register_slave_port(struct serio *serio);
+void __serio_register_port(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
-void serio_unregister_slave_port(struct serio *serio);
+void __serio_unregister_port(struct serio *serio);
 void serio_register_device(struct serio_dev *dev);
 void serio_unregister_device(struct serio_dev *dev);
 
