@@ -933,15 +933,24 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	if (vcc->qos.aal != ATM_AAL5)
 		return -EINVAL;
 
+	if (!instance->firmware_loaded) {
+		dbg ("firmware not loaded!");
+		return -EAGAIN;
+	}
+
+	MOD_INC_USE_COUNT;
+
 	down (&instance->serialize); /* vs self, udsl_atm_close */
 
 	if (udsl_find_vcc (instance, vpi, vci)) {
 		up (&instance->serialize);
+		MOD_DEC_USE_COUNT;
 		return -EADDRINUSE;
 	}
 
 	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL))) {
 		up (&instance->serialize);
+		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 
@@ -967,10 +976,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 	dbg ("Allocated new SARLib vcc 0x%p with vpi %d vci %d", new, vpi, vci);
 
-	MOD_INC_USE_COUNT;
-
-	if (instance->firmware_loaded)
-		udsl_fire_receivers (instance);
+	udsl_fire_receivers (instance);
 
 	dbg ("udsl_atm_open successful");
 
@@ -1041,6 +1047,7 @@ static int udsl_set_alternate (struct udsl_instance_data *instance)
 		int ret;
 
 		if ((ret = usb_set_interface (instance->usb_dev, 1, 1)) < 0) {
+			dbg ("usb_set_interface returned %d!", ret);
 			up (&instance->serialize);
 			return ret;
 		}
