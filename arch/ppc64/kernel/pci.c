@@ -49,7 +49,6 @@ static void fixup_windbond_82c105(struct pci_dev* dev);
 void fixup_resources(struct pci_dev* dev);
 
 void   iSeries_pcibios_init(void);
-void   pSeries_pcibios_init(void);
 
 struct pci_controller* hose_head;
 struct pci_controller** hose_tail = &hose_head;
@@ -410,9 +409,7 @@ pcibios_init(void)
 	struct pci_bus *bus;
 	int next_busno;
 
-#ifndef CONFIG_PPC_ISERIES
-	pSeries_pcibios_init();
-#else
+#ifdef CONFIG_PPC_ISERIES
 	iSeries_pcibios_init(); 
 #endif
 
@@ -467,54 +464,7 @@ subsys_initcall(pcibios_init);
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
-#ifndef CONFIG_PPC_ISERIES
-	struct pci_controller *phb = PCI_GET_PHB_PTR(bus);
-	struct resource *res;
-	int i;
-
-	if (bus->parent == NULL) {
-		/* This is a host bridge - fill in its resources */
-		phb->bus = bus;
-		bus->resource[0] = res = &phb->io_resource;
-		if (!res->flags)
-			BUG();	/* No I/O resource for this PHB? */
-
-		for (i = 0; i < 3; ++i) {
-			res = &phb->mem_resources[i];
-			if (!res->flags) {
-				if (i == 0)
-					BUG();	/* No memory resource for this PHB? */
-			}
-			bus->resource[i+1] = res;
-		}
-	} else {
-		/* This is a subordinate bridge */
-		pci_read_bridge_bases(bus);
-
-		for (i = 0; i < 4; ++i) {
-			if ((res = bus->resource[i]) == NULL)
-				continue;
-			if (!res->flags)
-				continue;
-			if (res == pci_find_parent_resource(bus->self, res)) {
-				/* Transparent resource -- don't try to "fix" it. */
-				continue;
-			}
-			if (res->flags & IORESOURCE_IO) {
-				unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
-				res->start += offset;
-				res->end += offset;
-			} else if (phb->pci_mem_offset
-				   && (res->flags & IORESOURCE_MEM)) {
-				if (res->start < phb->pci_mem_offset) {
-					res->start += phb->pci_mem_offset;
-					res->end += phb->pci_mem_offset;
-				}
-			}
-		}
-	}
-#endif	
-	if ( ppc_md.pcibios_fixup_bus )
+	if (ppc_md.pcibios_fixup_bus)
 		ppc_md.pcibios_fixup_bus(bus);
 }
 

@@ -500,6 +500,55 @@ fixup_resources(struct pci_dev *dev)
  	}
 }   
 
+void __init pSeries_pcibios_fixup_bus(struct pci_bus *bus)
+{
+	struct pci_controller *phb = PCI_GET_PHB_PTR(bus);
+	struct resource *res;
+	int i;
+
+	if (bus->parent == NULL) {
+		/* This is a host bridge - fill in its resources */
+		phb->bus = bus;
+		bus->resource[0] = res = &phb->io_resource;
+		if (!res->flags)
+			BUG();	/* No I/O resource for this PHB? */
+
+		for (i = 0; i < 3; ++i) {
+			res = &phb->mem_resources[i];
+			if (!res->flags) {
+				if (i == 0)
+					BUG();	/* No memory resource for this PHB? */
+			}
+			bus->resource[i+1] = res;
+		}
+	} else {
+		/* This is a subordinate bridge */
+		pci_read_bridge_bases(bus);
+
+		for (i = 0; i < 4; ++i) {
+			if ((res = bus->resource[i]) == NULL)
+				continue;
+			if (!res->flags)
+				continue;
+			if (res == pci_find_parent_resource(bus->self, res)) {
+				/* Transparent resource -- don't try to "fix" it. */
+				continue;
+			}
+			if (res->flags & IORESOURCE_IO) {
+				unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
+				res->start += offset;
+				res->end += offset;
+			} else if (phb->pci_mem_offset
+				   && (res->flags & IORESOURCE_MEM)) {
+				if (res->start < phb->pci_mem_offset) {
+					res->start += phb->pci_mem_offset;
+					res->end += phb->pci_mem_offset;
+				}
+			}
+		}
+	}
+}
+
 static void check_s7a(void)
 {
 	struct device_node *root;
@@ -546,17 +595,6 @@ pci_find_hose_for_OF_device(struct device_node *node)
 		node=node->parent;
 	}
 	return NULL;
-}
-
-/*********************************************************************** 
- * ppc64_pcibios_init
- *  
- * Chance to initialize and structures or variable before PCI Bus walk.
- *  
- ***********************************************************************/
-void 
-pSeries_pcibios_init(void)
-{
 }
 
 /*
