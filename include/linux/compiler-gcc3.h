@@ -28,3 +28,7 @@
 #if __GNUC_MINOR__ >= 4
 #define __must_check __attribute__((warn_unused_result))
 #endif
+
+#if __GNUC_MINOR__ >= 5
+#define __compiler_offsetof(a,b) __builtin_offsetof(a,b)
+#endif
