@@ -104,17 +104,4 @@ static ide_pci_device_t generic_chipsets[] __devinitdata = {
 	}
 };
 
-#if 0
-static ide_pci_device_t unknown_chipset[] __devinitdata = {
-	{	/* 0 */
-		.name		= "PCI_IDE",
-		.init_chipset	= init_chipset_generic,
-		.init_hwif	= init_hwif_generic,
-		.channels	= 2,
-		.autodma	= AUTODMA,
-		.bootable	= ON_BOARD,
-	}
-};
-#endif
-
 #endif /* IDE_GENERIC_H */
