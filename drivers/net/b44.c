@@ -1314,7 +1314,7 @@ err_out_free:
 static void b44_poll_controller(struct net_device *dev)
 {
 	disable_irq(dev->irq);
-	b44_interrupt (dev->irq, dev, NULL);
+	b44_interrupt(dev->irq, dev, NULL);
 	enable_irq(dev->irq);
 }
 #endif
