@@ -216,4 +216,6 @@ extern void llc_conn_busy_tmr_cb(unsigned long timeout_data);
 extern void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data);
 extern void llc_conn_ack_tmr_cb(unsigned long timeout_data);
 extern void llc_conn_rej_tmr_cb(unsigned long timeout_data);
+
+extern void llc_conn_set_p_flag(struct sock *sk, u8 value);
 #endif /* LLC_C_AC_H */
