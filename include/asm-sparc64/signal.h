@@ -6,6 +6,7 @@
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
+#include <linux/config.h>
 #include <linux/personality.h>
 #include <linux/types.h>
 #include <linux/compat.h>
@@ -208,12 +209,15 @@ struct __new_sigaction {
 };
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 struct __new_sigaction32 {
 	unsigned		sa_handler;
 	unsigned int    	sa_flags;
 	unsigned		sa_restorer;     /* not used by Linux/SPARC yet */
 	compat_sigset_t 	sa_mask;
 };
+#endif
 
 struct k_sigaction {
 	struct __new_sigaction 	sa;
@@ -229,12 +233,16 @@ struct __old_sigaction {
 };
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 struct __old_sigaction32 {
 	unsigned		sa_handler;
 	compat_old_sigset_t  	sa_mask;
 	unsigned int    	sa_flags;
 	unsigned		sa_restorer;     /* not used by Linux/SPARC yet */
 };
+#endif
+
 #endif
 
 typedef struct sigaltstack {
@@ -244,11 +252,14 @@ typedef struct sigaltstack {
 } stack_t;
 
 #ifdef __KERNEL__
+
+#ifdef CONFIG_COMPAT
 typedef struct sigaltstack32 {
 	u32			ss_sp;
 	int			ss_flags;
 	compat_size_t		ss_size;
 } stack_t32;
+#endif
 
 struct signal_deliver_cookie {
 	int restart_syscall;

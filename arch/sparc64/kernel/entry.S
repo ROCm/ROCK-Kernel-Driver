@@ -1496,28 +1496,30 @@ sunos_getgid:
 	/* SunOS's execv() call only specifies the argv argument, the
 	 * environment settings are the same as the calling processes.
 	 */
-	.globl	sunos_execv, sys_execve, sys32_execve
+	.globl	sunos_execv
 sys_execve:
 	sethi		%hi(sparc_execve), %g1
 	ba,pt		%xcc, execve_merge
 	 or		%g1, %lo(sparc_execve), %g1
+#ifdef CONFIG_COMPAT
+	.globl	sys_execve
 sunos_execv:
 	stx		%g0, [%sp + PTREGS_OFF + PT_V9_I2]
+	.globl	sys32_execve
 sys32_execve:
 	sethi		%hi(sparc32_execve), %g1
 	or		%g1, %lo(sparc32_execve), %g1
+#endif
 execve_merge:
 	flushw
 	jmpl		%g1, %g0
 	 add		%sp, PTREGS_OFF, %o0
 
 	.globl	sys_pipe, sys_sigpause, sys_nis_syscall
-	.globl	sys_sigsuspend, sys_rt_sigsuspend, sys32_rt_sigsuspend
+	.globl	sys_sigsuspend, sys_rt_sigsuspend
 	.globl	sys_rt_sigreturn
-	.globl	sys32_sigreturn, sys32_rt_sigreturn
-	.globl	sys32_execve, sys_ptrace
-	.globl	sys_sigaltstack, sys32_sigaltstack
-	.globl	sys32_sigstack
+	.globl	sys_ptrace
+	.globl	sys_sigaltstack
 	.align	32
 sys_pipe:	ba,pt		%xcc, sparc_pipe
 		 add		%sp, PTREGS_OFF, %o0
@@ -1528,12 +1530,15 @@ sys_memory_ordering:
 		 add		%sp, PTREGS_OFF, %o1
 sys_sigaltstack:ba,pt		%xcc, do_sigaltstack
 		 add		%i6, STACK_BIAS, %o2
+#ifdef CONFIG_COMPAT
+	.globl	sys32_sigstack
 sys32_sigstack:	ba,pt		%xcc, do_sys32_sigstack
 		 mov		%i6, %o2
+	.globl	sys32_sigaltstack
 sys32_sigaltstack:
 		ba,pt		%xcc, do_sys32_sigaltstack
 		 mov		%i6, %o2
-
+#endif
 		.align		32
 sys_sigsuspend:	add		%sp, PTREGS_OFF, %o0
 		call		do_sigsuspend
@@ -1544,31 +1549,40 @@ sys_rt_sigsuspend: /* NOTE: %o0,%o1 have a correct value already */
 		call		do_rt_sigsuspend
 		 add		%o7, 1f-.-4, %o7
 		nop
+#ifdef CONFIG_COMPAT
+	.globl	sys32_rt_sigsuspend
 sys32_rt_sigsuspend: /* NOTE: %o0,%o1 have a correct value already */
 		srl		%o0, 0, %o0
 		add		%sp, PTREGS_OFF, %o2
 		call		do_rt_sigsuspend32
 		 add		%o7, 1f-.-4, %o7
+#endif
 		/* NOTE: %o0 has a correct value already */
 sys_sigpause:	add		%sp, PTREGS_OFF, %o1
 		call		do_sigpause
 		 add		%o7, 1f-.-4, %o7
 		nop
+#ifdef CONFIG_COMPAT
+	.globl	sys32_sigreturn
 sys32_sigreturn:
 		add		%sp, PTREGS_OFF, %o0
 		call		do_sigreturn32
 		 add		%o7, 1f-.-4, %o7
 		nop
+#endif
 sys_rt_sigreturn:
 		add		%sp, PTREGS_OFF, %o0
 		call		do_rt_sigreturn
 		 add		%o7, 1f-.-4, %o7
 		nop
+#ifdef CONFIG_COMPAT
+	.globl	sys32_rt_sigreturn
 sys32_rt_sigreturn:
 		add		%sp, PTREGS_OFF, %o0
 		call		do_rt_sigreturn32
 		 add		%o7, 1f-.-4, %o7
 		nop
+#endif
 sys_ptrace:	add		%sp, PTREGS_OFF, %o0
 		call		do_ptrace
 		 add		%o7, 1f-.-4, %o7
