@@ -943,7 +943,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 int
 fb_blank(struct fb_info *info, int blank)
 {	
-	/* ??? Varible sized stack allocation.  */
+	/* ??? Variable sized stack allocation.  */
 	u16 black[info->cmap.len];
 	struct fb_cmap cmap;
 	
@@ -990,7 +990,8 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		return 0;
 	case FBIOGET_FSCREENINFO:
-		return copy_to_user((void *) arg, &info->fix, sizeof(fix)) ? -EFAULT : 0;
+		return copy_to_user((void *) arg, &info->fix,
+				    sizeof(fix)) ? -EFAULT : 0;
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
