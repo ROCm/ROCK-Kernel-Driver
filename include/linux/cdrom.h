@@ -499,6 +499,7 @@ struct cdrom_generic_command
 #define GPMODE_VENDOR_PAGE		0x00
 #define GPMODE_R_W_ERROR_PAGE		0x01
 #define GPMODE_WRITE_PARMS_PAGE		0x05
+#define GPMODE_WCACHING_PAGE		0x08
 #define GPMODE_AUDIO_CTL_PAGE		0x0e
 #define GPMODE_POWER_PAGE		0x1a
 #define GPMODE_FAULT_FAIL_PAGE		0x1c

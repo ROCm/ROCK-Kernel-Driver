@@ -22,6 +22,8 @@ mcdx
 	- info on improved Mitsumi CD-ROM driver.
 optcd
 	- info on the Optics Storage 8000 AT CD-ROM driver
+packet-writing.txt
+	- Info on the CDRW packet writing module
 sbpcd
 	- info on the SoundBlaster/Panasonic CD-ROM interface driver.
 sjcd
