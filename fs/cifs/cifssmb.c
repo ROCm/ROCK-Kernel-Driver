@@ -1508,16 +1508,16 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 	if (rc) {
 		cFYI(1, ("Send error in QueryReparseLinkInfo = %d", rc));
 	} else {		/* decode response */
-		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		pSMBr->DataCount = le16_to_cpu(pSMBr->DataCount);
-		if ((pSMBr->ByteCount < 2) || (pSMBr->DataOffset > 512))
+		__u32 data_offset = le32_to_cpu(pSMBr->DataOffset);
+		__u32 data_count = le32_to_cpu(pSMBr->DataCount);
+		if ((pSMBr->ByteCount < 2) || (data_offset > 512))
 		/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
-			if(pSMBr->DataCount && (pSMBr->DataCount < 2048)) {
+			if(data_count && (data_count < 2048)) {
 		/* could also validate reparse tag && better check name length */
 				struct reparse_data * reparse_buf = (struct reparse_data *)
-					((char *)&pSMBr->hdr.Protocol + pSMBr->DataOffset);
+					((char *)&pSMBr->hdr.Protocol + data_offset);
 				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
 					name_len = UniStrnlen((wchar_t *)
 							(reparse_buf->LinkNamesBuf + 
