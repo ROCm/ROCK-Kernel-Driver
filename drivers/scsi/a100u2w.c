@@ -1,7 +1,8 @@
-/**************************************************************************
+/*
  * Initio A100 device driver for Linux.
  *
  * Copyright (c) 1994-1998 Initio Corporation
+ * Copyright (c) 2003-2004 Christoph Hellwig
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -50,13 +51,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- **************************************************************************
- * 
- * module: inia100.c
- * DESCRIPTION:
- * 	This is the Linux low-level SCSI driver for Initio INIA100 SCSI host
- * 	adapters
+ */
+
+/*
+ * Revision History:
  * 07/02/98 hl	- v.91n Initial drivers.
  * 09/14/98 hl - v1.01 Support new Kernel.
  * 09/22/98 hl - v1.01a Support reset.
@@ -71,13 +69,13 @@
  *          - Clean up interrupt handler registration
  *          - Fix memory leaks
  *          - Fix allocation of scsi host structs and private data
- * 18/11/03 Christoph Hellwig <hch@lst.de>
+ * 11/18/03 Christoph Hellwig <hch@lst.de>
  *	    - Port to new probing API
  *	    - Fix some more leaks in init failure cases
- * TODO:
- *	    - use list.h macros for SCB queue
- *	  ( - merge with i60uscsi.c )
- **************************************************************************/
+ * 9/28/04 Christoph Hellwig <hch@lst.de>
+ *	    - merge the two source files
+ *	    - remove internal queueing code
+ */
 
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -91,6 +89,7 @@
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
+
 #include <asm/io.h>
 #include <asm/irq.h>
 
@@ -98,42 +97,17 @@
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
-#include "scsi.h"
 
 #include "a100u2w.h"
 
-#define ORC_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
-
-char *inia100_Copyright = "Copyright (C) 1998-99";
-char *inia100_InitioName = "by Initio Corporation";
-char *inia100_ProductName = "INI-A100U2W";
-char *inia100_Version = "v1.02d";
 
 #define JIFFIES_TO_MS(t) ((t) * 1000 / HZ)
 #define MS_TO_JIFFIES(j) ((j * HZ) / 1000)
 
-/* ---- INTERNAL FUNCTIONS ---- */
-static UCHAR waitChipReady(ORC_HCS * hcsp);
-static UCHAR waitFWReady(ORC_HCS * hcsp);
-static UCHAR waitFWReady(ORC_HCS * hcsp);
-static UCHAR waitSCSIRSTdone(ORC_HCS * hcsp);
-static UCHAR waitHDOoff(ORC_HCS * hcsp);
-static UCHAR waitHDIset(ORC_HCS * hcsp, UCHAR * pData);
-static unsigned short get_FW_version(ORC_HCS * hcsp);
-static UCHAR set_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char value);
-static UCHAR get_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char *pDataIn);
-static int se2_rd_all(ORC_HCS * hcsp);
-static void se2_update_all(ORC_HCS * hcsp);	/* setup default pattern        */
-static void read_eeprom(ORC_HCS * hcsp);
-static UCHAR load_FW(ORC_HCS * hcsp);
-static void setup_SCBs(ORC_HCS * hcsp);
-static void initAFlag(ORC_HCS * hcsp);
-ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
+static ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
+static void inia100SCBPost(BYTE * pHcb, BYTE * pScb);
 
-/* ---- EXTERNAL FUNCTIONS ---- */
-extern void inia100SCBPost(BYTE * pHcb, BYTE * pScb);
-
-NVRAM nvram, *nvramp = &nvram;
+static NVRAM nvram, *nvramp = &nvram;
 static UCHAR dftNvRam[64] =
 {
 /*----------header -------------*/
@@ -192,72 +166,72 @@ static void waitForPause(unsigned amount)
 }
 
 /***************************************************************************/
-UCHAR waitChipReady(ORC_HCS * hcsp)
+static UCHAR waitChipReady(ORC_HCS * hcsp)
 {
 	int i;
 
 	for (i = 0; i < 10; i++) {	/* Wait 1 second for report timeout     */
 		if (ORC_RD(hcsp->HCS_Base, ORC_HCTRL) & HOSTSTOP)	/* Wait HOSTSTOP set */
-			return (TRUE);
+			return 1;
 		waitForPause(100);	/* wait 100ms before try again  */
 	}
-	return (FALSE);
+	return 0;
 }
 
 /***************************************************************************/
-UCHAR waitFWReady(ORC_HCS * hcsp)
+static UCHAR waitFWReady(ORC_HCS * hcsp)
 {
 	int i;
 
 	for (i = 0; i < 10; i++) {	/* Wait 1 second for report timeout     */
 		if (ORC_RD(hcsp->HCS_Base, ORC_HSTUS) & RREADY)		/* Wait READY set */
-			return (TRUE);
+			return 1;
 		waitForPause(100);	/* wait 100ms before try again  */
 	}
-	return (FALSE);
+	return 0;
 }
 
 /***************************************************************************/
-UCHAR waitSCSIRSTdone(ORC_HCS * hcsp)
+static UCHAR waitSCSIRSTdone(ORC_HCS * hcsp)
 {
 	int i;
 
 	for (i = 0; i < 10; i++) {	/* Wait 1 second for report timeout     */
 		if (!(ORC_RD(hcsp->HCS_Base, ORC_HCTRL) & SCSIRST))	/* Wait SCSIRST done */
-			return (TRUE);
+			return 1;
 		waitForPause(100);	/* wait 100ms before try again  */
 	}
-	return (FALSE);
+	return 0;
 }
 
 /***************************************************************************/
-UCHAR waitHDOoff(ORC_HCS * hcsp)
+static UCHAR waitHDOoff(ORC_HCS * hcsp)
 {
 	int i;
 
 	for (i = 0; i < 10; i++) {	/* Wait 1 second for report timeout     */
 		if (!(ORC_RD(hcsp->HCS_Base, ORC_HCTRL) & HDO))		/* Wait HDO off */
-			return (TRUE);
+			return 1;
 		waitForPause(100);	/* wait 100ms before try again  */
 	}
-	return (FALSE);
+	return 0;
 }
 
 /***************************************************************************/
-UCHAR waitHDIset(ORC_HCS * hcsp, UCHAR * pData)
+static UCHAR waitHDIset(ORC_HCS * hcsp, UCHAR * pData)
 {
 	int i;
 
 	for (i = 0; i < 10; i++) {	/* Wait 1 second for report timeout     */
 		if ((*pData = ORC_RD(hcsp->HCS_Base, ORC_HSTUS)) & HDI)
-			return (TRUE);	/* Wait HDI set */
+			return 1;	/* Wait HDI set */
 		waitForPause(100);	/* wait 100ms before try again  */
 	}
-	return (FALSE);
+	return 0;
 }
 
 /***************************************************************************/
-unsigned short get_FW_version(ORC_HCS * hcsp)
+static unsigned short get_FW_version(ORC_HCS * hcsp)
 {
 	UCHAR bData;
 	union {
@@ -267,16 +241,16 @@ unsigned short get_FW_version(ORC_HCS * hcsp)
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, ORC_CMD_VERSION);
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
-	if (waitHDIset(hcsp, &bData) == FALSE)	/* Wait HDI set   */
-		return (FALSE);
+	if (waitHDIset(hcsp, &bData) == 0)	/* Wait HDI set   */
+		return 0;
 	Version.cVersion[0] = ORC_RD(hcsp->HCS_Base, ORC_HDATA);
 	ORC_WR(hcsp->HCS_Base + ORC_HSTUS, bData);	/* Clear HDI            */
 
-	if (waitHDIset(hcsp, &bData) == FALSE)	/* Wait HDI set   */
-		return (FALSE);
+	if (waitHDIset(hcsp, &bData) == 0)	/* Wait HDI set   */
+		return 0;
 	Version.cVersion[1] = ORC_RD(hcsp->HCS_Base, ORC_HDATA);
 	ORC_WR(hcsp->HCS_Base + ORC_HSTUS, bData);	/* Clear HDI            */
 
@@ -284,51 +258,51 @@ unsigned short get_FW_version(ORC_HCS * hcsp)
 }
 
 /***************************************************************************/
-UCHAR set_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char value)
+static UCHAR set_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char value)
 {
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, ORC_CMD_SET_NVM);	/* Write command */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, address);	/* Write address */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, value);	/* Write value  */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
-	return (TRUE);
+	return 1;
 }
 
 /***************************************************************************/
-UCHAR get_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char *pDataIn)
+static UCHAR get_NVRAM(ORC_HCS * hcsp, unsigned char address, unsigned char *pDataIn)
 {
 	unsigned char bData;
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, ORC_CMD_GET_NVM);	/* Write command */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, address);	/* Write address */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
-	if (waitHDIset(hcsp, &bData) == FALSE)	/* Wait HDI set   */
-		return (FALSE);
+	if (waitHDIset(hcsp, &bData) == 0)	/* Wait HDI set   */
+		return 0;
 	*pDataIn = ORC_RD(hcsp->HCS_Base, ORC_HDATA);
 	ORC_WR(hcsp->HCS_Base + ORC_HSTUS, bData);	/* Clear HDI    */
 
-	return (TRUE);
+	return 1;
 }
 
 /***************************************************************************/
-void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
+static void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 {
 	scbp->SCB_Status = ORCSCB_POST;
 	ORC_WR(hcsp->HCS_Base + ORC_PQUEUE, scbp->SCB_ScbIdx);
@@ -339,14 +313,14 @@ void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 /***********************************************************************
  Read SCSI H/A configuration parameters from serial EEPROM
 ************************************************************************/
-int se2_rd_all(ORC_HCS * hcsp)
+static int se2_rd_all(ORC_HCS * hcsp)
 {
 	int i;
 	UCHAR *np, chksum = 0;
 
 	np = (UCHAR *) nvramp;
 	for (i = 0; i < 64; i++, np++) {	/* <01> */
-		if (get_NVRAM(hcsp, (unsigned char) i, np) == FALSE)
+		if (get_NVRAM(hcsp, (unsigned char) i, np) == 0)
 			return -1;
 //      *np++ = get_NVRAM(hcsp, (unsigned char ) i);
 	}
@@ -364,7 +338,7 @@ int se2_rd_all(ORC_HCS * hcsp)
 /************************************************************************
  Update SCSI H/A configuration parameters from serial EEPROM
 *************************************************************************/
-void se2_update_all(ORC_HCS * hcsp)
+static void se2_update_all(ORC_HCS * hcsp)
 {				/* setup default pattern  */
 	int i;
 	UCHAR *np, *np1, chksum = 0;
@@ -388,7 +362,7 @@ void se2_update_all(ORC_HCS * hcsp)
 /*************************************************************************
  Function name  : read_eeprom
 **************************************************************************/
-void read_eeprom(ORC_HCS * hcsp)
+static void read_eeprom(ORC_HCS * hcsp)
 {
 	if (se2_rd_all(hcsp) != 1) {
 		se2_update_all(hcsp);	/* setup default pattern        */
@@ -398,7 +372,7 @@ void read_eeprom(ORC_HCS * hcsp)
 
 
 /***************************************************************************/
-UCHAR load_FW(ORC_HCS * hcsp)
+static UCHAR load_FW(ORC_HCS * hcsp)
 {
 	U32 dData;
 	USHORT wBIOSAddress;
@@ -412,12 +386,12 @@ UCHAR load_FW(ORC_HCS * hcsp)
 	ORC_WRSHORT(hcsp->HCS_Base + ORC_EBIOSADR0, 0x00);
 	if (ORC_RD(hcsp->HCS_Base, ORC_EBIOSDATA) != 0x55) {
 		ORC_WR(hcsp->HCS_Base + ORC_GCFG, bData);	/* Disable EEPROM programming */
-		return (FALSE);
+		return 0;
 	}
 	ORC_WRSHORT(hcsp->HCS_Base + ORC_EBIOSADR0, 0x01);
 	if (ORC_RD(hcsp->HCS_Base, ORC_EBIOSDATA) != 0xAA) {
 		ORC_WR(hcsp->HCS_Base + ORC_GCFG, bData);	/* Disable EEPROM programming */
-		return (FALSE);
+		return 0;
 	}
 	ORC_WR(hcsp->HCS_Base + ORC_RISCCTL, PRGMRST | DOWNLOAD);	/* Enable SRAM programming */
 	pData = (UCHAR *) & dData;
@@ -454,18 +428,18 @@ UCHAR load_FW(ORC_HCS * hcsp)
 			if (ORC_RDLONG(hcsp->HCS_Base, ORC_RISCRAM) != dData) {
 				ORC_WR(hcsp->HCS_Base + ORC_RISCCTL, PRGMRST);	/* Reset program to 0 */
 				ORC_WR(hcsp->HCS_Base + ORC_GCFG, bData);	/*Disable EEPROM programming */
-				return (FALSE);
+				return 0;
 			}
 			pData = (UCHAR *) & dData;
 		}
 	}
 	ORC_WR(hcsp->HCS_Base + ORC_RISCCTL, PRGMRST);	/* Reset program to 0   */
 	ORC_WR(hcsp->HCS_Base + ORC_GCFG, bData);	/* Disable EEPROM programming */
-	return (TRUE);
+	return 1;
 }
 
 /***************************************************************************/
-void setup_SCBs(ORC_HCS * hcsp)
+static void setup_SCBs(ORC_HCS * hcsp)
 {
 	ORC_SCB *pVirScb;
 	int i;
@@ -480,8 +454,8 @@ void setup_SCBs(ORC_HCS * hcsp)
 	ORC_WRLONG(hcsp->HCS_Base + ORC_SCBBASE1, hcsp->HCS_physScbArray);
 
 	/* setup scatter list address with one buffer */
-	pVirScb = (ORC_SCB *) hcsp->HCS_virScbArray;
-	pVirEscb = (ESCB *) hcsp->HCS_virEscbArray;
+	pVirScb = hcsp->HCS_virScbArray;
+	pVirEscb = hcsp->HCS_virEscbArray;
 
 	for (i = 0; i < ORC_MAXQUEUE; i++) {
 		pPhysEscb = (hcsp->HCS_physEscbArray + (sizeof(ESCB) * i));
@@ -509,7 +483,7 @@ static void initAFlag(ORC_HCS * hcsp)
 }
 
 /***************************************************************************/
-int init_orchid(ORC_HCS * hcsp)
+static int init_orchid(ORC_HCS * hcsp)
 {
 	UBYTE *readBytep;
 	USHORT revision;
@@ -521,12 +495,12 @@ int init_orchid(ORC_HCS * hcsp)
 		revision = get_FW_version(hcsp);
 		if (revision == 0xFFFF) {
 			ORC_WR(hcsp->HCS_Base + ORC_HCTRL, DEVRST);	/* Reset Host Adapter   */
-			if (waitChipReady(hcsp) == FALSE)
+			if (waitChipReady(hcsp) == 0)
 				return (-1);
 			load_FW(hcsp);	/* Download FW                  */
 			setup_SCBs(hcsp);	/* Setup SCB HCS_Base and SCB Size registers */
 			ORC_WR(hcsp->HCS_Base + ORC_HCTRL, 0);	/* clear HOSTSTOP       */
-			if (waitFWReady(hcsp) == FALSE)
+			if (waitFWReady(hcsp) == 0)
 				return (-1);
 			/* Wait for firmware ready     */
 		} else {
@@ -534,14 +508,14 @@ int init_orchid(ORC_HCS * hcsp)
 		}
 	} else {		/* Orchid is not Ready          */
 		ORC_WR(hcsp->HCS_Base + ORC_HCTRL, DEVRST);	/* Reset Host Adapter   */
-		if (waitChipReady(hcsp) == FALSE)
+		if (waitChipReady(hcsp) == 0)
 			return (-1);
 		load_FW(hcsp);	/* Download FW                  */
 		setup_SCBs(hcsp);	/* Setup SCB HCS_Base and SCB Size registers */
 		ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);	/* Do Hardware Reset &  */
 
 		/*     clear HOSTSTOP  */
-		if (waitFWReady(hcsp) == FALSE)		/* Wait for firmware ready      */
+		if (waitFWReady(hcsp) == 0)		/* Wait for firmware ready      */
 			return (-1);
 	}
 
@@ -576,7 +550,7 @@ int init_orchid(ORC_HCS * hcsp)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int orc_reset_scsi_bus(ORC_HCS * pHCB)
+static int orc_reset_scsi_bus(ORC_HCS * pHCB)
 {				/* I need Host Control Block Information */
 	ULONG flags;
 
@@ -585,7 +559,7 @@ int orc_reset_scsi_bus(ORC_HCS * pHCB)
 	initAFlag(pHCB);
 	/* reset scsi bus */
 	ORC_WR(pHCB->HCS_Base + ORC_HCTRL, SCSIRST);
-	if (waitSCSIRSTdone(pHCB) == FALSE) {
+	if (waitSCSIRSTdone(pHCB) == 0) {
 		spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
 		return FAILED;
 	} else {
@@ -602,7 +576,7 @@ int orc_reset_scsi_bus(ORC_HCS * pHCB)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target)
+static int orc_device_reset(ORC_HCS * pHCB, struct scsi_cmnd *SCpnt, unsigned int target)
 {				/* I need Host Control Block Information */
 	ORC_SCB *pScb;
 	ESCB *pVirEscb;
@@ -615,7 +589,7 @@ int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target)
 	pVirEscb = (ESCB *) NULL;
 
 	/* setup scatter list address with one buffer */
-	pVirScb = (ORC_SCB *) pHCB->HCS_virScbArray;
+	pVirScb = pHCB->HCS_virScbArray;
 
 	initAFlag(pHCB);
 	/* device reset */
@@ -655,7 +629,7 @@ int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target)
 
 
 /***************************************************************************/
-ORC_SCB *__orc_alloc_scb(ORC_HCS * hcsp)
+static ORC_SCB *__orc_alloc_scb(ORC_HCS * hcsp)
 {
 	ORC_SCB *pTmpScb;
 	UCHAR Ch;
@@ -672,13 +646,13 @@ ORC_SCB *__orc_alloc_scb(ORC_HCS * hcsp)
 			}
 		}
 		idx = index + 32 * i;
-		pTmpScb = (PVOID) ((ULONG) hcsp->HCS_virScbArray + (idx * sizeof(ORC_SCB)));
+		pTmpScb = (ORC_SCB *) ((ULONG) hcsp->HCS_virScbArray + (idx * sizeof(ORC_SCB)));
 		return (pTmpScb);
 	}
 	return (NULL);
 }
 
-ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp)
+static ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp)
 {
 	ORC_SCB *pTmpScb;
 	ULONG flags;
@@ -691,7 +665,7 @@ ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp)
 
 
 /***************************************************************************/
-void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
+static void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 {
 	ULONG flags;
 	UCHAR Index;
@@ -715,28 +689,28 @@ void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb)
+static int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb)
 {
 	unsigned char bData, bStatus;
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, ORC_CMD_ABORT_SCB);	/* Write command */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
 	ORC_WR(hcsp->HCS_Base + ORC_HDATA, pScb->SCB_ScbIdx);	/* Write address */
 	ORC_WR(hcsp->HCS_Base + ORC_HCTRL, HDO);
-	if (waitHDOoff(hcsp) == FALSE)	/* Wait HDO off   */
-		return (FALSE);
+	if (waitHDOoff(hcsp) == 0)	/* Wait HDO off   */
+		return 0;
 
-	if (waitHDIset(hcsp, &bData) == FALSE)	/* Wait HDI set   */
-		return (FALSE);
+	if (waitHDIset(hcsp, &bData) == 0)	/* Wait HDI set   */
+		return 0;
 	bStatus = ORC_RD(hcsp->HCS_Base, ORC_HDATA);
 	ORC_WR(hcsp->HCS_Base + ORC_HSTUS, bData);	/* Clear HDI    */
 
 	if (bStatus == 1)	/* 0 - Successfully               */
-		return (FALSE);	/* 1 - Fail                     */
-	return (TRUE);
+		return 0;	/* 1 - Fail                     */
+	return 1;
 }
 
 /*****************************************************************************
@@ -747,7 +721,7 @@ int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt)
+static int orc_abort_srb(ORC_HCS * hcsp, struct scsi_cmnd *SCpnt)
 {
 	ESCB *pVirEscb;
 	ORC_SCB *pVirScb;
@@ -756,7 +730,7 @@ int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt)
 
 	spin_lock_irqsave(&(hcsp->BitAllocFlagLock), flags);
 
-	pVirScb = (ORC_SCB *) hcsp->HCS_virScbArray;
+	pVirScb = hcsp->HCS_virScbArray;
 
 	for (i = 0; i < ORC_MAXQUEUE; i++, pVirScb++) {
 		pVirEscb = pVirScb->SCB_EScb;
@@ -789,7 +763,7 @@ int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt)
 	  HwDeviceExtension - HBA miniport driver's adapter data storage
  Return Value:
 ***********************************************************************/
-void orc_interrupt(
+static void orc_interrupt(
 			  ORC_HCS * hcsp
 )
 {
@@ -797,7 +771,7 @@ void orc_interrupt(
 	ORC_SCB *pScb;
 
 	if (ORC_RD(hcsp->HCS_Base, ORC_RQUEUECNT) == 0) {
-		return;		// (FALSE);
+		return;		// 0;
 
 	}
 	do {
@@ -808,7 +782,7 @@ void orc_interrupt(
 
 		inia100SCBPost((BYTE *) hcsp, (BYTE *) pScb);
 	} while (ORC_RD(hcsp->HCS_Base, ORC_RQUEUECNT));
-	return;			//(TRUE);
+	return;			//1;
 
 }				/* End of I1060Interrupt() */
 
@@ -962,7 +936,7 @@ static int inia100_device_reset(struct scsi_cmnd * SCpnt)
  Output         : None.
  Return         : None.
 *****************************************************************************/
-void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
+static void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 {
 	struct scsi_cmnd *pSRB;	/* Pointer to SCSI request block */
 	ORC_HCS *pHCB;
@@ -1198,7 +1172,7 @@ static void __devexit inia100_remove_one(struct pci_dev *pdev)
 } 
 
 static struct pci_device_id inia100_pci_tbl[] = {
-	{ORC_VENDOR_ID, ORC_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{PCI_VENDOR_ID_INIT, 0x1060, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0,}
 };
 MODULE_DEVICE_TABLE(pci, inia100_pci_tbl);

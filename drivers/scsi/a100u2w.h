@@ -1,4 +1,4 @@
-/**************************************************************************
+/*
  * Initio A100 device driver for Linux.
  *
  * Copyright (c) 1994-1998 Initio Corporation
@@ -50,27 +50,20 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- **************************************************************************
- *
- * Module: inia100.h
- * Description: INI-A100U2W LINUX device driver header
- * Revision History:
- *	06/18/98 HL, Initial production Version 1.02
- *	12/19/98 bv, Use spinlocks for 2.1.95 and up
- *	06/25/02 Doug Ledford <dledford@redhat.com>
- *		 - This and the i60uscsi.h file are almost identical,
- *		   merged them into a single header used by both .c files.
- ****************************************************************************/
+ */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/pci.h>
+/*
+ * Revision History:
+ * 06/18/98 HL, Initial production Version 1.02
+ * 12/19/98 bv, Use spinlocks for 2.1.95 and up
+ * 06/25/02 Doug Ledford <dledford@redhat.com>
+ *	 - This and the i60uscsi.h file are almost identical,
+ *	   merged them into a single header used by both .c files.
+ */
 
 #define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02d"
 
 #define ULONG   unsigned long
-#define PVOID   void *
 #define USHORT  unsigned short
 #define UCHAR   unsigned char
 #define BYTE    unsigned char
@@ -81,9 +74,6 @@
 #define UDWORD  unsigned long
 #define U32     u32
 
-#ifndef FAILURE
-#define FAILURE  (-1)
-#endif
 #if 1
 #define ORC_MAXQUEUE		245
 #define ORC_MAXTAGS		64
@@ -96,9 +86,6 @@
 #define MAX_TARGETS		16
 #define IMAX_CDB			15
 #define SENSE_SIZE		14
-#define SUCCESSFUL              0x00
-
-#define I920_DEVICE_ID	0x0002	/* Initio's inic-950 product ID   */
 
 /************************************************************************/
 /*              Scatter-Gather Element Structure                        */
@@ -118,23 +105,6 @@ typedef struct ORC_SG_Struc {
 #define MAX_CHANNELS       2
 #define MAX_ESCB_ELE				64
 #define TCF_DRV_255_63     0x0400
-
-/********************************************************/
-/*      Orchid Configuration Register Set               */
-/********************************************************/
-#define ORC_PVID	0x00	/* Vendor ID                      */
-#define ORC_VENDOR_ID	0x1101	/* Orchid vendor ID               */
-#define ORC_PDID        0x02	/* Device ID                    */
-#define ORC_DEVICE_ID	0x1060	/* Orchid device ID               */
-#define ORC_COMMAND	0x04	/* Command                        */
-#define BUSMS		0x04	/* BUS MASTER Enable              */
-#define IOSPA		0x01	/* IO Space Enable                */
-#define ORC_STATUS	0x06	/* Status register                */
-#define ORC_REVISION	0x08	/* Revision number                */
-#define ORC_BASE	0x10	/* Base address                   */
-#define ORC_BIOS	0x50	/* Expansion ROM base address     */
-#define ORC_INT_NUM	0x3C	/* Interrupt line         */
-#define ORC_INT_PIN	0x3D	/* Interrupt pin          */
 
 /********************************************************/
 /*      Orchid Host Command Set                         */
@@ -265,27 +235,6 @@ typedef struct orc_scb {	/* Scsi_Ctrl_Blk                */
 #define TARGET_TAG_FULL	0x28
 
 
-/* Queue tag msg: Simple_quque_tag, Head_of_queue_tag, Ordered_queue_tag */
-#define MSG_STAG	0x20
-#define MSG_HTAG	0x21
-#define MSG_OTAG	0x22
-
-#define MSG_IGNOREWIDE	0x23
-
-#define MSG_IDENT	0x80
-#define MSG_DISC	0x40	/* Disconnect allowed             */
-
-
-/* SCSI MESSAGE */
-#define	MSG_EXTEND	0x01
-#define	MSG_SDP		0x02
-#define	MSG_ABORT	0x06
-#define	MSG_REJ		0x07
-#define	MSG_NOP		0x08
-#define	MSG_PARITY	0x09
-#define	MSG_DEVRST	0x0C
-#define	MSG_STAG	0x20
-
 /***********************************************************************
 		Target Device Control Structure
 **********************************************************************/
@@ -296,7 +245,7 @@ typedef struct ORC_Tar_Ctrl_Struc {
 	UBYTE TCS_DrvHead;	/* 8 */
 	UWORD TCS_DrvFlags;	/* 4 */
 	UBYTE TCS_DrvSector;	/* 7 */
-} ORC_TCS, *PORC_TCS;
+} ORC_TCS;
 
 /* Bit Definition for TCF_DrvFlags */
 #define	TCS_DF_NODASD_SUPT	0x20	/* Suppress OS/2 DASD Mgr support */
@@ -320,9 +269,9 @@ typedef struct ORC_Ha_Ctrl_Struc {
 	USHORT HCS_Units;	/* Number of units this adapter  */
 	USHORT HCS_AFlags;	/* Adapter info. defined flags   */
 	ULONG HCS_Timeout;	/* Adapter timeout value   */
-	PVOID HCS_virScbArray;	/* 28 Virtual Pointer to SCB array     */
+	ORC_SCB *HCS_virScbArray;	/* 28 Virtual Pointer to SCB array */
 	dma_addr_t HCS_physScbArray;	/* Scb Physical address */
-	PVOID HCS_virEscbArray;	/* Virtual pointer to ESCB Scatter list */
+	ESCB *HCS_virEscbArray;	/* Virtual pointer to ESCB Scatter list */
 	dma_addr_t HCS_physEscbArray;	/* scatter list Physical address */
 	UBYTE TargetFlag[16];	/* 30  target configuration, TCF_EN_TAG */
 	UBYTE MaximumTags[16];	/* 40  ORC_MAX_SCBS */
@@ -351,46 +300,6 @@ typedef struct ORC_Ha_Ctrl_Struc {
 #define	HCS_AF_IGNORE		0x01	/* Adapter ignore         */
 #define	HCS_AF_DISABLE_RESET	0x10	/* Adapter disable reset  */
 #define	HCS_AF_DISABLE_ADPT	0x80	/* Adapter disable                */
-
-
-/*---------------------------------------*/
-/* TimeOut for RESET to complete (30s)   */
-/*                                       */
-/* After a RESET the drive is checked    */
-/* every 200ms.                          */
-/*---------------------------------------*/
-#define DELAYED_RESET_MAX       (30*1000L)
-#define DELAYED_RESET_INTERVAL  200L
-
-/*----------------------------------------------*/
-/* TimeOut for IRQ from last interrupt (5s)     */
-/*----------------------------------------------*/
-#define IRQ_TIMEOUT_INTERVAL    (5*1000L)
-
-/*----------------------------------------------*/
-/* Retry Delay interval (200ms)                 */
-/*----------------------------------------------*/
-#define DELAYED_RETRY_INTERVAL  200L
-
-#define	INQUIRY_SIZE		36
-#define	CAPACITY_SIZE		8
-#define	DEFAULT_SENSE_LEN	14
-
-#define	DEVICE_NOT_FOUND	0x86
-
-/*----------------------------------------------*/
-/* Definition for PCI device                    */
-/*----------------------------------------------*/
-#define	MAX_PCI_DEVICES	21
-#define	MAX_PCI_BUSES	8
-
-typedef struct Adpt_Struc {
-        USHORT ADPT_BIOS;       /* 0 */
-        UBYTE ADPT_BASE;        /* 1 */
-        UBYTE ADPT_Bus;         /* 2 */
-        UBYTE ADPT_Device;      /* 3 */
-        UBYTE ADPT_Reserved[3];
-} JACS, *PJACS;
 
 typedef struct _NVRAM {
 /*----------header ---------------*/
@@ -498,33 +407,10 @@ typedef struct _NVRAM {
 #define NCC_RESET_TIME  0x0A    /* SCSI RESET recovering time     */
 #define NTC_DEFAULT     (NTC_1GIGA | NTC_NO_WIDESYNC | NTC_DISC_ENABLE)
 
-typedef union {                 /* Union define for mechanism 1   */
-        struct {
-                unsigned char RegNum;
-                unsigned char FcnNum:3;
-                unsigned char DeviceNum:5;
-                unsigned char BusNum;
-                unsigned char Reserved:7;
-                unsigned char Enable:1;
-        } sConfigAdr;
-        unsigned long lConfigAdr;
-} CONFIG_ADR;
-
-typedef union {                 /* Union define for mechanism 2   */
-        struct {
-                unsigned char RegNum;
-                unsigned char DeviceNum;
-                unsigned short Reserved;
-        } sHostAdr;
-        unsigned long lHostAdr;
-} HOST_ADR;
-
 #define ORC_RD(x,y)             (UCHAR)(inb(  (int)((ULONG)((ULONG)x+(UCHAR)y)) ))
+#define ORC_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
 #define ORC_RDLONG(x,y)         (long)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
 
 #define ORC_WR(     adr,data)   outb( (UCHAR)(data), (int)(adr))
 #define ORC_WRSHORT(adr,data)   outw( (UWORD)(data), (int)(adr))
 #define ORC_WRLONG( adr,data)   outl( (ULONG)(data), (int)(adr))
-
-
-
