@@ -70,6 +70,10 @@ struct inode_operations nfs_dir_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
+	.listxattr	= nfs_listxattr,
+	.getxattr	= nfs_getxattr,
+	.setxattr	= nfs_setxattr,
+	.removexattr	= nfs_removexattr,
 };
 
 /*
@@ -1279,6 +1283,7 @@ out:
 int
 nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
+	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs_access_cache *cache = &NFS_I(inode)->cache_access;
 	struct rpc_cred *cred;
 	int mode = inode->i_mode;
@@ -1312,7 +1317,7 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 
 	lock_kernel();
 
-	if (!NFS_PROTO(inode)->access)
+	if ((server->flags & NFS_MOUNT_NOACL) || !NFS_PROTO(inode)->access)
 		goto out_notsup;
 
 	cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0);

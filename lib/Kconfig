@@ -12,6 +12,9 @@ config CRC32
 	  kernel tree does. Such modules that use library CRC32 functions
 	  require M here.
 
+config QSORT
+	bool "Quick Sort"
+
 #
 # compression support is select'ed if needed
 #

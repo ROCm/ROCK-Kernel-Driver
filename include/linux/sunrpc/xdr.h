@@ -222,6 +222,22 @@ extern void xdr_write_pages(struct xdr_stream *xdr, struct page **pages,
 		unsigned int base, unsigned int len);
 extern void xdr_read_pages(struct xdr_stream *xdr, unsigned int len);
 
+extern int xdr_encode_word(struct xdr_buf *buf, unsigned int base, u32 w);
+extern int xdr_decode_word(struct xdr_buf *buf, unsigned int base, u32 *w);
+
+struct xdr_array2_desc;
+typedef int (*xdr_xcode_elem_t)(struct xdr_array2_desc *desc, void *elem);
+struct xdr_array2_desc {
+	unsigned int elem_size;
+	unsigned int array_len;
+	xdr_xcode_elem_t xcode;
+};
+
+extern int xdr_decode_array2(struct xdr_buf *buf, unsigned int base,
+                             struct xdr_array2_desc *desc);
+extern int xdr_encode_array2(struct xdr_buf *buf, unsigned int base,
+			     struct xdr_array2_desc *desc);
+
 /*
  * Initialize an xdr_stream for decoding data.
  */
