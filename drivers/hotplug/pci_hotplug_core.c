@@ -414,7 +414,7 @@ static int get_mount (void)
 	}
 
 	spin_unlock (&mount_lock);
-	mnt = kern_mount (&pcihpfs_fs_type);
+	mnt = kern_mount (&pcihpfs_type);
 	if (IS_ERR(mnt)) {
 		err ("could not mount the fs...erroring out!\n");
 		return -ENODEV;
@@ -1114,7 +1114,7 @@ static int __init pci_hotplug_init (void)
 	spin_lock_init(&list_lock);
 
 	dbg("registering filesystem.\n");
-	result = register_filesystem(&pcihpfs_fs_type);
+	result = register_filesystem(&pcihpfs_type);
 	if (result) {
 		err("register_filesystem failed with %d\n", result);
 		goto exit;
@@ -1128,7 +1128,7 @@ exit:
 
 static void __exit pci_hotplug_exit (void)
 {
-	unregister_filesystem(&pcihpfs_fs_type);
+	unregister_filesystem(&pcihpfs_type);
 }
 
 module_init(pci_hotplug_init);

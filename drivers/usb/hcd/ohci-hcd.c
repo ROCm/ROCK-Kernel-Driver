@@ -469,7 +469,7 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	usb_connect (udev);
 	udev->speed = USB_SPEED_FULL;
-	if (usb_new_device (udev) != 0) {
+	if (usb_register_root_hub (udev, &ohci->hcd.pdev->dev) != 0) {
 		usb_free_dev (udev); 
 		ohci->disabled = 1;
 // FIXME cleanup
