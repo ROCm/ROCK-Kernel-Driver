@@ -64,7 +64,7 @@ struct systemcfg *systemcfg;
 		(&paca[number].exception_stack[0]) - EXC_FRAME_SIZE,	    \
 }
 
-struct paca_struct paca[MAX_PACAS] __page_aligned = {
+struct paca_struct paca[NR_CPUS] __page_aligned = {
 #ifdef CONFIG_PPC_ISERIES
 	PACAINITDATA( 0, 1, &xItLpQueue, 0, STAB0_VIRT_ADDR),
 #else
@@ -101,6 +101,7 @@ struct paca_struct paca[MAX_PACAS] __page_aligned = {
 	PACAINITDATA(29, 0, 0, 0, 0),
 	PACAINITDATA(30, 0, 0, 0, 0),
 	PACAINITDATA(31, 0, 0, 0, 0),
+#if NR_CPUS > 32
 	PACAINITDATA(32, 0, 0, 0, 0),
 	PACAINITDATA(33, 0, 0, 0, 0),
 	PACAINITDATA(34, 0, 0, 0, 0),
@@ -116,5 +117,22 @@ struct paca_struct paca[MAX_PACAS] __page_aligned = {
 	PACAINITDATA(44, 0, 0, 0, 0),
 	PACAINITDATA(45, 0, 0, 0, 0),
 	PACAINITDATA(46, 0, 0, 0, 0),
-	PACAINITDATA(47, 0, 0, 0, 0)
+	PACAINITDATA(47, 0, 0, 0, 0),
+	PACAINITDATA(48, 0, 0, 0, 0),
+	PACAINITDATA(49, 0, 0, 0, 0),
+	PACAINITDATA(50, 0, 0, 0, 0),
+	PACAINITDATA(51, 0, 0, 0, 0),
+	PACAINITDATA(52, 0, 0, 0, 0),
+	PACAINITDATA(53, 0, 0, 0, 0),
+	PACAINITDATA(54, 0, 0, 0, 0),
+	PACAINITDATA(55, 0, 0, 0, 0),
+	PACAINITDATA(56, 0, 0, 0, 0),
+	PACAINITDATA(57, 0, 0, 0, 0),
+	PACAINITDATA(58, 0, 0, 0, 0),
+	PACAINITDATA(59, 0, 0, 0, 0),
+	PACAINITDATA(60, 0, 0, 0, 0),
+	PACAINITDATA(61, 0, 0, 0, 0),
+	PACAINITDATA(62, 0, 0, 0, 0),
+	PACAINITDATA(63, 0, 0, 0, 0),
+#endif
 };

@@ -77,7 +77,7 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev);
 static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
 {
 	struct device_node *dn = (struct device_node *)(dev->sysdata);
-	if (dn->devfn == dev->devfn && dn->busno == dev->bus->number)
+	if (dn->devfn == dev->devfn && dn->busno == (dev->bus->number&0xff))
 		return dn;	/* fast path.  sysdata is good */
 	else
 		return fetch_dev_dn(dev);

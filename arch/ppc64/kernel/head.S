@@ -1106,9 +1106,11 @@ SLB_NUM_ENTRIES = 64
 	oris    r21,r23,2048   /* valid bit    */
 	rldimi  r21,r22,0,52   /* Insert entry */
 
-	isync
+	/* 
+	 * No need for an isync before or after this slbmte. The exception
+	 * we enter with and the rfid we exit with are context synchronizing .
+	 */
 	slbmte  r20,r21
-	isync
 
 	/* All done -- return from exception. */
 	mfsprg  r20,3                   /* Load the PACA pointer  */
@@ -1861,9 +1863,9 @@ _STATIC(start_here_common)
 	li	r5,0
 	std	r0,PACAKSAVE(r13)
 
-	/* ptr to hardware interrupt stack for processor 0                */
+	/* ptr to hardware interrupt stack for boot processor */
 	LOADADDR(r3, hardware_int_paca0)
-	li      r5,0x1000
+	li      r5,PAGE_SIZE
 	sldi    r5,r5,3
 	subi    r5,r5,STACK_FRAME_OVERHEAD
 
@@ -1991,7 +1993,7 @@ ioremap_dir:
 
 	.globl  hardware_int_paca0
 hardware_int_paca0:
-	.space	8*4096
+	.space	8*PAGE_SIZE
 
 /* 1 page segment table per cpu (max 48, cpu0 allocated at STAB0_PHYS_ADDR) */
 	.globl	stab_array

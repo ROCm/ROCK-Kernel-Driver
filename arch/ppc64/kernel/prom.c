@@ -1060,12 +1060,11 @@ unsigned long __init
 prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	  unsigned long r6, unsigned long r7)
 {
-	int chrp = 0;
 	unsigned long mem;
-	ihandle prom_mmu, prom_op, prom_root, prom_cpu;
+	ihandle prom_root, prom_cpu;
 	phandle cpu_pkg;
 	unsigned long offset = reloc_offset();
-	long l, sz;
+	long l;
 	char *p, *d;
  	unsigned long phys;
         u32 getprop_rval;
