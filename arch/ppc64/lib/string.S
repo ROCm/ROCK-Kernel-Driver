@@ -120,54 +120,6 @@ _GLOBAL(strlen)
 	subf	r3,r3,r4
 	blr
 
-/*
- * Use dcbz on the complete cache lines in the destination
- * to set them to zero.  This requires that the destination
- * area is cacheable.  -- paulus
- */
-_GLOBAL(cacheable_memzero)
-	mr	r5,r4
-	li	r4,0
-	addi	r6,r3,-4
-	cmplwi	0,r5,4
-	blt	7f
-	stwu	r4,4(r6)
-	beqlr
-	andi.	r0,r6,3
-	add	r5,r0,r5
-	subf	r6,r0,r6
-	clrlwi	r7,r6,32-LG_CACHELINE_BYTES
-	add	r8,r7,r5
-	srwi	r9,r8,LG_CACHELINE_BYTES
-	addic.	r9,r9,-1	/* total number of complete cachelines */
-	ble	2f
-	xori	r0,r7,CACHELINE_MASK & ~3
-	srwi.	r0,r0,2
-	beq	3f
-	mtctr	r0
-4:	stwu	r4,4(r6)
-	bdnz	4b
-3:	mtctr	r9
-	li	r7,4
-10:	dcbz	r7,r6
-	addi	r6,r6,CACHELINE_BYTES
-	bdnz	10b
-	clrlwi	r5,r8,32-LG_CACHELINE_BYTES
-	addi	r5,r5,4
-2:	srwi	r0,r5,2
-	mtctr	r0
-	bdz	6f
-1:	stwu	r4,4(r6)
-	bdnz	1b
-6:	andi.	r5,r5,3
-7:	cmpwi	0,r5,0
-	beqlr
-	mtctr	r5
-	addi	r6,r6,3
-8:	stbu	r4,1(r6)
-	bdnz	8b
-	blr
-
 _GLOBAL(memset)
 	rlwimi	r4,r4,8,16,23
 	rlwimi	r4,r4,16,0,15

@@ -130,7 +130,7 @@ htab_initialize(void)
 		RELOC(_SDR1) = table + __ilog2(pteg_count) - 11;
 
 		/* Initialize the HPT with no entries */
-		cacheable_memzero((void *)table, htab_size_bytes);
+		memset((void *)table, 0, htab_size_bytes);
 	} else {
 		_htab_data->htab = NULL;
 		RELOC(_SDR1) = 0; 
