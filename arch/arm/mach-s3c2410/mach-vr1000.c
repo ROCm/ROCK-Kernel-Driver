@@ -11,13 +11,8 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     21-Aug-2004 BJD  Added struct s3c2410_board
  *     06-Aug-2004 BJD  Fixed call to time initialisation
- *     12-Jul-2004 BJD  Renamed machine
- *     16-May-2003 BJD  Created initial version
- *     16-Aug-2003 BJD  Fixed header files and copyright, added URL
- *     05-Sep-2003 BJD  Moved to v2.6 kernel
- *     06-Jan-2003 BJD  Updates for <arch/map.h>
- *     18-Jan-2003 BJD  Added serial port configuration
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
 */
 
@@ -44,6 +39,7 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "devs.h"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -143,11 +139,26 @@ static struct s3c2410_uartcfg vr1000_uartcfgs[] = {
 	}
 };
 
+static struct platform_device *vr1000_devices[] __initdata = {
+	&s3c_device_usb,
+	&s3c_device_lcd,
+	&s3c_device_wdt,
+	&s3c_device_i2c,
+	&s3c_device_iis,
+};
+
+static struct s3c2410_board vr1000_board __initdata = {
+	.devices       = vr1000_devices,
+	.devices_count = ARRAY_SIZE(vr1000_devices)
+};
+
 
 void __init vr1000_map_io(void)
 {
 	s3c2410_map_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
 	s3c2410_uartcfgs = vr1000_uartcfgs;
+
+	s3c2410_set_board(&vr1000_board);
 }
 
 void __init vr1000_init_irq(void)
