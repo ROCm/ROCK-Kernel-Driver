@@ -40,6 +40,8 @@
  *		fairly useless proc entry.
  * 990610	removed said useless proc code for the merge <alan>
  * 000403	Removed last traces of proc code. <davej>
+ * 011214	Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT <Matt_Domsch@dell.com>
+ *              Added timeout module option to override default
  */
 
 #include <linux/module.h>
@@ -76,7 +78,7 @@
  */
 static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 
-#define WD_VER                  "1.10 (06/05/99)"
+#define WD_VER                  "1.12 (12/14/2001)"
 
 /*
  * It should be noted that PCWD_REVISION_B was removed because A and B
@@ -88,7 +90,22 @@ static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 #define	PCWD_REVISION_A		1
 #define	PCWD_REVISION_C		2
 
-#define	WD_TIMEOUT		3	/* 1 1/2 seconds for a timeout */
+#define	WD_TIMEOUT		4	/* 2 seconds for a timeout */
+static int timeout_val = WD_TIMEOUT;
+static int timeout = 2;
+
+MODULE_PARM(timeout,"i");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)"); 
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 
 /*
  * These are the defines for the PC Watchdog card, revision A.
@@ -121,7 +138,7 @@ static int __init pcwd_checkcard(void)
 	if (prev_card_dat == 0xFF)
 		return 0;
 
-	while(count < WD_TIMEOUT) {
+	while(count < timeout_val) {
 
 	/* Read the raw card data from the port, and strip off the
 	   first 4 bits */
@@ -450,16 +467,16 @@ static int pcwd_close(struct inode *ino, struct file *filep)
 {
 	if (minor(ino->i_rdev)==WATCHDOG_MINOR)
 	{
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-		/*  Disable the board  */
-		if (revision == PCWD_REVISION_C) {
-			spin_lock(&io_lock);
-			outb_p(0xA5, current_readport + 3);
-			outb_p(0xA5, current_readport + 3);
-			spin_unlock(&io_lock);
+		if (!nowayout) {
+                        /*  Disable the board  */
+			if (revision == PCWD_REVISION_C) {
+				spin_lock(&io_lock);
+				outb_p(0xA5, current_readport + 3);
+				outb_p(0xA5, current_readport + 3);
+				spin_unlock(&io_lock);
+			}
+			atomic_inc( &open_allowed );
 		}
-	        atomic_inc( &open_allowed );
-#endif
 	}
 	return 0;
 }
@@ -560,9 +577,15 @@ static struct miscdevice temp_miscdev = {
 	&pcwd_fops
 };
  
+static void __init pcwd_validate_timeout(void)
+{
+	timeout_val = timeout * 2;
+}
+ 
 static int __init pcwatchdog_init(void)
 {
 	int i, found = 0;
+	pcwd_validate_timeout();
 	spin_lock_init(&io_lock);
 	
 	revision = PCWD_REVISION_A;
