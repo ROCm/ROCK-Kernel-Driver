@@ -1,12 +1,12 @@
 /*
- *  Copyright (c) 2000-2001 LSI Logic Corporation.
+ *  Copyright (c) 2000-2002 LSI Logic Corporation.
  *
  *
  *           Name:  MPI_INIT.H
  *          Title:  MPI initiator mode messages and structures
  *  Creation Date:  June 8, 2000
  *
- *    MPI Version:  01.02.04
+ *    MPI_INIT.H Version:  01.02.05
  *
  *  Version History
  *  ---------------
@@ -29,6 +29,8 @@
  *  09-28-01  01.02.03  Added structures and defines for SCSI Enclosure
  *                      Processor messages.
  *  10-04-01  01.02.04  Added defines for SEP request Action field.
+ *  05-31-02  01.02.05  Added MPI_SCSIIO_MSGFLGS_CMD_DETERMINES_DATA_DIR define
+ *                      for SCSI IO requests.
  *  --------------------------------------------------------------------------
  */
 
@@ -67,16 +69,17 @@ typedef struct _MSG_SCSI_IO_REQUEST
   SCSIIORequest_t, MPI_POINTER pSCSIIORequest_t;
 
 
-/* SCSIO MsgFlags bits */
+/* SCSI IO MsgFlags bits */
 
-#define MPI_SCSIIO_MSGFLGS_SENSE_WIDTH          (0x01)
-#define MPI_SCSIIO_MSGFLGS_SENSE_WIDTH_32       (0x00)
-#define MPI_SCSIIO_MSGFLGS_SENSE_WIDTH_64       (0x01)
-#define MPI_SCSIIO_MSGFLGS_SENSE_LOCATION       (0x02)
-#define MPI_SCSIIO_MSGFLGS_SENSE_LOC_HOST       (0x00)
-#define MPI_SCSIIO_MSGFLGS_SENSE_LOC_IOC        (0x02)
+#define MPI_SCSIIO_MSGFLGS_SENSE_WIDTH              (0x01)
+#define MPI_SCSIIO_MSGFLGS_SENSE_WIDTH_32           (0x00)
+#define MPI_SCSIIO_MSGFLGS_SENSE_WIDTH_64           (0x01)
+#define MPI_SCSIIO_MSGFLGS_SENSE_LOCATION           (0x02)
+#define MPI_SCSIIO_MSGFLGS_SENSE_LOC_HOST           (0x00)
+#define MPI_SCSIIO_MSGFLGS_SENSE_LOC_IOC            (0x02)
+#define MPI_SCSIIO_MSGFLGS_CMD_DETERMINES_DATA_DIR  (0x04)
 
-/* SCSIIO LUN fields */
+/* SCSI IO LUN fields */
 
 #define MPI_SCSIIO_LUN_FIRST_LEVEL_ADDRESSING   (0x0000FFFF)
 #define MPI_SCSIIO_LUN_SECOND_LEVEL_ADDRESSING  (0xFFFF0000)
@@ -85,7 +88,7 @@ typedef struct _MSG_SCSI_IO_REQUEST
 #define MPI_SCSIIO_LUN_LEVEL_1_WORD             (0xFF00)
 #define MPI_SCSIIO_LUN_LEVEL_1_DWORD            (0x0000FF00)
 
-/* SCSIO Control bits */
+/* SCSI IO Control bits */
 
 #define MPI_SCSIIO_CONTROL_DATADIRECTION_MASK   (0x03000000)
 #define MPI_SCSIIO_CONTROL_NODATATRANSFER       (0x00000000)
@@ -114,7 +117,7 @@ typedef struct _MSG_SCSI_IO_REQUEST
 #define MPI_SCSIIO_CONTROL_RESERVED2            (0x00010000)
 
 
-/* SCSIIO reply structure */
+/* SCSI IO reply structure */
 typedef struct _MSG_SCSI_IO_REPLY
 {
     U8                      TargetID;           /* 00h */
@@ -137,7 +140,7 @@ typedef struct _MSG_SCSI_IO_REPLY
   SCSIIOReply_t, MPI_POINTER pSCSIIOReply_t;
 
 
-/* SCSIIO Reply SCSIStatus values (SAM-2 status codes) */
+/* SCSI IO Reply SCSIStatus values (SAM-2 status codes) */
 
 #define MPI_SCSI_STATUS_SUCCESS                 (0x00)
 #define MPI_SCSI_STATUS_CHECK_CONDITION         (0x02)
@@ -151,7 +154,7 @@ typedef struct _MSG_SCSI_IO_REPLY
 #define MPI_SCSI_STATUS_ACA_ACTIVE              (0x30)
 
 
-/* SCSIIO Reply SCSIState values */
+/* SCSI IO Reply SCSIState values */
 
 #define MPI_SCSI_STATE_AUTOSENSE_VALID          (0x01)
 #define MPI_SCSI_STATE_AUTOSENSE_FAILED         (0x02)
@@ -160,7 +163,7 @@ typedef struct _MSG_SCSI_IO_REPLY
 #define MPI_SCSI_STATE_RESPONSE_INFO_VALID      (0x10)
 #define MPI_SCSI_STATE_QUEUE_TAG_REJECTED       (0x20)
 
-/* SCSIIO Reply ResponseInfo values */
+/* SCSI IO Reply ResponseInfo values */
 /* (FCP-1 RSP_CODE values and SPI-3 Packetized Failure codes) */
 
 #define MPI_SCSI_RSP_INFO_FUNCTION_COMPLETE     (0x00000000)
