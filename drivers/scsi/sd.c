@@ -57,7 +57,6 @@
 #include "hosts.h"
 #include "sd.h"
 #include <scsi/scsi_ioctl.h>
-#include "constants.h"
 #include <scsi/scsicam.h>	/* must follow "hosts.h" */
 
 #include <linux/genhd.h>
@@ -232,7 +231,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 			   or driver values */
 	
 			if(host->hostt->bios_param != NULL)
-				host->hostt->bios_param(sdkp, dev, 
+				host->hostt->bios_param(sdkp, dev,
 							&diskinfo[0]);
 			else
 				scsicam_bios_param(sdkp, dev, &diskinfo[0]);
@@ -551,8 +550,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	/*
 	 * It is possible that the disk changing stuff resulted in the device
 	 * being taken offline.  If this is the case, report this to the user,
-	 * and don't pretend that
-	 * the open actually succeeded.
+	 * and don't pretend that the open actually succeeded.
 	 */
 	if (!sdp->online) {
 		goto error_out;
@@ -754,6 +752,13 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 	scsi_io_completion(SCpnt, good_sectors, block_sectors);
 }
 
+static void
+sd_set_media_not_present(Scsi_Disk *sdkp) {
+	sdkp->media_present = 0;
+	sdkp->capacity = 0;
+	sdkp->device->changed = 1;
+}
+
 /**
  *	check_scsidisk_media_change - self descriptive
  *	@full_dev: kernel device descriptor (kdev_t)
@@ -826,13 +831,6 @@ static int check_scsidisk_media_change(kdev_t full_dev)
 	if (!flag)
 		sdp->changed = 0;
 	return retval;
-}
-
-static void
-sd_set_media_not_present(Scsi_Disk *sdkp) {
-	sdkp->media_present = 0;
-	sdkp->capacity = 0;
-	sdkp->device->changed = 1;
 }
 
 static int
@@ -1325,7 +1323,7 @@ cleanup_mem:
 }
 
 /**
- *	sd_finish- called during driver initialization, after all
+ *	sd_finish - called during driver initialization, after all
  *	the sd_attach() calls are finished.
  *
  *	Note: this function is invoked from the scsi mid-level.
@@ -1361,7 +1359,7 @@ static void sd_finish()
 }
 
 /**
- *	sd_detect- called at the start of driver initialization, once 
+ *	sd_detect - called at the start of driver initialization, once 
  *	for each scsi device (not just disks) present.
  *
  *	Returns 0 if not interested in this scsi device (e.g. scanner);
@@ -1380,7 +1378,7 @@ static int sd_detect(Scsi_Device * sdp)
 }
 
 /**
- *	sd_attach- called during driver initialization and whenever a
+ *	sd_attach - called during driver initialization and whenever a
  *	new scsi device is attached to the system. It is called once
  *	for each scsi device (not just disks) present.
  *	@sdp: pointer to mid level scsi device object
@@ -1447,7 +1445,7 @@ static int sd_attach(Scsi_Device * sdp)
 }
 
 /**
- *	revalidate_scsidisk- called to flush all partitions and partition 
+ *	revalidate_scsidisk - called to flush all partitions and partition 
  *	tables for a changed scsi disk. sd_init_onedisk() is then called
  *	followed by re-reading the new partition table.
  *      @dev: kernel device descriptor (kdev_t)
@@ -1496,7 +1494,7 @@ static int fop_revalidate_scsidisk(kdev_t dev)
 }
 
 /**
- *	sd_detach- called whenever a scsi disk (previously recognized by
+ *	sd_detach - called whenever a scsi disk (previously recognized by
  *	sd_attach) is detached from the system. It is called (potentially
  *	multiple times) during sd module unload.
  *	@sdp: pointer to mid level scsi device object
@@ -1550,7 +1548,7 @@ static void sd_detach(Scsi_Device * sdp)
 }
 
 /**
- *	init_sd- entry point for this driver (both when built in or when
+ *	init_sd - entry point for this driver (both when built in or when
  *	a module).
  *
  *	Note: this function registers this driver with the scsi mid-level.
@@ -1563,14 +1561,13 @@ static int __init init_sd(void)
 }
 
 /**
- *	exit_sd- exit point for this driver (when it is	a module).
+ *	exit_sd - exit point for this driver (when it is	a module).
  *
  *	Note: this function unregisters this driver from the scsi mid-level.
  **/
 static void __exit exit_sd(void)
 {
 	int k;
-	Scsi_Disk * sdkp;
 
 	SCSI_LOG_HLQUEUE(3, printk("exit_sd: exiting sd driver\n"));
 	scsi_unregister_device(&sd_template);
@@ -1579,15 +1576,12 @@ static void __exit exit_sd(void)
 
 	sd_registered--;
 	if (sd_dsk_arr != NULL) {
-		for (k = 0; k < sd_template.dev_max; ++k) {
-			sdkp = sd_dsk_arr[k];
-			if (sdkp)
-				vfree(sdkp);
-		}
+		for (k = 0; k < sd_template.dev_max; ++k)
+			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	if (sd_sizes) vfree(sd_sizes);
-	if (sd) vfree((char *) sd);
+	vfree(sd_sizes);
+	vfree((char *) sd);
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		blk_dev[SD_MAJOR(k)].queue = NULL;
 		del_gendisk(&(sd_gendisks[k]));

@@ -102,7 +102,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "seagate.h"
-#include "constants.h"
 #include <linux/stat.h>
 #include <asm/uaccess.h>
 #include "sd.h"
@@ -1709,7 +1708,7 @@ static int internal_command (unsigned char target, unsigned char lun,
 #endif
 	printk ("scsi%d : status = ", hostno);
 	print_status (status);
-	printk ("message = %02x\n", message);
+	printk (" message = %02x\n", message);
 #endif
 
 /* We shouldn't reach this until *after* BSY has been deasserted */

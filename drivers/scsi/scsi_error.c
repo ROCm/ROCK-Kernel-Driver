@@ -32,7 +32,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 
 /*
  * We must always allow SHUTDOWN_SIGS.  Even if we are not a module,
@@ -2014,23 +2013,3 @@ scsi_new_reset(Scsi_Cmnd *SCpnt, int flag)
 
 	return rtn;
 }
-
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

@@ -218,158 +218,17 @@ void usb_stor_show_sense(
 		unsigned char asc,
 		unsigned char ascq) {
 
-	char *keys[] = {
-		"No Sense",
-		"Recovered Error",
-		"Not Ready",
-		"Medium Error",
-		"Hardware Error",
-		"Illegal Request",
-		"Unit Attention",
-		"Data Protect",
-		"Blank Check",
-		"Vendor Specific",
-		"Copy Aborted",
-		"Aborted Command",
-		"(Obsolete)",
-		"Volume Overflow",
-		"Miscompare"
-	};
+	const char *what, *keystr;
 
-	unsigned short qual = asc;
+	keystr = scsi_sense_key_string(key);
+	what = scsi_extd_sense_format(asc, ascq);
 
-	char *what = 0;
-	char *keystr = 0;
-
-	qual <<= 8;
-	qual |= ascq;
-
-	if (key>0x0E)
+	if (keystr == NULL)
 		keystr = "(Unknown Key)";
-	else
-		keystr = keys[key];
-
-	switch (qual) {
-
-	case 0x0000: what="no additional sense information"; break;
-	case 0x0001: what="filemark detected"; break;
-	case 0x0002: what="end of partition/medium detected"; break;
-	case 0x0003: what="setmark detected"; break;
-	case 0x0004: what="beginning of partition/medium detected"; break;
-	case 0x0005: what="end of data detected"; break;
-	case 0x0006: what="I/O process terminated"; break;
-	case 0x0011: what="audio play operation in progress"; break;
-	case 0x0012: what="audio play operation paused"; break;
-	case 0x0013: what="audio play operation stopped due to error"; break;
-	case 0x0014: what="audio play operation successfully completed"; break;
-	case 0x0015: what="no current audio status to return"; break;
-	case 0x0016: what="operation in progress"; break;
-	case 0x0017: what="cleaning requested"; break;
-	case 0x0100: what="no index/sector signal"; break;
-	case 0x0200: what="no seek complete"; break;
-	case 0x0300: what="peripheral device write fault"; break;
-	case 0x0301: what="no write current"; break;
-	case 0x0302: what="excessive write errors"; break;
-	case 0x0400: what="LUN not ready, cause not reportable"; break;
-	case 0x0401: what="LUN in process of becoming ready"; break;
-	case 0x0402: what="LUN not ready, initializing cmd. required"; break;
-	case 0x0403: what="LUN not ready, manual intervention required"; break;
-	case 0x0404: what="LUN not ready, format in progress"; break;
-	case 0x0405: what="LUN not ready, rebuild in progress"; break;
-	case 0x0406: what="LUN not ready, recalculation in progress"; break;
-	case 0x0407: what="LUN not ready, operation in progress"; break;
-	case 0x0408: what="LUN not ready, long write in progress"; break;
-	case 0x0500: what="LUN doesn't respond to selection"; break;
-	case 0x0A00: what="error log overflow"; break;
-	case 0x0C04: what="compression check miscompare error"; break;
-	case 0x0C05: what="data expansion occurred during compression"; break;
-	case 0x0C06: what="block not compressible"; break;
-	case 0x1102: what="error too long to correct"; break;
-	case 0x1106: what="CIRC unrecovered error"; break;
-	case 0x1107: what="data resynchronization error"; break;
-	case 0x110D: what="decompression CRC error"; break;
-	case 0x110E: what="can't decompress using declared algorithm"; break;
-	case 0x110F: what="error reading UPC/EAN number"; break;
-	case 0x1110: what="error reading ISRC number"; break;
-	case 0x1200: what="address mark not found for ID field"; break;
-	case 0x1300: what="address mark not found for data field"; break;
-	case 0x1403: what="end of data not found"; break;
-	case 0x1404: what="block sequence error"; break;
-	case 0x1600: what="data sync mark error"; break;
-	case 0x1601: what="data sync error: data rewritten"; break;
-	case 0x1602: what="data sync error: recommend rewrite"; break;
-	case 0x1603: what="data sync error: data auto-reallocated"; break;
-	case 0x1604: what="data sync error: recommend reassignment"; break;
-	case 0x1900: what="defect list error"; break;
-	case 0x1901: what="defect list not available"; break;
-	case 0x1902: what="defect list error in primary list"; break;
-	case 0x1903: what="defect list error in grown list"; break;
-	case 0x1C00: what="defect list not found"; break;
-	case 0x2000: what="invalid command operation code"; break;
-	case 0x2400: what="invalid field in CDB"; break;
-	case 0x2703: what="associated write protect"; break;
-	case 0x2800: what="not ready to ready transition"; break;
-	case 0x2900: what="device reset occurred"; break;
-	case 0x2903: what="bus device reset function occurred"; break;
-	case 0x2904: what="device internal reset"; break;
-	case 0x2B00: what="copy can't execute / host can't disconnect"; break;
-	case 0x2C00: what="command sequence error"; break;
-	case 0x2C03: what="current program area is not empty"; break;
-	case 0x2C04: what="current program area is empty"; break;
-	case 0x2F00: what="commands cleared by another initiator"; break;
-	case 0x3001: what="can't read medium: unknown format"; break;
-	case 0x3002: what="can't read medium: incompatible format"; break;
-	case 0x3003: what="cleaning cartridge installed"; break;
-	case 0x3004: what="can't write medium: unknown format"; break;
-	case 0x3005: what="can't write medium: incompatible format"; break;
-	case 0x3006: what="can't format medium: incompatible medium"; break;
-	case 0x3007: what="cleaning failure"; break;
-	case 0x3008: what="can't write: application code mismatch"; break;
-	case 0x3009: what="current session not fixated for append"; break;
-	case 0x3201: what="defect list update failure"; break;
-	case 0x3400: what="enclosure failure"; break;
-	case 0x3500: what="enclosure services failure"; break;
-	case 0x3502: what="enclosure services unavailable"; break;
-	case 0x3503: what="enclosure services transfer failure"; break;
-	case 0x3504: what="enclosure services transfer refused"; break;
-	case 0x3A00: what="media not present"; break;
-	case 0x3B0F: what="end of medium reached"; break;
-	case 0x3F02: what="changed operating definition"; break;
-	case 0x4100: what="data path failure (should use 40 NN)"; break;
-	case 0x4A00: what="command phase error"; break;
-	case 0x4B00: what="data phase error"; break;
-	case 0x5100: what="erase failure"; break;
-	case 0x5200: what="cartridge fault"; break;
-	case 0x6300: what="end of user area encountered on this track"; break;
-	case 0x6600: what="automatic document feeder cover up"; break;
-	case 0x6601: what="automatic document feeder lift up"; break;
-	case 0x6602: what="document jam in auto doc feeder"; break;
-	case 0x6603: what="document miss feed auto in doc feeder"; break;
-	case 0x6700: what="configuration failure"; break;
-	case 0x6701: what="configuration of incapable LUN's failed"; break;
-	case 0x6702: what="add logical unit failed"; break;
-	case 0x6706: what="attachment of logical unit failed"; break;
-	case 0x6707: what="creation of logical unit failed"; break;
-	case 0x6900: what="data loss on logical unit"; break;
-	case 0x6E00: what="command to logical unit failed"; break;
-	case 0x7100: what="decompression exception long algorithm ID"; break;
-	case 0x7204: what="empty or partially written reserved track"; break;
-	case 0x7300: what="CD control error"; break;
-
-	default:
-		if (asc==0x40) {
-			US_DEBUGP("%s: diagnostic failure on component"
-			  " %02X\n", keystr, ascq);
-			return;
-		}
-		if (asc==0x70) {
-			US_DEBUGP("%s: decompression exception short"
-			  " algorithm ID of %02X\n", keystr, ascq);
-			return;
-		}
+	if (what == NULL)
 		what = "(unknown ASC/ASCQ)";
-	}
 
-	US_DEBUGP("%s: %s\n", keystr, what);
+	US_DEBUGP("%s: ", keystr);
+	US_DEBUGPX(what, ascq);
+	US_DEBUGPX("\n");
 }
-

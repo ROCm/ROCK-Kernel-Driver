@@ -228,7 +228,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 #include "sd.h"
 #include <linux/stat.h>
 #include <scsi/scsicam.h>
