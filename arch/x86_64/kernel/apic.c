@@ -441,9 +441,6 @@ void __init setup_local_APIC (void)
 
 #ifdef CONFIG_PM
 
-#include <linux/device.h>
-#include <linux/module.h>
-
 static struct {
 	/* 'active' is true if the local APIC was enabled by us and
 	   not the BIOS; this signifies that we are also responsible
@@ -540,7 +537,6 @@ static struct sysdev_class lapic_sysclass = {
 	.suspend	= lapic_suspend,
 };
 
-/* not static, needed by child devices */
 static struct sys_device device_lapic = {
 	.id		= 0,
 	.cls		= &lapic_sysclass,
