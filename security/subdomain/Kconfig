@@ -1,0 +1,3 @@
+config SECURITY_SUBDOMAIN
+	tristate "Subdomain support"
+	depends on SECURITY!=n
