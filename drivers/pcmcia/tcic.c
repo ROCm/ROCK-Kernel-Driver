@@ -516,17 +516,12 @@ static int __init init_tcic(void)
 
 static void __exit exit_tcic(void)
 {
-    u_long flags;
     unregister_ss_entry(&tcic_operations);
-    save_flags(flags);
-    cli();
+    del_timer_sync(&poll_timer);
     if (cs_irq != 0) {
 	tcic_aux_setw(TCIC_AUX_SYSCFG, TCIC_SYSCFG_AUTOBUSY|0x0a00);
 	free_irq(cs_irq, tcic_interrupt);
     }
-    if (tcic_timer_pending)
-	del_timer(&poll_timer);
-    restore_flags(flags);
     release_region(tcic_base, 16);
 } /* exit_tcic */
 
