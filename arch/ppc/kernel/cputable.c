@@ -545,8 +545,8 @@ struct cpu_spec	cpu_specs[] = {
         32, 32,
         0, /*__setup_cpu_440 */
     },
-    { /* 440GX Rev. B1 (2.1) */
-        0xf0000fff, 0x50000852, "440GX Rev. B1 (2.1)",
+    { /* 440GX Rev. C */
+        0xf0000fff, 0x50000892, "440GX Rev. C",
         CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
         PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
         32, 32,
