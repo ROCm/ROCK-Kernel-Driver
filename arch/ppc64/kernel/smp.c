@@ -551,3 +551,19 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	 */
 	cpu_present_map = cpu_possible_map;
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+int __cpu_disable(void)
+{
+	if (smp_ops->cpu_disable)
+		return smp_ops->cpu_disable();
+
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	if (smp_ops->cpu_die)
+		smp_ops->cpu_die(cpu);
+}
+#endif

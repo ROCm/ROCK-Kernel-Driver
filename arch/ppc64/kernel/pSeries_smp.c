@@ -87,7 +87,7 @@ static int query_cpu_stopped(unsigned int pcpu)
 
 #ifdef CONFIG_HOTPLUG_CPU
 
-int __cpu_disable(void)
+int pSeries_cpu_disable(void)
 {
 	/* FIXME: go put this in a header somewhere */
 	extern void xics_migrate_irqs_away(void);
@@ -103,7 +103,7 @@ int __cpu_disable(void)
 	return 0;
 }
 
-void __cpu_die(unsigned int cpu)
+void pSeries_cpu_die(unsigned int cpu)
 {
 	int tries;
 	int cpu_status;
@@ -351,6 +351,11 @@ void __init smp_init_pSeries(void)
 		smp_ops = &pSeries_mpic_smp_ops;
 	else
 		smp_ops = &pSeries_xics_smp_ops;
+
+#ifdef CONFIG_HOTPLUG_CPU
+	smp_ops->cpu_disable = pSeries_cpu_disable;
+	smp_ops->cpu_die = pSeries_cpu_die;
+#endif
 
 	/* Start secondary threads on SMT systems; primary threads
 	 * are already in the running state.
