@@ -2343,14 +2343,18 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 		case SIOCSIFNAME:
 			if (dev->flags & IFF_UP)
 				return -EBUSY;
+			ifr->ifr_newname[IFNAMSIZ-1] = '\0';
 			if (__dev_get_by_name(ifr->ifr_newname))
 				return -EEXIST;
-			memcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
-			dev->name[IFNAMSIZ - 1] = 0;
-			strlcpy(dev->class_dev.class_id, dev->name, BUS_ID_SIZE);
-			notifier_call_chain(&netdev_chain,
-					    NETDEV_CHANGENAME, dev);
-			return 0;
+			err = class_device_rename(&dev->class_dev, 
+						  ifr->ifr_newname);
+			if (!err) {
+				strlcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
+
+				notifier_call_chain(&netdev_chain,
+						    NETDEV_CHANGENAME, dev);
+			}
+			return err;
 
 		/*
 		 *	Unknown or private ioctl
