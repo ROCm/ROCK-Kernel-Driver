@@ -2626,7 +2626,7 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 	 */
 	if (cnt) {
 		TRACE_BUSYSEARCH("xfs_alloc_search_busy", "found", agno, bno, len, n, tp);
-		lsn = bsy->busy_tp->t_lsn;
+		lsn = bsy->busy_tp->t_commit_lsn;
 		mutex_spinunlock(&mp->m_perag[agno].pagb_lock, s);
 		xfs_log_force(mp, lsn, XFS_LOG_FORCE|XFS_LOG_SYNC);
 	} else {

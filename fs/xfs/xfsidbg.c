@@ -5299,8 +5299,10 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		tp->t_log_res, tp->t_blk_res, tp->t_blk_res_used);
 	kdb_printf("rt res %d rt res used %d\n", tp->t_rtx_res,
 		tp->t_rtx_res_used);
-	kdb_printf("ticket 0x%lx lsn %s\n",
-		(unsigned long) tp->t_ticket, xfs_fmtlsn(&tp->t_lsn));
+	kdb_printf("ticket 0x%lx lsn %s commit_lsn %s\n",
+		(unsigned long) tp->t_ticket,
+		xfs_fmtlsn(&tp->t_lsn),
+		xfs_fmtlsn(&tp->t_commit_lsn));
 	kdb_printf("callback 0x%p callarg 0x%p\n",
 		tp->t_callback, tp->t_callarg);
 	kdb_printf("icount delta %ld ifree delta %ld\n",
