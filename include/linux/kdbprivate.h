@@ -357,4 +357,6 @@ extern task_t *kdb_cpu_curr(int cpu);
 #define	kdb_do_each_thread(g, p) do_each_thread(g, p)
 #define	kdb_while_each_thread(g, p) while_each_thread(g, p)
 
+#define GFP_KDB (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
+
 #endif	/* !_KDBPRIVATE_H */

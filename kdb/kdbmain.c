@@ -729,14 +729,14 @@ kdb_defcmd2(const char *cmdstr, const char *argv0)
 	}
 	if (!s->usable)
 		return KDB_NOTIMP;
-	s->command = kmalloc((s->count + 1) * sizeof(*(s->command)), GFP_KERNEL);
+	s->command = kmalloc((s->count + 1) * sizeof(*(s->command)), GFP_KDB);
 	if (!s->command) {
 		kdb_printf("Could not allocate new kdb_defcmd table for %s\n", cmdstr);
 		s->usable = 0;
 		return KDB_NOTIMP;
 	}
 	memcpy(s->command, save_command, s->count * sizeof(*(s->command)));
-	s->command[s->count++] = kdb_strdup(cmdstr, GFP_KERNEL);
+	s->command[s->count++] = kdb_strdup(cmdstr, GFP_KDB);
 	kfree(save_command);
 	return 0;
 }
@@ -751,7 +751,7 @@ kdb_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		kdb_printf("kdb: nested defcmd detected, assuming missing endefcmd\n");
 		kdb_defcmd2("endefcmd", "endefcmd");
 	}
-	defcmd_set = kmalloc((defcmd_set_count + 1) * sizeof(*defcmd_set), GFP_KERNEL);
+	defcmd_set = kmalloc((defcmd_set_count + 1) * sizeof(*defcmd_set), GFP_KDB);
 	if (!defcmd_set) {
 		kdb_printf("Could not allocate new defcmd_set entry for %s\n", argv[1]);
 		defcmd_set = save_defcmd_set;
@@ -762,9 +762,9 @@ kdb_defcmd(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	s = defcmd_set + defcmd_set_count;
 	memset(s, 0, sizeof(*s));
 	s->usable = 1;
-	s->name = kdb_strdup(argv[1], GFP_KERNEL);
-	s->usage = kdb_strdup(argv[2], GFP_KERNEL);
-	s->help = kdb_strdup(argv[3], GFP_KERNEL);
+	s->name = kdb_strdup(argv[1], GFP_KDB);
+	s->usage = kdb_strdup(argv[2], GFP_KDB);
+	s->help = kdb_strdup(argv[3], GFP_KDB);
 	if (s->usage[0] == '"') {
 		strcpy(s->usage, s->usage+1);
 		s->usage[strlen(s->usage)-1] = '\0';
@@ -3056,7 +3056,7 @@ kdb_ll(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	 */
 
 	va = addr;
-	if (!(command = kdb_strdup(argv[3], GFP_KERNEL))) {
+	if (!(command = kdb_strdup(argv[3], GFP_KDB))) {
 		kdb_printf("%s: cannot duplicate command\n", __FUNCTION__);
 		return 0;
 	}
@@ -3231,7 +3231,7 @@ kdb_register_repeat(char *cmd,
 	}
 
 	if (i >= kdb_max_commands) {
-		kdbtab_t *new = kmalloc((kdb_max_commands + kdb_command_extend) * sizeof(*new), GFP_KERNEL);
+		kdbtab_t *new = kmalloc((kdb_max_commands + kdb_command_extend) * sizeof(*new), GFP_KDB);
 		if (!new) {
 			kdb_printf("Could not allocate new kdb_command table\n");
 			return 1;
