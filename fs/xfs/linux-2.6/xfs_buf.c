@@ -359,6 +359,7 @@ _pagebuf_lookup_pages(
 	error = _pagebuf_get_pages(bp, page_count, flags);
 	if (unlikely(error))
 		return error;
+	bp->pb_flags |= _PBF_PAGE_CACHE;
 
 	offset = bp->pb_offset;
 	first = bp->pb_file_offset >> PAGE_CACHE_SHIFT;
@@ -370,8 +371,12 @@ _pagebuf_lookup_pages(
 	      retry:
 		page = find_or_create_page(mapping, first + i, gfp_mask);
 		if (unlikely(page == NULL)) {
-			if (flags & PBF_READ_AHEAD)
+			if (flags & PBF_READ_AHEAD) {
+				bp->pb_page_count = i;
+				for (i = 0; i < bp->pb_page_count; i++)
+					unlock_page(bp->pb_pages[i]);
 				return -ENOMEM;
+			}
 
 			/*
 			 * This could deadlock.
@@ -426,8 +431,6 @@ _pagebuf_lookup_pages(
 		for (i = 0; i < bp->pb_page_count; i++)
 			unlock_page(bp->pb_pages[i]);
 	}
-
-	bp->pb_flags |= _PBF_PAGE_CACHE;
 
 	if (page_count) {
 		/* if we have any uptodate pages, mark that in the buffer */
