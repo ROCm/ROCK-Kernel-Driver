@@ -297,6 +297,10 @@ int __init adb_init(void)
 	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
 		return 0;
 #endif
+#ifdef CONFIG_PPC64
+	if (_machine != _MACH_Pmac)
+		return 0;
+#endif
 #ifdef CONFIG_MAC
 	if (!MACH_IS_MAC)
 		return 0;
