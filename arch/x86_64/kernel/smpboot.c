@@ -734,10 +734,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
 
-	if (!cpu_isset(hard_smp_processor_id(), phys_cpu_present_map)) {
+	if (!physid_isset(hard_smp_processor_id(), phys_cpu_present_map)) {
 		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
 		       hard_smp_processor_id());
-		cpu_set(hard_smp_processor_id(), phys_cpu_present_map);
+		physid_set(hard_smp_processor_id(), phys_cpu_present_map);
 	}
 
 	/*
@@ -748,7 +748,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 		io_apic_irqs = 0;
 		cpu_online_map = cpumask_of_cpu(0);
-		phys_cpu_present_map = cpumask_of_cpu(0);
+		phys_cpu_present_map = physid_mask_of_physid(0);
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
@@ -759,10 +759,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * Should not be necessary because the MP table should list the boot
 	 * CPU too, but we do it for the sake of robustness anyway.
 	 */
-	if (!cpu_isset(boot_cpu_id, phys_cpu_present_map)) {
+	if (!physid_isset(boot_cpu_id, phys_cpu_present_map)) {
 		printk(KERN_NOTICE "weird, boot CPU (#%d) not listed by the BIOS.\n",
 								 boot_cpu_id);
-		cpu_set(hard_smp_processor_id(), phys_cpu_present_map);
+		physid_set(hard_smp_processor_id(), phys_cpu_present_map);
 	}
 
 	/*
@@ -774,7 +774,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
 		io_apic_irqs = 0;
 		cpu_online_map = cpumask_of_cpu(0);
-		phys_cpu_present_map = cpumask_of_cpu(0);
+		phys_cpu_present_map = physid_mask_of_physid(0);
 		disable_apic = 1;
 		goto smp_done;
 	}
@@ -789,7 +789,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
 		io_apic_irqs = 0;
 		cpu_online_map = cpumask_of_cpu(0);
-		phys_cpu_present_map = cpumask_of_cpu(0);
+		phys_cpu_present_map = physid_mask_of_physid(0);
 		disable_apic = 1;
 		goto smp_done;
 	}
@@ -803,7 +803,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Now scan the CPU present map and fire up the other CPUs.
 	 */
-	Dprintk("CPU present map: %lx\n", phys_cpu_present_map);
+	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
 
 	for (apicid = 0; apicid < NR_CPUS; apicid++) {
 		/*
