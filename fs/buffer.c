@@ -129,7 +129,7 @@ void __wait_on_buffer(struct buffer_head * bh)
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		blk_run_queues();
 		if (buffer_locked(bh))
-			schedule();
+			io_schedule();
 	} while (buffer_locked(bh));
 	put_bh(bh);
 	finish_wait(wqh, &wait);
