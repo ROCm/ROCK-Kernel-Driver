@@ -613,10 +613,6 @@ static void unmap_page_range(struct mmu_gather *tlb,
 }
 
 #ifdef CONFIG_PREEMPT
-/*
- * It's not an issue to have a small zap block size - TLB flushes
- * only happen once normally, due to the tlb->need_flush optimization.
- */
 # define ZAP_BLOCK_SIZE	(8 * PAGE_SIZE)
 #else
 /* No preempt: go for improved straight-line efficiency */
@@ -695,6 +691,9 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 
 			start += block;
 			zap_bytes -= block;
+			if ((long)zap_bytes > 0)
+				continue;
+
 			if (!atomic) {
 				int fullmm = tlb_is_full_mm(*tlbp);
 				tlb_finish_mmu(*tlbp, tlb_start, start);
@@ -702,8 +701,6 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 				*tlbp = tlb_gather_mmu(mm, fullmm);
 				tlb_start_valid = 0;
 			}
-			if ((long)zap_bytes > 0)
-				continue;
 			zap_bytes = ZAP_BLOCK_SIZE;
 		}
 	}
