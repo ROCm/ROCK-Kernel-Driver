@@ -301,7 +301,12 @@ include/linux/autoconf.h: .config
 #	this Makefile
 
 include/linux/version.h: Makefile
-	@scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
+	@echo -n 'Generating $@'
+	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
+	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
+	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
+	) > $@.tmp
+	@$(update-if-changed)
 
 # Helpers built in scripts/
 # ---------------------------------------------------------------------------
@@ -339,6 +344,7 @@ ifdef CONFIG_MODVERSIONS
 include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@rm -rf .tmp_export-objs
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+	@echo -n 'Generating $@'
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
@@ -346,15 +352,8 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
-	) > $@.tmp
-	@rm -rf .tmp_export-objs
-	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-		echo $@ was not updated; \
-		rm -f $@.tmp; \
-	else \
-		echo $@ was updated; \
-		mv -f $@.tmp $@; \
-	fi
+	) > $@.tmp; \
+	$(update-if-changed)
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
 	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
@@ -659,6 +658,16 @@ if_changed_rule = $(if $(strip $? \
 # If quiet is set, only print short version of rule
 
 cmd = @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1))
+
+define update-if-changed
+	if [ -r $@ ] && cmp -s $@ $@.tmp; then \
+		echo ' (unchanged)'; \
+		rm -f $@.tmp; \
+	else \
+		echo ' (updated)'; \
+		mv -f $@.tmp $@; \
+	fi
+endef
 
 
 FORCE:
