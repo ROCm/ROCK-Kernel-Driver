@@ -280,6 +280,26 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
+ * Insert vm structure into process list sorted by address and into the inode's
+ * i_mmap ring. The caller should hold mm->page_table_lock and
+ * ->f_mappping->i_shared_sem if vm_file is non-NULL.
+ */
+static void
+__insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
+{
+	struct vm_area_struct * __vma, * prev;
+	struct rb_node ** rb_link, * rb_parent;
+
+	__vma = find_vma_prepare(mm, vma->vm_start,&prev, &rb_link, &rb_parent);
+	if (__vma && __vma->vm_start < vma->vm_end)
+		BUG();
+	__vma_link(mm, vma, prev, rb_link, rb_parent);
+	mark_mm_hugetlb(mm, vma);
+	mm->map_count++;
+	validate_mm(mm);
+}
+
+/*
  * If the vma has a ->close operation then the driver probably needs to release
  * per-vma resources, so we don't attempt to merge those.
  */
@@ -351,7 +371,9 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			unsigned long end, unsigned long vm_flags,
 			struct file *file, unsigned long pgoff)
 {
-	spinlock_t * lock = &mm->page_table_lock;
+	spinlock_t *lock = &mm->page_table_lock;
+	struct inode *inode = file ? file->f_dentry->d_inode : NULL;
+	struct semaphore *i_shared_sem;
 
 	/*
 	 * We later require that vma->vm_flags == vm_flags, so this tests
@@ -359,6 +381,8 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	 */
 	if (vm_flags & VM_SPECIAL)
 		return 0;
+
+	i_shared_sem = file ? &inode->i_mapping->i_shared_sem : NULL;
 
 	if (!prev) {
 		prev = rb_entry(rb_parent, struct vm_area_struct, vm_rb);
@@ -372,12 +396,11 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			is_mergeable_vma(prev, file, vm_flags) &&
 			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
 		struct vm_area_struct *next;
-		struct inode *inode = file ? file->f_dentry->d_inode : NULL;
 		int need_up = 0;
 
 		if (unlikely(file && prev->vm_next &&
 				prev->vm_next->vm_file == file)) {
-			down(&inode->i_mapping->i_shared_sem);
+			down(i_shared_sem);
 			need_up = 1;
 		}
 		spin_lock(lock);
@@ -395,7 +418,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			__remove_shared_vm_struct(next, inode);
 			spin_unlock(lock);
 			if (need_up)
-				up(&inode->i_mapping->i_shared_sem);
+				up(i_shared_sem);
 			if (file)
 				fput(file);
 
@@ -405,7 +428,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 		}
 		spin_unlock(lock);
 		if (need_up)
-			up(&inode->i_mapping->i_shared_sem);
+			up(i_shared_sem);
 		return 1;
 	}
 
@@ -419,10 +442,14 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 				pgoff, (end - addr) >> PAGE_SHIFT))
 			return 0;
 		if (end == prev->vm_start) {
+			if (file)
+				down(i_shared_sem);
 			spin_lock(lock);
 			prev->vm_start = addr;
 			prev->vm_pgoff -= (end - addr) >> PAGE_SHIFT;
 			spin_unlock(lock);
+			if (file)
+				up(i_shared_sem);
 			return 1;
 		}
 	}
@@ -1142,6 +1169,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	      unsigned long addr, int new_below)
 {
 	struct vm_area_struct *new;
+	struct address_space *mapping = NULL;
 
 	if (mm->map_count >= MAX_MAP_COUNT)
 		return -ENOMEM;
@@ -1155,12 +1183,9 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	INIT_LIST_HEAD(&new->shared);
 
-	if (new_below) {
+	if (new_below)
 		new->vm_end = addr;
-		vma->vm_start = addr;
-		vma->vm_pgoff += ((addr - new->vm_start) >> PAGE_SHIFT);
-	} else {
-		vma->vm_end = addr;
+	else {
 		new->vm_start = addr;
 		new->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
 	}
@@ -1171,7 +1196,25 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	if (new->vm_ops && new->vm_ops->open)
 		new->vm_ops->open(new);
 
-	insert_vm_struct(mm, new);
+	if (vma->vm_file)
+		 mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+
+	if (mapping)
+		down(&mapping->i_shared_sem);
+	spin_lock(&mm->page_table_lock);
+
+	if (new_below) {
+		vma->vm_start = addr;
+		vma->vm_pgoff += ((addr - new->vm_start) >> PAGE_SHIFT);
+	} else
+		vma->vm_end = addr;
+
+	__insert_vm_struct(mm, new);
+
+	spin_unlock(&mm->page_table_lock);
+	if (mapping)
+		up(&mapping->i_shared_sem);
+
 	return 0;
 }
 
