@@ -49,6 +49,8 @@ static inline struct efs_sb_info *SUPER_INFO(struct super_block *sb)
 	return sb->s_fs_info;
 }
 
+struct statfs;
+
 extern struct inode_operations efs_dir_inode_operations;
 extern struct file_operations efs_dir_operations;
 extern struct address_space_operations efs_symlink_aops;

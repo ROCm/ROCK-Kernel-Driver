@@ -13,7 +13,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.h,v 1.136 2002/10/21 13:51:54 pdelaney Exp $
+ *  $Id: mptbase.h,v 1.141 2002/12/03 21:26:32 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -80,8 +80,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2002 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.03.00.02"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.03.00.02"
+#define MPT_LINUX_VERSION_COMMON	"2.03.01.01"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.03.01.01"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -134,8 +134,10 @@
 #define	 CAN_SLEEP			1
 #define  NO_SLEEP			0
 
-/* 
- * SCSI transfer rate defines. 
+#define MPT_COALESCING_TIMEOUT		0x10
+
+/*
+ * SCSI transfer rate defines.
  */
 #define MPT_ULTRA320			0x08
 #define MPT_ULTRA160			0x09
@@ -524,7 +526,7 @@ typedef struct _mpt_ioctl_events {
 #define MPT_SCSICFG_DV_PENDING		0x04	/* DV on this physical id pending */
 #define MPT_SCSICFG_DV_NOT_DONE		0x08	/* DV has not been performed */
 #define MPT_SCSICFG_BLK_NEGO		0x10	/* WriteSDP1 with WDTR and SDTR disabled */
-
+#define MPT_SCSICFG_RELOAD_IOC_PG3	0x20	/* IOC Pg 3 data is obsolete */
 						/* Args passed to writeSDP1: */
 #define MPT_SCSICFG_USE_NVRAM		0x01	/* WriteSDP1 using NVRAM */
 #define MPT_SCSICFG_ALL_IDS		0x02	/* WriteSDP1 to all IDS */
@@ -754,6 +756,12 @@ typedef struct _mpt_sge {
 #define nehprintk(x) printk x
 #else
 #define nehprintk(x)
+#endif
+
+#if defined(MPT_DEBUG_CONFIG) || defined(MPT_DEBUG)
+#define dcprintk(x) printk x
+#else
+#define dcprintk(x)
 #endif
 
 #define MPT_INDEX_2_MFPTR(ioc,idx) \
@@ -1009,6 +1017,7 @@ extern int	 mpt_HardResetHandler(MPT_ADAPTER *ioc, int sleepFlag);
 extern int	 mpt_config(MPT_ADAPTER *ioc, CONFIGPARMS *cfg);
 extern void	*mpt_alloc_fw_memory(MPT_ADAPTER *ioc, int size, int *frags, int *alloc_sz);
 extern void	 mpt_free_fw_memory(MPT_ADAPTER *ioc, fw_image_t **alt_img);
+extern int	 mpt_read_ioc_pg_3(MPT_ADAPTER *ioc);
 
 /*
  *  Public data decl's...

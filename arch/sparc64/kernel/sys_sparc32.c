@@ -52,6 +52,7 @@
 #include <linux/dnotify.h>
 #include <linux/security.h>
 #include <linux/compat.h>
+#include <linux/vfs.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>

@@ -46,36 +46,31 @@ static __inline__ void DQUOT_INIT(struct inode *inode)
 {
 	if (!inode->i_sb)
 		BUG();
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb) && !IS_NOQUOTA(inode))
 		inode->i_sb->dq_op->initialize(inode, -1);
-	unlock_kernel();
 }
 
 static __inline__ void DQUOT_DROP(struct inode *inode)
 {
-	lock_kernel();
 	if (IS_QUOTAINIT(inode)) {
 		if (!inode->i_sb)
 			BUG();
 		inode->i_sb->dq_op->drop(inode);	/* Ops must be set when there's any quota... */
 	}
-	unlock_kernel();
 }
 
 static __inline__ int DQUOT_PREALLOC_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb)) {
 		/* Used space is updated in alloc_space() */
-		if (inode->i_sb->dq_op->alloc_space(inode, nr, 1) == NO_QUOTA) {
-			unlock_kernel();
+		if (inode->i_sb->dq_op->alloc_space(inode, nr, 1) == NO_QUOTA)
 			return 1;
-		}
 	}
-	else
+	else {
+		spin_lock(&dq_data_lock);
 		inode_add_bytes(inode, nr);
-	unlock_kernel();
+		spin_unlock(&dq_data_lock);
+	}
 	return 0;
 }
 
@@ -89,17 +84,16 @@ static __inline__ int DQUOT_PREALLOC_SPACE(struct inode *inode, qsize_t nr)
 
 static __inline__ int DQUOT_ALLOC_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb)) {
 		/* Used space is updated in alloc_space() */
-		if (inode->i_sb->dq_op->alloc_space(inode, nr, 0) == NO_QUOTA) {
-			unlock_kernel();
+		if (inode->i_sb->dq_op->alloc_space(inode, nr, 0) == NO_QUOTA)
 			return 1;
-		}
 	}
-	else
+	else {
+		spin_lock(&dq_data_lock);
 		inode_add_bytes(inode, nr);
-	unlock_kernel();
+		spin_unlock(&dq_data_lock);
+	}
 	return 0;
 }
 
@@ -113,26 +107,23 @@ static __inline__ int DQUOT_ALLOC_SPACE(struct inode *inode, qsize_t nr)
 
 static __inline__ int DQUOT_ALLOC_INODE(struct inode *inode)
 {
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb)) {
 		DQUOT_INIT(inode);
-		if (inode->i_sb->dq_op->alloc_inode(inode, 1) == NO_QUOTA) {
-			unlock_kernel();
+		if (inode->i_sb->dq_op->alloc_inode(inode, 1) == NO_QUOTA)
 			return 1;
-		}
 	}
-	unlock_kernel();
 	return 0;
 }
 
 static __inline__ void DQUOT_FREE_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb))
 		inode->i_sb->dq_op->free_space(inode, nr);
-	else
+	else {
+		spin_lock(&dq_data_lock);
 		inode_sub_bytes(inode, nr);
-	unlock_kernel();
+		spin_unlock(&dq_data_lock);
+	}
 }
 
 static __inline__ void DQUOT_FREE_SPACE(struct inode *inode, qsize_t nr)
@@ -143,23 +134,17 @@ static __inline__ void DQUOT_FREE_SPACE(struct inode *inode, qsize_t nr)
 
 static __inline__ void DQUOT_FREE_INODE(struct inode *inode)
 {
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb))
 		inode->i_sb->dq_op->free_inode(inode, 1);
-	unlock_kernel();
 }
 
 static __inline__ int DQUOT_TRANSFER(struct inode *inode, struct iattr *iattr)
 {
-	lock_kernel();
 	if (sb_any_quota_enabled(inode->i_sb) && !IS_NOQUOTA(inode)) {
 		DQUOT_INIT(inode);
-		if (inode->i_sb->dq_op->transfer(inode, iattr) == NO_QUOTA) {
-			unlock_kernel();
+		if (inode->i_sb->dq_op->transfer(inode, iattr) == NO_QUOTA)
 			return 1;
-		}
 	}
-	unlock_kernel();
 	return 0;
 }
 
@@ -169,10 +154,8 @@ static __inline__ int DQUOT_OFF(struct super_block *sb)
 {
 	int ret = -ENOSYS;
 
-	lock_kernel();
 	if (sb->s_qcop && sb->s_qcop->quota_off)
 		ret = sb->s_qcop->quota_off(sb, -1);
-	unlock_kernel();
 	return ret;
 }
 
@@ -192,9 +175,7 @@ static __inline__ int DQUOT_OFF(struct super_block *sb)
 #define DQUOT_TRANSFER(inode, iattr)		(0)
 extern __inline__ int DQUOT_PREALLOC_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
-	lock_kernel();
 	inode_add_bytes(inode, nr);
-	unlock_kernel();
 	return 0;
 }
 
@@ -207,9 +188,7 @@ extern __inline__ int DQUOT_PREALLOC_SPACE(struct inode *inode, qsize_t nr)
 
 extern __inline__ int DQUOT_ALLOC_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
-	lock_kernel();
 	inode_add_bytes(inode, nr);
-	unlock_kernel();
 	return 0;
 }
 
@@ -222,9 +201,7 @@ extern __inline__ int DQUOT_ALLOC_SPACE(struct inode *inode, qsize_t nr)
 
 extern __inline__ void DQUOT_FREE_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
-	lock_kernel();
 	inode_sub_bytes(inode, nr);
-	unlock_kernel();
 }
 
 extern __inline__ void DQUOT_FREE_SPACE(struct inode *inode, qsize_t nr)

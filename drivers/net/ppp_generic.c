@@ -1841,7 +1841,6 @@ ppp_register_channel(struct ppp_channel *chan)
 	list_add(&pch->list, &new_channels);
 	atomic_inc(&channel_count);
 	spin_unlock_bh(&all_channels_lock);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1904,7 +1903,6 @@ ppp_unregister_channel(struct ppp_channel *chan)
 	wake_up_interruptible(&pch->file.rwait);
 	if (atomic_dec_and_test(&pch->file.refcnt))
 		ppp_destroy_channel(pch);
-	MOD_DEC_USE_COUNT;
 }
 
 /*
