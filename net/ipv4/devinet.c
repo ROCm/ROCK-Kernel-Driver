@@ -102,18 +102,17 @@ static struct in_ifaddr *inet_alloc_ifa(void)
 	return ifa;
 }
 
-static inline void inet_free_ifa(struct in_ifaddr *ifa)
+static void inet_rcu_free_ifa(struct rcu_head *head)
 {
+	struct in_ifaddr *ifa = container_of(head, struct in_ifaddr, rcu_head);
 	if (ifa->ifa_dev)
 		in_dev_put(ifa->ifa_dev);
 	kfree(ifa);
 }
 
-static void inet_rcu_free_ifa(struct rcu_head *head)
+static inline void inet_free_ifa(struct in_ifaddr *ifa)
 {
-	struct in_ifaddr *ifa = container_of(head, struct in_ifaddr, rcu_head);
-
-	inet_free_ifa(ifa);
+	call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
 }
 
 void in_dev_finish_destroy(struct in_device *idev)
@@ -194,7 +193,7 @@ static void inetdev_destroy(struct in_device *in_dev)
 
 	while ((ifa = in_dev->ifa_list) != NULL) {
 		inet_del_ifa(in_dev, &in_dev->ifa_list, 0);
-		call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
+		inet_free_ifa(ifa);
 	}
 
 #ifdef CONFIG_SYSCTL
@@ -250,7 +249,7 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 
 			rtmsg_ifa(RTM_DELADDR, ifa);
 			notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa);
-			call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
+			inet_free_ifa(ifa);
 		}
 	}
 
@@ -271,7 +270,7 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 	rtmsg_ifa(RTM_DELADDR, ifa1);
 	notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa1);
 	if (destroy) {
-		call_rcu(&ifa1->rcu_head, inet_rcu_free_ifa);
+		inet_free_ifa(ifa1);
 
 		if (!in_dev->ifa_list)
 			inetdev_destroy(in_dev);
@@ -286,7 +285,7 @@ static int inet_insert_ifa(struct in_ifaddr *ifa)
 	ASSERT_RTNL();
 
 	if (!ifa->ifa_local) {
-		call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
+		inet_free_ifa(ifa);
 		return 0;
 	}
 
@@ -301,11 +300,11 @@ static int inet_insert_ifa(struct in_ifaddr *ifa)
 		if (ifa1->ifa_mask == ifa->ifa_mask &&
 		    inet_ifa_match(ifa1->ifa_address, ifa)) {
 			if (ifa1->ifa_local == ifa->ifa_local) {
-				call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
+				inet_free_ifa(ifa);
 				return -EEXIST;
 			}
 			if (ifa1->ifa_scope != ifa->ifa_scope) {
-				call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
+				inet_free_ifa(ifa);
 				return -EINVAL;
 			}
 			ifa->ifa_flags |= IFA_F_SECONDARY;
@@ -338,7 +337,7 @@ static int inet_set_ifa(struct net_device *dev, struct in_ifaddr *ifa)
 	if (!in_dev) {
 		in_dev = inetdev_init(dev);
 		if (!in_dev) {
-			call_rcu(&ifa->rcu_head, inet_rcu_free_ifa);
+			inet_free_ifa(ifa);
 			return -ENOBUFS;
 		}
 	}
