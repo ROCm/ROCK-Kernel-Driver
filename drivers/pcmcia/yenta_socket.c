@@ -752,6 +752,7 @@ static void yenta_close(struct pci_dev *dev)
 		iounmap(sock->base);
 	yenta_free_resources(sock);
 
+	pci_release_regions(dev);
 	pci_set_drvdata(dev, NULL);
 }
 
@@ -823,6 +824,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 {
 	struct yenta_socket *socket;
 	struct cardbus_override_struct *d;
+	int ret;
 	
 	socket = kmalloc(sizeof(struct yenta_socket), GFP_KERNEL);
 	if (!socket)
@@ -842,11 +844,19 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	/*
 	 * Do some basic sanity checking..
 	 */
-	if (pci_enable_device(dev))
-		return -1;
+	if (pci_enable_device(dev)) {
+		ret = -EBUSY;
+		goto free;
+	}
+
+	ret = pci_request_regions(dev, "yenta_socket");
+	if (ret)
+		goto disable;
+
 	if (!pci_resource_start(dev, 0)) {
 		printk("No cardbus resource!\n");
-		return -1;
+		ret = -ENODEV;
+		goto release;
 	}
 
 	/*
@@ -854,8 +864,12 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	 * and request the IRQ.
 	 */
 	socket->base = ioremap(pci_resource_start(dev, 0), 0x1000);
-	if (!socket->base)
-		return -1;
+	if (!socket->base) {
+		ret = -ENOMEM;
+		goto release;
+	}
+
+	printk(KERN_INFO "Yenta: CardBus bridge found at %s\n", dev->slot_name);
 
 	yenta_config_init(socket);
 
@@ -871,9 +885,9 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	d = cardbus_override;
 	while (d->override) {
 		if ((dev->vendor == d->vendor) && (dev->device == d->device)) {
-			int retval = d->override(socket);
-			if (retval < 0)
-				return retval;
+			ret = d->override(socket);
+			if (ret < 0)
+				goto unmap;
 		}
 		d++;
 	}
@@ -895,7 +909,20 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	printk("Socket status: %08x\n", cb_readl(socket, CB_SOCKET_STATE));
 
 	/* Register it with the pcmcia layer.. */
-	return pcmcia_register_socket(&socket->socket);
+	ret = pcmcia_register_socket(&socket->socket);
+	if (ret == 0)
+		goto out;
+
+ unmap:
+	iounmap(socket->base);
+ release:
+	pci_release_regions(dev);
+ disable:
+	pci_disable_device(dev);
+ free:
+	kfree(socket);
+ out:
+	return ret;
 }
 
 
