@@ -1212,7 +1212,7 @@ static ide_startstop_t ide_dma_timeout_retry(ide_drive_t *drive, int error)
 	rq->sector = rq->bio->bi_sector;
 	rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 	rq->hard_cur_sectors = rq->current_nr_sectors;
-	rq->buffer = NULL;
+	rq->buffer = bio_data(rq->bio);
 out:
 	return ret;
 }
