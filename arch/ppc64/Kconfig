@@ -424,8 +424,6 @@ config IRQSTACKS
 	  for handling hard and soft interrupts.  This can help avoid
 	  overflowing the process kernel stacks.
 	  
-endmenu
-
 config SPINLINE
 	bool "Inline spinlock code at each call site"
 	depends on SMP && !PPC_SPLPAR && !PPC_ISERIES
@@ -435,6 +433,8 @@ config SPINLINE
 	  somewhat bigger, but can be useful when profiling the kernel.
 
 	  If in doubt, say N.
+
+endmenu
 
 source "security/Kconfig"
 
