@@ -247,6 +247,11 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.21:
+	These only affect 32-bit architectures:
+	- Check for, and refuse to mount too large volumes (maximum is 2TiB).
+	- Check for, and refuse to open too large files and directories
+	  (maximum is 16TiB).
 2.0.20:
 	- Support non-resident directory index bitmaps. This means we now cope
 	  with huge directories without problems.
