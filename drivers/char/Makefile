@@ -219,8 +219,16 @@ include $(TOPDIR)/Rules.make
 $(obj)/consolemap_deftbl.c: $(src)/$(FONTMAPFILE) $(obj)/conmakehash
 	$(obj)/conmakehash $< > $@
 
-$(obj)/defkeymap.c: $(src)/defkeymap.map
-	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@
+# Uncomment if you're changing the keymap and have an appropriate
+# loadkeys version for the map. By default, we'll use the shipped
+# versions.
+# GENERATE_KEYMAP := 1
 
-$(obj)/qtronixmap.c: $(src)/qtronixmap.map
-	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@
+ifdef GENERATE_KEYMAP
+
+$(obj)/defkeymap.c $(obj)/qtronixmap.c: $(obj)/%.c: $(src)/%.map
+	$(LOADKEYS) --mktable $< > $@.tmp
+	sed -e 's/^static *//' $@.tmp > $@
+	rm $@.tmp
+
+endif
