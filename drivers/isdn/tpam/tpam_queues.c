@@ -145,6 +145,7 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 		do {
 			hpic = readl(card->bar0 + TPAM_HPIC_REGISTER);
 			if (waiting_too_long++ > 0xfffffff) {
+				kfree_skb(skb); 
 				spin_unlock(&card->lock);
 				printk(KERN_ERR "TurboPAM(tpam_irq): "
 						"waiting too long...\n");

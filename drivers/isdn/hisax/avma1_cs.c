@@ -153,6 +153,8 @@ static dev_link_t *avma1cs_attach(void)
 
     /* Initialize the dev_link_t structure */
     link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
+    if (!link)
+	return NULL;
     memset(link, 0, sizeof(struct dev_link_t));
     link->release.function = &avma1cs_release;
     link->release.data = (u_long)link;
@@ -186,6 +188,10 @@ static dev_link_t *avma1cs_attach(void)
 
     /* Allocate space for private device-specific data */
     local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
+    if (!local) {
+	kfree(link);
+	return NULL;
+    }
     memset(local, 0, sizeof(local_info_t));
     link->priv = local;
     
@@ -515,30 +521,30 @@ static int avma1cs_event(event_t event, int priority,
     return 0;
 } /* avma1cs_event */
 
-/*====================================================================*/
+static struct pcmcia_driver avma1cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "avma1_cs",
+	},
+	.attach		= avma1cs_attach,
+	.detach		= avma1cs_detach,
+};
 
 static int __init init_avma1_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-        printk(KERN_NOTICE "avma1_cs: Card Services release "
-               "does not match!\n");
-        return -1;
-    }
-    register_pccard_driver(&dev_info, &avma1cs_attach, &avma1cs_detach);
-    return 0;
+	return pcmcia_register_driver(&avma1cs_driver);
 }
 
 static void __exit exit_avma1_cs(void)
 {
-    DEBUG(0, "avma1_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	if (dev_list->state & DEV_CONFIG)
-	    avma1cs_release((u_long)dev_list);
-        avma1cs_detach(dev_list);
+	pcmcia_unregister_driver(&avma1cs_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL) {
+		if (dev_list->state & DEV_CONFIG)
+			avma1cs_release((u_long)dev_list);
+		avma1cs_detach(dev_list);
+	}
 }
 
 module_init(init_avma1_cs);
