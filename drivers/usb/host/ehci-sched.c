@@ -222,11 +222,10 @@ static int disable_periodic (struct ehci_hcd *ehci)
 
 // FIXME microframe periods not yet handled
 
-static unsigned long intr_deschedule (
+static void intr_deschedule (
 	struct ehci_hcd	*ehci,
 	struct ehci_qh	*qh,
-	int		wait,
-	unsigned long	flags
+	int		wait
 ) {
 	int		status;
 	unsigned	frame = qh->start;
@@ -256,10 +255,8 @@ static unsigned long intr_deschedule (
 	 */
 	if (((ehci_get_frame (&ehci->hcd) - frame) % qh->period) == 0) {
 		if (wait) {
-			spin_unlock_irqrestore (&ehci->lock, flags);
 			udelay (125);
 			qh->hw_next = EHCI_LIST_END;
-			spin_lock_irqsave (&ehci->lock, flags);
 		} else {
 			/* we may not be IDLE yet, but if the qh is empty
 			 * the race is very short.  then if qh also isn't
@@ -276,10 +273,9 @@ static unsigned long intr_deschedule (
 	hcd_to_bus (&ehci->hcd)->bandwidth_allocated -= 
 		(qh->usecs + qh->c_usecs) / qh->period;
 
-	vdbg ("descheduled qh %p, per = %d frame = %d count = %d, urbs = %d",
+	dbg ("descheduled qh %p, period = %d frame = %d count = %d, urbs = %d",
 		qh, qh->period, frame,
 		atomic_read (&qh->refcount), ehci->periodic_sched);
-	return flags;
 }
 
 static int check_period (
@@ -414,7 +410,7 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 	/* stuff into the periodic schedule */
 	qh->qh_state = QH_STATE_LINKED;
-	dbg ("qh %p usecs %d/%d period %d.0 starting %d.%d (gap %d)",
+	dbg ("scheduled qh %p usecs %d/%d period %d.0 starting %d.%d (gap %d)",
 		qh, qh->usecs, qh->c_usecs,
 		qh->period, frame, uframe, qh->gap_uf);
 	do {
@@ -495,29 +491,30 @@ done:
 	return status;
 }
 
-static unsigned long
+static unsigned
 intr_complete (
 	struct ehci_hcd	*ehci,
 	unsigned	frame,
-	struct ehci_qh	*qh,
-	unsigned long	flags		/* caller owns ehci->lock ... */
+	struct ehci_qh	*qh
 ) {
+	unsigned	count;
+
 	/* nothing to report? */
 	if (likely ((qh->hw_token & __constant_cpu_to_le32 (QTD_STS_ACTIVE))
 			!= 0))
-		return flags;
+		return 0;
 	if (unlikely (list_empty (&qh->qtd_list))) {
 		dbg ("intr qh %p no TDs?", qh);
-		return flags;
+		return 0;
 	}
 	
 	/* handle any completions */
-	flags = qh_completions (ehci, qh, flags);
+	count = qh_completions (ehci, qh);
 
 	if (unlikely (list_empty (&qh->qtd_list)))
-		flags = intr_deschedule (ehci, qh, 0, flags);
+		intr_deschedule (ehci, qh, 0);
 
-	return flags;
+	return count;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -866,12 +863,11 @@ itd_schedule (struct ehci_hcd *ehci, struct urb *urb)
 
 #define	ISO_ERRS (EHCI_ISOC_BUF_ERR | EHCI_ISOC_BABBLE | EHCI_ISOC_XACTERR)
 
-static unsigned long
+static unsigned
 itd_complete (
 	struct ehci_hcd	*ehci,
 	struct ehci_itd	*itd,
-	unsigned	uframe,
-	unsigned long	flags
+	unsigned	uframe
 ) {
 	struct urb				*urb = itd->urb;
 	struct usb_iso_packet_descriptor	*desc;
@@ -909,7 +905,7 @@ itd_complete (
 
 	/* handle completion now? */
 	if ((itd->index + 1) != urb->number_of_packets)
-		return flags;
+		return 0;
 
 	/*
 	 * Always give the urb back to the driver ... expect it to submit
@@ -924,16 +920,17 @@ itd_complete (
 	if (urb->status == -EINPROGRESS)
 		urb->status = 0;
 
-	spin_unlock_irqrestore (&ehci->lock, flags);
+	/* complete() can reenter this HCD */
+	spin_unlock (&ehci->lock);
 	usb_hcd_giveback_urb (&ehci->hcd, urb);
-	spin_lock_irqsave (&ehci->lock, flags);
+	spin_lock (&ehci->lock);
 
 	/* defer stopping schedule; completion can submit */
 	ehci->periodic_sched--;
 	if (!ehci->periodic_sched)
 		(void) disable_periodic (ehci);
 
-	return flags;
+	return 1;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -945,10 +942,6 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 
 	dbg ("itd_submit urb %p", urb);
 
-	/* NOTE DMA mapping assumes this ... */
-	if (urb->iso_frame_desc [0].offset != 0)
-		return -EINVAL;
-	
 	/* allocate ITDs w/o locking anything */
 	status = itd_urb_transaction (ehci, urb, mem_flags);
 	if (status < 0)
@@ -979,10 +972,11 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 
 /*-------------------------------------------------------------------------*/
 
-static unsigned long
-scan_periodic (struct ehci_hcd *ehci, unsigned long flags)
+static void
+scan_periodic (struct ehci_hcd *ehci)
 {
 	unsigned	frame, clock, now_uframe, mod;
+	unsigned	count = 0;
 
 	mod = ehci->periodic_size << 3;
 
@@ -1004,6 +998,14 @@ scan_periodic (struct ehci_hcd *ehci, unsigned long flags)
 		union ehci_shadow	q, *q_p;
 		u32			type, *hw_p;
 		unsigned		uframes;
+
+		/* keep latencies down: let any irqs in */
+		if (count > max_completions) {
+			spin_unlock_irq (&ehci->lock);
+			cpu_relax ();
+			count = 0;
+			spin_lock_irq (&ehci->lock);
+		}
 
 restart:
 		/* scan schedule to _before_ current frame index */
@@ -1028,8 +1030,8 @@ restart:
 				last = (q.qh->hw_next == EHCI_LIST_END);
 				temp = q.qh->qh_next;
 				type = Q_NEXT_TYPE (q.qh->hw_next);
-				flags = intr_complete (ehci, frame,
-						qh_get (q.qh), flags);
+				count += intr_complete (ehci, frame,
+						qh_get (q.qh));
 				qh_put (ehci, q.qh);
 				q = temp;
 				break;
@@ -1061,8 +1063,8 @@ restart:
 						type = Q_NEXT_TYPE (*hw_p);
 
 						/* might free q.itd ... */
-						flags = itd_complete (ehci,
-							temp.itd, uf, flags);
+						count += itd_complete (ehci,
+							temp.itd, uf);
 						break;
 					}
 				}
@@ -1078,7 +1080,7 @@ restart:
 #ifdef have_split_iso
 			case Q_TYPE_SITD:
 				last = (q.sitd->hw_next == EHCI_LIST_END);
-				flags = sitd_complete (ehci, q.sitd, flags);
+				sitd_complete (ehci, q.sitd);
 				type = Q_NEXT_TYPE (q.sitd->hw_next);
 
 				// FIXME unlink SITD after split completes
@@ -1124,5 +1126,4 @@ restart:
 		} else
 			frame = (frame + 1) % ehci->periodic_size;
 	} 
-	return flags;
 }

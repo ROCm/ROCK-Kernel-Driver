@@ -537,7 +537,7 @@ static inline int de_thread(struct signal_struct *oldsig)
 	if (!newsig)
 		return -ENOMEM;
 
-	if (list_empty(&current->thread_group))
+	if (thread_group_empty(current))
 		goto out;
 	/*
 	 * Kill all other threads in the thread group:
@@ -607,21 +607,17 @@ static inline int de_thread(struct signal_struct *oldsig)
 		ptrace = leader->ptrace;
 		parent = leader->parent;
 
-		ptrace_unlink(leader);
 		ptrace_unlink(current);
+		ptrace_unlink(leader);
 		remove_parent(current);
 		remove_parent(leader);
-		/*
-		 * Split up the last two remaining members of the
-		 * thread group:
-		 */
-		list_del_init(&leader->thread_group);
 
-		leader->pid = leader->tgid = current->pid;
-		current->pid = current->tgid;
+		switch_exec_pids(leader, current);
+
 		current->parent = current->real_parent = leader->real_parent;
 		leader->parent = leader->real_parent = child_reaper;
-		current->exit_signal = SIGCHLD;
+		current->group_leader = current;
+		leader->group_leader = leader;
 
 		add_parent(current, current->parent);
 		add_parent(leader, leader->parent);
@@ -631,15 +627,17 @@ static inline int de_thread(struct signal_struct *oldsig)
 		}
 		
 		list_add_tail(&current->tasks, &init_task.tasks);
+		current->exit_signal = SIGCHLD;
 		state = leader->state;
+
 		write_unlock_irq(&tasklist_lock);
+
+		put_proc_dentry(proc_dentry1);
+		put_proc_dentry(proc_dentry2);
 
 		if (state != TASK_ZOMBIE)
 			BUG();
 		release_task(leader);
-
-		put_proc_dentry(proc_dentry1);
-		put_proc_dentry(proc_dentry2);
         }
 
 out:
@@ -661,7 +659,7 @@ out:
 	if (atomic_dec_and_test(&oldsig->count))
 		kmem_cache_free(sigact_cachep, oldsig);
 
-	if (!list_empty(&current->thread_group))
+	if (!thread_group_empty(current))
 		BUG();
 	if (current->tgid != current->pid)
 		BUG();

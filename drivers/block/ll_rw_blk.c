@@ -1795,7 +1795,7 @@ void generic_make_request(struct bio *bio)
 			       bdevname(bio->bi_bdev),
 			       (long long) bio->bi_sector);
 end_io:
-			bio_endio(bio, 0, -EIO);
+			bio_endio(bio, bio->bi_size, -EIO);
 			break;
 		}
 

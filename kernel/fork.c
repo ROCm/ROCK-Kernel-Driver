@@ -62,13 +62,15 @@ void __put_task_struct(struct task_struct *tsk)
 		free_thread_info(tsk->thread_info);
 		kmem_cache_free(task_struct_cachep,tsk);
 	} else {
-		int cpu = smp_processor_id();
+		int cpu = get_cpu();
 
-		tsk = xchg(task_cache + cpu, tsk);
+		tsk = task_cache[cpu];
 		if (tsk) {
 			free_thread_info(tsk->thread_info);
 			kmem_cache_free(task_struct_cachep,tsk);
 		}
+		task_cache[cpu] = current;
+		put_cpu();
 	}
 }
 
@@ -126,8 +128,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;
+	int cpu = get_cpu();
 
-	tsk = xchg(task_cache + smp_processor_id(), NULL);
+	tsk = task_cache[cpu];
+	task_cache[cpu] = NULL;
+	put_cpu();
 	if (!tsk) {
 		ti = alloc_thread_info();
 		if (!ti)
@@ -802,7 +807,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	p->tgid = p->pid;
 	p->group_leader = p;
-	INIT_LIST_HEAD(&p->thread_group);
 	INIT_LIST_HEAD(&p->ptrace_children);
 	INIT_LIST_HEAD(&p->ptrace_list);
 
@@ -830,7 +834,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		}
 		p->tgid = current->tgid;
 		p->group_leader = current->group_leader;
-		list_add(&p->thread_group, &current->thread_group);
 		spin_unlock(&current->sig->siglock);
 	}
 
@@ -840,9 +843,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	attach_pid(p, PIDTYPE_PID, p->pid);
 	if (thread_group_leader(p)) {
+		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, p->pgrp);
 		attach_pid(p, PIDTYPE_SID, p->session);
-	}
+	} else
+		link_pid(p, p->pids + PIDTYPE_TGID, &p->group_leader->pids[PIDTYPE_TGID].pid);
 
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);

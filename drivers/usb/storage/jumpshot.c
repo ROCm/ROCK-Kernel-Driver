@@ -65,7 +65,7 @@ static inline int jumpshot_bulk_read(struct us_data *us,
 	unsigned int act_len;	/* ignored */
 
 	if (len == 0)
-		return USB_STOR_TRANSPORT_GOOD;
+		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("jumpshot_bulk_read:  len = %d\n", len);
 	return usb_storage_raw_bulk(us, SCSI_DATA_READ, data, len, &act_len);
@@ -79,7 +79,7 @@ static inline int jumpshot_bulk_write(struct us_data *us,
 	unsigned int act_len;	/* ignored */
 
 	if (len == 0)
-		return USB_STOR_TRANSPORT_GOOD;
+		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("jumpshot_bulk_write:  len = %d\n", len);
 	return usb_storage_raw_bulk(us, SCSI_DATA_WRITE, data, len, &act_len);
@@ -168,7 +168,7 @@ static int jumpshot_read_data(struct us_data *us,
 
 		// read the result
 		result = jumpshot_bulk_read(us, ptr, len);
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		US_DEBUGP("jumpshot_read_data:  %d bytes\n", len);
@@ -192,7 +192,7 @@ static int jumpshot_read_data(struct us_data *us,
  leave:
 	if (use_sg)
 		kfree(buffer);
-	return result;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 
@@ -253,7 +253,7 @@ static int jumpshot_write_data(struct us_data *us,
 
 		// send the data
 		result = jumpshot_bulk_write(us, ptr, len);
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		// read the result.  apparently the bulk write can complete
@@ -288,7 +288,7 @@ static int jumpshot_write_data(struct us_data *us,
  leave:
 	if (use_sg)
 		kfree(buffer);
-	return result;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 static int jumpshot_id_device(struct us_data *us,
@@ -314,8 +314,8 @@ static int jumpshot_id_device(struct us_data *us,
 
 	// read the reply
 	rc = jumpshot_bulk_read(us, reply, sizeof(reply));
-	if (rc != USB_STOR_TRANSPORT_GOOD)
-		return rc;
+	if (rc != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	info->sectors = ((u32)(reply[117]) << 24) |
 			((u32)(reply[116]) << 16) |

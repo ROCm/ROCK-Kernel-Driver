@@ -1830,6 +1830,14 @@ L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.kroah.com/linux/
 S:	Maintained
 
+USB SERIAL WHITEHEAT DRIVER
+P:	Stuart MacDonald
+M:	stuartm@connecttech.com
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://www.connecttech.com
+S:	Supported
+
 USB SUBSYSTEM
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com

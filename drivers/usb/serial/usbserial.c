@@ -498,7 +498,7 @@ int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *da
 		return -ENOMEM;
 	}
 	memcpy (transfer_buffer, data, length);
-	result = usb_control_msg (serial->dev, usb_sndctrlpipe(serial->dev, 0), bRequest, 0x40, address, 0, transfer_buffer, length, 300);
+	result = usb_control_msg (serial->dev, usb_sndctrlpipe(serial->dev, 0), bRequest, 0x40, address, 0, transfer_buffer, length, 3*HZ);
 	kfree (transfer_buffer);
 	return result;
 }
@@ -557,12 +557,11 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 			retval = serial->type->open(port, filp);
 		else
 			retval = generic_open(port, filp);
-	}
-
-	if (retval) {
-		port->open_count = 0;
-		if (serial->type->owner)
-			__MOD_DEC_USE_COUNT(serial->type->owner);
+		if (retval) {
+			port->open_count = 0;
+			if (serial->type->owner)
+				__MOD_DEC_USE_COUNT(serial->type->owner);
+		}
 	}
 
 	up (&port->sem);
@@ -1091,6 +1090,8 @@ static void generic_write_bulk_callback (struct urb *urb)
 		return;
 	}
 
+	usb_serial_port_softint((void *)port);
+
 	queue_task(&port->tqueue, &tq_immediate);
 	mark_bh(IMMEDIATE_BH);
 
@@ -1109,14 +1110,18 @@ static void generic_shutdown (struct usb_serial *serial)
 	}
 }
 
-static void port_softint(void *private)
+void usb_serial_port_softint(void *private)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)private;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+	struct usb_serial *serial;
 	struct tty_struct *tty;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
+	if (!port)
+		return;
+
+	serial = get_usb_serial (port, __FUNCTION__);
 	if (!serial)
 		return;
 
@@ -1400,7 +1405,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		port->number = i + serial->minor;
 		port->serial = serial;
 		port->magic = USB_SERIAL_PORT_MAGIC;
-		port->tqueue.routine = port_softint;
+		port->tqueue.routine = usb_serial_port_softint;
 		port->tqueue.data = port;
 		init_MUTEX (&port->sem);
 	}
@@ -1690,6 +1695,7 @@ EXPORT_SYMBOL(usb_serial_register);
 EXPORT_SYMBOL(usb_serial_deregister);
 EXPORT_SYMBOL(usb_serial_probe);
 EXPORT_SYMBOL(usb_serial_disconnect);
+EXPORT_SYMBOL(usb_serial_port_softint);
 #ifdef USES_EZUSB_FUNCTIONS
 	EXPORT_SYMBOL(ezusb_writememory);
 	EXPORT_SYMBOL(ezusb_set_reset);

@@ -254,7 +254,6 @@ static inline void __remove_thread_group(struct task_struct *tsk, struct signal_
 {
 	if (tsk == sig->curr_target)
 		sig->curr_target = next_thread(tsk);
-	list_del_init(&tsk->thread_group);
 }
 
 void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig)
@@ -281,15 +280,13 @@ void __exit_sighand(struct task_struct *tsk)
 		BUG();
 	spin_lock(&sig->siglock);
 	spin_lock(&tsk->sigmask_lock);
-	tsk->sig = NULL;
 	if (atomic_dec_and_test(&sig->count)) {
 		__remove_thread_group(tsk, sig);
+		tsk->sig = NULL;
 		spin_unlock(&sig->siglock);
 		flush_sigqueue(&sig->shared_pending);
 		kmem_cache_free(sigact_cachep, sig);
 	} else {
-		struct task_struct *leader = tsk->group_leader;
-
 		/*
 		 * If there is any task waiting for the group exit
 		 * then notify it:
@@ -298,24 +295,9 @@ void __exit_sighand(struct task_struct *tsk)
 			wake_up_process(sig->group_exit_task);
 			sig->group_exit_task = NULL;
 		}
-		/*
-		 * If we are the last non-leader member of the thread
-		 * group, and the leader is zombie, then notify the
-		 * group leader's parent process.
-		 *
-		 * (subtle: here we also rely on the fact that if we are the
-		 *  thread group leader then we are not zombied yet.)
-		 */
-		if (atomic_read(&sig->count) == 1 &&
-					leader->state == TASK_ZOMBIE) {
-
-			__remove_thread_group(tsk, sig);
-			spin_unlock(&sig->siglock);
-			do_notify_parent(leader, leader->exit_signal);
-		} else {
-			__remove_thread_group(tsk, sig);
-			spin_unlock(&sig->siglock);
-		}
+		__remove_thread_group(tsk, sig);
+		tsk->sig = NULL;
+		spin_unlock(&sig->siglock);
 	}
 	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
 	flush_sigqueue(&tsk->pending);
@@ -853,7 +835,7 @@ int load_balance_thread_group(struct task_struct *p, int sig,
 		p->sig->curr_target = p;
 
 	else for (;;) {
-		if (list_empty(&p->thread_group))
+		if (thread_group_empty(p))
 			BUG();
 		if (!tmp || tmp->tgid != p->tgid)
 			BUG();
@@ -882,17 +864,13 @@ int load_balance_thread_group(struct task_struct *p, int sig,
 int __broadcast_thread_group(struct task_struct *p, int sig)
 {
 	struct task_struct *tmp;
-	struct list_head *entry;
+	struct list_head *l;
+	struct pid *pid;
 	int err = 0;
 
-	/* send a signal to the head of the list */
-	err = __force_sig_info(sig, p);
-
-	/* send a signal to all members of the list */
-	list_for_each(entry, &p->thread_group) {
-		tmp = list_entry(entry, task_t, thread_group);
+	for_each_task_pid(p->tgid, PIDTYPE_TGID, tmp, l, pid)
 		err = __force_sig_info(sig, tmp);
-	}
+
 	return err;
 }
 
@@ -909,7 +887,7 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	spin_lock_irqsave(&p->sig->siglock, flags);
 
 	/* not a thread group - normal signal behavior */
-	if (list_empty(&p->thread_group) || !sig)
+	if (thread_group_empty(p) || !sig)
 		goto out_send;
 
 	if (sig_user_defined(p, sig)) {

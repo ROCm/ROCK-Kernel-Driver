@@ -36,12 +36,7 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 {
 	unsigned long	flags;
 
-#ifdef DEBUG
-	if (!urb->hcpriv) {
-		err ("already unlinked!");
-		BUG ();
-	}
-#endif
+	// ASSERT (urb->hcpriv != 0);
 
 	urb_free_priv (ohci, urb->hcpriv);
 	urb->hcpriv = NULL;
@@ -51,6 +46,7 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 		urb->status = 0;
 	spin_unlock_irqrestore (&urb->lock, flags);
 
+	// what lock protects these?
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_ISOCHRONOUS:
 		ohci->hcd.self.bandwidth_isoc_reqs--;
@@ -425,6 +421,9 @@ static struct ed *ed_get (
 	/* FIXME:  Don't do this without knowing it's safe to clobber this
 	 * state/mode info.  Currently the upper layers don't support such
 	 * guarantees; we're lucky changing config/altsetting is rare.
+	 * The state/mode info also changes during enumeration: set_address
+	 * uses the 'wrong' device address, and ep0 maxpacketsize will often
+	 * improve on the initial value.
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;
@@ -454,25 +453,6 @@ static struct ed *ed_get (
 		}
 		ed->hwINFO = info;
 
-#ifdef DEBUG
-	/*
-	 * There are two other cases we ought to change hwINFO, both during
-	 * enumeration.  There, the control request completes, unlinks, and
-	 * the next request gets queued before the unlink completes, so it
-	 * uses old/wrong hwINFO.  How much of a problem is this?  khubd is
-	 * already retrying after such failures...
-	 */
-	} else if (type == PIPE_CONTROL) {
-		u32	info = le32_to_cpup (&ed->hwINFO);
-
-		if (!(info & 0x7f))
-			dbg ("RETRY ctrl: address != 0");
-		info >>= 16;
-		if (info != udev->epmaxpacketin [0])
-			dbg ("RETRY ctrl: maxpacket %d != 8",
-				udev->epmaxpacketin [0]);
-
-#endif /* DEBUG */
 	}
 
 done:
@@ -526,10 +506,7 @@ td_fill (unsigned int info,
 	struct urb_priv		*urb_priv = urb->hcpriv;
 	int			is_iso = info & TD_ISO;
 
-	if (index >= urb_priv->length) {
-		err ("internal OHCI error: TD index > length");
-		return;
-	}
+	// ASSERT (index < urb_priv->length);
 
 	/* aim for only one interrupt per urb.  mostly applies to control
 	 * and iso; other urbs rarely need more than one TD per urb.
@@ -578,6 +555,7 @@ td_fill (unsigned int info,
 	wmb ();
 
 	/* append to queue */
+	list_add_tail (&td->td_list, &td->ed->td_list);
 	td->ed->hwTailP = td->hwNextTD;
 }
 
@@ -698,8 +676,7 @@ static void td_submit_urb (
 		ohci->hcd.self.bandwidth_isoc_reqs++;
 		break;
 	}
-	if (urb_priv->length != cnt)
-		dbg ("TD LENGTH %d != CNT %d", urb_priv->length, cnt);
+	// ASSERT (urb_priv->length == cnt);
 }
 
 /*-------------------------------------------------------------------------*
@@ -713,6 +690,8 @@ static void td_done (struct urb *urb, struct td *td)
 {
 	u32	tdINFO = le32_to_cpup (&td->hwINFO);
 	int	cc = 0;
+
+	list_del (&td->td_list);
 
 	/* ISO ... drivers see per-TD length/status */
   	if (tdINFO & TD_ISO) {
@@ -792,74 +771,106 @@ static void td_done (struct urb *urb, struct td *td)
 
 /*-------------------------------------------------------------------------*/
 
+static inline struct td *
+ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
+{
+  	struct urb		*urb = td->urb;
+	struct ed		*ed = td->ed;
+	struct list_head	*tmp = td->td_list.next;
+	u32			toggle = ed->hwHeadP & ED_C;
+
+	/* clear ed halt; this is the td that caused it, but keep it inactive
+	 * until its urb->complete() has a chance to clean up.
+	 */
+	ed->hwINFO |= ED_SKIP;
+	wmb ();
+	td->ed->hwHeadP &= ~ED_H; 
+
+	while (tmp != &ed->td_list) {
+		struct td	*next;
+
+		next = list_entry (tmp, struct td, td_list);
+		tmp = next->td_list.next;
+
+		/* move other tds from this urb to the donelist, after 'td'.
+		 * order won't matter here: no errors, nothing transferred.
+		 *
+		 * NOTE: this "knows" short control reads won't need fixup:
+		 * hc went from the (one) data TD to the status td. that'll
+		 * change if multi-td control DATA segments are supported,
+		 * and we want to send the status packet.
+		 */
+		if (next->urb == urb) {
+			u32	info = next->hwINFO;
+
+			info |= cpu_to_le32 (TD_DONE);
+			info &= ~cpu_to_le32 (TD_CC);
+			next->hwINFO = info;
+			next->next_dl_td = rev;	
+			rev = next;
+			continue;
+		}
+
+		/* restart ed with first td of this next urb */
+		ed->hwHeadP = cpu_to_le32 (next->td_dma) | toggle;
+		tmp = 0;
+		break;
+	}
+
+	/* no urbs queued? then ED is empty. */
+	if (tmp)
+		ed->hwHeadP = cpu_to_le32 (ed->dummy->td_dma) | toggle;
+
+	/* help for troubleshooting: */
+	dbg ("urb %p usb-%s-%s ep-%d-%s cc %d --> status %d",
+		urb,
+		urb->dev->bus->bus_name, urb->dev->devpath,
+		usb_pipeendpoint (urb->pipe),
+		usb_pipein (urb->pipe) ? "IN" : "OUT",
+		cc, cc_to_error [cc]);
+
+	return rev;
+}
+
 /* replies to the request have to be on a FIFO basis so
  * we unreverse the hc-reversed done-list
  */
 static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 {
-	__u32		td_list_hc;
+	u32		td_dma;
 	struct td	*td_rev = NULL;
-	struct td	*td_list = NULL;
-  	urb_priv_t	*urb_priv = NULL;
+	struct td	*td = NULL;
   	unsigned long	flags;
 
   	spin_lock_irqsave (&ohci->lock, flags);
 
-	td_list_hc = le32_to_cpup (&ohci->hcca->done_head);
+	td_dma = le32_to_cpup (&ohci->hcca->done_head);
 	ohci->hcca->done_head = 0;
 
-	while (td_list_hc) {		
+	/* get TD from hc's singly linked list, and
+	 * prepend to ours.  ed->td_list changes later.
+	 */
+	while (td_dma) {		
 	    	int		cc;
 
-		td_list = dma_to_td (ohci, td_list_hc);
+		td = dma_to_td (ohci, td_dma);
 
-		td_list->hwINFO |= cpu_to_le32 (TD_DONE);
+		td->hwINFO |= cpu_to_le32 (TD_DONE);
+		cc = TD_CC_GET (le32_to_cpup (&td->hwINFO));
 
-		cc = TD_CC_GET (le32_to_cpup (&td_list->hwINFO));
-		if (cc != TD_CC_NOERROR) {
-			urb_priv = (urb_priv_t *) td_list->urb->hcpriv;
+		/* Non-iso endpoints can halt on error; un-halt,
+		 * and dequeue any other TDs from this urb.
+		 * No other TD could have caused the halt.
+		 */
+		if (cc != TD_CC_NOERROR && (td->ed->hwHeadP & ED_H))
+			td_rev = ed_halted (ohci, td, cc, td_rev);
 
-			/* Non-iso endpoints can halt on error; un-halt,
-			 * and dequeue any other TDs from this urb.
-			 * No other TD could have caused the halt.
-			 */
-			if (td_list->ed->hwHeadP & ED_H) {
-				if (urb_priv && ((td_list->index + 1)
-						< urb_priv->length)) {
-#ifdef DEBUG
-					struct urb *urb = td_list->urb;
-
-					/* help for troubleshooting: */
-					dbg ("urb %p usb-%s-%s ep-%d-%s "
-						    "(td %d/%d), "
-						    "cc %d --> status %d",
-						td_list->urb,
-						urb->dev->bus->bus_name,
-						urb->dev->devpath,
-						usb_pipeendpoint (urb->pipe),
-						usb_pipein (urb->pipe)
-						    ? "IN" : "OUT",
-						1 + td_list->index,
-						urb_priv->length,
-						cc, cc_to_error [cc]);
-#endif
-					td_list->ed->hwHeadP = 
-			    (urb_priv->td [urb_priv->length - 1]->hwNextTD
-				    & __constant_cpu_to_le32 (TD_MASK))
-			    | (td_list->ed->hwHeadP & ED_C);
-					urb_priv->td_cnt += urb_priv->length
-						- td_list->index - 1;
-				} else 
-					td_list->ed->hwHeadP &= ~ED_H;
-			}
-		}
-
-		td_list->next_dl_td = td_rev;	
-		td_rev = td_list;
-		td_list_hc = le32_to_cpup (&td_list->hwNextTD);
+		td->next_dl_td = td_rev;	
+		td_rev = td;
+		td_dma = le32_to_cpup (&td->hwNextTD);
 	}	
 	spin_unlock_irqrestore (&ohci->lock, flags);
-	return td_list;
+	return td_rev;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -874,9 +885,9 @@ static void finish_unlinks (struct ohci_hcd *ohci, u16 tick)
 
 rescan_all:
 	for (last = &ohci->ed_rm_list, ed = *last; ed != NULL; ed = *last) {
-		struct td	*td, *td_next, *tdHeadP, *tdTailP;
-		u32		*td_p;
-		int		completed, modified;
+		struct list_head	*entry, *tmp;
+		int			completed, modified;
+		u32			*prev;
 
 		/* only take off EDs that the HC isn't using, accounting for
 		 * frame counter wraps.
@@ -897,53 +908,52 @@ rescan_all:
 		/* unlink urbs as requested, but rescan the list after
 		 * we call a completion since it might have unlinked
 		 * another (earlier) urb
-		 *
-		 * FIXME use td_list to scan, not td hashtables.
 		 */
 rescan_this:
 		completed = 0;
+		prev = &ed->hwHeadP;
+		list_for_each_safe (entry, tmp, &ed->td_list) {
+			struct td	*td;
+			struct urb	*urb;
+			urb_priv_t	*urb_priv;
+			u32		savebits;
 
-		tdTailP = dma_to_td (ohci, le32_to_cpup (&ed->hwTailP));
-		tdHeadP = dma_to_td (ohci, le32_to_cpup (&ed->hwHeadP));
-		td_p = &ed->hwHeadP;
+			td = list_entry (entry, struct td, td_list);
+			urb = td->urb;
+			urb_priv = td->urb->hcpriv;
 
-		for (td = tdHeadP; td != tdTailP; td = td_next) {
-			struct urb *urb = td->urb;
-			urb_priv_t *urb_priv = td->urb->hcpriv;
+			if (urb_priv->state != URB_DEL) {
+				prev = &td->hwNextTD;
+				continue;
+			}
 
-			td_next = dma_to_td (ohci,
-				le32_to_cpup (&td->hwNextTD));
-			if (urb_priv->state == URB_DEL) {
+			/* patch pointer hc uses */
+			savebits = *prev & cpu_to_le32 (TD_MASK);
+			*prev = td->hwNextTD | savebits;
 
-				/* HC may have partly processed this TD */
-				td_done (urb, td);
-				urb_priv->td_cnt++;
+			/* HC may have partly processed this TD */
+			td_done (urb, td);
+			urb_priv->td_cnt++;
 
-				*td_p = td->hwNextTD | (*td_p & ~TD_MASK);
-
-				/* URB is done; clean up */
-				if (urb_priv->td_cnt == urb_priv->length) {
-					modified = completed = 1;
-     					spin_unlock (&ohci->lock);
-					finish_urb (ohci, urb);
-					spin_lock (&ohci->lock);
-				}
-			} else {
-				td_p = &td->hwNextTD;
+			/* if URB is done, clean up */
+			if (urb_priv->td_cnt == urb_priv->length) {
+				modified = completed = 1;
+				spin_unlock (&ohci->lock);
+				finish_urb (ohci, urb);
+				spin_lock (&ohci->lock);
 			}
 		}
+		if (completed && !list_empty (&ed->td_list))
+			goto rescan_this;
 
 		/* ED's now officially unlinked, hc doesn't see */
 		ed->state = ED_IDLE;
-		ed->hwINFO &= ~ED_SKIP;
+		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
 		ed->hwHeadP &= ~ED_H;
 		ed->hwNextED = 0;
 
 		/* but if there's work queued, reschedule */
-		tdHeadP = dma_to_td (ohci, le32_to_cpup (&ed->hwHeadP));
-		if (tdHeadP != tdTailP) {
-			if (completed)
-				goto rescan_this;
+		if (!list_empty (&ed->td_list)) {
 			if (!ohci->disabled && !ohci->sleeping)
 				ed_schedule (ohci, ed);
 		}
@@ -1027,10 +1037,15 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
   		}
 
 		/* clean schedule:  unlink EDs that are no longer busy */
-		if ((ed->hwHeadP & __constant_cpu_to_le32 (TD_MASK))
-					== ed->hwTailP
-				&& (ed->state == ED_OPER)) 
+		if (list_empty (&ed->td_list))
 			ed_deschedule (ohci, ed);
+		/* ... reenabling halted EDs only after fault cleanup */
+		else if (!(ed->hwINFO & ED_DEQUEUE)) {
+			td = list_entry (ed->td_list.next, struct td, td_list);
+			if (!(td->hwINFO & TD_DONE))
+				ed->hwINFO &= ~ED_SKIP;
+		}
+
     		td = td_next;
   	}  
 	spin_unlock_irqrestore (&ohci->lock, flags);
