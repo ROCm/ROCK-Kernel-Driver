@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsinit - Object initialization namespace walk
- *              $Revision: 2 $
+ *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -106,7 +106,7 @@ acpi_ds_init_one_object (
 		/* Print a dot for each method unless we are going to print the entire pathname */
 
 		if (!(acpi_dbg_level & ACPI_LV_INIT_NAMES)) {
-			acpi_os_printf (".");
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
 		}
 
 		/*
