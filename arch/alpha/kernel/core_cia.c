@@ -47,6 +47,15 @@
 
 #define vip	volatile int  *
 
+/* Save CIA configuration data as the console had it set up.  */
+
+struct 
+{
+	unsigned int w_base;
+	unsigned int w_mask;
+	unsigned int t_base;
+} saved_config[4] __attribute((common));
+
 /*
  * Given a bus, device, and function number, compute resulting
  * configuration space address.  It is therefore not safe to have
@@ -648,6 +657,24 @@ do_init_arch(int is_pyxis)
 		hose->dense_io_base = CIA_BW_IO - IDENT_ADDR;
 	}
 
+	/* Save CIA configuration data as the console had it set up.  */
+
+	saved_config[0].w_base = *(vip)CIA_IOC_PCI_W0_BASE;
+	saved_config[0].w_mask = *(vip)CIA_IOC_PCI_W0_MASK;
+	saved_config[0].t_base = *(vip)CIA_IOC_PCI_T0_BASE;
+
+	saved_config[1].w_base = *(vip)CIA_IOC_PCI_W1_BASE;
+	saved_config[1].w_mask = *(vip)CIA_IOC_PCI_W1_MASK;
+	saved_config[1].t_base = *(vip)CIA_IOC_PCI_T1_BASE;
+
+	saved_config[2].w_base = *(vip)CIA_IOC_PCI_W2_BASE;
+	saved_config[2].w_mask = *(vip)CIA_IOC_PCI_W2_MASK;
+	saved_config[2].t_base = *(vip)CIA_IOC_PCI_T2_BASE;
+
+	saved_config[3].w_base = *(vip)CIA_IOC_PCI_W3_BASE;
+	saved_config[3].w_mask = *(vip)CIA_IOC_PCI_W3_MASK;
+	saved_config[3].t_base = *(vip)CIA_IOC_PCI_T3_BASE;
+
 	/*
 	 * Set up the PCI to main memory translation windows.
 	 *
@@ -734,6 +761,26 @@ pyxis_init_arch(void)
 	hwrpb_update_checksum(hwrpb);
 
 	do_init_arch(1);
+}
+
+void
+cia_kill_arch(int mode)
+{
+	*(vip)CIA_IOC_PCI_W0_BASE = saved_config[0].w_base;
+	*(vip)CIA_IOC_PCI_W0_MASK = saved_config[0].w_mask;
+	*(vip)CIA_IOC_PCI_T0_BASE = saved_config[0].t_base;
+
+	*(vip)CIA_IOC_PCI_W1_BASE = saved_config[1].w_base;
+	*(vip)CIA_IOC_PCI_W1_MASK = saved_config[1].w_mask;
+	*(vip)CIA_IOC_PCI_T1_BASE = saved_config[1].t_base;
+
+	*(vip)CIA_IOC_PCI_W2_BASE = saved_config[2].w_base;
+	*(vip)CIA_IOC_PCI_W2_MASK = saved_config[2].w_mask;
+	*(vip)CIA_IOC_PCI_T2_BASE = saved_config[2].t_base;
+
+	*(vip)CIA_IOC_PCI_W3_BASE = saved_config[3].w_base;
+	*(vip)CIA_IOC_PCI_W3_MASK = saved_config[3].w_mask;
+	*(vip)CIA_IOC_PCI_T3_BASE = saved_config[3].t_base;
 }
 
 void __init

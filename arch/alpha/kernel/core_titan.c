@@ -27,12 +27,14 @@
 
 unsigned TITAN_agp = 0;
 
-static struct
+/* Save Titan configuration data as the console had it set up.  */
+
+struct
 {
 	unsigned long wsba[4];
 	unsigned long wsm[4];
 	unsigned long tba[4];
-} saved_pachip_port[4];
+} saved_config[4] __attribute__((common));
 
 /*
  * BIOS32-style PCI interface:
@@ -289,21 +291,21 @@ titan_init_one_pachip_port(titan_pachip_port *port, int index)
 	 * Save the existing PCI window translations.  SRM will 
 	 * need them when we go to reboot.
 	 */
-	saved_pachip_port[index].wsba[0] = port->wsba[0].csr;
-	saved_pachip_port[index].wsm[0]  = port->wsm[0].csr;
-	saved_pachip_port[index].tba[0]  = port->tba[0].csr;
+	saved_config[index].wsba[0] = port->wsba[0].csr;
+	saved_config[index].wsm[0]  = port->wsm[0].csr;
+	saved_config[index].tba[0]  = port->tba[0].csr;
 
-	saved_pachip_port[index].wsba[1] = port->wsba[1].csr;
-	saved_pachip_port[index].wsm[1]  = port->wsm[1].csr;
-	saved_pachip_port[index].tba[1]  = port->tba[1].csr;
+	saved_config[index].wsba[1] = port->wsba[1].csr;
+	saved_config[index].wsm[1]  = port->wsm[1].csr;
+	saved_config[index].tba[1]  = port->tba[1].csr;
 
-	saved_pachip_port[index].wsba[2] = port->wsba[2].csr;
-	saved_pachip_port[index].wsm[2]  = port->wsm[2].csr;
-	saved_pachip_port[index].tba[2]  = port->tba[2].csr;
+	saved_config[index].wsba[2] = port->wsba[2].csr;
+	saved_config[index].wsm[2]  = port->wsm[2].csr;
+	saved_config[index].tba[2]  = port->tba[2].csr;
 
-	saved_pachip_port[index].wsba[3] = port->wsba[3].csr;
-	saved_pachip_port[index].wsm[3]  = port->wsm[3].csr;
-	saved_pachip_port[index].tba[3]  = port->tba[3].csr;
+	saved_config[index].wsba[3] = port->wsba[3].csr;
+	saved_config[index].wsm[3]  = port->wsm[3].csr;
+	saved_config[index].tba[3]  = port->tba[3].csr;
 
 	/*
 	 * Set up the PCI to main memory translation windows.
@@ -392,21 +394,21 @@ titan_init_arch(void)
 static void
 titan_kill_one_pachip_port(titan_pachip_port *port, int index)
 {
-	port->wsba[0].csr = saved_pachip_port[index].wsba[0];
-	port->wsm[0].csr  = saved_pachip_port[index].wsm[0];
-	port->tba[0].csr  = saved_pachip_port[index].tba[0];
+	port->wsba[0].csr = saved_config[index].wsba[0];
+	port->wsm[0].csr  = saved_config[index].wsm[0];
+	port->tba[0].csr  = saved_config[index].tba[0];
 
-	port->wsba[1].csr = saved_pachip_port[index].wsba[1];
-	port->wsm[1].csr  = saved_pachip_port[index].wsm[1];
-	port->tba[1].csr  = saved_pachip_port[index].tba[1];
+	port->wsba[1].csr = saved_config[index].wsba[1];
+	port->wsm[1].csr  = saved_config[index].wsm[1];
+	port->tba[1].csr  = saved_config[index].tba[1];
 
-	port->wsba[2].csr = saved_pachip_port[index].wsba[2];
-	port->wsm[2].csr  = saved_pachip_port[index].wsm[2];
-	port->tba[2].csr  = saved_pachip_port[index].tba[2];
+	port->wsba[2].csr = saved_config[index].wsba[2];
+	port->wsm[2].csr  = saved_config[index].wsm[2];
+	port->tba[2].csr  = saved_config[index].tba[2];
 
-	port->wsba[3].csr = saved_pachip_port[index].wsba[3];
-	port->wsm[3].csr  = saved_pachip_port[index].wsm[3];
-	port->tba[3].csr  = saved_pachip_port[index].tba[3];
+	port->wsba[3].csr = saved_config[index].wsba[3];
+	port->wsm[3].csr  = saved_config[index].wsm[3];
+	port->tba[3].csr  = saved_config[index].tba[3];
 }
 
 static void
