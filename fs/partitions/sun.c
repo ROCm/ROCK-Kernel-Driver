@@ -7,21 +7,13 @@
  *  Re-organised Feb 1998 Russell King
  */
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
-
-#include <asm/system.h>
-
 #include "check.h"
 #include "sun.h"
 
-int sun_partition(struct gendisk *hd, struct block_device *bdev, unsigned long first_sector, int first_part_minor)
+int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	int i, csum;
+	int slot = 1;
 	unsigned short *ush;
 	Sector sect;
 	struct sun_disklabel {
@@ -74,11 +66,10 @@ int sun_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 		unsigned long st_sector;
 		int num_sectors;
 
-		st_sector = first_sector + be32_to_cpu(p->start_cylinder) * spc;
+		st_sector = be32_to_cpu(p->start_cylinder) * spc;
 		num_sectors = be32_to_cpu(p->num_sectors);
 		if (num_sectors)
-			add_gd_partition(hd, first_part_minor, st_sector, num_sectors);
-		first_part_minor++;
+			put_partition(state, slot++, st_sector, num_sectors);
 	}
 	printk("\n");
 	put_dev_sector(sect);

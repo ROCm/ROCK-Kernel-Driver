@@ -6,16 +6,9 @@
  *  Re-organised Jul 1999 Russell King
  */
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/blk.h>
-
 #include "check.h"
 
-int ultrix_partition(struct gendisk *hd, struct block_device *bdev,
-                            unsigned long first_sector, int first_part_minor)
+int ultrix_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	int i;
 	Sector sect;
@@ -39,9 +32,9 @@ int ultrix_partition(struct gendisk *hd, struct block_device *bdev,
 	label = (struct ultrix_disklabel *)(data + 512 - sizeof(*label));
 
 	if (label->pt_magic == PT_MAGIC && label->pt_valid == PT_VALID) {
-		for (i=0; i<8; i++, first_part_minor++)
+		for (i=0; i<8; i++)
 			if (label->pt_part[i].pi_nblocks)
-				add_gd_partition(hd, first_part_minor, 
+				put_partition(state, i+1, 
 					      label->pt_part[i].pi_blkoff,
 					      label->pt_part[i].pi_nblocks);
 		put_dev_sector(sect);

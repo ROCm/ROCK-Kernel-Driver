@@ -5,12 +5,28 @@
  * add_gd_partition adds a partitions details to the devices partition
  * description.
  */
-void add_gd_partition(struct gendisk *hd, int minor, int start, int size);
 
-/*
- * check_and_add_subpartition does the same for subpartitions
- */
-int check_and_add_subpartition(struct gendisk *hd, int super_minor,
-			       int minor, int sub_start, int sub_size);
+enum { MAX_PART = 256 };
+
+struct parsed_partitions {
+	char name[40];
+	struct {
+		unsigned long from;
+		unsigned long size;
+		int flags;
+	} parts[MAX_PART];
+	int next;
+	int limit;
+};
+
+static inline void
+put_partition(struct parsed_partitions *p, int n, int from, int size)
+{
+	if (n < p->limit) {
+		p->parts[n].from = from;
+		p->parts[n].size = size;
+		printk(" %s%d", p->name, n);
+	}
+}
 
 extern int warn_no_part;

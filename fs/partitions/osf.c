@@ -7,23 +7,15 @@
  *  Re-organised Feb 1998 Russell King
  */
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
-
 #include "check.h"
 #include "osf.h"
 
-int osf_partition(struct gendisk *hd, struct block_device *bdev,
-		unsigned long first_sector, int current_minor)
+int osf_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	int i;
+	int slot = 1;
 	Sector sect;
 	unsigned char *data;
-	int mask = (1 << hd->minor_shift) - 1;
 	struct disklabel {
 		u32 d_magic;
 		u16 d_type,d_subtype;
@@ -72,16 +64,14 @@ int osf_partition(struct gendisk *hd, struct block_device *bdev,
 		return 0;
 	}
 	for (i = 0 ; i < le16_to_cpu(label->d_npartitions); i++, partition++) {
-		if ((current_minor & mask) == 0)
+		if (slot == state->limit)
 		        break;
 		if (le32_to_cpu(partition->p_size))
-			add_gd_partition(hd, current_minor,
-				first_sector+le32_to_cpu(partition->p_offset),
+			put_partition(state, slot++,
+				le32_to_cpu(partition->p_offset),
 				le32_to_cpu(partition->p_size));
-		current_minor++;
 	}
 	printk("\n");
 	put_dev_sector(sect);
 	return 1;
 }
-

@@ -34,10 +34,13 @@
 #include "ultrix.h"
 #include "efi.h"
 
+#if CONFIG_BLK_DEV_MD
+extern void md_autodetect_dev(kdev_t dev);
+#endif
+
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
-static int (*check_part[])(struct gendisk *hd, struct block_device *bdev,
-			   unsigned long first_sect, int first_minor) = {
+static int (*check_part[])(struct parsed_partitions *, struct block_device *) = {
 #ifdef CONFIG_ACORN_PARTITION
 	acorn_partition,
 #endif
@@ -199,28 +202,6 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 	return buf;
 }
 
-/*
- * Add a partitions details to the devices partition description.
- */
-void add_gd_partition(struct gendisk *hd, int minor, int start, int size)
-{
-#ifndef CONFIG_DEVFS_FS
-	char buf[40];
-#endif
-
-	hd->part[minor].start_sect = start;
-	hd->part[minor].nr_sects   = size;
-#ifdef CONFIG_DEVFS_FS
-	printk(" p%d", (minor & ((1 << hd->minor_shift) - 1)));
-#else
-	if ((hd->major >= COMPAQ_SMART2_MAJOR+0 && hd->major <= COMPAQ_SMART2_MAJOR+7) ||
-	    (hd->major >= COMPAQ_CISS_MAJOR+0 && hd->major <= COMPAQ_CISS_MAJOR+7))
-		printk(" p%d", (minor & ((1 << hd->minor_shift) - 1)));
-	else
-		printk(" %s", disk_name(hd, minor, buf));
-#endif
-}
-
 /* Driverfs file support */
 static ssize_t partition_device_kdev_read(struct device *driverfs_dev, 
 			char *page, size_t count, loff_t off)
@@ -351,12 +332,13 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 	return;
 }
 
-static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor)
+static void check_partition(struct gendisk *hd, kdev_t dev)
 {
 	devfs_handle_t de = NULL;
 	unsigned long first_sector;
 	struct block_device *bdev;
 	char buf[64];
+	struct parsed_partitions *state;
 	int i;
 
 	first_sector = hd->part[minor(dev)].start_sect;
@@ -369,14 +351,26 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 		hd->part[minor(dev)].start_sect = 0;
 		return;
 	}
+	if (first_sector != 0)
+		BUG();
+
+	state = kmalloc(sizeof(struct parsed_partitions), GFP_KERNEL);
+	if (!state)
+		return;
 
 	if (hd->de_arr)
 		de = hd->de_arr[minor(dev) >> hd->minor_shift];
 	i = devfs_generate_path (de, buf, sizeof buf);
-	if (i >= 0)
+	if (i >= 0) {
 		printk(KERN_INFO " /dev/%s:", buf + i);
-	else
-		printk(KERN_INFO " %s:", disk_name(hd, minor(dev), buf));
+		sprintf(state->name, "p");
+	} else {
+		unsigned n = hd->major;
+		disk_name(hd, minor(dev), state->name);
+		printk(KERN_INFO " %s:", state->name);
+		if (n - COMPAQ_SMART2_MAJOR <= 7 || n - COMPAQ_CISS_MAJOR <= 7)
+			sprintf(state->name, "p");
+	}
 	bdev = bdget(kdev_t_to_nr(dev));
 	bdev->bd_contains = bdev;
 	bdev->bd_inode->i_size = (loff_t)hd->part[minor(dev)].nr_sects << 9;
@@ -395,14 +389,30 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 		bdev->bd_block_size = bsize;
 		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
 	}
+	state->limit = 1<<hd->minor_shift;
 	for (i = 0; check_part[i]; i++) {
-		int res;
-		res = check_part[i](hd, bdev, first_sector, first_part_minor);
-		if (res) {
-			if (res < 0 &&  warn_no_part)
+		int res, j;
+		memset(&state->parts, 0, sizeof(state->parts));
+		res = check_part[i](state, bdev);
+		if (!res)
+			continue;
+		if (res < 0) {
+			if (warn_no_part)
 				printk(" unable to read partition table\n");
 			goto setup_devfs;
 		}
+		for (j = 1; j < state->limit; j++) {
+			hd->part[j + minor(dev)].start_sect =
+				state->parts[j].from;
+			hd->part[j + minor(dev)].nr_sects =
+				state->parts[j].size;
+#if CONFIG_BLK_DEV_MD
+			if (!state->parts[j].flags)
+				continue;
+			md_autodetect_dev(mk_kdev(major(dev),minor(dev)+j));
+#endif
+		}
+		goto setup_devfs;
 	}
 
 	printk(" unknown partition table\n");
@@ -410,15 +420,14 @@ setup_devfs:
 	invalidate_bdev(bdev, 1);
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 	bdput(bdev);
-	i = first_part_minor - 1;
 
 	/* Setup driverfs tree */
 	if (hd->sizes)
-		driverfs_create_partitions(hd, i);
+		driverfs_create_partitions(hd, minor(dev));
 	else
-		driverfs_remove_partitions(hd, i);
+		driverfs_remove_partitions(hd, minor(dev));
 
-	devfs_register_partitions (hd, i, hd->sizes ? 0 : 1);
+	devfs_register_partitions (hd, minor(dev), hd->sizes ? 0 : 1);
 }
 
 #ifdef CONFIG_DEVFS_FS
@@ -564,7 +573,7 @@ void grok_partitions(kdev_t dev, long size)
 	if (!size)
 		return;
 
-	check_partition(g, mk_kdev(g->major, first_minor), 1 + first_minor);
+	check_partition(g, mk_kdev(g->major, first_minor));
 
  	/*
  	 * We need to set the sizes array before we will be able to access
@@ -630,30 +639,5 @@ int wipe_partitions(kdev_t dev)
 		g->part[minor].start_sect = 0;
 		g->part[minor].nr_sects = 0;
 	}
-	return 0;
-}
-
-/*
- * Make sure that a proposed subpartition is strictly contained inside
- * the parent partition.  If all is well, call add_gd_partition().
- */
-int
-check_and_add_subpartition(struct gendisk *hd, int super_minor, int minor,
-			   int sub_start, int sub_size)
-{
-	int start = hd->part[super_minor].start_sect;
-	int size = hd->part[super_minor].nr_sects;
-
-	if (start == sub_start && size == sub_size) {
-		/* full parent partition, we have it already */
-		return 0;
-	}
-
-	if (start <= sub_start && start+size >= sub_start+sub_size) {
-		add_gd_partition(hd, minor, sub_start, sub_size);
-		return 1;
-	}
-
-	printk("bad subpartition - ignored\n");
 	return 0;
 }

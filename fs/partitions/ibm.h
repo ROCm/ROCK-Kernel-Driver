@@ -1,1 +1,1 @@
-int ibm_partition(struct gendisk *, struct block_device *, unsigned long, int);
+int ibm_partition(struct parsed_partitions *, struct block_device *);

@@ -1254,10 +1254,11 @@ void mfm_setup(char *str, int *ints)
  * since if there are any non-ADFS partitions on the disk, this won't work!
  * Hence, I want to get rid of this...
  */
-void xd_set_geometry(kdev_t dev, unsigned char secsptrack, unsigned char heads,
-		     unsigned long discsize, unsigned int secsize)
+void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
+			unsigned char heads, unsigned int secsize)
 {
-	int drive = minor(dev) >> 6;
+	int drive = MINOR(bdev->bd_dev) >> 6;
+	unsigned long disksize = bdev->bd_inode->i_size;
 
 	if (mfm_info[drive].cylinders == 1) {
 		mfm_info[drive].sectors = secsptrack;
@@ -1265,7 +1266,7 @@ void xd_set_geometry(kdev_t dev, unsigned char secsptrack, unsigned char heads,
 		mfm_info[drive].cylinders = discsize / (secsptrack * heads * secsize);
 
 		if ((heads < 1) || (mfm_info[drive].cylinders > 1024)) {
-			printk("mfm%c: Insane disc shape! Setting to 512/4/32\n",'a' + (dev >> 6));
+			printk("mfm%c: Insane disc shape! Setting to 512/4/32\n",'a' + drive);
 
 			/* These values are fairly arbitary, but are there so that if your
 			 * lucky you can pick apart your disc to find out what is going on -
