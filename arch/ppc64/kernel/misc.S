@@ -736,8 +736,11 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for sys_io_getevents */
 	.llong .sys_ni_syscall		/* 230 - reserved for sys_io_submit */
 	.llong .sys_ni_syscall		/* reserved for sys_io_cancel */
+	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
+	.llong .sys_ni_syscall		/* reserved for free_hugepages */
+	.llong .sys_ni_syscall		/* reserved for exit_group */
 
-	.rept NR_syscalls-231
+	.rept NR_syscalls-234
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -976,7 +979,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_io_getevents
 	.llong .sys_io_submit		/* 230 */
 	.llong .sys_io_cancel
+	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
+	.llong .sys_ni_syscall		/* reserved for free_hugepages */
+	.llong .sys_ni_syscall		/* reserved for exit_group */
 
-	.rept NR_syscalls-231
+	.rept NR_syscalls-234
 		.llong .sys_ni_syscall
 	.endr
