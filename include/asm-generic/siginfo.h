@@ -27,7 +27,7 @@ typedef union sigval {
 #endif
 
 #ifndef __ARCH_SI_BAND_T
-#define __ARCH_SI_BAND_T int
+#define __ARCH_SI_BAND_T long int
 #endif
 
 #ifndef HAVE_ARCH_SIGINFO_T
