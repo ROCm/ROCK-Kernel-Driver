@@ -555,7 +555,7 @@ asmlinkage int sys_execve(struct pt_regs regs)
 	if (error == 0) {
 		current->ptrace &= ~PT_DTRACE;
 		/* Make sure we don't return using sysenter.. */
-		set_thread_flag(TIF_SIGPENDING);
+		set_thread_flag(TIF_IRET);
 	}
 	putname(filename);
 out:

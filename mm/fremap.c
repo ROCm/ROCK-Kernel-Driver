@@ -11,6 +11,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
+#include <linux/rmap-locking.h>
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -52,6 +53,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_t *pte, entry;
 	pgd_t *pgd;
 	pmd_t *pmd;
+	struct pte_chain *pte_chain = NULL;
 
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
@@ -60,6 +62,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pmd)
 		goto err_unlock;
 
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	pte = pte_alloc_map(mm, pmd, addr);
 	if (!pte)
 		goto err_unlock;
@@ -73,16 +76,17 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (prot & PROT_WRITE)
 		entry = pte_mkwrite(pte_mkdirty(entry));
 	set_pte(pte, entry);
-	page_add_rmap(page, pte);
+	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
 	flush_tlb_page(vma, addr);
 
 	spin_unlock(&mm->page_table_lock);
-
+	pte_chain_free(pte_chain);
 	return 0;
 
 err_unlock:
 	spin_unlock(&mm->page_table_lock);
+	pte_chain_free(pte_chain);
 	return err;
 }
 

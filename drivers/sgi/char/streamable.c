@@ -309,10 +309,27 @@ static struct miscdevice dev_input_mouse = {
 void
 streamable_init (void)
 {
-	printk ("streamable misc devices registered (keyb:%d, gfx:%d)\n",
+	if (misc_register (&dev_gfx) < 0) {
+		printk(KERN_ERR
+			"streamable: cannot register gfx misc device.\n");
+		return;
+	}
+
+	if (misc_register (&dev_input_keyboard) < 0) {
+		printk(KERN_ERR
+			"streamable: cannot register keyboard misc device.\n");
+		misc_deregister(&dev_gfx);
+		return;
+	}
+
+	if (misc_register (&dev_input_mouse) < 0) {
+		printk(KERN_ERR
+			"streamable: cannot register mouse misc device.\n");
+		misc_deregister(&dev_input_keyboard);
+		misc_deregister(&dev_gfx);
+		return;
+	}
+
+	printk ("streamable: misc devices registered (keyb:%d, gfx:%d)\n",
 		SGI_STREAMS_KEYBOARD, SGI_GFX_MINOR);
-	
-	misc_register (&dev_gfx);
-	misc_register (&dev_input_keyboard);
-	misc_register (&dev_input_mouse);
 }

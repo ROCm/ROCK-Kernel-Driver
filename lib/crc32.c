@@ -92,7 +92,7 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 
 	crc = __cpu_to_le32(crc);
 	/* Align it */
-	for ( ; ((u32)b)&3 && len ; len--){
+	for ( ; ((long)b)&3 && len ; len--){
 # ifdef __LITTLE_ENDIAN
 		crc = (crc>>8) ^ crc32table_le[ (crc ^ *((u8 *)b)++) & 0xff ];
 # else
@@ -201,7 +201,7 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 
 	crc = __cpu_to_be32(crc);
 	/* Align it */
-	for ( ; ((u32)b)&3 && len ; len--){
+	for ( ; ((long)b)&3 && len ; len--){
 # ifdef __LITTLE_ENDIAN
 		crc = (crc>>8) ^ crc32table_be[ (crc ^ *((u8 *)b)++) & 0xff ];
 # else

@@ -31,16 +31,7 @@
 
 #include <asm/uaccess.h>
 
-#if defined(CONFIG_X86_NUMAQ) || defined(CONFIG_IA64)
-#define LOG_BUF_LEN	(65536)
-#elif defined(CONFIG_ARCH_S390)
-#define LOG_BUF_LEN	(131072)
-#elif defined(CONFIG_SMP)
-#define LOG_BUF_LEN	(32768)
-#else	
-#define LOG_BUF_LEN	(16384)			/* This must be a power of two */
-#endif
-
+#define LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 #define LOG_BUF_MASK	(LOG_BUF_LEN-1)
 
 /* printk's without a loglevel use this.. */

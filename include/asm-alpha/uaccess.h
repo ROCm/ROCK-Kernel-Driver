@@ -501,19 +501,14 @@ struct exception_table_entry
 	} fixup;
 };
 
-/* Returns 0 if exception not found and fixup.unit otherwise.  */
-extern unsigned search_exception_table(unsigned long);
-
 /* Returns the new pc */
-#define fixup_exception(map_reg, fixup_unit, pc)		\
+#define fixup_exception(map_reg, fixup, pc)			\
 ({								\
-	union exception_fixup __fie_fixup;			\
-	__fie_fixup.unit = fixup_unit;				\
-	if (__fie_fixup.bits.valreg != 31)			\
-		map_reg(__fie_fixup.bits.valreg) = 0;		\
-	if (__fie_fixup.bits.errreg != 31)			\
-		map_reg(__fie_fixup.bits.errreg) = -EFAULT;	\
-	(pc) + __fie_fixup.bits.nextinsn;			\
+	if ((fixup)->fixup.bits.valreg != 31)			\
+		map_reg((fixup)->fixup.bits.valreg) = 0;	\
+	if ((fixup)->fixup.bits.errreg != 31)			\
+		map_reg((fixup)->fixup.bits.errreg) = -EFAULT;	\
+	(pc) + (fixup)->fixup.bits.nextinsn;			\
 })
 
 

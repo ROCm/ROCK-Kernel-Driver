@@ -212,9 +212,7 @@
 
 struct gtt_data {
 	agp_memory *i810_fb_memory;
-	agp_memory *i810_iring_memory;
 	agp_memory *i810_cursor_memory;
-	agp_memory *i810_pixmap_memory;
 };
 
 struct mode_registers {

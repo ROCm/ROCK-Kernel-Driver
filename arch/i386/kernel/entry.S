@@ -253,11 +253,11 @@ ENTRY(sysenter_entry)
  * Careful about security.
  */
 	cmpl $__PAGE_OFFSET-3,%ebp
-	jae syscall_badsys
+	jae syscall_fault
 1:	movl (%ebp),%ebp
 .section __ex_table,"a"
 	.align 4
-	.long 1b,syscall_badsys
+	.long 1b,syscall_fault
 .previous
 
 	pushl %eax
@@ -364,6 +364,14 @@ syscall_exit_work:
 	movl %esp, %eax
 	movl $1, %edx
 	call do_syscall_trace
+	jmp resume_userspace
+
+	ALIGN
+syscall_fault:
+	pushl %eax			# save orig_eax
+	SAVE_ALL
+	GET_THREAD_INFO(%ebx)
+	movl $-EFAULT,EAX(%esp)
 	jmp resume_userspace
 
 	ALIGN

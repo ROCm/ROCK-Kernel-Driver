@@ -47,7 +47,6 @@ extern int zft_resid;
 extern void zft_reset_position(zft_position *pos);
 extern int  zft_check_write_access(zft_position *pos);
 extern int  zft_def_idle_state(void);
-extern int  zft_dirty(void);
 
 /*  hooks for the VFS interface 
  */

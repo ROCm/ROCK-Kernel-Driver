@@ -196,8 +196,17 @@ static struct miscdevice rtc_dev=
 
 static int __init rtc_init(void)
 {
-	misc_register(&rtc_dev);
-	create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL);
+	int retval;
+
+	retval = misc_register(&rtc_dev);
+	if(retval < 0)
+		return retval;
+
+#ifdef CONFIG_PROC_FS
+	if(create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL) == NULL)
+		misc_deregister(&rtc_dev);
+		return -ENOMEM;
+#endif
 
 	printk(KERN_INFO "i/pSeries Real Time Clock Driver v" RTC_VERSION "\n");
 

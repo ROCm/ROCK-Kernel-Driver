@@ -146,11 +146,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		}
 
 		error = nfserr_dropit;
-		if (IS_ERR(exp))
+		if (IS_ERR(exp) && PTR_ERR(exp) == -EAGAIN)
 			goto out;
 
 		error = nfserr_stale; 
-		if (!exp)
+		if (!exp || IS_ERR(exp))
 			goto out;
 
 		/* Check if the request originated from a secure port. */

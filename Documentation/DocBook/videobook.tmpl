@@ -146,16 +146,17 @@ static int io = 0x320;
 
 int __init myradio_init(struct video_init *v)
 {
-        if(check_region(io, MY_IO_SIZE))
+        if(!request_region(io, MY_IO_SIZE, "myradio"))
         {
                 printk(KERN_ERR 
                     "myradio: port 0x%03X is in use.\n", io);
                 return -EBUSY;
         }
 
-        if(video_device_register(&amp;my_radio, VFL_TYPE_RADIO)==-1)
+        if(video_device_register(&amp;my_radio, VFL_TYPE_RADIO)==-1) {
+                release_region(io, MY_IO_SIZE);
                 return -EINVAL;
-        request_region(io, MY_IO_SIZE, "myradio");
+        }		
         return 0;
 }
 
@@ -920,7 +921,7 @@ static int irq = 11;
 
 int __init mycamera_init(struct video_init *v)
 {
-        if(check_region(io, MY_IO_SIZE))
+        if(!request_region(io, MY_IO_SIZE, "mycamera"))
         {
                 printk(KERN_ERR 
                       "mycamera: port 0x%03X is in use.\n", io);
@@ -928,9 +929,10 @@ int __init mycamera_init(struct video_init *v)
         }
 
         if(video_device_register(&amp;my_camera, 
-            VFL_TYPE_GRABBER)==-1)
+            VFL_TYPE_GRABBER)==-1) {
+                release_region(io, MY_IO_SIZE);
                 return -EINVAL;
-        request_region(io, MY_IO_SIZE, "mycamera");
+        }
         return 0;
 }
 

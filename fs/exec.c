@@ -45,6 +45,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/rmap-locking.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -292,12 +293,13 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	pgd_t * pgd;
 	pmd_t * pmd;
 	pte_t * pte;
+	struct pte_chain *pte_chain;
 
 	if (page_count(page) != 1)
 		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n", page, address);
 
 	pgd = pgd_offset(tsk->mm, address);
-
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	spin_lock(&tsk->mm->page_table_lock);
 	pmd = pmd_alloc(tsk->mm, pgd, address);
 	if (!pmd)
@@ -313,17 +315,19 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	flush_dcache_page(page);
 	flush_page_to_ram(page);
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));
-	page_add_rmap(page, pte);
+	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
 	tsk->mm->rss++;
 	spin_unlock(&tsk->mm->page_table_lock);
 
 	/* no need for flush_tlb */
+	pte_chain_free(pte_chain);
 	return;
 out:
 	spin_unlock(&tsk->mm->page_table_lock);
 	__free_page(page);
 	force_sig(SIGKILL, tsk);
+	pte_chain_free(pte_chain);
 	return;
 }
 

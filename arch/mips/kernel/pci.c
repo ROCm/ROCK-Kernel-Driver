@@ -3,7 +3,7 @@
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
  *
  * Modified to be mips generic, ppopov@mvista.com
- * arch/mips/kernl/pci.c
+ * arch/mips/kernel/pci.c
  *     Common MIPS PCI routines.
  *
  * This program is free software; you can redistribute  it and/or modify it

@@ -27,7 +27,6 @@ static u32 i810fb_rop[] = {
 }                                                                      
 
 extern inline void flush_cache(void);
-extern int reinit_agp(struct fb_info *info);
 
 /************************************************************/
 
@@ -343,7 +342,7 @@ void i810fb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	dy = rect->dy;
 	height = rect->height;
 
-	dest = p->fix.smem_start +  (dy * p->fix.line_length) + dx;
+	dest = p->fix.smem_start + (dy * p->fix.line_length) + dx;
 	color_blit(width, height, p->fix.line_length, dest, rop, color, 
 		   par->blit_bpp, par);
 }
@@ -394,11 +393,6 @@ void i810fb_copyarea(struct fb_info *p, struct fb_copyarea *region)
 			 PAT_COPY_ROP, par->blit_bpp, par);
 }
 
-/*
- * Blitting is done at 8x8 pixel-array at a time.  If map is not 
- * monochrome or not a multiple of 8x8 pixels, cfb_imageblit will
- * be called instead.  
- */
 void i810fb_imageblit(struct fb_info *p, struct fb_image *image)
 {
 	struct i810fb_par *par = (struct i810fb_par *) p->par;
@@ -422,9 +416,6 @@ void i810fb_imageblit(struct fb_info *p, struct fb_image *image)
 		bg = image->bg_color;
 		break;
 	case 16:
-		fg = ((u32 *)(p->pseudo_palette))[image->fg_color];
-		bg = ((u32 *)(p->pseudo_palette))[image->bg_color];
-		break;
 	case 24:
 		fg = ((u32 *)(p->pseudo_palette))[image->fg_color];
 		bg = ((u32 *)(p->pseudo_palette))[image->bg_color];

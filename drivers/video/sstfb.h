@@ -17,7 +17,7 @@
  */
 
 #ifdef SST_DEBUG
-#  define dprintk(X...)	printk(KERN_DEBUG "sstfb: " X)
+#  define dprintk(X...)		printk("sstfb: " X)
 #else
 #  define dprintk(X...)
 #  undef SST_DEBUG_REG
@@ -75,8 +75,6 @@
 #ifndef ABS
 # define ABS(x)		(((x)<0)?-(x):(x))
 #endif
-
-//void Dump_regs(void);
 
 /*
  *
@@ -180,6 +178,29 @@
 #  define TILES_IN_X_LSB_SHIFT	  30		/* v2 */
 #define FBIINIT7		0x024c		/* v2 specific */
 
+#define BLTSRCBASEADDR		0x02c0	/* BitBLT Source base address */
+#define BLTDSTBASEADDR		0x02c4	/* BitBLT Destination base address */
+#define BLTXYSTRIDES		0x02c8	/* BitBLT Source and Destination strides */
+#define BLTSRCCHROMARANGE	0x02cc	/* BitBLT Source Chroma key range */
+#define BLTDSTCHROMARANGE	0x02d0	/* BitBLT Destination Chroma key range */
+#define BLTCLIPX		0x02d4	/* BitBLT Min/Max X clip values */
+#define BLTCLIPY		0x02d8	/* BitBLT Min/Max Y clip values */
+#define BLTSRCXY		0x02e0	/* BitBLT Source starting XY coordinates */
+#define BLTDSTXY		0x02e4	/* BitBLT Destination starting XY coordinates */
+#define BLTSIZE			0x02e8	/* BitBLT width and height */
+#define BLTROP			0x02ec	/* BitBLT Raster operations */
+#  define BLTROP_COPY		  0x0cccc
+#  define BLTROP_INVERT		  0x05555
+#  define BLTROP_XOR		  0x06666
+#define BLTCOLOR		0x02f0	/* BitBLT and foreground background colors */
+#define BLTCOMMAND		0x02f8	/* BitBLT command mode (v2 specific) */
+# define BLT_SCR2SCR_BITBLT	  0	  /* Screen-to-Screen BitBLT */
+# define BLT_CPU2SCR_BITBLT	  1	  /* CPU-to-screen BitBLT */
+# define BLT_RECFILL_BITBLT	  2	  /* BitBLT Rectangle Fill */
+# define BLT_16BPP_FMT		  2	  /* 16 BPP (5-6-5 RGB) */
+#define BLTDATA			0x02fc	/* BitBLT data for CPU-to-Screen BitBLTs */
+#  define LAUNCH_BITBLT		  BIT(31) /* Launch BitBLT in BltCommand, bltDstXY or bltSize */
+
 /* Dac Registers */
 #define DACREG_WMA		0x0	/* pixel write mode address */
 #define DACREG_LUT		0x01	/* color value */
@@ -211,7 +232,7 @@
 #define DACREG_DIR_TI		0x09
 #define DACREG_MIR_ATT		0x84
 #define DACREG_DIR_ATT		0x09
-/* ics dac specific registers*/
+/* ics dac specific registers */
 #define DACREG_ICS_PLLWMA	0x04	/* PLL write mode address */
 #define DACREG_ICS_PLLDATA	0x05	/* PLL data /parameter */
 #define DACREG_ICS_CMD		0x06	/* command */
@@ -299,8 +320,6 @@ struct pll_timing {
 	unsigned int n;
 	unsigned int p;
 };
-
-struct sstfb_info;
 
 struct dac_switch {
 	char * name;

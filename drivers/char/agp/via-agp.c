@@ -97,7 +97,6 @@ static struct gatt_mask via_generic_masks[] =
 static int __init via_generic_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = via_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) via_generic_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -203,9 +202,9 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset_name	= "Apollo ProSavage PM133"
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_8235_0,
-		.chipset	= VIA_P4X400,
-		.chipset_name	= "P4X400"
+		.device_id	= PCI_DEVICE_ID_VIA_8754,
+		.chipset	= VIA_P4X,
+		.chipset_name	= "Apollo P4X333/P4X400"
 	},
 	{ }, /* dummy final entry, always present */
 };

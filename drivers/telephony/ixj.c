@@ -6906,21 +6906,19 @@ static int ixj_selfprobe(IXJ *j)
 				/*  Internet PhoneJack Lite */
 			 {
 				j->cardtype = QTI_PHONEJACK_LITE;
-				if (check_region(j->XILINXbase, 4)) {
+				if (!request_region(j->XILINXbase, 4, "ixj control")) {
 					printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 					return -1;
 				}
-				request_region(j->XILINXbase, 4, "ixj control");
 				j->pld_slicw.pcib.e1 = 1;
 				outb_p(j->pld_slicw.byte, j->XILINXbase);
 			} else {
 				j->cardtype = QTI_LINEJACK;
 
-				if (check_region(j->XILINXbase, 8)) {
+				if (!request_region(j->XILINXbase, 8, "ixj control")) {
 					printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 					return -1;
 				}
-				request_region(j->XILINXbase, 8, "ixj control");
 			}
 		} else if (j->dsp.low == 0x22) {
 			j->cardtype = QTI_PHONEJACK_PCI;
@@ -6941,19 +6939,17 @@ static int ixj_selfprobe(IXJ *j)
 			}
 			break;
 		case QTI_LINEJACK:
-			if (check_region(j->XILINXbase, 8)) {
+			if (!request_region(j->XILINXbase, 8, "ixj control")) {
 				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 				return -1;
 			}
-			request_region(j->XILINXbase, 8, "ixj control");
 			break;
 		case QTI_PHONEJACK_LITE:
 		case QTI_PHONEJACK_PCI:
-			if (check_region(j->XILINXbase, 4)) {
+			if (!request_region(j->XILINXbase, 4, "ixj control")) {
 				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", j->XILINXbase);
 				return -1;
 			}
-			request_region(j->XILINXbase, 4, "ixj control");
 			j->pld_slicw.pcib.e1 = 1;
 			outb_p(j->pld_slicw.byte, j->XILINXbase);
 			break;

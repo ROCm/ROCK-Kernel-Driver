@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/rmap-locking.h>
 #include <linux/cache.h>
+#include <linux/percpu.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -51,7 +52,7 @@ struct pte_chain {
 	pte_addr_t ptes[NRPTE];
 } ____cacheline_aligned;
 
-static kmem_cache_t	*pte_chain_cache;
+kmem_cache_t	*pte_chain_cache;
 
 /*
  * pte_chain list management policy:
@@ -69,39 +70,6 @@ static kmem_cache_t	*pte_chain_cache;
  * - Removal from a pte chain moves the head pte of the head member onto the
  *   victim pte and frees the head member if it became empty.
  */
-
-/**
- * pte_chain_alloc - allocate a pte_chain struct
- *
- * Returns a pointer to a fresh pte_chain structure. Allocates new
- * pte_chain structures as required.
- * Caller needs to hold the page's pte_chain_lock.
- */
-static inline struct pte_chain *pte_chain_alloc(void)
-{
-	struct pte_chain *ret;
-
-	ret = kmem_cache_alloc(pte_chain_cache, GFP_ATOMIC);
-#ifdef DEBUG_RMAP
-	{
-		int i;
-		for (i = 0; i < NRPTE; i++)
-			BUG_ON(ret->ptes[i]);
-		BUG_ON(ret->next);
-	}
-#endif
-	return ret;
-}
-
-/**
- * pte_chain_free - free pte_chain structure
- * @pte_chain: pte_chain struct to free
- */
-static inline void pte_chain_free(struct pte_chain *pte_chain)
-{
-	pte_chain->next = NULL;
-	kmem_cache_free(pte_chain_cache, pte_chain);
-}
 
 /**
  ** VM stuff below this comment
@@ -156,7 +124,7 @@ int page_referenced(struct page * page)
 			page->pte.direct = pc->ptes[NRPTE-1];
 			SetPageDirect(page);
 			pc->ptes[NRPTE-1] = 0;
-			pte_chain_free(pc);
+			__pte_chain_free(pc);
 		}
 	}
 	return referenced;
@@ -170,10 +138,11 @@ int page_referenced(struct page * page)
  * Add a new pte reverse mapping to a page.
  * The caller needs to hold the mm->page_table_lock.
  */
-void page_add_rmap(struct page * page, pte_t * ptep)
+struct pte_chain *
+page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 {
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
-	struct pte_chain *pte_chain;
+	struct pte_chain *cur_pte_chain;
 	int i;
 
 #ifdef DEBUG_RMAP
@@ -186,7 +155,7 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 #endif
 
 	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
-		return;
+		return pte_chain;
 
 	pte_chain_lock(page);
 
@@ -222,30 +191,28 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 	if (PageDirect(page)) {
 		/* Convert a direct pointer into a pte_chain */
 		ClearPageDirect(page);
-		pte_chain = pte_chain_alloc();
 		pte_chain->ptes[NRPTE-1] = page->pte.direct;
 		pte_chain->ptes[NRPTE-2] = pte_paddr;
 		page->pte.direct = 0;
 		page->pte.chain = pte_chain;
+		pte_chain = NULL;	/* We consumed it */
 		goto out;
 	}
 
-	pte_chain = page->pte.chain;
-	if (pte_chain->ptes[0]) {	/* It's full */
-		struct pte_chain *new;
-
-		new = pte_chain_alloc();
-		new->next = pte_chain;
-		page->pte.chain = new;
-		new->ptes[NRPTE-1] = pte_paddr;
+	cur_pte_chain = page->pte.chain;
+	if (cur_pte_chain->ptes[0]) {	/* It's full */
+		pte_chain->next = cur_pte_chain;
+		page->pte.chain = pte_chain;
+		pte_chain->ptes[NRPTE-1] = pte_paddr;
+		pte_chain = NULL;	/* We consumed it */
 		goto out;
 	}
 
-	BUG_ON(!pte_chain->ptes[NRPTE-1]);
+	BUG_ON(!cur_pte_chain->ptes[NRPTE-1]);
 
 	for (i = NRPTE-2; i >= 0; i--) {
-		if (!pte_chain->ptes[i]) {
-			pte_chain->ptes[i] = pte_paddr;
+		if (!cur_pte_chain->ptes[i]) {
+			cur_pte_chain->ptes[i] = pte_paddr;
 			goto out;
 		}
 	}
@@ -253,7 +220,7 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 out:
 	pte_chain_unlock(page);
 	inc_page_state(nr_reverse_maps);
-	return;
+	return pte_chain;
 }
 
 /**
@@ -311,7 +278,7 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 				if (victim_i == NRPTE-1) {
 					/* Emptied a pte_chain */
 					page->pte.chain = start->next;
-					pte_chain_free(start);
+					__pte_chain_free(start);
 				} else {
 					/* Do singleton->PageDirect here */
 				}
@@ -486,7 +453,7 @@ int try_to_unmap(struct page * page)
 				victim_i++;
 				if (victim_i == NRPTE) {
 					page->pte.chain = start->next;
-					pte_chain_free(start);
+					__pte_chain_free(start);
 					start = page->pte.chain;
 					victim_i = 0;
 				}
@@ -520,6 +487,58 @@ static void pte_chain_ctor(void *p, kmem_cache_t *cachep, unsigned long flags)
 	struct pte_chain *pc = p;
 
 	memset(pc, 0, sizeof(*pc));
+}
+
+DEFINE_PER_CPU(struct pte_chain *, local_pte_chain) = 0;
+
+/**
+ * __pte_chain_free - free pte_chain structure
+ * @pte_chain: pte_chain struct to free
+ */
+void __pte_chain_free(struct pte_chain *pte_chain)
+{
+	int cpu = get_cpu();
+	struct pte_chain **pte_chainp;
+
+	if (pte_chain->next)
+		pte_chain->next = NULL;
+	pte_chainp = &per_cpu(local_pte_chain, cpu);
+	if (*pte_chainp)
+		kmem_cache_free(pte_chain_cache, *pte_chainp);
+	*pte_chainp = pte_chain;
+	put_cpu();
+}
+
+/*
+ * pte_chain_alloc(): allocate a pte_chain structure for use by page_add_rmap().
+ *
+ * The caller of page_add_rmap() must perform the allocation because
+ * page_add_rmap() is invariably called under spinlock.  Often, page_add_rmap()
+ * will not actually use the pte_chain, because there is space available in one
+ * of the existing pte_chains which are attached to the page.  So the case of
+ * allocating and then freeing a single pte_chain is specially optimised here,
+ * with a one-deep per-cpu cache.
+ */
+struct pte_chain *pte_chain_alloc(int gfp_flags)
+{
+	int cpu;
+	struct pte_chain *ret;
+	struct pte_chain **pte_chainp;
+
+	if (gfp_flags & __GFP_WAIT)
+		might_sleep();
+
+	cpu = get_cpu();
+	pte_chainp = &per_cpu(local_pte_chain, cpu);
+	if (*pte_chainp) {
+		ret = *pte_chainp;
+		*pte_chainp = NULL;
+		put_cpu();
+	} else {
+		put_cpu();
+		ret = kmem_cache_alloc(pte_chain_cache, gfp_flags);
+	}
+	return ret;
 }
 
 void __init pte_chain_init(void)

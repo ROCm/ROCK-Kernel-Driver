@@ -790,13 +790,6 @@ int _zft_close(void)
 		zft_uninit_mem();
 		going_offline = 0;
 		zft_offline   = 1;
-	} else if (zft_dirty()) {
-		TRACE(ft_t_noise, "Keeping module locked in memory because:\n"
-		      KERN_INFO "header segments need updating: %s\n"
-		      KERN_INFO "tape not at BOT              : %s",
-		      (zft_volume_table_changed || zft_header_changed) 
-		      ? "yes" : "no",
-		      zft_tape_at_lbot(&zft_pos) ? "no" : "yes");
 	} else if (zft_cmpr_lock(0 /* don't load */) == 0) {
 		(*zft_cmpr_ops->reset)(); /* unlock it again */
 	}

@@ -1728,8 +1728,17 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read 
 	WRITE32(maxcount);
 	ADJUST_ARGS();
 	resp->xbuf->head[0].iov_len = ((char*)resp->p) - (char*)resp->xbuf->head[0].iov_base;
-	resp->p = resp->xbuf->tail[0].iov_base;
+
 	resp->xbuf->page_len = maxcount;
+
+	/* set up page for remaining responses */
+	svc_take_page(resp->rqstp);
+	resp->xbuf->tail[0].iov_base = 
+		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+	resp->xbuf->tail[0].iov_len = 0;
+	resp->p = resp->xbuf->tail[0].iov_base;
+	resp->end = resp->p + PAGE_SIZE/4;
+
 	if (maxcount&3) {
 		*(resp->p)++ = 0;
 		resp->xbuf->tail[0].iov_base += maxcount&3;
@@ -1753,11 +1762,6 @@ nfsd4_encode_readlink(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_r
 	svc_take_page(resp->rqstp);
 	page = page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
 
-	svc_take_page(resp->rqstp);
-	resp->xbuf->tail[0].iov_base = 
-		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
-	resp->xbuf->tail[0].iov_len = 0;
-
 	maxcount = PAGE_SIZE;
 	RESERVE_SPACE(4);
 
@@ -1774,7 +1778,14 @@ nfsd4_encode_readlink(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_r
 	WRITE32(maxcount);
 	ADJUST_ARGS();
 	resp->xbuf->head[0].iov_len = ((char*)resp->p) - (char*)resp->xbuf->head[0].iov_base;
+
+	svc_take_page(resp->rqstp);
+	resp->xbuf->tail[0].iov_base = 
+		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+	resp->xbuf->tail[0].iov_len = 0;
 	resp->p = resp->xbuf->tail[0].iov_base;
+	resp->end = resp->p + PAGE_SIZE/4;
+
 	resp->xbuf->page_len = maxcount;
 	if (maxcount&3) {
 		*(resp->p)++ = 0;
@@ -1803,6 +1814,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	WRITE32(0);
 	WRITE32(0);
 	ADJUST_ARGS();
+	resp->xbuf->head[0].iov_len = ((char*)resp->p) - (char*)resp->xbuf->head[0].iov_base;
 
 	maxcount = PAGE_SIZE;
 	if (maxcount > readdir->rd_maxcount)
@@ -1832,16 +1844,26 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	    readdir->common.err == nfserr_readdir_nospc &&
 	    readdir->buffer == page) 
 		nfserr = nfserr_readdir_nospc;
-	if (!nfserr) {
-		if (readdir->offset)
-			xdr_encode_hyper(readdir->offset, offset);
+	if (nfserr)
+		return nfserr;
 
-		p = readdir->buffer;
-		*p++ = 0;	/* no more entries */
-		*p++ = htonl(readdir->common.err == nfserr_eof);
-		resp->xbuf->page_len = ((char*)p) - (char*)page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
-	}
-	return nfserr;
+	if (readdir->offset)
+		xdr_encode_hyper(readdir->offset, offset);
+
+	p = readdir->buffer;
+	*p++ = 0;	/* no more entries */
+	*p++ = htonl(readdir->common.err == nfserr_eof);
+	resp->xbuf->page_len = ((char*)p) - (char*)page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+
+	/* allocate a page for the tail */
+	svc_take_page(resp->rqstp);
+	resp->xbuf->tail[0].iov_base = 
+		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+	resp->xbuf->tail[0].iov_len = 0;
+	resp->p = resp->xbuf->tail[0].iov_base;
+	resp->end = resp->p + PAGE_SIZE/4;
+
+	return 0;
 }
 
 static void
@@ -2066,6 +2088,7 @@ nfs4svc_encode_compoundres(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compound
 	 * All that remains is to write the tag and operation count...
 	 */
 	struct iovec *iov;
+	p = resp->tagp;
 	*p++ = htonl(resp->taglen);
 	memcpy(p, resp->tag, resp->taglen);
 	p += XDR_QUADLEN(resp->taglen);

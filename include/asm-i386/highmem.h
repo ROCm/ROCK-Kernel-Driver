@@ -39,7 +39,7 @@ extern void kmap_init(void);
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
-#define PKMAP_BASE (0xfe000000UL)
+#define PKMAP_BASE (0xff800000UL)
 #ifdef CONFIG_X86_PAE
 #define LAST_PKMAP 512
 #else

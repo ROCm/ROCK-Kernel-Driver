@@ -90,7 +90,7 @@ IMG-parportbook2 := $(addprefix $(obj)/,$(IMG-parportbook))
 EPS-parportbook := $(patsubst %.fig,%.eps, $(IMG-parportbook2))
 PNG-parportbook := $(patsubst %.fig,%.png, $(IMG-parportbook2))
 $(obj)/parportbook.html: $(PNG-parportbook)
-$(obj)/parportbook.ps $(obj)/parportbook.pdf: $(EPS-parportbook)
+$(obj)/parportbook.ps $(obj)/parportbook.pdf: $(EPS-parportbook) $(PNG-parportbook)
 
 ###
 # Rules to generate postscript, PDF and HTML

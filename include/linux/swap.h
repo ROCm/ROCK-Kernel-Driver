@@ -169,11 +169,13 @@ extern int vm_swappiness;
 extern void out_of_memory(void);
 
 /* linux/mm/rmap.c */
-extern int FASTCALL(page_referenced(struct page *));
-extern void FASTCALL(page_add_rmap(struct page *, pte_t *));
-extern void FASTCALL(page_remove_rmap(struct page *, pte_t *));
-extern int FASTCALL(try_to_unmap(struct page *));
-extern int FASTCALL(page_over_rsslimit(struct page *));
+struct pte_chain;
+int FASTCALL(page_referenced(struct page *));
+struct pte_chain *FASTCALL(page_add_rmap(struct page *, pte_t *,
+					struct pte_chain *));
+void FASTCALL(page_remove_rmap(struct page *, pte_t *));
+int FASTCALL(try_to_unmap(struct page *));
+int FASTCALL(page_over_rsslimit(struct page *));
 
 /* return values of try_to_unmap */
 #define	SWAP_SUCCESS	0

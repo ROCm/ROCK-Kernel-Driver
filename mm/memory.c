@@ -44,6 +44,7 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/vcache.h>
+#include <linux/rmap-locking.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -209,11 +210,22 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	pgd_t * src_pgd, * dst_pgd;
 	unsigned long address = vma->vm_start;
 	unsigned long end = vma->vm_end;
-	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
+	unsigned long cow;
+	struct pte_chain *pte_chain = NULL;
 
 	if (is_vm_hugetlb_page(vma))
 		return copy_hugetlb_page_range(dst, src, vma);
 
+	pte_chain = pte_chain_alloc(GFP_ATOMIC);
+	if (!pte_chain) {
+		spin_unlock(&dst->page_table_lock);
+		pte_chain = pte_chain_alloc(GFP_KERNEL);
+		spin_lock(&dst->page_table_lock);
+		if (!pte_chain)
+			goto nomem;
+	}
+	
+	cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
 
@@ -250,7 +262,8 @@ skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
 			if (pmd_bad(*src_pmd)) {
 				pmd_ERROR(*src_pmd);
 				pmd_clear(src_pmd);
-skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
+skip_copy_pte_range:
+				address = (address + PMD_SIZE) & PMD_MASK;
 				if (address >= end)
 					goto out;
 				goto cont_copy_pmd_range;
@@ -259,13 +272,13 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 			dst_pte = pte_alloc_map(dst, dst_pmd, address);
 			if (!dst_pte)
 				goto nomem;
-			spin_lock(&src->page_table_lock);			
+			spin_lock(&src->page_table_lock);	
 			src_pte = pte_offset_map_nested(src_pmd, address);
 			do {
 				pte_t pte = *src_pte;
-				struct page *ptepage;
+				struct page *page;
 				unsigned long pfn;
-				
+
 				/* copy_one_pte */
 
 				if (pte_none(pte))
@@ -276,30 +289,60 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 					set_pte(dst_pte, pte);
 					goto cont_copy_pte_range_noset;
 				}
-				ptepage = pte_page(pte);
 				pfn = pte_pfn(pte);
+				page = pfn_to_page(pfn);
 				if (!pfn_valid(pfn))
 					goto cont_copy_pte_range;
-				ptepage = pfn_to_page(pfn);
-				if (PageReserved(ptepage))
+				if (PageReserved(page))
 					goto cont_copy_pte_range;
 
-				/* If it's a COW mapping, write protect it both in the parent and the child */
+				/*
+				 * If it's a COW mapping, write protect it both
+				 * in the parent and the child
+				 */
 				if (cow) {
 					ptep_set_wrprotect(src_pte);
 					pte = *src_pte;
 				}
 
-				/* If it's a shared mapping, mark it clean in the child */
+				/*
+				 * If it's a shared mapping, mark it clean in
+				 * the child
+				 */
 				if (vma->vm_flags & VM_SHARED)
 					pte = pte_mkclean(pte);
 				pte = pte_mkold(pte);
-				get_page(ptepage);
+				get_page(page);
 				dst->rss++;
 
-cont_copy_pte_range:		set_pte(dst_pte, pte);
-				page_add_rmap(ptepage, dst_pte);
-cont_copy_pte_range_noset:	address += PAGE_SIZE;
+cont_copy_pte_range:
+				set_pte(dst_pte, pte);
+				pte_chain = page_add_rmap(page, dst_pte,
+							pte_chain);
+				if (pte_chain)
+					goto cont_copy_pte_range_noset;
+				pte_chain = pte_chain_alloc(GFP_ATOMIC);
+				if (pte_chain)
+					goto cont_copy_pte_range_noset;
+
+				/*
+				 * pte_chain allocation failed, and we need to
+				 * run page reclaim.
+				 */
+				pte_unmap_nested(src_pte);
+				pte_unmap(dst_pte);
+				spin_unlock(&src->page_table_lock);	
+				spin_unlock(&dst->page_table_lock);	
+				pte_chain = pte_chain_alloc(GFP_KERNEL);
+				spin_lock(&dst->page_table_lock);	
+				if (!pte_chain)
+					goto nomem;
+				spin_lock(&src->page_table_lock);
+				dst_pte = pte_offset_map(dst_pmd, address);
+				src_pte = pte_offset_map_nested(src_pmd,
+								address);
+cont_copy_pte_range_noset:
+				address += PAGE_SIZE;
 				if (address >= end) {
 					pte_unmap_nested(src_pte);
 					pte_unmap(dst_pte);
@@ -312,19 +355,23 @@ cont_copy_pte_range_noset:	address += PAGE_SIZE;
 			pte_unmap(dst_pte-1);
 			spin_unlock(&src->page_table_lock);
 		
-cont_copy_pmd_range:	src_pmd++;
+cont_copy_pmd_range:
+			src_pmd++;
 			dst_pmd++;
 		} while ((unsigned long)src_pmd & PMD_TABLE_MASK);
 	}
 out_unlock:
 	spin_unlock(&src->page_table_lock);
 out:
+	pte_chain_free(pte_chain);
 	return 0;
 nomem:
+	pte_chain_free(pte_chain);
 	return -ENOMEM;
 }
 
-static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
+static void
+zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
 {
 	unsigned long offset;
 	pte_t *ptep;
@@ -806,6 +853,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 {
 	struct page *old_page, *new_page;
 	unsigned long pfn = pte_pfn(pte);
+	struct pte_chain *pte_chain = NULL;
 
 	if (!pfn_valid(pfn))
 		goto bad_wp_page;
@@ -834,6 +882,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!new_page)
 		goto no_mem;
 	copy_cow_page(old_page,new_page,address);
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
 
 	/*
 	 * Re-check the pte - we dropped the lock
@@ -845,7 +894,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			++mm->rss;
 		page_remove_rmap(old_page, page_table);
 		break_cow(vma, new_page, address, page_table);
-		page_add_rmap(new_page, page_table);
+		pte_chain = page_add_rmap(new_page, page_table, pte_chain);
 		lru_cache_add_active(new_page);
 
 		/* Free the old page.. */
@@ -855,6 +904,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	spin_unlock(&mm->page_table_lock);
 	page_cache_release(new_page);
 	page_cache_release(old_page);
+	pte_chain_free(pte_chain);
 	return VM_FAULT_MINOR;
 
 bad_wp_page:
@@ -992,6 +1042,7 @@ static int do_swap_page(struct mm_struct * mm,
 	swp_entry_t entry = pte_to_swp_entry(orig_pte);
 	pte_t pte;
 	int ret = VM_FAULT_MINOR;
+	struct pte_chain *pte_chain = NULL;
 
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
@@ -1021,6 +1072,11 @@ static int do_swap_page(struct mm_struct * mm,
 	}
 
 	mark_page_accessed(page);
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain) {
+		ret = -ENOMEM;
+		goto out;
+	}
 	lock_page(page);
 
 	/*
@@ -1053,13 +1109,14 @@ static int do_swap_page(struct mm_struct * mm,
 	flush_page_to_ram(page);
 	flush_icache_page(vma, page);
 	set_pte(page_table, pte);
-	page_add_rmap(page, page_table);
+	pte_chain = page_add_rmap(page, page_table, pte_chain);
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, pte);
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 out:
+	pte_chain_free(pte_chain);
 	return ret;
 }
 
@@ -1068,11 +1125,27 @@ out:
  * spinlock held to protect against concurrent faults in
  * multithreaded programs. 
  */
-static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma, pte_t *page_table, pmd_t *pmd, int write_access, unsigned long addr)
+static int
+do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
+		pte_t *page_table, pmd_t *pmd, int write_access,
+		unsigned long addr)
 {
 	pte_t entry;
 	struct page * page = ZERO_PAGE(addr);
+	struct pte_chain *pte_chain;
+	int ret;
 
+	pte_chain = pte_chain_alloc(GFP_ATOMIC);
+	if (!pte_chain) {
+		pte_unmap(page_table);
+		spin_unlock(&mm->page_table_lock);
+		pte_chain = pte_chain_alloc(GFP_KERNEL);
+		if (!pte_chain)
+			goto no_mem;
+		spin_lock(&mm->page_table_lock);
+		page_table = pte_offset_map(pmd, addr);
+	}
+		
 	/* Read-only mapping of ZERO_PAGE. */
 	entry = pte_wrprotect(mk_pte(ZERO_PAGE(addr), vma->vm_page_prot));
 
@@ -1094,7 +1167,8 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 			pte_unmap(page_table);
 			page_cache_release(page);
 			spin_unlock(&mm->page_table_lock);
-			return VM_FAULT_MINOR;
+			ret = VM_FAULT_MINOR;
+			goto out;
 		}
 		mm->rss++;
 		flush_page_to_ram(page);
@@ -1104,16 +1178,21 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	}
 
 	set_pte(page_table, entry);
-	page_add_rmap(page, page_table); /* ignores ZERO_PAGE */
+	/* ignores ZERO_PAGE */
+	pte_chain = page_add_rmap(page, page_table, pte_chain);
 	pte_unmap(page_table);
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, addr, entry);
 	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_MINOR;
+	ret = VM_FAULT_MINOR;
+	goto out;
 
 no_mem:
-	return VM_FAULT_OOM;
+	ret = VM_FAULT_OOM;
+out:
+	pte_chain_free(pte_chain);
+	return ret;
 }
 
 /*
@@ -1128,14 +1207,17 @@ no_mem:
  * This is called with the MM semaphore held and the page table
  * spinlock held. Exit with the spinlock released.
  */
-static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
+static int
+do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	unsigned long address, int write_access, pte_t *page_table, pmd_t *pmd)
 {
 	struct page * new_page;
 	pte_t entry;
+	struct pte_chain *pte_chain;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
-		return do_anonymous_page(mm, vma, page_table, pmd, write_access, address);
+		return do_anonymous_page(mm, vma, page_table,
+					pmd, write_access, address);
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 
@@ -1162,6 +1244,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		new_page = page;
 	}
 
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	spin_lock(&mm->page_table_lock);
 	page_table = pte_offset_map(pmd, address);
 
@@ -1184,19 +1267,21 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		if (write_access)
 			entry = pte_mkwrite(pte_mkdirty(entry));
 		set_pte(page_table, entry);
-		page_add_rmap(new_page, page_table);
+		pte_chain = page_add_rmap(new_page, page_table, pte_chain);
 		pte_unmap(page_table);
 	} else {
 		/* One of our sibling threads was faster, back out. */
 		pte_unmap(page_table);
 		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
+		pte_chain_free(pte_chain);
 		return VM_FAULT_MINOR;
 	}
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
 	update_mmu_cache(vma, address, entry);
 	spin_unlock(&mm->page_table_lock);
+	pte_chain_free(pte_chain);
 	return VM_FAULT_MAJOR;
 }
 

@@ -16,6 +16,7 @@
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/svcauth.h>
 #include <linux/err.h>
+#include <linux/hash.h>
 
 #define RPCDBG_FACILITY	RPCDBG_AUTH
 
@@ -111,14 +112,22 @@ svc_auth_unregister(rpc_authflavor_t flavor)
  * it will complain.
  */
 
-int name_hash(char *name, int size)
+int hash_mem(char *buf, int len, int bits)
 {
 	int hash = 0;
-	while (*name) {
-		hash += *name;
-		name++;
+	unsigned long l;
+	while (len >= BITS_PER_LONG/8) {
+		l = *(unsigned long *)buf;
+		buf += BITS_PER_LONG/8;
+		len -= BITS_PER_LONG/8;
+		hash ^= hash_long(l, bits);
 	}
-	return hash % size;
+	if (len) {
+		l=0;
+		memcpy((char*)&l, buf, len);
+		hash ^= hash_long(l, bits);
+	}
+	return hash;
 }
 
 
@@ -161,7 +170,7 @@ void auth_domain_put(struct auth_domain *dom)
 
 static inline int auth_domain_hash(struct auth_domain *item)
 {
-	return name_hash(item->name, DN_HASHMAX);
+	return hash_str(item->name, DN_HASHBITS);
 }
 static inline int auth_domain_match(struct auth_domain *tmp, struct auth_domain *item)
 {

@@ -2605,8 +2605,8 @@ void cleanup_module(void)
 	if (info->screen_base)
 		iounmap((void *) info->screen_base);
 #ifdef __BIG_ENDIAN
-	if (info->cursor && info->cursor->ram)
-		iounmap(info->cursor->ram);
+	if (info->cursor && par->cursor->ram)
+		iounmap(par->cursor->ram);
 #endif
 #endif
 	if (info->cursor)
