@@ -98,8 +98,8 @@ core-y					+= arch/i386/kernel/ arch/i386/mm/ arch/i386/$(MACHINE)/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 
-CFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
-AFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
+CFLAGS += -Iarch/i386/$(MACHINE)
+AFLAGS += -Iarch/i386/$(MACHINE)
 
 MAKEBOOT = +$(MAKE) -C arch/$(ARCH)/boot
 

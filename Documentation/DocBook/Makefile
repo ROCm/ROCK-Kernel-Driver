@@ -154,7 +154,6 @@ LOG     :=      $(patsubst %.sgml, %.log, $(BOOKS))
 OUT     :=      $(patsubst %.sgml, %.out, $(BOOKS))
 
 clean:
-	@echo 'Cleaning up (DocBook)'
 	@rm -f core *~
 	@rm -f $(BOOKS)
 	@rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
@@ -162,7 +161,6 @@ clean:
 	@rm -f $(C-procfs-example)
 
 mrproper:
-	@echo 'Making mrproper (DocBook)'
 	@rm -f $(PS) $(PDF)
 	@rm -f -r $(HTML) $(patsubst %.html,%,$(HTML))
 

@@ -27,7 +27,7 @@ int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 #else
 
 static inline int
-isdn_ppp_xmit(struct sk_buff *, struct net_device *);
+isdn_ppp_xmit(struct sk_buff *, struct net_device *)
 {
 	return 0;
 }
