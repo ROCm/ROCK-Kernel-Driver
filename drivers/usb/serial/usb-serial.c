@@ -1237,7 +1237,6 @@ int usb_serial_probe(struct usb_interface *interface,
 	}
 
 #if defined(CONFIG_USB_SERIAL_PL2303) || defined(CONFIG_USB_SERIAL_PL2303_MODULE)
-#if 1
 	/* BEGIN HORRIBLE HACK FOR PL2303 */ 
 	/* this is needed due to the looney way its endpoints are set up */
 	if (((dev->descriptor.idVendor == PL2303_VENDOR_ID) &&
@@ -1268,11 +1267,11 @@ int usb_serial_probe(struct usb_interface *interface,
 		 */
 		if (num_bulk_in == 0 || num_bulk_out == 0) {
 			info("PL-2303 hack: descriptors matched but endpoints did not");
-			return NULL;
+			kfree (serial);
+			return -ENODEV;
 		}
 	}
 	/* END HORRIBLE HACK FOR PL2303 */
-#endif
 #endif
 
 	/* found all that we need */
