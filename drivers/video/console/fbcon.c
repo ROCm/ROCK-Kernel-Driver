@@ -326,8 +326,14 @@ int set_con2fb_map(int unit, int newidx)
 	struct vc_data *vc = vc_cons[unit].d;
 	int oldidx = con2fb_map[unit];
 	struct fb_info *info = registered_fb[newidx];
-	struct fb_info *oldinfo = registered_fb[oldidx];
+	struct fb_info *oldinfo = NULL;
 	int found;
+
+	if (oldidx == newidx)
+		return 0;
+
+	if (!vc)
+	    return -ENODEV;
 
 	if (!search_for_mapped_con()) {
 		info_idx = newidx;
@@ -335,21 +341,22 @@ int set_con2fb_map(int unit, int newidx)
 		return 0;
 	}
 
-	if (oldidx == newidx)
-		return 0;
-	if (!vc)
-	    return -ENODEV;
+	if (oldidx != -1)
+		oldinfo = registered_fb[oldidx];
+
 	found = search_fb_in_map(newidx);
 
 	acquire_console_sem();
 	con2fb_map[unit] = newidx;
 	if (!found) {
 		if (!try_module_get(info->fbops->owner)) {
+			con2fb_map[unit] = oldidx;
 			release_console_sem();
 			return -ENODEV;
 		}
 		if (info->fbops->fb_open && info->fbops->fb_open(info, 0)) {
 			module_put(info->fbops->owner);
+			con2fb_map[unit] = oldidx;
 			release_console_sem();
 			return -ENODEV;
 		}
@@ -360,18 +367,18 @@ int set_con2fb_map(int unit, int newidx)
 	 * fbcon should release it.
 	 */
 	if (oldinfo && !search_fb_in_map(oldidx)) {
-		int err;
-
-		if (info->queue.func == fb_flashcursor)
-			del_timer_sync(&oldinfo->cursor_timer);
-		if (oldinfo->fbops->fb_release) {
-			err = oldinfo->fbops->fb_release(oldinfo, 0);
-			if (err) {
-				con2fb_map[unit] = oldidx;
-				release_console_sem();
-				return err;
-			}
+		if (oldinfo->fbops->fb_release &&
+		    oldinfo->fbops->fb_release(oldinfo, 0)) {
+			con2fb_map[unit] = oldidx;
+			if (!found && info->fbops->fb_release)
+				info->fbops->fb_release(info, 0);
+			if (!found)
+				module_put(info->fbops->owner);
+			release_console_sem();
+			return -ENODEV;
 		}
+		if (oldinfo->queue.func == fb_flashcursor)
+			del_timer_sync(&oldinfo->cursor_timer);
 		module_put(oldinfo->fbops->owner);
 	}
 	info->currcon = -1;
@@ -1624,8 +1631,10 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 			height, width);
 }
 
-static __inline__ void updatescrollmode(struct display *p, struct fb_info *info, struct vc_data *vc)
+static __inline__ void updatescrollmode(struct display *p, struct fb_info *info,
+					struct vc_data *vc)
 {
+	int fh = vc->vc_font.height;
 	int cap = info->flags;
 	int good_pan = (cap & FBINFO_HWACCEL_YPAN)
 		 && divides(info->fix.ypanstep, vc->vc_font.height)
@@ -1635,6 +1644,13 @@ static __inline__ void updatescrollmode(struct display *p, struct fb_info *info,
 		 && divides(vc->vc_font.height, info->var.yres_virtual);
 	int reading_fast = cap & FBINFO_READS_FAST;
 	int fast_copyarea = (cap & FBINFO_HWACCEL_COPYAREA) && !(cap & FBINFO_HWACCEL_DISABLED);
+
+	p->vrows = info->var.yres_virtual/fh;
+	if (info->var.yres > (fh * (vc->vc_rows + 1)))
+		p->vrows -= (info->var.yres - (fh * vc->vc_rows)) / fh;
+	if ((info->var.yres % fh) && (info->var.yres_virtual % fh <
+				      info->var.yres % fh))
+		p->vrows--;
 
 	if (good_wrap || good_pan) {
 		if (reading_fast || fast_copyarea)
@@ -1686,11 +1702,6 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 		}
 		info->flags &= ~FBINFO_MISC_MODESWITCH;
 	}
-	p->vrows = var.yres_virtual/fh;
-	if (var.yres > (fh * (height + 1)))
-		p->vrows -= (var.yres - (fh * height)) / fh;
-	if ((var.yres % fh) && (var.yres_virtual % fh < var.yres % fh))
-		p->vrows--;
 	updatescrollmode(p, info, vc);
 	return 0;
 }
@@ -1766,7 +1777,6 @@ static int fbcon_switch(struct vc_data *vc)
 		struct fb_fillrect rect;
 		int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 
-		logo_shown = fg_console;
 		rect.color = attr_bgcol_ec(bgshift, vc);
 		rect.rop = ROP_COPY;
 		rect.dx = rect.dy = 0;
@@ -2383,19 +2393,7 @@ static void fbcon_modechanged(struct fb_info *info)
 		cols = info->var.xres / vc->vc_font.width;
 		rows = info->var.yres / vc->vc_font.height;
 		vc_resize(vc->vc_num, cols, rows);
-		switch (p->scrollmode) {
-		case SCROLL_WRAP:
-			scrollback_phys_max = p->vrows - vc->vc_rows;
-			break;
-		case SCROLL_PAN:
-			scrollback_phys_max = p->vrows - 2 * vc->vc_rows;
-			if (scrollback_phys_max < 0)
-				scrollback_phys_max = 0;
-			break;
-		default:
-			scrollback_phys_max = 0;
-			break;
-		}
+		updatescrollmode(p, info, vc);
 		scrollback_max = 0;
 		scrollback_current = 0;
 		update_var(vc->vc_num, info);
@@ -2466,7 +2464,8 @@ static struct notifier_block fbcon_event_notifier = {
 };
 static int fbcon_event_notifier_registered;
 
-int __init fb_console_init(void)
+/* can't be __init as it can be called by set_con2fb_map() later */
+int fb_console_init(void)
 {
 	int err, i;
 
