@@ -536,37 +536,34 @@ ncp_ObtainSpecificDirBase(struct ncp_server *server,
 }
 
 int
-ncp_mount_subdir(struct ncp_server *server, struct nw_info_struct *i,
-			__u8 volNumber, __u8 srcNS, __u32 dirEntNum)
+ncp_mount_subdir(struct ncp_server *server,
+		 __u8 volNumber, __u8 srcNS, __u32 dirEntNum,
+		 __u32* volume, __u32* newDirEnt, __u32* newDosEnt)
 {
 	int dstNS;
 	int result;
-	__u32 newDirEnt;
-	__u32 newDosEnt;
 	
 	dstNS = ncp_get_known_namespace(server, volNumber);
 	if ((result = ncp_ObtainSpecificDirBase(server, srcNS, dstNS, volNumber, 
-				      dirEntNum, NULL, &newDirEnt, &newDosEnt)) != 0)
+				      dirEntNum, NULL, newDirEnt, newDosEnt)) != 0)
 	{
 		return result;
 	}
 	server->name_space[volNumber] = dstNS;
-	i->volNumber = volNumber;
-	i->dirEntNum = newDirEnt;
-	i->DosDirNum = newDosEnt;
+	*volume = volNumber;
 	server->m.mounted_vol[1] = 0;
 	server->m.mounted_vol[0] = 'X';
 	return 0;
 }
 
 int 
-ncp_lookup_volume(struct ncp_server *server, char *volname,
-		      struct nw_info_struct *target)
+ncp_get_volume_root(struct ncp_server *server, const char *volname,
+		    __u32* volume, __u32* dirent, __u32* dosdirent)
 {
 	int result;
-	int volnum;
+	__u8 volnum;
 
-	DPRINTK("ncp_lookup_volume: looking up vol %s\n", volname);
+	DPRINTK("ncp_get_volume_root: looking up vol %s\n", volname);
 
 	ncp_init_request(server);
 	ncp_add_byte(server, 22);	/* Subfunction: Generate dir handle */
@@ -585,16 +582,31 @@ ncp_lookup_volume(struct ncp_server *server, char *volname,
 		ncp_unlock_server(server);
 		return result;
 	}
-	memset(target, 0, sizeof(*target));
-	target->DosDirNum = target->dirEntNum = ncp_reply_dword(server, 4);
-	target->volNumber = volnum = ncp_reply_byte(server, 8);
+	*dirent = *dosdirent = ncp_reply_dword(server, 4);
+	volnum = ncp_reply_byte(server, 8);
 	ncp_unlock_server(server);
+	*volume = volnum;
 
 	server->name_space[volnum] = ncp_get_known_namespace(server, volnum);
 
 	DPRINTK("lookup_vol: namespace[%d] = %d\n",
 		volnum, server->name_space[volnum]);
 
+	return 0;
+}
+
+int
+ncp_lookup_volume(struct ncp_server *server, const char *volname,
+		  struct nw_info_struct *target)
+{
+	int result;
+
+	memset(target, 0, sizeof(*target));
+	result = ncp_get_volume_root(server, volname,
+			&target->volNumber, &target->dirEntNum, &target->DosDirNum);
+	if (result) {
+		return result;
+	}
 	target->nameLen = strlen(volname);
 	memcpy(target->entryName, volname, target->nameLen+1);
 	target->attributes = aDIR;
