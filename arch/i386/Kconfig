@@ -1340,14 +1340,6 @@ config X86_MPPARSE
 	depends on X86_LOCAL_APIC && !X86_VISWS
 	default y
 
-config REGPARM
-	bool "Use register arguments (EXPERIMENTAL)"
-	default n
-	help
-	Compile the kernel with -mregparm=3. This uses an different ABI
-	and passes the first three arguments of a function call in registers.
-	This will probably break binary only modules.	
-	
 endmenu
 
 source "security/Kconfig"
