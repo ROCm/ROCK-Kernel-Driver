@@ -42,28 +42,6 @@ qla2x00_get_cmd_direction(struct scsi_cmnd *cmd)
 		cflags = CF_WRITE;
 	else if (cmd->sc_data_direction == DMA_FROM_DEVICE)
 		cflags = CF_READ;
-	else {
-		switch (cmd->cmnd[0]) {
-		case WRITE_6:
-		case WRITE_10:
-		case WRITE_12:
-		case WRITE_BUFFER:
-		case WRITE_LONG:
-		case WRITE_SAME:
-		case WRITE_VERIFY:
-		case WRITE_VERIFY_12:
-		case FORMAT_UNIT:
-		case SEND_VOLUME_TAG:
-		case MODE_SELECT:
-		case SEND_DIAGNOSTIC:
-		case MODE_SELECT_10:
-			cflags = CF_WRITE;
-			break;
-		default:
-			cflags = CF_READ;
-			break;
-		}
-	}
 	return (cflags);
 }
 
