@@ -519,7 +519,6 @@ void __journal_remove_checkpoint(struct journal_head *jh)
 		JBUFFER_TRACE(jh, "not on transaction");
 		goto out;
 	}
-
 	journal = transaction->t_journal;
 
 	__buffer_unlink(jh);
@@ -528,11 +527,14 @@ void __journal_remove_checkpoint(struct journal_head *jh)
 		goto out;
 	JBUFFER_TRACE(jh, "transaction has no more buffers");
 
-	/* There is one special case to worry about: if we have just
-           pulled the buffer off a committing transaction's forget list,
-           then even if the checkpoint list is empty, the transaction
-           obviously cannot be dropped! */
-
+	/*
+	 * There is one special case to worry about: if we have just pulled the
+	 * buffer off a committing transaction's forget list, then even if the
+	 * checkpoint list is empty, the transaction obviously cannot be
+	 * dropped!
+	 *
+	 * AKPM2: locking here around j_committing_transaction is a bit flakey.
+	 */
 	if (transaction == journal->j_committing_transaction) {
 		JBUFFER_TRACE(jh, "belongs to committing transaction");
 		goto out;
@@ -601,21 +603,19 @@ void __journal_drop_transaction(journal_t *journal, transaction_t *transaction)
 			journal->j_checkpoint_transactions = NULL;
 	}
 
-	J_ASSERT (transaction->t_buffers == NULL);
-	J_ASSERT (transaction->t_sync_datalist == NULL);
-	J_ASSERT (transaction->t_forget == NULL);
-	J_ASSERT (transaction->t_iobuf_list == NULL);
-	J_ASSERT (transaction->t_shadow_list == NULL);
-	J_ASSERT (transaction->t_log_list == NULL);
-	J_ASSERT (transaction->t_checkpoint_list == NULL);
-	J_ASSERT (transaction->t_updates == 0);
-	J_ASSERT (list_empty(&transaction->t_jcb));
+	J_ASSERT(transaction->t_buffers == NULL);
+	J_ASSERT(transaction->t_sync_datalist == NULL);
+	J_ASSERT(transaction->t_forget == NULL);
+	J_ASSERT(transaction->t_iobuf_list == NULL);
+	J_ASSERT(transaction->t_shadow_list == NULL);
+	J_ASSERT(transaction->t_log_list == NULL);
+	J_ASSERT(transaction->t_checkpoint_list == NULL);
+	J_ASSERT(transaction->t_updates == 0);
+	J_ASSERT(list_empty(&transaction->t_jcb));
 
-	J_ASSERT (transaction->t_journal->j_committing_transaction !=
-					transaction);
-	
-	jbd_debug (1, "Dropping transaction %d, all done\n", 
-		   transaction->t_tid);
-	kfree (transaction);
+	J_ASSERT(journal->j_committing_transaction != transaction);
+
+	jbd_debug(1, "Dropping transaction %d, all done\n", transaction->t_tid);
+	kfree(transaction);
 }
 

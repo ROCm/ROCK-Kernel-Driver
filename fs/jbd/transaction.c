@@ -948,7 +948,7 @@ out:
  * by kswapd.  So it cannot block.  Happily, there's nothing here
  * which needs lock_journal if `async' is set.
  */
-int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
+int journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 {
 	journal_t *journal = handle->h_transaction->t_journal;
 	int need_brelse = 0;
@@ -1217,7 +1217,7 @@ void journal_release_buffer(handle_t *handle, struct buffer_head *bh)
  * Allow this call even if the handle has aborted --- it may be part of
  * the caller's cleanup after an abort.
  */
-void journal_forget (handle_t *handle, struct buffer_head *bh)
+void journal_forget(handle_t *handle, struct buffer_head *bh)
 {
 	transaction_t *transaction = handle->h_transaction;
 	journal_t *journal = transaction->t_journal;
