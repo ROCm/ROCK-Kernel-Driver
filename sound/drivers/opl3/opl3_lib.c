@@ -37,7 +37,7 @@ MODULE_LICENSE("GPL");
 
 extern char snd_opl3_regmap[MAX_OPL2_VOICES][4];
 
-void snd_opl2_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
+static void snd_opl2_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
 {
 	unsigned long flags;
 	unsigned long port;
@@ -60,7 +60,7 @@ void snd_opl2_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
 	spin_unlock_irqrestore(&opl3->reg_lock, flags);
 }
 
-void snd_opl3_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
+static void snd_opl3_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
 {
 	unsigned long flags;
 	unsigned long port;

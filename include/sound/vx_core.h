@@ -340,7 +340,6 @@ int vx_set_monitor_level(vx_core_t *chip, int audio, int level, int active);
  */
 void vx_set_iec958_status(vx_core_t *chip, unsigned int bits);
 int vx_set_clock(vx_core_t *chip, unsigned int freq);
-void vx_change_clock_source(vx_core_t *chip, int source);
 void vx_set_internal_clock(vx_core_t *chip, unsigned int freq);
 int vx_change_frequency(vx_core_t *chip);
 
