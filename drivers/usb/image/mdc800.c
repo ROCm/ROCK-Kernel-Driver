@@ -431,7 +431,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 		err ("probe fails -> wrong Number of Configuration");
 		return -ENODEV;
 	}
-	intf_desc = &intf->altsetting[0];
+	intf_desc = intf->cur_altsetting;
 
 	if (
 			( intf_desc->desc.bInterfaceClass != 0xff )
@@ -468,13 +468,6 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 		}
 	}
 
-
-	usb_driver_claim_interface (&mdc800_usb_driver, intf, mdc800);
-	if (usb_set_interface (dev, intf_desc->desc.bInterfaceNumber, 0) < 0)
-	{
-		err ("MDC800 Configuration fails.");
-		return -ENODEV;
-	}
 
 	info ("Found Mustek MDC800 on USB.");
 
@@ -550,8 +543,6 @@ static void mdc800_usb_disconnect (struct usb_interface *intf)
 		usb_unlink_urb (mdc800->irq_urb);
 		usb_unlink_urb (mdc800->write_urb);
 		usb_unlink_urb (mdc800->download_urb);
-
-		usb_driver_release_interface (&mdc800_usb_driver, intf);
 
 		mdc800->dev=0;
 		usb_set_intfdata(intf, NULL);
