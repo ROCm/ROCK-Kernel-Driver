@@ -734,6 +734,8 @@ acpi_ec_start (
 	if (ACPI_FAILURE(status)) {
 		return_VALUE(-ENODEV);
 	}
+	acpi_set_gpe_type (NULL, ec->gpe_bit, ACPI_GPE_TYPE_RUNTIME);
+	acpi_enable_gpe (NULL, ec->gpe_bit, ACPI_NOT_ISR);
 
 	status = acpi_install_address_space_handler (ec->handle,
 			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler,
