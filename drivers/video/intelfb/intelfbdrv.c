@@ -1573,7 +1573,7 @@ intelfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		intelfbhw_cursor_setcolor(dinfo, bg, fg);
 	}
 
-	if (cursor->set & FB_CUR_SETSHAPE) {
+	if (cursor->set & (FB_CUR_SETSHAPE & FB_CUR_SETIMAGE)) {
 		u32 s_pitch = (ROUND_UP_TO(cursor->image.width, 8) / 8);
 		u32 size = s_pitch * cursor->image.height;
 		u8 *dat = (u8 *) cursor->image.data;
