@@ -56,8 +56,7 @@ halt_msg:
 GLOBAL_ENTRY(_start)
 start_ap:
 	.prologue
-	.save rp, r4		// terminate unwind chain with a NULL rp
-	mov r4=r0
+	.save rp, r0		// terminate unwind chain with a NULL rp
 	.body
 
 	rsm psr.i | psr.ic
@@ -818,8 +817,7 @@ END(ia64_delay_loop)
 
 GLOBAL_ENTRY(start_kernel_thread)
 	.prologue
-	.save rp, r4				// this is the end of the call-chain
-	mov r4=r0
+	.save rp, r0				// this is the end of the call-chain
 	.body
 	alloc r2 = ar.pfs, 0, 0, 2, 0
 	mov out0 = r9

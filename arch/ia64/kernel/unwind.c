@@ -89,6 +89,8 @@ static struct {
 	/* list of unwind tables (one per load-module) */
 	struct unw_table *tables;
 
+	unsigned long r0;			/* constant 0 for r0 */
+
 	/* table of registers that prologues can save (and order in which they're saved): */
 	const unsigned char save_order[8];
 
@@ -239,7 +241,11 @@ static struct {
 #endif
 };
 
-/* Unwind accessors.  */
+static inline int
+read_only (unsigned long *addr)
+{
+	return (addr == &unw.r0);
+}
 
 /*
  * Returns offset of rREG in struct pt_regs.
@@ -273,6 +279,8 @@ get_scratch_regs (struct unw_frame_info *info)
 	UNW_DPRINT(3, "unwind.%s: sp 0x%lx pt 0x%lx\n", __FUNCTION__, info->sp, info->pt);
 	return (struct pt_regs *) info->pt;
 }
+
+/* Unwind accessors.  */
 
 int
 unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char *nat, int write)
@@ -377,11 +385,15 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 	}
 
 	if (write) {
-		*addr = *val;
-		if (*nat)
-			*nat_addr |= nat_mask;
-		else
-			*nat_addr &= ~nat_mask;
+		if (read_only(addr))
+			UNW_DPRINT(0, "unwind.%s: ignoring attempt to write read-only location\n");
+		else {
+			*addr = *val;
+			if (*nat)
+				*nat_addr |= nat_mask;
+			else
+				*nat_addr &= ~nat_mask;
+		}
 	} else {
 		if ((*nat_addr & nat_mask) == 0) {
 			*val = *addr;
@@ -420,7 +432,10 @@ unw_access_br (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		return -1;
 	}
 	if (write)
-		*addr = *val;
+		if (read_only(addr))
+			UNW_DPRINT(0, "unwind.%s: ignoring attempt to write read-only location\n");
+		else
+			*addr = *val;
 	else
 		*val = *addr;
 	return 0;
@@ -465,7 +480,10 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 	}
 
 	if (write)
-		*addr = *val;
+		if (read_only(addr))
+			UNW_DPRINT(0, "unwind.%s: ignoring attempt to write read-only location\n");
+		else
+			*addr = *val;
 	else
 		*val = *addr;
 	return 0;
@@ -557,9 +575,12 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 		return -1;
 	}
 
-	if (write)
-		*addr = *val;
-	else
+	if (write) {
+		if (read_only(addr))
+			UNW_DPRINT(0, "unwind.%s: ignoring attempt to write read-only location\n");
+		else
+			*addr = *val;
+	} else
 		*val = *addr;
 	return 0;
 }
@@ -574,9 +595,12 @@ unw_access_pr (struct unw_frame_info *info, unsigned long *val, int write)
 	if (!addr)
 		addr = &info->sw->pr;
 
-	if (write)
-		*addr = *val;
-	else
+	if (write) {
+		if (read_only(addr))
+			UNW_DPRINT(0, "unwind.%s: ignoring attempt to write read-only location\n");
+		else
+			*addr = *val;
+	} else
 		*val = *addr;
 	return 0;
 }
@@ -1407,6 +1431,9 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 				need_nat_info = 0;
 			}
 			val = unw.preg_index[UNW_REG_R4 + (rval - 4)];
+		} else if (rval == 0) {
+			opc = UNW_INSN_MOVE_CONST;
+			val = 0;
 		} else {
 			/* register got spilled to a scratch register */
 			opc = UNW_INSN_MOVE_SCRATCH;
@@ -1728,6 +1755,17 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 					   __FUNCTION__, dst, val);
 			}
 			break;
+
+		      case UNW_INSN_MOVE_CONST:
+			if (val == 0)
+				s[dst] = (unsigned long) &unw.r0;
+			else {
+				s[dst] = 0;
+				UNW_DPRINT(0, "unwind.%s: UNW_INSN_MOVE_CONST bad val=%ld\n",
+					   __FUNCTION__, val);
+			}
+			break;
+
 
 		      case UNW_INSN_MOVE_STACKED:
 			s[dst] = (unsigned long) ia64_rse_skip_regs((unsigned long *)state->bsp,
