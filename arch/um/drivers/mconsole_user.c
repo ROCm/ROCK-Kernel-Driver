@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2001 Lennert Buytenhek (buytenh@gnu.org)
- * Copyright (C) 2001, 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2001 - 2003 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -18,16 +18,18 @@
 #include "umid.h"
 
 static struct mconsole_command commands[] = {
-	{ "version", mconsole_version, 1 },
-	{ "halt", mconsole_halt, 0 },
-	{ "reboot", mconsole_reboot, 0 },
-	{ "config", mconsole_config, 0 },
-	{ "remove", mconsole_remove, 0 },
-	{ "sysrq", mconsole_sysrq, 1 },
-	{ "help", mconsole_help, 1 },
-	{ "cad", mconsole_cad, 1 },
-	{ "stop", mconsole_stop, 0 },
-	{ "go", mconsole_go, 1 },
+	{ "version", mconsole_version, MCONSOLE_INTR },
+	{ "halt", mconsole_halt, MCONSOLE_PROC },
+	{ "reboot", mconsole_reboot, MCONSOLE_PROC },
+	{ "config", mconsole_config, MCONSOLE_PROC },
+	{ "remove", mconsole_remove, MCONSOLE_PROC },
+	{ "sysrq", mconsole_sysrq, MCONSOLE_INTR },
+	{ "help", mconsole_help, MCONSOLE_INTR },
+	{ "cad", mconsole_cad, MCONSOLE_INTR },
+	{ "stop", mconsole_stop, MCONSOLE_PROC },
+	{ "go", mconsole_go, MCONSOLE_INTR },
+	{ "log", mconsole_log, MCONSOLE_INTR },
+	{ "proc", mconsole_proc, MCONSOLE_PROC },
 };
 
 /* Initialized in mconsole_init, which is an initcall */
@@ -139,6 +141,7 @@ int mconsole_reply(struct mc_request *req, char *str, int err, int more)
 		memcpy(reply.data, str, len);
 		reply.data[len] = '\0';
 		total -= len;
+		str += len;
 		reply.len = len + 1;
 
 		len = sizeof(reply) + reply.len - sizeof(reply.data);

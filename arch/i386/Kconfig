@@ -823,6 +823,15 @@ config BOOT_IOREMAP
 
 endmenu
 
+menu "Special options"
+
+config PROC_MM
+	bool "proc/mm support"
+	---help---
+		/proc/mm is used by a User Mode Linux kernel to support SKAS 
+		mode. If you need this, you'll know it.
+
+endmenu
 
 menu "Power management options (ACPI, APM)"
 	depends on !X86_VOYAGER

@@ -474,6 +474,8 @@ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *threa
 struct task_struct;
 struct mm_struct;
 
+int mm_copy_segments(struct mm_struct *old_mm, struct mm_struct *mm);
+
 /* Free all resources held by a thread. */
 extern void release_thread(struct task_struct *);
 

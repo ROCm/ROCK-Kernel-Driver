@@ -35,7 +35,8 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 		printk("fd_init : couldn't parse file descriptor '%s'\n", str);
 		return(NULL);
 	}
-	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
+	data = um_kmalloc(sizeof(*data));
+	if(data == NULL) return(NULL);
 	*data = ((struct fd_chan) { .fd  	= n,
 				    .raw  	= opts->raw });
 	return(data);

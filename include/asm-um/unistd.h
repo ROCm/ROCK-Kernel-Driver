@@ -33,7 +33,10 @@ extern long sys_write(int fildes, const char *buf, size_t len);
 	set_fs(KERNEL_DS);			\
 	ret = sys(args);			\
 	set_fs(fs);				\
-	return ret;
+	if (ret >= 0)				\
+		return ret;			\
+	errno = -(long)ret;			\
+	return -1;
 
 static inline long open(const char *pathname, int flags, int mode) 
 {

@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2000, 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000 - 2003 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -43,65 +43,19 @@ extern unsigned long get_fault_addr(void);
 
 extern int __do_copy_from_user(void *to, const void *from, int n,
 			       void **fault_addr, void **fault_catcher);
-
-static inline int copy_from_user_tt(void *to, const void *from, int n)
-{
-	return(access_ok_tt(VERIFY_READ, from, n) ?
-	       __do_copy_from_user(to, from, n, 
-				   &current->thread.fault_addr,
-				   &current->thread.fault_catcher) : n);
-}
-
-static inline int copy_to_user_tt(void *to, const void *from, int n)
-{
-	return(access_ok_tt(VERIFY_WRITE, to, n) ?
-	       __do_copy_to_user(to, from, n, 
-				   &current->thread.fault_addr,
-				   &current->thread.fault_catcher) : n);
-}
-
 extern int __do_strncpy_from_user(char *dst, const char *src, size_t n,
 				  void **fault_addr, void **fault_catcher);
-
-static inline int strncpy_from_user_tt(char *dst, const char *src, int count)
-{
-	int n;
-
-	if(!access_ok_tt(VERIFY_READ, src, 1)) return(-EFAULT);
-	n = __do_strncpy_from_user(dst, src, count, 
-				   &current->thread.fault_addr,
-				   &current->thread.fault_catcher);
-	if(n < 0) return(-EFAULT);
-	return(n);
-}
-
 extern int __do_clear_user(void *mem, size_t len, void **fault_addr,
 			   void **fault_catcher);
-
-static inline int __clear_user_tt(void *mem, int len)
-{
-	return(__do_clear_user(mem, len,
-			       &current->thread.fault_addr,
-			       &current->thread.fault_catcher));
-}
-
-static inline int clear_user_tt(void *mem, int len)
-{
-	return(access_ok_tt(VERIFY_WRITE, mem, len) ? 
-	       __do_clear_user(mem, len, 
-			       &current->thread.fault_addr,
-			       &current->thread.fault_catcher) : len);
-}
-
 extern int __do_strnlen_user(const char *str, unsigned long n,
 			     void **fault_addr, void **fault_catcher);
 
-static inline int strnlen_user_tt(const void *str, int len)
-{
-	return(__do_strnlen_user(str, len,
-				 &current->thread.fault_addr,
-				 &current->thread.fault_catcher));
-}
+extern int copy_from_user_tt(void *to, const void *from, int n);
+extern int copy_to_user_tt(void *to, const void *from, int n);
+extern int strncpy_from_user_tt(char *dst, const char *src, int count);
+extern int __clear_user_tt(void *mem, int len);
+extern int clear_user_tt(void *mem, int len);
+extern int strnlen_user_tt(const void *str, int len);
 
 #endif
 

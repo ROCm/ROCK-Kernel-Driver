@@ -10,7 +10,7 @@
 
 extern cpumask_t cpu_online_map;
 
-#define smp_processor_id() (current->thread_info->cpu)
+#define smp_processor_id() (current_thread->cpu)
 #define cpu_logical_map(n) (n)
 #define cpu_number_map(n) (n)
 #define PROC_CHANGE_PENALTY	15 /* Pick a number, any number */

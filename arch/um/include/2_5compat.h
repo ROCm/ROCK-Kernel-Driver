@@ -6,20 +6,6 @@
 #ifndef __2_5_COMPAT_H__
 #define __2_5_COMPAT_H__
 
-#include "linux/version.h"
-
-#define INIT_CONSOLE(dev_name, write_proc, device_proc, setup_proc, f) { \
-	name :		dev_name, \
-	write :		write_proc, \
-	read :		NULL, \
-	device :	device_proc, \
-	setup :		setup_proc, \
-	flags :		f, \
-	index :		-1, \
-	cflag :		0, \
-	next :		NULL \
-}
-
 #define INIT_HARDSECT(arr, maj, sizes)
 
 #define SET_PRI(task) do ; while(0)

@@ -5,7 +5,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
 #include <sys/mman.h> 
@@ -82,7 +81,8 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	int status, ret;
 
 	while(1){
-		if(((ret = waitpid(pid, &status, WUNTRACED)) < 0) ||
+		ret = waitpid(pid, &status, WUNTRACED);
+		if((ret < 0) ||
 		   !WIFSTOPPED(status) || (WSTOPSIG(status) != sig)){
 			if(ret < 0){
 				if(errno == EINTR) continue;
@@ -117,17 +117,6 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 		}
 		return(status);
 	}
-}
-
-int clone_and_wait(int (*fn)(void *), void *arg, void *sp, int flags)
-{
-	int pid;
-
-	pid = clone(fn, sp, flags, arg);
- 	if(pid < 0) return(-1);
-	wait_for_stop(pid, SIGSTOP, PTRACE_CONT, NULL);
-	ptrace(PTRACE_CONT, pid, 0, 0);
-	return(pid);
 }
 
 int raw(int fd, int complain)

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <errno.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/user.h>
@@ -123,12 +124,14 @@ int main(int argc, char **argv, char **envp)
 
 	set_stklim();
 
-	if((new_argv = malloc((argc + 1) * sizeof(char *))) == NULL){
+	new_argv = malloc((argc + 1) * sizeof(char *));
+	if(new_argv == NULL){
 		perror("Mallocing argv");
 		exit(1);
 	}
 	for(i=0;i<argc;i++){
-		if((new_argv[i] = strdup(argv[i])) == NULL){
+		new_argv[i] = strdup(argv[i]);
+		if(new_argv[i] == NULL){
 			perror("Mallocing an arg");
 			exit(1);
 		}

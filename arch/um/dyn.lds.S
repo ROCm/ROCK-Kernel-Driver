@@ -10,12 +10,15 @@ SECTIONS
 {
   . = START + SIZEOF_HEADERS;
   .interp         : { *(.interp) }
-  . = ALIGN(4096);
   __binary_start = .;
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .text.init : { *(.text.init) }
+  .init.text : { 
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
+  }
 
   . = ALIGN(4096);
 
@@ -67,7 +70,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  .data.init : { *(.data.init) }
+  init.data : { *(.init.data) }
 
   /* Ensure the __preinit_array_start label is properly aligned.  We
      could instead move the label definition inside the section, but

@@ -41,11 +41,13 @@ struct mconsole_notify {
 
 struct mc_request;
 
+enum mc_context { MCONSOLE_INTR, MCONSOLE_PROC };
+
 struct mconsole_command
 {
 	char *command;
 	void (*handler)(struct mc_request *req);
-	int as_interrupt;
+	enum mc_context context;
 };
 
 struct mc_request
@@ -77,6 +79,8 @@ extern void mconsole_sysrq(struct mc_request *req);
 extern void mconsole_cad(struct mc_request *req);
 extern void mconsole_stop(struct mc_request *req);
 extern void mconsole_go(struct mc_request *req);
+extern void mconsole_log(struct mc_request *req);
+extern void mconsole_proc(struct mc_request *req);
 
 extern int mconsole_get_request(int fd, struct mc_request *req);
 extern int mconsole_notify(char *sock_name, int type, const void *data, 
