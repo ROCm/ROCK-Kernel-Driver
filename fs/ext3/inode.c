@@ -1644,7 +1644,6 @@ static struct address_space_operations ext3_journalled_aops = {
 	.bmap		= ext3_bmap,
 	.invalidatepage	= ext3_invalidatepage,
 	.releasepage	= ext3_releasepage,
-	.direct_IO	= ext3_direct_IO,
 };
 
 void ext3_set_aops(struct inode *inode)
