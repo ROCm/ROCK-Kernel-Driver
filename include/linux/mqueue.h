@@ -27,6 +27,7 @@ struct mq_attr {
 	long	mq_maxmsg;	/* maximum number of messages		*/
 	long	mq_msgsize;	/* maximum message size			*/
 	long	mq_curmsgs;	/* number of messages currently queued	*/
+	long	__reserved[4];	/* ignored for input, zeroed for output */
 };
 
 #define NOTIFY_NONE	0

@@ -121,7 +121,7 @@ static struct inode *mqueue_get_inode(struct super_block *sb, int mode)
 			INIT_LIST_HEAD(&info->e_wait_q[1].list);
 			info->notify_owner = 0;
 			info->qsize = 0;
-			info->attr.mq_curmsgs = 0;
+			memset(&info->attr, 0, sizeof(info->attr));
 			info->attr.mq_maxmsg = DFLT_MSGMAX;
 			info->attr.mq_msgsize = DFLT_MSGSIZEMAX;
 			info->messages = kmalloc(DFLT_MSGMAX * sizeof(struct msg_msg *), GFP_KERNEL);
@@ -1082,6 +1082,8 @@ asmlinkage long sys_mq_getsetattr(mqd_t mqdes,
 	if (u_mqstat != NULL) {
 		if (copy_from_user(&mqstat, u_mqstat, sizeof(struct mq_attr)))
 			return -EFAULT;
+		if (mqstat.mq_flags & (~O_NONBLOCK))
+			return -EINVAL;
 	}
 
 	ret = -EBADF;
@@ -1097,7 +1099,7 @@ asmlinkage long sys_mq_getsetattr(mqd_t mqdes,
 	spin_lock(&info->lock);
 
 	omqstat = info->attr;
-	omqstat.mq_flags = filp->f_flags;
+	omqstat.mq_flags = filp->f_flags & O_NONBLOCK;
 	if (u_mqstat) {
 		if (mqstat.mq_flags & O_NONBLOCK)
 			filp->f_flags |= O_NONBLOCK;
