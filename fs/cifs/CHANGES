@@ -1,6 +1,6 @@
 Version 0.79
 ------------
-Fix mount options for ro (readonly) ,uid, gid and file and directory mode. 
+Fix mount options for ro (readonly), uid, gid and file and directory mode. 
 
 Version 0.78
 ------------
