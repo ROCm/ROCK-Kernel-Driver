@@ -79,11 +79,14 @@ extern void __save_cpu_setup(void);
 #define PPC_MSG_INVALIDATE_TLB	2
 #define PPC_MSG_XMON_BREAK	3
 
-#define smp_message_pass(t,m,d,w) \
-    do { if (smp_ops) \
-	     atomic_inc(&ipi_sent); \
-	     smp_ops->message_pass((t),(m),(d),(w)); \
-       } while(0)
+static inline void
+smp_message_pass(int target, int msg, unsigned long data, int wait)
+{
+	if (smp_ops){
+		atomic_inc(&ipi_sent);
+		smp_ops->message_pass(target,msg,data,wait);
+	}
+}
 
 /*
  * Common functions
