@@ -1027,7 +1027,8 @@ void kbd_keycode(unsigned int keycode, int down)
 
 	if ((raw_mode = (kbd->kbdmode == VC_RAW)))
 		if (emulate_raw(vc, keycode, !down << 7))
-			printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
+			if (keycode < BTN_MISC)
+				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
 
 #ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
 	if (keycode == KEY_SYSRQ && !rep) {
