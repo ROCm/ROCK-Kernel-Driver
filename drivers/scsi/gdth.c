@@ -4,9 +4,11 @@
  * Intel Corporation:  Storage RAID Controllers                         *
  *                                                                      *
  * gdth.c                                                               *
- * Copyright (C) 1995-01 ICP vortex, an Intel company,  Achim Leubner   *
+ * Copyright (C) 1995-02 ICP vortex, an Intel company,  Achim Leubner   *
+ * <achim.leubner@intel.com>                                            *
  *                                                                      *
- * <achim@vortex.de>                                                    *
+ * Additions/Fixes: Boji Tony Kannanthanam                              *
+ * <boji.t.kannanthanam@intel.com>                                      *
  *                                                                      *
  * This program is free software; you can redistribute it and/or modify *
  * it under the terms of the GNU General Public License as published    *
@@ -22,9 +24,23 @@
  * along with this kernel; if not, write to the Free Software           *
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.            *
  *                                                                      *
- * Tested with Linux 1.2.13, ..., 2.2.19, ..., 2.4.7                    *
+ * Tested with Linux 1.2.13, ..., 2.2.20, ..., 2.4.18                   *
  *                                                                      *
  * $Log: gdth.c,v $
+ * Revision 1.61  2002/10/03 09:35:22  boji
+ * Fixed SCREENSERVICE intialisation in SMP cases.
+ * Added checks for gdth_polling before GDTH_HA_LOCK
+ *
+ * Revision 1.60  2002/02/05 09:35:22  achim
+ * MODULE_LICENSE only if kernel >= 2.4.11
+ *
+ * Revision 1.59  2002/01/30 09:46:33  achim
+ * Small changes
+ *
+ * Revision 1.58  2002/01/29 15:30:02  achim
+ * Set default value of shared_access to Y
+ * New status S_CACHE_RESERV for clustering added
+ *
  * Revision 1.57  2001/08/21 11:16:35  achim
  * Bugfix free_irq()
  *
@@ -232,7 +248,7 @@
  * Initial revision
  *
  ************************************************************************/
-#ident "$Id: gdth.c,v 1.57 2001/08/21 11:16:35 achim Exp $" 
+#ident "$Id: gdth.c,v 1.60 2002/02/05 09:35:22 achim Exp $" 
 
 /* All GDT Disk Array Controllers are fully supported by this driver.
  * This includes the PCI/EISA/ISA SCSI Disk Array Controllers and the
@@ -269,7 +285,7 @@
  *
  * The default values are: "gdth=disable:N,reserve_mode:1,reverse_scan:N,
  *                          max_ids:127,rescan:N,virt_ctr:N,hdr_channel:0,
- *                          shared_access:N".
+ *                          shared_access:Y".
  * Here is another example: "gdth=reserve_list:0,1,2,0,0,1,3,0,rescan:Y".
  * 
  * When loading the gdth driver as a module, the same options are available. 
@@ -670,7 +686,7 @@ static int rescan = 0;
 /* map channels to virtual controllers */
 static int virt_ctr = 0;
 /* shared access */
-static int shared_access = 0;
+static int shared_access = 1;
 
 #ifdef MODULE
 #if LINUX_VERSION_CODE >= 0x02011A
@@ -2343,12 +2359,13 @@ static void gdth_next(int hanum)
     register Scsi_Cmnd *nscp;
     unchar b, t, firsttime;
     unchar this_cmd, next_cmd;
-    ulong flags;
+    ulong flags = 0;
     int cmd_index;
 
     TRACE(("gdth_next() hanum %d\n",hanum));
     ha = HADATA(gdth_ctr_tab[hanum]);
-    GDTH_LOCK_HA(ha, flags);
+    if (!gdth_polling) 
+    	GDTH_LOCK_HA(ha, flags);
 
     ha->cmd_cnt = ha->cmd_offs_dpmem = 0;
     this_cmd = firsttime = TRUE;
@@ -2443,10 +2460,12 @@ static void gdth_next(int hanum)
                 if (!nscp->SCp.have_data_in)
                     nscp->SCp.have_data_in++;
                 else {
-                    GDTH_UNLOCK_HA(ha,flags);
+                    if (!gdth_polling) 
+                        GDTH_UNLOCK_HA(ha,flags);
                     /* io_request_lock already active ! */
                     nscp->scsi_done(nscp);
-                    GDTH_LOCK_HA(ha,flags);
+                    if (!gdth_polling) 
+                    	GDTH_LOCK_HA(ha,flags);
                 }
             }
         } else
@@ -2471,10 +2490,12 @@ static void gdth_next(int hanum)
             if (!nscp->SCp.have_data_in)
                 nscp->SCp.have_data_in++;
             else {
-                GDTH_UNLOCK_HA(ha,flags);
+                if (!gdth_polling) 
+                	GDTH_UNLOCK_HA(ha,flags);
                 /* io_request_lock already active ! */      
                 nscp->scsi_done(nscp);
-                GDTH_LOCK_HA(ha,flags);
+                if (!gdth_polling) 
+                	GDTH_LOCK_HA(ha,flags);
             }
         } else {
             switch (nscp->cmnd[0]) {
@@ -2500,16 +2521,20 @@ static void gdth_next(int hanum)
                     if (!nscp->SCp.have_data_in)
                         nscp->SCp.have_data_in++;
                     else {
-                        GDTH_UNLOCK_HA(ha,flags);
+                	if (!gdth_polling) 
+                        	GDTH_UNLOCK_HA(ha,flags);
                         /* io_request_lock already active ! */      
                         nscp->scsi_done(nscp);
-                        GDTH_LOCK_HA(ha,flags);
+                	if (!gdth_polling) 
+                        	GDTH_LOCK_HA(ha,flags);
                     }
                 } else if (gdth_internal_cache_cmd(hanum,nscp)) {
-                    GDTH_UNLOCK_HA(ha,flags);
+                    if (!gdth_polling) 
+                    	GDTH_UNLOCK_HA(ha,flags);
                     /* io_request_lock already active ! */      
                     nscp->scsi_done(nscp);
-                    GDTH_LOCK_HA(ha,flags);
+                    if (!gdth_polling) 
+                    	GDTH_LOCK_HA(ha,flags);
                 }
                 break;
 
@@ -2524,10 +2549,12 @@ static void gdth_next(int hanum)
                     if (!nscp->SCp.have_data_in)
                         nscp->SCp.have_data_in++;
                     else {
-                        GDTH_UNLOCK_HA(ha,flags);
+                    	if (!gdth_polling) 
+                        	GDTH_UNLOCK_HA(ha,flags);
                         /* io_request_lock already active ! */      
                         nscp->scsi_done(nscp);
-                        GDTH_LOCK_HA(ha,flags);
+                    	if (!gdth_polling) 
+                        	GDTH_LOCK_HA(ha,flags);
                     }
                 } else {
                     nscp->cmnd[3] = (ha->hdr[t].devtype&1) ? 1:0;
@@ -2562,10 +2589,12 @@ static void gdth_next(int hanum)
                     if (!nscp->SCp.have_data_in)
                         nscp->SCp.have_data_in++;
                     else {
-                        GDTH_UNLOCK_HA(ha,flags);
+                    	if (!gdth_polling) 
+                        	GDTH_UNLOCK_HA(ha,flags);
                         /* io_request_lock already active ! */      
                         nscp->scsi_done(nscp);
-                        GDTH_LOCK_HA(ha,flags);
+                    	if (!gdth_polling) 
+                        	GDTH_LOCK_HA(ha,flags);
                     }
                 } else if (!(cmd_index=gdth_fill_cache_cmd(hanum,nscp,t)))
                     this_cmd = FALSE;
@@ -2581,10 +2610,12 @@ static void gdth_next(int hanum)
                 if (!nscp->SCp.have_data_in)
                     nscp->SCp.have_data_in++;
                 else {
-                    GDTH_UNLOCK_HA(ha,flags);
+                    if (!gdth_polling) 
+                    	GDTH_UNLOCK_HA(ha,flags);
                     /* io_request_lock already active ! */  
                     nscp->scsi_done(nscp);
-                    GDTH_LOCK_HA(ha,flags);
+                    if (!gdth_polling) 
+                    	GDTH_LOCK_HA(ha,flags);
                 }
                 break;
             }
@@ -2604,7 +2635,8 @@ static void gdth_next(int hanum)
         gdth_release_event(hanum);
     }
 
-    GDTH_UNLOCK_HA(ha, flags);
+    if (!gdth_polling) 
+    	GDTH_UNLOCK_HA(ha, flags);
 
     if (gdth_polling && ha->cmd_cnt > 0) {
         if (!gdth_wait(hanum,cmd_index,POLL_TIMEOUT))
@@ -3512,9 +3544,13 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
                     ha->hdr[scp->target].cluster_type &= ~CLUSTER_RESERVED;
                 }
                 memset((char*)scp->sense_buffer,0,16);
-                scp->sense_buffer[0] = 0x70;
-                scp->sense_buffer[2] = NOT_READY;
-                scp->result = (DID_OK << 16) | (CHECK_CONDITION << 1);
+                if (ha->status == (ushort)S_CACHE_RESERV) {
+                    scp->result = (DID_OK << 16) | (RESERVATION_CONFLICT << 1);
+                } else {
+                    scp->sense_buffer[0] = 0x70;
+                    scp->sense_buffer[2] = NOT_READY;
+                    scp->result = (DID_OK << 16) | (CHECK_CONDITION << 1);
+                }
 #if LINUX_VERSION_CODE >= 0x010300
                 if (scp->done != gdth_scsi_done)
 #endif  
@@ -3981,6 +4017,7 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
         return 0;
     }
 
+    printk("GDT: Storage RAID Controller Driver. Version: %s \n",GDTH_VERSION_STR);
     /* initializations */
     gdth_polling = TRUE; b = 0;
     gdth_clear_events();
@@ -4215,6 +4252,7 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
         gdth_pci_str pcistr[MAXHA];
 
         cnt = gdth_search_pci(pcistr);
+	printk("GDT: Found %d PCI Storage RAID Controllers\n",cnt);
         gdth_sort_pci(pcistr,cnt);
         for (ctr = 0; ctr < cnt; ++ctr) {
             if (gdth_ctr_count >= MAXHA)
@@ -4229,8 +4267,8 @@ GDTH_INITFUNC(int, gdth_detect(Scsi_Host_Template *shtp))
                 continue;
             }
             /* controller found and initialized */
-            printk("Configuring GDT-PCI HA at %d/%d IRQ %u\n",
-                   pcistr[ctr].bus,PCI_SLOT(pcistr[ctr].device_fn),ha->irq);
+            printk("GDT CTR%d: Configuring GDT-PCI HA at %d/%d IRQ %u\n",
+                   ctr,pcistr[ctr].bus,PCI_SLOT(pcistr[ctr].device_fn),ha->irq);
 
 #if LINUX_VERSION_CODE >= 0x010346 
             if (request_irq(ha->irq, gdth_interrupt,
@@ -4703,9 +4741,7 @@ void gdth_halt(void)
     del_timer(&gdth_timer);
 #endif
 #if LINUX_VERSION_CODE >= 0x020100
-#if LINUX_VERSION_CODE < 0x020322
     unregister_reboot_notifier(&gdth_notifier);
-#endif
     return NOTIFY_OK;
 #endif
 }

@@ -176,11 +176,11 @@ hardware.
 	Locking: port_sem taken.
 	Interrupts: caller dependent.
 
-  change_speed(port,cflag,iflag,quot)
+  set_termios(port,termios,oldtermios)
 	Change the port parameters, including word length, parity, stop
 	bits.  Update read_status_mask and ignore_status_mask to indicate
 	the types of events we are interested in receiving.  Relevant
-	cflag bits are:
+	termios->c_cflag bits are:
 		CSIZE	- word size
 		CSTOPB	- 2 stop bits
 		PARENB	- parity enable
@@ -191,7 +191,7 @@ hardware.
 		CRTSCTS	- if set, enable CTS status change reporting
 		CLOCAL	- if not set, enable modem status change
 			  reporting.
-	Relevant iflag bits are:
+	Relevant termios->c_iflag bits are:
 		INPCK	- enable frame and parity error events to be
 			  passed to the TTY layer.
 		BRKINT
@@ -278,6 +278,35 @@ hardware.
 	Locking: none.
 	Interrupts: caller dependent.
 
+Other functions
+---------------
+
+uart_update_timeout(port,cflag,quot)
+	Update the FIFO drain timeout, port->timeout, according to the
+	number of bits, parity, stop bits and quotient.
+
+	Locking: caller is expected to take port->lock
+	Interrupts: n/a
+
+uart_get_baud_rate(port,termios)
+	Return the numeric baud rate for the specified termios, taking
+	account of the special 38400 baud "kludge".  The B0 baud rate
+	is mapped to 9600 baud.
+
+	Locking: caller dependent.
+	Interrupts: n/a
+
+uart_get_divisor(port,termios,oldtermios)
+	Return the divsor (baud_base / baud) for the selected baud rate
+	specified by termios.  If the baud rate is out of range, try
+	the original baud rate specified by oldtermios (if non-NULL).
+	If that fails, try 9600 baud.
+
+	If 38400 baud and custom divisor is selected, return the
+	custom divisor instead.
+
+	Locking: caller dependent.
+	Interrupts: n/a
 
 Other notes
 -----------
@@ -292,10 +321,3 @@ thus:
 		struct uart_port	port;
 		int			my_stuff;
 	};
-
-Todo
-----
-
-Please see the BUGS file in CVS at
-
-	http://cvs.arm.linux.org.uk/cgi/viewcvs.cgi/serial/BUGS

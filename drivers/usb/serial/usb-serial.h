@@ -231,7 +231,7 @@ struct usb_serial_device_type {
 	struct list_head	driver_list;
 	struct device_driver	driver;
 
-	int (*probe) (struct usb_serial *serial);
+	int (*probe) (struct usb_serial *serial, const struct usb_device_id *id);
 	int (*attach) (struct usb_serial *serial);
 	int (*calc_num_ports) (struct usb_serial *serial);
 

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,13 +52,13 @@
 
 acpi_status
 acpi_get_handle (
-	acpi_handle             parent,
-	acpi_string             pathname,
-	acpi_handle             *ret_handle)
+	acpi_handle                     parent,
+	acpi_string                     pathname,
+	acpi_handle                     *ret_handle)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node = NULL;
-	acpi_namespace_node     *prefix_node = NULL;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node = NULL;
+	struct acpi_namespace_node      *prefix_node = NULL;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -129,12 +129,12 @@ acpi_get_handle (
 
 acpi_status
 acpi_get_name (
-	acpi_handle             handle,
-	u32                     name_type,
-	acpi_buffer             *buffer)
+	acpi_handle                     handle,
+	u32                             name_type,
+	struct acpi_buffer              *buffer)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
 
 
 	/* Parameter validation */
@@ -209,15 +209,15 @@ unlock_and_exit:
 
 acpi_status
 acpi_get_object_info (
-	acpi_handle             handle,
-	acpi_device_info        *info)
+	acpi_handle                     handle,
+	struct acpi_device_info         *info)
 {
-	acpi_device_id          hid;
-	acpi_device_id          uid;
-	acpi_status             status;
-	u32                     device_status = 0;
-	acpi_integer            address = 0;
-	acpi_namespace_node     *node;
+	struct acpi_device_id           hid;
+	struct acpi_device_id           uid;
+	acpi_status                     status;
+	u32                             device_status = 0;
+	acpi_integer                    address = 0;
+	struct acpi_namespace_node      *node;
 
 
 	/* Parameter validation */

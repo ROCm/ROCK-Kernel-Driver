@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,12 +48,12 @@
 
 acpi_status
 acpi_ns_one_complete_parse (
-	u32                     pass_number,
-	acpi_table_desc         *table_desc)
+	u32                             pass_number,
+	struct acpi_table_desc          *table_desc)
 {
-	acpi_parse_object       *parse_root;
-	acpi_status             status;
-	acpi_walk_state         *walk_state;
+	union acpi_parse_object         *parse_root;
+	acpi_status                     status;
+	struct acpi_walk_state          *walk_state;
 
 
 	ACPI_FUNCTION_TRACE ("ns_one_complete_parse");
@@ -108,10 +108,10 @@ acpi_ns_one_complete_parse (
 
 acpi_status
 acpi_ns_parse_table (
-	acpi_table_desc         *table_desc,
-	acpi_namespace_node     *start_node)
+	struct acpi_table_desc          *table_desc,
+	struct acpi_namespace_node      *start_node)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ns_parse_table");

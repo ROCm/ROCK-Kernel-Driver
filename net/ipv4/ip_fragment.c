@@ -185,7 +185,7 @@ static __inline__ void ipq_put(struct ipq *ipq)
 /* Kill ipq entry. It is not destroyed immediately,
  * because caller (and someone more) holds reference count.
  */
-static __inline__ void ipq_kill(struct ipq *ipq)
+static void ipq_kill(struct ipq *ipq)
 {
 	if (del_timer(&ipq->timer))
 		atomic_dec(&ipq->refcnt);

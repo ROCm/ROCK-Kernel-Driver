@@ -1,5 +1,5 @@
 #
-# Makefile for the kernel character device drivers.
+# Makefile for the video capture/playback device drivers.
 #
 
 # All of the (potential) objects that export symbols.

@@ -122,7 +122,7 @@ td_free (struct ohci_hcd *hc, struct td *td)
 	if (*prev)
 		*prev = td->td_hash;
 	else
-		dev_dbg (*hc->hcd.controller, "bad hash for td %p\n", td);
+		dev_dbg (hc->hcd.controller, "bad hash for td %p\n", td);
 	pci_pool_free (hc->td_cache, td, td->td_dma);
 }
 

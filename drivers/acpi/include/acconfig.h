@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20021217
+#define ACPI_CA_VERSION                 0x20030109
 
 /* Version of ACPI supported */
 

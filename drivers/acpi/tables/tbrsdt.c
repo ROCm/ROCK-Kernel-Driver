@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,11 +45,11 @@
 
 acpi_status
 acpi_tb_verify_rsdp (
-	acpi_pointer            *address)
+	struct acpi_pointer             *address)
 {
-	acpi_table_desc         table_info;
-	acpi_status             status;
-	rsdp_descriptor         *rsdp;
+	struct acpi_table_desc          table_info;
+	acpi_status                     status;
+	struct rsdp_descriptor          *rsdp;
 
 
 	ACPI_FUNCTION_TRACE ("tb_verify_rsdp");
@@ -65,7 +65,7 @@ acpi_tb_verify_rsdp (
 		/*
 		 * Obtain access to the RSDP structure
 		 */
-		status = acpi_os_map_memory (address->pointer.physical, sizeof (rsdp_descriptor),
+		status = acpi_os_map_memory (address->pointer.physical, sizeof (struct rsdp_descriptor),
 				  (void **) &rsdp);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -104,8 +104,8 @@ acpi_tb_verify_rsdp (
 
 	/* The RSDP supplied is OK */
 
-	table_info.pointer     = ACPI_CAST_PTR (acpi_table_header, rsdp);
-	table_info.length      = sizeof (rsdp_descriptor);
+	table_info.pointer     = ACPI_CAST_PTR (struct acpi_table_header, rsdp);
+	table_info.length      = sizeof (struct rsdp_descriptor);
 	table_info.allocation  = ACPI_MEM_MAPPED;
 
 	/* Save the table pointers and allocation info */
@@ -117,7 +117,7 @@ acpi_tb_verify_rsdp (
 
 	/* Save the RSDP in a global for easy access */
 
-	acpi_gbl_RSDP = ACPI_CAST_PTR (rsdp_descriptor, table_info.pointer);
+	acpi_gbl_RSDP = ACPI_CAST_PTR (struct rsdp_descriptor, table_info.pointer);
 	return_ACPI_STATUS (status);
 
 
@@ -125,7 +125,7 @@ acpi_tb_verify_rsdp (
 cleanup:
 
 	if (acpi_gbl_table_flags & ACPI_PHYSICAL_POINTER) {
-		acpi_os_unmap_memory (rsdp, sizeof (rsdp_descriptor));
+		acpi_os_unmap_memory (rsdp, sizeof (struct rsdp_descriptor));
 	}
 	return_ACPI_STATUS (status);
 }
@@ -146,7 +146,7 @@ cleanup:
 
 void
 acpi_tb_get_rsdt_address (
-	acpi_pointer            *out_address)
+	struct acpi_pointer             *out_address)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -181,9 +181,9 @@ acpi_tb_get_rsdt_address (
 
 acpi_status
 acpi_tb_validate_rsdt (
-	acpi_table_header       *table_ptr)
+	struct acpi_table_header        *table_ptr)
 {
-	int                     no_match;
+	int                             no_match;
 
 
 	ACPI_FUNCTION_NAME ("tb_validate_rsdt");
@@ -237,9 +237,9 @@ acpi_status
 acpi_tb_get_table_rsdt (
 	void)
 {
-	acpi_table_desc         table_info;
-	acpi_status             status;
-	acpi_pointer            address;
+	struct acpi_table_desc          table_info;
+	acpi_status                     status;
+	struct acpi_pointer             address;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_table_rsdt");
@@ -287,7 +287,7 @@ acpi_tb_get_table_rsdt (
 		return_ACPI_STATUS (status);
 	}
 
-	acpi_gbl_XSDT = (xsdt_descriptor *) table_info.pointer;
+	acpi_gbl_XSDT = (XSDT_DESCRIPTOR *) table_info.pointer;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "XSDT located at %p\n", acpi_gbl_XSDT));
 	return_ACPI_STATUS (status);

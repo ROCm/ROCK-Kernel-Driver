@@ -553,118 +553,6 @@ static struct  xfrm_state *pfkey_xfrm_state_lookup(struct sadb_msg *hdr, void **
 	return x;
 }
 
-/* Table of algos supported by pfkeyv2 interface. */
-
-struct algo_desc {
-	char		*id;
-	struct sadb_alg desc;
-};
-
-struct algo_desc aalg_list[] = {
-{ .id	= NULL,
-	  .desc	= {
-		  .sadb_alg_id =	SADB_AALG_NONE,
-		  .sadb_alg_ivlen = 0,
-		  .sadb_alg_minbits = 0,
-		  .sadb_alg_maxbits = 0
-	  }
-},
-{ .id	= "md5",
-	  .desc	= {
-		  .sadb_alg_id =	SADB_AALG_MD5HMAC,
-		  .sadb_alg_ivlen = 0,
-		  .sadb_alg_minbits = 128,
-		  .sadb_alg_maxbits = 128
-	  }
-},
-{ .id	= "sha1",
-	  .desc	= {
-		  .sadb_alg_id =	SADB_AALG_SHA1HMAC,
-		  .sadb_alg_ivlen = 0,
-		  .sadb_alg_minbits = 160,
-		  .sadb_alg_maxbits = 160
-	  }
-}
-};
-
-struct algo_desc ealg_list[] = {
-{ .id	= NULL,
-	  .desc	= {
-		  .sadb_alg_id =	SADB_EALG_NONE,
-		  .sadb_alg_ivlen = 0,
-		  .sadb_alg_minbits = 0,
-		  .sadb_alg_maxbits = 2048
-	  }
-},
-{ .id	= "des",
-	  .desc	= {
-		  .sadb_alg_id =	SADB_EALG_DESCBC,
-		  .sadb_alg_ivlen = 8,
-		  .sadb_alg_minbits = 64,
-		  .sadb_alg_maxbits = 64
-	  }
-},
-{ .id	= "des3_ede",
-	  .desc	= {
-		  .sadb_alg_id =	SADB_EALG_3DESCBC,
-		  .sadb_alg_ivlen = 8,
-		  .sadb_alg_minbits = 192,
-		  .sadb_alg_maxbits = 192
-	  }
-}
-};
-
-static struct algo_desc *aalg_get_byid(int alg_id)	
-{
-	int i;
-
-	for (i=0; i<sizeof(aalg_list)/sizeof(aalg_list[0]); i++) {
-		if (aalg_list[i].desc.sadb_alg_id == alg_id)
-			return &aalg_list[i];
-	}
-	return NULL;
-}
-
-static struct algo_desc *ealg_get_byid(int alg_id)	
-{
-	int i;
-
-	for (i=0; i<sizeof(ealg_list)/sizeof(ealg_list[0]); i++) {
-		if (ealg_list[i].desc.sadb_alg_id == alg_id)
-			return &ealg_list[i];
-	}
-	return NULL;
-}
-
-static struct algo_desc *aalg_get_byname(char *name)	
-{
-	int i;
-
-	if (!name)
-		return NULL;
-
-	for (i=1; i<sizeof(aalg_list)/sizeof(aalg_list[0]); i++) {
-		if (strcmp(name, aalg_list[i].id) == 0)
-			return &aalg_list[i];
-	}
-	return NULL;
-}
-
-static struct algo_desc *ealg_get_byname(char *name)	
-{
-	int i;
-
-	if (!name)
-		return NULL;
-
-	for (i=1; i<sizeof(ealg_list)/sizeof(ealg_list[0]); i++) {
-		if (strcmp(name, ealg_list[i].id) == 0)
-			return &ealg_list[i];
-	}
-	return NULL;
-}
-
-
 #define PFKEY_ALIGN8(a) (1 + (((a) - 1) | (8 - 1)))
 static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys, int hsc)
 {
@@ -730,12 +618,12 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		sa->sadb_sa_state = SADB_SASTATE_DEAD;
 	sa->sadb_sa_auth = 0;
 	if (x->aalg) {
-		struct algo_desc *a = aalg_get_byname(x->aalg->alg_name);
+		struct xfrm_algo_desc *a = xfrm_aalg_get_byname(x->aalg->alg_name);
 		sa->sadb_sa_auth = a ? a->desc.sadb_alg_id : 0;
 	}
 	sa->sadb_sa_encrypt = 0;
 	if (x->ealg) {
-		struct algo_desc *a = ealg_get_byname(x->ealg->alg_name);
+		struct xfrm_algo_desc *a = xfrm_ealg_get_byname(x->ealg->alg_name);
 		sa->sadb_sa_encrypt = a ? a->desc.sadb_alg_id : 0;
 	}
 	sa->sadb_sa_flags = 0;
@@ -938,7 +826,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_AUTH-1];
 	if (sa->sadb_sa_auth) {
 		int keysize = 0;
-		struct algo_desc *a = aalg_get_byid(sa->sadb_sa_auth);
+		struct xfrm_algo_desc *a = xfrm_aalg_get_byid(sa->sadb_sa_auth);
 		if (!a)
 			goto out;
 		if (key)
@@ -946,7 +834,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		x->aalg = kmalloc(sizeof(*x->aalg) + keysize, GFP_KERNEL);
 		if (!x->aalg)
 			goto out;
-		strcpy(x->aalg->alg_name, a->id);
+		strcpy(x->aalg->alg_name, a->name);
 		x->aalg->alg_key_len = 0;
 		if (key) {
 			x->aalg->alg_key_len = key->sadb_key_bits;
@@ -958,7 +846,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	key = (struct sadb_key*) ext_hdrs[SADB_EXT_KEY_ENCRYPT-1];
 	if (sa->sadb_sa_encrypt) {
 		int keysize = 0;
-		struct algo_desc *a = ealg_get_byid(sa->sadb_sa_encrypt);
+		struct xfrm_algo_desc *a = xfrm_ealg_get_byid(sa->sadb_sa_encrypt);
 		if (!a)
 			goto out;
 		if (key)
@@ -966,7 +854,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		x->ealg = kmalloc(sizeof(*x->ealg) + keysize, GFP_KERNEL);
 		if (!x->ealg)
 			goto out;
-		strcpy(x->ealg->alg_name, a->id);
+		strcpy(x->ealg->alg_name, a->name);
 		x->ealg->alg_key_len = 0;
 		if (key) {
 			x->ealg->alg_key_len = key->sadb_key_bits;
@@ -1131,6 +1019,8 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 	struct xfrm_state *x;
 	struct xfrm_state *x1;
 
+	xfrm_probe_algs();
+	
 	x = pfkey_msg2xfrm_state(hdr, ext_hdrs);
 	if (IS_ERR(x))
 		return PTR_ERR(x);
@@ -1238,17 +1128,21 @@ static struct sk_buff *compose_sadb_supported(struct sadb_msg *orig, int allocat
 {
 	struct sk_buff *skb;
 	struct sadb_msg *hdr;
-	int len, ah_len, esp_len, i;
+	int len, auth_len, enc_len, i;
 
-	ah_len = sizeof(aalg_list)/sizeof(aalg_list[0]) - 1;
-	ah_len *= sizeof(struct sadb_alg);
-	esp_len = sizeof(ealg_list)/sizeof(ealg_list[0]) - 1;
-	esp_len *= sizeof(struct sadb_alg);
-	if (ah_len)
-		ah_len += sizeof(struct sadb_supported);
-	if (esp_len)
-		esp_len += sizeof(struct sadb_supported);
-	len = esp_len + ah_len + sizeof(struct sadb_msg);
+	auth_len = xfrm_count_auth_supported();
+	if (auth_len) {
+		auth_len *= sizeof(struct sadb_alg);
+		auth_len += sizeof(struct sadb_supported);
+	}
+	
+	enc_len = xfrm_count_enc_supported();
+	if (enc_len) {
+		enc_len *= sizeof(struct sadb_alg);
+		enc_len += sizeof(struct sadb_supported);
+	}
+	
+	len = enc_len + auth_len + sizeof(struct sadb_msg);
 
 	skb = alloc_skb(len + 16, allocation);
 	if (!skb)
@@ -1259,32 +1153,42 @@ static struct sk_buff *compose_sadb_supported(struct sadb_msg *orig, int allocat
 	hdr->sadb_msg_errno = 0;
 	hdr->sadb_msg_len = len / sizeof(uint64_t);
 
-	if (ah_len) {
+	if (auth_len) {
 		struct sadb_supported *sp;
 		struct sadb_alg *ap;
 
-		sp = (struct sadb_supported *) skb_put(skb, ah_len);
+		sp = (struct sadb_supported *) skb_put(skb, auth_len);
 		ap = (struct sadb_alg *) (sp + 1);
 
-		sp->sadb_supported_len = ah_len / sizeof(uint64_t);
+		sp->sadb_supported_len = auth_len / sizeof(uint64_t);
 		sp->sadb_supported_exttype = SADB_EXT_SUPPORTED_AUTH;
 
-		for (i=1; i<sizeof(aalg_list)/sizeof(aalg_list[0]); i++)
-			*ap++ = aalg_list[i].desc;
+		for (i = 0; ; i++) {
+			struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(i);
+			if (!aalg)
+				break;
+			if (aalg->available)
+				*ap++ = aalg->desc;
+		}
 	}
 
-	if (esp_len) {
+	if (enc_len) {
 		struct sadb_supported *sp;
 		struct sadb_alg *ap;
 
-		sp = (struct sadb_supported *) skb_put(skb, esp_len);
+		sp = (struct sadb_supported *) skb_put(skb, enc_len);
 		ap = (struct sadb_alg *) (sp + 1);
 
-		sp->sadb_supported_len = esp_len / sizeof(uint64_t);
+		sp->sadb_supported_len = enc_len / sizeof(uint64_t);
 		sp->sadb_supported_exttype = SADB_EXT_SUPPORTED_ENCRYPT;
 
-		for (i=1; i<sizeof(ealg_list)/sizeof(ealg_list[0]); i++)
-			*ap++ = ealg_list[i].desc;
+		for (i = 0; ; i++) {
+			struct xfrm_algo_desc *ealg = xfrm_ealg_get_byidx(i);
+			if (!ealg)
+				break;
+			if (ealg->available)
+				*ap++ = ealg->desc;
+		}
 	}
 
 out_put_algs:
@@ -1305,6 +1209,8 @@ static int pfkey_register(struct sock *sk, struct sk_buff *skb, struct sadb_msg 
 		pfk->registered |= (1<<hdr->sadb_msg_satype);
 	}
 
+	xfrm_probe_algs();
+	
 	supp_skb = compose_sadb_supported(hdr, GFP_KERNEL);
 	if (!supp_skb) {
 		if (hdr->sadb_msg_satype != SADB_SATYPE_UNSPEC)
@@ -1955,35 +1861,55 @@ static struct sadb_msg *pfkey_get_base_msg(struct sk_buff *skb, int *errp)
 	return hdr;
 }
 
-int count_ah_combs(struct xfrm_tmpl *t)
+static inline int aalg_tmpl_set(struct xfrm_tmpl *t, struct xfrm_algo_desc *d)
 {
-	int sz = 0;
-	int i;
+	return t->aalgos & (1 << d->desc.sadb_alg_id);
+}
 
-	for (i=1; i<sizeof(aalg_list)/sizeof(aalg_list[0]); i++) {
-		if (t->aalgos&(1<<aalg_list[i].desc.sadb_alg_id))
+static inline int ealg_tmpl_set(struct xfrm_tmpl *t, struct xfrm_algo_desc *d)
+{
+	return t->ealgos & (1 << d->desc.sadb_alg_id);
+}
+
+static int count_ah_combs(struct xfrm_tmpl *t)
+{
+	int i, sz = 0;
+
+	for (i = 0; ; i++) {
+		struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(i);
+		if (!aalg)
+			break;
+		if (aalg_tmpl_set(t, aalg) && aalg->available)
 			sz += sizeof(struct sadb_comb);
 	}
 	return sz + sizeof(struct sadb_prop);
 }
 
-int count_esp_combs(struct xfrm_tmpl *t)
+static int count_esp_combs(struct xfrm_tmpl *t)
 {
-	int sz = 0;
-	int i, k;
+	int i, k, sz = 0;
 
-	for (i=1; i<sizeof(ealg_list)/sizeof(ealg_list[0]); i++) {
-		if (!(t->ealgos&(1<<ealg_list[i].desc.sadb_alg_id)))
+	for (i = 0; ; i++) {
+		struct xfrm_algo_desc *ealg = xfrm_ealg_get_byidx(i);
+		if (!ealg)
+			break;
+			
+		if (!(ealg_tmpl_set(t, ealg) && ealg->available))
 			continue;
-		for (k=1; k<sizeof(aalg_list)/sizeof(aalg_list[0]); k++) {
-			if (t->aalgos&(1<<aalg_list[i].desc.sadb_alg_id))
+			
+		for (k = 1; ; k++) {
+			struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(k);
+			if (!aalg)
+				break;
+				
+			if (aalg_tmpl_set(t, aalg) && aalg->available)
 				sz += sizeof(struct sadb_comb);
 		}
 	}
 	return sz + sizeof(struct sadb_prop);
 }
 
-void dump_ah_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
+static void dump_ah_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 {
 	struct sadb_prop *p;
 	int i;
@@ -1993,15 +1919,19 @@ void dump_ah_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	p->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	p->sadb_prop_replay = 32;
 
-	for (i=1; i<sizeof(aalg_list)/sizeof(aalg_list[0]); i++) {
-		if (t->aalgos&(1<<aalg_list[i].desc.sadb_alg_id)) {
+	for (i = 0; ; i++) {
+		struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(i);
+		if (!aalg)
+			break;
+
+		if (aalg_tmpl_set(t, aalg) && aalg->available) {
 			struct sadb_comb *c;
 			c = (struct sadb_comb*)skb_put(skb, sizeof(struct sadb_comb));
 			memset(c, 0, sizeof(*c));
 			p->sadb_prop_len += sizeof(struct sadb_comb)/8;
-			c->sadb_comb_auth = aalg_list[i].desc.sadb_alg_id;
-			c->sadb_comb_auth_minbits = aalg_list[i].desc.sadb_alg_minbits;
-			c->sadb_comb_auth_maxbits = aalg_list[i].desc.sadb_alg_maxbits;
+			c->sadb_comb_auth = aalg->desc.sadb_alg_id;
+			c->sadb_comb_auth_minbits = aalg->desc.sadb_alg_minbits;
+			c->sadb_comb_auth_maxbits = aalg->desc.sadb_alg_maxbits;
 			c->sadb_comb_hard_addtime = 24*60*60;
 			c->sadb_comb_soft_addtime = 20*60*60;
 			c->sadb_comb_hard_usetime = 8*60*60;
@@ -2010,7 +1940,7 @@ void dump_ah_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	}
 }
 
-void dump_esp_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
+static void dump_esp_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 {
 	struct sadb_prop *p;
 	int i, k;
@@ -2020,22 +1950,30 @@ void dump_esp_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	p->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	p->sadb_prop_replay = 32;
 
-	for (i=1; i<sizeof(ealg_list)/sizeof(ealg_list[0]); i++) {
-		if (!(t->ealgos&(1<<ealg_list[i].desc.sadb_alg_id)))
+	for (i=0; ; i++) {
+		struct xfrm_algo_desc *ealg = xfrm_ealg_get_byidx(i);
+		if (!ealg)
+			break;
+	
+		if (!(ealg_tmpl_set(t, ealg) && ealg->available))
 			continue;
-		for (k=1; k<sizeof(aalg_list)/sizeof(aalg_list[0]); k++) {
+			
+		for (k = 1; ; k++) {
 			struct sadb_comb *c;
-			if (!(t->aalgos&(1<<aalg_list[i].desc.sadb_alg_id)))
+			struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(k);
+			if (!aalg)
+				break;
+			if (!(aalg_tmpl_set(t, aalg) && aalg->available))
 				continue;
 			c = (struct sadb_comb*)skb_put(skb, sizeof(struct sadb_comb));
 			memset(c, 0, sizeof(*c));
 			p->sadb_prop_len += sizeof(struct sadb_comb)/8;
-			c->sadb_comb_auth = aalg_list[k].desc.sadb_alg_id;
-			c->sadb_comb_auth_minbits = aalg_list[k].desc.sadb_alg_minbits;
-			c->sadb_comb_auth_maxbits = aalg_list[k].desc.sadb_alg_maxbits;
-			c->sadb_comb_encrypt = ealg_list[i].desc.sadb_alg_id;
-			c->sadb_comb_encrypt_minbits = ealg_list[i].desc.sadb_alg_minbits;
-			c->sadb_comb_encrypt_maxbits = ealg_list[i].desc.sadb_alg_maxbits;
+			c->sadb_comb_auth = aalg->desc.sadb_alg_id;
+			c->sadb_comb_auth_minbits = aalg->desc.sadb_alg_minbits;
+			c->sadb_comb_auth_maxbits = aalg->desc.sadb_alg_maxbits;
+			c->sadb_comb_encrypt = ealg->desc.sadb_alg_id;
+			c->sadb_comb_encrypt_minbits = ealg->desc.sadb_alg_minbits;
+			c->sadb_comb_encrypt_maxbits = ealg->desc.sadb_alg_maxbits;
 			c->sadb_comb_hard_addtime = 24*60*60;
 			c->sadb_comb_soft_addtime = 20*60*60;
 			c->sadb_comb_hard_usetime = 8*60*60;

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -55,14 +55,14 @@
 
 acpi_status
 acpi_ds_parse_method (
-	acpi_handle             obj_handle)
+	acpi_handle                     obj_handle)
 {
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
-	acpi_parse_object       *op;
-	acpi_namespace_node     *node;
-	acpi_owner_id           owner_id;
-	acpi_walk_state         *walk_state;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
+	union acpi_parse_object         *op;
+	struct acpi_namespace_node      *node;
+	acpi_owner_id                   owner_id;
+	struct acpi_walk_state          *walk_state;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_parse_method", obj_handle);
@@ -75,11 +75,11 @@ acpi_ds_parse_method (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Parsing [%4.4s] **** named_obj=%p\n",
-		((acpi_namespace_node *) obj_handle)->name.ascii, obj_handle));
+		((struct acpi_namespace_node *) obj_handle)->name.ascii, obj_handle));
 
 	/* Extract the method object from the method Node */
 
-	node = (acpi_namespace_node *) obj_handle;
+	node = (struct acpi_namespace_node *) obj_handle;
 	obj_desc = acpi_ns_get_attached_object (node);
 	if (!obj_desc) {
 		return_ACPI_STATUS (AE_NULL_OBJECT);
@@ -150,7 +150,7 @@ acpi_ds_parse_method (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 		"**** [%4.4s] Parsed **** named_obj=%p Op=%p\n",
-		((acpi_namespace_node *) obj_handle)->name.ascii, obj_handle, op));
+		((struct acpi_namespace_node *) obj_handle)->name.ascii, obj_handle, op));
 
 	acpi_ps_delete_parse_tree (op);
 	return_ACPI_STATUS (status);
@@ -177,11 +177,11 @@ acpi_ds_parse_method (
 
 acpi_status
 acpi_ds_begin_method_execution (
-	acpi_namespace_node     *method_node,
-	acpi_operand_object     *obj_desc,
-	acpi_namespace_node     *calling_method_node)
+	struct acpi_namespace_node      *method_node,
+	union acpi_operand_object       *obj_desc,
+	struct acpi_namespace_node      *calling_method_node)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_begin_method_execution", method_node);
@@ -242,15 +242,15 @@ acpi_ds_begin_method_execution (
 
 acpi_status
 acpi_ds_call_control_method (
-	acpi_thread_state       *thread,
-	acpi_walk_state         *this_walk_state,
-	acpi_parse_object       *op)
+	struct acpi_thread_state        *thread,
+	struct acpi_walk_state          *this_walk_state,
+	union acpi_parse_object         *op)
 {
-	acpi_status             status;
-	acpi_namespace_node     *method_node;
-	acpi_operand_object     *obj_desc;
-	acpi_walk_state         *next_walk_state;
-	u32                     i;
+	acpi_status                     status;
+	struct acpi_namespace_node      *method_node;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_walk_state          *next_walk_state;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_call_control_method", this_walk_state);
@@ -376,10 +376,10 @@ cleanup:
 
 acpi_status
 acpi_ds_restart_control_method (
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     *return_desc)
+	struct acpi_walk_state          *walk_state,
+	union acpi_operand_object       *return_desc)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_restart_control_method", walk_state);
@@ -431,11 +431,11 @@ acpi_ds_restart_control_method (
 
 acpi_status
 acpi_ds_terminate_control_method (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_namespace_node     *method_node;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *method_node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_terminate_control_method", walk_state);

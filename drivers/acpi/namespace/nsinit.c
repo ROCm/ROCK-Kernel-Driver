@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -49,8 +49,8 @@ acpi_status
 acpi_ns_initialize_objects (
 	void)
 {
-	acpi_status             status;
-	acpi_init_walk_info     info;
+	acpi_status                     status;
+	struct acpi_init_walk_info      info;
 
 
 	ACPI_FUNCTION_TRACE ("ns_initialize_objects");
@@ -62,7 +62,7 @@ acpi_ns_initialize_objects (
 
 	/* Set all init info to zero */
 
-	ACPI_MEMSET (&info, 0, sizeof (acpi_init_walk_info));
+	ACPI_MEMSET (&info, 0, sizeof (struct acpi_init_walk_info));
 
 	/* Walk entire namespace from the supplied root */
 
@@ -110,8 +110,8 @@ acpi_status
 acpi_ns_initialize_devices (
 	void)
 {
-	acpi_status             status;
-	acpi_device_walk_info   info;
+	acpi_status                     status;
+	struct acpi_device_walk_info    info;
 
 
 	ACPI_FUNCTION_TRACE ("ns_initialize_devices");
@@ -165,16 +165,16 @@ acpi_ns_initialize_devices (
 
 acpi_status
 acpi_ns_init_one_object (
-	acpi_handle             obj_handle,
-	u32                     level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_object_type        type;
-	acpi_status             status;
-	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
-	acpi_namespace_node     *node = (acpi_namespace_node *) obj_handle;
-	acpi_operand_object     *obj_desc;
+	acpi_object_type                type;
+	acpi_status                     status;
+	struct acpi_init_walk_info      *info = (struct acpi_init_walk_info *) context;
+	struct acpi_namespace_node      *node = (struct acpi_namespace_node *) obj_handle;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_NAME ("ns_init_one_object");
@@ -305,15 +305,15 @@ acpi_ns_init_one_object (
 
 acpi_status
 acpi_ns_init_one_device (
-	acpi_handle             obj_handle,
-	u32                     nesting_level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             nesting_level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_status             status;
-	acpi_namespace_node    *node;
-	u32                     flags;
-	acpi_device_walk_info  *info = (acpi_device_walk_info *) context;
+	acpi_status                     status;
+	struct acpi_namespace_node     *node;
+	u32                             flags;
+	struct acpi_device_walk_info   *info = (struct acpi_device_walk_info *) context;
 
 
 	ACPI_FUNCTION_TRACE ("ns_init_one_device");
@@ -372,7 +372,7 @@ acpi_ns_init_one_device (
 			/* Ignore error and move on to next device */
 
 	#ifdef ACPI_DEBUG_OUTPUT
-			char        *scope_name = acpi_ns_get_external_pathname (obj_handle);
+			char                *scope_name = acpi_ns_get_external_pathname (obj_handle);
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
 					scope_name, acpi_format_exception (status)));

@@ -88,10 +88,10 @@ acpi_pci_irq_find_prt_entry (
 
 static int
 acpi_pci_irq_add_entry (
-	acpi_handle		handle,
-	int			segment,
-	int			bus,
-	acpi_pci_routing_table	*prt)
+	acpi_handle			handle,
+	int				segment,
+	int				bus,
+	struct acpi_pci_routing_table	*prt)
 {
 	struct acpi_prt_entry	*entry = NULL;
 
@@ -157,12 +157,12 @@ acpi_pci_irq_add_prt (
 	int			segment,
 	int			bus)
 {
-	acpi_status		status = AE_OK;
-	char			pathname[ACPI_PATHNAME_MAX] = {0};
-	acpi_buffer		buffer = {0, NULL};
-	acpi_pci_routing_table	*prt = NULL;
-	acpi_pci_routing_table	*entry = NULL;
-	static int		first_time = 1;
+	acpi_status			status = AE_OK;
+	char				pathname[ACPI_PATHNAME_MAX] = {0};
+	struct acpi_buffer		buffer = {0, NULL};
+	struct acpi_pci_routing_table	*prt = NULL;
+	struct acpi_pci_routing_table	*entry = NULL;
+	static int			first_time = 1;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_add_prt");
 
@@ -215,7 +215,7 @@ acpi_pci_irq_add_prt (
 
 	while (entry && (entry->length > 0)) {
 		acpi_pci_irq_add_entry(handle, segment, bus, entry);
-		entry = (acpi_pci_routing_table *)
+		entry = (struct acpi_pci_routing_table *)
 			((unsigned long) entry + entry->length);
 	}
 

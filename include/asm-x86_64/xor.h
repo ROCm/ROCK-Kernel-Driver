@@ -51,7 +51,7 @@ typedef struct { unsigned long a,b; } __attribute__((aligned(16))) xmm_store_t;
 		: "memory");			\
 } while(0)
 
-#define XMMS_RESTORE				\
+#define XMMS_RESTORE do {			\
 	asm volatile (				\
 		"sfence			;\n\t"	\
 		"movups (%1),%%xmm0	;\n\t"	\

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -73,9 +73,9 @@
 
 u8
 acpi_ex_do_match (
-	u32                     match_op,
-	acpi_integer            package_value,
-	acpi_integer            match_value)
+	u32                             match_op,
+	acpi_integer                    package_value,
+	acpi_integer                    match_value)
 {
 
 	switch (match_op) {
@@ -148,13 +148,13 @@ acpi_ex_do_match (
 
 acpi_status
 acpi_ex_opcode_6A_0T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *return_desc = NULL;
-	acpi_status             status = AE_OK;
-	u32                     index;
-	acpi_operand_object     *this_element;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *return_desc = NULL;
+	acpi_status                     status = AE_OK;
+	u32                             index;
+	union acpi_operand_object       *this_element;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_6A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));

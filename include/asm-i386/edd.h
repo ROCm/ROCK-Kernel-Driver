@@ -48,7 +48,7 @@
 #define EDD_EXT_ENHANCED_DISK_DRIVE_SUPPORT (1 << 2)
 #define EDD_EXT_64BIT_EXTENSIONS            (1 << 3)
 
-#define EDD_INFO_DMA_BOUNDRY_ERROR_TRANSPARENT (1 << 0)
+#define EDD_INFO_DMA_BOUNDARY_ERROR_TRANSPARENT (1 << 0)
 #define EDD_INFO_GEOMETRY_VALID                (1 << 1)
 #define EDD_INFO_REMOVABLE                     (1 << 2)
 #define EDD_INFO_WRITE_VERIFY                  (1 << 3)

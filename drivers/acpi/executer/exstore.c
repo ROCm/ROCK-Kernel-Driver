@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@
  *
  * PARAMETERS:  *source_desc        - Value to be stored
  *              *dest_desc          - Where to store it.  Must be an NS node
- *                                    or an acpi_operand_object of type
+ *                                    or an union acpi_operand_object of type
  *                                    Reference;
  *              walk_state          - Current walk state
  *
@@ -57,12 +57,12 @@
 
 acpi_status
 acpi_ex_store (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *dest_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *dest_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *ref_desc = dest_desc;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *ref_desc = dest_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_store", dest_desc);
@@ -83,7 +83,7 @@ acpi_ex_store (
 		 * Storing an object into a Named node.
 		 */
 		status = acpi_ex_store_object_to_node (source_desc,
-				 (acpi_namespace_node *) dest_desc, walk_state);
+				 (struct acpi_namespace_node *) dest_desc, walk_state);
 
 		return_ACPI_STATUS (status);
 	}
@@ -237,14 +237,14 @@ acpi_ex_store (
 
 acpi_status
 acpi_ex_store_object_to_index (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *index_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *index_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *new_desc;
-	u8                      value = 0;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *new_desc;
+	u8                              value = 0;
 
 
 	ACPI_FUNCTION_TRACE ("ex_store_object_to_index");
@@ -390,14 +390,14 @@ acpi_ex_store_object_to_index (
 
 acpi_status
 acpi_ex_store_object_to_node (
-	acpi_operand_object     *source_desc,
-	acpi_namespace_node     *node,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *source_desc,
+	struct acpi_namespace_node      *node,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *target_desc;
-	acpi_operand_object     *new_desc;
-	acpi_object_type        target_type;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *target_desc;
+	union acpi_operand_object       *new_desc;
+	acpi_object_type                target_type;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_store_object_to_node", source_desc);

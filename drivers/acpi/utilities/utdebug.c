@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ void
 acpi_ut_init_stack_ptr_trace (
 	void)
 {
-	u32                 current_sp;
+	u32                         current_sp;
 
 
 	acpi_gbl_entry_stack_pointer = ACPI_PTR_DIFF (&current_sp, NULL);
@@ -75,7 +75,7 @@ void
 acpi_ut_track_stack_ptr (
 	void)
 {
-	acpi_size           current_sp;
+	acpi_size                   current_sp;
 
 
 	current_sp = ACPI_PTR_DIFF (&current_sp, NULL);
@@ -112,13 +112,13 @@ acpi_ut_track_stack_ptr (
 
 void  ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print (
-	u32                     requested_debug_level,
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	char                    *format,
+	u32                             requested_debug_level,
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	char                            *format,
 	...)
 {
-	u32                     thread_id;
+	u32                             thread_id;
 	va_list                 args;
 
 
@@ -183,10 +183,10 @@ acpi_ut_debug_print (
 
 void  ACPI_INTERNAL_VAR_XFACE
 acpi_ut_debug_print_raw (
-	u32                     requested_debug_level,
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	char                    *format,
+	u32                             requested_debug_level,
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	char                            *format,
 	...)
 {
 	va_list                 args;
@@ -221,8 +221,8 @@ acpi_ut_debug_print_raw (
 
 void
 acpi_ut_trace (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info)
 {
 
 	acpi_gbl_nesting_level++;
@@ -253,9 +253,9 @@ acpi_ut_trace (
 
 void
 acpi_ut_trace_ptr (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	void                    *pointer)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	void                            *pointer)
 {
 	acpi_gbl_nesting_level++;
 	acpi_ut_track_stack_ptr ();
@@ -285,9 +285,9 @@ acpi_ut_trace_ptr (
 
 void
 acpi_ut_trace_str (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	char                    *string)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	char                            *string)
 {
 
 	acpi_gbl_nesting_level++;
@@ -318,9 +318,9 @@ acpi_ut_trace_str (
 
 void
 acpi_ut_trace_u32 (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	u32                     integer)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	u32                             integer)
 {
 
 	acpi_gbl_nesting_level++;
@@ -350,8 +350,8 @@ acpi_ut_trace_u32 (
 
 void
 acpi_ut_exit (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info)
 {
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
@@ -381,9 +381,9 @@ acpi_ut_exit (
 
 void
 acpi_ut_status_exit (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	acpi_status             status)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	acpi_status                     status)
 {
 
 	if (ACPI_SUCCESS (status)) {
@@ -421,9 +421,9 @@ acpi_ut_status_exit (
 
 void
 acpi_ut_value_exit (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	acpi_integer            value)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	acpi_integer                    value)
 {
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
@@ -454,9 +454,9 @@ acpi_ut_value_exit (
 
 void
 acpi_ut_ptr_exit (
-	u32                     line_number,
-	acpi_debug_print_info   *dbg_info,
-	u8                      *ptr)
+	u32                             line_number,
+	struct acpi_debug_print_info    *dbg_info,
+	u8                              *ptr)
 {
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
@@ -485,15 +485,15 @@ acpi_ut_ptr_exit (
 
 void
 acpi_ut_dump_buffer (
-	u8                      *buffer,
-	u32                     count,
-	u32                     display,
-	u32                     component_id)
+	u8                              *buffer,
+	u32                             count,
+	u32                             display,
+	u32                             component_id)
 {
-	acpi_native_uint        i = 0;
-	acpi_native_uint        j;
-	u32                     temp32;
-	u8                      buf_char;
+	acpi_native_uint                i = 0;
+	acpi_native_uint                j;
+	u32                             temp32;
+	u8                              buf_char;
 
 
 	/* Only dump the buffer if tracing is enabled */

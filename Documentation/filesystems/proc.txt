@@ -1462,10 +1462,14 @@ routing issues.
 error_burst and error_cost
 --------------------------
 
-These parameters  are used to limit the warning messages written to the kernel
-log from  the  routing  code.  The  higher the error_cost factor is, the fewer
-messages will  be written. Error_burst controls when messages will be dropped.
-The default settings limit warning messages to one every five seconds.
+These  parameters  are used to limit how many ICMP destination unreachable to 
+send  from  the  host  in question. ICMP destination unreachable messages are 
+sent  when  we can not reach the next hop, while trying to transmit a packet. 
+It  will also print some error messages to kernel logs if someone is ignoring 
+our   ICMP  redirects.  The  higher  the  error_cost  factor  is,  the  fewer 
+destination  unreachable  and error messages will be let through. Error_burst 
+controls  when  destination  unreachable  messages and error messages will be
+dropped. The default settings limit warning messages to five every second.
 
 flush
 -----

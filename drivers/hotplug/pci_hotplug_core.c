@@ -596,7 +596,7 @@ static ssize_t power_read_file (struct file *file, char *buf, size_t count, loff
 
 	if (*offset < 0)
 		return -EINVAL;
-	if (count <= 0)
+	if (count == 0 || count > 16384)
 		return 0;
 	if (*offset != 0)
 		return 0;

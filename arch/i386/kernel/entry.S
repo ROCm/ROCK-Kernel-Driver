@@ -145,16 +145,16 @@ ENTRY(lcall7)
 				# gates, which has to be cleaned up later..
 	pushl %eax
 	SAVE_ALL
-	movl %esp, %ebx
-	pushl %ebx
+	movl %esp, %ebp
+	pushl %ebp
 	pushl $0x7
 do_lcall:
-	movl EIP(%ebx), %eax	# due to call gates, this is eflags, not eip..
-	movl CS(%ebx), %edx	# this is eip..
-	movl EFLAGS(%ebx), %ecx	# and this is cs..
-	movl %eax,EFLAGS(%ebx)	#
-	movl %edx,EIP(%ebx)	# Now we move them to their "normal" places
-	movl %ecx,CS(%ebx)	#
+	movl EIP(%ebp), %eax	# due to call gates, this is eflags, not eip..
+	movl CS(%ebp), %edx	# this is eip..
+	movl EFLAGS(%ebp), %ecx	# and this is cs..
+	movl %eax,EFLAGS(%ebp)	#
+	movl %edx,EIP(%ebp)	# Now we move them to their "normal" places
+	movl %ecx,CS(%ebp)	#
 
 	#
 	# Call gates don't clear TF and NT in eflags like
@@ -166,8 +166,8 @@ do_lcall:
 	pushl %eax
 	popfl
 
-	andl $-8192, %ebx	# GET_THREAD_INFO
-	movl TI_EXEC_DOMAIN(%ebx), %edx	# Get the execution domain
+	andl $-8192, %ebp	# GET_THREAD_INFO
+	movl TI_EXEC_DOMAIN(%ebp), %edx	# Get the execution domain
 	call *4(%edx)		# Call the lcall7 handler for the domain
 	addl $4, %esp
 	popl %eax
@@ -178,8 +178,8 @@ ENTRY(lcall27)
 				# gates, which has to be cleaned up later..
 	pushl %eax
 	SAVE_ALL
-	movl %esp, %ebx
-	pushl %ebx
+	movl %esp, %ebp
+	pushl %ebp
 	pushl $0x27
 	jmp do_lcall
 
@@ -187,7 +187,7 @@ ENTRY(lcall27)
 ENTRY(ret_from_fork)
 	# NOTE: this function takes a parameter but it's unused on x86.
 	call schedule_tail
-	GET_THREAD_INFO(%ebx)
+	GET_THREAD_INFO(%ebp)
 	jmp syscall_exit
 
 /*
@@ -202,7 +202,7 @@ ENTRY(ret_from_fork)
 ret_from_exception:
 	preempt_stop
 ret_from_intr:
-	GET_THREAD_INFO(%ebx)
+	GET_THREAD_INFO(%ebp)
 	movl EFLAGS(%esp), %eax		# mix EFLAGS and CS
 	movb CS(%esp), %al
 	testl $(VM_MASK | 3), %eax
@@ -211,7 +211,7 @@ ENTRY(resume_userspace)
  	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_FLAGS(%ebx), %ecx
+	movl TI_FLAGS(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done on
 					# int/exception return?
 	jne work_pending
@@ -219,18 +219,18 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	cmpl $0,TI_PRE_COUNT(%ebx)	# non-zero preempt_count ?
+	cmpl $0,TI_PRE_COUNT(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
 need_resched:
-	movl TI_FLAGS(%ebx), %ecx	# need_resched set ?
+	movl TI_FLAGS(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
 	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (execption path) ?
 	jz restore_all
-	movl $PREEMPT_ACTIVE,TI_PRE_COUNT(%ebx)
+	movl $PREEMPT_ACTIVE,TI_PRE_COUNT(%ebp)
 	sti
 	call schedule
-	movl $0,TI_PRE_COUNT(%ebx) 
+	movl $0,TI_PRE_COUNT(%ebp)
 	cli
 	jmp need_resched
 #endif
@@ -262,21 +262,21 @@ ENTRY(sysenter_entry)
 
 	pushl %eax
 	SAVE_ALL
-	GET_THREAD_INFO(%ebx)
+	GET_THREAD_INFO(%ebp)
 	cmpl $(NR_syscalls), %eax
 	jae syscall_badsys
 
-	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebx)
+	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
 	jnz syscall_trace_entry
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)
 	cli
-	movl TI_FLAGS(%ebx), %ecx
+	movl TI_FLAGS(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx
 	jne syscall_exit_work
-	RESTORE_INT_REGS
-	movl 12(%esp),%edx
-	movl 24(%esp),%ecx
+/* if something modifies registers it must also disable sysexit */
+	movl EIP(%esp), %edx
+	movl OLDESP(%esp), %ecx
 	sti
 	sysexit
 
@@ -286,11 +286,11 @@ ENTRY(sysenter_entry)
 ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
-	GET_THREAD_INFO(%ebx)
+	GET_THREAD_INFO(%ebp)
 	cmpl $(NR_syscalls), %eax
 	jae syscall_badsys
 					# system call tracing in operation
-	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebx)
+	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
 	jnz syscall_trace_entry
 syscall_call:
 	call *sys_call_table(,%eax,4)
@@ -299,7 +299,7 @@ syscall_exit:
 	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_FLAGS(%ebx), %ecx
+	movl TI_FLAGS(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work
 restore_all:
@@ -315,7 +315,7 @@ work_resched:
 	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-	movl TI_FLAGS(%ebx), %ecx
+	movl TI_FLAGS(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other
 					# than syscall tracing?
 	jz restore_all
@@ -370,7 +370,7 @@ syscall_exit_work:
 syscall_fault:
 	pushl %eax			# save orig_eax
 	SAVE_ALL
-	GET_THREAD_INFO(%ebx)
+	GET_THREAD_INFO(%ebp)
 	movl $-EFAULT,EAX(%esp)
 	jmp resume_userspace
 

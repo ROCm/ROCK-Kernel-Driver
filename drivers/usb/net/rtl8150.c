@@ -21,7 +21,7 @@
 #include <asm/uaccess.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v0.5.6 (2002/09/19)"
+#define DRIVER_VERSION "v0.5.7 (2002/12/31)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "rtl8150 based usb-ethernet driver"
 
@@ -640,6 +640,9 @@ static int rtl8150_open(struct net_device *netdev)
 		return -ENOMEM;
 
 	down(&dev->sem);
+
+	set_registers(dev, IDR, 6, netdev->dev_addr);
+	
 	usb_fill_bulk_urb(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
 	if ((res = usb_submit_urb(dev->rx_urb, GFP_KERNEL)))

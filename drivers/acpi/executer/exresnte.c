@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -62,22 +62,22 @@
 
 acpi_status
 acpi_ex_resolve_node_to_value (
-	acpi_namespace_node     **object_ptr,
-	acpi_walk_state         *walk_state)
+	struct acpi_namespace_node      **object_ptr,
+	struct acpi_walk_state          *walk_state)
 
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *source_desc;
-	acpi_operand_object     *obj_desc = NULL;
-	acpi_namespace_node     *node;
-	acpi_object_type        entry_type;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *source_desc;
+	union acpi_operand_object       *obj_desc = NULL;
+	struct acpi_namespace_node      *node;
+	acpi_object_type                entry_type;
 
 
 	ACPI_FUNCTION_TRACE ("ex_resolve_node_to_value");
 
 
 	/*
-	 * The stack pointer points to a acpi_namespace_node (Node).  Get the
+	 * The stack pointer points to a struct acpi_namespace_node (Node).  Get the
 	 * object that is attached to the Node.
 	 */
 	node       = *object_ptr;
@@ -90,7 +90,7 @@ acpi_ex_resolve_node_to_value (
 	if (entry_type == ACPI_TYPE_LOCAL_ALIAS) {
 		/* There is always exactly one level of indirection */
 
-		node       = (acpi_namespace_node *) node->object;
+		node       = (struct acpi_namespace_node *) node->object;
 		source_desc = acpi_ns_get_attached_object (node);
 		entry_type = acpi_ns_get_type ((acpi_handle) node);
 		*object_ptr = node;

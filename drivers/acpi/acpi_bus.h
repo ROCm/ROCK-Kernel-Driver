@@ -44,9 +44,24 @@ struct acpi_handle_list {
 
 
 /* acpi_utils.h */
-acpi_status acpi_extract_package (acpi_object *, acpi_buffer *, acpi_buffer *);
-acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *, unsigned long *);
-acpi_status acpi_evaluate_reference (acpi_handle, acpi_string, acpi_object_list *, struct acpi_handle_list *);
+acpi_status
+acpi_extract_package (
+	union acpi_object       *package,
+	struct acpi_buffer      *format,
+	struct acpi_buffer      *buffer);
+acpi_status
+acpi_evaluate_integer (
+	acpi_handle             handle,
+	acpi_string             pathname,
+	struct acpi_object_list *arguments,
+	unsigned long           *data);
+acpi_status
+acpi_evaluate_reference (
+	acpi_handle             handle,
+	acpi_string             pathname,
+	struct acpi_object_list *arguments,
+	struct acpi_handle_list *list);
+
 
 #ifdef CONFIG_ACPI_BUS
 

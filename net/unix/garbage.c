@@ -92,7 +92,7 @@ static unix_socket *gc_current=GC_HEAD;	/* stack of objects to mark */
 atomic_t unix_tot_inflight = ATOMIC_INIT(0);
 
 
-extern inline unix_socket *unix_get_socket(struct file *filp)
+static unix_socket *unix_get_socket(struct file *filp)
 {
 	unix_socket * u_sock = NULL;
 	struct inode *inode = filp->f_dentry->d_inode;
@@ -141,19 +141,19 @@ void unix_notinflight(struct file *fp)
  *	Garbage Collector Support Functions
  */
 
-extern inline unix_socket *pop_stack(void)
+static inline unix_socket *pop_stack(void)
 {
 	unix_socket *p=gc_current;
 	gc_current = unix_sk(p)->gc_tree;
 	return p;
 }
 
-extern inline int empty_stack(void)
+static inline int empty_stack(void)
 {
 	return gc_current == GC_HEAD;
 }
 
-extern inline void maybe_unmark_and_push(unix_socket *x)
+static void maybe_unmark_and_push(unix_socket *x)
 {
 	struct unix_sock *u = unix_sk(x);
 

@@ -81,6 +81,7 @@ struct ehci_hcd {			/* one per controller */
 	struct pci_pool		*sitd_pool;	/* sitd per split iso urb */
 
 	struct timer_list	watchdog;
+	unsigned		stamp;
 
 #ifdef EHCI_STATS
 	struct ehci_stats	stats;
@@ -306,6 +307,7 @@ struct ehci_qh {
 	struct ehci_qtd		*dummy;
 
 	atomic_t		refcount;
+	unsigned		stamp;
 
 	u8			qh_state;
 #define	QH_STATE_LINKED		1		/* HC sees this */

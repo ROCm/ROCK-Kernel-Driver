@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,13 +53,13 @@
 
 acpi_status
 acpi_ns_attach_object (
-	acpi_namespace_node     *node,
-	acpi_operand_object     *object,
-	acpi_object_type        type)
+	struct acpi_namespace_node      *node,
+	union acpi_operand_object       *object,
+	acpi_object_type                type)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *last_obj_desc;
-	acpi_object_type        object_type = ACPI_TYPE_ANY;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *last_obj_desc;
+	acpi_object_type                object_type = ACPI_TYPE_ANY;
 
 
 	ACPI_FUNCTION_TRACE ("ns_attach_object");
@@ -110,13 +110,13 @@ acpi_ns_attach_object (
 	 * we will use that (attached) object
 	 */
 	else if ((ACPI_GET_DESCRIPTOR_TYPE (object) == ACPI_DESC_TYPE_NAMED) &&
-			((acpi_namespace_node *) object)->object) {
+			((struct acpi_namespace_node *) object)->object) {
 		/*
 		 * Value passed is a name handle and that name has a
 		 * non-null value.  Use that name's value and type.
 		 */
-		obj_desc   = ((acpi_namespace_node *) object)->object;
-		object_type = ((acpi_namespace_node *) object)->type;
+		obj_desc   = ((struct acpi_namespace_node *) object)->object;
+		object_type = ((struct acpi_namespace_node *) object)->type;
 	}
 
 	/*
@@ -124,7 +124,7 @@ acpi_ns_attach_object (
 	 * it first
 	 */
 	else {
-		obj_desc = (acpi_operand_object *) object;
+		obj_desc = (union acpi_operand_object   *) object;
 
 		/* Use the given type */
 
@@ -184,9 +184,9 @@ acpi_ns_attach_object (
 
 void
 acpi_ns_detach_object (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
-	acpi_operand_object     *obj_desc;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ns_detach_object");
@@ -237,9 +237,9 @@ acpi_ns_detach_object (
  *
  ******************************************************************************/
 
-acpi_operand_object *
+union acpi_operand_object *
 acpi_ns_get_attached_object (
-	acpi_namespace_node     *node)
+	struct acpi_namespace_node      *node)
 {
 	ACPI_FUNCTION_TRACE_PTR ("ns_get_attached_object", node);
 
@@ -273,9 +273,9 @@ acpi_ns_get_attached_object (
  *
  ******************************************************************************/
 
-acpi_operand_object *
+union acpi_operand_object *
 acpi_ns_get_secondary_object (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
 	ACPI_FUNCTION_TRACE_PTR ("ns_get_secondary_object", obj_desc);
 
@@ -307,13 +307,13 @@ acpi_ns_get_secondary_object (
 
 acpi_status
 acpi_ns_attach_data (
-	acpi_namespace_node     *node,
-	acpi_object_handler     handler,
-	void                    *data)
+	struct acpi_namespace_node      *node,
+	acpi_object_handler             handler,
+	void                            *data)
 {
-	acpi_operand_object     *prev_obj_desc;
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *data_desc;
+	union acpi_operand_object       *prev_obj_desc;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *data_desc;
 
 
 	/* We only allow one attachment per handler */
@@ -369,11 +369,11 @@ acpi_ns_attach_data (
 
 acpi_status
 acpi_ns_detach_data (
-	acpi_namespace_node     *node,
-	acpi_object_handler     handler)
+	struct acpi_namespace_node      *node,
+	acpi_object_handler             handler)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *prev_obj_desc;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *prev_obj_desc;
 
 
 	prev_obj_desc = NULL;
@@ -417,11 +417,11 @@ acpi_ns_detach_data (
 
 acpi_status
 acpi_ns_get_attached_data (
-	acpi_namespace_node     *node,
-	acpi_object_handler     handler,
-	void                    **data)
+	struct acpi_namespace_node      *node,
+	acpi_object_handler             handler,
+	void                            **data)
 {
-	acpi_operand_object     *obj_desc;
+	union acpi_operand_object       *obj_desc;
 
 
 	obj_desc = node->object;

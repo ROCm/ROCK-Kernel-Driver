@@ -45,7 +45,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.5.8 (2002/12/13)"
+#define DRIVER_VERSION "v0.5.9 (2002/12/31)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
@@ -866,6 +866,9 @@ static int pegasus_open(struct net_device *net)
 		return -ENOMEM;
 
 	down(&pegasus->sem);
+
+	set_registers(pegasus, EthID, 6, net->dev_addr);
+	
 	usb_fill_bulk_urb(pegasus->rx_urb, pegasus->usb,
 			  usb_rcvbulkpipe(pegasus->usb, 1),
 			  pegasus->rx_skb->data, PEGASUS_MTU + 8,

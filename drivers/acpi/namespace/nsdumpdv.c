@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,14 +48,14 @@
 
 acpi_status
 acpi_ns_dump_one_device (
-	acpi_handle             obj_handle,
-	u32                     level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_device_info        info;
-	acpi_status             status;
-	u32                     i;
+	struct acpi_device_info         info;
+	acpi_status                     status;
+	u32                             i;
 
 
 	ACPI_FUNCTION_NAME ("ns_dump_one_device");
@@ -92,8 +92,8 @@ acpi_ns_dump_one_device (
 void
 acpi_ns_dump_root_devices (void)
 {
-	acpi_handle             sys_bus_handle;
-	acpi_status             status;
+	acpi_handle                     sys_bus_handle;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_NAME ("ns_dump_root_devices");

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,12 +53,12 @@
 
 void
 acpi_ex_dump_operand (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	u8                      *buf = NULL;
-	u32                     length;
-	acpi_operand_object     **element;
-	u16                     element_index;
+	u8                              *buf = NULL;
+	u32                             length;
+	union acpi_operand_object       **element;
+	u16                             element_index;
 
 
 	ACPI_FUNCTION_NAME ("ex_dump_operand")
@@ -86,7 +86,7 @@ acpi_ex_dump_operand (
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p is not a local object\n", obj_desc));
-		ACPI_DUMP_BUFFER (obj_desc, sizeof (acpi_operand_object));
+		ACPI_DUMP_BUFFER (obj_desc, sizeof (union acpi_operand_object));
 		return;
 	}
 
@@ -383,16 +383,16 @@ acpi_ex_dump_operand (
 
 void
 acpi_ex_dump_operands (
-	acpi_operand_object     **operands,
-	acpi_interpreter_mode   interpreter_mode,
-	char                    *ident,
-	u32                     num_levels,
-	char                    *note,
-	char                    *module_name,
-	u32                     line_number)
+	union acpi_operand_object       **operands,
+	acpi_interpreter_mode           interpreter_mode,
+	char                            *ident,
+	u32                             num_levels,
+	char                            *note,
+	char                            *module_name,
+	u32                             line_number)
 {
-	acpi_native_uint        i;
-	acpi_operand_object     **obj_desc;
+	acpi_native_uint                i;
+	union acpi_operand_object       **obj_desc;
 
 
 	ACPI_FUNCTION_NAME ("ex_dump_operands");
@@ -443,32 +443,32 @@ acpi_ex_dump_operands (
 
 void
 acpi_ex_out_string (
-	char                    *title,
-	char                    *value)
+	char                            *title,
+	char                            *value)
 {
 	acpi_os_printf ("%20s : %s\n", title, value);
 }
 
 void
 acpi_ex_out_pointer (
-	char                    *title,
-	void                    *value)
+	char                            *title,
+	void                            *value)
 {
 	acpi_os_printf ("%20s : %p\n", title, value);
 }
 
 void
 acpi_ex_out_integer (
-	char                    *title,
-	u32                     value)
+	char                            *title,
+	u32                             value)
 {
 	acpi_os_printf ("%20s : %X\n", title, value);
 }
 
 void
 acpi_ex_out_address (
-	char                    *title,
-	acpi_physical_address   value)
+	char                            *title,
+	acpi_physical_address           value)
 {
 
 #if ACPI_MACHINE_WIDTH == 16
@@ -493,8 +493,8 @@ acpi_ex_out_address (
 
 void
 acpi_ex_dump_node (
-	acpi_namespace_node     *node,
-	u32                     flags)
+	struct acpi_namespace_node      *node,
+	u32                             flags)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -531,10 +531,10 @@ acpi_ex_dump_node (
 
 void
 acpi_ex_dump_object_descriptor (
-	acpi_operand_object     *obj_desc,
-	u32                     flags)
+	union acpi_operand_object       *obj_desc,
+	u32                             flags)
 {
-	u32                     i;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ex_dump_object_descriptor");
@@ -547,9 +547,9 @@ acpi_ex_dump_object_descriptor (
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) {
-		acpi_ex_dump_node ((acpi_namespace_node *) obj_desc, flags);
-		acpi_os_printf ("\nAttached Object (%p):\n", ((acpi_namespace_node *) obj_desc)->object);
-		acpi_ex_dump_object_descriptor (((acpi_namespace_node *) obj_desc)->object, flags);
+		acpi_ex_dump_node ((struct acpi_namespace_node *) obj_desc, flags);
+		acpi_os_printf ("\nAttached Object (%p):\n", ((struct acpi_namespace_node *) obj_desc)->object);
+		acpi_ex_dump_object_descriptor (((struct acpi_namespace_node *) obj_desc)->object, flags);
 		return;
 	}
 

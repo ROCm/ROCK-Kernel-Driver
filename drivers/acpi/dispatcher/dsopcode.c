@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,15 +52,15 @@
 
 acpi_status
 acpi_ds_execute_arguments (
-	acpi_namespace_node     *node,
-	acpi_namespace_node     *scope_node,
-	u32                     aml_length,
-	u8                      *aml_start)
+	struct acpi_namespace_node      *node,
+	struct acpi_namespace_node      *scope_node,
+	u32                             aml_length,
+	u8                              *aml_start)
 {
-	acpi_status             status;
-	acpi_parse_object       *op;
-	acpi_walk_state         *walk_state;
-	acpi_parse_object       *arg;
+	acpi_status                     status;
+	union acpi_parse_object         *op;
+	struct acpi_walk_state          *walk_state;
+	union acpi_parse_object         *arg;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_ds_execute_arguments");
@@ -153,11 +153,11 @@ acpi_ds_execute_arguments (
 
 acpi_status
 acpi_ds_get_buffer_field_arguments (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_operand_object     *extra_desc;
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	union acpi_operand_object       *extra_desc;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_buffer_field_arguments", obj_desc);
@@ -199,10 +199,10 @@ acpi_ds_get_buffer_field_arguments (
 
 acpi_status
 acpi_ds_get_buffer_arguments (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_buffer_arguments", obj_desc);
@@ -246,10 +246,10 @@ acpi_ds_get_buffer_arguments (
 
 acpi_status
 acpi_ds_get_package_arguments (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_package_arguments", obj_desc);
@@ -293,11 +293,11 @@ acpi_ds_get_package_arguments (
 
 acpi_status
 acpi_ds_get_region_arguments (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_operand_object     *extra_desc;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	union acpi_operand_object       *extra_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_region_arguments", obj_desc);
@@ -342,10 +342,10 @@ acpi_ds_get_region_arguments (
 
 acpi_status
 acpi_ds_initialize_region (
-	acpi_handle             obj_handle)
+	acpi_handle                     obj_handle)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	obj_desc = acpi_ns_get_attached_object (obj_handle);
@@ -376,18 +376,18 @@ acpi_ds_initialize_region (
 
 acpi_status
 acpi_ds_init_buffer_field (
-	u16                     aml_opcode,
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     *buffer_desc,
-	acpi_operand_object     *offset_desc,
-	acpi_operand_object     *length_desc,
-	acpi_operand_object     *result_desc)
+	u16                             aml_opcode,
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       *buffer_desc,
+	union acpi_operand_object       *offset_desc,
+	union acpi_operand_object       *length_desc,
+	union acpi_operand_object       *result_desc)
 {
-	u32                     offset;
-	u32                     bit_offset;
-	u32                     bit_count;
-	u8                      field_flags;
-	acpi_status             status;
+	u32                             offset;
+	u32                             bit_offset;
+	u32                             bit_count;
+	u8                              field_flags;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_init_buffer_field", obj_desc);
@@ -558,13 +558,13 @@ cleanup:
 
 acpi_status
 acpi_ds_eval_buffer_field_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op)
 {
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
-	acpi_namespace_node     *node;
-	acpi_parse_object       *next_op;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *node;
+	union acpi_parse_object         *next_op;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_eval_buffer_field_operands", op);
@@ -645,14 +645,14 @@ acpi_ds_eval_buffer_field_operands (
 
 acpi_status
 acpi_ds_eval_region_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op)
 {
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *operand_desc;
-	acpi_namespace_node     *node;
-	acpi_parse_object       *next_op;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *operand_desc;
+	struct acpi_namespace_node      *node;
+	union acpi_parse_object         *next_op;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_eval_region_operands", op);
@@ -743,13 +743,13 @@ acpi_ds_eval_region_operands (
 
 acpi_status
 acpi_ds_eval_data_object_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_operand_object     *obj_desc)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	union acpi_operand_object       *obj_desc)
 {
-	acpi_status             status;
-	acpi_operand_object     *arg_desc;
-	u32                     length;
+	acpi_status                     status;
+	union acpi_operand_object       *arg_desc;
+	u32                             length;
 
 
 	ACPI_FUNCTION_TRACE ("ds_eval_data_object_operands");
@@ -836,11 +836,11 @@ acpi_ds_eval_data_object_operands (
 
 acpi_status
 acpi_ds_exec_begin_control_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op)
 {
-	acpi_status             status = AE_OK;
-	acpi_generic_state      *control_state;
+	acpi_status                     status = AE_OK;
+	union acpi_generic_state        *control_state;
 
 
 	ACPI_FUNCTION_NAME ("ds_exec_begin_control_op");
@@ -916,11 +916,11 @@ acpi_ds_exec_begin_control_op (
 
 acpi_status
 acpi_ds_exec_end_control_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op)
 {
-	acpi_status             status = AE_OK;
-	acpi_generic_state      *control_state;
+	acpi_status                     status = AE_OK;
+	union acpi_generic_state        *control_state;
 
 
 	ACPI_FUNCTION_NAME ("ds_exec_end_control_op");

@@ -637,8 +637,12 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	u32			status = readl (&ehci->regs->status);
+	u32			status;
 	int			bh;
+
+	spin_lock (&ehci->lock);
+
+	status = readl (&ehci->regs->status);
 
 	/* e.g. cardbus physical eject */
 	if (status == ~(u32) 0) {
@@ -648,9 +652,7 @@ static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 
 	status &= INTR_MASK;
 	if (!status)			/* irq sharing? */
-		return;
-
-	spin_lock (&ehci->lock);
+		goto done;
 
 	/* clear (just) interrupts */
 	writel (status, &ehci->regs->status);
@@ -693,6 +695,7 @@ dead:
 
 	if (bh)
 		ehci_work (ehci, regs);
+done:
 	spin_unlock (&ehci->lock);
 }
 
