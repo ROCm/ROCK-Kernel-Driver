@@ -124,14 +124,25 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 		unsigned int length = le16_to_cpu(config->wTotalLength);
 
 		if (*ppos < pos + length) {
+
+			/* The descriptor may claim to be longer than it
+			 * really is.  Here is the actual allocated length. */
+			unsigned alloclen =
+				ps->dev->config[i].desc.wTotalLength;
+
 			len = length - (*ppos - pos);
 			if (len > nbytes)
 				len = nbytes;
 
-			if (copy_to_user(buf,
-			    ps->dev->rawdescriptors[i] + (*ppos - pos), len)) {
-				ret = -EFAULT;
-				goto err;
+			/* Simply don't write (skip over) unallocated parts */
+			if (alloclen > (*ppos - pos)) {
+				alloclen -= (*ppos - pos);
+				if (copy_to_user(buf,
+				    ps->dev->rawdescriptors[i] + (*ppos - pos),
+				    min(len, alloclen))) {
+					ret = -EFAULT;
+					goto err;
+				}
 			}
 
 			*ppos += len;
