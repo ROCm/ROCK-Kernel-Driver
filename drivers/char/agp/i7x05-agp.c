@@ -8,7 +8,7 @@ static int intel_7505_fetch_size(void)
 {
 	int i;
 	u16 tmp;
-	aper_size_info_16 *values;
+	struct aper_size_info_16 *values;
 
 	/* 
 	 * For AGP 3.0 APSIZE is now 16 bits
@@ -41,7 +41,7 @@ static void intel_7505_tlbflush(agp_memory *mem)
 
 static void intel_7505_cleanup(void)
 {
-	aper_size_info_16 *previous_size;
+	struct aper_size_info_16 *previous_size;
 
 	previous_size = A_SIZE_16(agp_bridge->previous_size);
 	pci_write_config_byte(agp_bridge->dev, INTEL_I7505_APSIZE,
@@ -52,7 +52,7 @@ static void intel_7505_cleanup(void)
 static int intel_7505_configure(void)
 {
 	u32 temp;
-	aper_size_info_16 *current_size;
+	struct aper_size_info_16 *current_size;
 	
 	current_size = A_SIZE_16(agp_bridge->current_size);
 
@@ -76,7 +76,7 @@ static int intel_7505_configure(void)
 	return 0;
 }
 
-static aper_size_info_16 intel_7505_sizes[7] =
+static struct aper_size_info_16 intel_7505_sizes[7] =
 {
 	{256, 65536, 6, 0xf00},
 	{128, 32768, 5, 0xf20},
@@ -87,10 +87,21 @@ static aper_size_info_16 intel_7505_sizes[7] =
 	{4, 1024, 0, 0xf3f}
 };
 
+static unsigned long i7x05_mask_memory(unsigned long addr, int type)
+{
+	/* Memory type is ignored */
+	return addr | agp_bridge->masks[0].mask;
+}
+
+static struct gatt_mask i7x05_generic_masks[] =
+{
+	{.mask = 0x00000017, .type = 0}
+};
+
 
 static int __init intel_7505_setup (struct pci_dev *pdev)
 {
-	agp_bridge->masks = intel_generic_masks;
+	agp_bridge->masks = i7x05_generic_masks;
 	agp_bridge->aperture_sizes = (void *) intel_7505_sizes;
 	agp_bridge->size_type = U16_APER_SIZE;
 	agp_bridge->num_aperture_sizes = 7;
@@ -100,8 +111,8 @@ static int __init intel_7505_setup (struct pci_dev *pdev)
 	agp_bridge->fetch_size = intel_7505_fetch_size;
 	agp_bridge->cleanup = intel_7505_cleanup;
 	agp_bridge->tlb_flush = intel_7505_tlbflush;
-	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->mask_memory = i7x05_mask_memory;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -160,7 +171,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 static struct agp_driver i7x05_agp_driver = {
-	.owner = THIS_MODULE;
+	.owner = THIS_MODULE,
 };
 
 static int __init agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_id *ent)
@@ -175,7 +186,7 @@ static int __init agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_
 		agp_bridge->dev = dev;
 		agp_bridge->capndx = cap_ptr;
 		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode)
+		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
 		i7x05_agp_driver.dev = dev;
 		agp_register_driver(&i7x05_agp_driver);
 		return 0;
