@@ -172,6 +172,8 @@ extern void nf_reinject(struct sk_buff *skb,
 			struct nf_info *info,
 			unsigned int verdict);
 
+extern void (*ip_ct_attach)(struct sk_buff *, struct sk_buff *);
+
 #ifdef CONFIG_NETFILTER_DEBUG
 extern void nf_dump_skb(int pf, struct sk_buff *skb);
 #endif
