@@ -201,7 +201,7 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 
 #define RTAS_DEBUG KERN_DEBUG "RTAS: "
  
-#define RTAS_ERROR_LOG_MAX 2048
+#define RTAS_ERROR_LOG_MAX 1024
  
  
 /* Event Scan Parameters */
