@@ -401,7 +401,6 @@ int acpi_pci_irq_init (void);
 
 #ifdef CONFIG_ACPI
 
-int acpi_init(void);
 int acpi_blacklisted(void);
 
 #endif /*CONFIG_ACPI*/

@@ -163,6 +163,9 @@ static int __init acpi_system_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_system_init");
 
+	if (acpi_disabled)
+		return_VALUE(0);
+
 	/* 'info' [R] */
 	name = ACPI_SYSTEM_FILE_INFO;
 	entry = create_proc_read_entry(name,

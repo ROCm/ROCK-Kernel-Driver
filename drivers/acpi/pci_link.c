@@ -567,10 +567,12 @@ acpi_pci_link_remove (
 }
 
 
-int __init
-acpi_pci_link_init (void)
+static int __init acpi_pci_link_init (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_pci_link_init");
+
+	if (acpi_disabled)
+		return_VALUE(0);
 
 	acpi_link.count = 0;
 	INIT_LIST_HEAD(&acpi_link.entries);
@@ -580,3 +582,5 @@ acpi_pci_link_init (void)
 
 	return_VALUE(0);
 }
+
+subsys_initcall(acpi_pci_link_init);

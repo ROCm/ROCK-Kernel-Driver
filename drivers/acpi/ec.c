@@ -781,12 +781,14 @@ error:
 }
 
 
-int __init
-acpi_ec_init (void)
+static int __init acpi_ec_init (void)
 {
 	int			result = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_init");
+
+	if (acpi_disabled)
+		return_VALUE(0);
 
 	result = acpi_bus_register_driver(&acpi_ec_driver);
 	if (result < 0) {
@@ -796,6 +798,8 @@ acpi_ec_init (void)
 
 	return_VALUE(0);
 }
+
+subsys_initcall(acpi_ec_init);
 
 void __exit
 acpi_ec_ecdt_exit (void)
