@@ -32,10 +32,24 @@
  * in exit.c or in signal.c.
  */
 
+#if 1
 /*
  * Breakpoint SWI instruction: SWI &9F0001
  */
 #define BREAKINST_ARM	0xef9f0001
+#define BREAKINST_THUMB	0xdf00		/* fill this in later */
+#else
+/*
+ * New breakpoints - use an undefined instruction.  The ARM architecture
+ * reference manual guarantees that the following instruction space
+ * will produce an undefined instruction exception on all CPUs:
+ *
+ *  ARM:   xxxx 0111 1111 xxxx xxxx xxxx 1111 xxxx
+ *  Thumb: 1101 1110 xxxx xxxx
+ */
+#define BREAKINST_ARM	0xe7f001f0
+#define BREAKINST_THUMB	0xde01
+#endif
 
 /*
  * Get the address of the live pt_regs for the specified task.
@@ -89,23 +103,32 @@ put_user_reg(struct task_struct *task, int offset, long data)
 }
 
 static inline int
-read_tsk_long(struct task_struct *child, unsigned long addr, unsigned long *res)
+read_u32(struct task_struct *task, unsigned long addr, u32 *res)
 {
-	int copied;
+	int ret;
 
-	copied = access_process_vm(child, addr, res, sizeof(*res), 0);
+	ret = access_process_vm(task, addr, res, sizeof(*res), 0);
 
-	return copied != sizeof(*res) ? -EIO : 0;
+	return ret == sizeof(*res) ? 0 : -EIO;
 }
 
 static inline int
-write_tsk_long(struct task_struct *child, unsigned long addr, unsigned long val)
+read_instr(struct task_struct *task, unsigned long addr, u32 *res)
 {
-	int copied;
+	int ret;
 
-	copied = access_process_vm(child, addr, &val, sizeof(val), 1);
-
-	return copied != sizeof(val) ? -EIO : 0;
+	if (addr & 1) {
+		u16 val;
+		ret = access_process_vm(task, addr & ~1, &val, sizeof(val), 0);
+		ret = ret == sizeof(val) ? 0 : -EIO;
+		*res = val;
+	} else {
+		u32 val;
+		ret = access_process_vm(task, addr & ~3, &val, sizeof(val), 0);
+		ret = ret == sizeof(val) ? 0 : -EIO;
+		*res = val;
+	}
+	return ret;
 }
 
 /*
@@ -206,7 +229,7 @@ ptrace_getldrop2(struct task_struct *child, unsigned long insn)
 static unsigned long
 get_branch_address(struct task_struct *child, unsigned long pc, unsigned long insn)
 {
-	unsigned long alt = 0;
+	u32 alt = 0;
 
 	switch (insn & 0x0e000000) {
 	case 0x00000000:
@@ -262,7 +285,7 @@ get_branch_address(struct task_struct *child, unsigned long pc, unsigned long in
 				else
 					base -= aluop2;
 			}
-			if (read_tsk_long(child, base, &alt) == 0)
+			if (read_u32(child, base, &alt) == 0)
 				alt = pc_pointer(alt);
 		}
 		break;
@@ -289,7 +312,7 @@ get_branch_address(struct task_struct *child, unsigned long pc, unsigned long in
 
 			base = ptrace_getrn(child, insn);
 
-			if (read_tsk_long(child, base + nr_regs, &alt) == 0)
+			if (read_u32(child, base + nr_regs, &alt) == 0)
 				alt = pc_pointer(alt);
 			break;
 		}
@@ -319,30 +342,71 @@ get_branch_address(struct task_struct *child, unsigned long pc, unsigned long in
 }
 
 static int
-add_breakpoint(struct task_struct *child, struct debug_info *dbg, unsigned long addr)
+swap_insn(struct task_struct *task, unsigned long addr,
+	  void *old_insn, void *new_insn, int size)
+{
+	int ret;
+
+	ret = access_process_vm(task, addr, old_insn, size, 0);
+	if (ret == size)
+		ret = access_process_vm(task, addr, new_insn, size, 1);
+	return ret;
+}
+
+static void
+add_breakpoint(struct task_struct *task, struct debug_info *dbg, unsigned long addr)
 {
 	int nr = dbg->nsaved;
-	int res = -EINVAL;
 
 	if (nr < 2) {
-		res = read_tsk_long(child, addr, &dbg->bp[nr].insn);
-		if (res == 0)
-			res = write_tsk_long(child, addr, BREAKINST_ARM);
+		u32 new_insn = BREAKINST_ARM;
+		int res;
 
-		if (res == 0) {
+		res = swap_insn(task, addr, &dbg->bp[nr].insn, &new_insn, 4);
+
+		if (res == 4) {
 			dbg->bp[nr].address = addr;
 			dbg->nsaved += 1;
 		}
 	} else
 		printk(KERN_ERR "ptrace: too many breakpoints\n");
+}
 
-	return res;
+/*
+ * Clear one breakpoint in the user program.  We copy what the hardware
+ * does and use bit 0 of the address to indicate whether this is a Thumb
+ * breakpoint or an ARM breakpoint.
+ */
+static void clear_breakpoint(struct task_struct *task, struct debug_entry *bp)
+{
+	unsigned long addr = bp->address;
+	union debug_insn old_insn;
+	int ret;
+
+	if (addr & 1) {
+		ret = swap_insn(task, addr & ~1, &old_insn.thumb,
+				&bp->insn.thumb, 2);
+
+		if (ret != 2 || old_insn.thumb != BREAKINST_THUMB)
+			printk(KERN_ERR "%s:%d: corrupted Thumb breakpoint at "
+				"0x%08lx (0x%04x)\n", task->comm, task->pid,
+				addr, old_insn.thumb);
+	} else {
+		ret = swap_insn(task, addr & ~3, &old_insn.arm,
+				&bp->insn.arm, 4);
+
+		if (ret != 4 || old_insn.arm != BREAKINST_ARM)
+			printk(KERN_ERR "%s:%d: corrupted ARM breakpoint at "
+				"0x%08lx (0x%08x)\n", task->comm, task->pid,
+				addr, old_insn.arm);
+	}
 }
 
 void ptrace_set_bpt(struct task_struct *child)
 {
 	struct pt_regs *regs;
-	unsigned long pc, insn;
+	unsigned long pc;
+	u32 insn;
 	int res;
 
 	regs = get_user_regs(child);
@@ -353,7 +417,7 @@ void ptrace_set_bpt(struct task_struct *child)
 		return;
 	}
 
-	res = read_tsk_long(child, pc, &insn);
+	res = read_instr(child, pc, &insn);
 	if (!res) {
 		struct debug_info *dbg = &child->thread.debug;
 		unsigned long alt;
@@ -362,7 +426,7 @@ void ptrace_set_bpt(struct task_struct *child)
 
 		alt = get_branch_address(child, pc, insn);
 		if (alt)
-			res = add_breakpoint(child, dbg, alt);
+			add_breakpoint(child, dbg, alt);
 
 		/*
 		 * Note that we ignore the result of setting the above
@@ -374,7 +438,7 @@ void ptrace_set_bpt(struct task_struct *child)
 		 * loose control of the thread during single stepping.
 		 */
 		if (!alt || predicate(insn) != PREDICATE_ALWAYS)
-			res = add_breakpoint(child, dbg, pc + 4);
+			add_breakpoint(child, dbg, pc + 4);
 	}
 }
 
@@ -384,24 +448,17 @@ void ptrace_set_bpt(struct task_struct *child)
  */
 void __ptrace_cancel_bpt(struct task_struct *child)
 {
-	struct debug_info *dbg = &child->thread.debug;
-	int i, nsaved = dbg->nsaved;
+	int i, nsaved = child->thread.debug.nsaved;
 
-	dbg->nsaved = 0;
+	child->thread.debug.nsaved = 0;
 
 	if (nsaved > 2) {
 		printk("ptrace_cancel_bpt: bogus nsaved: %d!\n", nsaved);
 		nsaved = 2;
 	}
 
-	for (i = 0; i < nsaved; i++) {
-		unsigned long tmp;
-
-		read_tsk_long(child, dbg->bp[i].address, &tmp);
-		write_tsk_long(child, dbg->bp[i].address, dbg->bp[i].insn);
-		if (tmp != BREAKINST_ARM)
-			printk(KERN_ERR "ptrace_cancel_bpt: weirdness\n");
-	}
+	for (i = 0; i < nsaved; i++)
+		clear_breakpoint(child, &child->thread.debug.bp[i]);
 }
 
 /*
@@ -537,9 +594,12 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 		 */
 		case PTRACE_PEEKTEXT:
 		case PTRACE_PEEKDATA:
-			ret = read_tsk_long(child, addr, &tmp);
-			if (!ret)
+			ret = access_process_vm(child, addr, &tmp,
+						sizeof(unsigned long), 0);
+			if (ret == sizeof(unsigned long))
 				ret = put_user(tmp, (unsigned long *) data);
+			else
+				ret = -EIO;
 			break;
 
 		case PTRACE_PEEKUSR:
@@ -551,7 +611,12 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 		 */
 		case PTRACE_POKETEXT:
 		case PTRACE_POKEDATA:
-			ret = write_tsk_long(child, addr, data);
+			ret = access_process_vm(child, addr, &data,
+						sizeof(unsigned long), 1);
+			if (ret == sizeof(unsigned long))
+				ret = 0;
+			else
+				ret = -EIO;
 			break;
 
 		case PTRACE_POKEUSR:

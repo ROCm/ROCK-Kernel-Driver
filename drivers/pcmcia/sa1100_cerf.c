@@ -11,6 +11,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include "sa1100_generic.h"
 
@@ -160,14 +161,14 @@ static int cerf_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level cerf_pcmcia_ops = { 
-  init:			cerf_pcmcia_init,
-  shutdown:		cerf_pcmcia_shutdown,
-  socket_state:		cerf_pcmcia_socket_state,
-  get_irq_info:		cerf_pcmcia_get_irq_info,
-  configure_socket:	cerf_pcmcia_configure_socket,
+  .init			= cerf_pcmcia_init,
+  .shutdown		= cerf_pcmcia_shutdown,
+  .socket_state		= cerf_pcmcia_socket_state,
+  .get_irq_info		= cerf_pcmcia_get_irq_info,
+  .configure_socket	= cerf_pcmcia_configure_socket,
 
-  socket_init:		cerf_pcmcia_socket_init,
-  socket_suspend:	cerf_pcmcia_socket_suspend,
+  .socket_init		= cerf_pcmcia_socket_init,
+  .socket_suspend	= cerf_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_cerf_init(void)

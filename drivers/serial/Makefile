@@ -13,6 +13,7 @@ obj-$(CONFIG_SERIAL_CORE) += core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
 obj-$(CONFIG_SERIAL_8250) += 8250.o $(serial-8250-y)
 obj-$(CONFIG_SERIAL_8250_CS) += 8250_cs.o
+obj-$(CONFIG_SERIAL_8250_ACORN) += 8250_acorn.o
 obj-$(CONFIG_SERIAL_ANAKIN) += anakin.o
 obj-$(CONFIG_SERIAL_AMBA) += amba.o
 obj-$(CONFIG_SERIAL_CLPS711X) += clps711x.o

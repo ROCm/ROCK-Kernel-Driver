@@ -36,9 +36,15 @@ static void debug_printf(char *fmt, ...)
 #define debug_printf(x...) do { } while (0)
 #endif
 
-#define PIXFORMAT_8BPP		0
-#define PIXFORMAT_16BPP		1
-#define PIXFORMAT_24BPP		2
+#define RAMDAC_RAMPWRDN		0x01
+#define RAMDAC_DAC8BIT		0x02
+#define RAMDAC_VREFEN		0x04
+#define RAMDAC_BYPASS		0x10
+#define RAMDAC_DACPWRDN		0x40
+
+#define EXT_CRT_VRTOFL		0x11
+#define EXT_CRT_VRTOFL_LINECOMP10	0x10
+#define EXT_CRT_VRTOFL_INTERLACE	0x20
 
 #define EXT_CRT_IRQ		0x12
 #define EXT_CRT_IRQ_ENABLE		0x01
@@ -61,7 +67,8 @@ static void debug_printf(char *fmt, ...)
 #define EXT_BUS_CTL_LIN_2MB		0x01
 #define EXT_BUS_CTL_LIN_4MB		0x02
 #define EXT_BUS_CTL_ZEROWAIT		0x04
-#define EXT_BUS_CTL_PCIBURST		0x20
+#define EXT_BUS_CTL_PCIBURST_WRITE	0x20
+#define EXT_BUS_CTL_PCIBURST_READ	0x80	/* CyberPro 5000 only */
 
 #define EXT_SEG_WRITE_PTR	0x31
 #define EXT_SEG_READ_PTR	0x32
@@ -401,24 +408,54 @@ static void debug_printf(char *fmt, ...)
 /*
  * Graphics Co-processor
  */
-#define CO_CMD_L_PATTERN_FGCOL	0x8000
-#define CO_CMD_L_INC_LEFT	0x0004
-#define CO_CMD_L_INC_UP		0x0002
-
-#define CO_CMD_H_SRC_PIXMAP	0x2000
-#define CO_CMD_H_BLITTER	0x0800
-
 #define CO_REG_CONTROL		0xbf011
+#define CO_CTRL_BUSY			0x80
+#define CO_CTRL_CMDFULL			0x04
+#define CO_CTRL_FIFOEMPTY		0x02
+#define CO_CTRL_READY			0x01
+
 #define CO_REG_SRC_WIDTH	0xbf018
-#define CO_REG_PIX_FORMAT	0xbf01c
-#define CO_REG_FORE_MIX		0xbf048
-#define CO_REG_FOREGROUND	0xbf058
-#define CO_REG_WIDTH		0xbf060
-#define CO_REG_HEIGHT		0xbf062
+#define CO_REG_PIXFMT		0xbf01c
+#define CO_PIXFMT_32BPP			0x03
+#define CO_PIXFMT_24BPP			0x02
+#define CO_PIXFMT_16BPP			0x01
+#define CO_PIXFMT_8BPP			0x00
+
+#define CO_REG_FGMIX		0xbf048
+#define CO_FG_MIX_ZERO			0x00
+#define CO_FG_MIX_SRC_AND_DST		0x01
+#define CO_FG_MIX_SRC_AND_NDST		0x02
+#define CO_FG_MIX_SRC			0x03
+#define CO_FG_MIX_NSRC_AND_DST		0x04
+#define CO_FG_MIX_DST			0x05
+#define CO_FG_MIX_SRC_XOR_DST		0x06
+#define CO_FG_MIX_SRC_OR_DST		0x07
+#define CO_FG_MIX_NSRC_AND_NDST		0x08
+#define CO_FG_MIX_SRC_XOR_NDST		0x09
+#define CO_FG_MIX_NDST			0x0a
+#define CO_FG_MIX_SRC_OR_NDST		0x0b
+#define CO_FG_MIX_NSRC			0x0c
+#define CO_FG_MIX_NSRC_OR_DST		0x0d
+#define CO_FG_MIX_NSRC_OR_NDST		0x0e
+#define CO_FG_MIX_ONES			0x0f
+
+#define CO_REG_FGCOLOUR		0xbf058
+#define CO_REG_BGCOLOUR		0xbf05c
+#define CO_REG_PIXWIDTH		0xbf060
+#define CO_REG_PIXHEIGHT	0xbf062
 #define CO_REG_X_PHASE		0xbf078
 #define CO_REG_CMD_L		0xbf07c
+#define CO_CMD_L_PATTERN_FGCOL		0x8000
+#define CO_CMD_L_INC_LEFT		0x0004
+#define CO_CMD_L_INC_UP			0x0002
+
 #define CO_REG_CMD_H		0xbf07e
-#define CO_REG_SRC_PTR		0xbf170
+#define CO_CMD_H_BGSRCMAP		0x8000	/* otherwise bg colour */
+#define CO_CMD_H_FGSRCMAP		0x2000	/* otherwise fg colour */
+#define CO_CMD_H_BLITTER		0x0800
+
+#define CO_REG_SRC1_PTR		0xbf170
+#define CO_REG_SRC2_PTR		0xbf174
 #define CO_REG_DEST_PTR		0xbf178
 #define CO_REG_DEST_WIDTH	0xbf218
 

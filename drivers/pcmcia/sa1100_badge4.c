@@ -146,14 +146,14 @@ badge4_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level badge4_pcmcia_ops = {
-	init:			badge4_pcmcia_init,
-	shutdown:		badge4_pcmcia_shutdown,
-	socket_state:		sa1111_pcmcia_socket_state,
-	get_irq_info:		sa1111_pcmcia_get_irq_info,
-	configure_socket:	badge4_pcmcia_configure_socket,
+	.init			= badge4_pcmcia_init,
+	.shutdown		= badge4_pcmcia_shutdown,
+	.socket_state		= sa1111_pcmcia_socket_state,
+	.get_irq_info		= sa1111_pcmcia_get_irq_info,
+	.configure_socket	= badge4_pcmcia_configure_socket,
 
-	socket_init:		sa1111_pcmcia_socket_init,
-	socket_suspend:		sa1111_pcmcia_socket_suspend,
+	.socket_init		= sa1111_pcmcia_socket_init,
+	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_badge4_init(void)

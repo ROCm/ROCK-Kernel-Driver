@@ -27,59 +27,6 @@
 
 
 /*
- *	MMU TLB Model
- *	=============
- *
- *	We have the following to choose from:
- *	  v3    - ARMv3
- *	  v4    - ARMv4 without write buffer
- *	  v4wb  - ARMv4 with write buffer without I TLB flush entry instruction
- *	  v4wbi - ARMv4 with write buffer with I TLB flush entry instruction
- */
-#undef _TLB
-#undef MULTI_TLB
-
-#if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v3
-# endif
-#endif
-
-#if defined(CONFIG_CPU_ARM720T)
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4
-# endif
-#endif
-
-#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
-    defined(CONFIG_CPU_ARM926T) || defined(CONFIG_CPU_ARM1020) || \
-    defined(CONFIG_CPU_XSCALE)
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4wbi
-# endif
-#endif
-
-#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
-# ifdef _TLB
-#  define MULTI_TLB 1
-# else
-#  define _TLB v4wb
-# endif
-#endif
-
-#ifndef _TLB
-#error Unknown TLB model
-#endif
-
-
-
-/*
  *	Data Abort Model
  *	================
  *
@@ -154,71 +101,6 @@
 
 #ifndef CPU_ABORT_HANDLER
 #error Unknown data abort handler type
-#endif
-
-
-/*
- *	User Space Model
- *	================
- *
- *	This section selects the correct set of functions for dealing with
- *	page-based copying and clearing for user space for the particular
- *	processor(s) we're building for.
- *
- *	We have the following to choose from:
- *	  v3		- ARMv3
- *	  v4wt		- ARMv4 with writethrough cache, without minicache
- *	  v4wb		- ARMv4 with writeback cache, without minicache
- *	  v4_mc		- ARMv4 with minicache
- *	  xscale	- Xscale
- */
-#undef _USER
-#undef MULTI_USER
-
-#if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v3
-# endif
-#endif
-
-#if defined(CONFIG_CPU_ARM720T)
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v4wt
-# endif
-#endif
-
-#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
-    defined(CONFIG_CPU_ARM926T) || defined(CONFIG_CPU_SA110)   || \
-    defined(CONFIG_CPU_ARM1020)
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v4wb
-# endif
-#endif
-
-#if defined(CONFIG_CPU_SA1100)
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER v4_mc
-# endif
-#endif
-
-#if defined(CONFIG_CPU_XSCALE)
-# ifdef _USER
-#  define MULTI_USER 1
-# else
-#  define _USER xscale_mc
-# endif
-#endif
-
-#ifndef _USER
-#error Unknown user operations model
 #endif
 
 #endif

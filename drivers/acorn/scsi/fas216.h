@@ -288,7 +288,7 @@ typedef struct {
 		neg_t		sync_state;		/* synchronous transfer mode		*/
 		neg_t		wide_state;		/* wide transfer mode			*/
 	} device[8];
-	unsigned char	busyluns[8];			/* array of bits indicating LUNs busy	*/
+	unsigned long	busyluns[64/sizeof(unsigned long)];/* array of bits indicating LUNs busy	*/
 
 	/* dma */
 	struct {

@@ -21,7 +21,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: integrator-flash.c,v 1.6 2001/10/02 16:00:01 dwmw2 Exp $
+   $Id: integrator-flash.c,v 1.7 2001/11/01 20:55:47 rmk Exp $
 
 ======================================================================*/
 
@@ -208,10 +208,10 @@ static struct map_info armflash_map =
 };
 
 static struct mtd_info *mtd;
+static struct mtd_partition *parts;
 
 static int __init armflash_cfi_init(void *base, u_int size)
 {
-	struct mtd_partition *parts;
 	int ret;
 
 	armflash_flash_init();
@@ -238,8 +238,6 @@ static int __init armflash_cfi_init(void *base, u_int size)
 	ret = parse_afs_partitions(mtd, &parts);
 	if (ret > 0) {
 		ret = add_mtd_partitions(mtd, parts, ret);
-		/* we don't need the partition info any longer */
-		kfree(parts);
 		if (ret)
 			printk(KERN_ERR "mtd partition registration "
 				"failed: %d\n", ret);
@@ -262,6 +260,8 @@ static void armflash_cfi_exit(void)
 		del_mtd_partitions(mtd);
 		map_destroy(mtd);
 	}
+	if (parts)
+		kfree(parts);
 }
 
 static int __init armflash_init(void)

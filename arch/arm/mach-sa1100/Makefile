@@ -2,20 +2,17 @@
 # Makefile for the linux kernel.
 #
 
-# Common support (must be linked before board specific support)
+# Common support
 obj-y := generic.o irq.o dma.o
 obj-m :=
 obj-n :=
 obj-  :=
 led-y := leds.o
 
-export-objs :=	dma.o generic.o pcipool.o pm.o sa1111.o sa1111-pcibuf.o \
-		usb_ctl.o usb_recv.o usb_send.o
+export-objs := dma.o generic.o pcipool.o pm.o sa1111.o sa1111-pcibuf.o
 
 # This needs to be cleaned up.  We probably need to have SA1100
 # and SA1110 config symbols.
-#
-# We link the CPU support next, so that RAM timings can be tuned.
 ifeq ($(CONFIG_CPU_FREQ),y)
 obj-$(CONFIG_SA1100_ASSABET)		+= cpu-sa1110.o
 obj-$(CONFIG_SA1100_CERF)		+= cpu-sa1110.o
@@ -107,10 +104,7 @@ export-objs				+= yopy.o
 obj-$(CONFIG_LEDS) += $(led-y)
 
 # SA1110 USB client support
-sa1100usb_core-objs := usb_ctl.o usb_ep0.o usb_recv.o usb_send.o
-obj-$(CONFIG_SA1100_USB) += sa1100usb_core.o
-obj-$(CONFIG_SA1100_USB_NETLINK) += usb-eth.o
-obj-$(CONFIG_SA1100_USB_CHAR) += usb-char.o
+#obj-$(CONFIG_SA1100_USB)		+= usb/
 
 # Miscelaneous functions
 obj-$(CONFIG_PM) += pm.o sleep.o

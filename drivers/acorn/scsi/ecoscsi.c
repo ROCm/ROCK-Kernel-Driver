@@ -248,11 +248,9 @@ printk("reading %p len %d\n",addr, len);
 #define NCR5380_read(reg) ecoscsi_read(_instance, reg)
 #define NCR5380_write(reg, value) ecoscsi_write(_instance, reg, value)
 
-#define do_NCR5380_intr do_ecoscsi_intr
-#define NCR5380_queue_command ecoscsi_queue_command
-#define NCR5380_abort ecoscsi_abort
-#define NCR5380_reset ecoscsi_reset
-#define NCR5380_proc_info ecoscsi_proc_info
+#define NCR5380_intr		ecoscsi_intr
+#define NCR5380_queue_command	ecoscsi_queue_command
+#define NCR5380_proc_info	ecoscsi_proc_info
 
 int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 		      int length, int hostno, int inout);
@@ -269,8 +267,10 @@ static Scsi_Host_Template ecoscsi_template =  {
 	.release	= ecoscsi_release,
 	.info		= ecoscsi_info,
 	.queuecommand	= ecoscsi_queue_command,
-	.abort		= ecoscsi_abort,
-	.reset		= ecoscsi_reset,
+	.eh_abort_handler	= NCR5380_abort,
+	.eh_device_reset_handler= NCR5380_device_reset,
+	.eh_bus_reset_handler	= NCR5380_bus_reset,
+	.eh_host_reset_handler	= NCR5380_host_reset,
 	.can_queue	= 16,
 	.this_id	= 7,
 	.sg_tablesize	= SG_ALL,

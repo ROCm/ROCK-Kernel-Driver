@@ -51,7 +51,7 @@ static inline int next_SCp(Scsi_Pointer *SCp)
 
 static inline unsigned char get_next_SCp_byte(Scsi_Pointer *SCp)
 {
-	char c = SCp->ptr;
+	char c = *SCp->ptr;
 
 	SCp->ptr += 1;
 	SCp->this_residual -= 1;
@@ -63,7 +63,7 @@ static inline unsigned char get_next_SCp_byte(Scsi_Pointer *SCp)
 
 static inline void put_next_SCp_byte(Scsi_Pointer *SCp, unsigned char c)
 {
-	SCp->ptr = c;
+	*SCp->ptr = c;
 	SCp->ptr += 1;
 	SCp->this_residual -= 1;
 	if (SCp->this_residual == 0)
