@@ -285,7 +285,7 @@ static int longhaul_get_cpu_mult (void)
 
 /**
  * longhaul_set_cpu_frequency()
- * @clock_ratio_index : index of clock_ratio[] for new frequency
+ * @clock_ratio_index : bitpattern of the new multiplier.
  *
  * Sets a new clock ratio, and -if applicable- a new Front Side Bus
  */
@@ -295,6 +295,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	int vidindex, i;
 	struct cpufreq_freqs freqs;
 	union msr_longhaul longhaul;
+	union msr_bcr2 bcr2;
 
 	if (clock_ratio[clock_ratio_index] == -1)
 		return;
@@ -312,25 +313,20 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	dprintk (KERN_INFO PFX "FSB:%d Mult(x10):%d\n",
 				fsb * 100, clock_ratio[clock_ratio_index]);
 
-	/* "bits" contains the bitpattern of the new multiplier.
-	   we now need to transform it to the desired format. */
-
 	switch (longhaul_version) {
 	case 1:
-//		rdmsr (MSR_VIA_BCR2, lo, hi);
+		rdmsrl (MSR_VIA_BCR2, bcr2.val);
 		/* Enable software clock multiplier */
-//		lo |= (1<<19);
-		/* desired multiplier */
-//		lo &= ~(1<<23|1<<24|1<<25|1<<26);
-//		lo |= (bits<<23);
-//		wrmsr (MSR_VIA_BCR2, lo, hi);
+		bcr2.bits.ESOFTBF = 1;
+		bcr2.bits.CLOCKMUL = clock_ratio_index;
+		wrmsrl (MSR_VIA_BCR2, bcr2.val);
 
 		__hlt();
 
 		/* Disable software clock multiplier */
-//		rdmsr (MSR_VIA_BCR2, lo, hi);
-//		lo &= ~(1<<19);
-//		wrmsr (MSR_VIA_BCR2, lo, hi);
+		rdmsrl (MSR_VIA_BCR2, bcr2.val);
+		bcr2.bits.ESOFTBF = 0;
+		wrmsrl (MSR_VIA_BCR2, bcr2.val);
 		break;
 
 	case 2:

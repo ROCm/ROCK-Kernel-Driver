@@ -7,6 +7,17 @@
  *  VIA-specific information
  */
 
+union msr_bcr2 {
+	struct {
+		unsigned Reseved:19,	// 18:0
+		ESOFTBF:1,		// 19
+		Reserved2:3,		// 22:20
+		CLOCKMUL:4,		// 26:23
+		Reserved3:5;		// 31:27
+	} bits;
+	unsigned long val;
+};
+
 union msr_longhaul {
 	struct {
 		unsigned RevisionID:4,	// 3:0
@@ -35,3 +46,4 @@ union msr_longhaul {
 	} bits;
 	unsigned long long val;
 };
+
