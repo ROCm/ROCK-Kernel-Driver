@@ -56,19 +56,19 @@ struct net_bridge_port
 	struct net_bridge		*br;
 	struct net_device		*dev;
 	struct list_head		list;
-	__u8				port_no;
-	__u8				priority;
 
 	/* STP */
+	u8				priority;
+	u8				state;
+	u16				port_no;
+	unsigned char			topology_change_ack;
+	unsigned char			config_pending;
 	port_id				port_id;
-	int				state;
-	int				path_cost;
-	bridge_id			designated_root;
-	int				designated_cost;
-	bridge_id			designated_bridge;
 	port_id				designated_port;
-	unsigned			topology_change_ack:1;
-	unsigned			config_pending:1;
+	bridge_id			designated_root;
+	bridge_id			designated_bridge;
+	u32				path_cost;
+	u32				designated_cost;
 
 	struct timer_list		forward_delay_timer;
 	struct timer_list		hold_timer;
@@ -88,25 +88,25 @@ struct net_bridge
 
 	/* STP */
 	bridge_id			designated_root;
-	int				root_path_cost;
-	int				root_port;
-	int				max_age;
-	int				hello_time;
-	int				forward_delay;
 	bridge_id			bridge_id;
-	int				bridge_max_age;
-	int				bridge_hello_time;
-	int				bridge_forward_delay;
-	unsigned			stp_enabled:1;
-	unsigned			topology_change:1;
-	unsigned			topology_change_detected:1;
+	u32				root_path_cost;
+	unsigned long			max_age;
+	unsigned long			hello_time;
+	unsigned long			forward_delay;
+	unsigned long			bridge_max_age;
+	unsigned long			ageing_time;
+	unsigned long			bridge_hello_time;
+	unsigned long			bridge_forward_delay;
+
+	u16				root_port;
+	unsigned char			stp_enabled;
+	unsigned char			topology_change;
+	unsigned char			topology_change_detected;
 
 	struct timer_list		hello_timer;
 	struct timer_list		tcn_timer;
 	struct timer_list		topology_change_timer;
 	struct timer_list		gc_timer;
-
-	int				ageing_time;
 };
 
 extern struct notifier_block br_device_notifier;
@@ -187,7 +187,7 @@ extern void br_netfilter_fini(void);
 /* br_stp.c */
 extern void br_log_state(const struct net_bridge_port *p);
 extern struct net_bridge_port *br_get_port(struct net_bridge *br,
-				    int port_no);
+				    	   u16 port_no);
 extern void br_init_port(struct net_bridge_port *p);
 extern void br_become_designated_port(struct net_bridge_port *p);
 
@@ -198,11 +198,11 @@ extern void br_stp_enable_port(struct net_bridge_port *p);
 extern void br_stp_disable_port(struct net_bridge_port *p);
 extern void br_stp_recalculate_bridge_id(struct net_bridge *br);
 extern void br_stp_set_bridge_priority(struct net_bridge *br,
-				int newprio);
+				       u16 newprio);
 extern void br_stp_set_port_priority(struct net_bridge_port *p,
-			      int newprio);
+				     u8 newprio);
 extern void br_stp_set_path_cost(struct net_bridge_port *p,
-			  int path_cost);
+				 u32 path_cost);
 
 /* br_stp_bpdu.c */
 extern int br_stp_handle_bpdu(struct sk_buff *skb);

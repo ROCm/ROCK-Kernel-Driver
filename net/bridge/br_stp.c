@@ -35,7 +35,7 @@ void br_log_state(const struct net_bridge_port *p)
 }
 
 /* called under bridge lock */
-struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
+struct net_bridge_port *br_get_port(struct net_bridge *br, u16 port_no)
 {
 	struct net_bridge_port *p;
 
@@ -49,7 +49,7 @@ struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
 
 /* called under bridge lock */
 static int br_should_become_root_port(const struct net_bridge_port *p, 
-				      int root_port)
+				      u16 root_port)
 {
 	struct net_bridge *br;
 	struct net_bridge_port *rp;
@@ -102,9 +102,7 @@ static int br_should_become_root_port(const struct net_bridge_port *p,
 static void br_root_selection(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
-	int root_port;
-
-	root_port = 0;
+	u16 root_port = 0;
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (br_should_become_root_port(p, root_port))

@@ -158,7 +158,7 @@ void br_stp_recalculate_bridge_id(struct net_bridge *br)
 }
 
 /* called under bridge lock */
-void br_stp_set_bridge_priority(struct net_bridge *br, int newprio)
+void br_stp_set_bridge_priority(struct net_bridge *br, u16 newprio)
 {
 	struct net_bridge_port *p;
 	int wasroot;
@@ -183,7 +183,7 @@ void br_stp_set_bridge_priority(struct net_bridge *br, int newprio)
 }
 
 /* called under bridge lock */
-void br_stp_set_port_priority(struct net_bridge_port *p, int newprio)
+void br_stp_set_port_priority(struct net_bridge_port *p, u8 newprio)
 {
 	__u16 new_port_id;
 
@@ -202,7 +202,7 @@ void br_stp_set_port_priority(struct net_bridge_port *p, int newprio)
 }
 
 /* called under bridge lock */
-void br_stp_set_path_cost(struct net_bridge_port *p, int path_cost)
+void br_stp_set_path_cost(struct net_bridge_port *p, u32 path_cost)
 {
 	p->path_cost = path_cost;
 	br_configuration_update(p->br);
