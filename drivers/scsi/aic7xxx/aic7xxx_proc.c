@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id$
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#29 $
  */
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -50,7 +50,7 @@ static void	ahc_dump_target_state(struct ahc_softc *ahc,
 				      u_int our_id, char channel,
 				      u_int target_id, u_int target_offset);
 static void	ahc_dump_device_state(struct info_str *info,
-				      struct aic_linux_device *dev);
+				      struct ahc_linux_device *dev);
 static int	ahc_proc_write_seeprom(struct ahc_softc *ahc,
 				       char *buffer, int length);
 
@@ -141,7 +141,7 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 		      u_int our_id, char channel, u_int target_id,
 		      u_int target_offset)
 {
-	struct	aic_linux_target *targ;
+	struct	ahc_linux_target *targ;
 	struct	ahc_initiator_tinfo *tinfo;
 	struct	ahc_tmode_tstate *tstate;
 	int	lun;
@@ -163,7 +163,7 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 	ahc_format_transinfo(info, &tinfo->curr);
 
 	for (lun = 0; lun < AHC_NUM_LUNS; lun++) {
-		struct aic_linux_device *dev;
+		struct ahc_linux_device *dev;
 
 		dev = targ->devices[lun];
 
@@ -175,7 +175,7 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 }
 
 static void
-ahc_dump_device_state(struct info_str *info, struct aic_linux_device *dev)
+ahc_dump_device_state(struct info_str *info, struct ahc_linux_device *dev)
 {
 	copy_info(info, "\tChannel %c Target %d Lun %d Settings\n",
 		  dev->target->channel + 'A', dev->target->target, dev->lun);
@@ -204,8 +204,7 @@ ahc_proc_write_seeprom(struct ahc_softc *ahc, char *buffer, int length)
 		ahc_pause(ahc);
 
 	if (length != sizeof(struct seeprom_config)) {
-		printf("ahc_proc_write_seeprom: incorrect buffer size %d\n",
-		       length);
+		printf("ahc_proc_write_seeprom: incorrect buffer size\n");
 		goto done;
 	}
 
@@ -216,7 +215,7 @@ ahc_proc_write_seeprom(struct ahc_softc *ahc, char *buffer, int length)
 	}
 
 	sd.sd_ahc = ahc;
-#if AIC_PCI_CONFIG > 0
+#if AHC_PCI_CONFIG > 0
 	if ((ahc->chip & AHC_PCI) != 0) {
 		sd.sd_control_offset = SEECTL;
 		sd.sd_status_offset = SEECTL;
@@ -272,7 +271,7 @@ ahc_proc_write_seeprom(struct ahc_softc *ahc, char *buffer, int length)
 				  sizeof(struct seeprom_config)/2);
 		ahc_read_seeprom(&sd, (uint16_t *)ahc->seep_config,
 				 start_addr, sizeof(struct seeprom_config)/2);
-#if AIC_PCI_CONFIG > 0
+#if AHC_PCI_CONFIG > 0
 		if ((ahc->chip & AHC_VL) == 0)
 			ahc_release_seeprom(&sd);
 #endif

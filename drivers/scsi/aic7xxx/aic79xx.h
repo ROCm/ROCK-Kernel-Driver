@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#95 $
  *
  * $FreeBSD$
  */
@@ -74,8 +74,9 @@ struct scb_platform_data;
 #define ALL_TARGETS_MASK 0xFFFF
 #define INITIATOR_WILDCARD	(~0)
 #define	SCB_LIST_NULL		0xFF00
-#define	SCB_LIST_NULL_LE	(aic_htole16(SCB_LIST_NULL))
-#define QOUTFIFO_ENTRY_VALID 0x80
+#define	SCB_LIST_NULL_LE	(ahd_htole16(SCB_LIST_NULL))
+#define QOUTFIFO_ENTRY_VALID 0x8000
+#define QOUTFIFO_ENTRY_VALID_LE (ahd_htole16(0x8000))
 #define SCBID_IS_NULL(scbid) (((scbid) & 0xFF00 ) == SCB_LIST_NULL)
 
 #define SCSIID_TARGET(ahd, scsiid)	\
@@ -117,7 +118,7 @@ struct scb_platform_data;
 	((lun) | ((target) << 8))
 
 #define SCB_GET_TAG(scb) \
-	aic_le16toh(scb->hscb->tag)
+	ahd_le16toh(scb->hscb->tag)
 
 #ifndef	AHD_TARGET_MODE
 #undef	AHD_TMODE_ENABLE
@@ -201,8 +202,6 @@ do {								\
 #define AHD_BUSRESET_DELAY	25
 
 /******************* Chip Characteristics/Operating Settings  *****************/
-extern uint32_t ahd_attach_to_HostRAID_controllers;
-
 /*
  * Chip Type
  * The chip order is from least sophisticated to most sophisticated.
@@ -376,9 +375,7 @@ typedef enum {
 	AHD_RESET_POLL_ACTIVE = 0x200000,
 	AHD_UPDATE_PEND_CMDS  = 0x400000,
 	AHD_RUNNING_QOUTFIFO  = 0x800000,
-	AHD_HAD_FIRST_SEL     = 0x1000000,
-	AHD_SHUTDOWN_RECOVERY = 0x2000000, /* Terminate recovery thread. */
-	AHD_HOSTRAID_BOARD    = 0x4000000
+	AHD_HAD_FIRST_SEL     = 0x1000000
 } ahd_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -552,7 +549,7 @@ struct ahd_dma64_seg {
 
 struct map_node {
 	bus_dmamap_t		 dmamap;
-	bus_addr_t		 busaddr;
+	bus_addr_t		 physaddr;
 	uint8_t			*vaddr;
 	SLIST_ENTRY(map_node)	 links;
 };
@@ -594,16 +591,12 @@ typedef enum {
 	SCB_PKT_SENSE		= 0x02000,
 	SCB_CMDPHASE_ABORT	= 0x04000,
 	SCB_ON_COL_LIST		= 0x08000,
-	SCB_SILENT		= 0x10000,/*
+	SCB_SILENT		= 0x10000 /*
 					   * Be quiet about transmission type
 					   * errors.  They are expected and we
 					   * don't want to upset the user.  This
 					   * flag is typically used during DV.
 					   */
-	SCB_TIMEDOUT		= 0x20000/*
-					  * SCB has timed out and is on the
-					  * timedout list.
-					  */
 } scb_flag;
 
 struct scb {
@@ -620,9 +613,8 @@ struct scb {
 	} links2;
 #define pending_links links2.le
 #define collision_links links2.le
-	LIST_ENTRY(scb)		  timedout_links;
 	struct scb		 *col_scb;
-	aic_io_ctx_t		  io_ctx;
+	ahd_io_ctx_t		  io_ctx;
 	struct ahd_softc	 *ahd_softc;
 	scb_flag		  flags;
 #ifndef __linux__
@@ -1061,14 +1053,6 @@ typedef uint8_t ahd_mode_state;
 
 typedef void ahd_callback_t (void *);
 
-struct ahd_completion
-{
-	uint16_t	tag;
-	uint8_t		sg_status;
-	uint8_t		pad[4];
-	uint8_t		valid_tag;
-};
-
 struct ahd_softc {
 	bus_space_tag_t           tags[2];
 	bus_space_handle_t        bshs[2];
@@ -1078,17 +1062,11 @@ struct ahd_softc {
 	struct scb_data		  scb_data;
 
 	struct hardware_scb	 *next_queued_hscb;
-	struct map_node		 *next_queued_hscb_map;
 
 	/*
 	 * SCBs that have been sent to the controller
 	 */
 	LIST_HEAD(, scb)	  pending_scbs;
-
-	/*
-	 * SCBs whose timeout routine has been called.
-	 */
-	LIST_HEAD(, scb)	  timedout_scbs;
 
 	/*
 	 * Current register window mode information.
@@ -1111,7 +1089,7 @@ struct ahd_softc {
 	/*
 	 * Platform specific device information.
 	 */
-	aic_dev_softc_t		  dev_softc;
+	ahd_dev_softc_t		  dev_softc;
 
 	/*
 	 * Bus specific device information.
@@ -1141,8 +1119,8 @@ struct ahd_softc {
 	/*
 	 * Timer handles for timer driven callbacks.
 	 */
-	aic_timer_t		  reset_timer;
-	aic_timer_t		  stat_timer;
+	ahd_timer_t		  reset_timer;
+	ahd_timer_t		  stat_timer;
 
 	/*
 	 * Statistics.
@@ -1162,23 +1140,16 @@ struct ahd_softc {
 	ahd_flag		  flags;
 	struct seeprom_config	 *seep_config;
 
+	/* Values to store in the SEQCTL register for pause and unpause */
+	uint8_t			  unpause;
+	uint8_t			  pause;
+
 	/* Command Queues */
-	struct ahd_completion    *qoutfifo;
 	uint16_t		  qoutfifonext;
 	uint16_t		  qoutfifonext_valid_tag;
 	uint16_t		  qinfifonext;
 	uint16_t		  qinfifo[AHD_SCB_MAX];
-
-	/*
-	 * Our qfreeze count.  The sequencer compares
-	 * this value with its own counter to determine
-	 * whether to allow selections to occur.
-	 */
-	uint16_t		  qfreeze_cnt;
-
-	/* Values to store in the SEQCTL register for pause and unpause */
-	uint8_t			  unpause;
-	uint8_t			  pause;
+	uint16_t		 *qoutfifo;
 
 	/* Critical Section Data */
 	struct cs		 *critical_sections;
@@ -1226,7 +1197,8 @@ struct ahd_softc {
 	 */
 	bus_dma_tag_t		  parent_dmat;
 	bus_dma_tag_t		  shared_data_dmat;
-	struct map_node		  shared_data_map;
+	bus_dmamap_t		  shared_data_dmamap;
+	bus_addr_t		  shared_data_busaddr;
 
 	/* Information saved through suspend/resume cycles */
 	struct ahd_suspend_state  suspend_state;
@@ -1327,9 +1299,9 @@ struct ahd_devinfo {
 };
 
 /****************************** PCI Structures ********************************/
-#define AHD_PCI_IOADDR0	PCIR_BAR(0)	/* I/O BAR*/
-#define AHD_PCI_MEMADDR	PCIR_BAR(1)	/* Memory BAR */
-#define AHD_PCI_IOADDR1	PCIR_BAR(3)	/* Second I/O BAR */
+#define AHD_PCI_IOADDR0	PCIR_MAPS	/* I/O BAR*/
+#define AHD_PCI_MEMADDR	(PCIR_MAPS + 4)	/* Memory BAR */
+#define AHD_PCI_IOADDR1	(PCIR_MAPS + 12)/* Second I/O BAR */
 
 typedef int (ahd_device_setup_t)(struct ahd_softc *);
 
@@ -1369,7 +1341,7 @@ ahd_unbusy_tcl(struct ahd_softc *ahd, u_int tcl)
 }
 
 /***************************** PCI Front End *********************************/
-struct	ahd_pci_identity *ahd_find_pci_device(aic_dev_softc_t);
+struct	ahd_pci_identity *ahd_find_pci_device(ahd_dev_softc_t);
 int			  ahd_pci_config(struct ahd_softc *,
 					 struct ahd_pci_identity *);
 int	ahd_pci_test_register_access(struct ahd_softc *);
@@ -1461,8 +1433,6 @@ void			ahd_handle_scsi_status(struct ahd_softc *ahd,
 					       struct scb *scb);
 void			ahd_calc_residual(struct ahd_softc *ahd,
 					  struct scb *scb);
-void			ahd_timeout(struct scb *scb);
-void			ahd_recover_commands(struct ahd_softc *ahd);
 /*************************** Utility Functions ********************************/
 struct ahd_phase_table_entry*
 			ahd_lookup_phase_entry(int phase);

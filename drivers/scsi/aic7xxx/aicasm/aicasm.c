@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm.c#22 $
  *
  * $FreeBSD$
  */
@@ -609,10 +609,10 @@ output_listing(char *ifilename)
 
 		while (line < cur_instr->srcline) {
 			fgets(buf, sizeof(buf), ifile);
-				fprintf(listfile, "             \t%s", buf);
+				fprintf(listfile, "\t\t%s", buf);
 				line++;
 		}
-		fprintf(listfile, "%04x %02x%02x%02x%02x", instrptr,
+		fprintf(listfile, "%03x %02x%02x%02x%02x", instrptr,
 #if BYTE_ORDER == LITTLE_ENDIAN
 			cur_instr->format.bytes[0],
 			cur_instr->format.bytes[1],
@@ -624,23 +624,14 @@ output_listing(char *ifilename)
 			cur_instr->format.bytes[1],
 			cur_instr->format.bytes[0]);
 #endif
-		/*
-		 * Macro expansions can cause several instructions
-		 * to be output for a single source line.  Only
-		 * advance the line once in these cases.
-		 */
-		if (line == cur_instr->srcline) {
-			fgets(buf, sizeof(buf), ifile);
-			fprintf(listfile, "\t%s", buf);
-			line++;
-		} else {
-			fprintf(listfile, "\n");
-		}
+		fgets(buf, sizeof(buf), ifile);
+		fprintf(listfile, "\t%s", buf);
+		line++;
 		instrptr++;
 	}
 	/* Dump the remainder of the file */
 	while(fgets(buf, sizeof(buf), ifile) != NULL)
-		fprintf(listfile, "             %s", buf);
+		fprintf(listfile, "\t\t%s", buf);
 
 	fclose(ifile);
 }

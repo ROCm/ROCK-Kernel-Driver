@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7770_osm.c#14 $
  */
 
 #include "aic7xxx_osm.h"
@@ -82,7 +82,7 @@ ahc_linux_eisa_init(void)
 	int i;
 
 	if (aic7xxx_probe_eisa_vl == 0)
-		return (0);
+		return -ENODEV;
 
 	/*
 	 * Linux requires the EISA IDs to be specified in
@@ -93,7 +93,7 @@ ahc_linux_eisa_init(void)
 					 (ahc_num_aic7770_devs + 1),
 					 M_DEVBUF, M_NOWAIT);
 	if (aic7770_driver.id_table == NULL)
-		return (-ENOMEM);
+		return -ENOMEM;
 
 	for (eid = (struct eisa_device_id *)aic7770_driver.id_table,
 	     id = aic7770_ident_table, i = 0;
@@ -109,23 +109,30 @@ ahc_linux_eisa_init(void)
 	}
 	eid->sig[0] = 0;
 
-	return (eisa_driver_register(&aic7770_driver));
+	return eisa_driver_register(&aic7770_driver);
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0) */
 	struct aic7770_identity *entry;
 	u_int  slot;
 	u_int  eisaBase;
 	u_int  i;
+	int ret = -ENODEV;
 
 	if (aic7xxx_probe_eisa_vl == 0)
-		return (0);
+		return ret;
 
 	eisaBase = 0x1000 + AHC_EISA_SLOT_OFFSET;
 	for (slot = 1; slot < NUMSLOTS; eisaBase+=0x1000, slot++) {
 		uint32_t eisa_id;
 		size_t	 id_size;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
+		if (check_region(eisaBase, AHC_EISA_IOSIZE) != 0)
+			continue;
+		request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx");
+#else
 		if (request_region(eisaBase, AHC_EISA_IOSIZE, "aic7xxx") == 0)
 			continue;
+#endif
 
 		eisa_id = 0;
 		id_size = sizeof(eisa_id);
@@ -140,10 +147,12 @@ ahc_linux_eisa_init(void)
 			continue;  /* no EISA card in slot */
 
 		entry = aic7770_find_device(eisa_id);
-		if (entry != NULL)
+		if (entry != NULL) {
 			aic7770_linux_config(entry, NULL, eisaBase);
+			ret = 0;
+		}
 	}
-	return (0);
+	return ret;
 #endif
 }
 
@@ -151,13 +160,8 @@ void
 ahc_linux_eisa_exit(void)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	if (aic7xxx_probe_eisa_vl == 0)
-		return;
-
-	if (aic7770_driver.id_table != NULL) {
-		eisa_driver_unregister(&aic7770_driver);
-		free(aic7770_driver.id_table, M_DEVBUF);
-	}
+	eisa_driver_unregister(&aic7770_driver);
+	free(aic7770_driver.id_table, M_DEVBUF);
 #endif
 }
 
@@ -185,14 +189,6 @@ aic7770_linux_config(struct aic7770_identity *entry, aic7770_dev_t dev,
 		free(name, M_DEVBUF);
 		return (ENOMEM);
 	}
-	ahc->dev_softc = dev;
-	if (aic_set_dma_mask(ahc, 0xFFFFFFFF) != 0
-       /*|| aic_set_consistent_dma_mask(ahc, 0xFFFFFFFF) != 0 */) {
-		printk(KERN_WARNING "aic7xxx: Unable to set DMA masks.\n");
-		ahc_free(ahc);
-		return (-ENOMEM);
-	}
-	ahc->platform_data->hw_dma_mask = 0xFFFFFFFF;
 	error = aic7770_config(ahc, entry, eisaBase);
 	if (error != 0) {
 		ahc->bsh.ioport = 0;
@@ -213,8 +209,14 @@ aic7770_map_registers(struct ahc_softc *ahc, u_int port)
 	/*
 	 * Lock out other contenders for our i/o space.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
+	if (check_region(port, AHC_EISA_IOSIZE) != 0)
+		return (ENOMEM);
+	request_region(port, AHC_EISA_IOSIZE, "aic7xxx");
+#else
 	if (request_region(port, AHC_EISA_IOSIZE, "aic7xxx") == 0)
 		return (ENOMEM);
+#endif
 	ahc->tag = BUS_SPACE_PIO;
 	ahc->bsh.ioport = port;
 	return (0);
@@ -264,14 +266,12 @@ aic7770_eisa_dev_remove(struct device *dev)
 	if (ahc != NULL) {
 		u_long s;
 
-		TAILQ_REMOVE(&ahc_tailq, ahc, links);
-		ahc_list_unlock(&l);
 		ahc_lock(ahc, &s);
 		ahc_intr_enable(ahc, FALSE);
 		ahc_unlock(ahc, &s);
 		ahc_free(ahc);
-	} else
-		ahc_list_unlock(&l);
+	}
+	ahc_list_unlock(&l);
 
 	return (0);
 }
