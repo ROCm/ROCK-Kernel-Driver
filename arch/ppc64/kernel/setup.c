@@ -821,6 +821,9 @@ early_param("mem", early_parsemem);
 #endif
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
+int do_not_try_pc_legacy_8250_console;
+EXPORT_SYMBOL(do_not_try_pc_legacy_8250_console);
+
 static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout = NULL;
@@ -919,9 +922,15 @@ static int __init set_preferred_console(void)
 #endif /* CONFIG_PPC_PSERIES */
 #ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
 	else if (strcmp(name, "ch-a") == 0)
+	{
+		do_not_try_pc_legacy_8250_console = 1;
 		offset = 0;
+	}
 	else if (strcmp(name, "ch-b") == 0)
+	{
+		do_not_try_pc_legacy_8250_console = 1;
 		offset = 1;
+	}
 #endif /* CONFIG_SERIAL_PMACZILOG_CONSOLE */
 	else
 		goto not_found;
