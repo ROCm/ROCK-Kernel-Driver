@@ -1222,7 +1222,7 @@ static struct Scsi_Host *__nsp_detect(Scsi_Host_Template *sht)
 	DEBUG(0, "%s: this_id=%d\n", __FUNCTION__, sht->this_id);
 
 	request_region(data->BaseAddress, data->NumAddress, "nsp_cs");
-	host		  = scsi_register(sht, 0);
+	host		  = scsi_host_alloc(sht, 0);
 	if(host == NULL)
 		return NULL;
 

@@ -736,7 +736,7 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	 * Since this is a new device, we need to register a SCSI
 	 * host definition with the higher SCSI layers.
 	 */
-	us->host = scsi_register(&usb_stor_host_template, sizeof(us));
+	us->host = scsi_host_alloc(&usb_stor_host_template, sizeof(us));
 	if (!us->host) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to register the scsi host\n");

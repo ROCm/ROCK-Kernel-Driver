@@ -177,7 +177,7 @@ static struct Scsi_Host *host;
 static int __init ecoscsi_init(void)
 {
 
-	host = scsi_register(tpnt, sizeof(struct NCR5380_hostdata));
+	host = scsi_host_alloc(tpnt, sizeof(struct NCR5380_hostdata));
 	if (!host)
 		return 0;
 
@@ -211,7 +211,7 @@ static int __init ecoscsi_init(void)
 release_reg:
 	release_region(host->io_port, host->n_io_port);
 unregister_scsi:
-	scsi_unregister(host);
+	scsi_host_put(host);
 	return -ENODEV;
 }
 
@@ -224,7 +224,7 @@ static void __exit ecoscsi_exit(void)
 	if (shpnt->io_port)
 		release_region(shpnt->io_port, shpnt->n_io_port);
 
-	scsi_unregister(host);
+	scsi_host_put(host);
 	return 0;
 }
 

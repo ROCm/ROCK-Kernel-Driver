@@ -787,20 +787,6 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	return 0;
 }
 
-static void internal_done(Scsi_Cmnd *SCpnt)
-{
-	SCpnt->SCp.Status++;
-}
-
-static int sym53c416_command(Scsi_Cmnd *SCpnt)
-{
-	sym53c416_queuecommand(SCpnt, internal_done);
-	SCpnt->SCp.Status = 0;
-	while(!SCpnt->SCp.Status)
-		barrier();
-	return SCpnt->result;
-}
-
 static int sym53c416_abort(Scsi_Cmnd *SCpnt)
 {
 	return FAILED;
@@ -880,7 +866,6 @@ static Scsi_Host_Template driver_template = {
 	.name =			"Symbios Logic 53c416",
 	.detect =		sym53c416_detect,
 	.info =			sym53c416_info,	
-	.command =		sym53c416_command,
 	.queuecommand =		sym53c416_queuecommand,
 	.eh_abort_handler =	sym53c416_abort,
 	.eh_host_reset_handler =sym53c416_host_reset,

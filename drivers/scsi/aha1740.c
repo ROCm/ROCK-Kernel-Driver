@@ -476,23 +476,6 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
     return 0;
 }
 
-static void internal_done(Scsi_Cmnd * SCpnt)
-{
-    SCpnt->SCp.Status++;
-}
-
-static int aha1740_command(Scsi_Cmnd * SCpnt)
-{
-    aha1740_queuecommand(SCpnt, internal_done);
-    SCpnt->SCp.Status = 0;
-    while (!SCpnt->SCp.Status)
-    {
-	cpu_relax();
-	barrier();
-    }
-    return SCpnt->result;
-}
-
 /* Query the board for its irq_level.  Nothing else matters
    in enhanced mode on an EISA bus. */
 
@@ -567,6 +550,16 @@ static int aha1740_detect(Scsi_Host_Template * tpnt)
     return count;
 }
 
+static int aha1740_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static int aha1740_biosparam(struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int* ip)
 {
@@ -596,7 +589,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_info		= aha1740_proc_info,
 	.name			= "Adaptec 174x (EISA)",
 	.detect			= aha1740_detect,
-	.command		= aha1740_command,
+	.release		= aha1740_release,
 	.queuecommand		= aha1740_queuecommand,
 	.bios_param		= aha1740_biosparam,
 	.can_queue		= AHA1740_ECBS,

@@ -811,7 +811,7 @@ static int mts_usb_probe(struct usb_interface *intf,
 		MTS_WARNING( "will this work? Image data EP is not usually %d\n",
 			     (int)new_desc->ep_image );
 
-	new_desc->host = scsi_register(&mts_scsi_host_template,
+	new_desc->host = scsi_host_alloc(&mts_scsi_host_template,
 			sizeof(new_desc));
 	if (!new_desc->host)
 		goto out_free_urb;
@@ -838,7 +838,7 @@ static void mts_usb_disconnect (struct usb_interface *intf)
 
 	scsi_remove_host(desc->host);
 	usb_unlink_urb(desc->urb);
-	scsi_unregister(desc->host);
+	scsi_host_put(desc->host);
 
 	usb_free_urb(desc->urb);
 	kfree(desc);

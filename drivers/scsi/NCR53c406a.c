@@ -170,7 +170,6 @@ enum Phase {
 /* Static function prototypes */
 static void NCR53c406a_intr(int, void *, struct pt_regs *);
 static irqreturn_t do_NCR53c406a_intr(int, void *, struct pt_regs *);
-static void internal_done(Scsi_Cmnd *);
 static void wait_intr(void);
 static void chip_init(void);
 static void calc_port_addr(void);
@@ -205,8 +204,6 @@ static int fast_pio = USE_FAST_PIO;
 #endif
 
 static Scsi_Cmnd *current_SC;
-static volatile int internal_done_flag;
-static volatile int internal_done_errcode;
 static char info_msg[256];
 
 /* ================================================================= */
@@ -590,6 +587,21 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 	return 0;
 }
 
+static int NCR53c406a_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+#ifdef USE_DMA
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+#endif
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+
+	scsi_unregister(shost);
+	return 0;
+}
+
 /* called from init/main.c */
 static void __init NCR53c406a_setup(char *str, int *ints)
 {
@@ -649,13 +661,6 @@ static const char *NCR53c406a_info(struct Scsi_Host *SChost)
 	return (info_msg);
 }
 
-static void internal_done(Scsi_Cmnd * SCpnt)
-{
-	internal_done_errcode = SCpnt->result;
-	++internal_done_flag;
-}
-
-
 static void wait_intr(void)
 {
 	unsigned long i = jiffies + WATCHDOG;
@@ -707,21 +712,6 @@ static int NCR53c406a_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 
 	rtrc(1);
 	return 0;
-}
-
-static int NCR53c406a_command(Scsi_Cmnd * SCpnt)
-{
-	DEB(printk("NCR53c406a_command called\n"));
-	NCR53c406a_queue(SCpnt, internal_done);
-	if (irq_level)
-		while (!internal_done_flag)
-			cpu_relax();
-	else			/* interrupts not supported */
-		while (!internal_done_flag)
-			wait_intr();
-
-	internal_done_flag = 0;
-	return internal_done_errcode;
 }
 
 static int NCR53c406a_abort(Scsi_Cmnd * SCpnt)
@@ -1074,8 +1064,8 @@ static Scsi_Host_Template driver_template =
      .proc_name         	= "NCR53c406a"		/* proc_name */,        
      .name              	= "NCR53c406a"		/* name */,             
      .detect            	= NCR53c406a_detect	/* detect */,           
+     .release            	= NCR53c406a_release,
      .info              	= NCR53c406a_info		/* info */,             
-     .command           	= NCR53c406a_command	/* command */,          
      .queuecommand      	= NCR53c406a_queue	/* queuecommand */,     
      .eh_abort_handler  	= NCR53c406a_abort	/* abort */,            
      .eh_bus_reset_handler      = NCR53c406a_bus_reset	/* reset */,            
