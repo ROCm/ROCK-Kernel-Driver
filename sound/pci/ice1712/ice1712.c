@@ -1906,6 +1906,74 @@ static snd_kcontrol_new_t snd_ice1712_pro_internal_clock __devinitdata = {
 	.put = snd_ice1712_pro_internal_clock_put
 };
 
+static int snd_ice1712_pro_internal_clock_default_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	static char *texts[] = {
+		"8000",		/* 0: 6 */
+		"9600",		/* 1: 3 */
+		"11025",	/* 2: 10 */
+		"12000",	/* 3: 2 */
+		"16000",	/* 4: 5 */
+		"22050",	/* 5: 9 */
+		"24000",	/* 6: 1 */
+		"32000",	/* 7: 4 */
+		"44100",	/* 8: 8 */
+		"48000",	/* 9: 0 */
+		"64000",	/* 10: 15 */
+		"88200",	/* 11: 11 */
+		"96000",	/* 12: 7 */
+		// "IEC958 Input",	/* 13: -- */
+	};
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 13;
+	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
+		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+
+static int snd_ice1712_pro_internal_clock_default_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	int val;
+	static unsigned int xrate[13] = {
+		8000, 9600, 11025, 12000, 1600, 22050, 24000,
+		32000, 44100, 48000, 64000, 88200, 96000
+	};
+
+	for (val = 0; val < 13; val++) {
+		if (xrate[val] == PRO_RATE_DEFAULT)
+			break;
+	}
+
+	ucontrol->value.enumerated.item[0] = val;
+	return 0;
+}
+
+static int snd_ice1712_pro_internal_clock_default_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	static unsigned int xrate[13] = {
+		8000, 9600, 11025, 12000, 1600, 22050, 24000,
+		32000, 44100, 48000, 64000, 88200, 96000
+	};
+	unsigned char oval;
+	int change = 0;
+
+	oval = PRO_RATE_DEFAULT;
+	PRO_RATE_DEFAULT = xrate[ucontrol->value.integer.value[0] % 13];
+	change = PRO_RATE_DEFAULT != oval;
+
+	return change;
+}
+
+static snd_kcontrol_new_t snd_ice1712_pro_internal_clock_default __devinitdata = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Multi Track Internal Clock Default",
+	.info = snd_ice1712_pro_internal_clock_default_info,
+	.get = snd_ice1712_pro_internal_clock_default_get,
+	.put = snd_ice1712_pro_internal_clock_default_put
+};
+
 static int snd_ice1712_pro_rate_locking_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
@@ -2341,6 +2409,9 @@ static int __devinit snd_ice1712_build_controls(ice1712_t *ice)
 	if (err < 0)
 		return err;
 	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_pro_internal_clock, ice));
+	if (err < 0)
+		return err;
+	err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_pro_internal_clock_default, ice));
 	if (err < 0)
 		return err;
 
