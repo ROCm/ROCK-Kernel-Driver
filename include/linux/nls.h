@@ -18,7 +18,7 @@ struct nls_table {
 };
 
 /* this value hold the maximum octet of charset */
-#define NLS_MAX_CHARSET_SIZE 3
+#define NLS_MAX_CHARSET_SIZE 6 /* for UTF-8 */
 
 /* nls.c */
 extern int register_nls(struct nls_table *);
