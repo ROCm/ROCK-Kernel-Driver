@@ -700,14 +700,29 @@ out:
 		tg3_writephy(tp, 0x1c, 0x8d68);
 		tg3_writephy(tp, 0x1c, 0x8d68);
 	}
+	if (tp->tg3_flags2 & TG3_FLG2_PHY_BER_BUG) {
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x000a);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x310b);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x9506);
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x401f);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x14e2);
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+	}
 	/* Set Extended packet length bit (bit 14) on all chips that */
 	/* support jumbo frames */
-	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401 ||
-	    (tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5411) {
+	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401) {
+		/* Cannot do read-modify-write on 5401 */
 		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4c20);
 	}
 	else if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
-		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4400);
+		u32 phy_reg;
+
+		/* Set bit 14 with read-modify-write to preserve other bits */
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0007);
+		tg3_readphy(tp, MII_TG3_AUX_CTRL, &phy_reg);
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, phy_reg | 0x4000);
 	}
 	tg3_phy_set_wirespeed(tp);
 	return 0;
@@ -1059,8 +1074,6 @@ static int tg3_phy_copper_begin(struct tg3 *tp)
 {
 	u32 new_adv;
 	int i;
-
-	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
 
 	if (tp->link_config.phy_is_low_power) {
 		/* Entering low power mode.  Disable gigabit and
@@ -6605,21 +6618,6 @@ skip_phy_reset:
 			return err;
 	}
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) {
-		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4c00);
-		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
-		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
-	}
-
-	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
-	    (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)) {
-		tg3_writephy(tp, 0x1c, 0x8d68);
-		tg3_writephy(tp, 0x1c, 0x8d68);
-	}
-
-	/* Enable Ethernet@WireSpeed */
-	tg3_phy_set_wirespeed(tp);
-
 	if (!err && ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401)) {
 		err = tg3_init_5401phy_dsp(tp);
 	}
@@ -6933,6 +6931,10 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_ADC_BUG;
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_5704_A0_BUG;
+
+	/* Note: 5750 also needs this flag set to improve bit error rate. */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		tp->tg3_flags2 |= TG3_FLG2_PHY_BER_BUG;
 
 	/* Only 5701 and later support tagged irq status mode.
 	 * Also, 5788 chips cannot use tagged irq status.
