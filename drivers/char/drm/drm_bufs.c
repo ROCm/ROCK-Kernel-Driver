@@ -36,6 +36,41 @@
 #include <linux/vmalloc.h>
 #include "drmP.h"
 
+#ifdef _LP64
+static __inline__ unsigned int HandleID(void *handle, drm_device_t *dev) 
+{
+    unsigned long lhandle;
+    unsigned int hash;
+    struct list_head *list;
+    drm_map_list_t *r_list = NULL;
+   
+    lhandle = (unsigned long)handle;
+    hash = (unsigned int)(((lhandle >> 32) 
+			   + (lhandle >> 16) 
+			   + lhandle) & 0xffff0000);
+    while (1) {
+	if (hash == 0) hash = (1 << 16);
+
+	list = &dev->maplist->head;
+	list_for_each(list, &dev->maplist->head) {
+	    r_list = list_entry(list, drm_map_list_t, head);
+
+	    if(r_list->map && r_list->map->pub.pub_handle
+	       && r_list->map->pub.pub_handle == hash)
+		break;
+	}
+
+	if(list == (&dev->maplist->head))
+	    return hash;
+
+	hash += (1 << 16);
+    }
+}
+#else
+# define HandleID(x,dev) (unsigned int)(x)
+#endif
+
+
 /**
  * Compute size order.  Returns the exponent of the smaller power of two which
  * is greater or equal to given number.
@@ -78,7 +113,7 @@ int drm_addmap( struct inode *inode, struct file *filp,
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
-	drm_map_t *map;
+	drm_map_priv_t *map;
 	drm_map_t __user *argp = (void __user *)arg;
 	drm_map_list_t *list;
 
@@ -88,7 +123,7 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	if ( !map )
 		return -ENOMEM;
 
-	if ( copy_from_user( map, argp, sizeof(*map) ) ) {
+	if ( copy_from_user( map, argp, sizeof(drm_map_t) ) ) {
 		drm_free( map, sizeof(*map), DRM_MEM_MAPS );
 		return -EFAULT;
 	}
@@ -97,54 +132,54 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	 * book keeping information about shared memory to allow for removal
 	 * when processes fork.
 	 */
-	if ( (map->flags & _DRM_REMOVABLE) && map->type != _DRM_SHM ) {
+	if ( (map->pub.flags & _DRM_REMOVABLE) && map->pub.type != _DRM_SHM ) {
 		drm_free( map, sizeof(*map), DRM_MEM_MAPS );
 		return -EINVAL;
 	}
 	DRM_DEBUG( "offset = 0x%08lx, size = 0x%08lx, type = %d\n",
-		   map->offset, map->size, map->type );
-	if ( (map->offset & (~PAGE_MASK)) || (map->size & (~PAGE_MASK)) ) {
+		   map->pub.offset, map->pub.size, map->pub.type );
+	if ( (map->pub.offset & (~PAGE_MASK)) || (map->pub.size & (~PAGE_MASK)) ) {
 		drm_free( map, sizeof(*map), DRM_MEM_MAPS );
 		return -EINVAL;
 	}
-	map->mtrr   = -1;
+	map->pub.mtrr   = -1;
 	map->handle = NULL;
 
-	switch ( map->type ) {
+	switch ( map->pub.type ) {
 	case _DRM_REGISTERS:
 	case _DRM_FRAME_BUFFER:
 #if !defined(__sparc__) && !defined(__alpha__) && !defined(__ia64__)
-		if ( map->offset + map->size < map->offset ||
-		     map->offset < virt_to_phys(high_memory) ) {
+		if ( map->pub.offset + map->pub.size < map->pub.offset ||
+		     map->pub.offset < virt_to_phys(high_memory) ) {
 			drm_free( map, sizeof(*map), DRM_MEM_MAPS );
 			return -EINVAL;
 		}
 #endif
 #ifdef __alpha__
-		map->offset += dev->hose->mem_space->start;
+		map->pub.offset += dev->hose->mem_space->start;
 #endif
 		if (drm_core_has_MTRR(dev)) {
-			if ( map->type == _DRM_FRAME_BUFFER ||
-			     (map->flags & _DRM_WRITE_COMBINING) ) {
-				map->mtrr = mtrr_add( map->offset, map->size,
+			if ( map->pub.type == _DRM_FRAME_BUFFER ||
+			     (map->pub.flags & _DRM_WRITE_COMBINING) ) {
+				map->pub.mtrr = mtrr_add( map->pub.offset, map->pub.size,
 						      MTRR_TYPE_WRCOMB, 1 );
 			}
 		}
-		if (map->type == _DRM_REGISTERS)
-			map->handle = drm_ioremap( map->offset, map->size,
+		if (map->pub.type == _DRM_REGISTERS)
+			map->handle = drm_ioremap( map->pub.offset, map->pub.size,
 						    dev );
 		break;
 
 	case _DRM_SHM:
-		map->handle = vmalloc_32(map->size);
+		map->handle = vmalloc(map->pub.size);
 		DRM_DEBUG( "%lu %d %p\n",
-			   map->size, drm_order( map->size ), map->handle );
+			   map->pub.size, drm_order( map->pub.size ), map->handle );
 		if ( !map->handle ) {
 			drm_free( map, sizeof(*map), DRM_MEM_MAPS );
 			return -ENOMEM;
 		}
-		map->offset = (unsigned long)map->handle;
-		if ( map->flags & _DRM_CONTAINS_LOCK ) {
+		map->pub.offset = (unsigned long)map->handle;
+		if ( map->pub.flags & _DRM_CONTAINS_LOCK ) {
 			/* Prevent a 2nd X Server from creating a 2nd lock */
 			if (dev->lock.hw_lock != NULL) {
 				vfree( map->handle );
@@ -158,10 +193,10 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	case _DRM_AGP:
 		if (drm_core_has_AGP(dev)) {
 #ifdef __alpha__
-			map->offset += dev->hose->mem_space->start;
+			map->pub.offset += dev->hose->mem_space->start;
 #endif
-			map->offset += dev->agp->base;
-			map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
+			map->pub.offset += dev->agp->base;
+			map->pub.mtrr   = dev->agp->agp_mtrr; /* for getmap */
 		}
 		break;
 	case _DRM_SCATTER_GATHER:
@@ -169,7 +204,7 @@ int drm_addmap( struct inode *inode, struct file *filp,
 			drm_free(map, sizeof(*map), DRM_MEM_MAPS);
 			return -EINVAL;
 		}
-		map->offset += dev->sg->handle;
+		map->pub.offset += (unsigned long)dev->sg->virtual;
 		break;
 
 	default:
@@ -189,12 +224,16 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	list_add(&list->head, &dev->maplist->head);
  	up(&dev->struct_sem);
 
-	if ( copy_to_user( argp, map, sizeof(*map) ) )
+	map->pub.pub_handle = HandleID(map->handle, dev);
+	DRM_DEBUG( "HandleID = 0x%lx addr = %p offset = 0x%lx\n",
+		  map->pub.pub_handle,map->handle,map->pub.offset);
+	
+	if ( copy_to_user( argp, map, sizeof(drm_map_t) ) )
 		return -EFAULT;
-	if ( map->type != _DRM_SHM ) {
-		if ( copy_to_user( &argp->handle,
-				   &map->offset,
-				   sizeof(map->offset) ) )
+	if ( map->pub.type != _DRM_SHM ) {
+		if ( copy_to_user( &argp->pub_handle,
+				   &map->pub.pub_handle,
+				   sizeof(map->pub.pub_handle) ) )
 			return -EFAULT;
 	}
 	return 0;
@@ -225,7 +264,7 @@ int drm_rmmap(struct inode *inode, struct file *filp,
 	struct list_head *list;
 	drm_map_list_t *r_list = NULL;
 	drm_vma_entry_t *pt, *prev;
-	drm_map_t *map;
+	drm_map_priv_t *map;
 	drm_map_t request;
 	int found_maps = 0;
 
@@ -240,8 +279,8 @@ int drm_rmmap(struct inode *inode, struct file *filp,
 		r_list = list_entry(list, drm_map_list_t, head);
 
 		if(r_list->map &&
-		   r_list->map->handle == request.handle &&
-		   r_list->map->flags & _DRM_REMOVABLE) break;
+		   r_list->map->pub.pub_handle == request.pub_handle &&
+		   r_list->map->pub.flags & _DRM_REMOVABLE) break;
 	}
 
 	/* List has wrapped around to the head pointer, or its empty we didn't
@@ -260,19 +299,19 @@ int drm_rmmap(struct inode *inode, struct file *filp,
 	}
 
 	if(!found_maps) {
-		switch (map->type) {
+		switch (map->pub.type) {
 		case _DRM_REGISTERS:
 		case _DRM_FRAME_BUFFER:
 		  if (drm_core_has_MTRR(dev)) {
-				if (map->mtrr >= 0) {
+				if (map->pub.mtrr >= 0) {
 					int retcode;
-					retcode = mtrr_del(map->mtrr,
-							   map->offset,
-							   map->size);
+					retcode = mtrr_del(map->pub.mtrr,
+							   map->pub.offset,
+							   map->pub.size);
 					DRM_DEBUG("mtrr_del = %d\n", retcode);
 				}
 			}
-			drm_ioremapfree(map->handle, map->size, dev);
+			drm_ioremapfree(map->handle, map->pub.size, dev);
 			break;
 		case _DRM_SHM:
 			vfree(map->handle);
@@ -837,7 +876,8 @@ int drm_addbufs_sg( struct inode *inode, struct file *filp,
 
 		buf->offset  = (dma->byte_count + offset);
 		buf->bus_address = agp_offset + offset;
-		buf->address = (void *)(agp_offset + offset + dev->sg->handle);
+		buf->address = (void *)(agp_offset + offset 
+					+ (unsigned long)dev->sg->virtual);
 		buf->next    = NULL;
 		buf->waiting = 0;
 		buf->pending = 0;
@@ -1187,7 +1227,7 @@ int drm_mapbufs( struct inode *inode, struct file *filp,
 	if ( request.count >= dma->buf_count ) {
 		if ((drm_core_has_AGP(dev) && (dma->flags & _DRM_DMA_USE_AGP)) ||
 		    (drm_core_check_feature(dev, DRIVER_SG) && (dma->flags & _DRM_DMA_USE_SG)) ) {
-			drm_map_t *map = dev->agp_buffer_map;
+			drm_map_priv_t *map = dev->agp_buffer_map;
 
 			if ( !map ) {
 				retcode = -EINVAL;
@@ -1199,10 +1239,10 @@ int drm_mapbufs( struct inode *inode, struct file *filp,
 #else
 			down_write( &current->mm->mmap_sem );
 #endif
-			virtual = do_mmap( filp, 0, map->size,
+			virtual = do_mmap( filp, 0, map->pub.size,
 					   PROT_READ | PROT_WRITE,
 					   MAP_SHARED,
-					   (unsigned long)map->offset );
+					   (unsigned long)map->pub.pub_handle );
 #if LINUX_VERSION_CODE <= 0x020402
 			up( &current->mm->mmap_sem );
 #else

@@ -227,7 +227,7 @@ typedef enum drm_map_flags {
 
 typedef struct drm_ctx_priv_map {
 	unsigned int	ctx_id;  /**< Context requesting private mapping */
-	void		*handle; /**< Handle of map */
+	unsigned long		handle; /**< Handle of map */
 } drm_ctx_priv_map_t;
 
 
@@ -242,12 +242,16 @@ typedef struct drm_map {
 	unsigned long	size;	 /**< Requested physical size (bytes) */
 	drm_map_type_t	type;	 /**< Type of memory to map */
 	drm_map_flags_t flags;	 /**< Flags */
-	void		*handle; /**< User-space: "Handle" to pass to mmap() */
+	unsigned long   pub_handle; /**< User-space: "Handle" to pass to mmap() */
 				 /**< Kernel-space: kernel-virtual address */
 	int		mtrr;	 /**< MTRR slot used */
 				 /*   Private data */
 } drm_map_t;
 
+typedef struct drm_map_priv {
+    struct drm_map pub;
+    void *handle;
+} drm_map_priv_t;
 
 /**
  * DRM_IOCTL_GET_CLIENT ioctl argument type.

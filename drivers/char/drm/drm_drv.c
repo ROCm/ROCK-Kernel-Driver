@@ -133,7 +133,7 @@ drm_ioctl_desc_t		  drm_ioctls[] = {
 int drm_takedown( drm_device_t *dev )
 {
 	drm_magic_entry_t *pt, *next;
-	drm_map_t *map;
+	drm_map_priv_t *map;
 	drm_map_list_t *r_list;
 	struct list_head *list, *list_next;
 	drm_vma_entry_t *vma, *vma_next;
@@ -205,19 +205,19 @@ int drm_takedown( drm_device_t *dev )
 			r_list = (drm_map_list_t *)list;
 
 			if ( ( map = r_list->map ) ) {
-				switch ( map->type ) {
+				switch ( map->pub.type ) {
 				case _DRM_REGISTERS:
 				case _DRM_FRAME_BUFFER:
 					if (drm_core_has_MTRR(dev)) {
-						if ( map->mtrr >= 0 ) {
+						if ( map->pub.mtrr >= 0 ) {
 							int retcode;
-							retcode = mtrr_del( map->mtrr,
-									    map->offset,
-									    map->size );
+							retcode = mtrr_del( map->pub.mtrr,
+									    map->pub.offset,
+									    map->pub.size );
 							DRM_DEBUG( "mtrr_del=%d\n", retcode );
 						}
 					}
-					drm_ioremapfree( map->handle, map->size, dev );
+					drm_ioremapfree( map->handle, map->pub.size, dev );
 					break;
 				case _DRM_SHM:
 					vfree(map->handle);
@@ -310,6 +310,9 @@ int drm_init( struct drm_driver *driver )
 			drm_probe(pdev, pid, driver);
 		}
 	}
+	if (driver->register_ioctl32)
+	driver->register_ioctl32();
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_init);
@@ -347,6 +350,9 @@ static void drm_cleanup( drm_device_t *dev )
 		drm_free( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
 		dev->agp = NULL;
 	}
+
+	if (dev->driver->unregister_ioctl32)
+	    dev->driver->unregister_ioctl32();
 
 	if (dev->driver->postcleanup)
 		dev->driver->postcleanup(dev);

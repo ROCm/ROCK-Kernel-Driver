@@ -109,8 +109,8 @@ do { 									 \
 	drm_map_list_t *entry;						 \
 	list_for_each_entry( entry, &dev->maplist->head, head ) {	 \
 		if ( entry->map &&					 \
-		     entry->map->type == _DRM_SHM &&			 \
-		     (entry->map->flags & _DRM_CONTAINS_LOCK) ) {	 \
+		     entry->map->pub.type == _DRM_SHM &&		 \
+		     (entry->map->pub.flags & _DRM_CONTAINS_LOCK) ) {	 \
 			dev_priv->sarea = entry->map;			 \
  			break;						 \
  		}							 \

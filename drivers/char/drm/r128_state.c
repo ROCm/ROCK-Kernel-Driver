@@ -733,7 +733,7 @@ static void r128_cce_dispatch_indices( drm_device_t *dev,
 	drm_r128_buf_priv_t *buf_priv = buf->dev_private;
 	drm_r128_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	int format = sarea_priv->vc_format;
-	int offset = dev->agp_buffer_map->offset - dev_priv->cce_buffers_offset;
+	int offset = dev->agp_buffer_map->pub.offset - dev_priv->cce_buffers_offset;
 	int prim = buf_priv->prim;
 	u32 *data;
 	int dwords;

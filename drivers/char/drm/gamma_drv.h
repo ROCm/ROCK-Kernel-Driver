@@ -34,11 +34,11 @@
 
 typedef struct drm_gamma_private {
 	drm_gamma_sarea_t *sarea_priv;
-	drm_map_t *sarea;
-	drm_map_t *mmio0;
-	drm_map_t *mmio1;
-	drm_map_t *mmio2;
-	drm_map_t *mmio3;
+	drm_map_priv_t *sarea;
+	drm_map_priv_t *mmio0;
+	drm_map_priv_t *mmio1;
+	drm_map_priv_t *mmio2;
+	drm_map_priv_t *mmio3;
 	int num_rast;
 } drm_gamma_private_t;
 

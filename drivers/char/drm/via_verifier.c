@@ -258,13 +258,13 @@ eat_words(const uint32_t **buf, const uint32_t *buf_end, unsigned num_words)
  * Partially stolen from drm_memory.h
  */
 
-static __inline__ drm_map_t *
+static __inline__ drm_map_priv_t *
 via_drm_lookup_agp_map (drm_via_state_t *seq, unsigned long offset, unsigned long size, 
 			drm_device_t *dev)
 {
 	struct list_head *list;
 	drm_map_list_t *r_list;
-	drm_map_t *map = seq->map_cache;
+	drm_map_priv_t *map = seq->map_cache;
 
 	if (map && map->offset <= offset && (offset + size) <= (map->offset + map->size)) {
 		return map;

@@ -55,7 +55,7 @@ static __inline__ struct page *drm_do_vm_nopage(struct vm_area_struct *vma,
 {
 	drm_file_t *priv  = vma->vm_file->private_data;
 	drm_device_t *dev = priv->dev;
-	drm_map_t *map    = NULL;
+	drm_map_priv_t *map    = NULL;
 	drm_map_list_t  *r_list;
 	struct list_head *list;
 
@@ -71,12 +71,12 @@ static __inline__ struct page *drm_do_vm_nopage(struct vm_area_struct *vma,
 		r_list = list_entry(list, drm_map_list_t, head);
 		map = r_list->map;
 		if (!map) continue;
-		if (map->offset == VM_OFFSET(vma)) break;
+		if (map->pub.pub_handle == VM_OFFSET(vma)) break;
 	}
 
-	if (map && map->type == _DRM_AGP) {
+	if (map && map->pub.type == _DRM_AGP) {
 		unsigned long offset = address - vma->vm_start;
-		unsigned long baddr = VM_OFFSET(vma) + offset;
+		unsigned long baddr = map->pub.offset + offset;
 		struct drm_agp_mem *agpmem;
 		struct page *page;
 
@@ -135,7 +135,7 @@ static __inline__ struct page *drm_do_vm_nopage(struct vm_area_struct *vma,
 static __inline__ struct page *drm_do_vm_shm_nopage(struct vm_area_struct *vma,
 						     unsigned long address)
 {
-	drm_map_t	 *map	 = (drm_map_t *)vma->vm_private_data;
+	drm_map_priv_t	 *map	 = (drm_map_priv_t *)vma->vm_private_data;
 	unsigned long	 offset;
 	unsigned long	 i;
 	struct page	 *page;
@@ -168,7 +168,7 @@ void drm_vm_shm_close(struct vm_area_struct *vma)
 	drm_file_t	*priv	= vma->vm_file->private_data;
 	drm_device_t	*dev	= priv->dev;
 	drm_vma_entry_t *pt, *prev, *next;
-	drm_map_t *map;
+	drm_map_priv_t *map;
 	drm_map_list_t *r_list;
 	struct list_head *list;
 	int found_maps = 0;
@@ -196,7 +196,7 @@ void drm_vm_shm_close(struct vm_area_struct *vma)
 	}
 	/* We were the only map that was found */
 	if(found_maps == 1 &&
-	   map->flags & _DRM_REMOVABLE) {
+	   map->pub.flags & _DRM_REMOVABLE) {
 		/* Check to see if we are in the maplist, if we are not, then
 		 * we delete this mappings information.
 		 */
@@ -208,17 +208,17 @@ void drm_vm_shm_close(struct vm_area_struct *vma)
 		}
 
 		if(!found_maps) {
-			switch (map->type) {
+			switch (map->pub.type) {
 			case _DRM_REGISTERS:
 			case _DRM_FRAME_BUFFER:
-				if (drm_core_has_MTRR(dev) && map->mtrr >= 0) {
+				if (drm_core_has_MTRR(dev) && map->pub.mtrr >= 0) {
 					int retcode;
-					retcode = mtrr_del(map->mtrr,
-							   map->offset,
-							   map->size);
+					retcode = mtrr_del(map->pub.mtrr,
+							   map->pub.offset,
+							   map->pub.size);
 					DRM_DEBUG("mtrr_del = %d\n", retcode);
 				}
-				drm_ioremapfree(map->handle, map->size, dev);
+				drm_ioremapfree(map->handle, map->pub.size, dev);
 				break;
 			case _DRM_SHM:
 				vfree(map->handle);
@@ -279,7 +279,7 @@ static __inline__ struct page *drm_do_vm_dma_nopage(struct vm_area_struct *vma,
 static __inline__ struct page *drm_do_vm_sg_nopage(struct vm_area_struct *vma,
 						    unsigned long address)
 {
-	drm_map_t        *map    = (drm_map_t *)vma->vm_private_data;
+	drm_map_priv_t        *map    = (drm_map_priv_t *)vma->vm_private_data;
 	drm_file_t *priv = vma->vm_file->private_data;
 	drm_device_t *dev = priv->dev;
 	drm_sg_mem_t *entry = dev->sg;
@@ -294,7 +294,7 @@ static __inline__ struct page *drm_do_vm_sg_nopage(struct vm_area_struct *vma,
 
 
 	offset = address - vma->vm_start;
-	map_offset = map->offset - dev->sg->handle;
+	map_offset = map->pub.offset - (unsigned long)dev->sg->virtual;
 	page_offset = (offset >> PAGE_SHIFT) + (map_offset >> PAGE_SHIFT);
 	page = entry->pagelist[page_offset];
 	get_page(page);
@@ -496,9 +496,9 @@ int drm_mmap_dma(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 }
 
-unsigned long drm_core_get_map_ofs(drm_map_t *map)
+unsigned long drm_core_get_map_ofs(drm_map_priv_t *map)
 {
-	return map->offset;
+	return map->pub.offset;
 }
 EXPORT_SYMBOL(drm_core_get_map_ofs);
 
@@ -529,9 +529,9 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= filp->private_data;
 	drm_device_t	*dev	= priv->dev;
-	drm_map_t	*map	= NULL;
+	drm_map_priv_t	*map	= NULL;
 	drm_map_list_t  *r_list;
-	unsigned long   offset  = 0;
+	unsigned long   vm_offset = 0, offset  = 0;
 	struct list_head *list;
 
 	DRM_DEBUG("start = 0x%lx, end = 0x%lx, offset = 0x%lx\n",
@@ -558,22 +558,20 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 				   for performance, even if the list was a
 				   bit longer. */
 	list_for_each(list, &dev->maplist->head) {
-		unsigned long off;
 
 		r_list = list_entry(list, drm_map_list_t, head);
 		map = r_list->map;
 		if (!map) continue;
-		off = dev->driver->get_map_ofs(map);
-		if (off == VM_OFFSET(vma)) break;
+		if (map->pub.pub_handle == VM_OFFSET(vma)) break;
 	}
 
-	if (!map || ((map->flags&_DRM_RESTRICTED) && !capable(CAP_SYS_ADMIN)))
+	if (!map || ((map->pub.flags&_DRM_RESTRICTED) && !capable(CAP_SYS_ADMIN)))
 		return -EPERM;
 
 				/* Check for valid size. */
-	if (map->size != vma->vm_end - vma->vm_start) return -EINVAL;
+	if (map->pub.size != vma->vm_end - vma->vm_start) return -EINVAL;
 
-	if (!capable(CAP_SYS_ADMIN) && (map->flags & _DRM_READ_ONLY)) {
+	if (!capable(CAP_SYS_ADMIN) && (map->pub.flags & _DRM_READ_ONLY)) {
 		vma->vm_flags &= ~(VM_WRITE | VM_MAYWRITE);
 #if defined(__i386__) || defined(__x86_64__)
 		pgprot_val(vma->vm_page_prot) &= ~_PAGE_RW;
@@ -586,7 +584,9 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 #endif
 	}
 
-	switch (map->type) {
+	/* fetch real vm_offset from map structure */
+	vm_offset = dev->driver->get_map_ofs(map);
+	switch (map->pub.type) {
         case _DRM_AGP:
 	  if (drm_core_has_AGP(dev) && dev->agp->cant_use_aperture) {
                 /*
@@ -603,9 +603,9 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
                 /* fall through to _DRM_FRAME_BUFFER... */        
 	case _DRM_FRAME_BUFFER:
 	case _DRM_REGISTERS:
-		if (VM_OFFSET(vma) >= __pa(high_memory)) {
+		if (vm_offset >= __pa(high_memory)) {
 #if defined(__i386__) || defined(__x86_64__)
-			if (boot_cpu_data.x86 > 3 && map->type != _DRM_AGP) {
+			if (boot_cpu_data.x86 > 3 && map->pub.type != _DRM_AGP) {
 				pgprot_val(vma->vm_page_prot) |= _PAGE_PCD;
 				pgprot_val(vma->vm_page_prot) &= ~_PAGE_PWT;
 			}
@@ -626,26 +626,26 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 		offset = dev->driver->get_reg_ofs(dev);
 #ifdef __sparc__
 		if (io_remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,
-					VM_OFFSET(vma) + offset,
+					vm_offset + offset,
 					vma->vm_end - vma->vm_start,
 					vma->vm_page_prot, 0))
 #elif defined(CONFIG_XEN)
 		if (io_remap_page_range(vma, vma->vm_start,
-					VM_OFFSET(vma) + offset,
+					vm_offset + offset,
 					vma->vm_end - vma->vm_start,
 					vma->vm_page_prot))
 			
 #else
 		if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
-				     (VM_OFFSET(vma) + offset) >> PAGE_SHIFT,
+				     (vm_offset + offset) >> PAGE_SHIFT,
 				     vma->vm_end - vma->vm_start,
 				     vma->vm_page_prot))
 #endif
 				return -EAGAIN;
 		DRM_DEBUG("   Type = %d; start = 0x%lx, end = 0x%lx,"
 			  " offset = 0x%lx\n",
-			  map->type,
-			  vma->vm_start, vma->vm_end, VM_OFFSET(vma) + offset);
+			  map->pub.type,
+			  vma->vm_start, vma->vm_end, vm_offset + offset);
 		vma->vm_ops = &drm_vm_ops;
 		break;
 	case _DRM_SHM:

@@ -805,7 +805,7 @@ int gamma_getsareactx(struct inode *inode, struct file *filp,
 	drm_device_t	*dev	= priv->dev;
 	drm_ctx_priv_map_t __user *argp = (void __user *)arg;
 	drm_ctx_priv_map_t request;
-	drm_map_t *map;
+	drm_map_priv_t *map;
 
 	if (copy_from_user(&request, argp, sizeof(request)))
 		return -EFAULT;
@@ -819,7 +819,7 @@ int gamma_getsareactx(struct inode *inode, struct file *filp,
 	map = dev->context_sareas[request.ctx_id];
 	up(&dev->struct_sem);
 
-	request.handle = map->handle;
+	request.handle = map->pub.pub_handle;
 	if (copy_to_user(argp, &request, sizeof(request)))
 		return -EFAULT;
 	return 0;
@@ -831,7 +831,7 @@ int gamma_setsareactx(struct inode *inode, struct file *filp,
 	drm_file_t	*priv	= filp->private_data;
 	drm_device_t	*dev	= priv->dev;
 	drm_ctx_priv_map_t request;
-	drm_map_t *map = NULL;
+	drm_map_priv_t *map = NULL;
 	drm_map_list_t *r_list;
 	struct list_head *list;
 
@@ -845,7 +845,7 @@ int gamma_setsareactx(struct inode *inode, struct file *filp,
 	list_for_each(list, &dev->maplist->head) {
 		r_list = list_entry(list, drm_map_list_t, head);
 		if(r_list->map &&
-		   r_list->map->handle == request.handle) break;
+		   r_list->map->pub.pub_handle == request.handle) break;
 	}
 	if (list == &(dev->maplist->head)) {
 		up(&dev->struct_sem);

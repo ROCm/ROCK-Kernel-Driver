@@ -112,6 +112,10 @@ typedef struct drm_mga_private {
 	drm_local_map_t *agp_textures;
 } drm_mga_private_t;
 
+				/* mga_ioctl32.c */
+extern int mga_register_ioctl32( void );
+extern void mga_unregister_ioctl32( void );
+
 				/* mga_dma.c */
 extern int mga_dma_init( DRM_IOCTL_ARGS );
 extern int mga_dma_flush( DRM_IOCTL_ARGS );
@@ -275,11 +279,11 @@ do {									\
 #define FLUSH_DMA()							\
 do {									\
 	if ( 0 ) {							\
-		DRM_INFO( "%s:\n", __FUNCTION__ );				\
+		DRM_INFO( "%s:\n", __FUNCTION__ );			\
 		DRM_INFO( "   tail=0x%06x head=0x%06lx\n",		\
 			  dev_priv->prim.tail,				\
 			  MGA_READ( MGA_PRIMADDRESS ) -			\
-			  dev_priv->primary->offset );			\
+			  dev_priv->primary->pub.offset );		\
 	}								\
 	if ( !test_bit( 0, &dev_priv->prim.wrapped ) ) {		\
 		if ( dev_priv->prim.space <				\
@@ -334,7 +338,7 @@ do {									\
 	drm_mga_freelist_t *entry = (buf_priv)->list_entry;		\
 	if ( (buf_priv)->dispatched ) {					\
 		entry->age.head = (dev_priv->prim.tail +		\
-				   dev_priv->primary->offset);		\
+				   dev_priv->primary->pub.offset);	\
 		entry->age.wrap = dev_priv->sarea_priv->last_wrap;	\
 	} else {							\
 		entry->age.head = 0;					\

@@ -138,11 +138,11 @@ static int i915_initialize(drm_device_t * dev,
 	dev_priv->ring.Size = init->ring_size;
 	dev_priv->ring.tail_mask = dev_priv->ring.Size - 1;
 
-	dev_priv->ring.map.offset = init->ring_start;
-	dev_priv->ring.map.size = init->ring_size;
-	dev_priv->ring.map.type = 0;
-	dev_priv->ring.map.flags = 0;
-	dev_priv->ring.map.mtrr = 0;
+	dev_priv->ring.map.pub.offset = init->ring_start;
+	dev_priv->ring.map.pub.size = init->ring_size;
+	dev_priv->ring.map.pub.type = 0;
+	dev_priv->ring.map.pub.flags = 0;
+	dev_priv->ring.map.pub.mtrr = 0;
 
 	drm_core_ioremap( &dev_priv->ring.map, dev );
 

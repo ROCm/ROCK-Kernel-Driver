@@ -173,7 +173,7 @@ void mga_do_dma_flush( drm_mga_private_t *dev_priv )
 		return;
 	}
 
-	tail = primary->tail + dev_priv->primary->offset;
+	tail = primary->tail + dev_priv->primary->pub.offset;
 
 	/* We need to pad the stream between flushes, as the card
 	 * actually (partially?) reads the first of these commands.
@@ -198,8 +198,8 @@ void mga_do_dma_flush( drm_mga_private_t *dev_priv )
 		primary->space = head - tail;
 	}
 
-	DRM_DEBUG( "   head = 0x%06lx\n", head - dev_priv->primary->offset );
-	DRM_DEBUG( "   tail = 0x%06lx\n", tail - dev_priv->primary->offset );
+	DRM_DEBUG( "   head = 0x%06lx\n", head - dev_priv->primary->pub.offset );
+	DRM_DEBUG( "   tail = 0x%06lx\n", tail - dev_priv->primary->pub.offset );
 	DRM_DEBUG( "  space = 0x%06x\n", primary->space );
 
 	mga_flush_write_combine();
@@ -224,7 +224,7 @@ void mga_do_dma_wrap_start( drm_mga_private_t *dev_priv )
 
 	ADVANCE_DMA();
 
-	tail = primary->tail + dev_priv->primary->offset;
+	tail = primary->tail + dev_priv->primary->pub.offset;
 
 	primary->tail = 0;
 	primary->last_flush = 0;
@@ -232,14 +232,14 @@ void mga_do_dma_wrap_start( drm_mga_private_t *dev_priv )
 
 	head = MGA_READ( MGA_PRIMADDRESS );
 
-	if ( head == dev_priv->primary->offset ) {
+	if ( head == dev_priv->primary->pub.offset ) {
 		primary->space = primary->size;
 	} else {
-		primary->space = head - dev_priv->primary->offset;
+		primary->space = head - dev_priv->primary->pub.offset;
 	}
 
 	DRM_DEBUG( "   head = 0x%06lx\n",
-		  head - dev_priv->primary->offset );
+		  head - dev_priv->primary->pub.offset );
 	DRM_DEBUG( "   tail = 0x%06x\n", primary->tail );
 	DRM_DEBUG( "   wrap = %d\n", primary->last_wrap );
 	DRM_DEBUG( "  space = 0x%06x\n", primary->space );
@@ -255,7 +255,7 @@ void mga_do_dma_wrap_end( drm_mga_private_t *dev_priv )
 {
 	drm_mga_primary_buffer_t *primary = &dev_priv->prim;
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
-	u32 head = dev_priv->primary->offset;
+	u32 head = dev_priv->primary->pub.offset;
 	DRM_DEBUG( "\n" );
 
 	sarea_priv->last_wrap++;
@@ -286,13 +286,13 @@ static void mga_freelist_print( drm_device_t *dev )
 	DRM_INFO( "current dispatch: last=0x%x done=0x%x\n",
 		  dev_priv->sarea_priv->last_dispatch,
 		  (unsigned int)(MGA_READ( MGA_PRIMADDRESS ) -
-				 dev_priv->primary->offset) );
+				 dev_priv->primary->pub.offset) );
 	DRM_INFO( "current freelist:\n" );
 
 	for ( entry = dev_priv->head->next ; entry ; entry = entry->next ) {
 		DRM_INFO( "   %p   idx=%2d  age=0x%x 0x%06lx\n",
 			  entry, entry->buf->idx, entry->age.head,
-			  entry->age.head - dev_priv->primary->offset );
+			  entry->age.head - dev_priv->primary->pub.offset );
 	}
 	DRM_INFO( "\n" );
 }
@@ -396,10 +396,10 @@ static drm_buf_t *mga_freelist_get( drm_device_t *dev )
 
 	DRM_DEBUG( "   tail=0x%06lx %d\n",
 		   tail->age.head ?
-		   tail->age.head - dev_priv->primary->offset : 0,
+		   tail->age.head - dev_priv->primary->pub.offset : 0,
 		   tail->age.wrap );
 	DRM_DEBUG( "   head=0x%06lx %d\n",
-		   head - dev_priv->primary->offset, wrap );
+		   head - dev_priv->primary->pub.offset, wrap );
 
 	if ( TEST_AGE( &tail->age, head, wrap ) ) {
 		prev = dev_priv->tail->prev;
@@ -423,7 +423,7 @@ int mga_freelist_put( drm_device_t *dev, drm_buf_t *buf )
 
 	DRM_DEBUG( "age=0x%06lx wrap=%d\n",
 		   buf_priv->list_entry->age.head -
-		   dev_priv->primary->offset,
+		   dev_priv->primary->pub.offset,
 		   buf_priv->list_entry->age.wrap );
 
 	entry = buf_priv->list_entry;
@@ -583,7 +583,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	/* Init the primary DMA registers.
 	 */
 	MGA_WRITE( MGA_PRIMADDRESS,
-		   dev_priv->primary->offset | MGA_DMA_GENERAL );
+		   dev_priv->primary->pub.offset | MGA_DMA_GENERAL );
 #if 0
 	MGA_WRITE( MGA_PRIMPTR,
 		   virt_to_bus((void *)dev_priv->prim.status) |
@@ -593,8 +593,8 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 	dev_priv->prim.start = (u8 *)dev_priv->primary->handle;
 	dev_priv->prim.end = ((u8 *)dev_priv->primary->handle
-			      + dev_priv->primary->size);
-	dev_priv->prim.size = dev_priv->primary->size;
+			      + dev_priv->primary->pub.size);
+	dev_priv->prim.size = dev_priv->primary->pub.size;
 
 	dev_priv->prim.tail = 0;
 	dev_priv->prim.space = dev_priv->prim.size;
@@ -605,7 +605,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 
 	dev_priv->prim.high_mark = 256 * DMA_BLOCK_SIZE;
 
-	dev_priv->prim.status[0] = dev_priv->primary->offset;
+	dev_priv->prim.status[0] = dev_priv->primary->pub.offset;
 	dev_priv->prim.status[1] = 0;
 
 	dev_priv->sarea_priv->last_wrap = 0;

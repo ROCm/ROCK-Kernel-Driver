@@ -267,6 +267,10 @@ typedef struct drm_radeon_buf_priv {
 	u32 age;
 } drm_radeon_buf_priv_t;
 
+				/* radeon_ioctl32.c */
+extern int radeon_register_ioctl32( void );
+extern void radeon_unregister_ioctl32( void );
+
 				/* radeon_cp.c */
 extern int radeon_cp_init( DRM_IOCTL_ARGS );
 extern int radeon_cp_start( DRM_IOCTL_ARGS );
