@@ -43,6 +43,8 @@ struct serial8250_config {
 	unsigned int	flags;
 };
 
+#define UART_CAP_FIFO	(1 << 8)	/* UART has FIFO */
+
 #undef SERIAL_DEBUG_PCI
 
 #if defined(__i386__) && (defined(CONFIG_M386) || defined(CONFIG_M486))

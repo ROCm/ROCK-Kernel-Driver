@@ -162,18 +162,18 @@ static const struct serial8250_config uart_config[PORT_MAX_8250+1] = {
 	{ "8250",	1,	1,	0 },
 	{ "16450",	1,	1,	0 },
 	{ "16550",	1,	1,	0 },
-	{ "16550A",	16,	16,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "16550A",	16,	16,	UART_CAP_FIFO },
 	{ "Cirrus",	1, 	1,	0 },
-	{ "ST16650",	1,	1,	UART_CLEAR_FIFO | UART_STARTECH },
-	{ "ST16650V2",	32,	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "TI16750",	64,	64,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "ST16650",	1,	1,	UART_CAP_FIFO | UART_STARTECH },
+	{ "ST16650V2",	32,	16,	UART_CAP_FIFO | UART_STARTECH },
+	{ "TI16750",	64,	64,	UART_CAP_FIFO },
 	{ "Startech",	1,	1,	0 },
-	{ "16C950/954",	128,	128,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "ST16654",	64,	32,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "XR16850",	128,	128,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "RSA",	2048,	2048,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "NS16550A",	16,	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI },
-	{ "XScale",	32,	32,	UART_CLEAR_FIFO | UART_USE_FIFO  },
+	{ "16C950/954",	128,	128,	UART_CAP_FIFO },
+	{ "ST16654",	64,	32,	UART_CAP_FIFO | UART_STARTECH },
+	{ "XR16850",	128,	128,	UART_CAP_FIFO | UART_STARTECH },
+	{ "RSA",	2048,	2048,	UART_CAP_FIFO },
+	{ "NS16550A",	16,	16,	UART_CAP_FIFO | UART_NATSEMI },
+	{ "XScale",	32,	32,	UART_CAP_FIFO },
 };
 
 static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
@@ -249,7 +249,7 @@ static unsigned int serial_icr_read(struct uart_8250_port *up, int offset)
  */
 static inline void serial8250_clear_fifos(struct uart_8250_port *p)
 {
-	if (p->capabilities & UART_CLEAR_FIFO) {
+	if (p->capabilities & UART_CAP_FIFO) {
 		serial_outp(p, UART_FCR, UART_FCR_ENABLE_FIFO);
 		serial_outp(p, UART_FCR, UART_FCR_ENABLE_FIFO |
 			       UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
@@ -1461,7 +1461,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	    up->rev == 0x5201)
 		quot ++;
 
-	if (up->capabilities & UART_USE_FIFO && up->port.fifosize > 1) {
+	if (up->capabilities & UART_CAP_FIFO && up->port.fifosize > 1) {
 		if (baud < 2400)
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
 #ifdef CONFIG_SERIAL_8250_RSA
