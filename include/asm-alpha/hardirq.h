@@ -9,9 +9,6 @@
 /* entry.S is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned long __softirq_pending;
-	unsigned int __syscall_count;
-	unsigned long idle_timestamp;
-	struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
