@@ -29,6 +29,8 @@ static int acer_tm360_irqrouting;
 
 static struct irq_routing_table *pirq_table;
 
+static int pirq_enable_irq(struct pci_dev *dev);
+
 /*
  * Never use: 0, 1, 2 (timer, keyboard, and cascade)
  * Avoid using: 13, 14 and 15 (FP error and IDE).
@@ -1021,7 +1023,7 @@ void pcibios_penalize_isa_irq(int irq)
 		pirq_penalize_isa_irq(irq);
 }
 
-int pirq_enable_irq(struct pci_dev *dev)
+static int pirq_enable_irq(struct pci_dev *dev)
 {
 	u8 pin;
 	extern int via_interrupt_line_quirk;
