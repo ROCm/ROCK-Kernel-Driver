@@ -253,7 +253,7 @@ static int flock_make_lock(struct file *filp,
 
 	fl->fl_file = filp;
 	fl->fl_pid = current->pid;
-	fl->fl_flags = FL_FLOCK;
+	fl->fl_flags = (cmd & LOCK_NB) ? FL_FLOCK : FL_FLOCK | FL_SLEEP;
 	fl->fl_type = type;
 	fl->fl_end = OFFSET_MAX;
 	

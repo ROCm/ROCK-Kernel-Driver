@@ -1357,11 +1357,7 @@ void* kmem_cache_alloc_batch(kmem_cache_t* cachep, int flags)
 		cc_entry(cc)[cc->avail++] =
 				kmem_cache_alloc_one_tail(cachep, slabp);
 	}
-	/*
-	 * CAREFUL: do not enable preemption yet, the per-CPU
-	 * entries rely on us being atomic.
-	 */
-	_raw_spin_unlock(&cachep->spinlock);
+	spin_unlock(&cachep->spinlock);
 
 	if (cc->avail)
 		return cc_entry(cc)[--cc->avail];
@@ -1389,8 +1385,6 @@ try_again:
 				STATS_INC_ALLOCMISS(cachep);
 				objp = kmem_cache_alloc_batch(cachep,flags);
 				local_irq_restore(save_flags);
-				/* end of non-preemptible region */
-				preempt_enable();
 				if (!objp)
 					goto alloc_new_slab_nolock;
 				return objp;

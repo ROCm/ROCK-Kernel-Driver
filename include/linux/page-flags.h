@@ -86,9 +86,9 @@ extern void get_page_state(struct page_state *ret);
 
 #define mod_page_state(member, delta)					\
 	do {								\
-		preempt_disable();					\
-		page_states[smp_processor_id()].member += (delta);	\
-		preempt_enable();					\
+		int cpu = get_cpu();					\
+		page_states[cpu].member += (delta);			\
+		put_cpu();						\
 	} while (0)
 
 #define inc_page_state(member)	mod_page_state(member, 1UL)
