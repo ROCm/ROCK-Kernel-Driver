@@ -2457,7 +2457,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	hba[i]->pdev = pdev;
 
 	/* configure PCI DMA stuff */
-	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff))
+	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL))
 		printk("cciss: using DAC cycles\n");
 	else if (!pci_set_dma_mask(pdev, 0xffffffff))
 		printk("cciss: not using DAC cycles\n");

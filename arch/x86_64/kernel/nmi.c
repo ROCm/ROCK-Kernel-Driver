@@ -40,6 +40,7 @@
  * -1: the lapic NMI watchdog is disabled, but can be enabled
  */
 static int nmi_active;
+static int panic_on_timeout;
 
 unsigned int nmi_watchdog = NMI_IO_APIC;
 static unsigned int nmi_hz = HZ;
@@ -114,6 +115,14 @@ int __init check_nmi_watchdog (void)
 static int __init setup_nmi_watchdog(char *str)
 {
 	int nmi;
+
+	if (!strncmp(str,"panic",5)) {
+		panic_on_timeout = 1;
+		str = strchr(str, ',');
+		if (!str)
+			return 1;
+		++str;
+	}
 
 	get_option(&str, &nmi);
 
@@ -327,6 +336,8 @@ void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 			bust_spinlocks(1);
 			printk("NMI Watchdog detected LOCKUP on CPU%d, registers:\n", cpu);
 			show_registers(regs);
+			if (panic_on_timeout)
+				panic("nmi watchdog");
 			printk("console shuts up ...\n");
 			console_silent();
 			spin_unlock(&nmi_print_lock);
@@ -374,3 +385,4 @@ EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
 EXPORT_SYMBOL(enable_lapic_nmi_watchdog);
 EXPORT_SYMBOL(disable_timer_nmi_watchdog);
 EXPORT_SYMBOL(enable_timer_nmi_watchdog);
+EXPORT_SYMBOL(touch_nmi_watchdog);

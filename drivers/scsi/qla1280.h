@@ -21,18 +21,6 @@
 #define	_IO_HBA_QLA1280_H	/* subject to change without notice */
 
 #ifndef HOSTS_C			/* included in hosts.c */
-/*
- * Enable define statement to ignore Data Underrun Errors,
- * remove define statement to enable detection.
- */
-/* #define  DATA_UNDERRUN_ERROR_DISABLE */
-
-#ifndef TRUE
-#define TRUE 1
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
 
 /*
  * Data bit definitions.
@@ -70,48 +58,13 @@
 #define BIT_30	0x40000000
 #define BIT_31	0x80000000
 
-/*
- *  Local Macro Definitions.
- */
-#if defined(QL_DEBUG_LEVEL_1) || defined(QL_DEBUG_LEVEL_2) || \
-    defined(QL_DEBUG_LEVEL_3) || defined(QL_DEBUG_LEVEL_4) || \
-    defined(QL_DEBUG_LEVEL_5) || defined(QL_DEBUG_LEVEL_6) || \
-    defined(QL_DEBUG_LEVEL_7)
-#define QL_DEBUG_ROUTINES
-#endif
-
-/*
- * I/O port macros
-*/
-/* #define MEMORY_MAPPED_IO *//* Enable memory mapped I/O */
-#undef MEMORY_MAPPED_IO		/* Disable memory mapped I/O */
-
-#ifdef QL_DEBUG_LEVEL_1
-#define RD_REG_BYTE(addr)		qla1280_getbyte((u8 *)addr)
-#define RD_REG_WORD(addr)		qla1280_getword((u16 *)addr)
-#define RD_REG_DWORD(addr)		qla1280_getdword((u32 *)addr)
-#define WRT_REG_BYTE(addr, data)	qla1280_putbyte((u8 *)addr, data)
-#define WRT_REG_WORD(addr, data)	qla1280_putword((u16 *)addr, data)
-#define WRT_REG_DWORD(addr, data)	qla1280_putdword((u32 *)addr, data)
-#else				/* QL_DEBUG_LEVEL_1 */
-
-#ifdef MEMORY_MAPPED_IO
-#define RD_REG_BYTE(addr)		readb(addr)
+#if MEMORY_MAPPED_IO
 #define RD_REG_WORD(addr)		readw(addr)
-#define RD_REG_DWORD(addr)		readl(addr)
-#define WRT_REG_BYTE(addr, data)	writeb(data, addr)
 #define WRT_REG_WORD(addr, data)	writew(data, addr)
-#define WRT_REG_DWORD(addr, data)	writel(data, addr)
 #else				/* MEMORY_MAPPED_IO */
-#define RD_REG_BYTE(addr)		inb((unsigned long)addr)
 #define RD_REG_WORD(addr)		inw((unsigned long)addr)
-#define RD_REG_DWORD(addr)		inl((unsigned long)addr)
-/* Parameters are reversed in Linux */
-#define WRT_REG_BYTE(addr, data)	outb(data, (unsigned long)addr)
 #define WRT_REG_WORD(addr, data)	outw(data, (unsigned long)addr)
-#define WRT_REG_DWORD(addr, data)	outl(data, (unsigned long)addr)
 #endif				/* MEMORY_MAPPED_IO */
-#endif				/* QL_DEBUG_LEVEL_1 */
 
 /*
  * Host adapter default definitions.
@@ -133,15 +86,13 @@
 /* Command retry count (0-65535) */
 #define COMMAND_RETRY_COUNT		255
 
-/* Maximum outstanding commands in ISP queues (1-65535) */
+/* Maximum outstanding commands in ISP queues */
 #define MAX_OUTSTANDING_COMMANDS	512
+#define INVALID_HANDLE			(MAX_OUTSTANDING_COMMANDS + 2)
 
 /* ISP request and response entry counts (37-65535) */
 #define REQUEST_ENTRY_CNT		256 /* Number of request entries. */
 #define RESPONSE_ENTRY_CNT		16  /* Number of response entries. */
-
-/* Maximum equipage per controller */
-#define MAX_EQ				(MAX_BUSES * MAX_TARGETS * MAX_LUNS)
 
 /* Number of segments 1 - 65535 */
 #define SG_SEGMENTS			32  /* Cmd entry + 6 continuations */
@@ -150,20 +101,20 @@
  * SCSI Request Block structure  (sp)  that is placed
  * on cmd->SCp location of every I/O
  */
-typedef struct srb {
+struct srb {
 	Scsi_Cmnd *cmd;		/* (4/8) SCSI command block */
 	struct srb *s_next;	/* (4/8) Next block on LU queue */
 	struct srb *s_prev;	/* (4/8) Previous block on LU queue */
 	uint8_t flags;		/* (1) Status flags. */
 	uint8_t dir;		/* direction of transfer */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,18)
+	/*
+	 * This should be moved around to save space.
+	 */
 	dma_addr_t saved_dma_handle;	/* for unmap of single transfers */
 	/* NOTE: the sp->cmd will be NULL when this completion is
 	 * called, so you should know the scsi_cmnd when using this */
 	struct completion *wait;
-#endif
-
-} srb_t;
+};
 
 /*
  * SRB flag definitions
@@ -176,9 +127,9 @@ typedef struct srb {
 /*
  * Logical Unit Queue structure
  */
-typedef struct scsi_lu {
-	srb_t *q_first;		/* First block on LU queue */
-	srb_t *q_last;		/* Last block on LU queue */
+struct scsi_lu {
+	struct srb *q_first;	/* First block on LU queue */
+	struct srb *q_last;	/* Last block on LU queue */
 	uint8_t q_flag;		/* LU queue state flags */
 	uint8_t q_sense[16];	/* sense data */
 	unsigned long io_cnt;	/* total xfer count */
@@ -187,12 +138,7 @@ typedef struct scsi_lu {
 	unsigned long w_cnt;	/* total writes */
 	unsigned long r_cnt;	/* total reads */
 	uint16_t q_outcnt;	/* Pending jobs for this LU */
-#if QL1280_TARGET_MODE_SUPPORT
-	void (*q_func)();	/* Target driver event handler */
-	int32_t q_param;	/* Target driver event param */
-	uint8_t q_lock;		/* Device Queue Lock */
-#endif
-} scsi_lu_t;
+};
 
 /*
  * Logical Unit flags
@@ -317,44 +263,47 @@ struct device_reg {
 /*
  * ISP mailbox commands
  */
-#define MBC_NOP                     0	/* No Operation. */
-#define MBC_LOAD_RAM                1	/* Load RAM. */
-#define MBC_EXECUTE_FIRMWARE        2	/* Execute firmware. */
-#define MBC_DUMP_RAM		     3   /* Dump RAM contents */
-#define MBC_WRITE_RAM_WORD          4	/* Write ram word. */
-#define MBC_READ_RAM_WORD           5	/* Read ram word. */
-#define MBC_MAILBOX_REGISTER_TEST   6	/* Wrap incoming mailboxes */
-#define MBC_VERIFY_CHECKSUM         7	/* Verify checksum. */
-#define MBC_ABOUT_FIRMWARE          8	/* Get firmware revision. */
-#define MBC_INIT_REQUEST_QUEUE      0x10	/* Initialize request queue. */
-#define MBC_INIT_RESPONSE_QUEUE     0x11	/* Initialize response queue. */
-#define MBC_EXECUTE_IOCB            0x12	/* Execute IOCB command. */
-#define MBC_ABORT_COMMAND           0x15	/* Abort IOCB command. */
-#define MBC_ABORT_DEVICE            0x16	/* Abort device (ID/LUN). */
-#define MBC_ABORT_TARGET            0x17	/* Abort target (ID). */
-#define MBC_BUS_RESET               0x18	/* SCSI bus reset. */
-#define MBC_GET_RETRY_COUNT         0x22	/* Get retry count and delay. */
-#define MBC_GET_TARGET_PARAMETERS   0x28	/* Get target parameters. */
-#define MBC_SET_INITIATOR_ID        0x30	/* Set initiator SCSI ID. */
-#define MBC_SET_SELECTION_TIMEOUT   0x31	/* Set selection timeout. */
-#define MBC_SET_RETRY_COUNT         0x32	/* Set retry count and delay. */
-#define MBC_SET_TAG_AGE_LIMIT       0x33	/* Set tag age limit. */
-#define MBC_SET_CLOCK_RATE          0x34	/* Set clock rate. */
-#define MBC_SET_ACTIVE_NEGATION     0x35	/* Set active negation state. */
-#define MBC_SET_ASYNC_DATA_SETUP    0x36	/* Set async data setup time. */
-#define MBC_SET_PCI_CONTROL         0x37	/* Set BUS control parameters. */
-#define MBC_SET_TARGET_PARAMETERS   0x38	/* Set target parameters. */
-#define MBC_SET_DEVICE_QUEUE        0x39	/* Set device queue parameters */
-#define MBC_SET_SYSTEM_PARAMETER    0x45	/* Set system parameter word. */
-#define MBC_SET_FIRMWARE_FEATURES   0x4A	/* Set firmware feature word. */
-#define MBC_INIT_REQUEST_QUEUE_A64  0x52	/* Initialize request queue A64 */
-#define MBC_INIT_RESPONSE_QUEUE_A64 0x53	/* Initialize response q A64. */
-#define MBC_ENABLE_TARGET_MODE      0x55	/* Enable target mode. */
+#define MBC_NOP				0	/* No Operation */
+#define MBC_LOAD_RAM			1	/* Load RAM */
+#define MBC_EXECUTE_FIRMWARE		2	/* Execute firmware */
+#define MBC_DUMP_RAM			3	/* Dump RAM contents */
+#define MBC_WRITE_RAM_WORD		4	/* Write ram word */
+#define MBC_READ_RAM_WORD		5	/* Read ram word */
+#define MBC_MAILBOX_REGISTER_TEST	6	/* Wrap incoming mailboxes */
+#define MBC_VERIFY_CHECKSUM		7	/* Verify checksum */
+#define MBC_ABOUT_FIRMWARE		8	/* Get firmware revision */
+#define MBC_INIT_REQUEST_QUEUE		0x10	/* Initialize request queue */
+#define MBC_INIT_RESPONSE_QUEUE		0x11	/* Initialize response queue */
+#define MBC_EXECUTE_IOCB		0x12	/* Execute IOCB command */
+#define MBC_ABORT_COMMAND		0x15	/* Abort IOCB command */
+#define MBC_ABORT_DEVICE		0x16	/* Abort device (ID/LUN) */
+#define MBC_ABORT_TARGET		0x17	/* Abort target (ID) */
+#define MBC_BUS_RESET			0x18	/* SCSI bus reset */
+#define MBC_GET_RETRY_COUNT		0x22	/* Get retry count and delay */
+#define MBC_GET_TARGET_PARAMETERS	0x28	/* Get target parameters */
+#define MBC_SET_INITIATOR_ID		0x30	/* Set initiator SCSI ID */
+#define MBC_SET_SELECTION_TIMEOUT	0x31	/* Set selection timeout */
+#define MBC_SET_RETRY_COUNT		0x32	/* Set retry count and delay */
+#define MBC_SET_TAG_AGE_LIMIT		0x33	/* Set tag age limit */
+#define MBC_SET_CLOCK_RATE		0x34	/* Set clock rate */
+#define MBC_SET_ACTIVE_NEGATION		0x35	/* Set active negation state */
+#define MBC_SET_ASYNC_DATA_SETUP	0x36	/* Set async data setup time */
+#define MBC_SET_PCI_CONTROL		0x37	/* Set BUS control parameters */
+#define MBC_SET_TARGET_PARAMETERS	0x38	/* Set target parameters */
+#define MBC_SET_DEVICE_QUEUE		0x39	/* Set device queue parameters */
+#define MBC_SET_RESET_DELAY_PARAMETERS	0x3A	/* Set reset delay parameters */
+#define MBC_SET_SYSTEM_PARAMETER	0x45	/* Set system parameter word */
+#define MBC_SET_FIRMWARE_FEATURES	0x4A	/* Set firmware feature word */
+#define MBC_INIT_REQUEST_QUEUE_A64	0x52	/* Initialize request queue A64 */
+#define MBC_INIT_RESPONSE_QUEUE_A64	0x53	/* Initialize response q A64 */
+#define MBC_ENABLE_TARGET_MODE		0x55	/* Enable target mode */
+#define MBC_SET_DATA_OVERRUN_RECOVERY	0x5A	/* Set data overrun recovery mode */
 
 /*
  * ISP Get/Set Target Parameters mailbox command control flags.
  */
-#define TP_RENEGOTIATE          BIT_8	/* Renegotiate on error. */
+#define TP_PPR			BIT_5	/* PPR */
+#define TP_RENEGOTIATE		BIT_8	/* Renegotiate on error. */
 #define TP_STOP_QUEUE           BIT_9	/* Stop que on check condition */
 #define TP_AUTO_REQUEST_SENSE   BIT_10	/* Automatic request sense. */
 #define TP_TAGGED_QUEUE         BIT_11	/* Tagged queuing. */
@@ -374,167 +323,9 @@ struct device_reg {
 #define NV_DELAY_COUNT		10
 
 /*
- *  QLogic ISP1280 NVRAM structure definition.
- *
- * NOTE: the firmware structure is byte reversed on big-endian systems
- * because it is read a word at a time from the chip, so the in-memory
- * representation becomes correct
+ *  QLogic ISP1280/ISP12160 NVRAM structure definition.
  */
-typedef struct {
-#if defined(__BIG_ENDIAN)
-	uint8_t id1;		/* 1 */
-	uint8_t id0;		/* 0 */
-
-	uint8_t id3;		/* 3 */
-	uint8_t id2;		/* 2 */
-
-	struct {
-		uint8_t bios_configuration_mode:2;
-		uint8_t bios_disable:1;
-		uint8_t selectable_scsi_boot_enable:1;
-		uint8_t cd_rom_boot_enable:1;
-		uint8_t disable_loading_risc_code:1;
-		uint8_t enable_64bit_addressing:1;
-		uint8_t unused_7:1;
-	} cntr_flags_1;		/* 5 */
-	uint8_t version;	/* 4 */
-
-	struct {
-		uint8_t boot_lun_number:5;
-		uint8_t scsi_bus_number:1;
-		uint8_t unused_6:1;
-		uint8_t unused_7:1;
-		uint8_t boot_target_number:4;
-		uint8_t unused_12:1;
-		uint8_t unused_13:1;
-		uint8_t unused_14:1;
-		uint8_t unused_15:1;
-	} cntr_flags_2;		/* 6, 7 */
-
-	uint16_t unused_8;	/* 8, 9 */
-	uint16_t unused_10;	/* 10, 11 */
-	uint16_t unused_12;	/* 12, 13 */
-	uint16_t unused_14;	/* 14, 15 */
-
-	/* Termination
-	 * 0 = Disable, 1 = high only, 3 = Auto term
-	 */
-	union {
-		uint8_t c;
-		struct {
-			uint8_t scsi_bus_1_control:2;
-			uint8_t scsi_bus_0_control:2;
-			uint8_t unused_0:1;
-			uint8_t unused_1:1;
-			uint8_t unused_2:1;
-			uint8_t auto_term_support:1;
-		} f;
-	} termination;		/* 17 */
-	union {
-		uint8_t c;
-		struct {
-			uint8_t reserved:2;
-			uint8_t burst_enable:1;
-			uint8_t reserved_1:1;
-			uint8_t fifo_threshold:4;
-		} f;
-	} isp_config;		/* 16 */
-
-
-	uint16_t isp_parameter;	/* 18, 19 */
-
-	union {
-		uint16_t w;
-		struct {
-			uint16_t enable_fast_posting:1;
-			uint16_t report_lvd_bus_transition:1;
-			uint16_t unused_2:1;
-			uint16_t unused_3:1;
-			uint16_t unused_4:1;
-			uint16_t unused_5:1;
-			uint16_t unused_6:1;
-			uint16_t unused_7:1;
-			uint16_t unused_8:1;
-			uint16_t unused_9:1;
-			uint16_t unused_10:1;
-			uint16_t unused_11:1;
-			uint16_t unused_12:1;
-			uint16_t unused_13:1;
-			uint16_t unused_14:1;
-			uint16_t unused_15:1;
-		} f;
-	} firmware_feature;	/* 20, 21 */
-
-	uint16_t unused_22;	/* 22, 23 */
-
-	struct {
-		uint8_t bus_reset_delay;	/* 25 */
-		struct {
-			uint8_t initiator_id:4;
-			uint8_t scsi_reset_disable:1;
-			uint8_t scsi_bus_size:1;
-			uint8_t scsi_bus_type:1;
-			uint8_t unused_7:1;
-		} config_1;	/* 24 */
-
-		uint8_t retry_delay;	/* 27 */
-		uint8_t retry_count;	/* 26 */
-
-		uint8_t unused_29;	/* 29 */
-		struct {
-			uint8_t async_data_setup_time:4;
-			uint8_t req_ack_active_negation:1;
-			uint8_t data_line_active_negation:1;
-			uint8_t unused_6:1;
-			uint8_t unused_7:1;
-		} config_2;	/* 28 */
-
-
-		uint16_t selection_timeout;	/* 30, 31 */
-		uint16_t max_queue_depth;	/* 32, 33 */
-
-		uint16_t unused_34;	/* 34, 35 */
-		uint16_t unused_36;	/* 36, 37 */
-		uint16_t unused_38;	/* 38, 39 */
-
-		struct {
-			uint8_t execution_throttle;	/* 41 */
-			union {
-				uint8_t c;
-				struct {
-					uint8_t renegotiate_on_error:1;
-					uint8_t stop_queue_on_check:1;
-					uint8_t auto_request_sense:1;
-					uint8_t tag_queuing:1;
-					uint8_t sync_data_transfers:1;
-					uint8_t wide_data_transfers:1;
-					uint8_t parity_checking:1;
-					uint8_t disconnect_allowed:1;
-				} f;
-			} parameter;	/* 40 */
-
-			struct {
-				uint8_t sync_offset:4;
-				uint8_t device_enable:1;
-				uint8_t lun_disable:1;
-				uint8_t unused_6:1;
-				uint8_t unused_7:1;
-			} flags;	/* 43 */
-			uint8_t sync_period;	/* 42 */
-
-
-			uint16_t unused_44;	/* 44, 45 */
-		} target[MAX_TARGETS];
-	} bus[MAX_BUSES];
-
-	uint16_t unused_248;	/* 248, 249 */
-
-	uint16_t subsystem_id[2];	/* 250, 251, 252, 253 */
-
-	uint8_t chksum;		/* 255 */
-	uint8_t unused_254;	/* 254 */
-
-#elif defined(__LITTLE_ENDIAN)
+struct nvram {
 	uint8_t id0;		/* 0 */
 	uint8_t id1;		/* 1 */
 	uint8_t id2;		/* 2 */
@@ -552,174 +343,6 @@ typedef struct {
 	} cntr_flags_1;		/* 5 */
 
 	struct {
-		uint8_t boot_lun_number:5;
-		uint8_t scsi_bus_number:1;
-		uint8_t unused_6:1;
-		uint8_t unused_7:1;
-		uint8_t boot_target_number:4;
-		uint8_t unused_12:1;
-		uint8_t unused_13:1;
-		uint8_t unused_14:1;
-		uint8_t unused_15:1;
-	} cntr_flags_2;		/* 6, 7 */
-
-	uint16_t unused_8;	/* 8, 9 */
-	uint16_t unused_10;	/* 10, 11 */
-	uint16_t unused_12;	/* 12, 13 */
-	uint16_t unused_14;	/* 14, 15 */
-
-	union {
-		uint8_t c;
-		struct {
-			uint8_t reserved:2;
-			uint8_t burst_enable:1;
-			uint8_t reserved_1:1;
-			uint8_t fifo_threshold:4;
-		} f;
-	} isp_config;		/* 16 */
-
-	/* Termination
-	 * 0 = Disable, 1 = high only, 3 = Auto term
-	 */
-	union {
-		uint8_t c;
-		struct {
-			uint8_t scsi_bus_1_control:2;
-			uint8_t scsi_bus_0_control:2;
-			uint8_t unused_0:1;
-			uint8_t unused_1:1;
-			uint8_t unused_2:1;
-			uint8_t auto_term_support:1;
-		} f;
-	} termination;		/* 17 */
-
-	uint16_t isp_parameter;	/* 18, 19 */
-
-	union {
-		uint16_t w;
-		struct {
-			uint8_t enable_fast_posting:1;
-			uint8_t report_lvd_bus_transition:1;
-			uint8_t unused_2:1;
-			uint8_t unused_3:1;
-			uint8_t unused_4:1;
-			uint8_t unused_5:1;
-			uint8_t unused_6:1;
-			uint8_t unused_7:1;
-			uint8_t unused_8:1;
-			uint8_t unused_9:1;
-			uint8_t unused_10:1;
-			uint8_t unused_11:1;
-			uint8_t unused_12:1;
-			uint8_t unused_13:1;
-			uint8_t unused_14:1;
-			uint8_t unused_15:1;
-		} f;
-	} firmware_feature;	/* 20, 21 */
-
-	uint16_t unused_22;	/* 22, 23 */
-
-	struct {
-		struct {
-			uint8_t initiator_id:4;
-			uint8_t scsi_reset_disable:1;
-			uint8_t scsi_bus_size:1;
-			uint8_t scsi_bus_type:1;
-			uint8_t unused_7:1;
-		} config_1;	/* 24 */
-
-		uint8_t bus_reset_delay;	/* 25 */
-		uint8_t retry_count;	/* 26 */
-		uint8_t retry_delay;	/* 27 */
-
-		struct {
-			uint8_t async_data_setup_time:4;
-			uint8_t req_ack_active_negation:1;
-			uint8_t data_line_active_negation:1;
-			uint8_t unused_6:1;
-			uint8_t unused_7:1;
-		} config_2;	/* 28 */
-
-		uint8_t unused_29;	/* 29 */
-
-		uint16_t selection_timeout;	/* 30, 31 */
-		uint16_t max_queue_depth;	/* 32, 33 */
-
-		uint16_t unused_34;	/* 34, 35 */
-		uint16_t unused_36;	/* 36, 37 */
-		uint16_t unused_38;	/* 38, 39 */
-
-		struct {
-			union {
-				uint8_t c;
-				struct {
-					uint8_t renegotiate_on_error:1;
-					uint8_t stop_queue_on_check:1;
-					uint8_t auto_request_sense:1;
-					uint8_t tag_queuing:1;
-					uint8_t sync_data_transfers:1;
-					uint8_t wide_data_transfers:1;
-					uint8_t parity_checking:1;
-					uint8_t disconnect_allowed:1;
-				} f;
-			} parameter;	/* 40 */
-
-			uint8_t execution_throttle;	/* 41 */
-			uint8_t sync_period;	/* 42 */
-
-			struct {
-				uint8_t sync_offset:4;
-				uint8_t device_enable:1;
-				uint8_t lun_disable:1;
-				uint8_t unused_6:1;
-				uint8_t unused_7:1;
-			} flags;	/* 43 */
-
-			uint16_t unused_44;	/* 44, 45 */
-		} target[MAX_TARGETS];
-	} bus[MAX_BUSES];
-
-	uint16_t unused_248;	/* 248, 249 */
-
-	uint16_t subsystem_id[2];	/* 250, 251, 252, 253 */
-
-	uint8_t unused_254;	/* 254 */
-
-	uint8_t chksum;		/* 255 */
-#else
-#error neither __BIG_ENDIAN nor __LITTLE_ENDIAN is defined
-#endif
-} nvram_t;
-
-/*
- *  QLogic ISP12160 NVRAM structure definition.
- *
- * NOTE: the firmware structure is byte reversed on big-endian systems
- * because it is read a word at a time from the chip, so the in-memory
- * representation becomes correct
- */
-typedef struct {
-#if defined(__BIG_ENDIAN)
-	uint8_t id1;		/* 1 */
-	uint8_t id0;		/* 0 */
-
-	uint8_t id3;		/* 3 */
-	uint8_t id2;		/* 2 */
-
-	/* Host/Bios Flags */
-	struct {
-		uint8_t bios_configuration_mode:2;
-		uint8_t bios_disable:1;
-		uint8_t selectable_scsi_boot_enable:1;
-		uint8_t cd_rom_boot_enable:1;
-		uint8_t disable_loading_risc_code:1;
-		uint8_t unused_6:1;
-		uint8_t unused_7:1;
-	} cntr_flags_1;		/* 5 */
-	uint8_t version;	/* 4 */
-
-	/* Selectable Boot Support */
-	struct {
 		uint16_t boot_lun_number:5;
 		uint16_t scsi_bus_number:1;
 		uint16_t unused_6:1;
@@ -736,167 +359,6 @@ typedef struct {
 	uint16_t unused_12;	/* 12, 13 */
 	uint16_t unused_14;	/* 14, 15 */
 
-	/* Termination
-	 * 0 = Disable, 1 = high only, 3 = Auto term
-	 */
-	union {
-		uint8_t c;
-		struct {
-			uint8_t scsi_bus_1_control:2;
-			uint8_t scsi_bus_0_control:2;
-			uint8_t unused_0:1;
-			uint8_t unused_1:1;
-			uint8_t unused_2:1;
-			uint8_t auto_term_support:1;
-		} f;
-	} termination;		/* 17 */
-	/* Auto Term - 3                          */
-	/* High Only - 1 (GPIO2 = 1 & GPIO3 = 0)  */
-	/* Disable - 0 (GPIO2 = 0 & GPIO3 = X)    */
-	/* ISP Config Parameters */
-	union {
-		uint8_t c;
-		struct {
-			uint8_t reserved:2;
-			uint8_t burst_enable:1;
-			uint8_t reserved_1:1;
-			uint8_t fifo_threshold:4;
-		} f;
-	} isp_config;		/* 16 */
-
-	uint16_t isp_parameter;	/* 18, 19 */
-
-	union {
-		uint16_t w;
-		struct {
-			uint16_t enable_fast_posting:1;
-			uint16_t report_lvd_bus_transition:1;
-			uint16_t unused_2:1;
-			uint16_t unused_3:1;
-			uint16_t unused_4:1;
-			uint16_t unused_5:1;
-			uint16_t unused_6:1;
-			uint16_t unused_7:1;
-			uint16_t unused_8:1;
-			uint16_t unused_9:1;
-			uint16_t unused_10:1;
-			uint16_t unused_11:1;
-			uint16_t unused_12:1;
-			uint16_t unused_13:1;
-			uint16_t unused_14:1;
-			uint16_t unused_15:1;
-		} f;
-	} firmware_feature;	/* 20, 21 */
-
-	uint16_t unused_22;	/* 22, 23 */
-
-	struct {
-		uint8_t bus_reset_delay;	/* 25 */
-		struct {
-			uint8_t initiator_id:4;
-			uint8_t scsi_reset_disable:1;
-			uint8_t scsi_bus_size:1;
-			uint8_t scsi_bus_type:1;
-			uint8_t unused_7:1;
-		} config_1;	/* 24 */
-
-		uint8_t retry_delay;	/* 27 */
-		uint8_t retry_count;	/* 26 */
-
-		uint8_t unused_29;	/* 29 */
-		/* Adapter Capabilities bits */
-		struct {
-			uint8_t async_data_setup_time:4;
-			uint8_t req_ack_active_negation:1;
-			uint8_t data_line_active_negation:1;
-			uint8_t unused_6:1;
-			uint8_t unused_7:1;
-		} config_2;	/* 28 */
-
-		uint16_t selection_timeout;	/* 30, 31 */
-		uint16_t max_queue_depth;	/* 32, 33 */
-
-		uint16_t unused_34;	/* 34, 35 */
-		uint16_t unused_36;	/* 36, 37 */
-		uint16_t unused_38;	/* 38, 39 */
-
-		struct {
-			uint8_t execution_throttle;	/* 41 */
-			union {
-				uint8_t c;
-				struct {
-					uint8_t renegotiate_on_error:1;
-					uint8_t stop_queue_on_check:1;
-					uint8_t auto_request_sense:1;
-					uint8_t tag_queuing:1;
-					uint8_t sync_data_transfers:1;
-					uint8_t wide_data_transfers:1;
-					uint8_t parity_checking:1;
-					uint8_t disconnect_allowed:1;
-				} f;
-			} parameter;	/* 40 */
-
-			struct {
-				uint8_t sync_offset:5;
-				uint8_t device_enable:1;
-				uint8_t unused_6:1;
-				uint8_t unused_7:1;
-			} flags1; /* 43 */
-			uint8_t sync_period;	/* 42 */
-
-			uint8_t unused_45;	/* 45 */
-			struct {
-				uint8_t ppr_options:4;
-				uint8_t ppr_bus_width:2;
-				uint8_t unused_8:1;
-				uint8_t enable_ppr:1;
-			} flags2;	/* 44 */
-
-		} target[MAX_TARGETS];
-	} bus[MAX_BUSES];
-
-	uint16_t unused_248;	/* 248, 249 */
-
-	uint16_t subsystem_id[2];	/* 250, 251, 252, 253 */
-
-	uint8_t chksum;		/* 255 */
-	uint8_t System_Id_Pointer;	/* 254 */
-
-#elif defined(__LITTLE_ENDIAN)
-	uint8_t id0;		/* 0 */
-	uint8_t id1;		/* 1 */
-	uint8_t id2;		/* 2 */
-	uint8_t id3;		/* 3 */
-	uint8_t version;	/* 4 */
-	/* Host/Bios Flags */
-	struct {
-		uint8_t bios_configuration_mode:2;
-		uint8_t bios_disable:1;
-		uint8_t selectable_scsi_boot_enable:1;
-		uint8_t cd_rom_boot_enable:1;
-		uint8_t disable_loading_risc_code:1;
-		uint8_t unused_6:1;
-		uint8_t unused_7:1;
-	} cntr_flags_1;		/* 5 */
-	/* Selectable Boot Support */
-	struct {
-		uint16_t boot_lun_number:5;
-		uint16_t scsi_bus_number:1;
-		uint16_t unused_6:1;
-		uint16_t unused_7:1;
-		uint16_t boot_target_number:4;
-		uint16_t unused_12:1;
-		uint16_t unused_13:1;
-		uint16_t unused_14:1;
-		uint16_t unused_15:1;
-	} cntr_flags_2;		/* 6, 7 */
-
-	uint16_t unused_8;	/* 8, 9 */
-	uint16_t unused_10;	/* 10, 11 */
-	uint16_t unused_12;	/* 12, 13 */
-	uint16_t unused_14;	/* 14, 15 */
-
-	/* ISP Config Parameters */
 	union {
 		uint8_t c;
 		struct {
@@ -921,9 +383,6 @@ typedef struct {
 			uint8_t auto_term_support:1;
 		} f;
 	} termination;		/* 17 */
-	/* Auto Term - 3                          */
-	/* High Only - 1 (GPIO2 = 1 & GPIO3 = 0)  */
-	/* Disable - 0 (GPIO2 = 0 & GPIO3 = X)    */
 
 	uint16_t isp_parameter;	/* 18, 19 */
 
@@ -934,11 +393,11 @@ typedef struct {
 			uint16_t report_lvd_bus_transition:1;
 			uint16_t unused_2:1;
 			uint16_t unused_3:1;
-			uint16_t unused_4:1;
-			uint16_t unused_5:1;
+			uint16_t disable_iosbs_with_bus_reset_status:1;
+			uint16_t disable_synchronous_backoff:1;
 			uint16_t unused_6:1;
-			uint16_t unused_7:1;
-			uint16_t unused_8:1;
+			uint16_t synchronous_backoff_reporting:1;
+			uint16_t disable_reselection_fairness:1;
 			uint16_t unused_9:1;
 			uint16_t unused_10:1;
 			uint16_t unused_11:1;
@@ -963,7 +422,7 @@ typedef struct {
 		uint8_t bus_reset_delay;	/* 25 */
 		uint8_t retry_count;	/* 26 */
 		uint8_t retry_delay;	/* 27 */
-		/* Adapter Capabilities bits */
+
 		struct {
 			uint8_t async_data_setup_time:4;
 			uint8_t req_ack_active_negation:1;
@@ -989,8 +448,8 @@ typedef struct {
 					uint8_t stop_queue_on_check:1;
 					uint8_t auto_request_sense:1;
 					uint8_t tag_queuing:1;
-					uint8_t sync_data_transfers:1;
-					uint8_t wide_data_transfers:1;
+					uint8_t enable_sync:1;
+					uint8_t enable_wide:1;
 					uint8_t parity_checking:1;
 					uint8_t disconnect_allowed:1;
 				} f;
@@ -999,20 +458,31 @@ typedef struct {
 			uint8_t execution_throttle;	/* 41 */
 			uint8_t sync_period;	/* 42 */
 
-			struct {
-				uint8_t sync_offset:5;
-				uint8_t device_enable:1;
-				uint8_t unused_6:1;
-				uint8_t unused_7:1;
-			} flags1; /* 43 */
-
-			struct {
-				uint8_t ppr_options:4;
-				uint8_t ppr_bus_width:2;
-				uint8_t unused_8:1;
-				uint8_t enable_ppr:1;
-			} flags2;	/* 43 */
-
+			union {		/* 43 */
+				uint8_t flags_43;
+				struct {
+					uint8_t sync_offset:4;
+					uint8_t device_enable:1;
+					uint8_t lun_disable:1;
+					uint8_t unused_6:1;
+					uint8_t unused_7:1;
+				} flags1x80;
+				struct {
+					uint8_t sync_offset:5;
+					uint8_t device_enable:1;
+					uint8_t unused_6:1;
+					uint8_t unused_7:1;
+				} flags1x160;
+			} flags;
+			union {	/* PPR flags for the 1x160 controllers */
+				uint8_t unused_44;
+				struct {
+					uint8_t ppr_options:4;
+					uint8_t ppr_bus_width:2;
+					uint8_t unused_8:1;
+					uint8_t enable_ppr:1;
+				} flags;	/* 44 */
+			} ppr_1x160;
 			uint8_t unused_45;	/* 45 */
 		} target[MAX_TARGETS];
 	} bus[MAX_BUSES];
@@ -1021,19 +491,19 @@ typedef struct {
 
 	uint16_t subsystem_id[2];	/* 250, 251, 252, 253 */
 
-	uint8_t System_Id_Pointer;	/* 254 */
+	union {				/* 254 */
+		uint8_t unused_254;
+		uint8_t system_id_pointer;
+	} sysid_1x160;
 
 	uint8_t chksum;		/* 255 */
-#else
-#error neither __BIG_ENDIAN nor __LITTLE_ENDIAN is defined
-#endif
-} nvram160_t;
+};
 
 /*
  * ISP queue - command entry structure definition.
  */
 #define MAX_CMDSZ	12		/* SCSI maximum CDB size. */
-typedef struct {
+struct cmd_entry {
 	uint8_t entry_type;		/* Entry type. */
 #define COMMAND_TYPE    1		/* Command entry */
 	uint8_t entry_count;		/* Entry count. */
@@ -1056,12 +526,12 @@ typedef struct {
 	uint32_t dseg_2_length;		/* Data segment 2 length. */
 	uint32_t dseg_3_address;	/* Data segment 3 address. */
 	uint32_t dseg_3_length;		/* Data segment 3 length. */
-} cmd_entry_t;
+};
 
 /*
  * ISP queue - continuation entry structure definition.
  */
-typedef struct {
+struct cont_entry {
 	uint8_t entry_type;		/* Entry type. */
 #define CONTINUE_TYPE   2		/* Continuation entry. */
 	uint8_t entry_count;		/* Entry count. */
@@ -1082,12 +552,12 @@ typedef struct {
 	uint32_t dseg_5_length;		/* Data segment 5 length. */
 	uint32_t dseg_6_address;	/* Data segment 6 address. */
 	uint32_t dseg_6_length;		/* Data segment 6 length. */
-} cont_entry_t;
+};
 
 /*
  * ISP queue - status entry structure definition.
  */
-typedef struct {
+struct response {
 	uint8_t entry_type;	/* Entry type. */
 #define STATUS_TYPE     3	/* Status entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1114,12 +584,12 @@ typedef struct {
 	uint32_t residual_length;	/* Residual transfer length. */
 	uint16_t reserved[4];
 	uint8_t req_sense_data[32];	/* Request sense data. */
-} sts_entry_t, response_t;
+};
 
 /*
  * ISP queue - marker entry structure definition.
  */
-typedef struct {
+struct mrk_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define MARKER_TYPE     4	/* Marker entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1133,12 +603,14 @@ typedef struct {
 #define MK_SYNC_ID          1	/* Synchronize ID */
 #define MK_SYNC_ALL         2	/* Synchronize all ID/LUN */
 	uint8_t reserved_1[53];
-} mrk_entry_t;
+};
 
 /*
  * ISP queue - extended command entry structure definition.
+ *
+ * Unused by the driver!
  */
-typedef struct {
+struct ecmd_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define EXTENDED_CMD_TYPE  5	/* Extended command entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1153,7 +625,7 @@ typedef struct {
 	uint16_t timeout;	/* Command timeout. */
 	uint16_t dseg_count;	/* Data segment count. */
 	uint8_t scsi_cdb[88];	/* SCSI command words. */
-} ecmd_entry_t;
+};
 
 /*
  * ISP queue - 64-Bit addressing, command entry structure definition.
@@ -1183,7 +655,7 @@ typedef struct {
 /*
  * ISP queue - 64-Bit addressing, continuation entry structure definition.
  */
-typedef struct {
+struct cont_a64_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define CONTINUE_A64_TYPE 0xA	/* Continuation A64 entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1199,12 +671,12 @@ typedef struct {
 	uint32_t dseg_3_length;	/* Data segment 3 length. */
 	uint32_t dseg_4_address[2];	/* Data segment 4 address. */
 	uint32_t dseg_4_length;	/* Data segment 4 length. */
-} cont_a64_entry_t;
+};
 
 /*
  * ISP queue - enable LUN entry structure definition.
  */
-typedef struct {
+struct elun_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define ENABLE_LUN_TYPE 0xB	/* Enable LUN entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1225,12 +697,14 @@ typedef struct {
 	/* commands (2-26). */
 	uint16_t timeout;	/* 0 = 30 seconds, 0xFFFF = disable */
 	uint16_t reserved_6[20];
-} elun_entry_t;
+};
 
 /*
  * ISP queue - modify LUN entry structure definition.
+ *
+ * Unused by the driver!
  */
-typedef struct {
+struct modify_lun_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define MODIFY_LUN_TYPE 0xC	/* Modify LUN entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1250,12 +724,12 @@ typedef struct {
 	uint16_t reserved_6;
 	uint16_t timeout;	/* 0 = 30 seconds, 0xFFFF = disable */
 	uint16_t reserved_7[20];
-} modify_lun_entry_t;
+};
 
 /*
  * ISP queue - immediate notify entry structure definition.
  */
-typedef struct {
+struct notify_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define IMMED_NOTIFY_TYPE 0xD	/* Immediate notify entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1276,12 +750,12 @@ typedef struct {
 	uint8_t scsi_msg[8];	/* SCSI message not handled by ISP */
 	uint16_t reserved_5[8];
 	uint8_t sense_data[18];
-} notify_entry_t;
+};
 
 /*
  * ISP queue - notify acknowledge entry structure definition.
  */
-typedef struct {
+struct nack_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define NOTIFY_ACK_TYPE 0xE	/* Notify acknowledge entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1297,12 +771,12 @@ typedef struct {
 	uint8_t event;
 	uint16_t seq_id;
 	uint16_t reserved_4[22];
-} nack_entry_t;
+};
 
 /*
  * ISP queue - Accept Target I/O (ATIO) entry structure definition.
  */
-typedef struct {
+struct atio_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define ACCEPT_TGT_IO_TYPE 6	/* Accept target I/O entry. */
 	uint8_t entry_count;	/* Entry count. */
@@ -1320,12 +794,12 @@ typedef struct {
 	uint8_t tag_type;	/* Received queue tag message type */
 	uint8_t cdb[26];
 	uint8_t sense_data[18];
-} atio_entry_t;
+};
 
 /*
  * ISP queue - Continue Target I/O (CTIO) entry structure definition.
  */
-typedef struct {
+struct ctio_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define CONTINUE_TGT_IO_TYPE 7	/* CTIO entry */
 	uint8_t entry_count;	/* Entry count. */
@@ -1353,12 +827,12 @@ typedef struct {
 	uint32_t dseg_2_length;	/* Data segment 2 length. */
 	uint32_t dseg_3_address;	/* Data segment 3 address. */
 	uint32_t dseg_3_length;	/* Data segment 3 length. */
-} ctio_entry_t;
+};
 
 /*
  * ISP queue - CTIO returned entry structure definition.
  */
-typedef struct {
+struct ctio_ret_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define CTIO_RET_TYPE   7	/* CTIO return entry */
 	uint8_t entry_count;	/* Entry count. */
@@ -1383,12 +857,12 @@ typedef struct {
 	uint32_t dseg_1_address;	/* Data segment 1 address. */
 	uint16_t dseg_1_length;	/* Data segment 1 length. */
 	uint8_t sense_data[18];
-} ctio_ret_entry_t;
+};
 
 /*
  * ISP queue - CTIO A64 entry structure definition.
  */
-typedef struct {
+struct ctio_a64_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define CTIO_A64_TYPE 0xF	/* CTIO A64 entry */
 	uint8_t entry_count;	/* Entry count. */
@@ -1413,12 +887,12 @@ typedef struct {
 	uint32_t dseg_0_length;	/* Data segment 0 length. */
 	uint32_t dseg_1_address[2];	/* Data segment 1 address. */
 	uint32_t dseg_1_length;	/* Data segment 1 length. */
-} ctio_a64_entry_t;
+};
 
 /*
  * ISP queue - CTIO returned entry structure definition.
  */
-typedef struct {
+struct ctio_a64_ret_entry {
 	uint8_t entry_type;	/* Entry type. */
 #define CTIO_A64_RET_TYPE 0xF	/* CTIO A64 returned entry */
 	uint8_t entry_count;	/* Entry count. */
@@ -1440,12 +914,12 @@ typedef struct {
 	uint16_t dseg_count;	/* Data segment count. */
 	uint16_t reserved_4[7];
 	uint8_t sense_data[18];
-} ctio_a64_ret_entry_t;
+};
 
 /*
  * ISP request and response queue entry sizes
  */
-#define RESPONSE_ENTRY_SIZE	(sizeof(response_t))
+#define RESPONSE_ENTRY_SIZE	(sizeof(struct response))
 #define REQUEST_ENTRY_SIZE	(sizeof(request_t))
 
 /*
@@ -1508,27 +982,11 @@ typedef struct {
 #define OF_FORCE_DISC       BIT_30	/* Disconnects mandatory */
 #define OF_SSTS             BIT_31	/* Send SCSI status */
 
-#if QL1280_TARGET_MODE_SUPPORT
-/*
- * Target Read/Write buffer structure.
- */
-#define TARGET_DATA_OFFSET	4
-#define TARGET_DATA_SIZE	0x2000	/* 8K */
-#define TARGET_INQ_OFFSET	(TARGET_DATA_OFFSET + TARGET_DATA_SIZE)
-#define TARGET_SENSE_SIZE	18
-#define TARGET_BUF_SIZE		36
-
-typedef struct {
-	uint8_t hdr[4];
-	uint8_t data[TARGET_DATA_SIZE];
-	struct ident inq;
-} tgt_t;
-#endif
 
 /*
- * BUS parameters/settings structure
+ * BUS parameters/settings structure - UNUSED
  */
-typedef struct {
+struct bus_param {
 	uint8_t id;		/* Host adapter SCSI id */
 	uint8_t bus_reset_delay;	/* SCSI bus reset delay. */
 	uint8_t failed_reset_count;	/* number of time reset failed */
@@ -1540,8 +998,19 @@ typedef struct {
 	uint8_t reset_marker:1;
 	uint8_t disable_scsi_reset:1;
 	uint8_t scsi_bus_dead:1;	/* SCSI Bus is Dead, when 5 back to back resets failed */
+};
 
-} bus_param_t;
+
+struct qla_driver_setup {
+	uint32_t no_sync:1;
+	uint32_t no_wide:1;
+	uint32_t no_ppr:1;
+	uint32_t no_nvram:1;
+	uint16_t sync_mask;
+	uint16_t wide_mask;
+	uint16_t ppr_mask;
+};
+
 
 /*
  * Linux Host Adapter structure
@@ -1551,35 +1020,32 @@ struct scsi_qla_host {
 	struct Scsi_Host *host;	/* pointer to host data */
 	struct scsi_qla_host *next;
 	struct device_reg *iobase;	/* Base Memory-mapped I/O address */
+
+	unsigned char *mmpbase;	/* memory mapped address */
+	unsigned long host_no;
+	unsigned long instance;
+	struct pci_dev *pdev;
+	uint32_t device_id;
 	uint8_t pci_bus;
 	uint8_t pci_device_fn;
 	uint8_t devnum;
-	struct pci_dev *pdev;
-
-	volatile unsigned char *mmpbase;	/* memory mapped address */
-	unsigned long host_no;
-	unsigned long instance;
 	uint8_t revision;
 	uint8_t ports;
 
 	unsigned long actthreads;
-	unsigned long qthreads;
 	unsigned long isr_count;	/* Interrupt count */
 	unsigned long spurious_int;
 
-	uint32_t device_id;
-
 	/* Outstandings ISP commands. */
-	srb_t *outstanding_cmds[MAX_OUTSTANDING_COMMANDS];
+	struct srb *outstanding_cmds[MAX_OUTSTANDING_COMMANDS];
 
 	/* BUS configuration data */
-	bus_param_t bus_settings[MAX_BUSES];
+	struct bus_param bus_settings[MAX_BUSES];
 
-	/* Device LUN queues. */
-	struct scsi_lu *dev[MAX_EQ];	/* Logical unit queues */
-
+#if 0
 	/* bottom half run queue */
-	struct work_struct run_qla_bh;
+	struct tq_struct run_qla_bh;
+#endif
 
 	/* Received ISP mailbox data. */
 	volatile uint16_t mailbox_out[MAILBOX_REGISTER_COUNT];
@@ -1595,49 +1061,43 @@ struct scsi_qla_host {
 	uint16_t req_q_cnt;		/* Number of available entries. */
 
 	dma_addr_t response_dma;	/* Physical address. */
-	response_t *response_ring;	/* Base virtual address */
-	response_t *response_ring_ptr;	/* Current address. */
+	struct response *response_ring;	/* Base virtual address */
+	struct response *response_ring_ptr;	/* Current address. */
 	uint16_t rsp_ring_index;	/* Current index. */
-
-#if QL1280_TARGET_MODE_SUPPORT
-	/* Target buffer and sense data. */
-	dma_addr_t tbuf_dma;	/* Physical address. */
-	dma_addr_t tsense_dma;	/* Physical address. */
-	tgt_t *tbuf;
-	uint8_t *tsense;
-#endif
 
 #if WATCHDOGTIMER
 	/* Watchdog queue, lock and total timer */
 	uint8_t watchdog_q_lock;	/* Lock for watchdog queue */
-	srb_t *wdg_q_first;	/* First job on watchdog queue */
-	srb_t *wdg_q_last;	/* Last job on watchdog queue */
+	struct srb *wdg_q_first;	/* First job on watchdog queue */
+	struct srb *wdg_q_last;	/* Last job on watchdog queue */
 	uint32_t total_timeout;	/* Total timeout (quantum count) */
 	uint32_t watchdogactive;
 #endif
 
-	srb_t *done_q_first;	/* First job on done queue */
-	srb_t *done_q_last;	/* Last job on done queue */
+	struct srb *done_q_first;	/* First job on done queue */
+	struct srb *done_q_last;	/* Last job on done queue */
+
+	struct completion *mailbox_wait;
 
 	volatile struct {
-		uint32_t mbox_int:1;	/* 0 */
-		uint32_t mbox_busy:1;	/* 1 */
-		uint32_t online:1;	/* 2 */
-		uint32_t reset_marker:1;	/* 3 */
-		uint32_t isp_abort_needed:1;	/* 4 */
-		uint32_t disable_host_adapter:1;	/* 5 */
-		uint32_t reset_active:1;	/* 6 */
-		uint32_t abort_isp_active:1;	/* 7 */
-		uint32_t disable_risc_code_load:1;	/* 8 */
-		uint32_t enable_64bit_addressing:1;	/* 9 */
-		uint32_t in_reset:1;	/* 10 */
+		uint32_t mbox_busy:1;			/* 0 */
+		uint32_t online:1;			/* 1 */
+		uint32_t reset_marker:1;		/* 2 */
+		uint32_t disable_host_adapter:1;	/* 4 */
+		uint32_t reset_active:1;		/* 5 */
+		uint32_t abort_isp_active:1;		/* 6 */
+		uint32_t disable_risc_code_load:1;	/* 7 */
+		uint32_t enable_64bit_addressing:1;	/* 8 */
+		uint32_t in_reset:1;			/* 9 */
 		uint32_t ints_enabled:1;
+		uint32_t ignore_nvram:1;
+#ifdef __ia64__
+		uint32_t use_pci_vchannel:1;
+#endif
 	} flags;
 
-	/* needed holders for PCI ordered list of hosts */
-	unsigned long io_port;
-	uint32_t irq;
-
+	struct nvram nvram;
+	int nvram_valid;
 };
 
 /*
@@ -1651,16 +1111,60 @@ struct scsi_qla_host {
 /*
  *  Linux - SCSI Driver Interface Function Prototypes.
  */
+int qla1280_proc_info(char *, char **, off_t, int, int, int);
 const char *qla1280_info(struct Scsi_Host *host);
 int qla1280_detect(Scsi_Host_Template *);
 int qla1280_release(struct Scsi_Host *);
 int qla1280_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-int qla1280_abort(Scsi_Cmnd *);
-int qla1280_reset(Scsi_Cmnd *, unsigned int);
+#if LINUX_VERSION_CODE < 0x020545
+int qla1280_biosparam(Disk *, kdev_t, int[]);
+#else
 int qla1280_biosparam(struct scsi_device *, struct block_device *,
-		sector_t, int[]);
-static int qla1280_slave_configure(Scsi_Device *);
-irqreturn_t qla1280_intr_handler(int, void *, struct pt_regs *);
-void qla1280_setup(char *s, int *dummy);
+		      sector_t, int *);
+#endif
+int __init qla1280_setup(char *s);
+int qla1280_eh_abort(struct scsi_cmnd * cmd);
+int qla1280_eh_device_reset(struct scsi_cmnd *cmd);
+int qla1280_eh_bus_reset(struct scsi_cmnd *cmd);
+int qla1280_eh_adapter_reset(struct scsi_cmnd *cmd);
+
+#if LINUX_VERSION_CODE < 0x020545
+#define USE_NEW_EH	.use_new_eh_code= 1
+#else
+#define USE_NEW_EH
+#endif
+
+/*
+ * Scsi_Host_template (see hosts.h)
+ * Device driver Interfaces to mid-level SCSI driver.
+ */
+
+#define QLA1280_LINUX_TEMPLATE {				\
+	.module = NULL,						\
+	.proc_dir = NULL,					\
+	.proc_info = qla1280_proc_info,				\
+	.name = "Qlogic ISP 1280/12160",			\
+	.detect = qla1280_detect,				\
+	.release = qla1280_release,				\
+	.info = qla1280_info,					\
+	.ioctl = NULL,						\
+	.command = NULL,					\
+	.queuecommand = qla1280_queuecommand,			\
+	.eh_strategy_handler = NULL,				\
+	.eh_abort_handler = qla1280_eh_abort,			\
+	.eh_device_reset_handler = qla1280_eh_device_reset,	\
+	.eh_bus_reset_handler = qla1280_eh_bus_reset,		\
+	.eh_host_reset_handler = qla1280_eh_adapter_reset,	\
+	.bios_param = qla1280_biosparam,			\
+	.can_queue = 255,	/* max simultaneous cmds      */\
+	.this_id = -1,		/* scsi id of host adapter    */\
+	.sg_tablesize = SG_ALL,	/* max scatter-gather cmds    */\
+	.cmd_per_lun = 3,	/* cmds per lun (linked cmds) */\
+	.present = 0,		/* number of 1280's present   */\
+	.unchecked_isa_dma = 0,	/* no memory DMA restrictions */\
+	.use_clustering = ENABLE_CLUSTERING,			\
+	.emulated = 0,						\
+	USE_NEW_EH						\
+}
 
 #endif				/* _IO_HBA_QLA1280_H */

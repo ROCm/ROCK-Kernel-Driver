@@ -287,12 +287,9 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   return 0;
 }
 
-                    
 static struct address_space_operations blkmtd_aops = {
-  writepage:     blkmtd_writepage,
-  readpage:      NULL,
+	.writepage	= blkmtd_writepage,
 }; 
-
 
 /* This is the kernel thread that empties the write queue to disk */
 static int write_queue_task(void *data)

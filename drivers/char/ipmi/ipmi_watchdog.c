@@ -559,7 +559,10 @@ static int ipmi_ioctl(struct inode *inode, struct file *file,
 
 	case WDIOC_GETSTATUS:
 		val = 0;
-		return copy_to_user((void *) arg, &val, sizeof(val));
+		i = copy_to_user((void *) arg, &val, sizeof(val));
+		if (i)
+			return -EFAULT;
+		return 0;
 
 	default:
 		return -ENOIOCTLCMD;

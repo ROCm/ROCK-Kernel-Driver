@@ -132,9 +132,9 @@ static int __init arcrimi_found(struct net_device *dev)
 	u_long first_mirror, last_mirror, shmem;
 	int mirror_size;
 
-	/* reserve the irq */  {
-		if (request_irq(dev->irq, &arcnet_interrupt, 0, "arcnet (RIM I)", dev))
-			BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", dev->irq);
+	/* reserve the irq */
+	if (request_irq(dev->irq, &arcnet_interrupt, 0, "arcnet (RIM I)", dev)) {
+		BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", dev->irq);
 		return -ENODEV;
 	}
 

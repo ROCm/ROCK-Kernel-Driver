@@ -232,7 +232,10 @@ static int comxlapb_write_proc(struct file *file, const char *buffer,
 		return -ENOMEM;
 	}
 
-	copy_from_user(page, buffer, count);
+	if (copy_from_user(page, buffer, count)) {
+		free_page((unsigned long)page);
+		return -EFAULT;
+	}
 	if (*(page + count - 1) == '\n') {
 		*(page + count - 1) = 0;
 	}

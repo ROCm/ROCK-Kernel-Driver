@@ -122,3 +122,17 @@ asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
 	unsigned long raddr;
 	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: (long)raddr;
 } 
+
+asmlinkage long sys_time64(long * tloc)
+{
+	struct timeval now; 
+	int i; 
+
+	do_gettimeofday(&now);
+	i = now.tv_sec;
+	if (tloc) {
+		if (put_user(i,tloc))
+			i = -EFAULT;
+	}
+	return i;
+}

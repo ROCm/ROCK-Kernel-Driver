@@ -38,8 +38,8 @@ struct parsed_partitions;
 /* Magic numbers in CPU format. */
 #define MAGIC_VMDB	0x564D4442		/* VMDB */
 #define MAGIC_VBLK	0x56424C4B		/* VBLK */
-#define MAGIC_PRIVHEAD	0x5052495648454144	/* PRIVHEAD */
-#define MAGIC_TOCBLOCK	0x544F43424C4F434B	/* TOCBLOCK */
+#define MAGIC_PRIVHEAD	0x5052495648454144ULL	/* PRIVHEAD */
+#define MAGIC_TOCBLOCK	0x544F43424C4F434BULL	/* TOCBLOCK */
 
 /* The defined vblk types. */
 #define VBLK_VOL5		0x51		/* Volume,     version 5 */

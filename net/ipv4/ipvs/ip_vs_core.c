@@ -53,7 +53,9 @@ EXPORT_SYMBOL(ip_vs_proto_name);
 EXPORT_SYMBOL(ip_vs_conn_new);
 EXPORT_SYMBOL(ip_vs_conn_in_get);
 EXPORT_SYMBOL(ip_vs_conn_out_get);
+#ifdef CONFIG_IP_VS_PROTO_TCP
 EXPORT_SYMBOL(ip_vs_tcp_conn_listen);
+#endif
 EXPORT_SYMBOL(ip_vs_conn_put);
 #ifdef CONFIG_IP_VS_DEBUG
 EXPORT_SYMBOL(ip_vs_get_debug_level);

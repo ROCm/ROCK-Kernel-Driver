@@ -4,6 +4,8 @@
  * XDR support for nfsd/protocol version 3.
  *
  * Copyright (C) 1995, 1996, 1997 Olaf Kirch <okir@monad.swb.de>
+ *
+ * 2003-08-09 Jamie Lokier: Use htonl() for nanoseconds, not htons()!
  */
 
 #include <linux/types.h>
@@ -43,7 +45,7 @@ static u32	nfs3_ftypes[] = {
 static inline u32 *
 encode_time3(u32 *p, struct timespec *time)
 {
-	*p++ = htonl((u32) time->tv_sec); *p++ = htons(time->tv_nsec);
+	*p++ = htonl((u32) time->tv_sec); *p++ = htonl(time->tv_nsec);
 	return p;
 }
 

@@ -689,7 +689,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     
     err = ret = 0;
     
-    if (cmd & IOC_IN) copy_from_user((char *)&buf, (char *)arg, size);
+    if (cmd & IOC_IN) __copy_from_user((char *)&buf, (char *)arg, size);
     
     switch (cmd) {
     case DS_ADJUST_RESOURCE_INFO:
@@ -803,9 +803,9 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	    err = -EIO; break;
 	}
     }
-    
-    if (cmd & IOC_OUT) copy_to_user((char *)arg, (char *)&buf, size);
-     
+
+    if (cmd & IOC_OUT) __copy_to_user((char *)arg, (char *)&buf, size);
+
     return err;
 } /* ds_ioctl */
 

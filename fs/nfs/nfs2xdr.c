@@ -90,7 +90,7 @@ xdr_encode_time(u32 *p, struct timespec *timep)
 {
 	*p++ = htonl(timep->tv_sec);
 	/* Convert nanoseconds into microseconds */
-	*p++ = htonl(timep->tv_nsec / 1000);
+	*p++ = htonl(timep->tv_nsec ? timep->tv_nsec / 1000 : 0);
 	return p;
 }
 

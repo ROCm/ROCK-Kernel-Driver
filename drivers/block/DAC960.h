@@ -65,7 +65,7 @@
  */
 
 #define DAC690_V1_PciDmaMask	0xffffffff
-#define DAC690_V2_PciDmaMask	0xffffffffffffffff
+#define DAC690_V2_PciDmaMask	0xffffffffffffffffULL
 
 /*
   Define a Boolean data type.

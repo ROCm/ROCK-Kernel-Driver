@@ -27,6 +27,20 @@ static inline void ipip_ecn_decapsulate(struct iphdr *outer_iph, struct sk_buff 
 		IP_ECN_set_ce(inner_iph);
 }
 
+static int xfrm4_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq)
+{
+	switch (nexthdr) {
+	case IPPROTO_IPIP:
+		if (!pskb_may_pull(skb, sizeof(struct iphdr)))
+			return -EINVAL;
+		*spi = skb->nh.iph->saddr;
+		*seq = 0;
+		return 0;
+	}
+
+	return xfrm_parse_spi(skb, nexthdr, spi, seq);
+}
+
 int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 {
 	int err;
@@ -36,7 +50,7 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 	int xfrm_nr = 0;
 	int decaps = 0;
 
-	if ((err = xfrm_parse_spi(skb, skb->nh.iph->protocol, &spi, &seq)) != 0)
+	if ((err = xfrm4_parse_spi(skb, skb->nh.iph->protocol, &spi, &seq)) != 0)
 		goto drop;
 
 	do {

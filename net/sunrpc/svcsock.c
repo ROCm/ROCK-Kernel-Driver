@@ -567,14 +567,17 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 				(serv->sv_nrthreads+3) * serv->sv_bufsz,
 				(serv->sv_nrthreads+3) * serv->sv_bufsz);
 
-	if ((rqstp->rq_deferred = svc_deferred_dequeue(svsk)))
+	if ((rqstp->rq_deferred = svc_deferred_dequeue(svsk))) {
+		svc_sock_received(svsk);
 		return svc_deferred_recv(rqstp);
+	}
 
 	clear_bit(SK_DATA, &svsk->sk_flags);
 	while ((skb = skb_recv_datagram(svsk->sk_sk, 0, 1, &err)) == NULL) {
-		svc_sock_received(svsk);
-		if (err == -EAGAIN)
+		if (err == -EAGAIN) {
+			svc_sock_received(svsk);
 			return err;
+		}
 		/* possibly an icmp error */
 		dprintk("svc: recvfrom returned error %d\n", -err);
 	}
@@ -869,8 +872,10 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		test_bit(SK_CONN, &svsk->sk_flags),
 		test_bit(SK_CLOSE, &svsk->sk_flags));
 
-	if ((rqstp->rq_deferred = svc_deferred_dequeue(svsk)))
+	if ((rqstp->rq_deferred = svc_deferred_dequeue(svsk))) {
+		svc_sock_received(svsk);
 		return svc_deferred_recv(rqstp);
+	}
 
 	if (test_bit(SK_CLOSE, &svsk->sk_flags)) {
 		svc_delete_socket(svsk);
@@ -1545,6 +1550,5 @@ static struct svc_deferred_req *svc_deferred_dequeue(struct svc_sock *svsk)
 		set_bit(SK_DEFERRED, &svsk->sk_flags);
 	}
 	spin_unlock(&serv->sv_lock);
-	svc_sock_received(svsk);
 	return dr;
 }

@@ -11,8 +11,6 @@
 #include <linux/mm.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 struct amd_page_map {
 	unsigned long *real;
 	unsigned long *remapped;
@@ -404,16 +402,9 @@ static int __init agp_amdk7_probe(struct pci_dev *pdev,
 		}
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX
-		    "Unsupported AMD chipset (device id: %04x),"
-		    " you might want to try agp_try_unsupported=1.\n",
+	printk(KERN_ERR PFX "Unsupported AMD chipset (device id: %04x)\n",
 		    pdev->device);
-		return -ENODEV;
-	}
-
-	printk(KERN_WARNING PFX "Trying generic AMD routines"
-	       " for device id: %04x\n", pdev->device);
+	return -ENODEV;
 
 found:
 	bridge = agp_alloc_bridge();
@@ -476,5 +467,4 @@ static void __exit agp_amdk7_cleanup(void)
 module_init(agp_amdk7_init);
 module_exit(agp_amdk7_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");

@@ -225,7 +225,7 @@ void __kfree_skb(struct sk_buff *skb)
 	}
 
 	dst_release(skb->dst);
-#ifdef CONFIG_INET
+#ifdef CONFIG_XFRM
 	secpath_put(skb->sp);
 #endif
 	if(skb->destructor) {

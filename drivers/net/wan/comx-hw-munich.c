@@ -2414,7 +2414,10 @@ static int munich_write_proc(struct file *file, const char *buffer,
 	return -ENOMEM;
 
     /* Copy user data and cut trailing \n */
-    copy_from_user(page, buffer, count = min(count, PAGE_SIZE));
+    if (copy_from_user(page, buffer, count = min(count, PAGE_SIZE))) {
+	    free_page((unsigned long)page);
+	    return -EFAULT;
+    }
     if (*(page + count - 1) == '\n')
 	*(page + count - 1) = 0;
     *(page + PAGE_SIZE - 1) = 0;

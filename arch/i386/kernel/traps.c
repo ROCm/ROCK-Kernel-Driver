@@ -629,9 +629,10 @@ void math_error(void *eip)
 		default:
 			break;
 		case 0x001: /* Invalid Op */
-		case 0x040: /* Stack Fault */
-		case 0x240: /* Stack Fault | Direction */
+		case 0x041: /* Stack Fault */
+		case 0x241: /* Stack Fault | Direction */
 			info.si_code = FPE_FLTINV;
+			/* Should we clear the SF or let user space do it ???? */
 			break;
 		case 0x002: /* Denormalize */
 		case 0x010: /* Underflow */
