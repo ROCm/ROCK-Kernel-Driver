@@ -286,9 +286,10 @@ static void destroy_async (struct dev_state *ps, struct list_head *list)
 	while (!list_empty(list)) {
 		as = list_entry(list->next, struct async, asynclist);
 		list_del_init(&as->asynclist);
+
+		/* drop the spinlock so the completion handler can run */
 		spin_unlock_irqrestore(&ps->lock, flags);
-                /* usb_unlink_urb calls the completion handler with status == -ENOENT */
-		usb_unlink_urb(as->urb);
+		usb_kill_urb(as->urb);
 		spin_lock_irqsave(&ps->lock, flags);
 	}
 	spin_unlock_irqrestore(&ps->lock, flags);
@@ -976,7 +977,7 @@ static int proc_unlinkurb(struct dev_state *ps, void __user *arg)
 	as = async_getpending(ps, arg);
 	if (!as)
 		return -EINVAL;
-	usb_unlink_urb(as->urb);
+	usb_kill_urb(as->urb);
 	return 0;
 }
 
