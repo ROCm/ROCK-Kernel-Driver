@@ -135,15 +135,11 @@ out_destroy:
  * XDR functions for NSM.
  */
 
-static int
-xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
+static u32 *
+xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
 	char	buffer[20];
 	u32	addr = ntohl(argp->addr);
-
-	dprintk("nsm: xdr_encode_mon(%08x, %d, %d, %d)\n",
-			htonl(argp->addr), htonl(argp->prog),
-			htonl(argp->vers), htonl(argp->proc));
 
 	/*
 	 * Use the dotted-quad IP address of the remote host as
@@ -155,19 +151,34 @@ xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 				 	(addr>>8) & 0xff,  (addr) & 0xff);
 	if (!(p = xdr_encode_string(p, buffer))
 	 || !(p = xdr_encode_string(p, system_utsname.nodename)))
-		return -EIO;
+		return ERR_PTR(-EIO);
 	*p++ = htonl(argp->prog);
 	*p++ = htonl(argp->vers);
 	*p++ = htonl(argp->proc);
 
-	/* This is the private part. Needed only for SM_MON call */
-	if (rqstp->rq_task->tk_msg.rpc_proc == SM_MON) {
-		*p++ = argp->addr;
-		*p++ = argp->vers;
-		*p++ = argp->proto;
-		*p++ = 0;
-	}
+	return p;
+}
 
+static int
+xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
+{
+	p = xdr_encode_common(rqstp, p, argp);
+	if (IS_ERR(p))
+		return PTR_ERR(p);
+	*p++ = argp->addr;
+	*p++ = argp->vers;
+	*p++ = argp->proto;
+	*p++ = 0;
+	rqstp->rq_slen = xdr_adjust_iovec(rqstp->rq_svec, p);
+	return 0;
+}
+
+static int
+xdr_encode_unmon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
+{
+	p = xdr_encode_common(rqstp, p, argp);
+	if (IS_ERR(p))
+		return PTR_ERR(p);
 	rqstp->rq_slen = xdr_adjust_iovec(rqstp->rq_svec, p);
 	return 0;
 }
@@ -209,7 +220,7 @@ static struct rpc_procinfo	nsm_procedures[] = {
 	},
 [SM_UNMON] = {
 		.p_proc		= SM_UNMON,
-		.p_encode	= (kxdrproc_t) xdr_encode_mon,
+		.p_encode	= (kxdrproc_t) xdr_encode_unmon,
 		.p_decode	= (kxdrproc_t) xdr_decode_stat,
 		.p_bufsiz	= MAX(SM_mon_id_sz, SM_unmonres_sz) << 2,
 	},
