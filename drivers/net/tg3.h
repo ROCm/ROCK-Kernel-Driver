@@ -124,6 +124,7 @@
 #define  CHIPREV_ID_5705_A3		 0x3003
 #define  CHIPREV_ID_5750_A0		 0x4000
 #define  CHIPREV_ID_5750_A1		 0x4001
+#define  CHIPREV_ID_5750_A3		 0x4003
 #define  GET_ASIC_REV(CHIP_REV_ID)	((CHIP_REV_ID) >> 12)
 #define   ASIC_REV_5700			 0x07
 #define   ASIC_REV_5701			 0x00

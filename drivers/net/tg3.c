@@ -3723,6 +3723,8 @@ static void tg3_write_sig_legacy(struct tg3 *tp, int kind)
 	}
 }
 
+static void tg3_stop_fw(struct tg3 *);
+
 /* tp->lock is held. */
 static int tg3_chip_reset(struct tg3 *tp)
 {
@@ -3824,6 +3826,11 @@ static int tg3_chip_reset(struct tg3 *tp)
 	pci_write_config_dword(tp->pdev, TG3PCI_X_CAPS, val);
 
 	tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
+
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5750_A3) {
+		tg3_stop_fw(tp);
+		tw32(0x5000, 0x400);
+	}
 
 	tw32(GRC_MODE, tp->grc_mode);
 
