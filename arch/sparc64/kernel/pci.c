@@ -804,25 +804,20 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 
 /* Return the domain nuber for this pci bus */
 
-int pci_domain_nr(struct pci_bus *bus)
+int pci_domain_nr(struct pci_bus *pbus)
 {
-	struct pcidev_cookie *cookie = bus->sysdata;
+	struct pci_pbm_info *pbm = pbus->sysdata;
 	int ret;
 
-	if (cookie != NULL) {
-		struct pci_pbm_info *pbm = cookie->pbm;
-		if (pbm == NULL || pbm->parent == NULL) {
-			ret = -ENXIO;
-		} else {
-			struct pci_controller_info *p = pbm->parent;
-
-			ret = p->index;
-			if (p->pbms_same_domain == 0)
-				ret = ((ret << 1) +
-				       ((pbm == &pbm->parent->pbm_B) ? 1 : 0));
-		}
-	} else {
+	if (pbm == NULL || pbm->parent == NULL) {
 		ret = -ENXIO;
+	} else {
+		struct pci_controller_info *p = pbm->parent;
+
+		ret = p->index;
+		if (p->pbms_same_domain == 0)
+			ret = ((ret << 1) +
+			       ((pbm == &pbm->parent->pbm_B) ? 1 : 0));
 	}
 
 	return ret;
