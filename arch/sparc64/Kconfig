@@ -18,6 +18,11 @@ config TIME_INTERPOLATION
 
 source "init/Kconfig"
 
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
+	default y
+
 menu "General machine setup"
 
 config BBC_I2C
