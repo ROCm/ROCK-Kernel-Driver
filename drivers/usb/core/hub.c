@@ -405,9 +405,14 @@ static int hub_configure(struct usb_hub *hub,
 			hub->tt.hub = dev;
 			break;
 		case 2:
-			dev_dbg(hub_dev, "TT per port\n");
+			ret = usb_set_interface(dev, 0, 1);
+			if (ret == 0) {
+				dev_dbg(hub_dev, "TT per port\n");
+				hub->tt.multi = 1;
+			} else
+				dev_err(hub_dev, "Using single TT (err %d)\n",
+					ret);
 			hub->tt.hub = dev;
-			hub->tt.multi = 1;
 			break;
 		default:
 			dev_dbg(hub_dev, "Unrecognized hub protocol %d\n",

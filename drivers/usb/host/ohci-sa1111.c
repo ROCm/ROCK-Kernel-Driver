@@ -167,9 +167,7 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 	hcd->description = driver->description;
 	hcd->irq = dev->irq[1];
 	hcd->regs = dev->mapbase;
-	hcd->pdev = SA1111_FAKE_PCIDEV;
 	hcd->self.controller = &dev->dev;
-	hcd->controller = hcd->self.controller;
 
 	retval = hcd_buffer_create (hcd);
 	if (retval != 0) {
@@ -270,14 +268,12 @@ ohci_sa1111_start (struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ret;
 
-	if (hcd->pdev) {
-		ohci->hcca = pci_alloc_consistent (hcd->pdev,
-				sizeof *ohci->hcca, &ohci->hcca_dma);
-		if (!ohci->hcca)
-			return -ENOMEM;
-	}
-
-        memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
+	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
+			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
+	if (!ohci->hcca)
+		return -ENOMEM;
+        
+	memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
 	if ((ret = ohci_mem_init (ohci)) < 0) {
 		ohci_stop (hcd);
 		return ret;

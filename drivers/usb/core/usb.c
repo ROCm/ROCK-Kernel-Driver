@@ -1152,12 +1152,19 @@ int usb_new_device(struct usb_device *dev)
 	config = dev->config[0].desc.bConfigurationValue;
 	if (dev->descriptor.bNumConfigurations != 1) {
 		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
+			struct usb_interface_descriptor	*desc;
+
 			/* heuristic:  Linux is more likely to have class
 			 * drivers, so avoid vendor-specific interfaces.
 			 */
-			if (dev->config[i].interface[0]->altsetting
-						->desc.bInterfaceClass
-					== USB_CLASS_VENDOR_SPEC)
+			desc = &dev->config[i].interface[0]
+					->altsetting->desc;
+			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
+				continue;
+			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
+			if (desc->bInterfaceClass == USB_CLASS_COMM
+					&& desc->bInterfaceSubClass == 2
+					&& desc->bInterfaceProtocol == 0xff)
 				continue;
 			config = dev->config[i].desc.bConfigurationValue;
 			break;
