@@ -2534,12 +2534,6 @@ int Pci2220i_Detect (Scsi_Host_Template *tpnt)
 	UCHAR				device;
 	struct pci_dev	   *pcidev = NULL;
 
-	if ( !pci_present () )
-		{
-		printk ("pci2220i: PCI BIOS not present\n");
-		return 0;
-		}
-
 	while ( (pcidev = pci_find_device (VENDOR_PSI, DEVICE_DALE_1, pcidev)) != NULL )
 		{
 		if (pci_enable_device(pcidev))
