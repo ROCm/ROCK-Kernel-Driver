@@ -23,7 +23,7 @@
 #include <asm/machdep.h>
 #include <asm/io.h>
 #include <asm/todc.h>
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 
 static void (*callback_setup_arch)(void);
 
@@ -67,7 +67,7 @@ TODC_ALLOC();
 #ifdef CONFIG_GEN_RTC
 static void sbc82xx_time_init(void)
 {
-	volatile memctl8260_t *mc = &immr->im_memctl;
+	volatile memctl_cpm2_t *mc = &cpm2_immr->im_memctl;
 	TODC_INIT(TODC_TYPE_MK48T59, 0, 0, SBC82xx_TODC_NVRAM_ADDR, 0);
 
 	/* Set up CS11 for RTC chip */

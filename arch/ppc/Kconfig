@@ -582,14 +582,23 @@ config EMBEDDEDBOOT
 	default y
 
 config 8260
-	bool "MPC8260 CPM Support" if WILLOW
+	bool "CPM2 Support" if WILLOW
 	depends on 6xx
 	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260 || SBC82xx
 	help
-	  The MPC8260 CPM (Communications Processor Module) is a typical
-	  embedded CPU made by Motorola.  Selecting this option means that
-	  you wish to build a kernel for a machine with specifically an 8260
-	  for a CPU.
+	  The MPC8260 is a typical embedded CPU made by Motorola.  Selecting
+	  this option means that you wish to build a kernel for a machine with
+	  an 8260 class CPU.
+
+config CPM2
+	bool
+	depends on 8260
+	default y
+	help
+	  The CPM2 (Communications Processor Module) is a coprocessor on
+	  embedded CPUs made by Motorola.  Selecting this option means that
+	  you wish to build a kernel for a machine with a CPM2 coprocessor
+	  on it (826x, 827x, 8560).
 
 config PPC_CHRP
 	bool
@@ -672,11 +681,11 @@ config SPRUCE_BAUD_33M
 
 config PC_KEYBOARD
 	bool "PC PS/2 style Keyboard"
-	depends on 4xx || 8260
+	depends on 4xx || CPM2
 
 config SERIAL_CONSOLE
 	bool
-	depends on 8xx || 8260
+	depends on 8xx || CPM2
 	default y
 
 config SERIAL_CONSOLE_BAUD
@@ -957,7 +966,7 @@ config ISA
 
 config GENERIC_ISA_DMA
 	bool
-	depends on POWER3 || POWER4 || 6xx && !8260
+	depends on POWER3 || POWER4 || 6xx && !CPM2
 	default y
 
 config EISA
@@ -974,10 +983,10 @@ config MCA
 	bool
 
 config PCI
-	bool "PCI support" if 40x || 8260
-	default y if !40x && !8260 && !8xx && !APUS
-	default PCI_PERMEDIA if !4xx && !8260 && !8xx && APUS
-	default PCI_QSPAN if !4xx && !8260 && 8xx
+	bool "PCI support" if 40x || CPM2
+	default y if !40x && !CPM2 && !8xx && !APUS
+	default PCI_PERMEDIA if !4xx && !CPM2 && !8xx && APUS
+	default PCI_QSPAN if !4xx && !CPM2 && 8xx
 	help
 	  Find out whether your system includes a PCI bus. PCI is the name of
 	  a bus system, i.e. the way the CPU talks to the other stuff inside
@@ -990,7 +999,7 @@ config PCI_DOMAINS
 
 config PCI_QSPAN
 	bool "QSpan PCI"
-	depends on !4xx && !8260 && 8xx
+	depends on !4xx && !CPM2 && 8xx
 	help
 	  Say Y here if you have a system based on a Motorola 8xx-series
 	  embedded processor with a QSPAN PCI interface, otherwise say N.
@@ -1229,7 +1238,7 @@ endchoice
 
 config KGDB_CONSOLE
 	bool "Enable serial console thru kgdb port"
-	depends on KGDB && 8xx || 8260
+	depends on KGDB && 8xx || CPM2
 	help
 	  If you enable this, all serial console messages will be sent
 	  over the gdb stub.

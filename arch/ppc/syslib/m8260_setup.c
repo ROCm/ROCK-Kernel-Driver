@@ -39,12 +39,12 @@
 #include <asm/pgtable.h>
 #include <asm/ide.h>
 #include <asm/mpc8260.h>
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 #include <asm/machdep.h>
 #include <asm/bootinfo.h>
 #include <asm/time.h>
 
-#include "ppc8260_pic.h"
+#include "cpm2_pic.h"
 
 static int m8260_set_rtc_time(unsigned long time);
 static unsigned long m8260_get_rtc_time(void);
@@ -52,14 +52,14 @@ static void m8260_calibrate_decr(void);
 
 unsigned char __res[sizeof(bd_t)];
 
-extern void m8260_cpm_reset(void);
+extern void cpm2_reset(void);
 
 static void __init
 m8260_setup_arch(void)
 {
 	/* Reset the Communication Processor Module.
 	*/
-	m8260_cpm_reset();
+	cpm2_reset();
 }
 
 /* The decrementer counts at the system (internal) clock frequency
@@ -142,9 +142,9 @@ m8260_show_percpuinfo(struct seq_file *m, int i)
 
 	bp = (bd_t *)__res;
 
-	seq_printf(m, "core clock\t: %d MHz\n"
-		   "CPM  clock\t: %d MHz\n"
-		   "bus  clock\t: %d MHz\n",
+	seq_printf(m, "core clock\t: %ld MHz\n"
+		   "CPM  clock\t: %ld MHz\n"
+		   "bus  clock\t: %ld MHz\n",
 		   bp->bi_intfreq / 1000000,
 		   bp->bi_cpmfreq / 1000000,
 		   bp->bi_busfreq / 1000000);
@@ -164,15 +164,15 @@ m8260_init_IRQ(void)
 	void cpm_interrupt_init(void);
 
         for ( i = 0 ; i < NR_SIU_INTS ; i++ )
-                irq_desc[i].handler = &ppc8260_pic;
+                irq_desc[i].handler = &cpm2_pic;
 
 	/* Initialize the default interrupt mapping priorities,
 	 * in case the boot rom changed something on us.
 	 */
-	immr->im_intctl.ic_sicr = 0;
-	immr->im_intctl.ic_siprr = 0x05309770;
-	immr->im_intctl.ic_scprrh = 0x05309770;
-	immr->im_intctl.ic_scprrl = 0x05309770;
+	cpm2_immr->im_intctl.ic_sicr = 0;
+	cpm2_immr->im_intctl.ic_siprr = 0x05309770;
+	cpm2_immr->im_intctl.ic_scprrh = 0x05309770;
+	cpm2_immr->im_intctl.ic_scprrl = 0x05309770;
 }
 
 /*
@@ -200,7 +200,7 @@ m8260_map_io(void)
 	uint addr;
 
 	/* Map IMMR region to a 256MB BAT */
-	addr = (immr != NULL) ? (uint)immr : IMAP_ADDR;
+	addr = (cpm2_immr != NULL) ? (uint)cpm2_immr : CPM_MAP_ADDR;
 	io_block_mapping(addr, addr, 0x10000000, _PAGE_IO);
 
 	/* Map I/O region to a 256MB BAT */
@@ -244,7 +244,7 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.show_percpuinfo		= m8260_show_percpuinfo;
 	ppc_md.irq_canonicalize	= NULL;
 	ppc_md.init_IRQ			= m8260_init_IRQ;
-	ppc_md.get_irq			= m8260_get_irq;
+	ppc_md.get_irq			= cpm2_get_irq;
 	ppc_md.init			= NULL;
 
 	ppc_md.restart			= m8260_restart;

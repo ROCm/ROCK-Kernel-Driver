@@ -44,9 +44,9 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <asm/uaccess.h>
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 #include <asm/mpc8260.h>
-#include <asm/cpm_8260.h>
+#include <asm/cpm2.h>
 #include <asm/irq.h>
 
 #ifdef CONFIG_MAGIC_SYSRQ
@@ -161,7 +161,7 @@ static struct serial_state rs_table[] = {
 #ifndef CONFIG_SCC1_ENET
 	{ 0,     0, PROFF_SCC1, SIU_INT_SCC1,   0, SCC_NUM_BASE},    /* SCC1 ttyS2 */
 #endif
-#ifndef CONFIG_SCC2_ENET
+#if !defined(CONFIG_SBC82xx) && !defined(CONFIG_SCC2_ENET)
 	{ 0,     0, PROFF_SCC2, SIU_INT_SCC2,   0, SCC_NUM_BASE + 1},    /* SCC2 ttyS3 */
 #endif
 };
@@ -283,11 +283,11 @@ static void rs_8xx_stop(struct tty_struct *tty)
 
 	save_flags(flags); cli();
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-		smcp = &immr->im_smc[idx];
+		smcp = &cpm2_immr->im_smc[idx];
 		smcp->smc_smcm &= ~SMCM_TX;
 	}
 	else {
-		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
+		sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
 		sccp->scc_sccm &= ~UART_SCCM_TX;
 	}
 	restore_flags(flags);
@@ -306,11 +306,11 @@ static void rs_8xx_start(struct tty_struct *tty)
 
 	save_flags(flags); cli();
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-		smcp = &immr->im_smc[idx];
+		smcp = &cpm2_immr->im_smc[idx];
 		smcp->smc_smcm |= SMCM_TX;
 	}
 	else {
-		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
+		sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
 		sccp->scc_sccm |= UART_SCCM_TX;
 	}
 	restore_flags(flags);
@@ -635,7 +635,7 @@ static irqreturn_t rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * reg
 	info = (ser_info_t *)dev_id;
 
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-		smcp = &immr->im_smc[idx];
+		smcp = &cpm2_immr->im_smc[idx];
 		events = smcp->smc_smce;
 		if (events & SMCM_BRKE)
 			receive_break(info, regs);
@@ -646,7 +646,7 @@ static irqreturn_t rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * reg
 		smcp->smc_smce = events;
 	}
 	else {
-		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
+		sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
 		events = sccp->scc_scce;
 		if (events & SMCM_BRKE)
 			receive_break(info, regs);
@@ -775,7 +775,7 @@ static int startup(ser_info_t *info)
 	change_speed(info);
 
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-		smcp = &immr->im_smc[idx];
+		smcp = &cpm2_immr->im_smc[idx];
 
 		/* Enable interrupts and I/O.
 		*/
@@ -790,7 +790,7 @@ static int startup(ser_info_t *info)
 		 * of the last character before we decide no more characters
 		 * are coming.
 		 */
-		up = (smc_uart_t *)&immr->im_dprambase[state->port];
+		up = (smc_uart_t *)&cpm2_immr->im_dprambase[state->port];
 #if 0
 		up->smc_mrblr = 1;	/* receive buffer length */
 		up->smc_maxidl = 0;	/* wait forever for next char */
@@ -801,8 +801,8 @@ static int startup(ser_info_t *info)
 		up->smc_brkcr = 1;	/* number of break chars */
 	}
 	else {
-		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
-		scup = (scc_uart_t *)&immr->im_dprambase[state->port];
+		sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
+		scup = (scc_uart_t *)&cpm2_immr->im_dprambase[state->port];
 #if 0
 		scup->scc_genscc.scc_mrblr = 1;	/* receive buffer length */
 		scup->scc_maxidl = 0;	/* wait forever for next char */
@@ -849,7 +849,7 @@ static void shutdown(ser_info_t * info)
 	save_flags(flags); cli(); /* Disable interrupts */
 
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-		smcp = &immr->im_smc[idx];
+		smcp = &cpm2_immr->im_smc[idx];
 
 		/* Disable interrupts and I/O.
 		*/
@@ -863,7 +863,7 @@ static void shutdown(ser_info_t * info)
 			smcp->smc_smcmr &= ~(SMCMR_REN | SMCMR_TEN);
 	}
 	else {
-		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
+		sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
 		sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
 #ifdef CONFIG_SERIAL_CONSOLE
 		if (idx != CONFIG_SERIAL_CONSOLE_PORT)
@@ -916,17 +916,17 @@ static void change_speed(ser_info_t *info)
 
 	if (cflag & CSTOPB) {
 		cval |= SMCMR_SL;	/* Two stops */
-		scval |= SCU_PMSR_SL;
+		scval |= SCU_PSMR_SL;
 		bits++;
 	}
 	if (cflag & PARENB) {
 		cval |= SMCMR_PEN;
-		scval |= SCU_PMSR_PEN;
+		scval |= SCU_PSMR_PEN;
 		bits++;
 	}
 	if (!(cflag & PARODD)) {
 		cval |= SMCMR_PM_EVEN;
-		scval |= (SCU_PMSR_REVP | SCU_PMSR_TEVP);
+		scval |= (SCU_PSMR_REVP | SCU_PSMR_TEVP);
 	}
 
 	/* Determine divisor based on baud rate */
@@ -997,7 +997,7 @@ static void change_speed(ser_info_t *info)
 	 */
 	bits++;
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-		smcp = &immr->im_smc[idx];
+		smcp = &cpm2_immr->im_smc[idx];
 
 		/* Set the mode register.  We want to keep a copy of the
 		 * enables, because we want to put them back if they were
@@ -1008,11 +1008,11 @@ static void change_speed(ser_info_t *info)
 		smcp->smc_smcmr |= (prev_mode & (SMCMR_REN | SMCMR_TEN));
 	}
 	else {
-		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
-		sccp->scc_pmsr = (sbits << 12) | scval;
+		sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
+		sccp->scc_psmr = (sbits << 12) | scval;
 	}
 
-	m8260_cpm_setbrg(info->state->smc_scc_num, baud_rate);
+	cpm2_setbrg(info->state->smc_scc_num, baud_rate);
 
 	restore_flags(flags);
 }
@@ -1359,7 +1359,7 @@ static int set_modem_info(ser_info_t *info, unsigned int cmd,
  */
 static void begin_break(ser_info_t *info)
 {
-	volatile cpm8260_t *cp;
+	volatile cpm_cpm2_t *cp;
 	uint	page, sblock;
 	int	num;
 
@@ -1403,7 +1403,7 @@ static void begin_break(ser_info_t *info)
 
 static void end_break(ser_info_t *info)
 {
-	volatile cpm8260_t *cp;
+	volatile cpm_cpm2_t *cp;
 	uint	page, sblock;
 	int	num;
 
@@ -1732,12 +1732,12 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 	info->read_status_mask &= ~BD_SC_EMPTY;
 	if (info->flags & ASYNC_INITIALIZED) {
 		if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
-			smcp = &immr->im_smc[idx];
+			smcp = &cpm2_immr->im_smc[idx];
 			smcp->smc_smcm &= ~SMCM_RX;
 			smcp->smc_smcmr &= ~SMCMR_REN;
 		}
 		else {
-			sccp = &immr->im_scc[idx - SCC_IDX_BASE];
+			sccp = &cpm2_immr->im_scc[idx - SCC_IDX_BASE];
 			sccp->scc_sccm &= ~UART_SCCM_RX;
 			sccp->scc_gsmrl &= ~SCC_GSMRL_ENR;
 		}
@@ -2195,11 +2195,11 @@ static void my_console_write(int idx, const char *s,
 	else {
 		/* Pointer to UART in parameter ram.
 		*/
-		up = (smc_uart_t *)&immr->im_dprambase[ser->port];
+		up = (smc_uart_t *)&cpm2_immr->im_dprambase[ser->port];
 
 		/* Get the address of the host memory buffer.
 		 */
-		bdp = bdbase = (cbd_t *)&immr->im_dprambase[up->smc_tbase];
+		bdp = bdbase = (cbd_t *)&cpm2_immr->im_dprambase[up->smc_tbase];
 	}
 
 	/*
@@ -2224,7 +2224,7 @@ static void my_console_write(int idx, const char *s,
 		 * If the buffer address is in the CPM DPRAM, don't
 		 * convert it.
 		 */
-		if ((uint)(bdp->cbd_bufaddr) > (uint)IMAP_ADDR)
+		if ((uint)(bdp->cbd_bufaddr) > (uint)CPM_MAP_ADDR)
 			cp = (u_char *)(bdp->cbd_bufaddr);
 		else
 			cp = __va(bdp->cbd_bufaddr);
@@ -2311,7 +2311,7 @@ static int my_console_wait_key(int idx, int xmon, char *obuf)
 
 	/* Pointer to UART in parameter ram.
 	*/
-	up = (smc_uart_t *)&immr->im_dprambase[ser->port];
+	up = (smc_uart_t *)&cpm2_immr->im_dprambase[ser->port];
 
 	/* Get the address of the host memory buffer.
 	 * If the port has been initialized for general use, we must
@@ -2320,7 +2320,7 @@ static int my_console_wait_key(int idx, int xmon, char *obuf)
 	if ((info = (ser_info_t *)ser->info))
 		bdp = info->rx_cur;
 	else
-		bdp = (cbd_t *)&immr->im_dprambase[up->smc_rbase];
+		bdp = (cbd_t *)&cpm2_immr->im_dprambase[up->smc_rbase];
 
 	/*
 	 * We need to gracefully shut down the receiver, disable
@@ -2339,7 +2339,7 @@ static int my_console_wait_key(int idx, int xmon, char *obuf)
 	/* If the buffer address is in the CPM DPRAM, don't
 	 * convert it.
 	 */
-	if ((uint)(bdp->cbd_bufaddr) > (uint)IMAP_ADDR)
+	if ((uint)(bdp->cbd_bufaddr) > (uint)CPM_MAP_ADDR)
 		cp = (u_char *)(bdp->cbd_bufaddr);
 	else
 		cp = __va(bdp->cbd_bufaddr);
@@ -2402,7 +2402,7 @@ void kgdb_interruptible(int yes)
 {
 	volatile smc_t	*smcp;
 
-	smcp = &immr->im_smc[KGDB_SER_IDX];
+	smcp = &cpm2_immr->im_smc[KGDB_SER_IDX];
 
 	if (yes == 1)
 		smcp->smc_smcm |= SMCM_RX;
@@ -2422,29 +2422,29 @@ void kgdb_map_scc(void)
 	 * the kernel, and grab a memory location in the CPM that will
 	 * work until the driver is really initialized.
 	 */
-	immr = (immap_t *)IMAP_ADDR;
+	cpm2_immr = (cpm2_map_t *)CPM_MAP_ADDR;
 
 	/* Right now, assume we are using SMCs.
 	*/
 #ifdef USE_KGDB_SMC2
-	*(ushort *)(&immr->im_dprambase[PROFF_SMC2_BASE]) = serbase = PROFF_SMC2;
+	*(ushort *)(&cpm2_immr->im_dprambase[PROFF_SMC2_BASE]) = serbase = PROFF_SMC2;
 #else
-	*(ushort *)(&immr->im_dprambase[PROFF_SMC1_BASE]) = serbase = PROFF_SMC1;
+	*(ushort *)(&cpm2_immr->im_dprambase[PROFF_SMC1_BASE]) = serbase = PROFF_SMC1;
 #endif
-	up = (smc_uart_t *)&immr->im_dprambase[serbase];
+	up = (smc_uart_t *)&cpm2_immr->im_dprambase[serbase];
 
 	/* Allocate space for an input FIFO, plus a few bytes for output.
 	 * Allocate bytes to maintain word alignment.
 	 */
-	mem_addr = (uint)(&immr->im_dprambase[0x1000]);
+	mem_addr = (uint)(&cpm2_immr->im_dprambase[0x1000]);
 
 	/* Set the physical address of the host memory buffers in
 	 * the buffer descriptors.
 	 */
-	bdp = (cbd_t *)&immr->im_dprambase[up->smc_rbase];
+	bdp = (cbd_t *)&cpm2_immr->im_dprambase[up->smc_rbase];
 	bdp->cbd_bufaddr = mem_addr;
 
-	bdp = (cbd_t *)&immr->im_dprambase[up->smc_tbase];
+	bdp = (cbd_t *)&cpm2_immr->im_dprambase[up->smc_tbase];
 	bdp->cbd_bufaddr = mem_addr+RX_BUF_SIZE;
 
 	up->smc_mrblr = RX_BUF_SIZE;		/* receive buffer length */
@@ -2507,13 +2507,13 @@ static int __init rs_8xx_init(void)
 	int		i, j, idx;
 	uint		page, sblock;
 	volatile	cbd_t		*bdp;
-	volatile	cpm8260_t	*cp;
+	volatile	cpm_cpm2_t	*cp;
 	volatile	smc_t		*sp;
 	volatile	smc_uart_t	*up;
 	volatile	scc_t		*scp;
 	volatile	scc_uart_t	*sup;
-	volatile	immap_t		*immap;
-	volatile	iop8260_t	*io;
+	volatile	cpm2_map_t		*immap;
+	volatile	iop_cpm2_t	*io;
 
 	serial_driver = alloc_tty_driver(NR_PORTS);
 	if (!serial_driver)
@@ -2539,7 +2539,7 @@ static int __init rs_8xx_init(void)
 	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 
-	immap = immr;
+	immap = cpm2_immr;
 	cp = &immap->im_cpm;
 	io = &immap->im_ioport;
 
@@ -2657,11 +2657,11 @@ static int __init rs_8xx_init(void)
 			 * descriptors from dual port ram, and a character
 			 * buffer area from host mem.
 			 */
-			dp_addr = m8260_cpm_dpalloc(sizeof(cbd_t) * RX_NUM_FIFO, 8);
+			dp_addr = cpm2_dpalloc(sizeof(cbd_t) * RX_NUM_FIFO, 8);
 
 			/* Allocate space for FIFOs in the host memory.
 			*/
-			mem_addr = m8260_cpm_hostalloc(RX_NUM_FIFO * RX_BUF_SIZE, 1);
+			mem_addr = cpm2_hostalloc(RX_NUM_FIFO * RX_BUF_SIZE, 1);
 
 			/* Set the physical address of the host memory
 			 * buffers in the buffer descriptors, and the
@@ -2691,11 +2691,11 @@ static int __init rs_8xx_init(void)
 				sup->scc_genscc.scc_rbase = dp_addr;
 			}
 
-			dp_addr = m8260_cpm_dpalloc(sizeof(cbd_t) * TX_NUM_FIFO, 8);
+			dp_addr = cpm2_dpalloc(sizeof(cbd_t) * TX_NUM_FIFO, 8);
 
 			/* Allocate space for FIFOs in the host memory.
 			*/
-			mem_addr = m8260_cpm_hostalloc(TX_NUM_FIFO * TX_BUF_SIZE, 1);
+			mem_addr = cpm2_hostalloc(TX_NUM_FIFO * TX_BUF_SIZE, 1);
 
 			/* Set the physical address of the host memory
 			 * buffers in the buffer descriptors, and the
@@ -2834,7 +2834,7 @@ static int __init rs_8xx_init(void)
 				scp->scc_sccm = 0;
 				scp->scc_scce = 0xffff;
 				scp->scc_dsr = 0x7e7e;
-				scp->scc_pmsr = 0x3000;
+				scp->scc_psmr = 0x3000;
 			}
 
 			/* Install interrupt handler.
@@ -2843,7 +2843,7 @@ static int __init rs_8xx_init(void)
 
 			/* Set up the baud rate generator.
 			*/
-			m8260_cpm_setbrg(state->smc_scc_num,
+			cpm2_setbrg(state->smc_scc_num,
 							baud_table[baud_idx]);
 
 			/* If the port is the console, enable Rx and Tx.
@@ -2870,8 +2870,8 @@ static int __init serial_console_setup(struct console *co, char *options)
 	struct		serial_state *ser;
 	uint		mem_addr, dp_addr, bidx;
 	volatile	cbd_t		*bdp;
-	volatile	cpm8260_t	*cp;
-	volatile	immap_t		*immap;
+	volatile	cpm_cpm2_t	*cp;
+	volatile	cpm2_map_t		*immap;
 #ifndef SCC_CONSOLE
 	volatile	smc_t		*sp;
 	volatile	smc_uart_t	*up;
@@ -2880,7 +2880,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	volatile	scc_t		*scp;
 	volatile	scc_uart_t	*sup;
 #endif
-	volatile	iop8260_t	*io;
+	volatile	iop_cpm2_t	*io;
 	bd_t				*bd;
 
 	bd = (bd_t *)__res;
@@ -2894,7 +2894,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	ser = rs_table + co->index;
 
-	immap = immr;
+	immap = cpm2_immr;
 	cp = &immap->im_cpm;
 	io = &immap->im_ioport;
 
@@ -2944,11 +2944,11 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	/* Allocate space for two buffer descriptors in the DP ram.
 	*/
-	dp_addr = m8260_cpm_dpalloc(sizeof(cbd_t) * 2, 8);
+	dp_addr = cpm2_dpalloc(sizeof(cbd_t) * 2, 8);
 
 	/* Allocate space for two 2 byte FIFOs in the host memory.
 	*/
-	mem_addr = m8260_cpm_hostalloc(4, 1);
+	mem_addr = cpm2_hostalloc(4, 1);
 
 	/* Set the physical address of the host memory buffers in
 	 * the buffer descriptors.
@@ -3014,7 +3014,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	scp->scc_sccm = 0;
 	scp->scc_scce = 0xffff;
 	scp->scc_dsr = 0x7e7e;
-	scp->scc_pmsr = 0x3000;
+	scp->scc_psmr = 0x3000;
 
 	/* Wire BRG1 to SCC1.  The serial init will take care of
 	 * others.
@@ -3023,7 +3023,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	/* Set up the baud rate generator.
 	*/
-	m8260_cpm_setbrg(ser->smc_scc_num, bd->bi_baudrate);
+	cpm2_setbrg(ser->smc_scc_num, bd->bi_baudrate);
 
 	scp->scc_gsmrl |= (SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 #else
@@ -3050,7 +3050,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	/* Set up the baud rate generator.
 	*/
-	m8260_cpm_setbrg(ser->smc_scc_num, bd->bi_baudrate);
+	cpm2_setbrg(ser->smc_scc_num, bd->bi_baudrate);
 
 	/* And finally, enable Rx and Tx.
 	*/

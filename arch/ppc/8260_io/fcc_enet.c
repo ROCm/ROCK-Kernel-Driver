@@ -35,13 +35,13 @@
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 #include <asm/pgtable.h>
 #include <asm/mpc8260.h>
 #include <asm/irq.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/cpm_8260.h>
+#include <asm/cpm2.h>
 
 /* The transmitter timeout
  */
@@ -331,12 +331,12 @@ struct fcc_enet_private {
 };
 
 static void init_fcc_shutdown(fcc_info_t *fip, struct fcc_enet_private *cep,
-	volatile immap_t *immap);
+	volatile cpm2_map_t *immap);
 static void init_fcc_startup(fcc_info_t *fip, struct net_device *dev);
-static void init_fcc_ioports(fcc_info_t *fip, volatile iop8260_t *io,
-	volatile immap_t *immap);
+static void init_fcc_ioports(fcc_info_t *fip, volatile iop_cpm2_t *io,
+	volatile cpm2_map_t *immap);
 static void init_fcc_param(fcc_info_t *fip, struct net_device *dev,
-	volatile immap_t *immap);
+	volatile cpm2_map_t *immap);
 
 #ifdef	CONFIG_USE_MDIO
 static int	mii_queue(struct net_device *dev, int request, void (*func)(uint, struct net_device *));
@@ -586,7 +586,7 @@ fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	    }
 
 	    if (must_restart) {
-		volatile cpm8260_t *cp;
+		volatile cpm_cpm2_t *cp;
 
 		/* Some transmit errors cause the transmitter to shut
 		 * down.  We now issue a restart transmit.  Since the
@@ -1361,10 +1361,10 @@ static int __init fec_enet_init(void)
 	struct fcc_enet_private *cep;
 	fcc_info_t	*fip;
 	int	i, np, err;
-	volatile	immap_t		*immap;
-	volatile	iop8260_t	*io;
+	volatile	cpm2_map_t		*immap;
+	volatile	iop_cpm2_t	*io;
 
-	immap = (immap_t *)IMAP_ADDR;	/* and to internal registers */
+	immap = (cpm2_map_t *)CPM_MAP_ADDR;	/* and to internal registers */
 	io = &immap->im_ioport;
 
 	np = sizeof(fcc_ports) / sizeof(fcc_info_t);
@@ -1431,7 +1431,7 @@ module_init(fec_enet_init);
 */
 static void __init
 init_fcc_shutdown(fcc_info_t *fip, struct fcc_enet_private *cep,
-						volatile immap_t *immap)
+						volatile cpm2_map_t *immap)
 {
 	volatile	fcc_enet_t	*ep;
 	volatile	fcc_t		*fccp;
@@ -1454,8 +1454,8 @@ init_fcc_shutdown(fcc_info_t *fip, struct fcc_enet_private *cep,
 /* Initialize the I/O pins for the FCC Ethernet.
 */
 static void __init
-init_fcc_ioports(fcc_info_t *fip, volatile iop8260_t *io,
-						volatile immap_t *immap)
+init_fcc_ioports(fcc_info_t *fip, volatile iop_cpm2_t *io,
+						volatile cpm2_map_t *immap)
 {
 
 	/* FCC1 pins are on port A/C.  FCC2/3 are port B/C.
@@ -1513,7 +1513,7 @@ init_fcc_ioports(fcc_info_t *fip, volatile iop8260_t *io,
 
 static void __init
 init_fcc_param(fcc_info_t *fip, struct net_device *dev,
-						volatile immap_t *immap)
+						volatile cpm2_map_t *immap)
 {
 	unsigned char	*eap;
 	unsigned long	mem_addr;
@@ -1522,7 +1522,7 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	struct		fcc_enet_private *cep;
 	volatile	fcc_enet_t	*ep;
 	volatile	cbd_t		*bdp;
-	volatile	cpm8260_t	*cp;
+	volatile	cpm_cpm2_t	*cp;
 
 	cep = (struct fcc_enet_private *)(dev->priv);
 	ep = cep->ep;
@@ -1544,17 +1544,17 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	 * work with the data cache enabled, so I allocate from the
 	 * main memory instead.
 	 */
-	i = m8260_cpm_dpalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
+	i = cpm2_dpalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
 	ep->fen_genfcc.fcc_rbase = (uint)&immap->im_dprambase[i];
 	cep->rx_bd_base = (cbd_t *)&immap->im_dprambase[i];
 
-	i = m8260_cpm_dpalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
+	i = cpm2_dpalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
 	ep->fen_genfcc.fcc_tbase = (uint)&immap->im_dprambase[i];
 	cep->tx_bd_base = (cbd_t *)&immap->im_dprambase[i];
 #else
-	cep->rx_bd_base = (cbd_t *)m8260_cpm_hostalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
+	cep->rx_bd_base = (cbd_t *)cpm2_hostalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
 	ep->fen_genfcc.fcc_rbase = __pa(cep->rx_bd_base);
-	cep->tx_bd_base = (cbd_t *)m8260_cpm_hostalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
+	cep->tx_bd_base = (cbd_t *)cpm2_hostalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
 	ep->fen_genfcc.fcc_tbase = __pa(cep->tx_bd_base);
 #endif
 
@@ -1817,10 +1817,10 @@ mii_send_receive(fcc_info_t *fip, uint cmd)
 {
 	uint		retval;
 	int		read_op, i, off;
-	volatile	immap_t		*immap;
-	volatile	iop8260_t	*io;
+	volatile	cpm2_map_t		*immap;
+	volatile	iop_cpm2_t	*io;
 
-	immap = (immap_t *)IMAP_ADDR;
+	immap = (cpm2_map_t *)CPM_MAP_ADDR;
 	io = &immap->im_ioport;
 
 	io->iop_pdirc |= (fip->fc_mdio | fip->fc_mdck);

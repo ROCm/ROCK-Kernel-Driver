@@ -42,7 +42,7 @@ core-$(CONFIG_XMON)		+= arch/ppc/xmon/
 core-$(CONFIG_APUS)		+= arch/ppc/amiga/
 drivers-$(CONFIG_8xx)		+= arch/ppc/8xx_io/
 drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
-drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
+drivers-$(CONFIG_CPM2)		+= arch/ppc/8260_io/
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 

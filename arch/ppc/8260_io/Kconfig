@@ -1,9 +1,9 @@
 #
-# MPC8260 Communication options
+# CPM2 Communication options
 #
 
-menu "MPC8260 CPM Options"
-	depends on 8260
+menu "CPM2 Options"
+	depends on CPM2
 
 config SCC_CONSOLE
 	bool "Enable SCC Console"
@@ -24,19 +24,19 @@ config FCC1_ENET
 	bool "Ethernet on FCC1"
 	depends on FEC_ENET
 	help
-	  Use MPC8260 fast Ethernet controller 1 to drive Ethernet (default).
+	  Use CPM2 fast Ethernet controller 1 to drive Ethernet (default).
 
 config FCC2_ENET
 	bool "Ethernet on FCC2"
 	depends on FEC_ENET
 	help
-	  Use MPC8260 fast Ethernet controller 2 to drive Ethernet.
+	  Use CPM2 fast Ethernet controller 2 to drive Ethernet.
 
 config FCC3_ENET
 	bool "Ethernet on FCC3"
 	depends on FEC_ENET
 	help
-	  Use MPC8260 fast Ethernet controller 3 to drive Ethernet.
+	  Use CPM2 fast Ethernet controller 3 to drive Ethernet.
 
 config USE_MDIO
 	bool "Use MDIO for PHY configuration"

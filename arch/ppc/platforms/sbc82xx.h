@@ -9,7 +9,6 @@
 
 #include <asm/ppcboot.h>
 
-#define IMAP_ADDR			0xf0000000
 #define CPM_MAP_ADDR			0xf0000000
 
 #define SBC82xx_TODC_NVRAM_ADDR		0x80000000
