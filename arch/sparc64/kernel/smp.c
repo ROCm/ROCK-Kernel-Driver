@@ -445,11 +445,18 @@ static __inline__ void spitfire_xcall_deliver(u64 data0, u64 data1, u64 data2, u
 #endif
 static void cheetah_xcall_deliver(u64 data0, u64 data1, u64 data2, unsigned long mask)
 {
-	u64 pstate;
-	int nack_busy_id;
+	u64 pstate, ver;
+	int nack_busy_id, is_jalapeno;
 
 	if (!mask)
 		return;
+
+	/* Unfortunately, someone at Sun had the brilliant idea to make the
+	 * busy/nack fields hard-coded by ITID number for this Ultra-III
+	 * derivative processor.
+	 */
+	__asm__ ("rdpr %%ver, %0" : "=r" (ver));
+	is_jalapeno = ((ver >> 32) == 0x003e0016);
 
 	__asm__ __volatile__("rdpr %%pstate, %0" : "=r" (pstate));
 
@@ -476,12 +483,14 @@ retry:
 			if (work_mask & (1UL << i)) {
 				u64 target = (i << 14) | 0x70;
 
-				target |= (nack_busy_id++ << 24);
+				if (!is_jalapeno)
+					target |= (nack_busy_id << 24);
 				__asm__ __volatile__(
 					"stxa	%%g0, [%0] %1\n\t"
 					"membar	#Sync\n\t"
 					: /* no outputs */
 					: "r" (target), "i" (ASI_INTR_W));
+				nack_busy_id++;
 				work_mask &= ~(1UL << i);
 				if (!work_mask)
 					break;
@@ -531,8 +540,14 @@ retry:
 			 */
 			for (i = 0; i < NR_CPUS; i++) {
 				if (work_mask & (1UL << i)) {
-					if ((dispatch_stat &
-					     (0x2 << this_busy_nack)) == 0)
+					u64 check_mask;
+
+					if (is_jalapeno)
+						check_mask = (0x2UL << (2*i));
+					else
+						check_mask = (0x2UL <<
+							      this_busy_nack);
+					if ((dispatch_stat & check_mask) == 0)
 						mask &= ~(1UL << i);
 					this_busy_nack += 2;
 					work_mask &= ~(1UL << i);
