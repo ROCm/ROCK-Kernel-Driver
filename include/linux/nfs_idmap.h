@@ -60,6 +60,10 @@ struct idmap_msg {
 };
 
 #ifdef __KERNEL__
+
+/* Forward declaration to make this header independent of others */
+struct nfs4_client;
+
 void nfs_idmap_new(struct nfs4_client *);
 void nfs_idmap_delete(struct nfs4_client *);
 
