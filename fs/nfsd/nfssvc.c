@@ -8,7 +8,6 @@
  * Copyright (C) 1995, 1996, 1997 Olaf Kirch <okir@monad.swb.de>
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -17,7 +16,6 @@
 #include <linux/nfs.h>
 #include <linux/in.h>
 #include <linux/uio.h>
-#include <linux/version.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/smp.h>

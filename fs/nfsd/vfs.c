@@ -16,7 +16,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/string.h>
 #include <linux/time.h>
 #include <linux/errno.h>
@@ -30,7 +29,6 @@
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/in.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/namei.h>
 
