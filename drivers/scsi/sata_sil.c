@@ -75,10 +75,6 @@ enum {
 	SIL_QUIRK_UDMA5MAX	= (1 << 1),
 };
 
-static void sil_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio);
-static void sil_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma);
 static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev);
 static u32 sil_scr_read (struct ata_port *ap, unsigned int sc_reg);
@@ -141,8 +137,6 @@ static Scsi_Host_Template sil_sht = {
 static struct ata_port_operations sil_ops = {
 	.port_disable		= ata_port_disable,
 	.dev_config		= sil_dev_config,
-	.set_piomode		= sil_set_piomode,
-	.set_udmamode		= sil_set_udmamode,
 	.tf_load		= ata_tf_load_mmio,
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
@@ -287,22 +281,6 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 	}
 }
 
-static void sil_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-static void sil_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
 static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
@@ -360,12 +338,14 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	base = (unsigned long) mmio_base;
 	probe_ent->port[0].cmd_addr = base + SIL_IDE0_TF;
+	probe_ent->port[0].altstatus_addr =
 	probe_ent->port[0].ctl_addr = base + SIL_IDE0_CTL;
 	probe_ent->port[0].bmdma_addr = base + SIL_IDE0_BMDMA;
 	probe_ent->port[0].scr_addr = base + SIL_IDE0_SCR;
 	ata_std_ports(&probe_ent->port[0]);
 
 	probe_ent->port[1].cmd_addr = base + SIL_IDE1_TF;
+	probe_ent->port[1].altstatus_addr =
 	probe_ent->port[1].ctl_addr = base + SIL_IDE1_CTL;
 	probe_ent->port[1].bmdma_addr = base + SIL_IDE1_BMDMA;
 	probe_ent->port[1].scr_addr = base + SIL_IDE1_SCR;
@@ -373,12 +353,14 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (ent->driver_data == sil_3114) {
 		probe_ent->port[2].cmd_addr = base + SIL_IDE2_TF;
+		probe_ent->port[2].altstatus_addr =
 		probe_ent->port[2].ctl_addr = base + SIL_IDE2_CTL;
 		probe_ent->port[2].bmdma_addr = base + SIL_IDE2_BMDMA;
 		probe_ent->port[2].scr_addr = base + SIL_IDE2_SCR;
 		ata_std_ports(&probe_ent->port[2]);
 
 		probe_ent->port[3].cmd_addr = base + SIL_IDE3_TF;
+		probe_ent->port[3].altstatus_addr =
 		probe_ent->port[3].ctl_addr = base + SIL_IDE3_CTL;
 		probe_ent->port[3].bmdma_addr = base + SIL_IDE3_BMDMA;
 		probe_ent->port[3].scr_addr = base + SIL_IDE3_SCR;
