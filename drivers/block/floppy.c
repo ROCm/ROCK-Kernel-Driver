@@ -240,9 +240,8 @@ static int allowed_drive_mask = 0x33;
 static int irqdma_allocated;
 
 #define LOCAL_END_REQUEST
-#define MAJOR_NR FLOPPY_MAJOR
 #define DEVICE_NAME "floppy"
-#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
+
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h> /* for the compatibility eject ioctl */
@@ -3969,7 +3968,7 @@ static void __init register_devfs_entries (int drive)
 	    char name[16];
 
 	    sprintf(name, "floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
-	    devfs_register(NULL, name, DEVFS_FL_DEFAULT, MAJOR_NR,
+	    devfs_register(NULL, name, DEVFS_FL_DEFAULT, FLOPPY_MAJOR,
 			    base_minor + (table_sup[UDP->cmos][i] << 2),
 			    S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
 			    &floppy_fops, NULL);
@@ -4229,20 +4228,20 @@ int __init floppy_init(void)
 	}
 
 	devfs_mk_dir (NULL, "floppy", NULL);
-	if (register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
-		printk("Unable to get major %d for floppy\n",MAJOR_NR);
+	if (register_blkdev(FLOPPY_MAJOR,"fd",&floppy_fops)) {
+		printk("Unable to get major %d for floppy\n",FLOPPY_MAJOR);
 		err = -EBUSY;
 		goto out;
 	}
 
 	for (i=0; i<N_DRIVE; i++) {
-		disks[i]->major = MAJOR_NR;
+		disks[i]->major = FLOPPY_MAJOR;
 		disks[i]->first_minor = TOMINOR(i);
 		disks[i]->fops = &floppy_fops;
 		sprintf(disks[i]->disk_name, "fd%d", i);
 	}
 
-	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+	blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
 				floppy_find, NULL, NULL);
 
 	for (i=0; i<256; i++)
@@ -4366,8 +4365,8 @@ int __init floppy_init(void)
 out1:
 	del_timer(&fd_timeout);
 out2:
-	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
-	unregister_blkdev(MAJOR_NR,"fd");
+	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
+	unregister_blkdev(FLOPPY_MAJOR,"fd");
 	blk_cleanup_queue(&floppy_queue);
 out:
 	for (i=0; i<N_DRIVE; i++)
@@ -4572,8 +4571,8 @@ void cleanup_module(void)
 	int drive;
 		
 	platform_device_unregister(&floppy_device);
-	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
-	unregister_blkdev(MAJOR_NR, "fd");
+	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
+	unregister_blkdev(FLOPPY_MAJOR, "fd");
 	for (drive = 0; drive < N_DRIVE; drive++) {
 		if ((allowed_drive_mask & (1 << drive)) &&
 		    fdc_state[FDC(drive)].version != FDC_NONE) {

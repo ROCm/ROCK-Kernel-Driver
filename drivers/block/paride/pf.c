@@ -150,7 +150,8 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_SLV, D_LUN, D_DLY};
 #include <linux/hdreg.h>
 #include <linux/cdrom.h>
 #include <linux/spinlock.h>
-
+#include <linux/blk.h>
+#include <linux/blkpg.h>
 #include <asm/uaccess.h>
 
 static spinlock_t pf_spin_lock;
@@ -187,14 +188,6 @@ MODULE_PARM(drive2, "1-7i");
 MODULE_PARM(drive3, "1-7i");
 
 #include "paride.h"
-
-/* set up defines for blk.h,  why don't all drivers do it this way ? */
-
-#define MAJOR_NR   major
-
-#include <linux/blk.h>
-#include <linux/blkpg.h>
-
 #include "pseudo.h"
 
 /* constants for faking geometry numbers */
@@ -316,7 +309,7 @@ void pf_init_units(void)
 		pf->drive = (*drives[unit])[D_SLV];
 		pf->lun = (*drives[unit])[D_LUN];
 		snprintf(pf->name, PF_NAMELEN, "%s%d", name, unit);
-		disk->major = MAJOR_NR;
+		disk->major = major;
 		disk->first_minor = unit;
 		strcpy(disk->disk_name, pf->name);
 		disk->fops = &pf_fops;
@@ -964,7 +957,7 @@ static int __init pf_init(void)
 		return -1;
 	pf_busy = 0;
 
-	if (register_blkdev(MAJOR_NR, name, &pf_fops)) {
+	if (register_blkdev(major, name, &pf_fops)) {
 		printk("pf_init: unable to get major number %d\n", major);
 		for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++)
 			put_disk(pf->disk);
@@ -989,7 +982,7 @@ static void __exit pf_exit(void)
 {
 	struct pf_unit *pf;
 	int unit;
-	unregister_blkdev(MAJOR_NR, name);
+	unregister_blkdev(major, name);
 	for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++) {
 		if (!pf->present)
 			continue;

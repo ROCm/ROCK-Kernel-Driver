@@ -38,6 +38,9 @@
 #include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/spinlock.h>
+#include <linux/blk.h>
+#include <linux/blkdev.h>
+#include <linux/genhd.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
@@ -52,14 +55,6 @@
 MODULE_AUTHOR("Compaq Computer Corporation");
 MODULE_DESCRIPTION("Driver for Compaq Smart2 Array Controllers");
 MODULE_LICENSE("GPL");
-
-#define MAJOR_NR COMPAQ_SMART2_MAJOR
-#define LOCAL_END_REQUEST
-#define DEVICE_NAME "ida"
-#define DEVICE_NR(device) (minor(device) >> 4)
-#include <linux/blk.h>
-#include <linux/blkdev.h>
-#include <linux/genhd.h>
 
 #include "cpqarray.h"
 #include "ida_cmd.h"
@@ -295,7 +290,7 @@ static void __exit cpqarray_exit(void)
 		}
 		free_irq(hba[i]->intr, hba[i]);
 		iounmap(hba[i]->vaddr);
-		unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
+		unregister_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname);
 		del_timer(&hba[i]->timer);
 		blk_cleanup_queue(&hba[i]->queue);
 		remove_proc_entry(hba[i]->devname, proc_array);
@@ -344,9 +339,9 @@ static int __init cpqarray_init(void)
 	for(i=0; i < nr_ctlr; i++) {
 	  	/* If this successful it should insure that we are the only */
 		/* instance of the driver */	
-		if (register_blkdev(MAJOR_NR+i, hba[i]->devname, &ida_fops)) {
+		if (register_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname, &ida_fops)) {
                         printk(KERN_ERR "cpqarray: Unable to get major number %d for ida\n",
-                                MAJOR_NR+i);
+                                COMPAQ_SMART2_MAJOR+i);
                         continue;
                 }
 		hba[i]->access.set_intr_mask(hba[i], 0);
@@ -355,7 +350,7 @@ static int __init cpqarray_init(void)
 
 			printk(KERN_ERR "cpqarray: Unable to get irq %d for %s\n", 
 				hba[i]->intr, hba[i]->devname);
-			unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
+			unregister_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname);
 			continue;
 		}
 		num_cntlrs_reg++;
@@ -405,7 +400,7 @@ static int __init cpqarray_init(void)
 			struct gendisk *disk = ida_gendisk[i][j];
 			drv_info_t *drv = &hba[i]->drv[j];
 			sprintf(disk->disk_name, "ida/c%dd%d", i, j);
-			disk->major = MAJOR_NR + i;
+			disk->major = COMPAQ_SMART2_MAJOR + i;
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->flags = GENHD_FL_DEVFS;
 			disk->fops = &ida_fops; 
@@ -433,7 +428,7 @@ Enomem2:
 		ida_gendisk[i][j] = NULL;
 	}
 	free_irq(hba[i]->intr, hba[i]);
-	unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
+	unregister_blkdev(COMPAQ_SMART2_MAJOR+i, hba[i]->devname);
 	num_cntlrs_reg--;
 	printk( KERN_ERR "cpqarray: out of memory");
 
@@ -712,7 +707,7 @@ DBGINFO(
  */
 static int ida_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int ctlr = major(inode->i_rdev) - COMPAQ_SMART2_MAJOR;
 	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 	DBGINFO(printk("ida_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk) );
@@ -741,7 +736,7 @@ static int ida_open(struct inode *inode, struct file *filep)
  */
 static int ida_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int ctlr = major(inode->i_rdev) - COMPAQ_SMART2_MAJOR;
 	hba[ctlr]->usage_count--;
 	return 0;
 }
@@ -1022,7 +1017,7 @@ static void ida_timer(unsigned long tdata)
  */
 static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, unsigned long arg)
 {
-	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int ctlr = major(inode->i_rdev) - COMPAQ_SMART2_MAJOR;
 	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 	int error;
 	int diskinfo[4];
@@ -1402,7 +1397,7 @@ static int revalidate_allvol(kdev_t dev)
 	if (minor(dev) != 0)
 		return -ENXIO;
 
-	ctlr = major(dev) - MAJOR_NR;
+	ctlr = major(dev) - COMPAQ_SMART2_MAJOR;
 
 	spin_lock_irqsave(IDA_LOCK(ctlr), flags);
 	if (hba[ctlr]->usage_count > 1) {

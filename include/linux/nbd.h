@@ -26,13 +26,6 @@ enum {
 	NBD_CMD_DISC = 2
 };
 
-#ifdef MAJOR_NR
-
-#include <asm/semaphore.h>
-
-#define LOCAL_END_REQUEST
-
-#include <linux/blk.h>
 
 #ifdef PARANOIA
 extern int requests_in;
@@ -40,30 +33,6 @@ extern int requests_out;
 #endif
 
 #define nbd_cmd(req) ((req)->cmd[0])
-
-static void
-nbd_end_request(struct request *req)
-{
-	struct bio *bio;
-	unsigned nsect;
-	unsigned long flags;
-	int uptodate = (req->errors == 0) ? 1 : 0;
-	request_queue_t *q = req->q;
-
-#ifdef PARANOIA
-	requests_out++;
-#endif
-	spin_lock_irqsave(q->queue_lock, flags);
-	while((bio = req->bio) != NULL) {
-		nsect = bio_sectors(bio);
-		blk_finished_io(nsect);
-		req->bio = bio->bi_next;
-		bio->bi_next = NULL;
-		bio_endio(bio, nsect << 9, uptodate ? 0 : -EIO);
-	}
-	blk_put_request(req);
-	spin_unlock_irqrestore(q->queue_lock, flags);
-}
 
 #define MAX_NBD 128
 

@@ -24,6 +24,8 @@
 #include <linux/delay.h>
 #include <linux/fd.h>
 #include <linux/ioctl.h>
+#include <linux/blk.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/io.h>
 #include <asm/dbdma.h>
 #include <asm/prom.h>
@@ -31,11 +33,6 @@
 #include <asm/mediabay.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
-
-#define MAJOR_NR	FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#include <linux/blk.h>
-#include <linux/devfs_fs_kernel.h>
 
 static struct request_queue swim3_queue;
 static struct gendisk *disks[2];
@@ -1007,15 +1004,16 @@ int swim3_init(void)
 			goto out;
 	}
 
-	if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
-		printk(KERN_ERR"Unable to get major %d for floppy\n", MAJOR_NR);
+	if (register_blkdev(FLOPPY_MAJOR, "fd", &floppy_fops)) {
+		printk(KERN_ERR"Unable to get major %d for floppy\n",
+				FLOPPY_MAJOR);
 		err = -EBUSY;
 		goto out;
 	}
 	blk_init_queue(&swim3_queue, do_fd_request, &swim3_lock);
 	for (i = 0; i < floppy_count; i++) {
 		struct gendisk *disk = disks[i];
-		disk->major = MAJOR_NR;
+		disk->major = FLOPPY_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;
 		disk->private_data = &floppy_states[i];
@@ -1102,7 +1100,7 @@ static int swim3_add_device(struct device_node *swim)
 	sprintf(floppy_name, "%s%d", floppy_devfs_handle ? "" : "floppy",
 			floppy_count);
 	floppy_handle = devfs_register(floppy_devfs_handle, floppy_name, 
-			DEVFS_FL_DEFAULT, MAJOR_NR, floppy_count, 
+			DEVFS_FL_DEFAULT, FLOPPY_MAJOR, floppy_count, 
 			S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP, 
 			&floppy_fops, NULL);
 
