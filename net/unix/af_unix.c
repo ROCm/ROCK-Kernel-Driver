@@ -90,6 +90,7 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/stat.h>
+#include <linux/dcache.h>
 #include <linux/namei.h>
 #include <linux/socket.h>
 #include <linux/un.h>
