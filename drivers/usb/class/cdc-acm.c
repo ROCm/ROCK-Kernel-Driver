@@ -306,9 +306,9 @@ done:
 	return 0;
 
 full_bailout:
-	usb_unlink_urb(acm->readurb);
+	usb_kill_urb(acm->readurb);
 bail_out_and_unlink:
-	usb_unlink_urb(acm->ctrlurb);
+	usb_kill_urb(acm->ctrlurb);
 bail_out:
 	up(&open_sem);
 	return -EIO;
@@ -325,9 +325,9 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	if (!--acm->used) {
 		if (acm->dev) {
 			acm_set_control(acm, acm->ctrlout = 0);
-			usb_unlink_urb(acm->ctrlurb);
-			usb_unlink_urb(acm->writeurb);
-			usb_unlink_urb(acm->readurb);
+			usb_kill_urb(acm->ctrlurb);
+			usb_kill_urb(acm->writeurb);
+			usb_kill_urb(acm->readurb);
 		} else {
 			tty_unregister_device(acm_tty_driver, acm->minor);
 			acm_table[acm->minor] = NULL;
@@ -778,9 +778,9 @@ static void acm_disconnect(struct usb_interface *intf)
 	acm->dev = NULL;
 	usb_set_intfdata (intf, NULL);
 
-	usb_unlink_urb(acm->ctrlurb);
-	usb_unlink_urb(acm->readurb);
-	usb_unlink_urb(acm->writeurb);
+	usb_kill_urb(acm->ctrlurb);
+	usb_kill_urb(acm->readurb);
+	usb_kill_urb(acm->writeurb);
 
 	flush_scheduled_work(); /* wait for acm_softint */
 
