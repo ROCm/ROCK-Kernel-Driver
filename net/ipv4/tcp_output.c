@@ -603,7 +603,7 @@ static inline int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
    this function.			--ANK (980731)
  */
 
-int tcp_sync_mss(struct sock *sk, u32 pmtu)
+unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
@@ -661,6 +661,36 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 	return mss_now;
 }
 
+/* Compute the current effective MSS, taking SACKs and IP options,
+ * and even PMTU discovery events into account.
+ *
+ * LARGESEND note: !urg_mode is overkill, only frames up to snd_up
+ * cannot be large. However, taking into account rare use of URG, this
+ * is not a big flaw.
+ */
+
+unsigned int tcp_current_mss(struct sock *sk, int large)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	struct dst_entry *dst = __sk_dst_get(sk);
+	int do_large, mss_now;
+
+	do_large = (large &&
+		    (sk->sk_route_caps & NETIF_F_TSO) &&
+		    !tp->urg_mode);
+	mss_now = do_large ? tp->mss_cache : tp->mss_cache_std;
+
+	if (dst) {
+		u32 mtu = dst_pmtu(dst);
+		if (mtu != tp->pmtu_cookie ||
+		    tp->ext2_header_len != dst->header_len)
+			mss_now = tcp_sync_mss(sk, mtu);
+	}
+	if (tp->eff_sacks)
+		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
+			    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
+	return mss_now;
+}
 
 /* This routine writes packets to the network.  It advances the
  * send_head.  This happens as incoming acks open up the remote
