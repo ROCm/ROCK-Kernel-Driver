@@ -806,6 +806,11 @@ sn_pci_init (void)
 		return 0;
 
 	/*
+	 * This is needed to avoid bounce limit checks in the blk layer
+	 */
+	ia64_max_iommu_merge_mask = ~PAGE_MASK;
+
+	/*
 	 * set pci_raw_ops, etc.
 	 */
 	sn_pci_fixup(0);
