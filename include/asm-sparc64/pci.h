@@ -50,7 +50,7 @@ extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t
  * size must be the same as what as passed into pci_alloc_consistent,
  * and likewise dma_addr must be the same as what *dma_addrp was set to.
  *
- * References to the memory and mappings assosciated with cpu_addr/dma_addr
+ * References to the memory and mappings associated with cpu_addr/dma_addr
  * past this call are illegal.
  */
 extern void pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle);
@@ -92,7 +92,7 @@ extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t 
 	(((PTR)->LEN_NAME) = (VAL))
 
 /* Map a set of buffers described by scatterlist in streaming
- * mode for DMA.  This is the scather-gather version of the
+ * mode for DMA.  This is the scatter-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
  * elements are each tagged with the appropriate dma address
  * and length.  They are obtained via sg_dma_{address,length}(SG).

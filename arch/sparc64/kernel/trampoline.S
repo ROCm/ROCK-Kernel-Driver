@@ -40,7 +40,7 @@ sparc64_cpu_startup:
 	 nop
 
 cheetah_plus_startup:
-	/* Preserve OBP choosen DCU and DCR register settings.  */
+	/* Preserve OBP chosen DCU and DCR register settings.  */
 	ba,pt	%xcc, cheetah_generic_startup
 	 nop
 
