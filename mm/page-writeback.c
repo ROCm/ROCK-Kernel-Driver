@@ -63,9 +63,9 @@ static inline long sync_writeback_pages(void)
 int dirty_background_ratio = 10;
 
 /*
- * The generator of dirty data starts async writeback at this percentage
+ * The generator of dirty data starts writeback at this percentage
  */
-int dirty_async_ratio = 40;
+int vm_dirty_ratio = 40;
 
 /*
  * The interval between `kupdate'-style writebacks, in centiseconds
@@ -86,7 +86,7 @@ static void background_writeout(unsigned long _min_pages);
 /*
  * balance_dirty_pages() must be called by processes which are generating dirty
  * data.  It looks at the number of dirty pages in the machine and will force
- * the caller to perform writeback if the system is over `async_thresh'.
+ * the caller to perform writeback if the system is over `vm_dirty_ratio'.
  * If we're over `background_thresh' then pdflush is woken to perform some
  * writeout.
  */
@@ -94,15 +94,15 @@ void balance_dirty_pages(struct address_space *mapping)
 {
 	struct page_state ps;
 	long background_thresh;
-	long async_thresh;
+	long dirty_thresh;
 	struct backing_dev_info *bdi = mapping->backing_dev_info;
 
 	background_thresh = (dirty_background_ratio * total_pages) / 100;
-	async_thresh = (dirty_async_ratio * total_pages) / 100;
+	dirty_thresh = (vm_dirty_ratio * total_pages) / 100;
 
 	get_page_state(&ps);
 
-	while (ps.nr_dirty + ps.nr_writeback > async_thresh) {
+	while (ps.nr_dirty + ps.nr_writeback > dirty_thresh) {
 		struct writeback_control wbc = {
 			.bdi		= bdi,
 			.sync_mode	= WB_SYNC_NONE,
@@ -116,7 +116,7 @@ void balance_dirty_pages(struct address_space *mapping)
 			writeback_inodes(&wbc);
 
 		get_page_state(&ps);
-		if (ps.nr_dirty + ps.nr_writeback <= async_thresh)
+		if (ps.nr_dirty + ps.nr_writeback <= dirty_thresh)
 			break;
 		blk_congestion_wait(WRITE, HZ/10);
 	}
@@ -338,8 +338,8 @@ static int __init page_writeback_init(void)
 	if (correction < 100) {
 		dirty_background_ratio *= correction;
 		dirty_background_ratio /= 100;
-		dirty_async_ratio *= correction;
-		dirty_async_ratio /= 100;
+		vm_dirty_ratio *= correction;
+		vm_dirty_ratio /= 100;
 	}
 
 	init_timer(&wb_timer);
