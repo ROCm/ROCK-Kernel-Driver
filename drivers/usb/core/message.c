@@ -1176,15 +1176,34 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 			intf->dev.bus = &usb_bus_type;
 			intf->dev.dma_mask = dev->dev.dma_mask;
 			intf->dev.release = release_interface;
+			device_initialize (&intf->dev);
 			sprintf (&intf->dev.bus_id[0], "%d-%s:%d.%d",
 				 dev->bus->busnum, dev->devpath,
 				 configuration,
 				 alt->desc.bInterfaceNumber);
+		}
+
+		/* Now that all interfaces are setup, probe() calls
+		 * may claim() any interface that's not yet bound.
+		 * Many class drivers need that: CDC, audio, video, etc.
+		 */
+		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+			struct usb_interface *intf = cp->interface[i];
+			struct usb_interface_descriptor *desc;
+
+			desc = &intf->altsetting [0].desc;
 			dev_dbg (&dev->dev,
-				"registering %s (config #%d, interface %d)\n",
+				"adding %s (config #%d, interface %d)\n",
 				intf->dev.bus_id, configuration,
-				alt->desc.bInterfaceNumber);
-			device_register (&intf->dev);
+				desc->bInterfaceNumber);
+			ret = device_add (&intf->dev);
+			if (ret != 0) {
+				dev_err(&dev->dev,
+					"device_add(%s) --> %d\n",
+					intf->dev.bus_id,
+					ret);
+				continue;
+			}
 			usb_create_driverfs_intf_files (intf);
 		}
 	}

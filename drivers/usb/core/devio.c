@@ -704,9 +704,9 @@ static int proc_getdriver(struct dev_state *ps, void __user *arg)
 	if ((ret = findintfif(ps->dev, gd.interface)) < 0)
 		return ret;
 	interface = ps->dev->actconfig->interface[ret];
-	if (!interface->driver)
+	if (!interface->dev.driver)
 		return -ENODATA;
-	strcpy(gd.driver, interface->driver->name);
+	strncpy(gd.driver, interface->dev.driver->name, sizeof(gd.driver));
 	if (copy_to_user(arg, &gd, sizeof(gd)))
 		return -EFAULT;
 	return 0;
@@ -725,26 +725,11 @@ static int proc_connectinfo(struct dev_state *ps, void __user *arg)
 
 static int proc_resetdevice(struct dev_state *ps)
 {
-	int i, ret;
+	/* FIXME when usb_reset_device() is fixed we'll need to grab
+	 * ps->dev->serialize before calling it.
+	 */
+	return usb_reset_device(ps->dev);
 
-	ret = usb_reset_device(ps->dev);
-	if (ret < 0)
-		return ret;
-
-	for (i = 0; i < ps->dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *intf = ps->dev->actconfig->interface[i];
-
-		/* Don't simulate interfaces we've claimed */
-		if (test_bit(i, &ps->ifclaimed))
-			continue;
-
-		err ("%s - this function is broken", __FUNCTION__);
-		if (intf->driver && ps->dev) {
-			usb_probe_interface (&intf->dev);
-		}
-	}
-
-	return 0;
 }
 
 static int proc_setintf(struct dev_state *ps, void __user *arg)
@@ -758,7 +743,7 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 	if ((ret = findintfif(ps->dev, setintf.interface)) < 0)
 		return ret;
 	interface = ps->dev->actconfig->interface[ret];
-	if (interface->driver) {
+	if (interface->dev.driver) {
 		if ((ret = checkintf(ps, ret)))
 			return ret;
 	}
@@ -1141,58 +1126,51 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		}
 	}
 
-       if (!ps->dev)
-               retval = -ENODEV;
-       else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
-               retval = -EINVAL;
-       else switch (ctrl.ioctl_code) {
+	if (!ps->dev) {
+		if (buf)
+			kfree(buf);
+		return -ENODEV;
+	}
 
-       /* disconnect kernel driver from interface, leaving it unbound.  */
-       /* maybe unbound - you get no guarantee it stays unbound */
-       case USBDEVFS_DISCONNECT:
-		/* this function is misdesigned - retained for compatibility */
-		lock_kernel();
-		driver = ifp->driver;
-		if (driver) {
-			dbg ("disconnect '%s' from dev %d interface %d",
-			     driver->name, ps->dev->devnum, ctrl.ifno);
-			usb_unbind_interface(&ifp->dev);
+	down(&ps->dev->serialize);
+	if (ps->dev->state != USB_STATE_CONFIGURED)
+		retval = -ENODEV;
+	else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
+               retval = -EINVAL;
+	else switch (ctrl.ioctl_code) {
+
+	/* disconnect kernel driver from interface */
+	case USBDEVFS_DISCONNECT:
+		down_write(&usb_bus_type.subsys.rwsem);
+		if (ifp->dev.driver) {
+			driver = to_usb_driver(ifp->dev.driver);
+			dev_dbg (&ifp->dev, "disconnect by usbfs\n");
+			usb_driver_release_interface(driver, ifp);
 		} else
 			retval = -ENODATA;
-		unlock_kernel();
+		up_write(&usb_bus_type.subsys.rwsem);
 		break;
 
 	/* let kernel drivers try to (re)bind to the interface */
 	case USBDEVFS_CONNECT:
-		lock_kernel();
-		retval = usb_probe_interface (&ifp->dev);
-		unlock_kernel();
+		bus_rescan_devices(ifp->dev.bus);
 		break;
 
 	/* talk directly to the interface's driver */
 	default:
-		/* BKL used here to protect against changing the binding
-		 * of this driver to this device, as well as unloading its
-		 * driver module.
-		 */
-		lock_kernel ();
-		driver = ifp->driver;
+		down_read(&usb_bus_type.subsys.rwsem);
+		if (ifp->dev.driver)
+			driver = to_usb_driver(ifp->dev.driver);
 		if (driver == 0 || driver->ioctl == 0) {
-			unlock_kernel();
-			retval = -ENOSYS;
+			retval = -ENOTTY;
 		} else {
-			if (!try_module_get (driver->owner)) {
-				unlock_kernel();
-				retval = -ENOSYS;
-				break;
-			}
-			unlock_kernel ();
 			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
 			if (retval == -ENOIOCTLCMD)
 				retval = -ENOTTY;
-			module_put (driver->owner);
 		}
+		up_read(&usb_bus_type.subsys.rwsem);
 	}
+	up(&ps->dev->serialize);
 
 	/* cleanup and return */
 	if (retval >= 0

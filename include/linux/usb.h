@@ -31,6 +31,7 @@ static __inline__ void wait_ms(unsigned int ms)
 }
 
 struct usb_device;
+struct usb_driver;
 
 /*-------------------------------------------------------------------------*/
 
@@ -123,7 +124,6 @@ struct usb_interface {
 					 * active alternate setting */
 	unsigned num_altsetting;	/* number of alternate settings */
 
-	struct usb_driver *driver;	/* driver */
 	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
 	struct class_device *class_dev;
@@ -318,7 +318,21 @@ extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 /* used these for multi-interface device registration */
 extern int usb_driver_claim_interface(struct usb_driver *driver,
 			struct usb_interface *iface, void* priv);
-extern int usb_interface_claimed(struct usb_interface *iface);
+
+/**
+ * usb_interface_claimed - returns true iff an interface is claimed
+ * @iface: the interface being checked
+ *
+ * Returns true (nonzero) iff the interface is claimed, else false (zero).
+ * Callers must own the driver model's usb bus readlock.  So driver
+ * probe() entries don't need extra locking, but other call contexts
+ * may need to explicitly claim that lock.
+ *
+ */
+static int inline usb_interface_claimed(struct usb_interface *iface) {
+	return (iface->dev.driver != NULL);
+}
+
 extern void usb_driver_release_interface(struct usb_driver *driver,
 			struct usb_interface *iface);
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
