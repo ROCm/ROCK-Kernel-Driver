@@ -49,11 +49,11 @@
 #include "cs_internal.h"
 
 #ifdef DEBUG
-extern int pc_debug;
+extern int ds_pc_debug;
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 
 #define ds_dbg(skt, lvl, fmt, arg...) do {		\
-	if (pc_debug >= lvl)				\
+	if (ds_pc_debug >= lvl)				\
 		printk(KERN_DEBUG "ds: %s: " fmt, 	\
 		       cs_socket_name(skt) , ## arg);	\
 } while (0)

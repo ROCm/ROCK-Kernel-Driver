@@ -75,12 +75,12 @@ MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
 #ifdef DEBUG
-int pc_debug;
+int ds_pc_debug;
 
-module_param(pc_debug, int, 0644);
+module_param_named(pc_debug, ds_pc_debug, int, 0644);
 
 #define ds_dbg(lvl, fmt, arg...) do {				\
-	if (pc_debug > (lvl))					\
+	if (ds_pc_debug > (lvl))					\
 		printk(KERN_DEBUG "ds: " fmt , ## arg);		\
 } while (0)
 #else
