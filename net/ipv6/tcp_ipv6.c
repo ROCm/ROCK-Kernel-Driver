@@ -1172,7 +1172,11 @@ static void tcp_v6_synq_add(struct sock *sk, struct open_request *req)
 	lopt->syn_table[h] = req;
 	write_unlock(&tp->syn_wait_lock);
 
+#ifdef CONFIG_ACCEPT_QUEUES
+	tcp_synq_added(sk, req);
+#else
 	tcp_synq_added(sk);
+#endif
 }
 
 
@@ -1185,12 +1189,16 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	struct tcp_opt tmptp, *tp = tcp_sk(sk);
 	struct open_request *req = NULL;
 	__u32 isn = TCP_SKB_CB(skb)->when;
+#ifdef CONFIG_ACCEPT_QUEUES
+	int class = 0;
+#endif
 
 	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_conn_request(sk, skb);
 
 	if (!ipv6_unicast_destination(skb))
 		goto drop; 
+
 
 	/*
 	 *	There are no SYN attacks on IPv6, yet...	
@@ -1201,8 +1209,33 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 		goto drop;		
 	}
 
+#ifdef CONFIG_ACCEPT_QUEUES
+        class = (skb->nfmark <= 0) ? 0 :
+	                ((skb->nfmark >= NUM_ACCEPT_QUEUES) ? 0: skb->nfmark);
+        /*
+	 * Accept only if the class has shares set or if the default class
+	 * i.e. class 0 has shares
+	 */
+        if (!(tcp_sk(sk)->acceptq[class].aq_valid)) {
+		if (tcp_sk(sk)->acceptq[0].aq_valid) 
+			class = 0; 
+		else 
+			goto drop;
+	}
+#endif
+
+        /* Accept backlog is full. If we have already queued enough
+	 * of warm entries in syn queue, drop request. It is better than
+	 * clogging syn queue with openreqs with exponentially increasing
+	 * timeout.
+	 */
+#ifdef CONFIG_ACCEPT_QUEUES
+	 if (tcp_acceptq_is_full(sk, class) && tcp_synq_young(sk, class) > 1)
+#else
 	if (tcp_acceptq_is_full(sk) && tcp_synq_young(sk) > 1)
+#endif
 		goto drop;
+
 
 	req = tcp_openreq_alloc();
 	if (req == NULL)
@@ -1216,7 +1249,10 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 
 	tmptp.tstamp_ok = tmptp.saw_tstamp;
 	tcp_openreq_init(req, &tmptp, skb);
-
+#ifdef CONFIG_ACCEPT_QUEUES
+	req->acceptq_class = class;
+	req->acceptq_time_stamp = jiffies;
+#endif
 	req->class = &or_ipv6;
 	ipv6_addr_copy(&req->af.v6_req.rmt_addr, &skb->nh.ipv6h->saddr);
 	ipv6_addr_copy(&req->af.v6_req.loc_addr, &skb->nh.ipv6h->daddr);
@@ -1318,7 +1354,11 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 
 	opt = np->opt;
 
+#ifdef CONFIG_ACCEPT_QUEUES
+	if (tcp_acceptq_is_full(sk, req->acceptq_class))
+#else
 	if (tcp_acceptq_is_full(sk))
+#endif
 		goto out_overflow;
 
 	if (np->rxopt.bits.srcrt == 2 &&
