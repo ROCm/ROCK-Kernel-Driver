@@ -65,8 +65,14 @@ struct Scsi_Host;
  */
 struct scsi_target {
 	struct scsi_device	*starget_sdev_user;
-	unsigned int		starget_refcnt;
+	struct device		dev;
 };
+
+#define to_scsi_target(d)	container_of(d, struct scsi_target, dev)
+static inline struct scsi_target *scsi_target(struct scsi_device *sdev)
+{
+	return to_scsi_target(sdev->sdev_gendev.parent);
+}
 
 /* hosts.c */
 extern int scsi_init_hosts(void);
@@ -156,6 +162,8 @@ extern int scsi_sysfs_add_sdev(struct scsi_device *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
+extern int scsi_sysfs_device_initialize(struct scsi_device *);
+extern int scsi_sysfs_target_initialize(struct scsi_device *);
 extern struct scsi_transport_template blank_transport_template;
 
 extern struct class sdev_class;

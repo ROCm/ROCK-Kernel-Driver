@@ -153,25 +153,31 @@ void scsi_device_dev_release(struct device *dev)
 	struct scsi_device *sdev;
 	struct device *parent;
 	unsigned long flags;
+	int delete;
 
 	parent = dev->parent;
 	sdev = to_scsi_device(dev);
 
 	spin_lock_irqsave(sdev->host->host_lock, flags);
+	/* If we're the last LUN on the target, destroy the target */
+	delete = (list_empty(&sdev->same_target_siblings) && parent);
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 	list_del(&sdev->starved_entry);
-	if (sdev->single_lun && --sdev->sdev_target->starget_refcnt == 0)
-		kfree(sdev->sdev_target);
 	spin_unlock_irqrestore(sdev->host->host_lock, flags);
 
+	if (delete) {
+		device_del(parent);
+		put_device(parent);
+	}
 	if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
 
 	kfree(sdev->inquiry);
 	kfree(sdev);
 
-	put_device(parent);
+	if (parent)
+		put_device(parent);
 }
 
 struct class sdev_class = {
@@ -430,6 +436,14 @@ static int attr_add(struct device *dev, struct device_attribute *attr)
 	return device_create_file(dev, attr);
 }
 
+static void scsi_target_dev_release(struct device *dev)
+{
+	struct scsi_target *starget = to_scsi_target(dev);
+	struct device *parent = dev->parent;
+	kfree(starget);
+	put_device(parent);
+}
+
 /**
  * scsi_sysfs_add_sdev - add scsi device to sysfs
  * @sdev:	scsi_device to add
@@ -447,6 +461,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 
 	error = device_add(&sdev->sdev_gendev);
 	if (error) {
+		put_device(sdev->sdev_gendev.parent);
 		printk(KERN_INFO "error 1\n");
 		return error;
 	}
@@ -626,6 +641,76 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
 		}
 	}
 
+	return 0;
+}
+
+int scsi_sysfs_device_initialize(struct scsi_device *sdev)
+{
+	device_initialize(&sdev->sdev_gendev);
+	sdev->sdev_gendev.bus = &scsi_bus_type;
+	sdev->sdev_gendev.release = scsi_device_dev_release;
+	sprintf(sdev->sdev_gendev.bus_id,"%d:%d:%d:%d",
+		sdev->host->host_no, sdev->channel, sdev->id,
+		sdev->lun);
+	
+	class_device_initialize(&sdev->sdev_classdev);
+	sdev->sdev_classdev.dev = &sdev->sdev_gendev;
+	sdev->sdev_classdev.class = &sdev_class;
+	snprintf(sdev->sdev_classdev.class_id, BUS_ID_SIZE,
+		 "%d:%d:%d:%d", sdev->host->host_no,
+		 sdev->channel, sdev->id, sdev->lun);
+
+	class_device_initialize(&sdev->transport_classdev);
+	sdev->transport_classdev.dev = &sdev->sdev_gendev;
+	sdev->transport_classdev.class = sdev->host->transportt->class;
+	snprintf(sdev->transport_classdev.class_id, BUS_ID_SIZE,
+		 "%d:%d:%d:%d", sdev->host->host_no,
+		 sdev->channel, sdev->id, sdev->lun);
+	return 0;
+}
+
+int scsi_sysfs_target_initialize(struct scsi_device *sdev)
+{
+	struct scsi_target *starget = NULL;
+	struct scsi_device *sdev_sibling;
+	struct device *dev = NULL;
+	int error;
+	unsigned long flags;
+
+	spin_lock_irqsave(sdev->host->host_lock, flags);
+	/*
+	 * Search for an existing target for this sdev.
+	 */
+	list_for_each_entry(sdev_sibling, &sdev->same_target_siblings,
+			    same_target_siblings) {
+		if (sdev_sibling->sdev_gendev.parent != NULL) {
+			starget = scsi_target(sdev_sibling);
+			break;
+		}
+	}
+	if (!starget) {
+		starget = kmalloc(sizeof(*starget), GFP_ATOMIC);
+		if (!starget) {
+			printk(KERN_ERR "%s: allocation failure\n", __FUNCTION__);
+			spin_unlock_irqrestore(sdev->host->host_lock,
+					       flags);
+			return -ENOMEM;
+		}
+		memset(starget, 0, sizeof(*starget));
+		dev = &starget->dev;
+		device_initialize(dev);
+		dev->parent = &sdev->host->shost_gendev;
+		dev->release = scsi_target_dev_release;
+		sprintf(dev->bus_id, "target%d:%d:%d",
+			sdev->host->host_no, sdev->channel, sdev->id);
+	}
+	get_device(&starget->dev);
+	sdev->sdev_gendev.parent = &starget->dev;
+	spin_unlock_irqrestore(sdev->host->host_lock, flags);
+	if (dev && (error = device_add(dev))) {
+		printk(KERN_ERR "Target device_add failed\n");
+		return error;
+	}
 	return 0;
 }
 

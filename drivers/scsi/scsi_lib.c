@@ -365,7 +365,7 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	unsigned long flags;
 
 	spin_lock_irqsave(shost->host_lock, flags);
-	current_sdev->sdev_target->starget_sdev_user = NULL;
+	scsi_target(current_sdev)->starget_sdev_user = NULL;
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	/*
@@ -377,7 +377,7 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	blk_run_queue(current_sdev->request_queue);
 
 	spin_lock_irqsave(shost->host_lock, flags);
-	if (current_sdev->sdev_target->starget_sdev_user)
+	if (scsi_target(current_sdev)->starget_sdev_user)
 		goto out;
 	list_for_each_entry_safe(sdev, tmp, &current_sdev->same_target_siblings,
 			same_target_siblings) {
@@ -1247,10 +1247,10 @@ static void scsi_request_fn(struct request_queue *q)
 		if (!scsi_host_queue_ready(q, shost, sdev))
 			goto not_ready;
 		if (sdev->single_lun) {
-			if (sdev->sdev_target->starget_sdev_user &&
-			    sdev->sdev_target->starget_sdev_user != sdev)
+			if (scsi_target(sdev)->starget_sdev_user &&
+			    scsi_target(sdev)->starget_sdev_user != sdev)
 				goto not_ready;
-			sdev->sdev_target->starget_sdev_user = sdev;
+			scsi_target(sdev)->starget_sdev_user = sdev;
 		}
 		shost->host_busy++;
 
