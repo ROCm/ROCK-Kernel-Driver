@@ -273,7 +273,7 @@ static inline void disable_surveillance(void)
 		args.args[0] = SURVEILLANCE_TOKEN;
 		args.args[1] = 0;
 		args.args[2] = 0;
-		enter_rtas((void *) __pa(&args));
+		enter_rtas(__pa(&args));
 	}
 #endif
 }

@@ -260,8 +260,8 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	bus_width &= 1 << ((ioaddr >> 21) & 7);
 	ei_status.word16 = (bus_width == 0); /* temporary setting */
 	for(i = 0; i < 16 /*sizeof(SA_prom)*/; i++) {
-		SA_prom[i] = inb(ioaddr + NE_DATAPORT);
-		inb(ioaddr + NE_DATAPORT); /* dummy read */
+		SA_prom[i] = inb_p(ioaddr + NE_DATAPORT);
+		inb_p(ioaddr + NE_DATAPORT); /* dummy read */
 	}
 
 	start_page = NESM_START_PG;
@@ -590,7 +590,7 @@ retry:
 
 
 #ifdef MODULE
-#define MAX_NE_CARDS	4	/* Max number of NE cards per module */
+#define MAX_NE_CARDS	1	/* Max number of NE cards per module */
 static struct net_device *dev_ne[MAX_NE_CARDS];
 static int io[MAX_NE_CARDS];
 static int irq[MAX_NE_CARDS];
@@ -599,7 +599,7 @@ static int bad[MAX_NE_CARDS];	/* 0xbad = bad sig or no reset ack */
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");
 MODULE_PARM(bad, "1-" __MODULE_STRING(MAX_NE_CARDS) "i");
-MODULE_PARM_DESC(io, "I/O base address(es),required");
+MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s)");
 MODULE_DESCRIPTION("H8/300 NE2000 Ethernet driver");
 MODULE_LICENSE("GPL");
@@ -612,26 +612,35 @@ ISA device autoprobes on a running machine are not recommended anyway. */
 int init_module(void)
 {
 	int this_dev, found = 0;
+	int err;
 
 	for (this_dev = 0; this_dev < MAX_NE_CARDS; this_dev++) {
 		struct net_device *dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->irq = irq[this_dev];
-		dev->mem_end = bad[this_dev];
-		dev->base_addr = io[this_dev];
-		if (do_ne_probe(dev) == 0) {
-			if (register_netdev(dev) == 0) {
-				dev_ne[found++] = dev;
-				continue;
+		if (io[this_dev]) {
+			dev->irq = irq[this_dev];
+			dev->mem_end = bad[this_dev];
+			dev->base_addr = io[this_dev];
+		} else {
+			dev->base_addr = h8300_ne_base[this_dev];
+			dev->irq = h8300_ne_irq[this_dev];
+		}
+		err = init_reg_offset(dev, dev->base_addr);
+		if (!err) {
+			if (do_ne_probe(dev) == 0) {
+				if (register_netdev(dev) == 0) {
+					dev_ne[found++] = dev;
+					continue;
+				}
+				cleanup_card(dev);
 			}
-			cleanup_card(dev);
 		}
 		free_netdev(dev);
 		if (found)
 			break;
 		if (io[this_dev] != 0)
-			printk(KERN_WARNING "ne.c: No NE*000 card found at i/o = %#x\n", io[this_dev]);
+			printk(KERN_WARNING "ne.c: No NE*000 card found at i/o = %#x\n", dev->base_addr);
 		else
 			printk(KERN_NOTICE "ne.c: You must supply \"io=0xNNN\" value(s) for ISA cards.\n");
 		return -ENXIO;

@@ -256,7 +256,7 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len,
 asmlinkage unsigned long sys_mremap(unsigned long addr,
 				unsigned long old_len, unsigned long new_len,
 				unsigned long flags, unsigned long new_addr);
-long sys_remap_file_pages(unsigned long start, unsigned long size,
+asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 			unsigned long prot, unsigned long pgoff,
 			unsigned long flags);
 asmlinkage long sys_msync(unsigned long start, size_t len, int flags);

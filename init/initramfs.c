@@ -207,7 +207,7 @@ static int __init do_header(void)
 
 static int __init do_skip(void)
 {
-	if (this_header + count <= next_header) {
+	if (this_header + count < next_header) {
 		eat(count);
 		return 1;
 	} else {

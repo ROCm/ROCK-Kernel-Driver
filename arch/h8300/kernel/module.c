@@ -67,7 +67,6 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		Elf32_Sym *sym = (Elf32_Sym *)sechdrs[symindex].sh_addr
 			+ ELF32_R_SYM(rela[i].r_info);
 		uint32_t v = sym->st_value + rela[i].r_addend;
-		uint32_t dot = sechdrs[symindex].sh_addr + rela[i].r_offset;
 
 		switch (ELF32_R_TYPE(rela[i].r_info)) {
 		case R_H8_DIR24R8:
@@ -75,14 +74,15 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			*loc = (*loc & 0xff000000) | ((*loc & 0xffffff) + v);
 			break;
 		case R_H8_DIR24A8:
-			*loc += v;
+			if (ELF32_R_SYM(rela[i].r_info))
+				*loc += v;
 			break;
 		case R_H8_DIR32:
 		case R_H8_DIR32A16:
 			*loc += v;
 			break;
 		case R_H8_PCREL16:
-			v -= dot + 2;
+			v -= (unsigned long)loc + 2;
 			if ((Elf32_Sword)v > 0x7fff || 
 			    (Elf32_Sword)v < -(Elf32_Sword)0x8000)
 				goto overflow;
@@ -90,7 +90,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 				*(unsigned short *)loc = v;
 			break;
 		case R_H8_PCREL8:
-			v -= dot + 1;
+			v -= (unsigned long)loc + 1;
 			if ((Elf32_Sword)v > 0x7f || 
 			    (Elf32_Sword)v < -(Elf32_Sword)0x80)
 				goto overflow;
@@ -105,7 +105,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	}
 	return 0;
  overflow:
-	printk(KERN_ERR "module %s: relocation offset overflow: %p\n",
+	printk(KERN_ERR "module %s: relocation offset overflow: %08x\n",
 	       me->name, rela[i].r_offset);
 	return -ENOEXEC;
 }

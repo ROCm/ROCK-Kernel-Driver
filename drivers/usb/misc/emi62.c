@@ -229,6 +229,8 @@ static int emi62_load_firmware (struct usb_device *dev)
 		goto wraperr;
 	}
 
+	kfree(buf);
+
 	/* return 1 to fail the driver inialization
 	 * and give real driver change to load */
 	return 1;

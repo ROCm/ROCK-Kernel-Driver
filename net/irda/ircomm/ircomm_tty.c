@@ -721,8 +721,10 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 		kbuf = kmalloc(count, GFP_KERNEL);
 		if (kbuf == NULL)
 			return -ENOMEM;
-		if (copy_from_user(kbuf, ubuf, count))
+		if (copy_from_user(kbuf, ubuf, count)) {
+			kfree(kbuf);
 			return -EFAULT;
+		}
 	} else
 		/* The buffer is already in kernel space */
 		kbuf = (unsigned char *) ubuf;
@@ -779,6 +781,8 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 					    self->max_header_size);
 			if (!skb) {
 				spin_unlock_irqrestore(&self->spinlock, flags);
+	                        if (from_user)
+		                        kfree(kbuf);
 				return -ENOBUFS;
 			}
 			skb_reserve(skb, self->max_header_size);
