@@ -752,7 +752,15 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
+
+#ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);
+#else
+static inline void __vm_stat_account(struct mm_struct *mm,
+			unsigned long flags, struct file *file, long pages)
+{
+}
+#endif /* CONFIG_PROC_FS */
 
 static inline void vm_stat_account(struct vm_area_struct *vma)
 {

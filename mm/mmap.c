@@ -729,6 +729,7 @@ none:
 	return NULL;
 }
 
+#ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
 						struct file *file, long pages)
 {
@@ -750,6 +751,7 @@ void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
 	if (flags & VM_EXEC)
 		mm->exec_vm += pages;
 }
+#endif /* CONFIG_PROC_FS */
 
 /*
  * The caller must hold down_write(current->mm->mmap_sem).
