@@ -1,5 +1,5 @@
 /*
- *  $Id: longhaul.c,v 1.77 2002/10/31 21:17:40 db Exp $
+ *  $Id: longhaul.c,v 1.86 2003/02/12 13:59:11 davej Exp $
  *
  *  (C) 2001  Dave Jones. <davej@suse.de>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
@@ -48,6 +48,7 @@ static int vrmrev;
 
 
 /* Module parameters */
+static int prefer_slow_fsb;
 static int dont_scale_voltage;
 static int dont_scale_fsb;
 static int current_fsb;
@@ -237,7 +238,6 @@ static unsigned int power_fsb_table[] = { 66, 100, 133, -1 };
 /* fsb values to favour high fsb speed (for e.g. if lowering CPU 
    freq because of heat, but want to maintain highest performance possible) */
 static unsigned int perf_fsb_table[] = { 133, 100, 66, -1 };
-static unsigned int *fsb_search_table;
 
 /* Voltage scales. Div by 1000 to get actual voltage. */
 static int __initdata vrm85scales[32] = {
@@ -260,7 +260,7 @@ static int eblcr_table[32];
 static int voltage_table[32];
 static int highest_speed, lowest_speed; /* kHz */
 static int longhaul; /* version. */
-static struct cpufreq_driver *longhaul_driver;
+static struct cpufreq_frequency_table *longhaul_table;
 
 
 static int longhaul_get_cpu_fsb (void)
@@ -428,7 +428,7 @@ bad_voltage:
 }
 
 
-static void __init longhaul_get_ranges (void)
+static int __init longhaul_get_ranges (void)
 {
 	unsigned long lo, hi, invalue;
 	unsigned int minmult=0, maxmult=0, minfsb=0, maxfsb=0;
@@ -436,6 +436,9 @@ static void __init longhaul_get_ranges (void)
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
 	unsigned int fsb_table[4] = { 133, 100, -1, 66 };
+	unsigned int fsbcount = 1;
+	unsigned int i, j, k = 0;
+	static unsigned int *fsb_search_table;
 
 	switch (longhaul) {
 	case 1:
@@ -472,6 +475,11 @@ static void __init longhaul_get_ranges (void)
 
 			dprintk (KERN_INFO "longhaul: Min FSB=%d Max FSB=%d\n",
 				minfsb, maxfsb);
+			fsbcount = 0;
+			for (i=0;i<4;i++) {
+				if((fsb_table[i] >= minfsb) && (fsb_table[i] <= maxfsb))
+					fsbcount++;
+			}
 		} else {
 			minfsb = maxfsb = current_fsb;
 		}
@@ -480,11 +488,37 @@ static void __init longhaul_get_ranges (void)
 
 	highest_speed = maxmult * maxfsb * 100;
 	lowest_speed = minmult * minfsb * 100;
-
 	dprintk (KERN_INFO "longhaul: MinMult(x10)=%d MaxMult(x10)=%d\n",
-		minmult, maxmult);
+		 minmult, maxmult);
 	dprintk (KERN_INFO "longhaul: Lowestspeed=%d Highestspeed=%d\n",
-		lowest_speed, highest_speed);
+		 lowest_speed, highest_speed);
+
+	longhaul_table = kmalloc((numscales * fsbcount + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
+	if(!longhaul_table)
+		return -ENOMEM;
+
+	if (prefer_slow_fsb) 
+		fsb_search_table = perf_fsb_table;   // yep, this is right: the last entry is preferred by cpufreq_frequency_table_* ...
+	else
+		fsb_search_table = power_fsb_table;
+
+	for (i=0; (i<4); i++) {
+		if ((fsb_search_table[i] > maxfsb) || (fsb_search_table[i] < minfsb) || (fsb_search_table[i] == -1))
+			continue;
+		for (j=0; (j<numscales); j++) {
+			if ((clock_ratio[j] > maxmult) || (clock_ratio[j] < minmult) || (clock_ratio[j] == -1))
+				continue;
+			longhaul_table[k].frequency= clock_ratio[j] * fsb_search_table[i] * 100;
+			longhaul_table[k].index	= (j << 8) | (i);
+			k++;
+		}
+	}
+	
+	longhaul_table[k].frequency = CPUFREQ_TABLE_END;
+	if (!k)
+		return -EINVAL;
+	
+	return 0;
 }
 
 
@@ -523,182 +557,43 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 }
 
 
-static inline unsigned int longhaul_statecount_fsb(struct cpufreq_policy *policy, unsigned int fsb) {
-	unsigned int i, count = 0;
-
-	for(i=0; i<numscales; i++) {
-		if ((clock_ratio[i] != -1) &&
-		    ((clock_ratio[i] * fsb * 100) <= policy->max) &&
-		    ((clock_ratio[i] * fsb * 100) >= policy->min))
-			count++;
-	}
-
-	return count;
-}
-
-
 static int longhaul_verify(struct cpufreq_policy *policy)
 {
-	unsigned int    number_states = 0;
-	unsigned int    i;
-	unsigned int    fsb_index = 0;
-	unsigned int    tmpfreq = 0;
-	unsigned int    newmax = -1;
-
-	if (!policy || !longhaul_driver)
-		return -EINVAL;
-
-	policy->cpu = 0;
-	cpufreq_verify_within_limits(policy, lowest_speed, highest_speed);
-
-	if (can_scale_fsb==1) {
-		for (fsb_index=0; fsb_search_table[fsb_index]!=-1; fsb_index++)
-			number_states += longhaul_statecount_fsb(policy, fsb_search_table[fsb_index]);
-	} else
-		number_states = longhaul_statecount_fsb(policy, current_fsb);
-
-	if (number_states)
-		return 0;
-
-	/* get frequency closest above current policy->max */
-	if (can_scale_fsb==1) {
-		for (fsb_index=0; fsb_search_table[fsb_index] != -1; fsb_index++)
-			for(i=0; i<numscales; i++) {
-				if (clock_ratio[i] == -1)
-					continue;
-
-				tmpfreq = clock_ratio[i] * fsb_search_table[fsb_index];
-				if ((tmpfreq > policy->max) &&
-				    (tmpfreq < newmax))
-					newmax = tmpfreq;
-			}
-	} else {
-		for(i=0; i<numscales; i++) {
-			if (clock_ratio[i] == -1)
-				continue;
-
-			tmpfreq = clock_ratio[i] * current_fsb;
-			if ((tmpfreq > policy->max) &&
-			    (tmpfreq < newmax))
-				newmax = tmpfreq;
-			}
-	}
-
-	policy->max = newmax;
-
-	cpufreq_verify_within_limits(policy, lowest_speed, highest_speed);
-
-	return 0;
+	return cpufreq_frequency_table_verify(policy, longhaul_table);
 }
 
 
-static int longhaul_get_best_freq_for_fsb(struct cpufreq_policy *policy, 
-					  unsigned int min_mult, 
-					  unsigned int max_mult, 
-					  unsigned int fsb, 
-					  unsigned int *new_mult)
+static int longhaul_target (struct cpufreq_policy *policy,
+			    unsigned int target_freq,
+			    unsigned int relation)
 {
-	unsigned int optimal = 0;
-	unsigned int found_optimal = 0;
-	unsigned int i;
+	unsigned int    table_index = 0;
+ 	unsigned int    new_fsb = 0;
+ 	unsigned int    new_clock_ratio = 0;
 
-	switch(policy->policy) {
-	case CPUFREQ_POLICY_POWERSAVE:
-		optimal = max_mult;
-		break;
-	case CPUFREQ_POLICY_PERFORMANCE:
-		optimal = min_mult;
-	}
-
-	for(i=0; i<numscales; i++) {
-		unsigned int freq = fsb * clock_ratio[i] * 100;
-		if ((freq > policy->max) ||
-		    (freq < policy->min))
-			continue;
-		switch(policy->policy) {
-		case CPUFREQ_POLICY_POWERSAVE:
-			if (clock_ratio[i] < clock_ratio[optimal]) {
-				found_optimal = 1;
-				optimal = i;
-			}
-			break;
-		case CPUFREQ_POLICY_PERFORMANCE:
-			if (clock_ratio[i] > clock_ratio[optimal]) {
-				found_optimal = 1;
-				optimal = i;
-			}
-			break;
-		}
-	}
-		
-	if (found_optimal) {
-		*new_mult = optimal;
-		return 1;
-	}
-	return 0;
-}
-
-
-static int longhaul_setpolicy (struct cpufreq_policy *policy)
-{
-	unsigned int    i;
-	unsigned int    fsb_index = 0;
-	unsigned int    new_fsb = 0;
-	unsigned int    new_clock_ratio = 0;
-	unsigned int    min_mult = 0;
-	unsigned int    max_mult = 0;
-
-
-	if (!longhaul_driver)
+	if (cpufreq_frequency_table_target(policy, longhaul_table, target_freq, relation, &table_index))
 		return -EINVAL;
 
-	if (policy->policy==CPUFREQ_POLICY_PERFORMANCE)
-		fsb_search_table = perf_fsb_table;
-	else
-		fsb_search_table = power_fsb_table;
-
-	for(i=0;i<numscales;i++) {
-		if (clock_ratio[max_mult] < clock_ratio[i])
-				max_mult = i;
-		else if (clock_ratio[min_mult] > clock_ratio[i])
-				min_mult = i;
-	}
-
-	if (can_scale_fsb==1) {
-		unsigned int found = 0;
-		for (fsb_index=0; fsb_search_table[fsb_index]!=-1; fsb_index++)
-		{
-			if (longhaul_get_best_freq_for_fsb(policy, 
-			              min_mult, max_mult, 
-				      fsb_search_table[fsb_index], 
-				      &new_clock_ratio)) {
-				new_fsb = fsb_search_table[fsb_index];
-				break;
-			}
-		}
-		if (!found)
-			return -EINVAL;
-	} else {
-		new_fsb = current_fsb;
-		if (!longhaul_get_best_freq_for_fsb(policy, min_mult, 
-			     max_mult, new_fsb, &new_clock_ratio))
-			return -EINVAL;
-	}
-
+	new_clock_ratio = longhaul_table[table_index].index & 0xFF;
+	new_fsb = power_fsb_table[(longhaul_table[table_index].index & 0xFF00) >> 8];
+ 
 	longhaul_setstate(new_clock_ratio, new_fsb);
 
 	return 0;
 }
 
+static int longhaul_cpu_init (struct cpufreq_policy *policy);
 
-static int __init longhaul_init (void)
+static struct cpufreq_driver longhaul_driver = {
+	.verify 	= longhaul_verify,
+	.target 	= longhaul_target,
+	.init		= longhaul_cpu_init,
+	.name		= "longhaul",
+};
+
+static int longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
-	unsigned int currentspeed;
-	static int currentmult;
-	unsigned long lo, hi;
-	int ret;
-	struct cpufreq_driver *driver;
 
 	if ((c->x86_vendor != X86_VENDOR_CENTAUR) || (c->x86 !=6) )
 		return -ENODEV;
@@ -733,21 +628,12 @@ static int __init longhaul_init (void)
 		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
 		break;
 
-	default:
-		printk (KERN_INFO "longhaul: Unknown VIA CPU. Contact davej@suse.de\n");
-		return -ENODEV;
 	}
 
 	printk (KERN_INFO "longhaul: VIA CPU detected. Longhaul version %d supported\n", longhaul);
 
-	current_fsb = longhaul_get_cpu_fsb();
-	currentmult = longhaul_get_cpu_mult();
-	currentspeed = currentmult * current_fsb * 100;
-
-	dprintk (KERN_INFO "longhaul: CPU currently at %dMHz (%d x %d.%d)\n",
-		(currentspeed/1000), current_fsb, currentmult/10, currentmult%10);
-
 	if (longhaul==2 || longhaul==3) {
+		unsigned long lo, hi;
 		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
 		if ((lo & (1<<0)) && (dont_scale_voltage==0))
 			longhaul_setup_voltagescaling (lo, hi);
@@ -756,57 +642,48 @@ static int __init longhaul_init (void)
 			can_scale_fsb = 1;
 	}
 
-	longhaul_get_ranges();
-
-	driver = kmalloc(sizeof(struct cpufreq_driver) + 
-			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!driver)
+	if (longhaul_get_ranges())
 		return -ENOMEM;
-	memset(driver, 0, sizeof(struct cpufreq_driver) +
-			NR_CPUS * sizeof(struct cpufreq_policy));
 
-	driver->policy = (struct cpufreq_policy *) (driver + 1);
+ 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+ 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0] = currentspeed;
+        longhaul_driver.cpu_cur_freq[0] = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
 #endif
 
-	driver->verify    = &longhaul_verify;
-	driver->setpolicy = &longhaul_setpolicy;
-
-	strncpy(driver->name, "longhaul", CPUFREQ_NAME_LEN);
-
-	driver->policy[0].cpu = 0;
-	driver->policy[0].min = (unsigned int) lowest_speed;
-	driver->policy[0].max = (unsigned int) highest_speed;
-	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].cpuinfo.min_freq = (unsigned int) lowest_speed;
-	driver->policy[0].cpuinfo.max_freq = (unsigned int) highest_speed;
-	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-
-	longhaul_driver = driver;
-
-	ret = cpufreq_register(driver);
-	if (ret) {
-		longhaul_driver = NULL;
-		kfree(driver);
-	}
-
-	return ret;
+	return cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
 }
 
+static int __init longhaul_init (void)
+{
+	struct cpuinfo_x86 *c = cpu_data;
+
+	if ((c->x86_vendor != X86_VENDOR_CENTAUR) || (c->x86 !=6) )
+		return -ENODEV;
+
+	switch (c->x86_model) {
+	case 6 ... 7:
+		return cpufreq_register_driver(&longhaul_driver);
+	case 8:
+		return -ENODEV;
+	default:
+		printk (KERN_INFO "longhaul: Unknown VIA CPU. Contact davej@suse.de\n");
+	}
+
+	return -ENODEV;
+}
 
 static void __exit longhaul_exit (void)
 {
-	if (longhaul_driver) {
-		cpufreq_unregister();
-		kfree(longhaul_driver);
-	}
+	cpufreq_unregister_driver(&longhaul_driver);
+	kfree(longhaul_table);
 }
 
 MODULE_PARM (dont_scale_fsb, "i");
 MODULE_PARM (dont_scale_voltage, "i");
 MODULE_PARM (current_fsb, "i");
+MODULE_PARM (prefer_slow_fsb, "i");
 
 MODULE_AUTHOR ("Dave Jones <davej@suse.de>");
 MODULE_DESCRIPTION ("Longhaul driver for VIA Cyrix processors.");

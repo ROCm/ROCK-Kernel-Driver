@@ -56,6 +56,16 @@ config X86_ACPI_CPUFREQ
 
 	  If in doubt, say N.
 
+config X86_ACPI_CPUFREQ_PROC_INTF
+        bool "/proc/acpi/processor/../performance interface (deprecated)"
+	depends on X86_ACPI_CPUFREQ && PROC_FS
+	help
+	  This enables the deprecated /proc/acpi/processor/../performance 
+	  interface. While it is helpful for debugging, the generic,
+	  cross-architecture cpufreq interfaces should be used.
+
+	  If in doubt, say N.
+
 config ELAN_CPUFREQ
 	tristate "AMD Elan"
 	depends on CPU_FREQ_TABLE && MELAN
@@ -139,7 +149,7 @@ config X86_LONGRUN
 
 config X86_LONGHAUL
 	tristate "VIA Cyrix III Longhaul"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for VIA Samuel/CyrixIII, 
 	  VIA Cyrix Samuel/C3, VIA Cyrix Ezra and VIA Cyrix Ezra-T 
