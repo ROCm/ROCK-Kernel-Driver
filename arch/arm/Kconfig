@@ -344,9 +344,10 @@ config ZBOOT_ROM_BSS
 	  while the decompressor is running.  Unless you have special requirements,
 	  you should not change this value.
 
+if (ARCH_SA1100 || ARCH_INTEGRATOR)
+
 config CPU_FREQ
-	bool "Support CPU clock change (EXPERIMENTAL)"
-	depends on (ARCH_SA1100 || ARCH_INTEGRATOR) && EXPERIMENTAL
+	bool "Support CPU clock change"
 	help
 	  CPU clock scaling allows you to change the clock speed of the
 	  running CPU on the fly. This is a nice method to save battery power,
@@ -356,20 +357,17 @@ config CPU_FREQ
 	  written) to implement the policy. If you don't understand what this
 	  is all about, it's safe to say 'N'.
 
-
-# CPUfreq on SA11x0 is special -- it _needs_ the userspace governor
+source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_SA1100
 	bool
 	depends on CPU_FREQ && SA1100_LART
 	default y
-	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_SA1110
 	bool
 	depends on CPU_FREQ && (SA1100_ASSABET || SA1100_CERF || SA1100_PT_SYSTEM3)
 	default y
-	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"
@@ -381,10 +379,6 @@ config CPU_FREQ_INTEGRATOR
 	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say Y.
-
-if (CPU_FREQ_INTEGRATOR) || (CPU_FREQ_SA1110) || (CPU_FREQ_SA1100)
-
-source "drivers/cpufreq/Kconfig"
 
 endif
 
