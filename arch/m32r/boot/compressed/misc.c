@@ -8,8 +8,6 @@
  *
  * Adapted for SH by Stuart Menefy, Aug 1999
  *
- * Modified to use standard LinuxSH BIOS by Greg Banks 7Jul2000
- *
  * 2003-02-12:	Support M32R by Takeo Takahashi
  * 		This is based on arch/sh/boot/compressed/misc.c.
  */
@@ -38,9 +36,9 @@ typedef unsigned long  ulg;
 static uch *inbuf;	     /* input buffer */
 static uch window[WSIZE];    /* Sliding window buffer */
 
-static unsigned insize;  /* valid bytes in inbuf */
-static unsigned inptr;   /* index of next byte to be processed in inbuf */
-static unsigned outcnt;  /* bytes in output buffer */
+static unsigned insize = 0;  /* valid bytes in inbuf */
+static unsigned inptr = 0;   /* index of next byte to be processed in inbuf */
+static unsigned outcnt = 0;  /* bytes in output buffer */
 
 /* gzip flag byte */
 #define ASCII_FLAG   0x01 /* bit 0 set: file probably ASCII text */
@@ -76,24 +74,18 @@ static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
 
-extern char input_data[];
-extern int input_len;
+static unsigned char *input_data;
+static int input_len;
 
-static long bytes_out;
+static long bytes_out = 0;
 static uch *output_data;
-static unsigned long output_ptr;
+static unsigned long output_ptr = 0;
 
+#include "m32r_sio.c"
 
 static void *malloc(int size);
 static void free(void *where);
-static void error(char *m);
-static void gzip_mark(void **);
-static void gzip_release(void **);
 
-extern int puts(const char *);
-
-extern int _text;		/* Defined in vmlinux.lds.S */
-extern int _end;
 static unsigned long free_mem_ptr;
 static unsigned long free_mem_end_ptr;
 
@@ -105,8 +97,8 @@ static void *malloc(int size)
 {
 	void *p;
 
-	if (size <0) error("Malloc error\n");
-	if (free_mem_ptr == 0) error("Memory error\n");
+	if (size <0) error("Malloc error");
+	if (free_mem_ptr == 0) error("Memory error");
 
 	free_mem_ptr = (free_mem_ptr + 3) & ~3;	/* Align */
 
@@ -114,7 +106,7 @@ static void *malloc(int size)
 	free_mem_ptr += size;
 
 	if (free_mem_ptr >= free_mem_end_ptr)
-		error("\nOut of memory\n");
+		error("Out of memory");
 
 	return p;
 }
@@ -159,7 +151,7 @@ void* memcpy(void* __dest, __const void* __src,
 static int fill_inbuf(void)
 {
 	if (insize != 0) {
-		error("ran out of input data\n");
+		error("ran out of input data");
 	}
 
 	inbuf = input_data;
@@ -199,25 +191,20 @@ static void error(char *x)
 	while(1);	/* Halt */
 }
 
-#define STACK_SIZE (4096)
-long user_stack [STACK_SIZE];
-long* stack_start = &user_stack[STACK_SIZE];
-
 /* return decompressed size */
-long decompress_kernel(void)
+void
+decompress_kernel(int mmu_on, unsigned char *zimage_data,
+		  unsigned int zimage_len, unsigned long heap)
 {
-	insize = 0;
-	inptr = 0;
-	bytes_out = 0;
-	outcnt = 0;
-	output_data = 0;
-	output_ptr = CONFIG_MEMORY_START + 0x2000;
-	free_mem_ptr = (unsigned long)&_end;
+	output_data = (unsigned char *)CONFIG_MEMORY_START + 0x2000
+		+ (mmu_on ? 0x80000000 : 0);
+	free_mem_ptr = heap;
 	free_mem_end_ptr = free_mem_ptr + HEAP_SIZE;
+	input_data = zimage_data;
+	input_len = zimage_len;
 
 	makecrc();
 	puts("Uncompressing Linux... ");
 	gunzip();
 	puts("Ok, booting the kernel.\n");
-	return bytes_out;
 }

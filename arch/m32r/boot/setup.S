@@ -24,7 +24,7 @@
 #define CPU_PARAMS	boot_cpu_data
 #define M32R_MCICAR	 0xfffffff0
 #define M32R_MCDCAR	 0xfffffff4
-#define	M32R_MCCR 	 0xfffffffc
+#define M32R_MCCR 	 0xfffffffc
 #define M32R_BSCR0	 0xffffffd2
 
 ;BSEL
