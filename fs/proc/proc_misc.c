@@ -62,7 +62,6 @@
 extern int get_hardware_list(char *);
 extern int get_stram_list(char *);
 extern int get_chrdev_list(char *);
-extern int get_blkdev_list(char *);
 extern int get_filesystem_list(char *);
 extern int get_exec_domain_list(char *);
 extern int get_dma_list(char *);
