@@ -78,7 +78,7 @@ static void __init lubbock_init_irq(void)
 	pxa_init_irq();
 
 	/* setup extra lubbock irqs */
-	for (irq = LUBBOCK_IRQ(0); irq <= LUBBOCK_IRQ(5); irq++) {
+	for (irq = LUBBOCK_IRQ(0); irq <= LUBBOCK_LAST_IRQ; irq++) {
 		set_irq_chip(irq, &lubbock_irq_chip);
 		set_irq_handler(irq, do_level_IRQ);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
@@ -124,6 +124,7 @@ static struct map_desc lubbock_io_desc[] __initdata = {
   { 0xf0000000, 0x08000000, 0x00100000, MT_DEVICE }, /* CPLD */
   { 0xf1000000, 0x0c000000, 0x00100000, MT_DEVICE }, /* LAN91C96 IO */
   { 0xf1100000, 0x0e000000, 0x00100000, MT_DEVICE }, /* LAN91C96 Attr */
+  { 0xf4000000, 0x10000000, 0x00800000, MT_DEVICE }, /* SA1111 */
 };
 
 static void __init lubbock_map_io(void)

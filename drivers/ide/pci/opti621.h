@@ -7,7 +7,6 @@
 
 static void init_setup_opti621(struct pci_dev *, ide_pci_device_t *);
 static void init_hwif_opti621(ide_hwif_t *);
-static void init_dma_opti621(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t opti621_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -18,7 +17,6 @@ static ide_pci_device_t opti621_chipsets[] __devinitdata = {
 		.init_chipset	= NULL,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_opti621,
-		.init_dma	= init_dma_opti621,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
@@ -32,7 +30,6 @@ static ide_pci_device_t opti621_chipsets[] __devinitdata = {
 		.init_chipset	= NULL,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_opti621,
-                .init_dma	= init_dma_opti621,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x45,0x80,0x00}, {0x40,0x08,0x00}},

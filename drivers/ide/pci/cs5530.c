@@ -404,19 +404,6 @@ static void __init init_hwif_cs5530 (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
-/**
- *	init_dma_cs5530		-	set up for DMA
- *	@hwif: interface
- *	@dmabase: DMA base address
- *
- *	FIXME: this can go away
- */
- 
-static void __init init_dma_cs5530 (ide_hwif_t *hwif, unsigned long dmabase)
-{
-	ide_setup_dma(hwif, dmabase, 8);
-}
-
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
 

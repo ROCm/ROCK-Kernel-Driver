@@ -29,7 +29,6 @@ static ide_pci_host_proc_t slc90e66_procs[] __initdata = {
 
 static unsigned int init_chipset_slc90e66(struct pci_dev *, const char *);
 static void init_hwif_slc90e66(ide_hwif_t *);
-static void init_dma_slc90e66(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t slc90e66_chipsets[] __devinitdata = {
 	{	/* 0 */
@@ -39,7 +38,6 @@ static ide_pci_device_t slc90e66_chipsets[] __devinitdata = {
 		.init_chipset	= init_chipset_slc90e66,
 		.init_iops	= NULL,
 		.init_hwif	= init_hwif_slc90e66,
-		.init_dma	= init_dma_slc90e66,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
