@@ -23,7 +23,7 @@ struct swsusp_info {
 
 
 
-#ifdef CONFIG_PM_DISK
+#ifdef CONFIG_SOFTWARE_SUSPEND
 extern int pm_suspend_disk(void);
 
 #else

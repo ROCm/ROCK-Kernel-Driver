@@ -42,18 +42,6 @@ config SOFTWARE_SUSPEND
 
 	  For more information take a look at Documentation/power/swsusp.txt.
 
-config PM_DISK
-	bool "PMDisk Support"
-	depends on SOFTWARE_SUSPEND && X86 && !X86_64
-	---help---
-
-	This option enables an alternative implementation of Suspend-to-Disk.
-	It is functionally equivalent to Software Suspend, and uses many of
-	the same internal routines. But, it offers a slightly different 
-	interface.
-
-	If unsure, Say N.
-
 config PM_STD_PARTITION
 	string "Default resume partition"
 	depends on SOFTWARE_SUSPEND
