@@ -106,35 +106,35 @@ writefifo(struct IsdnCardState *cs, int offset, u8 *data, int size)
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
-static inline u8
-ReadISAC(struct IsdnCardState *cs, u8 adr)
+static u8
+isac_read(struct IsdnCardState *cs, u8 adr)
 {
 	return readreg(cs, ISAC_REG_OFFSET, adr);
 }
 
-static inline void
-WriteISAC(struct IsdnCardState *cs, u8 adr, u8 value)
+static void
+isac_write(struct IsdnCardState *cs, u8 adr, u8 value)
 {
 	writereg(cs, ISAC_REG_OFFSET, adr, value);
 }
 
-static inline void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+static void
+isac_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
 {
 	readfifo(cs, ISAC_FIFO_OFFSET, data, size);
 }
 
-static inline void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+static void
+isac_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
 {
 	writefifo(cs, ISAC_FIFO_OFFSET, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
 };
 
 static inline u8
@@ -193,15 +193,15 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 				hscx_int_main(cs, val);
 		}
 		if (sval & ASL0_R_ISAC) {
-			val = ReadISAC(cs, ISAC_ISTA);
+			val = isac_read(cs, ISAC_ISTA);
 			if (val)
 				isac_interrupt(cs, val);
 		}
 	}
 	WriteHSCX(cs, 0, HSCX_MASK, 0xff);
 	WriteHSCX(cs, 1, HSCX_MASK, 0xff);
-	WriteISAC(cs, ISAC_MASK, 0xff);
-	WriteISAC(cs, ISAC_MASK, 0x00);
+	isac_write(cs, ISAC_MASK, 0xff);
+	isac_write(cs, ISAC_MASK, 0x00);
 	WriteHSCX(cs, 0, HSCX_MASK, 0x00);
 	WriteHSCX(cs, 1, HSCX_MASK, 0x00);
 	spin_unlock(&cs->lock);

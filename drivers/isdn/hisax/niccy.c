@@ -93,37 +93,35 @@ writefifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
 	spin_unlock_irqrestore(&niccy_lock, flags);
 }
 
-/* Interface functions */
-
 static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return (readreg(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, offset));
+	return readreg(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
 {
 	readfifo(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
 {
 	writefifo(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, 0, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
 };
 
 static u8

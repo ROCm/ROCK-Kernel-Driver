@@ -29,18 +29,46 @@ const char *teles0_revision = "$Revision: 2.13.6.2 $";
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u8
-readisac(unsigned long adr, u8 off)
+static u8
+isac_read(struct IsdnCardState *cs, u8 off)
 {
-	return readb(adr + ((off & 1) ? 0x2ff : 0x100) + off);
+	return readb(cs->hw.teles0.membase + 
+		     ((off & 1) ? 0x2ff : 0x100) + off);
 }
 
-static inline void
-writeisac(unsigned long adr, u8 off, u8 data)
+static void
+isac_write(struct IsdnCardState *cs, u8 off, u8 data)
 {
-	writeb(data, adr + ((off & 1) ? 0x2ff : 0x100) + off); mb();
+	writeb(data, cs->hw.teles0.membase + 
+	       ((off & 1) ? 0x2ff : 0x100) + off); mb();
 }
 
+
+static void
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
+{
+	int i;
+	unsigned long ad = cs->hw.teles0.membase + 0x100;
+	for (i = 0; i < size; i++)
+		data[i] = readb(ad);
+}
+
+static void
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
+{
+	int i;
+	unsigned long ad = cs->hw.teles0.membase + 0x100;
+	for (i = 0; i < size; i++) {
+		writeb(data[i], ad); mb();
+	}
+}
+
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
 
 static inline u8
 readhscx(unsigned long adr, int hscx, u8 off)
@@ -54,25 +82,6 @@ writehscx(unsigned long adr, int hscx, u8 off, u8 data)
 {
 	writeb(data, adr + (hscx ? 0x1c0 : 0x180) +
 	       ((off & 1) ? 0x1ff : 0) + off); mb();
-}
-
-static inline void
-read_fifo_isac(unsigned long adr, u8 * data, int size)
-{
-	register int i;
-	register u8 *ad = (u8 *)adr + 0x100;
-	for (i = 0; i < size; i++)
-		data[i] = readb(ad);
-}
-
-static inline void
-write_fifo_isac(unsigned long adr, u8 * data, int size)
-{
-	register int i;
-	register u8 *ad = (u8 *)adr + 0x100;
-	for (i = 0; i < size; i++) {
-		writeb(data[i], ad); mb();
-	}
 }
 
 static inline void
@@ -93,39 +102,6 @@ write_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
 		writeb(data[i], ad); mb();
 	}
 }
-
-/* Interface functions */
-
-static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
-{
-	return (readisac(cs->hw.teles0.membase, offset));
-}
-
-static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writeisac(cs->hw.teles0.membase, offset, value);
-}
-
-static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	read_fifo_isac(cs->hw.teles0.membase, data, size);
-}
-
-static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	write_fifo_isac(cs->hw.teles0.membase, data, size);
-}
-
-static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
-};
 
 static u8
 ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
@@ -167,7 +143,7 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readisac(cs->hw.teles0.membase, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
@@ -178,7 +154,7 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readisac(cs->hw.teles0.membase, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val && count < 5) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
@@ -186,8 +162,8 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0xFF);
 	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0xFF);
-	writeisac(cs->hw.teles0.membase, ISAC_MASK, 0xFF);
-	writeisac(cs->hw.teles0.membase, ISAC_MASK, 0x0);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
 	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0x0);
 	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);

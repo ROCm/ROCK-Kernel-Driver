@@ -42,10 +42,11 @@ const char *telespci_revision = "$Revision: 2.16.6.5 $";
 					portdata = readl(adr + 0x200); \
 				} while (portdata & ZORAN_PO_RQ_PEN)
 
-static inline u8
-readisac(unsigned long adr, u8 off)
+static u8
+isac_read(struct IsdnCardState *cs, u8 off)
 {
-	register unsigned int portdata;
+	unsigned long adr = cs->hw.teles0.membase;
+	unsigned int portdata;
 
 	ZORAN_WAIT_NOBUSY;
 	
@@ -59,10 +60,11 @@ readisac(unsigned long adr, u8 off)
 	return((u8)(portdata & ZORAN_PO_DMASK));
 }
 
-static inline void
-writeisac(unsigned long adr, u8 off, u8 data)
+static void
+isac_write(struct IsdnCardState *cs, u8 off, u8 data)
 {
-	register unsigned int portdata;
+	unsigned long adr = cs->hw.teles0.membase;
+	unsigned int portdata;
 
 	ZORAN_WAIT_NOBUSY;
 	
@@ -74,6 +76,50 @@ writeisac(unsigned long adr, u8 off, u8 data)
 	writel(WRITE_DATA_ISAC | data, adr + 0x200);
 	ZORAN_WAIT_NOBUSY;
 }
+
+static void
+isac_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
+{
+	unsigned long adr = cs->hw.teles0.membase;
+	unsigned int portdata;
+	int i;
+
+	ZORAN_WAIT_NOBUSY;
+	/* read data from ISAC */
+	for (i = 0; i < size; i++) {
+		/* set address for ISAC fifo */
+		writel(WRITE_ADDR_ISAC | 0x1E, adr);
+		ZORAN_WAIT_NOBUSY;
+		writel(READ_DATA_ISAC, adr + 0x200);
+		ZORAN_WAIT_NOBUSY;
+		data[i] = (u8)(portdata & ZORAN_PO_DMASK);
+	}
+}
+
+static void
+isac_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
+{
+	unsigned long adr = cs->hw.teles0.membase;
+	unsigned int portdata;
+	int i;
+
+	ZORAN_WAIT_NOBUSY;
+	/* write data to ISAC */
+	for (i = 0; i < size; i++) {
+		/* set address for ISAC fifo */
+		writel(WRITE_ADDR_ISAC | 0x1E, adr);
+		ZORAN_WAIT_NOBUSY;
+		writel(WRITE_DATA_ISAC | data[i], adr + 0x200);
+		ZORAN_WAIT_NOBUSY;
+	}
+}
+
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
 
 static inline u8
 readhscx(unsigned long adr, int hscx, u8 off)
@@ -104,41 +150,6 @@ writehscx(unsigned long adr, int hscx, u8 off, u8 data)
 	/* write data to HSCX */
 	writel(WRITE_DATA_HSCX | data, adr + 0x200);
 	ZORAN_WAIT_NOBUSY;
-}
-
-static inline void
-read_fifo_isac(unsigned long adr, u8 * data, int size)
-{
-	register unsigned int portdata;
-	register int i;
-
-	ZORAN_WAIT_NOBUSY;
-	/* read data from ISAC */
-	for (i = 0; i < size; i++) {
-		/* set address for ISAC fifo */
-		writel(WRITE_ADDR_ISAC | 0x1E, adr + 0x200);
-		ZORAN_WAIT_NOBUSY;
-		writel(READ_DATA_ISAC, adr + 0x200);
-		ZORAN_WAIT_NOBUSY;
-		data[i] = (u8)(portdata & ZORAN_PO_DMASK);
-	}
-}
-
-static void
-write_fifo_isac(unsigned long adr, u8 * data, int size)
-{
-	register unsigned int portdata;
-	register int i;
-
-	ZORAN_WAIT_NOBUSY;
-	/* write data to ISAC */
-	for (i = 0; i < size; i++) {
-		/* set address for ISAC fifo */
-		writel(WRITE_ADDR_ISAC | 0x1E, adr + 0x200);
-		ZORAN_WAIT_NOBUSY;
-		writel(WRITE_DATA_ISAC | data[i], adr + 0x200);
-		ZORAN_WAIT_NOBUSY;
-	}
 }
 
 static inline void
@@ -176,39 +187,6 @@ write_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
 		udelay(10);
 	}
 }
-
-/* Interface functions */
-
-static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
-{
-	return (readisac(cs->hw.teles0.membase, offset));
-}
-
-static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writeisac(cs->hw.teles0.membase, offset, value);
-}
-
-static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	read_fifo_isac(cs->hw.teles0.membase, data, size);
-}
-
-static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	write_fifo_isac(cs->hw.teles0.membase, data, size);
-}
-
-static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
-};
 
 static u8
 ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
@@ -249,7 +227,7 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	val = readhscx(cs->hw.teles0.membase, 1, HSCX_ISTA);
 	if (val)
 		hscx_int_main(cs, val);
-	val = readisac(cs->hw.teles0.membase, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val)
 		isac_interrupt(cs, val);
 	/* Clear interrupt register for Zoran PCI controller */
@@ -257,8 +235,8 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0xFF);
 	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0xFF);
-	writeisac(cs->hw.teles0.membase, ISAC_MASK, 0xFF);
-	writeisac(cs->hw.teles0.membase, ISAC_MASK, 0x0);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
 	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0x0);
 	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);

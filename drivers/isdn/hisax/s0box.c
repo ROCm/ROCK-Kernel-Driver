@@ -104,37 +104,35 @@ write_fifo(struct IsdnCardState *cs, signed int adr, u8 * data, int size)
 	outb_p(0x1c,padr+2);
 }
 
-/* Interface functions */
-
 static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.teles3.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.teles3.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo(cs, cs->hw.teles3.isacfifo, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo(cs, cs->hw.teles3.isacfifo, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
 };
 
 static u8

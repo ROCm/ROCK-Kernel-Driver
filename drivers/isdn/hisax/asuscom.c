@@ -90,68 +90,66 @@ writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int siz
 	spin_unlock_irqrestore(&asuscom_lock, flags);
 }
 
-/* Interface functions */
-
 static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.asus.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.asus.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.asus.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.asus.isac, 0, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
 };
 
 static u8
-ReadISAC_IPAC(struct IsdnCardState *cs, u8 offset)
+ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.asus.isac, offset|0x80);
 }
 
 static void
-WriteISAC_IPAC(struct IsdnCardState *cs, u8 offset, u8 value)
+ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.asus.isac, offset|0x80, value);
 }
 
 static void
-ReadISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
+ipac_dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.asus.isac, 0x80, data, size);
 }
 
 static void
-WriteISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
+ipac_dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.asus.isac, 0x80, data, size);
 }
 
 static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ReadISAC_IPAC,
-	.write_reg  = WriteISAC_IPAC,
-	.read_fifo  = ReadISACfifo_IPAC,
-	.write_fifo = WriteISACfifo_IPAC,
+	.read_reg   = ipac_dc_read,
+	.write_reg  = ipac_dc_write,
+	.read_fifo  = ipac_dc_read_fifo,
+	.write_fifo = ipac_dc_write_fifo,
 };
 
 static u8

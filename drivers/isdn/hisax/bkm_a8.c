@@ -90,37 +90,35 @@ writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 }
 
-/* Interface functions */
-
 static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
+ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, offset | 0x80);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
+ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, offset | 0x80, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+ipac_dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, 0x80, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+ipac_dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, 0x80, data, size);
 }
 
-static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+static struct dc_hw_ops ipac_dc_ops = {
+	.read_reg   = ipac_dc_read,
+	.write_reg  = ipac_dc_write,
+	.read_fifo  = ipac_dc_read_fifo,
+	.write_fifo = ipac_dc_write_fifo,
 };
 
 static u8
@@ -437,7 +435,7 @@ setup_sct_quadro(struct IsdnCard *card)
 
 	test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 
-	cs->dc_hw_ops = &isac_ops;
+	cs->dc_hw_ops = &ipac_dc_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &BKM_card_msg;
