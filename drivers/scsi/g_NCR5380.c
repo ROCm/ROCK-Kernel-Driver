@@ -527,8 +527,9 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
  *	Locks: none
  */
 
-int generic_NCR5380_biosparam(struct scsi_device *sdev,
-		struct block_device *bdev, sector_t capacity, int *ip)
+static int
+generic_NCR5380_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+			  sector_t capacity, int *ip)
 {
 	ip[0] = 64;
 	ip[1] = 32;
