@@ -26,7 +26,7 @@
 #include <sound/emu10k1_synth.h>
 
 /* emu10k1_patch.c */
-int snd_emu10k1_sample_new(snd_emux_t *private_data, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr, const void *_data, long count);
+int snd_emu10k1_sample_new(snd_emux_t *private_data, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr, const void __user *_data, long count);
 int snd_emu10k1_sample_free(snd_emux_t *private_data, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr);
 int snd_emu10k1_memhdr_init(snd_emux_t *emu);
 

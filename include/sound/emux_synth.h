@@ -63,7 +63,7 @@ typedef struct snd_emux_operators {
 	int (*sample_new)(snd_emux_t *emu, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr, const void *data, long count);
 	int (*sample_free)(snd_emux_t *emu, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr);
 	void (*sample_reset)(snd_emux_t *emu);
-	int (*load_fx)(snd_emux_t *emu, int type, int arg, const void *data, long count);
+	int (*load_fx)(snd_emux_t *emu, int type, int arg, const void __user *data, long count);
 	void (*sysex)(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_channel_set_t *chset);
 #ifdef CONFIG_SND_SEQUENCER_OSS
 	int (*oss_ioctl)(snd_emux_t *emu, int cmd, int p1, int p2);

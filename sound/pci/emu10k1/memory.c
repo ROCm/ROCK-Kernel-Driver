@@ -529,7 +529,7 @@ int snd_emu10k1_synth_bzero(emu10k1_t *emu, snd_util_memblk_t *blk, int offset, 
 /*
  * copy_from_user(blk + offset, data, size)
  */
-int snd_emu10k1_synth_copy_from_user(emu10k1_t *emu, snd_util_memblk_t *blk, int offset, const char *data, int size)
+int snd_emu10k1_synth_copy_from_user(emu10k1_t *emu, snd_util_memblk_t *blk, int offset, const char __user *data, int size)
 {
 	int page, nextofs, end_offset, temp, temp1;
 	void *ptr;

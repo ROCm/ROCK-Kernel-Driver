@@ -655,7 +655,7 @@ static soundfont_chorus_fx_t chorus_parm[SNDRV_EMU8000_CHORUS_NUMBERS] = {
 };
 
 /*exported*/ int
-snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void *buf, long len)
+snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void __user *buf, long len)
 {
 	soundfont_chorus_fx_t rec;
 	if (mode < SNDRV_EMU8000_CHORUS_PREDEFINED || mode >= SNDRV_EMU8000_CHORUS_NUMBERS) {
@@ -782,7 +782,7 @@ static struct reverb_cmd_pair {
 };
 
 /*exported*/ int
-snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void *buf, long len)
+snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void __user *buf, long len)
 {
 	soundfont_reverb_fx_t rec;
 
