@@ -642,41 +642,6 @@ static int Psi240i_Release(struct Scsi_Host *shost)
 }
 
 /****************************************************************
- *	Name:	Psi240i_Abort
- *
- *	Description:	Process the Abort command from the SCSI manager.
- *
- *	Parameters:		SCpnt - Pointer to SCSI command structure.
- *
- *	Returns:		Allways snooze.
- *
- ****************************************************************/
-int Psi240i_Abort (Scsi_Cmnd *SCpnt)
-	{
-	DEB (printk ("psi240i_abort\n"));
-	return SCSI_ABORT_SNOOZE;
-	}
-/****************************************************************
- *	Name:	Psi240i_Reset
- *
- *	Description:	Process the Reset command from the SCSI manager.
- *
- *	Parameters:		SCpnt - Pointer to SCSI command structure.
- *					flags - Flags about the reset command
- *
- *	Returns:		No active command at this time, so this means
- *					that each time we got some kind of response the
- *					last time through.  Tell the mid-level code to
- *					request sense information in order to decide what
- *					to do next.
- *
- ****************************************************************/
-int Psi240i_Reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
-	{
-	return SCSI_RESET_PUNT;
-	}
-
-/****************************************************************
  *	Name:	Psi240i_BiosParam
  *
  *	Description:	Process the biosparam request from the SCSI manager to
@@ -710,8 +675,6 @@ static Scsi_Host_Template driver_template = {
 	.detect			= Psi240i_Detect,
 	.release		= Psi240i_Release,
 	.queuecommand		= Psi240i_QueueCommand,
-	.abort	  		= Psi240i_Abort,
-	.reset	  		= Psi240i_Reset,
 	.bios_param	  	= Psi240i_BiosParam,
 	.can_queue	  	= 1,
 	.this_id	  	= -1,

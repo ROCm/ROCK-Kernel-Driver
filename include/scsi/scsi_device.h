@@ -30,6 +30,9 @@ enum scsi_device_state {
 				 * originate in the mid-layer) */
 	SDEV_OFFLINE,		/* Device offlined (by error handling or
 				 * user request */
+	SDEV_BLOCK,		/* Device blocked by scsi lld.  No scsi 
+				 * commands from user or midlayer should be issued
+				 * to the scsi lld. */
 };
 
 struct scsi_device {
@@ -106,6 +109,8 @@ struct scsi_device {
 	unsigned use_192_bytes_for_3f:1; /* ask for 192 bytes from page 0x3f */
 	unsigned no_start_on_add:1;	/* do not issue start on add */
 	unsigned allow_restart:1; /* issue START_UNIT in error handler */
+	unsigned no_uld_attach:1; /* disable connecting to upper level drivers */
+	unsigned select_no_atn:1;
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 
@@ -120,7 +125,7 @@ struct scsi_device {
 	struct class_device	transport_classdev;
 
 	enum scsi_device_state sdev_state;
-	unsigned long		transport_data[0];
+	unsigned long		sdev_data[0];
 } __attribute__((aligned(sizeof(unsigned long))));
 #define	to_scsi_device(d)	\
 	container_of(d, struct scsi_device, sdev_gendev)
@@ -128,6 +133,30 @@ struct scsi_device {
 	container_of(d, struct scsi_device, sdev_classdev)
 #define transport_class_to_sdev(class_dev) \
 	container_of(class_dev, struct scsi_device, transport_classdev)
+
+/*
+ * scsi_target: representation of a scsi target, for now, this is only
+ * used for single_lun devices. If no one has active IO to the target,
+ * starget_sdev_user is NULL, else it points to the active sdev.
+ */
+struct scsi_target {
+	struct scsi_device	*starget_sdev_user;
+	struct device		dev;
+	unsigned int		channel;
+	unsigned int		id; /* target id ... replace
+				     * scsi_device.id eventually */
+	struct class_device	transport_classdev;
+	unsigned long		create:1; /* signal that it needs to be added */
+	unsigned long		starget_data[0];
+} __attribute__((aligned(sizeof(unsigned long))));
+
+#define to_scsi_target(d)	container_of(d, struct scsi_target, dev)
+static inline struct scsi_target *scsi_target(struct scsi_device *sdev)
+{
+	return to_scsi_target(sdev->sdev_gendev.parent);
+}
+#define transport_class_to_starget(class_dev) \
+	container_of(class_dev, struct scsi_target, transport_classdev)
 
 extern struct scsi_device *__scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint, void *hostdata);
@@ -191,6 +220,8 @@ extern int scsi_device_set_state(struct scsi_device *sdev,
 				 enum scsi_device_state state);
 extern int scsi_device_quiesce(struct scsi_device *sdev);
 extern void scsi_device_resume(struct scsi_device *sdev);
+extern void scsi_target_quiesce(struct scsi_target *);
+extern void scsi_target_resume(struct scsi_target *);
 extern const char *scsi_device_state_name(enum scsi_device_state);
 static inline int scsi_device_online(struct scsi_device *sdev)
 {

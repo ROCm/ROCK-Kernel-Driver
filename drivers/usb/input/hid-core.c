@@ -926,6 +926,8 @@ static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 		case -ENOENT:
 		case -ESHUTDOWN:
 			return;
+		case -ETIMEDOUT:	/* NAK */
+			break;
 		default:		/* error */
 			warn("input irq status %d received", urb->status);
 	}
