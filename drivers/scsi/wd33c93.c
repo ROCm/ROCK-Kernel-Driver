@@ -2034,3 +2034,5 @@ void wd33c93_release(void)
 {
    MOD_DEC_USE_COUNT;
 }
+
+MODULE_LICENSE("GPL");
