@@ -95,6 +95,11 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 #define PBF_NOT_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) != 0)
 #define PBF_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) == 0)
 
+typedef struct xfs_bufhash {
+	struct list_head	bh_list;
+	spinlock_t		bh_lock;
+} xfs_bufhash_t;
+
 typedef struct xfs_buftarg {
 	dev_t			pbr_dev;
 	struct block_device	*pbr_bdev;
@@ -102,32 +107,35 @@ typedef struct xfs_buftarg {
 	unsigned int		pbr_bsize;
 	unsigned int		pbr_sshift;
 	size_t			pbr_smask;
+
+	/* per-device buffer hash table */
+	uint			bt_hashmask;
+	uint			bt_hashshift;
+	xfs_bufhash_t		*bt_hash;
 } xfs_buftarg_t;
 
 /*
  *	xfs_buf_t:  Buffer structure for page cache-based buffers
  *
  * This buffer structure is used by the page cache buffer management routines
- * to refer to an assembly of pages forming a logical buffer.  The actual
- * I/O is performed with buffer_head or bio structures, as required by drivers,
- * for drivers which do not understand this structure.  The buffer structure is
- * used on temporary basis only, and discarded when released.
- *
- * The real data storage is recorded in the page cache.  Metadata is
- * hashed to the inode for the block device on which the file system resides.
- * File data is hashed to the inode for the file.  Pages which are only
- * partially filled with data have bits set in their block_map entry
- * to indicate which disk blocks in the page are not valid.
+ * to refer to an assembly of pages forming a logical buffer.  The actual I/O
+ * is performed with buffer_head structures, as required by drivers.
+ * 
+ * The buffer structure is used on temporary basis only, and discarded when
+ * released.  The real data storage is recorded in the page cache.  Metadata is
+ * hashed to the block device on which the file system resides.
  */
 
 struct xfs_buf;
+
+/* call-back function on I/O completion */
 typedef void (*page_buf_iodone_t)(struct xfs_buf *);
-			/* call-back function on I/O completion */
+/* call-back function on I/O completion */
 typedef void (*page_buf_relse_t)(struct xfs_buf *);
-			/* call-back function on I/O completion */
+/* pre-write function */
 typedef int (*page_buf_bdstrat_t)(struct xfs_buf *);
 
-#define PB_PAGES	4
+#define PB_PAGES	2
 
 typedef struct xfs_buf {
 	struct semaphore	pb_sema;	/* semaphore for lockables  */
@@ -136,8 +144,9 @@ typedef struct xfs_buf {
 	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 	struct list_head	pb_list;
 	page_buf_flags_t	pb_flags;	/* status flags */
-	struct list_head	pb_hash_list;
-	xfs_buftarg_t		*pb_target;	/* logical object */
+	struct list_head	pb_hash_list;	/* hash table list */
+	xfs_bufhash_t		*pb_hash;	/* hash table list start */
+	xfs_buftarg_t		*pb_target;	/* buffer target (device) */
 	atomic_t		pb_hold;	/* reference count */
 	xfs_daddr_t		pb_bn;		/* block number for I/O */
 	loff_t			pb_file_offset;	/* offset in file */
@@ -154,10 +163,9 @@ typedef struct xfs_buf {
 	void			*pb_fspriv2;
 	void			*pb_fspriv3;
 	unsigned short		pb_error;	/* error code on I/O */
-	unsigned short		pb_page_count;	/* size of page array */
-	unsigned short		pb_offset;	/* page offset in first page */
-	unsigned char		pb_locked;	/* page array is locked */
-	unsigned char		pb_hash_index;	/* hash table index	*/
+ 	unsigned short		pb_locked;	/* page array is locked */
+ 	unsigned int		pb_page_count;	/* size of page array */
+	unsigned int		pb_offset;	/* page offset in first page */
 	struct page		**pb_pages;	/* array of page pointers */
 	struct page		*pb_page_array[PB_PAGES]; /* inline pages */
 #ifdef PAGEBUF_LOCK_TRACKING
@@ -455,7 +463,7 @@ extern inline xfs_caddr_t xfs_buf_offset(xfs_buf_t *bp, size_t offset)
 				pagebuf_associate_memory(bp, val, count)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
-			((bp)->pb_bn = (blk))
+			((bp)->pb_bn = (xfs_daddr_t)(blk))
 #define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset)
 #define XFS_BUF_SET_OFFSET(bp, off)		\
 			((bp)->pb_file_offset = (off))
@@ -564,7 +572,7 @@ static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
  *	Handling of buftargs.
  */
 
-extern xfs_buftarg_t *xfs_alloc_buftarg(struct block_device *);
+extern xfs_buftarg_t *xfs_alloc_buftarg(struct block_device *, int);
 extern void xfs_free_buftarg(xfs_buftarg_t *, int);
 extern void xfs_wait_buftarg(xfs_buftarg_t *);
 extern int xfs_setsize_buftarg(xfs_buftarg_t *, unsigned int, unsigned int);

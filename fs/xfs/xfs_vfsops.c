@@ -252,6 +252,7 @@ xfs_start_flags(
 			ap->logbufsize);
 		return XFS_ERROR(EINVAL);
 	}
+	mp->m_ihsize = ap->ihashsize;
 	mp->m_logbsize = ap->logbufsize;
 	mp->m_fsname_len = strlen(ap->fsname) + 1;
 	mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
@@ -468,19 +469,19 @@ xfs_mount(
 	 * Setup xfs_mount buffer target pointers
 	 */
 	error = ENOMEM;
-	mp->m_ddev_targp = xfs_alloc_buftarg(ddev);
+	mp->m_ddev_targp = xfs_alloc_buftarg(ddev, 0);
 	if (!mp->m_ddev_targp) {
 		xfs_blkdev_put(logdev);
 		xfs_blkdev_put(rtdev);
 		return error;
 	}
 	if (rtdev) {
-		mp->m_rtdev_targp = xfs_alloc_buftarg(rtdev);
+		mp->m_rtdev_targp = xfs_alloc_buftarg(rtdev, 1);
 		if (!mp->m_rtdev_targp)
 			goto error0;
 	}
 	mp->m_logdev_targp = (logdev && logdev != ddev) ?
-				xfs_alloc_buftarg(logdev) : mp->m_ddev_targp;
+				xfs_alloc_buftarg(logdev, 1) : mp->m_ddev_targp;
 	if (!mp->m_logdev_targp)
 		goto error0;
 
@@ -1579,7 +1580,7 @@ xfs_syncsub(
 }
 
 /*
- * xfs_vget - called by DMAPI to get vnode from file handle
+ * xfs_vget - called by DMAPI and NFSD to get vnode from file handle
  */
 STATIC int
 xfs_vget(
@@ -1621,7 +1622,7 @@ xfs_vget(
 		return XFS_ERROR(EIO);
 	}
 
-	if (ip->i_d.di_mode == 0 || (igen && (ip->i_d.di_gen != igen))) {
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
 		xfs_iput_new(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return XFS_ERROR(ENOENT);
@@ -1646,6 +1647,7 @@ xfs_vget(
 #define MNTOPT_SWIDTH	"swidth"	/* data volume stripe width */
 #define MNTOPT_NOUUID	"nouuid"	/* ignore filesystem UUID */
 #define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
+#define MNTOPT_IHASHSIZE    "ihashsize"    /* size of inode hash table */
 #define MNTOPT_NORECOVERY   "norecovery"   /* don't run XFS recovery */
 #define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
@@ -1734,6 +1736,13 @@ xfs_parseargs(
 			iosize = simple_strtoul(value, &eov, 10);
 			args->flags |= XFSMNT_IOSIZE;
 			args->iosizelog = (uint8_t) iosize;
+		} else if (!strcmp(this_char, MNTOPT_IHASHSIZE)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					this_char); 
+				return EINVAL;
+			}
+			args->ihashsize = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
 			args->flags |= XFSMNT_WSYNC;
 		} else if (!strcmp(this_char, MNTOPT_OSYNCISOSYNC)) {

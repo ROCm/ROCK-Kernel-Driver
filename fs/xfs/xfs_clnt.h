@@ -64,6 +64,7 @@ struct xfs_mount_args {
 	int	sunit;		/* stripe unit (BBs) */
 	int	swidth;		/* stripe width (BBs), multiple of sunit */
 	uchar_t iosizelog;	/* log2 of the preferred I/O size */
+	int	ihashsize;	/* inode hash table size (buckets) */
 };
 
 /*

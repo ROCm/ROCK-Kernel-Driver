@@ -199,7 +199,6 @@ vn_revalidate_core(
 {
 	struct inode	*inode = LINVFS_GET_IP(vp);
 
-	inode = LINVFS_GET_IP(vp);
 	inode->i_mode	    = VTTOIF(vap->va_type) | vap->va_mode;
 	inode->i_nlink	    = vap->va_nlink;
 	inode->i_uid	    = vap->va_uid;
@@ -416,8 +415,8 @@ vn_remove(
 /*  3 */		(void *)(vn_count(vp)), \
 /*  4 */		(void *)(ra),				\
 /*  5 */		(void *)(__psunsigned_t)(vp)->v_flag,	\
-/*  6 */		(void *)(__psint_t)smp_processor_id(),	\
-/*  7 */		(void *)(__psint_t)(current->pid),	\
+/*  6 */		(void *)(__psint_t)current_cpu(),	\
+/*  7 */		(void *)(__psint_t)current_pid(),	\
 /*  8 */		(void *)__return_address,		\
 /*  9 */		0, 0, 0, 0, 0, 0, 0)
 
