@@ -390,7 +390,7 @@ irqProceed:;
 	OpDone (SCpnt, DID_OK << 16);
 
 irq_return:
-    spin_unlock_irqrestore(&shost->host_lock, flags);
+    spin_unlock_irqrestore(shost->host_lock, flags);
 out:;
 }
 /****************************************************************
@@ -407,11 +407,11 @@ out:;
 int Pci2000_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	{
 	UCHAR		   *cdb = (UCHAR *)SCpnt->cmnd;					// Pointer to SCSI CDB
-	PADAPTER2000	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
+	PADAPTER2000	padapter = HOSTDATA(SCpnt->device->host);			// Pointer to adapter control structure
 	int				rc		 = -1;								// command return code
-	UCHAR			bus		 = SCpnt->channel;
-	UCHAR			pun		 = SCpnt->target;
-	UCHAR			lun		 = SCpnt->lun;
+	UCHAR			bus		 = SCpnt->device->channel;
+	UCHAR			pun		 = SCpnt->device->id;
+	UCHAR			lun		 = SCpnt->device->lun;
 	UCHAR			cmd;
 	PDEV2000		pdev	 = &padapter->dev[bus][pun];
 
@@ -506,13 +506,16 @@ int Pci2000_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 			
 			if ( SCpnt->use_sg )
 				{
-				SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev, ((struct scatterlist *)SCpnt->request_buffer)->address, 
-										  SCpnt->request_bufflen, scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
+				SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev,
+									  ((struct scatterlist *)SCpnt->request_buffer)->address,
+									  SCpnt->request_bufflen,
+									  scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
 				}
 			else
 				{
-				SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev, SCpnt->request_buffer, 
-										  SCpnt->request_bufflen, scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
+				SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev, SCpnt->request_buffer,
+									  SCpnt->request_bufflen,
+									  scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
 				}
 			outl (SCpnt->SCp.have_data_in, padapter->mb2);
 			outl (SCpnt->request_bufflen, padapter->mb3);

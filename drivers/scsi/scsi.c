@@ -371,7 +371,7 @@ busy:
 
 found:
 	scmnd->request = NULL;
-	atomic_inc(&scmnd->host->host_active);
+	atomic_inc(&scmnd->device->host->host_active);
 	atomic_inc(&scmnd->device->device_active);
 
 	scmnd->buffer  = NULL;
@@ -398,8 +398,8 @@ found:
 	spin_unlock_irqrestore(&device_request_lock, flags);
 
 	SCSI_LOG_MLQUEUE(5, printk("Activating command for device %d (%d)\n",
-				scmnd->target,
-				atomic_read(&scmnd->host->host_active)));
+				scmnd->device->id,
+				atomic_read(&scmnd->device->host->host_active)));
 
 	return scmnd;
 
@@ -421,13 +421,13 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 	SCpnt->request = NULL;
 	SCpnt->state = SCSI_STATE_UNUSED;
 	SCpnt->owner = SCSI_OWNER_NOBODY;
-	atomic_dec(&SCpnt->host->host_active);
+	atomic_dec(&SCpnt->device->host->host_active);
 	atomic_dec(&SDpnt->device_active);
 
 	SCSI_LOG_MLQUEUE(5, printk("Deactivating command for device %d (active=%d, failed=%d)\n",
-				   SCpnt->target,
-				   atomic_read(&SCpnt->host->host_active),
-				   SCpnt->host->host_failed));
+				   SCpnt->device->id,
+				   atomic_read(&SCpnt->device->host->host_active),
+				   SCpnt->device->host->host_failed));
 
 	if(SDpnt->current_queue_depth > SDpnt->new_queue_depth) {
 		Scsi_Cmnd *prev, *next;
@@ -471,11 +471,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 		if(newSCpnt) {
 			memset(newSCpnt, 0, sizeof(Scsi_Cmnd));
 			init_timer(&newSCpnt->eh_timeout);
-			newSCpnt->host = SDpnt->host;
 			newSCpnt->device = SDpnt;
-			newSCpnt->target = SDpnt->id;
-			newSCpnt->lun = SDpnt->lun;
-			newSCpnt->channel = SDpnt->channel;
 			newSCpnt->request = NULL;
 			newSCpnt->use_sg = 0;
 			newSCpnt->old_use_sg = 0;
@@ -522,7 +518,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
  */
 int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 {
-	struct Scsi_Host *host = cmd->host;
+	struct Scsi_Host *host = cmd->device->host;
 	struct scsi_device *device = cmd->device;
 
 	SCSI_LOG_MLQUEUE(1,
@@ -649,7 +645,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 #endif
 #endif
 
-	host = SCpnt->host;
+	host = SCpnt->device->host;
 
 	ASSERT_LOCK(host->host_lock, 0);
 
@@ -663,7 +659,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 	 */
 	if (SCpnt->device->scsi_level <= SCSI_2)
 		SCpnt->cmnd[1] = (SCpnt->cmnd[1] & 0x1f) |
-			(SCpnt->lun << 5 & 0xe0);
+			(SCpnt->device->lun << 5 & 0xe0);
 
 	/*
 	 * We will wait MIN_RESET_DELAY clock ticks after the last reset so
@@ -695,7 +691,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 	 */
 	SCSI_LOG_MLQUEUE(3, printk("scsi_dispatch_cmnd (host = %d, channel = %d, target = %d, "
 	       "command = %p, buffer = %p, \nbufflen = %d, done = %p)\n",
-	SCpnt->host->host_no, SCpnt->channel, SCpnt->target, SCpnt->cmnd,
+	SCpnt->device->host->host_no, SCpnt->device->channel, SCpnt->device->id, SCpnt->cmnd,
 			    SCpnt->buffer, SCpnt->bufflen, SCpnt->done));
 
 	SCpnt->state = SCSI_STATE_QUEUED;
@@ -707,7 +703,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		 * Before we queue this command, check if the command
 		 * length exceeds what the host adapter can handle.
 		 */
-		if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
+		if (CDB_SIZE(SCpnt) <= SCpnt->device->host->max_cmd_len) {
 			spin_lock_irqsave(host->host_lock, flags);
 			rtn = host->hostt->queuecommand(SCpnt, scsi_done);
 			spin_unlock_irqrestore(host->host_lock, flags);
@@ -816,12 +812,11 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
 	SCSI_LOG_MLQUEUE(4,
 			 {
 			 int i;
-			 int target = SDpnt->id;
 			 int size = COMMAND_SIZE(((const unsigned char *)cmnd)[0]);
 			 printk("scsi_do_req (host = %d, channel = %d target = %d, "
 		    "buffer =%p, bufflen = %d, done = %p, timeout = %d, "
 				"retries = %d)\n"
-				"command : ", host->host_no, SDpnt->channel, target, buffer,
+				"command : ", host->host_no, SDpnt->channel, SDpnt->id, buffer,
 				bufflen, done, timeout, retries);
 			 for (i	 = 0; i < size; ++i)
 			 	printk("%02x  ", ((unsigned char *) cmnd)[i]);
@@ -906,7 +901,7 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
  */
 void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 {
-	struct Scsi_Host *host = SCpnt->host;
+	struct Scsi_Host *host = SCpnt->device->host;
 
 	ASSERT_LOCK(host->host_lock, 0);
 
@@ -995,7 +990,7 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 	      void *buffer, unsigned bufflen, void (*done) (Scsi_Cmnd *),
 		 int timeout, int retries)
 {
-	struct Scsi_Host *host = SCpnt->host;
+	struct Scsi_Host *host = SCpnt->device->host;
 
 	ASSERT_LOCK(host->host_lock, 0);
 
@@ -1005,12 +1000,12 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 	SCSI_LOG_MLQUEUE(4,
 			 {
 			 int i;
-			 int target = SCpnt->target;
 			 int size = COMMAND_SIZE(((const unsigned char *)cmnd)[0]);
 			 printk("scsi_do_cmd (host = %d, channel = %d target = %d, "
 		    "buffer =%p, bufflen = %d, done = %p, timeout = %d, "
 				"retries = %d)\n"
-				"command : ", host->host_no, SCpnt->channel, target, buffer,
+				"command : ", host->host_no, SCpnt->device->channel,
+				SCpnt->device->id, buffer,
 				bufflen, done, timeout, retries);
 			 for (i = 0; i < size; ++i)
 			 	printk("%02x  ", ((unsigned char *) cmnd)[i]);
@@ -1180,8 +1175,8 @@ static void scsi_softirq(struct softirq_action *h)
 				/*
 				 * Add to BH queue.
 				 */
-				SCSI_LOG_MLCOMPLETE(3, printk("Command finished %d %d 0x%x\n", SCpnt->host->host_busy,
-						SCpnt->host->host_failed,
+				SCSI_LOG_MLCOMPLETE(3, printk("Command finished %d %d 0x%x\n", SCpnt->device->host->host_busy,
+						SCpnt->device->host->host_failed,
 							 SCpnt->result));
 
 				scsi_finish_command(SCpnt);
@@ -1194,8 +1189,8 @@ static void scsi_softirq(struct softirq_action *h)
 				 * track of the number of tries, so we don't
 				 * end up looping, of course.
 				 */
-				SCSI_LOG_MLCOMPLETE(3, printk("Command needs retry %d %d 0x%x\n", SCpnt->host->host_busy,
-				SCpnt->host->host_failed, SCpnt->result));
+				SCSI_LOG_MLCOMPLETE(3, printk("Command needs retry %d %d 0x%x\n", SCpnt->device->host->host_busy,
+				SCpnt->device->host->host_failed, SCpnt->result));
 
 				scsi_retry_command(SCpnt);
 				break;
@@ -1221,9 +1216,9 @@ static void scsi_softirq(struct softirq_action *h)
 				 */
 				SCSI_LOG_MLCOMPLETE(3, printk("Command failed %p %x active=%d busy=%d failed=%d\n",
 						    SCpnt, SCpnt->result,
-				  atomic_read(&SCpnt->host->host_active),
-						  SCpnt->host->host_busy,
-					      SCpnt->host->host_failed));
+				  atomic_read(&SCpnt->device->host->host_active),
+						  SCpnt->device->host->host_busy,
+					      SCpnt->device->host->host_failed));
 
 				/*
 				 * Dump the sense information too.
@@ -1231,12 +1226,12 @@ static void scsi_softirq(struct softirq_action *h)
 				if ((status_byte(SCpnt->result) & CHECK_CONDITION) != 0) {
 					SCSI_LOG_MLCOMPLETE(3, print_sense("bh", SCpnt));
 				}
-				if (SCpnt->host->eh_wait != NULL) {
+				if (SCpnt->device->host->eh_wait != NULL) {
 					scsi_eh_eflags_set(SCpnt, SCSI_EH_CMD_FAILED | SCSI_EH_CMD_ERR);
 					SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
 					SCpnt->state = SCSI_STATE_FAILED;
 
-					scsi_host_failed_inc_and_test(SCpnt->host);
+					scsi_host_failed_inc_and_test(SCpnt->device->host);
 				} else {
 					/*
 					 * We only get here if the error
@@ -1288,7 +1283,7 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	Scsi_Device *device;
 	Scsi_Request * SRpnt;
 
-	host = SCpnt->host;
+	host = SCpnt->device->host;
 	device = SCpnt->device;
 
 	ASSERT_LOCK(host->host_lock, 0);
@@ -1409,11 +1404,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 
 	memset(SCpnt, 0, sizeof(Scsi_Cmnd));
 	init_timer(&SCpnt->eh_timeout);
-	SCpnt->host = SDpnt->host;
 	SCpnt->device = SDpnt;
-	SCpnt->target = SDpnt->id;
-	SCpnt->lun = SDpnt->lun;
-	SCpnt->channel = SDpnt->channel;
 	SCpnt->request = NULL;
 	SCpnt->use_sg = 0;
 	SCpnt->old_use_sg = 0;
@@ -1955,6 +1946,7 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
+	struct list_head spnt, *prev_spnt;
 	
 
 	/*

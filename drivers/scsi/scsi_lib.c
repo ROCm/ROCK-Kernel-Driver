@@ -428,7 +428,7 @@ static void scsi_release_buffers(Scsi_Cmnd * SCpnt)
 {
 	struct request *req = SCpnt->request;
 
-	ASSERT_LOCK(SCpnt->host->host_lock, 0);
+	ASSERT_LOCK(SCpnt->device->host->host_lock, 0);
 
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
@@ -653,8 +653,8 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 		case MEDIUM_ERROR:
 		case VOLUME_OVERFLOW:
 			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
-			       SCpnt->host->host_no, (int) SCpnt->channel,
-			       (int) SCpnt->target, (int) SCpnt->lun);
+			       SCpnt->device->host->host_no, (int) SCpnt->device->channel,
+			       (int) SCpnt->device->id, (int) SCpnt->device->lun);
 			print_command(SCpnt->data_cmnd);
 			print_sense("sd", SCpnt);
 			SCpnt = scsi_end_request(SCpnt, 0, block_sectors, 1);

@@ -729,9 +729,12 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
       case CPQFC_IOCTL_FC_TARGET_ADDRESS:
 	// can we find an FC device mapping to this SCSI target?
-	DumCmnd.channel = ScsiDev->channel;		// For searching
-	DumCmnd.target  = ScsiDev->id;
-	DumCmnd.lun     = ScsiDev->lun;
+/* 	DumCmnd.channel = ScsiDev->channel; */		// For searching
+/* 	DumCmnd.target  = ScsiDev->id; */
+/* 	DumCmnd.lun     = ScsiDev->lun; */
+
+        DumCmnd.device = ScsiDev;
+	
 	pLoggedInPort = fcFindLoggedInPort( fcChip,
 		&DumCmnd, // search Scsi Nexus
 		0,        // DON'T search linked list for FC port id
@@ -1296,7 +1299,7 @@ static void QueBadTargetCmnd( CPQFCHBA *cpqfcHBAdata, Scsi_Cmnd *Cmnd)
 
 int cpqfcTS_queuecommand(Scsi_Cmnd *Cmnd, void (* done)(Scsi_Cmnd *))
 {
-  struct Scsi_Host *HostAdapter = Cmnd->host;
+  struct Scsi_Host *HostAdapter = Cmnd->device->host;
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
   TachFCHDR_GCMND fchs;  // only use for FC destination id field  
@@ -1352,9 +1355,9 @@ int cpqfcTS_queuecommand(Scsi_Cmnd *Cmnd, void (* done)(Scsi_Cmnd *))
 //    printk(" @Q bad targ cmnd %p@ ", Cmnd);
       QueBadTargetCmnd( cpqfcHBAdata, Cmnd);
     }
-    else if (Cmnd->lun >= CPQFCTS_MAX_LUN)
+    else if (Cmnd->device->lun >= CPQFCTS_MAX_LUN)
     {
-      printk(KERN_WARNING "cpqfc: Invalid LUN: %d\n", Cmnd->lun);
+      printk(KERN_WARNING "cpqfc: Invalid LUN: %d\n", Cmnd->device->lun);
       QueBadTargetCmnd( cpqfcHBAdata, Cmnd);
     } 
 
@@ -1474,7 +1477,7 @@ int cpqfcTS_abort(Scsi_Cmnd *Cmnd)
 int cpqfcTS_eh_abort(Scsi_Cmnd *Cmnd)
 {
 
-  struct Scsi_Host *HostAdapter = Cmnd->host;
+  struct Scsi_Host *HostAdapter = Cmnd->device->host;
   // get the pointer to our Scsi layer HBA buffer  
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
@@ -1667,9 +1670,9 @@ int cpqfcTS_eh_device_reset(Scsi_Cmnd *Cmnd)
   int retval;
   Scsi_Device *SDpnt = Cmnd->device;
   // printk("   ENTERING cpqfcTS_eh_device_reset() \n");
-  spin_unlock_irq(Cmnd->host->host_lock);
+  spin_unlock_irq(Cmnd->device->host->host_lock);
   retval = cpqfcTS_TargetDeviceReset( SDpnt, 0);
-  spin_lock_irq(Cmnd->host->host_lock);
+  spin_lock_irq(Cmnd->device->host->host_lock);
   return retval;
 }
 
