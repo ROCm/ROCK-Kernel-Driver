@@ -9,6 +9,7 @@
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
 #include <linux/sysctl.h>
+#include <linux/highmem.h>
 
 const unsigned long hugetlb_zero = 0, hugetlb_infinity = ~0UL;
 static unsigned long nr_huge_pages, free_huge_pages;
@@ -66,6 +67,7 @@ void free_huge_page(struct page *page)
 struct page *alloc_huge_page(void)
 {
 	struct page *page;
+	int i;
 
 	spin_lock(&hugetlb_lock);
 	page = dequeue_huge_page();
@@ -77,7 +79,8 @@ struct page *alloc_huge_page(void)
 	spin_unlock(&hugetlb_lock);
 	set_page_count(page, 1);
 	page->lru.prev = (void *)free_huge_page;
-	memset(page_address(page), 0, HPAGE_SIZE);
+	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
+		clear_highpage(&page[i]);
 	return page;
 }
 
