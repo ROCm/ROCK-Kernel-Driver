@@ -264,7 +264,7 @@ MODULE_PARM_DESC(proc_perm, "The permission bits of the files in /proc");
 
 /* This is a kind of sloppy hack to get this information to OUT4500 and
    IN4500.  I would be extremely interested in the situation where this
-   doesnt work though!!! */
+   doesn't work though!!! */
 static int do8bitIO = 0;
 
 /* Return codes */
@@ -3653,7 +3653,7 @@ static struct net_device_list {
 	struct net_device_list *next;
 } *airo_devices = 0;
 
-/* Since the card doesnt automatically switch to the right WEP mode,
+/* Since the card doesn't automatically switch to the right WEP mode,
    we will make it do it.  If the card isn't associated, every secs we
    will switch WEP modes to see if that will help.  If the card is
    associated we will check every minute to see if anything has
