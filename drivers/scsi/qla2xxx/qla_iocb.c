@@ -43,7 +43,7 @@ qla2x00_get_cmd_direction(struct scsi_cmnd *cmd)
 	else if (cmd->sc_data_direction == DMA_FROM_DEVICE)
 		cflags = CF_READ;
 	else {
-		switch (cmd->data_cmnd[0]) {
+		switch (cmd->cmnd[0]) {
 		case WRITE_6:
 		case WRITE_10:
 		case WRITE_12:
