@@ -696,6 +696,11 @@ static int parse_options (char * options, unsigned long * sb_block,
 				*mount_options &= ~EXT3_MOUNT_DATA_FLAGS;
 				*mount_options |= data_opt;
 			}
+		} else if (!strcmp (this_char, "commit")) {
+			unsigned long v;
+			if (want_numeric(value, "commit", &v))
+				return 0;
+			sbi->s_commit_interval = (HZ * v);
 		} else {
 			printk (KERN_ERR 
 				"EXT3-fs: Unrecognized mount option %s\n",
@@ -1260,6 +1265,22 @@ out_fail:
 	return -EINVAL;
 }
 
+/*
+ * Setup any per-fs journal parameters now.  We'll do this both on
+ * initial mount, once the journal has been initialised but before we've
+ * done any recovery; and again on any subsequent remount. 
+ */
+static void ext3_init_journal_params(struct ext3_sb_info *sbi, 
+				     journal_t *journal)
+{
+	if (sbi->s_commit_interval)
+		journal->j_commit_interval = sbi->s_commit_interval;
+	/* We could also set up an ext3-specific default for the commit
+	 * interval here, but for now we'll just fall back to the jbd
+	 * default. */
+}
+
+
 static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 {
 	struct inode *journal_inode;
@@ -1294,7 +1315,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 		printk(KERN_ERR "EXT3-fs: Could not load journal inode\n");
 		iput(journal_inode);
 	}
-	
+	ext3_init_journal_params(EXT3_SB(sb), journal);
 	return journal;
 }
 
@@ -1371,6 +1392,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 		goto out_journal;
 	}
 	EXT3_SB(sb)->journal_bdev = bdev;
+	ext3_init_journal_params(EXT3_SB(sb), journal);
 	return journal;
 out_journal:
 	journal_destroy(journal);
@@ -1667,6 +1689,8 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 
 	es = sbi->s_es;
 
+	ext3_init_journal_params(sbi, sbi->s_journal);
+	
 	if ((*flags & MS_RDONLY) != (sb->s_flags & MS_RDONLY)) {
 		if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)
 			return -EROFS;
