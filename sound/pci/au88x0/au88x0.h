@@ -80,8 +80,8 @@
 #define VORTEX_IS_QUAD(x) ((x->codec == NULL) ?  0 : (x->codec->ext_id|0x80))
 /* Check if chip has bug. */
 #define IS_BAD_CHIP(x) (\
-	(x->rev < 3 && x->device == PCI_DEVICE_ID_AUREAL_VORTEX) || \
-	(x->rev < 0xfe && x->device == PCI_DEVICE_ID_AUREAL_VORTEX2) || \
+	(x->rev < 3 && x->device == PCI_DEVICE_ID_AUREAL_VORTEX_1) || \
+	(x->rev < 0xfe && x->device == PCI_DEVICE_ID_AUREAL_VORTEX_2) || \
 	(x->rev < 0xfe && x->device == PCI_DEVICE_ID_AUREAL_ADVANTAGE))
 
 
