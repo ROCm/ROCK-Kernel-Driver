@@ -519,7 +519,6 @@ static struct xfrm_policy *__xfrm_policy_unlink(struct xfrm_policy *pol,
 	     *polp != NULL; polp = &(*polp)->next) {
 		if (*polp == pol) {
 			*polp = pol->next;
-			atomic_dec(&pol->refcnt);
 			return pol;
 		}
 	}
@@ -574,6 +573,7 @@ static struct xfrm_policy *clone_policy(struct xfrm_policy *old, int dir)
 		write_lock_bh(&xfrm_policy_lock);
 		__xfrm_policy_link(newp, XFRM_POLICY_MAX+dir);
 		write_unlock_bh(&xfrm_policy_lock);
+		xfrm_pol_put(newp);
 	}
 	return newp;
 }

@@ -831,6 +831,7 @@ int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
 
 	if (err >= 0) {
 		xfrm_sk_policy_insert(sk, err, pol);
+		xfrm_pol_put(pol);
 		err = 0;
 	}
 
