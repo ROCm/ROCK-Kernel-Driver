@@ -571,5 +571,10 @@ config IUCV
 	  vehicle networking under VM or VIF.  This option is also available
 	  as a module which will be called iucv.o. If unsure, say "Y".
 
+config CCWGROUP
+ 	tristate
+ 	depends on LCS || CTC
+	default m if LCS!=y && CTC!=y
+	default y if LCS=y || CTC=y
 endmenu
 
