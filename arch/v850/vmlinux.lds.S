@@ -41,6 +41,7 @@
 			*(.rodata)					      \
 		. = ALIGN (0x4) ;					      \
 			*(.kstrtab)					      \
+			*(__vermagic)					      \
 		. = ALIGN (4) ;						      \
 		    	*(.call_table_data)				      \
 			*(.call_table_text)				      \

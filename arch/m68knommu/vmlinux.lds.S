@@ -224,6 +224,7 @@ SECTIONS {
 
 		. = ALIGN(0x4) ;
 		*(.kstrtab)
+		*(__vermagic)
 
 		. = ALIGN(16);          /* Exception table              */
 		__start___ex_table = .;

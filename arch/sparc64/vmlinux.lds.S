@@ -43,6 +43,7 @@ SECTIONS
   __gpl_ksymtab : { *(__gpl_ksymtab) }
   __stop___gpl_ksymtab = .;
   __kstrtab  : { *(.kstrtab) }
+  __vermagic : { *(__vermagic) }
   __start___kallsyms = .;	/* All kernel symbols */
   __kallsyms : { *(__kallsyms) }
   __stop___kallsyms = .;

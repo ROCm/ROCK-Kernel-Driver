@@ -47,6 +47,7 @@ SECTIONS
     *(.rodata1)
   }
   .kstrtab   : { *(.kstrtab) }
+  __vermagic : { *(__vermagic) }
   .fini      : { *(.fini)    } =0
   .ctors     : { *(.ctors)   }
   .dtors     : { *(.dtors)   }

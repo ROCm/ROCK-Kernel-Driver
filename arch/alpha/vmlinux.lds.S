@@ -47,6 +47,7 @@ SECTIONS
   }
 
   .kstrtab : { *(.kstrtab) }
+  __vermagic : { *(__vermagic) }
   .rodata : { *(.rodata) *(.rodata.*) }
 
   /* Startup code */
