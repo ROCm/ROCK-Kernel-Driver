@@ -537,18 +537,10 @@ int RivaGetConfig(RIVA_HW_INST *, unsigned int);
  * FIFO Free Count. Should attempt to yield processor if RIVA is busy.
  */
 
-/*
- * The mb()'s work around some lockup problems I experienced with some
- * GeForceII MX cards, neither I nor Mark Vojkovich knows for sure what's
- * going on there. --BenH
- */ 
 #define RIVA_FIFO_FREE(hwinst,hwptr,cnt)                            \
 {                                                                   \
-    while ((hwinst).FifoFreeCount < (cnt)) {                        \
-    	mb();                                                       \
-    	mb();	                                                    \
+    while ((hwinst).FifoFreeCount < (cnt))                          \
         (hwinst).FifoFreeCount = (hwinst).hwptr->FifoFree >> 2;     \
-    }                                                               \
     (hwinst).FifoFreeCount -= (cnt);                                \
 }
 #endif /* __RIVA_HW_H__ */

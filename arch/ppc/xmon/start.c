@@ -35,22 +35,6 @@ static int via_modem;
 static int xmon_use_sccb;
 static struct device_node *channel_node;
 
-/* There are used when hooked via firewire */
-#ifdef CONFIG_XMON_FW
-volatile unsigned int xmon_fw_outbuf_size;
-volatile unsigned char xmon_fw_outbuf[1024];
-volatile unsigned int xmon_fw_oflags;
-volatile unsigned int xmon_fw_iflags;
-volatile unsigned int xmon_fw_idata;
-volatile unsigned int xmon_fw_kick;
-#define XMON_FW_FLAGS_OUT_ENTERED	0x00000001
-#define XMON_FW_FLAGS_OUT_DATA		0x00000002
-#define XMON_FW_FLAGS_OUT_ACK		0x00000004
-#define XMON_FW_FLAGS_IN_ATTACHED	0x00000001
-#define XMON_FW_FLAGS_IN_DATA		0x00000002
-#define XMON_FW_FLAGS_IN_ACK		0x00000004
-#endif /* CONFIG_XMON_FW */
-
 #define TB_SPEED	25000000
 
 static inline unsigned int readtb(void)
@@ -255,98 +239,6 @@ static inline void do_poll_adb(void)
 #endif /* CONFIG_ADB_CUDA */
 }
 
-#ifdef CONFIG_XMON_FW
-static int
-xmon_fw_write(void* ptr, int nb)
-{
-	char* p = (char *)ptr;
-	int c, i;
-
-	while (nb && (xmon_fw_iflags & XMON_FW_FLAGS_IN_ATTACHED)) {
-		c = (nb > 1024) ? 1024 : nb;
-		memcpy((void *)xmon_fw_outbuf, p, c);
-		xmon_fw_outbuf_size = c;
-		wmb();
-		xmon_fw_oflags |= XMON_FW_FLAGS_OUT_DATA;
-		wmb();
-		for (i=0; i<1000000; i++) {
-			rmb();
-			if (xmon_fw_iflags & XMON_FW_FLAGS_IN_ACK)
-				break;
-			udelay(1);
-		}
-		xmon_fw_oflags &= ~XMON_FW_FLAGS_OUT_DATA;
-		wmb();
-		if ((xmon_fw_iflags & XMON_FW_FLAGS_IN_ACK) == 0) {
-			xmon_fw_iflags = 0;
-			break;
-		}
-		for (i=0; i<1000000; i++) {
-			rmb();
-			if ((xmon_fw_iflags & XMON_FW_FLAGS_IN_ACK) == 0)
-				break;
-			udelay(1);
-		}
-		if ((xmon_fw_iflags & XMON_FW_FLAGS_IN_ACK) != 0) {
-			xmon_fw_iflags = 0;
-			break;
-		}
-		nb -= c;
-		p += c;
-	}
-	return (xmon_fw_iflags & XMON_FW_FLAGS_IN_ATTACHED) != 0;
-}
-
-static int
-xmon_fw_read(void* ptr, int nb)
-{
-	int t, on, i;
-	unsigned int k;
-	char c[3];
-	char* p = (char *)ptr;
-	
-	while (nb) {
-		t = 0;
-		on = 0;
-		while(xmon_fw_iflags & XMON_FW_FLAGS_IN_ATTACHED) {
-			if (xmon_fw_iflags & XMON_FW_FLAGS_IN_DATA)
-				break;
-			if (--t < 0) {
-				on = 1 - on;
-				c[0] = on? 0xdb: 0x20;
-				c[1] = '\b';
-				if (!xmon_fw_write(c, 2))
-					break;
-				t = 2000000;
-			}
-			rmb();
-		}
-		k = xmon_fw_idata & 0xff;
-		xmon_fw_oflags |= XMON_FW_FLAGS_OUT_ACK;
-		wmb();
-		for (i=0; i<1000000; i++) {
-			rmb();
-			if ((xmon_fw_iflags & XMON_FW_FLAGS_IN_DATA) == 0)
-				break;
-			udelay(1);
-		}
-		if (xmon_fw_iflags & XMON_FW_FLAGS_IN_DATA) {
-			xmon_fw_iflags = 0;
-			break;
-		}
-		xmon_fw_oflags &= ~XMON_FW_FLAGS_OUT_ACK;
-		wmb();
-		if (on) {
-			c[0] = 0x20; c[1] = '\b';
-			xmon_fw_write(c, 2);
-		}
-		*(p++) = k;
-		nb--;
-	}
-	return (xmon_fw_iflags & XMON_FW_FLAGS_IN_ATTACHED) != 0;
-}
-#endif /* CONFIG_XMON_FW */
-
 int
 xmon_write(void *handle, void *ptr, int nb)
 {
@@ -363,10 +255,6 @@ xmon_write(void *handle, void *ptr, int nb)
 			break;
 #endif
 
-#ifdef CONFIG_XMON_FW
-	if (xmon_fw_write(ptr, nb))
-		goto out;
-#endif /* CONFIG_XMON_FW */
 #ifdef CONFIG_BOOTX_TEXT
 	if (use_screen) {
 		/* write it on the screen */
@@ -469,10 +357,6 @@ xmon_read(void *handle, void *ptr, int nb)
     char *p = ptr;
     int i;
 
-#ifdef CONFIG_XMON_FW
-	if (xmon_fw_read(ptr, nb))
-		return nb;
-#endif /* CONFIG_XMON_FW */		
 #ifdef CONFIG_BOOTX_TEXT
     if (use_screen) {
 	for (i = 0; i < nb; ++i)
@@ -753,20 +637,11 @@ xmon_enter(void)
 		pmu_suspend();
 	}
 #endif
-#ifdef CONFIG_XMON_FW
-	xmon_fw_oflags |= XMON_FW_FLAGS_OUT_ENTERED;
-	wmb();
-	xmon_fw_kick = 0;
-#endif /* CONFIG_XMON_FW */
 }
 
 void
 xmon_leave(void)
 {
-#ifdef CONFIG_XMON_FW
-	xmon_fw_oflags &= ~XMON_FW_FLAGS_OUT_ENTERED;
-	wmb();
-#endif /* CONFIG_XMON_FW */
 #ifdef CONFIG_ADB_PMU
 	if (_machine == _MACH_Pmac) {
 		pmu_resume();

@@ -374,7 +374,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 #ifdef CONFIG_BOOTX_TEXT
-	extern int force_printk_to_btext;
 	if (boot_text_mapped) {
 		btext_clearscreen();
 		btext_welcome();
@@ -458,26 +457,12 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 			}
 		}
 	}
-#ifdef CONFIG_ADB_PMU
-	if (strstr(cmd_line, "fake_sleep")) {
-		extern int __fake_sleep;
-		__fake_sleep = 1;
-	}
-#endif /* CONFIG_ADB_PMU */	
 #ifdef CONFIG_ADB
 	if (strstr(cmd_line, "adb_sync")) {
 		extern int __adb_probe_sync;
 		__adb_probe_sync = 1;
 	}
 #endif /* CONFIG_ADB */
-	if (strstr(cmd_line, "nol3") && cur_cpu_spec[0]->cpu_features & CPU_FTR_L3CR)
-		_set_L3CR(0);
-	if (strstr(cmd_line, "nonap"))
-		cur_cpu_spec[0]->cpu_features &= ~CPU_FTR_CAN_NAP;
-#ifdef CONFIG_BOOTX_TEXT
-	if (strstr(cmd_line, "printkbtext"))
-		force_printk_to_btext = 1;
-#endif
 
 	switch (_machine) {
 	case _MACH_Pmac:
@@ -635,8 +620,8 @@ void __init setup_arch(char **cmdline_p)
 	extern char *klimit;
 	extern void do_init_bootmem(void);
 
-	/* so udelay does something sensible, assume <= 2000 bogomips */
-	loops_per_jiffy = 1000000000 / HZ;
+	/* so udelay does something sensible, assume <= 1000 bogomips */
+	loops_per_jiffy = 500000000 / HZ;
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
 	/* This could be called "early setup arch", it must be done

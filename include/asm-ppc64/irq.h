@@ -53,20 +53,21 @@ static __inline__ int irq_canonicalize(int irq)
  */
 
 #define NUM_ISA_INTERRUPTS	0x10
+extern int __irq_offset_value;
 
 extern inline int irq_offset_up(int irq)
 {
-	return(irq + NUM_ISA_INTERRUPTS);
+	return(irq + __irq_offset_value);
 }
 
 extern inline int irq_offset_down(int irq)
 {
-	return(irq - NUM_ISA_INTERRUPTS);
+	return(irq - __irq_offset_value);
 }
 
 extern inline int irq_offset_value(void)
 {
-	return NUM_ISA_INTERRUPTS;
+	return __irq_offset_value;
 }
 
 #endif /* _ASM_IRQ_H */

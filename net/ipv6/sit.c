@@ -184,6 +184,7 @@ static struct ip_tunnel * ipip6_tunnel_locate(struct ip_tunnel_parm *parms, int 
 
 	nt = dev->priv;
 	dev->init = ipip6_tunnel_init;
+	dev->tx_queue_len = 1;
 	nt->parms = *parms;
 
 	if (register_netdevice(dev) < 0) {
@@ -832,6 +833,7 @@ int __init sit_init(void)
 	}
 
 	ipip6_fb_tunnel_dev->init = ipip6_fb_tunnel_init;
+	ipip6_fb_tunnel_dev->tx_queue_len = 1;
 
 	if ((err =  register_netdev(ipip6_fb_tunnel_dev)))
 		goto fail;

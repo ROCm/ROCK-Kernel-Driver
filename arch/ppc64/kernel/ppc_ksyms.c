@@ -54,7 +54,8 @@ extern int do_signal(sigset_t *, struct pt_regs *);
 int abs(int);
 
 extern struct pci_dev * iSeries_veth_dev;
-extern struct pci_dev * iSeries_vio_dev;
+extern struct pci_dev * iSeries_pci_dev;
+extern struct device * iSeries_vio_dev;
 
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(sys_ioctl);
@@ -156,6 +157,7 @@ EXPORT_SYMBOL(eeh_total_mmio_ffs);
 #endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL(iSeries_veth_dev);
+EXPORT_SYMBOL(iSeries_pci_dev);
 EXPORT_SYMBOL(iSeries_vio_dev);
 
 EXPORT_SYMBOL(start_thread);

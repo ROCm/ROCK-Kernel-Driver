@@ -28,8 +28,6 @@ typedef struct board_info {
 	unsigned char	bi_enetaddr[6];		/* Ethernet MAC address */
 	unsigned int	bi_intfreq;		/* Processor speed, in Hz */
 	unsigned int	bi_busfreq;		/* Bus speed, in Hz */
-	unsigned int	bi_opb_busfreq;		/* OPB Bus speed, in Hz */
-	int		bi_iic_fast[2];		/* Use fast i2c mode */
 } bd_t;
 #define bi_tbfreq bi_intfreq
 

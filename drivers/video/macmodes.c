@@ -19,7 +19,6 @@
 #include <linux/errno.h>
 #include <linux/fb.h>
 #include <linux/string.h>
-#include <linux/module.h>
 
 #include "macmodes.h"
 
@@ -282,7 +281,6 @@ int mac_vmode_to_var(int vmode, int cmode, struct fb_var_screeninfo *var)
     var->vmode = mode->vmode;
     return 0;
 }
-EXPORT_SYMBOL(mac_vmode_to_var);
 
 
 /**
@@ -328,7 +326,6 @@ int mac_var_to_vmode(const struct fb_var_screeninfo *var, int *vmode,
     }
     return -EINVAL;
 }
-EXPORT_SYMBOL(mac_var_to_vmode);
 
 
 /**
@@ -351,7 +348,6 @@ int mac_map_monitor_sense(int sense)
 	    break;
     return map->vmode;
 }
-EXPORT_SYMBOL(mac_map_monitor_sense);
 
 
 /**
@@ -388,4 +384,3 @@ int __init mac_find_mode(struct fb_var_screeninfo *var, struct fb_info *info,
     return fb_find_mode(var, info, mode_option, db, dbsize,
 			&mac_modedb[DEFAULT_MODEDB_INDEX], default_bpp);
 }
-EXPORT_SYMBOL(mac_find_mode);

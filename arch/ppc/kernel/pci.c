@@ -22,7 +22,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 
-#define DEBUG
+#undef DEBUG
 
 #ifdef DEBUG
 #define DBG(x...) printk(x)

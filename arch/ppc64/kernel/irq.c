@@ -127,15 +127,16 @@ extern void iSeries_smp_message_recv( struct pt_regs * );
 
 static void register_irq_proc (unsigned int irq);
 static irq_desc_t *add_irq_desc(unsigned int irq);
-	
+
+int __irq_offset_value;
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
 
 extern int mem_init_done;
 
-irq_desc_t **irq_desc_base_dir[IRQ_BASE_PTRS] __page_aligned = {0};
-irq_desc_t **irq_desc_mid_null;
-irq_desc_t *irq_desc_bot_null;
+irq_desc_t **irq_desc_base_dir[IRQ_BASE_PTRS];
+irq_desc_t *irq_desc_mid_null[IRQ_MID_PTRS];
+irq_desc_t irq_desc_bot_null[IRQ_BOT_DESCS];
 
 static inline irq_desc_t **get_irq_mid_table(unsigned int irq)
 {
@@ -202,12 +203,7 @@ unsigned int _next_irq(unsigned int irq)
  */
 void *_get_real_irq_desc(unsigned int irq)
 {
-	irq_desc_t *desc = get_irq_desc(irq);
-	if (((unsigned long)desc & PAGE_MASK) ==
-	    (unsigned long)irq_desc_bot_null) {
-		desc = add_irq_desc(irq);
-	}
-	return desc;
+	return add_irq_desc(irq);
 }
 
 /* Allocate an irq middle page and init entries to null page. */
@@ -215,10 +211,8 @@ static irq_desc_t **alloc_irq_mid_page(void)
 {
 	irq_desc_t **m, **ent;
 
-	if (mem_init_done)
-		m = (irq_desc_t **)__get_free_page(GFP_KERNEL);
-	else
-		m = (irq_desc_t **)alloc_bootmem_pages(PAGE_SIZE);
+	BUG_ON(!mem_init_done);
+	m = (irq_desc_t **) __get_free_page(GFP_KERNEL);
 	if (m) {
 		for (ent = m; ent < m + IRQ_MID_PTRS; ent++) {
 			*ent = irq_desc_bot_null;
@@ -231,10 +225,9 @@ static irq_desc_t **alloc_irq_mid_page(void)
 static irq_desc_t *alloc_irq_bot_page(void)
 {
 	irq_desc_t *b, *ent;
-	if (mem_init_done)
-		b = (irq_desc_t *)get_zeroed_page(GFP_KERNEL);
-	else
-		b = (irq_desc_t *)alloc_bootmem_pages(PAGE_SIZE);
+
+	BUG_ON(!mem_init_done);
+	b = (irq_desc_t *) get_zeroed_page(GFP_KERNEL);
 	if (b) {
 		for (ent = b; ent < b + IRQ_BOT_DESCS; ent++) {
 			ent->lock = SPIN_LOCK_UNLOCKED;
@@ -250,22 +243,20 @@ static irq_desc_t *alloc_irq_bot_page(void)
  * bits.  Mid level is 1 page, covering 9 bits.  Last page covering
  * 5 bits is the irq_desc, each of which is 128B.
  */
-static void irq_desc_init(void) {
-	irq_desc_t ***entry_p;
+static void irq_desc_init(void)
+{
+	int i;
 
 	/* 
 	 * Now initialize the tables to point though the NULL tables for
 	 * the default case of no interrupt handler (spurious).
 	 */
-	irq_desc_bot_null = alloc_irq_bot_page();
-	irq_desc_mid_null = alloc_irq_mid_page();
-	if (!irq_desc_bot_null || !irq_desc_mid_null)
-		panic("irq_desc_init: could not allocate pages\n");
-	for(entry_p = irq_desc_base_dir;
-	    entry_p < irq_desc_base_dir + IRQ_BASE_PTRS;
-	    entry_p++) {
-		*entry_p = irq_desc_mid_null;
-	}
+	for (i = 0; i < IRQ_BASE_PTRS; ++i)
+		irq_desc_base_dir[i] = irq_desc_mid_null;
+	for (i = 0; i < IRQ_MID_PTRS; ++i)
+		irq_desc_mid_null[i] = irq_desc_bot_null;
+	for (i = 0; i < IRQ_BOT_DESCS; ++i)
+		irq_desc_bot_null[i].lock = SPIN_LOCK_UNLOCKED;
 }
 
 /*
@@ -282,19 +273,20 @@ static irq_desc_t *add_irq_desc(unsigned int irq)
 	irq_desc_t **mid_table_p, *bot_table_p;
 
 	mid_table_p = get_irq_mid_table(irq); 
-	if(mid_table_p == irq_desc_mid_null) {
+	if (mid_table_p == irq_desc_mid_null) {
 		/* No mid table for this IRQ - create it */
 		mid_table_p = alloc_irq_mid_page();
-		if (!mid_table_p) return NULL;
+		if (!mid_table_p)
+			return NULL;
 		irq_desc_base_dir[irq >> IRQ_BASE_IDX_SHIFT] = mid_table_p;
 	}
 
-	bot_table_p = (irq_desc_t *)(*(mid_table_p + ((irq >> 5) & 0x1ff)));
-
-	if(bot_table_p == irq_desc_bot_null) {
+	bot_table_p = get_irq_bot_table(irq, mid_table_p);
+	if (bot_table_p == irq_desc_bot_null) {
 		/* No bot table for this IRQ - create it */
 		bot_table_p = alloc_irq_bot_page();
-		if (!bot_table_p) return NULL;
+		if (!bot_table_p)
+			return NULL;
 		mid_table_p[(irq >> IRQ_MID_IDX_SHIFT) & IRQ_MID_IDX_MASK] = bot_table_p;
 	}
 
@@ -325,7 +317,7 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	if (!desc)
 		return -ENOMEM;
 
-	ppc_md.init_irq_desc(desc);
+	ppc_md.init_irq_desc(irq, desc);
 
 	hwstat = get_irq_stat(desc);
 

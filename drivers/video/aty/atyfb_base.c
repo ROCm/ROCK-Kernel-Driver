@@ -178,10 +178,6 @@ static void set_off_pitch(struct atyfb_par *par,
 #ifdef CONFIG_PPC
 static int read_aty_sense(const struct atyfb_par *par);
 #endif
-#ifdef CONFIG_PMAC_PBOOK
-static void aty_set_crt_enable(struct atyfb_par *par, int on);
-static void aty_set_lcd_enable(struct atyfb_par *par, int on);
-#endif
 
 
     /*
@@ -215,7 +211,6 @@ static struct fb_ops atyfb_ops = {
 
 static char curblink __initdata = 1;
 static char noaccel __initdata = 0;
-static char mirror  __initdata = 0;
 static u32 default_vram __initdata = 0;
 static int default_pll __initdata = 0;
 static int default_mclk __initdata = 0;
@@ -407,6 +402,8 @@ static char ram_wram[] __initdata = "WRAM";
 static char ram_off[] __initdata = "OFF";
 #endif /* CONFIG_FB_ATY_CT */
 static char ram_resv[] __initdata = "RESV";
+
+static u32 pseudo_palette[17];
 
 #ifdef CONFIG_FB_ATY_GX
 static char *aty_gx_ram[8] __initdata = {
@@ -863,12 +860,6 @@ static int atyfb_set_par(struct fb_info *info)
 			     var->bits_per_pixel,
 			     par->crtc.vxres * var->bits_per_pixel / 8);
 #endif				/* CONFIG_BOOTX_TEXT */
-#ifdef CONFIG_PMAC_PBOOK
-	if (M64_HAS(RESET_3D)) {
-		aty_set_crt_enable(par, par->crt_on);
-		aty_set_lcd_enable(par, par->lcd_on);
-	}
-#endif
 	return 0;
 }
 
@@ -1026,27 +1017,12 @@ struct atyclk {
 #define ATYIO_FEATW		0x41545903	/* ATY\03 */
 #endif
 
-#ifdef CONFIG_PMAC_PBOOK	/* LCD/CRT mirror */
-#define ATY_MIRROR_LCD_ON	0x00000001
-#define ATY_MIRROR_CRT_ON	0x00000002
-
-/* out param: u32*	mirror level: 0 to 3 */
-#define FBIO_ATY_GET_MIRROR	_IOR('@', 1, __u32*)
-/* in param: u32*	mirror level: 0 to 3 */
-#define FBIO_ATY_SET_MIRROR	_IOW('@', 2, __u32*)
-#endif
-
-
 static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		       u_long arg, struct fb_info *info)
 {
-#if defined(__sparc__) || (defined(DEBUG) && defined(CONFIG_FB_ATY_CT)) || defined(CONFIG_PMAC_PBOOK)
+#if defined(__sparc__) || (defined(DEBUG) && defined(CONFIG_FB_ATY_CT))
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 #endif				/* __sparc__ || DEBUG */
-#ifdef CONFIG_PMAC_PBOOK
-	u32 value;
-	int rc;
-#endif
 #ifdef __sparc__
 	struct fbtype fbtyp;
 #endif
@@ -1126,29 +1102,6 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			return -EFAULT;
 		break;
 #endif				/* DEBUG && CONFIG_FB_ATY_CT */
-#ifdef CONFIG_PMAC_PBOOK
-	case FBIO_ATY_SET_MIRROR:
-		if (!M64_HAS(RESET_3D)) 
-			return -EINVAL;
-		rc = get_user(value, (__u32*)arg);
-		if (rc) {
-			printk("atyfb_ioctl: get_user returned %d\n", rc);
-			return rc;
-		}
-
-		par->lcd_on = (value & 0x01) != 0;
-		par->crt_on = (value & 0x02) != 0;
-		if (!par->crt_on && !par->lcd_on)
-			par->lcd_on = 1;
-		aty_set_crt_enable(par, par->crt_on);	
-		aty_set_lcd_enable(par, par->lcd_on);	
-		break;
-	case FBIO_ATY_GET_MIRROR:
-		if (!M64_HAS(RESET_3D)) 
-			return -EINVAL;
-		value = (par->crt_on << 1) | par->lcd_on;
-		return put_user(value, (__u32*)arg);
-#endif /* CONFIG_PMAC_PBOOK */
 	default:
 		return -EINVAL;
 	}
@@ -1302,31 +1255,6 @@ static void atyfb_palette(int enter)
 
 
 #ifdef CONFIG_PMAC_PBOOK
-
-/*
- * ++MSch: LCD/CRT mirror support
- */
- 
-static void aty_set_crt_enable(struct atyfb_par *par, int on)
-{
-	if (on) {
-		aty_st_lcd(LCD_GEN_CTRL,
-			   aty_ld_lcd(LCD_GEN_CTRL, par) | LCD_GCTL_CRT_ON, par);
-	} else
-		aty_st_lcd(LCD_GEN_CTRL,
-			   aty_ld_lcd(LCD_GEN_CTRL, par) & ~LCD_GCTL_CRT_ON, par);
-}
- 
-static void aty_set_lcd_enable(struct atyfb_par *par, int on)
-{
-	if (on) {
-		aty_st_lcd(LCD_GEN_CTRL,
-			   aty_ld_lcd(LCD_GEN_CTRL, par) | LCD_GCTL_LCD_ON, par);
-	} else
-		aty_st_lcd(LCD_GEN_CTRL,
-			   aty_ld_lcd(LCD_GEN_CTRL, par) & ~LCD_GCTL_LCD_ON, par);
-}
- 
 
 static struct fb_info *first_display = NULL;
 
@@ -1484,16 +1412,6 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			}
 			break;
 		case PBOOK_SLEEP_NOW:
-			acquire_console_sem();
-
-			fb_set_suspend(info, 1);
-
-			/* Setup dummy fb raster ops */
-			info->fbops->fb_fillrect 	= fb_dummy_fillrect;
-			info->fbops->fb_copyarea 	= fb_dummy_copyarea;
-			info->fbops->fb_imageblit	= fb_dummy_imageblit;
-			info->fbops->fb_cursor   	= fb_dummy_cursor;
-
 			if (par->blitter_may_be_busy)
 				wait_for_idle(par);
 			/* Stop accel engine (stop bus mastering) */
@@ -1510,13 +1428,9 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 			/* Set chip to "suspend" mode */
 			result = aty_power_mgmt(1, par);
-
-			release_console_sem();
 			break;
 		case PBOOK_WAKE:
 			/* Wakeup chip */
-			acquire_console_sem();
-
 			result = aty_power_mgmt(0, par);
 
 			/* Restore fb content */
@@ -1526,21 +1440,9 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				vfree(par->save_framebuffer);
 				par->save_framebuffer = 0;
 			}
-
-			/* Restore fb raster ops */
-			info->fbops->fb_fillrect	= atyfb_fillrect;
-			info->fbops->fb_copyarea	= atyfb_copyarea;
-			info->fbops->fb_imageblit 	= atyfb_imageblit;
-			info->fbops->fb_cursor   	= soft_cursor;
-
-			/* Refresh */
-			fb_set_suspend(info, 0);
-
 			/* Restore display */
 			atyfb_set_par(info);
 			atyfb_blank(0, info);
-
-			release_console_sem();
 			break;
 		}
 	}
@@ -1887,59 +1789,8 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		  info->fix.smem_len);
 
 	info->fbops = &atyfb_ops;
-	info->pseudo_palette = par->pseudo_palette;
+	info->pseudo_palette = pseudo_palette;
 	info->flags = FBINFO_FLAG_DEFAULT;
-
-#ifdef CONFIG_PMAC_PBOOK
-	/* set up initial output to LCD only, unless OF set CRTC1 to the external port */
-	par->lcd_on=1;
-	par->crt_on=1;
-
-	if (M64_HAS(RESET_3D)) {
-		int lcd_src = aty_ld_le32(LCD_INDEX, par) & LCD_SRC_SEL;
-#ifdef DEBUG
-		printk("atyfb: LCD_INDEX: %d \n", aty_ld_le32(LCD_INDEX, par));
-		printk("atyfb: LCD_GEN_CTRL: %08x \n", aty_ld_lcd(LCD_GEN_CTRL, par));
-#endif
-		if (lcd_src || mirror ||
-		    (aty_ld_lcd(LCD_GEN_CTRL, par) & LCD_GCTL_CRT_ON)) {
-			u32 h_tot_disp, h_start_width, v_tot_disp;
-			u32 v_start_width, off_pitch;
-
-			par->crt_on=1;
-			printk("atyfb: switching LCD to primary CRTC \n");
-			/* LCD source is CRTC1 */
-			aty_st_le32(LCD_INDEX,
-				    aty_ld_le32(LCD_INDEX, par) & ~LCD_SRC_SEL, par);
-			/* set LCD_GEN_CNTL as OF on LCD boot (xcept CRTC_RW_SEL is cleared):  */ 
-			aty_st_lcd(LCD_GEN_CTRL,
-				   (aty_ld_lcd(LCD_GEN_CTRL, par) &
-				    ~(LCD_GCTL_CRTC_RW_SEL | LCD_GCTL_SHADOW_RW_EN)), par);
-			/* DAC1 source is CRTC1 */
-			aty_st_le32(DAC_CNTL, (aty_ld_le32(DAC_CNTL, par) & ~0x10) |
-				    0x01001000, par);
-			/* copy CRTC1 to CRTC2 if CRTC2 unset */
-			h_tot_disp = aty_ld_le32(CRTC_H_TOTAL_DISP, par);
-			v_tot_disp = aty_ld_le32(CRTC_V_TOTAL_DISP, par);
-			h_start_width = aty_ld_le32(CRTC_H_SYNC_STRT_WID, par);
-			v_start_width = aty_ld_le32(CRTC_V_SYNC_STRT_WID, par);
-			off_pitch = aty_ld_le32(CRTC_OFF_PITCH, par);
-			/* select second CRTC register set */ 
-			aty_st_lcd(LCD_GEN_CTRL, aty_ld_lcd(LCD_GEN_CTRL, par) |
-				   LCD_GCTL_CRTC_RW_SEL, par);
-			aty_st_le32(CRTC_H_TOTAL_DISP, h_tot_disp, par);
-			aty_st_le32(CRTC_V_TOTAL_DISP, v_tot_disp, par);
-			aty_st_le32(CRTC_H_SYNC_STRT_WID, h_start_width, par);
-			aty_st_le32(CRTC_V_SYNC_STRT_WID, v_start_width, par);
-			aty_st_le32(CRTC_OFF_PITCH, off_pitch, par);
-			/* select first CRTC register set */ 
-			aty_st_lcd(LCD_GEN_CTRL, aty_ld_lcd(LCD_GEN_CTRL, par) &
-				   ~LCD_GCTL_CRTC_RW_SEL, par);
-		}
-		aty_set_crt_enable(par, par->crt_on);
-		aty_set_lcd_enable(par, par->lcd_on);
-	}
-#endif /* CONFIG_PMAC_PBOOK */
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 	if (M64_HAS(G3_PB_1_1) && machine_is_compatible("PowerBook1,1")) {
@@ -2442,8 +2293,7 @@ int __init atyfb_init(void)
 			if (first_display == NULL)
 				pmu_register_sleep_notifier(&aty_sleep_notifier);
 			default_par->next = first_display;
-			first_display = info;
-#endif /* CONFIG_PMAC_PBOOK */
+#endif
 		}
 	}
 
@@ -2532,8 +2382,6 @@ int __init atyfb_setup(char *options)
 			curblink = 0;
 		} else if (!strncmp(this_opt, "noaccel", 7)) {
 			noaccel = 1;
-		} else if (!strncmp(this_opt, "mirror", 6)) {
-			mirror = 1;
 		} else if (!strncmp(this_opt, "vram:", 5))
 			default_vram =
 			    simple_strtoul(this_opt + 5, NULL, 0);

@@ -67,10 +67,10 @@
 
 void chrp_progress(char *, unsigned short);
 
-extern void openpic_init_IRQ(void);
-extern void openpic_init_irq_desc(irq_desc_t *);
+extern void pSeries_init_openpic(void);
 
 extern void find_and_init_phbs(void);
+extern void pSeries_final_fixup(void);
 
 extern void pSeries_get_boot_time(struct rtc_time *rtc_time);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
@@ -174,6 +174,10 @@ chrp_setup_arch(void)
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
 #endif
+
+#ifdef CONFIG_PPC_PSERIES
+	pSeries_nvram_init();
+#endif
 }
 
 void __init
@@ -247,8 +251,8 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.setup_residual = NULL;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
-	if(naca->interrupt_controller == IC_OPEN_PIC) {
-		ppc_md.init_IRQ       = openpic_init_IRQ;
+	if (naca->interrupt_controller == IC_OPEN_PIC) {
+		ppc_md.init_IRQ       = pSeries_init_openpic; 
 		ppc_md.init_irq_desc  = openpic_init_irq_desc;
 		ppc_md.get_irq        = openpic_get_irq;
 	} else {
@@ -258,6 +262,8 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	ppc_md.init           = chrp_init2;
+
+	ppc_md.pcibios_fixup  = pSeries_final_fixup;
 
 	ppc_md.restart        = rtas_restart;
 	ppc_md.power_off      = rtas_power_off;
@@ -269,9 +275,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = pSeries_calibrate_decr;
 
 	ppc_md.progress       = chrp_progress;
-
-	ppc_md.nvram_read     = pSeries_nvram_read;
-	ppc_md.nvram_write    = pSeries_nvram_write;
 
         /* Build up the firmware_features bitmask field
          * using contents of device-tree/ibm,hypertas-functions.

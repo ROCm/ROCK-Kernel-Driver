@@ -63,6 +63,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/pci.h>
 #include <asm/vio.h>
 #include "ibmvscsi.h"
 

@@ -253,7 +253,7 @@ struct radeon_i2c_chan {
 #endif
 
 struct radeonfb_info {
-	struct fb_info 		info;
+	struct fb_info		*info;
 
 	struct radeon_regs 	state;
 	struct radeon_regs	init_state;
@@ -285,12 +285,12 @@ struct radeonfb_info {
 
 	int			pitch, bpp, depth;
 
-	int			has_CRTC2 : 1;
-	int			is_mobility : 1;
-	int			is_IGP : 1;
-	int			R300_cg_workaround : 1;
-	int			reversed_DAC : 1;
-	int			reversed_TMDS : 1;
+	int			has_CRTC2;
+	int			is_mobility;
+	int			is_IGP;
+	int			R300_cg_workaround;
+	int			reversed_DAC;
+	int			reversed_TMDS;
 	struct panel_info	panel_info;
 	int			mon1_type;
 	u8			*mon1_EDID;
@@ -332,7 +332,7 @@ struct radeonfb_info {
 /*
  * Debugging stuffs
  */
-#define DEBUG		1
+#define DEBUG		0
 
 #if DEBUG
 #define RTRACE		printk
@@ -556,8 +556,8 @@ extern void radeonfb_fillrect(struct fb_info *info, const struct fb_fillrect *re
 extern void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
 extern void radeonfb_imageblit(struct fb_info *p, const struct fb_image *image);
 extern int radeonfb_sync(struct fb_info *info);
-extern void radeon_engine_init (struct radeonfb_info *rinfo);
-extern void radeon_engine_reset(struct radeonfb_info *rinfo);
+extern void radeonfb_engine_init (struct radeonfb_info *rinfo);
+extern void radeonfb_engine_reset(struct radeonfb_info *rinfo);
 
 /* Other functions */
 extern int radeonfb_blank(int blank, struct fb_info *info);

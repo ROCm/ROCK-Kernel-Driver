@@ -28,6 +28,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/pci.h>
 #include <asm/vio.h>
 #include <asm/pci_dma.h>
 #include <asm/hvcall.h>

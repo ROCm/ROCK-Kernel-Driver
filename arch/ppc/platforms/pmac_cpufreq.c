@@ -443,7 +443,6 @@ static int __init pmac_cpufreq_setup(void)
 		if (!value)
 			goto out;
 		low_freq = (*value) / 1000;
-
 		/* The PowerBook G4 12" (PowerBook6,1) has an error in the device-tree
 		 * here */
 		if (low_freq < 100000)

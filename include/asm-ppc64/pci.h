@@ -25,12 +25,6 @@
 extern int pcibios_scan_all_fns(struct pci_bus *bus, int devfn);
 #endif
 
-#ifdef CONFIG_PPC_ISERIES
-#define pcibios_scan_all_fns(a, b)	0
-#else
-extern int pcibios_scan_all_fns(struct pci_bus *bus, int devfn);
-#endif
-
 static inline void pcibios_set_master(struct pci_dev *dev)
 {
 	/* No special bus mastering setup handling */
@@ -59,19 +53,62 @@ static inline int pcibios_prep_mwi(struct pci_dev *dev)
 
 extern unsigned int pcibios_assign_all_busses(void);
 
-extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
-				  dma_addr_t *dma_handle);
-extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
-				void *vaddr, dma_addr_t dma_handle);
+/*
+ * PCI DMA operations are abstracted for G5 vs. i/pSeries
+ */
+struct pci_dma_ops {
+	void *		(*pci_alloc_consistent)(struct pci_dev *hwdev, size_t size,
+					dma_addr_t *dma_handle);
+	void		(*pci_free_consistent)(struct pci_dev *hwdev, size_t size,
+				       void *vaddr, dma_addr_t dma_handle);
 
-extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-				 size_t size, int direction);
-extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-                             size_t size, int direction);
-extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-                      int nents, int direction);
-extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-                         int nents, int direction);
+	dma_addr_t	(*pci_map_single)(struct pci_dev *hwdev, void *ptr,
+					  size_t size, int direction);
+	void		(*pci_unmap_single)(struct pci_dev *hwdev, dma_addr_t dma_addr,
+					    size_t size, int direction);
+	int		(*pci_map_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
+				      int nents, int direction);
+	void		(*pci_unmap_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
+					int nents, int direction);
+};
+
+extern struct pci_dma_ops pci_dma_ops;
+
+static inline void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+					 dma_addr_t *dma_handle)
+{
+	return pci_dma_ops.pci_alloc_consistent(hwdev, size, dma_handle);
+}
+
+static inline void pci_free_consistent(struct pci_dev *hwdev, size_t size,
+				       void *vaddr, dma_addr_t dma_handle)
+{
+	pci_dma_ops.pci_free_consistent(hwdev, size, vaddr, dma_handle);
+}
+
+static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
+					size_t size, int direction)
+{
+	return pci_dma_ops.pci_map_single(hwdev, ptr, size, direction); 
+}
+
+static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
+				    size_t size, int direction)
+{
+	pci_dma_ops.pci_unmap_single(hwdev, dma_addr, size, direction);
+}
+
+static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+			     int nents, int direction)
+{
+	return pci_dma_ops.pci_map_sg(hwdev, sg, nents, direction);
+}
+
+static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+				int nents, int direction)
+{
+	pci_dma_ops.pci_unmap_sg(hwdev, sg, nents, direction);
+}
 
 static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
@@ -155,6 +192,8 @@ extern void
 pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus);
 
 extern int pci_read_irq_line(struct pci_dev *dev);
+
+extern void pcibios_add_platform_entries(struct pci_dev *dev);
 
 extern void pcibios_add_platform_entries(struct pci_dev *dev);
 

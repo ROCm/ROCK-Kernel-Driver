@@ -51,7 +51,8 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/string.h>
-#include <linux/pci.h>
+#include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/seq_file.h>
 
 #include <asm/iSeries/HvTypes.h>
@@ -155,18 +156,12 @@ enum {
 static int		viodasd_max_disk = MAX_DISKNO - 1;
 static spinlock_t	viodasd_spinlock = SPIN_LOCK_UNLOCKED;
 
-static inline int devt_to_diskno(dev_t dev)
-{
-	return major_to_index(MAJOR(dev)) * DEV_PER_MAJOR +
-	    (MINOR(dev) >> PARTITION_SHIFT);
-}
-
 #define VIOMAXREQ		16
 #define VIOMAXBLOCKDMA		12
 
 #define DEVICE_NO(cell)	((struct viodasd_device *)(cell) - &viodasd_devices[0])
 
-extern struct pci_dev *iSeries_vio_dev;
+extern struct device *iSeries_vio_dev;
 
 struct openData {
 	u64 mDiskLen;
@@ -267,12 +262,6 @@ struct viodasd_device {
 		long ntce[VIOMAXBLOCKDMA];
 	} stats[2];
 } viodasd_devices[MAX_DISKNO];
-
-static struct hd_struct *devt_to_partition(dev_t dev)
-{
-	return viodasd_devices[devt_to_diskno(dev)].disk->
-		part[MINOR(dev) & ((1 << PARTITION_SHIFT) - 1)];
-}
 
 /*
  * Handle reads from the proc file system
@@ -494,21 +483,9 @@ static int internal_release(int device_no, u16 flags)
 
 static int inode_to_device_no(struct inode *ino, const char *func)
 {
-	int device_no;
+	int device_no = DEVICE_NO(ino->i_bdev->bd_disk->private_data);
 
-	/* Do a bunch of sanity checks */
-	if (!ino) {
-		printk(KERN_WARNING_VIO "no inode provided in %s\n", func);
-		return -ENODEV;
-	}
-
-	if (major_to_index(MAJOR(ino->i_rdev)) < 0) {
-		printk(KERN_WARNING_VIO
-		       "Weird error...wrong major number in %s\n", func);
-		return -ENODEV;
-	}
-
-	device_no = devt_to_diskno(ino->i_rdev);
+	/* sanity check */
 	if ((device_no > MAX_DISKNO) || (device_no < 0)) {
 		printk(KERN_WARNING_VIO
 		       "Invalid disk number %d in %s\n", device_no, func);
@@ -551,7 +528,7 @@ static int viodasd_release(struct inode *ino, struct file *fil)
 {
 	int device_no;
 
-	device_no = inode_to_device_no(ino, "open");
+	device_no = inode_to_device_no(ino, "release");
 	if (device_no < 0)
 		return device_no;
 
@@ -566,29 +543,13 @@ static int viodasd_release(struct inode *ino, struct file *fil)
 static int viodasd_ioctl(struct inode *ino, struct file *fil,
 			 unsigned int cmd, unsigned long arg)
 {
-	int device_no;
 	int err;
-	struct hd_struct *partition;
 	unsigned char sectors;
 	unsigned char heads;
 	unsigned short cylinders;
 	struct hd_geometry *geo;
-
-	/* Sanity checks */
-	if (major_to_index(MAJOR(ino->i_rdev)) < 0) {
-		printk(KERN_WARNING_VIO
-		       "Weird error...wrong major number on ioctl\n");
-		return -ENODEV;
-	}
-
-	device_no = devt_to_diskno(ino->i_rdev);
-	if (device_no > viodasd_max_disk) {
-		printk(KERN_WARNING_VIO
-		       "Invalid device number %d in ioctl\n", device_no);
-		return -ENODEV;
-	}
-
-	partition = devt_to_partition(ino->i_rdev);
+	struct gendisk *gendisk;
+	struct viodasd_device *d;
 
 	switch (cmd) {
 	case HDIO_GETGEO:
@@ -598,23 +559,21 @@ static int viodasd_ioctl(struct inode *ino, struct file *fil,
 		err = verify_area(VERIFY_WRITE, geo, sizeof(*geo));
 		if (err)
 			return err;
-		sectors = viodasd_devices[device_no].sectors;
+		gendisk = ino->i_bdev->bd_disk;
+		d = gendisk->private_data;
+		sectors = d->sectors;
 		if (sectors == 0)
 			sectors = 32;
-		heads = viodasd_devices[device_no].tracks;
+		heads = d->tracks;
 		if (heads == 0)
 			heads = 64;
-		cylinders = viodasd_devices[device_no].cylinders;
-		if ((cylinders == 0) && partition)
-			cylinders = partition->nr_sects / (sectors * heads);
+		cylinders = d->cylinders;
+		if (cylinders == 0)
+			cylinders = get_capacity(gendisk) / (sectors * heads);
 		__put_user(sectors, &geo->sectors);
 		__put_user(heads, &geo->heads);
 		__put_user(cylinders, &geo->cylinders);
-
-		if (partition)
-			__put_user(partition->start_sect, &geo->start);
-		else
-			__put_user(0, &geo->start);
+		__put_user(get_start_sect(ino->i_bdev), &geo->start);
 
 		return 0;
 	}
@@ -636,7 +595,7 @@ static int send_request(struct request *req)
 	struct scatterlist sg[VIOMAXBLOCKDMA];
 	int sgindex;
 	int statindex;
-        int device_no = DEVICE_NO(req->rq_disk->private_data);
+	struct viodasd_device *d;
 	unsigned long flags;
 
 	start = (u64)req->sector << 9;
@@ -653,23 +612,24 @@ static int send_request(struct request *req)
 	}
 
 	if (rq_data_dir(req) == READ) {
-		direction = PCI_DMA_FROMDEVICE;
+		direction = DMA_FROM_DEVICE;
 		viocmd = viomajorsubtype_blockio | vioblockread;
 		statindex = 0;
 	} else {
-		direction = PCI_DMA_TODEVICE;
+		direction = DMA_TO_DEVICE;
 		viocmd = viomajorsubtype_blockio | vioblockwrite;
 		statindex = 1;
 	}
 
+        d = req->rq_disk->private_data;
 	/* Update totals */
-	viodasd_devices[device_no].stats[statindex].tot++;
+	d->stats[statindex].tot++;
 
 	/* Now build the scatter-gather list */
 	nsg = blk_rq_map_sg(req->q, req, sg);
-	nsg = pci_map_sg(iSeries_vio_dev, sg, nsg, direction);
+	nsg = dma_map_sg(iSeries_vio_dev, sg, nsg, direction);
 	/* Update stats */
-	viodasd_devices[device_no].stats[statindex].ntce[nsg - 1]++;
+	d->stats[statindex].ntce[nsg - 1]++;
 
 	spin_lock_irqsave(&viodasd_spinlock, flags);
 	num_req_outstanding++;
@@ -683,7 +643,7 @@ static int send_request(struct request *req)
 				viopath_sourceinst(viopath_hostLp),
 				viopath_targetinst(viopath_hostLp),
 				(u64)(unsigned long)req, VIOVERSION << 16,
-				((u64)device_no << 48), start,
+				((u64)DEVICE_NO(d) << 48), start,
 				((u64)sg[0].dma_address) << 32,
 				sg[0].dma_length);
 	else {
@@ -692,7 +652,7 @@ static int send_request(struct request *req)
 		if (bevent == NULL) {
 			num_req_outstanding--;
 			spin_unlock_irqrestore(&viodasd_spinlock, flags);
-			pci_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
+			dma_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
 			printk(KERN_WARNING_VIO
 			       "error allocating disk event buffer\n");
 			return -1;
@@ -721,7 +681,7 @@ static int send_request(struct request *req)
 			viopath_targetinst(viopath_hostLp);
 		bevent->event.xCorrelationToken = (u64)req;
 		bevent->mVersion = VIOVERSION;
-		bevent->mDisk = device_no;
+		bevent->mDisk = DEVICE_NO(d);
 		bevent->u.rwData.mOffset = start;
 
 		/*
@@ -743,7 +703,7 @@ static int send_request(struct request *req)
 	if (hvrc != HvLpEvent_Rc_Good) {
 		num_req_outstanding--;
 		spin_unlock_irqrestore(&viodasd_spinlock, flags);
-		pci_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
+		dma_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
 		printk(KERN_WARNING_VIO
 		       "error sending disk event to OS/400 (rc %d)\n",
 		       (int)hvrc);
@@ -758,20 +718,17 @@ static int send_request(struct request *req)
  */
 static void do_viodasd_request(request_queue_t *q)
 {
-	for (;;) {
-		struct request *req;
-		struct gendisk *gendisk;
+	struct request *req;
 
+	while ((req = elv_next_request(q)) != NULL) {
 		/*
 		 * If we already have the maximum number of requests
 		 * outstanding to OS/400 just bail out. We'll come
 		 * back later.
 		 */
 		if (num_req_outstanding >= VIOMAXREQ)
-			return;
+			break;
 
-		if ((req = elv_next_request(q)) == NULL)
-			return;
 		/* dequeue the current request from the queue */
 		blkdev_dequeue_request(req);
 		/* check that request contains a valid command */
@@ -779,10 +736,6 @@ static void do_viodasd_request(request_queue_t *q)
 			viodasd_end_request(req, 0, req->hard_nr_sectors);
 			continue;
 		}
-
-		gendisk = req->rq_disk;
-		if (major_to_index(gendisk->major) < 0)
-			panic(VIOD_DEVICE_NAME ": request list destroyed");
 
 		/* Try sending the request */
 		if (send_request(req) != 0)
@@ -797,7 +750,7 @@ static int viodasd_check_change(struct gendisk *gendisk)
 {
 	struct viodasd_waitevent we;
 	HvLpEvent_Rc hvrc;
-	int device_no = major_to_index(gendisk->major);
+	int device_no = DEVICE_NO(gendisk->private_data);
 
 	/* This semaphore is raised in the interrupt handler */
 	DECLARE_MUTEX_LOCKED(Semaphore);
@@ -915,10 +868,10 @@ static int viodasd_handleReadWrite(struct vioblocklpevent *bevent)
 	num_sg = block_event_to_scatterlist(bevent, sg, &total_len);
 	num_sect = total_len >> 9;
 	if (event->xSubtype == (viomajorsubtype_blockio | vioblockread))
-		pci_direction = PCI_DMA_FROMDEVICE;
+		pci_direction = DMA_FROM_DEVICE;
 	else
-		pci_direction = PCI_DMA_TODEVICE;
-	pci_unmap_sg(iSeries_vio_dev, sg, num_sg, pci_direction);
+		pci_direction = DMA_TO_DEVICE;
+	dma_unmap_sg(iSeries_vio_dev, sg, num_sg, pci_direction);
 
 	/*
 	 * Since this is running in interrupt mode, we need to make sure

@@ -27,7 +27,6 @@
 #include <linux/init.h>
 #include <linux/linux_logo.h>
 #include <linux/proc_fs.h>
-#include <linux/console.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif
@@ -144,8 +143,6 @@ extern int sstfb_init(void);
 extern int sstfb_setup(char*);
 extern int i810fb_init(void);
 extern int i810fb_setup(char*);
-extern int ibmlcdfb_init(void);
-extern int ibmlcdfb_setup(char*);
 extern int ffb_init(void);
 extern int ffb_setup(char*);
 extern int cg6_init(void);
@@ -257,9 +254,6 @@ static struct {
 #endif	
 #ifdef CONFIG_FB_STI
 	{ "stifb", stifb_init, stifb_setup },
-#endif
-#ifdef CONFIG_FB_IBMLCDC
-	{ "ibmlcdfb", ibmlcdfb_init, ibmlcdfb_setup },
 #endif
 #ifdef CONFIG_FB_FFB
 	{ "ffb", ffb_init, ffb_setup },
@@ -403,9 +397,6 @@ static initcall_t pref_init_funcs[FB_MAX];
 static int num_pref_init_funcs __initdata = 0;
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
-
-static LIST_HEAD(fb_clients);
-static DECLARE_MUTEX(fb_clients_lock);
 
 #ifdef CONFIG_FB_OF
 static int ofonly __initdata = 0;
@@ -950,8 +941,6 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			fb_pan_display(info, &info->var);
 
 			fb_set_cmap(&info->cmap, 1, info);
-
-			fb_clients_call_mode_changed(info);
 		}
 	}
 	return 0;
@@ -1001,9 +990,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		acquire_console_sem();
 		i = fb_set_var(info, &var);
-		release_console_sem();
 		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
@@ -1022,10 +1009,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		acquire_console_sem();
-		i = fb_pan_display(info, &var);
-		release_console_sem();
-		if (i)
+		if ((i = fb_pan_display(info, &var)))
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
@@ -1061,10 +1045,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return 0;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
-		acquire_console_sem();
-		i = fb_blank(info, arg);
-		release_console_sem();
-		return i;
+		return fb_blank(info, arg);
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;
@@ -1302,6 +1283,9 @@ unregister_framebuffer(struct fb_info *fb_info)
 	return 0;
 }
 
+void fb_set_suspend(struct fb_info *info, int state)
+{
+}
 
 /**
  *	fbmem_init - init frame buffer subsystem
@@ -1402,107 +1386,6 @@ int __init video_setup(char *options)
 
 __setup("video=", video_setup);
 
-/*
- * Dummy operations used typically when power managing
- */
-
-int fb_dummy_cursor(struct fb_info *info, struct fb_cursor *cursor)
-{
-	return 0;
-}
-
-void fb_dummy_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
-{
-}
-
-void fb_dummy_copyarea(struct fb_info *info, const struct fb_copyarea *area)
-{
-}
-
-void fb_dummy_imageblit(struct fb_info *info, const struct fb_image *image)
-{
-}
-
-/*
- * Wrappers to client calls
- */
-
-int
-fb_set_suspend(struct fb_info *info, int suspended)
-{
-	if (suspended == info->suspended)
-		return 0;
-
-	info->suspended = suspended;
-	if (suspended)
-		fb_clients_call_suspended(info);
-	else
-		fb_clients_call_resumed(info);
-
-	return 0;
-}
-
-int register_fb_client(struct fb_client_ops *ops, void *data)
-{
-	struct fb_client *client;
-
-	client = kmalloc(sizeof(*client), GFP_KERNEL);
-	if (client == NULL)
-		return -ENOMEM;
-
-	memset(client, 0, sizeof(*client));
-	client->ops = ops;
-	client->data = data;
-	
-	down(&fb_clients_lock);
-	list_add(&client->link, &fb_clients);
-	up(&fb_clients_lock);
-
-	return 0;
-}
-
-int unregister_fb_client(struct fb_client_ops *ops)
-{
-	struct fb_client *client = NULL;
-	struct list_head *pos;
-	
-	down(&fb_clients_lock);
-	list_for_each(pos, &fb_clients) {
-		client = list_entry(pos, struct fb_client, link);
-		if (client->ops == ops) {
-			list_del(&client->link);
-			kfree(client);
-			break;
-		}
-	}
-	up(&fb_clients_lock);
-
-	return 0;
-}
-
-#define make_fb_client_call(name) \
-int fb_clients_call_##name(struct fb_info *info) \
-{ \
-	struct fb_client *client = NULL; \
-	struct list_head *pos; \
-\
-	down(&fb_clients_lock); \
-	list_for_each(pos, &fb_clients) { \
-		client = list_entry(pos, struct fb_client, link); \
-		if (try_module_get(client->ops->owner)) { \
-			if (client->ops->name) \
-				client->ops->name(client->data, info); \
-			module_put(client->ops->owner); \
-		} \
-	} \
-	up(&fb_clients_lock); \
-	return 0; \
-}
-
-make_fb_client_call(mode_changed)
-make_fb_client_call(suspended)
-make_fb_client_call(resumed)
-
     /*
      *  Visible symbols for modules
      */
@@ -1520,14 +1403,5 @@ EXPORT_SYMBOL(fb_get_buffer_offset);
 EXPORT_SYMBOL(move_buf_unaligned);
 EXPORT_SYMBOL(move_buf_aligned);
 EXPORT_SYMBOL(fb_set_suspend);
-EXPORT_SYMBOL(register_fb_client);
-EXPORT_SYMBOL(unregister_fb_client);
-EXPORT_SYMBOL(fb_clients_call_mode_changed);
-EXPORT_SYMBOL(fb_clients_call_suspended);
-EXPORT_SYMBOL(fb_clients_call_resumed);
-EXPORT_SYMBOL(fb_dummy_fillrect);
-EXPORT_SYMBOL(fb_dummy_copyarea);
-EXPORT_SYMBOL(fb_dummy_imageblit);
-EXPORT_SYMBOL(fb_dummy_cursor);
 
 MODULE_LICENSE("GPL");

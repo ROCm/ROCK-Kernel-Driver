@@ -2061,8 +2061,7 @@ static void nv10GetConfig
 
 #ifdef __BIG_ENDIAN
     /* turn on big endian register access */
-    if(!(chip->PMC[0x00000004/4] & 0x01000001))
-        chip->PMC[0x00000004/4] = 0x01000001;
+    chip->PMC[0x00000004/4] = 0x01000001;
 #endif
 
     /*
@@ -2123,11 +2122,6 @@ static void nv10GetConfig
     case 0x01F0:
     case 0x0250:
     case 0x0280:
-    case 0x0300:
-    case 0x0310:
-    case 0x0320:
-    case 0x0330:
-    case 0x0340:
        if(chip->PEXTDEV[0x0000/4] & (1 << 22))
            chip->CrystalFreqKHz = 27000;
        break;
@@ -2159,11 +2153,6 @@ static void nv10GetConfig
     case 0x01F0:
     case 0x0250:
     case 0x0280:
-    case 0x0300:
-    case 0x0310:
-    case 0x0320:
-    case 0x0330:
-    case 0x0340:
         chip->twoHeads = TRUE;
         break;
     default:

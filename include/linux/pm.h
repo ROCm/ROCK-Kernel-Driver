@@ -63,7 +63,6 @@ enum
 	PM_SCSI_DEV,	    /* SCSI device */
 	PM_ISA_DEV,	    /* ISA device */
 	PM_MTD_DEV,	    /* Memory Technology Device */
-	PM_OCP_DEV,	    /* On Chip Device */
 };
 
 typedef int pm_dev_t;

@@ -14,6 +14,7 @@
 
 #include <linux/config.h>
 #include <linux/cpumask.h>
+#include <linux/irq.h>
 
 #define OPENPIC_SIZE	0x40000
 
@@ -37,5 +38,6 @@ extern int openpic_get_irq(struct pt_regs *regs);
 extern void openpic_init_processor(u_int cpumask);
 extern void openpic_setup_ISU(int isu_num, unsigned long addr);
 extern void openpic_cause_IPI(u_int ipi, u_int cpumask);
+extern void openpic_init_irq_desc(int irq, irq_desc_t *);
 
 #endif /* _PPC64_KERNEL_OPEN_PIC_H */

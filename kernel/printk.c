@@ -33,11 +33,6 @@
 
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_BOOTX_TEXT
-#include <asm/btext.h>
-#endif
-
-
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 
 /* printk's without a loglevel use this.. */
@@ -513,9 +508,6 @@ asmlinkage int printk(const char *fmt, ...)
 	char *p;
 	static char printk_buf[1024];
 	static int log_level_unknown = 1;
-#ifdef CONFIG_BOOTX_TEXT
-	extern int force_printk_to_btext;
-#endif
 
 	if (oops_in_progress) {
 		/* If a crash is occurring, make sure we can't deadlock */
@@ -531,10 +523,6 @@ asmlinkage int printk(const char *fmt, ...)
 	va_start(args, fmt);
 	printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 	va_end(args);
-#ifdef CONFIG_BOOTX_TEXT
-	if (force_printk_to_btext)
-		btext_drawstring(printk_buf);
-#endif /* CONFIG_BOOTX_TEXT */
 
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide

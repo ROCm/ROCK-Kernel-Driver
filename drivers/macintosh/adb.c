@@ -40,8 +40,8 @@
 #include <asm/semaphore.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
-#include <asm/hydra.h>
 #endif
+
 
 EXPORT_SYMBOL(adb_controller);
 EXPORT_SYMBOL(adb_client_list);
@@ -345,7 +345,6 @@ __initcall(adb_init);
 int
 adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 {
-	extern int __fake_sleep;
 	int ret;
 	
 	switch (when) {
@@ -354,7 +353,7 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 		/* We need to get a lock on the probe thread */
 		down(&adb_probe_mutex);
 		/* Stop autopoll */
-		if (!__fake_sleep && adb_controller->autopoll)
+		if (adb_controller->autopoll)
 			adb_controller->autopoll(0);
 		ret = notifier_call_chain(&adb_client_list, ADB_MSG_POWERDOWN, NULL);
 		if (ret & NOTIFY_STOP_MASK) {

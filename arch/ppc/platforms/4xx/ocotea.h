@@ -25,7 +25,7 @@
 #define PPC44x_EMAC0_MR0	0xE0000800
 
 /* Location of MAC addresses in firmware */
-#define OCOTEA_MAC_BASE		(OCOTEA_SMALL_FLASH_HIGH+0xb0500)
+#define OCOTEA_MAC_BASE		(OCOTEA_SMALL_FLASH_HIGH+0xc0500)
 #define OCOTEA_MAC_SIZE		0x200
 #define OCOTEA_MAC1_OFFSET	0x100
 

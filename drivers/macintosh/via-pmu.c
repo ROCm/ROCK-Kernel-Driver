@@ -377,6 +377,7 @@ find_via_pmu(void)
 #ifndef CONFIG_PPC64
 	sys_ctrler = SYS_CTRLER_PMU;
 #endif
+	
 	return 1;
 }
 
@@ -603,6 +604,7 @@ static inline void wakeup_decrementer(void)
 	last_jiffy_stamp(0) = tb_last_stamp = get_tbl();
 }
 #endif
+
 static void pmu_set_server_mode(int server_mode)
 {
 	struct adb_request req;
@@ -1393,7 +1395,7 @@ next:
 			}
 			pmu_done(req);
 		} else {
-#ifdef CONFIG_XMON
+#if defined(CONFIG_XMON) && !defined(CONFIG_PPC64)
 			if (len == 4 && data[1] == 0x2c) {
 				extern int xmon_wants_key, xmon_adb_keycode;
 				if (xmon_wants_key) {
@@ -1401,7 +1403,7 @@ next:
 					return;
 				}
 			}
-#endif /* CONFIG_XMON */
+#endif /* defined(CONFIG_XMON) && !defined(CONFIG_PPC64) */
 #ifdef CONFIG_ADB
 			/*
 			 * XXX On the [23]400 the PMU gives us an up

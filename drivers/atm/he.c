@@ -177,9 +177,7 @@ he_writel_internal(struct he_dev *he_dev, unsigned val, unsigned addr,
 								unsigned flags)
 {
 	he_writel(he_dev, val, CON_DAT);
-#ifdef CONFIG_IA64_SGI_SN2
-	(void) he_readl(he_dev, CON_DAT);
-#endif
+	(void) he_readl(he_dev, CON_DAT);		/* flush posted writes */
 	he_writel(he_dev, flags | CON_CTL_WRITE | CON_CTL_ADDR(addr), CON_CTL);
 	while (he_readl(he_dev, CON_CTL) & CON_CTL_BUSY);
 }
@@ -1950,9 +1948,6 @@ next_rbrq_entry:
 
 		he_writel(he_dev, RBRQ_MASK(he_dev->rbrq_head),
 						G0_RBRQ_H + (group * 16));
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl(he_dev, G0_RBRQ_H + (group * 16));
-#endif
 	}
 
 	return pdus_assembled;
@@ -2045,9 +2040,6 @@ next_tbrq_entry:
 
 		he_writel(he_dev, TBRQ_MASK(he_dev->tbrq_head),
 						G0_TBRQ_H + (group * 16));
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl(he_dev, G0_TBRQ_H + (group * 16));
-#endif
 	}
 }
 
@@ -2075,12 +2067,8 @@ he_service_rbpl(struct he_dev *he_dev, int group)
 		++moved;
 	} 
 
-	if (moved) {
+	if (moved)
 		he_writel(he_dev, RBPL_MASK(he_dev->rbpl_tail), G0_RBPL_T);
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl(he_dev, G0_RBPL_T);
-#endif
-	}
 }
 
 #ifdef USE_RBPS
@@ -2107,12 +2095,8 @@ he_service_rbps(struct he_dev *he_dev, int group)
 		++moved;
 	} 
 
-	if (moved) {
+	if (moved)
 		he_writel(he_dev, RBPS_MASK(he_dev->rbps_tail), G0_RBPS_T);
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl(he_dev, G0_RBPS_T);
-#endif
-	}
 }
 #endif /* USE_RBPS */
 
@@ -2209,7 +2193,7 @@ he_tasklet(unsigned long data)
 			IRQ_SIZE(CONFIG_IRQ_SIZE) |
 			IRQ_THRESH(CONFIG_IRQ_THRESH) |
 			IRQ_TAIL(he_dev->irq_tail), IRQ0_HEAD);
-		(void) he_readl(he_dev, INT_FIFO); /* 8.1.2 controller errata */
+		(void) he_readl(he_dev, INT_FIFO); /* 8.1.2 controller errata; flush posted writes */
 	}
 #ifdef USE_TASKLET
 	spin_unlock_irqrestore(&he_dev->global_lock, flags);
@@ -2250,11 +2234,8 @@ he_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 #else
 		he_tasklet((unsigned long) he_dev);
 #endif
-		he_writel(he_dev, INT_CLEAR_A, INT_FIFO);
-							/* clear interrupt */
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl(he_dev, INT_FIFO);
-#endif
+		he_writel(he_dev, INT_CLEAR_A, INT_FIFO);	/* clear interrupt */
+		(void) he_readl(he_dev, INT_FIFO);		/* flush posted writes */
 	}
 	spin_unlock_irqrestore(&he_dev->global_lock, flags);
 	return IRQ_RETVAL(handled);
@@ -2323,9 +2304,7 @@ __enqueue_tpd(struct he_dev *he_dev, struct he_tpd *tpd, unsigned cid)
 	he_dev->tpdrq_tail = new_tail;
 
 	he_writel(he_dev, TPDRQ_MASK(he_dev->tpdrq_tail), TPDRQ_T);
-#ifdef CONFIG_IA64_SGI_SN2
-	(void) he_readl(he_dev, TPDRQ_T);
-#endif
+	(void) he_readl(he_dev, TPDRQ_T);		/* flush posted writes */
 }
 
 static int
@@ -2475,9 +2454,7 @@ he_open(struct atm_vcc *vcc)
 		he_writel_tsr12(he_dev, 0x0, cid);
 		he_writel_tsr13(he_dev, 0x0, cid);
 		he_writel_tsr14(he_dev, 0x0, cid);
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl_tsr0(he_dev, cid);
-#endif
+		(void) he_readl_tsr0(he_dev, cid);		/* flush posted writes */
 		spin_unlock_irqrestore(&he_dev->global_lock, flags);
 	}
 
@@ -2531,9 +2508,7 @@ he_open(struct atm_vcc *vcc)
 			  the open/closed indication in rsr0 */
 		he_writel_rsr0(he_dev,
 			rsr0 | RSR0_START_PDU | RSR0_OPEN_CONN | aal, cid);
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl_rsr0(he_dev, cid);
-#endif
+		(void) he_readl_rsr0(he_dev, cid);		/* flush posted writes */
 
 		spin_unlock_irqrestore(&he_dev->global_lock, flags);
 	}
@@ -2587,9 +2562,7 @@ he_close(struct atm_vcc *vcc)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 
 		he_writel_rsr0(he_dev, RSR0_CLOSE_CONN, cid);
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl_rsr0(he_dev, cid);
-#endif
+		(void) he_readl_rsr0(he_dev, cid);		/* flush posted writes */
 		he_writel_mbox(he_dev, cid, RXCON_CLOSE);
 		spin_unlock_irqrestore(&he_dev->global_lock, flags);
 
@@ -2638,9 +2611,6 @@ he_close(struct atm_vcc *vcc)
 		spin_lock_irqsave(&he_dev->global_lock, flags);
 		he_writel_tsr4_upper(he_dev, TSR4_FLUSH_CONN, cid);
 					/* also clears TSR4_SESSION_ENDED */
-#ifdef CONFIG_IA64_SGI_SN2
-		(void) he_readl_tsr4(he_dev, cid);
-#endif
 
 		switch (vcc->qos.txtp.traffic_class) {
 			case ATM_UBR:
@@ -2652,6 +2622,7 @@ he_close(struct atm_vcc *vcc)
 				he_writel_tsr14_upper(he_dev, TSR14_DELETE, cid);
 				break;
 		}
+		(void) he_readl_tsr4(he_dev, cid);		/* flush posted writes */
 
 		tpd = __alloc_tpd(he_dev);
 		if (tpd == NULL) {
@@ -2904,9 +2875,7 @@ he_phy_put(struct atm_dev *atm_dev, unsigned char val, unsigned long addr)
 
 	spin_lock_irqsave(&he_dev->global_lock, flags);
 	he_writel(he_dev, val, FRAMER + (addr*4));
-#ifdef CONFIG_IA64_SGI_SN2
-	(void) he_readl(he_dev, FRAMER + (addr*4));
-#endif
+	(void) he_readl(he_dev, FRAMER + (addr*4));		/* flush posted writes */
 	spin_unlock_irqrestore(&he_dev->global_lock, flags);
 }
  

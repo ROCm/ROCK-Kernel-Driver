@@ -625,7 +625,7 @@ config FB_RADEON_OLD
 	  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
 
 config FB_RADEON
-	tristate "ATI Radeon display support (New driver)"
+	tristate "ATI Radeon display support"
 	depends on FB && PCI
 	help
 	  Choose this option if you want to use an ATI Radeon graphics card as
@@ -645,6 +645,7 @@ config FB_RADEON
 config FB_RADEON_I2C
 	bool "DDC/I2C for ATI Radeon support"
 	depends on FB_RADEON && (I2C_ALGOBIT=FB_RADEON || I2C_ALGOBIT=y)
+	default y
 	help
 	  Say Y here if you want DDC/I2C support for your Radeon board. 
 

@@ -118,7 +118,6 @@ static int softback_lines;
 static int first_fb_vc;
 static int last_fb_vc = MAX_NR_CONSOLES - 1;
 static int fbcon_is_default = 1; 
-static int console_resizing;
 
 #define REFCOUNT(fd)	(((int *)(fd))[-1])
 #define FNTSIZE(fd)	(((int *)(fd))[-2])
@@ -1700,21 +1699,14 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	y_diff = info->var.yres - var.yres;
 	if (x_diff < 0 || x_diff > fw ||
 	   (y_diff < 0 || y_diff > fh)) {
-		var.activate = FB_ACTIVATE_FIND;
+		var.activate = FB_ACTIVATE_TEST;
 		err = fb_set_var(info, &var);
 		if (err || width > var.xres/fw ||
 		    height > var.yres/fh)
 			return -EINVAL;
-       		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
+		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
 		var.activate = FB_ACTIVATE_NOW;
-		/* This flag is enough for now as we are supposed to hold
-		 * the console semaphore at this point. I agree it's a bit
-		 * ugly but it does the job until some better solution is
-		 * found
-		 */
-		console_resizing = 1;
 		fb_set_var(info, &var);
-		console_resizing = 0;
 	}
 	p->vrows = var.yres_virtual/fh;
 	if (var.yres > (fh * (height + 1)))
@@ -1756,12 +1748,6 @@ static int fbcon_switch(struct vc_data *vc)
 	}
 	if (info)
 		info->var.yoffset = p->yscroll = 0;
-
-	/* Set currcon before fbcon_resize or we'll do bad things
-	 * when fbdev calls us back on mode changed notification
-	 */
-	info->currcon = vc->vc_num;
-
         fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
 	switch (p->scrollmode & __SCROLL_YMASK) {
 	case __SCROLL_YWRAP:
@@ -1778,6 +1764,8 @@ static int fbcon_switch(struct vc_data *vc)
 	}
 	scrollback_max = 0;
 	scrollback_current = 0;
+
+	info->currcon = vc->vc_num;
 	
 	update_var(vc->vc_num, info);
 	fbcon_set_palette(vc, color_table); 	
@@ -1799,7 +1787,7 @@ static int fbcon_switch(struct vc_data *vc)
 
 static int fbcon_blank(struct vc_data *vc, int blank)
 {
- 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
+	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 
@@ -2380,58 +2368,6 @@ static int fbcon_set_origin(struct vc_data *vc)
 	return 0;
 }
 
-static void fbcon_suspended(void *data, struct fb_info *info)
-{
-	/* Here, we should do something to properly erase the
-	 * cursor and synchronize with the cursor interrupt on
-	 * SMP... (may not be that critical though...)
-	 */
-}
-
-static void fbcon_resumed(void *data, struct fb_info *info)
-{
-	struct vc_data *vc;
-
-	if (info->currcon < 0)
-		return;
-	vc = vc_cons[info->currcon].d;
-
-	update_screen(vc->vc_num);
-}
-
-static void fbcon_mode_changed(void *data, struct fb_info *info)
-{
-	struct vc_data *vc;
-	int rows, cols;
-
-	if (info->currcon < 0)
-		return;
-	vc = vc_cons[info->currcon].d;
-
-	/* This isn't perfect yet. If we change one console, we
-	 * don't change them all and we switch back to the wrong
-	 * mode on next console switch. We need to either keep a
-	 * per-console car or fix mode selection based on console
-	 * size. --BenH.
-	 */
-	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
-		return;
-	rows = info->var.yres / vc->vc_font.height;
-	cols = info->var.xres / vc->vc_font.width;
-	if (cols == vc->vc_cols && rows == vc->vc_rows)
-		return;
-	DPRINTK("mode changed, resizing: %dx%d\n", cols, rows);
-	if (console_resizing) {
-		DPRINTK("resize skipped, busy !\n");
-		return;
-	}
-	vc_resize(vc->vc_num, cols, rows);
-	if (CON_IS_VISIBLE(vc)) {
-		accel_clear_margins(vc, info, 0);
-		update_screen(vc->vc_num);
-	}
-}
-
 /*
  *  The console `switch' structure for the frame buffer based console
  */
@@ -2458,13 +2394,6 @@ const struct consw fb_con = {
 	.con_resize             = fbcon_resize,
 };
 
-static struct fb_client_ops fbcon_client = {
-	.owner			= THIS_MODULE,
-	.mode_changed		= fbcon_mode_changed,
-	.suspended		= fbcon_suspended,
-	.resumed		= fbcon_resumed,
-};
-
 int __init fb_console_init(void)
 {
 	if (!num_registered_fb)
@@ -2473,13 +2402,11 @@ int __init fb_console_init(void)
 	splash_init();
 #endif
 	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
-	register_fb_client(&fbcon_client, NULL);
 	return 0;
 }
 
 void __exit fb_console_exit(void)
 {
-	unregister_fb_client(&fbcon_client);
 	give_up_console(&fb_con);
 }	
 

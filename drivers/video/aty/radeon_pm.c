@@ -836,7 +836,8 @@ static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 
 int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 {
-	struct radeonfb_info *rinfo = pci_get_drvdata(pdev);
+        struct fb_info *info = pci_get_drvdata(pdev);
+        struct radeonfb_info *rinfo = info->par;
 
 	/* We don't do anything but D2, for now we return 0, but
 	 * we may want to change that. How do we know if the BIOS
@@ -856,23 +857,17 @@ int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 	agp_enable(0);
 #endif
 
-	fb_set_suspend(&rinfo->info, 1);
-
-	/* Setup dummy fb raster ops */
-	rinfo->info.fbops->fb_fillrect 	= fb_dummy_fillrect;
-	rinfo->info.fbops->fb_copyarea 	= fb_dummy_copyarea;
-	rinfo->info.fbops->fb_imageblit	= fb_dummy_imageblit;
-	rinfo->info.fbops->fb_cursor   	= fb_dummy_cursor;
+	fb_set_suspend(info, 1);
 
 	if (!radeon_accel_disabled()) {
 		/* Make sure engine is reset */
 		radeon_engine_idle();
-		radeon_engine_reset(rinfo);
+		radeonfb_engine_reset(rinfo);
 		radeon_engine_idle();
 	}
 
 	/* Blank display and LCD */
-	radeonfb_blank(VESA_POWERDOWN+1, (struct fb_info *)rinfo);
+	radeonfb_blank(VESA_POWERDOWN+1, info);
 
 	/* Sleep */
 	rinfo->asleep = 1;
@@ -894,7 +889,8 @@ int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 
 int radeonfb_pci_resume(struct pci_dev *pdev)
 {
-	struct radeonfb_info *rinfo = pci_get_drvdata(pdev);
+        struct fb_info *info = pci_get_drvdata(pdev);
+        struct radeonfb_info *rinfo = info->par;
 
 	if (pdev->dev.power_state == 0)
 		return 0;
@@ -910,22 +906,16 @@ int radeonfb_pci_resume(struct pci_dev *pdev)
 	rinfo->asleep = 0;
 
 	/* Restore display & engine */
-	radeonfb_set_par(&rinfo->info);
-	fb_pan_display(&rinfo->info, &rinfo->info.var);
-	fb_set_cmap(&rinfo->info.cmap, 1, &rinfo->info);
-
-	/* Restore fb raster ops */
-	rinfo->info.fbops->fb_fillrect	= cfb_fillrect;
-	rinfo->info.fbops->fb_copyarea	= cfb_copyarea;
-	rinfo->info.fbops->fb_imageblit = cfb_imageblit;
-	rinfo->info.fbops->fb_cursor   	= soft_cursor;
+	radeonfb_set_par(info);
+	fb_pan_display(info, &info->var);
+	fb_set_cmap(&info->cmap, 1, info);
 
 	/* Refresh */
-	fb_set_suspend(&rinfo->info, 0);
+	fb_set_suspend(info, 0);
 
 	/* Unblank */
 	rinfo->lock_blank = 0;
-	radeonfb_blank(0, (struct fb_info *)rinfo);
+	radeonfb_blank(0, info);
 
 	release_console_sem();
 

@@ -402,13 +402,15 @@ void xics_setup_cpu(void)
 #endif /* CONFIG_SMP */
 
 void
-xics_init_irq_desc(irq_desc_t *desc)
+xics_init_irq_desc(int irq, irq_desc_t *desc)
 {
-	/* Don't mess with the handler if already set.
-	 * This leaves the setup of isa handlers undisturbed.
-	 */
-	if (!desc->handler)
+	if (irq < NUM_ISA_INTERRUPTS) {
+		desc->handler = &xics_8259_pic;
+	} else {
+		if (irq == XICS_IPI + NUM_ISA_INTERRUPTS)
+			desc->status |= IRQ_PER_CPU;
 		desc->handler = &xics_pic;
+	}
 }
 
 void xics_init_IRQ(void)
@@ -529,8 +531,6 @@ nextnode:
 
 	xics_8259_pic.enable = i8259_pic.enable;
 	xics_8259_pic.disable = i8259_pic.disable;
-	for (i = 0; i < 16; ++i)
-		get_real_irq_desc(i)->handler = &xics_8259_pic;
 
 	ops->cppr_info(boot_cpuid, 0xff);
 	iosync();
@@ -560,7 +560,6 @@ void xics_request_IPIs(void)
 {
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(irq_offset_up(XICS_IPI), xics_ipi_action, SA_INTERRUPT, "IPI", 0);
-	get_real_irq_desc(irq_offset_up(XICS_IPI))->status |= IRQ_PER_CPU;
 }
 #endif
 

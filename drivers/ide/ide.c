@@ -2238,12 +2238,6 @@ static void __init probe_for_hwifs (void)
 		pnpide_init(1);
 	}
 #endif /* CONFIG_BLK_DEV_IDEPNP */
-#ifdef CONFIG_BLK_DEV_STD
-	{
-		extern void std_ide_cntl_scan(void);
-		std_ide_cntl_scan();
-	}
-#endif /* CONFIG_BLK_DEV_STD */
 }
 
 /*

@@ -24,10 +24,12 @@ static void radeonfb_prim_fillrect(struct radeonfb_info *rinfo,
 
 void radeonfb_fillrect(struct fb_info *info, const struct fb_fillrect *region)
 {
-	struct radeonfb_info *rinfo = (struct radeonfb_info *)info;
+	struct radeonfb_info *rinfo = info->par;
 	struct fb_fillrect modded;
 	int vxres, vyres;
   
+	if (rinfo->asleep)
+		return;
 	if (radeon_accel_disabled()) {
 		cfb_fillrect(info, region);
 		return;
@@ -69,7 +71,7 @@ static void radeonfb_prim_copyarea(struct radeonfb_info *rinfo,
 
 void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
-	struct radeonfb_info *rinfo = (struct radeonfb_info *)info;
+	struct radeonfb_info *rinfo = info->par;
 	struct fb_copyarea modded;
 	u32 vxres, vyres;
 	modded.sx = area->sx;
@@ -79,6 +81,8 @@ void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	modded.width  = area->width;
 	modded.height = area->height;
   
+	if (rinfo->asleep)
+		return;
 	if (radeon_accel_disabled()) {
 		cfb_copyarea(info, area);
 		return;
@@ -102,8 +106,10 @@ void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 
 void radeonfb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
-	struct radeonfb_info *rinfo = (struct radeonfb_info *)info;
+	struct radeonfb_info *rinfo = info->par;
 
+	if (rinfo->asleep)
+		return;
 	radeon_engine_idle();
 
 	cfb_imageblit(info, image);
@@ -111,14 +117,16 @@ void radeonfb_imageblit(struct fb_info *info, const struct fb_image *image)
 
 int radeonfb_sync(struct fb_info *info)
 {
-	struct radeonfb_info *rinfo = (struct radeonfb_info *)info;
+	struct radeonfb_info *rinfo = info->par;
 
+	if (rinfo->asleep)
+		return 0;
 	radeon_engine_idle();
 
 	return 0;
 }
 
-void radeon_engine_reset(struct radeonfb_info *rinfo)
+void radeonfb_engine_reset(struct radeonfb_info *rinfo)
 {
 	u32 clock_cntl_index, mclk_cntl, rbbm_soft_reset;
 	u32 host_path_cntl;
@@ -214,14 +222,14 @@ void radeon_engine_reset(struct radeonfb_info *rinfo)
 		R300_cg_workardound(rinfo);
 }
 
-void radeon_engine_init (struct radeonfb_info *rinfo)
+void radeonfb_engine_init (struct radeonfb_info *rinfo)
 {
 	unsigned long temp;
 
 	/* disable 3D engine */
 	OUTREG(RB3D_CNTL, 0);
 
-	radeon_engine_reset(rinfo);
+	radeonfb_engine_reset(rinfo);
 
 	radeon_fifo_wait (1);
 	if ((rinfo->family != CHIP_FAMILY_R300) &&

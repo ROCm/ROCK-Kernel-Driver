@@ -37,7 +37,8 @@
 #include <linux/cdrom.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/pci.h>
+#include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/proc_fs.h>
 #include <linux/module.h>
 
@@ -63,7 +64,7 @@
 
 #define VIOCD_VERS "1.04"
 
-extern struct pci_dev *iSeries_vio_dev;
+extern struct device *iSeries_vio_dev;
 
 #define signalLpEventFast HvCallEvent_signalLpEventFast
 
@@ -220,8 +221,8 @@ static void __init get_viocd_info(void)
 	if (viopath_hostLp == HvLpIndexInvalid)
 		return;
 
-	dmaaddr = pci_map_single(iSeries_vio_dev, viocd_unitinfo,
-			sizeof(viocd_unitinfo), PCI_DMA_FROMDEVICE);
+	dmaaddr = dma_map_single(iSeries_vio_dev, viocd_unitinfo,
+			sizeof(viocd_unitinfo), DMA_FROM_DEVICE);
 	if (dmaaddr == 0xFFFFFFFF) {
 		printk(KERN_WARNING_VIO "error allocating tce\n");
 		return;
@@ -246,8 +247,8 @@ static void __init get_viocd_info(void)
 	/* wait for completion */
 	down(&Semaphore);
 
-	pci_unmap_single(iSeries_vio_dev, dmaaddr, sizeof(viocd_unitinfo),
-			PCI_DMA_FROMDEVICE);
+	dma_unmap_single(iSeries_vio_dev, dmaaddr, sizeof(viocd_unitinfo),
+			DMA_FROM_DEVICE);
 
 	if (we.rc) {
 		const struct vio_error_entry *err =
@@ -340,7 +341,7 @@ static int send_request(struct request *req)
 	u64 start = req->sector * 512;
 	u64 len;
 	int reading = rq_data_dir(req) == READ;
-	int dir = reading ? PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE;
+	int dir = reading ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 	u16 command = viomajorsubtype_cdio | (reading ? viocdread : viocdwrite);
 	dma_addr_t dmaaddr;
 	int nsg, ntce;
@@ -362,7 +363,7 @@ static int send_request(struct request *req)
 		return -1;
 	}
 
-	ntce = pci_map_sg(iSeries_vio_dev, sg, nsg, dir);
+	ntce = dma_map_sg(iSeries_vio_dev, sg, nsg, dir);
 	if (!ntce) {
 		printk(KERN_WARNING_VIO "error allocating sg tces\n");
 		return -1;
@@ -371,7 +372,7 @@ static int send_request(struct request *req)
 	len = sg[0].dma_length;
 	if (ntce > 1) {
 		printk("viocd: unmapping %d extra sg entries\n", ntce - 1);
-		pci_unmap_sg(iSeries_vio_dev, &sg[1], ntce - 1, dir);
+		dma_unmap_sg(iSeries_vio_dev, &sg[1], ntce - 1, dir);
 	}
 	if (dmaaddr == 0xFFFFFFFF) {
 		printk(KERN_WARNING_VIO
@@ -556,7 +557,7 @@ printk(KERN_INFO "viocdopen event: size %lu blocks %u mediasize %u\n", bevent->m
 		unsigned long flags;
 		int dir =
 			((event->xSubtype & VIOMINOR_SUBTYPE_MASK) == viocdread)
-			? PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE;
+			? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 		struct request *req;
 
 		/*
@@ -564,7 +565,7 @@ printk(KERN_INFO "viocdopen event: size %lu blocks %u mediasize %u\n", bevent->m
 		 * make sure we're not stepping on any global I/O operations
 		 */
 		spin_lock_irqsave(&viocd_reqlock, flags);
-		pci_unmap_single(iSeries_vio_dev, bevent->mToken, bevent->mLen,
+		dma_unmap_single(iSeries_vio_dev, bevent->mToken, bevent->mLen,
 				dir);
 		req = (struct request *)bevent->event.xCorrelationToken;
 		spin_lock(&viocd_lock);

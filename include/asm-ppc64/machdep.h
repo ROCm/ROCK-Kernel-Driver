@@ -68,8 +68,11 @@ struct machdep_calls {
 	void		(*get_cpuinfo)(struct seq_file *m);
 
 	void		(*init_IRQ)(void);
-	void		(*init_irq_desc)(irq_desc_t *desc);
+	void		(*init_irq_desc)(int irq, irq_desc_t *desc);
 	int		(*get_irq)(struct pt_regs *);
+
+	/* PCI stuff */
+	void		(*pcibios_fixup)(void);
 
 	/* Optional, may be NULL. */
 	void		(*init)(void);
@@ -96,11 +99,15 @@ struct machdep_calls {
 
 	ssize_t		(*nvram_write)(char *buf, size_t count, loff_t *index);
 	ssize_t		(*nvram_read)(char *buf, size_t count, loff_t *index);	
+	ssize_t		(*nvram_size)(void);		
+	int		(*nvram_sync)(void);
 
-#ifdef CONFIG_SMP
-	/* functions for dealing with other cpus */
-	struct smp_ops_t smp_ops;
-#endif /* CONFIG_SMP */
+	/* Motherboard/chipset features. This is a kind of general purpose
+	 * hook used to control some machine specific features (like reset
+	 * lines, chip power control, etc...).
+	 */
+	long	 	(*feature_call)(unsigned int feature, ...);
+
 };
 
 extern struct machdep_calls ppc_md;

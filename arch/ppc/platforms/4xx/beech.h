@@ -42,18 +42,17 @@
  */
 
 typedef struct board_info {
-	unsigned char	bi_s_version[4];	/* Version of this structure */
-	unsigned long	bi_tbfreq;		/* Frequency of SysTmrClk */
-	unsigned char	bi_r_version[30];	/* Version of the IBM ROM */
-	unsigned int	bi_memsize;		/* DRAM installed, in bytes */
-	unsigned long	sysclock_period;	/* SysClk period in ns */
-	unsigned long	sys_speed;		/* SysCLk frequency in Hz */
-	unsigned long	bi_intfreq;		/* Processor speed, in Hz */
-	unsigned long	vco_speed;		/* PLL VCO speed, in Hz */
-	unsigned long	bi_busfreq;		/* PLB Bus speed, in Hz */
-	unsigned int  	bi_opb_busfreq;		/* OPB Bus speed, in Hz */
-	unsigned long	bi_ebc_busfreq;		/* EBC Bus speed, in Hz */
-	int		bi_iic_fast[1];		/* Use fast i2c mode */
+	unsigned char bi_s_version[4];	/* Version of this structure */
+	unsigned long bi_tbfreq;	/* Frequency of SysTmrClk */
+	unsigned char bi_r_version[30];	/* Version of the IBM ROM */
+	unsigned int bi_memsize;	/* DRAM installed, in bytes */
+	unsigned long sysclock_period;	/* SysClk period in ns */
+	unsigned long sys_speed;	/* SysCLk frequency in Hz */
+	unsigned long bi_intfreq;	/* Processor speed, in Hz */
+	unsigned long vco_speed;	/* PLL VCO speed, in Hz */
+	unsigned long bi_busfreq;	/* PLB Bus speed, in Hz */
+	unsigned long opb_speed;	/* OPB Bus speed, in Hz */
+	unsigned long ebc_speed;	/* EBC Bus speed, in Hz */
 } bd_t;
 
 /* See beech.c for a concise diagram of the Beech physical memory map. */

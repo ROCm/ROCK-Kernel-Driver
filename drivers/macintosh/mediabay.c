@@ -101,7 +101,6 @@ int media_bay_count = 0;
 #define MB_IDE_READY(i)	((readb(media_bays[i].cd_base + 0x70) & 0x80) == 0)
 #endif
 
-
 /* Note: All delays are not in milliseconds and converted to HZ relative
  * values by the macro below
  */

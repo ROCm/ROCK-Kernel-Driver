@@ -1,7 +1,6 @@
 #
 # Makefile for the PowerPC 4xx linux kernel.
 
-obj-$(CONFIG_ARCTIC2)		+= arctic2.o subzero.o
 obj-$(CONFIG_ASH)		+= ash.o
 obj-$(CONFIG_BEECH)		+= beech.o
 obj-$(CONFIG_CEDAR)		+= cedar.o
@@ -10,7 +9,6 @@ obj-$(CONFIG_EBONY)		+= ebony.o
 obj-$(CONFIG_EP405)		+= ep405.o
 obj-$(CONFIG_OAK)		+= oak.o
 obj-$(CONFIG_OCOTEA)		+= ocotea.o
-obj-$(CONFIG_RAINIER)		+= rainier.o 
 obj-$(CONFIG_REDWOOD_4)		+= redwood.o
 obj-$(CONFIG_REDWOOD_5)		+= redwood5.o
 obj-$(CONFIG_REDWOOD_6)		+= redwood6.o
@@ -28,4 +26,3 @@ obj-$(CONFIG_405LP)		+= ibm405lp.o
 obj-$(CONFIG_EBONY)		+= ibm440gp.o
 obj-$(CONFIG_OCOTEA)		+= ibm440gx.o
 obj-$(CONFIG_405GPR)		+= ibm405gpr.o
-obj-$(CONFIG_VIRTEX_II_PRO)	+= virtex-ii_pro.o

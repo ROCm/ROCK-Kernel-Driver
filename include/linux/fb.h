@@ -147,7 +147,6 @@ struct fb_bitfield {
 #define FB_ACTIVATE_NOW		0	/* set values immediately (or vbl)*/
 #define FB_ACTIVATE_NXTOPEN	1	/* activate on next open	*/
 #define FB_ACTIVATE_TEST	2	/* don't set, round up impossible */
-#define FB_ACTIVATE_FIND	3	/* don't set, find an approaching mode */
 #define FB_ACTIVATE_MASK       15
 					/* values			*/
 #define FB_ACTIVATE_VBL	       16	/* activate values on next vbl  */
@@ -473,7 +472,6 @@ struct fb_info {
 	int node;
 	int flags;
 	int open;			/* Has this been open already ? */
-   int suspended;			/* Is this currently suspended ? */
 #define FBINFO_FLAG_MODULE	1	/* Low-level driver is a module */
 	struct fb_var_screeninfo var;	/* Current var */
 	struct fb_fix_screeninfo fix;	/* Current fix */
@@ -559,10 +557,6 @@ extern int soft_cursor(struct fb_info *info, struct fb_cursor *cursor);
 extern void cfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect); 
 extern void cfb_copyarea(struct fb_info *info, const struct fb_copyarea *area); 
 extern void cfb_imageblit(struct fb_info *info, const struct fb_image *image);
-extern int fb_dummy_cursor(struct fb_info *info, struct fb_cursor *cursor);
-extern void fb_dummy_fillrect(struct fb_info *info, const struct fb_fillrect *rect); 
-extern void fb_dummy_copyarea(struct fb_info *info, const struct fb_copyarea *area); 
-extern void fb_dummy_imageblit(struct fb_info *info, const struct fb_image *image);
 
 /* drivers/video/fbmem.c */
 extern int register_framebuffer(struct fb_info *fb_info);
@@ -576,6 +570,7 @@ extern void move_buf_unaligned(struct fb_info *info, u8 * dst, u8 * src,
 				u32 idx);
 extern void move_buf_aligned(struct fb_info *info, u8 * dst, u8 * src,
 				u32 d_pitch, u32 s_pitch, u32 height);
+extern void fb_set_suspend(struct fb_info *info, int state);
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
 
@@ -598,7 +593,7 @@ extern int fbmon_valid_timings(u_int pixclock, u_int htotal, u_int vtotal,
 extern int fbmon_dpms(const struct fb_info *fb_info);
 extern int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
 		       struct fb_info *info);
-extern int fb_validate_mode(const struct fb_var_screeninfo *var,
+extern int fb_validate_mode(struct fb_var_screeninfo *var,
 			    struct fb_info *info);
 extern int parse_edid(unsigned char *edid, struct fb_var_screeninfo *var);
 extern int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs);
@@ -671,22 +666,6 @@ extern int __init fb_find_mode(struct fb_var_screeninfo *var,
 			       const struct fb_videomode *default_mode,
 			       unsigned int default_bpp);
 #endif
-
-/* Power Management: called by low driver to notify other layers,
- * driver should have acquired the console semaphore prior to
- * calling this
- */
-extern int fb_set_suspend(struct fb_info *info, int suspended);
-
-/*
- * fb_client operations
- */
-
-extern int register_fb_client(struct fb_client_ops *ops, void *data);
-extern int unregister_fb_client(struct fb_client_ops *ops);
-extern int fb_clients_call_mode_changed(struct fb_info *info);
-extern int fb_clients_call_suspended(struct fb_info *info);
-extern int fb_clients_call_resumed(struct fb_info *info);
 
 #endif /* __KERNEL__ */
 

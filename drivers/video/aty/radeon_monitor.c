@@ -537,18 +537,14 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
  bail:
 	printk(KERN_INFO "radeonfb: Monitor 1 type %s found\n",
 	       radeon_get_mon_name(rinfo->mon1_type));
-	if (rinfo->mon1_EDID) {
+	if (rinfo->mon1_EDID)
 		printk(KERN_INFO "radeonfb: EDID probed\n");
-		show_edid(rinfo->mon1_EDID);
-	}
 	if (!rinfo->has_CRTC2)
 		return;
 	printk(KERN_INFO "radeonfb: Monitor 2 type %s found\n",
 	       radeon_get_mon_name(rinfo->mon2_type));
-	if (rinfo->mon2_EDID) {
+	if (rinfo->mon2_EDID)
 		printk(KERN_INFO "radeonfb: EDID probed\n");
-		show_edid(rinfo->mon2_EDID);
-	}
 }
 
 
@@ -670,7 +666,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	/*
 	 * Fill default var first
 	 */
-	rinfo->info.var = radeonfb_default_var;
+	rinfo->info->var = radeonfb_default_var;
 
 	/*
 	 * First check out what BIOS has to say
@@ -704,7 +700,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	 * those
 	 */
 	if (rinfo->mon1_type != MT_CRT && rinfo->panel_info.valid) {
-		struct fb_var_screeninfo *var = &rinfo->info.var;
+		struct fb_var_screeninfo *var = &rinfo->info->var;
 
 		RTRACE("Setting up default mode based on panel info\n");
 		var->xres = rinfo->panel_info.xres;
@@ -737,7 +733,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	if (rinfo->mon1_EDID) {
 		rinfo->mon1_modedb = fb_create_modedb(rinfo->mon1_EDID,
 						      &rinfo->mon1_dbsize);
-		fb_get_monitor_limits(rinfo->mon1_EDID, &rinfo->info.monspecs);
+		fb_get_monitor_limits(rinfo->mon1_EDID, &rinfo->info->monspecs);
 	}
 
 	
@@ -768,14 +764,14 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 		modedb = rinfo->mon1_modedb;
 		dbsize = rinfo->mon1_dbsize;
 		snprintf(modename, 31, "%dx%d", rinfo->panel_info.xres, rinfo->panel_info.yres);
-		if (fb_find_mode(&rinfo->info.var, &rinfo->info, modename,
+		if (fb_find_mode(&rinfo->info->var, rinfo->info, modename,
 				 modedb, dbsize, NULL, 8) == 0) {
 			printk(KERN_WARNING "radeonfb: Can't find mode for panel size, going back to CRT\n");
 			rinfo->mon1_type = MT_CRT;
 			goto pickup_default;
 		}
 		has_default_mode = 1;
-		radeon_var_to_panel_info(rinfo, &rinfo->info.var);
+		radeon_var_to_panel_info(rinfo, &rinfo->info->var);
 	}
 
  pickup_default:
@@ -785,12 +781,12 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	if (!has_default_mode || mode_option) {
 		struct fb_videomode default_mode;
 		if (has_default_mode)
-			radeon_var_to_videomode(&default_mode, &rinfo->info.var);
+			radeon_var_to_videomode(&default_mode, &rinfo->info->var);
 		else
 			radeon_var_to_videomode(&default_mode, &radeonfb_default_var);
-		if (fb_find_mode(&rinfo->info.var, &rinfo->info, mode_option,
+		if (fb_find_mode(&rinfo->info->var, rinfo->info, mode_option,
 				 rinfo->mon1_modedb, rinfo->mon1_dbsize, &default_mode, 8) == 0)
-			rinfo->info.var = radeonfb_default_var;
+			rinfo->info->var = radeonfb_default_var;
 	}
 
 }
@@ -866,7 +862,7 @@ int  radeon_match_mode(struct radeonfb_info *rinfo,
 		 * (though I may be proven wrong...)
 		 */
 		if (has_rmx == 0 && rinfo->mon1_modedb)
-			if (fb_validate_mode(src, &rinfo->info))
+			if (fb_validate_mode(src, rinfo->info))
 				return -EINVAL;
 		return 0;
 	}

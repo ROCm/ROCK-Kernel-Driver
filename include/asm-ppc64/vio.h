@@ -68,6 +68,33 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 void vio_free_consistent(struct vio_dev *dev, size_t size, void *vaddr, 
 			 dma_addr_t dma_handle);
 
+static inline int vio_dma_supported(struct vio_dev *hwdev, u64 mask)
+{
+	return 1;
+}
+
+#define vio_map_page(dev, page, off, size, dir) \
+		vio_map_single(dev, (page_address(page) + (off)), size, dir)
+#define vio_unmap_page(dev,addr,sz,dir) vio_unmap_single(dev,addr,sz,dir)
+
+
+static inline void vio_dma_sync_single(struct vio_dev *hwdev,
+				       dma_addr_t dma_handle,
+				       size_t size, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void vio_dma_sync_sg(struct vio_dev *hwdev,
+				   struct scatterlist *sg,
+				   int nelems, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+	/* nothing to do */
+}
+static inline int vio_set_dma_mask(struct vio_dev *dev, u64 mask) { return -EIO; }
+
 extern struct bus_type vio_bus_type;
 
 struct vio_device_id {

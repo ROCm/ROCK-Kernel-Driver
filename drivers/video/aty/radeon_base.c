@@ -727,7 +727,7 @@ found:
 
 static int radeonfb_check_var (struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	struct radeonfb_info *rinfo = (struct radeonfb_info *) info->par;
+	struct radeonfb_info *rinfo = info->par;
         struct fb_var_screeninfo v;
         int nom, den;
 	unsigned int pitch;
@@ -852,7 +852,7 @@ static int radeonfb_check_var (struct fb_var_screeninfo *var, struct fb_info *in
 static int radeonfb_pan_display (struct fb_var_screeninfo *var,
                                  struct fb_info *info)
 {
-        struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
+        struct radeonfb_info *rinfo = info->par;
 
         if ((var->xoffset + var->xres > var->xres_virtual)
 	    || (var->yoffset + var->yres > var->yres_virtual))
@@ -870,7 +870,7 @@ static int radeonfb_pan_display (struct fb_var_screeninfo *var,
 static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
                            unsigned long arg, struct fb_info *info)
 {
-        struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
+        struct radeonfb_info *rinfo = info->par;
 	unsigned int tmp;
 	u32 value = 0;
 	int rc;
@@ -981,7 +981,7 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank)
 
 int radeonfb_blank (int blank, struct fb_info *info)
 {
-        struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
+        struct radeonfb_info *rinfo = info->par;
 
 	if (rinfo->asleep)
 		return 0;
@@ -1004,7 +1004,7 @@ int radeonfb_blank (int blank, struct fb_info *info)
 static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
                              unsigned blue, unsigned transp, struct fb_info *info)
 {
-        struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
+        struct radeonfb_info *rinfo = info->par;
 	u32 pindex;
 	unsigned int i;
 	
@@ -1385,7 +1385,7 @@ static void radeon_calc_pll_regs(struct radeonfb_info *rinfo, struct radeon_regs
 
 int radeonfb_set_par(struct fb_info *info)
 {
-	struct radeonfb_info *rinfo = (struct radeonfb_info *)info->par;
+	struct radeonfb_info *rinfo = info->par;
 	struct fb_var_screeninfo *mode = &info->var;
 	struct radeon_regs newmode;
 	int hTotal, vTotal, hSyncStart, hSyncEnd,
@@ -1662,7 +1662,7 @@ int radeonfb_set_par(struct fb_info *info)
 		radeon_write_mode (rinfo, &newmode);
 		/* (re)initialize the engine */
 		if (!radeon_accel_disabled())
-			radeon_engine_init (rinfo);
+			radeonfb_engine_init (rinfo);
 	
 	}
 	/* Update fix */
@@ -1703,9 +1703,7 @@ static struct fb_ops radeonfb_ops = {
 
 static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 {
-	struct fb_info *info;
-
-	info = &rinfo->info;
+	struct fb_info *info = rinfo->info;
 
 	info->currcon = -1;
 	info->par = rinfo;
@@ -1947,7 +1945,8 @@ static ssize_t radeon_show_edid1(struct kobject *kobj, char *buf, loff_t off, si
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct radeonfb_info *rinfo = pci_get_drvdata(pdev);
+        struct fb_info *info = pci_get_drvdata(pdev);
+        struct radeonfb_info *rinfo = info->par;
 
 	return radeon_show_one_edid(buf, off, count, rinfo->mon1_EDID);
 }
@@ -1957,7 +1956,8 @@ static ssize_t radeon_show_edid2(struct kobject *kobj, char *buf, loff_t off, si
 {
 	struct device *dev = container_of(kobj, struct device, kobj);
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct radeonfb_info *rinfo = pci_get_drvdata(pdev);
+        struct fb_info *info = pci_get_drvdata(pdev);
+        struct radeonfb_info *rinfo = info->par;
 
 	return radeon_show_one_edid(buf, off, count, rinfo->mon2_EDID);
 }
@@ -1986,6 +1986,7 @@ static struct bin_attribute edid2_attr = {
 static int radeonfb_pci_register (struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
+	struct fb_info *info;
 	struct radeonfb_info *rinfo;
 	u32 tmp;
 
@@ -1997,13 +1998,13 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	rinfo = kmalloc (sizeof (struct radeonfb_info), GFP_KERNEL);
-	if (!rinfo) {
+	info = framebuffer_alloc(sizeof(struct radeonfb_info), &pdev->dev);
+	if (!info) {
 		printk (KERN_ERR "radeonfb: could not allocate memory\n");
 		return -ENODEV;
 	}
-
-	memset (rinfo, 0, sizeof (struct radeonfb_info));
+	rinfo = info->par;
+	rinfo->info = info;	
 	rinfo->pdev = pdev;
 	
 	spin_lock_init(&rinfo->reg_lock);
@@ -2182,7 +2183,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	 */
 	radeon_save_state (rinfo, &rinfo->init_state);
 
-	pci_set_drvdata(pdev, rinfo);
+	pci_set_drvdata(pdev, info);
 
 	/* Enable PM on mobility chips */
 	if (rinfo->is_mobility) {
@@ -2193,7 +2194,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		printk("radeonfb: Power Management enabled for Mobility chipsets\n");
 	}
 
-	if (register_framebuffer ((struct fb_info *) rinfo) < 0) {
+	if (register_framebuffer(info) < 0) {
 		printk (KERN_ERR "radeonfb: could not register framebuffer\n");
 		goto unmap_fb;
 	}
@@ -2243,7 +2244,7 @@ release_fb:
 	release_mem_region (rinfo->fb_base_phys,
 			    pci_resource_len(pdev, 0));
 free_rinfo:	
-	kfree (rinfo);
+	framebuffer_release(info);
 	return -ENODEV;
 }
 
@@ -2251,7 +2252,8 @@ free_rinfo:
 
 static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 {
-        struct radeonfb_info *rinfo = pci_get_drvdata(pdev);
+        struct fb_info *info = pci_get_drvdata(pdev);
+        struct radeonfb_info *rinfo = info->par;
  
         if (!rinfo)
                 return;
@@ -2270,7 +2272,7 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 		mtrr_del(rinfo->mtrr_hdl, 0, 0);
 #endif
 
-        unregister_framebuffer ((struct fb_info *) rinfo);
+        unregister_framebuffer(info);
 
         iounmap ((void*)rinfo->mmio_base);
         iounmap ((void*)rinfo->fb_base);

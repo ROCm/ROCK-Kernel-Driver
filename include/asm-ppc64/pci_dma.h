@@ -94,7 +94,9 @@ extern struct TceTable virtBusTceTable;	/* Tce table for virtual bus */
 extern void create_tce_tables(void);
 extern void create_pci_bus_tce_table(unsigned long);
 
-void tce_init_pSeries(void);
-void tce_init_iSeries(void);
+extern void tce_init_pSeries(void);
+extern void tce_init_iSeries(void);
+
+extern void pci_dma_init_direct(void);
 
 #endif

@@ -1125,7 +1125,6 @@ endmenu
 
 source "lib/Kconfig"
 
-source "arch/ppc/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
@@ -1213,10 +1212,6 @@ config XMON
 	help
 	  Include in-kernel hooks for the xmon kernel monitor/debugger.
 	  Unless you are intending to debug the kernel, say N here.
-
-config XMON_FW
-	bool "xmon over firewire support"
-	depends on XMON
 
 config BDI_SWITCH
 	bool "Include BDI-2000 user context switcher"

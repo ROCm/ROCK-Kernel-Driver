@@ -151,20 +151,20 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		break;
 	}
 
-	if (regno < 16) {
-		u32 *pal = info->pseudo_palette;
-		unsigned int i;
-
+	if (regno < 16)
 		switch (info->var.bits_per_pixel) {
 		case 16:
-			pal[regno] = (regno << 10) | (regno << 5) | regno;
+			((u16 *) (info->pseudo_palette))[regno] =
+			    (regno << 10) | (regno << 5) | regno;
 			break;
 		case 32:
-			i = (regno << 8) | regno;
-			pal[regno] = (i << 16) | i;
-			break;
+			{
+				int i = (regno << 8) | regno;
+				((u32 *) (info->pseudo_palette))[regno] =
+				    (i << 16) | i;
+				break;
+			}
 		}
-	}
 	return 0;
 }
 
@@ -247,7 +247,7 @@ int __init offb_init(void)
 {
 	struct device_node *dp;
 	unsigned int dpy;
-#ifdef CONFIG_BOOTX_TEXT
+#if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
 	struct device_node *displays = find_type_devices("display");
 	struct device_node *macos_display = NULL;
 
@@ -323,7 +323,7 @@ int __init offb_init(void)
 			     boot_infos->dispDeviceDepth,
 			     boot_infos->dispDeviceRowBytes, addr, NULL);
 	}
-#endif
+#endif /* defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32) */
 
 	for (dpy = 0; dpy < prom_num_displays; dpy++) {
 		if ((dp = find_path_device(prom_display_paths[dpy])))

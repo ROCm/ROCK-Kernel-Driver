@@ -93,7 +93,7 @@ config ADB
 
 config ADB_MACIO
 	bool "Include MacIO (CHRP) ADB driver"
-	depends on ADB && !PPC_PMAC64
+	depends on ADB && PPC_PMAC && !PPC_PMAC64
 	help
 	  Say Y here to include direct support for the ADB controller in the
 	  Hydra chip used on PowerPC Macintoshes of the CHRP type.  (The Hydra
@@ -129,18 +129,18 @@ config MAC_EMUMOUSEBTN
 
 config THERM_WINDTUNNEL
 	tristate "Support for thermal management on Windtunnel G4s"
-	depends on I2C && I2C_KEYWEST && !PPC_PMAC64
+	depends on I2C && I2C_KEYWEST && PPC_PMAC && !PPC_PMAC64
 	help
 	  This driver provides some thermostat and fan control for the desktop
 	  G4 "Windtunnel"
 
-config THERM_IBOOKG4
-	tristate "Support for thermal management on iBook G4"
-	depends on I2C && I2C_KEYWEST && !PPC_PMAC64
+config THERM_ADT7467
+	tristate "Support for thermal mgmnt on laptops with ADT 7467 chipset"
+	depends on I2C && I2C_KEYWEST && PPC_PMAC && !PPC_PMAC64
 	help
 	  This driver provides some thermostat and fan control for the
-          iBook G4, allowing slighlty better fan behaviour by default,
-	  and optionally some manual control.
+          iBook G4, and the ATI based aluminium PowerBooks, allowing slighlty
+	  better fan behaviour by default, and some manual control.
 
 config THERM_PM72
 	tristate "Support for thermal management on PowerMac G5"
