@@ -251,6 +251,11 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset_name	= "Pro 266",
 	},
 
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_XN266,
+		.chipset_name	= "Apollo Pro266",
+	},
+
 	/* VT8361 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8361,
