@@ -25,14 +25,15 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
-#include <linux/device.h>
-#include <asm/io.h>
-#include <asm/scatterlist.h>
 #include <linux/dma-mapping.h>
 #include <asm/semaphore.h>
 #include <sound/memalloc.h>
+#ifdef CONFIG_SBUS
+#include <asm/sbus.h>
+#endif
 
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>, Jaroslav Kysela <perex@suse.cz>");
