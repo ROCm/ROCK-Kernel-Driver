@@ -120,7 +120,7 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 
 	if (uptodate)
 		multipath_end_bh_io(mp_bh, uptodate);
-	else {
+	else if ((bio->bi_rw & (1 << BIO_RW_AHEAD)) == 0) {
 		/*
 		 * oops, IO error:
 		 */
@@ -130,7 +130,8 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		       bdevname(rdev->bdev,b), 
 		       (unsigned long long)bio->bi_sector);
 		multipath_reschedule_retry(mp_bh);
-	}
+	} else
+		multipath_end_bh_io(mp_bh, 0);
 	rdev_dec_pending(rdev, conf->mddev);
 	return 0;
 }
