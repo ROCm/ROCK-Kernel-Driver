@@ -92,7 +92,7 @@
 		debug_event(qeth_dbf_##name,level,(void*)(addr),len); \
 	} while (0)
 
-extern DEFINE_PER_CPU(char[256], qeth_dbf_txt_buf);
+DECLARE_PER_CPU(char[256], qeth_dbf_txt_buf);
 
 #define QETH_DBF_TEXT_(name,level,text...)				\
 	do {								\
@@ -740,8 +740,6 @@ struct qeth_card {
 #ifdef CONFIG_QETH_VLAN
 	spinlock_t vlanlock;
 	struct vlan_group *vlangrp;
-	__u8 vlans_current[VLAN_GROUP_ARRAY_LEN/(8*sizeof(__u8))];
-        __u8 vlans_new[VLAN_GROUP_ARRAY_LEN/(8*sizeof(__u8))];
 #endif
 	struct work_struct kernel_thread_starter;
 	spinlock_t thread_mask_lock;

@@ -127,6 +127,8 @@ void debug_unregister(debug_info_t* id);
 
 void debug_set_level(debug_info_t* id, int new_level);
 
+void debug_stop_all(void);
+
 extern inline debug_entry_t* 
 debug_event(debug_info_t* id, int level, void* data, int length)
 {

@@ -30,6 +30,8 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/unistd.h>
+#include <linux/serial.h>
+#include <linux/8250.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -51,6 +53,7 @@
 #include <asm/system.h>
 #include <asm/rtas.h>
 #include <asm/iommu.h>
+#include <asm/serial.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -72,11 +75,14 @@ extern void udbg_init_debug_lpar(void);
 extern void udbg_init_pmac_realmode(void);
 /* That's RTAS panel debug */
 extern void call_rtas_display_status_delay(unsigned char c);
+/* Here's maple real mode debug */
+extern void udbg_init_maple_realmode(void);
 
 #define EARLY_DEBUG_INIT() do {} while(0)
 
 #if 0
 #define EARLY_DEBUG_INIT() udbg_init_debug_lpar()
+#define EARLY_DEBUG_INIT() udbg_init_maple_realmode()
 #define EARLY_DEBUG_INIT() udbg_init_pmac_realmode()
 #define EARLY_DEBUG_INIT()						\
 	do { ppc_md.udbg_putc = call_rtas_display_status_delay; } while(0)
@@ -323,6 +329,7 @@ static void __init setup_cpu_maps(void)
 
 extern struct machdep_calls pSeries_md;
 extern struct machdep_calls pmac_md;
+extern struct machdep_calls maple_md;
 
 /* Ultimately, stuff them in an elf section like initcalls... */
 static struct machdep_calls __initdata *machines[] = {
@@ -332,6 +339,9 @@ static struct machdep_calls __initdata *machines[] = {
 #ifdef CONFIG_PPC_PMAC
 	&pmac_md,
 #endif /* CONFIG_PPC_PMAC */
+#ifdef CONFIG_PPC_MAPLE
+	&maple_md,
+#endif /* CONFIG_PPC_MAPLE */
 	NULL
 };
 
@@ -630,6 +640,7 @@ void __init setup_system(void)
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
 	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
 	printk("systemcfg                     = 0x%p\n", systemcfg);
+	printk("systemcfg->platform           = 0x%x\n", systemcfg->platform);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
 	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
@@ -783,12 +794,11 @@ early_param("mem", early_parsemem);
 #ifdef CONFIG_PPC_MULTIPLATFORM
 static int __init set_preferred_console(void)
 {
-	struct device_node *prom_stdout;
+	struct device_node *prom_stdout = NULL;
 	char *name;
+	u32 *spd;
 	int offset = 0;
-#if  0
-	phandle *stdout_ph;
-#endif
+
 	DBG(" -> set_preferred_console()\n");
 
 	/* The user has requested a console so this is already set up. */
@@ -802,20 +812,7 @@ static int __init set_preferred_console(void)
 		return -ENODEV;
 	}
 	/* We are getting a weird phandle from OF ... */
-#if 0
-	stdout_ph = (phandle *)get_property(of_chosen, "linux,stdout-package", NULL);
-	if (stdout_ph == NULL) {
-		DBG(" no linux,stdout-package !\n");
-		return -ENODEV;
-	}
-	prom_stdout = of_find_node_by_phandle(*stdout_ph);
-	if (!prom_stdout) {
-		DBG(" can't find stdout package for phandle 0x%x !\n", *stdout_ph);
-		return -ENODEV;
-	}
-#endif
 	/* ... So use the full path instead */
-#if 1
 	name = (char *)get_property(of_chosen, "linux,stdout-path", NULL);
 	if (name == NULL) {
 		DBG(" no linux,stdout-path !\n");
@@ -826,7 +823,6 @@ static int __init set_preferred_console(void)
 		DBG(" can't find stdout package %s !\n", name);
 		return -ENODEV;
 	}	
-#endif
 	DBG("stdout is %s\n", prom_stdout->full_name);
 
 	name = (char *)get_property(prom_stdout, "name", NULL);
@@ -834,8 +830,12 @@ static int __init set_preferred_console(void)
 		DBG(" stdout package has no name !\n");
 		goto not_found;
 	}
+	spd = (u32 *)get_property(prom_stdout, "current-speed", NULL);
 
-	if (strcmp(name, "serial") == 0) {
+	if (0)
+		;
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	else if (strcmp(name, "serial") == 0) {
 		int i;
 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
 		if (i > 8) {
@@ -858,6 +858,7 @@ static int __init set_preferred_console(void)
 			}
 		}
 	}
+#endif /* CONFIG_SERIAL_8250_CONSOLE */
 #ifdef CONFIG_PPC_PSERIES
 	else if (strcmp(name, "vty") == 0) {
  		u32 *reg = (u32 *)get_property(prom_stdout, "reg", NULL);
@@ -887,17 +888,24 @@ static int __init set_preferred_console(void)
  		}
 	}
 #endif /* CONFIG_PPC_PSERIES */
+#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
 	else if (strcmp(name, "ch-a") == 0)
 		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
 		offset = 1;
+#endif /* CONFIG_SERIAL_PMACZILOG_CONSOLE */
 	else
 		goto not_found;
 	of_node_put(prom_stdout);
 
 	DBG("Found serial console at ttyS%d\n", offset);
 
-	return add_preferred_console("ttyS", offset, NULL);
+	if (spd) {
+		char opt[16];
+		sprintf(opt, "%d", *spd);
+		return add_preferred_console("ttyS", offset, opt);
+	} else
+		return add_preferred_console("ttyS", offset, NULL);
 
  not_found:
 	DBG("No preferred console found !\n");
@@ -1106,15 +1114,209 @@ __setup("spread_lpevents=", set_spread_lpevents );
 __setup("decr_overclock_proc0=", set_decr_overclock_proc0 );
 __setup("decr_overclock=", set_decr_overclock );
 
+#ifndef CONFIG_PPC_ISERIES
+/*
+ * This function can be used by platforms to "find" legacy serial ports.
+ * It works for "serial" nodes under an "isa" node, and will try to
+ * respect the "ibm,aix-loc" property if any. It works with up to 8
+ * ports.
+ */
+
+#define MAX_LEGACY_SERIAL_PORTS	8
+static struct old_serial_port	old_serial_ports[MAX_LEGACY_SERIAL_PORTS];
+static unsigned int		old_serial_count;
+
+void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
+{
+	struct device_node *np;
+	u32 *sizeprop;
+
+	struct isa_reg_property {
+		u32 space;
+		u32 address;
+		u32 size;
+	};
+	struct pci_reg_property {
+		struct pci_address addr;
+		u32 size_hi;
+		u32 size_lo;
+	};                                                                        
+
+	DBG(" -> generic_find_legacy_serial_port()\n");
+
+	naca->serialPortAddr = 0;
+	if (default_speed)
+		*default_speed = 0;
+
+	np = of_find_node_by_path("/");
+	if (!np)
+		return;
+
+	/* First fill our array */
+	for (np = NULL; (np = of_find_node_by_type(np, "serial"));) {
+		struct device_node *isa, *pci;
+		struct isa_reg_property *reg;
+		unsigned long phys_size, addr_size, io_base;
+		u32 *rangesp;
+		u32 *interrupts, *clk, *spd;
+		char *typep;
+		int index, rlen, rentsize;
+
+		/* Ok, first check if it's under an "isa" parent */
+		isa = of_get_parent(np);
+		if (!isa || strcmp(isa->name, "isa")) {
+			DBG("%s: no isa parent found\n", np->full_name);
+			continue;
+		}
+		
+		/* Now look for an "ibm,aix-loc" property that gives us ordering
+		 * if any...
+		 */
+	 	typep = (char *)get_property(np, "ibm,aix-loc", NULL);
+
+		/* Get the ISA port number */
+		reg = (struct isa_reg_property *)get_property(np, "reg", NULL);	
+		if (reg == NULL)
+			goto next_port;
+		/* We assume the interrupt number isn't translated ... */
+		interrupts = (u32 *)get_property(np, "interrupts", NULL);
+		/* get clock freq. if present */
+		clk = (u32 *)get_property(np, "clock-frequency", NULL);
+		/* get default speed if present */
+		spd = (u32 *)get_property(np, "current-speed", NULL);
+		/* Default to locate at end of array */
+		index = old_serial_count; /* end of the array by default */
+
+		/* If we have a location index, then use it */
+		if (typep && *typep == 'S') {
+			index = simple_strtol(typep+1, NULL, 0) - 1;
+			/* if index is out of range, use end of array instead */
+			if (index >= MAX_LEGACY_SERIAL_PORTS)
+				index = old_serial_count;
+			/* if our index is still out of range, that mean that
+			 * array is full, we could scan for a free slot but that
+			 * make little sense to bother, just skip the port
+			 */
+			if (index >= MAX_LEGACY_SERIAL_PORTS)
+				goto next_port;
+			if (index >= old_serial_count)
+				old_serial_count = index + 1;
+			/* Check if there is a port who already claimed our slot */
+			if (old_serial_ports[index].port != 0) {
+				/* if we still have some room, move it, else override */
+				if (old_serial_count < MAX_LEGACY_SERIAL_PORTS) {
+					DBG("Moved legacy port %d -> %d\n", index,
+					    old_serial_count);
+					old_serial_ports[old_serial_count++] =
+						old_serial_ports[index];
+				} else {
+					DBG("Replacing legacy port %d\n", index);
+				}
+			}
+		}
+		if (index >= MAX_LEGACY_SERIAL_PORTS)
+			goto next_port;
+		if (index >= old_serial_count)
+			old_serial_count = index + 1;
+
+		/* Now fill the entry */
+		memset(&old_serial_ports[index], 0, sizeof(struct old_serial_port));
+		old_serial_ports[index].uart = 0;
+		old_serial_ports[index].baud_base = clk ? (*clk / 16) : BASE_BAUD;
+		old_serial_ports[index].port = reg->address;
+		old_serial_ports[index].irq = interrupts ? interrupts[0] : 0;
+		old_serial_ports[index].flags = ASYNC_BOOT_AUTOCONF;
+
+		DBG("Added legacy port, index: %d, port: %x, irq: %d, clk: %d\n",
+		    index,
+		    old_serial_ports[index].port,
+		    old_serial_ports[index].irq,
+		    old_serial_ports[index].baud_base * 16);
+
+		/* Get phys address of IO reg for port 1 */
+		if (index != 0)
+			goto next_port;
+
+		pci = of_get_parent(isa);
+		if (!pci) {
+			DBG("%s: no pci parent found\n", np->full_name);
+			goto next_port;
+		}
+
+		rangesp = (u32 *)get_property(pci, "ranges", &rlen);
+		if (rangesp == NULL) {
+			of_node_put(pci);
+			goto next_port;
+		}
+		rlen /= 4;
+
+		/* we need the #size-cells of the PCI bridge node itself */
+		phys_size = 1;
+		sizeprop = (u32 *)get_property(pci, "#size-cells", NULL);
+		if (sizeprop != NULL)
+			phys_size = *sizeprop;
+		/* we need the parent #addr-cells */
+		addr_size = prom_n_addr_cells(pci);
+		rentsize = 3 + addr_size + phys_size;
+		io_base = 0;
+		for (;rlen >= rentsize; rlen -= rentsize,rangesp += rentsize) {
+			if (((rangesp[0] >> 24) & 0x3) != 1)
+				continue; /* not IO space */
+			io_base = rangesp[3];
+			if (addr_size == 2)
+				io_base = (io_base << 32) | rangesp[4];
+		}
+		if (io_base != 0) {
+			naca->serialPortAddr = io_base + reg->address;
+			if (default_speed && spd)
+				*default_speed = *spd;
+		}
+		of_node_put(pci);
+	next_port:
+		of_node_put(isa);
+	}
+
+	DBG(" <- generic_find_legacy_serial_port()\n");
+}
+
+struct old_serial_port *get_legacy_serial_ports(unsigned int *count)
+{
+	*count = old_serial_count;
+	return old_serial_ports;
+}
+#else
+struct old_serial_port *get_legacy_serial_ports(unsigned int *count)
+{
+	*count = 0;
+	return 0;
+}
+#endif /* CONFIG_PPC_ISERIES */
+EXPORT_SYMBOL(get_legacy_serial_ports);
+
+int check_legacy_ioport(unsigned long base_port)
+{
+	if (ppc_md.check_legacy_ioport == NULL)
+		return 0;
+	return ppc_md.check_legacy_ioport(base_port);
+}
+EXPORT_SYMBOL(check_legacy_ioport);
+
 #ifdef CONFIG_XMON
 static int __init early_xmon(char *p)
 {
 	/* ensure xmon is enabled */
 	xmon_init();
-	debugger(0);
+	debugger(NULL);
 
 	return 0;
 }
 early_param("xmon", early_xmon);
 #endif
 
+void cpu_die(void)
+{
+	if (ppc_md.cpu_die)
+		ppc_md.cpu_die();
+	local_irq_disable();
+	for (;;);
+}

@@ -267,7 +267,7 @@ const char *snd_pcm_oss_format_name(int format)
 }
 #endif
 
-
+#ifdef CONFIG_PROC_FS
 static void snd_pcm_proc_info_read(snd_pcm_substream_t *substream, snd_info_buffer_t *buffer)
 {
 	snd_pcm_info_t info;
@@ -391,6 +391,7 @@ static void snd_pcm_substream_proc_status_read(snd_info_entry_t *entry, snd_info
 	snd_iprintf(buffer, "hw_ptr      : %ld\n", runtime->status->hw_ptr);
 	snd_iprintf(buffer, "appl_ptr    : %ld\n", runtime->control->appl_ptr);
 }
+#endif
 
 #ifdef CONFIG_SND_DEBUG
 static void snd_pcm_xrun_debug_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)

@@ -645,7 +645,7 @@ typedef struct host_bsq {
 
 typedef struct fw_header {
     u32 magic;           /* magic number                               */
-    u32 version;         /* firware version id                         */
+    u32 version;         /* firmware version id                        */
     u32 load_offset;     /* fw load offset in board memory             */
     u32 start_offset;    /* fw execution start address in board memory */
 } fw_header_t;

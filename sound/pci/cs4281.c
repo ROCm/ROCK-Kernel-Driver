@@ -463,8 +463,8 @@ struct snd_cs4281_dma {
 struct snd_cs4281 {
 	int irq;
 
-	unsigned long ba0;		/* virtual (accessible) address */
-	unsigned long ba1;		/* virtual (accessible) address */
+	void __iomem *ba0;		/* virtual (accessible) address */
+	void __iomem *ba1;		/* virtual (accessible) address */
 	unsigned long ba0_addr;
 	unsigned long ba1_addr;
 
@@ -1358,9 +1358,9 @@ static int snd_cs4281_free(cs4281_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	if (chip->ba0)
-		iounmap((void *) chip->ba0);
+		iounmap(chip->ba0);
 	if (chip->ba1)
-		iounmap((void *) chip->ba1);
+		iounmap(chip->ba1);
 	pci_release_regions(chip->pci);
 
 	kfree(chip);
@@ -1422,8 +1422,8 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	}
 	chip->irq = pci->irq;
 
-	chip->ba0 = (unsigned long) ioremap_nocache(chip->ba0_addr, pci_resource_len(pci, 0));
-	chip->ba1 = (unsigned long) ioremap_nocache(chip->ba1_addr, pci_resource_len(pci, 1));
+	chip->ba0 = ioremap_nocache(chip->ba0_addr, pci_resource_len(pci, 0));
+	chip->ba1 = ioremap_nocache(chip->ba1_addr, pci_resource_len(pci, 1));
 	if (!chip->ba0 || !chip->ba1) {
 		snd_cs4281_free(chip);
 		return -ENOMEM;
@@ -1913,6 +1913,31 @@ static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *r
 }
 
 
+/*
+ * OPL3 command
+ */
+static void snd_cs4281_opl3_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
+{
+	unsigned long flags;
+	cs4281_t *chip = opl3->private_data;
+	void __iomem *port;
+
+	if (cmd & OPL3_RIGHT)
+		port = chip->ba0 + BA0_B1AP; /* right port */
+	else
+		port = chip->ba0 + BA0_B0AP; /* left port */
+
+	spin_lock_irqsave(&opl3->reg_lock, flags);
+
+	writel((unsigned int)cmd, port);
+	udelay(10);
+
+	writel((unsigned int)val, port + 4);
+	udelay(30);
+
+	spin_unlock_irqrestore(&opl3->reg_lock, flags);
+}
+
 static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 				      const struct pci_device_id *pci_id)
 {
@@ -1950,13 +1975,13 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_opl3_create(card,
-				   (chip->ba0 + BA0_B0AP) >> 2,
-				   (chip->ba0 + BA0_B1AP) >> 2,
-				   OPL3_HW_OPL3_CS4281, 1, &opl3)) < 0) {
+	if ((err = snd_opl3_new(card, OPL3_HW_OPL3_CS4281, &opl3)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
+	opl3->private_data = chip;
+	opl3->command = snd_cs4281_opl3_command;
+	snd_opl3_init(opl3);
 	if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

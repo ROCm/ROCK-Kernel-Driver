@@ -629,7 +629,7 @@ void ufs_read_inode (struct inode * inode)
 		}
 	} else
 		init_special_inode(inode, inode->i_mode,
-			old_decode_dev(fs32_to_cpu(sb, ufsi->i_u1.i_data[0])));
+			ufs_get_inode_dev(sb, ufsi));
 
 	brelse (bh);
 
@@ -705,7 +705,7 @@ ufs2_inode :
 		}
 	} else   /* TODO  : here ...*/
 		init_special_inode(inode, inode->i_mode,
-			old_decode_dev(fs32_to_cpu(sb, ufsi->i_u1.i_data[0])));
+			ufs_get_inode_dev(sb, ufsi));
 
 	brelse(bh);
 

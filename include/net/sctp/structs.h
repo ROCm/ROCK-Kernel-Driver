@@ -266,6 +266,7 @@ struct sctp_opt {
 	__u8 disable_fragments;
 	__u8 pd_mode;
 	__u8 v4mapped;
+	__u32 adaption_ind;
 
 	/* Receive to here while partial delivery is in effect. */
 	struct sk_buff_head pd_lobby;
@@ -323,6 +324,8 @@ struct sctp_cookie {
 
 	__u8 prsctp_capable;
 
+	__u32 adaption_ind;	
+
 	/* This is a shim for my peer's INIT packet, followed by
 	 * a copy of the raw address list of the association.
 	 * The length of the raw address list is saved in the
@@ -362,6 +365,7 @@ union sctp_params {
 	struct sctp_ipv4addr_param *v4;
 	struct sctp_ipv6addr_param *v6;
 	union sctp_addr_param *addr;
+	struct sctp_adaption_ind_param *aind;
 };
 
 /* RFC 2960.  Section 3.3.5 Heartbeat.
@@ -1394,6 +1398,8 @@ struct sctp_association {
 		__u8	hostname_address;/* Peer understands DNS addresses? */
 		__u8    asconf_capable;  /* Does peer support ADDIP? */
 		__u8    prsctp_capable;  /* Can peer do PR-SCTP? */
+
+		__u32   adaption_ind;	 /* Adaption Code point. */
 
 		/* This mask is used to disable sending the ASCONF chunk
 		 * with specified parameter to peer.

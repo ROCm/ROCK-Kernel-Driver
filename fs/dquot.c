@@ -811,22 +811,22 @@ static void print_warning(struct dquot *dquot, const char warntype)
 	tty_write_message(current->signal->tty, quotatypes[dquot->dq_type]);
 	switch (warntype) {
 		case IHARDWARN:
-			msg = " file limit reached.\n";
+			msg = " file limit reached.\r\n";
 			break;
 		case ISOFTLONGWARN:
-			msg = " file quota exceeded too long.\n";
+			msg = " file quota exceeded too long.\r\n";
 			break;
 		case ISOFTWARN:
-			msg = " file quota exceeded.\n";
+			msg = " file quota exceeded.\r\n";
 			break;
 		case BHARDWARN:
-			msg = " block limit reached.\n";
+			msg = " block limit reached.\r\n";
 			break;
 		case BSOFTLONGWARN:
-			msg = " block quota exceeded too long.\n";
+			msg = " block quota exceeded too long.\r\n";
 			break;
 		case BSOFTWARN:
-			msg = " block quota exceeded.\n";
+			msg = " block quota exceeded.\r\n";
 			break;
 	}
 	tty_write_message(current->signal->tty, msg);

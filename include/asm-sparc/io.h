@@ -23,6 +23,8 @@ static inline u16 flip_word (u16 w)
 	return ((w&0xff) << 8) | ((w>>8)&0xff);
 }
 
+#define mmiowb()
+
 /*
  * Memory mapped I/O to PCI
  *

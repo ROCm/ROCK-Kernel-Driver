@@ -320,6 +320,8 @@ DECLARE_IO(int,l,"")
 #define writesw(p,d,l)                        __readwrite_bug("writesw")
 #define writesl(p,d,l)                        __readwrite_bug("writesl")
 
+#define mmiowb()
+
 /* the following macro is depreciated */
 #define ioaddr(port)                    __ioaddr((port))
 

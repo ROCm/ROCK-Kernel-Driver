@@ -335,7 +335,7 @@ static inline void sctp_v6_exit(void) { return; }
 /* Map an association to an assoc_id. */
 static inline sctp_assoc_t sctp_assoc2id(const struct sctp_association *asoc)
 {
-	return (asoc?asoc->assoc_id:NULL);
+	return (asoc?asoc->assoc_id:0);
 }
 
 /* Look up the association by its id.  */

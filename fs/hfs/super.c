@@ -98,8 +98,7 @@ int hfs_remount(struct super_block *sb, int *flags, char *data)
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 	if (!(*flags & MS_RDONLY)) {
-		if (!(HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))
-		    || (HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT))) {
+		if (!(HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))) {
 			printk("HFS-fs warning: Filesystem was not cleanly unmounted, "
 			       "running fsck.hfs is recommended.  leaving read-only.\n");
 			sb->s_flags |= MS_RDONLY;

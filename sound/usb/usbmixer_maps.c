@@ -91,6 +91,14 @@ static struct usbmix_name_map extigy_map[] = {
 	{ 0 } /* terminator */
 };
 
+/* LineX FM Transmitter entry - needed to bypass controls bug */
+static struct usbmix_name_map linex_map[] = {
+	/* 1: IT pcm */
+	/* 2: OT Speaker */ 
+	{ 3, "Master" }, /* FU: master volume - left / right / mute */
+	{ 0 } /* terminator */
+};
+
 /* Section "justlink_map" below added by James Courtier-Dutton <James@superbug.demon.co.uk>
  * sourced from Maplin Electronics (http://www.maplin.co.uk), part number A56AK
  * Part has 2 connectors that act as a single output. (TOSLINK Optical for digital out, and 3.5mm Jack for Analogue out.)
@@ -120,6 +128,7 @@ static struct usbmix_name_map justlink_map[] = {
 
 static struct usbmix_ctl_map usbmix_ctl_maps[] = {
 	{ 0x41e, 0x3000, extigy_map, 1 },
+	{ 0x8bb, 0x2702, linex_map, 1 },
 	{ 0xc45, 0x1158, justlink_map, 0 },
 	{ 0 } /* terminator */
 };

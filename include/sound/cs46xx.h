@@ -1662,7 +1662,7 @@ typedef struct _snd_cs46xx_pcm_t {
 typedef struct {
 	char name[24];
 	unsigned long base;
-	unsigned long remap_addr;
+	void __iomem *remap_addr;
 	unsigned long size;
 	struct resource *resource;
 } snd_cs46xx_region_t;

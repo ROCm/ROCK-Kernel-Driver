@@ -9,6 +9,10 @@
 # define __safe		__attribute__((safe))
 # define __force	__attribute__((force))
 # define __iomem	__attribute__((noderef, address_space(2)))
+# define __acquires(x)	__attribute__((context(0,1)))
+# define __releases(x)	__attribute__((context(1,0)))
+# define __acquire(x)	__context__(1)
+# define __release(x)	__context__(-1)
 extern void __chk_user_ptr(void __user *);
 extern void __chk_io_ptr(void __iomem *);
 #else
@@ -20,6 +24,10 @@ extern void __chk_io_ptr(void __iomem *);
 # define __chk_user_ptr(x) (void)0
 # define __chk_io_ptr(x) (void)0
 # define __builtin_warning(x, y...) (1)
+# define __acquires(x)
+# define __releases(x)
+# define __acquire(x) (void)0
+# define __release(x) (void)0
 #endif
 
 #ifdef __KERNEL__

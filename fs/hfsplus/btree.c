@@ -187,10 +187,12 @@ struct hfs_bnode *hfs_bmap_alloc(struct hfs_btree *tree)
 		res = hfsplus_file_extend(inode);
 		if (res)
 			return ERR_PTR(res);
-		inode->i_blocks = HFSPLUS_I(inode).alloc_blocks <<
-				  HFSPLUS_SB(tree->sb).fs_shift;
 		HFSPLUS_I(inode).phys_size = inode->i_size =
-			(loff_t)inode->i_blocks << tree->sb->s_blocksize_bits;
+				(loff_t)HFSPLUS_I(inode).alloc_blocks <<
+				HFSPLUS_SB(tree->sb).alloc_blksz_shift;
+		HFSPLUS_I(inode).fs_blocks = HFSPLUS_I(inode).alloc_blocks <<
+					     HFSPLUS_SB(tree->sb).fs_shift;
+		inode_set_bytes(inode, inode->i_size);
 		count = inode->i_size >> tree->node_size_shift;
 		tree->free_nodes = count - tree->node_count;
 		tree->node_count = count;

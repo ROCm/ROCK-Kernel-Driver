@@ -35,6 +35,7 @@ struct r1_private_data_s {
 	sector_t		next_seq_sect;
 	spinlock_t		device_lock;
 
+	struct list_head	retry_list;
 	/* for use when syncing mirrors: */
 
 	spinlock_t		resync_lock;

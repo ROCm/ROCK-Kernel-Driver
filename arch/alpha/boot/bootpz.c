@@ -41,15 +41,14 @@
 #undef DEBUG_ADDRESSES
 #undef DEBUG_LAST_STEPS
 
-#define DEBUG_SP(x) \
-    {register long sp asm("30"); srm_printk("%s (sp=%lx)\n", x, sp);}
-
 extern unsigned long switch_to_osf_pal(unsigned long nr,
 	struct pcb_struct * pcb_va, struct pcb_struct * pcb_pa,
 	unsigned long *vptb);
 
 extern int decompress_kernel(void* destination, void *source,
 			     size_t ksize, size_t kzsize);
+
+extern void move_stack(unsigned long new_stack);
 
 struct hwrpb_struct *hwrpb = INIT_HWRPB;
 static struct pcb_struct pcb_va[1];
@@ -163,12 +162,10 @@ static inline void
 runkernel(void)
 {
 	__asm__ __volatile__(
-		"bis %1,%1,$30\n\t"
 		"bis %0,%0,$27\n\t"
 		"jmp ($27)"
 		: /* no outputs: it doesn't even return */
-		: "r" (START_ADDR),
-		  "r" (PAGE_SIZE + INIT_STACK));
+		: "r" (START_ADDR));
 }
 
 /* Must record the SP (it is virtual) on entry, so we can make sure
@@ -253,7 +250,9 @@ extern char _end;
    for "bootmem" anyway.
 */
 #define K_COPY_IMAGE_START	NEXT_PAGE(K_KERNEL_IMAGE_END)
-#define K_INITRD_START		NEXT_PAGE(K_COPY_IMAGE_START + KERNEL_SIZE)
+/* Reserve one page below INITRD for the new stack. */
+#define K_INITRD_START \
+    NEXT_PAGE(K_COPY_IMAGE_START + KERNEL_SIZE + PAGE_SIZE)
 #define K_COPY_IMAGE_END \
     (K_INITRD_START + REAL_INITRD_SIZE + MALLOC_AREA_SIZE)
 #define K_COPY_IMAGE_SIZE \
@@ -419,8 +418,7 @@ start_kernel(void)
 		   initrd_image_start,
 		   INITRD_IMAGE_SIZE);
 #endif
-	memcpy((void *)initrd_image_start,
-	       (void *)V_INITRD_START,
+	memcpy((void *)initrd_image_start, (void *)V_INITRD_START,
 	       INITRD_IMAGE_SIZE);
 
 #endif /* INITRD_IMAGE_SIZE */
@@ -436,9 +434,14 @@ start_kernel(void)
 			   K_KERNEL_IMAGE_START,
 			   (unsigned)KERNEL_SIZE);
 #endif
+		/*
+		 * Move the stack to a safe place to ensure it won't be
+		 * overwritten by kernel image.
+		 */
+		move_stack(initrd_image_start - PAGE_SIZE);
+
 		memcpy((void *)K_KERNEL_IMAGE_START,
-		       (void *)uncompressed_image_start,
-		       KERNEL_SIZE);
+		       (void *)uncompressed_image_start, KERNEL_SIZE);
 	}
 	
 	/* Clear the zero page, then move the argument list in. */

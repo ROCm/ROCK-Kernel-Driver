@@ -17,8 +17,9 @@ obj-$(CONFIG_PNP)		+= pnp/
 # default.
 obj-y				+= char/
 
-# i810fb depends on char/agp/
+# i810fb and intelfb depend on char/agp/
 obj-$(CONFIG_FB_I810)           += video/i810/
+obj-$(CONFIG_FB_INTEL)          += video/intelfb/
 
 # we also need input/serio early so serio bus is initialized by the time
 # serial drivers start registering their serio ports

@@ -46,13 +46,11 @@ D: Various kernel patches
 S: United Kingdom
 
 N: Werner Almesberger
-E: werner.almesberger@epfl.ch
+E: werner@almesberger.net
+W: http://www.almesberger.net/
 D: dosfs, LILO, some fd features, ATM, various other hacks here and there
-S: Ecole Polytechnique Federale de Lausanne
-S: DSC ICA
-S: INN (Ecublens)
-S: CH-1015 Lausanne
-S: Switzerland
+S: Buenos Aires
+S: Argentina
 
 N: Tim Alpaerts
 E: tim_alpaerts@toyota-motor-europe.com
@@ -495,6 +493,14 @@ D: USB Serial Empeg Empeg-car Mark I/II Driver
 N: Matthias Bruestle
 E: m@mbsks.franken.de
 D: REINER SCT cyberJack pinpad/e-com USB chipcard reader driver
+S: Germany
+
+N: Adrian Bunk
+E: bunk@stusta.de
+P: 1024D/4F12B400  B29C E71E FE19 6755 5C8A  84D4 99FC EA98 4F12 B400
+D: misc kernel hacking and testing
+S: Grasmeierstrasse 11
+S: 80805 Muenchen
 S: Germany
 
 N: Ray Burr

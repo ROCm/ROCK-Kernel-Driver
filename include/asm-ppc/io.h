@@ -207,6 +207,8 @@ static inline void __raw_writel(__u32 b, volatile void __iomem *addr)
 	*(__force volatile __u32 *)(addr) = b;
 }
 
+#define mmiowb()
+
 /*
  * The insw/outsw/insl/outsl macros don't do byte-swapping.
  * They are only used in practice for transferring buffers which

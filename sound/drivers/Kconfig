@@ -30,8 +30,14 @@ config SND_DUMMY
 	depends on SND
 	select SND_PCM
 	help
-	  Say 'Y' or 'M' to include dummy driver. This driver does nothing, but
-	  emulates various mixer controls and PCM devices.
+	  Say Y here to include the dummy driver.  This driver does
+	  nothing, but emulates various mixer controls and PCM devices.
+
+	  You don't need this unless you're testing the hardware support
+	  of programs using the ALSA API.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-dummy.
 
 config SND_VIRMIDI
 	tristate "Virtual MIDI soundcard"
@@ -39,8 +45,14 @@ config SND_VIRMIDI
 	select SND_TIMER
 	select SND_RAWMIDI
 	help
-	  Say 'Y' or 'M' to include virtual MIDI driver. This driver allows to
-	  connect applications using raw MIDI devices to sequencer.
+	  Say Y here to include the virtual MIDI driver.  This driver
+	  allows to connect applications using raw MIDI devices to
+	  sequencer clients.
+
+	  If you don't know what MIDI is, say N here.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-virmidi.
 
 config SND_MTPAV
 	tristate "MOTU MidiTimePiece AV multiport MIDI"
@@ -48,23 +60,39 @@ config SND_MTPAV
 	select SND_TIMER
 	select SND_RAWMIDI
 	help
-	  Say 'Y' or 'M' to include support for MOTU MidiTimePiece AV multiport
-	  MIDI adapter.
+	  To use a MOTU MidiTimePiece AV multiport MIDI adapter
+	  connected to the parallel port, say Y here and make sure that
+	  the standard parallel port driver isn't used for the port.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-mtpav.
 
 config SND_SERIAL_U16550
-	tristate "UART16550 - MIDI only driver"
+	tristate "UART16550 serial MIDI driver"
 	depends on SND
 	select SND_TIMER
 	select SND_RAWMIDI
 	help
-	  Say 'Y' or 'M' to include support for MIDI serial port driver. It works
-	  with serial UARTs 16550 and better.
+	  To include support for MIDI serial port interfaces, say Y here
+	  and read <file:Documentation/sound/alsa/serial-u16550.txt>.
+	  This driver works with serial UARTs 16550 and better.
+
+	  This driver accesses the serial port hardware directly, so
+	  make sure that the standard serial driver isn't used or
+	  deactivated with setserial before loading this driver.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-serial-u16550.
 
 config SND_MPU401
 	tristate "Generic MPU-401 UART driver"
 	depends on SND
 	select SND_MPU401_UART
 	help
-	  Say 'Y' or 'M' to include support for MPU401 hardware using UART access.
+	  Say Y here to include support for MIDI ports compatible with
+	  the Roland MPU-401 interface in UART mode.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-mpu401.
 
 endmenu

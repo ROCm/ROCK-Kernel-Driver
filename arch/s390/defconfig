@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-rc3
-# Fri Oct  8 19:17:35 2004
+# Linux kernel version: 2.6.9
+# Fri Oct 22 13:50:22 2004
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -26,6 +26,7 @@ CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
 CONFIG_LOG_BUF_SHIFT=17
 CONFIG_HOTPLUG=y
+CONFIG_KOBJECT_UEVENT=y
 CONFIG_IKCONFIG=y
 CONFIG_IKCONFIG_PROC=y
 # CONFIG_EMBEDDED is not set
@@ -49,6 +50,7 @@ CONFIG_MODULES=y
 # CONFIG_MODULE_UNLOAD is not set
 CONFIG_OBSOLETE_MODPARM=y
 # CONFIG_MODVERSIONS is not set
+# CONFIG_MODULE_SRCVERSION_ALL is not set
 CONFIG_KMOD=y
 
 #
@@ -144,6 +146,7 @@ CONFIG_SCSI_FC_ATTRS=y
 # SCSI low-level drivers
 #
 # CONFIG_SCSI_SATA is not set
+# CONFIG_SCSI_QLOGIC_1280_1040 is not set
 # CONFIG_SCSI_DEBUG is not set
 CONFIG_ZFCP=y
 CONFIG_CCW=y
@@ -157,7 +160,9 @@ CONFIG_BLK_DEV_NBD=m
 CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
 # CONFIG_LBD is not set
+# CONFIG_CDROM_PKTCDVD is not set
 
 #
 # S/390 block device drivers
@@ -224,6 +229,7 @@ CONFIG_S390_TAPE_BLOCK=y
 CONFIG_S390_TAPE_34XX=m
 # CONFIG_VMLOGRDR is not set
 # CONFIG_MONREADER is not set
+# CONFIG_DCSS_SHM is not set
 
 #
 # Cryptographic devices
@@ -427,6 +433,7 @@ CONFIG_SYSFS=y
 # CONFIG_DEVFS_FS is not set
 # CONFIG_DEVPTS_FS_XATTR is not set
 CONFIG_TMPFS=y
+# CONFIG_TMPFS_XATTR is not set
 # CONFIG_HUGETLB_PAGE is not set
 CONFIG_RAMFS=y
 
@@ -506,6 +513,7 @@ CONFIG_MSDOS_PARTITION=y
 #
 CONFIG_DEBUG_KERNEL=y
 CONFIG_MAGIC_SYSRQ=y
+# CONFIG_SCHEDSTATS is not set
 # CONFIG_DEBUG_SLAB is not set
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_DEBUG_INFO is not set
@@ -513,6 +521,7 @@ CONFIG_MAGIC_SYSRQ=y
 #
 # Security options
 #
+# CONFIG_KEYS is not set
 # CONFIG_SECURITY is not set
 
 #

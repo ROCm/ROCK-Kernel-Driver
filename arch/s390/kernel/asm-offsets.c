@@ -22,6 +22,8 @@ int main(void)
 	DEFINE(__THREAD_mm_segment,
 	       offsetof(struct task_struct, thread.mm_segment),);
 	BLANK();
+	DEFINE(__TASK_pid, offsetof(struct task_struct, pid),);
+	BLANK();
 	DEFINE(__PER_atmid, offsetof(per_struct, lowcore.words.perc_atmid),);
 	DEFINE(__PER_address, offsetof(per_struct, lowcore.words.address),);
 	DEFINE(__PER_access_id, offsetof(per_struct, lowcore.words.access_id),);

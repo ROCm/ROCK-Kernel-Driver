@@ -168,8 +168,7 @@ static struct tty_struct *alloc_tty_struct(void)
 
 static inline void free_tty_struct(struct tty_struct *tty)
 {
-	if (tty->write_buf)
-		kfree(tty->write_buf);
+	kfree(tty->write_buf);
 	kfree(tty);
 }
 
@@ -1060,6 +1059,7 @@ static inline ssize_t do_tty_write(
 			up(&tty->atomic_write);
 			return -ENOMEM;
 		}
+		kfree(tty->write_buf);
 		tty->write_cnt = chunk;
 		tty->write_buf = buf;
 	}
@@ -2148,11 +2148,11 @@ static int tiocsetd(struct tty_struct *tty, int __user *p)
 
 static int send_break(struct tty_struct *tty, int duration)
 {
-	set_current_state(TASK_INTERRUPTIBLE);
-
 	tty->driver->break_ctl(tty, -1);
-	if (!signal_pending(current))
+	if (!signal_pending(current)) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(duration);
+	}
 	tty->driver->break_ctl(tty, 0);
 	if (signal_pending(current))
 		return -EINTR;

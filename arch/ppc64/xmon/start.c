@@ -173,7 +173,7 @@ xmon_fgets(char *str, int nb, void *f)
 		c = xmon_getchar();
 		if (c == -1) {
 			if (p == str)
-				return 0;
+				return NULL;
 			break;
 		}
 		*p++ = c;

@@ -621,7 +621,7 @@ static void pkt_copy_bio_data(struct bio *src_bio, int seg, int offs,
 
 		BUG_ON(len < 0);
 		memcpy(vto, vfrom, len);
-		kunmap_atomic(src_bvl->bv_page, KM_USER0);
+		kunmap_atomic(vfrom, KM_USER0);
 
 		seg++;
 		offs = 0;
@@ -649,7 +649,7 @@ static void pkt_make_local_copy(struct packet_data *pkt, struct page **pages, in
 			void *vfrom = kmap_atomic(pages[f], KM_USER0) + offsets[f];
 			void *vto = page_address(pkt->pages[p]) + offs;
 			memcpy(vto, vfrom, CD_FRAMESIZE);
-			kunmap_atomic(pages[f], KM_USER0);
+			kunmap_atomic(vfrom, KM_USER0);
 			pages[f] = pkt->pages[p];
 			offsets[f] = offs;
 		} else {

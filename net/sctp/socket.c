@@ -1063,7 +1063,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct sctp_sndrcvinfo default_sinfo = { 0 };
 	struct sctp_sndrcvinfo *sinfo;
 	struct sctp_initmsg *sinit;
-	sctp_assoc_t associd = NULL;
+	sctp_assoc_t associd = 0;
 	sctp_cmsgs_t cmsgs = { NULL };
 	int err;
 	sctp_scope_t scope;
@@ -2120,6 +2120,20 @@ static int sctp_setsockopt_peer_primary_addr(struct sock *sk, char __user *optva
 	return err;
 }
 
+static int sctp_setsockopt_adaption_layer(struct sock *sk, char __user *optval,
+					  int optlen)
+{
+	__u32 val;
+
+	if (optlen < sizeof(__u32))
+		return -EINVAL;
+	if (copy_from_user(&val, optval, sizeof(__u32)))
+		return -EFAULT;
+
+	sctp_sk(sk)->adaption_ind = val;
+
+	return 0;
+}
 
 /* API 6.2 setsockopt(), getsockopt()
  *
@@ -2219,6 +2233,10 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	case SCTP_MAXSEG:
 		retval = sctp_setsockopt_maxseg(sk, optval, optlen);
 		break;
+	case SCTP_ADAPTION_LAYER:
+		retval = sctp_setsockopt_adaption_layer(sk, optval, optlen);
+		break;
+
 	default:
 		retval = -ENOPROTOOPT;
 		break;
@@ -2517,6 +2535,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 
 	/* User specified fragmentation limit. */
 	sp->user_frag         = 0;
+
+	sp->adaption_ind = 0;
 
 	sp->pf = sctp_get_pf_specific(sk->sk_family);
 
@@ -3160,6 +3180,29 @@ static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
 }
 
 /*
+ * 7.1.11  Set Adaption Layer Indicator (SCTP_ADAPTION_LAYER)
+ *
+ * Requests that the local endpoint set the specified Adaption Layer
+ * Indication parameter for all future INIT and INIT-ACK exchanges.
+ */
+static int sctp_getsockopt_adaption_layer(struct sock *sk, int len,
+				  char __user *optval, int __user *optlen)
+{
+	__u32 val;
+
+	if (len < sizeof(__u32))
+		return -EINVAL;
+
+	len = sizeof(__u32);
+	val = sctp_sk(sk)->adaption_ind;
+	if (put_user(len, optlen))
+		return -EFAULT;
+	if (copy_to_user(optval, &val, len))
+		return -EFAULT;
+	return 0;
+}
+
+/*
  *
  * 7.1.14 Set default send parameters (SCTP_DEFAULT_SEND_PARAM)
  *
@@ -3513,6 +3556,10 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_GET_PEER_ADDR_INFO:
 		retval = sctp_getsockopt_peer_addr_info(sk, len, optval,
+							optlen);
+		break;
+	case SCTP_ADAPTION_LAYER:
+		retval = sctp_getsockopt_adaption_layer(sk, len, optval,
 							optlen);
 		break;
 	default:

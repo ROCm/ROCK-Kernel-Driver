@@ -57,8 +57,7 @@ ip6t_limit_match(const struct sk_buff *skb,
 		const struct net_device *out,
 		const void *matchinfo,
 		int offset,
-		const void *hdr,
-		u_int16_t datalen,
+		unsigned int protoff,
 		int *hotdrop)
 {
 	struct ip6t_rateinfo *r = ((struct ip6t_rateinfo *)matchinfo)->master;

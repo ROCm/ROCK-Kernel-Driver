@@ -88,7 +88,6 @@ struct tc_u_hnode
 	struct tc_u_common	*tp_c;
 	int			refcnt;
 	unsigned		divisor;
-	u32			hgenerator;
 	struct tc_u_knode	*ht[1];
 };
 

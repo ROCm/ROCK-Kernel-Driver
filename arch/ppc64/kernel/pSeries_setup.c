@@ -61,18 +61,17 @@
 #include <asm/nvram.h>
 
 #include "i8259.h"
-#include "open_pic.h"
 #include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
+
+#include "mpic.h"
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
 #else
 #define DBG(fmt...)
 #endif
-
-extern void pSeries_init_openpic(void);
 
 extern void find_and_init_phbs(void);
 extern void pSeries_final_fixup(void);
@@ -82,6 +81,8 @@ extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 extern void find_udbg_vterm(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
+extern void generic_find_legacy_serial_ports(unsigned int *default_speed);
+
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
 unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
@@ -90,6 +91,9 @@ extern unsigned long loops_per_jiffy;
 
 extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
+
+static volatile void __iomem * chrp_int_ack_special;
+struct mpic *pSeries_mpic;
 
 void pSeries_get_cpuinfo(struct seq_file *m)
 {
@@ -120,15 +124,84 @@ static void __init fwnmi_init(void)
 		fwnmi_active = 1;
 }
 
+static int pSeries_irq_cascade(struct pt_regs *regs, void *data)
+{
+	if (chrp_int_ack_special)
+		return readb(chrp_int_ack_special);
+	else
+		return i8259_irq(smp_processor_id());
+}
+
+static void __init pSeries_init_mpic(void)
+{
+        unsigned int *addrp;
+	struct device_node *np;
+        int i;
+
+	/* All ISUs are setup, complete initialization */
+	mpic_init(pSeries_mpic);
+
+	/* Check what kind of cascade ACK we have */
+        if (!(np = of_find_node_by_name(NULL, "pci"))
+            || !(addrp = (unsigned int *)
+                 get_property(np, "8259-interrupt-acknowledge", NULL)))
+                printk(KERN_ERR "Cannot find pci to get ack address\n");
+        else
+		chrp_int_ack_special = ioremap(addrp[prom_n_addr_cells(np)-1], 1);
+	of_node_put(np);
+
+	/* Setup the legacy interrupts & controller */
+        for (i = 0; i < NUM_ISA_INTERRUPTS; i++)
+                irq_desc[i].handler = &i8259_pic;
+	i8259_init(0);
+
+	/* Hook cascade to mpic */
+	mpic_setup_cascade(NUM_ISA_INTERRUPTS, pSeries_irq_cascade, NULL);
+}
+
+static void __init pSeries_setup_mpic(void)
+{
+	unsigned int *opprop;
+	unsigned long openpic_addr = 0;
+        unsigned char senses[NR_IRQS - NUM_ISA_INTERRUPTS];
+        struct device_node *root;
+	int irq_count;
+
+	/* Find the Open PIC if present */
+	root = of_find_node_by_path("/");
+	opprop = (unsigned int *) get_property(root, "platform-open-pic", NULL);
+	if (opprop != 0) {
+		int n = prom_n_addr_cells(root);
+
+		for (openpic_addr = 0; n > 0; --n)
+			openpic_addr = (openpic_addr << 32) + *opprop++;
+		printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic_addr);
+	}
+	of_node_put(root);
+
+	BUG_ON(openpic_addr == 0);
+
+	/* Get the sense values from OF */
+	prom_get_irq_senses(senses, NUM_ISA_INTERRUPTS, NR_IRQS);
+	
+	/* Setup the openpic driver */
+	irq_count = NR_IRQS - NUM_ISA_INTERRUPTS - 4; /* leave room for IPIs */
+	pSeries_mpic = mpic_alloc(openpic_addr, MPIC_PRIMARY,
+				  16, 16, irq_count, /* isu size, irq offset, irq count */ 
+				  NR_IRQS - 4, /* ipi offset */
+				  senses, irq_count, /* sense & sense size */
+				  " MPIC     ");
+}
+
 static void __init pSeries_setup_arch(void)
 {
-	struct device_node *root;
-	unsigned int *opprop;
-
 	/* Fixup ppc_md depending on the type of interrupt controller */
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
-		ppc_md.init_IRQ       = pSeries_init_openpic; 
-		ppc_md.get_irq        = openpic_get_irq;
+		ppc_md.init_IRQ       = pSeries_init_mpic; 
+		ppc_md.get_irq        = mpic_get_irq;
+		/* Allocate the mpic now, so that find_and_init_phbs() can
+		 * fill the ISUs */
+		pSeries_setup_mpic();
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
 		ppc_md.get_irq        = xics_get_irq;
@@ -156,21 +229,6 @@ static void __init pSeries_setup_arch(void)
 	eeh_init();
 	find_and_init_phbs();
 
-	/* Find the Open PIC if present */
-	root = of_find_node_by_path("/");
-	opprop = (unsigned int *) get_property(root,
-				"platform-open-pic", NULL);
-	if (opprop != 0) {
-		int n = prom_n_addr_cells(root);
-		unsigned long openpic;
-
-		for (openpic = 0; n > 0; --n)
-			openpic = (openpic << 32) + *opprop++;
-		printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic);
-		OpenPIC_Addr = __ioremap(openpic, 0x40000, _PAGE_NO_CACHE);
-	}
-	of_node_put(root);
-
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
 #endif
@@ -187,75 +245,6 @@ static int __init pSeries_init_panel(void)
 	return 0;
 }
 arch_initcall(pSeries_init_panel);
-
-
-
-void __init pSeries_find_serial_port(void)
-{
-	struct device_node *np;
-	unsigned long encode_phys_size = 32;
-	u32 *sizeprop;
-
-	struct isa_reg_property {
-		u32 space;
-		u32 address;
-		u32 size;
-	};
-	struct pci_reg_property {
-		struct pci_address addr;
-		u32 size_hi;
-		u32 size_lo;
-	};                                                                        
-
-	DBG(" -> pSeries_find_serial_port()\n");
-
-	naca->serialPortAddr = 0;
-
-	np = of_find_node_by_path("/");
-	if (!np)
-		return;
-	sizeprop = (u32 *)get_property(np, "#size-cells", NULL);
-	if (sizeprop != NULL)
-		encode_phys_size = (*sizeprop) << 5;
-	
-	for (np = NULL; (np = of_find_node_by_type(np, "serial"));) {
-		struct device_node *isa, *pci;
-		struct isa_reg_property *reg;
-		union pci_range *rangesp;
-		char *typep;
-
-	 	typep = (char *)get_property(np, "ibm,aix-loc", NULL);
-		if ((typep == NULL) || (typep && strcmp(typep, "S1")))
-			continue;
-
-		reg = (struct isa_reg_property *)get_property(np, "reg", NULL);	
-
-		isa = of_get_parent(np);
-		if (!isa) {
-			DBG("no isa parent found\n");
-			break;
-		}
-		pci = of_get_parent(isa);
-		if (!pci) {
-			DBG("no pci parent found\n");
-			break;
-		}
-
-		rangesp = (union pci_range *)get_property(pci, "ranges", NULL);
-
-		if ( encode_phys_size == 32 )
-			naca->serialPortAddr = rangesp->pci32.phys+reg->address;
-		else {
-			naca->serialPortAddr =
-				((((unsigned long)rangesp->pci64.phys_hi) << 32)
-				|
-			(rangesp->pci64.phys_lo)) + reg->address;
-		}
-		break;
-	}
-
-	DBG(" <- pSeries_find_serial_port()\n");
-}
 
 
 /* Build up the firmware_features bitmask field
@@ -330,6 +319,20 @@ static  void __init pSeries_discover_pic(void)
 	}
 }
 
+static void pSeries_cpu_die(void)
+{
+	local_irq_disable();
+	/* Some hardware requires clearing the CPPR, while other hardware does not
+	 * it is safe either way
+	 */
+	pSeriesLP_cppr_info(0, 0);
+	rtas_stop_self();
+	/* Should never get here... */
+	BUG();
+	for(;;);
+}
+
+
 /*
  * Early initialization.  Relocation is on but do not reference unbolted pages
  */
@@ -337,6 +340,7 @@ static void __init pSeries_init_early(void)
 {
 	void *comport;
 	int iommu_off = 0;
+	unsigned int default_speed;
 
 	DBG(" -> pSeries_init_early()\n");
 
@@ -350,14 +354,14 @@ static void __init pSeries_init_early(void)
 			     get_property(of_chosen, "linux,iommu-off", NULL));
 	}
 
-	pSeries_find_serial_port();
+	generic_find_legacy_serial_ports(&default_speed);
 
 	if (systemcfg->platform & PLATFORM_LPAR)
 		find_udbg_vterm();
 	else if (naca->serialPortAddr) {
 		/* Map the uart for udbg. */
 		comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
-		udbg_init_uart(comport);
+		udbg_init_uart(comport, default_speed);
 
 		ppc_md.udbg_putc = udbg_putc;
 		ppc_md.udbg_getc = udbg_getc;
@@ -542,6 +546,31 @@ static void __init pSeries_calibrate_decr(void)
 	setup_default_decr();
 }
 
+static int pSeries_check_legacy_ioport(unsigned int baseport)
+{
+	struct device_node *np;
+
+#define I8042_DATA_REG	0x60
+#define FDC_BASE	0x3f0
+
+
+	switch(baseport) {
+	case I8042_DATA_REG:
+		np = of_find_node_by_type(NULL, "8042");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
+		break;
+	case FDC_BASE:
+		np = of_find_node_by_type(NULL, "fdc");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
+		break;
+	}
+	return 0;
+}
+
 /*
  * Called very early, MMU is off, device-tree isn't unflattened
  */
@@ -571,9 +600,11 @@ struct machdep_calls __initdata pSeries_md = {
 	.power_off		= rtas_power_off,
 	.halt			= rtas_halt,
 	.panic			= rtas_os_term,
+	.cpu_die		= pSeries_cpu_die,
 	.get_boot_time		= pSeries_get_boot_time,
 	.get_rtc_time		= pSeries_get_rtc_time,
 	.set_rtc_time		= pSeries_set_rtc_time,
 	.calibrate_decr		= pSeries_calibrate_decr,
 	.progress		= pSeries_progress,
+	.check_legacy_ioport	= pSeries_check_legacy_ioport,
 };

@@ -24,6 +24,23 @@
 #include <linux/xattr.h>
 #include <linux/hugetlb.h>
 
+int cap_netlink_send(struct sock *sk, struct sk_buff *skb)
+{
+	NETLINK_CB(skb).eff_cap = current->cap_effective;
+	return 0;
+}
+
+EXPORT_SYMBOL(cap_netlink_send);
+
+int cap_netlink_recv(struct sk_buff *skb)
+{
+	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
+EXPORT_SYMBOL(cap_netlink_recv);
+
 int cap_capable (struct task_struct *tsk, int cap)
 {
 	/* Derived from include/linux/sched.h:capable. */

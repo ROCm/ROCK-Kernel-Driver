@@ -173,13 +173,8 @@ static struct dentry *ibmasmfs_create_file (struct super_block *sb,
 {
 	struct dentry *dentry;
 	struct inode *inode;
-	struct qstr qname;
 
-	qname.name = name;
-	qname.len = strlen (name);
-	qname.hash = full_name_hash(name, qname.len);
-
-	dentry = d_alloc(parent, &qname);
+	dentry = d_alloc_name(parent, name);
 	if (!dentry)
 		return NULL;
 
@@ -202,12 +197,8 @@ static struct dentry *ibmasmfs_create_dir (struct super_block *sb,
 {
 	struct dentry *dentry;
 	struct inode *inode;
-	struct qstr qname;
 
-	qname.name = name;
-	qname.len = strlen (name);
-	qname.hash = full_name_hash(name, qname.len);
-	dentry = d_alloc(parent, &qname);
+	dentry = d_alloc_name(parent, name);
 	if (!dentry)
 		return NULL;
 

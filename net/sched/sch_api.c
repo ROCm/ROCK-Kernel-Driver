@@ -308,7 +308,7 @@ dev_graft_qdisc(struct net_device *dev, struct Qdisc *qdisc)
 		dev_deactivate(dev);
 
 	qdisc_lock_tree(dev);
-	if (qdisc && qdisc->flags&TCQ_F_INGRES) {
+	if (qdisc && qdisc->flags&TCQ_F_INGRESS) {
 		oqdisc = dev->qdisc_ingress;
 		/* Prune old scheduler */
 		if (oqdisc && atomic_read(&oqdisc->refcnt) <= 1) {
@@ -357,7 +357,7 @@ int qdisc_graft(struct net_device *dev, struct Qdisc *parent, u32 classid,
 
 
 	if (parent == NULL) { 
-		if (q && q->flags&TCQ_F_INGRES) {
+		if (q && q->flags&TCQ_F_INGRESS) {
 			*old = dev_graft_qdisc(dev, q);
 		} else {
 			*old = dev_graft_qdisc(dev, new);
@@ -430,7 +430,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	skb_queue_head_init(&sch->q);
 
 	if (handle == TC_H_INGRESS)
-		sch->flags |= TCQ_F_INGRES;
+		sch->flags |= TCQ_F_INGRESS;
 
 	sch->ops = ops;
 	sch->enqueue = ops->enqueue;

@@ -1195,18 +1195,20 @@ unrecov_slb:
  * At entry, r3 = this processor's number (in Linux terms, not hardware).
  */
 _GLOBAL(pseries_secondary_smp_init)
+	mr	r24,r3
+	
 	/* turn on 64-bit mode */
 	bl	.enable_64b_mode
 	isync
 
+	/* Copy some CPU settings from CPU 0 */
+	bl	.__restore_cpu_setup
+
 	/* Set up a paca value for this processor. */
-	LOADADDR(r24, paca) 		/* Get base vaddr of paca array	 */
-	mulli	r13,r3,PACA_SIZE	/* Calculate vaddr of right paca */
-	add	r13,r13,r24		/* for this processor.		 */
-
+	LOADADDR(r5, paca) 		/* Get base vaddr of paca array	 */
+	mulli	r13,r24,PACA_SIZE	/* Calculate vaddr of right paca */
+	add	r13,r13,r5		/* for this processor.		 */
 	mtspr	SPRG3,r13		/* Save vaddr of paca in SPRG3	 */
-	mr	r24,r3			/* __secondary_start needs cpu#	 */
-
 1:
 	HMT_LOW
 	lbz	r23,PACAPROCSTART(r13)	/* Test if this processor should */
@@ -1886,19 +1888,6 @@ _STATIC(start_here_multiplatform)
 91:
 #endif
 
-#ifdef CONFIG_SMP
-	/* All secondary cpus are now spinning on a common
-	 * spinloop, release them all now so they can start
-	 * to spin on their individual paca spinloops.
-	 * For non SMP kernels, the secondary cpus never
-	 * get out of the common spinloop.
-	 */
-	li	r3,1
-	LOADADDR(r5,__secondary_hold_spinloop)
-	tophys(r4,r5)
-	std	r3,0(r4)
-#endif
-
 	/* The following gets the stack and TOC set up with the regs */
 	/* pointing to the real addr of the kernel stack.  This is   */
 	/* all done to support the C function call below which sets  */
@@ -1913,7 +1902,7 @@ _STATIC(start_here_multiplatform)
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
 
-		/* set up the TOC (physical address) */
+	/* set up the TOC (physical address) */
 	LOADADDR(r2,__toc_start)
 	addi	r2,r2,0x4000
 	addi	r2,r2,0x4000
@@ -1925,6 +1914,25 @@ _STATIC(start_here_multiplatform)
 	sub	r4,r4,r26
 	mr	r5,r26
 	bl	.identify_cpu
+
+	/* Save some low level config HIDs of CPU0 to be copied to
+	 * other CPUs later on, or used for suspend/resume
+	 */
+	bl	.__save_cpu_setup
+	sync
+
+#ifdef CONFIG_SMP
+	/* All secondary cpus are now spinning on a common
+	 * spinloop, release them all now so they can start
+	 * to spin on their individual paca spinloops.
+	 * For non SMP kernels, the secondary cpus never
+	 * get out of the common spinloop.
+	 */
+	li	r3,1
+	LOADADDR(r5,__secondary_hold_spinloop)
+	tophys(r4,r5)
+	std	r3,0(r4)
+#endif
 
 	/* Setup a valid physical PACA pointer in SPRG3 for early_setup
 	 * note that boot_cpuid can always be 0 nowadays since there is

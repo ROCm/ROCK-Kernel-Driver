@@ -41,7 +41,7 @@ config FB
 config FB_MODE_HELPERS
         bool "Enable Video Mode Handling Helpers"
         depends on FB
-	default y
+	default n
 	---help---
 	  This enables functions for handling video modes using the
 	  Generalized Timing Formula and the EDID parser. A few drivers rely
@@ -61,10 +61,10 @@ config FB_TILEBLITTING
 	 parameters in terms of number of tiles instead of number of pixels.
 	 For example, to draw a single character, instead of using bitmaps,
 	 an index to an array of bitmaps will be used.  To clear or move a
-	 rectangular section of a screen, the rectangle willbe described in
+	 rectangular section of a screen, the rectangle will be described in
 	 terms of number of tiles in the x- and y-axis.
 
-	 This is particularly important to one driver, the matroxfb.  If
+	 This is particularly important to one driver, matroxfb.  If
 	 unsure, say N.
 
 config FB_CIRRUS
@@ -517,6 +517,27 @@ config FB_I810_GTF
   
           If unsure, say N.
 
+config FB_INTEL
+	tristate "Intel 830M/845G/852GM/855GM/865G support (EXPERIMENTAL)"
+	depends on FB && EXPERIMENTAL && PCI
+	select AGP
+	select AGP_INTEL
+	help
+	  This driver supports the on-board graphics built in to the Intel
+          830M/845G/852GM/855GM/865G chipsets.
+          Say Y if you have and plan to use such a board.
+
+          To compile this driver as a module, choose M here: the
+	  module will be called intelfb.
+
+config FB_INTEL_DEBUG
+        bool "Intel driver Debug Messages"
+	depends on FB_INTEL
+	---help---
+	  Say Y here if you want the Intel driver to output all sorts
+	  of debugging informations to provide to the maintainer when
+	  something goes wrong.
+
 config FB_MATROX
 	tristate "Matrox acceleration"
 	depends on FB && PCI
@@ -750,6 +771,19 @@ config FB_ATY_CT
 	  framebuffer device.  The ATI product support page for these boards
 	  is at <http://support.ati.com/products/pc/mach64/>.
 
+config FB_ATY_GENERIC_LCD
+	bool "Mach64 generic LCD support (EXPERIMENTAL)"
+	depends on FB_ATY_CT
+	help
+	  Say Y if you have a laptop with an ATI Rage LT PRO, Rage Mobility,
+	  Rage XC, or Rage XL chipset.
+
+config FB_ATY_XL_INIT
+	bool "Rage XL No-BIOS Init support"
+	depends on FB_ATY_CT
+	help
+	  Say Y here to support booting a Rage XL without BIOS support.
+
 config FB_ATY_GX
 	bool "Mach64 GX support" if PCI
 	depends on FB_ATY
@@ -761,11 +795,41 @@ config FB_ATY_GX
 	  is at
 	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
 
-config FB_ATY_XL_INIT
-	bool "  Rage XL No-BIOS Init support" if FB_ATY_CT
-	depends on FB_ATY
+config FB_SAVAGE
+	tristate "S3 Savage support"
+	depends on FB && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT if FB_SAVAGE_I2C
+	select I2C if FB_SAVAGE_I2C
+	select FB_MODE_HELPERS
 	help
-	  Say Y here to support booting a Rage XL without BIOS support.
+	  This driver supports notebooks and computers with S3 Savage PCI/AGP
+	  chips.
+
+	  Say Y if you have such a graphics card.
+
+	  To compile this driver as a module, choose M here; the module
+	  will be called savagefb.
+
+config FB_SAVAGE_I2C
+       bool "Enable DDC2 Support"
+       depends on FB_SAVAGE
+       help
+	  This enables I2C support for S3 Savage Chipsets.  This is used
+	  only for getting EDID information from the attached display
+	  allowing for robust video mode handling and switching.
+
+	  Because fbdev-2.6 requires that drivers must be able to
+	  independently validate video mode parameters, you should say Y
+	  here.
+
+config FB_SAVAGE_ACCEL
+       bool "Enable Console Acceleration"
+       depends on FB_SAVAGE
+       default n
+       help
+          This option will compile in console acceleration support. If
+          the resulting framebuffer console has bothersome glitches, then
+          choose N here.
 
 config FB_SIS
 	tristate "SiS acceleration"

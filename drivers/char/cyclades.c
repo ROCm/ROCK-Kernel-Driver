@@ -5551,7 +5551,7 @@ cy_setup(char *str, int *ints)
     }
     for (j = 1; j <= ints[0]; j++){
         if ( i < NR_ISA_ADDRS ){
-            cy_isa_addresses[i++] = (unsigned char *)(ints[j]);
+            cy_isa_addresses[i++] = ints[j];
         }
     }
 #endif /* CONFIG_ISA */

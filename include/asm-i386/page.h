@@ -63,6 +63,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define HPAGE_SIZE	((1UL) << HPAGE_SHIFT)
 #define HPAGE_MASK	(~(HPAGE_SIZE - 1))
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 #endif
 
 

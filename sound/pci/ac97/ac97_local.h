@@ -51,7 +51,14 @@ int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *
 void snd_ac97_rename_vol_ctl(ac97_t *ac97, const char *src, const char *dst);
 
 /* ac97_proc.c */
+#ifdef CONFIG_PROC_FS
 void snd_ac97_bus_proc_init(ac97_bus_t * ac97);
 void snd_ac97_bus_proc_done(ac97_bus_t * ac97);
 void snd_ac97_proc_init(ac97_t * ac97);
 void snd_ac97_proc_done(ac97_t * ac97);
+#else
+#define snd_ac97_bus_proc_init(ac97_bus_t) do { } while (0)
+#define snd_ac97_bus_proc_done(ac97_bus_t) do { } while (0)
+#define snd_ac97_proc_init(ac97_t) do { } while (0)
+#define snd_ac97_proc_done(ac97_t) do { } while (0)
+#endif

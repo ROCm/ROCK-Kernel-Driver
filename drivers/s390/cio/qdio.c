@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.86 $"
+#define VERSION_QDIO_C "$Revision: 1.88 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -808,7 +808,7 @@ check_next:
 #endif /* QDIO_USE_PROCESSING_STATE */
 		/* 
 		 * not needed, as the inbound queue will be synced on the next
-		 * siga-r
+		 * siga-r, resp. tiqdio_is_inbound_q_done will do the siga-s
 		 */
 		/*SYNC_MEMORY;*/
 		f++;
@@ -899,7 +899,7 @@ qdio_has_inbound_q_moved(struct qdio_q *q)
 
 /* means, no more buffers to be filled */
 inline static int
-iqdio_is_inbound_q_done(struct qdio_q *q)
+tiqdio_is_inbound_q_done(struct qdio_q *q)
 {
 	int no_used;
 #ifdef CONFIG_QDIO_DEBUG
@@ -1139,7 +1139,7 @@ __tiqdio_inbound_processing(struct qdio_q *q, int spare_ind_was_set)
 		goto out;
 
 	qdio_kick_inbound_handler(q);
-	if (iqdio_is_inbound_q_done(q))
+	if (tiqdio_is_inbound_q_done(q))
 		if (!qdio_stop_polling(q)) {
 			/* 
 			 * we set the flags to get into the stuff next time,
@@ -1401,7 +1401,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 	int result=-ENOMEM;
 
 	for (i=0;i<no_input_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
+		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL|GFP_DMA);
 
 		if (!q) {
 			QDIO_PRINT_ERR("kmalloc of q failed!\n");
@@ -1410,7 +1410,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 
 		memset(q,0,sizeof(struct qdio_q));
 
-		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
+		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL|GFP_DMA);
 		if (!q->slib) {
 			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
 			goto out;
@@ -1420,7 +1420,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 	}
 
 	for (i=0;i<no_output_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
+		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL|GFP_DMA);
 
 		if (!q) {
 			goto out;
@@ -1428,7 +1428,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 
 		memset(q,0,sizeof(struct qdio_q));
 
-		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
+		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL|GFP_DMA);
 		if (!q->slib) {
 			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
 			goto out;

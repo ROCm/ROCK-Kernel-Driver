@@ -72,49 +72,6 @@
 
 #include "hpt366.h"
 
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-#endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
-
-static unsigned int hpt_revision(struct pci_dev *dev);
-static unsigned int hpt_minimum_revision(struct pci_dev *dev, int revision);
-
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-
-static u8 hpt366_proc = 0;
-static struct pci_dev *hpt_devs[HPT366_MAX_DEVS];
-static int n_hpt_devs;
-
-static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p	= buffer;
-	char *chipset_nums[] = {"366", "366",  "368",
-				"370", "370A", "372",
-				"302", "371",  "374" };
-	int i, len;
-
-	p += sprintf(p, "\n                             "
-		"HighPoint HPT366/368/370/372/374\n");
-	for (i = 0; i < n_hpt_devs; i++) {
-		struct pci_dev *dev = hpt_devs[i];
-		unsigned long iobase = dev->resource[4].start;
-		u32 class_rev = hpt_revision(dev);
-		u8 c0, c1;
-
-		p += sprintf(p, "\nController: %d\n", i);
-		p += sprintf(p, "Chipset: HPT%s\n", chipset_nums[class_rev]);
-		p += sprintf(p, "--------------- Primary Channel "
-				"--------------- Secondary Channel "
-				"--------------\n");
-
-		/* get the bus master status registers */
-		c0 = inb(iobase + 0x2);
-		c1 = inb(iobase + 0xa);
-		p += sprintf(p, "Enabled:        %s"
-				"                             %s\n",
-			(c0 & 0x80) ? "no" : "yes",
-			(c1 & 0x80) ? "no" : "yes");
 #if 0
 		if (hpt_minimum_revision(dev, 3)) {
 			u8 cbl;
@@ -128,16 +85,6 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 				(cbl & 0x01) ? 33 : 66);
 			p += sprintf(p, "\n");
 		}
-#endif
-		p += sprintf(p, "--------------- drive0 --------- drive1 "
-				"------- drive0 ---------- drive1 -------\n");
-		p += sprintf(p, "DMA capable:    %s              %s" 
-				"            %s               %s\n",
-			(c0 & 0x20) ? "yes" : "no ", 
-			(c0 & 0x40) ? "yes" : "no ",
-			(c1 & 0x20) ? "yes" : "no ", 
-			(c1 & 0x40) ? "yes" : "no ");
-
 		{
 			u8 c2, c3;
 			/* older revs don't have these registers mapped 
@@ -159,15 +106,7 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 					(c3 & 0x80) ? "PIO " : "off ");
 		}
 	}
-	p += sprintf(p, "\n");
-
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
+#endif
 
 static u32 hpt_revision (struct pci_dev *dev)
 {
@@ -1105,15 +1044,6 @@ static unsigned int __devinit init_chipset_hpt366(struct pci_dev *dev, const cha
 	}
 	if (ret)
 		return ret;
-	
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-	hpt_devs[n_hpt_devs++] = dev;
-
-	if (!hpt366_proc) {
-		hpt366_proc = 1;
-		ide_pci_create_host_proc("hpt366", hpt366_get_info);
-	}
-#endif /* DISPLAY_HPT366_TIMINGS && CONFIG_PROC_FS */
 
 	return dev->irq;
 }

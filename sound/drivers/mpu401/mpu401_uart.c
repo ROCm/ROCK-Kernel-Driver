@@ -70,12 +70,12 @@ static unsigned char mpu401_read_port(mpu401_t *mpu, unsigned long addr)
 
 static void mpu401_write_mmio(mpu401_t *mpu, unsigned char data, unsigned long addr)
 {
-	writeb(data, (unsigned long*)addr);
+	writeb(data, (void __iomem *)addr);
 }
 
 static unsigned char mpu401_read_mmio(mpu401_t *mpu, unsigned long addr)
 {
-	return readb((unsigned long*)addr);
+	return readb((void __iomem *)addr);
 }
 /*  */
 

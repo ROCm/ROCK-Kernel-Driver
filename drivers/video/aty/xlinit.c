@@ -148,15 +148,15 @@ static void reset_sdram(struct atyfb_par *par)
 static void init_dll(struct atyfb_par *par)
 {
 	// enable DLL
-	aty_st_pll(PLL_GEN_CNTL,
-		   aty_ld_pll(PLL_GEN_CNTL, par) & 0x7f,
+	aty_st_pll_ct(PLL_GEN_CNTL,
+		   aty_ld_pll_ct(PLL_GEN_CNTL, par) & 0x7f,
 		   par);
 
 	// reset DLL
-	aty_st_pll(DLL_CNTL, 0x82, par);
-	aty_st_pll(DLL_CNTL, 0xE2, par);
+	aty_st_pll_ct(DLL_CNTL, 0x82, par);
+	aty_st_pll_ct(DLL_CNTL, 0xE2, par);
 	mdelay(5);
-	aty_st_pll(DLL_CNTL, 0x82, par);
+	aty_st_pll_ct(DLL_CNTL, 0x82, par);
 	mdelay(6);
 }
 
@@ -164,8 +164,8 @@ static void reset_clocks(struct atyfb_par *par, struct pll_ct *pll,
 			 int hsync_enb)
 {
 	reset_gui(par);
-	aty_st_pll(MCLK_FB_DIV, pll->mclk_fb_div, par);
-	aty_st_pll(SCLK_FB_DIV, pll->sclk_fb_div, par);
+	aty_st_pll_ct(MCLK_FB_DIV, pll->mclk_fb_div, par);
+	aty_st_pll_ct(SCLK_FB_DIV, pll->sclk_fb_div, par);
 
 	mdelay(15);
 	init_dll(par);
@@ -177,9 +177,9 @@ static void reset_clocks(struct atyfb_par *par, struct pll_ct *pll,
 	aty_st_8(CRTC_GEN_CNTL+3,
 		 hsync_enb ? 0x00 : 0x04, par);
 
-	aty_st_pll(SPLL_CNTL2, pll->spll_cntl2, par);
-	aty_st_pll(PLL_GEN_CNTL, pll->pll_gen_cntl, par);
-	aty_st_pll(PLL_VCLK_CNTL, pll->pll_vclk_cntl, par);
+	aty_st_pll_ct(SPLL_CNTL2, pll->spll_cntl2, par);
+	aty_st_pll_ct(PLL_GEN_CNTL, pll->pll_gen_cntl, par);
+	aty_st_pll_ct(PLL_VCLK_CNTL, pll->pll_vclk_cntl, par);
 }
 
 int atyfb_xl_init(struct fb_info *info)
@@ -216,31 +216,31 @@ int atyfb_xl_init(struct fb_info *info)
 	if ((err = aty_pll_ct.var_to_pll(info, 39726, 8, &pll)))
 		return err;
 
-	aty_st_pll(LVDS_CNTL0, 0x00, par);
-	aty_st_pll(DLL2_CNTL, card->dll2_cntl, par);
-	aty_st_pll(V2PLL_CNTL, 0x10, par);
-	aty_st_pll(MPLL_CNTL, MPLL_GAIN, par);
-	aty_st_pll(VPLL_CNTL, VPLL_GAIN, par);
-	aty_st_pll(PLL_VCLK_CNTL, 0x00, par);
-	aty_st_pll(VFC_CNTL, 0x1B, par);
-	aty_st_pll(PLL_REF_DIV, pll.ct.pll_ref_div, par);
-	aty_st_pll(PLL_EXT_CNTL, pll.ct.pll_ext_cntl, par);
-	aty_st_pll(SPLL_CNTL2, 0x03, par);
-	aty_st_pll(PLL_GEN_CNTL, 0x44, par);
+	aty_st_pll_ct(LVDS_CNTL0, 0x00, par);
+	aty_st_pll_ct(DLL2_CNTL, card->dll2_cntl, par);
+	aty_st_pll_ct(V2PLL_CNTL, 0x10, par);
+	aty_st_pll_ct(MPLL_CNTL, MPLL_GAIN, par);
+	aty_st_pll_ct(VPLL_CNTL, VPLL_GAIN, par);
+	aty_st_pll_ct(PLL_VCLK_CNTL, 0x00, par);
+	aty_st_pll_ct(VFC_CNTL, 0x1B, par);
+	aty_st_pll_ct(PLL_REF_DIV, pll.ct.pll_ref_div, par);
+	aty_st_pll_ct(PLL_EXT_CNTL, pll.ct.pll_ext_cntl, par);
+	aty_st_pll_ct(SPLL_CNTL2, 0x03, par);
+	aty_st_pll_ct(PLL_GEN_CNTL, 0x44, par);
 
 	reset_clocks(par, &pll.ct, 0);
 	mdelay(10);
 
-	aty_st_pll(VCLK_POST_DIV, 0x03, par);
-	aty_st_pll(VCLK0_FB_DIV, 0xDA, par);
-	aty_st_pll(VCLK_POST_DIV, 0x0F, par);
-	aty_st_pll(VCLK1_FB_DIV, 0xF5, par);
-	aty_st_pll(VCLK_POST_DIV, 0x3F, par);
-	aty_st_pll(PLL_EXT_CNTL, 0x40 | pll.ct.pll_ext_cntl, par);
-	aty_st_pll(VCLK2_FB_DIV, 0x00, par);
-	aty_st_pll(VCLK_POST_DIV, 0xFF, par);
-	aty_st_pll(PLL_EXT_CNTL, 0xC0 | pll.ct.pll_ext_cntl, par);
-	aty_st_pll(VCLK3_FB_DIV, 0x00, par);
+	aty_st_pll_ct(VCLK_POST_DIV, 0x03, par);
+	aty_st_pll_ct(VCLK0_FB_DIV, 0xDA, par);
+	aty_st_pll_ct(VCLK_POST_DIV, 0x0F, par);
+	aty_st_pll_ct(VCLK1_FB_DIV, 0xF5, par);
+	aty_st_pll_ct(VCLK_POST_DIV, 0x3F, par);
+	aty_st_pll_ct(PLL_EXT_CNTL, 0x40 | pll.ct.pll_ext_cntl, par);
+	aty_st_pll_ct(VCLK2_FB_DIV, 0x00, par);
+	aty_st_pll_ct(VCLK_POST_DIV, 0xFF, par);
+	aty_st_pll_ct(PLL_EXT_CNTL, 0xC0 | pll.ct.pll_ext_cntl, par);
+	aty_st_pll_ct(VCLK3_FB_DIV, 0x00, par);
 
 	aty_st_8(BUS_CNTL, 0x01, par);
 	aty_st_le32(BUS_CNTL, card->bus_cntl | 0x08000000, par);
@@ -295,7 +295,7 @@ int atyfb_xl_init(struct fb_info *info)
 	aty_st_8(CRTC_GEN_CNTL+3, 0x04, par);
 	mdelay(10);
 
-	aty_st_pll(PLL_YCLK_CNTL, 0x25, par);
+	aty_st_pll_ct(PLL_YCLK_CNTL, 0x25, par);
 
 	aty_st_le16(CUSTOM_MACRO_CNTL, 0x0179, par);
 	aty_st_le16(CUSTOM_MACRO_CNTL+2, 0x005E, par);
@@ -309,9 +309,9 @@ int atyfb_xl_init(struct fb_info *info)
 
 	aty_st_8(CONFIG_STAT0, 0xA0 | card->mem_type, par);
 
-	aty_st_pll(PLL_YCLK_CNTL, 0x01, par);
+	aty_st_pll_ct(PLL_YCLK_CNTL, 0x01, par);
 	mdelay(15);
-	aty_st_pll(PLL_YCLK_CNTL, card->pll_yclk_cntl, par);
+	aty_st_pll_ct(PLL_YCLK_CNTL, card->pll_yclk_cntl, par);
 	mdelay(1);
 	
 	reset_clocks(par, &pll.ct, 0);

@@ -1,7 +1,7 @@
 /*
  * netfilter module for userspace packet logging daemons
  *
- * (C) 2000-2002 by Harald Welte <laforge@netfilter.org>
+ * (C) 2000-2004 by Harald Welte <laforge@netfilter.org>
  *
  * 2000/09/22 ulog-cprange feature added
  * 2001/01/04 in-kernel queue as proposed by Sebastian Zander 
@@ -13,6 +13,8 @@
  * 2002/07/07 remove broken nflog_rcv() function -HW
  * 2002/08/29 fix shifted/unshifted nlgroup bug -HW
  * 2002/10/30 fix uninitialized mac_len field - <Anders K. Pedersen>
+ * 2004/10/25 fix erroneous calculation of 'len' parameter to NLMSG_PUT
+ *	      resulting in bogus 'error during NLMSG_PUT' messages.
  *
  * (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
@@ -212,7 +214,7 @@ static void ipt_ulog_packet(unsigned int hooknum,
 
 	/* NLMSG_PUT contains a hidden goto nlmsg_failure !!! */
 	nlh = NLMSG_PUT(ub->skb, 0, ub->qlen, ULOG_NL_EVENT, 
-			size - sizeof(*nlh));
+			sizeof(*pm)+copy_len);
 	ub->qlen++;
 
 	pm = NLMSG_DATA(nlh);

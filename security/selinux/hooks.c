@@ -2237,6 +2237,9 @@ static int selinux_inode_setxattr(struct dentry *dentry, char *name, void *value
 	if (sbsec->behavior == SECURITY_FS_USE_MNTPOINT)
 		return -EOPNOTSUPP;
 
+	if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
+		return -EPERM;
+
 	AVC_AUDIT_DATA_INIT(&ad,FS);
 	ad.u.fs.dentry = dentry;
 
@@ -2562,8 +2565,7 @@ static int selinux_file_set_fowner(struct file *file)
 }
 
 static int selinux_file_send_sigiotask(struct task_struct *tsk,
-				       struct fown_struct *fown,
-				       int fd, int reason)
+				       struct fown_struct *fown, int signum)
 {
         struct file *file;
 	u32 perm;
@@ -2576,10 +2578,10 @@ static int selinux_file_send_sigiotask(struct task_struct *tsk,
 	tsec = tsk->security;
 	fsec = file->f_security;
 
-	if (!fown->signum)
+	if (!signum)
 		perm = signal_to_av(SIGIO); /* as per send_sigio_to_task */
 	else
-		perm = signal_to_av(fown->signum);
+		perm = signal_to_av(signum);
 
 	return avc_has_perm(fsec->fown_sid, tsec->sid,
 			    SECCLASS_PROCESS, perm, NULL, NULL);

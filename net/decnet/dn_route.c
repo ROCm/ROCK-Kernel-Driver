@@ -683,9 +683,8 @@ out:
 	return NET_RX_DROP;
 }
 
-static int dn_output(struct sk_buff **pskb)
+static int dn_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
 	struct dn_route *rt = (struct dn_route *)dst;
 	struct net_device *dev = dst->dev;
@@ -794,11 +793,6 @@ static int dn_rt_bug(struct sk_buff *skb)
 	kfree_skb(skb);
 
 	return NET_RX_BAD;
-}
-
-static int dn_rt_bug_out(struct sk_buff **pskb)
-{
-	return dn_rt_bug(*pskb);
 }
 
 static int dn_rt_set_next_hop(struct dn_route *rt, struct dn_fib_res *res)
@@ -1392,7 +1386,7 @@ make_route:
 	rt->u.dst.neighbour = neigh;
 	rt->u.dst.dev = out_dev;
 	rt->u.dst.lastuse = jiffies;
-	rt->u.dst.output = dn_rt_bug_out;
+	rt->u.dst.output = dn_rt_bug;
 	switch(res.type) {
 		case RTN_UNICAST:
 			rt->u.dst.input = dn_forward;

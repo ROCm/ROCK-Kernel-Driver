@@ -12,7 +12,7 @@
 #include <asm/intrinsics.h>
 
 extern void * sn_io_addr(unsigned long port) __attribute_const__; /* Forward definition */
-extern void sn_mmiob(void); /* Forward definition */
+extern void __sn_mmiowb(void); /* Forward definition */
 
 extern int numionodes;
 
@@ -93,7 +93,7 @@ ___sn_outb (unsigned char val, unsigned long port)
 
 	if ((addr = sn_io_addr(port))) {
 		*addr = val;
-		sn_mmiob();
+		__sn_mmiowb();
 	}
 }
 
@@ -104,7 +104,7 @@ ___sn_outw (unsigned short val, unsigned long port)
 
 	if ((addr = sn_io_addr(port))) {
 		*addr = val;
-		sn_mmiob();
+		__sn_mmiowb();
 	}
 }
 
@@ -115,7 +115,7 @@ ___sn_outl (unsigned int val, unsigned long port)
 
 	if ((addr = sn_io_addr(port))) {
 		*addr = val;
-		sn_mmiob();
+		__sn_mmiowb();
 	}
 }
 

@@ -407,7 +407,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				printk(KERN_INFO "%s forgot to set AF_INET in "
 						 "raw sendmsg. Fix it!\n",
 						 current->comm);
-			err = -EINVAL;
+			err = -EAFNOSUPPORT;
 			if (usin->sin_family)
 				goto out;
 		}

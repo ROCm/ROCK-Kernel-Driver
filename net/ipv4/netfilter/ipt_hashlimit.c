@@ -121,7 +121,6 @@ __dsthash_find(const struct ipt_hashlimit_htable *ht, struct dsthash_dst *dst)
 {
 	struct dsthash_ent *ent;
 	u_int32_t hash = hash_dst(ht, dst);
-	MUST_BE_LOCKED(&ht->lock);
 	ent = LIST_FIND(&ht->hash[hash], dst_cmp, struct dsthash_ent *, dst);
 	return ent;
 }
@@ -170,8 +169,6 @@ __dsthash_alloc_init(struct ipt_hashlimit_htable *ht, struct dsthash_dst *dst)
 static inline void 
 __dsthash_free(struct ipt_hashlimit_htable *ht, struct dsthash_ent *ent)
 {
-	MUST_BE_LOCKED(&ht->lock);
-
 	list_del(&ent->list);
 	kmem_cache_free(hashlimit_cachep, ent);
 	atomic_dec(&ht->count);
@@ -258,7 +255,7 @@ static void htable_selective_cleanup(struct ipt_hashlimit_htable *ht,
 	IP_NF_ASSERT(ht->cfg.size && ht->cfg.max);
 
 	/* lock hash table and iterate over it */
-	LOCK_BH(&ht->lock);
+	spin_lock_bh(&ht->lock);
 	for (i = 0; i < ht->cfg.size; i++) {
 		struct dsthash_ent *dh, *n;
 		list_for_each_entry_safe(dh, n, &ht->hash[i], list) {
@@ -266,7 +263,7 @@ static void htable_selective_cleanup(struct ipt_hashlimit_htable *ht,
 				__dsthash_free(ht, dh);
 		}
 	}
-	UNLOCK_BH(&ht->lock);
+	spin_unlock_bh(&ht->lock);
 }
 
 /* hash table garbage collector, run by timer */
@@ -457,7 +454,7 @@ hashlimit_match(const struct sk_buff *skb,
 			dst.dst_port = ports[1];
 	} 
 
-	LOCK_BH(&hinfo->lock);
+	spin_lock_bh(&hinfo->lock);
 	dh = __dsthash_find(hinfo, &dst);
 	if (!dh) {
 		dh = __dsthash_alloc_init(hinfo, &dst);
@@ -466,7 +463,7 @@ hashlimit_match(const struct sk_buff *skb,
 			/* enomem... don't match == DROP */
 			if (net_ratelimit())
 				printk(KERN_ERR "%s: ENOMEM\n", __FUNCTION__);
-			UNLOCK_BH(&hinfo->lock);
+			spin_unlock_bh(&hinfo->lock);
 			return 0;
 		}
 
@@ -479,7 +476,7 @@ hashlimit_match(const struct sk_buff *skb,
 							hinfo->cfg.burst);
 		dh->rateinfo.cost = user2credits(hinfo->cfg.avg);
 
-		UNLOCK_BH(&hinfo->lock);
+		spin_unlock_bh(&hinfo->lock);
 		return 1;
 	}
 
@@ -490,11 +487,11 @@ hashlimit_match(const struct sk_buff *skb,
 	if (dh->rateinfo.credit >= dh->rateinfo.cost) {
 		/* We're underlimit. */
 		dh->rateinfo.credit -= dh->rateinfo.cost;
-		UNLOCK_BH(&hinfo->lock);
+		spin_unlock_bh(&hinfo->lock);
 		return 1;
 	}
 
-       	UNLOCK_BH(&hinfo->lock);
+       	spin_unlock_bh(&hinfo->lock);
 
 	/* default case: we're overlimit, thus don't match */
 	return 0;
@@ -569,7 +566,7 @@ static void *dl_seq_start(struct seq_file *s, loff_t *pos)
 	struct ipt_hashlimit_htable *htable = pde->data;
 	unsigned int *bucket;
 
-	LOCK_BH(&htable->lock);
+	spin_lock_bh(&htable->lock);
 	if (*pos >= htable->cfg.size)
 		return NULL;
 
@@ -603,7 +600,7 @@ static void dl_seq_stop(struct seq_file *s, void *v)
 
 	kfree(bucket);
 
-	UNLOCK_BH(&htable->lock);
+	spin_unlock_bh(&htable->lock);
 }
 
 static inline int dl_seq_real_show(struct dsthash_ent *ent, struct seq_file *s)

@@ -301,6 +301,9 @@ struct inode_operations hfsplus_file_inode_operations = {
 	.lookup		= hfsplus_file_lookup,
 	.truncate	= hfsplus_file_truncate,
 	.permission	= hfsplus_permission,
+	.setxattr	= hfsplus_setxattr,
+	.getxattr	= hfsplus_getxattr,
+	.listxattr	= hfsplus_listxattr,
 };
 
 struct file_operations hfsplus_file_operations = {
@@ -332,6 +335,7 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 	inode->i_gid = current->fsgid;
 	inode->i_nlink = 1;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_blksize = HFSPLUS_SB(sb).alloc_blksz;
 	INIT_LIST_HEAD(&HFSPLUS_I(inode).open_dir_list);
 	init_MUTEX(&HFSPLUS_I(inode).extents_lock);
 	atomic_set(&HFSPLUS_I(inode).opencnt, 0);
@@ -343,6 +347,7 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 	HFSPLUS_I(inode).cached_start = 0;
 	HFSPLUS_I(inode).cached_blocks = 0;
 	HFSPLUS_I(inode).phys_size = 0;
+	HFSPLUS_I(inode).fs_blocks = 0;
 	HFSPLUS_I(inode).rsrc_inode = NULL;
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_size = 2;
@@ -408,7 +413,8 @@ void hfsplus_inode_read_fork(struct inode *inode, struct hfsplus_fork_raw *fork)
 
 	HFSPLUS_I(inode).alloc_blocks = be32_to_cpu(fork->total_blocks);
 	inode->i_size = HFSPLUS_I(inode).phys_size = be64_to_cpu(fork->total_size);
-	inode->i_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+	HFSPLUS_I(inode).fs_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+	inode_set_bytes(inode, HFSPLUS_I(inode).fs_blocks << sb->s_blocksize_bits);
 	HFSPLUS_I(inode).clump_blocks = be32_to_cpu(fork->clump_size) >> HFSPLUS_SB(sb).alloc_blksz_shift;
 	if (!HFSPLUS_I(inode).clump_blocks)
 		HFSPLUS_I(inode).clump_blocks = HFSPLUS_IS_RSRC(inode) ? HFSPLUS_SB(sb).rsrc_clump_blocks :
@@ -432,7 +438,7 @@ int hfsplus_cat_read_inode(struct inode *inode, struct hfs_find_data *fd)
 	type = hfs_bnode_read_u16(fd->bnode, fd->entryoffset);
 
 	HFSPLUS_I(inode).dev = 0;
-	inode->i_blksize = PAGE_SIZE; /* Doesn't seem to be useful... */
+	inode->i_blksize = HFSPLUS_SB(inode->i_sb).alloc_blksz;
 	if (type == HFSPLUS_FOLDER) {
 		struct hfsplus_cat_folder *folder = &entry.folder;
 
@@ -446,7 +452,7 @@ int hfsplus_cat_read_inode(struct inode *inode, struct hfs_find_data *fd)
 		inode->i_atime = hfsp_mt2ut(folder->access_date);
 		inode->i_mtime = hfsp_mt2ut(folder->content_mod_date);
 		inode->i_ctime = inode->i_mtime;
-		inode->i_blocks = 0;
+		HFSPLUS_I(inode).fs_blocks = 0;
 		inode->i_op = &hfsplus_dir_inode_operations;
 		inode->i_fop = &hfsplus_dir_operations;
 	} else if (type == HFSPLUS_FILE) {
@@ -486,26 +492,25 @@ int hfsplus_cat_read_inode(struct inode *inode, struct hfs_find_data *fd)
 
 int hfsplus_cat_write_inode(struct inode *inode)
 {
+	struct inode *main_inode = inode;
 	struct hfs_find_data fd;
 	hfsplus_cat_entry entry;
 
-	if (HFSPLUS_IS_RSRC(inode)) {
-		mark_inode_dirty(HFSPLUS_I(inode).rsrc_inode);
-		return 0;
-	}
+	if (HFSPLUS_IS_RSRC(inode))
+		main_inode = HFSPLUS_I(inode).rsrc_inode;
 
-	if (!inode->i_nlink)
+	if (!main_inode->i_nlink)
 		return 0;
 
-	if (hfs_find_init(HFSPLUS_SB(inode->i_sb).cat_tree, &fd))
+	if (hfs_find_init(HFSPLUS_SB(main_inode->i_sb).cat_tree, &fd))
 		/* panic? */
 		return -EIO;
 
-	if (hfsplus_find_cat(inode->i_sb, inode->i_ino, &fd))
+	if (hfsplus_find_cat(main_inode->i_sb, main_inode->i_ino, &fd))
 		/* panic? */
 		goto out;
 
-	if (S_ISDIR(inode->i_mode)) {
+	if (S_ISDIR(main_inode->i_mode)) {
 		struct hfsplus_cat_folder *folder = &entry.folder;
 
 		if (fd.entrylength < sizeof(struct hfsplus_cat_folder))
@@ -520,6 +525,13 @@ int hfsplus_cat_write_inode(struct inode *inode)
 		folder->valence = cpu_to_be32(inode->i_size - 2);
 		hfs_bnode_write(fd.bnode, &entry, fd.entryoffset,
 					 sizeof(struct hfsplus_cat_folder));
+	} else if (HFSPLUS_IS_RSRC(inode)) {
+		struct hfsplus_cat_file *file = &entry.file;
+		hfs_bnode_read(fd.bnode, &entry, fd.entryoffset,
+			       sizeof(struct hfsplus_cat_file));
+		hfsplus_inode_write_fork(inode, &file->rsrc_fork);
+		hfs_bnode_write(fd.bnode, &entry, fd.entryoffset,
+				sizeof(struct hfsplus_cat_file));
 	} else {
 		struct hfsplus_cat_file *file = &entry.file;
 
@@ -528,8 +540,6 @@ int hfsplus_cat_write_inode(struct inode *inode)
 		hfs_bnode_read(fd.bnode, &entry, fd.entryoffset,
 					sizeof(struct hfsplus_cat_file));
 		hfsplus_inode_write_fork(inode, &file->data_fork);
-		if (HFSPLUS_I(inode).rsrc_inode)
-			hfsplus_inode_write_fork(HFSPLUS_I(inode).rsrc_inode, &file->rsrc_fork);
 		if (S_ISREG(inode->i_mode))
 			HFSPLUS_I(inode).dev = inode->i_nlink;
 		if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))

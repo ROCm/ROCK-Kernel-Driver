@@ -18,7 +18,6 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/delay.h>
-#include <linux/irq.h>
 
 #undef DEBUG
 
@@ -1211,58 +1210,12 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_ANY_ID,	  quirk_intel_ide_combined );
 #endif /* CONFIG_SCSI_SATA */
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP)
-
-void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
-{
-	u8 config, rev;
-	u32 word;
-	extern struct pci_raw_ops *raw_pci_ops;
-
-	/* BIOS may enable hardware IRQ balancing for
-	 * E7520/E7320/E7525(revision ID 0x9 and below)
-	 * based platforms.
-	 * Disable SW irqbalance/affinity on those platforms.
-	 */
-	pci_read_config_byte(dev, PCI_CLASS_REVISION, &rev);
-	if (rev > 0x9)
-		return;
-
-	printk(KERN_INFO "Intel E7520/7320/7525 detected.");
-
-	/* enable access to config space*/
-	pci_read_config_byte(dev, 0xf4, &config);
-	config |= 0x2;
-	pci_write_config_byte(dev, 0xf4, config);
-
-	/* read xTPR register */
-	raw_pci_ops->read(0, 0, 0x40, 0x4c, 2, &word);
-
-	if (!(word & (1 << 13))) {
-		printk(KERN_INFO "Disabling irq balancing and affinity\n");
-#ifdef CONFIG_IRQBALANCE
-		irqbalance_disable("");
-#endif
-		noirqdebug_setup("");
-		no_irq_affinity = 1;
-	}
-
-	config &= ~0x2;
-	/* disable access to config space*/
-	pci_write_config_byte(dev, 0xf4, config);
-}
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7320_MCH,	quirk_intel_irqbalance);
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7525_MCH,	quirk_intel_irqbalance);
-#endif
 
 int pciehp_msi_quirk;
 
 static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
 {
 	pciehp_msi_quirk = 1;
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP)
-	quirk_intel_irqbalance(pdev);
-#endif
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_SMCH,	quirk_pciehp_msi );
 

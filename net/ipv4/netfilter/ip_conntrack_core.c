@@ -352,16 +352,14 @@ __ip_conntrack_find(const struct ip_conntrack_tuple *tuple,
 {
 	struct ip_conntrack_tuple_hash *h;
 	unsigned int hash = hash_conntrack(tuple);
-	/* use per_cpu() to avoid multiple calls to smp_processor_id() */
-	unsigned int cpu = smp_processor_id();
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
 	list_for_each_entry(h, &ip_conntrack_hash[hash], list) {
 		if (conntrack_tuple_cmp(h, tuple, ignored_conntrack)) {
-			per_cpu(ip_conntrack_stat, cpu).found++;
+			CONNTRACK_STAT_INC(found);
 			return h;
 		}
-		per_cpu(ip_conntrack_stat, cpu).searched++;
+		CONNTRACK_STAT_INC(searched);
 	}
 
 	return NULL;
@@ -436,13 +434,14 @@ __ip_conntrack_confirm(struct sk_buff *skb)
 		add_timer(&ct->timeout);
 		atomic_inc(&ct->ct_general.use);
 		set_bit(IPS_CONFIRMED_BIT, &ct->status);
-		WRITE_UNLOCK(&ip_conntrack_lock);
 		CONNTRACK_STAT_INC(insert);
+		WRITE_UNLOCK(&ip_conntrack_lock);
 		return NF_ACCEPT;
 	}
 
-	WRITE_UNLOCK(&ip_conntrack_lock);
 	CONNTRACK_STAT_INC(insert_failed);
+	WRITE_UNLOCK(&ip_conntrack_lock);
+
 	return NF_DROP;
 }
 

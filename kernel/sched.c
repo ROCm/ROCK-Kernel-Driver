@@ -1973,11 +1973,19 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 			 */
 			sd->nr_balance_failed = sd->cache_nice_tries;
 		}
-	} else
-		sd->nr_balance_failed = 0;
 
-	/* We were unbalanced, so reset the balancing interval */
-	sd->balance_interval = sd->min_interval;
+		/*
+		 * We were unbalanced, but unsuccessful in move_tasks(),
+		 * so bump the balance_interval to lessen the lock contention.
+		 */
+		if (sd->balance_interval < sd->max_interval)
+			sd->balance_interval++;
+	} else {
+                sd->nr_balance_failed = 0;
+
+		/* We were unbalanced, so reset the balancing interval */
+		sd->balance_interval = sd->min_interval;
+	}
 
 	return nr_moved;
 
@@ -2052,70 +2060,85 @@ static inline void idle_balance(int this_cpu, runqueue_t *this_rq)
 	}
 }
 
+#ifdef CONFIG_SCHED_SMT
+static int cpu_and_siblings_are_idle(int cpu)
+{
+	int sib;
+	for_each_cpu_mask(sib, cpu_sibling_map[cpu]) {
+		if (idle_cpu(sib))
+			continue;
+		return 0;
+	}
+
+	return 1;
+}
+#else
+#define cpu_and_siblings_are_idle(A) idle_cpu(A)
+#endif
+
+
 /*
- * active_load_balance is run by migration threads. It pushes a running
- * task off the cpu. It can be required to correctly have at least 1 task
- * running on each physical CPU where possible, and not have a physical /
- * logical imbalance.
+ * active_load_balance is run by migration threads. It pushes running tasks
+ * off the busiest CPU onto idle CPUs. It requires at least 1 task to be
+ * running on each physical CPU where possible, and avoids physical /
+ * logical imbalances.
  *
- * Called with busiest locked.
+ * Called with busiest_rq locked.
  */
-static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
+static void active_load_balance(runqueue_t *busiest_rq, int busiest_cpu)
 {
 	struct sched_domain *sd;
-	struct sched_group *group, *busy_group;
-	int i;
+	struct sched_group *cpu_group;
+	cpumask_t visited_cpus;
 
-	schedstat_inc(busiest, alb_cnt);
-	if (busiest->nr_running <= 1)
-		return;
+	schedstat_inc(busiest_rq, alb_cnt);
+	/*
+	 * Search for suitable CPUs to push tasks to in successively higher
+	 * domains with SD_LOAD_BALANCE set.
+	 */
+	visited_cpus = CPU_MASK_NONE;
+	for_each_domain(busiest_cpu, sd) {
+		if (!(sd->flags & SD_LOAD_BALANCE) || busiest_rq->nr_running <= 1)
+			break; /* no more domains to search or no more tasks to move */
 
-	for_each_domain(busiest_cpu, sd)
-		if (cpu_isset(busiest->push_cpu, sd->span))
-			break;
-	if (!sd)
-		return;
+		cpu_group = sd->groups;
+		do { /* sched_groups should either use list_heads or be merged into the domains structure */
+			int cpu, target_cpu = -1;
+			runqueue_t *target_rq;
 
-	group = sd->groups;
-	while (!cpu_isset(busiest_cpu, group->cpumask))
-		group = group->next;
-	busy_group = group;
+			for_each_cpu_mask(cpu, cpu_group->cpumask) {
+				if (cpu_isset(cpu, visited_cpus) || cpu == busiest_cpu ||
+				    !cpu_and_siblings_are_idle(cpu)) {
+					cpu_set(cpu, visited_cpus);
+					continue;
+				}
+				target_cpu = cpu;
+				break;
+			}
+			if (target_cpu == -1)
+				goto next_group; /* failed to find a suitable target cpu in this domain */
 
-	group = sd->groups;
-	do {
-		runqueue_t *rq;
-		int push_cpu = 0;
+			target_rq = cpu_rq(target_cpu);
 
-		if (group == busy_group)
-			goto next_group;
+			/*
+			 * This condition is "impossible", if it occurs we need to fix it
+			 * Reported by Bjorn Helgaas on a 128-cpu setup.
+			 */
+			BUG_ON(busiest_rq == target_rq);
 
-		for_each_cpu_mask(i, group->cpumask) {
-			if (!idle_cpu(i))
-				goto next_group;
-			push_cpu = i;
-		}
-
-		rq = cpu_rq(push_cpu);
-
-		/*
-		 * This condition is "impossible", but since load
-		 * balancing is inherently a bit racy and statistical,
-		 * it can trigger.. Reported by Bjorn Helgaas on a
-		 * 128-cpu setup.
-		 */
-		if (unlikely(busiest == rq))
-			goto next_group;
-		double_lock_balance(busiest, rq);
-		if (move_tasks(rq, push_cpu, busiest, 1, sd, SCHED_IDLE)) {
-			schedstat_inc(busiest, alb_lost);
-			schedstat_inc(rq, alb_gained);
-		} else {
-			schedstat_inc(busiest, alb_failed);
-		}
-		spin_unlock(&rq->lock);
+			/* move a task from busiest_rq to target_rq */
+			double_lock_balance(busiest_rq, target_rq);
+			if (move_tasks(target_rq, target_cpu, busiest_rq, 1, sd, SCHED_IDLE)) {
+				schedstat_inc(busiest_rq, alb_lost);
+				schedstat_inc(target_rq, alb_gained);
+			} else {
+				schedstat_inc(busiest_rq, alb_failed);
+			}
+			spin_unlock(&target_rq->lock);
 next_group:
-		group = group->next;
-	} while (group != sd->groups);
+			cpu_group = cpu_group->next;
+		} while (cpu_group != sd->groups && busiest_rq->nr_running > 1);
+	}
 }
 
 /*
@@ -2502,6 +2525,8 @@ asmlinkage void __sched schedule(void)
 need_resched:
 	preempt_disable();
 	prev = current;
+	release_kernel_lock(prev);
+need_resched_nonpreemptible:
 	rq = this_rq();
 
 	/*
@@ -2513,7 +2538,6 @@ need_resched:
 		dump_stack();
 	}
 
-	release_kernel_lock(prev);
 	schedstat_inc(rq, sched_cnt);
 	now = sched_clock();
 	if (likely(now - prev->timestamp < NS_MAX_SLEEP_AVG))
@@ -2565,7 +2589,6 @@ go_idle:
 		}
 	} else {
 		if (dependent_sleeper(cpu, rq)) {
-			schedstat_inc(rq, sched_goidle);
 			next = rq->idle;
 			goto switch_tasks;
 		}
@@ -2609,6 +2632,8 @@ go_idle:
 	}
 	next->activated = 0;
 switch_tasks:
+	if (next == rq->idle)
+		schedstat_inc(rq, sched_goidle);
 	prefetch(next);
 	clear_tsk_need_resched(prev);
 	rcu_qsctr_inc(task_cpu(prev));
@@ -2636,7 +2661,9 @@ switch_tasks:
 	} else
 		spin_unlock_irq(&rq->lock);
 
-	reacquire_kernel_lock(current);
+	prev = current;
+	if (unlikely(reacquire_kernel_lock(prev) < 0))
+		goto need_resched_nonpreemptible;
 	preempt_enable_no_resched();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
@@ -4048,21 +4075,6 @@ int __init migration_init(void)
 }
 #endif
 
-/*
- * The 'big kernel lock'
- *
- * This spinlock is taken and released recursively by lock_kernel()
- * and unlock_kernel().  It is transparently dropped and reaquired
- * over schedule().  It is used to protect legacy code that hasn't
- * been migrated to a proper locking design yet.
- *
- * Don't use in new code.
- *
- * Note: spinlock debugging needs this even on !CONFIG_SMP.
- */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-EXPORT_SYMBOL(kernel_flag);
-
 #ifdef CONFIG_SMP
 /*
  * Attach the domain 'sd' to 'cpu' as its base domain.  Callers must
@@ -4379,11 +4391,10 @@ static void sched_domain_debug(void)
 			printk("domain %d: ", level);
 
 			if (!(sd->flags & SD_LOAD_BALANCE)) {
-				printk("does not balance");
+				printk("does not load-balance");
 				if (sd->parent)
 					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
 				printk("\n");
-				break;
 			}
 
 			printk("span %s\n", str);
