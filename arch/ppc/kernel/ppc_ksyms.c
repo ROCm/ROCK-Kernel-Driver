@@ -336,7 +336,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
-#if defined(CONFIG_8xx) || defined(CONFIG_4xx)
+#if defined(CONFIG_8xx) || defined(CONFIG_40x)
 EXPORT_SYMBOL(__res);
 #endif
 #if defined(CONFIG_8xx)
