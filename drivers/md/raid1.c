@@ -523,9 +523,8 @@ static int make_request(request_queue_t *q, struct bio * bio)
 
 	r1_bio->mddev = mddev;
 	r1_bio->sector = bio->bi_sector;
-	r1_bio->cmd = bio_data_dir(bio);
 
-	if (r1_bio->cmd == READ) {
+	if (bio_data_dir(bio) == READ) {
 		/*
 		 * read balancing logic:
 		 */
@@ -539,7 +538,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		read_bio->bi_sector = r1_bio->sector + mirror->rdev->data_offset;
 		read_bio->bi_bdev = mirror->rdev->bdev;
 		read_bio->bi_end_io = raid1_end_read_request;
-		read_bio->bi_rw = r1_bio->cmd;
+		read_bio->bi_rw = READ;
 		read_bio->bi_private = r1_bio;
 
 		generic_make_request(read_bio);
@@ -577,7 +576,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		mbio->bi_sector	= r1_bio->sector + conf->mirrors[i].rdev->data_offset;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_end_io	= raid1_end_write_request;
-		mbio->bi_rw = r1_bio->cmd;
+		mbio->bi_rw = WRITE;
 		mbio->bi_private = r1_bio;
 
 		atomic_inc(&r1_bio->remaining);
@@ -926,30 +925,26 @@ static void raid1d(mddev_t *mddev)
 		mddev = r1_bio->mddev;
 		conf = mddev_to_conf(mddev);
 		bio = r1_bio->master_bio;
-		switch(r1_bio->cmd) {
-		case SPECIAL:
+		if (test_bit(R1BIO_IsSync, &r1_bio->state)) {
 			sync_request_write(mddev, r1_bio);
-			break;
-		case READ:
-		case READA:
+		} else {
 			if (map(mddev, &rdev) == -1) {
 				printk(KERN_ALERT "raid1: %s: unrecoverable I/O"
-				" read error for block %llu\n",
-				bdevname(bio->bi_bdev,b),
-				(unsigned long long)r1_bio->sector);
+				       " read error for block %llu\n",
+				       bdevname(bio->bi_bdev,b),
+				       (unsigned long long)r1_bio->sector);
 				raid_end_bio_io(r1_bio);
-				break;
-			}
-			printk(KERN_ERR "raid1: %s: redirecting sector %llu to"
-				" another mirror\n",
-				bdevname(rdev->bdev,b),
-				(unsigned long long)r1_bio->sector);
-			bio->bi_bdev = rdev->bdev;
-			bio->bi_sector = r1_bio->sector + rdev->data_offset;
-			bio->bi_rw = r1_bio->cmd;
+			} else {
+				printk(KERN_ERR "raid1: %s: redirecting sector %llu to"
+				       " another mirror\n",
+				       bdevname(rdev->bdev,b),
+				       (unsigned long long)r1_bio->sector);
+				bio->bi_bdev = rdev->bdev;
+				bio->bi_sector = r1_bio->sector + rdev->data_offset;
+				bio->bi_rw = READ;
 
-			generic_make_request(bio);
-			break;
+				generic_make_request(bio);
+			}
 		}
 	}
 	spin_unlock_irqrestore(&retry_list_lock, flags);
@@ -1037,7 +1032,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 
 	r1_bio->mddev = mddev;
 	r1_bio->sector = sector_nr;
-	r1_bio->cmd = SPECIAL;
+	set_bit(R1BIO_IsSync, &r1_bio->state);
 	r1_bio->read_disk = disk;
 
 	bio = r1_bio->master_bio;

@@ -54,7 +54,6 @@ struct r1bio_s {
 	atomic_t		remaining; /* 'have we finished' count,
 					    * used from IRQ handlers
 					    */
-	int			cmd;
 	sector_t		sector;
 	unsigned long		state;
 	mddev_t			*mddev;
@@ -78,6 +77,6 @@ struct r1bio_s {
 };
 
 /* bits for r1bio.state */
-#define	R1BIO_Uptodate	1
-
+#define	R1BIO_Uptodate	0
+#define	R1BIO_IsSync	1
 #endif
