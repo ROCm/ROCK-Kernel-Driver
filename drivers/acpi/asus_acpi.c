@@ -33,10 +33,6 @@
  */
 
 #include <linux/config.h>
-#if defined (CONFIG_MODVERSIONS) && !defined (MODVERSIONS) && defined (MODULE)
-#include <linux/modversions.h>
-#endif
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
