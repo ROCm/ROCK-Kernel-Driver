@@ -243,7 +243,7 @@ static int madgemc_sifprobe(struct net_device *dev)
  */
 int tms380tr_open(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	int err;
 	
 	/* init the spinlock */
@@ -313,7 +313,7 @@ int tms380tr_open(struct net_device *dev)
 static void tms380tr_timer_end_wait(unsigned long data)
 {
 	struct net_device *dev = (struct net_device*)data;
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	if(tp->Sleeping)
 	{
@@ -329,7 +329,7 @@ static void tms380tr_timer_end_wait(unsigned long data)
  */
 static int tms380tr_chipset_init(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	int err;
 
 	tms380tr_init_ipb(tp);
@@ -364,7 +364,7 @@ static int tms380tr_chipset_init(struct net_device *dev)
  */
 static void tms380tr_init_net_local(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	int i;
 	dma_addr_t dmabuf;
 
@@ -492,7 +492,7 @@ static void tms380tr_init_opb(struct net_device *dev)
 	unsigned short BufferSize = BUFFER_SIZE;
 	int i;
 
-	tp = (struct net_local *)dev->priv;
+	tp = netdev_priv(dev);
 
 	tp->ocpl.OPENOptions 	 = 0;
 	tp->ocpl.OPENOptions 	|= ENABLE_FULL_DUPLEX_SELECTION;
@@ -531,7 +531,7 @@ static void tms380tr_init_opb(struct net_device *dev)
  */
 static void tms380tr_open_adapter(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	if(tp->OpenCommandIssued)
 		return;
@@ -569,7 +569,7 @@ static void tms380tr_enable_interrupts(struct net_device *dev)
  */
 static void tms380tr_exec_cmd(struct net_device *dev, unsigned short Command)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	tp->CMDqueue |= Command;
 	tms380tr_chk_outstanding_cmds(dev);
@@ -596,7 +596,7 @@ static void tms380tr_timeout(struct net_device *dev)
  */
 static int tms380tr_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	int err;
 
 	err = tms380tr_hardware_send_packet(skb, dev);
@@ -616,7 +616,7 @@ static int tms380tr_hardware_send_packet(struct sk_buff *skb, struct net_device 
 	unsigned long flags;
 	int i;
 	dma_addr_t dmabuf, newbuf;
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
    
 	/* Try to get a free TPL from the chain.
 	 *
@@ -715,7 +715,7 @@ static void tms380tr_chk_src_addr(unsigned char *frame, unsigned char *hw_addr)
 static void tms380tr_timer_chk(unsigned long data)
 {
 	struct net_device *dev = (struct net_device*)data;
-	struct net_local *tp = (struct net_local*)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	if(tp->HaltInProgress)
 		return;
@@ -755,7 +755,7 @@ irqreturn_t tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		return IRQ_NONE;
 	}
 
-	tp = (struct net_local *)dev->priv;
+	tp = netdev_priv(dev);
 
 	irq_type = SIFREADW(SIFSTS);
 
@@ -843,7 +843,7 @@ irqreturn_t tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 static void tms380tr_reset_interrupt(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	SSB *ssb = &tp->ssb;
 
 	/*
@@ -929,7 +929,7 @@ static unsigned char tms380tr_chk_ssb(struct net_local *tp, unsigned short IrqTy
  */
 static void tms380tr_cmd_status_irq(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned short ssb_cmd, ssb_parm_0;
 	unsigned short ssb_parm_1;
 	char *open_err = "Open error -";
@@ -1126,7 +1126,7 @@ static void tms380tr_cmd_status_irq(struct net_device *dev)
  */
 int tms380tr_close(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	netif_stop_queue(dev);
 	
 	del_timer(&tp->timer);
@@ -1172,7 +1172,7 @@ int tms380tr_close(struct net_device *dev)
  */
 static struct net_device_stats *tms380tr_get_stats(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	return ((struct net_device_stats *)&tp->MacStat);
 }
@@ -1182,7 +1182,7 @@ static struct net_device_stats *tms380tr_get_stats(struct net_device *dev)
  */
 static void tms380tr_set_multicast_list(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned int OpenOptions;
 	
 	OpenOptions = tp->ocpl.OPENOptions &
@@ -1275,7 +1275,7 @@ static void tms380tr_exec_sifcmd(struct net_device *dev, unsigned int WriteValue
  */
 static int tms380tr_reset_adapter(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned short *fw_ptr;
 	unsigned short count, c, count2;
 	const struct firmware *fw_entry = NULL;
@@ -1428,7 +1428,7 @@ static int tms380tr_bringup_diags(struct net_device *dev)
  */
 static int tms380tr_init_adapter(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	const unsigned char SCB_Test[6] = {0x00, 0x00, 0xC1, 0xE2, 0xD4, 0x8B};
 	const unsigned char SSB_Test[8] = {0xFF, 0xFF, 0xD1, 0xD7,
@@ -1541,7 +1541,7 @@ static int tms380tr_init_adapter(struct net_device *dev)
  */
 static void tms380tr_chk_outstanding_cmds(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned long Addr = 0;
 
 	if(tp->CMDqueue == 0)
@@ -1713,7 +1713,7 @@ static void tms380tr_chk_outstanding_cmds(struct net_device *dev)
  */
 static void tms380tr_ring_status_irq(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	tp->CurrentRingStatus = be16_to_cpu((unsigned short)tp->ssb.Parm[0]);
 
@@ -1785,7 +1785,7 @@ static void tms380tr_chk_irq(struct net_device *dev)
 {
 	int i;
 	unsigned short AdapterCheckBlock[4];
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 
 	tp->AdapterOpenFlag = 0;	/* Adapter closed now */
 
@@ -1941,7 +1941,7 @@ static void tms380tr_chk_irq(struct net_device *dev)
  */
 static int tms380tr_read_ptr(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned short adapterram;
 
 	tms380tr_read_ram(dev, (unsigned char *)&tp->intptrs.BurnedInAddrPtr,
@@ -2031,7 +2031,7 @@ static void tms380tr_cancel_tx_queue(struct net_local* tp)
  */
 static void tms380tr_tx_status_irq(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned char HighByte, HighAc, LowAc;
 	TPL *tpl;
 
@@ -2102,7 +2102,7 @@ static void tms380tr_tx_status_irq(struct net_device *dev)
  */
 static void tms380tr_rcv_status_irq(struct net_device *dev)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned char *ReceiveDataPtr;
 	struct sk_buff *skb;
 	unsigned int Length, Length2;
@@ -2293,7 +2293,7 @@ static void tms380tr_update_rcv_stats(struct net_local *tp, unsigned char DataPt
 
 static int tms380tr_set_mac_address(struct net_device *dev, void *addr)
 {
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	struct sockaddr *saddr = addr;
 	
 	if (tp->AdapterOpenFlag || tp->AdapterVirtOpenFlag) {
@@ -2327,7 +2327,7 @@ void tmsdev_term(struct net_device *dev)
 {
 	struct net_local *tp;
 
-	tp = (struct net_local *) dev->priv;
+	tp = netdev_priv(dev);
 	pci_unmap_single(tp->pdev, tp->dmabuffer, sizeof(struct net_local),
 		PCI_DMA_BIDIRECTIONAL);
 }
@@ -2338,7 +2338,7 @@ int tmsdev_init(struct net_device *dev, unsigned long dmalimit,
 	struct net_local *tms_local;
 
 	memset(dev->priv, 0, sizeof(struct net_local));
-	tms_local = (struct net_local *)dev->priv;
+	tms_local = netdev_priv(dev);
 	init_waitqueue_head(&tms_local->wait_for_tok_int);
 	tms_local->dmalimit = dmalimit;
 	tms_local->pdev = pdev;
