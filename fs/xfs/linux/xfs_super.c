@@ -836,6 +836,7 @@ exit_xfs_fs( void )
 	vfs_exitquota();
 	vfs_exitdmapi();
 	unregister_filesystem(&xfs_fs_type);
+	XFS_DM_EXIT();
 	xfs_cleanup();
 	pagebuf_terminate();
 	destroy_inodecache();
