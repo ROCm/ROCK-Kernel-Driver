@@ -2575,8 +2575,8 @@ he_close(struct atm_vcc *vcc)
 			udelay(250);
 		}
 
-		add_wait_queue(&he_vcc->rx_waitq, &wait);
 		set_current_state(TASK_UNINTERRUPTIBLE);
+		add_wait_queue(&he_vcc->rx_waitq, &wait);
 
 		he_writel_rsr0(he_dev, RSR0_CLOSE_CONN, cid);
 		(void) he_readl_rsr0(he_dev, cid);		/* flush posted writes */
@@ -2650,8 +2650,8 @@ he_close(struct atm_vcc *vcc)
 		tpd->vcc = vcc;
 		wmb();
 
-		add_wait_queue(&he_vcc->tx_waitq, &wait);
 		set_current_state(TASK_UNINTERRUPTIBLE);
+		add_wait_queue(&he_vcc->tx_waitq, &wait);
 		__enqueue_tpd(he_dev, tpd, cid);
 		spin_unlock_irqrestore(&he_dev->global_lock, flags);
 
