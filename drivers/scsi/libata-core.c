@@ -2208,7 +2208,7 @@ static void __atapi_pio_bytes(struct ata_queued_cmd *qc, unsigned int bytes)
 		ap->pio_task_state = PIO_ST_LAST;
 
 next_sg:
-	sg = &sg[qc->cursg];
+	sg = &qc->sg[qc->cursg];
 	page = sg->page;
 
 	count = min(sg_dma_len(sg) - qc->cursg_ofs, bytes);
@@ -2586,7 +2586,7 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->dev = dev;
 		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 		qc->nsect = 0;
-		qc->nbytes = qc->nbytes = 0;
+		qc->nbytes = qc->curbytes = 0;
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
 
