@@ -386,7 +386,7 @@ out:
  */
 static void udp_flush_pending_frames(struct sock *sk)
 {
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
 
 	if (up->pending) {
 		up->len = 0;
@@ -398,7 +398,7 @@ static void udp_flush_pending_frames(struct sock *sk)
 /*
  * Push out all pending data as one UDP datagram. Socket is locked.
  */
-static int udp_push_pending_frames(struct sock *sk, struct udp_opt *up)
+static int udp_push_pending_frames(struct sock *sk, struct udp_sock *up)
 {
 	struct inet_sock *inet = inet_sk(sk);
 	struct flowi *fl = &inet->cork.fl;
@@ -483,7 +483,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		size_t len)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
 	int ulen = len;
 	struct ipcm_cookie ipc;
 	struct rtable *rt = NULL;
@@ -672,7 +672,7 @@ do_confirm:
 static int udp_sendpage(struct sock *sk, struct page *page, int offset,
 			size_t size, int flags)
 {
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
 	int ret;
 
 	if (!up->pending) {
@@ -902,7 +902,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 #ifndef CONFIG_XFRM
 	return 1; 
 #else
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
   	struct udphdr *uh = skb->h.uh;
 	struct iphdr *iph;
 	int iphlen, len;
@@ -988,7 +988,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
  */
 static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 {
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
 
 	/*
 	 *	Charge it to the socket, dropping if the queue is full.
@@ -1223,7 +1223,7 @@ static int udp_destroy_sock(struct sock *sk)
 static int udp_setsockopt(struct sock *sk, int level, int optname, 
 			  char __user *optval, int optlen)
 {
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
 	int val;
 	int err = 0;
 
@@ -1272,7 +1272,7 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 static int udp_getsockopt(struct sock *sk, int level, int optname, 
 			  char __user *optval, int __user *optlen)
 {
-	struct udp_opt *up = udp_sk(sk);
+	struct udp_sock *up = udp_sk(sk);
 	int val, len;
 
 	if (level != SOL_UDP)
