@@ -47,19 +47,19 @@ extern int xfs_bdstrat_cb (struct xfs_buf *);
 extern int xfs_zero_eof (vnode_t *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t, struct pm *);
 extern ssize_t xfs_read (
-	struct bhv_desc	       *bdp,
-	struct file		*file,
-	char			*buf,
-	size_t			size,
-	loff_t			*offset,
-	struct cred	       *credp);
+	struct bhv_desc		*bdp,
+	struct file		*filp,
+	const struct iovec	*iovp,
+	unsigned long		segs,
+	loff_t			*offp,
+	struct cred		*credp);
 
 extern ssize_t xfs_write (
 	struct bhv_desc		*bdp,
-	struct file		*file,
-	const char		*buf,
-	size_t			size,
-	loff_t			*offset,
+	struct file		*filp,
+	const struct iovec	*iovp,
+	unsigned long		segs,
+	loff_t			*offp,
 	struct cred		*credp);
 
 extern int xfs_recover_read_only (xlog_t *);

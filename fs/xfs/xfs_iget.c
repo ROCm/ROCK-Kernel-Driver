@@ -508,26 +508,6 @@ inode_allocate:
 
 
 /*
- * A 'special' interface to xfs_iget, where the
- * vnode is already allocated.
- */
-int
-xfs_vn_iget(
-	vfs_t		*vfsp,
-	struct vnode	*vp,
-	xfs_ino_t	ino)
-{
-	xfs_inode_t	*ip;
-	xfs_mount_t	*mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	int error;
-
-	error = xfs_iget_core(vp, mp, NULL, ino, 0, &ip, 0);
-
-	return error;
-}
-
-
-/*
  * Do the setup for the various locks within the incore inode.
  */
 void
