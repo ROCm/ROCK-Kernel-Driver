@@ -37,7 +37,7 @@ nasid_t master_nasid = INVALID_NASID;	/* This is the partition master nasid */
  *
  * 	This code is executed once for each Hub chip.
  */
-static void
+static void __init
 per_hub_init(cnodeid_t cnode)
 {
 	nasid_t nasid;
@@ -130,10 +130,8 @@ sgi_master_io_infr_init(void)
 	klhwg_add_all_modules(hwgraph_root);
 	klhwg_add_all_nodes(hwgraph_root);
 
-	for (cnode = 0; cnode < numionodes; cnode++) {
-		extern void per_hub_init(cnodeid_t);
+	for (cnode = 0; cnode < numionodes; cnode++)
 		per_hub_init(cnode);
-	}
 
 	/*
 	 *

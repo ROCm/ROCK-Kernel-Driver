@@ -952,7 +952,7 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		bl	do_DataAbort
 		disable_irq r0
 		ldr	r0, [sp, #S_PSR]
-		msr	spsr, r0
+		msr	spsr_cxsf, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
 
 		.align	5
@@ -988,7 +988,7 @@ preempt_return:
 		strne	r0, [r0, -r0]			@ bug()
 #endif
 		ldr	r0, [sp, #S_PSR]		@ irqs are already disabled
-		msr	spsr, r0
+		msr	spsr_cxsf, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
 
 		.ltorg
@@ -1031,7 +1031,7 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 
 1:		disable_irq r0
 		ldr	lr, [sp, #S_PSR]		@ Get SVC cpsr
-		msr	spsr, lr
+		msr	spsr_cxsf, lr
 		ldmia	sp, {r0 - pc}^			@ Restore SVC registers
 
 		.align	5
@@ -1052,7 +1052,7 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		bl	do_PrefetchAbort		@ call abort handler
 		disable_irq r0
 		ldr	r0, [sp, #S_PSR]
-		msr	spsr, r0
+		msr	spsr_cxsf, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
 
 		.align	5
@@ -1303,7 +1303,7 @@ vector_IRQ:	@
 		mrs	r13, cpsr
 		bic	r13, r13, #MODE_MASK
 		orr	r13, r13, #MODE_SVC
-		msr	spsr, r13			@ switch to SVC_32 mode
+		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]
@@ -1346,7 +1346,7 @@ vector_data:	@
 		mrs	r13, cpsr
 		bic	r13, r13, #MODE_MASK
 		orr	r13, r13, #MODE_SVC
-		msr	spsr, r13			@ switch to SVC_32 mode
+		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]
@@ -1390,7 +1390,7 @@ vector_prefetch:
 		mrs	r13, cpsr
 		bic	r13, r13, #MODE_MASK
 		orr	r13, r13, #MODE_SVC
-		msr	spsr, r13			@ switch to SVC_32 mode
+		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
 
 		ands	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]
@@ -1433,7 +1433,7 @@ vector_undefinstr:
 		mrs	r13, cpsr
 		bic	r13, r13, #MODE_MASK
 		orr	r13, r13, #MODE_SVC
-		msr	spsr, r13			@ switch to SVC_32 mode
+		msr	spsr_cxsf, r13			@ switch to SVC_32 mode
 
 		and	lr, lr, #15
 		ldr	lr, [pc, lr, lsl #2]

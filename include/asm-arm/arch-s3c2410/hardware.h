@@ -26,6 +26,41 @@ extern unsigned long s3c2410_pclk;
 extern unsigned long s3c2410_hclk;
 extern unsigned long s3c2410_fclk;
 
+/* external functions for GPIO support
+ *
+ * These allow various different clients to access the same GPIO
+ * registers without conflicting. If your driver only owns the entire
+ * GPIO register, then it is safe to ioremap/__raw_{read|write} to it.
+*/
+
+/* s3c2410_gpio_cfgpin
+ *
+ * set the configuration of the given pin to the value passed.
+ *
+ * eg:
+ *    s3c2410_gpio_cfgpin(S3C2410_GPA0, S3C2410_GPA0_ADDR0);
+ *    s3c2410_gpio_cfgpin(S3C2410_GPE8, S3C2410_GPE8_SDDAT1);
+*/
+
+extern void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function);
+
+/* s3c2410_gpio_pullup
+ *
+ * configure the pull-up control on the given pin
+ *
+ * to = 1 => disable the pull-up
+ *      0 => enable the pull-up
+ *
+ * eg;
+ *
+ *   s3c2410_gpio_pullup(S3C2410_GPB0, 0);
+ *   s3c2410_gpio_pullup(S3C2410_GPE8, 0);
+*/
+
+extern void s3c2410_gpio_pullup(unsigned int pin, unsigned int to);
+
+extern void s3c2410_gpio_setpin(unsigned int pin, unsigned int to);
+
 #endif /* __ASSEMBLY__ */
 
 #include <asm/sizes.h>
