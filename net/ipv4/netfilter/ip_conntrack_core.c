@@ -258,9 +258,7 @@ static void remove_expectations(struct ip_conntrack *ct)
 
 	DEBUGP("remove_expectations(%p)\n", ct);
 
-	for (exp_entry = ct->sibling_list.next;
-	     exp_entry != &ct->sibling_list; exp_entry = next) {
-		next = exp_entry->next;
+	list_for_each_safe(exp_entry, next, &ct->sibling_list) {
 		exp = list_entry(exp_entry, struct ip_conntrack_expect,
 				 expected_list);
 
@@ -307,7 +305,7 @@ destroy_conntrack(struct nf_conntrack *nfct)
 	IP_NF_ASSERT(atomic_read(&nfct->use) == 0);
 	IP_NF_ASSERT(!timer_pending(&ct->timeout));
 
-	if (ct->master && master_ct(ct))
+	if (master_ct(ct))
 		ip_conntrack_put(master_ct(ct));
 
 	/* To make sure we don't get any weird locking issues here:
@@ -675,9 +673,6 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 
 	INIT_LIST_HEAD(&conntrack->sibling_list);
 
-	/* Mark clearly that it's not in the hash table. */
-	conntrack->tuplehash[IP_CT_DIR_ORIGINAL].list.next = NULL;
-
 	WRITE_LOCK(&ip_conntrack_lock);
 	/* Need finding and deleting of expected ONLY if we win race */
 	READ_LOCK(&ip_conntrack_expect_tuple_lock);
@@ -1015,18 +1010,11 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 		return -ENOMEM;
 	}
 	
-	/* Zero out the new structure, then fill out it with the data */
 	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
-	memset(new, 0, sizeof(*expect));
-	INIT_LIST_HEAD(&new->list);
-	INIT_LIST_HEAD(&new->expected_list);
 	memcpy(new, expect, sizeof(*expect));
 	new->expectant = related_to;
 	new->sibling = NULL;
-	/* increase usage count. This sucks. The memset above overwrites
-	 * old usage count [if still present] and we increase to one.  Only
-	 * works because everything is done under ip_conntrack_lock() */
-	atomic_inc(&new->use);
+	atomic_set(&new->use, 1);
 	
 	/* add to expected list for this connection */	
 	list_add(&new->expected_list, &related_to->sibling_list);
@@ -1476,8 +1464,10 @@ int __init ip_conntrack_init(void)
 	ip_ct_attach = ip_conntrack_attach;
 	return ret;
 
+#ifdef CONFIG_SYSCTL
 err_free_ct_cachep:
 	kmem_cache_destroy(ip_conntrack_cachep);
+#endif /*CONFIG_SYSCTL*/
 err_free_hash:
 	vfree(ip_conntrack_hash);
 err_unreg_sockopt:
