@@ -441,8 +441,7 @@ static void __qdisc_destroy(struct rcu_head *head)
 	write_unlock(&qdisc_tree_lock);
 	module_put(ops->owner);
 
-	if (qdisc->dev)
-		dev_put(qdisc->dev);
+	dev_put(qdisc->dev);
 	if (!(qdisc->flags&TCQ_F_BUILTIN))
 		kfree(qdisc);
 }
