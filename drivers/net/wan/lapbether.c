@@ -198,7 +198,7 @@ drop:
 
 static void lapbeth_data_transmit(struct net_device *ndev, struct sk_buff *skb)
 {
-	struct lapbethdev *lapbeth = ndev->priv;
+	struct lapbethdev *lapbeth = netdev_priv(ndev);
 	unsigned char *ptr;
 	struct net_device *dev;
 	int size = skb->len;
@@ -269,7 +269,7 @@ static void lapbeth_disconnected(struct net_device *dev, int reason)
  */
 static struct net_device_stats *lapbeth_get_stats(struct net_device *dev)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)dev->priv;
+	struct lapbethdev *lapbeth = netdev_priv(dev);
 	return &lapbeth->stats;
 }
 
@@ -278,7 +278,7 @@ static struct net_device_stats *lapbeth_get_stats(struct net_device *dev)
  */
 static int lapbeth_set_mac_address(struct net_device *dev, void *addr)
 {
-	struct sockaddr *sa = (struct sockaddr *)addr;
+	struct sockaddr *sa = addr;
 	memcpy(dev->dev_addr, sa->sa_data, dev->addr_len);
 	return 0;
 }
@@ -355,7 +355,7 @@ static int lapbeth_new_device(struct net_device *dev)
 	if (!ndev)
 		goto out;
 
-	lapbeth = ndev->priv;
+	lapbeth = netdev_priv(ndev);
 	lapbeth->axdev = ndev;
 
 	dev_hold(dev);
@@ -397,7 +397,7 @@ static int lapbeth_device_event(struct notifier_block *this,
 				unsigned long event, void *ptr)
 {
 	struct lapbethdev *lapbeth;
-	struct net_device *dev = (struct net_device *)ptr;
+	struct net_device *dev = ptr;
 
 	if (!dev_is_ethdev(dev))
 		return NOTIFY_DONE;

@@ -313,7 +313,7 @@ static void load_csrs(struct lance_private *lp)
 /* Setup the Lance Rx and Tx rings */
 static void lance_init_ring_dvma(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	dma_addr_t aib = lp->init_block_dvma;
 	__u32 leptr;
@@ -370,7 +370,7 @@ static void lance_init_ring_dvma(struct net_device *dev)
 
 static void lance_init_ring_pio(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	u32 leptr;
 	int i;
@@ -500,7 +500,7 @@ static int init_restart_lance(struct lance_private *lp)
 
 static void lance_rx_dvma(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile struct lance_rx_desc *rd;
 	u8 bits;
@@ -563,7 +563,7 @@ static void lance_rx_dvma(struct net_device *dev)
 
 static void lance_tx_dvma(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	int i, j;
 
@@ -673,7 +673,7 @@ static void lance_piocopy_to_skb(struct sk_buff *skb, volatile void *piobuf, int
 
 static void lance_rx_pio(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile struct lance_rx_desc *rd;
 	unsigned char bits;
@@ -735,7 +735,7 @@ static void lance_rx_pio(struct net_device *dev)
 
 static void lance_tx_pio(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	int i, j;
 
@@ -816,7 +816,7 @@ out:
 static irqreturn_t lance_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
-	struct lance_private *lp = (struct lance_private *)dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	int csr0;
     
 	sbus_writew(LE_CSR0, lp->lregs + RAP);
@@ -915,7 +915,7 @@ struct net_device *last_dev = 0;
 
 static int lance_open(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *)dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	int status = 0;
 
@@ -968,7 +968,7 @@ static int lance_open(struct net_device *dev)
 
 static int lance_close(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 	del_timer_sync(&lp->multicast_timer);
@@ -981,7 +981,7 @@ static int lance_close(struct net_device *dev)
 
 static int lance_reset(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	int status;
     
 	STOP_LANCE(lp);
@@ -1102,7 +1102,7 @@ static void lance_piozero(volatile void *dest, int len)
 
 static void lance_tx_timeout(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 
 	printk(KERN_ERR "%s: transmit timed out, status %04x, reset\n",
 	       dev->name, sbus_readw(lp->lregs + RDP));
@@ -1112,7 +1112,7 @@ static void lance_tx_timeout(struct net_device *dev)
 
 static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	int entry, skblen, len;
 
@@ -1165,7 +1165,7 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *lance_get_stats(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }
@@ -1173,7 +1173,7 @@ static struct net_device_stats *lance_get_stats(struct net_device *dev)
 /* taken from the depca driver */
 static void lance_load_multicast(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	volatile u16 *mcast_table = (u16 *) &ib->filter;
 	struct dev_mc_list *dmi = dev->mc_list;
@@ -1223,7 +1223,7 @@ static void lance_load_multicast(struct net_device *dev)
 
 static void lance_set_multicast(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib = lp->init_block;
 	u16 mode;
 
@@ -1291,7 +1291,7 @@ static void lance_free_hwresources(struct lance_private *lp)
 /* Ethtool support... */
 static void sparc_lance_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct lance_private *lp = dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 
 	strcpy(info->driver, "sunlance");
 	strcpy(info->version, "2.02");
@@ -1325,7 +1325,7 @@ static int __init sparc_lance_init(struct sbus_dev *sdev,
 	if (!dev)
 		return -ENOMEM;
 
-	lp = dev->priv;
+	lp = netdev_priv(dev);
 
 	if (sparc_lance_debug && version_printed++ == 0)
 		printk (KERN_INFO "%s", version);

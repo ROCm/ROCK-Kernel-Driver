@@ -433,7 +433,7 @@ void cp_from_buf(const int type, void *to, const void *from, int len)
 /* Setup the Lance Rx and Tx rings */
 static void lance_init_ring(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib;
 	int leptr;
 	int i;
@@ -530,7 +530,7 @@ static int init_restart_lance(struct lance_private *lp)
 
 static int lance_rx(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib;
 	volatile struct lance_rx_desc *rd = 0;
 	unsigned char bits;
@@ -617,7 +617,7 @@ static int lance_rx(struct net_device *dev)
 
 static void lance_tx(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib;
 	volatile struct lance_regs *ll = lp->ll;
 	volatile struct lance_tx_desc *td;
@@ -709,7 +709,7 @@ static irqreturn_t
 lance_interrupt(const int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	int csr0;
 
@@ -757,7 +757,7 @@ struct net_device *last_dev = 0;
 static int lance_open(struct net_device *dev)
 {
 	volatile struct lance_init_block *ib = (struct lance_init_block *) (dev->mem_start);
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	int status = 0;
 
@@ -822,7 +822,7 @@ static int lance_open(struct net_device *dev)
 
 static int lance_close(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 
 	netif_stop_queue(dev);
@@ -856,7 +856,7 @@ static int lance_close(struct net_device *dev)
 
 static inline int lance_reset(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	int status;
 
@@ -873,7 +873,7 @@ static inline int lance_reset(struct net_device *dev)
 
 static void lance_tx_timeout(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 
 	printk(KERN_ERR "%s: transmit timed out, status %04x, reset\n",
@@ -884,7 +884,7 @@ static void lance_tx_timeout(struct net_device *dev)
 
 static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_regs *ll = lp->ll;
 	volatile struct lance_init_block *ib = (struct lance_init_block *) (dev->mem_start);
 	int entry, skblen, len;
@@ -936,7 +936,7 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *lance_get_stats(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 
 	return &lp->stats;
 }
@@ -982,7 +982,7 @@ static void lance_load_multicast(struct net_device *dev)
 
 static void lance_set_multicast(struct net_device *dev)
 {
-	struct lance_private *lp = (struct lance_private *) dev->priv;
+	struct lance_private *lp = netdev_priv(dev);
 	volatile struct lance_init_block *ib;
 	volatile struct lance_regs *ll = lp->ll;
 
@@ -1048,7 +1048,7 @@ static int __init dec_lance_init(const int type, const int slot)
 	 * alloc_etherdev ensures the data structures used by the LANCE
 	 * are aligned.
 	 */
-	lp = (struct lance_private *) dev->priv;
+	lp = netdev_priv(dev);
 	spin_lock_init(&lp->lock);
 
 	lp->type = type;
@@ -1287,7 +1287,7 @@ static void __exit dec_lance_cleanup(void)
 {
 	while (root_lance_dev) {
 		struct net_device *dev = root_lance_dev;
-		struct lance_private *lp = (struct lance_private *)dev->priv;
+		struct lance_private *lp = netdev_priv(dev);
 		unregister_netdev(dev);
 #ifdef CONFIG_TC
 		if (lp->slot >= 0)

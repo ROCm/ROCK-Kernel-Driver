@@ -63,7 +63,7 @@ unsigned int mit_table[MIT_SIZE+1] =
 
 int tulip_refill_rx(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry;
 	int refilled = 0;
 
@@ -109,7 +109,7 @@ void oom_timer(unsigned long data)
 
 int tulip_poll(struct net_device *dev, int *budget)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = *budget;
 	int received = 0;
@@ -354,7 +354,7 @@ done:
 
 static int tulip_rx(struct net_device *dev)
 {
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = tp->dirty_rx + RX_RING_SIZE - tp->cur_rx;
 	int received = 0;
@@ -465,7 +465,7 @@ static inline unsigned int phy_interrupt (struct net_device *dev)
 {
 #ifdef __hppa__
 	int csr12 = inl(dev->base_addr + CSR12) & 0xff;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 
 	if (csr12 != tp->csr12_shadow) {
 		/* ack interrupt */
@@ -490,7 +490,7 @@ static inline unsigned int phy_interrupt (struct net_device *dev)
 irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	struct tulip_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr5;
 	int missed;

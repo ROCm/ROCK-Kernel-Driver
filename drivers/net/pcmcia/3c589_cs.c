@@ -196,7 +196,7 @@ static dev_link_t *tc589_attach(void)
     dev = alloc_etherdev(sizeof(struct el3_private));
     if (!dev)
 	 return NULL;
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     link = &lp->link;
     link->priv = dev;
 
@@ -304,7 +304,7 @@ static void tc589_config(dev_link_t *link)
 {
     client_handle_t handle = link->handle;
     struct net_device *dev = link->priv;
-    struct el3_private *lp = dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     tuple_t tuple;
     cisparse_t parse;
     u16 buf[32], *phys_addr;
@@ -526,7 +526,7 @@ static u16 read_eeprom(ioaddr_t ioaddr, int index)
 */
 static void tc589_set_xcvr(struct net_device *dev, int if_port)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     
     EL3WINDOW(0);
@@ -648,7 +648,7 @@ static int el3_config(struct net_device *dev, struct ifmap *map)
 
 static int el3_open(struct net_device *dev)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
     
     if (!DEV_OK(link))
@@ -672,7 +672,7 @@ static int el3_open(struct net_device *dev)
 
 static void el3_tx_timeout(struct net_device *dev)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     
     printk(KERN_WARNING "%s: Transmit timed out!\n", dev->name);
@@ -687,7 +687,7 @@ static void el3_tx_timeout(struct net_device *dev)
 
 static void pop_tx_status(struct net_device *dev)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     int i;
     
@@ -741,7 +741,7 @@ static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *) dev_id;
-    struct el3_private *lp = dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr, status;
     int i = 0, handled = 1;
     
@@ -826,7 +826,7 @@ static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void media_check(unsigned long arg)
 {
     struct net_device *dev = (struct net_device *)(arg);
-    struct el3_private *lp = dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     u16 media, errs;
     unsigned long flags;
@@ -906,7 +906,7 @@ reschedule:
 
 static struct net_device_stats *el3_get_stats(struct net_device *dev)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     unsigned long flags;
     dev_link_t *link = &lp->link;
 
@@ -928,7 +928,7 @@ static struct net_device_stats *el3_get_stats(struct net_device *dev)
 */
 static void update_stats(struct net_device *dev)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
 
     DEBUG(2, "%s: updating the statistics.\n", dev->name);
@@ -955,7 +955,7 @@ static void update_stats(struct net_device *dev)
 
 static int el3_rx(struct net_device *dev)
 {
-    struct el3_private *lp = (struct el3_private *)dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     ioaddr_t ioaddr = dev->base_addr;
     int worklimit = 32;
     short rx_status;
@@ -1009,7 +1009,7 @@ static int el3_rx(struct net_device *dev)
 
 static void set_multicast_list(struct net_device *dev)
 {
-    struct el3_private *lp = dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
     ioaddr_t ioaddr = dev->base_addr;
     u16 opts = SetRxFilter | RxStation | RxBroadcast;
@@ -1024,7 +1024,7 @@ static void set_multicast_list(struct net_device *dev)
 
 static int el3_close(struct net_device *dev)
 {
-    struct el3_private *lp = dev->priv;
+    struct el3_private *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
     ioaddr_t ioaddr = dev->base_addr;
     
