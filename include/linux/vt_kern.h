@@ -32,8 +32,8 @@ extern struct vt_struct {
 	wait_queue_head_t paste_wait;
 } *vt_cons[MAX_NR_CONSOLES];
 
-extern void (*kd_mksound)(unsigned int hz, unsigned int ticks);
-extern int (*kbd_rate)(struct kbd_repeat *rep);
+extern void kd_mksound(unsigned int hz, unsigned int ticks);
+extern int kbd_rate(struct kbd_repeat *rep);
 
 /* console.c */
 

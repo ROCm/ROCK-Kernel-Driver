@@ -7,7 +7,6 @@
 #include <linux/slab.h>
 #include <asm/io.h>
 #include <linux/pm.h>
-#include <asm/keyboard.h>
 #include <asm/system.h>
 #include <linux/bootmem.h>
 
@@ -393,21 +392,13 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
 }
 
 /*
- * Some Bioses enable the PS/2 mouse (touchpad) at resume, even if it
- * was disabled before the suspend. Linux gets terribly confused by that.
+ * Some Bioses enable the PS/2 mouse (touchpad) at resume, even if it was
+ * disabled before the suspend. Linux used to get terribly confused by that.
  */
-
-typedef void (pm_kbd_func) (void);
 
 static __init int broken_ps2_resume(struct dmi_blacklist *d)
 {
-#ifdef CONFIG_VT
-	if (pm_kbd_request_override == NULL)
-	{
-		pm_kbd_request_override = pckbd_pm_resume;
-		printk(KERN_INFO "%s machine detected. Mousepad Resume Bug workaround enabled.\n", d->ident);
-	}
-#endif
+	printk(KERN_INFO "%s machine detected. Mousepad Resume Bug workaround hopefully not needed.\n", d->ident);
 	return 0;
 }
 
