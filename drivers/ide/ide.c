@@ -518,11 +518,6 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr && !hwif_request_region(hwif, addr, 1))
 		goto control_region_busy;
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	addr = hwif->io_ports[IDE_IRQ_OFFSET];
-	if (addr && !hwif_request_region(hwif, addr, 1))
-		goto irq_region_busy;
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
 	hwif->straight8 = 0;
 	addr = hwif->io_ports[IDE_DATA_OFFSET];
 	if ((addr | 7) == hwif->io_ports[IDE_STATUS_OFFSET]) {
@@ -542,12 +537,6 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 	return 0;
 
 data_region_busy:
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	addr = hwif->io_ports[IDE_IRQ_OFFSET];
-	if (addr)
-		hwif_release_region(addr, 1);
-irq_region_busy:
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr)
 		hwif_release_region(addr, 1);
@@ -577,20 +566,13 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 		return;
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
 		hwif_release_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
-#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-	if (hwif->io_ports[IDE_IRQ_OFFSET])
-		hwif_release_region(hwif->io_ports[IDE_IRQ_OFFSET], 1);
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
-
 	if (hwif->straight8) {
 		hwif_release_region(hwif->io_ports[IDE_DATA_OFFSET], 8);
 		return;
 	}
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		if (hwif->io_ports[i]) {
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
+		if (hwif->io_ports[i])
 			hwif_release_region(hwif->io_ports[i], 1);
-		}
-	}
 }
 
 EXPORT_SYMBOL(ide_hwif_release_regions);
