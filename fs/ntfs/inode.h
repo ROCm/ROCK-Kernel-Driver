@@ -181,8 +181,22 @@ static inline void NInoClear##flag(ntfs_inode *ni)	\
 	clear_bit(NI_##flag, &(ni)->state);		\
 }
 
+/*
+ * As above for NInoTestSetFoo() and NInoTestClearFoo().
+ */
+#define TAS_NINO_FNS(flag)					\
+static inline int NInoTestSet##flag(ntfs_inode *ni)		\
+{								\
+	return test_and_set_bit(NI_##flag, &(ni)->state);	\
+}								\
+static inline int NInoTestClear##flag(ntfs_inode *ni)		\
+{								\
+	return test_and_clear_bit(NI_##flag, &(ni)->state);	\
+}
+
 /* Emit the ntfs inode bitops functions. */
 NINO_FNS(Dirty)
+TAS_NINO_FNS(Dirty)
 NINO_FNS(AttrList)
 NINO_FNS(AttrListNonResident)
 NINO_FNS(Attr)
@@ -243,6 +257,6 @@ extern void ntfs_truncate(struct inode *vi);
 
 extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
 
-#endif
+#endif /* NTFS_RW */
 
-#endif /* _LINUX_NTFS_FS_INODE_H */
+#endif /* _LINUX_NTFS_INODE_H */
