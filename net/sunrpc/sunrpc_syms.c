@@ -125,6 +125,10 @@ EXPORT_SYMBOL(xdr_inline_pages);
 EXPORT_SYMBOL(xdr_shift_buf);
 EXPORT_SYMBOL(xdr_write_pages);
 EXPORT_SYMBOL(xdr_read_pages);
+EXPORT_SYMBOL(xdr_encode_word);
+EXPORT_SYMBOL(xdr_decode_word);
+EXPORT_SYMBOL(xdr_encode_array2);
+EXPORT_SYMBOL(xdr_decode_array2);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG
