@@ -76,7 +76,17 @@ struct link {
 
 union diskpage {
 	struct link link;
-	struct suspend_header sh;
+};
+
+
+struct pmdisk_info {
+	u32		version_code;
+	unsigned long	num_physpages;
+	char		machine[8];
+	char		version[20];
+	int		cpus;
+	unsigned long	image_pages;
+	swp_entry_t	pagedir_start;
 };
 
 
@@ -95,28 +105,10 @@ struct pmdisk_header {
  */
 #define PAGES_FOR_IO	512
 
+
 /*
  * Saving part...
  */
-
-static void fill_suspend_header(struct suspend_header *sh)
-{
-	memset((char *)sh, 0, sizeof(*sh));
-
-	sh->version_code = LINUX_VERSION_CODE;
-	sh->num_physpages = num_physpages;
-	strncpy(sh->machine, system_utsname.machine, 8);
-	strncpy(sh->version, system_utsname.version, 20);
-
-	sh->num_cpus = num_online_cpus();
-	sh->page_size = PAGE_SIZE;
-	BUG_ON (pagedir_save != pm_pagedir_nosave);
-	sh->num_pbes = pmdisk_pages;
-	/* TODO: needed? mounted fs' last mounted date comparison
-	 * [so they haven't been mounted since last suspend.
-	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
-	 */
-}
 
 
 /* We memorize in swapfile_used what swap devices are used for suspension */
@@ -351,18 +343,23 @@ static int write_pagedir(swp_entry_t * last)
 
 static int write_header(swp_entry_t * entry)
 {
-	union diskpage * buffer;
+	struct pmdisk_info * hdr;
 	int error;
 
-	buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	if (!buffer)
+	hdr = (struct pmdisk_info *)get_zeroed_page(GFP_ATOMIC);
+	if (!hdr)
 		return -ENOMEM;
 
-	printk("H");
-	fill_suspend_header(&buffer->sh);
-	buffer->link.next = *entry;
-	error = write_swap_page((unsigned long)buffer,entry);
-	free_page((unsigned long) buffer);
+	hdr->version_code = LINUX_VERSION_CODE;
+	hdr->num_physpages = num_physpages;
+	strncpy(hdr->machine, system_utsname.machine, 8);
+	strncpy(hdr->version, system_utsname.version, 20);
+
+	hdr->cpus = num_online_cpus();
+	hdr->image_pages = pmdisk_pages;
+	hdr->pagedir_start = *entry;
+	error = write_swap_page((unsigned long)hdr,entry);
+	free_page((unsigned long)hdr);
 	return error;
 }
 
@@ -975,48 +972,46 @@ static int __init check_sig(swp_entry_t * next)
  * I really don't think that it's foolproof but more than nothing..
  */
 
-static const char * __init sanity_check(struct suspend_header *sh)
+static const char * __init sanity_check(struct pmdisk_info * hdr)
 {
-	if(sh->version_code != LINUX_VERSION_CODE)
+	if(hdr->version_code != LINUX_VERSION_CODE)
 		return "Incorrect kernel version";
-	if(sh->num_physpages != num_physpages)
+	if(hdr->num_physpages != num_physpages)
 		return "Incorrect memory size";
-	if(strncmp(sh->machine, system_utsname.machine, 8))
+	if(strncmp(hdr->machine, system_utsname.machine, 8))
 		return "Incorrect machine type";
-	if(strncmp(sh->version, system_utsname.version, 20))
+	if(strncmp(hdr->version, system_utsname.version, 20))
 		return "Incorrect version";
-	if(sh->num_cpus != num_online_cpus())
+	if(hdr->cpus != num_online_cpus())
 		return "Incorrect number of cpus";
-	if(sh->page_size != PAGE_SIZE)
-		return "Incorrect PAGE_SIZE";
 	return 0;
 }
 
 
 static int __init check_header(swp_entry_t * next)
 {
-	struct suspend_header * sh;
+	struct pmdisk_info * hdr;
 	const char * reason = NULL;
 	int error;
 
-	sh = (struct suspend_header *)get_zeroed_page(GFP_ATOMIC);
-	if (!sh)
+	hdr = (struct pmdisk_info *)get_zeroed_page(GFP_ATOMIC);
+	if (!hdr)
 		return -ENOMEM;
 
-	if ((error = read_page(swp_offset(*next), sh)))
+	if ((error = read_page(swp_offset(*next), hdr)))
 		goto Done;
 
  	/* Is this same machine? */
-	if ((reason = sanity_check(sh))) {
+	if ((reason = sanity_check(hdr))) {
 		printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
 		error = -EPERM;
 		goto Done;
 	}
 
-	*next = next_entry((union diskpage *)sh);
-	pmdisk_pages = sh->num_pbes;
+	*next = hdr->pagedir_start;
+	pmdisk_pages = hdr->image_pages;
  Done:
-	free_page((unsigned long)sh);
+	free_page((unsigned long)hdr);
 	return error;
 }
 
