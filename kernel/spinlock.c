@@ -173,7 +173,7 @@ EXPORT_SYMBOL(_write_lock);
  * (We do this in a function because inlining it would be excessive.)
  */
 
-#define BUILD_LOCK_OPS(op, locktype)					\
+#define BUILD_LOCK_OPS(op, locktype, is_locked_fn)			\
 void __lockfunc _##op##_lock(locktype *lock)				\
 {									\
 	preempt_disable();						\
@@ -183,7 +183,8 @@ void __lockfunc _##op##_lock(locktype *lock)				\
 		preempt_enable();					\
 		if (!(lock)->break_lock)				\
 			(lock)->break_lock = 1;				\
-		cpu_relax();						\
+		while (is_locked_fn(lock) && (lock)->break_lock)	\
+			cpu_relax();					\
 		preempt_disable();					\
 	}								\
 }									\
@@ -204,7 +205,8 @@ unsigned long __lockfunc _##op##_lock_irqsave(locktype *lock)		\
 		preempt_enable();					\
 		if (!(lock)->break_lock)				\
 			(lock)->break_lock = 1;				\
-		cpu_relax();						\
+		while (is_locked_fn(lock) && (lock)->break_lock)	\
+			cpu_relax();					\
 		preempt_disable();					\
 	}								\
 	return flags;							\
@@ -244,9 +246,9 @@ EXPORT_SYMBOL(_##op##_lock_bh)
  *         _[spin|read|write]_lock_irqsave()
  *         _[spin|read|write]_lock_bh()
  */
-BUILD_LOCK_OPS(spin, spinlock_t);
-BUILD_LOCK_OPS(read, rwlock_t);
-BUILD_LOCK_OPS(write, rwlock_t);
+BUILD_LOCK_OPS(spin, spinlock_t, spin_is_locked);
+BUILD_LOCK_OPS(read, rwlock_t, rwlock_is_locked);
+BUILD_LOCK_OPS(write, rwlock_t, spin_is_locked);
 
 #endif /* CONFIG_PREEMPT */
 
