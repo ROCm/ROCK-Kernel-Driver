@@ -124,8 +124,6 @@
 #include <linux/spinlock.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
-#include <linux/init.h>
-#include <linux/mca.h>
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -236,7 +234,7 @@ static __u8 NCR_700_SDTR_msg[] = {
 	NCR_700_MAX_OFFSET
 };
 
-struct Scsi_Host * __init
+struct Scsi_Host *
 NCR_700_detect(Scsi_Host_Template *tpnt,
 	       struct NCR_700_Host_Parameters *hostdata)
 {
@@ -2020,3 +2018,5 @@ NCR_700_slave_destroy(Scsi_Device *SDp)
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
+
+no_module_init;

@@ -472,8 +472,8 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
  * Return value:
  *     Scsi_Device pointer, or NULL on failure.
  **/
-struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
-				    uint id, uint lun)
+static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
+					   uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev, *device;
 
@@ -542,7 +542,7 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
  *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
  *     the list, and freeing @sdev.
  **/
-void scsi_free_sdev(struct scsi_device *sdev)
+static void scsi_free_sdev(struct scsi_device *sdev)
 {
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
@@ -1419,6 +1419,14 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	return SCSI_SCAN_LUN_PRESENT;
 }
 
+static int scsi_remove_lun(struct scsi_device *sdev)
+{
+	devfs_unregister(sdev->de);
+	device_unregister(&sdev->sdev_driverfs_dev);
+
+	scsi_free_sdev(sdev);
+}
+
 /**
  * scsi_probe_and_add_lun - probe a LUN, if a LUN is found add it
  * @sdevscan:	probe the LUN corresponding to this Scsi_Device
@@ -1941,8 +1949,7 @@ int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 	if (sdev->attached)
 		goto out;
 
-	devfs_unregister(sdev->de);
-	scsi_free_sdev(sdev);
+	scsi_remove_lun(sdev);
 	error = 0;
 
 out:
@@ -2067,4 +2074,70 @@ void scsi_scan_host(struct Scsi_Host *shost)
 		}
 	}
 	scsi_free_sdev(sdevscan);
+}
+
+void scsi_forget_host(struct Scsi_Host *shost)
+{
+	struct list_head *le, *lh;
+
+	list_for_each_safe(le, lh, &shost->my_devices)
+		scsi_remove_lun(list_entry(le, struct scsi_device, siblings));
+}
+
+/*
+ * Function:    scsi_get_host_dev()
+ *
+ * Purpose:     Create a Scsi_Device that points to the host adapter itself.
+ *
+ * Arguments:   SHpnt   - Host that needs a Scsi_Device
+ *
+ * Lock status: None assumed.
+ *
+ * Returns:     The Scsi_Device or NULL
+ *
+ * Notes:
+ *	Attach a single Scsi_Device to the Scsi_Host - this should
+ *	be made to look like a "pseudo-device" that points to the
+ *	HA itself.
+ *
+ *	Note - this device is not accessible from any high-level
+ *	drivers (including generics), which is probably not
+ *	optimal.  We can add hooks later to attach 
+ */
+struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
+{
+	struct scsi_device *sdev;
+
+	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
+	if (sdev) {
+		scsi_build_commandblocks(sdev);
+		if (sdev->current_queue_depth == 0)
+			goto fail;
+		sdev->borken = 0;
+	}
+
+	return sdev;
+
+fail:
+	kfree(sdev);
+	return NULL;
+}
+
+/*
+ * Function:    scsi_free_host_dev()
+ *
+ * Purpose:     Free a scsi_device that points to the host adapter itself.
+ *
+ * Arguments:   SHpnt   - Host that needs a Scsi_Device
+ *
+ * Lock status: None assumed.
+ *
+ * Returns:     Nothing
+ *
+ * Notes:
+ */
+void scsi_free_host_dev(struct scsi_device *sdev)
+{
+	BUG_ON(sdev->id != sdev->host->this_id);
+	scsi_free_sdev(sdev);
 }

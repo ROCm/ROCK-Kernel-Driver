@@ -510,7 +510,7 @@ typedef struct os_header_s {
 #define OS_AUX_SIZE     (512)
 //#define OSST_MAX_SG      2
 
-/* The tape buffer descriptor. */
+/* The OnStream tape buffer descriptor. */
 typedef struct {
   unsigned char in_use;
   unsigned char dma;	/* DMA-able buffer */
@@ -523,14 +523,14 @@ typedef struct {
   int syscall_result;
   Scsi_Request *last_SRpnt;
   unsigned char *b_data;
-  os_aux_t *aux;               /* onstream AUX structure at end of each block */
-  unsigned short use_sg;       /* zero or number of segments for this adapter */
-  unsigned short sg_segs;      /* total number of allocated segments */
-  unsigned short orig_sg_segs; /* number of segments allocated at first try */
-  struct scatterlist sg[1];    /* MUST BE last item */
+  os_aux_t *aux;               /* onstream AUX structure at end of each block     */
+  unsigned short use_sg;       /* zero or number of s/g segments for this adapter */
+  unsigned short sg_segs;      /* number of segments in s/g list                  */
+  unsigned short orig_sg_segs; /* number of segments allocated at first try       */
+  struct scatterlist sg[1];    /* MUST BE last item                               */
 } OSST_buffer;
 
-/* The tape drive descriptor */
+/* The OnStream tape drive descriptor */
 typedef struct {
   struct Scsi_Device_Template *driver;
   unsigned capacity;
@@ -549,6 +549,7 @@ typedef struct {
   unsigned char restr_dma;
   unsigned char scsi2_logical;
   unsigned char default_drvbuffer;  /* 0xff = don't touch, value 3 bits */
+  unsigned char pos_unknown;        /* after reset position unknown */
   int write_threshold;
   int timeout;			/* timeout for normal commands */
   int long_timeout;		/* timeout for commands known to take long time*/
@@ -556,10 +557,10 @@ typedef struct {
   /* Mode characteristics */
   ST_mode modes[ST_NBR_MODES];
   int current_mode;
-#ifdef CONFIG_DEVFS_FS
   devfs_handle_t de_r[ST_NBR_MODES];  /*  Rewind entries     */
   devfs_handle_t de_n[ST_NBR_MODES];  /*  No-rewind entries  */
-#endif
+  struct device driverfs_dev_r[ST_NBR_MODES];
+  struct device driverfs_dev_n[ST_NBR_MODES];
 
   /* Status variables */
   int partition;
@@ -628,7 +629,7 @@ typedef struct {
   unsigned char last_cmnd[6];
   unsigned char last_sense[16];
 #endif
-  struct gendisk *disk;
+  struct gendisk *drive;
 } OS_Scsi_Tape;
 
 /* Values of write_type */
