@@ -37,3 +37,5 @@
 extern int HscxVersion(struct IsdnCardState *cs, char *s);
 extern void modehscx(struct BCState *bcs, int mode, int bc);
 extern void inithscxisac(struct IsdnCardState *cs);
+extern void hscx_int_main(struct IsdnCardState *cs, u8 val);
+extern void hscx_fill_fifo(struct BCState *bcs);

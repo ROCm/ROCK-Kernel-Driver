@@ -12,13 +12,12 @@
  *
  */
 
-
-static inline void
-waitforCEC(struct IsdnCardState *cs, int hscx)
+static void
+waitforCEC(struct BCState *bcs)
 {
 	int to = 50;
 
-	while ((READHSCX(cs, hscx, HSCX_STAR) & 0x04) && to) {
+	while ((hscx_read(bcs, HSCX_STAR) & 0x04) && to) {
 		udelay(1);
 		to--;
 	}
@@ -28,11 +27,11 @@ waitforCEC(struct IsdnCardState *cs, int hscx)
 
 
 static inline void
-waitforXFW(struct IsdnCardState *cs, int hscx)
+waitforXFW(struct BCState *bcs)
 {
 	int to = 50;
 
-	while ((!(READHSCX(cs, hscx, HSCX_STAR) & 0x44) == 0x40) && to) {
+	while ((!(hscx_read(bcs, HSCX_STAR) & 0x44) == 0x40) && to) {
 		udelay(1);
 		to--;
 	}
@@ -41,10 +40,10 @@ waitforXFW(struct IsdnCardState *cs, int hscx)
 }
 
 static inline void
-hscx_writeCMDR(struct IsdnCardState *cs, int hscx, u8 data)
+WriteHSCXCMDR(struct BCState *bcs, u8 data)
 {
-	waitforCEC(cs, hscx);
-	WRITEHSCX(cs, hscx, HSCX_CMDR, data);
+	waitforCEC(bcs);
+	hscx_write(bcs, HSCX_CMDR, data);
 }
 
 
@@ -60,14 +59,14 @@ hscx_empty_fifo(struct BCState *bcs, int count)
 	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
-		hscx_writeCMDR(cs, bcs->hw.hscx.hscx, 0x80);
+		WriteHSCXCMDR(bcs, 0x80);
 		bcs->hw.hscx.rcvidx = 0;
 		return;
 	}
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
-	READHSCXFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
-	hscx_writeCMDR(cs, bcs->hw.hscx.hscx, 0x80);
+	hscx_read_fifo(bcs, ptr, count);
+	WriteHSCXCMDR(bcs, 0x80);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -78,7 +77,7 @@ hscx_empty_fifo(struct BCState *bcs, int count)
 	}
 }
 
-static void
+void
 hscx_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
@@ -101,13 +100,13 @@ hscx_fill_fifo(struct BCState *bcs)
 	} else
 		count = bcs->tx_skb->len;
 
-	waitforXFW(cs, bcs->hw.hscx.hscx);
+	waitforXFW(bcs);
 	ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
 	bcs->count += count;
-	WRITEHSCXFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
-	hscx_writeCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
+	hscx_write_fifo(bcs, ptr, count);
+	WriteHSCXCMDR(bcs, more ? 0x8 : 0xa);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -131,7 +130,7 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 		return;
 
 	if (val & 0x80) {	/* RME */
-		r = READHSCX(cs, hscx, HSCX_RSTA);
+		r = hscx_read(bcs, HSCX_RSTA);
 		if ((r & 0xf0) != 0xa0) {
 			if (!(r & 0x80)) {
 				if (cs->debug & L1_DEB_WARN)
@@ -155,9 +154,9 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 				bcs->err_crc++;
 #endif
 			}
-			hscx_writeCMDR(cs, hscx, 0x80);
+			WriteHSCXCMDR(bcs, 0x80);
 		} else {
-			count = READHSCX(cs, hscx, HSCX_RBCL) & (
+			count = hscx_read(bcs, HSCX_RBCL) & (
 				test_bit(HW_IPAC, &cs->HW_Flags)? 0x3f: 0x1f);
 			if (count == 0)
 				count = fifo_size;
@@ -198,10 +197,10 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 static void
 reset_xmit(struct BCState *bcs)
 {
-	hscx_writeCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
+	WriteHSCXCMDR(bcs, 0x01);
 }
 
-static inline void
+void
 hscx_int_main(struct IsdnCardState *cs, u8 val)
 {
 
@@ -211,7 +210,7 @@ hscx_int_main(struct IsdnCardState *cs, u8 val)
 	spin_lock(&cs->lock);
 	if (val & 0x01) {
 		bcs = cs->bcs + 1;
-		exval = READHSCX(cs, 1, HSCX_EXIR);
+		exval = hscx_read(bcs, HSCX_EXIR);
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX B EXIR %x", exval);
 		if (exval & 0x40) {
@@ -225,7 +224,7 @@ hscx_int_main(struct IsdnCardState *cs, u8 val)
 	}
 	if (val & 0x02) {
 		bcs = cs->bcs;
-		exval = READHSCX(cs, 0, HSCX_EXIR);
+		exval = hscx_read(bcs, HSCX_EXIR);
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX A EXIR %x", exval);
 		if (exval & 0x40) {
@@ -233,7 +232,8 @@ hscx_int_main(struct IsdnCardState *cs, u8 val)
 		}
 	}
 	if (val & 0x04) {
-		exval = READHSCX(cs, 0, HSCX_ISTA);
+		bcs = cs->bcs;
+		exval = hscx_read(bcs, HSCX_ISTA);
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX A interrupt %x", exval);
 		hscx_interrupt(cs, exval, 0);

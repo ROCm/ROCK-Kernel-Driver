@@ -160,21 +160,6 @@ set_ipac_active(struct IsdnCardState *cs, u_int active)
 	writereg(cs, IPAC_MASK, active ? 0xc0 : 0xff);
 }
 
-/*
- * fast interrupt HSCX stuff goes here
- */
-
-#define READHSCX(cs, nr, reg) readreg(cs, \
-	reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs, \
-	reg + (nr ? 0x40 : 0), data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs, \
-	(nr ? 0x40 : 0), ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs, \
-	(nr ? 0x40 : 0), ptr, cnt)
-
-#include "hscx_irq.c"
-
 static void
 bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {

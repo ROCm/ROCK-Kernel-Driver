@@ -153,24 +153,11 @@ hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
 }
 
 static struct bc_hw_ops hscx_ops = {
-	.read_reg   = hscx_read,
-	.write_reg  = hscx_write,
+	.read_reg  = hscx_read,
+	.write_reg = hscx_write,
 	.read_fifo  = hscx_read_fifo,
 	.write_fifo = hscx_write_fifo,
 };
- 
-#define READHSCX(cs, nr, reg) readreg(cs->hw.niccy.hscx_ale, \
-		cs->hw.niccy.hscx, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.niccy.hscx_ale, \
-		cs->hw.niccy.hscx, reg + (nr ? 0x40 : 0), data)
-
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.niccy.hscx_ale, \
-		cs->hw.niccy.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.niccy.hscx_ale, \
-		cs->hw.niccy.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#include "hscx_irq.c"
 
 static void
 niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)

@@ -339,23 +339,6 @@ static struct bc_hw_ops ipacx_bc_ops = {
 	.write_reg  = ipacx_bc_write,
 };
 
-/*
- * fast interrupt HSCX stuff goes here
- */
-
-#define READHSCX(cs, nr, reg) readreg(cs->hw.diva.hscx_adr, \
-		cs->hw.diva.hscx, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.diva.hscx_adr, \
-                cs->hw.diva.hscx, reg + (nr ? 0x40 : 0), data)
-
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.diva.hscx_adr, \
-		cs->hw.diva.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.diva.hscx_adr, \
-		cs->hw.diva.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#include "hscx_irq.c"
-
 static void
 diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {

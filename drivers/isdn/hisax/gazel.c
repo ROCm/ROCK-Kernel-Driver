@@ -252,17 +252,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-/*
- * fast interrupt HSCX stuff goes here
- */
-
-#define READHSCX(cs, nr, reg) hscx_read(cs, nr, reg)
-#define WRITEHSCX(cs, nr, reg, data) hscx_write(cs, nr, reg, data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) hscx_read_fifo(cs, nr, ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) hscx_write_fifo(cs, nr, ptr, cnt)
-
-#include "hscx_irq.c"
-
 static void
 gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {

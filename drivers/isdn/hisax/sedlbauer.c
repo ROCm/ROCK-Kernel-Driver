@@ -293,23 +293,6 @@ static struct bc_hw_ops isar_ops = {
 	.write_reg  = isar_write,
 };
 
-/*
- * fast interrupt HSCX stuff goes here
- */
-
-#define READHSCX(cs, nr, reg) readreg(cs, \
-		cs->hw.sedl.hscx, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs, \
-		cs->hw.sedl.hscx, reg + (nr ? 0x40 : 0), data)
-
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs, \
-		cs->hw.sedl.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs, \
-		cs->hw.sedl.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#include "hscx_irq.c"
-
 static void
 sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
