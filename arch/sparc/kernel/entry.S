@@ -350,7 +350,7 @@ smp4m_ticker:
 	 * for cross calls.  That has a separate entry point below.
 	 */
 maybe_smp4m_msg:
-	GET_PROCESSOR_MID(o3)
+	GET_PROCESSOR4M_ID(o3)
 	set	sun4m_interrupts, %l5
 	ld	[%l5], %o5
 	sethi	%hi(0x60000000), %o4
@@ -390,7 +390,7 @@ maybe_smp4m_msg:
 linux_trap_ipi15_sun4m:
 	SAVE_ALL
 	sethi	%hi(0x80000000), %o2
-	GET_PROCESSOR_MID(o0)
+	GET_PROCESSOR4M_ID(o0)
 	set	sun4m_interrupts, %l5
 	ld	[%l5], %o5
 	sll	%o0, 12, %o0
