@@ -95,10 +95,10 @@ HandSpring Visor, Palm USB, and Clié USB driver
   Kroah-Hartman at greg@kroah.com
 
 
-Compaq iPAQ and HP Jornada driver
+Compaq iPAQ, HP Jornada and Casio EM500 driver
 
-  This driver can be used to connect to Compaq iPAQ and HP Jornada PDAs
-  running Windows CE 3.0 or PocketPC 2002 using a USB cable/cradle. It
+  This driver can be used to connect to Compaq iPAQ, HP Jornada and Casio EM500
+  PDAs running Windows CE 3.0 or PocketPC 2002 using a USB cable/cradle. It
   has been tested only on the Compaq H3135, but is rumoured to work on
   with the H3600 and later models as well as the Jornada 548 and 568.
   With minor modifications, it may work for other CE based handhelds too.

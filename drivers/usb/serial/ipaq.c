@@ -9,6 +9,10 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (30/4/2002) ganesh
+ * 	Added support for the Casio EM500. Completely untested. Thanks
+ * 	to info from Nathan <wfilardo@fuse.net>
+ *
  * (19/3/2002) ganesh
  *	Don't submit urbs while holding spinlocks. Not strictly necessary
  *	in 2.5.x.
@@ -58,7 +62,7 @@
  */
 #define DRIVER_VERSION "v0.2"
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
-#define DRIVER_DESC "USB Compaq iPAQ, HP Jornada driver"
+#define DRIVER_DESC "USB Compaq iPAQ, HP Jornada, Casio EM500 driver"
 
 /* Function prototypes for an ipaq */
 static int  ipaq_open (struct usb_serial_port *port, struct file *filp);
@@ -81,6 +85,7 @@ static __devinitdata struct usb_device_id ipaq_id_table [] = {
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_548_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_568_ID) },
+	{ USB_DEVICE(CASIO_VENDOR_ID, CASIO_EM500_ID) },
 	{ }					/* Terminating entry */
 };
 
