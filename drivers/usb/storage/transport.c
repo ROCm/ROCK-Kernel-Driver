@@ -779,8 +779,9 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer, transfer_length,
+					srb->use_sg, &srb->resid);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -869,8 +870,9 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer, transfer_length,
+					srb->use_sg, &srb->resid);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -951,8 +953,9 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer, transfer_length,
+					srb->use_sg, &srb->resid);
 		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
