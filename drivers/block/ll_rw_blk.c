@@ -1546,7 +1546,7 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
 	int rw = rq_data_dir(rq);
 
-	if (!rq->rq_disk)
+	if (!blk_fs_request(rq) || !rq->rq_disk)
 		return;
 
 	if (rw == READ) {
