@@ -457,6 +457,7 @@ struct matrox_fb_info {
 		struct matrox_vsync	vsync;
 		unsigned int	pixclock;
 		int		mnp;
+		int		panpos;
 			      } crtc1;
 	struct {
 		struct matrox_vsync	vsync;

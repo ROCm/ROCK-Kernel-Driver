@@ -1036,6 +1036,7 @@ static void MGA1064_restore(WPMINFO2) {
 
 	DAC1064_restore_1(PMINFO2);
 	matroxfb_vgaHWrestore(PMINFO2);
+	ACCESS_FBINFO(crtc1.panpos) = -1;
 	for (i = 0; i < 6; i++)
 		mga_setr(M_EXTVGA_INDEX, i, hw->CRTCEXT[i]);
 	DAC1064_restore_2(PMINFO2);
@@ -1062,6 +1063,7 @@ static void MGAG100_restore(WPMINFO2) {
 	if (ACCESS_FBINFO(devflags.support32MB))
 		mga_setr(M_EXTVGA_INDEX, 8, hw->CRTCEXT[8]);
 #endif
+	ACCESS_FBINFO(crtc1.panpos) = -1;
 	for (i = 0; i < 6; i++)
 		mga_setr(M_EXTVGA_INDEX, i, hw->CRTCEXT[i]);
 	DAC1064_restore_2(PMINFO2);

@@ -148,7 +148,7 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 	mga_outl(0x3C10, tmp);
 	ACCESS_FBINFO(hw).crtc2.ctl = tmp;
 
-	tmp = 0x0FFF0000;		/* line compare */
+	tmp = mt->VDisplay << 16;	/* line compare */
 	if (mt->sync & FB_SYNC_HOR_HIGH_ACT)
 		tmp |= 0x00000100;
 	if (mt->sync & FB_SYNC_VERT_HIGH_ACT)
