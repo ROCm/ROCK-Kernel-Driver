@@ -57,6 +57,7 @@ EXPORT_SYMBOL(serio_unregister_device);
 EXPORT_SYMBOL(serio_open);
 EXPORT_SYMBOL(serio_close);
 EXPORT_SYMBOL(serio_rescan);
+EXPORT_SYMBOL(serio_reconnect);
 
 struct serio_event {
 	int type;
@@ -83,6 +84,7 @@ static void serio_find_dev(struct serio *serio)
 }
 
 #define SERIO_RESCAN	1
+#define SERIO_RECONNECT	2
 
 static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
@@ -109,6 +111,12 @@ void serio_handle_events(void)
 			goto event_done;
 
 		switch (event->type) {
+			case SERIO_RECONNECT :
+				if (event->serio->dev && event->serio->dev->reconnect)
+					if (event->serio->dev->reconnect(event->serio) == 0)
+						break;
+				/* reconnect failed - fall through to rescan */
+
 			case SERIO_RESCAN :
 				if (event->serio->dev && event->serio->dev->disconnect)
 					event->serio->dev->disconnect(event->serio);
@@ -143,18 +151,27 @@ static int serio_thread(void *nothing)
 	complete_and_exit(&serio_exited, 0);
 }
 
-void serio_rescan(struct serio *serio)
+static void serio_queue_event(struct serio *serio, int event_type)
 {
 	struct serio_event *event;
 
-	if (!(event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC)))
-		return;
+	if ((event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC))) {
+		event->type = event_type;
+		event->serio = serio;
 
-	event->type = SERIO_RESCAN;
-	event->serio = serio;
+		list_add_tail(&event->node, &serio_event_list);
+		wake_up(&serio_wait);
+	}
+}
 
-	list_add_tail(&event->node, &serio_event_list);
-	wake_up(&serio_wait);
+void serio_rescan(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_RESCAN);
+}
+
+void serio_reconnect(struct serio *serio)
+{
+	serio_queue_event(serio, SERIO_RECONNECT);
 }
 
 irqreturn_t serio_interrupt(struct serio *serio,
