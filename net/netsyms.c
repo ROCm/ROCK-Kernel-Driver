@@ -12,7 +12,6 @@
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/netdevice.h>
-#include <linux/inetdevice.h>
 #include <linux/fddidevice.h>
 #include <linux/trdevice.h>
 #include <linux/fcdevice.h>
@@ -66,7 +65,6 @@ EXPORT_SYMBOL(make_EII_client);
 EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
-
 #ifdef CONFIG_INET
 /* Internet layer registration */
 EXPORT_SYMBOL(inet_add_protocol);
@@ -98,7 +96,6 @@ EXPORT_SYMBOL_GPL(skb_cow_data);
 EXPORT_SYMBOL_GPL(pskb_put);
 EXPORT_SYMBOL_GPL(skb_to_sgvec);
 #endif
-
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */
@@ -152,5 +149,4 @@ EXPORT_SYMBOL(unregister_tcf_proto_ops);
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
 
-EXPORT_SYMBOL(linkwatch_fire_event);
 #endif  /* CONFIG_NET */
