@@ -339,6 +339,95 @@ move_to_confirmed(struct nfs4_client *clp, unsigned int idhashval)
 	renew_client(clp);
 }
 
+
+/* a helper function for parse_callback */
+static int
+parse_octet(unsigned int *lenp, char **addrp)
+{
+	unsigned int len = *lenp;
+	char *p = *addrp;
+	int n = -1;
+	char c;
+
+	for (;;) {
+		if (!len)
+			break;
+		len--;
+		c = *p++;
+		if (c == '.')
+			break;
+		if ((c < '0') || (c > '9')) {
+			n = -1;
+			break;
+		}
+		if (n < 0)
+			n = 0;
+		n = (n * 10) + (c - '0');
+		if (n > 255) {
+			n = -1;
+			break;
+		}
+	}
+	*lenp = len;
+	*addrp = p;
+	return n;
+}
+
+/* parse and set the setclientid ipv4 callback address */
+int
+parse_ipv4(unsigned int addr_len, char *addr_val, unsigned int *cbaddrp, unsigned short *cbportp)
+{
+	int temp = 0;
+	u32 cbaddr = 0;
+	u16 cbport = 0;
+	u32 addrlen = addr_len;
+	char *addr = addr_val;
+	int i, shift;
+
+	/* ipaddress */
+	shift = 24;
+	for(i = 4; i > 0  ; i--) {
+		if ((temp = parse_octet(&addrlen, &addr)) < 0) {
+			return 0;
+		}
+		cbaddr |= (temp << shift);
+		if(shift > 0)
+		shift -= 8;
+	}
+	*cbaddrp = cbaddr;
+
+	/* port */
+	shift = 8;
+	for(i = 2; i > 0  ; i--) {
+		if ((temp = parse_octet(&addrlen, &addr)) < 0) {
+			return 0;
+		}
+		cbport |= (temp << shift);
+		if(shift > 0)
+			shift -= 8;
+	}
+	*cbportp = cbport;
+	return 1;
+}
+
+void
+gen_callback(struct nfs4_client *clp, struct nfsd4_setclientid *se)
+{
+	struct nfs4_callback *cb = &clp->cl_callback;
+
+	if( !(parse_ipv4(se->se_callback_addr_len, se->se_callback_addr_val,
+		         &cb->cb_addr, &cb->cb_port))) {
+		printk(KERN_INFO "NFSD: BAD callback address. client will not receive delegations\n");
+		cb->cb_parsed = 0;
+		return;
+	}
+	cb->cb_netid.len = se->se_callback_netid_len;
+	cb->cb_netid.data = se->se_callback_netid_val;
+        cb->cb_prog = se->se_callback_prog;
+        cb->cb_ident = se->se_callback_ident;
+        cb->cb_parsed = 1;
+}
+
 /*
  * RFC 3010 has a complex implmentation description of processing a 
  * SETCLIENTID request consisting of 5 bullets, labeled as 
@@ -450,6 +539,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		gen_clid(new);
 		gen_confirm(new);
+		gen_callback(new, setclid);
 		add_to_unconfirmed(new, strhashval);
 	} else if (cmp_verf(&conf->cl_verifier, &clverifier)) {
 		/*
@@ -477,6 +567,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		copy_clid(new, conf);
 		gen_confirm(new);
+		gen_callback(new, setclid);
 		add_to_unconfirmed(new,strhashval);
 	} else if (!unconf) {
 		/*
@@ -494,6 +585,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		gen_clid(new);
 		gen_confirm(new);
+		gen_callback(new, setclid);
 		add_to_unconfirmed(new, strhashval);
 	} else if (!cmp_verf(&conf->cl_confirm, &unconf->cl_confirm)) {
 		/*	
@@ -519,6 +611,7 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 		copy_cred(&new->cl_cred,&rqstp->rq_cred);
 		gen_clid(new);
 		gen_confirm(new);
+		gen_callback(new, setclid);
 		add_to_unconfirmed(new, strhashval);
 	} else {
 		/* No cases hit !!! */
@@ -529,7 +622,6 @@ nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid)
 	setclid->se_clientid.cl_boot = new->cl_clientid.cl_boot;
 	setclid->se_clientid.cl_id = new->cl_clientid.cl_id;
 	memcpy(setclid->se_confirm.data, new->cl_confirm.data, sizeof(setclid->se_confirm.data));
-	printk(KERN_INFO "NFSD: this client will not receive delegations\n");
 	status = nfs_ok;
 out:
 	nfs4_unlock_state();
