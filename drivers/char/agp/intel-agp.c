@@ -1489,18 +1489,13 @@ static struct agp_bridge_driver intel_7505_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-static int find_i810(u16 device, const char *name)
+static int find_i810(u16 device)
 {
 	struct pci_dev *i810_dev;
 
 	i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL, device, NULL);
-	if (!i810_dev) {
-		printk(KERN_ERR PFX "Detected an Intel %s Chipset, "
-				"but could not find the secondary device.\n",
-				name);
+	if (!i810_dev)
 		return 0;
-	}
-
 	intel_i810_private.i810_dev = i810_dev;
 	return 1;
 }
@@ -1550,29 +1545,29 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 		name = "440GX";
 		break;
 	case PCI_DEVICE_ID_INTEL_82810_MC1:
-		if (!find_i810(PCI_DEVICE_ID_INTEL_82810_IG1, "i810"))
+		name = "i810";
+		if (!find_i810(PCI_DEVICE_ID_INTEL_82810_IG1))
 			goto fail;
 		bridge->driver = &intel_810_driver;
-		name = "i810";
 		break;
 	case PCI_DEVICE_ID_INTEL_82810_MC3:
-		if (!find_i810(PCI_DEVICE_ID_INTEL_82810_IG3, "i810 DC100"))
+		name = "i810 DC100";
+		if (!find_i810(PCI_DEVICE_ID_INTEL_82810_IG3))
 			goto fail;
 		bridge->driver = &intel_810_driver;
-		name = "i810 DC100";
 		break;
 	case PCI_DEVICE_ID_INTEL_82810E_MC:
-		if (!find_i810(PCI_DEVICE_ID_INTEL_82810E_IG, "i810 E"))
+		name = "i810 E";
+		if (!find_i810(PCI_DEVICE_ID_INTEL_82810E_IG))
 			goto fail;
 		bridge->driver = &intel_810_driver;
-		name = "i810 E";
 		break;
 	 case PCI_DEVICE_ID_INTEL_82815_MC:
 		/*
 		 * The i815 can operate either as an i810 style
 		 * integrated device, or as an AGP4X motherboard.
 		 */
-		if (find_i810(PCI_DEVICE_ID_INTEL_82815_CGC, "i815"))
+		if (find_i810(PCI_DEVICE_ID_INTEL_82815_CGC))
 			bridge->driver = &intel_810_driver;
 		else
 			bridge->driver = &intel_815_driver;
@@ -1708,7 +1703,10 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
- fail:
+
+fail:
+	printk(KERN_ERR PFX "Detected an Intel %s chipset, "
+		"but could not find the secondary device.\n", name);
 	agp_put_bridge(bridge);
 	return -ENODEV;
 }
