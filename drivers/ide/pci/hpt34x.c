@@ -42,7 +42,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "hpt34x.h"
+#define HPT343_DEBUG_DRIVE_INFO		0
 
 static u8 hpt34x_ratemask (ide_drive_t *drive)
 {
@@ -69,7 +69,8 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	u32 reg1= 0, tmp1 = 0, reg2 = 0, tmp2 = 0;
 	u8			hi_speed, lo_speed;
 
-	SPLIT_BYTE(speed, hi_speed, lo_speed);
+	hi_speed = speed >> 4;
+	lo_speed = speed & 0x0f;
 
 	if (hi_speed & 7) {
 		hi_speed = (hi_speed & 4) ? 0x01 : 0x10;
@@ -229,9 +230,19 @@ static void __devinit init_hwif_hpt34x(ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t hpt34x_chipset __devinitdata = {
+	.name		= "HPT34X",
+	.init_chipset	= init_chipset_hpt34x,
+	.init_hwif	= init_hwif_hpt34x,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.bootable	= NEVER_BOARD,
+	.extra		= 16
+};
+
 static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &hpt34x_chipsets[id->driver_data];
+	ide_pci_device_t *d = &hpt34x_chipset;
 	static char *chipset_names[] = {"HPT343", "HPT345"};
 	u16 pcicmd = 0;
 
