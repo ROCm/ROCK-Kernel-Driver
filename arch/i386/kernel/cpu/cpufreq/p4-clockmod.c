@@ -57,8 +57,7 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	u32 l, h;
 	cpumask_t cpus_allowed, affected_cpu_map;
 	struct cpufreq_freqs freqs;
-	int hyperthreading = 0;
-	int sibling = 0;
+	int j;
 
 	if (!cpu_online(cpu) || (newstate > DC_DISABLE) || 
 		(newstate == DC_RESV))
@@ -68,13 +67,10 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	cpus_allowed = current->cpus_allowed;
 
 	/* only run on CPU to be set, or on its sibling */
-       affected_cpu_map = cpumask_of_cpu(cpu);
-#ifdef CONFIG_X86_HT
-	hyperthreading = ((cpu_has_ht) && (smp_num_siblings == 2));
-	if (hyperthreading) {
-		sibling = cpu_sibling_map[cpu];
-                cpu_set(sibling, affected_cpu_map);
-	}
+#ifdef CONFIG_SMP
+	affected_cpu_map = cpu_sibling_map[cpu];
+#else
+	affected_cpu_map = cpumask_of_cpu(cpu);
 #endif
 	set_cpus_allowed(current, affected_cpu_map);
         BUG_ON(!cpu_isset(smp_processor_id(), affected_cpu_map));
@@ -97,11 +93,11 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	/* notifiers */
 	freqs.old = stock_freq * l / 8;
 	freqs.new = stock_freq * newstate / 8;
-	freqs.cpu = cpu;
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	if (hyperthreading) {
-		freqs.cpu = sibling;
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	for_each_cpu(j) {
+		if (cpu_isset(j, affected_cpu_map)) {
+			freqs.cpu = j;
+			cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+		}
 	}
 
 	rdmsr(MSR_IA32_THERM_STATUS, l, h);
@@ -132,10 +128,11 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	set_cpus_allowed(current, cpus_allowed);
 
 	/* notifiers */
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-	if (hyperthreading) {
-		freqs.cpu = cpu;
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	for_each_cpu(j) {
+		if (cpu_isset(j, affected_cpu_map)) {
+			freqs.cpu = j;
+			cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+		}
 	}
 
 	return 0;
