@@ -566,7 +566,6 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 {
 	struct usb_interface *intf;
 	struct usb_device *usb_dev;
-	char *scratch;
 	int i = 0;
 	int length = 0;
 
@@ -593,8 +592,6 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 		return -ENODEV;
 	}
 
-	scratch = buffer;
-
 #ifdef	CONFIG_USB_DEVICEFS
 	/* If this is available, userspace programs can directly read
 	 * all the device descriptors we don't tell them about.  Or
@@ -602,37 +599,30 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	 *
 	 * FIXME reduce hardwired intelligence here
 	 */
-	envp [i++] = scratch;
-	length += snprintf (scratch, buffer_size - length,
-			    "DEVICE=/proc/bus/usb/%03d/%03d",
-			    usb_dev->bus->busnum, usb_dev->devnum);
-	if ((buffer_size - length <= 0) || (i >= num_envp))
+	if (add_hotplug_env_var(envp, num_envp, &i,
+				buffer, buffer_size, &length,
+				"DEVICE=/proc/bus/usb/%03d/%03d",
+				usb_dev->bus->busnum, usb_dev->devnum))
 		return -ENOMEM;
-	++length;
-	scratch += length;
 #endif
 
 	/* per-device configurations are common */
-	envp [i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PRODUCT=%x/%x/%x",
-			    usb_dev->descriptor.idVendor,
-			    usb_dev->descriptor.idProduct,
-			    usb_dev->descriptor.bcdDevice);
-	if ((buffer_size - length <= 0) || (i >= num_envp))
+	if (add_hotplug_env_var(envp, num_envp, &i,
+				buffer, buffer_size, &length,
+				"PRODUCT=%x/%x/%x",
+				usb_dev->descriptor.idVendor,
+				usb_dev->descriptor.idProduct,
+				usb_dev->descriptor.bcdDevice))
 		return -ENOMEM;
-	++length;
-	scratch += length;
 
 	/* class-based driver binding models */
-	envp [i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "TYPE=%d/%d/%d",
-			    usb_dev->descriptor.bDeviceClass,
-			    usb_dev->descriptor.bDeviceSubClass,
-			    usb_dev->descriptor.bDeviceProtocol);
-	if ((buffer_size - length <= 0) || (i >= num_envp))
+	if (add_hotplug_env_var(envp, num_envp, &i,
+				buffer, buffer_size, &length,
+				"TYPE=%d/%d/%d",
+				usb_dev->descriptor.bDeviceClass,
+				usb_dev->descriptor.bDeviceSubClass,
+				usb_dev->descriptor.bDeviceProtocol))
 		return -ENOMEM;
-	++length;
-	scratch += length;
 
 	if (usb_dev->descriptor.bDeviceClass == 0) {
 		struct usb_host_interface *alt = intf->cur_altsetting;
@@ -641,18 +631,15 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 		 * agents are called for all interfaces, and can use
 		 * $DEVPATH/bInterfaceNumber if necessary.
 		 */
-		envp [i++] = scratch;
-		length += snprintf (scratch, buffer_size - length,
-			    "INTERFACE=%d/%d/%d",
-			    alt->desc.bInterfaceClass,
-			    alt->desc.bInterfaceSubClass,
-			    alt->desc.bInterfaceProtocol);
-		if ((buffer_size - length <= 0) || (i >= num_envp))
+		if (add_hotplug_env_var(envp, num_envp, &i,
+					buffer, buffer_size, &length,
+					"INTERFACE=%d/%d/%d",
+					alt->desc.bInterfaceClass,
+					alt->desc.bInterfaceSubClass,
+					alt->desc.bInterfaceProtocol))
 			return -ENOMEM;
-		++length;
-		scratch += length;
-
 	}
+
 	envp[i++] = NULL;
 
 	return 0;
