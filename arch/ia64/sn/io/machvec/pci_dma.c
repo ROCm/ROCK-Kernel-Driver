@@ -562,8 +562,6 @@ sn_pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 	return 1;
 }
 
-#ifdef CONFIG_PCI
-
 /*
  * New generic DMA routines just wrap sn2 PCI routines until we
  * support other bus types (if ever).
@@ -691,8 +689,6 @@ sn_dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
 	sn_pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_sync_sg);
-
-#endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL(sn_pci_unmap_single);
 EXPORT_SYMBOL(sn_pci_map_single);
