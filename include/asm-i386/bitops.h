@@ -6,6 +6,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 
 /*
  * These have to be done with inline assembly: that way the bit-setting
