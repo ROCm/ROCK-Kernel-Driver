@@ -126,8 +126,8 @@ static int skel_ioctl		(struct inode *inode, struct file *file, unsigned int cmd
 static int skel_open		(struct inode *inode, struct file *file);
 static int skel_release		(struct inode *inode, struct file *file);
 
-static int skel_probe		(struct usb_interface *intf, const struct usb_device_id *id);
-static void skel_disconnect	(struct usb_interface *intf);
+static int skel_probe		(struct usb_interface *interface, const struct usb_device_id *id);
+static void skel_disconnect	(struct usb_interface *interface);
 
 static void skel_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 
@@ -163,7 +163,7 @@ static struct file_operations skel_fops = {
  * usb class driver info in order to get a minor number from the usb core,
  * and to have the device registered with devfs and the driver core
  */
-static struct usb_class_driver skell_class = {
+static struct usb_class_driver skel_class = {
 	.name =		"usb/skel%d",
 	.fops =		&skel_fops,
 	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH,
@@ -515,7 +515,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		return -ENODEV;
 	}
 
-	retval = usb_register_dev (intf, &skel_class);
+	retval = usb_register_dev (interface, &skel_class);
 	if (retval) {
 		/* something prevented us from registering this driver */
 		err ("Not able to get a minor for this device.");
@@ -533,7 +533,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	init_MUTEX (&dev->sem);
 	dev->udev = udev;
 	dev->interface = interface;
-	dev->minor = intf->minor;
+	dev->minor = interface->minor;
 
 	/* set up the endpoint information */
 	/* check out the endpoints */
@@ -610,7 +610,7 @@ error:
 	dev = NULL;
 
 exit_minor:
-	usb_deregister_dev (intf, &skel_class);
+	usb_deregister_dev (interface, &skel_class);
 
 exit:
 	if (dev) {
@@ -654,7 +654,7 @@ static void skel_disconnect(struct usb_interface *interface)
 	minor = dev->minor;
 
 	/* give back our minor */
-	usb_deregister_dev (intf, &skel_class);
+	usb_deregister_dev (interface, &skel_class);
 
 	/* terminate an ongoing write */
 	if (atomic_read (&dev->write_busy)) {
