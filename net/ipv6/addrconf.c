@@ -1311,7 +1311,7 @@ regen:
 	 *  - XXX: already assigned to an address on the device
 	 */
 	if (idev->rndid[0] == 0xfd && 
-	    (idev->rndid[1]&idev->rndid[2]&idev->rndid[3]&idev->rndid[4]&idev->rndid[5]&idev->rndid[6]) &&
+	    (idev->rndid[1]&idev->rndid[2]&idev->rndid[3]&idev->rndid[4]&idev->rndid[5]&idev->rndid[6]) == 0xff &&
 	    (idev->rndid[7]&0x80))
 		goto regen;
 	if ((idev->rndid[0]|idev->rndid[1]) == 0) {
@@ -2541,6 +2541,10 @@ restart:
 			unsigned long regen_advance;
 #endif
 
+#ifdef CONFIG_IPV6_PRIVACY
+			regen_advance = ifp->idev->cnf.regen_max_retry * ifp->idev->cnf.dad_transmits * ifp->idev->nd_parms->retrans_time / HZ;
+#endif
+
 			if (ifp->flags & IFA_F_PERMANENT)
 				continue;
 
@@ -2583,28 +2587,33 @@ restart:
 				}
 #ifdef CONFIG_IPV6_PRIVACY
 			} else if ((ifp->flags&IFA_F_TEMPORARY) &&
-				   !(ifp->flags&IFA_F_TENTATIVE)) {
-				if (age >= ifp->prefered_lft - regen_advance) {
-					struct inet6_ifaddr *ifpub = ifp->ifpub;
-					if (time_before(ifp->tstamp + ifp->prefered_lft * HZ, next))
-						next = ifp->tstamp + ifp->prefered_lft * HZ;
-					if (!ifp->regen_count && ifpub) {
-						ifp->regen_count++;
-						in6_ifa_hold(ifp);
-						in6_ifa_hold(ifpub);
-						spin_unlock(&ifp->lock);
-						write_unlock(&addrconf_hash_lock);
-						ipv6_create_tempaddr(ifpub, ifp);
-						in6_ifa_put(ifpub);
-						in6_ifa_put(ifp);
-						goto restart;
-					}
-				} else if (time_before(ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ, next))
-					next = ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ;
-				spin_unlock(&ifp->lock);
+				   !(ifp->flags&IFA_F_TENTATIVE) &&
+				   age >= ifp->prefered_lft - regen_advance) {
+				struct inet6_ifaddr *ifpub = ifp->ifpub;
+				if (time_before(ifp->tstamp + ifp->prefered_lft * HZ, next))
+					next = ifp->tstamp + ifp->prefered_lft * HZ;
+				if (!ifp->regen_count && ifpub) {
+					ifp->regen_count++;
+					in6_ifa_hold(ifp);
+					in6_ifa_hold(ifpub);
+					spin_unlock(&ifp->lock);
+					write_unlock(&addrconf_hash_lock);
+					ipv6_create_tempaddr(ifpub, ifp);
+					in6_ifa_put(ifpub);
+					in6_ifa_put(ifp);
+					goto restart;
+				} else {
+					spin_unlock(&ifp->lock);
+				}
 #endif
 			} else {
 				/* ifp->prefered_lft <= ifp->valid_lft */
+#ifdef CONFIG_IPV6_PRIVACY
+				if (ifp->flags&IFA_F_TEMPORARY) {
+					if (time_before(ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ, next))
+						next = ifp->tstamp + ifp->prefered_lft * HZ - regen_advance * HZ;
+				} else
+#endif
 				if (time_before(ifp->tstamp + ifp->prefered_lft * HZ, next))
 					next = ifp->tstamp + ifp->prefered_lft * HZ;
 				spin_unlock(&ifp->lock);
@@ -2660,6 +2669,7 @@ inet6_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 			return -EINVAL;
 		pfx = RTA_DATA(rta[IFA_LOCAL-1]);
 	}
+
 	if (pfx == NULL)
 		return -EINVAL;
 
@@ -3494,10 +3504,20 @@ void __init addrconf_init(void)
 	register_netdevice_notifier(&ipv6_dev_notf);
 
 #ifdef CONFIG_IPV6_PRIVACY
-	md5_tfm = crypto_alloc_tfm("md5", 0);
-	if (unlikely(md5_tfm == NULL))
+	struct crypto_tfm *tfm = crypto_alloc_tfm("md5", 0);
+	if (likely(tfm != NULL)) {
+		spin_lock(&md5_tfm_lock);
+		if (likely(md5_tfm == NULL)) {
+			md5_tfm = tfm;
+			spin_unlock(&md5_tfm_lock);
+		} else {
+			spin_unlock(&md5_tfm_lock);
+			crypto_free_tfm(tfm);
+		}
+	} else {
 		printk(KERN_WARNING
 			"failed to load transform for md5\n");
+	}
 #endif
 
 	addrconf_verify(0);
@@ -3516,6 +3536,9 @@ void addrconf_cleanup(void)
  	struct inet6_dev *idev;
  	struct inet6_ifaddr *ifa;
 	int i;
+#ifdef CONFIG_IPV6_PRIVACY
+	struct crypto_tfm *tfm;
+#endif
 
 	unregister_netdevice_notifier(&ipv6_dev_notf);
 
@@ -3561,10 +3584,12 @@ void addrconf_cleanup(void)
 	rtnl_unlock();
 
 #ifdef CONFIG_IPV6_PRIVACY
-	if (likely(md5_tfm != NULL)) {
-		crypto_free_tfm(md5_tfm);
-		md5_tfm = NULL;
-	}
+	spin_lock(&md5_tfm_lock);
+	tfm = md5_tfm;
+	md5_tfm = NULL;
+	spin_unlock(&md5_tfm_lock);
+	if (likely(tfm))
+		crypto_free_tfm(tfm);
 #endif
 
 #ifdef CONFIG_PROC_FS
