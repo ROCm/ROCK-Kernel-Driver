@@ -50,6 +50,31 @@ struct task_struct *pidhash[PIDHASH_SZ];
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
+/*
+ * A per-CPU task cache - this relies on the fact that
+ * the very last portion of sys_exit() is executed with
+ * preemption turned off.
+ */
+static task_t *task_cache[NR_CPUS] __cacheline_aligned;
+
+void __put_task_struct(struct task_struct *tsk)
+{
+	if (tsk != current) {
+		free_thread_info(tsk->thread_info);
+		kmem_cache_free(task_struct_cachep,tsk);
+	} else {
+		int cpu = smp_processor_id();
+
+		tsk = task_cache[cpu];
+		if (tsk) {
+			free_thread_info(tsk->thread_info);
+			kmem_cache_free(task_struct_cachep,tsk);
+		}
+		task_cache[cpu] = current;
+	}
+}
+
+/* Protects next_safe and last_pid. */
 void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
@@ -123,13 +148,6 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	return tsk;
 }
 
-void __put_task_struct(struct task_struct *tsk)
-{
-	free_thread_info(tsk->thread_info);
-	kmem_cache_free(task_struct_cachep,tsk);
-}
-
-/* Protects next_safe and last_pid. */
 spinlock_t lastpid_lock = SPIN_LOCK_UNLOCKED;
 
 static int get_pid(unsigned long flags)
@@ -737,7 +755,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	/* ok, now we should be set up.. */
 	p->swappable = 1;
-	p->exit_signal = clone_flags & CSIGNAL;
+	if (clone_flags & CLONE_DETACHED)
+		p->exit_signal = -1;
+	else
+		p->exit_signal = clone_flags & CSIGNAL;
 	p->pdeath_signal = 0;
 
 	/*

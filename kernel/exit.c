@@ -56,10 +56,11 @@ static inline void __unhash_process(struct task_struct *p)
 
 static void release_task(struct task_struct * p)
 {
-	if (p == current)
+	if (p->state != TASK_ZOMBIE)
 		BUG();
 #ifdef CONFIG_SMP
-	wait_task_inactive(p);
+	if (p != current)
+		wait_task_inactive(p);
 #endif
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
@@ -67,10 +68,12 @@ static void release_task(struct task_struct * p)
 	unhash_process(p);
 
 	release_thread(p);
-	current->cmin_flt += p->min_flt + p->cmin_flt;
-	current->cmaj_flt += p->maj_flt + p->cmaj_flt;
-	current->cnswap += p->nswap + p->cnswap;
-	sched_exit(p);
+	if (p != current) {
+		current->cmin_flt += p->min_flt + p->cmin_flt;
+		current->cmaj_flt += p->maj_flt + p->cmaj_flt;
+		current->cnswap += p->nswap + p->cnswap;
+		sched_exit(p);
+	}
 	put_task_struct(p);
 }
 
@@ -479,14 +482,15 @@ static void exit_notify(void)
 
 	write_lock_irq(&tasklist_lock);
 	current->state = TASK_ZOMBIE;
-	do_notify_parent(current, current->exit_signal);
+	if (current->exit_signal != -1)
+		do_notify_parent(current, current->exit_signal);
 	while ((p = eldest_child(current))) {
 		list_del_init(&p->sibling);
 		p->ptrace = 0;
 
 		p->parent = p->real_parent;
 		list_add_tail(&p->sibling,&p->parent->children);
-		if (p->state == TASK_ZOMBIE)
+		if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
 			do_notify_parent(p, p->exit_signal);
 		/*
 		 * process group orphan check
@@ -555,6 +559,9 @@ fake_volatile:
 
 	tsk->exit_code = code;
 	exit_notify();
+	preempt_disable();
+	if (current->exit_signal == -1)
+		release_task(current);
 	schedule();
 	BUG();
 /*
