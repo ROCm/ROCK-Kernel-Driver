@@ -244,7 +244,7 @@ e1000_ethtool_gregs(struct e1000_adapter *adapter,
 	return;
 }
 
-static void
+static int
 e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
@@ -257,6 +257,9 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 
 	max_len = e1000_eeprom_size(hw);
 
+	if(eeprom->offset > eeprom->offset + eeprom->len)
+		return -EINVAL;
+	
 	if((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
 
@@ -265,6 +268,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 
 	for(i = 0; i <= (last_word - first_word); i++)
 		e1000_read_eeprom(hw, first_word + i, &eeprom_buff[i]);
+	return 0;
 }
 
 static int 
@@ -546,11 +550,13 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		struct ethtool_eeprom eeprom = {ETHTOOL_GEEPROM};
 		uint16_t eeprom_buff[256];
 		void *ptr;
+		int err;
 
 		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
 			return -EFAULT;
 
-		e1000_ethtool_geeprom(adapter, &eeprom, eeprom_buff);
+		if((err = e1000_ethtool_geeprom(adapter, &eeprom, eeprom_buff))<0)
+			return err;
 
 		if(copy_to_user(addr, &eeprom, sizeof(eeprom)))
 			return -EFAULT;

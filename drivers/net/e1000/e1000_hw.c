@@ -152,7 +152,7 @@ e1000_reset_hw(struct e1000_hw *hw)
     /* Force a reload from the EEPROM if necessary */
     if(hw->mac_type < e1000_82540) {
         /* Wait for reset to complete */
-        usec_delay(10);
+        udelay(10);
         ctrl_ext = E1000_READ_REG(hw, CTRL_EXT);
         ctrl_ext |= E1000_CTRL_EXT_EE_RST;
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
@@ -761,7 +761,7 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             DEBUGOUT("Valid link established!!!\n");
             return 0;
         }
-        usec_delay(10);
+        udelay(10);
     }
 
     DEBUGOUT("Unable to establish link!!!\n");
@@ -1014,7 +1014,7 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
         DEBUGOUT("PHY Write Error\n");
         return -E1000_ERR_PHY;
     }
-    usec_delay(1);
+    udelay(1);
 
     /* The wait_autoneg_complete flag may be a little misleading here.
      * Since we are forcing speed and duplex, Auto-Neg is not enabled.
@@ -1718,7 +1718,7 @@ e1000_raise_mdi_clk(struct e1000_hw *hw,
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl | E1000_CTRL_MDC));
     E1000_WRITE_FLUSH(hw);
-    usec_delay(2);
+    udelay(2);
 }
 
 /******************************************************************************
@@ -1736,7 +1736,7 @@ e1000_lower_mdi_clk(struct e1000_hw *hw,
      */
     E1000_WRITE_REG(hw, CTRL, (*ctrl & ~E1000_CTRL_MDC));
     E1000_WRITE_FLUSH(hw);
-    usec_delay(2);
+    udelay(2);
 }
 
 /******************************************************************************
@@ -1780,7 +1780,7 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
         E1000_WRITE_REG(hw, CTRL, ctrl);
         E1000_WRITE_FLUSH(hw);
 
-        usec_delay(2);
+        udelay(2);
 
         e1000_raise_mdi_clk(hw, &ctrl);
         e1000_lower_mdi_clk(hw, &ctrl);
@@ -1876,7 +1876,7 @@ e1000_read_phy_reg(struct e1000_hw *hw,
 
         /* Poll the ready bit to see if the MDI read completed */
         for(i = 0; i < 64; i++) {
-            usec_delay(10);
+            udelay(10);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
         }
@@ -1958,7 +1958,7 @@ e1000_write_phy_reg(struct e1000_hw *hw,
 
         /* Poll the ready bit to see if the MDI read completed */
         for(i = 0; i < 64; i++) {
-            usec_delay(10);
+            udelay(10);
             mdic = E1000_READ_REG(hw, MDIC);
             if(mdic & E1000_MDIC_READY) break;
         }
@@ -2029,7 +2029,7 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
         E1000_WRITE_FLUSH(hw);
     }
-    usec_delay(150);
+    udelay(150);
 }
 
 /******************************************************************************
@@ -2055,7 +2055,7 @@ e1000_phy_reset(struct e1000_hw *hw)
         DEBUGOUT("PHY Write Error\n");
         return -E1000_ERR_PHY;
     }
-    usec_delay(1);
+    udelay(1);
     return 0;
 }
 
@@ -2078,7 +2078,7 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     hw->phy_id = (uint32_t) (phy_id_high << 16);
-    usec_delay(2);
+    udelay(2);
     if(e1000_read_phy_reg(hw, PHY_ID2, &phy_id_low) < 0) {
         DEBUGOUT("PHY Read Error\n");
         return -E1000_ERR_PHY;
@@ -2231,7 +2231,7 @@ e1000_raise_ee_clk(struct e1000_hw *hw,
     *eecd = *eecd | E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 }
 
 /******************************************************************************
@@ -2250,7 +2250,7 @@ e1000_lower_ee_clk(struct e1000_hw *hw,
     *eecd = *eecd & ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 }
 
 /******************************************************************************
@@ -2289,7 +2289,7 @@ e1000_shift_out_ee_bits(struct e1000_hw *hw,
         E1000_WRITE_REG(hw, EECD, eecd);
         E1000_WRITE_FLUSH(hw);
 
-        usec_delay(50);
+        udelay(50);
 
         e1000_raise_ee_clk(hw, &eecd);
         e1000_lower_ee_clk(hw, &eecd);
@@ -2383,25 +2383,25 @@ e1000_standby_eeprom(struct e1000_hw *hw)
     eecd &= ~(E1000_EECD_CS | E1000_EECD_SK);
     E1000_WRITE_REG(hw, EECD, eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 
     /* Clock high */
     eecd |= E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 
     /* Select EEPROM */
     eecd |= E1000_EECD_CS;
     E1000_WRITE_REG(hw, EECD, eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 
     /* Clock low */
     eecd &= ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 }
 
 /******************************************************************************
@@ -2420,13 +2420,13 @@ e1000_clock_eeprom(struct e1000_hw *hw)
     eecd |= E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 
     /* Falling edge of clock */
     eecd &= ~E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, eecd);
     E1000_WRITE_FLUSH(hw);
-    usec_delay(50);
+    udelay(50);
 }
 
 /******************************************************************************
@@ -2475,7 +2475,7 @@ e1000_read_eeprom(struct e1000_hw *hw,
         eecd = E1000_READ_REG(hw, EECD);
         while((!(eecd & E1000_EECD_GNT)) && (i < 100)) {
             i++;
-            usec_delay(5);
+            udelay(5);
             eecd = E1000_READ_REG(hw, EECD);
         }
         if(!(eecd & E1000_EECD_GNT)) {
@@ -2610,7 +2610,7 @@ e1000_write_eeprom(struct e1000_hw *hw,
         eecd = E1000_READ_REG(hw, EECD);
         while((!(eecd & E1000_EECD_GNT)) && (i < 100)) {
             i++;
-            usec_delay(5);
+            udelay(5);
             eecd = E1000_READ_REG(hw, EECD);
         }
         if(!(eecd & E1000_EECD_GNT)) {
@@ -2661,7 +2661,7 @@ e1000_write_eeprom(struct e1000_hw *hw,
     for(i = 0; i < 200; i++) {
         eecd = E1000_READ_REG(hw, EECD);
         if(eecd & E1000_EECD_DO) break;
-        usec_delay(50);
+        udelay(50);
     }
     if(i == 200) {
         DEBUGOUT("EEPROM Write did not complete\n");
