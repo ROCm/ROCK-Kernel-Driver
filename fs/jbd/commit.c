@@ -487,7 +487,7 @@ start_journal_io:
 		 */
 		bh = jh2bh(jh);
 		BUFFER_TRACE(bh, "dumping temporary bh");
-		journal_unlock_journal_head(jh);
+		journal_put_journal_head(jh);
 		__brelse(bh);
 		J_ASSERT_BH(bh, atomic_read(&bh->b_count) == 0);
 		free_buffer_head(bh);
@@ -536,7 +536,7 @@ start_journal_io:
 		clear_bit(BH_JWrite, &bh->b_state);
 		journal_unfile_buffer(jh);
 		jh->b_transaction = NULL;
-		journal_unlock_journal_head(jh);
+		journal_put_journal_head(jh);
 		__brelse(bh);		/* One for getblk */
 		/* AKPM: bforget here */
 	}
@@ -578,7 +578,7 @@ start_journal_io:
 		if (unlikely(!buffer_uptodate(bh)))
 			err = -EIO;
 		put_bh(bh);		/* One for getblk() */
-		journal_unlock_journal_head(descriptor);
+		journal_put_journal_head(descriptor);
 	}
 
 	/* End of a transaction!  Finally, we can do checkpoint

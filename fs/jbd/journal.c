@@ -1686,7 +1686,7 @@ static void journal_free_journal_head(struct journal_head *jh)
  * _before_ attaching the journal_head to a transaction.  To protect the
  * journal_head in this situation, journal_add_journal_head elevates the
  * journal_head's b_jcount refcount by one.  The caller must call
- * journal_unlock_journal_head() to undo this.
+ * journal_put_journal_head() to undo this.
  *
  * So the typical usage would be:
  *
@@ -1694,7 +1694,7 @@ static void journal_free_journal_head(struct journal_head *jh)
  *	struct journal_head *jh = journal_add_journal_head(bh);
  *	...
  *	jh->b_transaction = xxx;
- *	journal_unlock_journal_head(jh);
+ *	journal_put_journal_head(jh);
  *
  * Now, the journal_head's b_jcount is zero, but it is safe from being released
  * because it has a non-zero b_transaction.
@@ -1791,7 +1791,11 @@ void journal_remove_journal_head(struct buffer_head *bh)
 	jbd_unlock_bh_journal_head(bh);
 }
 
-void journal_unlock_journal_head(struct journal_head *jh)
+/*
+ * Drop a reference on the passed journal_head.  If it fell to zero then try to
+ * release the journal_head from the buffer_head.
+ */
+void journal_put_journal_head(struct journal_head *jh)
 {
 	struct buffer_head *bh = jh2bh(jh);
 

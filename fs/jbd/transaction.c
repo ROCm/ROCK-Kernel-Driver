@@ -725,7 +725,7 @@ int journal_get_write_access (handle_t *handle, struct buffer_head *bh)
 	 * completes any outstanding IO before proceeding. */
 	lock_journal(journal);
 	rc = do_get_write_access(handle, jh, 0);
-	journal_unlock_journal_head(jh);
+	journal_put_journal_head(jh);
 	unlock_journal(journal);
 	return rc;
 }
@@ -802,7 +802,7 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 	JBUFFER_TRACE(jh, "cancelling revoke");
 	lock_kernel();
 	journal_cancel_revoke(handle, jh);
-	journal_unlock_journal_head(jh);
+	journal_put_journal_head(jh);
 	unlock_kernel();
 out:
 	unlock_journal(journal);
@@ -877,7 +877,7 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 out:
 	if (!err)
 		J_ASSERT_JH(jh, jh->b_committed_data);
-	journal_unlock_journal_head(jh);
+	journal_put_journal_head(jh);
 	unlock_journal(journal);
 	return err;
 }
@@ -1035,7 +1035,7 @@ no_journal:
 		__brelse(bh);
 	}
 	JBUFFER_TRACE(jh, "exit");
-	journal_unlock_journal_head(jh);
+	journal_put_journal_head(jh);
 	return 0;
 }
 
