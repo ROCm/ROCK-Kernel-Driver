@@ -283,7 +283,6 @@ xfs_read(
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
 	mp = ip->i_mount;
-	vn_trace_entry(vp, "xfs_read", (inst_t *)__return_address);
 
 	XFS_STATS_INC(xs_read_calls);
 
@@ -345,6 +344,8 @@ xfs_read(
 		}
 	}
 
+	xfs_rw_enter_trace(XFS_READ_ENTER, &ip->i_iocore,
+				iovp, segs, *offset, ioflags);
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
@@ -377,7 +378,6 @@ xfs_sendfile(
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
 	mp = ip->i_mount;
-	vn_trace_entry(vp, "xfs_sendfile", (inst_t *)__return_address);
 
 	XFS_STATS_INC(xs_read_calls);
 
@@ -405,6 +405,8 @@ xfs_sendfile(
 			return -error;
 		}
 	}
+	xfs_rw_enter_trace(XFS_SENDFILE_ENTER, &ip->i_iocore,
+				target, count, *offset, ioflags);
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
@@ -658,7 +660,6 @@ xfs_write(
 	XFS_STATS_INC(xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
-	vn_trace_entry(vp, "xfs_write", (inst_t *)__return_address);
 	xip = XFS_BHVTOI(bdp);
 
 	/* START copy & waste from filemap.c */
@@ -678,7 +679,7 @@ xfs_write(
 	if (size == 0)
 		return 0;
 
-	io = &(xip->i_iocore);
+	io = &xip->i_iocore;
 	mp = io->io_mount;
 
 	xfs_check_frozen(mp, bdp, XFS_FREEZE_WRITE);
@@ -729,11 +730,12 @@ start:
 	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
 	    !(ioflags & IO_INVIS) && !eventsent)) {
 		loff_t		savedsize = *offset;
+		int dmflags = FILP_DELAY_FLAG(file) | DM_SEM_FLAG_RD(ioflags);
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, vp,
 				      *offset, size,
-				      FILP_DELAY_FLAG(file), &locktype);
+				      dmflags, &locktype);
 		if (error) {
 			xfs_iunlock(xip, iolock);
 			return -error;

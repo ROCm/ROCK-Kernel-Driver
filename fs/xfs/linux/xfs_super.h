@@ -61,7 +61,7 @@
 #endif
 
 #ifdef CONFIG_XFS_SECURITY
-# define XFS_SECURITY_STRING	"security attrs, "
+# define XFS_SECURITY_STRING	"security attributes, "
 # define ENOSECURITY		0
 #else
 # define XFS_SECURITY_STRING

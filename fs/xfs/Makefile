@@ -130,7 +130,6 @@ xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 # Objects in linux/
 xfs-y				+= $(addprefix linux/, \
-				   mrlock.o \
 				   xfs_aops.o \
 				   xfs_buf.o \
 				   xfs_file.o \
