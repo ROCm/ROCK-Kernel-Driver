@@ -499,7 +499,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		if (ea_buf->xattr == NULL)
 			return -ENOMEM;
 
-		ea_buf->flag |= EA_MALLOC;
+		ea_buf->flag = EA_MALLOC;
 		ea_buf->max_size = (size + sb->s_blocksize - 1) &
 		    ~(sb->s_blocksize - 1);
 
