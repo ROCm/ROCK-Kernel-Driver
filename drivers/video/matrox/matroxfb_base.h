@@ -55,7 +55,7 @@
 #if defined(CONFIG_PPC_PMAC)
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
-#include <video/macmodes.h>
+#include "../macmodes.h"
 #endif
 
 /* always compile support for 32MB... It cost almost nothing */
