@@ -50,13 +50,14 @@ typedef struct {
 
 	igcsr32 bacsr10;		/* 0x40 - base address chip selects */
 	igcsr32 bacsr32;		/* 0x44 - base address chip selects */
-	igcsr32 bacsr54;		/* 0x48 - base address chip selects */
+	igcsr32 bacsr54_eccms761;	/* 0x48 - 751: base addr. chip selects
+						  761: ECC, mode/status */
 
 	igcsr32 rsrvd2[1];		/* 0x4C-0x4F reserved */
 
 	igcsr32 drammap;		/* 0x50 - address mapping control */
 	igcsr32 dramtm;			/* 0x54 - timing, driver strength */
-	igcsr32 dramms;			/* 0x58 - ECC, mode/status */
+	igcsr32 dramms;			/* 0x58 - DRAM mode/status */
 
 	igcsr32 rsrvd3[1];		/* 0x5C-0x5F reserved */
 
@@ -73,7 +74,10 @@ typedef struct {
 	igcsr32 pciarb;			/* 0x84 - PCI arbitration control */
 	igcsr32 pcicfg;			/* 0x88 - PCI config status */
 
-	igcsr32 rsrvd6[5];		/* 0x8C-0x9F reserved */
+	igcsr32 rsrvd6[4];		/* 0x8C-0x9B reserved */
+
+	igcsr32 pci_mem;		/* 0x9C - PCI top of memory,
+						  761 only */
 
 	/* AGP (bus 1) control registers */
 	igcsr32 agpcap;			/* 0xA0 - AGP Capability Identifier */
@@ -102,6 +106,7 @@ typedef struct {
 
 } Irongate1;
 
+extern igcsr32 *IronECC;
 
 /*
  * Memory spaces:
