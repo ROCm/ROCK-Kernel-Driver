@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
 
 static xfs_mac_label_t *mac_low_high_lp;
 static xfs_mac_label_t *mac_high_low_lp;

@@ -45,12 +45,15 @@
 #include <linux/pagemap.h>
 #include <linux/vfs.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
+#include <linux/proc_fs.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
+#include <asm/unaligned.h>
 
 #include <linux/xfs_behavior.h>
 #include <linux/xfs_vfs.h>

@@ -30,7 +30,22 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_fs.h"
+#include "xfs_macros.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_clnt.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_imap.h"
+#include "xfs_alloc.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_quota.h"
 
 int
 vfs_mount(

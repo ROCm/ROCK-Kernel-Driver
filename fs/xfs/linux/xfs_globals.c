@@ -35,7 +35,9 @@
  * somewhere else in IRIX.
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_bit.h"
 
 /*
  * System memory size - used to scale certain data structures in XFS.

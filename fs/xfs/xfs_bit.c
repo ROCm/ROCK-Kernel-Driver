@@ -34,7 +34,12 @@
  * XFS bit manipulation routines, used in non-realtime code.
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_bit.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_buf_item.h"
+
 
 #ifndef HAVE_ARCH_HIGHBIT
 /*

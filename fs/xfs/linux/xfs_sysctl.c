@@ -30,7 +30,8 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_rw.h"
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 

@@ -34,7 +34,25 @@
  * High level interface routines for log manager
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_ag.h"
+#include "xfs_sb.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_dir.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_error.h"
+#include "xfs_log_priv.h"
+#include "xfs_buf_item.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_log_recover.h"
+#include "xfs_bit.h"
+#include "xfs_rw.h"
+#include "xfs_trans_priv.h"
 
 
 #define xlog_write_adv_cnt(ptr, len, off, bytes) \

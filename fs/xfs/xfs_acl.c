@@ -30,7 +30,24 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+
+#include "xfs_inum.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
+#include "xfs_acl.h"
+#include "xfs_mac.h"
+#include "xfs_attr.h"
+
 #include <linux/posix_acl_xattr.h>
 
 STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *, int *);

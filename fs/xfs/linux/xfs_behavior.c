@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  *
  */
-#include <xfs.h>
+#include "xfs.h"
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized
