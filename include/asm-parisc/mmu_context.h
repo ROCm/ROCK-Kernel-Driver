@@ -52,6 +52,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 	}
 }
 
+#define deactivate_mm(tsk,mm)	do { } while (0)
+
 static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
 {
 	/*

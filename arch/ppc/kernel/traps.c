@@ -112,42 +112,23 @@ _exception(int signr, struct pt_regs *regs)
 	force_sig(signr, current);
 }
 
-void
-MachineCheckException(struct pt_regs *regs)
+/*
+ * I/O accesses can cause machine checks on powermacs.
+ * Check if the NIP corresponds to the address of a sync
+ * instruction for which there is an entry in the exception
+ * table.
+ * Note that the 601 only takes a machine check on TEA
+ * (transfer error ack) signal assertion, and does not
+ * set any of the top 16 bits of SRR1.
+ *  -- paulus.
+ */
+static inline int check_io_access(struct pt_regs *regs)
 {
 #ifdef CONFIG_ALL_PPC
-	const struct exception_table_entry *entry;
-#endif /* CONFIG_ALL_PPC */
 	unsigned long msr = regs->msr;
+	const struct exception_table_entry *entry;
+	unsigned int *nip = (unsigned int *)regs->nip;
 
-	if (user_mode(regs)) {
-		regs->msr |= MSR_RI;
-		_exception(SIGSEGV, regs);
-		return;
-	}
-
-#if defined(CONFIG_8xx) && defined(CONFIG_PCI)
-	/* the qspan pci read routines can cause machine checks -- Cort */
-	bad_page_fault(regs, regs->dar, SIGBUS);
-	return;
-#endif
-	if (debugger_fault_handler) {
-		debugger_fault_handler(regs);
-		regs->msr |= MSR_RI;
-		return;
-	}
-
-#ifdef CONFIG_ALL_PPC
-	/*
-	 * I/O accesses can cause machine checks on powermacs.
-	 * Check if the NIP corresponds to the address of a sync
-	 * instruction for which there is an entry in the exception
-	 * table.
-	 * Note that the 601 only takes a machine check on TEA
-	 * (transfer error ack) signal assertion, and does not
-	 * set any of the top 16 bits of SRR1.
-	 *  -- paulus.
-	 */
 	if (((msr & 0xffff0000) == 0 || (msr & (0x80000 | 0x40000)))
 	    && (entry = search_exception_tables(regs->nip)) != NULL) {
 		/*
@@ -158,7 +139,6 @@ MachineCheckException(struct pt_regs *regs)
 		 * For the debug message, we look at the preceding
 		 * load or store.
 		 */
-		unsigned int *nip = (unsigned int *)regs->nip;
 		if (*nip == 0x60000000)		/* nop */
 			nip -= 2;
 		else if (*nip == 0x4c00012c)	/* isync */
@@ -173,14 +153,42 @@ MachineCheckException(struct pt_regs *regs)
 			       (*nip & 0x100)? "OUT to": "IN from",
 			       regs->gpr[rb] - _IO_BASE, nip);
 			regs->msr |= MSR_RI;
-			regs->nip = fixup;
-			return;
+			regs->nip = entry->fixup;
+			return 1;
 		}
 	}
 #endif /* CONFIG_ALL_PPC */
-	printk("Machine check in kernel mode.\n");
-	printk("Caused by (from SRR1=%lx): ", msr);
-	switch (msr & 0x601F0000) {
+	return 0;
+}
+
+void
+MachineCheckException(struct pt_regs *regs)
+{
+	if (user_mode(regs)) {
+		regs->msr |= MSR_RI;
+		_exception(SIGSEGV, regs);
+		return;
+	}
+
+#if defined(CONFIG_8xx) && defined(CONFIG_PCI)
+	/* the qspan pci read routines can cause machine checks -- Cort */
+	bad_page_fault(regs, regs->dar, SIGBUS);
+	return;
+#endif
+
+	if (debugger_fault_handler) {
+		debugger_fault_handler(regs);
+		regs->msr |= MSR_RI;
+		return;
+	}
+
+	if (check_io_access(regs))
+		return;
+
+#ifndef CONFIG_4xx
+	printk(KERN_CRIT "Machine check in kernel mode.\n");
+	printk(KERN_CRIT "Caused by (from SRR1=%lx): ", regs->msr);
+	switch (regs->msr & 0x601F0000) {
 	case 0x80000:
 		printk("Machine check signal\n");
 		break;
@@ -207,6 +215,17 @@ MachineCheckException(struct pt_regs *regs)
 	default:
 		printk("Unknown values in msr\n");
 	}
+
+#else /* CONFIG_4xx */
+	/* Note that the ESR gets stored in regs->dsisr on 4xx. */
+	if (regs->dsisr & ESR_MCI) {
+		printk(KERN_CRIT "Instruction");
+		mtspr(SPRN_ESR, regs->dsisr & ~ESR_MCI);
+	} else
+		printk(KERN_CRIT "Data");
+	printk(" machine check in kernel mode.\n");
+#endif /* CONFIG_4xx */
+
 	debugger(regs);
 	die("machine check", regs, SIGBUS);
 }

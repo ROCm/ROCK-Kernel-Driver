@@ -412,7 +412,7 @@ static void tcp_event_data_recv(struct sock *sk, struct tcp_opt *tp, struct sk_b
  * To save cycles in the RFC 1323 implementation it was better to break
  * it up into three procedures. -- erics
  */
-static __inline__ void tcp_rtt_estimator(struct tcp_opt *tp, __u32 mrtt)
+static void tcp_rtt_estimator(struct tcp_opt *tp, __u32 mrtt)
 {
 	long m = mrtt; /* RTT */
 
@@ -2243,14 +2243,14 @@ static __inline__ int tcp_fast_parse_options(struct sk_buff *skb, struct tcphdr 
 	return 1;
 }
 
-extern __inline__ void
+static __inline__ void
 tcp_store_ts_recent(struct tcp_opt *tp)
 {
 	tp->ts_recent = tp->rcv_tsval;
 	tp->ts_recent_stamp = xtime.tv_sec;
 }
 
-extern __inline__ void
+static __inline__ void
 tcp_replace_ts_recent(struct tcp_opt *tp, u32 seq)
 {
 	if (tp->saw_tstamp && !after(seq, tp->rcv_wup)) {
@@ -2309,7 +2309,7 @@ static int tcp_disordered_ack(struct tcp_opt *tp, struct sk_buff *skb)
 		(s32)(tp->ts_recent - tp->rcv_tsval) <= (tp->rto*1024)/HZ);
 }
 
-extern __inline__ int tcp_paws_discard(struct tcp_opt *tp, struct sk_buff *skb)
+static __inline__ int tcp_paws_discard(struct tcp_opt *tp, struct sk_buff *skb)
 {
 	return ((s32)(tp->ts_recent - tp->rcv_tsval) > TCP_PAWS_WINDOW &&
 		xtime.tv_sec < tp->ts_recent_stamp + TCP_PAWS_24DAYS &&
@@ -3155,7 +3155,7 @@ static __inline__ void tcp_data_snd_check(struct sock *sk)
 /*
  * Check if sending an ack is needed.
  */
-static __inline__ void __tcp_ack_snd_check(struct sock *sk, int ofo_possible)
+static void __tcp_ack_snd_check(struct sock *sk, int ofo_possible)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
@@ -3265,7 +3265,7 @@ static void tcp_check_urg(struct sock * sk, struct tcphdr * th)
 }
 
 /* This is the 'fast' part of urgent handling. */
-static inline void tcp_urg(struct sock *sk, struct sk_buff *skb, struct tcphdr *th)
+static void tcp_urg(struct sock *sk, struct sk_buff *skb, struct tcphdr *th)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 

@@ -186,6 +186,7 @@ Original developers of the crypto algorithms:
   Kazunori Miyazawa / USAGI (HMAC)
   Matthew Skala (Twofish)
   Dag Arne Osvik (Serpent)
+  Brian Gladman (AES)
   
 DES algorithm contributors:
   Raimar Falke
@@ -202,6 +203,12 @@ Twofish algorithm contributors:
 
 SHA256 algorithm contributors:
   Andrew McDonald
+
+AES algorithm contributors:
+  Alexander Kjeldaas
+  Herbert Valerio Riedel
+  Kyle McMartin
+  Adam J. Richter
 
 Please send any credits updates or corrections to:
 James Morris <jmorris@intercode.com.au>

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,12 +52,12 @@
 
 acpi_status
 acpi_ds_build_internal_object (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_operand_object     **obj_desc_ptr)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	union acpi_operand_object       **obj_desc_ptr)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ds_build_internal_object");
@@ -74,7 +74,7 @@ acpi_ds_build_internal_object (
 			status = acpi_ns_lookup (walk_state->scope_info, op->common.value.string,
 					  ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
 					  ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
-					  (acpi_namespace_node **) &(op->common.node));
+					  (struct acpi_namespace_node **) &(op->common.node));
 
 			if (ACPI_FAILURE (status)) {
 				ACPI_REPORT_NSERROR (op->common.value.string, status);
@@ -119,15 +119,15 @@ acpi_ds_build_internal_object (
 
 acpi_status
 acpi_ds_build_internal_buffer_obj (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	u32                     buffer_length,
-	acpi_operand_object     **obj_desc_ptr)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	u32                             buffer_length,
+	union acpi_operand_object       **obj_desc_ptr)
 {
-	acpi_parse_object       *arg;
-	acpi_operand_object     *obj_desc;
-	acpi_parse_object       *byte_list;
-	u32                     byte_list_length = 0;
+	union acpi_parse_object         *arg;
+	union acpi_operand_object       *obj_desc;
+	union acpi_parse_object         *byte_list;
+	u32                             byte_list_length = 0;
 
 
 	ACPI_FUNCTION_TRACE ("ds_build_internal_buffer_obj");
@@ -204,7 +204,7 @@ acpi_ds_build_internal_buffer_obj (
 	}
 
 	obj_desc->buffer.flags |= AOPOBJ_DATA_VALID;
-	op->common.node = (acpi_namespace_node *) obj_desc;
+	op->common.node = (struct acpi_namespace_node *) obj_desc;
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -227,17 +227,17 @@ acpi_ds_build_internal_buffer_obj (
 
 acpi_status
 acpi_ds_build_internal_package_obj (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	u32                     package_length,
-	acpi_operand_object     **obj_desc_ptr)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	u32                             package_length,
+	union acpi_operand_object       **obj_desc_ptr)
 {
-	acpi_parse_object       *arg;
-	acpi_parse_object       *parent;
-	acpi_operand_object     *obj_desc = NULL;
-	u32                     package_list_length;
-	acpi_status             status = AE_OK;
-	u32                     i;
+	union acpi_parse_object         *arg;
+	union acpi_parse_object         *parent;
+	union acpi_operand_object       *obj_desc = NULL;
+	u32                             package_list_length;
+	acpi_status                     status = AE_OK;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ds_build_internal_package_obj");
@@ -311,7 +311,7 @@ acpi_ds_build_internal_package_obj (
 		if (arg->common.aml_opcode == AML_INT_RETURN_VALUE_OP) {
 			/* Object (package or buffer) is already built */
 
-			obj_desc->package.elements[i] = ACPI_CAST_PTR (acpi_operand_object, arg->common.node);
+			obj_desc->package.elements[i] = ACPI_CAST_PTR (union acpi_operand_object, arg->common.node);
 		}
 		else {
 			status = acpi_ds_build_internal_object (walk_state, arg,
@@ -323,7 +323,7 @@ acpi_ds_build_internal_package_obj (
 	}
 
 	obj_desc->package.flags |= AOPOBJ_DATA_VALID;
-	op->common.node = (acpi_namespace_node *) obj_desc;
+	op->common.node = (struct acpi_namespace_node *) obj_desc;
 	return_ACPI_STATUS (status);
 }
 
@@ -344,12 +344,12 @@ acpi_ds_build_internal_package_obj (
 
 acpi_status
 acpi_ds_create_node (
-	acpi_walk_state         *walk_state,
-	acpi_namespace_node     *node,
-	acpi_parse_object       *op)
+	struct acpi_walk_state          *walk_state,
+	struct acpi_namespace_node      *node,
+	union acpi_parse_object         *op)
 {
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_create_node", op);
@@ -413,14 +413,14 @@ acpi_ds_create_node (
 
 acpi_status
 acpi_ds_init_object_from_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	u16                     opcode,
-	acpi_operand_object     **ret_obj_desc)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	u16                             opcode,
+	union acpi_operand_object       **ret_obj_desc)
 {
-	const acpi_opcode_info  *op_info;
-	acpi_operand_object     *obj_desc;
-	acpi_status             status = AE_OK;
+	const struct acpi_opcode_info   *op_info;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ds_init_object_from_op");
@@ -442,7 +442,7 @@ acpi_ds_init_object_from_op (
 		/*
 		 * Defer evaluation of Buffer term_arg operand
 		 */
-		obj_desc->buffer.node     = (acpi_namespace_node *) walk_state->operands[0];
+		obj_desc->buffer.node     = (struct acpi_namespace_node *) walk_state->operands[0];
 		obj_desc->buffer.aml_start = op->named.data;
 		obj_desc->buffer.aml_length = op->named.length;
 		break;
@@ -453,7 +453,7 @@ acpi_ds_init_object_from_op (
 		/*
 		 * Defer evaluation of Package term_arg operand
 		 */
-		obj_desc->package.node     = (acpi_namespace_node *) walk_state->operands[0];
+		obj_desc->package.node     = (struct acpi_namespace_node *) walk_state->operands[0];
 		obj_desc->package.aml_start = op->named.data;
 		obj_desc->package.aml_length = op->named.length;
 		break;
@@ -551,7 +551,7 @@ acpi_ds_init_object_from_op (
 
 #ifndef ACPI_NO_METHOD_EXECUTION
 			status = acpi_ds_method_data_get_node (AML_LOCAL_OP, obj_desc->reference.offset,
-					 walk_state, (acpi_namespace_node **) &obj_desc->reference.object);
+					 walk_state, (struct acpi_namespace_node **) &obj_desc->reference.object);
 #endif
 			break;
 

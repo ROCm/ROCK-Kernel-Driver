@@ -251,9 +251,9 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	static struct watchdog_info ident=
 	{
-		0,
-		1,
-		"W83877F"
+		.options = WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "W83877F"
 	};
 	
 	switch(cmd)

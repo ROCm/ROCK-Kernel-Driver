@@ -487,8 +487,8 @@ acpi_power_add (
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct acpi_power_resource *resource = NULL;
-	acpi_object		acpi_object;
-	acpi_buffer		buffer = {sizeof(acpi_object), &acpi_object};
+	union acpi_object	acpi_object;
+	struct acpi_buffer	buffer = {sizeof(acpi_object), &acpi_object};
 
 	ACPI_FUNCTION_TRACE("acpi_power_add");
 

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ acpi_hw_initialize_system_info (
 
 acpi_status
 acpi_hw_set_mode (
-	u32                     mode);
+	u32                             mode);
 
 u32
 acpi_hw_get_mode (
@@ -59,35 +59,35 @@ acpi_hw_get_mode_capabilities (
 
 /* Register I/O Prototypes */
 
-acpi_bit_register_info *
+struct acpi_bit_register_info *
 acpi_hw_get_bit_register_info (
-	u32                     register_id);
+	u32                             register_id);
 
 acpi_status
 acpi_hw_register_read (
-	u8                      use_lock,
-	u32                     register_id,
-	u32                     *return_value);
+	u8                              use_lock,
+	u32                             register_id,
+	u32                             *return_value);
 
 acpi_status
 acpi_hw_register_write (
-	u8                      use_lock,
-	u32                     register_id,
-	u32                     value);
+	u8                              use_lock,
+	u32                             register_id,
+	u32                             value);
 
 acpi_status
 acpi_hw_low_level_read (
-	u32                     width,
-	u32                     *value,
-	acpi_generic_address    *reg,
-	u32                     offset);
+	u32                             width,
+	u32                             *value,
+	struct acpi_generic_address     *reg,
+	u32                             offset);
 
 acpi_status
 acpi_hw_low_level_write (
-	u32                     width,
-	u32                     value,
-	acpi_generic_address    *reg,
-	u32                     offset);
+	u32                             width,
+	u32                             value,
+	struct acpi_generic_address     *reg,
+	u32                             offset);
 
 acpi_status
 acpi_hw_clear_acpi_status (
@@ -98,32 +98,32 @@ acpi_hw_clear_acpi_status (
 
 u8
 acpi_hw_get_gpe_bit_mask (
-	u32                     gpe_number);
+	u32                             gpe_number);
 
 acpi_status
 acpi_hw_enable_gpe (
-	u32                     gpe_number);
+	u32                             gpe_number);
 
 void
 acpi_hw_enable_gpe_for_wakeup (
-	u32                     gpe_number);
+	u32                             gpe_number);
 
 acpi_status
 acpi_hw_disable_gpe (
-	u32                     gpe_number);
+	u32                             gpe_number);
 
 void
 acpi_hw_disable_gpe_for_wakeup (
-	u32                     gpe_number);
+	u32                             gpe_number);
 
 acpi_status
 acpi_hw_clear_gpe (
-	u32                     gpe_number);
+	u32                             gpe_number);
 
 acpi_status
 acpi_hw_get_gpe_status (
-	u32                     gpe_number,
-	acpi_event_status       *event_status);
+	u32                             gpe_number,
+	acpi_event_status               *event_status);
 
 acpi_status
 acpi_hw_disable_non_wakeup_gpes (
@@ -138,17 +138,17 @@ acpi_hw_enable_non_wakeup_gpes (
 
 acpi_status
 acpi_get_timer_resolution (
-	u32                     *resolution);
+	u32                             *resolution);
 
 acpi_status
 acpi_get_timer (
-	u32                     *ticks);
+	u32                             *ticks);
 
 acpi_status
 acpi_get_timer_duration (
-	u32                     start_ticks,
-	u32                     end_ticks,
-	u32                     *time_elapsed);
+	u32                             start_ticks,
+	u32                             end_ticks,
+	u32                             *time_elapsed);
 
 
 #endif /* __ACHWARE_H__ */

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
 
 acpi_status
 acpi_get_timer_resolution (
-	u32                     *resolution)
+	u32                             *resolution)
 {
 	ACPI_FUNCTION_TRACE ("acpi_get_timer_resolution");
 
@@ -77,9 +77,9 @@ acpi_get_timer_resolution (
 
 acpi_status
 acpi_get_timer (
-	u32                     *ticks)
+	u32                             *ticks)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_timer");
@@ -123,14 +123,14 @@ acpi_get_timer (
 
 acpi_status
 acpi_get_timer_duration (
-	u32                     start_ticks,
-	u32                     end_ticks,
-	u32                     *time_elapsed)
+	u32                             start_ticks,
+	u32                             end_ticks,
+	u32                             *time_elapsed)
 {
-	u32                     delta_ticks = 0;
-	uint64_overlay          normalized_ticks;
-	acpi_status             status;
-	acpi_integer            out_quotient;
+	u32                             delta_ticks = 0;
+	union uint64_overlay            normalized_ticks;
+	acpi_status                     status;
+	acpi_integer                    out_quotient;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_timer_duration");

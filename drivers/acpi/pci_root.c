@@ -62,7 +62,7 @@ static struct acpi_driver acpi_pci_root_driver = {
  struct acpi_pci_root {
 	struct list_head	node;
  	acpi_handle		handle;
- 	acpi_pci_id		id;
+ 	struct acpi_pci_id	id;
  	struct pci_bus		*bus;
 	u64			mem_tra;
 	u64			io_tra;
@@ -73,7 +73,7 @@ struct list_head		acpi_pci_roots;
 
 void
 acpi_pci_get_translations (
-	acpi_pci_id		*id,
+	struct acpi_pci_id	*id,
 	u64			*mem_tra,
 	u64			*io_tra)
 {
@@ -98,12 +98,12 @@ acpi_pci_get_translations (
 
 static u64
 acpi_pci_root_bus_tra (
-       acpi_resource           *resource,
-       int                     type)
+       struct acpi_resource	*resource,
+       int			type)
 {
-	acpi_resource_address16 *address16;
-	acpi_resource_address32 *address32;
-	acpi_resource_address64 *address64;
+	struct acpi_resource_address16 *address16;
+	struct acpi_resource_address32 *address32;
+	struct acpi_resource_address64 *address64;
 
 	while (1) {
 		switch (resource->id) {
@@ -111,27 +111,27 @@ acpi_pci_root_bus_tra (
 			return 0;
 
 		case ACPI_RSTYPE_ADDRESS16:
-			address16 = (acpi_resource_address16 *) &resource->data;
+			address16 = (struct acpi_resource_address16 *) &resource->data;
 			if (type == address16->resource_type) {
 				return address16->address_translation_offset;
 			}
 			break;
 
 		case ACPI_RSTYPE_ADDRESS32:
-			address32 = (acpi_resource_address32 *) &resource->data;
+			address32 = (struct acpi_resource_address32 *) &resource->data;
 			if (type == address32->resource_type) {
 				return address32->address_translation_offset;
 			}
 			break;
 
 		case ACPI_RSTYPE_ADDRESS64:
-			address64 = (acpi_resource_address64 *) &resource->data;
+			address64 = (struct acpi_resource_address64 *) &resource->data;
 			if (type == address64->resource_type) {
 				return address64->address_translation_offset;
 			}
 			break;
 		}
-		resource = ACPI_PTR_ADD (acpi_resource,
+		resource = ACPI_PTR_ADD (struct acpi_resource,
 				resource, resource->length);
 	}
 
@@ -144,7 +144,7 @@ acpi_pci_evaluate_crs (
 	struct acpi_pci_root	*root)
 {
 	acpi_status		status;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 
 	ACPI_FUNCTION_TRACE("acpi_pci_evaluate_crs");
 
@@ -152,9 +152,9 @@ acpi_pci_evaluate_crs (
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 
-	root->io_tra = acpi_pci_root_bus_tra ((acpi_resource *)
+	root->io_tra = acpi_pci_root_bus_tra ((struct acpi_resource *)
 			buffer.pointer, ACPI_IO_RANGE);
-	root->mem_tra = acpi_pci_root_bus_tra ((acpi_resource *)
+	root->mem_tra = acpi_pci_root_bus_tra ((struct acpi_resource *)
 			buffer.pointer, ACPI_MEMORY_RANGE);
 
 	acpi_os_free(buffer.pointer);

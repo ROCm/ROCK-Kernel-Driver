@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,18 +53,18 @@
 
 acpi_status
 acpi_rs_address16_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u8                      *temp_ptr;
-	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address16);
-	u32                     index;
-	u16                     temp16;
-	u8                      temp8;
+	u8                              *buffer = byte_stream_buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u8                              *temp_ptr;
+	acpi_size                       struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_address16);
+	u32                             index;
+	u16                             temp16;
+	u8                              temp8;
 
 
 	ACPI_FUNCTION_TRACE ("rs_address16_resource");
@@ -265,15 +265,15 @@ acpi_rs_address16_resource (
 
 acpi_status
 acpi_rs_address16_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer = *output_buffer;
-	u8                      *length_field;
-	u8                      temp8;
-	char                    *temp_pointer = NULL;
-	acpi_size               actual_bytes;
+	u8                              *buffer = *output_buffer;
+	u8                              *length_field;
+	u8                              temp8;
+	char                            *temp_pointer = NULL;
+	acpi_size                       actual_bytes;
 
 
 	ACPI_FUNCTION_TRACE ("rs_address16_stream");
@@ -431,25 +431,25 @@ acpi_rs_address16_stream (
 
 acpi_status
 acpi_rs_address32_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer;
-	acpi_resource           *output_struct= (void *) *output_buffer;
-	u16                     temp16;
-	u8                      temp8;
-	u8                      *temp_ptr;
-	acpi_size               struct_size;
-	u32                     index;
+	u8                              *buffer;
+	struct acpi_resource            *output_struct= (void *) *output_buffer;
+	u16                             temp16;
+	u8                              temp8;
+	u8                              *temp_ptr;
+	acpi_size                       struct_size;
+	u32                             index;
 
 
 	ACPI_FUNCTION_TRACE ("rs_address32_resource");
 
 
 	buffer = byte_stream_buffer;
-	struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address32);
+	struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_address32);
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -648,14 +648,14 @@ acpi_rs_address32_resource (
 
 acpi_status
 acpi_rs_address32_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer;
-	u16                     *length_field;
-	u8                      temp8;
-	char                    *temp_pointer;
+	u8                              *buffer;
+	u16                             *length_field;
+	u8                              temp8;
+	char                            *temp_pointer;
 
 
 	ACPI_FUNCTION_TRACE ("rs_address32_stream");
@@ -813,25 +813,25 @@ acpi_rs_address32_stream (
 
 acpi_status
 acpi_rs_address64_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u16                     temp16;
-	u8                      temp8;
-	u8                      *temp_ptr;
-	acpi_size               struct_size;
-	u32                     index;
+	u8                              *buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u16                             temp16;
+	u8                              temp8;
+	u8                              *temp_ptr;
+	acpi_size                       struct_size;
+	u32                             index;
 
 
 	ACPI_FUNCTION_TRACE ("rs_address64_resource");
 
 
 	buffer = byte_stream_buffer;
-	struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address64);
+	struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_address64);
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -1034,14 +1034,14 @@ acpi_rs_address64_resource (
 
 acpi_status
 acpi_rs_address64_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer;
-	u16                     *length_field;
-	u8                      temp8;
-	char                    *temp_pointer;
+	u8                              *buffer;
+	u16                             *length_field;
+	u8                              temp8;
+	char                            *temp_pointer;
 
 
 	ACPI_FUNCTION_TRACE ("rs_address64_stream");

@@ -19,7 +19,7 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	void *ret;
 	int gfp = GFP_ATOMIC;
 
-	if (dev == NULL || ((u32)*dev->dma_mask != 0xffffffff))
+	if (dev == NULL || (*dev->dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
 	ret = (void *)__get_free_pages(gfp, get_order(size));
 

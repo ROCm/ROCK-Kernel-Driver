@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,9 +48,9 @@
 
 static void
 acpi_ut_fadt_register_error (
-	char                    *register_name,
-	u32                     value,
-	acpi_size               offset)
+	char                            *register_name,
+	u32                             value,
+	acpi_size                       offset)
 {
 
 	ACPI_REPORT_WARNING (

@@ -79,6 +79,7 @@ struct atyfb_par {
 	u8 ram_type;
 	u8 mem_refresh_rate;
 	u8 blitter_may_be_busy;
+	u32 accel_flags;
 #ifdef __sparc__
 	struct pci_mmap_map *mmap_map;
 	u8 mmaped;

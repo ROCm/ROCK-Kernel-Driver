@@ -546,7 +546,300 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 
 /*-------------------------------------------------------------------------*/
 
-// control queueing !!
+/* use ch9 requests to test whether:
+ *   (a) queues work for control, keeping N subtests queued and
+ *       active (auto-resubmit) for M loops through the queue.
+ *   (b) protocol stalls (control-only) will autorecover.
+ *       it's quite not like bulk/intr; no halt clearing.
+ *   (c) short control reads are reported and handled.
+ */
+
+struct ctrl_ctx {
+	spinlock_t		lock;
+	struct usbtest_dev	*dev;
+	struct completion	complete;
+	unsigned		count;
+	unsigned		pending;
+	int			status;
+	struct urb		**urb;
+	struct usbtest_param	*param;
+};
+
+static void ctrl_complete (struct urb *urb, struct pt_regs *regs)
+{
+	struct ctrl_ctx		*ctx = urb->context;
+	struct usb_ctrlrequest	*reqp;
+	int			status = urb->status;
+
+	reqp = (struct usb_ctrlrequest *)urb->setup_packet;
+
+	spin_lock (&ctx->lock);
+	ctx->count--;
+	ctx->pending--;
+
+	/* FIXME verify that the completions are in the right sequence.
+	 * we could store the test number with the setup packet, that
+	 * buffer has extra space.
+	 */
+
+	switch (status) {
+	case 0:			/* success */
+	case -EREMOTEIO:	/* short read */
+		if (reqp->bRequestType == (USB_DIR_IN|USB_RECIP_DEVICE)
+				&& reqp->bRequest == USB_REQ_GET_DESCRIPTOR
+				&& ((le16_to_cpu (reqp->wValue) >> 8)
+					== USB_DT_DEVICE)) {
+			if (reqp->wLength > USB_DT_DEVICE_SIZE
+					&& status == -EREMOTEIO)
+				status = 0;
+			else if (reqp->wLength == USB_DT_DEVICE_SIZE
+					&& status != 0)
+				status = -EIO;
+			if (status)
+				goto error;
+		}
+		break;
+	case -ECONNRESET:	/* async unlink */
+		break;
+	case -EPIPE: 		/* (protocol) stall */
+		if (reqp->bRequestType == (USB_DIR_IN|USB_RECIP_INTERFACE)
+				&& reqp->bRequest == USB_REQ_GET_INTERFACE)
+			status = 0;
+		else if (reqp->bRequestType == (USB_DIR_IN|USB_RECIP_DEVICE)
+				&& reqp->bRequest == USB_REQ_GET_DESCRIPTOR) {
+			switch (le16_to_cpu (reqp->wValue) >> 8) {
+			case USB_DT_DEVICE_QUALIFIER:
+			case USB_DT_OTHER_SPEED_CONFIG:
+			case USB_DT_INTERFACE:
+			case USB_DT_ENDPOINT:
+				status = 0;
+			}
+		} else if (reqp->bRequestType == USB_RECIP_ENDPOINT
+				&& reqp->bRequest == USB_REQ_CLEAR_FEATURE)
+			status = 0;
+		/* some stalls we plan on; others would be errors */
+		if (status == 0)
+			break;
+		/* else FALLTHROUGH */
+error:
+	default:		/* this fault's an error */
+		if (ctx->status == 0) {
+			int		i;
+
+			ctx->status = status;
+			info ("control queue %02x.%02x, err %d, %d left",
+					reqp->bRequestType, reqp->bRequest,
+					status, ctx->count);
+
+			/* FIXME use this "unlink everything" exit route
+			 * in all cases, not just for fault cleanup.
+			 * it'll be another test mode, but one that makes
+			 * testing be more consistent.
+			 */
+
+			/* unlink whatever's still pending */
+			for (i = 0; i < ctx->param->sglen; i++) {
+				struct urb	*u = ctx->urb [i];
+
+				if (u == urb || !u->dev)
+					continue;
+				status = usb_unlink_urb (u);
+				switch (status) {
+				case -EINPROGRESS:
+				case -EBUSY:
+					continue;
+				default:
+					dbg ("urb unlink --> %d", status);
+				}
+			}
+			status = ctx->status;
+		}
+	}
+
+	/* resubmit if we need to, else mark this as done */
+	if ((status == 0) && (ctx->pending < ctx->count)) {
+		if ((status = usb_submit_urb (urb, SLAB_ATOMIC)) != 0) {
+			dbg ("can't resubmit ctrl %02x.%02x, err %d",
+				reqp->bRequestType, reqp->bRequest, status);
+			urb->dev = 0;
+		} else
+			ctx->pending++;
+	} else
+		urb->dev = 0;
+	
+	/* signal completion when nothing's queued */
+	if (ctx->pending == 0)
+		complete (&ctx->complete);
+	spin_unlock (&ctx->lock);
+}
+
+static int
+test_ctrl_queue (struct usbtest_dev *dev, struct usbtest_param *param)
+{
+	struct usb_device	*udev = testdev_to_usbdev (dev);
+	struct urb		**urb;
+	struct ctrl_ctx		context;
+	int			i;
+
+	spin_lock_init (&context.lock);
+	context.dev = dev;
+	init_completion (&context.complete);
+	context.count = param->sglen * param->iterations;
+	context.pending = 0;
+	context.status = -ENOMEM;
+	context.param = param;
+
+	/* allocate and init the urbs we'll queue.
+	 * as with bulk/intr sglists, sglen is the queue depth; it also
+	 * controls which subtests run (more tests than sglen) or rerun.
+	 */
+	urb = kmalloc (param->sglen * sizeof (struct urb *), SLAB_KERNEL);
+	if (!urb)
+		goto cleanup;
+	memset (urb, 0, param->sglen * sizeof (struct urb *));
+	for (i = 0; i < param->sglen; i++) {
+		int			pipe = usb_rcvctrlpipe (udev, 0);
+		unsigned		len;
+		struct urb		*u;
+		struct usb_ctrlrequest	req, *reqp;
+
+		/* requests here are mostly expected to succeed on any
+		 * device, but some are chosen to trigger protocol stalls
+		 * or short reads.
+		 */
+		memset (&req, 0, sizeof req);
+		req.bRequest = USB_REQ_GET_DESCRIPTOR;
+		req.bRequestType = USB_DIR_IN|USB_RECIP_DEVICE;
+
+		switch (i % 12 /* number of subtest cases here */) {
+		case 0:		// get device descriptor
+			req.wValue = cpu_to_le16 (USB_DT_DEVICE << 8);
+			len = sizeof (struct usb_device_descriptor);
+			break;
+		case 1:		// get first config descriptor (only)
+			req.wValue = cpu_to_le16 ((USB_DT_CONFIG << 8) | 0);
+			len = sizeof (struct usb_config_descriptor);
+			break;
+		case 2:		// get altsetting (OFTEN STALLS)
+			req.bRequest = USB_REQ_GET_INTERFACE;
+			req.bRequestType = USB_DIR_IN|USB_RECIP_INTERFACE;
+			// index = 0 means first interface
+			len = 1;
+			break;
+		case 3:		// get interface status
+			req.bRequest = USB_REQ_GET_STATUS;
+			req.bRequestType = USB_DIR_IN|USB_RECIP_INTERFACE;
+			// interface 0
+			len = 2;
+			break;
+		case 4:		// get device status
+			req.bRequest = USB_REQ_GET_STATUS;
+			req.bRequestType = USB_DIR_IN|USB_RECIP_DEVICE;
+			len = 2;
+			break;
+		case 5:		// get device qualifier (MAY STALL)
+			req.wValue = cpu_to_le16 (USB_DT_DEVICE_QUALIFIER << 8);
+			len = sizeof (struct usb_qualifier_descriptor);
+			break;
+		case 6:		// get first config descriptor, plus interface
+			req.wValue = cpu_to_le16 ((USB_DT_CONFIG << 8) | 0);
+			len = sizeof (struct usb_config_descriptor);
+			len += sizeof (struct usb_interface_descriptor);
+			break;
+		case 7:		// get interface descriptor (ALWAYS STALLS)
+			req.wValue = cpu_to_le16 (USB_DT_INTERFACE << 8);
+			// interface == 0
+			len = sizeof (struct usb_interface_descriptor);
+			break;
+		// NOTE: two consecutive stalls in the queue here.
+		// that tests fault recovery a bit more aggressively.
+		case 8:		// clear endpoint halt (USUALLY STALLS)
+			req.bRequest = USB_REQ_CLEAR_FEATURE;
+			req.bRequestType = USB_RECIP_ENDPOINT;
+			// wValue 0 == ep halt
+			// wIndex 0 == ep0 (shouldn't halt!)
+			len = 0;
+			pipe = usb_sndctrlpipe (udev, 0);
+			break;
+		case 9:		// get endpoint status
+			req.bRequest = USB_REQ_GET_STATUS;
+			req.bRequestType = USB_DIR_IN|USB_RECIP_ENDPOINT;
+			// endpoint 0
+			len = 2;
+			break;
+		case 10:	// trigger short read (EREMOTEIO)
+			req.wValue = cpu_to_le16 ((USB_DT_CONFIG << 8) | 0);
+			len = 1024;
+			break;
+		// NOTE: two consecutive _different_ faults in the queue.
+		case 11:	// get endpoint descriptor (ALWAYS STALLS)
+			req.wValue = cpu_to_le16 (USB_DT_ENDPOINT << 8);
+			// endpoint == 0
+			len = sizeof (struct usb_interface_descriptor);
+			break;
+		// NOTE: sometimes even a third fault in the queue!
+		case 12:	// get string 0 descriptor (MAY STALL)
+			req.wValue = cpu_to_le16 (USB_DT_STRING << 8);
+			// string == 0, for language IDs
+			len = sizeof (struct usb_interface_descriptor);
+			break;
+		default:
+			err ("bogus number of ctrl queue testcases!");
+			context.status = -EINVAL;
+			goto cleanup;
+		}
+		req.wLength = cpu_to_le16 (len);
+		urb [i] = u = simple_alloc_urb (udev, pipe, len);
+		if (!u)
+			goto cleanup;
+
+		reqp = usb_buffer_alloc (udev, sizeof req, SLAB_KERNEL,
+				&u->setup_dma);
+		if (!reqp)
+			goto cleanup;
+		*reqp = req;
+		u->setup_packet = (char *) reqp;
+
+		u->context = &context;
+		u->complete = ctrl_complete;
+		u->transfer_flags |= URB_ASYNC_UNLINK;
+	}
+
+	/* queue the urbs */
+	context.urb = urb;
+	spin_lock_irq (&context.lock);
+	for (i = 0; i < param->sglen; i++) {
+		context.status = usb_submit_urb (urb [i], SLAB_ATOMIC);
+		if (context.status != 0) {
+			dbg ("can't submit urb[%d], status %d",
+					i, context.status);
+			context.count = context.pending;
+			break;
+		}
+		context.pending++;
+	}
+	spin_unlock_irq (&context.lock);
+
+	/* FIXME  set timer and time out; provide a disconnect hook */
+
+	/* wait for the last one to complete */
+	wait_for_completion (&context.complete);
+
+cleanup:
+	for (i = 0; i < param->sglen; i++) {
+		if (!urb [i])
+			continue;
+		urb [i]->dev = udev;
+		if (urb [i]->setup_packet)
+			usb_buffer_free (udev, sizeof (struct usb_ctrlrequest),
+					urb [i]->setup_packet,
+					urb [i]->setup_dma);
+		simple_free_urb (urb [i]);
+	}
+	kfree (urb);
+	return context.status;
+}
+
 
 /*-------------------------------------------------------------------------*/
 
@@ -830,7 +1123,16 @@ usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
 			dbg ("ch9 subset failed, iterations left %d", i);
 		break;
 
-	// case 10: queued control
+	/* queued control messaging */
+	case 10:
+		if (param->sglen == 0)
+			break;
+		retval = 0;
+		dbg ("%s TEST 10:  queue %d control calls, %d times",
+				dev->id, param->sglen,
+				param->iterations);
+		retval = test_ctrl_queue (dev, param);
+		break;
 
 	/* simple non-queued unlinks (ring with one urb) */
 	case 11:

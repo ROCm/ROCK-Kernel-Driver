@@ -61,6 +61,18 @@ struct s_elan_multiplier elan_multiplier[] = {
 	{99000,	0x01,	0x05}
 };
 
+static struct cpufreq_frequency_table elanfreq_table[] = {
+	{0,	1000},
+	{1,	2000},
+	{2,	4000},
+	{3,	8000},
+	{4,	16000},
+	{5,	33000},
+	{6,	66000},
+	{7,	99000},
+	{0,	CPUFREQ_TABLE_END},
+};
+
 
 /**
  *	elanfreq_get_cpu_frequency: determine current cpu speed
@@ -172,63 +184,17 @@ static void elanfreq_set_cpu_state (unsigned int state) {
 
 static int elanfreq_verify (struct cpufreq_policy *policy)
 {
-	unsigned int    number_states = 0;
-	unsigned int    i;
-
-	if (!policy || !max_freq)
-		return -EINVAL;
-
-	policy->cpu = 0;
-
-	cpufreq_verify_within_limits(policy, 1000, max_freq);
-
-	for (i=7; i>=0; i--)
-		if ((elan_multiplier[i].clock >= policy->min) &&
-		    (elan_multiplier[i].clock <= policy->max))
-			number_states++;
-
-	if (number_states)
-		return 0;
-
-	for (i=7; i>=0; i--)
-		if (elan_multiplier[i].clock < policy->max)
-			break;
-
-	policy->max = elan_multiplier[i+1].clock;
-
-	cpufreq_verify_within_limits(policy, 1000, max_freq);
-
-	return 0;
+	return cpufreq_frequency_table_verify(policy, &elanfreq_table[0]);
 }
 
 static int elanfreq_setpolicy (struct cpufreq_policy *policy)
 {
-	unsigned int    i;
-	unsigned int    optimal = 8;
+	unsigned int    newstate = 0;
 
-	if (!elanfreq_driver)
+	if (cpufreq_frequency_table_setpolicy(policy, &elanfreq_table[0], &newstate))
 		return -EINVAL;
 
-	for (i=0; i<8; i++) {
-		if ((elan_multiplier[i].clock > policy->max) ||
-		    (elan_multiplier[i].clock < policy->min))
-			continue;
-		switch(policy->policy) {
-		case CPUFREQ_POLICY_POWERSAVE:
-			if (optimal == 8)
-				optimal = i;
-			break;
-		case CPUFREQ_POLICY_PERFORMANCE:
-			optimal = i;
-			break;
-		default:
-			return -EINVAL;
-		}
-	}
-	if ((optimal == 8) || (elan_multiplier[optimal].clock > max_freq))
-		return -EINVAL;
-
-	elanfreq_set_cpu_state(optimal);
+	elanfreq_set_cpu_state(newstate);
 
 	return 0;
 }
@@ -262,7 +228,7 @@ static int __init elanfreq_init(void)
 {	
 	struct cpuinfo_x86 *c = cpu_data;
 	struct cpufreq_driver *driver;
-	int ret;
+	int ret, i;
 
 	/* Test if we have the right hardware */
 	if ((c->x86_vendor != X86_VENDOR_AMD) ||
@@ -282,6 +248,12 @@ static int __init elanfreq_init(void)
 	if (!max_freq)
 		max_freq = elanfreq_get_cpu_frequency();
 
+	/* table init */
+ 	for (i=0; (elanfreq_table[i].frequency != CPUFREQ_TABLE_END); i++) {
+		if (elanfreq_table[i].frequency > max_freq)
+			elanfreq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+	}
+
 #ifdef CONFIG_CPU_FREQ_24_API
 	driver->cpu_cur_freq[0] = elanfreq_get_cpu_frequency();
 #endif
@@ -290,11 +262,12 @@ static int __init elanfreq_init(void)
 	driver->setpolicy     = &elanfreq_setpolicy;
 
 	driver->policy[0].cpu    = 0;
-	driver->policy[0].min    = 1000;
-	driver->policy[0].max    = max_freq;
+	ret = cpufreq_frequency_table_cpuinfo(&driver->policy[0], &elanfreq_table[0]);
+	if (ret) {
+		kfree(driver);
+		return ret;
+	}
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].cpuinfo.max_freq = max_freq;
-	driver->policy[0].cpuinfo.min_freq = 1000;
 	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	elanfreq_driver = driver;

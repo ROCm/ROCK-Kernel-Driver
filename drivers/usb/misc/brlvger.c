@@ -467,8 +467,6 @@ brlvger_open(struct inode *inode, struct file *file)
 
 	n = devnum - BRLVGER_MINOR;
 
-	MOD_INC_USE_COUNT;
-
 	do {
 		down(&disconnect_sem);
 		priv = display_table[n];
@@ -478,7 +476,6 @@ brlvger_open(struct inode *inode, struct file *file)
 			if (file->f_flags & O_NONBLOCK) {
 				dbg3("Failing non-blocking open: "
 				     "device %d not connected", n);
-				MOD_DEC_USE_COUNT;
 				return -EAGAIN;
 			}
 			/* Blocking open. One global wait queue will
@@ -490,7 +487,6 @@ brlvger_open(struct inode *inode, struct file *file)
 						       != NULL);
 			if(ret) {
 				dbg2("Interrupted wait for device %d", n);
-				MOD_DEC_USE_COUNT;
 				return ret;
 			}
 		}
@@ -504,7 +500,7 @@ brlvger_open(struct inode *inode, struct file *file)
 	/* Only one process can open each device, no sharing. */
 	ret = -EBUSY;
 	if(priv->opened)
-		goto error;
+		goto out;
 
 	dbg("Opening display %d", priv->subminor);
 
@@ -512,7 +508,7 @@ brlvger_open(struct inode *inode, struct file *file)
 	priv->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if(!priv->intr_urb) {
 		err("Unable to allocate URB");
-		goto error;
+		goto out;
 	}
 	usb_fill_int_urb( priv->intr_urb, priv->dev,
 			usb_rcvintpipe(priv->dev,
@@ -521,19 +517,19 @@ brlvger_open(struct inode *inode, struct file *file)
 			intr_callback, priv, priv->in_interrupt->bInterval);
 	if((ret = usb_submit_urb(priv->intr_urb, GFP_KERNEL)) <0){
 		err("Error %d while submitting URB", ret);
-		goto error;
+		goto out;
 	}
 
 	/* Set voltage */
 	if(brlvger_set_display_voltage(priv, raw_voltage) <0) {
 		err("Unable to set voltage");
-		goto error;
+		goto out;
 	}
 
 	/* Turn display on */
 	if((ret = brlvger_set_display_on_off(priv, 1)) <0) {
 		err("Error %d while turning display on", ret);
-		goto error;
+		goto out;
 	}
 
 	/* Mark as opened, so disconnect cannot free priv. */
@@ -544,8 +540,6 @@ brlvger_open(struct inode *inode, struct file *file)
 	ret = 0;
 	goto out;
 
- error:
-	MOD_DEC_USE_COUNT;
  out:
 	up(&priv->open_sem);
 	return ret;
@@ -577,8 +571,6 @@ brlvger_release(struct inode *inode, struct file *file)
 		up(&priv->open_sem);
 	}
 
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 
@@ -589,7 +581,8 @@ brlvger_write(struct file *file, const char *buffer,
 	struct brlvger_priv *priv = file->private_data;
 	char buf[MAX_BRLVGER_CELLS];
 	int ret;
-	int rs, off;
+	size_t rs;
+	loff_t off;
 	__u16 written;
 
 	if(!priv->dev)

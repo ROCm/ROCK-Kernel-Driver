@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -56,14 +56,14 @@
 
 acpi_status
 acpi_ds_init_one_object (
-	acpi_handle             obj_handle,
-	u32                     level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_object_type        type;
-	acpi_status             status;
-	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
+	acpi_object_type                type;
+	acpi_status                     status;
+	struct acpi_init_walk_info      *info = (struct acpi_init_walk_info *) context;
 
 
 	ACPI_FUNCTION_NAME ("ds_init_one_object");
@@ -73,7 +73,7 @@ acpi_ds_init_one_object (
 	 * We are only interested in objects owned by the table that
 	 * was just loaded
 	 */
-	if (((acpi_namespace_node *) obj_handle)->owner_id !=
+	if (((struct acpi_namespace_node *) obj_handle)->owner_id !=
 			info->table_desc->table_id) {
 		return (AE_OK);
 	}
@@ -90,7 +90,7 @@ acpi_ds_init_one_object (
 		status = acpi_ds_initialize_region (obj_handle);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Region %p [%4.4s] - Init failure, %s\n",
-				obj_handle, ((acpi_namespace_node *) obj_handle)->name.ascii,
+				obj_handle, ((struct acpi_namespace_node *) obj_handle)->name.ascii,
 				acpi_format_exception (status)));
 		}
 
@@ -115,7 +115,7 @@ acpi_ds_init_one_object (
 		 * on a per-table basis. Currently, we just use a global for the width.
 		 */
 		if (info->table_desc->pointer->revision == 1) {
-			((acpi_namespace_node *) obj_handle)->flags |= ANOBJ_DATA_WIDTH_32;
+			((struct acpi_namespace_node *) obj_handle)->flags |= ANOBJ_DATA_WIDTH_32;
 		}
 
 		/*
@@ -125,7 +125,7 @@ acpi_ds_init_one_object (
 		status = acpi_ds_parse_method (obj_handle);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Method %p [%4.4s] - parse failure, %s\n",
-				obj_handle, ((acpi_namespace_node *) obj_handle)->name.ascii,
+				obj_handle, ((struct acpi_namespace_node *) obj_handle)->name.ascii,
 				acpi_format_exception (status)));
 
 			/* This parse failed, but we will continue parsing more methods */
@@ -138,7 +138,7 @@ acpi_ds_init_one_object (
 		 * for every execution since there isn't much overhead
 		 */
 		acpi_ns_delete_namespace_subtree (obj_handle);
-		acpi_ns_delete_namespace_by_owner (((acpi_namespace_node *) obj_handle)->object->method.owning_id);
+		acpi_ns_delete_namespace_by_owner (((struct acpi_namespace_node *) obj_handle)->object->method.owning_id);
 		break;
 
 
@@ -176,11 +176,11 @@ acpi_ds_init_one_object (
 
 acpi_status
 acpi_ds_initialize_objects (
-	acpi_table_desc         *table_desc,
-	acpi_namespace_node     *start_node)
+	struct acpi_table_desc          *table_desc,
+	struct acpi_namespace_node      *start_node)
 {
-	acpi_status             status;
-	acpi_init_walk_info     info;
+	acpi_status                     status;
+	struct acpi_init_walk_info      info;
 
 
 	ACPI_FUNCTION_TRACE ("ds_initialize_objects");

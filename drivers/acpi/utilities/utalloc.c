@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,10 +45,10 @@
 
 void
 acpi_ut_release_to_cache (
-	u32                     list_id,
-	void                    *object)
+	u32                             list_id,
+	void                            *object)
 {
-	acpi_memory_list        *cache_info;
+	struct acpi_memory_list         *cache_info;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -101,10 +101,10 @@ acpi_ut_release_to_cache (
 
 void *
 acpi_ut_acquire_from_cache (
-	u32                     list_id)
+	u32                             list_id)
 {
-	acpi_memory_list        *cache_info;
-	void                    *object;
+	struct acpi_memory_list         *cache_info;
+	void                            *object;
 
 
 	ACPI_FUNCTION_NAME ("ut_acquire_from_cache");
@@ -173,10 +173,10 @@ acpi_ut_acquire_from_cache (
 
 void
 acpi_ut_delete_generic_cache (
-	u32                     list_id)
+	u32                             list_id)
 {
-	acpi_memory_list        *cache_info;
-	char                    *next;
+	struct acpi_memory_list         *cache_info;
+	char                            *next;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -203,13 +203,13 @@ acpi_ut_delete_generic_cache (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Perform parameter validation checks on an acpi_buffer
+ * DESCRIPTION: Perform parameter validation checks on an struct acpi_buffer
  *
  ******************************************************************************/
 
 acpi_status
 acpi_ut_validate_buffer (
-	acpi_buffer             *buffer)
+	struct acpi_buffer              *buffer)
 {
 
 	/* Obviously, the structure pointer must be valid */
@@ -252,10 +252,10 @@ acpi_ut_validate_buffer (
 
 acpi_status
 acpi_ut_initialize_buffer (
-	acpi_buffer             *buffer,
-	acpi_size               required_length)
+	struct acpi_buffer              *buffer,
+	acpi_size                       required_length)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	switch (buffer->length) {
@@ -329,12 +329,12 @@ acpi_ut_initialize_buffer (
 
 void *
 acpi_ut_allocate (
-	acpi_size               size,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	acpi_size                       size,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	void                    *allocation;
+	void                            *allocation;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ut_allocate", size);
@@ -379,12 +379,12 @@ acpi_ut_allocate (
 
 void *
 acpi_ut_callocate (
-	acpi_size               size,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	acpi_size                       size,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	void                    *allocation;
+	void                            *allocation;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("ut_callocate", size);
@@ -444,16 +444,16 @@ acpi_ut_callocate (
 
 void *
 acpi_ut_allocate_and_track (
-	acpi_size               size,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	acpi_size                       size,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	acpi_debug_mem_block    *allocation;
-	acpi_status             status;
+	struct acpi_debug_mem_block     *allocation;
+	acpi_status                     status;
 
 
-	allocation = acpi_ut_allocate (size + sizeof (acpi_debug_mem_block), component,
+	allocation = acpi_ut_allocate (size + sizeof (struct acpi_debug_mem_block), component,
 			  module, line);
 	if (!allocation) {
 		return (NULL);
@@ -490,16 +490,16 @@ acpi_ut_allocate_and_track (
 
 void *
 acpi_ut_callocate_and_track (
-	acpi_size               size,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	acpi_size                       size,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	acpi_debug_mem_block    *allocation;
-	acpi_status             status;
+	struct acpi_debug_mem_block     *allocation;
+	acpi_status                     status;
 
 
-	allocation = acpi_ut_callocate (size + sizeof (acpi_debug_mem_block), component,
+	allocation = acpi_ut_callocate (size + sizeof (struct acpi_debug_mem_block), component,
 			  module, line);
 	if (!allocation) {
 		/* Report allocation error */
@@ -540,13 +540,13 @@ acpi_ut_callocate_and_track (
 
 void
 acpi_ut_free_and_track (
-	void                    *allocation,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	void                            *allocation,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	acpi_debug_mem_block    *debug_block;
-	acpi_status             status;
+	struct acpi_debug_mem_block     *debug_block;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_free", allocation);
@@ -559,8 +559,8 @@ acpi_ut_free_and_track (
 		return_VOID;
 	}
 
-	debug_block = ACPI_CAST_PTR (acpi_debug_mem_block,
-			  (((char *) allocation) - sizeof (acpi_debug_mem_header)));
+	debug_block = ACPI_CAST_PTR (struct acpi_debug_mem_block,
+			  (((char *) allocation) - sizeof (struct acpi_debug_mem_header)));
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_GLOBAL].total_freed++;
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_GLOBAL].current_total_size -= debug_block->size;
@@ -592,12 +592,12 @@ acpi_ut_free_and_track (
  *
  ******************************************************************************/
 
-acpi_debug_mem_block *
+struct acpi_debug_mem_block *
 acpi_ut_find_allocation (
-	u32                     list_id,
-	void                    *allocation)
+	u32                             list_id,
+	void                            *allocation)
 {
-	acpi_debug_mem_block    *element;
+	struct acpi_debug_mem_block     *element;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -642,17 +642,17 @@ acpi_ut_find_allocation (
 
 acpi_status
 acpi_ut_track_allocation (
-	u32                     list_id,
-	acpi_debug_mem_block    *allocation,
-	acpi_size               size,
-	u8                      alloc_type,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	u32                             list_id,
+	struct acpi_debug_mem_block     *allocation,
+	acpi_size                       size,
+	u8                              alloc_type,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	acpi_memory_list        *mem_list;
-	acpi_debug_mem_block    *element;
-	acpi_status             status = AE_OK;
+	struct acpi_memory_list         *mem_list;
+	struct acpi_debug_mem_block     *element;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ut_track_allocation", allocation);
@@ -695,7 +695,7 @@ acpi_ut_track_allocation (
 	/* Insert at list head */
 
 	if (mem_list->list_head) {
-		((acpi_debug_mem_block *)(mem_list->list_head))->previous = allocation;
+		((struct acpi_debug_mem_block *)(mem_list->list_head))->previous = allocation;
 	}
 
 	allocation->next = mem_list->list_head;
@@ -727,14 +727,14 @@ unlock_and_exit:
 
 acpi_status
 acpi_ut_remove_allocation (
-	u32                     list_id,
-	acpi_debug_mem_block    *allocation,
-	u32                     component,
-	char                    *module,
-	u32                     line)
+	u32                             list_id,
+	struct acpi_debug_mem_block     *allocation,
+	u32                             component,
+	char                            *module,
+	u32                             line)
 {
-	acpi_memory_list        *mem_list;
-	acpi_status             status;
+	struct acpi_memory_list         *mem_list;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ut_remove_allocation");
@@ -800,7 +800,7 @@ acpi_ut_dump_allocation_info (
 	void)
 {
 /*
-	acpi_memory_list        *mem_list;
+	struct acpi_memory_list         *mem_list;
 */
 
 	ACPI_FUNCTION_TRACE ("ut_dump_allocation_info");
@@ -836,7 +836,7 @@ acpi_ut_dump_allocation_info (
 	ACPI_DEBUG_PRINT (TRACE_ALLOCATIONS | TRACE_TABLES,
 			  ("%30s: %4d (%3d Kb)\n", "Max Nodes",
 			  acpi_gbl_max_concurrent_node_count,
-			  ROUND_UP_TO_1K ((acpi_gbl_max_concurrent_node_count * sizeof (acpi_namespace_node)))));
+			  ROUND_UP_TO_1K ((acpi_gbl_max_concurrent_node_count * sizeof (struct acpi_namespace_node)))));
 */
 	return_VOID;
 }
@@ -857,12 +857,12 @@ acpi_ut_dump_allocation_info (
 
 void
 acpi_ut_dump_allocations (
-	u32                     component,
-	char                    *module)
+	u32                             component,
+	char                            *module)
 {
-	acpi_debug_mem_block    *element;
-	acpi_descriptor         *descriptor;
-	u32                     num_outstanding = 0;
+	struct acpi_debug_mem_block     *element;
+	union acpi_descriptor           *descriptor;
+	u32                             num_outstanding = 0;
 
 
 	ACPI_FUNCTION_TRACE ("ut_dump_allocations");
@@ -881,7 +881,7 @@ acpi_ut_dump_allocations (
 			((module == NULL) || (0 == ACPI_STRCMP (module, element->module)))) {
 			/* Ignore allocated objects that are in a cache */
 
-			descriptor = ACPI_CAST_PTR (acpi_descriptor, &element->user_space);
+			descriptor = ACPI_CAST_PTR (union acpi_descriptor, &element->user_space);
 			if (descriptor->descriptor_id != ACPI_DESC_TYPE_CACHED) {
 				acpi_os_printf ("%p Len %04X %9.9s-%d ",
 						 descriptor, element->size, element->module,

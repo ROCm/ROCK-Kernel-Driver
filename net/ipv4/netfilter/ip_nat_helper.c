@@ -8,6 +8,9 @@
  *		- add support for SACK adjustment 
  *	14 Mar 2002 Harald Welte <laforge@gnumonks.org>:
  *		- merge SACK support into newnat API
+ *	16 Aug 2002 Brian J. Murrell <netfilter@interlinx.bc.ca>:
+ *		- make ip_nat_resize_packet more generic (TCP and UDP)
+ *		- add ip_nat_mangle_udp_packet
  */
 #include <linux/version.h>
 #include <linux/config.h>
@@ -22,6 +25,7 @@
 #include <net/icmp.h>
 #include <net/ip.h>
 #include <net/tcp.h>
+#include <net/udp.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
@@ -51,17 +55,11 @@ ip_nat_resize_packet(struct sk_buff **skb,
 		     int new_size)
 {
 	struct iphdr *iph;
-	struct tcphdr *tcph;
-	void *data;
 	int dir;
 	struct ip_nat_seq *this_way, *other_way;
 
 	DEBUGP("ip_nat_resize_packet: old_size = %u, new_size = %u\n",
 		(*skb)->len, new_size);
-
-	iph = (*skb)->nh.iph;
-	tcph = (void *)iph + iph->ihl*4;
-	data = (void *)tcph + tcph->doff*4;
 
 	dir = CTINFO2DIR(ctinfo);
 
@@ -84,37 +82,41 @@ ip_nat_resize_packet(struct sk_buff **skb,
 	}
 
 	iph = (*skb)->nh.iph;
-	tcph = (void *)iph + iph->ihl*4;
-	data = (void *)tcph + tcph->doff*4;
+	if (iph->protocol == IPPROTO_TCP) {
+		struct tcphdr *tcph = (void *)iph + iph->ihl*4;
+		void *data = (void *)tcph + tcph->doff*4;
 
-	DEBUGP("ip_nat_resize_packet: Seq_offset before: ");
-	DUMP_OFFSET(this_way);
+		DEBUGP("ip_nat_resize_packet: Seq_offset before: ");
+		DUMP_OFFSET(this_way);
 
-	LOCK_BH(&ip_nat_seqofs_lock);
+		LOCK_BH(&ip_nat_seqofs_lock);
 
-	/* SYN adjust. If it's uninitialized, of this is after last 
-	 * correction, record it: we don't handle more than one 
-	 * adjustment in the window, but do deal with common case of a 
-	 * retransmit */
-	if (this_way->offset_before == this_way->offset_after
-	    || before(this_way->correction_pos, ntohl(tcph->seq))) {
-		this_way->correction_pos = ntohl(tcph->seq);
-		this_way->offset_before = this_way->offset_after;
-		this_way->offset_after = (int32_t)
-			this_way->offset_before + new_size - (*skb)->len;
+		/* SYN adjust. If it's uninitialized, of this is after last 
+		 * correction, record it: we don't handle more than one 
+		 * adjustment in the window, but do deal with common case of a 
+		 * retransmit */
+		if (this_way->offset_before == this_way->offset_after
+		    || before(this_way->correction_pos, ntohl(tcph->seq))) {
+			this_way->correction_pos = ntohl(tcph->seq);
+			this_way->offset_before = this_way->offset_after;
+			this_way->offset_after = (int32_t)
+				this_way->offset_before + new_size -
+				(*skb)->len;
+		}
+
+		UNLOCK_BH(&ip_nat_seqofs_lock);
+
+		DEBUGP("ip_nat_resize_packet: Seq_offset after: ");
+		DUMP_OFFSET(this_way);
 	}
-
-	UNLOCK_BH(&ip_nat_seqofs_lock);
-
-	DEBUGP("ip_nat_resize_packet: Seq_offset after: ");
-	DUMP_OFFSET(this_way);
 	
 	return 1;
 }
 
 
 /* Generic function for mangling variable-length address changes inside
- * NATed connections (like the PORT XXX,XXX,XXX,XXX,XXX,XXX command in FTP).
+ * NATed TCP connections (like the PORT XXX,XXX,XXX,XXX,XXX,XXX
+ * command in FTP).
  *
  * Takes care about all the nasty sequence number changes, checksumming,
  * skb enlargement, ...
@@ -174,10 +176,11 @@ ip_nat_mangle_tcp_packet(struct sk_buff **skb,
 	tcph = (void *)iph + iph->ihl*4;
 	data = (void *)tcph + tcph->doff*4;
 
-	/* move post-replacement */
-	memmove(data + match_offset + rep_len,
-		 data + match_offset + match_len,
-		 (*skb)->tail - (data + match_offset + match_len));
+	if (rep_len != match_len)
+		/* move post-replacement */
+		memmove(data + match_offset + rep_len,
+			data + match_offset + match_len,
+			(*skb)->tail - (data + match_offset + match_len));
 
 	/* insert data from buffer */
 	memcpy(data + match_offset, rep_buffer, rep_len);
@@ -203,6 +206,114 @@ ip_nat_mangle_tcp_packet(struct sk_buff **skb,
 	tcph->check = tcp_v4_check(tcph, newtcplen, iph->saddr, iph->daddr,
 				   csum_partial((char *)tcph, tcph->doff*4,
 					   (*skb)->csum));
+	ip_send_check(iph);
+
+	return 1;
+}
+			
+/* Generic function for mangling variable-length address changes inside
+ * NATed UDP connections (like the CONNECT DATA XXXXX MESG XXXXX INDEX XXXXX
+ * command in the Amanda protocol)
+ *
+ * Takes care about all the nasty sequence number changes, checksumming,
+ * skb enlargement, ...
+ *
+ * XXX - This function could be merged with ip_nat_mangle_tcp_packet which
+ *       should be fairly easy to do.
+ */
+int 
+ip_nat_mangle_udp_packet(struct sk_buff **skb,
+			 struct ip_conntrack *ct,
+			 enum ip_conntrack_info ctinfo,
+			 unsigned int match_offset,
+			 unsigned int match_len,
+			 char *rep_buffer,
+			 unsigned int rep_len)
+{
+	struct iphdr *iph = (*skb)->nh.iph;
+	struct udphdr *udph = (void *)iph + iph->ihl * 4;
+	unsigned char *data;
+	u_int32_t udplen, newlen, newudplen;
+
+	udplen = (*skb)->len - iph->ihl*4;
+	newudplen = udplen - match_len + rep_len;
+	newlen = iph->ihl*4 + newudplen;
+
+	if (newlen > 65535) {
+		if (net_ratelimit())
+			printk("ip_nat_mangle_udp_packet: nat'ed packet "
+				"exceeds maximum packet size\n");
+		return 0;
+	}
+
+	if ((*skb)->len != newlen) {
+		if (!ip_nat_resize_packet(skb, ct, ctinfo, newlen)) {
+			printk("resize_packet failed!!\n");
+			return 0;
+		}
+	}
+
+	/* Alexey says: if a hook changes _data_ ... it can break
+	   original packet sitting in tcp queue and this is fatal */
+	if (skb_cloned(*skb)) {
+		struct sk_buff *nskb = skb_copy(*skb, GFP_ATOMIC);
+		if (!nskb) {
+			if (net_ratelimit())
+				printk("Out of memory cloning TCP packet\n");
+			return 0;
+		}
+		/* Rest of kernel will get very unhappy if we pass it
+		   a suddenly-orphaned skbuff */
+		if ((*skb)->sk)
+			skb_set_owner_w(nskb, (*skb)->sk);
+		kfree_skb(*skb);
+		*skb = nskb;
+	}
+
+	/* skb may be copied !! */
+	iph = (*skb)->nh.iph;
+	udph = (void *)iph + iph->ihl*4;
+	data = (void *)udph + sizeof(struct udphdr);
+
+	if (rep_len != match_len)
+		/* move post-replacement */
+		memmove(data + match_offset + rep_len,
+			data + match_offset + match_len,
+			(*skb)->tail - (data + match_offset + match_len));
+
+	/* insert data from buffer */
+	memcpy(data + match_offset, rep_buffer, rep_len);
+
+	/* update skb info */
+	if (newlen > (*skb)->len) {
+		DEBUGP("ip_nat_mangle_udp_packet: Extending packet by "
+			"%u to %u bytes\n", newlen - (*skb)->len, newlen);
+		skb_put(*skb, newlen - (*skb)->len);
+	} else {
+		DEBUGP("ip_nat_mangle_udp_packet: Shrinking packet from "
+			"%u to %u bytes\n", (*skb)->len, newlen);
+		skb_trim(*skb, newlen);
+	}
+
+	/* update the length of the UDP and IP packets to the new values*/
+	udph->len = htons((*skb)->len - iph->ihl*4);
+	iph->tot_len = htons(newlen);
+
+	/* fix udp checksum if udp checksum was previously calculated */
+	if ((*skb)->csum != 0) {
+		(*skb)->csum = csum_partial((char *)udph +
+					    sizeof(struct udphdr),
+					    newudplen - sizeof(struct udphdr),
+					    0);
+
+		udph->check = 0;
+		udph->check = csum_tcpudp_magic(iph->saddr, iph->daddr,
+						newudplen, IPPROTO_UDP,
+						csum_partial((char *)udph,
+							 sizeof(struct udphdr),
+							(*skb)->csum));
+	}
+
 	ip_send_check(iph);
 
 	return 1;

@@ -1017,7 +1017,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 	 * walking the MADT again.
 	 */
 	status = acpi_get_firmware_table("APIC", 1, ACPI_LOGICAL_ADDRESSING,
-		(acpi_table_header **) &madt);
+		(struct acpi_table_header **) &madt);
 	if (ACPI_SUCCESS(status)) {
 		madt_end = (void *) (unsigned long)madt + madt->header.length;
 

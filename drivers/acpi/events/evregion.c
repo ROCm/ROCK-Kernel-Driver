@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ acpi_status
 acpi_ev_init_address_spaces (
 	void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_init_address_spaces");
@@ -121,12 +121,12 @@ acpi_ev_init_address_spaces (
 
 static acpi_status
 acpi_ev_execute_reg_method (
-	acpi_operand_object    *region_obj,
-	u32                     function)
+	union acpi_operand_object      *region_obj,
+	u32                             function)
 {
-	acpi_operand_object    *params[3];
-	acpi_operand_object    *region_obj2;
-	acpi_status             status;
+	union acpi_operand_object      *params[3];
+	union acpi_operand_object      *region_obj2;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_execute_reg_method");
@@ -203,19 +203,19 @@ cleanup:
 
 acpi_status
 acpi_ev_address_space_dispatch (
-	acpi_operand_object     *region_obj,
-	u32                     function,
-	acpi_physical_address   address,
-	u32                     bit_width,
-	void                    *value)
+	union acpi_operand_object       *region_obj,
+	u32                             function,
+	acpi_physical_address           address,
+	u32                             bit_width,
+	void                            *value)
 {
-	acpi_status             status;
-	acpi_status             status2;
-	acpi_adr_space_handler  handler;
-	acpi_adr_space_setup    region_setup;
-	acpi_operand_object     *handler_desc;
-	acpi_operand_object     *region_obj2;
-	void                    *region_context = NULL;
+	acpi_status                     status;
+	acpi_status                     status2;
+	acpi_adr_space_handler          handler;
+	acpi_adr_space_setup            region_setup;
+	union acpi_operand_object       *handler_desc;
+	union acpi_operand_object       *region_obj2;
+	void                            *region_context = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("ev_address_space_dispatch");
@@ -352,16 +352,16 @@ acpi_ev_address_space_dispatch (
 
 void
 acpi_ev_detach_region(
-	acpi_operand_object     *region_obj,
-	u8                      acpi_ns_is_locked)
+	union acpi_operand_object       *region_obj,
+	u8                              acpi_ns_is_locked)
 {
-	acpi_operand_object     *handler_obj;
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     **last_obj_ptr;
-	acpi_adr_space_setup    region_setup;
-	void                    *region_context;
-	acpi_operand_object     *region_obj2;
-	acpi_status             status;
+	union acpi_operand_object       *handler_obj;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       **last_obj_ptr;
+	acpi_adr_space_setup            region_setup;
+	void                            *region_context;
+	union acpi_operand_object       *region_obj2;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ev_detach_region");
@@ -498,12 +498,12 @@ acpi_ev_detach_region(
 
 acpi_status
 acpi_ev_attach_region (
-	acpi_operand_object     *handler_obj,
-	acpi_operand_object     *region_obj,
-	u8                      acpi_ns_is_locked)
+	union acpi_operand_object       *handler_obj,
+	union acpi_operand_object       *region_obj,
+	u8                              acpi_ns_is_locked)
 {
-	acpi_status             status;
-	acpi_status             status2;
+	acpi_status                     status;
+	acpi_status                     status2;
 
 
 	ACPI_FUNCTION_TRACE ("ev_attach_region");
@@ -570,22 +570,22 @@ acpi_ev_attach_region (
 
 acpi_status
 acpi_ev_addr_handler_helper (
-	acpi_handle             obj_handle,
-	u32                     level,
-	void                    *context,
-	void                    **return_value)
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value)
 {
-	acpi_operand_object     *handler_obj;
-	acpi_operand_object     *tmp_obj;
-	acpi_operand_object     *obj_desc;
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	union acpi_operand_object       *handler_obj;
+	union acpi_operand_object       *tmp_obj;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_NAME ("ev_addr_handler_helper");
 
 
-	handler_obj = (acpi_operand_object *) context;
+	handler_obj = (union acpi_operand_object   *) context;
 
 	/* Parameter validation */
 

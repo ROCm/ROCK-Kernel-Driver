@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,10 +52,10 @@
 
 u8
 acpi_ds_is_result_used (
-	acpi_parse_object       *op,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	struct acpi_walk_state          *walk_state)
 {
-	const acpi_opcode_info  *parent_info;
+	const struct acpi_opcode_info   *parent_info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_is_result_used", op);
@@ -200,12 +200,12 @@ result_not_used:
 
 void
 acpi_ds_delete_result_if_not_used (
-	acpi_parse_object       *op,
-	acpi_operand_object     *result_obj,
-	acpi_walk_state         *walk_state)
+	union acpi_parse_object         *op,
+	union acpi_operand_object       *result_obj,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_delete_result_if_not_used", result_obj);
@@ -251,10 +251,10 @@ acpi_ds_delete_result_if_not_used (
 
 acpi_status
 acpi_ds_resolve_operands (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	u32                     i;
-	acpi_status             status = AE_OK;
+	u32                             i;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_resolve_operands", walk_state);
@@ -289,9 +289,9 @@ acpi_ds_resolve_operands (
 
 void
 acpi_ds_clear_operands (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	u32                     i;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("acpi_ds_clear_operands", walk_state);
@@ -333,18 +333,18 @@ acpi_ds_clear_operands (
 
 acpi_status
 acpi_ds_create_operand (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *arg,
-	u32                     arg_index)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *arg,
+	u32                             arg_index)
 {
-	acpi_status             status = AE_OK;
-	char                    *name_string;
-	u32                     name_length;
-	acpi_operand_object     *obj_desc;
-	acpi_parse_object       *parent_op;
-	u16                     opcode;
-	acpi_interpreter_mode   interpreter_mode;
-	const acpi_opcode_info  *op_info;
+	acpi_status                     status = AE_OK;
+	char                            *name_string;
+	u32                             name_length;
+	union acpi_operand_object       *obj_desc;
+	union acpi_parse_object         *parent_op;
+	u16                             opcode;
+	acpi_interpreter_mode           interpreter_mode;
+	const struct acpi_opcode_info   *op_info;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_create_operand", arg);
@@ -397,7 +397,7 @@ acpi_ds_create_operand (
 				 ACPI_TYPE_ANY, interpreter_mode,
 				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
 				 walk_state,
-				 ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &obj_desc));
+				 ACPI_CAST_INDIRECT_PTR (struct acpi_namespace_node, &obj_desc));
 		/*
 		 * The only case where we pass through (ignore) a NOT_FOUND
 		 * error is for the cond_ref_of opcode.
@@ -410,7 +410,7 @@ acpi_ds_create_operand (
 				 * indicate this to the interpreter, set the
 				 * object to the root
 				 */
-				obj_desc = ACPI_CAST_PTR (acpi_operand_object, acpi_gbl_root_node);
+				obj_desc = ACPI_CAST_PTR (union acpi_operand_object, acpi_gbl_root_node);
 				status = AE_OK;
 			}
 
@@ -543,12 +543,12 @@ acpi_ds_create_operand (
 
 acpi_status
 acpi_ds_create_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *first_arg)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *first_arg)
 {
-	acpi_status             status = AE_OK;
-	acpi_parse_object       *arg;
-	u32                     arg_count = 0;
+	acpi_status                     status = AE_OK;
+	union acpi_parse_object         *arg;
+	u32                             arg_count = 0;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_create_operands", first_arg);

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -58,12 +58,12 @@
 
 char *
 acpi_ex_allocate_name_string (
-	u32                     prefix_count,
-	u32                     num_name_segs)
+	u32                             prefix_count,
+	u32                             num_name_segs)
 {
-	char                    *temp_ptr;
-	char                    *name_string;
-	u32                      size_needed;
+	char                            *temp_ptr;
+	char                            *name_string;
+	u32                              size_needed;
 
 	ACPI_FUNCTION_TRACE ("ex_allocate_name_string");
 
@@ -143,13 +143,13 @@ acpi_ex_allocate_name_string (
 
 acpi_status
 acpi_ex_name_segment (
-	u8                      **in_aml_address,
-	char                    *name_string)
+	u8                              **in_aml_address,
+	char                            *name_string)
 {
-	char                    *aml_address = (void *) *in_aml_address;
-	acpi_status             status = AE_OK;
-	u32                     index;
-	char                    char_buf[5];
+	char                            *aml_address = (void *) *in_aml_address;
+	acpi_status                     status = AE_OK;
+	u32                             index;
+	char                            char_buf[5];
 
 
 	ACPI_FUNCTION_TRACE ("ex_name_segment");
@@ -230,17 +230,17 @@ acpi_ex_name_segment (
 
 acpi_status
 acpi_ex_get_name_string (
-	acpi_object_type        data_type,
-	u8                      *in_aml_address,
-	char                    **out_name_string,
-	u32                     *out_name_length)
+	acpi_object_type                data_type,
+	u8                              *in_aml_address,
+	char                            **out_name_string,
+	u32                             *out_name_length)
 {
-	acpi_status             status = AE_OK;
-	u8                      *aml_address = in_aml_address;
-	char                    *name_string = NULL;
-	u32                     num_segments;
-	u32                     prefix_count = 0;
-	u8                      has_prefix = FALSE;
+	acpi_status                     status = AE_OK;
+	u8                              *aml_address = in_aml_address;
+	char                            *name_string = NULL;
+	u32                             num_segments;
+	u32                             prefix_count = 0;
+	u8                              has_prefix = FALSE;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_get_name_string", aml_address);

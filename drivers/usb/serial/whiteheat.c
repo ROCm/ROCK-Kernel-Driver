@@ -134,7 +134,7 @@ static struct usb_driver whiteheat_driver = {
 };
 
 /* function prototypes for the Connect Tech WhiteHEAT prerenumeration device */
-static int  whiteheat_firmware_download	(struct usb_serial *serial);
+static int  whiteheat_firmware_download	(struct usb_serial *serial, const struct usb_device_id *id);
 static int  whiteheat_firmware_attach	(struct usb_serial *serial);
 
 /* function prototypes for the Connect Tech WhiteHEAT serial converter */
@@ -269,7 +269,7 @@ static int firm_report_tx_done(struct usb_serial_port *port);
  - device renumerated itself and comes up as new device id with all
    firmware download completed.
 */
-static int whiteheat_firmware_download (struct usb_serial *serial)
+static int whiteheat_firmware_download (struct usb_serial *serial, const struct usb_device_id *id)
 {
 	int response;
 	const struct whiteheat_hex_record *record;

@@ -15,7 +15,7 @@ extern int printk(const char * fmt, ...)
 
 typedef struct {
 	volatile unsigned int lock;
-#if SPINLOCK_DEBUG
+#if CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
 } spinlock_t;

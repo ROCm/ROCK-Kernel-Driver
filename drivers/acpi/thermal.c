@@ -270,8 +270,8 @@ acpi_thermal_set_cooling_mode (
 	int			mode)
 {
 	acpi_status		status = AE_OK;
-	acpi_object		arg0 = {ACPI_TYPE_INTEGER};
-	acpi_object_list	arg_list= {1, &arg0};
+	union acpi_object	arg0 = {ACPI_TYPE_INTEGER};
+	struct acpi_object_list	arg_list = {1, &arg0};
 	acpi_handle		handle = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_set_cooling_mode");

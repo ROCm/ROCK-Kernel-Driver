@@ -225,8 +225,8 @@ nodata:
 /*
  *	Slab constructor for a skb head.
  */
-static inline void skb_headerinit(void *p, kmem_cache_t *cache,
-				  unsigned long flags)
+static void skb_headerinit(void *p, kmem_cache_t *cache,
+			   unsigned long flags)
 {
 	struct sk_buff *skb = p;
 

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,11 +47,11 @@
 
 acpi_status
 acpi_ex_store_buffer_to_buffer (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *target_desc)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *target_desc)
 {
-	u32                     length;
-	u8                      *buffer;
+	u32                             length;
+	u8                              *buffer;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_store_buffer_to_buffer", source_desc);
@@ -121,11 +121,11 @@ acpi_ex_store_buffer_to_buffer (
 
 acpi_status
 acpi_ex_store_string_to_string (
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     *target_desc)
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       *target_desc)
 {
-	u32                     length;
-	u8                      *buffer;
+	u32                             length;
+	u8                              *buffer;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_store_string_to_string", source_desc);

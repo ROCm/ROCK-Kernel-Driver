@@ -233,12 +233,29 @@ static void serial21285_shutdown(struct uart_port *port)
 }
 
 static void
-serial21285_change_speed(struct uart_port *port, unsigned int cflag,
-			 unsigned int iflag, unsigned int quot)
+serial21285_set_termios(struct uart_port *port, struct termios *termios,
+			struct termios *old)
 {
-	unsigned int h_lcr;
+	unsigned long flags;
+	unsigned int quot, h_lcr;
 
-	switch (cflag & CSIZE) {
+	/*
+	 * We don't support modem control lines.
+	 */
+	termios->c_cflag &= ~(HUPCL | CRTSCTS | CMSPAR);
+	termios->c_cflag |= CLOCAL;
+
+	/*
+	 * We don't support BREAK character recognition.
+	 */
+	termios->c_iflag &= ~(IGNBRK | BRKINT);
+
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
+
+	switch (termios->c_cflag & CSIZE) {
 	case CS5:
 		h_lcr = 0x00;
 		break;
@@ -253,34 +270,44 @@ serial21285_change_speed(struct uart_port *port, unsigned int cflag,
 		break;
 	}
 
-	if (cflag & CSTOPB)
+	if (termios->c_cflag & CSTOPB)
 		h_lcr |= H_UBRLCR_STOPB;
-	if (cflag & PARENB) {
+	if (termios->c_cflag & PARENB) {
 		h_lcr |= H_UBRLCR_PARENB;
-		if (!(cflag & PARODD))
+		if (!(termios->c_cflag & PARODD))
 			h_lcr |= H_UBRLCR_PAREVN;
 	}
 
 	if (port->fifosize)
 		h_lcr |= H_UBRLCR_FIFO;
 
+	spin_lock_irqsave(&port->lock, flags);
+
+	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, termios->c_cflag, quot);
+
+	/*
+	 * Which character status flags are we interested in?
+	 */
 	port->read_status_mask = RXSTAT_OVERRUN;
-	if (iflag & INPCK)
+	if (termios->c_iflag & INPCK)
 		port->read_status_mask |= RXSTAT_FRAME | RXSTAT_PARITY;
 
 	/*
-	 * Characters to ignore
+	 * Which character status flags should we ignore?
 	 */
 	port->ignore_status_mask = 0;
-	if (iflag & IGNPAR)
+	if (termios->c_iflag & IGNPAR)
 		port->ignore_status_mask |= RXSTAT_FRAME | RXSTAT_PARITY;
-	if (iflag & IGNBRK && iflag & IGNPAR)
+	if (termios->c_iflag & IGNBRK && termios->c_iflag & IGNPAR)
 		port->ignore_status_mask |= RXSTAT_OVERRUN;
 
 	/*
 	 * Ignore all characters if CREAD is not set.
 	 */
-	if ((cflag & CREAD) == 0)
+	if ((termios->c_cflag & CREAD) == 0)
 		port->ignore_status_mask |= RXSTAT_DUMMY_READ;
 
 	quot -= 1;
@@ -290,6 +317,8 @@ serial21285_change_speed(struct uart_port *port, unsigned int cflag,
 	*CSR_M_UBRLCR = (quot >> 8) & 0x0f;
 	*CSR_H_UBRLCR = h_lcr;
 	*CSR_UARTCON = 1;
+
+	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static const char *serial21285_type(struct uart_port *port)
@@ -340,7 +369,7 @@ static struct uart_ops serial21285_ops = {
 	.break_ctl	= serial21285_break_ctl,
 	.startup	= serial21285_startup,
 	.shutdown	= serial21285_shutdown,
-	.change_speed	= serial21285_change_speed,
+	.set_termios	= serial21285_set_termios,
 	.type		= serial21285_type,
 	.release_port	= serial21285_release_port,
 	.request_port	= serial21285_request_port,

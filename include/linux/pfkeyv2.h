@@ -242,17 +242,25 @@ struct sadb_x_ipsecrequest {
 #define SADB_SATYPE_MAX		9
 
 /* Authentication algorithms */
-#define SADB_AALG_NONE		0
-#define SADB_AALG_MD5HMAC	2
-#define SADB_AALG_SHA1HMAC	3
-#define SADB_AALG_MAX		3
+#define SADB_AALG_NONE			0
+#define SADB_AALG_MD5HMAC		2
+#define SADB_AALG_SHA1HMAC		3
+#define SADB_X_AALG_SHA2_256HMAC	5
+#define SADB_X_AALG_SHA2_384HMAC	6
+#define SADB_X_AALG_SHA2_512HMAC	7
+#define SADB_X_AALG_RIPEMD160HMAC	8
+#define SADB_X_AALG_NULL		251	/* kame */
+#define SADB_AALG_MAX			251
 
 /* Encryption algorithms */
-#define SADB_EALG_NONE		0
-#define SADB_EALG_DESCBC	1
-#define SADB_EALG_3DESCBC	2
-#define SADB_EALG_NULL		11
-#define SADB_EALG_MAX		11
+#define SADB_EALG_NONE			0
+#define SADB_EALG_DESCBC		1
+#define SADB_EALG_3DESCBC		2
+#define SADB_X_EALG_CASTCBC		6
+#define SADB_X_EALG_BLOWFISHCBC		7
+#define SADB_EALG_NULL			11
+#define SADB_X_EALG_AESCBC		12
+#define SADB_EALG_MAX			12
 
 /* Extension Header values */
 #define SADB_EXT_RESERVED		0
