@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#67 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#70 $
  *
  * $FreeBSD$
  */
@@ -318,11 +318,11 @@ typedef enum {
  */
 typedef enum {
 	AHC_FNONE	      = 0x000,
-	AHC_PRIMARY_CHANNEL   = 0x003,/*
+	AHC_PRIMARY_CHANNEL   = 0x003,  /*
 					 * The channel that should
 					 * be probed first.
 					 */
-	AHC_USEDEFAULTS	      = 0x004,/*
+	AHC_USEDEFAULTS	      = 0x004,  /*
 					 * For cards without an seeprom
 					 * or a BIOS to initialize the chip's
 					 * SRAM, we use the default target
@@ -330,29 +330,29 @@ typedef enum {
 					 */
 	AHC_SEQUENCER_DEBUG   = 0x008,
 	AHC_SHARED_SRAM	      = 0x010,
-	AHC_LARGE_SEEPROM     = 0x020,/* Uses C56_66 not C46 */
+	AHC_LARGE_SEEPROM     = 0x020,  /* Uses C56_66 not C46 */
 	AHC_RESET_BUS_A	      = 0x040,
 	AHC_RESET_BUS_B	      = 0x080,
 	AHC_EXTENDED_TRANS_A  = 0x100,
 	AHC_EXTENDED_TRANS_B  = 0x200,
 	AHC_TERM_ENB_A	      = 0x400,
 	AHC_TERM_ENB_B	      = 0x800,
-	AHC_INITIATORROLE     = 0x1000,/*
+	AHC_INITIATORROLE     = 0x1000,  /*
 					  * Allow initiator operations on
 					  * this controller.
 					  */
-	AHC_TARGETROLE	      = 0x2000,/*
+	AHC_TARGETROLE	      = 0x2000,  /*
 					  * Allow target operations on this
 					  * controller.
 					  */
 	AHC_NEWEEPROM_FMT     = 0x4000,
 	AHC_RESOURCE_SHORTAGE = 0x8000,
-	AHC_TQINFIFO_BLOCKED  = 0x10000,/* Blocked waiting for ATIOs */
-	AHC_INT50_SPEEDFLEX   = 0x20000,/*
+	AHC_TQINFIFO_BLOCKED  = 0x10000,  /* Blocked waiting for ATIOs */
+	AHC_INT50_SPEEDFLEX   = 0x20000,  /*
 					   * Internal 50pin connector
 					   * sits behind an aic3860
 					   */
-	AHC_SCB_BTT	      = 0x40000,/*
+	AHC_SCB_BTT	      = 0x40000,  /*
 					   * The busy targets table is
 					   * stored in SCB space rather
 					   * than SRAM.
@@ -363,7 +363,9 @@ typedef enum {
 	AHC_EDGE_INTERRUPT    = 0x800000,  /* Device uses edge triggered ints */
 	AHC_39BIT_ADDRESSING  = 0x1000000, /* Use 39 bit addressing scheme. */
 	AHC_LSCBS_ENABLED     = 0x2000000, /* 64Byte SCBs enabled */
-	AHC_SCB_CONFIG_USED   = 0x4000000  /* No SEEPROM but SCB2 had info. */
+	AHC_SCB_CONFIG_USED   = 0x4000000, /* No SEEPROM but SCB2 had info. */
+	AHC_NO_BIOS_INIT      = 0x8000000, /* No BIOS left over settings. */
+	AHC_DISABLE_PCI_PERR  = 0x10000000
 } ahc_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -758,6 +760,7 @@ struct ahc_syncrate {
 #define AHC_SYNCRATE_ULTRA	3
 #define AHC_SYNCRATE_FAST	6
 #define AHC_SYNCRATE_MAX	AHC_SYNCRATE_DT
+#define	AHC_SYNCRATE_MIN	13
 
 /***************************** Lookup Tables **********************************/
 /*

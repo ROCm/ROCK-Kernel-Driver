@@ -25,12 +25,11 @@
 
 #ifdef __KERNEL__
 
-#include "pcm.h"
-#include "pcm_sgbuf.h"
-#include "rawmidi.h"
-#include "hwdep.h"
-#include "ac97_codec.h"
-#include "util_mem.h"
+#include <sound/pcm.h>
+#include <sound/rawmidi.h>
+#include <sound/hwdep.h>
+#include <sound/ac97_codec.h>
+#include <sound/util_mem.h>
 #include <asm/io.h>
 
 #ifndef PCI_VENDOR_ID_CREATIVE
@@ -232,7 +231,7 @@
 #define A_IOCFG			0x18		/* GPIO on Audigy card (16bits)			*/
 #define A_GPINPUT_MASK		0xff00
 #define A_GPOUTPUT_MASK		0x00ff
-#define A_IOCFG_GPOUT0		0x0040		/* analog/digital? */
+#define A_IOCFG_GPOUT0		0x0044		/* analog/digital? */
 
 #define TIMER			0x1a		/* Timer terminal count register		*/
 						/* NOTE: After the rate is changed, a maximum	*/
@@ -993,13 +992,6 @@ struct _snd_emu10k1 {
 	emu10k1_midi_t midi2; /* for audigy */
 
 	unsigned int efx_voices_mask[2];
-
-	snd_info_entry_t *proc_entry;
-	snd_info_entry_t *proc_entry_fx8010_gpr;
-	snd_info_entry_t *proc_entry_fx8010_tram_data;
-	snd_info_entry_t *proc_entry_fx8010_tram_addr;
-	snd_info_entry_t *proc_entry_fx8010_code;
-	snd_info_entry_t *proc_entry_fx8010_iblocks;
 };
 
 int snd_emu10k1_create(snd_card_t * card,
@@ -1045,7 +1037,7 @@ unsigned int snd_emu10k1_rate_to_pitch(unsigned int rate);
 unsigned char snd_emu10k1_sum_vol_attn(unsigned int value);
 
 /* memory allocation */
-snd_util_memblk_t *snd_emu10k1_alloc_pages(emu10k1_t *emu, struct snd_sg_buf *sgbuf);
+snd_util_memblk_t *snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream);
 int snd_emu10k1_free_pages(emu10k1_t *emu, snd_util_memblk_t *blk);
 snd_util_memblk_t *snd_emu10k1_synth_alloc(emu10k1_t *emu, unsigned int size);
 int snd_emu10k1_synth_free(emu10k1_t *emu, snd_util_memblk_t *blk);
@@ -1063,7 +1055,6 @@ int snd_emu10k1_audigy_midi(emu10k1_t * emu);
 
 /* proc interface */
 int snd_emu10k1_proc_init(emu10k1_t * emu);
-int snd_emu10k1_proc_done(emu10k1_t * emu);
 
 #endif /* __KERNEL__ */
 

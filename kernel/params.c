@@ -27,6 +27,22 @@
 #define DEBUGP(fmt, a...)
 #endif
 
+static inline int dash2underscore(char c)
+{
+	if (c == '-')
+		return '_';
+	return c;
+}
+
+static inline int parameq(const char *input, const char *paramname)
+{
+	unsigned int i;
+	for (i = 0; dash2underscore(input[i]) == paramname[i]; i++)
+		if (input[i] == '\0')
+			return 1;
+	return 0;
+}
+
 static int parse_one(char *param,
 		     char *val,
 		     struct kernel_param *params, 
@@ -37,7 +53,7 @@ static int parse_one(char *param,
 
 	/* Find parameter */
 	for (i = 0; i < num_params; i++) {
-		if (strcmp(param, params[i].name) == 0) {
+		if (parameq(param, params[i].name)) {
 			DEBUGP("They are equal!  Calling %p\n",
 			       params[i].set);
 			return params[i].set(val, &params[i]);
@@ -69,8 +85,6 @@ static char *next_arg(char *args, char **param, char **val)
 		if (equals == 0) {
 			if (args[i] == '=')
 				equals = i;
-			else if (args[i] == '-')
-				args[i] = '_';
 		}
 		if (args[i] == '"')
 			in_quote = !in_quote;

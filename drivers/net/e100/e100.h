@@ -56,7 +56,6 @@
 
 #include <linux/if.h>
 #include <asm/uaccess.h>
-#include <linux/proc_fs.h>
 #include <linux/ip.h>
 
 #define E100_REGS_LEN 1
@@ -926,20 +925,7 @@ struct e100_private {
 
 	struct cfg_params params;	/* adapter's command line parameters */
 
-	struct proc_dir_entry *proc_parent;
-
 	char *id_string;
-	char *cable_status;
-	char *mdix_status;
-
-	/* Variables for HWI */
-	int saved_open_circut;
-	int saved_short_circut;
-	int saved_distance;
-	int saved_i;
-	int saved_same;
-	unsigned char hwi_started;
-	struct timer_list hwi_timer;	/* hwi timer id */
 
 	u32 speed_duplex_caps;	/* adapter's speed/duplex capabilities */
 

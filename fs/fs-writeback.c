@@ -67,6 +67,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {
+		const int was_dirty = inode->i_state & I_DIRTY;
 		struct address_space *mapping = inode->i_mapping;
 
 		inode->i_state |= flags;
@@ -90,7 +91,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * If the inode was already on s_dirty or s_io, don't
 		 * reposition it (that would break s_dirty time-ordering).
 		 */
-		if (!mapping->dirtied_when) {
+		if (!was_dirty) {
 			mapping->dirtied_when = jiffies|1; /* 0 is special */
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
@@ -280,7 +281,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		__iget(inode);
 		__writeback_single_inode(inode, really_sync, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
-			mapping->dirtied_when = jiffies;
+			mapping->dirtied_when = jiffies|1;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 		if (current_is_pdflush())

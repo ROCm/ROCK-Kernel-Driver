@@ -2911,7 +2911,11 @@ static void redo_fd_request(void)
 
 	for (;;) {
 		if (!current_req) {
-			struct request *req = elv_next_request(&floppy_queue);
+			struct request *req;
+
+			spin_lock_irq(floppy_queue.queue_lock);
+			req = elv_next_request(&floppy_queue);
+			spin_unlock_irq(floppy_queue.queue_lock);
 			if (!req) {
 				do_floppy = NULL;
 				unlock_fdc();

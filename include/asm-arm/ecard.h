@@ -130,6 +130,20 @@ typedef struct {			/* Card handler routines	*/
 	int  (*fiqpending)(ecard_t *ec);
 } expansioncard_ops_t;
 
+#define ECARD_NUM_RESOURCES	(6)
+
+#define ECARD_RES_IOCSLOW	(0)
+#define ECARD_RES_IOCMEDIUM	(1)
+#define ECARD_RES_IOCFAST	(2)
+#define ECARD_RES_IOCSYNC	(3)
+#define ECARD_RES_MEMC		(4)
+#define ECARD_RES_EASI		(5)
+
+#define ecard_resource_start(ec,nr)	((ec)->resource[nr].start)
+#define ecard_resource_end(ec,nr)	((ec)->resource[nr].end)
+#define ecard_resource_len(ec,nr)	((ec)->resource[nr].end - \
+					 (ec)->resource[nr].start + 1)
+
 /*
  * This contains all the info needed on an expansion card
  */
@@ -137,6 +151,7 @@ struct expansion_card {
 	struct expansion_card  *next;
 
 	struct device		dev;
+	struct resource		resource[ECARD_NUM_RESOURCES];
 
 	/* Public data */
 	volatile unsigned char *irqaddr;	/* address of IRQ register	*/
@@ -147,7 +162,7 @@ struct expansion_card {
 
 	void			*irq_data;	/* Data for use for IRQ by card	*/
 	void			*fiq_data;	/* Data for use for FIQ by card	*/
-	expansioncard_ops_t	*ops;		/* Enable/Disable Ops for card	*/
+	const expansioncard_ops_t *ops;		/* Enable/Disable Ops for card	*/
 
 	CONST unsigned int	slot_no;	/* Slot number			*/
 	CONST unsigned int	dma;		/* DMA number (for request_dma)	*/

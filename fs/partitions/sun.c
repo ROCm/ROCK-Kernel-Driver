@@ -80,8 +80,8 @@ int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 			put_partition(state, slot, st_sector, num_sectors);
 			if (label->infos[i].id == LINUX_RAID_PARTITION)
 				state->parts[slot].flags = 1;
-			slot++;
 		}
+		slot++;
 	}
 	printk("\n");
 	put_dev_sector(sect);

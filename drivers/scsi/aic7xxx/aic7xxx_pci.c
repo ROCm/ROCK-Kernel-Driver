@@ -39,7 +39,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#55 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#57 $
  *
  * $FreeBSD$
  */
@@ -641,6 +641,7 @@ const u_int ahc_num_pci_devs = NUM_ELEMENTS(ahc_pci_ident_table);
 #define AHC_494X_SLOT_CHANNEL_D	7
 
 #define	DEVCONFIG		0x40
+#define		PCIERRGENDIS	0x80000000ul
 #define		SCBSIZE32	0x00010000ul	/* aic789X only */
 #define		REXTVALID	0x00001000ul	/* ultra cards only */
 #define		MPORTMODE	0x00000400ul	/* aic7870+ only */
@@ -785,6 +786,7 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	u_int	 sxfrctl1;
 	u_int	 scsiseq;
 	u_int	 dscommand0;
+	uint32_t devconfig;
 	int	 error;
 	uint8_t	 sblkctl;
 
@@ -809,6 +811,8 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	 */
 	ahc_intr_enable(ahc, FALSE);
 
+	devconfig = ahc_pci_read_config(ahc->dev_softc, DEVCONFIG, /*bytes*/4);
+
 	/*
 	 * If we need to support high memory, enable dual
 	 * address cycles.  This bit must be set to enable
@@ -816,21 +820,30 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	 * 64bit bus (PCI64BIT set in devconfig).
 	 */
 	if ((ahc->flags & AHC_39BIT_ADDRESSING) != 0) {
-		uint32_t devconfig;
 
 		if (bootverbose)
 			printf("%s: Enabling 39Bit Addressing\n",
 			       ahc_name(ahc));
-		devconfig = ahc_pci_read_config(ahc->dev_softc,
-						DEVCONFIG, /*bytes*/4);
 		devconfig |= DACEN;
-		ahc_pci_write_config(ahc->dev_softc, DEVCONFIG,
-				     devconfig, /*bytes*/4);
 	}
 	
+	/* Ensure that pci error generation, a test feature, is disabled. */
+	devconfig |= PCIERRGENDIS;
+
+	ahc_pci_write_config(ahc->dev_softc, DEVCONFIG, devconfig, /*bytes*/4);
+
 	/* Ensure busmastering is enabled */
 	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, /*bytes*/1);
 	command |= PCIM_CMD_BUSMASTEREN;
+
+	/*
+	 * Disable PCI parity error reporting.  Users typically
+	 * do this to work around broken PCI chipsets that get
+	 * the parity timing wrong and thus generate lots of spurious
+	 * errors.
+	 */
+	if ((ahc->flags & AHC_DISABLE_PCI_PERR) != 0)
+		command &= ~PCIM_CMD_PERRESPEN;
 	ahc_pci_write_config(ahc->dev_softc, PCIR_COMMAND, command, /*bytes*/1);
 
 	/* On all PCI adapters, we allow SCB paging */
@@ -947,7 +960,8 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 		 * a SEEPROM.
 		 */
 		/* See if someone else set us up already */
-		if (scsiseq != 0) {
+		if ((ahc->flags & AHC_NO_BIOS_INIT) == 0
+		 && scsiseq != 0) {
 			printf("%s: Using left over BIOS settings\n",
 				ahc_name(ahc));
 			ahc->flags &= ~AHC_USEDEFAULTS;

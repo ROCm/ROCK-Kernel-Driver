@@ -322,17 +322,20 @@ static void snd_uart16550_buffer_timer(unsigned long data)
  *  return 0 if found
  *  return negative error if not found
  */
-static int __init snd_uart16550_detect(unsigned int io_base)
+static int __init snd_uart16550_detect(snd_uart16550_t *uart)
 {
+	unsigned long io_base = uart->base;
 	int ok;
 	unsigned char c;
 
-	if (check_region(io_base, 8))
-		return -EBUSY;
-
 	/* Do some vague tests for the presence of the uart */
-	if (io_base == 0)
+	if (io_base == 0) {
 		return -ENODEV;	/* Not configured */
+	}
+
+	uart->res_base = request_region(io_base, 8, "Serial MIDI");
+	if (uart->res_base == NULL)
+		return -EBUSY;
 
 	ok = 1;			/* uart detected unless one of the following tests should fail */
 	/* 8 data-bits, 1 stop-bit, parity off, DLAB = 0 */
@@ -766,11 +769,13 @@ static int __init snd_uart16550_create(snd_card_t * card,
 	uart->card = card;
 	spin_lock_init(&uart->open_lock);
 	uart->irq = -1;
-	if ((uart->res_base = request_region(iobase, 8, "Serial MIDI")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", iobase, iobase + 8 - 1);
-		return -EBUSY;
-	}
 	uart->base = iobase;
+
+	if ((err = snd_uart16550_detect(uart)) <= 0) {
+		printk(KERN_ERR "no UART detected at 0x%lx\n", iobase);
+		return err;
+	}
+
 	if (irq >= 0) {
 		if (request_irq(irq, snd_uart16550_interrupt,
 				SA_INTERRUPT, "Serial MIDI", (void *) uart)) {
@@ -887,12 +892,6 @@ static int __init snd_serial_probe(int dev)
 
 	strcpy(card->driver, "Serial");
 	strcpy(card->shortname, "Serial midi (uart16550A)");
-
-	if ((err = snd_uart16550_detect(port[dev])) <= 0) {
-		snd_card_free(card);
-		printk(KERN_ERR "no UART detected at 0x%lx\n", (long)port[dev]);
-		return err;
-	}
 
 	if ((err = snd_uart16550_create(card,
 					port[dev],

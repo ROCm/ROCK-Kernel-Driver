@@ -863,8 +863,8 @@ static void callDone (Scsi_Cmnd * SCpnt)
 {
 	if (SCpnt->result) {
 		TRACE (("*** %.08lx %.02x <%d.%d.%d> = %x\n",
-			SCpnt->serial_number, SCpnt->cmnd[0], SCpnt->channel,
-			SCpnt->target, SCpnt->lun, SCpnt->result));
+			SCpnt->serial_number, SCpnt->cmnd[0], SCpnt->device->channel,
+			SCpnt->device->id, SCpnt->device->lun, SCpnt->result));
 	}
 	SCpnt->scsi_done (SCpnt);
 }
@@ -1077,10 +1077,10 @@ static void mega_cmd_done (mega_host_config * megaCfg, mega_scb * pScb, int stat
 		panic(KERN_ERR "megaraid:Problem...!\n");
 	}
 
-	islogical = ( (SCpnt->channel >= megaCfg->productInfo.SCSIChanPresent) &&
-					(SCpnt->channel <= megaCfg->host->max_channel) );
+	islogical = ( (SCpnt->device->channel >= megaCfg->productInfo.SCSIChanPresent) &&
+					(SCpnt->device->channel <= megaCfg->host->max_channel) );
 #if 0
-	islogical = (SCpnt->channel == megaCfg->host->max_channel);
+	islogical = (SCpnt->device->channel == megaCfg->host->max_channel);
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
@@ -1119,7 +1119,7 @@ static void mega_cmd_done (mega_host_config * megaCfg, mega_scb * pScb, int stat
 			status = 0xF0;
 		}
 #endif
-		if( IS_RAID_CH(SCpnt->channel) && ((c & 0x1F ) == TYPE_DISK) ) {
+		if( IS_RAID_CH(SCpnt->device->channel) && ((c & 0x1F ) == TYPE_DISK) ) {
 			status = 0xF0;
 		}
 	}
@@ -1206,7 +1206,7 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	mega_ext_passthru *epthru;
 	long seg;
 	char islogical;
-	int lun = SCpnt->lun;
+	int lun = SCpnt->device->lun;
 	int		max_lun;
 
 	if ((SCpnt->cmnd[0] == MEGADEVIOC))
@@ -1224,11 +1224,11 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	}
 #endif
 
-	islogical = ( (SCpnt->channel >= megaCfg->productInfo.SCSIChanPresent) &&
-					(SCpnt->channel <= megaCfg->host->max_channel) );
+	islogical = ( (SCpnt->device->channel >= megaCfg->productInfo.SCSIChanPresent) &&
+					(SCpnt->device->channel <= megaCfg->host->max_channel) );
 #if 0
-	islogical = (IS_RAID_CH(SCpnt->channel) && /* virtual ch is raid - AM */
-						(SCpnt->channel == megaCfg->host->max_channel));
+	islogical = (IS_RAID_CH(SCpnt->device->channel) && /* virtual ch is raid - AM */
+						(SCpnt->device->channel == megaCfg->host->max_channel));
 #endif
 
 	if ( ! megaCfg->support_ext_cdb ) {
@@ -1239,7 +1239,7 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 		}
 	}
 
-	if (!islogical && SCpnt->target == skip_id) {
+	if (!islogical && SCpnt->device->id == skip_id) {
 		SCpnt->result = (DID_BAD_TARGET << 16);
 		callDone (SCpnt);
 		return NULL;
@@ -1248,7 +1248,7 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	if (islogical) {
 
 		/* have just LUN 0 for each target on virtual channels */
-		if( SCpnt->lun != 0 ) {
+		if( SCpnt->device->lun != 0 ) {
 			SCpnt->result = (DID_BAD_TARGET << 16);
 			callDone (SCpnt);
 			return NULL;
@@ -1561,11 +1561,11 @@ mega_get_lun(mega_host_config *this_hba, Scsi_Cmnd *sc)
 	int		lun;
 	int		virt_chan;
 
-	tgt = sc->target;
+	tgt = sc->device->id;
 	
 	if ( tgt > 7 ) tgt--;	/* we do not get inquires for tgt 7 */
 
-	virt_chan = sc->channel - this_hba->productInfo.SCSIChanPresent;
+	virt_chan = sc->device->channel - this_hba->productInfo.SCSIChanPresent;
 	lun = (virt_chan * 15) + tgt;
 
 	/*
@@ -1610,11 +1610,11 @@ mega_prepare_passthru(mega_host_config *megacfg, mega_scb *scb, Scsi_Cmnd *sc)
 	pthru->ars = 1;
 	pthru->reqsenselen = 14;
 	pthru->islogical = 0;
-	pthru->channel = (megacfg->flag & BOARD_40LD) ? 0 : sc->channel;
+	pthru->channel = (megacfg->flag & BOARD_40LD) ? 0 : sc->device->channel;
 	pthru->target = (megacfg->flag & BOARD_40LD) ?
-	    (sc->channel << 4) | sc->target : sc->target;
+	    (sc->device->channel << 4) | sc->device->id : sc->device->id;
 	pthru->cdblen = sc->cmd_len;
-	pthru->logdrv = sc->lun;
+	pthru->logdrv = sc->device->lun;
 
 	memcpy (pthru->cdb, sc->cmnd, sc->cmd_len);
 
@@ -1666,11 +1666,11 @@ mega_prepare_extpassthru(mega_host_config *megacfg, mega_scb *scb, Scsi_Cmnd *sc
 	epthru->ars = 1;
 	epthru->reqsenselen = 14;
 	epthru->islogical = 0;
-	epthru->channel = (megacfg->flag & BOARD_40LD) ? 0 : sc->channel;
+	epthru->channel = (megacfg->flag & BOARD_40LD) ? 0 : sc->device->channel;
 	epthru->target = (megacfg->flag & BOARD_40LD) ?
-	    (sc->channel << 4) | sc->target : sc->target;
+	    (sc->device->channel << 4) | sc->device->id : sc->device->id;
 	epthru->cdblen = sc->cmd_len;
-	epthru->logdrv = sc->lun;
+	epthru->logdrv = sc->device->lun;
 
 	memcpy(epthru->cdb, sc->cmnd, sc->cmd_len);
 
@@ -3535,21 +3535,21 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 	mega_scb *pScb;
 	char *user_area = NULL;
 
-	megaCfg = (mega_host_config *) SCpnt->host->hostdata;
+	megaCfg = (mega_host_config *) SCpnt->device->host->hostdata;
 	DRIVER_LOCK (megaCfg);
 
-	if (!(megaCfg->flag & (1L << SCpnt->channel))) {
-		if (SCpnt->channel < megaCfg->productInfo.SCSIChanPresent)
+	if (!(megaCfg->flag & (1L << SCpnt->device->channel))) {
+		if (SCpnt->device->channel < megaCfg->productInfo.SCSIChanPresent)
 			printk ( KERN_NOTICE
 				"scsi%d: scanning channel %d for devices.\n",
-				megaCfg->host->host_no, SCpnt->channel);
+				megaCfg->host->host_no, SCpnt->device->channel);
 		else
 			printk ( KERN_NOTICE
 				"scsi%d: scanning virtual channel %d for logical drives.\n",
 				megaCfg->host->host_no,
-				SCpnt->channel-megaCfg->productInfo.SCSIChanPresent+1);
+				SCpnt->device->channel-megaCfg->productInfo.SCSIChanPresent+1);
 
-		megaCfg->flag |= (1L << SCpnt->channel);
+		megaCfg->flag |= (1L << SCpnt->device->channel);
 	}
 
 	SCpnt->scsi_done = pktComp;
@@ -3698,7 +3698,7 @@ int megaraid_abort (Scsi_Cmnd * SCpnt)
 
 	rc = SCSI_ABORT_NOT_RUNNING;
 
-	megaCfg = (mega_host_config *) SCpnt->host->hostdata;
+	megaCfg = (mega_host_config *) SCpnt->device->host->hostdata;
 
 	megaCfg->flag |= IN_ABORT;
 
@@ -3796,18 +3796,18 @@ int megaraid_reset (Scsi_Cmnd * SCpnt, unsigned int rstflags)
 	mega_scb *pScb;
 
 	rc = SCSI_RESET_NOT_RUNNING;
-	megaCfg = (mega_host_config *) SCpnt->host->hostdata;
+	megaCfg = (mega_host_config *) SCpnt->device->host->hostdata;
 
 	megaCfg->flag |= IN_RESET;
 
 	printk
 	    ("megaraid_RESET: %.08lx cmd=%.02x <c=%d.t=%d.l=%d>, flag = %x\n",
-	     SCpnt->serial_number, SCpnt->cmnd[0], SCpnt->channel,
-	     SCpnt->target, SCpnt->lun, rstflags);
+	     SCpnt->serial_number, SCpnt->cmnd[0], SCpnt->device->channel,
+	     SCpnt->device->id, SCpnt->device->lun, rstflags);
 
 	TRACE (("RESET: %.08lx %.02x <%d.%d.%d>\n",
-		SCpnt->serial_number, SCpnt->cmnd[0], SCpnt->channel,
-		SCpnt->target, SCpnt->lun));
+		SCpnt->serial_number, SCpnt->cmnd[0], SCpnt->device->channel,
+		SCpnt->device->id, SCpnt->device->lun));
 
 	/*
 	 * Walk list of SCBs for any that are still outstanding

@@ -861,11 +861,13 @@ aic_sector_div(sector_t capacity, int heads, int sectors)
 
 #define	aic_sense_desc			AIC_LIB_ENTRY(_sense_desc)
 #define	aic_sense_error_action		AIC_LIB_ENTRY(_sense_error_action)
+#define	aic_error_action		AIC_LIB_ENTRY(_error_action)
 #define	aic_op_desc			AIC_LIB_ENTRY(_op_desc)
 #define	aic_cdb_string			AIC_LIB_ENTRY(_cdb_string)
 #define aic_print_inquiry		AIC_LIB_ENTRY(_print_inquiry)
 #define aic_calc_syncsrate		AIC_LIB_ENTRY(_calc_syncrate)
 #define	aic_calc_syncparam		AIC_LIB_ENTRY(_calc_syncparam)
+#define	aic_calc_speed			AIC_LIB_ENTRY(_calc_speed)
 #define	aic_inquiry_match		AIC_LIB_ENTRY(_inquiry_match)
 #define	aic_static_inquiry_match	AIC_LIB_ENTRY(_static_inquiry_match)
 
@@ -878,6 +880,9 @@ void			aic_sense_desc(int /*sense_key*/, int /*asc*/,
 aic_sense_action	aic_sense_error_action(struct scsi_sense_data*,
 					       struct scsi_inquiry_data*,
 					       uint32_t /*sense_flags*/);
+uint32_t		aic_error_action(struct scsi_cmnd *,
+					 struct scsi_inquiry_data *,
+					 cam_status, u_int);
 
 #define	SF_RETRY_UA	0x01
 #define SF_NO_PRINT	0x02
@@ -892,6 +897,8 @@ void		aic_print_inquiry(struct scsi_inquiry_data*);
 
 u_int		aic_calc_syncsrate(u_int /*period_factor*/);
 u_int		aic_calc_syncparam(u_int /*period*/);
+u_int		aic_calc_speed(u_int width, u_int period, u_int offset,
+			       u_int min_rate);
 	
 int		aic_inquiry_match(caddr_t /*inqbuffer*/,
 				  caddr_t /*table_entry*/);

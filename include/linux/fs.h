@@ -371,9 +371,10 @@ struct inode {
 	struct timespec		i_ctime;
 	unsigned int		i_blkbits;
 	unsigned long		i_blksize;
-	unsigned long		i_blocks;
 	unsigned long		i_version;
+	unsigned long		i_blocks;
 	unsigned short          i_bytes;
+	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	struct semaphore	i_sem;
 	struct inode_operations	*i_op;
 	struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
@@ -400,7 +401,7 @@ struct inode {
 	void			*i_security;
 	__u32			i_generation;
 	union {
-		void				*generic_ip;
+		void		*generic_ip;
 	} u;
 };
 
@@ -411,39 +412,6 @@ struct fown_struct {
 	int signum;		/* posix.1b rt signal to be delivered on IO */
 	void *security;
 };
-
-static inline void inode_add_bytes(struct inode *inode, loff_t bytes)
-{
-	inode->i_blocks += bytes >> 9;
-	bytes &= 511;
-	inode->i_bytes += bytes;
-	if (inode->i_bytes >= 512) {
-		inode->i_blocks++;
-		inode->i_bytes -= 512;
-	}
-}
-
-static inline void inode_sub_bytes(struct inode *inode, loff_t bytes)
-{
-	inode->i_blocks -= bytes >> 9;
-	bytes &= 511;
-	if (inode->i_bytes < bytes) {
-		inode->i_blocks--;
-		inode->i_bytes += 512;
-	}
-	inode->i_bytes -= bytes;
-}
-
-static inline loff_t inode_get_bytes(struct inode *inode)
-{
-	return (((loff_t)inode->i_blocks) << 9) + inode->i_bytes;
-}
-
-static inline void inode_set_bytes(struct inode *inode, loff_t bytes)
-{
-	inode->i_blocks = bytes >> 9;
-	inode->i_bytes = bytes & 511;
-}
 
 /*
  * Track a single file's readahead state
@@ -1277,6 +1245,10 @@ extern int page_symlink(struct inode *inode, const char *symname, int len);
 extern struct inode_operations page_symlink_inode_operations;
 extern void generic_fillattr(struct inode *, struct kstat *);
 extern int vfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
+void inode_add_bytes(struct inode *inode, loff_t bytes);
+void inode_sub_bytes(struct inode *inode, loff_t bytes);
+loff_t inode_get_bytes(struct inode *inode);
+void inode_set_bytes(struct inode *inode, loff_t bytes);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 

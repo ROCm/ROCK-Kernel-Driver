@@ -962,11 +962,10 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		if (ppp->pass_filter.filter
 		    && sk_run_filter(skb, ppp->pass_filter.filter,
 				     ppp->pass_filter.len) == 0) {
-			if (ppp->debug & 1) {
+			if (ppp->debug & 1)
 				printk(KERN_DEBUG "PPP: outbound frame not passed\n");
-				kfree_skb(skb);
-				return;
-			}
+			kfree_skb(skb);
+			return;
 		}
 		/* if this packet passes the active filter, record the time */
 		if (!(ppp->active_filter.filter

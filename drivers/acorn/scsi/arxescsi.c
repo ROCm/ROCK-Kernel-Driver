@@ -40,33 +40,18 @@
 #include "fas216.h"
 
 struct arxescsi_info {
-    FAS216_Info info;
-
-    /* other info... */
-    unsigned int	cstatus;	/* card status register	*/
-    unsigned int	dmaarea;	/* Pseudo DMA area	*/
+	FAS216_Info		info;
+	struct expansion_card	*ec;
 };
 
+#define DMADATA_OFFSET	(0x200)
+
+#define DMASTAT_OFFSET	(0x600)
+#define DMASTAT_DRQ	(1 << 0)
+
 #define CSTATUS_IRQ	(1 << 0)
-#define CSTATUS_DRQ	(1 << 0)
 
-#ifndef CAN_QUEUE
-#define CAN_QUEUE	1
-#endif
-
-#ifndef CMD_PER_LUN
-#define CMD_PER_LUN	1
-#endif
-
-/* Hmm - this should go somewhere else */
-#define BUS_ADDR(x) ((((unsigned long)(x)) << 2) + IO_BASE)
-
-/*
- * Version
- */
-#define VER_MAJOR	0
-#define VER_MINOR	1
-#define VER_PATCH	1
+#define VERSION "1.10 (23/01/2003 2.5.57)"
 
 /*
  * Function: int arxescsi_dma_setup(host, SCpnt, direction, min_type)
@@ -87,44 +72,7 @@ arxescsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 	return fasdma_pseudo;
 }
 
-
-
-/* Faster transfer routines, written by SH to speed up the loops */
-
-static inline unsigned char getb(unsigned int address, unsigned int reg)
-{
-	unsigned char value;
-
-	__asm__ __volatile__(
-	"ldrb	%0, [%1, %2, lsl #5]"
-	: "=r" (value)
-	: "r" (address), "r" (reg) );
-	return value;
-}
-
-static inline unsigned int getw(unsigned int address, unsigned int reg)
-{
-	unsigned int value;
-	
-	__asm__ __volatile__(
-	"ldr	%0, [%1, %2, lsl #5]\n\t"
-	"mov	%0, %0, lsl #16\n\t"
-	"mov	%0, %0, lsr #16"
-	: "=r" (value)
-	: "r" (address), "r" (reg) );
-	return value;
-}
-
-static inline void putw(unsigned int address, unsigned int reg, unsigned long value)
-{
-	__asm__ __volatile__(
-	"mov	%0, %0, lsl #16\n\t"
-	"str	%0, [%1, %2, lsl #5]"
-	:
-	: "r" (value), "r" (address), "r" (reg) );
-}
-
-void arxescsi_pseudo_dma_write(unsigned char *addr, unsigned int io)
+static void arxescsi_pseudo_dma_write(unsigned char *addr, unsigned char *base)
 {
        __asm__ __volatile__(
        "               stmdb   sp!, {r0-r12}\n"
@@ -149,7 +97,7 @@ void arxescsi_pseudo_dma_write(unsigned char *addr, unsigned int io)
        "               bne     .loop_1\n"
        "               ldmia   sp!, {r0-r12}\n"
        :
-       : "r" (addr), "r" (io) );
+       : "r" (addr), "r" (base));
 }
 
 /*
@@ -160,40 +108,41 @@ void arxescsi_pseudo_dma_write(unsigned char *addr, unsigned int io)
  *	     direction - DMA on to/off of card
  *	     transfer  - minimum number of bytes we expect to transfer
  */
-void arxescsi_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
-			fasdmadir_t direction, int transfer)
+static void
+arxescsi_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
+		    fasdmadir_t direction, int transfer)
 {
 	struct arxescsi_info *info = (struct arxescsi_info *)host->hostdata;
-	unsigned int length, io, error=0;
+	unsigned int length, error = 0;
+	unsigned char *base = info->info.scsi.io_base;
 	unsigned char *addr;
 
 	length = SCp->this_residual;
 	addr = SCp->ptr;
-	io = __ioaddr(host->io_port);
 
 	if (direction == DMA_OUT) {
 		unsigned int word;
 		while (length > 256) {
-			if (getb(io, 4) & STAT_INT) {
-				error=1;
+			if (readb(base + 0x80) & STAT_INT) {
+				error = 1;
 				break;
 			}
-			arxescsi_pseudo_dma_write(addr, io);
+			arxescsi_pseudo_dma_write(addr, base);
 			addr += 256;
 			length -= 256;
 		}
 
 		if (!error)
 			while (length > 0) {
-				if (getb(io, 4) & STAT_INT)
+				if (readb(base + 0x80) & STAT_INT)
 					break;
 	 
-				if (!(getb(io, 48) & CSTATUS_IRQ))
+				if (!(readb(base + DMASTAT_OFFSET) & DMASTAT_DRQ))
 					continue;
 
 				word = *addr | *(addr + 1) << 8;
 
-				putw(io, 16, word);
+				writew(word, base + DMADATA_OFFSET);
 				if (length > 1) {
 					addr += 2;
 					length -= 2;
@@ -206,15 +155,15 @@ void arxescsi_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 	else {
 		if (transfer && (transfer & 255)) {
 			while (length >= 256) {
-				if (getb(io, 4) & STAT_INT) {
-					error=1;
+				if (readb(base + 0x80) & STAT_INT) {
+					error = 1;
 					break;
 				}
 	    
-				if (!(getb(io, 48) & CSTATUS_IRQ))
+				if (!(readb(base + DMASTAT_OFFSET) & DMASTAT_DRQ))
 					continue;
 
-				insw(info->dmaarea, addr, 256 >> 1);
+				readsw(base + DMADATA_OFFSET, addr, 256 >> 1);
 				addr += 256;
 				length -= 256;
 			}
@@ -224,13 +173,13 @@ void arxescsi_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 			while (length > 0) {
 				unsigned long word;
 
-				if (getb(io, 4) & STAT_INT)
+				if (readb(base + 0x80) & STAT_INT)
 					break;
 
-				if (!(getb(io, 48) & CSTATUS_IRQ))
+				if (!(readb(base + DMASTAT_OFFSET) & DMASTAT_DRQ))
 					continue;
 
-				word = getw(io, 16);
+				word = readw(base + DMADATA_OFFSET);
 				*addr++ = word;
 				if (--length > 0) {
 					*addr++ = word >> 8;
@@ -259,15 +208,14 @@ static void arxescsi_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
  * Params  : host - driver host structure to return info for.
  * Returns : pointer to a static buffer containing null terminated string.
  */
-const char *arxescsi_info(struct Scsi_Host *host)
+static const char *arxescsi_info(struct Scsi_Host *host)
 {
 	struct arxescsi_info *info = (struct arxescsi_info *)host->hostdata;
-	static char string[100], *p;
+	static char string[150];
 
-	p = string;
-	p += sprintf(p, "%s ", host->hostt->name);
-	p += fas216_info(&info->info, p);
-	p += sprintf(p, "v%d.%d.%d", VER_MAJOR, VER_MINOR, VER_PATCH);
+	sprintf(string, "%s (%s) in slot %d v%s",
+		host->hostt->name, info->info.scsi.type, info->ec->slot_no,
+		VERSION);
 
 	return string;
 }
@@ -286,8 +234,9 @@ const char *arxescsi_info(struct Scsi_Host *host)
  *	     inout  - 0 for reading, 1 for writing.
  * Returns : length of data written to buffer.
  */
-int arxescsi_proc_info(char *buffer, char **start, off_t offset,
-			    int length, int host_no, int inout)
+static int
+arxescsi_proc_info(char *buffer, char **start, off_t offset, int length,
+		   int host_no, int inout)
 {
 	int pos, begin;
 	struct Scsi_Host *host;
@@ -303,9 +252,7 @@ int arxescsi_proc_info(char *buffer, char **start, off_t offset,
 		return -EINVAL;
 
 	begin = 0;
-	pos = sprintf(buffer,
-			"ARXE 16-bit SCSI driver version %d.%d.%d\n",
-			VER_MAJOR, VER_MINOR, VER_PATCH);
+	pos = sprintf(buffer, "ARXE 16-bit SCSI driver v%s\n", VERSION);
 	pos += fas216_print_host(&info->info, buffer + pos);
 	pos += fas216_print_stats(&info->info, buffer + pos);
 
@@ -343,7 +290,7 @@ static Scsi_Host_Template arxescsi_template = {
 	.can_queue			= 0,
 	.this_id			= 7,
 	.sg_tablesize			= SG_ALL,
-	.cmd_per_lun			= CMD_PER_LUN,
+	.cmd_per_lun			= 1,
 	.use_clustering			= DISABLE_CLUSTERING,
 	.proc_name			= "arxescsi",
 };
@@ -352,21 +299,41 @@ static int __devinit
 arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct Scsi_Host *host;
-      	struct arxescsi_info *info;
-      	int ret = -ENOMEM;
+	struct arxescsi_info *info;
+	unsigned long resbase, reslen;
+	unsigned char *base;
+	int ret;
+
+	resbase = ecard_resource_start(ec, ECARD_RES_MEMC);
+	reslen = ecard_resource_len(ec, ECARD_RES_MEMC);
+
+	if (!request_mem_region(resbase, reslen, "arxescsi")) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	base = ioremap(resbase, reslen);
+	if (!base) {
+		ret = -ENOMEM;
+		goto out_region;
+	}
 
 	host = scsi_register(&arxescsi_template, sizeof(struct arxescsi_info));
-	if (!host)
-		goto out;
+	if (!host) {
+		ret = -ENOMEM;
+		goto out_unmap;
+	}
 
-	host->io_port = ecard_address(ec, ECARD_MEMC, 0) + 0x0800;
+	host->base = (unsigned long)base;
 	host->irq = NO_IRQ;
 	host->dma_channel = NO_DMA;
 
 	info = (struct arxescsi_info *)host->hostdata;
-	info->info.scsi.io_port		= host->io_port;
+	info->ec = ec;
+
+	info->info.scsi.io_base		= base + 0x2000;
 	info->info.scsi.irq		= host->irq;
-	info->info.scsi.io_shift	= 3;
+	info->info.scsi.io_shift	= 5;
 	info->info.ifcfg.clockrate	= 24; /* MHz */
 	info->info.ifcfg.select_timeout = 255;
 	info->info.ifcfg.asyncperiod	= 200; /* ns */
@@ -374,39 +341,29 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	info->info.ifcfg.cntl3		= CNTL3_FASTSCSI | CNTL3_FASTCLK;
 	info->info.ifcfg.disconnect_ok	= 0;
 	info->info.ifcfg.wide_max_size	= 0;
+	info->info.ifcfg.capabilities	= FASCAP_PSEUDODMA;
 	info->info.dma.setup		= arxescsi_dma_setup;
 	info->info.dma.pseudo		= arxescsi_dma_pseudo;
 	info->info.dma.stop		= arxescsi_dma_stop;
-	info->dmaarea			= host->io_port + 128;
-	info->cstatus			= host->io_port + 384;
 		
-	ec->irqaddr = (unsigned char *)BUS_ADDR(host->io_port);
+	ec->irqaddr = base;
 	ec->irqmask = CSTATUS_IRQ;
 
-	if (!request_region(host->io_port, 120, "arxescsi-fas")) {
-		ret = -EBUSY;
-		goto out_free;
-	}
-			
-	if (!request_region(host->io_port + 128, 384, "arxescsi-dma")) {
-		ret = -EBUSY;
-		goto out_release;
-	}
+	ret = fas216_init(host);
+	if (ret)
+		goto out_unregister;
 
-	printk("scsi%d: Has no interrupts - using polling mode\n",
-	       host->host_no);
-
-	fas216_init(host);
-
-	ret = scsi_add_host(host, &ec->dev);
+	ret = fas216_add(host, &ec->dev);
 	if (ret == 0)
 		goto out;
 
-	release_region(host->io_port + 128, 384);
- out_release:
-	release_region(host->io_port, 120);
- out_free:
+	fas216_release(host);
+ out_unregister:
 	scsi_unregister(host);
+ out_unmap:
+	iounmap(base);
+ out_region:
+	release_mem_region(resbase, reslen);
  out:
 	return ret;
 }
@@ -414,13 +371,19 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 static void __devexit arxescsi_remove(struct expansion_card *ec)
 {
 	struct Scsi_Host *host = ecard_get_drvdata(ec);
+	unsigned long resbase, reslen;
 
 	ecard_set_drvdata(ec, NULL);
-	scsi_remove_host(host);
-	fas216_release(host);
+	fas216_remove(host);
 
-	release_region(host->io_port + 128, 384);
-	release_region(host->io_port, 120);
+	iounmap((void *)host->base);
+
+	resbase = ecard_resource_start(ec, ECARD_RES_MEMC);
+	reslen = ecard_resource_len(ec, ECARD_RES_MEMC);
+
+	release_mem_region(resbase, reslen);
+
+	fas216_release(host);
 	scsi_unregister(host);
 }
 
@@ -434,7 +397,8 @@ static struct ecard_driver arxescsi_driver = {
 	.remove		= __devexit_p(arxescsi_remove),
 	.id_table	= arxescsi_cids,
 	.drv = {
-		.name	= "arxescsi",
+		.devclass	= &shost_devclass,
+		.name		= "arxescsi",
 	},
 };
 

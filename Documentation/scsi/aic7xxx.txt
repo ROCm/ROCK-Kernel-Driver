@@ -1,5 +1,5 @@
 ====================================================================
-=    Adaptec Aic7xxx Fast -> Ultra160 Family Manager Set v6.2.10   =
+=    Adaptec Aic7xxx Fast -> Ultra160 Family Manager Set v6.2.28   =
 =                            README for                            =
 =                     The Linux Operating System                   =
 ====================================================================
@@ -7,8 +7,9 @@
 The following information is available in this file:
 
   1. Supported Hardware
-  2. Command Line Options
-  3. Contacting Adaptec
+  2. Version History
+  3. Command Line Options
+  4. Contacting Adaptec
 
 1. Supported Hardware
 
@@ -44,52 +45,52 @@ The following information is available in this file:
    5.   Block Move Instruction Support - Doubles the speed of certain
         sequencer operations.
    6.   `Bayonet' style Scatter Gather Engine - Improves S/G prefetch
-	performance.
+        performance.
    7.   Queuing Registers - Allows queuing of new transactions without
-	pausing the sequencer.
+        pausing the sequencer.
    8.   Multiple Target IDs - Allows the controller to respond to selection
         as a target on multiple SCSI IDs.
 
    Controller      Chip   Host-Bus    Int-Connectors  Ext-Connectors  Notes
    --------------------------------------------------------------------------
-   AHA-274X[A]    aic7770   EISA        SE-50M          SE-HD50F
-   AHA-274X[A]W   aic7770   EISA        SE-HD68F	SE-HD68F
-				 	SE-50M
-   AHA-274X[A]T   aic7770   EISA       2 X SE-50M	SE-HD50F
-   AHA-2842       aic7770    VL          SE-50M		SE-HD50F
-   AHA-2940AU     aic7860   PCI/32       SE-50M		SE-HD50F
+   AHA-274X[A]    aic7770   EISA         SE-50M         SE-HD50F
+   AHA-274X[A]W   aic7770   EISA         SE-HD68F       SE-HD68F
+                                         SE-50M
+   AHA-274X[A]T   aic7770   EISA       2 X SE-50M       SE-HD50F
+   AHA-2842       aic7770    VL          SE-50M         SE-HD50F
+   AHA-2940AU     aic7860   PCI/32       SE-50M         SE-HD50F
    AVA-2902I      aic7860   PCI/32       SE-50M
    AVA-2902E      aic7860   PCI/32       SE-50M
-   AVA-2906       aic7856   PCI/32       SE-50M		SE-DB25F
-   APC-7850       aic7850   PCI/32       SE-50M			      1
+   AVA-2906       aic7856   PCI/32       SE-50M         SE-DB25F
+   APC-7850       aic7850   PCI/32       SE-50M                       1
    AVA-2940       aic7860   PCI/32       SE-50M
    AHA-2920B      aic7860   PCI/32       SE-50M
    AHA-2930B      aic7860   PCI/32       SE-50M
-   AHA-2920C      aic7856   PCI/32       SE-50M		SE-HD50F
+   AHA-2920C      aic7856   PCI/32       SE-50M         SE-HD50F
    AHA-2930C      aic7860   PCI/32       SE-50M
    AHA-2930C      aic7860   PCI/32       SE-50M
    AHA-2910C      aic7860   PCI/32       SE-50M
    AHA-2915C      aic7860   PCI/32       SE-50M
-   AHA-2940AU/CN  aic7860   PCI/32       SE-50M		SE-HD50F
-   AHA-2944W      aic7870   PCI/32     HVD-HD68F	HVD-HD68F
-				        HVD-50M
-   AHA-3940W      aic7870   PCI/32     2 X SE-HD68F	SE-HD68F        2
+   AHA-2940AU/CN  aic7860   PCI/32       SE-50M         SE-HD50F
+   AHA-2944W      aic7870   PCI/32     HVD-HD68F        HVD-HD68F
+                                        HVD-50M
+   AHA-3940W      aic7870   PCI/32     2 X SE-HD68F     SE-HD68F        2
    AHA-2940UW     aic7880   PCI/32       SE-HD68F
-					 SE-50M		SE-HD68F
-   AHA-2940U      aic7880   PCI/32       SE-50M		SE-HD50F
+                                         SE-50M         SE-HD68F
+   AHA-2940U      aic7880   PCI/32       SE-50M         SE-HD50F
    AHA-2940D      aic7880   PCI/32
-   AHA-2940 A/T   aic7880   PCI/32
+   aHA-2940 A/T   aic7880   PCI/32
    AHA-2940D A/T  aic7880   PCI/32
-   AHA-3940UW     aic7880   PCI/32     2 X SE-HD68F	SE-HD68F          3
+   AHA-3940UW     aic7880   PCI/32     2 X SE-HD68F     SE-HD68F          3
    AHA-3940UWD    aic7880   PCI/32     2 X SE-HD68F   2 X SE-VHD68F       3
-   AHA-3940U      aic7880   PCI/32     2 X SE-50M	SE-HD50F          3
-   AHA-2944UW     aic7880   PCI/32      HVD-HD68F	HVD-HD68F
-					 HVD-50M
+   AHA-3940U      aic7880   PCI/32     2 X SE-50M       SE-HD50F          3
+   AHA-2944UW     aic7880   PCI/32      HVD-HD68F       HVD-HD68F
+                                         HVD-50M
    AHA-3944UWD    aic7880   PCI/32     2 X HVD-HD68F  2 X HVD-VHD68F      3
    AHA-4944UW     aic7880   PCI/32
    AHA-2930UW     aic7880   PCI/32
-   AHA-2940UW Pro aic7880   PCI/32      SE-HD68F	SE-HD68F            4
-					 SE-50M
+   AHA-2940UW Pro aic7880   PCI/32      SE-HD68F        SE-HD68F            4
+                                         SE-50M
    AHA-2940UW/CN  aic7880   PCI/32
    AHA-2940UDual  aic7895   PCI/32
    AHA-2940UWDual aic7895   PCI/32
@@ -98,30 +99,30 @@ The following information is available in this file:
    AHA-3940AUWD   aic7895   PCI/32
    AHA-3940AU     aic7895   PCI/32
    AHA-3944AUWD   aic7895   PCI/32     2 X HVD-HD68F  2 X HVD-VHD68F
-   AHA-2940U2B    aic7890   PCI/32      LVD-HD68F	LVD-HD68F
+   AHA-2940U2B    aic7890   PCI/32      LVD-HD68F       LVD-HD68F
    AHA-2940U2 OEM aic7891   PCI/64
-   AHA-2940U2W    aic7890   PCI/32      LVD-HD68F	LVD-HD68F
-				        SE-HD68F 
-					 SE-50M
-   AHA-2950U2B    aic7891   PCI/64      LVD-HD68F	LVD-HD68F
-   AHA-2930U2     aic7890   PCI/32      LVD-HD68F	SE-HD50F
-					 SE-50M 
+   AHA-2940U2W    aic7890   PCI/32      LVD-HD68F       LVD-HD68F
+                                        SE-HD68F 
+                                         SE-50M
+   AHA-2950U2B    aic7891   PCI/64      LVD-HD68F       LVD-HD68F
+   AHA-2930U2     aic7890   PCI/32      LVD-HD68F       SE-HD50F
+                                         SE-50M 
    AHA-3950U2B    aic7897   PCI/64
    AHA-3950U2D    aic7897   PCI/64
    AHA-29160      aic7892   PCI/64-66
    AHA-29160 CPQ  aic7892   PCI/64-66
-   AHA-29160N     aic7892   PCI/32      LVD-HD68F	SE-HD50F
-					 SE-50M
+   AHA-29160N     aic7892   PCI/32      LVD-HD68F       SE-HD50F
+                                         SE-50M
    AHA-29160LP    aic7892   PCI/64-66
    AHA-19160      aic7892   PCI/64-66
    AHA-29150LP    aic7892   PCI/64-66
    AHA-29130LP    aic7892   PCI/64-66
    AHA-3960D      aic7899   PCI/64-66  2 X LVD-HD68F  2 X LVD-VHD68F
-					 LVD-50M
+                                         LVD-50M
    AHA-3960D CPQ  aic7899   PCI/64-66  2 X LVD-HD68F  2 X LVD-VHD68F
-					 LVD-50M
+                                         LVD-50M
    AHA-39160      aic7899   PCI/64-66  2 X LVD-HD68F  2 X LVD-VHD68F
-					 LVD-50M
+                                         LVD-50M
 
    1. No BIOS support
    2. DEC21050 PCI-PCI bridge with multiple controller chips on secondary bus
@@ -129,14 +130,22 @@ The following information is available in this file:
    4. All three SCSI connectors may be used simultaneously without
       SCSI "stub" effects.
 
-2. Command Line Options
+2. Version History
+
+        6.2.28 - Domain Validation Fixes
+                 PCI parity error disable
+                 Enhanced Memory Mapped I/O probe
+
+        6.2.20 - Added Domain Validation
+
+3. Command Line Options
 
         WARNING: ALTERING OR ADDING THESE DRIVER PARAMETERS
                  INCORRECTLY CAN RENDER YOUR SYSTEM INOPERABLE.
                  USE THEM WITH CAUTION. 
 
    Edit the file "modules.conf" in the directory /etc and add/edit a
-   line containing 'options aic7xxx=[command[,command...]]' where
+   line containing 'options aic7xxx aic7xxx=[command[,command...]]' where
    'command' is one or more of the following:
    -----------------------------------------------------------------
               Option: verbose
@@ -149,6 +158,30 @@ The following information is available in this file:
           Definition: Enables various levels of debugging information
      Possible Values: 0x0000 = no debugging, 0xffff = full debugging
        Default Value: 0x0000
+   -----------------------------------------------------------------
+              Option: no_probe
+          Definition: Do not probe for EISA/VLB controllers.
+                      This is a toggle.  If the driver is compiled
+                      to not probe EISA/VLB controllers by default,
+                      specifying "no_probe" will enable this probing.
+                      If the driver is compiled to probe EISA/VLB
+                      controllers by default, specifying "no_probe"
+                      will disable this probing.
+     Possible Values: This option is a toggle
+       Default Value: EISA/VLB probing is disabled by default.
+   -----------------------------------------------------------------
+              Option: pci_parity
+          Definition: Toggles the detection of PCI parity errors.
+                      On many motherboards with VIA chipsets,
+                      PCI parity is not generated correctly on the
+                      PCI bus.  It is impossible for the hardware to
+                      differentiate between these "spurious" parity
+                      errors and real parity errors.  The symptom of
+                      this problem is a stream of the message:
+    "scsi0: Data Parity Error Detected during address or write data phase"
+                      output by the driver.
+     Possible Values: This option is a toggle
+       Default Value: PCI Parity Error reporting is disabled
    -----------------------------------------------------------------
               Option: no_reset
           Definition: Do not reset the bus during the initial probe
@@ -173,33 +206,33 @@ The following information is available in this file:
      Possible Values: This option is a flag
        Default Value: disabled
    -----------------------------------------------------------------
-	      Option: global_tag_depth
+              Option: global_tag_depth:[value]
           Definition: Global tag depth for all targets on all busses.
-		      This option sets the default tag depth which
-		      may be selectively overridden vi the tag_info
-		      option.
+                      This option sets the default tag depth which
+                      may be selectively overridden vi the tag_info
+                      option.
      Possible Values: 1 - 253
        Default Value: 32
    -----------------------------------------------------------------
               Option: tag_info:{{value[,value...]}[,{value[,value...]}...]}
           Definition: Set the per-target tagged queue depth on a
-		      per controller basis.  Both controllers and targets
-		      may be ommitted indicating that they should retain
-		      the default tag depth.
+                      per controller basis.  Both controllers and targets
+                      may be ommitted indicating that they should retain
+                      the default tag depth.
             Examples: tag_info:{{16,32,32,64,8,8,,32,32,32,32,32,32,32,32,32}
-			On Controller 0
-			  specifies a tag depth of 16 for target 0
-			  specifies a tag depth of 64 for target 3
-			  specifies a tag depth of 8 for targets 4 and 5
-			  leaves target 6 at the default
-		          specifies a tag depth of 32 for targets 1,2,7-15
-			All other targets retain the default depth.
+                        On Controller 0
+                          specifies a tag depth of 16 for target 0
+                          specifies a tag depth of 64 for target 3
+                          specifies a tag depth of 8 for targets 4 and 5
+                          leaves target 6 at the default
+                          specifies a tag depth of 32 for targets 1,2,7-15
+                        All other targets retain the default depth.
 
-		      tag_info:{{},{32,,32}}
-			On Controller 1
-			  specifies a tag depth of 32 for targets 0 and 2
-			All other targets retain the default depth.
-			
+                      tag_info:{{},{32,,32}}
+                        On Controller 1
+                          specifies a tag depth of 32 for targets 0 and 2
+                        All other targets retain the default depth.
+                        
      Possible Values: 1 - 253
        Default Value: 32
    -----------------------------------------------------------------
@@ -208,10 +241,30 @@ The following information is available in this file:
      Possible Values: 0 = 256ms, 1 = 128ms, 2 = 64ms, 3 = 32ms
        Default Value: 0
    -----------------------------------------------------------------
+              Option: dv: {value[,value...]} 
+          Definition: Set Domain Validation Policy on a per-controller basis.
+                      Controllers may be ommitted indicating that
+                      they should retain the default read streaming setting.
+             Example: dv:{-1,0,,1,1,0}
+                        On Controller 0 leave DV at its default setting.
+                        On Controller 1 disable DV.
+                        Skip configuration on Controller 2.
+                        On Controllers 3 and 4 enable DV.
+                        On Controller 5 disable DV.
 
-   Example: 'options aic7xxx=verbose,no_probe,tag_info:{{},{,,10}},seltime:1"
-	enables verbose logging, Disable EISA/VLB probing,
-	and set tag depth on Controller 1/Target 2 to 10 tags.
+     Possible Values: < 0 Use setting from serial EEPROM.
+                      0 Disable DV
+                      > 0 Enable DV
+
+       Default Value: SCSI-Select setting on controllers with a SCSI Select
+                      option for DV.  Otherwise, on for controllers supporting
+                      U160 speeds and off for all other controller types.
+   -----------------------------------------------------------------
+
+   Example:
+   'options aic7xxx aic7xxx=verbose,no_probe,tag_info:{{},{,,10}},seltime:1"
+        enables verbose logging, Disable EISA/VLB probing,
+        and set tag depth on Controller 1/Target 2 to 10 tags.
 
 3. Contacting Adaptec
 

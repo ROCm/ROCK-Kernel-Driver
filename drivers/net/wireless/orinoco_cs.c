@@ -203,6 +203,7 @@ orinoco_cs_attach(void)
 	link->priv = dev;
 
 	/* Initialize the dev_link_t structure */
+	init_timer(&link->release);
 	link->release.function = &orinoco_cs_release;
 	link->release.data = (u_long) link;
 

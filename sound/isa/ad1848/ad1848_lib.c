@@ -28,6 +28,7 @@
 #include <linux/ioport.h>
 #include <sound/core.h>
 #include <sound/ad1848.h>
+#include <sound/control.h>
 #include <sound/pcm_params.h>
 
 #include <asm/io.h>
@@ -936,6 +937,12 @@ int snd_ad1848_pcm(ad1848_t *chip, int device, snd_pcm_t **rpcm)
 	return 0;
 }
 
+const snd_pcm_ops_t *snd_ad1848_get_pcm_ops(int direction)
+{
+	return direction == SNDRV_PCM_STREAM_PLAYBACK ?
+		&snd_ad1848_playback_ops : &snd_ad1848_capture_ops;
+}
+
 /*
  *  MIXER part
  */
@@ -990,7 +997,7 @@ static int snd_ad1848_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 	return change;
 }
 
-int snd_ad1848_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+static int snd_ad1848_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	int mask = (kcontrol->private_value >> 16) & 0xff;
 
@@ -1001,7 +1008,7 @@ int snd_ad1848_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo
 	return 0;
 }
 
-int snd_ad1848_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_ad1848_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ad1848_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -1018,7 +1025,7 @@ int snd_ad1848_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucon
 	return 0;
 }
 
-int snd_ad1848_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_ad1848_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ad1848_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -1041,7 +1048,7 @@ int snd_ad1848_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucon
 	return change;
 }
 
-int snd_ad1848_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+static int snd_ad1848_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	int mask = (kcontrol->private_value >> 24) & 0xff;
 
@@ -1052,7 +1059,7 @@ int snd_ad1848_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo
 	return 0;
 }
 
-int snd_ad1848_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_ad1848_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ad1848_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -1074,7 +1081,7 @@ int snd_ad1848_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucon
 	return 0;
 }
 
-int snd_ad1848_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+static int snd_ad1848_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ad1848_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -1111,9 +1118,47 @@ int snd_ad1848_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucon
 	return change;
 }
 
-#define AD1848_CONTROLS (sizeof(snd_ad1848_controls)/sizeof(snd_kcontrol_new_t))
+/*
+ */
+int snd_ad1848_add_ctl(ad1848_t *chip, const char *name, int index, int type, unsigned long value)
+{
+	static snd_kcontrol_new_t newctls[] = {
+		[AD1848_MIX_SINGLE] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_ad1848_info_single,
+			.get = snd_ad1848_get_single,
+			.put = snd_ad1848_put_single,
+		},
+		[AD1848_MIX_DOUBLE] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_ad1848_info_double,
+			.get = snd_ad1848_get_double,
+			.put = snd_ad1848_put_double,
+		},
+		[AD1848_MIX_CAPTURE] = {
+			.info = snd_ad1848_info_mux,
+			.get = snd_ad1848_get_mux,
+			.put = snd_ad1848_put_mux,
+		},
+	};
+	snd_kcontrol_t *ctl;
+	int err;
 
-static snd_kcontrol_new_t snd_ad1848_controls[] = {
+	ctl = snd_ctl_new1(&newctls[type], chip);
+	if (! ctl)
+		return -ENOMEM;
+	strncpy(ctl->id.name, name, sizeof(ctl->id.name)-1);
+	ctl->id.index = index;
+	ctl->private_value = value;
+	if ((err = snd_ctl_add(chip->card, ctl)) < 0) {
+		snd_ctl_free_one(ctl);
+		return err;
+	}
+	return 0;
+}
+
+
+static struct ad1848_mix_elem snd_ad1848_controls[] = {
 AD1848_DOUBLE("PCM Playback Switch", 0, AD1848_LEFT_OUTPUT, AD1848_RIGHT_OUTPUT, 7, 7, 1, 1),
 AD1848_DOUBLE("PCM Playback Volume", 0, AD1848_LEFT_OUTPUT, AD1848_RIGHT_OUTPUT, 0, 0, 63, 1),
 AD1848_DOUBLE("Aux Playback Switch", 0, AD1848_AUX1_LEFT_INPUT, AD1848_AUX1_RIGHT_INPUT, 7, 7, 1, 1),
@@ -1122,11 +1167,8 @@ AD1848_DOUBLE("Aux Playback Switch", 1, AD1848_AUX2_LEFT_INPUT, AD1848_AUX2_RIGH
 AD1848_DOUBLE("Aux Playback Volume", 1, AD1848_AUX2_LEFT_INPUT, AD1848_AUX2_RIGHT_INPUT, 0, 0, 31, 1),
 AD1848_DOUBLE("Capture Volume", 0, AD1848_LEFT_INPUT, AD1848_RIGHT_INPUT, 0, 0, 15, 0),
 {
-	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 	.name = "Capture Source",
-	.info = snd_ad1848_info_mux,
-	.get = snd_ad1848_get_mux,
-	.put = snd_ad1848_put_mux,
+	.type = AD1848_MIX_CAPTURE,
 },
 AD1848_SINGLE("Loopback Capture Switch", 0, AD1848_LOOPBACK, 0, 1, 0),
 AD1848_SINGLE("Loopback Capture Volume", 0, AD1848_LOOPBACK, 1, 63, 0)
@@ -1145,10 +1187,10 @@ int snd_ad1848_mixer(ad1848_t *chip)
 
 	strcpy(card->mixername, pcm->name);
 
-	for (idx = 0; idx < AD1848_CONTROLS; idx++) {
-		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_ad1848_controls[idx], chip))) < 0)
+	for (idx = 0; idx < ARRAY_SIZE(snd_ad1848_controls); idx++)
+		if ((err = snd_ad1848_add_ctl_elem(chip, &snd_ad1848_controls[idx])) < 0)
 			return err;
-	}
+
 	return 0;
 }
 
@@ -1160,13 +1202,9 @@ EXPORT_SYMBOL(snd_ad1848_mce_down);
 EXPORT_SYMBOL(snd_ad1848_interrupt);
 EXPORT_SYMBOL(snd_ad1848_create);
 EXPORT_SYMBOL(snd_ad1848_pcm);
+EXPORT_SYMBOL(snd_ad1848_get_pcm_ops);
 EXPORT_SYMBOL(snd_ad1848_mixer);
-EXPORT_SYMBOL(snd_ad1848_info_single);
-EXPORT_SYMBOL(snd_ad1848_get_single);
-EXPORT_SYMBOL(snd_ad1848_put_single);
-EXPORT_SYMBOL(snd_ad1848_info_double);
-EXPORT_SYMBOL(snd_ad1848_get_double);
-EXPORT_SYMBOL(snd_ad1848_put_double);
+EXPORT_SYMBOL(snd_ad1848_add_ctl);
 
 /*
  *  INIT part

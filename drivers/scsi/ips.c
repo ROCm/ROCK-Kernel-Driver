@@ -817,7 +817,7 @@ ips_eh_abort(Scsi_Cmnd *SC) {
    if (!SC)
       return (FAILED);
 
-   ha = (ips_ha_t *) SC->host->hostdata;
+   ha = (ips_ha_t *) SC->device->host->hostdata;
 
    if (!ha)
       return (FAILED);
@@ -884,7 +884,7 @@ ips_eh_reset(Scsi_Cmnd *SC) {
       return (FAILED);
    }
 
-   ha = (ips_ha_t *) SC->host->hostdata;
+   ha = (ips_ha_t *) SC->device->host->hostdata;
 
    if (!ha) {
       DEBUG(1, "Reset called with NULL ha struct");
@@ -1072,7 +1072,7 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 
    METHOD_TRACE("ips_queue", 1);
 
-   ha = (ips_ha_t *) SC->host->hostdata;
+   ha = (ips_ha_t *) SC->device->host->hostdata;
 
    if (!ha)
       return (1);
@@ -1100,12 +1100,12 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
              ips_name,
              ha->host_num,
              SC->cmnd[0],
-             SC->channel,
-             SC->target,
-             SC->lun);
+             SC->device->channel,
+             SC->device->id,
+             SC->device->lun);
 
    /* Check for command to initiator IDs */
-   if ((SC->channel > 0) && (SC->target == ha->ha_id[SC->channel])) {
+   if ((SC->device->channel > 0) && (SC->device->id == ha->ha_id[SC->device->channel])) {
       SC->result = DID_NO_CONNECT << 16;
       done(SC);
 
@@ -1556,9 +1556,9 @@ ips_is_passthru(Scsi_Cmnd *SC) {
       return (0);
 
    if ((SC->cmnd[0] == IPS_IOCTL_COMMAND) &&
-       (SC->channel == 0) &&
-       (SC->target == IPS_ADAPTER_ID) &&
-       (SC->lun == 0) &&
+       (SC->device->channel == 0) &&
+       (SC->device->id == IPS_ADAPTER_ID) &&
+       (SC->device->lun == 0) &&
         SC->request_buffer){
       if((!SC->use_sg) && SC->request_bufflen &&
          (((char *) SC->request_buffer)[0] == 'C') &&
@@ -1857,9 +1857,9 @@ ips_flash_firmware(ips_ha_t * ha, ips_passthru_t *pt, ips_scb_t *scb){
    /* FIX stuff that might be wrong */
    scb->sg_list = sg_list;
    scb->scb_busaddr = cmd_busaddr;
-   scb->bus = scb->scsi_cmd->channel;
-   scb->target_id = scb->scsi_cmd->target;
-   scb->lun = scb->scsi_cmd->lun;
+   scb->bus = scb->scsi_cmd->device->channel;
+   scb->target_id = scb->scsi_cmd->device->id;
+   scb->lun = scb->scsi_cmd->device->lun;
    scb->sg_len = 0;
    scb->data_len = 0;
    scb->flags = 0;
@@ -1922,9 +1922,9 @@ ips_usrcmd(ips_ha_t *ha, ips_passthru_t *pt, ips_scb_t *scb) {
    /* FIX stuff that might be wrong */
    scb->sg_list = sg_list;
    scb->scb_busaddr = cmd_busaddr;
-   scb->bus = scb->scsi_cmd->channel;
-   scb->target_id = scb->scsi_cmd->target;
-   scb->lun = scb->scsi_cmd->lun;
+   scb->bus = scb->scsi_cmd->device->channel;
+   scb->target_id = scb->scsi_cmd->device->id;
+   scb->lun = scb->scsi_cmd->device->lun;
    scb->sg_len = 0;
    scb->data_len = 0;
    scb->flags = 0;
@@ -2666,7 +2666,7 @@ ips_next(ips_ha_t *ha, int intr) {
     
    p = ha->scb_waitlist.head;
    while ((p) && (scb = ips_getscb(ha))) {
-      if ((p->channel > 0) && (ha->dcdb_active[p->channel-1] & (1 << p->target))) {
+      if ((p->device->channel > 0) && (ha->dcdb_active[p->device->channel-1] & (1 << p->device->id))) {
          ips_freescb(ha, scb);
          p = (Scsi_Cmnd *) p->host_scribble;
          continue;
@@ -2683,9 +2683,9 @@ ips_next(ips_ha_t *ha, int intr) {
 
       memset(SC->sense_buffer, 0, sizeof(SC->sense_buffer));
 
-      scb->target_id = SC->target;
-      scb->lun = SC->lun;
-      scb->bus = SC->channel;
+      scb->target_id = SC->device->id;
+      scb->lun = SC->device->lun;
+      scb->bus = SC->device->channel;
       scb->scsi_cmd = SC;
       scb->breakup = 0;
       scb->data_len = 0;
@@ -3499,9 +3499,9 @@ ips_map_status(ips_ha_t *ha, ips_scb_t *scb, ips_stat_t *sp) {
       DEBUG_VAR(2, "(%s%d) Physical device error (%d %d %d): %x %x, Sense Key: %x, ASC: %x, ASCQ: %x",
                 ips_name,
                 ha->host_num,
-                scb->scsi_cmd->channel,
-                scb->scsi_cmd->target,
-                scb->scsi_cmd->lun,
+                scb->scsi_cmd->device->channel,
+                scb->scsi_cmd->channel->id,
+                scb->scsi_cmd->channel->lun,
                 scb->basic_status,
                 scb->extended_status,
                 scb->extended_status == IPS_ERR_CKCOND ? scb->dcdb.sense_info[2] & 0xf : 0,

@@ -668,7 +668,7 @@ static int ac97_read_mixer(struct ess_card *card, int mixer)
 		if (mixer == SOUND_MIXER_IGAIN) {
 			right = (right * 100) / mh->scale;
 			left = (left * 100) / mh->scale;
-		else {
+		} else {
 			right = 100 - ((right * 100) / mh->scale);
 			left = 100 - ((left * 100) / mh->scale);
 		}

@@ -16,7 +16,7 @@
  * 2002-04-12	Tomas Kasparek	Proc interface update, code cleanup
  */
 
-/* $Id: uda1341.c,v 1.5 2002/11/09 13:12:19 perex Exp $ */
+/* $Id: uda1341.c,v 1.6 2003/01/07 10:36:28 tiwai Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -127,9 +127,6 @@ struct uda1341{
 	spinlock_t reg_lock;
 
 	snd_card_t *card;
-
-	snd_info_entry_t *proc_entry;
-	snd_info_entry_t *proc_regs_entry;
 
 	uda1341_cfg cfg;
 };
@@ -410,46 +407,10 @@ static void __devinit snd_uda1341_proc_init(snd_card_t *card, struct l3_client *
 
 	DEBUG_NAME(KERN_DEBUG "proc_init\n");
         
-	if ((entry = snd_info_create_card_entry(card, "uda1341", card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = clnt;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 512;
-		entry->c.text.read = snd_uda1341_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	uda->proc_entry = entry;
-	if ((entry = snd_info_create_card_entry(card, "uda1341-regs", card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = clnt;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 1024;
-		entry->c.text.read = snd_uda1341_proc_regs_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	uda->proc_regs_entry = entry;   
-}
-
-static void snd_uda1341_proc_done(struct l3_client *clnt)
-{
-	struct uda1341 *uda = clnt->driver_data;
-
-	DEBUG_NAME(KERN_DEBUG "proc_done\n");
-        
-	if (uda->proc_regs_entry) {
-		snd_info_unregister(uda->proc_regs_entry);
-		uda->proc_regs_entry = NULL;
-	}
-	if (uda->proc_entry) {
-		snd_info_unregister(uda->proc_entry);
-		uda->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(card, "uda1341", &entry))
+		snd_info_set_text_ops(entry, clnt, snd_uda1341_proc_read);
+	if (! snd_card_proc_new(card, "uda1341-regs", &entry)) {
+		snd_info_set_text_ops(entry, clnt, snd_uda1341_proc_regs_read);
 }
 
 /* }}} */
@@ -731,7 +692,6 @@ void __init snd_chip_uda1341_mixer_del(snd_card_t *card)
 {
 	DEBUG_NAME(KERN_DEBUG "uda1341 mixer_del\n");
         
-	snd_uda1341_proc_done(uda1341);
 	l3_detach_client(uda1341);
 
 	snd_magic_kfree(uda1341);

@@ -56,7 +56,7 @@ struct signal_sframe32 {
 	/* struct sigcontext32 * */ u32 sig_scptr;
 	int sig_address;
 	struct sigcontext32 sig_context;
-	unsigned extramask[_NSIG_WORDS32 - 1];
+	unsigned extramask[_COMPAT_NSIG_WORDS - 1];
 };
 
 /* 
@@ -69,7 +69,7 @@ struct new_signal_frame32 {
 	__siginfo32_t		info;
 	/* __siginfo_fpu32_t * */ u32 fpu_save;
 	unsigned int		insns [2];
-	unsigned		extramask[_NSIG_WORDS32 - 1];
+	unsigned		extramask[_COMPAT_NSIG_WORDS - 1];
 	unsigned		extra_size; /* Should be sizeof(siginfo_extra_v8plus_t) */
 	/* Only valid if (info.si_regs.psr & (PSR_VERS|PSR_IMPL)) == PSR_V8PLUS */
 	siginfo_extra_v8plus_t	v8plus;
@@ -80,7 +80,7 @@ struct rt_signal_frame32 {
 	struct sparc_stackf32	ss;
 	siginfo_t32		info;
 	struct pt_regs32	regs;
-	sigset_t32		mask;
+	compat_sigset_t		mask;
 	/* __siginfo_fpu32_t * */ u32 fpu_save;
 	unsigned int		insns [2];
 	stack_t32		stack;
@@ -139,7 +139,7 @@ int copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from)
  * atomically swap in the new signal mask, and wait for a signal.
  * This is really tricky on the Sparc, watch out...
  */
-asmlinkage void _sigpause32_common(old_sigset_t32 set, struct pt_regs *regs)
+asmlinkage void _sigpause32_common(compat_old_sigset_t set, struct pt_regs *regs)
 {
 	sigset_t saveset;
 
@@ -179,7 +179,7 @@ asmlinkage void _sigpause32_common(old_sigset_t32 set, struct pt_regs *regs)
 asmlinkage void do_rt_sigsuspend32(u32 uset, size_t sigsetsize, struct pt_regs *regs)
 {
 	sigset_t oldset, set;
-	sigset_t32 set32;
+	compat_sigset_t set32;
         
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
 	if (((compat_size_t)sigsetsize) != sizeof(sigset_t)) {
@@ -256,7 +256,7 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	unsigned int psr;
 	unsigned pc, npc, fpu_save;
 	sigset_t set;
-	unsigned seta[_NSIG_WORDS32];
+	unsigned seta[_COMPAT_NSIG_WORDS];
 	int err, i;
 	
 	regs->u_regs[UREG_FP] &= 0x00000000ffffffffUL;
@@ -302,7 +302,7 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	if (fpu_save)
 		err |= restore_fpu_state32(regs, &sf->fpu_state);
 	err |= __get_user(seta[0], &sf->info.si_mask);
-	err |= copy_from_user(seta+1, &sf->extramask, (_NSIG_WORDS32 - 1) * sizeof(unsigned));
+	err |= copy_from_user(seta+1, &sf->extramask, (_COMPAT_NSIG_WORDS - 1) * sizeof(unsigned));
 	if (err)
 	    	goto segv;
 	switch (_NSIG_WORDS) {
@@ -327,7 +327,7 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	struct sigcontext32 *scptr;
 	unsigned pc, npc, psr;
 	sigset_t set;
-	unsigned seta[_NSIG_WORDS32];
+	unsigned seta[_COMPAT_NSIG_WORDS];
 	int err;
 
 	synchronize_user_stack();
@@ -349,7 +349,7 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 
 	err |= __get_user(seta[0], &scptr->sigc_mask);
 	/* Note that scptr + 1 points to extramask */
-	err |= copy_from_user(seta+1, scptr + 1, (_NSIG_WORDS32 - 1) * sizeof(unsigned));
+	err |= copy_from_user(seta+1, scptr + 1, (_COMPAT_NSIG_WORDS - 1) * sizeof(unsigned));
 	if (err)
 	    	goto segv;
 	switch (_NSIG_WORDS) {
@@ -393,7 +393,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	unsigned pc, npc, fpu_save;
 	mm_segment_t old_fs;
 	sigset_t set;
-	sigset_t32 seta;
+	compat_sigset_t seta;
 	stack_t st;
 	int err, i;
 	
@@ -440,7 +440,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	err |= __get_user(fpu_save, &sf->fpu_save);
 	if (fpu_save)
 		err |= restore_fpu_state32(regs, &sf->fpu_state);
-	err |= copy_from_user(&seta, &sf->mask, sizeof(sigset_t32));
+	err |= copy_from_user(&seta, &sf->mask, sizeof(compat_sigset_t));
 	err |= __get_user((long)st.ss_sp, &sf->stack.ss_sp);
 	err |= __get_user(st.ss_flags, &sf->stack.ss_flags);
 	err |= __get_user(st.ss_size, &sf->stack.ss_size);
@@ -498,7 +498,7 @@ setup_frame32(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *o
 {
 	struct signal_sframe32 *sframep;
 	struct sigcontext32 *sc;
-	unsigned seta[_NSIG_WORDS32];
+	unsigned seta[_COMPAT_NSIG_WORDS];
 	int err = 0;
 	void *sig_address;
 	int sig_code;
@@ -544,7 +544,7 @@ setup_frame32(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *o
 	}
 	err |= __put_user(seta[0], &sc->sigc_mask);
 	err |= __copy_to_user(sframep->extramask, seta + 1,
-			      (_NSIG_WORDS32 - 1) * sizeof(unsigned));
+			      (_COMPAT_NSIG_WORDS - 1) * sizeof(unsigned));
 	err |= __put_user(regs->u_regs[UREG_FP], &sc->sigc_sp);
 	err |= __put_user(pc, &sc->sigc_pc);
 	err |= __put_user(npc, &sc->sigc_npc);
@@ -673,7 +673,7 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	int sigframe_size;
 	u32 psr;
 	int i, err;
-	unsigned seta[_NSIG_WORDS32];
+	unsigned seta[_COMPAT_NSIG_WORDS];
 
 	/* 1. Make sure everything is clean */
 	synchronize_user_stack();
@@ -729,7 +729,7 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	}
 	err |= __put_user(seta[0], &sf->info.si_mask);
 	err |= __copy_to_user(sf->extramask, seta + 1,
-			      (_NSIG_WORDS32 - 1) * sizeof(unsigned));
+			      (_COMPAT_NSIG_WORDS - 1) * sizeof(unsigned));
 
 	err |= copy_in_user((u32 *)sf,
 			    (u32 *)(regs->u_regs[UREG_FP]),
@@ -1098,7 +1098,7 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	int sigframe_size;
 	u32 psr;
 	int i, err;
-	sigset_t32 seta;
+	compat_sigset_t seta;
 
 	/* 1. Make sure everything is clean */
 	synchronize_user_stack();
@@ -1160,7 +1160,7 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	case 1: seta.sig[1] = (oldset->sig[0] >> 32);
 		seta.sig[0] = oldset->sig[0];
 	}
-	err |= __copy_to_user(&sf->mask, &seta, sizeof(sigset_t32));
+	err |= __copy_to_user(&sf->mask, &seta, sizeof(compat_sigset_t));
 
 	err |= copy_in_user((u32 *)sf,
 			    (u32 *)(regs->u_regs[UREG_FP]),

@@ -63,6 +63,7 @@ static dev_link_t *ixj_attach(void)
 	if (!link)
 		return NULL;
 	memset(link, 0, sizeof(struct dev_link_t));
+	init_timer(&link->release);
 	link->release.function = &ixj_cs_release;
 	link->release.data = (u_long) link;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;

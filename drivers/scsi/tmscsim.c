@@ -1184,7 +1184,7 @@ static void dc390_Query_to_Waiting (PACB pACB)
 	if (!pSRB) return;
 	pcmd = dc390_Query_get ( pACB );
 	if (!pcmd) { dc390_Free_insert (pACB, pSRB); return; }; /* should not happen */
-	pDCB = dc390_findDCB (pACB, pcmd->target, pcmd->lun);
+	pDCB = dc390_findDCB (pACB, pcmd->device->id, pcmd->device->lun);
 	if (!pDCB) 
 	{ 
 		dc390_Free_insert (pACB, pSRB);
@@ -1223,12 +1223,12 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     PDCB   pDCB;
     PSRB   pSRB;
     DC390_AFLAGS
-    PACB   pACB = (PACB) cmd->host->hostdata;
+    PACB   pACB = (PACB) cmd->device->host->hostdata;
 
 
     DEBUG0(/*  if(pACB->scan_devices) */	\
 	printk(KERN_INFO "DC390: Queue Cmd=%02x,Tgt=%d,LUN=%d (pid=%li)\n",\
-		cmd->cmnd[0],cmd->target,cmd->lun,cmd->pid);)
+		cmd->cmnd[0],cmd->device->id,cmd->device->lun,cmd->pid);)
 
     DC390_LOCK_ACB;
     
@@ -1245,11 +1245,11 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     else if( (pACB->scan_devices) && (cmd->cmnd[0] == READ_6) )
 	pACB->scan_devices = 0;
 
-    if ( ( cmd->target >= pACB->pScsiHost->max_id ) || 
-	 (cmd->lun >= pACB->pScsiHost->max_lun) )
+    if ( ( cmd->device->id >= pACB->pScsiHost->max_id ) || 
+	 (cmd->device->lun >= pACB->pScsiHost->max_lun) )
     {
 /*	printk ("DC390: Ignore target %d lun %d\n",
-		cmd->target, cmd->lun); */
+		cmd->device->id, cmd->device->lun); */
 	DC390_UNLOCK_ACB;
 	//return (1);
 	done (cmd);
@@ -1257,15 +1257,15 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     }
 
     if( (pACB->scan_devices || cmd->cmnd[0] == TEST_UNIT_READY || cmd->cmnd[0] == INQUIRY) && 
-       !(pACB->DCBmap[cmd->target] & (1 << cmd->lun)) )
+       !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun)) )
     {
         pACB->scan_devices = 1;
 
-	dc390_initDCB( pACB, &pDCB, cmd->target, cmd->lun );
+	dc390_initDCB( pACB, &pDCB, cmd->device->id, cmd->device->lun );
 	if (!pDCB)
 	  {
 	    printk (KERN_ERR "DC390: kmalloc for DCB failed, target %02x lun %02x\n", 
-		    cmd->target, cmd->lun);
+		    cmd->device->id, cmd->device->lun);
 	    DC390_UNLOCK_ACB;
 	    printk ("DC390: No DCB in queue_command!\n");
 #ifdef USE_NEW_EH
@@ -1277,10 +1277,10 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 	  };
             
     }
-    else if( !(pACB->scan_devices) && !(pACB->DCBmap[cmd->target] & (1 << cmd->lun)) )
+    else if( !(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun)) )
     {
 	printk(KERN_INFO "DC390: Ignore target %02x lun %02x\n",
-		cmd->target, cmd->lun); 
+		cmd->device->id, cmd->device->lun); 
 	DC390_UNLOCK_ACB;
 	//return (1);
 	done (cmd);
@@ -1288,11 +1288,11 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     }
     else
     {
-	pDCB = dc390_findDCB (pACB, cmd->target, cmd->lun);
+	pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
 	if (!pDCB)
 	 {  /* should never happen */
 	    printk (KERN_ERR "DC390: no DCB failed, target %02x lun %02x\n", 
-		    cmd->target, cmd->lun);
+		    cmd->device->id, cmd->device->lun);
 	    DC390_UNLOCK_ACB;
 	    printk ("DC390: No DCB in queuecommand (2)!\n");
 #ifdef USE_NEW_EH
@@ -1547,12 +1547,12 @@ int DC390_abort (Scsi_Cmnd *cmd)
     int   status;
     //ULONG sbac;
     DC390_AFLAGS
-    PACB  pACB = (PACB) cmd->host->hostdata;
+    PACB  pACB = (PACB) cmd->device->host->hostdata;
 
     DC390_LOCK_ACB;
 
     printk ("DC390: Abort command (pid %li, Device %02i-%02i)\n",
-	    cmd->pid, cmd->target, cmd->lun);
+	    cmd->pid, cmd->device->id, cmd->device->lun);
 
     /* First scan Query list */
     if( pACB->QueryCnt )
@@ -1586,7 +1586,7 @@ int DC390_abort (Scsi_Cmnd *cmd)
 	}
     }
 	
-    pDCB = dc390_findDCB (pACB, cmd->target, cmd->lun);
+    pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
     if( !pDCB ) goto  NOT_RUN;
 
     /* Added 98/07/02 KG */
@@ -1785,7 +1785,7 @@ int DC390_reset (Scsi_Cmnd *cmd, unsigned int resetFlags)
 {
     UCHAR   bval;
     DC390_AFLAGS
-    PACB    pACB = (PACB) cmd->host->hostdata;
+    PACB    pACB = (PACB) cmd->device->host->hostdata;
 
     printk(KERN_INFO "DC390: RESET ... ");
 
@@ -2358,11 +2358,11 @@ int __init DC390_detect (Scsi_Host_Template *psht)
 static void dc390_inquiry_done (Scsi_Cmnd* cmd)
 {
    printk (KERN_INFO "DC390: INQUIRY (ID %02x LUN %02x) returned %08x\n",
-	   cmd->target, cmd->lun, cmd->result);
+	   cmd->device->id, cmd->device->lun, cmd->result);
    if (cmd->result)
    {
-	PACB pACB = (PACB)cmd->host->hostdata;
-	PDCB pDCB = dc390_findDCB (pACB, cmd->target, cmd->lun);
+	PACB pACB = (PACB)cmd->device->host->hostdata;
+	PDCB pDCB = dc390_findDCB (pACB, cmd->device->id, cmd->device->lun);
 	printk ("DC390: Unsetting DsCn, Sync and TagQ!\n");
 	if (pDCB)
 	{
@@ -2387,9 +2387,10 @@ void dc390_inquiry (PACB pACB, PDCB pDCB)
    cmd->cmnd[4] = 0xff;
    
    cmd->cmd_len = 6; cmd->old_cmd_len = 6;
-   cmd->host = pACB->pScsiHost;
-   cmd->target = pDCB->TargetID;
-   cmd->lun = pDCB->TargetLUN; 
+/* TODO FIXME */
+/*    cmd->host = pACB->pScsiHost; */
+   cmd->device->id = pDCB->TargetID;
+   cmd->device->lun = pDCB->TargetLUN; 
    cmd->serial_number = 1;
    cmd->pid = 390;
    cmd->bufflen = 128;
@@ -2419,7 +2420,7 @@ void dc390_inquiry (PACB pACB, PDCB pDCB)
 static void dc390_sendstart_done (Scsi_Cmnd* cmd)
 {
    printk (KERN_INFO "DC390: SENDSTART (ID %02x LUN %02x) returned %08x\n",
-	   cmd->target, cmd->lun, cmd->result);
+	   cmd->device->id, cmd->device->lun, cmd->result);
    kfree (cmd);
 };
 
@@ -2437,9 +2438,10 @@ void dc390_sendstart (PACB pACB, PDCB pDCB)
    cmd->cmnd[4] = 0x01; /* START */
    
    cmd->cmd_len = 6; cmd->old_cmd_len = 6;
-   cmd->host = pACB->pScsiHost;
-   cmd->target = pDCB->TargetID;
-   cmd->lun = pDCB->TargetLUN; 
+/* TODO FIXME */
+/*    cmd->host = pACB->pScsiHost; */
+   cmd->device->id = pDCB->TargetID;
+   cmd->device->lun = pDCB->TargetLUN; 
    cmd->serial_number = 1;
    cmd->pid = 310;
    cmd->bufflen = 128;
@@ -2734,7 +2736,9 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
    
  reset:
      {
-	Scsi_Cmnd cmd; cmd.host = pACB->pScsiHost;
+	Scsi_Cmnd cmd;
+	/* TODO FIXME */
+	/* cmd.host = pACB->pScsiHost; */
 	printk (KERN_WARNING "DC390: Driver reset requested!\n");
 	DC390_UNLOCK_ACB;
 	DC390_reset (&cmd, 0);
