@@ -158,8 +158,6 @@ static int	send_1_5 (int lun, unsigned char *command, int dma);
 static int	get_status (void);
 static int	calc_received (void *start_address);
 
-extern int pamsnet_probe(struct net_device *dev);
-
 static int pamsnet_open(struct net_device *dev);
 static int pamsnet_send_packet(struct sk_buff *skb, struct net_device *dev);
 static void pamsnet_poll_rx(struct net_device *);
@@ -562,12 +560,12 @@ bad:
 /* Check for a network adaptor of this type, and return '0' if one exists.
  */
 
-int __init 
-pamsnet_probe (dev)
-	struct net_device *dev;
+struct net_device * __init pamsnet_probe (int unit)
 {
+	struct net_device *dev;
 	int i;
 	HADDR *hwaddr;
+	int err;
 
 	unsigned char station_addr[6];
 	static unsigned version_printed;
@@ -575,11 +573,17 @@ pamsnet_probe (dev)
 	static int no_more_found;
 
 	if (no_more_found)
-		return -ENODEV;
-
-	SET_MODULE_OWNER(dev);
-
+		return ERR_PTR(-ENODEV);
 	no_more_found = 1;
+
+	dev = alloc_etherdev(sizeof(struct net_local));
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+	}
+	SET_MODULE_OWNER(dev);
 
 	printk("Probing for PAM's Net/GK Adapter...\n");
 
@@ -618,11 +622,12 @@ pamsnet_probe (dev)
 	ENABLE_IRQ();
 	stdma_release();
 
-	if (lance_target < 0)
+	if (lance_target < 0) {
 		printk("No PAM's Net/GK found.\n");
+		free_netdev(dev);
+		return ERR_PTR(-ENODEV);
+	}
 
-	if ((dev == NULL) || (lance_target < 0))
-		return -ENODEV;
 	if (pamsnet_debug > 0 && version_printed++ == 0)
 		printk(version);
 
@@ -632,12 +637,6 @@ pamsnet_probe (dev)
 		station_addr[3], station_addr[4], station_addr[5]);
 
 	/* Initialize the device structure. */
-	if (dev->priv == NULL)
-		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-	if (!dev->priv)
-		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_local));
-
 	dev->open		= pamsnet_open;
 	dev->stop		= pamsnet_close;
 	dev->hard_start_xmit	= pamsnet_send_packet;
@@ -653,9 +652,12 @@ pamsnet_probe (dev)
 #endif
 		dev->dev_addr[i]  = station_addr[i];
 	}
-	ether_setup(dev);
+	err = register_netdev(dev);
+	if (!err)
+		return dev;
 
-	return(0);
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 /* Open/initialize the board.  This is called (in the current kernel)
@@ -866,25 +868,20 @@ static struct net_device_stats *net_get_stats(struct net_device *dev)
 
 #ifdef MODULE
 
-static struct net_device pam_dev;
+static struct net_device *pam_dev;
 
-int
-init_module(void) {
-	int err;
-
-	pam_dev.init = pamsnet_probe;
-	if ((err = register_netdev(&pam_dev))) {
-		if (err == -EEXIST)  {
-			printk("PAM's Net/GK: devices already present. Module not loaded.\n");
-		}
-		return err;
-	}
+int init_module(void)
+{
+	pam_dev = pamsnet_probe(-1);
+	if (IS_ERR(pam_dev))
+		return PTR_ERR(pam_dev);
 	return 0;
 }
 
-void
-cleanup_module(void) {
-	unregister_netdev(&pam_dev);
+void cleanup_module(void)
+{
+	unregister_netdev(pam_dev);
+	free_netdev(pam_dev);
 }
 
 #endif /* MODULE */
