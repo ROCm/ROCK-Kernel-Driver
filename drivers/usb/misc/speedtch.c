@@ -1306,7 +1306,8 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		if (completed == count)
 			break;
 
-		yield ();
+		set_current_state (TASK_RUNNING);
+		schedule ();
 	} while (1);
 
 	dbg ("udsl_usb_disconnect: flushing");
@@ -1345,7 +1346,8 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		if (count == UDSL_NUMBER_SND_URBS)
 			break;
 
-		yield ();
+		set_current_state (TASK_RUNNING);
+		schedule ();
 	} while (1);
 
 	dbg ("udsl_usb_disconnect: flushing");
