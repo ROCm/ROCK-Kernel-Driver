@@ -378,9 +378,11 @@ static void __init smp_init(void)
  * between the root thread and the init thread may cause start_kernel to
  * be reaped by free_initmem before the root thread has proceeded to
  * cpu_idle.
+ *
+ * gcc-3.4 accidentally inlines this function, so use noinline.
  */
 
-static void rest_init(void)
+static void noinline rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	unlock_kernel();
