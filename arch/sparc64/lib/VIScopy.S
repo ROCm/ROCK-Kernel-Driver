@@ -306,11 +306,7 @@
 		.globl			__memcpy_begin
 __memcpy_begin:
 
-		.globl			__memcpy
-		.type			__memcpy,@function
-
 memcpy_private:
-__memcpy:
 memcpy:		mov		ASI_P, asi_src			! IEU0	Group
 		brnz,pt		%o2, __memcpy_entry		! CTI
 		 mov		ASI_P, asi_dest			! IEU1
