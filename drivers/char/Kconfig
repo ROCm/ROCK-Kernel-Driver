@@ -62,6 +62,9 @@ config HW_CONSOLE
 	depends on VT && !S390 && !UM
 	default y
 
+config ECC
+	tristate "ECC memory monitoring"
+
 config SERIAL_NONSTANDARD
 	bool "Non-standard serial port support"
 	---help---
