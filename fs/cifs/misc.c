@@ -153,7 +153,7 @@ cifs_buf_get(void)
    albeit slightly larger than necessary and maxbuffersize 
    defaults to this and can not be bigger */
 	ret_buf =
-	    (struct smb_hdr *) kmem_cache_alloc(cifs_req_cachep, SLAB_KERNEL);
+	    (struct smb_hdr *) kmem_cache_alloc(cifs_req_cachep, SLAB_KERNEL | SLAB_NOFS);
 
 	/* clear the first few header bytes */
 	if (ret_buf) {

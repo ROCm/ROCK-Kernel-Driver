@@ -26,6 +26,7 @@
 #include <linux/version.h>
 #include <linux/ipv6.h>
 #include <linux/pagemap.h>
+#include <linux/ctype.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include "cifspdu.h"
@@ -54,7 +55,7 @@ struct smb_vol {
 	char *UNC;
 	char *UNCip;
 	char *iocharset;  /* local code page for mapping to and from Unicode */
-	char *source_rfc1001_name; /* netbios name of client */
+	char source_rfc1001_name[16]; /* netbios name of client */
 	uid_t linux_uid;
 	gid_t linux_gid;
 	mode_t file_mode;
@@ -67,8 +68,11 @@ struct smb_vol {
 	unsigned short int port;
 };
 
-int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
-int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket);
+static int ipv4_connect(struct sockaddr_in *psin_server, 
+			struct socket **csocket,
+			char * netb_name);
+static int ipv6_connect(struct sockaddr_in6 *psin_server, 
+			struct socket **csocket);
 
 
 	/* 
@@ -149,7 +153,9 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		if(server->protocolType == IPV6) {
 			rc = ipv6_connect(&server->addr.sockAddr6,&server->ssocket);
 		} else {
-			rc = ipv4_connect(&server->addr.sockAddr, &server->ssocket);
+			rc = ipv4_connect(&server->addr.sockAddr, 
+					&server->ssocket,
+					server->workstation_RFC1001_name);
 		}
 		if(rc) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -160,7 +166,6 @@ cifs_reconnect(struct TCP_Server_Info *server)
 			wake_up(&server->response_q);
 		}
 	}
-
 	return rc;
 }
 
@@ -182,7 +187,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 
 	daemonize("cifsd");
 	allow_signal(SIGKILL);
-
+	current->flags |= PF_MEMALLOC;
 	server->tsk = current;	/* save process info to wake at shutdown */
 	cFYI(1, ("Demultiplex PID: %d", current->pid));
 
@@ -456,11 +461,20 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 {
 	char *value;
 	char *data;
-	int  temp_len, i, j;
+	unsigned int  temp_len, i, j;
 	char separator[2];
 
 	separator[0] = ',';
 	separator[1] = 0; 
+
+	memset(vol->source_rfc1001_name,0x20,15);
+	for(i=0;i < strnlen(system_utsname.nodename,15);i++) {
+		/* does not have to be a perfect mapping since the field is
+		informational, only used for servers that do not support
+		port 445 and it can be overridden at mount time */
+		vol->source_rfc1001_name[i] = toupper(system_utsname.nodename[i]);
+	}
+	vol->source_rfc1001_name[15] = 0;
 
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
@@ -590,6 +604,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				printk(KERN_WARNING "CIFS: invalid domain name\n");
 				return 1;	/* needs_arg; */
 			}
+			/* BB are there cases in which a comma can be valid in
+			a domain name and need special handling? */
 			if (strnlen(value, 65) < 65) {
 				vol->domainname = value;
 				cFYI(1, ("Domain name set"));
@@ -652,12 +668,25 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 					simple_strtoul(value, &value, 0);
 			}
 		} else if (strnicmp(data, "netbiosname", 4) == 0) {
-			if (!value || !*value) {
-				vol->source_rfc1001_name = NULL;
-			} else if (strnlen(value, 17) < 17) {
-				vol->source_rfc1001_name = value;
+			if (!value || !*value || (*value == ' ')) {
+				cFYI(1,("invalid (empty) netbiosname specified"));
 			} else {
-				printk(KERN_WARNING "CIFS: netbiosname too long (more than 15)\n");
+				memset(vol->source_rfc1001_name,0x20,15);
+				for(i=0;i<15;i++) {
+				/* BB are there cases in which a comma can be 
+				valid in this workstation netbios name (and need
+				special handling)? */
+
+				/* We do not uppercase netbiosname for user */
+					if (value[i]==0)
+						break;
+					else 
+						vol->source_rfc1001_name[i] = value[i];
+				}
+				/* The string has 16th byte zero still from
+				set at top of the function  */
+				if((i==15) && (value[i] != 0))
+					printk(KERN_WARNING "CIFS: netbiosname longer than 15 and was truncated.\n");
 			}
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
@@ -845,8 +874,24 @@ get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 	return rc;
 }
 
-int
-ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
+/* See RFC1001 section 14 on representation of Netbios names */
+static void rfc1002mangle(char * target,char * source, unsigned int length)
+{
+	unsigned int i,j;
+
+	for(i=0,j=0;i<(length);i++) {
+		/* mask a nibble at a time and encode */
+		target[j] = 'A' + (0x0F & (source[i] >> 4));
+		target[j+1] = 'A' + (0x0F & source[i]);
+		j+=2;
+	}
+
+}
+
+
+static int
+ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket, 
+			 char * netbios_name)
 {
 	int rc = 0;
 	int connected = 0;
@@ -861,11 +906,11 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			cFYI(1,("Socket created"));
+	/*		(*csocket)->sk->allocation = GFP_NOFS; */ /* BB is there equivalent in 2.6 */
 		}
 	}
 
 	psin_server->sin_family = AF_INET;
-	
 	if(psin_server->sin_port) { /* user overrode default port */
 		rc = (*csocket)->ops->connect(*csocket,
 				(struct sockaddr *) psin_server,
@@ -912,11 +957,47 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		the default. sock_setsockopt not used because it expects 
 		user space buffer */
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
+
+	/* send RFC1001 sessinit */
+
+	if(psin_server->sin_port == htons(139)) {
+		/* some servers require RFC1001 sessinit before sending
+		negprot - BB check reconnection in case where second 
+		sessinit is sent but no second negprot */
+		struct rfc1002_session_packet * ses_init_buf;
+		struct smb_hdr * smb_buf;
+		ses_init_buf = cifs_kcalloc(sizeof(struct rfc1002_session_packet), GFP_KERNEL);
+		if(ses_init_buf) {
+			ses_init_buf->trailer.session_req.called_len = 32;
+			rfc1002mangle(ses_init_buf->trailer.session_req.called_name,
+				DEFAULT_CIFS_CALLED_NAME,16);
+			ses_init_buf->trailer.session_req.calling_len = 32;
+			if(netbios_name && (netbios_name[0] !=0)) {
+				rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
+					netbios_name,16);
+			} else {
+				rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
+					"LINUX_CIFS_CLNT",16);
+			}
+			ses_init_buf->trailer.session_req.scope1 = 0;
+			ses_init_buf->trailer.session_req.scope2 = 0;
+		/* BB fixme ensure calling space padded w/null terminate*/
+			smb_buf = (struct smb_hdr *)ses_init_buf;
+			/* sizeof RFC1002_SESSION_REQUEST with no scope */
+			smb_buf->smb_buf_length = 0x81000044;
+			rc = smb_send(*csocket, smb_buf, 0x44,
+				(struct sockaddr *)psin_server);
+			kfree(ses_init_buf);
+		}
+		/* else the negprot may still work without this 
+		even though malloc failed */
+		
+	}
 		
 	return rc;
 }
 
-int
+static int
 ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 {
 	int rc = 0;
@@ -1000,7 +1081,6 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 /* cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data)); */
 	
 	memset(&volume_info,0,sizeof(struct smb_vol));
-
 	if (cifs_parse_mount_options(mount_data, devname, &volume_info)) {
 		if(volume_info.UNC)
 			kfree(volume_info.UNC);
@@ -1049,6 +1129,12 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	} else if (volume_info.UNCip){
 		/* BB using ip addr as server name connect to the DFS root below */
 		cERROR(1,("Connecting to DFS root not implemented yet"));
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
+		FreeXid(xid);
+		return -EINVAL;
 	} else /* which servers DFS root would we conect to */ {
 		cERROR(1,
 		       ("CIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
@@ -1087,7 +1173,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			sin_server.sin_port = htons(volume_info.port);
 		else
 			sin_server.sin_port = 0;
-		rc = ipv4_connect(&sin_server, &csocket);
+		rc = ipv4_connect(&sin_server,&csocket,volume_info.source_rfc1001_name);
 		if (rc < 0) {
 			cERROR(1,
 			       ("Error connecting to IPv4 socket. Aborting operation"));
@@ -1123,6 +1209,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			init_MUTEX(&srvTcp->tcpSem);
 			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
 				      CLONE_FS | CLONE_FILES | CLONE_VM);
+			memcpy(srvTcp->workstation_RFC1001_name, volume_info.source_rfc1001_name,16);
 		}
 	}
 
@@ -1131,6 +1218,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cFYI(1, ("Existing smb sess found "));
 		if(volume_info.password)
 			kfree(volume_info.password);
+		/* volume_info.UNC freed at end of function */
 	} else if (!rc) {
 		cFYI(1, ("Existing smb sess not found "));
 		pSesInfo = sesInfoAlloc();
@@ -1142,7 +1230,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 				NIPQUAD(sin_server.sin_addr.s_addr));
 		}
 
-		if (!rc){   
+		if (!rc){
+			/* volume_info.password freed at unmount */   
 			if (volume_info.password)
 				pSesInfo->password = volume_info.password;
 			if (volume_info.username)
@@ -1263,6 +1352,11 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		if (tcon->ses->capabilities & CAP_UNIX)
 			CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls);
 	}
+
+	/* volume_info.password is freed above when existing session found
+	(in which case it is not needed anymore) but when new sesion is created
+	the password ptr is put in the new session structure (in which case the
+	password will be freed at unmount time) */
 	if(volume_info.UNC)
 		kfree(volume_info.UNC);
 	FreeXid(xid);
