@@ -1327,7 +1327,23 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			goto out;
 	}
 
-	if (!stp) {
+	if (stp) {
+		/* This is an upgrade of an existing OPEN.
+		 * OR the incoming share with the existing
+		 * nfs4_stateid share */
+		unsigned int share_access;
+
+		set_access(&share_access, stp->st_access_bmap);
+		share_access = ~share_access;
+		share_access &= open->op_share_access;
+
+		/* update the struct file */
+		if ((status = nfs4_file_upgrade(stp->st_vfs_file, share_access)))
+			goto out;
+		/* remember the open */
+		set_bit(open->op_share_access, &stp->st_access_bmap);
+		set_bit(open->op_share_deny, &stp->st_deny_bmap);
+	} else {
 		int flags = 0;
 
 		status = nfserr_resource;
@@ -1348,22 +1364,6 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 
 		init_stateid(stp, fp, sop, open);
 		stp->st_vfs_set = 1;
-	} else {
-		/* This is an upgrade of an existing OPEN. 
-		 * OR the incoming share with the existing 
-		 * nfs4_stateid share */
-		unsigned int share_access;
-
-		set_access(&share_access, stp->st_access_bmap);
-		share_access = ~share_access;
-		share_access &= open->op_share_access;
-
-		/* update the struct file */
-		if ((status = nfs4_file_upgrade(stp->st_vfs_file, share_access)))
-			goto out;
-		/* remember the open */
-		set_bit(open->op_share_access, &stp->st_access_bmap);
-		set_bit(open->op_share_deny, &stp->st_deny_bmap);
 	}
 	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
