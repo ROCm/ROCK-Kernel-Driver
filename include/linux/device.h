@@ -64,7 +64,7 @@ struct bus_type {
 	struct driver_dir_entry	device_dir;
 	struct driver_dir_entry	driver_dir;
 
-	int	(*bind)		(struct device * dev, struct device_driver * drv);
+	int	(*match)	(struct device * dev, struct device_driver * drv);
 };
 
 

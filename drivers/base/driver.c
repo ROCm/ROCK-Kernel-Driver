@@ -74,7 +74,7 @@ int driver_register(struct device_driver * drv)
 	list_add(&drv->bus_list,&drv->bus->drivers);
 	write_unlock(&drv->bus->lock);
 	driver_make_dir(drv);
-	driver_bind(drv);
+	driver_attach(drv);
 	put_driver(drv);
 	return 0;
 }
@@ -84,7 +84,7 @@ static void __remove_driver(struct device_driver * drv)
 	if (drv->bus) {
 		pr_debug("Unregistering driver '%s' from bus '%s'\n",drv->name,drv->bus->name);
 
-		driver_unbind(drv);
+		driver_detach(drv);
 		write_lock(&drv->bus->lock);
 		list_del_init(&drv->bus_list);
 		write_unlock(&drv->bus->lock);

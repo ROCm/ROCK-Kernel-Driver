@@ -165,7 +165,7 @@ pci_dev_driver(const struct pci_dev *dev)
 }
 
 /**
- * pci_bus_bind - Tell if a PCI device structure has a matching PCI device id structure
+ * pci_bus_match - Tell if a PCI device structure has a matching PCI device id structure
  * @ids: array of PCI device id structures to search in
  * @dev: the PCI device structure to match against
  * 
@@ -173,7 +173,7 @@ pci_dev_driver(const struct pci_dev *dev)
  * system is in its list of supported devices.Returns the matching
  * pci_device_id structure or %NULL if there is no match.
  */
-static int pci_bus_bind(struct device * dev, struct device_driver * drv) 
+static int pci_bus_match(struct device * dev, struct device_driver * drv) 
 {
 	struct pci_dev * pci_dev = list_entry(dev, struct pci_dev, dev);
 	struct pci_driver * pci_drv = list_entry(drv,struct pci_driver,driver);
@@ -196,7 +196,7 @@ static int pci_bus_bind(struct device * dev, struct device_driver * drv)
 
 struct bus_type pci_bus_type = {
 	name:	"pci",
-	bind:	pci_bus_bind,
+	match:	pci_bus_match,
 };
 
 static int __init pci_driver_init(void)
