@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-SH = $(CONFIG_SHELL)
-
 EXTRA_AFLAGS := -ansi
 
 EXTRA_TARGETS	:= head.o init_task.o

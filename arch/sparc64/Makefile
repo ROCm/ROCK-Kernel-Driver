@@ -33,7 +33,7 @@ AS		:= $(AS) -64
 LDFLAGS		:= -m elf64_sparc
 LDFLAGS_BLOB	:= --format binary --oformat elf64-sparc
 endif
-ELFTOAOUT	= elftoaout
+
 ifneq ($(UNDECLARED_REGS),y)
 CC_UNDECL	=
 else
@@ -63,13 +63,11 @@ core-$(CONFIG_SOLARIS_EMUL)	+= arch/sparc64/solaris/
 core-y				+= arch/sparc64/math-emu/
 libs-y				+= arch/sparc64/prom/ arch/sparc64/lib/
 
-vmlinux.aout: vmlinux
-	$(ELFTOAOUT) -o $(TOPDIR)/vmlinux.aout $(TOPDIR)/vmlinux
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/sparc64/boot $(1)
 
-archclean:
-	rm -f $(TOPDIR)/vmlinux.aout
+tftpboot.img vmlinux.aout:
+	$(call makeboot,arch/sparc64/boot/$@)
 
 archmrproper:
+archclean:
 
-tftpboot.img:
-	$(MAKE) -C arch/sparc64/boot tftpboot.img
