@@ -241,11 +241,21 @@ advwdt_init(void)
 
 	advwdt_validate_timeout();
 	spin_lock_init(&advwdt_lock);
-	misc_register(&advwdt_miscdev);
+	if (misc_register(&advwdt_miscdev))
+		return -ENODEV;
 #if WDT_START != WDT_STOP
-	request_region(WDT_STOP, 1, "Advantech WDT");
+	if (!request_region(WDT_STOP, 1, "Advantech WDT")) {
+		misc_deregister(&advwdt_miscdev);
+		return -EIO;
+	}
 #endif
-	request_region(WDT_START, 1, "Advantech WDT");
+	if (!request_region(WDT_START, 1, "Advantech WDT")) {
+		misc_deregister(&advwdt_miscdev);
+#if WDT_START != WDT_STOP
+		release_region(WDT_STOP, 1);
+#endif
+		return -EIO;
+	}
 	register_reboot_notifier(&advwdt_notifier);
 	return 0;
 }
