@@ -410,6 +410,7 @@ int patch_sigmatel_stac9708(ac97_t * ac97)
 	unsigned int codec72, codec6c;
 
 	ac97->build_ops = &patch_sigmatel_stac9708_ops;
+	ac97->caps |= 0x10;	/* HP (sigmatel surround) support */
 
 	codec72 = snd_ac97_read(ac97, AC97_SIGMATEL_BIAS2) & 0x8000;
 	codec6c = snd_ac97_read(ac97, AC97_SIGMATEL_ANALOG);
