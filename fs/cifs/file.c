@@ -1184,7 +1184,6 @@ fill_in_inode(struct inode *tmp_inode,
 	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
 	cifsInfo->cifsAttrs = pfindData->ExtFileAttributes;
 	cifsInfo->time = jiffies;
-	atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode info */
 
 	/* Linux can not store file creation time unfortunately so ignore it */
 	tmp_inode->i_atime =
@@ -1197,10 +1196,12 @@ fill_in_inode(struct inode *tmp_inode,
 	/* 2767 perms - indicate mandatory locking */
 		/* BB fill in uid and gid here? with help from winbind? 
 			or retrieve from NTFS stream extended attribute */
-	tmp_inode->i_uid = cifs_sb->mnt_uid;
-	tmp_inode->i_gid = cifs_sb->mnt_gid;
-	/* set default mode. will override for dirs below */
-	tmp_inode->i_mode = cifs_sb->mnt_file_mode;
+	if(atomic_read(&cifsInfo->inUse) == 0) {
+		tmp_inode->i_uid = cifs_sb->mnt_uid;
+		tmp_inode->i_gid = cifs_sb->mnt_gid;
+		/* set default mode. will override for dirs below */
+		tmp_inode->i_mode = cifs_sb->mnt_file_mode;
+	}
 
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
@@ -1212,7 +1213,9 @@ fill_in_inode(struct inode *tmp_inode,
 	} else if (pfindData->ExtFileAttributes & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
-		tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
+		if(atomic_read(&cifsInfo->inUse) == 0) {
+			tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
+		}
 		tmp_inode->i_mode |= S_IFDIR;
 	} else {
 		*pobject_type = DT_REG;
@@ -1223,6 +1226,10 @@ fill_in_inode(struct inode *tmp_inode,
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
+	if(atomic_read(&cifsInfo->inUse) == 0) {
+		atomic_set(&cifsInfo->inUse,1);
+	}
+
 	i_size_write(tmp_inode,pfindData->EndOfFile);
 	tmp_inode->i_blocks =
 		(tmp_inode->i_blksize - 1 + pfindData->AllocationSize) >> tmp_inode->i_blkbits;
