@@ -27,6 +27,20 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * Known vendor commands: 12 bytes, first byte is opcode
+ *
+ * E7: read scatter gather
+ * E8: read
+ * E9: write
+ * EA: erase
+ * EB: reset
+ * EC: read status
+ * ED: read ID
+ * EE: write CIS (?)
+ * EF: compute checksum (?)
+ */
+
 #include "transport.h"
 #include "protocol.h"
 #include "usb.h"
@@ -461,6 +475,7 @@ sddr09_read23(struct us_data *us, unsigned long fromaddress,
  * 
  * Always precisely one block is erased; bytes 2-5 and 10-11 are ignored.
  * The byte address being erased is 2*Eaddress.
+ * The CIS cannot be erased.
  */
 static int
 sddr09_erase(struct us_data *us, unsigned long Eaddress) {
@@ -485,6 +500,20 @@ sddr09_erase(struct us_data *us, unsigned long Eaddress) {
 
 	return result;
 }
+
+/*
+ * Write CIS Command: 12 bytes.
+ * byte 0: opcode: EE
+ * bytes 2-5: write address in shorts
+ * bytes 10-11: sector count
+ *
+ * This writes at the indicated address. Don't know how it differs
+ * from E9. Maybe it does not erase? However, it will also write to
+ * the CIS.
+ *
+ * When two such commands on the same page follow each other directly,
+ * the second one is not done.
+ */
 
 /*
  * Write Command: 12 bytes.
