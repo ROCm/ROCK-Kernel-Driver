@@ -443,7 +443,7 @@ struct bond_parm_tbl {
 
 static int arp_interval = BOND_LINK_ARP_INTERV;
 static char *arp_ip_target[MAX_ARP_IP_TARGETS] = { NULL, };
-static unsigned long arp_target[MAX_ARP_IP_TARGETS] = { 0, } ;
+static u32 arp_target[MAX_ARP_IP_TARGETS] = { 0, } ;
 static int arp_ip_count = 0;
 static u32 my_ip = 0;
 char *arp_target_hw_addr = NULL;
@@ -3811,7 +3811,7 @@ static int __init bonding_init(void)
                         arp_interval = 0;
 		} else { 
 			u32 ip = in_aton(arp_ip_target[arp_ip_count]); 
-			*(u32 *)(arp_ip_target[arp_ip_count]) = ip;
+			arp_target[arp_ip_count] = ip;
 		}
         }
 
