@@ -498,10 +498,12 @@ static inline void  smc_rcv(struct net_device *dev)
 			lp->stats.multicast++;
 
 		/*
-		 * Actual payload is packet_len - 4 (or 3 if odd byte).
+		 * Actual payload is packet_len - 6 (or 5 if odd byte).
 		 * We want skb_reserve(2) and the final ctrl word
 		 * (2 bytes, possibly containing the payload odd byte).
-		 * Ence packet_len - 4 + 2 + 2.
+		 * Furthermore, we add 2 bytes to allow rounding up to
+		 * multiple of 4 bytes on 32 bit buses.
+		 * Ence packet_len - 6 + 2 + 2 + 2.
 		 */
 		skb = dev_alloc_skb(packet_len);
 		if (unlikely(skb == NULL)) {
@@ -519,14 +521,15 @@ static inline void  smc_rcv(struct net_device *dev)
 			status |= RS_ODDFRAME;
 
 		/*
-		 * If odd length: packet_len - 3,
-		 * otherwise packet_len - 4.
+		 * If odd length: packet_len - 5,
+		 * otherwise packet_len - 6.
+		 * With the trailing ctrl byte it's packet_len - 4.
 		 */
-		data_len = packet_len - ((status & RS_ODDFRAME) ? 3 : 4);
+		data_len = packet_len - ((status & RS_ODDFRAME) ? 5 : 6);
 		data = skb_put(skb, data_len);
-		SMC_PULL_DATA(data, packet_len - 2);
+		SMC_PULL_DATA(data, packet_len - 4);
 
-		PRINT_PKT(data, packet_len - 2);
+		PRINT_PKT(data, packet_len - 4);
 
 		dev->last_rx = jiffies;
 		skb->dev = dev;
