@@ -45,7 +45,7 @@ xdr_nfsace_encode(struct xdr_array2_desc *desc, void *elem)
 		(struct nfsacl_encode_desc *) desc;
 	u32 *p = (u32 *) elem;
 
-	if (nfsacl_desc->count <= nfsacl_desc->acl->a_count) {
+	if (nfsacl_desc->count < nfsacl_desc->acl->a_count) {
 		struct posix_acl_entry *entry =
 			&nfsacl_desc->acl->a_entries[nfsacl_desc->count++];
 
@@ -89,12 +89,11 @@ unsigned int
 nfsacl_encode(struct xdr_buf *buf, unsigned int base, struct inode *inode,
 	      struct posix_acl *acl, int encode_entries, int typeflag)
 {
-	int entries = acl ? acl->a_count : 0;
+	int entries = (acl && acl->a_count) ? max(acl->a_count, 4) : 0;
 	struct nfsacl_encode_desc nfsacl_desc = {
 		.desc = {
 			.elem_size = 12,
-			.array_len = (encode_entries && entries) ?
-				max(entries, 4) : 0,
+			.array_len = encode_entries ? entries : 0,
 			.xcode = xdr_nfsace_encode,
 		},
 		.acl = acl,
@@ -212,7 +211,7 @@ posix_acl_from_nfsacl(struct posix_acl *acl)
 	if (acl->a_count == 4 && group_obj && mask &&
 	    mask->e_perm == group_obj->e_perm) {
 		/* remove bogus ACL_MASK entry */
-		memmove(mask, mask+1, (acl->a_entries + 4 - mask) *
+		memmove(mask, mask+1, (3 - (mask - acl->a_entries)) *
 				      sizeof(struct posix_acl_entry));
 		acl->a_count = 3;
 	}
