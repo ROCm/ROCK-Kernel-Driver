@@ -858,3 +858,12 @@ static void iSeries_setup_dprofile(void)
 		}
 	}
 }
+
+int __init iSeries_src_init(void)
+{
+        /* clear the progress line */
+        ppc_md.progress(" ", 0xffff);
+        return 0;
+}
+
+late_initcall(iSeries_src_init);
