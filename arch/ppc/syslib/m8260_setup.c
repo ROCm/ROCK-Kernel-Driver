@@ -54,6 +54,7 @@ unsigned char __res[sizeof(bd_t)];
 
 extern void cpm2_reset(void);
 extern void m8260_find_bridges(void);
+extern void idma_pci9_init(void);
 
 static void __init
 m8260_setup_arch(void)
@@ -61,6 +62,10 @@ m8260_setup_arch(void)
 	/* Reset the Communication Processor Module.
 	*/
 	cpm2_reset();
+#ifdef CONFIG_8260_PCI9
+	/* Initialise IDMA for PCI erratum workaround */
+	idma_pci9_init();
+#endif
 #ifdef CONFIG_PCI_8260
 	m8260_find_bridges();
 #endif

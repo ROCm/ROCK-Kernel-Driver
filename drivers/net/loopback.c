@@ -56,6 +56,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 
+static struct net_device_stats *loopback_stats;
 
 #define LOOPBACK_OVERHEAD (128 + MAX_HEADER + 16 + 16)
 
@@ -123,7 +124,6 @@ static void emulate_large_send_offload(struct sk_buff *skb)
  */
 static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats = dev->priv;
 
 	skb_orphan(skb);
 
@@ -142,11 +142,12 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	dev->last_rx = jiffies;
-	if (likely(stats)) {
-		stats->rx_bytes+=skb->len;
-		stats->tx_bytes+=skb->len;
-		stats->rx_packets++;
-		stats->tx_packets++;
+	if (likely(loopback_stats)) {
+		get_cpu_ptr(loopback_stats)->rx_bytes += skb->len;
+		get_cpu_ptr(loopback_stats)->tx_bytes += skb->len;
+		get_cpu_ptr(loopback_stats)->rx_packets++;
+		get_cpu_ptr(loopback_stats)->tx_packets++;
+		put_cpu_ptr(loopback_stats);
 	}
 
 	netif_rx(skb);
@@ -156,7 +157,28 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
-	return (struct net_device_stats *)dev->priv;
+	struct net_device_stats *stats = dev->priv;
+	int i;
+
+	if (!stats) {
+		return NULL;
+	}
+
+	memset(stats, 0, sizeof(struct net_device_stats));
+	if (!loopback_stats) {
+		return stats;
+	}
+
+	for (i=0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i)) 
+			continue;
+		stats->rx_bytes   += per_cpu_ptr(loopback_stats, i)->rx_bytes;
+		stats->tx_bytes   += per_cpu_ptr(loopback_stats, i)->tx_bytes;
+		stats->rx_packets += per_cpu_ptr(loopback_stats, i)->rx_packets;
+		stats->tx_packets += per_cpu_ptr(loopback_stats, i)->tx_packets;
+	}
+				
+	return stats;
 }
 
 struct net_device loopback_dev = {
@@ -173,7 +195,8 @@ struct net_device loopback_dev = {
 	.rebuild_header		= eth_rebuild_header,
 	.flags			= IFF_LOOPBACK,
 	.features 		= NETIF_F_SG|NETIF_F_FRAGLIST
-				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA,
+				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA
+				  |NETIF_F_LLTX,
 };
 
 /* Setup and register the of the LOOPBACK device. */
@@ -188,6 +211,8 @@ int __init loopback_init(void)
 		loopback_dev.priv = stats;
 		loopback_dev.get_stats = &get_stats;
 	}
+
+	loopback_stats = alloc_percpu(struct net_device_stats);
 	
 	return register_netdev(&loopback_dev);
 };

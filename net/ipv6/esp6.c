@@ -65,14 +65,16 @@ int esp6_output(struct sk_buff **pskb)
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, *pskb, AF_INET6);
+	err = xfrm_state_check(x, *pskb);
 	if (err)
 		goto error;
-	err = -ENOMEM;
 
-	/* Strip IP header in transport mode. Save it. */
-
-	if (!x->props.mode) {
+	if (x->props.mode) {
+		err = xfrm6_tunnel_check_size(*pskb);
+		if (err)
+			goto error;
+	} else {
+		/* Strip IP header in transport mode. Save it. */
 		hdr_len = ip6_find_1stfragopt(*pskb, &prevhdr);
 		nexthdr = *prevhdr;
 		*prevhdr = IPPROTO_ESP;
@@ -86,6 +88,7 @@ int esp6_output(struct sk_buff **pskb)
 	}
 
 	/* Now skb is pure payload to encrypt */
+	err = -ENOMEM;
 
 	/* Round to block size */
 	clen = (*pskb)->len;

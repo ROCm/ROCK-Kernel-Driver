@@ -71,6 +71,9 @@ static void gvc1100_muxsel(struct bttv *btv, unsigned int input);
 
 static void PXC200_muxsel(struct bttv *btv, unsigned int input);
 
+static void picolo_tetra_muxsel(struct bttv *btv, unsigned int input);
+static void picolo_tetra_init(struct bttv *btv);
+
 static int terratec_active_radio_upgrade(struct bttv *btv);
 static int tea5757_read(struct bttv *btv);
 static int tea5757_write(struct bttv *btv, int value);
@@ -181,6 +184,7 @@ static struct CARD {
 	{ 0xff00bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
 
 	{ 0x3000121a, BTTV_VOODOOTV_FM,   "3Dfx VoodooTV FM/ VoodooTV 200" },
+	{ 0x263710b4, BTTV_VOODOOTV_FM,   "3Dfx VoodooTV FM/ VoodooTV 200" },
 	{ 0x3060121a, BTTV_STB2,	  "3Dfx VoodooTV 100/ STB OEM" },
 	
 	{ 0x3000144f, BTTV_MAGICTVIEW063, "(Askey Magic/others) TView99 CPH06x" },
@@ -260,12 +264,15 @@ static struct CARD {
 	{ 0x41424344, BTTV_GRANDTEC,      "GrandTec Multi Capture" },
 	{ 0x01020304, BTTV_XGUARD,        "Grandtec Grand X-Guard" },
 	
-    	{ 0x010115cb, BTTV_GMV1,          "AG GMV1" },
-	{ 0x010114c7, BTTV_MODTEC_205,    "Modular Technology MM201/MM202/MM205/MM210/MM215 PCTV" },
 	{ 0x18501851, BTTV_CHRONOS_VS2,   "FlyVideo 98 (LR50)/ Chronos Video Shuttle II" },
 	{ 0x18511851, BTTV_FLYVIDEO98EZ,  "FlyVideo 98EZ (LR51)/ CyberMail AV" },
 	{ 0x18521852, BTTV_TYPHOON_TVIEW, "FlyVideo 98FM (LR50)/ Typhoon TView TV/FM Tuner" },
 	{ 0x41a0a051, BTTV_FLYVIDEO_98FM, "Lifeview FlyVideo 98 LR50 Rev Q" },
+	{ 0x18501f7f, BTTV_FLYVIDEO_98,   "Lifeview Flyvideo 98" },
+
+    	{ 0x010115cb, BTTV_GMV1,          "AG GMV1" },
+	{ 0x010114c7, BTTV_MODTEC_205,    "Modular Technology MM201/MM202/MM205/MM210/MM215 PCTV" },
+
 	{ 0x10b42636, BTTV_HAUPPAUGE878,  "STB ???" },
 	{ 0x217d6606, BTTV_WINFAST2000,   "Leadtek WinFast TV 2000" },
 	{ 0xfff6f6ff, BTTV_WINFAST2000,   "Leadtek WinFast TV 2000" },
@@ -280,14 +287,21 @@ static struct CARD {
 	{ 0x40111554, BTTV_PV_BT878P_9B,  "Prolink Pixelview PV-BT" },
 	{ 0x17de0a01, BTTV_KWORLD,        "Mecer TV/FM/Video Tuner" },
 
+	{ 0x01051805, BTTV_PICOLO_TETRA_CHIP, "Picolo Tetra Chip #1" },
+	{ 0x01061805, BTTV_PICOLO_TETRA_CHIP, "Picolo Tetra Chip #2" },
+	{ 0x01071805, BTTV_PICOLO_TETRA_CHIP, "Picolo Tetra Chip #3" },
+	{ 0x01081805, BTTV_PICOLO_TETRA_CHIP, "Picolo Tetra Chip #4" },
+
 	// likely broken, vendor id doesn't match the other magic views ...
 	//{ 0xa0fca04f, BTTV_MAGICTVIEW063, "Guillemot Maxi TV Video 3" },
 	
 	// DVB cards (using pci function .1 for mpeg data xfer)
 	{ 0x01010071, BTTV_NEBULA_DIGITV, "Nebula Electronics DigiTV" },
+	{ 0x07611461, BTTV_NEBULA_DIGITV, "AverMedia AverTV DVB-T" },
 	{ 0x002611bd, BTTV_TWINHAN_DST,   "Pinnacle PCTV SAT CI" },
 	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
+	{ 0x07711461, BTTV_AVDVBT_771,    "AVermedia DVB-T 771" },
 	
 	{ 0, -1, NULL }
 };
@@ -835,7 +849,7 @@ struct tvcard bttv_tvcards[] = {
 	.svhs		= 2,
 	.gpiomask	= 0x03000F,
 	.muxsel		= { 2, 3, 1, 1},
-	.audiomux	= { 2, 0, 0, 0, 1},
+	.audiomux	= { 2, 0xd0001, 0, 0, 1},
 	.needs_tvaudio	= 0,
 	.pll		= PLL_28,
 	.tuner_type	= -1,
@@ -1646,6 +1660,7 @@ struct tvcard bttv_tvcards[] = {
 	.muxsel         = { 3, 0, 1, 2},
 	.needs_tvaudio  = 0, 
 	.pll            = PLL_28,
+	.no_gpioirq     = 1,
 },{
         .name           = "Formac ProTV II (bt878)",
         .video_inputs   = 4,
@@ -2012,6 +2027,57 @@ struct tvcard bttv_tvcards[] = {
 	.tuner_type     = TUNER_PHILIPS_PAL,
 	.has_remote     = 1,
 	.has_radio      = 1,
+},{
+	/*Eric DEBIEF <debief@telemsa.com>*/
+	/*EURESYS Picolo Tetra : 4 Conexant Fusion 878A, no audio, video input set with analog multiplexers GPIO controled*/
+	/* adds picolo_tetra_muxsel(), picolo_tetra_init(), the folowing declaration strucure, and #define BTTV_PICOLO_TETRA_CHIP*/
+	/*0x79 in bttv.h*/
+	.name           = "Euresys Picolo Tetra",
+	.video_inputs   = 4,
+	.audio_inputs   = 0,
+	.tuner          = -1,
+	.svhs           = -1,
+	.gpiomask       = 0,
+	.gpiomask2      = 0x3C<<16,/*Set the GPIO[18]->GPIO[21] as output pin.==> drive the video inputs through analog multiplexers*/
+	.no_msp34xx     = 1,
+	.no_tda9875     = 1,
+	.no_tda7432     = 1,
+	.muxsel         = {2,2,2,2},/*878A input is always MUX0, see above.*/
+	.audiomux       = { 0, 0, 0, 0, 0, 0 }, /* card has no audio */
+	.pll            = PLL_28,
+	.needs_tvaudio  = 0,
+	.muxsel_hook    = picolo_tetra_muxsel,/*Required as it doesn't follow the classic input selection policy*/
+},{
+	/* Spirit TV Tuner from http://spiritmodems.com.au */
+	/* Stafford Goodsell <surge@goliath.homeunix.org> */
+	.name           = "Spirit TV Tuner",
+	.video_inputs   = 3,
+	.audio_inputs   = 1,
+	.tuner          = 0,
+	.svhs           = 2,
+	.gpiomask       = 0x0000000f,
+	.muxsel         = { 2, 1, 1 },
+	.audiomux       = { 0x02, 0x00, 0x00, 0x00, 0x00},
+	.tuner_type     = TUNER_TEMIC_PAL,
+	.no_msp34xx     = 1,
+	.no_tda9875     = 1,
+},{
+	/* Wolfram Joost <wojo@frokaschwei.de> */
+        .name           = "AVerMedia AVerTV DVB-T 771",
+        .video_inputs   = 2,
+        .svhs           = 1,
+        .tuner          = -1,
+        .tuner_type     = TUNER_ABSENT,
+        .muxsel         = { 3 , 3 },
+        .no_msp34xx     = 1,
+        .no_tda9875     = 1,
+        .no_tda7432     = 1,
+        .pll            = PLL_28,
+        .has_dvb        = 1,
+        .no_gpioirq     = 1,
+#if 0 /* untested */
+        .has_remote     = 1,
+#endif
 }};
 
 const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
@@ -2381,6 +2447,7 @@ void __devinit bttv_init_card1(struct bttv *btv)
 		pvr_boot(btv);
 		break;
 	case BTTV_TWINHAN_DST:
+	case BTTV_AVDVBT_771:
 		btv->use_i2c_hw = 1;
 		break;
 	}
@@ -2431,6 +2498,9 @@ void __devinit bttv_init_card2(struct bttv *btv)
 		break;
 	case BTTV_PXC200:
 		init_PXC200(btv);
+		break;
+	case BTTV_PICOLO_TETRA_CHIP:
+		picolo_tetra_init(btv);
 		break;
 	case BTTV_VHX:
 		btv->has_radio    = 1;
@@ -2667,6 +2737,10 @@ static void modtec_eeprom(struct bttv *btv)
 	} else if (strncmp(&(eeprom_data[0x1e]),"Alps TSBB5",10) ==0) {
 		btv->tuner_type=TUNER_ALPS_TSBB5_PAL_I;
 		printk("bttv%d: Modtec: Tuner autodetected by eeprom: %s\n",
+                       btv->c.nr,&eeprom_data[0x1e]);
+        } else if (strncmp(&(eeprom_data[0x1e]),"Philips FM1246",14) ==0) {
+                btv->tuner_type=TUNER_PHILIPS_NTSC;
+                printk("bttv%d: Modtec: Tuner autodetected by eeprom: %s\n",
                        btv->c.nr,&eeprom_data[0x1e]);
 	} else {
 		printk("bttv%d: Modtec: Unknown TunerString: %s\n",
@@ -3785,6 +3859,21 @@ static void xguard_muxsel(struct bttv *btv, unsigned int input)
                 ENA1, ENA1|IN01, ENA1|IN11, ENA1|IN01|IN11,
 	};
 	gpio_write(masks[input%16]);
+}
+static void picolo_tetra_init(struct bttv *btv)
+{
+	/*This is the video input redirection fonctionality : I DID NOT USED IT. */
+	btwrite (0x08<<16,BT848_GPIO_DATA);/*GPIO[19] [==> 4053 B+C] set to 1 */
+	btwrite (0x04<<16,BT848_GPIO_DATA);/*GPIO[18] [==> 4053 A]  set to 1*/
+}
+static void picolo_tetra_muxsel (struct bttv* btv, unsigned int input)
+{
+
+	dprintk (KERN_DEBUG "bttv%d : picolo_tetra_muxsel =>  input = %d\n",btv->c.nr,input);
+	/*Just set the right path in the analog multiplexers : channel 1 -> 4 ==> Analog Mux ==> MUX0*/
+	/*GPIO[20]&GPIO[21] used to choose the right input*/
+	btwrite (input<<20,BT848_GPIO_DATA);
+
 }
 
 /*

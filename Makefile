@@ -290,8 +290,6 @@ STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 AWK		= awk
-RPM 		:= $(shell if [ -x "/usr/bin/rpmbuild" ]; then echo rpmbuild; \
-		    	else echo rpm; fi)
 GENKSYMS	= scripts/genksyms/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
@@ -409,13 +407,6 @@ scripts: scripts_basic include/config/MARKER
 
 scripts_basic: include/linux/autoconf.h
 
-
-# That's our default target when none is given on the command line
-# Note that 'modules' will be added as a prerequisite as well, 
-# in the CONFIG_MODULES part below
-
-all:	vmlinux
-
 # Objects we will link into vmlinux / subdirs we need to visit
 init-y		:= init/
 drivers-y	:= drivers/ sound/
@@ -448,6 +439,19 @@ include/linux/autoconf.h: ;
 endif
 
 include $(srctree)/arch/$(ARCH)/Makefile
+
+# Default kernel image to build when no specific target is given.
+# KBUILD_IMAGE may be overruled on the commandline or
+# set in the environment
+# Also any assingments in arch/$(ARCH)/Makefiel take precedence over
+# this default value
+export KBUILD_IMAGE ?= vmlinux
+
+# The all: target is the default when no target is given on the
+# command line.
+# This allow a user to issue only 'make' to build a kernel including modules
+# Defaults vmlinux but it is usually overriden in the arch makefile
+all: vmlinux
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 CFLAGS		+= -Os
@@ -795,7 +799,7 @@ endef
 
 # Directories & files removed with 'make clean'
 CLEAN_DIRS  += $(MODVERDIR)
-CLEAN_FILES +=	vmlinux System.map kernel.spec \
+CLEAN_FILES +=	vmlinux System.map \
                 .tmp_kallsyms* .tmp_version .tmp_vmlinux*
 
 # Directories & files removed with 'make mrproper'
@@ -848,37 +852,19 @@ distclean: mrproper
 		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
 		-type f -print | xargs rm -f
 
-# RPM target
+
+# Packaging of the kernel to various formats
 # ---------------------------------------------------------------------------
+# rpm target kept for backward compatibility
+package-dir	:= $(srctree)/scripts/package
 
-.PHONY: rpm
+.PHONY: %-pkg rpm
 
-# Remove hyphens since they have special meaning in RPM filenames
-KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
+%pkg: FORCE
+	$(Q)$(MAKE) -f $(package-dir)/Makefile $@
+rpm: FORCE
+	$(Q)$(MAKE) -f $(package-dir)/Makefile $@
 
-#	If you do a make spec before packing the tarball you can rpm -ta it
-
-spec:
-	$(CONFIG_SHELL) $(srctree)/scripts/mkspec > $(objtree)/kernel.spec
-
-#	a) Build a tar ball
-#	b) generate an rpm from it
-#	c) and pack the result
-#	- Use /. to avoid tar packing just the symlink
-
-rpm:	clean spec
-	set -e; \
-	cd .. ; \
-	ln -sf $(srctree) $(KERNELPATH) ; \
-	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
-	rm $(KERNELPATH)
-
-	set -e; \
-	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > $(objtree)/.tmp_version;\
-	mv -f $(objtree)/.tmp_version $(objtree)/.version;
-
-	$(RPM) --target $(UTS_MACHINE) -ta ../$(KERNELPATH).tar.gz
-	rm ../$(KERNELPATH).tar.gz
 
 # Brief documentation of the typical targets used
 # ---------------------------------------------------------------------------
@@ -905,6 +891,8 @@ help:
 	@echo  '  tags/TAGS	  - Generate tags file for editors'
 	@echo  '  cscope	  - Generate cscope index'
 	@echo  '  checkstack      - Generate a list of stack hogs'
+	@echo  'Kernel packaging:'
+	@$(MAKE) -f $(package-dir)/Makefile help
 	@echo  ''
 	@echo  'Documentation targets:'
 	@$(MAKE) -f $(srctree)/Documentation/DocBook/Makefile dochelp

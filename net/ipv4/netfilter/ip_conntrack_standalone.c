@@ -24,6 +24,7 @@
 #include <linux/sysctl.h>
 #endif
 #include <net/checksum.h>
+#include <net/ip.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_conntrack_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_conntrack_lock)

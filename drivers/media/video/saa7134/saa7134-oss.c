@@ -50,7 +50,7 @@ static int dsp_buffer_conf(struct saa7134_dev *dev, int blksize, int blocks)
 	if (blksize < 0x100)
 		blksize = 0x100;
 	if (blksize > 0x10000)
-		blksize = 0x100;
+		blksize = 0x10000;
 
 	if (blocks < 2)
 		blocks = 2;
@@ -74,6 +74,7 @@ static int dsp_buffer_init(struct saa7134_dev *dev)
 
 	if (!dev->oss.bufsize)
 		BUG();
+	videobuf_dma_init(&dev->oss.dma);
 	err = videobuf_dma_init_kernel(&dev->oss.dma, PCI_DMA_FROMDEVICE,
 				       dev->oss.bufsize >> PAGE_SHIFT);
 	if (0 != err)
@@ -172,7 +173,7 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 			fmt |= (2 << 4);
 		if (!sign)
 			fmt |= 0x04;
-		saa_writel(0x588 >> 2, dev->oss.blksize);
+		saa_writel(0x588 >> 2, dev->oss.blksize -4);
 		saa_writel(0x58c >> 2, 0x543210 | (fmt << 24));
 		break;
 	}

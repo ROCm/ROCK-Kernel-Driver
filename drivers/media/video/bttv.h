@@ -124,6 +124,8 @@
 #define BTTV_SIMUS_GVC1100  0x74
 #define BTTV_NGSTV_PLUS     0x75
 #define BTTV_LMLBT4         0x76
+#define BTTV_PICOLO_TETRA_CHIP 0x79
+#define BTTV_AVDVBT_771     0x7b
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2

@@ -1,5 +1,14 @@
 menu "Generic Driver Options"
 
+config PREVENT_FIRMWARE_BUILD
+	bool "Prevent firmware from being built"
+	default y
+	help
+	  Say yes to avoid building firmware. Firmware is usually shipped
+	  with the driver, and only when updating the firware a rebuild
+	  should be made.
+	  If unsure say Y here.
+
 config FW_LOADER
 	tristate "Hotplug firmware loading support"
 	depends on HOTPLUG

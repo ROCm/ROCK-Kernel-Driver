@@ -200,7 +200,36 @@ do {									\
 		__wait_event_interruptible_timeout(wq, condition, __ret); \
 	__ret;								\
 })
-	
+
+#define __wait_event_interruptible_exclusive(wq, condition, ret)	\
+do {									\
+	wait_queue_t __wait;						\
+	init_waitqueue_entry(&__wait, current);				\
+									\
+	add_wait_queue_exclusive(&wq, &__wait);				\
+	for (;;) {							\
+		set_current_state(TASK_INTERRUPTIBLE);			\
+		if (condition)						\
+			break;						\
+		if (!signal_pending(current)) {				\
+			schedule();					\
+			continue;					\
+		}							\
+		ret = -ERESTARTSYS;					\
+		break;							\
+	}								\
+	current->state = TASK_RUNNING;					\
+	remove_wait_queue(&wq, &__wait);				\
+} while (0)
+
+#define wait_event_interruptible_exclusive(wq, condition)		\
+({									\
+	int __ret = 0;							\
+	if (!(condition))						\
+		__wait_event_interruptible_exclusive(wq, condition, __ret);\
+	__ret;								\
+})
+
 /*
  * Must be called with the spinlock in the wait_queue_head_t held.
  */

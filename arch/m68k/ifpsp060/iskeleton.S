@@ -196,13 +196,56 @@ _060_real_cas2:
 | Expected outputs:
 |	d0 = 0 -> success; non-zero -> failure
 |
-| Linux/68k: As long as ints are disabled, no swapping out should
-| occur (hopefully...)
+| Linux/m68k: Make sure the page is properly paged in, so we use
+| plpaw and handle any exception here. The kernel must not be
+| preempted until _060_unlock_page(), so that the page stays mapped.
 |
 	.global		_060_real_lock_page
 _060_real_lock_page:
-	clr.l		%d0
+	move.l	%d2,-(%sp)
+	| load sfc/dfc
+	moveq	#5,%d0
+	tst.b	%d0
+	jne	1f
+	moveq	#1,%d0
+1:	movec.l	%dfc,%d2
+	movec.l	%d0,%dfc
+	movec.l	%d0,%sfc
+
+	clr.l	%d0
+	| prefetch address
+	.chip	68060
+	move.l	%a0,%a1
+1:	plpaw	(%a1)
+	addq.w	#1,%a0
+	tst.b	%d1
+	jeq	2f
+	addq.w	#2,%a0
+2:	plpaw	(%a0)
+3:	.chip	68k
+
+	| restore sfc/dfc
+	movec.l	%d2,%dfc
+	movec.l	%d2,%sfc
+	move.l	(%sp)+,%d2
 	rts
+
+.section __ex_table,"a"
+	.align	4
+	.long	1b,11f
+	.long	2b,21f
+.previous
+.section .fixup,"ax"
+	.even
+11:	move.l	#0x020003c0,%d0
+	or.l	%d2,%d0
+	swap	%d0
+	jra	3b
+21:	move.l	#0x02000bc0,%d0
+	or.l	%d2,%d0
+	swap	%d0
+	jra	3b
+.previous
 
 |
 | _060_unlock_page():
@@ -216,8 +259,7 @@ _060_real_lock_page:
 |	d0 = `xxxxxxff -> supervisor; `xxxxxx00 -> user
 |	d1 = `xxxxxxff -> longword; `xxxxxx00 -> word
 |
-| Linux/68k: As we do no special locking operation, also no unlocking
-| is needed...
+| Linux/m68k: perhaps reenable preemption here...
 
 	.global		_060_real_unlock_page
 _060_real_unlock_page:

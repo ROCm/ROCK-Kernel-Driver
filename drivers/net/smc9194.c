@@ -96,16 +96,51 @@ static const char version[] =
 #define USE_32_BIT 1
 #endif
 
+#if defined(__H8300H__) || defined(__H8300S__)
+#define NO_AUTOPROBE
+#undef insl
+#undef outsl
+#define insl(a,b,l)  io_insl_noswap(a,b,l)
+#define outsl(a,b,l) io_outsl_noswap(a,b,l)
+#endif
+
 /*
  .the SMC9194 can be at any of the following port addresses.  To change,
  .for a slightly different card, you can add it to the array.  Keep in
  .mind that the array must end in zero.
 */
-static unsigned int smc_portlist[] __initdata = { 
-	0x200, 0x220, 0x240, 0x260, 0x280, 0x2A0, 0x2C0, 0x2E0,
-	0x300, 0x320, 0x340, 0x360, 0x380, 0x3A0, 0x3C0, 0x3E0, 0
+
+struct devlist {
+	unsigned int port;
+	unsigned int irq;
 };
 
+#if defined(CONFIG_H8S_EDOSK2674)
+static struct devlist smc_devlist[] __initdata = {
+	{.port = 0xf80000, .irq = 16},
+	{.port = 0,        .irq = 0 },
+};
+#else
+static struct devlist smc_devlist[] __initdata = {
+	{.port = 0x200, .irq = 0},
+	{.port = 0x220, .irq = 0},
+	{.port = 0x240, .irq = 0},
+	{.port = 0x260, .irq = 0},
+	{.port = 0x280, .irq = 0},
+	{.port = 0x2A0, .irq = 0},
+	{.port = 0x2C0, .irq = 0},
+	{.port = 0x2E0, .irq = 0},
+	{.port = 0x300, .irq = 0},
+	{.port = 0x320, .irq = 0},
+	{.port = 0x340, .irq = 0},
+	{.port = 0x360, .irq = 0},
+	{.port = 0x380, .irq = 0},
+	{.port = 0x3A0, .irq = 0},
+	{.port = 0x3C0, .irq = 0},
+	{.port = 0x3E0, .irq = 0},
+	{.port = 0,     .irq = 0},
+};
+#endif
 /*
  . Wait time for memory to be free.  This probably shouldn't be
  . tuned that much, as waiting for this means nothing else happens
@@ -468,7 +503,7 @@ static void smc_setmulticast( int ioaddr, int count, struct dev_mc_list * addrs 
 static int smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * dev )
 {
 	struct smc_local *lp = netdev_priv(dev);
-	unsigned short ioaddr 	= dev->base_addr;
+	unsigned int ioaddr 	= dev->base_addr;
 	word 			length;
 	unsigned short 		numPages;
 	word			time_out;
@@ -582,7 +617,7 @@ static void smc_hardware_send_packet( struct net_device * dev )
 	byte	 		packet_no;
 	struct sk_buff * 	skb = lp->saved_skb;
 	word			length;
-	unsigned short		ioaddr;
+	unsigned int		ioaddr;
 	byte			* buf;
 
 	ioaddr = dev->base_addr;
@@ -637,7 +672,11 @@ static void smc_hardware_send_packet( struct net_device * dev )
 #ifdef USE_32_BIT
 	if ( length & 0x2  ) {
 		outsl(ioaddr + DATA_1, buf,  length >> 2 );
+#if !defined(__H8300H__) && !defined(__H8300S__)
 		outw( *((word *)(buf + (length & 0xFFFFFFFC))),ioaddr +DATA_1);
+#else
+		ctrl_outw( *((word *)(buf + (length & 0xFFFFFFFC))),ioaddr +DATA_1);
+#endif
 	}
 	else
 		outsl(ioaddr + DATA_1, buf,  length >> 2 );
@@ -693,9 +732,12 @@ static int ifport;
 struct net_device * __init smc_init(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct smc_local));
-	unsigned *port;
+	static struct devlist *smcdev = smc_devlist;
 	int err = 0;
 
+#ifndef NO_AUTOPROBE
+	smcdev = smc_devlist;
+#endif
 	if (!dev)
 		return ERR_PTR(-ENODEV);
 
@@ -713,11 +755,11 @@ struct net_device * __init smc_init(int unit)
 	} else if (io != 0) {	/* Don't probe at all. */
 		err = -ENXIO;
 	} else {
-		for (port = smc_portlist; *port; port++) {
-			if (smc_probe(dev, *port) == 0)
+		for (;smcdev->port; smcdev++) {
+			if (smc_probe(dev, smcdev->port) == 0)
 				break;
 		}
-		if (!*port)
+		if (!smcdev->port)
 			err = -ENODEV;
 	}
 	if (err)
@@ -743,6 +785,7 @@ out:
 */
 int __init smc_findirq( int ioaddr )
 {
+#ifndef NO_AUTOPROBE
 	int	timeout = 20;
 	unsigned long cookie;
 
@@ -797,6 +840,14 @@ int __init smc_findirq( int ioaddr )
 
 	/* and return what I found */
 	return probe_irq_off(cookie);
+#else /* NO_AUTOPROBE */
+	struct devlist *smcdev;
+	for (smcdev = smc_devlist; smcdev->port; smcdev++) {
+		if (smcdev->port == ioaddr)
+			return smcdev->irq;
+	}
+	return 0;
+#endif
 }
 
 /*----------------------------------------------------------------------
@@ -865,6 +916,7 @@ static int __init smc_probe(struct net_device *dev, int ioaddr)
 		retval = -ENODEV;
 		goto err_out;
 	}
+#if !defined(CONFIG_H8S_EDOSK2674)
 	/* well, we've already written once, so hopefully another time won't
  	   hurt.  This time, I need to switch the bank register to bank 1,
 	   so I can access the base address register */
@@ -879,6 +931,10 @@ static int __init smc_probe(struct net_device *dev, int ioaddr)
 		retval = -ENODEV;
 		goto err_out;
 	}
+#else
+	(void)base_address_register; /* Warning suppression */
+#endif
+
 
 	/*  check if the revision register is something that I recognize.
 	    These might need to be added to later, as future revisions

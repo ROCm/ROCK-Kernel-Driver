@@ -80,8 +80,11 @@ static const struct fddi_addr null_addr = {{0,0,0,0,0,0}} ;
 	-------------------------------------------------------------
 */
 
-static	void	ess_send_response(),		ess_config_fifo(),
-		ess_send_alc_req(),		ess_send_frame() ;
+static void ess_send_response(struct s_smc *smc, struct smt_header *sm,
+			      int sba_cmd);
+static void ess_config_fifo(struct s_smc *smc);
+static void ess_send_alc_req(struct s_smc *smc);
+static void ess_send_frame(struct s_smc *smc, SMbuf *mb);
 
 /*
 	-------------------------------------------------------------
@@ -89,26 +92,17 @@ static	void	ess_send_response(),		ess_config_fifo(),
 	-------------------------------------------------------------
 */
 
-extern	void	*sm_to_para() ;
-
-extern	void	smt_send_frame(),	smt_free_mbuf(),
-		set_formac_tsync(),	formac_reinit_tx() ;
-
-extern	int	smt_check_para() ;
-
-extern	SMbuf	*smt_get_mbuf(),	*smt_build_frame() ;
-
-extern	u_long	smt_get_tid() ;
-
 /*
 	-------------------------------------------------------------
 	PUBLIC FUNCTIONS:
 	-------------------------------------------------------------
 */
 
-	void	ess_timer_poll(),		ess_para_change() ;
-
-	int	ess_raf_received_pack(),	process_bw_alloc() ;
+void ess_timer_poll(struct s_smc *smc);
+void ess_para_change(struct s_smc *smc);
+int ess_raf_received_pack(struct s_smc *smc, SMbuf *mb, struct smt_header *sm,
+			  int fs);
+int process_bw_alloc(struct s_smc *smc, long int payload, long int overhead);
 
 
 /*
@@ -120,11 +114,8 @@ extern	u_long	smt_get_tid() ;
 /*
  * evaluate the RAF frame
  */
-int ess_raf_received_pack(smc,mb,sm,fs)
-struct s_smc *smc ;
-SMbuf *mb ;
-struct smt_header *sm ;
-int fs ;
+int ess_raf_received_pack(struct s_smc *smc, SMbuf *mb, struct smt_header *sm,
+			  int fs)
 {
 	void			*p ;		/* universal pointer */
 	struct smt_p_0016	*cmd ;		/* para: command for the ESS */
@@ -384,10 +375,7 @@ int fs ;
  * determines the synchronous bandwidth, set the TSYNC register and the
  * mib variables SBAPayload, SBAOverhead and fddiMACT-NEG.
  */
-int process_bw_alloc(smc,payload,overhead)
-struct s_smc *smc ;
-long payload ;
-long overhead ;
+int process_bw_alloc(struct s_smc *smc, long int payload, long int overhead)
 {
 	/*
 	 * determine the synchronous bandwidth (sync_bw) in bytes per T-NEG,
@@ -483,10 +471,8 @@ long overhead ;
 	return(TRUE) ;
 }
 
-static void ess_send_response(smc,sm,sba_cmd)
-struct s_smc *smc ;
-struct smt_header *sm ;
-int sba_cmd ;
+static void ess_send_response(struct s_smc *smc, struct smt_header *sm,
+			      int sba_cmd)
 {
 	struct smt_sba_chg	*chg ;
 	SMbuf			*mb ;
@@ -550,9 +536,7 @@ int sba_cmd ;
 	ess_send_frame(smc,mb) ;
 }
 
-
-void ess_timer_poll(smc)
-struct s_smc *smc ;
+void ess_timer_poll(struct s_smc *smc)
 {
 	if (!smc->ess.raf_act_timer_poll)
 		return ;
@@ -566,8 +550,7 @@ struct s_smc *smc ;
 	}
 }
 
-static void ess_send_alc_req(smc)
-struct s_smc *smc ;
+static void ess_send_alc_req(struct s_smc *smc)
 {
 	struct smt_sba_alc_req *req ;
 	SMbuf	*mb ;
@@ -675,9 +658,7 @@ struct s_smc *smc ;
 	ess_send_frame(smc,mb) ;
 }
 
-static void ess_send_frame(smc,mb)
-struct s_smc *smc ;
-SMbuf *mb ;
+static void ess_send_frame(struct s_smc *smc, SMbuf *mb)
 {
 	/*
 	 * check if the frame must be send to the own ESS
@@ -703,15 +684,13 @@ SMbuf *mb ;
 	}
 }
 
-void ess_para_change(smc)
-struct s_smc *smc ;
+void ess_para_change(struct s_smc *smc)
 {
 	(void)process_bw_alloc(smc,(long)smc->mib.a[PATH0].fddiPATHSbaPayload,
 		(long)smc->mib.a[PATH0].fddiPATHSbaOverhead) ;
 }
 
-static void ess_config_fifo(smc)
-struct s_smc *smc ;
+static void ess_config_fifo(struct s_smc *smc)
 {
 	/*
 	 * if nothing to do exit 
@@ -738,3 +717,4 @@ struct s_smc *smc ;
 #endif /* ESS */
 
 #endif	/* no SLIM_SMT */
+

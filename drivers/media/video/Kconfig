@@ -295,5 +295,16 @@ config VIDEO_CX88
 	  To compile this driver as a module, choose M here: the
 	  module will be called cx8800
 
+config VIDEO_OVCAMCHIP
+	tristate "OmniVision Camera Chip support"
+	depends on VIDEO_DEV && I2C
+	---help---
+	  Support for the OmniVision OV6xxx and OV7xxx series of camera chips.
+	  This driver is intended to be used with the ov511 and w9968cf USB
+	  camera drivers.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ovcamchip
+
 endmenu
 

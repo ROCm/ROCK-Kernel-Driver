@@ -27,7 +27,7 @@
 #define IR_TYPE_OTHER  99
 
 #define IR_KEYTAB_TYPE	u32
-#define IR_KEYTAB_SIZE	64  // enougth for rc5, probably need more some day ...
+#define IR_KEYTAB_SIZE	128  // enougth for rc5, probably need more some day ...
 
 #define IR_KEYCODE(tab,code)	(((unsigned)code < IR_KEYTAB_SIZE) \
 				 ? tab[code] : KEY_RESERVED)

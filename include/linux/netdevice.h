@@ -405,6 +405,7 @@ struct net_device
 #define NETIF_F_HW_VLAN_FILTER	512	/* Receive filtering on VLAN */
 #define NETIF_F_VLAN_CHALLENGED	1024	/* Device cannot handle VLAN packets */
 #define NETIF_F_TSO		2048	/* Can offload TCP/IP segmentation */
+#define NETIF_F_LLTX		4096	/* LockLess TX */
 
 	/* Called after device is detached from network. */
 	void			(*uninit)(struct net_device *dev);

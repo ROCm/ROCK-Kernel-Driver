@@ -35,6 +35,7 @@
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 
+#include <net/ip.h>
 #include <net/sock.h>
 #include <net/snmp.h>
 
@@ -42,6 +43,7 @@
 #include <net/ndisc.h>
 #include <net/protocol.h>
 #include <net/ip6_route.h>
+#include <net/ip6_checksum.h>
 #include <net/addrconf.h>
 #include <net/transp_v6.h>
 #include <net/udp.h>

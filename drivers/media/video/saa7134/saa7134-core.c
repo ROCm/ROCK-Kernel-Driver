@@ -607,10 +607,18 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 	};
 	if (10 == loop) {
 		print_irqstatus(dev,loop,report,status);
-		printk(KERN_WARNING "%s/irq: looping -- clearing enable bits\n",dev->name);
-		/* disable all irqs */
-		saa_writel(SAA7134_IRQ1,0);
-		saa_writel(SAA7134_IRQ2,0);
+		if (report & SAA7134_IRQ_REPORT_PE) {
+			/* disable all parity error */
+			printk(KERN_WARNING "%s/irq: looping -- "
+			       "clearing PE (parity error!) enable bit\n",dev->name);
+			saa_clearl(SAA7134_IRQ2,SAA7134_IRQ2_INTE_PE);
+		} else {
+			/* disable all irqs */
+			printk(KERN_WARNING "%s/irq: looping -- "
+			       "clearing all enable bits\n",dev->name);
+			saa_writel(SAA7134_IRQ1,0);
+			saa_writel(SAA7134_IRQ2,0);
+		}
 	}
 
  out:

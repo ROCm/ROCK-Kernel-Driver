@@ -48,7 +48,7 @@ quiet_cmd_ikconfig = IKCFG   $@
       cmd_ikconfig = $(CONFIG_SHELL) $< .config $(srctree)/Makefile > $@
 
 targets += ikconfig.h
-$(obj)/ikconfig.h: scripts/mkconfigs .config Makefile FORCE
+$(obj)/ikconfig.h: scripts/mkconfigs .config $(srctree)/Makefile FORCE
 	$(call if_changed,ikconfig)
 
 # config_data.h contains the same information as ikconfig.h but gzipped.

@@ -55,7 +55,7 @@
 #include <net/sock.h>
 
 #include <net/ipv6.h>
-#include <net/checksum.h>
+#include <net/ip6_checksum.h>
 #include <net/protocol.h>
 #include <net/raw.h>
 #include <net/rawv6.h>

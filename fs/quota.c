@@ -264,7 +264,7 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, cadd
  * calls. Maybe we need to add the process quotas etc. in the future,
  * but we probably should use rlimits for that.
  */
-asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, caddr_t addr)
+asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special, qid_t id, caddr_t addr)
 {
 	uint cmds, type;
 	struct super_block *sb = NULL;

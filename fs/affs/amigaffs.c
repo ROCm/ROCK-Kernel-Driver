@@ -458,7 +458,6 @@ affs_error(struct super_block *sb, const char *function, const char *fmt, ...)
 	if (!(sb->s_flags & MS_RDONLY))
 		printk(KERN_WARNING "AFFS: Remounting filesystem read-only\n");
 	sb->s_flags |= MS_RDONLY;
-	AFFS_SB(sb)->s_flags |= SF_READONLY;	/* Don't allow to remount rw */
 }
 
 void

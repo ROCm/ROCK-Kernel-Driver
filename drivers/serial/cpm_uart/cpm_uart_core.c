@@ -30,7 +30,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/ioport.h>
@@ -51,6 +50,7 @@
 #endif
 
 #include <linux/serial_core.h>
+#include <linux/kernel.h>
 
 #include "cpm_uart.h"
 
@@ -60,6 +60,14 @@
 int cpm_uart_port_map[UART_NR];
 /* How many ports did we config as uarts */
 int cpm_uart_nr;
+
+/**************************************************************/
+
+static int  cpm_uart_tx_pump(struct uart_port *port);
+static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval);
+static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int sbits, u16 sval);
+
+/**************************************************************/
 
 /*
  * Check, if transmit buffers are processed		
@@ -115,78 +123,6 @@ static void cpm_uart_stop_tx(struct uart_port *port, unsigned int tty_stop)
 }
 
 /*
- * Transmit characters, refill buffer descriptor, if possible
- */
-static int cpm_uart_tx_pump(struct uart_port *port)
-{
-	volatile cbd_t *bdp;
-	unsigned char *p;
-	int count;
-	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
-	struct circ_buf *xmit = &port->info->xmit;
-
-	/* Handle xon/xoff */
-	if (port->x_char) {
-		/* Pick next descriptor and fill from buffer */
-		bdp = pinfo->tx_cur;
-
-		p = bus_to_virt(bdp->cbd_bufaddr);
-		*p++ = xmit->buf[xmit->tail];
-		bdp->cbd_datlen = 1;
-		bdp->cbd_sc |= BD_SC_READY;
-		/* Get next BD. */
-		if (bdp->cbd_sc & BD_SC_WRAP)
-			bdp = pinfo->tx_bd_base;
-		else
-			bdp++;
-		pinfo->tx_cur = bdp;
-
-		port->icount.tx++;
-		port->x_char = 0;
-		return 1;
-	}
-
-	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		cpm_uart_stop_tx(port, 0);
-		return 0;
-	}
-
-	/* Pick next descriptor and fill from buffer */
-	bdp = pinfo->tx_cur;
-
-	while (!(bdp->cbd_sc & BD_SC_READY) && (xmit->tail != xmit->head)) {
-		count = 0;
-		p = bus_to_virt(bdp->cbd_bufaddr);
-		while (count < pinfo->tx_fifosize) {
-			*p++ = xmit->buf[xmit->tail];
-			xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
-			port->icount.tx++;
-			count++;
-			if (xmit->head == xmit->tail)
-				break;
-		}
-		bdp->cbd_datlen = count;
-		bdp->cbd_sc |= BD_SC_READY;
-		/* Get next BD. */
-		if (bdp->cbd_sc & BD_SC_WRAP)
-			bdp = pinfo->tx_bd_base;
-		else
-			bdp++;
-	}
-	pinfo->tx_cur = bdp;
-
-	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_write_wakeup(port);
-
-	if (uart_circ_empty(xmit)) {
-		cpm_uart_stop_tx(port, 0);
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
  * Start transmitter
  */
 static void cpm_uart_start_tx(struct uart_port *port, unsigned int tty_start)
@@ -196,6 +132,10 @@ static void cpm_uart_start_tx(struct uart_port *port, unsigned int tty_start)
 	volatile scc_t *sccp = pinfo->sccp;
 
 	pr_debug("CPM uart[%d]:start tx\n", port->line);
+
+	/* if in the middle of discarding return */
+	if (IS_DISCARDING(pinfo))
+		return;
 
 	if (IS_SMC(pinfo)) {
 		if (smcp->smc_smcm & SMCM_TX)
@@ -420,7 +360,6 @@ static irqreturn_t cpm_uart_int(int irq, void *data, struct pt_regs *regs)
 
 static int cpm_uart_startup(struct uart_port *port)
 {
-	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
 	int retval;
 
 	pr_debug("CPM uart[%d]:startup\n", port->line);
@@ -430,32 +369,7 @@ static int cpm_uart_startup(struct uart_port *port)
 	if (retval)
 		return retval;
 
-	/* Startup rx-int */
-	if (IS_SMC(pinfo)) {
-		pinfo->smcp->smc_smcm |= SMCM_RX;
-		pinfo->smcp->smc_smcmr |= SMCMR_REN;
-	} else {
-		pinfo->sccp->scc_sccm |= UART_SCCM_RX;
-	}
-
 	return 0;
-}
-
-/*
- * Reinit buffer descriptors
- */
-static void cpm_uart_initbd(struct uart_cpm_port *pinfo)
-{
-	int i;
-	volatile cbd_t *bdp;
-
-	pr_debug("CPM uart[%d]:initbd\n", pinfo->port.line);
-
-	for (bdp = pinfo->rx_cur = pinfo->rx_bd_base, i = 0; i < pinfo->rx_nrfifos; i++, bdp++)
-		bdp->cbd_sc = BD_SC_EMPTY | BD_SC_INTRPT | (i < (pinfo->rx_nrfifos - 1) ? 0 : BD_SC_WRAP);
-
-	for (bdp = pinfo->tx_cur = pinfo->tx_bd_base, i = 0; i < pinfo->tx_nrfifos; i++, bdp++)
-		bdp->cbd_sc = BD_SC_INTRPT | (i < (pinfo->rx_nrfifos - 1) ? 0 : BD_SC_WRAP);
 }
 
 /*
@@ -484,9 +398,264 @@ static void cpm_uart_shutdown(struct uart_port *port)
 		}
 
 		/* Shut them really down and reinit buffer descriptors */
-		cpm_line_cr_cmd(pinfo->port.line, CPM_CR_STOP_TX);
-		cpm_uart_initbd(pinfo);
+		cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
 	}
+}
+
+static void cpm_uart_set_termios(struct uart_port *port,
+				 struct termios *termios, struct termios *old)
+{
+	int baud;
+	unsigned long flags;
+	u16 cval, scval;
+	int bits, sbits;
+	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
+	volatile cbd_t *bdp;
+
+	pr_debug("CPM uart[%d]:set_termios\n", port->line);
+
+	spin_lock_irqsave(&port->lock, flags);
+	/* disable uart interrupts */
+	if (IS_SMC(pinfo))
+		pinfo->smcp->smc_smcm &= ~(SMCM_RX | SMCM_TX);
+	else
+		pinfo->sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
+	pinfo->flags |= FLAG_DISCARDING;
+	spin_unlock_irqrestore(&port->lock, flags);
+
+	/* if previous configuration exists wait for tx to finish */
+	if (pinfo->baud != 0 && pinfo->bits != 0) {
+
+		/* point to the last txed bd */
+		bdp = pinfo->tx_cur;
+		if (bdp == pinfo->tx_bd_base)
+			bdp = pinfo->tx_bd_base + pinfo->tx_nrfifos;
+		else
+			bdp--;
+
+		/* wait for it to be transmitted */
+		while ((bdp->cbd_sc & BD_SC_READY) != 0)
+			schedule();
+
+		/* and delay for the hw fifo to drain */
+		udelay((3 * 1000000 * pinfo->bits) / pinfo->baud);
+	}
+
+	spin_lock_irqsave(&port->lock, flags);
+
+	/* Send the CPM an initialize command. */
+	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_STOP_TX);
+
+	/* Stop uart */
+	if (IS_SMC(pinfo))
+		pinfo->smcp->smc_smcmr &= ~(SMCMR_REN | SMCMR_TEN);
+	else
+		pinfo->sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+
+	/* Send the CPM an initialize command. */
+	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
+
+	spin_unlock_irqrestore(&port->lock, flags);
+
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
+
+	/* Character length programmed into the mode register is the
+	 * sum of: 1 start bit, number of data bits, 0 or 1 parity bit,
+	 * 1 or 2 stop bits, minus 1.
+	 * The value 'bits' counts this for us.
+	 */
+	cval = 0;
+	scval = 0;
+
+	/* byte size */
+	switch (termios->c_cflag & CSIZE) {
+	case CS5:
+		bits = 5;
+		break;
+	case CS6:
+		bits = 6;
+		break;
+	case CS7:
+		bits = 7;
+		break;
+	case CS8:
+		bits = 8;
+		break;
+		/* Never happens, but GCC is too dumb to figure it out */
+	default:
+		bits = 8;
+		break;
+	}
+	sbits = bits - 5;
+
+	if (termios->c_cflag & CSTOPB) {
+		cval |= SMCMR_SL;	/* Two stops */
+		scval |= SCU_PSMR_SL;
+		bits++;
+	}
+
+	if (termios->c_cflag & PARENB) {
+		cval |= SMCMR_PEN;
+		scval |= SCU_PSMR_PEN;
+		bits++;
+		if (!(termios->c_cflag & PARODD)) {
+			cval |= SMCMR_PM_EVEN;
+			scval |= (SCU_PSMR_REVP | SCU_PSMR_TEVP);
+		}
+	}
+
+	/*
+	 * Set up parity check flag
+	 */
+#define RELEVANT_IFLAG(iflag) (iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
+
+	port->read_status_mask = (BD_SC_EMPTY | BD_SC_OV);
+	if (termios->c_iflag & INPCK)
+		port->read_status_mask |= BD_SC_FR | BD_SC_PR;
+	if ((termios->c_iflag & BRKINT) || (termios->c_iflag & PARMRK))
+		port->read_status_mask |= BD_SC_BR;
+
+	/*
+	 * Characters to ignore
+	 */
+	port->ignore_status_mask = 0;
+	if (termios->c_iflag & IGNPAR)
+		port->ignore_status_mask |= BD_SC_PR | BD_SC_FR;
+	if (termios->c_iflag & IGNBRK) {
+		port->ignore_status_mask |= BD_SC_BR;
+		/*
+		 * If we're ignore parity and break indicators, ignore
+		 * overruns too.  (For real raw support).
+		 */
+		if (termios->c_iflag & IGNPAR)
+			port->ignore_status_mask |= BD_SC_OV;
+	}
+	/*
+	 * !!! ignore all characters if CREAD is not set
+	 */
+	if ((termios->c_cflag & CREAD) == 0)
+		port->read_status_mask &= ~BD_SC_EMPTY;
+	
+	spin_lock_irqsave(&port->lock, flags);
+
+	cpm_set_brg(pinfo->brg - 1, baud);
+
+	/* Start bit has not been added (so don't, because we would just
+	 * subtract it later), and we need to add one for the number of
+	 * stops bits (there is always at least one).
+	 */
+	bits++;
+
+	/* re-init */
+	if (IS_SMC(pinfo))
+		cpm_uart_init_smc(pinfo, bits, cval);
+	else
+		cpm_uart_init_scc(pinfo, sbits, scval);
+
+	pinfo->baud = baud;
+	pinfo->bits = bits;
+
+	pinfo->flags &= ~FLAG_DISCARDING;
+	spin_unlock_irqrestore(&port->lock, flags);
+
+}
+
+static const char *cpm_uart_type(struct uart_port *port)
+{
+	pr_debug("CPM uart[%d]:uart_type\n", port->line);
+
+	return port->type == PORT_CPM ? "CPM UART" : NULL;
+}
+
+/*
+ * verify the new serial_struct (for TIOCSSERIAL).
+ */
+static int cpm_uart_verify_port(struct uart_port *port,
+				struct serial_struct *ser)
+{
+	int ret = 0;
+
+	pr_debug("CPM uart[%d]:verify_port\n", port->line);
+
+	if (ser->type != PORT_UNKNOWN && ser->type != PORT_CPM)
+		ret = -EINVAL;
+	if (ser->irq < 0 || ser->irq >= NR_IRQS)
+		ret = -EINVAL;
+	if (ser->baud_base < 9600)
+		ret = -EINVAL;
+	return ret;
+}
+
+/*
+ * Transmit characters, refill buffer descriptor, if possible
+ */
+static int cpm_uart_tx_pump(struct uart_port *port)
+{
+	volatile cbd_t *bdp;
+	unsigned char *p;
+	int count;
+	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
+	struct circ_buf *xmit = &port->info->xmit;
+
+	/* Handle xon/xoff */
+	if (port->x_char) {
+		/* Pick next descriptor and fill from buffer */
+		bdp = pinfo->tx_cur;
+
+		p = bus_to_virt(bdp->cbd_bufaddr);
+		*p++ = xmit->buf[xmit->tail];
+		bdp->cbd_datlen = 1;
+		bdp->cbd_sc |= BD_SC_READY;
+		/* Get next BD. */
+		if (bdp->cbd_sc & BD_SC_WRAP)
+			bdp = pinfo->tx_bd_base;
+		else
+			bdp++;
+		pinfo->tx_cur = bdp;
+
+		port->icount.tx++;
+		port->x_char = 0;
+		return 1;
+	}
+
+	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
+		cpm_uart_stop_tx(port, 0);
+		return 0;
+	}
+
+	/* Pick next descriptor and fill from buffer */
+	bdp = pinfo->tx_cur;
+
+	while (!(bdp->cbd_sc & BD_SC_READY) && (xmit->tail != xmit->head)) {
+		count = 0;
+		p = bus_to_virt(bdp->cbd_bufaddr);
+		while (count < pinfo->tx_fifosize) {
+			*p++ = xmit->buf[xmit->tail];
+			xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+			port->icount.tx++;
+			count++;
+			if (xmit->head == xmit->tail)
+				break;
+		}
+		bdp->cbd_datlen = count;
+		bdp->cbd_sc |= BD_SC_READY;
+		/* Get next BD. */
+		if (bdp->cbd_sc & BD_SC_WRAP)
+			bdp = pinfo->tx_bd_base;
+		else
+			bdp++;
+	}
+	pinfo->tx_cur = bdp;
+
+	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+		uart_write_wakeup(port);
+
+	if (uart_circ_empty(xmit)) {
+		cpm_uart_stop_tx(port, 0);
+		return 0;
+	}
+
+	return 1;
 }
 
 static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int bits, u16 scval)
@@ -638,178 +807,6 @@ static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval)
 	sp->smc_smce = 0xff;
 
 	sp->smc_smcmr |= (SMCMR_REN | SMCMR_TEN);
-}
-
-static void cpm_uart_set_termios(struct uart_port *port,
-				 struct termios *termios, struct termios *old)
-{
-	int baud;
-	unsigned long flags;
-	u16 cval, scval;
-	int bits, sbits;
-	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
-
-	pr_debug("CPM uart[%d]:set_termios\n", port->line);
-
-	spin_lock_irqsave(&port->lock, flags);
-	/* Disable UART interrupts */
-	if (IS_SMC(pinfo))
-		pinfo->smcp->smc_smcm &= ~(SMCM_RX | SMCM_TX);
-	else
-		pinfo->sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
-	spin_unlock_irqrestore(&port->lock, flags);
-
-	/*
-	 * If a previous configuration exists wait 2+1 character times
-	 * for tx to finish
-	 */
-	if (pinfo->baud != 0 && pinfo->bits != 0)
-		udelay((3 * 1000000 * pinfo->bits) / pinfo->baud);
-
-	spin_lock_irqsave(&port->lock, flags);
-	/* Send the CPM an initialize command. */
-	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_STOP_TX);
-
-	/* Stop uart */
-	if (IS_SMC(pinfo))
-		pinfo->smcp->smc_smcmr &= ~(SMCMR_REN | SMCMR_TEN);
-	else
-		pinfo->sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
-
-	/* Send the CPM an initialize command. */
-	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
-
-	/* init bds */
-	cpm_uart_initbd(pinfo);
-
-	spin_unlock_irqrestore(&port->lock, flags);
-
-	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
-
-	/* Character length programmed into the mode register is the
-	 * sum of: 1 start bit, number of data bits, 0 or 1 parity bit,
-	 * 1 or 2 stop bits, minus 1.
-	 * The value 'bits' counts this for us.
-	 */
-	cval = 0;
-	scval = 0;
-
-	/* byte size */
-	switch (termios->c_cflag & CSIZE) {
-	case CS5:
-		bits = 5;
-		break;
-	case CS6:
-		bits = 6;
-		break;
-	case CS7:
-		bits = 7;
-		break;
-	case CS8:
-		bits = 8;
-		break;
-		/* Never happens, but GCC is too dumb to figure it out */
-	default:
-		bits = 8;
-		break;
-	}
-	sbits = bits - 5;
-
-	if (termios->c_cflag & CSTOPB) {
-		cval |= SMCMR_SL;	/* Two stops */
-		scval |= SCU_PSMR_SL;
-		bits++;
-	}
-
-	if (termios->c_cflag & PARENB) {
-		cval |= SMCMR_PEN;
-		scval |= SCU_PSMR_PEN;
-		bits++;
-		if (!(termios->c_cflag & PARODD)) {
-			cval |= SMCMR_PM_EVEN;
-			scval |= (SCU_PSMR_REVP | SCU_PSMR_TEVP);
-		}
-	}
-
-	/*
-	 * Set up parity check flag
-	 */
-#define RELEVANT_IFLAG(iflag) (iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
-
-	port->read_status_mask = (BD_SC_EMPTY | BD_SC_OV);
-	if (termios->c_iflag & INPCK)
-		port->read_status_mask |= BD_SC_FR | BD_SC_PR;
-	if ((termios->c_iflag & BRKINT) || (termios->c_iflag & PARMRK))
-		port->read_status_mask |= BD_SC_BR;
-
-	/*
-	 * Characters to ignore
-	 */
-	port->ignore_status_mask = 0;
-	if (termios->c_iflag & IGNPAR)
-		port->ignore_status_mask |= BD_SC_PR | BD_SC_FR;
-	if (termios->c_iflag & IGNBRK) {
-		port->ignore_status_mask |= BD_SC_BR;
-		/*
-		 * If we're ignore parity and break indicators, ignore
-		 * overruns too.  (For real raw support).
-		 */
-		if (termios->c_iflag & IGNPAR)
-			port->ignore_status_mask |= BD_SC_OV;
-	}
-	/*
-	 * !!! ignore all characters if CREAD is not set
-	 */
-	if ((termios->c_cflag & CREAD) == 0)
-		port->read_status_mask &= ~BD_SC_EMPTY;
-	
-	spin_lock_irqsave(&port->lock, flags);
-
-	cpm_set_brg(pinfo->brg - 1, baud);
-
-	/* Start bit has not been added (so don't, because we would just
-	 * subtract it later), and we need to add one for the number of
-	 * stops bits (there is always at least one).
-	 */
-	bits++;
-
-	/* re-init */
-	if (IS_SMC(pinfo))
-		cpm_uart_init_smc(pinfo, bits, cval);
-	else
-		cpm_uart_init_scc(pinfo, sbits, scval);
-
-	pinfo->baud = baud;
-	pinfo->bits = bits;
-
-	spin_unlock_irqrestore(&port->lock, flags);
-
-}
-
-static const char *cpm_uart_type(struct uart_port *port)
-{
-	pr_debug("CPM uart[%d]:uart_type\n", port->line);
-
-	return port->type == PORT_CPM ? "CPM UART" : NULL;
-}
-
-/*
- * verify the new serial_struct (for TIOCSSERIAL).
- */
-static int cpm_uart_verify_port(struct uart_port *port,
-				struct serial_struct *ser)
-{
-	int ret = 0;
-
-	pr_debug("CPM uart[%d]:verify_port\n", port->line);
-
-	if (ser->type != PORT_UNKNOWN && ser->type != PORT_CPM)
-		ret = -EINVAL;
-	if (ser->irq < 0 || ser->irq >= NR_IRQS)
-		ret = -EINVAL;
-	if (ser->baud_base < 9600)
-		ret = -EINVAL;
-	return ret;
 }
 
 /*
@@ -975,6 +972,9 @@ static void cpm_uart_console_write(struct console *co, const char *s,
 	unsigned int i;
 	volatile cbd_t *bdp, *bdbase;
 	volatile unsigned char *cp;
+
+	if (IS_DISCARDING(pinfo))
+		return;
 
 	/* Get the address of the host memory buffer.
 	 */

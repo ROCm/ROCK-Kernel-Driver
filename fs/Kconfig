@@ -672,6 +672,25 @@ config VFAT_FS
 	  To compile this as a module, choose M here: the module will be called
 	  vfat.
 
+config FAT_DEFAULT_CODEPAGE
+	int "Default codepage for FAT"
+	depends on MSDOS_FS || VFAT_FS
+	default 437
+	help
+	  This option should be set to the codepage of your FAT filesystems.
+	  It can be overridden with the 'codepage' mount option.
+
+config FAT_DEFAULT_IOCHARSET
+	string "Default iocharset for FAT"
+	depends on VFAT_FS
+	default "iso8859-1"
+	help
+	  Set this to the default I/O character set you'd like FAT to use.
+	  It should probably match the character set that most of your
+	  FAT filesystems use, and can be overridded with the 'iocharset'
+	  mount option for FAT filesystems.  Note that UTF8 is *not* a
+	  supported charset for FAT filesystems.
+
 config UMSDOS_FS
 #dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
 # UMSDOS is temprory broken
@@ -1562,7 +1581,7 @@ config SMB_NLS_REMOTE
 	  smbmount from samba 2.2.0 or later supports this.
 
 config CIFS
-	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)(EXPERIMENTAL)"
+	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)"
 	depends on INET
 	select NLS
 	help
@@ -1592,7 +1611,16 @@ config CIFS_STATS
         depends on CIFS
         help
           Enabling this option will cause statistics for each server share
-	  mounted by the cifs client to be displayed in /proc/fs/cifs/DebugData
+	  mounted by the cifs client to be displayed in /proc/fs/cifs/Stats
+
+config CIFS_POSIX
+        bool "CIFS POSIX Extensions (EXPERIMENTAL)"
+        depends on CIFS
+        help
+          Enabling this option will cause the cifs client to attempt to
+	  negotiate a newer dialect with servers, such as Samba 3.0.5
+	  or later, that optionally can handle more POSIX like (rather
+	  than Windows like) file behavior.  If unsure, say N.
 
 config NCP_FS
 	tristate "NCP file system support (to mount NetWare volumes)"

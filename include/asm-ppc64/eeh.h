@@ -55,6 +55,7 @@ void __init pci_addr_cache_build(void);
  * device (including config space i/o).  Call eeh_add_device_late
  * to finish the eeh setup for this device.
  */
+struct device_node;
 void eeh_add_device_early(struct device_node *);
 void eeh_add_device_late(struct pci_dev *);
 

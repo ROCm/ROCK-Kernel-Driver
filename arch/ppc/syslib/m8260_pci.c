@@ -164,9 +164,9 @@ void __init m8260_find_bridges(void)
 	hose->bus_offset = 0;
 	hose->last_busno = 0xff;
 
-	setup_indirect_pci(hose, 
-			   (unsigned long)&cpm2_immr->im_pci.pci_cfg_addr,
-			   (unsigned long)&cpm2_immr->im_pci.pci_cfg_data);
+	setup_m8260_indirect_pci(hose, 
+				 (unsigned long)&cpm2_immr->im_pci.pci_cfg_addr,
+				 (unsigned long)&cpm2_immr->im_pci.pci_cfg_data);
 
 	m8260_setup_pci(hose);
         hose->pci_mem_offset = MPC826x_PCI_MEM_OFFSET;

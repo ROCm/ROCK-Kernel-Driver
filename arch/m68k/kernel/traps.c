@@ -329,7 +329,8 @@ static inline void access_error060 (struct frame *fp)
 		 * fault during mem_read/mem_write in ifpsp060/os.S
 		 */
 		send_fault_sig(&fp->ptregs);
-	} else {
+	} else if (!(fslw & (MMU060_RE|MMU060_WE)) ||
+		   send_fault_sig(&fp->ptregs) > 0) {
 		printk("pc=%#lx, fa=%#lx\n", fp->ptregs.pc, fp->un.fmt4.effaddr);
 		printk( "68060 access error, fslw=%lx\n", fslw );
 		trap_c( fp );
@@ -517,7 +518,7 @@ static inline void access_error040(struct frame *fp)
 			if (fp->un.fmt7.wb2a == fp->un.fmt7.faddr)
 				fp->un.fmt7.wb2s &= ~WBV_040;
 		}
-	} else {
+	} else if (send_fault_sig(&fp->ptregs) > 0) {
 		printk("68040 access error, ssw=%x\n", ssw);
 		trap_c(fp);
 	}
@@ -732,7 +733,7 @@ static inline void bus_error030 (struct frame *fp)
 				return;
 		} else if (!(mmusr & MMU_I)) {
 			/* probably a 020 cas fault */
-			if (!(ssw & RM))
+			if (!(ssw & RM) && send_fault_sig(&fp->ptregs) > 0)
 				printk("unexpected bus error (%#x,%#x)\n", ssw, mmusr);
 		} else if (mmusr & (MMU_B|MMU_L|MMU_S)) {
 			printk("invalid %s access at %#lx from pc %#lx\n",
