@@ -277,7 +277,26 @@ static inline void remove_debug_files (struct ehci_hcd *bus) { }
 		default: tmp = '?'; break; \
 		}; tmp; })
 
-static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
+static inline char token_mark (u32 token)
+{
+	token = le32_to_cpu (token);
+	if (token & QTD_STS_ACTIVE)
+		return '*';
+	if (token & QTD_STS_HALT)
+		return '-';
+	if (QTD_PID (token) != 1 /* not IN: OUT or SETUP */
+			|| QTD_LENGTH (token) == 0)
+		return ' ';
+	/* tries to advance through hw_alt_next */
+	return '/';
+}
+
+static void qh_lines (
+	struct ehci_hcd *ehci,
+	struct ehci_qh *qh,
+	char **nextp,
+	unsigned *sizep
+)
 {
 	u32			scratch;
 	u32			hw_curr;
@@ -286,26 +305,49 @@ static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
 	unsigned		temp;
 	unsigned		size = *sizep;
 	char			*next = *nextp;
+	char			mark;
 
+	mark = token_mark (qh->hw_token);
+	if (mark == '/') {	/* qh_alt_next controls qh advance? */
+		if ((qh->hw_alt_next & QTD_MASK) == ehci->async->hw_alt_next)
+			mark = '#';	/* blocked */
+		else if (qh->hw_alt_next & cpu_to_le32 (0x01))
+			mark = '.';	/* use hw_qtd_next */
+		/* else alt_next points to some other qtd */
+	}
 	scratch = cpu_to_le32p (&qh->hw_info1);
-	hw_curr = cpu_to_le32p (&qh->hw_current);
+	hw_curr = (mark == '*') ? cpu_to_le32p (&qh->hw_current) : 0;
 	temp = snprintf (next, size,
-			"qh/%p dev%d %cs ep%d %08x %08x (%08x %08x)",
+			"qh/%p dev%d %cs ep%d %08x %08x (%08x%c %s nak%d)",
 			qh, scratch & 0x007f,
 			speed_char (scratch),
 			(scratch >> 8) & 0x000f,
 			scratch, cpu_to_le32p (&qh->hw_info2),
-			hw_curr, cpu_to_le32p (&qh->hw_token));
+			cpu_to_le32p (&qh->hw_token), mark,
+			(cpu_to_le32 (0x8000000) & qh->hw_token)
+				? "data0" : "data1",
+			(cpu_to_le32p (&qh->hw_alt_next) >> 1) & 0x0f);
 	size -= temp;
 	next += temp;
 
+	/* hc may be modifying the list as we read it ... */
 	list_for_each (entry, &qh->qtd_list) {
 		td = list_entry (entry, struct ehci_qtd, qtd_list);
 		scratch = cpu_to_le32p (&td->hw_token);
+		mark = ' ';
+		if (hw_curr == td->qtd_dma)
+			mark = '*';
+		else if (qh->hw_qtd_next == td->qtd_dma)
+			mark = '+';
+		else if (QTD_LENGTH (scratch)) {
+			if (td->hw_alt_next == ehci->async->hw_alt_next)
+				mark = '#';
+			else if (td->hw_alt_next != EHCI_LIST_END)
+				mark = '/';
+		}
 		temp = snprintf (next, size,
-				"\n\t%std/%p %s len=%d %08x urb %p",
-				(hw_curr == td->qtd_dma) ? "*" : "",
-				td, ({ char *tmp;
+				"\n\t%p%c%s len=%d %08x urb %p",
+				td, mark, ({ char *tmp;
 				 switch ((scratch>>8)&0x03) {
 				 case 0: tmp = "out"; break;
 				 case 1: tmp = "in"; break;
@@ -315,13 +357,27 @@ static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
 				(scratch >> 16) & 0x7fff,
 				scratch,
 				td->urb);
+		if (temp < 0)
+			temp = 0;
+		else if (size < temp)
+			temp = size;
 		size -= temp;
 		next += temp;
+		if (temp == size)
+			goto done;
 	}
 
 	temp = snprintf (next, size, "\n");
-	*sizep = size - temp;
-	*nextp = next + temp;
+	if (temp < 0)
+		temp = 0;
+	else if (size < temp)
+		temp = size;
+	size -= temp;
+	next += temp;
+
+done:
+	*sizep = size;
+	*nextp = next;
 }
 
 static ssize_t
@@ -344,14 +400,15 @@ show_async (struct device *dev, char *buf)
 	 * one QH per line, and TDs we know about
 	 */
 	spin_lock_irqsave (&ehci->lock, flags);
-	for (qh = ehci->async->qh_next.qh; qh; qh = qh->qh_next.qh)
-		qh_lines (qh, &next, &size);
-	if (ehci->reclaim) {
+	for (qh = ehci->async->qh_next.qh; size > 0 && qh; qh = qh->qh_next.qh)
+		qh_lines (ehci, qh, &next, &size);
+	if (ehci->reclaim && size > 0) {
 		temp = snprintf (next, size, "\nreclaim =\n");
 		size -= temp;
 		next += temp;
 
-		qh_lines (ehci->reclaim, &next, &size);
+		for (qh = ehci->reclaim; size > 0 && qh; qh = qh->reclaim)
+			qh_lines (ehci, qh, &next, &size);
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
@@ -421,7 +478,7 @@ show_periodic (struct device *dev, char *buf)
 						scratch & 0x007f,
 						(scratch >> 8) & 0x000f,
 						p.qh->usecs, p.qh->c_usecs,
-						scratch >> 16);
+						0x7ff & (scratch >> 16));
 
 					/* FIXME TD info too */
 
@@ -490,7 +547,8 @@ show_registers (struct device *dev, char *buf)
 
 	/* Capability Registers */
 	i = readw (&ehci->caps->hci_version);
-	temp = snprintf (next, size, "EHCI %x.%02x, hcd state %d\n",
+	temp = snprintf (next, size,
+		"EHCI %x.%02x, hcd state %d (version " DRIVER_VERSION ")\n",
 		i >> 8, i & 0x0ff, ehci->hcd.state);
 	size -= temp;
 	next += temp;

@@ -236,11 +236,11 @@ struct ehci_qtd {
 	/* the rest is HCD-private */
 	dma_addr_t		qtd_dma;		/* qtd address */
 	struct list_head	qtd_list;		/* sw qtd list */
-
-	/* dma same in urb's qtds, except 1st control qtd (setup buffer) */
 	struct urb		*urb;			/* qtd's urb */
 	size_t			length;			/* length of buffer */
 } __attribute__ ((aligned (32)));
+
+#define QTD_MASK cpu_to_le32 (~0x1f)	/* mask NakCnt+T in qh->hw_alt_next */
 
 /*-------------------------------------------------------------------------*/
 
@@ -305,6 +305,7 @@ struct ehci_qh {
 	union ehci_shadow	qh_next;	/* ptr to qh; or periodic */
 	struct list_head	qtd_list;	/* sw qtd list */
 	struct ehci_qtd		*dummy;
+	struct ehci_qh		*reclaim;	/* next to reclaim */
 
 	atomic_t		refcount;
 	unsigned		stamp;
@@ -313,6 +314,8 @@ struct ehci_qh {
 #define	QH_STATE_LINKED		1		/* HC sees this */
 #define	QH_STATE_UNLINK		2		/* HC may still see this */
 #define	QH_STATE_IDLE		3		/* HC doesn't see this */
+#define	QH_STATE_UNLINK_WAIT	4		/* LINKED and on reclaim q */
+#define	QH_STATE_COMPLETING	5		/* don't touch token.HALT */
 
 	/* periodic schedule info */
 	u8			usecs;		/* intr bandwidth */
