@@ -405,10 +405,7 @@ do_boot_cpu (int sapicid, int cpu)
 	}
 	Dprintk("\n");
 
-	if (cpu_isset(cpu, cpu_callin_map)) {
-		/* number CPUs logically, starting from 1 (BSP is 0) */
-		printk(KERN_INFO "CPU%d: CPU has booted.\n", cpu);
-	} else {
+	if (!cpu_isset(cpu, cpu_callin_map)) {
 		printk(KERN_ERR "Processor 0x%x/0x%x is stuck.\n", cpu, sapicid);
 		ia64_cpu_to_sapicid[cpu] = -1;
 		cpu_clear(cpu, cpu_online_map);  /* was set in smp_callin() */
@@ -583,14 +580,11 @@ __cpu_up (unsigned int cpu)
 	if (sapicid == -1)
 		return -EINVAL;
 
-	printk(KERN_INFO "Processor %d/%d is spinning up...\n", sapicid, cpu);
-
 	/* Processor goes to start_secondary(), sets online flag */
 	ret = do_boot_cpu(sapicid, cpu);
 	if (ret < 0)
 		return ret;
 
-	printk(KERN_INFO "Processor %d has spun up...\n", cpu);
 	return 0;
 }
 
