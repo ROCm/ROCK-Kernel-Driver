@@ -151,12 +151,9 @@ struct cpuinfo_ia64 {
 	__u64 itc_freq;		/* frequency of ITC counter */
 	__u64 proc_freq;	/* frequency of processor */
 	__u64 cyc_per_usec;	/* itc_freq/1000000 */
-	__u64 percpu_paddr;
 	__u64 ptce_base;
 	__u32 ptce_count[2];
 	__u32 ptce_stride[2];
-	__u64 pal_paddr;
-	__u64 pal_base;
 	struct task_struct *ksoftirqd;	/* kernel softirq daemon for this CPU */
 
 #ifdef CONFIG_SMP
@@ -177,7 +174,6 @@ struct cpuinfo_ia64 {
 #ifdef CONFIG_NUMA
 	struct ia64_node_data *node_data;
 #endif
-	__u64 *ia64_pa_mca_data;	/* prt to MCA/INIT processor state */
 };
 
 DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);

@@ -46,40 +46,9 @@
 	mov	temp	= 0x7	;;							\
 	dep	addr	= temp, addr, 61, 3
 
-/*
- * This macro gets the physical address of this cpu's cpuinfo structure.
- */
-#define GET_PERCPU_PADDR(reg)							\
-	mov	reg	= ar.k3;;						\
-	addl	reg	= IA64_CPUINFO_PERCPU_PADDR,reg
-
-#define GET_CPUINFO_PAL_PADDR(reg)						\
-	mov	reg	= ar.k3;;						\
-	addl	reg	= IA64_CPUINFO_PAL_PADDR,reg
-
-/*
- * This macro gets the physical address of this cpu's MCA save structure.
- */
-#define GET_CPUINFO_MCA_PADDR(reg)						\
-	mov	reg	= ar.k3;;						\
-	addl	reg	= IA64_CPUINFO_PA_MCA_INFO,reg;;			\
-	ld8	reg	= [reg]
-
-#define	GET_MCA_BSPSTORE(reg)							\
-	GET_CPUINFO_MCA_PADDR(reg);;						\
-	addl	reg	= IA64_MCA_BSPSTORE,reg
-
-#define	GET_MCA_STACKFRAME(reg)							\
-	GET_CPUINFO_MCA_PADDR(reg);;						\
-	addl	reg	= IA64_MCA_STACKFRAME,reg
-
-#define	GET_MCA_STACK(reg)							\
-	GET_CPUINFO_MCA_PADDR(reg);;						\
-	addl	reg	= IA64_MCA_STACK,reg
-
-#define	GET_MCA_DUMP_PADDR(reg)							\
-	GET_CPUINFO_MCA_PADDR(reg);;						\
-	addl	reg	= IA64_MCA_PROC_STATE_DUMP,reg
+#define GET_THIS_PADDR(reg, var)		\
+	mov	reg = IA64_KR(PER_CPU_DATA);;	\
+        addl	reg = THIS_CPU(var), reg
 
 /*
  * This macro jumps to the instruction at the given virtual address

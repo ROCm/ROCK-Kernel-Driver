@@ -84,12 +84,11 @@ ia64_rt_sigsuspend (sigset_t __user *uset, size_t sigsetsize, struct sigscratch 
 }
 
 asmlinkage long
-sys_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, long arg2, long arg3, long arg4,
-		 long arg5, long arg6, long arg7, long stack)
+sys_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, long arg2,
+		 long arg3, long arg4, long arg5, long arg6, long arg7,
+		 struct pt_regs regs)
 {
-	struct pt_regs *pt = (struct pt_regs *) &stack;
-
-	return do_sigaltstack(uss, uoss, pt->r12);
+	return do_sigaltstack(uss, uoss, regs.r12);
 }
 
 static long

@@ -339,7 +339,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 	pernodesize += node * L1_CACHE_BYTES;
 	pernodesize += L1_CACHE_ALIGN(sizeof(pg_data_t));
 	pernodesize += L1_CACHE_ALIGN(sizeof(struct ia64_node_data));
-	pernodesize += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
+	pernodesize += L1_CACHE_ALIGN(sizeof(struct ia64_mca_cpu)) * phys_cpus;
 	pernodesize = PAGE_ALIGN(pernodesize);
 	pernode = NODEDATA_ALIGN(start, node);
 
@@ -363,7 +363,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 		pernode += L1_CACHE_ALIGN(sizeof(pg_data_t));
 
 		mca_data_phys = (void *)pernode;
-		pernode += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
+		pernode += L1_CACHE_ALIGN(sizeof(struct ia64_mca_cpu)) * phys_cpus;
 
 		/*
 		 * Copy the static per-cpu data into the region we
@@ -384,7 +384,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 					 * will be put in the cpuinfo structure.
 					 */
 					__per_cpu_mca[cpu] = __pa(mca_data_phys);
-					mca_data_phys += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t));
+					mca_data_phys += L1_CACHE_ALIGN(sizeof(struct ia64_mca_cpu));
 				}
 				__per_cpu_offset[cpu] = (char*)__va(cpu_data) -
 					__per_cpu_start;
