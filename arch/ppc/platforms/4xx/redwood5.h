@@ -1,14 +1,15 @@
 /*
- *    Copyright 2001 MontaVista Software Inc.
- *	PPC405 modifications
- * 	Author: MontaVista Software, Inc.
- *          Armin Kuster
+ * arch/ppc/platforms/4xx/redwood5.h
  *
- *    Module name: redwood5.h
+ * Macros, definitions, and data structures specific to the IBM PowerPC
+ * STB03xxx "Redwood" evaluation board.
  *
- *    Description:
- *      Macros, definitions, and data structures specific to the IBM PowerPC
- *      STB03xxx "Redwood" evaluation board.
+ * Author: Armin Kuster <akuster@mvista.com>
+ *
+ * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 #ifdef __KERNEL__
