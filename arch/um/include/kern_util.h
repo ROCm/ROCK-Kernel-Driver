@@ -110,7 +110,6 @@ extern void arch_switch(void);
 extern void free_irq(unsigned int, void *);
 extern int um_in_interrupt(void);
 extern int cpu(void);
-extern unsigned long long time_stamp(void);
 
 #endif
 
