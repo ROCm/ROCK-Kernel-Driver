@@ -145,8 +145,9 @@ hardware.
   enable_ms(port)
 	Enable the modem status interrupts.
 
-	Locking: none.
-	Interrupts: caller dependent.
+	Locking: port->lock taken.
+	Interrupts: locally disabled.
+	This call must not sleep
 
   break_ctl(port,ctl)
 	Control the transmission of a break signal.  If ctl is

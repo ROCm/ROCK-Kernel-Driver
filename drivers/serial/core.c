@@ -931,12 +931,12 @@ uart_wait_modem_status(struct uart_info *info, unsigned long arg)
 	 */
 	spin_lock_irq(&port->lock);
 	memcpy(&cprev, &port->icount, sizeof(struct uart_icount));
-	spin_unlock_irq(&port->lock);
 
 	/*
 	 * Force modem status interrupts on
 	 */
 	port->ops->enable_ms(port);
+	spin_unlock_irq(&port->lock);
 
 	add_wait_queue(&info->delta_msr_wait, &wait);
 	for (;;) {

@@ -733,12 +733,9 @@ static void serial8250_stop_rx(struct uart_port *port)
 static void serial8250_enable_ms(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	unsigned long flags;
 
-	spin_lock_irqsave(&up->port.lock, flags);
 	up->ier |= UART_IER_MSI;
 	serial_out(up, UART_IER, up->ier);
-	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
 static _INLINE_ void
@@ -1361,17 +1358,18 @@ serial8250_change_speed(struct uart_port *port, unsigned int cflag,
 		up->port.ignore_status_mask |= UART_LSR_DR;
 
 	/*
+	 * Ok, we're now changing the port state.  Do it with
+	 * interrupts disabled.
+	 */
+	spin_lock_irqsave(&up->port.lock, flags);
+
+	/*
 	 * CTS flow control flag and modem status interrupts
 	 */
 	up->ier &= ~UART_IER_MSI;
 	if (UART_ENABLE_MS(&up->port, cflag))
 		up->ier |= UART_IER_MSI;
 
-	/*
-	 * Ok, we're now changing the port state.  Do it with
-	 * interrupts disabled.
-	 */
-	spin_lock_irqsave(&up->port.lock, flags);
 	serial_out(up, UART_IER, up->ier);
 
 	if (uart_config[up->port.type].flags & UART_STARTECH) {

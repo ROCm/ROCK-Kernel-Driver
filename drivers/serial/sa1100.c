@@ -423,7 +423,9 @@ static int sa1100_startup(struct uart_port *port)
 	/*
 	 * Enable modem status interrupts
 	 */
+	spin_lock_irq(&sport->port.lock);
 	sa1100_enable_ms(&sport->port);
+	spin_unlock_irq(&sport->port.lock);
 
 	return 0;
 }
@@ -524,10 +526,11 @@ sa1100_change_speed(struct uart_port *port, unsigned int cflag,
 	UART_PUT_UTSR0(sport, -1);
 
 	UART_PUT_UTCR3(sport, old_utcr3);
-	spin_unlock_irqrestore(&sport->port.lock, flags);
 
 	if (UART_ENABLE_MS(&sport->port, cflag))
 		sa1100_enable_ms(&sport->port);
+
+	spin_unlock_irqrestore(&sport->port.lock, flags);
 }
 
 static const char *sa1100_type(struct uart_port *port)
