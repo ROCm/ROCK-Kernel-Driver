@@ -95,7 +95,7 @@ acpi_blacklisted(void)
 
 	while (acpi_blacklist[i].oem_id[0] != '\0')
 	{
-		if (!acpi_get_table_header_early(acpi_blacklist[i].table, &table_header)) {
+		if (acpi_get_table_header_early(acpi_blacklist[i].table, &table_header)) {
 			i++;
 			continue;
 		}
