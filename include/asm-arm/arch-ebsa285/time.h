@@ -181,12 +181,13 @@ set_isa_cmos_time(void)
 }
 
 
+static unsigned long timer1_latch;
 
 static unsigned long timer1_gettimeoffset (void)
 {
-	unsigned long value = LATCH - *CSR_TIMER1_VALUE;
+	unsigned long value = timer1_latch - *CSR_TIMER1_VALUE;
 
-	return ((tick_nsec / 1000) * value) / LATCH;
+	return ((tick_nsec / 1000) * value) / timer1_latch;
 }
 
 static irqreturn_t
@@ -260,8 +261,10 @@ void __init time_init(void)
 	    machine_is_personal_server()) {
 		gettimeoffset = timer1_gettimeoffset;
 
+		timer1_latch = (mem_fclk_21285 + 8 * HZ) / (16 * HZ);
+
 		*CSR_TIMER1_CLR  = 0;
-		*CSR_TIMER1_LOAD = LATCH;
+		*CSR_TIMER1_LOAD = timer1_latch;
 		*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD | TIMER_CNTL_DIV16;
 
 		timer_irq.handler = timer1_interrupt;

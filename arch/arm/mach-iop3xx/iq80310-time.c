@@ -88,7 +88,8 @@ static unsigned long iq80310_gettimeoffset (void)
 }
 
 
-static void iq80310_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+iq80310_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	volatile u_char *timer_en = (volatile u_char *)IQ80310_TIMER_EN;
 
@@ -96,21 +97,9 @@ static void iq80310_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	*timer_en &= ~2;
 	*timer_en |= 2;
 
-	/*
-	 * AHEM..HACK
-	 *
-	 * Since the timer interrupt is cascaded through the CPLD and
-	 * the 80312 and the demux code calls do_IRQ, the irq count is
-	 * going to be at least 2 when we get here and this will cause the
-	 * kernel to increment the system tick counter even if we're
-	 * idle. This causes it to look like there's always 100% system
-	 * time, which is not the case.  To get around it, we just decrement
-	 * the IRQ count before calling do_timer. We increment it again
-	 * b/c otherwise it will go negative and than bad things happen.
-	 *
-	 * -DS
-	 */
 	do_timer(regs);
+
+	return IRQ_HANDLED;
 }
 
 extern unsigned long (*gettimeoffset)(void);
@@ -126,7 +115,9 @@ void __init time_init(void)
 	volatile u_char *timer_en = (volatile u_char *)IQ80310_TIMER_EN;
 
 	gettimeoffset = iq80310_gettimeoffset;
+
 	setup_irq(IRQ_IQ80310_TIMER, &timer_irq);
+
 	*timer_en = 0;
 	iq80310_write_timer(LATCH);
 	*timer_en |= 2;

@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/completion.h>
 
+#include <asm/apm.h> /* apm_power_info */
 #include <asm/system.h>
 
 /*
@@ -93,18 +94,7 @@ static DECLARE_COMPLETION(kapmd_exit);
 
 static const char driver_version[] = "1.13";	/* no spaces */
 
-/*
- * This structure gets filled in by the machine specific 'get_power_status'
- * implementation.  Any fields which are not set default to a safe value.
- */
-struct apm_power_info {
-	unsigned char	ac_line_status;
-	unsigned char	battery_status;
-	unsigned char	battery_flag;
-	unsigned char	battery_life;
-	int		time;
-	int		units;
-};
+
 
 /*
  * Compatibility cruft until the IPAQ people move over to the new
