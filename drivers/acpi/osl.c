@@ -736,7 +736,7 @@ acpi_os_acquire_lock (
 	if (flags & ACPI_NOT_ISR)
 		ACPI_DISABLE_IRQS();
 
-	spin_lock(handle);
+	spin_lock((spinlock_t *)handle);
 
 	return_VOID;
 }
@@ -755,7 +755,7 @@ acpi_os_release_lock (
 	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Releasing spinlock[%p] from %s level\n", handle,
 		((flags & ACPI_NOT_ISR) ? "non-interrupt" : "interrupt")));
 
-	spin_unlock(handle);
+	spin_unlock((spinlock_t *)handle);
 
 	if (flags & ACPI_NOT_ISR)
 		ACPI_ENABLE_IRQS();

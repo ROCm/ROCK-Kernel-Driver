@@ -55,20 +55,18 @@ DEFINE_SNMP_STAT(struct ipv6_mib, ipv6_statistics);
 
 static struct packet_type ipv6_packet_type =
 {
-	__constant_htons(ETH_P_IPV6), 
-	NULL,					/* All devices */
-	ipv6_rcv,
-	(void*)1,
-	NULL
+	.type = __constant_htons(ETH_P_IPV6), 
+	.dev  = NULL,				/* All devices */
+	.func = ipv6_rcv,
+	.data = (void*)1,
 };
 
 /*
- *	addrconf module should be notifyed of a device going up
+ *	addrconf module should be notified of a device going up
  */
 static struct notifier_block ipv6_dev_notf = {
-	addrconf_notify,
-	NULL,
-	0
+	.notifier_call = addrconf_notify,
+	.priority = 0
 };
 
 struct ip6_ra_chain *ip6_ra_chain;

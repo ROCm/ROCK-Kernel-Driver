@@ -67,7 +67,7 @@ void it_real_fn(unsigned long __data)
 	struct task_struct * p = (struct task_struct *) __data;
 	unsigned long interval;
 
-	send_sig(SIGALRM, p, 1);
+	send_group_sig_info(SIGALRM, SEND_SIG_PRIV, p);
 	interval = p->it_real_incr;
 	if (interval) {
 		if (interval > (unsigned long) LONG_MAX)

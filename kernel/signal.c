@@ -33,64 +33,79 @@ static kmem_cache_t *sigqueue_cachep;
 atomic_t nr_queued_signals;
 int max_queued_signals = 1024;
 
-/*********************************************************
-
-    POSIX thread group signal behavior:
-
-----------------------------------------------------------
-|                    |  userspace       |  kernel        |
-----------------------------------------------------------
-|  SIGHUP            |  load-balance    |  kill-all      |
-|  SIGINT            |  load-balance    |  kill-all      |
-|  SIGQUIT           |  load-balance    |  kill-all+core |
-|  SIGILL            |  specific        |  kill-all+core |
-|  SIGTRAP           |  specific        |  kill-all+core |
-|  SIGABRT/SIGIOT    |  specific        |  kill-all+core |
-|  SIGBUS            |  specific        |  kill-all+core |
-|  SIGFPE            |  specific        |  kill-all+core |
-|  SIGKILL           |  n/a             |  kill-all      |
-|  SIGUSR1           |  load-balance    |  kill-all      |
-|  SIGSEGV           |  specific        |  kill-all+core |
-|  SIGUSR2           |  load-balance    |  kill-all      |
-|  SIGPIPE           |  specific        |  kill-all      |
-|  SIGALRM           |  load-balance    |  kill-all      |
-|  SIGTERM           |  load-balance    |  kill-all      |
-|  SIGCHLD           |  load-balance    |  ignore        |
-|  SIGCONT           |  load-balance    |  ignore        |
-|  SIGSTOP           |  n/a             |  stop-all      |
-|  SIGTSTP           |  load-balance    |  stop-all      |
-|  SIGTTIN           |  load-balance    |  stop-all      |
-|  SIGTTOU           |  load-balance    |  stop-all      |
-|  SIGURG            |  load-balance    |  ignore        |
-|  SIGXCPU           |  specific        |  kill-all+core |
-|  SIGXFSZ           |  specific        |  kill-all+core |
-|  SIGVTALRM         |  load-balance    |  kill-all      |
-|  SIGPROF           |  specific        |  kill-all      |
-|  SIGPOLL/SIGIO     |  load-balance    |  kill-all      |
-|  SIGSYS/SIGUNUSED  |  specific        |  kill-all+core |
-|  SIGSTKFLT         |  specific        |  kill-all      |
-|  SIGWINCH          |  load-balance    |  ignore        |
-|  SIGPWR            |  load-balance    |  kill-all      |
-|  SIGRTMIN-SIGRTMAX |  load-balance    |  kill-all      |
-----------------------------------------------------------
-
-    non-POSIX signal thread group behavior:
-
-----------------------------------------------------------
-|                    |  userspace       |  kernel        |
-----------------------------------------------------------
-|  SIGEMT            |  specific        |  kill-all+core |
-----------------------------------------------------------
-*/
-
-/* Some systems do not have a SIGSTKFLT and the kernel never
- * generates such signals anyways.
+/*
+ * In POSIX a signal is sent either to a specific thread (Linux task)
+ * or to the process as a whole (Linux thread group).  How the signal
+ * is sent determines whether it's to one thread or the whole group,
+ * which determines which signal mask(s) are involved in blocking it
+ * from being delivered until later.  When the signal is delivered,
+ * either it's caught or ignored by a user handler or it has a default
+ * effect that applies to the whole thread group (POSIX process).
+ *
+ * The possible effects an unblocked signal set to SIG_DFL can have are:
+ *   ignore	- Nothing Happens
+ *   terminate	- kill the process, i.e. all threads in the group,
+ * 		  similar to exit_group.  The group leader (only) reports
+ *		  WIFSIGNALED status to its parent.
+ *   coredump	- write a core dump file describing all threads using
+ *		  the same mm and then kill all those threads
+ *   stop 	- stop all the threads in the group, i.e. TASK_STOPPED state
+ *
+ * SIGKILL and SIGSTOP cannot be caught, blocked, or ignored.
+ * Other signals when not blocked and set to SIG_DFL behaves as follows.
+ * The job control signals also have other special effects.
+ *
+ *	+--------------------+------------------+
+ *	|  POSIX signal      |  default action  |
+ *	+--------------------+------------------+
+ *	|  SIGHUP            |  terminate	|
+ *	|  SIGINT            |	terminate	|
+ *	|  SIGQUIT           |	coredump 	|
+ *	|  SIGILL            |	coredump 	|
+ *	|  SIGTRAP           |	coredump 	|
+ *	|  SIGABRT/SIGIOT    |	coredump 	|
+ *	|  SIGBUS            |	coredump 	|
+ *	|  SIGFPE            |	coredump 	|
+ *	|  SIGKILL           |	terminate(+)	|
+ *	|  SIGUSR1           |	terminate	|
+ *	|  SIGSEGV           |	coredump 	|
+ *	|  SIGUSR2           |	terminate	|
+ *	|  SIGPIPE           |	terminate	|
+ *	|  SIGALRM           |	terminate	|
+ *	|  SIGTERM           |	terminate	|
+ *	|  SIGCHLD           |	ignore   	|
+ *	|  SIGCONT           |	ignore(*)	|
+ *	|  SIGSTOP           |	stop(*)(+)  	|
+ *	|  SIGTSTP           |	stop(*)  	|
+ *	|  SIGTTIN           |	stop(*)  	|
+ *	|  SIGTTOU           |	stop(*)  	|
+ *	|  SIGURG            |	ignore   	|
+ *	|  SIGXCPU           |	coredump 	|
+ *	|  SIGXFSZ           |	coredump 	|
+ *	|  SIGVTALRM         |	terminate	|
+ *	|  SIGPROF           |	terminate	|
+ *	|  SIGPOLL/SIGIO     |	terminate	|
+ *	|  SIGSYS/SIGUNUSED  |	coredump 	|
+ *	|  SIGSTKFLT         |	terminate	|
+ *	|  SIGWINCH          |	ignore   	|
+ *	|  SIGPWR            |	terminate	|
+ *	|  SIGRTMIN-SIGRTMAX |	terminate       |
+ *	+--------------------+------------------+
+ *	|  non-POSIX signal  |  default action  |
+ *	+--------------------+------------------+
+ *	|  SIGEMT            |  coredump	|
+ *	+--------------------+------------------+
+ *
+ * (+) For SIGKILL and SIGSTOP the action is "always", not just "default".
+ * (*) Special job control effects:
+ * When SIGCONT is sent, it resumes the process (all threads in the group)
+ * from TASK_STOPPED state and also clears any pending/queued stop signals
+ * (any of those marked with "stop(*)").  This happens regardless of blocking,
+ * catching, or ignoring SIGCONT.  When any stop signal is sent, it clears
+ * any pending/queued SIGCONT signals; this happens regardless of blocking,
+ * catching, or ignored the stop signal, though (except for SIGSTOP) the
+ * default action of stopping the process may happen later or never.
  */
-#ifdef SIGSTKFLT
-#define M_SIGSTKFLT	M(SIGSTKFLT)
-#else
-#define M_SIGSTKFLT	0
-#endif
 
 #ifdef SIGEMT
 #define M_SIGEMT	M(SIGEMT)
@@ -104,16 +119,6 @@ int max_queued_signals = 1024;
 #define M(sig) (1UL << ((sig)-1))
 #endif
 #define T(sig, mask) (M(sig) & (mask))
-
-#define SIG_KERNEL_BROADCAST_MASK (\
-	M(SIGHUP)    |  M(SIGINT)    |  M(SIGQUIT)   |  M(SIGILL)    | \
-	M(SIGTRAP)   |  M(SIGABRT)   |  M(SIGBUS)    |  M(SIGFPE)    | \
-	M(SIGKILL)   |  M(SIGUSR1)   |  M(SIGSEGV)   |  M(SIGUSR2)   | \
-	M(SIGPIPE)   |  M(SIGALRM)   |  M(SIGTERM)   |  M(SIGXCPU)   | \
-	M(SIGXFSZ)   |  M(SIGVTALRM) |  M(SIGPROF)   |  M(SIGPOLL)   | \
-	M(SIGSYS)    |  M_SIGSTKFLT  |  M(SIGPWR)    |  M(SIGCONT)   | \
-        M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   | \
-        M_SIGEMT )
 
 #define SIG_KERNEL_ONLY_MASK (\
 	M(SIGKILL)   |  M(SIGSTOP)                                   )
@@ -599,7 +604,7 @@ static void do_notify_parent_cldstop(struct task_struct *tsk,
 				     struct task_struct *parent);
 
 /*
- * Handle magic process-wide effects of stop/continue signals, and SIGKILL.
+ * Handle magic process-wide effects of stop/continue signals.
  * Unlike the signal actions, these happen immediately at signal-generation
  * time regardless of blocking, ignoring, or handling.  This does the
  * actual continuing for SIGCONT, but not the actual stopping for stop
@@ -1134,9 +1139,8 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
  */
 
 /*
- * XXX should probably nix these interfaces and update the kernel
- * to specify explicitly whether the signal is a group signal or
- * specific to a thread.
+ * These two are the most common entry points.  They send a signal
+ * just to the specific thread.
  */
 int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
@@ -1150,13 +1154,9 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 * going away or changing from under us.
 	 */
 	read_lock(&tasklist_lock);  
-	if (T(sig, SIG_KERNEL_BROADCAST_MASK)) {
-		ret = group_send_sig_info(sig, info, p);
-	} else {
-		spin_lock_irq(&p->sighand->siglock);
-		ret = specific_send_sig_info(sig, info, p);
-		spin_unlock_irq(&p->sighand->siglock);
-	}
+	spin_lock_irq(&p->sighand->siglock);
+	ret = specific_send_sig_info(sig, info, p);
+	spin_unlock_irq(&p->sighand->siglock);
 	read_unlock(&tasklist_lock);
 	return ret;
 }
@@ -1165,6 +1165,20 @@ int
 send_sig(int sig, struct task_struct *p, int priv)
 {
 	return send_sig_info(sig, (void*)(long)(priv != 0), p);
+}
+
+/*
+ * This is the entry point for "process-wide" signals.
+ * They will go to an appropriate thread in the thread group.
+ */
+int
+send_group_sig_info(int sig, struct siginfo *info, struct task_struct *p)
+{
+	int ret;
+	read_lock(&tasklist_lock);
+	ret = group_send_sig_info(sig, info, p);
+	read_unlock(&tasklist_lock);
+	return ret;
 }
 
 void
@@ -1642,6 +1656,7 @@ EXPORT_SYMBOL(kill_sl_info);
 EXPORT_SYMBOL(notify_parent);
 EXPORT_SYMBOL(send_sig);
 EXPORT_SYMBOL(send_sig_info);
+EXPORT_SYMBOL(send_group_sig_info);
 EXPORT_SYMBOL(sigprocmask);
 EXPORT_SYMBOL(block_all_signals);
 EXPORT_SYMBOL(unblock_all_signals);

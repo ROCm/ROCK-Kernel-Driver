@@ -148,6 +148,7 @@ out:
 static void __exit oprofile_exit(void)
 {
 	oprofilefs_unregister();
+	oprofile_arch_exit();
 }
 
  

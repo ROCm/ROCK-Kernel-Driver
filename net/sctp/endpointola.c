@@ -177,8 +177,15 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep,
 /* Add an association to an endpoint.  */
 void sctp_endpoint_add_asoc(sctp_endpoint_t *ep, sctp_association_t *asoc)
 {
+	struct sock *sk = ep->base.sk;
+
 	/* Now just add it to our list of asocs */
 	list_add_tail(&asoc->asocs, &ep->asocs);
+
+	/* Increment the backlog value for a TCP-style listening socket. */
+	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
+	    (SCTP_SS_LISTENING == sk->state))
+		sk->ack_backlog++;
 }
 
 /* Free the endpoint structure.  Delay cleanup until

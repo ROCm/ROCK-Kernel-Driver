@@ -67,15 +67,22 @@ static struct device device_nmi = {
 };
 
 
-static int __init init_nmi_driverfs(void)
+static int __init init_driverfs(void)
 {
 	driver_register(&nmi_driver);
 	return device_register(&device_nmi);
 }
 
 
-late_initcall(init_nmi_driverfs);
+static void __exit exit_driverfs(void)
+{
+	device_unregister(&device_nmi);
+	driver_unregister(&nmi_driver);
+}
 
+#else
+#define init_driverfs() do { } while (0)
+#define exit_driverfs() do { } while (0)
 #endif /* CONFIG_PM */
 
 
@@ -297,6 +304,10 @@ static int __init ppro_init(void)
 
 #endif /* !CONFIG_X86_64 */
  
+
+/* in order to get driverfs right */
+static int using_nmi;
+
 int __init nmi_init(struct oprofile_operations ** ops)
 {
 	__u8 vendor = current_cpu_data.x86_vendor;
@@ -339,7 +350,16 @@ int __init nmi_init(struct oprofile_operations ** ops)
 			return 0;
 	}
 
+	init_driverfs();
+	using_nmi = 1;
 	*ops = &nmi_ops;
 	printk(KERN_INFO "oprofile: using NMI interrupt.\n");
 	return 1;
+}
+
+
+void __exit nmi_exit(void)
+{
+	if (using_nmi)
+		exit_driverfs();
 }

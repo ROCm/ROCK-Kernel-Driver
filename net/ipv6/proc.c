@@ -156,7 +156,7 @@ static int snmp6_seq_show(struct seq_file *seq, void *v)
 	int i;
 
 	for (i=0; i<sizeof(snmp6_list)/sizeof(snmp6_list[0]); i++)
-		seq_printf(seq, "%-32s\t%ld\n", snmp6_list[i].name,
+		seq_printf(seq, "%-32s\t%lu\n", snmp6_list[i].name,
 			       fold_field(snmp6_list[i].mib, snmp6_list[i].offset));
 
 	return 0;
