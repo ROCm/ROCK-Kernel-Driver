@@ -106,19 +106,32 @@ static int iop310_pri_pci_status(void)
 	return ret;
 }
 
+static inline u32 iop310_pri_read(struct pci_dev *dev, int where)
+{
+	unsigned long addr = iop310_cfg_address(dev, where);
+	u32 val;
+
+	__asm__ __volatile__(
+		"str	%1, [%2]\n\t"
+		"ldr	%0, [%3]\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		: "=r" (val)
+		: "r" (addr), "r" (IOP310_POCCAR), "r" (IOP310_POCCDR));
+
+	return val;
+}
+
 static int
 iop310_pri_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
 {
-	int ret;
 	u8 val;
 
-	*IOP310_POCCAR = iop310_cfg_address(dev, where);
+	val = iop310_pri_read(dev, where) >> ((where & 3) * 8);
 
-	val = (*IOP310_POCCDR) >> ((where & 3) * 8);
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	ret = iop310_pri_pci_status();
-	if (ret)
+	if (iop310_pri_pci_status())
 		val = 0xff;
 
 	*p = val;
@@ -129,16 +142,11 @@ iop310_pri_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
 static int
 iop310_pri_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
 {
-	int ret;
 	u16 val;
 
-	*IOP310_POCCAR = iop310_cfg_address(dev, where);
+	val = iop310_pri_read(dev, where) >> ((where & 3) * 8);
 
-	val = (*IOP310_POCCDR) >> ((where & 2) * 8);
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	ret = iop310_pri_pci_status();
-	if (ret)
+	if (iop310_pri_pci_status())
 		val = 0xffff;
 
 	*p = val;
@@ -149,16 +157,11 @@ iop310_pri_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
 static int
 iop310_pri_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
 {
-	int ret;
 	u32 val;
 
-	*IOP310_POCCAR = iop310_cfg_address(dev, where);
+	val = iop310_pri_read(dev, where);
 
-	val = *IOP310_POCCDR;
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	ret = iop310_pri_pci_status();
-	if (ret)
+	if (iop310_pri_pci_status())
 		val = 0xffffffff;
 
 	*p = val;
@@ -169,16 +172,11 @@ iop310_pri_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
 static int
 iop310_pri_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
 {
-	int ret;
 	u32 val;
 
-	*IOP310_POCCAR = iop310_cfg_address(dev, where);
+	val = iop310_pri_read(dev, where);
 
-	val = *IOP310_POCCDR;
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	ret = iop310_pri_pci_status();
-	if (ret == 0) {
+	if (iop310_pri_pci_status() == 0) {
 		where = (where & 3) * 8;
 		val &= ~(0xff << where);
 		val |= v << where;
@@ -191,16 +189,11 @@ iop310_pri_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
 static int
 iop310_pri_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
 {
-	int ret;
 	u32 val;
 
-	*IOP310_POCCAR = iop310_cfg_address(dev, where);
+	val = iop310_pri_read(dev, where);
 
-	val = *IOP310_POCCDR;
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	ret = iop310_pri_pci_status();
-	if (ret == 0) {
+	if (iop310_pri_pci_status() == 0) {
 		where = (where & 2) * 8;
 		val &= ~(0xffff << where);
 		val |= v << where;
@@ -211,11 +204,21 @@ iop310_pri_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
 }
 
 static int
-iop310_pri_wr_cfg_dword(struct pci_dev *dev, int where, u32 v)
+iop310_pri_wr_cfg_dword(struct pci_dev *dev, int where, u32 val)
 {
-	*IOP310_POCCAR = iop310_cfg_address(dev, where);
-	*IOP310_POCCDR = v;
-	__asm__ __volatile__("nop; nop; nop; nop");
+	unsigned long addr;
+
+	addr = iop310_cfg_address(dev, where);
+
+	__asm__ __volatile__(
+		"str	%1, [%2]\n\t"
+		"str	%0, [%3]\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		:
+		: "r" (val), "r" (addr), "r" (IOP310_POCCAR), "r" (IOP310_POCCDR));
 
 	return PCIBIOS_SUCCESSFUL;
 }
@@ -248,28 +251,38 @@ static int iop310_sec_pci_status(void)
 		ret = 1;
 	}
 	if (ret)
-		DBG("ERROR (%08lx %08lx)", usr, uisr);
+		DBG("ERROR (%08x %08x)", usr, uisr);
 	return ret;
+}
+
+static inline u32 iop310_sec_read(struct pci_dev *dev, int where)
+{
+	unsigned long addr = iop310_cfg_address(dev, where);
+	u32 val;
+
+	__asm__ __volatile__(
+		"str	%1, [%2]\n\t"
+		"ldr	%0, [%3]\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		: "=r" (val)
+		: "r" (addr), "r" (IOP310_SOCCAR), "r" (IOP310_SOCCDR));
+
+	return val;
 }
 
 static int
 iop310_sec_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
 {
-	int ret;
 	u8 val;
 
-	DBG("rdb: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
-	    PCI_FUNC(dev->devfn), where);
-	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
+	val = iop310_sec_read(dev, where) >> ((where & 3) * 8);
 
-	val = (*IOP310_SOCCDR) >> ((where & 3) * 8);
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	DBG(">= %08lx ", val);
-	ret = iop310_sec_pci_status();
-	if (ret)
+	if (iop310_sec_pci_status())
 		val = 0xff;
-	DBG("\n");
+
 	*p = val;
 
 	return PCIBIOS_SUCCESSFUL;
@@ -278,21 +291,13 @@ iop310_sec_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
 static int
 iop310_sec_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
 {
-	int ret;
 	u16 val;
 
-	DBG("rdw: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
-	    PCI_FUNC(dev->devfn), where);
-	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
+	val = iop310_sec_read(dev, where) >> ((where & 3) * 8);
 
-	val = (*IOP310_SOCCDR) >> ((where & 3) * 8);
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	DBG(">= %08lx ", val);
-	ret = iop310_sec_pci_status();
-	if (ret)
+	if (iop310_sec_pci_status())
 		val = 0xffff;
-	DBG("\n");
+
 	*p = val;
 
 	return PCIBIOS_SUCCESSFUL;
@@ -301,21 +306,13 @@ iop310_sec_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
 static int
 iop310_sec_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
 {
-	int ret;
 	u32 val;
 
-	DBG("rdl: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
-	    PCI_FUNC(dev->devfn), where);
-	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
+	val = iop310_sec_read(dev, where);
 
-	val = *IOP310_SOCCDR;
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	DBG(">= %08lx ", val);
-	ret = iop310_sec_pci_status();
-	if (ret)
+	if (iop310_sec_pci_status())
 		val = 0xffffffff;
-	DBG("\n");
+
 	*p = val;
 
 	return PCIBIOS_SUCCESSFUL;
@@ -324,63 +321,54 @@ iop310_sec_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
 static int
 iop310_sec_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
 {
-	int ret;
 	u32 val;
 
-	DBG("wrb: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
-	    PCI_FUNC(dev->devfn), where);
-	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
+	val = iop310_sec_read(dev, where);
 
-	val = *IOP310_SOCCDR;
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	DBG("<= %08lx", v);
-	ret = iop310_sec_pci_status();
-	if (ret == 0) {
+	if (iop310_sec_pci_status() == 0) {
 		where = (where & 3) * 8;
 		val &= ~(0xff << where);
 		val |= v << where;
 		*IOP310_SOCCDR = val;
 	}
-	DBG("\n");
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
 iop310_sec_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
 {
-	int ret;
 	u32 val;
 
-	DBG("wrw: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
-	    PCI_FUNC(dev->devfn), where);
-	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
+	val = iop310_sec_read(dev, where);
 
-	val = *IOP310_SOCCDR;
-	__asm__ __volatile__("nop; nop; nop; nop");
-
-	DBG("<= %08lx", v);
-	ret = iop310_sec_pci_status();
-	if (ret == 0) {
+	if (iop310_sec_pci_status() == 0) {
 		where = (where & 2) * 8;
 		val &= ~(0xffff << where);
 		val |= v << where;
 		*IOP310_SOCCDR = val;
 	}
-	DBG("\n");
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
-iop310_sec_wr_cfg_dword(struct pci_dev *dev, int where, u32 v)
+iop310_sec_wr_cfg_dword(struct pci_dev *dev, int where, u32 val)
 {
-	DBG("wrl: %d:%02x.%x %02x ", dev->bus->number, PCI_SLOT(dev->devfn),
-	    PCI_FUNC(dev->devfn), where);
-	*IOP310_SOCCAR = iop310_cfg_address(dev, where);
-	*IOP310_SOCCDR = v;
-	__asm__ __volatile__("nop; nop; nop; nop");
+	unsigned long addr;
 
-	DBG("<= %08lx\n", v);
+	addr = iop310_cfg_address(dev, where);
+
+	__asm__ __volatile__(
+		"str	%1, [%2]\n\t"
+		"str	%0, [%3]\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		:
+		: "r" (val), "r" (addr), "r" (IOP310_SOCCAR), "r" (IOP310_SOCCDR));
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -394,13 +382,34 @@ static struct pci_ops iop310_secondary_ops = {
 };
 
 /*
- * When a PCI device does not exist during config cycles, the 80200 gets a
- * bus error instead of returning 0xffffffff. This handler simply returns.
+ * When a PCI device does not exist during config cycles, the 80200 gets
+ * an external abort instead of returning 0xffffffff.  If it was an
+ * imprecise abort, we need to correct the return address to point after
+ * the instruction.  Also note that the Xscale manual says:
+ *
+ *  "if a stall-until-complete LD or ST instruction triggers an
+ *  imprecise fault, then that fault will be seen by the program
+ *  within 3 instructions."
+ *
+ * This does not appear to be the case.  With 8 NOPs after the load, we
+ * see the imprecise abort occuring on the STM of iop310_sec_pci_status()
+ * which is about 10 instructions away.
+ *
+ * Always trust reality!
  */
-int iop310_pci_abort_handler(unsigned long addr, struct pt_regs *regs)
+static int
+iop310_pci_abort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 {
-	DBG("PCI abort: address = %08x PC = %08x LR = %08lx\n",
-		addr, regs->ARM_pc, regs->ARM_lr);
+	DBG("PCI abort: address = 0x%08lx fsr = 0x%03x PC = 0x%08lx LR = 0x%08lx\n",
+		addr, fsr, regs->ARM_pc, regs->ARM_lr);
+
+	/*
+	 * If it was an imprecise abort, then we need to correct the
+	 * return address to be _after_ the instruction.
+	 */
+	if (fsr & (1 << 10))
+		regs->ARM_pc += 4;
+
 	return 0;
 }
 
@@ -515,6 +524,5 @@ void iop310_init(void)
 	 */
 	*IOP310_PCR &= 0xfff8;
 
-	external_fault = iop310_pci_abort_handler;
+	hook_fault_code(6, iop310_pci_abort, SIGBUS, "imprecise external abort");
 }
-
