@@ -938,19 +938,10 @@ static HvLpIndexMap veth_transmit_to_many(struct sk_buff *skb,
 	int rc;
 
 	for (i = 0; i < HVMAXARCHITECTEDLPS; i++) {
-		struct sk_buff *clone;
-
 		if ((lpmask & (1 << i)) == 0)
 			continue;
 
-		clone = skb_clone(skb, GFP_ATOMIC);
-		if (! clone) {
-			veth_error("%s: skb_clone failed %p\n",
-				   dev->name, skb);
-			continue;
-		}
-
-		rc = veth_transmit_to_one(clone, i, dev);
+		rc = veth_transmit_to_one(skb_get(skb), i, dev);
 		if (! rc)
 			lpmask &= ~(1<<i);
 	}
