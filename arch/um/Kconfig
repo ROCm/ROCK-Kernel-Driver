@@ -64,9 +64,41 @@ config BINFMT_MISC
 
 config HOSTFS
 	tristate "Host filesystem"
+	help
+        While the User-Mode Linux port uses its own root file system for
+        booting and normal file access, this module lets the UML user
+        access files stored on the host.  It does not require any
+        network connection between the Host and UML.  An example use of
+        this might be:
+
+        mount none /tmp/fromhost -t hostfs -o /tmp/umlshare
+
+        where /tmp/fromhost is an empty directory inside UML and
+        /tmp/umlshare is a directory on the host with files the UML user
+        wishes to access.
+
+        For more information, see
+        <http://user-mode-linux.sourceforge.net/hostfs.html>.
+
+        If you'd like to be able to work with files stored on the host, 
+        say Y or M here; otherwise say N.
+
 
 config MCONSOLE
 	bool "Management console"
+	help
+        The user mode linux management console is a low-level interface to
+        the kernel, somewhat like the i386 SysRq interface.  Since there is
+        a full-blown operating system running under every user mode linux
+        instance, there is much greater flexibility possible than with the
+        SysRq mechanism.
+
+        If you answer 'Y' to this option, to use this feature, you need the
+        mconsole client (called uml_mconsole) which is present in CVS in
+        2.4.5-9um and later (path /tools/mconsole), and is also in the
+        distribution RPM package in 2.4.6 and later.
+
+        It is safe to say 'Y' here.
 
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
@@ -77,6 +109,16 @@ config HOST_2G_2G
 
 config UML_SMP
 	bool "Symmetric multi-processing support"
+	help
+        This option enables UML SMP support.  UML implements virtual SMP by
+        allowing as many processes to run simultaneously on the host as
+        there are virtual processors configured.  Obviously, if the host is
+        a uniprocessor, those processes will timeshare, but, inside UML,
+        will appear to be running simultaneously.  If the host is a
+        multiprocessor, then UML processes may run simultaneously, depending
+        on the host scheduler.
+        CONFIG_SMP will be set to whatever this option is set to.
+        It is safe to leave this unchanged.
 
 config SMP
 	bool
@@ -90,10 +132,27 @@ config NR_CPUS
 config NEST_LEVEL
 	int "Nesting level"
 	default "0"
+	help
+        This is set to the number of layers of UMLs that this UML will be run
+        in.  Normally, this is zero, meaning that it will run directly on the
+        host.  Setting it to one will build a UML that can run inside a UML
+        that is running on the host.  Generally, if you intend this UML to run
+        inside another UML, set CONFIG_NEST_LEVEL to one more than the host 
+        UML.
+
+        Note that if the hosting UML has its CONFIG_KERNEL_HALF_GIGS set to 
+        greater than one, then the guest UML should have its CONFIG_NEST_LEVEL 
+        set to the host's CONFIG_NEST_LEVEL + CONFIG_KERNEL_HALF_GIGS.
+        Only change this if you are running nested UMLs.
 
 config KERNEL_HALF_GIGS
 	int "Kernel address space size (in .5G units)"
 	default "1"
+	help
+        This determines the amount of address space that UML will allocate for
+        its own, measured in half Gigabyte units.  The default is 1.
+        Change this only if you need to boot UML with an unusually large amount
+        of physical memory.
 
 config HIGHMEM
 	bool "Highmem support"
@@ -156,6 +215,14 @@ config DEBUG_SLAB
 
 config DEBUGSYM
 	bool "Enable kernel debugging symbols"
+	help
+        When this is enabled, the User-Mode Linux binary will include
+        debugging symbols.  This enlarges the binary by a few megabytes,
+        but aids in tracking down kernel problems in UML.  It is required
+        if you intend to do any kernel development.
+
+        If you're truly short on disk space or don't expect to report any
+        bugs back to the UML developers, say N, otherwise say Y.
 
 config PT_PROXY
 	bool "Enable ptrace proxy"
@@ -164,10 +231,28 @@ config PT_PROXY
 config GPROF
 	bool "Enable gprof support"
 	depends on DEBUGSYM
+	help
+        This allows profiling of a User-Mode Linux kernel with the gprof
+        utility.
+
+        See <http://user-mode-linux.sourceforge.net/gprof.html> for more
+        details.
+
+        If you're involved in UML kernel development and want to use gprof,
+        say Y.  If you're unsure, say N.
 
 config GCOV
 	bool "Enable gcov support"
 	depends on DEBUGSYM
+	help
+        This option allows developers to retrieve coverage data from a UML
+        session.
+
+        See <http://user-mode-linux.sourceforge.net/gcov.html> for more
+        details.
+
+        If you're involved in UML kernel development and want to use gcov,
+        say Y.  If you're unsure, say N.
 
 endmenu
 
