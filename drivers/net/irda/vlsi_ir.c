@@ -49,6 +49,7 @@ MODULE_LICENSE("GPL");
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/wrapper.h>
+#include <net/irda/crc.h>
 
 #include <net/irda/vlsi_ir.h>
 
@@ -669,32 +670,52 @@ static int vlsi_process_rx(struct vlsi_ring *r, struct ring_descr *rd)
 			ret |= VLSI_RX_FRAME;
 		if (status & RD_RX_CRCERR)  
 			ret |= VLSI_RX_CRC;
+		goto done;
 	}
-	else {
-		len = rd_get_count(rd);
-		crclen = (idev->mode==IFF_FIR) ? sizeof(u32) : sizeof(u16);
-		len -= crclen;		/* remove trailing CRC */
-		if (len <= 0) {
-			WARNING("%s: strange frame (len=%d)\n", __FUNCTION__, len);
-			ret |= VLSI_RX_DROP;
-		}
-		else if (!rd->skb) {
-			WARNING("%s: rx packet dropped\n", __FUNCTION__);
-			ret |= VLSI_RX_DROP;
-		}
-		else {
-			skb = rd->skb;
-			rd->skb = NULL;
-			skb->dev = ndev;
-			memcpy(skb_put(skb,len), rd->buf, len);
-			skb->mac.raw = skb->data;
-			if (in_interrupt())
-				netif_rx(skb);
-			else
-				netif_rx_ni(skb);
-			ndev->last_rx = jiffies;
+
+	len = rd_get_count(rd);
+	crclen = (idev->mode==IFF_FIR) ? sizeof(u32) : sizeof(u16);
+	len -= crclen;		/* remove trailing CRC */
+	if (len <= 0) {
+		IRDA_DEBUG(0, "%s: strange frame (len=%d)\n", __FUNCTION__, len);
+		ret |= VLSI_RX_DROP;
+		goto done;
+	}
+
+	if (idev->mode == IFF_SIR) {	/* hw checks CRC in MIR, FIR mode */
+
+		/* rd->buf is a streaming PCI_DMA_FROMDEVICE map. Doing the
+		 * endian-adjustment there just in place will dirty a cache line
+		 * which belongs to the map and thus we must be sure it will
+		 * get flushed before giving the buffer back to hardware.
+		 * vlsi_fill_rx() will do this anyway - but here we rely on.
+		 */
+		le16_to_cpus(rd->buf+len);
+		if (irda_calc_crc16(INIT_FCS,rd->buf,len+crclen) != GOOD_FCS) {
+			IRDA_DEBUG(0, "%s: crc error\n", __FUNCTION__);
+			ret |= VLSI_RX_CRC;
+			goto done;
 		}
 	}
+
+	if (!rd->skb) {
+		WARNING("%s: rx packet lost\n", __FUNCTION__);
+		ret |= VLSI_RX_DROP;
+		goto done;
+	}
+
+	skb = rd->skb;
+	rd->skb = NULL;
+	skb->dev = ndev;
+	memcpy(skb_put(skb,len), rd->buf, len);
+	skb->mac.raw = skb->data;
+	if (in_interrupt())
+		netif_rx(skb);
+	else
+		netif_rx_ni(skb);
+	ndev->last_rx = jiffies;
+
+done:
 	rd_set_status(rd, 0);
 	rd_set_count(rd, 0);
 	/* buffer still owned by CPU */
@@ -1583,38 +1604,33 @@ static irqreturn_t vlsi_interrupt(int irq, void *dev_instance,
 	vlsi_irda_dev_t *idev = ndev->priv;
 	unsigned	iobase;
 	u8		irintr;
-	int 		boguscount = 32;
-	unsigned	got_act;
+	int 		boguscount = 5;
 	unsigned long	flags;
 	int		handled = 0;
 
-	got_act = 0;
 	iobase = ndev->base_addr;
+	spin_lock_irqsave(&idev->lock,flags);
 	do {
-		spin_lock_irqsave(&idev->lock,flags);
 		irintr = inb(iobase+VLSI_PIO_IRINTR);
-		rmb();
-		outb(irintr, iobase+VLSI_PIO_IRINTR); /* acknowledge asap */
-		spin_unlock_irqrestore(&idev->lock,flags);
+		mb();
+		outb(irintr, iobase+VLSI_PIO_IRINTR);	/* acknowledge asap */
 
 		if (!(irintr&=IRINTR_INT_MASK))		/* not our INT - probably shared */
 			break;
+
 		handled = 1;
+
+		if (unlikely(!(irintr & ~IRINTR_ACTIVITY)))
+			break;				/* nothing todo if only activity */
+
 		if (irintr&IRINTR_RPKTINT)
 			vlsi_rx_interrupt(ndev);
 
 		if (irintr&IRINTR_TPKTINT)
 			vlsi_tx_interrupt(ndev);
 
-		if (!(irintr & ~IRINTR_ACTIVITY))
-			break;		/* done if only activity remaining */
-	
-		if (irintr & ~(IRINTR_RPKTINT|IRINTR_TPKTINT|IRINTR_ACTIVITY)) {
-			IRDA_DEBUG(1, "%s: IRINTR = %02x\n",
-				__FUNCTION__, (unsigned)irintr);
-			vlsi_reg_debug(iobase,__FUNCTION__);
-		}			
 	} while (--boguscount > 0);
+	spin_unlock_irqrestore(&idev->lock,flags);
 
 	if (boguscount <= 0)
 		MESSAGE("%s: too much work in interrupt!\n", __FUNCTION__);
