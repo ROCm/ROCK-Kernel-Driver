@@ -290,12 +290,11 @@ enum {
 	UWF             = (1 << 4),  /* Accept Unicast wakeup frame */
 	LANWake         = (1 << 1),  /* Enable LANWake signal */
 	PMEStatus	= (1 << 0),  /* PME status can be reset by PCI RST# */
-};
 
-static const unsigned int cp_intr_mask =
-	PciErr | LinkChg |
-	RxOK | RxErr | RxEmpty | RxFIFOOvr |
-	TxOK | TxErr | TxEmpty;
+	cp_norx_intr_mask = PciErr | LinkChg | TxOK | TxErr | TxEmpty,
+	cp_rx_intr_mask = RxOK | RxErr | RxEmpty | RxFIFOOvr,
+	cp_intr_mask = cp_rx_intr_mask | cp_norx_intr_mask,
+};
 
 static const unsigned int cp_rx_config =
 	  (RX_FIFO_THRESH << RxCfgFIFOShift) |
@@ -469,7 +468,7 @@ static inline void cp_rx_skb (struct cp_private *cp, struct sk_buff *skb,
 		vlan_hwaccel_rx(skb, cp->vlgrp, be16_to_cpu(desc->opts2 & 0xffff));
 	} else
 #endif
-		netif_rx(skb);
+		netif_receive_skb(skb);
 }
 
 static void cp_rx_err_acct (struct cp_private *cp, unsigned rx_tail,
@@ -484,79 +483,12 @@ static void cp_rx_err_acct (struct cp_private *cp, unsigned rx_tail,
 		cp->net_stats.rx_frame_errors++;
 	if (status & RxErrCRC)
 		cp->net_stats.rx_crc_errors++;
-	if (status & RxErrRunt)
+	if ((status & RxErrRunt) || (status & RxErrLong))
 		cp->net_stats.rx_length_errors++;
-	if (status & RxErrLong)
+	if ((status & (FirstFrag | LastFrag)) != (FirstFrag | LastFrag))
 		cp->net_stats.rx_length_errors++;
 	if (status & RxErrFIFO)
 		cp->net_stats.rx_fifo_errors++;
-}
-
-static void cp_rx_frag (struct cp_private *cp, unsigned rx_tail,
-			struct sk_buff *skb, u32 status, u32 len)
-{
-	struct sk_buff *copy_skb, *frag_skb = cp->frag_skb;
-	unsigned orig_len = frag_skb ? frag_skb->len : 0;
-	unsigned target_len = orig_len + len;
-	unsigned first_frag = status & FirstFrag;
-	unsigned last_frag = status & LastFrag;
-
-	if (netif_msg_rx_status (cp))
-		printk (KERN_DEBUG "%s: rx %s%sfrag, slot %d status 0x%x len %d\n",
-			cp->dev->name,
-			cp->dropping_frag ? "dropping " : "",
-			first_frag ? "first " :
-			last_frag ? "last " : "",
-			rx_tail, status, len);
-
-	cp->cp_stats.rx_frags++;
-
-	if (!frag_skb && !first_frag)
-		cp->dropping_frag = 1;
-	if (cp->dropping_frag)
-		goto drop_frag;
-
-	copy_skb = dev_alloc_skb (target_len + RX_OFFSET);
-	if (!copy_skb) {
-		printk(KERN_WARNING "%s: rx slot %d alloc failed\n",
-		       cp->dev->name, rx_tail);
-
-		cp->dropping_frag = 1;
-drop_frag:
-		if (frag_skb) {
-			dev_kfree_skb_irq(frag_skb);
-			cp->frag_skb = NULL;
-		}
-		if (last_frag) {
-			cp->net_stats.rx_dropped++;
-			cp->dropping_frag = 0;
-		}
-		return;
-	}
-
-	copy_skb->dev = cp->dev;
-	skb_reserve(copy_skb, RX_OFFSET);
-	skb_put(copy_skb, target_len);
-	if (frag_skb) {
-		memcpy(copy_skb->data, frag_skb->data, orig_len);
-		dev_kfree_skb_irq(frag_skb);
-	}
-	pci_dma_sync_single(cp->pdev, cp->rx_skb[rx_tail].mapping,
-			    len, PCI_DMA_FROMDEVICE);
-	memcpy(copy_skb->data + orig_len, skb->data, len);
-
-	copy_skb->ip_summed = CHECKSUM_NONE;
-
-	if (last_frag) {
-		if (status & (RxError | RxErrFIFO)) {
-			cp_rx_err_acct(cp, rx_tail, status, len);
-			dev_kfree_skb_irq(copy_skb);
-		} else
-			cp_rx_skb(cp, copy_skb, &cp->rx_ring[rx_tail]);
-		cp->frag_skb = NULL;
-	} else {
-		cp->frag_skb = copy_skb;
-	}
 }
 
 static inline unsigned int cp_rx_csum_ok (u32 status)
@@ -572,12 +504,17 @@ static inline unsigned int cp_rx_csum_ok (u32 status)
 	return 0;
 }
 
-static void cp_rx (struct cp_private *cp)
+static int cp_rx_poll (struct net_device *dev, int *budget)
 {
+	struct cp_private *cp = dev->priv;
 	unsigned rx_tail = cp->rx_tail;
-	unsigned rx_work = 100;
+	unsigned rx_work = dev->quota;
+	unsigned rx = 0;
 
-	while (rx_work--) {
+rx_status_loop:
+	cpw16(IntrStatus, cp_rx_intr_mask);
+
+	while (1) {
 		u32 status, len;
 		dma_addr_t mapping;
 		struct sk_buff *skb, *new_skb;
@@ -597,7 +534,13 @@ static void cp_rx (struct cp_private *cp)
 		mapping = cp->rx_skb[rx_tail].mapping;
 
 		if ((status & (FirstFrag | LastFrag)) != (FirstFrag | LastFrag)) {
-			cp_rx_frag(cp, rx_tail, skb, status, len);
+			/* we don't support incoming fragmented frames.
+			 * instead, we attempt to ensure that the
+			 * pre-allocated RX skbs are properly sized such
+			 * that RX fragments are never encountered
+			 */
+			cp_rx_err_acct(cp, rx_tail, status, len);
+			cp->net_stats.rx_dropped++;
 			goto rx_next;
 		}
 
@@ -638,6 +581,7 @@ static void cp_rx (struct cp_private *cp)
 		cp->rx_skb[rx_tail].skb = new_skb;
 
 		cp_rx_skb(cp, skb, desc);
+		rx++;
 
 rx_next:
 		cp->rx_ring[rx_tail].opts2 = 0;
@@ -648,12 +592,30 @@ rx_next:
 		else
 			desc->opts1 = cpu_to_le32(DescOwn | cp->rx_buf_sz);
 		rx_tail = NEXT_RX(rx_tail);
+
+		if (!rx_work--)
+			break;
 	}
 
-	if (!rx_work)
-		printk(KERN_WARNING "%s: rx work limit reached\n", cp->dev->name);
-
 	cp->rx_tail = rx_tail;
+
+	dev->quota -= rx;
+	*budget -= rx;
+
+	/* if we did not reach work limit, then we're done with
+	 * this round of polling
+	 */
+	if (rx_work) {
+		if (cpr16(IntrStatus) & cp_rx_intr_mask)
+			goto rx_status_loop;
+
+		cpw16_f(IntrMask, cp_intr_mask);
+		netif_rx_complete(dev);
+
+		return 0;	/* done */
+	}
+
+	return 1;		/* not done */
 }
 
 static irqreturn_t
@@ -671,12 +633,16 @@ cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 		printk(KERN_DEBUG "%s: intr, status %04x cmd %02x cpcmd %04x\n",
 		        dev->name, status, cpr8(Cmd), cpr16(CpCmd));
 
-	cpw16_f(IntrStatus, status);
+	cpw16(IntrStatus, status & ~cp_rx_intr_mask);
 
 	spin_lock(&cp->lock);
 
-	if (status & (RxOK | RxErr | RxEmpty | RxFIFOOvr))
-		cp_rx(cp);
+	if (status & (RxOK | RxErr | RxEmpty | RxFIFOOvr)) {
+		if (netif_rx_schedule_prep(dev)) {
+			cpw16_f(IntrMask, cp_norx_intr_mask);
+			__netif_rx_schedule(dev);
+		}
+	}
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
 	if (status & LinkChg)
@@ -689,6 +655,8 @@ cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 		pci_write_config_word(cp->pdev, PCI_STATUS, pci_status);
 		printk(KERN_ERR "%s: PCI bus error, status=%04x, PCI status=%04x\n",
 		       dev->name, status, pci_status);
+
+		/* TODO: reset hardware */
 	}
 
 	spin_unlock(&cp->lock);
@@ -986,11 +954,10 @@ static void cp_stop_hw (struct cp_private *cp)
 {
 	struct net_device *dev = cp->dev;
 
-	cpw16(IntrMask, 0);
-	cpr16(IntrMask);
+	cpw16(IntrStatus, ~(cpr16(IntrStatus)));
+	cpw16_f(IntrMask, 0);
 	cpw8(Cmd, 0);
-	cpw16(CpCmd, 0);
-	cpr16(CpCmd);
+	cpw16_f(CpCmd, 0);
 	cpw16(IntrStatus, ~(cpr16(IntrStatus)));
 	synchronize_irq(dev->irq);
 	udelay(10);
@@ -1779,6 +1746,8 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	dev->hard_start_xmit = cp_start_xmit;
 	dev->get_stats = cp_get_stats;
 	dev->do_ioctl = cp_ioctl;
+	dev->poll = cp_rx_poll;
+	dev->weight = 16;	/* arbitrary? from NAPI_HOWTO.txt. */
 #ifdef BROKEN
 	dev->change_mtu = cp_change_mtu;
 #endif
