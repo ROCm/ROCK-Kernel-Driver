@@ -367,8 +367,6 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	stw	r10,crit_sprg4@l(r8);					     \
 	mfspr	r10,SPRG5R;						     \
 	stw	r10,crit_sprg5@l(r8);					     \
-	mfspr	r10,SPRG6R;						     \
-	stw	r10,crit_sprg6@l(r8);					     \
 	mfspr	r10,SPRG7R;						     \
 	stw	r10,crit_sprg7@l(r8);					     \
 	mfspr	r10,SPRN_PID;						     \
@@ -409,6 +407,71 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	SAVE_2GPRS(7, r11)
 
 /*
+ * Exception prolog for machine check exceptions.  This is similar to
+ * the critical exception prolog, except that machine check exceptions
+ * have their own save area.  For Book E processors, we also have a
+ * reserved register (SPRG6) that is only used in machine check exceptions
+ * so we can free up a GPR to use as the base for indirect access to the
+ * machine check exception save area.  This is necessary since the MMU
+ * is always on and the save area is offset from KERNELBASE.
+ */
+#define MCHECK_EXCEPTION_PROLOG					     \
+	mtspr	SPRG6W,r8;		/* SPRG6 used in machine checks */   \
+	lis	r8,mcheck_save@ha;					     \
+	stw	r10,mcheck_r10@l(r8);					     \
+	stw	r11,mcheck_r11@l(r8);					     \
+	mfspr	r10,SPRG0;						     \
+	stw	r10,mcheck_sprg0@l(r8);					     \
+	mfspr	r10,SPRG1;						     \
+	stw	r10,mcheck_sprg1@l(r8);					     \
+	mfspr	r10,SPRG4R;						     \
+	stw	r10,mcheck_sprg4@l(r8);					     \
+	mfspr	r10,SPRG5R;						     \
+	stw	r10,mcheck_sprg5@l(r8);					     \
+	mfspr	r10,SPRG7R;						     \
+	stw	r10,mcheck_sprg7@l(r8);					     \
+	mfspr	r10,SPRN_PID;						     \
+	stw	r10,mcheck_pid@l(r8);					     \
+	mfspr	r10,SRR0;						     \
+	stw	r10,mcheck_srr0@l(r8);					     \
+	mfspr	r10,SRR1;						     \
+	stw	r10,mcheck_srr1@l(r8);					     \
+	mfspr	r10,CSRR0;						     \
+	stw	r10,mcheck_csrr0@l(r8);					     \
+	mfspr	r10,CSRR1;						     \
+	stw	r10,mcheck_csrr1@l(r8);					     \
+	mfspr	r8,SPRG6R;		/* SPRG6 used in machine checks */   \
+	mfcr	r10;			/* save CR in r10 for now	   */\
+	mfspr	r11,SPRN_MCSRR1;	/* check whether user or kernel    */\
+	andi.	r11,r11,MSR_PR;						     \
+	lis	r11,mcheck_stack_top@h;					     \
+	ori	r11,r11,mcheck_stack_top@l;				     \
+	beq	1f;							     \
+	/* COMING FROM USER MODE */					     \
+	mfspr	r11,SPRG3;		/* if from user, start at top of   */\
+	lwz	r11,THREAD_INFO-THREAD(r11); /* this thread's kernel stack */\
+	addi	r11,r11,THREAD_SIZE;					     \
+1:	subi	r11,r11,INT_FRAME_SIZE;	/* Allocate an exception frame     */\
+	stw	r10,_CCR(r11);          /* save various registers	   */\
+	stw	r12,GPR12(r11);						     \
+	stw	r9,GPR9(r11);						     \
+	mflr	r10;							     \
+	stw	r10,_LINK(r11);						     \
+	mfspr	r12,SPRN_DEAR;		/* save DEAR and ESR in the frame  */\
+	stw	r12,_DEAR(r11);		/* since they may have had stuff   */\
+	mfspr	r9,SPRN_ESR;		/* in them at the point where the  */\
+	stw	r9,_ESR(r11);		/* exception was taken		   */\
+	mfspr	r12,MCSRR0;						     \
+	stw	r1,GPR1(r11);						     \
+	mfspr	r9,MCSRR1;						     \
+	stw	r1,0(r11);						     \
+	tovirt(r1,r11);							     \
+	rlwinm	r9,r9,0,14,12;		/* clear MSR_WE (necessary?)	   */\
+	stw	r0,GPR0(r11);						     \
+	SAVE_4GPRS(3, r11);						     \
+	SAVE_2GPRS(7, r11)
+
+/*
  * Exception vectors.
  */
 #define	START_EXCEPTION(label)						     \
@@ -433,6 +496,18 @@ label:
 	EXC_XFER_TEMPLATE(hdlr, n+2, (MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
 			  NOCOPY, transfer_to_handler_full, \
 			  ret_from_except_full)
+
+#define MCHECK_EXCEPTION(n, label, hdlr)			\
+	START_EXCEPTION(label);					\
+	MCHECK_EXCEPTION_PROLOG;				\
+	lis	r4,MCSR_MCS@h;					\
+	mtspr	SPRN_MCSR,r4;					\
+	mfspr	r5,SPRN_ESR;					\
+	stw	r5,_ESR(r11);					\
+	addi	r3,r1,STACK_FRAME_OVERHEAD;			\
+	EXC_XFER_TEMPLATE(hdlr, n+2, (MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
+			  NOCOPY, mcheck_transfer_to_handler,   \
+			  ret_from_mcheck_exc)
 
 #define EXC_XFER_TEMPLATE(hdlr, trap, msr, copyee, tfer, ret)	\
 	li	r10,trap;					\
@@ -468,7 +543,11 @@ interrupt_base:
 	CRITICAL_EXCEPTION(0x0100, CriticalInput, UnknownException)
 
 	/* Machine Check Interrupt */
+#ifdef CONFIG_440A
+	MCHECK_EXCEPTION(0x0200, MachineCheck, MachineCheckException)
+#else
 	CRITICAL_EXCEPTION(0x0200, MachineCheck, MachineCheckException)
+#endif
 
 	/* Data Storage Interrupt */
 	START_EXCEPTION(DataStorage)
@@ -476,7 +555,6 @@ interrupt_base:
 	mtspr	SPRG1, r11
 	mtspr	SPRG4W, r12
 	mtspr	SPRG5W, r13
-	mtspr	SPRG6W, r14
 	mfcr	r11
 	mtspr	SPRG7W, r11
 
@@ -549,15 +627,14 @@ interrupt_base:
 	rlwinm	r11,r11,0,20,15		/* Clear U0-U3 */
 
 	/* find the TLB index that caused the fault.  It has to be here. */
-	tlbsx	r14, 0, r10
+	tlbsx	r10, 0, r10
 
-	tlbwe	r11, r14, PPC44x_TLB_ATTRIB	/* Write ATTRIB */
+	tlbwe	r11, r10, PPC44x_TLB_ATTRIB	/* Write ATTRIB */
 
 	/* Done...restore registers and get out of here.
 	*/
 	mfspr	r11, SPRG7R
 	mtcr	r11
-	mfspr	r14, SPRG6R
 	mfspr	r13, SPRG5R
 	mfspr	r12, SPRG4R
 
@@ -572,7 +649,6 @@ interrupt_base:
 	 */
 	mfspr	r11, SPRG7R
 	mtcr	r11
-	mfspr	r14, SPRG6R
 	mfspr	r13, SPRG5R
 	mfspr	r12, SPRG4R
 
@@ -640,7 +716,6 @@ interrupt_base:
 	mtspr	SPRG1, r11
 	mtspr	SPRG4W, r12
 	mtspr	SPRG5W, r13
-	mtspr	SPRG6W, r14
 	mfcr	r11
 	mtspr	SPRG7W, r11
 	mfspr	r10, SPRN_DEAR		/* Get faulting address */
@@ -693,7 +768,6 @@ interrupt_base:
 	 */
 	mfspr	r11, SPRG7R
 	mtcr	r11
-	mfspr	r14, SPRG6R
 	mfspr	r13, SPRG5R
 	mfspr	r12, SPRG4R
 	mfspr	r11, SPRG1
@@ -711,7 +785,6 @@ interrupt_base:
 	mtspr	SPRG1, r11
 	mtspr	SPRG4W, r12
 	mtspr	SPRG5W, r13
-	mtspr	SPRG6W, r14
 	mfcr	r11
 	mtspr	SPRG7W, r11
 	mfspr	r10, SRR0		/* Get faulting address */
@@ -764,7 +837,6 @@ interrupt_base:
 	 */
 	mfspr	r11, SPRG7R
 	mtcr	r11
-	mfspr	r14, SPRG6R
 	mfspr	r13, SPRG5R
 	mfspr	r12, SPRG4R
 	mfspr	r11, SPRG1
@@ -854,7 +926,6 @@ data_access:
  * 	r11 - available to use
  *	r12 - Pointer to the 64-bit PTE
  *	r13 - available to use
- *	r14 - available to use
  *	MMUCR - loaded with proper value when we get here
  *	Upon exit, we reload everything and RFI.
  */
@@ -869,51 +940,50 @@ finish_tlb_load:
 
 	/* Load the next available TLB index */
 	lis	r13, tlb_44x_index@ha
-	lwz	r14, tlb_44x_index@l(r13)
+	lwz	r13, tlb_44x_index@l(r13)
 	/* Load the TLB high watermark */
-	lis	r13, tlb_44x_hwater@ha
-	lwz	r11, tlb_44x_hwater@l(r13)
+	lis	r11, tlb_44x_hwater@ha
+	lwz	r11, tlb_44x_hwater@l(r11)
 
 	/* Increment, rollover, and store TLB index */
-	addi	r14, r14, 1
-	cmpw	0, r14, r11			/* reserve entries */
+	addi	r13, r13, 1
+	cmpw	0, r13, r11			/* reserve entries */
 	ble	7f
-	li	r14, 0
+	li	r13, 0
 7:
 	/* Store the next available TLB index */
-	lis	r13, tlb_44x_index@ha
-	stw	r14, tlb_44x_index@l(r13)
+	lis	r11, tlb_44x_index@ha
+	stw	r13, tlb_44x_index@l(r11)
 
-	lwz	r13, 0(r12)			/* Get MS word of PTE */
-	lwz	r11, 4(r12)			/* Get LS word of PTE */
-	rlwimi	r13, r11, 0, 0 , 19		/* Insert RPN */
-	tlbwe	r13, r14, PPC44x_TLB_XLAT	/* Write XLAT */
+	lwz	r11, 0(r12)			/* Get MS word of PTE */
+	lwz	r12, 4(r12)			/* Get LS word of PTE */
+	rlwimi	r11, r12, 0, 0 , 19		/* Insert RPN */
+	tlbwe	r11, r13, PPC44x_TLB_XLAT	/* Write XLAT */
 
 	/*
 	 * Create PAGEID. This is the faulting address,
 	 * page size, and valid flag.
 	 */
-	li	r12, PPC44x_TLB_VALID | PPC44x_TLB_4K
-	rlwimi	r10, r12, 0, 20, 31		/* Insert valid and page size */
-	tlbwe	r10, r14, PPC44x_TLB_PAGEID	/* Write PAGEID */
+	li	r11, PPC44x_TLB_VALID | PPC44x_TLB_4K
+	rlwimi	r10, r11, 0, 20, 31		/* Insert valid and page size */
+	tlbwe	r10, r13, PPC44x_TLB_PAGEID	/* Write PAGEID */
 
-	li	r13, PPC44x_TLB_SR@l		/* Set SR */
-	rlwimi	r13, r11, 0, 30, 30		/* Set SW = _PAGE_RW */
-	rlwimi	r13, r11, 29, 29, 29		/* SX = _PAGE_HWEXEC */
-	rlwimi	r13, r11, 29, 28, 28		/* UR = _PAGE_USER */
-	rlwimi	r12, r11, 31, 26, 26		/* (_PAGE_USER>>1)->r12 */
-	and	r12, r12, r11			/* HWEXEC & USER */
-	rlwimi	r13, r12, 0, 26, 26		/* UX = HWEXEC & USER */
+	li	r10, PPC44x_TLB_SR@l		/* Set SR */
+	rlwimi	r10, r12, 0, 30, 30		/* Set SW = _PAGE_RW */
+	rlwimi	r10, r12, 29, 29, 29		/* SX = _PAGE_HWEXEC */
+	rlwimi	r10, r12, 29, 28, 28		/* UR = _PAGE_USER */
+	rlwimi	r11, r12, 31, 26, 26		/* (_PAGE_USER>>1)->r12 */
+	and	r11, r12, r11			/* HWEXEC & USER */
+	rlwimi	r10, r11, 0, 26, 26		/* UX = HWEXEC & USER */
 
-	rlwimi	r11, r13, 0, 26, 31		/* Insert static perms */
-	rlwinm	r11, r11, 0, 20, 15		/* Clear U0-U3 */
-	tlbwe	r11, r14, PPC44x_TLB_ATTRIB	/* Write ATTRIB */
+	rlwimi	r12, r10, 0, 26, 31		/* Insert static perms */
+	rlwinm	r12, r12, 0, 20, 15		/* Clear U0-U3 */
+	tlbwe	r12, r13, PPC44x_TLB_ATTRIB	/* Write ATTRIB */
 
 	/* Done...restore registers and get out of here.
 	*/
 	mfspr	r11, SPRG7R
 	mtcr	r11
-	mfspr	r14, SPRG6R
 	mfspr	r13, SPRG5R
 	mfspr	r12, SPRG4R
 	mfspr	r11, SPRG1
@@ -979,19 +1049,28 @@ _GLOBAL(empty_zero_page)
 _GLOBAL(swapper_pg_dir)
 	.space	8192
 
-/* Stack for handling critical exceptions from kernel mode */
 	.section .bss
+/* Stack for handling critical exceptions from kernel mode */
 critical_stack_bottom:
 	.space 4096
 critical_stack_top:
 	.previous
 
+/* Stack for handling machine check exceptions from kernel mode */
+mcheck_stack_bottom:
+	.space 4096
+mcheck_stack_top:
+	.previous
+
 /*
  * This area is used for temporarily saving registers during the
- * critical exception prolog. It must always follow the page
- * aligned allocations, so it starts on a page boundary, ensuring
- * that all crit_save areas are in a single page.
+ * critical and machine check exception prologs. It must always
+ * follow the page aligned allocations, so it starts on a page
+ * boundary, ensuring that all crit_save areas are in a single
+ * page.
  */
+
+/* crit_save */
 _GLOBAL(crit_save)
 	.space  4
 _GLOBAL(crit_r10)
@@ -1006,8 +1085,6 @@ _GLOBAL(crit_sprg4)
 	.space	4
 _GLOBAL(crit_sprg5)
 	.space	4
-_GLOBAL(crit_sprg6)
-	.space	4
 _GLOBAL(crit_sprg7)
 	.space	4
 _GLOBAL(crit_pid)
@@ -1015,6 +1092,34 @@ _GLOBAL(crit_pid)
 _GLOBAL(crit_srr0)
 	.space	4
 _GLOBAL(crit_srr1)
+	.space	4
+
+/* mcheck_save */
+_GLOBAL(mcheck_save)
+	.space  4
+_GLOBAL(mcheck_r10)
+	.space	4
+_GLOBAL(mcheck_r11)
+	.space	4
+_GLOBAL(mcheck_sprg0)
+	.space	4
+_GLOBAL(mcheck_sprg1)
+	.space	4
+_GLOBAL(mcheck_sprg4)
+	.space	4
+_GLOBAL(mcheck_sprg5)
+	.space	4
+_GLOBAL(mcheck_sprg7)
+	.space	4
+_GLOBAL(mcheck_pid)
+	.space	4
+_GLOBAL(mcheck_srr0)
+	.space	4
+_GLOBAL(mcheck_srr1)
+	.space	4
+_GLOBAL(mcheck_csrr0)
+	.space	4
+_GLOBAL(mcheck_csrr1)
 	.space	4
 
 /*

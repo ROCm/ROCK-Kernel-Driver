@@ -56,6 +56,19 @@
 #define BOOKE_SAVE_COR
 #endif
 
+#ifdef CONFIG_BOOKE
+	.globl	mcheck_transfer_to_handler
+mcheck_transfer_to_handler:
+	mtspr	SPRG6W,r8
+	lis	r8,mcheck_save@ha
+	lwz	r0,mcheck_r10@l(r8)
+	stw	r0,GPR10(r11)
+	lwz	r0,mcheck_r11@l(r8)
+	stw	r0,GPR11(r11)
+	mfspr	r8,SPRG6R
+	b	transfer_to_handler_full
+#endif
+
 #if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 	.globl	crit_transfer_to_handler
 crit_transfer_to_handler:
@@ -97,7 +110,7 @@ transfer_to_handler:
 	beq	2f			/* if from user, fix up THREAD.regs */
 	addi	r11,r1,STACK_FRAME_OVERHEAD
 	stw	r11,PT_REGS(r12)
-#ifdef CONFIG_4xx
+#if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 	lwz	r12,PTRACE-THREAD(r12)
 	andi.	r12,r12,PT_PTRACED
 	beq+	3f
@@ -738,8 +751,10 @@ ret_from_crit_exc:
 	mtspr	SPRN_SPRG4,r10
 	lwz	r10,crit_sprg5@l(COR)
 	mtspr	SPRN_SPRG5,r10
+#ifdef CONFIG_40x
 	lwz	r10,crit_sprg6@l(COR)
 	mtspr	SPRN_SPRG6,r10
+#endif
 	lwz	r10,crit_sprg7@l(COR)
 	mtspr	SPRN_SPRG7,r10
 	lwz	r10,crit_srr0@l(COR)
@@ -755,6 +770,74 @@ ret_from_crit_exc:
 	PPC405_ERR77_SYNC
 	rfci
 	b	.		/* prevent prefetch past rfci */
+
+#ifdef CONFIG_BOOKE
+/*
+ * Return from a machine check interrupt, similar to a critical
+ * interrupt.
+ */
+	.globl	ret_from_mcheck_exc
+ret_from_mcheck_exc:
+	REST_NVGPRS(r1)
+	lwz	r3,_MSR(r1)
+	andi.	r3,r3,MSR_PR
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
+	bne	user_exc_return
+
+	lwz	r0,GPR0(r1)
+	lwz	r2,GPR2(r1)
+	REST_4GPRS(3, r1)
+	REST_2GPRS(7, r1)
+
+	lwz	r10,_XER(r1)
+	lwz	r11,_CTR(r1)
+	mtspr	XER,r10
+	mtctr	r11
+
+	stwcx.	r0,0,r1			/* to clear the reservation */
+
+	lwz	r11,_LINK(r1)
+	mtlr	r11
+	lwz	r10,_CCR(r1)
+	mtcrf	0xff,r10
+	lwz	r9,_DEAR(r1)
+	lwz	r10,_ESR(r1)
+	mtspr	SPRN_DEAR,r9
+	mtspr	SPRN_ESR,r10
+	lwz	r11,_NIP(r1)
+	lwz	r12,_MSR(r1)
+	mtspr	MCSRR0,r11
+	mtspr	MCSRR1,r12
+	lwz	r9,GPR9(r1)
+	lwz	r12,GPR12(r1)
+	mtspr	SPRG6W,r8
+	lis	r8,mcheck_save@ha
+	lwz	r10,mcheck_sprg0@l(r8)
+	mtspr	SPRN_SPRG0,r10
+	lwz	r10,mcheck_sprg1@l(r8)
+	mtspr	SPRN_SPRG1,r10
+	lwz	r10,mcheck_sprg4@l(r8)
+	mtspr	SPRN_SPRG4,r10
+	lwz	r10,mcheck_sprg5@l(r8)
+	mtspr	SPRN_SPRG5,r10
+	lwz	r10,mcheck_sprg7@l(r8)
+	mtspr	SPRN_SPRG7,r10
+	lwz	r10,mcheck_srr0@l(r8)
+	mtspr	SRR0,r10
+	lwz	r10,mcheck_srr1@l(r8)
+	mtspr	SRR1,r10
+	lwz	r10,mcheck_csrr0@l(r8)
+	mtspr	CSRR0,r10
+	lwz	r10,mcheck_csrr1@l(r8)
+	mtspr	CSRR1,r10
+	lwz	r10,mcheck_pid@l(r8)
+	mtspr	SPRN_PID,r10
+	lwz	r10,GPR10(r1)
+	lwz	r11,GPR11(r1)
+	lwz	r1,GPR1(r1)
+	mfspr	r8,SPRG6R
+	RFMCI
+#endif /* CONFIG_BOOKE */
 
 /*
  * Load the DBCR0 value for a task that is being ptraced,
