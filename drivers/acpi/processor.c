@@ -1022,7 +1022,7 @@ acpi_processor_get_performance_states (
 			(u32) px->status));
 
 		if (!px->core_frequency) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "core_frequency is 0\n"));
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data: freq is zero\n"));
 			result = -EFAULT;
 			kfree(pr->performance->states);
 			goto end;
