@@ -24,7 +24,12 @@
 /* Define version type for version validation of dump and kerntypes */
 LINUX_COMPILE_VERSION_ID_TYPE;
 #endif
+#if defined(CONFIG_SMP) && defined(CONFIG_CRASH_DUMP)
+extern struct runqueue runqueues;
+struct runqueue rn;
+#endif
 
+struct new_utsname *p;
 void
 kerntypes_dummy(void)
 {

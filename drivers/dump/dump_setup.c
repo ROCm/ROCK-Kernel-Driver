@@ -116,9 +116,9 @@
 #include <linux/sysctl.h>
 #include <linux/nmi.h>
 #include <linux/init.h>
-
 #include <asm/hardirq.h>
 #include <asm/uaccess.h>
+
 
 /*
  * -----------------------------------------------------------------------
@@ -193,6 +193,9 @@ struct __lkcdinfo lkcdinfo = {
 	.page_mask	= PAGE_MASK,
 	.page_offset	= PAGE_OFFSET,
 };
+
+int dump_mbanks;                   /* number of  physical memory banks     */
+struct __dump_mbank dump_mbank[MAXCHUNKS]; /* describes layout of physical memory  */
 
 /*
  * -----------------------------------------------------------------------
@@ -296,7 +299,7 @@ dump_execute(const char *panic_str, const struct pt_regs *regs)
 {
 	int state = -1;
 	unsigned long flags;
-
+	
 	/* make sure we can dump */
 	if (!dump_okay) {
 		pr_info("LKCD not yet configured, can't take dump now\n");
@@ -322,16 +325,16 @@ dump_execute(const char *panic_str, const struct pt_regs *regs)
 	 */
 	dump_oncpu = smp_processor_id() + 1;
 	dump_silence_level = DUMP_HARD_SPIN_CPUS; 
-
-	state = dump_generic_execute(panic_str, regs);
 	
+	state = dump_generic_execute(panic_str, regs);
+	printk(KERN_EMERG "dump_generic_execute compelte\n");	
 	dump_oncpu = 0;
 	spin_unlock_irqrestore(&dump_lock, flags);
 
 	if (state < 0) {
-		printk("Dump Incomplete or failed!\n");
+		printk(KERN_EMERG "Dump Incomplete or failed!\n");
 	} else {
-		printk("Dump Complete; %d dump pages saved.\n", 
+		printk(KERN_EMERG "Dump Complete; %d dump pages saved.\n", 
 		       dump_header.dh_num_dump_pages);
 	}
 }
@@ -420,8 +423,9 @@ dumper_setup(unsigned long flags, unsigned long devid)
 #ifdef CONFIG_CRASH_DUMP_MEMDEV
 		dump_config.dumper = &dumper_stage1; 
 #else
+/*
 		printk("Requires CONFIG_CRASHDUMP_MEMDEV. Can't proceed.\n");
-		return -1;
+		return -1;*/
 #endif
 	} else {
 		dump_config.dumper = &dumper_singlestage;
@@ -482,7 +486,6 @@ dump_target_init(int target)
 static int
 dump_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned long arg)
 {
-	/* check capabilities */
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
@@ -711,8 +714,10 @@ static int panic_event(struct notifier_block *this, unsigned long event,
 	struct pt_regs regs;
 	
 	get_current_regs(&regs);
+	printk("Inside panic event \n");
 	dump_execute((const char *)ptr, &regs);
 #endif
+	printk("Returning from panic event\n");
 	return 0;
 }
 
@@ -757,6 +762,7 @@ dump_sysrq_unregister(void)
 #endif
 }
 
+extern unsigned long num_physpages;
 /*
  * Name: dump_init()
  * Func: Initialize the dump process.  This will set up any architecture
@@ -787,6 +793,8 @@ dump_init(void)
 
 	/* set the memory size */
 	dump_header.dh_memory_size = (u64)info.totalram;
+	bzero(&dump_header,sizeof(dump_header));
+	bzero(&dump_header_asm,sizeof(dump_header_asm));
 
 	sysctl_header = register_sysctl_table(kernel_root, 0);
 	dump_sysrq_register();
@@ -833,3 +841,4 @@ MODULE_LICENSE("GPL");
 
 module_init(dump_init);
 module_exit(dump_cleanup);
+

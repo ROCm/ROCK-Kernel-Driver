@@ -19,6 +19,7 @@
 #include <linux/mm.h>
 
 /* definitions */
+#define STACK_START_POSITION(tsk)		(tsk)
 #define DUMP_ASM_MAGIC_NUMBER	0xdeaddeadULL	/* magic number            */
 #define DUMP_ASM_VERSION_NUMBER	0x3	/* version number          */
 

@@ -61,7 +61,7 @@ extern int max_queued_signals;
 extern int sysrq_enabled;
 extern int core_uses_pid;
 extern char core_pattern[];
-extern int cad_pid;
+extern int cad_pid; 
 extern int pid_max;
 extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
@@ -1573,6 +1573,10 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 int proc_dointvec(ctl_table *table, int write, struct file *filp,
 		     void __user *buffer, size_t *lenp)
 {
+
+	if ( KERN_CADPID == table->ctl_name){
+		panic("From cad pid");
+	}
     return do_proc_dointvec(table,write,filp,buffer,lenp,
 		    	    NULL,NULL);
 }

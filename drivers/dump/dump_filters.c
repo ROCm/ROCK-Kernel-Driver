@@ -54,7 +54,7 @@ int dump_low_page(struct page *p)
 		(page_to_pfn(p) < (min_low_pfn + bootmap_pages)));
 }
 
-static inline int kernel_page(struct page *p)
+int kernel_page(struct page *p)
 {
 	/* FIXME: Need to exclude hugetlb pages. Clue: reserved but inuse */
 	return (PageReserved(p) && !PageInuse(p)) || (!PageLRU(p) && PageInuse(p));
@@ -72,12 +72,19 @@ static inline int unreferenced_page(struct page *p)
 
 
 /* loc marks the beginning of a range of pages */
-int dump_filter_kernpages(int pass, unsigned long loc, unsigned long sz)
+int dump_filter_kernpages(int pass, unsigned long loc, unsigned long phy_addr,unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
 	/* if any of the pages is a kernel page, select this set */	
 	while (sz) {
+#ifndef CONFIG_IA64		
 		if (dump_low_page(page) || kernel_page(page))
+#else
+		if(IS_PINNED_ADDRESS(phy_addr))
+			return 1;
+
+		if (kernel_page(page))
+#endif			
 			return 1;
 		sz -= PAGE_SIZE;
 		page++;
@@ -87,33 +94,51 @@ int dump_filter_kernpages(int pass, unsigned long loc, unsigned long sz)
 
 
 /* loc marks the beginning of a range of pages */
-int dump_filter_userpages(int pass, unsigned long loc, unsigned long sz)
+int dump_filter_userpages(int pass, unsigned long loc, unsigned long phy_addr,unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
 	int ret = 0;
 	/* select if the set has any user page, and no kernel pages  */	
+
 	while (sz) {
+#ifndef CONFIG_IA64		
 		if (user_page(page) && !dump_low_page(page)) {
 			ret = 1;
 		} else if (kernel_page(page) || dump_low_page(page)) {
 			return 0;
 		}
+#else
+		if(IS_PINNED_ADDRESS(phy_addr))
+			return 0;
+
+		if (user_page(page)) {
+			ret = 1;
+		} else if (kernel_page(page)) {
+			return 0;
+		}
+#endif		
 		page++;
 		sz -= PAGE_SIZE;
 	}	
 	return ret;
 }
 
-
-
 /* loc marks the beginning of a range of pages */
-int dump_filter_unusedpages(int pass, unsigned long loc, unsigned long sz)
+int dump_filter_unusedpages(int pass, unsigned long loc,unsigned long phy_addr, unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
+	
 
 	/* select if the set does not have any used pages  */	
 	while (sz) {
+#ifndef CONFIG_IA64		
 		if (!unreferenced_page(page) || dump_low_page(page)) {
+#else
+		if(IS_PINNED_ADDRESS(phy_addr))
+			return 0;
+
+		if (!unreferenced_page(page)) {
+#endif			
 			return 0;
 		}
 		page++;
@@ -123,7 +148,7 @@ int dump_filter_unusedpages(int pass, unsigned long loc, unsigned long sz)
 }
 
 /* dummy: last (non-existent) pass */
-int dump_filter_none(int pass, unsigned long loc, unsigned long sz)
+int dump_filter_none(int pass, unsigned long loc,unsigned long phy_addr, unsigned long sz)
 {
 	return 0;
 }

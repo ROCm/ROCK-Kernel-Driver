@@ -48,7 +48,7 @@ int dump_generic_sequencer(void)
 {
 	struct dump_data_filter *filter = dump_config.dumper->filter;
 	int pass = 0, err = 0, save = 0;
-	int (*action)(unsigned long, unsigned long);
+	int (*action)(unsigned long, unsigned long,unsigned long,unsigned long);
 
 	/* 
 	 * We want to save the more critical data areas first in 
@@ -65,12 +65,10 @@ int dump_generic_sequencer(void)
 		else
 			action = dump_skip_data;
 
-		if ((err = dump_iterator(pass, action, filter)) < 0)
+		if ((err = dump_iterator(pass, action, filter)) < 0){
+			printk(KERN_EMERG "Iterator failed \n");
 			break;
-
-		printk("\n %d dump pages %s of %d each in pass %d\n", 
-		err, save ? "saved" : "skipped", DUMP_PAGE_SIZE, pass);
-
+		}
 	}
 
 	return (err < 0) ? err : 0;
@@ -80,7 +78,14 @@ static inline struct page *dump_get_page(loff_t loc)
 {
 
 	unsigned long page_index = loc >> PAGE_SHIFT;
-
+	unsigned long vaddr;
+#ifdef CONFIG_IA64
+	if(IS_PINNED_ADDRESS(loc))		
+	{
+		vaddr = START + loc - (PHYS_START);
+		return  (struct page *)(vaddr);
+	}
+#endif
 	/* todo: complete this  to account for ia64/discontig mem */
 	/* todo: and to check for validity, ram page, no i/o mem etc */
 	/* need to use pfn/physaddr equiv of kern_addr_valid */
@@ -105,37 +110,32 @@ static inline struct page *dump_get_page(loff_t loc)
 
 /* Default iterator: for singlestage and stage 1 of soft-boot dumping */
 /* Iterates over range of physical memory pages in DUMP_PAGE_SIZE increments */
-int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long), 
-	struct dump_data_filter *filter)
+int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long, unsigned long,unsigned long),
+        struct dump_data_filter *filter)
 {
 	/* Todo : fix unit, type */
-	loff_t loc, start, end;
-	int i, count = 0, err = 0;
+	loff_t loc;
+	int count = 0, err = 0,i=0;
 	struct page *page;
 
 	/* Todo: Add membanks code */
 	/* TBD: Check if we need to address DUMP_PAGE_SIZE < PAGE_SIZE */	
 
-	for (i = 0; i < filter->num_mbanks; i++) {
-		start = filter->start[i];
-		end = filter->end[i];
-		for (loc = start; loc < end; loc += DUMP_PAGE_SIZE) {
+	for(i=0;i<dump_mbanks;i++)
+	{
+		//printk(KERN_EMERG "Mbank %d start %lx end %lx\n",i,dump_mbank[ i ].start,dump_mbank[ i ].end);
+		for (loc = dump_mbank[ i ].start; loc < dump_mbank[ i ].end; loc += DUMP_PAGE_SIZE/*PAGE_SIZE*/) {
 			dump_config.dumper->curr_loc = loc;
 			page = dump_get_page(loc);
-			if (page && filter->selector(pass, 
-				(unsigned long) page, DUMP_PAGE_SIZE)) { 
-				if ((err = action((unsigned long)page, 
-					DUMP_PAGE_SIZE))) {
-					printk("dump_page_iterator: err %d for "
-						"loc 0x%llx, in pass %d\n", 
-						err, loc, pass);
-					return err ? err : count;
+			if (page && filter->selector(pass, (unsigned long) page,loc, PAGE_SIZE)) {
+				if ((err = action((unsigned long)page, loc/*+offset_in_page*/,DUMP_PAGE_SIZE,loc%PAGE_SIZE)))
+				{
+					break;
 				} else
 					count++;
 			}
 		}
 	}
-
 	return err ? err : count;
 }
 
@@ -143,22 +143,23 @@ int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long),
  * Base function that saves the selected block of data in the dump 
  * Action taken when iterator decides that data needs to be saved 
  */
-int dump_generic_save_data(unsigned long loc, unsigned long sz)
+int dump_generic_save_data(unsigned long loc, unsigned long phys_addr,unsigned long sz,unsigned long offset)
 {
 	void *buf;
 	void *dump_buf = dump_config.dumper->dump_buf;
 	int left, bytes, ret;
 
-	if ((ret = dump_add_data(loc, sz))) {
+	if ((ret = dump_add_data(loc, phys_addr,sz,offset))) {
 		return ret;
 	}
 	buf = dump_config.dumper->curr_buf;
 
 	/* If we've filled up the buffer write it out */
+	
 	if ((left = buf - dump_buf) >= DUMP_BUFFER_SIZE) {
 		bytes = dump_write_buffer(dump_buf, DUMP_BUFFER_SIZE);
 		if (bytes < DUMP_BUFFER_SIZE) {
-			printk("dump_write_buffer failed %d\n", bytes);
+			printk(KERN_EMERG "dump_write_buffer failed %d\n", bytes);
 			return bytes ? -ENOSPC : bytes;
 		}
 
@@ -174,7 +175,7 @@ int dump_generic_save_data(unsigned long loc, unsigned long sz)
 				/* issue warning */
 				return ret;
 			}
-			printk(".");
+			printk (".");
 
 			touch_nmi_watchdog();
 		} else if (!(dump_config.dumper->count & 0x7)) {
@@ -184,16 +185,6 @@ int dump_generic_save_data(unsigned long loc, unsigned long sz)
 		/* Todo: Touch/Refresh watchdog */
 
 		/* --- Done with periodic chores -- */
-
-		/* 
-		 * extra bit of copying to simplify verification  
-		 * in the second kernel boot based scheme
-		 */
-		memcpy(dump_buf - DUMP_PAGE_SIZE, dump_buf + 
-			DUMP_BUFFER_SIZE - DUMP_PAGE_SIZE, DUMP_PAGE_SIZE);
-
-		/* now adjust the leftover bits back to the top of the page */
-		/* this case would not arise during stage 2 (passthru) */
 		memset(dump_buf, 'z', DUMP_BUFFER_SIZE);
 		if (left) {
 			memcpy(dump_buf, dump_buf + DUMP_BUFFER_SIZE, left);
@@ -205,7 +196,7 @@ int dump_generic_save_data(unsigned long loc, unsigned long sz)
 	return 0;
 }
 
-int dump_generic_skip_data(unsigned long loc, unsigned long sz)
+int dump_generic_skip_data(unsigned long loc, unsigned long phys_addr,unsigned long sz,unsigned long offset_in_page)
 {
 	/* dummy by default */
 	return 0;
@@ -225,23 +216,26 @@ int dump_ll_write(void *buf, unsigned long len)
 	/* make sure device is ready */
 	while ((ret = dump_dev_ready(NULL)) == -EAGAIN);
 	if  (ret < 0) {
-		printk("dump_dev_ready failed !err %d\n", ret);
+		printk(KERN_EMERG "dump_dev_ready failed !err %d\n", ret);
 		return ret;
 	}
-
+	
 	while (len) {
 		if ((last_transfer = dump_dev_write(buf, len)) <= 0)  {
 			ret = last_transfer;
-			printk("dump_dev_write failed !err %d\n", 
+			printk(KERN_EMERG "dump_dev_write failed !err %d\n", 
 			ret);
 			break;
 		}
-		/* wait till complete */
-		while ((ret = dump_dev_ready(buf)) == -EAGAIN)
-			cpu_relax();
 
+		/* wait till complete */
+		while ((ret = dump_dev_ready(buf)) == -EAGAIN){
+		//	printk(KERN_EMERG "dump_dev_ready failed \n");
+			cpu_relax();			
+		}
+		
 		if  (ret < 0) {
-			printk("i/o failed !err %d\n", ret);
+			printk(KERN_EMERG "i/o failed !err %d\n", ret);
 			break;
 		}
 
@@ -262,7 +256,7 @@ int dump_generic_write_buffer(void *buf, unsigned long len)
 	/* check for space */
 	if ((err = dump_dev_seek(dump_config.dumper->curr_offset + len + 
 			2*DUMP_BUFFER_SIZE)) < 0) {
-		printk("dump_write_buffer: insuff space after offset 0x%llx\n",
+		printk(KERN_EMERG "dump_write_buffer: insuff space after offset 0x%llx\n",
 			dump_config.dumper->curr_offset);
 		return err;
 	}
@@ -278,7 +272,7 @@ int dump_generic_write_buffer(void *buf, unsigned long len)
 		written = written ? -ENOSPC : written;
 	else
 		dump_config.dumper->curr_offset += len;
-
+	
 	return written;
 }
 
@@ -300,8 +294,10 @@ int dump_generic_configure(unsigned long devid)
 		return -ENOMEM; /* fixme: better error code */
 	}
 
-	/* Initialize the rest of the fields */
+	/* Initialize the rest of the fields *
 	dump_config.dumper->dump_buf = buf + DUMP_PAGE_SIZE;
+	COMMENTED :: TBD : Query lkcd lists For the offsetting */
+	dump_config.dumper->dump_buf = buf;
 	dumper_reset();
 
 	/* Open the dump device */
@@ -345,7 +341,11 @@ int dump_generic_unconfigure(void)
 	printk("Closed dump device\n");
 	
 	if (buf)
-		dump_free_mem((buf - DUMP_PAGE_SIZE));
+	{
+		/* Commented: Query LKCD on the need for offsetting
+		 * */
+		dump_free_mem((buf /*- DUMP_PAGE_SIZE*/));
+	}
 
 	dump_config.dumper->curr_buf = dump_config.dumper->dump_buf = NULL;
 	pr_debug("Released dump buffer\n");

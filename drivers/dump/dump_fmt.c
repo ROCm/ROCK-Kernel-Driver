@@ -30,8 +30,8 @@
 #include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
-#include <asm/dump.h>
 #include <linux/dump.h>
+#include <asm/dump.h>
 #include "dump_methods.h"
 
 /*
@@ -187,20 +187,20 @@ int dump_lcrash_configure_header(const char *panic_str,
 	dump_config.dumper->header_dirty++;
 	return 0;
 }
-
 /* save register and task context */
 void dump_lcrash_save_context(int cpu, const struct pt_regs *regs, 
 	struct task_struct *tsk)
 {
 	dump_header_asm.dha_smp_current_task[cpu] = (unsigned long)tsk;
-
 	__dump_save_regs(&dump_header_asm.dha_smp_regs[cpu], regs);
-
+	
 	/* take a snapshot of the stack */
 	/* doing this enables us to tolerate slight drifts on this cpu */
+
 	if (dump_header_asm.dha_stack[cpu]) {
 		memcpy((void *)dump_header_asm.dha_stack[cpu],
-				tsk->thread_info, THREAD_SIZE);
+				STACK_START_POSITION(tsk),
+				THREAD_SIZE);
 	}
 	dump_header_asm.dha_stack_ptr[cpu] = (unsigned long)(tsk->thread_info);
 }
@@ -273,14 +273,17 @@ int dump_allow_compress(struct page *page, unsigned long size)
 	return !is_curr_stack_page(page, size) && !is_dump_page(page, size);
 }
 
-void lcrash_init_pageheader(struct __dump_page *dp, struct page *page, 
-	unsigned long sz)
+void lcrash_init_pageheader(struct __dump_page *dp, struct page *page,
+       unsigned long phys_addr,
+       unsigned long sz,
+       unsigned long offset_in_page)
 {
 	memset(dp, sizeof(struct __dump_page), 0);
 	dp->dp_flags = 0; 
 	dp->dp_size = 0;
-	if (sz > 0)
-		dp->dp_address = (loff_t)page_to_pfn(page) << PAGE_SHIFT;
+	if (sz > 0){
+		dp->dp_address = phys_addr;
+	}
 
 #if DUMP_DEBUG > 6
 	dp->dp_page_index = dump_header.dh_num_dump_pages;
@@ -289,7 +292,7 @@ void lcrash_init_pageheader(struct __dump_page *dp, struct page *page,
 #endif /* DUMP_DEBUG */
 }
 
-int dump_lcrash_add_data(unsigned long loc, unsigned long len)
+int dump_lcrash_add_data(unsigned long loc, unsigned long phys_addr,unsigned long len,unsigned long offset_in_page)
 {
 	struct page *page = (struct page *)loc;
 	void *addr, *buf = dump_config.dumper->curr_buf;
@@ -299,11 +302,20 @@ int dump_lcrash_add_data(unsigned long loc, unsigned long len)
 	if (buf > dump_config.dumper->dump_buf + DUMP_BUFFER_SIZE)
 		return -ENOMEM;
 
-	lcrash_init_pageheader(dp, page, len);
+	lcrash_init_pageheader(dp, page, phys_addr, len,offset_in_page);
 	buf += sizeof(struct __dump_page);
 
 	while (len) {
+#ifdef CONFIG_IA64
+		if (IS_PINNED_ADDRESS(phys_addr)){
+			addr=(void *)(loc);
+		} else {
+			addr = kmap_atomic(page, KM_DUMP);
+			addr += offset_in_page;
+		}
+#else
 		addr = kmap_atomic(page, KM_DUMP);
+#endif
 		size = bytes = (len > PAGE_SIZE) ? PAGE_SIZE : len;	
 		/* check for compression */
 		if (dump_allow_compress(page, bytes)) {
@@ -319,7 +331,14 @@ int dump_lcrash_add_data(unsigned long loc, unsigned long len)
 			size = bytes;
 		}
 		/* memset(buf, 'A', size); temporary: testing only !! */
-		kunmap_atomic(addr, KM_DUMP);
+#ifdef CONFIG_IA64
+		if(!IS_PINNED_ADDRESS(phys_addr)){
+			kunmap_atomic(page, KM_DUMP);
+		}
+#else
+		kunmap_atomic(page, KM_DUMP);
+#endif
+
 		dp->dp_size += size;
 		buf += size;
 		len -= bytes;
@@ -345,7 +364,7 @@ int dump_lcrash_update_end_marker(void)
 	unsigned long left;
 	int ret = 0;
 		
-	lcrash_init_pageheader(dp, NULL, 0);
+	lcrash_init_pageheader(dp, NULL,0, 0,0);
 	dp->dp_flags |= DUMP_DH_END; /* tbd: truncation test ? */
 	
 	/* now update the header */

@@ -51,7 +51,7 @@
 /* To customise selection of pages to be dumped in a given pass/group */
 struct dump_data_filter{
 	char name[32];
-	int (*selector)(int, unsigned long, unsigned long);
+	int (*selector)(int, unsigned long, unsigned long, unsigned long);
 	ulong level_mask; /* dump level(s) for which this filter applies */
 	loff_t start[MAX_NUMNODES], end[MAX_NUMNODES]; /* location range applicable */
 	ulong num_mbanks;  /* Number of memory banks. Greater than one for discontig memory (NUMA) */
@@ -71,12 +71,12 @@ struct dump_scheme_ops {
 	/* ordering of passes, invoking iterator */
 	int (*sequencer)(void); 
         /* iterates over system data, selects and acts on data to dump */
-	int (*iterator)(int, int (*)(unsigned long, unsigned long), 
+	int (*iterator)(int, int (*)(unsigned long, unsigned long, unsigned long, unsigned long), 
 		struct dump_data_filter *); 
         /* action when data is selected for dump */
-	int (*save_data)(unsigned long, unsigned long); 
+	int (*save_data)(unsigned long, unsigned long,unsigned long,unsigned long); 
         /* action when data is to be excluded from dump */
-	int (*skip_data)(unsigned long, unsigned long); 
+	int (*skip_data)(unsigned long,unsigned long, unsigned long,unsigned long); 
 	/* policies for space, multiple dump devices etc */
 	int (*write_buffer)(void *, unsigned long); 
 };
@@ -105,7 +105,7 @@ struct dump_fmt_ops {
 		struct task_struct *); 
 	/* typically called by the save_data action */
 	/* add formatted data to the dump buffer */
-	int (*add_data)(unsigned long, unsigned long); 
+	int (*add_data)(unsigned long, unsigned long, unsigned long,unsigned long); 
 	int (*update_end_marker)(void);
 };
 
@@ -185,8 +185,8 @@ static inline int dump_sequencer(void)
 	return dump_config.dumper->scheme->ops->sequencer();
 }
 
-static inline int dump_iterator(int pass, int (*action)(unsigned long, 
-	unsigned long), struct dump_data_filter *filter)
+static inline int dump_iterator(int pass, int (*action)(unsigned long,unsigned long, 
+	unsigned long,unsigned long), struct dump_data_filter *filter)
 {
 	return dump_config.dumper->scheme->ops->iterator(pass, action, filter);
 }
@@ -241,9 +241,9 @@ static inline int dump_update_end_marker(void)
 	return dump_config.dumper->fmt->ops->update_end_marker();
 }
 
-static inline int dump_add_data(unsigned long loc, unsigned long sz)
+static inline int dump_add_data(unsigned long loc, unsigned long phys_addr, unsigned long sz,unsigned long off_in_page)
 {
-	return dump_config.dumper->fmt->ops->add_data(loc, sz);
+	return dump_config.dumper->fmt->ops->add_data(loc,phys_addr, sz,off_in_page);
 }
 
 /* Compression operation */
@@ -261,10 +261,9 @@ extern struct __dump_compress dump_none_compression;
 /* Default scheme methods (dump_scheme.c) */
 
 extern int dump_generic_sequencer(void);
-extern int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned
-	long), struct dump_data_filter *filter);
-extern int dump_generic_save_data(unsigned long loc, unsigned long sz);
-extern int dump_generic_skip_data(unsigned long loc, unsigned long sz);
+extern int dump_page_iterator(int pass, int (*action)(unsigned long, unsigned long, unsigned long,unsigned long), struct dump_data_filter *filter);
+extern int dump_generic_save_data(unsigned long loc, unsigned long phys_addr,unsigned long sz,unsigned long offset_in_page);
+extern int dump_generic_skip_data(unsigned long loc, unsigned long phys_addr,unsigned long sz,unsigned long offset_in_page);
 extern int dump_generic_write_buffer(void *buf, unsigned long len);
 extern int dump_generic_configure(unsigned long);
 extern int dump_generic_unconfigure(void);
@@ -279,7 +278,7 @@ extern int dump_lcrash_configure_header(const char *panic_str,
 extern void dump_lcrash_save_context(int  cpu, const struct pt_regs *regs, 
 	struct task_struct *tsk);
 extern int dump_generic_update_header(void);
-extern int dump_lcrash_add_data(unsigned long loc, unsigned long sz);
+extern int dump_lcrash_add_data(unsigned long loc, unsigned long phys_addr, unsigned long sz,unsigned long offset_in_page);
 extern int dump_lcrash_update_end_marker(void);
 
 /* Default format (lcrash) template */

@@ -928,7 +928,10 @@ static struct proc_dir_entry * irq_dir [NR_IRQS];
 
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
-static cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
+#if !(defined(CONFIG_CRASH_DUMP) || defined (CONFIG_CRASH_DUMP_MODULE))
+static
+#endif
+unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
 
 static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
 

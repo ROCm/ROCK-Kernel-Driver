@@ -29,8 +29,12 @@
 #include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/cache.h>
-#include <linux/efi.h>
 
+#if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
+#include <linux/dump.h>
+#endif
+
+#include <linux/efi.h>
 #include <asm/atomic.h>
 #include <asm/bitops.h>
 #include <asm/current.h>
@@ -76,10 +80,15 @@ static volatile struct call_data_struct *call_data;
 #define IPI_KDB_INTERRUPT	2
 #endif	/* CONFIG_KDB */
 
+#if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
+#define IPI_DUMP_INTERRUPT      4
+	int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
+#endif
+
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
 static DEFINE_PER_CPU(u64, ipi_operation) ____cacheline_aligned;
-
-static void
+/*changed static void stop_this_cpu -> void stop_this_cpu */
+void
 stop_this_cpu (void)
 {
 	extern void cpu_halt (void);
@@ -143,6 +152,15 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 			      case IPI_CPU_STOP:
 				stop_this_cpu();
 				break;
+#if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
+			      case IPI_DUMP_INTERRUPT:
+			        if( dump_ipi_function_ptr != NULL ) {
+				        if (!dump_ipi_function_ptr(regs)) {
+					         printk(KERN_ERR "(*dump_ipi_function_ptr)(): rejected IPI_DUMP_INTERRUPT\n");
+				        }
+			        }
+			        break;
+#endif
 
 #ifdef CONFIG_KDB
 			      case IPI_KDB_INTERRUPT:
@@ -387,3 +405,8 @@ smp_kdb_stop(void)
 		send_IPI_allbutself(IPI_KDB_INTERRUPT);
 }
 #endif	/* CONFIG_KDB */
+
+void dump_send_ipi(void)
+{
+        send_IPI_allbutself(IPI_DUMP_INTERRUPT);
+}
