@@ -1325,15 +1325,15 @@ e1000_run_loopback_test(struct e1000_adapter *adapter)
 
 	for(i = 0; i < 64; i++) {
 		e1000_create_lbtest_frame(txdr->buffer_info[i].skb, 1024);
-		pci_dma_sync_single(pdev, txdr->buffer_info[i].dma,
-				    txdr->buffer_info[i].length,
-				    PCI_DMA_TODEVICE);
+		pci_dma_sync_single_for_device(pdev, txdr->buffer_info[i].dma,
+					    txdr->buffer_info[i].length,
+					    PCI_DMA_TODEVICE);
 	}
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
 
 	msec_delay(200);
 
-	pci_dma_sync_single(pdev, rxdr->buffer_info[0].dma,
+	pci_dma_sync_single_for_cpu(pdev, rxdr->buffer_info[0].dma,
 			    rxdr->buffer_info[0].length, PCI_DMA_FROMDEVICE);
 
 	return e1000_check_lbtest_frame(rxdr->buffer_info[0].skb, 1024);
