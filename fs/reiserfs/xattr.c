@@ -1276,6 +1276,12 @@ error:
           clear_bit (REISERFS_XATTRS_USER, &(REISERFS_SB(s)->s_mount_opt));
           clear_bit (REISERFS_POSIXACL, &(REISERFS_SB(s)->s_mount_opt));
     }
+
+    /* The super_block MS_POSIXACL must mirror the (no)acl mount option. */
+    s->s_flags = s->s_flags & ~MS_POSIXACL;
+    if (reiserfs_posixacl (s))
+	s->s_flags |= MS_POSIXACL;
+
     return err;
 }
 
