@@ -2929,17 +2929,10 @@ int md_thread(void * arg)
 	complete(thread->event);
 	while (thread->run) {
 		void (*run)(void *data);
-		DECLARE_WAITQUEUE(wait, current);
 
-		add_wait_queue(&thread->wqueue, &wait);
-		set_task_state(current, TASK_INTERRUPTIBLE);
-		if (!test_bit(THREAD_WAKEUP, &thread->flags)) {
-			dprintk("md: thread %p went to sleep.\n", thread);
-			schedule();
-			dprintk("md: thread %p woke up.\n", thread);
-		}
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&thread->wqueue, &wait);
+		wait_event_interruptible(thread->wqueue,
+					 test_bit(THREAD_WAKEUP, &thread->flags));
+
 		clear_bit(THREAD_WAKEUP, &thread->flags);
 
 		run = thread->run;
