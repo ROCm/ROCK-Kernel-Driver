@@ -4,7 +4,7 @@
  *
  * (C) 2000 Red Hat. GPL'd
  *
- * $Id: cfi_cmdset_0001.c,v 1.157 2004/10/15 20:00:26 nico Exp $
+ * $Id: cfi_cmdset_0001.c,v 1.160 2004/11/01 06:02:24 nico Exp $
  *
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
@@ -861,6 +861,7 @@ static int cfi_intelext_read (struct mtd_info *mtd, loff_t from, size_t len, siz
 	}
 	return ret;
 }
+
 #if 0
 static int cfi_intelext_read_prot_reg (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf, int base_offst, int reg_sz)
 {
@@ -1028,6 +1029,7 @@ static int do_write_oneword(struct map_info *map, struct flchip *chip, unsigned 
 
 	/* Done and happy. */
 	chip->state = FL_STATUS;
+
 	/* check for lock bit */
 	if (map_word_bitsset(map, status, CMD(0x02))) {
 		/* clear status */
@@ -1179,13 +1181,15 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 
 		if (++z > 20) {
 			/* Argh. Not ready for write to buffer */
+			map_word Xstatus;
 			map_write(map, CMD(0x70), cmd_adr);
 			chip->state = FL_STATUS;
-			printk(KERN_ERR "Chip not ready for buffer write. Xstatus = %lx, status = %lx\n",
-			       status.x[0], map_read(map, cmd_adr).x[0]);
+			Xstatus = map_read(map, cmd_adr);
 			/* Odd. Clear status bits */
 			map_write(map, CMD(0x50), cmd_adr);
 			map_write(map, CMD(0x70), cmd_adr);
+			printk(KERN_ERR "Chip not ready for buffer write. status = %lx, Xstatus = %lx\n",
+			       status.x[0], Xstatus.x[0]);
 			ret = -EIO;
 			goto out;
 		}
@@ -1413,16 +1417,17 @@ static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 		
 		/* OK Still waiting */
 		if (time_after(jiffies, timeo)) {
+			map_word Xstatus;
 			map_write(map, CMD(0x70), adr);
 			chip->state = FL_STATUS;
-			printk(KERN_ERR "waiting for erase at %08lx to complete timed out. Xstatus = %lx, status = %lx.\n",
-			       adr, status.x[0], map_read(map, adr).x[0]);
+			Xstatus = map_read(map, adr);
 			/* Clear status bits */
 			map_write(map, CMD(0x50), adr);
 			map_write(map, CMD(0x70), adr);
-			DISABLE_VPP(map);
-			spin_unlock(chip->mutex);
-			return -EIO;
+			printk(KERN_ERR "waiting for erase at %08lx to complete timed out. status = %lx, Xstatus = %lx.\n",
+			       adr, status.x[0], Xstatus.x[0]);
+			ret = -EIO;
+			goto out;
 		}
 		
 		/* Latency issues. Drop the lock, wait a while and retry */
@@ -1431,9 +1436,6 @@ static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 		schedule_timeout(1);
 		spin_lock(chip->mutex);
 	}
-	
-	DISABLE_VPP(map);
-	ret = 0;
 
 	/* We've broken this before. It doesn't hurt to be safe */
 	map_write(map, CMD(0x70), adr);
@@ -1442,7 +1444,13 @@ static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 
 	/* check for lock bit */
 	if (map_word_bitsset(map, status, CMD(0x3a))) {
-		unsigned char chipstatus = status.x[0];
+		unsigned char chipstatus;
+
+		/* Reset the error bits */
+		map_write(map, CMD(0x50), adr);
+		map_write(map, CMD(0x70), adr);
+
+		chipstatus = status.x[0];
 		if (!map_word_equal(map, status, CMD(chipstatus))) {
 			int i, w;
 			for (w=0; w<map_words(map); w++) {
@@ -1453,10 +1461,7 @@ static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 			printk(KERN_WARNING "Status is not identical for all chips: 0x%lx. Merging to give 0x%02x\n",
 			       status.x[0], chipstatus);
 		}
-		/* Reset the error bits */
-		map_write(map, CMD(0x50), adr);
-		map_write(map, CMD(0x70), adr);
-		
+
 		if ((chipstatus & 0x30) == 0x30) {
 			printk(KERN_NOTICE "Chip reports improper command sequence: status 0x%x\n", chipstatus);
 			ret = -EIO;
@@ -1471,16 +1476,18 @@ static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 			if (retries--) {
 				printk(KERN_DEBUG "Chip erase failed at 0x%08lx: status 0x%x. Retrying...\n", adr, chipstatus);
 				timeo = jiffies + HZ;
-				chip->state = FL_STATUS;
+				put_chip(map, chip, adr);
 				spin_unlock(chip->mutex);
 				goto retry;
 			}
 			printk(KERN_DEBUG "Chip erase failed at 0x%08lx: status 0x%x\n", adr, chipstatus);
 			ret = -EIO;
 		}
+	} else {
+		ret = 0;
 	}
 
-	wake_up(&chip->wq);
+ out:	put_chip(map, chip, adr);
 	spin_unlock(chip->mutex);
 	return ret;
 }
@@ -1548,12 +1555,13 @@ static int do_printlockstatus_oneblock(struct map_info *map, struct flchip *chip
 				       unsigned long adr, int len, void *thunk)
 {
 	struct cfi_private *cfi = map->fldrv_priv;
-	int ofs_factor = cfi->interleave * cfi->device_type;
+	int status, ofs_factor = cfi->interleave * cfi->device_type;
 
 	cfi_send_gen_cmd(0x90, 0x55, 0, map, cfi, cfi->device_type, NULL);
-	printk(KERN_DEBUG "block status register for 0x%08lx is %x\n",
-	       adr, cfi_read_query(map, adr+(2*ofs_factor)));
 	chip->state = FL_JEDEC_QUERY;
+	status = cfi_read_query(map, adr+(2*ofs_factor));
+	printk(KERN_DEBUG "block status register for 0x%08lx is %x\n",
+	       adr, status);
 	return 0;
 }
 #endif
@@ -1609,11 +1617,13 @@ static int do_xxlock_oneblock(struct map_info *map, struct flchip *chip,
 		
 		/* OK Still waiting */
 		if (time_after(jiffies, timeo)) {
+			map_word Xstatus;
 			map_write(map, CMD(0x70), adr);
 			chip->state = FL_STATUS;
-			printk(KERN_ERR "waiting for unlock to complete timed out. Xstatus = %lx, status = %lx.\n",
-			       status.x[0], map_read(map, adr).x[0]);
-			DISABLE_VPP(map);
+			Xstatus = map_read(map, adr);
+			printk(KERN_ERR "waiting for unlock to complete timed out. status = %lx, Xstatus = %lx.\n",
+			       status.x[0], Xstatus.x[0]);
+			put_chip(map, chip, adr);
 			spin_unlock(chip->mutex);
 			return -EIO;
 		}
