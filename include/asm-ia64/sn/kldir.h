@@ -5,7 +5,7 @@
  *
  * Derived from IRIX <sys/SN/kldir.h>, revision 1.21.
  *
- * Copyright (C) 1992-1997,1999,2001-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1992-1997,1999,2001-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright (C) 1999 by Ralf Baechle
  */
 #ifndef _ASM_IA64_SN_KLDIR_H

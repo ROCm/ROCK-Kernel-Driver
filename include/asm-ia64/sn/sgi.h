@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 
@@ -17,6 +17,13 @@
 #include <asm/uaccess.h>		/* for copy_??_user */
 #include <linux/mm.h>
 #include <linux/devfs_fs_kernel.h>
+#ifdef CONFIG_HWGFS_FS
+#include <linux/fs.h>
+#include <asm/sn/hwgfs.h>
+typedef hwgfs_handle_t vertex_hdl_t;
+#else
+typedef devfs_handle_t vertex_hdl_t;
+#endif
 
 typedef int64_t  __psint_t;	/* needed by klgraph.c */
 
@@ -50,9 +57,8 @@ typedef enum graph_error_e {
 typedef uint64_t vhandl_t;
 
 
-#ifndef NBPP
-#define NBPP 4096
-#endif
+#define NBPP PAGE_SIZE
+#define _PAGESZ PAGE_SIZE
 
 #ifndef D_MP
 #define D_MP 1
@@ -64,10 +70,6 @@ typedef uint64_t vhandl_t;
 
 #ifndef NBPC
 #define NBPC 0
-#endif
-
-#ifndef _PAGESZ
-#define _PAGESZ 4096
 #endif
 
 typedef uint64_t mrlock_t;	/* needed by devsupport.c */
@@ -141,12 +143,6 @@ mutex_spinlock(spinlock_t *sem) {
 
 #define PRINT_PANIC		panic
 
-#ifdef CONFIG_SMP
-#define cpu_enabled(cpu)        (test_bit(cpu, &cpu_online_map))
-#else
-#define cpu_enabled(cpu)	(1)
-#endif
-
 /* print_register() defs */
 
 /*
@@ -172,6 +168,35 @@ struct reg_desc {
 
 extern void print_register(unsigned long long, struct reg_desc *);
 
-#include <asm/sn/hack.h>	/* for now */
+/******************************************
+ * Definitions that do not exist in linux *
+ ******************************************/
+
+typedef int cred_t;	/* This is for compilation reasons */
+struct cred { int x; };
+
+
+#define DELAY(a)
+
+/************************************************
+ * Routines redefined to use linux equivalents. *
+ ************************************************/
+
+/* #define FIXME(s) printk("FIXME: [ %s ] in %s at %s:%d\n", s, __FUNCTION__, __FILE__, __LINE__) */
+
+#define FIXME(s)
+
+/* move to stubs.c yet */
+#define dev_to_vhdl(dev) 0
+#define get_timestamp() 0
+#define us_delay(a)
+#define v_mapphys(a,b,c) 0    // printk("Fixme: v_mapphys - soft->base 0x%p\n", b);
+#define splhi()  0
+#define splx(s)
+
+extern void * snia_kmem_alloc_node(register size_t, register int, cnodeid_t);
+extern void * snia_kmem_zalloc(size_t, int);
+extern void * snia_kmem_zalloc_node(register size_t, register int, cnodeid_t );
+extern int is_specified(char *);
 
 #endif /* _ASM_IA64_SN_SGI_H */

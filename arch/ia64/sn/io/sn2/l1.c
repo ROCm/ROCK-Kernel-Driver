@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
+#include <asm/io.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
@@ -36,7 +37,6 @@
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/labelcl.h>
-#include <asm/sn/eeprom.h>
 #include <asm/sn/router.h>
 #include <asm/sn/module.h>
 #include <asm/sn/ksys/l1.h>
@@ -50,6 +50,9 @@
 
 #define UART_BAUD_RATE          57600
 
+static int L1_connected;	/* non-zero when interrupts are enabled */
+
+
 int 
 get_L1_baud(void)
 {
@@ -62,7 +65,23 @@ get_L1_baud(void)
 int
 l1_get_intr_value( void )
 {
-	return(0);
+	cpuid_t intr_cpuid;
+	nasid_t console_nasid;
+	int major, minor;
+	extern nasid_t get_console_nasid(void);
+
+	/* if it is an old prom, run in poll mode */
+
+	major = sn_sal_rev_major();
+	minor = sn_sal_rev_minor();
+	if ( (major < 1) || ((major == 1) && (minor < 10)) ) {
+		/* before version 1.10 doesn't work */
+		return (0);
+	}
+
+	console_nasid = get_console_nasid();
+	intr_cpuid = NODEPDA(NASID_TO_COMPACT_NODEID(console_nasid))->node_first_cpu;
+	return CPU_VECTOR_TO_IRQ(intr_cpuid, SGI_UART_VECTOR);
 }
 
 /* Disconnect the callup functions - throw away interrupts */
@@ -74,19 +93,45 @@ l1_unconnect_intr(void)
 
 /* Set up uart interrupt handling for this node's uart */
 
-void
-l1_connect_intr(void *rx_notify, void *tx_notify)
+int
+l1_connect_intr(void *intr_func, void *arg, struct pt_regs *ep)
 {
-#if 0
-	// Will need code here for sn2 - something like this
-	console_nodepda = NODEPDA(NASID_TO_COMPACT_NODEID(get_master_nasid());
-	intr_connect_level(console_nodepda->node_first_cpu,
-                                SGI_UART_VECTOR, INTPEND0_MAXMASK,
-                                dummy_intr_func);
-	request_irq(SGI_UART_VECTOR | (console_nodepda->node_first_cpu << 8),
-                                intr_func, SA_INTERRUPT | SA_SHIRQ,
-                                "l1_protocol_driver", (void *)sc);
-#endif
+	cpuid_t intr_cpuid;
+	nasid_t console_nasid;
+	unsigned int console_irq;
+	int result;
+	extern int intr_connect_level(cpuid_t, int, ilvl_t, intr_func_t);
+	extern nasid_t get_console_nasid(void);
+
+
+	/* don't call to connect multiple times - we DON'T support changing the handler */
+
+	if ( !L1_connected ) {
+		L1_connected++;
+		console_nasid = get_console_nasid();
+		intr_cpuid = NODEPDA(NASID_TO_COMPACT_NODEID(console_nasid))->node_first_cpu;
+		console_irq = CPU_VECTOR_TO_IRQ(intr_cpuid, SGI_UART_VECTOR);
+		result = intr_connect_level(intr_cpuid, SGI_UART_VECTOR,
+                                	0 /*not used*/, 0 /*not used*/);
+		if (result != SGI_UART_VECTOR) {
+			if (result < 0)
+				printk(KERN_WARNING "L1 console driver : intr_connect_level failed %d\n", result);
+        		else
+				printk(KERN_WARNING "L1 console driver : intr_connect_level returns wrong bit %d\n", result);
+			return (-1);
+		}
+
+		result = request_irq(console_irq, intr_func, SA_INTERRUPT,
+					"SGI L1 console driver", (void *)arg);
+		if (result < 0) {
+			printk(KERN_WARNING "L1 console driver : request_irq failed %d\n", result);
+			return (-1);
+		}
+
+		/* ask SAL to turn on interrupts in the UART itself */
+		ia64_sn_console_intr_enable(SAL_CONSOLE_INTR_RECV);
+	}
+	return (0);
 }
 
 
@@ -195,7 +240,7 @@ l1_serial_in_local(void)
 int
 l1_serial_out( char *str, int len )
 {
-	int counter = len;
+	int tmp;
 
 	/* Ignore empty messages */
 	if ( len == 0 )
@@ -216,6 +261,8 @@ l1_serial_out( char *str, int len )
 	if ( IS_RUNNING_ON_SIMULATOR() ) {
 		extern u64 master_node_bedrock_address;
 		void early_sn_setup(void);
+		int counter = len;
+
 		if (!master_node_bedrock_address)
 			early_sn_setup();
 		if ( master_node_bedrock_address != (u64)0 ) {
@@ -237,8 +284,9 @@ l1_serial_out( char *str, int len )
 	}
 
 	/* Attempt to write things out thru the sal */
-	if ( ia64_sn_console_putb(str, len) )
-		return(0);
-
-	return((counter <= 0) ? 0 : (len - counter));
+	if ( L1_connected )
+		tmp = ia64_sn_console_xmit_chars(str, len);
+	else
+		tmp = ia64_sn_console_putb(str, len);
+	return ((tmp < 0) ? 0 : tmp);
 }

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_SN2_SN_PRIVATE_H
 #define _ASM_IA64_SN_SN2_SN_PRIVATE_H
@@ -49,13 +49,13 @@ extern void get_dir_ent(paddr_t paddr, int *state,
 #endif
 
 /* intr.c */
-extern int intr_reserve_level(cpuid_t cpu, int level, int err, devfs_handle_t owner_dev, char *name);
+extern int intr_reserve_level(cpuid_t cpu, int level, int err, vertex_hdl_t owner_dev, char *name);
 extern void intr_unreserve_level(cpuid_t cpu, int level);
 extern int intr_connect_level(cpuid_t cpu, int bit, ilvl_t mask_no, 
 			intr_func_t intr_prefunc);
 extern int intr_disconnect_level(cpuid_t cpu, int bit);
-extern cpuid_t intr_heuristic(devfs_handle_t dev, device_desc_t dev_desc,
-			      int req_bit,int intr_resflags,devfs_handle_t owner_dev,
+extern cpuid_t intr_heuristic(vertex_hdl_t dev, device_desc_t dev_desc,
+			      int req_bit,int intr_resflags,vertex_hdl_t owner_dev,
 			      char *intr_name,int *resp_bit);
 extern void intr_block_bit(cpuid_t cpu, int bit);
 extern void intr_unblock_bit(cpuid_t cpu, int bit);
@@ -83,8 +83,8 @@ void bte_lateinit(void);
 void bte_wait_for_xfer_completion(void *);
 
 /* klgraph.c */
-void klhwg_add_all_nodes(devfs_handle_t);
-void klhwg_add_all_modules(devfs_handle_t);
+void klhwg_add_all_nodes(vertex_hdl_t);
+void klhwg_add_all_modules(vertex_hdl_t);
 
 /* klidbg.c */
 void install_klidbg_functions(void);
@@ -97,7 +97,6 @@ extern void setup_replication_mask(int maxnodes);
 /* init.c */
 extern cnodeid_t get_compact_nodeid(void);	/* get compact node id */
 extern void init_platform_nodepda(nodepda_t *npda, cnodeid_t node);
-extern void init_platform_pda(cpuid_t cpu);
 extern void per_cpu_init(void);
 extern int is_fine_dirmode(void);
 extern void update_node_information(cnodeid_t);
@@ -125,7 +124,7 @@ extern __psunsigned_t	debugger_stopped;
  */
 struct hub_piomap_s {
 	struct xtalk_piomap_s	hpio_xtalk_info;/* standard crosstalk pio info */
-	devfs_handle_t		hpio_hub;	/* which shub's mapping registers are set up */
+	vertex_hdl_t		hpio_hub;	/* which shub's mapping registers are set up */
 	short			hpio_holdcnt;	/* count of current users of bigwin mapping */
 	char			hpio_bigwin_num;/* if big window map, which one */
 	int 			hpio_flags;	/* defined below */
@@ -146,7 +145,7 @@ struct hub_piomap_s {
  */
 struct hub_dmamap_s {
 	struct xtalk_dmamap_s	hdma_xtalk_info;/* standard crosstalk dma info */
-	devfs_handle_t		hdma_hub;	/* which shub we go through */
+	vertex_hdl_t		hdma_hub;	/* which shub we go through */
 	int			hdma_flags;	/* defined below */
 };
 /* shub_dmamap flags */
@@ -214,7 +213,7 @@ typedef struct cpuinfo_s {
 	(vhdl, INFO_LBL_CPU_INFO, (arbitrary_info_t)infoptr)
 
 /* Special initialization function for xswitch vertices created during startup. */
-extern void xswitch_vertex_init(devfs_handle_t xswitch);
+extern void xswitch_vertex_init(vertex_hdl_t xswitch);
 
 extern xtalk_provider_t hub_provider;
 
@@ -248,6 +247,6 @@ extern void crbx(nasid_t nasid, void (*pf)(char *, ...));
 void bootstrap(void);
 
 /* sndrv.c */
-extern int sndrv_attach(devfs_handle_t vertex);
+extern int sndrv_attach(vertex_hdl_t vertex);
 
 #endif /* _ASM_IA64_SN_SN2_SN_PRIVATE_H */

@@ -1,26 +1,17 @@
-
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1992-1999,2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 1992-1999,2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
-
 
 #ifndef _ASM_IA64_SN_ADDRS_H
 #define _ASM_IA64_SN_ADDRS_H
 
 #include <linux/config.h>
 
-#if defined (CONFIG_IA64_SGI_SN1)
-#include <asm/sn/sn1/addrs.h>
-#elif defined (CONFIG_IA64_SGI_SN2)
 #include <asm/sn/sn2/addrs.h>
-#else
-#error <<<BOMB! addrs.h defined only for SN1, or SN2 >>>
-#endif /* !SN1 && !SN2 */
 
 #ifndef __ASSEMBLY__
 #include <asm/sn/types.h>
@@ -30,11 +21,7 @@
 
 #define PS_UINT_CAST		(__psunsigned_t)
 #define UINT64_CAST		(uint64_t)
-#ifdef CONFIG_IA64_SGI_SN2
 #define HUBREG_CAST		(volatile mmr_t *)
-#else
-#define HUBREG_CAST		(volatile hubreg_t *)
-#endif
 
 #elif __ASSEMBLY__
 
@@ -52,11 +39,7 @@
  * node's address space.
  */
 
-#ifdef CONFIG_IA64_SGI_SN2	/* SN2 has an extra AS field between node offset and node id (nasid) */
 #define NODE_OFFSET(_n)		(UINT64_CAST (_n) << NASID_SHFT)
-#else
-#define NODE_OFFSET(_n)		(UINT64_CAST (_n) << NODE_SIZE_BITS)
-#endif
 
 #define NODE_CAC_BASE(_n)	(CAC_BASE  + NODE_OFFSET(_n))
 #define NODE_HSPEC_BASE(_n)	(HSPEC_BASE + NODE_OFFSET(_n))
@@ -83,7 +66,7 @@
  */
 
 #define SWIN_SIZE_BITS		24
-#define SWIN_SIZE		(UINT64_CAST 1 << 24)
+#define SWIN_SIZE		(1UL<<24)
 #define	SWIN_SIZEMASK		(SWIN_SIZE - 1)
 #define	SWIN_WIDGET_MASK	0xF
 
@@ -119,42 +102,11 @@
  *			references to the local hub's registers.
  */
 
-#if defined CONFIG_IA64_SGI_SN1
-#define LREG_BASE		(HSPEC_BASE + 0x10000000)
-#define LREG_SIZE		0x8000000  /* 128 MB */
-#define LREG_LIMIT		(LREG_BASE + LREG_SIZE)
-#define LBOOT_BASE		(LREG_LIMIT)
-#define LBOOT_SIZE		0x8000000   /* 128 MB */
-#define LBOOT_LIMIT		(LBOOT_BASE + LBOOT_SIZE)
-#define LBOOT_STRIDE		0x2000000    /* two PROMs, on 32M boundaries */
-#endif
-
 #define	HUB_REGISTER_WIDGET	1
-#ifdef CONFIG_IA64_SGI_SN2
 #define IALIAS_BASE		LOCAL_SWIN_BASE(HUB_REGISTER_WIDGET)
-#else
-#define IALIAS_BASE		NODE_SWIN_BASE(0, HUB_REGISTER_WIDGET)
-#endif
 #define IALIAS_SIZE		0x800000	/* 8 Megabytes */
 #define IS_IALIAS(_a)		(((_a) >= IALIAS_BASE) &&		\
 				 ((_a) < (IALIAS_BASE + IALIAS_SIZE)))
-
-/*
- * Macro for referring to Hub's RBOOT space
- */
-
-#if defined CONFIG_IA64_SGI_SN1
-
-#define NODE_LREG_BASE(_n)	(NODE_HSPEC_BASE(_n) + 0x30000000)
-#define NODE_LREG_LIMIT(_n)	(NODE_LREG_BASE(_n) + LREG_SIZE)
-#define RREG_BASE(_n)		(NODE_LREG_BASE(_n))
-#define RREG_LIMIT(_n)		(NODE_LREG_LIMIT(_n))
-#define RBOOT_SIZE		0x8000000	/* 128 Megabytes */
-#define NODE_RBOOT_BASE(_n)	(NODE_HSPEC_BASE(_n) + 0x38000000)
-#define NODE_RBOOT_LIMIT(_n)	(NODE_RBOOT_BASE(_n) + RBOOT_SIZE)
-
-#endif
-
 
 /*
  * The following macros produce the correct base virtual address for
@@ -166,11 +118,10 @@
  */
 
 
-#ifdef CONFIG_IA64_SGI_SN2
 /*
- * SN2 has II mmr's located inside small window space like SN0 & SN1,
- * but has all other non-II mmr's located at the top of big window
- * space, unlike SN0 & SN1.
+ * SN2 has II mmr's located inside small window space.
+ * As all other non-II mmr's located at the top of big window
+ * space.
  */
 #define LOCAL_HUB_BASE(_x)	(LOCAL_MMR_ADDR(_x) | (((~(_x)) & BWIN_TOP)>>8))
 #define REMOTE_HUB_BASE(_x)						\
@@ -182,18 +133,6 @@
 #define REMOTE_HUB(_n, _x)						\
 	(HUBREG_CAST (REMOTE_HUB_BASE(_x) | ((((long)(_n))<<NASID_SHFT))))
 
-#else	/* not CONFIG_IA64_SGI_SN2 */
-
-#define LOCAL_HUB(_x)		(HUBREG_CAST (IALIAS_BASE + (_x)))
-#define REMOTE_HUB(_n, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
-					      0x800000 + (_x)))
-#endif
-
-#ifdef CONFIG_IA64_SGI_SN1
-#define LOCAL_HSPEC(_x)		(HUBREG_CAST (LREG_BASE + (_x)))
-#define REMOTE_HSPEC(_n, _x)		(HUBREG_CAST (RREG_BASE(_n) + (_x)))
-#endif /* CONFIG_IA64_SGI_SN1 */
-
 
 /*
  * WARNING:
@@ -203,27 +142,12 @@
  *	Otherwise, the recommended approach is to use *_HUB_L() and *_HUB_S().
  *	They're always safe.
  */
-#ifdef CONFIG_IA64_SGI_SN2
 #define LOCAL_HUB_ADDR(_x)							\
 	(((_x) & BWIN_TOP) ? (HUBREG_CAST (LOCAL_MMR_ADDR(_x)))		\
 	: (HUBREG_CAST (IALIAS_BASE + (_x))))
 #define REMOTE_HUB_ADDR(_n, _x)						\
 	(((_x) & BWIN_TOP) ? (HUBREG_CAST (GLOBAL_MMR_ADDR(_n, _x)))	\
 	: (HUBREG_CAST (NODE_SWIN_BASE(_n, 1) + 0x800000 + (_x))))
-#else
-#define LOCAL_HUB_ADDR(_x)	(HUBREG_CAST (IALIAS_BASE + (_x)))
-#define REMOTE_HUB_ADDR(_n, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
-					      0x800000 + (_x)))
-#endif
-#if CONFIG_IA64_SGI_SN1
-#define REMOTE_HUB_PI_ADDR(_n, _sn, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
-					      0x800000 + PIREG(_x, _sn)))
-#endif
-
-#ifdef CONFIG_IA64_SGI_SN1
-#define LOCAL_HSPEC_ADDR(_x)		(HUBREG_CAST (LREG_BASE + (_x)))
-#define REMOTE_HSPEC_ADDR(_n, _x)	(HUBREG_CAST (RREG_BASE(_n) + (_x)))
-#endif /* CONFIG_IA64_SGI_SN1 */
 
 #ifndef __ASSEMBLY__
 
@@ -236,13 +160,6 @@
 #define REMOTE_HUB_S(_n, _r, _d)	HUB_S(REMOTE_HUB_ADDR((_n), (_r)), (_d))
 #define REMOTE_HUB_PI_L(_n, _sn, _r)	HUB_L(REMOTE_HUB_PI_ADDR((_n), (_sn), (_r)))
 #define REMOTE_HUB_PI_S(_n, _sn, _r, _d) HUB_S(REMOTE_HUB_PI_ADDR((_n), (_sn), (_r)), (_d))
-
-#ifdef CONFIG_IA64_SGI_SN1
-#define LOCAL_HSPEC_L(_r)	     HUB_L(LOCAL_HSPEC_ADDR(_r))
-#define LOCAL_HSPEC_S(_r, _d)	     HUB_S(LOCAL_HSPEC_ADDR(_r), (_d))
-#define REMOTE_HSPEC_L(_n, _r)	     HUB_L(REMOTE_HSPEC_ADDR((_n), (_r)))
-#define REMOTE_HSPEC_S(_n, _r, _d)   HUB_S(REMOTE_HSPEC_ADDR((_n), (_r)), (_d))
-#endif /* CONFIG_IA64_SGI_SN1 */
 
 #endif /* __ASSEMBLY__ */
 
@@ -311,12 +228,7 @@
 #define	KLD_KERN_XP(nasid)	(KLD_BASE(nasid) + KLI_KERN_XP)
 #define	KLD_KERN_PARTID(nasid)	(KLD_BASE(nasid) + KLI_KERN_PARTID)
 
-#ifndef CONFIG_IA64_SGI_SN2
-#define KLCONFIG_OFFSET(nasid)	KLD_KLCONFIG(nasid)->offset
-#else
-#define KLCONFIG_OFFSET(nasid) \
-	ia64_sn_get_klconfig_addr(nasid)
-#endif /* CONFIG_IA64_SGI_SN2 */
+#define KLCONFIG_OFFSET(nasid)  ia64_sn_get_klconfig_addr(nasid)
 
 #define KLCONFIG_ADDR(nasid)						\
 	TO_NODE_CAC((nasid), KLCONFIG_OFFSET(nasid))

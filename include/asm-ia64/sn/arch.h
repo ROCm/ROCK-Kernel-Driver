@@ -6,7 +6,7 @@
  *
  * SGI specific setup.
  *
- * Copyright (C) 1995-1997,1999,2001-2002 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (C) 1995-1997,1999,2001-2003 Silicon Graphics, Inc.  All rights reserved.
  * Copyright (C) 1999 Ralf Baechle (ralf@gnu.org)
  */
 #ifndef _ASM_IA64_SN_ARCH_H
@@ -17,23 +17,12 @@
 #include <linux/mmzone.h>
 #include <asm/sn/types.h>
 
-#if defined(CONFIG_IA64_SGI_SN1) 
-#include <asm/sn/sn1/arch.h>
-#elif defined(CONFIG_IA64_SGI_SN2)
 #include <asm/sn/sn2/arch.h>
-#endif
 
-
-#if defined(CONFIG_IA64_SGI_SN1) 
-typedef u64	bdrkreg_t;
-#elif defined(CONFIG_IA64_SGI_SN2)
 typedef u64	shubreg_t;
-#endif
-
 typedef u64	hubreg_t;
 typedef u64	mmr_t;
 typedef u64	nic_t;
-typedef char cnodeid_t;
 
 #define CNODE_TO_CPU_BASE(_cnode)	(NODEPDA(_cnode)->node_first_cpu)
 

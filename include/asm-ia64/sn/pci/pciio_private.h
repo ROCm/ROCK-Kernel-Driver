@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIIO_PRIVATE_H
 #define _ASM_SN_PCI_PCIIO_PRIVATE_H
@@ -24,7 +24,7 @@
  */
 struct pciio_piomap_s {
     unsigned                pp_flags;	/* PCIIO_PIOMAP flags */
-    devfs_handle_t            pp_dev;	/* associated pci card */
+    vertex_hdl_t            pp_dev;	/* associated pci card */
     pciio_slot_t            pp_slot;	/* which slot the card is in */
     pciio_space_t           pp_space;	/* which address space */
     iopaddr_t               pp_pciaddr;		/* starting offset of mapping */
@@ -37,7 +37,7 @@ struct pciio_piomap_s {
  */
 struct pciio_dmamap_s {
     unsigned                pd_flags;	/* PCIIO_DMAMAP flags */
-    devfs_handle_t            pd_dev;	/* associated pci card */
+    vertex_hdl_t            pd_dev;	/* associated pci card */
     pciio_slot_t            pd_slot;	/* which slot the card is in */
 };
 
@@ -47,7 +47,7 @@ struct pciio_dmamap_s {
 
 struct pciio_intr_s {
     unsigned                pi_flags;	/* PCIIO_INTR flags */
-    devfs_handle_t            pi_dev;	/* associated pci card */
+    vertex_hdl_t            pi_dev;	/* associated pci card */
     device_desc_t	    pi_dev_desc;	/* override device descriptor */
     pciio_intr_line_t       pi_lines;	/* which interrupt line(s) */
     intr_func_t             pi_func;	/* handler function (when connected) */
@@ -100,13 +100,13 @@ struct pciio_win_alloc_s {
 
 struct pciio_info_s {
     char                   *c_fingerprint;
-    devfs_handle_t            c_vertex;	/* back pointer to vertex */
+    vertex_hdl_t            c_vertex;	/* back pointer to vertex */
     pciio_bus_t             c_bus;	/* which bus the card is in */
     pciio_slot_t            c_slot;	/* which slot the card is in */
     pciio_function_t        c_func;	/* which func (on multi-func cards) */
     pciio_vendor_id_t       c_vendor;	/* PCI card "vendor" code */
     pciio_device_id_t       c_device;	/* PCI card "device" code */
-    devfs_handle_t            c_master;	/* PCI bus provider */
+    vertex_hdl_t            c_master;	/* PCI bus provider */
     arbitrary_info_t        c_mfast;	/* cached fastinfo from c_master */
     pciio_provider_t       *c_pops;	/* cached provider from c_master */
     error_handler_f        *c_efunc;	/* error handling function */

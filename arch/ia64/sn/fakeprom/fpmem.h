@@ -4,13 +4,13 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2002 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
 #include <linux/config.h>
 
 /*
- * Structure of the mem config of the node as a SN1 MI reg
+ * Structure of the mem config of the node as a SN MI reg
  * Medusa supports this reg config.
  *
  * BankSize nibble to bank size mapping
@@ -24,32 +24,7 @@
 
 #define MBSHIFT				20
 
-#ifdef CONFIG_IA64_SGI_SN1
-typedef struct node_memmap_s
-{
-        unsigned int    b0      :1,     /* 0 bank 0 present */
-                        b1      :1,     /* 1 bank 1 present */
-                        r01     :2,     /* 2-3 reserved */
-                        b01size :4,     /* 4-7 Size of bank 0 and 1 */
-                        b2      :1,     /* 8 bank 2 present */
-                        b3      :1,     /* 9 bank 3 present */
-                        r23     :2,     /* 10-11 reserved */
-                        b23size :4,     /* 12-15 Size of bank 2 and 3 */
-                        b4      :1,     /* 16 bank 4 present */
-                        b5      :1,     /* 17 bank 5 present */
-                        r45     :2,     /* 18-19 reserved */
-                        b45size :4,     /* 20-23 Size of bank 4 and 5 */
-                        b6      :1,     /* 24 bank 6 present */
-                        b7      :1,     /* 25 bank 7 present */
-                        r67     :2,     /* 26-27 reserved */
-                        b67size :4;     /* 28-31 Size of bank 6 and 7 */
-} node_memmap_t ;
-
-/* Support the medusa hack for 8M/16M/32M nodes */
-#define SN1_BANK_SIZE_SHIFT		(MBSHIFT+6)     /* 64 MB */
-#define BankSizeBytes(bsize)            ((bsize<6) ? (1<<((bsize-1)+SN1_BANK_SIZE_SHIFT)) :\
-                                         (1<<((bsize-9)+MBSHIFT)))
-#else
+#ifdef SGI_SN2
 typedef struct node_memmap_s
 {
         unsigned int    b0size  :3,     /* 0-2   bank 0 size */
@@ -73,6 +48,8 @@ typedef struct node_memmap_s
 #define SN2_BANK_SIZE_SHIFT		(MBSHIFT+6)     /* 64 MB */
 #define BankPresent(bsize)		(bsize<6)
 #define BankSizeBytes(bsize)            (BankPresent(bsize) ? 1UL<<((bsize)+SN2_BANK_SIZE_SHIFT) : 0)
+#define MD_BANKS_PER_NODE 4
+#define MD_BANKSIZE			(1UL << 34)
 #endif
 
 typedef struct sn_memmap_s

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 /*
@@ -31,28 +31,10 @@
 typedef long clkreg_t;
 extern unsigned long sn_rtc_cycles_per_second;
 
-
-#if defined(CONFIG_IA64_SGI_SN1)
-#include <asm/sn/sn1/bedrock.h>
-#include <asm/sn/sn1/hubpi_next.h>
-
-extern nasid_t master_nasid;
-
-#define RTC_MASK		0x007fffffffffffffUL
-/* clocks are not synchronized yet on SN1  - used node 0 (problem if no NASID 0) */
-#define RTC_COUNTER_ADDR	((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_COUNTER))
-#define RTC_COMPARE_A_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_COMPARE_A))
-#define RTC_COMPARE_B_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_COMPARE_B))
-#define RTC_INT_PENDING_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_PEND_A))
-#define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_PEND_B))
-#define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_EN_A))
-#define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_EN_B))
-#else	/* !CONFIG_IA64_SGI_SN1 */
 #include <asm/sn/addrs.h>
 #include <asm/sn/sn2/addrs.h>
 #include <asm/sn/sn2/shubio.h>
 #include <asm/sn/sn2/shub_mmr.h>
-#define RTC_MASK		SH_RTC_MASK
 #define RTC_COUNTER_ADDR	((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_COMPARE_A_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_COMPARE_B_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
@@ -60,7 +42,6 @@ extern nasid_t master_nasid;
 #define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
-#endif	/* CONFIG_IA64_SGI_SN1 */
 
 #define GET_RTC_COUNTER()	(*RTC_COUNTER_ADDR)
 #define rtc_time()		GET_RTC_COUNTER()

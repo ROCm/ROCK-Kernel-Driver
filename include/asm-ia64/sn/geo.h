@@ -17,15 +17,7 @@
  *   GEO_MAX_LEN:	The maximum length of a geoid, formatted for printing
  */
 
-#include <linux/config.h>
-
-#ifdef CONFIG_IA64_SGI_SN2
 #include <asm/sn/sn2/geo.h>
-#else
-
-#error <<BOMB! need geo.h for this platform >>
-
-#endif /* !SN2 && ... */
 
 /* Declarations applicable to all platforms */
 

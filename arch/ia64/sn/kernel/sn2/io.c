@@ -9,12 +9,7 @@
  * we wrap the inlines from asm/ia64/sn/sn2/io.h here.
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-
 #include <asm/sn/sn2/io.h>
-
-#ifdef CONFIG_IA64_GENERIC
 
 unsigned int
 sn_inb (unsigned long port)
@@ -73,7 +68,7 @@ sn_readl (void *addr)
 unsigned long
 sn_readq (void *addr)
 {
-	return __sn_readq (addr)
+	return __sn_readq (addr);
 }
 
 
@@ -94,5 +89,3 @@ asm ("__sn_readb = sn_readb");
 asm ("__sn_readw = sn_readw");
 asm ("__sn_readl = sn_readl");
 asm ("__sn_readq = sn_readq");
-
-#endif /* CONFIG_IA64_GENERIC */

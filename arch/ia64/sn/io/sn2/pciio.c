@@ -7,8 +7,6 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#define	USRPCI	0
-
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -44,12 +42,7 @@
 #undef DEBUG_PCIIO	/* turn this on for yet more console output */
 
 
-#define GET_NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
-#define DO_DEL(ptr)	(kfree(ptr))
-
 char                    pciio_info_fingerprint[] = "pciio_info";
-
-cdl_p                   pciio_registry = NULL;
 
 int
 badaddr_val(volatile void *addr, int len, volatile void *ptr)
@@ -97,8 +90,6 @@ get_master_baseio_nasid(void)
 	extern char master_baseio_wid;
 
 	if (master_baseio_nasid < 0) {
-		nasid_t tmp;
-
 		master_baseio_nasid = ia64_sn_get_master_baseio_nasid();
 
 		if ( master_baseio_nasid >= 0 ) {
@@ -109,13 +100,13 @@ get_master_baseio_nasid(void)
 }
 
 int
-hub_dma_enabled(devfs_handle_t xconn_vhdl)
+hub_dma_enabled(vertex_hdl_t xconn_vhdl)
 {
 	return(0);
 }
 
 int
-hub_error_devenable(devfs_handle_t xconn_vhdl, int devnum, int error_code)
+hub_error_devenable(vertex_hdl_t xconn_vhdl, int devnum, int error_code)
 {
 	return(0);
 }
@@ -153,66 +144,64 @@ ioerror_dump(char *name, int error_code, int error_mode, ioerror_t *ioerror)
  */
 
 #if !defined(DEV_FUNC)
-static pciio_provider_t *pciio_to_provider_fns(devfs_handle_t dev);
+static pciio_provider_t *pciio_to_provider_fns(vertex_hdl_t dev);
 #endif
 
-pciio_piomap_t          pciio_piomap_alloc(devfs_handle_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, size_t, unsigned);
+pciio_piomap_t          pciio_piomap_alloc(vertex_hdl_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, size_t, unsigned);
 void                    pciio_piomap_free(pciio_piomap_t);
 caddr_t                 pciio_piomap_addr(pciio_piomap_t, iopaddr_t, size_t);
 
 void                    pciio_piomap_done(pciio_piomap_t);
-caddr_t                 pciio_piotrans_addr(devfs_handle_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, unsigned);
-caddr_t			pciio_pio_addr(devfs_handle_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, pciio_piomap_t *, unsigned);
+caddr_t                 pciio_piotrans_addr(vertex_hdl_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, unsigned);
+caddr_t			pciio_pio_addr(vertex_hdl_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, pciio_piomap_t *, unsigned);
 
-iopaddr_t               pciio_piospace_alloc(devfs_handle_t, device_desc_t, pciio_space_t, size_t, size_t);
-void                    pciio_piospace_free(devfs_handle_t, pciio_space_t, iopaddr_t, size_t);
+iopaddr_t               pciio_piospace_alloc(vertex_hdl_t, device_desc_t, pciio_space_t, size_t, size_t);
+void                    pciio_piospace_free(vertex_hdl_t, pciio_space_t, iopaddr_t, size_t);
 
-pciio_dmamap_t          pciio_dmamap_alloc(devfs_handle_t, device_desc_t, size_t, unsigned);
+pciio_dmamap_t          pciio_dmamap_alloc(vertex_hdl_t, device_desc_t, size_t, unsigned);
 void                    pciio_dmamap_free(pciio_dmamap_t);
 iopaddr_t               pciio_dmamap_addr(pciio_dmamap_t, paddr_t, size_t);
-alenlist_t              pciio_dmamap_list(pciio_dmamap_t, alenlist_t, unsigned);
 void                    pciio_dmamap_done(pciio_dmamap_t);
-iopaddr_t               pciio_dmatrans_addr(devfs_handle_t, device_desc_t, paddr_t, size_t, unsigned);
-alenlist_t              pciio_dmatrans_list(devfs_handle_t, device_desc_t, alenlist_t, unsigned);
+iopaddr_t               pciio_dmatrans_addr(vertex_hdl_t, device_desc_t, paddr_t, size_t, unsigned);
 void			pciio_dmamap_drain(pciio_dmamap_t);
-void			pciio_dmaaddr_drain(devfs_handle_t, paddr_t, size_t);
-void			pciio_dmalist_drain(devfs_handle_t, alenlist_t);
-iopaddr_t               pciio_dma_addr(devfs_handle_t, device_desc_t, paddr_t, size_t, pciio_dmamap_t *, unsigned);
+void			pciio_dmaaddr_drain(vertex_hdl_t, paddr_t, size_t);
+void			pciio_dmalist_drain(vertex_hdl_t, alenlist_t);
+iopaddr_t               pciio_dma_addr(vertex_hdl_t, device_desc_t, paddr_t, size_t, pciio_dmamap_t *, unsigned);
 
-pciio_intr_t            pciio_intr_alloc(devfs_handle_t, device_desc_t, pciio_intr_line_t, devfs_handle_t);
+pciio_intr_t            pciio_intr_alloc(vertex_hdl_t, device_desc_t, pciio_intr_line_t, vertex_hdl_t);
 void                    pciio_intr_free(pciio_intr_t);
 int                     pciio_intr_connect(pciio_intr_t, intr_func_t, intr_arg_t);
 void                    pciio_intr_disconnect(pciio_intr_t);
-devfs_handle_t            pciio_intr_cpu_get(pciio_intr_t);
+vertex_hdl_t            pciio_intr_cpu_get(pciio_intr_t);
 
 void			pciio_slot_func_to_name(char *, pciio_slot_t, pciio_function_t);
 
-void                    pciio_provider_startup(devfs_handle_t);
-void                    pciio_provider_shutdown(devfs_handle_t);
+void                    pciio_provider_startup(vertex_hdl_t);
+void                    pciio_provider_shutdown(vertex_hdl_t);
 
-pciio_endian_t          pciio_endian_set(devfs_handle_t, pciio_endian_t, pciio_endian_t);
-pciio_priority_t        pciio_priority_set(devfs_handle_t, pciio_priority_t);
-devfs_handle_t            pciio_intr_dev_get(pciio_intr_t);
+pciio_endian_t          pciio_endian_set(vertex_hdl_t, pciio_endian_t, pciio_endian_t);
+pciio_priority_t        pciio_priority_set(vertex_hdl_t, pciio_priority_t);
+vertex_hdl_t            pciio_intr_dev_get(pciio_intr_t);
 
-devfs_handle_t            pciio_pio_dev_get(pciio_piomap_t);
+vertex_hdl_t            pciio_pio_dev_get(pciio_piomap_t);
 pciio_slot_t            pciio_pio_slot_get(pciio_piomap_t);
 pciio_space_t           pciio_pio_space_get(pciio_piomap_t);
 iopaddr_t               pciio_pio_pciaddr_get(pciio_piomap_t);
 ulong                   pciio_pio_mapsz_get(pciio_piomap_t);
 caddr_t                 pciio_pio_kvaddr_get(pciio_piomap_t);
 
-devfs_handle_t            pciio_dma_dev_get(pciio_dmamap_t);
+vertex_hdl_t            pciio_dma_dev_get(pciio_dmamap_t);
 pciio_slot_t            pciio_dma_slot_get(pciio_dmamap_t);
 
-pciio_info_t            pciio_info_chk(devfs_handle_t);
-pciio_info_t            pciio_info_get(devfs_handle_t);
-void                    pciio_info_set(devfs_handle_t, pciio_info_t);
-devfs_handle_t            pciio_info_dev_get(pciio_info_t);
+pciio_info_t            pciio_info_chk(vertex_hdl_t);
+pciio_info_t            pciio_info_get(vertex_hdl_t);
+void                    pciio_info_set(vertex_hdl_t, pciio_info_t);
+vertex_hdl_t            pciio_info_dev_get(pciio_info_t);
 pciio_slot_t            pciio_info_slot_get(pciio_info_t);
 pciio_function_t        pciio_info_function_get(pciio_info_t);
 pciio_vendor_id_t       pciio_info_vendor_id_get(pciio_info_t);
 pciio_device_id_t       pciio_info_device_id_get(pciio_info_t);
-devfs_handle_t            pciio_info_master_get(pciio_info_t);
+vertex_hdl_t            pciio_info_master_get(pciio_info_t);
 arbitrary_info_t        pciio_info_mfast_get(pciio_info_t);
 pciio_provider_t       *pciio_info_pops_get(pciio_info_t);
 error_handler_f	       *pciio_info_efunc_get(pciio_info_t);
@@ -223,30 +212,28 @@ size_t			pciio_info_bar_size_get(pciio_info_t, int);
 iopaddr_t		pciio_info_rom_base_get(pciio_info_t);
 size_t			pciio_info_rom_size_get(pciio_info_t);
 
-void                    pciio_init(void);
-int                     pciio_attach(devfs_handle_t);
+int                     pciio_attach(vertex_hdl_t);
 
-void                    pciio_provider_register(devfs_handle_t, pciio_provider_t *pciio_fns);
-void                    pciio_provider_unregister(devfs_handle_t);
-pciio_provider_t       *pciio_provider_fns_get(devfs_handle_t);
+void                    pciio_provider_register(vertex_hdl_t, pciio_provider_t *pciio_fns);
+void                    pciio_provider_unregister(vertex_hdl_t);
+pciio_provider_t       *pciio_provider_fns_get(vertex_hdl_t);
 
 int                     pciio_driver_register(pciio_vendor_id_t, pciio_device_id_t, char *driver_prefix, unsigned);
-void                    pciio_driver_unregister(char *driver_prefix);
 
-devfs_handle_t            pciio_device_register(devfs_handle_t, devfs_handle_t, pciio_slot_t, pciio_function_t, pciio_vendor_id_t, pciio_device_id_t);
+vertex_hdl_t            pciio_device_register(vertex_hdl_t, vertex_hdl_t, pciio_slot_t, pciio_function_t, pciio_vendor_id_t, pciio_device_id_t);
 
-void			pciio_device_unregister(devfs_handle_t);
-pciio_info_t		pciio_device_info_new(pciio_info_t, devfs_handle_t, pciio_slot_t, pciio_function_t, pciio_vendor_id_t, pciio_device_id_t);
+void			pciio_device_unregister(vertex_hdl_t);
+pciio_info_t		pciio_device_info_new(pciio_info_t, vertex_hdl_t, pciio_slot_t, pciio_function_t, pciio_vendor_id_t, pciio_device_id_t);
 void			pciio_device_info_free(pciio_info_t);
-devfs_handle_t		pciio_device_info_register(devfs_handle_t, pciio_info_t);
-void			pciio_device_info_unregister(devfs_handle_t, pciio_info_t);
-int                     pciio_device_attach(devfs_handle_t, int);
-int			pciio_device_detach(devfs_handle_t, int);
-void                    pciio_error_register(devfs_handle_t, error_handler_f *, error_handler_arg_t);
+vertex_hdl_t		pciio_device_info_register(vertex_hdl_t, pciio_info_t);
+void			pciio_device_info_unregister(vertex_hdl_t, pciio_info_t);
+int                     pciio_device_attach(vertex_hdl_t, int);
+int			pciio_device_detach(vertex_hdl_t, int);
+void                    pciio_error_register(vertex_hdl_t, error_handler_f *, error_handler_arg_t);
 
-int                     pciio_reset(devfs_handle_t);
-int                     pciio_write_gather_flush(devfs_handle_t);
-int                     pciio_slot_inuse(devfs_handle_t);
+int                     pciio_reset(vertex_hdl_t);
+int                     pciio_write_gather_flush(vertex_hdl_t);
+int                     pciio_slot_inuse(vertex_hdl_t);
 
 /* =====================================================================
  *    Provider Function Location
@@ -261,7 +248,7 @@ int                     pciio_slot_inuse(devfs_handle_t);
 #if !defined(DEV_FUNC)
 
 static pciio_provider_t *
-pciio_to_provider_fns(devfs_handle_t dev)
+pciio_to_provider_fns(vertex_hdl_t dev)
 {
     pciio_info_t            card_info;
     pciio_provider_t       *provider_fns;
@@ -316,7 +303,7 @@ pciio_to_provider_fns(devfs_handle_t dev)
  */
 
 pciio_piomap_t
-pciio_piomap_alloc(devfs_handle_t dev,	/* set up mapping for this device */
+pciio_piomap_alloc(vertex_hdl_t dev,	/* set up mapping for this device */
 		   device_desc_t dev_desc,	/* device descriptor */
 		   pciio_space_t space,	/* CFG, MEM, IO, or a device-decoded window */
 		   iopaddr_t addr,	/* lowest address (or offset in window) */
@@ -354,7 +341,7 @@ pciio_piomap_done(pciio_piomap_t pciio_piomap)
 }
 
 caddr_t
-pciio_piotrans_addr(devfs_handle_t dev,	/* translate for this device */
+pciio_piotrans_addr(vertex_hdl_t dev,	/* translate for this device */
 		    device_desc_t dev_desc,	/* device descriptor */
 		    pciio_space_t space,	/* CFG, MEM, IO, or a device-decoded window */
 		    iopaddr_t addr,	/* starting address (or offset in window) */
@@ -366,7 +353,7 @@ pciio_piotrans_addr(devfs_handle_t dev,	/* translate for this device */
 }
 
 caddr_t
-pciio_pio_addr(devfs_handle_t dev,	/* translate for this device */
+pciio_pio_addr(vertex_hdl_t dev,	/* translate for this device */
 	       device_desc_t dev_desc,	/* device descriptor */
 	       pciio_space_t space,	/* CFG, MEM, IO, or a device-decoded window */
 	       iopaddr_t addr,		/* starting address (or offset in window) */
@@ -410,7 +397,7 @@ pciio_pio_addr(devfs_handle_t dev,	/* translate for this device */
 }
 
 iopaddr_t
-pciio_piospace_alloc(devfs_handle_t dev,	/* Device requiring space */
+pciio_piospace_alloc(vertex_hdl_t dev,	/* Device requiring space */
 		     device_desc_t dev_desc,	/* Device descriptor */
 		     pciio_space_t space,	/* MEM32/MEM64/IO */
 		     size_t byte_count,	/* Size of mapping */
@@ -423,7 +410,7 @@ pciio_piospace_alloc(devfs_handle_t dev,	/* Device requiring space */
 }
 
 void
-pciio_piospace_free(devfs_handle_t dev,	/* Device freeing space */
+pciio_piospace_free(vertex_hdl_t dev,	/* Device freeing space */
 		    pciio_space_t space,	/* Type of space        */
 		    iopaddr_t pciaddr,	/* starting address */
 		    size_t byte_count)
@@ -440,7 +427,7 @@ pciio_piospace_free(devfs_handle_t dev,	/* Device freeing space */
  */
 
 pciio_dmamap_t
-pciio_dmamap_alloc(devfs_handle_t dev,	/* set up mappings for this device */
+pciio_dmamap_alloc(vertex_hdl_t dev,	/* set up mappings for this device */
 		   device_desc_t dev_desc,	/* device descriptor */
 		   size_t byte_count_max,	/* max size of a mapping */
 		   unsigned flags)
@@ -465,15 +452,6 @@ pciio_dmamap_addr(pciio_dmamap_t pciio_dmamap,	/* use these mapping resources */
 	(CAST_DMAMAP(pciio_dmamap), paddr, byte_count);
 }
 
-alenlist_t
-pciio_dmamap_list(pciio_dmamap_t pciio_dmamap,	/* use these mapping resources */
-		  alenlist_t alenlist,	/* map this Address/Length List */
-		  unsigned flags)
-{
-    return DMAMAP_FUNC(pciio_dmamap, dmamap_list)
-	(CAST_DMAMAP(pciio_dmamap), alenlist, flags);
-}
-
 void
 pciio_dmamap_done(pciio_dmamap_t pciio_dmamap)
 {
@@ -482,7 +460,7 @@ pciio_dmamap_done(pciio_dmamap_t pciio_dmamap)
 }
 
 iopaddr_t
-pciio_dmatrans_addr(devfs_handle_t dev,	/* translate for this device */
+pciio_dmatrans_addr(vertex_hdl_t dev,	/* translate for this device */
 		    device_desc_t dev_desc,	/* device descriptor */
 		    paddr_t paddr,	/* system physical address */
 		    size_t byte_count,	/* length */
@@ -492,18 +470,8 @@ pciio_dmatrans_addr(devfs_handle_t dev,	/* translate for this device */
 	(dev, dev_desc, paddr, byte_count, flags);
 }
 
-alenlist_t
-pciio_dmatrans_list(devfs_handle_t dev,	/* translate for this device */
-		    device_desc_t dev_desc,	/* device descriptor */
-		    alenlist_t palenlist,	/* system address/length list */
-		    unsigned flags)
-{					/* defined in dma.h */
-    return DEV_FUNC(dev, dmatrans_list)
-	(dev, dev_desc, palenlist, flags);
-}
-
 iopaddr_t
-pciio_dma_addr(devfs_handle_t dev,	/* translate for this device */
+pciio_dma_addr(vertex_hdl_t dev,	/* translate for this device */
 	       device_desc_t dev_desc,	/* device descriptor */
 	       paddr_t paddr,		/* system physical address */
 	       size_t byte_count,	/* length */
@@ -553,14 +521,14 @@ pciio_dmamap_drain(pciio_dmamap_t map)
 }
 
 void
-pciio_dmaaddr_drain(devfs_handle_t dev, paddr_t addr, size_t size)
+pciio_dmaaddr_drain(vertex_hdl_t dev, paddr_t addr, size_t size)
 {
     DEV_FUNC(dev, dmaaddr_drain)
 	(dev, addr, size);
 }
 
 void
-pciio_dmalist_drain(devfs_handle_t dev, alenlist_t list)
+pciio_dmalist_drain(vertex_hdl_t dev, alenlist_t list)
 {
     DEV_FUNC(dev, dmalist_drain)
 	(dev, list);
@@ -577,10 +545,10 @@ pciio_dmalist_drain(devfs_handle_t dev, alenlist_t list)
  * Return resource handle in intr_hdl.
  */
 pciio_intr_t
-pciio_intr_alloc(devfs_handle_t dev,	/* which Crosstalk device */
+pciio_intr_alloc(vertex_hdl_t dev,	/* which Crosstalk device */
 		 device_desc_t dev_desc,	/* device descriptor */
 		 pciio_intr_line_t lines,	/* INTR line(s) to attach */
-		 devfs_handle_t owner_dev)
+		 vertex_hdl_t owner_dev)
 {					/* owner of this interrupt */
     return (pciio_intr_t) DEV_FUNC(dev, intr_alloc)
 	(dev, dev_desc, lines, owner_dev);
@@ -624,7 +592,7 @@ pciio_intr_disconnect(pciio_intr_t intr_hdl)
  * Return a hwgraph vertex that represents the CPU currently
  * targeted by an interrupt.
  */
-devfs_handle_t
+vertex_hdl_t
 pciio_intr_cpu_get(pciio_intr_t intr_hdl)
 {
     return INTR_FUNC(intr_hdl, intr_cpu_get)
@@ -663,12 +631,12 @@ pciio_slot_func_to_name(char		       *name,
  */
 static pciio_info_t
 pciio_cardinfo_get(
-		      devfs_handle_t pciio_vhdl,
+		      vertex_hdl_t pciio_vhdl,
 		      pciio_slot_t pci_slot)
 {
     char                    namebuf[16];
     pciio_info_t	    info = 0;
-    devfs_handle_t	    conn;
+    vertex_hdl_t	    conn;
 
     pciio_slot_func_to_name(namebuf, pci_slot, PCIIO_FUNC_NONE);
     if (GRAPH_SUCCESS ==
@@ -699,22 +667,16 @@ pciio_cardinfo_get(
 /*ARGSUSED */
 int
 pciio_error_handler(
-		       devfs_handle_t pciio_vhdl,
+		       vertex_hdl_t pciio_vhdl,
 		       int error_code,
 		       ioerror_mode_t mode,
 		       ioerror_t *ioerror)
 {
     pciio_info_t            pciio_info;
-    devfs_handle_t            pconn_vhdl;
-#if USRPCI
-    devfs_handle_t            usrpci_v;
-#endif
+    vertex_hdl_t            pconn_vhdl;
     pciio_slot_t            slot;
 
     int                     retval;
-#ifdef EHE_ENABLE
-    error_state_t	    e_state;
-#endif /* EHE_ENABLE */
 
 #if DEBUG && ERROR_DEBUG
     printk("%v: pciio_error_handler\n", pciio_vhdl);
@@ -732,16 +694,6 @@ pciio_error_handler(
     pciio_info = pciio_cardinfo_get(pciio_vhdl, PCIIO_SLOT_NONE);
     if (pciio_info && pciio_info->c_efunc) {
 	pconn_vhdl = pciio_info_dev_get(pciio_info);
-
-#ifdef EHE_ENABLE
-	e_state = error_state_get(pciio_vhdl);
-
-	if (e_state == ERROR_STATE_ACTION)
-	    (void)error_state_set(pciio_vhdl, ERROR_STATE_NONE);
-
-	if (error_state_set(pconn_vhdl,e_state) == ERROR_RETURN_CODE_CANNOT_SET_STATE)
-	    return(IOERROR_UNHANDLED);
-#endif 
 
 	retval = pciio_info->c_efunc
 	    (pciio_info->c_einfo, error_code, mode, ioerror);
@@ -770,49 +722,11 @@ pciio_error_handler(
 
 		pconn_vhdl = pciio_info_dev_get(pciio_info);
 
-#ifdef EHE_ENABLE
-		e_state = error_state_get(pciio_vhdl);
-
-		if (e_state == ERROR_STATE_ACTION)
-		    (void)error_state_set(pciio_vhdl, ERROR_STATE_NONE);
-
-		if (error_state_set(pconn_vhdl,e_state) ==
-		    ERROR_RETURN_CODE_CANNOT_SET_STATE)
-		    return(IOERROR_UNHANDLED);
-#endif /* EHE_ENABLE */
-
 		retval = pciio_info->c_efunc
 		    (pciio_info->c_einfo, error_code, mode, ioerror);
 		if (retval != IOERROR_UNHANDLED)
 		    return retval;
 	    }
-
-#if USRPCI
-	    /* If the USRPCI driver is available and
-	     * knows about this connection point,
-	     * deliver the error to it.
-	     *
-	     * OK to use pconn_vhdl here, even though we
-	     * have already UNREF'd it, since we know that
-	     * it is not going away.
-	     */
-	    pconn_vhdl = pciio_info_dev_get(pciio_info);
-	    if (GRAPH_SUCCESS == hwgraph_traverse(pconn_vhdl, EDGE_LBL_USRPCI, &usrpci_v)) {
-		iopaddr_t busaddr;
-		IOERROR_GETVALUE(busaddr, ioerror, busaddr);
-		retval = usrpci_error_handler (usrpci_v, error_code, busaddr);
-		hwgraph_vertex_unref(usrpci_v);
-		if (retval != IOERROR_UNHANDLED) {
-		    /*
-		     * This unref is not needed.  If this code is called often enough,
-		     * the system will crash, due to vertex reference count reaching 0,
-		     * causing vertex to be unallocated.  -jeremy
-		     * hwgraph_vertex_unref(pconn_vhdl);
-		     */
-		    return retval;
-		}
-	    }
-#endif
 	}
     }
 
@@ -829,7 +743,7 @@ pciio_error_handler(
  * Startup a crosstalk provider
  */
 void
-pciio_provider_startup(devfs_handle_t pciio_provider)
+pciio_provider_startup(vertex_hdl_t pciio_provider)
 {
     DEV_FUNC(pciio_provider, provider_startup)
 	(pciio_provider);
@@ -839,7 +753,7 @@ pciio_provider_startup(devfs_handle_t pciio_provider)
  * Shutdown a crosstalk provider
  */
 void
-pciio_provider_shutdown(devfs_handle_t pciio_provider)
+pciio_provider_shutdown(vertex_hdl_t pciio_provider)
 {
     DEV_FUNC(pciio_provider, provider_shutdown)
 	(pciio_provider);
@@ -851,7 +765,7 @@ pciio_provider_shutdown(devfs_handle_t pciio_provider)
  * how things will actually appear in memory.
  */
 pciio_endian_t
-pciio_endian_set(devfs_handle_t dev,
+pciio_endian_set(vertex_hdl_t dev,
 		 pciio_endian_t device_end,
 		 pciio_endian_t desired_end)
 {
@@ -880,7 +794,7 @@ pciio_endian_set(devfs_handle_t dev,
  * Specify PCI arbitration priority.
  */
 pciio_priority_t
-pciio_priority_set(devfs_handle_t dev,
+pciio_priority_set(vertex_hdl_t dev,
 		   pciio_priority_t device_prio)
 {
     ASSERT((device_prio == PCI_PRIO_HIGH) || (device_prio == PCI_PRIO_LOW));
@@ -893,7 +807,7 @@ pciio_priority_set(devfs_handle_t dev,
  * Read value of configuration register
  */
 uint64_t
-pciio_config_get(devfs_handle_t	dev,
+pciio_config_get(vertex_hdl_t	dev,
 		 unsigned	reg,
 		 unsigned	size)
 {
@@ -923,7 +837,7 @@ pciio_config_get(devfs_handle_t	dev,
  * Change value of configuration register
  */
 void
-pciio_config_set(devfs_handle_t	dev,
+pciio_config_set(vertex_hdl_t	dev,
 		 unsigned	reg,
 		 unsigned	size,
 		 uint64_t	value)
@@ -953,7 +867,7 @@ pciio_config_set(devfs_handle_t	dev,
  * Issue a hardware reset to a card.
  */
 int
-pciio_reset(devfs_handle_t dev)
+pciio_reset(vertex_hdl_t dev)
 {
     return DEV_FUNC(dev, reset) (dev);
 }
@@ -962,19 +876,19 @@ pciio_reset(devfs_handle_t dev)
  * flush write gather buffers
  */
 int
-pciio_write_gather_flush(devfs_handle_t dev)
+pciio_write_gather_flush(vertex_hdl_t dev)
 {
     return DEV_FUNC(dev, write_gather_flush) (dev);
 }
 
-devfs_handle_t
+vertex_hdl_t
 pciio_intr_dev_get(pciio_intr_t pciio_intr)
 {
     return (pciio_intr->pi_dev);
 }
 
 /****** Generic crosstalk pio interfaces ******/
-devfs_handle_t
+vertex_hdl_t
 pciio_pio_dev_get(pciio_piomap_t pciio_piomap)
 {
     return (pciio_piomap->pp_dev);
@@ -1011,7 +925,7 @@ pciio_pio_kvaddr_get(pciio_piomap_t pciio_piomap)
 }
 
 /****** Generic crosstalk dma interfaces ******/
-devfs_handle_t
+vertex_hdl_t
 pciio_dma_dev_get(pciio_dmamap_t pciio_dmamap)
 {
     return (pciio_dmamap->pd_dev);
@@ -1026,7 +940,7 @@ pciio_dma_slot_get(pciio_dmamap_t pciio_dmamap)
 /****** Generic pci slot information interfaces ******/
 
 pciio_info_t
-pciio_info_chk(devfs_handle_t pciio)
+pciio_info_chk(vertex_hdl_t pciio)
 {
     arbitrary_info_t        ainfo = 0;
 
@@ -1035,7 +949,7 @@ pciio_info_chk(devfs_handle_t pciio)
 }
 
 pciio_info_t
-pciio_info_get(devfs_handle_t pciio)
+pciio_info_get(vertex_hdl_t pciio)
 {
     pciio_info_t            pciio_info;
 
@@ -1051,18 +965,17 @@ pciio_info_get(devfs_handle_t pciio)
 #endif /* DEBUG_PCIIO */
 
     if ((pciio_info != NULL) &&
-	(pciio_info->c_fingerprint != pciio_info_fingerprint)
-	&& (pciio_info->c_fingerprint != NULL)) {
+        (pciio_info->c_fingerprint != pciio_info_fingerprint)
+        && (pciio_info->c_fingerprint != NULL)) {
 
-	return((pciio_info_t)-1); /* Should panic .. */
+        return((pciio_info_t)-1); /* Should panic .. */
     }
-	
 
     return pciio_info;
 }
 
 void
-pciio_info_set(devfs_handle_t pciio, pciio_info_t pciio_info)
+pciio_info_set(vertex_hdl_t pciio, pciio_info_t pciio_info)
 {
     if (pciio_info != NULL)
 	pciio_info->c_fingerprint = pciio_info_fingerprint;
@@ -1076,7 +989,7 @@ pciio_info_set(devfs_handle_t pciio, pciio_info_t pciio_info)
 			 (arbitrary_info_t) pciio_info);
 }
 
-devfs_handle_t
+vertex_hdl_t
 pciio_info_dev_get(pciio_info_t pciio_info)
 {
     return (pciio_info->c_vertex);
@@ -1106,7 +1019,7 @@ pciio_info_device_id_get(pciio_info_t pciio_info)
     return (pciio_info->c_device);
 }
 
-devfs_handle_t
+vertex_hdl_t
 pciio_info_master_get(pciio_info_t pciio_info)
 {
     return (pciio_info->c_master);
@@ -1172,47 +1085,12 @@ pciio_info_rom_size_get(pciio_info_t info)
  */
 
 /*
- *    pciioinit: called once during device driver
- *      initializtion if this driver is configured into
- *      the system.
- */
-void
-pciio_init(void)
-{
-    cdl_p                   cp;
-
-#if DEBUG && ATTACH_DEBUG
-    printf("pciio_init\n");
-#endif
-    /* Allocate the registry.
-     * We might already have one.
-     * If we don't, go get one.
-     * MPness: someone might have
-     * set one up for us while we
-     * were not looking; use an atomic
-     * compare-and-swap to commit to
-     * using the new registry if and
-     * only if nobody else did first.
-     * If someone did get there first,
-     * toss the one we allocated back
-     * into the pool.
-     */
-    if (pciio_registry == NULL) {
-	cp = cdl_new(EDGE_LBL_PCI, "vendor", "device");
-	if (!compare_and_swap_ptr((void **) &pciio_registry, NULL, (void *) cp)) {
-	    cdl_del(cp);
-	}
-    }
-    ASSERT(pciio_registry != NULL);
-}
-
-/*
  *    pciioattach: called for each vertex in the graph
  *      that is a PCI provider.
  */
 /*ARGSUSED */
 int
-pciio_attach(devfs_handle_t pciio)
+pciio_attach(vertex_hdl_t pciio)
 {
 #if DEBUG && ATTACH_DEBUG
 #if defined(SUPPORT_PRINTING_V_FORMAT)
@@ -1228,7 +1106,7 @@ pciio_attach(devfs_handle_t pciio)
  * Associate a set of pciio_provider functions with a vertex.
  */
 void
-pciio_provider_register(devfs_handle_t provider, pciio_provider_t *pciio_fns)
+pciio_provider_register(vertex_hdl_t provider, pciio_provider_t *pciio_fns)
 {
     hwgraph_info_add_LBL(provider, INFO_LBL_PFUNCS, (arbitrary_info_t) pciio_fns);
 }
@@ -1237,7 +1115,7 @@ pciio_provider_register(devfs_handle_t provider, pciio_provider_t *pciio_fns)
  * Disassociate a set of pciio_provider functions with a vertex.
  */
 void
-pciio_provider_unregister(devfs_handle_t provider)
+pciio_provider_unregister(vertex_hdl_t provider)
 {
     arbitrary_info_t        ainfo;
 
@@ -1249,7 +1127,7 @@ pciio_provider_unregister(devfs_handle_t provider)
  * provider.
  */
 pciio_provider_t       *
-pciio_provider_fns_get(devfs_handle_t provider)
+pciio_provider_fns_get(vertex_hdl_t provider)
 {
     arbitrary_info_t        ainfo = 0;
 
@@ -1265,86 +1143,13 @@ pciio_driver_register(
 			 char *driver_prefix,
 			 unsigned flags)
 {
-    /* a driver's init routine might call
-     * pciio_driver_register before the
-     * system calls pciio_init; so we
-     * make the init call ourselves here.
-     */
-    if (pciio_registry == NULL)
-	pciio_init();
-
-    return cdl_add_driver(pciio_registry,
-			  vendor_id, device_id,
-			  driver_prefix, flags, NULL);
+	return(0);
 }
 
-/*
- * Remove an initialization function.
- */
-void
-pciio_driver_unregister(
-			   char *driver_prefix)
-{
-    /* before a driver calls unregister,
-     * it must have called register; so
-     * we can assume we have a registry here.
-     */
-    ASSERT(pciio_registry != NULL);
-
-    cdl_del_driver(pciio_registry, driver_prefix, NULL);
-}
-
-/* 
- * Set the slot status for a device supported by the 
- * driver being registered.
- */
-void
-pciio_driver_reg_callback(
-                           devfs_handle_t pconn_vhdl,
-			   int key1,
-			   int key2,
-                           int error)
-{
-}
-
-/* 
- * Set the slot status for a device supported by the 
- * driver being unregistered.
- */
-void
-pciio_driver_unreg_callback(
-                           devfs_handle_t pconn_vhdl,
-			   int key1,
-			   int key2,
-                           int error)
-{
-}
-
-/*
- * Call some function with each vertex that
- * might be one of this driver's attach points.
- */
-void
-pciio_iterate(char *driver_prefix,
-	      pciio_iter_f * func)
-{
-    /* a driver's init routine might call
-     * pciio_iterate before the
-     * system calls pciio_init; so we
-     * make the init call ourselves here.
-     */
-    if (pciio_registry == NULL)
-	pciio_init();
-
-    ASSERT(pciio_registry != NULL);
-
-    cdl_iterate(pciio_registry, driver_prefix, (cdl_iter_f *) func);
-}
-
-devfs_handle_t
+vertex_hdl_t
 pciio_device_register(
-		devfs_handle_t connectpt,	/* vertex for /hw/.../pciio/%d */
-		devfs_handle_t master,	/* card's master ASIC (PCI provider) */
+		vertex_hdl_t connectpt,	/* vertex for /hw/.../pciio/%d */
+		vertex_hdl_t master,	/* card's master ASIC (PCI provider) */
 		pciio_slot_t slot,	/* card's slot */
 		pciio_function_t func,	/* card's func */
 		pciio_vendor_id_t vendor_id,
@@ -1356,7 +1161,7 @@ pciio_device_register(
 }
 
 void
-pciio_device_unregister(devfs_handle_t pconn)
+pciio_device_unregister(vertex_hdl_t pconn)
 {
     DEV_FUNC(pconn,device_unregister)(pconn);
 }
@@ -1364,14 +1169,14 @@ pciio_device_unregister(devfs_handle_t pconn)
 pciio_info_t
 pciio_device_info_new(
 		pciio_info_t pciio_info,
-		devfs_handle_t master,
+		vertex_hdl_t master,
 		pciio_slot_t slot,
 		pciio_function_t func,
 		pciio_vendor_id_t vendor_id,
 		pciio_device_id_t device_id)
 {
     if (!pciio_info)
-	GET_NEW(pciio_info);
+	NEW(pciio_info);
     ASSERT(pciio_info != NULL);
 
     pciio_info->c_slot = slot;
@@ -1396,14 +1201,14 @@ pciio_device_info_free(pciio_info_t pciio_info)
     BZERO((char *)pciio_info,sizeof(pciio_info));
 }
 
-devfs_handle_t
+vertex_hdl_t
 pciio_device_info_register(
-		devfs_handle_t connectpt,		/* vertex at center of bus */
+		vertex_hdl_t connectpt,		/* vertex at center of bus */
 		pciio_info_t pciio_info)	/* details about the connectpt */
 {
     char		name[32];
-    devfs_handle_t	pconn;
-    int device_master_set(devfs_handle_t, devfs_handle_t);
+    vertex_hdl_t	pconn;
+    int device_master_set(vertex_hdl_t, vertex_hdl_t);
 
     pciio_slot_func_to_name(name,
 			    pciio_info->c_slot,
@@ -1429,25 +1234,15 @@ pciio_device_info_register(
      */
 
     device_master_set(pconn, pciio_info->c_master);
-
-#if USRPCI
-    /*
-     * Call into usrpci provider to let it initialize for
-     * the given slot.
-     */
-    if (pciio_info->c_slot != PCIIO_SLOT_NONE)
-	usrpci_device_register(pconn, pciio_info->c_master, pciio_info->c_slot);
-#endif
-
     return pconn;
 }
 
 void
-pciio_device_info_unregister(devfs_handle_t connectpt,
+pciio_device_info_unregister(vertex_hdl_t connectpt,
 			     pciio_info_t pciio_info)
 {
     char		name[32];
-    devfs_handle_t	pconn;
+    vertex_hdl_t	pconn;
 
     if (!pciio_info)
 	return;
@@ -1470,7 +1265,7 @@ pciio_device_info_unregister(devfs_handle_t connectpt,
 /* Add the pci card inventory information to the hwgraph
  */
 static void
-pciio_device_inventory_add(devfs_handle_t pconn_vhdl)
+pciio_device_inventory_add(vertex_hdl_t pconn_vhdl)
 {
     pciio_info_t	pciio_info = pciio_info_get(pconn_vhdl);
 
@@ -1488,7 +1283,7 @@ pciio_device_inventory_add(devfs_handle_t pconn_vhdl)
 
 /*ARGSUSED */
 int
-pciio_device_attach(devfs_handle_t pconn,
+pciio_device_attach(vertex_hdl_t pconn,
 		    int          drv_flags)
 {
     pciio_info_t            pciio_info;
@@ -1507,34 +1302,15 @@ pciio_device_attach(devfs_handle_t pconn,
      * pciio_init) have been called; so we
      * can assume here that we have a registry.
      */
-    ASSERT(pciio_registry != NULL);
 
-    return(cdl_add_connpt(pciio_registry, vendor_id, device_id, pconn, drv_flags));
+    return(cdl_add_connpt(vendor_id, device_id, pconn, drv_flags));
 }
 
 int
-pciio_device_detach(devfs_handle_t pconn,
+pciio_device_detach(vertex_hdl_t pconn,
 		    int          drv_flags)
 {
-    pciio_info_t            pciio_info;
-    pciio_vendor_id_t       vendor_id;
-    pciio_device_id_t       device_id;
-
-    pciio_info = pciio_info_get(pconn);
-
-    vendor_id = pciio_info->c_vendor;
-    device_id = pciio_info->c_device;
-
-    /* we don't start attaching things until
-     * all the driver init routines (including
-     * pciio_init) have been called; so we
-     * can assume here that we have a registry.
-     */
-    ASSERT(pciio_registry != NULL);
-
-    return(cdl_del_connpt(pciio_registry, vendor_id, device_id,
-		          pconn, drv_flags));
-
+    return(0);
 }
 
 /* SN2 */
@@ -1728,7 +1504,7 @@ pciio_device_win_free(pciio_win_alloc_t win_alloc)
  * cooperating drivers, well, cooperate ...
  */
 void
-pciio_error_register(devfs_handle_t pconn,
+pciio_error_register(vertex_hdl_t pconn,
 		     error_handler_f *efunc,
 		     error_handler_arg_t einfo)
 {
@@ -1746,7 +1522,7 @@ pciio_error_register(devfs_handle_t pconn,
  * vhdl is the vertex for the slot
  */
 int
-pciio_slot_inuse(devfs_handle_t pconn_vhdl)
+pciio_slot_inuse(vertex_hdl_t pconn_vhdl)
 {
     pciio_info_t            pciio_info = pciio_info_get(pconn_vhdl);
 
@@ -1763,7 +1539,7 @@ pciio_slot_inuse(devfs_handle_t pconn_vhdl)
 }
 
 int
-pciio_dma_enabled(devfs_handle_t pconn_vhdl)
+pciio_dma_enabled(vertex_hdl_t pconn_vhdl)
 {
 	return DEV_FUNC(pconn_vhdl, dma_enabled)(pconn_vhdl);
 }
@@ -1777,7 +1553,7 @@ pciio_info_type1_get(pciio_info_t pci_info)
 
 /*
  * These are complementary Linux interfaces that takes in a pci_dev * as the 
- * first arguement instead of devfs_handle_t.
+ * first arguement instead of vertex_hdl_t.
  */
 iopaddr_t               snia_pciio_dmatrans_addr(struct pci_dev *, device_desc_t, paddr_t, size_t, unsigned);
 pciio_dmamap_t          snia_pciio_dmamap_alloc(struct pci_dev *, device_desc_t, size_t, unsigned);
@@ -1800,7 +1576,7 @@ snia_pcibr_rrb_alloc(struct pci_dev *pci_dev,
 	int *count_vchan0,
 	int *count_vchan1)
 {
-	devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+	vertex_hdl_t dev = PCIDEV_VERTEX(pci_dev);
 
 	return pcibr_rrb_alloc(dev, count_vchan0, count_vchan1);
 }
@@ -1811,7 +1587,7 @@ snia_pciio_endian_set(struct pci_dev *pci_dev,
 	pciio_endian_t device_end,
 	pciio_endian_t desired_end)
 {
-	devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+	vertex_hdl_t dev = PCIDEV_VERTEX(pci_dev);
 	
 	return DEV_FUNC(dev, endian_set)
 		(dev, device_end, desired_end);
@@ -1825,7 +1601,7 @@ snia_pciio_dmatrans_addr(struct pci_dev *pci_dev, /* translate for this device *
                     unsigned flags)
 {                                       /* defined in dma.h */
 
-    devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+    vertex_hdl_t dev = PCIDEV_VERTEX(pci_dev);
 
     /*
      * If the device is not a PIC, we always want the PCIIO_BYTE_STREAM to be 
@@ -1842,7 +1618,7 @@ snia_pciio_dmamap_alloc(struct pci_dev *pci_dev,  /* set up mappings for this de
                    unsigned flags)
 {                                       /* defined in dma.h */
 
-    devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+    vertex_hdl_t dev = PCIDEV_VERTEX(pci_dev);
 
     /*
      * If the device is not a PIC, we always want the PCIIO_BYTE_STREAM to be

@@ -4,13 +4,14 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000,2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000,2002-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
+#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/smp.h>
 #include <asm/sn/sgi.h>
@@ -27,6 +28,7 @@
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/intr.h>
+#include <asm/sn/ioerror_handling.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/sn2/shubio.h>
 #include <asm/sn/bte.h>
@@ -34,20 +36,17 @@
 extern void hubni_eint_init(cnodeid_t cnode);
 extern void hubii_eint_init(cnodeid_t cnode);
 extern void hubii_eint_handler (int irq, void *arg, struct pt_regs *ep);
-int hubiio_crb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo);
-int hubiio_prb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo);
-extern void bte_crb_error_handler(devfs_handle_t hub_v, int btenum, int crbnum, ioerror_t *ioe, int bteop);
+int hubiio_crb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo);
+int hubiio_prb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo);
+extern void bte_crb_error_handler(vertex_hdl_t hub_v, int btenum, int crbnum, ioerror_t *ioe, int bteop);
+void print_crb_fields(int crb_num, ii_icrb0_a_u_t icrba,
+	ii_icrb0_b_u_t icrbb, ii_icrb0_c_u_t icrbc,
+	ii_icrb0_d_u_t icrbd, ii_icrb0_e_u_t icrbe);
 
 extern int maxcpus;
+extern error_return_code_t error_state_set(vertex_hdl_t v,error_state_t new_state);
 
 #define HUB_ERROR_PERIOD        (120 * HZ)      /* 2 minutes */
-
-#ifdef BUS_INT_WAR
-void sn_add_polled_interrupt(int irq, int interval);
-void sn_delete_polled_interrupt(int irq);
-extern int bus_int_war_ide_irq;
-#endif
-
 
 void
 hub_error_clear(nasid_t nasid)
@@ -74,9 +73,7 @@ hub_error_clear(nasid_t nasid)
         REMOTE_HUB_S(nasid, IIO_IOPRB_0 + (i * sizeof(hubreg_t)), prb.iprb_regval);
     }
 
-    REMOTE_HUB_S(nasid, IIO_IO_ERR_CLR, -1);
-    idsr = REMOTE_HUB_L(nasid, IIO_IIDSR);
-    REMOTE_HUB_S(nasid, IIO_IIDSR, (idsr & ~(IIO_IIDSR_SENT_MASK)));
+    REMOTE_HUB_S(nasid, IIO_IECLR, -1);
 
 }
 
@@ -117,7 +114,6 @@ hub_error_init(cnodeid_t cnode)
  * Returns	: None.
  */
 
-
 void
 hubii_eint_init(cnodeid_t cnode)
 {
@@ -125,33 +121,41 @@ hubii_eint_init(cnodeid_t cnode)
     ii_iidsr_u_t    	hubio_eint;
     hubinfo_t		hinfo; 
     cpuid_t		intr_cpu;
-    devfs_handle_t 	hub_v;
+    vertex_hdl_t 	hub_v;
     int bit_pos_to_irq(int bit);
+    ii_ilcsr_u_t	ilcsr;
 
 
-    hub_v = (devfs_handle_t)cnodeid_to_vertex(cnode);
+    hub_v = (vertex_hdl_t)cnodeid_to_vertex(cnode);
     ASSERT_ALWAYS(hub_v);
     hubinfo_get(hub_v, &hinfo);
 
     ASSERT(hinfo);
     ASSERT(hinfo->h_cnodeid == cnode);
 
+    ilcsr.ii_ilcsr_regval = REMOTE_HUB_L(hinfo->h_nasid, IIO_ILCSR);
+    if ((ilcsr.ii_ilcsr_fld_s.i_llp_stat & 0x2) == 0) {
+	/*
+	 * HUB II link is not up.  Disable LLP. Clear old errors.
+	 * Enable interrupts to handle BTE errors.
+	 */
+	ilcsr.ii_ilcsr_fld_s.i_llp_en = 0;
+	REMOTE_HUB_S(hinfo->h_nasid, IIO_ILCSR, ilcsr.ii_ilcsr_regval);
+    }
+
     /* Select a possible interrupt target where there is a free interrupt
      * bit and also reserve the interrupt bit for this IO error interrupt
      */
-    intr_cpu = intr_heuristic(hub_v,0,-1,0,hub_v,
+    intr_cpu = intr_heuristic(hub_v,0,SGI_II_ERROR,0,hub_v,
 			      "HUB IO error interrupt",&bit);
     if (intr_cpu == CPU_NONE) {
 	printk("hubii_eint_init: intr_reserve_level failed, cnode %d", cnode);
 	return;
     }
 	
-    rv = intr_connect_level(intr_cpu, bit, 0, NULL);
-    request_irq(bit + (intr_cpu << 8), hubii_eint_handler, 0, "SN_hub_error", (void *)hub_v);
-    irq_desc(bit + (intr_cpu << 8))->status |= SN2_IRQ_PER_HUB;
-#ifdef BUS_INT_WAR                                              
-    sn_add_polled_interrupt(bit + (intr_cpu << 8), (0.01 * HZ));
-#endif
+    rv = intr_connect_level(intr_cpu, SGI_II_ERROR, 0, NULL);
+    request_irq(SGI_II_ERROR, hubii_eint_handler, SA_SHIRQ, "SN_hub_error", (void *)hub_v);
+    irq_desc(bit)->status |= SN2_IRQ_PER_HUB;
     ASSERT_ALWAYS(rv >= 0);
     hubio_eint.ii_iidsr_regval = 0;
     hubio_eint.ii_iidsr_fld_s.i_enable = 1;
@@ -167,18 +171,29 @@ hubii_eint_init(cnodeid_t cnode)
 void
 hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
 {
-    devfs_handle_t	hub_v;
+    vertex_hdl_t	hub_v;
     hubinfo_t		hinfo; 
     ii_wstat_u_t	wstat;
     hubreg_t		idsr;
+    ii_ilcsr_u_t	ilcsr;
 
 
     /* two levels of casting avoids compiler warning.!! */
-    hub_v = (devfs_handle_t)(long)(arg); 
+    hub_v = (vertex_hdl_t)(long)(arg); 
     ASSERT(hub_v);
 
     hubinfo_get(hub_v, &hinfo);
     
+    idsr = REMOTE_HUB_L(hinfo->h_nasid, IIO_ICMR);
+#if 0
+    if (idsr & 0x1) {
+	/* ICMR bit is set .. we are getting into "Spurious Interrupts condition. */
+	printk("Cnode %d II has seen the ICMR condition\n", hinfo->h_cnodeid);
+	printk("***** Please file PV with the above messages *****\n");
+	/* panic("We have to panic to prevent further unknown states ..\n"); */
+    }
+#endif
+	
     /* 
      * Identify the reason for error. 
      */
@@ -218,9 +233,25 @@ hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
 	 * Note: we may never be able to print this, if the II talking
 	 * to Xbow which hosts the console is dead. 
 	 */
-	printk("Hub %d to Xtalk Link failed (II_ECRAZY) Reason: %s", 
-		hinfo->h_cnodeid, reason);
+	ilcsr.ii_ilcsr_regval = REMOTE_HUB_L(hinfo->h_nasid, IIO_ILCSR);
+	if (ilcsr.ii_ilcsr_fld_s.i_llp_en == 1) {	/* Link is enabled */
+	    printk("Hub %d, cnode %d to Xtalk Link failed (II_ECRAZY) Reason: %s", 
+		hinfo->h_nasid, hinfo->h_cnodeid, reason);
+	}
     }
+
+
+    /*
+     * Before processing any interrupt related information, clear all
+     * error indication and reenable interrupts.  This will prevent
+     * lost interrupts due to the interrupt handler scanning past a PRB/CRB
+     * which has not errorred yet and then the PRB/CRB goes into error.
+     * Note, PRB errors are cleared individually.
+     */
+    REMOTE_HUB_S(hinfo->h_nasid, IIO_IECLR, 0xff0000);
+    idsr = REMOTE_HUB_L(hinfo->h_nasid, IIO_IIDSR) & ~IIO_IIDSR_SENT_MASK;
+    REMOTE_HUB_S(hinfo->h_nasid, IIO_IIDSR, idsr);
+
 
     /* 
      * It's a toss as to which one among PRB/CRB to check first. 
@@ -232,14 +263,6 @@ hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
      */
     (void)hubiio_crb_error_handler(hub_v, hinfo);
     (void)hubiio_prb_error_handler(hub_v, hinfo);
-    /*
-     * If we reach here, it indicates crb/prb handlers successfully
-     * handled the error. So, re-enable II to send more interrupt
-     * and return.
-     */
-    REMOTE_HUB_S(hinfo->h_nasid, IIO_IECLR, 0xffffff);
-    idsr = REMOTE_HUB_L(hinfo->h_nasid, IIO_IIDSR) & ~IIO_IIDSR_SENT_MASK;
-    REMOTE_HUB_S(hinfo->h_nasid, IIO_IIDSR, idsr);
 }
 
 /*
@@ -295,6 +318,105 @@ char *hubiio_crb_errors[] = {
 	"Xtalk Error Packet"
 };
 
+void
+print_crb_fields(int crb_num, ii_icrb0_a_u_t icrba,
+	ii_icrb0_b_u_t icrbb, ii_icrb0_c_u_t icrbc,
+	ii_icrb0_d_u_t icrbd, ii_icrb0_e_u_t icrbe)
+{
+    printk("CRB %d regA\n\t"
+	    "a_iow 0x%x\n\t"
+	    "valid0x%x\n\t"
+	    "Address0x%lx\n\t"
+	    "a_tnum 0x%x\n\t"
+	    "a_sidn 0x%x\n",
+	    crb_num,
+	    icrba.a_iow, 
+	    icrba.a_valid, 
+	    icrba.a_addr, 
+	    icrba.a_tnum, 
+	    icrba.a_sidn);
+    printk("CRB %d regB\n\t"
+	    "b_imsgtype 0x%x\n\t"
+	    "b_imsg 0x%x\n"
+	    "\tb_use_old 0x%x\n\t"
+	    "b_initiator 0x%x\n\t"
+	    "b_exc 0x%x\n"
+	    "\tb_ackcnt 0x%x\n\t"
+	    "b_resp 0x%x\n\t"
+	    "b_ack 0x%x\n"
+	    "\tb_hold 0x%x\n\t"
+	    "b_wb 0x%x\n\t"
+	    "b_intvn 0x%x\n"
+	    "\tb_stall_ib 0x%x\n\t"
+	    "b_stall_int 0x%x\n"
+	    "\tb_stall_bte_0 0x%x\n\t"
+	    "b_stall_bte_1 0x%x\n"
+	    "\tb_error 0x%x\n\t"
+	    "b_lnetuce 0x%x\n\t"
+	    "b_mark 0x%x\n\t"
+	    "b_xerr 0x%x\n",
+	    crb_num,
+	    icrbb.b_imsgtype, 
+	    icrbb.b_imsg, 
+	    icrbb.b_use_old, 
+	    icrbb.b_initiator,
+	    icrbb.b_exc, 
+	    icrbb.b_ackcnt, 
+	    icrbb.b_resp, 
+	    icrbb.b_ack, 
+	    icrbb.b_hold,
+	    icrbb.b_wb, 
+	    icrbb.b_intvn, 
+	    icrbb.b_stall_ib, 
+	    icrbb.b_stall_int,
+	    icrbb.b_stall_bte_0, 
+	    icrbb.b_stall_bte_1, 
+	    icrbb.b_error,
+	    icrbb.b_lnetuce, 
+	    icrbb.b_mark, 
+	    icrbb.b_xerr);
+    printk("CRB %d regC\n\t"
+	    "c_source 0x%x\n\t"
+	    "c_xtsize 0x%x\n\t"
+	    "c_cohtrans 0x%x\n\t"
+	    "c_btenum 0x%x\n\t"
+	    "c_gbr 0x%x\n\t"
+	    "c_doresp 0x%x\n\t"
+	    "c_barrop 0x%x\n\t"
+	    "c_suppl 0x%x\n",
+	    crb_num,
+	    icrbc.c_source,
+	    icrbc.c_xtsize,
+	    icrbc.c_cohtrans,
+	    icrbc.c_btenum,
+	    icrbc.c_gbr,
+	    icrbc.c_doresp,
+	    icrbc.c_barrop,
+	    icrbc.c_suppl);
+    printk("CRB %d regD\n\t"
+	    "d_bteaddr 0x%lx\n\t"
+	    "d_bteop 0x%x\n\t"
+	    "d_pripsc 0x%x\n\t"
+	    "d_pricnt 0x%x\n\t"
+	    "d_sleep 0x%x\n\t",
+	    crb_num,
+	    icrbd.d_bteaddr,
+	    icrbd.d_bteop,
+	    icrbd.d_pripsc,
+	    icrbd.d_pricnt,
+	    icrbd.d_sleep);
+    printk("CRB %d regE\n\t"
+	    "icrbe_timeout 0x%x\n\t"
+	    "icrbe_context 0x%x\n\t"
+	    "icrbe_toutvld 0x%x\n\t"
+	    "icrbe_ctxtvld 0x%x\n\t",
+	    crb_num,
+	    icrbe.icrbe_timeout,
+	    icrbe.icrbe_context,
+	    icrbe.icrbe_toutvld,
+	    icrbe.icrbe_ctxtvld);
+}
+
 /*
  * hubiio_crb_error_handler
  *
@@ -317,7 +439,7 @@ char *hubiio_crb_errors[] = {
  */
 
 int
-hubiio_crb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo)
+hubiio_crb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo)
 {
 	cnodeid_t	cnode;
 	nasid_t		nasid;
@@ -334,6 +456,9 @@ hubiio_crb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo)
 	nasid = hinfo->h_nasid;
 	cnode = NASID_TO_COMPACT_NODEID(nasid);
 
+	/*
+	 * XXX - Add locking for any recovery actions
+	 */
 	/*
 	 * Scan through all CRBs in the Hub, and handle the errors
 	 * in any of the CRBs marked.
@@ -373,16 +498,11 @@ hubiio_crb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo)
 			else /* b_initiator bit 2 gives BTE number */
 				bte_num = (icrbb.b_initiator & 0x4) >> 2;
 
-			/* >>> bte_crb_error_handler needs to be 
-			 * broken into two parts.  The first should
-			 * cleanup the CRB.  The second should wait
-			 * until all bte related CRB's are complete
-			 * and then do the error reset.
-			 */
+			hubiio_crb_free(hinfo, i);
+
 			bte_crb_error_handler(hub_v, bte_num,
 					      i, &ioerror,
 					      icrbd.d_bteop);
-			hubiio_crb_free(hinfo, i);
 			num_errors++;
 			continue;
 		}
@@ -430,6 +550,86 @@ hubiio_crb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo)
 			IOERROR_SETVALUE(&ioerror, tnum, icrba.a_tnum);
 
 		}
+		if (icrbb.b_error) {
+		    /*
+		     * CRB 'i' has some error. Identify the type of error,
+		     * and try to handle it.
+		     *
+		     */
+		    switch(icrbb.b_ecode) {
+			case IIO_ICRB_ECODE_PERR:
+			case IIO_ICRB_ECODE_WERR:
+			case IIO_ICRB_ECODE_AERR:
+			case IIO_ICRB_ECODE_PWERR:
+			case IIO_ICRB_ECODE_TOUT:
+			case IIO_ICRB_ECODE_XTERR:
+			    printk("Shub II CRB %d: error %s on hub cnodeid: %d",
+				    i, hubiio_crb_errors[icrbb.b_ecode], cnode);
+			    /*
+			     * Any sort of write error is mostly due
+			     * bad programming (Note it's not a timeout.)
+			     * So, invoke hub_iio_error_handler with
+			     * appropriate information.
+			     */
+			    IOERROR_SETVALUE(&ioerror,errortype,icrbb.b_ecode);
+
+			    /* Go through the error bit lookup phase */
+			    if (error_state_set(hub_v, ERROR_STATE_LOOKUP) ==
+				    ERROR_RETURN_CODE_CANNOT_SET_STATE)
+				return(IOERROR_UNHANDLED);
+			    rc = hub_ioerror_handler(
+				    hub_v,
+				    DMA_WRITE_ERROR,
+				    MODE_DEVERROR,
+				    &ioerror);
+			    if (rc == IOERROR_HANDLED) {
+				rc = hub_ioerror_handler(
+					hub_v,
+					DMA_WRITE_ERROR,
+					MODE_DEVREENABLE,
+					&ioerror);
+			    }else {
+				printk("Unable to handle %s on hub %d",
+					hubiio_crb_errors[icrbb.b_ecode],
+					cnode);
+				/* panic; */
+			    }
+			    /* Go to Next error */
+			    print_crb_fields(i, icrba, icrbb, icrbc,
+				    icrbd, icrbe);
+			    hubiio_crb_free(hinfo, i);
+			    continue;
+			case IIO_ICRB_ECODE_PRERR:
+			case IIO_ICRB_ECODE_DERR:
+			    printk("Shub II CRB %d: error %s on hub : %d",
+				    i, hubiio_crb_errors[icrbb.b_ecode], cnode);
+			    /* panic */
+			default:
+			    printk("Shub II CRB error (code : %d) on hub : %d",
+				    icrbb.b_ecode, cnode);
+			    /* panic */
+		    }
+		} 
+		/*
+		 * Error is not indicated via the errcode field
+		 * Check other error indications in this register.
+		 */
+		if (icrbb.b_xerr) {
+		    printk("Shub II CRB %d: Xtalk Packet with error bit set to hub %d",
+			    i, cnode);
+		    /* panic */
+		}
+		if (icrbb.b_lnetuce) {
+		    printk("Shub II CRB %d: Uncorrectable data error detected on data "
+			    " from NUMAlink to node %d",
+			    i, cnode);
+		    /* panic */
+		}
+		print_crb_fields(i, icrba, icrbb, icrbc, icrbd, icrbe);
+
+
+
+
 
 		if (icrbb.b_error) {
 		/* 
@@ -488,7 +688,7 @@ hubiio_crb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo)
 		
 		default:
 			panic("Fatal error (code : %d) on hub : %d",
-				cnode);
+				icrbb.b_ecode, cnode);
 			/*NOTREACHED*/
 
 		}
@@ -568,7 +768,7 @@ hubii_check_widget_disabled(nasid_t nasid, int wnum)
  *      Cleanup involes freeing the PRB register
  */
 static void
-hubii_prb_handler(devfs_handle_t hub_v, hubinfo_t hinfo, int wnum)
+hubii_prb_handler(vertex_hdl_t hub_v, hubinfo_t hinfo, int wnum)
 {
         nasid_t         nasid;
 
@@ -576,13 +776,13 @@ hubii_prb_handler(devfs_handle_t hub_v, hubinfo_t hinfo, int wnum)
         /*
          * Clear error bit by writing to IECLR register.
          */
-        REMOTE_HUB_S(nasid, IIO_IO_ERR_CLR, (1 << wnum));
+        REMOTE_HUB_S(nasid, IIO_IECLR, (1 << wnum));
         /*
          * PIO Write to Widget 'i' got into an error.
          * Invoke hubiio_error_handler with this information.
          */
-        printk( "Hub nasid %d got a PIO Write error from widget %d, cleaning up and continuing",
-                        nasid, wnum);
+        printk( "Hub nasid %d got a PIO Write error from widget %d, "
+				"cleaning up and continuing", nasid, wnum);
         /*
          * XXX
          * It may be necessary to adjust IO PRB counter
@@ -591,7 +791,7 @@ hubii_prb_handler(devfs_handle_t hub_v, hubinfo_t hinfo, int wnum)
 }
 
 int
-hubiio_prb_error_handler(devfs_handle_t hub_v, hubinfo_t hinfo)
+hubiio_prb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo)
 {
         int             wnum;
         nasid_t         nasid;

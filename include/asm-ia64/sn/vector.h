@@ -4,28 +4,15 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_VECTOR_H
 #define _ASM_IA64_SN_VECTOR_H
 
 #include <linux/config.h>
-#include <asm/sn/arch.h>
 
 #define NET_VEC_NULL            ((net_vec_t)  0)
 #define NET_VEC_BAD             ((net_vec_t) -1)
-
-#ifdef RTL
-
-#define VEC_POLLS_W		16	/* Polls before write times out */
-#define VEC_POLLS_R		16	/* Polls before read times out */
-#define VEC_POLLS_X		16	/* Polls before exch times out */
-
-#define VEC_RETRIES_W		1	/* Retries before write fails */
-#define VEC_RETRIES_R		1	/* Retries before read fails */
-#define VEC_RETRIES_X		1	/* Retries before exch fails */
-
-#else /* RTL */
 
 #define VEC_POLLS_W		128	/* Polls before write times out */
 #define VEC_POLLS_R		128	/* Polls before read times out */
@@ -34,37 +21,6 @@
 #define VEC_RETRIES_W		8	/* Retries before write fails */
 #define VEC_RETRIES_R           8	/* Retries before read fails */
 #define VEC_RETRIES_X		4	/* Retries before exch fails */
-
-#endif /* RTL */
-
-#if defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#define VECTOR_PARMS		LB_VECTOR_PARMS
-#define VECTOR_ROUTE		LB_VECTOR_ROUTE
-#define VECTOR_DATA		LB_VECTOR_DATA
-#define VECTOR_STATUS		LB_VECTOR_STATUS
-#define VECTOR_RETURN		LB_VECTOR_RETURN
-#define VECTOR_READ_DATA	LB_VECTOR_READ_DATA
-#define VECTOR_STATUS_CLEAR	LB_VECTOR_STATUS_CLEAR
-#define VP_PIOID_SHFT		LVP_PIOID_SHFT
-#define VP_PIOID_MASK		LVP_PIOID_MASK
-#define VP_WRITEID_SHFT		LVP_WRITEID_SHFT
-#define VP_WRITEID_MASK		LVP_WRITEID_MASK
-#define VP_ADDRESS_MASK		LVP_ADDRESS_MASK
-#define VP_TYPE_SHFT		LVP_TYPE_SHFT
-#define VP_TYPE_MASK		LVP_TYPE_MASK
-#define VS_VALID		LVS_VALID
-#define VS_OVERRUN		LVS_OVERRUN
-#define VS_TARGET_SHFT		LVS_TARGET_SHFT
-#define VS_TARGET_MASK		LVS_TARGET_MASK
-#define VS_PIOID_SHFT		LVS_PIOID_SHFT
-#define VS_PIOID_MASK		LVS_PIOID_MASK
-#define VS_WRITEID_SHFT		LVS_WRITEID_SHFT
-#define VS_WRITEID_MASK		LVS_WRITEID_MASK
-#define VS_ADDRESS_MASK		LVS_ADDRESS_MASK
-#define VS_TYPE_SHFT		LVS_TYPE_SHFT
-#define VS_TYPE_MASK		LVS_TYPE_MASK
-#define VS_ERROR_MASK		LVS_ERROR_MASK
-#endif
 
 #define NET_ERROR_NONE		0	/* No error		*/
 #define NET_ERROR_HARDWARE	(-1)	/* Hardware error	*/

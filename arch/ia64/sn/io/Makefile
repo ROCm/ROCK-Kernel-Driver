@@ -9,18 +9,15 @@
 # Makefile for the sn io routines.
 #
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN
+EXTRA_CFLAGS    := -DLITTLE_ENDIAN -DSHUB_SWAP_WAR
 
-ifdef CONFIG_IA64_SGI_SN2
-EXTRA_CFLAGS    += -DSHUB_SWAP_WAR
-endif
-
-obj-$(CONFIG_IA64_SGI_SN) += stubs.o sgi_if.o xswitch.o klgraph_hack.o \
-		hcl.o labelcl.o invent.o sgi_io_sim.o \
-		klgraph_hack.o hcl_util.o cdl.o hubdev.o hubspc.o \
-		alenlist.o pci.o pci_dma.o ate_utils.o \
-		ifconfig_net.o io.o ioconfig_bus.o
+obj-$(CONFIG_IA64_SGI_SN) += sgi_if.o xswitch.o sgi_io_sim.o cdl.o ate_utils.o \
+			     io.o machvec/ drivers/ platform_init/
 
 obj-$(CONFIG_IA64_SGI_SN2) += sn2/
 
-obj-$(CONFIG_PCIBA) += pciba.o
+ifdef CONFIG_HWGFS_FS
+obj-$(CONFIG_HWGFS_FS) += hwgfs/
+else
+obj-$(CONFIG_DEVFS_FS) += hwgdfs/
+endif

@@ -37,8 +37,6 @@
 
 char                    widget_info_fingerprint[] = "widget_info";
 
-cdl_p                   xtalk_registry = NULL;
-
 #define	DEV_FUNC(dev,func)	hub_##func
 #define	CAST_PIOMAP(x)		((hub_piomap_t)(x))
 #define	CAST_DMAMAP(x)		((hub_dmamap_t)(x))
@@ -47,71 +45,70 @@ cdl_p                   xtalk_registry = NULL;
 /* =====================================================================
  *            Function Table of Contents
  */
-xtalk_piomap_t          xtalk_piomap_alloc(devfs_handle_t, device_desc_t, iopaddr_t, size_t, size_t, unsigned);
+xtalk_piomap_t          xtalk_piomap_alloc(vertex_hdl_t, device_desc_t, iopaddr_t, size_t, size_t, unsigned);
 void                    xtalk_piomap_free(xtalk_piomap_t);
 caddr_t                 xtalk_piomap_addr(xtalk_piomap_t, iopaddr_t, size_t);
 void                    xtalk_piomap_done(xtalk_piomap_t);
-caddr_t                 xtalk_piotrans_addr(devfs_handle_t, device_desc_t, iopaddr_t, size_t, unsigned);
-caddr_t                 xtalk_pio_addr(devfs_handle_t, device_desc_t, iopaddr_t, size_t, xtalk_piomap_t *, unsigned);
+caddr_t                 xtalk_piotrans_addr(vertex_hdl_t, device_desc_t, iopaddr_t, size_t, unsigned);
+caddr_t                 xtalk_pio_addr(vertex_hdl_t, device_desc_t, iopaddr_t, size_t, xtalk_piomap_t *, unsigned);
 void                    xtalk_set_early_piotrans_addr(xtalk_early_piotrans_addr_f *);
 caddr_t                 xtalk_early_piotrans_addr(xwidget_part_num_t, xwidget_mfg_num_t, int, iopaddr_t, size_t, unsigned);
 static caddr_t          null_xtalk_early_piotrans_addr(xwidget_part_num_t, xwidget_mfg_num_t, int, iopaddr_t, size_t, unsigned);
-xtalk_dmamap_t          xtalk_dmamap_alloc(devfs_handle_t, device_desc_t, size_t, unsigned);
+xtalk_dmamap_t          xtalk_dmamap_alloc(vertex_hdl_t, device_desc_t, size_t, unsigned);
 void                    xtalk_dmamap_free(xtalk_dmamap_t);
 iopaddr_t               xtalk_dmamap_addr(xtalk_dmamap_t, paddr_t, size_t);
 alenlist_t              xtalk_dmamap_list(xtalk_dmamap_t, alenlist_t, unsigned);
 void                    xtalk_dmamap_done(xtalk_dmamap_t);
-iopaddr_t               xtalk_dmatrans_addr(devfs_handle_t, device_desc_t, paddr_t, size_t, unsigned);
-alenlist_t              xtalk_dmatrans_list(devfs_handle_t, device_desc_t, alenlist_t, unsigned);
+iopaddr_t               xtalk_dmatrans_addr(vertex_hdl_t, device_desc_t, paddr_t, size_t, unsigned);
+alenlist_t              xtalk_dmatrans_list(vertex_hdl_t, device_desc_t, alenlist_t, unsigned);
 void			xtalk_dmamap_drain(xtalk_dmamap_t);
-void			xtalk_dmaaddr_drain(devfs_handle_t, iopaddr_t, size_t);
-void			xtalk_dmalist_drain(devfs_handle_t, alenlist_t);
-xtalk_intr_t            xtalk_intr_alloc(devfs_handle_t, device_desc_t, devfs_handle_t);
-xtalk_intr_t            xtalk_intr_alloc_nothd(devfs_handle_t, device_desc_t, devfs_handle_t);
+void			xtalk_dmaaddr_drain(vertex_hdl_t, iopaddr_t, size_t);
+void			xtalk_dmalist_drain(vertex_hdl_t, alenlist_t);
+xtalk_intr_t            xtalk_intr_alloc(vertex_hdl_t, device_desc_t, vertex_hdl_t);
+xtalk_intr_t            xtalk_intr_alloc_nothd(vertex_hdl_t, device_desc_t, vertex_hdl_t);
 void                    xtalk_intr_free(xtalk_intr_t);
 int                     xtalk_intr_connect(xtalk_intr_t, intr_func_t, intr_arg_t, xtalk_intr_setfunc_t, void *);
 void                    xtalk_intr_disconnect(xtalk_intr_t);
-devfs_handle_t            xtalk_intr_cpu_get(xtalk_intr_t);
-int                     xtalk_error_handler(devfs_handle_t, int, ioerror_mode_t, ioerror_t *);
-int                     xtalk_error_devenable(devfs_handle_t, int, int);
-void                    xtalk_provider_startup(devfs_handle_t);
-void                    xtalk_provider_shutdown(devfs_handle_t);
-devfs_handle_t            xtalk_intr_dev_get(xtalk_intr_t);
+vertex_hdl_t            xtalk_intr_cpu_get(xtalk_intr_t);
+int                     xtalk_error_handler(vertex_hdl_t, int, ioerror_mode_t, ioerror_t *);
+int                     xtalk_error_devenable(vertex_hdl_t, int, int);
+void                    xtalk_provider_startup(vertex_hdl_t);
+void                    xtalk_provider_shutdown(vertex_hdl_t);
+vertex_hdl_t            xtalk_intr_dev_get(xtalk_intr_t);
 xwidgetnum_t            xtalk_intr_target_get(xtalk_intr_t);
 xtalk_intr_vector_t     xtalk_intr_vector_get(xtalk_intr_t);
 iopaddr_t               xtalk_intr_addr_get(struct xtalk_intr_s *);
 void                   *xtalk_intr_sfarg_get(xtalk_intr_t);
-devfs_handle_t            xtalk_pio_dev_get(xtalk_piomap_t);
+vertex_hdl_t            xtalk_pio_dev_get(xtalk_piomap_t);
 xwidgetnum_t            xtalk_pio_target_get(xtalk_piomap_t);
 iopaddr_t               xtalk_pio_xtalk_addr_get(xtalk_piomap_t);
 ulong                   xtalk_pio_mapsz_get(xtalk_piomap_t);
 caddr_t                 xtalk_pio_kvaddr_get(xtalk_piomap_t);
-devfs_handle_t            xtalk_dma_dev_get(xtalk_dmamap_t);
+vertex_hdl_t            xtalk_dma_dev_get(xtalk_dmamap_t);
 xwidgetnum_t            xtalk_dma_target_get(xtalk_dmamap_t);
-xwidget_info_t          xwidget_info_chk(devfs_handle_t);
-xwidget_info_t          xwidget_info_get(devfs_handle_t);
-void                    xwidget_info_set(devfs_handle_t, xwidget_info_t);
-devfs_handle_t            xwidget_info_dev_get(xwidget_info_t);
+xwidget_info_t          xwidget_info_chk(vertex_hdl_t);
+xwidget_info_t          xwidget_info_get(vertex_hdl_t);
+void                    xwidget_info_set(vertex_hdl_t, xwidget_info_t);
+vertex_hdl_t            xwidget_info_dev_get(xwidget_info_t);
 xwidgetnum_t            xwidget_info_id_get(xwidget_info_t);
-devfs_handle_t            xwidget_info_master_get(xwidget_info_t);
+vertex_hdl_t            xwidget_info_master_get(xwidget_info_t);
 xwidgetnum_t            xwidget_info_masterid_get(xwidget_info_t);
 xwidget_part_num_t      xwidget_info_part_num_get(xwidget_info_t);
 xwidget_mfg_num_t       xwidget_info_mfg_num_get(xwidget_info_t);
 char 			*xwidget_info_name_get(xwidget_info_t);
-void                    xtalk_init(void);
-void                    xtalk_provider_register(devfs_handle_t, xtalk_provider_t *);
-void                    xtalk_provider_unregister(devfs_handle_t);
-xtalk_provider_t       *xtalk_provider_fns_get(devfs_handle_t);
+void                    xtalk_provider_register(vertex_hdl_t, xtalk_provider_t *);
+void                    xtalk_provider_unregister(vertex_hdl_t);
+xtalk_provider_t       *xtalk_provider_fns_get(vertex_hdl_t);
 int                     xwidget_driver_register(xwidget_part_num_t, 
 						xwidget_mfg_num_t, 
 						char *, unsigned);
 void                    xwidget_driver_unregister(char *);
-int                     xwidget_register(xwidget_hwid_t, devfs_handle_t, 
-					 xwidgetnum_t, devfs_handle_t, 
-					 xwidgetnum_t, async_attach_t);
-int			xwidget_unregister(devfs_handle_t);
-void                    xwidget_reset(devfs_handle_t);
-char			*xwidget_name_get(devfs_handle_t);
+int                     xwidget_register(xwidget_hwid_t, vertex_hdl_t, 
+					 xwidgetnum_t, vertex_hdl_t, 
+					 xwidgetnum_t);
+int			xwidget_unregister(vertex_hdl_t);
+void                    xwidget_reset(vertex_hdl_t);
+char			*xwidget_name_get(vertex_hdl_t);
 #if !defined(DEV_FUNC)
 /*
  * There is more than one possible provider
@@ -126,7 +123,7 @@ char			*xwidget_name_get(devfs_handle_t);
 #define	CAST_INTR(x)		((xtalk_intr_t)(x))
 
 static xtalk_provider_t *
-xwidget_to_provider_fns(devfs_handle_t xconn)
+xwidget_to_provider_fns(vertex_hdl_t xconn)
 {
     xwidget_info_t          widget_info;
     xtalk_provider_t       *provider_fns;
@@ -159,7 +156,7 @@ xwidget_to_provider_fns(devfs_handle_t xconn)
  */
 
 xtalk_piomap_t
-xtalk_piomap_alloc(devfs_handle_t dev,	/* set up mapping for this device */
+xtalk_piomap_alloc(vertex_hdl_t dev,	/* set up mapping for this device */
 		   device_desc_t dev_desc,	/* device descriptor */
 		   iopaddr_t xtalk_addr,	/* map for this xtalk_addr range */
 		   size_t byte_count,
@@ -198,7 +195,7 @@ xtalk_piomap_done(xtalk_piomap_t xtalk_piomap)
 
 
 caddr_t
-xtalk_piotrans_addr(devfs_handle_t dev,	/* translate for this device */
+xtalk_piotrans_addr(vertex_hdl_t dev,	/* translate for this device */
 		    device_desc_t dev_desc,	/* device descriptor */
 		    iopaddr_t xtalk_addr,	/* Crosstalk address */
 		    size_t byte_count,	/* map this many bytes */
@@ -209,7 +206,7 @@ xtalk_piotrans_addr(devfs_handle_t dev,	/* translate for this device */
 }
 
 caddr_t
-xtalk_pio_addr(devfs_handle_t dev,	/* translate for this device */
+xtalk_pio_addr(vertex_hdl_t dev,	/* translate for this device */
 	       device_desc_t dev_desc,	/* device descriptor */
 	       iopaddr_t addr,		/* starting address (or offset in window) */
 	       size_t byte_count,	/* map this many bytes */
@@ -326,7 +323,7 @@ null_xtalk_early_piotrans_addr(xwidget_part_num_t part_num,
  */
 
 xtalk_dmamap_t
-xtalk_dmamap_alloc(devfs_handle_t dev,	/* set up mappings for this device */
+xtalk_dmamap_alloc(vertex_hdl_t dev,	/* set up mappings for this device */
 		   device_desc_t dev_desc,	/* device descriptor */
 		   size_t byte_count_max,	/* max size of a mapping */
 		   unsigned flags)
@@ -373,7 +370,7 @@ xtalk_dmamap_done(xtalk_dmamap_t xtalk_dmamap)
 
 
 iopaddr_t
-xtalk_dmatrans_addr(devfs_handle_t dev,	/* translate for this device */
+xtalk_dmatrans_addr(vertex_hdl_t dev,	/* translate for this device */
 		    device_desc_t dev_desc,	/* device descriptor */
 		    paddr_t paddr,	/* system physical address */
 		    size_t byte_count,	/* length */
@@ -385,7 +382,7 @@ xtalk_dmatrans_addr(devfs_handle_t dev,	/* translate for this device */
 
 
 alenlist_t
-xtalk_dmatrans_list(devfs_handle_t dev,	/* translate for this device */
+xtalk_dmatrans_list(vertex_hdl_t dev,	/* translate for this device */
 		    device_desc_t dev_desc,	/* device descriptor */
 		    alenlist_t palenlist,	/* system address/length list */
 		    unsigned flags)
@@ -402,14 +399,14 @@ xtalk_dmamap_drain(xtalk_dmamap_t map)
 }
 
 void
-xtalk_dmaaddr_drain(devfs_handle_t dev, paddr_t addr, size_t size)
+xtalk_dmaaddr_drain(vertex_hdl_t dev, paddr_t addr, size_t size)
 {
     DEV_FUNC(dev, dmaaddr_drain)
 	(dev, addr, size);
 }
 
 void
-xtalk_dmalist_drain(devfs_handle_t dev, alenlist_t list)
+xtalk_dmalist_drain(vertex_hdl_t dev, alenlist_t list)
 {
     DEV_FUNC(dev, dmalist_drain)
 	(dev, list);
@@ -426,9 +423,9 @@ xtalk_dmalist_drain(devfs_handle_t dev, alenlist_t list)
  * Return resource handle in intr_hdl.
  */
 xtalk_intr_t
-xtalk_intr_alloc(devfs_handle_t dev,	/* which Crosstalk device */
+xtalk_intr_alloc(vertex_hdl_t dev,	/* which Crosstalk device */
 		 device_desc_t dev_desc,	/* device descriptor */
-		 devfs_handle_t owner_dev)
+		 vertex_hdl_t owner_dev)
 {				/* owner of this interrupt */
     return (xtalk_intr_t) DEV_FUNC(dev, intr_alloc)
 	(dev, dev_desc, owner_dev);
@@ -440,9 +437,9 @@ xtalk_intr_alloc(devfs_handle_t dev,	/* which Crosstalk device */
  * Return resource handle in intr_hdl.
  */
 xtalk_intr_t
-xtalk_intr_alloc_nothd(devfs_handle_t dev,	/* which Crosstalk device */
+xtalk_intr_alloc_nothd(vertex_hdl_t dev,	/* which Crosstalk device */
 		 	device_desc_t dev_desc,	/* device descriptor */
-		 	devfs_handle_t owner_dev)	/* owner of this interrupt */
+		 	vertex_hdl_t owner_dev)	/* owner of this interrupt */
 {
     return (xtalk_intr_t) DEV_FUNC(dev, intr_alloc_nothd)
 	(dev, dev_desc, owner_dev);
@@ -492,11 +489,10 @@ xtalk_intr_disconnect(xtalk_intr_t intr_hdl)
  * Return a hwgraph vertex that represents the CPU currently
  * targeted by an interrupt.
  */
-devfs_handle_t
+vertex_hdl_t
 xtalk_intr_cpu_get(xtalk_intr_t intr_hdl)
 {
-    return INTR_FUNC(intr_hdl, intr_cpu_get)
-	(CAST_INTR(intr_hdl));
+      return (vertex_hdl_t)0;
 }
 
 
@@ -526,7 +522,7 @@ xtalk_intr_cpu_get(xtalk_intr_t intr_hdl)
  */
 int
 xtalk_error_handler(
-		       devfs_handle_t xconn,
+		       vertex_hdl_t xconn,
 		       int error_code,
 		       ioerror_mode_t mode,
 		       ioerror_t *ioerror)
@@ -555,7 +551,7 @@ xtalk_error_handler(
 #if defined(SUPPORT_PRINTING_V_FORMAT)
     printk(KERN_WARNING "Xbow at %v encountered Fatal error", xconn);
 #else
-    printk(KERN_WARNING "Xbow at 0x%p encountered Fatal error", xconn);
+    printk(KERN_WARNING "Xbow at 0x%p encountered Fatal error", (void *)xconn);
 #endif
     ioerror_dump("xtalk", error_code, mode, ioerror);
 
@@ -563,7 +559,7 @@ xtalk_error_handler(
 }
 
 int
-xtalk_error_devenable(devfs_handle_t xconn_vhdl, int devnum, int error_code)
+xtalk_error_devenable(vertex_hdl_t xconn_vhdl, int devnum, int error_code)
 {
     return DEV_FUNC(xconn_vhdl, error_devenable) (xconn_vhdl, devnum, error_code);
 }
@@ -577,7 +573,7 @@ xtalk_error_devenable(devfs_handle_t xconn_vhdl, int devnum, int error_code)
  * Startup a crosstalk provider
  */
 void
-xtalk_provider_startup(devfs_handle_t xtalk_provider)
+xtalk_provider_startup(vertex_hdl_t xtalk_provider)
 {
     DEV_FUNC(xtalk_provider, provider_startup)
 	(xtalk_provider);
@@ -588,7 +584,7 @@ xtalk_provider_startup(devfs_handle_t xtalk_provider)
  * Shutdown a crosstalk provider
  */
 void
-xtalk_provider_shutdown(devfs_handle_t xtalk_provider)
+xtalk_provider_shutdown(vertex_hdl_t xtalk_provider)
 {
     DEV_FUNC(xtalk_provider, provider_shutdown)
 	(xtalk_provider);
@@ -598,22 +594,22 @@ xtalk_provider_shutdown(devfs_handle_t xtalk_provider)
  * Enable a device on a xtalk widget 
  */
 void
-xtalk_widgetdev_enable(devfs_handle_t xconn_vhdl, int devnum)
+xtalk_widgetdev_enable(vertex_hdl_t xconn_vhdl, int devnum)
 {
-    DEV_FUNC(xconn_vhdl, widgetdev_enable) (xconn_vhdl, devnum);
+	return;
 }
 
 /* 
  * Shutdown a device on a xtalk widget 
  */
 void
-xtalk_widgetdev_shutdown(devfs_handle_t xconn_vhdl, int devnum)
+xtalk_widgetdev_shutdown(vertex_hdl_t xconn_vhdl, int devnum)
 {
-    DEV_FUNC(xconn_vhdl, widgetdev_shutdown) (xconn_vhdl, devnum);
+	return;
 }
 
 int
-xtalk_dma_enabled(devfs_handle_t xconn_vhdl)
+xtalk_dma_enabled(vertex_hdl_t xconn_vhdl)
 {
     return DEV_FUNC(xconn_vhdl, dma_enabled) (xconn_vhdl);
 }
@@ -623,7 +619,7 @@ xtalk_dma_enabled(devfs_handle_t xconn_vhdl)
  */
 
 /****** Generic crosstalk interrupt interfaces ******/
-devfs_handle_t
+vertex_hdl_t
 xtalk_intr_dev_get(xtalk_intr_t xtalk_intr)
 {
     return (xtalk_intr->xi_dev);
@@ -654,7 +650,7 @@ xtalk_intr_sfarg_get(xtalk_intr_t xtalk_intr)
 }
 
 /****** Generic crosstalk pio interfaces ******/
-devfs_handle_t
+vertex_hdl_t
 xtalk_pio_dev_get(xtalk_piomap_t xtalk_piomap)
 {
     return (xtalk_piomap->xp_dev);
@@ -686,7 +682,7 @@ xtalk_pio_kvaddr_get(xtalk_piomap_t xtalk_piomap)
 
 
 /****** Generic crosstalk dma interfaces ******/
-devfs_handle_t
+vertex_hdl_t
 xtalk_dma_dev_get(xtalk_dmamap_t xtalk_dmamap)
 {
     return (xtalk_dmamap->xd_dev);
@@ -707,7 +703,7 @@ xtalk_dma_target_get(xtalk_dmamap_t xtalk_dmamap)
  * if not, return NULL.
  */
 xwidget_info_t
-xwidget_info_chk(devfs_handle_t xwidget)
+xwidget_info_chk(vertex_hdl_t xwidget)
 {
     arbitrary_info_t        ainfo = 0;
 
@@ -717,28 +713,18 @@ xwidget_info_chk(devfs_handle_t xwidget)
 
 
 xwidget_info_t
-xwidget_info_get(devfs_handle_t xwidget)
+xwidget_info_get(vertex_hdl_t xwidget)
 {
     xwidget_info_t          widget_info;
 
     widget_info = (xwidget_info_t)
 	hwgraph_fastinfo_get(xwidget);
 
-#ifdef	LATER
-    if ((widget_info != NULL) &&
-	(widget_info->w_fingerprint != widget_info_fingerprint))
-#ifdef SUPPORT_PRINTING_V_FORMAT
-	PRINT_PANIC("%v bad xwidget_info", xwidget);
-#else
-	PRINT_PANIC("%x bad xwidget_info", xwidget);
-#endif
-#endif	/* LATER */
-
     return (widget_info);
 }
 
 void
-xwidget_info_set(devfs_handle_t xwidget, xwidget_info_t widget_info)
+xwidget_info_set(vertex_hdl_t xwidget, xwidget_info_t widget_info)
 {
     if (widget_info != NULL)
 	widget_info->w_fingerprint = widget_info_fingerprint;
@@ -753,11 +739,11 @@ xwidget_info_set(devfs_handle_t xwidget, xwidget_info_t widget_info)
 			 (arbitrary_info_t) widget_info);
 }
 
-devfs_handle_t
+vertex_hdl_t
 xwidget_info_dev_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget_info");
+	panic("xwidget_info_dev_get: null xwidget_info");
     return (xwidget_info->w_vertex);
 }
 
@@ -765,16 +751,16 @@ xwidgetnum_t
 xwidget_info_id_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget_info");
+	panic("xwidget_info_id_get: null xwidget_info");
     return (xwidget_info->w_id);
 }
 
 
-devfs_handle_t
+vertex_hdl_t
 xwidget_info_master_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget_info");
+	panic("xwidget_info_master_get: null xwidget_info");
     return (xwidget_info->w_master);
 }
 
@@ -782,7 +768,7 @@ xwidgetnum_t
 xwidget_info_masterid_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget_info");
+	panic("xwidget_info_masterid_get: null xwidget_info");
     return (xwidget_info->w_masterid);
 }
 
@@ -790,7 +776,7 @@ xwidget_part_num_t
 xwidget_info_part_num_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget_info");
+	panic("xwidget_info_part_num_get: null xwidget_info");
     return (xwidget_info->w_hwid.part_num);
 }
 
@@ -798,7 +784,7 @@ xwidget_mfg_num_t
 xwidget_info_mfg_num_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget_info");
+	panic("xwidget_info_mfg_num_get: null xwidget_info");
     return (xwidget_info->w_hwid.mfg_num);
 }
 /* Extract the widget name from the widget information
@@ -808,49 +794,16 @@ char *
 xwidget_info_name_get(xwidget_info_t xwidget_info)
 {
     if (xwidget_info == NULL)
-	panic("null xwidget info");
+	panic("xwidget_info_name_get: null xwidget_info");
     return(xwidget_info->w_name);
 }
 /****** Generic crosstalk initialization interfaces ******/
 
 /*
- * One-time initialization needed for systems that support crosstalk.
- */
-void
-xtalk_init(void)
-{
-    cdl_p                   cp;
-
-#if DEBUG && ATTACH_DEBUG
-    printf("xtalk_init\n");
-#endif
-    /* Allocate the registry.
-     * We might already have one.
-     * If we don't, go get one.
-     * MPness: someone might have
-     * set one up for us while we
-     * were not looking; use an atomic
-     * compare-and-swap to commit to
-     * using the new registry if and
-     * only if nobody else did first.
-     * If someone did get there first,
-     * toss the one we allocated back
-     * into the pool.
-     */
-    if (xtalk_registry == NULL) {
-	cp = cdl_new(EDGE_LBL_XIO, "part", "mfgr");
-	if (!compare_and_swap_ptr((void **) &xtalk_registry, NULL, (void *) cp)) {
-	    cdl_del(cp);
-	}
-    }
-    ASSERT(xtalk_registry != NULL);
-}
-
-/*
  * Associate a set of xtalk_provider functions with a vertex.
  */
 void
-xtalk_provider_register(devfs_handle_t provider, xtalk_provider_t *xtalk_fns)
+xtalk_provider_register(vertex_hdl_t provider, xtalk_provider_t *xtalk_fns)
 {
     hwgraph_fastinfo_set(provider, (arbitrary_info_t) xtalk_fns);
 }
@@ -859,7 +812,7 @@ xtalk_provider_register(devfs_handle_t provider, xtalk_provider_t *xtalk_fns)
  * Disassociate a set of xtalk_provider functions with a vertex.
  */
 void
-xtalk_provider_unregister(devfs_handle_t provider)
+xtalk_provider_unregister(vertex_hdl_t provider)
 {
     hwgraph_fastinfo_set(provider, (arbitrary_info_t)NULL);
 }
@@ -869,34 +822,9 @@ xtalk_provider_unregister(devfs_handle_t provider)
  * provider.
  */
 xtalk_provider_t       *
-xtalk_provider_fns_get(devfs_handle_t provider)
+xtalk_provider_fns_get(vertex_hdl_t provider)
 {
     return ((xtalk_provider_t *) hwgraph_fastinfo_get(provider));
-}
-
-/*
- * Announce a driver for a particular crosstalk part.
- * Returns 0 on success or -1 on failure.  Failure occurs if the
- * specified hardware already has a driver.
- */
-/*ARGSUSED4 */
-int
-xwidget_driver_register(xwidget_part_num_t part_num,
-			xwidget_mfg_num_t mfg_num,
-			char *driver_prefix,
-			unsigned flags)
-{
-    /* a driver's init routine could call
-     * xwidget_driver_register before the
-     * system calls xtalk_init; so, we
-     * make the call here.
-     */
-    if (xtalk_registry == NULL)
-	xtalk_init();
-
-    return cdl_add_driver(xtalk_registry,
-			  part_num, mfg_num,
-			  driver_prefix, flags, NULL);
 }
 
 /*
@@ -906,13 +834,7 @@ xwidget_driver_register(xwidget_part_num_t part_num,
 void
 xwidget_driver_unregister(char *driver_prefix)
 {
-    /* before a driver calls unregister,
-     * it must have called registger; so we
-     * can assume we have a registry here.
-     */
-    ASSERT(xtalk_registry != NULL);
-
-    cdl_del_driver(xtalk_registry, driver_prefix, NULL);
+	return;
 }
 
 /*
@@ -923,9 +845,6 @@ void
 xtalk_iterate(char *driver_prefix,
 	      xtalk_iter_f *func)
 {
-    ASSERT(xtalk_registry != NULL);
-
-    cdl_iterate(xtalk_registry, driver_prefix, (cdl_iter_f *)func);
 }
 
 /*
@@ -939,11 +858,10 @@ xtalk_iterate(char *driver_prefix,
  */
 int
 xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
-		 devfs_handle_t 	widget,		/* widget to initialize */
+		 vertex_hdl_t 	widget,		/* widget to initialize */
 		 xwidgetnum_t 	id,		/* widget's target id (0..f) */
-		 devfs_handle_t 	master,		/* widget's master vertex */
-		 xwidgetnum_t 	targetid,	/* master's target id (9/a) */
-		 async_attach_t aa)
+		 vertex_hdl_t 	master,		/* widget's master vertex */
+		 xwidgetnum_t 	targetid)	/* master's target id (9/a) */
 {			
     xwidget_info_t          widget_info;
     char		    *s,devnm[MAXDEVNAME];
@@ -972,21 +890,11 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
 
     device_master_set(widget, master);
 
-    /* All the driver init routines (including
-     * xtalk_init) are called before we get into
-     * attaching devices, so we can assume we
-     * have a registry here.
-     */
-    ASSERT(xtalk_registry != NULL);
-
     /* 
      * Add pointer to async attach info -- tear down will be done when
      * the particular descendant is done with the info.
      */
-    if (aa)
-	    async_attach_add_info(widget, aa);
-
-    return cdl_add_connpt(xtalk_registry, hwid->part_num, hwid->mfg_num,
+    return cdl_add_connpt(hwid->part_num, hwid->mfg_num,
                           widget, 0);
 }
 
@@ -995,7 +903,7 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
  *	Unregister the xtalk device and detach all its hwgraph namespace.
  */
 int
-xwidget_unregister(devfs_handle_t widget)
+xwidget_unregister(vertex_hdl_t widget)
 {
     xwidget_info_t	widget_info;
     xwidget_hwid_t	hwid;
@@ -1011,9 +919,6 @@ xwidget_unregister(devfs_handle_t widget)
     
     hwid = &(widget_info->w_hwid);
 
-    cdl_del_connpt(xtalk_registry, hwid->part_num, hwid->mfg_num,
-                   widget, 0);
-
     /* Clean out the xwidget information */
     (void)kfree(widget_info->w_name);
     BZERO((void *)widget_info, sizeof(widget_info));
@@ -1023,7 +928,7 @@ xwidget_unregister(devfs_handle_t widget)
 }
 
 void
-xwidget_error_register(devfs_handle_t xwidget,
+xwidget_error_register(vertex_hdl_t xwidget,
 		       error_handler_f *efunc,
 		       error_handler_arg_t einfo)
 {
@@ -1039,37 +944,23 @@ xwidget_error_register(devfs_handle_t xwidget,
  * Issue a link reset to a widget.
  */
 void
-xwidget_reset(devfs_handle_t xwidget)
+xwidget_reset(vertex_hdl_t xwidget)
 {
     xswitch_reset_link(xwidget);
-
 }
 
 
 void
-xwidget_gfx_reset(devfs_handle_t xwidget)
+xwidget_gfx_reset(vertex_hdl_t xwidget)
 {
-    xwidget_info_t info;
-
-    xswitch_reset_link(xwidget);
-    info = xwidget_info_get(xwidget);
-#ifdef LATER
-    ASSERT_ALWAYS(info != NULL);
-#endif
-
-    /*
-     * Enable this for other architectures once we add widget_reset to the
-     * xtalk provider interface.
-     */
-    DEV_FUNC(xtalk_provider, widget_reset)
-	(xwidget_info_master_get(info), xwidget_info_id_get(info));
+	return;
 }
 
 #define ANON_XWIDGET_NAME	"No Name"	/* Default Widget Name */
 
 /* Get the canonical hwgraph  name of xtalk widget */
 char *
-xwidget_name_get(devfs_handle_t xwidget_vhdl)
+xwidget_name_get(vertex_hdl_t xwidget_vhdl)
 {
 	xwidget_info_t  info;
 

@@ -4,12 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_LABELCL_H
 #define _ASM_IA64_SN_LABELCL_H
-
-#include <asm/sn/hcl.h>
 
 #define LABELCL_MAGIC 0x4857434c	/* 'HWLC' */
 #define LABEL_LENGTH_MAX 256		/* Includes NULL char */
@@ -77,18 +75,18 @@ struct string_table {
 
 extern labelcl_info_t *labelcl_info_create(void);
 extern int labelcl_info_destroy(labelcl_info_t *);
-extern int labelcl_info_add_LBL(struct devfs_entry *, char *, arb_info_desc_t, arbitrary_info_t);
-extern int labelcl_info_remove_LBL(struct devfs_entry *, char *, arb_info_desc_t *, arbitrary_info_t *);
-extern int labelcl_info_replace_LBL(struct devfs_entry *, char *, arb_info_desc_t,
+extern int labelcl_info_add_LBL(vertex_hdl_t, char *, arb_info_desc_t, arbitrary_info_t);
+extern int labelcl_info_remove_LBL(vertex_hdl_t, char *, arb_info_desc_t *, arbitrary_info_t *);
+extern int labelcl_info_replace_LBL(vertex_hdl_t, char *, arb_info_desc_t,
                         arbitrary_info_t, arb_info_desc_t *, arbitrary_info_t *);
-extern int labelcl_info_get_LBL(struct devfs_entry *, char *, arb_info_desc_t *,
+extern int labelcl_info_get_LBL(vertex_hdl_t, char *, arb_info_desc_t *,
                       arbitrary_info_t *);
-extern int labelcl_info_get_next_LBL(struct devfs_entry *, char *, arb_info_desc_t *,
+extern int labelcl_info_get_next_LBL(vertex_hdl_t, char *, arb_info_desc_t *,
                            arbitrary_info_t *, labelcl_info_place_t *);
-extern int labelcl_info_replace_IDX(struct devfs_entry *, int, arbitrary_info_t, 
+extern int labelcl_info_replace_IDX(vertex_hdl_t, int, arbitrary_info_t, 
 			arbitrary_info_t *);
-extern int labelcl_info_connectpt_set(struct devfs_entry *, struct devfs_entry *);
-extern int labelcl_info_get_IDX(struct devfs_entry *, int, arbitrary_info_t *);
-extern struct devfs_entry *device_info_connectpt_get(struct devfs_entry *);
+extern int labelcl_info_connectpt_set(vertex_hdl_t, vertex_hdl_t);
+extern int labelcl_info_get_IDX(vertex_hdl_t, int, arbitrary_info_t *);
+extern struct devfs_handle_t device_info_connectpt_get(vertex_hdl_t);
 
 #endif /* _ASM_IA64_SN_LABELCL_H */

@@ -4,12 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_DRIVER_H
 #define _ASM_IA64_SN_DRIVER_H
 
-#include <linux/devfs_fs_kernel.h>
+#include <asm/sn/sgi.h>
 #include <asm/types.h>
 
 /*
@@ -75,7 +75,7 @@ typedef struct device_desc_s {
 	/* TBD: allocated badwidth requirements */
 
 	/* interrupt description */
-	devfs_handle_t	intr_target;	/* Hardware locator string */
+	vertex_hdl_t	intr_target;	/* Hardware locator string */
 	int 		intr_policy;	/* TBD */
 	ilvl_t		intr_swlevel;	/* software level for blocking intr */
 	char		*intr_name;	/* name of interrupt, if any */

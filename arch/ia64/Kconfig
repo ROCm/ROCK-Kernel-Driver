@@ -82,9 +82,6 @@ config IA64_HP_ZX1
 	  for the zx1 I/O MMU and makes root bus bridges appear in PCI config
 	  space (required for zx1 agpgart support).
 
-config IA64_SGI_SN1
-	bool "SGI-SN1"
-
 config IA64_SGI_SN2
 	bool "SGI-SN2"
 
@@ -288,10 +285,15 @@ config PM
 
 config IOSAPIC
 	bool
-	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
+	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1 || IA64_SGI_SN2
 	default y
 
 config IA64_SGI_SN
+	bool
+	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	default y
+
+config HWGFS_FS
 	bool
 	depends on IA64_SGI_SN1 || IA64_SGI_SN2
 	default y

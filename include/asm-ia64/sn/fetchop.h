@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_FETCHOP_H
@@ -39,27 +39,9 @@
 #ifdef __KERNEL__
 
 /*
- * Initialize a FETCHOP line. The argument should point to the beginning
- * of the line.
- * 	SN1 - region mask is in word 0, data in word 1
- * 	SN2 - no region mask. Data in word 0
- */
-#ifdef CONFIG_IA64_SGI_SN1
-#define FETCHOP_INIT_LINE(p)	*(p) = 0xffffffffffffffffUL
-#elif CONFIG_IA64_SGI_SN2
-#define FETCHOP_INIT_LINE(p)
-#endif
-
-/*
- * Convert a region 7 (kaddr) address to the address of the fetchop variable
+ * Convert a region 6 (kaddr) address to the address of the fetchop variable
  */
 #define FETCHOP_KADDR_TO_MSPEC_ADDR(kaddr)	TO_MSPEC(kaddr)
-
-/*
- * Convert a page struct (page) address to the address of the first
- * fetchop variable in the page
- */
-#define FETCHOP_PAGE_TO_MSPEC_ADDR(page)	FETCHOP_KADDR_TO_MSPEC_ADDR(__pa(page_address(page)))
 
 
 /*
@@ -80,19 +62,19 @@
  * inconsistency.
  */
 typedef struct {
-
-#ifdef CONFIG_IA64_SGI_SN1
-	u64 permissions;
-#endif
         u64 variable;
-
-#ifdef CONFIG_IA64_SGI_SN1
-        u64 unused[6];
-#else
         u64 unused[7];
-#endif
-
 } AMO_t;
+
+
+/*
+ * The following APIs are externalized to the kernel to allocate/free fetchop variables.
+ * 	fetchop_kalloc_one	- Allocate/initialize 1 fetchop variable on the specified cnode.
+ * 	fetchop_kfree_one	- Free a previously allocated fetchop variable 
+ */
+
+unsigned long fetchop_kalloc_one(int nid);
+void fetchop_kfree_one(unsigned long maddr);
 
 
 #endif /* __KERNEL__ */

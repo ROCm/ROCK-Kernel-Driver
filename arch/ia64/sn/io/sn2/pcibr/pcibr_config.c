@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2001-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -28,19 +28,16 @@
 #include <asm/sn/prio.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/ioc3.h>
-#include <asm/sn/eeprom.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
-extern pcibr_info_t      pcibr_info_get(devfs_handle_t);
+extern pcibr_info_t      pcibr_info_get(vertex_hdl_t);
 
-uint64_t          pcibr_config_get(devfs_handle_t, unsigned, unsigned);
-uint64_t          do_pcibr_config_get(int, cfg_p, unsigned, unsigned);
-void              pcibr_config_set(devfs_handle_t, unsigned, unsigned, uint64_t);
-void       	  do_pcibr_config_set(int, cfg_p, unsigned, unsigned, uint64_t);
-static void	  swap_do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
+uint64_t          pcibr_config_get(vertex_hdl_t, unsigned, unsigned);
+uint64_t          do_pcibr_config_get(cfg_p, unsigned, unsigned);
+void              pcibr_config_set(vertex_hdl_t, unsigned, unsigned, uint64_t);
+void       	  do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
 
-#ifdef LITTLE_ENDIAN
 /*
  * on sn-ia we need to twiddle the the addresses going out
  * the pci bus because we use the unswizzled synergy space
@@ -51,18 +48,13 @@ static void	  swap_do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
 #define CS(b,r) (((volatile uint16_t *) b)[((r^4)/2)])
 #define CW(b,r) (((volatile uint32_t *) b)[((r^4)/4)])
 
-#define	CBP(b,r) (((volatile uint8_t *) b)[(r)^3])
-#define	CSP(b,r) (((volatile uint16_t *) b)[((r)/2)^1])
+#define	CBP(b,r) (((volatile uint8_t *) b)[(r)])
+#define	CSP(b,r) (((volatile uint16_t *) b)[((r)/2)])
 #define	CWP(b,r) (((volatile uint32_t *) b)[(r)/4])
 
 #define SCB(b,r) (((volatile uint8_t *) b)[((r)^3)])
 #define SCS(b,r) (((volatile uint16_t *) b)[((r^2)/2)])
 #define SCW(b,r) (((volatile uint32_t *) b)[((r)/4)])
-#else
-#define	CB(b,r)	(((volatile uint8_t *) cfgbase)[(r)^3])
-#define	CS(b,r)	(((volatile uint16_t *) cfgbase)[((r)/2)^1])
-#define	CW(b,r)	(((volatile uint32_t *) cfgbase)[(r)/4])
-#endif
 
 /*
  * Return a config space address for given slot / func / offset.  Note the
@@ -84,8 +76,7 @@ pcibr_func_config_addr(bridge_t *bridge, pciio_bus_t bus, pciio_slot_t slot,
 	/*
 	 * Type 0 config space
 	 */
-	if (is_pic(bridge))
-		slot++;
+	slot++;
 	return &bridge->b_type0_cfg_dev[slot].f[func].l[offset];
 }
 
@@ -109,7 +100,7 @@ pcibr_slot_config_get(bridge_t *bridge, pciio_slot_t slot, int offset)
 	cfg_p  cfg_base;
 	
 	cfg_base = pcibr_slot_config_addr(bridge, slot, 0);
-	return (do_pcibr_config_get(is_pic(bridge), cfg_base, offset, sizeof(unsigned)));
+	return (do_pcibr_config_get(cfg_base, offset, sizeof(unsigned)));
 }
 
 /*
@@ -122,7 +113,7 @@ pcibr_func_config_get(bridge_t *bridge, pciio_slot_t slot,
 	cfg_p  cfg_base;
 
 	cfg_base = pcibr_func_config_addr(bridge, 0, slot, func, 0);
-	return (do_pcibr_config_get(is_pic(bridge), cfg_base, offset, sizeof(unsigned)));
+	return (do_pcibr_config_get(cfg_base, offset, sizeof(unsigned)));
 }
 
 /*
@@ -135,7 +126,7 @@ pcibr_slot_config_set(bridge_t *bridge, pciio_slot_t slot,
 	cfg_p  cfg_base;
 
 	cfg_base = pcibr_slot_config_addr(bridge, slot, 0);
-	do_pcibr_config_set(is_pic(bridge), cfg_base, offset, sizeof(unsigned), val);
+	do_pcibr_config_set(cfg_base, offset, sizeof(unsigned), val);
 }
 
 /*
@@ -148,13 +139,13 @@ pcibr_func_config_set(bridge_t *bridge, pciio_slot_t slot,
 	cfg_p  cfg_base;
 
 	cfg_base = pcibr_func_config_addr(bridge, 0, slot, func, 0);
-	do_pcibr_config_set(is_pic(bridge), cfg_base, offset, sizeof(unsigned), val);
+	do_pcibr_config_set(cfg_base, offset, sizeof(unsigned), val);
 }
 
 int pcibr_config_debug = 0;
 
 cfg_p
-pcibr_config_addr(devfs_handle_t conn,
+pcibr_config_addr(vertex_hdl_t conn,
 		  unsigned reg)
 {
     pcibr_info_t            pcibr_info;
@@ -183,19 +174,6 @@ pcibr_config_addr(devfs_handle_t conn,
 	pciio_func = PCI_TYPE1_FUNC(reg);
 
 	ASSERT(pciio_bus != 0);
-#if 0
-    } else if (conn != pciio_info_hostdev_get(pciio_info)) {
-	/*
-	 * Conn is on a subordinate bus, so get bus/slot/func directly from
-	 * its pciio_info_t structure.
-	 */
-	pciio_bus = pciio_info->c_bus;
-	pciio_slot = pciio_info->c_slot;
-	pciio_func = pciio_info->c_func;
-	if (pciio_func == PCIIO_FUNC_NONE) {
-		pciio_func = 0;
-	}
-#endif
     } else {
 	/*
 	 * Conn is directly connected to the host bus.  PCI bus number is
@@ -224,44 +202,23 @@ pcibr_config_addr(devfs_handle_t conn,
     return cfgbase;
 }
 
-extern unsigned char Is_pic_on_this_nasid[];
 uint64_t
-pcibr_config_get(devfs_handle_t conn,
+pcibr_config_get(vertex_hdl_t conn,
 		 unsigned reg,
 		 unsigned size)
 {
-    if ( !Is_pic_on_this_nasid[ NASID_GET((pcibr_config_addr(conn, reg)))] )
-    	return do_pcibr_config_get(0, pcibr_config_addr(conn, reg),
-				PCI_TYPE1_REG(reg), size);
-    else
-    	return do_pcibr_config_get(1, pcibr_config_addr(conn, reg),
+	return do_pcibr_config_get(pcibr_config_addr(conn, reg),
 				PCI_TYPE1_REG(reg), size);
 }
 
 uint64_t
-do_pcibr_config_get(
-		       int pic,
-		       cfg_p cfgbase,
+do_pcibr_config_get(cfg_p cfgbase,
 		       unsigned reg,
 		       unsigned size)
 {
     unsigned                value;
 
-    if ( pic ) {
-	value = CWP(cfgbase, reg);
-    }
-    else {
-	if ( io_get_sh_swapper(NASID_GET(cfgbase)) ) {
-	    /*
-	     * Shub Swapper on - 0 returns PCI Offset 0 but byte swapped!
-	     * Do not swizzle address and byte swap the result.
-	     */
-	    value = SCW(cfgbase, reg);
-	    value = __swab32(value);
-	} else {
-    	    value = CW(cfgbase, reg);
-	}
-    }
+    value = CWP(cfgbase, reg);
     if (reg & 3)
 	value >>= 8 * (reg & 3);
     if (size < 4)
@@ -270,108 +227,43 @@ do_pcibr_config_get(
 }
 
 void
-pcibr_config_set(devfs_handle_t conn,
+pcibr_config_set(vertex_hdl_t conn,
 		 unsigned reg,
 		 unsigned size,
 		 uint64_t value)
 {
-    if ( Is_pic_on_this_nasid[ NASID_GET((pcibr_config_addr(conn, reg)))] )
-    	do_pcibr_config_set(1, pcibr_config_addr(conn, reg),
-			PCI_TYPE1_REG(reg), size, value);
-    else
-	swap_do_pcibr_config_set(pcibr_config_addr(conn, reg),
+	do_pcibr_config_set(pcibr_config_addr(conn, reg),
 			PCI_TYPE1_REG(reg), size, value);
 }
 
 void
-do_pcibr_config_set(int pic,
-		    cfg_p cfgbase,
+do_pcibr_config_set(cfg_p cfgbase,
 		    unsigned reg,
 		    unsigned size,
 		    uint64_t value)
 {
-	if ( pic ) {
-		switch (size) {
-		case 1:
+	switch (size) {
+	case 1:
+		CBP(cfgbase, reg) = value;
+		break;
+	case 2:
+		if (reg & 1) {
 			CBP(cfgbase, reg) = value;
-			break;
-		case 2:
-			if (reg & 1) {
-				CBP(cfgbase, reg) = value;
-				CBP(cfgbase, reg + 1) = value >> 8;
-			} else
-				CSP(cfgbase, reg) = value;
-			break;
-		case 3:
-			if (reg & 1) {
-				CBP(cfgbase, reg) = value;
-				CSP(cfgbase, (reg + 1)) = value >> 8;
-			} else {
-				CSP(cfgbase, reg) = value;
-				CBP(cfgbase, reg + 2) = value >> 16;
-			}
-			break;
-		case 4:
-			CWP(cfgbase, reg) = value;
-			break;
-   		}
-	}
-	else {
-		switch (size) {
-		case 1:
-			CB(cfgbase, reg) = value;
-			break;
-		case 2:
-			if (reg & 1) {
-				CB(cfgbase, reg) = value;
-				CB(cfgbase, reg + 1) = value >> 8;
-			} else
-				CS(cfgbase, reg) = value;
-			break;
-		case 3:
-			if (reg & 1) {
-				CB(cfgbase, reg) = value;
-				CS(cfgbase, (reg + 1)) = value >> 8;
-			} else {
-				CS(cfgbase, reg) = value;
-				CB(cfgbase, reg + 2) = value >> 16;
-			}
-			break;
-		case 4:
-			CW(cfgbase, reg) = value;
-			break;
-   		}
-	}
-}
-
-void
-swap_do_pcibr_config_set(cfg_p cfgbase,
-                    unsigned reg,
-                    unsigned size,
-                    uint64_t value)
-{
-
-    uint64_t temp_value = 0;
-
-    switch (size) {
-    case 1:
-        SCB(cfgbase, reg) = value;
-        break;
-    case 2:
-	temp_value = __swab16(value);
-        if (reg & 1) {
-            SCB(cfgbase, reg) = temp_value;
-            SCB(cfgbase, reg + 1) = temp_value >> 8;
-        } else
-            SCS(cfgbase, reg) = temp_value;
-        break;
-    case 3:
-	BUG();
-        break;
-
-    case 4:
-	temp_value = __swab32(value);
-        SCW(cfgbase, reg) = temp_value;
-        break;
-    }
+			CBP(cfgbase, reg + 1) = value >> 8;
+		} else
+			CSP(cfgbase, reg) = value;
+		break;
+	case 3:
+		if (reg & 1) {
+			CBP(cfgbase, reg) = value;
+			CSP(cfgbase, (reg + 1)) = value >> 8;
+		} else {
+			CSP(cfgbase, reg) = value;
+			CBP(cfgbase, reg + 2) = value >> 16;
+		}
+		break;
+	case 4:
+		CWP(cfgbase, reg) = value;
+		break;
+ 	}
 }

@@ -96,6 +96,9 @@ acpi_get_sysname (void)
 	if (!strcmp(hdr->oem_id, "HP")) {
 		return "hpzx1";
 	}
+	else if (!strcmp(hdr->oem_id, "SGI")) {
+		return "sn2";
+	}
 
 	return "dig";
 #else
@@ -103,8 +106,6 @@ acpi_get_sysname (void)
 	return "hpsim";
 # elif defined (CONFIG_IA64_HP_ZX1)
 	return "hpzx1";
-# elif defined (CONFIG_IA64_SGI_SN1)
-	return "sn1";
 # elif defined (CONFIG_IA64_SGI_SN2)
 	return "sn2";
 # elif defined (CONFIG_IA64_DIG)

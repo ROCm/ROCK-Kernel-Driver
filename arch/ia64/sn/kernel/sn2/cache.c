@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  * 
- * Copyright (C) 2001-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  *
  */
 
@@ -24,6 +24,5 @@ void
 sn_flush_all_caches(long flush_addr, long bytes)
 {
 	flush_icache_range(flush_addr, flush_addr+bytes);
+	mb();
 }
-
-

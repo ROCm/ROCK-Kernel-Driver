@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2001-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -27,7 +27,6 @@
 #include <asm/sn/prio.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/ioc3.h>
-#include <asm/sn/eeprom.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
@@ -36,20 +35,32 @@
 #define rmfreemap atemapfree
 #define rmfree atefree
 #define rmalloc atealloc
+
+inline int
+compare_and_swap_ptr(void **location, void *old_ptr, void *new_ptr)
+{
+	FIXME("compare_and_swap_ptr : NOT ATOMIC");
+	if (*location == old_ptr) {
+		*location = new_ptr;
+		return(1);
+	}
+	else
+		return(0);
+}
 #endif
 
 unsigned		pcibr_intr_bits(pciio_info_t info, pciio_intr_line_t lines, int nslots);
-pcibr_intr_t            pcibr_intr_alloc(devfs_handle_t, device_desc_t, pciio_intr_line_t, devfs_handle_t);
+pcibr_intr_t            pcibr_intr_alloc(vertex_hdl_t, device_desc_t, pciio_intr_line_t, vertex_hdl_t);
 void                    pcibr_intr_free(pcibr_intr_t);
 void              pcibr_setpciint(xtalk_intr_t);
 int                     pcibr_intr_connect(pcibr_intr_t, intr_func_t, intr_arg_t);
 void                    pcibr_intr_disconnect(pcibr_intr_t);
 
-devfs_handle_t            pcibr_intr_cpu_get(pcibr_intr_t);
+vertex_hdl_t            pcibr_intr_cpu_get(pcibr_intr_t);
 void                    pcibr_xintr_preset(void *, int, xwidgetnum_t, iopaddr_t, xtalk_intr_vector_t);
 void                    pcibr_intr_func(intr_arg_t);
 
-extern pcibr_info_t      pcibr_info_get(devfs_handle_t);
+extern pcibr_info_t      pcibr_info_get(vertex_hdl_t);
 
 /* =====================================================================
  *    INTERRUPT MANAGEMENT
@@ -132,6 +143,102 @@ pcibr_wrap_put(pcibr_intr_wrap_t wrap, pcibr_intr_cbuf_t cbuf)
 }
 
 /*
+ *	On SN systems there is a race condition between a PIO read response
+ *	and DMA's.  In rare cases, the read response may beat the DMA, causing
+ *	the driver to think that data in memory is complete and meaningful.
+ *	This code eliminates that race.
+ *	This routine is called by the PIO read routines after doing the read.
+ *	This routine then forces a fake interrupt on another line, which
+ *	is logically associated with the slot that the PIO is addressed to.
+ *	(see sn_dma_flush_init() )
+ *	It then spins while watching the memory location that the interrupt
+ *	is targetted to.  When the interrupt response arrives, we are sure
+ *	that the DMA has landed in memory and it is safe for the driver
+ *	to proceed.
+ */
+
+extern struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
+
+void
+sn_dma_flush(unsigned long addr) {
+	nasid_t nasid;
+	int wid_num;
+	volatile struct sn_flush_device_list *p;
+	int i,j;
+	int bwin;
+	unsigned long flags;
+
+	nasid = NASID_GET(addr);
+	wid_num = SWIN_WIDGETNUM(addr);
+	bwin = BWIN_WINDOWNUM(addr);
+
+	if (flush_nasid_list[nasid].widget_p == NULL) return;
+	if (bwin > 0) {
+		bwin--;
+		switch (bwin) {
+			case 0:
+				wid_num = ((flush_nasid_list[nasid].iio_itte1) >> 8) & 0xf;
+				break;
+			case 1:
+				wid_num = ((flush_nasid_list[nasid].iio_itte2) >> 8) & 0xf;
+				break;
+			case 2: 
+				wid_num = ((flush_nasid_list[nasid].iio_itte3) >> 8) & 0xf;
+				break;
+			case 3: 
+				wid_num = ((flush_nasid_list[nasid].iio_itte4) >> 8) & 0xf;
+				break;
+			case 4: 
+				wid_num = ((flush_nasid_list[nasid].iio_itte5) >> 8) & 0xf;
+				break;
+			case 5: 
+				wid_num = ((flush_nasid_list[nasid].iio_itte6) >> 8) & 0xf;
+				break;
+			case 6: 
+				wid_num = ((flush_nasid_list[nasid].iio_itte7) >> 8) & 0xf;
+				break;
+		}
+	}
+	if (flush_nasid_list[nasid].widget_p == NULL) return;
+	if (flush_nasid_list[nasid].widget_p[wid_num] == NULL) return;
+	p = &flush_nasid_list[nasid].widget_p[wid_num][0];
+
+	// find a matching BAR
+
+	for (i=0; i<DEV_PER_WIDGET;i++) {
+		for (j=0; j<PCI_ROM_RESOURCE;j++) {
+			if (p->bar_list[j].start == 0) break;
+			if (addr >= p->bar_list[j].start && addr <= p->bar_list[j].end) break;
+		}
+		if (j < PCI_ROM_RESOURCE && p->bar_list[j].start != 0) break;
+		p++;
+	}
+
+	// if no matching BAR, return without doing anything.
+
+	if (i == DEV_PER_WIDGET) return;
+
+	spin_lock_irqsave(&p->flush_lock, flags);
+
+	p->flush_addr = 0;
+
+	// force an interrupt.
+
+	*(bridgereg_t *)(p->force_int_addr) = 1;
+
+	// wait for the interrupt to come back.
+
+	while (p->flush_addr != 0x10f);
+
+	// okay, everything is synched up.
+	spin_unlock_irqrestore(&p->flush_lock, flags);
+
+	return;
+}
+
+EXPORT_SYMBOL(sn_dma_flush);
+
+/*
  *	There are end cases where a deadlock can occur if interrupt 
  *	processing completes and the Bridge b_int_status bit is still set.
  *
@@ -164,51 +271,42 @@ pcibr_wrap_put(pcibr_intr_wrap_t wrap, pcibr_intr_cbuf_t cbuf)
  *	to check if a specific Bridge b_int_status bit is set, and if so,
  *	cause the setting of the corresponding interrupt bit.
  *
- *	On a XBridge (SN1), we do this by writing the appropriate Bridge Force 
- *	Interrupt register. On SN0, or SN1 with an older Bridge, the Bridge 
- *	Force Interrupt register does not exist, so we write the Hub 
- *	INT_PEND_MOD register directly. Likewise for Octane, where we write the 
- *	Heart Set Interrupt Status register directly.
+ *	On a XBridge (SN1) and PIC (SN2), we do this by writing the appropriate Bridge Force 
+ *	Interrupt register.
  */
 void
-pcibr_force_interrupt(pcibr_intr_wrap_t wrap)
+pcibr_force_interrupt(pcibr_intr_t intr)
 {
-#ifdef PIC_LATER
 	unsigned	bit;
-	pcibr_soft_t    pcibr_soft = wrap->iw_soft;
+	unsigned	bits;
+	pcibr_soft_t    pcibr_soft = intr->bi_soft;
 	bridge_t       *bridge = pcibr_soft->bs_base;
 
-	bit = wrap->iw_ibit;
+	bits = intr->bi_ibits;
+	for (bit = 0; bit < 8; bit++) {
+		if (bits & (1 << bit)) {
 
-	PCIBR_DEBUG((PCIBR_DEBUG_INTR, pcibr_soft->bs_vhdl,
-		    "pcibr_force_interrupt: bit=0x%x\n", bit));
+			PCIBR_DEBUG((PCIBR_DEBUG_INTR, pcibr_soft->bs_vhdl,
+		    		"pcibr_force_interrupt: bit=0x%x\n", bit));
 
-	if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
-	    bridge->b_force_pin[bit].intr = 1;
-	} else if ((1 << bit) & *wrap->iw_stat) {
-	    cpuid_t	    cpu;
-	    unsigned        intr_bit;
-	    xtalk_intr_t    xtalk_intr =
-				pcibr_soft->bs_intr[bit].bsi_xtalk_intr;
-
-	    intr_bit = (short) xtalk_intr_vector_get(xtalk_intr);
-	    cpu = xtalk_intr_cpuid_get(xtalk_intr);
-	    REMOTE_CPU_SEND_INTR(cpu, intr_bit);
+			if (IS_XBRIDGE_OR_PIC_SOFT(pcibr_soft)) {
+	    			bridge->b_force_pin[bit].intr = 1;
+			}
+		}
 	}
-#endif	/* PIC_LATER */
 }
 
 /*ARGSUSED */
 pcibr_intr_t
-pcibr_intr_alloc(devfs_handle_t pconn_vhdl,
+pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		 device_desc_t dev_desc,
 		 pciio_intr_line_t lines,
-		 devfs_handle_t owner_dev)
+		 vertex_hdl_t owner_dev)
 {
     pcibr_info_t            pcibr_info = pcibr_info_get(pconn_vhdl);
     pciio_slot_t            pciio_slot = PCIBR_INFO_SLOT_GET_INT(pcibr_info);
     pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pcibr_info->f_mfast;
-    devfs_handle_t            xconn_vhdl = pcibr_soft->bs_conn;
+    vertex_hdl_t            xconn_vhdl = pcibr_soft->bs_conn;
     bridge_t               *bridge = pcibr_soft->bs_base;
     int                     is_threaded = 0;
 
@@ -498,25 +596,18 @@ pcibr_setpciint(xtalk_intr_t xtalk_intr)
 {
     iopaddr_t		 addr;
     xtalk_intr_vector_t	 vect;
-    devfs_handle_t	 vhdl;
+    vertex_hdl_t	 vhdl;
     bridge_t		*bridge;
+    picreg_t	*int_addr;
 
     addr = xtalk_intr_addr_get(xtalk_intr);
     vect = xtalk_intr_vector_get(xtalk_intr);
     vhdl = xtalk_intr_dev_get(xtalk_intr);
     bridge = (bridge_t *)xtalk_piotrans_addr(vhdl, 0, 0, sizeof(bridge_t), 0);
 
-    if (is_pic(bridge)) {
-	picreg_t	*int_addr;
-	int_addr = (picreg_t *)xtalk_intr_sfarg_get(xtalk_intr);
-	*int_addr = ((PIC_INT_ADDR_FLD & ((uint64_t)vect << 48)) |
+    int_addr = (picreg_t *)xtalk_intr_sfarg_get(xtalk_intr);
+    *int_addr = ((PIC_INT_ADDR_FLD & ((uint64_t)vect << 48)) |
 		     (PIC_INT_ADDR_HOST & addr));
-    } else {
-	bridgereg_t	*int_addr;
-	int_addr = (bridgereg_t *)xtalk_intr_sfarg_get(xtalk_intr);
-	*int_addr = ((BRIDGE_INT_ADDR_HOST & (addr >> 30)) |
-		     (BRIDGE_INT_ADDR_FLD & vect));
-    }
 }
 
 /*ARGSUSED */
@@ -582,8 +673,7 @@ pcibr_intr_connect(pcibr_intr_t pcibr_intr, intr_func_t intr_func, intr_arg_t in
 	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pcibr_intr->bi_dev,
 			"pcibr_setpciint: int_addr=0x%x, *int_addr=0x%x, "
 			"pcibr_int_bit=0x%x\n", int_addr,
-			(is_pic(bridge) ? 
-			 *(picreg_t *)int_addr : *(bridgereg_t *)int_addr),
+			 *(picreg_t *)int_addr,
 			pcibr_int_bit));
 	}
 
@@ -699,7 +789,7 @@ pcibr_intr_disconnect(pcibr_intr_t pcibr_intr)
 	    xtalk_intr_connect(pcibr_soft->bs_intr[pcibr_int_bit].bsi_xtalk_intr,
 				pcibr_intr_func, (intr_arg_t) intr_wrap,
 			       (xtalk_intr_setfunc_t)pcibr_setpciint,
-			       (void *)pcibr_int_bit);
+			       (void *)(long)pcibr_int_bit);
 	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pcibr_intr->bi_dev,
 			"pcibr_intr_disconnect: now-sharing int_bits=0x%x\n",
 			pcibr_int_bit));
@@ -707,7 +797,7 @@ pcibr_intr_disconnect(pcibr_intr_t pcibr_intr)
 }
 
 /*ARGSUSED */
-devfs_handle_t
+vertex_hdl_t
 pcibr_intr_cpu_get(pcibr_intr_t pcibr_intr)
 {
     pcibr_soft_t            pcibr_soft = pcibr_intr->bi_soft;
@@ -779,9 +869,6 @@ pcibr_setwidint(xtalk_intr_t intr)
     bridge->b_wid_int_upper = NEW_b_wid_int_upper;
     bridge->b_wid_int_lower = NEW_b_wid_int_lower;
     bridge->b_int_host_err = vect;
-
-printk("pcibr_setwidint: b_wid_int_upper 0x%x b_wid_int_lower 0x%x b_int_host_err 0x%x\n",
-	NEW_b_wid_int_upper, NEW_b_wid_int_lower, vect);
 
 }
 
@@ -957,7 +1044,7 @@ pcibr_intr_func(intr_arg_t arg)
 	     * interrupt to avoid a potential deadlock situation.
 	     */
 	    if (wrap->iw_hdlrcnt == 0) {
-		pcibr_force_interrupt(wrap);
+		pcibr_force_interrupt((pcibr_intr_t) wrap);
 	    }
 	}
 

@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/sn2/sn_private.h>
@@ -19,7 +20,6 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-#include <asm/sn/hack.h>
 #include <asm/sn/pci/bridge.h>
 #include <asm/sn/xtalk/xtalk_private.h>
 #include <asm/sn/simulator.h>
@@ -60,9 +60,9 @@ int                     xbow_devflag = D_MP;
 typedef struct xbow_soft_s *xbow_soft_t;
 
 struct xbow_soft_s {
-    devfs_handle_t            conn;	/* our connection point */
-    devfs_handle_t            vhdl;	/* xbow's private vertex */
-    devfs_handle_t            busv;	/* the xswitch vertex */
+    vertex_hdl_t            conn;	/* our connection point */
+    vertex_hdl_t            vhdl;	/* xbow's private vertex */
+    vertex_hdl_t            busv;	/* the xswitch vertex */
     xbow_t                 *base;	/* PIO pointer to crossbow chip */
     char                   *name;	/* hwgraph name */
 
@@ -90,36 +90,35 @@ struct xbow_soft_s {
  */
 
 void                    xbow_mlreset(xbow_t *);
-void                    xbow_init(void);
-int                     xbow_attach(devfs_handle_t);
+int                     xbow_attach(vertex_hdl_t);
 
-int                     xbow_open(devfs_handle_t *, int, int, cred_t *);
-int                     xbow_close(devfs_handle_t, int, int, cred_t *);
+static int              xbow_open(struct inode *, struct file *);
 
-int                     xbow_map(devfs_handle_t, vhandl_t *, off_t, size_t, uint);
-int                     xbow_unmap(devfs_handle_t, vhandl_t *);
-int                     xbow_ioctl(devfs_handle_t, int, void *, int, struct cred *, int *);
+int                     xbow_close(vertex_hdl_t, int, int, cred_t *);
+
+int                     xbow_map(vertex_hdl_t, vhandl_t *, off_t, size_t, uint);
+int                     xbow_unmap(vertex_hdl_t, vhandl_t *);
+int                     xbow_ioctl(vertex_hdl_t, int, void *, int, struct cred *, int *);
 
 int                     xbow_widget_present(xbow_t *, int);
 static int              xbow_link_alive(xbow_t *, int);
-devfs_handle_t            xbow_widget_lookup(devfs_handle_t, int);
+vertex_hdl_t            xbow_widget_lookup(vertex_hdl_t, int);
 
 void                    xbow_intr_preset(void *, int, xwidgetnum_t, iopaddr_t, xtalk_intr_vector_t);
 
 
 
-void                    xbow_update_perf_counters(devfs_handle_t);
-xbow_perf_link_t       *xbow_get_perf_counters(devfs_handle_t);
-int                     xbow_enable_perf_counter(devfs_handle_t, int, int, int);
-xbow_link_status_t     *xbow_get_llp_status(devfs_handle_t);
-void                    xbow_update_llp_status(devfs_handle_t);
+void                    xbow_update_perf_counters(vertex_hdl_t);
+xbow_perf_link_t       *xbow_get_perf_counters(vertex_hdl_t);
+int                     xbow_enable_perf_counter(vertex_hdl_t, int, int, int);
+xbow_link_status_t     *xbow_get_llp_status(vertex_hdl_t);
+void                    xbow_update_llp_status(vertex_hdl_t);
 
-int                     xbow_disable_llp_monitor(devfs_handle_t);
-int                     xbow_enable_llp_monitor(devfs_handle_t);
-int                     xbow_prio_bw_alloc(devfs_handle_t, xwidgetnum_t, xwidgetnum_t,
+int                     xbow_disable_llp_monitor(vertex_hdl_t);
+int                     xbow_enable_llp_monitor(vertex_hdl_t);
+int                     xbow_prio_bw_alloc(vertex_hdl_t, xwidgetnum_t, xwidgetnum_t,
                                 unsigned long long, unsigned long long);
 static void		xbow_setwidint(xtalk_intr_t);
-void                    idbg_xbowregs(int64_t);
 
 xswitch_reset_link_f    xbow_reset_link;
 
@@ -164,8 +163,8 @@ xbow_mmap(struct file * file, struct vm_area_struct * vma)
         phys_addr = (unsigned long)file->private_data & ~0xc000000000000000; /* Mask out the Uncache bits */
         vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
         vma->vm_flags |= VM_RESERVED | VM_IO;
-        error = io_remap_page_range(vma, vma->vm_start, phys_addr,
-                                   vma->vm_end - vma->vm_start,
+        error = io_remap_page_range(vma, phys_addr, vma->vm_start,
+                                   vma->vm_end-vma->vm_start,
                                    vma->vm_page_prot);
         return(error);
 }
@@ -186,39 +185,6 @@ xbow_mmap(struct file * file, struct vm_area_struct * vma)
 void
 xbow_mlreset(xbow_t * xbow)
 {
-}
-
-/*
- *    xbow_init: called with the rest of the device
- *      driver XXX_init routines. This platform *might*
- *      have a Crossbow chip, or even several, but it
- *      might have none. Register with the crosstalk
- *      generic provider so when we encounter the chip
- *      the right magic happens.
- */
-void
-xbow_init(void)
-{
-
-#if DEBUG && ATTACH_DEBUG
-    printk("xbow_init\n");
-#endif
-
-    xwidget_driver_register(PXBOW_WIDGET_PART_NUM,
-			    0, /* XXBOW_WIDGET_MFGR_NUM, */
-			    "xbow_",
-			    CDL_PRI_HI);	/* attach before friends */
-
-
-    xwidget_driver_register(XXBOW_WIDGET_PART_NUM,
-			    0, /* XXBOW_WIDGET_MFGR_NUM, */
-			    "xbow_",
-			    CDL_PRI_HI);	/* attach before friends */
-
-    xwidget_driver_register(XBOW_WIDGET_PART_NUM,
-			    XBOW_WIDGET_MFGR_NUM,
-			    "xbow_",
-			    CDL_PRI_HI);	/* attach before friends */
 }
 
 #ifdef XBRIDGE_REGS_SIM
@@ -257,11 +223,11 @@ xbow_set_simulated_regs(xbow_t *xbow, int port)
 
 /*ARGSUSED */
 int
-xbow_attach(devfs_handle_t conn)
+xbow_attach(vertex_hdl_t conn)
 {
     /*REFERENCED */
-    devfs_handle_t            vhdl;
-    devfs_handle_t            busv;
+    vertex_hdl_t            vhdl;
+    vertex_hdl_t            busv;
     xbow_t                 *xbow;
     xbow_soft_t             soft;
     int                     port;
@@ -322,10 +288,10 @@ xbow_attach(devfs_handle_t conn)
      * file ops.
      */
     vhdl = NULL;
-    vhdl = devfs_register(conn, EDGE_LBL_XBOW,
-		DEVFS_FL_AUTO_DEVNUM, 0, 0,
-		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-		&xbow_fops, (void *)xbow);
+    vhdl = hwgraph_register(conn, EDGE_LBL_XBOW, 0,
+	   DEVFS_FL_AUTO_DEVNUM, 0, 0,
+	   S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
+	   (struct file_operations *)&xbow_fops, (void *)xbow);
     if (!vhdl) {
         printk(KERN_WARNING "xbow_attach: Unable to create char device for xbow conn %p\n",
                 (void *)conn);
@@ -393,6 +359,14 @@ xbow_attach(devfs_handle_t conn)
       */
      intr_hdl = xtalk_intr_alloc(conn, (device_desc_t)0, vhdl);
      ASSERT(intr_hdl != NULL);
+
+        {
+                int irq = ((hub_intr_t)intr_hdl)->i_bit;
+                int cpu = ((hub_intr_t)intr_hdl)->i_cpuid;
+
+                intr_unreserve_level(cpu, irq);
+                ((hub_intr_t)intr_hdl)->i_bit = SGI_XBOW_ERROR;
+        }
  
      xtalk_intr_connect(intr_hdl,
                         (intr_func_t) xbow_errintr_handler,
@@ -400,18 +374,8 @@ xbow_attach(devfs_handle_t conn)
                         (xtalk_intr_setfunc_t) xbow_setwidint,
                         (void *) xbow);
 
-     request_irq(CPU_VECTOR_TO_IRQ(((hub_intr_t)intr_hdl)->i_cpuid,
-			((hub_intr_t)intr_hdl)->i_bit),
-			(intr_func_t)xbow_errintr_handler, 0, "XBOW error",
+     request_irq(SGI_XBOW_ERROR, (void *)xbow_errintr_handler, SA_SHIRQ, "XBOW error",
 			(intr_arg_t) soft);
-
-#ifdef BUS_INT_WAR_NOT_YET
-    {
-	void sn_add_polled_interrupt(int, int);
-        sn_add_polled_interrupt(CPU_VECTOR_TO_IRQ(((hub_intr_t)intr_hdl)->i_cpuid,
-                                ((hub_intr_t)intr_hdl)->i_bit), 5000);
-    }
-#endif
 
  
     /*
@@ -483,24 +447,24 @@ xbow_attach(devfs_handle_t conn)
 }
 
 /*ARGSUSED */
-int
-xbow_open(devfs_handle_t *devp, int oflag, int otyp, cred_t *credp)
+static int
+xbow_open(struct inode *xx, struct file *yy)
 {
     return 0;
 }
 
 /*ARGSUSED */
 int
-xbow_close(devfs_handle_t dev, int oflag, int otyp, cred_t *crp)
+xbow_close(vertex_hdl_t dev, int oflag, int otyp, cred_t *crp)
 {
     return 0;
 }
 
 /*ARGSUSED */
 int
-xbow_map(devfs_handle_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
+xbow_map(vertex_hdl_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
 {
-    devfs_handle_t            vhdl = dev_to_vhdl(dev);
+    vertex_hdl_t            vhdl = dev_to_vhdl(dev);
     xbow_soft_t             soft = xbow_soft_get(vhdl);
     int                     error;
 
@@ -513,7 +477,7 @@ xbow_map(devfs_handle_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
 
 /*ARGSUSED */
 int
-xbow_unmap(devfs_handle_t dev, vhandl_t *vt)
+xbow_unmap(vertex_hdl_t dev, vhandl_t *vt)
 {
     return 0;
 }
@@ -523,9 +487,9 @@ xbow_unmap(devfs_handle_t dev, vhandl_t *vt)
  * be good enough.
  */
 xwidgetnum_t
-xbow_widget_num_get(devfs_handle_t dev)
+xbow_widget_num_get(vertex_hdl_t dev)
 {
-	devfs_handle_t	tdev;
+	vertex_hdl_t	tdev;
 	char		devname[MAXDEVNAME];
 	xwidget_info_t	xwidget_info;
 	int		i;
@@ -556,19 +520,19 @@ xbow_widget_num_get(devfs_handle_t dev)
 }
 
 int
-xbow_ioctl(devfs_handle_t dev,
+xbow_ioctl(vertex_hdl_t dev,
 	   int cmd,
 	   void *arg,
 	   int flag,
 	   struct cred *cr,
 	   int *rvalp)
 {
-    devfs_handle_t            vhdl;
+    vertex_hdl_t            vhdl;
     int                     error = 0;
 
 #if defined (DEBUG)
     int                     rc;
-    devfs_handle_t            conn;
+    vertex_hdl_t            conn;
     struct xwidget_info_s  *xwidget_info;
     xbow_soft_t             xbow_soft;
 #endif
@@ -648,12 +612,12 @@ xbow_link_alive(xbow_t * xbow, int port)
  *      specified.
  *      If not found, return 0.
  */
-devfs_handle_t
-xbow_widget_lookup(devfs_handle_t vhdl,
+vertex_hdl_t
+xbow_widget_lookup(vertex_hdl_t vhdl,
 		   int widgetnum)
 {
     xswitch_info_t          xswitch_info;
-    devfs_handle_t            conn;
+    vertex_hdl_t            conn;
 
     xswitch_info = xswitch_info_get(vhdl);
     conn = xswitch_info_vhdl_get(xswitch_info, widgetnum);
@@ -713,48 +677,14 @@ xbow_intr_preset(void *which_widget,
 				    XEM_ADD_NVAR("ioe." #n, p);		\
 				}
 
-#ifdef LATER
-static void
-xem_add_ioe(ioerror_t *ioe)
-{
-    union tmp {
-	ushort stmp;
-	unsigned long long lltmp;
-	cpuid_t cputmp;
-	cnodeid_t cntmp;
-	iopaddr_t iotmp;
-	caddr_t catmp;
-	paddr_t patmp;
-    } tmp;
-
-    XEM_ADD_IOEF(tmp.stmp, errortype);
-    XEM_ADD_IOEF(tmp.stmp, widgetnum);
-    XEM_ADD_IOEF(tmp.stmp, widgetdev);
-    XEM_ADD_IOEF(tmp.cputmp, srccpu);
-    XEM_ADD_IOEF(tmp.cntmp, srcnode);
-    XEM_ADD_IOEF(tmp.cntmp, errnode);
-    XEM_ADD_IOEF(tmp.iotmp, sysioaddr);
-    XEM_ADD_IOEF(tmp.iotmp, xtalkaddr);
-    XEM_ADD_IOEF(tmp.iotmp, busspace);
-    XEM_ADD_IOEF(tmp.iotmp, busaddr);
-    XEM_ADD_IOEF(tmp.catmp, vaddr);
-    XEM_ADD_IOEF(tmp.patmp, memaddr);
-    XEM_ADD_IOEF(tmp.catmp, epc);
-    XEM_ADD_IOEF(tmp.catmp, ef);
-    XEM_ADD_IOEF(tmp.stmp, tnum);
-}
-
-#define XEM_ADD_IOE()   (xem_add_ioe(ioe))
-#endif	/* LATER */
-
-int                     xbow_xmit_retry_errors = 0;
+int                     xbow_xmit_retry_errors;
 
 int
 xbow_xmit_retry_error(xbow_soft_t soft,
 		      int port)
 {
     xswitch_info_t          info;
-    devfs_handle_t            vhdl;
+    vertex_hdl_t            vhdl;
     widget_cfg_t           *wid;
     widgetreg_t             id;
     int                     part;
@@ -904,7 +834,7 @@ xbow_errintr_handler(int irq, void *arg, struct pt_regs *ep)
 		    link_pend &= ~XB_STAT_XMT_RTRY_ERR;
 		}
 		if (link_pend) {
-		    devfs_handle_t	xwidget_vhdl;
+		    vertex_hdl_t	xwidget_vhdl;
 		    char		*xwidget_name;
 		    
 		    /* Get the widget name corresponding to the current
@@ -956,12 +886,6 @@ xbow_errintr_handler(int irq, void *arg, struct pt_regs *ep)
 			XEM_ADD_VAR(link_status);
 			XEM_ADD_VAR(link_aux_status);
 
-#ifdef LATER
-			if (dump_ioe) {
-			    XEM_ADD_IOE();
-			    dump_ioe = 0;
-			}
-#endif
 #if !DEBUG
 		    }
 #endif
@@ -1026,8 +950,8 @@ xbow_error_handler(
 
     xbow_soft_t             soft = (xbow_soft_t) einfo;
     int                     port;
-    devfs_handle_t          conn;
-    devfs_handle_t          busv;
+    vertex_hdl_t          conn;
+    vertex_hdl_t          busv;
 
     xbow_t                 *xbow = soft->base;
     xbowreg_t               wid_stat;
@@ -1279,7 +1203,7 @@ xbow_error_handler(
 }
 
 void
-xbow_update_perf_counters(devfs_handle_t vhdl)
+xbow_update_perf_counters(vertex_hdl_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
     xbow_perf_t            *xbow_perf = xbow_soft->xbow_perfcnt;
@@ -1307,7 +1231,7 @@ xbow_update_perf_counters(devfs_handle_t vhdl)
 }
 
 xbow_perf_link_t       *
-xbow_get_perf_counters(devfs_handle_t vhdl)
+xbow_get_perf_counters(vertex_hdl_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
     xbow_perf_link_t       *xbow_perf_link = xbow_soft->xbow_perflink;
@@ -1316,7 +1240,7 @@ xbow_get_perf_counters(devfs_handle_t vhdl)
 }
 
 int
-xbow_enable_perf_counter(devfs_handle_t vhdl, int link, int mode, int counter)
+xbow_enable_perf_counter(vertex_hdl_t vhdl, int link, int mode, int counter)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
     xbow_perf_t            *xbow_perf = xbow_soft->xbow_perfcnt;
@@ -1370,7 +1294,7 @@ xbow_enable_perf_counter(devfs_handle_t vhdl, int link, int mode, int counter)
 }
 
 xbow_link_status_t     *
-xbow_get_llp_status(devfs_handle_t vhdl)
+xbow_get_llp_status(vertex_hdl_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
     xbow_link_status_t     *xbow_llp_status = xbow_soft->xbow_link_status;
@@ -1379,7 +1303,7 @@ xbow_get_llp_status(devfs_handle_t vhdl)
 }
 
 void
-xbow_update_llp_status(devfs_handle_t vhdl)
+xbow_update_llp_status(vertex_hdl_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
     xbow_link_status_t     *xbow_llp_status = xbow_soft->xbow_link_status;
@@ -1387,7 +1311,7 @@ xbow_update_llp_status(devfs_handle_t vhdl)
     xbwX_stat_t             lnk_sts;
     xbow_aux_link_status_t  aux_sts;
     int                     link;
-    devfs_handle_t	    xwidget_vhdl;
+    vertex_hdl_t	    xwidget_vhdl;
     char		   *xwidget_name;	
 
     xbow = (xbow_t *) xbow_soft->base;
@@ -1421,7 +1345,7 @@ xbow_update_llp_status(devfs_handle_t vhdl)
 }
 
 int
-xbow_disable_llp_monitor(devfs_handle_t vhdl)
+xbow_disable_llp_monitor(vertex_hdl_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
     int                     port;
@@ -1436,7 +1360,7 @@ xbow_disable_llp_monitor(devfs_handle_t vhdl)
 }
 
 int
-xbow_enable_llp_monitor(devfs_handle_t vhdl)
+xbow_enable_llp_monitor(vertex_hdl_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
 
@@ -1446,7 +1370,7 @@ xbow_enable_llp_monitor(devfs_handle_t vhdl)
 
 
 int
-xbow_reset_link(devfs_handle_t xconn_vhdl)
+xbow_reset_link(vertex_hdl_t xconn_vhdl)
 {
     xwidget_info_t          widget_info;
     xwidgetnum_t            port;
@@ -1469,7 +1393,7 @@ xbow_reset_link(devfs_handle_t xconn_vhdl)
     xbow = XBOW_K1PTR;
 #else
     {
-	devfs_handle_t            xbow_vhdl;
+	vertex_hdl_t            xbow_vhdl;
 	xbow_soft_t             xbow_soft;
 
 	hwgraph_traverse(xconn_vhdl, ".master/xtalk/0/xbow", &xbow_vhdl);
@@ -1501,46 +1425,6 @@ xbow_reset_link(devfs_handle_t xconn_vhdl)
     xbow->xb_link(port).link_control = ctrl;
     return 0;
 }
-
-/*
- * Dump xbow registers.
- * input parameter is either a pointer to
- * the xbow chip or the vertex handle for
- * an xbow vertex.
- */
-void
-idbg_xbowregs(int64_t regs)
-{
-    xbow_t                 *xbow;
-    int                     i;
-    xb_linkregs_t          *link;
-
-    xbow = (xbow_t *) regs;
-
-#ifdef LATER
-    qprintf("Printing xbow registers starting at 0x%x\n", xbow);
-    qprintf("wid %x status %x erruppr %x errlower %x control %x timeout %x\n",
-	    xbow->xb_wid_id, xbow->xb_wid_stat, xbow->xb_wid_err_upper,
-	    xbow->xb_wid_err_lower, xbow->xb_wid_control,
-	    xbow->xb_wid_req_timeout);
-    qprintf("intr uppr %x lower %x errcmd %x llp ctrl %x arb_reload %x\n",
-	    xbow->xb_wid_int_upper, xbow->xb_wid_int_lower,
-	    xbow->xb_wid_err_cmdword, xbow->xb_wid_llp,
-	    xbow->xb_wid_arb_reload);
-#endif
-
-    for (i = 8; i <= 0xf; i++) {
-	link = &xbow->xb_link(i);
-#ifdef LATER
-	qprintf("Link %d registers\n", i);
-	qprintf("\tctrl %x stat %x arbuppr %x arblowr %x auxstat %x\n",
-		link->link_control, link->link_status,
-		link->link_arb_upper, link->link_arb_lower,
-		link->link_aux_status);
-#endif
-    }
-}
-
 
 #define XBOW_ARB_RELOAD_TICKS		25
 					/* granularity: 4 MB/s, max: 124 MB/s */
@@ -1601,7 +1485,7 @@ xbow_gbr_to_bytes(int gbr)
  * If bandwidth allocation is successful, return success else return failure.
  */
 int
-xbow_prio_bw_alloc(devfs_handle_t vhdl,
+xbow_prio_bw_alloc(vertex_hdl_t vhdl,
 		xwidgetnum_t src_wid,
 		xwidgetnum_t dest_wid,
 		unsigned long long old_alloc_bw,

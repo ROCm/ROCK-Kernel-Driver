@@ -13,7 +13,7 @@
  * FPROM EFI memory descriptor build routines
  *
  * 	- Routines to build the EFI memory descriptor map
- * 	- Should also be usable by the SGI SN1 prom to convert
+ * 	- Should also be usable by the SGI prom to convert
  * 	  klconfig to efi_memmap
  */
 
@@ -53,10 +53,7 @@ sn_config_t	*sn_config ;
 #define KERNEL_SIZE		(4*MB)
 #define PROMRESERVED_SIZE	(1*MB)
 
-#ifdef CONFIG_IA64_SGI_SN1
-#define PHYS_ADDRESS(_n, _x)		(((long)_n<<33) | (long)_x)
-#define MD_BANK_SHFT 30
-#else
+#ifdef SGI_SN2
 #define PHYS_ADDRESS(_n, _x)		(((long)_n<<38) | (long)_x | 0x3000000000UL)
 #define MD_BANK_SHFT 34
 #endif
@@ -77,7 +74,7 @@ GetNumCpus(void)
 	return sn_config->cpus;
 }
 
-/* For SN1, get the index th nasid */
+/* For SN, get the index th nasid */
 
 int
 GetNasid(int index)
@@ -104,40 +101,7 @@ IsCpuPresent(int cnode, int cpu)
  * actually disabled etc.
  */
 
-#ifdef CONFIG_IA64_SGI_SN1
-int
-IsBankPresent(int index, node_memmap_t nmemmap)
-{
-	switch (index) {
-		case 0:return nmemmap.b0;
-		case 1:return nmemmap.b1;
-		case 2:return nmemmap.b2;
-		case 3:return nmemmap.b3;
-		case 4:return nmemmap.b4;
-		case 5:return nmemmap.b5;
-		case 6:return nmemmap.b6;
-		case 7:return nmemmap.b7;
-		default:return -1 ;
-	}
-}
-
-int
-GetBankSize(int index, node_memmap_t nmemmap)
-{
-        switch (index) {
-                case 0:
-                case 1:return nmemmap.b01size;
-                case 2:
-                case 3:return nmemmap.b23size;
-                case 4:
-                case 5:return nmemmap.b45size;
-                case 6:
-                case 7:return nmemmap.b67size;
-                default:return -1 ;
-        }
-}
-
-#else
+#ifdef SGI_SN2
 int
 IsBankPresent(int index, node_memmap_t nmemmap)
 {
@@ -192,12 +156,12 @@ build_efi_memmap(void *md, int mdsize)
 	for (cnode=0;cnode<numnodes;cnode++) {
 		nasid = GetNasid(cnode) ;
 		membank_info = GetMemBankInfo(cnode) ;
-		for (bank=0;bank<NR_BANKS_PER_NODE;bank++) {
+		for (bank=0;bank<MD_BANKS_PER_NODE;bank++) {
 			if (IsBankPresent(bank, membank_info)) {
 				bsize = GetBankSize(bank, membank_info) ;
                                 paddr = PHYS_ADDRESS(nasid, (long)bank<<MD_BANK_SHFT);
                                 numbytes = BankSizeBytes(bsize);
-#ifdef CONFIG_IA64_SGI_SN2
+#ifdef SGI_SN2
 				/* 
 				 * Ignore directory.
 				 * Shorten memory chunk by 1 page - makes a better
@@ -218,7 +182,7 @@ build_efi_memmap(void *md, int mdsize)
 				}
 
                                 /*
-                                 * Check for the node 0 hole. Since banks can't
+                                 * Check for the node 0 hole. Since banks cant
                                  * span the hole, we only need to check if the end of
                                  * the range is the end of the hole.
                                  */
@@ -226,7 +190,7 @@ build_efi_memmap(void *md, int mdsize)
                                         numbytes -= NODE0_HOLE_SIZE;
                                 /*
                                  * UGLY hack - we must skip overr the kernel and
-                                 * PROM runtime services but we don't exactly where it is.
+                                 * PROM runtime services but we dont exactly where it is.
                                  * So lets just reserve:
 				 *	node 0
 				 *		0-1MB for PAL

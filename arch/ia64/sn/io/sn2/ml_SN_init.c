@@ -19,25 +19,12 @@
 #include <asm/sn/sn_private.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/snconfig.h>
 
-extern int numcpus;
-extern char arg_maxnodes[];
 extern cpuid_t master_procid;
-
-extern int hasmetarouter;
-
 int		maxcpus;
-cpumask_t	boot_cpumask;
-hubreg_t	region_mask = 0;
-
 
 extern xwidgetnum_t hub_widget_id(nasid_t);
 
-extern int valid_icache_reasons;	/* Reasons to flush the icache */
-extern int valid_dcache_reasons;	/* Reasons to flush the dcache */
-extern u_char miniroot;
-extern volatile int	need_utlbmiss_patch;
 extern void iograph_early_init(void);
 
 nasid_t master_nasid = INVALID_NASID;		/* This is the partition master nasid */
@@ -121,16 +108,6 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	npda->geoid.any.type = GEO_TYPE_INVALID;
 
 	mutex_init_locked(&npda->xbow_sema); /* init it locked? */
-}
-
-/* XXX - Move the interrupt stuff to intr.c ? */
-/*
- * Set up the platform-dependent fields in the processor pda.
- * Must be done _after_ init_platform_nodepda().
- * If we need a lock here, something else is wrong!
- */
-void init_platform_pda(cpuid_t cpu)
-{
 }
 
 void

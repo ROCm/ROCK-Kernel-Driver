@@ -74,8 +74,6 @@ extern void machvec_memory_fence (void);
 #  include <asm/machvec_dig.h>
 # elif defined (CONFIG_IA64_HP_ZX1)
 #  include <asm/machvec_hpzx1.h>
-# elif defined (CONFIG_IA64_SGI_SN1)
-#  include <asm/machvec_sn1.h>
 # elif defined (CONFIG_IA64_SGI_SN2)
 #  include <asm/machvec_sn2.h>
 # elif defined (CONFIG_IA64_GENERIC)

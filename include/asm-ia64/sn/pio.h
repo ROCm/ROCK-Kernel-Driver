@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_PIO_H
 #define _ASM_IA64_SN_PIO_H
@@ -32,19 +32,11 @@ typedef volatile ulong*	pioaddr_t;
 typedef struct piomap {
 	uint		pio_bus;
 	uint		pio_adap;
-#ifdef LATER
-	iospace_t	pio_iospace;
-#endif
 	int		pio_flag;
 	int		pio_reg;
 	char		pio_name[7];	/* to identify the mapped device */
 	struct piomap	*pio_next;	/* dlist to link active piomap's */
 	struct piomap	*pio_prev;	/* for debug and error reporting */
-#ifdef LATER
-	void		(*pio_errfunc)(); /* Pointer to an error function */
-					  /* Used only for piomaps allocated
-					   * in user level vme driver     */
-#endif
 	iopaddr_t	pio_iopmask;	/* valid iop address bit mask */
 	iobush_t	pio_bushandle;	/* bus-level handle */
 } piomap_t;
@@ -57,54 +49,6 @@ typedef struct piomap {
 /* Macro to get/set PIO error function */
 #define	pio_seterrf(p,f)	(p)->pio_errfunc = (f)
 #define	pio_geterrf(p)		(p)->pio_errfunc
-
-
-/*
- * pio_mapalloc() - allocates a handle that specifies a mapping from kernel
- *		    virtual to io space. The returned handle piomap is used
- *		    with the access functions to make sure that the mapping
- *		    to the iospace exists.
- * pio_mapfree()  - frees the mapping as specified in the piomap handle.
- * pio_mapaddr()  - returns the kv address that maps to piomap'ed io address.
- */
-#ifdef LATER
-extern piomap_t	*pio_mapalloc(uint,uint,iospace_t*,int,char*);
-extern void	 pio_mapfree(piomap_t*);
-extern caddr_t	 pio_mapaddr(piomap_t*,iopaddr_t);
-extern piomap_t *pio_ioaddr(int, iobush_t, iopaddr_t, piomap_t *);
-
-/*
- * PIO access functions.
- */
-extern int  pio_badaddr(piomap_t*,iopaddr_t,int);
-extern int  pio_badaddr_val(piomap_t*,iopaddr_t,int,void*);
-extern int  pio_wbadaddr(piomap_t*,iopaddr_t,int);
-extern int  pio_wbadaddr_val(piomap_t*,iopaddr_t,int,int);
-extern int  pio_bcopyin(piomap_t*,iopaddr_t,void *,int, int, int);
-extern int  pio_bcopyout(piomap_t*,iopaddr_t,void *,int, int, int);
-
-
-/*
- * PIO RMW functions using piomap.
- */
-extern void pio_orb_rmw(piomap_t*, iopaddr_t, unsigned char);
-extern void pio_orh_rmw(piomap_t*, iopaddr_t, unsigned short);
-extern void pio_orw_rmw(piomap_t*, iopaddr_t, unsigned long);
-extern void pio_andb_rmw(piomap_t*, iopaddr_t, unsigned char);
-extern void pio_andh_rmw(piomap_t*, iopaddr_t, unsigned short); 
-extern void pio_andw_rmw(piomap_t*, iopaddr_t, unsigned long); 
-
-
-/*
- * Old RMW function interface
- */
-extern void orb_rmw(volatile void*, unsigned int);
-extern void orh_rmw(volatile void*, unsigned int);
-extern void orw_rmw(volatile void*, unsigned int);
-extern void andb_rmw(volatile void*, unsigned int);
-extern void andh_rmw(volatile void*, unsigned int);
-extern void andw_rmw(volatile void*, unsigned int);
-#endif	/* LATER */
 
 
 /*

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1992 - 1997,2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 1992-1997,2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_SN2_SLOTNUM_H

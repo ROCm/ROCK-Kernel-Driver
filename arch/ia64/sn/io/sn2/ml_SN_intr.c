@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 /*
@@ -40,11 +40,14 @@
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
 
-extern irqpda_t	*irqpdaindr[];
-extern cnodeid_t master_node_get(devfs_handle_t vhdl);
+extern irqpda_t	*irqpdaindr;
+extern cnodeid_t master_node_get(vertex_hdl_t vhdl);
 extern nasid_t master_nasid;
 
 //  Initialize some shub registers for interrupts, both IO and error.
+//  
+
+
 
 void
 intr_init_vecblk( nodepda_t *npda,
@@ -58,6 +61,8 @@ intr_init_vecblk( nodepda_t *npda,
 	nodepda_t		*lnodepda;
 	sh_ii_int0_enable_u_t	ii_int_enable;
 	sh_int_node_id_config_u_t	node_id_config;
+	sh_local_int5_config_u_t	local5_config;
+	sh_local_int5_enable_u_t	local5_enable;
 	extern void sn_init_cpei_timer(void);
 	static int timer_added = 0;
 
@@ -93,6 +98,19 @@ intr_init_vecblk( nodepda_t *npda,
 	HUB_S( (unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_PI_ERROR_MASK), 0);
 	HUB_S( (unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_PI_CRBP_ERROR_MASK), 0);
 
+	// Config and enable UART interrupt, all nodes.
+
+	local5_config.sh_local_int5_config_regval = 0;
+	local5_config.sh_local_int5_config_s.idx = SGI_UART_VECTOR;
+	local5_config.sh_local_int5_config_s.pid = cpu0;
+	HUB_S( (unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_LOCAL_INT5_CONFIG),
+		local5_config.sh_local_int5_config_regval);
+
+	local5_enable.sh_local_int5_enable_regval = 0;
+	local5_enable.sh_local_int5_enable_s.uart_int = 1;
+	HUB_S( (unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_LOCAL_INT5_ENABLE),
+		local5_enable.sh_local_int5_enable_regval);
+
 
 	// The II_INT_CONFIG register for cpu 0.
 	ii_int_config.sh_ii_int0_config_regval = 0;
@@ -119,13 +137,6 @@ intr_init_vecblk( nodepda_t *npda,
 	// Enable interrupts for II_INT0 and 1.
 	ii_int_enable.sh_ii_int0_enable_regval = 0;
 	ii_int_enable.sh_ii_int0_enable_s.ii_enable = 1;
-#ifdef BUS_INT_WAR
-	/* Dont enable any ints from II. We will poll for interrupts. */
-	ii_int_enable.sh_ii_int0_enable_s.ii_enable = 0;
-
-	/* Enable IPIs. We use them ONLY for send INITs to hung cpus */
-	*(volatile long*)GLOBAL_MMR_ADDR(nasid, SH_IPI_INT_ENABLE) = 1;
-#endif
 
 	HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_II_INT0_ENABLE),
 		ii_int_enable.sh_ii_int0_enable_regval);
@@ -147,7 +158,8 @@ do_intr_reserve_level(cpuid_t cpu,
 			int reserve)
 {
 	int i;
-	irqpda_t	*irqs = irqpdaindr[cpu];
+	irqpda_t	*irqs = irqpdaindr;
+	int		min_shared;
 
 	if (reserve) {
 		if (bit < 0) {
@@ -158,8 +170,32 @@ do_intr_reserve_level(cpuid_t cpu,
 				}
 			}
 		}
-		if (bit < 0) {
-			return -1;
+		if (bit < 0) {  /* ran out of irqs.  Have to share.  This will be rare. */
+			min_shared = 256;
+			for (i=IA64_SN2_FIRST_DEVICE_VECTOR; i < IA64_SN2_LAST_DEVICE_VECTOR; i++) {
+				/* Share with the same device class */
+				if (irqpdaindr->current->vendor == irqpdaindr->device_dev[i]->vendor &&
+					irqpdaindr->current->device == irqpdaindr->device_dev[i]->device &&
+					irqpdaindr->share_count[i] < min_shared) {
+						min_shared = irqpdaindr->share_count[i];
+						bit = i;
+				}
+			}
+			min_shared = 256;
+			if (bit < 0) {  /* didn't find a matching device, just pick one. This will be */
+					/* exceptionally rare. */
+				for (i=IA64_SN2_FIRST_DEVICE_VECTOR; i < IA64_SN2_LAST_DEVICE_VECTOR; i++) {
+					if (irqpdaindr->share_count[i] < min_shared) {
+						min_shared = irqpdaindr->share_count[i];
+						bit = i;
+					}
+				}
+			}
+			irqpdaindr->share_count[bit]++;
+		}
+		if (irqs->irq_flags[bit] & SN2_IRQ_SHARED) {
+			irqs->irq_flags[bit] |= SN2_IRQ_RESERVED;
+			return bit;
 		}
 		if (irqs->irq_flags[bit] & SN2_IRQ_RESERVED) {
 			return -1;
@@ -183,7 +219,7 @@ int
 intr_reserve_level(cpuid_t cpu,
 		int bit,
 		int resflags,
-		devfs_handle_t owner_dev,
+		vertex_hdl_t owner_dev,
 		char *name)
 {
 	return(do_intr_reserve_level(cpu, bit, 1));
@@ -203,9 +239,13 @@ do_intr_connect_level(cpuid_t cpu,
 			int bit,
 			int connect)
 {
-	irqpda_t	*irqs = irqpdaindr[cpu];
+	irqpda_t	*irqs = irqpdaindr;
 
 	if (connect) {
+		if (irqs->irq_flags[bit] & SN2_IRQ_SHARED) {
+			irqs->irq_flags[bit] |= SN2_IRQ_CONNECTED;
+			return bit;
+		}
 		if (irqs->irq_flags[bit] & SN2_IRQ_CONNECTED) {
 			return -1;
 		} else {
@@ -248,24 +288,29 @@ do_intr_cpu_choose(cnodeid_t cnode) {
 	int		slice, min_count = 1000;
 	irqpda_t	*irqs;
 
-	for (slice = 0; slice < CPUS_PER_NODE; slice++) {
+	for (slice = CPUS_PER_NODE - 1; slice >= 0; slice--) {
 		int intrs;
 
 		cpu = cnode_slice_to_cpuid(cnode, slice);
-		if (cpu == CPU_NONE) {
+		if (cpu == num_online_cpus()) {
 			continue;
 		}
 
-		if (!cpu_enabled(cpu)) {
+		if (!cpu_online(cpu)) {
 			continue;
 		}
 
-		irqs = irqpdaindr[cpu];
+		irqs = irqpdaindr;
 		intrs = irqs->num_irq_used;
 
 		if (min_count > intrs) {
 			min_count = intrs;
 			best_cpu = cpu;
+			if ( enable_shub_wars_1_1() ) {
+				/* Rather than finding the best cpu, always return the first cpu*/
+				/* This forces all interrupts to the same cpu */
+				break;
+			}
 		}
 	}
 	return best_cpu;
@@ -285,7 +330,7 @@ intr_bit_reserve_test(cpuid_t cpu,
 			cnodeid_t cnode,
 			int req_bit,
 			int resflags,
-			devfs_handle_t owner_dev,
+			vertex_hdl_t owner_dev,
 			char *name,
 			int *resp_bit)
 {
@@ -307,18 +352,18 @@ intr_bit_reserve_test(cpuid_t cpu,
 // Find the node to assign for this interrupt.
 
 cpuid_t
-intr_heuristic(devfs_handle_t dev,
+intr_heuristic(vertex_hdl_t dev,
 		device_desc_t dev_desc,
 		int	req_bit,
 		int resflags,
-		devfs_handle_t owner_dev,
+		vertex_hdl_t owner_dev,
 		char *name,
 		int *resp_bit)
 {
 	cpuid_t		cpuid;
 	cpuid_t		candidate = CPU_NONE;
 	cnodeid_t	candidate_node;
-	devfs_handle_t	pconn_vhdl;
+	vertex_hdl_t	pconn_vhdl;
 	pcibr_soft_t	pcibr_soft;
 	int 		bit;
 
@@ -369,8 +414,8 @@ intr_heuristic(devfs_handle_t dev,
 	if (candidate  != CPU_NONE) {
 		printk("Cannot target interrupt to target node (%ld).\n",candidate);
 		return CPU_NONE; } else {
-		printk("Cannot target interrupt to closest node (%d) 0x%p\n",
-			master_node_get(dev), (void *)owner_dev);
+		/* printk("Cannot target interrupt to closest node (%d) 0x%p\n",
+			master_node_get(dev), (void *)owner_dev); */
 	}
 
 	// We couldn't put it on the closest node.  Try to find another one.

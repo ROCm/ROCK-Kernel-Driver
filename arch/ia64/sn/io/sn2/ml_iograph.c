@@ -22,7 +22,6 @@
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/pci/bridge.h>
 #include <asm/sn/klconfig.h>
-#include <asm/sn/eeprom.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/xtalk/xtalk.h>
@@ -43,8 +42,6 @@
 /* At most 2 hubs can be connected to an xswitch */
 #define NUM_XSWITCH_VOLUNTEER 2
 
-extern unsigned char Is_pic_on_this_nasid[512];
-
 /*
  * Track which hubs have volunteered to manage devices hanging off of
  * a Crosstalk Switch (e.g. xbow).  This structure is allocated,
@@ -54,11 +51,11 @@ extern unsigned char Is_pic_on_this_nasid[512];
 typedef struct xswitch_vol_s {
 	mutex_t xswitch_volunteer_mutex;
 	int		xswitch_volunteer_count;
-	devfs_handle_t	xswitch_volunteer[NUM_XSWITCH_VOLUNTEER];
+	vertex_hdl_t	xswitch_volunteer[NUM_XSWITCH_VOLUNTEER];
 } *xswitch_vol_t;
 
 void
-xswitch_vertex_init(devfs_handle_t xswitch)
+xswitch_vertex_init(vertex_hdl_t xswitch)
 {
 	xswitch_vol_t xvolinfo;
 	int rc;
@@ -78,7 +75,7 @@ xswitch_vertex_init(devfs_handle_t xswitch)
  * xswitch volunteer structure hanging around.  Destroy it.
  */
 static void
-xswitch_volunteer_delete(devfs_handle_t xswitch)
+xswitch_volunteer_delete(vertex_hdl_t xswitch)
 {
 	xswitch_vol_t xvolinfo;
 	int rc;
@@ -94,10 +91,10 @@ xswitch_volunteer_delete(devfs_handle_t xswitch)
  */
 /* ARGSUSED */
 static void
-volunteer_for_widgets(devfs_handle_t xswitch, devfs_handle_t master)
+volunteer_for_widgets(vertex_hdl_t xswitch, vertex_hdl_t master)
 {
 	xswitch_vol_t xvolinfo = NULL;
-	devfs_handle_t hubv;
+	vertex_hdl_t hubv;
 	hubinfo_t hubinfo;
 
 	(void)hwgraph_info_get_LBL(xswitch, 
@@ -140,7 +137,7 @@ extern int xbow_port_io_enabled(nasid_t nasid, int widgetnum);
  */
 /* ARGSUSED */
 static void
-assign_widgets_to_volunteers(devfs_handle_t xswitch, devfs_handle_t hubv)
+assign_widgets_to_volunteers(vertex_hdl_t xswitch, vertex_hdl_t hubv)
 {
 	xswitch_info_t xswitch_info;
 	xswitch_vol_t xvolinfo = NULL;
@@ -223,18 +220,6 @@ assign_widgets_to_volunteers(devfs_handle_t xswitch, devfs_handle_t hubv)
 
                        	bt = iobrick_type_get_nasid(nasid);
                         if (bt >= 0) {
-				/*
-				 * PXBRICK has two busses per widget so this
-				 * algorithm wouldn't work (all busses would
-				 * be assigned to one volunteer). Change the
-				 * bricktype to PBRICK whose mapping is setup
-				 * suchthat 2 of the PICs will be assigned to
-				 * one volunteer and the other one will be
-				 * assigned to the other volunteer.
-				 */
-				if (bt == MODULE_PXBRICK) 
-					bt = MODULE_PBRICK;
-
 			        i = io_brick_map_widget(bt, widgetnum) & 1;
                         }
                 }
@@ -281,8 +266,6 @@ iograph_early_init(void)
 			DBG("iograph_early_init: Found board 0x%p\n", board);
 		}
 	}
-
-	hubio_init();
 }
 
 /*
@@ -307,7 +290,7 @@ io_init_done(cnodeid_t cnodeid,cpu_cookie_t c)
  * hwid for our use.
  */
 static void
-early_probe_for_widget(devfs_handle_t hubv, xwidget_hwid_t hwid)
+early_probe_for_widget(vertex_hdl_t hubv, xwidget_hwid_t hwid)
 {
 	hubreg_t llp_csr_reg;
 	nasid_t nasid;
@@ -351,7 +334,7 @@ early_probe_for_widget(devfs_handle_t hubv, xwidget_hwid_t hwid)
  * added as inventory information.
  */
 static void
-xwidget_inventory_add(devfs_handle_t 		widgetv,
+xwidget_inventory_add(vertex_hdl_t 		widgetv,
 		      lboard_t 			*board,
 		      struct xwidget_hwid_s 	hwid)
 {
@@ -374,14 +357,13 @@ xwidget_inventory_add(devfs_handle_t 		widgetv,
  */
 
 void
-io_xswitch_widget_init(devfs_handle_t  	xswitchv,
-		       devfs_handle_t	hubv,
-		       xwidgetnum_t	widgetnum,
-		       async_attach_t	aa)
+io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
+		       vertex_hdl_t	hubv,
+		       xwidgetnum_t	widgetnum)
 {
 	xswitch_info_t		xswitch_info;
 	xwidgetnum_t		hub_widgetid;
-	devfs_handle_t		widgetv;
+	vertex_hdl_t		widgetv;
 	cnodeid_t		cnode;
 	widgetreg_t		widget_id;
 	nasid_t			nasid, peer_nasid;
@@ -427,6 +409,7 @@ io_xswitch_widget_init(devfs_handle_t  	xswitchv,
 		char			name[4];
 		lboard_t dummy;
 
+
 		/*
 		 * If the current hub is not supposed to be the master 
 		 * for this widgetnum, then skip this widget.
@@ -470,12 +453,15 @@ io_xswitch_widget_init(devfs_handle_t  	xswitchv,
 
 		memset(buffer, 0, 16);
 		format_module_id(buffer, geo_module(board->brd_geoid), MODULE_FORMAT_BRIEF);
-		sprintf(pathname, EDGE_LBL_MODULE "/%s/" EDGE_LBL_SLAB "/%d" "/%cbrick" "/%s/%d",
+
+		sprintf(pathname, EDGE_LBL_MODULE "/%s/" EDGE_LBL_SLAB "/%d" "/%s" "/%s/%d",
 			buffer,
 			geo_slab(board->brd_geoid),
-			(board->brd_type == KLTYPE_IBRICK) ? 'I' :
-			(board->brd_type == KLTYPE_PBRICK) ? 'P' :
-			(board->brd_type == KLTYPE_XBRICK) ? 'X' : '?',
+			(board->brd_type == KLTYPE_IBRICK) ? EDGE_LBL_IBRICK :
+			(board->brd_type == KLTYPE_PBRICK) ? EDGE_LBL_PBRICK :
+			(board->brd_type == KLTYPE_PXBRICK) ? EDGE_LBL_PXBRICK :
+			(board->brd_type == KLTYPE_IXBRICK) ? EDGE_LBL_IXBRICK :
+			(board->brd_type == KLTYPE_XBRICK) ? EDGE_LBL_XBRICK : "?brick",
 			EDGE_LBL_XTALK, widgetnum);
 		
 		DBG("io_xswitch_widget_init: path= %s\n", pathname);
@@ -514,36 +500,46 @@ io_xswitch_widget_init(devfs_handle_t  	xswitchv,
 		xwidget_inventory_add(widgetv,board,hwid);
 
 		(void)xwidget_register(&hwid, widgetv, widgetnum,
-				       hubv, hub_widgetid,
-				       aa);
+				       hubv, hub_widgetid);
 
 		ia64_sn_sysctl_iobrick_module_get(nasid, &io_module);
 
 		if (io_module >= 0) {
 			char			buffer[16];
-			devfs_handle_t		to, from;
+			vertex_hdl_t		to, from;
+			char           		*brick_name;
+			extern char *iobrick_L1bricktype_to_name(int type);
+
 
 			memset(buffer, 0, 16);
 			format_module_id(buffer, geo_module(board->brd_geoid), MODULE_FORMAT_BRIEF);
 
-			bt = toupper(MODULE_GET_BTCHAR(io_module));
+			if ( islower(MODULE_GET_BTCHAR(io_module)) ) {
+				bt = toupper(MODULE_GET_BTCHAR(io_module));
+			}
+			else {
+				bt = MODULE_GET_BTCHAR(io_module);
+			}
+
+			brick_name = iobrick_L1bricktype_to_name(bt);
+
 			/* Add a helper vertex so xbow monitoring
 			* can identify the brick type. It's simply
 			* an edge from the widget 0 vertex to the
 			*  brick vertex.
 			*/
 
-			sprintf(pathname, "/dev/hw/" EDGE_LBL_MODULE "/%s/"
+			sprintf(pathname, EDGE_LBL_HW "/" EDGE_LBL_MODULE "/%s/"
 				EDGE_LBL_SLAB "/%d/"
 				EDGE_LBL_NODE "/" EDGE_LBL_XTALK "/"
 				"0",
 				buffer, geo_slab(board->brd_geoid));
 			from = hwgraph_path_to_vertex(pathname);
 			ASSERT_ALWAYS(from);
-			sprintf(pathname, "/dev/hw/" EDGE_LBL_MODULE "/%s/"
+			sprintf(pathname, EDGE_LBL_HW "/" EDGE_LBL_MODULE "/%s/"
 				EDGE_LBL_SLAB "/%d/"
-				"%cbrick",
-				buffer, geo_slab(board->brd_geoid), bt);
+				"%s",
+				buffer, geo_slab(board->brd_geoid), brick_name);
 
 			to = hwgraph_path_to_vertex(pathname);
 			ASSERT_ALWAYS(to);
@@ -566,12 +562,9 @@ link_done:
 
 
 static void
-io_init_xswitch_widgets(devfs_handle_t xswitchv, cnodeid_t cnode)
+io_init_xswitch_widgets(vertex_hdl_t xswitchv, cnodeid_t cnode)
 {
 	xwidgetnum_t		widgetnum;
-	async_attach_t          aa;
-
-	aa = async_attach_new();
 	
 	DBG("io_init_xswitch_widgets: xswitchv 0x%p for cnode %d\n", xswitchv, cnode);
 
@@ -579,13 +572,8 @@ io_init_xswitch_widgets(devfs_handle_t xswitchv, cnodeid_t cnode)
 	     widgetnum++) {
 		io_xswitch_widget_init(xswitchv,
 				       cnodeid_to_vertex(cnode),
-				       widgetnum, aa);
+				       widgetnum);
 	}
-	/* 
-	 * Wait for parallel attach threads, if any, to complete.
-	 */
-	async_attach_waitall(aa);
-	async_attach_free(aa);
 }
 
 /*
@@ -595,11 +583,11 @@ io_init_xswitch_widgets(devfs_handle_t xswitchv, cnodeid_t cnode)
  * graph and risking hangs.
  */
 static void
-io_link_xswitch_widgets(devfs_handle_t xswitchv, cnodeid_t cnodeid)
+io_link_xswitch_widgets(vertex_hdl_t xswitchv, cnodeid_t cnodeid)
 {
 	xwidgetnum_t		widgetnum;
 	char 			pathname[128];
-	devfs_handle_t		vhdl;
+	vertex_hdl_t		vhdl;
 	nasid_t			nasid, peer_nasid;
 	lboard_t		*board;
 
@@ -638,21 +626,12 @@ io_link_xswitch_widgets(devfs_handle_t xswitchv, cnodeid_t cnodeid)
 			return;
 		}
 
-		if ( Is_pic_on_this_nasid[nasid] ) {
-			/* Check both buses */
-			sprintf(pathname, "%d/"EDGE_LBL_PCIX_0, widgetnum);
-			if (hwgraph_traverse(xswitchv, pathname, &vhdl) == GRAPH_SUCCESS)
-				board->brd_graph_link = vhdl;
-			else {
-				sprintf(pathname, "%d/"EDGE_LBL_PCIX_1, widgetnum);
-				if (hwgraph_traverse(xswitchv, pathname, &vhdl) == GRAPH_SUCCESS)
-					board->brd_graph_link = vhdl;
-				else
-					board->brd_graph_link = GRAPH_VERTEX_NONE;
-			}
-		}
+		/* Check both buses */
+		sprintf(pathname, "%d/"EDGE_LBL_PCIX_0, widgetnum);
+		if (hwgraph_traverse(xswitchv, pathname, &vhdl) == GRAPH_SUCCESS)
+			board->brd_graph_link = vhdl;
 		else {
-			sprintf(pathname, "%d/"EDGE_LBL_PCI, widgetnum);
+			sprintf(pathname, "%d/"EDGE_LBL_PCIX_1, widgetnum);
 			if (hwgraph_traverse(xswitchv, pathname, &vhdl) == GRAPH_SUCCESS)
 				board->brd_graph_link = vhdl;
 			else
@@ -668,16 +647,15 @@ static void
 io_init_node(cnodeid_t cnodeid)
 {
 	/*REFERENCED*/
-	devfs_handle_t hubv, switchv, widgetv;
+	vertex_hdl_t hubv, switchv, widgetv;
 	struct xwidget_hwid_s hwid;
 	hubinfo_t hubinfo;
 	int is_xswitch;
 	nodepda_t	*npdap;
 	struct semaphore *peer_sema = 0;
 	uint32_t	widget_partnum;
-	nodepda_router_info_t *npda_rip;
 	cpu_cookie_t	c = 0;
-	extern int hubdev_docallouts(devfs_handle_t);
+	extern int hubdev_docallouts(vertex_hdl_t);
 
 	npdap = NODEPDA(cnodeid);
 
@@ -694,21 +672,6 @@ io_init_node(cnodeid_t cnodeid)
 	ASSERT(hubv != GRAPH_VERTEX_NONE);
 
 	hubdev_docallouts(hubv);
-
-	/*
-	 * Set up the dependent routers if we have any.
-	 */
-	npda_rip = npdap->npda_rip_first;
-
-	while(npda_rip) {
-		/* If the router info has not been initialized
-		 * then we need to do the router initialization
-		 */
-		if (!npda_rip->router_infop) {
-			router_init(cnodeid,0,npda_rip);
-		}
-		npda_rip = npda_rip->router_next;
-	}
 
 	/*
 	 * Read mfg info on this hub
@@ -833,7 +796,7 @@ io_init_node(cnodeid_t cnodeid)
 		 */
 		hubinfo_get(hubv, &hubinfo);
 
-		(void)xwidget_register(&hwid, widgetv, npdap->basew_id, hubv, hubinfo->h_widgetid, NULL);
+		(void)xwidget_register(&hwid, widgetv, npdap->basew_id, hubv, hubinfo->h_widgetid);
 
 		if (!is_xswitch) {
 			/* io_init_done takes cpu cookie as 2nd argument 
@@ -915,231 +878,9 @@ io_init_node(cnodeid_t cnodeid)
  * XXX Irix legacy..controller numbering should be part of devfsd's job
  */
 int num_base_io_scsi_ctlr = 2; /* used by syssgi */
-devfs_handle_t		base_io_scsi_ctlr_vhdl[NUM_BASE_IO_SCSI_CTLR];
-static devfs_handle_t	baseio_enet_vhdl,baseio_console_vhdl;
-
-/*
- * Put the logical controller number information in the 
- * scsi controller vertices for each scsi controller that
- * is in a "fixed position".
- */
-static void
-scsi_ctlr_nums_add(devfs_handle_t pci_vhdl)
-{
-	{
-		int i;
-
-		num_base_io_scsi_ctlr = NUM_BASE_IO_SCSI_CTLR;
-
-		/* Initialize base_io_scsi_ctlr_vhdl array */
-		for (i=0; i<num_base_io_scsi_ctlr; i++)
-			base_io_scsi_ctlr_vhdl[i] = GRAPH_VERTEX_NONE;
-	}
-	{
-	/*
-	 * May want to consider changing the SN0 code, above, to work more like
-	 * the way this works.
-	 */
-	devfs_handle_t base_ibrick_xbridge_vhdl;
-	devfs_handle_t base_ibrick_xtalk_widget_vhdl;
-	devfs_handle_t scsi_ctlr_vhdl;
-	int i;
-	graph_error_t rv;
-
-	/*
-	 * This is a table of "well-known" SCSI controllers and their well-known
-	 * controller numbers.  The names in the table start from the base IBrick's
-	 * Xbridge vertex, so the first component is the xtalk widget number.
-	 */
-	static struct {
-		char	*base_ibrick_scsi_path;
-		int	controller_number;
-	} hardwired_scsi_controllers[] = {
-		{"15/" EDGE_LBL_PCI "/1/" EDGE_LBL_SCSI_CTLR "/0", 0},
-		{"15/" EDGE_LBL_PCI "/2/" EDGE_LBL_SCSI_CTLR "/0", 1},
-		{"15/" EDGE_LBL_PCI "/3/" EDGE_LBL_SCSI_CTLR "/0", 2},
-		{"14/" EDGE_LBL_PCI "/1/" EDGE_LBL_SCSI_CTLR "/0", 3},
-		{"14/" EDGE_LBL_PCI "/2/" EDGE_LBL_SCSI_CTLR "/0", 4},
-		{"15/" EDGE_LBL_PCI "/6/ohci/0/" EDGE_LBL_SCSI_CTLR "/0", 5},
-		{NULL, -1} /* must be last */
-	};
-
-	base_ibrick_xtalk_widget_vhdl = hwgraph_connectpt_get(pci_vhdl);
-	ASSERT_ALWAYS(base_ibrick_xtalk_widget_vhdl != GRAPH_VERTEX_NONE);
-
-	base_ibrick_xbridge_vhdl = hwgraph_connectpt_get(base_ibrick_xtalk_widget_vhdl);
-	ASSERT_ALWAYS(base_ibrick_xbridge_vhdl != GRAPH_VERTEX_NONE);
-	hwgraph_vertex_unref(base_ibrick_xtalk_widget_vhdl);
-
-	/*
-	 * Iterate through the list of well-known SCSI controllers.
-	 * For each controller found, set it's controller number according
-	 * to the table.
-	 */
-	for (i=0; hardwired_scsi_controllers[i].base_ibrick_scsi_path != NULL; i++) {
-		rv = hwgraph_path_lookup(base_ibrick_xbridge_vhdl,
-			hardwired_scsi_controllers[i].base_ibrick_scsi_path, &scsi_ctlr_vhdl, NULL);
-
-		if (rv != GRAPH_SUCCESS) /* No SCSI at this path */
-			continue;
-
-		ASSERT(hardwired_scsi_controllers[i].controller_number < NUM_BASE_IO_SCSI_CTLR);
-		base_io_scsi_ctlr_vhdl[hardwired_scsi_controllers[i].controller_number] = scsi_ctlr_vhdl;
-		device_controller_num_set(scsi_ctlr_vhdl, hardwired_scsi_controllers[i].controller_number);
-		hwgraph_vertex_unref(scsi_ctlr_vhdl); /* (even though we're actually keeping a reference) */
-	}
-
-	hwgraph_vertex_unref(base_ibrick_xbridge_vhdl);
-	}
-}
-
+vertex_hdl_t		base_io_scsi_ctlr_vhdl[NUM_BASE_IO_SCSI_CTLR];
 
 #include <asm/sn/ioerror_handling.h>
-devfs_handle_t		sys_critical_graph_root = GRAPH_VERTEX_NONE;
-
-/* Define the system critical vertices and connect them through
- * a canonical parent-child relationships for easy traversal
- * during io error handling.
- */
-static void
-sys_critical_graph_init(void)
-{
-	devfs_handle_t		bridge_vhdl,master_node_vhdl;
-	devfs_handle_t  		xbow_vhdl = GRAPH_VERTEX_NONE;
-	extern devfs_handle_t	hwgraph_root;
-	devfs_handle_t		pci_slot_conn;
-	int			slot;
-	devfs_handle_t		baseio_console_conn;
-
-	DBG("sys_critical_graph_init: FIXME.\n");
-	baseio_console_conn = hwgraph_connectpt_get(baseio_console_vhdl);
-
-	if (baseio_console_conn == NULL) {
-		return;
-	}
-
-	/* Get the vertex handle for the baseio bridge */
-	bridge_vhdl = device_master_get(baseio_console_conn);
-
-	/* Get the master node of the baseio card */
-	master_node_vhdl = cnodeid_to_vertex(
-				master_node_get(baseio_console_vhdl));
-	
-	/* Add the "root->node" part of the system critical graph */
-
-	sys_critical_graph_vertex_add(hwgraph_root,master_node_vhdl);
-
-	/* Check if we have a crossbow */
-	if (hwgraph_traverse(master_node_vhdl,
-			     EDGE_LBL_XTALK"/0",
-			     &xbow_vhdl) == GRAPH_SUCCESS) {
-		/* We have a crossbow.Add "node->xbow" part of the system 
-		 * critical graph.
-		 */
-		sys_critical_graph_vertex_add(master_node_vhdl,xbow_vhdl);
-		
-		/* Add "xbow->baseio bridge" of the system critical graph */
-		sys_critical_graph_vertex_add(xbow_vhdl,bridge_vhdl);
-
-		hwgraph_vertex_unref(xbow_vhdl);
-	} else 
-		/* We donot have a crossbow. Add "node->baseio_bridge"
-		 * part of the system critical graph.
-		 */
-		sys_critical_graph_vertex_add(master_node_vhdl,bridge_vhdl);
-
-	/* Add all the populated PCI slot vertices to the system critical
-	 * graph with the bridge vertex as the parent.
-	 */
-	for (slot = 0 ; slot < 8; slot++) {
-		char	slot_edge[10];
-
-		sprintf(slot_edge,"%d",slot);
-		if (hwgraph_traverse(bridge_vhdl,slot_edge, &pci_slot_conn)
-		    != GRAPH_SUCCESS)
-			continue;
-		sys_critical_graph_vertex_add(bridge_vhdl,pci_slot_conn);
-		hwgraph_vertex_unref(pci_slot_conn);
-	}
-
-	hwgraph_vertex_unref(bridge_vhdl);
-
-	/* Add the "ioc3 pci connection point  -> console ioc3" part 
-	 * of the system critical graph
-	 */
-
-	if (hwgraph_traverse(baseio_console_vhdl,"..",&pci_slot_conn) ==
-	    GRAPH_SUCCESS) {
-		sys_critical_graph_vertex_add(pci_slot_conn, 
-					      baseio_console_vhdl);
-		hwgraph_vertex_unref(pci_slot_conn);
-	}
-
-	/* Add the "ethernet pci connection point  -> base ethernet" part of 
-	 * the system  critical graph
-	 */
-	if (hwgraph_traverse(baseio_enet_vhdl,"..",&pci_slot_conn) ==
-	    GRAPH_SUCCESS) {
-		sys_critical_graph_vertex_add(pci_slot_conn, 
-					      baseio_enet_vhdl);
-		hwgraph_vertex_unref(pci_slot_conn);
-	}
-
-	/* Add the "scsi controller pci connection point  -> base scsi 
-	 * controller" part of the system critical graph
-	 */
-	if (hwgraph_traverse(base_io_scsi_ctlr_vhdl[0],
-			     "../..",&pci_slot_conn) == GRAPH_SUCCESS) {
-		sys_critical_graph_vertex_add(pci_slot_conn, 
-					      base_io_scsi_ctlr_vhdl[0]);
-		hwgraph_vertex_unref(pci_slot_conn);
-	}
-	if (hwgraph_traverse(base_io_scsi_ctlr_vhdl[1],
-			     "../..",&pci_slot_conn) == GRAPH_SUCCESS) {
-		sys_critical_graph_vertex_add(pci_slot_conn, 
-					      base_io_scsi_ctlr_vhdl[1]);
-		hwgraph_vertex_unref(pci_slot_conn);
-	}
-	hwgraph_vertex_unref(baseio_console_conn);
-
-}
-
-static void
-baseio_ctlr_num_set(void)
-{
-	char 			name[MAXDEVNAME];
-	devfs_handle_t		console_vhdl, pci_vhdl, enet_vhdl;
-	devfs_handle_t		ioc3_console_vhdl_get(void);
-
-
-	DBG("baseio_ctlr_num_set; FIXME\n");
-	console_vhdl = ioc3_console_vhdl_get();
-	if (console_vhdl == GRAPH_VERTEX_NONE)
-		return;
-	/* Useful for setting up the system critical graph */
-	baseio_console_vhdl = console_vhdl;
-
-	vertex_to_name(console_vhdl,name,MAXDEVNAME);
-
-	strcat(name,__DEVSTR1);
-	pci_vhdl =  hwgraph_path_to_vertex(name);
-	scsi_ctlr_nums_add(pci_vhdl);
-	/* Unref the pci_vhdl due to the reference by hwgraph_path_to_vertex
-	 */
-	hwgraph_vertex_unref(pci_vhdl);
-
-	vertex_to_name(console_vhdl, name, MAXDEVNAME);
-	strcat(name, __DEVSTR4);
-	enet_vhdl = hwgraph_path_to_vertex(name);
-
-	/* Useful for setting up the system critical graph */
-	baseio_enet_vhdl = enet_vhdl;
-
-	device_controller_num_set(enet_vhdl, 0);
-	/* Unref the enet_vhdl due to the reference by hwgraph_path_to_vertex
-	 */
-	hwgraph_vertex_unref(enet_vhdl);
-}
 /* #endif */
 
 /*
@@ -1167,13 +908,6 @@ init_all_devices(void)
 	 	 * Update information generated by IO init.
 		 */
 		update_node_information(cnodeid);
-
-	baseio_ctlr_num_set();
-	/* Setup the system critical graph (which is a subgraph of the
-	 * main hwgraph). This information is useful during io error
-	 * handling.
-	 */
-	sys_critical_graph_init();
 
 #if HWG_PRINT
 	hwgraph_print();
@@ -1300,6 +1034,20 @@ struct io_brick_map_s io_brick_tab[] = {
     }
  },
 
+/* IXbrick widget number to PCI bus number map */
+ {      MODULE_IXBRICK,                         /* IXbrick type   */ 
+    /*  PCI Bus #                                  Widget #       */
+    {   0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7      */
+        0,                                      /* 0x8            */
+        0,                                      /* 0x9            */
+        0, 0,                                   /* 0xa - 0xb      */
+        1,                                      /* 0xc            */
+        5,                                      /* 0xd            */
+        0,                                      /* 0xe            */
+        3                                       /* 0xf            */
+    }
+ },
+
 /* Xbrick widget to XIO slot map */
  {      MODULE_XBRICK,                          /* Xbrick type    */ 
     /*  XIO Slot #                                 Widget #       */
@@ -1333,63 +1081,5 @@ io_brick_map_widget(int brick_type, int widget_num)
         }
 
         return 0;
-
-}
-
-/*
- * Use the device's vertex to map the device's widget to a meaningful int
- */
-int
-io_path_map_widget(devfs_handle_t vertex)
-{
-        char hw_path_name[MAXDEVNAME];
-        char *wp, *bp, *sp = NULL;
-        int  widget_num;
-	long atoi(char *);
-	int hwgraph_vertex_name_get(devfs_handle_t vhdl, char *buf, uint buflen);
-
-
-        /* Get the full path name of the vertex */
-        if (GRAPH_SUCCESS != hwgraph_vertex_name_get(vertex, hw_path_name,
-                                                     MAXDEVNAME))
-                return 0;
-
-        /* Find the widget number in the path name */
-        wp = strstr(hw_path_name, "/"EDGE_LBL_XTALK"/");
-        if (wp == NULL)
-                return 0;
-        widget_num = atoi(wp+7);
-        if (widget_num < XBOW_PORT_8 || widget_num > XBOW_PORT_F)
-                return 0;
-
-        /* Find "brick" in the path name */
-        bp = strstr(hw_path_name, "brick");
-        if (bp == NULL)
-                return 0;
-
-        /* Find preceding slash */
-        sp = bp;
-        while (sp > hw_path_name) {
-                sp--;
-                if (*sp == '/')
-                        break;
-        }
-
-        /* Invalid if no preceding slash */
-        if (!sp)
-                return 0;
-
-        /* Bump slash pointer to "brick" prefix */
-        sp++;
-        /*
-         * Verify "brick" prefix length;  valid exaples:
-         * 'I' from "/Ibrick"
-         * 'P' from "/Pbrick"
-         * 'X' from "/Xbrick"
-         */
-         if ((bp - sp) != 1)
-                return 0;
-
-        return (io_brick_map_widget((int)*sp, widget_num));
 
 }

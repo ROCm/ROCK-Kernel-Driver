@@ -103,7 +103,7 @@ amount of memory present on nodes 0-3.
     1GB*<dn>, where dn is the digit number. The amount of memory
     is 8MB*2**<d>. (If <d> = 0, the memory size is 0).
 
-    SN1 doesnt support dimms this small but small memory systems 
+    SN1 doesn't support dimms this small but small memory systems 
     boot faster on Medusa.
 
 

@@ -24,8 +24,6 @@
 #include <asm/sn/router.h>
 #include <asm/sn/xtalk/xbow.h>
 
-#define printf printk
-int hasmetarouter;
 
 #define LDEBUG 0
 #define NIC_UNKNOWN ((nic_t) -1)
@@ -37,10 +35,11 @@ int hasmetarouter;
 #define DBG(x...)
 #endif /* DEBUG_KLGRAPH */
 
-static void sort_nic_names(lboard_t *) ;
-
 u64 klgraph_addr[MAX_COMPACT_NODES];
-int module_number = 0;
+static int hasmetarouter;
+
+
+char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#=012345";
 
 lboard_t *
 find_lboard(lboard_t *start, unsigned char brd_type)
@@ -135,23 +134,6 @@ find_lboard_module(lboard_t *start, geoid_t geoid)
         return (lboard_t *)NULL;
 }
 
-lboard_t *
-find_lboard_module_class(lboard_t *start, geoid_t geoid,
-                                                unsigned char brd_type)
-{
-	while (start) {
-		DBG("find_lboard_module_class: lboard 0x%p, start->brd_geoid 0x%x, mod 0x%x, start->brd_type 0x%x, brd_type 0x%x\n", start, start->brd_geoid, geoid, start->brd_type, brd_type);
-
-		if (geo_cmp(start->brd_geoid, geoid) &&
-			(KLCLASS(start->brd_type) == KLCLASS(brd_type)))
-			return start;
-		start = KLCF_NEXT(start);
-	}
-
-	/* Didn't find it. */
-	return (lboard_t *)NULL;
-}
-
 /*
  * Convert a NIC name to a name for use in the hardware graph.
  */
@@ -202,63 +184,6 @@ nic_name_convert(char *old_name, char *new_name)
 	else if (!strncmp(new_name, "divo", 4))
 		strcpy(new_name, "divo") ;
 
-}
-
-/*
- * Find the lboard structure and get the board name.
- * If we can't find the structure or it's too low a revision,
- * use default name.
- */
-lboard_t *
-get_board_name(nasid_t nasid, geoid_t geoid, slotid_t slot, char *name)
-{
-	lboard_t *brd;
-
-	brd = find_lboard_modslot((lboard_t *)KL_CONFIG_INFO(nasid),
-				  geoid);
-
-#ifndef _STANDALONE
-	{
-		cnodeid_t cnode = NASID_TO_COMPACT_NODEID(nasid);
-
-		if (!brd && (NODEPDA(cnode)->xbow_peer != INVALID_NASID))
-			brd = find_lboard_modslot((lboard_t *)
-				KL_CONFIG_INFO(NODEPDA(cnode)->xbow_peer),
-				geoid);
-	}
-#endif
-
-	if (!brd || (brd->brd_sversion < 2)) {
-		strcpy(name, EDGE_LBL_XWIDGET);
-	} else {
-		nic_name_convert(brd->brd_name, name);
-	}
-
-	/*
-	 * PV # 540860
-	 * If the name is not 'baseio'
-	 * get the lowest of all the names in the nic string.
-	 * This is needed for boards like divo, which can have
-	 * a bunch of daughter cards, but would like to be called
-	 * divo. We could do this for baseio
-	 * but it has some special case names that we would not
-	 * like to disturb at this point.
-	 */
-
-	/* gfx boards don't need any of this name scrambling */
-	if (brd && (KLCLASS(brd->brd_type) == KLCLASS_GFX)) {
-		return(brd);
-	}
-
-	if (!(!strcmp(name, "baseio") )) {
-		if (brd) {
-			sort_nic_names(brd) ;
-			/* Convert to small case, '-' to '_' etc */
-			nic_name_convert(brd->brd_name, name) ;
-		}
-	}
-
-	return(brd);
 }
 
 /*
@@ -341,12 +266,20 @@ board_to_path(lboard_t *brd, char *path)
 			board_name = EDGE_LBL_IO;
 			break;
 		case KLCLASS_IOBRICK:
-			if (brd->brd_type == KLTYPE_PBRICK)
+			if (brd->brd_type == KLTYPE_PXBRICK)
+				board_name = EDGE_LBL_PXBRICK;
+			else if (brd->brd_type == KLTYPE_IXBRICK)
+				board_name = EDGE_LBL_IXBRICK;
+			else if (brd->brd_type == KLTYPE_PBRICK)
 				board_name = EDGE_LBL_PBRICK;
 			else if (brd->brd_type == KLTYPE_IBRICK)
 				board_name = EDGE_LBL_IBRICK;
 			else if (brd->brd_type == KLTYPE_XBRICK)
 				board_name = EDGE_LBL_XBRICK;
+			else if (brd->brd_type == KLTYPE_PEBRICK)
+				board_name = EDGE_LBL_PEBRICK;
+			else if (brd->brd_type == KLTYPE_CGBRICK)
+				board_name = EDGE_LBL_CGBRICK;
 			else
 				board_name = EDGE_LBL_IOBRICK;
 			break;
@@ -623,185 +556,6 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 
 #include "asm/sn/sn_private.h"
 
-xwidgetnum_t
-nodevertex_widgetnum_get(devfs_handle_t node_vtx)
-{
-	hubinfo_t hubinfo_p;
-
-	hwgraph_info_get_LBL(node_vtx, INFO_LBL_NODE_INFO, 
-			     (arbitrary_info_t *) &hubinfo_p);
-	return(hubinfo_p->h_widgetid);
-}
-
-devfs_handle_t
-nodevertex_xbow_peer_get(devfs_handle_t node_vtx)
-{
-	hubinfo_t hubinfo_p;
-	nasid_t xbow_peer_nasid;
-	cnodeid_t xbow_peer;
-
-	hwgraph_info_get_LBL(node_vtx, INFO_LBL_NODE_INFO,
-				     (arbitrary_info_t *) &hubinfo_p);
-	xbow_peer_nasid = hubinfo_p->h_nodepda->xbow_peer;
-	if(xbow_peer_nasid == INVALID_NASID) 
-			return ( (devfs_handle_t)-1);
-	xbow_peer = NASID_TO_COMPACT_NODEID(xbow_peer_nasid);
-	return(NODEPDA(xbow_peer)->node_vertex);
-}
-
-/* NIC Sorting Support */
-
-#define MAX_NICS_PER_STRING 	32
-#define MAX_NIC_NAME_LEN	32
-
-static char *
-get_nic_string(lboard_t *lb)
-{
-        int         	i;
-        klinfo_t    	*k = NULL ;
-    	klconf_off_t    mfg_off = 0 ;
-    	char            *mfg_nic = NULL ;
-
-        for (i = 0; i < KLCF_NUM_COMPS(lb); i++) {
-                k = KLCF_COMP(lb, i) ;
-                switch(k->struct_type) {
-                        case KLSTRUCT_BRI:
-            			mfg_off = ((klbri_t *)k)->bri_mfg_nic ;
-				break ;
-
-                        case KLSTRUCT_HUB:
-            			mfg_off = ((klhub_t *)k)->hub_mfg_nic ;
-				break ;
-
-                        case KLSTRUCT_ROU:
-            			mfg_off = ((klrou_t *)k)->rou_mfg_nic ;
-				break ;
-
-                        case KLSTRUCT_GFX:
-            			mfg_off = ((klgfx_t *)k)->gfx_mfg_nic ;
-				break ;
-
-                        case KLSTRUCT_TPU:
-            			mfg_off = ((kltpu_t *)k)->tpu_mfg_nic ;
-				break ;
-
-                        case KLSTRUCT_GSN_A:
-                        case KLSTRUCT_GSN_B:
-            			mfg_off = ((klgsn_t *)k)->gsn_mfg_nic ;
-				break ;
-
-                        case KLSTRUCT_XTHD:
-                                mfg_off = ((klxthd_t *)k)->xthd_mfg_nic ;
-                                break;
-
-			default:
-				mfg_off = 0 ;
-                                break ;
-                }
-		if (mfg_off)
-			break ;
-        }
-
-	if ((mfg_off) && (k))
-		mfg_nic = (char *)NODE_OFFSET_TO_K0(k->nasid, mfg_off) ;
-
-        return mfg_nic ;
-}
-
-char *
-get_first_string(char **ptrs, int n)
-{
-        int     i ;
-        char    *tmpptr ;
-
-        if ((ptrs == NULL) || (n == 0))
-                return NULL ;
-
-        tmpptr = ptrs[0] ;
-
-        if (n == 1)
-                return tmpptr ;
-
-        for (i = 0 ; i < n ; i++) {
-                if (strcmp(tmpptr, ptrs[i]) > 0)
-                        tmpptr = ptrs[i] ;
-        }
-
-        return tmpptr ;
-}
-
-int
-get_ptrs(char *idata, char **ptrs, int n, char *label)
-{
-        int     i = 0 ;
-        char    *tmp = idata ;
-
-        if ((ptrs == NULL) || (idata == NULL) || (label == NULL) || (n == 0))
-                return 0 ;
-
-        while  ( (tmp = strstr(tmp, label)) ){
-                tmp += strlen(label) ;
-                /* check for empty name field, and last NULL ptr */
-                if ((i < (n-1)) && (*tmp != ';')) {
-                        ptrs[i++] = tmp ;
-                }
-        }
-
-        ptrs[i] = NULL ;
-
-        return i ;
-}
-
-/*
- * sort_nic_names
- *
- * 	Does not really do sorting. Find the alphabetically lowest
- *	name among all the nic names found in a nic string.
- *
- * Return:
- *	Nothing
- *
- * Side Effects:
- *
- *	lb->brd_name gets the new name found
- */
-
-static void
-sort_nic_names(lboard_t *lb)
-{
-	char 	*nic_str ;
-        char    *ptrs[MAX_NICS_PER_STRING] ;
-        char    name[MAX_NIC_NAME_LEN] ;
-        char    *tmp, *tmp1 ;
-
-	*name = 0 ;
-
-	/* Get the nic pointer from the lb */
-
-	if ((nic_str = get_nic_string(lb)) == NULL)
-		return ;
-
-        tmp = get_first_string(ptrs,
-                        get_ptrs(nic_str, ptrs, MAX_NICS_PER_STRING, "Name:")) ;
-
-        if (tmp == NULL)
-		return ;
-
-        if  ( (tmp1 = strchr(tmp, ';')) ){
-                strncpy(name, tmp, tmp1-tmp) ;
-                name[tmp1-tmp] = 0 ;
-        } else {
-                strncpy(name, tmp, (sizeof(name) -1)) ;
-                name[sizeof(name)-1] = 0 ;
-        }
-
-	strcpy(lb->brd_name, name) ;
-}
-
-
-
-char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#012345";
-
 /*
  * Format a module id for printing.
  */
@@ -814,6 +568,7 @@ format_module_id(char *buffer, moduleid_t m, int fmt)
 	rack = MODULE_GET_RACK(m);
 	ASSERT(MODULE_GET_BTYPE(m) < MAX_BRICK_TYPES);
 	brickchar = MODULE_GET_BTCHAR(m);
+
 	position = MODULE_GET_BPOS(m);
 
 	if (fmt == MODULE_FORMAT_BRIEF) {

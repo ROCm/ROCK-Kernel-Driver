@@ -23,7 +23,6 @@
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/kldir.h>
-#include <asm/sn/gda.h> 
 #include <asm/sn/klconfig.h>
 #include <asm/sn/router.h>
 #include <asm/sn/xtalk/xbow.h>
@@ -42,7 +41,7 @@
 
 extern char arg_maxnodes[];
 extern u64 klgraph_addr[];
-void mark_cpuvertex_as_cpu(devfs_handle_t vhdl, cpuid_t cpuid);
+void mark_cpuvertex_as_cpu(vertex_hdl_t vhdl, cpuid_t cpuid);
 
 
 /*
@@ -69,7 +68,7 @@ klhwg_invent_alloc(cnodeid_t cnode, int class, int size)
  * Add detailed disabled cpu inventory info to the hardware graph.
  */
 void
-klhwg_disabled_cpu_invent_info(devfs_handle_t cpuv,
+klhwg_disabled_cpu_invent_info(vertex_hdl_t cpuv,
                                cnodeid_t cnode,
                                klcpu_t *cpu, slotid_t slot)
 {
@@ -118,7 +117,7 @@ klhwg_disabled_cpu_invent_info(devfs_handle_t cpuv,
  * Add detailed cpu inventory info to the hardware graph.
  */
 void
-klhwg_cpu_invent_info(devfs_handle_t cpuv,
+klhwg_cpu_invent_info(vertex_hdl_t cpuv,
 			cnodeid_t cnode,
 			klcpu_t *cpu)
 {
@@ -153,7 +152,7 @@ klhwg_cpu_invent_info(devfs_handle_t cpuv,
  * as a part of detailed inventory info in the hwgraph.
  */
 void
-klhwg_baseio_inventory_add(devfs_handle_t baseio_vhdl,cnodeid_t cnode)
+klhwg_baseio_inventory_add(vertex_hdl_t baseio_vhdl,cnodeid_t cnode)
 {
 	invent_miscinfo_t	*baseio_inventory;
 	unsigned char		version = 0,revision = 0;
@@ -177,20 +176,11 @@ klhwg_baseio_inventory_add(devfs_handle_t baseio_vhdl,cnodeid_t cnode)
 				sizeof(invent_miscinfo_t));
 }
 
-char	*hub_rev[] = {
-	"0.0",
-	"1.0",
-	"2.0",
-	"2.1",
-	"2.2",
-	"2.3"
-};
-
 /*
  * Add detailed cpu inventory info to the hardware graph.
  */
 void
-klhwg_hub_invent_info(devfs_handle_t hubv,
+klhwg_hub_invent_info(vertex_hdl_t hubv,
 		      cnodeid_t cnode, 
 		      klhub_t *hub)
 {
@@ -215,10 +205,10 @@ klhwg_hub_invent_info(devfs_handle_t hubv,
 
 /* ARGSUSED */
 void
-klhwg_add_hub(devfs_handle_t node_vertex, klhub_t *hub, cnodeid_t cnode)
+klhwg_add_hub(vertex_hdl_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 {
-	devfs_handle_t myhubv;
-	devfs_handle_t hub_mon;
+	vertex_hdl_t myhubv;
+	vertex_hdl_t hub_mon;
 	int rc;
 	extern struct file_operations shub_mon_fops;
 
@@ -234,9 +224,9 @@ klhwg_add_hub(devfs_handle_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 
 /* ARGSUSED */
 void
-klhwg_add_disabled_cpu(devfs_handle_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, slotid_t slot)
+klhwg_add_disabled_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, slotid_t slot)
 {
-        devfs_handle_t my_cpu;
+        vertex_hdl_t my_cpu;
         char name[120];
         cpuid_t cpu_id;
 	nasid_t nasid;
@@ -257,9 +247,9 @@ klhwg_add_disabled_cpu(devfs_handle_t node_vertex, cnodeid_t cnode, klcpu_t *cpu
 
 /* ARGSUSED */
 void
-klhwg_add_cpu(devfs_handle_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
+klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
 {
-        devfs_handle_t my_cpu, cpu_dir;
+        vertex_hdl_t my_cpu, cpu_dir;
         char name[120];
         cpuid_t cpu_id;
 	nasid_t nasid;
@@ -295,7 +285,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	nasid_t hub_nasid;
 	cnodeid_t hub_cnode;
 	int widgetnum;
-	devfs_handle_t xbow_v, hubv;
+	vertex_hdl_t xbow_v, hubv;
 	/*REFERENCED*/
 	graph_error_t err;
 
@@ -363,12 +353,12 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 
 /* ARGSUSED */
 void
-klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
+klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 {
 	nasid_t nasid;
 	lboard_t *brd;
 	klhub_t *hub;
-	devfs_handle_t node_vertex = NULL;
+	vertex_hdl_t node_vertex = NULL;
 	char path_buffer[100];
 	int rv;
 	char *s;
@@ -382,7 +372,7 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 	ASSERT(brd);
 
 	do {
-		devfs_handle_t cpu_dir;
+		vertex_hdl_t cpu_dir;
 
 		/* Generate a hardware graph path for this board. */
 		board_to_path(brd, path_buffer);
@@ -443,7 +433,7 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 		while (cpu) {
 			cpuid_t cpu_id;
 			cpu_id = nasid_slice_to_cpuid(nasid,cpu->cpu_info.physid);
-			if (cpu_enabled(cpu_id))
+			if (cpu_online(cpu_id))
 				klhwg_add_cpu(node_vertex, cnode, cpu);
 			else
 				klhwg_add_disabled_cpu(node_vertex, cnode, cpu, brd->brd_slot);
@@ -466,12 +456,12 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 
 /* ARGSUSED */
 void
-klhwg_add_all_routers(devfs_handle_t hwgraph_root)
+klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 {
 	nasid_t nasid;
 	cnodeid_t cnode;
 	lboard_t *brd;
-	devfs_handle_t node_vertex;
+	vertex_hdl_t node_vertex;
 	char path_buffer[100];
 	int rv;
 
@@ -525,14 +515,14 @@ klhwg_add_all_routers(devfs_handle_t hwgraph_root)
 
 /* ARGSUSED */
 void
-klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
+klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 			 cnodeid_t cnode, nasid_t nasid)
 {
 	klrou_t *router;
 	char path_buffer[50];
 	char dest_path[50];
-	devfs_handle_t router_hndl;
-	devfs_handle_t dest_hndl;
+	vertex_hdl_t router_hndl;
+	vertex_hdl_t dest_hndl;
 	int rc;
 	int port;
 	lboard_t *dest_brd;
@@ -619,7 +609,7 @@ klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
 
 
 void
-klhwg_connect_routers(devfs_handle_t hwgraph_root)
+klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 {
 	nasid_t nasid;
 	cnodeid_t cnode;
@@ -652,15 +642,15 @@ klhwg_connect_routers(devfs_handle_t hwgraph_root)
 
 
 void
-klhwg_connect_hubs(devfs_handle_t hwgraph_root)
+klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 {
 	nasid_t nasid;
 	cnodeid_t cnode;
 	lboard_t *brd;
 	klhub_t *hub;
 	lboard_t *dest_brd;
-	devfs_handle_t hub_hndl;
-	devfs_handle_t dest_hndl;
+	vertex_hdl_t hub_hndl;
+	vertex_hdl_t dest_hndl;
 	char path_buffer[50];
 	char dest_path[50];
 	graph_error_t rc;
@@ -796,12 +786,12 @@ klhwg_device_disable_hints_add(void)
 }
 
 void
-klhwg_add_all_modules(devfs_handle_t hwgraph_root)
+klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 {
 	cmoduleid_t	cm;
 	char		name[128];
-	devfs_handle_t	vhdl;
-	devfs_handle_t  module_vhdl;
+	vertex_hdl_t	vhdl;
+	vertex_hdl_t  module_vhdl;
 	int		rc;
 	char		buffer[16];
 
@@ -837,12 +827,12 @@ klhwg_add_all_modules(devfs_handle_t hwgraph_root)
 }
 
 void
-klhwg_add_all_nodes(devfs_handle_t hwgraph_root)
+klhwg_add_all_nodes(vertex_hdl_t hwgraph_root)
 {
 	cnodeid_t	cnode;
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
-		klhwg_add_node(hwgraph_root, cnode, NULL);
+		klhwg_add_node(hwgraph_root, cnode);
 	}
 
 	for (cnode = 0; cnode < numnodes; cnode++) {

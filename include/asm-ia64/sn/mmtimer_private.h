@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All rights reserved.
  *
  * Helper file for the SN implementation of mmtimers
  *

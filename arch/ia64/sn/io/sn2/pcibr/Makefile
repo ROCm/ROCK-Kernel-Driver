@@ -9,13 +9,9 @@
 # Makefile for the sn2 specific pci bridge routines.
 #
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN
+EXTRA_CFLAGS    := -DLITTLE_ENDIAN -DSHUB_SWAP_WAR
 
-ifdef CONFIG_IA64_SGI_SN2
-EXTRA_CFLAGS    += -DSHUB_SWAP_WAR
-endif
-
-obj-$(CONFIG_IA64_SGI_SN2)	+= pcibr_dvr.o pcibr_ate.o pcibr_config.o \
+obj-$(CONFIG_IA64_SGI_SN2)	+= pcibr_ate.o pcibr_config.o \
                                    pcibr_dvr.o pcibr_hints.o \
 				   pcibr_intr.o pcibr_rrb.o pcibr_slot.o \
 				   pcibr_error.o

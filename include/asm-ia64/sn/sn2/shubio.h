@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_SN2_SHUBIO_H
@@ -3035,31 +3035,31 @@ typedef union ii_ippr_u {
 /* Scratch registers (all bits available) */
 #define IIO_SCRATCH_REG0        IIO_ISCR0
 #define IIO_SCRATCH_REG1        IIO_ISCR1
-#define IIO_SCRATCH_MASK        0xffffffffffffffff
+#define IIO_SCRATCH_MASK        0xffffffffffffffffUL
 
-#define IIO_SCRATCH_BIT0_0      0x0000000000000001
-#define IIO_SCRATCH_BIT0_1      0x0000000000000002
-#define IIO_SCRATCH_BIT0_2      0x0000000000000004
-#define IIO_SCRATCH_BIT0_3      0x0000000000000008
-#define IIO_SCRATCH_BIT0_4      0x0000000000000010
-#define IIO_SCRATCH_BIT0_5      0x0000000000000020
-#define IIO_SCRATCH_BIT0_6      0x0000000000000040
-#define IIO_SCRATCH_BIT0_7      0x0000000000000080
-#define IIO_SCRATCH_BIT0_8      0x0000000000000100
-#define IIO_SCRATCH_BIT0_9      0x0000000000000200
-#define IIO_SCRATCH_BIT0_A      0x0000000000000400
+#define IIO_SCRATCH_BIT0_0      0x0000000000000001UL
+#define IIO_SCRATCH_BIT0_1      0x0000000000000002UL
+#define IIO_SCRATCH_BIT0_2      0x0000000000000004UL
+#define IIO_SCRATCH_BIT0_3      0x0000000000000008UL
+#define IIO_SCRATCH_BIT0_4      0x0000000000000010UL
+#define IIO_SCRATCH_BIT0_5      0x0000000000000020UL
+#define IIO_SCRATCH_BIT0_6      0x0000000000000040UL
+#define IIO_SCRATCH_BIT0_7      0x0000000000000080UL
+#define IIO_SCRATCH_BIT0_8      0x0000000000000100UL
+#define IIO_SCRATCH_BIT0_9      0x0000000000000200UL
+#define IIO_SCRATCH_BIT0_A      0x0000000000000400UL
 
-#define IIO_SCRATCH_BIT1_0      0x0000000000000001
-#define IIO_SCRATCH_BIT1_1      0x0000000000000002
+#define IIO_SCRATCH_BIT1_0      0x0000000000000001UL
+#define IIO_SCRATCH_BIT1_1      0x0000000000000002UL
 /* IO Translation Table Entries */
 #define IIO_NUM_ITTES   7               /* ITTEs numbered 0..6 */
                                         /* Hw manuals number them 1..7! */
 /*
  * IIO_IMEM Register fields.
  */
-#define IIO_IMEM_W0ESD  0x1             /* Widget 0 shut down due to error */
-#define IIO_IMEM_B0ESD  (1 << 4)        /* BTE 0 shut down due to error */
-#define IIO_IMEM_B1ESD  (1 << 8)        /* BTE 1 Shut down due to error */
+#define IIO_IMEM_W0ESD  0x1UL             /* Widget 0 shut down due to error */
+#define IIO_IMEM_B0ESD  (1UL << 4)        /* BTE 0 shut down due to error */
+#define IIO_IMEM_B1ESD  (1UL << 8)        /* BTE 1 Shut down due to error */
 
 /*
  * As a permanent workaround for a bug in the PI side of the shub, we've
@@ -3191,23 +3191,23 @@ typedef union ii_ippr_u {
 /* 
  * IO BTE Length/Status (IIO_IBLS) register bit field definitions
  */
-#define IBLS_BUSY		(0x1 << 20)
+#define IBLS_BUSY		(0x1UL << 20)
 #define IBLS_ERROR_SHFT		16
-#define IBLS_ERROR		(0x1 << IBLS_ERROR_SHFT)
+#define IBLS_ERROR		(0x1UL << IBLS_ERROR_SHFT)
 #define IBLS_LENGTH_MASK	0xffff
 
 /*
  * IO BTE Control/Terminate register (IBCT) register bit field definitions
  */
-#define IBCT_POISON		(0x1 << 8)
-#define IBCT_NOTIFY		(0x1 << 4)
-#define IBCT_ZFIL_MODE		(0x1 << 0)
+#define IBCT_POISON		(0x1UL << 8)
+#define IBCT_NOTIFY		(0x1UL << 4)
+#define IBCT_ZFIL_MODE		(0x1UL << 0)
 
 /*
  * IIO Incoming Error Packet Header (IIO_IIEPH1/IIO_IIEPH2)
  */
-#define IIEPH1_VALID		(1 << 44)
-#define IIEPH1_OVERRUN		(1 << 40)
+#define IIEPH1_VALID		(1UL << 44)
+#define IIEPH1_OVERRUN		(1UL << 40)
 #define IIEPH1_ERR_TYPE_SHFT	32
 #define IIEPH1_ERR_TYPE_MASK	0xf
 #define IIEPH1_SOURCE_SHFT	20
@@ -3217,7 +3217,7 @@ typedef union ii_ippr_u {
 #define IIEPH1_CMD_SHFT		0
 #define IIEPH1_CMD_MASK		7
 
-#define IIEPH2_TAIL		(1 << 40)
+#define IIEPH2_TAIL		(1UL << 40)
 #define IIEPH2_ADDRESS_SHFT	0
 #define IIEPH2_ADDRESS_MASK	38
 
@@ -3229,21 +3229,21 @@ typedef union ii_ippr_u {
 /*
  * IO Error Clear register bit field definitions
  */
-#define IECLR_PI1_FWD_INT	(1 << 31)  /* clear PI1_FORWARD_INT in iidsr */
-#define IECLR_PI0_FWD_INT	(1 << 30)  /* clear PI0_FORWARD_INT in iidsr */
-#define IECLR_SPUR_RD_HDR	(1 << 29)  /* clear valid bit in ixss reg */
-#define IECLR_BTE1		(1 << 18)  /* clear bte error 1 */
-#define IECLR_BTE0		(1 << 17)  /* clear bte error 0 */
-#define IECLR_CRAZY		(1 << 16)  /* clear crazy bit in wstat reg */
-#define IECLR_PRB_F		(1 << 15)  /* clear err bit in PRB_F reg */
-#define IECLR_PRB_E		(1 << 14)  /* clear err bit in PRB_E reg */
-#define IECLR_PRB_D		(1 << 13)  /* clear err bit in PRB_D reg */
-#define IECLR_PRB_C		(1 << 12)  /* clear err bit in PRB_C reg */
-#define IECLR_PRB_B		(1 << 11)  /* clear err bit in PRB_B reg */
-#define IECLR_PRB_A		(1 << 10)  /* clear err bit in PRB_A reg */
-#define IECLR_PRB_9		(1 << 9)   /* clear err bit in PRB_9 reg */
-#define IECLR_PRB_8		(1 << 8)   /* clear err bit in PRB_8 reg */
-#define IECLR_PRB_0		(1 << 0)   /* clear err bit in PRB_0 reg */
+#define IECLR_PI1_FWD_INT	(1UL << 31)  /* clear PI1_FORWARD_INT in iidsr */
+#define IECLR_PI0_FWD_INT	(1UL << 30)  /* clear PI0_FORWARD_INT in iidsr */
+#define IECLR_SPUR_RD_HDR	(1UL << 29)  /* clear valid bit in ixss reg */
+#define IECLR_BTE1		(1UL << 18)  /* clear bte error 1 */
+#define IECLR_BTE0		(1UL << 17)  /* clear bte error 0 */
+#define IECLR_CRAZY		(1UL << 16)  /* clear crazy bit in wstat reg */
+#define IECLR_PRB_F		(1UL << 15)  /* clear err bit in PRB_F reg */
+#define IECLR_PRB_E		(1UL << 14)  /* clear err bit in PRB_E reg */
+#define IECLR_PRB_D		(1UL << 13)  /* clear err bit in PRB_D reg */
+#define IECLR_PRB_C		(1UL << 12)  /* clear err bit in PRB_C reg */
+#define IECLR_PRB_B		(1UL << 11)  /* clear err bit in PRB_B reg */
+#define IECLR_PRB_A		(1UL << 10)  /* clear err bit in PRB_A reg */
+#define IECLR_PRB_9		(1UL << 9)   /* clear err bit in PRB_9 reg */
+#define IECLR_PRB_8		(1UL << 8)   /* clear err bit in PRB_8 reg */
+#define IECLR_PRB_0		(1UL << 0)   /* clear err bit in PRB_0 reg */
 
 /*
  * IIO CRB control register Fields: IIO_ICCR 
@@ -3495,7 +3495,7 @@ typedef union iprte_a {
 typedef struct hub_piomap_s *hub_piomap_t;
 
 extern hub_piomap_t
-hub_piomap_alloc(devfs_handle_t dev,      /* set up mapping for this device */
+hub_piomap_alloc(vertex_hdl_t dev,      /* set up mapping for this device */
                 device_desc_t dev_desc, /* device descriptor */
                 iopaddr_t xtalk_addr,   /* map for this xtalk_addr range */
                 size_t byte_count,
@@ -3513,7 +3513,7 @@ extern void
 hub_piomap_done(hub_piomap_t hub_piomap);
 
 extern caddr_t
-hub_piotrans_addr(      devfs_handle_t dev,       /* translate to this device */
+hub_piotrans_addr(      vertex_hdl_t dev,       /* translate to this device */
                         device_desc_t dev_desc, /* device descriptor */
                         iopaddr_t xtalk_addr,   /* Crosstalk address */
                         size_t byte_count,      /* map this many bytes */
@@ -3523,7 +3523,7 @@ hub_piotrans_addr(      devfs_handle_t dev,       /* translate to this device */
 typedef struct hub_dmamap_s *hub_dmamap_t;
 
 extern hub_dmamap_t
-hub_dmamap_alloc(       devfs_handle_t dev,       /* set up mappings for dev */
+hub_dmamap_alloc(       vertex_hdl_t dev,       /* set up mappings for dev */
                         device_desc_t dev_desc, /* device descriptor */
                         size_t byte_count_max,  /* max size of a mapping */
                         unsigned flags);        /* defined in dma.h */
@@ -3545,14 +3545,14 @@ extern void
 hub_dmamap_done(        hub_dmamap_t dmamap);   /* done w/ mapping resources */
 
 extern iopaddr_t
-hub_dmatrans_addr(      devfs_handle_t dev,       /* translate for this device */
+hub_dmatrans_addr(      vertex_hdl_t dev,       /* translate for this device */
                         device_desc_t dev_desc, /* device descriptor */
                         paddr_t paddr,          /* system physical address */
                         size_t byte_count,      /* length */
                         unsigned flags);                /* defined in dma.h */
 
 extern alenlist_t
-hub_dmatrans_list(      devfs_handle_t dev,       /* translate for this device */
+hub_dmatrans_list(      vertex_hdl_t dev,       /* translate for this device */
                         device_desc_t dev_desc, /* device descriptor */
                         alenlist_t palenlist,   /* system addr/length list */
                         unsigned flags);                /* defined in dma.h */
@@ -3561,12 +3561,12 @@ extern void
 hub_dmamap_drain(       hub_dmamap_t map);
 
 extern void
-hub_dmaaddr_drain(      devfs_handle_t vhdl,
+hub_dmaaddr_drain(      vertex_hdl_t vhdl,
                         paddr_t addr,
                         size_t bytes);
 
 extern void
-hub_dmalist_drain(      devfs_handle_t vhdl,
+hub_dmalist_drain(      vertex_hdl_t vhdl,
                         alenlist_t list);
 
 
@@ -3574,14 +3574,14 @@ hub_dmalist_drain(      devfs_handle_t vhdl,
 typedef struct hub_intr_s *hub_intr_t;
 
 extern hub_intr_t
-hub_intr_alloc( devfs_handle_t dev,               /* which device */
+hub_intr_alloc( vertex_hdl_t dev,               /* which device */
                 device_desc_t dev_desc,         /* device descriptor */
-                devfs_handle_t owner_dev);        /* owner of this interrupt */
+                vertex_hdl_t owner_dev);        /* owner of this interrupt */
 
 extern hub_intr_t
-hub_intr_alloc_nothd(devfs_handle_t dev,          /* which device */
+hub_intr_alloc_nothd(vertex_hdl_t dev,          /* which device */
                 device_desc_t dev_desc,         /* device descriptor */
-                devfs_handle_t owner_dev);        /* owner of this interrupt */
+                vertex_hdl_t owner_dev);        /* owner of this interrupt */
 
 extern void
 hub_intr_free(hub_intr_t intr_hdl);
@@ -3596,16 +3596,14 @@ hub_intr_connect(       hub_intr_t intr_hdl,    /* xtalk intr resource hndl */
 extern void
 hub_intr_disconnect(hub_intr_t intr_hdl);
 
-extern devfs_handle_t
-hub_intr_cpu_get(hub_intr_t intr_hdl);
 
 /* CONFIGURATION MANAGEMENT */
 
 extern void
-hub_provider_startup(devfs_handle_t hub);
+hub_provider_startup(vertex_hdl_t hub);
 
 extern void
-hub_provider_shutdown(devfs_handle_t hub);
+hub_provider_shutdown(vertex_hdl_t hub);
 
 #define HUB_PIO_CONVEYOR        0x1     /* PIO in conveyor belt mode */
 #define HUB_PIO_FIRE_N_FORGET   0x2     /* PIO in fire-and-forget mode */
@@ -3619,38 +3617,26 @@ hub_provider_shutdown(devfs_handle_t hub);
 
 typedef int     hub_widget_flags_t;
 
-/* Set the PIO mode for a widget.  These two functions perform the
- * same operation, but hub_device_flags_set() takes a hardware graph
- * vertex while hub_widget_flags_set() takes a nasid and widget
- * number.  In most cases, hub_device_flags_set() should be used.
- */
+/* Set the PIO mode for a widget. */
 extern int      hub_widget_flags_set(nasid_t            nasid,
                                      xwidgetnum_t       widget_num,
                                      hub_widget_flags_t flags);
 
-/* Depending on the flags set take the appropriate actions */
-extern int      hub_device_flags_set(devfs_handle_t       widget_dev,
-                                     hub_widget_flags_t flags);
-                                                    
-
 /* Error Handling. */
-extern int hub_ioerror_handler(devfs_handle_t, int, int, struct io_error_s *);
+extern int hub_ioerror_handler(vertex_hdl_t, int, int, struct io_error_s *);
 extern int kl_ioerror_handler(cnodeid_t, cnodeid_t, cpuid_t,
                               int, paddr_t, caddr_t, ioerror_mode_t);
-extern void hub_widget_reset(devfs_handle_t, xwidgetnum_t);
-extern int hub_error_devenable(devfs_handle_t, int, int);
-extern void hub_widgetdev_enable(devfs_handle_t, int);
-extern void hub_widgetdev_shutdown(devfs_handle_t, int);
-extern int  hub_dma_enabled(devfs_handle_t);
+extern int hub_error_devenable(vertex_hdl_t, int, int);
+extern int  hub_dma_enabled(vertex_hdl_t);
 
 /* hubdev */
 extern void hubdev_init(void);
-extern void hubdev_register(int (*attach_method)(devfs_handle_t));
-extern int hubdev_unregister(int (*attach_method)(devfs_handle_t));
-extern int hubdev_docallouts(devfs_handle_t hub);
+extern void hubdev_register(int (*attach_method)(vertex_hdl_t));
+extern int hubdev_unregister(int (*attach_method)(vertex_hdl_t));
+extern int hubdev_docallouts(vertex_hdl_t hub);
 
-extern caddr_t hubdev_prombase_get(devfs_handle_t hub);
-extern cnodeid_t hubdev_cnodeid_get(devfs_handle_t hub);
+extern caddr_t hubdev_prombase_get(vertex_hdl_t hub);
+extern cnodeid_t hubdev_cnodeid_get(vertex_hdl_t hub);
 
 #endif /* __ASSEMBLY__ */
 #endif /* _KERNEL */

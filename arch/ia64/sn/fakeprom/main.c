@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
 
@@ -33,25 +33,9 @@ fmain(int lid, int bsp) {
 	 * First lets figure out who we are. This is done from the
 	 * LID passed to us.
 	 */
-
-#ifdef CONFIG_IA64_SGI_SN1
-	nasid = (lid>>24);
-	syn = (lid>>17)&1;
-	cpu = (lid>>16)&1;
-
-	/*
-	 * Now pick a synergy master to initialize synergy registers.
-	 */
-	if (test_and_set_bit(syn, &nasidmaster[nasid]) == 0) {
-		synergy_init(nasid, syn);
-		test_and_set_bit(syn+2, &nasidmaster[nasid]);
-	} else
-		while (get_bit(syn+2, &nasidmaster[nasid]) == 0);
-#else
 	nasid = (lid>>16)&0xfff;
 	cpu = (lid>>28)&3;
 	syn = 0;
-#endif
 	
 	/*
 	 * Now pick a nasid master to initialize Bedrock registers.

@@ -1,7 +1,7 @@
 /*
- * Platform dependent support for SGI SN1
+ * Platform dependent support for SGI SN
  *
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it 
  * under the terms of version 2 of the GNU General Public License 
@@ -32,12 +32,12 @@
  * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <asm/current.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/slab.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/sn/sgi.h>
@@ -49,19 +49,25 @@
 #include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pciio_private.h>
-#ifdef ajmtestintr
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
-#endif /* ajmtestintr */
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/io.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/arch.h>
-#include <asm/sn/nodepda.h>
+#include <asm/sn/pda.h>
+#include <asm/processor.h>
+#include <asm/system.h>
+#include <asm/bitops.h>
 
 int irq_to_bit_pos(int irq);
+static void force_interrupt(int irq);
+extern void pcibr_force_interrupt(pcibr_intr_t intr);
+extern int sn_force_interrupt_flag;
+
+
 
 static unsigned int
 sn_startup_irq(unsigned int irq)
@@ -87,49 +93,11 @@ sn_enable_irq(unsigned int irq)
 static void
 sn_ack_irq(unsigned int irq)
 {
-#ifdef CONFIG_IA64_SGI_SN1
-	int bit = -1;
-	unsigned long long intpend_val;
-	int subnode;
-#endif
-#ifdef CONFIG_IA64_SGI_SN2
 	unsigned long event_occurred, mask = 0;
-#endif
 	int nasid;
 
 	irq = irq & 0xff;
 	nasid = smp_physical_node_id();
-#ifdef CONFIG_IA64_SGI_SN1
-	subnode = cpuid_to_subnode(smp_processor_id());
-	if (irq == SGI_UART_IRQ) {
-		intpend_val = REMOTE_HUB_PI_L(nasid, subnode, PI_INT_PEND0);
-		if (intpend_val & (1L<<GFX_INTR_A) ) {
-			bit = GFX_INTR_A;
-			REMOTE_HUB_PI_CLR_INTR(nasid, subnode, bit);
-		}
-		if ( intpend_val & (1L<<GFX_INTR_B) ) {
-			bit = GFX_INTR_B;
-			REMOTE_HUB_PI_CLR_INTR(nasid, subnode, bit);
-		}
-		if (intpend_val & (1L<<PG_MIG_INTR) ) {
-			bit = PG_MIG_INTR;
-			REMOTE_HUB_PI_CLR_INTR(nasid, subnode, bit);
-		}
-		if (intpend_val & (1L<<CC_PEND_A)) {
-			bit = CC_PEND_A;
-			REMOTE_HUB_PI_CLR_INTR(nasid, subnode, bit);
-		}
-		if (intpend_val & (1L<<CC_PEND_B)) {
-			bit = CC_PEND_B;
-			REMOTE_HUB_PI_CLR_INTR(nasid, subnode, bit);
-		}
-		return;
-	}
-	bit = irq_to_bit_pos(irq);
-	REMOTE_HUB_PI_CLR_INTR(nasid, subnode, bit);
-#endif
-
-#ifdef CONFIG_IA64_SGI_SN2
 	event_occurred = HUB_L( (unsigned long *)GLOBAL_MMR_ADDR(nasid,SH_EVENT_OCCURRED) );
 	if (event_occurred & SH_EVENT_OCCURRED_UART_INT_MASK) {
 		mask |= (1 << SH_EVENT_OCCURRED_UART_INT_SHFT);
@@ -144,34 +112,18 @@ sn_ack_irq(unsigned int irq)
 		mask |= (1 << SH_EVENT_OCCURRED_II_INT1_SHFT);
 	}
 	HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_EVENT_OCCURRED_ALIAS), mask );
-#endif
+	__set_bit(irq, (volatile void *)pda->sn_in_service_ivecs);
 }
 
 static void
 sn_end_irq(unsigned int irq)
 {
-#ifdef CONFIG_IA64_SGI_SN1
-	unsigned long long intpend_val, mask = 0x70L;
-	int subnode;
-#endif
 	int nasid;
-#ifdef CONFIG_IA64_SGI_SN2
+	int ivec;
 	unsigned long event_occurred;
-#endif
 
-	irq = irq & 0xff;
-#ifdef CONFIG_IA64_SGI_SN1
-	if (irq == SGI_UART_IRQ) {
-		nasid = smp_physical_node_id();
-		subnode = cpuid_to_subnode(smp_processor_id());
-		intpend_val = REMOTE_HUB_PI_L(nasid, subnode, PI_INT_PEND0);
-		if (intpend_val & mask) {
-			platform_send_ipi(smp_processor_id(), SGI_UART_IRQ, IA64_IPI_DM_INT, 0);
-		}
-	}
-#endif
-#ifdef CONFIG_IA64_SGI_SN2
-	if (irq == SGI_UART_VECTOR) {
+	ivec = irq & 0xff;
+	if (ivec == SGI_UART_VECTOR) {
 		nasid = smp_physical_node_id();
 		event_occurred = HUB_L( (unsigned long *)GLOBAL_MMR_ADDR(nasid,SH_EVENT_OCCURRED) );
 		// If the UART bit is set here, we may have received an interrupt from the
@@ -181,8 +133,9 @@ sn_end_irq(unsigned int irq)
 				platform_send_ipi(smp_processor_id(), SGI_UART_VECTOR, IA64_IPI_DM_INT, 0);
 		}
 	}
-#endif
-
+	__clear_bit(ivec, (volatile void *)pda->sn_in_service_ivecs);
+	if (sn_force_interrupt_flag)
+		force_interrupt(irq);
 }
 
 static void
@@ -191,7 +144,7 @@ sn_set_affinity_irq(unsigned int irq, unsigned long mask)
 }
 
 
-struct hw_interrupt_type irq_type_iosapic_level = {
+struct hw_interrupt_type irq_type_sn = {
 	"SN hub",
 	sn_startup_irq,
 	sn_shutdown_irq,
@@ -203,29 +156,17 @@ struct hw_interrupt_type irq_type_iosapic_level = {
 };
 
 
-#define irq_type_sn irq_type_iosapic_level
-struct irq_desc *_sn_irq_desc[NR_CPUS];
-
 struct irq_desc *
 sn_irq_desc(unsigned int irq) {
-	int cpu = irq >> 8;
 
-	irq = irq & 0xff;
+	irq = SN_IVEC_FROM_IRQ(irq);
 
-	return(_sn_irq_desc[cpu] + irq);
+	return(_irq_desc + irq);
 }
 
 u8
 sn_irq_to_vector(u8 irq) {
-	return(irq & 0xff);
-}
-
-int gsi_to_vector(u32 irq) {
-	return irq & 0xff;
-}
-
-int gsi_to_irq(u32 irq) {
-	return irq & 0xff;
+	return(irq);
 }
 
 unsigned int
@@ -233,46 +174,23 @@ sn_local_vector_to_irq(u8 vector) {
 	return (CPU_VECTOR_TO_IRQ(smp_processor_id(), vector));
 }
 
-void *kmalloc(size_t, int);
-
 void
 sn_irq_init (void)
 {
 	int i;
 	irq_desc_t *base_desc = _irq_desc;
 
-	for (i=IA64_FIRST_DEVICE_VECTOR; i<NR_IVECS; i++) {
+	for (i=IA64_FIRST_DEVICE_VECTOR; i<NR_IRQS; i++) {
 		if (base_desc[i].handler == &no_irq_type) {
 			base_desc[i].handler = &irq_type_sn;
 		}
 	}
 }
 
-void
-sn_init_irq_desc(void) {
-	int i;
-	irq_desc_t *base_desc = _irq_desc, *p;
-
-	for (i=0; i < NR_CPUS; i++) {
-		p =  page_address(alloc_pages_node(local_nodeid, GFP_KERNEL,
-			get_order(sizeof(struct irq_desc) * NR_IVECS) ) );
-		ASSERT(p);
-		memcpy(p, base_desc, sizeof(struct irq_desc) * NR_IVECS);
-		_sn_irq_desc[i] = p;
-	}
-}
-
-
 int
 bit_pos_to_irq(int bit) {
 #define BIT_TO_IRQ 64
 	if (bit > 118) bit = 118;
-
-#ifdef CONFIG_IA64_SGI_SN1
-	if (bit >= GFX_INTR_A && bit <= CC_PEND_B) {
-		return SGI_UART_IRQ;
-	}
-#endif
 
         return bit + BIT_TO_IRQ;
 }
@@ -285,53 +203,181 @@ irq_to_bit_pos(int irq) {
         return bit;
 }
 
-#ifdef ajmtestintr
-
-#include <linux/timer.h>
-struct timer_list intr_test_timer = TIMER_INITIALIZER(NULL, 0, 0);
-int intr_test_icount[NR_IRQS];
-struct intr_test_reg_struct {
-	pcibr_soft_t pcibr_soft;
-	int slot;
+struct pcibr_intr_list_t {
+	struct pcibr_intr_list_t *next;
+	pcibr_intr_t intr;
 };
-struct intr_test_reg_struct intr_test_registered[NR_IRQS];
+
+static struct pcibr_intr_list_t **pcibr_intr_list;
 
 void
-intr_test_handle_timer(unsigned long data) {
-	int i;
-	bridge_t	*bridge;
+register_pcibr_intr(int irq, pcibr_intr_t intr) {
+	struct pcibr_intr_list_t *p = kmalloc(sizeof(struct pcibr_intr_list_t), GFP_KERNEL);
+	struct pcibr_intr_list_t *list;
+	int cpu = SN_CPU_FROM_IRQ(irq);
 
-	for (i=0;i<NR_IRQS;i++) {
-		if (intr_test_registered[i].pcibr_soft) {
-			pcibr_soft_t pcibr_soft = intr_test_registered[i].pcibr_soft;
-			xtalk_intr_t intr = pcibr_soft->bs_intr[intr_test_registered[i].slot].bsi_xtalk_intr;
-			/* send interrupt */
-			bridge = pcibr_soft->bs_base;
-			bridge->b_force_always[intr_test_registered[i].slot].intr = 1;
+	if (pcibr_intr_list == NULL) {
+		pcibr_intr_list = kmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS, GFP_KERNEL);
+		if (pcibr_intr_list == NULL) panic("Could not allocate memory for pcibr_intr_list\n");
+		memset( (void *)pcibr_intr_list, 0, sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
+	}
+	if (pdacpu(cpu)->sn_last_irq < irq) {
+		pdacpu(cpu)->sn_last_irq = irq;
+	}
+	if (pdacpu(cpu)->sn_first_irq > irq) pdacpu(cpu)->sn_first_irq = irq;
+	if (!p) panic("Could not allocate memory for pcibr_intr_list_t\n");
+	if ((list = pcibr_intr_list[irq])) {
+		while (list->next) list = list->next;
+		list->next = p;
+		p->next = NULL;
+		p->intr = intr;
+	} else {
+		pcibr_intr_list[irq] = p;
+		p->next = NULL;
+		p->intr = intr;
+	}
+}
+
+void
+force_polled_int(void) {
+	int i;
+	struct pcibr_intr_list_t *p;
+
+	for (i=0; i<NR_IRQS;i++) {
+		p = pcibr_intr_list[i];
+		while (p) {
+			if (p->intr){
+				pcibr_force_interrupt(p->intr);
+			}
+			p = p->next;
 		}
 	}
-	del_timer(&intr_test_timer);
-	intr_test_timer.expires = jiffies + HZ/100;
-	add_timer(&intr_test_timer);
+}
+
+static void
+force_interrupt(int irq) {
+	struct pcibr_intr_list_t *p = pcibr_intr_list[irq];
+
+	while (p) {
+		if (p->intr) {
+			pcibr_force_interrupt(p->intr);
+		}
+		p = p->next;
+	}
+}
+
+/*
+Check for lost interrupts.  If the PIC int_status reg. says that
+an interrupt has been sent, but not handled, and the interrupt
+is not pending in either the cpu irr regs or in the soft irr regs,
+and the interrupt is not in service, then the interrupt may have
+been lost.  Force an interrupt on that pin.  It is possible that
+the interrupt is in flight, so we may generate a spurious interrupt,
+but we should never miss a real lost interrupt.
+*/
+
+static void
+sn_check_intr(int irq, pcibr_intr_t intr) {
+	unsigned long regval;
+	int irr_reg_num;
+	int irr_bit;
+	unsigned long irr_reg;
+
+
+	regval = intr->bi_soft->bs_base->p_int_status_64;
+	irr_reg_num = irq_to_vector(irq) / 64;
+	irr_bit = irq_to_vector(irq) % 64;
+	switch (irr_reg_num) {
+		case 0:
+			irr_reg = ia64_get_irr0();
+			break;
+		case 1:
+			irr_reg = ia64_get_irr1();
+			break;
+		case 2:
+			irr_reg = ia64_get_irr2();
+			break;
+		case 3:
+			irr_reg = ia64_get_irr3();
+			break;
+	}
+	if (!test_bit(irr_bit, &irr_reg) ) {
+		if (!test_bit(irq, pda->sn_soft_irr) ) {
+			if (!test_bit(irq, pda->sn_in_service_ivecs) ) {
+				regval &= 0xff;
+				if (intr->bi_ibits & regval & intr->bi_last_intr) {
+					regval &= ~(intr->bi_ibits & regval);
+					pcibr_force_interrupt(intr);
+				}
+			}
+		}
+	}
+	intr->bi_last_intr = regval;
 }
 
 void
-intr_test_set_timer(void) {
-	intr_test_timer.expires = jiffies + HZ/100;
-	intr_test_timer.function = intr_test_handle_timer;
-	add_timer(&intr_test_timer);
+sn_lb_int_war_check(void) {
+	int i;
+
+	if (pda->sn_first_irq == 0) return;
+	for (i=pda->sn_first_irq;
+		i <= pda->sn_last_irq; i++) {
+			struct pcibr_intr_list_t *p = pcibr_intr_list[i];
+			if (p == NULL) {
+				continue;
+			}
+			while (p) {
+				sn_check_intr(i, p->intr);
+				p = p->next;
+			}
+	}
+}
+
+static inline int
+sn_get_next_bit(void) {
+	int i;
+	int bit;
+
+	for (i = 3; i >= 0; i--) {
+		if (pda->sn_soft_irr[i] != 0) {
+			bit = (i * 64) +  __ffs(pda->sn_soft_irr[i]);
+			__change_bit(bit, (volatile void *)pda->sn_soft_irr);
+			return(bit);
+		}
+	}
+	return IA64_SPURIOUS_INT_VECTOR;
 }
 
 void
-intr_test_register_irq(int irq, pcibr_soft_t pcibr_soft, int slot) {
-	irq = irq & 0xff;
-	intr_test_registered[irq].pcibr_soft = pcibr_soft;
-	intr_test_registered[irq].slot = slot;
+sn_set_tpr(int vector) {
+	if (vector > IA64_LAST_DEVICE_VECTOR || vector < IA64_FIRST_DEVICE_VECTOR) {
+		ia64_set_tpr(vector);
+	} else {
+		ia64_set_tpr(IA64_LAST_DEVICE_VECTOR);
+	}
 }
 
-void
-intr_test_handle_intr(int irq, void *junk, struct pt_regs *morejunk) {
-	intr_test_icount[irq]++;
-	printk("RECEIVED %d INTERRUPTS ON IRQ %d\n",intr_test_icount[irq], irq);
+static inline void
+sn_get_all_ivr(void) {
+	int vector;
+
+	vector = ia64_get_ivr();
+	while (vector != IA64_SPURIOUS_INT_VECTOR) {
+		__set_bit(vector, (volatile void *)pda->sn_soft_irr);
+		ia64_eoi();
+		if (vector > IA64_LAST_DEVICE_VECTOR) return;
+		vector = ia64_get_ivr();
+	}
 }
-#endif /* ajmtestintr */
+	
+int
+sn_get_ivr(void) {
+	int vector;
+
+	vector = sn_get_next_bit();
+	if (vector == IA64_SPURIOUS_INT_VECTOR) {
+		sn_get_all_ivr();
+		vector = sn_get_next_bit();
+	}
+	return vector;
+}

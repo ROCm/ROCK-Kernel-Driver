@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #include <linux/types.h>
@@ -30,7 +30,7 @@
 
 /* ARGSUSED */
 void
-hub_intr_init(devfs_handle_t hubv)
+hub_intr_init(vertex_hdl_t hubv)
 {
 }
 
@@ -45,9 +45,9 @@ hub_widget_id(nasid_t nasid)
 }
 
 static hub_intr_t
-do_hub_intr_alloc(devfs_handle_t dev,
+do_hub_intr_alloc(vertex_hdl_t dev,
 		device_desc_t dev_desc,
-		devfs_handle_t owner_dev,
+		vertex_hdl_t owner_dev,
 		int uncond_nothread)
 {
 	cpuid_t		cpu = 0;
@@ -71,7 +71,7 @@ do_hub_intr_alloc(devfs_handle_t dev,
 	cpuphys = cpu_physical_id(cpu);
 	slice = cpu_physical_id_to_slice(cpuphys);
 	nasid = cpu_physical_id_to_nasid(cpuphys);
-	cnode = cpu_to_node_map[cpu];
+	cnode = cpuid_to_cnodeid(cpu);
 
 	if (slice) {
 		xtalk_addr = SH_II_INT1 | ((unsigned long)nasid << 36) | (1UL << 47);
@@ -101,17 +101,17 @@ do_hub_intr_alloc(devfs_handle_t dev,
 }
 
 hub_intr_t
-hub_intr_alloc(devfs_handle_t dev,
+hub_intr_alloc(vertex_hdl_t dev,
 		device_desc_t dev_desc,
-		devfs_handle_t owner_dev)
+		vertex_hdl_t owner_dev)
 {
 	return(do_hub_intr_alloc(dev, dev_desc, owner_dev, 0));
 }
 
 hub_intr_t
-hub_intr_alloc_nothd(devfs_handle_t dev,
+hub_intr_alloc_nothd(vertex_hdl_t dev,
 		device_desc_t dev_desc,
-		devfs_handle_t owner_dev)
+		vertex_hdl_t owner_dev)
 {
 	return(do_hub_intr_alloc(dev, dev_desc, owner_dev, 1));
 }
@@ -187,19 +187,4 @@ hub_intr_disconnect(hub_intr_t intr_hdl)
 	rv = intr_disconnect_level(cpu, bit);
 	ASSERT(rv == 0);
 	intr_hdl->i_flags &= ~HUB_INTR_IS_CONNECTED;
-}
-
-
-/*
- * Return a hwgraph vertex that represents the CPU currently
- * targeted by an interrupt.
- */
-devfs_handle_t
-hub_intr_cpu_get(hub_intr_t intr_hdl)
-{
-	cpuid_t cpuid = intr_hdl->i_cpuid;
-
-	ASSERT(cpuid != CPU_NONE);
-
-	return(cpuid_to_vertex(cpuid));
 }
