@@ -40,8 +40,6 @@ RCU/
 	- directory with info on RCU (read-copy update).
 README.DAC960
 	- info on Mylex DAC960/DAC1100 PCI RAID Controller Driver for Linux.
-README.moxa
-	- release notes for Moxa mutiport serial card.
 SAK.txt
 	- info on Secure Attention Keys.
 SubmittingDrivers
