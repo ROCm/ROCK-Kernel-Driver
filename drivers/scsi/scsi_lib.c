@@ -712,8 +712,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	}
 
 	if (blk_pc_request(req)) { /* SG_IO ioctl from block level */
-		req->errors = (driver_byte(result) & DRIVER_SENSE) ?
-			      (CHECK_CONDITION << 1) : (result & 0xff);
+		req->errors = result;
 		if (result) {
 			clear_errors = 0;
 			if (scsi_command_normalize_sense(cmd, &sshdr)) {
