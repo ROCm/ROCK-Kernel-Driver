@@ -213,27 +213,28 @@ void __init permanent_kmaps_init(pgd_t *pgd_base)
 	pkmap_page_table = pte;	
 }
 
+void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
+{
+	if (!page_is_ram(pfn)) {
+		SetPageReserved(page);
+		return;
+	}
+	if (bad_ppro && page_kills_ppro(pfn)) {
+		SetPageReserved(page);
+		return;
+	}
+	ClearPageReserved(page);
+	set_bit(PG_highmem, &page->flags);
+	atomic_set(&page->count, 1);
+	__free_page(page);
+	totalhigh_pages++;
+}
+
 void __init set_highmem_pages_init(int bad_ppro) 
 {
 	int pfn;
-	for (pfn = highstart_pfn; pfn < highend_pfn; pfn++) {
-		struct page *page = mem_map + pfn;
-
-		if (!page_is_ram(pfn)) {
-			SetPageReserved(page);
-			continue;
-		}
-		if (bad_ppro && page_kills_ppro(pfn))
-		{
-			SetPageReserved(page);
-			continue;
-		}
-		ClearPageReserved(page);
-		set_bit(PG_highmem, &page->flags);
-		atomic_set(&page->count, 1);
-		__free_page(page);
-		totalhigh_pages++;
-	}
+	for (pfn = highstart_pfn; pfn < highend_pfn; pfn++)
+		one_highpage_init((struct page *)(mem_map + pfn), pfn, bad_ppro);
 	totalram_pages += totalhigh_pages;
 }
 
@@ -405,7 +406,17 @@ void __init test_wp_bit(void)
 		printk("Ok.\n");
 	}
 }
-	
+
+static void __init set_max_mapnr_init(void)
+{
+#ifdef CONFIG_HIGHMEM
+	highmem_start_page = mem_map + highstart_pfn;
+	max_mapnr = num_physpages = highend_pfn;
+#else
+	max_mapnr = num_physpages = max_low_pfn;
+#endif
+}
+
 void __init mem_init(void)
 {
 	extern int ppro_with_ram_bug(void);
@@ -418,12 +429,8 @@ void __init mem_init(void)
 	
 	bad_ppro = ppro_with_ram_bug();
 
-#ifdef CONFIG_HIGHMEM
-	highmem_start_page = mem_map + highstart_pfn;
-	max_mapnr = num_physpages = highend_pfn;
-#else
-	max_mapnr = num_physpages = max_low_pfn;
-#endif
+	set_max_mapnr_init();
+
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 
 	/* clear the zero-page */
