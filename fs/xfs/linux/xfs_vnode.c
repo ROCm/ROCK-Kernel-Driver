@@ -184,7 +184,6 @@ vn_get(struct vnode *vp, vmap_t *vmap)
 		return NULL;
 
 	vn_trace_exit(vp, "vn_get", (inst_t *)__return_address);
-	ASSERT((vp->v_flag & VPURGE) == 0);
 
 	return vp;
 }
@@ -237,8 +236,6 @@ void
 vn_purge(struct vnode *vp, vmap_t *vmap)
 {
 	vn_trace_entry(vp, "vn_purge", (inst_t *)__return_address);
-
-	ASSERT(vp->v_flag & VPURGE);
 
 again:
 	/*

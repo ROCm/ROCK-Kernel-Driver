@@ -589,7 +589,6 @@ xfs_unmount(
 	 * Drop the reference count, and then
 	 * run the vnode through vn_remove.
 	 */
-	rvp->v_flag |= VPURGE;			/* OK for vn_purge */
 	VN_RELE(rvp);
 
 	vn_remove(rvp);

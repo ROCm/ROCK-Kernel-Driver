@@ -3384,7 +3384,6 @@ xfs_iflush_all(
 			 * whether we reached the end or not.
 			 */
 			VMAP(vp, vmap);
-			vp->v_flag |= VPURGE;		/* OK for vn_purge */
 			XFS_MOUNT_IUNLOCK(mp);
 
 			vn_purge(vp, &vmap);

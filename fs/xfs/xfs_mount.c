@@ -900,7 +900,6 @@ xfs_mountfs(
 		VMAP(rvp, vmap);
 		prdev("Root inode %llu is not a directory",
 		      mp->m_dev, (unsigned long long)rip->i_ino);
-		rvp->v_flag |= VPURGE;
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
@@ -936,7 +935,6 @@ xfs_mountfs(
 			(!quotaondisk ? "out quota" : ""),
 			(uquotaondisk ? " usrquota" : ""),
 			(gquotaondisk ? " grpquota" : ""));
-		rvp->v_flag |= VPURGE;
 		VN_RELE(rvp);
 		vn_remove(rvp);
 		error = XFS_ERROR(EPERM);
@@ -951,7 +949,6 @@ xfs_mountfs(
 		 * Free up the root inode.
 		 */
 		cmn_err(CE_WARN, "XFS: failed to read RT inodes");
-		rvp->v_flag |= VPURGE;
 		VMAP(rvp, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
