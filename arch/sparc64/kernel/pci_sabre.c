@@ -1293,6 +1293,14 @@ static void __init sabre_iommu_init(struct pci_controller_info *p,
 	 * in pci_iommu.c
 	 */
 
+	iommu->dummy_page = __get_free_pages(GFP_KERNEL, 0);
+	if (!iommu->dummy_page) {
+		prom_printf("PSYCHO_IOMMU: Error, gfp(dummy_page) failed.\n");
+		prom_halt();
+	}
+	memset((void *)iommu->dummy_page, 0, PAGE_SIZE);
+	iommu->dummy_page_pa = (unsigned long) __pa(iommu->dummy_page);
+
 	tsbbase = __get_free_pages(GFP_KERNEL, order = get_order(tsbsize * 1024 * 8));
 	if (!tsbbase) {
 		prom_printf("SABRE_IOMMU: Error, gfp(tsb) failed.\n");
@@ -1301,7 +1309,7 @@ static void __init sabre_iommu_init(struct pci_controller_info *p,
 	iommu->page_table = (iopte_t *)tsbbase;
 	iommu->page_table_map_base = dvma_offset;
 	iommu->dma_addr_mask = dma_mask;
-	memset((char *)tsbbase, 0, PAGE_SIZE << order);
+	pci_iommu_table_init(iommu, PAGE_SIZE << order);
 
 	sabre_write(p->pbm_A.controller_regs + SABRE_IOMMU_TSBBASE, __pa(tsbbase));
 

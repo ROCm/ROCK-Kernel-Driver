@@ -228,13 +228,10 @@ extern unsigned long find_next_zero_bit(unsigned long *, unsigned long, unsigned
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
 
-extern long ___test_and_set_le_bit(int nr, volatile unsigned long *addr);
-extern long ___test_and_clear_le_bit(int nr, volatile unsigned long *addr);
-
-#define test_and_set_le_bit(nr,addr)	({___test_and_set_le_bit(nr,addr)!=0;})
-#define test_and_clear_le_bit(nr,addr)	({___test_and_clear_le_bit(nr,addr)!=0;})
-#define set_le_bit(nr,addr)		((void)___test_and_set_le_bit(nr,addr))
-#define clear_le_bit(nr,addr)		((void)___test_and_clear_le_bit(nr,addr))
+#define test_and_set_le_bit(nr,addr)	\
+	({ ___test_and_set_bit((nr) ^ 0x38, (addr)) != 0; })
+#define test_and_clear_le_bit(nr,addr)	\
+	({ ___test_and_clear_bit((nr) ^ 0x38, (addr)) != 0; })
 
 static __inline__ int test_le_bit(int nr, __const__ unsigned long * addr)
 {
@@ -253,22 +250,30 @@ extern unsigned long find_next_zero_le_bit(unsigned long *, unsigned long, unsig
 
 #ifdef __KERNEL__
 
-#define ext2_set_bit(nr,addr)		test_and_set_le_bit((nr),(unsigned long *)(addr))
-#define ext2_set_bit_atomic(lock,nr,addr) test_and_set_le_bit((nr),(unsigned long *)(addr))
-#define ext2_clear_bit(nr,addr)		test_and_clear_le_bit((nr),(unsigned long *)(addr))
-#define ext2_clear_bit_atomic(lock,nr,addr) test_and_clear_le_bit((nr),(unsigned long *)(addr))
-#define ext2_test_bit(nr,addr)		test_le_bit((nr),(unsigned long *)(addr))
+#define ext2_set_bit(nr,addr)	\
+	test_and_set_le_bit((nr),(unsigned long *)(addr))
+#define ext2_set_bit_atomic(lock,nr,addr) \
+	test_and_set_le_bit((nr),(unsigned long *)(addr))
+#define ext2_clear_bit(nr,addr)	\
+	test_and_clear_le_bit((nr),(unsigned long *)(addr))
+#define ext2_clear_bit_atomic(lock,nr,addr) \
+	test_and_clear_le_bit((nr),(unsigned long *)(addr))
+#define ext2_test_bit(nr,addr)	\
+	test_le_bit((nr),(unsigned long *)(addr))
 #define ext2_find_first_zero_bit(addr, size) \
 	find_first_zero_le_bit((unsigned long *)(addr), (size))
 #define ext2_find_next_zero_bit(addr, size, off) \
 	find_next_zero_le_bit((unsigned long *)(addr), (size), (off))
 
 /* Bitmap functions for the minix filesystem.  */
-#define minix_test_and_set_bit(nr,addr)	test_and_set_bit((nr),(unsigned long *)(addr))
-#define minix_set_bit(nr,addr)		set_bit((nr),(unsigned long *)(addr))
+#define minix_test_and_set_bit(nr,addr)	\
+	test_and_set_bit((nr),(unsigned long *)(addr))
+#define minix_set_bit(nr,addr)	\
+	set_bit((nr),(unsigned long *)(addr))
 #define minix_test_and_clear_bit(nr,addr) \
 	test_and_clear_bit((nr),(unsigned long *)(addr))
-#define minix_test_bit(nr,addr)		test_bit((nr),(unsigned long *)(addr))
+#define minix_test_bit(nr,addr)	\
+	test_bit((nr),(unsigned long *)(addr))
 #define minix_find_first_zero_bit(addr,size) \
 	find_first_zero_bit((unsigned long *)(addr),(size))
 
