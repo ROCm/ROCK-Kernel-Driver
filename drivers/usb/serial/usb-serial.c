@@ -366,7 +366,7 @@ static struct usb_device_id generic_serial_ids[] = {
 
 /* Driver structure we register with the USB core */
 static struct usb_driver usb_serial_driver = {
-	.name =		"serial",
+	.name =		"usbserial",
 	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
 #ifdef CONFIG_USB_SERIAL_GENERIC
@@ -1259,7 +1259,7 @@ void usb_serial_disconnect(struct usb_interface *interface)
 
 struct tty_driver usb_serial_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
-	.driver_name =		"usb-serial",
+	.driver_name =		"usbserial",
 #ifndef CONFIG_DEVFS_FS
 	.name =			"ttyUSB",
 #else
