@@ -873,8 +873,7 @@ static int MGAG100_preinit(WPMINFO2) {
 
 		hw->MXoptionReg |= 0x1080;
 		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, hw->MXoptionReg);
-		mga_outl(M_CTLWTST, 0x00000300);
-		/* mga_outl(M_CTLWTST, 0x03258A31); */
+		mga_outl(M_CTLWTST, ACCESS_FBINFO(values).reg.mctlwtst);
 		udelay(100);
 		mga_outb(0x1C05, 0x00);
 		mga_outb(0x1C05, 0x80);
@@ -925,17 +924,18 @@ static int MGAG100_preinit(WPMINFO2) {
 		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION2_REG, reg50);
 
 		if (ACCESS_FBINFO(devflags.memtype) == -1)
-			ACCESS_FBINFO(devflags.memtype) = 0;
-		hw->MXoptionReg |= (ACCESS_FBINFO(devflags.memtype) & 7) << 10;
+			hw->MXoptionReg |= ACCESS_FBINFO(values).reg.opt & 0x1C00;
+		else
+			hw->MXoptionReg |= (ACCESS_FBINFO(devflags.memtype) & 7) << 10;
 		if (ACCESS_FBINFO(devflags.sgram))
 			hw->MXoptionReg |= 0x4000;
-		mga_outl(M_CTLWTST, 0x042450A1);
-		mga_outl(M_MEMRDBK, 0x00000108);
+		mga_outl(M_CTLWTST, ACCESS_FBINFO(values).reg.mctlwtst);
+		mga_outl(M_MEMRDBK, ACCESS_FBINFO(values).reg.memrdbk);
 		udelay(200);
 		mga_outl(M_MACCESS, 0x00000000);
 		mga_outl(M_MACCESS, 0x00008000);
 		udelay(100);
-		mga_outl(M_MEMRDBK, 0x00000108);
+		mga_outl(M_MEMRDBK, ACCESS_FBINFO(values).reg.memrdbk);
 		hw->MXoptionReg |= 0x00040020;
 	}
 	pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, hw->MXoptionReg);
