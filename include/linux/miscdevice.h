@@ -1,8 +1,6 @@
 #ifndef _LINUX_MISCDEVICE_H
 #define _LINUX_MISCDEVICE_H
 
-#include <linux/devfs_fs_kernel.h>
-
 #define BUSMOUSE_MINOR 0
 #define PSMOUSE_MINOR  1
 #define MS_BUSMOUSE_MINOR 2

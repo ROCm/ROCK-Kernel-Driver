@@ -715,7 +715,7 @@ struct request_sense {
 };
 
 #ifdef __KERNEL__
-#include <linux/devfs_fs_kernel.h>
+#include <linux/fs.h>		/* not really needed, later.. */
 #include <linux/device.h>
 
 struct cdrom_write_settings {

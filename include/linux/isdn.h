@@ -201,10 +201,6 @@ typedef struct {
 #  include <linux/concap.h>
 #endif
 
-#ifdef CONFIG_DEVFS_FS
-#  include <linux/devfs_fs_kernel.h>
-#endif
-
 #include <linux/isdnif.h>
 
 #define ISDN_DRVIOCTL_MASK       0x7f  /* Mask for Device-ioctl */

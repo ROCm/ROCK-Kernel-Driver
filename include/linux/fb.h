@@ -348,7 +348,6 @@ struct fb_pixmap {
 
 #include <linux/fs.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 
 struct fb_info;
 struct vm_area_struct;

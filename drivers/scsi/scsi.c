@@ -52,6 +52,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/devfs_fs_kernel.h>
 
 #define __KERNEL_SYSCALLS__
 

@@ -55,6 +55,7 @@ static int sg_version_num = 30528;	/* 2 digits for each component */
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 #include <linux/moduleparam.h>
+#include <linux/devfs_fs_kernel.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>

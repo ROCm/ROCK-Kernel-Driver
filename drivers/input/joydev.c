@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Joystick device interfaces");
