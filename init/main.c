@@ -31,6 +31,7 @@
 #include <linux/tty.h>
 #include <linux/gfp.h>
 #include <linux/percpu.h>
+#include <linux/kmod.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/workqueue.h>
@@ -605,6 +606,10 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+	/* drivers will send hotplug events */
+	init_workqueues();
+	usermodehelper_init();
+
 	driver_init();
 
 #ifdef CONFIG_SYSCTL
@@ -614,7 +619,6 @@ static void __init do_basic_setup(void)
 	/* Networking initialization needs a process context */ 
 	sock_init();
 
-	init_workqueues();
 	do_initcalls();
 }
 
