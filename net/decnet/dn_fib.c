@@ -67,18 +67,18 @@ static struct
 	int error;
 	u8 scope;
 } dn_fib_props[RTA_MAX+1] = {
-	{ .error = 0, .scope = RT_SCOPE_NOWHERE },	  /* RTN_UNSPEC */
-	{ .error = 0, .scope = RT_SCOPE_UNIVERSE },	  /* RTN_UNICAST */
-	{ .error = 0, .scope = RT_SCOPE_HOST },		  /* RTN_LOCAL */
-	{ .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },  /* RTN_BROADCAST */
-	{ .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },  /* RTN_ANYCAST */
-	{ .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },  /* RTN_MULTICAST */
-	{ .error = -EINVAL, .scope = RT_SCOPE_UNIVERSE }, /* RTN_BLACKHOLE */
-	{ .error = -EHOSTUNREACH, .scope = RT_SCOPE_UNIVERSE },	/* RTN_UNREACHABLE */
-	{ .error = -EACCES, .scope = RT_SCOPE_UNIVERSE }, /* RTN_PROHIBIT */
-	{ .error = -EAGAIN, .scope = RT_SCOPE_UNIVERSE }, /* RTN_THROW */
-	{ .error = 0, .scope = RT_SCOPE_NOWHERE },  /* RTN_NAT */
-	{ .error = -EINVAL, .scope = RT_SCOPE_NOWHERE }	  /* RTN_XRESOLVE */
+	[RTN_UNSPEC] =      { .error = 0,       .scope = RT_SCOPE_NOWHERE },
+	[RTN_UNICAST] =     { .error = 0,       .scope = RT_SCOPE_UNIVERSE },
+	[RTN_LOCAL] =       { .error = 0,       .scope = RT_SCOPE_HOST },
+	[RTN_BROADCAST] =   { .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },
+	[RTN_ANYCAST] =     { .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },
+	[RTN_MULTICAST] =   { .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },
+	[RTN_BLACKHOLE] =   { .error = -EINVAL, .scope = RT_SCOPE_UNIVERSE },
+	[RTN_UNREACHABLE] = { .error = -EHOSTUNREACH, .scope = RT_SCOPE_UNIVERSE },
+	[RTN_PROHIBIT] =    { .error = -EACCES, .scope = RT_SCOPE_UNIVERSE },
+	[RTN_THROW] =       { .error = -EAGAIN, .scope = RT_SCOPE_UNIVERSE },
+	[RTN_NAT] =         { .error = 0,       .scope = RT_SCOPE_NOWHERE },
+	[RTN_XRESOLVE] =    { .error = -EINVAL, .scope = RT_SCOPE_NOWHERE },
 };
 
 void dn_fib_free_info(struct dn_fib_info *fi)
@@ -792,53 +792,12 @@ void dn_fib_flush(void)
                 dn_rt_cache_flush(-1);
 }
 
-#ifdef CONFIG_PROC_FS
-
-static int decnet_rt_get_info(char *buffer, char **start, off_t offset, int length)
-{
-        int first = offset / 128;
-        char *ptr = buffer;
-        int count = (length + 127) / 128;
-        int len;
-        int i;
-        struct dn_fib_table *tb;
-
-        *start = buffer + (offset % 128);
-
-        if (--first < 0) {
-                sprintf(buffer, "%-127s\n", "Iface\tDest\tGW  \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT");
-                --count;
-                ptr += 128;
-                first = 0;
-        }
-
-
-        for(i = RT_MIN_TABLE; (i <= RT_TABLE_MAX) && (count > 0); i++) {
-                if ((tb = dn_fib_get_table(i, 0)) != NULL) {
-                        int n = tb->get_info(tb, ptr, first, count);
-                        count -= n;
-                        ptr += n * 128;
-                }
-        }
-
-        len = ptr - *start;
-        if (len >= length)
-                return length;
-        if (len >= 0)
-                return len;
-
-        return 0;
-}
-#endif /* CONFIG_PROC_FS */
-
 static struct notifier_block dn_fib_dnaddr_notifier = {
 	.notifier_call = dn_fib_dnaddr_event,
 };
 
 void __exit dn_fib_cleanup(void)
 {
-	proc_net_remove("decnet_route");
-
 	dn_fib_table_cleanup();
 	dn_fib_rules_cleanup();
 
@@ -848,10 +807,6 @@ void __exit dn_fib_cleanup(void)
 
 void __init dn_fib_init(void)
 {
-
-#ifdef CONFIG_PROC_FS
-	proc_net_create("decnet_route", 0, decnet_rt_get_info);
-#endif
 
 	dn_fib_table_init();
 	dn_fib_rules_init();

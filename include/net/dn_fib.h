@@ -101,10 +101,6 @@ struct dn_fib_table {
 	int (*lookup)(struct dn_fib_table *t, const struct flowi *fl,
 			struct dn_fib_res *res);
 	int (*flush)(struct dn_fib_table *t);
-#ifdef CONFIG_PROC_FS
-	int (*get_info)(struct dn_fib_table *table, char *buf,
-			int first, int count);
-#endif /* CONFIG_PROC_FS */
 	int (*dump)(struct dn_fib_table *t, struct sk_buff *skb, struct netlink_callback *cb);
 
 	unsigned char data[0];
@@ -183,6 +179,9 @@ static inline void dn_fib_res_put(struct dn_fib_res *res)
 extern struct dn_fib_table *dn_fib_tables[];
 
 #else /* Endnode */
+
+#define dn_fib_init() (0)
+#define dn_fib_cleanup() (0)
 
 #define dn_fib_lookup(fl, res) (-ESRCH)
 #define dn_fib_info_put(fi) do { } while(0)
