@@ -703,6 +703,7 @@ call_status(struct rpc_task *task)
 		break;
 	case -ECONNREFUSED:
 	case -ENOTCONN:
+		req->rq_bytes_sent = 0;
 		if (clnt->cl_autobind)
 			clnt->cl_port = 0;
 		task->tk_action = call_bind;

@@ -259,6 +259,7 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 		 */
 	case -EAGAIN:
 		break;
+	case -ECONNRESET:
 	case -ENOTCONN:
 	case -EPIPE:
 		/* connection broken */
@@ -474,8 +475,8 @@ xprt_connect(struct rpc_task *task)
 		release_sock(inet);
 		break;
 	case -ECONNREFUSED:
+	case -ECONNRESET:
 	case -ENOTCONN:
-	case -ENETUNREACH:
 		if (!task->tk_client->cl_softrtry) {
 			rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
 			task->tk_status = -ENOTCONN;
@@ -926,7 +927,7 @@ tcp_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 		}
 		/* Skip over any trailing bytes on short reads */
 		tcp_read_discard(xprt, &desc);
-	} while (desc.count && xprt_connected(xprt));
+	} while (desc.count);
 	dprintk("RPC:      tcp_data_recv done\n");
 	return len - desc.count;
 }
@@ -964,18 +965,18 @@ tcp_state_change(struct sock *sk)
 
 	switch (sk->state) {
 	case TCP_ESTABLISHED:
-		if (xprt_test_and_set_connected(xprt))
-			break;
-
-		/* Reset TCP record info */
-		xprt->tcp_offset = 0;
-		xprt->tcp_reclen = 0;
-		xprt->tcp_copied = 0;
-		xprt->tcp_flags = XPRT_COPY_RECM | XPRT_COPY_XID;
-
 		spin_lock_bh(&xprt->sock_lock);
-		if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
-			rpc_wake_up_task(xprt->snd_task);
+		if (!xprt_test_and_set_connected(xprt)) {
+			/* Reset TCP record info */
+			xprt->tcp_offset = 0;
+			xprt->tcp_reclen = 0;
+			xprt->tcp_copied = 0;
+			xprt->tcp_flags = XPRT_COPY_RECM | XPRT_COPY_XID;
+
+			if (xprt->snd_task)
+				rpc_wake_up_task(xprt->snd_task);
+			rpc_wake_up(&xprt->pending);
+		}
 		spin_unlock_bh(&xprt->sock_lock);
 		break;
 	case TCP_SYN_SENT:
@@ -1094,9 +1095,6 @@ xprt_prepare_transmit(struct rpc_task *task)
 	if (xprt->shutdown)
 		return -EIO;
 
-	if (!xprt_connected(xprt))
-		return -ENOTCONN;
-
 	if (task->tk_rpcwait)
 		rpc_remove_wait_queue(task);
 
@@ -1105,6 +1103,12 @@ xprt_prepare_transmit(struct rpc_task *task)
 		err = -EAGAIN;
 		goto out_unlock;
 	}
+
+	if (!xprt_connected(xprt)) {
+		err = -ENOTCONN;
+		goto out_unlock;
+	}
+
 	if (list_empty(&req->rq_list)) {
 		list_add_tail(&req->rq_list, &xprt->recv);
 		req->rq_received = 0;
@@ -1193,20 +1197,17 @@ xprt_transmit(struct rpc_task *task)
 		rpc_delay(task, HZ>>4);
 		return;
 	case -ECONNREFUSED:
+		task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
+		rpc_sleep_on(&xprt->sending, task, NULL, NULL);
 	case -ENOTCONN:
-		if (!xprt->stream) {
-			task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
-			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
-			return;
-		}
-		/* fall through */
+		return;
 	default:
 		if (xprt->stream)
 			xprt_disconnect(xprt);
-		req->rq_bytes_sent = 0;
 	}
  out_release:
 	xprt_release_write(xprt, task);
+	req->rq_bytes_sent = 0;
 	return;
  out_receive:
 	dprintk("RPC: %4d xmit complete\n", task->tk_pid);
@@ -1227,6 +1228,7 @@ xprt_transmit(struct rpc_task *task)
 		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
 	__xprt_release_write(xprt, task);
 	spin_unlock_bh(&xprt->sock_lock);
+	req->rq_bytes_sent = 0;
 }
 
 /*
@@ -1410,6 +1412,9 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	req->rq_next = NULL;
 	xprt->free = xprt->slot;
 
+	/* Check whether we want to use a reserved port */
+	xprt->resvport = capable(CAP_NET_BIND_SERVICE) ? 1 : 0;
+
 	dprintk("RPC:      created transport %p\n", xprt);
 	
 	return xprt;
@@ -1423,6 +1428,12 @@ xprt_bindresvport(struct socket *sock)
 {
 	struct sockaddr_in myaddr;
 	int		err, port;
+	kernel_cap_t saved_cap = current->cap_effective;
+
+	/* Override capabilities.
+	 * They were checked in xprt_create_proto i.e. at mount time
+	 */
+	cap_raise(current->cap_effective, CAP_NET_BIND_SERVICE);
 
 	memset(&myaddr, 0, sizeof(myaddr));
 	myaddr.sin_family = AF_INET;
@@ -1432,6 +1443,7 @@ xprt_bindresvport(struct socket *sock)
 		err = sock->ops->bind(sock, (struct sockaddr *) &myaddr,
 						sizeof(myaddr));
 	} while (err == -EADDRINUSE && --port > 0);
+	current->cap_effective = saved_cap;
 
 	if (err < 0)
 		printk("RPC: Can't bind to reserved port (%d).\n", -err);
@@ -1537,7 +1549,6 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
 	if (!xprt)
 		goto out_bad;
 
-	xprt->resvport = capable(CAP_NET_BIND_SERVICE) ? 1 : 0;
 	if (!xprt->stream) {
 		struct socket *sock;
 
