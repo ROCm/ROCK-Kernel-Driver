@@ -108,10 +108,16 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 {
 	struct sctp_association *asoc = NULL;
 
-	/* If this is not a UDP-style socket, assoc id should be
-	 * ignored.
-	 */
+	/* If this is not a UDP-style socket, assoc id should be ignored. */
 	if (!sctp_style(sk, UDP)) {
+		/* Return NULL if the socket state is not ESTABLISHED. It 
+		 * could be a TCP-style listening socket or a socket which
+		 * hasn't yet called connect() to establish an association.
+		 */
+		if (!sctp_sstate(sk, ESTABLISHED))
+			return NULL;
+
+		/* Get the first and the only association from the list. */ 
 		if (!list_empty(&sctp_sk(sk)->ep->asocs))
 			asoc = list_entry(sctp_sk(sk)->ep->asocs.next,
 					  struct sctp_association, asocs);
@@ -132,6 +138,30 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 	}
 
 	return asoc;
+}
+
+/* Look up the transport from an address and an assoc id. If both address and
+ * id are specified, the associations matching the address and the id should be
+ * the same.
+ */
+struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
+					      struct sockaddr_storage *addr,
+					      sctp_assoc_t id)
+{
+	struct sctp_association *addr_asoc = NULL, *id_asoc = NULL;
+	struct sctp_transport *transport;
+
+	addr_asoc = sctp_endpoint_lookup_assoc(sctp_sk(sk)->ep,
+					       (union sctp_addr *)addr,
+					       &transport);
+	if (!addr_asoc)
+		return NULL;
+
+	id_asoc = sctp_id2assoc(sk, id);
+	if (id_asoc && (id_asoc != addr_asoc))
+		return NULL;
+
+	return transport;
 }
 
 /* API 3.1.2 bind() - UDP Style Syntax
@@ -712,7 +742,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	struct sctp_association *asoc;
 	struct list_head *pos, *temp;
 
-	printk("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
+	SCTP_DEBUG_PRINTK("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
 
 	sctp_lock_sock(sk);
 	sk->shutdown = SHUTDOWN_MASK;
@@ -1063,11 +1093,11 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		/* If the user didn't specify SNDRCVINFO, make up one with
 		 * some defaults.
 		 */
-		default_sinfo.sinfo_stream = asoc->defaults.stream;
-		default_sinfo.sinfo_flags = asoc->defaults.flags;
-		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
-		default_sinfo.sinfo_context = asoc->defaults.context;
-		default_sinfo.sinfo_timetolive = asoc->defaults.timetolive;
+		default_sinfo.sinfo_stream = asoc->default_stream;
+		default_sinfo.sinfo_flags = asoc->default_flags;
+		default_sinfo.sinfo_ppid = asoc->default_ppid;
+		default_sinfo.sinfo_context = asoc->default_context;
+		default_sinfo.sinfo_timetolive = asoc->default_timetolive;
 		default_sinfo.sinfo_assoc_id = sctp_assoc2id(asoc);
 		sinfo = &default_sinfo;
 	}
@@ -1382,8 +1412,6 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 					    char *optval, int optlen)
 {
 	struct sctp_paddrparams params;
-	struct sctp_association *asoc;
-	union sctp_addr *addr;
 	struct sctp_transport *trans;
 	int error;
 
@@ -1392,15 +1420,10 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	if (copy_from_user(&params, optval, optlen))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, params.spp_assoc_id);
-	if (!asoc)
-		return -EINVAL;
-
-	addr = (union sctp_addr *) &(params.spp_address);
-
-	trans = sctp_assoc_lookup_paddr(asoc, addr);
+	trans = sctp_addr_id2transport(sk, &params.spp_address,
+				       params.spp_assoc_id);
 	if (!trans)
-		return -ENOENT;
+		return -EINVAL;
 
 	/* Applications can enable or disable heartbeats for any peer address
 	 * of an association, modify an address's heartbeat interval, force a
@@ -1414,7 +1437,7 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	 * and the current interval should remain unchanged.
 	 */
 	if (0xffffffff == params.spp_hbinterval) {
-		error = sctp_primitive_REQUESTHEARTBEAT (asoc, trans);
+		error = sctp_primitive_REQUESTHEARTBEAT (trans->asoc, trans);
 		if (error)
 			return error;
 	} else {
@@ -1465,6 +1488,7 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 {
 	struct sctp_sndrcvinfo info;
 	struct sctp_association *asoc;
+	struct sctp_opt *sp = sctp_sk(sk);
 
 	if (optlen != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -1472,14 +1496,23 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 		return -EFAULT;
 
 	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
-	if (!asoc)
+	if (!asoc && info.sinfo_assoc_id && sctp_style(sk, UDP))
 		return -EINVAL;
 
-	asoc->defaults.stream = info.sinfo_stream;
-	asoc->defaults.flags = info.sinfo_flags;
-	asoc->defaults.ppid = info.sinfo_ppid;
-	asoc->defaults.context = info.sinfo_context;
-	asoc->defaults.timetolive = info.sinfo_timetolive;
+	if (asoc) {
+		asoc->default_stream = info.sinfo_stream;
+		asoc->default_flags = info.sinfo_flags;
+		asoc->default_ppid = info.sinfo_ppid;
+		asoc->default_context = info.sinfo_context;
+		asoc->default_timetolive = info.sinfo_timetolive;
+	} else {
+		sp->default_stream = info.sinfo_stream;
+		sp->default_flags = info.sinfo_flags;
+		sp->default_ppid = info.sinfo_ppid;
+		sp->default_context = info.sinfo_context;
+		sp->default_timetolive = info.sinfo_timetolive;
+	}
+
 	return 0;
 }
 
@@ -1492,8 +1525,6 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 {
 	struct sctp_setpeerprim prim;
-	struct sctp_association *asoc;
-	union sctp_addr *addr;
 	struct sctp_transport *trans;
 
 	if (optlen != sizeof(struct sctp_setpeerprim))
@@ -1502,18 +1533,11 @@ static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
 	if (copy_from_user(&prim, optval, sizeof(struct sctp_setpeerprim)))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, prim.sspp_assoc_id);
-	if (!asoc)
+	trans = sctp_addr_id2transport(sk, &prim.sspp_addr, prim.sspp_assoc_id);
+	if (!trans)
 		return -EINVAL;
 
-	/* Find the requested address. */
-	addr = (union sctp_addr *) &(prim.sspp_addr);
-
-	trans = sctp_assoc_lookup_paddr(asoc, addr);
-	if (!trans)
-		return -ENOENT;
-
-	sctp_assoc_set_primary(asoc, trans);
+	sctp_assoc_set_primary(trans->asoc, trans);
 
 	return 0;
 }
@@ -1935,6 +1959,9 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 */
 	sp->default_stream = 0;
 	sp->default_ppid = 0;
+	sp->default_flags = 0;
+	sp->default_context = 0;
+	sp->default_timetolive = 0;
 
 	/* Initialize default setup parameters. These parameters
 	 * can be modified with the SCTP_INITMSG socket option or
@@ -2246,8 +2273,6 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 						char *optval, int *optlen)
 {
 	struct sctp_paddrparams params;
-	struct sctp_association *asoc;
-	union sctp_addr *addr;
 	struct sctp_transport *trans;
 
 	if (len != sizeof(struct sctp_paddrparams))
@@ -2255,15 +2280,10 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	if (copy_from_user(&params, optval, *optlen))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, params.spp_assoc_id);
-	if (!asoc)
-		return -EINVAL;
-
-	addr = (union sctp_addr *) &(params.spp_address);
-
-	trans = sctp_assoc_lookup_paddr(asoc, addr);
+	trans = sctp_addr_id2transport(sk, &params.spp_address,
+				       params.spp_assoc_id);
 	if (!trans)
-		return -ENOENT;
+		return -EINVAL;
 
 	/* The value of the heartbeat interval, in milliseconds. A value of 0,
 	 * when modifying the parameter, specifies that the heartbeat on this
@@ -2513,6 +2533,7 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
 {
 	struct sctp_sndrcvinfo info;
 	struct sctp_association *asoc;
+	struct sctp_opt *sp = sctp_sk(sk);
 
 	if (len != sizeof(struct sctp_sndrcvinfo))
 		return -EINVAL;
@@ -2520,14 +2541,22 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
 		return -EFAULT;
 
 	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
-	if (!asoc)
+	if (!asoc && info.sinfo_assoc_id && sctp_style(sk, UDP))
 		return -EINVAL;
 
-	info.sinfo_stream = asoc->defaults.stream;
-	info.sinfo_flags = asoc->defaults.flags;
-	info.sinfo_ppid = asoc->defaults.ppid;
-	info.sinfo_context = asoc->defaults.context;
-	info.sinfo_timetolive = asoc->defaults.timetolive;
+	if (asoc) {
+		info.sinfo_stream = asoc->default_stream;
+		info.sinfo_flags = asoc->default_flags;
+		info.sinfo_ppid = asoc->default_ppid;
+		info.sinfo_context = asoc->default_context;
+		info.sinfo_timetolive = asoc->default_timetolive;
+	} else {
+		info.sinfo_stream = sp->default_stream;
+		info.sinfo_flags = sp->default_flags;
+		info.sinfo_ppid = sp->default_ppid;
+		info.sinfo_context = sp->default_context;
+		info.sinfo_timetolive = sp->default_timetolive;
+	}
 
 	if (copy_to_user(optval, &info, sizeof(struct sctp_sndrcvinfo)))
 		return -EFAULT;
