@@ -348,7 +348,7 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 }
 
 /*
- * Perform auto-hangup and cps-calculation for net-interfaces.
+ * Perform auto-hangup for net-interfaces.
  *
  * auto-hangup:
  * Increment idle-counter (this counter is reset on any incoming or
@@ -356,6 +356,54 @@ isdn_net_unbind_channel(isdn_net_local * lp)
  * hangup immediately or - if configured - wait until just before the next
  * charge-info.
  */
+
+static int isdn_net_hup_timer(unsigned long data)
+{
+	isdn_net_local *lp = (isdn_net_local *) data;
+
+	if (!(lp->flags & ISDN_NET_CONNECTED) || lp->dialstate != ST_ACTIVE) {
+		isdn_BUG();
+		return 1;
+	}
+	
+	dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
+		     l->name, l->huptimer, l->onhtime, l->chargetime, l->chargeint);
+
+	if (!(lp->onhtime))
+		return 0;
+	
+	if (lp->huptimer++ <= lp->onhtime)
+		return 1;
+
+	if (lp->hupflags & ISDN_MANCHARGE && lp->hupflags & ISDN_CHARGEHUP) {
+		while (time_after(jiffies, lp->chargetime + lp->chargeint))
+			lp->chargetime += lp->chargeint;
+		
+		if (time_after(jiffies, lp->chargetime + lp->chargeint - 2 * HZ)) {
+			if (lp->outgoing || lp->hupflags & ISDN_INHUP) {
+				isdn_net_hangup(lp);
+				return 0;
+			}
+		}
+	} else if (lp->outgoing) {
+		if (lp->hupflags & ISDN_CHARGEHUP) {
+			if (lp->charge_state != ST_CHARGE_HAVE_CINT) {
+				dbg_net_dial("%s: did not get CINT\n", lp->name);
+				isdn_net_hangup(lp);
+				return 0;
+			} else if (time_after(jiffies, lp->chargetime + lp->chargeint)) {
+				dbg_net_dial("%s: chtime = %lu, chint = %d\n",
+					     lp->name, lp->chargetime, lp->chargeint);
+				isdn_net_hangup(lp);
+				return 0;
+			}
+		}
+	} else if (lp->hupflags & ISDN_INHUP) {
+		isdn_net_hangup(lp);
+		return 0;
+	}
+	return 1;
+}
 
 void
 isdn_net_autohup()
@@ -373,47 +421,12 @@ isdn_net_autohup()
 
 		if(dev->global_flags & ISDN_GLOBAL_STOPPED || 
 		   ISDN_NET_DIALMODE(*l) == ISDN_NET_DM_OFF) {
-			isdn_net_hangup(&p->dev);
+			isdn_net_hangup(l);
 			continue;
 		}
-		dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
-			     l->name, l->huptimer, l->onhtime, l->chargetime, l->chargeint);
-
-		if (!(l->onhtime))
-			continue;
-
-		if (l->huptimer++ <= l->onhtime) {
+		
+		if (isdn_net_hup_timer((unsigned long) l))
 			anymore = 1;
-			continue;
-		}
-		if (l->hupflags & ISDN_MANCHARGE && l->hupflags & ISDN_CHARGEHUP) {
-			while (time_after(jiffies, l->chargetime + l->chargeint))
-				l->chargetime += l->chargeint;
-
-			if (time_after(jiffies, l->chargetime + l->chargeint - 2 * HZ)) {
-				if (l->outgoing || l->hupflags & ISDN_INHUP) {
-					isdn_net_hangup(&p->dev);
-					continue;
-				}
-			}
-		} else if (l->outgoing) {
-			if (l->hupflags & ISDN_CHARGEHUP) {
-				if (l->charge_state != ST_CHARGE_HAVE_CINT) {
-					dbg_net_dial("%s: did not get CINT\n", l->name);
-					isdn_net_hangup(&p->dev);
-					continue;
-				} else if (time_after(jiffies, l->chargetime + l->chargeint)) {
-					dbg_net_dial("%s: chtime = %lu, chint = %d\n",
-						     l->name, l->chargetime, l->chargeint);
-					isdn_net_hangup(&p->dev);
-					continue;
-				}
-			}
-		} else if (l->hupflags & ISDN_INHUP) {
-			isdn_net_hangup(&p->dev);
-			continue;
-		}
-		anymore = 1;
 	}
 	isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, anymore);
 }
@@ -495,11 +508,6 @@ isdn_net_dial_timer(unsigned long data)
 {
 	isdn_net_local *lp = (isdn_net_local *) data;
 
-	if (!lp) {
-		isdn_BUG();
-		return;
-	}
-	printk("%s: %s %#x\n", __FUNCTION__ , lp->name, lp->dial_event);
 	isdn_net_handle_event(lp, lp->dial_event, NULL);
 }
 
@@ -519,7 +527,7 @@ init_dialout(isdn_net_local *lp)
 	if (!lp->dial) {
 		printk(KERN_WARNING "%s: phone number deleted?\n",
 		       lp->name);
-		isdn_net_hangup(&lp->netdev->dev);
+		isdn_net_hangup(lp);
 		return 0;
 	}
 	if (lp->dialtimeout > 0 &&
@@ -548,7 +556,7 @@ do_dialout(isdn_net_local *lp)
 		else
 			s = "dial suppressed: dialmode `off'";
 		isdn_net_unreachable(&lp->netdev->dev, 0, s);
-		isdn_net_hangup(&lp->netdev->dev);
+		isdn_net_hangup(lp);
 		return 0;
 	}
 
@@ -558,7 +566,7 @@ do_dialout(isdn_net_local *lp)
 		restore_flags(flags);
 		printk(KERN_WARNING "%s: phone number deleted?\n",
 		       lp->name);
-		isdn_net_hangup(&lp->netdev->dev);
+		isdn_net_hangup(lp);
 		return 0;
 	}
 	if (!strncmp(lp->dial->num, "LEASED", strlen("LEASED"))) {
@@ -581,7 +589,7 @@ do_dialout(isdn_net_local *lp)
 				lp->dialwait_timer = jiffies + lp->dialwait;
 				lp->dialstarted = 0;
 				isdn_net_unreachable(&lp->netdev->dev, 0, "dial: timed out");
-				isdn_net_hangup(&lp->netdev->dev);
+				isdn_net_hangup(lp);
 				return 0;
 			}
 		}
@@ -599,7 +607,7 @@ do_dialout(isdn_net_local *lp)
 					lp->dialstarted = 0;
 					isdn_net_unreachable(&lp->netdev->dev, 0, "dial: tried all numbers dialmax times");
 				}
-				isdn_net_hangup(&lp->netdev->dev);
+				isdn_net_hangup(lp);
 				return 0;
 			}
 		}
@@ -725,7 +733,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			/* Remote does callback. Hangup after cbdelay, 
 			 * then wait for incoming call */
 			printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
-			isdn_net_hangup(&lp->netdev->dev);
+			isdn_net_hangup(lp);
 			return 1;
 		case ISDN_STAT_DCONN:
 			/* Got D-Channel-Connect, send B-Channel-request */
@@ -766,7 +774,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 	case ST_IN_WAIT_DCONN:
 		switch (pr) {
 		case EV_NET_TIMER_IN_DCONN:
-			isdn_net_hangup(&p->dev);
+			isdn_net_hangup(lp);
 			return 1;
 		case ISDN_STAT_DCONN:
 			del_timer(&lp->dial_timer);
@@ -787,7 +795,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 	case ST_IN_WAIT_BCONN:
 		switch (pr) {
 		case EV_NET_TIMER_IN_BCONN:
-			isdn_net_hangup(&p->dev);
+			isdn_net_hangup(lp);
 			break;
 		case ISDN_STAT_BCONN:
 			del_timer(&lp->dial_timer);
@@ -822,9 +830,8 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
  * Perform hangup for a net-interface.
  */
 void
-isdn_net_hangup(struct net_device *d)
+isdn_net_hangup(isdn_net_local *lp)
 {
-	isdn_net_local *lp = (isdn_net_local *) d->priv;
 	isdn_ctrl cmd;
 #ifdef CONFIG_ISDN_X25
 	struct concap_proto *cprot = lp -> netdev -> cprot;
@@ -838,7 +845,7 @@ isdn_net_hangup(struct net_device *d)
 				printk(KERN_INFO
 					"isdn_net: hang up slave %s before %s\n",
 					slp->name, lp->name);
-				isdn_net_hangup(lp->slave);
+				isdn_net_hangup(slp);
 			}
 		}
 		printk(KERN_INFO "isdn_net: local hangup %s\n", lp->name);
@@ -1324,11 +1331,11 @@ isdn_net_close(struct net_device *dev)
 			if( cprot && cprot -> pops )
 				cprot -> pops -> close( cprot );
 #endif
-			isdn_net_hangup(p);
+			isdn_net_hangup(p->priv);
 			p = (((isdn_net_local *) p->priv)->slave);
 		}
 	}
-	isdn_net_hangup(dev);
+	isdn_net_hangup(dev->priv);
 	isdn_MOD_DEC_USE_COUNT();
 	return 0;
 }
@@ -3089,10 +3096,10 @@ isdn_net_force_hangup(char *name)
 		q = p->local.slave;
 		/* If this interface has slaves, do a hangup for them also. */
 		while (q) {
-			isdn_net_hangup(q);
+			isdn_net_hangup(&p->local);
 			q = (((isdn_net_local *) q->priv)->slave);
 		}
-		isdn_net_hangup(&p->dev);
+		isdn_net_hangup(&p->local);
 		return 0;
 	}
 	return -ENODEV;
