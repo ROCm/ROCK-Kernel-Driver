@@ -480,6 +480,8 @@ int __set_page_dirty_buffers(struct page *page)
 		do {
 			if (buffer_uptodate(bh))
 				set_buffer_dirty(bh);
+			else
+				buffer_error();
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}

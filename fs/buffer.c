@@ -1288,6 +1288,16 @@ static int __block_write_full_page(struct inode *inode,
 					(1 << BH_Dirty)|(1 << BH_Uptodate));
 	}
 
+	/*
+	 * Be very careful.  We have no exclusion from __set_page_dirty_buffers
+	 * here, and the (potentially unmapped) buffers may become dirty at
+	 * any time.  If a buffer becomes dirty here after we've inspected it
+	 * then we just miss that fact, and the page stays dirty.
+	 *
+	 * Buffers outside i_size may be dirtied by __set_page_dirty_buffers;
+	 * handle that here by just cleaning them.
+	 */
+
 	block = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 	head = page_buffers(page);
 	bh = head;
@@ -1298,15 +1308,11 @@ static int __block_write_full_page(struct inode *inode,
 	 */
 	do {
 		if (block > last_block) {
-			if (buffer_dirty(bh))
-				buffer_error();
+			clear_buffer_dirty(bh);
 			if (buffer_mapped(bh))
 				buffer_error();
 			/*
-			 * NOTE: this buffer can only be marked uptodate
-			 * because we know that block_write_full_page has
-			 * zeroed it out.  That seems unnecessary and may go
-			 * away.
+			 * The buffer was zeroed by block_write_full_page()
 			 */
 			set_buffer_uptodate(bh);
 		} else if (!buffer_mapped(bh) && buffer_dirty(bh)) {
@@ -1327,11 +1333,9 @@ static int __block_write_full_page(struct inode *inode,
 
 	do {
 		get_bh(bh);
-		if (buffer_dirty(bh)) {
+		if (buffer_mapped(bh) && buffer_dirty(bh)) {
 			lock_buffer(bh);
-			if (buffer_dirty(bh)) {
-				if (!buffer_mapped(bh))
-					buffer_error();
+			if (test_clear_buffer_dirty(bh)) {
 				if (!buffer_uptodate(bh))
 					buffer_error();
 				set_buffer_async_io(bh);
@@ -1353,7 +1357,6 @@ static int __block_write_full_page(struct inode *inode,
 	do {
 		struct buffer_head *next = bh->b_this_page;
 		if (buffer_async(bh)) {
-			clear_buffer_dirty(bh);
 			submit_bh(WRITE, bh);
 			nr_underway++;
 		}
