@@ -178,7 +178,7 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 		area--;
 		high--;
 		size >>= 1;
-		list_add(&(page)->list, &(area)->free_list);
+		list_add(&page->list, &area->free_list);
 		MARK_USED(index, high, area);
 		index += size;
 		page += size;
