@@ -728,7 +728,7 @@ ccio_unmap_single(struct device *dev, dma_addr_t iova, size_t size,
  * This function implements the pci_alloc_consistent function.
  */
 static void * 
-ccio_alloc_consistent(struct device *dev, size_t size, dma_addr_t *dma_handle)
+ccio_alloc_consistent(struct device *dev, size_t size, dma_addr_t *dma_handle, int flag)
 {
       void *ret;
 #if 0
@@ -741,7 +741,7 @@ ccio_alloc_consistent(struct device *dev, size_t size, dma_addr_t *dma_handle)
 		return 0;
 	}
 #endif
-        ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
+        ret = (void *) __get_free_pages(flag, get_order(size));
 
 	if (ret) {
 		memset(ret, 0, size);

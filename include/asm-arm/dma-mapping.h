@@ -82,10 +82,8 @@ static inline int dma_is_consistent(dma_addr_t handle)
  * device-viewed address.
  */
 static inline void *
-dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle)
+dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
 {
-	int gfp = GFP_ATOMIC;
-
 	if (dev == NULL || dmadev_is_sa1111(dev) || *dev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
 
