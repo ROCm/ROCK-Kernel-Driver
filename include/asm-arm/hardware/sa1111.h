@@ -198,6 +198,12 @@
 #define USB_RESET_PWRSENSELOW	(1 << 6)
 #define USB_RESET_PWRCTRLLOW	(1 << 7)
 
+#define USB_STATUS_IRQHCIRMTWKUP  (1 <<  7)
+#define USB_STATUS_IRQHCIBUFFACC  (1 <<  8)
+#define USB_STATUS_NIRQHCIM       (1 <<  9)
+#define USB_STATUS_NHCIMFCLR      (1 << 10)
+#define USB_STATUS_USBPWRSENSE    (1 << 11)
+
 /*
  * Serial Audio Controller
  *

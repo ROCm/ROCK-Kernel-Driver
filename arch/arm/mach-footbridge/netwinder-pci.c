@@ -11,6 +11,7 @@
 
 #include <asm/irq.h>
 #include <asm/mach/pci.h>
+#include <asm/mach-types.h>
 
 /*
  * We now use the slot ID instead of the device identifiers to select
@@ -41,7 +42,7 @@ static int __init netwinder_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	}
 }
 
-struct hw_pci netwinder_pci __initdata = {
+static struct hw_pci netwinder_pci __initdata = {
 	swizzle:		pci_std_swizzle,
 	map_irq:		netwinder_map_irq,
 	nr_controllers:		1,
@@ -50,3 +51,12 @@ struct hw_pci netwinder_pci __initdata = {
 	preinit:		dc21285_preinit,
 	postinit:		dc21285_postinit,
 };
+
+static int __init netwinder_pci_init(void)
+{
+	if (machine_is_netwinder())
+		pci_common_init(&netwinder_pci);
+	return 0;
+}
+
+subsys_initcall(netwinder_pci_init);
