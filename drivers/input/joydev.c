@@ -143,7 +143,7 @@ static int joydev_fasync(int fd, struct file *file, int on)
 
 static void joydev_free(struct joydev *joydev)
 {
-	devfs_remove("js%d", joydev->minor);
+	devfs_remove("input/js%d", joydev->minor);
 	joydev_table[joydev->minor] = NULL;
 	kfree(joydev);
 }
@@ -443,7 +443,7 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	joydev_table[minor] = joydev;
 	
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
-			S_IFCHR|S_IRUGO|S_IWUSR, "js%d", minor);
+			S_IFCHR|S_IRUGO|S_IWUSR, "input/js%d", minor);
 
 	return &joydev->handle;
 }
