@@ -188,8 +188,6 @@ static ssize_t rate_show(struct ib_port *p, struct port_attribute *unused,
 	case 4: speed = " QDR"; break;
 	}
 
-	printk(KERN_ERR "width %d speed %d\n", attr.active_width, attr.active_speed);
-
 	rate = 25 * ib_width_enum_to_int(attr.active_width) * attr.active_speed;
 	if (rate < 0)
 		return -EINVAL;
