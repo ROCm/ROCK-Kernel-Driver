@@ -11,11 +11,28 @@
 #include <linux/blk.h>
 #include <linux/completion.h>
 #include <linux/kernel.h>
+#include <linux/mempool.h>
 #include <linux/slab.h>
 
 #include "scsi.h"
 #include "hosts.h"
 
+
+#define SG_MEMPOOL_NR		5
+#define SG_MEMPOOL_SIZE		32
+
+struct scsi_host_sg_pool {
+	size_t		size;
+	char		*name; 
+	kmem_cache_t	*slab;
+	mempool_t	*pool;
+};
+
+#define SP(x) { x, "sgpool-" #x } 
+struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = { 
+	SP(8), SP(16), SP(32), SP(64), SP(MAX_PHYS_SEGMENTS)
+}; 	
+#undef SP 	
 
 /*
  * Function:    scsi_insert_special_cmd()
@@ -348,6 +365,51 @@ static Scsi_Cmnd *scsi_end_request(Scsi_Cmnd * SCpnt,
 	return NULL;
 }
 
+static struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask)
+{
+	struct scsi_host_sg_pool *sgp;
+	struct scatterlist *sgl;
+
+	BUG_ON(!SCpnt->use_sg);
+
+	switch (SCpnt->use_sg) {
+	case 1 ... 8:
+		SCpnt->sglist_len = 0;
+		break;
+	case 9 ... 16:
+		SCpnt->sglist_len = 1;
+		break;
+	case 17 ... 32:
+		SCpnt->sglist_len = 2;
+		break;
+	case 33 ... 64:
+		SCpnt->sglist_len = 3;
+		break;
+	case 65 ... MAX_PHYS_SEGMENTS:
+		SCpnt->sglist_len = 4;
+		break;
+	default:
+		return NULL;
+	}
+
+	sgp = scsi_sg_pools + SCpnt->sglist_len;
+	sgl = mempool_alloc(sgp->pool, gfp_mask);
+	if (sgl)
+		memset(sgl, 0, sgp->size);
+	return sgl;
+}
+
+static void scsi_free_sgtable(struct scatterlist *sgl, int index)
+{
+	struct scsi_host_sg_pool *sgp;
+
+	BUG_ON(index > SG_MEMPOOL_NR);
+
+	sgp = scsi_sg_pools + index;
+	mempool_free(sgl, sgp->pool);
+}
+
+
 /*
  * Function:    scsi_release_buffers()
  *
@@ -374,15 +436,10 @@ static void scsi_release_buffers(Scsi_Cmnd * SCpnt)
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
 	 */
-	if (SCpnt->use_sg) {
-		struct scatterlist *sgpnt;
-
-		sgpnt = (struct scatterlist *) SCpnt->request_buffer;
+	if (SCpnt->use_sg)
 		scsi_free_sgtable(SCpnt->request_buffer, SCpnt->sglist_len);
-	} else {
-		if (SCpnt->request_buffer != req->buffer)
-			kfree(SCpnt->request_buffer);
-	}
+	else if (SCpnt->request_buffer != req->buffer)
+		kfree(SCpnt->request_buffer);
 
 	/*
 	 * Zero these out.  They now point to freed memory, and it is
@@ -462,22 +519,16 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	 * For the case of a READ, we need to copy the data out of the
 	 * bounce buffer and into the real buffer.
 	 */
-	if (SCpnt->use_sg) {
-		struct scatterlist *sgpnt;
-
-		sgpnt = (struct scatterlist *) SCpnt->buffer;
+	if (SCpnt->use_sg)
 		scsi_free_sgtable(SCpnt->buffer, SCpnt->sglist_len);
-	} else {
-		if (SCpnt->buffer != req->buffer) {
-			if (rq_data_dir(req) == READ) {
-				unsigned long flags;
-				char *to = bio_kmap_irq(req->bio, &flags);
-
-				memcpy(to, SCpnt->buffer, SCpnt->bufflen);
-				bio_kunmap_irq(to, &flags);
-			}
-			kfree(SCpnt->buffer);
+	else if (SCpnt->buffer != req->buffer) {
+		if (rq_data_dir(req) == READ) {
+			unsigned long flags;
+			char *to = bio_kmap_irq(req->bio, &flags);
+			memcpy(to, SCpnt->buffer, SCpnt->bufflen);
+			bio_kunmap_irq(to, &flags);
 		}
+		kfree(SCpnt->buffer);
 	}
 
 	if (blk_pc_request(req)) {
@@ -1092,4 +1143,42 @@ void scsi_register_blocked_host(struct Scsi_Host * SHpnt)
 
 void scsi_deregister_blocked_host(struct Scsi_Host * SHpnt)
 {
+}
+
+int __init scsi_init_queue(void)
+{
+	int i;
+
+	for (i = 0; i < SG_MEMPOOL_NR; i++) {
+		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
+		int size = sgp->size * sizeof(struct scatterlist);
+
+		sgp->slab = kmem_cache_create(sgp->name, size, 0,
+				SLAB_HWCACHE_ALIGN, NULL, NULL);
+		if (!sgp->slab) {
+			printk(KERN_ERR "SCSI: can't init sg slab %s\n",
+					sgp->name);
+		}
+
+		sgp->pool = mempool_create(SG_MEMPOOL_SIZE,
+				mempool_alloc_slab, mempool_free_slab,
+				sgp->slab);
+		if (!sgp->pool) {
+			printk(KERN_ERR "SCSI: can't init sg mempool %s\n",
+					sgp->name);
+		}
+	}
+
+	return 0;
+}
+
+void __exit scsi_exit_lib(void)
+{
+	int i;
+
+	for (i = 0; i < SG_MEMPOOL_NR; i++) {
+		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
+		mempool_destroy(sgp->pool);
+		kmem_cache_destroy(sgp->slab);
+	}
 }
