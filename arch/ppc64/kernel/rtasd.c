@@ -372,7 +372,7 @@ static int rtasd(void *unused)
 	if (event_scan == RTAS_UNKNOWN_SERVICE || get_eventscan_parms() == -1)
 		goto error;
 
-	rtas_log_buf = vmalloc(rtas_error_log_max*LOG_NUMBER);
+	rtas_log_buf = vmalloc(rtas_error_log_buffer_max*LOG_NUMBER);
 	if (!rtas_log_buf) {
 		printk(KERN_ERR "rtasd: no memory\n");
 		goto error;
