@@ -251,10 +251,10 @@ static struct pci_device_id tpam_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, tpam_pci_tbl);
 
 static struct pci_driver tpam_driver = {
-	name:		"tpam",
-	id_table:	tpam_pci_tbl,
-	probe:		tpam_probe,
-	remove:		__devexit_p(tpam_remove),
+	.name		= "tpam",
+	.id_table	= tpam_pci_tbl,
+	.probe		= tpam_probe,
+	.remove		= __devexit_p(tpam_remove),
 };
 
 static int __init tpam_init(void) {
