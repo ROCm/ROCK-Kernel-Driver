@@ -171,6 +171,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x83847650, 0xffffffff, "STAC9750/51",	NULL,		NULL },	// patch?
 { 0x83847652, 0xffffffff, "STAC9752/53",	NULL,		NULL }, // patch?
 { 0x83847656, 0xffffffff, "STAC9756/57",	patch_sigmatel_stac9756,	NULL },
+{ 0x83847658, 0xffffffff, "STAC9758/59",	patch_sigmatel_stac9758,	NULL },
 { 0x83847666, 0xffffffff, "STAC9766/67",	NULL,		NULL }, // patch?
 { 0, 	      0,	  NULL,			NULL,		NULL }
 };

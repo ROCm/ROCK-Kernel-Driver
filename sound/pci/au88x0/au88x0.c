@@ -71,6 +71,8 @@ MODULE_DEVICE_TABLE(pci, snd_vortex_ids);
 static void __devinit snd_vortex_workaround(struct pci_dev *vortex, int fix)
 {
 	struct pci_dev *via = NULL;
+	int rc;
+
 	/* autodetect if workarounds are required */
 	while ((via = pci_find_device(PCI_VENDOR_ID_VIA,
 				      PCI_DEVICE_ID_VIA_8365_1, via))) {
@@ -85,8 +87,6 @@ static void __devinit snd_vortex_workaround(struct pci_dev *vortex, int fix)
 	/* do not do anything if autodetection was enabled and found no VIA */
 	if (fix == 255)
 		return;
-
-	int rc;
 
 	/* fix vortex latency */
 	if (fix & 0x01) {

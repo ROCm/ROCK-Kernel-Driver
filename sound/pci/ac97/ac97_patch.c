@@ -447,6 +447,21 @@ int patch_sigmatel_stac9756(ac97_t * ac97)
 	return 0;
 }
 
+int patch_sigmatel_stac9758(ac97_t * ac97)
+{
+	// patch for SigmaTel
+	ac97->build_ops = &patch_sigmatel_stac9700_ops;
+	// turn on stereo speaker, headphone and line-out
+	snd_ac97_write_cache(ac97, AC97_SIGMATEL_OUTSEL, 0x9040);
+	// headphone select and boost
+	snd_ac97_write_cache(ac97, AC97_SIGMATEL_IOMISC, 0x2102);
+	// enable mic
+	snd_ac97_write_cache(ac97, AC97_SIGMATEL_INSEL, 0x0203);
+	// enable stereo mic
+	snd_ac97_write_cache(ac97, AC97_SIGMATEL_VARIOUS, 0x0001);
+	return 0;
+}
+
 /*
  * Cirrus Logic CS42xx codecs
  */

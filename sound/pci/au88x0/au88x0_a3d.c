@@ -562,7 +562,7 @@ static void vortex_A3dSourceHw_Initialize(vortex_t * v, int source, int slice)
 	a3dsrc_SetA3DSampleRate(a3dsrc, 0x11);
 }
 
-int Vort3DRend_Initialize(vortex_t * v, unsigned short mode)
+static int Vort3DRend_Initialize(vortex_t * v, unsigned short mode)
 {
 	v->xt_mode = mode;	/* this_14 */
 
