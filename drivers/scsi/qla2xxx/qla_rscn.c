@@ -379,7 +379,7 @@ qla2x00_get_mbx_iocb_entry(scsi_qla_host_t *ha, uint32_t handle)
 	mbxentry = NULL;
 
 	if (ha->req_q_cnt < 3) {
-		cnt = qla2x00_debounce_register(ISP_REQ_Q_OUT(reg));
+		cnt = qla2x00_debounce_register(ISP_REQ_Q_OUT(ha, reg));
 		if  (ha->req_ring_index < cnt)
 			ha->req_q_cnt = cnt - ha->req_ring_index;
 		else
@@ -430,7 +430,7 @@ qla2x00_send_abort_iocb(scsi_qla_host_t *ha, struct io_descriptor *iodesc,
 		return (QLA_FUNCTION_FAILED);
 	}
 	mbxentry->mb0 = __constant_cpu_to_le16(MBC_ABORT_COMMAND);
-	mbxentry->loop_id = mbxentry->mb1 =
+	mbxentry->mb1 = mbxentry->loop_id.extended =
 	    cpu_to_le16(iodesc->remote_fcport->loop_id);
 	mbxentry->mb2 = LSW(handle_to_abort);
 	mbxentry->mb3 = MSW(handle_to_abort);
@@ -503,7 +503,7 @@ qla2x00_send_adisc_iocb(scsi_qla_host_t *ha, struct io_descriptor *iodesc,
 		return (QLA_FUNCTION_FAILED);
 	}
 	mbxentry->mb0 = __constant_cpu_to_le16(MBC_GET_PORT_DATABASE);
-	mbxentry->loop_id = mbxentry->mb1 =
+	mbxentry->mb1 = mbxentry->loop_id.extended =
 	    cpu_to_le16(iodesc->remote_fcport->loop_id);
 	mbxentry->mb2 = cpu_to_le16(MSW(LSD(ha->iodesc_pd_dma)));
 	mbxentry->mb3 = cpu_to_le16(LSW(LSD(ha->iodesc_pd_dma)));
@@ -619,7 +619,7 @@ qla2x00_send_logout_iocb(scsi_qla_host_t *ha, struct io_descriptor *iodesc,
 		return (QLA_FUNCTION_FAILED);
 	}
 	mbxentry->mb0 = __constant_cpu_to_le16(MBC_LOGOUT_FABRIC_PORT);
-	mbxentry->loop_id = mbxentry->mb1 =
+	mbxentry->mb1 = mbxentry->loop_id.extended =
 	    cpu_to_le16(iodesc->remote_fcport->loop_id);
 
 	qla2x00_add_iodesc_timer(iodesc);
@@ -693,7 +693,7 @@ qla2x00_send_login_iocb(scsi_qla_host_t *ha, struct io_descriptor *iodesc,
 		return (QLA_FUNCTION_FAILED);
 	}
 	mbxentry->mb0 = __constant_cpu_to_le16(MBC_LOGIN_FABRIC_PORT);
-	mbxentry->loop_id = mbxentry->mb1 =
+	mbxentry->mb1 = mbxentry->loop_id.extended =
 	    cpu_to_le16(iodesc->remote_fcport->loop_id);
 	mbxentry->mb2 = cpu_to_le16(d_id->b.domain);
 	mbxentry->mb3 = cpu_to_le16(d_id->b.area << 8 | d_id->b.al_pa);

@@ -1,26 +1,33 @@
 config SCSI_QLA2XXX
-	bool "QLogic QLA2XXX FC-SCSI support (v8)"
+	bool "QLogic ISP2xxx PCI/PCI-X Fibre Channel HBA Support"
 	depends on PCI && SCSI
 	---help---
-	These drivers support the QLogic 2xxx host adapter family of SCSI
-	FCP HBAs.
-          
-config SCSI_QLA2XXX_QLA21XX
-	tristate "QLogic QLA21xx FC-SCSI support (v8)"
+	These drivers support the QLogic 2xxx host adapter family of SCSI FCP
+	HBAs.
+
+config SCSI_QLA21XX
+	tristate "ISP2100 host adapter family support"
 	depends on SCSI_QLA2XXX
 	---help---
 	This driver supports the QLogic 21xx (ISP2100) host adapter family.
 
-config SCSI_QLA2XXX_QLA22XX
-	tristate "QLogic QLA22xx FC-SCSI support (v8)"
+config SCSI_QLA22XX
+	tristate "ISP2200 host adapter family support"
 	depends on SCSI_QLA2XXX
 	---help---
 	This driver supports the QLogic 22xx (ISP2200) host adapter family.
 
-config SCSI_QLA2XXX_QLA23XX
-	tristate "QLogic QLA23xx FC-SCSI support (v8)"
+config SCSI_QLA23XX
+	tristate "ISP23xx host adapter family support"
 	depends on SCSI_QLA2XXX
 	---help---
 	This driver supports the QLogic 23xx (ISP2300, ISP2312, and ISP2322)
 	host adapter family.
 
+config SCSI_QLA2XXX_FAILOVER_ENABLE
+	bool "Compile in Failover code"
+	depends on SCSI_QLA2XXX
+	---help---
+	Compile the driver with failover support.  Please review the driver
+	documentation for further information on supported hosts and storage
+	types.

@@ -21,6 +21,8 @@
 #include "qla_def.h"
 
 static uint16_t qla2x00_nvram_request(scsi_qla_host_t *, uint32_t);
+static void qla2x00_nv_deselect(scsi_qla_host_t *);
+static void qla2x00_nv_write(scsi_qla_host_t *, uint16_t);
 
 uint8_t qla2x00_read_flash_byte(scsi_qla_host_t *, uint32_t);
 static void qla2x00_write_flash_byte(scsi_qla_host_t *, uint32_t, uint8_t);
@@ -42,6 +44,54 @@ uint16_t qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image);
  */
 
 /**
+ * qla2x00_lock_nvram_access() - 
+ * @ha: HA context
+ */
+void
+qla2x00_lock_nvram_access(scsi_qla_host_t *ha)
+{
+	uint16_t data;
+	device_reg_t *reg;
+
+	reg = ha->iobase;
+
+	if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
+		data = RD_REG_WORD(&reg->nvram);
+		while (data & NVR_BUSY) {
+			udelay(100);
+			data = RD_REG_WORD(&reg->nvram);
+		}
+
+		/* Lock resource */
+		WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0x1);
+		udelay(5);
+		data = RD_REG_WORD(&reg->u.isp2300.host_semaphore);
+		while ((data & BIT_0) == 0) {
+			/* Lock failed */
+			udelay(100);
+			WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0x1);
+			udelay(5);
+			data = RD_REG_WORD(&reg->u.isp2300.host_semaphore);
+		}
+	}
+}
+
+/**
+ * qla2x00_unlock_nvram_access() - 
+ * @ha: HA context
+ */
+void
+qla2x00_unlock_nvram_access(scsi_qla_host_t *ha)
+{
+	device_reg_t *reg;
+
+	reg = ha->iobase;
+
+	if (IS_QLA2312(ha) || IS_QLA2322(ha)) 
+		WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0);
+}
+
+/**
  * qla2x00_get_nvram_word() - Calculates word position in NVRAM and calls the
  *	request routine to get the word from NVRAM.
  * @ha: HA context
@@ -55,18 +105,89 @@ qla2x00_get_nvram_word(scsi_qla_host_t *ha, uint32_t addr)
 	uint16_t	data;
 	uint32_t	nv_cmd;
 
-	ENTER(__func__);
-
 	nv_cmd = addr << 16;
 	nv_cmd |= NV_READ_OP;
 	data = qla2x00_nvram_request(ha, nv_cmd);
 
-	DEBUG4(printk("%s(%ld): NVRAM[%lx]=%lx.\n",
-	    __func__, ha->host_no, (u_long)addr, (u_long)data));
-
-	LEAVE(__func__);
-
 	return (data);
+}
+
+/**
+ * qla2x00_write_nvram_word() - Write NVRAM data.
+ * @ha: HA context
+ * @addr: Address in NVRAM to write
+ * @data: word to program
+ */
+void
+qla2x00_write_nvram_word(scsi_qla_host_t *ha, uint32_t addr, uint16_t data)
+{
+	int count;
+	uint16_t word;
+	uint32_t nv_cmd;
+	device_reg_t *reg = ha->iobase;
+
+	qla2x00_nv_write(ha, NVR_DATA_OUT);
+	qla2x00_nv_write(ha, 0);
+	qla2x00_nv_write(ha, 0);
+
+	for (word = 0; word < 8; word++)
+		qla2x00_nv_write(ha, NVR_DATA_OUT);
+
+	qla2x00_nv_deselect(ha);
+
+	/* Erase Location */
+	nv_cmd = (addr << 16) | NV_ERASE_OP;
+	nv_cmd <<= 5;
+	for (count = 0; count < 11; count++) {
+		if (nv_cmd & BIT_31)
+			qla2x00_nv_write(ha, NVR_DATA_OUT);
+		else
+			qla2x00_nv_write(ha, 0);
+
+		nv_cmd <<= 1;
+	}
+
+	qla2x00_nv_deselect(ha);
+
+	/* Wait for Erase to Finish */
+	WRT_REG_WORD(&reg->nvram, NVR_SELECT);
+	do {
+		NVRAM_DELAY();
+		word = RD_REG_WORD(&reg->nvram);
+	} while ((word & NVR_DATA_IN) == 0);
+
+	qla2x00_nv_deselect(ha);
+
+	/* Write data */
+	nv_cmd = (addr << 16) | NV_WRITE_OP;
+	nv_cmd |= data;
+	nv_cmd <<= 5;
+	for (count = 0; count < 27; count++) {
+		if (nv_cmd & BIT_31)
+			qla2x00_nv_write(ha, NVR_DATA_OUT);
+		else
+			qla2x00_nv_write(ha, 0);
+
+		nv_cmd <<= 1;
+	}
+
+	qla2x00_nv_deselect(ha);
+
+	/* Wait for NVRAM to become ready */
+	WRT_REG_WORD(&reg->nvram, NVR_SELECT);
+	do {
+		NVRAM_DELAY();
+		word = RD_REG_WORD(&reg->nvram);
+	} while ((word & NVR_DATA_IN) == 0);
+
+	qla2x00_nv_deselect(ha);
+
+	/* Disable writes */
+	qla2x00_nv_write(ha, NVR_DATA_OUT);
+	for (count = 0; count < 10; count++)
+		qla2x00_nv_write(ha, 0);
+
+	qla2x00_nv_deselect(ha);
 }
 
 /**
@@ -112,11 +233,13 @@ qla2x00_nvram_request(scsi_qla_host_t *ha, uint32_t nv_cmd)
 			data |= BIT_0;
 		WRT_REG_WORD(&reg->nvram, NVR_SELECT);
 		NVRAM_DELAY();
+		RD_REG_WORD(&reg->nvram);	/* PCI Posting. */
 	}
 
 	/* Deselect chip. */
 	WRT_REG_WORD(&reg->nvram, NVR_DESELECT);
 	NVRAM_DELAY();
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 
 	return (data);
 }
@@ -132,6 +255,7 @@ qla2x00_nv_deselect(scsi_qla_host_t *ha)
 
 	WRT_REG_WORD(&reg->nvram, NVR_DESELECT);
 	NVRAM_DELAY();
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 }
 
 /**
@@ -146,10 +270,13 @@ qla2x00_nv_write(scsi_qla_host_t *ha, uint16_t data)
 
 	WRT_REG_WORD(&reg->nvram, data | NVR_SELECT);
 	NVRAM_DELAY();
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 	WRT_REG_WORD(&reg->nvram, data | NVR_SELECT | NVR_CLOCK);
 	NVRAM_DELAY();
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 	WRT_REG_WORD(&reg->nvram, data | NVR_SELECT);
 	NVRAM_DELAY();
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 }
 
 /*
@@ -487,29 +614,25 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image)
 			// Am29LV001 part
 			rest_addr = 0x1fff;
 			sec_mask = 0x1e000;
-		}
-		else if (mid == 0x40) {
+		} else if (mid == 0x40) {
 			// Mostel v29c51001 part
 			rest_addr = 0x1ff;
 			sec_mask = 0x1fe00;
-		}
-		else if (mid == 0xbf) {
+		} else if (mid == 0xbf) {
 			// SST39sf10 part
 			rest_addr = 0xfff;
 			sec_mask = 0x1f000;
-		}
-		else if (mid == 0xda) {
+		} else if (mid == 0xda) {
 			// Winbond W29EE011 part
 			rest_addr = 0x7f;
 			sec_mask = 0x1ff80;
 			addr = 0;
-			if (qla2x00_erase_flash_sector(ha,
-			    addr, sec_mask, mid)) {
+			if (qla2x00_erase_flash_sector(ha, addr, sec_mask,
+			    mid)) {
 				status = 1;
 				break;
 			}
-		}
-		else {
+		} else {
 			// Am29F010 part
 			rest_addr = 0x3fff;
 			sec_mask = 0x1c000;
@@ -524,8 +647,8 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image)
 					WRT_REG_WORD(&reg->nvram, NVR_SELECT);
 
 				/* Then erase it */
-				if (qla2x00_erase_flash_sector(ha,
-				    addr, sec_mask, mid)) {
+				if (qla2x00_erase_flash_sector(ha, addr,
+				    sec_mask, mid)) {
 					status = 1;
 					break;
 				}
@@ -537,20 +660,20 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image)
 				    (addr == (rest_addr - 1))) {
 					rest_addr = 0x0fff;
 					sec_mask   = 0x1f000;
-				}
-				else if (sec_number == 3 && (addr & 0x7ffe)) {
+				} else if (sec_number == 3 && (addr & 0x7ffe)) {
 					rest_addr = 0x3fff;
 					sec_mask   = 0x1c000;
 				}
 			}
 
-			if (qla2x00_program_flash_address(ha,
-			    addr, data, mid)) {
+			if (qla2x00_program_flash_address(ha, addr, data,
+			    mid)) {
 				status = 1;
 				break;
 			}
 		}
 	} while (0);
+
 	qla2x00_flash_disable(ha);
 
 	return (status);

@@ -22,14 +22,13 @@
 
 static int qla_uprintf(char **, char *, ...);
 
-#if defined(ISP2300)
 /**
- * qla2x00_fw_dump() - Dumps binary data from the 2300 firmware.
+ * qla2300_fw_dump() - Dumps binary data from the 2300 firmware.
  * @ha: HA context
  * @hardware_locked: Called with the hardware_lock
  */
 void
-qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
+qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 {
 	int		rval;
 	uint32_t	cnt, timer;
@@ -40,7 +39,7 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	device_reg_t	*reg;
 	uint16_t	*dmp_reg;
 	unsigned long	flags;
-	struct fw_dump	*fw;
+	struct qla2300_fw_dump	*fw;
 
 	reg = ha->iobase;
 	risc_address = 0;
@@ -58,13 +57,13 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	}
 
 	/* Allocate (large) dump buffer. */
-	ha->fw_dump_order = get_order(sizeof(struct fw_dump));
-	ha->fw_dump = (struct fw_dump *) __get_free_pages(GFP_ATOMIC,
+	ha->fw_dump_order = get_order(sizeof(struct qla2300_fw_dump));
+	ha->fw_dump = (struct qla2300_fw_dump *) __get_free_pages(GFP_ATOMIC,
 	    ha->fw_dump_order);
 	if (ha->fw_dump == NULL) {
 		qla_printk(KERN_WARNING, ha,
 		    "Unable to allocated memory for firmware dump (%d/%d).\n",
-		    ha->fw_dump_order, sizeof(struct fw_dump));
+		    ha->fw_dump_order, sizeof(struct qla2300_fw_dump));
 		return;
 	}
 	fw = ha->fw_dump;
@@ -74,8 +73,7 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 	/* Pause RISC. */
 	WRT_REG_WORD(&reg->hccr, HCCR_PAUSE_RISC); 
-	if (ha->pdev->device != QLA2312_DEVICE_ID ||
-	    ha->pdev->device != QLA2322_DEVICE_ID) {
+	if (!IS_QLA2312(ha) && !IS_QLA2322(ha)) {
 		for (cnt = 30000;
 		    (RD_REG_WORD(&reg->hccr) & HCCR_RISC_PAUSE) == 0 &&
 			rval == QLA_SUCCESS; cnt--) {
@@ -182,9 +180,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 		}
 	}
 
-	if (ha->pdev->device != QLA2312_DEVICE_ID ||
-	    ha->pdev->device != QLA2322_DEVICE_ID) {
-		for (cnt = 30000; RD_REG_WORD(&reg->mailbox0) != 0 &&
+	if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
+		for (cnt = 30000; RD_MAILBOX_REG(ha, reg, 0) != 0 &&
 		    rval == QLA_SUCCESS; cnt--) {
 			if (cnt)
 				udelay(100);
@@ -196,17 +193,17 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	if (rval == QLA_SUCCESS) {
 		/* Get RISC SRAM. */
 		risc_address = 0x800;
-		WRT_REG_WORD(&reg->mailbox0, MBC_READ_RAM_WORD);
+ 		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_WORD);
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 	}
 	for (cnt = 0; cnt < sizeof(fw->risc_ram) / 2 && rval == QLA_SUCCESS;
-	    cnt++) {
-		WRT_REG_WORD(&reg->mailbox1, (uint16_t)risc_address++);
+	    cnt++, risc_address++) {
+ 		WRT_MAILBOX_REG(ha, reg, 1, (uint16_t)risc_address);
 		WRT_REG_WORD(&reg->hccr, HCCR_SET_HOST_INT);
 
 		for (timer = 6000000; timer; timer--) {
 			/* Check for pending interrupts. */
-			stat = RD_REG_DWORD(&reg->host_status);
+ 			stat = RD_REG_DWORD(&reg->u.isp2300.host_status);
 			if (stat & HSR_RISC_INT) {
 				stat &= 0xff;
 
@@ -214,8 +211,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					/* Release mailbox registers. */
 					WRT_REG_WORD(&reg->semaphore, 0);
@@ -226,8 +223,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
@@ -251,18 +248,18 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	if (rval == QLA_SUCCESS) {
 		/* Get stack SRAM. */
 		risc_address = 0x10000;
-		WRT_REG_WORD(&reg->mailbox0, MBC_READ_RAM_EXTENDED);
+ 		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_EXTENDED);
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 	}
 	for (cnt = 0; cnt < sizeof(fw->stack_ram) / 2 && rval == QLA_SUCCESS;
-	    cnt++) {
-		WRT_REG_WORD(&reg->mailbox1, LSW(risc_address));
-		WRT_REG_WORD(&reg->mailbox8, MSW(risc_address++));
+	    cnt++, risc_address++) {
+ 		WRT_MAILBOX_REG(ha, reg, 1, LSW(risc_address));
+ 		WRT_MAILBOX_REG(ha, reg, 8, MSW(risc_address));
 		WRT_REG_WORD(&reg->hccr, HCCR_SET_HOST_INT);
 
 		for (timer = 6000000; timer; timer--) {
 			/* Check for pending interrupts. */
-			stat = RD_REG_DWORD(&reg->host_status);
+ 			stat = RD_REG_DWORD(&reg->u.isp2300.host_status);
 			if (stat & HSR_RISC_INT) {
 				stat &= 0xff;
 
@@ -270,8 +267,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					/* Release mailbox registers. */
 					WRT_REG_WORD(&reg->semaphore, 0);
@@ -282,8 +279,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
@@ -307,18 +304,18 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	if (rval == QLA_SUCCESS) {
 		/* Get data SRAM. */
 		risc_address = 0x11000;
-		WRT_REG_WORD(&reg->mailbox0, MBC_READ_RAM_EXTENDED);
+ 		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_EXTENDED);
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 	}
 	for (cnt = 0; cnt < sizeof(fw->data_ram) / 2 && rval == QLA_SUCCESS;
-	    cnt++) {
-		WRT_REG_WORD(&reg->mailbox1, LSW(risc_address));
-		WRT_REG_WORD(&reg->mailbox8, MSW(risc_address++));
+	    cnt++, risc_address++) {
+ 		WRT_MAILBOX_REG(ha, reg, 1, LSW(risc_address));
+ 		WRT_MAILBOX_REG(ha, reg, 8, MSW(risc_address));
 		WRT_REG_WORD(&reg->hccr, HCCR_SET_HOST_INT);
 
 		for (timer = 6000000; timer; timer--) {
 			/* Check for pending interrupts. */
-			stat = RD_REG_DWORD(&reg->host_status);
+ 			stat = RD_REG_DWORD(&reg->u.isp2300.host_status);
 			if (stat & HSR_RISC_INT) {
 				stat &= 0xff;
 
@@ -326,8 +323,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					/* Release mailbox registers. */
 					WRT_REG_WORD(&reg->semaphore, 0);
@@ -338,8 +335,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					WRT_REG_WORD(&reg->hccr,
 					    HCCR_CLR_RISC_INT);
@@ -378,21 +375,21 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 }
 
 /**
- * qla2x00_ascii_fw_dump() - Converts a binary firmware dump to ASCII.
+ * qla2300_ascii_fw_dump() - Converts a binary firmware dump to ASCII.
  * @ha: HA context
  */
 void
-qla2x00_ascii_fw_dump(scsi_qla_host_t *ha)
+qla2300_ascii_fw_dump(scsi_qla_host_t *ha)
 {
 	uint32_t cnt;
 	char *uiter;
 	char fw_info[30];
-	struct fw_dump *fw;
+	struct qla2300_fw_dump *fw;
 
 	uiter = ha->fw_dump_buffer;
 	fw = ha->fw_dump;
 
-	qla_uprintf(&uiter, "%s Firmware Version %s\n", ha->brd_info->name,
+	qla_uprintf(&uiter, "%s Firmware Version %s\n", ha->model_number,
 	    qla2x00_get_fw_version_str(ha, fw_info));
 
 	qla_uprintf(&uiter, "\n[==>BEG]\n");
@@ -562,15 +559,13 @@ qla2x00_ascii_fw_dump(scsi_qla_host_t *ha)
 	qla_uprintf(&uiter, "\n\n[<==END] ISP Debug Dump.");
 }
 
-#else
-
 /**
- * qla2x00_fw_dump() - Dumps binary data from the 2100/2200 firmware.
+ * qla2100_fw_dump() - Dumps binary data from the 2100/2200 firmware.
  * @ha: HA context
  * @hardware_locked: Called with the hardware_lock
  */
 void
-qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
+qla2100_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 {
 	int		rval;
 	uint32_t	cnt, timer;
@@ -580,7 +575,7 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	device_reg_t	*reg;
 	uint16_t	*dmp_reg;
 	unsigned long	flags;
-	struct fw_dump	*fw;
+	struct qla2100_fw_dump	*fw;
 
 	reg = ha->iobase;
 	risc_address = 0;
@@ -598,13 +593,13 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	}
 
 	/* Allocate (large) dump buffer. */
-	ha->fw_dump_order = get_order(sizeof(struct fw_dump));
-	ha->fw_dump = (struct fw_dump *) __get_free_pages(GFP_ATOMIC,
+	ha->fw_dump_order = get_order(sizeof(struct qla2100_fw_dump));
+	ha->fw_dump = (struct qla2100_fw_dump *) __get_free_pages(GFP_ATOMIC,
 	    ha->fw_dump_order);
 	if (ha->fw_dump == NULL) {
 		qla_printk(KERN_WARNING, ha,
 		    "Unable to allocated memory for firmware dump (%d/%d).\n",
-		    ha->fw_dump_order, sizeof(struct fw_dump));
+		    ha->fw_dump_order, sizeof(struct qla2100_fw_dump));
 		return;
 	}
 	fw = ha->fw_dump;
@@ -628,7 +623,7 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 			fw->pbiu_reg[cnt] = RD_REG_WORD(dmp_reg++);
 
 		dmp_reg = (uint16_t *)((uint8_t *)reg + 0x10);
-		for (cnt = 0; cnt < sizeof(fw->mailbox_reg) / 2; cnt++) {
+		for (cnt = 0; cnt < ha->mbx_count; cnt++) {
 			if (cnt == 8) {
 				dmp_reg = (uint16_t *)((uint8_t *)reg + 0xe0);
 			}
@@ -713,7 +708,7 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 		WRT_REG_WORD(&reg->hccr, HCCR_CLR_HOST_INT); 
 	}
 
-	for (cnt = 30000; RD_REG_WORD(&reg->mailbox0) != 0 &&
+	for (cnt = 30000; RD_MAILBOX_REG(ha, reg, 0) != 0 &&
 	    rval == QLA_SUCCESS; cnt--) {
 		if (cnt)
 			udelay(100);
@@ -722,9 +717,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	}
 
 	/* Pause RISC. */
-	if (rval == QLA_SUCCESS && (ha->pdev->device == QLA2200_DEVICE_ID ||
-	    (ha->pdev->device == QLA2100_DEVICE_ID &&
-		(RD_REG_WORD(&reg->mctr) & (BIT_1 | BIT_0)) != 0))) {
+	if (rval == QLA_SUCCESS && (IS_QLA2200(ha) || (IS_QLA2100(ha) &&
+	    (RD_REG_WORD(&reg->mctr) & (BIT_1 | BIT_0)) != 0))) {
 
 		WRT_REG_WORD(&reg->hccr, HCCR_PAUSE_RISC); 
 		for (cnt = 30000;
@@ -738,7 +732,7 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 		if (rval == QLA_SUCCESS) {
 			/* Set memory configuration and timing. */
-			if (ha->pdev->device == QLA2100_DEVICE_ID)
+			if (IS_QLA2100(ha))
 				WRT_REG_WORD(&reg->mctr, 0xf1);
 			else
 				WRT_REG_WORD(&reg->mctr, 0xf2);
@@ -751,12 +745,12 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	if (rval == QLA_SUCCESS) {
 		/* Get RISC SRAM. */
 		risc_address = 0x1000;
-		WRT_REG_WORD(&reg->mailbox0, MBC_READ_RAM_WORD);
+ 		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_WORD);
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 	}
 	for (cnt = 0; cnt < sizeof(fw->risc_ram) / 2 && rval == QLA_SUCCESS;
-	    cnt++) {
-		WRT_REG_WORD(&reg->mailbox1, (uint16_t)risc_address++);
+	    cnt++, risc_address++) {
+ 		WRT_MAILBOX_REG(ha, reg, 1, (uint16_t)risc_address);
 		WRT_REG_WORD(&reg->hccr, HCCR_SET_HOST_INT);
 
 		for (timer = 6000000; timer != 0; timer--) {
@@ -766,8 +760,8 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 					set_bit(MBX_INTERRUPT,
 					    &ha->mbx_cmd_flags);
 
-					mb0 = RD_REG_WORD(&reg->mailbox0);
-					mb2 = RD_REG_WORD(&reg->mailbox2);
+					mb0 = RD_MAILBOX_REG(ha, reg, 0);
+					mb2 = RD_MAILBOX_REG(ha, reg, 2);
 
 					WRT_REG_WORD(&reg->semaphore, 0);
 					WRT_REG_WORD(&reg->hccr,
@@ -804,21 +798,21 @@ qla2x00_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 }
 
 /**
- * qla2x00_ascii_fw_dump() - Converts a binary firmware dump to ASCII.
+ * qla2100_ascii_fw_dump() - Converts a binary firmware dump to ASCII.
  * @ha: HA context
  */
 void
-qla2x00_ascii_fw_dump(scsi_qla_host_t *ha)
+qla2100_ascii_fw_dump(scsi_qla_host_t *ha)
 {
 	uint32_t cnt;
 	char *uiter;
 	char fw_info[30];
-	struct fw_dump *fw;
+	struct qla2100_fw_dump *fw;
 
 	uiter = ha->fw_dump_buffer;
 	fw = ha->fw_dump;
 
-	qla_uprintf(&uiter, "%s Firmware Version %s\n", ha->brd_info->name,
+	qla_uprintf(&uiter, "%s Firmware Version %s\n", ha->model_number,
 	    qla2x00_get_fw_version_str(ha, fw_info));
 
 	qla_uprintf(&uiter, "\n[==>BEG]\n");
@@ -957,7 +951,6 @@ qla2x00_ascii_fw_dump(scsi_qla_host_t *ha)
 
 	return;
 }
-#endif /* if defined(ISP2300) */
 
 static int
 qla_uprintf(char **uiter, char *fmt, ...)
@@ -991,17 +984,17 @@ qla2x00_dump_regs(scsi_qla_host_t *ha)
 
 	printk("Mailbox registers:\n");
 	printk("scsi(%ld): mbox 0 0x%04x \n",
-	    ha->host_no, RD_REG_WORD(&reg->mailbox0));
+	    ha->host_no, RD_MAILBOX_REG(ha, reg, 0));
 	printk("scsi(%ld): mbox 1 0x%04x \n",
-	    ha->host_no, RD_REG_WORD(&reg->mailbox1));
+	    ha->host_no, RD_MAILBOX_REG(ha, reg, 1));
 	printk("scsi(%ld): mbox 2 0x%04x \n",
-	    ha->host_no, RD_REG_WORD(&reg->mailbox2));
+	    ha->host_no, RD_MAILBOX_REG(ha, reg, 2));
 	printk("scsi(%ld): mbox 3 0x%04x \n",
-	    ha->host_no, RD_REG_WORD(&reg->mailbox3));
+	    ha->host_no, RD_MAILBOX_REG(ha, reg, 3));
 	printk("scsi(%ld): mbox 4 0x%04x \n",
-	    ha->host_no, RD_REG_WORD(&reg->mailbox4));
+	    ha->host_no, RD_MAILBOX_REG(ha, reg, 4));
 	printk("scsi(%ld): mbox 5 0x%04x \n",
-	    ha->host_no, RD_REG_WORD(&reg->mailbox5));
+	    ha->host_no, RD_MAILBOX_REG(ha, reg, 5));
 }
 
 

@@ -107,6 +107,11 @@ qla2x00_cfg_init(scsi_qla_host_t *ha)
 {
 	int	rval;
 
+	if (ConfigRequired > 0)
+		mp_config_required = 1;
+	else
+		mp_config_required = 0;
+
 	ENTER("qla2x00_cfg_init");
 	set_bit(CFG_ACTIVE, &ha->cfg_flags);
 	if (!mp_initialized) {
@@ -386,7 +391,7 @@ qla2x00_cfg_get_paths(EXT_IOCTL *cmd, FO_GET_PATHS *bp, int mode)
 	DEBUG9(printk("%s(%ld): found matching ha inst %d.\n",
 	    __func__, ha->host_no, bp->HbaInstance);)
 
-	if (ha->flags.failover_enabled)
+	if (qla2x00_failover_enabled(ha)) {
 		if ((host = qla2x00_cfg_find_host(ha)) == NULL) {
 			cmd->Status = EXT_STATUS_DEV_NOT_FOUND;
 			cmd->DetailStatus = EXT_DSTATUS_HBA_INST;
@@ -397,6 +402,7 @@ qla2x00_cfg_get_paths(EXT_IOCTL *cmd, FO_GET_PATHS *bp, int mode)
 
 			return rval;
 		}
+	}
 
 	paths = (FO_PATHS_INFO *)qla2x00_kmem_zalloc(
 	    sizeof(FO_PATHS_INFO), GFP_ATOMIC, 20);
@@ -413,7 +419,7 @@ qla2x00_cfg_get_paths(EXT_IOCTL *cmd, FO_GET_PATHS *bp, int mode)
 	DEBUG9(printk("%s(%ld): found matching ha inst %d.\n",
 	    __func__, ha->host_no, bp->HbaInstance);)
 
-	if (!ha->flags.failover_enabled) {
+	if (!qla2x00_failover_enabled(ha)) {
 		/* non-fo case. There's only one path. */
 
 		mp_path_list_t	*ptmp_plist;
@@ -716,7 +722,7 @@ qla2x00_cfg_set_current_path(EXT_IOCTL *cmd, FO_SET_CURRENT_PATH *bp, int mode )
 		return (rval);
 	}
 
-	if (!ha->flags.failover_enabled) {
+	if (!qla2x00_failover_enabled(ha)) {
 		/* non-failover mode. nothing to be done. */
 		DEBUG9_10(printk("%s(%ld): non-failover driver mode.\n",
 		    __func__, ha->host_no);)
@@ -3017,7 +3023,7 @@ qla2x00_failback_single_lun(mp_device_t *dp, uint8_t lun, uint8_t new)
 
 	vis_host = vis_path->host;
 	if ((lq = qla2x00_lun_alloc(vis_host->ha, dp->dev_id, lun)) != NULL) {
-		qla2x00_delay_lun(vis_host->ha, lq, recoveryTime);
+		qla2x00_delay_lun(vis_host->ha, lq, ql2xrecoveryTime);
 		qla2x00_flush_failover_q(vis_host->ha, lq);
 		qla2x00_reset_lun_fo_counts(vis_host->ha, lq);
 	}
@@ -3323,48 +3329,40 @@ qla2x00_cfg_mem_free(scsi_qla_host_t *ha)
 }
 
 int
-qla2x00_is_fcport_in_config(scsi_qla_host_t *ha, fc_port_t *fcport)
+__qla2x00_is_fcport_in_config(scsi_qla_host_t *ha, fc_port_t *fcport)
 {
-	if (!ha->flags.failover_enabled) {
-		if (fcport->flags & FCF_PERSISTENT_BOUND)
-			return(TRUE);
-	} else {
-		mp_device_t	*dp;
-		mp_host_t	*host;
-		mp_path_t	*path;
-		mp_path_list_t	*pathlist;
-		uint16_t	dev_no;
+	mp_device_t	*dp;
+	mp_host_t	*host;
+	mp_path_t	*path;
+	mp_path_list_t	*pathlist;
+	uint16_t	dev_no;
 
-		if ((host = qla2x00_cfg_find_host(ha)) == NULL) {
-			/* no configured devices */
-			return (FALSE);
+	/* no configured devices */
+	host = qla2x00_cfg_find_host(ha);
+	if (!host)
+		return (FALSE);
+
+	for (dev_no = 0; dev_no < MAX_MP_DEVICES; dev_no++) {
+		dp = host->mp_devs[dev_no];
+
+		if (dp == NULL)
+			continue;
+
+		/* Sanity check */
+		if (qla2x00_is_wwn_zero(dp->nodename))
+			continue;
+
+		if ((pathlist = dp->path_list) == NULL)
+			continue;
+
+		path = qla2x00_find_path_by_name(host, dp->path_list,
+		    fcport->port_name);
+		if (path != NULL) {
+			/* found path for port */
+			if (path->config == TRUE)
+				return (TRUE);
+			break;
 		}
-
-		for (dev_no = 0; dev_no < MAX_MP_DEVICES; dev_no++) {
-			dp = host->mp_devs[dev_no];
-
-			if (dp == NULL)
-				continue;
-
-			/* Sanity check */
-			if (qla2x00_is_wwn_zero(dp->nodename))
-				continue;
-
-			if ((pathlist = dp->path_list) == NULL)
-				continue;
-
-			path = qla2x00_find_path_by_name(host, dp->path_list,
-			    fcport->port_name);
-			if (path != NULL) {
-				/* found path for port */
-				if (path->config == TRUE) {
-					return (TRUE);
-				} else {
-					break;
-				}
-			}
-		}
-
 	}
 
 	return (FALSE);

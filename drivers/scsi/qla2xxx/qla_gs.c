@@ -45,11 +45,7 @@ qla2x00_prep_ms_iocb(scsi_qla_host_t *ha, uint32_t req_size, uint32_t rsp_size)
 
 	ms_pkt->entry_type = MS_IOCB_TYPE;
 	ms_pkt->entry_count = 1;
-#if defined(EXTENDED_IDS)
-	ms_pkt->loop_id = __constant_cpu_to_le16(SIMPLE_NAME_SERVER);
-#else
-	ms_pkt->loop_id = SIMPLE_NAME_SERVER;
-#endif
+	SET_TARGET_ID(ha, ms_pkt->loop_id, SIMPLE_NAME_SERVER);
 	ms_pkt->control_flags = __constant_cpu_to_le16(CF_READ | CF_HEAD_TAG);
 	ms_pkt->timeout = __constant_cpu_to_le16(25);
 	ms_pkt->cmd_dsd_count = __constant_cpu_to_le16(1);
@@ -221,7 +217,6 @@ qla2x00_gid_pt(scsi_qla_host_t *ha, sw_info_t *list)
 	} else {
 		/* Set port IDs in switch info list. */
 		for (i = 0; i < MAX_FIBRE_DEVICES; i++) {
-			memset(&list[i], 0, sizeof(sw_info_t));
 			gid_data = &ct_rsp->rsp.gid_pt.entries[i];
 			list[i].d_id.b.domain = gid_data->port_id[0];
 			list[i].d_id.b.area = gid_data->port_id[1];
@@ -233,6 +228,15 @@ qla2x00_gid_pt(scsi_qla_host_t *ha, sw_info_t *list)
 				break;
 			}
 		}
+
+		/*
+		 * If we've used all available slots, then the switch is
+		 * reporting back more devices that we can handle with this
+		 * single call.  Return a failed status, and let GA_NXT handle
+		 * the overload.
+		 */
+		if (i == MAX_FIBRE_DEVICES) 
+			rval = QLA_FUNCTION_FAILED;
 	}
 
 	return (rval);

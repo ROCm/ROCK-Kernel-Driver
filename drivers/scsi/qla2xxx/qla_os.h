@@ -53,9 +53,6 @@
 #endif
 
 #include <linux/config.h>
-#ifndef QLA_MODVERSION
-#define __NO_VERSION__
-#endif
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/init.h>
@@ -72,11 +69,14 @@
 #include <linux/interrupt.h>
 #include <linux/stat.h>
 #include <linux/slab.h>
+#include <linux/mempool.h>
+#include <linux/vmalloc.h>
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/bio.h>
 #include <linux/moduleparam.h>
+#include <linux/capability.h>
 
 #include <asm/system.h>
 

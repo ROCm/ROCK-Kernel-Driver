@@ -22,8 +22,7 @@
  */
 #define FW_DUMP_SIZE	0xBC000		/* bytes */
 
-#if defined(ISP2300)
-struct fw_dump {
+struct qla2300_fw_dump {
 	uint16_t hccr;
 	uint16_t pbiu_reg[8];
 	uint16_t risc_host_reg[8];
@@ -46,15 +45,11 @@ struct fw_dump {
 	uint16_t stack_ram[0x1000];
 	uint16_t data_ram[0xF000];
 };
-#else /* defined(ISP2300) */
-struct fw_dump {
+
+struct qla2100_fw_dump {
 	uint16_t hccr;
 	uint16_t pbiu_reg[8];
-#if defined(ISP2200)
 	uint16_t mailbox_reg[32];
-#else
-	uint16_t mailbox_reg[8];
-#endif
 	uint16_t dma_reg[48];
 	uint16_t risc_hdw_reg[16];
 	uint16_t risc_gp0_reg[16];
@@ -70,7 +65,6 @@ struct fw_dump {
 	uint16_t fpm_b1_reg[64];
 	uint16_t risc_ram[0xf000];
 };
-#endif /* defined(ISP2300) */
 
 /*
 * Macros use for debugging the driver.

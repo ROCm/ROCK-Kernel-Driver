@@ -20,19 +20,24 @@
 #include "qla_os.h"
 
 #include "qla_def.h"
-#include <linux/vmalloc.h>
 
 /*
  * Driver version
  */
-char qla2x00_version_str[40] = { 0 };
+char qla2x00_version_str[40];
+
+/*
+ * SRB allocation cache
+ */
+char srb_cachep_name[16];
+kmem_cache_t *srb_cachep;
 
 /*
 * Command line options.
 */
-unsigned long qla2x00_verbose = 0;
+unsigned long qla2x00_verbose;
 unsigned long qla2x00_reinit = 1;
-unsigned long qla2x00_req_dmp = 0;
+unsigned long qla2x00_req_dmp;
 
 /*
  * Stats for all adpaters.
@@ -42,62 +47,42 @@ struct _qla2x00stats qla2x00_stats;
 /*
  * Ioctl related information.
  */
-int num_hosts = 0;       
-int apiHBAInstance = 0;
+int num_hosts;
+int apiHBAInstance;
 
 /*
  * Module parameter information and variables
  */
 
-char *ql2xdevconf = NULL;
-#if MPIO_SUPPORT
-int ql2xretrycount = 30;
-#else
+char *ql2xdevconf;
 int ql2xretrycount = 20;
-#endif
 int qla2xenbinq = 1;
 int ql2xlogintimeout = 20;
-int qlport_down_retry = 0;
-int ql2xmaxqdepth = 0;
-int displayConfig = 0;
-int ql2xplogiabsentdevice = 0;
-#if defined(ISP2300)
+int qlport_down_retry;
+int ql2xmaxqdepth;
+int displayConfig;
+int ql2xplogiabsentdevice;
 int ql2xintrdelaytimer = 10;
-#endif
 
 /* Enable for failover */
-#if MPIO_SUPPORT
-int ql2xfailover = 1;
-#else
-int ql2xfailover = 0;
-#endif
-
-int ConfigRequired = 0;
-int recoveryTime = MAX_RECOVERYTIME;
-int failbackTime = MAX_FAILBACKTIME;
+int ConfigRequired;
 
 /* Persistent binding type */
 int Bind = BIND_BY_PORT_NAME;
 
 int ql2xsuspendcount = SUSPEND_COUNT;
 
-int ql2xdoinitscan = 1;
+int ql2xdoinitscan = 0;
 
-int qla2x00_retryq_dmp = 0;
+int qla2x00_retryq_dmp;
 
 #if defined(MODULE)
-char *ql2xopts = NULL;
+char *ql2xopts;
 
 /* insmod qla2100 ql2xopts=verbose" */
 MODULE_PARM(ql2xopts, "s");
 MODULE_PARM_DESC(ql2xopts,
 		"Additional driver options.");
-
-MODULE_PARM(ql2xfailover, "i");
-MODULE_PARM_DESC(ql2xfailover,
-		"Driver failover support: 0 to disable; 1 to enable. "
-		"Default behaviour based on compile-time option "
-		"MPIO_SUPPORT.");
 
 MODULE_PARM(ql2xmaxqdepth, "i");
 MODULE_PARM_DESC(ql2xmaxqdepth,
@@ -115,39 +100,27 @@ MODULE_PARM_DESC(qlport_down_retry,
 MODULE_PARM(ql2xretrycount,"i");
 MODULE_PARM_DESC(ql2xretrycount,
 		"Maximum number of mid-layer retries allowed for a command.  "
-		"Default value in non-failover mode is 20, "
-		"in failover mode, 30.");
+		"Default value is 20, ");
 
 MODULE_PARM(displayConfig, "i");
 MODULE_PARM_DESC(displayConfig,
-		"If 1 then display the configuration used in "
-		"/etc/modules.conf.");
+		"If 1 then display the configuration used in /etc/modules.conf.");
+
 MODULE_PARM(ql2xplogiabsentdevice, "i");
 MODULE_PARM_DESC(ql2xplogiabsentdevice,
 		"Option to enable PLOGI to devices that are not present after "
 		"a Fabric scan.  This is needed for several broken switches."
 		"Default is 0 - no PLOGI. 1 - perfom PLOGI.");
 
-#if defined(ISP2300)
 MODULE_PARM(ql2xintrdelaytimer,"i");
 MODULE_PARM_DESC(ql2xintrdelaytimer,
 		"ZIO: Waiting time for Firmware before it generates an "
 		"interrupt to the host to notify completion of request.");
-#endif
 
 MODULE_PARM(ConfigRequired, "i");
 MODULE_PARM_DESC(ConfigRequired,
 		"If 1, then only configured devices passed in through the"
 		"ql2xopts parameter will be presented to the OS");
-
-MODULE_PARM(recoveryTime, "i");
-MODULE_PARM_DESC(recoveryTime,
-		"Recovery time in seconds before a target device is sent I/O "
-		"after a failback is performed.");
-
-MODULE_PARM(failbackTime, "i");
-MODULE_PARM_DESC(failbackTime,
-		"Delay in seconds before a failback is performed.");
 
 MODULE_PARM(Bind, "i");
 MODULE_PARM_DESC(Bind,
@@ -165,10 +138,6 @@ MODULE_PARM_DESC(ql2xdoinitscan,
 		"Signal mid-layer to perform scan after driver load: 0 -- no "
 		"signal sent to mid-layer.");
 #endif
-
-MODULE_AUTHOR("QLogic Corporation");
-MODULE_DESCRIPTION("QLogic " ISP_NAME " FC-SCSI Host Bus Adapter driver");
-MODULE_LICENSE("GPL");
 
 
 /*
@@ -191,186 +160,9 @@ static int copy_info(struct info_str *, char *, ...);
 LIST_HEAD(qla_hostlist);
 rwlock_t qla_hostlist_lock = RW_LOCK_UNLOCKED;
 
-
-/*
- * PCI driver interface definitions
- */
-#define ISP21XX_FW_INDEX	0
-#define ISP22XX_FW_INDEX	0
-#define ISP23XX_FW_INDEX	0
-#define ISP232X_FW_INDEX	2
-
-static struct qla_fw_info qla_fw_tbl[] = {
-#if defined(ISP2100)
-	/* Start of 21xx firmware list */
-	{
-		.addressing	= FW_INFO_ADDR_NORMAL,
-		.fwcode		= &fw2100tp_code01[0],
-		.fwlen		= &fw2100tp_length01,
-		.fwstart	= &fw2100tp_addr01,
-	},
-#endif
-
-#if defined(ISP2200)
-	/* Start of 22xx firmware list */
-	{
-		.addressing	= FW_INFO_ADDR_NORMAL,
-		.fwcode		= &fw2200tp_code01[0],
-		.fwlen		= &fw2200tp_length01,
-		.fwstart	= &fw2200tp_addr01,
-	},
-#endif
-
-#if defined(ISP2300)
-	/* Start of 23xx firmware list */
-	{
-		.addressing	= FW_INFO_ADDR_NORMAL,
-		.fwcode		= &fw2300tpx_code01[0],
-		.fwlen		= &fw2300tpx_length01,
-		.fwstart	= &fw2300tpx_addr01,
-	},
-
-#if defined(ISP2322)
-	/* End of 23xx firmware list */
-	{ FW_INFO_ADDR_NOMORE, },
-
-	/* Start of 232x firmware list */
-	{
-		.addressing	= FW_INFO_ADDR_NORMAL,
-		.fwcode		= &fw2322tpx_code01[0],
-		.fwlen		= &fw2322tpx_length01,
-		.fwstart	= &fw2322tpx_addr01,
-	},
-	{
-		.addressing	= FW_INFO_ADDR_EXTENDED,
-		.fwcode		= &rseqtpx_code01[0],
-		.fwlen		= &rseqtpx_code_length01,
-		.lfwstart	= &rseqtpx_code_addr01,
-	},
-	{
-		.addressing	= FW_INFO_ADDR_EXTENDED,
-		.fwcode		= &xseqtpx_code01[0],
-		.fwlen		= &xseqtpx_code_length01,
-		.lfwstart	= &xseqtpx_code_addr01,
-	},
-#endif
-
-#endif
-
-	/* End of firmware list */
-	{ FW_INFO_ADDR_NOMORE, },
-};
-
-#define ISP21XX_BRD_INDEX	0
-#define ISP22XX_BRD_INDEX	0
-#define ISP23XX_BRD_INDEX	0
-#define ISP2312_BRD_INDEX	1
-#define ISP2322_BRD_INDEX	2
-
-static struct qla_board_info qla_board_tbl[] = {
-#if defined(ISP2100)
-	{
-		.name		= "ISP2100",
-		.fwinfo		= &qla_fw_tbl[ISP21XX_FW_INDEX],
-	}
-#endif
-
-#if defined(ISP2200)
-	{
-		.name		= "ISP2200",
-		.fwinfo		= &qla_fw_tbl[ISP22XX_FW_INDEX],
-	}
-#endif
-
-#if defined(ISP2300)
-	{
-		.name		= "ISP2300",
-		.fwinfo		= &qla_fw_tbl[ISP23XX_FW_INDEX],
-	},
-
-	{
-		.name		= "ISP2312",
-		.fwinfo		= &qla_fw_tbl[ISP23XX_FW_INDEX],
-	},
-
-#if defined(ISP2322)
-	{
-		.name		= "ISP2322",
-		.fwinfo		= &qla_fw_tbl[ISP232X_FW_INDEX],
-	}
-#endif
-#endif
-};
-
-static struct pci_device_id qla_pci_tbl[] __devinitdata = {
-#if defined(ISP2100)
-	{
-		.vendor		= QLA2X00_VENDOR_ID,
-		.device		= QLA2100_DEVICE_ID,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data
-			= (unsigned long)&qla_board_tbl[ISP21XX_BRD_INDEX],
-	},
-#endif
-
-#if defined(ISP2200)
-	{
-		.vendor		= QLA2X00_VENDOR_ID,
-		.device		= QLA2200_DEVICE_ID,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data
-			= (unsigned long)&qla_board_tbl[ISP22XX_BRD_INDEX],
-	},
-#endif
-
-#if defined(ISP2300)
-	{
-		.vendor		= QLA2X00_VENDOR_ID,
-		.device		= QLA2300_DEVICE_ID,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data
-			= (unsigned long)&qla_board_tbl[ISP23XX_BRD_INDEX],
-	},
-
-	{
-		.vendor		= QLA2X00_VENDOR_ID,
-		.device		= QLA2312_DEVICE_ID,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data
-			= (unsigned long)&qla_board_tbl[ISP2312_BRD_INDEX],
-	},
-#if defined(ISP2322)
-	{
-		.vendor		= QLA2X00_VENDOR_ID,
-		.device		= QLA2322_DEVICE_ID,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data
-			= (unsigned long)&qla_board_tbl[ISP2322_BRD_INDEX],
-	},
-#endif
-#endif
-	{0 , 0}
-};
-MODULE_DEVICE_TABLE(pci, qla_pci_tbl);
-
-static int __devinit qla2x00_probe_device(struct pci_dev *,
-    const struct pci_device_id *);
-static void __devexit qla2x00_remove_device(struct pci_dev *);
 static void qla2x00_free_device(scsi_qla_host_t *);
 
-struct pci_driver qla2x00_pci_driver = {
-	.name		= DRIVER_NAME,
-	.id_table	= qla_pci_tbl,
-
-	.probe		= qla2x00_probe_device,
-	.remove		= __devexit_p(qla2x00_remove_device),
-};
-
+static void qla2x00_config_dma_addressing(scsi_qla_host_t *ha);
 
 /*
  * SCSI host template entry points 
@@ -387,25 +179,10 @@ static int qla2x00_device_reset(scsi_qla_host_t *, fc_port_t *);
 static int qla2x00_proc_info(struct Scsi_Host *, char *, char **,
     off_t, int, int);
 
-static uint8_t qla2x00_register_with_Linux(scsi_qla_host_t *, uint8_t);
-
-#if defined (CONFIG_SCSIFCHOTSWAP) || defined(CONFIG_GAMAP)
-int qla2x00_get_scsi_info_from_wwn(int mode, unsigned long long wwn, int *host, int *channel, int *lun, int *id);
-int qla2x00_get_wwn_from_scsi_info(int host, int id, unsigned long long *wwn);
-#endif /* CONFIG_SCSIFCHOTSWAP || CONFIG_GAMAP */
-
-#if !defined(MODULE)
-static int __init qla2x00_setup(char *);
-#else
-static void qla2x00_setup(char *);
-#endif
-static char *qla2x00_get_line(char *, char *);
-static int qla2x00_get_tokens(char *, char **, int);
-
 static struct scsi_host_template qla2x00_driver_template = {
 	.module			= THIS_MODULE,
-	.name			= DRIVER_NAME,
-	.proc_name		= DRIVER_NAME,
+	.name			= "qla2xxx",
+	.proc_name		= "qla2xxx",
 	.proc_info		= qla2x00_proc_info,
 	.queuecommand		= qla2x00_queuecommand,
 
@@ -419,16 +196,8 @@ static struct scsi_host_template qla2x00_driver_template = {
 	.this_id		= -1,
 	.can_queue		= REQUEST_ENTRY_CNT+128,
 	.cmd_per_lun		= 3,
-
-	/*
-	 * At this time, we limit the S/G table size to the maximum number of
-	 * entries possible given the use of IOCBs that are capable of 32bit
-	 * DMA addressing.
-	 *
-	 * We will update this value after we've determined the appropriate DMA
-	 * mask (qla2x00_config_dma_addressing()).
-	 */
-	.sg_tablesize		= SG_SEGMENTS_32,
+	.use_clustering		= ENABLE_CLUSTERING,
+	.sg_tablesize		= SG_ALL,
 
 	/*
 	 * The RISC allows for each command to transfer (2^32-1) bytes of data,
@@ -683,77 +452,81 @@ qla2x00_delete_from_done_queue(scsi_qla_host_t *dest_ha, srb_t *sp)
 		/* Release memory used for this I/O */
 		if (sp->cmd->use_sg) {
 			pci_unmap_sg(dest_ha->pdev, sp->cmd->request_buffer,
-			    sp->cmd->use_sg,
-			    scsi_to_pci_dma_dir(sp->cmd->sc_data_direction));
+			    sp->cmd->use_sg, sp->cmd->sc_data_direction);
 		} else if (sp->cmd->request_bufflen) {
 			pci_unmap_page(dest_ha->pdev, sp->dma_handle,
 			    sp->cmd->request_bufflen,
-			    scsi_to_pci_dma_dir(sp->cmd->sc_data_direction));
+			    sp->cmd->sc_data_direction);
 		}
 	}
 }
 
 static int qla2x00_do_dpc(void *data);
-static uint8_t qla2x00_check_for_devices_online(scsi_qla_host_t *);
 
 static void qla2x00_rst_aen(scsi_qla_host_t *);
-
-static void qla2x00_process_failover(scsi_qla_host_t *);
 
 static uint8_t qla2x00_mem_alloc(scsi_qla_host_t *);
 static void qla2x00_mem_free(scsi_qla_host_t *ha);
 int qla2x00_allocate_sp_pool( scsi_qla_host_t *ha);
 void qla2x00_free_sp_pool(scsi_qla_host_t *ha);
 
-
-#define to_qla_host(x)	((scsi_qla_host_t *) (x)->hostdata)
-
-static ssize_t qla2x00_read_fw_dump(struct kobject *, char *, loff_t, size_t);
-static ssize_t qla2x00_write_fw_dump(struct kobject *, char *, loff_t, size_t);
-
-static struct bin_attribute fw_dump_attr = {
+static ssize_t qla2x00_sysfs_read_fw_dump(struct kobject *, char *, loff_t,
+    size_t);
+static ssize_t qla2x00_sysfs_write_fw_dump(struct kobject *, char *, loff_t,
+    size_t);
+static struct bin_attribute sysfs_fw_dump_attr = {
 	.attr = {
 		.name = "fw_dump",
 		.mode = S_IRUSR | S_IWUSR,
 	},
 	.size = 0,
-	.read = qla2x00_read_fw_dump,
-	.write = qla2x00_write_fw_dump,
+	.read = qla2x00_sysfs_read_fw_dump,
+	.write = qla2x00_sysfs_write_fw_dump,
+};
+static ssize_t qla2x00_sysfs_read_nvram(struct kobject *, char *, loff_t,
+    size_t);
+static ssize_t qla2x00_sysfs_write_nvram(struct kobject *, char *, loff_t,
+    size_t);
+static struct bin_attribute sysfs_nvram_attr = {
+	.attr = {
+		.name = "nvram",
+		.mode = S_IRUSR | S_IWUSR,
+	},
+	.size = sizeof(nvram_t),
+	.read = qla2x00_sysfs_read_nvram,
+	.write = qla2x00_sysfs_write_nvram,
 };
 
-/*************************************************************************
-*   qla2x00_set_info
-*
-* Description:
-*   Set parameters for the driver from the /proc filesystem.
-*
-* Returns:
-*************************************************************************/
+
 int
 qla2x00_set_info(char *buffer, int length, struct Scsi_Host *shost)
 {
 	return (-ENOSYS);  /* Currently this is a no-op */
 }
 
-static ssize_t qla2x00_read_fw_dump(struct kobject *kobj, char *buf, loff_t off,
-    size_t count)
+/* -------------------------------------------------------------------------- */
+
+
+/* SysFS attributes. */
+static ssize_t qla2x00_sysfs_read_fw_dump(struct kobject *kobj, char *buf,
+    loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
 
 	if (ha->fw_dump_reading == 0)
 		return 0;
-	if (off > strlen(ha->fw_dump_buffer))
+	if (off > ha->fw_dump_buffer_len)
 		return 0;
-	if (off + count > strlen(ha->fw_dump_buffer))
-		count = strlen(ha->fw_dump_buffer) - off;
+	if (off + count > ha->fw_dump_buffer_len)
+		count = ha->fw_dump_buffer_len - off;
 
 	memcpy(buf, &ha->fw_dump_buffer[off], count);
 
 	return (count);
 }
 
-static ssize_t qla2x00_write_fw_dump(struct kobject *kobj, char *buf,
+static ssize_t qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf,
     loff_t off, size_t count)
 {
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
@@ -797,115 +570,87 @@ static ssize_t qla2x00_write_fw_dump(struct kobject *kobj, char *buf,
 			    "Firmware dump ready for read on (%ld).\n",
 			    ha->host_no);
 			memset(ha->fw_dump_buffer, 0, FW_DUMP_SIZE);
-			qla2x00_ascii_fw_dump(ha);
+			if (IS_QLA2100(ha) || IS_QLA2200(ha))
+ 				qla2100_ascii_fw_dump(ha);
+ 			else
+ 				qla2300_ascii_fw_dump(ha);
+			ha->fw_dump_buffer_len = strlen(ha->fw_dump_buffer);
 		}
 		break;
 	}
 	return (count);
 }
 
-/* TODO: Complete module_param() */
-#if 0
-/**************************************************************************
-* qla2x00_detect
-*
-* Description:
-*    This routine will probe for Qlogic FC SCSI host adapters.
-*    It returns the number of host adapters of a particular
-*    type that were found.	 It also initialize all data necessary for
-*    the driver.  It is passed-in the host number, so that it
-*    knows where its first entry is in the scsi_hosts[] array.
-*
-* Input:
-*     template - pointer to SCSI template
-*
-* Returns:
-*  num - number of host adapters found.
-**************************************************************************/
-int
-qla2x00_detect(struct scsi_host_template *template)
+static ssize_t qla2x00_sysfs_read_nvram(struct kobject *kobj, char *buf,
+    loff_t off, size_t count)
 {
-	/*
-	 * If we are called as a module, the qla2100 pointer may not be null
-	 * and it would point to our bootup string, just like on the lilo
-	 * command line.  IF not NULL, then process this config string with
-	 * qla2x00_setup
-	 *
-	 * Boot time Options To add options at boot time add a line to your
-	 * lilo.conf file like:
-	 * append="qla2100=verbose,tag_info:{{32,32,32,32},{32,32,32,32}}"
-	 * which will result in the first four devices on the first two
-	 * controllers being set to a tagged queue depth of 32.
-	 */
-	if (ql2xopts)
-		qla2x00_setup(ql2xopts);
-	if (dummy_buffer[0] != 'P')
-		printk(KERN_WARNING
-		    "qla2x00: Please read the file "
-		    "/usr/src/linux/drivers/scsi/README.qla2x00\n"
-		    "qla2x00: to see the proper way to specify options to "
-		    "the qla2x00 module\n"
-		    "qla2x00: Specifically, don't use any commas when passing "
-		    "arguments to\n"
-		    "qla2x00: insmod or else it might trash certain memory "
-		    "areas.\n");
+	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+	uint16_t	*witer;
+	unsigned long	flags;
+	uint16_t	cnt;
+
+	if (!capable(CAP_SYS_ADMIN) || off != 0 || count != sizeof(nvram_t))
+		return 0;
+
+	/* Read NVRAM. */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	qla2x00_lock_nvram_access(ha);
+ 	witer = (uint16_t *)buf;
+ 	for (cnt = 0; cnt < count / 2; cnt++) {
+		*witer = cpu_to_le16(qla2x00_get_nvram_word(ha,
+		    cnt+ha->nvram_base));
+		witer++;
+ 	}
+	qla2x00_unlock_nvram_access(ha);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	return (count);
 }
-#endif
 
-/**************************************************************************
-*   qla2x00_register_with_Linux
-*
-* Description:
-*   Free the passed in Scsi_Host memory structures prior to unloading the
-*   module.
-*
-* Input:
-*     ha - pointer to host adapter structure
-*     maxchannels - MAX number of channels.
-*
-* Returns:
-*  0 - Sucessfully reserved resources.
-*  1 - Failed to reserved a resource.
-**************************************************************************/
-static uint8_t
-qla2x00_register_with_Linux(scsi_qla_host_t *ha, uint8_t maxchannels)
+static ssize_t qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf,
+    loff_t off, size_t count)
 {
-	struct Scsi_Host *host = ha->host;
+	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+	uint8_t		*iter;
+	uint16_t	*witer;
+	unsigned long	flags;
+	uint16_t	cnt;
+	uint8_t		chksum;
 
-	host->cmd_per_lun = 3;
-	host->max_cmd_len = MAX_CMDSZ;
+	if (!capable(CAP_SYS_ADMIN) || off != 0 || count != sizeof(nvram_t))
+		return 0;
 
-	host->max_channel = maxchannels;
-	host->max_lun = ha->max_luns;
-	host->unique_id = ha->instance;
-	host->max_id = ha->max_targets;
+	/* Checksum NVRAM. */
+	iter = (uint8_t *)buf;
+	chksum = 0;
+	for (cnt = 0; cnt < count - 1; cnt++)
+		chksum += *iter++;
+	chksum = ~chksum + 1;
+	*iter = chksum;
 
-	/* set our host ID  (need to do something about our two IDs) */
-	host->this_id = 255;
-
-	/* Register the IRQ with Linux (sharable) */
-	if (request_irq(host->irq, qla2x00_intr_handler,
-	    SA_INTERRUPT|SA_SHIRQ, DRIVER_NAME, ha)) {
-		qla_printk(KERN_WARNING, ha,
-		    "Failed to reserve interrupt %d already in use.\n",
-		    host->irq);
-		return 1;
+	/* Write NVRAM. */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	qla2x00_lock_nvram_access(ha);
+ 	witer = (uint16_t *)buf;
+	for (cnt = 0; cnt < count / 2; cnt++) {
+		qla2x00_write_nvram_word(ha, cnt+ha->nvram_base,
+		    cpu_to_le16(*witer));
+		witer++;
 	}
+	qla2x00_unlock_nvram_access(ha);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-	/* Initialized the timer */
-	qla2x00_start_timer(ha, qla2x00_timer, WATCH_INTERVAL);
-
-	return 0;
+	return (count);
 }
 
+/* -------------------------------------------------------------------------- */
 char *
 qla2x00_get_pci_info_str(struct scsi_qla_host *ha, char *str)
 {
 	static char *pci_bus_modes[] = {
-		"33",
-		"66",
-		"100",
-		"133",
+		"33", "66", "100", "133",
 	};
 	uint16_t pci_bus;
 
@@ -989,6 +734,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	unsigned long	handle;
 	int		was_empty;
 
+
 	host = cmd->device->host;
 	ha = (scsi_qla_host_t *) host->hostdata;
 
@@ -1006,7 +752,6 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 
 		spin_lock_irq(ha->host->host_lock);
 
-		LEAVE(__func__);
 		return (1);
 	}
 
@@ -1044,14 +789,12 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		spin_lock_irq(ha->host->host_lock);
 
 		sp_put(ha, sp);
-		LEAVE(__func__);
 
 		return (0);
 	}
 
 	if ((tq = (os_tgt_t *) TGT_Q(ha, t)) != NULL &&
-		(lq = (os_lun_t *) LUN_Q(ha, t, l)) != NULL ) {
-
+	    (lq = (os_lun_t *) LUN_Q(ha, t, l)) != NULL) {
 		fcport = lq->fclun->fcport;
 		ha2 = fcport->ha;
 	} else {
@@ -1112,7 +855,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	sp->fclun = lq->fclun;
 	sp->ha = ha2;
 
-	if (cmd->sc_data_direction == SCSI_DATA_UNKNOWN &&
+	if (cmd->sc_data_direction == DMA_BIDIRECTIONAL &&
 	    cmd->request_bufflen != 0) {
 
 		DEBUG2(printk(KERN_WARNING
@@ -1127,7 +870,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	 *	Either PORT_DOWN_TIMER OR LINK_DOWN_TIMER Expired.
 	 */
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-	    ha->loop_state == LOOP_DEAD) {
+	    atomic_read(&ha->loop_state) == LOOP_DEAD) {
 		/*
 		 * Add the command to the done-queue for later failover
 		 * processing
@@ -1142,19 +885,17 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	}
 	was_empty = add_to_pending_queue(ha, sp);
 
-#if defined(ISP2100) || defined(ISP2200)
-	if (ha->flags.online) {
+	if ((IS_QLA2100(ha) || IS_QLA2200(ha)) && ha->flags.online) {
 		unsigned long flags;
 		device_reg_t *reg;
 		reg = ha->iobase;
 		
-		if (RD_REG_WORD(ISP_RSP_Q_IN(reg)) != ha->rsp_ring_index) {
+		if (RD_REG_WORD(ISP_RSP_Q_IN(ha, reg)) != ha->rsp_ring_index) {
 			spin_lock_irqsave(&ha->hardware_lock, flags);	
 			qla2x00_process_response_queue(ha);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 		}
 	}
-#endif	
 
 	/* We submit to the hardware if:
 	 *
@@ -1318,9 +1059,9 @@ qla2x00_wait_for_loop_ready(scsi_qla_host_t *ha)
 	loop_timeout = jiffies + (MAX_LOOP_TIMEOUT * HZ); 
 
 	while ((!atomic_read(&ha->loop_down_timer) &&
-	    ha->loop_state == LOOP_DOWN) ||
+	    atomic_read(&ha->loop_state) == LOOP_DOWN) ||
 	    test_bit(CFG_ACTIVE, &ha->cfg_flags) ||
-	    ha->loop_state != LOOP_READY) {
+	    atomic_read(&ha->loop_state) != LOOP_READY) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(3 * HZ);
 		if (time_after_eq(jiffies, loop_timeout)) {
@@ -1330,7 +1071,6 @@ qla2x00_wait_for_loop_ready(scsi_qla_host_t *ha)
 	}
 	return (return_status);	
 }
-
 
 /**************************************************************************
 * qla2xxx_eh_abort
@@ -1375,7 +1115,7 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	 */
 	if ((sp == NULL)) {
 		/* no action - we don't have command */
-		qla_printk(KERN_INFO, QLA_HA(cmd->device->host),
+		qla_printk(KERN_INFO, to_qla_host(cmd->device->host),
 		    "qla2xxx_eh_abort: cmd already done sp=%p\n", sp);
 		DEBUG(printk("qla2xxx_eh_abort: cmd already done sp=%p\n", sp);)
 		return(SUCCESS);
@@ -1386,7 +1126,7 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	}
 
 	vis_ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
-	if (vis_ha->flags.failover_enabled)
+	if (qla2x00_failover_enabled(vis_ha))
 		/* Get Actual HA pointer */
 		ha = (scsi_qla_host_t *)sp->ha;
 	else
@@ -1468,66 +1208,40 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	/*
 	 * See if this command is in the retry queue
 	 */
-	if (!found) {
-		DEBUG3(printk("qla2xxx_eh_abort: searching sp %p in retry "
+	DEBUG3(printk("qla2xxx_eh_abort: searching sp %p in retry "
 		    "queue.\n", sp);)
 
-		spin_lock_irqsave(&ha->list_lock, flags);
-		list_for_each_safe(list, temp, &ha->retry_queue) {
-			rp = list_entry(list, srb_t, list);
+	spin_lock_irqsave(&ha->list_lock, flags);
+	list_for_each_safe(list, temp, &ha->retry_queue) {
+		rp = list_entry(list, srb_t, list);
 
-			if (cmd != rp->cmd)
-				continue;
+		if (cmd != rp->cmd)
+			continue;
 
 
-			DEBUG2(printk("qla2xxx_eh_abort: found "
-			    "in retry queue. SP=%p\n", sp);)
+		DEBUG2(printk("qla2xxx_eh_abort: found "
+		    "in retry queue. SP=%p\n", sp);)
 
-			__del_from_retry_queue(ha, rp);
-			cmd->result = DID_ABORT << 16;
-			__add_to_done_queue(ha, rp);
+		__del_from_retry_queue(ha, rp);
+		cmd->result = DID_ABORT << 16;
+		__add_to_done_queue(ha, rp);
 
-			return_status = SUCCESS;
-			found++;
+		return_status = SUCCESS;
+		found++;
 
-			break;
+		break;
 
-		} /* list_for_each_safe() */
-		spin_unlock_irqrestore(&ha->list_lock, flags);
-	}
+	} 
+	spin_unlock_irqrestore(&ha->list_lock, flags);
 
 	/*
 	 * Search failover queue
 	 */
-	if (ha->flags.failover_enabled) {
-		if (!found) {
-			DEBUG3(printk("qla2xxx_eh_abort: searching sp %p in "
-			    "failover queue.\n", sp);)
-
-			spin_lock_irqsave(&ha->list_lock, flags);
-			list_for_each_safe(list, temp, &ha->failover_queue) {
-				rp = list_entry(list, srb_t, list);
-
-				if (cmd != rp->cmd)
-					continue;
-
-				DEBUG2(printk(KERN_WARNING
-				    "qla2xxx_eh_abort: found in failover "
-				    "queue. SP=%p\n", sp);)
-
-				/* Remove srb from failover queue. */
-				__del_from_failover_queue(ha, rp);
-				cmd->result = DID_ABORT << 16;
-				__add_to_done_queue(ha, rp);
-
-				return_status = SUCCESS;
-				found++;
-
-				break;
-
-			} /* list_for_each_safe() */
-			spin_unlock_irqrestore(&ha->list_lock, flags);
-		} /*End of if !found */
+	if (qla2x00_failover_enabled(ha)) {
+		if (!found && qla2x00_search_failover_queue(ha, cmd)) {
+			return_status = SUCCESS;
+			found++;
+		}
 	}
 
 	/*
@@ -1896,61 +1610,15 @@ qla2x00_eh_wait_for_pending_commands(scsi_qla_host_t *ha)
 int
 qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 {
-	int        return_status = SUCCESS;
-	unsigned int b, t, l;
-	srb_t      *sp;
-	int	found;
-	struct list_head *hal;
-	scsi_qla_host_t *ha, *search_ha;
+	scsi_qla_host_t *ha;
+	srb_t *sp;
+	int rval = FAILED;
 
 
 	ENTER("qla2xxx_eh_bus_reset");
 
-	if (cmd == NULL) {
-		printk(KERN_INFO
-			"%s(): **** SCSI mid-layer passing in NULL cmd\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return (FAILED);
-	}
-
-	b = cmd->device->channel;
-	t = cmd->device->id;
-	l = cmd->device->lun;
-
 	ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
 	sp = (srb_t *) CMD_SP(cmd);
-
-	if (ha == NULL) {
-		qla_printk(KERN_INFO, ha,
-			"%s(): **** CMD derives a NULL HA\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return (FAILED);
-	}
-
-	found = 0;
-	read_lock(&qla_hostlist_lock);
-	list_for_each(hal, &qla_hostlist) {
-		search_ha = list_entry(hal, scsi_qla_host_t, list);
-
-		if (search_ha == ha) {
-			found ++;
-			break;
-		}
-	}
-	read_unlock(&qla_hostlist_lock);
-
-	if (!found) {
-		qla_printk(KERN_INFO, ha,
-			"%s(): **** CMD derives a NULL search HA\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return (FAILED);
-	}
 
 #if  STOP_ON_RESET
 	printk("Resetting the Bus= 0x%x\n", (int)cmd);
@@ -1959,7 +1627,8 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 #endif
 
 	qla_printk(KERN_INFO, ha,
-	    "scsi(%ld:%d:%d:%d): LOOP RESET ISSUED.\n", ha->host_no, b, t, l);
+	    "scsi(%ld:%d:%d:%d): LOOP RESET ISSUED.\n", ha->host_no,
+	    cmd->device->channel, cmd->device->id, cmd->device->lun);
 
 	spin_unlock_irq(ha->host->host_lock);
 
@@ -1967,49 +1636,34 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 	if (qla2x00_wait_for_hba_online(ha) != QLA_SUCCESS) {
 		DEBUG2(printk("%s failed:board disabled\n",__func__));
 		spin_lock_irq(ha->host->host_lock);
-		return (FAILED);
+		return FAILED;
 	}
 
 	/* Blocking call-Does context switching if loop is Not Ready */ 
 	if (qla2x00_wait_for_loop_ready(ha) == QLA_SUCCESS) {
-		if (qla2x00_loop_reset(ha) != 0) 
-			return_status = FAILED;
-	} else {
-		return_status = FAILED;
+		if (qla2x00_loop_reset(ha)) 
+			rval = SUCCESS;
 	}
+
 	spin_lock_irq(ha->host->host_lock);
+	if (rval == FAILED)
+		goto out;
 
-	if (return_status == FAILED) {
-		DEBUG2(printk("%s(%ld): reset failed\n",
-		    __func__,ha->host_no);)
-		qla_printk(KERN_INFO, ha, "%s: reset failed\n",
-		    __func__);
-		return FAILED;
-	}
+	/*
+	 * Blocking Call. It goes to sleep waiting for cmd to get to done q
+	 *
+	 * XXX(hch): really?  We're under host_lock here..
+	 */
+	/* Waiting for our command in done_queue to be returned to OS.*/
+	if (!qla2x00_eh_wait_for_pending_commands(ha))
+		rval = FAILED;
 
-	/* Blocking Call. It goes to sleep waiting for cmd to get to done q */
-	 /* Waiting for our command in done_queue to be returned to OS.*/
-
-	if ( qla2x00_eh_wait_for_pending_commands(ha) == 0) {
-		return_status = FAILED;
-	}
-
-	if(return_status == FAILED) {
-		DEBUG2(printk("%s(%ld): reset failed\n",
-		    __func__,ha->host_no));
-		qla_printk(KERN_INFO, ha, "%s: reset failed\n",
-		    __func__);
-		return FAILED;
-	} else {
-		DEBUG2(printk("%s(%ld): reset succeded\n",
-		    __func__,ha->host_no));
-		qla_printk(KERN_INFO, ha, "%s: reset succeded\n",
-		    __func__);
-	}
+ out:
+	qla_printk(KERN_INFO, ha, "%s: reset %s\n", __func__,
+			(rval == FAILED) ? "failed" : "succeded");
 
 	LEAVE("qla2xxx_eh_bus_reset");
-
-	return (return_status);
+	return rval;
 }
 
 /**************************************************************************
@@ -2030,62 +1684,15 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 int
 qla2xxx_eh_host_reset(struct scsi_cmnd *cmd)
 {
-	int		return_status = SUCCESS;
-	srb_t		*sp;
-	unsigned int	b, t, l;
-	int	found;
-	struct list_head *hal;
-	scsi_qla_host_t *ha, *search_ha;
+	scsi_qla_host_t *ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
+	srb_t		*sp = (srb_t *)CMD_SP(cmd);
+	int		rval = SUCCESS;
 
 	ENTER("qla2xxx_eh_host_reset");
 
-	if (cmd == NULL) {
-		printk(KERN_INFO
-			"%s(): **** SCSI mid-layer passing in NULL cmd\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return (FAILED);
-	}
-
-	ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
 	/* Find actual ha */
-	sp = (srb_t *)CMD_SP(cmd);
-	if (ha->flags.failover_enabled && sp != NULL &&
-	    ha->host->eh_active == EH_ACTIVE)
+	if (qla2x00_failover_enabled(ha) && ha->host->eh_active == EH_ACTIVE)
 		ha = sp->ha;
-	else
-		ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
-
-	if (ha == NULL) {
-		qla_printk(KERN_INFO, ha,
-			"%s(): **** CMD derives a NULL HA\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return (FAILED);
-	}
-
-	found = 0;
-	read_lock(&qla_hostlist_lock);
-	list_for_each(hal, &qla_hostlist) {
-		search_ha = list_entry(hal, scsi_qla_host_t, list);
-
-		if (search_ha == ha) {
-			found ++;
-			break;
-		}
-	}
-	read_unlock(&qla_hostlist_lock);
-
-	if (!found) {
-		qla_printk(KERN_INFO, ha,
-			"%s(): **** CMD derives a NULL search HA\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return (FAILED);
-	}
 
 	/* Display which one we're actually resetting for debug. */
 	DEBUG(printk("qla2xxx_eh_host_reset:Resetting scsi(%ld).\n",
@@ -2100,85 +1707,58 @@ qla2xxx_eh_host_reset(struct scsi_cmnd *cmd)
 	/*
 	 *  Now issue reset.
 	 */
-	b = cmd->device->channel;
-	t = cmd->device->id;
-	l = cmd->device->lun;
-
 	qla_printk(KERN_INFO, ha,
-	    "scsi(%ld:%d:%d:%d): ADAPTER RESET issued.\n", ha->host_no, b, t,
-	    l);
+	    "scsi(%ld:%d:%d:%d): ADAPTER RESET issued.\n", ha->host_no,
+	    cmd->device->channel, cmd->device->id, cmd->device->lun);
 
 	spin_unlock_irq(ha->host->host_lock);
 
 	/* Blocking call-Does context switching if abort isp is active etc*/  
-	if (qla2x00_wait_for_hba_online(ha) != QLA_SUCCESS) {
-		spin_lock_irq(ha->host->host_lock);
+	if (qla2x00_wait_for_hba_online(ha) != QLA_SUCCESS)
+		goto board_disabled;
 
-		DEBUG2(printk("%s(%ld): failed:board disabled\n",
-				       	__func__,ha->host_no);)
-		qla_printk(KERN_INFO, ha, 
-				"%s: failed:board disabled\n", __func__);
-		return (FAILED);
-	} else {
-		/* Fixme-may be dpc thread is active and processing
-		 * loop_resync,so wait a while for it to 
-		 * be completed and then issue big hammer.Otherwise
-		 * it may cause I/O failure as big hammer marks the
-		 * devices as lost kicking of the port_down_timer
-		 * while dpc is stuck for the mailbox to complete.
-		 */
-		/* Blocking call-Does context switching if loop is Not Ready */
-		qla2x00_wait_for_loop_ready(ha);
-		set_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
-		if (qla2x00_abort_isp(ha)) {
-			clear_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
-			/* failed. schedule dpc to try */
-			set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
-
-			if (qla2x00_wait_for_hba_online(ha) != QLA_SUCCESS){
-				return_status = FAILED;
-				DEBUG2(printk("%s(%ld): failed:board"
-					" disabled\n",
-				__func__,ha->host_no);)
-				qla_printk(KERN_INFO, ha, 
-					"%s: failed:board disabled\n",
-					__func__);
-			}
-		} 
-
+	/*
+	 * Fixme-may be dpc thread is active and processing
+	 * loop_resync,so wait a while for it to 
+	 * be completed and then issue big hammer.Otherwise
+	 * it may cause I/O failure as big hammer marks the
+	 * devices as lost kicking of the port_down_timer
+	 * while dpc is stuck for the mailbox to complete.
+	 */
+	/* Blocking call-Does context switching if loop is Not Ready */
+	qla2x00_wait_for_loop_ready(ha);
+	set_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
+	if (qla2x00_abort_isp(ha)) {
 		clear_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
-	}
+		/* failed. schedule dpc to try */
+		set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+
+		if (qla2x00_wait_for_hba_online(ha) != QLA_SUCCESS)
+			goto board_disabled;
+	} 
+
+	clear_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
 
 	spin_lock_irq(ha->host->host_lock);
-
-	if (return_status == FAILED) {
-		DEBUG2(printk("%s(%ld): reset failed\n",
-		    __func__,ha->host_no);)
-		qla_printk(KERN_INFO, ha, "%s: reset failed\n",
-		    __func__);
-		return FAILED;
-	}
+	if (rval == FAILED)
+		goto out;
 
 	/* Waiting for our command in done_queue to be returned to OS.*/
-	if (qla2x00_eh_wait_for_pending_commands(ha) == 0) {
-		return_status = FAILED;
-	}
+	if (qla2x00_eh_wait_for_pending_commands(ha))
+		rval = FAILED;
 
-	if (return_status == FAILED) {
-		DEBUG2(printk("%s(%ld): reset failed\n",
-		    __func__,ha->host_no);)
-		qla_printk(KERN_INFO, ha, "%s: reset failed\n",
-		    __func__);
-		return FAILED;
-	} else {
-		DEBUG2(printk("%s(%ld): reset succeded\n",
-		    __func__,ha->host_no);)
-		qla_printk(KERN_INFO, ha, "%s: reset succeded\n",
-		    __func__);
-	}
+ out:
+	qla_printk(KERN_INFO, ha, "%s: reset %s\n", __func__,
+			(rval == FAILED) ? "failed" : "succeded");
+
 	LEAVE("qla2xxx_eh_host_reset");
+	return rval;
 
-	return (return_status);
+ board_disabled:
+	spin_lock_irq(ha->host->host_lock);
+
+	qla_printk(KERN_INFO, ha, "%s: failed:board disabled\n", __func__);
+	return FAILED;
 }
 
 
@@ -2264,12 +1844,8 @@ qla2x00_loop_reset(scsi_qla_host_t *ha)
 static int
 qla2x00_device_reset(scsi_qla_host_t *ha, fc_port_t *reset_fcport)
 {
-	uint8_t		status = 0;
-
 	/* Abort Target command will clear Reservation */
-	status = qla2x00_abort_target(reset_fcport);
-
-	return( status );
+	return qla2x00_abort_target(reset_fcport);
 }
 
 /**************************************************************************
@@ -2280,14 +1856,14 @@ qla2x00_device_reset(scsi_qla_host_t *ha, fc_port_t *reset_fcport)
 int
 qla2xxx_slave_configure(struct scsi_device *sdev)
 {
-	scsi_qla_host_t *ha;
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
 	int queue_depth;
 
-#if defined(ISP2300)
-	queue_depth = 32;
-#else
-	queue_depth = 16;
-#endif
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		queue_depth = 16;
+	else
+		queue_depth = 32;
+
 	if (sdev->tagged_supported) {
 #if defined(MODULE)
 		if (!(ql2xmaxqdepth == 0 || ql2xmaxqdepth > 256))
@@ -2296,7 +1872,6 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 		ql2xmaxqdepth = queue_depth;
 
 		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, queue_depth);
-		ha = QLA_HA(sdev->host);
 
 		qla_printk(KERN_INFO, ha,
 		    "scsi(%d:%d:%d:%d): Enabled tagged queuing, queue "
@@ -2309,6 +1884,51 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 	}
 
 	return (0);
+}
+
+/**
+ * qla2x00_config_dma_addressing() - Configure OS DMA addressing method.
+ * @ha: HA context
+ *
+ * At exit, the @ha's flags.enable_64bit_addressing set to indicated
+ * supported addressing method.
+ */
+static void
+qla2x00_config_dma_addressing(scsi_qla_host_t *ha)
+{
+	/* Assume 32bit DMA address */
+	ha->flags.enable_64bit_addressing = 0;
+	ha->calc_request_entries = qla2x00_calc_iocbs_32;
+	ha->build_scsi_iocbs = qla2x00_build_scsi_iocbs_32;
+
+	/*
+	 * Given the two variants pci_set_dma_mask(), allow the compiler to
+	 * assist in setting the proper dma mask.
+	 */
+	if (sizeof(dma_addr_t) > 4) {
+		/* Update our PCI device dma_mask for full 64 bits */
+		if (pci_set_dma_mask(ha->pdev, 0xffffffffffffffffULL) == 0) {
+			ha->flags.enable_64bit_addressing = 1;
+			ha->calc_request_entries = qla2x00_calc_iocbs_64;
+			ha->build_scsi_iocbs = qla2x00_build_scsi_iocbs_64;
+
+			if (pci_set_consistent_dma_mask(ha->pdev,
+			    0xffffffffffffffffULL)) {
+				qla_printk(KERN_DEBUG, ha, 
+				    "Failed to set 64 bit PCI consistent mask; "
+				    "using 32 bit.\n");
+				pci_set_consistent_dma_mask(ha->pdev,
+				    0xffffffffULL);
+			}
+		} else {
+			qla_printk(KERN_DEBUG, ha,
+			    "Failed to set 64 bit PCI DMA mask, falling back "
+			    "to 32 bit MASK.\n");
+			pci_set_dma_mask(ha->pdev, 0xffffffff);
+		}
+	} else {
+		pci_set_dma_mask(ha->pdev, 0xffffffff);
+	}
 }
 
 static int
@@ -2353,7 +1973,7 @@ qla2x00_iospace_config(scsi_qla_host_t *ha)
 	}
 #endif
 
-	if (pci_request_regions(ha->pdev, DRIVER_NAME)) {
+	if (pci_request_regions(ha->pdev, ha->brd_info->drv_name)) {
 		qla_printk(KERN_WARNING, ha,
 		    "Failed to reserve PIO/MMIO regions (%s)\n", 
 		    ha->pdev->slot_name);
@@ -2387,8 +2007,7 @@ iospace_error_exit:
 /*
  * PCI driver interface
  */
-static int __devinit
-qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
+int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 {
 	int	ret;
 	device_reg_t *reg;
@@ -2397,7 +2016,7 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned long	flags = 0;
 	unsigned long	wait_switch = 0;
 	char pci_info[20];
-	char fw_info[30];
+	char fw_str[30];
 
 	if (pci_enable_device(pdev))
 		return -1;
@@ -2406,7 +2025,7 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	    sizeof(scsi_qla_host_t));
 	if (host == NULL) {
 		printk(KERN_WARNING
-		    "%s: Couldn't register with scsi layer!\n", DRIVER_NAME);
+		    "qla2xxx: Couldn't allocate host from scsi layer!\n");
 		return -1;
 	}
 
@@ -2414,10 +2033,11 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ha = (scsi_qla_host_t *)host->hostdata;
 	memset(ha, 0, sizeof(scsi_qla_host_t));
 
-	ha->host_no = host->host_no;
-	sprintf(ha->host_str, "%s_%ld", DRIVER_NAME, ha->host_no);
 	ha->pdev = pdev;
 	ha->host = host;
+	ha->host_no = host->host_no;
+	ha->brd_info = brd_info;
+	sprintf(ha->host_str, "%s_%ld", ha->brd_info->drv_name, ha->host_no);
 
 	/* Configure PCI I/O space */
 	ret = qla2x00_iospace_config(ha);
@@ -2428,10 +2048,8 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* Sanitize the information from PCI BIOS. */
 	host->irq = pdev->irq;
 
-	ha->brd_info = (struct qla_board_info *)ent->driver_data;
-
 	qla_printk(KERN_INFO, ha,
-	    "Found an %s, irq %d, iobase 0x%p\n", ha->brd_info->name,
+	    "Found an %s, irq %d, iobase 0x%p\n", ha->brd_info->isp_name,
 	    host->irq, ha->iobase);
 
 	spin_lock_init(&ha->hardware_lock);
@@ -2439,7 +2057,6 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* 4.23 Initialize /proc/scsi/qla2x00 counters */
 	ha->actthreads = 0;
 	ha->qthreads   = 0;
-	ha->dump_done  = 0;
 	ha->total_isr_cnt = 0;
 	ha->total_isp_aborts = 0;
 	ha->total_lip_cnt = 0;
@@ -2450,11 +2067,22 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ha->prev_topology = 0;
 	ha->ports = MAX_BUSES;
 
-#if defined(ISP2100)
-	ha->max_targets = MAX_TARGETS_2100;
-#else
-	ha->max_targets = MAX_TARGETS_2200;
-#endif
+	if (IS_QLA2100(ha)) {
+		ha->max_targets = MAX_TARGETS_2100;
+		ha->mbx_count = MAILBOX_REGISTER_COUNT_2100;
+		ha->response_q_length = RESPONSE_ENTRY_CNT_2100;
+		ha->last_loop_id = SNS_LAST_LOOP_ID_2100;
+	} else if (IS_QLA2200(ha)) {
+		ha->max_targets = MAX_TARGETS_2200;
+		ha->mbx_count = MAILBOX_REGISTER_COUNT;
+		ha->response_q_length = RESPONSE_ENTRY_CNT_2100;
+		ha->last_loop_id = SNS_LAST_LOOP_ID_2100;
+	} else /*if (IS_QLA2300(ha))*/ {
+		ha->max_targets = MAX_TARGETS_2200;
+		ha->mbx_count = MAILBOX_REGISTER_COUNT;
+		ha->response_q_length = RESPONSE_ENTRY_CNT_2300;
+		ha->last_loop_id = SNS_LAST_LOOP_ID_2300;
+	}
 
 	/* load the F/W, read paramaters, and init the H/W */
 	ha->instance = num_hosts;
@@ -2470,11 +2098,6 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	INIT_LIST_HEAD(&ha->failover_queue);
 	INIT_LIST_HEAD(&ha->pending_queue);
 
-	if (ql2xfailover)
-		ha->flags.failover_enabled = 1;
-	else
-		ha->flags.failover_enabled = 0;
-
 	/*
 	 * These locks are used to prevent more than one CPU
 	 * from modifying the queue at the same time. The
@@ -2488,10 +2111,6 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	init_completion(&ha->dpc_inited);
 	init_completion(&ha->dpc_exited);
-
-	DEBUG2(printk(KERN_INFO, 
-	    "scsi(%ld): Scatter/Gather Entries (0x%x).\n",
-	    ha->host_no, ha->host->sg_tablesize));
 
 	qla2x00_config_dma_addressing(ha);
 	if (qla2x00_mem_alloc(ha)) {
@@ -2527,13 +2146,24 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 	wait_for_completion(&ha->dpc_inited);
 
-	/* Register our resources with Linux */
-	if (qla2x00_register_with_Linux(ha, ha->ports - 1)) {
-		qla_printk(KERN_WARNING, ha,
-		    "Failed to register resources.\n");
+	host->this_id = 255;
+	host->cmd_per_lun = 3;
+	host->max_cmd_len = MAX_CMDSZ;
+	host->max_channel = ha->ports - 1;
+	host->max_lun = ha->max_luns;
+	host->unique_id = ha->instance;
+	host->max_id = ha->max_targets;
 
+	if (request_irq(host->irq, qla2x00_intr_handler, SA_INTERRUPT|SA_SHIRQ,
+	    ha->brd_info->drv_name, ha)) {
+		qla_printk(KERN_WARNING, ha,
+		    "Failed to reserve interrupt %d already in use.\n",
+		    host->irq);
 		goto probe_failed;
 	}
+
+	/* Initialized the timer */
+	qla2x00_start_timer(ha, qla2x00_timer, WATCH_INTERVAL);
 
 	DEBUG2(printk("DEBUG: detect hba %ld at address = %p\n",
 	    ha->host_no, ha));
@@ -2550,31 +2180,21 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 	WRT_REG_WORD(&reg->hccr, HCCR_CLR_HOST_INT);
 
 	/* Enable proper parity */
-#if defined(ISP2300)
-	if (ha->pdev->device == QLA2312_DEVICE_ID ||
-	    ha->pdev->device == QLA2322_DEVICE_ID)
-		/* SRAM, Instruction RAM and GP RAM parity */
-		WRT_REG_WORD(&reg->hccr, (HCCR_ENABLE_PARITY + 0x7));
-	else
-		/* SRAM parity */
-		WRT_REG_WORD(&reg->hccr, (HCCR_ENABLE_PARITY + 0x1));
-#endif
+	if (IS_QLA23XX(ha)) {
+		if (IS_QLA2312(ha) || IS_QLA2322(ha))
+			/* SRAM, Instruction RAM and GP RAM parity */
+			WRT_REG_WORD(&reg->hccr, (HCCR_ENABLE_PARITY + 0x7));
+		else
+			/* SRAM parity */
+			WRT_REG_WORD(&reg->hccr, (HCCR_ENABLE_PARITY + 0x1));
+	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	/*
 	 * if failover is enabled read the user configuration
 	 */
-	if (ha->flags.failover_enabled) {
-		if (ConfigRequired > 0)
-			mp_config_required = 1;
-		else
-			mp_config_required = 0;
-
-		DEBUG(printk("qla2x00_detect: qla2x00_cfg_init for hba %ld\n",
-		    ha->instance));
-
+	if (qla2x00_failover_enabled(ha))
 		qla2x00_cfg_init(ha);
-	}
 
 	/* Enable chip interrupts. */
 	qla2x00_enable_intrs(ha);
@@ -2601,30 +2221,32 @@ qla2x00_probe_device(struct pci_dev *pdev, const struct pci_device_id *ent)
 		schedule_timeout(5);
 	}
 
-	/* List the target we have found */
-	if (displayConfig && (!ha->flags.failover_enabled))
-		qla2x00_display_fc_names(ha);
-
 	pci_set_drvdata(pdev, ha);
-	ha->init_done = 1;
+	ha->flags.init_done = 1;
 	num_hosts++;
 
- 	if (displayConfig && ha->flags.failover_enabled)
-		qla2x00_cfg_display_devices();
+	/* List the target we have found */
+	if (displayConfig) {
+		if (qla2x00_failover_enabled(ha))
+			qla2x00_cfg_display_devices();
+		else
+			qla2x00_display_fc_names(ha);
+	}
 
 	if (scsi_add_host(host, &pdev->dev))
 		goto probe_failed;
 
-	sysfs_create_bin_file(&host->shost_gendev.kobj, &fw_dump_attr);
+	sysfs_create_bin_file(&host->shost_gendev.kobj, &sysfs_fw_dump_attr);
+	sysfs_create_bin_file(&host->shost_gendev.kobj, &sysfs_nvram_attr);
 
 	qla_printk(KERN_INFO, ha, "\n"
-	    " QLogic QLA" ISP_NAME " PCI/PCI-X Fibre Channel HBA Driver: %s\n"
-	    "  QLogic %s\n"
+	    " QLogic ISP2xxx PCI/PCI-X Fibre Channel HBA Driver: %s\n"
+	    "  QLogic %s - %s\n"
 	    "  %s: %s @ %s hdma%c, host#=%ld, fw=%s\n", qla2x00_version_str,
-	    ha->model_number, ha->brd_info->name,
-	    qla2x00_get_pci_info_str(ha, pci_info), pci_name(ha->pdev),
-	    ha->flags.enable_64bit_addressing ? '+': '-', ha->host_no,
-	    qla2x00_get_fw_version_str(ha, fw_info));
+	    ha->model_number, ha->model_desc ? ha->model_desc: "",
+	    ha->brd_info->isp_name, qla2x00_get_pci_info_str(ha, pci_info),
+	    pci_name(ha->pdev), ha->flags.enable_64bit_addressing ? '+': '-',
+	    ha->host_no, qla2x00_get_fw_version_str(ha, fw_str));
 
 	if (ql2xdoinitscan)
 		scsi_scan_host(host);
@@ -2638,9 +2260,9 @@ probe_failed:
 
 	return -1;
 }
+EXPORT_SYMBOL_GPL(qla2x00_probe_one);
 
-static void __devexit
-qla2x00_remove_device(struct pci_dev *pdev)
+void qla2x00_remove_one(struct pci_dev *pdev)
 {
 	scsi_qla_host_t *ha;
 
@@ -2650,7 +2272,9 @@ qla2x00_remove_device(struct pci_dev *pdev)
 	list_del(&ha->list);
 	write_unlock(&qla_hostlist_lock);
 
-	sysfs_remove_bin_file(&ha->host->shost_gendev.kobj, &fw_dump_attr);
+	sysfs_remove_bin_file(&ha->host->shost_gendev.kobj,
+	    &sysfs_fw_dump_attr);
+	sysfs_remove_bin_file(&ha->host->shost_gendev.kobj, &sysfs_nvram_attr);
 
 	scsi_remove_host(ha->host);
 
@@ -2660,16 +2284,16 @@ qla2x00_remove_device(struct pci_dev *pdev)
 
 	pci_set_drvdata(pdev, NULL);
 }
+EXPORT_SYMBOL_GPL(qla2x00_remove_one);
 
 static void
 qla2x00_free_device(scsi_qla_host_t *ha)
 {
 	int ret;
 
-#if defined(ISP2300)
 	/* Abort any outstanding IO descriptors. */
-	qla2x00_cancel_io_descriptors(ha);
-#endif
+	if (IS_QLA23XX(ha))
+		qla2x00_cancel_io_descriptors(ha);
 
 	/* turn-off interrupts on the card */
 	if (ha->interrupts_on)
@@ -2696,7 +2320,7 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 
 	qla2x00_mem_free(ha);
 
-	if (ha->flags.failover_enabled)
+	if (qla2x00_failover_enabled(ha))
 		qla2x00_cfg_mem_free(ha);
 
 	ha->flags.online = FALSE;
@@ -2855,7 +2479,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	tmp_sn = ((ha->serial0 & 0x1f) << 16) | (ha->serial2 << 8) | 
 	    ha->serial1;
 	copy_info(&info, "ISP: %s, Serial# %c%05d\n",
-	    ha->brd_info->name, ('A' + tmp_sn/100000), (tmp_sn%100000));
+	    ha->brd_info->isp_name, ('A' + tmp_sn/100000), (tmp_sn%100000));
 
 	copy_info(&info,
 	    "Request Queue = 0x%p, Response Queue = 0x%p\n",
@@ -2863,7 +2487,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 
 	copy_info(&info,
 	    "Request Queue count = %ld, Response Queue count = %ld\n",
-	    (long)REQUEST_ENTRY_CNT, (long)RESPONSE_ENTRY_CNT);
+	    (long)REQUEST_ENTRY_CNT, (long)ha->response_q_length);
 
 	copy_info(&info,
 	    "Total number of active commands = %ld\n",
@@ -2899,7 +2523,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->qthreads, ha->retry_q_cnt,
 	    ha->done_q_cnt, ha->scsi_retry_q_cnt);
 
-	if (ha->flags.failover_enabled) {
+	if (qla2x00_failover_enabled(ha)) {
 		copy_info(&info,
 		    "Number of reqs in failover_q= %d\n",
 		    ha->failover_cnt);
@@ -2907,15 +2531,15 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 
 	flags = (unsigned long *) &ha->flags;
 
-	if (ha->loop_state == LOOP_DOWN) {
+	if (atomic_read(&ha->loop_state) == LOOP_DOWN) {
 		loop_state = "DOWN";
-	} else if (ha->loop_state == LOOP_UP) {
+	} else if (atomic_read(&ha->loop_state) == LOOP_UP) {
 		loop_state = "UP";
-	} else if (ha->loop_state == LOOP_READY) {
+	} else if (atomic_read(&ha->loop_state) == LOOP_READY) {
 		loop_state = "READY";
-	} else if (ha->loop_state == LOOP_TIMEOUT) {
+	} else if (atomic_read(&ha->loop_state) == LOOP_TIMEOUT) {
 		loop_state = "TIMEOUT";
-	} else if (ha->loop_state == LOOP_UPDATE) {
+	} else if (atomic_read(&ha->loop_state) == LOOP_UPDATE) {
 		loop_state = "UPDATE";
 	} else {
 		loop_state = "UNKNOWN";
@@ -2983,7 +2607,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 		if ((tq = TGT_Q(ha, i)) == NULL)
 			continue;
 
-		if (ha->flags.failover_enabled) {
+		if (qla2x00_failover_enabled(ha)) {
 			copy_info(&info,
 			    "scsi-qla%d-port-%d="
 			    "%02x%02x%02x%02x%02x%02x%02x%02x:"
@@ -3074,156 +2698,7 @@ profile_stop:
 	    "Exiting proc_info: info.pos=%d, offset=0x%lx, "
 	    "length=0x%x\n", info.pos, offset, length);)
 
-#if QLA2100_LIPTEST
-	qla2x00_lip = 1;
-#endif
-
 	return (retval);
-}
-
-/**************************************************************************
-*   qla2x00_setup
-*
-*   Handle Linux boot parameters. This routine allows for assigning a value
-*   to a parameter with a ';' between the parameter and the value.
-*   ie. qla2x00=arg0;arg1;...;argN;<properties .... properties>  OR
-*   via the command line.
-*   ie. qla2x00 ql2xopts=arg0;arg1;...;argN;<properties .... properties>
-**************************************************************************/
-#if !defined(MODULE)
-static int __init
-qla2x00_setup(char *s)
-#else
-void 
-qla2x00_setup(char *s)
-#endif	
-{
-	char		*cp, *np;
-	char		*slots[MAXARGS];
-	char		**argv = &slots[0];
-	static char	buf[LINESIZE];
-	int		argc, opts;
-
-#if !defined(MODULE)
-	if (s == NULL || *s == '\0')
-		return 0;
-#endif
-
-	/*
-	 * Determine if we have any properties.
-	 */
-	cp = s;
-	opts = 1;
-	while (*cp && (np = qla2x00_get_line(cp, buf)) != NULL) {
-		if (strncmp("scsi-qla",buf,8) == 0) {
-			DEBUG(printk("qla2100: devconf=%s\n",cp);)
-
-			ql2xdevconf = cp;
-			(opts > 0)? opts-- : 0;
-			break;
-		}
-		opts++;
-		cp = np;
-	}
-
-	/*
-	 * Parse the args before the properties
-	 */
-	if (opts) {
-		opts = (opts > MAXARGS-1)? MAXARGS-1: opts;
-		argc = qla2x00_get_tokens(s, argv, opts);
-		while (argc > 0) {
-			cp = *argv;
-			DEBUG(printk("scsi: found cmd arg =[%s]\n", cp));
-
-			if (strcmp(cp, "verbose") == 0) {
-				DEBUG(printk("qla2100: verbose\n"));
-				qla2x00_verbose++;
-			} else if (strcmp(cp, "reinit_on_loopdown") == 0) {
-				qla2x00_reinit++;
-				DEBUG(printk("qla2100: reinit_on_loopdown\n"));
-			}
-			argc--, argv++;
-		}
-	}
-
-#if !defined(MODULE)
-	if (ql2xdevconf)
-		return 1;
-	else
-		return 0;
-#endif
-}
-
-#if !defined(MODULE)
-__setup("ql2xopts=", qla2x00_setup);
-#endif
-
-/********************** qla2x00_get_line *********************
-* qla2x00_get_line
-* Copy a substring from the specified string. The substring
-* consists of any number of chars seperated by white spaces (i.e. spaces)
-* and ending with a newline '\n' or a semicolon ';'.
-*
-* Enter:
-* str - orig string
-* line - substring
-*
-* Returns:
-*   cp - pointer to next string
-*     or
-*   null - End of string
-*************************************************************/
-static char *
-qla2x00_get_line(char *str, char *line) 
-{
-	register	char 	*cp = str;
-	register	char 	*sp = line;
-
-	/* skip preceeding spaces */
-	while (*cp && *cp == ' ')
-		++cp;
-	while ((*cp) && *cp != '\n' && *cp != ';')   /* end of line */
-		*sp++ = *cp++;
-
-	*sp = '\0';
-
-	DEBUG5(printk("%s(): %s\n", __func__, line));
-
-	if( (*cp) ) {
-		cp++;
-		return (cp);
-	}
-
-	return (NULL);
-}
-
-
-/**************************** get_tokens *********************
-* Parse command line into argv1, argv2, ... argvX
-* Arguments are seperated by white spaces and colons and end
-* with a NULL.
-*************************************************************/
-static int 
-qla2x00_get_tokens(char *line, char **argv, int maxargs) 
-{
-	register	char 	*cp = line;
-	int	count = 0;
-
-	while (*cp && count < maxargs) {
-		/* skip preceeding spaces */
-		while ((*cp) && *cp == ' ')
-			++cp;
-		/* symbol starts here */
-		argv[count++] = cp;
-		/* skip symbols */
-		while ((*cp) && !(*cp == ' ' || *cp == ';' || *cp == ':'))
-			cp++;
-		/* replace comma or space with a null */
-		if((*cp) && (*cp ==' ' ) && argv[count-1] != cp)
-			*cp++ = '\0';
-	}
-	return (count);
 }
 
 /*
@@ -3304,22 +2779,6 @@ qla2x00_display_fc_names(scsi_qla_host_t *ha)
 				    tq->d_id.b.domain,
 				    tq->d_id.b.area,
 				    tq->d_id.b.al_pa);
-				break;
-
-			case BIND_BY_NODE_NAME:
-				qla_printk(KERN_INFO, ha,
-				    "scsi-qla%d-tgt-%d-di-0-node="
-				    "%02x%02x%02x%02x%02x%02x%02x%02x\\;\n",
-				    (int)ha->instance, 
-				    tgt,
-				    tq->node_name[0], 
-				    tq->node_name[1],
-				    tq->node_name[2], 
-				    tq->node_name[3],
-				    tq->node_name[4], 
-				    tq->node_name[5],
-				    tq->node_name[6], 
-				    tq->node_name[7]);
 				break;
 		}
 
@@ -3536,7 +2995,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		}
 
 		ha->response_ring = pci_alloc_consistent(ha->pdev,
-		    ((RESPONSE_ENTRY_CNT + 1) * (sizeof(response_t))),
+		    ((ha->response_q_length + 1) * (sizeof(response_t))),
 		    &ha->response_dma);
 		if (ha->response_ring == NULL) {
 			qla_printk(KERN_WARNING, ha,
@@ -3765,7 +3224,7 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 
 	if (ha->response_ring) {
 		pci_free_consistent(ha->pdev,
-		    ((RESPONSE_ENTRY_CNT + 1) * (sizeof(response_t))),
+		    ((ha->response_q_length + 1) * (sizeof(response_t))),
 		    ha->response_ring, ha->response_dma);
 	}
 
@@ -3830,12 +3289,11 @@ qla2x00_allocate_sp_pool(scsi_qla_host_t *ha)
 	int      rval;
 
 	rval = QLA_SUCCESS;
-	ha->srb_cachep = kmem_cache_create(ha->host_str, sizeof(srb_t), 0,
-	    SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (ha->srb_cachep == NULL) {
-		qla_printk(KERN_INFO, ha, "Unable to allocate SRB cache.\n");
+	ha->srb_mempool = mempool_create(SRB_MIN_REQ, mempool_alloc_slab,
+	    mempool_free_slab, srb_cachep);
+	if (ha->srb_mempool == NULL) {
+		qla_printk(KERN_INFO, ha, "Unable to allocate SRB mempool.\n");
 		rval = QLA_FUNCTION_FAILED;
-
 	}
 	return (rval);
 }
@@ -3847,17 +3305,11 @@ qla2x00_allocate_sp_pool(scsi_qla_host_t *ha)
 void
 qla2x00_free_sp_pool( scsi_qla_host_t *ha) 
 {
-	if (ha->srb_cachep) {
-		if (kmem_cache_destroy(ha->srb_cachep) != 0) {
-			qla_printk(KERN_ERR, ha,
-			    "Did not free all srbs, before destroying "
-			    "cache!!!\n");
-		}
-		ha->srb_cachep = NULL;
+	if (ha->srb_mempool) {
+		mempool_destroy(ha->srb_mempool);
+		ha->srb_mempool = NULL;
 	}
 }
-
-
 
 /**************************************************************************
 * qla2x00_do_dpc
@@ -3917,7 +3369,7 @@ qla2x00_do_dpc(void *data)
 		DEBUG3(printk("qla2x00: DPC handler waking up\n"));
 
 		/* Initialization not yet finished. Don't do anything yet. */
-		if (!ha->init_done || ha->dpc_active)
+		if (!ha->flags.init_done || ha->dpc_active)
 			continue;
 
 		DEBUG3(printk("scsi(%ld): DPC handler\n", ha->host_no));
@@ -3949,7 +3401,7 @@ qla2x00_do_dpc(void *data)
 
 				if (atomic_read(&fcport->state) ==
 				    FCS_DEVICE_DEAD ||
-				    (ha->loop_state == LOOP_DEAD)) {
+				    atomic_read(&ha->loop_state) == LOOP_DEAD) {
 
 					__del_from_retry_queue(ha, sp);
 					sp->cmd->result = DID_NO_CONNECT << 16;
@@ -4068,7 +3520,7 @@ qla2x00_do_dpc(void *data)
 		/* Retry each device up to login retry count */
 		if ((test_and_clear_bit(RELOGIN_NEEDED, &ha->dpc_flags)) &&
 		    !test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags) &&
-		    ha->loop_state != LOOP_DOWN) {
+		    atomic_read(&ha->loop_state) != LOOP_DOWN) {
 
 			DEBUG(printk("scsi(%ld): qla2x00_port_login()\n",
 			    ha->host_no));
@@ -4124,7 +3576,7 @@ qla2x00_do_dpc(void *data)
 		}
 
 		if ((test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags)) &&
-		    ha->loop_state != LOOP_DOWN ) {
+		    atomic_read(&ha->loop_state) != LOOP_DOWN) {
 
 			clear_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags);
 			DEBUG(printk("scsi(%ld): qla2x00_login_retry()\n",
@@ -4153,42 +3605,8 @@ qla2x00_do_dpc(void *data)
 			    ha->host_no));
 		}
 
-		if (ha->flags.failover_enabled) {
-			/*
-			 * If we are not processing a ioctl or one of
-			 * the ports are still MISSING or need a resync
-			 * then process the failover event.
-			*/  
-			if (!test_bit(CFG_ACTIVE, &ha->cfg_flags)) {
-				if (qla2x00_check_for_devices_online(ha)) {
-					if (test_and_clear_bit(FAILOVER_EVENT, &ha->dpc_flags)) {
-
-						DEBUG(printk("scsi(%ld): qla2x00_cfg_event_notify()\n",
-						    ha->host_no));
-
-						if (ha->flags.online) {
-							qla2x00_cfg_event_notify(ha, ha->failover_type);
-						}
-
-						DEBUG(printk("scsi(%ld): qla2x00_cfg_event_notify - end\n",
-						    ha->host_no));
-					}
-				}
-
-				if (test_and_clear_bit(FAILOVER_NEEDED, &ha->dpc_flags)) {
-					/*
-					 * Get any requests from failover queue
-					 */
-					DEBUG(printk("scsi(%ld): qla2x00_process_failover()\n",
-					    ha->host_no));
-
-					qla2x00_process_failover(ha);
-
-					DEBUG(printk("scsi(%ld): qla2x00_process_failover - end\n",
-					    ha->host_no));
-				}
-			}
-		}
+		if (qla2x00_failover_enabled(ha))
+			qla2x00_process_failover_event(ha);
 
 		if (test_bit(RESTART_QUEUES_NEEDED, &ha->dpc_flags)) {
 			DEBUG(printk("scsi(%ld): qla2x00_restart_queues()\n",
@@ -4288,47 +3706,6 @@ qla2x00_abort_queues(scsi_qla_host_t *ha, uint8_t doneqflg)
 }
 
 /*
- * qla2x00_check_for_devices_online
- *
- *	Check fcport state of all devices to make sure online.
- *
- * Input:
- *	ha = adapter block pointer.
- *
- * Return:
- *	None.
- *
- * Context:
- */
-static uint8_t
-qla2x00_check_for_devices_online(scsi_qla_host_t *ha) 
-{
-	struct list_head	*fcpl;
-	fc_port_t	*fcport;
-	int		found, cnt;
-
-	found = 0;
-	cnt = 0;
-
-	list_for_each(fcpl, &ha->fcports) {
-		fcport = list_entry(fcpl, fc_port_t, list);
-
-		if ((atomic_read(&fcport->state) == FCS_ONLINE) ||
-			(atomic_read(&fcport->state) == FCS_DEVICE_DEAD))
-			found++;
-
-		cnt++;
-	}
-	if (cnt == found) {
-		DEBUG5(printk("%s(%ld): all online\n",
-				__func__,
-				ha->host_no);)
-		return 1;
-	} else
-		return 0;
-}
-
-/*
 *  qla2x00_rst_aen
 *      Processes asynchronous reset.
 *
@@ -4373,19 +3750,15 @@ qla2x00_rst_aen(scsi_qla_host_t *ha)
 srb_t *
 qla2x00_get_new_sp(scsi_qla_host_t *ha)
 {
-	srb_t		*sp = NULL;
-	unsigned long	flags;
+	srb_t *sp;
 
-	spin_lock_irqsave(&ha->list_lock, flags);
-	sp = kmem_cache_alloc(ha->srb_cachep, GFP_ATOMIC);
-	spin_unlock_irqrestore(&ha->list_lock, flags);
+	sp = mempool_alloc(ha->srb_mempool, GFP_KERNEL);
 	if (sp) {
 		atomic_set(&sp->ref_count, 1);
 	}
 	return (sp);
 }
 
-#if defined(ISP2300)
 /**************************************************************************
  * qla2x00_blink_led
  *
@@ -4456,7 +3829,6 @@ qla2x00_blink_led(scsi_qla_host_t *ha)
 
 	LEAVE(__func__);
 }
-#endif 
 
 /**************************************************************************
 *   qla2x00_timer
@@ -4493,11 +3865,9 @@ qla2x00_timer(scsi_qla_host_t *ha)
 		start_dpc++;
 	}
 
-#if defined(ISP2300)
 	/* Check if beacon LED needs to be blinked */
-	if (ha->beacon_blink_led)
+	if (IS_QLA23XX(ha) && ha->beacon_blink_led)
 		qla2x00_blink_led(ha);
-#endif
 
 	/*
 	 * We try and failover any request in the failover queue every second.
@@ -4600,10 +3970,8 @@ qla2x00_timer(scsi_qla_host_t *ha)
 			    "queues before time expire\n",
 			    ha->host_no));
 
-#if !defined(ISP2100)
-			if (ha->link_down_timeout)
-				ha->loop_state = LOOP_DEAD; 
-#endif
+			if (!IS_QLA2100(ha) && ha->link_down_timeout)
+				atomic_set(&ha->loop_state, LOOP_DEAD); 
 
 			set_bit(ABORT_QUEUES_NEEDED, &ha->dpc_flags);
 			start_dpc++;
@@ -4617,8 +3985,9 @@ qla2x00_timer(scsi_qla_host_t *ha)
 
 			set_bit(RESTART_QUEUES_NEEDED, &ha->dpc_flags);
 			start_dpc++;
-			if (!(ha->device_flags & DFLG_NO_CABLE) &&
-			    qla2x00_reinit && !ha->flags.failover_enabled) {
+
+			if (!qla2x00_failover_enabled(ha) && qla2x00_reinit &&
+				!(ha->device_flags & DFLG_NO_CABLE)) {
 
 				DEBUG(printk("scsi(%ld): Loop down - "
 				    "aborting ISP.\n",
@@ -4638,33 +4007,6 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	 */
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
-
-#if QLA2100_LIPTEST
-	/*
-	 * This block is used to periodically schedule isp abort after
-	 * qla2x00_lip flag is set. 
-	 */
-
-	/*
-	   if (qla2x00_lip && (ha->forceLip++) == (60*2)) {
-	   printk("timer: schedule isp abort.\n");
-	   set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
-	   ha->forceLip = 0;
-	   }
-	 */
-
-	/*
-	 * This block is used to periodically schedule mailbox cmd timeout
-	 * simulation
-	 */
-	if (qla2x00_lip && (ha->forceLip++) == (60*6)) {
-		qla_printk(KERN_INFO, ha, 
-			"qla2x00_timer: Going to force mbx timeout\n");
-
-		ha->forceLip = 0;
-		mbxtimeout = 1;
-	}
-#endif
 
 	if (test_bit(FAILOVER_EVENT_NEEDED, &ha->dpc_flags)) {
 		if (ha->failback_delay)  {
@@ -4785,7 +4127,7 @@ qla2x00_cmd_timeout(srb_t *sp)
 		 * DID_BUS_BUSY to let the OS  retry this cmd.
 		 */
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-		    (vis_ha->loop_state == LOOP_DEAD)) {
+		    atomic_read(&vis_ha->loop_state) == LOOP_DEAD) {
 			cmd->result = DID_NO_CONNECT << 16;
 		} else {
 			cmd->result = DID_BUS_BUSY << 16;
@@ -4824,11 +4166,11 @@ qla2x00_cmd_timeout(srb_t *sp)
 		 * DID_NO_CONNECT status.  Otherwise set the host_byte to
 		 * DID_BUS_BUSY to let the OS  retry this cmd.
 		 */
-		if (dest_ha->flags.failover_enabled) {
+		if (qla2x00_failover_enabled(dest_ha))  {
 			cmd->result = DID_BUS_BUSY << 16;
 		} else {
 			if ((atomic_read(&fcport->state) == FCS_DEVICE_DEAD) ||
-			    (dest_ha->loop_state == LOOP_DEAD)) {
+			    atomic_read(&dest_ha->loop_state) == LOOP_DEAD) {
 				qla2x00_extend_timeout(cmd, EXTEND_CMD_TIMEOUT);
 				cmd->result = DID_NO_CONNECT << 16;
 			} else {
@@ -4950,40 +4292,17 @@ qla2x00_done(scsi_qla_host_t *old_ha)
 			/* Release memory used for this I/O */
 			if (cmd->use_sg) {
 				pci_unmap_sg(ha->pdev, cmd->request_buffer,
-				    cmd->use_sg, scsi_to_pci_dma_dir(
-					    cmd->sc_data_direction));
+				    cmd->use_sg, cmd->sc_data_direction);
 			} else if (cmd->request_bufflen) {
 				pci_unmap_page(ha->pdev, sp->dma_handle,
-				    cmd->request_bufflen, scsi_to_pci_dma_dir(
-					    cmd->sc_data_direction));
+				    cmd->request_bufflen,
+				    cmd->sc_data_direction);
 			}
 		}
 
-		if (!(sp->flags & SRB_IOCTL) && ha->flags.failover_enabled) {
-			/*
-			 * This routine checks for DID_NO_CONNECT to decide
-			 * whether to failover to another path or not. We only
-			 * failover on that status.
-			 */
-			if (qla2x00_fo_check(ha, sp)) {
-				if ((sp->state != SRB_FAILOVER_STATE)) {
-					/*
-					 * Retry the command on this path
-					 * several times before selecting a new
-					 * path.
-					 */
-					add_to_pending_queue_head(vis_ha, sp);
-					qla2x00_next(vis_ha);
-				}
-				else {
-					/* we failover this path */
-					qla2x00_extend_timeout(cmd,
-					    EXTEND_CMD_TIMEOUT);
-				}
+		if (qla2x00_failover_enabled(ha) && !(sp->flags & SRB_IOCTL))
+			if (qla2x00_do_fo_check(ha, sp, vis_ha))
 				continue;
-			}
-			
-		}
 
 		switch (host_byte(cmd->result)) {
 			case DID_OK:
@@ -5042,7 +4361,6 @@ qla2x00_done(scsi_qla_host_t *old_ha)
 	} /* end of while */
 }
 
-#if defined(ISP2300)
 /*
  * qla2x00_process_response_queue_in_zio_mode
  *	Process response queue completion as fast as possible
@@ -5074,7 +4392,6 @@ qla2x00_process_response_queue_in_zio_mode(scsi_qla_host_t *ha)
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
 }
-#endif
 
 /*
  * qla2x00_next
@@ -5123,7 +4440,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 			sp->cmd->result = DID_NO_CONNECT << 16;
 
 			if (!atomic_read(&dest_ha->loop_down_timer) &&
-			    dest_ha->loop_state == LOOP_DOWN) {
+			    atomic_read(&dest_ha->loop_state) == LOOP_DOWN) {
 				sp->err_id = 2;
 			} else {
 				sp->err_id = 1;
@@ -5159,7 +4476,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 	 	if (!(sp->flags & SRB_IOCTL) &&
 		    (atomic_read(&fcport->state) != FCS_ONLINE ||
 			test_bit(ABORT_ISP_ACTIVE, &dest_ha->dpc_flags) ||
-			(dest_ha->loop_state != LOOP_READY) ||
+			atomic_read(&dest_ha->loop_state) != LOOP_READY ||
 			(sp->flags & SRB_FAILOVER))) {
 
 			DEBUG3(printk("scsi(%ld): port=(0x%x) retry_q(%d) "
@@ -5168,7 +4485,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 			    dest_ha->host_no,
 			    fcport->loop_id,
 			    atomic_read(&fcport->state),
-			    dest_ha->loop_state,
+			    atomic_read(&dest_ha->loop_state),
 			    atomic_read(&dest_ha->loop_down_timer),
 			    dest_ha->dpc_flags));
 
@@ -5209,13 +4526,13 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 		}
 	}
 
-#if defined(ISP2300)
-	/* Process response_queue if ZIO support is enabled*/ 
-	qla2x00_process_response_queue_in_zio_mode(vis_ha);
+	if (IS_QLA23XX(vis_ha)) {
+		/* Process response_queue if ZIO support is enabled*/ 
+		qla2x00_process_response_queue_in_zio_mode(vis_ha);
 
-	if (dest_ha && dest_ha->flags.failover_enabled)
-		qla2x00_process_response_queue_in_zio_mode(dest_ha);
-#endif
+		if (dest_ha && qla2x00_failover_enabled(dest_ha))
+			qla2x00_process_response_queue_in_zio_mode(dest_ha);
+	}
 }
 
 /*
@@ -5306,128 +4623,6 @@ qla2x00_reset_lun_fo_counts(scsi_qla_host_t *ha, os_lun_t *lq)
 	spin_unlock_irqrestore(&ha->list_lock, flags);
 }
 
-/*
- *  qla2x00_failover_cleanup
- *	Cleanup queues after a failover.
- *
- * Input:
- *	sp = command pointer
- *
- * Context:
- *	Interrupt context.
- */
-static void
-qla2x00_failover_cleanup(srb_t *sp) 
-{
-	sp->cmd->result = DID_BUS_BUSY << 16;
-	sp->cmd->host_scribble = (unsigned char *) NULL;
-
-	/* turn-off all failover flags */
-	sp->flags = sp->flags & ~(SRB_RETRY|SRB_FAILOVER|SRB_FO_CANCEL);
-}
-
-
-/*
- *  qla2x00_process_failover
- *	Process any command on the failover queue.
- *
- * Input:
- *	ha = adapter block pointer.
- *
- * Context:
- *	Interrupt context.
- */
-static void
-qla2x00_process_failover(scsi_qla_host_t *ha) 
-{
-
-	os_tgt_t	*tq;
-	os_lun_t	*lq;
-	srb_t       *sp;
-	fc_port_t *fcport;
-	struct list_head *list, *temp;
-	unsigned long flags;
-	unsigned int	t, l;
-	scsi_qla_host_t *vis_ha = NULL;
-
-	DEBUG(printk("scsi(%ld): Processing failover for hba.\n", ha->host_no));
-
-	/*
-	 * Process all the commands in the failover queue. Attempt to failover
-	 * then either complete the command as is or requeue for retry.
-	 */
-
-	/* Prevent or allow acceptance of new I/O requests. */
-	spin_lock_irqsave(&ha->list_lock, flags);
-
-	/*
-	 * Get first entry to find our visible adapter.  We could never get
-	 * here if the list is empty
-	 */
-	list = ha->failover_queue.next;
-	sp = list_entry(list, srb_t, list);
-	vis_ha = (scsi_qla_host_t *) sp->cmd->device->host->hostdata;
-	list_for_each_safe(list, temp, &ha->failover_queue) {
-		sp = list_entry(list, srb_t, list);
-
-		tq = sp->tgt_queue;
-		lq = sp->lun_queue;
-		fcport = lq->fclun->fcport;
-
-		/* Remove srb from failover queue. */
-		__del_from_failover_queue(ha, sp);
-
-		DEBUG2(printk("%s(): pid %ld retrycnt=%d\n",
-		    __func__, sp->cmd->serial_number, sp->cmd->retries));
-
-		/*** Select an alternate path ***/
-		/* 
-		 * If the path has already been change by a previous request
-		 * sp->fclun != lq->fclun
-		 */
-		if (sp->fclun != lq->fclun ||
-		    atomic_read(&fcport->state) != FCS_DEVICE_DEAD) {
-
-			qla2x00_failover_cleanup(sp);
-
-		} else if (qla2x00_cfg_failover(ha, lq->fclun, tq, sp) ==
-		    NULL) {
-			/*
-			 * We ran out of paths, so just post the status which
-			 * is already set in the cmd.
-			 */
-			printk(KERN_INFO
-			    "scsi(%ld): Ran out of paths - pid %ld\n",
-			    ha->host_no, sp->cmd->serial_number);
-		} else {
-			qla2x00_failover_cleanup(sp);
-
-		}
-		__add_to_done_queue(ha, sp);
-	} /* list_for_each_safe */
-	spin_unlock_irqrestore(&ha->list_lock, flags);
-
-	for (t = 0; t < vis_ha->max_targets; t++) {
-		if ((tq = vis_ha->otgt[t]) == NULL)
-			continue;
-		for (l = 0; l < vis_ha->max_luns; l++) {
-			if ((lq = (os_lun_t *) tq->olun[l]) == NULL)
-				continue;
-
-			if( test_and_clear_bit(LUN_MPIO_BUSY, &lq->q_flag) ) {
-				/* EMPTY */
-				DEBUG(printk("scsi(%ld): remove suspend for "
-				    "lun %d\n", ha->host_no, lq->fclun->lun));
-			}
-		}
-	}
-
-	//qla2x00_restart_queues(ha,TRUE);
-	qla2x00_restart_queues(ha, FALSE);
-
-	DEBUG(printk("%s() - done", __func__));
-}
-
 /**************************************************************************
 *   qla2x00_check_tgt_status
 *
@@ -5462,13 +4657,13 @@ qla2x00_check_tgt_status(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
 
 	if (TGT_Q(ha, t) == NULL ||
 	    l >= ha->max_luns ||
-	    (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) ||
-	    ha->loop_state == LOOP_DEAD ||
+	    atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
+	    atomic_read(&ha->loop_state) == LOOP_DEAD ||
 	    (!atomic_read(&ha->loop_down_timer) &&
-		ha->loop_state == LOOP_DOWN) ||
+		atomic_read(&ha->loop_state) == LOOP_DOWN) ||
 	    test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags) ||
 	    test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
-	    ha->loop_state != LOOP_READY) {
+	    atomic_read(&ha->loop_state) != LOOP_READY) {
 
 		DEBUG(printk(KERN_INFO
 		    "scsi(%ld:%2d:%2d:%2d): %s connection is down\n",
@@ -5504,17 +4699,17 @@ qla2x00_check_port_status(scsi_qla_host_t *ha, fc_port_t *fcport)
 	}
 
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-	    ha->loop_state == LOOP_DEAD) {
+	    atomic_read(&ha->loop_state) == LOOP_DEAD) {
 		return (QLA_FUNCTION_FAILED);
 	}
 
 	if ((atomic_read(&fcport->state) != FCS_ONLINE) || 
 	    (!atomic_read(&ha->loop_down_timer) &&
-		ha->loop_state == LOOP_DOWN) ||
+		atomic_read(&ha->loop_state) == LOOP_DOWN) ||
 	    (test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags)) ||
 	    test_bit(CFG_ACTIVE, &ha->cfg_flags) ||
 	    test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
-	    ha->loop_state != LOOP_READY) {
+	    atomic_read(&ha->loop_state) != LOOP_READY) {
 
 		DEBUG(printk(KERN_INFO
 		    "scsi(%ld): Connection is down. fcport=%p.\n",
@@ -5532,23 +4727,31 @@ qla2x00_check_port_status(scsi_qla_host_t *ha, fc_port_t *fcport)
 static int __init
 qla2x00_module_init(void)
 {
-	DEBUG2(printk("DEBUG: qla2x00_set_info() starts at address = %p\n",
-	    qla2x00_set_info));
-	printk(KERN_INFO
-	    "qla2x00_set_info() starts at address = %p\n",
-	    qla2x00_set_info);
-
-	/* Derive version string */
-	strcpy(qla2x00_version_str, QLA2100_VERSION);
+	/* Derive version string. */
+	strcpy(qla2x00_version_str, QLA2XXX_VERSION);
 #if DEBUG_QLA2100
 	strcat(qla2x00_version_str, "-debug");
 #endif
-	if (ql2xfailover)
-		strcat(qla2x00_version_str, "-fo");
+#if defined(CONFIG_SCSI_QLA2XXX_FAILOVER_ENABLE)
+	strcat(qla2x00_version_str, "-fo");
+#endif
 
-	return (pci_module_init(&qla2x00_pci_driver));
+	/* Allocate cache for SRBs. */
+	sprintf(srb_cachep_name, "qla2xxx_srbs");
+	srb_cachep = kmem_cache_create(srb_cachep_name, sizeof(srb_t), 0,
+	    SLAB_HWCACHE_ALIGN, NULL, NULL);
+	if (srb_cachep == NULL) {
+		printk(KERN_ERR
+		    "qla2xxx: Unable to allocate SRB cache...Failing load!\n");
+		return -ENOMEM;
+	}
+
+	printk(KERN_INFO
+	    "QLogic ISP2xxx PCI/PCI-X Fibre Channel HBA Driver (%p)\n",
+	    qla2x00_set_info);
+
+	return 0;
 }
-
 
 /**
  * qla2x00_module_exit - Module cleanup.
@@ -5556,8 +4759,20 @@ qla2x00_module_init(void)
 static void __exit
 qla2x00_module_exit(void)
 {
-	pci_unregister_driver(&qla2x00_pci_driver);
+	/* Free SRBs cache. */
+	if (srb_cachep != NULL) {
+		if (kmem_cache_destroy(srb_cachep) != 0) {
+			printk(KERN_ERR
+			    "qla2xxx: Unable to free SRB cache...Memory pools "
+			    "still active?\n");
+		}
+		srb_cachep = NULL;
+	}
 }
 
 module_init(qla2x00_module_init);
 module_exit(qla2x00_module_exit);
+
+MODULE_AUTHOR("QLogic Corporation");
+MODULE_DESCRIPTION("QLogic ISP2xxx FC-SCSI Host Bus Adapter driver");
+MODULE_LICENSE("GPL");

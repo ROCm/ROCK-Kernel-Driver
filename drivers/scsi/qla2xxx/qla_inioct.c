@@ -27,7 +27,6 @@ extern int qla2x00_loopback_test(scsi_qla_host_t *ha, INT_LOOPBACK_REQ *req,
 
 int qla2x00_read_nvram(scsi_qla_host_t *, EXT_IOCTL *, int);
 int qla2x00_update_nvram(scsi_qla_host_t *, EXT_IOCTL *, int);
-int qla2x00_write_nvram_word(scsi_qla_host_t *, uint8_t, uint16_t);
 int qla2x00_send_loopback(scsi_qla_host_t *, EXT_IOCTL *, int);
 int qla2x00_read_option_rom(scsi_qla_host_t *, EXT_IOCTL *, int);
 int qla2x00_update_option_rom(scsi_qla_host_t *, EXT_IOCTL *, int);
@@ -37,10 +36,6 @@ qla2x00_read_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
 	int	ret = 0;
 	char	*ptmp_buf;
-#if defined(ISP2300)
-	device_reg_t	*reg = ha->iobase;
-	uint16_t data;
-#endif
 	uint16_t cnt;
  	uint16_t *wptr;
 	uint32_t transfer_size;
@@ -64,28 +59,7 @@ qla2x00_read_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		transfer_size = sizeof(nvram_t) / 2;
 
 	/* Dump NVRAM. */
-#if defined(ISP2300)
-	if (ha->pdev->device == QLA2312_DEVICE_ID ||
-	    ha->pdev->device == QLA2322_DEVICE_ID) {
-		data = RD_REG_WORD(&reg->nvram);
-		while (data & NVR_BUSY) {
-			udelay(100);
-			data = RD_REG_WORD(&reg->nvram);
-		}
-
-		/* Lock resource */
-		WRT_REG_WORD(&reg->host_semaphore, 0x1);
-		udelay(5);
-		data = RD_REG_WORD(&reg->host_semaphore);
-		while ((data & BIT_0) == 0) {
-			/* Lock failed */
-			udelay(100);
-			WRT_REG_WORD(&reg->host_semaphore, 0x1);
-			udelay(5);
-			data = RD_REG_WORD(&reg->host_semaphore);
-		}
-	}
-#endif
+	qla2x00_lock_nvram_access(ha);
 
  	wptr = (uint16_t *)ptmp_buf;
  	for (cnt = 0; cnt < transfer_size; cnt++) {
@@ -93,14 +67,7 @@ qla2x00_read_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		    cnt+ha->nvram_base));
 		wptr++;
  	}
-
-#if defined(ISP2300)
-	if (ha->pdev->device == QLA2312_DEVICE_ID ||
-	    ha->pdev->device == QLA2322_DEVICE_ID) {
-		/* Unlock resource */
-		WRT_REG_WORD(&reg->host_semaphore, 0);
-	}
-#endif
+	qla2x00_unlock_nvram_access(ha);
 
 	ret = copy_to_user((uint8_t *)pext->ResponseAdr, ptmp_buf,
 	    transfer_size * 2);
@@ -138,9 +105,7 @@ qla2x00_read_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 int
 qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
-#if defined(ISP2300)
 	device_reg_t	*reg = ha->iobase;
-#endif
 	uint8_t i, cnt;
 	uint8_t *usr_tmp, *kernel_tmp;
 	nvram_t *pnew_nv;
@@ -196,9 +161,7 @@ qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	*kernel_tmp = chksum;
 
 	/* Write to NVRAM */
-#if defined(ISP2300)
-	if (ha->pdev->device == QLA2312_DEVICE_ID ||
-	    ha->pdev->device == QLA2322_DEVICE_ID) {
+	if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
 		data = RD_REG_WORD(&reg->nvram);
 		while (data & NVR_BUSY) {
 			udelay(100);
@@ -206,18 +169,17 @@ qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		}
 
 		/* Lock resource */
-		WRT_REG_WORD(&reg->host_semaphore, 0x1);
+		WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0x1);
 		udelay(5);
-		data = RD_REG_WORD(&reg->host_semaphore);
+		data = RD_REG_WORD(&reg->u.isp2300.host_semaphore);
 		while ((data & BIT_0) == 0) {
 			/* Lock failed */
 			udelay(100);
-			WRT_REG_WORD(&reg->host_semaphore, 0x1);
+			WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0x1);
 			udelay(5);
-			data = RD_REG_WORD(&reg->host_semaphore);
+			data = RD_REG_WORD(&reg->u.isp2300.host_semaphore);
 		}
 	}
-#endif
 
 	wptr = (uint16_t *)pnew_nv;
 	for (cnt = 0; cnt < transfer_size / 2; cnt++) {
@@ -225,13 +187,9 @@ qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		qla2x00_write_nvram_word(ha, cnt+ha->nvram_base, data);
 	}
 
-#if defined(ISP2300)
-	if (ha->pdev->device == QLA2312_DEVICE_ID ||
-	    ha->pdev->device == QLA2322_DEVICE_ID) {
-		/* Unlock resource */
-		WRT_REG_WORD(&reg->host_semaphore, 0);
-	}
-#endif
+	/* Unlock resource */
+	if (IS_QLA2312(ha) || IS_QLA2322(ha))
+		WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0);
 
 	pext->Status       = EXT_STATUS_OK;
 	pext->DetailStatus = EXT_STATUS_OK;
@@ -239,82 +197,6 @@ qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	qla2x00_free_ioctl_scrap_mem(ha);
 
 	DEBUG9(printk("qla2x00_update_nvram: exiting.\n");)
-
-	return 0;
-}
-
-int
-qla2x00_write_nvram_word(scsi_qla_host_t *ha, uint8_t addr, uint16_t data)
-{
-	int count;
-	uint16_t word;
-	uint32_t nv_cmd;
-	device_reg_t *reg = ha->iobase;
-
-	qla2x00_nv_write(ha, NVR_DATA_OUT);
-	qla2x00_nv_write(ha, 0);
-	qla2x00_nv_write(ha, 0);
-
-	for (word = 0; word < 8; word++)
-		qla2x00_nv_write(ha, NVR_DATA_OUT);
-
-	qla2x00_nv_deselect(ha);
-
-	/* Erase Location */
-	nv_cmd = (addr << 16) | NV_ERASE_OP;
-	nv_cmd <<= 5;
-	for (count = 0; count < 11; count++) {
-		if (nv_cmd & BIT_31)
-			qla2x00_nv_write(ha, NVR_DATA_OUT);
-		else
-			qla2x00_nv_write(ha, 0);
-
-		nv_cmd <<= 1;
-	}
-
-	qla2x00_nv_deselect(ha);
-
-	/* Wait for Erase to Finish */
-	WRT_REG_WORD(&reg->nvram, NVR_SELECT);
-	do {
-		NVRAM_DELAY();
-		word = RD_REG_WORD(&reg->nvram);
-	} while ((word & NVR_DATA_IN) == 0);
-
-	qla2x00_nv_deselect(ha);
-
-	/* Write data */
-	nv_cmd = (addr << 16) | NV_WRITE_OP;
-	nv_cmd |= data;
-	nv_cmd <<= 5;
-	for (count = 0; count < 27; count++) {
-		if (nv_cmd & BIT_31)
-			qla2x00_nv_write(ha, NVR_DATA_OUT);
-		else
-			qla2x00_nv_write(ha, 0);
-
-		nv_cmd <<= 1;
-	}
-
-	qla2x00_nv_deselect(ha);
-
-	/* Wait for NVRAM to become ready */
-	WRT_REG_WORD(&reg->nvram, NVR_SELECT);
-	do {
-		NVRAM_DELAY();
-		word = RD_REG_WORD(&reg->nvram);
-	} while ((word & NVR_DATA_IN) == 0);
-
-	qla2x00_nv_deselect(ha);
-
-	/* Disable writes */
-	qla2x00_nv_write(ha, NVR_DATA_OUT);
-	for (count = 0; count < 10; count++)
-		qla2x00_nv_write(ha, 0);
-
-	qla2x00_nv_deselect(ha);
-
-	DEBUG9(printk("qla2x00_write_nvram_word: exiting.\n");)
 
 	return 0;
 }
@@ -406,7 +288,7 @@ qla2x00_send_loopback(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	 * a loopdown situation and return a good status for the
 	 * call function and a LOOPDOWN status for the test operations
 	 */
-	/*if (ha->loop_state != LOOP_READY || */
+	/*if (atomic_read(&ha->loop_state) != LOOP_READY || */
 	if (test_bit(CFG_ACTIVE, &ha->cfg_flags) ||
 	    test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags) ||
 	    test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) || ha->dpc_active) {
@@ -418,14 +300,13 @@ qla2x00_send_loopback(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	}
 
 	if (ha->current_topology == ISP_CFG_F) {
-#if defined(ISP2300)
+		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
+			pext->Status = EXT_STATUS_INVALID_REQUEST ;
+			DEBUG9_10(printk("qla2x00_send_loopback: ERROR "
+			    "command only supported for QLA23xx.\n");)
+			return 0;
+		}
 		status = qla2x00_echo_test(ha, &req, ret_mb);
-#else
-		pext->Status = EXT_STATUS_INVALID_REQUEST ;
-		DEBUG9_10(printk("qla2x00_send_loopback: ERROR "
-		    "command only supported for QLA23xx.\n");)
-		return 0;
-#endif
 	} else {
 		status = qla2x00_loopback_test(ha, &req, ret_mb);
 	}

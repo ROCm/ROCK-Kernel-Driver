@@ -59,7 +59,6 @@ __add_to_retry_queue(struct scsi_qla_host * ha, srb_t * sp)
         list_add_tail(&sp->list,&ha->retry_queue);
         ha->retry_q_cnt++;
         sp->flags |= SRB_WATCHDOG;
-        ha->flags.watchdog_enabled = TRUE;
         sp->state = SRB_RETRY_STATE;
 	sp->ha = ha;
 }
@@ -93,11 +92,7 @@ add_to_done_queue(struct scsi_qla_host * ha, srb_t * sp)
 static inline void 
 add_to_free_queue(struct scsi_qla_host * ha, srb_t * sp)
 {
-        unsigned long flags;
-
-        spin_lock_irqsave(&ha->list_lock, flags);
-	kmem_cache_free(ha->srb_cachep, sp);
-        spin_unlock_irqrestore(&ha->list_lock, flags);
+	mempool_free(sp, ha->srb_mempool);
 }
 
 static inline void 
@@ -140,8 +135,6 @@ __del_from_retry_queue(struct scsi_qla_host * ha, srb_t * sp)
 {
         list_del_init(&sp->list);
 
-        if (list_empty(&ha->retry_queue))
-                ha->flags.watchdog_enabled = FALSE;
         sp->flags &= ~(SRB_WATCHDOG | SRB_BUSY);
         sp->state = SRB_NO_QUEUE_STATE;
         ha->retry_q_cnt--;

@@ -145,18 +145,8 @@ typedef struct  track_instance {
 /*****************/
 /* Command codes */
 /*****************/
-#define	QL_IOCTL_BASE(idx)	\
-    _IOWR(QLMULTIPATH_MAGIC, idx, size_t)
-
-#ifndef APILIB
-  #if CONFIG_PPC64
-  #define	QL_IOCTL_CMD(idx)	(QL_IOCTL_BASE(idx) - 0x40000)
-  #else
-  #define	QL_IOCTL_CMD(idx)	QL_IOCTL_BASE(idx)
-  #endif
-#else
-  #define	QL_IOCTL_CMD(idx)	QL_IOCTL_BASE(idx)
-#endif
+#define	QL_IOCTL_BASE(idx)	_IOWR(QLMULTIPATH_MAGIC, idx, EXT_IOCTL)
+#define	QL_IOCTL_CMD(idx)	QL_IOCTL_BASE(idx)
 
 /***************************************************************
  * These are regular/external command codes, starting from 0.

@@ -230,7 +230,7 @@ qla2x00_fo_get_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT *bp, int mode)
 	DEBUG4(printk("%s: hba %p, buff %p bp->HbaInstance(%x).\n",
 	    __func__, ha, bp, (int)bp->HbaInstance));
 
-	if (ha->flags.failover_enabled) {
+	if (qla2x00_failover_enabled(ha)) {
 		if ((host = qla2x00_cfg_find_host(ha)) == NULL) {
 			if (list_empty(&ha->fcports)) {
 				DEBUG2_9_10(printk(
@@ -353,7 +353,7 @@ qla2x00_fo_get_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT *bp, int mode)
 	u_entry = &u_list->DataEntry[0];
 
 	/* find the correct fcport list */
-	if (!ha->flags.failover_enabled)
+	if (!qla2x00_failover_enabled(ha))
 		fcports = &ha->fcports;
 	else
 		fcports = host->fcports;
@@ -428,7 +428,7 @@ qla2x00_fo_get_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT *bp, int mode)
 			continue;
 		}
 
-		if (!ha->flags.failover_enabled) {
+		if (!qla2x00_failover_enabled(ha)) {
 			/*
 			 * Failover disabled. Just return LUN mask info
 			 * in lun data entry of this port.
@@ -684,13 +684,14 @@ qla2x00_fo_set_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT  *bp, int mode)
 	DEBUG9(printk("%s: ha inst %ld, buff %p.\n",
 	    __func__, ha->instance, bp);)
 
-	if (ha->flags.failover_enabled)
+	if (qla2x00_failover_enabled(ha)) {
 		if ((host = qla2x00_cfg_find_host(ha)) == NULL) {
 			DEBUG2_9_10(printk("%s: no HOST for ha inst %ld.\n",
 			    __func__, ha->instance);)
 			pext->Status = EXT_STATUS_DEV_NOT_FOUND;
 			return (ret);
 		}
+	}
 
 	list = (FO_LUN_DATA_LIST *)qla2x00_kmem_zalloc(
 	    sizeof(FO_LUN_DATA_LIST), GFP_ATOMIC, 13);
@@ -757,7 +758,7 @@ qla2x00_fo_set_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT  *bp, int mode)
 			break;
 		}
 
-		if (!ha->flags.failover_enabled) {
+		if (!qla2x00_failover_enabled(ha)) {
 			/*
 			 * Failover disabled. Just find the port and set
 			 * LUN mask values in lun_mask field of this port.
@@ -876,7 +877,7 @@ qla2x00_fo_get_target_data(EXT_IOCTL *pext, FO_TARGET_DATA_INPUT *bp, int mode)
 	DEBUG9(printk("%s: ha inst %ld, buff %p.\n",
 	    __func__, ha->instance, bp);)
 
-	if (ha->flags.failover_enabled)
+	if (qla2x00_failover_enabled(ha)) {
 		if ((host = qla2x00_cfg_find_host(ha)) == NULL &&
 		    list_empty(&ha->fcports)) {
 			DEBUG2_9_10(printk("%s: no HOST for ha inst %ld.\n",
@@ -884,6 +885,7 @@ qla2x00_fo_get_target_data(EXT_IOCTL *pext, FO_TARGET_DATA_INPUT *bp, int mode)
 			pext->Status = EXT_STATUS_DEV_NOT_FOUND;
 			return (ret);
 		}
+	}
 
 	if ((entry = (FO_DEVICE_DATA *)kmalloc(sizeof(FO_DEVICE_DATA),
 	    GFP_ATOMIC)) == NULL) {
@@ -894,7 +896,7 @@ qla2x00_fo_get_target_data(EXT_IOCTL *pext, FO_TARGET_DATA_INPUT *bp, int mode)
 	}
 
 	/* Return data accordingly. */
-	if (!ha->flags.failover_enabled)
+	if (!qla2x00_failover_enabled(ha))
 		ret = qla2x00_std_get_tgt(ha, pext, entry);
 	else
 		ret = qla2x00_fo_get_tgt(host, ha, pext, entry);
@@ -1464,7 +1466,7 @@ qla2x00_fo_set_target_data(EXT_IOCTL *pext, FO_TARGET_DATA_INPUT  *bp, int mode)
 	DEBUG9(printk("%s: ha inst %ld, buff %p.\n",
 	    __func__, ha->instance, bp);)
 
-	if (!ha->flags.failover_enabled)
+	if (!qla2x00_failover_enabled(ha))
 		/* non-failover mode. nothing to be done. */
 		return 0;
 
@@ -2097,7 +2099,7 @@ qla2x00_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 		pkt->p.cmd.entry_type = COMMAND_A64_TYPE;
 		pkt->p.cmd.entry_count = 1;
 		pkt->p.cmd.lun = cpu_to_le16(lun);
-		pkt->p.cmd.target = (uint8_t)fcport->loop_id;
+		SET_TARGET_ID(ha, pkt->p.cmd.target, fcport->loop_id);
 		/* no direction for this command */
 		pkt->p.cmd.control_flags =
 		    __constant_cpu_to_le16(CF_SIMPLE_TAG);
@@ -2256,11 +2258,8 @@ qla2x00_send_fo_notification(fc_lun_t *old_lp, fc_lun_t *new_lp)
 		pkt->p.cmd.entry_type = COMMAND_A64_TYPE;
 		pkt->p.cmd.entry_count = 1;
 		pkt->p.cmd.lun = cpu_to_le16(lun);
-#if defined(EXTENDED_IDS)
-		pkt->p.cmd.target = cpu_to_le16(loop_id);
-#else
-		pkt->p.cmd.target = loop_id;
-#endif
+		SET_TARGET_ID(old_ha, pkt->p.cmd.target, loop_id);
+
 		/* FIXME: How do you know the direction ???? */
 		/* This has same issues as passthur commands - you 
 		 * need more than just the CDB.
@@ -2321,12 +2320,7 @@ qla2x00_send_fo_notification(fc_lun_t *old_lp, fc_lun_t *new_lp)
 uint8_t
 qla2x00_fo_enabled(scsi_qla_host_t *ha, int instance)
 {
-	uint8_t enable = FALSE;
-
-	if (ha->flags.failover_enabled)
-		enable = TRUE;
-
-	return enable;
+	return qla2x00_failover_enabled(ha);
 }
 
 /*

@@ -38,9 +38,9 @@ qla2x00_get_cmd_direction(struct scsi_cmnd *cmd)
 	cflags = 0;
 
 	/* Set transfer direction */
-	if (cmd->sc_data_direction == SCSI_DATA_WRITE)
+	if (cmd->sc_data_direction == DMA_TO_DEVICE)
 		cflags = CF_WRITE;
-	else if (cmd->sc_data_direction == SCSI_DATA_READ)
+	else if (cmd->sc_data_direction == DMA_FROM_DEVICE)
 		cflags = CF_READ;
 	else {
 		switch (cmd->data_cmnd[0]) {
@@ -192,8 +192,7 @@ void qla2x00_build_scsi_iocbs_32(srb_t *sp, cmd_entry_t *cmd_pkt,
 	    __constant_cpu_to_le32(COMMAND_TYPE);
 
 	/* No data transfer */
-	if (cmd->request_bufflen == 0 ||
-	    cmd->sc_data_direction == SCSI_DATA_NONE) {
+	if (cmd->request_bufflen == 0 || cmd->sc_data_direction == DMA_NONE) {
 		cmd_pkt->byte_count = __constant_cpu_to_le32(0);
 		return;
 	}
@@ -241,8 +240,7 @@ void qla2x00_build_scsi_iocbs_32(srb_t *sp, cmd_entry_t *cmd_pkt,
 		page = virt_to_page(cmd->request_buffer);
 		offset = ((unsigned long)cmd->request_buffer & ~PAGE_MASK);
 		req_dma = pci_map_page(ha->pdev, page, offset,
-		    cmd->request_bufflen,
-		    scsi_to_pci_dma_dir(cmd->sc_data_direction));
+		    cmd->request_bufflen, cmd->sc_data_direction);
 
 		sp->dma_handle = req_dma;
 
@@ -274,8 +272,7 @@ void qla2x00_build_scsi_iocbs_64(srb_t *sp, cmd_entry_t *cmd_pkt,
 	    __constant_cpu_to_le32(COMMAND_A64_TYPE);
 
 	/* No data transfer */
-	if (cmd->request_bufflen == 0 ||
-	    cmd->sc_data_direction == SCSI_DATA_NONE) {
+	if (cmd->request_bufflen == 0 || cmd->sc_data_direction == DMA_NONE) {
 		cmd_pkt->byte_count = __constant_cpu_to_le32(0);
 		return;
 	}
@@ -326,8 +323,7 @@ void qla2x00_build_scsi_iocbs_64(srb_t *sp, cmd_entry_t *cmd_pkt,
 		page = virt_to_page(cmd->request_buffer);
 		offset = ((unsigned long)cmd->request_buffer & ~PAGE_MASK);
 		req_dma = pci_map_page(ha->pdev, page, offset,
-		    cmd->request_bufflen,
-		    scsi_to_pci_dma_dir(cmd->sc_data_direction));
+		    cmd->request_bufflen, cmd->sc_data_direction);
 
 		sp->dma_handle = req_dma;
 
@@ -360,7 +356,6 @@ qla2x00_start_scsi(srb_t *sp)
 	struct scatterlist *sg;
 
 	device_reg_t	*reg;
-	uint16_t        reg_flushed;
 
 	/* Setup device pointers. */
 	ret = 0;
@@ -382,7 +377,7 @@ qla2x00_start_scsi(srb_t *sp)
 	if (cmd->use_sg) {
 		sg = (struct scatterlist *) cmd->request_buffer;
 		tot_dsds = pci_map_sg(ha->pdev, sg, cmd->use_sg,
-		    scsi_to_pci_dma_dir(cmd->sc_data_direction));
+		    cmd->sc_data_direction);
 	} else if (cmd->request_bufflen) {   /* Single segment transfer */
 		tot_dsds++;
 	}
@@ -393,7 +388,7 @@ qla2x00_start_scsi(srb_t *sp)
 
 	if (ha->req_q_cnt < (req_cnt + 2)) {
 		/* Calculate number of free request entries */
-		cnt = RD_REG_WORD(ISP_REQ_Q_OUT(reg));
+		cnt = RD_REG_WORD(ISP_REQ_Q_OUT(ha, reg));
 		if (ha->req_ring_index < cnt)
 			ha->req_q_cnt = cnt - ha->req_ring_index;
 		else
@@ -442,11 +437,7 @@ qla2x00_start_scsi(srb_t *sp)
 	cmd_pkt->dseg_count = cpu_to_le16(tot_dsds);
 
 	/* Set target ID */
-#if defined(EXTENDED_IDS)
-	cmd_pkt->target = cpu_to_le16(fclun->fcport->loop_id);
-#else
-	cmd_pkt->target = (uint8_t)fclun->fcport->loop_id;
-#endif
+	SET_TARGET_ID(ha, cmd_pkt->target, fclun->fcport->loop_id);
 
 	/* Set LUN number*/
 	cmd_pkt->lun = cpu_to_le16(fclun->lun);
@@ -504,9 +495,8 @@ qla2x00_start_scsi(srb_t *sp)
 	sp->u_start = jiffies;
 
 	/* Set chip new ring index. */
-	reg_flushed = CACHE_FLUSH(ISP_REQ_Q_IN(reg));
-	WRT_REG_WORD(ISP_REQ_Q_IN(reg), ha->req_ring_index);
-	RD_REG_WORD(ISP_REQ_Q_IN(reg));
+	WRT_REG_WORD(ISP_REQ_Q_IN(ha, reg), ha->req_ring_index);
+	RD_REG_WORD(ISP_REQ_Q_IN(ha, reg));	/* PCI Posting. */
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return (QLA_SUCCESS);
@@ -514,10 +504,8 @@ qla2x00_start_scsi(srb_t *sp)
 queuing_error:
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-	if (cmd->use_sg) {
-		pci_unmap_sg(ha->pdev, sg, cmd->use_sg,
-		    scsi_to_pci_dma_dir(cmd->sc_data_direction));
-	}
+	if (cmd->use_sg)
+		pci_unmap_sg(ha->pdev, sg, cmd->use_sg, cmd->sc_data_direction);
 
 	return (QLA_FUNCTION_FAILED);
 }
@@ -553,11 +541,7 @@ __qla2x00_marker(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun,
 
 	if (type != MK_SYNC_ALL) {
 		pkt->lun = cpu_to_le16(lun);
-#if defined(EXTENDED_IDS)
-		pkt->target = cpu_to_le16(loop_id);
-#else
-		pkt->target = (uint8_t)loop_id;
-#endif
+		SET_TARGET_ID(ha, pkt->target, loop_id);
 	}
 
 	/* Issue command to ISP */
@@ -606,7 +590,7 @@ qla2x00_req_pkt(scsi_qla_host_t *ha)
 	for (timer = HZ; timer; timer--) {
 		if ((req_cnt + 2) >= ha->req_q_cnt) {
 			/* Calculate number of free request entries. */
-			cnt = qla2x00_debounce_register(ISP_REQ_Q_OUT(reg));
+			cnt = qla2x00_debounce_register(ISP_REQ_Q_OUT(ha, reg));
 			if  (ha->req_ring_index < cnt)
 				ha->req_q_cnt = cnt - ha->req_ring_index;
 			else
@@ -680,7 +664,7 @@ qla2x00_ms_req_pkt(scsi_qla_host_t *ha, srb_t  *sp)
 	for (timer = HZ; timer; timer--) {
 		if ((req_cnt + 2) >= ha->req_q_cnt) {
 			/* Calculate number of free request entries. */
-			cnt = qla2x00_debounce_register(ISP_REQ_Q_OUT(reg));
+			cnt = qla2x00_debounce_register(ISP_REQ_Q_OUT(ha, reg));
 			if (ha->req_ring_index < cnt) {
 				ha->req_q_cnt = cnt - ha->req_ring_index;
 			} else {
@@ -762,8 +746,6 @@ qla2x00_isp_cmd(scsi_qla_host_t *ha)
 {
 	device_reg_t *reg = ha->iobase;
 
-	ENTER(__func__);
-
 	DEBUG5(printk("%s(): IOCB data:\n", __func__));
 	DEBUG5(qla2x00_dump_buffer(
 	    (uint8_t *)ha->request_ring_ptr, REQUEST_ENTRY_SIZE));
@@ -777,8 +759,6 @@ qla2x00_isp_cmd(scsi_qla_host_t *ha)
 		ha->request_ring_ptr++;
 
 	/* Set chip new ring index. */
-	WRT_REG_WORD(ISP_REQ_Q_IN(reg), ha->req_ring_index);
-	RD_REG_WORD(ISP_REQ_Q_IN(reg));
-
-	LEAVE(__func__);
+	WRT_REG_WORD(ISP_REQ_Q_IN(ha, reg), ha->req_ring_index);
+	RD_REG_WORD(ISP_REQ_Q_IN(ha, reg));	/* PCI Posting. */
 }

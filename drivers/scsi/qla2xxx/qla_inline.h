@@ -45,52 +45,6 @@ qla2x00_debounce_register(volatile uint16_t *addr)
 	return (first);
 }
 
-static __inline__ void qla2x00_config_dma_addressing(scsi_qla_host_t *ha);
-
-/**
- * qla2x00_config_dma_addressing() - Configure OS DMA addressing method.
- * @ha: HA context
- *
- * At exit, the @ha's flags.enable_64bit_addressing set to indicated
- * supported addressing method.
- */
-static __inline__ void
-qla2x00_config_dma_addressing(scsi_qla_host_t *ha)
-{
-	/* Assume 32bit DMA address */
-	ha->flags.enable_64bit_addressing = 0;
-	ha->calc_request_entries = qla2x00_calc_iocbs_32;
-	ha->build_scsi_iocbs = qla2x00_build_scsi_iocbs_32;
-
-	/*
-	 * Given the two variants pci_set_dma_mask(), allow the compiler to
-	 * assist in setting the proper dma mask.
-	 */
-	if (sizeof(dma_addr_t) > 4) {
-		/* Update our PCI device dma_mask for full 64 bits */
-		if (pci_set_dma_mask(ha->pdev, 0xffffffffffffffffULL) == 0) {
-			ha->flags.enable_64bit_addressing = 1;
-			ha->calc_request_entries = qla2x00_calc_iocbs_64;
-			ha->build_scsi_iocbs = qla2x00_build_scsi_iocbs_64;
-			ha->host->sg_tablesize = SG_SEGMENTS_64;
-			if (pci_set_consistent_dma_mask(ha->pdev, 0xffffffffffffffffULL)) {
-				printk(KERN_DEBUG "scsi(%ld): Failed to set 64 bit PCI"
-						" consistent mask; using 32 bit.\n",
-						ha->host_no);
-				pci_set_consistent_dma_mask(ha->pdev, 0xffffffffULL);
-			}
-		} else {
-			printk(KERN_DEBUG
-			    "scsi(%ld): Failed to set 64 bit PCI DMA mask, "
-			    "falling back to 32 bit MASK.\n", ha->host_no);
-			pci_set_dma_mask(ha->pdev, 0xffffffff);
-		}
-	} else {
-		pci_set_dma_mask(ha->pdev, 0xffffffff);
-	}
-}
-
-
 static __inline__ int qla2x00_normalize_dma_addr(
     dma_addr_t *e_addr,  uint32_t *e_len,
     dma_addr_t *ne_addr, uint32_t *ne_len);
@@ -181,7 +135,7 @@ qla2x00_enable_intrs(scsi_qla_host_t *ha)
 	ha->interrupts_on = 1;
 	/* enable risc and host interrupts */
 	WRT_REG_WORD(&reg->ictrl, ICR_EN_INT | ICR_EN_RISC);
-	CACHE_FLUSH(&reg->ictrl);
+	RD_REG_WORD(&reg->ictrl);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 }
@@ -197,7 +151,7 @@ qla2x00_disable_intrs(scsi_qla_host_t *ha)
 	ha->interrupts_on = 0;
 	/* disable risc and host interrupts */
 	WRT_REG_WORD(&reg->ictrl, 0);
-	CACHE_FLUSH(&reg->ictrl);
+	RD_REG_WORD(&reg->ictrl);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 

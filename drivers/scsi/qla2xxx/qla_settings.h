@@ -25,19 +25,11 @@
 #define MEMORY_MAPPED_IO	1
 #define STOP_ON_ERROR		0	/* Stop on aborts and resets  */
 #define STOP_ON_RESET		0
-#define STOP_ON_ABORT		0
-#define QLA_SCSI_VENDOR_DIR	0	/*
-					 * Decode vendor specific opcodes for
-					 * direction
-					 */
-#define QLA2100_LIPTEST		0
-#define REQ_TRACE		1
 #define USE_ABORT_TGT		1	/* Use Abort Target mbx cmd */
 
 #define VSA			0	/* Volume Set Addressing */
 
 /* Failover options */
-#define MPIO_SUPPORT		0
 #define MAX_RECOVERYTIME	10	/*
 					 * Max suspend time for a lun recovery
 					 * time

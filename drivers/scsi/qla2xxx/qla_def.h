@@ -20,40 +20,63 @@
 #ifndef __QLA_DEF_H
 #define __QLA_DEF_H
 
-#if defined(qla23xx)
-	#define MAILBOX_REGISTER_COUNT	32
-	#define ISP_NAME		"23xx"
-	#define DRIVER_NAME		"qla2300"
-	#define ISP2300
-	#undef ISP2322
-	#define EXTENDED_IDS
-#elif defined(qla22xx)
-	#define MAILBOX_REGISTER_COUNT	32
-	#define ISP_NAME		"22xx"
-	#define DRIVER_NAME		"qla2200"
-	#define ISP2200
-#elif defined(qla21xx)
-	#define MAILBOX_REGISTER_COUNT	8
-	#define ISP_NAME		"21xx"
-	#define DRIVER_NAME		"qla2100"
-	#define ISP2100
-#else
-#warning Please define an ISP type for compilation!!!
+/* XXX(hch): move to pci_ids.h */
+#ifndef PCI_DEVICE_ID_QLOGIC_ISP2300
+#define PCI_DEVICE_ID_QLOGIC_ISP2300	0x2300
 #endif
 
-/*****************************************/
-/*   ISP Boards supported by this driver */
-/*****************************************/
-#define QLA2X00_VENDOR_ID	0x1077
+#ifndef PCI_DEVICE_ID_QLOGIC_ISP2312
+#define PCI_DEVICE_ID_QLOGIC_ISP2312	0x2312
+#endif
 
-#define QLA2100_DEVICE_ID	0x2100
+#ifndef PCI_DEVICE_ID_QLOGIC_ISP2322
+#define PCI_DEVICE_ID_QLOGIC_ISP2322	0x2322
+#endif
 
-#define QLA2200_DEVICE_ID	0x2200
+#if !defined(CONFIG_SCSI_QLA21XX) && !defined(CONFIG_SCSI_QLA21XX_MODULE) && \
+  !defined(CONFIG_SCSI_QLA22XX) && !defined(CONFIG_SCSI_QLA22XX_MODULE) && \
+  !defined(CONFIG_SCSI_QLA23XX) && !defined(CONFIG_SCSI_QLA23XX_MODULE)
+#error Please define an ISP type for compilation!!!
+#endif
+
+#if defined(CONFIG_SCSI_QLA21XX) || defined(CONFIG_SCSI_QLA21XX_MODULE)
+#define IS_QLA2100(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2100)
+#else
+#define IS_QLA2100(ha)	0
+#endif
+
+#if defined(CONFIG_SCSI_QLA22XX) || defined(CONFIG_SCSI_QLA22XX_MODULE)
+#define IS_QLA2200(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2200)
+#else
+#define IS_QLA2200(ha)	0
+#endif
+
+#if defined(CONFIG_SCSI_QLA23XX) || defined(CONFIG_SCSI_QLA23XX_MODULE)
+#define IS_QLA2300(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2300)
+#define IS_QLA2312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2312)
+#define IS_QLA2322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2322)
+#define IS_QLA23XX(ha)	(IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA2322(ha))
+#else
+#define IS_QLA2300(ha)	0
+#define IS_QLA2312(ha)	0
+#define IS_QLA2322(ha)	0
+#define IS_QLA23XX(ha)	0
+#endif
+
+/*
+ * Only ISP23XX has extended addressing support in the firmware.
+ */
+#define HAS_EXTENDED_IDS(ha)	IS_QLA23XX(ha)
+
+/*
+ * We have MAILBOX_REGISTER_COUNT sized arrays in a few places,
+ * but that's fine as we don't look at the last 24 ones for
+ * ISP2100 HBAs.
+ */
+#define MAILBOX_REGISTER_COUNT_2100	8
+#define MAILBOX_REGISTER_COUNT		32
+
 #define QLA2200A_RISC_ROM_VER	4
-
-#define QLA2300_DEVICE_ID	0x2300
-#define QLA2312_DEVICE_ID	0x2312
-#define QLA2322_DEVICE_ID	0x2322
 #define FPM_2300		6
 #define FPM_2310		7
 
@@ -150,11 +173,8 @@
 /*
  * Fibre Channel device definitions.
  */
-#if defined(EXTENDED_IDS)
-#define SNS_LAST_LOOP_ID	0x7ff
-#else
-#define SNS_LAST_LOOP_ID	0xfe
-#endif
+#define SNS_LAST_LOOP_ID_2100	0xfe
+#define SNS_LAST_LOOP_ID_2300	0x7ff
 
 #define LAST_LOCAL_LOOP_ID	0x7d
 #define SNS_FL_PORT		0x7e
@@ -182,11 +202,8 @@
 
 /* ISP request and response entry counts (37-65535) */
 #define REQUEST_ENTRY_CNT		1024	/* Number of request entries. */
-#if defined(ISP2100) || defined(ISP2200)
-#define RESPONSE_ENTRY_CNT		64	/* Number of response entries.*/
-#else
-#define RESPONSE_ENTRY_CNT		512	/* Number of response entries.*/
-#endif
+#define RESPONSE_ENTRY_CNT_2100		64	/* Number of response entries.*/
+#define RESPONSE_ENTRY_CNT_2300		512	/* Number of response entries.*/
 
 /* Calculations for SG segments */
 #define SEGS_PER_REQUEST_32	3 
@@ -306,82 +323,78 @@ typedef volatile struct {
 #define NVR_SELECT		BIT_1
 #define NVR_CLOCK		BIT_0
 
-#if defined(ISP2100) || defined(ISP2200)
-	volatile uint16_t mailbox0;
-	volatile uint16_t mailbox1;
-	volatile uint16_t mailbox2;
-	volatile uint16_t mailbox3;
-	volatile uint16_t mailbox4;
-#define	ISP_REQ_Q_IN(reg)	(&(reg)->mailbox4)
-#define	ISP_REQ_Q_OUT(reg)	(&(reg)->mailbox4)
-	volatile uint16_t mailbox5;
-#define	ISP_RSP_Q_IN(reg)	(&(reg)->mailbox5)
-#define	ISP_RSP_Q_OUT(reg)	(&(reg)->mailbox5)
-	volatile uint16_t mailbox6;
-	volatile uint16_t mailbox7;
-	uint16_t unused_2[0x3b];	/* Gap */
-#else /* defined(ISP2300) */
-	volatile uint16_t req_q_in;	/* Request Queue In-Pointer */
-#define	ISP_REQ_Q_IN(reg)	(&(reg)->req_q_in)
-	volatile uint16_t req_q_out;	/* Request Queue Out-Pointer */
-#define	ISP_REQ_Q_OUT(reg)	(&(reg)->req_q_out)
-	volatile uint16_t rsp_q_in;	/* Response Queue In-Pointer */
-#define	ISP_RSP_Q_IN(reg)	(&(reg)->rsp_q_in)
-	volatile uint16_t rsp_q_out;	/* Response Queue Out-Pointer */
-#define	ISP_RSP_Q_OUT(reg)	(&(reg)->rsp_q_out)
+	union {
+		struct {
+			volatile uint16_t mailbox0;
+			volatile uint16_t mailbox1;
+			volatile uint16_t mailbox2;
+			volatile uint16_t mailbox3;
+			volatile uint16_t mailbox4;
+			volatile uint16_t mailbox5;
+			volatile uint16_t mailbox6;
+			volatile uint16_t mailbox7;
+			uint16_t unused_2[59];		/* Gap */
+		} __attribute__((packed)) isp2100;
+		struct {
+							/* Request Queue */
+			volatile uint16_t req_q_in;	/*  In-Pointer */
+			volatile uint16_t req_q_out;	/*  Out-Pointer */
+							/* Response Queue */
+			volatile uint16_t rsp_q_in;	/*  In-Pointer */
+			volatile uint16_t rsp_q_out;	/*  Out-Pointer */
 
-	volatile uint32_t host_status;	/* RISC to Host Status */
+						/* RISC to Host Status */
+			volatile uint32_t host_status;	
 #define HSR_RISC_INT		BIT_15	/* RISC interrupt */
 #define HSR_RISC_PAUSED		BIT_8	/* RISC Paused */
 
-	volatile uint16_t host_semaphore; /* Host to Host Semaphore */
-	uint16_t unused_3[0x11];	/* Gap */
-	volatile uint16_t mailbox0;
-	volatile uint16_t mailbox1;
-	volatile uint16_t mailbox2;
-	volatile uint16_t mailbox3;
-	volatile uint16_t mailbox4;
-	volatile uint16_t mailbox5;
-	volatile uint16_t mailbox6;
-	volatile uint16_t mailbox7;
-	volatile uint16_t mailbox8;
-	volatile uint16_t mailbox9;
-	volatile uint16_t mailbox10;
-	volatile uint16_t mailbox11;
-	volatile uint16_t mailbox12;
-	volatile uint16_t mailbox13;
-	volatile uint16_t mailbox14;
-	volatile uint16_t mailbox15;
-	volatile uint16_t mailbox16;
-	volatile uint16_t mailbox17;
-	volatile uint16_t mailbox18;
-	volatile uint16_t mailbox19;
-	volatile uint16_t mailbox20;
-	volatile uint16_t mailbox21;
-	volatile uint16_t mailbox22;
-	volatile uint16_t mailbox23;
-	volatile uint16_t mailbox24;
-	volatile uint16_t mailbox25;
-	volatile uint16_t mailbox26;
-	volatile uint16_t mailbox27;
-	volatile uint16_t mailbox28;
-	volatile uint16_t mailbox29;
-	volatile uint16_t mailbox30;
-	volatile uint16_t mailbox31;
-	volatile uint16_t fb_cmd;
-	uint16_t unused_4[0xa];		/* Gap */
-#endif /* defined(ISP2100) || defined(ISP2200) */
+					/* Host to Host Semaphore */
+			volatile uint16_t host_semaphore; 
+			uint16_t unused_3[17];		/* Gap */
+			volatile uint16_t mailbox0;
+			volatile uint16_t mailbox1;
+			volatile uint16_t mailbox2;
+			volatile uint16_t mailbox3;
+			volatile uint16_t mailbox4;
+			volatile uint16_t mailbox5;
+			volatile uint16_t mailbox6;
+			volatile uint16_t mailbox7;
+			volatile uint16_t mailbox8;
+			volatile uint16_t mailbox9;
+			volatile uint16_t mailbox10;
+			volatile uint16_t mailbox11;
+			volatile uint16_t mailbox12;
+			volatile uint16_t mailbox13;
+			volatile uint16_t mailbox14;
+			volatile uint16_t mailbox15;
+			volatile uint16_t mailbox16;
+			volatile uint16_t mailbox17;
+			volatile uint16_t mailbox18;
+			volatile uint16_t mailbox19;
+			volatile uint16_t mailbox20;
+			volatile uint16_t mailbox21;
+			volatile uint16_t mailbox22;
+			volatile uint16_t mailbox23;
+			volatile uint16_t mailbox24;
+			volatile uint16_t mailbox25;
+			volatile uint16_t mailbox26;
+			volatile uint16_t mailbox27;
+			volatile uint16_t mailbox28;
+			volatile uint16_t mailbox29;
+			volatile uint16_t mailbox30;
+			volatile uint16_t mailbox31;
+			volatile uint16_t fb_cmd;
+			uint16_t unused_4[10];		/* Gap */
+		} __attribute__((packed)) isp2300;
+	} u;
+
 	volatile uint16_t fpm_diag_config;
 	uint16_t unused_5[0x6];		/* Gap */
 	volatile uint16_t pcr;		/* Processor Control Register. */
 	uint16_t unused_6[0x5];		/* Gap */
 	volatile uint16_t mctr;		/* Memory Configuration and Timing. */
 	uint16_t unused_7[0x3];		/* Gap */
-#if defined(ISP2100) || defined(ISP2200)
-	volatile uint16_t fb_cmd;
-#else /* defined(ISP2300) */
-	uint16_t unused_11;
-#endif /* defined(ISP2100) || defined(ISP2200) */
+	volatile uint16_t fb_cmd_2100;	/* Unused on 23XX */
 	uint16_t unused_8[0x3];		/* Gap */
 	volatile uint16_t hccr;		/* Host command & control register. */
 #define HCCR_HOST_INT		BIT_7	/* Host interrupt bit */
@@ -405,26 +418,64 @@ typedef volatile struct {
 #define GPIO_LED_GREEN_OFF_AMBER_ON	0x0080
 #define GPIO_LED_GREEN_ON_AMBER_ON	0x00C0
 
-#if defined(ISP2200)
-	uint16_t unused_10[8];		/* Gap */
-	volatile uint16_t mailbox8;
-	volatile uint16_t mailbox9;
-	volatile uint16_t mailbox10;
-	volatile uint16_t mailbox11;
-	volatile uint16_t mailbox12;
-	volatile uint16_t mailbox13;
-	volatile uint16_t mailbox14;
-	volatile uint16_t mailbox15;
-	volatile uint16_t mailbox16;
-	volatile uint16_t mailbox17;
-	volatile uint16_t mailbox18;
-	volatile uint16_t mailbox19;
-	volatile uint16_t mailbox20;
-	volatile uint16_t mailbox21;
-	volatile uint16_t mailbox22;
-	volatile uint16_t mailbox23;	/* Also probe reg. */
-#endif /* defined(ISP2200) */
+	union {
+		struct {
+			uint16_t unused_10[8];		/* Gap */
+			volatile uint16_t mailbox8;
+			volatile uint16_t mailbox9;
+			volatile uint16_t mailbox10;
+			volatile uint16_t mailbox11;
+			volatile uint16_t mailbox12;
+			volatile uint16_t mailbox13;
+			volatile uint16_t mailbox14;
+			volatile uint16_t mailbox15;
+			volatile uint16_t mailbox16;
+			volatile uint16_t mailbox17;
+			volatile uint16_t mailbox18;
+			volatile uint16_t mailbox19;
+			volatile uint16_t mailbox20;
+			volatile uint16_t mailbox21;
+			volatile uint16_t mailbox22;
+			volatile uint16_t mailbox23;	/* Also probe reg. */
+		} __attribute__((packed)) isp2200;
+	} u_end;
 } device_reg_t;
+
+#define	ISP_REQ_Q_IN(ha, reg) \
+	(IS_QLA23XX(ha) ? \
+	 &(reg)->u.isp2300.req_q_in : \
+	 &(reg)->u.isp2100.mailbox4)
+#define	ISP_REQ_Q_OUT(ha, reg) \
+	(IS_QLA23XX(ha) ? \
+	 &(reg)->u.isp2300.req_q_out : \
+	 &(reg)->u.isp2100.mailbox4)
+#define	ISP_RSP_Q_IN(ha, reg) \
+	(IS_QLA23XX(ha) ? \
+	 &(reg)->u.isp2300.rsp_q_in : \
+	 &(reg)->u.isp2100.mailbox5)
+#define	ISP_RSP_Q_OUT(ha, reg) \
+	(IS_QLA23XX(ha) ? \
+	 &(reg)->u.isp2300.rsp_q_out : \
+	 &(reg)->u.isp2100.mailbox5)
+
+#define MAILBOX_REG(ha, reg, num) \
+	(IS_QLA23XX(ha) ? \
+	 &(reg)->u.isp2300.mailbox0 + (num) : \
+	 ((num < 8) ? \
+	  &(reg)->u.isp2100.mailbox0 + (num) : \
+	  &(reg)->u_end.isp2200.mailbox8 + (num) - 8))	/* only for isp2200 */
+#define RD_MAILBOX_REG(ha, reg, num) \
+	RD_REG_WORD(MAILBOX_REG(ha, reg, num))
+#define WRT_MAILBOX_REG(ha, reg, num, data) \
+	WRT_REG_WORD(MAILBOX_REG(ha, reg, num), data)
+
+#define FB_CMD_REG(ha, reg) \
+	(IS_QLA23XX(ha) ? &(reg)->u.isp2300.fb_cmd : &(reg)->fb_cmd_2100)
+#define RD_FB_CMD_REG(ha, reg) \
+	RD_REG_WORD(FB_CMD_REG(ha, reg))
+#define WRT_FB_CMD_REG(ha, reg, data) \
+	WRT_REG_WORD(FB_CMD_REG(ha, reg), data)
+
 
 typedef struct {
 	uint32_t	out_mb;		/* outbound from driver */
@@ -727,54 +778,6 @@ typedef struct {
 #define PD_STATE_WAIT_PORT_LOGOUT_ACK		11
 
 
-struct qla2x00_special_options
-{
-#if defined(__BIG_ENDIAN)
-	uint8_t	data_rate			:2;
-	uint8_t	enable_50_ohm_termination	:1;
-	uint8_t	unused_12			:1;
-
-	uint8_t	unused_11			:1;
-	uint8_t	unused_10			:1;
-	uint8_t	unused_9			:1;
-	uint8_t	unused_8			:1;
-
-	uint8_t	disable_auto_plogi_local_loop	:1;
-	uint8_t	enable_ooo_frame_handling	:1;
-	uint8_t	fcp_rsp_payload			:2;
-
-	uint8_t	unused_3			:1;
-	uint8_t	unused_2			:1;
-	uint8_t	soft_id_only			:1;
-	uint8_t	enable_read_xfr_rdy		:1;
-#else
-	uint8_t	enable_read_xfr_rdy		:1;
-	uint8_t	soft_id_only			:1;
-	uint8_t	unused_2			:1;
-	uint8_t	unused_3			:1;
-
-	uint8_t	fcp_rsp_payload			:2;
-	uint8_t	enable_ooo_frame_handling	:1;
-	uint8_t	disable_auto_plogi_local_loop	:1;
-
-	uint8_t	unused_8			:1;
-	uint8_t	unused_9			:1;
-	uint8_t	unused_10			:1;
-	uint8_t	unused_11			:1;
-
-	uint8_t	unused_12			:1;
-	uint8_t	enable_50_ohm_termination	:1;
-	uint8_t	data_rate			:2;
-#endif
-};
-
-/*
- * ISP Initialization Control Block.
- */
-#define SO_DATA_RATE_1GB	0
-#define SO_DATA_RATE_2GB	1
-#define SO_DATA_RATE_AUTO	2
-
 /*
  * ISP Initialization Control Block.
  * Little endian except where noted.
@@ -876,10 +879,6 @@ typedef struct {
 
 	uint8_t  reserved_3[26];
 } init_cb_t;
-
-/*
- * ISP Get/Set Target Parameters mailbox command control flags.
- */
 
 /*
  * Get Link Status mailbox command return buffer.
@@ -995,7 +994,7 @@ typedef struct {
 	 * MSB BIT 6 = Data Rate (2300 only)
 	 * MSB BIT 7 = Data Rate (2300 only)
 	 */
-	struct qla2x00_special_options special_options;
+	uint8_t	 special_options[2];
 
 	/* Reserved for expanded RISC parameter block */
 	uint8_t reserved_2[24];
@@ -1140,6 +1139,21 @@ typedef struct {
 #define RESPONSE_PROCESSED	0xDEADDEAD	/* Signature */
 } response_t;
 
+typedef union {
+	uint16_t extended;
+	struct {
+		uint8_t reserved;
+		uint8_t standard;;
+	};
+} target_id_t;
+
+#define SET_TARGET_ID(ha, to, from)			\
+do {							\
+	if (HAS_EXTENDED_IDS(ha))			\
+		to.extended = cpu_to_le16(from);	\
+	else						\
+		to.standard = (uint8_t)from;		\
+} while (0)
 
 /*
  * ISP queue - command entry structure definition.
@@ -1152,12 +1166,7 @@ typedef struct {
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
 	uint32_t handle;		/* System handle. */
-#if defined(EXTENDED_IDS)
-	uint16_t target;		/* SCSI ID */
-#else
-	uint8_t reserved;
-	uint8_t target;			/* SCSI ID */
-#endif
+	target_id_t target;		/* SCSI ID */
 	uint16_t lun;			/* SCSI LUN */
 	uint16_t control_flags;		/* Control flags. */
 #define CF_WRITE	BIT_6
@@ -1188,12 +1197,7 @@ typedef struct {
 	uint8_t sys_define;		/* System defined. */
 	uint8_t entry_status;		/* Entry Status. */
 	uint32_t handle;		/* System handle. */
-#if defined(EXTENDED_IDS)
-	uint16_t target;		/* SCSI ID */
-#else
-	uint8_t reserved;
-	uint8_t target;			/* SCSI ID */
-#endif
+	target_id_t target;		/* SCSI ID */
 	uint16_t lun;			/* SCSI LUN */
 	uint16_t control_flags;		/* Control flags. */
 	uint16_t reserved_1;
@@ -1287,20 +1291,17 @@ typedef struct {
 /*
  * Status entry SCSI status bit definitions.
  */
-#define SS_MASK			0xfff	/* Reserved bits BIT_12-BIT_15*/
-#define SS_RESIDUAL_UNDER	BIT_11
-#define SS_RESIDUAL_OVER	BIT_10
-#define SS_SENSE_LEN_VALID	BIT_9
-#if defined(ISP2100)
-#define SS_RESIDUAL_LEN_VALID	BIT_8
-#else
-#define SS_RESPONSE_INFO_LEN_VALID	BIT_8
-#endif
+#define SS_MASK				0xfff	/* Reserved bits BIT_12-BIT_15*/
+#define SS_RESIDUAL_UNDER		BIT_11
+#define SS_RESIDUAL_OVER		BIT_10
+#define SS_SENSE_LEN_VALID		BIT_9
+#define SS_RESIDUAL_LEN_VALID		BIT_8	/* ISP2100 only */
+#define SS_RESPONSE_INFO_LEN_VALID	BIT_8	/* ISP2200 and 23xx */
 
-#define SS_RESERVE_CONFLICT	(BIT_4 | BIT_3)
-#define SS_BUSY_CONDITION	BIT_3
-#define SS_CONDITION_MET	BIT_2
-#define SS_CHECK_CONDITION	BIT_1
+#define SS_RESERVE_CONFLICT		(BIT_4 | BIT_3)
+#define SS_BUSY_CONDITION		BIT_3
+#define SS_CONDITION_MET		BIT_2
+#define SS_CHECK_CONDITION		BIT_1
 
 /*
  * Status entry completion status
@@ -1380,12 +1381,7 @@ typedef struct {
 	uint8_t handle_count;		/* Handle count. */
 	uint8_t entry_status;		/* Entry Status. */
 	uint32_t sys_define_2;		/* System defined. */
-#if defined(EXTENDED_IDS)
-	uint16_t target;		/* SCSI ID */
-#else
-	uint8_t reserved;
-	uint8_t target;			/* SCSI ID */
-#endif
+	target_id_t target;		/* SCSI ID */
 	uint8_t modifier;		/* Modifier (7-0). */
 #define MK_SYNC_ID_LUN	0		/* Synchronize ID/LUN */
 #define MK_SYNC_ID	1		/* Synchronize ID */
@@ -1409,12 +1405,7 @@ typedef struct {
 	uint8_t handle_count;		/* Handle count. */
 	uint8_t entry_status;		/* Entry Status. */
 	uint32_t handle1;		/* System handle. */
-#if defined(EXTENDED_IDS)
-	uint16_t loop_id;
-#else
-	uint8_t reserved;
-	uint8_t loop_id;
-#endif
+	target_id_t loop_id;
 	uint16_t status;
 	uint16_t control_flags;		/* Control flags. */
 	uint16_t reserved2;
@@ -1455,12 +1446,7 @@ struct mbx_entry {
 	uint8_t entry_status;
 
 	uint32_t handle;
-#if defined(EXTENDED_IDS)
-	uint16_t loop_id;
-#else
-	uint8_t reserved_1;
-	uint8_t loop_id;
-#endif
+	target_id_t loop_id;
 
 	uint16_t status;
 	uint16_t state_flags;
@@ -1474,13 +1460,9 @@ struct mbx_entry {
 	uint16_t mb3;
 	uint16_t mb6;
 	uint16_t mb7;
-#if defined(EXTENDED_IDS)
 	uint16_t mb9;
 	uint16_t mb10;
 	uint32_t reserved_2[2];
-#else
-	uint32_t reserved_2[3];
-#endif
 	uint8_t node_name[WWN_SIZE];
 	uint8_t port_name[WWN_SIZE];
 };
@@ -2000,8 +1982,6 @@ typedef struct _mbx_cmdq_t {
 	struct _mbx_cmdq_t	*pnext;
 } mbx_cmdq_t;
 
-
-/* Linux PCI interface definitions */
 struct qla_fw_info {
 	unsigned short addressing;	/* addressing method used to load fw */
 #define FW_INFO_ADDR_NORMAL	0
@@ -2012,45 +1992,88 @@ struct qla_fw_info {
 	unsigned short *fwstart;	/* start address for F/W */
 	unsigned long *lfwstart;	/* start address (long) for F/W */
 };
-struct qla_board_info {
-	char name[9];			/* Board ID String */
-	struct qla_fw_info *fwinfo;
-};
 
+struct qla_board_info {
+	char *drv_name;
+
+	char isp_name[8];
+	struct qla_fw_info *fw_info;
+};
 
 /*
  * Linux Host Adapter structure
  */
 typedef struct scsi_qla_host {
-	struct list_head	list;
+	struct list_head list;
 
 	/* Commonly used flags and state information. */
+	struct Scsi_Host *host;
+	struct pci_dev	*pdev;
 
-	struct Scsi_Host	*host;
-	struct pci_dev		*pdev;
+	unsigned long	host_no;
+	unsigned long	instance;
 
-	unsigned long		host_no;
-	unsigned long		instance;
+	volatile struct {
+		uint32_t	init_done		:1;
+		uint32_t	online			:1;
+		uint32_t	mbox_int		:1;
+		uint32_t	mbox_busy		:1;
+		uint32_t	rscn_queue_overflow	:1;
+		uint32_t	reset_active		:1;
 
-	uint16_t		nvram_base;
+		uint32_t	management_server_logged_in :1;
+                uint32_t	process_response_queue	:1;
 
-	struct qla_board_info	*brd_info;
-	uint16_t		fw_major_version;
-	uint16_t		fw_minor_version;
-	uint16_t		fw_subminor_version;
-	uint16_t		fw_attributes;
-	uint32_t		fw_transfer_size;
+		uint32_t	disable_risc_code_load	:1;
+		uint32_t	enable_64bit_addressing	:1;
+		uint32_t	enable_lip_reset	:1;
+		uint32_t	enable_lip_full_login	:1;
+		uint32_t	enable_target_reset	:1;
+	} flags;
 
-	uint16_t		fw_options[16];		/* slots: 1,2,3,10,11 */
-	uint8_t			fw_seriallink_options[2];
+	atomic_t	loop_state;
+#define LOOP_TIMEOUT	1
+#define LOOP_DOWN	2
+#define LOOP_UP		3
+#define LOOP_UPDATE	4
+#define LOOP_READY	5
+#define LOOP_DEAD	6
+
+	unsigned long   dpc_flags;
+#define	RESET_MARKER_NEEDED	0	/* Send marker to ISP. */
+#define	RESET_ACTIVE		1
+#define	ISP_ABORT_NEEDED	2	/* Initiate ISP abort. */
+#define	ABORT_ISP_ACTIVE	3	/* ISP abort in progress. */
+#define	LOOP_RESYNC_NEEDED	4	/* Device Resync needed. */
+#define	LOOP_RESYNC_ACTIVE	5
+#define LOCAL_LOOP_UPDATE       6	/* Perform a local loop update. */
+#define RSCN_UPDATE             7	/* Perform an RSCN update. */
+#define MAILBOX_RETRY           8
+#define ISP_RESET_NEEDED        9	/* Initiate a ISP reset. */
+#define FAILOVER_EVENT_NEEDED   10
+#define FAILOVER_EVENT		11
+#define FAILOVER_NEEDED   	12
+#define SCSI_RESTART_NEEDED	13	/* Processes SCSI retry queue. */
+#define PORT_RESTART_NEEDED	14	/* Processes Retry queue. */
+#define RESTART_QUEUES_NEEDED	15	/* Restarts the Lun queue. */
+#define ABORT_QUEUES_NEEDED	16
+#define RELOGIN_NEEDED	        17
+#define LOGIN_RETRY_NEEDED	18	/* Initiate required fabric logins. */
+#define REGISTER_FC4_NEEDED	19	/* SNS FC4 registration required. */
+#define ISP_ABORT_RETRY         20      /* ISP aborted. */
+#define FCPORT_RESCAN_NEEDED	21      /* IO descriptor processing needed */
+#define IODESC_PROCESS_NEEDED	22      /* IO descriptor processing needed */
+
+	uint32_t	device_flags;
+#define DFLG_LOCAL_DEVICES		BIT_0
+#define DFLG_RETRY_LOCAL_DEVICES	BIT_1
+#define DFLG_FABRIC_DEVICES		BIT_2
+#define	SWITCH_FOUND			BIT_3
+#define	DFLG_NO_CABLE			BIT_4
 
 	/* SRB cache. */
-	kmem_cache_t	*srb_cachep;
-
-	ms_iocb_entry_t		*ms_iocb;
-	dma_addr_t		ms_iocb_dma;
-	struct ct_sns_pkt	*ct_sns;
-	dma_addr_t		ct_sns_dma;
+#define SRB_MIN_REQ	128
+	mempool_t	*srb_mempool;
 
 	/* This spinlock is used to protect "io transactions", you must	
 	 * aquire it before doing any IO to the card, eg with RD_REG*() and
@@ -2079,13 +2102,39 @@ typedef struct scsi_qla_host {
 	response_t      *response_ring;     /* Base virtual address */
 	response_t      *response_ring_ptr; /* Current address. */
 	uint16_t        rsp_ring_index;     /* Current index. */
+	uint16_t	response_q_length;
     
+	uint16_t	(*calc_request_entries)(uint16_t);
+	void		(*build_scsi_iocbs)(srb_t *, cmd_entry_t *, uint16_t);
+
 	/* Outstandings ISP commands. */
 	srb_t		*outstanding_cmds[MAX_OUTSTANDING_COMMANDS];
 	uint32_t	current_outstanding_cmd; 
+	srb_t		*status_srb;	/* Status continuation entry. */
 
-	uint16_t	(*calc_request_entries)(uint16_t);
-	void		(*build_scsi_iocbs)(srb_t *, cmd_entry_t *, uint16_t);
+	/*
+	 * Need to hold the list_lock with irq's disabled in order to access
+	 * the following list.
+	 *
+	 * This list_lock is of lower priority than the io_request_lock.
+	 *
+	 */
+	spinlock_t		list_lock ____cacheline_aligned;
+						/* lock to guard lists which
+						 * hold srb_t's */
+        struct list_head        retry_queue;    /* watchdog queue */
+        struct list_head        done_queue;     /* job on done queue */
+        struct list_head        failover_queue; /* failover list link. */
+	struct list_head        scsi_retry_queue;     /* SCSI retry queue */
+	struct list_head        pending_queue;	/* SCSI command pending queue */
+
+	unsigned long    done_q_cnt;
+	unsigned long    pending_in_q;
+        uint32_t	retry_q_cnt; 
+        uint32_t	scsi_retry_q_cnt; 
+        uint32_t	failover_cnt; 
+
+	unsigned long	last_irq_cpu;	/* cpu where we got our last irq */
 
 	uint16_t           revision;
 	uint8_t           ports;
@@ -2093,7 +2142,6 @@ typedef struct scsi_qla_host {
 	u_long            ipreq_cnt;
 	u_long            qthreads;
 
-	unsigned long	last_irq_cpu;	/* cpu where we got our last irq */
 	uint32_t        total_isr_cnt;		/* Interrupt count */
 	uint32_t        total_isp_aborts;	/* controller err cnt */
 	uint32_t        total_lip_cnt;		/* LIP cnt */
@@ -2102,54 +2150,67 @@ typedef struct scsi_qla_host {
 	uint64_t	total_bytes;		/* xfr byte cnt */
 	uint32_t	total_mbx_timeout;	/* mailbox timeout cnt */
 	uint32_t 	total_loop_resync; 	/* loop resyn cnt */
+	uint32_t	dropped_frame_error_cnt;
 
-	/* Adapter I/O statistics for failover */
-	uint64_t	IosRequested;
-	uint64_t	BytesRequested;
-	uint64_t	IosExecuted;
-	uint64_t	BytesExecuted;
+	/* ISP configuration data. */
+	uint16_t	loop_id;		/* Host adapter loop id */
+	uint16_t	fb_rev;
 
-	/* ISP connection configuration data */
-	uint16_t         max_public_loop_ids;
-	uint16_t         min_external_loopid; /* First external loop Id */
-	uint8_t          current_topology; /* Current ISP configuration */
-	uint8_t          prev_topology;    /* Previous ISP configuration */
-                     #define ISP_CFG_NL     1
-                     #define ISP_CFG_N      2
-                     #define ISP_CFG_FL     4
-                     #define ISP_CFG_F      8
-	uint16_t        loop_id;       /* Host adapter loop id */
-	port_id_t       d_id;           /* Host adapter port id */
+	port_id_t	d_id;			/* Host adapter port id */
+	uint16_t	max_public_loop_ids;
+	uint16_t	min_external_loopid;	/* First external loop Id */
 
-	uint8_t         operating_mode;  /* current F/W operating mode */
-		#define LOOP      0
-		#define P2P       1
-		#define LOOP_P2P  2
-		#define P2P_LOOP  3
+	uint8_t		current_topology;
+	uint8_t		prev_topology;
+#define ISP_CFG_NL	1
+#define ISP_CFG_N	2
+#define ISP_CFG_FL	4
+#define ISP_CFG_F	8
 
-	uint8_t         active_fc4_types;/* active fc4 types */
-	uint8_t         current_speed;   /* current F/W operating speed */
+	uint8_t		operating_mode;		/* F/W operating mode */
+#define LOOP      0
+#define P2P       1
+#define LOOP_P2P  2
+#define P2P_LOOP  3
+
+	uint8_t		active_fc4_types;	/* Active fc4 types */
+
+	uint8_t		current_speed;		/* F/W operating speed */
+        uint8_t		marker_needed; 
+	uint8_t		sns_retry_cnt;
+	uint8_t		mem_err;
+
+	uint8_t		interrupts_on;
+
+	/* HBA serial number */
+	uint8_t		serial0;
+	uint8_t		serial1;
+	uint8_t		serial2;
 
 	/* NVRAM configuration data */
-	uint16_t        loop_reset_delay;   /* Loop reset delay. */
-	uint16_t        minimum_timeout;    /* Minimum timeout. */
-	uint8_t         retry_count;
-	uint8_t         login_timeout;
+	uint16_t	nvram_base;
+
+	uint16_t	loop_reset_delay;
+	uint16_t	minimum_timeout;
+	uint8_t		retry_count;
+	uint8_t		login_timeout;
 	uint16_t	r_a_tov;
-	int             port_down_retry_count;
-	uint8_t         loop_down_timeout;
-	uint16_t        max_probe_luns;
-	uint16_t        max_luns;
-	uint16_t        max_targets;
-	
+	int		port_down_retry_count;
+	uint8_t		loop_down_timeout;
+	uint8_t		mbx_count;
+	uint16_t	max_probe_luns;
+	uint16_t	max_luns;
+	uint16_t	max_targets;
+	uint16_t	last_loop_id;
+
+        uint32_t	login_retry_count; 
+
 	/* Fibre Channel Device List. */
 	struct list_head	fcports;
-
 	struct list_head	rscn_fcports;
 
 	struct io_descriptor	io_descriptors[MAX_IO_DESCRIPTORS];
 	uint16_t		iodesc_signature;
-
 	port_database_t		*iodesc_pd;
 	dma_addr_t		iodesc_pd_dma;
 
@@ -2161,63 +2222,44 @@ typedef struct scsi_qla_host {
 	uint8_t rscn_in_ptr;
 	uint8_t rscn_out_ptr;
 
-	/*
-	 * Need to hold the list_lock with irq's disabled in order to
-	 * access the following list.
-	 * This list_lock is of lower priority than the io_request_lock.
-	 */
-	/*********************************************************/
-	spinlock_t		list_lock ____cacheline_aligned;
-						/* lock to guard lists which
-						 * hold srb_t's */
-        struct list_head        retry_queue;    /* watchdog queue */
-        struct list_head        done_queue;     /* job on done queue */
-        struct list_head        failover_queue; /* failover list link. */
-	struct list_head        scsi_retry_queue;     /* SCSI retry queue */
-	
-	struct list_head        pending_queue;	/* SCSI command pending queue */
-
-        /*********************************************************/
+	ms_iocb_entry_t		*ms_iocb;
+	dma_addr_t		ms_iocb_dma;
+	struct ct_sns_pkt	*ct_sns;
+	dma_addr_t		ct_sns_dma;
 
 	pid_t			dpc_pid;
 	int			dpc_should_die;
 	struct completion	dpc_inited;
 	struct completion	dpc_exited;
 	struct semaphore	*dpc_wait;
-
 	uint8_t dpc_active;                  /* DPC routine is active */
 
-	/* Received ISP mailbox data. */
-	volatile uint16_t mailbox_out[MAILBOX_REGISTER_COUNT];
+	/* Timeout timers. */
+	uint8_t         queue_restart_timer;   
+	uint8_t         loop_down_abort_time;    /* port down timer */
+	atomic_t        loop_down_timer;         /* loop down timer */
+	uint8_t         link_down_timeout;       /* link down timeout */
+
+	uint32_t        timer_active;
+	struct timer_list        timer;
 
 	/* Firmware Initialization Control Block data */
 	dma_addr_t	init_cb_dma;         /* Physical address. */
 	init_cb_t       *init_cb;
   
-	/* Timeout timers. */
-	uint8_t         queue_restart_timer;   
-	atomic_t        loop_down_timer;         /* loop down timer */
-	uint8_t         loop_down_abort_time;    /* port down timer */
-	uint8_t         link_down_timeout;       /* link down timeout */
-	uint32_t        timer_active;
-	uint32_t        forceLip;
-	struct timer_list        timer;
-
 	/* These are used by mailbox operations. */
+	volatile uint16_t mailbox_out[MAILBOX_REGISTER_COUNT];
+
 	mbx_cmd_t	*mcp;
 	unsigned long	mbx_cmd_flags;
-#define MBX_CMD_ACTIVE	1 /* first bit */
-#define MBX_CMD_WANT	2 /* 2nd bit */
-#define MBX_INTERRUPT	3 /* 3rd bit */
-#define MBX_INTR_WAIT   4 /* 4rd bit */
+#define MBX_CMD_ACTIVE	1
+#define MBX_CMD_WANT	2
+#define MBX_INTERRUPT	3
+#define MBX_INTR_WAIT   4
 
 	spinlock_t	mbx_reg_lock;   /* Mbx Cmd Register Lock */
 	spinlock_t	mbx_q_lock;     /* Mbx Active Cmd Queue Lock */
 	spinlock_t	mbx_bits_lock;  /* Mailbox access bits Lock */
-
-	uint32_t	mbx_lock_bits;  /* controlled by mbx_bits_lock */
-#define MBX_CMD_LOCK	1 /* first bit */
-#define MBX_CMD_WANT	2 /* 2nd bit */
 
 	struct semaphore  mbx_intr_sem;  /* Used for completion notification */
 
@@ -2231,146 +2273,54 @@ typedef struct scsi_qla_host {
 	mbx_cmdq_t	*mbx_q_head; /* Head Pointer to sem q for active cmds */
 	mbx_cmdq_t	*mbx_q_tail; /* Tail Pointer to sem q for active cmds */
 
+	uint32_t	mbx_flags;
+#define  MBX_IN_PROGRESS	BIT_0
+#define  MBX_BUSY		BIT_1	/* Got the Access */
+#define  MBX_SLEEPING_ON_SEM	BIT_2 
+#define  MBX_POLLING_FOR_COMP	BIT_3
+#define  MBX_COMPLETED		BIT_4
+#define  MBX_TIMEDOUT		BIT_5 
+#define  MBX_ACCESS_TIMEDOUT	BIT_6
 
-        uint32_t	retry_q_cnt; 
-        uint32_t	scsi_retry_q_cnt; 
-        uint32_t	failover_cnt; 
+	mbx_cmd_t 	mc;
 
 	uint8_t	*cmdline;
 
-        uint32_t	login_retry_count; 
-    
-	volatile struct
-	{
-		uint32_t     online                  :1;   /* 0 */
-		uint32_t     enable_64bit_addressing :1;   /* 1 */
-		uint32_t     mbox_int                :1;   /* 2 */
-		uint32_t     mbox_busy               :1;   /* 3 */
+	uint32_t failover_type;
+	uint32_t failback_delay;
+	unsigned long   cfg_flags;
+#define	CFG_ACTIVE	0	/* CFG during a failover, event update, or ioctl */
 
-		// UNUSED and UNASSIGNED
-		uint32_t     port_name_used          :1;   /* 4 */
+	uint32_t	binding_type;
+#define BIND_BY_PORT_NAME	0
+#define BIND_BY_PORT_ID		1
 
-		uint32_t     failover_enabled        :1;   /* 5 */
-		uint32_t     watchdog_enabled        :1;   /* 6 */
-		uint32_t     cfg_suspended   	     :1;   /* 7 */
+	/* Basic firmware related information. */
+	struct qla_board_info	*brd_info;
+	uint16_t	fw_major_version;
+	uint16_t	fw_minor_version;
+	uint16_t	fw_subminor_version;
+	uint16_t	fw_attributes;
+	uint32_t	fw_transfer_size;
 
-		uint32_t     disable_host_adapter    :1;   /* 8 */
-		uint32_t     rscn_queue_overflow     :1;   /* 9 */
-		uint32_t     reset_active            :1;   /* 10 */
+	uint16_t	fw_options[16];		/* slots: 1,2,3,10,11 */
+	uint8_t		fw_seriallink_options[2];
 
-		// UNUSED and UNASSIGNED
-		uint32_t     link_down_error_enable  :1;   /* 11 */
+	/* Firmware dump information. */
+	void		*fw_dump;
+	int		fw_dump_order;
+	int		fw_dump_reading;
+	char		*fw_dump_buffer;
+	int		fw_dump_buffer_len;
 
-		uint32_t     disable_risc_code_load  :1;   /* 12 */
-		uint32_t     set_cache_line_size_1   :1;   /* 13 */
+	uint8_t		host_str[16];
+	uint16_t	pci_attr;
+	uint16_t	xchg_buf_cnt;
+	uint16_t	iocb_buf_cnt;
 
-		// UNUSED and UNASSIGNED
-		uint32_t     enable_target_mode      :1;   /* 14 */
-
-		uint32_t     disable_luns            :1;   /* 15 */
-
-		uint32_t     enable_lip_reset        :1;   /* 16 */
-		uint32_t     enable_lip_full_login   :1;   /* 17 */
-		uint32_t     enable_target_reset     :1;   /* 18 */
-
-		// UNUSED and UNASSIGNED
-		uint32_t     updated_fc_db           :1;   /* 19 */
-
-		uint32_t     enable_flash_db_update  :1;   /* 20 */
-		uint32_t     in_isr                  :1;   /* 21 */
-		uint32_t     dpc_sched               :1;   /* 23 */
-
-		// UNUSED and UNASSIGNED
-		uint32_t     nvram_config_done       :1;   /* 24 */
-
-		// UNUSED and UNASSIGNED
-		uint32_t     update_config_needed    :1;   /* 25 */
-		uint32_t     management_server_logged_in    :1; /* 26 */
-                uint32_t     process_response_queue  :1;   /* 27 */
-	} flags;
-
-	uint32_t     device_flags;
-#define DFLG_LOCAL_DEVICES		BIT_0
-#define DFLG_RETRY_LOCAL_DEVICES	BIT_1
-#define DFLG_FABRIC_DEVICES		BIT_2
-#define	SWITCH_FOUND			BIT_3
-#define	DFLG_NO_CABLE			BIT_4
-
-        uint8_t		marker_needed; 
-	uint8_t		sns_retry_cnt;
-	uint8_t		mem_err;
-
-	unsigned long   dpc_flags;
-#define	RESET_MARKER_NEEDED	0	/* initiate sending a marker to ISP */
-#define	RESET_ACTIVE		1
-#define	ISP_ABORT_NEEDED	2	/* initiate ISP Abort */
-#define	ABORT_ISP_ACTIVE	3	/* isp abort in progress */
-
-#define	LOOP_RESYNC_NEEDED	4	/* initiate a configure fabric sequence */
-#define	LOOP_RESYNC_ACTIVE	5
-
-/* UNUSED BITS */
-/*
-#define	COMMAND_WAIT_NEEDED	6
-#define	COMMAND_WAIT_ACTIVE	7
-*/
-
-#define LOCAL_LOOP_UPDATE       8	/* Perform a local loop update */
-#define RSCN_UPDATE             9	/* Perform a RSCN update */
-#define MAILBOX_RETRY           10
-#define ISP_RESET_NEEDED        11	/* Initiate a ISP reset ??? */
-
-#define FAILOVER_EVENT_NEEDED   12
-#define FAILOVER_EVENT		13
-#define FAILOVER_NEEDED   	14
-
-/* UNUSED BITS */
-/*
-#define LOOP_RESET_NEEDED	15
-#define DEVICE_RESET_NEEDED	16
-#define DEVICE_ABORT_NEEDED	17
- */
-
-#define SCSI_RESTART_NEEDED	18	/* Processes any requests in scsi retry queue */
-#define PORT_RESTART_NEEDED	19	/* Processes any requests in retry queue */
-
-#define RESTART_QUEUES_NEEDED	20	/* Restarts requeusts in the lun queue */
-#define ABORT_QUEUES_NEEDED	21
-#define RELOGIN_NEEDED	        22
-#define LOGIN_RETRY_NEEDED	23	/* initiates any fabric logins that are required */ 
-#define REGISTER_FC4_NEEDED	24	/* set when need to register again.*/
-
-/* UNUSED BITS */
-/*
-#define TASKLET_SCHED		25
-#define DONE_RUNNING		26
- */
-
-#define ISP_ABORT_RETRY         27      /* ISP aborted. */
-
-#define FCPORT_RESCAN_NEEDED	28      /* IO descriptor processing needed */
-#define IODESC_PROCESS_NEEDED	29      /* IO descriptor processing needed */
-
-	uint8_t		interrupts_on;
-	uint8_t		init_done;
-
-	volatile uint16_t loop_state;
-#define LOOP_TIMEOUT 0x01
-#define LOOP_DOWN    0x02
-#define LOOP_UP      0x04
-#define LOOP_UPDATE  0x08
-#define LOOP_READY   0x10
-#define LOOP_DEAD    0x20	/* Link Down Timer expires */
-
-	mbx_cmd_t 	mc;
-	uint32_t	mbx_flags;
-#define  MBX_IN_PROGRESS  BIT_0
-#define  MBX_BUSY       BIT_1 /* Got the Access */
-#define  MBX_SLEEPING_ON_SEM  BIT_2 
-#define  MBX_POLLING_FOR_COMP  BIT_3
-#define  MBX_COMPLETED      BIT_4
-#define  MBX_TIMEDOUT       BIT_5 
-#define  MBX_ACCESS_TIMEDOUT BIT_6
+	uint8_t model_number[16+1];
+#define BINZERO		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+	char *model_desc;
 
 /* following are new and needed for IOCTL support */
 	hba_ioctl_context *ioctl;
@@ -2386,55 +2336,15 @@ typedef struct scsi_qla_host {
 	uint32_t    ioctl_mem_size;
 	uint32_t    isp_abort_cnt;
 
-	/* HBA serial number */
-	uint8_t     serial0;
-	uint8_t     serial1;
-	uint8_t     serial2;
+	/* Adapter I/O statistics for failover */
+	uint64_t	IosRequested;
+	uint64_t	BytesRequested;
+	uint64_t	IosExecuted;
+	uint64_t	BytesExecuted;
 
-#if defined(ISP2300)
-	uint16_t fb_rev;
-#endif
-
-	/* HBA Model Number */
-	uint8_t model_number[16+1];
-#define BINZERO		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-
-	/* OEM related items */
-	uint8_t oem_specific[16];
-
-	uint32_t    dump_done;
-	unsigned long    done_q_cnt;
-	unsigned long    pending_in_q;
-
-	uint32_t failover_type;
-	uint32_t failback_delay;
-	unsigned long   cfg_flags;
-#define	CFG_ACTIVE	0	/* CFG during a failover, event update, or ioctl */
-
-	uint32_t	binding_type;
-#define BIND_BY_PORT_NAME	0
-#define BIND_BY_PORT_ID		1
-#define BIND_BY_NODE_NAME	2
-
-	srb_t	*status_srb;    /* Keep track of Status Continuation Entries */
-
-	uint32_t	dropped_frame_error_cnt;
-
-#if defined(ISP2300)
 	/* Needed for BEACON */
 	uint16_t	beacon_blink_led;
 	uint16_t	beacon_green_on;
-#endif
-
-	uint8_t host_str[16];
-	uint16_t	pci_attr;
-	uint16_t	xchg_buf_cnt;
-	uint16_t	iocb_buf_cnt;
-
-	struct fw_dump	*fw_dump;
-	int		fw_dump_order;
-	int		fw_dump_reading;
-	char		*fw_dump_buffer;
 } scsi_qla_host_t;
 
 
@@ -2450,7 +2360,7 @@ typedef struct scsi_qla_host {
 	  test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags) || \
 	  test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags) || \
 	  test_bit(LOOP_RESYNC_ACTIVE, &ha->dpc_flags)) || \
-	 ha->loop_state == LOOP_DOWN)
+	 atomic_read(&ha->loop_state) == LOOP_DOWN)
 				 
 #define LOOP_RDY(ha)	(!LOOP_NOT_READY(ha))
 
@@ -2461,7 +2371,7 @@ typedef struct scsi_qla_host {
 #define KMEM_ZALLOC(siz,id)	qla2x00_kmem_zalloc((siz), GFP_ATOMIC, (id))
 #define KMEM_FREE(ip,siz)	kfree((ip))
 
-#define QLA_HA(x)		((scsi_qla_host_t *) x->hostdata)
+#define to_qla_host(x)		((scsi_qla_host_t *) (x)->hostdata)
 
 #define qla_printk(level, ha, format, arg...) \
 	dev_printk(level , &((ha)->pdev->dev) , format , ## arg)
@@ -2493,14 +2403,6 @@ typedef struct scsi_qla_host {
 #define QLA_RSCNS_HANDLED		0x108
 
 /*
- * LOCK MACROS
- */
-#define QLA_MBX_REG_LOCK(ha) \
-	spin_lock_irqsave(&(ha)->mbx_reg_lock, mbx_flags)
-#define QLA_MBX_REG_UNLOCK(ha) \
-	spin_unlock_irqrestore(&(ha)->mbx_reg_lock, mbx_flags)
-
-/*
 * Stat info for all adpaters
 */
 struct _qla2x00stats  {
@@ -2518,7 +2420,6 @@ struct _qla2x00stats  {
 #define NVRAM_DELAY()		udelay(10)
 #define UDELAY(x)		udelay(x)
 
-#define CACHE_FLUSH(a)	(RD_REG_WORD(a))
 #define INVALID_HANDLE	(MAX_OUTSTANDING_COMMANDS+1)
 
 /*
@@ -2526,8 +2427,7 @@ struct _qla2x00stats  {
  */
 #define FLASH_IMAGE_SIZE	131072
 
-#include "qla_fo.h"
-#include "qla_cfg.h"
+#include "qla_foln.h"
 #include "qla_gbl.h"
 #include "qla_dbg.h"
 #include "qla_inline.h"
