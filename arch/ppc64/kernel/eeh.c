@@ -94,16 +94,13 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 
 		dev = pci_find_slot(bus, devfn);
 		if (dev) {
-			udbg_printf("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
-			      rets[0], dev->slot_name, dev->name);
-			printk("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
+			printk(KERN_ERR "EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
 			      rets[0], dev->slot_name, dev->name);
 			PPCDBG_ENTER_DEBUGGER();
 			panic("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
 			      rets[0], dev->slot_name, dev->name);
 		} else {
-			udbg_printf("EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
-			printk("EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
+			printk(KERN_ERR "EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
 			PPCDBG_ENTER_DEBUGGER();
 			panic("EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
 		}
@@ -112,8 +109,46 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	return val;	/* good case */
 }
 
+struct eeh_early_enable_info {
+	unsigned int buid_hi;
+	unsigned int buid_lo;
+	int adapters_enabled;
+};
+
+/* Enable eeh for the given device node. */
+static void *early_enable_eeh(struct device_node *dn, void *data)
+{
+	struct eeh_early_enable_info *info = data;
+	long ret;
+
+	/* Try to enable eeh */
+	ret = rtas_call(ibm_set_eeh_option, 4, 1, NULL,
+			CONFIG_ADDR(dn->busno, dn->devfn),
+			info->buid_hi, info->buid_lo, EEH_ENABLE);
+	if (ret == 0)
+		info->adapters_enabled++;
+	return NULL; 
+}
+
+/*
+ * Initialize eeh by trying to enable it for all of the adapters in the system.
+ * As a side effect we can determine here if eeh is supported at all.
+ * Note that we leave EEH on so failed config cycles won't cause a machine
+ * check.  If a user turns off EEH for a particular adapter they are really
+ * telling Linux to ignore errors.
+ *
+ * We should probably distinguish between "ignore errors" and "turn EEH off"
+ * but for now disabling EEH for adapters is mostly to work around drivers that
+ * directly access mmio space (without using the macros).
+ *
+ * The eeh-force-off/on option does literally what it says, so if Linux must
+ * avoid enabling EEH this must be done.
+ */
 void eeh_init(void)
 {
+	struct device_node *phb;
+	struct eeh_early_enable_info info;
+
 	extern char cmd_line[];	/* Very early cmd line parse.  Cheap, but works. */
 	char *eeh_force_off = strstr(cmd_line, "eeh-force-off");
 	char *eeh_force_on = strstr(cmd_line, "eeh-force-on");
@@ -127,7 +162,7 @@ void eeh_init(void)
 	if (eeh_force_off > eeh_force_on) {
 		/* User is forcing EEH off.  Be noisy if it is implemented. */
 		if (eeh_implemented)
-			printk("EEH: WARNING: PCI Enhanced I/O Error Handling is user disabled\n");
+			printk(KERN_WARNING "EEH: WARNING: PCI Enhanced I/O Error Handling is user disabled\n");
 		eeh_implemented = 0;
 		return;
 	}
@@ -135,8 +170,29 @@ void eeh_init(void)
 	if (eeh_force_on > eeh_force_off)
 		eeh_implemented = 1;	/* User is forcing it on. */
 
-	if (eeh_implemented)
-		printk("EEH: PCI Enhanced I/O Error Handling Enabled\n");
+	/* Enable EEH for all adapters.  Note that eeh requires buid's */
+	info.adapters_enabled = 0;
+	for (phb = find_devices("pci"); phb; phb = phb->next) {
+		int len;
+		int *buid_vals = (int *) get_property(phb, "ibm,fw-phb-id", &len);
+		if (!buid_vals)
+			continue;
+		if (len == sizeof(int)) {
+			info.buid_lo = buid_vals[0];
+			info.buid_hi = 0;
+		} else if (len == sizeof(int)*2) {
+			info.buid_hi = buid_vals[0];
+			info.buid_lo = buid_vals[1];
+		} else {
+			printk("EEH: odd ibm,fw-phb-id len returned: %d\n", len);
+			continue;
+		}
+		traverse_pci_devices(phb, early_enable_eeh, NULL, &info);
+	}
+	if (info.adapters_enabled) {
+		printk(KERN_INFO "EEH: PCI Enhanced I/O Error Handling Enabled\n");
+		eeh_implemented = 1;
+	}
 }
 
 
@@ -167,7 +223,7 @@ int is_eeh_configured(struct pci_dev *dev)
 
 	if (!eeh_check_opts_config(dev, default_state)) {
 		if (default_state)
-			printk("EEH: %s %s user requested to run without EEH.\n", dev->slot_name, dev->name);
+			printk(KERN_INFO "EEH: %s %s user requested to run without EEH.\n", dev->slot_name, dev->name);
 		return 0;
 	}
 
@@ -175,7 +231,6 @@ int is_eeh_configured(struct pci_dev *dev)
 			CONFIG_ADDR(dn->busno, dn->devfn),
 			BUID_HI(phb->buid), BUID_LO(phb->buid));
 	eeh_capable = (ret == 0 && rets[1] == 1);
-	printk("EEH: %s %s is%s EEH capable.\n", dev->slot_name, dev->name, eeh_capable ? "" : " not");
 	return eeh_capable;
 }
 
@@ -318,7 +373,7 @@ static int __init eeh_parm(char *str, int state)
 		if (*cur) {
 			int curlen = curend-cur;
 			if (eeh_opts_last + curlen > EEH_MAX_OPTS-2) {
-				printk("EEH: sorry...too many eeh cmd line options\n");
+				printk(KERN_INFO "EEH: sorry...too many eeh cmd line options\n");
 				return 1;
 			}
 			eeh_opts[eeh_opts_last++] = state ? '+' : '-';
