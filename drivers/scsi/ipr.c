@@ -736,13 +736,13 @@ static void ipr_send_hcam(struct ipr_ioa_cfg *ioa_cfg, u8 type,
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_HCAM;
 		ioarcb->cmd_pkt.cdb[0] = IPR_HOST_CONTROLLED_ASYNC;
 		ioarcb->cmd_pkt.cdb[1] = type;
-		ioarcb->cmd_pkt.cdb[7] = (IPR_HOSTRCB_SZ >> 8) & 0xff;
-		ioarcb->cmd_pkt.cdb[8] = IPR_HOSTRCB_SZ & 0xff;
+		ioarcb->cmd_pkt.cdb[7] = (sizeof(hostrcb->hcam) >> 8) & 0xff;
+		ioarcb->cmd_pkt.cdb[8] = sizeof(hostrcb->hcam) & 0xff;
 
-		ioarcb->read_data_transfer_length = cpu_to_be32(IPR_HOSTRCB_SZ);
+		ioarcb->read_data_transfer_length = cpu_to_be32(sizeof(hostrcb->hcam));
 		ioarcb->read_ioadl_len = cpu_to_be32(sizeof(struct ipr_ioadl_desc));
 		ipr_cmd->ioadl[0].flags_and_data_len =
-			cpu_to_be32(IPR_IOADL_FLAGS_READ_LAST | IPR_HOSTRCB_SZ);
+			cpu_to_be32(IPR_IOADL_FLAGS_READ_LAST | sizeof(hostrcb->hcam));
 		ipr_cmd->ioadl[0].address = cpu_to_be32(hostrcb->hostrcb_dma);
 
 		if (type == IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE)
@@ -794,7 +794,7 @@ static void ipr_handle_config_change(struct ipr_ioa_cfg *ioa_cfg,
 	struct ipr_config_table_entry *cfgte;
 	u32 is_ndn = 1;
 
-	cfgte = &hostrcb->ccn.cfgte;
+	cfgte = &hostrcb->hcam.ccn.cfgte;
 
 	list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
 		if (!memcmp(&res->cfgte.res_addr, &cfgte->res_addr,
@@ -822,7 +822,7 @@ static void ipr_handle_config_change(struct ipr_ioa_cfg *ioa_cfg,
 
 	memcpy(&res->cfgte, cfgte, sizeof(struct ipr_config_table_entry));
 
-	if (hostrcb->notify_type == IPR_HOST_RCB_NOTIF_TYPE_REM_ENTRY) {
+	if (hostrcb->hcam.notify_type == IPR_HOST_RCB_NOTIF_TYPE_REM_ENTRY) {
 		if (res->sdev) {
 			res->sdev->hostdata = NULL;
 			res->del_from_ml = 1;
@@ -902,7 +902,7 @@ static void ipr_log_vpd(struct ipr_std_inq_vpids *vpids, u8 *serial_num)
 static void ipr_log_cache_error(struct ipr_ioa_cfg *ioa_cfg,
 				struct ipr_hostrcb *hostrcb)
 {
-	struct ipr_hostrcb_type_02_error *error = &hostrcb->error.type_02_error;
+	struct ipr_hostrcb_type_02_error *error = &hostrcb->hcam.error.type_02_error;
 
 	ipr_err("-----Current Configuration-----\n");
 	ipr_err("Cache Directory Card Information:\n");
@@ -938,13 +938,13 @@ static void ipr_log_config_error(struct ipr_ioa_cfg *ioa_cfg,
 	int errors_logged, i;
 	struct ipr_hostrcb_device_data_entry *dev_entry;
 
-	errors_logged = be32_to_cpu(hostrcb->error.type_03_error.errors_logged);
+	errors_logged = be32_to_cpu(hostrcb->hcam.error.type_03_error.errors_logged);
 
 	ipr_err("Device Errors Detected/Logged: %d/%d\n",
-		be32_to_cpu(hostrcb->error.type_03_error.errors_detected),
+		be32_to_cpu(hostrcb->hcam.error.type_03_error.errors_detected),
 		errors_logged);
 
-	dev_entry = hostrcb->error.type_03_error.dev_entry;
+	dev_entry = hostrcb->hcam.error.type_03_error.dev_entry;
 
 	for (i = 0; i < errors_logged; i++, dev_entry++) {
 		ipr_err_separator;
@@ -996,7 +996,7 @@ static void ipr_log_array_error(struct ipr_ioa_cfg *ioa_cfg,
 
 	memset(zero_sn, '0', IPR_SERIAL_NUM_LEN);
 
-	error = &hostrcb->error.type_04_error;
+	error = &hostrcb->hcam.error.type_04_error;
 
 	ipr_err_separator;
 
@@ -1064,7 +1064,7 @@ static void ipr_log_generic_error(struct ipr_ioa_cfg *ioa_cfg,
 				  struct ipr_hostrcb *hostrcb)
 {
 	int i;
-	int ioa_data_len = be32_to_cpu(hostrcb->length);
+	int ioa_data_len = be32_to_cpu(hostrcb->hcam.length);
 
 	if (ioa_data_len == 0)
 		return;
@@ -1074,10 +1074,10 @@ static void ipr_log_generic_error(struct ipr_ioa_cfg *ioa_cfg,
 
 	for (i = 0; i < ioa_data_len / 4; i += 4) {
 		ipr_err("%08X: %08X %08X %08X %08X\n", i*4,
-			be32_to_cpu(hostrcb->raw.data[i]),
-			be32_to_cpu(hostrcb->raw.data[i+1]),
-			be32_to_cpu(hostrcb->raw.data[i+2]),
-			be32_to_cpu(hostrcb->raw.data[i+3]));
+			be32_to_cpu(hostrcb->hcam.raw.data[i]),
+			be32_to_cpu(hostrcb->hcam.raw.data[i+1]),
+			be32_to_cpu(hostrcb->hcam.raw.data[i+2]),
+			be32_to_cpu(hostrcb->hcam.raw.data[i+3]));
 	}
 }
 
@@ -1119,19 +1119,19 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 	u32 ioasc;
 	int error_index;
 
-	if (hostrcb->notify_type != IPR_HOST_RCB_NOTIF_TYPE_ERROR_LOG_ENTRY)
+	if (hostrcb->hcam.notify_type != IPR_HOST_RCB_NOTIF_TYPE_ERROR_LOG_ENTRY)
 		return;
 
-	if (hostrcb->notifications_lost == IPR_HOST_RCB_NOTIFICATIONS_LOST)
+	if (hostrcb->hcam.notifications_lost == IPR_HOST_RCB_NOTIFICATIONS_LOST)
 		dev_err(&ioa_cfg->pdev->dev, "Error notifications lost\n");
 
-	ioasc = be32_to_cpu(hostrcb->error.failing_dev_ioasc);
+	ioasc = be32_to_cpu(hostrcb->hcam.error.failing_dev_ioasc);
 
 	if (ioasc == IPR_IOASC_BUS_WAS_RESET ||
 	    ioasc == IPR_IOASC_BUS_WAS_RESET_BY_OTHER) {
 		/* Tell the midlayer we had a bus reset so it will handle the UA properly */
 		scsi_report_bus_reset(ioa_cfg->host,
-				      hostrcb->error.failing_dev_res_addr.bus);
+				      hostrcb->hcam.error.failing_dev_res_addr.bus);
 	}
 
 	error_index = ipr_get_error(ioasc);
@@ -1139,8 +1139,8 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 	if (!ipr_error_table[error_index].log_hcam)
 		return;
 
-	if (ipr_is_device(&hostrcb->error.failing_dev_res_addr)) {
-		ipr_res_err(ioa_cfg, hostrcb->error.failing_dev_res_addr,
+	if (ipr_is_device(&hostrcb->hcam.error.failing_dev_res_addr)) {
+		ipr_res_err(ioa_cfg, hostrcb->hcam.error.failing_dev_res_addr,
 			    "%s\n", ipr_error_table[error_index].error);
 	} else {
 		dev_err(&ioa_cfg->pdev->dev, "%s\n",
@@ -1153,7 +1153,7 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 	if (ioa_cfg->log_level < IPR_DEFAULT_LOG_LEVEL)
 		return;
 
-	switch (hostrcb->overlay_id) {
+	switch (hostrcb->hcam.overlay_id) {
 	case IPR_HOST_RCB_OVERLAY_ID_1:
 		ipr_log_generic_error(ioa_cfg, hostrcb);
 		break;
@@ -1173,7 +1173,7 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 	default:
 		dev_err(&ioa_cfg->pdev->dev,
 			"Unknown error received. Overlay ID: %d\n",
-			hostrcb->overlay_id);
+			hostrcb->hcam.overlay_id);
 		break;
 	}
 }
@@ -4886,12 +4886,12 @@ static void ipr_get_unit_check_buffer(struct ipr_ioa_cfg *ioa_cfg)
 	hostrcb = list_entry(ioa_cfg->hostrcb_free_q.next,
 			     struct ipr_hostrcb, queue);
 	list_del(&hostrcb->queue);
-	memset(hostrcb, 0, IPR_HOSTRCB_SZ);
+	memset(&hostrcb->hcam, 0, sizeof(hostrcb->hcam));
 
 	rc = ipr_get_ldump_data_section(ioa_cfg,
 					be32_to_cpu(sdt.entry[0].bar_str_offset),
-					(u32 *)hostrcb,
-					min(length, (int)IPR_HOSTRCB_SZ) / sizeof(u32));
+					(u32 *)&hostrcb->hcam,
+					min(length, (int)sizeof(hostrcb->hcam)) / sizeof(u32));
 
 	if (!rc)
 		ipr_handle_log_data(ioa_cfg, hostrcb);
@@ -5531,7 +5531,8 @@ static int __devinit ipr_alloc_mem(struct ipr_ioa_cfg *ioa_cfg)
 			goto cleanup;
 
 		memset(ioa_cfg->hostrcb[i], 0, sizeof(struct ipr_hostrcb));
-		ioa_cfg->hostrcb[i]->hostrcb_dma = ioa_cfg->hostrcb_dma[i];
+		ioa_cfg->hostrcb[i]->hostrcb_dma =
+			ioa_cfg->hostrcb_dma[i] + offsetof(struct ipr_hostrcb, hcam);
 		list_add_tail(&ioa_cfg->hostrcb[i]->queue, &ioa_cfg->hostrcb_free_q);
 	}
 

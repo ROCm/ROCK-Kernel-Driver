@@ -624,7 +624,7 @@ struct ipr_hostrcb_raw {
 	u32 data[sizeof(struct ipr_hostrcb_error)/sizeof(u32)];
 }__attribute__((packed, aligned (4)));
 
-struct ipr_hostrcb {
+struct ipr_hcam {
 	u8 op_code;
 #define IPR_HOST_RCB_OP_CODE_CONFIG_CHANGE			0xE1
 #define IPR_HOST_RCB_OP_CODE_LOG_DATA				0xE2
@@ -663,13 +663,13 @@ struct ipr_hostrcb {
 		struct ipr_hostrcb_cfg_ch_not ccn;
 		struct ipr_hostrcb_raw raw;
 	};
-
-	/* Driver added data */
-	u32 hostrcb_dma;
-	struct list_head queue;
 }__attribute__((packed, aligned (4)));
 
-#define IPR_HOSTRCB_SZ offsetof(struct ipr_hostrcb, hostrcb_dma)
+struct ipr_hostrcb {
+	struct ipr_hcam hcam;
+	u32 hostrcb_dma;
+	struct list_head queue;
+};
 
 /* IPR smart dump table structures */
 struct ipr_sdt_entry {
