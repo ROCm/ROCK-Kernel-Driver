@@ -153,7 +153,7 @@ make_bi_recs(unsigned long addr)
 
 	rec = bi_rec_alloc(rec, 2);
 	rec->tag = BI_MACHTYPE;
-	rec->data[0] = _MACH_pSeries;
+	rec->data[0] = PLATFORM_PSERIES;
 	rec->data[1] = 1;
 
 	if ( initrd_size > 0 ) {
