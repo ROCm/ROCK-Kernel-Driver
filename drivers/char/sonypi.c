@@ -646,7 +646,7 @@ static struct file_operations sonypi_misc_fops = {
 };
 
 struct miscdevice sonypi_misc_device = {
-	.minor		= -1,
+	.minor		= MISC_DYNAMIC_MINOR,
 	.name		= "sonypi",
 	.fops		= &sonypi_misc_fops,
 };
@@ -755,7 +755,8 @@ static int __devinit sonypi_probe(void)
 		goto out_pcienable;
 	}
 
-	sonypi_misc_device.minor = (minor == -1) ? MISC_DYNAMIC_MINOR : minor;
+	if (minor != -1)
+		sonypi_misc_device.minor = minor;
 	if ((ret = misc_register(&sonypi_misc_device))) {
 		printk(KERN_ERR "sonypi: misc_register failed\n");
 		goto out_miscreg;
