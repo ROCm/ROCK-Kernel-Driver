@@ -433,7 +433,7 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		break;
 
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
-	  	if (!access_ok(VERIFY_WRITE, (unsigned __user *)data, 
+	  	if (!access_ok(VERIFY_WRITE, (unsigned __user *)data,
 			       sizeof(struct user_regs_struct))) {
 			ret = -EIO;
 			break;
@@ -448,8 +448,8 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp;
-	  	if (!access_ok(VERIFY_READ, (unsigned __user *)data, 
-			       sizeof(struct user_regs_struct))) { 
+	  	if (!access_ok(VERIFY_READ, (unsigned __user *)data,
+			       sizeof(struct user_regs_struct))) {
 			ret = -EIO;
 			break;
 		}

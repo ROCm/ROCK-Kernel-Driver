@@ -101,10 +101,12 @@
 #define H_VIO_SIGNAL		0x104
 #define H_SEND_CRQ		0x108
 #define H_COPY_RDMA             0x110
-#define H_POLL_PENDING	        0x1D8
+#define H_STUFF_TCE		0x138
+#define H_PUT_TCE_INDIRECT	0x13C
 #define H_VTERM_PARTNER_INFO	0x150
-#define H_REGISTER_VTERM		0x154
-#define H_FREE_VTERM			0x158
+#define H_REGISTER_VTERM	0x154
+#define H_FREE_VTERM		0x158
+#define H_POLL_PENDING	        0x1D8
 
 /* plpar_hcall() -- Generic call interface using above opcodes
  *

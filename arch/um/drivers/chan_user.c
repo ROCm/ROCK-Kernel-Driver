@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2000, 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000 - 2003 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <termios.h>
-#include <fcntl.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -21,33 +20,6 @@
 #include "os.h"
 #include "choose-mode.h"
 #include "mode.h"
-
-void generic_close(int fd, void *unused)
-{
-	close(fd);
-}
-
-int generic_read(int fd, char *c_out, void *unused)
-{
-	int n;
-
-	n = read(fd, c_out, sizeof(*c_out));
-	if(n < 0){
-		if(errno == EAGAIN) return(0);
-		return(-errno);
-	}
-	else if(n == 0) return(-EIO);
-	return(1);
-}
-
-int generic_write(int fd, const char *buf, int n, void *unused)
-{
-	int count;
-
-	count = write(fd, buf, n);
-	if(count < 0) return(-errno);
-	return(count);
-}
 
 int generic_console_write(int fd, const char *buf, int n, void *unused)
 {
@@ -65,26 +37,6 @@ int generic_console_write(int fd, const char *buf, int n, void *unused)
 	return(err);
 }
 
-int generic_window_size(int fd, void *unused, unsigned short *rows_out,
-			unsigned short *cols_out)
-{
-	struct winsize size;
-	int ret = 0;
-
-	if(ioctl(fd, TIOCGWINSZ, &size) == 0){
-		ret = ((*rows_out != size.ws_row) || 
-		       (*cols_out != size.ws_col));
-		*rows_out = size.ws_row;
-		*cols_out = size.ws_col;
-	}
-	return(ret);
-}
-
-void generic_free(void *data)
-{
-	kfree(data);
-}
-
 static void winch_handler(int sig)
 {
 }
@@ -100,14 +52,16 @@ static int winch_thread(void *arg)
 	struct winch_data *data = arg;
 	sigset_t sigs;
 	int pty_fd, pipe_fd;
+	int count, err;
 	char c = 1;
 
-	close(data->close_me);
+	os_close_file(data->close_me);
 	pty_fd = data->pty_fd;
 	pipe_fd = data->pipe_fd;
-	if(write(pipe_fd, &c, sizeof(c)) != sizeof(c))
+	count = os_write_file(pipe_fd, &c, sizeof(c));
+	if(count != sizeof(c))
 		printk("winch_thread : failed to write synchronization "
-		       "byte, errno = %d\n", errno);
+		       "byte, err = %d\n", -count);
 
 	signal(SIGWINCH, winch_handler);
 	sigfillset(&sigs);
@@ -123,26 +77,24 @@ static int winch_thread(void *arg)
 		exit(1);
 	}
 
-	if(ioctl(pty_fd, TIOCSCTTY, 0) < 0){
-		printk("winch_thread : TIOCSCTTY failed, errno = %d\n", errno);
-		exit(1);
-	}
-	if(tcsetpgrp(pty_fd, os_getpid()) < 0){
-		printk("winch_thread : tcsetpgrp failed, errno = %d\n", errno);
+	err = os_new_tty_pgrp(pty_fd, os_getpid());
+	if(err < 0){
+		printk("winch_thread : new_tty_pgrp failed, err = %d\n", -err);
 		exit(1);
 	}
 
-	if(read(pipe_fd, &c, sizeof(c)) != sizeof(c))
+	count = os_read_file(pipe_fd, &c, sizeof(c));
+	if(count != sizeof(c))
 		printk("winch_thread : failed to read synchronization byte, "
-		       "errno = %d\n", errno);
+		       "err = %d\n", -count);
 
 	while(1){
 		pause();
 
-		if(write(pipe_fd, &c, sizeof(c)) != sizeof(c)){
-			printk("winch_thread : write failed, errno = %d\n",
-			       errno);
-		}
+		count = os_write_file(pipe_fd, &c, sizeof(c));
+		if(count != sizeof(c))
+			printk("winch_thread : write failed, err = %d\n",
+			       -count);
 	}
 }
 
@@ -154,8 +106,8 @@ static int winch_tramp(int fd, void *device_data, int *fd_out)
 	char c;
 
 	err = os_pipe(fds, 1, 1);
-	if(err){
-		printk("winch_tramp : os_pipe failed, errno = %d\n", -err);
+	if(err < 0){
+		printk("winch_tramp : os_pipe failed, err = %d\n", -err);
 		return(err);
 	}
 
@@ -168,12 +120,12 @@ static int winch_tramp(int fd, void *device_data, int *fd_out)
 		return(pid);
 	}
 
-	close(fds[1]);
+	os_close_file(fds[1]);
 	*fd_out = fds[0];
-	n = read(fds[0], &c, sizeof(c));
+	n = os_read_file(fds[0], &c, sizeof(c));
 	if(n != sizeof(c)){
 		printk("winch_tramp : failed to read synchronization byte\n");
-		printk("read returned %d, errno = %d\n", n, errno);
+		printk("read failed, err = %d\n", -n);
 		printk("fd %d will not support SIGWINCH\n", fd);
 		*fd_out = -1;
 	}
@@ -183,20 +135,24 @@ static int winch_tramp(int fd, void *device_data, int *fd_out)
 void register_winch(int fd, void *device_data)
 {
 	int pid, thread, thread_fd;
+	int count;
 	char c = 1;
 
-	if(!isatty(fd)) return;
+	if(!isatty(fd))
+		return;
 
 	pid = tcgetpgrp(fd);
-	if(!CHOOSE_MODE(is_tracer_winch(pid, fd, device_data), 0) && 
-	   (pid == -1)){
+	if(!CHOOSE_MODE_PROC(is_tracer_winch, is_skas_winch, pid, fd,
+			     device_data) && (pid == -1)){
 		thread = winch_tramp(fd, device_data, &thread_fd);
 		if(fd != -1){
 			register_winch_irq(thread_fd, fd, thread, device_data);
 
-			if(write(thread_fd, &c, sizeof(c)) != sizeof(c))
+			count = os_write_file(thread_fd, &c, sizeof(c));
+			if(count != sizeof(c))
 				printk("register_winch : failed to write "
-				       "synchronization byte\n");
+				       "synchronization byte, err = %d\n",
+					-count);
 		}
 	}
 }

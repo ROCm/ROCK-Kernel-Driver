@@ -1340,7 +1340,7 @@ static struct urb *uhci_find_urb_ep(struct uhci_hcd *uhci, struct urb *urb)
 
 static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 {
-	int ret = -EINVAL;
+	int ret;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned long flags;
 	struct urb *eurb;
@@ -1348,7 +1348,8 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 
 	spin_lock_irqsave(&uhci->schedule_lock, flags);
 
-	if (urb->status != -EINPROGRESS)	/* URB already unlinked! */
+	ret = urb->status;
+	if (ret != -EINPROGRESS)		/* URB already unlinked! */
 		goto out;
 
 	eurb = uhci_find_urb_ep(uhci, urb);
@@ -1632,13 +1633,6 @@ static void stall_callback(unsigned long ptr)
 		/* Check if the FSBR timed out */
 		if (up->fsbr && !up->fsbr_timeout && time_after_eq(jiffies, up->fsbrtime + IDLE_TIMEOUT))
 			uhci_fsbr_timeout(uhci, u);
-
-		/* Check if the URB timed out */
-		if (u->timeout && u->status == -EINPROGRESS &&
-			time_after_eq(jiffies, up->inserttime + u->timeout)) {
-			u->status = -ETIMEDOUT;
-			list_move_tail(&up->urb_list, &list);
-		}
 
 		spin_unlock(&u->lock);
 	}
@@ -2254,7 +2248,8 @@ static int uhci_start(struct usb_hcd *hcd)
 			irq = 7;
 
 		/* Only place we don't use the frame list routines */
-		uhci->fl->frame[i] = cpu_to_le32(uhci->skelqh[irq]->dma_handle);
+		uhci->fl->frame[i] = UHCI_PTR_QH |
+				cpu_to_le32(uhci->skelqh[irq]->dma_handle);
 	}
 
 	/*

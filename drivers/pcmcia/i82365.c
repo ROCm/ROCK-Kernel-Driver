@@ -1159,13 +1159,13 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
     
     debug(1, "SetMemMap(%d, %d, %#2.2x, %d ns, %#5.5lx-%#5.5"
 	  "lx, %#5.5x)\n", sock, mem->map, mem->flags, mem->speed,
-	  mem->sys_start, mem->sys_stop, mem->card_start);
+	  mem->res->start, mem->res->end, mem->card_start);
 
     map = mem->map;
     if ((map > 4) || (mem->card_start > 0x3ffffff) ||
-	(mem->sys_start > mem->sys_stop) || (mem->speed > 1000))
+	(mem->res->start > mem->res->end) || (mem->speed > 1000))
 	return -EINVAL;
-    if ((mem->sys_start > 0xffffff) || (mem->sys_stop > 0xffffff))
+    if ((mem->res->start > 0xffffff) || (mem->res->end > 0xffffff))
 	return -EINVAL;
 	
     /* Turn off the window before changing anything */
@@ -1173,12 +1173,12 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
 	i365_bclr(sock, I365_ADDRWIN, I365_ENA_MEM(map));
     
     base = I365_MEM(map);
-    i = (mem->sys_start >> 12) & 0x0fff;
+    i = (mem->res->start >> 12) & 0x0fff;
     if (mem->flags & MAP_16BIT) i |= I365_MEM_16BIT;
     if (mem->flags & MAP_0WS) i |= I365_MEM_0WS;
     i365_set_pair(sock, base+I365_W_START, i);
     
-    i = (mem->sys_stop >> 12) & 0x0fff;
+    i = (mem->res->end >> 12) & 0x0fff;
     switch (to_cycles(mem->speed)) {
     case 0:	break;
     case 1:	i |= I365_MEM_WS0; break;
@@ -1187,7 +1187,7 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
     }
     i365_set_pair(sock, base+I365_W_STOP, i);
     
-    i = ((mem->card_start - mem->sys_start) >> 12) & 0x3fff;
+    i = ((mem->card_start - mem->res->start) >> 12) & 0x3fff;
     if (mem->flags & MAP_WRPROT) i |= I365_MEM_WRPROT;
     if (mem->flags & MAP_ATTRIB) i |= I365_MEM_REG;
     i365_set_pair(sock, base+I365_W_OFF, i);
@@ -1309,7 +1309,7 @@ static int pcic_init(struct pcmcia_socket *s)
 	int i;
 	struct resource res = { .start = 0, .end = 0x1000 };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { .res = &res, .sys_stop = 0x1000, };
+	pccard_mem_map mem = { .res = &res, };
 
 	for (i = 0; i < 2; i++) {
 		io.map = i;

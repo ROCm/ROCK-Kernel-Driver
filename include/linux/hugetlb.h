@@ -17,10 +17,7 @@ int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_ar
 int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
 void zap_hugepage_range(struct vm_area_struct *, unsigned long, unsigned long);
 void unmap_hugepage_range(struct vm_area_struct *, unsigned long, unsigned long);
-pte_t *huge_pte_alloc(struct mm_struct *, unsigned long);
-void set_huge_pte(struct mm_struct *, struct vm_area_struct *, struct page *, pte_t *, int);
-int handle_hugetlb_mm_fault(struct mm_struct *, struct vm_area_struct *, unsigned long, int);
-
+int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 int hugetlb_report_meminfo(char *);
 int hugetlb_report_node_meminfo(int, char *);
 int is_hugepage_mem_enough(size_t);
@@ -64,7 +61,7 @@ static inline unsigned long hugetlb_total_pages(void)
 #define follow_hugetlb_page(m,v,p,vs,a,b,i)	({ BUG(); 0; })
 #define follow_huge_addr(mm, addr, write)	ERR_PTR(-EINVAL)
 #define copy_hugetlb_page_range(src, dst, vma)	({ BUG(); 0; })
-#define handle_hugetlb_mm_fault(mm, vma, addr, write) VM_FAULT_SIGBUS
+#define hugetlb_prefault(mapping, vma)		({ BUG(); 0; })
 #define zap_hugepage_range(vma, start, len)	BUG()
 #define unmap_hugepage_range(vma, start, end)	BUG()
 #define is_hugepage_mem_enough(size)		0
@@ -122,8 +119,8 @@ static inline struct hugetlbfs_sb_info *HUGETLBFS_SB(struct super_block *sb)
 extern struct file_operations hugetlbfs_file_operations;
 extern struct vm_operations_struct hugetlb_vm_ops;
 struct file *hugetlb_zero_setup(size_t);
-int hugetlb_get_quota(struct address_space *mapping, int blocks);
-void hugetlb_put_quota(struct address_space *mapping, int blocks);
+int hugetlb_get_quota(struct address_space *mapping);
+void hugetlb_put_quota(struct address_space *mapping);
 
 static inline int is_file_hugepages(struct file *file)
 {
@@ -134,14 +131,11 @@ static inline void set_file_hugepages(struct file *file)
 {
 	file->f_op = &hugetlbfs_file_operations;
 }
-int hugetlbfs_report_meminfo(char *);
-
 #else /* !CONFIG_HUGETLBFS */
 
 #define is_file_hugepages(file)		0
 #define set_file_hugepages(file)	BUG()
 #define hugetlb_zero_setup(size)	ERR_PTR(-ENOSYS)
-#define hugetlbfs_report_meminfo(buf)	0
 
 #endif /* !CONFIG_HUGETLBFS */
 

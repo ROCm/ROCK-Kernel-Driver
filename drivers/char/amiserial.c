@@ -118,10 +118,6 @@ static struct serial_state rs_table[1];
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
  * lock it in case the copy_from_user blocks while swapping in a page,
@@ -430,7 +426,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 
 	if ((info->flags & ASYNC_CHECK_CD) && (dstatus & SER_DCD)) {
 #if (defined(SERIAL_DEBUG_OPEN) || defined(SERIAL_DEBUG_INTR))
-		printk("ttyS%02d CD now %s...", info->line,
+		printk("ttyS%d CD now %s...", info->line,
 		       (!(status & SER_DCD)) ? "on" : "off");
 #endif
 		if (!(status & SER_DCD))
@@ -1610,7 +1606,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 	if (char_time == 0)
 		char_time = 1;
 	if (timeout)
-	  char_time = MIN(char_time, timeout);
+	  char_time = min_t(unsigned long, char_time, timeout);
 	/*
 	 * If the transmitter hasn't cleared in twice the approximate
 	 * amount of time to send the entire FIFO, it probably won't
@@ -2095,7 +2091,7 @@ static int __init rs_init(void)
 	  continue;
 	*/
 
-	printk(KERN_INFO "ttyS%02d is the amiga builtin serial port\n",
+	printk(KERN_INFO "ttyS%d is the amiga builtin serial port\n",
 		       state->line);
 
 	/* Hardware set up */

@@ -32,11 +32,11 @@
 #include <linux/thread_info.h>
 #include <linux/version.h>
 #include <linux/ptrace.h>
-#include <asm/pgtable.h>
+#include <linux/hardirq.h>
 
+#include <asm/pgtable.h>
 #include <asm/ptrace.h>
 #include <asm/processor.h>
-#include <asm/hardirq.h>
 #include <asm/pdc.h>
 
 #define DEFINE(sym, val) \

@@ -50,6 +50,7 @@ bootup_user_stack:
  */
         .global root_flags, ram_flags, root_dev
         .global sparc_ramdisk_image, sparc_ramdisk_size
+	.global sparc_ramdisk_image64
 
         .ascii  "HdrS"
         .word   LINUX_VERSION_CODE
@@ -60,7 +61,7 @@ bootup_user_stack:
 	 * 0x0202 : Supports kernel params string
 	 * 0x0201 : Supports reboot_command
 	 */
-	.half   0x0300          /* HdrS version */
+	.half   0x0301          /* HdrS version */
 
 root_flags:
         .half   1
@@ -74,6 +75,8 @@ sparc_ramdisk_size:
         .word   0
         .xword  reboot_command
 	.xword	bootstr_info
+sparc_ramdisk_image64:
+	.xword	0
 	.word	_end
 
 	/* We must be careful, 32-bit OpenBOOT will get confused if it

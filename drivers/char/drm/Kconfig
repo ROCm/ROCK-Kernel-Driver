@@ -24,14 +24,14 @@ config DRM_TDFX
 
 config DRM_GAMMA
 	tristate "3dlabs GMX 2000"
-	depends on DRM
+	depends on DRM && BROKEN
 	help
 	  This is the old gamma driver, please tell me if it might actually
 	  work.
 
 config DRM_R128
 	tristate "ATI Rage 128"
-	depends on DRM
+	depends on DRM && PCI
 	help
 	  Choose this option if you have an ATI Rage 128 graphics card.  If M
 	  is selected, the module will be called r128.  AGP support for
@@ -39,7 +39,7 @@ config DRM_R128
 
 config DRM_RADEON
 	tristate "ATI Radeon"
-	depends on DRM
+	depends on DRM && PCI
 	help
 	  Choose this option if you have an ATI Radeon graphics card.  There
 	  are both PCI and AGP versions.  You don't need to choose this to
@@ -62,7 +62,18 @@ config DRM_I830
 	  Choose this option if you have a system that has Intel 830M, 845G,
 	  852GM, 855GM or 865G integrated graphics.  If M is selected, the
 	  module will be called i830.  AGP support is required for this driver
-	  to work.
+	  to work. This driver will eventually be replaced by the i915 one.
+
+config DRM_I915
+	tristate "Intel 830M, 845G, 852GM, 855GM, 865G, 915G"
+	depends on DRM && AGP && AGP_INTEL
+	help
+	  Choose this option if you have a system that has Intel 830M, 845G,
+	  852GM, 855GM 865G or 915G integrated graphics.  If M is selected, the
+	  module will be called i915.  AGP support is required for this driver
+	  to work. This driver will eventually replace the I830 driver, when
+	  later release of X start to use the new DDX and DRI.
+	
 
 config DRM_MGA
 	tristate "Matrox g200/g400"

@@ -520,13 +520,6 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 	 */
 	
 	DDB(printk("sb_dsp_detect(%x) entered\n", hw_config->io_base));
-	if (check_region(hw_config->io_base, 16))
-	{
-#ifdef MODULE
-		printk(KERN_INFO "sb: I/O region in use.\n");
-#endif
-		return 0;
-	}
 
 	devc->lock = SPIN_LOCK_UNLOCKED;
 	devc->type = hw_config->card_subtype;
@@ -668,6 +661,7 @@ int sb_dsp_init(struct address_info *hw_config, struct module *owner)
 	if (devc->base != hw_config->io_base)
 	{
 		DDB(printk("I/O port mismatch\n"));
+		release_region(devc->base, 16);
 		return 0;
 	}
 	/*
@@ -689,6 +683,7 @@ int sb_dsp_init(struct address_info *hw_config, struct module *owner)
 		if (request_irq(hw_config->irq, sbintr, i, "soundblaster", devc) < 0)
 		{
 			printk(KERN_ERR "SB: Can't allocate IRQ%d\n", hw_config->irq);
+			release_region(devc->base, 16);
 			return 0;
 		}
 		devc->irq_ok = 0;
@@ -697,6 +692,7 @@ int sb_dsp_init(struct address_info *hw_config, struct module *owner)
 			if (!sb16_set_irq_hw(devc, devc->irq))	/* Unsupported IRQ */
 			{
 				free_irq(devc->irq, devc);
+				release_region(devc->base, 16);
 				return 0;
 			}
 		if ((devc->type == 0 || devc->type == MDL_ESS) &&
@@ -735,7 +731,6 @@ int sb_dsp_init(struct address_info *hw_config, struct module *owner)
 			}
 		}
 	}			/* IRQ setup */
-	request_region(hw_config->io_base, 16, "soundblaster");
 
 	last_sb = devc;
 	
@@ -1224,17 +1219,22 @@ int probe_sbmpu(struct address_info *hw_config, struct module *owner)
 #if defined(CONFIG_SOUND_MPU401)
 	if (devc->model == MDL_ESS)
 	{
-		if (check_region(hw_config->io_base, 2))
-		{
+		struct resource *ports;
+		ports = request_region(hw_config->io_base, 2, "mpu401");
+		if (!ports) {
 			printk(KERN_ERR "sbmpu: I/O port conflict (%x)\n", hw_config->io_base);
 			return 0;
 		}
-		if (!ess_midi_init(devc, hw_config))
+		if (!ess_midi_init(devc, hw_config)) {
+			release_region(hw_config->io_base, 2);
 			return 0;
+		}
 		hw_config->name = "ESS1xxx MPU";
 		devc->midi_irq_cookie = NULL;
-		if (!probe_mpu401(hw_config))
+		if (!probe_mpu401(hw_config, ports)) {
+			release_region(hw_config->io_base, 2);
 			return 0;
+		}
 		attach_mpu401(hw_config, owner);
 		if (last_sb->irq == -hw_config->irq)
 			last_sb->midi_irq_cookie=(void *)hw_config->slots[1];

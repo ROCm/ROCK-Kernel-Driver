@@ -175,9 +175,11 @@ success:
 	 * vm_flags and vm_page_prot are protected by the mmap_sem
 	 * held in write mode.
 	 */
+	vm_stat_unaccount(vma);
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = newprot;
 	change_protection(vma, start, end, newprot);
+	vm_stat_account(vma);
 	return 0;
 
 fail:

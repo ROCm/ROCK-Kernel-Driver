@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <linux/timer.h>
 #include <linux/vmalloc.h>
-#include <asm/hardirq.h>
+#include <linux/interrupt.h>
 #include <linux/bitops.h>
 #include <asm/semaphore.h>
 

@@ -692,7 +692,9 @@ ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
  
 		if (!args)
 			goto done;
- 
+
+		hwif->data_phase = args->data_phase;
+
 		if (args->tf_out_flags.all != 0) 
 			return flagged_taskfile(drive, args);
 		return do_rw_taskfile(drive, args);

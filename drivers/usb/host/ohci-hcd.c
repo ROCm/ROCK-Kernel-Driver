@@ -97,6 +97,7 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>  /* for in_interrupt () */
 #include <linux/usb.h>
+#include <linux/usb_otg.h>
 #include "../core/hcd.h"
 #include <linux/dma-mapping.h> 
 #include <linux/dmapool.h>    /* needed by ohci-mem.c when no PCI */
@@ -693,7 +694,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 
 /* must not be called from interrupt context */
 
-#ifdef CONFIG_PM
+#if	defined(CONFIG_USB_SUSPEND) || defined(CONFIG_PM)
 
 static void mark_children_gone (struct usb_device *dev)
 {

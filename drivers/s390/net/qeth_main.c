@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.130 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.132 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.130 $	 $Date: 2004/08/05 11:21:50 $
+ *    $Revision: 1.132 $	 $Date: 2004/08/19 12:39:43 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,7 +79,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.130 $"
+#define VERSION_QETH_C "$Revision: 1.132 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -4547,7 +4547,8 @@ qeth_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (!card)
 		return -ENODEV;
 
-	if (card->state != CARD_STATE_UP)
+	if ((card->state != CARD_STATE_UP) &&
+            (card->state != CARD_STATE_SOFTSETUP))
 		return -ENODEV;
 
 	switch (cmd){
@@ -6709,19 +6710,26 @@ static int
 qeth_arp_constructor(struct neighbour *neigh)
 {
 	struct net_device *dev = neigh->dev;
-	struct in_device *in_dev = in_dev_get(dev);
+	struct in_device *in_dev;
+	struct neigh_parms *parms;
 
-	if (in_dev == NULL)
-		return -EINVAL;
 	if (!qeth_verify_dev(dev)) {
-		in_dev_put(in_dev);
 		return qeth_old_arp_constructor(neigh);
 	}
 
+	rcu_read_lock();
+	in_dev = rcu_dereference(__in_dev_get(dev));
+	if (in_dev == NULL) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+
+	parms = in_dev->arp_parms;
+	__neigh_parms_put(neigh->parms);
+	neigh->parms = neigh_parms_clone(parms);
+	rcu_read_unlock();
+
 	neigh->type = inet_addr_type(*(u32 *) neigh->primary_key);
-	if (in_dev->arp_parms)
-		neigh->parms = in_dev->arp_parms;
-	in_dev_put(in_dev);
 	neigh->nud_state = NUD_NOARP;
 	neigh->ops = arp_direct_ops;
 	neigh->output = neigh->ops->queue_xmit;

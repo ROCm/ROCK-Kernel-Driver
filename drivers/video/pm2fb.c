@@ -1215,8 +1215,14 @@ MODULE_DEVICE_TABLE(pci, pm2fb_id_table);
  *  Initialization
  */
 
+int __init pm2fb_setup(char *options);
+
 int __init pm2fb_init(void)
 {
+#ifndef MODULE
+	pm2fb_setup(fb_get_options("pm2fb"));
+#endif
+
 	return pci_module_init(&pm2fb_driver);
 }
 
@@ -1266,9 +1272,7 @@ int __init pm2fb_setup(char *options)
 
 
 
-#ifdef MODULE
 module_init(pm2fb_init);
-#endif 
 module_exit(pm2fb_exit);
 
 MODULE_PARM(mode,"s");

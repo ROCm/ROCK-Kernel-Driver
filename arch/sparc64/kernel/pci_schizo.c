@@ -2081,13 +2081,11 @@ static void __init __schizo_init(int node, char *model_name, int chip_type)
 {
 	struct pci_controller_info *p;
 	struct pci_iommu *iommu;
-	unsigned long flags;
 	int is_pbm_a;
 	u32 portid;
 
 	portid = prom_getintdefault(node, "portid", 0xff);
 
-	spin_lock_irqsave(&pci_controller_lock, flags);
 	for(p = pci_controller_root; p; p = p->next) {
 		struct pci_pbm_info *pbm;
 
@@ -2099,13 +2097,11 @@ static void __init __schizo_init(int node, char *model_name, int chip_type)
 		       &p->pbm_B);
 
 		if (portid_compare(pbm->portid, portid, chip_type)) {
-			spin_unlock_irqrestore(&pci_controller_lock, flags);
 			is_pbm_a = (p->pbm_A.prom_node == 0);
 			schizo_pbm_init(p, node, portid, chip_type);
 			return;
 		}
 	}
-	spin_unlock_irqrestore(&pci_controller_lock, flags);
 
 	p = kmalloc(sizeof(struct pci_controller_info), GFP_ATOMIC);
 	if (!p) {
@@ -2130,10 +2126,8 @@ static void __init __schizo_init(int node, char *model_name, int chip_type)
 	memset(iommu, 0, sizeof(*iommu));
 	p->pbm_B.iommu = iommu;
 
-	spin_lock_irqsave(&pci_controller_lock, flags);
 	p->next = pci_controller_root;
 	pci_controller_root = p;
-	spin_unlock_irqrestore(&pci_controller_lock, flags);
 
 	p->index = pci_num_controllers++;
 	p->pbms_same_domain = 0;

@@ -422,7 +422,7 @@ static int i82092aa_init(struct pcmcia_socket *sock)
 	int i;
 	struct resource res = { .start = 0, .end = 0x0fff };
         pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff, };
+	pccard_mem_map mem = { .res = &res, };
         
         enter("i82092aa_init");
                         
@@ -706,11 +706,15 @@ static int i82092aa_set_io_map(struct pcmcia_socket *socket, struct pccard_io_ma
 
 static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_map *mem)
 {
-	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
+	struct socket_info *sock_info = container_of(socket, struct socket_info, socket);
+	unsigned int sock = sock_info->number;
+	struct pci_bus_region region;
 	unsigned short base, i;
 	unsigned char map;
 	
 	enter("i82092aa_set_mem_map");
+
+	pcibios_resource_to_bus(sock_info->dev, &region, mem->res);
 	
 	map = mem->map;
 	if (map > 4) {
@@ -719,10 +723,10 @@ static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_
 	}
 	
 	
-	if ( (mem->card_start > 0x3ffffff) || (mem->sys_start > mem->sys_stop) ||
+	if ( (mem->card_start > 0x3ffffff) || (region.start > region.end) ||
 	     (mem->speed > 1000) ) {
 		leave("i82092aa_set_mem_map: invalid address / speed");
-		printk("invalid mem map for socket %i : %lx to %lx with a start of %x \n",sock,mem->sys_start, mem->sys_stop, mem->card_start);
+		printk("invalid mem map for socket %i : %lx to %lx with a start of %x \n",sock,region.start, region.end, mem->card_start);
 		return -EINVAL;
 	}
 	
@@ -731,11 +735,11 @@ static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_
 	              indirect_resetbit(sock, I365_ADDRWIN, I365_ENA_MEM(map));
 	                 
 	                 
-/* 	printk("set_mem_map: Setting map %i range to %x - %x on socket %i, speed is %i, active = %i \n",map, mem->sys_start,mem->sys_stop,sock,mem->speed,mem->flags & MAP_ACTIVE);  */
+/* 	printk("set_mem_map: Setting map %i range to %x - %x on socket %i, speed is %i, active = %i \n",map, region.start,region.end,sock,mem->speed,mem->flags & MAP_ACTIVE);  */
 
 	/* write the start address */
 	base = I365_MEM(map);
-	i = (mem->sys_start >> 12) & 0x0fff;
+	i = (region.start >> 12) & 0x0fff;
 	if (mem->flags & MAP_16BIT) 
 		i |= I365_MEM_16BIT;
 	if (mem->flags & MAP_0WS)
@@ -744,7 +748,7 @@ static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_
 		               
 	/* write the stop address */
 	
-	i= (mem->sys_stop >> 12) & 0x0fff;
+	i= (region.end >> 12) & 0x0fff;
 	switch (to_cycles(mem->speed)) {
 		case 0:
 			break;
@@ -763,7 +767,7 @@ static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_
 	
 	/* card start */
 	
-	i = ((mem->card_start - mem->sys_start) >> 12) & 0x3fff;
+	i = ((mem->card_start - region.start) >> 12) & 0x3fff;
 	if (mem->flags & MAP_WRPROT)
 		i |= I365_MEM_WRPROT;
 	if (mem->flags & MAP_ATTRIB) {

@@ -26,58 +26,6 @@
 #define DRIVER_MINOR		0
 #define DRIVER_PATCHLEVEL	1
 
-#define DRIVER_FOPS						\
-static struct file_operations	DRM(fops) = {			\
-	.owner   		= THIS_MODULE,			\
-	.open	 		= DRM(open),			\
-	.flush	 		= DRM(flush),			\
-	.release 		= DRM(release),			\
-	.ioctl	 		= DRM(ioctl),			\
-	.mmap	 		= DRM(mmap),			\
-	.read	 		= DRM(read),			\
-	.fasync	 		= DRM(fasync),			\
-	.poll	 		= DRM(poll),			\
-	.get_unmapped_area	= ffb_get_unmapped_area,		\
-}
-
-#define DRIVER_COUNT_CARDS()	ffb_count_card_instances()
-/* Allocate private structure and fill it */
-#define DRIVER_PRESETUP()	do {		\
-	int _ret;				\
-	_ret = ffb_presetup(dev);		\
-	if (_ret != 0) return _ret;		\
-} while(0)
-
-/* Free private structure */
-#define DRIVER_PRETAKEDOWN()	do {				\
-	if (dev->dev_private) kfree(dev->dev_private);		\
-} while(0)
-
-#define DRIVER_POSTCLEANUP()	do {				\
-	if (ffb_position != NULL) kfree(ffb_position);		\
-} while(0)
-
-/* We have to free up the rogue hw context state holding error or 
- * else we will leak it.
- */
-#define DRIVER_RELEASE()	do {					\
-	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;	\
-	int context = _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock);	\
-	int idx;							\
-									\
-	idx = context - 1;						\
-	if (fpriv &&							\
-	    context != DRM_KERNEL_CONTEXT &&				\
-	    fpriv->hw_state[idx] != NULL) {				\
-		kfree(fpriv->hw_state[idx]);				\
-		fpriv->hw_state[idx] = NULL;				\
-	}								\
-} while(0)
-
-/* For mmap customization */
-#define DRIVER_GET_MAP_OFS()	(map->offset & 0xffffffff)
-#define DRIVER_GET_REG_OFS()	ffb_get_reg_offset(dev)
-
 typedef struct _ffb_position_t {
 	int node;
 	int root;
@@ -192,63 +140,6 @@ static int ffb_init_one(drm_device_t *dev, int prom_node, int parent_node,
 	return 0;
 }
 
-static int __init ffb_count_siblings(int root)
-{
-	int node, child, count = 0;
-
-	child = prom_getchild(root);
-	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
-	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb"))
-		count++;
-
-	return count;
-}
-
-static int __init ffb_scan_siblings(int root, int instance)
-{
-	int node, child;
-
-	child = prom_getchild(root);
-	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
-	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb")) {
-		ffb_position[instance].node = node;
-		ffb_position[instance].root = root;
-		instance++;
-	}
-
-	return instance;
-}
-
-static int ffb_presetup(drm_device_t *);
-
-static int __init ffb_count_card_instances(void)
-{
-	int root, total, instance;
-
-	total = ffb_count_siblings(prom_root_node);
-	root = prom_getchild(prom_root_node);
-	for (root = prom_searchsiblings(root, "upa"); root;
-	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
-		total += ffb_count_siblings(root);
-
-	ffb_position = kmalloc(sizeof(ffb_position_t) * total, GFP_KERNEL);
-
-	/* Actual failure will be caught during ffb_presetup b/c we can't catch
-	 * it easily here.
-	 */
-	if (!ffb_position)
-		return -ENOMEM;
-
-	instance = ffb_scan_siblings(prom_root_node, 0);
-
-	root = prom_getchild(prom_root_node);
-	for (root = prom_searchsiblings(root, "upa"); root;
-	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
-		instance = ffb_scan_siblings(root, instance);
-
-	return total;
-}
-
 static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -275,11 +166,11 @@ static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 	return NULL;
 }
 
-static unsigned long ffb_get_unmapped_area(struct file *filp,
-					   unsigned long hint,
-					   unsigned long len,
-					   unsigned long pgoff,
-					   unsigned long flags)
+unsigned long ffb_get_unmapped_area(struct file *filp,
+				    unsigned long hint,
+				    unsigned long len,
+				    unsigned long pgoff,
+				    unsigned long flags)
 {
 	drm_map_t *map = ffb_find_map(filp, pgoff << PAGE_SHIFT);
 	unsigned long addr = -ENOMEM;
@@ -319,18 +210,9 @@ static unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-static unsigned long ffb_get_reg_offset(drm_device_t *dev)
-{
-	ffb_dev_priv_t *ffb_priv = (ffb_dev_priv_t *)dev->dev_private;
-
-	if (ffb_priv)
-		return ffb_priv->card_phys_base;
-
-	return 0;
-}
-
 #include "drm_auth.h"
 #include "drm_bufs.h"
+#include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
@@ -375,8 +257,83 @@ static int ffb_presetup(drm_device_t *dev)
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"
+#include "drm_irq.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
 #include "drm_proc.h"
 #include "drm_vm.h"
 #include "drm_stub.h"
+#include "drm_scatter.h"
+
+
+static void ffb_driver_release(drm_device_t *dev, struct file *filp)
+{
+	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;
+	int context = _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock);
+	int idx;
+
+	idx = context - 1;
+	if (fpriv &&
+	    context != DRM_KERNEL_CONTEXT &&
+	    fpriv->hw_state[idx] != NULL) {
+		kfree(fpriv->hw_state[idx]);
+		fpriv->hw_state[idx] = NULL;
+	}	
+}
+
+static void ffb_driver_pretakedown(drm_device_t *dev)
+{
+	if (dev->dev_private) kfree(dev->dev_private);
+}
+
+static int ffb_driver_postcleanup(drm_device_t *dev)
+{
+	if (ffb_position != NULL) kfree(ffb_position);
+	return 0;
+}
+
+static void ffb_driver_kernel_context_switch_unlock(struct drm_device *dev, drm_lock_t *lock)
+{
+	dev->lock.filp = 0;
+	{
+		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
+		unsigned int old, new, prev, ctx;
+		
+		ctx = lock->context;
+		do {
+			old  = *plock;
+			new  = ctx;
+			prev = cmpxchg(plock, old, new);
+		} while (prev != old);
+	}
+	wake_up_interruptible(&dev->lock.lock_queue);
+}
+
+static unsigned long ffb_driver_get_map_ofs(drm_map_t *map)
+{
+	return (map->offset & 0xffffffff);
+}
+
+static unsigned long ffb_driver_get_reg_ofs(drm_device_t *dev)
+{
+       ffb_dev_priv_t *ffb_priv = (ffb_dev_priv_t *)dev->dev_private;
+       
+       if (ffb_priv)
+               return ffb_priv->card_phys_base;
+       
+       return 0;
+}
+
+void ffb_driver_register_fns(drm_device_t *dev)
+{
+	ffb_set_context_ioctls();
+	DRM(fops).get_unmapped_area = ffb_get_unmapped_area;
+	dev->fn_tbl.release = ffb_driver_release;
+	dev->fn_tbl.presetup = ffb_presetup;
+	dev->fn_tbl.pretakedown = ffb_driver_pretakedown;
+	dev->fn_tbl.postcleanup = ffb_driver_postcleanup;
+	dev->fn_tbl.kernel_context_switch = ffb_context_switch;
+	dev->fn_tbl.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
+	dev->fn_tbl.get_map_ofs = ffb_driver_get_map_ofs;
+	dev->fn_tbl.get_reg_ofs = ffb_driver_get_reg_ofs;
+}

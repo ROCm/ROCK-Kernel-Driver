@@ -184,6 +184,7 @@ static void in_dev_rcu_put(struct rcu_head *head)
 static void inetdev_destroy(struct in_device *in_dev)
 {
 	struct in_ifaddr *ifa;
+	struct net_device *dev;
 
 	ASSERT_RTNL();
 
@@ -200,12 +201,15 @@ static void inetdev_destroy(struct in_device *in_dev)
 	devinet_sysctl_unregister(&in_dev->cnf);
 #endif
 
-	in_dev->dev->ip_ptr = NULL;
+	dev = in_dev->dev;
+	dev->ip_ptr = NULL;
 
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_unregister(in_dev->arp_parms);
 #endif
 	neigh_parms_release(&arp_tbl, in_dev->arp_parms);
+	arp_ifdown(dev);
+
 	call_rcu(&in_dev->rcu_head, in_dev_rcu_put);
 }
 

@@ -1414,7 +1414,7 @@ static int carm_init_host(struct carm_host *host)
 	tmp8 = readb(mmio + CARM_INITC);
 	if (tmp8 & 0x01) {
 		tmp8 &= ~0x01;
-		writeb(tmp8, CARM_INITC);
+		writeb(tmp8, mmio + CARM_INITC);
 		readb(mmio + CARM_INITC);	/* flush */
 
 		DPRINTK("snooze...\n");

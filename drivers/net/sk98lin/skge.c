@@ -110,10 +110,7 @@
 
 #include	<linux/module.h>
 #include	<linux/init.h>
-
-#ifdef CONFIG_PROC_FS
 #include 	<linux/proc_fs.h>
-#endif
 
 #include	"h/skdrv1st.h"
 #include	"h/skdrv2nd.h"
@@ -430,7 +427,7 @@ static int __devinit sk98lin_init_device(struct pci_dev *pdev,
 	dev->open =		&SkGeOpen;
 	dev->stop =		&SkGeClose;
 	dev->get_stats =	&SkGeStats;
-	dev->last_stats =	&SkGeStats;
+	//dev->last_stats =	&SkGeStats;
 	dev->set_multicast_list = &SkGeSetRxMode;
 	dev->set_mac_address =	&SkGeSetMacAddr;
 	dev->do_ioctl =		&SkGeIoctl;
@@ -567,7 +564,7 @@ static int __devinit sk98lin_init_device(struct pci_dev *pdev,
 		dev->open               = &SkGeOpen;
 		dev->stop               = &SkGeClose;
 		dev->get_stats          = &SkGeStats;
-		dev->last_stats         = &SkGeStats;
+		//dev->last_stats	= &SkGeStats;
 		dev->set_multicast_list = &SkGeSetRxMode;
 		dev->set_mac_address    = &SkGeSetMacAddr;
 		dev->do_ioctl           = &SkGeIoctl;

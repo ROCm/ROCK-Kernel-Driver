@@ -41,6 +41,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/bcd.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -118,8 +119,7 @@ irqreturn_t timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 
 #ifndef CONFIG_SMP
 	/* Not SMP, do kernel PC profiling here.  */
-	if (!user_mode(regs))
-		alpha_do_profile(regs->pc);
+	profile_tick(CPU_PROFILING, regs);
 #endif
 
 	write_seqlock(&xtime_lock);
@@ -366,7 +366,7 @@ time_init(void)
 		BCD_TO_BIN(year);
 	}
 
-	/* PC-like is standard; used for year < 20 || year >= 70 */
+	/* PC-like is standard; used for year >= 70 */
 	epoch = 1900;
 	if (year < 20)
 		epoch = 2000;

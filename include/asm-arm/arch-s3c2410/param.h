@@ -22,6 +22,6 @@
  * add a software pre-scaler to the evil timer systems.
 */
 
-#define __KERNEL_HZ   200
+#define HZ   200
 
 #endif /* __ASM_ARCH_PARAM_H */

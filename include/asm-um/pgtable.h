@@ -12,8 +12,6 @@
 #include "asm/page.h"
 #include "asm/fixmap.h"
 
-extern pgd_t swapper_pg_dir[1024];
-
 extern void *um_virt_to_phys(struct task_struct *task, unsigned long virt,
 			     pte_t *pte_out);
 
@@ -49,6 +47,8 @@ extern unsigned long *empty_zero_page;
 #define pgd_ERROR(e) \
         printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pgd_val(e))
 
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+
 /*
  * pgd entries used up by user/kernel:
  */
@@ -65,10 +65,10 @@ extern unsigned long *empty_zero_page;
  * area for the same reason. ;)
  */
 
-extern unsigned long high_physmem;
+extern unsigned long end_iomem;
 
 #define VMALLOC_OFFSET	(__va_space)
-#define VMALLOC_START	(((unsigned long) high_physmem + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+#define VMALLOC_START	((end_iomem + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 
 #ifdef CONFIG_HIGHMEM
 # define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
@@ -78,12 +78,13 @@ extern unsigned long high_physmem;
 
 #define _PAGE_PRESENT	0x001
 #define _PAGE_NEWPAGE	0x002
-#define _PAGE_PROTNONE	0x004	/* If not present */
-#define _PAGE_RW	0x008
-#define _PAGE_USER	0x010
-#define _PAGE_ACCESSED	0x020
-#define _PAGE_DIRTY	0x040
-#define _PAGE_NEWPROT   0x080
+#define _PAGE_NEWPROT   0x004
+#define _PAGE_FILE	0x008   /* set:pagecache unset:swap */
+#define _PAGE_PROTNONE	0x010	/* If not present */
+#define _PAGE_RW	0x020
+#define _PAGE_USER	0x040
+#define _PAGE_ACCESSED	0x080
+#define _PAGE_DIRTY	0x100
 
 #define REGION_MASK	0xf0000000
 #define REGION_SHIFT	28
@@ -143,7 +144,8 @@ extern pte_t * __bad_pagetable(void);
 
 #define BAD_PAGETABLE __bad_pagetable()
 #define BAD_PAGE __bad_page()
-#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
+
+#define ZERO_PAGE(vaddr) virt_to_page(empty_zero_page)
 
 /* number of bits that fit into a memory pointer */
 #define BITS_PER_PTR			(8*sizeof(unsigned long))
@@ -163,9 +165,6 @@ extern pte_t * __bad_pagetable(void);
 #define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 
 #define pte_clear(xp)	do { pte_val(*(xp)) = _PAGE_NEWPAGE; } while (0)
-
-#define phys_region_index(x) (((x) & REGION_MASK) >> REGION_SHIFT)
-#define pte_region_index(x) phys_region_index(pte_val(x))
 
 #define pmd_none(x)	(!(pmd_val(x) & ~_PAGE_NEWPAGE))
 #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
@@ -188,19 +187,25 @@ static inline void pgd_clear(pgd_t * pgdp)	{ }
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
-extern struct page *pte_mem_map(pte_t pte);
-extern struct page *phys_mem_map(unsigned long phys);
-extern unsigned long phys_to_pfn(unsigned long p);
-extern unsigned long pfn_to_phys(unsigned long pfn);
+#define pte_page(pte) phys_to_page(pte_val(pte))
+#define pmd_page(pmd) phys_to_page(pmd_val(pmd) & PAGE_MASK)
 
-#define pte_page(x) pfn_to_page(pte_pfn(x))
-#define pte_address(x) (__va(pte_val(x) & PAGE_MASK))
-#define mk_phys(a, r) ((a) + (r << REGION_SHIFT))
-#define phys_addr(p) ((p) & ~REGION_MASK)
-#define phys_page(p) (phys_mem_map(p) + ((phys_addr(p)) >> PAGE_SHIFT))
 #define pte_pfn(x) phys_to_pfn(pte_val(x))
 #define pfn_pte(pfn, prot) __pte(pfn_to_phys(pfn) | pgprot_val(prot))
-#define pfn_pmd(pfn, prot) __pmd(pfn_to_phys(pfn) | pgprot_val(prot))
+
+extern struct page *phys_to_page(const unsigned long phys);
+extern struct page *__virt_to_page(const unsigned long virt);
+#define virt_to_page(addr) __virt_to_page((const unsigned long) addr)
+
+/*
+ * Bits 0 through 3 are taken
+ */
+#define PTE_FILE_MAX_BITS	28
+
+#define pte_to_pgoff(pte) ((pte).pte_low >> 4)
+
+#define pgoff_to_pte(off) \
+	((pte_t) { ((off) << 4) + _PAGE_FILE })
 
 static inline pte_t pte_mknewprot(pte_t pte)
 {
@@ -235,6 +240,12 @@ static inline void set_pte(pte_t *pteptr, pte_t pteval)
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+static inline int pte_user(pte_t pte)
+{
+	return((pte_val(pte) & _PAGE_USER) &&
+	       !(pte_val(pte) & _PAGE_PROTNONE));
+}
+
 static inline int pte_read(pte_t pte)
 { 
 	return((pte_val(pte) & _PAGE_USER) && 
@@ -250,6 +261,14 @@ static inline int pte_write(pte_t pte)
 {
 	return((pte_val(pte) & _PAGE_RW) &&
 	       !(pte_val(pte) & _PAGE_PROTNONE));
+}
+
+/*
+ * The following only works if pte_present() is not true.
+ */
+static inline int pte_file(pte_t pte)
+{
+	return (pte).pte_low & _PAGE_FILE;
 }
 
 static inline int pte_dirty(pte_t pte)	{ return pte_val(pte) & _PAGE_DIRTY; }
@@ -334,14 +353,7 @@ extern unsigned long page_to_phys(struct page *page);
  * and a page entry and page directory to the page they refer to.
  */
 
-#define mk_pte(page, pgprot) \
-({					\
-	pte_t __pte;                    \
-                                        \
-	pte_val(__pte) = page_to_phys(page) + pgprot_val(pgprot);\
-	if(pte_present(__pte)) pte_mknewprot(pte_mknewpage(__pte)); \
-	__pte;                          \
-})
+extern pte_t mk_pte(struct page *page, pgprot_t pgprot);
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
@@ -351,17 +363,27 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 }
 
 #define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
-#define pmd_page(pmd) (phys_mem_map(pmd_val(pmd) & PAGE_MASK) + \
-		       ((phys_addr(pmd_val(pmd)) >> PAGE_SHIFT)))
 
-/* to find an entry in a page-table-directory. */
+/*
+ * the pgd page can be thought of an array like this: pgd_t[PTRS_PER_PGD]
+ *
+ * this macro returns the index of the entry in the pgd page which would
+ * control the given virtual address
+ */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 
-/* to find an entry in a page-table-directory */
+/*
+ * pgd_offset() returns a (pgd_t *)
+ * pgd_index() is used get the offset into the pgd page's array of pgd_t's;
+ */
 #define pgd_offset(mm, address) \
 ((mm)->pgd + ((address) >> PGDIR_SHIFT))
 
-/* to find an entry in a kernel page-table-directory */
+
+/*
+ * a shortcut which implies the use of the kernel's pgd, instead
+ * of a process's
+ */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
 #define pmd_index(address) \
@@ -373,7 +395,12 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 	return (pmd_t *) dir;
 }
 
-/* Find an entry in the third-level page table.. */ 
+/*
+ * the pte page can be thought of an array like this: pte_t[PTRS_PER_PTE]
+ *
+ * this macro returns the index of the entry in the pte page which would
+ * control the given virtual address
+ */
 #define pte_index(address) (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset_kernel(dir, address) \
 	((pte_t *) pmd_page_kernel(*(dir)) +  pte_index(address))
@@ -387,11 +414,11 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 #define update_mmu_cache(vma,address,pte) do ; while (0)
 
 /* Encode and de-code a swap entry */
-#define __swp_type(x)			(((x).val >> 3) & 0x7f)
-#define __swp_offset(x)			((x).val >> 10)
+#define __swp_type(x)			(((x).val >> 4) & 0x3f)
+#define __swp_offset(x)			((x).val >> 11)
 
 #define __swp_entry(type, offset) \
-	((swp_entry_t) { ((type) << 3) | ((offset) << 10) })
+	((swp_entry_t) { ((type) << 4) | ((offset) << 11) })
 #define __pte_to_swp_entry(pte) \
 	((swp_entry_t) { pte_val(pte_mkuptodate(pte)) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })

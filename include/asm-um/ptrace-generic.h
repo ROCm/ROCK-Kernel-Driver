@@ -45,6 +45,8 @@ struct pt_regs {
 
 #define PT_REGS_SC(r) UPT_SC(&(r)->regs)
 
+#define instruction_pointer(regs) PT_REGS_IP(regs)
+
 struct task_struct;
 
 extern unsigned long getreg(struct task_struct *child, int regno);

@@ -27,16 +27,6 @@ typedef struct {
 #endif
 } mm_context_t;
 
-#ifdef CONFIG_HUGETLB_PAGE
-#define KERNEL_LOW_HPAGES	.htlb_segs = 0,
-#else
-#define KERNEL_LOW_HPAGES
-#endif
-
-#define KERNEL_CONTEXT(ea) ({ \
-		mm_context_t ctx = { .id = REGION_ID(ea), KERNEL_LOW_HPAGES}; \
-		ctx; })
-
 #define STE_ESID_V	0x80
 #define STE_ESID_KS	0x20
 #define STE_ESID_KP	0x10
@@ -208,7 +198,7 @@ extern void htab_finish_init(void);
 #define STAB0_PHYS_ADDR	(STAB0_PAGE<<PAGE_SHIFT)
 #define STAB0_VIRT_ADDR	(KERNELBASE+STAB0_PHYS_ADDR)
 
-#define SLB_NUM_BOLTED		2
+#define SLB_NUM_BOLTED		3
 #define SLB_CACHE_ENTRIES	8
 
 /* Bits in the SLB ESID word */

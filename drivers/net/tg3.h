@@ -124,6 +124,7 @@
 #define  CHIPREV_ID_5705_A3		 0x3003
 #define  CHIPREV_ID_5750_A0		 0x4000
 #define  CHIPREV_ID_5750_A1		 0x4001
+#define  CHIPREV_ID_5750_A3		 0x4003
 #define  GET_ASIC_REV(CHIP_REV_ID)	((CHIP_REV_ID) >> 12)
 #define   ASIC_REV_5700			 0x07
 #define   ASIC_REV_5701			 0x00
@@ -1548,7 +1549,7 @@
  * exist only in the cards on-chip SRAM.  All 16 send bds are under
  * the same mode, they may not be configured individually.
  *
- * The mode we use is controlled by TG3_FLAG_HOST_TXDS in tp->tg3_flags.
+ * This driver always uses host memory TX descriptors.
  *
  * To use host memory TX descriptors:
  *	1) Set GRC_MODE_HOST_SENDBDS in GRC_MODE register.
@@ -1988,7 +1989,7 @@ struct tg3 {
 	spinlock_t			lock;
 	spinlock_t			indirect_lock;
 
-	unsigned long			regs;
+	void __iomem			*regs;
 	struct net_device		*dev;
 	struct pci_dev			*pdev;
 
@@ -2004,7 +2005,6 @@ struct tg3 {
 
 	spinlock_t			tx_lock;
 
-	/* TX descs are only used if TG3_FLAG_HOST_TXDS is set. */
 	struct tg3_tx_buffer_desc	*tx_ring;
 	struct tx_ring_info		*tx_buffers;
 	dma_addr_t			tx_desc_mapping;
@@ -2040,7 +2040,6 @@ struct tg3 {
 
 	u32				rx_offset;
 	u32				tg3_flags;
-#define TG3_FLAG_HOST_TXDS		0x00000001
 #define TG3_FLAG_TXD_MBOX_HWBUG		0x00000002
 #define TG3_FLAG_RX_CHECKSUMS		0x00000004
 #define TG3_FLAG_USE_LINKCHG_REG	0x00000008
@@ -2089,6 +2088,9 @@ struct tg3 {
 #define TG3_FLG2_PCI_EXPRESS		0x00000200
 #define TG3_FLG2_ASF_NEW_HANDSHAKE	0x00000400
 #define TG3_FLG2_HW_AUTONEG		0x00000800
+#define TG3_FLG2_PHY_JUST_INITTED	0x00001000
+#define TG3_FLG2_PHY_SERDES		0x00002000
+#define TG3_FLG2_CAPACITIVE_COUPLING	0x00004000
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
@@ -2136,7 +2138,6 @@ struct tg3 {
 #define PHY_ID_BCM5705			0x600081a0
 #define PHY_ID_BCM5750			0x60008180
 #define PHY_ID_BCM8002			0x60010140
-#define PHY_ID_SERDES			0xfeedbee0
 #define PHY_ID_INVALID			0xffffffff
 #define PHY_ID_REV_MASK			0x0000000f
 #define PHY_REV_BCM5401_B0		0x1
@@ -2159,7 +2160,7 @@ struct tg3 {
 	 (X) == PHY_ID_BCM5411 || (X) == PHY_ID_BCM5701 || \
 	 (X) == PHY_ID_BCM5703 || (X) == PHY_ID_BCM5704 || \
 	 (X) == PHY_ID_BCM5705 || (X) == PHY_ID_BCM5750 || \
-	 (X) == PHY_ID_BCM8002 || (X) == PHY_ID_SERDES)
+	 (X) == PHY_ID_BCM8002)
 
 	struct tg3_hw_stats		*hw_stats;
 	dma_addr_t			stats_mapping;

@@ -13,6 +13,7 @@
 #include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/thread_info.h>
+#include <asm-generic/uaccess.h>
 
 /*
  * The fs value determines whether argument validity checking should be
@@ -462,6 +463,9 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len = __invoke_copy_to_user(__cu_to, __cu_from, __cu_len);	\
 	__cu_len;							\
 })
+
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 
 /*
  * copy_to_user: - Copy a block of data into user space.

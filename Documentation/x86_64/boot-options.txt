@@ -138,17 +138,17 @@ IOMMU
 
  iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]][,merge]
          [,forcesac][,fullflush][,nomerge][,noaperture]
-   size  set size of iommu (in bytes) 
+   size  set size of iommu (in bytes)
    noagp don't initialize the AGP driver and use full aperture.
    off   don't use the IOMMU
    leak  turn on simple iommu leak tracing (only when CONFIG_IOMMU_LEAK is on)
-   memaper[=order] allocate an own aperture over RAM with size 32MB^order.  
+   memaper[=order] allocate an own aperture over RAM with size 32MB^order.
    noforce don't force IOMMU usage. Default.
    force  Force IOMMU.
-   merge  Do SG merging. Implies force (experimental)  
+   merge  Do SG merging. Implies force (experimental)
    nomerge Don't do SG merging.
    forcesac For SAC mode for masks <40bits  (experimental)
-   fullflush Flush IOMMU on each allocation (default) 
+   fullflush Flush IOMMU on each allocation (default)
    nofullflush Don't use IOMMU fullflush
    allowed  overwrite iommu off workarounds for specific chipsets.
    soft	 Use software bounce buffering (default for Intel machines)

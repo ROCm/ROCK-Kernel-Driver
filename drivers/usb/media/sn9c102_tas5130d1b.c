@@ -27,7 +27,6 @@ static struct sn9c102_sensor tas5130d1b;
 
 static int tas5130d1b_init(struct sn9c102_device* cam)
 {
-	const u8 DARKNESS = 0xff, CONTRAST = 0xb0, GAIN = 0x08;
 	int err = 0;
 
 	err += sn9c102_write_reg(cam, 0x01, 0x01);
@@ -39,16 +38,25 @@ static int tas5130d1b_init(struct sn9c102_device* cam)
 	err += sn9c102_write_reg(cam, 0x60, 0x17);
 	err += sn9c102_write_reg(cam, 0x07, 0x18);
 
-	err += sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11, 0x00, 0x80,
-	                                 0x00, 0, 0);
-	err += sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11, 0x00, 0xc0,
-	                                 GAIN, 0, 0);
 	err += sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11, 0x00, 0x40,
-	                                 CONTRAST, 0, 0);
-	err += sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11, 0x02, 0x20,
-	                                 DARKNESS, 0, 0);
+	                                 0x47, 0, 0);
 
 	return err;
+}
+
+
+static int tas5130d1b_set_ctrl(struct sn9c102_device* cam, 
+                               const struct v4l2_control* ctrl)
+{
+	switch (ctrl->id) {
+	case V4L2_CID_GAIN:
+		return sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11,
+		                                 0x02, 0x20,
+		                                 0xff - (ctrl->value & 0xff),
+		                                 0, 0);
+	default:
+		return -EINVAL;
+	}
 }
 
 
@@ -78,6 +86,19 @@ static struct sn9c102_sensor tas5130d1b = {
 	.frequency = SN9C102_I2C_100KHZ,
 	.interface = SN9C102_I2C_3WIRES,
 	.init = &tas5130d1b_init,
+	.qctrl = {
+		{
+			.id = V4L2_CID_GAIN,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "global gain",
+			.minimum = 0x00,
+			.maximum = 0xff,
+			.step = 0x01,
+			.default_value = 0x00,
+			.flags = 0,
+		},
+	},
+	.set_ctrl = &tas5130d1b_set_ctrl,
 	.cropcap = {
 		.bounds = {
 			.left = 0,

@@ -421,9 +421,10 @@ bte_init_node(nodepda_t * mynodepda, cnodeid_t cnode)
 	mynodepda->bte_recovery_timer.data = (unsigned long) mynodepda;
 
 	for (i = 0; i < BTES_PER_NODE; i++) {
-		(u64) mynodepda->bte_if[i].bte_base_addr =
-		    REMOTE_HUB_ADDR(cnodeid_to_nasid(cnode),
-			(i == 0 ? IIO_IBLS0 : IIO_IBLS1));
+		/* Which link status register should we use? */
+		unsigned long link_status = (i == 0 ? IIO_IBLS0 : IIO_IBLS1);
+		mynodepda->bte_if[i].bte_base_addr = (u64 *)
+			REMOTE_HUB_ADDR(cnodeid_to_nasid(cnode), link_status);
 
 		/*
 		 * Initialize the notification and spinlock

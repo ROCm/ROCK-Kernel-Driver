@@ -103,7 +103,7 @@ struct clps_info {
 	unsigned long base;
 	unsigned long size;
 	int width;
-	void *vbase;
+	void __iomem *vbase;
 	struct map_info *map;
 	struct mtd_info *mtd;
 	struct resource *res;
@@ -150,7 +150,7 @@ static int __init clps_setup_mtd(struct clps_info *clps, int nr, struct mtd_info
 			break;
 		}
 
-		clps[i].map->virt = (unsigned long)clps[i].vbase;
+		clps[i].map->virt = clps[i].vbase;
 		clps[i].map->bankwidth = clps[i].width;
 		clps[i].map->size = clps[i].size;
 

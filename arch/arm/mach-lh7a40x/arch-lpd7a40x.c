@@ -45,7 +45,6 @@ static struct platform_device smc91x_device = {
 	.resource	= smc91x_resources,
 };
 
-#if 0
 static struct resource lh7a40x_usbclient_resources[] = {
 	[0] = {
 		.start	= USB_PHYS,
@@ -53,8 +52,8 @@ static struct resource lh7a40x_usbclient_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= IRQ_USB,
-		.end	= IRQ_USB,
+		.start	= IRQ_USBINTR,
+		.end	= IRQ_USBINTR,
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -62,7 +61,7 @@ static struct resource lh7a40x_usbclient_resources[] = {
 static u64 lh7a40x_usbclient_dma_mask = 0xffffffffUL;
 
 static struct platform_device lh7a40x_usbclient_device = {
-	.name		= "lh7a40x-udc",
+	.name		= "lh7a40x_udc",
 	.id		= 0,
 	.dev		= {
 		.dma_mask = &lh7a40x_usbclient_dma_mask,
@@ -71,7 +70,6 @@ static struct platform_device lh7a40x_usbclient_device = {
 	.num_resources	= ARRAY_SIZE (lh7a40x_usbclient_resources),
 	.resource	= lh7a40x_usbclient_resources,
 };
-#endif
 
 #if defined (CONFIG_ARCH_LH7A404)
 
@@ -105,8 +103,7 @@ static struct platform_device lh7a404_usbhost_device = {
 
 static struct platform_device *lpd7a40x_devs[] __initdata = {
 	&smc91x_device,
-/*	&lh7a40x_usbclient_device, */
-
+	&lh7a40x_usbclient_device,
 #if defined (CONFIG_ARCH_LH7A404)
 	&lh7a404_usbhost_device,
 #endif

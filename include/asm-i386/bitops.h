@@ -31,6 +31,11 @@
  *
  * This function is atomic and may not be reordered.  See __set_bit()
  * if you do not require the atomic guarantees.
+ *
+ * Note: there are no guarantees that this function will not be reordered
+ * on non x86 architectures, so if you are writting portable code,
+ * make sure not to rely on its reordering guarantees.
+ *
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
@@ -109,7 +114,8 @@ static inline void __change_bit(int nr, volatile unsigned long * addr)
  * @nr: Bit to change
  * @addr: Address to start counting from
  *
- * change_bit() is atomic and may not be reordered.
+ * change_bit() is atomic and may not be reordered. It may be
+ * reordered on other architectures than x86.
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
@@ -127,6 +133,7 @@ static inline void change_bit(int nr, volatile unsigned long * addr)
  * @addr: Address to count from
  *
  * This operation is atomic and cannot be reordered.  
+ * It may be reordered on other architectures than x86.
  * It also implies a memory barrier.
  */
 static inline int test_and_set_bit(int nr, volatile unsigned long * addr)
@@ -165,7 +172,8 @@ static inline int __test_and_set_bit(int nr, volatile unsigned long * addr)
  * @nr: Bit to clear
  * @addr: Address to count from
  *
- * This operation is atomic and cannot be reordered.  
+ * This operation is atomic and cannot be reordered.
+ * It can be reorderdered on other architectures other than x86.
  * It also implies a memory barrier.
  */
 static inline int test_and_clear_bit(int nr, volatile unsigned long * addr)

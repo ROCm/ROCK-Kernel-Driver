@@ -2430,12 +2430,13 @@ static int atmel_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			rc = -ENOMEM;
 			break;
 		}
-		
+
 		if (copy_from_user(new_firmware, com.data, com.len)) {
+			kfree(new_firmware);
 			rc = -EFAULT;
 			break;
 		}
-		
+
 		if (priv->firmware)
 			kfree(priv->firmware);
 		

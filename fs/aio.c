@@ -655,7 +655,7 @@ static ssize_t aio_run_iocb(struct kiocb *iocb)
 	struct kioctx	*ctx = iocb->ki_ctx;
 	ssize_t (*retry)(struct kiocb *);
 	ssize_t ret;
- 
+
 	if (iocb->ki_retried++ > 1024*1024) {
 		printk("Maximal retry count.  Bytes done %Zd\n",
 			iocb->ki_nbytes - iocb->ki_left);
@@ -673,7 +673,7 @@ static ssize_t aio_run_iocb(struct kiocb *iocb)
 		printk("aio_run_iocb: iocb->ki_retry = NULL\n");
 		return 0;
 	}
- 
+
 	/*
 	 * We don't want the next retry iteration for this
 	 * operation to start until this one has returned and
@@ -743,7 +743,7 @@ static ssize_t aio_run_iocb(struct kiocb *iocb)
 	}
 out:
 	spin_lock_irq(&ctx->ctx_lock);
- 
+
 	if (-EIOCBRETRY == ret) {
 		/*
 		 * OK, now that we are done with this iteration
@@ -799,7 +799,7 @@ static int __aio_run_iocbs(struct kioctx *ctx)
 static void aio_queue_work(struct kioctx * ctx)
 {
 	unsigned long timeout;
-	/* 
+	/*
 	 * if someone is waiting, get the work started right
 	 * away, otherwise, use a longer delay
 	 */
@@ -824,7 +824,7 @@ static inline void aio_run_iocbs(struct kioctx *ctx)
 	int requeue;
 
 	spin_lock_irq(&ctx->ctx_lock);
-	
+
 	requeue = __aio_run_iocbs(ctx);
 	spin_unlock_irq(&ctx->ctx_lock);
 	if (requeue)
@@ -838,10 +838,11 @@ static inline void aio_run_iocbs(struct kioctx *ctx)
 static inline void aio_run_all_iocbs(struct kioctx *ctx)
 {
 	spin_lock_irq(&ctx->ctx_lock);
-	while( __aio_run_iocbs(ctx));
+	while (__aio_run_iocbs(ctx))
+		;
 	spin_unlock_irq(&ctx->ctx_lock);
 }
- 
+
 /*
  * aio_kick_handler:
  * 	Work queue handler triggered to process pending
@@ -870,7 +871,7 @@ static void aio_kick_handler(void *data)
 	if (requeue)
 		queue_work(aio_wq, &ctx->wq);
 }
- 
+
 
 /*
  * Called by kick_iocb to queue the kiocb for retry
@@ -974,7 +975,7 @@ int fastcall aio_complete(struct kiocb *iocb, long res, long res2)
 	/*
 	 * cancelled requests don't get events, userland was given one
 	 * when the event got cancelled.
-	 */ 
+	 */
 	if (kiocbIsCancelled(iocb))
 		goto put_rq;
 
@@ -1117,7 +1118,7 @@ static int read_events(struct kioctx *ctx,
 	int			i = 0;
 	struct io_event		ent;
 	struct aio_timeout	to;
-	int			event_loop = 0; /* testing only */
+	int 			event_loop = 0; /* testing only */
 	int			retry = 0;
 
 	/* needed to zero any padding within an entry (there shouldn't be 
@@ -1126,7 +1127,6 @@ static int read_events(struct kioctx *ctx,
 	memset(&ent, 0, sizeof(ent));
 retry:
 	ret = 0;
-
 	while (likely(i < nr)) {
 		ret = aio_read_evt(ctx, &ent);
 		if (unlikely(ret <= 0))
@@ -1283,7 +1283,7 @@ asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 		ret = put_user(ioctx->user_id, ctxp);
 		if (!ret)
 			return 0;
-		get_ioctx(ioctx);
+
 		io_destroy(ioctx);
 	}
 
@@ -1309,7 +1309,7 @@ asmlinkage long sys_io_destroy(aio_context_t ctx)
 }
 
 /*
- * Retry method for aio_read (also used for first time submit)
+ * Default retry method for aio_read (also used for first time submit)
  * Responsible for updating iocb state as retries progress
  */
 static ssize_t aio_pread(struct kiocb *iocb)
@@ -1329,7 +1329,7 @@ static ssize_t aio_pread(struct kiocb *iocb)
 	if (ret > 0) {
 		iocb->ki_buf += ret;
 		iocb->ki_left -= ret;
-		/* 
+		/*
 		 * For pipes and sockets we return once we have
 		 * some data; for regular files we retry till we
 		 * complete the entire read or find that we can't
@@ -1348,7 +1348,7 @@ static ssize_t aio_pread(struct kiocb *iocb)
 }
 
 /*
- * Retry method for aio_write (also used for first time submit)
+ * Default retry method for aio_write (also used for first time submit)
  * Responsible for updating iocb state as retries progress
  */
 static ssize_t aio_pwrite(struct kiocb *iocb)
@@ -1359,12 +1359,6 @@ static ssize_t aio_pwrite(struct kiocb *iocb)
 	ret = file->f_op->aio_write(iocb, iocb->ki_buf,
 		iocb->ki_left, iocb->ki_pos);
 
-	/*
-	 * TBD: Even if iocb->ki_left = 0, could we need to
-	 * wait for data to be sync'd ? Or can we assume
-	 * that aio_fdsync/aio_fsync would be called explicitly
-	 * as required.
-	 */
 	if (ret > 0) {
 		iocb->ki_buf += ret;
 		iocb->ki_left -= ret;
@@ -1374,7 +1368,7 @@ static ssize_t aio_pwrite(struct kiocb *iocb)
 
 	/* This means we must have transferred all that we could */
 	/* No need to retry anymore */
-	if (ret == 0)
+	if ((ret == 0) || (iocb->ki_left == 0))
 		ret = iocb->ki_nbytes - iocb->ki_left;
 
 	return ret;
@@ -1401,16 +1395,6 @@ static ssize_t aio_fsync(struct kiocb *iocb)
 }
 
 /*
- * Retry method for aio_poll (also used for first time submit)
- * Responsible for updating iocb state as retries progress
- */
-static ssize_t aio_poll(struct kiocb *iocb)
-{
-	unsigned events = (unsigned)(iocb->ki_buf);
-	return generic_aio_poll(iocb, events);
-}
-
-/*
  * aio_setup_iocb:
  *	Performs the initial checks and aio retry method
  *	setup for the kiocb at the time of io submission.
@@ -1429,9 +1413,6 @@ ssize_t aio_setup_iocb(struct kiocb *kiocb)
 		if (unlikely(!access_ok(VERIFY_WRITE, kiocb->ki_buf,
 			kiocb->ki_left)))
 			break;
-		ret = security_file_permission(file, MAY_READ);
-		if (ret)
-			break;
 		ret = -EINVAL;
 		if (file->f_op->aio_read)
 			kiocb->ki_retry = aio_pread;
@@ -1443,9 +1424,6 @@ ssize_t aio_setup_iocb(struct kiocb *kiocb)
 		ret = -EFAULT;
 		if (unlikely(!access_ok(VERIFY_READ, kiocb->ki_buf,
 			kiocb->ki_left)))
-			break;
-		ret = security_file_permission(file, MAY_WRITE);
-		if (ret)
 			break;
 		ret = -EINVAL;
 		if (file->f_op->aio_write)
@@ -1460,13 +1438,6 @@ ssize_t aio_setup_iocb(struct kiocb *kiocb)
 		ret = -EINVAL;
 		if (file->f_op->aio_fsync)
 			kiocb->ki_retry = aio_fsync;
-		break;
-	case IOCB_CMD_POLL:
-		ret = -EINVAL;
-		if (file->f_op->poll) {
-			memset(kiocb->private, 0, sizeof(kiocb->private));
-			kiocb->ki_retry = aio_poll;
-		}
 		break;
 	default:
 		dprintk("EINVAL: io_submit: no operation provided\n");
@@ -1552,7 +1523,7 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	req->ki_user_data = iocb->aio_data;
 	req->ki_pos = iocb->aio_offset;
 
-	req->ki_buf = (char *)(unsigned long)iocb->aio_buf;
+	req->ki_buf = (char __user *)(unsigned long)iocb->aio_buf;
 	req->ki_left = req->ki_nbytes = iocb->aio_nbytes;
 	req->ki_opcode = iocb->aio_lio_opcode;
 	init_waitqueue_func_entry(&req->ki_wait, aio_wake_function);
@@ -1573,7 +1544,8 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	spin_lock_irq(&ctx->ctx_lock);
 	list_add_tail(&req->ki_run_list, &ctx->run_list);
 	/* drain the run list */
-	while(__aio_run_iocbs(ctx));
+	while (__aio_run_iocbs(ctx))
+		;
 	spin_unlock_irq(&ctx->ctx_lock);
 	aio_put_req(req);	/* drop extra ref to req */
 	return 0;

@@ -37,7 +37,7 @@ LDFLAGS		:= -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
-CHECKFLAGS      += -D__x86_64__=1
+CHECKFLAGS      += -D__x86_64__=1 -m64
 
 cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
@@ -59,7 +59,6 @@ endif
 # -funit-at-a-time shrinks the kernel .text considerably
 # unfortunately it makes reading oopses harder.
 CFLAGS += $(call cc-option,-funit-at-a-time)
-CFLAGS += $(call cc-option,-msoft-float)
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 

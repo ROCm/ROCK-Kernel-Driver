@@ -107,6 +107,9 @@ config ARCH_IOP3XX
 config ARCH_IXP4XX
 	bool "IXP4xx-based"
 
+config ARCH_IXP2000
+	bool "IXP2400/2800-based"
+
 config ARCH_L7200
 	bool "LinkUp-L7200"
 	help
@@ -173,6 +176,8 @@ source "arch/arm/mach-integrator/Kconfig"
 source "arch/arm/mach-iop3xx/Kconfig"
 
 source "arch/arm/mach-ixp4xx/Kconfig"
+
+source "arch/arm/mach-ixp2000/Kconfig"
 
 source "arch/arm/mach-pxa/Kconfig"
 
@@ -267,7 +272,7 @@ config DISCONTIGMEM
 # Now handle the bus types
 config PCI
 	bool "PCI support" if ARCH_INTEGRATOR_AP
-	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX
+	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_IXP2000
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -402,7 +407,7 @@ config FPE_NWFPE
 
 config FPE_NWFPE_XP
 	bool "Support extended precision"
-	depends on FPE_NWFPE
+	depends on FPE_NWFPE && !CPU_BIG_ENDIAN
 	help
 	  Say Y to include 80-bit support in the kernel floating-point
 	  emulator.  Otherwise, only 32 and 64-bit support is compiled in.
@@ -428,6 +433,7 @@ config FPE_FASTFPE
 
 config VFP
 	bool "VFP-format floating point maths"
+	depends on CPU_V6 || CPU_ARM926T
 	help
 	  Say Y to include VFP support code in the kernel. This is needed
 	  if your hardware includes a VFP unit.

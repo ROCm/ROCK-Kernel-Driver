@@ -504,7 +504,8 @@ static int tvaudio_thread(void *data)
 		dprintk("tvaudio thread scan start [%d]\n",dev->thread.scan1);
 		dev->tvaudio  = NULL;
 		tvaudio_init(dev);
-		dev->automute = 1;
+		if (dev->ctl_automute)
+			dev->automute = 1;
 		mute_input_7134(dev);
 
 		/* give the tuner some time */
@@ -924,8 +925,9 @@ int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 	int (*my_thread)(void *data) = NULL;
 
 	/* enable I2S audio output */
-	if (saa7134_boards[dev->board].i2s_rate) {
-		int i2sform = (32000 == saa7134_boards[dev->board].i2s_rate) ? 0x00 : 0x01;
+	if (saa7134_boards[dev->board].has_ts) {
+		int i2sform = (48000 == dev->oss.rate)
+			? 0x01 : 0x00;
 		
 		/* enable I2S output */
 		saa_writeb(SAA7134_I2S_OUTPUT_SELECT,  0x80); 

@@ -7,6 +7,7 @@
 
 obj-$(CONFIG_PCI)		+= pci/
 obj-$(CONFIG_PARISC)		+= parisc/
+obj-y				+= video/
 obj-$(CONFIG_ACPI_BOOT)		+= acpi/
 # PnP must come after ACPI since it will eventually need to check if acpi
 # was used and do nothing if so
@@ -26,7 +27,7 @@ obj-$(CONFIG_FC4)		+= fc4/
 obj-$(CONFIG_SCSI)		+= scsi/
 obj-$(CONFIG_FUSION)		+= message/
 obj-$(CONFIG_IEEE1394)		+= ieee1394/
-obj-y				+= cdrom/ video/
+obj-y				+= cdrom/
 obj-$(CONFIG_MTD)		+= mtd/
 obj-$(CONFIG_PCMCIA)		+= pcmcia/
 obj-$(CONFIG_DIO)		+= dio/

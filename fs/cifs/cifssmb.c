@@ -234,10 +234,12 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 
 		/* BB might be helpful to save off the domain of server here */
 
-		if (pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) {
-			if (pSMBr->ByteCount < 16)
+		if ((pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) && 
+			(server->capabilities & CAP_EXTENDED_SECURITY)) {
+			__u16 count = le16_to_cpu(pSMBr->ByteCount);
+			if (count < 16)
 				rc = -EIO;
-			else if (pSMBr->ByteCount == 16) {
+			else if (count == 16) {
 				server->secType = RawNTLMSSP;
 				if (server->socketUseCount.counter > 1) {
 					if (memcmp
@@ -260,8 +262,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 				rc = decode_negTokenInit(pSMBr->u.
 							 extended_response.
 							 SecurityBlob,
-							 pSMBr->ByteCount -
-							 16, &server->secType);
+							 count - 16,
+							 &server->secType);
 			}
 		} else
 			server->capabilities &= ~CAP_EXTENDED_SECURITY;
@@ -365,9 +367,12 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
-
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	
+	if(ses->server) {
+		if(ses->server->secMode & 
+		   (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+			pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	}
 
 	if (rc) {
 		up(&ses->sesSem);
@@ -794,7 +799,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	LOCK_RSP *pSMBr = NULL;
 	int bytes_returned;
 	int timeout = 0;
-	__u64 temp;
+	__u16 count;
 
 	cFYI(1, ("In CIFSSMBLock - timeout %d numLock %d",waitFlag,numLock));
 	rc = smb_init(SMB_COM_LOCKING_ANDX, 8, tcon, (void **) &pSMB,
@@ -812,28 +817,26 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		pSMB->Timeout = 0;
 	}
 
-	pSMB->NumberOfLocks = cpu_to_le32(numLock);
-	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
+	pSMB->NumberOfLocks = cpu_to_le16(numLock);
+	pSMB->NumberOfUnlocks = cpu_to_le16(numUnlock);
 	pSMB->LockType = lockType;
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
 
-	if(numLock != 0) {
+	if((numLock != 0) || (numUnlock != 0)) {
 		pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
 		/* BB where to store pid high? */
-		temp = cpu_to_le64(len);
-		pSMB->Locks[0].LengthLow = (__u32)(temp & 0xFFFFFFFF);
-		pSMB->Locks[0].LengthHigh =  (__u32)(temp>>32);
-		temp = cpu_to_le64(offset);
-		pSMB->Locks[0].OffsetLow = (__u32)(temp & 0xFFFFFFFF);
-		pSMB->Locks[0].OffsetHigh = (__u32)(temp>>32);
-		pSMB->ByteCount = sizeof (LOCKING_ANDX_RANGE);
+		pSMB->Locks[0].LengthLow = cpu_to_le32((u32)len);
+		pSMB->Locks[0].LengthHigh = cpu_to_le32((u32)(len>>32));
+		pSMB->Locks[0].OffsetLow = cpu_to_le32((u32)offset);
+		pSMB->Locks[0].OffsetHigh = cpu_to_le32((u32)(offset>>32));
+		count = sizeof(LOCKING_ANDX_RANGE);
 	} else {
 		/* oplock break */
-		pSMB->ByteCount = 0;
+		count = 0;
 	}
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += count;
+	pSMB->ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, timeout);
@@ -1505,16 +1508,16 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 	if (rc) {
 		cFYI(1, ("Send error in QueryReparseLinkInfo = %d", rc));
 	} else {		/* decode response */
-		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		pSMBr->DataCount = le16_to_cpu(pSMBr->DataCount);
-		if ((pSMBr->ByteCount < 2) || (pSMBr->DataOffset > 512))
+		__u32 data_offset = le32_to_cpu(pSMBr->DataOffset);
+		__u32 data_count = le32_to_cpu(pSMBr->DataCount);
+		if ((pSMBr->ByteCount < 2) || (data_offset > 512))
 		/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
-			if(pSMBr->DataCount && (pSMBr->DataCount < 2048)) {
+			if(data_count && (data_count < 2048)) {
 		/* could also validate reparse tag && better check name length */
 				struct reparse_data * reparse_buf = (struct reparse_data *)
-					((char *)&pSMBr->hdr.Protocol + pSMBr->DataOffset);
+					((char *)&pSMBr->hdr.Protocol + data_offset);
 				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
 					name_len = UniStrnlen((wchar_t *)
 							(reparse_buf->LinkNamesBuf + 
@@ -2173,6 +2176,10 @@ getDFSRetry:
 			/* BB add check for name_len bigger than bcc */
 			*targetUNCs = 
 				kmalloc(name_len+1+ (*number_of_UNC_in_array),GFP_KERNEL);
+			if(*targetUNCs == NULL) {
+				rc = -ENOMEM;
+				goto GetDFSRefExit;
+			}
 			/* copy the ref strings */
 			referrals =  
 			    (struct dfs_referral_level_3 *) 
@@ -2196,6 +2203,7 @@ getDFSRetry:
 		}
 
 	}
+GetDFSRefExit:
 	if (pSMB)
 		cifs_buf_release(pSMB);
 
@@ -3105,7 +3113,7 @@ QAllEAsRetry:
 					rc += temp_fea->name_len;
 				/* account for prefix user. and trailing null */
 					rc = rc + 5 + 1; 
-					if(rc<buf_size) {
+					if(rc<(int)buf_size) {
 						memcpy(EAData,"user.",5);
 						EAData+=5;
 						memcpy(EAData,temp_ptr,temp_fea->name_len);
@@ -3141,7 +3149,7 @@ QAllEAsRetry:
 	if (rc == -EAGAIN)
 		goto QAllEAsRetry;
 
-	return rc;
+	return (ssize_t)rc;
 }
 
 ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
@@ -3255,7 +3263,7 @@ QEARetry:
 						/* found a match */
 						rc = temp_fea->value_len;
 				/* account for prefix user. and trailing null */
-						if(rc<=buf_size) {
+						if(rc<=(int)buf_size) {
 							memcpy(ea_value,
 								temp_fea->name+temp_fea->name_len+1,
 								rc);
@@ -3288,7 +3296,7 @@ QEARetry:
 	if (rc == -EAGAIN)
 		goto QEARetry;
 
-	return rc;
+	return (ssize_t)rc;
 }
 
 int

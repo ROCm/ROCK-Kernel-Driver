@@ -10,6 +10,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/completion.h>
@@ -47,7 +48,7 @@ MODULE_LICENSE("GPL");
 
 static char *rootcell;
 
-MODULE_PARM(rootcell, "s");
+module_param(rootcell, charp, 0);
 MODULE_PARM_DESC(rootcell, "root AFS cell name and VL server IP addr list");
 
 

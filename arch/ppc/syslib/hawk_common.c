@@ -285,3 +285,35 @@ hawk_get_mem_size(uint smc_base)
 
 	return total;
 }
+
+int __init
+hawk_mpic_init(unsigned int pci_mem_offset)
+{
+	unsigned short	devid;
+	unsigned int	pci_membase;
+
+	/* Check the first PCI device to see if it is a Raven or Hawk. */
+	early_read_config_word(0, 0, 0, PCI_DEVICE_ID, &devid);
+
+	switch (devid) {
+	case PCI_DEVICE_ID_MOTOROLA_RAVEN:
+	case PCI_DEVICE_ID_MOTOROLA_HAWK:
+		break;
+	default:
+		OpenPIC_Addr = NULL;
+		return 1;
+	}
+
+	/* Read the memory base register. */
+	early_read_config_dword(0, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
+
+	if (pci_membase == 0) {
+		OpenPIC_Addr = NULL;
+		return 1;
+	}
+
+	/* Map the MPIC registers to virtual memory. */
+	OpenPIC_Addr = ioremap(pci_membase + pci_mem_offset, 0x22000);
+
+	return 0;
+}

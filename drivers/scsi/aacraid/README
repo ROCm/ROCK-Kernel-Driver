@@ -10,27 +10,37 @@ the original).
 
 Supported Cards/Chipsets
 -------------------------
-	Dell Computer Corporation PERC 2 Quad Channel
-	Dell Computer Corporation PERC 2/Si
-	Dell Computer Corporation PERC 3/Si
-	Dell Computer Corporation PERC 3/Di
-	Dell Computer Corporation CERC 2
-	HP NetRAID-4M
-	ADAPTEC 2120S
-	ADAPTEC 2200S
-	ADAPTEC 2230S
-	ADAPTEC 5400S
-	Legend S220
-	Legend S230
+	Adaptec 2020S
+	Adaptec 2025S
+	Adaptec 2120S
+	Adaptec 2200S
+	Adaptec 2230S
+	Adaptec 2240S
+	Adaptec 2410SA
+	Adaptec 2610SA
+	Adaptec 2810SA
+	Adaptec 21610SA
 	Adaptec 3230S
 	Adaptec 3240S
-	ASR-2020S PCI-X
-	AAR-2410SA SATA
+	Adaptec 4000SAS
+	Adaptec 4005SAS
+	Adaptec 4800SAS
+	Adaptec 4805SAS
+	Adaptec 5400S
+	Dell PERC 2 Quad Channel
+	Dell PERC 2/Si
+	Dell PERC 3/Si
+	Dell PERC 3/Di
+	Dell CERC 2
+	HP NetRAID-4M
+	Legend S220
+	Legend S230
 
 People
 -------------------------
 Alan Cox <alan@redhat.com>
-Christoph Hellwig <hch@infradead.org>	(updates for new-style PCI probing and SCSI host registration)
+Christoph Hellwig <hch@infradead.org>	(updates for new-style PCI probing and SCSI host registration,
+					 small cleanups/fixes)
 Matt Domsch <matt_domsch@dell.com>	(revision ioctl, adapter messages)
 Deanna Bonds <deanna_bonds@adaptec.com> (non-DASD support, PAE fibs and 64 bit, added new adaptec controllers
 					 added new ioctls, changed scsi interface to use new error handler,

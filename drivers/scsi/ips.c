@@ -133,10 +133,6 @@
 /* 6.10.00  - Remove 1G Addressing Limitations                               */
 /* 6.11.xx  - Get VersionInfo buffer off the stack !              DDTS 60401 */
 /* 6.11.xx  - Make Logical Drive Info structure safe for DMA      DDTS 60639 */
-/* 7.10.xx  - Add highmem_io flag in SCSI Templete for 2.4 kernels           */
-/*          - Fix path/name for scsi_hosts.h include for 2.6 kernels         */
-/*          - Fix sort order of 7k                                           */
-/*          - Remove 3 unused "inline" functions                             */
 /*****************************************************************************/
 
 /*
@@ -180,13 +176,7 @@
 #include <scsi/sg.h>
 
 #include "scsi.h"
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
-#include "hosts.h"
-#else
 #include <scsi/scsi_host.h>
-#endif
-
 #include "ips.h"
 
 #include <linux/module.h>
@@ -207,8 +197,8 @@ MODULE_PARM(ips, "s");
 /*
  * DRIVER_VER
  */
-#define IPS_VERSION_HIGH        "7.10"
-#define IPS_VERSION_LOW         ".18 "
+#define IPS_VERSION_HIGH        "7.00"
+#define IPS_VERSION_LOW         ".15 "
 
 #if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
 #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
@@ -287,9 +277,6 @@ static Scsi_Host_Template ips_driver_template = {
 	.use_clustering		= ENABLE_CLUSTERING,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	.use_new_eh_code	= 1,
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20)  &&  LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-    .highmem_io          = 1,   
 #endif
 };
 
@@ -6917,6 +6904,7 @@ ips_order_controllers(void)
 			for (j = position; j < ips_num_controllers; j++) {
 				switch (ips_ha[j]->ad_type) {
 				case IPS_ADTYPE_SERVERAID6M:
+				case IPS_ADTYPE_SERVERAID7k:
 				case IPS_ADTYPE_SERVERAID7M:
 					if (nvram->adapter_order[i] == 'M') {
 						ips_shift_controllers(position,
@@ -6937,7 +6925,6 @@ ips_order_controllers(void)
 				case IPS_ADTYPE_SERVERAID6I:
 				case IPS_ADTYPE_SERVERAID5I2:
 				case IPS_ADTYPE_SERVERAID5I1:
-				case IPS_ADTYPE_SERVERAID7k:
 					if (nvram->adapter_order[i] == 'S') {
 						ips_shift_controllers(position,
 								      j);
@@ -7465,15 +7452,6 @@ ips_init_phase2(int index)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,9)
 MODULE_LICENSE("GPL");
 #endif
-
-#ifdef MODULE_DESCRIPTION
-MODULE_DESCRIPTION("IBM ServeRAID Adapter Driver " IPS_VER_STRING);
-#endif
-
-#ifdef MODULE_VERSION
-MODULE_VERSION(IPS_VER_STRING);
-#endif
-
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.

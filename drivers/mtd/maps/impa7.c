@@ -77,7 +77,7 @@ int __init init_impa7(void)
 {
 	static const char *rom_probe_types[] = PROBETYPES;
 	const char **type;
-	const char *part_type = 0;
+	const char *part_type = NULL;
 	int i;
 	static struct { u_long addr; u_long size; } pt[NUM_FLASHBANKS] = {
 	  { WINDOW_ADDR0, WINDOW_SIZE0 },
@@ -99,7 +99,7 @@ int __init init_impa7(void)
 		}
 		simple_map_init(&impa7_map[i]);
 
-		impa7_mtd[i] = 0;
+		impa7_mtd[i] = NULL;
 		type = rom_probe_types;
 		for(; !impa7_mtd[i] && *type; type++) {
 			impa7_mtd[i] = do_map_probe(*type, &impa7_map[i]);

@@ -181,8 +181,7 @@ static inline int get_order(unsigned long size)
 
 #define __pa(x) ((unsigned long)(x)-PAGE_OFFSET)
 
-/* Not 100% correct, for use by /dev/mem only */
-extern int page_is_ram(unsigned long physaddr);
+extern int page_is_ram(unsigned long pfn);
 
 #endif /* __ASSEMBLY__ */
 
@@ -240,6 +239,7 @@ extern int page_is_ram(unsigned long physaddr);
 #endif
 
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 

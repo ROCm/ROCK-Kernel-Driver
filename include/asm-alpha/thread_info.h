@@ -19,7 +19,7 @@ struct thread_info {
 
 	struct exec_domain	*exec_domain;	/* execution domain */
 	mm_segment_t		addr_limit;	/* thread address space */
-	long			cpu;		/* current CPU */
+	unsigned		cpu;		/* current CPU */
 	int			preempt_count; /* 0 => preemptable, <0 => BUG */
 
 	int bpt_nsaved;

@@ -22,14 +22,10 @@ void oprofile_reset_stats(void)
 	struct oprofile_cpu_buffer * cpu_buf; 
 	int i;
  
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_possible(i))
-			continue;
-
+	for_each_cpu(i) {
 		cpu_buf = &cpu_buffer[i]; 
 		cpu_buf->sample_received = 0;
 		cpu_buf->sample_lost_overflow = 0;
-		cpu_buf->sample_lost_task_exit = 0;
 	}
  
 	atomic_set(&oprofile_stats.sample_lost_no_mm, 0);
@@ -50,10 +46,7 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 	if (!dir)
 		return;
 
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_possible(i))
-			continue;
-
+	for_each_cpu(i) {
 		cpu_buf = &cpu_buffer[i]; 
 		snprintf(buf, 10, "cpu%d", i);
 		cpudir = oprofilefs_mkdir(sb, dir, buf);
@@ -66,8 +59,6 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 			&cpu_buf->sample_received);
 		oprofilefs_create_ro_ulong(sb, cpudir, "sample_lost_overflow",
 			&cpu_buf->sample_lost_overflow);
-		oprofilefs_create_ro_ulong(sb, cpudir, "sample_lost_task_exit",
-			&cpu_buf->sample_lost_task_exit);
 	}
  
 	oprofilefs_create_ro_atomic(sb, dir, "sample_lost_no_mm",

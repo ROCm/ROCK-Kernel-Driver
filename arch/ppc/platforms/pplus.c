@@ -583,8 +583,6 @@ static void __init pplus_setup_arch(void)
 	vgacon_remap_base = (unsigned long)ioremap(PPLUS_ISA_MEM_BASE,
 						   0x08000000);
 	conswitchp = &vga_con;
-#elif defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
 #endif
 #ifdef CONFIG_PPCBUG_NVRAM
 	/* Read in NVRAM data */

@@ -60,7 +60,6 @@
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->tree_lock
- *    ->page_map_lock()		(try_to_unmap_file)
  *
  *  ->i_sem
  *    ->i_mmap_lock		(truncate->unmap_mapping_range)
@@ -83,16 +82,20 @@
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->tree_lock	(__sync_single_inode)
  *
+ *  ->i_mmap_lock
+ *    ->anon_vma.lock		(vma_adjust)
+ *
+ *  ->anon_vma.lock
+ *    ->page_table_lock		(anon_vma_prepare and various)
+ *
  *  ->page_table_lock
  *    ->swap_device_lock	(try_to_unmap_one)
  *    ->private_lock		(try_to_unmap_one)
  *    ->tree_lock		(try_to_unmap_one)
  *    ->zone.lru_lock		(follow_page->mark_page_accessed)
- *    ->page_map_lock()		(page_add_anon_rmap)
- *      ->tree_lock		(page_remove_rmap->set_page_dirty)
- *      ->private_lock		(page_remove_rmap->set_page_dirty)
- *      ->inode_lock		(page_remove_rmap->set_page_dirty)
- *    ->anon_vma.lock		(anon_vma_prepare)
+ *    ->private_lock		(page_remove_rmap->set_page_dirty)
+ *    ->tree_lock		(page_remove_rmap->set_page_dirty)
+ *    ->inode_lock		(page_remove_rmap->set_page_dirty)
  *    ->inode_lock		(zap_pte_range->set_page_dirty)
  *    ->private_lock		(zap_pte_range->__set_page_dirty_buffers)
  *
@@ -232,10 +235,6 @@ static int wait_on_page_writeback_range(struct address_space *mapping,
 			if (page->index > end)
 				continue;
 
-			/* until radix tree lookup accepts end_index */
-			if (page->index > end) {
-				continue;
-			}
 			wait_on_page_writeback(page);
 			if (PageError(page))
 				ret = -EIO;
@@ -280,6 +279,7 @@ int sync_page_range(struct inode *inode, struct address_space *mapping,
 		ret = wait_on_page_writeback_range(mapping, start, end);
 	return ret;
 }
+EXPORT_SYMBOL(sync_page_range);
 
 /**
  * filemap_fdatawait - walk the list of under-writeback pages of the given
@@ -289,7 +289,13 @@ int sync_page_range(struct inode *inode, struct address_space *mapping,
  */
 int filemap_fdatawait(struct address_space *mapping)
 {
-	return wait_on_page_writeback_range(mapping, 0, -1);
+	loff_t i_size = i_size_read(mapping->host);
+
+	if (i_size == 0)
+		return 0;
+
+	return wait_on_page_writeback_range(mapping, 0,
+				(i_size - 1) >> PAGE_CACHE_SHIFT);
 }
 EXPORT_SYMBOL(filemap_fdatawait);
 
@@ -406,43 +412,22 @@ static void wake_up_page(struct page *page)
 		__wake_up(waitqueue, mode, 1, page);
 }
 
-/*
- * wait for the specified page bit to be cleared
- * this could be a synchronous wait or could just queue an async
- * notification callback depending on the wait queue entry parameter
- *
- * A NULL wait queue parameter defaults to sync behaviour
- */
-int fastcall wait_on_page_bit_wq(struct page *page, int bit_nr, wait_queue_t *wait)
+void fastcall wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	DEFINE_PAGE_WAIT(local_wait, page, bit_nr);
+	DEFINE_PAGE_WAIT(wait, page, bit_nr);
 
-	if (!wait)
-		wait = &local_wait.wait; /* default to a sync wait entry */
- 
- 	do {
-		prepare_to_wait(waitqueue, wait, TASK_UNINTERRUPTIBLE);
- 		if (test_bit(bit_nr, &page->flags)) {
- 			sync_page(page);
-			if (!is_sync_wait(wait)) {
-				/*
-				 * if we've queued an async wait queue
-				 * callback do not block; just tell the
-				 * caller to return and retry later when
-				 * the callback is notified
-				 */
-				return -EIOCBRETRY;
-			}
- 			io_schedule();
- 		}
- 	} while (test_bit(bit_nr, &page->flags));
-	finish_wait(waitqueue, wait);
- 
-	return 0;
+	do {
+		prepare_to_wait(waitqueue, &wait.wait, TASK_UNINTERRUPTIBLE);
+		if (test_bit(bit_nr, &page->flags)) {
+			sync_page(page);
+			io_schedule();
+		}
+	} while (test_bit(bit_nr, &page->flags));
+	finish_wait(waitqueue, &wait.wait);
 }
-EXPORT_SYMBOL(wait_on_page_bit_wq);
- 
+
+EXPORT_SYMBOL(wait_on_page_bit);
 
 /**
  * unlock_page() - unlock a locked page
@@ -452,9 +437,8 @@ EXPORT_SYMBOL(wait_on_page_bit_wq);
  * Unlocks the page and wakes up sleepers in ___wait_on_page_locked().
  * Also wakes sleepers in wait_on_page_writeback() because the wakeup
  * mechananism between PageLocked pages and PageWriteback pages is shared.
- * But that's OK - sleepers in wait_on_page_writeback() just go back to sleep,
- * or in case the wakeup notifies async wait queue entries, as in the case
- * of aio, retries would be triggered and may re-queue their callbacks.
+ * But that's OK - sleepers in wait_on_page_writeback() just go back to sleep.
+ *
  * The first mb is necessary to safely close the critical section opened by the
  * TestSetPageLocked(), the second mb is necessary to enforce ordering between
  * the clear_bit and the read of the waitqueue (to avoid SMP races with a
@@ -487,59 +471,29 @@ void end_page_writeback(struct page *page)
 
 EXPORT_SYMBOL(end_page_writeback);
 
- 
 /*
- * Get a lock on the page, assuming we need to either sleep to get it
- * or to queue an async notification callback to try again when its
- * available.
- *
- * A NULL wait queue parameter defaults to sync behaviour. Otherwise
- * it specifies the wait queue entry to be used for async notification
- * or waiting.
+ * Get a lock on the page, assuming we need to sleep to get it.
  *
  * Ugly: running sync_page() in state TASK_UNINTERRUPTIBLE is scary.  If some
  * random driver's requestfn sets TASK_RUNNING, we could busywait.  However
  * chances are that on the second loop, the block layer's plug list is empty,
  * so sync_page() will then return in state TASK_UNINTERRUPTIBLE.
  */
-int fastcall __lock_page_wq(struct page *page, wait_queue_t *wait)
-{
- 	wait_queue_head_t *wqh = page_waitqueue(page);
-	DEFINE_PAGE_WAIT_EXCLUSIVE(local_wait, page, PG_locked);
-
-	if (!wait)
-		wait = &local_wait.wait;
- 
- 	while (TestSetPageLocked(page)) {
-		if (wait == &local_wait.wait)
-			prepare_to_wait_exclusive(wqh, wait, 
-						  TASK_UNINTERRUPTIBLE);
-		else 
-			prepare_to_wait(wqh, wait, TASK_UNINTERRUPTIBLE);
- 		if (PageLocked(page)) {
- 			sync_page(page);
-			if (!is_sync_wait(wait)) {
-				/*
-				 * if we've queued an async wait queue
-				 * callback do not block; just tell the
-				 * caller to return and retry later when
-				 * the callback is notified
-				 */
-				return -EIOCBRETRY;
-			}
- 			io_schedule();
- 		}
- 	}
-	finish_wait(wqh, wait);
-	return 0;
-}
-EXPORT_SYMBOL(__lock_page_wq);
-
 void fastcall __lock_page(struct page *page)
 {
-	__lock_page_wq(page, NULL);
+	wait_queue_head_t *wqh = page_waitqueue(page);
+	DEFINE_PAGE_WAIT_EXCLUSIVE(wait, page, PG_locked);
+
+	while (TestSetPageLocked(page)) {
+		prepare_to_wait_exclusive(wqh, &wait.wait, TASK_UNINTERRUPTIBLE);
+		if (PageLocked(page)) {
+			sync_page(page);
+			io_schedule();
+		}
+	}
+	finish_wait(wqh, &wait.wait);
 }
- 
+
 EXPORT_SYMBOL(__lock_page);
 
 /*
@@ -754,13 +708,15 @@ EXPORT_SYMBOL(grab_cache_page_nowait);
  *
  * This is really ugly. But the goto's actually try to clarify some
  * of the logic when it comes to error handling etc.
- * - note the struct file * is only passed for the use of readpage
+ *
+ * Note the struct file* is only passed for the use of readpage.  It may be
+ * NULL.
  */
 void do_generic_mapping_read(struct address_space *mapping,
 			     struct file_ra_state *_ra,
-			     struct file * filp,
+			     struct file *filp,
 			     loff_t *ppos,
-			     read_descriptor_t * desc,
+			     read_descriptor_t *desc,
 			     read_actor_t actor)
 {
 	struct inode *inode = mapping->host;
@@ -775,46 +731,29 @@ void do_generic_mapping_read(struct address_space *mapping,
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
 	isize = i_size_read(inode);
-	end_index = isize >> PAGE_CACHE_SHIFT;
-	if (index > end_index)
+	if (!isize)
 		goto out;
 
-	if (unlikely(in_aio())) {
-		/*
-	 	 * Let the readahead logic know upfront about all
-	 	 * the pages we'll need to satisfy this request while
-		 * taking care to avoid repeat readaheads during retries.
-		 * Required for reasonable IO ordering with multipage 
-		 * streaming AIO requests.
-		 */
-		if ((!is_retried_kiocb(io_wait_to_kiocb(current->io_wait)))
-			|| (ra.prev_page + 1 == index)) {
-			unsigned long nr, bytes;
-			bytes = offset + desc->count;
-			nr = bytes >> PAGE_CACHE_SHIFT;
-			if (bytes & ~PAGE_CACHE_MASK)
-				nr++;
-			nr = max_sane_readahead(nr);
-			force_page_cache_readahead(mapping, filp, index,
-					max_sane_readahead(nr));
-			ra.prev_page = index;
-		}
-	}
-
+	end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
 	for (;;) {
 		struct page *page;
 		unsigned long nr, ret;
 
-		cond_resched();
+		/* nr is the maximum number of bytes to copy from this page */
+		nr = PAGE_CACHE_SIZE;
+		if (index >= end_index) {
+			if (index > end_index)
+				goto out;
+			nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
+			if (nr <= offset) {
+				goto out;
+			}
+		}
+		nr = nr - offset;
 
-		/* 
-		 * Take care to avoid disturbing the existing readahead 
-		 * window (concurrent reads may be active for the same fd, 
-		 * in the AIO case)
-		 */
-		if (!in_aio() || (ra.prev_page + 1 == index))
-			page_cache_readahead(mapping, &ra, filp, index);
-		
+		cond_resched();
+		page_cache_readahead(mapping, &ra, filp, index);
+
 find_page:
 		page = find_get_page(mapping, index);
 		if (unlikely(page == NULL)) {
@@ -824,16 +763,6 @@ find_page:
 		if (!PageUptodate(page))
 			goto page_not_up_to_date;
 page_ok:
-		/* nr is the maximum number of bytes to copy from this page */
-		nr = PAGE_CACHE_SIZE;
-		if (index == end_index) {
-			nr = isize & ~PAGE_CACHE_MASK;
-			if (nr <= offset) {
-				page_cache_release(page);
-				goto out;
-			}
-		}
-		nr = nr - offset;
 
 		/* If users can be writing to this page using arbitrary
 		 * virtual addresses, take care about potential aliasing
@@ -870,12 +799,7 @@ page_ok:
 
 page_not_up_to_date:
 		/* Get exclusive access to the page ... */
-
-		if (lock_page_wq(page, current->io_wait)) {
-			pr_debug("queued lock page \n");
-			error = -EIOCBRETRY;
-			goto readpage_error;
-		}
+		lock_page(page);
 
 		/* Did it get unhashed before we got the lock? */
 		if (!page->mapping) {
@@ -898,11 +822,7 @@ readpage:
 			goto readpage_error;
 
 		if (!PageUptodate(page)) {
-			if (wait_on_page_locked_wq(page, current->io_wait)) {
-				pr_debug("queued wait_on_page \n");
-				error = -EIOCBRETRY;
-				goto readpage_error;
-			}
+			wait_on_page_locked(page);
 			if (!PageUptodate(page)) {
 				error = -EIO;
 				goto readpage_error;
@@ -918,19 +838,26 @@ readpage:
 		 * another truncate extends the file - this is desired though).
 		 */
 		isize = i_size_read(inode);
-		end_index = isize >> PAGE_CACHE_SHIFT;
-		if (index > end_index) {
+		end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
+		if (unlikely(!isize || index > end_index)) {
 			page_cache_release(page);
 			goto out;
 		}
+
+		/* nr is the maximum number of bytes to copy from this page */
+		nr = PAGE_CACHE_SIZE;
+		if (index == end_index) {
+			nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
+			if (nr <= offset) {
+				page_cache_release(page);
+				goto out;
+			}
+		}
+		nr = nr - offset;
 		goto page_ok;
 
 readpage_error:
-		/* We don't have uptodate data in the page yet
-		 * Could be due to an error or because we need to
-		 * retry when we get an async i/o notification.
-		 * Report the reason.
-		 */
+		/* UHHUH! A synchronous read error occurred. Report it */
 		desc->error = error;
 		page_cache_release(page);
 		goto out;
@@ -966,7 +893,8 @@ out:
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
 		page_cache_release(cached_page);
-	file_accessed(filp);
+	if (filp)
+		file_accessed(filp);
 }
 
 EXPORT_SYMBOL(do_generic_mapping_read);
@@ -986,7 +914,8 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 	 */
 	if (!fault_in_pages_writeable(desc->arg.buf, size)) {
 		kaddr = kmap_atomic(page, KM_USER0);
-		left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
+		left = __copy_to_user_inatomic(desc->arg.buf,
+						kaddr + offset, size);
 		kunmap_atomic(kaddr, KM_USER0);
 		if (left == 0)
 			goto success;
@@ -1584,7 +1513,7 @@ repeat:
 	return 0;
 }
 
-static struct vm_operations_struct generic_file_vm_ops = {
+struct vm_operations_struct generic_file_vm_ops = {
 	.nopage		= filemap_nopage,
 	.populate	= filemap_populate,
 };
@@ -1783,7 +1712,7 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 	int left;
 
 	kaddr = kmap_atomic(page, KM_USER0);
-	left = __copy_from_user(kaddr + offset, buf, bytes);
+	left = __copy_from_user_inatomic(kaddr + offset, buf, bytes);
 	kunmap_atomic(kaddr, KM_USER0);
 
 	if (left != 0) {
@@ -1806,7 +1735,7 @@ __filemap_copy_from_user_iovec(char *vaddr,
 		int copy = min(bytes, iov->iov_len - base);
 
 		base = 0;
-		left = __copy_from_user(vaddr, buf, copy);
+		left = __copy_from_user_inatomic(vaddr, buf, copy);
 		copied += copy;
 		bytes -= copy;
 		vaddr += copy;

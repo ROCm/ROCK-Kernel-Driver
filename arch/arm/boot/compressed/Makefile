@@ -8,11 +8,13 @@ HEAD	= head.o
 OBJS	= misc.o
 FONTC	= drivers/video/console/font_acorn_8x8.c
 
+FONT = $(addprefix ../../../../drivers/video/console/, font_acorn_8x8.o)
+
 #
 # Architecture dependencies
 #
 ifeq ($(CONFIG_ARCH_ACORN),y)
-OBJS		+= ll_char_wr.o font.o
+OBJS		+= ll_char_wr.o $(FONT)
 endif
 
 ifeq ($(CONFIG_ARCH_SHARK),y)
@@ -51,6 +53,10 @@ ifeq ($(CONFIG_DEBUG_ICEDCC),y)
 OBJS            += ice-dcc.o
 endif
 
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+OBJS		+= big-endian.o
+endif
+
 #
 # We now have a PIC decompressor implementation.  Decompressors running
 # from RAM should not define ZTEXTADDR.  Decompressors running directly
@@ -66,7 +72,7 @@ endif
 
 SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
 
-targets       := vmlinux vmlinux.lds piggy.gz piggy.o font.o \
+targets       := vmlinux vmlinux.lds piggy.gz piggy.o $(FONT) \
 		 head.o misc.o $(OBJS)
 EXTRA_CFLAGS  := -fpic
 EXTRA_AFLAGS  :=
@@ -98,8 +104,7 @@ $(obj)/piggy.gz: $(obj)/../Image FORCE
 
 $(obj)/piggy.o:  $(obj)/piggy.gz FORCE
 
-CFLAGS_font.o := -Dstatic=
-$(obj)/font.o: $(FONTC)
+CFLAGS_font_acorn_8x8.o := -Dstatic=
 
 $(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile .config
 	@sed "$(SEDFLAGS)" < $< > $@

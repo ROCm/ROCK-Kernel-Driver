@@ -4,11 +4,9 @@
 #include <stddef.h>
 #include <sched.h>
 #include <string.h>
-#include <sys/fcntl.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/termios.h>
 #include <sys/wait.h>
-#include <sys/ioctl.h>
 #include <sys/signal.h>
 #include "user_util.h"
 #include "kern_util.h"
@@ -65,9 +63,9 @@ static void slip_pre_exec(void *arg)
 {
 	struct slip_pre_exec_data *data = arg;
 
-	if(data->stdin != -1) dup2(data->stdin, 0);
+	if(data->stdin >= 0) dup2(data->stdin, 0);
 	dup2(data->stdout, 1);
-	if(data->close_me != -1) close(data->close_me);
+	if(data->close_me >= 0) os_close_file(data->close_me);
 }
 
 static int slip_tramp(char **argv, int fd)
@@ -77,8 +75,8 @@ static int slip_tramp(char **argv, int fd)
 	int status, pid, fds[2], err, output_len;
 
 	err = os_pipe(fds, 1, 0);
-	if(err){
-		printk("slip_tramp : pipe failed, errno = %d\n", -err);
+	if(err < 0){
+		printk("slip_tramp : pipe failed, err = %d\n", -err);
 		return(err);
 	}
 
@@ -96,16 +94,18 @@ static int slip_tramp(char **argv, int fd)
 			printk("slip_tramp : failed to allocate output "
 			       "buffer\n");
 
-		close(fds[1]);
+		os_close_file(fds[1]);
 		read_output(fds[0], output, output_len);
 		if(output != NULL){
 			printk("%s", output);
 			kfree(output);
 		}
-		if(waitpid(pid, &status, 0) < 0) err = errno;
+		CATCH_EINTR(err = waitpid(pid, &status, 0));
+		if(err < 0)
+			err = errno;
 		else if(!WIFEXITED(status) || (WEXITSTATUS(status) != 0)){
 			printk("'%s' didn't exit with status 0\n", argv[0]);
-			err = EINVAL;
+			err = -EINVAL;
 		}
 	}
 	return(err);
@@ -118,15 +118,17 @@ static int slip_open(void *data)
 	char gate_buf[sizeof("nnn.nnn.nnn.nnn\0")];
 	char *argv[] = { "uml_net", version_buf, "slip", "up", gate_buf, 
 			 NULL };
-	int sfd, mfd, disc, sencap, err;
+	int sfd, mfd, err;
 
-	if((mfd = get_pty()) < 0){
-		printk("umn : Failed to open pty\n");
-		return(-1);
+	mfd = get_pty();
+	if(mfd < 0){
+		printk("umn : Failed to open pty, err = %d\n", -mfd);
+		return(mfd);
 	}
-	if((sfd = os_open_file(ptsname(mfd), of_rdwr(OPENFLAGS()), 0)) < 0){
-		printk("Couldn't open tty for slip line\n");
-		return(-1);
+	sfd = os_open_file(ptsname(mfd), of_rdwr(OPENFLAGS()), 0);
+	if(sfd < 0){
+		printk("Couldn't open tty for slip line, err = %d\n", -sfd);
+		return(sfd);
 	}
 	if(set_up_tty(sfd)) return(-1);
 	pri->slave = sfd;
@@ -138,28 +140,23 @@ static int slip_open(void *data)
 
 		err = slip_tramp(argv, sfd);
 
-		if(err != 0){
-			printk("slip_tramp failed - errno = %d\n", err);
-			return(-err);
+		if(err < 0){
+			printk("slip_tramp failed - err = %d\n", -err);
+			return(err);
 		}
-		if(ioctl(pri->slave, SIOCGIFNAME, pri->name) < 0){
-			printk("SIOCGIFNAME failed, errno = %d\n", errno);
-			return(-errno);
+		err = os_get_ifname(pri->slave, pri->name);
+		if(err < 0){
+			printk("get_ifname failed, err = %d\n", -err);
+			return(err);
 		}
 		iter_addresses(pri->dev, open_addr, pri->name);
 	}
 	else {
-		disc = N_SLIP;
-		if(ioctl(sfd, TIOCSETD, &disc) < 0){
-			printk("Failed to set slip line discipline - "
-			       "errno = %d\n", errno);
-			return(-errno);
-		}
-		sencap = 0;
-		if(ioctl(sfd, SIOCSIFENCAP, &sencap) < 0){
-			printk("Failed to set slip encapsulation - "
-			       "errno = %d\n", errno);
-			return(-errno);
+		err = os_set_slip(sfd);
+		if(err < 0){
+			printk("Failed to set slip discipline encapsulation - "
+			       "err = %d\n", -err);
+			return(err);
 		}
 	}
 	return(mfd);
@@ -181,9 +178,9 @@ static void slip_close(int fd, void *data)
 	err = slip_tramp(argv, -1);
 
 	if(err != 0)
-		printk("slip_tramp failed - errno = %d\n", err);
-	close(fd);
-	close(pri->slave);
+		printk("slip_tramp failed - errno = %d\n", -err);
+	os_close_file(fd);
+	os_close_file(pri->slave);
 	pri->slave = -1;
 }
 
@@ -243,7 +240,7 @@ static void slip_add_addr(unsigned char *addr, unsigned char *netmask,
 {
 	struct slip_data *pri = data;
 
-	if(pri->slave == -1) return;
+	if(pri->slave < 0) return;
 	open_addr(addr, netmask, pri->name);
 }
 
@@ -252,7 +249,7 @@ static void slip_del_addr(unsigned char *addr, unsigned char *netmask,
 {
 	struct slip_data *pri = data;
 
-	if(pri->slave == -1) return;
+	if(pri->slave < 0) return;
 	close_addr(addr, netmask, pri->name);
 }
 

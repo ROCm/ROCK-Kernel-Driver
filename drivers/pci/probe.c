@@ -571,6 +571,11 @@ static int pci_cfg_space_size(struct pci_dev *dev)
 	return PCI_CFG_SPACE_SIZE;
 }
 
+static void pci_release_bus_bridge_dev(struct device *dev)
+{
+	kfree(dev);
+}
+
 /*
  * Read the config data for a PCI device, sanity-check it
  * and fill in the dev structure...
@@ -772,6 +777,7 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 
 	memset(dev, 0, sizeof(*dev));
 	dev->parent = parent;
+	dev->release = pci_release_bus_bridge_dev;
 	sprintf(dev->bus_id, "pci%04x:%02x", pci_domain_nr(b), bus);
 	device_register(dev);
 	b->bridge = get_device(dev);

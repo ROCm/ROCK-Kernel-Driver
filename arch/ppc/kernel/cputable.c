@@ -55,7 +55,7 @@ extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spe
 #endif
 
 /* We need to mark all pages as being coherent if we're SMP or we
- * have a 754x and an MPC107 host bridge.
+ * have a 74[45]x and an MPC107 host bridge.
  */
 #if defined(CONFIG_SMP) || defined(CONFIG_MPC10X_BRIDGE)
 #define CPU_FTR_COMMON                  CPU_FTR_NEED_COHERENT
@@ -438,6 +438,15 @@ struct cpu_spec	cpu_specs[] = {
     },
     {	/* PPC970 */
 	0xffff0000, 0x00390000, "PPC970",
+	CPU_FTR_COMMON |
+	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+	CPU_FTR_ALTIVEC_COMP | CPU_FTR_CAN_NAP,
+	COMMON_PPC | PPC_FEATURE_64 | PPC_FEATURE_ALTIVEC_COMP,
+	128, 128,
+	__setup_cpu_ppc970
+    },
+    {	/* PPC970FX */
+	0xffff0000, 0x003c0000, "PPC970FX",
 	CPU_FTR_COMMON |
 	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
 	CPU_FTR_ALTIVEC_COMP | CPU_FTR_CAN_NAP,

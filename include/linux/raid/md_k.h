@@ -24,7 +24,8 @@
 #define HSM               6UL
 #define MULTIPATH         7UL
 #define RAID6		  8UL
-#define MAX_PERSONALITY   9UL
+#define	RAID10		  9UL
+#define MAX_PERSONALITY   10UL
 
 #define	LEVEL_MULTIPATH		(-4)
 #define	LEVEL_LINEAR		(-1)
@@ -43,6 +44,7 @@ static inline int pers_to_level (int pers)
 		case RAID1:		return 1;
 		case RAID5:		return 5;
 		case RAID6:		return 6;
+		case RAID10:		return 10;
 	}
 	BUG();
 	return MD_RESERVED;
@@ -60,6 +62,7 @@ static inline int level_to_pers (int level)
 		case 4:
 		case 5: return RAID5;
 		case 6: return RAID6;
+		case 10: return RAID10;
 	}
 	return MD_RESERVED;
 }
@@ -216,6 +219,7 @@ struct mddev_s
 	unsigned long			resync_mark;	/* a recent timestamp */
 	sector_t			resync_mark_cnt;/* blocks written at resync_mark */
 
+	sector_t			resync_max_sectors; /* may be set by personality */
 	/* recovery/resync flags 
 	 * NEEDED:   we might need to start a resync/recover
 	 * RUNNING:  a thread is running, or about to be started
@@ -261,6 +265,11 @@ static inline void rdev_dec_pending(mdk_rdev_t *rdev, mddev_t *mddev)
 	int faulty = rdev->faulty;
 	if (atomic_dec_and_test(&rdev->nr_pending) && faulty)
 		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+}
+
+static inline void md_sync_acct(struct block_device *bdev, unsigned long nr_sectors)
+{
+        atomic_add(nr_sectors, &bdev->bd_contains->bd_disk->sync_io);
 }
 
 struct mdk_personality_s

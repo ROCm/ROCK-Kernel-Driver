@@ -51,7 +51,7 @@ asmlinkage void resume(void);
 #if 0
 #define local_irq_enable() asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory")
 #else
-#include <asm/hardirq.h>
+#include <linux/hardirq.h>
 #define local_irq_enable() ({							\
 	if (MACH_IS_Q40 || !hardirq_count())					\
 		asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory");	\

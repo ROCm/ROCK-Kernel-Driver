@@ -48,24 +48,22 @@ MODULE_LICENSE("GPL");
 extern atomic_t ip_conntrack_count;
 DECLARE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
+unsigned int ip_ct_log_invalid = 0;
+
 static int kill_proto(const struct ip_conntrack *i, void *data)
 {
 	return (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == 
 			*((u_int8_t *) data));
 }
 
-static unsigned int
-print_tuple(char *buffer, const struct ip_conntrack_tuple *tuple,
+#ifdef CONFIG_PROC_FS
+static int
+print_tuple(struct seq_file *s, const struct ip_conntrack_tuple *tuple,
 	    struct ip_conntrack_protocol *proto)
 {
-	int len;
-
-	len = sprintf(buffer, "src=%u.%u.%u.%u dst=%u.%u.%u.%u ",
-		      NIPQUAD(tuple->src.ip), NIPQUAD(tuple->dst.ip));
-
-	len += proto->print_tuple(buffer + len, tuple);
-
-	return len;
+	seq_printf(s, "src=%u.%u.%u.%u dst=%u.%u.%u.%u ",
+		   NIPQUAD(tuple->src.ip), NIPQUAD(tuple->dst.ip));
+	return proto->print_tuple(s, tuple);
 }
 
 #ifdef CONFIG_IP_NF_CT_ACCT
@@ -73,7 +71,8 @@ static unsigned int
 seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
 {
 	return seq_printf(s, "packets=%llu bytes=%llu ",
-			  counter->packets, counter->bytes);
+			  (unsigned long long)counter->packets,
+			  (unsigned long long)counter->bytes);
 }
 #else
 #define seq_print_counters(x, y)	0
@@ -81,48 +80,29 @@ seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
 
 static void *ct_seq_start(struct seq_file *s, loff_t *pos)
 {
-	unsigned int *bucket;
-
-	/* strange seq_file api calls stop even if we fail,
-	 * thus we need to grab lock since stop unlocks */
-	READ_LOCK(&ip_conntrack_lock);
-  
 	if (*pos >= ip_conntrack_htable_size)
 		return NULL;
-
-	bucket = kmalloc(sizeof(unsigned int), GFP_KERNEL);
-	if (!bucket) {
-		return ERR_PTR(-ENOMEM);
-	}
-  
-	*bucket = *pos;
-	return bucket;
-}
-  
-static void *ct_seq_next(struct seq_file *s, void *v, loff_t *pos)
-{
-	unsigned int *bucket = (unsigned int *) v;
-
-	*pos = ++(*bucket);
-	if (*pos >= ip_conntrack_htable_size) {
-		kfree(v);
-		return NULL;
-	}
-	return bucket;
+	return &ip_conntrack_hash[*pos];
 }
   
 static void ct_seq_stop(struct seq_file *s, void *v)
 {
-	READ_UNLOCK(&ip_conntrack_lock);
 }
 
+static void *ct_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	(*pos)++;
+	if (*pos >= ip_conntrack_htable_size)
+		return NULL;
+	return &ip_conntrack_hash[*pos];
+}
+  
 /* return 0 on success, 1 in case of error */
 static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 			    struct seq_file *s)
 {
 	struct ip_conntrack *conntrack = hash->ctrack;
 	struct ip_conntrack_protocol *proto;
-	char buffer[IP_CT_PRINT_BUFLEN];
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
 
@@ -143,12 +123,12 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 		      ? (conntrack->timeout.expires - jiffies)/HZ : 0) != 0)
 		return 1;
 
-	proto->print_conntrack(buffer, conntrack);
-	if (seq_puts(s, buffer))
+	if (proto->print_conntrack(s, conntrack))
 		return 1;
   
-	print_tuple(buffer, &conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
-		    proto);
+	if (print_tuple(s, &conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
+			proto))
+		return 1;
 
  	if (seq_print_counters(s, &conntrack->counters[IP_CT_DIR_ORIGINAL]))
 		return 1;
@@ -157,9 +137,8 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 		if (seq_printf(s, "[UNREPLIED] "))
 			return 1;
 
-	print_tuple(buffer, &conntrack->tuplehash[IP_CT_DIR_REPLY].tuple,
-		    proto);
-	if (seq_puts(s, buffer))
+	if (print_tuple(s, &conntrack->tuplehash[IP_CT_DIR_REPLY].tuple,
+			proto))
 		return 1;
 
  	if (seq_print_counters(s, &conntrack->counters[IP_CT_DIR_REPLY]))
@@ -181,17 +160,18 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 	return 0;
 }
 
-
 static int ct_seq_show(struct seq_file *s, void *v)
 {
-	unsigned int *bucket = (unsigned int *) v;
+	struct list_head *list = v;
+	int ret = 0;
 
-	if (LIST_FIND(&ip_conntrack_hash[*bucket], ct_seq_real_show,
-		      struct ip_conntrack_tuple_hash *, s)) {
-		/* buffer was filled and unable to print that tuple */
-		return 1;
-	}
-	return 0;
+	/* FIXME: Simply truncates if hash chain too long. */
+	READ_LOCK(&ip_conntrack_lock);
+	if (LIST_FIND(list, ct_seq_real_show,
+		      struct ip_conntrack_tuple_hash *, s))
+		ret = -ENOSPC;
+	READ_UNLOCK(&ip_conntrack_lock);
+	return ret;
 }
 	
 static struct seq_operations ct_seq_ops = {
@@ -257,7 +237,6 @@ static void exp_seq_stop(struct seq_file *s, void *v)
 static int exp_seq_show(struct seq_file *s, void *v)
 {
 	struct ip_conntrack_expect *expect = v;
-	char buffer[IP_CT_PRINT_BUFLEN];
 
 	if (expect->expectant->helper->timeout)
 		seq_printf(s, "%lu ", timer_pending(&expect->timeout)
@@ -268,9 +247,8 @@ static int exp_seq_show(struct seq_file *s, void *v)
 	seq_printf(s, "use=%u proto=%u ", atomic_read(&expect->use),
 		   expect->tuple.dst.protonum);
 
-	print_tuple(buffer, &expect->tuple,
-		    __ip_ct_find_proto(expect->tuple.dst.protonum));
-	return seq_printf(s, "%s\n", buffer);
+	return print_tuple(s, &expect->tuple,
+			   __ip_ct_find_proto(expect->tuple.dst.protonum));
 }
 
 static struct seq_operations exp_seq_ops = {
@@ -372,6 +350,7 @@ static struct file_operations ct_cpu_seq_fops = {
 	.llseek  = seq_lseek,
 	.release = seq_release_private,
 };
+#endif
 
 static unsigned int ip_confirm(unsigned int hooknum,
 			       struct sk_buff **pskb,
@@ -527,7 +506,6 @@ extern unsigned long ip_ct_icmp_timeout;
 extern unsigned long ip_ct_generic_timeout;
 
 /* Log invalid packets of a given protocol */
-unsigned int ip_ct_log_invalid = 0;
 static int log_invalid_proto_min = 0;
 static int log_invalid_proto_max = 255;
 
@@ -731,10 +709,15 @@ static ctl_table ip_ct_net_table[] = {
 	},
 	{ .ctl_name = 0 }
 };
-#endif
+
+EXPORT_SYMBOL(ip_ct_log_invalid);
+#endif /* CONFIG_SYSCTL */
+
 static int init_or_cleanup(int init)
 {
+#ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc, *proc_exp, *proc_stat;
+#endif
 	int ret = 0;
 
 	if (!init) goto cleanup;
@@ -743,19 +726,20 @@ static int init_or_cleanup(int init)
 	if (ret < 0)
 		goto cleanup_nothing;
 
-	proc = proc_net_create("ip_conntrack", 0440, NULL);
+#ifdef CONFIG_PROC_FS
+	proc = proc_net_fops_create("ip_conntrack", 0440, &ct_file_ops);
 	if (!proc) goto cleanup_init;
-	proc->proc_fops = &ct_file_ops;
 
-	proc_exp = proc_net_create("ip_conntrack_expect", 0440, NULL);
+	proc_exp = proc_net_fops_create("ip_conntrack_expect", 0440,
+					&exp_file_ops);
 	if (!proc_exp) goto cleanup_proc;
-	proc_exp->proc_fops = &exp_file_ops;
 
 	proc_stat = proc_net_fops_create("ip_conntrack_stat", S_IRUGO,
 					 &ct_cpu_seq_fops);
 	if (!proc_stat)
 		goto cleanup_proc_exp;
 	proc_stat->owner = THIS_MODULE;
+#endif
 
 	ret = nf_register_hook(&ip_conntrack_defrag_ops);
 	if (ret < 0) {
@@ -811,14 +795,22 @@ static int init_or_cleanup(int init)
  cleanup_defraglocalops:
 	nf_unregister_hook(&ip_conntrack_defrag_local_out_ops);
  cleanup_defragops:
+	/* Frag queues may hold fragments with skb->dst == NULL */
+	ip_ct_no_defrag = 1;
+	synchronize_net();
+	local_bh_disable();
+	ipfrag_flush();
+	local_bh_enable();
 	nf_unregister_hook(&ip_conntrack_defrag_ops);
  cleanup_proc_stat:
+#ifdef CONFIG_PROC_FS
 	proc_net_remove("ip_conntrack_stat");
 cleanup_proc_exp:
 	proc_net_remove("ip_conntrack_exp");
  cleanup_proc:
 	proc_net_remove("ip_conntrack");
  cleanup_init:
+#endif /* CONFIG_PROC_FS */
 	ip_conntrack_cleanup();
  cleanup_nothing:
 	return ret;
@@ -912,4 +904,3 @@ EXPORT_SYMBOL(ip_conntrack_hash);
 EXPORT_SYMBOL(ip_conntrack_untracked);
 EXPORT_SYMBOL_GPL(ip_conntrack_find_get);
 EXPORT_SYMBOL_GPL(ip_conntrack_put);
-EXPORT_SYMBOL(ip_ct_log_invalid);

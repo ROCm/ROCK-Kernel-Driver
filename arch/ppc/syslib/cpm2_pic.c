@@ -1,12 +1,3 @@
-#include <linux/stddef.h>
-#include <linux/init.h>
-#include <linux/sched.h>
-#include <linux/signal.h>
-#include <asm/irq.h>
-#include <asm/immap_cpm2.h>
-#include <asm/mpc8260.h>
-#include "cpm2_pic.h"
-
 /* The CPM2 internal interrupt controller.  It is usually
  * the only interrupt controller.
  * There are two 32-bit registers (high/low) for up to 64
@@ -18,6 +9,18 @@
  * We create two tables, indexed by vector number, to indicate
  * which register to use and which bit in the register to use.
  */
+
+#include <linux/stddef.h>
+#include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/signal.h>
+#include <linux/irq.h>
+
+#include <asm/immap_cpm2.h>
+#include <asm/mpc8260.h>
+
+#include "cpm2_pic.h"
+
 static	u_char	irq_to_siureg[] = {
 	1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 1, 1, 1, 1, 1, 1,
@@ -123,9 +126,5 @@ cpm2_get_irq(struct pt_regs *regs)
 
 	if (irq == 0)
 		return(-1);
-#if 0
-        irq += ppc8260_pic.irq_offset;
-#endif
 	return irq;
 }
-

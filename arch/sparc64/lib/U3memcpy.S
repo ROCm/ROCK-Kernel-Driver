@@ -78,6 +78,7 @@
 	 */
 
 	.globl	FUNC_NAME
+	.type	FUNC_NAME,#function
 FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	PREAMBLE
 	mov		%o0, %g5
@@ -412,3 +413,5 @@ FUNC_NAME:	/* %o0=dst, %o1=src, %o2=len */
 	 add		%o1, 1, %o1
 	retl
 	 mov		EX_RETVAL(%g5), %o0
+
+	.size		FUNC_NAME, .-FUNC_NAME

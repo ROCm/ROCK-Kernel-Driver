@@ -1,12 +1,14 @@
 #ifndef _X8664_DMA_MAPPING_H
 #define _X8664_DMA_MAPPING_H 1
 
-/* 
- * IOMMU interface. See Documentation/DMA-mapping.txt and DMA-API.txt for 
- * documentation. 
+/*
+ * IOMMU interface. See Documentation/DMA-mapping.txt and DMA-API.txt for
+ * documentation.
  */
 
 #include <linux/config.h>
+#include <linux/device.h>
+
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 #include <asm/swiotlb.h>
@@ -37,7 +39,7 @@ static inline dma_addr_t dma_map_single(struct device *hwdev, void *ptr,
 	dma_addr_t addr;
 
 	if (direction == DMA_NONE)
-		out_of_line_bug();	
+		out_of_line_bug();
 	addr = virt_to_bus(ptr);
 
 	if ((addr+size) & ~*hwdev->dma_mask)

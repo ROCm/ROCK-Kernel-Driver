@@ -376,7 +376,8 @@ struct nfs_diropok {
 
 struct nfs_readlinkargs {
 	struct nfs_fh *		fh;
-	unsigned int		count;
+	unsigned int		pgbase;
+	unsigned int		pglen;
 	struct page **		pages;
 };
 
@@ -470,7 +471,8 @@ struct nfs3_accessres {
 
 struct nfs3_readlinkargs {
 	struct nfs_fh *		fh;
-	unsigned int		count;
+	unsigned int		pgbase;
+	unsigned int		pglen;
 	struct page **		pages;
 };
 
@@ -594,7 +596,8 @@ struct nfs4_readdir_res {
 
 struct nfs4_readlink {
 	const struct nfs_fh *		fh;
-	u32				count;   /* zero-copy data */
+	unsigned int			pgbase;
+	unsigned int			pglen;   /* zero-copy data */
 	struct page **			pages;   /* zero-copy data */
 };
 
@@ -697,7 +700,8 @@ struct nfs_rpc_ops {
 	int	(*lookup)  (struct inode *, struct qstr *,
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*access)  (struct inode *, struct nfs_access_entry *);
-	int	(*readlink)(struct inode *, struct page *);
+	int	(*readlink)(struct inode *, struct page *, unsigned int,
+			    unsigned int);
 	int	(*read)    (struct nfs_read_data *);
 	int	(*write)   (struct nfs_write_data *);
 	int	(*commit)  (struct nfs_write_data *);

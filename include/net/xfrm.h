@@ -428,6 +428,7 @@ u16 xfrm_flowi_sport(struct flowi *fl)
 	switch(fl->proto) {
 	case IPPROTO_TCP:
 	case IPPROTO_UDP:
+	case IPPROTO_SCTP:
 		port = fl->fl_ip_sport;
 		break;
 	case IPPROTO_ICMP:
@@ -447,6 +448,7 @@ u16 xfrm_flowi_dport(struct flowi *fl)
 	switch(fl->proto) {
 	case IPPROTO_TCP:
 	case IPPROTO_UDP:
+	case IPPROTO_SCTP:
 		port = fl->fl_ip_dport;
 		break;
 	case IPPROTO_ICMP:
@@ -896,5 +898,18 @@ typedef void (icv_update_fn_t)(struct crypto_tfm *, struct scatterlist *, unsign
 
 extern void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 			 int offset, int len, icv_update_fn_t icv_update);
+
+static inline int xfrm_addr_cmp(xfrm_address_t *a, xfrm_address_t *b,
+				int family)
+{
+	switch (family) {
+	default:
+	case AF_INET:
+		return a->a4 - b->a4;
+	case AF_INET6:
+		return ipv6_addr_cmp((struct in6_addr *)a,
+				     (struct in6_addr *)b);
+	}
+}
 
 #endif	/* _NET_XFRM_H */

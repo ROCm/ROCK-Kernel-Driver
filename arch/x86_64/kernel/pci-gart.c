@@ -48,7 +48,7 @@ int force_iommu = 1;
 int panic_on_overflow = 0;
 int force_iommu = 0;
 #endif
-int iommu_merge = 1; 
+int iommu_merge = 1;
 int iommu_sac_force = 0; 
 
 /* If this is disabled the IOMMU will use an optimized flushing strategy
@@ -102,16 +102,16 @@ AGPEXTERN __u32 *agp_gatt_table;
 
 static unsigned long next_bit;  /* protected by iommu_bitmap_lock */
 static int need_flush; 		/* global flush state. set for each gart wrap */
-static dma_addr_t dma_map_area(struct device *dev, unsigned long phys_mem, 
+static dma_addr_t dma_map_area(struct device *dev, unsigned long phys_mem,
 			       size_t size, int dir, int do_panic);
 
 /* Dummy device used for NULL arguments (normally ISA). Better would
    be probably a smaller DMA mask, but this is bug-to-bug compatible to i386. */
-static struct device fallback_dev = { 
-	.bus_id = "fallback device", 
+static struct device fallback_dev = {
+	.bus_id = "fallback device",
 	.coherent_dma_mask = 0xffffffff,
-	.dma_mask = &fallback_dev.coherent_dma_mask, 	
-}; 
+	.dma_mask = &fallback_dev.coherent_dma_mask,
+};
 
 static unsigned long alloc_iommu(int size) 
 { 	
@@ -167,11 +167,11 @@ static void flush_gart(struct device *dev)
 			pci_write_config_dword(northbridges[i], 0x9c, 
 					       northbridge_flush_word[i] | 1); 
 			flushed++;
-			max = i; 
-		} 
+			max = i;
+		}
 		for (i = 0; i <= max; i++) {
 			u32 w;
-			if (!northbridges[i]) 
+			if (!northbridges[i])
 				continue;
 			/* Make sure the hardware actually executed the flush. */
 			do { 
@@ -186,15 +186,15 @@ static void flush_gart(struct device *dev)
 } 
 
 /* Allocate DMA memory on node near device */
-noinline 
+noinline
 static void *dma_alloc_pages(struct device *dev, unsigned gfp, unsigned order)
 {
-	struct page *page; 
-	int node; 
-	if (dev->bus == &pci_bus_type) { 
+	struct page *page;
+	int node;
+	if (dev->bus == &pci_bus_type) {
 		cpumask_t mask;
 		mask = pcibus_to_cpumask(to_pci_dev(dev)->bus->number);
-		node = cpu_to_node(first_cpu(mask)); 
+		node = cpu_to_node(first_cpu(mask));
 	} else
 		node = numa_node_id();
 	page = alloc_pages_node(node, gfp, order);
@@ -212,7 +212,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	unsigned long dma_mask = 0;
 	u64 bus;
 
-	if (!dev) 
+	if (!dev)
 		dev = &fallback_dev;
 	dma_mask = dev->coherent_dma_mask;
 	if (dma_mask == 0) 
@@ -259,7 +259,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	
 error:
 	if (panic_on_overflow)
-		panic("dma_alloc_coherent: IOMMU overflow by %lu bytes\n", size); 
+		panic("dma_alloc_coherent: IOMMU overflow by %lu bytes\n", size);
 free:
 	free_pages((unsigned long)memory, get_order(size)); 
 	/* XXX Could use the swiotlb pool here too */
@@ -329,7 +329,7 @@ static void iommu_full(struct device *dev, size_t size, int dir, int do_panic)
 		if (dir == PCI_DMA_FROMDEVICE || dir == PCI_DMA_BIDIRECTIONAL)
 			panic("PCI-DMA: Memory would be corrupted\n");
 		if (dir == PCI_DMA_TODEVICE || dir == PCI_DMA_BIDIRECTIONAL) 
-			panic("PCI-DMA: Random memory would be DMAed\n"); 
+			panic("PCI-DMA: Random memory would be DMAed\n");
 	} 
 
 #ifdef CONFIG_IOMMU_LEAK
@@ -368,7 +368,7 @@ static inline int nonforced_iommu(struct device *dev, unsigned long addr, size_t
 /* Map a single continuous physical area into the IOMMU.
  * Caller needs to check if the iommu is needed and flush.
  */
-static dma_addr_t dma_map_area(struct device *dev, unsigned long phys_mem, 
+static dma_addr_t dma_map_area(struct device *dev, unsigned long phys_mem,
 				size_t size, int dir, int do_panic)
 { 
 	unsigned long npages = to_pages(phys_mem, size);
@@ -393,7 +393,7 @@ static dma_addr_t dma_map_area(struct device *dev, unsigned long phys_mem,
 
 /* Map a single area into the IOMMU */
 dma_addr_t dma_map_single(struct device *dev, void *addr, size_t size, int dir)
-{ 	
+{
 	unsigned long phys_mem, bus;
 
 	BUG_ON(dir == DMA_NONE);
@@ -412,7 +412,7 @@ dma_addr_t dma_map_single(struct device *dev, void *addr, size_t size, int dir)
 	return bus; 
 } 
 
-/* Fallback for dma_map_sg in case of overflow */ 
+/* Fallback for dma_map_sg in case of overflow */
 static int dma_map_sg_nonforce(struct device *dev, struct scatterlist *sg,
 			       int nents, int dir)
 {
@@ -426,10 +426,10 @@ static int dma_map_sg_nonforce(struct device *dev, struct scatterlist *sg,
 		struct scatterlist *s = &sg[i];
 		unsigned long addr = page_to_phys(s->page) + s->offset; 
 		if (nonforced_iommu(dev, addr, s->length)) { 
-			addr = dma_map_area(dev, addr, s->length, dir, 0); 
+			addr = dma_map_area(dev, addr, s->length, dir, 0);
 			if (addr == bad_dma_address) { 
 				if (i > 0) 
-					dma_unmap_sg(dev, sg, i, dir); 
+					dma_unmap_sg(dev, sg, i, dir);
 				nents = 0; 
 				sg[0].dma_length = 0;
 				break;
@@ -443,7 +443,7 @@ static int dma_map_sg_nonforce(struct device *dev, struct scatterlist *sg,
 }
 
 /* Map multiple scatterlist entries continuous into the first. */
-static int __dma_map_cont(struct scatterlist *sg, int start, int stopat, 
+static int __dma_map_cont(struct scatterlist *sg, int start, int stopat,
 		      struct scatterlist *sout, unsigned long pages)
 {
 	unsigned long iommu_start = alloc_iommu(pages);
@@ -481,7 +481,7 @@ static int __dma_map_cont(struct scatterlist *sg, int start, int stopat,
 	return 0;
 }
 
-static inline int dma_map_cont(struct scatterlist *sg, int start, int stopat, 
+static inline int dma_map_cont(struct scatterlist *sg, int start, int stopat,
 		      struct scatterlist *sout,
 		      unsigned long pages, int need)
 {
@@ -532,7 +532,7 @@ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents, int dir)
 			   boundary and the new one doesn't have an offset. */
 			if (!iommu_merge || !nextneed || !need || s->offset ||
 			    (ps->offset + ps->length) % PAGE_SIZE) { 
-				if (dma_map_cont(sg, start, i, sg+out, pages, 
+				if (dma_map_cont(sg, start, i, sg+out, pages,
 						 need) < 0)
 					goto error;
 				out++;
@@ -559,7 +559,7 @@ error:
 	if (force_iommu) 
 		return dma_map_sg_nonforce(dev, sg, nents, dir);
 	if (panic_on_overflow)
-		panic("dma_map_sg: overflow on %lu pages\n", pages); 
+		panic("dma_map_sg: overflow on %lu pages\n", pages);
 	iommu_full(dev, pages << PAGE_SHIFT, dir, 0);
 	for (i = 0; i < nents; i++)
 		sg[i].dma_address = bad_dma_address;
@@ -614,7 +614,7 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents, int dir
 int dma_supported(struct device *dev, u64 mask)
 {
 	/* Copied from i386. Doesn't make much sense, because it will 
-	   only work for pci_alloc_coherent. 
+	   only work for pci_alloc_coherent.
 	   The caller just has to use GFP_DMA in this case. */
         if (mask < 0x00ffffff)
                 return 0;
@@ -781,7 +781,7 @@ static int __init pci_iommu_init(void)
 
 	if (swiotlb) { 
 		no_iommu = 1;
-		printk(KERN_INFO "PCI-DMA: Using software bounce buffering for IO (SWIOTLB)\n"); 
+		printk(KERN_INFO "PCI-DMA: Using software bounce buffering for IO (SWIOTLB)\n");
 		return -1; 
 	} 
 	
@@ -893,8 +893,8 @@ fs_initcall(pci_iommu_init);
    memaper[=order] allocate an own aperture over RAM with size 32MB^order.  
    noforce don't force IOMMU usage. Default.
    force  Force IOMMU.
-   merge  Do lazy merging. This may improve performance on some block devices. 
-          Implies force (experimental)  
+   merge  Do lazy merging. This may improve performance on some block devices.
+          Implies force (experimental)
    biomerge Do merging at the BIO layer. This is more efficient than merge,
             but should be only done with very big IOMMUs. Implies merge,force.
    nomerge Don't do SG merging.
@@ -905,11 +905,11 @@ fs_initcall(pci_iommu_init);
    soft	 Use software bounce buffering (default for Intel machines)
    noaperture Don't touch the aperture for AGP.
 */
-__init int iommu_setup(char *p) 
+__init int iommu_setup(char *p)
 { 
     int arg;
 
-    while (*p) { 
+    while (*p) {
 	    if (!strncmp(p,"noagp",5))
 		    no_agp = 1;
 	    if (!strncmp(p,"off",3))
@@ -920,11 +920,11 @@ __init int iommu_setup(char *p)
 	    }
 	    if (!strncmp(p,"allowed",7))
 		    iommu_aperture_allowed = 1;
-	    if (!strncmp(p,"noforce",7)) { 
+	    if (!strncmp(p,"noforce",7)) {
 		    iommu_merge = 0;
 		    force_iommu = 0;
 	    }
-	    if (!strncmp(p, "memaper", 7)) { 
+	    if (!strncmp(p, "memaper", 7)) {
 		    fallback_aper_force = 1; 
 		    p += 7; 
 		    if (*p == '=') {
@@ -933,7 +933,7 @@ __init int iommu_setup(char *p)
 				    fallback_aper_order = arg;
 		    }
 	    } 
-	    if (!strncmp(p, "biomerge",8)) { 
+	    if (!strncmp(p, "biomerge",8)) {
 		    iommu_bio_merge = 4096;
 		    iommu_merge = 1;
 		    force_iommu = 1;
@@ -942,7 +942,7 @@ __init int iommu_setup(char *p)
 		    panic_on_overflow = 1;
 	    if (!strncmp(p, "nopanic",7))
 		    panic_on_overflow = 0;	    
-	    if (!strncmp(p, "merge",5)) { 
+	    if (!strncmp(p, "merge",5)) {
 		    iommu_merge = 1;
 		    force_iommu = 1; 
 	    }
@@ -956,10 +956,10 @@ __init int iommu_setup(char *p)
 		    iommu_fullflush = 0;
 	    if (!strncmp(p, "soft",4))
 		    swiotlb = 1;
-	    if (!strncmp(p, "noaperture",10)) 
-		    fix_aperture = 0; 
+	    if (!strncmp(p, "noaperture",10))
+		    fix_aperture = 0;
 #ifdef CONFIG_IOMMU_LEAK
-	    if (!strncmp(p,"leak",4)) { 
+	    if (!strncmp(p,"leak",4)) {
 		    leak_trace = 1;
 		    p += 4; 
 		    if (*p == '=') ++p;
@@ -969,7 +969,7 @@ __init int iommu_setup(char *p)
 #endif
 	    if (isdigit(*p) && get_option(&p, &arg)) 
 		    iommu_size = arg;
-	    p += strcspn(p, ","); 
+	    p += strcspn(p, ",");
 	    if (*p == ',')
 		    ++p;
     }

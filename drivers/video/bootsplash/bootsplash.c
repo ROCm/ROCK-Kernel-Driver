@@ -29,6 +29,7 @@
 #include "decode-jpg.h"
 
 extern struct fb_ops vesafb_ops;
+extern signed char con2fb_map[MAX_NR_CONSOLES];
 
 #define SPLASH_VERSION "3.1.6-2004/03/31"
 

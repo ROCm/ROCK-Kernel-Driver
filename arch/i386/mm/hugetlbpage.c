@@ -18,26 +18,13 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-static void scrub_one_pmd(pmd_t * pmd)
-{
-	struct page *page;
-
-	if (pmd && !pmd_none(*pmd) && !pmd_huge(*pmd)) {
-		page = pmd_page(*pmd);
-		pmd_clear(pmd);
-		dec_page_state(nr_page_table_pages);
-		page_cache_release(page);
-	}
-}
-
-pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr)
+static pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
 	pmd_t *pmd = NULL;
 
 	pgd = pgd_offset(mm, addr);
 	pmd = pmd_alloc(mm, pgd, addr);
-	scrub_one_pmd(pmd);
 	return (pte_t *) pmd;
 }
 
@@ -47,14 +34,11 @@ static pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 	pmd_t *pmd = NULL;
 
 	pgd = pgd_offset(mm, addr);
-	if (pgd_present(*pgd)) {
-		pmd = pmd_offset(pgd, addr);
-		scrub_one_pmd(pmd);
-	}
+	pmd = pmd_offset(pgd, addr);
 	return (pte_t *) pmd;
 }
 
-void set_huge_pte(struct mm_struct *mm, struct vm_area_struct *vma, struct page *page, pte_t * page_table, int write_access)
+static void set_huge_pte(struct mm_struct *mm, struct vm_area_struct *vma, struct page *page, pte_t * page_table, int write_access)
 {
 	pte_t entry;
 
@@ -89,18 +73,17 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 	unsigned long addr = vma->vm_start;
 	unsigned long end = vma->vm_end;
 
-	for (; addr < end; addr+= HPAGE_SIZE) {
-		src_pte = huge_pte_offset(src, addr);
-		if (!src_pte || pte_none(*src_pte))
-			continue;
+	while (addr < end) {
 		dst_pte = huge_pte_alloc(dst, addr);
 		if (!dst_pte)
 			goto nomem;
+		src_pte = huge_pte_offset(src, addr);
 		entry = *src_pte;
 		ptepage = pte_page(entry);
 		get_page(ptepage);
 		set_pte(dst_pte, entry);
 		dst->rss += (HPAGE_SIZE / PAGE_SIZE);
+		addr += HPAGE_SIZE;
 	}
 	return 0;
 
@@ -237,4 +220,64 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 	}
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 	flush_tlb_range(vma, start, end);
+}
+
+int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = current->mm;
+	unsigned long addr;
+	int ret = 0;
+
+	BUG_ON(vma->vm_start & ~HPAGE_MASK);
+	BUG_ON(vma->vm_end & ~HPAGE_MASK);
+
+	spin_lock(&mm->page_table_lock);
+	for (addr = vma->vm_start; addr < vma->vm_end; addr += HPAGE_SIZE) {
+		unsigned long idx;
+		pte_t *pte = huge_pte_alloc(mm, addr);
+		struct page *page;
+
+		if (!pte) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		if (!pte_none(*pte)) {
+			pmd_t *pmd = (pmd_t *) pte;
+
+			page = pmd_page(*pmd);
+			pmd_clear(pmd);
+			dec_page_state(nr_page_table_pages);
+			page_cache_release(page);
+		}
+
+		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+		page = find_get_page(mapping, idx);
+		if (!page) {
+			/* charge the fs quota first */
+			if (hugetlb_get_quota(mapping)) {
+				ret = -ENOMEM;
+				goto out;
+			}
+			page = alloc_huge_page();
+			if (!page) {
+				hugetlb_put_quota(mapping);
+				ret = -ENOMEM;
+				goto out;
+			}
+			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+			if (! ret) {
+				unlock_page(page);
+			} else {
+				hugetlb_put_quota(mapping);
+				free_huge_page(page);
+				goto out;
+			}
+		}
+		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
+	}
+out:
+	spin_unlock(&mm->page_table_lock);
+	return ret;
 }

@@ -24,6 +24,7 @@
 #include <linux/string.h>
 #include <linux/crypto.h>
 #include <linux/highmem.h>
+#include <linux/moduleparam.h>
 #include "tcrypt.h"
 
 /*
@@ -846,7 +847,7 @@ static void __exit fini(void) { }
 module_init(init);
 module_exit(fini);
 
-MODULE_PARM(mode, "i");
+module_param(mode, int, 0);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Quick & dirty crypto testing module");

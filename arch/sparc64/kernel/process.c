@@ -588,8 +588,6 @@ asmlinkage long sparc_do_fork(unsigned long clone_flags,
 {
 	int __user *parent_tid_ptr, *child_tid_ptr;
 
-	clone_flags &= ~CLONE_IDLETASK;
-
 #ifdef CONFIG_COMPAT
 	if (test_thread_flag(TIF_32BIT)) {
 		parent_tid_ptr = compat_ptr(regs->u_regs[UREG_I2]);

@@ -135,7 +135,7 @@ enum
 	KERN_HZ_TIMER=65,	/* int: hz timer on or off */
 	KERN_UNKNOWN_NMI_PANIC=66, /* int: unknown nmi panic flag */
 	KERN_KDB=67,		/* int: kdb on/off */
-	KERN_MAXTIMESLICE=68,	/* int: nice -20 max timeslice */
+	KERN_DEFTIMESLICE=68,	/* int: nice   0 def timeslice */
 	KERN_MINTIMESLICE=69,	/* int: nice +19 min timeslice */
 	KERN_HZ=70,		/* unsigned long: internal kernel HZ */
 	KERN_UNSUPPORTED=71,	/* int: allow loading of unsupported modules */
@@ -171,6 +171,7 @@ enum
 	VM_BLOCK_DUMP=24,	/* block dump mode */
 	VM_HUGETLB_GROUP=25,	/* permitted hugetlb group */
 	VM_VFS_CACHE_PRESSURE=26, /* dcache/icache reclaim pressure */
+	VM_LEGACY_VA_LAYOUT=27, /* legacy/compatibility virtual address space layout */
 };
 
 

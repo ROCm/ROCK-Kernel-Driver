@@ -205,6 +205,7 @@ unsigned long riva_get_memlen(struct riva_par *par)
 		break;
 	case NV_ARCH_10:
 	case NV_ARCH_20:
+	case NV_ARCH_30:
 		if(chipset == NV_CHIP_IGEFORCE2) {
 
 			dev = pci_find_slot(0, 1);
@@ -274,6 +275,7 @@ unsigned long riva_get_maxdclk(struct riva_par *par)
 	case NV_ARCH_04:
 	case NV_ARCH_10:
 	case NV_ARCH_20:
+	case NV_ARCH_30:
 		switch ((chip->PFB[0x00000000/4] >> 3) & 0x00000003) {
 		case 3:
 			dclk = 800000;

@@ -16,6 +16,10 @@ config OPROFILE
 	  whole system, include the kernel, kernel modules, libraries,
 	  and applications.
 
+	  Due to firmware bugs, you may need to use the "nohalt" boot
+	  option if you're using OProfile with the hardware performance
+	  counters.
+
 	  If unsure, say N.
 
 endmenu

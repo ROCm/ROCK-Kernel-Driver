@@ -349,13 +349,17 @@ static int rd_open(struct inode *inode, struct file *filp)
 	if (rd_bdev[unit] == NULL) {
 		struct block_device *bdev = inode->i_bdev;
 		struct address_space *mapping;
+		unsigned bsize;
 		int gfp_mask;
 
 		inode = igrab(bdev->bd_inode);
 		rd_bdev[unit] = bdev;
 		bdev->bd_openers++;
-		bdev->bd_block_size = rd_blocksize;
-		inode->i_size = get_capacity(rd_disks[unit])<<9;
+		bsize = bdev_hardsect_size(bdev);
+		bdev->bd_block_size = bsize;
+		inode->i_blkbits = blksize_bits(bsize);
+		inode->i_size = get_capacity(bdev->bd_disk)<<9;
+
 		mapping = inode->i_mapping;
 		mapping->a_ops = &ramdisk_aops;
 		mapping->backing_dev_info = &rd_backing_dev_info;
@@ -449,6 +453,7 @@ static int __init rd_init(void)
 			goto out_queue;
 
 		blk_queue_make_request(rd_queue[i], &rd_make_request);
+		blk_queue_hardsect_size(rd_queue[i], rd_blocksize);
 
 		/* rd_size is given in kB */
 		disk->major = RAMDISK_MAJOR;

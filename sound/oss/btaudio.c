@@ -961,7 +961,7 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 	/* init hw */
         btwrite(0, REG_GPIO_DMA_CTL);
         btwrite(0, REG_INT_MASK);
-        btwrite(~0x0UL, REG_INT_STAT);
+        btwrite(~0U, REG_INT_STAT);
 	pci_set_master(pci_dev);
 
 	if ((rc = request_irq(bta->irq, btaudio_irq, SA_SHIRQ|SA_INTERRUPT,
@@ -1033,7 +1033,7 @@ static void __devexit btaudio_remove(struct pci_dev *pci_dev)
 	/* turn off all DMA / IRQs */
         btand(~15, REG_GPIO_DMA_CTL);
         btwrite(0, REG_INT_MASK);
-        btwrite(~0x0UL, REG_INT_STAT);
+        btwrite(~0U, REG_INT_STAT);
 
 	/* unregister devices */
 	if (digital) {

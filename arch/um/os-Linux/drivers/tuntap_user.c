@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -19,6 +18,7 @@
 #include "net_user.h"
 #include "tuntap.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "user.h"
 #include "helper.h"
 #include "os.h"
@@ -61,7 +61,7 @@ static void tuntap_pre_exec(void *arg)
 	struct tuntap_pre_exec_data *data = arg;
 	
 	dup2(data->stdout, 1);
-	close(data->close_me);
+	os_close_file(data->close_me);
 }
 
 static int tuntap_open_tramp(char *gate, int *fd_out, int me, int remote,
@@ -86,7 +86,7 @@ static int tuntap_open_tramp(char *gate, int *fd_out, int me, int remote,
 
 	if(pid < 0) return(-pid);
 
-	close(remote);
+	os_close_file(remote);
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
@@ -107,19 +107,19 @@ static int tuntap_open_tramp(char *gate, int *fd_out, int me, int remote,
 	if(n < 0){
 		printk("tuntap_open_tramp : recvmsg failed - errno = %d\n", 
 		       errno);
-		return(errno);
+		return(-errno);
 	}
-	waitpid(pid, NULL, 0);
+	CATCH_EINTR(waitpid(pid, NULL, 0));
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 	if(cmsg == NULL){
 		printk("tuntap_open_tramp : didn't receive a message\n");
-		return(EINVAL);
+		return(-EINVAL);
 	}
 	if((cmsg->cmsg_level != SOL_SOCKET) || 
 	   (cmsg->cmsg_type != SCM_RIGHTS)){
 		printk("tuntap_open_tramp : didn't receive a descriptor\n");
-		return(EINVAL);
+		return(-EINVAL);
 	}
 	*fd_out = ((int *) CMSG_DATA(cmsg))[0];
 	return(0);
@@ -133,27 +133,29 @@ static int tuntap_open(void *data)
 	int err, fds[2], len, used;
 
 	err = tap_open_common(pri->dev, pri->gate_addr);
-	if(err) return(err);
+	if(err < 0)
+		return(err);
 
 	if(pri->fixed_config){
-		if((pri->fd = open("/dev/net/tun", O_RDWR)) < 0){
-			printk("Failed to open /dev/net/tun, errno = %d\n",
-			       errno);
-			return(-errno);
+		pri->fd = os_open_file("/dev/net/tun", of_rdwr(OPENFLAGS()), 0);
+		if(pri->fd < 0){
+			printk("Failed to open /dev/net/tun, err = %d\n",
+			       -pri->fd);
+			return(pri->fd);
 		}
 		memset(&ifr, 0, sizeof(ifr));
-		ifr.ifr_flags = IFF_TAP;
+		ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 		strlcpy(ifr.ifr_name, pri->dev_name, sizeof(ifr.ifr_name));
 		if(ioctl(pri->fd, TUNSETIFF, (void *) &ifr) < 0){
-			printk("TUNSETIFF failed, errno = %d", errno);
-			close(pri->fd);
+			printk("TUNSETIFF failed, errno = %d\n", errno);
+			os_close_file(pri->fd);
 			return(-errno);
 		}
 	}
 	else {
 		err = os_pipe(fds, 0, 0);
-		if(err){
-			printk("tuntap_open : os_pipe failed - errno = %d\n",
+		if(err < 0){
+			printk("tuntap_open : os_pipe failed - err = %d\n",
 			       -err);
 			return(err);
 		}
@@ -166,19 +168,19 @@ static int tuntap_open(void *data)
 					fds[1], buffer, len, &used);
 
 		output = buffer;
-		if(err == 0){
-			pri->dev_name = uml_strdup(buffer);
-			output += IFNAMSIZ;
-			printk(output);
+		if(err < 0) {
+			printk("%s", output);
 			free_output_buffer(buffer);
+			printk("tuntap_open_tramp failed - err = %d\n", -err);
+			return(err);
 		}
-		else {
-			printk(output);
-			free_output_buffer(buffer);
-			printk("tuntap_open_tramp failed - errno = %d\n", err);
-			return(-err);
-		}
-		close(fds[0]);
+
+		pri->dev_name = uml_strdup(buffer);
+		output += IFNAMSIZ;
+		printk("%s", output);
+		free_output_buffer(buffer);
+
+		os_close_file(fds[0]);
 		iter_addresses(pri->dev, open_addr, pri->dev_name);
 	}
 
@@ -191,7 +193,7 @@ static void tuntap_close(int fd, void *data)
 
 	if(!pri->fixed_config) 
 		iter_addresses(pri->dev, close_addr, pri->dev_name);
-	close(fd);
+	os_close_file(fd);
 	pri->fd = -1;
 }
 

@@ -31,14 +31,12 @@
 #include <asm/irq.h>
 #include <asm/arch/map.h>
 #include <asm/arch/regs-timer.h>
+#include <asm/arch/regs-irq.h>
 #include <asm/mach/time.h>
 
 static unsigned long timer_startval;
 static unsigned long timer_ticks_usec;
 
-#ifdef CONFIG_S3C2410_RTC
-extern void s3c2410_rtc_check();
-#endif
 
 /* with an 12MHz clock, we get 12 ticks per-usec
  */
@@ -49,14 +47,29 @@ extern void s3c2410_rtc_check();
  * will have been disabled by do_gettimeoffset()
  * IRQs are disabled before entering here from do_gettimeofday()
  */
+
+#define SRCPND_TIMER4 (1<<(IRQ_TIMER4 - IRQ_EINT0))
+
 static unsigned long s3c2410_gettimeoffset (void)
 {
 	unsigned long tdone;
 	unsigned long usec;
+	unsigned long irqpend;
 
 	/* work out how many ticks have gone since last timer interrupt */
 
 	tdone = timer_startval - __raw_readl(S3C2410_TCNTO(4));
+
+	/* check to see if there is an interrupt pending */
+
+	irqpend = __raw_readl(S3C2410_SRCPND);
+	if (irqpend & SRCPND_TIMER4) {
+		/* re-read the timer, and try and fix up for the missed
+		 * interrupt */
+
+		tdone = timer_startval - __raw_readl(S3C2410_TCNTO(4));
+		tdone += 1<<16;
+	}
 
 	/* currently, tcnt is in 12MHz units, but this may change
 	 * for non-bast machines...

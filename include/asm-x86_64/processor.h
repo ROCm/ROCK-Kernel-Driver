@@ -60,6 +60,8 @@ struct cpuinfo_x86 {
 	int	x86_cache_alignment;
 	int	x86_tlbsize;	/* number of 4K pages in DTLB/ITLB combined(in pages)*/
         __u8    x86_virt_bits, x86_phys_bits;
+	__u8	x86_num_cores;
+	__u8	x86_apicid;
         __u32   x86_power; 	
 	unsigned long loops_per_jiffy;
 } ____cacheline_aligned;
@@ -460,10 +462,5 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 })
 
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
-
-#ifdef CONFIG_SCHED_SMT
-#define ARCH_HAS_SCHED_DOMAIN
-#define ARCH_HAS_SCHED_WAKE_IDLE
-#endif
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

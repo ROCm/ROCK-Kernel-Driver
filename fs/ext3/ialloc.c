@@ -97,7 +97,7 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 	unsigned long bit;
 	struct ext3_group_desc * gdp;
 	struct ext3_super_block * es;
-	struct ext3_sb_info *sbi = EXT3_SB(sb);
+	struct ext3_sb_info *sbi;
 	int fatal = 0, err;
 
 	if (atomic_read(&inode->i_count) > 1) {
@@ -114,6 +114,7 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 		printk("ext3_free_inode: inode on nonexistent device\n");
 		return;
 	}
+	sbi = EXT3_SB(sb);
 
 	ino = inode->i_ino;
 	ext3_debug ("freeing inode %lu\n", ino);

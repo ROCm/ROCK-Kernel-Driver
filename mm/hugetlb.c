@@ -8,7 +8,6 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
-#include <linux/pagemap.h>
 #include <linux/sysctl.h>
 #include <linux/highmem.h>
 
@@ -22,7 +21,7 @@ static spinlock_t hugetlb_lock = SPIN_LOCK_UNLOCKED;
 
 static void enqueue_huge_page(struct page *page)
 {
-	int nid = page_zone(page)->zone_pgdat->node_id;
+	int nid = page_to_nid(page);
 	list_add(&page->lru, &hugepage_freelists[nid]);
 	free_huge_pages++;
 	free_huge_pages_node[nid]++;
@@ -53,7 +52,7 @@ static struct page *alloc_fresh_huge_page(void)
 {
 	static int nid = 0;
 	struct page *page;
-	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP,
+	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP|__GFP_NOWARN,
 					HUGETLB_PAGE_ORDER);
 	nid = (nid + 1) % numnodes;
 	if (page) {
@@ -124,6 +123,7 @@ static int __init hugetlb_setup(char *s)
 }
 __setup("hugepages=", hugetlb_setup);
 
+#ifdef CONFIG_SYSCTL
 static void update_and_free_page(struct page *page)
 {
 	int i;
@@ -189,7 +189,6 @@ static unsigned long set_max_huge_pages(unsigned long count)
 	return nr_huge_pages;
 }
 
-#ifdef CONFIG_SYSCTL
 int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 			   struct file *file, void __user *buffer,
 			   size_t *length, loff_t *ppos)
@@ -249,65 +248,11 @@ unsigned long hugetlb_total_pages(void)
 }
 EXPORT_SYMBOL(hugetlb_total_pages);
 
-int __attribute__ ((weak))
-handle_hugetlb_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
-	unsigned long addr, int write_access)
-{
-	pte_t *pte;
-	struct page *page;
-	struct address_space *mapping;
-	int idx, ret;
-
-	spin_lock(&mm->page_table_lock);
-	pte = huge_pte_alloc(mm, addr & HPAGE_MASK);
-	if (!pte)
-		goto oom;
-	if (!pte_none(*pte))
-		goto out;
-	spin_unlock(&mm->page_table_lock);
-
-	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
-	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
-		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
-retry:
-	page = find_get_page(mapping, idx);
-	if (!page) {
-		page = alloc_huge_page();
-		if (!page)
-			/*
-			 * with strict overcommit accounting, we should never
-			 * run out of hugetlb page, so must be a fault race
-			 * and let's retry.
-			 */
-			goto retry;
-		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-		if (!ret) {
-			unlock_page(page);
-		} else {
-			put_page(page);
-			if (ret == -EEXIST)
-				goto retry;
-			else
-				return VM_FAULT_OOM;
-		}
-	}
-
-	spin_lock(&mm->page_table_lock);
-	if (pte_none(*pte))
-		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
-	else
-		put_page(page);
-out:
-	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_MINOR;
-oom:
-	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_OOM;
-}
-
 /*
- * We should not get here because handle_mm_fault() is supposed to trap
- * hugetlb page fault.  BUG if we get here.
+ * We cannot handle pagefaults against hugetlb pages at all.  They cause
+ * handle_mm_fault() to try to instantiate regular-sized pages in the
+ * hugegpage VMA.  do_page_fault() is supposed to trap this, so BUG is we get
+ * this far.
  */
 static struct page *hugetlb_nopage(struct vm_area_struct *vma,
 				unsigned long address, int *unused)

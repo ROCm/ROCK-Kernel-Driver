@@ -704,7 +704,6 @@ static int stv680_start_stream (struct usb_stv *stv680)
 				   usb_rcvbulkpipe (stv680->udev, stv680->bulk_in_endpointAddr),
 				   stv680->sbuf[i].data, stv680->rawbufsize,
 				   stv680_video_irq, stv680);
-		urb->timeout = PENCAM_TIMEOUT * 2;
 		stv680->urb[i] = urb;
 		err = usb_submit_urb (stv680->urb[i], GFP_KERNEL);
 		if (err)

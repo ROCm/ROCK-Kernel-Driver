@@ -171,7 +171,7 @@ int add_to_swap(struct page * page)
 		/*
 		 * Add it to the swap cache and mark it dirty
 		 */
-		err = __add_to_swap_cache(page, entry, GFP_ATOMIC);
+		err = __add_to_swap_cache(page, entry, GFP_ATOMIC|__GFP_NOWARN);
 
 		if (pf_flags & PF_MEMALLOC)
 			current->flags |= PF_MEMALLOC;

@@ -51,9 +51,6 @@
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
 #define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
 #endif
-#ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
-#define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
-#endif
 
 #ifdef CONFIG_BLK_DEV_CMD640
 #if 0	/* change to 1 when debugging cmd640 problems */
@@ -756,8 +753,8 @@ typedef struct ide_drive_s {
 					 *  2=48-bit doing 28-bit
 					 *  3=64-bit
 					 */
+	unsigned scsi		: 1;	/* 0=default, 1=ide-scsi emulation */
 
-	u8	scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
         u8	quirk_list;	/* considered quirky, set for a specific host */
         u8	suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
         u8	init_speed;	/* transfer rate set at boot */
@@ -798,31 +795,6 @@ typedef struct ide_drive_s {
 	struct semaphore gendev_rel_sem;	/* to deal with device release() */
 	struct gendisk *disk;
 } ide_drive_t;
-
-typedef struct ide_pio_ops_s {
-	void (*ata_input_data)(ide_drive_t *, void *, u32);
-	void (*ata_output_data)(ide_drive_t *, void *, u32);
-
-	void (*atapi_input_bytes)(ide_drive_t *, void *, u32);
-	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
-} ide_pio_ops_t;
-
-typedef struct ide_dma_ops_s {
-	/* insert dma operations here! */
-	int (*ide_dma_read)(ide_drive_t *drive);
-	int (*ide_dma_write)(ide_drive_t *drive);
-	int (*ide_dma_begin)(ide_drive_t *drive);
-	int (*ide_dma_end)(ide_drive_t *drive);
-	int (*ide_dma_check)(ide_drive_t *drive);
-	int (*ide_dma_on)(ide_drive_t *drive);
-	int (*ide_dma_off_quietly)(ide_drive_t *drive);
-	int (*ide_dma_test_irq)(ide_drive_t *drive);
-	int (*ide_dma_host_on)(ide_drive_t *drive);
-	int (*ide_dma_host_off)(ide_drive_t *drive);
-	int (*ide_dma_verbose)(ide_drive_t *drive);
-	int (*ide_dma_lostirq)(ide_drive_t *drive);
-	int (*ide_dma_timeout)(ide_drive_t *drive);
-} ide_dma_ops_t;
 
 /*
  * mapping stuff, prepare for highmem...
@@ -916,15 +888,11 @@ typedef struct hwif_s {
 //	u8	(*ratefilter)(ide_drive_t *, u8);
 #endif
 
-#if 0
-	ide_pio_ops_t	*pioops;
-#else
 	void (*ata_input_data)(ide_drive_t *, void *, u32);
 	void (*ata_output_data)(ide_drive_t *, void *, u32);
 
 	void (*atapi_input_bytes)(ide_drive_t *, void *, u32);
 	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
-#endif
 
 	int (*ide_dma_read)(ide_drive_t *drive);
 	int (*ide_dma_write)(ide_drive_t *drive);
@@ -963,6 +931,9 @@ typedef struct hwif_s {
 	int sg_dma_direction;		/* dma transfer direction */
 	int sg_dma_active;		/* is it in use */
 
+	/* data phase of the active command (currently only valid for PIO/DMA) */
+	int		data_phase;
+
 	int		mmio;		/* hosts iomio (0) or custom (2) select */
 	int		rqsize;		/* max sectors per request */
 	int		irq;		/* our irq number */
@@ -989,6 +960,7 @@ typedef struct hwif_s {
 	unsigned	autodma    : 1;	/* auto-attempt using DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
 	unsigned	no_lba48   : 1; /* 1 = cannot do LBA48 */
+	unsigned	no_lba48_dma : 1; /* 1 = cannot do LBA48 DMA */
 	unsigned	no_dsc     : 1;	/* 0 default, 1 dsc_overlap disabled */
 	unsigned	auto_poll  : 1; /* supports nop auto-poll */
 
@@ -1452,11 +1424,8 @@ extern ide_startstop_t set_geometry_intr(ide_drive_t *);
 extern ide_startstop_t recal_intr(ide_drive_t *);
 extern ide_startstop_t task_no_data_intr(ide_drive_t *);
 extern ide_startstop_t task_in_intr(ide_drive_t *);
-extern ide_startstop_t task_mulin_intr(ide_drive_t *);
 extern ide_startstop_t pre_task_out_intr(ide_drive_t *, struct request *);
 extern ide_startstop_t task_out_intr(ide_drive_t *);
-extern ide_startstop_t pre_task_mulout_intr(ide_drive_t *, struct request *);
-extern ide_startstop_t task_mulout_intr(ide_drive_t *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
 

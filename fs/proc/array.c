@@ -130,8 +130,9 @@ static const char *task_state_array[] = {
 	"S (sleeping)",		/*  1 */
 	"D (disk sleep)",	/*  2 */
 	"T (stopped)",		/*  4 */
-	"Z (zombie)",		/*  8 */
-	"X (dead)"		/* 16 */
+	"T (tracing stop)",	/*  8 */
+	"Z (zombie)",		/* 16 */
+	"X (dead)"		/* 32 */
 };
 
 static inline const char * get_task_state(struct task_struct *tsk)
@@ -141,7 +142,8 @@ static inline const char * get_task_state(struct task_struct *tsk)
 					   TASK_UNINTERRUPTIBLE |
 					   TASK_ZOMBIE |
 					   TASK_DEAD |
-					   TASK_STOPPED);
+					   TASK_STOPPED |
+					   TASK_TRACED);
 	const char **p = &task_state_array[0];
 
 	while (state) {
@@ -278,7 +280,6 @@ static inline char *task_cap(struct task_struct *p, char *buffer)
 			    cap_t(p->cap_effective));
 }
 
-extern char *task_mem(struct mm_struct *, char *);
 int proc_pid_status(struct task_struct *task, char * buffer)
 {
 	char * orig = buffer;
@@ -299,7 +300,6 @@ int proc_pid_status(struct task_struct *task, char * buffer)
 	return buffer - orig;
 }
 
-extern unsigned long task_vsize(struct mm_struct *);
 int proc_pid_stat(struct task_struct *task, char * buffer)
 {
 	unsigned long vsize, eip, esp, wchan;
@@ -312,21 +312,16 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	int num_threads = 0;
 	struct mm_struct *mm;
 	unsigned long long start_time;
+	unsigned long cmin_flt = 0, cmaj_flt = 0, cutime = 0, cstime = 0;
 	char tcomm[sizeof(task->comm)];
 
 	state = *get_task_state(task);
 	vsize = eip = esp = 0;
-	task_lock(task);
-	mm = task->mm;
-	if(mm)
-		mm = mmgrab(mm);
-	task_unlock(task);
+	mm = get_task_mm(task);
 	if (mm) {
-		down_read(&mm->mmap_sem);
 		vsize = task_vsize(mm);
 		eip = KSTK_EIP(task);
 		esp = KSTK_ESP(task);
-		up_read(&mm->mmap_sem);
 	}
 
 	get_task_comm(tcomm, task);
@@ -348,6 +343,10 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		}
 		pgid = process_group(task);
 		sid = task->signal->session;
+		cmin_flt = task->signal->cmin_flt;
+		cmaj_flt = task->signal->cmaj_flt;
+		cutime = task->signal->cutime;
+		cstime = task->signal->cstime;
 	}
 	read_unlock(&tasklist_lock);
 
@@ -376,13 +375,13 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		tty_pgrp,
 		task->flags,
 		task->min_flt,
-		task->cmin_flt,
+		cmin_flt,
 		task->maj_flt,
-		task->cmaj_flt,
+		cmaj_flt,
 		jiffies_to_clock_t(task->utime),
 		jiffies_to_clock_t(task->stime),
-		jiffies_to_clock_t(task->cutime),
-		jiffies_to_clock_t(task->cstime),
+		jiffies_to_clock_t(cutime),
+		jiffies_to_clock_t(cstime),
 		priority,
 		nice,
 		num_threads,
@@ -416,17 +415,13 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	return res;
 }
 
-extern int task_statm(struct mm_struct *, int *, int *, int *, int *);
 int proc_pid_statm(struct task_struct *task, char *buffer)
 {
 	int size = 0, resident = 0, shared = 0, text = 0, lib = 0, data = 0;
 	struct mm_struct *mm = get_task_mm(task);
 	
 	if (mm) {
-		down_read(&mm->mmap_sem);
 		size = task_statm(mm, &shared, &text, &data, &resident);
-		up_read(&mm->mmap_sem);
-
 		mmput(mm);
 	}
 

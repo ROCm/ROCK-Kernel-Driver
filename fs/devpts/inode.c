@@ -178,7 +178,7 @@ struct tty_struct *devpts_get_tty(int number)
 {
 	struct dentry *dentry = get_node(number);
 	struct tty_struct *tty;
-	
+
 	tty = NULL;
 	if (!IS_ERR(dentry)) {
 		if (dentry->d_inode)

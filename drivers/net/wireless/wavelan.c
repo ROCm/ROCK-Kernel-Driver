@@ -3822,17 +3822,18 @@ static irqreturn_t wavelan_interrupt(int irq, void *dev_id, struct pt_regs *regs
 	if ((hasr & HASR_MMC_INTR) && (lp->hacr & HACR_MMC_INT_ENABLE)) {
 		u8 dce_status;
 
-#ifdef DEBUG_INTERRUPT_ERROR
-		printk(KERN_INFO
-		       "%s: wavelan_interrupt(): unexpected mmc interrupt: status 0x%04x.\n",
-		       dev->name, dce_status);
-#endif
 		/*
 		 * Interrupt from the modem management controller.
 		 * This will clear it -- ignored for now.
 		 */
 		mmc_read(ioaddr, mmroff(0, mmr_dce_status), &dce_status,
 			 sizeof(dce_status));
+
+#ifdef DEBUG_INTERRUPT_ERROR
+		printk(KERN_INFO
+		       "%s: wavelan_interrupt(): unexpected mmc interrupt: status 0x%04x.\n",
+		       dev->name, dce_status);
+#endif
 	}
 
 	/* Check if not controller interrupt */

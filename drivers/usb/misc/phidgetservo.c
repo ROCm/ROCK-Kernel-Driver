@@ -12,8 +12,6 @@
  * controllers available at: http://www.phidgets.com/ 
  *
  * Note that the driver takes input as: degrees.minutes
- * -23 < degrees < 203
- * 0 < minutes < 59
  *
  * CAUTION: Generally you should use 0 < degrees < 180 as anything else
  * is probably beyond the range of your servo and may damage it.
@@ -21,6 +19,10 @@
  * Jun 16, 2004: Sean Young <sean@mess.org>
  *  - cleanups
  *  - was using memory after kfree()
+ * Aug 8, 2004: Sean Young <sean@mess.org>
+ *  - set the highest angle as high as the hardware allows, there are 
+ *    some odd servos out there
+ *
  */
 
 #include <linux/config.h>
@@ -86,6 +88,9 @@ change_position_v30(struct phidget_servo *servo, int servo_no, int degrees,
 {
 	int retval;
 	unsigned char *buffer;
+
+	if (degrees < -23 || degrees > 362)
+		return -EINVAL;
 
 	buffer = kmalloc(6, GFP_KERNEL);
 	if (!buffer) {
@@ -157,6 +162,9 @@ change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 	int retval;
 	unsigned char *buffer;
 
+	if (degrees < -23 || degrees > 278)
+		return -EINVAL;
+
 	buffer = kmalloc(2, GFP_KERNEL);
 	if (!buffer) {
 		dev_err(&servo->udev->dev, "%s - out of memory\n",
@@ -212,10 +220,8 @@ static ssize_t set_servo##value (struct device *dev,			\
 		return -EINVAL;						\
 	}								\
 									\
-	if (degrees < -23 || degrees > (180 + 23) ||			\
-	    minutes < 0 || minutes > 59) {				\
+	if (minutes < 0 || minutes > 59) 				\
 		return -EINVAL;						\
-	}								\
 									\
 	if (servo->type & SERVO_VERSION_30)				\
 		retval = change_position_v30 (servo, value, degrees, 	\

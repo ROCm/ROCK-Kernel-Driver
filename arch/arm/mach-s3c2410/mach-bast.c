@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-bast.c
  *
- * Copyright (c) 2003 Simtec Electronics
+ * Copyright (c) 2003,2004 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
@@ -10,6 +10,8 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     20-Aug-2004 BJD  Added s3c2410_board struct
+ *     18-Aug-2004 BJD  Added platform devices from default set
  *     16-May-2003 BJD  Created initial version
  *     16-Aug-2003 BJD  Fixed header files and copyright, added URL
  *     05-Sep-2003 BJD  Moved to v2.6 kernel
@@ -23,6 +25,7 @@
 #include <linux/list.h>
 #include <linux/timer.h>
 #include <linux/init.h>
+#include <linux/device.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -39,6 +42,8 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "devs.h"
+#include "cpu.h"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -154,6 +159,7 @@ static struct s3c2410_uartcfg bast_uartcfgs[] = {
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
+
 		.clock	     = &bast_serial_clock,
 		.ucon	     = UCON,
 		.ulcon	     = ULCON,
@@ -170,19 +176,50 @@ static struct s3c2410_uartcfg bast_uartcfgs[] = {
 	}
 };
 
+/* NOR Flash on BAST board */
+
+static struct resource bast_nor_resource[] = {
+	[0] = {
+		.start = S3C2410_CS1 + 0x4000000,
+		.end   = S3C2410_CS1 + 0x4000000 + (32*1024*1024) - 1,
+		.flags = IORESOURCE_MEM,
+	}
+};
+
+static struct platform_device bast_device_nor = {
+	.name		= "bast-nor",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(bast_nor_resource),
+	.resource	= bast_nor_resource,
+};
+
+/* Standard BAST devices */
+
+static struct platform_device *bast_devices[] __initdata = {
+	&s3c_device_usb,
+	&s3c_device_lcd,
+	&s3c_device_wdt,
+	&s3c_device_i2c,
+	&s3c_device_iis,
+ 	&s3c_device_rtc,
+	&bast_device_nor
+};
+
+static struct s3c2410_board bast_board __initdata = {
+	.devices       = bast_devices,
+	.devices_count = ARRAY_SIZE(bast_devices)
+};
 
 void __init bast_map_io(void)
 {
-	s3c2410_map_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
-	s3c2410_uartcfgs = bast_uartcfgs;
+	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
+	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
+	s3c2410_set_board(&bast_board);
 }
 
 void __init bast_init_irq(void)
 {
-	//llprintk("bast_init_irq:\n");
-
 	s3c2410_init_irq();
-
 }
 
 void __init bast_init_time(void)

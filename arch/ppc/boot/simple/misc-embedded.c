@@ -22,7 +22,6 @@
 #endif
 
 #include "nonstdio.h"
-#include "zlib.h"
 
 /* The linker tells us where the image is. */
 extern char __image_begin, __image_end;
@@ -71,6 +70,14 @@ extern unsigned long start;
 extern void flush_instruction_cache(void);
 extern void gunzip(void *, int, unsigned char *, int *);
 extern void embed_config(bd_t **bp);
+
+/* Weak function for boards which don't need to build the
+ * board info struct because they are using PPCBoot/U-Boot.
+ */
+void __attribute__ ((weak))
+embed_config(bd_t **bdp)
+{
+}
 
 unsigned long
 load_kernel(unsigned long load_addr, int num_words, unsigned long cksum, bd_t *bp)

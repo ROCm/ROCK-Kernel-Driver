@@ -1712,10 +1712,16 @@ static struct pci_driver cyberpro_driver = {
  * I don't think we can use the "module_init" stuff here because
  * the fbcon stuff may not be initialised yet.  Hence the #ifdef
  * around module_init.
+ *
+ * Tony: "module_init" is now required
  */
 int __init cyber2000fb_init(void)
 {
 	int ret = -1, err;
+
+#ifndef MODULE
+	cyber2000fb_setup(fb_get_options("cyber200fb"));
+#endif
 
 #ifdef CONFIG_ARCH_SHARK
 	err = cyberpro_vl_probe();
@@ -1738,9 +1744,7 @@ static void __exit cyberpro_exit(void)
 	pci_unregister_driver(&cyberpro_driver);
 }
 
-#ifdef MODULE
 module_init(cyber2000fb_init);
-#endif
 module_exit(cyberpro_exit);
 
 MODULE_AUTHOR("Russell King");

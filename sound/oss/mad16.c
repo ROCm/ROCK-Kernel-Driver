@@ -54,7 +54,6 @@ static int      mad16_conf;
 static int      mad16_cdsel;
 static struct gameport gameport;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
-static int      already_initialized;
 
 #define C928	1
 #define MOZART	2
@@ -313,19 +312,6 @@ static int __init detect_mad16(void)
 
 static int __init wss_init(struct address_info *hw_config)
 {
-	int ad_flags = 0;
-
-	/*
-	 *    Verify the WSS parameters
-	 */
-
-	if (check_region(hw_config->io_base, 8))
-	{
-		printk(KERN_ERR "MSS: I/O port conflict\n");
-		return 0;
-	}
-	if (!ad1848_detect(hw_config->io_base + 4, &ad_flags, mad16_osp))
-		return 0;
 	/*
 	 * Check if the IO port returns valid signature. The original MS Sound
 	 * system returns 0x04 while some cards (AudioTrix Pro for example)
@@ -338,31 +324,20 @@ static int __init wss_init(struct address_info *hw_config)
 		DDB(printk("No MSS signature detected on port 0x%x (0x%x)\n", hw_config->io_base, inb(hw_config->io_base + 3)));
 		return 0;
 	}
-	if (hw_config->irq > 11)
-	{
-		printk(KERN_ERR "MSS: Bad IRQ %d\n", hw_config->irq);
-		return 0;
-	}
-	if (hw_config->dma != 0 && hw_config->dma != 1 && hw_config->dma != 3)
-	{
-		printk(KERN_ERR "MSS: Bad DMA %d\n", hw_config->dma);
-		return 0;
-	}
 	/*
 	 * Check that DMA0 is not in use with a 8 bit board.
 	 */
-
 	if (hw_config->dma == 0 && inb(hw_config->io_base + 3) & 0x80)
 	{
 		printk("MSS: Can't use DMA0 with a 8 bit card/slot\n");
 		return 0;
 	}
-	if (hw_config->irq > 7 && hw_config->irq != 9 && inb(hw_config->io_base + 3) & 0x80)
+	if (hw_config->irq > 9 && inb(hw_config->io_base + 3) & 0x80)
 		printk(KERN_ERR "MSS: Can't use IRQ%d with a 8 bit card/slot\n", hw_config->irq);
 	return 1;
 }
 
-static int __init init_c930(struct address_info *hw_config)
+static void __init init_c930(struct address_info *hw_config, int base)
 {
 	unsigned char cfg = 0;
 
@@ -376,25 +351,7 @@ static int __init init_c930(struct address_info *hw_config)
 		   somewhere else. */
 		cfg =  (cfg & 0x09) ^ 0x07;
 	}
-
-	switch (hw_config->io_base)
-	{
-		case 0x530:
-			cfg |= 0x00;
-			break;
-		case 0xe80:
-			cfg |= 0x10;
-			break;
-		case 0xf40:
-			cfg |= 0x20;
-			break;
-		case 0x604:
-			cfg |= 0x30;
-			break;
-		default:
-			printk(KERN_ERR "MAD16: Invalid codec port %x\n", hw_config->io_base);
-			return 0;
-	}
+	cfg |= base << 4;
 	mad_write(MC1_PORT, cfg);
 
 	/* MC2 is CD configuration. Don't touch it. */
@@ -414,8 +371,6 @@ static int __init init_c930(struct address_info *hw_config)
 	mad_write(MC6_PORT, 0x02);	/* Enable WSS, Disable MPU and SB */
 	mad_write(MC7_PORT, 0xCB);
 	mad_write(MC10_PORT, 0x11);
-
-	return wss_init(hw_config);
 }
 
 static int __init chip_detect(void)
@@ -508,19 +463,47 @@ static int __init chip_detect(void)
 static int __init probe_mad16(struct address_info *hw_config)
 {
 	int i;
-	static int valid_ports[] = 
-	{
-		0x530, 0xe80, 0xf40, 0x604
-	};
 	unsigned char tmp;
 	unsigned char cs4231_mode = 0;
 
 	int ad_flags = 0;
 
-	if (already_initialized)
-		return 0;
+	signed char bits;
+
+	static char     dma_bits[4] = {
+		1, 2, 0, 3
+	};
+
+	int config_port = hw_config->io_base + 0, version_port = hw_config->io_base + 3;
+	int dma = hw_config->dma, dma2 = hw_config->dma2;
+	unsigned char dma2_bit = 0;
+	int base;
+	struct resource *ports;
 
 	mad16_osp = hw_config->osp;
+
+	switch (hw_config->io_base) {
+	case 0x530:
+		base = 0;
+		break;
+	case 0xe80:
+		base = 1;
+		break;
+	case 0xf40:
+		base = 2;
+		break;
+	case 0x604:
+		base = 3;
+		break;
+	default:
+		printk(KERN_ERR "MAD16/Mozart: Bad WSS base address 0x%x\n", hw_config->io_base);
+		return 0;
+	}
+
+	if (dma != 0 && dma != 1 && dma != 3) {
+		printk(KERN_ERR "MSS: Bad DMA %d\n", dma);
+		return 0;
+	}
 
 	/*
 	 *    Check that all ports return 0xff (bus float) when no password
@@ -531,9 +514,44 @@ static int __init probe_mad16(struct address_info *hw_config)
 	if (!chip_detect())
 		return 0;
 
-	if (board_type == C930)
-		return init_c930(hw_config);
+	switch (hw_config->irq) {
+	case 7:
+		bits = 8;
+		break;
+	case 9:
+		bits = 0x10;
+		break;
+	case 10:
+		bits = 0x18;
+		break;
+	case 12:
+		bits = 0x20;
+		break;
+	case 5:	/* Also IRQ5 is possible on C930 */
+		if (board_type == C930 || c924pnp) {
+			bits = 0x28;
+			break;
+		}
+	default:
+		printk(KERN_ERR "MAD16/Mozart: Bad IRQ %d\n", hw_config->irq);
+		return 0;
+	}
 
+	ports = request_region(hw_config->io_base + 4, 4, "ad1848");
+	if (!ports) {
+		printk(KERN_ERR "MSS: I/O port conflict\n");
+		return 0;
+	}
+	if (!request_region(hw_config->io_base, 4, "mad16 WSS config")) {
+		release_region(hw_config->io_base + 4, 4);
+		printk(KERN_ERR "MSS: I/O port conflict\n");
+		return 0;
+	}
+
+	if (board_type == C930) {
+		init_c930(hw_config, base);
+		goto got_it;
+	}
 
 	for (i = 0xf8d; i <= 0xf93; i++) {
 		if (!c924pnp)
@@ -547,20 +565,7 @@ static int __init probe_mad16(struct address_info *hw_config)
  */
 
 	tmp = (mad_read(MC1_PORT) & 0x0f) | 0x80;	/* Enable WSS, Disable SB */
-
-	for (i = 0; i < 5; i++)
-	{
-		if (i > 3)	/* Not a valid port */
-		{
-			printk(KERN_ERR "MAD16/Mozart: Bad WSS base address 0x%x\n", hw_config->io_base);
-			return 0;
-		}
-		if (valid_ports[i] == hw_config->io_base)
-		{
-			tmp |= i << 4;	/* WSS port select bits */
-			break;
-		}
-	}
+	tmp |= base << 4;	/* WSS port select bits */
 
 	/*
 	 * Set optional CD-ROM and joystick settings.
@@ -580,8 +585,8 @@ static int __init probe_mad16(struct address_info *hw_config)
 		mad_write(MC5_PORT, 0x05);
 		mad_write(MC6_PORT, 0x03);
 	}
-	if (!ad1848_detect(hw_config->io_base + 4, &ad_flags, mad16_osp))
-		return 0;
+	if (!ad1848_detect(ports, &ad_flags, mad16_osp))
+		goto fail;
 
 	if (ad_flags & (AD_F_CS4231 | AD_F_CS4248))
 		cs4231_mode = 0x02;	/* CS4248/CS4231 sync delay switch */
@@ -604,43 +609,19 @@ static int __init probe_mad16(struct address_info *hw_config)
 		else
 			DDB(printk("port %03x after init = %02x\n", i-0x80, mad_read(i)));
 	}
-	wss_init(hw_config);
 
-	return 1;
-}
+got_it:
+	ad_flags = 0;
+	if (!ad1848_detect(ports, &ad_flags, mad16_osp))
+		goto fail;
 
-static void __init attach_mad16(struct address_info *hw_config)
-{
-
-	static signed char     interrupt_bits[12] = {
-		-1, -1, -1, -1, -1, -1, -1, 0x08, -1, 0x10, 0x18, 0x20
-	};
-	signed char bits;
-
-	static char     dma_bits[4] = {
-		1, 2, 0, 3
-	};
-
-	int config_port = hw_config->io_base + 0, version_port = hw_config->io_base + 3;
-	int ad_flags = 0, dma = hw_config->dma, dma2 = hw_config->dma2;
-	unsigned char dma2_bit = 0;
-
-	already_initialized = 1;
-
-	if (!ad1848_detect(hw_config->io_base + 4, &ad_flags, mad16_osp))
-		return;
+	if (!wss_init(hw_config))
+		goto fail;
 
 	/*
 	 * Set the IRQ and DMA addresses.
 	 */
 	
-	if (board_type == C930 || c924pnp)
-		interrupt_bits[5] = 0x28;	/* Also IRQ5 is possible on C930 */
-
-	bits = interrupt_bits[hw_config->irq];
-	if (bits == -1)
-		return;
-
 	outb((bits | 0x40), config_port);
 	if ((inb(version_port) & 0x40) == 0)
 		printk(KERN_ERR "[IRQ Conflict?]\n");
@@ -675,26 +656,23 @@ static void __init attach_mad16(struct address_info *hw_config)
 
 	outb((bits | dma_bits[dma] | dma2_bit), config_port);	/* Write IRQ+DMA setup */
 
-	hw_config->slots[0] = ad1848_init("mad16 WSS", hw_config->io_base + 4,
+	hw_config->slots[0] = ad1848_init("mad16 WSS", ports,
 					  hw_config->irq,
 					  dma,
 					  dma2, 0,
 					  hw_config->osp,
 					  THIS_MODULE);
-	request_region(hw_config->io_base, 4, "mad16 WSS config");
+	return 1;
+
+fail:
+	release_region(hw_config->io_base + 4, 4);
+	release_region(hw_config->io_base, 4);
+	return 0;
 }
 
 static int __init probe_mad16_mpu(struct address_info *hw_config)
 {
-	static int mpu_attached;
 	unsigned char tmp;
-
-	if (!already_initialized)	/* The MSS port must be initialized first */
-		return 0;
-
-	if (mpu_attached)		/* Don't let them call this twice */
-		return 0;
-	mpu_attached = 1;
 
 	if (board_type < C929)	/* Early chip. No MPU support. Just SB MIDI */
 	{
@@ -732,8 +710,12 @@ static int __init probe_mad16_mpu(struct address_info *hw_config)
 
 		mad_write(MC3_PORT, tmp | 0x04);
 		hw_config->driver_use_1 = SB_MIDI_ONLY;
-		if (!sb_dsp_detect(hw_config, 0, 0, NULL))
+		if (!request_region(hw_config->io_base, 16, "soundblaster"))
 			return 0;
+		if (!sb_dsp_detect(hw_config, 0, 0, NULL)) {
+			release_region(hw_config->io_base, 16);
+			return 0;
+		}
 
 		if (mad_read(MC1_PORT) & 0x20)
 			hw_config->io_base = 0x240;
@@ -1031,14 +1013,17 @@ static int __init init_mad16(void)
 		printk(KERN_ERR "I/O, DMA and irq are mandatory\n");
 		return -EINVAL;
 	}
-	
-	if (!probe_mad16(&cfg))
+
+	if (!request_region(MC0_PORT, 12, "mad16"))
+		return -EBUSY;
+
+	if (!probe_mad16(&cfg)) {
+		release_region(MC0_PORT, 12);
 		return -ENODEV;
+	}
 
 	cfg_mpu.io_base = mpu_io;
 	cfg_mpu.irq = mpu_irq;
-
-	attach_mad16(&cfg);
 
 	found_mpu = probe_mad16_mpu(&cfg_mpu);
 
@@ -1067,6 +1052,7 @@ static void __exit cleanup_mad16(void)
 		release_region(0x201, 1);
 	}
 	unload_mad16(&cfg);
+	release_region(MC0_PORT, 12);
 }
 
 module_init(init_mad16);

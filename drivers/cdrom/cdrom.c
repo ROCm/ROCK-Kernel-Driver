@@ -608,13 +608,16 @@ static int cdrom_flush_cache(struct cdrom_device_info *cdi)
 static int cdrom_mrw_exit(struct cdrom_device_info *cdi)
 {
 	disc_information di;
-	int ret = 0;
+	int ret;
 
-	if (cdrom_get_disc_info(cdi, &di) < offsetof(typeof(di),disc_type))
+	ret = cdrom_get_disc_info(cdi, &di);
+	if (ret < 0 || ret < (int)offsetof(typeof(di),disc_type))
 		return 1;
 
+	ret = 0;
 	if (di.mrw_status == CDM_MRW_BGFORMAT_ACTIVE) {
-		printk(KERN_INFO "cdrom: issuing MRW back ground format suspend\n");
+		printk(KERN_INFO "cdrom: issuing MRW back ground "
+				"format suspend\n");
 		ret = cdrom_mrw_bgformat_susp(cdi, 0);
 	}
 
@@ -718,8 +721,10 @@ int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write)
 static int cdrom_media_erasable(struct cdrom_device_info *cdi)
 {
 	disc_information di;
+	int ret;
 
-	if (cdrom_get_disc_info(cdi, &di) < offsetof(typeof(di),n_first_track))
+	ret = cdrom_get_disc_info(cdi, &di);
+	if (ret < 0 || ret < offsetof(typeof(di), n_first_track))
 		return -1;
 
 	return di.erasable;
@@ -755,7 +760,8 @@ static int cdrom_mrw_open_write(struct cdrom_device_info *cdi)
 		return 1;
 	}
 
-	if (cdrom_get_disc_info(cdi, &di) < offsetof(typeof(di),disc_type))
+	ret = cdrom_get_disc_info(cdi, &di);
+	if (ret < 0 || ret < offsetof(typeof(di),disc_type))
 		return 1;
 
 	if (!di.erasable)
@@ -769,10 +775,12 @@ static int cdrom_mrw_open_write(struct cdrom_device_info *cdi)
 	 * 3	-	MRW formatting complete
 	 */
 	ret = 0;
-	printk(KERN_INFO "cdrom open: mrw_status '%s'\n", mrw_format_status[di.mrw_status]);
+	printk(KERN_INFO "cdrom open: mrw_status '%s'\n",
+			mrw_format_status[di.mrw_status]);
 	if (!di.mrw_status)
 		ret = 1;
-	else if (di.mrw_status == CDM_MRW_BGFORMAT_INACTIVE && mrw_format_restart)
+	else if (di.mrw_status == CDM_MRW_BGFORMAT_INACTIVE &&
+			mrw_format_restart)
 		ret = cdrom_mrw_bgformat(cdi, 1);
 
 	return ret;
@@ -2507,7 +2515,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 	struct cdrom_device_ops *cdo = cdi->ops;
 	struct packet_command cgc;
 	struct request_sense sense;
-	char buffer[32];
+	unsigned char buffer[32];
 	int ret = 0;
 
 	memset(&cgc, 0, sizeof(cgc));
@@ -2634,8 +2642,9 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 	case CDROMVOLCTRL:
 	case CDROMVOLREAD: {
 		struct cdrom_volctrl volctrl;
-		char mask[32];
+		char mask[sizeof(buffer)];
 		unsigned short offset;
+
 		cdinfo(CD_DO_IOCTL, "entering CDROMVOLUME\n");
 
 		IOCTL_IN(arg, struct cdrom_volctrl, volctrl);
@@ -2645,17 +2654,27 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		if ((ret = cdrom_mode_sense(cdi, &cgc, GPMODE_AUDIO_CTL_PAGE, 0)))
 		    return ret;
 		
-		/* some drives have longer pages, adjust and reread. */
-		if (buffer[1] > cgc.buflen) {
-			cgc.buflen = buffer[1] + 2;
-			if ((ret = cdrom_mode_sense(cdi, &cgc, 
-					GPMODE_AUDIO_CTL_PAGE, 0))) 
-			    return ret;
+		/* originally the code depended on buffer[1] to determine
+		   how much data is available for transfer. buffer[1] is
+		   unfortunately ambigious and the only reliable way seem
+		   to be to simply skip over the block descriptor... */
+		offset = 8 + be16_to_cpu(*(unsigned short *)(buffer+6));
+
+		if (offset + 16 > sizeof(buffer))
+			return -E2BIG;
+
+		if (offset + 16 > cgc.buflen) {
+			cgc.buflen = offset+16;
+			ret = cdrom_mode_sense(cdi, &cgc,
+						GPMODE_AUDIO_CTL_PAGE, 0);
+			if (ret)
+				return ret;
 		}
-		
-		/* get the offset from the length of the page. length
-		   is measure from byte 2 an on, thus the 14. */
-		offset = buffer[1] - 14;
+
+		/* sanity check */
+		if ((buffer[offset] & 0x3f) != GPMODE_AUDIO_CTL_PAGE ||
+				buffer[offset+1] < 14)
+			return -EINVAL;
 
 		/* now we have the current volume settings. if it was only
 		   a CDROMVOLREAD, return these values */
@@ -2680,7 +2699,8 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		buffer[offset+15] = volctrl.channel3 & mask[offset+15];
 
 		/* set volume */
-		cgc.buffer = buffer;
+		cgc.buffer = buffer + offset - 8;
+		memset(cgc.buffer, 0, 8);
 		return cdrom_mode_select(cdi, &cgc);
 		}
 
@@ -2836,28 +2856,32 @@ int cdrom_get_last_written(struct cdrom_device_info *cdi, long *last_written)
 	if (!CDROM_CAN(CDC_GENERIC_PACKET))
 		goto use_toc;
 
-	if ((ret = cdrom_get_disc_info(cdi, &di))
-			< offsetof(typeof(di), last_track_msb)
-			+ sizeof(di.last_track_msb))
+	ret = cdrom_get_disc_info(cdi, &di);
+	if (ret < (int)(offsetof(typeof(di), last_track_lsb)
+			+ sizeof(di.last_track_lsb)))
 		goto use_toc;
 
+	/* if unit didn't return msb, it's zeroed by cdrom_get_disc_info */
 	last_track = (di.last_track_msb << 8) | di.last_track_lsb;
 	ti_size = cdrom_get_track_info(cdi, last_track, 1, &ti);
-	if (ti_size < offsetof(typeof(ti), track_start))
+	if (ti_size < (int)offsetof(typeof(ti), track_start))
 		goto use_toc;
 
 	/* if this track is blank, try the previous. */
 	if (ti.blank) {
+		if (last_track==1)
+			goto use_toc;
 		last_track--;
 		ti_size = cdrom_get_track_info(cdi, last_track, 1, &ti);
 	}
 
-	if (ti_size < offsetof(typeof(ti), track_size) + sizeof(ti.track_size))
+	if (ti_size < (int)(offsetof(typeof(ti), track_size)
+				+ sizeof(ti.track_size)))
 		goto use_toc;
 
 	/* if last recorded field is valid, return it. */
-	if (ti.lra_v && ti_size >= offsetof(typeof(ti), last_rec_address)
-				+ sizeof(ti.last_rec_address)) {
+	if (ti.lra_v && ti_size >= (int)(offsetof(typeof(ti), last_rec_address)
+				+ sizeof(ti.last_rec_address))) {
 		*last_written = be32_to_cpu(ti.last_rec_address);
 	} else {
 		/* make it up instead */
@@ -2888,25 +2912,30 @@ static int cdrom_get_next_writable(struct cdrom_device_info *cdi, long *next_wri
 	disc_information di;
 	track_information ti;
 	__u16 last_track;
-	int ret = -1, ti_size;
+	int ret, ti_size;
 
 	if (!CDROM_CAN(CDC_GENERIC_PACKET))
 		goto use_last_written;
 
-	if ((ret = cdrom_get_disc_info(cdi, &di))
-			< offsetof(typeof(di), last_track_msb)
-			+ sizeof(di.last_track_msb))
+	ret = cdrom_get_disc_info(cdi, &di);
+	if (ret < 0 || ret < offsetof(typeof(di), last_track_lsb)
+				+ sizeof(di.last_track_lsb))
 		goto use_last_written;
 
+	/* if unit didn't return msb, it's zeroed by cdrom_get_disc_info */
 	last_track = (di.last_track_msb << 8) | di.last_track_lsb;
 	ti_size = cdrom_get_track_info(cdi, last_track, 1, &ti);
-	if (ti_size < offsetof(typeof(ti), track_start))
+	if (ti_size < 0 || ti_size < offsetof(typeof(ti), track_start))
 		goto use_last_written;
 
         /* if this track is blank, try the previous. */
 	if (ti.blank) {
+		if (last_track == 1)
+			goto use_last_written;
 		last_track--;
 		ti_size = cdrom_get_track_info(cdi, last_track, 1, &ti);
+		if (ti_size < 0)
+			goto use_last_written;
 	}
 
 	/* if next recordable address field is valid, use it. */

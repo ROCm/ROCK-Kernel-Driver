@@ -49,59 +49,102 @@
 static irqreturn_t aac_rkt_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct aac_dev *dev = dev_id;
-
-	if (dev->new_comm_interface) {
-		u32 Index = rkt_readl(dev, MUnit.OutboundQueue);
-		if (Index == 0xFFFFFFFFL)
-			Index = rkt_readl(dev, MUnit.OutboundQueue);
-		if (Index != 0xFFFFFFFFL) {
-			do {
-				if (aac_intr_normal(dev, Index)) {
-					rkt_writel(dev, MUnit.OutboundQueue, Index);
-					rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdReady);
-				}
-				Index = rkt_readl(dev, MUnit.OutboundQueue);
-			} while (Index != 0xFFFFFFFFL);
-			return IRQ_HANDLED;
+	unsigned long bellbits;
+	u8 intstat, mask;
+	intstat = rkt_readb(dev, MUnit.OISR);
+	/*
+	 *	Read mask and invert because drawbridge is reversed.
+	 *	This allows us to only service interrupts that have 
+	 *	been enabled.
+	 */
+	mask = ~(dev->OIMR);
+	/* Check to see if this is our interrupt.  If it isn't just return */
+	if (intstat & mask) 
+	{
+		bellbits = rkt_readl(dev, OutboundDoorbellReg);
+		if (bellbits & DoorBellPrintfReady) {
+			aac_printf(dev, le32_to_cpu(rkt_readl (dev, IndexRegs.Mailbox[5])));
+			rkt_writel(dev, MUnit.ODR,DoorBellPrintfReady);
+			rkt_writel(dev, InboundDoorbellReg,DoorBellPrintfDone);
 		}
-	} else {
-		unsigned long bellbits;
-		u8 intstat;
-		intstat = rkt_readb(dev, MUnit.OISR);
-		/*
-		 *	Read mask and invert because drawbridge is reversed.
-		 *	This allows us to only service interrupts that have 
-		 *	been enabled.
-		 *	Check to see if this is our interrupt.  If it isn't just return
-		 */
-		if (intstat & ~(dev->OIMR))
-		{
-			bellbits = rkt_readl(dev, OutboundDoorbellReg);
-			if (bellbits & DoorBellPrintfReady) {
-				aac_printf(dev, le32_to_cpu(rkt_readl (dev, IndexRegs.Mailbox[5])));
-				rkt_writel(dev, MUnit.ODR,DoorBellPrintfReady);
-				rkt_writel(dev, InboundDoorbellReg,DoorBellPrintfDone);
-			}
-			else if (bellbits & DoorBellAdapterNormCmdReady) {
-				rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdReady);
-				aac_command_normal(&dev->queues->queue[HostNormCmdQueue]);
-//				rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdReady);
-			}
-			else if (bellbits & DoorBellAdapterNormRespReady) {
-				rkt_writel(dev, MUnit.ODR,DoorBellAdapterNormRespReady);
-				aac_response_normal(&dev->queues->queue[HostNormRespQueue]);
-			}
-			else if (bellbits & DoorBellAdapterNormCmdNotFull) {
-				rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdNotFull);
-			}
-			else if (bellbits & DoorBellAdapterNormRespNotFull) {
-				rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdNotFull);
-				rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormRespNotFull);
-			}
-			return IRQ_HANDLED;
+		else if (bellbits & DoorBellAdapterNormCmdReady) {
+			rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdReady);
+			aac_command_normal(&dev->queues->queue[HostNormCmdQueue]);
 		}
+		else if (bellbits & DoorBellAdapterNormRespReady) {
+			aac_response_normal(&dev->queues->queue[HostNormRespQueue]);
+			rkt_writel(dev, MUnit.ODR,DoorBellAdapterNormRespReady);
+		}
+		else if (bellbits & DoorBellAdapterNormCmdNotFull) {
+			rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdNotFull);
+		}
+		else if (bellbits & DoorBellAdapterNormRespNotFull) {
+			rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormCmdNotFull);
+			rkt_writel(dev, MUnit.ODR, DoorBellAdapterNormRespNotFull);
+		}
+		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;
+}
+
+/**
+ *	aac_rkt_enable_interrupt	-	Enable event reporting
+ *	@dev: Adapter
+ *	@event: Event to enable
+ *
+ *	Enable event reporting from the i960 for a given event.
+ */
+ 
+static void aac_rkt_enable_interrupt(struct aac_dev * dev, u32 event)
+{
+	switch (event) {
+
+	case HostNormCmdQue:
+		dev->irq_mask &= ~(OUTBOUNDDOORBELL_1);
+		break;
+
+	case HostNormRespQue:
+		dev->irq_mask &= ~(OUTBOUNDDOORBELL_2);
+		break;
+
+	case AdapNormCmdNotFull:
+		dev->irq_mask &= ~(OUTBOUNDDOORBELL_3);
+		break;
+
+	case AdapNormRespNotFull:
+		dev->irq_mask &= ~(OUTBOUNDDOORBELL_4);
+		break;
+	}
+}
+
+/**
+ *	aac_rkt_disable_interrupt	-	Disable event reporting
+ *	@dev: Adapter
+ *	@event: Event to enable
+ *
+ *	Disable event reporting from the i960 for a given event.
+ */
+
+static void aac_rkt_disable_interrupt(struct aac_dev *dev, u32 event)
+{
+	switch (event) {
+
+	case HostNormCmdQue:
+		dev->irq_mask |= (OUTBOUNDDOORBELL_1);
+		break;
+
+	case HostNormRespQue:
+		dev->irq_mask |= (OUTBOUNDDOORBELL_2);
+		break;
+
+	case AdapNormCmdNotFull:
+		dev->irq_mask |= (OUTBOUNDDOORBELL_3);
+		break;
+
+	case AdapNormRespNotFull:
+		dev->irq_mask |= (OUTBOUNDDOORBELL_4);
+		break;
+	}
 }
 
 /**
@@ -111,30 +154,25 @@ static irqreturn_t aac_rkt_intr(int irq, void *dev_id, struct pt_regs *regs)
  *	@p1: first parameter
  *	@ret: adapter status
  *
- *	This routine will send a synchronous command to the adapter and wait 
+ *	This routine will send a synchronous comamnd to the adapter and wait 
  *	for its	completion.
  */
 
-static int rkt_sync_cmd(struct aac_dev *dev, u32 command,
-	u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7,
-	u32 *status, u32 *r1, u32 *r2, u32 *r3, u32 *r4)
+static int rkt_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *status)
 {
 	unsigned long start;
 	int ok;
 	/*
 	 *	Write the command into Mailbox 0
 	 */
-	rkt_writel(dev, InboundMailbox0, command);
+	rkt_writel(dev, InboundMailbox0, cpu_to_le32(command));
 	/*
-	 *	Write the parameters into Mailboxes 1 - 7
+	 *	Write the parameters into Mailboxes 1 - 4
 	 */
 	rkt_writel(dev, InboundMailbox1, cpu_to_le32(p1));
-	rkt_writel(dev, InboundMailbox2, cpu_to_le32(p2));
-	rkt_writel(dev, InboundMailbox3, cpu_to_le32(p3));
-	rkt_writel(dev, InboundMailbox4, cpu_to_le32(p4));
-	rkt_writel(dev, InboundMailbox5, cpu_to_le32(p5));
-	rkt_writel(dev, InboundMailbox6, cpu_to_le32(p6));
-	rkt_writel(dev, InboundMailbox7, cpu_to_le32(p7));
+	rkt_writel(dev, InboundMailbox2, 0);
+	rkt_writel(dev, InboundMailbox3, 0);
+	rkt_writel(dev, InboundMailbox4, 0);
 	/*
 	 *	Clear the synch command doorbell to start on a clean slate.
 	 */
@@ -142,7 +180,7 @@ static int rkt_sync_cmd(struct aac_dev *dev, u32 command,
 	/*
 	 *	Disable doorbell interrupts
 	 */
-	rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xff);
+	rkt_writeb(dev, MUnit.OIMR, dev->OIMR |= 0x04);
 	/*
 	 *	Force the completion of the mask register write before issuing
 	 *	the interrupt.
@@ -183,25 +221,13 @@ static int rkt_sync_cmd(struct aac_dev *dev, u32 command,
 		/*
 		 *	Restore interrupt mask even though we timed out
 		 */
-		if (dev->new_comm_interface)
-			rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xf7);
-		else
-			rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xfb);
+		rkt_writeb(dev, MUnit.OIMR, dev->OIMR &= 0xfb);
 		return -ETIMEDOUT;
 	}
 	/*
 	 *	Pull the synch status from Mailbox 0.
 	 */
-	if (status)
-		*status = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[0]));
-	if (r1)
-		*r1 = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[1]));
-	if (r2)
-		*r2 = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[2]));
-	if (r3)
-		*r3 = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[3]));
-	if (r4)
-		*r4 = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[4]));
+	*status = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[0]));
 	/*
 	 *	Clear the synch command doorbell.
 	 */
@@ -209,10 +235,7 @@ static int rkt_sync_cmd(struct aac_dev *dev, u32 command,
 	/*
 	 *	Restore interrupt mask
 	 */
-	if (dev->new_comm_interface)
-		rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xf7);
-	else
-		rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xfb);
+	rkt_writeb(dev, MUnit.OIMR, dev->OIMR &= 0xfb);
 	return 0;
 
 }
@@ -226,8 +249,8 @@ static int rkt_sync_cmd(struct aac_dev *dev, u32 command,
 
 static void aac_rkt_interrupt_adapter(struct aac_dev *dev)
 {
-	rkt_sync_cmd(dev, BREAKPOINT_REQUEST, 0, 0, 0, 0, 0, 0, 0,
-	  NULL, NULL, NULL, NULL, NULL);
+	u32 ret;
+	rkt_sync_cmd(dev, BREAKPOINT_REQUEST, 0, &ret);
 }
 
 /**
@@ -256,8 +279,7 @@ static void aac_rkt_notify_adapter(struct aac_dev *dev, u32 event)
 		rkt_writel(dev, MUnit.IDR,INBOUNDDOORBELL_3);
 		break;
 	case HostShutdown:
-//		rkt_sync_cmd(dev, HOST_CRASHING, 0, 0, 0, 0, 0, 0, 0,
-//		  NULL, NULL, NULL, NULL, NULL);
+//		rkt_sync_cmd(dev, HOST_CRASHING, 0, 0, 0, 0, &ret);
 		break;
 	case FastIo:
 		rkt_writel(dev, MUnit.IDR,INBOUNDDOORBELL_6);
@@ -280,13 +302,27 @@ static void aac_rkt_notify_adapter(struct aac_dev *dev, u32 event)
 
 static void aac_rkt_start_adapter(struct aac_dev *dev)
 {
+	u32 status;
 	struct aac_init *init;
 
 	init = dev->init;
 	init->HostElapsedSeconds = cpu_to_le32(get_seconds());
+	/*
+	 *	Tell the adapter we are back and up and running so it will scan
+	 *	its command queues and enable our interrupts
+	 */
+	dev->irq_mask = (DoorBellPrintfReady | OUTBOUNDDOORBELL_1 | OUTBOUNDDOORBELL_2 | OUTBOUNDDOORBELL_3 | OUTBOUNDDOORBELL_4);
+	/*
+	 *	First clear out all interrupts.  Then enable the one's that we
+	 *	can handle.
+	 */
+	rkt_writeb(dev, MUnit.OIMR, 0xff);
+	rkt_writel(dev, MUnit.ODR, 0xffffffff);
+//	rkt_writeb(dev, MUnit.OIMR, ~(u8)OUTBOUND_DOORBELL_INTERRUPT_MASK);
+	rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xfb);
+
 	// We can only use a 32 bit address here
-	rkt_sync_cmd(dev, INIT_STRUCT_BASE_ADDRESS, (u32)(ulong)dev->init_pa,
-	  0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL);
+	rkt_sync_cmd(dev, INIT_STRUCT_BASE_ADDRESS, (u32)(ulong)dev->init_pa, &status);
 }
 
 /**
@@ -298,7 +334,7 @@ static void aac_rkt_start_adapter(struct aac_dev *dev)
  */
 static int aac_rkt_check_health(struct aac_dev *dev)
 {
-	long status = le32_to_cpu(rkt_readl(dev, MUnit.OMRx[0]));
+	long status = rkt_readl(dev, IndexRegs.Mailbox[7]);
 
 	/*
 	 *	Check to see if the board failed any self tests.
@@ -308,43 +344,34 @@ static int aac_rkt_check_health(struct aac_dev *dev)
 	/*
 	 *	Check to see if the board panic'd.
 	 */
-	if (status & KERNEL_PANIC) {
-		char * buffer;
+	if (status & KERNEL_PANIC)
+	{
+		char * buffer = kmalloc(512, GFP_KERNEL|__GFP_DMA);
 		struct POSTSTATUS {
 			u32 Post_Command;
 			u32 Post_Address;
-		} * post;
-		dma_addr_t paddr, baddr;
-		int ret;
-
-		if ((status & 0xFF000000L) == 0xBC000000L)
-			return (status >> 16) & 0xFF;
-		buffer = pci_alloc_consistent(dev->pdev, 512, &baddr);
-		ret = -2;
-		if (buffer == NULL)
-			return ret;
-		post = pci_alloc_consistent(dev->pdev,
-		  sizeof(struct POSTSTATUS), &paddr);
-		if (post == NULL) {
-			pci_free_consistent(dev->pdev, 512, buffer, baddr);
-			return ret;
+		} * post = kmalloc(sizeof(struct POSTSTATUS), GFP_KERNEL);
+		dma_addr_t paddr = pci_map_single(dev->pdev, post, sizeof(struct POSTSTATUS), 2);
+		dma_addr_t baddr = pci_map_single(dev->pdev, buffer, 512, 1);
+		u32 status = -1;
+		int ret = -2;
+		
+		memset(buffer, 0, 512);
+		post->Post_Command = cpu_to_le32(COMMAND_POST_RESULTS);
+		post->Post_Address = cpu_to_le32(baddr);
+		rkt_writel(dev, MUnit.IMRx[0], cpu_to_le32(paddr));
+		rkt_sync_cmd(dev, COMMAND_POST_RESULTS, baddr, &status);
+		pci_unmap_single(dev->pdev, paddr, sizeof(struct POSTSTATUS),2);
+		kfree(post);
+		if ((buffer[0] == '0') && (buffer[1] == 'x')) {
+			ret = (buffer[2] <= '9') ? (buffer[2] - '0') : (buffer[2] - 'A' + 10);
+			ret <<= 4;
+			ret += (buffer[3] <= '9') ? (buffer[3] - '0') : (buffer[3] - 'A' + 10);
 		}
-                memset(buffer, 0, 512);
-                post->Post_Command = cpu_to_le32(COMMAND_POST_RESULTS);
-                post->Post_Address = cpu_to_le32(baddr);
-                rkt_writel(dev, MUnit.IMRx[0], cpu_to_le32(paddr));
-                rkt_sync_cmd(dev, COMMAND_POST_RESULTS, baddr, 0, 0, 0, 0, 0, 0,
-		  NULL, NULL, NULL, NULL, NULL);
-		pci_free_consistent(dev->pdev, sizeof(struct POSTSTATUS),
-		  post, paddr);
-                if ((buffer[0] == '0') && (buffer[1] == 'x')) {
-                        ret = (buffer[2] <= '9') ? (buffer[2] - '0') : (buffer[2] - 'A' + 10);
-                        ret <<= 4;
-                        ret += (buffer[3] <= '9') ? (buffer[3] - '0') : (buffer[3] - 'A' + 10);
-                }
-		pci_free_consistent(dev->pdev, 512, buffer, baddr);
-                return ret;
-        }
+		pci_unmap_single(dev->pdev, baddr, 512, 1);
+		kfree(buffer);
+		return ret;
+	}
 	/*
 	 *	Wait for the adapter to be up and running.
 	 */
@@ -353,39 +380,6 @@ static int aac_rkt_check_health(struct aac_dev *dev)
 	/*
 	 *	Everything is OK
 	 */
-	return 0;
-}
-
-/**
- *	aac_rkt_send
- *	@fib: fib to issue
- *
- *	Will send a fib, returning 0 if successful.
- */
-static int aac_rkt_send(struct fib * fib)
-{
-	u64 addr = fib->hw_fib_pa;
-	struct aac_dev *dev = fib->dev;
-	u32 * device = (u32 *)(dev->regs.rkt);
-	u32 Index;
-
-	dprintk((KERN_DEBUG "%p->aac_rkt_send(%p->%llx)\n", dev, fib, addr));
-	Index = rkt_readl(dev, MUnit.InboundQueue);
-	if (Index == 0xFFFFFFFFL)
-		Index = rkt_readl(dev, MUnit.InboundQueue);
-	dprintk((KERN_DEBUG "Index = 0x%x\n", Index));
-	if (Index == 0xFFFFFFFFL)
-		return Index;
-	device += le32_to_cpu(Index) / sizeof(u32);
-	dprintk((KERN_DEBUG "entry = %x %x %u\n", (u32)(addr & 0xffffffff),
-	  (u32)(addr >> 32), (u32)le16_to_cpu(fib->hw_fib->header.Size)));
-	writel(cpu_to_le32((u32)(addr & 0xffffffff)), device);
-	++device;
-	writel(cpu_to_le32((u32)(addr >> 32)), device);
-	++device;
-	writel(cpu_to_le32(le16_to_cpu(fib->hw_fib->header.Size)), device);
-	rkt_writel(dev, MUnit.InboundQueue, Index);
-	dprintk((KERN_DEBUG "aac_rkt_send - return 0\n"));
 	return 0;
 }
 
@@ -401,6 +395,7 @@ static int aac_rkt_send(struct fib * fib)
 int aac_rkt_init(struct aac_dev *dev)
 {
 	unsigned long start;
+	unsigned long status;
 	int instance;
 	const char * name;
 
@@ -408,41 +403,45 @@ int aac_rkt_init(struct aac_dev *dev)
 	name     = dev->name;
 
 	/*
+	 *	Map in the registers from the adapter.
+	 */
+	if((dev->regs.rkt = (struct rkt_registers *)ioremap((unsigned long)dev->scsi_host_ptr->base, 8192))==NULL)
+	{	
+		printk(KERN_WARNING "aacraid: unable to map i960.\n" );
+		goto error_iounmap;
+	}
+	/*
 	 *	Check to see if the board failed any self tests.
 	 */
-	if (rkt_readl(dev, MUnit.OMRx[0]) & cpu_to_le32(SELF_TEST_FAILED)) {
+	if (rkt_readl(dev, MUnit.OMRx[0]) & SELF_TEST_FAILED) {
 		printk(KERN_ERR "%s%d: adapter self-test failed.\n", dev->name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Check to see if the monitor panic'd while booting.
 	 */
-	if (rkt_readl(dev, MUnit.OMRx[0]) & cpu_to_le32(MONITOR_PANIC)) {
-		printk(KERN_ERR "%s%d: adapter monitor panic'd.\n", dev->name, instance);
-		return -1;
+	if (rkt_readl(dev, MUnit.OMRx[0]) & MONITOR_PANIC) {
+		printk(KERN_ERR "%s%d: adapter monitor panic.\n", dev->name, instance);
+		goto error_iounmap;
 	}
 	/*
 	 *	Check to see if the board panic'd while booting.
 	 */
-	if (rkt_readl(dev, MUnit.OMRx[0]) & cpu_to_le32(KERNEL_PANIC)) {
+	if (rkt_readl(dev, MUnit.OMRx[0]) & KERNEL_PANIC) {
 		printk(KERN_ERR "%s%d: adapter kernel panic'd.\n", dev->name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	start = jiffies;
 	/*
 	 *	Wait for the adapter to be up and running. Wait up to 3 minutes
 	 */
-	dprintk ((KERN_DEBUG "rkt_readl(dev,MUnit.OMRx[0]=%x\n",
-	  rkt_readl(dev, MUnit.OMRx[0])));
-	while (
-//	 (!(rkt_readl(dev, IndexRegs.Mailbox[7]) & cpu_to_le32(KERNEL_UP_AND_RUNNING))) || 
-	 (!(rkt_readl(dev, MUnit.OMRx[0]) & cpu_to_le32(KERNEL_UP_AND_RUNNING)))) 
+	while (!(rkt_readl(dev, MUnit.OMRx[0]) & KERNEL_UP_AND_RUNNING))
 	{
 		if(time_after(jiffies, start+180*HZ))
 		{
-			unsigned long status = le32_to_cpu(rkt_readl(dev, MUnit.OMRx[0]));
-			printk(KERN_ERR "%s%d: adapter kernel failed to start, init status = %lx.\n", dev->name, instance, status);
-			return -1;
+			status = rkt_readl(dev, IndexRegs.Mailbox[7]) >> 16;
+			printk(KERN_ERR "%s%d: adapter kernel failed to start, init status = %ld.\n", dev->name, instance, status);
+			goto error_iounmap;
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
@@ -450,61 +449,28 @@ int aac_rkt_init(struct aac_dev *dev)
 	if (request_irq(dev->scsi_host_ptr->irq, aac_rkt_intr, SA_SHIRQ|SA_INTERRUPT, "aacraid", (void *)dev)<0) 
 	{
 		printk(KERN_ERR "%s%d: Interrupt unavailable.\n", name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Fill in the function dispatch table.
 	 */
 	dev->a_ops.adapter_interrupt = aac_rkt_interrupt_adapter;
+	dev->a_ops.adapter_enable_int = aac_rkt_enable_interrupt;
+	dev->a_ops.adapter_disable_int = aac_rkt_disable_interrupt;
 	dev->a_ops.adapter_notify = aac_rkt_notify_adapter;
 	dev->a_ops.adapter_sync_cmd = rkt_sync_cmd;
 	dev->a_ops.adapter_check_health = aac_rkt_check_health;
-	dev->a_ops.adapter_send = aac_rkt_send;
-#ifdef __arm__
-//DEBUG
-//printk(KERN_INFO "Disabling New Comm Interface as xscale utilization is affected negatively\n");
-//	dev->a_ops.adapter_send = NULL;
-#endif
 
-	/*
-	 *	First clear out all interrupts.  Then enable the one's that we
-	 *	can handle.
-	 */
-	rkt_writeb(dev, MUnit.OIMR, 0xff);
-	rkt_writel(dev, MUnit.ODR, 0xffffffff);
-	rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xfb);
-
-	if (aac_init_adapter(dev) == NULL) {
-		free_irq(dev->scsi_host_ptr->irq, (void *)dev);
-		return -1;
-	}
-	if (dev->new_comm_interface) {
-		/*
-		 * FIB Setup has already been done, but we can minimize the
-		 * damage by at least ensuring the OS never issues more
-		 * commands than we can handle. The Rocket adapters currently
-		 * can only handle 246 commands and 8 AIFs at the same time,
-		 * and in fact do notify us accordingly if we negotiate the
-		 * FIB size. The problem that causes us to add this check is
-		 * to ensure that we do not overdo it with the adapter when a
-		 * hard coded FIB override is being utilized. This special
-		 * case warrants this half baked, but convenient, check here.
-		 */
-		if (dev->scsi_host_ptr->can_queue > (246 - AAC_NUM_MGT_FIB)) {
-			dev->init->MaxIoCommands = 246;
-			dev->scsi_host_ptr->can_queue = 246 - AAC_NUM_MGT_FIB;
-		}
-		rkt_writeb(dev, MUnit.OIMR, dev->OIMR = 0xf7);
-	}
+	if (aac_init_adapter(dev) == NULL)
+		goto error_irq;
 	/*
 	 *	Start any kernel threads needed
 	 */
 	dev->thread_pid = kernel_thread((int (*)(void *))aac_command_thread, dev, 0);
 	if(dev->thread_pid < 0)
 	{
-		free_irq(dev->scsi_host_ptr->irq, (void *)dev);
 		printk(KERN_ERR "aacraid: Unable to create rkt thread.\n");
-		return -1;
+		goto error_kfree;
 	}	
 	/*
 	 *	Tell the adapter that all is configured, and it can start
@@ -512,4 +478,15 @@ int aac_rkt_init(struct aac_dev *dev)
 	 */
 	aac_rkt_start_adapter(dev);
 	return 0;
+
+error_kfree:
+	kfree(dev->queues);
+
+error_irq:
+	free_irq(dev->scsi_host_ptr->irq, (void *)dev);
+
+error_iounmap:
+	iounmap(dev->regs.rkt);
+
+	return -1;
 }

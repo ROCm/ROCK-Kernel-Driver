@@ -36,6 +36,7 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 #include <asm/cputable.h>
+#include <asm/sections.h>
 
 #include <asm/time.h>
 #include "iSeries_setup.h"
@@ -54,17 +55,12 @@
 #include <asm/iSeries/mf.h>
 
 /* Function Prototypes */
-extern void abort(void);
 extern void ppcdbg_initialize(void);
-extern void iSeries_pcibios_init(void);
 extern void tce_init_iSeries(void);
 
 static void build_iSeries_Memory_Map(void);
 static void setup_iSeries_cache_sizes(void);
 static void iSeries_bolt_kernel(unsigned long saddr, unsigned long eaddr);
-extern void build_valid_hpte(unsigned long vsid, unsigned long ea, unsigned long pa,
-			     pte_t *ptep, unsigned hpteflags, unsigned bolted);
-static void iSeries_setup_dprofile(void);
 extern void iSeries_setup_arch(void);
 extern void iSeries_pci_final_fixup(void);
 
@@ -77,15 +73,9 @@ static unsigned long tbFreqHz;
 static unsigned long tbFreqMhz;
 static unsigned long tbFreqMhzHundreths;
 
-unsigned long dprof_shift;
-unsigned long dprof_len;
-unsigned int *dprof_buffer;
-
 int piranha_simulator;
 
 int boot_cpuid;
-
-extern char _end[];
 
 extern int rd_size;		/* Defined in drivers/block/rd.c */
 extern unsigned long klimit;
@@ -365,30 +355,6 @@ void __init iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		++p;
 	}
 	*p = 0;
-
-        if (strstr(cmd_line, "dprofile=")) {
-                for (q = cmd_line; (p = strstr(q, "dprofile=")) != 0; ) {
-			unsigned long size, new_klimit;
-
-                        q = p + 9;
-                        if ((p > cmd_line) && (p[-1] != ' '))
-                                continue;
-                        dprof_shift = simple_strtoul(q, &q, 0);
-			dprof_len = (unsigned long)_etext -
-				(unsigned long)_stext;
-			dprof_len >>= dprof_shift;
-			size = ((dprof_len * sizeof(unsigned int)) +
-					(PAGE_SIZE-1)) & PAGE_MASK;
-			dprof_buffer = (unsigned int *)((klimit +
-						(PAGE_SIZE-1)) & PAGE_MASK);
-			new_klimit = ((unsigned long)dprof_buffer) + size;
-			lmb_reserve(__pa(klimit), (new_klimit-klimit));
-			klimit = new_klimit;
-			memset(dprof_buffer, 0, size);
-                }
-        }
-
-	iSeries_setup_dprofile();
 
 	mf_init();
 	mf_initialized = 1;
@@ -834,22 +800,6 @@ void iSeries_fixup_klimit(void)
 		if (embedded_sysmap_end)
 			klimit = KERNELBASE + ((embedded_sysmap_end + 4095) &
 					0xfffffffffffff000);
-	}
-}
-
-static void iSeries_setup_dprofile(void)
-{
-	if (dprof_buffer) {
-		unsigned i;
-
-		for (i = 0; i < NR_CPUS; ++i) {
-			paca[i].prof_shift = dprof_shift;
-			paca[i].prof_len = dprof_len - 1;
-			paca[i].prof_buffer = dprof_buffer;
-			paca[i].prof_stext = (unsigned *)_stext;
-			mb();
-			paca[i].prof_enabled = 1;
-		}
 	}
 }
 

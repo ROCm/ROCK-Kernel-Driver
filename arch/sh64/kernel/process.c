@@ -820,7 +820,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
 {
 	if (!newsp)
 		newsp = pregs->regs[15];
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, pregs, 0, 0, 0);
+	return do_fork(clone_flags, newsp, pregs, 0, 0, 0);
 }
 
 /*
@@ -901,7 +901,7 @@ unsigned long get_wchan(struct task_struct *p)
 	 */
 	pc = thread_saved_pc(p);
 
-#if CONFIG_FRAME_POINTER
+#ifdef CONFIG_FRAME_POINTER
 	if (in_sh64_switch_to(pc)) {
 		sh64_switch_to_fp = (long) p->thread.sp;
 		/* r14 is saved at offset 4 in the sh64_switch_to frame */

@@ -424,7 +424,7 @@ static void ipmi_po_new_smi(int if_num)
 	if (ready)
 		return;
 
-	rv = ipmi_create_user(if_num, &ipmi_poweroff_handler, 0, &ipmi_user);
+	rv = ipmi_create_user(if_num, &ipmi_poweroff_handler, NULL, &ipmi_user);
 	if (rv) {
 		printk(KERN_ERR PFX "could not create IPMI user, error %d\n",
 		       rv);

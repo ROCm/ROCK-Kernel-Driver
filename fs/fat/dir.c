@@ -93,14 +93,6 @@ static void dump_de(struct msdos_dir_entry *de)
 }
 #endif
 
-static inline unsigned char
-fat_tolower(struct nls_table *t, unsigned char c)
-{
-	unsigned char nc = t->charset2lower[c];
-
-	return nc ? nc : c;
-}
-
 static inline int
 fat_short2uni(struct nls_table *t, unsigned char *c, int clen, wchar_t *uni)
 {
@@ -138,17 +130,6 @@ fat_short2lower_uni(struct nls_table *t, unsigned char *c, int clen, wchar_t *un
 		*uni = wc;
 	
 	return charlen;
-}
-
-static int
-fat_strnicmp(struct nls_table *t, const unsigned char *s1,
-					const unsigned char *s2, int len)
-{
-	while(len--)
-		if (fat_tolower(t, *s1++) != fat_tolower(t, *s2++))
-			return 1;
-
-	return 0;
 }
 
 static inline int
@@ -311,7 +292,7 @@ parse_long:
 			:uni16_to_x8(bufname, bufuname, uni_xlate, nls_io);
 		if (xlate_len == name_len)
 			if ((!anycase && !memcmp(name, bufname, xlate_len)) ||
-			    (anycase && !fat_strnicmp(nls_io, name, bufname,
+			    (anycase && !nls_strnicmp(nls_io, name, bufname,
 								xlate_len)))
 				goto Found;
 
@@ -322,7 +303,7 @@ parse_long:
 			if (xlate_len != name_len)
 				continue;
 			if ((!anycase && !memcmp(name, bufname, xlate_len)) ||
-			    (anycase && !fat_strnicmp(nls_io, name, bufname,
+			    (anycase && !nls_strnicmp(nls_io, name, bufname,
 								xlate_len)))
 				goto Found;
 		}
@@ -745,12 +726,12 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 	memcpy(de[0].name,MSDOS_DOT,MSDOS_NAME);
 	memcpy(de[1].name,MSDOS_DOTDOT,MSDOS_NAME);
 	de[0].attr = de[1].attr = ATTR_DIR;
-	de[0].time = de[1].time = CT_LE_W(time);
-	de[0].date = de[1].date = CT_LE_W(date);
+	de[0].time = de[1].time = time;
+	de[0].date = de[1].date = date;
 	if (is_vfat) {	/* extra timestamps */
-		de[0].ctime = de[1].ctime = CT_LE_W(time);
+		de[0].ctime = de[1].ctime = time;
 		de[0].adate = de[0].cdate =
-			de[1].adate = de[1].cdate = CT_LE_W(date);
+			de[1].adate = de[1].cdate = date;
 	}
 	de[0].start = CT_LE_W(MSDOS_I(dir)->i_logstart);
 	de[0].starthi = CT_LE_W(MSDOS_I(dir)->i_logstart>>16);

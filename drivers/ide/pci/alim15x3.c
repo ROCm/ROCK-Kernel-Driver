@@ -752,8 +752,8 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
 	hwif->tuneproc = &ali15x3_tune_drive;
 	hwif->speedproc = &ali15x3_tune_chipset;
 
-	/* Don't use LBA48 on ALi devices before rev 0xC5 */
-	hwif->no_lba48 = (m5229_revision <= 0xC4) ? 1 : 0;
+	/* don't use LBA48 DMA on ALi devices before rev 0xC5 */
+	hwif->no_lba48_dma = (m5229_revision <= 0xC4) ? 1 : 0;
 
 	if (!hwif->dma_base) {
 		hwif->drives[0].autotune = 1;

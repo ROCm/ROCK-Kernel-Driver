@@ -69,10 +69,10 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-module_param(power_mode, bool, 644);
+module_param(power_mode, bool, 0644);
 MODULE_PARM_DESC(power_mode, "Power mode enabled or not");
 
-module_param(debug, bool, 644);
+module_param(debug, bool, 0644);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 
 #define CPQHPC_MODULE_MINOR 208

@@ -115,6 +115,7 @@ typedef struct siginfo32 {
 			int _status;		/* exit code */
 			compat_clock_t _utime;
 			compat_clock_t _stime;
+			struct compat_rusage _rusage;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */

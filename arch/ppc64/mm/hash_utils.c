@@ -28,6 +28,7 @@
 #include <linux/ctype.h>
 #include <linux/cache.h>
 #include <linux/init.h>
+#include <linux/signal.h>
 
 #include <asm/ppcdebug.h>
 #include <asm/processor.h>
@@ -236,14 +237,11 @@ unsigned int hash_page_do_lazy_icache(unsigned int pp, pte_t pte, int trap)
 	return pp;
 }
 
-/*
- * Called by asm hashtable.S in case of critical insert failure
+/* Result code is:
+ *  0 - handled
+ *  1 - normal page fault
+ * -1 - critical hash insertion error
  */
-void htab_insert_failure(void)
-{
-	panic("hash_page: pte_insert failed\n");
-}
-
 int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 {
 	void *pgdir;
@@ -369,6 +367,25 @@ static inline void make_bl(unsigned int *insn_addr, void *func)
 	*insn_addr = (unsigned int)(0x48000001 | (offset & 0x03fffffc));
 	flush_icache_range((unsigned long)insn_addr, 4+
 			   (unsigned long)insn_addr);
+}
+
+/*
+ * low_hash_fault is called when we the low level hash code failed
+ * to instert a PTE due to an hypervisor error
+ */
+void low_hash_fault(struct pt_regs *regs, unsigned long address)
+{
+	if (user_mode(regs)) {
+		siginfo_t info;
+
+		info.si_signo = SIGBUS;
+		info.si_errno = 0;
+		info.si_code = BUS_ADRERR;
+		info.si_addr = (void *)address;
+		force_sig_info(SIGBUS, &info, current);
+		return;
+	}
+	bad_page_fault(regs, address, SIGBUS);
 }
 
 void __init htab_finish_init(void)

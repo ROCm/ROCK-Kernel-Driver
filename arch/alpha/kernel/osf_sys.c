@@ -723,7 +723,8 @@ osf_setsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
 {
 	switch (op) {
 	case SSI_IEEE_FP_CONTROL: {
-		unsigned long swcr, fpcr, fex;
+		unsigned long swcr, fpcr;
+		unsigned int *state;
 
 		/* 
 		 * Alpha Architecture Handbook 4.7.7.3:
@@ -732,22 +733,42 @@ osf_setsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
 		 * set in the trap shadow of a software-complete insn.
 		 */
 
-		/* Update softare trap enable bits.  */
 		if (get_user(swcr, (unsigned long __user *)buffer))
 			return -EFAULT;
-		current_thread_info()->ieee_state
-		  = ((current_thread_info()->ieee_state & ~IEEE_SW_MASK)
-		     | (swcr & IEEE_SW_MASK));
+		state = &current_thread_info()->ieee_state;
+
+		/* Update softare trap enable bits.  */
+		*state = (*state & ~IEEE_SW_MASK) | (swcr & IEEE_SW_MASK);
 
 		/* Update the real fpcr.  */
-		fpcr = rdfpcr();
-		fpcr &= FPCR_DYN_MASK;
+		fpcr = rdfpcr() & FPCR_DYN_MASK;
 		fpcr |= ieee_swcr_to_fpcr(swcr);
 		wrfpcr(fpcr);
 
- 		/* If any exceptions are now unmasked, send a signal.  */
-		fex = ((swcr & IEEE_STATUS_MASK)
-		       >> IEEE_STATUS_TO_EXCSUM_SHIFT) & swcr;
+		return 0;
+	}
+
+	case SSI_IEEE_RAISE_EXCEPTION: {
+		unsigned long exc, swcr, fpcr, fex;
+		unsigned int *state;
+
+		if (get_user(exc, (unsigned long __user *)buffer))
+			return -EFAULT;
+		state = &current_thread_info()->ieee_state;
+		exc &= IEEE_STATUS_MASK;
+
+		/* Update softare trap enable bits.  */
+ 		swcr = (*state & IEEE_SW_MASK) | exc;
+		*state |= exc;
+
+		/* Update the real fpcr.  */
+		fpcr = rdfpcr();
+		fpcr |= ieee_swcr_to_fpcr(swcr);
+		wrfpcr(fpcr);
+
+ 		/* If any exceptions set by this call, and are unmasked,
+		   send a signal.  Old exceptions are not signaled.  */
+		fex = (exc >> IEEE_STATUS_TO_EXCSUM_SHIFT) & swcr;
  		if (fex) {
 			siginfo_t info;
 			int si_code = 0;
@@ -765,7 +786,6 @@ osf_setsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
 			info.si_addr = NULL;  /* FIXME */
  			send_sig_info(SIGFPE, &info, current);
  		}
-
 		return 0;
 	}
 
@@ -1079,18 +1099,10 @@ osf_getrusage(int who, struct rusage32 __user *ru)
 		r.ru_majflt = current->maj_flt;
 		break;
 	case RUSAGE_CHILDREN:
-		jiffies_to_timeval32(current->cutime, &r.ru_utime);
-		jiffies_to_timeval32(current->cstime, &r.ru_stime);
-		r.ru_minflt = current->cmin_flt;
-		r.ru_majflt = current->cmaj_flt;
-		break;
-	default:
-		jiffies_to_timeval32(current->utime + current->cutime,
-				   &r.ru_utime);
-		jiffies_to_timeval32(current->stime + current->cstime,
-				   &r.ru_stime);
-		r.ru_minflt = current->min_flt + current->cmin_flt;
-		r.ru_majflt = current->maj_flt + current->cmaj_flt;
+		jiffies_to_timeval32(current->signal->cutime, &r.ru_utime);
+		jiffies_to_timeval32(current->signal->cstime, &r.ru_stime);
+		r.ru_minflt = current->signal->cmin_flt;
+		r.ru_majflt = current->signal->cmaj_flt;
 		break;
 	}
 

@@ -260,17 +260,17 @@ extern long find_first_bit(const unsigned long * addr, unsigned long size);
 extern long find_next_bit(const unsigned long * addr, long size, long offset);
 
 /* return index of first bet set in val or max when no bit is set */
-static inline unsigned long __scanbit(unsigned long val, unsigned long max) 
-{ 
-	asm("bsfq %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max)); 
+static inline unsigned long __scanbit(unsigned long val, unsigned long max)
+{
+	asm("bsfq %1,%0 ; cmovz %2,%0" : "=&r" (val) : "r" (val), "r" (max));
 	return val;
-} 
+}
 
 #define find_first_bit(addr,size) \
 ((__builtin_constant_p(size) && size <= BITS_PER_LONG ? \
   (__scanbit(*(unsigned long *)addr,(size))) : \
   find_first_bit(addr,size)))
-  
+
 #define find_next_bit(addr,size,off) \
 ((__builtin_constant_p(size) && size <= BITS_PER_LONG ? 	  \
   ((off) + (__scanbit((*(unsigned long *)addr) >> (off),(size)-(off)))) : \

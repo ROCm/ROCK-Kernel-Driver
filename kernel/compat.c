@@ -160,10 +160,39 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 	 */
 	if (tbuf) {
 		struct compat_tms tmp;
-		tmp.tms_utime = compat_jiffies_to_clock_t(current->utime);
-		tmp.tms_stime = compat_jiffies_to_clock_t(current->stime);
-		tmp.tms_cutime = compat_jiffies_to_clock_t(current->cutime);
-		tmp.tms_cstime = compat_jiffies_to_clock_t(current->cstime);
+		struct task_struct *tsk = current;
+		struct task_struct *t;
+		unsigned long utime, stime, cutime, cstime;
+
+		read_lock(&tasklist_lock);
+		utime = tsk->signal->utime;
+		stime = tsk->signal->stime;
+		t = tsk;
+		do {
+			utime += t->utime;
+			stime += t->stime;
+			t = next_thread(t);
+		} while (t != tsk);
+
+		/*
+		 * While we have tasklist_lock read-locked, no dying thread
+		 * can be updating current->signal->[us]time.  Instead,
+		 * we got their counts included in the live thread loop.
+		 * However, another thread can come in right now and
+		 * do a wait call that updates current->signal->c[us]time.
+		 * To make sure we always see that pair updated atomically,
+		 * we take the siglock around fetching them.
+		 */
+		spin_lock_irq(&tsk->sighand->siglock);
+		cutime = tsk->signal->cutime;
+		cstime = tsk->signal->cstime;
+		spin_unlock_irq(&tsk->sighand->siglock);
+		read_unlock(&tasklist_lock);
+
+		tmp.tms_utime = compat_jiffies_to_clock_t(utime);
+		tmp.tms_stime = compat_jiffies_to_clock_t(stime);
+		tmp.tms_cutime = compat_jiffies_to_clock_t(cutime);
+		tmp.tms_cstime = compat_jiffies_to_clock_t(cstime);
 		if (copy_to_user(tbuf, &tmp, sizeof(tmp)))
 			return -EFAULT;
 	}
@@ -310,7 +339,7 @@ asmlinkage long compat_sys_getrlimit (unsigned int resource,
 	return ret;
 }
 
-static long put_compat_rusage(struct compat_rusage __user *ru, struct rusage *r)
+int put_compat_rusage(const struct rusage *r, struct compat_rusage __user *ru)
 {
 	if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru)) ||
 	    __put_user(r->ru_utime.tv_sec, &ru->ru_utime.tv_sec) ||
@@ -348,7 +377,7 @@ asmlinkage long compat_sys_getrusage(int who, struct compat_rusage __user *ru)
 	if (ret)
 		return ret;
 
-	if (put_compat_rusage(ru, &r))
+	if (put_compat_rusage(&r, ru))
 		return -EFAULT;
 
 	return 0;
@@ -374,7 +403,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 		set_fs (old_fs);
 
 		if (ret > 0) {
-			if (put_compat_rusage(ru, &r)) 
+			if (put_compat_rusage(&r, ru))
 				return -EFAULT;
 			if (stat_addr && put_user(status, stat_addr))
 				return -EFAULT;
@@ -383,16 +412,43 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 	}
 }
 
+/*
+ * for maximum compatability, we allow programs to use a single (compat)
+ * unsigned long bitmask if all cpus will fit. If not, you have to have
+ * at least the kernel size available.
+ */
+#define USE_COMPAT_ULONG_CPUMASK (NR_CPUS <= BITS_PER_COMPAT_LONG)
+
 asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid, 
 					     unsigned int len,
 					     compat_ulong_t __user *user_mask_ptr)
 {
-	unsigned long kern_mask;
+	cpumask_t kern_mask;
 	mm_segment_t old_fs;
 	int ret;
 
-	if (get_user(kern_mask, user_mask_ptr))
-		return -EFAULT;
+	if (USE_COMPAT_ULONG_CPUMASK) {
+		compat_ulong_t user_mask;
+
+		if (len < sizeof(user_mask))
+			return -EINVAL;
+
+		if (get_user(user_mask, user_mask_ptr))
+			return -EFAULT;
+
+		cpus_addr(kern_mask)[0] = user_mask;
+	} else {
+		unsigned long *k;
+
+		if (len < sizeof(kern_mask))
+			return -EINVAL;
+
+		k = cpus_addr(kern_mask);
+		ret = compat_get_bitmap(k, user_mask_ptr,
+					sizeof(kern_mask) * BITS_PER_LONG);
+		if (ret)
+			return ret;
+	}
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -407,9 +463,13 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 					     compat_ulong_t __user *user_mask_ptr)
 {
-	unsigned long kern_mask;
+	cpumask_t kern_mask;
 	mm_segment_t old_fs;
 	int ret;
+
+	if (len < (USE_COMPAT_ULONG_CPUMASK ? sizeof(compat_ulong_t)
+				: sizeof(kern_mask)))
+		return -EINVAL;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -418,10 +478,23 @@ asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 				    (unsigned long __user *) &kern_mask);
 	set_fs(old_fs);
 
-	if (ret > 0) {
-		ret = sizeof(compat_ulong_t);
-		if (put_user(kern_mask, user_mask_ptr))
+	if (ret < 0)
+		return ret;
+
+	if (USE_COMPAT_ULONG_CPUMASK) {
+		if (put_user(&cpus_addr(kern_mask)[0], user_mask_ptr))
 			return -EFAULT;
+		ret = sizeof(compat_ulong_t);
+	} else {
+		unsigned long *k;
+
+		k = cpus_addr(kern_mask);
+		ret = compat_put_bitmap(user_mask_ptr, k,
+					sizeof(kern_mask) * BITS_PER_LONG);
+		if (ret)
+			return ret;
+
+		ret = sizeof(kern_mask);
 	}
 
 	return ret;
@@ -561,3 +634,83 @@ long compat_clock_nanosleep(clockid_t which_clock, int flags,
 
 /* timer_create is architecture specific because it needs sigevent conversion */
 
+long compat_get_bitmap(unsigned long *mask, compat_ulong_t __user *umask,
+		       unsigned long bitmap_size)
+{
+	int i, j;
+	unsigned long m;
+	compat_ulong_t um;
+	unsigned long nr_compat_longs;
+
+	/* align bitmap up to nearest compat_long_t boundary */
+	bitmap_size = ALIGN(bitmap_size, BITS_PER_COMPAT_LONG);
+
+	if (verify_area(VERIFY_READ, umask, bitmap_size / 8))
+		return -EFAULT;
+
+	nr_compat_longs = BITS_TO_COMPAT_LONGS(bitmap_size);
+
+	for (i = 0; i < BITS_TO_LONGS(bitmap_size); i++) {
+		m = 0;
+
+		for (j = 0; j < sizeof(m)/sizeof(um); j++) {
+			/*
+			 * We dont want to read past the end of the userspace
+			 * bitmap. We must however ensure the end of the
+			 * kernel bitmap is zeroed.
+			 */
+			if (nr_compat_longs-- > 0) {
+				if (__get_user(um, umask))
+					return -EFAULT;
+			} else {
+				um = 0;
+			}
+
+			umask++;
+			m |= (long)um << (j * BITS_PER_COMPAT_LONG);
+		}
+		*mask++ = m;
+	}
+
+	return 0;
+}
+
+long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
+		       unsigned long bitmap_size)
+{
+	int i, j;
+	unsigned long m;
+	compat_ulong_t um;
+	unsigned long nr_compat_longs;
+
+	/* align bitmap up to nearest compat_long_t boundary */
+	bitmap_size = ALIGN(bitmap_size, BITS_PER_COMPAT_LONG);
+
+	if (verify_area(VERIFY_WRITE, umask, bitmap_size / 8))
+		return -EFAULT;
+
+	nr_compat_longs = BITS_TO_COMPAT_LONGS(bitmap_size);
+
+	for (i = 0; i < BITS_TO_LONGS(bitmap_size); i++) {
+		m = *mask++;
+
+		for (j = 0; j < sizeof(m)/sizeof(um); j++) {
+			um = m;
+
+			/*
+			 * We dont want to write past the end of the userspace
+			 * bitmap.
+			 */
+			if (nr_compat_longs-- > 0) {
+				if (__put_user(um, umask))
+					return -EFAULT;
+			}
+
+			umask++;
+			m >>= 4*sizeof(um);
+			m >>= 4*sizeof(um);
+		}
+	}
+
+	return 0;
+}

@@ -10,6 +10,7 @@
  * S3C2410 clock register definitions
  *
  *  Changelog:
+ *    18-Aug-2004 Ben Dooks      Added 2440 definitions
  *    08-Aug-2004 Herbert Pötzl  Added CLKCON definitions
  *    19-06-2003  Ben Dooks      Created file
  *    12-03-2004  Ben Dooks      Updated include protection
@@ -87,5 +88,30 @@ s3c2410_get_pll(int pllval, int baseclk)
 
   return (baseclk * (mdiv + 8)) / ((pdiv + 2) << sdiv);
 }
+
+#ifdef CONFIG_CPU_S3C2440
+
+/* extra registers */
+#define S3C2440_CAMDIVN	    S3C2410_CLKREG(0x14)
+
+#define S3C2440_CLKCON_CAMERA        (1<<19)
+#define S3C2440_CLKCON_AC97          (1<<20)
+
+#define S3C2440_CLKDIVN_PDIVN	     (1<<0)
+#define S3C2440_CLKDIVN_HDIVN_MASK   (3<<1)
+#define S3C2440_CLKDIVN_HDIVN_1      (0<<1)
+#define S3C2440_CLKDIVN_HDIVN_2      (1<<1)
+#define S3C2440_CLKDIVN_HDIVN_4_8    (2<<1)
+#define S3C2440_CLKDIVN_HDIVN_3_6    (3<<1)
+#define S3C2440_CLKDIVN_UCLK         (1<<3)
+
+#define S3C2440_CAMDIVN_CAMCLK_MASK  (0xf<<0)
+#define S3C2440_CAMDIVN_CAMCLK_SEL   (1<<4)
+#define S3C2440_CAMDIVN_HCLK3_HALF   (1<<8)
+#define S3C2440_CAMDIVN_HCLK4_HALF   (1<<9)
+#define S3C2440_CAMDIVN_DVSEN        (1<<12)
+
+#endif /* CONFIG_CPU_S3C2440 */
+
 
 #endif /* __ASM_ARM_REGS_CLOCK */

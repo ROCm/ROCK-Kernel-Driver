@@ -411,8 +411,16 @@
 
 		.macro	addruart,rx
 		mov	\rx, #0xfe000000	@ physical
-#if defined(CONFIG_ARCH_IQ80321)
+#if defined(CONFIG_ARCH_IQ80321) || defined(CONFIG_ARCH_IQ31244)
 		orr	\rx, \rx, #0x00800000	@ location of the UART
+#elif defined(CONFIG_ARCH_IOP331)
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #0x000fe000	@ Physical Base
+		movne	\rx, #0
+		orr	\rx, \rx, #0xfe000000
+		orr	\rx, \rx, #0x00f00000	@ Virtual Base
+		orr	\rx, \rx, #0x00001700   @ location of the UART
 #else
 #error Unknown IOP3XX implementation
 #endif
@@ -430,7 +438,7 @@
 		.endm
 
 		.macro	waituart,rd,rx
-#ifndef	CONFIG_ARCH_IQ80321
+#if !defined(CONFIG_ARCH_IQ80321) || !defined(CONFIG_ARCH_IQ31244) || !defined(CONFIG_ARCH_IQ80331)
 1001:		ldrb	\rd, [\rx, #0x6]
 		tst	\rd, #0x10
 		beq	1001b
@@ -461,6 +469,36 @@
 
                 .macro  busyuart,rd,rx
                 .endm
+
+#elif defined(CONFIG_ARCH_IXP2000)
+
+		.macro  addruart,rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #0xc0000000	@ Physical base
+		movne	\rx, #0xfe000000	@ virtual base
+		orrne	\rx, \rx, #0x00f00000
+		orr	\rx, \rx, #0x00030000
+#ifdef	__ARMEB__
+		orr	\rx, \rx, #0x00000003
+#endif
+		.endm 
+		
+		.macro	senduart,rd,rx
+		strb	\rd, [\rx]
+		.endm
+
+		.macro	busyuart,rd,rx
+1002:		ldrb	\rd, [\rx, #0x14]
+		tst	\rd, #0x20       
+		beq	1002b
+		.endm
+
+		.macro	waituart,rd,rx
+		nop
+		nop
+		nop
+		.endm
 
 #elif defined(CONFIG_ARCH_OMAP)
 

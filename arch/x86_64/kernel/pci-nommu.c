@@ -17,36 +17,36 @@ int iommu_bio_merge = 0;
 EXPORT_SYMBOL(iommu_bio_merge);
 
 int iommu_sac_force = 0;
-EXPORT_SYMBOL(iommu_sac_force); 
+EXPORT_SYMBOL(iommu_sac_force);
 
 /* 
  * Dummy IO MMU functions
  */
 
-void *dma_alloc_coherent(struct device *hwdev, size_t size, 
+void *dma_alloc_coherent(struct device *hwdev, size_t size,
 			 dma_addr_t *dma_handle, unsigned gfp)
 {
 	void *ret;
 	u64 mask;
 	int order = get_order(size);
 
-	if (hwdev) 
-		mask = hwdev->coherent_dma_mask & *hwdev->dma_mask; 
+	if (hwdev)
+		mask = hwdev->coherent_dma_mask & *hwdev->dma_mask;
 	else
 		mask = 0xffffffff;
-	for (;;) { 
+	for (;;) {
 		ret = (void *)__get_free_pages(gfp, order);
 		if (ret == NULL)
-			return NULL; 
-		*dma_handle = virt_to_bus(ret);
-		if ((*dma_handle & ~mask) == 0) 
-			break; 
-		free_pages((unsigned long)ret, order);
-		if (gfp & GFP_DMA) 
 			return NULL;
-		gfp |= GFP_DMA; 
+		*dma_handle = virt_to_bus(ret);
+		if ((*dma_handle & ~mask) == 0)
+			break;
+		free_pages((unsigned long)ret, order);
+		if (gfp & GFP_DMA)
+			return NULL;
+		gfp |= GFP_DMA;
 	}
-		
+
 	memset(ret, 0, size);
 	return ret;
 }
@@ -86,7 +86,7 @@ static int __init check_ram(void)
 	if (end_pfn >= 0xffffffff>>PAGE_SHIFT) { 
 		printk(
 		KERN_ERR "WARNING more than 4GB of memory but IOMMU not compiled in.\n"
-		KERN_ERR "WARNING 32bit PCI may malfunction.\n"); 
+		KERN_ERR "WARNING 32bit PCI may malfunction.\n");
 	} 
 	return 0;
 } 

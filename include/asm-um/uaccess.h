@@ -6,6 +6,8 @@
 #ifndef __UM_UACCESS_H
 #define __UM_UACCESS_H
 
+#include "linux/sched.h"
+
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
 
@@ -33,6 +35,9 @@
 #define __copy_from_user(to, from, n) copy_from_user(to, from, n)
 
 #define __copy_to_user(to, from, n) copy_to_user(to, from, n)
+
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 
 #define __get_user(x, ptr) \
 ({ \

@@ -24,10 +24,10 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 
-extern void __ide_mm_insw(unsigned long port, void *addr, u32 count);
-extern void __ide_mm_outsw(unsigned long port, void *addr, u32 count);
-extern void __ide_mm_insl(unsigned long port, void *addr, u32 count);
-extern void __ide_mm_outsl(unsigned long port, void *addr, u32 count);
+extern void __ide_mm_insw(void __iomem *port, void *addr, u32 count);
+extern void __ide_mm_outsw(void __iomem *port, void *addr, u32 count);
+extern void __ide_mm_insl(void __iomem *port, void *addr, u32 count);
+extern void __ide_mm_outsl(void __iomem *port, void *addr, u32 count);
 
 struct ide_machdep_calls {
         int         (*default_irq)(unsigned long base);

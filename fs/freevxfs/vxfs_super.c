@@ -60,7 +60,7 @@ static int		vxfs_remount(struct super_block *, int *, char *);
 
 static struct super_operations vxfs_super_ops = {
 	.read_inode =		vxfs_read_inode,
-	.put_inode =		vxfs_put_inode,
+	.clear_inode =		vxfs_clear_inode,
 	.put_super =		vxfs_put_super,
 	.statfs =		vxfs_statfs,
 	.remount_fs =		vxfs_remount,

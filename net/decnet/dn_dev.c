@@ -41,6 +41,7 @@
 #include <linux/sysctl.h>
 #include <linux/notifier.h>
 #include <asm/uaccess.h>
+#include <asm/system.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
 #include <net/flow.h>
@@ -1108,6 +1109,7 @@ struct dn_dev *dn_dev_create(struct net_device *dev, int *err)
 
 	memset(dn_db, 0, sizeof(struct dn_dev));
 	memcpy(&dn_db->parms, p, sizeof(struct dn_dev_parms));
+	smp_wmb();
 	dev->dn_ptr = dn_db;
 	dn_db->dev = dev;
 	init_timer(&dn_db->timer);
@@ -1215,6 +1217,7 @@ static void dn_dev_delete(struct net_device *dev)
 	dev->dn_ptr = NULL;
 
 	neigh_parms_release(&dn_neigh_table, dn_db->neigh_parms);
+	neigh_ifdown(&dn_neigh_table, dev);
 
 	if (dn_db->router)
 		neigh_release(dn_db->router);

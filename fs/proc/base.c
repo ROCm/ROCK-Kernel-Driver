@@ -61,6 +61,9 @@ enum pid_directory_inos {
 	PROC_TGID_MOUNTS,
 	PROC_TGID_WCHAN,
 	PROC_TGID_MAPBASE,
+#ifdef CONFIG_SCHEDSTATS
+	PROC_TGID_SCHEDSTAT,
+#endif
 #ifdef CONFIG_SECURITY
 	PROC_TGID_ATTR,
 	PROC_TGID_ATTR_CURRENT,
@@ -84,6 +87,9 @@ enum pid_directory_inos {
 	PROC_TID_MAPS,
 	PROC_TID_MOUNTS,
 	PROC_TID_WCHAN,
+#ifdef CONFIG_SCHEDSTATS
+	PROC_TID_SCHEDSTAT,
+#endif
 #ifdef CONFIG_SECURITY
 	PROC_TID_ATTR,
 	PROC_TID_ATTR_CURRENT,
@@ -127,6 +133,9 @@ static struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TGID_WCHAN,     "wchan",   S_IFREG|S_IRUGO),
 #endif
+#ifdef CONFIG_SCHEDSTATS
+	E(PROC_TGID_SCHEDSTAT, "schedstat", S_IFREG|S_IRUGO),
+#endif
 	{0,0,NULL,0}
 };
 static struct pid_entry tid_base_stuff[] = {
@@ -148,6 +157,9 @@ static struct pid_entry tid_base_stuff[] = {
 #endif
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TID_WCHAN,      "wchan",   S_IFREG|S_IRUGO),
+#endif
+#ifdef CONFIG_SCHEDSTATS
+	E(PROC_TID_SCHEDSTAT, "schedstat",S_IFREG|S_IRUGO),
 #endif
 	{0,0,NULL,0}
 };
@@ -279,7 +291,8 @@ static int proc_root_link(struct inode *inode, struct dentry **dentry, struct vf
 #define MAY_PTRACE(task) \
 	(task == current || \
 	(task->parent == current && \
-	(task->ptrace & PT_PTRACED) &&  task->state == TASK_STOPPED && \
+	(task->ptrace & PT_PTRACED) && \
+	 (task->state == TASK_STOPPED || task->state == TASK_TRACED) && \
 	 security_ptrace(current,task) == 0))
 
 static int may_ptrace_attach(struct task_struct *task)
@@ -402,6 +415,19 @@ static int proc_pid_wchan(struct task_struct *task, char *buffer)
 }
 #endif /* CONFIG_KALLSYMS */
 
+#ifdef CONFIG_SCHEDSTATS
+/*
+ * Provides /proc/PID/schedstat
+ */
+static int proc_pid_schedstat(struct task_struct *task, char *buffer)
+{
+	return sprintf(buffer, "%lu %lu %lu\n",
+			task->sched_info.cpu_time,
+			task->sched_info.run_delay,
+			task->sched_info.pcnt);
+}
+#endif
+
 /************************************************************************/
 /*                       Here the fs part begins                        */
 /************************************************************************/
@@ -522,7 +548,6 @@ static ssize_t proc_info_read(struct file * file, char __user * buf,
 	struct inode * inode = file->f_dentry->d_inode;
 	unsigned long page;
 	ssize_t length;
-	ssize_t end;
 	struct task_struct *task = proc_task(inode);
 
 	if (count > PROC_BLOCK_SIZE)
@@ -532,24 +557,10 @@ static ssize_t proc_info_read(struct file * file, char __user * buf,
 
 	length = PROC_I(inode)->op.proc_read(task, (char*)page);
 
-	if (length < 0) {
-		free_page(page);
-		return length;
-	}
-	/* Static 4kB (or whatever) block capacity */
-	if (*ppos >= length) {
-		free_page(page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count))
-		count = -EFAULT;
-	else
-		*ppos = end;
+	if (length >= 0)
+		length = simple_read_from_buffer(buf, count, ppos, (char *)page, length);
 	free_page(page);
-	return count;
+	return length;
 }
 
 static struct file_operations proc_info_file_operations = {
@@ -821,10 +832,9 @@ static struct inode_operations proc_pid_link_inode_operations = {
 	.follow_link	= proc_pid_follow_link
 };
 
-static int pid_alive(struct task_struct *p)
+static inline int pid_alive(struct task_struct *p)
 {
-	BUG_ON(p->pids[PIDTYPE_PID].pidptr != &p->pids[PIDTYPE_PID].pid);
-	return atomic_read(&p->pids[PIDTYPE_PID].pid.count);
+	return p->pids[PIDTYPE_PID].nr != 0;
 }
 
 #define NUMBUF 10
@@ -1222,7 +1232,6 @@ static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 	struct inode * inode = file->f_dentry->d_inode;
 	unsigned long page;
 	ssize_t length;
-	ssize_t end;
 	struct task_struct *task = proc_task(inode);
 
 	if (count > PAGE_SIZE)
@@ -1233,24 +1242,10 @@ static ssize_t proc_pid_attr_read(struct file * file, char __user * buf,
 	length = security_getprocattr(task, 
 				      (char*)file->f_dentry->d_name.name, 
 				      (void*)page, count);
-	if (length < 0) {
-		free_page(page);
-		return length;
-	}
-	/* Static 4kB (or whatever) block capacity */
-	if (*ppos >= length) {
-		free_page(page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count))
-		count = -EFAULT;
-	else
-		*ppos = end;
+	if (length >= 0)
+		length = simple_read_from_buffer(buf, count, ppos, (char *)page, length);
 	free_page(page);
-	return count;
+	return length;
 }
 
 static ssize_t proc_pid_attr_write(struct file * file, const char __user * buf,
@@ -1434,6 +1429,13 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			ei->op.proc_read = proc_pid_wchan;
 			break;
 #endif
+#ifdef CONFIG_SCHEDSTATS
+		case PROC_TID_SCHEDSTAT:
+		case PROC_TGID_SCHEDSTAT:
+			inode->i_fop = &proc_info_file_operations;
+			ei->op.proc_read = proc_pid_schedstat;
+			break;
+#endif
 		default:
 			printk("procfs: impossible type (%d)",p->type);
 			iput(inode);
@@ -1585,6 +1587,7 @@ struct dentry *proc_pid_unhash(struct task_struct *p)
 	
 void proc_pid_flush(struct dentry *proc_dentry)
 {
+	might_sleep();
 	if(proc_dentry != NULL) {
 		shrink_dcache_parent(proc_dentry);
 		dput(proc_dentry);
@@ -1725,7 +1728,7 @@ static int get_tgid_list(int index, unsigned long version, unsigned int *tgids)
 	p = NULL;
 	if (version) {
 		p = find_task_by_pid(version);
-		if (!thread_group_leader(p))
+		if (p && !thread_group_leader(p))
 			p = NULL;
 	}
 
@@ -1788,6 +1791,7 @@ int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	char buf[PROC_NUMBUF];
 	unsigned int nr = filp->f_pos - FIRST_PROCESS_ENTRY;
 	unsigned int nr_tgids, i;
+	int next_tgid;
 
 	if (!nr) {
 		ino_t ino = fake_ino(0,PROC_TGID_INO);
@@ -1797,26 +1801,45 @@ int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir)
 		nr++;
 	}
 
-	/*
-	 * f_version caches the last tgid which was returned from readdir
+	/* f_version caches the tgid value that the last readdir call couldn't
+	 * return. lseek aka telldir automagically resets f_version to 0.
 	 */
-	nr_tgids = get_tgid_list(nr, filp->f_version, tgid_array);
-
-	for (i = 0; i < nr_tgids; i++) {
-		int tgid = tgid_array[i];
-		ino_t ino = fake_ino(tgid,PROC_TGID_INO);
-		unsigned long j = PROC_NUMBUF;
-
-		do
-			buf[--j] = '0' + (tgid % 10);
-		while ((tgid /= 10) != 0);
-
-		if (filldir(dirent, buf+j, PROC_NUMBUF-j, filp->f_pos, ino, DT_DIR) < 0) {
-			filp->f_version = tgid;
+	next_tgid = filp->f_version;
+	filp->f_version = 0;
+	for (;;) {
+		nr_tgids = get_tgid_list(nr, next_tgid, tgid_array);
+		if (!nr_tgids) {
+			/* no more entries ! */
 			break;
 		}
-		filp->f_pos++;
+		next_tgid = 0;
+
+		/* do not use the last found pid, reserve it for next_tgid */
+		if (nr_tgids == PROC_MAXPIDS) {
+			nr_tgids--;
+			next_tgid = tgid_array[nr_tgids];
+		}
+
+		for (i=0;i<nr_tgids;i++) {
+			int tgid = tgid_array[i];
+			ino_t ino = fake_ino(tgid,PROC_TGID_INO);
+			unsigned long j = PROC_NUMBUF;
+
+			do
+				buf[--j] = '0' + (tgid % 10);
+			while ((tgid /= 10) != 0);
+
+			if (filldir(dirent, buf+j, PROC_NUMBUF-j, filp->f_pos, ino, DT_DIR) < 0) {
+				/* returning this tgid failed, save it as the first
+				 * pid for the next readir call */
+				filp->f_version = tgid_array[i];
+				goto out;
+			}
+			filp->f_pos++;
+			nr++;
+		}
 	}
+out:
 	return 0;
 }
 

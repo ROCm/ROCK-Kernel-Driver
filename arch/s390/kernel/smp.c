@@ -562,21 +562,15 @@ int __devinit start_secondary(void *cpuvoid)
 
 static void __init smp_create_idle(unsigned int cpu)
 {
-	struct pt_regs regs;
 	struct task_struct *p;
 
 	/*
 	 *  don't care about the psw and regs settings since we'll never
 	 *  reschedule the forked task.
 	 */
-	memset(&regs, 0, sizeof(struct pt_regs));
-	p = copy_process(CLONE_VM | CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	p = fork_idle(cpu);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
-
-	wake_up_forked_process(p);
-	init_idle(p, cpu);
-	unhash_process(p);
 	current_set[cpu] = p;
 }
 
@@ -643,6 +637,7 @@ __cpu_up(unsigned int cpu)
 {
 	struct task_struct *idle;
         struct _lowcore    *cpu_lowcore;
+	struct stack_frame *sf;
         sigp_ccode          ccode;
 	int                 curr_cpu;
 
@@ -666,9 +661,14 @@ __cpu_up(unsigned int cpu)
 
 	idle = current_set[cpu];
         cpu_lowcore = lowcore_ptr[cpu];
-	cpu_lowcore->save_area[15] = idle->thread.ksp;
 	cpu_lowcore->kernel_stack = (unsigned long)
 		idle->thread_info + (THREAD_SIZE);
+	sf = (struct stack_frame *) (cpu_lowcore->kernel_stack
+				     - sizeof(struct pt_regs)
+				     - sizeof(struct stack_frame));
+	memset(sf, 0, sizeof(struct stack_frame));
+	sf->gprs[9] = (unsigned long) sf;
+	cpu_lowcore->save_area[15] = (unsigned long) sf;
 	__ctl_store(cpu_lowcore->cregs_save_area[0], 0, 15);
 	__asm__ __volatile__("stam  0,15,0(%0)"
 			     : : "a" (&cpu_lowcore->access_regs_save_area)
@@ -747,7 +747,7 @@ cpu_die(void)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	unsigned long async_stack;
+	unsigned long stack;
 	unsigned int cpu;
         int i;
 
@@ -767,12 +767,18 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		lowcore_ptr[i] = (struct _lowcore *)
 			__get_free_pages(GFP_KERNEL|GFP_DMA, 
 					sizeof(void*) == 8 ? 1 : 0);
-		async_stack = __get_free_pages(GFP_KERNEL,ASYNC_ORDER);
-		if (lowcore_ptr[i] == NULL || async_stack == 0ULL)
+		stack = __get_free_pages(GFP_KERNEL,ASYNC_ORDER);
+		if (lowcore_ptr[i] == NULL || stack == 0ULL)
 			panic("smp_boot_cpus failed to allocate memory\n");
 
 		*(lowcore_ptr[i]) = S390_lowcore;
-		lowcore_ptr[i]->async_stack = async_stack + (ASYNC_SIZE);
+		lowcore_ptr[i]->async_stack = stack + (ASYNC_SIZE);
+#ifdef CONFIG_CHECK_STACK
+		stack = __get_free_pages(GFP_KERNEL,0);
+		if (stack == 0ULL)
+			panic("smp_boot_cpus failed to allocate memory\n");
+		lowcore_ptr[i]->panic_stack = stack + (PAGE_SIZE);
+#endif
 	}
 	set_prefix((u32)(unsigned long) lowcore_ptr[smp_processor_id()]);
 

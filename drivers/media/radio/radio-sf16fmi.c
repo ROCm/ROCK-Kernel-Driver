@@ -89,8 +89,7 @@ static inline int fmi_setfreq(struct fmi_device *dev)
 
 	outbits(16, RSF16_ENCODE(freq), myport);
 	outbits(8, 0xC0, myport);
-	current->state = TASK_UNINTERRUPTIBLE;
-	schedule_timeout(HZ/7);
+	msleep(143);		/* was schedule_timeout(HZ/7) */
 	up(&lock);
 	if (dev->curvol) fmi_unmute(myport);
 	return 0;
@@ -107,8 +106,7 @@ static inline int fmi_getsigstr(struct fmi_device *dev)
 	val = dev->curvol ? 0x08 : 0x00;	/* unmute/mute */
 	outb(val, myport);
 	outb(val | 0x10, myport);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/7);
+	msleep(143); 		/* was schedule_timeout(HZ/7) */
 	res = (int)inb(myport+1);
 	outb(val, myport);
 	

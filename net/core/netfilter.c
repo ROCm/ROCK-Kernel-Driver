@@ -887,9 +887,6 @@ EXPORT_SYMBOL(nf_log_packet);
    and hence manufactured ICMP or RST packets will not be associated
    with it. */
 void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-void (*ip6_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-#endif
 
 void __init netfilter_init(void)
 {
@@ -902,9 +899,6 @@ void __init netfilter_init(void)
 }
 
 EXPORT_SYMBOL(ip_ct_attach);
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-EXPORT_SYMBOL(ip6_ct_attach);
-#endif
 EXPORT_SYMBOL(ip_route_me_harder);
 EXPORT_SYMBOL(nf_getsockopt);
 EXPORT_SYMBOL(nf_hook_slow);

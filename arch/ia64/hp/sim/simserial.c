@@ -50,10 +50,6 @@
 #define _INLINE_ inline
 #endif
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 #define IRQ_T(info) ((info->flags & ASYNC_SHARE_IRQ) ? SA_SHIRQ : SA_INTERRUPT)
 
 #define SSC_GETCHAR	21
@@ -275,7 +271,7 @@ static _INLINE_ void transmit_chars(struct async_struct *info, int *intr_done)
 	 * Then from the beginning of the buffer until necessary
 	 */
 
-	count = MIN(CIRC_CNT(info->xmit.head, info->xmit.tail, SERIAL_XMIT_SIZE),
+	count = min(CIRC_CNT(info->xmit.head, info->xmit.tail, SERIAL_XMIT_SIZE),
 		    SERIAL_XMIT_SIZE - info->xmit.tail);
 	console->write(console, info->xmit.buf+info->xmit.tail, count);
 
@@ -1055,7 +1051,7 @@ simrs_init (void)
 			ia64_ssc_connect_irq(KEYBOARD_INTR, state->irq);
 		}
 
-		printk(KERN_INFO "ttyS%02d at 0x%04lx (irq = %d) is a %s\n",
+		printk(KERN_INFO "ttyS%d at 0x%04lx (irq = %d) is a %s\n",
 		       state->line,
 		       state->port, state->irq,
 		       uart_config[state->type].name);

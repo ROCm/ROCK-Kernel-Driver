@@ -34,15 +34,15 @@ static int generic_invert_tuple(struct ip_conntrack_tuple *tuple,
 }
 
 /* Print out the per-protocol part of the tuple. */
-static unsigned int generic_print_tuple(char *buffer,
-					const struct ip_conntrack_tuple *tuple)
+static int generic_print_tuple(struct seq_file *s,
+			       const struct ip_conntrack_tuple *tuple)
 {
 	return 0;
 }
 
 /* Print out the private part of the conntrack. */
-static unsigned int generic_print_conntrack(char *buffer,
-					    const struct ip_conntrack *state)
+static int generic_print_conntrack(struct seq_file *s,
+				   const struct ip_conntrack *state)
 {
 	return 0;
 }

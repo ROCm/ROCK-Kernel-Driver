@@ -428,6 +428,7 @@ int __init vesafb_init(void)
 {
 	int ret;
 
+	vesafb_setup(fb_get_options("vesafb"));
 	ret = driver_register(&vesafb_driver);
 
 	if (!ret) {
@@ -437,6 +438,7 @@ int __init vesafb_init(void)
 	}
 	return ret;
 }
+module_init(vesafb_init);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -40,7 +40,6 @@
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
-#include <scsi/scsi.h>
 
 #include "aacraid.h"
 
@@ -53,19 +52,14 @@
  *	program.
  */
  
-static int ioctl_send_fib(struct aac_dev * dev, void *arg)
+static int ioctl_send_fib(struct aac_dev * dev, void __user *arg)
 {
 	struct hw_fib * kfib;
 	struct fib *fibptr;
-	struct hw_fib * hw_fib = (struct hw_fib *)0;
-	dma_addr_t hw_fib_pa = (dma_addr_t)0LL;
-	unsigned size;
-	int retval;
 
 	fibptr = fib_alloc(dev);
-	if(fibptr == NULL) {
+	if(fibptr == NULL)
 		return -ENOMEM;
-	}
 		
 	kfib = fibptr->hw_fib;
 	/*
@@ -80,19 +74,14 @@ static int ioctl_send_fib(struct aac_dev * dev, void *arg)
 	 *	will not overrun the buffer when we copy the memory. Return
 	 *	an error if we would.
 	 */
-	size = le32_to_cpu(kfib->header.Size) + sizeof(struct aac_fibhdr);
-	if (size > dev->max_fib_size) {
-		/* Highjack the hw_fib */
-		hw_fib = fibptr->hw_fib;
-		hw_fib_pa = fibptr->hw_fib_pa;
-		fibptr->hw_fib = kfib = pci_alloc_consistent(dev->pdev, size, &fibptr->hw_fib_pa);
-		memset(((char *)kfib) + dev->max_fib_size, 0, size - dev->max_fib_size);
-		memcpy(kfib, hw_fib, dev->max_fib_size);
+	if(le32_to_cpu(kfib->header.Size) > sizeof(struct hw_fib) - sizeof(struct aac_fibhdr)) {
+		fib_free(fibptr);
+		return -EINVAL;
 	}
 
-	if (copy_from_user((void *) kfib, arg, size)) {
-		retval = -EFAULT;
-		goto cleanup;
+	if (copy_from_user((void *) kfib, arg, le32_to_cpu(kfib->header.Size) + sizeof(struct aac_fibhdr))) {
+		fib_free(fibptr);
+		return -EFAULT;
 	}
 
 	if (kfib->header.Command == cpu_to_le32(TakeABreakPt)) {
@@ -103,14 +92,16 @@ static int ioctl_send_fib(struct aac_dev * dev, void *arg)
 		 */
 		kfib->header.XferState = 0;
 	} else {
-		retval = fib_send(kfib->header.Command, fibptr,
+		int retval = fib_send(kfib->header.Command, fibptr,
 				le32_to_cpu(kfib->header.Size) , FsaNormal,
 				1, 1, NULL, NULL);
-		if (retval != 0)
-			goto cleanup;
+		if (retval) {
+			fib_free(fibptr);
+			return retval;
+		}
 		if (fib_complete(fibptr) != 0) {
-			retval = -EINVAL;
-			goto cleanup;
+			fib_free(fibptr);
+			return -EINVAL;
 		}
 	}
 	/*
@@ -121,14 +112,9 @@ static int ioctl_send_fib(struct aac_dev * dev, void *arg)
 	 *	was already included by the adapter.)
 	 */
 
-	retval = 0;
-	if (copy_to_user(arg, (void *)kfib, kfib->header.Size))
-		retval = -EFAULT;
-cleanup:
-	if (hw_fib) {
-		pci_free_consistent(dev->pdev, size, kfib, fibptr->hw_fib_pa);
-		fibptr->hw_fib_pa = hw_fib_pa;
-		fibptr->hw_fib = hw_fib;
+	if (copy_to_user(arg, (void *)kfib, kfib->header.Size)) {
+		fib_free(fibptr);
+		return -EFAULT;
 	}
 	fib_free(fibptr);
 	return 0;
@@ -141,7 +127,7 @@ cleanup:
  *	passed in from the user.
  */
 
-static int open_getadapter_fib(struct aac_dev * dev, void *arg)
+static int open_getadapter_fib(struct aac_dev * dev, void __user *arg)
 {
 	struct aac_fib_context * fibctx;
 	int status;
@@ -156,7 +142,7 @@ static int open_getadapter_fib(struct aac_dev * dev, void *arg)
 
 		fibctx->type = FSAFS_NTC_GET_ADAPTER_FIB_CONTEXT;
 		fibctx->size = sizeof(struct aac_fib_context);
-		/*
+ 		/*
 		 *	Yes yes, I know this could be an index, but we have a
 		 * better guarantee of uniqueness for the locked loop below.
 		 * Without the aid of a persistent history, this also helps
@@ -182,7 +168,7 @@ static int open_getadapter_fib(struct aac_dev * dev, void *arg)
 		spin_lock_irqsave(&dev->fib_lock, flags);
 		/* Ensure that we have a unique identifier */
 		entry = dev->fib_list.next;
-		while(entry != &dev->fib_list) {
+		while (entry != &dev->fib_list) {
 			context = list_entry(entry, struct aac_fib_context, next);
 			if (context->unique == fibctx->unique) {
 				/* Not unique (32 bits) */
@@ -194,8 +180,8 @@ static int open_getadapter_fib(struct aac_dev * dev, void *arg)
 		}
 		list_add_tail(&fibctx->next, &dev->fib_list);
 		spin_unlock_irqrestore(&dev->fib_lock, flags);
-		if (copy_to_user(arg,  &fibctx->unique,
-					sizeof(fibctx->unique))) {
+		if (copy_to_user(arg,  &fibctx->unique, 
+						sizeof(fibctx->unique))) {
 			status = -EFAULT;
 		} else {
 			status = 0;
@@ -213,18 +199,17 @@ static int open_getadapter_fib(struct aac_dev * dev, void *arg)
  *	passed in from the user.
  */
 
-static int next_getadapter_fib(struct aac_dev * dev, void *arg)
+static int next_getadapter_fib(struct aac_dev * dev, void __user *arg)
 {
 	struct fib_ioctl f;
+	struct fib *fib;
 	struct aac_fib_context *fibctx;
-	struct fib * fib;
 	int status;
 	struct list_head * entry;
 	unsigned long flags;
 	
 	if(copy_from_user((void *)&f, arg, sizeof(struct fib_ioctl)))
 		return -EFAULT;
-
 	/*
 	 *	Verify that the HANDLE passed in was a valid AdapterFibContext
 	 *
@@ -234,12 +219,12 @@ static int next_getadapter_fib(struct aac_dev * dev, void *arg)
 	entry = dev->fib_list.next;
 	fibctx = NULL;
 
-	while(entry != &dev->fib_list) {
+	while (entry != &dev->fib_list) {
 		fibctx = list_entry(entry, struct aac_fib_context, next);
 		/*
 		 *	Extract the AdapterFibContext from the Input parameters.
 		 */
-		if(fibctx->unique == f.fibctx) {   /* We found a winner */
+		if (fibctx->unique == f.fibctx) {   /* We found a winner */
 			break;
 		}
 		entry = entry->next;
@@ -284,6 +269,7 @@ return_fib:
 		kfree(fib->hw_fib);
 		kfree(fib);
 		status = 0;
+		fibctx->jiffies = jiffies/HZ;
 	} else {
 		spin_unlock_irqrestore(&dev->fib_lock, flags);
 		if (f.wait) {
@@ -298,7 +284,6 @@ return_fib:
 			status = -EAGAIN;
 		}	
 	}
-	fibctx->jiffies = jiffies/HZ;
 	return status;
 }
 
@@ -347,7 +332,7 @@ int aac_close_fib_context(struct aac_dev * dev, struct aac_fib_context * fibctx)
  *	This routine will close down the fibctx passed in from the user.
  */
  
-static int close_getadapter_fib(struct aac_dev * dev, void *arg)
+static int close_getadapter_fib(struct aac_dev * dev, void __user *arg)
 {
 	struct aac_fib_context *fibctx;
 	int status;
@@ -369,14 +354,15 @@ static int close_getadapter_fib(struct aac_dev * dev, void *arg)
 		/*
 		 *	Extract the fibctx from the input parameters
 		 */
-		if(fibctx->unique == (u32)(unsigned long)arg) {   /* We found a winner */
+		if (fibctx->unique == (u32)(unsigned long)arg) {   
+			/* We found a winner */
 			break;
 		}
 		entry = entry->next;
 		fibctx = NULL;
 	}
 
-	if(!fibctx)
+	if (!fibctx)
 		return 0; /* Already gone */
 
 	if((fibctx->type != FSAFS_NTC_GET_ADAPTER_FIB_CONTEXT) ||
@@ -394,22 +380,17 @@ static int close_getadapter_fib(struct aac_dev * dev, void *arg)
  *	@arg: ioctl arguments
  *
  *	This routine returns the driver version.
- *      Under Linux, there have been no version incompatibilities, so
- *	this is simple!
+ *      Under Linux, there have been no version incompatibilities, so this is 
+ *      simple!
  */
 
-static int check_revision(struct aac_dev *dev, void *arg)
+static int check_revision(struct aac_dev *dev, void __user *arg)
 {
 	struct revision response;
-	extern unsigned long aac_driver_version;
 
 	response.compat = 1;
-	response.version = aac_driver_version;
-#	if (defined(AAC_DRIVER_BUILD))
-		response.build = AAC_DRIVER_BUILD;
-#	else
-		response.build = 9999;
-#	endif
+	response.version = dev->adapter_info.kernelrev;
+	response.build = dev->adapter_info.kernelbuild;
 
 	if (copy_to_user(arg, &response, sizeof(response)))
 		return -EFAULT;
@@ -422,20 +403,20 @@ static int check_revision(struct aac_dev *dev, void *arg)
  *
  */
 
-int aac_send_raw_srb(struct aac_dev* dev, void* arg)
+int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 {
 	struct fib* srbfib;
 	int status;
 	struct aac_srb *srbcmd;
-	struct aac_srb *user_srb = arg;
-	struct aac_srb_reply* user_reply;
+	struct aac_srb __user *user_srb = arg;
+	struct aac_srb_reply __user *user_reply;
 	struct aac_srb_reply* reply;
 	u32 fibsize = 0;
 	u32 flags = 0;
 	s32 rcode = 0;
 	u32 data_dir;
-	ulong sg_user[32];
-	ulong sg_list[32];
+	void __user *sg_user[32];
+	void *sg_list[32];
 	u32   sg_indx = 0;
 	u32 byte_count = 0;
 	u32 actual_fibsize = 0;
@@ -443,7 +424,7 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 
 
 	if (!capable(CAP_SYS_ADMIN)){
-		dprintk((KERN_DEBUG"aacraid: No permission to send raw srb\n")); 
+		printk(KERN_DEBUG"aacraid: No permission to send raw srb\n"); 
 		return -EPERM;
 	}
 	/*
@@ -456,19 +437,19 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 
 	srbcmd = (struct aac_srb*) fib_data(srbfib);
 
-	if(copy_from_user((void*)&fibsize, (void*)&user_srb->count,sizeof(u32))){
-		dprintk((KERN_DEBUG"aacraid: Could not copy data size from user\n")); 
+	if(copy_from_user(&fibsize, &user_srb->count,sizeof(u32))){
+		printk(KERN_DEBUG"aacraid: Could not copy data size from user\n"); 
 		rcode = -EFAULT;
 		goto cleanup;
 	}
 
-	if (fibsize > (dev->max_fib_size - sizeof(struct aac_fibhdr))) {
+	if (fibsize > FIB_DATA_SIZE_IN_BYTES) {
 		rcode = -EINVAL;
 		goto cleanup;
 	}
 
 	if(copy_from_user(srbcmd, user_srb,fibsize)){
-		dprintk((KERN_DEBUG"aacraid: Could not copy srb from user\n")); 
+		printk(KERN_DEBUG"aacraid: Could not copy srb from user\n"); 
 		rcode = -EFAULT;
 		goto cleanup;
 	}
@@ -479,14 +460,14 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 	// Fix up srb for endian and force some values
 	srbcmd->function = cpu_to_le32(SRBF_ExecuteScsi);	// Force this
 	srbcmd->channel  = cpu_to_le32(srbcmd->channel);
-	srbcmd->id       = cpu_to_le32(srbcmd->id);
+	srbcmd->id	 = cpu_to_le32(srbcmd->id);
 	srbcmd->lun      = cpu_to_le32(srbcmd->lun);
 	srbcmd->flags    = cpu_to_le32(srbcmd->flags);
 	srbcmd->timeout  = cpu_to_le32(srbcmd->timeout);
 	srbcmd->retry_limit =cpu_to_le32(0); // Obsolete parameter
 	srbcmd->cdb_size = cpu_to_le32(srbcmd->cdb_size);
 	
-	switch(srbcmd->flags & (SRB_DataIn | SRB_DataOut)){
+	switch (srbcmd->flags & (SRB_DataIn | SRB_DataOut)) {
 	case SRB_DataOut:
 		data_dir = DMA_TO_DEVICE;
 		break;
@@ -503,17 +484,19 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 		struct sgmap64* psg = (struct sgmap64*)&srbcmd->sg;
 		byte_count = 0;
 
-		// This should also catch if user used the 32 bit sgmap
-		actual_fibsize = sizeof (struct aac_srb) -
-			sizeof(struct sgentry) + ((srbcmd->sg.count & 0xff) *
-				sizeof (struct sgentry64));
+		/*
+		 * This should also catch if user used the 32 bit sgmap
+		 */
+		actual_fibsize = sizeof(struct aac_srb) - 
+			sizeof(struct sgentry) + ((srbcmd->sg.count & 0xff) * 
+			 	sizeof(struct sgentry64));
 		if(actual_fibsize != fibsize){ // User made a mistake - should not continue
-			dprintk((KERN_DEBUG"aacraid: Bad Size specified in Raw SRB command\n"));
+			printk(KERN_DEBUG"aacraid: Bad Size specified in Raw SRB command\n");
 			rcode = -EINVAL;
 			goto cleanup;
 		}
-		if ((data_dir == DMA_NONE) && psg->count) { // Dogs and cats sleeping with eachother - should not continue
-			dprintk((KERN_DEBUG"aacraid: SG with no direction specified in Raw SRB command\n"));
+		if ((data_dir == DMA_NONE) && psg->count) { 
+			printk(KERN_DEBUG"aacraid: SG with no direction specified in Raw SRB command\n");
 			rcode = -EINVAL;
 			goto cleanup;
 		}
@@ -524,18 +507,18 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 			void* p;
 			p = kmalloc(psg->sg[i].count,GFP_KERNEL|__GFP_DMA);
 			if(p == 0) {
-				dprintk((KERN_DEBUG"aacraid: Could not allocate SG buffer - size = %d buffer number %d of %d\n",
-				  psg->sg[i].count,i,psg->count));
+				printk(KERN_DEBUG"aacraid: Could not allocate SG buffer - size = %d buffer number %d of %d\n",
+				psg->sg[i].count,i,psg->count);
 				rcode = -ENOMEM;
 				goto cleanup;
 			}
-			sg_user[i] = (ulong)psg->sg[i].addr;
-			sg_list[i] = (ulong)p; // save so we can clean up later
-			sg_indx = i + 1;
+			sg_user[i] = (void __user *)psg->sg[i].addr;
+			sg_list[i] = p; // save so we can clean up later
+			sg_indx = i;
 
 			if( flags & SRB_DataOut ){
-				if(copy_from_user(p,psg->sg[i].addr,psg->sg[i].count)){
-					dprintk((KERN_DEBUG"aacraid: Could not copy sg data from user\n")); 
+				if(copy_from_user(p,sg_user[i],psg->sg[i].count)){
+					printk(KERN_DEBUG"aacraid: Could not copy sg data from user\n"); 
 					rcode = -EFAULT;
 					goto cleanup;
 				}
@@ -550,19 +533,19 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 		}
 
 		srbcmd->count = cpu_to_le32(byte_count);
-		status = fib_send(ScsiPortCommand64, srbfib, actual_fibsize, FsaNormal, 1, 1,0,0);
+		status = fib_send(ScsiPortCommand64, srbfib, actual_fibsize, FsaNormal, 1, 1,NULL,NULL);
 	} else {
 		struct sgmap* psg = &srbcmd->sg;
 		byte_count = 0;
 
 		actual_fibsize = sizeof (struct aac_srb) + (((srbcmd->sg.count & 0xff) - 1) * sizeof (struct sgentry));
 		if(actual_fibsize != fibsize){ // User made a mistake - should not continue
-			dprintk((KERN_DEBUG"aacraid: Bad Size specified in Raw SRB command\n"));
+			printk(KERN_DEBUG"aacraid: Bad Size specified in Raw SRB command\n");
 			rcode = -EINVAL;
 			goto cleanup;
 		}
-		if ((data_dir == DMA_NONE) && psg->count) { // Dogs and cats sleeping with eachother - should not continue
-			dprintk((KERN_DEBUG"aacraid: SG with no direction specified in Raw SRB command\n"));
+		if ((data_dir == DMA_NONE) && psg->count) {
+			printk(KERN_DEBUG"aacraid: SG with no direction specified in Raw SRB command\n");
 			rcode = -EINVAL;
 			goto cleanup;
 		}
@@ -571,18 +554,18 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 			void* p;
 			p = kmalloc(psg->sg[i].count,GFP_KERNEL);
 			if(p == 0) {
-				dprintk((KERN_DEBUG"aacraid: Could not allocate SG buffer - size = %d buffer number %d of %d\n",
-				  psg->sg[i].count,i,psg->count));
+				printk(KERN_DEBUG"aacraid: Could not allocate SG buffer - size = %d buffer number %d of %d\n",
+				psg->sg[i].count,i,psg->count);
 				rcode = -ENOMEM;
 				goto cleanup;
 			}
-			sg_user[i] = (ulong)(psg->sg[i].addr);
-			sg_list[i] = (ulong)p; // save so we can clean up later
-			sg_indx = i + 1;
+			sg_user[i] = (void __user *)(psg->sg[i].addr);
+			sg_list[i] = p; // save so we can clean up later
+			sg_indx = i;
 
 			if( flags & SRB_DataOut ){
-				if(copy_from_user((void*)p,(void*)(ulong)(psg->sg[i].addr),psg->sg[i].count)){
-					dprintk((KERN_DEBUG"aacraid: Could not copy sg data from user\n")); 
+				if(copy_from_user(p,sg_user[i],psg->sg[i].count)){
+					printk(KERN_DEBUG"aacraid: Could not copy sg data from user\n"); 
 					rcode = -EFAULT;
 					goto cleanup;
 				}
@@ -594,19 +577,19 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 			byte_count += psg->sg[i].count;
 		}
 		srbcmd->count = cpu_to_le32(byte_count);
-		status = fib_send(ScsiPortCommand, srbfib, actual_fibsize, FsaNormal, 1, 1, 0, 0);
+		status = fib_send(ScsiPortCommand, srbfib, actual_fibsize, FsaNormal, 1, 1, NULL, NULL);
 	}
 
 	if (status != 0){
-		dprintk((KERN_DEBUG"aacraid: Could not send raw srb fib to hba\n")); 
+		printk(KERN_DEBUG"aacraid: Could not send raw srb fib to hba\n"); 
 		rcode = -1;
 		goto cleanup;
 	}
 
 	if( flags & SRB_DataIn ) {
-		for (i = 0 ; i < sg_indx; i++) {
-			if(copy_to_user((void*)(sg_user[i]),(void*)(sg_list[i]),le32_to_cpu(srbcmd->sg.sg[i].count))){
-				dprintk((KERN_DEBUG"aacraid: Could not copy sg data to user\n")); 
+		for(i = 0 ; i <= sg_indx; i++){
+			if(copy_to_user(sg_user[i],sg_list[i],le32_to_cpu(srbcmd->sg.sg[i].count))){
+				printk(KERN_DEBUG"aacraid: Could not copy sg data to user\n"); 
 				rcode = -EFAULT;
 				goto cleanup;
 
@@ -616,14 +599,14 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 
 	reply = (struct aac_srb_reply *) fib_data(srbfib);
 	if(copy_to_user(user_reply,reply,sizeof(struct aac_srb_reply))){
-		dprintk((KERN_DEBUG"aacraid: Could not copy reply to user\n")); 
+		printk(KERN_DEBUG"aacraid: Could not copy reply to user\n"); 
 		rcode = -EFAULT;
 		goto cleanup;
 	}
 
 cleanup:
-	for (i=0; i < sg_indx; i++) {
-		kfree((void*)sg_list[i]);
+	for(i=0; i <= sg_indx; i++){
+		kfree(sg_list[i]);
 	}
 	fib_complete(srbfib);
 	fib_free(srbfib);
@@ -638,22 +621,22 @@ struct aac_pci_info {
 };
 
 
-int aac_get_pci_info(struct aac_dev* dev, void* arg)
+int aac_get_pci_info(struct aac_dev* dev, void __user *arg)
 {
         struct aac_pci_info pci_info;
 
 	pci_info.bus = dev->pdev->bus->number;
 	pci_info.slot = PCI_SLOT(dev->pdev->devfn);
 
-       if(copy_to_user( arg, (void*)&pci_info, sizeof(struct aac_pci_info))){
-               dprintk((KERN_DEBUG "aacraid: Could not copy pci info\n"));
+       if (copy_to_user(arg, &pci_info, sizeof(struct aac_pci_info))) {
+		printk(KERN_DEBUG "aacraid: Could not copy pci info\n");
                return -EFAULT;
 	}
         return 0;
-}
+ }
  
 
-int aac_do_ioctl(struct aac_dev * dev, int cmd, void *arg)
+int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 {
 	int status;
 	
@@ -662,9 +645,8 @@ int aac_do_ioctl(struct aac_dev * dev, int cmd, void *arg)
 	 */
 	 
 	status = aac_dev_ioctl(dev, cmd, arg);
-	if (status != -ENOTTY) {
+	if(status != -ENOTTY)
 		return status;
-	}
 
 	switch (cmd) {
 	case FSACTL_MINIPORT_REV_CHECK:

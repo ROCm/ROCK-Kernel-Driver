@@ -45,7 +45,7 @@ EXPORT_SYMBOL(dma_map_sg);
  * Again, cpu read rules concerning calls here are the same as for
  * pci_unmap_single() above.
  */
-void dma_unmap_sg(struct device *dev, struct scatterlist *sg, 
+void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		  int nents, int dir)
 {
 	int i;
@@ -53,7 +53,7 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		struct scatterlist *s = &sg[i];
 		BUG_ON(s->page == NULL); 
 		BUG_ON(s->dma_address == 0); 
-		dma_unmap_single(dev, s->dma_address, s->dma_length, dir); 
+		dma_unmap_single(dev, s->dma_address, s->dma_length, dir);
 	} 
 }
 

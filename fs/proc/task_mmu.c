@@ -6,27 +6,11 @@
 
 char *task_mem(struct mm_struct *mm, char *buffer)
 {
-	unsigned long data = 0, stack = 0, exec = 0, lib = 0;
-	struct vm_area_struct *vma;
+	unsigned long data, text, lib;
 
-	down_read(&mm->mmap_sem);
-	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		unsigned long len = (vma->vm_end - vma->vm_start) >> 10;
-		if (!vma->vm_file) {
-			data += len;
-			if (vma->vm_flags & VM_GROWSDOWN)
-				stack += len;
-			continue;
-		}
-		if (vma->vm_flags & VM_WRITE)
-			continue;
-		if (vma->vm_flags & VM_EXEC) {
-			exec += len;
-			if (vma->vm_flags & VM_EXECUTABLE)
-				continue;
-			lib += len;
-		}
-	}
+	data = mm->total_vm - mm->shared_vm - mm->stack_vm;
+	text = (mm->end_code - mm->start_code) >> 10;
+	lib = (mm->exec_vm << (PAGE_SHIFT-10)) - text;
 	buffer += sprintf(buffer,
 		"VmSize:\t%8lu kB\n"
 		"VmLck:\t%8lu kB\n"
@@ -35,12 +19,11 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 		"VmStk:\t%8lu kB\n"
 		"VmExe:\t%8lu kB\n"
 		"VmLib:\t%8lu kB\n",
-		mm->total_vm << (PAGE_SHIFT-10),
+		(mm->total_vm - mm->reserved_vm) << (PAGE_SHIFT-10),
 		mm->locked_vm << (PAGE_SHIFT-10),
 		mm->rss << (PAGE_SHIFT-10),
-		data - stack, stack,
-		exec - lib, lib);
-	up_read(&mm->mmap_sem);
+		data << (PAGE_SHIFT-10),
+		mm->stack_vm << (PAGE_SHIFT-10), text, lib);
 	return buffer;
 }
 
@@ -52,28 +35,11 @@ unsigned long task_vsize(struct mm_struct *mm)
 int task_statm(struct mm_struct *mm, int *shared, int *text,
 	       int *data, int *resident)
 {
-	struct vm_area_struct *vma;
-	int size = 0;
-
+	*shared = mm->shared_vm;
+	*text = (mm->end_code - mm->start_code) >> PAGE_SHIFT;
+	*data = mm->total_vm - mm->shared_vm - *text;
 	*resident = mm->rss;
-	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		int pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-
-		size += pages;
-		if (is_vm_hugetlb_page(vma)) {
-			if (!(vma->vm_flags & VM_DONTCOPY))
-				*shared += pages;
-			continue;
-		}
-		if (vma->vm_file)
-			*shared += pages;
-		if (vma->vm_flags & VM_EXECUTABLE)
-			*text += pages;
-		else
-			*data += pages;
-	}
-
-	return size;
+	return mm->total_vm;
 }
 
 static int show_map(struct seq_file *m, void *v)

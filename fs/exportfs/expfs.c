@@ -283,13 +283,10 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 
 	/* drat - I just cannot find anything acceptable */
 	dput(result);
-
-	/* Originally, we would return ESTALE here. This is not
-	 * correct, however, as the file handle is valid; it just
-	 * failed our acceptance test.
-	 * This will lead to unexpected results in the client if
-	 * there are two processes accessing the same file; one
-	 * with proper permissions and one without.
+	/* It might be justifiable to return ESTALE here,
+	 * but the filehandle at-least looks reasonable good
+	 * and it just be a permission problem, so returning
+	 * -EACCESS is safer
 	 */
 	return ERR_PTR(-EACCES);
 

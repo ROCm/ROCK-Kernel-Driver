@@ -73,33 +73,6 @@ static int vfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 	return ret;
 }
 
-static inline unsigned char
-vfat_tolower(struct nls_table *t, unsigned char c)
-{
-	unsigned char nc = t->charset2lower[c];
-
-	return nc ? nc : c;
-}
-
-static inline unsigned char
-vfat_toupper(struct nls_table *t, unsigned char c)
-{
-	unsigned char nc = t->charset2upper[c];
-
-	return nc ? nc : c;
-}
-
-static inline int
-vfat_strnicmp(struct nls_table *t, const unsigned char *s1,
-					const unsigned char *s2, int len)
-{
-	while(len--)
-		if (vfat_tolower(t, *s1++) != vfat_tolower(t, *s2++))
-			return 1;
-
-	return 0;
-}
-
 /* returns the length of a struct qstr, ignoring trailing dots */
 static unsigned int vfat_striptail_len(struct qstr *qstr)
 {
@@ -142,7 +115,7 @@ static int vfat_hashi(struct dentry *dentry, struct qstr *qstr)
 
 	hash = init_name_hash();
 	while (len--)
-		hash = partial_name_hash(vfat_tolower(t, *name++), hash);
+		hash = partial_name_hash(nls_tolower(t, *name++), hash);
 	qstr->hash = end_name_hash(hash);
 
 	return 0;
@@ -160,7 +133,7 @@ static int vfat_cmpi(struct dentry *dentry, struct qstr *a, struct qstr *b)
 	alen = vfat_striptail_len(a);
 	blen = vfat_striptail_len(b);
 	if (alen == blen) {
-		if (vfat_strnicmp(t, a->name, b->name, alen) == 0)
+		if (nls_strnicmp(t, a->name, b->name, alen) == 0)
 			return 0;
 	}
 	return 1;
@@ -341,7 +314,7 @@ static inline int to_shortname_char(struct nls_table *nls,
 			info->upper = 0;
 		}
 
-		buf[0] = vfat_toupper(nls, buf[0]);
+		buf[0] = nls_toupper(nls, buf[0]);
 		if (isalpha(buf[0])) {
 			if (buf[0] == prev)
 				info->lower = 0;

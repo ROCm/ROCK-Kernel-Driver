@@ -54,6 +54,16 @@ endmenu
 
 menu "General setup"
 
+config LOCALVERSION
+	string "Local version - append to kernel release"
+	help
+	  Append an extra string to the end of your kernel version.
+	  This will show up when you type uname, for example.
+	  The string you set here will be appended after the contents of
+	  any files with a filename matching localversion* in your
+	  object and source tree, in that order.  Your total string can
+	  be a maximum of 64 characters.
+
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
 	depends on MMU
@@ -121,7 +131,7 @@ config BSD_PROCESS_ACCT_V3
 	  process and it's parent. Note that this file format is incompatible
 	  with previous v0/v1/v2 file formats, so you will need updated tools
 	  for processing it. A preliminary version of these tools is available
-	  at <http://http://www.de.kernel.org/pub/linux/utils/acct/>.
+	  at <http://www.physik3.uni-rostock.de/tim/kernel/utils/acct/>.
 
 config SYSCTL
 	bool "Sysctl support"
@@ -283,7 +293,21 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say N.
 
+config SHMEM
+	default y
+	bool "Use full shmem filesystem" if EMBEDDED && MMU
+	help
+	  The shmem is an internal filesystem used to manage shared memory.
+	  It is backed by swap and manages resource limits. It is also exported
+	  to userspace as tmpfs if TMPFS is enabled. Disabling this
+	  option replaces shmem and tmpfs with the much simpler ramfs code,
+	  which may be appropriate on small systems without swap.
+
 endmenu		# General setup
+
+config TINY_SHMEM
+	default !SHMEM
+	bool
 
 menu "Loadable module support"
 

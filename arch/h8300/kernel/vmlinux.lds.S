@@ -150,9 +150,6 @@ SECTIONS
 		*(.init.setup)
 	. = ALIGN(0x4) ;
 	___setup_end = .;
-	___start___param = .;
-		*(__param)
-	___stop___param = .;
 	___initcall_start = .;
 		*(.initcall1.init)
 		*(.initcall2.init)

@@ -41,6 +41,7 @@ static int max_dcc_channels = 8;
 static unsigned int dcc_timeout = 300;
 /* This is slow, but it's simple. --RR */
 static char irc_buffer[65536];
+static DECLARE_LOCK(irc_buffer_lock);
 
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
@@ -55,7 +56,6 @@ MODULE_PARM_DESC(dcc_timeout, "timeout on for unestablished DCC channels");
 static char *dccprotos[] = { "SEND ", "CHAT ", "MOVE ", "TSEND ", "SCHAT " };
 #define MINMATCHLEN	5
 
-DECLARE_LOCK(ip_irc_lock);
 struct module *ip_conntrack_irc = THIS_MODULE;
 
 #if 0
@@ -137,7 +137,7 @@ static int help(struct sk_buff *skb,
 	if (dataoff >= skb->len)
 		return NF_ACCEPT;
 
-	LOCK_BH(&ip_irc_lock);
+	LOCK_BH(&irc_buffer_lock);
 	ib_ptr = skb_header_pointer(skb, dataoff,
 				    skb->len - dataoff, irc_buffer);
 	BUG_ON(ib_ptr == NULL);
@@ -232,7 +232,7 @@ static int help(struct sk_buff *skb,
 	} /* while data < ... */
 
  out:
-	UNLOCK_BH(&ip_irc_lock);
+	UNLOCK_BH(&irc_buffer_lock);
 	return NF_ACCEPT;
 }
 
@@ -306,7 +306,6 @@ static void fini(void)
 }
 
 PROVIDES_CONNTRACK(irc);
-EXPORT_SYMBOL(ip_irc_lock);
 
 module_init(init);
 module_exit(fini);

@@ -35,7 +35,6 @@
 typedef struct drm_gamma_private {
 	drm_gamma_sarea_t *sarea_priv;
 	drm_map_t *sarea;
-	drm_map_t *buffers;
 	drm_map_t *mmio0;
 	drm_map_t *mmio1;
 	drm_map_t *mmio2;
@@ -91,6 +90,10 @@ extern int	     DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl,
 				       drm_buf_t *buf);
 extern drm_buf_t     *DRM(freelist_get)(drm_freelist_t *bl, int block);
 
+/* externs for gamma changes to the ops */
+extern struct file_operations DRM(fops);
+extern unsigned int gamma_fops_poll(struct file *filp, struct poll_table_struct *wait);
+extern ssize_t gamma_fops_read(struct file *filp, char __user *buf, size_t count, loff_t *off);
 
 
 #define GLINT_DRI_BUF_COUNT 256

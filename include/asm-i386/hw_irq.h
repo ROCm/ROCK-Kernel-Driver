@@ -68,46 +68,6 @@ extern atomic_t irq_mis_count;
 
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
 
-/*
- * The profiling function is SMP safe. (nothing can mess
- * around with "current", and the profiling counters are
- * updated with atomic operations). This is especially
- * useful with a profiling multiplier != 1
- */
-static inline void x86_do_profile(struct pt_regs * regs)
-{
-	unsigned long eip;
-	extern unsigned long prof_cpu_mask;
- 
-	profile_hook(regs);
- 
-	if (user_mode(regs))
-		return;
- 
-	if (!prof_buffer)
-		return;
-
-	eip = regs->eip;
- 
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
-		return;
-
-	eip -= (unsigned long)_stext;
-	eip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds EIP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (eip > prof_len-1)
-		eip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[eip]);
-}
- 
 #if defined(CONFIG_X86_IO_APIC)
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
 {

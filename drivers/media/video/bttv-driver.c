@@ -1861,6 +1861,8 @@ static int setup_window(struct bttv_fh *fh, struct bttv *btv,
 
 	if (NULL == fh->ovfmt)
 		return -EINVAL;
+	if (!(fh->ovfmt->flags & FORMAT_FLAGS_PACKED))
+		return -EINVAL;
 	retval = verify_window(&bttv_tvnorms[btv->tvnorm],win,fixup);
 	if (0 != retval)
 		return retval;
@@ -2052,6 +2054,7 @@ static int bttv_try_fmt(struct bttv_fh *fh, struct bttv *btv,
 			f->fmt.pix.width = maxw;
 		if (f->fmt.pix.height > maxh)
 			f->fmt.pix.height = maxh;
+		f->fmt.pix.width &= ~0x03;
 		f->fmt.pix.bytesperline =
 			(f->fmt.pix.width * fmt->depth) >> 3;
 		f->fmt.pix.sizeimage =

@@ -617,10 +617,9 @@ _GLOBAL(flush_instruction_cache)
  * flush_icache_range(unsigned long start, unsigned long stop)
  */
 _GLOBAL(flush_icache_range)
-	mfspr	r5,PVR
-	rlwinm	r5,r5,16,16,31
-	cmpi	0,r5,1
-	beqlr				/* for 601, do nothing */
+BEGIN_FTR_SECTION
+	blr				/* for 601, do nothing */
+END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
 	li	r5,L1_CACHE_LINE_SIZE-1
 	andc	r3,r3,r5
 	subf	r4,r3,r4
@@ -735,10 +734,9 @@ _GLOBAL(flush_dcache_all)
  *	void __flush_dcache_icache(void *page)
  */
 _GLOBAL(__flush_dcache_icache)
-	mfspr	r5,PVR
-	rlwinm	r5,r5,16,16,31
-	cmpi	0,r5,1
-	beqlr					/* for 601, do nothing */
+BEGIN_FTR_SECTION
+	blr					/* for 601, do nothing */
+END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
 	rlwinm	r3,r3,0,0,19			/* Get page base address */
 	li	r4,4096/L1_CACHE_LINE_SIZE	/* Number of lines in a page */
 	mtctr	r4
@@ -764,10 +762,9 @@ _GLOBAL(__flush_dcache_icache)
  *	void __flush_dcache_icache_phys(unsigned long physaddr)
  */
 _GLOBAL(__flush_dcache_icache_phys)
-	mfspr	r5,PVR
-	rlwinm	r5,r5,16,16,31
-	cmpi	0,r5,1
-	beqlr					/* for 601, do nothing */
+BEGIN_FTR_SECTION
+	blr					/* for 601, do nothing */
+END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
 	mfmsr	r10
 	rlwinm	r0,r10,0,28,26			/* clear DR */
 	mtmsr	r0

@@ -319,10 +319,6 @@ ocotea_setup_arch(void)
 		ROOT_DEV = Root_HDA1;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	ocotea_early_serial_map(&clocks);
 
 	/* Identify the system */

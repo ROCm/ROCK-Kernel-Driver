@@ -181,7 +181,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 {
 	int rc = 0;
 	unsigned int receive_len;
-	long timeout;
+	unsigned long timeout;
 	struct mid_q_entry *midQ;
 
 	if (ses == NULL) {
@@ -307,23 +307,25 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	if (signal_pending(current)) {
 		/* if signal pending do not hold up user for full smb timeout
 		but we still give response a change to complete */
-		if(midQ->midState & MID_REQUEST_SUBMITTED) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			timeout = sleep_on_timeout(&ses->server->response_q,2 * HZ);
-		}
-	} else { /* using normal timeout */
-		/* timeout = wait_event_interruptible_timeout(ses->server->response_q,
+		timeout = 2 * HZ;
+		
+	}   
+
+	/* No user interrupts in wait - wreaks havoc with performance */
+	if(timeout != MAX_SCHEDULE_TIMEOUT) {
+		timeout += jiffies;
+		wait_event(ses->server->response_q,
+			(midQ->midState & MID_RESPONSE_RECEIVED) || 
+			time_after(jiffies, timeout) || 
+			((ses->server->tcpStatus != CifsGood) &&
+			 (ses->server->tcpStatus != CifsNew)));
+	} else {
+		wait_event(ses->server->response_q,
 			(midQ->midState & MID_RESPONSE_RECEIVED) || 
 			((ses->server->tcpStatus != CifsGood) &&
-			 (ses->server->tcpStatus != CifsNew)),
-			timeout); */ 
-		/* Can not allow user interrupts- wreaks havoc with performance */
-		if(midQ->midState & MID_REQUEST_SUBMITTED) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			timeout = sleep_on_timeout(&ses->server->response_q,timeout);
-		}
+			 (ses->server->tcpStatus != CifsNew)));
 	}
-    
+
 	spin_lock(&GlobalMid_Lock);
 	if (midQ->resp_buf) {
 		spin_unlock(&GlobalMid_Lock);

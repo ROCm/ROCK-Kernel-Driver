@@ -201,6 +201,8 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 	/* if file info not passed in then get it from server */
 	if(pfindData == NULL) {
 		buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+		if(buf == NULL)
+			return -ENOMEM;
 		pfindData = (FILE_ALL_INFO *)buf;
 	/* could do find first instead but this returns more info */
 		rc = CIFSSMBQPathInfo(xid, pTcon, search_path, pfindData,
@@ -293,7 +295,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 
 		/* 512 bytes (2**9) is the fake blocksize that must be used */
 		/* for this calculation */
-			inode->i_blocks = (512 - 1 + pfindData->AllocationSize)
+			inode->i_blocks = (512 - 1 + le64_to_cpu(pfindData->AllocationSize))
 				 >> 9;
 		}
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);

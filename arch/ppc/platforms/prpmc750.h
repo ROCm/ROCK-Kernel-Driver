@@ -5,19 +5,15 @@
  *
  * Author: Matt Porter <mporter@mvista.com>
  *
- * Copyright 2001 MontaVista Software Inc.
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 #ifdef __KERNEL__
 #ifndef __ASM_PRPMC750_H__
 #define __ASM_PRPMC750_H__
-
-#include <linux/serial_reg.h>
 
 /*
  * Due to limiations imposed by legacy hardware (primaryily IDE controllers),
@@ -80,6 +76,20 @@
 
 #define PRPMC750_TBEN_REG		0xfef880c0
 #define PRPMC750_TBEN_MASK		0x01
+
+/* UART Defines. */
+#define RS_TABLE_SIZE  4
+
+/* Rate for the 1.8432 Mhz clock for the onboard serial chip */
+#define BASE_BAUD  (PRPMC750_BASE_BAUD / 16)
+
+#define STD_COM_FLAGS ASYNC_BOOT_AUTOCONF
+
+#define SERIAL_PORT_DFNS \
+        { 0, BASE_BAUD, PRPMC750_SERIAL_0, 1, STD_COM_FLAGS, \
+		iomem_base: (unsigned char *)PRPMC750_SERIAL_0, \
+		iomem_reg_shift: 4, \
+		io_type: SERIAL_IO_MEM } /* ttyS0 */
 
 #endif				/* __ASM_PRPMC750_H__ */
 #endif				/* __KERNEL__ */

@@ -8,7 +8,7 @@
 /* Simple VGA output */
 
 #ifdef __i386__
-#define VGABASE		__pa(__PAGE_OFFSET + 0xb8000UL)
+#define VGABASE		(__ISA_IO_base + 0xb8000)
 #else
 #define VGABASE		0xffffffff800b8000UL
 #endif
@@ -106,10 +106,10 @@ static __init void early_serial_init(char *s)
 	unsigned baud = DEFAULT_BAUD;
 	char *e;
 
-	if (*s == ',') 
+	if (*s == ',')
 		++s;
 
-	if (*s) { 
+	if (*s) {
 		unsigned port; 
 		if (!strncmp(s,"0x",2)) {
 			early_serial_base = simple_strtoul(s, &e, 16);
@@ -123,9 +123,9 @@ static __init void early_serial_init(char *s)
 				port = 0;
 			early_serial_base = bases[port];
 		}
-		s += strcspn(s, ","); 
+		s += strcspn(s, ",");
 		if (*s == ',')
-			s++; 
+			s++;
 	}
 
 	outb(0x3, early_serial_base + LCR);	/* 8n1 */
@@ -133,7 +133,7 @@ static __init void early_serial_init(char *s)
 	outb(0, early_serial_base + FCR);	/* no fifo */
 	outb(0x3, early_serial_base + MCR);	/* DTR + RTS */
 
-	if (*s) { 
+	if (*s) {
 		baud = simple_strtoul(s, &e, 0); 
 		if (baud == 0 || s == e) 
 			baud = DEFAULT_BAUD;

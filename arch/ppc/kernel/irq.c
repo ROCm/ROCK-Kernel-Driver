@@ -46,6 +46,7 @@
 #include <linux/random.h>
 #include <linux/seq_file.h>
 #include <linux/cpumask.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -414,13 +415,15 @@ static inline void
 handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 {
 	int status = 0;
+	int ret;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
 	do {
-		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		ret = action->handler(irq, action->dev_id, regs);
+		if (ret == IRQ_HANDLED)
+			status |= action->flags;
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
@@ -620,32 +623,6 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 	return full_count;
 }
 
-static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	int len = cpumask_scnprintf(page, count, *(cpumask_t *)data);
-	if (count - len < 2)
-		return -EINVAL;
-	len += sprintf(page + len, "\n");
-	return len;
-}
-
-static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
-					unsigned long count, void *data)
-{
-	int err;
-	int full_count = count;
-	cpumask_t *mask = (cpumask_t *)data;
-	cpumask_t new_value;
-
-	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
-
-	*mask = new_value;
-	return full_count;
-}
-
 #define MAX_NAMELEN 10
 
 static void register_irq_proc (unsigned int irq)
@@ -673,23 +650,14 @@ static void register_irq_proc (unsigned int irq)
 	smp_affinity_entry[irq] = entry;
 }
 
-unsigned long prof_cpu_mask = -1;
-
 void init_irq_proc (void)
 {
-	struct proc_dir_entry *entry;
 	int i;
 
 	/* create /proc/irq */
 	root_irq_dir = proc_mkdir("irq", NULL);
-
 	/* create /proc/irq/prof_cpu_mask */
-	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
-
-	entry->nlink = 1;
-	entry->data = (void *)&prof_cpu_mask;
-	entry->read_proc = prof_cpu_mask_read_proc;
-	entry->write_proc = prof_cpu_mask_write_proc;
+	create_prof_cpu_mask(root_irq_dir);
 
 	/*
 	 * Create entries for all existing IRQs.

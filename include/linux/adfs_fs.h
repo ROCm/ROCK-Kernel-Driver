@@ -17,20 +17,20 @@ struct adfs_discrecord {
     __u8  bootoption;
     __u8  lowsector;
     __u8  nzones;
-    __u16 zone_spare;
-    __u32 root;
-    __u32 disc_size;
-    __u16 disc_id;
+    __le16 zone_spare;
+    __le32 root;
+    __le32 disc_size;
+    __le16 disc_id;
     __u8  disc_name[10];
-    __u32 disc_type;
-    __u32 disc_size_high;
+    __le32 disc_type;
+    __le32 disc_size_high;
     __u8  log2sharesize:4;
     __u8  unused40:4;
     __u8  big_flag:1;
     __u8  unused41:1;
     __u8  nzones_high;
-    __u32 format_version;
-    __u32 root_size;
+    __le32 format_version;
+    __le32 root_size;
     __u8  unused52[60 - 52];
 };
 

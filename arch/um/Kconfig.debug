@@ -9,6 +9,10 @@ config FRAME_POINTER
 config PT_PROXY
 	bool "Enable ptrace proxy"
 	depends on XTERM_CHAN && DEBUG_INFO
+	help
+	This option enables a debugging interface which allows gdb to debug
+	the kernel without needing to actually attach to kernel threads.
+	If you want to do kernel debugging, say Y here; otherwise say N.
 
 config GPROF
 	bool "Enable gprof support"

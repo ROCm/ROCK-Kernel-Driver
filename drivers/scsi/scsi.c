@@ -897,15 +897,16 @@ void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 	 */
 	if (tags <= 0)
 		return;
-	/*
-	 * Limit max queue depth on a single lun to 256 for now.  Remember,
-	 * we allocate a struct scsi_command for each of these and keep it
-	 * around forever.  Too deep of a depth just wastes memory.
-	 */
-	if (tags > 256)
-		return;
 
 	spin_lock_irqsave(&device_request_lock, flags);
+	spin_lock(sdev->request_queue->queue_lock);
+
+	/* Check to see if the queue is managed by the block layer
+	 * if it is, and we fail to adjust the depth, exit */
+	if (blk_queue_tagged(sdev->request_queue) &&
+	    blk_queue_resize_tags(sdev->request_queue, tags) != 0)
+		goto out;
+
 	sdev->queue_depth = tags;
 	switch (tagged) {
 		case MSG_ORDERED_TAG:
@@ -926,6 +927,8 @@ void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 			sdev->queue_depth = tags;
 			break;
 	}
+ out:
+	spin_unlock(sdev->request_queue->queue_lock);
 	spin_unlock_irqrestore(&device_request_lock, flags);
 }
 

@@ -167,6 +167,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 #endif /* __ASSEMBLY__ */
 
 #define HAVE_ARCH_UNMAPPED_AREA
+#define HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
 #else
 
 #define hash_huge_page(mm,a,ea,vsid,local)	-1

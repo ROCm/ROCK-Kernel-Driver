@@ -84,7 +84,7 @@ uint32_t udf_get_pblock_virt15(struct super_block *sb, uint32_t block, uint16_t 
 		return 0xFFFFFFFF;
 	}
 
-	loc = le32_to_cpu(((uint32_t *)bh->b_data)[index]);
+	loc = le32_to_cpu(((__le32 *)bh->b_data)[index]);
 
 	udf_release_data(bh);
 
@@ -119,7 +119,7 @@ uint32_t udf_get_pblock_spar15(struct super_block *sb, uint32_t block, uint16_t 
 
 	if (st)
 	{
-		for (i=0; i<st->reallocationTableLen; i++)
+		for (i=0; i<le16_to_cpu(st->reallocationTableLen); i++)
 		{
 			if (le32_to_cpu(st->mapEntry[i].origLocation) >= 0xFFFFFFF0)
 				break;
@@ -163,7 +163,7 @@ int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
 			if (!st)
 				return 1;
 
-			for (k=0; k<st->reallocationTableLen; k++)
+			for (k=0; k<le16_to_cpu(st->reallocationTableLen); k++)
 			{
 				if (le32_to_cpu(st->mapEntry[k].origLocation) == 0xFFFFFFFF)
 				{
@@ -173,7 +173,7 @@ int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
 						{
 							st = (struct sparingTable *)sdata->s_spar_map[j]->b_data;
 							st->mapEntry[k].origLocation = cpu_to_le32(packet);
-							udf_update_tag((char *)st, sizeof(struct sparingTable) + st->reallocationTableLen * sizeof(struct sparingEntry));
+							udf_update_tag((char *)st, sizeof(struct sparingTable) + le16_to_cpu(st->reallocationTableLen) * sizeof(struct sparingEntry));
 							mark_buffer_dirty(sdata->s_spar_map[j]);
 						}
 					}
@@ -190,7 +190,7 @@ int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
 				else if (le32_to_cpu(st->mapEntry[k].origLocation) > packet)
 					break;
 			}
-			for (l=k; l<st->reallocationTableLen; l++)
+			for (l=k; l<le16_to_cpu(st->reallocationTableLen); l++)
 			{
 				if (le32_to_cpu(st->mapEntry[l].origLocation) == 0xFFFFFFFF)
 				{
@@ -203,7 +203,7 @@ int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
 							mapEntry.origLocation = cpu_to_le32(packet);
 							memmove(&st->mapEntry[k+1], &st->mapEntry[k], (l-k)*sizeof(struct sparingEntry));
 							st->mapEntry[k] = mapEntry;
-							udf_update_tag((char *)st, sizeof(struct sparingTable) + st->reallocationTableLen * sizeof(struct sparingEntry));
+							udf_update_tag((char *)st, sizeof(struct sparingTable) + le16_to_cpu(st->reallocationTableLen) * sizeof(struct sparingEntry));
 							mark_buffer_dirty(sdata->s_spar_map[j]);
 						}
 					}

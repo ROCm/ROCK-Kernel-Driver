@@ -354,15 +354,6 @@ read_next:
 			  (unsigned long)rq->nr_sectors - nsect);
 #endif /* DEBUG_READ */
 
-#ifdef CONFIG_IDE_TASKFILE_IO
-	task_bio_sectors(drive, rq, nsect, IDE_PIO_IN);
-
-	/* FIXME: can we check status after transfer on pdc4030? */
-	/* Complete previously submitted bios. */
-	while (rq->bio != rq->cbio)
-		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
-			return ide_stopped;
-#else /* CONFIG_IDE_TASKFILE_IO */
 	HWIF(drive)->ata_input_data(drive, rq->buffer, nsect * SECTOR_WORDS);
 	rq->buffer += nsect<<9;
 	rq->sector += nsect;
@@ -370,7 +361,6 @@ read_next:
 	rq->nr_sectors -= nsect;
 	if (!rq->current_nr_sectors)
 		DRIVER(drive)->end_request(drive, 1, 0);
-#endif /* CONFIG_IDE_TASKFILE_IO */
 
 /*
  * Now the data has been read in, do the following:
@@ -421,12 +411,8 @@ read_next:
 static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-#ifdef CONFIG_IDE_TASKFILE_IO
-	struct request *rq = hwgroup->rq;
-#else
 	struct request *rq = &hwgroup->wrq;
 	struct bio *bio = rq->bio;
-#endif
 
 	if ((HWIF(drive)->INB(IDE_STATUS_REG)) & BUSY_STAT) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
@@ -450,15 +436,10 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif /* DEBUG_WRITE */
 
-#ifdef CONFIG_IDE_TASKFILE_IO
-	/* Complete previously submitted bios. */
-	while (rq->bio != rq->cbio)
-		(void) DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio));
-#else
 	bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 	rq = hwgroup->rq;
 	DRIVER(drive)->end_request(drive, 1, rq->hard_nr_sectors);
-#endif
+
 	return ide_stopped;
 }
 
@@ -466,27 +447,6 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
  * promise_multwrite() transfers a block of up to mcount sectors of data
  * to a drive as part of a disk multiple-sector write operation.
  */
-#ifdef CONFIG_IDE_TASKFILE_IO
-static void promise_multwrite (ide_drive_t *drive, unsigned int msect)
-{
-	struct request* rq = HWGROUP(drive)->rq;
-	unsigned int nsect;
-
-	rq->errors = 0;
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		task_bio_sectors(drive, rq, nsect, IDE_PIO_OUT);
-
-		if (!rq->nr_sectors)
-			msect = 0;
-		else
-			msect -= nsect;
-	} while (msect);
-}
-#else /* CONFIG_IDE_TASKFILE_IO */
 static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 {
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
@@ -537,7 +497,6 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 		taskfile_output_data(drive, buffer, nsect<<7);
 	} while (mcount);
 }
-#endif
 
 /*
  * promise_write_pollfunc() is the handler for disk write completion polling.
@@ -545,12 +504,8 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-#ifdef CONFIG_IDE_TASKFILE_IO
-	struct request *rq = hwgroup->rq;
-#else
 	struct request *rq = &hwgroup->wrq;
 	struct bio *bio = rq->bio;
-#endif
 
 	if (HWIF(drive)->INB(IDE_NSECTOR_REG) != 0) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
@@ -564,18 +519,10 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 		}
 		hwgroup->poll_timeout = 0;
 		printk(KERN_ERR "%s: write timed-out!\n",drive->name);
-#ifndef CONFIG_IDE_TASKFILE_IO
 		bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
-#endif
 		return DRIVER(drive)->error(drive, "write timeout",
 				HWIF(drive)->INB(IDE_STATUS_REG));
 	}
-
-#ifdef CONFIG_IDE_TASKFILE_IO
-	/* Complete previously submitted bios. */
-	while (rq->bio != rq->cbio)
-		(void) DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio));
-#endif
 
 	/*
 	 * Now write out last 4 sectors and poll for not BUSY
@@ -602,11 +549,7 @@ static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 static ide_startstop_t promise_write (ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-#ifdef CONFIG_IDE_TASKFILE_IO
-	struct request *rq = hwgroup->rq;
-#else
 	struct request *rq = &hwgroup->wrq;
-#endif
 
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: %s: sectors(%lu-%lu)\n",
@@ -654,39 +597,14 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
  * already set up. It issues a READ or WRITE command to the Promise
  * controller, assuming LBA has been used to set up the block number.
  */
-#ifndef CONFIG_IDE_TASKFILE_IO
 ide_startstop_t do_pdc4030_io (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	unsigned long timeout;
 	u8 stat = 0;
-#else
-static ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
-{
-	struct request *rq	= HWGROUP(drive)->rq;
-	task_struct_t *taskfile = (task_struct_t *) task->tfRegister;
-	ide_startstop_t startstop;
-	unsigned long timeout;
-	u8 stat = 0;
-
-	if (IDE_CONTROL_REG)
-		HWIF(drive)->OUTB(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
-	SELECT_MASK(drive, 0);
-	HWIF(drive)->OUTB(taskfile->feature, IDE_FEATURE_REG);
-	HWIF(drive)->OUTB(taskfile->sector_count, IDE_NSECTOR_REG);
-	/* refers to number of sectors to transfer */
-	HWIF(drive)->OUTB(taskfile->sector_number, IDE_SECTOR_REG);
-	/* refers to sector offset or start sector */
-	HWIF(drive)->OUTB(taskfile->low_cylinder, IDE_LCYL_REG);
-	HWIF(drive)->OUTB(taskfile->high_cylinder, IDE_HCYL_REG);
-	HWIF(drive)->OUTB(taskfile->device_head, IDE_SELECT_REG);
-	HWIF(drive)->OUTB(taskfile->command, IDE_COMMAND_REG);
-#endif
 
 	if (rq_data_dir(rq) == READ) {
-#ifndef CONFIG_IDE_TASKFILE_IO
 		HWIF(drive)->OUTB(PROMISE_READ, IDE_COMMAND_REG);
-#endif
 /*
  * The card's behaviour is odd at this point. If the data is
  * available, DRQ will be true, and no interrupt will be
@@ -722,9 +640,7 @@ static ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 				"waiting - Odd!\n", drive->name);
 		return ide_stopped;
 	} else {
-#ifndef CONFIG_IDE_TASKFILE_IO
 		HWIF(drive)->OUTB(PROMISE_WRITE, IDE_COMMAND_REG);
-#endif
 		if (ide_wait_stat(&startstop, drive, DATA_READY,
 				drive->bad_wstat, WAIT_DRQ)) {
 			printk(KERN_ERR "%s: no DRQ after issuing "
@@ -733,9 +649,7 @@ static ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 	    	}
 		if (!drive->unmask)
 			local_irq_disable();
-#ifndef CONFIG_IDE_TASKFILE_IO
 		HWGROUP(drive)->wrq = *rq; /* scratchpad */
-#endif
 		return promise_write(drive);
 	}
 }
@@ -749,14 +663,9 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 	*/
 	ide_hwif_t *hwif = HWIF(drive);
 	int drive_number = (hwif->channel << 1) + drive->select.b.unit;
-#ifdef CONFIG_IDE_TASKFILE_IO
-	struct hd_drive_task_hdr taskfile;
-	ide_task_t args;
-#endif
 
 	BUG_ON(rq->nr_sectors > 127);
 
-#ifndef CONFIG_IDE_TASKFILE_IO
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl, IDE_CONTROL_REG);
 	hwif->OUTB(drive_number, IDE_FEATURE_REG);
@@ -767,27 +676,4 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 	hwif->OUTB(((block>>8)&0x0f)|drive->select.all,IDE_SELECT_REG);
 
 	return do_pdc4030_io(drive, rq);
-#else /* !CONFIG_IDE_TASKFILE_IO */
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-
-	taskfile.feature	= drive_number;
-	taskfile.sector_count	= rq->nr_sectors;
-	taskfile.sector_number	= block;
-	taskfile.low_cylinder	= (block>>=8);
-	taskfile.high_cylinder	= (block>>=8);
-	taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
-	taskfile.command	= (rq->cmd==READ)?PROMISE_READ:PROMISE_WRITE;
-
-	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
-	memset(args.hobRegister, 0, sizeof(struct hd_drive_hob_hdr));
-	/*
-	 * Setup the bits of args that we do need.
-	 * Note that we don't use the generic interrupt handlers.
-	 */
-	args.handler		= NULL;
-	args.rq			= (struct request *) rq;
-	rq->special		= (ide_task_t *)&args;
-
-	return do_pdc4030_io(drive, &args);
-#endif /* !CONFIG_IDE_TASKFILE_IO */
 }

@@ -76,10 +76,12 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		break;
 
 	case NETDEV_UNREGISTER:
+		spin_unlock_bh(&br->lock);
 		br_del_if(br, dev);
-		break;
+		goto done;
 	} 
 	spin_unlock_bh(&br->lock);
 
+ done:
 	return NOTIFY_DONE;
 }

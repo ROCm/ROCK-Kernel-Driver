@@ -130,6 +130,12 @@ extern int  mga_getparam( DRM_IOCTL_ARGS );
 extern int mga_warp_install_microcode( drm_mga_private_t *dev_priv );
 extern int mga_warp_init( drm_mga_private_t *dev_priv );
 
+extern int mga_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence);
+extern irqreturn_t mga_driver_irq_handler( DRM_IRQ_ARGS );
+extern void mga_driver_irq_preinstall( drm_device_t *dev );
+extern void mga_driver_irq_postinstall( drm_device_t *dev );
+extern void mga_driver_irq_uninstall( drm_device_t *dev );
+
 #define mga_flush_write_combine()	DRM_WRITEMEMORYBARRIER()
 
 #if defined(__linux__) && defined(__alpha__)

@@ -153,9 +153,11 @@ get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty)
 	if (dirty_ratio < 5)
 		dirty_ratio = 5;
 
-	background_ratio = dirty_background_ratio;
-	if (background_ratio >= dirty_ratio)
-		background_ratio = dirty_ratio / 2;
+	/*
+	 * Keep the ratio between dirty_ratio and background_ratio roughly
+	 * what the sysctls are after dirty_ratio has been scaled (above).
+	 */
+	background_ratio = dirty_background_ratio * dirty_ratio/vm_dirty_ratio;
 
 	background = (background_ratio * total_pages) / 100;
 	dirty = (dirty_ratio * total_pages) / 100;

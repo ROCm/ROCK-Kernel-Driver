@@ -5,6 +5,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/compiler.h>
 #include <linux/wait.h>
 #include <linux/string.h>
 #include <linux/mm.h>
@@ -81,11 +82,12 @@ int get_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
 	return 0;
 }
 
-static inline
-void set_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
+static inline unsigned long __must_check
+set_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
 {
 	if (ufdset)
-		__copy_to_user(ufdset, fdset, FDS_BYTES(nr));
+		return __copy_to_user(ufdset, fdset, FDS_BYTES(nr));
+	return 0;
 }
 
 static inline

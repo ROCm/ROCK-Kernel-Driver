@@ -1733,14 +1733,13 @@ struct velocity_opt {
 };
 
 struct velocity_info {
-	struct velocity_info *next;
-	struct velocity_info *prev;
+	struct list_head list;
 
 	struct pci_dev *pdev;
 	struct net_device *dev;
 	struct net_device_stats stats;
 
-#if CONFIG_PM
+#ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
 

@@ -463,8 +463,8 @@ static void sca_set_port(port_t *port)
 			brv >>= 1; /* brv = 2^9 = 512 max in specs */
 
 			/* Baud Rate = CLOCK_BASE / TMC / 2^BR */
-			tmc = CLOCK_BASE / (brv * port->settings.clock_rate);
-		}while(br > 1 && tmc <= 128);
+			tmc = CLOCK_BASE / brv / port->settings.clock_rate;
+		}while (br > 1 && tmc <= 128);
 
 		if (tmc < 1) {
 			tmc = 1;
@@ -473,7 +473,7 @@ static void sca_set_port(port_t *port)
 		} else if (tmc > 255)
 			tmc = 256; /* tmc=0 means 256 - low baud rates */
 
-		port->settings.clock_rate = CLOCK_BASE / (brv * tmc);
+		port->settings.clock_rate = CLOCK_BASE / brv / tmc;
 	} else {
 		br = 9; /* Minimum clock rate */
 		tmc = 256;	/* 8bit = 0 */

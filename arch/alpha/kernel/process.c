@@ -246,8 +246,7 @@ alpha_clone(unsigned long clone_flags, unsigned long usp,
 	if (!usp)
 		usp = rdusp();
 
-	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
-		       parent_tid, child_tid);
+	return do_fork(clone_flags, usp, regs, 0, parent_tid, child_tid);
 }
 
 int

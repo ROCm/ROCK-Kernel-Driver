@@ -1123,7 +1123,7 @@ static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
 						PDE(inode)->data);
 }
 
-static int
+static ssize_t
 acpi_processor_write_performance (
         struct file		*file,
         const char		__user *buffer,

@@ -1402,7 +1402,7 @@ wavefront_fetch_multisample (wavefront_patch_info *header)
 	num_samples = (1 << log_ns[0]);
     
 	for (i = 0; i < num_samples; i++) {
-		char d[2];
+		s8 d[2];
 	
 		if ((d[0] = wavefront_read ()) == -1) {
 			printk (KERN_ERR LOGNAME "upload multisample failed "
@@ -2961,8 +2961,8 @@ wffx_memset (int page,
 		if (i != cnt) {
 			printk (KERN_WARNING LOGNAME
 				"FX memset "
-				"(0x%x, 0x%x, 0x%x, %d) incomplete\n",
-				page, addr, (int) data, cnt);
+				"(0x%x, 0x%x, %p, %d) incomplete\n",
+				page, addr, data, cnt);
 			return -(EIO);
 		}
 	}

@@ -41,30 +41,70 @@ typedef unsigned char spinlock_t;
 do {	membar("#LoadLoad");	\
 } while(*((volatile unsigned char *)lock))
 
-/* arch/sparc64/lib/spinlock.S */
-extern void _raw_spin_lock(spinlock_t *lock);
-
-static __inline__ int _raw_spin_trylock(spinlock_t *lock)
+static inline void _raw_spin_lock(spinlock_t *lock)
 {
-	unsigned int result;
-	__asm__ __volatile__("ldstub [%1], %0\n\t"
-			     "membar #StoreLoad | #StoreStore"
-			     : "=r" (result)
-			     : "r" (lock)
-			     : "memory");
-	return (result == 0);
+	unsigned long tmp;
+
+	__asm__ __volatile__(
+"1:	ldstub		[%1], %0\n"
+"	brnz,pn		%0, 2f\n"
+"	 membar		#StoreLoad | #StoreStore\n"
+"	.subsection	2\n"
+"2:	ldub		[%1], %0\n"
+"	brnz,pt		%0, 2b\n"
+"	 membar		#LoadLoad\n"
+"	ba,a,pt		%%xcc, 1b\n"
+"	.previous"
+	: "=&r" (tmp)
+	: "r" (lock)
+	: "memory");
 }
 
-static __inline__ void _raw_spin_unlock(spinlock_t *lock)
+static inline int _raw_spin_trylock(spinlock_t *lock)
 {
-	__asm__ __volatile__("membar	#StoreStore | #LoadStore\n\t"
-			     "stb	%%g0, [%0]"
-			     : /* No outputs */
-			     : "r" (lock)
-			     : "memory");
+	unsigned long result;
+
+	__asm__ __volatile__(
+"	ldstub		[%1], %0\n"
+"	membar		#StoreLoad | #StoreStore"
+	: "=r" (result)
+	: "r" (lock)
+	: "memory");
+
+	return (result == 0UL);
 }
 
-extern void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags);
+static inline void _raw_spin_unlock(spinlock_t *lock)
+{
+	__asm__ __volatile__(
+"	membar		#StoreStore | #LoadStore\n"
+"	stb		%%g0, [%0]"
+	: /* No outputs */
+	: "r" (lock)
+	: "memory");
+}
+
+static inline void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags)
+{
+	unsigned long tmp1, tmp2;
+
+	__asm__ __volatile__(
+"1:	ldstub		[%2], %0\n"
+"	brnz,pn		%0, 2f\n"
+"	membar		#StoreLoad | #StoreStore\n"
+"	.subsection	2\n"
+"2:	rdpr		%%pil, %1\n"
+"	wrpr		%3, %%pil\n"
+"3:	ldub		[%2], %0\n"
+"	brnz,pt		%0, 3b\n"
+"	membar		#LoadLoad\n"
+"	ba,pt		%%xcc, 1b\n"
+"	wrpr		%1, %%pil\n"
+"	.previous"
+	: "=&r" (tmp1), "=&r" (tmp2)
+	: "r"(lock), "r"(flags)
+	: "memory");
+}
 
 #else /* !(CONFIG_DEBUG_SPINLOCK) */
 
@@ -86,9 +126,9 @@ do { \
 
 extern void _do_spin_lock (spinlock_t *lock, char *str);
 extern void _do_spin_unlock (spinlock_t *lock);
-extern int _spin_trylock (spinlock_t *lock);
+extern int _do_spin_trylock (spinlock_t *lock);
 
-#define _raw_spin_trylock(lp)	_spin_trylock(lp)
+#define _raw_spin_trylock(lp)	_do_spin_trylock(lp)
 #define _raw_spin_lock(lock)	_do_spin_lock(lock, "spin_lock")
 #define _raw_spin_unlock(lock)	_do_spin_unlock(lock)
 #define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
@@ -104,11 +144,103 @@ typedef unsigned int rwlock_t;
 #define rwlock_init(lp) do { *(lp) = RW_LOCK_UNLOCKED; } while(0)
 #define rwlock_is_locked(x) (*(x) != RW_LOCK_UNLOCKED)
 
-extern void __read_lock(rwlock_t *);
-extern void __read_unlock(rwlock_t *);
-extern void __write_lock(rwlock_t *);
-extern void __write_unlock(rwlock_t *);
-extern int __write_trylock(rwlock_t *);
+static void inline __read_lock(rwlock_t *lock)
+{
+	unsigned long tmp1, tmp2;
+
+	__asm__ __volatile__ (
+"1:	ldsw		[%2], %0\n"
+"	brlz,pn		%0, 2f\n"
+"4:	 add		%0, 1, %1\n"
+"	cas		[%2], %0, %1\n"
+"	cmp		%0, %1\n"
+"	bne,pn		%%icc, 1b\n"
+"	 membar		#StoreLoad | #StoreStore\n"
+"	.subsection	2\n"
+"2:	ldsw		[%2], %0\n"
+"	brlz,pt		%0, 2b\n"
+"	 membar		#LoadLoad\n"
+"	ba,a,pt		%%xcc, 4b\n"
+"	.previous"
+	: "=&r" (tmp1), "=&r" (tmp2)
+	: "r" (lock)
+	: "memory");
+}
+
+static void inline __read_unlock(rwlock_t *lock)
+{
+	unsigned long tmp1, tmp2;
+
+	__asm__ __volatile__(
+"1:	lduw	[%2], %0\n"
+"	sub	%0, 1, %1\n"
+"	cas	[%2], %0, %1\n"
+"	cmp	%0, %1\n"
+"	bne,pn	%%xcc, 1b\n"
+"	 membar	#StoreLoad | #StoreStore"
+	: "=&r" (tmp1), "=&r" (tmp2)
+	: "r" (lock)
+	: "memory");
+}
+
+static void inline __write_lock(rwlock_t *lock)
+{
+	unsigned long mask, tmp1, tmp2;
+
+	mask = 0x80000000UL;
+
+	__asm__ __volatile__(
+"1:	lduw		[%2], %0\n"
+"	brnz,pn		%0, 2f\n"
+"4:	 or		%0, %3, %1\n"
+"	cas		[%2], %0, %1\n"
+"	cmp		%0, %1\n"
+"	bne,pn		%%icc, 1b\n"
+"	 membar		#StoreLoad | #StoreStore\n"
+"	.subsection	2\n"
+"2:	lduw		[%2], %0\n"
+"	brnz,pt		%0, 2b\n"
+"	 membar		#LoadLoad\n"
+"	ba,a,pt		%%xcc, 4b\n"
+"	.previous"
+	: "=&r" (tmp1), "=&r" (tmp2)
+	: "r" (lock), "r" (mask)
+	: "memory");
+}
+
+static void inline __write_unlock(rwlock_t *lock)
+{
+	__asm__ __volatile__(
+"	membar		#LoadStore | #StoreStore\n"
+"	stw		%%g0, [%0]"
+	: /* no outputs */
+	: "r" (lock)
+	: "memory");
+}
+
+static int inline __write_trylock(rwlock_t *lock)
+{
+	unsigned long mask, tmp1, tmp2, result;
+
+	mask = 0x80000000UL;
+
+	__asm__ __volatile__(
+"	mov		0, %2\n"
+"1:	lduw		[%3], %0\n"
+"	brnz,pn		%0, 2f\n"
+"	 or		%0, %4, %1\n"
+"	cas		[%3], %0, %1\n"
+"	cmp		%0, %1\n"
+"	bne,pn		%%icc, 1b\n"
+"	 membar		#StoreLoad | #StoreStore\n"
+"	mov		1, %2\n"
+"2:"
+	: "=&r" (tmp1), "=&r" (tmp2), "=&r" (result)
+	: "r" (lock), "r" (mask)
+	: "memory");
+
+	return result;
+}
 
 #define _raw_read_lock(p)	__read_lock(p)
 #define _raw_read_unlock(p)	__read_unlock(p)

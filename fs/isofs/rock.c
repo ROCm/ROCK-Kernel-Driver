@@ -153,14 +153,17 @@ int get_rock_ridge_filename(struct iso_directory_record * de,
     }
   }
   MAYBE_CONTINUE(repeat,inode);
+  if (buffer) kfree(buffer);
   return retnamlen; /* If 0, this file did not have a NM field */
  out:
   if(buffer) kfree(buffer);
   return 0;
 }
 
-int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
-			            struct inode * inode,int regard_xa){
+static int
+parse_rock_ridge_inode_internal(struct iso_directory_record *de,
+				struct inode *inode, int regard_xa)
+{
   int len;
   unsigned char * chr;
   int symlink_len = 0;
@@ -174,7 +177,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
      chr+=14;
      len-=14;
      if (len<0) len=0;
-   };
+   }
    
  repeat:
   {
@@ -351,7 +354,6 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
     }
   }
   MAYBE_CONTINUE(repeat,inode);
-  return 0;
  out:
   if(buffer) kfree(buffer);
   return 0;
@@ -435,9 +437,9 @@ int parse_rock_ridge_inode(struct iso_directory_record * de,
        &&(ISOFS_SB(inode->i_sb)->s_rock==2))
      {
 	result=parse_rock_ridge_inode_internal(de,inode,14);
-     };
+     }
    return result;
-};
+}
 
 /* readpage() for symlinks: reads symlink contents into the page and either
    makes it uptodate and returns 0 or returns error (-EIO) */
@@ -515,6 +517,8 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 		}
 	}
 	MAYBE_CONTINUE(repeat, inode);
+	if (buffer)
+		kfree(buffer);
 
 	if (rpnt == link)
 		goto fail;

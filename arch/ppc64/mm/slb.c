@@ -24,30 +24,55 @@
 
 extern void slb_allocate(unsigned long ea);
 
+static inline unsigned long mk_esid_data(unsigned long ea, unsigned long slot)
+{
+	return (ea & ESID_MASK) | SLB_ESID_V | slot;
+}
+
+static inline unsigned long mk_vsid_data(unsigned long ea, unsigned long flags)
+{
+	return (get_kernel_vsid(ea) << SLB_VSID_SHIFT) | flags;
+}
+
 static inline void create_slbe(unsigned long ea, unsigned long vsid,
 			       unsigned long flags, unsigned long entry)
 {
-	ea = (ea & ESID_MASK) | SLB_ESID_V | entry;
-	vsid = (vsid << SLB_VSID_SHIFT) | flags;
 	asm volatile("slbmte  %0,%1" :
-		     : "r" (vsid), "r" (ea)
+		     : "r" (mk_vsid_data(ea, flags)),
+		       "r" (mk_esid_data(ea, entry))
 		     : "memory" );
 }
 
-static void slb_add_bolted(void)
+static void slb_flush_and_rebolt(void)
 {
+	/* If you change this make sure you change SLB_NUM_BOLTED
+	 * appropriately too. */
+	unsigned long ksp_flags = SLB_VSID_KERNEL;
+	unsigned long ksp_esid_data;
+
 	WARN_ON(!irqs_disabled());
 
-	/* If you change this make sure you change SLB_NUM_BOLTED
-	 * appropriately too */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+		ksp_flags |= SLB_VSID_L;
 
-	/* Slot 1 - first VMALLOC segment
-         * 	Since modules end up there it gets hit very heavily.
-         */
-	create_slbe(VMALLOCBASE, get_kernel_vsid(VMALLOCBASE),
-		    SLB_VSID_KERNEL, 1);
+	ksp_esid_data = mk_esid_data(get_paca()->kstack, 2);
+	if ((ksp_esid_data & ESID_MASK) == KERNELBASE)
+		ksp_esid_data &= ~SLB_ESID_V;
 
-	asm volatile("isync":::"memory");
+	/* We need to do this all in asm, so we're sure we don't touch
+	 * the stack between the slbia and rebolting it. */
+	asm volatile("isync\n"
+		     "slbia\n"
+		     /* Slot 1 - first VMALLOC segment */
+		     "slbmte	%0,%1\n"
+		     /* Slot 2 - kernel stack */
+		     "slbmte	%2,%3\n"
+		     "isync"
+		     :: "r"(mk_vsid_data(VMALLOCBASE, SLB_VSID_KERNEL)),
+		        "r"(mk_esid_data(VMALLOCBASE, 1)),
+		        "r"(mk_vsid_data(ksp_esid_data, ksp_flags)),
+		        "r"(ksp_esid_data)
+		     : "memory");
 }
 
 /* Flush all user entries from the segment table of the current processor. */
@@ -69,8 +94,7 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 		}
 		asm volatile("isync" : : : "memory");
 	} else {
-		asm volatile("isync; slbia; isync" : : : "memory");
-		slb_add_bolted();
+		slb_flush_and_rebolt();
 	}
 
 	/* Workaround POWER5 < DD2.1 issue */
@@ -113,22 +137,27 @@ void switch_slb(struct task_struct *tsk, struct mm_struct *mm)
 
 void slb_initialize(void)
 {
-#ifdef CONFIG_PPC_ISERIES
-	asm volatile("isync; slbia; isync":::"memory");
-#else
+	/* On iSeries the bolted entries have already been set up by
+	 * the hypervisor from the lparMap data in head.S */
+#ifndef CONFIG_PPC_ISERIES
 	unsigned long flags = SLB_VSID_KERNEL;
 
-	/* Invalidate the entire SLB (even slot 0) & all the ERATS */
-	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
-		flags |= SLB_VSID_L;
+ 	/* Invalidate the entire SLB (even slot 0) & all the ERATS */
+ 	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+ 		flags |= SLB_VSID_L;
 
-	asm volatile("isync":::"memory");
-	asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
+ 	asm volatile("isync":::"memory");
+ 	asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
 	asm volatile("isync; slbia; isync":::"memory");
-	create_slbe(KERNELBASE, get_kernel_vsid(KERNELBASE),
-		    flags, 0);
-
+	create_slbe(KERNELBASE, get_kernel_vsid(KERNELBASE), flags, 0);
+	create_slbe(VMALLOCBASE, get_kernel_vsid(KERNELBASE),
+		    SLB_VSID_KERNEL, 1);
+	/* We don't bolt the stack for the time being - we're in boot,
+	 * so the stack is in the bolted segment.  By the time it goes
+	 * elsewhere, we'll call _switch() which will bolt in the new
+	 * one. */
+	asm volatile("isync":::"memory");
 #endif
-	slb_add_bolted();
+
 	get_paca()->stab_rr = SLB_NUM_BOLTED;
 }

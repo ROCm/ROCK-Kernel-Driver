@@ -144,8 +144,7 @@ pcibios_fixup_resources(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID,		PCI_ANY_ID,			pcibios_fixup_resources);
 
-void
-pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+void pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res)
 {
 	unsigned long offset = 0;
@@ -158,6 +157,7 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 	region->start = res->start - offset;
 	region->end = res->end - offset;
 }
+EXPORT_SYMBOL(pcibios_resource_to_bus);
 
 /*
  * We need to avoid collisions with `mirrored' VGA ports
@@ -172,8 +172,7 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
  * but we want to try to avoid allocating at 0x2900-0x2bff
  * which might have be mirrored at 0x0100-0x03ff..
  */
-void
-pcibios_align_resource(void *data, struct resource *res, unsigned long size,
+void pcibios_align_resource(void *data, struct resource *res, unsigned long size,
 		       unsigned long align)
 {
 	struct pci_dev *dev = data;
@@ -193,7 +192,7 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size,
 		}
 	}
 }
-
+EXPORT_SYMBOL(pcibios_align_resource);
 
 /*
  *  Handle resources of PCI devices.  If the world were perfect, we could

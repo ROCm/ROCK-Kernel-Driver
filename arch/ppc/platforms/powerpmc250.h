@@ -7,7 +7,7 @@
  *
  * Borrowed heavily from prpmc750.h by Matt Porter <mporter@mvista.com>
  *
- * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -15,8 +15,6 @@
 
 #ifndef __ASMPPC_POWERPMC250_H
 #define __ASMPPC_POWERPMC250_H
-
-#include <linux/serial_reg.h>
 
 #define POWERPMC250_PCI_CONFIG_ADDR	0x80000cf8
 #define POWERPMC250_PCI_CONFIG_DATA	0x80000cfc
@@ -36,5 +34,19 @@
 #define POWERPMC250_BASE_BAUD		12288000
 #define POWERPMC250_SERIAL		0xff000000
 #define POWERPMC250_SERIAL_IRQ		20
+
+/* UART Defines. */
+#define RS_TABLE_SIZE  1
+
+#define BASE_BAUD  (POWERPMC250_BASE_BAUD / 16)
+
+#define STD_COM_FLAGS ASYNC_BOOT_AUTOCONF
+
+#define SERIAL_PORT_DFNS \
+	{ 0, BASE_BAUD, POWERPMC250_SERIAL, POWERPMC250_SERIAL_IRQ,	\
+		STD_COM_FLAGS, 				/* ttyS0 */	\
+		iomem_base: (u8 *)POWERPMC250_SERIAL,			\
+		iomem_reg_shift: 0,					\
+		io_type: SERIAL_IO_MEM }
 
 #endif /* __ASMPPC_POWERPMC250_H */

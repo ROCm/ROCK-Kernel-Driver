@@ -4,20 +4,21 @@
  */
 
 #include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/signal.h>
+#include <asm/ldt.h>
 #include "kern_util.h"
 #include "user.h"
 #include "sysdep/ptrace.h"
 #include "task.h"
+#include "os.h"
 
 #define MAXTOKEN 64
 
 /* Set during early boot */
-int cpu_has_cmov = 1;
-int cpu_has_xmm = 0;
+int host_has_cmov = 1;
+int host_has_xmm = 0;
 
 static char token(int fd, char *buf, int len, char stop)
 {
@@ -27,13 +28,15 @@ static char token(int fd, char *buf, int len, char stop)
 	ptr = buf;
 	end = &buf[len];
 	do {
-		n = read(fd, ptr, sizeof(*ptr));
+		n = os_read_file(fd, ptr, sizeof(*ptr));
 		c = *ptr++;
-		if(n == 0) return(0);
-		else if(n != sizeof(*ptr)){
-			printk("Reading /proc/cpuinfo failed, "
-			       "errno = %d\n", errno);
-			return(-errno);
+		if(n != sizeof(*ptr)){
+			if(n == 0) return(0);
+			printk("Reading /proc/cpuinfo failed, err = %d\n", -n);
+			if(n < 0)
+				return(n);
+			else
+				return(-EIO);
 		}
 	} while((c != '\n') && (c != stop) && (ptr < end));
 
@@ -45,45 +48,79 @@ static char token(int fd, char *buf, int len, char stop)
 	return(c);
 }
 
-static int check_cpu_feature(char *feature, int *have_it)
+static int find_cpuinfo_line(int fd, char *key, char *scratch, int len)
+{
+	int n;
+	char c;
+
+	scratch[len - 1] = '\0';
+	while(1){
+		c = token(fd, scratch, len - 1, ':');
+		if(c <= 0)
+			return(0);
+		else if(c != ':'){
+			printk("Failed to find ':' in /proc/cpuinfo\n");
+			return(0);
+		}
+
+		if(!strncmp(scratch, key, strlen(key)))
+			return(1);
+
+		do {
+			n = os_read_file(fd, &c, sizeof(c));
+			if(n != sizeof(c)){
+				printk("Failed to find newline in "
+				       "/proc/cpuinfo, err = %d\n", -n);
+				return(0);
+			}
+		} while(c != '\n');
+	}
+	return(0);
+}
+
+int cpu_feature(char *what, char *buf, int len)
+{
+	int fd, ret = 0;
+
+	fd = os_open_file("/proc/cpuinfo", of_read(OPENFLAGS()), 0);
+	if(fd < 0){
+		printk("Couldn't open /proc/cpuinfo, err = %d\n", -fd);
+		return(0);
+	}
+
+	if(!find_cpuinfo_line(fd, what, buf, len)){
+		printk("Couldn't find '%s' line in /proc/cpuinfo\n", what);
+		goto out_close;
+	}
+
+	token(fd, buf, len, '\n');
+	ret = 1;
+
+ out_close:
+	os_close_file(fd);
+	return(ret);
+}
+
+static int check_cpu_flag(char *feature, int *have_it)
 {
 	char buf[MAXTOKEN], c;
-	int fd, len = sizeof(buf)/sizeof(buf[0]), n;
+	int fd, len = sizeof(buf)/sizeof(buf[0]);
 
 	printk("Checking for host processor %s support...", feature);
-	fd = open("/proc/cpuinfo", O_RDONLY);
+	fd = os_open_file("/proc/cpuinfo", of_read(OPENFLAGS()), 0);
 	if(fd < 0){
-		printk("Couldn't open /proc/cpuinfo, errno = %d\n", errno);
+		printk("Couldn't open /proc/cpuinfo, err = %d\n", -fd);
 		return(0);
 	}
 
 	*have_it = 0;
-	buf[len - 1] = '\0';
-	while(1){
-		c = token(fd, buf, len - 1, ':');
-		if(c <= 0) goto out;
-		else if(c != ':'){
-			printk("Failed to find ':' in /proc/cpuinfo\n");
-			goto out;
-		}
-
-		if(!strncmp(buf, "flags", strlen("flags"))) break;
-
-		do {
-			n = read(fd, &c, sizeof(c));
-			if(n != sizeof(c)){
-				printk("Failed to find newline in "
-				       "/proc/cpuinfo, n = %d, errno = %d\n",
-				       n, errno);
-				goto out;
-			}
-		} while(c != '\n');
-	}
+	if(!find_cpuinfo_line(fd, "flags", buf, sizeof(buf) / sizeof(buf[0])))
+		goto out;
 
 	c = token(fd, buf, len - 1, ' ');
 	if(c < 0) goto out;
 	else if(c != ' '){
-		printk("Failed to find ':' in /proc/cpuinfo\n");
+		printk("Failed to find ' ' in /proc/cpuinfo\n");
 		goto out;
 	}
 
@@ -100,21 +137,48 @@ static int check_cpu_feature(char *feature, int *have_it)
  out:
 	if(*have_it == 0) printk("No\n");
 	else if(*have_it == 1) printk("Yes\n");
-	close(fd);
+	os_close_file(fd);
 	return(1);
+}
+
+#if 0 /* This doesn't work in tt mode, plus it's causing compilation problems
+       * for some people.
+       */
+static void disable_lcall(void)
+{
+	struct modify_ldt_ldt_s ldt;
+	int err;
+
+	bzero(&ldt, sizeof(ldt));
+	ldt.entry_number = 7;
+	ldt.base_addr = 0;
+	ldt.limit = 0;
+	err = modify_ldt(1, &ldt, sizeof(ldt));
+	if(err)
+		printk("Failed to disable lcall7 - errno = %d\n", errno);
+}
+#endif
+
+void arch_init_thread(void)
+{
+#if 0
+	disable_lcall();
+#endif
 }
 
 void arch_check_bugs(void)
 {
 	int have_it;
 
-	if(access("/proc/cpuinfo", R_OK)){
+	if(os_access("/proc/cpuinfo", OS_ACC_R_OK) < 0){
 		printk("/proc/cpuinfo not available - skipping CPU capability "
 		       "checks\n");
 		return;
 	}
-	if(check_cpu_feature("cmov", &have_it)) cpu_has_cmov = have_it;
-	if(check_cpu_feature("xmm", &have_it)) cpu_has_xmm = have_it;
+	if(check_cpu_flag("cmov", &have_it))
+		host_has_cmov = have_it;
+	if(check_cpu_flag("xmm", &have_it))
+		host_has_xmm = have_it;
 }
 
 int arch_handle_signal(int sig, union uml_pt_regs *regs)
@@ -130,18 +194,18 @@ int arch_handle_signal(int sig, union uml_pt_regs *regs)
 	if((*((char *) ip) != 0x0f) || ((*((char *) (ip + 1)) & 0xf0) != 0x40))
 		return(0);
 
-	if(cpu_has_cmov == 0)
+	if(host_has_cmov == 0)
 		panic("SIGILL caused by cmov, which this processor doesn't "
 		      "implement, boot a filesystem compiled for older "
 		      "processors");
-	else if(cpu_has_cmov == 1)
+	else if(host_has_cmov == 1)
 		panic("SIGILL caused by cmov, which this processor claims to "
 		      "implement");
-	else if(cpu_has_cmov == -1)
+	else if(host_has_cmov == -1)
 		panic("SIGILL caused by cmov, couldn't tell if this processor "
 		      "implements it, boot a filesystem compiled for older "
 		      "processors");
-	else panic("Bad value for cpu_has_cmov (%d)", cpu_has_cmov);
+	else panic("Bad value for host_has_cmov (%d)", host_has_cmov);
 	return(0);
 }
 

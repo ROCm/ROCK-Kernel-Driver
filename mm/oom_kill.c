@@ -41,9 +41,9 @@
  *    of least surprise ... (be careful when you change it)
  */
 
-static int badness(struct task_struct *p)
+static unsigned long badness(struct task_struct *p)
 {
-	int points, cpu_time, run_time, s;
+	unsigned long points, cpu_time, run_time, s;
 
 	if (!p->mm)
 		return 0;
@@ -108,13 +108,13 @@ static int badness(struct task_struct *p)
  */
 static struct task_struct * select_bad_process(void)
 {
-	int maxpoints = 0;
+	unsigned long maxpoints = 0;
 	struct task_struct *g, *p;
 	struct task_struct *chosen = NULL;
 
 	do_each_thread(g, p)
 		if (p->pid) {
-			int points = badness(p);
+			unsigned long points = badness(p);
 			if (points > maxpoints) {
 				chosen = p;
 				maxpoints = points;

@@ -3,9 +3,9 @@
 #include <asm/mpspec.h>
 #include <linux/cpumask.h>
 
-/* 
+/*
  * This discovers the pcibus <-> node mapping on AMD K8.
- * 
+ *
  * RED-PEN need to call this again on PCI hotplug
  * RED-PEN empty cpus get reported wrong
  */
@@ -32,21 +32,21 @@ fill_mp_bus_to_cpumask(void)
 	int i, j;
 	u32 ldtbus, nid;
 	static int lbnr[3] = {
-		LDT_BUS_NUMBER_REGISTER_0, 
+		LDT_BUS_NUMBER_REGISTER_0,
 		LDT_BUS_NUMBER_REGISTER_1,
 		LDT_BUS_NUMBER_REGISTER_2
 	};
 
-	while ((nb_dev = pci_get_device(PCI_VENDOR_ID_AMD, 
+	while ((nb_dev = pci_get_device(PCI_VENDOR_ID_AMD,
 			PCI_DEVICE_ID_K8HTCONFIG, nb_dev))) {
 		pci_read_config_dword(nb_dev, NODE_ID_REGISTER, &nid);
-		
+
 		for (i = 0; i < NR_LDT_BUS_NUMBER_REGISTERS; i++) {
 			pci_read_config_dword(nb_dev, lbnr[i], &ldtbus);
 			/*
 			 * if there are no busses hanging off of the current
 			 * ldt link then both the secondary and subordinate
-			 * bus number fields are set to 0.  
+			 * bus number fields are set to 0.
 			 */
 			if (!(SECONDARY_LDT_BUS_NUMBER(ldtbus) == 0
 				&& SUBORDINATE_LDT_BUS_NUMBER(ldtbus) == 0)) {
@@ -62,7 +62,7 @@ fill_mp_bus_to_cpumask(void)
 	/* quick sanity check */
 	for (i = 0; i < 256; i++) {
 		if (cpus_empty(pci_bus_to_cpumask[i])) {
-			printk(KERN_ERR 
+			printk(KERN_ERR
 			       "k8-bus.c: bus %i has empty cpu mask\n", i);
 			pci_bus_to_cpumask[i] = CPU_MASK_ALL;
 		}

@@ -5,7 +5,7 @@
  * second extended file system inode data in memory
  */
 struct ext2_inode_info {
-	__u32	i_data[15];
+	__le32	i_data[15];
 	__u32	i_flags;
 	__u32	i_faddr;
 	__u8	i_frag_no;
@@ -131,9 +131,6 @@ extern int ext2_ioctl (struct inode *, struct file *, unsigned int,
 /* super.c */
 extern void ext2_error (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
-extern NORET_TYPE void ext2_panic (struct super_block *, const char *,
-				   const char *, ...)
-	__attribute__ ((NORET_AND format (printf, 3, 4)));
 extern void ext2_warning (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
 extern void ext2_update_dynamic_rev (struct super_block *sb);

@@ -781,8 +781,7 @@ GLOBAL_ENTRY(ia64_switch_mode_virt)
 
 	// going to virtual
 	//   - for code addresses, set upper bits of addr to KERNEL_START
-	//   - for stack addresses, set upper 3 bits to 0xe.... Dont change any of the
-	//     lower bits since we want it to stay identity mapped
+	//   - for stack addresses, copy from input argument
 	movl r18=KERNEL_START
 	dep r3=0,r3,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
 	dep r14=0,r14,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT

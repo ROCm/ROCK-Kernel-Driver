@@ -584,6 +584,39 @@ ENTRY(soft_irq_mask)
 		.macro  irq_prio_table
 		.endm
 
+#elif defined(CONFIG_ARCH_IOP331)
+		.macro  disable_fiq
+		.endm
+
+		/*
+		 * Note: only deal with normal interrupts, not FIQ
+		 */
+		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+		mov     \irqnr, #0
+		mrc     p6, 0, \irqstat, c4, c0, 0      @ Read IINTSRC0
+		cmp     \irqstat, #0
+		bne     1002f
+		mrc     p6, 0, \irqstat, c5, c0, 0      @ Read IINTSRC1
+		cmp	\irqstat, #0
+		beq	1001f
+		clz	\irqnr, \irqstat
+/*
+ *		mov	\base, #31
+ *		subs	\irqnr,\base,\irqnr
+ */
+        rsbs    \irqnr,\irqnr,#31   @ recommend by RMK
+		add	\irqnr,\irqnr,#IRQ_IOP331_XINT8
+		b	1001f
+1002:		clz     \irqnr, \irqstat
+		mov     \base, #31
+		subs    \irqnr,\base,\irqnr
+		add     \irqnr,\irqnr,#IRQ_IOP331_DMA0_EOT
+1001:
+		.endm
+
+		.macro  irq_prio_table
+		.endm
+
 #elif defined(CONFIG_ARCH_PXA)
 
 		.macro	disable_fiq
@@ -609,6 +642,60 @@ ENTRY(soft_irq_mask)
 		.endm
 
 		.macro	irq_prio_table
+		.endm
+
+#elif defined(CONFIG_ARCH_IXP2000)
+
+		.macro  disable_fiq
+		.endm
+
+		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+		
+		mov	\irqnr, #0x0              @clear out irqnr as default
+                mov	\base, #0xfe000000        
+		orr	\base, \base, #0x00ff0000
+		orr	\base, \base, #0x0000a000
+		orr	\base, \base, #0x08
+		ldr	\irqstat, [\base]         @ get interrupts 
+		mov	\tmp, #IXP2000_VALID_IRQ_MASK & 0xff000000
+		orr	\tmp, \tmp, #IXP2000_VALID_IRQ_MASK & 0x00ff0000
+		orr	\tmp, \tmp, #IXP2000_VALID_IRQ_MASK & 0x0000ff00
+		orr	\tmp, \tmp, #IXP2000_VALID_IRQ_MASK & 0x000000ff
+		and	\irqstat, \irqstat, \tmp
+
+		cmp	\irqstat, #0
+		beq	1001f	
+
+		clz     \irqnr, \irqstat
+		mov     \base, #31
+		subs    \irqnr, \base, \irqnr
+		
+		/*
+		 * We handle PCIA and PCIB here so we don't have an
+		 * extra layer of code just to check these two bits.
+		 */
+		cmp	\irqnr, #IRQ_IXP2000_PCI
+		bne	1001f
+
+		mov	\base, #0xfe000000
+		orr	\base, \base, #0x00fd0000
+		orr	\base, \base, #0x0000e100
+		orr	\base, \base, #0x00000058
+		ldr	\irqstat, [\base]
+
+		mov	\tmp, #(1<<26)
+		tst	\irqstat, \tmp
+		movne	\irqnr, #IRQ_IXP2000_PCIA
+		bne	1001f
+
+		mov	\tmp, #(1<<27)
+		tst	\irqstat, \tmp
+		movne	\irqnr, #IRQ_IXP2000_PCIB
+
+1001:
+		.endm 
+		
+		.macro  irq_prio_table
 		.endm
 
 #elif defined (CONFIG_ARCH_IXP4XX)

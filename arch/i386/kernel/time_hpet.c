@@ -29,7 +29,7 @@ unsigned long hpet_address;	/* hpet memory map physical address */
 
 static int use_hpet; 		/* can be used for runtime check of hpet */
 static int boot_hpet_disable; 	/* boottime override for HPET timer */
-static unsigned long hpet_virt_address;	/* hpet kernel virtual address */
+static void __iomem * hpet_virt_address;	/* hpet kernel virtual address */
 
 #define FSEC_TO_USEC (1000000000UL)
 
@@ -76,8 +76,7 @@ int __init hpet_enable(void)
 	if (!hpet_address) {
 		return -1;
 	}
-	hpet_virt_address = (unsigned long) ioremap_nocache(hpet_address,
-	                                                    HPET_MMAP_SIZE);
+	hpet_virt_address = ioremap_nocache(hpet_address, HPET_MMAP_SIZE);
 	/*
 	 * Read the period, compute tick and quotient.
 	 */
@@ -162,11 +161,11 @@ int __init hpet_enable(void)
 		hd.hd_irq[0] = HPET_LEGACY_8254;
 		hd.hd_irq[1] = HPET_LEGACY_RTC;
 		if (ntimer > 2) {
-			struct hpet		*hpet;
-			struct hpet_timer	*timer;
+			struct hpet __iomem	*hpet;
+			struct hpet_timer __iomem *timer;
 			int			i;
 
-			hpet = (struct hpet *) hpet_virt_address;
+			hpet = hpet_virt_address;
 
 			for (i = 2, timer = &hpet->hpet_timers[2]; i < ntimer;
 				timer++, i++)

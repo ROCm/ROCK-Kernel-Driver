@@ -90,23 +90,24 @@ MODULE_PARM_DESC(skb_res, "Amount of data to reserve on skb buffs\n"
 
 #define RGMII_PRIV(ocpdev) ((struct ibm_ocp_rgmii*)ocp_get_drvdata(ocpdev))
 
-static unsigned int rgmii_enable[] =
-    { RGMII_RTBI, RGMII_RGMII, RGMII_TBI, RGMII_GMII };
+static unsigned int rgmii_enable[] = {
+	RGMII_RTBI,
+	RGMII_RGMII,
+	RGMII_TBI,
+	RGMII_GMII
+};
 
-static unsigned int rgmii_speed_mask[] = { 0,
-	0,
+static unsigned int rgmii_speed_mask[] = {
 	RGMII_MII2_SPDMASK,
 	RGMII_MII3_SPDMASK
 };
 
-static unsigned int rgmii_speed100[] = { 0,
-	0,
+static unsigned int rgmii_speed100[] = {
 	RGMII_MII2_100MB,
 	RGMII_MII3_100MB
 };
 
-static unsigned int rgmii_speed1000[] = { 0,
-	0,
+static unsigned int rgmii_speed1000[] = {
 	RGMII_MII2_1000MB,
 	RGMII_MII3_1000MB
 };
@@ -122,11 +123,21 @@ static unsigned int zmii_enable[][4] = {
 	 ~(ZMII_MDI0 | ZMII_MDI1 | ZMII_MDI3)},
 	{ZMII_SMII3, ZMII_RMII3, ZMII_MII3, ~(ZMII_MDI0 | ZMII_MDI1 | ZMII_MDI2)}
 };
-static unsigned int mdi_enable[] =
-    { ZMII_MDI0, ZMII_MDI1, ZMII_MDI2, ZMII_MDI3 };
+
+static unsigned int mdi_enable[] = {
+	ZMII_MDI0,
+	ZMII_MDI1,
+	ZMII_MDI2,
+	ZMII_MDI3
+};
 
 static unsigned int zmii_speed = 0x0;
-static unsigned int zmii_speed100[] = { ZMII_MII0_100MB, ZMII_MII1_100MB };
+static unsigned int zmii_speed100[] = {
+	ZMII_MII0_100MB,
+	ZMII_MII1_100MB,
+	ZMII_MII2_100MB,
+	ZMII_MII3_100MB
+};
 
 /* Since multiple EMACs share MDIO lines in various ways, we need
  * to avoid re-using the same PHY ID in cases where the arch didn't
@@ -367,6 +378,7 @@ static void emac_close_zmii(struct ocp_device *ocpdev)
 
 int emac_phy_read(struct net_device *dev, int mii_id, int reg)
 {
+	int count;
 	uint32_t stacr;
 	struct ocp_enet_private *fep = dev->priv;
 	emac_t *emacp = fep->emacp;
@@ -385,9 +397,13 @@ int emac_phy_read(struct net_device *dev, int mii_id, int reg)
 		emacp = fep->emacp;
 	}
 
-	udelay(MDIO_DELAY);
+	count = 0;
+	while ((((stacr = in_be32(&emacp->em0stacr)) & EMAC_STACR_OC) == 0)
+					&& (count++ < MDIO_DELAY))
+		udelay(1);
+	MDIO_DEBUG((" (count was %d)\n", count));
 
-	if ((in_be32(&emacp->em0stacr) & EMAC_STACR_OC) == 0) {
+	if ((stacr & EMAC_STACR_OC) == 0) {
 		printk(KERN_WARNING "%s: PHY read timeout #1!\n", dev->name);
 		return -1;
 	}
@@ -398,8 +414,11 @@ int emac_phy_read(struct net_device *dev, int mii_id, int reg)
 
 	out_be32(&emacp->em0stacr, stacr);
 
-	udelay(MDIO_DELAY);
-	stacr = in_be32(&emacp->em0stacr);
+	count = 0;
+	while ((((stacr = in_be32(&emacp->em0stacr)) & EMAC_STACR_OC) == 0)
+					&& (count++ < MDIO_DELAY))
+		udelay(1);
+	MDIO_DEBUG((" (count was %d)\n", count));
 
 	if ((stacr & EMAC_STACR_OC) == 0) {
 		printk(KERN_WARNING "%s: PHY read timeout #2!\n", dev->name);
@@ -419,6 +438,7 @@ int emac_phy_read(struct net_device *dev, int mii_id, int reg)
 
 void emac_phy_write(struct net_device *dev, int mii_id, int reg, int data)
 {
+	int count;
 	uint32_t stacr;
 	struct ocp_enet_private *fep = dev->priv;
 	emac_t *emacp = fep->emacp;
@@ -437,9 +457,13 @@ void emac_phy_write(struct net_device *dev, int mii_id, int reg, int data)
 		emacp = fep->emacp;
 	}
 
-	udelay(MDIO_DELAY);
+	count = 0;
+	while ((((stacr = in_be32(&emacp->em0stacr)) & EMAC_STACR_OC) == 0)
+					&& (count++ < MDIO_DELAY))
+		udelay(1);
+	MDIO_DEBUG((" (count was %d)\n", count));
 
-	if ((in_be32(&emacp->em0stacr) & EMAC_STACR_OC) == 0) {
+	if ((stacr & EMAC_STACR_OC) == 0) {
 		printk(KERN_WARNING "%s: PHY write timeout #2!\n", dev->name);
 		return;
 	}
@@ -451,9 +475,12 @@ void emac_phy_write(struct net_device *dev, int mii_id, int reg, int data)
 
 	out_be32(&emacp->em0stacr, stacr);
 
-	udelay(MDIO_DELAY);
+	while (((stacr = in_be32(&emacp->em0stacr) & EMAC_STACR_OC) == 0)
+					&& (count++ < 5000))
+		udelay(1);
+	MDIO_DEBUG((" (count was %d)\n", count));
 
-	if ((in_be32(&emacp->em0stacr) & EMAC_STACR_OC) == 0)
+	if ((stacr & EMAC_STACR_OC) == 0)
 		printk(KERN_WARNING "%s: PHY write timeout #2!\n", dev->name);
 
 	/* Check for a write error */
@@ -1940,8 +1967,6 @@ static struct ocp_driver emac_driver = {
 
 static int __init emac_init(void)
 {
-	int rc;
-
 	printk(KERN_INFO DRV_NAME ": " DRV_DESC ", version " DRV_VERSION "\n");
 	printk(KERN_INFO "Maintained by " DRV_AUTHOR "\n");
 
@@ -1950,13 +1975,8 @@ static int __init emac_init(void)
 		       skb_res);
 		skb_res = 2;
 	}
-	rc = ocp_register_driver(&emac_driver);
-	if (rc < 0) {
-		ocp_unregister_driver(&emac_driver);
-		return -ENODEV;
-	}
 
-	return 0;
+	return ocp_register_driver(&emac_driver);
 }
 
 static void __exit emac_exit(void)

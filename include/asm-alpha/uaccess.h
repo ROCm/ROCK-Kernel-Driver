@@ -108,7 +108,6 @@ extern void __get_user_unknown(void);
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
 	const __typeof__(*(ptr)) __user *__gu_addr = (ptr);		\
-	__chk_user_ptr(ptr);						\
 	if (__access_ok((unsigned long)__gu_addr,size,segment)) {	\
 		__gu_err = 0;						\
 		switch (size) {						\
@@ -223,7 +222,6 @@ extern void __put_user_unknown(void);
 ({									\
 	long __pu_err = -EFAULT;					\
 	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
-	__chk_user_ptr(ptr);						\
 	if (__access_ok((unsigned long)__pu_addr,size,segment)) {	\
 		__pu_err = 0;						\
 		switch (size) {						\
@@ -394,6 +392,10 @@ __copy_tofrom_user(void *to, const void *from, long len, const void __user *vali
 	__chk_user_ptr(from);						\
 	__copy_tofrom_user_nocheck((to),(__force void *)(from),(n));	\
 })
+
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 
 extern inline long
 copy_to_user(void __user *to, const void *from, long n)

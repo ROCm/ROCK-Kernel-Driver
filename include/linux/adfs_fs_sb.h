@@ -31,7 +31,7 @@ struct adfs_sb_info {
 	unsigned long	s_size;		/* total size (in blocks) of this fs	 */
 	signed int	s_map2blk;	/* shift left by this for map->sector	 */
 	unsigned int	s_log2sharesize;/* log2 share size			 */
-	unsigned int	s_version;	/* disc format version			 */
+	__le32		s_version;	/* disc format version			 */
 	unsigned int	s_namelen;	/* maximum number of characters in name	 */
 };
 

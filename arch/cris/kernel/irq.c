@@ -125,7 +125,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 {
 	struct irqaction *action;
 	int do_random, cpu;
-        int retval = 0;
+        int ret, retval = 0;
 
         cpu = smp_processor_id();
         irq_enter();
@@ -137,8 +137,10 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
                         local_irq_enable();
                 do_random = 0;
                 do {
-                        do_random |= action->flags;
-                        retval |= action->handler(irq, action->dev_id, regs);
+			ret = action->handler(irq, action->dev_id, regs);
+			if (ret == IRQ_HANDLED)
+				do_random |= action->flags;
+                        retval |= ret;
                         action = action->next;
                 } while (action);
 

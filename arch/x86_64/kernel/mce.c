@@ -24,7 +24,7 @@
 #define MISC_MCELOG_MINOR 227
 #define NR_BANKS 5
 
-static int mce_dont_init; 
+static int mce_dont_init;
 
 /* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic,
    3: never panic or exit (for testing only) */
@@ -158,13 +158,13 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		if ((m.status & MCI_STATUS_VAL) == 0)
 			continue;
 
-		if (m.status & MCI_STATUS_EN) { 
+		if (m.status & MCI_STATUS_EN) {
 			/* In theory _OVER could be a nowayout too, but
 			   assume any overflowed errors were no fatal. */
 			nowayout |= !!(m.status & MCI_STATUS_PCC);
 			kill_it |= !!(m.status & MCI_STATUS_UC);
 		}
-							    
+
 		if (m.status & MCI_STATUS_MISCV)
 			rdmsrl(MSR_IA32_MC0_MISC + i*4, m.misc);
 		if (m.status & MCI_STATUS_ADDRV)
@@ -173,7 +173,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		if (regs && (m.mcgstatus & MCG_STATUS_RIPV)) {
 			m.rip = regs->rip;
 			m.cs = regs->cs;
-		} else { 
+		} else {
 			m.rip = 0;
 			m.cs = 0;
 		}
@@ -198,7 +198,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 
 	/* If we didn't find an uncorrectable error, pick
 	   the last one (shouldn't happen, just being safe). */
-	if (!panicm_found) 
+	if (!panicm_found)
 		panicm = m;
 	if (nowayout)
 		mce_panic("Machine check", &panicm, mcestart);
@@ -278,7 +278,7 @@ static void mce_init(void *dummy)
 
 	/* Log the machine checks left over from the previous reset.
 	   This also clears all registers */
-	do_machine_check(NULL, -1); 
+	do_machine_check(NULL, -1);
 
 	set_in_cr4(X86_CR4_MCE);
 
@@ -312,8 +312,8 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 
 	mce_cpu_quirks(c); 
 
-	if (mce_dont_init || 
-	    test_and_set_bit(smp_processor_id(), &mce_cpus) || 
+	if (mce_dont_init ||
+	    test_and_set_bit(smp_processor_id(), &mce_cpus) ||
 	    !mce_available(c))
 		return;
 

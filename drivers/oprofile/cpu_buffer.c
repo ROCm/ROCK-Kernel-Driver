@@ -9,7 +9,7 @@
  * Each CPU has a local buffer that stores PC value/event
  * pairs. We also log context switches when we notice them.
  * Eventually each CPU's buffer is processed into the global
- * event buffer by sync_cpu_buffers().
+ * event buffer by sync_buffer().
  *
  * We use a local buffer for two reasons: an NMI or similar
  * interrupt cannot synchronise, and high sampling rates
@@ -22,21 +22,23 @@
 #include <linux/errno.h>
  
 #include "cpu_buffer.h"
+#include "buffer_sync.h"
 #include "oprof.h"
 
 struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
+
+static void wq_sync_buffer(void *);
+
+#define DEFAULT_TIMER_EXPIRE (HZ / 10)
+int timers_enabled;
 
 static void __free_cpu_buffers(int num)
 {
 	int i;
  
-	for (i=0; i < num; ++i) {
-		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
- 
-		if (!cpu_possible(i)) 
-			continue;
- 
-		vfree(b->buffer);
+	for_each_online_cpu(i) {
+		if (cpu_buffer[i].buffer)
+			vfree(cpu_buffer[i].buffer);
 	}
 }
  
@@ -47,11 +49,8 @@ int alloc_cpu_buffers(void)
  
 	unsigned long buffer_size = fs_cpu_buffer_size;
  
-	for (i=0; i < NR_CPUS; ++i) {
+	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
- 
-		if (!cpu_possible(i)) 
-			continue;
  
 		b->buffer = vmalloc(sizeof(struct op_sample) * buffer_size);
 		if (!b->buffer)
@@ -64,9 +63,11 @@ int alloc_cpu_buffers(void)
 		b->head_pos = 0;
 		b->sample_received = 0;
 		b->sample_lost_overflow = 0;
-		b->sample_lost_task_exit = 0;
+		b->cpu = i;
+		INIT_WORK(&b->work, wq_sync_buffer, b);
 	}
 	return 0;
+
 fail:
 	__free_cpu_buffers(i);
 	return -ENOMEM;
@@ -76,6 +77,40 @@ fail:
 void free_cpu_buffers(void)
 {
 	__free_cpu_buffers(NR_CPUS);
+}
+
+
+void start_cpu_timers(void)
+{
+	int i;
+
+	timers_enabled = 1;
+
+	for_each_online_cpu(i) {
+		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
+
+		/*
+		 * Spread the work by 1 jiffy per cpu so they dont all
+		 * fire at once.
+		 */
+		schedule_delayed_work_on(i, &b->work, DEFAULT_TIMER_EXPIRE + i);
+	}
+}
+
+
+void end_cpu_timers(void)
+{
+	int i;
+
+	timers_enabled = 0;
+
+	for_each_online_cpu(i) {
+		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
+
+		cancel_delayed_work(&b->work);
+	}
+
+	flush_scheduled_work();
 }
 
 
@@ -145,21 +180,9 @@ void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
 	/* notice a task switch */
 	if (cpu_buf->last_task != task) {
 		cpu_buf->last_task = task;
-		if (!(task->flags & PF_EXITING)) {
-			cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
-			cpu_buf->buffer[cpu_buf->head_pos].event = (unsigned long)task;
-			increment_head(cpu_buf);
-		}
-	}
- 
-	/* If the task is exiting it's not safe to take a sample
-	 * as the task_struct is about to be freed. We can't just
-	 * notify at release_task() time because of CLONE_DETACHED
-	 * tasks that release_task() themselves.
-	 */
-	if (task->flags & PF_EXITING) {
-		cpu_buf->sample_lost_task_exit++;
-		return;
+		cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
+		cpu_buf->buffer[cpu_buf->head_pos].event = (unsigned long)task;
+		increment_head(cpu_buf);
 	}
  
 	cpu_buf->buffer[cpu_buf->head_pos].eip = eip;
@@ -177,4 +200,26 @@ void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
 	 */
 	cpu_buf->last_is_kernel = -1;
 	cpu_buf->last_task = NULL;
+}
+
+
+/*
+ * This serves to avoid cpu buffer overflow, and makes sure
+ * the task mortuary progresses
+ *
+ * By using schedule_delayed_work_on and then schedule_delayed_work
+ * we guarantee this will stay on the correct cpu
+ */
+static void wq_sync_buffer(void * data)
+{
+	struct oprofile_cpu_buffer * b = (struct oprofile_cpu_buffer *)data;
+	if (b->cpu != smp_processor_id()) {
+		printk("WQ on CPU%d, prefer CPU%d\n",
+		       smp_processor_id(), b->cpu);
+	}
+	sync_buffer(b->cpu);
+
+	/* don't re-add the work if we're shutting down */
+	if (timers_enabled)
+		schedule_delayed_work(&b->work, DEFAULT_TIMER_EXPIRE);
 }

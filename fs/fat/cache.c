@@ -146,7 +146,8 @@ void fat_cache_init(struct super_block *sb)
 	sbi->cache = sbi->cache_array;
 }
 
-void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu, int *d_clu)
+static void
+fat_cache_lookup(struct inode *inode, int cluster, int *f_clu, int *d_clu)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	struct fat_cache *walk;

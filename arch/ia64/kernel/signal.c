@@ -1,7 +1,7 @@
 /*
  * Architecture-specific signal handling support.
  *
- * Copyright (C) 1999-2003 Hewlett-Packard Co
+ * Copyright (C) 1999-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from i386 and Alpha versions.
@@ -352,13 +352,42 @@ rbs_on_sig_stack (unsigned long bsp)
 }
 
 static long
+force_sigsegv_info (int sig, void *addr)
+{
+	unsigned long flags;
+	struct siginfo si;
+
+	if (sig == SIGSEGV) {
+		/*
+		 * Acquiring siglock around the sa_handler-update is almost
+		 * certainly overkill, but this isn't a
+		 * performance-critical path and I'd rather play it safe
+		 * here than having to debug a nasty race if and when
+		 * something changes in kernel/signal.c that would make it
+		 * no longer safe to modify sa_handler without holding the
+		 * lock.
+		 */
+		spin_lock_irqsave(&current->sighand->siglock, flags);
+		current->sighand->action[sig - 1].sa.sa_handler = SIG_DFL;
+		spin_unlock_irqrestore(&current->sighand->siglock, flags);
+	}
+	si.si_signo = SIGSEGV;
+	si.si_errno = 0;
+	si.si_code = SI_KERNEL;
+	si.si_pid = current->pid;
+	si.si_uid = current->uid;
+	si.si_addr = addr;
+	force_sig_info(SIGSEGV, &si, current);
+	return 0;
+}
+
+static long
 setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	     struct sigscratch *scr)
 {
 	extern char __kernel_sigtramp[];
 	unsigned long tramp_addr, new_rbs = 0;
 	struct sigframe *frame;
-	struct siginfo si;
 	long err;
 
 	frame = (void *) scr->pt.r12;
@@ -377,7 +406,7 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	frame = (void *) frame - ((sizeof(*frame) + STACK_ALIGN - 1) & ~(STACK_ALIGN - 1));
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
-		goto give_sigsegv;
+		return force_sigsegv_info(sig, frame);
 
 	err  = __put_user(sig, &frame->arg0);
 	err |= __put_user(&frame->info, &frame->arg1);
@@ -393,8 +422,8 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	err |= __put_user(sas_ss_flags(scr->pt.r12), &frame->sc.sc_stack.ss_flags);
 	err |= setup_sigcontext(&frame->sc, set, scr);
 
-	if (err)
-		goto give_sigsegv;
+	if (unlikely(err))
+		return force_sigsegv_info(sig, frame);
 
 	scr->pt.r12 = (unsigned long) frame - 16;	/* new stack pointer */
 	scr->pt.ar_fpsr = FPSR_DEFAULT;			/* reset fpsr for signal handler */
@@ -422,18 +451,6 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	       current->comm, current->pid, sig, scr->pt.r12, frame->sc.sc_ip, frame->handler);
 #endif
 	return 1;
-
-  give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	si.si_signo = SIGSEGV;
-	si.si_errno = 0;
-	si.si_code = SI_KERNEL;
-	si.si_pid = current->pid;
-	si.si_uid = current->uid;
-	si.si_addr = frame;
-	force_sig_info(SIGSEGV, &si, current);
-	return 0;
 }
 
 static long
@@ -448,9 +465,6 @@ handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigse
 		/* send signal to IA-64 process */
 		if (!setup_frame(sig, ka, info, oldset, scr))
 			return 0;
-
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
@@ -471,7 +485,7 @@ handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigse
 long
 ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 {
-	struct k_sigaction *ka;
+	struct k_sigaction ka;
 	siginfo_t info;
 	long restart = in_syscall;
 	long errno = scr->pt.r8;
@@ -493,7 +507,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 	 * need to push through a forced SIGSEGV.
 	 */
 	while (1) {
-		int signr = get_signal_to_deliver(&info, &scr->pt, NULL);
+		int signr = get_signal_to_deliver(&info, &ka, &scr->pt, NULL);
 
 		/*
 		 * get_signal_to_deliver() may have run a debugger (via notify_parent())
@@ -520,8 +534,6 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		if (signr <= 0)
 			break;
 
-		ka = &current->sighand->action[signr - 1];
-
 		if (unlikely(restart)) {
 			switch (errno) {
 			      case ERESTART_RESTARTBLOCK:
@@ -531,7 +543,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 				break;
 
 			      case ERESTARTSYS:
-				if ((ka->sa.sa_flags & SA_RESTART) == 0) {
+				if ((ka.sa.sa_flags & SA_RESTART) == 0) {
 					scr->pt.r8 = ERR_CODE(EINTR);
 					/* note: scr->pt.r10 is already -1 */
 					break;
@@ -550,7 +562,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		 * Whee!  Actually deliver the signal.  If the delivery failed, we need to
 		 * continue to iterate in this loop so we can deliver the SIGSEGV...
 		 */
-		if (handle_signal(signr, ka, &info, oldset, scr))
+		if (handle_signal(signr, &ka, &info, oldset, scr))
 			return 1;
 	}
 

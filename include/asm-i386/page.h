@@ -121,6 +121,8 @@ static __inline__ int get_order(unsigned long size)
 	return order;
 }
 
+extern int sysctl_legacy_va_layout;
+
 #endif /* __ASSEMBLY__ */
 
 #ifdef __ASSEMBLY__

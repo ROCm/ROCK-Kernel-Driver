@@ -190,7 +190,6 @@
 #include <scsi/scsicam.h>
 
 
-#define ANY2SCSI_INLINE		/* undef this to use old macros */
 #undef  WD7000_DEBUG		/* general debug                */
 #ifdef WD7000_DEBUG
 #define dprintk printk
@@ -726,55 +725,17 @@ static int __init wd7000_setup(char *str)
 
 __setup("wd7000=", wd7000_setup);
 
-#ifdef ANY2SCSI_INLINE
-/*
- * Since they're used a lot, I've redone the following from the macros
- * formerly in wd7000.h, hopefully to speed them up by getting rid of
- * all the shifting (it may not matter; GCC might have done as well anyway).
- *
- * xany2scsi and xscsi2int were not being used, and are no longer defined.
- * (They were simply 4-byte versions of these routines).
- */
-typedef union {			/* let's cheat... */
-	int i;
-	unchar u[sizeof(int)];	/* the sizeof(int) makes it more portable */
-} i_u;
-
-
 static inline void any2scsi(unchar * scsi, int any)
 {
-	*scsi++ = ((i_u) any).u[2];
-	*scsi++ = ((i_u) any).u[1];
-	*scsi++ = ((i_u) any).u[0];
+	*scsi++ = (unsigned)any >> 16;
+	*scsi++ = (unsigned)any >> 8;
+	*scsi++ = any;
 }
-
 
 static inline int scsi2int(unchar * scsi)
 {
-	i_u result;
-
-	result.i = 0;		/* clears unused bytes */
-	result.u[2] = *scsi++;
-	result.u[1] = *scsi++;
-	result.u[0] = *scsi++;
-
-	return (result.i);
+	return (scsi[0] << 16) | (scsi[1] << 8) | scsi[2];
 }
-#else
-/*
- * These are the old ones - I've just moved them here...
- */
-#undef any2scsi
-#define any2scsi(up, p)   (up)[0] = (((unsigned long) (p)) >> 16);	\
-			  (up)[1] = ((unsigned long) (p)) >> 8;		\
-			  (up)[2] = ((unsigned long) (p));
-
-#undef scsi2int
-#define scsi2int(up)   ( (((unsigned long) *(up)) << 16) +	\
-			 (((unsigned long) (up)[1]) << 8) +	\
-			 ((unsigned long) (up)[2]) )
-#endif
-
 
 static inline void wd7000_enable_intr(Adapter * host)
 {

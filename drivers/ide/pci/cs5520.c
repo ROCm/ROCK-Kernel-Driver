@@ -290,7 +290,10 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 		return 1;
 	}
 	pci_set_master(dev);
-	pci_set_dma_mask(dev, 0xFFFFFFFF);
+	if (pci_set_dma_mask(dev, 0xFFFFFFFF)) {
+		printk(KERN_WARNING "cs5520: No suitable DMA available.\n");
+		return -ENODEV;
+	}
 	init_chipset_cs5520(dev, d->name);
 
 	index.all = 0xf0f0;

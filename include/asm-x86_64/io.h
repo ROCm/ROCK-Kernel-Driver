@@ -188,7 +188,7 @@ extern void iounmap(void *addr);
 
 #ifdef CONFIG_UNORDERED_IO
 static inline void __writel(u32 val, void *addr)
-{ 
+{
 	volatile u32 *target = addr;
 	asm volatile("movnti %1,%0"
 		     : "=m" (*target)
@@ -196,7 +196,7 @@ static inline void __writel(u32 val, void *addr)
 }
 
 static inline void __writeq(u64 val, void *addr)
-{ 
+{
 	volatile u64 *target = addr;
 	asm volatile("movnti %1,%0"
 		     : "=m" (*target)

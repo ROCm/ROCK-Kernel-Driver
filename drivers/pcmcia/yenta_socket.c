@@ -343,14 +343,17 @@ static int yenta_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io
 static int yenta_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *mem)
 {
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
+	struct pci_bus_region region;
 	int map;
 	unsigned char addr, enable;
 	unsigned int start, stop, card_start;
 	unsigned short word;
 
+	pcibios_resource_to_bus(socket->dev, &region, mem->res);
+
 	map = mem->map;
-	start = mem->sys_start;
-	stop = mem->sys_stop;
+	start = region.start;
+	stop = region.end;
 	card_start = mem->card_start;
 
 	if (map > 4 || start > stop || ((start ^ stop) >> 24) ||
@@ -447,7 +450,7 @@ static void yenta_clear_maps(struct yenta_socket *socket)
 	int i;
 	struct resource res = { .start = 0, .end = 0x0fff };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff, };
+	pccard_mem_map mem = { .res = &res, };
 
 	yenta_set_socket(&socket->socket, &dead_socket);
 	for (i = 0; i < 2; i++) {

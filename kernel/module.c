@@ -103,13 +103,6 @@ static inline int strong_try_module_get(struct module *mod)
 	return try_module_get(mod);
 }
 
-/* Stub function for modules which don't have an initfn */
-int init_module(void)
-{
-	return 0;
-}
-EXPORT_SYMBOL(init_module);
-
 /* A thread that wants to hold a reference to a module only while it
  * is running can call ths to safely exit.
  * nfsd and lockd use this.
@@ -543,12 +536,6 @@ EXPORT_SYMBOL(module_refcount);
 /* This exists whether we can unload or not */
 static void free_module(struct module *mod);
 
-/* Stub function for modules which don't have an exitfn */
-void cleanup_module(void)
-{
-}
-EXPORT_SYMBOL(cleanup_module);
-
 static void wait_for_zero_refcount(struct module *mod)
 {
 	/* Since we might sleep for some time, drop the semaphore first */
@@ -603,7 +590,7 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 	}
 
 	/* If it has an init func, it must have an exit func to unload */
-	if ((mod->init != init_module && mod->exit == cleanup_module)
+	if ((mod->init != NULL && mod->exit == NULL)
 	    || mod->unsafe) {
 		forced = try_force(flags);
 		if (!forced) {
@@ -624,9 +611,11 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 		wait_for_zero_refcount(mod);
 
 	/* Final destruction now noone is using it. */
-	up(&module_mutex);
-	mod->exit();
-	down(&module_mutex);
+	if (mod->exit != NULL) {
+		up(&module_mutex);
+		mod->exit();
+		down(&module_mutex);
+	}
 	free_module(mod);
 
  out:
@@ -653,7 +642,7 @@ static void print_unload_info(struct seq_file *m, struct module *mod)
 		seq_printf(m, "[unsafe],");
 	}
 
-	if (mod->init != init_module && mod->exit == cleanup_module) {
+	if (mod->init != NULL && mod->exit == NULL) {
 		printed_something = 1;
 		seq_printf(m, "[permanent],");
 	}
@@ -1552,9 +1541,6 @@ static struct module *load_module(void __user *umod,
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
 	sechdrs[0].sh_addr = 0;
 
-	/* And these should exist, but gcc whinges if we don't init them */
-	symindex = strindex = 0;
-
 	for (i = 1; i < hdr->e_shnum; i++) {
 		if (sechdrs[i].sh_type != SHT_NOBITS
 		    && len < sechdrs[i].sh_offset + sechdrs[i].sh_size)
@@ -1585,6 +1571,13 @@ static struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 	mod = (void *)sechdrs[modindex].sh_addr;
+
+	if (symindex == 0) {
+		printk(KERN_WARNING "%s: module has no symbols (stripped?)\n",
+		       mod->name);
+		err = -ENOEXEC;
+		goto free_hdr;
+	}
 
 	/* Optional sections */
 	exportindex = find_sec(hdr, sechdrs, secstrings, "__ksymtab");
@@ -1869,7 +1862,7 @@ sys_init_module(void __user *umod,
 		const char __user *uargs)
 {
 	struct module *mod;
-	int ret;
+	int ret = 0;
 
 	/* Must have permission */
 	if (!capable(CAP_SYS_MODULE))
@@ -1908,7 +1901,8 @@ sys_init_module(void __user *umod,
 	up(&notify_mutex);
 
 	/* Start the module */
-	ret = mod->init();
+	if (mod->init != NULL)
+		ret = mod->init();
 	if (ret < 0) {
 		/* Init routine failed: abort.  Try to protect us from
                    buggy refcounters. */

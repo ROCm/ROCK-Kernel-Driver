@@ -47,7 +47,7 @@ long find_next_zero_bit (const unsigned long * addr, long size, long offset)
 	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long set = 0;
 	unsigned long res, bit = offset&63;
-	
+
 	if (bit) {
 		/*
 		 * Look for zero in first word
@@ -64,12 +64,12 @@ long find_next_zero_bit (const unsigned long * addr, long size, long offset)
 	/*
 	 * No zero yet, search remaining full words for a zero
 	 */
-	res = find_first_zero_bit ((const unsigned long *)p, 
+	res = find_first_zero_bit ((const unsigned long *)p,
 				   size - 64 * (p - (unsigned long *) addr));
 	return (offset + set + res);
 }
 
-static inline long 
+static inline long
 __find_first_bit(const unsigned long * addr, unsigned long size)
 {
 	long d0, d1;
@@ -85,7 +85,7 @@ __find_first_bit(const unsigned long * addr, unsigned long size)
 		"   addq %%rdi,%%rax"
 		:"=a" (res), "=&c" (d0), "=&D" (d1)
 		:"0" (0ULL),
-		 "1" ((size + 63) >> 6), "2" (addr), 
+		 "1" ((size + 63) >> 6), "2" (addr),
 		 [addr] "r" (addr) : "memory");
 	return res;
 }
@@ -113,7 +113,7 @@ long find_next_bit(const unsigned long * addr, long size, long offset)
 {
 	const unsigned long * p = addr + (offset >> 6);
 	unsigned long set = 0, bit = offset & 63, res;
-	
+
 	if (bit) {
 		/*
 		 * Look for nonzero in the first 64 bits:

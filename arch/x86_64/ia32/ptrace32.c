@@ -250,7 +250,7 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_SETFPXREGS:
 	case PTRACE_GETFPXREGS:
 	case PTRACE_GETEVENTMSG:
-		break;		
+		break;
 	} 
 
 	child = find_target(request, pid, &ret);

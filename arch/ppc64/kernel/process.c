@@ -34,6 +34,7 @@
 #include <linux/prctl.h>
 #include <linux/ptrace.h>
 #include <linux/kallsyms.h>
+#include <linux/interrupt.h>
 #include <linux/version.h>
 
 #include <asm/pgtable.h>
@@ -47,7 +48,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
-#include <asm/hardirq.h>
 #include <asm/cputable.h>
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -356,6 +356,16 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	kregs = (struct pt_regs *) sp;
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
+		unsigned long sp_vsid = get_kernel_vsid(sp);
+
+		sp_vsid <<= SLB_VSID_SHIFT;
+		sp_vsid |= SLB_VSID_KERNEL;
+		if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+			sp_vsid |= SLB_VSID_L;
+
+		p->thread.ksp_vsid = sp_vsid;
+	}
 
 	/*
 	 * The PPC64 ABI makes use of a TOC to contain function 
@@ -458,7 +468,7 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 		}
 	}
 
-	return do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
+	return do_fork(clone_flags, p2, regs, 0,
 		    (int __user *)parent_tidptr, (int __user *)child_tidptr);
 }
 

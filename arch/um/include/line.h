@@ -9,12 +9,14 @@
 #include "linux/list.h"
 #include "linux/workqueue.h"
 #include "linux/tty.h"
+#include "linux/interrupt.h"
 #include "asm/semaphore.h"
 #include "chan_user.h"
 #include "mconsole_kern.h"
 
 struct line_driver {
 	char *name;
+	char *device_name;
 	char *devfs_name;
 	short major;
 	short minor_start;
@@ -67,8 +69,6 @@ struct lines {
 
 #define LINES_INIT(n) {  num :		n }
 
-extern void line_interrupt(int irq, void *data, struct pt_regs *unused);
-extern void line_write_interrupt(int irq, void *data, struct pt_regs *unused);
 extern void line_close(struct line *lines, struct tty_struct *tty);
 extern int line_open(struct line *lines, struct tty_struct *tty, 
 		     struct chan_opts *opts);

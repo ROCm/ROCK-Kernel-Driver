@@ -433,7 +433,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_flags |= mm->def_flags;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
 		insert_vm_struct(mm, mpnt);
-		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+		mm->stack_vm = mm->total_vm = vma_pages(mpnt);
 	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
@@ -546,6 +546,7 @@ static int exec_mmap(struct mm_struct *mm)
 	tsk->active_mm = mm;
 	activate_mm(active_mm, mm);
 	task_unlock(tsk);
+	arch_pick_mmap_layout(mm);
 	if (old_mm) {
 		if (active_mm != old_mm) BUG();
 		mmput(old_mm);
@@ -1102,7 +1103,7 @@ int do_execve(char * filename,
 	if (IS_ERR(file))
 		return retval;
 
-	sched_balance_exec();
+	sched_exec();
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
@@ -1215,7 +1216,7 @@ EXPORT_SYMBOL(set_binfmt);
  * name into corename, which must have space for at least
  * CORENAME_MAX_SIZE bytes plus one byte for the zero terminator.
  */
-void format_corename(char *corename, const char *pattern, long signr)
+static void format_corename(char *corename, const char *pattern, long signr)
 {
 	const char *pat_ptr = pattern;
 	char *out_ptr = corename;
@@ -1379,7 +1380,6 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	struct file * file;
 	int retval = 0;
 
-	lock_kernel();
 	binfmt = current->binfmt;
 	if (!binfmt || !binfmt->core_dump)
 		goto fail;
@@ -1397,7 +1397,13 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
 		goto fail_unlock;
 
- 	format_corename(corename, core_pattern, signr);
+	/*
+	 * lock_kernel() because format_corename() is controlled by sysctl, which
+	 * uses lock_kernel()
+	 */
+ 	lock_kernel();
+	format_corename(corename, core_pattern, signr);
+	unlock_kernel();
 	file = filp_open(corename, O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE, 0600);
 	if (IS_ERR(file))
 		goto fail_unlock;
@@ -1424,6 +1430,5 @@ close_fail:
 fail_unlock:
 	complete_all(&mm->core_done);
 fail:
-	unlock_kernel();
 	return retval;
 }

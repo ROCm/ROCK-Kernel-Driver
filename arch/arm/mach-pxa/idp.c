@@ -100,7 +100,7 @@ static void __init idp_map_io(void)
 	pxa_map_io();
 	iotable_init(idp_io_desc, ARRAY_SIZE(idp_io_desc));
 
-	set_irq_type(IRQ_TO_GPIO_2_80(TOUCH_PANEL_IRQ), TOUCH_PANEL_IRQ_EDGE);
+	set_irq_type(TOUCH_PANEL_IRQ, TOUCH_PANEL_IRQ_EDGE);
 
 	// serial ports 2 & 3
 	pxa_gpio_mode(GPIO42_BTRXD_MD);

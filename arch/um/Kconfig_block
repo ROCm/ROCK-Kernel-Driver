@@ -29,6 +29,10 @@ config BLK_DEV_UBD_SYNC
         wise choice too.  In all other cases (for example, if you're just
         playing around with User-Mode Linux) you can choose N.
 
+config BLK_DEV_COW_COMMON
+	bool
+	default BLK_DEV_UBD
+
 config BLK_DEV_LOOP
 	tristate "Loopback device support"
 

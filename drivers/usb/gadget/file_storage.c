@@ -3713,6 +3713,8 @@ static int __init check_parameters(struct fsg_dev *fsg)
 			mod_data.release = __constant_cpu_to_le16(0x0307);
 		else if (gadget_is_omap(fsg->gadget))
 			mod_data.release = __constant_cpu_to_le16(0x0308);
+		else if (gadget_is_lh7a40x(gadget))
+			mod_data.release = __constant_cpu_to_le16 (0x0309);
 		else {
 			WARN(fsg, "controller '%s' not recognized\n",
 				fsg->gadget->name);

@@ -97,46 +97,69 @@ int qdisc_restart(struct net_device *dev)
 
 	/* Dequeue packet */
 	if ((skb = q->dequeue(q)) != NULL) {
-		if (spin_trylock(&dev->xmit_lock)) {
+		unsigned nolock = (dev->features & NETIF_F_LLTX);
+		/*
+		 * When the driver has LLTX set it does its own locking
+		 * in start_xmit. No need to add additional overhead by
+		 * locking again. These checks are worth it because
+		 * even uncongested locks can be quite expensive.
+		 * The driver can do trylock like here too, in case
+		 * of lock congestion it should return -1 and the packet
+		 * will be requeued.
+		 */
+		if (!nolock) {
+			if (!spin_trylock(&dev->xmit_lock)) {
+			collision:
+				/* So, someone grabbed the driver. */
+				
+				/* It may be transient configuration error,
+				   when hard_start_xmit() recurses. We detect
+				   it by checking xmit owner and drop the
+				   packet when deadloop is detected.
+				*/
+				if (dev->xmit_lock_owner == smp_processor_id()) {
+					kfree_skb(skb);
+					if (net_ratelimit())
+						printk(KERN_DEBUG "Dead loop on netdevice %s, fix it urgently!\n", dev->name);
+					return -1;
+				}
+				__get_cpu_var(netdev_rx_stat).cpu_collision++;
+				goto requeue;
+			}
 			/* Remember that the driver is grabbed by us. */
 			dev->xmit_lock_owner = smp_processor_id();
-
+		}
+		
+		{
 			/* And release queue */
 			spin_unlock(&dev->queue_lock);
 
 			if (!netif_queue_stopped(dev)) {
+				int ret;
 				if (netdev_nit)
 					dev_queue_xmit_nit(skb, dev);
 
-				if (dev->hard_start_xmit(skb, dev) == 0) {
-					dev->xmit_lock_owner = -1;
-					spin_unlock(&dev->xmit_lock);
-
+				ret = dev->hard_start_xmit(skb, dev);
+				if (ret == NETDEV_TX_OK) { 
+					if (!nolock) {
+						dev->xmit_lock_owner = -1;
+						spin_unlock(&dev->xmit_lock);
+					}
 					spin_lock(&dev->queue_lock);
 					return -1;
 				}
+				if (ret == NETDEV_TX_LOCKED && nolock)
+					goto collision; 
 			}
 
+			/* NETDEV_TX_BUSY - we need to requeue */
 			/* Release the driver */
-			dev->xmit_lock_owner = -1;
-			spin_unlock(&dev->xmit_lock);
+			if (!nolock) { 
+				dev->xmit_lock_owner = -1;
+				spin_unlock(&dev->xmit_lock);
+			} 
 			spin_lock(&dev->queue_lock);
 			q = dev->qdisc;
-		} else {
-			/* So, someone grabbed the driver. */
-
-			/* It may be transient configuration error,
-			   when hard_start_xmit() recurses. We detect
-			   it by checking xmit owner and drop the
-			   packet when deadloop is detected.
-			 */
-			if (dev->xmit_lock_owner == smp_processor_id()) {
-				kfree_skb(skb);
-				if (net_ratelimit())
-					printk(KERN_DEBUG "Dead loop on netdevice %s, fix it urgently!\n", dev->name);
-				return -1;
-			}
-			__get_cpu_var(netdev_rx_stat).cpu_collision++;
 		}
 
 		/* Device kicked us out :(
@@ -149,6 +172,7 @@ int qdisc_restart(struct net_device *dev)
 		   3. device is buggy (ppp)
 		 */
 
+requeue:
 		q->ops->requeue(skb, q);
 		netif_schedule(dev);
 		return 1;

@@ -1241,10 +1241,6 @@ struct r_port {
 #define TTY_ROCKET_MAJOR	46
 #define CUA_ROCKET_MAJOR	47
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 #ifdef PCI_VENDOR_ID_RP
 #undef PCI_VENDOR_ID_RP
 #undef PCI_DEVICE_ID_RP8OCTA

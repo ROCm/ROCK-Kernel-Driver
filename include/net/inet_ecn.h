@@ -16,9 +16,9 @@ static inline int INET_ECN_is_ce(__u8 dsfield)
 	return (dsfield & INET_ECN_MASK) == INET_ECN_CE;
 }
 
-static inline int INET_ECN_is_not_ce(__u8 dsfield)
+static inline int INET_ECN_is_not_ect(__u8 dsfield)
 {
-	return (dsfield & INET_ECN_MASK) == INET_ECN_ECT_0;
+	return (dsfield & INET_ECN_MASK) == INET_ECN_NOT_ECT;
 }
 
 static inline int INET_ECN_is_capable(__u8 dsfield)
@@ -29,8 +29,7 @@ static inline int INET_ECN_is_capable(__u8 dsfield)
 static inline __u8 INET_ECN_encapsulate(__u8 outer, __u8 inner)
 {
 	outer &= ~INET_ECN_MASK;
-	if (INET_ECN_is_capable(inner))
-		outer |= (inner & INET_ECN_MASK);
+	outer |= (inner & INET_ECN_MASK) ?: INET_ECN_ECT_0;
 	return outer;
 }
 
@@ -50,7 +49,25 @@ static inline __u8 INET_ECN_encapsulate(__u8 outer, __u8 inner)
 static inline void IP_ECN_set_ce(struct iphdr *iph)
 {
 	u32 check = iph->check;
-	check += __constant_htons(0xFFFE);
+	u32 ecn = (iph->tos + 1) & INET_ECN_MASK;
+
+	/*
+	 * After the last operation we have (in binary):
+	 * INET_ECN_NOT_ECT => 01
+	 * INET_ECN_ECT_1   => 10
+	 * INET_ECN_ECT_0   => 11
+	 * INET_ECN_CE      => 00
+	 */
+	if (!(ecn & 2))
+		return;
+
+	/*
+	 * The following gives us:
+	 * INET_ECN_ECT_1 => check += htons(0xFFFD)
+	 * INET_ECN_ECT_0 => check += htons(0xFFFE)
+	 */
+	check += htons(0xFFFB) + htons(ecn);
+
 	iph->check = check + (check>=0xFFFF);
 	iph->tos |= INET_ECN_CE;
 }
@@ -60,10 +77,14 @@ static inline void IP_ECN_clear(struct iphdr *iph)
 	iph->tos &= ~INET_ECN_MASK;
 }
 
+#define ip6_get_dsfield(iph) ((ntohs(*(u16*)(iph)) >> 4) & 0xFF)
+
 struct ipv6hdr;
 
 static inline void IP6_ECN_set_ce(struct ipv6hdr *iph)
 {
+	if (INET_ECN_is_not_ect(ip6_get_dsfield(iph)))
+		return;
 	*(u32*)iph |= htonl(INET_ECN_CE << 20);
 }
 
@@ -71,7 +92,5 @@ static inline void IP6_ECN_clear(struct ipv6hdr *iph)
 {
 	*(u32*)iph &= ~htonl(INET_ECN_MASK << 20);
 }
-
-#define ip6_get_dsfield(iph) ((ntohs(*(u16*)(iph)) >> 4) & 0xFF)
 
 #endif

@@ -653,7 +653,7 @@ static void get_product_info(struct edgeport_serial *edge_serial)
 
 	memset (product_info, 0, sizeof(struct edgeport_product_info));
 
-	product_info->ProductId		= (__u16)(edge_serial->serial->dev->descriptor.idProduct & ~ION_DEVICE_ID_GENERATION_2);
+	product_info->ProductId		= (__u16)(edge_serial->serial->dev->descriptor.idProduct & ~ION_DEVICE_ID_80251_NETCHIP);
 	product_info->NumPorts		= edge_serial->manuf_descriptor.NumPorts;
 	product_info->ProdInfoVer	= 0;
 
@@ -669,7 +669,7 @@ static void get_product_info(struct edgeport_serial *edge_serial)
 	memcpy(product_info->ManufactureDescDate, edge_serial->manuf_descriptor.DescDate, sizeof(edge_serial->manuf_descriptor.DescDate));
 
 	// check if this is 2nd generation hardware
-	if (edge_serial->serial->dev->descriptor.idProduct & ION_DEVICE_ID_GENERATION_2) {
+	if (edge_serial->serial->dev->descriptor.idProduct & ION_DEVICE_ID_80251_NETCHIP) {
 		product_info->FirmwareMajorVersion	= OperationalCodeImageVersion_GEN2.MajorVersion;
 		product_info->FirmwareMinorVersion	= OperationalCodeImageVersion_GEN2.MinorVersion;
 		product_info->FirmwareBuildNumber	= cpu_to_le16(OperationalCodeImageVersion_GEN2.BuildNumber);
@@ -1389,7 +1389,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	//	to bother queueing a write. If it's too small, say a few bytes,
 	//	it's better to wait for more credits so we can do a larger
 	//	write.
-	if (edge_port->txCredits < EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(edge_port->maxTxCredits)) {
+	if (edge_port->txCredits < EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(edge_port->maxTxCredits,EDGE_FW_BULK_MAX_PACKET_SIZE)) {
 		dbg("%s(%d) Not enough credit - fifo %d TxCredit %d", __FUNCTION__, edge_port->port->number, fifo->count, edge_port->txCredits );
 		return;
 	}
@@ -3007,9 +3007,6 @@ static void edge_shutdown (struct usb_serial *serial)
 static int __init edgeport_init(void)
 {
 	int retval;
-	retval = usb_serial_register(&edgeport_1port_device);
-	if (retval) 
-		goto failed_1port_device_register;
 	retval = usb_serial_register(&edgeport_2port_device);
 	if (retval)
 		goto failed_2port_device_register;
@@ -3031,8 +3028,6 @@ failed_8port_device_register:
 failed_4port_device_register:
 	usb_serial_deregister(&edgeport_2port_device);
 failed_2port_device_register:
-	usb_serial_deregister(&edgeport_1port_device);
-failed_1port_device_register:
 	return retval;
 }
 
@@ -3045,7 +3040,6 @@ failed_1port_device_register:
 static void __exit edgeport_exit (void)
 {
 	usb_deregister (&io_driver);
-	usb_serial_deregister (&edgeport_1port_device);
 	usb_serial_deregister (&edgeport_2port_device);
 	usb_serial_deregister (&edgeport_4port_device);
 	usb_serial_deregister (&edgeport_8port_device);

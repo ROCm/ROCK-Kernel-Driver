@@ -2154,10 +2154,12 @@ static struct device_driver smc_driver = {
 static int __init smc_init(void)
 {
 #ifdef MODULE
+#ifdef CONFIG_ISA
 	if (io == -1)
 		printk(KERN_WARNING 
 			"%s: You shouldn't use auto-probing with insmod!\n",
 			CARDNAME);
+#endif
 #endif
 
 	return driver_register(&smc_driver);

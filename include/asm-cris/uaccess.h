@@ -434,6 +434,8 @@ __generic_clear_user_nocheck(void *to, unsigned long n)
 
 #define __copy_to_user(to,from,n)   __generic_copy_to_user_nocheck((to),(from),(n))
 #define __copy_from_user(to,from,n) __generic_copy_from_user_nocheck((to),(from),(n))
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 #define __clear_user(to,n) __generic_clear_user_nocheck((to),(n))
 
 #define strlen_user(str)	strnlen_user((str), 0x7ffffffe)

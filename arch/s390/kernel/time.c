@@ -174,47 +174,7 @@ __calculate_ticks(__u64 elapsed)
 
 
 #ifdef CONFIG_PROFILING
-extern char _stext, _etext;
-
-/*
- * The profiling function is SMP safe. (nothing can mess
- * around with "current", and the profiling counters are
- * updated with atomic operations). This is especially
- * useful with a profiling multiplier != 1
- */
-static inline void s390_do_profile(struct pt_regs * regs)
-{
-	unsigned long eip;
-	extern cpumask_t prof_cpu_mask;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	eip = instruction_pointer(regs);
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
-		return;
-
-	eip -= (unsigned long) &_stext;
-	eip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds EIP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (eip > prof_len-1)
-		eip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[eip]);
-}
+#define s390_do_profile(regs)	profile_tick(CPU_PROFILING, regs)
 #else
 #define s390_do_profile(regs)  do { ; } while(0)
 #endif /* CONFIG_PROFILING */

@@ -1159,6 +1159,12 @@ static inline void nf_reset(struct sk_buff *skb)
 	skb->nf_debug = 0;
 #endif
 }
+static inline void nf_reset_debug(struct sk_buff *skb)
+{
+#ifdef CONFIG_NETFILTER_DEBUG
+	skb->nf_debug = 0;
+#endif
+}
 
 #ifdef CONFIG_BRIDGE_NETFILTER
 static inline void nf_bridge_put(struct nf_bridge_info *nf_bridge)

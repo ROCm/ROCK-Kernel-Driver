@@ -413,6 +413,62 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 }
 
+int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
+{
+	struct mm_struct *mm = current->mm;
+	unsigned long addr;
+	int ret = 0;
+
+	WARN_ON(!is_vm_hugetlb_page(vma));
+	BUG_ON((vma->vm_start % HPAGE_SIZE) != 0);
+	BUG_ON((vma->vm_end % HPAGE_SIZE) != 0);
+
+	spin_lock(&mm->page_table_lock);
+	for (addr = vma->vm_start; addr < vma->vm_end; addr += HPAGE_SIZE) {
+		unsigned long idx;
+		hugepte_t *pte = hugepte_alloc(mm, addr);
+		struct page *page;
+
+		BUG_ON(!in_hugepage_area(mm->context, addr));
+
+		if (!pte) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		if (!hugepte_none(*pte))
+			continue;
+
+		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+		page = find_get_page(mapping, idx);
+		if (!page) {
+			/* charge the fs quota first */
+			if (hugetlb_get_quota(mapping)) {
+				ret = -ENOMEM;
+				goto out;
+			}
+			page = alloc_huge_page();
+			if (!page) {
+				hugetlb_put_quota(mapping);
+				ret = -ENOMEM;
+				goto out;
+			}
+			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+			if (! ret) {
+				unlock_page(page);
+			} else {
+				hugetlb_put_quota(mapping);
+				free_huge_page(page);
+				goto out;
+			}
+		}
+		setup_huge_pte(mm, page, pte, vma->vm_flags & VM_WRITE);
+	}
+out:
+	spin_unlock(&mm->page_table_lock);
+	return ret;
+}
+
 /* Because we have an exclusive hugepage region which lies within the
  * normal user address space, we have to take special measures to make
  * non-huge mmap()s evade the hugepage reserved regions. */
@@ -469,6 +525,108 @@ full_search:
 		goto full_search;
 	}
 	return -ENOMEM;
+}
+
+/*
+ * This mmap-allocator allocates new areas top-down from below the
+ * stack's low limit (the base):
+ *
+ * Because we have an exclusive hugepage region which lies within the
+ * normal user address space, we have to take special measures to make
+ * non-huge mmap()s evade the hugepage reserved regions.
+ */
+unsigned long
+arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+			  const unsigned long len, const unsigned long pgoff,
+			  const unsigned long flags)
+{
+	struct vm_area_struct *vma, *prev_vma;
+	struct mm_struct *mm = current->mm;
+	unsigned long base = mm->mmap_base, addr = addr0;
+	int first_time = 1;
+
+	/* requested length too big for entire address space */
+	if (len > TASK_SIZE)
+		return -ENOMEM;
+
+	/* dont allow allocations above current base */
+	if (mm->free_area_cache > base)
+		mm->free_area_cache = base;
+
+	/* requesting a specific address */
+	if (addr) {
+		addr = PAGE_ALIGN(addr);
+		vma = find_vma(mm, addr);
+		if (TASK_SIZE - len >= addr &&
+				(!vma || addr + len <= vma->vm_start)
+				&& !is_hugepage_only_range(addr,len))
+			return addr;
+	}
+
+try_again:
+	/* make sure it can fit in the remaining address space */
+	if (mm->free_area_cache < len)
+		goto fail;
+
+	/* either no address requested or cant fit in requested address hole */
+	addr = (mm->free_area_cache - len) & PAGE_MASK;
+	do {
+hugepage_recheck:
+		if (touches_hugepage_low_range(addr, len)) {
+			addr = (addr & ((~0) << SID_SHIFT)) - len;
+			goto hugepage_recheck;
+		} else if (touches_hugepage_high_range(addr, len)) {
+			addr = TASK_HPAGE_BASE - len;
+		}
+
+		/*
+		 * Lookup failure means no vma is above this address,
+		 * i.e. return with success:
+		 */
+ 	 	if (!(vma = find_vma_prev(mm, addr, &prev_vma)))
+			return addr;
+
+		/*
+		 * new region fits between prev_vma->vm_end and
+		 * vma->vm_start, use it:
+		 */
+		if (addr+len <= vma->vm_start &&
+				(!prev_vma || (addr >= prev_vma->vm_end)))
+			/* remember the address as a hint for next time */
+			return (mm->free_area_cache = addr);
+		else
+			/* pull free_area_cache down to the first hole */
+			if (mm->free_area_cache == vma->vm_end)
+				mm->free_area_cache = vma->vm_start;
+
+		/* try just below the current vma->vm_start */
+		addr = vma->vm_start-len;
+	} while (len <= vma->vm_start);
+
+fail:
+	/*
+	 * if hint left us with no space for the requested
+	 * mapping then try again:
+	 */
+	if (first_time) {
+		mm->free_area_cache = base;
+		first_time = 0;
+		goto try_again;
+	}
+	/*
+	 * A failed mmap() very likely causes application failure,
+	 * so fall back to the bottom-up function here. This scenario
+	 * can happen with large stack limits and large mmap()
+	 * allocations.
+	 */
+	mm->free_area_cache = TASK_UNMAPPED_BASE;
+	addr = arch_get_unmapped_area(filp, addr0, len, pgoff, flags);
+	/*
+	 * Restore the topdown base:
+	 */
+	mm->free_area_cache = base;
+
+	return addr;
 }
 
 static unsigned long htlb_get_low_area(unsigned long len, u16 segmask)
@@ -703,60 +861,4 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	slot += (hugepte_val(pte) & _HUGEPAGE_GROUP_IX) >> 5;
 
 	ppc_md.hpte_invalidate(slot, va, 1, local);
-}
-
-int
-handle_hugetlb_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
-	unsigned long addr, int write_access)
-{
-	hugepte_t *pte;
-	struct page *page;
-	struct address_space *mapping;
-	int idx, ret;
-
-	spin_lock(&mm->page_table_lock);
-	pte = hugepte_alloc(mm, addr & HPAGE_MASK);
-	if (!pte)
-		goto oom;
-	if (!hugepte_none(*pte))
-		goto out;
-	spin_unlock(&mm->page_table_lock);
-
-	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
-	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
-		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
-retry:
-	page = find_get_page(mapping, idx);
-	if (!page) {
-		page = alloc_huge_page();
-		if (!page)
-			/*
-			 * with strict overcommit accounting, we should never
-			 * run out of hugetlb page, so must be a fault race
-			 * and let's retry.
-			 */
-			goto retry;
-		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-		if (!ret) {
-			unlock_page(page);
-		} else {
-			put_page(page);
-			if (ret == -EEXIST)
-				goto retry;
-			else
-				return VM_FAULT_OOM;
-		}
-	}
-
-	spin_lock(&mm->page_table_lock);
-	if (hugepte_none(*pte))
-		setup_huge_pte(mm, page, pte, vma->vm_flags & VM_WRITE);
-	else
-		put_page(page);
-out:
-	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_MINOR;
-oom:
-	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_OOM;
 }

@@ -421,12 +421,18 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 }
 
 struct ip_nat_helper *
+__ip_nat_find_helper(const struct ip_conntrack_tuple *tuple)
+{
+	return LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *, tuple);
+}
+
+struct ip_nat_helper *
 ip_nat_find_helper(const struct ip_conntrack_tuple *tuple)
 {
 	struct ip_nat_helper *h;
 
 	READ_LOCK(&ip_nat_lock);
-	h = LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *, tuple);
+	h = __ip_nat_find_helper(tuple);
 	READ_UNLOCK(&ip_nat_lock);
 
 	return h;

@@ -568,7 +568,7 @@ pmac_outbsync(ide_drive_t *drive, u8 value, unsigned long port)
 {
 	u32 tmp;
 	
-	writeb(value, port);	
+	writeb(value, (void __iomem *) port);
 	tmp = readl((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG));
 }
 

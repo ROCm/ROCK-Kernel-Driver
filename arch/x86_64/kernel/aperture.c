@@ -246,12 +246,12 @@ void __init iommu_hole_init(void)
 		   valid_agp ||
 		   fallback_aper_force) { 
 		printk("Your BIOS doesn't leave a aperture memory hole\n");
-		printk("Please enable the IOMMU option in the BIOS setup\n"); 
-		printk("This costs you %d MB of RAM\n", 
-		       32 << fallback_aper_order); 
-	
+		printk("Please enable the IOMMU option in the BIOS setup\n");
+		printk("This costs you %d MB of RAM\n",
+		       32 << fallback_aper_order);
+
 		aper_order = fallback_aper_order;
-		aper_alloc = allocate_aperture(); 
+		aper_alloc = allocate_aperture();
 		if (!aper_alloc) { 
 			/* Could disable AGP and IOMMU here, but it's probably
 			   not worth it. But the later users cannot deal with

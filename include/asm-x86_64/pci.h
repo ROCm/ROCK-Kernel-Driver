@@ -54,9 +54,9 @@ extern int iommu_setup(char *opt);
  * On AMD64 it mostly equals, but we set it to zero to tell some subsystems
  * that an IOMMU is available.
  */
-#define PCI_DMA_BUS_IS_PHYS	(no_iommu ? 1 : 0) 
+#define PCI_DMA_BUS_IS_PHYS	(no_iommu ? 1 : 0)
 
-/* 
+/*
  * x86-64 always supports DAC, but sometimes it is useful to force
  * devices through the IOMMU to get automatic sg list merging.
  * Optional right now.

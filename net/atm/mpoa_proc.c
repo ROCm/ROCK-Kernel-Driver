@@ -121,7 +121,7 @@ static void mpc_stop(struct seq_file *m, void *v)
 /*
  * READING function - called when the /proc/atm/mpoa file is read from.
  */
-static ssize_t mpc_show(struct seq_file *m, void *v)
+static int mpc_show(struct seq_file *m, void *v)
 {
 	struct mpoa_client *mpc = v;
 	unsigned char *temp;

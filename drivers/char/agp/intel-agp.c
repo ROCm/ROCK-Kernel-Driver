@@ -69,7 +69,7 @@ static struct gatt_mask intel_i810_masks[] =
 
 static struct _intel_i810_private {
 	struct pci_dev *i810_dev;	/* device one */
-	volatile u8 *registers;
+	volatile u8 __iomem *registers;
 	int num_dcache_entries;
 } intel_i810_private;
 
@@ -111,7 +111,7 @@ static int intel_i810_configure(void)
 	pci_read_config_dword(intel_i810_private.i810_dev, I810_MMADDR, &temp);
 	temp &= 0xfff80000;
 
-	intel_i810_private.registers = (volatile u8 *) ioremap(temp, 128 * 4096);
+	intel_i810_private.registers = ioremap(temp, 128 * 4096);
 	if (!intel_i810_private.registers) {
 		printk(KERN_ERR PFX "Unable to remap memory.\n");
 		return -ENOMEM;
@@ -142,7 +142,7 @@ static int intel_i810_configure(void)
 static void intel_i810_cleanup(void)
 {
 	OUTREG32(intel_i810_private.registers, I810_PGETBL_CTL, 0);
-	iounmap((void *) intel_i810_private.registers);
+	iounmap(intel_i810_private.registers);
 }
 
 static void intel_i810_tlbflush(struct agp_memory *mem)
@@ -353,8 +353,8 @@ static struct aper_size_info_fixed intel_i830_sizes[] =
 
 static struct _intel_i830_private {
 	struct pci_dev *i830_dev;		/* device one */
-	volatile u8 *registers;
-	volatile u32 *gtt;		/* I915G */
+	volatile u8 __iomem *registers;
+	volatile u32 __iomem *gtt;		/* I915G */
 	int gtt_entries;
 } intel_i830_private;
 
@@ -461,7 +461,7 @@ static int intel_i830_create_gatt_table(void)
 	pci_read_config_dword(intel_i830_private.i830_dev,I810_MMADDR,&temp);
 	temp &= 0xfff80000;
 
-	intel_i830_private.registers = (volatile u8 *) ioremap(temp,128 * 4096);
+	intel_i830_private.registers = ioremap(temp,128 * 4096);
 	if (!intel_i830_private.registers)
 		return (-ENOMEM);
 
@@ -544,7 +544,7 @@ static int intel_i830_configure(void)
 
 static void intel_i830_cleanup(void)
 {
-	iounmap((void *) intel_i830_private.registers);
+	iounmap(intel_i830_private.registers);
 }
 
 static int intel_i830_insert_entries(struct agp_memory *mem,off_t pg_start,
@@ -649,8 +649,8 @@ static int intel_i915_configure(void)
 
 static void intel_i915_cleanup(void)
 {
-	iounmap((void *) intel_i830_private.gtt);
-	iounmap((void *) intel_i830_private.registers);
+	iounmap(intel_i830_private.gtt);
+	iounmap(intel_i830_private.registers);
 }
 
 static int intel_i915_insert_entries(struct agp_memory *mem,off_t pg_start,
@@ -751,13 +751,13 @@ static int intel_i915_create_gatt_table(void)
 	pci_read_config_dword(intel_i830_private.i830_dev, I915_MMADDR, &temp);
 	pci_read_config_dword(intel_i830_private.i830_dev, I915_PTEADDR,&temp2);
 
-	intel_i830_private.gtt = (volatile u32 *) ioremap(temp2, 256 * 1024);
+	intel_i830_private.gtt = ioremap(temp2, 256 * 1024);
 	if (!intel_i830_private.gtt)
 		return (-ENOMEM);
 
 	temp &= 0xfff80000;
 
-	intel_i830_private.registers = (volatile u8 *) ioremap(temp,128 * 4096);
+	intel_i830_private.registers = ioremap(temp,128 * 4096);
 	if (!intel_i830_private.registers)
 		return (-ENOMEM);
 

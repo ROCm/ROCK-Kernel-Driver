@@ -326,7 +326,7 @@ adbhid_mouse_input(unsigned char *data, int nb, struct pt_regs *regs, int autopo
 	input_report_key(&adbhid[id]->input, BTN_LEFT,   !((data[1] >> 7) & 1));
 	input_report_key(&adbhid[id]->input, BTN_MIDDLE, !((data[2] >> 7) & 1));
 
-	if (nb >= 4)
+	if (nb >= 4 && adbhid[id]->mouse_kind != ADBMOUSE_TRACKPAD)
 		input_report_key(&adbhid[id]->input, BTN_RIGHT,  !((data[3] >> 7) & 1));
 
 	input_report_rel(&adbhid[id]->input, REL_X,

@@ -6,7 +6,7 @@
 #include <linux/workqueue.h>
 #include <asm/ccwdev.h>
 
-#define VERSION_LCS_H "$Revision: 1.17 $"
+#define VERSION_LCS_H "$Revision: 1.18 $"
 
 #define LCS_DBF_TEXT(level, name, text) \
 	do { \
@@ -152,6 +152,12 @@ enum lcs_dev_states {
 	DEV_STATE_RECOVER,
 };
 
+enum lcs_threads {
+	LCS_SET_MC_THREAD 	= 1,
+	LCS_STARTLAN_THREAD	= 2,
+	LCS_STOPLAN_THREAD	= 4,
+	LCS_STARTUP_THREAD	= 8,
+};
 /**
  * LCS struct declarations
  */
@@ -247,9 +253,11 @@ struct lcs_buffer {
 struct lcs_reply {
 	struct list_head list;
 	__u16 sequence_no;
+	atomic_t refcnt;
 	/* Callback for completion notification. */
 	void (*callback)(struct lcs_card *, struct lcs_cmd *);
 	wait_queue_head_t wait_q;
+	struct lcs_card *card;
 	int received;
 	int rc;
 };
@@ -267,6 +275,7 @@ struct lcs_channel {
 	int io_idx;
 	int buf_idx;
 };
+
 
 /**
  * definition of the lcs card
@@ -287,7 +296,11 @@ struct lcs_card {
 	int lancmd_timeout;
 
 	struct work_struct kernel_thread_starter;
-	unsigned long thread_mask;
+	spinlock_t mask_lock;
+	unsigned long thread_start_mask;
+	unsigned long thread_running_mask;
+	unsigned long thread_allowed_mask;
+	wait_queue_head_t wait_q;
 
 #ifdef CONFIG_IP_MULTICAST
 	struct list_head ipm_list;

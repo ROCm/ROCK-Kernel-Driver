@@ -70,14 +70,14 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 
 	info->tcpi_rto = (1000000*tp->rto)/HZ;
 	info->tcpi_ato = (1000000*tp->ack.ato)/HZ;
-	info->tcpi_snd_mss = tp->mss_cache;
+	info->tcpi_snd_mss = tp->mss_cache_std;
 	info->tcpi_rcv_mss = tp->ack.rcv_mss;
 
-	info->tcpi_unacked = tp->packets_out;
-	info->tcpi_sacked = tp->sacked_out;
-	info->tcpi_lost = tp->lost_out;
-	info->tcpi_retrans = tp->retrans_out;
-	info->tcpi_fackets = tp->fackets_out;
+	info->tcpi_unacked = tcp_get_pcount(&tp->packets_out);
+	info->tcpi_sacked = tcp_get_pcount(&tp->sacked_out);
+	info->tcpi_lost = tcp_get_pcount(&tp->lost_out);
+	info->tcpi_retrans = tcp_get_pcount(&tp->retrans_out);
+	info->tcpi_fackets = tcp_get_pcount(&tp->fackets_out);
 
 	info->tcpi_last_data_sent = ((now - tp->lsndtime)*1000)/HZ;
 	info->tcpi_last_data_recv = ((now - tp->ack.lrcvtime)*1000)/HZ;

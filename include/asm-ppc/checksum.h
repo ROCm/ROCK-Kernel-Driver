@@ -33,7 +33,7 @@ extern unsigned int csum_partial_copy_generic(const char *src, char *dst,
 					      int *src_err, int *dst_err);
 
 #define csum_partial_copy_from_user(src, dst, len, sum, errp)	\
-	csum_partial_copy_generic((src), (dst), (len), (sum), (errp), NULL)
+	csum_partial_copy_generic((__force void *)(src), (dst), (len), (sum), (errp), NULL)
 
 /* FIXME: this needs to be written to really do no check -- Cort */
 #define csum_partial_copy_nocheck(src, dst, len, sum)	\

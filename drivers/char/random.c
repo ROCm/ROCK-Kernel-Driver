@@ -401,6 +401,7 @@ static struct poolinfo {
  */
 static struct entropy_store *random_state; /* The default global store */
 static struct entropy_store *sec_random_state; /* secondary store */
+static struct entropy_store *urandom_state; /* For urandom */
 static DECLARE_WAIT_QUEUE_HEAD(random_read_wait);
 static DECLARE_WAIT_QUEUE_HEAD(random_write_wait);
 
@@ -493,6 +494,7 @@ struct entropy_store {
 	/* mostly-read data: */
 	struct poolinfo poolinfo;
 	__u32		*pool;
+	const char	*name;
 
 	/* read-write data: */
 	spinlock_t lock ____cacheline_aligned_in_smp;
@@ -507,7 +509,8 @@ struct entropy_store {
  *
  * Returns an negative error if there is a problem.
  */
-static int create_entropy_store(int size, struct entropy_store **ret_bucket)
+static int create_entropy_store(int size, const char *name,
+				struct entropy_store **ret_bucket)
 {
 	struct	entropy_store	*r;
 	struct	poolinfo	*p;
@@ -538,6 +541,7 @@ static int create_entropy_store(int size, struct entropy_store **ret_bucket)
 	}
 	memset(r->pool, 0, POOLBYTES);
 	r->lock = SPIN_LOCK_UNLOCKED;
+	r->name = name;
 	*ret_bucket = r;
 	return 0;
 }
@@ -643,12 +647,8 @@ static void credit_entropy_store(struct entropy_store *r, int nbits)
 	} else {
 		r->entropy_count += nbits;
 		if (nbits)
-			DEBUG_ENT("%04d %04d : added %d bits to %s\n",
-				  random_state->entropy_count,
-				  sec_random_state->entropy_count,
-				  nbits,
-				  r == sec_random_state ? "secondary" :
-				  r == random_state ? "primary" : "unknown");
+			DEBUG_ENT("Added %d entropy credits to %s, now %d\n",
+				  nbits, r->name, r->entropy_count);
 	}
 
 	spin_unlock_irqrestore(&r->lock, flags);
@@ -781,8 +781,8 @@ static void batch_entropy_process(void *private_)
 
 /* There is one of these per entropy source */
 struct timer_rand_state {
-	__u32		last_time;
-	__s32		last_delta,last_delta2;
+	cycles_t	last_time;
+	long		last_delta,last_delta2;
 	unsigned	dont_count_entropy:1;
 };
 
@@ -799,14 +799,12 @@ static struct timer_rand_state *irq_timer_state[NR_IRQS];
  * The number "num" is also added to the pool - it should somehow describe
  * the type of event which just happened.  This is currently 0-255 for
  * keyboard scan codes, and 256 upwards for interrupts.
- * On the i386, this is assumed to be at most 16 bits, and the high bits
- * are used for a high-resolution timer.
  *
  */
 static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 {
-	__u32		time;
-	__s32		delta, delta2, delta3;
+	cycles_t	time;
+	long		delta, delta2, delta3;
 	int		entropy = 0;
 
 	/* if over the trickle threshold, use only 1 in 4096 samples */
@@ -814,22 +812,17 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	     (__get_cpu_var(trickle_count)++ & 0xfff))
 		return;
 
-#if defined (__i386__) || defined (__x86_64__)
-	if (cpu_has_tsc) {
-		__u32 high;
-		rdtsc(time, high);
-		num ^= high;
+	/*
+	 * Use get_cycles() if implemented, otherwise fall back to
+	 * jiffies.
+	 */
+	time = get_cycles();
+	if (time != 0) {
+		if (sizeof(time) > 4)
+			num ^= (u32)(time >> 32);
 	} else {
 		time = jiffies;
 	}
-#elif defined (__sparc_v9__)
-	unsigned long tick = tick_ops->get_tick();
-
-	time = (unsigned int) tick;
-	num ^= (tick >> 32UL);
-#else
-	time = jiffies;
-#endif
 
 	/*
 	 * Calculate number of bits of randomness we probably added.
@@ -1328,8 +1321,7 @@ static inline void xfer_secondary_pool(struct entropy_store *r,
 			  "(%d of %d requested)\n",
 			  random_state->entropy_count,
 			  sec_random_state->entropy_count,
-			  r == sec_random_state ? "secondary" : "unknown",
-			  bytes * 8, nbytes * 8, r->entropy_count);
+			  r->name, bytes * 8, nbytes * 8, r->entropy_count);
 
 		bytes=extract_entropy(random_state, tmp, bytes,
 				      EXTRACT_ENTROPY_LIMIT);
@@ -1373,9 +1365,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	DEBUG_ENT("%04d %04d : trying to extract %d bits from %s\n",
 		  random_state->entropy_count,
 		  sec_random_state->entropy_count,
-		  nbytes * 8,
-		  r == sec_random_state ? "secondary" :
-		  r == random_state ? "primary" : "unknown");
+		  nbytes * 8, r->name);
 
 	if (flags & EXTRACT_ENTROPY_LIMIT && nbytes >= r->entropy_count / 8)
 		nbytes = r->entropy_count / 8;
@@ -1388,12 +1378,8 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 	if (r->entropy_count < random_write_wakeup_thresh)
 		wake_up_interruptible(&random_write_wait);
 
-	DEBUG_ENT("%04d %04d : debiting %d bits from %s%s\n",
-		  random_state->entropy_count,
-		  sec_random_state->entropy_count,
-		  nbytes * 8,
-		  r == sec_random_state ? "secondary" :
-		  r == random_state ? "primary" : "unknown",
+	DEBUG_ENT("Debiting %d entropy credits from %s%s\n",
+		  nbytes * 8, r->name,
 		  flags & EXTRACT_ENTROPY_LIMIT ? "" : " (unlimited)");
 
 	spin_unlock_irqrestore(&r->lock, cpuflags);
@@ -1482,14 +1468,21 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
  */
 void get_random_bytes(void *buf, int nbytes)
 {
-	if (sec_random_state)  
-		extract_entropy(sec_random_state, (char *) buf, nbytes, 
-				EXTRACT_ENTROPY_SECONDARY);
-	else if (random_state)
-		extract_entropy(random_state, (char *) buf, nbytes, 0);
-	else
+	struct entropy_store *r = urandom_state;
+	int flags = EXTRACT_ENTROPY_SECONDARY;
+
+	if (!r)
+		r = sec_random_state;
+	if (!r) {
+		r = random_state;
+		flags = 0;
+	}
+	if (!r) {
 		printk(KERN_NOTICE "get_random_bytes called before "
 				   "random driver initialization\n");
+		return;
+	}
+	extract_entropy(r, (char *) buf, nbytes, flags);
 }
 
 EXPORT_SYMBOL(get_random_bytes);
@@ -1533,16 +1526,22 @@ static int __init rand_initialize(void)
 {
 	int i;
 
-	if (create_entropy_store(DEFAULT_POOL_SIZE, &random_state))
+	if (create_entropy_store(DEFAULT_POOL_SIZE, "primary", &random_state))
 		goto err;
 	if (batch_entropy_init(BATCH_ENTROPY_SIZE, random_state))
 		goto err;
-	if (create_entropy_store(SECONDARY_POOL_SIZE, &sec_random_state))
+	if (create_entropy_store(SECONDARY_POOL_SIZE, "secondary",
+				 &sec_random_state))
+		goto err;
+	if (create_entropy_store(SECONDARY_POOL_SIZE, "urandom",
+				 &urandom_state))
 		goto err;
 	clear_entropy_store(random_state);
 	clear_entropy_store(sec_random_state);
+	clear_entropy_store(urandom_state);
 	init_std_data(random_state);
 	init_std_data(sec_random_state);
+	init_std_data(urandom_state);
 #ifdef CONFIG_SYSCTL
 	sysctl_init_random(random_state);
 #endif
@@ -1675,9 +1674,15 @@ static ssize_t
 urandom_read(struct file * file, char __user * buf,
 		      size_t nbytes, loff_t *ppos)
 {
-	return extract_entropy(sec_random_state, buf, nbytes,
-			       EXTRACT_ENTROPY_USER |
-			       EXTRACT_ENTROPY_SECONDARY);
+	int flags = EXTRACT_ENTROPY_USER;
+	unsigned long cpuflags;
+
+	spin_lock_irqsave(&random_state->lock, cpuflags);
+	if (random_state->entropy_count > random_state->poolinfo.POOLBITS)
+		flags |= EXTRACT_ENTROPY_SECONDARY;
+	spin_unlock_irqrestore(&random_state->lock, cpuflags);
+
+	return extract_entropy(urandom_state, buf, nbytes, flags);
 }
 
 static unsigned int
@@ -1731,10 +1736,9 @@ static int
 random_ioctl(struct inode * inode, struct file * file,
 	     unsigned int cmd, unsigned long arg)
 {
-	int *tmp, size, ent_count;
+	int size, ent_count;
 	int __user *p = (int __user *)arg;
 	int retval;
-	unsigned long flags;
 	
 	switch (cmd) {
 	case RNDGETENTCNT:
@@ -1754,40 +1758,6 @@ random_ioctl(struct inode * inode, struct file * file,
 		 */
 		if (random_state->entropy_count >= random_read_wakeup_thresh)
 			wake_up_interruptible(&random_read_wait);
-		return 0;
-	case RNDGETPOOL:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		if (get_user(size, p) ||
-		    put_user(random_state->poolinfo.poolwords, p++))
-			return -EFAULT;
-		if (size < 0)
-			return -EFAULT;
-		if (size > random_state->poolinfo.poolwords)
-			size = random_state->poolinfo.poolwords;
-
-		/* prepare to atomically snapshot pool */
-
-		tmp = kmalloc(size * sizeof(__u32), GFP_KERNEL);
-
-		if (!tmp)
-			return -ENOMEM;
-
-		spin_lock_irqsave(&random_state->lock, flags);
-		ent_count = random_state->entropy_count;
-		memcpy(tmp, random_state->pool, size * sizeof(__u32));
-		spin_unlock_irqrestore(&random_state->lock, flags);
-
-		if (!copy_to_user(p, tmp, size * sizeof(__u32))) {
-			kfree(tmp);
-			return -EFAULT;
-		}
-
-		kfree(tmp);
-
-		if(put_user(ent_count, p++))
-			return -EFAULT;
-
 		return 0;
 	case RNDADDENTROPY:
 		if (!capable(CAP_SYS_ADMIN))
@@ -1885,7 +1855,8 @@ static int change_poolsize(int poolsize)
 	struct entropy_store	*new_store, *old_store;
 	int			ret;
 	
-	if ((ret = create_entropy_store(poolsize, &new_store)))
+	if ((ret = create_entropy_store(poolsize, random_state->name,
+					&new_store)))
 		return ret;
 
 	add_entropy_words(new_store, random_state->pool,
@@ -2247,22 +2218,27 @@ static struct keydata {
 static spinlock_t ip_lock = SPIN_LOCK_UNLOCKED;
 static unsigned int ip_cnt;
 
-static struct keydata *__check_and_rekey(time_t time)
+static void rekey_seq_generator(void *private_)
 {
 	struct keydata *keyptr;
+	struct timeval 	tv;
+
+	do_gettimeofday(&tv);
+
 	spin_lock_bh(&ip_lock);
 	keyptr = &ip_keydata[ip_cnt&1];
-	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
-		keyptr = &ip_keydata[1^(ip_cnt&1)];
-		keyptr->rekey_time = time;
-		get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
-		keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
-		mb();
-		ip_cnt++;
-	}
+
+	keyptr = &ip_keydata[1^(ip_cnt&1)];
+	keyptr->rekey_time = tv.tv_sec;
+	get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
+	keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
+	mb();
+	ip_cnt++;
+
 	spin_unlock_bh(&ip_lock);
-	return keyptr;
 }
+
+static DECLARE_WORK(rekey_work, rekey_seq_generator, NULL);
 
 static inline struct keydata *check_and_rekey(time_t time)
 {
@@ -2270,7 +2246,7 @@ static inline struct keydata *check_and_rekey(time_t time)
 
 	rmb();
 	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
-		keyptr = __check_and_rekey(time);
+		schedule_work(&rekey_work);
 	}
 
 	return keyptr;
@@ -2303,19 +2279,7 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 	return seq;
 }
 EXPORT_SYMBOL(secure_tcpv6_sequence_number);
-
-__u32 secure_ipv6_id(__u32 *daddr)
-{
-	struct keydata *keyptr;
-
-	keyptr = check_and_rekey(get_seconds());
-
-	return halfMD4Transform(daddr, keyptr->secret);
-}
-
-EXPORT_SYMBOL(secure_ipv6_id);
 #endif
-
 
 __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 				 __u16 sport, __u16 dport)

@@ -105,6 +105,7 @@ extern int fix_alignment(struct pt_regs *regs);
 extern void bad_page_fault(struct pt_regs *regs, unsigned long address,
 			   int sig);
 extern void show_regs(struct pt_regs * regs);
+extern void low_hash_fault(struct pt_regs *regs, unsigned long address);
 extern int die(const char *str, struct pt_regs *regs, long err);
 
 extern void flush_instruction_cache(void);

@@ -153,4 +153,5 @@ int __init q40fb_init(void)
 	return ret;
 }
 
+module_init(q40fb_init);
 MODULE_LICENSE("GPL");

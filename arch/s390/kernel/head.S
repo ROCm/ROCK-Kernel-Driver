@@ -31,6 +31,8 @@
 #include <asm/setup.h>
 #include <asm/lowcore.h>
 #include <asm/offsets.h>
+#include <asm/thread_info.h>
+#include <asm/page.h>
 
 #ifndef CONFIG_IPL
         .org   0
@@ -741,10 +743,10 @@ _stext:	basr  %r13,0                    # get base
 #
         l     %r15,.Linittu-.LPG2(%r13)
 	mvc   __LC_CURRENT(4),__TI_task(%r15)
-        ahi   %r15,8192                 # init_task_union + 8192
+        ahi   %r15,1<<(PAGE_SHIFT+THREAD_ORDER) # init_task_union + THREAD_SIZE
         st    %r15,__LC_KERNEL_STACK    # set end of kernel stack
         ahi   %r15,-96
-        xc    0(4,%r15),0(%r15)         # set backchain to zero
+        xc    __SF_BACKCHAIN(4,%r15),__SF_BACKCHAIN(%r15) # clear backchain
 
 # check control registers
         stctl  %c0,%c15,0(%r15)

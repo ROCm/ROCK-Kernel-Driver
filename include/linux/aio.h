@@ -64,16 +64,17 @@ struct kiocb {
 	} ki_obj;
 	__u64			ki_user_data;	/* user's data for completion */
 	loff_t			ki_pos;
-	void			*private;
 	/* State that we remember to be able to restart/retry  */
 	unsigned short		ki_opcode;
 	size_t			ki_nbytes; 	/* copy of iocb->aio_nbytes */
-	char 			*ki_buf;	/* remaining iocb->aio_buf */
+	char 			__user *ki_buf;	/* remaining iocb->aio_buf */
 	size_t			ki_left; 	/* remaining bytes */
 	wait_queue_t		ki_wait;
 	long			ki_retried; 	/* just for testing */
 	long			ki_kicked; 	/* just for testing */
 	long			ki_queued; 	/* just for testing */
+
+	void			*private;
 };
 
 #define is_sync_kiocb(iocb)	((iocb)->ki_key == KIOCB_SYNC_KEY)
@@ -174,11 +175,14 @@ int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 
 #define in_aio() !is_sync_wait(current->io_wait)
 /* may be used for debugging */
-#define warn_if_async()	if (in_aio()) {\
-	printk(KERN_ERR "%s(%s:%d) called in async context!\n", \
-	__FUNCTION__, __FILE__, __LINE__); \
-	dump_stack(); \
-	}
+#define warn_if_async()							\
+do {									\
+	if (in_aio()) {							\
+		printk(KERN_ERR "%s(%s:%d) called in async context!\n",	\
+			__FUNCTION__, __FILE__, __LINE__);		\
+		dump_stack();						\
+	}								\
+} while (0)
 
 #define io_wait_to_kiocb(wait) container_of(wait, struct kiocb, ki_wait)
 #define is_retried_kiocb(iocb) ((iocb)->ki_retried > 1)
@@ -194,5 +198,4 @@ static inline struct kiocb *list_kiocb(struct list_head *h)
 extern atomic_t aio_nr;
 extern unsigned aio_max_nr;
 
-extern ssize_t generic_aio_poll(struct kiocb *, unsigned);
 #endif /* __LINUX__AIO_H */

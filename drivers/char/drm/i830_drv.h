@@ -53,7 +53,6 @@ typedef struct _drm_i830_ring_buffer{
 
 typedef struct drm_i830_private {
 	drm_map_t *sarea_map;
-	drm_map_t *buffer_map;
 	drm_map_t *mmio_map;
 
 	drm_i830_sarea_t *sarea_priv;
@@ -137,6 +136,10 @@ extern int i830_irq_wait( struct inode *inode, struct file *filp,
 extern int i830_wait_irq(drm_device_t *dev, int irq_nr);
 extern int i830_emit_irq(drm_device_t *dev);
 
+extern irqreturn_t i830_driver_irq_handler( DRM_IRQ_ARGS );
+extern void i830_driver_irq_preinstall( drm_device_t *dev );
+extern void i830_driver_irq_postinstall( drm_device_t *dev );
+extern void i830_driver_irq_uninstall( drm_device_t *dev );
 
 #define I830_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)

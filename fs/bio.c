@@ -389,10 +389,10 @@ int bio_uncopy_user(struct bio *bio)
 	int i, ret = 0;
 
 	char *uaddr = bio->bi_private;
-	
+
 	__bio_for_each_segment(bvec, bio, i, 0) {
 		char *addr = page_address(bvec->bv_page);
-		if (bio_data_dir(bio) == READ && !ret && 
+		if (bio_data_dir(bio) == READ && !ret &&
 		    copy_to_user(uaddr, addr, bvec->bv_len))
 			ret = -EFAULT;
 

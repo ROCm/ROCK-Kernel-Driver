@@ -2238,6 +2238,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		neigh_sysctl_unregister(idev->nd_parms);
 #endif
 		neigh_parms_release(&nd_tbl, idev->nd_parms);
+		neigh_ifdown(&nd_tbl, dev);
 		in6_dev_put(idev);
 	}
 	return 0;
@@ -2273,21 +2274,13 @@ static void addrconf_rs_timer(unsigned long data)
 
 		ndisc_send_rs(ifp->idev->dev, &ifp->addr, &all_routers);
 	} else {
-		struct in6_rtmsg rtmsg;
-
 		spin_unlock(&ifp->lock);
-
+		/*
+		 * Note: we do not support deprecated "all on-link"
+		 * assumption any longer.
+		 */
 		printk(KERN_DEBUG "%s: no IPv6 routers present\n",
 		       ifp->idev->dev->name);
-
-		memset(&rtmsg, 0, sizeof(struct in6_rtmsg));
-		rtmsg.rtmsg_type = RTMSG_NEWROUTE;
-		rtmsg.rtmsg_metric = IP6_RT_PRIO_ADDRCONF;
-		rtmsg.rtmsg_flags = (RTF_ALLONLINK | RTF_DEFAULT | RTF_UP);
-
-		rtmsg.rtmsg_ifindex = ifp->idev->dev->ifindex;
-
-		ip6_route_add(&rtmsg, NULL, NULL);
 	}
 
 out:

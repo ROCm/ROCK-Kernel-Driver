@@ -12,10 +12,9 @@
 #include "kern_util.h"
 #include "user.h"
 #include "sigcontext.h"
+#include "mode.h"
 
-extern int userspace_pid;
-
-int copy_sc_from_user_skas(union uml_pt_regs *regs, void *from_ptr)
+int copy_sc_from_user_skas(int pid, union uml_pt_regs *regs, void *from_ptr)
 {
   	struct sigcontext sc, *from = from_ptr;
 	unsigned long fpregs[FP_FRAME_SIZE];
@@ -41,13 +40,12 @@ int copy_sc_from_user_skas(union uml_pt_regs *regs, void *from_ptr)
 	regs->skas.regs[EIP] = sc.eip;
 	regs->skas.regs[CS] = sc.cs;
 	regs->skas.regs[EFL] = sc.eflags;
-	regs->skas.regs[UESP] = sc.esp_at_signal;
 	regs->skas.regs[SS] = sc.ss;
 	regs->skas.fault_addr = sc.cr2;
 	regs->skas.fault_type = FAULT_WRITE(sc.err);
 	regs->skas.trap_type = sc.trapno;
 
-	err = ptrace(PTRACE_SETFPREGS, userspace_pid, 0, fpregs);
+	err = ptrace(PTRACE_SETFPREGS, pid, 0, fpregs);
 	if(err < 0){
 	  	printk("copy_sc_to_user - PTRACE_SETFPREGS failed, "
 		       "errno = %d\n", errno);
@@ -57,8 +55,9 @@ int copy_sc_from_user_skas(union uml_pt_regs *regs, void *from_ptr)
 	return(0);
 }
 
-int copy_sc_to_user_skas(void *to_ptr, void *fp, union uml_pt_regs *regs, 
-			 unsigned long fault_addr, int fault_type)
+int copy_sc_to_user_skas(int pid, void *to_ptr, void *fp,
+			 union uml_pt_regs *regs, unsigned long fault_addr,
+			 int fault_type)
 {
   	struct sigcontext sc, *to = to_ptr;
 	struct _fpstate *to_fp;
@@ -86,7 +85,7 @@ int copy_sc_to_user_skas(void *to_ptr, void *fp, union uml_pt_regs *regs,
 	sc.err = TO_SC_ERR(fault_type);
 	sc.trapno = regs->skas.trap_type;
 
-	err = ptrace(PTRACE_GETFPREGS, userspace_pid, 0, fpregs);
+	err = ptrace(PTRACE_GETFPREGS, pid, 0, fpregs);
 	if(err < 0){
 	  	printk("copy_sc_to_user - PTRACE_GETFPREGS failed, "
 		       "errno = %d\n", errno);

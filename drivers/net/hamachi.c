@@ -559,7 +559,7 @@ static void hamachi_tx_timeout(struct net_device *dev);
 static void hamachi_init_ring(struct net_device *dev);
 static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
-static inline int hamachi_rx(struct net_device *dev);
+static int hamachi_rx(struct net_device *dev);
 static inline int hamachi_tx(struct net_device *dev);
 static void hamachi_error(struct net_device *dev, int intr_status);
 static int hamachi_close(struct net_device *dev);

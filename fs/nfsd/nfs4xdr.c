@@ -1414,6 +1414,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	u64 dummy64;
 	u32 *p = buffer;
 	int status;
+	int aclsupport = 0;
 	struct nfs4_acl *acl = NULL;
 
 	BUG_ON(bmval1 & NFSD_WRITEONLY_ATTRS_WORD1);
@@ -1437,12 +1438,16 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 			goto out;
 		fhp = &tempfh;
 	}
-	if (bmval0 & FATTR4_WORD0_ACL) {
+	if (bmval0 & (FATTR4_WORD0_ACL | FATTR4_WORD0_ACLSUPPORT
+			| FATTR4_WORD0_SUPPORTED_ATTRS)) {
 		status = nfsd4_get_nfs4_acl(rqstp, dentry, &acl);
-		if (status == -EOPNOTSUPP)
-			bmval0 &= ~FATTR4_WORD0_ACL;
-		else if (status < 0)
-			goto out_nfserr;
+		aclsupport = (status == 0);
+		if (bmval0 & FATTR4_WORD0_ACL) {
+			if (status == -EOPNOTSUPP)
+				bmval0 &= ~FATTR4_WORD0_ACL;
+			else if (status != 0)
+				goto out_nfserr;
+		}
 	}
 	if ((buflen -= 16) < 0)
 		goto out_resource;
@@ -1456,9 +1461,9 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if ((buflen -= 12) < 0)
 			goto out_resource;
 		WRITE32(2);
-		/* XXX Should depend on exported filesystem (e.g.
-		 * for acl support) */
-		WRITE32(NFSD_SUPPORTED_ATTRS_WORD0);
+		WRITE32(aclsupport ?
+			NFSD_SUPPORTED_ATTRS_WORD0 :
+			NFSD_SUPPORTED_ATTRS_WORD0 & ~FATTR4_WORD0_ACL);
 		WRITE32(NFSD_SUPPORTED_ATTRS_WORD1);
 	}
 	if (bmval0 & FATTR4_WORD0_TYPE) {
@@ -1565,8 +1570,8 @@ out_acl:
 	if (bmval0 & FATTR4_WORD0_ACLSUPPORT) {
 		if ((buflen -= 4) < 0)
 			goto out_resource;
-		/* XXX: should depend on exported filesystem: */
-		WRITE32(ACL4_SUPPORT_ALLOW_ACL|ACL4_SUPPORT_DENY_ACL);
+		WRITE32(aclsupport ?
+			ACL4_SUPPORT_ALLOW_ACL|ACL4_SUPPORT_DENY_ACL : 0);
 	}
 	if (bmval0 & FATTR4_WORD0_CANSETTIME) {
 		if ((buflen -= 4) < 0)

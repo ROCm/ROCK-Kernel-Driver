@@ -251,7 +251,6 @@
 struct NCR5380_hostdata {
 	NCR5380_implementation_fields;		/* implementation specific */
 	struct Scsi_Host *host;			/* Host backpointer */
-	struct NCR5380_hostdata *next;		/* Next in our hot chain */
 	unsigned char id_mask, id_higher_mask;	/* 1 << id, all bits greater */
 	unsigned char targets_present;		/* targets we have connected
 						   to, so we can call a select
@@ -270,7 +269,6 @@ struct NCR5380_hostdata {
 	volatile unsigned aborted:1;		/* flag, says aborted */
 	int flags;
 	unsigned long time_expires;		/* in jiffies, set prior to sleeping */
-	struct Scsi_Host *next_timer;
 	int select_time;			/* timer in select for target response */
 	volatile Scsi_Cmnd *selecting;
 	struct work_struct coroutine;		/* our co-routine */
@@ -295,6 +293,7 @@ struct NCR5380_hostdata {
 static int NCR5380_probe_irq(struct Scsi_Host *instance, int possible);
 #endif
 static int NCR5380_init(struct Scsi_Host *instance, int flags);
+static void NCR5380_exit(struct Scsi_Host *instance);
 static void NCR5380_information_transfer(struct Scsi_Host *instance);
 #ifndef DONT_USE_INTR
 static irqreturn_t NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs);

@@ -19,7 +19,7 @@ static int timer_notify(struct notifier_block * self, unsigned long val, void * 
 {
 	struct pt_regs * regs = (struct pt_regs *)data;
 	int cpu = smp_processor_id();
-	unsigned long eip = instruction_pointer(regs);
+	unsigned long eip = profile_pc(regs);
  
 	oprofile_add_sample(eip, !user_mode(regs), 0, cpu);
 	return 0;

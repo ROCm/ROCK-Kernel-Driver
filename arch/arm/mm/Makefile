@@ -3,7 +3,8 @@
 #
 
 obj-y				:= consistent.o extable.o fault-armv.o \
-				   fault.o init.o ioremap.o mmap.o mm-armv.o
+				   fault.o flush.o init.o ioremap.o mmap.o \
+				   mm-armv.o
 
 obj-$(CONFIG_MODULES)		+= proc-syms.o
 

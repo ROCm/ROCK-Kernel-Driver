@@ -17,7 +17,6 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/stat.h>
-#include <linux/topology.h>
 
 #include "pci.h"
 
@@ -38,15 +37,6 @@ pci_config_attr(subsystem_vendor, "0x%04x\n");
 pci_config_attr(subsystem_device, "0x%04x\n");
 pci_config_attr(class, "0x%06x\n");
 pci_config_attr(irq, "%u\n");
-
-static ssize_t local_cpus_show(struct device *dev, char *buf)
-{		
-	struct pci_dev *pdev = to_pci_dev(dev);
-	cpumask_t mask = pcibus_to_cpumask(pdev->bus->number);
-	int len = cpumask_scnprintf(buf, PAGE_SIZE-1, mask);
-	strcat(buf,"\n"); 
-	return 1+len;
-}
 
 /* show resources */
 static ssize_t
@@ -77,7 +67,6 @@ struct device_attribute pci_dev_attrs[] = {
 	__ATTR_RO(subsystem_device),
 	__ATTR_RO(class),
 	__ATTR_RO(irq),
-	__ATTR_RO(local_cpus),
 	__ATTR_NULL,
 };
 

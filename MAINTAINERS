@@ -169,7 +169,7 @@ ACI MIXER DRIVER
 P:	Robert Siemer
 M:	Robert.Siemer@gmx.de
 L:	linux-sound@vger.kernel.org
-W:	http://www.uni-karlsruhe.de/~Robert.Siemer/Private/
+W:	http://www.stud.uni-karlsruhe.de/~uh1b/
 S:	Maintained
 
 ACP/MWAVE MODEM
@@ -195,8 +195,14 @@ S:	Maintained
 
 AD1816 SOUND DRIVER
 P:	Thorsten Knabe
-W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
-W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
+M:	Thorsten Knabe <linux@thorsten-knabe.de>
+W:	http://linux.thorsten-knabe.de
+S:	Maintained
+
+ADM1025 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
 S:	Maintained
 
 ADT746X FAN DRIVER
@@ -563,7 +569,7 @@ CRYPTO API
 P:	James Morris
 M:	jmorris@redhat.com
 P:	David S. Miller
-M:	davem@redhat.com
+M:	davem@davemloft.net
 W	http://samba.org/~jamesm/crypto/
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
@@ -621,6 +627,8 @@ DC390/AM53C974 SCSI driver
 P:	Kurt Garloff
 M:	garloff@suse.de
 W:	http://www.garloff.de/kurt/linux/dc390/
+P:	Guennadi Liakhovetski
+M:	g.liakhovetski@gmx.de
 S:	Maintained
 
 DECnet NETWORK LAYER
@@ -648,8 +656,9 @@ W:	http://sources.redhat.com/dm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY
-P:	John Cagle
+P:	Torben Mathiasen
 M:	device@lanana.org
+W:	http://lanana.org/docs/device-list/index.html
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
@@ -762,8 +771,8 @@ M:	saw@saw.sw.com.sg
 S:	Maintained
 
 EMU10K1 SOUND DRIVER
-P:	Rui Sousa	
-M:	rui.p.m.sousa@clix.pt	
+P:	James Courtier-Dutton
+M:	James@superbug.demon.co.uk
 L:	emu10k1-devel@lists.sourceforge.net
 W:	http://sourceforge.net/projects/emu10k1/
 S:	Maintained
@@ -827,10 +836,8 @@ M:	viro@math.psu.edu
 S:	Maintained
 
 FIRMWARE LOADER (request_firmware)
-P:	Manuel Estrada Sainz
-M:	ranty@debian.org
 L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 FPU EMULATOR
 P:	Bill Metzenthen
@@ -950,6 +957,12 @@ P:	Philip Edelbrock
 M:	phil@netroedge.com
 L:	sensors@stimpy.netroedge.com
 W:	http://www.lm-sensors.nu/
+S:	Maintained
+
+I2O
+P:	Markus Lidel
+M:	markus.lidel@shadowconnect.com
+W:	http://i2o.shadowconnect.com/
 S:	Maintained
 
 i386 BOOT CODE
@@ -1277,13 +1290,14 @@ S:	Maintained
 LINUX FOR POWERPC
 P:	Paul Mackerras
 M:	paulus@samba.org
-W:	http://www.fsmlabs.com/linuxppcbk.html
+W:	http://www.penguinppc.org/
+L:	linuxppc-dev@lists.linuxppc.org
 S:	Supported
 
 LINUX FOR POWER MACINTOSH
 P:	Benjamin Herrenschmidt
 M:	benh@kernel.crashing.org
-W:	http://www.linuxppc.org/
+W:	http://www.penguinppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
 
@@ -1314,9 +1328,11 @@ M:	acme@conectiva.com.br
 S:	Maintained
 
 LINUX FOR 64BIT POWERPC
-P:	David Engebretsen (stable kernel)
-M:	engebret@us.ibm.com
-P:	Anton Blanchard (development kernel)
+P:	Paul Mackerras
+M:	paulus@samba.org
+M:	paulus@au.ibm.com
+P:	Anton Blanchard
+M:	anton@samba.org
 M:	anton@au.ibm.com
 W:	http://linuxppc64.org
 L:	linuxppc64-dev@lists.linuxppc.org
@@ -1328,6 +1344,18 @@ M:	chrisw@osdl.org
 L:	linux-security-module@wirex.com
 W:	http://lsm.immunix.org
 S:	Supported
+
+LM83 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Maintained
+
+LM90 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Maintained
 
 LOGICAL DISK MANAGER SUPPORT (LDM, Windows 2000/XP Dynamic Disks)
 P:	Richard Russon (FlatCap)
@@ -1506,7 +1534,7 @@ S:	Maintained
 
 NETWORKING [IPv4/IPv6]
 P:	David S. Miller
-M:	davem@redhat.com
+M:	davem@davemloft.net
 P:	Alexey Kuznetsov
 M:	kuznet@ms2.inr.ac.ru
 P:	Pekka Savola (ipv6)
@@ -1518,6 +1546,14 @@ M:	yoshfuji@linux-ipv6.org
 P:	Patrick McHardy
 M:	kaber@coreworks.de
 L:	netdev@oss.sgi.com
+S:	Maintained
+
+IPVS
+P:	Wensong Zhang
+M:	wensong@linux-vs.org
+P:	Julian Anastasov
+M:	ja@ssi.bg
+L:	lvs-users@linuxvirtualserver.org
 S:	Maintained
 
 NFS CLIENT
@@ -1613,14 +1649,14 @@ P:	David Campbell
 M:	campbell@torque.net
 P:	Andrea Arcangeli
 M:	andrea@e-mind.com
-L:	linux-parport@torque.net
+L:	linux-parport@lists.infradead.org
 W:	http://people.redhat.com/twaugh/parport/
 S:	Maintained
 
 PARIDE DRIVERS FOR PARALLEL PORT IDE DEVICES
 P:	Tim Waugh
 M:	tim@cyberelk.net
-L:	linux-parport@torque.net
+L:	linux-parport@lists.infradead.org
 W:	http://www.torque.net/linux-pp.html
 S:	Maintained
 
@@ -1908,6 +1944,12 @@ M:	thomas@winischhofer.net
 W:	http://www.winischhofer.net/linuxsisvga.shtml
 S:	Maintained	
 
+SMSC47M1 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Odd Fixes
+
 SMB FILESYSTEM
 P:	Urban Widmark
 M:	urban@teststation.com
@@ -1958,7 +2000,7 @@ S:	Maintained
 
 UltraSPARC (sparc64):
 P:	David S. Miller
-M:	davem@redhat.com
+M:	davem@davemloft.net
 P:	Eddie C. Dost
 M:	ecd@skynet.be
 P:	Jakub Jelinek
@@ -2411,6 +2453,12 @@ P:	Evgeniy Polyakov
 M:	johnpol@2ka.mipt.ru
 L:	sensors@stimpy.netroedge.com
 S:	Maintained
+
+W83L785TS HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Odd Fixes
 
 WAN ROUTER & SANGOMA WANPIPE DRIVERS & API (X.25, FRAME RELAY, PPP, CISCO HDLC)
 P:	Nenad Corbic

@@ -60,6 +60,20 @@ typedef uint8_t		dstring;
 /* Timestamp (ECMA 167r3 1/7.3) */
 typedef struct
 {
+	__le16		typeAndTimezone;
+	__le16		year;
+	uint8_t		month;
+	uint8_t		day;
+	uint8_t		hour;
+	uint8_t		minute;
+	uint8_t		second;
+	uint8_t		centiseconds;
+	uint8_t		hundredsOfMicroseconds;
+	uint8_t		microseconds;
+} __attribute__ ((packed)) timestamp;
+
+typedef struct
+{
 	uint16_t	typeAndTimezone;
 	int16_t		year;
 	uint8_t		month;
@@ -70,7 +84,7 @@ typedef struct
 	uint8_t		centiseconds;
 	uint8_t		hundredsOfMicroseconds;
 	uint8_t		microseconds;
-} __attribute__ ((packed)) timestamp;
+} __attribute__ ((packed)) kernel_timestamp;
 
 /* Type and Time Zone (ECMA 167r3 1/7.3.1) */
 #define TIMESTAMP_TYPE_MASK		0xF000
@@ -139,12 +153,12 @@ struct bootDesc
 	uint8_t		reserved1;
 	regid		archType;
 	regid		bootIdent;
-	uint32_t	bootExtLocation;
-	uint32_t	bootExtLength;
-	uint64_t	loadAddress;
-	uint64_t	startAddress;
+	__le32		bootExtLocation;
+	__le32		bootExtLength;
+	__le64		loadAddress;
+	__le64		startAddress;
 	timestamp	descCreationDateAndTime;
-	uint16_t	flags;
+	__le16		flags;
 	uint8_t		reserved2[32];
 	uint8_t		bootUse[1906];
 } __attribute__ ((packed));
@@ -155,21 +169,27 @@ struct bootDesc
 /* Extent Descriptor (ECMA 167r3 3/7.1) */
 typedef struct
 {
+	__le32		extLength;
+	__le32		extLocation;
+} __attribute__ ((packed)) extent_ad;
+
+typedef struct
+{
 	uint32_t	extLength;
 	uint32_t	extLocation;
-} __attribute__ ((packed)) extent_ad;
+} kernel_extent_ad;
 
 /* Descriptor Tag (ECMA 167r3 3/7.2) */
 typedef struct
 {
-	uint16_t	tagIdent;
-	uint16_t	descVersion;
+	__le16		tagIdent;
+	__le16		descVersion;
 	uint8_t		tagChecksum;
 	uint8_t		reserved;
-	uint16_t	tagSerialNum;
-	uint16_t	descCRC;
-	uint16_t	descCRCLength;
-	uint32_t	tagLocation;
+	__le16		tagSerialNum;
+	__le16		descCRC;
+	__le16		descCRCLength;
+	__le32		tagLocation;
 } __attribute__ ((packed)) tag;
 
 /* Tag Identifier (ECMA 167r3 3/7.2.1) */
@@ -197,15 +217,15 @@ struct NSRDesc
 struct primaryVolDesc
 {
 	tag		descTag;
-	uint32_t	volDescSeqNum;
-	uint32_t	primaryVolDescNum;
+	__le32		volDescSeqNum;
+	__le32		primaryVolDescNum;
 	dstring		volIdent[32];
-	uint16_t	volSeqNum;
-	uint16_t	maxVolSeqNum;
-	uint16_t	interchangeLvl;
-	uint16_t	maxInterchangeLvl;
-	uint32_t	charSetList;
-	uint32_t	maxCharSetList;
+	__le16		volSeqNum;
+	__le16		maxVolSeqNum;
+	__le16		interchangeLvl;
+	__le16		maxInterchangeLvl;
+	__le32		charSetList;
+	__le32		maxCharSetList;
 	dstring		volSetIdent[128];
 	charspec	descCharSet;
 	charspec	explanatoryCharSet;
@@ -215,8 +235,8 @@ struct primaryVolDesc
 	timestamp	recordingDateAndTime;
 	regid		impIdent;
 	uint8_t		impUse[64];
-	uint32_t	predecessorVolDescSeqLocation;
-	uint16_t	flags;
+	__le32		predecessorVolDescSeqLocation;
+	__le16		flags;
 	uint8_t		reserved[22];
 } __attribute__ ((packed));
 
@@ -236,7 +256,7 @@ struct anchorVolDescPtr
 struct volDescPtr
 {
 	tag		descTag;
-	uint32_t	volDescSeqNum;
+	__le32		volDescSeqNum;
 	extent_ad	nextVolDescSeqExt;
 	uint8_t		reserved[484];
 } __attribute__ ((packed));
@@ -245,7 +265,7 @@ struct volDescPtr
 struct impUseVolDesc
 {
 	tag		descTag;
-	uint32_t	volDescSeqNum;
+	__le32		volDescSeqNum;
 	regid		impIdent;
 	uint8_t		impUse[460];
 } __attribute__ ((packed));
@@ -254,14 +274,14 @@ struct impUseVolDesc
 struct partitionDesc
 {
 	tag		descTag;
-	uint32_t	volDescSeqNum;
-	uint16_t	partitionFlags;
-	uint16_t	partitionNumber;
+	__le32		volDescSeqNum;
+	__le16		partitionFlags;
+	__le16		partitionNumber;
 	regid		partitionContents;
 	uint8_t		partitionContentsUse[128];
-	uint32_t	accessType;
-	uint32_t	partitionStartingLocation;
-	uint32_t	partitionLength;
+	__le32		accessType;
+	__le32		partitionStartingLocation;
+	__le32		partitionLength;
 	regid		impIdent;
 	uint8_t		impUse[128];
 	uint8_t		reserved[156];
@@ -290,14 +310,14 @@ struct partitionDesc
 struct logicalVolDesc
 {
 	tag		descTag;
-	uint32_t	volDescSeqNum;
+	__le32		volDescSeqNum;
 	charspec	descCharSet;
 	dstring		logicalVolIdent[128];
-	uint32_t	logicalBlockSize;
+	__le32		logicalBlockSize;
 	regid		domainIdent;
 	uint8_t		logicalVolContentsUse[16];
-	uint32_t	mapTableLength;
-	uint32_t	numPartitionMaps;
+	__le32		mapTableLength;
+	__le32		numPartitionMaps;
 	regid		impIdent;
 	uint8_t		impUse[128];
 	extent_ad	integritySeqExt;
@@ -322,8 +342,8 @@ struct genericPartitionMap1
 {
 	uint8_t		partitionMapType;
 	uint8_t		partitionMapLength;
-	uint16_t	volSeqNum;
-	uint16_t	partitionNum;
+	__le16		volSeqNum;
+	__le16		partitionNum;
 } __attribute__ ((packed));
 
 /* Type 2 Partition Map (ECMA 167r3 3/10.7.3) */
@@ -338,8 +358,8 @@ struct genericPartitionMap2
 struct unallocSpaceDesc
 {
 	tag		descTag;
-	uint32_t	volDescSeqNum;
-	uint32_t	numAllocDescs;
+	__le32		volDescSeqNum;
+	__le32		numAllocDescs;
 	extent_ad	allocDescs[0];
 } __attribute__ ((packed));
 
@@ -355,13 +375,13 @@ struct logicalVolIntegrityDesc
 {
 	tag		descTag;
 	timestamp	recordingDateAndTime;
-	uint32_t	integrityType;
+	__le32		integrityType;
 	extent_ad	nextIntegrityExt;
 	uint8_t		logicalVolContentsUse[32];
-	uint32_t	numOfPartitions;
-	uint32_t	lengthOfImpUse;
-	uint32_t	freeSpaceTable[0];
-	uint32_t	sizeTable[0];
+	__le32		numOfPartitions;
+	__le32		lengthOfImpUse;
+	__le32		freeSpaceTable[0];
+	__le32		sizeTable[0];
 	uint8_t		impUse[0];
 } __attribute__ ((packed));
 
@@ -372,33 +392,55 @@ struct logicalVolIntegrityDesc
 /* Recorded Address (ECMA 167r3 4/7.1) */
 typedef struct 
 {
-	uint32_t	logicalBlockNum;
-	uint16_t	partitionReferenceNum;
+	__le32		logicalBlockNum;
+	__le16	 	partitionReferenceNum;
 } __attribute__ ((packed)) lb_addr;
+
+/* ... and its in-core analog */
+typedef struct 
+{
+	uint32_t		logicalBlockNum;
+	uint16_t	 	partitionReferenceNum;
+} kernel_lb_addr;
 
 /* Short Allocation Descriptor (ECMA 167r3 4/14.14.1) */
 typedef struct
 {
-        uint32_t	extLength;
-        uint32_t	extPosition;
+        __le32		extLength;
+        __le32		extPosition;
 } __attribute__ ((packed)) short_ad;
 
 /* Long Allocation Descriptor (ECMA 167r3 4/14.14.2) */
 typedef struct
 {
-	uint32_t	extLength;
+	__le32		extLength;
 	lb_addr		extLocation;
 	uint8_t		impUse[6];
 } __attribute__ ((packed)) long_ad;
 
+typedef struct
+{
+	uint32_t	extLength;
+	kernel_lb_addr	extLocation;
+	uint8_t		impUse[6];
+} kernel_long_ad;
+
 /* Extended Allocation Descriptor (ECMA 167r3 4/14.14.3) */
+typedef struct
+{
+	__le32		extLength;
+	__le32		recordedLength;
+	__le32		informationLength;
+	lb_addr		extLocation;
+} __attribute__ ((packed)) ext_ad;
+
 typedef struct
 {
 	uint32_t	extLength;
 	uint32_t	recordedLength;
 	uint32_t	informationLength;
-	lb_addr		extLocation;
-} __attribute__ ((packed)) ext_ad;
+	kernel_lb_addr	extLocation;
+} kernel_ext_ad;
 
 /* Descriptor Tag (ECMA 167r3 4/7.2 - See 3/7.2) */
 
@@ -420,12 +462,12 @@ struct fileSetDesc
 {
 	tag		descTag;
 	timestamp	recordingDateAndTime;
-	uint16_t	interchangeLvl;
-	uint16_t	maxInterchangeLvl;
-	uint32_t	charSetList;
-	uint32_t	maxCharSetList;
-	uint32_t	fileSetNum;
-	uint32_t	fileSetDescNum;
+	__le16		interchangeLvl;
+	__le16		maxInterchangeLvl;
+	__le32		charSetList;
+	__le32		maxCharSetList;
+	__le32		fileSetNum;
+	__le32		fileSetDescNum;
 	charspec	logicalVolIdentCharSet;
 	dstring		logicalVolIdent[128];
 	charspec	fileSetCharSet;
@@ -454,11 +496,11 @@ struct partitionHeaderDesc
 struct fileIdentDesc
 {
 	tag		descTag;
-	uint16_t	fileVersionNum;
+	__le16		fileVersionNum;
 	uint8_t		fileCharacteristics;
 	uint8_t		lengthFileIdent;
 	long_ad		icb;
-	uint16_t	lengthOfImpUse;
+	__le16		lengthOfImpUse;
 	uint8_t		impUse[0];
 	uint8_t		fileIdent[0];
 	uint8_t		padding[0];
@@ -475,21 +517,21 @@ struct fileIdentDesc
 struct allocExtDesc
 {
 	tag		descTag;
-	uint32_t	previousAllocExtLocation;
-	uint32_t	lengthAllocDescs;
+	__le32		previousAllocExtLocation;
+	__le32		lengthAllocDescs;
 } __attribute__ ((packed));
 
 /* ICB Tag (ECMA 167r3 4/14.6) */
 typedef struct
 {
-	uint32_t	priorRecordedNumDirectEntries;
-	uint16_t	strategyType;
-	uint16_t	strategyParameter;
-	uint16_t	numEntries;
+	__le32		priorRecordedNumDirectEntries;
+	__le16		strategyType;
+	__le16		strategyParameter;
+	__le16		numEntries;
 	uint8_t		reserved;
 	uint8_t		fileType;
 	lb_addr		parentICBLocation;
-	uint16_t	flags;
+	__le16		flags;
 } __attribute__ ((packed)) icbtag;
 
 /* Strategy Type (ECMA 167r3 4/14.6.2) */
@@ -553,24 +595,24 @@ struct fileEntry
 {
 	tag		descTag;
 	icbtag		icbTag;
-	uint32_t	uid;
-	uint32_t	gid;
-	uint32_t	permissions;
-	uint16_t	fileLinkCount;
+	__le32		uid;
+	__le32		gid;
+	__le32		permissions;
+	__le16		fileLinkCount;
 	uint8_t		recordFormat;
 	uint8_t		recordDisplayAttr;
-	uint32_t	recordLength;
-	uint64_t	informationLength;
-	uint64_t	logicalBlocksRecorded;
+	__le32		recordLength;
+	__le64		informationLength;
+	__le64		logicalBlocksRecorded;
 	timestamp	accessTime;
 	timestamp	modificationTime;
 	timestamp	attrTime;
-	uint32_t	checkpoint;
+	__le32		checkpoint;
 	long_ad		extendedAttrICB;
 	regid		impIdent;
-	uint64_t	uniqueID;
-	uint32_t	lengthExtendedAttr;
-	uint32_t	lengthAllocDescs;
+	__le64		uniqueID;
+	__le32		lengthExtendedAttr;
+	__le32		lengthAllocDescs;
 	uint8_t		extendedAttr[0];
 	uint8_t		allocDescs[0];
 } __attribute__ ((packed));
@@ -616,28 +658,28 @@ struct fileEntry
 struct extendedAttrHeaderDesc
 {
 	tag		descTag;
-	uint32_t	impAttrLocation;
-	uint32_t	appAttrLocation;
+	__le32		impAttrLocation;
+	__le32		appAttrLocation;
 } __attribute__ ((packed));
 
 /* Generic Format (ECMA 167r3 4/14.10.2) */
 struct genericFormat
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
+	__le32		attrLength;
 	uint8_t		attrData[0];
 } __attribute__ ((packed));
 
 /* Character Set Information (ECMA 167r3 4/14.10.3) */
 struct charSetInfo
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint32_t	escapeSeqLength;
+	__le32		attrLength;
+	__le32		escapeSeqLength;
 	uint8_t		charSetType;
 	uint8_t		escapeSeq[0];
 } __attribute__ ((packed));
@@ -645,24 +687,24 @@ struct charSetInfo
 /* Alternate Permissions (ECMA 167r3 4/14.10.4) */
 struct altPerms
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint16_t	ownerIdent;
-	uint16_t	groupIdent;
-	uint16_t	permission;
+	__le32		attrLength;
+	__le16		ownerIdent;
+	__le16		groupIdent;
+	__le16		permission;
 } __attribute__ ((packed));
 
 /* File Times Extended Attribute (ECMA 167r3 4/14.10.5) */
 struct fileTimesExtAttr
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint32_t	dataLength;
-	uint32_t	fileTimeExistence;
+	__le32		attrLength;
+	__le32		dataLength;
+	__le32		fileTimeExistence;
 	uint8_t		fileTimes;
 } __attribute__ ((packed));
 
@@ -675,36 +717,36 @@ struct fileTimesExtAttr
 /* Information Times Extended Attribute (ECMA 167r3 4/14.10.6) */
 struct infoTimesExtAttr
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint32_t	dataLength;
-	uint32_t	infoTimeExistence;
+	__le32		attrLength;
+	__le32		dataLength;
+	__le32		infoTimeExistence;
 	uint8_t		infoTimes[0];
 } __attribute__ ((packed));
 
 /* Device Specification (ECMA 167r3 4/14.10.7) */
 struct deviceSpec
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint32_t	impUseLength;
-	uint32_t	majorDeviceIdent;
-	uint32_t	minorDeviceIdent;
+	__le32		attrLength;
+	__le32		impUseLength;
+	__le32		majorDeviceIdent;
+	__le32		minorDeviceIdent;
 	uint8_t		impUse[0];
 } __attribute__ ((packed));
 
 /* Implementation Use Extended Attr (ECMA 167r3 4/14.10.8) */
 struct impUseExtAttr
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint32_t	impUseLength;
+	__le32		attrLength;
+	__le32		impUseLength;
 	regid		impIdent;
 	uint8_t		impUse[0];
 } __attribute__ ((packed));
@@ -712,11 +754,11 @@ struct impUseExtAttr
 /* Application Use Extended Attribute (ECMA 167r3 4/14.10.9) */
 struct appUseExtAttr
 {
-	uint32_t	attrType;
+	__le32		attrType;
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
-	uint32_t	attrLength;
-	uint32_t	appUseLength;
+	__le32		attrLength;
+	__le32		appUseLength;
 	regid		appIdent;
 	uint8_t		appUse[0];
 } __attribute__ ((packed));
@@ -735,7 +777,7 @@ struct unallocSpaceEntry
 {
 	tag		descTag;
 	icbtag		icbTag;
-	uint32_t	lengthAllocDescs;
+	__le32		lengthAllocDescs;
 	uint8_t		allocDescs[0];
 } __attribute__ ((packed));
 
@@ -743,8 +785,8 @@ struct unallocSpaceEntry
 struct spaceBitmapDesc
 {
 	tag		descTag;
-	uint32_t	numOfBits;
-	uint32_t	numOfBytes;
+	__le32		numOfBits;
+	__le32		numOfBytes;
 	uint8_t		bitmap[0];
 } __attribute__ ((packed));
 
@@ -775,7 +817,7 @@ struct partitionIntegrityEntry
 /* Logical Volume Header Descriptor (ECMA 167r3 4/14.15) */
 struct logicalVolHeaderDesc
 {
-	uint64_t	uniqueID;
+	__le64		uniqueID;
 	uint8_t		reserved[24];
 } __attribute__ ((packed));
 
@@ -784,7 +826,7 @@ struct pathComponent
 {
 	uint8_t		componentType;
 	uint8_t		lengthComponentIdent;
-	uint16_t	componentFileVersionNum;
+	__le16		componentFileVersionNum;
 	dstring		componentIdent[0];
 } __attribute__ ((packed));
 
@@ -793,28 +835,28 @@ struct extendedFileEntry
 {
 	tag		descTag;
 	icbtag		icbTag;
-	uint32_t	uid;
-	uint32_t	gid;
-	uint32_t	permissions;
-	uint16_t	fileLinkCount;
+	__le32		uid;
+	__le32		gid;
+	__le32		permissions;
+	__le16		fileLinkCount;
 	uint8_t		recordFormat;
 	uint8_t		recordDisplayAttr;
-	uint32_t	recordLength;
-	uint64_t	informationLength;
-	uint64_t	objectSize;
-	uint64_t	logicalBlocksRecorded;
+	__le32		recordLength;
+	__le64		informationLength;
+	__le64		objectSize;
+	__le64		logicalBlocksRecorded;
 	timestamp	accessTime;
 	timestamp	modificationTime;
 	timestamp	createTime;
 	timestamp	attrTime;
-	uint32_t	checkpoint;
-	uint32_t	reserved;
+	__le32		checkpoint;
+	__le32		reserved;
 	long_ad		extendedAttrICB;
 	long_ad		streamDirectoryICB;
 	regid		impIdent;
-	uint64_t	uniqueID;
-	uint32_t	lengthExtendedAttr;
-	uint32_t	lengthAllocDescs;
+	__le64		uniqueID;
+	__le32		lengthExtendedAttr;
+	__le32		lengthAllocDescs;
 	uint8_t		extendedAttr[0];
 	uint8_t		allocDescs[0];
 } __attribute__ ((packed));

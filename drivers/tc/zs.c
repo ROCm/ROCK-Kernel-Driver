@@ -211,10 +211,6 @@ static void probe_sccs(void);
 static void change_speed(struct dec_serial *info);
 static void rs_wait_until_sent(struct tty_struct *tty, int timeout);
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
  * lock it in case the copy_from_user blocks while swapping in a page,
@@ -706,7 +702,7 @@ int zs_startup(struct dec_serial * info)
 	save_flags(flags); cli();
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("starting up ttyS%02d (irq %d)...", info->line, info->irq);
+	printk("starting up ttyS%d (irq %d)...", info->line, info->irq);
 #endif
 
 	/*
@@ -950,16 +946,16 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	save_flags(flags);
 	while (1) {
 		cli();		
-		c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				   SERIAL_XMIT_SIZE - info->xmit_head));
+		c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					  SERIAL_XMIT_SIZE - info->xmit_head));
 		if (c <= 0)
 			break;
 
 		if (from_user) {
 			down(&tmp_buf_sem);
 			copy_from_user(tmp_buf, buf, c);
-			c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
+			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					      SERIAL_XMIT_SIZE - info->xmit_head));
 			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 			up(&tmp_buf_sem);
 		} else
@@ -1356,7 +1352,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	
 #ifdef SERIAL_DEBUG_OPEN
-	printk("rs_close ttyS%02d, count = %d\n", info->line, info->count);
+	printk("rs_close ttyS%d, count = %d\n", info->line, info->count);
 #endif
 	if ((tty->count == 1) && (info->count != 1)) {
 		/*
@@ -1371,7 +1367,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		info->count = 1;
 	}
 	if (--info->count < 0) {
-		printk("rs_close: bad serial port count for ttyS%02d: %d\n",
+		printk("rs_close: bad serial port count for ttyS%d: %d\n",
 		       info->line, info->count);
 		info->count = 0;
 	}
@@ -1446,7 +1442,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 	if (char_time == 0)
 		char_time = 1;
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 	while ((read_zsreg(info->zs_channel, 1) & Tx_BUF_EMP) == 0) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(char_time);
@@ -1531,7 +1527,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	retval = 0;
 	add_wait_queue(&info->open_wait, &wait);
 #ifdef SERIAL_DEBUG_OPEN
-	printk("block_til_ready before block: ttyS%02d, count = %d\n",
+	printk("block_til_ready before block: ttyS%d, count = %d\n",
 	       info->line, info->count);
 #endif
 	cli();
@@ -1565,7 +1561,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 			break;
 		}
 #ifdef SERIAL_DEBUG_OPEN
-		printk("block_til_ready blocking: ttyS%02d, count = %d\n",
+		printk("block_til_ready blocking: ttyS%d, count = %d\n",
 		       info->line, info->count);
 #endif
 		schedule();
@@ -1576,7 +1572,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		info->count++;
 	info->blocked_open--;
 #ifdef SERIAL_DEBUG_OPEN
-	printk("block_til_ready after blocking: ttyS%02d, count = %d\n",
+	printk("block_til_ready after blocking: ttyS%d, count = %d\n",
 	       info->line, info->count);
 #endif
 	if (retval)
@@ -1742,14 +1738,10 @@ static void __init probe_sccs(void)
 			 * We're called early and memory managment isn't up, yet.
 			 * Thus check_region would fail.
 			 */
-			if (check_region((unsigned long)
+			if (!request_region((unsigned long)
 					 zs_channels[n_channels].control,
-					 ZS_CHAN_IO_SIZE) < 0) {
+					 ZS_CHAN_IO_SIZE, "SCC"))
 				panic("SCC I/O region is not free");
-			}
-			request_region((unsigned long)
-				       zs_channels[n_channels].control,
-				       ZS_CHAN_IO_SIZE, "SCC");
 #endif
 			zs_soft[n_channels].zs_channel = &zs_channels[n_channels];
 			zs_soft[n_channels].irq = zs_parms->irq;
@@ -1896,7 +1888,7 @@ int __init zs_init(void)
 		info->tqueue.data = info;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
-		printk("ttyS%02d at 0x%08x (irq = %d)", info->line, 
+		printk("ttyS%d at 0x%08x (irq = %d)", info->line,
 		       info->port, info->irq);
 		printk(" is a Z85C30 SCC\n");
 		tty_register_device(serial_driver, info->line, NULL);

@@ -91,7 +91,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 {
 	unsigned int low, high;
 	int i;
-	unsigned long eip = instruction_pointer(regs);
+	unsigned long eip = profile_pc(regs);
 	int is_kernel = !user_mode(regs);
  
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {

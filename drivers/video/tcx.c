@@ -496,8 +496,9 @@ tcx_setup(char *arg)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(tcx_init);
+
+#ifdef MODULE
 module_exit(tcx_exit);
 #endif
 

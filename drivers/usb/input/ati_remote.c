@@ -112,11 +112,11 @@
 #define ATI_INPUTNUM      1     /* Which input device to register as */
 
 static unsigned long channel_mask = 0;
-module_param(channel_mask, ulong, 444);
+module_param(channel_mask, ulong, 0444);
 MODULE_PARM_DESC(channel_mask, "Bitmask of remote control channels to ignore");
 
 static int debug = 0;
-module_param(debug, int, 444);
+module_param(debug, int, 0444);
 MODULE_PARM_DESC(debug, "Enable extra debug messages and information");
 
 #define dbginfo(dev, format, arg...) do { if (debug) dev_info(dev , format , ## arg); } while (0)

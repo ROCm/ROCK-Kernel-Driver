@@ -184,7 +184,8 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 			if (dev->ifindex == oif)
 				return sprt;
 			if (dev->flags & IFF_LOOPBACK) {
-				if (sprt->rt6i_idev->dev->ifindex != oif) {
+				if (sprt->rt6i_idev == NULL ||
+				    sprt->rt6i_idev->dev->ifindex != oif) {
 					if (strict && oif)
 						continue;
 					if (local && (!oif || 
@@ -839,9 +840,12 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	 */
 	if ((rtmsg->rtmsg_flags&RTF_REJECT) ||
 	    (dev && (dev->flags&IFF_LOOPBACK) && !(addr_type&IPV6_ADDR_LOOPBACK))) {
-		if (dev && dev != &loopback_dev) {
-			dev_put(dev);
-			in6_dev_put(idev);
+		/* hold loopback dev/idev if we haven't done so. */
+		if (dev != &loopback_dev) {
+			if (dev) {
+				dev_put(dev);
+				in6_dev_put(idev);
+			}
 			dev = &loopback_dev;
 			dev_hold(dev);
 			idev = in6_dev_get(dev);

@@ -308,6 +308,7 @@ struct file_operations hfsplus_file_operations = {
 	.read		= generic_file_read,
 	.write		= generic_file_write,
 	.mmap		= generic_file_mmap,
+	.sendfile	= generic_file_sendfile,
 	.fsync		= file_fsync,
 	.open		= hfsplus_file_open,
 	.release	= hfsplus_file_release,

@@ -1602,6 +1602,9 @@ imsttfb_setup(char *options)
 
 int __init imsttfb_init(void)
 {
+#ifndef MODULE
+	imsttfb_setup(fb_get_options("imsttfb"));
+#endif
 	return pci_module_init(&imsttfb_pci_driver);
 }
  
@@ -1612,7 +1615,7 @@ static void __exit imsttfb_exit(void)
 
 #ifdef MODULE
 MODULE_LICENSE("GPL");
-module_init(imsttfb_init);
 #endif
+module_init(imsttfb_init);
 module_exit(imsttfb_exit);
 

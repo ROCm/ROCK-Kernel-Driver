@@ -46,14 +46,14 @@ static inline int need_signal_i387(struct task_struct *me)
 
 /* Ignore delayed exceptions from user space */
 static inline void tolerant_fwait(void)
-{ 
+{
 	asm volatile("1: fwait\n"
 		     "2:\n"
 		     "   .section __ex_table,\"a\"\n"
 		     "	.align 8\n"
 		     "	.quad 1b,2b\n"
 		     "	.previous\n");
-} 
+}
 
 #define clear_fpu(tsk) do { \
 	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
@@ -139,7 +139,7 @@ static inline void kernel_fpu_end(void)
 {
 	stts();
 	preempt_enable();
-} 
+}
 
 static inline void save_init_fpu( struct task_struct *tsk )
 {

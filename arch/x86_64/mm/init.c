@@ -411,9 +411,9 @@ void __init mem_init(void)
 	int tmp;
 
 #ifdef CONFIG_SWIOTLB
-	if (swiotlb_force) 
-		swiotlb = 1; 	    
-	if (!iommu_aperture && 
+	if (swiotlb_force)
+		swiotlb = 1;
+	if (!iommu_aperture &&
 	    (end_pfn >= 0xffffffff>>PAGE_SHIFT || force_iommu))
 	       swiotlb = 1;
 	if (swiotlb)
@@ -606,13 +606,13 @@ static struct vm_area_struct gate32_vma = {
 struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
 {
 #ifdef CONFIG_IA32_EMULATION
-	if (test_tsk_thread_flag(tsk, TIF_IA32)) { 
+	if (test_tsk_thread_flag(tsk, TIF_IA32)) {
 		/* lookup code assumes the pages are present. set them up
 		   now */
-		if (map_syscall32(tsk->mm, 0xfffe000) < 0) 
-			return NULL; 
+		if (map_syscall32(tsk->mm, 0xfffe000) < 0)
+			return NULL;
 		return &gate32_vma;
-	} 
+	}
 #endif
 	return &gate_vma;
 }

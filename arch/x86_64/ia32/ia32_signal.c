@@ -74,6 +74,8 @@ int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
 			err |= __put_user(from->si_utime, &to->si_utime);
 			err |= __put_user(from->si_stime, &to->si_stime);
 			err |= __put_user(from->si_status, &to->si_status);
+			err |= put_compat_rusage(&from->si_rusage,
+						 &to->si_rusage);
 		default:
 		case __SI_KILL >> 16:
 			err |= __put_user(from->si_uid, &to->si_uid);
@@ -115,7 +117,7 @@ int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from)
 }
 
 asmlinkage long
-sys32_sigsuspend(int history0, int history1, old_sigset_t mask, 
+sys32_sigsuspend(int history0, int history1, old_sigset_t mask,
 		 struct pt_regs *regs)
 {
 	sigset_t saveset;
@@ -300,7 +302,7 @@ asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 	return eax;
 
 badframe:
-	signal_fault(regs, frame, "32bit sigreturn"); 
+	signal_fault(regs, frame, "32bit sigreturn");
 	return 0;
 }	
 
@@ -347,6 +349,7 @@ ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __
 		 struct pt_regs *regs, unsigned int mask)
 {
 	int tmp, err = 0;
+	u32 eflags;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
@@ -371,7 +374,11 @@ ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __
 	err |= __put_user(current->thread.trap_no, &sc->trapno);
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user((u32)regs->rip, &sc->eip);
-	err |= __put_user((u32)regs->eflags, &sc->eflags);
+	eflags = regs->eflags;
+	if (current->ptrace & PT_PTRACED) {
+		eflags &= ~TF_MASK;
+	}
+	err |= __put_user((u32)eflags, &sc->eflags);
 	err |= __put_user((u32)regs->rsp, &sc->esp_at_signal);
 
 	tmp = save_i387_ia32(current, fpstate, regs, 0);
@@ -489,7 +496,13 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	regs->ss = __USER32_DS; 
 
 	set_fs(USER_DS);
-	regs->eflags &= ~TF_MASK;
+	if (regs->eflags & TF_MASK) {
+		if (current->ptrace & PT_PTRACED) {
+			ptrace_notify(SIGTRAP);
+		} else {
+			regs->eflags &= ~TF_MASK;
+		}
+	}
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",
@@ -499,9 +512,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs,frame,"32bit signal deliver");
+	force_sigsegv(sig, current);
 }
 
 void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
@@ -585,7 +596,13 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->ss = __USER32_DS; 
 
 	set_fs(USER_DS);
-	regs->eflags &= ~TF_MASK;
+	if (regs->eflags & TF_MASK) {
+		if (current->ptrace & PT_PTRACED) {
+			ptrace_notify(SIGTRAP);
+		} else {
+			regs->eflags &= ~TF_MASK;
+		}
+	}
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",
@@ -595,8 +612,6 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs, frame, "32bit rt signal setup"); 
+	force_sigsegv(sig, current);
 }
 

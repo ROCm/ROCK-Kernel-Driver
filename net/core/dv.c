@@ -553,6 +553,3 @@ void divert_frame(struct sk_buff *skb)
 		break;
 	}
 }
-
-EXPORT_SYMBOL(alloc_divert_blk);
-EXPORT_SYMBOL(free_divert_blk);

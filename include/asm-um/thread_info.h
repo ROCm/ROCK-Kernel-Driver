@@ -9,6 +9,7 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/processor.h>
+#include <asm/types.h>
 
 struct thread_info {
 	struct task_struct	*task;		/* main task structure */
@@ -43,15 +44,18 @@ struct thread_info {
 static inline struct thread_info *current_thread_info(void)
 {
 	struct thread_info *ti;
-	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~16383UL));
+	unsigned long mask = PAGE_SIZE *
+		(1 << CONFIG_KERNEL_STACK_ORDER) - 1;
+	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~mask));
 	return ti;
 }
 
 /* thread information allocation */
-#define THREAD_SIZE (4*PAGE_SIZE)
-#define alloc_thread_info(tsk) ((struct thread_info *) \
-	__get_free_pages(GFP_KERNEL,2))
-#define free_thread_info(ti) free_pages((unsigned long) (ti), 2)
+#define THREAD_SIZE ((1 << CONFIG_KERNEL_STACK_ORDER) * PAGE_SIZE)
+#define alloc_thread_info(tsk) \
+	((struct thread_info *) kmalloc(THREAD_SIZE, GFP_KERNEL))
+#define free_thread_info(ti) kfree(ti)
+
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
@@ -65,11 +69,13 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_POLLING_NRFLAG      3       /* true if poll_idle() is polling 
 					 * TIF_NEED_RESCHED 
 					 */
+#define TIF_RESTART_BLOCK 	4
 
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 #define _TIF_POLLING_NRFLAG     (1 << TIF_POLLING_NRFLAG)
+#define _TIF_RESTART_BLOCK	(1 << TIF_RESTART_BLOCK)
 
 #endif
 

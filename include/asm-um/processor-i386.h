@@ -6,8 +6,8 @@
 #ifndef __UM_PROCESSOR_I386_H
 #define __UM_PROCESSOR_I386_H
 
-extern int cpu_has_xmm;
-extern int cpu_has_cmov;
+extern int host_has_xmm;
+extern int host_has_cmov;
 
 struct arch_thread {
 	unsigned long debugregs[8];

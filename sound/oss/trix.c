@@ -29,12 +29,6 @@
 
 #include "trix_boot.h"
 
-static int kilroy_was_here;	/* Don't detect twice */
-static int sb_initialized;
-static int mpu_initialized;
-
-static int *trix_osp;
-
 static int mpu;
 
 static int joystick;
@@ -82,20 +76,11 @@ static int trix_set_wss_port(struct address_info *hw_config)
 {
 	unsigned char   addr_bits;
 
-	if (check_region(0x390, 2))
-	{
-		printk(KERN_ERR "AudioTrix: Config port I/O conflict\n");
-		return 0;
-	}
-	if (kilroy_was_here)	/* Already initialized */
-		return 0;
-
 	if (trix_read(0x15) != 0x71)	/* No ASIC signature */
 	{
 		MDB(printk(KERN_ERR "No AudioTrix ASIC signature found\n"));
 		return 0;
 	}
-	kilroy_was_here = 1;
 
 	/*
 	 * Reset some registers.
@@ -135,107 +120,114 @@ static int trix_set_wss_port(struct address_info *hw_config)
  *      AudioTrix Pro
  */
 
-static int __init probe_trix_wss(struct address_info *hw_config)
+static int __init init_trix_wss(struct address_info *hw_config)
 {
+	static unsigned char dma_bits[4] = {
+		1, 2, 0, 3
+	};
+	struct resource *ports;
+	int config_port = hw_config->io_base + 0;
+	int dma1 = hw_config->dma, dma2 = hw_config->dma2;
+	int old_num_mixers = num_mixers;
+	u8 config, bits;
 	int ret;
+ 
+	switch(hw_config->irq) {
+	case 7:
+		bits = 8;
+		break;
+	case 9:
+		bits = 0x10;
+		break;
+	case 10:
+		bits = 0x18;
+		break;
+	case 11:
+		bits = 0x20;
+		break;
+	default:
+		printk(KERN_ERR "AudioTrix: Bad WSS IRQ %d\n", hw_config->irq);
+		return 0;
+	}
+
+	switch (dma1) {
+	case 0:
+	case 1:
+	case 3:
+		break;
+	default:
+		printk(KERN_ERR "AudioTrix: Bad WSS DMA %d\n", dma1);
+		return 0;
+	}
+
+	switch (dma2) {
+	case -1:
+	case 0:
+	case 1:
+	case 3:
+		break;
+	default:
+		printk(KERN_ERR "AudioTrix: Bad capture DMA %d\n", dma2);
+		return 0;
+	}
 
 	/*
 	 * Check if the IO port returns valid signature. The original MS Sound
 	 * system returns 0x04 while some cards (AudioTrix Pro for example)
 	 * return 0x00.
 	 */
-	if (check_region(hw_config->io_base, 8))
-	{
+	ports = request_region(hw_config->io_base + 4, 4, "ad1848");
+	if (!ports) {
 		printk(KERN_ERR "AudioTrix: MSS I/O port conflict (%x)\n", hw_config->io_base);
 		return 0;
 	}
-	trix_osp = hw_config->osp;
+
+	if (!request_region(hw_config->io_base, 4, "MSS config")) {
+		printk(KERN_ERR "AudioTrix: MSS I/O port conflict (%x)\n", hw_config->io_base);
+		release_region(hw_config->io_base + 4, 4);
+		return 0;
+	}
 
 	if (!trix_set_wss_port(hw_config))
-		return 0;
+		goto fail;
 
-	if ((inb(hw_config->io_base + 3) & 0x3f) != 0x00)
+	config = inb(hw_config->io_base + 3);
+
+	if ((config & 0x3f) != 0x00)
 	{
 		MDB(printk(KERN_ERR "No MSS signature detected on port 0x%x\n", hw_config->io_base));
-		return 0;
+		goto fail;
 	}
-	if (hw_config->irq > 11)
-	{
-		printk(KERN_ERR "AudioTrix: Bad WSS IRQ %d\n", hw_config->irq);
-		return 0;
-	}
-	if (hw_config->dma != 0 && hw_config->dma != 1 && hw_config->dma != 3)
-	{
-		printk(KERN_ERR "AudioTrix: Bad WSS DMA %d\n", hw_config->dma);
-		return 0;
-	}
-	if (hw_config->dma2 != -1 && hw_config->dma2 != hw_config->dma)
-		if (hw_config->dma2 != 0 && hw_config->dma2 != 1 && hw_config->dma2 != 3)
-		{
-			  printk(KERN_ERR "AudioTrix: Bad capture DMA %d\n", hw_config->dma2);
-			  return 0;
-		}
+
 	/*
 	 * Check that DMA0 is not in use with a 8 bit board.
 	 */
 
-	if (hw_config->dma == 0 && inb(hw_config->io_base + 3) & 0x80)
+	if (dma1 == 0 && config & 0x80)
 	{
 		printk(KERN_ERR "AudioTrix: Can't use DMA0 with a 8 bit card slot\n");
-		return 0;
+		goto fail;
 	}
-	if (hw_config->irq > 7 && hw_config->irq != 9 && inb(hw_config->io_base + 3) & 0x80)
+	if (hw_config->irq > 9 && config & 0x80)
 	{
 		printk(KERN_ERR "AudioTrix: Can't use IRQ%d with a 8 bit card slot\n", hw_config->irq);
-		return 0;
+		goto fail;
 	}
-	ret = ad1848_detect(hw_config->io_base + 4, NULL, hw_config->osp);
 
-	if (ret)
-	{
-		if(joystick==1)
-			trix_write(0x15, 0x80);
-		request_region(0x390, 2, "AudioTrix");
-	}
-	return ret;
-}
+	ret = ad1848_detect(ports, NULL, hw_config->osp);
+	if (!ret)
+		goto fail;
 
-static void __init attach_trix_wss(struct address_info *hw_config)
-{
-	static unsigned char interrupt_bits[12] = {
-		0, 0, 0, 0, 0, 0, 0, 0x08, 0, 0x10, 0x18, 0x20
-	};
-	char bits;
+	if (joystick==1)
+		trix_write(0x15, 0x80);
 
-	static unsigned char dma_bits[4] = {
-		1, 2, 0, 3
-	};
-
-	int config_port = hw_config->io_base + 0;
-	int dma1 = hw_config->dma, dma2 = hw_config->dma2;
-	int old_num_mixers = num_mixers;
-
-	trix_osp = hw_config->osp;
-
-	if (!kilroy_was_here)
-	{
-		DDB(printk("AudioTrix: Attach called but not probed yet???\n"));
-		return;
-	}
-	
 	/*
 	 * Set the IRQ and DMA addresses.
 	 */
 
-	bits = interrupt_bits[hw_config->irq];
-	if (bits == 0)
-	{
-		printk("AudioTrix: Bad IRQ (%d)\n", hw_config->irq);
-		return;
-	}
 	outb((bits | 0x40), config_port);
 
-	if (hw_config->dma2 == -1 || hw_config->dma2 == hw_config->dma)
+	if (dma2 == -1 || dma2 == dma1)
 	{
 		  bits |= dma_bits[dma1];
 		  dma2 = dma1;
@@ -253,14 +245,13 @@ static void __init attach_trix_wss(struct address_info *hw_config)
 
 	outb((bits), config_port);	/* Write IRQ+DMA setup */
 
-	hw_config->slots[0] = ad1848_init("AudioTrix Pro", hw_config->io_base + 4,
+	hw_config->slots[0] = ad1848_init("AudioTrix Pro", ports,
 					  hw_config->irq,
 					  dma1,
 					  dma2,
 					  0,
 					  hw_config->osp,
 					  THIS_MODULE);
-	request_region(hw_config->io_base, 4, "MSS config");
 
 	if (num_mixers > old_num_mixers)	/* Mixer got installed */
 	{
@@ -269,6 +260,12 @@ static void __init attach_trix_wss(struct address_info *hw_config)
 		AD1848_REROUTE(SOUND_MIXER_LINE3, SOUND_MIXER_SYNTH);		/* OPL4 */
 		AD1848_REROUTE(SOUND_MIXER_SPEAKER, SOUND_MIXER_ALTPCM);	/* SB */
 	}
+	return 1;
+
+fail:
+	release_region(hw_config->io_base, 4);
+	release_region(hw_config->io_base + 4, 4);
+	return 0;
 }
 
 static int __init probe_trix_sb(struct address_info *hw_config)
@@ -276,6 +273,8 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 
 	int tmp;
 	unsigned char conf;
+	extern int sb_be_quiet;
+	int old_quiet;
 	static signed char irq_translate[] = {
 		-1, -1, -1, 0, 1, 2, -1, 3
 	};
@@ -283,17 +282,6 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 	if (trix_boot_len == 0)
 		return 0;	/* No boot code -> no fun */
 
-	if (!kilroy_was_here)
-		return 0;	/* AudioTrix Pro has not been detected earlier */
-
-	if (sb_initialized)
-		return 0;
-
-	if (check_region(hw_config->io_base, 16))
-	{
-		printk(KERN_ERR "AudioTrix: SB I/O port conflict (%x)\n", hw_config->io_base);
-		return 0;
-	}
 	if ((hw_config->io_base & 0xffffff8f) != 0x200)
 		return 0;
 
@@ -307,6 +295,11 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 	if (tmp != 1 && tmp != 3)
 		return 0;
 
+	if (!request_region(hw_config->io_base, 16, "soundblaster")) {
+		printk(KERN_ERR "AudioTrix: SB I/O port conflict (%x)\n", hw_config->io_base);
+		return 0;
+	}
+
 	conf = 0x84;		/* DMA and IRQ enable */
 	conf |= hw_config->io_base & 0x70;	/* I/O address bits */
 	conf |= irq_translate[hw_config->irq];
@@ -315,16 +308,12 @@ static int __init probe_trix_sb(struct address_info *hw_config)
 	trix_write(0x1b, conf);
 
 	download_boot(hw_config->io_base);
-	sb_initialized = 1;
 
 	hw_config->name = "AudioTrix SB";
-	return sb_dsp_detect(hw_config, 0, 0, NULL);
-}
-
-static void __init attach_trix_sb(struct address_info *hw_config)
-{
-	extern int sb_be_quiet;
-	int old_quiet;
+	if (!sb_dsp_detect(hw_config, 0, 0, NULL)) {
+		release_region(hw_config->io_base, 16);
+		return 0;
+	}
 
 	hw_config->driver_use_1 = SB_NO_MIDI | SB_NO_MIXER | SB_NO_RECORDING;
 
@@ -335,6 +324,7 @@ static void __init attach_trix_sb(struct address_info *hw_config)
 	sb_dsp_init(hw_config, THIS_MODULE);
 
 	sb_be_quiet = old_quiet;
+	return 1;
 }
 
 static int __init probe_trix_mpu(struct address_info *hw_config)
@@ -344,21 +334,6 @@ static int __init probe_trix_mpu(struct address_info *hw_config)
 		-1, -1, -1, 1, 2, 3, -1, 4, -1, 5
 	};
 
-	if (!kilroy_was_here)
-	{
-		DDB(printk("Trix: WSS and SB modes must be initialized before MPU\n"));
-		return 0;	/* AudioTrix Pro has not been detected earlier */
-	}
-	if (!sb_initialized)
-	{
-		DDB(printk("Trix: SB mode must be initialized before MPU\n"));
-		return 0;
-	}
-	if (mpu_initialized)
-	{
-		DDB(printk("Trix: MPU mode already initialized\n"));
-		return 0;
-	}
 	if (hw_config->irq > 9)
 	{
 		printk(KERN_ERR "AudioTrix: Bad MPU IRQ %d\n", hw_config->irq);
@@ -389,7 +364,6 @@ static int __init probe_trix_mpu(struct address_info *hw_config)
 
 	conf |= irq_bits[hw_config->irq] << 4;
 	trix_write(0x19, (trix_read(0x19) & 0x83) | conf);
-	mpu_initialized = 1;
 	hw_config->name = "AudioTrix Pro";
 	return probe_uart401(hw_config, THIS_MODULE);
 }
@@ -485,9 +459,16 @@ static int __init init_trix(void)
 		trix_boot_len = mod_firmware_load("/etc/sound/trxpro.bin",
 						    (char **) &trix_boot);
 	}
-	if (!probe_trix_wss(&cfg))
+
+	if (!request_region(0x390, 2, "AudioTrix")) {
+		printk(KERN_ERR "AudioTrix: Config port I/O conflict\n");
 		return -ENODEV;
-	attach_trix_wss(&cfg);
+	}
+
+	if (!init_trix_wss(&cfg)) {
+		release_region(0x390, 2);
+		return -ENODEV;
+	}
 
 	/*
 	 *    We must attach in the right order to get the firmware
@@ -496,8 +477,6 @@ static int __init init_trix(void)
 
 	if (cfg2.io_base != -1) {
 		sb = probe_trix_sb(&cfg2);
-		if (sb)
-			attach_trix_sb(&cfg2);
 	}
 	
 	if (cfg_mpu.io_base != -1)

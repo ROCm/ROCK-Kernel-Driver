@@ -1,5 +1,5 @@
 /*
- * arch/ppc/pp3boot/mkbugboot.c
+ * arch/ppc/boot/utils/mkbugboot.c
  *
  * Makes a Motorola PPCBUG ROM bootable image which can be flashed
  * into one of the FLASH banks on a Motorola PowerPlus board.
@@ -21,6 +21,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifdef __sun__
+#include <inttypes.h>
+#else
+#include <stdint.h>
+#endif
 
 #ifdef __i386__
 #define cpu_to_be32(x) le32_to_cpu(x)
@@ -48,11 +53,6 @@ unsigned short le16_to_cpu(unsigned short x)
 
 /* size of read buffer */
 #define SIZE 0x1000
-
-/* typedef long int32_t; */
-typedef unsigned long uint32_t;
-typedef unsigned short uint16_t;
-typedef unsigned char uint8_t;
 
 /* PPCBUG ROM boot header */
 typedef struct bug_boot_header {

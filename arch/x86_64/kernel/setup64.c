@@ -60,12 +60,12 @@ noforce (default) Don't enable by default for heap/stack/data,
 */ 
 static int __init nonx_setup(char *str)
 {
-	if (!strcmp(str, "on")) { 
+	if (!strcmp(str, "on")) {
                 __supported_pte_mask |= _PAGE_NX; 
  		do_not_nx = 0; 
  		vm_data_default_flags &= ~VM_EXEC; 
  		vm_stack_flags &= ~VM_EXEC;  
-	} else if (!strcmp(str, "noforce") || !strcmp(str, "off")) { 
+	} else if (!strcmp(str, "noforce") || !strcmp(str, "off")) {
 		do_not_nx = (str[0] == 'o');
 		if (do_not_nx)
 			__supported_pte_mask &= ~_PAGE_NX; 
@@ -93,25 +93,25 @@ Valid options:
 */
  static int __init nonx32_setup(char *s)
  {
-	 while (*s) { 
+	 while (*s) {
 		if (!strncmp(s, "all", 3) || !strncmp(s,"on",2)) {
 			vm_data_default_flags32 &= ~VM_EXEC; 
 			vm_stack_flags32 &= ~VM_EXEC;  
-		} else if (!strncmp(s, "off",3)) { 
+		} else if (!strncmp(s, "off",3)) {
 			vm_data_default_flags32 |= VM_EXEC; 
 			vm_stack_flags32 |= VM_EXEC;  
-		} else if (!strncmp(s, "stack", 5)) { 
+		} else if (!strncmp(s, "stack", 5)) {
 			vm_data_default_flags32 |= VM_EXEC; 
 			vm_stack_flags32 &= ~VM_EXEC;  		
-		} else if (!strncmp(s, "force",5)) { 
+		} else if (!strncmp(s, "force",5)) {
 			vm_force_exec32 = 0; 
-		} else if (!strncmp(s, "compat",5)) { 
+		} else if (!strncmp(s, "compat",5)) {
 			vm_force_exec32 = PROT_EXEC;
 		} 
 		s += strcspn(s, ",");
 		if (*s == ',')
 			++s;
-	 } 
+	 }
 	 return 1;
 } 
 

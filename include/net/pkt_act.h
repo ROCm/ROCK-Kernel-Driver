@@ -212,9 +212,8 @@ tcf_hash_search(struct tc_action *a, u32 index)
 	if (p != NULL) {
 		a->priv = p;
 		return 1;
-	} else {
-		return 0;
 	}
+	return 0;
 }
 
 #ifdef CONFIG_NET_ACT_INIT
@@ -274,11 +273,11 @@ tcf_hash_create(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int
 static inline struct tcf_st *
 tcf_hash_init(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int size, int ovr, int bind)
 {
-	struct tcf_st *p;
-	p = tcf_hash_check (parm,a,ovr,bind);
-	if (NULL == p) {
-		return tcf_hash_create(parm, est, a, size, ovr, bind);
-	}
+	struct tcf_st *p = tcf_hash_check (parm,a,ovr,bind);
+
+	if (!p)
+		p = tcf_hash_create(parm, est, a, size, ovr, bind);
+	return p;
 }
 
 #endif

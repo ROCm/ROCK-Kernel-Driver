@@ -1,6 +1,8 @@
 #ifndef	__HPET__
 #define	__HPET__ 1
 
+#include <linux/compiler.h>
+
 /*
  * Offsets into HPET Registers
  */
@@ -110,7 +112,7 @@ struct hpet_task {
 };
 
 struct hpet_data {
-	unsigned long hd_address;
+	void __iomem *hd_address;
 	unsigned short hd_nirqs;
 	unsigned short hd_flags;
 	unsigned int hd_state;	/* timer allocated */

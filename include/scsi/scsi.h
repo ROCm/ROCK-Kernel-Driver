@@ -350,29 +350,6 @@ struct scsi_lun {
 #define sense_error(sense)  ((sense) & 0xf)
 #define sense_valid(sense)  ((sense) & 0x80);
 
-
-#define IDENTIFY_BASE       0x80
-#define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
-		     ((can_disconnect) ?  0x40 : 0) |\
-		     ((lun) & 0x07))
-
-/*
- *  SCSI command sets
- */
-
-#define SCSI_UNKNOWN    0
-#define SCSI_1          1
-#define SCSI_1_CCS      2
-#define SCSI_2          3
-#define SCSI_3          4
-
-/*
- * INQ PERIPHERAL QUALIFIERS
- */
-#define SCSI_INQ_PQ_CON         0x00
-#define SCSI_INQ_PQ_NOT_CON     0x01
-#define SCSI_INQ_PQ_NOT_CAP     0x03
-
 /*
  * default timeouts
  */
@@ -381,6 +358,34 @@ struct scsi_lun {
 #define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
 #define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
 #define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
+
+#define IDENTIFY_BASE       0x80
+#define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
+		     ((can_disconnect) ?  0x40 : 0) |\
+		     ((lun) & 0x07))
+
+/*
+ *  struct scsi_device::scsi_level values. For SCSI devices other than those
+ *  prior to SCSI-2 (i.e. over 12 years old) this value is (resp[2] + 1)
+ *  where "resp" is a byte array of the response to an INQUIRY. The scsi_level
+ *  variable is visible to the user via sysfs.
+ */
+
+#define SCSI_UNKNOWN    0
+#define SCSI_1          1
+#define SCSI_1_CCS      2
+#define SCSI_2          3
+#define SCSI_3          4        /* SPC */
+#define SCSI_SPC_2      5
+#define SCSI_SPC_3      6
+
+/*
+ * INQ PERIPHERAL QUALIFIERS
+ */
+#define SCSI_INQ_PQ_CON         0x00
+#define SCSI_INQ_PQ_NOT_CON     0x01
+#define SCSI_INQ_PQ_NOT_CAP     0x03
+
 
 /*
  * Here are some scsi specific ioctl commands which are sometimes useful.

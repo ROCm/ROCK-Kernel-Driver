@@ -19,6 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/cache.h>
 #include <linux/jiffies.h>
+#include <linux/profile.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -31,7 +32,6 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
-#include <asm/hardirq.h>
 #include <asm/uaccess.h>
 #include <asm/timer.h>
 #include <asm/starfire.h>
@@ -303,14 +303,7 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 	struct task_struct *p;
 	int timeout, ret, cpu_node;
 
-	kernel_thread(NULL, NULL, CLONE_IDLETASK);
-
-	p = prev_task(&init_task);
-
-	init_idle(p, cpu);
-
-	unhash_process(p);
-
+	p = fork_idle(cpu);
 	callin_flag = 0;
 	cpu_new_thread = p->thread_info;
 	cpu_set(cpu, cpu_callout_map);
@@ -981,8 +974,6 @@ void smp_promstop_others(void)
 	smp_cross_call(&xcall_promstop, 0, 0, 0);
 }
 
-extern void sparc64_do_profile(struct pt_regs *regs);
-
 #define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
 #define prof_counter(__cpu)		cpu_data(__cpu).counter
 
@@ -1008,7 +999,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 	}
 
 	do {
-		sparc64_do_profile(regs);
+		profile_tick(CPU_PROFILING, regs);
 		if (!--prof_counter(cpu)) {
 			irq_enter();
 

@@ -1292,6 +1292,7 @@ acornfb_init(void)
 	u_int h_sync, v_sync;
 	int rc, i;
 
+	acornfb_setup(fb_get_options("acornfb"));
 	acornfb_init_fbinfo();
 
 	current_par.dev = &acornfb_device;
@@ -1455,6 +1456,8 @@ acornfb_init(void)
 		return -EINVAL;
 	return 0;
 }
+
+module_init(acornfb_init);
 
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("VIDC 1/1a/20 framebuffer driver");

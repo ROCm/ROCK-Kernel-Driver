@@ -72,44 +72,44 @@ struct _cache_table
 /* all the cache descriptor types we care about (no TLB or trace cache entries) */
 static struct _cache_table cache_table[] __initdata =
 {
-	{ 0x06, LVL_1_INST, 8 },
-	{ 0x08, LVL_1_INST, 16 },
-	{ 0x0a, LVL_1_DATA, 8 },
-	{ 0x0c, LVL_1_DATA, 16 },
-	{ 0x22, LVL_3,      512 },
-	{ 0x23, LVL_3,      1024 },
-	{ 0x25, LVL_3,      2048 },
-	{ 0x29, LVL_3,      4096 },
-	{ 0x2c, LVL_1_DATA, 32 },
-	{ 0x30, LVL_1_INST, 32 },
-	{ 0x39, LVL_2,      128 },
-	{ 0x3b, LVL_2,      128 },
-	{ 0x3c, LVL_2,      256 },
-	{ 0x41, LVL_2,      128 },
-	{ 0x42, LVL_2,      256 },
-	{ 0x43, LVL_2,      512 },
-	{ 0x44, LVL_2,      1024 },
-	{ 0x45, LVL_2,      2048 },
-	{ 0x60, LVL_1_DATA, 16 },
-	{ 0x66, LVL_1_DATA, 8 },
-	{ 0x67, LVL_1_DATA, 16 },
-	{ 0x68, LVL_1_DATA, 32 },
-	{ 0x70, LVL_TRACE,  12 },
-	{ 0x71, LVL_TRACE,  16 },
-	{ 0x72, LVL_TRACE,  32 },
-	{ 0x78, LVL_2,	    1024 },
-	{ 0x79, LVL_2,      128 },
-	{ 0x7a, LVL_2,      256 },
-	{ 0x7b, LVL_2,      512 },
-	{ 0x7c, LVL_2,      1024 },
-	{ 0x7d, LVL_2,	    2048 },
-	{ 0x7f, LVL_2,	    512 },
-	{ 0x82, LVL_2,      256 },
-	{ 0x83, LVL_2,      512 },
-	{ 0x84, LVL_2,      1024 },
-	{ 0x85, LVL_2,      2048 },
-	{ 0x86, LVL_2,      512 },
-	{ 0x87, LVL_2,      1024 },
+	{ 0x06, LVL_1_INST, 8 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x08, LVL_1_INST, 16 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x0a, LVL_1_DATA, 8 },	/* 2 way set assoc, 32 byte line size */
+	{ 0x0c, LVL_1_DATA, 16 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x22, LVL_3,      512 },	/* 4-way set assoc, sectored cache, 64 byte line size */
+	{ 0x23, LVL_3,      1024 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x25, LVL_3,      2048 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x29, LVL_3,      4096 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x2c, LVL_1_DATA, 32 },	/* 8-way set assoc, 64 byte line size */
+	{ 0x30, LVL_1_INST, 32 },	/* 8-way set assoc, 64 byte line size */
+	{ 0x39, LVL_2,      128 },	/* 4-way set assoc, sectored cache, 64 byte line size */
+	{ 0x3b, LVL_2,      128 },	/* 2-way set assoc, sectored cache, 64 byte line size */
+	{ 0x3c, LVL_2,      256 },	/* 4-way set assoc, sectored cache, 64 byte line size */
+	{ 0x41, LVL_2,      128 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x42, LVL_2,      256 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x43, LVL_2,      512 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x44, LVL_2,      1024 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x45, LVL_2,      2048 },	/* 4-way set assoc, 32 byte line size */
+	{ 0x60, LVL_1_DATA, 16 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x66, LVL_1_DATA, 8 },	/* 4-way set assoc, sectored cache, 64 byte line size */
+	{ 0x67, LVL_1_DATA, 16 },	/* 4-way set assoc, sectored cache, 64 byte line size */
+	{ 0x68, LVL_1_DATA, 32 },	/* 4-way set assoc, sectored cache, 64 byte line size */
+	{ 0x70, LVL_TRACE,  12 },	/* 8-way set assoc */
+	{ 0x71, LVL_TRACE,  16 },	/* 8-way set assoc */
+	{ 0x72, LVL_TRACE,  32 },	/* 8-way set assoc */
+	{ 0x78, LVL_2,    1024 },	/* 4-way set assoc, 64 byte line size */
+	{ 0x79, LVL_2,     128 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x7a, LVL_2,     256 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x7b, LVL_2,     512 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x7c, LVL_2,    1024 },	/* 8-way set assoc, sectored cache, 64 byte line size */
+	{ 0x7d, LVL_2,    2048 },	/* 8-way set assoc, 64 byte line size */
+	{ 0x7f, LVL_2,     512 },	/* 2-way set assoc, 64 byte line size */
+	{ 0x82, LVL_2,     256 },	/* 8-way set assoc, 32 byte line size */
+	{ 0x83, LVL_2,     512 },	/* 8-way set assoc, 32 byte line size */
+	{ 0x84, LVL_2,    1024 },	/* 8-way set assoc, 32 byte line size */
+	{ 0x85, LVL_2,    2048 },	/* 8-way set assoc, 32 byte line size */
+	{ 0x86, LVL_2,     512 },	/* 4-way set assoc, 64 byte line size */
+	{ 0x87, LVL_2,    1024 },	/* 8-way set assoc, 64 byte line size */
 	{ 0x00, 0, 0}
 };
 

@@ -330,17 +330,17 @@ static int tvmixer_clients(struct i2c_client *client)
 
 /* ----------------------------------------------------------------------- */
 
-static int tvmixer_init_module(void)
+static int __init tvmixer_init_module(void)
 {
 	int i;
 	
 	for (i = 0; i < DEV_MAX; i++)
 		devices[i].minor = -1;
-	i2c_add_driver(&driver);
-	return 0;
+
+	return i2c_add_driver(&driver);
 }
 
-static void tvmixer_cleanup_module(void)
+static void __exit tvmixer_cleanup_module(void)
 {
 	int i;
 	

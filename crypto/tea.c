@@ -154,7 +154,7 @@ static void xtea_encrypt(void *ctx_arg, u8 *dst, const u8 *src)
 
 	while (sum != limit) {
 		y += (z << 4 ^ z >> 5) + (z ^ sum) + ctx->KEY[sum&3]; 
-		sum += TEA_DELTA;
+		sum += XTEA_DELTA;
 		z += (y << 4 ^ y >> 5) + (y ^ sum) + ctx->KEY[sum>>11 &3]; 
 	}
 	

@@ -43,6 +43,7 @@ SECTIONS
 	*(.text.ivt)
 	*(.text)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.gnu.linkonce.t*)
     }
   .text2 : AT(ADDR(.text2) - LOAD_OFFSET)
@@ -141,12 +142,6 @@ SECTIONS
 	  __kdb_initcall_start = .;
 	  *(.kdb_initcall.init)
 	  __kdb_initcall_end = .;
-	}
-  __param : AT(ADDR(__param) - LOAD_OFFSET)
-        {
-	  __start___param = .;
-	  *(__param)
-	  __stop___param = .;
 	}
   .initcall.init : AT(ADDR(.initcall.init) - LOAD_OFFSET)
 	{

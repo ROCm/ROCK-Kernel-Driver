@@ -28,7 +28,7 @@ MODULE_DESCRIPTION("ftp connection tracking helper");
 /* This is slow, but it's simple. --RR */
 static char ftp_buffer[65536];
 
-DECLARE_LOCK(ip_ftp_lock);
+static DECLARE_LOCK(ip_ftp_lock);
 struct module *ip_conntrack_ftp = THIS_MODULE;
 
 #define MAX_PORTS 8
@@ -460,7 +460,6 @@ static int __init init(void)
 }
 
 PROVIDES_CONNTRACK(ftp);
-EXPORT_SYMBOL(ip_ftp_lock);
 
 module_init(init);
 module_exit(fini);

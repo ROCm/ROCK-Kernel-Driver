@@ -28,10 +28,10 @@ int get_pty(void)
 	struct grantpt_info info;
 	int fd;
 
-	if((fd = os_open_file("/dev/ptmx", of_rdwr(OPENFLAGS()), 0)) < 0){
-		printk("get_pty : Couldn't open /dev/ptmx - errno = %d\n",
-		       errno);
-		return(-1);
+	fd = os_open_file("/dev/ptmx", of_rdwr(OPENFLAGS()), 0);
+	if(fd < 0){
+		printk("get_pty : Couldn't open /dev/ptmx - err = %d\n", -fd);
+		return(fd);
 	}
 
 	info.fd = fd;
@@ -39,7 +39,7 @@ int get_pty(void)
 
 	if(info.res < 0){
 		printk("get_pty : Couldn't grant pty - errno = %d\n", 
-		       info.err);
+		       -info.err);
 		return(-1);
 	}
 	if(unlockpt(fd) < 0){

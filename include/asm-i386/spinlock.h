@@ -46,20 +46,18 @@ typedef struct {
 #define spin_lock_string \
 	"\n1:\t" \
 	"lock ; decb %0\n\t" \
-	"js 2f\n" \
-	LOCK_SECTION_START("") \
+	"jns 3f\n" \
 	"2:\t" \
 	"rep;nop\n\t" \
 	"cmpb $0,%0\n\t" \
 	"jle 2b\n\t" \
 	"jmp 1b\n" \
-	LOCK_SECTION_END
+	"3:\n\t"
 
 #define spin_lock_string_flags \
 	"\n1:\t" \
 	"lock ; decb %0\n\t" \
-	"js 2f\n\t" \
-	LOCK_SECTION_START("") \
+	"jns 4f\n\t" \
 	"2:\t" \
 	"testl $0x200, %1\n\t" \
 	"jz 3f\n\t" \
@@ -70,7 +68,7 @@ typedef struct {
 	"jle 3b\n\t" \
 	"cli\n\t" \
 	"jmp 1b\n" \
-	LOCK_SECTION_END
+	"4:\n\t"
 
 /*
  * This works. Despite all the confusion.
@@ -130,10 +128,8 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 static inline void _raw_spin_lock(spinlock_t *lock)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
-	__label__ here;
-here:
 	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
-		printk("eip: %p\n", &&here);
+		printk("eip: %p\n", __builtin_return_address(0));
 		BUG();
 	}
 #endif
@@ -145,10 +141,8 @@ here:
 static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
-	__label__ here;
-here:
 	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
-		printk("eip: %p\n", &&here);
+		printk("eip: %p\n", __builtin_return_address(0));
 		BUG();
 	}
 #endif

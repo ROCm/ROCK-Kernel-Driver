@@ -27,7 +27,9 @@
 #include <unistd.h>
 #include <assert.h>
 #include <stdarg.h>
+#ifdef __GNU_LIBRARY__
 #include <getopt.h>
+#endif /* __GNU_LIBRARY__ */
 
 #include "genksyms.h"
 
@@ -502,12 +504,21 @@ void genksyms_usage(void)
 	fputs("Usage:\n"
 	      "genksyms [-dDwqhV] > /path/to/.tmp_obj.ver\n"
 	      "\n"
+#ifdef __GNU_LIBRARY__
 	      "  -d, --debug           Increment the debug level (repeatable)\n"
 	      "  -D, --dump            Dump expanded symbol defs (for debugging only)\n"
 	      "  -w, --warnings        Enable warnings\n"
 	      "  -q, --quiet           Disable warnings (default)\n"
 	      "  -h, --help            Print this message\n"
 	      "  -V, --version         Print the release version\n"
+#else  /* __GNU_LIBRARY__ */
+             "  -d                    Increment the debug level (repeatable)\n"
+             "  -D                    Dump expanded symbol defs (for debugging only)\n"
+             "  -w                    Enable warnings\n"
+             "  -q                    Disable warnings (default)\n"
+             "  -h                    Print this message\n"
+             "  -V                    Print the release version\n"
+#endif /* __GNU_LIBRARY__ */
 	      , stderr);
 }
 
@@ -516,6 +527,7 @@ main(int argc, char **argv)
 {
   int o;
 
+#ifdef __GNU_LIBRARY__
   struct option long_opts[] = {
     {"debug", 0, 0, 'd'},
     {"warnings", 0, 0, 'w'},
@@ -528,6 +540,9 @@ main(int argc, char **argv)
 
   while ((o = getopt_long(argc, argv, "dwqVDk:p:",
 			  &long_opts[0], NULL)) != EOF)
+#else  /* __GNU_LIBRARY__ */
+  while ((o = getopt(argc, argv, "dwqVDk:p:")) != EOF)
+#endif /* __GNU_LIBRARY__ */
     switch (o)
       {
       case 'd':

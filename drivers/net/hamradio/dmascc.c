@@ -246,20 +246,20 @@ static int scc_send_packet(struct sk_buff *skb, struct net_device *dev);
 static struct net_device_stats *scc_get_stats(struct net_device *dev);
 static int scc_set_mac_address(struct net_device *dev, void *sa);
 
-static irqreturn_t scc_isr(int irq, void *dev_id, struct pt_regs * regs);
+static inline void tx_on(struct scc_priv *priv);
+static inline void rx_on(struct scc_priv *priv);
+static inline void rx_off(struct scc_priv *priv);
+static void start_timer(struct scc_priv *priv, int t, int r15);
+static inline unsigned char random(void);
+
 static inline void z8530_isr(struct scc_info *info);
+static irqreturn_t scc_isr(int irq, void *dev_id, struct pt_regs * regs);
 static void rx_isr(struct scc_priv *priv);
 static void special_condition(struct scc_priv *priv, int rc);
 static void rx_bh(void *arg);
 static void tx_isr(struct scc_priv *priv);
 static void es_isr(struct scc_priv *priv);
 static void tm_isr(struct scc_priv *priv);
-
-static inline void tx_on(struct scc_priv *priv);
-static inline void rx_on(struct scc_priv *priv);
-static inline void rx_off(struct scc_priv *priv);
-static void start_timer(struct scc_priv *priv, int t, int r15);
-static inline unsigned char random(void);
 
 
 /* Initialization variables */
@@ -945,6 +945,143 @@ static int scc_set_mac_address(struct net_device *dev, void *sa) {
 }
 
 
+static inline void tx_on(struct scc_priv *priv) {
+  int i, n;
+  unsigned long flags;
+
+  if (priv->param.dma >= 0) {
+    n = (priv->chip == Z85230) ? 3 : 1;
+    /* Program DMA controller */
+    flags = claim_dma_lock();
+    set_dma_mode(priv->param.dma, DMA_MODE_WRITE);
+    set_dma_addr(priv->param.dma, (int) priv->tx_buf[priv->tx_tail]+n);
+    set_dma_count(priv->param.dma, priv->tx_len[priv->tx_tail]-n);
+    release_dma_lock(flags);
+    /* Enable TX underrun interrupt */
+    write_scc(priv, R15, TxUIE);
+    /* Configure DREQ */
+    if (priv->type == TYPE_TWIN)
+      outb((priv->param.dma == 1) ? TWIN_DMA_HDX_T1 : TWIN_DMA_HDX_T3,
+	   priv->card_base + TWIN_DMA_CFG);
+    else
+      write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN | WT_RDY_ENAB);
+    /* Write first byte(s) */
+    spin_lock_irqsave(priv->register_lock, flags);
+    for (i = 0; i < n; i++)
+      write_scc_data(priv, priv->tx_buf[priv->tx_tail][i], 1);
+    enable_dma(priv->param.dma);
+    spin_unlock_irqrestore(priv->register_lock, flags);
+  } else {
+    write_scc(priv, R15, TxUIE);
+    write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN | TxINT_ENAB);
+    tx_isr(priv);
+  }
+  /* Reset EOM latch if we do not have the AUTOEOM feature */
+  if (priv->chip == Z8530) write_scc(priv, R0, RES_EOM_L);
+}
+
+
+static inline void rx_on(struct scc_priv *priv) {
+  unsigned long flags;
+
+  /* Clear RX FIFO */
+  while (read_scc(priv, R0) & Rx_CH_AV) read_scc_data(priv);
+  priv->rx_over = 0;
+  if (priv->param.dma >= 0) {
+    /* Program DMA controller */
+    flags = claim_dma_lock();
+    set_dma_mode(priv->param.dma, DMA_MODE_READ);
+    set_dma_addr(priv->param.dma, (int) priv->rx_buf[priv->rx_head]);
+    set_dma_count(priv->param.dma, BUF_SIZE);
+    release_dma_lock(flags);
+    enable_dma(priv->param.dma);
+    /* Configure PackeTwin DMA */
+    if (priv->type == TYPE_TWIN) {
+      outb((priv->param.dma == 1) ? TWIN_DMA_HDX_R1 : TWIN_DMA_HDX_R3,
+	   priv->card_base + TWIN_DMA_CFG);
+    }
+    /* Sp. cond. intr. only, ext int enable, RX DMA enable */
+    write_scc(priv, R1, EXT_INT_ENAB | INT_ERR_Rx |
+	      WT_RDY_RT | WT_FN_RDYFN | WT_RDY_ENAB);
+  } else {
+    /* Reset current frame */
+    priv->rx_ptr = 0;
+    /* Intr. on all Rx characters and Sp. cond., ext int enable */
+    write_scc(priv, R1, EXT_INT_ENAB | INT_ALL_Rx | WT_RDY_RT |
+	      WT_FN_RDYFN);
+  }
+  write_scc(priv, R0, ERR_RES);
+  write_scc(priv, R3, RxENABLE | Rx8 | RxCRC_ENAB);
+}
+
+
+static inline void rx_off(struct scc_priv *priv) {
+  /* Disable receiver */
+  write_scc(priv, R3, Rx8);
+  /* Disable DREQ / RX interrupt */
+  if (priv->param.dma >= 0 && priv->type == TYPE_TWIN)
+    outb(0, priv->card_base + TWIN_DMA_CFG);
+  else
+    write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN);
+  /* Disable DMA */
+  if (priv->param.dma >= 0) disable_dma(priv->param.dma);
+}
+
+
+static void start_timer(struct scc_priv *priv, int t, int r15) {
+  unsigned long flags;
+
+  outb(priv->tmr_mode, priv->tmr_ctrl);
+  if (t == 0) {
+    tm_isr(priv);
+  } else if (t > 0) {
+    save_flags(flags);
+    cli();
+    outb(t & 0xFF, priv->tmr_cnt);
+    outb((t >> 8) & 0xFF, priv->tmr_cnt);
+    if (priv->type != TYPE_TWIN) {
+      write_scc(priv, R15, r15 | CTSIE);
+      priv->rr0 |= CTS;
+    }
+    restore_flags(flags);
+  }
+}
+
+
+static inline unsigned char random(void) {
+  /* See "Numerical Recipes in C", second edition, p. 284 */
+  rand = rand * 1664525L + 1013904223L;
+  return (unsigned char) (rand >> 24);
+}
+
+static inline void z8530_isr(struct scc_info *info) {
+  int is, i = 100;
+
+  while ((is = read_scc(&info->priv[0], R3)) && i--) {
+    if (is & CHARxIP) {
+      rx_isr(&info->priv[0]);
+    } else if (is & CHATxIP) {
+      tx_isr(&info->priv[0]);
+    } else if (is & CHAEXT) {
+      es_isr(&info->priv[0]);
+    } else if (is & CHBRxIP) {
+      rx_isr(&info->priv[1]);
+    } else if (is & CHBTxIP) {
+      tx_isr(&info->priv[1]);
+    } else {
+      es_isr(&info->priv[1]);
+    }
+    write_scc(&info->priv[0], R0, RES_H_IUS);
+    i++;
+  }
+  if (i < 0) {
+    printk(KERN_ERR "dmascc: stuck in ISR with RR3=0x%02x.\n", is);
+  }
+  /* Ok, no interrupts pending from this 8530. The INT line should
+     be inactive now. */
+}
+
+
 static irqreturn_t scc_isr(int irq, void *dev_id, struct pt_regs * regs) {
   struct scc_info *info = dev_id;
 
@@ -978,34 +1115,6 @@ static irqreturn_t scc_isr(int irq, void *dev_id, struct pt_regs * regs) {
   } else z8530_isr(info);
   spin_unlock(info->priv[0].register_lock);
   return IRQ_HANDLED;
-}
-
-
-static inline void z8530_isr(struct scc_info *info) {
-  int is, i = 100;
-
-  while ((is = read_scc(&info->priv[0], R3)) && i--) {
-    if (is & CHARxIP) {
-      rx_isr(&info->priv[0]);
-    } else if (is & CHATxIP) {
-      tx_isr(&info->priv[0]);
-    } else if (is & CHAEXT) {
-      es_isr(&info->priv[0]);
-    } else if (is & CHBRxIP) {
-      rx_isr(&info->priv[1]);
-    } else if (is & CHBTxIP) {
-      tx_isr(&info->priv[1]);
-    } else {
-      es_isr(&info->priv[1]);
-    }
-    write_scc(&info->priv[0], R0, RES_H_IUS);
-    i++;
-  }
-  if (i < 0) {
-    printk(KERN_ERR "dmascc: stuck in ISR with RR3=0x%02x.\n", is);
-  }
-  /* Ok, no interrupts pending from this 8530. The INT line should
-     be inactive now. */
 }
 
 
@@ -1292,114 +1401,3 @@ static void tm_isr(struct scc_priv *priv) {
     break;
   }
 }
-
-
-static inline void tx_on(struct scc_priv *priv) {
-  int i, n;
-  unsigned long flags;
-
-  if (priv->param.dma >= 0) {
-    n = (priv->chip == Z85230) ? 3 : 1;
-    /* Program DMA controller */
-    flags = claim_dma_lock();
-    set_dma_mode(priv->param.dma, DMA_MODE_WRITE);
-    set_dma_addr(priv->param.dma, (int) priv->tx_buf[priv->tx_tail]+n);
-    set_dma_count(priv->param.dma, priv->tx_len[priv->tx_tail]-n);
-    release_dma_lock(flags);
-    /* Enable TX underrun interrupt */
-    write_scc(priv, R15, TxUIE);
-    /* Configure DREQ */
-    if (priv->type == TYPE_TWIN)
-      outb((priv->param.dma == 1) ? TWIN_DMA_HDX_T1 : TWIN_DMA_HDX_T3,
-	   priv->card_base + TWIN_DMA_CFG);
-    else
-      write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN | WT_RDY_ENAB);
-    /* Write first byte(s) */
-    spin_lock_irqsave(priv->register_lock, flags);
-    for (i = 0; i < n; i++)
-      write_scc_data(priv, priv->tx_buf[priv->tx_tail][i], 1);
-    enable_dma(priv->param.dma);
-    spin_unlock_irqrestore(priv->register_lock, flags);
-  } else {
-    write_scc(priv, R15, TxUIE);
-    write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN | TxINT_ENAB);
-    tx_isr(priv);
-  }
-  /* Reset EOM latch if we do not have the AUTOEOM feature */
-  if (priv->chip == Z8530) write_scc(priv, R0, RES_EOM_L);
-}
-
-
-static inline void rx_on(struct scc_priv *priv) {
-  unsigned long flags;
-
-  /* Clear RX FIFO */
-  while (read_scc(priv, R0) & Rx_CH_AV) read_scc_data(priv);
-  priv->rx_over = 0;
-  if (priv->param.dma >= 0) {
-    /* Program DMA controller */
-    flags = claim_dma_lock();
-    set_dma_mode(priv->param.dma, DMA_MODE_READ);
-    set_dma_addr(priv->param.dma, (int) priv->rx_buf[priv->rx_head]);
-    set_dma_count(priv->param.dma, BUF_SIZE);
-    release_dma_lock(flags);
-    enable_dma(priv->param.dma);
-    /* Configure PackeTwin DMA */
-    if (priv->type == TYPE_TWIN) {
-      outb((priv->param.dma == 1) ? TWIN_DMA_HDX_R1 : TWIN_DMA_HDX_R3,
-	   priv->card_base + TWIN_DMA_CFG);
-    }
-    /* Sp. cond. intr. only, ext int enable, RX DMA enable */
-    write_scc(priv, R1, EXT_INT_ENAB | INT_ERR_Rx |
-	      WT_RDY_RT | WT_FN_RDYFN | WT_RDY_ENAB);
-  } else {
-    /* Reset current frame */
-    priv->rx_ptr = 0;
-    /* Intr. on all Rx characters and Sp. cond., ext int enable */
-    write_scc(priv, R1, EXT_INT_ENAB | INT_ALL_Rx | WT_RDY_RT |
-	      WT_FN_RDYFN);
-  }
-  write_scc(priv, R0, ERR_RES);
-  write_scc(priv, R3, RxENABLE | Rx8 | RxCRC_ENAB);
-}
-
-
-static inline void rx_off(struct scc_priv *priv) {
-  /* Disable receiver */
-  write_scc(priv, R3, Rx8);
-  /* Disable DREQ / RX interrupt */
-  if (priv->param.dma >= 0 && priv->type == TYPE_TWIN)
-    outb(0, priv->card_base + TWIN_DMA_CFG);
-  else
-    write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN);
-  /* Disable DMA */
-  if (priv->param.dma >= 0) disable_dma(priv->param.dma);
-}
-
-
-static void start_timer(struct scc_priv *priv, int t, int r15) {
-  unsigned long flags;
-
-  outb(priv->tmr_mode, priv->tmr_ctrl);
-  if (t == 0) {
-    tm_isr(priv);
-  } else if (t > 0) {
-    save_flags(flags);
-    cli();
-    outb(t & 0xFF, priv->tmr_cnt);
-    outb((t >> 8) & 0xFF, priv->tmr_cnt);
-    if (priv->type != TYPE_TWIN) {
-      write_scc(priv, R15, r15 | CTSIE);
-      priv->rr0 |= CTS;
-    }
-    restore_flags(flags);
-  }
-}
-
-
-static inline unsigned char random(void) {
-  /* See "Numerical Recipes in C", second edition, p. 284 */
-  rand = rand * 1664525L + 1013904223L;
-  return (unsigned char) (rand >> 24);
-}
-

@@ -16,7 +16,7 @@
 #define _NET_IPV6_H
 
 #include <linux/ipv6.h>
-#include <asm/hardirq.h>
+#include <linux/hardirq.h>
 #include <net/ndisc.h>
 #include <net/flow.h>
 #include <net/snmp.h>

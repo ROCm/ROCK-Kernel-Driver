@@ -26,7 +26,7 @@
 struct amd76xrom_map_info {
 	struct map_info map;
 	struct mtd_info *mtd;
-	unsigned long window_addr;
+	void __iomem * window_addr;
 	u32 window_start, window_size;
 	struct pci_dev *pdev;
 	struct resource window_rsrc;
@@ -57,7 +57,7 @@ static void amd76xrom_cleanup(struct amd76xrom_map_info *info)
 		del_mtd_device(info->mtd);
 		map_destroy(info->mtd);
 		info->mtd = NULL;
-		info->map.virt = 0;
+		info->map.virt = NULL;
 	}
 	if (info->rom_rsrc.parent)
 		release_resource(&info->rom_rsrc);
@@ -65,8 +65,8 @@ static void amd76xrom_cleanup(struct amd76xrom_map_info *info)
 		release_resource(&info->window_rsrc);
 
 	if (info->window_addr) {
-		iounmap((void *)(info->window_addr));
-		info->window_addr = 0;
+		iounmap(info->window_addr);
+		info->window_addr = NULL;
 	}
 }
 
@@ -136,8 +136,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 		printk(KERN_NOTICE MOD_NAME " window : %x at %x\n", 
 		       window->size, window->start);
 		/* For write accesses caches are useless */
-		info->window_addr =
-			(unsigned long)ioremap_nocache(window->start,
+		info->window_addr = ioremap_nocache(window->start,
 						       window->size);
 
 		if (!info->window_addr) {
@@ -163,8 +162,8 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 			}
 			if (info->mtd) goto found_mtd;
 		}
-		iounmap((void *)(info->window_addr));
-		info->window_addr = 0;
+		iounmap(info->window_addr);
+		info->window_addr = NULL;
 
 		/* Disable writes through the rom window */
 		pci_read_config_byte(pdev, 0x40, &byte);

@@ -688,12 +688,12 @@ static int kernel_math_error(struct pt_regs *regs, char *str)
 		regs->rip = fixup->fixup;
 		return 1;
 	}
-	notify_die(DIE_GPF, str, regs, 0, 16, SIGFPE); 
+	notify_die(DIE_GPF, str, regs, 0, 16, SIGFPE);
 #if 0
 	/* This should be a die, but warn only for now */
 	die(str, regs, 0);
 #else
-	printk(KERN_DEBUG "%s: %s at ", current->comm, str); 
+	printk(KERN_DEBUG "%s: %s at ", current->comm, str);
 	printk_address(regs->rip);
 	printk("\n");
 #endif

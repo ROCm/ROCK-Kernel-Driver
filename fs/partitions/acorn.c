@@ -61,7 +61,7 @@ struct riscix_part {
 
 struct riscix_record {
 	__u32	magic;
-#define RISCIX_MAGIC	(0x4a657320)
+#define RISCIX_MAGIC	cpu_to_le32(0x4a657320)
 	__u32	date;
 	struct riscix_part part[8];
 };

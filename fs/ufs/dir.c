@@ -31,6 +31,9 @@
 #define UFSD(x)
 #endif
 
+static int
+ufs_check_dir_entry (const char *, struct inode *, struct ufs_dir_entry *,
+		     struct buffer_head *, unsigned long);
 
 
 /*
@@ -292,9 +295,10 @@ failed:
 	return NULL;
 }
 
-int ufs_check_dir_entry (const char * function,	struct inode * dir,
-	struct ufs_dir_entry * de, struct buffer_head * bh, 
-	unsigned long offset)
+static int
+ufs_check_dir_entry (const char *function, struct inode *dir,
+		     struct ufs_dir_entry *de, struct buffer_head *bh,
+		     unsigned long offset)
 {
 	struct super_block *sb = dir->i_sb;
 	const char *error_msg = NULL;

@@ -12,6 +12,10 @@ config MMU
 	bool
 	default y
 
+config TIME_INTERPOLATION
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "General machine setup"

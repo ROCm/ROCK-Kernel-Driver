@@ -572,4 +572,5 @@ int __init igafb_setup(char *options)
     return 0;
 }
 
+module_init(igafb_init);
 MODULE_LICENSE("GPL");

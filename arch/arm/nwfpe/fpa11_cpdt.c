@@ -42,8 +42,13 @@ static inline void loadDouble(const unsigned int Fn, const unsigned int __user *
 	unsigned int *p;
 	p = (unsigned int *) &fpa11->fpreg[Fn].fDouble;
 	fpa11->fType[Fn] = typeDouble;
+#ifdef __ARMEB__
+	get_user(p[0], &pMem[0]);	/* sign & exponent */
+	get_user(p[1], &pMem[1]);
+#else
 	get_user(p[0], &pMem[1]);
 	get_user(p[1], &pMem[0]);	/* sign & exponent */
+#endif
 }
 
 #ifdef CONFIG_FPE_NWFPE_XP
@@ -140,8 +145,13 @@ static inline void storeDouble(const unsigned int Fn, unsigned int __user *pMem)
 		val.f = fpa11->fpreg[Fn].fDouble;
 	}
 
+#ifdef __ARMEB__
+	put_user(val.i[0], &pMem[0]);	/* msw */
+	put_user(val.i[1], &pMem[1]);	/* lsw */
+#else
 	put_user(val.i[1], &pMem[0]);	/* msw */
 	put_user(val.i[0], &pMem[1]);	/* lsw */
+#endif
 }
 
 #ifdef CONFIG_FPE_NWFPE_XP

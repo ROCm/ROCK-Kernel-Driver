@@ -33,7 +33,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/leds.h>
-
+#include <asm/thread_info.h>
 #include <asm/mach/time.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
@@ -52,6 +52,20 @@ EXPORT_SYMBOL(rtc_lock);
 /* change this if you have some constant time drift */
 #define USECS_PER_JIFFY	(1000000/HZ)
 
+#ifdef CONFIG_SMP
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long fp, pc = instruction_pointer(regs);
+
+	if (in_lock_functions(pc)) {
+		fp = thread_saved_fp(current);
+		pc = pc_pointer(((unsigned long *)fp)[-1]);
+	}
+
+	return pc;
+}
+EXPORT_SYMBOL(profile_pc);
+#endif
 
 /*
  * hook for setting the RTC's idea of the current time.
@@ -77,31 +91,6 @@ unsigned long (*gettimeoffset)(void) = dummy_gettimeoffset;
 unsigned long long __attribute__((weak)) sched_clock(void)
 {
 	return (unsigned long long)jiffies * (1000000000 / HZ);
-}
-
-/*
- * Handle kernel profile stuff...
- */
-static inline void do_profile(struct pt_regs *regs)
-{
-
-	profile_hook(regs);
-
-	if (!user_mode(regs) &&
-	    prof_buffer &&
-	    current->pid) {
-		unsigned long pc = instruction_pointer(regs);
-		extern int _stext;
-
-		pc -= (unsigned long)&_stext;
-
-		pc >>= prof_shift;
-
-		if (pc >= prof_len)
-			pc = prof_len - 1;
-
-		prof_buffer[pc] += 1;
-	}
 }
 
 static unsigned long next_rtc_update;
@@ -317,7 +306,7 @@ EXPORT_SYMBOL(do_settimeofday);
 
 void timer_tick(struct pt_regs *regs)
 {
-	do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 	do_leds();
 	do_set_rtc();
 	do_timer(regs);

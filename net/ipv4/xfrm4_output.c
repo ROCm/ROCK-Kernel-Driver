@@ -58,8 +58,7 @@ static void xfrm4_encap(struct sk_buff *skb)
 	if (!top_iph->frag_off)
 		__ip_select_ident(top_iph, dst, 0);
 
-	/* TTL disclosed */
-	top_iph->ttl = iph->ttl;
+	top_iph->ttl = dst_path_metric(dst, RTAX_HOPLIMIT);
 
 	top_iph->saddr = x->props.saddr.a4;
 	top_iph->daddr = x->id.daddr.a4;
