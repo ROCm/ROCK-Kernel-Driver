@@ -343,7 +343,7 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 	if (!mm)
 		goto out;
 	if (!mm->arg_end)
-		goto out;	/* Shh! No looking before we're done */
+		goto out_mm;	/* Shh! No looking before we're done */
 
  	len = mm->arg_end - mm->arg_start;
  
@@ -366,8 +366,8 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 			res = strnlen(buffer, res);
 		}
 	}
+out_mm:
 	mmput(mm);
-
 out:
 	return res;
 }
