@@ -1455,7 +1455,10 @@ struct sctp_association {
 
 	struct {
 		__u16 stream;
+		__u16 flags;
 		__u32 ppid;
+		__u32 context;
+		__u32 timetolive;
 	} defaults;
 
 	/* This tracks outbound ssn for a given stream.  */

@@ -939,6 +939,19 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	/* ASSERT: we have a valid association at this point.  */
 	SCTP_DEBUG_PRINTK("We have a valid association.\n");
 
+	if (!sinfo) {
+		/* If the user didn't specify SNDRCVINFO, make up one with
+		 * some defaults.
+		 */
+		default_sinfo.sinfo_stream = asoc->defaults.stream;
+		default_sinfo.sinfo_flags = asoc->defaults.flags;
+		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
+		default_sinfo.sinfo_context = asoc->defaults.context;
+		default_sinfo.sinfo_timetolive = asoc->defaults.timetolive;
+		default_sinfo.sinfo_assoc_id = sctp_assoc2id(asoc);
+		sinfo = &default_sinfo;
+	}
+
 	/* API 7.1.7, the sndbuf size per association bounds the
 	 * maximum size of data that can be sent in a single send call.
 	 */
@@ -963,13 +976,6 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			err = -EINVAL;
 			goto out_free;
 		}
-	} else {
-		/* If the user didn't specify SNDRCVINFO, make up one with
-		 * some defaults.
-		 */
-		default_sinfo.sinfo_stream = asoc->defaults.stream;
-		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
-		sinfo = &default_sinfo;
 	}
 
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
@@ -1310,6 +1316,44 @@ static inline int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
 	return 0;
 }
 
+/*
+ *
+ * 7.1.15 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ *
+ *   Applications that wish to use the sendto() system call may wish to
+ *   specify a default set of parameters that would normally be supplied
+ *   through the inclusion of ancillary data.  This socket option allows
+ *   such an application to set the default sctp_sndrcvinfo structure.
+ *   The application that wishes to use this socket option simply passes
+ *   in to this call the sctp_sndrcvinfo structure defined in Section
+ *   5.2.2) The input parameters accepted by this call include
+ *   sinfo_stream, sinfo_flags, sinfo_ppid, sinfo_context,
+ *   sinfo_timetolive.  The user must provide the sinfo_assoc_id field in
+ *   to this call if the caller is using the UDP model.
+ */
+static inline int sctp_setsockopt_set_default_send_param(struct sock *sk,
+						char *optval, int optlen)
+{
+	struct sctp_sndrcvinfo info;
+	sctp_association_t *asoc;
+
+	if (optlen != sizeof(struct sctp_sndrcvinfo))
+		return -EINVAL;
+	if (copy_from_user(&info, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, info.sinfo_assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	asoc->defaults.stream = info.sinfo_stream;
+	asoc->defaults.flags = info.sinfo_flags;
+	asoc->defaults.ppid = info.sinfo_ppid;
+	asoc->defaults.context = info.sinfo_context;
+	asoc->defaults.timetolive = info.sinfo_timetolive;
+	return 0;
+}
+				
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -1399,6 +1443,11 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 
 	case SCTP_INITMSG:
 		retval = sctp_setsockopt_initmsg(sk, optval, optlen);
+		break;
+
+	case SCTP_SET_DEFAULT_SEND_PARAM:
+		retval = sctp_setsockopt_set_default_send_param(sk,
+							optval, optlen);
 		break;
 
 	default:
