@@ -113,12 +113,14 @@ static int cpufreq_proc_read (
 	if (off != 0)
 		goto end;
 
+#if 0
 	if (!warning_print) {
 		warning_print++;
 		printk(KERN_INFO "Access to /proc/cpufreq is deprecated and "
 			"will be removed from (new) 2.6. kernels soon "
 			"after 2005-01-01\n");
 	}
+#endif
 
 	p += sprintf(p, "          minimum CPU frequency  -  maximum CPU frequency  -  policy\n");
 	for (i=0;i<NR_CPUS;i++) {
