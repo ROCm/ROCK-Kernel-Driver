@@ -207,15 +207,15 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 			value, index, size);
 
 	/* fill in the devrequest structure */
-	us->dr->bRequestType = requesttype;
-	us->dr->bRequest = request;
-	us->dr->wValue = cpu_to_le16(value);
-	us->dr->wIndex = cpu_to_le16(index);
-	us->dr->wLength = cpu_to_le16(size);
+	us->cr->bRequestType = requesttype;
+	us->cr->bRequest = request;
+	us->cr->wValue = cpu_to_le16(value);
+	us->cr->wIndex = cpu_to_le16(index);
+	us->cr->wLength = cpu_to_le16(size);
 
 	/* fill and submit the URB */
 	usb_fill_control_urb(us->current_urb, us->pusb_dev, pipe, 
-			 (unsigned char*) us->dr, data, size, 
+			 (unsigned char*) us->cr, data, size, 
 			 usb_stor_blocking_completion, NULL);
 	status = usb_stor_msg_common(us, timeout);
 
@@ -346,15 +346,15 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 			value, index, size);
 
 	/* fill in the devrequest structure */
-	us->dr->bRequestType = requesttype;
-	us->dr->bRequest = request;
-	us->dr->wValue = cpu_to_le16(value);
-	us->dr->wIndex = cpu_to_le16(index);
-	us->dr->wLength = cpu_to_le16(size);
+	us->cr->bRequestType = requesttype;
+	us->cr->bRequest = request;
+	us->cr->wValue = cpu_to_le16(value);
+	us->cr->wIndex = cpu_to_le16(index);
+	us->cr->wLength = cpu_to_le16(size);
 
 	/* fill and submit the URB */
 	usb_fill_control_urb(us->current_urb, us->pusb_dev, pipe, 
-			 (unsigned char*) us->dr, data, size, 
+			 (unsigned char*) us->cr, data, size, 
 			 usb_stor_blocking_completion, NULL);
 	result = usb_stor_msg_common(us, 0);
 

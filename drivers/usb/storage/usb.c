@@ -513,15 +513,15 @@ static void get_device_info(struct us_data *us, int id_index)
 	/* Use the unusual_dev strings if the device didn't provide them */
 	if (strlen(us->vendor) == 0) {
 		if (unusual_dev->vendorName)
-			strncpy(us->vendor, unusual_dev->vendorName,
-				sizeof(us->vendor) - 1);
+			strlcpy(us->vendor, unusual_dev->vendorName,
+				sizeof(us->vendor));
 		else
 			strcpy(us->vendor, "Unknown");
 	}
 	if (strlen(us->product) == 0) {
 		if (unusual_dev->productName)
-			strncpy(us->product, unusual_dev->productName,
-				sizeof(us->product) - 1);
+			strlcpy(us->product, unusual_dev->productName,
+				sizeof(us->product));
 		else
 			strcpy(us->product, "Unknown");
 	}
@@ -743,8 +743,8 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	int p;
 
 	/* Allocate the USB control blocks */
-	us->dr = kmalloc(sizeof(*us->dr), GFP_KERNEL);
-	if (!us->dr) {
+	us->cr = kmalloc(sizeof(*us->cr), GFP_KERNEL);
+	if (!us->cr) {
 		US_DEBUGP("usb_ctrlrequest allocation failed\n");
 		return -ENOMEM;
 	}
@@ -860,8 +860,8 @@ void usb_stor_release_resources(struct us_data *us)
 		kfree(us->iobuf);
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
-	if (us->dr)
-		kfree(us->dr);
+	if (us->cr)
+		kfree(us->cr);
 
 	/* Free the structure itself */
 	kfree(us);

@@ -108,6 +108,7 @@ struct us_data {
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
 	struct usb_interface	*pusb_intf;	 /* this interface */
+	struct us_unusual_dev   *unusual_dev;	 /* device-filter entry     */
 	unsigned long		flags;		 /* from filter initially */
 	unsigned int		send_bulk_pipe;	 /* cached pipe values */
 	unsigned int		recv_bulk_pipe;
@@ -142,17 +143,16 @@ struct us_data {
 	int			sm_state;	 /* what we are doing	 */
 
 	/* control and bulk communications data */
-	struct urb		*current_urb;	 /* non-int USB requests */
-	struct usb_ctrlrequest	*dr;		 /* control requests	 */
-	struct usb_sg_request	current_sg;	 /* scatter-gather USB   */
+	struct urb		*current_urb;	 /* USB requests	 */
+	struct usb_ctrlrequest	*cr;		 /* control requests	 */
+	struct usb_sg_request	current_sg;	 /* scatter-gather req.  */
 	unsigned char		*iobuf;		 /* I/O buffer		 */
 
-	/* the semaphore for sleeping the control thread */
-	struct semaphore	sema;		 /* to sleep thread on   */
-
 	/* mutual exclusion structures */
+	struct semaphore	sema;		 /* to sleep thread on   */
 	struct completion	notify;		 /* thread begin/end	    */
-	struct us_unusual_dev   *unusual_dev;	 /* If unusual device       */
+
+	/* subdriver information */
 	void			*extra;		 /* Any extra data          */
 	extra_data_destructor	extra_destructor;/* extra data destructor   */
 };
