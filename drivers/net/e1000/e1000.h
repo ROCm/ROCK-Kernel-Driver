@@ -64,6 +64,7 @@
 #include <linux/udp.h>
 #include <net/pkt_sched.h>
 #include <linux/list.h>
+#include <linux/rtnetlink.h>
 #include <linux/reboot.h>
 #ifdef NETIF_F_TSO
 #include <net/checksum.h>
@@ -78,6 +79,8 @@
 #define BAR_1		1
 #define BAR_5		5
 
+#define INTEL_E1000_ETHERNET_DEVICE(device_id) {\
+	PCI_DEVICE(PCI_VENDOR_ID_INTEL, device_id)}
 
 struct e1000_adapter;
 
@@ -154,9 +157,9 @@ struct e1000_adapter;
 struct e1000_buffer {
 	struct sk_buff *skb;
 	uint64_t dma;
-	unsigned long length;
 	unsigned long time_stamp;
-	unsigned int next_to_watch;
+	uint16_t length;
+	uint16_t next_to_watch;
 };
 
 struct e1000_desc_ring {

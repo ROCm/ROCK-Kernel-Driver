@@ -357,11 +357,11 @@ int32_t e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active);
 #define E1000_DEV_ID_82547GI             0x1075
 #define E1000_DEV_ID_82541GI             0x1076
 #define E1000_DEV_ID_82541GI_MOBILE      0x1077
+#define E1000_DEV_ID_82541GI_LF          0x107C
 #define E1000_DEV_ID_82546GB_COPPER      0x1079
 #define E1000_DEV_ID_82546GB_FIBER       0x107A
 #define E1000_DEV_ID_82546GB_SERDES      0x107B
 #define E1000_DEV_ID_82547EI             0x1019
-
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6
 

@@ -251,6 +251,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82541ER:
     case E1000_DEV_ID_82541GI:
+    case E1000_DEV_ID_82541GI_LF:
     case E1000_DEV_ID_82541GI_MOBILE:
         hw->mac_type = e1000_82541_rev_2;
         break;
@@ -920,7 +921,8 @@ e1000_setup_copper_link(struct e1000_hw *hw)
     if(ret_val)
         return ret_val;
 
-    if(hw->mac_type == e1000_82545_rev_3) {
+    if((hw->mac_type == e1000_82545_rev_3) ||
+       (hw->mac_type == e1000_82546_rev_3)) {
         ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
         phy_data |= 0x00000008;
         ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, phy_data);
@@ -3057,16 +3059,6 @@ e1000_init_eeprom_params(struct e1000_hw *hw)
         }
         break;
     default:
-        eeprom->type = e1000_eeprom_spi;
-        eeprom->opcode_bits = 8;
-        eeprom->delay_usec = 1;
-        if (eecd & E1000_EECD_ADDR_BITS) {
-            eeprom->page_size = 32;
-            eeprom->address_bits = 16;
-        } else {
-            eeprom->page_size = 8;
-            eeprom->address_bits = 8;
-        }
         break;
     }
 
