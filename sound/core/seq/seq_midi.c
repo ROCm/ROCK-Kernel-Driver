@@ -279,7 +279,7 @@ static int set_client_name(seq_midisynth_client_t *client, snd_card_t *card,
 	cinfo.client = client->seq_client;
 	cinfo.type = KERNEL_CLIENT;
 	name = rmidi->name[0] ? (const char *)rmidi->name : "External MIDI";
-	snprintf(cinfo.name, sizeof(cinfo.name), "%s - Rawmidi %d", name, card->number);
+	strlcpy(cinfo.name, name, sizeof(cinfo.name));
 	return snd_seq_kernel_client_ctl(client->seq_client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, &cinfo);
 }
 
