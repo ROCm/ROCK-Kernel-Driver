@@ -743,6 +743,30 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 }
 
 /*
+ * This function currently is only a helper for the i386 smp boot process where 
+ * we need to reprogram the ioredtbls to cater for the cpus which have come online
+ * so mask in all cases should simply be TARGET_CPUS
+ */
+void __init setup_ioapic_dest (unsigned long mask)
+{
+	int pin, ioapic, irq, irq_entry;
+
+	if (skip_ioapic_setup == 1)
+		return;
+
+	for (ioapic = 0; ioapic < nr_ioapics; ioapic++) {
+		for (pin = 0; pin < nr_ioapic_registers[ioapic]; pin++) {
+			irq_entry = find_irq_entry(ioapic, pin, mp_INT);
+			if (irq_entry == -1)
+				continue;
+			irq = pin_2_irq(irq_entry, ioapic, pin);
+			set_ioapic_affinity(irq, mask);
+		}
+
+	}
+}
+
+/*
  * EISA Edge/Level control register, ELCR
  */
 static int __init EISA_ELCR(unsigned int irq)
