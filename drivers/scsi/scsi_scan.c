@@ -1001,6 +1001,7 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int possible_inq_resp_len;
 
+	*bflags = 0;
  repeat_inquiry:
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: INQUIRY to host %d"
 			" channel %d id %d lun %d\n", sdev->host->host_no,
@@ -1041,8 +1042,7 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 	 * bit fields in Scsi_Device, so bflags need not be passed as an
 	 * argument.
 	 */
-	BUG_ON(bflags == NULL);
-	*bflags = scsi_get_device_flags(&inq_result[8], &inq_result[16]);
+	*bflags |= scsi_get_device_flags(&inq_result[8], &inq_result[16]);
 
 	possible_inq_resp_len = (unsigned char) inq_result[4] + 5;
 	if (BLIST_INQUIRY_36 & *bflags)
@@ -1072,8 +1072,11 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 			/* if the longer inquiry has failed, flag the device
 			 * as only accepting 36 byte inquiries and retry the
 			 * 36 byte inquiry */
-			printk(KERN_INFO "scsi scan: %d byte inquiry failed with code %d.  Consider BLIST_INQUIRY_36 for this device\n", sreq->sr_result);
-			*bflags |= BLIST_INQUIRY_36;
+			printk(KERN_INFO "scsi scan: %d byte inquiry failed"
+			       " with code %d.  Consider BLIST_INQUIRY_36 for"
+			       " this device\n", possible_inq_resp_len,
+			       sreq->sr_result);
+			*bflags = BLIST_INQUIRY_36;
 			goto repeat_inquiry;
 		}
 
