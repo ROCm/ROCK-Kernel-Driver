@@ -39,6 +39,7 @@ typedef struct
 	__u8 callee_used_stack[__SIGNAL_FRAMESIZE];
 	struct sigcontext sc;
 	_sigregs sregs;
+	int signo;
 	__u8 retcode[S390_SYSCALL_SIZE];
 } sigframe;
 
@@ -350,6 +351,10 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	   To avoid breaking binary compatibility, they are passed as args. */
 	regs->gprs[4] = current->thread.trap_no;
 	regs->gprs[5] = current->thread.prot_addr;
+
+	/* Place signal number on stack to allow backtrace from handler.  */
+	if (__put_user(regs->gprs[2], (int __user *) &frame->signo))
+		goto give_sigsegv;
 	return;
 
 give_sigsegv:
