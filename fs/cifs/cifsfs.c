@@ -64,8 +64,10 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 	struct cifs_sb_info *cifs_sb;
 	int rc = 0;
 
-    sb->s_fs_info = kmalloc(sizeof(struct cifs_sb_info),GFP_KERNEL);
+	sb->s_fs_info = kmalloc(sizeof(struct cifs_sb_info),GFP_KERNEL);
 	cifs_sb = CIFS_SB(sb);
+	if(cifs_sb == NULL)
+		return -ENOMEM;
 	cifs_sb->local_nls = load_nls_default();	/* needed for ASCII cp to Unicode converts */
 	rc = cifs_mount(sb, cifs_sb, data, devname);
 
@@ -97,13 +99,12 @@ out_no_root:
 	if (inode)
 		iput(inode);
 
-/*	rc = cifs_umount(sb);  BB is CIFS unmount routine needed? */
 	if (rc) {
-		cERROR(1, ("cifs_umount failed with return code %d\n", rc));
+		cERROR(1, ("cifs_mount failed with no root inode"));
 	}
 out_mount_failed:
-    if(cifs_sb)
-        kfree(cifs_sb);
+	if(cifs_sb)
+		kfree(cifs_sb);
 	return -EINVAL;
 }
 
@@ -114,15 +115,18 @@ cifs_put_super(struct super_block *sb)
 	struct cifs_sb_info *cifs_sb;
 
 	cFYI(1, ("In cifs_put_super\n"));
+        schedule_timeout(HZ*4);
 	cifs_sb = CIFS_SB(sb);
-	rc = cifs_umount(sb, cifs_sb);	
+	if(cifs_sb == NULL) {
+		cFYI(1,("\nEmpty cifs superblock info passed to unmount"));
+		return;
+	}
+	rc = cifs_umount(sb, cifs_sb); 
 	if (rc) {
 		cERROR(1, ("cifs_umount failed with return code %d\n", rc));
 	}
-    if(cifs_sb) {    
-        unload_nls(cifs_sb->local_nls);
-        kfree(cifs_sb);
-    }
+	unload_nls(cifs_sb->local_nls);
+	kfree(cifs_sb);
 	return;
 }
 
@@ -387,8 +391,11 @@ init_cifs(void)
 	atomic_set(&tconInfoAllocCount, 0);
 	atomic_set(&bufAllocCount, 0);
 	atomic_set(&midCount, 0);
+	GlobalCurrentXid = 0;
 	GlobalTotalActiveXid = 0;
 	GlobalMaxActiveXid = 0;
+	GlobalSMBSeslock = RW_LOCK_UNLOCKED;
+	GlobalMid_Lock = RW_LOCK_UNLOCKED;
 
 	rc = cifs_init_inodecache();
 	if (!rc) {

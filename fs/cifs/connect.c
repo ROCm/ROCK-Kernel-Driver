@@ -219,6 +219,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				}
 
                 task_to_wake = NULL;
+				read_lock(&GlobalMid_Lock);
 				list_for_each(tmp, &server->pending_mid_q) {
 					mid_entry = list_entry(tmp, struct
 							       mid_q_entry,
@@ -234,7 +235,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 						    MID_RESPONSE_RECEIVED;
 					}
 				}
-
+				read_unlock(&GlobalMid_Lock);
 				if (task_to_wake) {
 					smb_buffer = NULL;	/* will be freed by users thread after he is done */
 					wake_up_process(task_to_wake);
@@ -256,12 +257,14 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	}
 	/* BB add code to lock SMB sessions while releasing */
 	if(server->ssocket) {
-        sock_release(csocket);
+		sock_release(csocket);
 	    server->ssocket = NULL;
-    }
+	}
 	set_fs(temp_fs);
 	if (smb_buffer) /* buffer usually freed in free_mid - need to free it on error or exit */
 		buf_release(smb_buffer);
+
+	read_lock(&GlobalSMBSeslock);
 	if (list_empty(&server->pending_mid_q)) {
 		/* loop through server session structures attached to this and mark them dead */
 		list_for_each(tmp, &GlobalSMBSessionList) {
@@ -275,10 +278,12 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		}
 		kfree(server);
 	} else	/* BB need to more gracefully handle the rare negative session 
-               response case because response will be still outstanding */
+			   response case because response will be still outstanding */
 		cERROR(1, ("\nThere are still active MIDs in queue and we are exiting but we can not delete mid_q_entries or TCP_Server_Info structure due to pending requests MEMORY LEAK!!\n "));	/* BB wake up waitors, and/or wait and/or free stale mids and try again? BB */
 /* BB Need to fix bug in error path above - perhaps wait until smb requests
    time out and then free the tcp per server struct BB */
+	read_unlock(&GlobalSMBSeslock);
+
 
 	cFYI(1, ("\nAbout to exit from demultiplex thread\n"));
 	return 0;
@@ -421,7 +426,7 @@ find_tcp_session(__u32 new_target_ip_addr,
 	struct cifsSesInfo *ses;
 
 	*psrvTcp = NULL;
-
+	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		if (ses->server) {
@@ -432,12 +437,15 @@ find_tcp_session(__u32 new_target_ip_addr,
 				/* BB check if reconnection needed */
 				if (strncmp
 				    (ses->userName, userName,
-				     MAX_USERNAME_SIZE) == 0)
+				     MAX_USERNAME_SIZE) == 0){
+					read_unlock(&GlobalSMBSeslock);
 					return ses;	/* found exact match on both tcp and SMB sessions */
+				}
 			}
 		}
 		/* else tcp and smb sessions need reconnection */
 	}
+	read_unlock(&GlobalSMBSeslock);
 	return NULL;
 }
 
@@ -447,6 +455,7 @@ find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
 	struct list_head *tmp;
 	struct cifsTconInfo *tcon;
 
+	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalTreeConnectionList) {
 		cFYI(1, ("\nNext tcon - "));
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
@@ -473,13 +482,16 @@ find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
 						if (strncmp
 						    (tcon->ses->userName,
 						     userName,
-						     MAX_USERNAME_SIZE) == 0)
+						     MAX_USERNAME_SIZE) == 0) {
+							read_unlock(&GlobalSMBSeslock);
 							return tcon;/* also matched user (smb session)*/
+						}
 					}
 				}
 			}
 		}
 	}
+	read_unlock(&GlobalSMBSeslock);
 	return NULL;
 }
 
@@ -599,7 +611,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 {
 	int rc = 0;
 	int xid;
-    int ntlmv2_flag = FALSE;
+	int ntlmv2_flag = FALSE;
 	struct socket *csocket;
 	struct sockaddr_in sin_server;
 /*	struct sockaddr_in6 sin_server6; */
@@ -616,7 +628,11 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	xid = GetXid();
 	cFYI(0, ("\nEntering cifs_mount. Xid: %d with: %s\n", xid, mount_data));
 
-	parse_mount_options(mount_data, devname, &volume_info);
+	if(parse_mount_options(mount_data, devname, &volume_info)) {
+		FreeXid(xid);
+		return -EINVAL;
+	}
+
 
 	if (volume_info.username) {
 		cFYI(1, ("\nUsername: %s ", volume_info.username));
@@ -634,7 +650,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cERROR(1,
 		       ("\nCIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
 		FreeXid(xid);
-		return -ENODEV;
+		return -EINVAL;
 	}
 	/* BB add support to use the multiuser_mount flag BB */
 	existingCifsSes =
@@ -2202,6 +2218,7 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 	struct cifsSesInfo *ses = NULL;
 
 	xid = GetXid();
+
 	if (cifs_sb->tcon) {
 		ses = cifs_sb->tcon->ses; /* save ptr to ses before delete tcon!*/
 		rc = CIFSSMBTDis(xid, cifs_sb->tcon);
@@ -2218,16 +2235,11 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 				FreeXid(xid);
 				return 0;
 			}
-    	 /* wake_up_process(ses->server->tsk);*/ /* was worth a try */
 			schedule_timeout(HZ / 4);	/* give captive thread time to exit */
-            if((ses->server) && (ses->server->ssocket)) {            
-                cFYI(1,("\nWaking up socket by sending it signal "));
-                send_sig(SIGINT,ses->server->tsk,1);
-                /* No luck figuring out a better way to_close socket */
-         /*ses->server->ssocket->sk->prot->close(ses->server->ssocket->sk,0);*/
-              /*  ses->server->ssocket = NULL; */  /* serialize better */
-                /* sock_wake_async(ses->server->ssocket,3,POLL_HUP); */
-            }
+			if((ses->server) && (ses->server->ssocket)) {            
+				cFYI(1,("\nWaking up socket by sending it signal "));
+				send_sig(SIGINT,ses->server->tsk,1);
+			}
 		} else
 			cFYI(1, ("\nNo session or bad tcon"));
 	}

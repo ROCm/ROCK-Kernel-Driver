@@ -292,13 +292,10 @@ GLOBAL_EXTERN struct servers_not_supported *NotSuppList;	/*@z4a */
  */
 GLOBAL_EXTERN struct smbUidInfo *GlobalUidList[UID_HASH];
 
-GLOBAL_EXTERN struct list_head GlobalServerList;	/* BB this one is not implemented yet */
+GLOBAL_EXTERN struct list_head GlobalServerList; /* BB not implemented yet */
 GLOBAL_EXTERN struct list_head GlobalSMBSessionList;
 GLOBAL_EXTERN struct list_head GlobalTreeConnectionList;
-/*
- * Global list of free SMB structures
- */
-GLOBAL_EXTERN void *GlobalFreeSMB;
+GLOBAL_EXTERN rwlock_t GlobalSMBSeslock;  /* protects list inserts on 3 above */
 
 /*
  * Global transaction id (XID) information
@@ -306,7 +303,8 @@ GLOBAL_EXTERN void *GlobalFreeSMB;
 GLOBAL_EXTERN unsigned int GlobalCurrentXid;	/* protected by GlobalMid_Sem */
 GLOBAL_EXTERN unsigned int GlobalTotalActiveXid;	/* prot by GlobalMid_Sem */
 GLOBAL_EXTERN unsigned int GlobalMaxActiveXid;	/* prot by GlobalMid_Sem */
-
+GLOBAL_EXTERN rwlock_t GlobalMid_Lock;  /* protects above and list operations */
+										/* on midQ entries */
 GLOBAL_EXTERN char Local_System_Name[15];
 
 /*
@@ -321,13 +319,12 @@ GLOBAL_EXTERN atomic_t midCount;
 
 /* Misc globals */
 GLOBAL_EXTERN unsigned int multiuser_mount;	/* if enabled allows new sessions
-                                     to be established on existing mount if we
-					                 have the uid/password or Kerberos credential 
-                                     or equivalent for current user */
+									to be established on existing mount if we
+					                have the uid/password or Kerberos credential 
+									or equivalent for current user */
 GLOBAL_EXTERN unsigned int oplockEnabled;
 GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent 
-                                     with more secure ntlmssp2 challenge/resp */
+									with more secure ntlmssp2 challenge/resp */
 GLOBAL_EXTERN unsigned int ntlmv2_support;  /* better optional password hash */
 GLOBAL_EXTERN unsigned int sign_CIFS_PDUs;  /* enable smb packet signing */
-
 

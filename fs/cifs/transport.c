@@ -59,9 +59,11 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		temp->tsk = current;
 	}
 	if (ses->status == CifsGood) {
+        write_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
 		atomic_inc(&midCount);
 		temp->midState = MID_REQUEST_ALLOCATED;
+        write_unlock(&GlobalMid_Lock);
 	} else {		/* BB add reconnect code here BB */
 
 		cERROR(1,
@@ -77,11 +79,13 @@ void
 DeleteMidQEntry(struct mid_q_entry *midEntry)
 {
 	/* BB add spinlock to protect midq for each session BB */
+	write_lock(&GlobalMid_Lock);
 	midEntry->midState = MID_FREE;
-	buf_release(midEntry->resp_buf);
 	list_del(&midEntry->qhead);
-	kmem_cache_free(cifs_mid_cachep, midEntry);
 	atomic_dec(&midCount);
+	write_unlock(&GlobalMid_Lock);
+	buf_release(midEntry->resp_buf);
+	kmem_cache_free(cifs_mid_cachep, midEntry);
 }
 
 int

@@ -505,7 +505,8 @@ CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 			pReadData =
 			    (char *) (&pSMBr->hdr.Protocol) +
 			    le16_to_cpu(pSMBr->DataOffset);
-			copy_to_user(buf, pReadData, pSMBr->DataLength);
+			if(copy_to_user(buf, pReadData, pSMBr->DataLength))
+                rc = -EFAULT;
 		}
 	}
 
@@ -544,7 +545,13 @@ CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->DataLengthHigh = 0;
 	pSMB->DataOffset =
 	    cpu_to_le16(offsetof(struct smb_com_write_req,Data) - 4);
-	copy_from_user(pSMB->Data, buf, pSMB->DataLengthLow);
+
+	if(copy_from_user(pSMB->Data, buf, pSMB->DataLengthLow)) {
+        buf_release(pSMB);
+        return -EFAULT;
+    }
+
+
 
 	pSMB->ByteCount += pSMB->DataLengthLow + 1 /* pad */ ;
 	pSMB->DataLengthLow = cpu_to_le16(pSMB->DataLengthLow);
