@@ -1307,31 +1307,5 @@ static inline ino_t parent_ino(struct dentry *dentry)
 	return res;
 }
 
-/* NOTE NOTE NOTE: this interface _will_ change in a couple of patches */
-
-static inline int dev_lock_part(kdev_t dev)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev)
-		return -ENOMEM;
-	if (!down_trylock(&bdev->bd_part_sem)) {
-		if (!bdev->bd_part_count)
-			return 0;
-		up(&bdev->bd_part_sem);
-	}
-	bdput(bdev);
-	return -EBUSY;
-}
-
-static inline void dev_unlock_part(kdev_t dev)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev)
-		BUG();
-	up(&bdev->bd_part_sem);
-	bdput(bdev);
-	bdput(bdev);
-}
-
 #endif /* __KERNEL__ */
 #endif /* _LINUX_FS_H */

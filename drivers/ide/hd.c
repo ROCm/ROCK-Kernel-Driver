@@ -108,8 +108,6 @@
 
 static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
 
-static int revalidate_hddisk(kdev_t, int);
-
 #define TIMEOUT_VALUE	(6*HZ)
 #define	HD_DELAY	0
 
@@ -683,11 +681,6 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 			return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
 		}
 
-		case BLKRRPART: /* Re-read partition tables */
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-			return revalidate_hddisk(inode->i_rdev, 1);
-
 		default:
 			return -EINVAL;
 	}
@@ -877,32 +870,6 @@ int __init hd_init(void)
 	device_timer.function = hd_times_out;
 	hd_geninit();
 	return 0;
-}
-
-#define CAPACITY (hd_info[target].head*hd_info[target].sect*hd_info[target].cyl)
-/* We assume that the BIOS parameters do not change, so the disk capacity
-   will not change */
-
-/*
- * This routine is called to flush all partitions and partition tables
- * for a changed disk, and then re-read the new partition table.
- * If we are revalidating a disk because of a media change, then we
- * enter with usage == 0.  If we are using an ioctl, we automatically have
- * usage == 1 (we need an open channel to use an ioctl :-), so this
- * is our limit.
- */
-static int revalidate_hddisk(kdev_t dev, int maxusage)
-{
-	int target = DEVICE_NR(dev);
-	kdev_t device = mk_kdev(MAJOR_NR, target << 6);
-	int res = dev_lock_part(device);
-	if (res < 0)
-		return res;
-	res = wipe_partitions(device);
-	if (!res)
-		grok_partitions(device, CAPACITY);
-	dev_unlock_part(device);
-	return res;
 }
 
 static int parse_hd_setup (char *line) {

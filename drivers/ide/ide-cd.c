@@ -2875,19 +2875,8 @@ int ide_cdrom_check_media_change(struct ata_device *drive)
 static
 void ide_cdrom_revalidate(struct ata_device *drive)
 {
-	struct cdrom_info *info = drive->driver_data;
-	struct atapi_toc *toc;
 	struct request_sense sense;
-
 	cdrom_read_toc(drive, &sense);
-
-	if (!CDROM_STATE_FLAGS(drive)->toc_valid)
-		return;
-
-	toc = info->toc;
-
-	/* for general /dev/cdrom like mounting, one big disc */
-	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
 }
 
 static sector_t ide_cdrom_capacity(struct ata_device *drive)

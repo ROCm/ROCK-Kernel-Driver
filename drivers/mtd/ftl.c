@@ -184,6 +184,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 static int ftl_open(struct inode *inode, struct file *file);
 static release_t ftl_close(struct inode *inode, struct file *file);
 static int ftl_reread_partitions(kdev_t dev);
+static int ftl_revalidate(kdev_t dev);
 
 static void ftl_erase_callback(struct erase_info *done);
 
@@ -192,6 +193,7 @@ static struct block_device_operations ftl_blk_fops = {
     open:	ftl_open,
     release:	ftl_close,
     ioctl:	ftl_ioctl,
+    revalidate:	ftl_revalidate,
 };
 
 /*======================================================================
@@ -1106,25 +1108,17 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
     if (!part)
 	return -ENODEV; /* How? */
 
-    switch (cmd) {
-    case HDIO_GETGEO:
-	ret = verify_area(VERIFY_WRITE, (long *)arg, sizeof(*geo));
-	if (ret) return ret;
-	/* Sort of arbitrary: round size down to 4K boundary */
-	sect = le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE;
-	put_user(1, (char *)&geo->heads);
-	put_user(8, (char *)&geo->sectors);
-	put_user((sect>>3), (short *)&geo->cylinders);
-	put_user(get_start_sect(inode->i_bdev), (u_long *)&geo->start);
-	break;
-    case BLKRRPART:
-	ret = ftl_reread_partitions(inode->i_rdev);
-	break;
-    default:
-	ret = -EINVAL;
-    }
-
-    return ret;
+    if (cmd != HDIO_GETGEO)
+	return -EINVAL;
+    ret = verify_area(VERIFY_WRITE, (long *)arg, sizeof(*geo));
+    if (ret) return ret;
+    /* Sort of arbitrary: round size down to 4K boundary */
+    sect = le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE;
+    put_user(1, (char *)&geo->heads);
+    put_user(8, (char *)&geo->sectors);
+    put_user((sect>>3), (short *)&geo->cylinders);
+    put_user(get_start_sect(inode->i_bdev), (u_long *)&geo->start);
+    return 0;
 } /* ftl_ioctl */
 
 /*======================================================================
@@ -1133,22 +1127,14 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 
 ======================================================================*/
 
-static int ftl_reread_partitions(kdev_t dev)
+static int ftl_revalidate(kdev_t dev)
 {
-	int minor = minor(dev);
-	partition_t *part = myparts[minor >> 4];
-	kdev_t device = mk_kdev(MAJOR_NR, minor & ~15);
-	int res = dev_lock_part(device);
-	if (rec < 0)
-		return res;
-	res = wipe_partitions(device);
-	if (!res) {
-		scan_header(part);
-		grok_partitions(device,
-			le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
-	}
-	dev_unlock_part(device);
-	return res;
+	int unit = minor(dev) >> 4;
+	partition_t *part = myparts[unit];
+	scan_header(part);
+	part->disk->part[0].nr_sects =
+		le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
+	return 0;
 }
 
 /*======================================================================

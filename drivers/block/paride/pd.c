@@ -404,10 +404,6 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 		}
 		put_user(get_start_sect(inode->i_bdev), (long *)&geo->start);
 		return 0;
-	    case BLKRRPART:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		return pd_revalidate(inode->i_rdev);
 	    default:
 		return -EINVAL;
 	}
@@ -439,23 +435,13 @@ static int pd_check_media( kdev_t dev)
 static int pd_revalidate(kdev_t dev)
 {
 	int unit = DEVICE_NR(dev);
-	kdev_t device = mk_kdev(MAJOR_NR, unit << PD_BITS);
-	int res;
-
 	if ((unit >= PD_UNITS) || !PD.present)
 		return -ENODEV;
-
-	res = dev_lock_part(device);
-	if (res < 0)
-		return res;
-	res = wipe_partitions(device);
-
-	if (res == 0 && pd_identify(unit))
-		grok_partitions(device, PD.capacity);
-
-	dev_unlock_part(device);
- 
-        return res;
+	if (pd_identify(unit))
+		pd_hd[minor(dev)].nr_sects = PD.capacity;
+	else
+		pd_hd[minor(dev)].nr_sects = 0;
+        return 0;
 }
 
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)

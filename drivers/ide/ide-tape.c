@@ -5537,13 +5537,6 @@ static int idetape_cleanup(struct ata_device *drive)
 	return 0;
 }
 
-static void idetape_revalidate(struct ata_device *_dummy)
-{
-	/* We don't have to handle any partition information here, which is the
-	 * default behaviour of this method.
-	 */
-}
-
 static void idetape_attach(struct ata_device *);
 
 static struct ata_operations idetape_driver = {
@@ -5556,8 +5549,6 @@ static struct ata_operations idetape_driver = {
 	.ioctl =		idetape_blkdev_ioctl,
 	.open =			idetape_blkdev_open,
 	.release =		idetape_blkdev_release,
-	.check_media_change =	NULL,
-	.revalidate =		idetape_revalidate,
 };
 
 

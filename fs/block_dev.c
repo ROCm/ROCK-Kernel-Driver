@@ -502,6 +502,8 @@ int check_disk_change(struct block_device *bdev)
 {
 	struct block_device_operations * bdops = bdev->bd_op;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	struct gendisk *disk;
+	struct hd_struct *part;
 
 	if (bdops->check_media_change == NULL)
 		return 0;
@@ -514,8 +516,23 @@ int check_disk_change(struct block_device *bdev)
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
 
-	if (bdops->revalidate)
-		bdops->revalidate(dev);
+	disk = get_gendisk(dev);
+	part = disk->part + minor(dev) - disk->first_minor;
+	if (disk && disk->minor_shift) {
+		if (!down_trylock(&bdev->bd_part_sem)) {
+			if (!bdev->bd_part_count) {
+				if (wipe_partitions(dev) == 0) {
+					if (bdops->revalidate)
+						bdops->revalidate(dev);
+					grok_partitions(dev, part[0].nr_sects);
+				}
+			}
+			up(&bdev->bd_part_sem);
+		}
+	} else {
+		if (bdops->revalidate)
+			bdops->revalidate(dev);
+	}
 	return 1;
 }
 
@@ -734,9 +751,38 @@ int blkdev_close(struct inode * inode, struct file * filp)
 	return blkdev_put(inode->i_bdev, BDEV_FILE);
 }
 
+static int blkdev_reread_part(struct block_device *bdev)
+{
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	struct gendisk *disk = get_gendisk(dev);
+	struct hd_struct *part;
+	int res;
+
+	if (!disk)
+		return -EINVAL;
+	part = disk->part + minor(dev) - disk->first_minor;
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (down_trylock(&bdev->bd_part_sem));
+		return -EBUSY;
+	if (bdev->bd_part_count) {
+		up(&bdev->bd_part_sem);
+		return -EBUSY;
+	}
+	res = wipe_partitions(dev);
+	if (!res) {
+		if (bdev->bd_op->revalidate)
+			bdev->bd_op->revalidate(dev);
+		grok_partitions(dev, part[0].nr_sects);
+	}
+	up(&bdev->bd_part_sem);
+	return res;
+}
+
 static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			unsigned long arg)
 {
+	struct block_device *bdev = inode->i_bdev;
 	int ret = -EINVAL;
 	switch (cmd) {
 	/*
@@ -756,21 +802,23 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	case BLKFRASET:
 	case BLKBSZSET:
 	case BLKPG:
-		ret = blk_ioctl(inode->i_bdev, cmd, arg);
+		ret = blk_ioctl(bdev, cmd, arg);
 		break;
 	default:
-		if (inode->i_bdev->bd_op->ioctl)
-			ret =inode->i_bdev->bd_op->ioctl(inode, file, cmd, arg);
+		if (bdev->bd_op->ioctl)
+			ret =bdev->bd_op->ioctl(inode, file, cmd, arg);
 		if (ret == -EINVAL) {
 			switch (cmd) {
 				case BLKGETSIZE:
 				case BLKGETSIZE64:
 				case BLKFLSBUF:
 				case BLKROSET:
-					ret = blk_ioctl(inode->i_bdev,cmd,arg);
+					ret = blk_ioctl(bdev,cmd,arg);
+					break;
+				case BLKRRPART:
+					ret = blkdev_reread_part(bdev);
 			}
 		}
-		break;
 	}
 	return ret;
 }

@@ -153,7 +153,7 @@ static inline void complete_command(cmdlist_t *cmd, int timeout);
 
 static void do_ida_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ida_timer(unsigned long tdata);
-static int frevalidate_logvol(kdev_t dev);
+static int ida_revalidate(kdev_t dev);
 static int revalidate_logvol(kdev_t dev, int maxusage);
 static int revalidate_allvol(kdev_t dev);
 
@@ -188,7 +188,7 @@ static struct block_device_operations ida_fops  = {
 	open:		ida_open,
 	release:	ida_release,
 	ioctl:		ida_ioctl,
-	revalidate:	frevalidate_logvol,
+	revalidate:	ida_revalidate,
 };
 
 
@@ -1107,8 +1107,6 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 				 sizeof(drv_info_t)))
 			return -EFAULT;
 		return 0;
-	case BLKRRPART:
-		return revalidate_logvol(inode->i_rdev, 1);
 	case IDAPASSTHRU:
 		if (!capable(CAP_SYS_RAWIO)) return -EPERM;
 		if (copy_from_user(&my_io, io, sizeof(my_io)))
@@ -1441,11 +1439,6 @@ DBG(
 	return (IO_OK);
 }
 
-static int frevalidate_logvol(kdev_t dev)
-{
-	return revalidate_logvol(dev, 0);
-}
-
 /*
  * revalidate_allvol is for online array config utilities.  After a
  * utility reconfigures the drives in the array, it can use this function
@@ -1502,6 +1495,15 @@ static int revalidate_allvol(kdev_t dev)
 	}
 
 	hba[ctlr]->usage_count--;
+	return 0;
+}
+
+static int ida_revalidate(kdev_t dev)
+{
+        int ctlr = major(dev) - MAJOR_NR;
+	int target = DEVICE_NR(dev);
+        struct gendisk *gdev = &ida_gendisk[ctlr];
+	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blocks;
 	return 0;
 }
 

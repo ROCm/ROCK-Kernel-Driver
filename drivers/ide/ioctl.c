@@ -349,9 +349,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case CDROMCLOSETRAY:
 			return block_ioctl(inode->i_bdev, cmd, arg);
 
-		case BLKRRPART: /* Re-read partition tables */
-			return ata_revalidate(inode->i_rdev);
-
 		/* Now check whatever this particular ioctl has a device type
 		 * specific implementation.
 		 */

@@ -260,40 +260,25 @@ struct ata_device *get_info_ptr(kdev_t i_rdev)
  * usage == 1 (we need an open channel to use an ioctl :-), so this
  * is our limit.
  */
-int ata_revalidate(kdev_t i_rdev)
+int ide_revalidate(kdev_t dev)
 {
-	kdev_t device = mk_kdev(major(i_rdev), minor(i_rdev) & ~PARTN_MASK);
 	struct ata_device *drive;
-	int res;
+	struct ata_channel *channel;
+	struct gendisk *disk;
+	int unit;
 
-	if ((drive = get_info_ptr(device)) == NULL)
+	if ((drive = get_info_ptr(dev)) == NULL)
 		return -ENODEV;
-
-	MOD_INC_USE_COUNT;
-
-	res = dev_lock_part(device);
-	if (res < 0) {
-		MOD_DEC_USE_COUNT;
-		return res;
+	if (ata_ops(drive) && ata_ops(drive)->revalidate) {
+		ata_get(ata_ops(drive));
+		ata_ops(drive)->revalidate(drive);
+		ata_put(ata_ops(drive));
 	}
-
-	res = wipe_partitions(device);
-	if (!res) {
-		if (ata_ops(drive) && ata_ops(drive)->revalidate) {
-			ata_get(ata_ops(drive));
-
-			/* This is expected to be a no-op for tapes and SCSI
-			 * based access.
-			 */
-			ata_ops(drive)->revalidate(drive);
-			ata_put(ata_ops(drive));
-		} else
-			grok_partitions(device, ata_capacity(drive));
-	}
-
-	dev_unlock_part(device);
-	MOD_DEC_USE_COUNT;
-	return res;
+	channel = drive->channel;
+	unit = drive - channel->drives;
+	disk = channel->gd[unit];
+	disk->part[0].nr_sects = ata_capacity(drive);
+	return 0;
 }
 
 void ide_driver_module(void)
@@ -1138,8 +1123,6 @@ void unregister_ata_driver(struct ata_operations *driver)
 		}
 	}
 }
-
-EXPORT_SYMBOL(unregister_ata_driver);
 
 EXPORT_SYMBOL(ide_hwifs);
 EXPORT_SYMBOL(ide_lock);

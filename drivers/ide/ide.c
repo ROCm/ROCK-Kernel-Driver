@@ -1106,7 +1106,7 @@ struct block_device_operations ide_fops[] = {{
 	.release =		ide_release,
 	.ioctl =		ata_ioctl,
 	.check_media_change =	ide_check_media_change,
-	.revalidate =		ata_revalidate
+	.revalidate =		ide_revalidate
 }};
 
 EXPORT_SYMBOL(ide_fops);

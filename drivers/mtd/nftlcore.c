@@ -799,21 +799,6 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		if (nftl->mtd->sync)
 			nftl->mtd->sync(nftl->mtd);
 		return 0;
-
-	case BLKRRPART:
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-		{
-		kdev_t device = mk_kdev(MAJOR_NR,
-			minor(inode->i_rdev) & -(1<<NFTL_PARTN_BITS));
-		res = dev_lock_part(device);
-		if (res < 0)
-			return res;
-		res = wipe_partitions(device);
-		if (!res)
-			grok_partitions(device, nftl->nr_sects);
-		dev_unlock_part(device);
-		}
-		return res;
 	default:
 		return -EINVAL;
 	}

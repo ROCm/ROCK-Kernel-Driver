@@ -448,31 +448,6 @@ static int dasd_ioctl_set_ro(void *inp, int no, long args)
 }
 
 /*
- * Reread partition table.
- */
-static int dasd_ioctl_rr_partition(void *inp, int no, long args)
-{
-	dasd_devmap_t *devmap;
-	dasd_device_t *device;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
-	device = (devmap != NULL) ?
-		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
-	if (IS_ERR(device))
-		return PTR_ERR(device);
-	if (atomic_read(&device->open_count) != 1)
-		DEV_MESSAGE(KERN_WARNING, device, "%s",
-			    "BLKRRPART: device is open! expect errors.");
-	dasd_destroy_partitions(device);
-	dasd_setup_partitions(device);
-	dasd_put_device(devmap);
-	return 0;
-}
-
-/*
  * Return disk geometry.
  */
 static int dasd_ioctl_getgeo(void *inp, int no, long args)
@@ -516,7 +491,6 @@ static struct { int no; dasd_ioctl_fn_t fn; } dasd_ioctls[] =
 	{ BIODASDPRRD, dasd_ioctl_read_profile },
 	{ BIODASDPRRST, dasd_ioctl_reset_profile },
 	{ BLKROSET, dasd_ioctl_set_ro },
-	{ BLKRRPART, dasd_ioctl_rr_partition },
 	{ DASDAPIVER, dasd_ioctl_api_version },
 	{ HDIO_GETGEO, dasd_ioctl_getgeo },
 	{ -1, NULL }
