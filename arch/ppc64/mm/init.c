@@ -243,21 +243,16 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 void
 flush_tlb_mm(struct mm_struct *mm)
 {
+	struct vm_area_struct *mp;
+
 	spin_lock(&mm->page_table_lock);
-	if (mm->map_count) {
-		struct vm_area_struct *mp;
-		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-			__flush_tlb_range(mm, mp->vm_start, mp->vm_end);
-	} else {
-		/* MIKEC: It is not clear why this is needed */
-		/* paulus: it is needed to clear out stale HPTEs
-		 * when an address space (represented by an mm_struct)
-		 * is being destroyed. */
-		__flush_tlb_range(mm, USER_START, USER_END);
-	}
+
+	for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
+		__flush_tlb_range(mm, mp->vm_start, mp->vm_end);
 
 	/* XXX are there races with checking cpu_vm_mask? - Anton */
 	mm->cpu_vm_mask = 0;
+
 	spin_unlock(&mm->page_table_lock);
 }
 
