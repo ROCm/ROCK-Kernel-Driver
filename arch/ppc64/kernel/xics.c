@@ -430,15 +430,6 @@ nextnode:
 	ppc64_boot_msg(0x21, "XICS Done");
 }
 
-void xics_isa_init(void)
-{
-	return;
-	if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET, no_action,
-			0, "8259 cascade", 0))
-		printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
-	i8259_init();
-}
-
 void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 {
         irq_desc_t *desc = irq_desc + virq;
