@@ -1850,6 +1850,21 @@ nfs4_set_lock_denied(struct file_lock *fl, struct nfsd4_lock_denied *deny)
 		deny->ld_type = NFS4_WRITE_LT;
 }
 
+static struct nfs4_stateowner *
+find_lockstateowner(struct xdr_netobj *owner, clientid_t *clid)
+{
+	struct nfs4_stateowner *local = NULL;
+	int i;
+
+	for (i = 0; i < LOCK_HASH_SIZE; i++) {
+		list_for_each_entry(local, &lock_ownerid_hashtbl[i], so_idhash) {
+			if(!cmp_owner_str(local, owner, clid))
+				continue;
+			return local;
+		}
+	}
+	return NULL;
+}
 
 static int
 find_lockstateowner_str(unsigned int hashval, struct xdr_netobj *owner, clientid_t *clid, struct nfs4_stateowner **op) {
@@ -2315,7 +2330,7 @@ nfsd4_release_lockowner(struct svc_rqst *rqstp, struct nfsd4_release_lockowner *
 	clientid_t *clid = &rlockowner->rl_clientid;
 	struct nfs4_stateowner *local = NULL;
 	struct xdr_netobj *owner = &rlockowner->rl_owner;
-	int status, i;
+	int status;
 
 	dprintk("nfsd4_release_lockowner clientid: (%08x/%08x):\n",
 		clid->cl_boot, clid->cl_id);
@@ -2330,29 +2345,25 @@ nfsd4_release_lockowner(struct svc_rqst *rqstp, struct nfsd4_release_lockowner *
 
 	nfs4_lock_state();
 
-	/* find the lockowner */
         status = nfs_ok;
-	for (i=0; i < LOCK_HASH_SIZE; i++)
-		list_for_each_entry(local, &lock_ownerstr_hashtbl[i], so_strhash)
-			if(cmp_owner_str(local, owner, clid)) {
-				struct nfs4_stateid *stp;
+	local = find_lockstateowner(owner, clid);
+	if (local) {
+		struct nfs4_stateid *stp;
 
-				/* check for any locks held by any stateid
-				 * associated with the (lock) stateowner */
-				status = nfserr_locks_held;
-				list_for_each_entry(stp, &local->so_perfilestate,
-						    st_perfilestate) {
-					if(stp->st_vfs_set) {
-						if (check_for_locks(&stp->st_vfs_file,
-								    local))
-							goto out;
-					}
-				}
-				/* no locks held by (lock) stateowner */
-				status = nfs_ok;
-				release_stateowner(local);
-				goto out;
+		/* check for any locks held by any stateid
+		 * associated with the (lock) stateowner */
+		status = nfserr_locks_held;
+		list_for_each_entry(stp, &local->so_perfilestate,
+				st_perfilestate) {
+			if(stp->st_vfs_set) {
+				if (check_for_locks(&stp->st_vfs_file, local))
+					goto out;
 			}
+		}
+		/* no locks held by (lock) stateowner */
+		status = nfs_ok;
+		release_stateowner(local);
+	}
 out:
 	nfs4_unlock_state();
 	return status;
