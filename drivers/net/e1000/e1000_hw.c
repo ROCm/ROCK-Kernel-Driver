@@ -1537,26 +1537,6 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
         if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
                                           phy_data)))
             return ret_val;
-
-        /* Polarity reversal workaround for forced 10F/10H links. */
-        if(hw->mac_type <= e1000_82544 &&
-           (hw->forced_speed_duplex == e1000_10_full ||
-            hw->forced_speed_duplex == e1000_10_half)) {
-            if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT,
-                                              0x0019)))
-                return ret_val;
-            if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL,
-                                              0x8F0F)))
-                return ret_val;
-            /* IEEE requirement is 150ms */
-            msec_delay(200);
-            if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT,
-                                              0x0019)))
-                return ret_val;
-            if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL,
-                                              0x8F00)))
-                return ret_val;
-        }
     }
     return E1000_SUCCESS;
 }
