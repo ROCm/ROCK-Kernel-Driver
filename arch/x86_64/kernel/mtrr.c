@@ -28,6 +28,7 @@
 	v2.02  July 2002  Dave Jones <davej@suse.de>
 	  Fix gentry inconsistencies between kernel/userspace.
 	  More casts to clean up warnings.
+	Andi Kleen - rework initialization.
 */
 
 #include <linux/types.h>
@@ -609,17 +610,6 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 		return -EINVAL;
 	}
 
-#if defined(__x86_64__) && defined(CONFIG_AGP) 
-/*	{
-	agp_kern_info info; 
-	if (type != MTRR_TYPE_UNCACHABLE && agp_copy_info(&info) >= 0 && 
-	    base<<PAGE_SHIFT >= info.aper_base && 
-            (base<<PAGE_SHIFT)+(size<<PAGE_SHIFT) >= 
-			info.aper_base+info.aper_size*1024*1024)
-		printk(KERN_INFO "%s[%d] setting conflicting mtrr into agp aperture\n",current->comm,current->pid); 
-	}*/
-#endif
-
 	/*  Check upper bits of base and last are equal and lower bits are 0
 	   for base and 1 for last  */
 	last = base + size - 1;
@@ -646,7 +636,7 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 	}
 
 	if (base & (size_or_mask>>PAGE_SHIFT)) {
-		printk (KERN_WARNING "mtrr: base(%Lx) exceeds the MTRR width(%Lx)\n",
+		printk (KERN_WARNING "mtrr: base(%lx) exceeds the MTRR width(%lx)\n",
 				(unsigned long) base,
 				(unsigned long) (size_or_mask>>PAGE_SHIFT));
 		return -EINVAL;
@@ -1226,12 +1216,13 @@ static void compute_ascii (void)
 EXPORT_SYMBOL (mtrr_add);
 EXPORT_SYMBOL (mtrr_del);
 
-
 static void __init mtrr_setup (void)
 {
-	printk ("mtrr: v%s)\n", MTRR_VERSION);
+	/* If you want to use other vendors please port over the modular
+	   framework from i386 first. */
+	if (!cpu_has_mtrr || boot_cpu_data.x86_vendor != X86_VENDOR_AMD) 
+		return; 
 
-	if (cpu_has_mtrr) { 
 		 /* Query the width (in bits) of the physical
 		   addressable memory on the Hammer family. */
 		if ((cpuid_eax (0x80000000) >= 0x80000008)) {
@@ -1244,8 +1235,6 @@ static void __init mtrr_setup (void)
 			 */
 			size_and_mask = (~size_or_mask) & 0x000ffffffffff000L;
 	}
-		printk ("mtrr: detected mtrr type: x86-64\n");
-    }
 }
 
 #ifdef CONFIG_SMP
@@ -1253,48 +1242,42 @@ static void __init mtrr_setup (void)
 static volatile u32 smp_changes_mask __initdata = 0;
 static struct mtrr_state smp_mtrr_state __initdata = { 0, 0 };
 
-void __init mtrr_init_boot_cpu (void)
+#endif	/*  CONFIG_SMP  */
+
+void mtrr_init_cpu(int cpu)
 {
+#ifndef CONFIG_SMP
+	if (cpu == 0) 
+		mtrr_setup();
+#else
+	if (cpu == 0) { 
 	mtrr_setup();
 	get_mtrr_state (&smp_mtrr_state);
-}
-
-
-void __init mtrr_init_secondary_cpu (void)
-{
+	} else { 
 	u64 mask;
 	int count;
 	struct set_mtrr_context ctxt;
 
-	/* Note that this is not ideal, since the cache is only flushed/disabled
-	   for this CPU while the MTRRs are changed, but changing this requires
-	   more invasive changes to the way the kernel boots  */
+		/* Note that this is not ideal, since the cache is
+		   only flushed/disabled for this CPU while the MTRRs
+		   are changed, but changing this requires more
+		   invasive changes to the way the kernel boots  */
 	set_mtrr_prepare (&ctxt);
 	mask = set_mtrr_state (&smp_mtrr_state, &ctxt);
 	set_mtrr_done (&ctxt);
 
 	/*  Use the atomic bitops to update the global mask  */
-	for (count = 0; count < sizeof mask * 8; ++count) {
-		if (mask & 0x01)
+		for (count = 0; count < (sizeof mask) * 8; ++count) {
+			if (mask & 1)
 			set_bit (count, &smp_changes_mask);
 		mask >>= 1;
 	}
+	} 
+#endif
 }
 
-#endif	/*  CONFIG_SMP  */
-
-
-int __init mtrr_init (void)
+static int __init mtrr_init (void)
 {
-#ifdef CONFIG_SMP
-	/* mtrr_setup() should already have been called from mtrr_init_boot_cpu() */
-
-	finalize_mtrr_state (&smp_mtrr_state);
-	mtrr_state_warn (smp_changes_mask);
-#else
-	mtrr_setup();
-#endif
-
 #ifdef CONFIG_PROC_FS
 	proc_root_mtrr = create_proc_entry ("mtrr", S_IWUSR | S_IRUGO, &proc_root);
 	if (proc_root_mtrr) {
@@ -1308,5 +1291,13 @@ int __init mtrr_init (void)
 				&mtrr_fops, NULL);
 #endif
 	init_table ();
+
+#ifdef CONFIG_SMP
+	finalize_mtrr_state (&smp_mtrr_state);
+	mtrr_state_warn (smp_changes_mask);
+#endif
+
 	return 0;
 }
+
+__initcall(mtrr_init);

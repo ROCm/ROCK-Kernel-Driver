@@ -28,6 +28,7 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/kdebug.h>
+#include <asm/unistd.h>
 
 extern spinlock_t rtc_lock;
 
@@ -145,6 +146,7 @@ EXPORT_SYMBOL(rtc_lock);
 #undef strcmp 
 #undef bcopy
 #undef strcpy 
+#undef strcat
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
@@ -153,6 +155,10 @@ extern void * memmove(void * dest,const void *src,size_t count);
 extern char * strcpy(char * dest,const char *src);
 extern int strcmp(const char * cs,const char * ct);
 extern void *memchr(const void *s, int c, size_t n);
+extern void * memcpy(void *,const void *,__kernel_size_t);
+extern void * __memcpy(void *,const void *,__kernel_size_t);
+extern char * strcat(char *, const char *);
+
 EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(strlen);
 EXPORT_SYMBOL_NOVERS(memmove);
@@ -168,6 +174,15 @@ EXPORT_SYMBOL_NOVERS(strrchr);
 EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(bcopy);
+EXPORT_SYMBOL_NOVERS(memcpy);
+EXPORT_SYMBOL_NOVERS(__memcpy);
+
+/* syscall export needed for misdesigned sound drivers. */
+extern ssize_t sys_read(unsigned int fd, char * buf, size_t count);
+extern off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin);
+EXPORT_SYMBOL(sys_read);
+EXPORT_SYMBOL(sys_lseek);
+EXPORT_SYMBOL(sys_open);
 
 EXPORT_SYMBOL(empty_zero_page);
 

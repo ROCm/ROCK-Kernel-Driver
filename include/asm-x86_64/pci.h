@@ -44,7 +44,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
 struct pci_dev;
 
-extern int iommu_setup(char *opt);
+extern int iommu_setup(char *opt, char **end);
 
 extern void pci_iommu_init(void);
 

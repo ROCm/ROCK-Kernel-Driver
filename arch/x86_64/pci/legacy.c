@@ -9,14 +9,14 @@
  * Discover remaining PCI buses in case there are peer host bridges.
  * We use the number of last PCI bus provided by the PCI BIOS.
  */
-static void __devinit pcibios_fixup_peer_bridges(void)
+void __devinit pcibios_fixup_peer_bridges(void)
 {
 	int n;
 	struct pci_bus bus;
 	struct pci_dev dev;
 	u16 l;
 
-	if (pcibios_last_bus <= 0 || pcibios_last_bus >= 0xff)
+	if (pcibios_last_bus <= 0 || pcibios_last_bus > 0xff)
 		return;
 	DBG("PCI: Peer bridge fixup\n");
 	for (n=0; n <= pcibios_last_bus; n++) {

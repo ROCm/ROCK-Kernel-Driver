@@ -17,6 +17,8 @@ static int __init pci_acpi_init(void)
 		} else
 			printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
 
+		/* still scan manually in case ACPI forgot some bus */
+		pcibios_fixup_peer_bridges(); 
 	}
 
 	return 0;
