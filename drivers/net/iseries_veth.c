@@ -994,6 +994,7 @@ static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			veth_error("%s: Tx while skb was pending!\n",
 				   dev->name);
 			dev_kfree_skb(skb);
+                       spin_unlock_irqrestore(&port->pending_gate, flags);
 			return 1;
 		}
 
