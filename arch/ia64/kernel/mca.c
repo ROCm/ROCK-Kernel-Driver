@@ -169,7 +169,8 @@ mca_handler_platform (void)
 void
 ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
-	IA64_MCA_DEBUG("ia64_mca_cpe_int_handler: received interrupt. CPU:%d vector = %#x\n", smp_processor_id(), cpe_irq);
+	IA64_MCA_DEBUG("ia64_mca_cpe_int_handler: received interrupt. CPU:%d vector = %#x\n",
+		       smp_processor_id(), cpe_irq);
 
 	/* Get the CMC error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE, 0);
@@ -679,14 +680,11 @@ void
 ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 {
 	unsigned long flags;
-	int cpu = 0;
+	int cpu = smp_processor_id();
 
 	/* Mask all interrupts */
 	local_irq_save(flags);
 
-#ifdef CONFIG_SMP
-	cpu = cpu_logical_id(hard_smp_processor_id());
-#endif
 	ia64_mc_info.imi_rendez_checkin[cpu] = IA64_MCA_RENDEZ_CHECKIN_DONE;
 	/* Register with the SAL monarch that the slave has
 	 * reached SAL
