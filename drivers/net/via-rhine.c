@@ -101,11 +101,18 @@
 	LK1.1.15 (jgarzik):
 	- Use new MII lib helper generic_mii_ioctl
 
+	LK1.1.16 (Roger Luethi)
+	- Etherleak fix
+	- Handle Tx buffer underrun
+	- Fix bugs in full duplex handling
+	- New reset code uses "force reset" cmd on Rhine-II
+	- Various clean ups
+
 */
 
 #define DRV_NAME	"via-rhine"
-#define DRV_VERSION	"1.1.15"
-#define DRV_RELDATE	"November-22-2002"
+#define DRV_VERSION	"1.1.16"
+#define DRV_RELDATE	"February-15-2003"
 
 
 /* A few user-configurable values.
@@ -395,7 +402,7 @@ enum register_offsets {
 	MIIPhyAddr=0x6C, MIIStatus=0x6D, PCIBusConfig=0x6E,
 	MIICmd=0x70, MIIRegAddr=0x71, MIIData=0x72, MACRegEEcsr=0x74,
 	ConfigA=0x78, ConfigB=0x79, ConfigC=0x7A, ConfigD=0x7B,
-	RxMissed=0x7C, RxCRCErrs=0x7E,
+	RxMissed=0x7C, RxCRCErrs=0x7E, MiscCmd=0x81,
 	StickyHW=0x83, WOLcrClr=0xA4, WOLcgClr=0xA7, PwrcsrClr=0xAC,
 };
 
@@ -532,7 +539,7 @@ static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 
 		/* Rhine-II needs to be forced sometimes */
 		if (chip_id == VT6102)
-			writeb(0x40, ioaddr + 0x81);
+			writeb(0x40, ioaddr + MiscCmd);
 
 		/* VT86C100A may need long delay after reset (dlink) */
 		/* Seen on Rhine-II as well (rl) */
