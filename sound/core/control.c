@@ -31,6 +31,9 @@
 #include <sound/info.h>
 #include <sound/control.h>
 
+/* max number of user-defined controls */
+#define MAX_USER_CONTROLS	32
+
 typedef struct _snd_kctl_ioctl {
 	struct list_head list;		/* list of all ioctls */
 	snd_kctl_ioctl_func_t fioctl;
@@ -801,13 +804,7 @@ static int snd_ctl_elem_unlock(snd_ctl_file_t *file, snd_ctl_elem_id_t __user *_
 }
 
 struct user_element {
-	enum sndrv_ctl_elem_type type;	/* element type */
-	unsigned int elem_count;	/* count of elements */
-	union {
-		struct {
-			unsigned int items;
-		} enumerated;
-	} u;
+	snd_ctl_elem_info_t info;
 	void *elem_data;		/* element data */
 	unsigned long elem_data_size;	/* size of element data in bytes */
 	void *priv_data;		/* private data (like strings for enumerated type) */
@@ -820,11 +817,10 @@ static int snd_ctl_elem_user_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 {
 	struct user_element *ue = kcontrol->private_data;
 
-	uinfo->type = ue->type;
-	uinfo->count = ue->elem_count;
-	if (ue->type == SNDRV_CTL_ELEM_TYPE_ENUMERATED) {
-		uinfo->value.enumerated.items = ue->u.enumerated.items;
-		if (uinfo->value.enumerated.item >= ue->u.enumerated.items)
+	*uinfo = ue->info;
+	if (ue->info.type == SNDRV_CTL_ELEM_TYPE_ENUMERATED) {
+		uinfo->value.enumerated.items = ue->info.value.enumerated.items;
+		if (uinfo->value.enumerated.item >= ue->info.value.enumerated.items)
 			uinfo->value.enumerated.item = 0;
 		strlcpy(uinfo->value.enumerated.name,
 			(char *)ue->priv_data + uinfo->value.enumerated.item * 64,
@@ -846,9 +842,10 @@ static int snd_ctl_elem_user_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	int change;
 	struct user_element *ue = kcontrol->private_data;
 	
-	change = memcmp(&ucontrol->value, ue->elem_data, ue->elem_data_size);
-	memcpy(ue->elem_data, &ucontrol->value, ue->elem_data_size);
-	return !!change;
+	change = memcmp(&ucontrol->value, ue->elem_data, ue->elem_data_size) != 0;
+	if (change)
+		memcpy(ue->elem_data, &ucontrol->value, ue->elem_data_size);
+	return change;
 }
 
 static void snd_ctl_elem_user_free(snd_kcontrol_t * kcontrol)
@@ -866,6 +863,8 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	struct user_element *ue;
 	int idx, err;
 	
+	if (card->user_ctl_count >= MAX_USER_CONTROLS)
+		return -ENOMEM;
 	if (copy_from_user(&info, _info, sizeof(info)))
 		return -EFAULT;
 	if (info.count > 1024)
@@ -878,18 +877,20 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	info.id.numid = 0;
 	memset(&kctl, 0, sizeof(kctl));
 	down_write(&card->controls_rwsem);
-	if (!!((_kctl = snd_ctl_find_id(card, &info.id)) != NULL) ^ replace) {
-		up_write(&card->controls_rwsem);
-		return !replace ? -EBUSY : -ENOENT;
-	}
-	if (replace) {
-		err = snd_ctl_remove(card, _kctl);
-		if (err < 0) {
-			up_write(&card->controls_rwsem);
-			return err;
-		}
+	_kctl = snd_ctl_find_id(card, &info.id);
+	err = 0;
+	if (_kctl) {
+		if (replace)
+			err = snd_ctl_remove(card, _kctl);
+		else
+			err = -EBUSY;
+	} else {
+		if (replace)
+			err = -ENOENT;
 	}
 	up_write(&card->controls_rwsem);
+	if (err < 0)
+		return err;
 	memcpy(&kctl.id, &info.id, sizeof(info.id));
 	kctl.count = info.owner ? info.owner : 1;
 	access |= SNDRV_CTL_ELEM_ACCESS_USER;
@@ -919,7 +920,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 		private_size = sizeof(unsigned int);
 		if (info.count > 128)
 			return -EINVAL;
-		if (info.value.enumerated.items > 1024)
+		if (info.value.enumerated.items > 128)
 			return -EINVAL;
 		extra_size = info.value.enumerated.items * 64;
 		break;
@@ -946,8 +947,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	ue = kcalloc(1, sizeof(struct user_element) + dimen_size + private_size + extra_size, GFP_KERNEL);
 	if (ue == NULL)
 		return -ENOMEM;
-	ue->type = info.type;
-	ue->elem_count = info.count;
+	ue->info = info;
 	if (!(info.access & SNDRV_CTL_ELEM_ACCESS_DINDIRECT)) {
 		for (idx = 0; idx < 4 && info.dimen.d[idx]; idx++)
 			ue->dimen[idx] = info.dimen.d[idx];
@@ -958,10 +958,9 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	if (extra_size) {
 		ue->priv_data = (char *)ue + sizeof(ue) + dimen_size + private_size;
 		ue->priv_data_size = extra_size;
-		if (ue->type == SNDRV_CTL_ELEM_TYPE_ENUMERATED) {
-			if (copy_from_user(ue->priv_data, *(char **)info.value.enumerated.name, extra_size))
+		if (ue->info.type == SNDRV_CTL_ELEM_TYPE_ENUMERATED) {
+			if (copy_from_user(ue->priv_data, *(char __user **)info.value.enumerated.name, extra_size))
 				return -EFAULT;
-			ue->u.enumerated.items = info.value.enumerated.items;
 		}
 	}
 	kctl.private_free = snd_ctl_elem_user_free;
@@ -978,16 +977,29 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 		snd_ctl_free_one(_kctl);
 		return err;
 	}
+
+	down_write(&card->controls_rwsem);
+	card->user_ctl_count++;
+	up_write(&card->controls_rwsem);
+
 	return 0;
 }
 
 static int snd_ctl_elem_remove(snd_ctl_file_t *file, snd_ctl_elem_id_t __user *_id)
 {
 	snd_ctl_elem_id_t id;
+	int err;
 
 	if (copy_from_user(&id, _id, sizeof(id)))
 		return -EFAULT;
-	return snd_ctl_remove_unlocked_id(file, &id);
+	err = snd_ctl_remove_unlocked_id(file, &id);
+	if (! err) {
+		snd_card_t *card = file->card;
+		down_write(&card->controls_rwsem);
+		card->user_ctl_count--;
+		up_write(&card->controls_rwsem);
+	}
+	return err;
 }
 
 static int snd_ctl_subscribe_events(snd_ctl_file_t *file, int __user *ptr)
