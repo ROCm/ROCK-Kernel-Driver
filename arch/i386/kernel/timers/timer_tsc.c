@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/timex.h>
 #include <linux/errno.h>
+#include <linux/cpufreq.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
