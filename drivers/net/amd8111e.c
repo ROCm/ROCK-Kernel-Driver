@@ -211,7 +211,7 @@ static void amd8111e_set_ext_phy(struct net_device *dev)
 	u32 bmcr,advert,tmp;
 	
 	/* Determine mii register values to set the speed */
-	advert = amd8111e_mdio_read(dev, PHY_ID, MII_ADVERTISE);
+	advert = amd8111e_mdio_read(dev, lp->ext_phy_addr, MII_ADVERTISE);
 	tmp = advert & ~(ADVERTISE_ALL | ADVERTISE_100BASE4);
 	switch (lp->ext_phy_option){
 
@@ -235,11 +235,11 @@ static void amd8111e_set_ext_phy(struct net_device *dev)
 	}
 
 	if(advert != tmp)
-		amd8111e_mdio_write(dev, PHY_ID, MII_ADVERTISE, tmp);
+		amd8111e_mdio_write(dev, lp->ext_phy_addr, MII_ADVERTISE, tmp);
 	/* Restart auto negotiation */
-	bmcr = amd8111e_mdio_read(dev, PHY_ID, MII_BMCR);
+	bmcr = amd8111e_mdio_read(dev, lp->ext_phy_addr, MII_BMCR);
 	bmcr |= (BMCR_ANENABLE | BMCR_ANRESTART);
-	amd8111e_mdio_write(dev, PHY_ID, MII_BMCR, bmcr);
+	amd8111e_mdio_write(dev, lp->ext_phy_addr, MII_BMCR, bmcr);
 
 }
 
@@ -350,6 +350,7 @@ static int amd8111e_init_ring(struct net_device *dev)
 
 		lp->rx_ring[i].buff_phy_addr = cpu_to_le32(lp->rx_dma_addr[i]);
 		lp->rx_ring[i].buff_count = cpu_to_le16(lp->rx_buff_len-2);
+		wmb();
 		lp->rx_ring[i].rx_flags = cpu_to_le16(OWN_BIT);
 	}
 
@@ -529,7 +530,7 @@ static void amd8111e_init_hw_default( struct amd8111e_priv* lp)
 	writel(RUN, mmio + CMD0);
 
 	/* AUTOPOLL0 Register *//*TBD default value is 8100 in FPS */
-	writew( 0x8101, mmio + AUTOPOLL0);
+	writew( 0x8100 | lp->ext_phy_addr, mmio + AUTOPOLL0);
 
 	/* Clear RCV_RING_BASE_ADDR */
 	writel(0, mmio + RCV_RING_BASE_ADDR0);
@@ -740,34 +741,34 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 	do{   
 		/* process receive packets until we use the quota*/
 		/* If we own the next entry, it's a new packet. Send it up. */
-		while(!(lp->rx_ring[rx_index].rx_flags & OWN_BIT)){
-	       
-			/* check if err summary bit is set */ 
-			if(le16_to_cpu(lp->rx_ring[rx_index].rx_flags) 
-								& ERR_BIT){
-				/* 
-				 * There is a tricky error noted by John Murphy,
-				 * <murf@perftech.com> to Russ Nelson: Even with
-				 * full-sized * buffers it's possible for a  
-				 * jabber packet to use two buffers, with only 
-				 * the last correctly noting the error.
-				 */
+		while(1) {
+			status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
+			if (status & OWN_BIT)
+				break;
 
+			/* 
+			 * There is a tricky error noted by John Murphy,
+			 * <murf@perftech.com> to Russ Nelson: Even with
+			 * full-sized * buffers it's possible for a  
+			 * jabber packet to use two buffers, with only 
+			 * the last correctly noting the error.
+			 */
+
+			if(status & ERR_BIT) {
 				/* reseting flags */
-				lp->rx_ring[rx_index].rx_flags &=RESET_RX_FLAGS;
+				lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
 				goto err_next_pkt;
 			}
 			/* check for STP and ENP */
-			status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
 			if(!((status & STP_BIT) && (status & ENP_BIT))){
 				/* reseting flags */
-				lp->rx_ring[rx_index].rx_flags &=RESET_RX_FLAGS;
+				lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
 				goto err_next_pkt;
 			}
 			pkt_len = le16_to_cpu(lp->rx_ring[rx_index].msg_count) - 4;
 
 #if AMD8111E_VLAN_TAG_USED		
-			vtag = le16_to_cpu(lp->rx_ring[rx_index].rx_flags) & TT_MASK;
+			vtag = status & TT_MASK;
 			/*MAC will strip vlan tag*/ 
 			if(lp->vlgrp != NULL && vtag !=0)
 				min_pkt_len =MIN_PKT_LEN - 4;
@@ -806,10 +807,9 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 			skb->protocol = eth_type_trans(skb, dev);
 
 #if AMD8111E_VLAN_TAG_USED		
-			vtag = lp->rx_ring[rx_index].rx_flags & TT_MASK;
 			if(lp->vlgrp != NULL && (vtag == TT_VLAN_TAGGED)){
 				amd8111e_vlan_rx(lp, skb,
-				    lp->rx_ring[rx_index].tag_ctrl_info);
+					 le16_to_cpy(lp->rx_ring[rx_index].tag_ctrl_info));
 			} else
 #endif
 				netif_receive_skb(skb);
@@ -824,6 +824,7 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 				= cpu_to_le32(lp->rx_dma_addr[rx_index]);
 			lp->rx_ring[rx_index].buff_count = 
 				cpu_to_le16(lp->rx_buff_len-2);
+			wmb();
 			lp->rx_ring[rx_index].rx_flags |= cpu_to_le16(OWN_BIT);
 			rx_index = (++lp->rx_idx) & RX_RING_DR_MOD_MASK;
 		}
@@ -872,11 +873,12 @@ static int amd8111e_rx(struct net_device *dev)
 	
 	/* If we own the next entry, it's a new packet. Send it up. */
 	while(++num_rx_pkt <= max_rx_pkt){
-		if(lp->rx_ring[rx_index].rx_flags & OWN_BIT)
+		status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
+		if(status & OWN_BIT)
 			return 0;
 	       
 		/* check if err summary bit is set */ 
-		if(le16_to_cpu(lp->rx_ring[rx_index].rx_flags) & ERR_BIT){
+		if(status & ERR_BIT){
 			/* 
 			 * There is a tricky error noted by John Murphy,
 			 * <murf@perftech.com> to Russ Nelson: Even with full-sized
@@ -887,7 +889,6 @@ static int amd8111e_rx(struct net_device *dev)
 			goto err_next_pkt;
 		}
 		/* check for STP and ENP */
-		status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
 		if(!((status & STP_BIT) && (status & ENP_BIT))){
 			/* reseting flags */
 			lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
@@ -896,7 +897,7 @@ static int amd8111e_rx(struct net_device *dev)
 		pkt_len = le16_to_cpu(lp->rx_ring[rx_index].msg_count) - 4;
 
 #if AMD8111E_VLAN_TAG_USED		
-		vtag = le16_to_cpu(lp->rx_ring[rx_index].rx_flags) & TT_MASK;
+		vtag = status & TT_MASK;
 		/*MAC will strip vlan tag*/ 
 		if(lp->vlgrp != NULL && vtag !=0)
 			min_pkt_len =MIN_PKT_LEN - 4;
@@ -930,12 +931,10 @@ static int amd8111e_rx(struct net_device *dev)
 	
 		skb->protocol = eth_type_trans(skb, dev);
 
-#if AMD8111E_VLAN_TAG_USED		
-		
-		vtag = lp->rx_ring[rx_index].rx_flags & TT_MASK;
+#if AMD8111E_VLAN_TAG_USED				
 		if(lp->vlgrp != NULL && (vtag == TT_VLAN_TAGGED)){
 			amd8111e_vlan_rx(lp, skb,
-				    lp->rx_ring[rx_index].tag_ctrl_info);
+				 le16_to_cpu(lp->rx_ring[rx_index].tag_ctrl_info));
 		} else
 #endif
 			
@@ -951,6 +950,7 @@ err_next_pkt:
 			 = cpu_to_le32(lp->rx_dma_addr[rx_index]);
 		lp->rx_ring[rx_index].buff_count = 
 				cpu_to_le16(lp->rx_buff_len-2);
+		wmb();
 		lp->rx_ring[rx_index].rx_flags |= cpu_to_le16(OWN_BIT);
 		rx_index = (++lp->rx_idx) & RX_RING_DR_MOD_MASK;
 	}
@@ -1431,7 +1431,7 @@ static int amd8111e_start_xmit(struct sk_buff *skb, struct net_device * dev)
 #if AMD8111E_VLAN_TAG_USED
 	if((lp->vlgrp != NULL) && vlan_tx_tag_present(skb)){
 		lp->tx_ring[tx_index].tag_ctrl_cmd |= 
-				cpu_to_le32(TCC_VLAN_INSERT);	
+				cpu_to_le16(TCC_VLAN_INSERT);	
 		lp->tx_ring[tx_index].tag_ctrl_info = 
 				cpu_to_le16(vlan_tx_tag_get(skb));
 
@@ -1443,6 +1443,7 @@ static int amd8111e_start_xmit(struct sk_buff *skb, struct net_device * dev)
 	    (u32) cpu_to_le32(lp->tx_dma_addr[tx_index]);
 
 	/*  Set FCS and LTINT bits */
+	wmb();
 	lp->tx_ring[tx_index].tx_flags |=
 	    cpu_to_le16(OWN_BIT | STP_BIT | ENP_BIT|ADD_FCS_BIT|LTINT_BIT);
 
@@ -1666,7 +1667,7 @@ static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 
 	switch(cmd) {
 	case SIOCGMIIPHY:
-		data->phy_id = PHY_ID;
+		data->phy_id = lp->ext_phy_addr;
 
 	/* fallthru */
 	case SIOCGMIIREG: 
@@ -1939,6 +1940,26 @@ static void amd8111e_config_ipg(struct net_device* dev)
 
 }
 
+static void __devinit amd8111e_probe_ext_phy(struct net_device* dev)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	int i;
+
+	for (i = 0x1e; i >= 0; i--) {
+		u32 id1, id2;
+
+		if (amd8111e_read_phy(lp, i, MII_PHYSID1, &id1))
+			continue;
+		if (amd8111e_read_phy(lp, i, MII_PHYSID2, &id2))
+			continue;
+		lp->ext_phy_id = (id1 << 16) | id2;
+		lp->ext_phy_addr = i;
+		return;
+	}
+	lp->ext_phy_id = 0;
+	lp->ext_phy_addr = 1;
+}
+
 static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
@@ -2009,12 +2030,6 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	lp->amd8111e_net_dev = dev;
 	lp->pm_cap = pm_cap;
 
-	/* setting mii default values */
-	lp->mii_if.dev = dev;
-	lp->mii_if.mdio_read = amd8111e_mdio_read;
-	lp->mii_if.mdio_write = amd8111e_mdio_write;
-	lp->mii_if.phy_id = PHY_ID;
-
 	spin_lock_init(&lp->lock);
 
 	lp->mmio = ioremap(reg_addr, reg_len);
@@ -2062,7 +2077,15 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	dev->vlan_rx_register =amd8111e_vlan_rx_register;
 	dev->vlan_rx_kill_vid = amd8111e_vlan_rx_kill_vid;
 #endif	
-	
+	/* Probe the external PHY */
+	amd8111e_probe_ext_phy(dev);
+
+	/* setting mii default values */
+	lp->mii_if.dev = dev;
+	lp->mii_if.mdio_read = amd8111e_mdio_read;
+	lp->mii_if.mdio_write = amd8111e_mdio_write;
+	lp->mii_if.phy_id = lp->ext_phy_addr;
+
 	/* Set receive buffer length and set jumbo option*/
 	amd8111e_set_rx_buff_len(dev);
 
@@ -2095,6 +2118,12 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
     	for (i = 0; i < 6; i++)
 		printk("%2.2x%c",dev->dev_addr[i],i == 5 ? ' ' : ':');
     	printk( "\n");	
+	if (lp->ext_phy_id)
+		printk(KERN_INFO "%s: Found MII PHY ID 0x%08x at address 0x%02x\n",
+		       dev->name, lp->ext_phy_id, lp->ext_phy_addr);
+	else
+		printk(KERN_INFO "%s: Couldn't detect MII PHY, assuming address 0x01\n",
+		       dev->name);
     	return 0;
 err_iounmap:
 	iounmap(lp->mmio);
