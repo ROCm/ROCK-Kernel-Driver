@@ -715,11 +715,6 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 CONFIG_SOUND=m
 
 #
-# Open Sound System
-#
-# CONFIG_SOUND_PRIME is not set
-
-#
 # Advanced Linux Sound Architecture
 #
 CONFIG_SND=m
@@ -782,6 +777,11 @@ CONFIG_SND_SONICVIBES=m
 #
 CONFIG_SND_SUN_AMD7930=m
 CONFIG_SND_SUN_CS4231=m
+
+#
+# Open Sound System
+#
+# CONFIG_SOUND_PRIME is not set
 
 #
 # USB support

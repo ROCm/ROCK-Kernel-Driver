@@ -839,11 +839,6 @@ CONFIG_DUMMY_CONSOLE=y
 CONFIG_SOUND=y
 
 #
-# Open Sound System
-#
-# CONFIG_SOUND_PRIME is not set
-
-#
 # Advanced Linux Sound Architecture
 #
 CONFIG_SND=y
@@ -922,6 +917,11 @@ CONFIG_SND_INTEL8X0=y
 # ALSA USB devices
 #
 # CONFIG_SND_USB_AUDIO is not set
+
+#
+# Open Sound System
+#
+# CONFIG_SOUND_PRIME is not set
 
 #
 # USB support
