@@ -18,8 +18,6 @@
 #include "err_impl.h"
 #include "proto.h"
 
-
-#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_MARVEL)
 
 void
 marvel_machine_check(u64 vector, u64 la_ptr, struct pt_regs *regs)
@@ -32,9 +30,7 @@ marvel_machine_check(u64 vector, u64 la_ptr, struct pt_regs *regs)
 	mb();
 	draina();
 
-srm_printk("MARVEL MACHINE CHECK!!!\n");  /* HACK */
 	el_process_subpacket(el_ptr);
-srm_printk("...PROCESSED\n");		  /* HACK */
 
 	switch(vector) {
 	case SCB_Q_SYSEVENT:
@@ -44,13 +40,12 @@ srm_printk("...PROCESSED\n");		  /* HACK */
 	case SCB_Q_SYSERR:
 		printk(KERN_CRIT "MARVEL SYSMCHK/ERR %ld\n", vector);
 		break;
-	default:	/* don't know it - pass it up */
+	default:
+		/* Don't know it - pass it up.  */
 		return ev7_machine_check(vector, la_ptr, regs);
 	}	
 
-        /* 
-	 * Release the logout frame 
-	 */
+        /* Release the logout frame.  */
 	wrmces(0x7);
 	mb();
 }
@@ -60,4 +55,3 @@ marvel_register_error_handlers(void)
 {
 	ev7_register_error_handlers();
 }
-#endif /* CONFIG_ALPHA_GENERIC || CONFIG_ALPHA_MARVEL */

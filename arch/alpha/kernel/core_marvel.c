@@ -1,7 +1,7 @@
 /*
  *	linux/arch/alpha/kernel/core_marvel.c
  *
- * Code common to all Marvel based systems
+ * Code common to all Marvel based systems.
  */
 
 #include <linux/config.h>
@@ -55,7 +55,7 @@ static struct io7 *io7_head = NULL;
 /*
  * Helper functions
  */
-static unsigned long 
+static unsigned long __attribute__ ((unused))
 read_ev7_csr(int pe, unsigned long offset)
 {
 	ev7_csr *ev7csr = EV7_CSR_KERN(pe, offset);
@@ -91,18 +91,19 @@ mk_resource_name(int pe, int port, char *str)
 	return name;
 }
 
-struct io7 *marvel_next_io7(struct io7 *prev)
+inline struct io7 *
+marvel_next_io7(struct io7 *prev)
 {
-	if (!prev) return io7_head;
-	return prev->next;
+	return (prev ? prev->next : io7_head);
 }
 
-struct io7 *marvel_find_io7(int pe)
+struct io7 *
+marvel_find_io7(int pe)
 {
 	struct io7 *io7;
 
-	io7 = marvel_next_io7(NULL);
-	for(; io7 && io7->pe != pe; io7 = marvel_next_io7(io7));
+	for (io7 = io7_head; io7 && io7->pe != pe; io7 = io7->next)
+		continue;
 
 	return io7;
 }
@@ -123,14 +124,14 @@ alloc_io7(unsigned int pe)
 	io7->pe = pe;
 	io7->irq_lock = SPIN_LOCK_UNLOCKED;
 
-	for(h = 0; h < 4; h++) {
+	for (h = 0; h < 4; h++) {
 		io7->ports[h].io7 = io7;
 		io7->ports[h].port = h;
 		io7->ports[h].enabled = 0; /* default to disabled */
 	}
 
 	/*
-	 * insert in pe sorted order
+	 * Insert in pe sorted order.
 	 */
 	if (NULL == io7_head)			/* empty list */
 		io7_head = io7;	
@@ -138,7 +139,7 @@ alloc_io7(unsigned int pe)
 		io7->next = io7_head;
 		io7_head = io7;
 	} else {				/* insert at position */
-		for(insp = io7_head; insp; insp = insp->next) {
+		for (insp = io7_head; insp; insp = insp->next) {
 			if (insp->pe == io7->pe) {
 				printk(KERN_ERR "Too many IO7s at PE %d\n", 
 				       io7->pe);
@@ -173,30 +174,30 @@ io7_clear_errors(struct io7 *io7)
 
 
 	/*
-	 * First the IO ports
+	 * First the IO ports.
 	 */
-	for(port = 0; port < 4; port++) {
+	for (port = 0; port < 4; port++) {
 		csrs = IO7_CSRS_KERN(io7->pe, port);
 
-		csrs->POx_ERR_SUM.csr = (unsigned long)-1L;
-		csrs->POx_TLB_ERR.csr = (unsigned long)-1L;
-		csrs->POx_SPL_COMPLT.csr = (unsigned long)-1L;
-		csrs->POx_TRANS_SUM.csr = (unsigned long)-1L;
+		csrs->POx_ERR_SUM.csr = -1UL;
+		csrs->POx_TLB_ERR.csr = -1UL;
+		csrs->POx_SPL_COMPLT.csr = -1UL;
+		csrs->POx_TRANS_SUM.csr = -1UL;
 	}
 
 	/*
-	 * Then the common ones
+	 * Then the common ones.
 	 */
 	p7csrs = IO7_PORT7_CSRS_KERN(io7->pe);
 
-	p7csrs->PO7_ERROR_SUM.csr = (unsigned long)-1L;
-	p7csrs->PO7_UNCRR_SYM.csr = (unsigned long)-1L;
-	p7csrs->PO7_CRRCT_SYM.csr = (unsigned long)-1L;
+	p7csrs->PO7_ERROR_SUM.csr = -1UL;
+	p7csrs->PO7_UNCRR_SYM.csr = -1UL;
+	p7csrs->PO7_CRRCT_SYM.csr = -1UL;
 }
 
 
 /*
- * IO7 PCI, PCI/X, AGP configuration
+ * IO7 PCI, PCI/X, AGP configuration.
  */
 static void __init
 io7_init_hose(struct io7 *io7, int port)
@@ -237,7 +238,7 @@ io7_init_hose(struct io7 *io7, int port)
 	hose->dense_io_base = IO7_IO_PHYS(io7->pe, port);
 
 	/*
-	 * Base addresses and resource ranges for kernel consumption
+	 * Base addresses and resource ranges for kernel consumption.
 	 */
 	hose->config_space_base = (unsigned long)IO7_CONF_KERN(io7->pe, port);
 
@@ -259,9 +260,9 @@ io7_init_hose(struct io7 *io7, int port)
 		       hose->index);
 
 	/*
-	 * Save the existing DMA window settings for later restoration
+	 * Save the existing DMA window settings for later restoration.
 	 */
-	for(i = 0; i < 4; i++) {
+	for (i = 0; i < 4; i++) {
 		io7_port->saved_wbase[i] = csrs->POx_WBASE[i].csr;
 		io7_port->saved_wmask[i] = csrs->POx_WMASK[i].csr;
 		io7_port->saved_tbase[i] = csrs->POx_TBASE[i].csr;
@@ -277,12 +278,12 @@ io7_init_hose(struct io7 *io7, int port)
 	 */
 
 	/*
-	 * tbia before modifying windows
+	 * TBIA before modifying windows.
 	 */
 	marvel_pci_tbi(hose, 0, -1);
 
 	/*
-	 * set up window 0 for scatter-gather 8MB at 8MB
+	 * Set up window 0 for scatter-gather 8MB at 8MB.
 	 */
 	hose->sg_isa = iommu_arena_new_node(marvel_cpuid_to_nid(io7->pe),
 					    hose, 0x00800000, 0x00800000, 0);
@@ -293,14 +294,14 @@ io7_init_hose(struct io7 *io7, int port)
 	csrs->POx_TBASE[0].csr = virt_to_phys(hose->sg_isa->ptes);
 
 	/*
-	 * set up window 1 for direct-mapped 1GB at 2GB
+	 * Set up window 1 for direct-mapped 1GB at 2GB.
 	 */
 	csrs->POx_WBASE[1].csr = __direct_map_base | wbase_m_ena;
 	csrs->POx_WMASK[1].csr = (__direct_map_size - 1) & wbase_m_addr;
 	csrs->POx_TBASE[1].csr = 0;
 
 	/*
-	 * set up window 2 for scatter-gather (up-to) 1GB at 3GB
+	 * Set up window 2 for scatter-gather (up-to) 1GB at 3GB.
 	 */
 	hose->sg_pci = iommu_arena_new_node(marvel_cpuid_to_nid(io7->pe),
 					    hose, 0xc0000000, 0x40000000, 0);
@@ -311,12 +312,12 @@ io7_init_hose(struct io7 *io7, int port)
 	csrs->POx_TBASE[2].csr = virt_to_phys(hose->sg_pci->ptes);
 
 	/*
-	 * disable window 3
+	 * Disable window 3.
 	 */
 	csrs->POx_WBASE[3].csr = 0;
 
 	/*
-	 * Make sure that the AGP Monster Window is disabled
+	 * Make sure that the AGP Monster Window is disabled.
 	 */
 	csrs->POx_CTRL.csr &= ~(1UL << 61);
 
@@ -325,7 +326,7 @@ io7_init_hose(struct io7 *io7, int port)
 	csrs->POx_MSK_HEI.csr &= ~(3UL << 14);
 #endif
 	/*
-	 * tbia after modifying windows
+	 * TBIA after modifying windows.
 	 */
 	marvel_pci_tbi(hose, 0, -1);
 }
@@ -338,14 +339,14 @@ marvel_init_io7(struct io7 *io7)
 	printk("Initializing IO7 at PID %d\n", io7->pe);
 
 	/*
-	 * Get the Port 7 CSR pointer
+	 * Get the Port 7 CSR pointer.
 	 */
 	io7->csrs = IO7_PORT7_CSRS_KERN(io7->pe);
 
 	/*
-	 * Init this IO7's hoses
+	 * Init this IO7's hoses.
 	 */
-	for(i = 0; i < IO7_NUM_PORTS; i++) {
+	for (i = 0; i < IO7_NUM_PORTS; i++) {
 		io7_ioport_csrs *csrs = IO7_CSRS_KERN(io7->pe, i);
 		if (csrs->POx_CACHE_CTL.csr == 8) {
 			io7->ports[i].enabled = 1;
@@ -354,7 +355,8 @@ marvel_init_io7(struct io7 *io7)
 	}
 }
 
-void marvel_io7_present(gct6_node *node)
+void
+marvel_io7_present(gct6_node *node)
 {
 	int pe;
 
@@ -418,7 +420,8 @@ gct6_search_struct gct_wanted_node_list[] = {
  * at boot time. Syntax is 'io7=a,b,c,...,n' where a-n are the PIDs (decimal)
  * where IO7s are connected
  */
-static int __init marvel_specify_io7(char *str)
+static int __init
+marvel_specify_io7(char *str)
 {
 	unsigned long pid;
 	struct io7 *io7;
@@ -449,18 +452,18 @@ marvel_init_arch(void)
 	ioport_resource.end = ~0UL;
 	iomem_resource.end = ~0UL;
 
-	/* PCI DMA Direct Mapping is 1GB at 2GB */
+	/* PCI DMA Direct Mapping is 1GB at 2GB.  */
 	__direct_map_base = 0x80000000;
 	__direct_map_size = 0x40000000;
 
-	/* parse the config tree */
+	/* Parse the config tree.  */
 	gct6_find_nodes(GCT_NODE_PTR(0), gct_wanted_node_list);
 
-	/* init the io7s */
-	for(io7 = NULL; NULL != (io7 = marvel_next_io7(io7)); ) 
+	/* Init the io7s.  */
+	for (io7 = NULL; NULL != (io7 = marvel_next_io7(io7)); ) 
 		marvel_init_io7(io7);
 
-	/* Check for graphic console location (if any) */
+	/* Check for graphic console location (if any).  */
 	marvel_init_vga_hose();
 }
 
@@ -499,7 +502,7 @@ marvel_kill_arch(int mode)
 
 static inline unsigned long
 build_conf_addr(struct pci_controller *hose, u8 bus, 
-                unsigned int devfn, int where)
+		unsigned int devfn, int where)
 {
 	return (hose->config_space_base | (bus << 16) | (devfn << 8) | where);
 }
@@ -515,14 +518,15 @@ mk_conf_addr(struct pci_bus *pbus, unsigned int devfn, int where)
 	if (!hose)
 		return addr;
 
-	/* check for enabled... */
+	/* Check for enabled.  */
 	io7_port = hose->sysdata;
 	if (!io7_port->enabled)
 		return addr;
 
 	if (hose->first_busno == bus) {
-		/* don't support idsel > 20 on primary bus */
-		if (devfn >= PCI_DEVFN(21, 0)) return addr;
+		/* Don't support idsel > 20 on primary bus.  */
+		if (devfn >= PCI_DEVFN(21, 0))
+			return addr;
 		bus = 0;
 	}
 
@@ -598,7 +602,7 @@ struct pci_ops marvel_pci_ops =
 
 
 /*
- * Other PCI helper functions
+ * Other PCI helper functions.
  */
 void
 marvel_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
@@ -613,12 +617,11 @@ marvel_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 
 
 /*
- * IO map support
+ * IO map support.
  */
 unsigned long
 marvel_ioremap(unsigned long addr, unsigned long size)
 {
-	extern struct pci_controller *hose_head;
 	struct pci_controller *hose;
 	unsigned long baddr, last;
 	struct vm_struct *area;
@@ -627,7 +630,7 @@ marvel_ioremap(unsigned long addr, unsigned long size)
 	unsigned long pfn;
 
 	/*
-	 * Adjust the addr
+	 * Adjust the addr.
 	 */ 
 #ifdef CONFIG_VGA_HOSE
 	if (pci_vga_hose && __marvel_is_mem_vga(addr)) {
@@ -638,15 +641,17 @@ marvel_ioremap(unsigned long addr, unsigned long size)
 	if (!marvel_is_ioaddr(addr)) return 0UL;
 
 	/*
-	 * Find the hose
+	 * Find the hose.
 	 */
-	for(hose = hose_head; hose; hose = hose->next) {
-		if ((addr >> 32) == (hose->mem_space->start >> 32)) break; 
+	for (hose = hose_head; hose; hose = hose->next) {
+		if ((addr >> 32) == (hose->mem_space->start >> 32))
+			break; 
 	}
-	if (!hose) return 0UL;
+	if (!hose)
+		return 0UL;
 
 	/*
-	 * We have the hose - calculate the bus limits
+	 * We have the hose - calculate the bus limits.
 	 */
 	baddr = addr - hose->mem_space->start;
 	last = baddr + size - 1;
@@ -659,7 +664,7 @@ marvel_ioremap(unsigned long addr, unsigned long size)
 		return IDENT_ADDR | (baddr - __direct_map_base);
 
 	/* 
-	 * Check the scatter-gather arena...
+	 * Check the scatter-gather arena.
 	 */
 	if (hose->sg_pci &&
 	    baddr >= (unsigned long)hose->sg_pci->dma_base &&
@@ -674,12 +679,12 @@ marvel_ioremap(unsigned long addr, unsigned long size)
 		size = PAGE_ALIGN(last) - baddr;
 
 		/*
-		 * Map it
+		 * Map it.
 		 */
 		area = get_vm_area(size, VM_IOREMAP);
 		if (!area) return (unsigned long)NULL;
 		ptes = hose->sg_pci->ptes;
-		for(vaddr = (unsigned long)area->addr; 
+		for (vaddr = (unsigned long)area->addr; 
 		    baddr <= last; 
 		    baddr += PAGE_SIZE, vaddr += PAGE_SIZE) {
 			pfn = ptes[baddr >> PAGE_SHIFT];
@@ -707,7 +712,7 @@ marvel_ioremap(unsigned long addr, unsigned long size)
 	}
 
 	/*
-	 * Not found - assume legacy ioremap
+	 * Not found - assume legacy ioremap.
 	 */
 	return addr;
 }
@@ -717,7 +722,8 @@ marvel_iounmap(unsigned long addr)
 {
 	if (((long)addr >> 41) == -2)
 		return;	/* kseg map, nothing to do */
-	if (addr) return vfree((void *)(PAGE_MASK & addr)); 
+	if (addr)
+		return vfree((void *)(PAGE_MASK & addr)); 
 }
 
 
@@ -726,16 +732,15 @@ marvel_iounmap(unsigned long addr)
  *
  * Marvel doesn't have a real serial console -- it's either graphics or 
  * server management based. If we're running on the server management based
- * console, allow the srmcons callback driver to be a console device
+ * console, allow the srmcons callback driver to be a console device.
  */
-int marvel_srmcons_allowed(void)
+int
+marvel_srmcons_allowed(void)
 {
 	u64 *pu64 = (u64 *)((u64)hwrpb + hwrpb->ctbt_offset);
 
-	if (pu64[7] == 2) return 1;
-	return 0;
+	return (pu64[7] == 2);
 }
-
 
 
 /*
@@ -747,7 +752,8 @@ struct marvel_rtc_access_info {
 	unsigned long data;
 };
 
-static void __marvel_access_rtc(void *info)
+static void
+__marvel_access_rtc(void *info)
 {
 	struct marvel_rtc_access_info *rtc_access = info;
 
@@ -765,7 +771,8 @@ static void __marvel_access_rtc(void *info)
 	rtc_access->data = __r0;
 }
 
-u8 __marvel_rtc_io(int write, u8 b, unsigned long addr)
+u8
+__marvel_rtc_io(int write, u8 b, unsigned long addr)
 {
 	struct marvel_rtc_access_info rtc_access = {0, };
 	static u8 index = 0;
@@ -807,7 +814,6 @@ u8 __marvel_rtc_io(int write, u8 b, unsigned long addr)
 	return ret;
 }
 
-
 
 /*
  * NUMA Support
@@ -817,7 +823,8 @@ u8 __marvel_rtc_io(int write, u8 b, unsigned long addr)
  *              -- no real support for striped mode 
  **********
  */
-int marvel_pa_to_nid(unsigned long pa)
+int
+marvel_pa_to_nid(unsigned long pa)
 {
 	int cpuid;
 
@@ -829,12 +836,14 @@ int marvel_pa_to_nid(unsigned long pa)
 	return marvel_cpuid_to_nid(cpuid);
 }
 
-int marvel_cpuid_to_nid(int cpuid)
+int
+marvel_cpuid_to_nid(int cpuid)
 {
 	return cpuid;
 }
 
-unsigned long marvel_node_mem_start(int nid)
+unsigned long
+marvel_node_mem_start(int nid)
 {
 	unsigned long pa;
 
@@ -844,14 +853,15 @@ unsigned long marvel_node_mem_start(int nid)
 	return pa;
 }
 
-unsigned long marvel_node_mem_size(int nid)
+unsigned long
+marvel_node_mem_size(int nid)
 {
 	return 16UL * 1024 * 1024 * 1024; /* 16GB */
 }
 
 
 /* 
- * AGP GART Support
+ * AGP GART Support.
  */
 #include <linux/agp_backend.h>
 #include <asm/agp_backend.h>
@@ -866,7 +876,8 @@ struct marvel_agp_aperture {
 	long pg_count;
 };
 
-static int marvel_agp_setup(alpha_agp_info *agp)
+static int
+marvel_agp_setup(alpha_agp_info *agp)
 {
 	struct marvel_agp_aperture *aper;
 
@@ -876,7 +887,7 @@ static int marvel_agp_setup(alpha_agp_info *agp)
 	aper->arena = agp->hose->sg_pci;
 	aper->pg_count = MARVEL_AGP_APER_SIZE / PAGE_SIZE;
 	aper->pg_start = iommu_reserve(aper->arena, aper->pg_count,
-                                       aper->pg_count - 1);
+				       aper->pg_count - 1);
 
 	if (aper->pg_start < 0) {
 		printk(KERN_ERR "Failed to reserve AGP memory\n");
@@ -892,7 +903,8 @@ static int marvel_agp_setup(alpha_agp_info *agp)
 	return 0;
 }
 
-static void marvel_agp_cleanup(alpha_agp_info *agp)
+static void
+marvel_agp_cleanup(alpha_agp_info *agp)
 {
 	struct marvel_agp_aperture *aper = agp->aperture.sysdata;
 	int status;
@@ -905,13 +917,15 @@ static void marvel_agp_cleanup(alpha_agp_info *agp)
 		status = iommu_release(aper->arena, aper->pg_start, 
 				       aper->pg_count);
 	}
-	if (status < 0) printk(KERN_ERR "Failed to release AGP memory\n");
+	if (status < 0)
+		printk(KERN_ERR "Failed to release AGP memory\n");
 
 	kfree(aper);
 	kfree(agp);
 }
 
-static int marvel_agp_configure(alpha_agp_info *agp)
+static int
+marvel_agp_configure(alpha_agp_info *agp)
 {
 	io7_ioport_csrs *csrs = ((struct io7_port *)agp->hose->sysdata)->csrs;
 	struct io7 *io7 = ((struct io7_port *)agp->hose->sysdata)->io7;
@@ -920,15 +934,15 @@ static int marvel_agp_configure(alpha_agp_info *agp)
 
 	/*
 	 * Check the requested mode against the PLL setting.
-	 * The agpgart_be code has not programmed the card yet, so we can
-	 * still tweak mode here 
+	 * The agpgart_be code has not programmed the card yet,
+	 * so we can still tweak mode here.
 	 */
 	agp_pll = io7->csrs->POx_RST[IO7_AGP_PORT].csr;
 	switch(IO7_PLL_RNGB(agp_pll)) {
 	case 0x4:				/* 2x only */
 		/* 
 		 * The PLL is only programmed for 2x, so adjust the
-		 * rate to 2x, if necessary
+		 * rate to 2x, if necessary.
 		 */
 		if (agp->mode.bits.rate != 2) 
 			new_rate = 2;
@@ -936,8 +950,8 @@ static int marvel_agp_configure(alpha_agp_info *agp)
 
 	case 0x6:				/* 1x / 4x */
 		/*
-		 * The PLL is programmed for 1x or 4x. Don't go faster
-		 * than requested, so if the requested rate is 2x, use 1x
+		 * The PLL is programmed for 1x or 4x.  Don't go faster
+		 * than requested, so if the requested rate is 2x, use 1x.
 		 */
 		if (agp->mode.bits.rate == 2) 
 			new_rate = 1;
@@ -946,7 +960,7 @@ static int marvel_agp_configure(alpha_agp_info *agp)
 	default:				/* ??????? */
 		/*
 		 * Don't know what this PLL setting is, take the requested
-		 * rate, but warn the user
+		 * rate, but warn the user.
 		 */
 		printk("%s: unknown PLL setting RNGB=%lx (PLL6_CTL=%016lx)\n",
 		       __FUNCTION__, IO7_PLL_RNGB(agp_pll), agp_pll);
@@ -954,7 +968,7 @@ static int marvel_agp_configure(alpha_agp_info *agp)
 	}
 
 	/*
-	 * Set the new rate, if necessary
+	 * Set the new rate, if necessary.
 	 */
 	if (new_rate) {
 		printk("Requested AGP Rate %dX not compatible "
@@ -1030,13 +1044,13 @@ marvel_agp_info(void)
 	struct io7 *io7;
 
 	/*
-	 * Find the first IO7 with an AGP card
+	 * Find the first IO7 with an AGP card.
 	 *
 	 * FIXME -- there should be a better way (we want to be able to
 	 * specify and what if the agp card is not video???)
 	 */
 	hose = NULL;
-	for(io7 = NULL; (io7 = marvel_next_io7(io7)) != NULL; ) {
+	for (io7 = NULL; (io7 = marvel_next_io7(io7)) != NULL; ) {
 		struct pci_controller *h;
 		vuip addr;
 
@@ -1054,20 +1068,21 @@ marvel_agp_info(void)
 
 	printk("MARVEL - using hose %d as AGP\n", hose->index);
 
-	if (!hose || !hose->sg_pci) return NULL;
+	if (!hose || !hose->sg_pci)
+		return NULL;
 
 	/* 
-	 * Get the csrs from the hose
+	 * Get the csrs from the hose.
 	 */
 	csrs = ((struct io7_port *)hose->sysdata)->csrs;
 
 	/*
-	 * Allocate the info structure
+	 * Allocate the info structure.
 	 */
 	agp = kmalloc(sizeof(*agp), GFP_KERNEL);
 
 	/*
-	 * Fill it in
+	 * Fill it in.
 	 */
 	agp->type = 0 /* FIXME: ALPHA_CORE_AGP */;
 	agp->hose = hose;
@@ -1075,14 +1090,14 @@ marvel_agp_info(void)
 	agp->ops = &marvel_agp_ops;
 
 	/*
-	 * Aperture - not configured until ops.setup()
+	 * Aperture - not configured until ops.setup().
 	 */
 	agp->aperture.bus_base = 0;
 	agp->aperture.size = 0;
 	agp->aperture.sysdata = NULL;
 
 	/*
-	 * Capabilities
+	 * Capabilities.
 	 *
 	 * NOTE: IO7 reports through AGP_STAT that it can support a read queue
 	 *       depth of 17 (rq = 0x10). It actually only supports a depth of
@@ -1092,7 +1107,7 @@ marvel_agp_info(void)
 	agp->capability.bits.rq = 0xf;
 	
 	/*
-	 * Mode
+	 * Mode.
 	 */
 	agp->mode.lw = csrs->AGP_CMD.csr;
 

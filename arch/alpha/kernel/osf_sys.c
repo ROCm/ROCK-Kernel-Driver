@@ -825,7 +825,7 @@ extern struct timezone sys_tz;
 extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 extern int do_getitimer(int which, struct itimerval *value);
 extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
-asmlinkage int sys_utimes(char *, struct timeval *);
+extern asmlinkage int sys_utimes(char *, struct timeval *);
 extern int do_adjtimex(struct timex *);
 
 struct timeval32

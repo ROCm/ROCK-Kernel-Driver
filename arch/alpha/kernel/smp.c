@@ -83,7 +83,6 @@ cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
 
 extern void calibrate_delay(void);
-extern asmlinkage void entInt(void);
 
 
 

@@ -18,12 +18,6 @@
 #include "err_impl.h"
 #include "proto.h"
 
-
-/*
- * Titan generic
- */
-
-#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_TITAN)
 
 static int
 titan_parse_c_misc(u64 c_misc, int print)
@@ -253,7 +247,7 @@ titan_parse_p_perror(int which, int port, u64 perror, int print)
 	if (perror & TITAN__PCHIP_PERROR__LOST)
 		printk("%s    Lost Error\n", err_print_prefix);
 	printk("%s      Command: 0x%x - %s\n"
-	         "      Address: 0x%lx\n",
+		 "      Address: 0x%lx\n",
 	       err_print_prefix,
 	       cmd, perror_cmd[cmd],
 	       addr);
@@ -336,7 +330,7 @@ titan_parse_p_agperror(int which, u64 agperror, int print)
 	if (agperror & TITAN__PCHIP_AGPERROR__LOST)
 		printk("%s    Lost Error\n", err_print_prefix);
 	printk("%s      Command: 0x%x - %s, %d Quadwords%s\n"
-	         "      Address: 0x%lx\n",
+		 "      Address: 0x%lx\n",
 	       err_print_prefix, cmd, agperror_cmd[cmd], len,
 	       (agperror & TITAN__PCHIP_AGPERROR__FENCE) ? ", FENCE" : "",
 	       addr);
@@ -389,7 +383,7 @@ titan_machine_check(u64 vector, u64 la_ptr, struct pt_regs *regs)
 		((unsigned long)mchk_header + mchk_header->sys_offset);
 	u64 irqmask;
 
-        /*
+	/*
 	 * Mask of Titan interrupt sources which are reported as machine checks
 	 *
 	 * 63 - CChip Error
@@ -545,7 +539,7 @@ el_process_regatta_subpacket(struct el_subpacket *header)
 		       err_print_prefix,
 		       (int)header->by_type.regatta_frame.cpuid);
 		status = privateer_process_logout_frame((struct el_common *)
-                        header->by_type.regatta_frame.data_start, 1);
+			header->by_type.regatta_frame.data_start, 1);
 		break;
 	default:
 		printk("%s  ** REGATTA TYPE %d SUBPACKET\n", 
@@ -559,30 +553,24 @@ el_process_regatta_subpacket(struct el_subpacket *header)
 } 
 
 static struct el_subpacket_handler titan_subpacket_handler = 
-        SUBPACKET_HANDLER_INIT(EL_CLASS__REGATTA_FAMILY, 
+	SUBPACKET_HANDLER_INIT(EL_CLASS__REGATTA_FAMILY, 
 			       el_process_regatta_subpacket);
 
 void
 titan_register_error_handlers(void)
 {
-	int i;
+	size_t i;
 
-	for(i = 0; 
-	    i < sizeof(el_titan_annotations)/sizeof(el_titan_annotations[1]); 
-	    i++) {
+	for (i = 0; i < ARRAY_SIZE (el_titan_annotations); i++)
 		cdl_register_subpacket_annotation(&el_titan_annotations[i]);
-	}
 
 	cdl_register_subpacket_handler(&titan_subpacket_handler);
 }
-#endif /* CONFIG_ALPHA_GENERIC || CONFIG_ALPHA_TITAN */
 
 
 /*
  * Privateer
  */
-
-#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_TITAN)
 
 static int
 privateer_process_680_frame(struct el_common *mchk_header, int print)
@@ -601,14 +589,14 @@ privateer_process_680_frame(struct el_common *mchk_header, int print)
 	/* TODO - decode instead of just dumping... */
 	printk("%s  Summary Flags:         %016lx\n"
  	         "  CChip DIRx:            %016lx\n"
-	         "  System Management IR:  %016lx\n"
-	         "  CPU IR:                %016lx\n"
-	         "  Power Supply IR:       %016lx\n"
-	         "  LM78 Fault Status:     %016lx\n"
-	         "  System Doors:          %016lx\n"
-	         "  Temperature Warning:   %016lx\n"
-	         "  Fan Control:           %016lx\n"
-	         "  Fatal Power Down Code: %016lx\n",
+		 "  System Management IR:  %016lx\n"
+		 "  CPU IR:                %016lx\n"
+		 "  Power Supply IR:       %016lx\n"
+		 "  LM78 Fault Status:     %016lx\n"
+		 "  System Doors:          %016lx\n"
+		 "  Temperature Warning:   %016lx\n"
+		 "  Fan Control:           %016lx\n"
+		 "  Fatal Power Down Code: %016lx\n",
 	       err_print_prefix,
 	       emchk->summary,
 	       emchk->c_dirx,
@@ -632,7 +620,7 @@ privateer_process_logout_frame(struct el_common *mchk_header, int print)
 		(struct el_common_EV6_mcheck *)mchk_header;
 	int status = MCHK_DISPOSITION_UNKNOWN_ERROR;
 
-        /*
+	/*
 	 * Machine check codes
 	 */
 #define PRIVATEER_MCHK__CORR_ECC		0x86	/* 630 */
@@ -717,13 +705,13 @@ privateer_machine_check(u64 vector, u64 la_ptr, struct pt_regs *regs)
 #define PRIVATEER_HOTPLUG_INTERRUPT_MASK	(0xE00UL)
 
 	/*
-	 * Sync the processor
+	 * Sync the processor.
 	 */
 	mb();
 	draina();
 
 	/* 
-	 * Only handle system events here 
+	 * Only handle system events here.
 	 */
 	if (vector != SCB_Q_SYSEVENT) 
 		return titan_machine_check(vector, la_ptr, regs);
@@ -742,23 +730,18 @@ privateer_machine_check(u64 vector, u64 la_ptr, struct pt_regs *regs)
 	
 	/* 
 	 * Convert any pending interrupts which report as 680 machine
-	 * checks to interrupts
+	 * checks to interrupts.
 	 */
 	irqmask = tmchk->c_dirx & PRIVATEER_680_INTERRUPT_MASK;
 
 	/*
-	 * Dispatch the interrupt(s)
+	 * Dispatch the interrupt(s).
 	 */
 	titan_dispatch_irqs(irqmask, regs);
 
-        /* 
-	 * Release the logout frame 
+	/* 
+	 * Release the logout frame.
 	 */
 	wrmces(0x7);
 	mb();
 }
-
-#endif /* CONFIG_ALPHA_GENERIC || CONFIG_ALPHA_TITAN */
-
-
-

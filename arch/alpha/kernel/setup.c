@@ -290,7 +290,7 @@ setup_memory(void *kernel_end)
 	  (hwrpb->mddt_offset + (unsigned long) hwrpb);
 
 	for_each_mem_cluster(memdesc, cluster, i) {
-		printk("memcluster %d, usage %01lx, start %8lu, end %8lu\n",
+		printk("memcluster %lu, usage %01lx, start %8lu, end %8lu\n",
 		       i, cluster->usage, cluster->start_pfn,
 		       cluster->start_pfn + cluster->numpages);
 

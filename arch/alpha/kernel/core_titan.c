@@ -56,20 +56,20 @@ struct
 /*
  * Routines to access TIG registers.
  */
-static volatile unsigned long *
+static inline volatile unsigned long *
 mk_tig_addr(int offset)
 {
 	return (volatile unsigned long *)(TITAN_TIG_SPACE + (offset << 6));
 }
 
-u8 
+static inline u8 
 titan_read_tig(int offset, u8 value)
 {
 	volatile unsigned long *tig_addr = mk_tig_addr(offset);
 	return (u8)(*tig_addr & 0xff);
 }
 
-void 
+static inline void 
 titan_write_tig(int offset, u8 value)
 {
 	volatile unsigned long *tig_addr = mk_tig_addr(offset);
@@ -207,7 +207,7 @@ titan_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 	volatile unsigned long *csr;
 	unsigned long value;
 
-	/* Get the right hose */
+	/* Get the right hose.  */
 	port = &pachip->g_port;
 	if (hose->index & 2) 
 		port = &pachip->a_port;
@@ -242,6 +242,7 @@ titan_query_agp(titan_pachip_port *port)
 	return pctl.pctl_r_bits.apctl_v_agp_present;
 
 }
+
 static void __init
 titan_init_one_pachip_port(titan_pachip_port *port, int index)
 {
@@ -308,7 +309,7 @@ titan_init_one_pachip_port(titan_pachip_port *port, int index)
 	/*
 	 * Set up the PCI to main memory translation windows.
 	 *
-	 * Note: Window 3 on Titan is Scatter-Gather ONLY
+	 * Note: Window 3 on Titan is Scatter-Gather ONLY.
 	 *
 	 * Window 0 is scatter-gather 8MB at 8MB (for isa)
 	 * Window 1 is direct access 1GB at 2GB
@@ -334,11 +335,11 @@ titan_init_one_pachip_port(titan_pachip_port *port, int index)
 
 	port->wsba[3].csr = 0;
 
-	/* Enable the Monster Window to make DAC pci64 possible. */
+	/* Enable the Monster Window to make DAC pci64 possible.  */
 	port->pctl.csr |= pctl_m_mwin;
 
 	/*
-	 * If it's an AGP port, initialize agplastwr
+	 * If it's an AGP port, initialize agplastwr.
 	 */
 	if (titan_query_agp(port)) 
 		port->port_specific.a.agplastwr.csr = __direct_map_base;
@@ -374,7 +375,7 @@ titan_init_vga_hose(void)
 		 * Our hose numbering matches the console's, so just find
 		 * the right one...
 		 */
-		for(hose = hose_head; hose; hose = hose->next) {
+		for (hose = hose_head; hose; hose = hose->next) {
 			if (hose->index == h) break;
 		}
 
@@ -413,14 +414,14 @@ titan_init_arch(void)
 	ioport_resource.end = ~0UL;
 	iomem_resource.end = ~0UL;
 
-	/* PCI DMA Direct Mapping is 1GB at 2GB */
+	/* PCI DMA Direct Mapping is 1GB at 2GB.  */
 	__direct_map_base = 0x80000000;
 	__direct_map_size = 0x40000000;
 
-	/* Init the PA chip(s) */
+	/* Init the PA chip(s).  */
 	titan_init_pachips(TITAN_pachip0, TITAN_pachip1);
 
-	/* Check for graphic console location (if any) */
+	/* Check for graphic console location (if any).  */
 	titan_init_vga_hose();
 }
 
@@ -450,8 +451,8 @@ titan_kill_pachips(titan_pachip *pachip0, titan_pachip *pachip1)
 	int pchip1_present = TITAN_cchip->csc.csr & 1L<<14;
 
 	if (pchip1_present) {
-		titan_kill_one_pachip_port(&pachip0->g_port, 1);
-		titan_kill_one_pachip_port(&pachip0->a_port, 3);
+		titan_kill_one_pachip_port(&pachip1->g_port, 1);
+		titan_kill_one_pachip_port(&pachip1->a_port, 3);
 	}
 	titan_kill_one_pachip_port(&pachip0->g_port, 0);
 	titan_kill_one_pachip_port(&pachip0->a_port, 2);
@@ -465,7 +466,7 @@ titan_kill_arch(int mode)
 
 
 /*
- * IO map support
+ * IO map support.
  */
 unsigned long
 titan_ioremap(unsigned long addr, unsigned long size)
@@ -480,7 +481,7 @@ titan_ioremap(unsigned long addr, unsigned long size)
 	unsigned long pfn;
 
 	/*
-	 * Adjust the addr
+	 * Adjust the addr.
 	 */ 
 #ifdef CONFIG_VGA_HOSE
 	if (pci_vga_hose && __titan_is_mem_vga(addr)) {
@@ -490,9 +491,9 @@ titan_ioremap(unsigned long addr, unsigned long size)
 #endif
 
 	/*
-	 * Find the hose 
+	 * Find the hose.
 	 */
-	for(hose = hose_head; hose; hose = hose->next)
+	for (hose = hose_head; hose; hose = hose->next)
 		if (hose->index == h) break;
 	if (!hose) return (unsigned long)NULL;
 
@@ -504,7 +505,7 @@ titan_ioremap(unsigned long addr, unsigned long size)
 		return addr - __direct_map_base + TITAN_MEM_BIAS;
 
 	/* 
-	 * Check the scatter-gather arena...
+	 * Check the scatter-gather arena.
 	 */
 	if (hose->sg_pci &&
 	    baddr >= (unsigned long)hose->sg_pci->dma_base &&
@@ -524,7 +525,7 @@ titan_ioremap(unsigned long addr, unsigned long size)
 		area = get_vm_area(size, VM_IOREMAP);
 		if (!area) return (unsigned long)NULL;
 		ptes = hose->sg_pci->ptes;
-		for(vaddr = (unsigned long)area->addr; 
+		for (vaddr = (unsigned long)area->addr; 
 		    baddr <= last; 
 		    baddr += PAGE_SIZE, vaddr += PAGE_SIZE) {
 			pfn = ptes[baddr >> PAGE_SHIFT];
@@ -551,7 +552,7 @@ titan_ioremap(unsigned long addr, unsigned long size)
 	}
 
 	/*
-	 * Not found - assume legacy ioremap
+	 * Not found - assume legacy ioremap.
 	 */
 	return addr + TITAN_MEM_BIAS;
 
@@ -562,16 +563,16 @@ titan_iounmap(unsigned long addr)
 {
 	if (((long)addr >> 41) == -2)
 		return;	/* kseg map, nothing to do */
-	if (addr) return vfree((void *)(PAGE_MASK & addr)); 
+	if (addr)
+		vfree((void *)(PAGE_MASK & addr)); 
 }
 
 EXPORT_SYMBOL(titan_ioremap);
 EXPORT_SYMBOL(titan_iounmap);
 
 /*
- * AGP GART Support
+ * AGP GART Support.
  */
-#if defined(CONFIG_ALPHA_CORE_AGP)
 #include <linux/agp_backend.h>
 #include <asm/agp_backend.h>
 #include <linux/slab.h>
@@ -585,12 +586,14 @@ struct titan_agp_aperture {
 	long pg_count;
 };
 
-static int titan_agp_setup(alpha_agp_info *agp)
+static int
+titan_agp_setup(alpha_agp_info *agp)
 {
 	struct titan_agp_aperture *aper;
 
 	aper = kmalloc(sizeof(struct titan_agp_aperture), GFP_KERNEL);
-	if (aper == NULL) return -ENOMEM;
+	if (aper == NULL)
+		return -ENOMEM;
 
 	aper->arena = agp->hose->sg_pci;
 	aper->pg_count = TITAN_AGP_APER_SIZE / PAGE_SIZE;
@@ -610,7 +613,8 @@ static int titan_agp_setup(alpha_agp_info *agp)
 	return 0;
 }
 
-static void titan_agp_cleanup(alpha_agp_info *agp)
+static void
+titan_agp_cleanup(alpha_agp_info *agp)
 {
 	struct titan_agp_aperture *aper = agp->aperture.sysdata;
 	int status;
@@ -623,13 +627,15 @@ static void titan_agp_cleanup(alpha_agp_info *agp)
 		status = iommu_release(aper->arena, aper->pg_start, 
 				       aper->pg_count);
 	}
-	if (status < 0) printk(KERN_ERR "Failed to release AGP memory\n");
+	if (status < 0)
+		printk(KERN_ERR "Failed to release AGP memory\n");
 
 	kfree(aper);
 	kfree(agp);
 }
 
-static int titan_agp_configure(alpha_agp_info *agp)
+static int
+titan_agp_configure(alpha_agp_info *agp)
 {
 	union TPAchipPCTL pctl;
 	titan_pachip_port *port = agp->private;
@@ -652,19 +658,19 @@ static int titan_agp_configure(alpha_agp_info *agp)
 	pctl.pctl_r_bits.apctl_v_agp_lp_rd = 7;
 
 	/*
-	 * AGP Enable
+	 * AGP Enable.
 	 */
 	pctl.pctl_r_bits.apctl_v_agp_en = agp->mode.bits.enable;
 
-	/* Tell the user... */
+	/* Tell the user.  */
 	printk("Enabling AGP: %dX%s\n", 
 	       1 << pctl.pctl_r_bits.apctl_v_agp_rate,
 	       pctl.pctl_r_bits.apctl_v_agp_sba_en ? " - SBA" : "");
 	       
-	/* Write it */
+	/* Write it.  */
 	port->pctl.csr = pctl.pctl_q_whole;
 	
-	/* And wait at least 5000 66MHz cycles (per Titan spec) */
+	/* And wait at least 5000 66MHz cycles (per Titan spec).  */
 	udelay(100);
 
 	return 0;
@@ -721,7 +727,6 @@ struct alpha_agp_ops titan_agp_ops =
 alpha_agp_info *
 titan_agp_info(void)
 {
-	extern struct pci_controller *hose_head;
 	alpha_agp_info *agp;
 	struct pci_controller *hose;
 	titan_pachip_port *port;
@@ -729,7 +734,7 @@ titan_agp_info(void)
 	union TPAchipPCTL pctl;
 
 	/*
-	 * Find the AGP port
+	 * Find the AGP port.
 	 */
 	port = &TITAN_pachip0->a_port;
 	if (titan_query_agp(port))
@@ -739,21 +744,22 @@ titan_agp_info(void)
 		hosenum = 3;
 	
 	/*
-	 * Find the hose the port is on
+	 * Find the hose the port is on.
 	 */
-	for(hose = hose_head; hose; hose = hose->next) {
-		if (hose->index == hosenum) break;
-	}
+	for (hose = hose_head; hose; hose = hose->next)
+		if (hose->index == hosenum)
+			break;
 
-	if (!hose || !hose->sg_pci) return NULL;
+	if (!hose || !hose->sg_pci)
+		return NULL;
 
 	/*
-	 * Allocate the info structure
+	 * Allocate the info structure.
 	 */
 	agp = kmalloc(sizeof(*agp), GFP_KERNEL);
 
 	/*
-	 * Fill it in
+	 * Fill it in.
 	 */
 	agp->type = 0 /* FIXME: ALPHA_CORE_AGP */;
 	agp->hose = hose;
@@ -761,7 +767,7 @@ titan_agp_info(void)
 	agp->ops = &titan_agp_ops;
 
 	/*
-	 * Aperture - not configured until ops.setup()
+	 * Aperture - not configured until ops.setup().
 	 *
 	 * FIXME - should we go ahead and allocate it here?
 	 */
@@ -770,7 +776,7 @@ titan_agp_info(void)
 	agp->aperture.sysdata = NULL;
 
 	/*
-	 * Capabilities
+	 * Capabilities.
 	 */
 	agp->capability.lw = 0;
 	agp->capability.bits.rate = 3; 	/* 2x, 1x */
@@ -778,7 +784,7 @@ titan_agp_info(void)
 	agp->capability.bits.rq = 7;	/* 8 - 1 */
 
 	/*
-	 * Mode
+	 * Mode.
 	 */
 	pctl.pctl_q_whole = port->pctl.csr;
 	agp->mode.lw = 0;
@@ -789,4 +795,3 @@ titan_agp_info(void)
 
 	return agp;
 }
-#endif /* CONFIG_ALPHA_CORE_AGP */

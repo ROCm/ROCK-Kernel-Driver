@@ -1,8 +1,9 @@
 /*
- * linux/arch/alpha/kernel/sys_io7.c
+ * linux/arch/alpha/kernel/sys_marvel.c
  *
  * Marvel / IO7 support
  */
+
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/mm.h>
@@ -30,15 +31,7 @@
 
 
 /*
- * private functions in core_marvel.c
- */
-struct io7 *marvel_find_io7(int pe);
-struct io7 *marvel_next_io7(struct io7 *prev);
-void io7_clear_errors(struct io7 *io7);
-
-
-/*
- * Interrupt handling
+ * Interrupt handling.
  */
 #define IRQ_VEC_PE_SHIFT (10)
 #define IRQ_VEC_IRQ_MASK ((1 << IRQ_VEC_PE_SHIFT) - 1)
@@ -161,12 +154,14 @@ io7_end_irq(unsigned int irq)
 		io7_enable_irq(irq);
 }
 
-static void marvel_irq_noop(unsigned int irq) 
+static void
+marvel_irq_noop(unsigned int irq) 
 { 
 	return; 
 }
 
-static unsigned int marvel_irq_noop_return(unsigned int irq) 
+static unsigned int
+marvel_irq_noop_return(unsigned int irq) 
 { 
 	return 0; 
 }
@@ -291,7 +286,7 @@ init_io7_irqs(struct io7 *io7,
 	 * traverse the mesh, but if it's not an SMP kernel, they have to
 	 * go to the boot CPU. Send them all to the boot CPU for now,
 	 * as each secondary starts, it can redirect it's local device 
-	 * interrupts
+	 * interrupts.
 	 */
 	printk("  Interrupts reported to CPU at PE %u\n", boot_cpuid);
 
@@ -304,27 +299,27 @@ init_io7_irqs(struct io7 *io7,
 	io7_redirect_irq(io7, &io7->csrs->STV_CTL.csr, boot_cpuid);
 	io7_redirect_irq(io7, &io7->csrs->HEI_CTL.csr, boot_cpuid);
 
-	/* set up the lsi irqs */
-	for(i = 0; i < 128; ++i) {
+	/* Set up the lsi irqs.  */
+	for (i = 0; i < 128; ++i) {
 		irq_desc[base + i].status = IRQ_DISABLED | IRQ_LEVEL;
 		irq_desc[base + i].handler = lsi_ops;
 	}
 
-	/* disable the implemented irqs in hardware */
-	for(i = 0; i < 0x60; ++i) 
+	/* Disable the implemented irqs in hardware.  */
+	for (i = 0; i < 0x60; ++i) 
 		init_one_io7_lsi(io7, i, boot_cpuid);
 
 	init_one_io7_lsi(io7, 0x74, boot_cpuid);
 	init_one_io7_lsi(io7, 0x75, boot_cpuid);
 
 
-	/* set up the msi irqs */
-	for(i = 128; i < (128 + 512); ++i) {
+	/* Set up the msi irqs.  */
+	for (i = 128; i < (128 + 512); ++i) {
 		irq_desc[base + i].status = IRQ_DISABLED | IRQ_LEVEL;
 		irq_desc[base + i].handler = msi_ops;
 	}
 
-	for(i = 0; i < 16; ++i)
+	for (i = 0; i < 16; ++i)
 		init_one_io7_msi(io7, i, boot_cpuid);
 
 	spin_unlock(&io7->irq_lock);
@@ -336,16 +331,15 @@ marvel_init_irq(void)
 	int i;
 	struct io7 *io7 = NULL;
 
-	/* reserve the legacy irqs */
-	for(i = 0; i < 16; ++i) {
+	/* Reserve the legacy irqs.  */
+	for (i = 0; i < 16; ++i) {
 		irq_desc[i].status = IRQ_DISABLED;
 		irq_desc[i].handler = &marvel_legacy_irq_type;
 	}
 
-	/* init the io7 irqs */
-	for(io7 = NULL; (io7 = marvel_next_io7(io7)) != NULL; ) {
+	/* Init the io7 irqs.  */
+	for (io7 = NULL; (io7 = marvel_next_io7(io7)) != NULL; )
 		init_io7_irqs(io7, &io7_lsi_irq_type, &io7_msi_irq_type);
-	}
 }
 
 static int 
@@ -401,7 +395,6 @@ marvel_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 		printk("  forcing LSI interrupt on irq %d [0x%x]\n", irq, irq);
 #endif
-
 	}
 
 	irq += 16;				/* offset for legacy */
@@ -413,7 +406,6 @@ marvel_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 static void __init
 marvel_init_pci(void)
 {
-	extern int pci_probe_only;
 	struct io7 *io7;
 
 	marvel_register_error_handlers();
@@ -425,8 +417,8 @@ marvel_init_pci(void)
 	locate_and_init_vga(NULL);
 #endif
 
-	/* clear any io7 errors */
-	for(io7 = NULL; (io7 = marvel_next_io7(io7)) != NULL; ) 
+	/* Clear any io7 errors.  */
+	for (io7 = NULL; (io7 = marvel_next_io7(io7)) != NULL; ) 
 		io7_clear_errors(io7);
 }
 
@@ -443,37 +435,36 @@ marvel_smp_callin(void)
 	struct io7 *io7 = marvel_find_io7(cpuid);
 	unsigned int i;
 
-	if (io7) {
-		/* 
-		 * There is a local IO7 - redirect all of it's interrupts here
-		 */
-		printk("Redirecting IO7 interrupts to local CPU at PE %u\n",
-		       cpuid);
+	if (!io7)
+		return;
 
-		/* redirect the error IRQS here */
-		io7_redirect_irq(io7, &io7->csrs->HLT_CTL.csr, cpuid);
-		io7_redirect_irq(io7, &io7->csrs->HPI_CTL.csr, cpuid);
-		io7_redirect_irq(io7, &io7->csrs->CRD_CTL.csr, cpuid);
-		io7_redirect_irq(io7, &io7->csrs->STV_CTL.csr, cpuid);
-		io7_redirect_irq(io7, &io7->csrs->HEI_CTL.csr, cpuid);
+	/* 
+	 * There is a local IO7 - redirect all of it's interrupts here.
+	 */
+	printk("Redirecting IO7 interrupts to local CPU at PE %u\n", cpuid);
 
-		/* redirect the implemented LSIs here */
-		for(i = 0; i < 0x60; ++i) 
-			io7_redirect_one_lsi(io7, i, cpuid);
+	/* Redirect the error IRQS here.  */
+	io7_redirect_irq(io7, &io7->csrs->HLT_CTL.csr, cpuid);
+	io7_redirect_irq(io7, &io7->csrs->HPI_CTL.csr, cpuid);
+	io7_redirect_irq(io7, &io7->csrs->CRD_CTL.csr, cpuid);
+	io7_redirect_irq(io7, &io7->csrs->STV_CTL.csr, cpuid);
+	io7_redirect_irq(io7, &io7->csrs->HEI_CTL.csr, cpuid);
 
-		io7_redirect_one_lsi(io7, 0x74, cpuid);
-		io7_redirect_one_lsi(io7, 0x75, cpuid);
+	/* Redirect the implemented LSIs here.  */
+	for (i = 0; i < 0x60; ++i) 
+		io7_redirect_one_lsi(io7, i, cpuid);
 
-		/* redirect the MSIs here */
-		for(i = 0; i < 16; ++i)
-			io7_redirect_one_msi(io7, i, cpuid);
-	}
+	io7_redirect_one_lsi(io7, 0x74, cpuid);
+	io7_redirect_one_lsi(io7, 0x75, cpuid);
+
+	/* Redirect the MSIs here.  */
+	for (i = 0; i < 16; ++i)
+		io7_redirect_one_msi(io7, i, cpuid);
 }
 
 /*
  * System Vectors
  */
-extern void *marvel_agp_info(void);
 struct alpha_machine_vector marvel_ev7_mv __initmv = {
 	.vector_name		= "MARVEL/EV7",
 	DO_EV7_MMU,
@@ -506,5 +497,3 @@ struct alpha_machine_vector marvel_ev7_mv __initmv = {
 	.node_mem_size		= marvel_node_mem_size,
 };
 ALIAS_MV(marvel_ev7)
-
-
