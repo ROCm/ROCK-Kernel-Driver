@@ -695,7 +695,7 @@ void usbfs_add_device(struct usb_device *dev)
 	for (i = 0; i < dev->descriptor.bNumConfigurations; ++i) {
 		struct usb_config_descriptor *config =
 			(struct usb_config_descriptor *)dev->rawdescriptors[i];
-		i_size += le16_to_cpu ((__force __le16)config->wTotalLength);
+		i_size += le16_to_cpu(config->wTotalLength);
 	}
 	if (dev->usbfs_dentry->d_inode)
 		dev->usbfs_dentry->d_inode->i_size = i_size;

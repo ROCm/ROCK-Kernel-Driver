@@ -1189,7 +1189,7 @@ int usb_new_device(struct usb_device *udev)
 
 		/* descriptor may appear anywhere in config */
 		if (__usb_get_extra_descriptor (udev->rawdescriptors[0],
-					udev->config[0].desc.wTotalLength,
+					le16_to_cpu(udev->config[0].desc.wTotalLength),
 					USB_DT_OTG, (void **) &desc) == 0) {
 			if (desc->bmAttributes & USB_OTG_HNP) {
 				unsigned		port1;
@@ -2828,8 +2828,8 @@ static int config_descriptors_changed(struct usb_device *udev)
 	struct usb_config_descriptor	*buf;
 
 	for (index = 0; index < udev->descriptor.bNumConfigurations; index++) {
-		if (len < udev->config[index].desc.wTotalLength)
-			len = udev->config[index].desc.wTotalLength;
+		if (len < le16_to_cpu(udev->config[index].desc.wTotalLength))
+			len = le16_to_cpu(udev->config[index].desc.wTotalLength);
 	}
 	buf = kmalloc (len, SLAB_KERNEL);
 	if (buf == 0) {
@@ -2839,7 +2839,7 @@ static int config_descriptors_changed(struct usb_device *udev)
 	}
 	for (index = 0; index < udev->descriptor.bNumConfigurations; index++) {
 		int length;
-		int old_length = udev->config[index].desc.wTotalLength;
+		int old_length = le16_to_cpu(udev->config[index].desc.wTotalLength);
 
 		length = usb_get_descriptor(udev, USB_DT_CONFIG, index, buf,
 				old_length);

@@ -148,7 +148,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 			/* The descriptor may claim to be longer than it
 			 * really is.  Here is the actual allocated length. */
 			unsigned alloclen =
-				dev->config[i].desc.wTotalLength;
+				le16_to_cpu(dev->config[i].desc.wTotalLength);
 
 			len = length - (*ppos - pos);
 			if (len > nbytes)

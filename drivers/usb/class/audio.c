@@ -3801,7 +3801,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 	 * find which configuration number is active
 	 */
 	buffer = dev->rawdescriptors[dev->actconfig - dev->config];
-	buflen = dev->actconfig->desc.wTotalLength;
+	buflen = le16_to_cpu(dev->actconfig->desc.wTotalLength);
 	s = usb_audio_parsecontrol(dev, buffer, buflen, intf->altsetting->desc.bInterfaceNumber);
 	if (s) {
 		usb_set_intfdata (intf, s);

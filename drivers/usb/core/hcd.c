@@ -170,7 +170,7 @@ static const u8 fs_rh_config_descriptor [] = {
 	/* one configuration */
 	0x09,       /*  __u8  bLength; */
 	0x02,       /*  __u8  bDescriptorType; Configuration */
-	0x19, 0x00, /*  __u16 wTotalLength; */
+	0x19, 0x00, /*  __le16 wTotalLength; */
 	0x01,       /*  __u8  bNumInterfaces; (1) */
 	0x01,       /*  __u8  bConfigurationValue; */
 	0x00,       /*  __u8  iConfiguration; */
@@ -217,7 +217,7 @@ static const u8 hs_rh_config_descriptor [] = {
 	/* one configuration */
 	0x09,       /*  __u8  bLength; */
 	0x02,       /*  __u8  bDescriptorType; Configuration */
-	0x19, 0x00, /*  __u16 wTotalLength; */
+	0x19, 0x00, /*  __le16 wTotalLength; */
 	0x01,       /*  __u8  bNumInterfaces; (1) */
 	0x01,       /*  __u8  bConfigurationValue; */
 	0x00,       /*  __u8  iConfiguration; */

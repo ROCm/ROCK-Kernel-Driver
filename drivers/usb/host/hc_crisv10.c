@@ -136,7 +136,7 @@ static __u8 root_hub_config_des[] =
 {
 	0x09,  /*  __u8  bLength; */
 	0x02,  /*  __u8  bDescriptorType; Configuration */
-	0x19,  /*  __u16 wTotalLength; */
+	0x19,  /*  __le16 wTotalLength; */
 	0x00,
 	0x01,  /*  __u8  bNumInterfaces; */
 	0x01,  /*  __u8  bConfigurationValue; */

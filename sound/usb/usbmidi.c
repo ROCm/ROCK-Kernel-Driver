@@ -59,7 +59,7 @@ struct usb_ms_header_descriptor {
 	__u8  bDescriptorType;
 	__u8  bDescriptorSubtype;
 	__u8  bcdMSC[2];
-	__u16 wTotalLength;
+	__le16 wTotalLength;
 } __attribute__ ((packed));
 
 struct usb_ms_endpoint_descriptor {

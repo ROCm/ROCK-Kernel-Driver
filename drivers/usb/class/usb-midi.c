@@ -1804,7 +1804,7 @@ static int detect_yamaha_device( struct usb_device *d,
 
 	i = d->actconfig - d->config;
 	buffer = d->rawdescriptors[i];
-	bufSize = d->actconfig->desc.wTotalLength;
+	bufSize = le16_to_cpu(d->actconfig->desc.wTotalLength);
 
 	u = parse_descriptor( d, buffer, bufSize, ifnum, alts, 1);
 	if ( u == NULL ) {
@@ -1892,7 +1892,7 @@ static int detect_midi_subclass(struct usb_device *d,
 
 	i = d->actconfig - d->config;
 	buffer = d->rawdescriptors[i];
-	bufSize = d->actconfig->desc.wTotalLength;
+	bufSize = le16_to_cpu(d->actconfig->desc.wTotalLength);
 
 	u = parse_descriptor( d, buffer, bufSize, ifnum, alts, 0);
 	if ( u == NULL ) {

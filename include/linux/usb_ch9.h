@@ -208,7 +208,7 @@ struct usb_config_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 wTotalLength;
+	__le16 wTotalLength;
 	__u8  bNumInterfaces;
 	__u8  bConfigurationValue;
 	__u8  iConfiguration;

@@ -766,7 +766,7 @@ do_get_descriptor(struct usb_dev* dev, struct usb_ctrlrequest* setup)
 							 dev->conf_desc),
 					    0);
 				} else {
-				int len = dev->conf_desc->wTotalLength;
+				int len = le16_to_cpu(dev->conf_desc->wTotalLength);
 				dbg("sending whole config desc,"
 				    " size=%d, our size=%d", desc_len, len);
 				desc_len = desc_len > len ? len : desc_len;
@@ -1407,7 +1407,7 @@ usbdev_init(struct usb_device_descriptor* dev_desc,
 	/*
 	 * initialize the full config descriptor
 	 */
-	usbdev.full_conf_desc = fcd = kmalloc(config_desc->wTotalLength,
+	usbdev.full_conf_desc = fcd = kmalloc(le16_to_cpu(config_desc->wTotalLength),
 					      ALLOC_FLAGS);
 	if (!fcd) {
 		err("failed to alloc full config descriptor");

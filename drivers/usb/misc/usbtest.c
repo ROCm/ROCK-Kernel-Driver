@@ -527,10 +527,9 @@ static int is_good_config (char *buf, int len)
 		return 0;
 	}
 
-	le16_to_cpus (&config->wTotalLength);
-	if (config->wTotalLength == len)		/* read it all */
+	if (le16_to_cpu(config->wTotalLength) == len)		/* read it all */
 		return 1;
-	if (config->wTotalLength >= TBUF_SIZE)		/* max partial read */
+	if (le16_to_cpu(config->wTotalLength) >= TBUF_SIZE)		/* max partial read */
 		return 1;
 	dbg ("bogus config descriptor read size");
 	return 0;
