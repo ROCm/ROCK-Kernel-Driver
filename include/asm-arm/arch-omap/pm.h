@@ -35,8 +35,8 @@
  * More ones like CP and general purpose register values are preserved
  * with the stack pointer in sleep.S.
  */
-#ifndef __ASM_ARCH_OMAP1510_PM_H
-#define __ASM_ARCH_OMAP1510_PM_H
+#ifndef __ASM_ARCH_OMAP_PM_H
+#define __ASM_ARCH_OMAP_PM_H
 
 #define ARM_REG_BASE		(0xfffece00)
 #define ARM_ASM_IDLECT1		(ARM_REG_BASE + 0x4)
@@ -50,29 +50,53 @@
 #define TCMIF_BASE		0xfffecc00
 #define EMIFS_ASM_CONFIG_REG	(TCMIF_BASE + 0x0c)
 #define EMIFF_ASM_SDRAM_CONFIG	(TCMIF_BASE + 0x20)
-#define IRQ_MIR1	(volatile unsigned int *)(OMAP_IH1_BASE + IRQ_MIR)
-#define IRQ_MIR2	(volatile unsigned int *)(OMAP_IH2_BASE + IRQ_MIR)
+#define IRQ_MIR1		(OMAP_IH1_BASE + IRQ_MIR)
 
-#define IDLE_WAIT_CYCLES		0x000000ff
+#ifdef CONFIG_ARCH_OMAP1510
+#define IRQ_MIR2		(OMAP_IH2_BASE + IRQ_MIR)
+#else /* CONFIG_ARCH_OMAP1610 */
+#define IRQ_MIR2_0		(OMAP_IH2_0_BASE + IRQ_MIR)
+#define IRQ_MIR2_1		(OMAP_IH2_1_BASE + IRQ_MIR)
+#define IRQ_MIR2_2		(OMAP_IH2_2_BASE + IRQ_MIR)
+#define IRQ_MIR2_3		(OMAP_IH2_3_BASE + IRQ_MIR)
+#endif
+
+#define IDLE_WAIT_CYCLES		0x00000fff
 #define PERIPHERAL_ENABLE		0x2
+
+#ifdef CONFIG_ARCH_OMAP1510
+#define DEEP_SLEEP_REQUEST		0x0ec7
 #define BIG_SLEEP_REQUEST		0x0cc5
 #define IDLE_LOOP_REQUEST		0x0c00
+#define IDLE_CLOCK_DOMAINS		0x2
+#else /* CONFIG_ARCH_OMAP1610 */
+#define DEEP_SLEEP_REQUEST		0x17c7
+#define BIG_SLEEP_REQUEST		TBD
+#define IDLE_LOOP_REQUEST		0x0400
+#define IDLE_CLOCK_DOMAINS		0x09c7
+#endif
+
 #define SELF_REFRESH_MODE		0x0c000001
 #define IDLE_EMIFS_REQUEST		0xc
-#define IDLE_CLOCK_DOMAINS		0x2
 #define MODEM_32K_EN			0x1
 
 #ifndef __ASSEMBLER__
-extern void omap1510_pm_idle(void);
+extern void omap_pm_idle(void);
 extern void omap_pm_suspend(void);
-extern int omap1510_cpu_suspend(void);
-extern int omap1510_idle_loop_suspend(void);
+extern int omap_cpu_suspend(unsigned short, unsigned short);
+extern int omap_idle_loop_suspend(void);
 extern struct async_struct *omap_pm_sercons;
 extern unsigned int serial_in(struct async_struct *, int);
 extern unsigned int serial_out(struct async_struct *, int, int);
 
-#define OMAP1510_SRAM_IDLE_SUSPEND	0xd002F000
-#define OMAP1510_SRAM_API_SUSPEND	0xd002F200
+#ifdef CONFIG_ARCH_OMAP1510
+#define OMAP_SRAM_IDLE_SUSPEND	0xd002F000
+#define OMAP_SRAM_API_SUSPEND	0xd002F200
+#else /* CONFIG_ARCH_OMAP1610 */
+#define OMAP_SRAM_IDLE_SUSPEND	0xd0000400
+#define OMAP_SRAM_API_SUSPEND	0xd0000600
+#endif
+
 #define CPU_SUSPEND_SIZE	200
 #define ARM_REG_BASE		(0xfffece00)
 #define ARM_ASM_IDLECT1		(ARM_REG_BASE + 0x4)
@@ -82,10 +106,17 @@ extern unsigned int serial_out(struct async_struct *, int, int);
 #define ARM_ASM_SYSST		(ARM_REG_BASE + 0x18)
 
 #define TCMIF_BASE		0xfffecc00
-#define PM_EMIFS_CONFIG_REG	   (volatile unsigned int *)(TCMIF_BASE + 0x0c)
-#define PM_EMIFF_SDRAM_CONFIG	   (volatile unsigned int *)(TCMIF_BASE + 0x20)
+#define PM_EMIFS_CONFIG_REG	(TCMIF_BASE + 0x0c)
+#define PM_EMIFF_SDRAM_CONFIG	(TCMIF_BASE + 0x20)
+#define FUNC_MUX_CTRL_LOW_PWR	(0xfffe1020)
 
-#define ULPD_LOW_POWER_REQ		0x3
+#ifdef CONFIG_ARCH_OMAP1510
+#define ULPD_LOW_POWER_REQ             0x0001
+#else /* CONFIG_ARCH_OMAP1610 */
+#define ULPD_LOW_POWER_REQ             0x3
+#endif
+#define ULPD_LOW_PWR                   0x1000
+#define ULPD_LOW_POWER_EN              0x0001
 
 #define DSP_IDLE_DELAY			10
 #define DSP_IDLE			0x0040
@@ -98,16 +129,16 @@ extern unsigned int serial_out(struct async_struct *, int, int);
 #define EMIFF_CONFIG_REG		EMIFF_SDRAM_CONFIG
 
 
-#define ARM_SAVE(x) arm_sleep_save[ARM_SLEEP_SAVE_##x] = (unsigned short)*x
-#define ARM_RESTORE(x) *x = (unsigned short)arm_sleep_save[ARM_SLEEP_SAVE_##x]
+#define ARM_SAVE(x) arm_sleep_save[ARM_SLEEP_SAVE_##x] = omap_readw(x)
+#define ARM_RESTORE(x) omap_writew((unsigned short)arm_sleep_save[ARM_SLEEP_SAVE_##x], x)
 #define ARM_SHOW(x) arm_sleep_save[ARM_SLEEP_SAVE_##x]
 
-#define ULPD_SAVE(x) ulpd_sleep_save[ULPD_SLEEP_SAVE_##x] = (unsigned short)*x
-#define ULPD_RESTORE(x) *x = (unsigned short)ulpd_sleep_save[ULPD_SLEEP_SAVE_##x]
+#define ULPD_SAVE(x) ulpd_sleep_save[ULPD_SLEEP_SAVE_##x] = omap_readw(x)
+#define ULPD_RESTORE(x) omap_writew((unsigned short)ulpd_sleep_save[ULPD_SLEEP_SAVE_##x], x)
 #define ULPD_SHOW(x) ulpd_sleep_save[ULPD_SLEEP_SAVE_##x]
 
-#define MPUI_SAVE(x) mpui_sleep_save[MPUI_SLEEP_SAVE_##x] = (unsigned int)*x
-#define MPUI_RESTORE(x) *x = (unsigned int)mpui_sleep_save[MPUI_SLEEP_SAVE_##x]
+#define MPUI_SAVE(x) mpui_sleep_save[MPUI_SLEEP_SAVE_##x] = omap_readl(x)
+#define MPUI_RESTORE(x) omap_writel((unsigned int)mpui_sleep_save[MPUI_SLEEP_SAVE_##x], x)
 #define MPUI_SHOW(x) (unsigned int)mpui_sleep_save[MPUI_SLEEP_SAVE_##x]
 
 enum arm_save_state {
@@ -124,7 +155,7 @@ enum arm_save_state {
 };
 
 enum ulpd_save_state {
-	ULDP_SLEEP_SAVE_START = 0,
+	ULPD_SLEEP_SAVE_START = 0,
 	ULPD_SLEEP_SAVE_ULPD_IT_STATUS_REG, ULPD_SLEEP_SAVE_ULPD_CLOCK_CTRL_REG,
 	ULPD_SLEEP_SAVE_ULPD_SOFT_REQ_REG, ULPD_SLEEP_SAVE_ULPD_STATUS_REQ_REG,
 	ULPD_SLEEP_SAVE_ULPD_DPLL_CTRL_REG, ULPD_SLEEP_SAVE_ULPD_POWER_CTRL_REG,
@@ -140,7 +171,15 @@ enum mpui_save_state {
 	MPUI_SLEEP_SAVE_MPUI_DSP_STATUS_REG,
 	MPUI_SLEEP_SAVE_PM_EMIFF_SDRAM_CONFIG,
 	MPUI_SLEEP_SAVE_PM_EMIFS_CONFIG_REG,
-	MPUI_SLEEP_SAVE_IRQ_MIR1, MPUI_SLEEP_SAVE_IRQ_MIR2,
+	MPUI_SLEEP_SAVE_IRQ_MIR1,
+#ifdef CONFIG_ARCH_OMAP1510
+	MPUI_SLEEP_SAVE_IRQ_MIR2,
+#else /* CONFIG_ARCH_OMAP1610 */
+	MPUI_SLEEP_SAVE_IRQ_MIR2_0,
+	MPUI_SLEEP_SAVE_IRQ_MIR2_1,
+	MPUI_SLEEP_SAVE_IRQ_MIR2_2,
+	MPUI_SLEEP_SAVE_IRQ_MIR2_3,
+#endif
 
 	MPUI_SLEEP_SAVE_SIZE
 };

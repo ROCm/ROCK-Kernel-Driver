@@ -259,4 +259,8 @@ extern void omap_init_irq(void);
  */
 #include <asm/arch/hardware.h>
 
+#ifndef NR_IRQS
+#define NR_IRQS                 256
+#endif
+
 #endif

@@ -1,8 +1,8 @@
-/* linux/include/asm-arm/arch-omap/omap1510.h
+/* linux/include/asm-arm/arch-omap/omap5912.h
  *
- * Hardware definitions for TI OMAP1510 processor.
+ * Hardware definitions for TI OMAP5912 processor.
  *
- * Cleanup for Linux-2.6 by Dirk Behme <dirk.behme@de.bosch.com>
+ * Written by Dirk Behme <dirk.behme@de.bosch.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,8 +25,8 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef __ASM_ARCH_OMAP1510_H
-#define __ASM_ARCH_OMAP1510_H
+#ifndef __ASM_ARCH_OMAP5912_H
+#define __ASM_ARCH_OMAP5912_H
 
 /*
  * ----------------------------------------------------------------------------
@@ -36,27 +36,26 @@
 
 /* Syntax: XX_BASE = Virtual base address, XX_START = Physical base address */
 
-#define OMAP1510_SRAM_BASE	0xD0000000
-#define OMAP1510_SRAM_SIZE	(SZ_128K + SZ_64K)
-#define OMAP1510_SRAM_START	0x20000000
+/* OMAP5912 internal SRAM size is 250kByte */
+#define OMAP5912_SRAM_BASE	0xD0000000
+#define OMAP5912_SRAM_SIZE	0x3E800
+#define OMAP5912_SRAM_START	0x20000000
 
-#define OMAP1510_MCBSP1_BASE	0xE1011000
-#define OMAP1510_MCBSP1_SIZE	SZ_4K
-#define OMAP1510_MCBSP1_START	0xE1011000
+#define OMAP5912_DSP_BASE	0xE0000000
+#define OMAP5912_DSP_SIZE	0x50000
+#define OMAP5912_DSP_START	0xE0000000
 
-#define OMAP1510_MCBSP2_BASE	0xFFFB1000
+#define OMAP5912_DSPREG_BASE	0xE1000000
+#define OMAP5912_DSPREG_SIZE	SZ_128K
+#define OMAP5912_DSPREG_START	0xE1000000
 
-#define OMAP1510_MCBSP3_BASE	0xE1017000
-#define OMAP1510_MCBSP3_SIZE	SZ_4K
-#define OMAP1510_MCBSP3_START	0xE1017000
+/*
+ * ----------------------------------------------------------------------------
+ * System control registers
+ * ----------------------------------------------------------------------------
+ */
 
-#define OMAP1510_DSP_BASE	0xE0000000
-#define OMAP1510_DSP_SIZE	0x28000
-#define OMAP1510_DSP_START	0xE0000000
+#define OMAP5912_ARM_IDLECT3		(CLKGEN_RESET_BASE + 0x24)
 
-#define OMAP1510_DSPREG_BASE	0xE1000000
-#define OMAP1510_DSPREG_SIZE	SZ_128K
-#define OMAP1510_DSPREG_START	0xE1000000
-
-#endif /*  __ASM_ARCH_OMAP1510_H */
+#endif /*  __ASM_ARCH_OMAP5912_H */
 

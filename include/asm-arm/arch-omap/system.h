@@ -14,7 +14,7 @@ static inline void arch_idle(void)
 
 static inline void arch_reset(char mode)
 {
-	*(volatile u16 *)(ARM_RSTCT1) = 1;
+	omap_writew(1, ARM_RSTCT1);
 }
 
 #endif
