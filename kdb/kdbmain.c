@@ -1677,6 +1677,9 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
  *	  release all the cpus at once.
  */
 
+#ifdef __i386__
+asmlinkage
+#endif
 int
 kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 {

@@ -184,8 +184,8 @@ typedef struct __kdb_jmp_buf {
         unsigned long   regs[6];	/* kdba_setjmp assumes fixed offsets here */
 } kdb_jmp_buf;
 
-extern int kdba_setjmp(kdb_jmp_buf *);
-extern void kdba_longjmp(kdb_jmp_buf *, int);
+extern int asmlinkage kdba_setjmp(kdb_jmp_buf *);
+extern void asmlinkage kdba_longjmp(kdb_jmp_buf *, int);
 
 extern kdb_jmp_buf  *kdbjmpbuf;
 #endif	/* KDB_HAVE_LONGJMP */

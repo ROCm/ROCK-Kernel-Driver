@@ -183,7 +183,10 @@ typedef enum {
 } kdb_repeat_t;
 
 #ifdef	CONFIG_KDB
-extern int   kdb(kdb_reason_t, int, struct pt_regs *);
+#ifdef __i386__
+asmlinkage
+#endif
+int kdb(kdb_reason_t, int, struct pt_regs *);
 #else
 #define kdb(reason,error_code,frame) (0)
 #endif

@@ -1108,7 +1108,7 @@ kdba_clearsinglestep(struct pt_regs *regs)
 }
 
 #ifdef	KDB_HAVE_LONGJMP
-int
+int asmlinkage
 kdba_setjmp(kdb_jmp_buf *jb)
 {
 #if defined(CONFIG_FRAME_POINTER)
@@ -1136,7 +1136,7 @@ kdba_setjmp(kdb_jmp_buf *jb)
 	return 0;
 }
 
-void
+void asmlinkage
 kdba_longjmp(kdb_jmp_buf *jb, int reason)
 {
 #if defined(CONFIG_FRAME_POINTER)
