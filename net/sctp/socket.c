@@ -3114,6 +3114,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 	struct sctp_bind_bucket *pp;
 
 	pp = kmem_cache_alloc(sctp_bucket_cachep, SLAB_ATOMIC);
+	SCTP_DBG_OBJCNT_INC(bind_bucket);
 	if (pp) {
 		pp->port = snum;
 		pp->fastreuse = 0;
@@ -3129,11 +3130,12 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 /* Caller must hold hashbucket lock for this tb with local BH disabled */
 static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 {
-	if (pp->sk) {
+	if (!pp->sk) {
 		if (pp->next)
 			pp->next->pprev = pp->pprev;
 		*(pp->pprev) = pp->next;
 		kmem_cache_free(sctp_bucket_cachep, pp);
+		SCTP_DBG_OBJCNT_DEC(bind_bucket);
 	}
 }
 

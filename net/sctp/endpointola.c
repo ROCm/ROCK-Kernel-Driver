@@ -209,7 +209,7 @@ void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 	sctp_bind_addr_free(&ep->base.bind_addr);
 
 	/* Remove and free the port */
-	if (ep->base.sk->prev != NULL)
+	if (ep->base.sk->prev)
 		sctp_put_port(ep->base.sk);
 
 	/* Give up our hold on the sock. */

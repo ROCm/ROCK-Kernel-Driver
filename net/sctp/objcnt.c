@@ -52,6 +52,7 @@ SCTP_DBG_OBJCNT(ep);
 SCTP_DBG_OBJCNT(transport);
 SCTP_DBG_OBJCNT(assoc);
 SCTP_DBG_OBJCNT(bind_addr);
+SCTP_DBG_OBJCNT(bind_bucket);
 SCTP_DBG_OBJCNT(chunk);
 SCTP_DBG_OBJCNT(addr);
 SCTP_DBG_OBJCNT(ssnmap);
@@ -67,6 +68,7 @@ sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
 	SCTP_DBG_OBJCNT_ENTRY(transport),
 	SCTP_DBG_OBJCNT_ENTRY(chunk),
 	SCTP_DBG_OBJCNT_ENTRY(bind_addr),
+	SCTP_DBG_OBJCNT_ENTRY(bind_bucket),
 	SCTP_DBG_OBJCNT_ENTRY(addr),
 	SCTP_DBG_OBJCNT_ENTRY(ssnmap),
 	SCTP_DBG_OBJCNT_ENTRY(datamsg),
