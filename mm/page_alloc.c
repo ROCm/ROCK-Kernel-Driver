@@ -394,12 +394,15 @@ rebalance:
 			if (page)
 				return page;
 		}
+nopage:
+		printk("%s: page allocation failure. order:%d, mode:0x%x\n",
+			current->comm, order, gfp_mask);
 		return NULL;
 	}
 
 	/* Atomic allocations - we can't balance anything */
 	if (!(gfp_mask & __GFP_WAIT))
-		return NULL;
+		goto nopage;
 
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
@@ -422,7 +425,7 @@ rebalance:
 
 	/* Don't let big-order allocations loop */
 	if (order > 3)
-		return NULL;
+		goto nopage;
 
 	/* Yield for kswapd, and try again */
 	__set_current_state(TASK_RUNNING);
