@@ -84,6 +84,10 @@ zimageinitrd-$(CONFIG_GEMINI)		:= zImage.initrd-STRIPELF
          end-$(CONFIG_K2)		:= k2
    cacheflag-$(CONFIG_K2)		:= -include $(clear_L2_L3)
 
+     extra.o-$(CONFIG_KATANA)		:= misc-katana.o mv64x60_stub.o
+         end-$(CONFIG_KATANA)		:= katana
+   cacheflag-$(CONFIG_KATANA)		:= -include $(clear_L2_L3)
+
 # kconfig 'feature', only one of these will ever be 'y' at a time.
 # The rest will be unset.
 motorola := $(CONFIG_MCPN765)$(CONFIG_MVME5100)$(CONFIG_PRPMC750) \

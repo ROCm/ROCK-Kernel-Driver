@@ -500,6 +500,12 @@ config APUS
 	  More information is available at:
 	  <http://linux-apus.sourceforge.net/>.
 
+config KATANA
+	bool "Artesyn-Katana"
+	help
+	  Select KATANA if configuring an Artesyn KATANA 750i or 3750
+	  cPCI board.
+
 config WILLOW
 	bool "Cogent-Willow"
 
@@ -699,6 +705,11 @@ config FORCE
 config GT64260
 	bool
 	depends on EV64260 || CPCI690
+	default y
+
+config MV64360
+	bool
+	depends on KATANA
 	default y
 
 config MV64X60

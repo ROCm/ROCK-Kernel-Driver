@@ -47,6 +47,7 @@ obj-$(CONFIG_GT64260)		+= gt64260_pic.o
 obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 					pci_auto.o
 obj-$(CONFIG_LOPEC)		+= i8259.o pci_auto.o todc_time.o
+obj-$(CONFIG_KATANA)		+= pci_auto.o
 obj-$(CONFIG_MCPN765)		+= todc_time.o indirect_pci.o pci_auto.o \
 					open_pic.o i8259.o hawk_common.o
 obj-$(CONFIG_MENF1)		+= todc_time.o i8259.o mpc10x_common.o \
