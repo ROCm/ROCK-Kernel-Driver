@@ -506,6 +506,9 @@ static int sr_attach(struct scsi_device *sdev)
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
 		return 1;
 
+	if (scsi_slave_attach(sdev))
+		return 1;
+
 	cd = kmalloc(sizeof(*cd), GFP_KERNEL);
 	if (!cd)
 		goto fail;
@@ -574,7 +577,7 @@ static int sr_attach(struct scsi_device *sdev)
 fail_free:
 	kfree(cd);
 fail:
-	sdev->attached--;
+	scsi_slave_detach(sdev);
 	return 1;
 }
 
@@ -807,7 +810,7 @@ static void sr_detach(struct scsi_device * SDp)
 	put_disk(cd->disk);
 	unregister_cdrom(&cd->cdi);
 
-	SDp->attached--;
+	scsi_slave_detach(SDp);
 	sr_nr_dev--;
 
 	kfree(cd);

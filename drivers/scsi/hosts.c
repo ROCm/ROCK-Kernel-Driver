@@ -195,10 +195,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 			       sdev->attached);
 			return 1;
 		}
-
-		if (shost->hostt->slave_detach)
-			(*shost->hostt->slave_detach) (sdev);
-
 		devfs_unregister(sdev->de);
 		device_unregister(&sdev->sdev_driverfs_dev);
 	}
@@ -207,7 +203,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 
 	for (sdev = shost->host_queue; sdev;
 	     sdev = shost->host_queue) {
-		scsi_release_commandblocks(sdev);
 		blk_cleanup_queue(&sdev->request_queue);
 		/* Next free up the Scsi_Device structures for this host */
 		shost->host_queue = sdev->next;

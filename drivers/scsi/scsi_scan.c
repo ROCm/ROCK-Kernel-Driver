@@ -1480,15 +1480,6 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 
 	scsi_detect_device(sdev);
 
-	if (sdev->host->hostt->slave_attach != NULL) {
-		if (sdev->host->hostt->slave_attach(sdev) != 0) {
-			printk(KERN_INFO "%s: scsi_add_lun: failed low level driver attach, setting device offline", devname);
-			sdev->online = FALSE;
-		}
-	} else if(sdev->host->cmd_per_lun) {
-		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-	}
-
 	if (sdevnew != NULL)
 		*sdevnew = sdev;
 

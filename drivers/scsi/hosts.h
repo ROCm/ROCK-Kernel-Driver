@@ -93,12 +93,6 @@ typedef struct	SHT
      */
     int (* detect)(struct SHT *);
 
-    /*
-     * This function is only used by one driver and will be going away
-     * once it switches over to using the slave_detach() function instead.
-     */
-    int (*revoke)(Scsi_Device *);
-
     /* Used with loadable modules to unload the host structures.  Note:
      * there is a default action built into the modules code which may
      * be sufficient for most host adapters.  Thus you may not have to supply

@@ -3667,6 +3667,9 @@ static int st_attach(Scsi_Device * SDp)
 		return 1;
 	}
 
+	if (scsi_slave_attach(SDp))
+		return 1;
+
 	i = SDp->host->sg_tablesize;
 	if (st_max_sg_segs < i)
 		i = st_max_sg_segs;
@@ -3692,11 +3695,11 @@ static int st_attach(Scsi_Device * SDp)
 		if (tmp_dev_max > ST_MAX_TAPES)
 			tmp_dev_max = ST_MAX_TAPES;
 		if (tmp_dev_max <= st_nr_dev) {
-			SDp->attached--;
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Too many tape devices (max. %d).\n",
 			       ST_MAX_TAPES);
 			put_disk(disk);
+			scsi_slave_detach(SDp);
 			return 1;
 		}
 
@@ -3707,10 +3710,10 @@ static int st_attach(Scsi_Device * SDp)
 				kfree(tmp_da);
 			if (tmp_ba != NULL)
 				kfree(tmp_ba);
-			SDp->attached--;
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Can't extend device array.\n");
 			put_disk(disk);
+			scsi_slave_detach(SDp);
 			return 1;
 		}
 
@@ -3733,10 +3736,10 @@ static int st_attach(Scsi_Device * SDp)
 
 	tpnt = kmalloc(sizeof(Scsi_Tape), GFP_ATOMIC);
 	if (tpnt == NULL) {
-		SDp->attached--;
 		write_unlock(&st_dev_arr_lock);
 		printk(KERN_ERR "st: Can't allocate device descriptor.\n");
 		put_disk(disk);
+		scsi_slave_detach(SDp);
 		return 1;
 	}
 	memset(tpnt, 0, sizeof(Scsi_Tape));
@@ -3906,7 +3909,7 @@ static void st_detach(Scsi_Device * SDp)
 				tpnt->de_n[mode] = NULL;
 			}
 			scsi_tapes[i] = 0;
-			SDp->attached--;
+			scsi_slave_detach(SDp);
 			st_nr_dev--;
 			write_unlock(&st_dev_arr_lock);
 

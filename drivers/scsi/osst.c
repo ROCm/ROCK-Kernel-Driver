@@ -5421,10 +5421,12 @@ static int osst_attach(Scsi_Device * SDp)
 		return 1;
 
 	if (osst_nr_dev >= osst_dev_max) {
-		 SDp->attached--;
 		 put_disk(disk);
 		 return 1;
 	}
+
+	if (scsi_slave_attach(SDp))
+		return 1;
 	
 	/* find a free minor number */
 	for (i=0; os_scsi_tapes[i] && i<osst_dev_max; i++);
@@ -5433,9 +5435,10 @@ static int osst_attach(Scsi_Device * SDp)
 	/* allocate a OS_Scsi_Tape for this device */
 	tpnt = (OS_Scsi_Tape *)kmalloc(sizeof(OS_Scsi_Tape), GFP_ATOMIC);
 	if (tpnt == NULL) {
-		 SDp->attached--;
 		 printk(KERN_WARNING "osst :W: Can't allocate device descriptor.\n");
 		 put_disk(disk);
+
+		 scsi_slave_detach(SDp);
 		 return 1;
 	}
 	memset(tpnt, 0, sizeof(OS_Scsi_Tape));
@@ -5648,7 +5651,7 @@ static void osst_detach(Scsi_Device * SDp)
 		put_disk(tpnt->disk);
 		kfree(tpnt);
 		os_scsi_tapes[i] = NULL;
-		SDp->attached--;
+		scsi_slave_detach(SDp);
 		osst_nr_dev--;
 		osst_dev_noticed--;
 		return;

@@ -1396,6 +1396,8 @@ sg_attach(Scsi_Device * scsidp)
 
 	if (!disk)
 		return 1;
+	if (scsi_slave_attach(scsidp))
+		return 1;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
 	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
@@ -1405,10 +1407,10 @@ sg_attach(Scsi_Device * scsidp)
 		tmp_da = (Sg_device **)vmalloc(
 				tmp_dev_max * sizeof(Sg_device *));
 		if (NULL == tmp_da) {
-			scsidp->attached--;
 			printk(KERN_ERR
 			       "sg_attach: device array cannot be resized\n");
 			put_disk(disk);
+			scsi_slave_detach(scsidp);
 			return 1;
 		}
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
@@ -1425,7 +1427,6 @@ find_empty_slot:
 		if (!sg_dev_arr[k])
 			break;
 	if (k > SG_MAX_DEVS_MASK) {
-		scsidp->attached--;
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_WARNING
 		       "Unable to attach sg device <%d, %d, %d, %d>"
@@ -1435,6 +1436,7 @@ find_empty_slot:
 		if (NULL != sdp)
 			vfree((char *) sdp);
 		put_disk(disk);
+		scsi_slave_detach(scsidp);
 		return 1;
 	}
 	if (k < sg_dev_max) {
@@ -1448,10 +1450,10 @@ find_empty_slot:
 	} else
 		sdp = NULL;
 	if (NULL == sdp) {
-		scsidp->attached--;
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
 		put_disk(disk);
+		scsi_slave_detach(scsidp);
 		return 1;
 	}
 
@@ -1559,7 +1561,7 @@ sg_detach(Scsi_Device * scsidp)
 			SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d\n", k));
 			sg_dev_arr[k] = NULL;
 		}
-		scsidp->attached--;
+		scsi_slave_detach(scsidp);
 		sg_nr_dev--;
 		sg_dev_noticed--;	/* from <dan@lectra.fr> */
 		break;

@@ -1212,9 +1212,12 @@ static int sd_attach(struct scsi_device * sdp)
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 
+	if (scsi_slave_attach(sdp))
+		goto out;
+
 	sdkp = kmalloc(sizeof(*sdkp), GFP_KERNEL);
 	if (!sdkp)
-		goto out;
+		goto out_detach;
 
 	gd = alloc_disk(16);
 	if (!gd)
@@ -1263,8 +1266,9 @@ static int sd_attach(struct scsi_device * sdp)
 
 out_free:
 	kfree(sdkp);
+out_detach:
+	scsi_slave_detach(sdp);
 out:
-	sdp->attached--;
 	return 1;
 }
 
@@ -1312,7 +1316,7 @@ static void sd_detach(struct scsi_device * sdp)
 
 	sd_devlist_remove(sdkp);
 	del_gendisk(sdkp->disk);
-	sdp->attached--;
+	scsi_slave_detach(sdp);
 	sd_nr_dev--;
 	put_disk(sdkp->disk);
 	kfree(sdkp);
