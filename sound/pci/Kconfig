@@ -147,6 +147,13 @@ config SND_FM801
 	help
 	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards.
 
+config CONFIG_SND_FM801_TEA575X
+	tristate "ForteMedia FM801 + TEA5757 tuner"
+	depends on SND_FM801 || CONFIG_VIDEO_DEV
+	help
+	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards
+          with TEA5757 tuner connected to GPIO1-3 pins (Media Forte SF256-PCS-02).
+
 config SND_ICE1712
 	tristate "ICEnsemble ICE1712 (Envy24)"
 	depends on SND

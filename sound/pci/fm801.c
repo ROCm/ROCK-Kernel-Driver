@@ -32,8 +32,15 @@
 #include <sound/opl3.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+#ifdef CONFIG_SND_FM801_TEA575X
+#endif
 
 #include <asm/io.h>
+
+#if defined(CONFIG_SND_FM801_TEA575X) && (defined(CONFIG_VIDEO_DEV) || defined(CONFIG_VIDEO_DEV_MODULE))
+#include <sound/tea575x-tuner.h>
+#define TEA575X_RADIO 1
+#endif
 
 #define chip_t fm801_t
 
@@ -47,6 +54,14 @@ MODULE_DEVICES("{{ForteMedia,FM801},"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+/*
+ *  Enable TEA575x tuner
+ *    1 = MediaForte 256-PCS
+ *    2 = MediaForte 256-PCPR
+ *    3 = MediaForte 64-PCR
+ *  High 16-bits are video (radio) device number + 1
+ */
+static int tea575x_tuner[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 };
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for the FM801 soundcard.");
@@ -57,6 +72,9 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable FM801 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(tea575x_tuner, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(tea575x_tuner, "Enable TEA575x tuner.");
+MODULE_PARM_SYNTAX(tea575x_tuner, SNDRV_ENABLE_DESC);
 
 /*
  *  Direct registers
@@ -116,6 +134,23 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define FM801_IRQ_CAPTURE	(1<<9)
 #define FM801_IRQ_VOLUME	(1<<14)
 #define FM801_IRQ_MPU		(1<<15)
+
+/* GPIO control register */
+#define FM801_GPIO_GP0		(1<<0)	/* read/write */
+#define FM801_GPIO_GP1		(1<<1)
+#define FM801_GPIO_GP2		(1<<2)
+#define FM801_GPIO_GP3		(1<<3)
+#define FM801_GPIO_GP(x)	(1<<(0+(x)))
+#define FM801_GPIO_GD0		(1<<8)	/* directions: 1 = input, 0 = output*/
+#define FM801_GPIO_GD1		(1<<9)
+#define FM801_GPIO_GD2		(1<<10)
+#define FM801_GPIO_GD3		(1<<11)
+#define FM801_GPIO_GD(x)	(1<<(8+(x)))
+#define FM801_GPIO_GS0		(1<<12)	/* function select: */
+#define FM801_GPIO_GS1		(1<<13)	/*    1 = GPIO */
+#define FM801_GPIO_GS2		(1<<14)	/*    0 = other (S/PDIF, VOL) */
+#define FM801_GPIO_GS3		(1<<15)
+#define FM801_GPIO_GS(x)	(1<<(12+(x)))
 	
 /*
 
@@ -162,6 +197,10 @@ struct _snd_fm801 {
 
 	spinlock_t reg_lock;
 	snd_info_entry_t *proc_entry;
+
+#ifdef TEA575X_RADIO
+	tea575x_t tea;
+#endif
 };
 
 static struct pci_device_id snd_fm801_ids[] = {
@@ -674,6 +713,295 @@ static int __devinit snd_fm801_pcm(fm801_t *chip, int device, snd_pcm_t ** rpcm)
 }
 
 /*
+ *  TEA5757 radio
+ */
+
+#ifdef TEA575X_RADIO
+
+/* 256PCS GPIO numbers */
+#define TEA_256PCS_DATA			1
+#define TEA_256PCS_WRITE_ENABLE		2	/* inverted */
+#define TEA_256PCS_BUS_CLOCK		3
+
+static void snd_fm801_tea575x_256pcs_write(tea575x_t *tea, unsigned int val)
+{
+	fm801_t *chip = tea->private_data;
+	unsigned short reg;
+	int i = 25;
+
+	spin_lock_irq(&chip->reg_lock);
+	reg = inw(FM801_REG(chip, GPIO_CTRL));
+	/* use GPIO lines and set write enable bit */
+	reg |= FM801_GPIO_GS(TEA_256PCS_DATA) |
+	       FM801_GPIO_GS(TEA_256PCS_WRITE_ENABLE) |
+	       FM801_GPIO_GS(TEA_256PCS_BUS_CLOCK);
+	/* all of lines are in the write direction */
+	/* clear data and clock lines */
+	reg &= ~(FM801_GPIO_GD(TEA_256PCS_DATA) |
+	         FM801_GPIO_GD(TEA_256PCS_WRITE_ENABLE) |
+	         FM801_GPIO_GD(TEA_256PCS_BUS_CLOCK) |
+	         FM801_GPIO_GP(TEA_256PCS_DATA) |
+	         FM801_GPIO_GP(TEA_256PCS_BUS_CLOCK) |
+		 FM801_GPIO_GP(TEA_256PCS_WRITE_ENABLE));
+	outw(reg, FM801_REG(chip, GPIO_CTRL));
+	udelay(1);
+
+	while (i--) {
+		if (val & (1 << i))
+			reg |= FM801_GPIO_GP(TEA_256PCS_DATA);
+		else
+			reg &= ~FM801_GPIO_GP(TEA_256PCS_DATA);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		reg |= FM801_GPIO_GP(TEA_256PCS_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		reg &= ~FM801_GPIO_GP(TEA_256PCS_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+	}
+
+	/* and reset the write enable bit */
+	reg |= FM801_GPIO_GP(TEA_256PCS_WRITE_ENABLE) |
+	       FM801_GPIO_GP(TEA_256PCS_DATA);
+	outw(reg, FM801_REG(chip, GPIO_CTRL));
+	spin_unlock_irq(&chip->reg_lock);
+}
+
+static unsigned int snd_fm801_tea575x_256pcs_read(tea575x_t *tea)
+{
+	fm801_t *chip = tea->private_data;
+	unsigned short reg;
+	unsigned int val = 0;
+	int i;
+	
+	spin_lock_irq(&chip->reg_lock);
+	reg = inw(FM801_REG(chip, GPIO_CTRL));
+	/* use GPIO lines, set data direction to input */
+	reg |= FM801_GPIO_GS(TEA_256PCS_DATA) |
+	       FM801_GPIO_GS(TEA_256PCS_WRITE_ENABLE) |
+	       FM801_GPIO_GS(TEA_256PCS_BUS_CLOCK) |
+	       FM801_GPIO_GD(TEA_256PCS_DATA) |
+	       FM801_GPIO_GP(TEA_256PCS_DATA) |
+	       FM801_GPIO_GP(TEA_256PCS_WRITE_ENABLE);
+	/* all of lines are in the write direction, except data */
+	/* clear data, write enable and clock lines */
+	reg &= ~(FM801_GPIO_GD(TEA_256PCS_WRITE_ENABLE) |
+	         FM801_GPIO_GD(TEA_256PCS_BUS_CLOCK) |
+	         FM801_GPIO_GP(TEA_256PCS_BUS_CLOCK));
+
+	for (i = 0; i < 24; i++) {
+		reg &= ~FM801_GPIO_GP(TEA_256PCS_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		reg |= FM801_GPIO_GP(TEA_256PCS_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		val <<= 1;
+		if (inw(FM801_REG(chip, GPIO_CTRL)) & FM801_GPIO_GP(TEA_256PCS_DATA))
+			val |= 1;
+	}
+
+	spin_unlock_irq(&chip->reg_lock);
+
+	return val;
+}
+
+/* 256PCPR GPIO numbers */
+#define TEA_256PCPR_BUS_CLOCK		0
+#define TEA_256PCPR_DATA		1
+#define TEA_256PCPR_WRITE_ENABLE	2	/* inverted */
+
+static void snd_fm801_tea575x_256pcpr_write(tea575x_t *tea, unsigned int val)
+{
+	fm801_t *chip = tea->private_data;
+	unsigned short reg;
+	int i = 25;
+
+	spin_lock_irq(&chip->reg_lock);
+	reg = inw(FM801_REG(chip, GPIO_CTRL));
+	/* use GPIO lines and set write enable bit */
+	reg |= FM801_GPIO_GS(TEA_256PCPR_DATA) |
+	       FM801_GPIO_GS(TEA_256PCPR_WRITE_ENABLE) |
+	       FM801_GPIO_GS(TEA_256PCPR_BUS_CLOCK);
+	/* all of lines are in the write direction */
+	/* clear data and clock lines */
+	reg &= ~(FM801_GPIO_GD(TEA_256PCPR_DATA) |
+	         FM801_GPIO_GD(TEA_256PCPR_WRITE_ENABLE) |
+	         FM801_GPIO_GD(TEA_256PCPR_BUS_CLOCK) |
+	         FM801_GPIO_GP(TEA_256PCPR_DATA) |
+	         FM801_GPIO_GP(TEA_256PCPR_BUS_CLOCK) |
+		 FM801_GPIO_GP(TEA_256PCPR_WRITE_ENABLE));
+	outw(reg, FM801_REG(chip, GPIO_CTRL));
+	udelay(1);
+
+	while (i--) {
+		if (val & (1 << i))
+			reg |= FM801_GPIO_GP(TEA_256PCPR_DATA);
+		else
+			reg &= ~FM801_GPIO_GP(TEA_256PCPR_DATA);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		reg |= FM801_GPIO_GP(TEA_256PCPR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		reg &= ~FM801_GPIO_GP(TEA_256PCPR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+	}
+
+	/* and reset the write enable bit */
+	reg |= FM801_GPIO_GP(TEA_256PCPR_WRITE_ENABLE) |
+	       FM801_GPIO_GP(TEA_256PCPR_DATA);
+	outw(reg, FM801_REG(chip, GPIO_CTRL));
+	spin_unlock_irq(&chip->reg_lock);
+}
+
+static unsigned int snd_fm801_tea575x_256pcpr_read(tea575x_t *tea)
+{
+	fm801_t *chip = tea->private_data;
+	unsigned short reg;
+	unsigned int val = 0;
+	int i;
+	
+	spin_lock_irq(&chip->reg_lock);
+	reg = inw(FM801_REG(chip, GPIO_CTRL));
+	/* use GPIO lines, set data direction to input */
+	reg |= FM801_GPIO_GS(TEA_256PCPR_DATA) |
+	       FM801_GPIO_GS(TEA_256PCPR_WRITE_ENABLE) |
+	       FM801_GPIO_GS(TEA_256PCPR_BUS_CLOCK) |
+	       FM801_GPIO_GD(TEA_256PCPR_DATA) |
+	       FM801_GPIO_GP(TEA_256PCPR_DATA) |
+	       FM801_GPIO_GP(TEA_256PCPR_WRITE_ENABLE);
+	/* all of lines are in the write direction, except data */
+	/* clear data, write enable and clock lines */
+	reg &= ~(FM801_GPIO_GD(TEA_256PCPR_WRITE_ENABLE) |
+	         FM801_GPIO_GD(TEA_256PCPR_BUS_CLOCK) |
+	         FM801_GPIO_GP(TEA_256PCPR_BUS_CLOCK));
+
+	for (i = 0; i < 24; i++) {
+		reg &= ~FM801_GPIO_GP(TEA_256PCPR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		reg |= FM801_GPIO_GP(TEA_256PCPR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		val <<= 1;
+		if (inw(FM801_REG(chip, GPIO_CTRL)) & FM801_GPIO_GP(TEA_256PCPR_DATA))
+			val |= 1;
+	}
+
+	spin_unlock_irq(&chip->reg_lock);
+
+	return val;
+}
+
+/* 64PCR GPIO numbers */
+#define TEA_64PCR_BUS_CLOCK		0
+#define TEA_64PCR_WRITE_ENABLE		1	/* inverted */
+#define TEA_64PCR_DATA			2
+
+static void snd_fm801_tea575x_64pcr_write(tea575x_t *tea, unsigned int val)
+{
+	fm801_t *chip = tea->private_data;
+	unsigned short reg;
+	int i = 25;
+
+	spin_lock_irq(&chip->reg_lock);
+	reg = inw(FM801_REG(chip, GPIO_CTRL));
+	/* use GPIO lines and set write enable bit */
+	reg |= FM801_GPIO_GS(TEA_64PCR_DATA) |
+	       FM801_GPIO_GS(TEA_64PCR_WRITE_ENABLE) |
+	       FM801_GPIO_GS(TEA_64PCR_BUS_CLOCK);
+	/* all of lines are in the write direction */
+	/* clear data and clock lines */
+	reg &= ~(FM801_GPIO_GD(TEA_64PCR_DATA) |
+	         FM801_GPIO_GD(TEA_64PCR_WRITE_ENABLE) |
+	         FM801_GPIO_GD(TEA_64PCR_BUS_CLOCK) |
+	         FM801_GPIO_GP(TEA_64PCR_DATA) |
+	         FM801_GPIO_GP(TEA_64PCR_BUS_CLOCK) |
+		 FM801_GPIO_GP(TEA_64PCR_WRITE_ENABLE));
+	outw(reg, FM801_REG(chip, GPIO_CTRL));
+	udelay(1);
+
+	while (i--) {
+		if (val & (1 << i))
+			reg |= FM801_GPIO_GP(TEA_64PCR_DATA);
+		else
+			reg &= ~FM801_GPIO_GP(TEA_64PCR_DATA);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		reg |= FM801_GPIO_GP(TEA_64PCR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		reg &= ~FM801_GPIO_GP(TEA_64PCR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+	}
+
+	/* and reset the write enable bit */
+	reg |= FM801_GPIO_GP(TEA_64PCR_WRITE_ENABLE) |
+	       FM801_GPIO_GP(TEA_64PCR_DATA);
+	outw(reg, FM801_REG(chip, GPIO_CTRL));
+	spin_unlock_irq(&chip->reg_lock);
+}
+
+static unsigned int snd_fm801_tea575x_64pcr_read(tea575x_t *tea)
+{
+	fm801_t *chip = tea->private_data;
+	unsigned short reg;
+	unsigned int val = 0;
+	int i;
+	
+	spin_lock_irq(&chip->reg_lock);
+	reg = inw(FM801_REG(chip, GPIO_CTRL));
+	/* use GPIO lines, set data direction to input */
+	reg |= FM801_GPIO_GS(TEA_64PCR_DATA) |
+	       FM801_GPIO_GS(TEA_64PCR_WRITE_ENABLE) |
+	       FM801_GPIO_GS(TEA_64PCR_BUS_CLOCK) |
+	       FM801_GPIO_GD(TEA_64PCR_DATA) |
+	       FM801_GPIO_GP(TEA_64PCR_DATA) |
+	       FM801_GPIO_GP(TEA_64PCR_WRITE_ENABLE);
+	/* all of lines are in the write direction, except data */
+	/* clear data, write enable and clock lines */
+	reg &= ~(FM801_GPIO_GD(TEA_64PCR_WRITE_ENABLE) |
+	         FM801_GPIO_GD(TEA_64PCR_BUS_CLOCK) |
+	         FM801_GPIO_GP(TEA_64PCR_BUS_CLOCK));
+
+	for (i = 0; i < 24; i++) {
+		reg &= ~FM801_GPIO_GP(TEA_64PCR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		reg |= FM801_GPIO_GP(TEA_64PCR_BUS_CLOCK);
+		outw(reg, FM801_REG(chip, GPIO_CTRL));
+		udelay(1);
+		val <<= 1;
+		if (inw(FM801_REG(chip, GPIO_CTRL)) & FM801_GPIO_GP(TEA_64PCR_DATA))
+			val |= 1;
+	}
+
+	spin_unlock_irq(&chip->reg_lock);
+
+	return val;
+}
+
+static struct snd_tea575x_ops snd_fm801_tea_ops[3] = {
+	{
+		/* 1 = MediaForte 256-PCS */
+		.write = snd_fm801_tea575x_256pcs_write,
+		.read = snd_fm801_tea575x_256pcs_read,
+	},
+	{
+		/* 2 = MediaForte 256-PCPR */
+		.write = snd_fm801_tea575x_256pcpr_write,
+		.read = snd_fm801_tea575x_256pcpr_read,
+	},
+	{
+		/* 3 = MediaForte 64-PCR */
+		.write = snd_fm801_tea575x_64pcr_write,
+		.read = snd_fm801_tea575x_64pcr_read,
+	}
+};
+#endif
+
+/*
  *  Mixer routines
  */
 
@@ -913,6 +1241,9 @@ static int snd_fm801_free(fm801_t *chip)
 	outw(cmdw, FM801_REG(chip, IRQ_MASK));
 
       __end_hw:
+#ifdef CONFIG_SND_FM801_TEA575X
+	snd_tea575x_exit(&chip->tea);
+#endif
 	if (chip->res_port) {
 		release_resource(chip->res_port);
 		kfree_nocheck(chip->res_port);
@@ -931,8 +1262,9 @@ static int snd_fm801_dev_free(snd_device_t *device)
 }
 
 static int __devinit snd_fm801_create(snd_card_t * card,
-				   struct pci_dev * pci,
-				   fm801_t ** rchip)
+				      struct pci_dev * pci,
+				      int tea575x_tuner,
+				      fm801_t ** rchip)
 {
 	fm801_t *chip;
 	unsigned char rev, id;
@@ -1056,6 +1388,17 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 
 	snd_card_set_dev(card, &pci->dev);
 
+#ifdef TEA575X_RADIO
+	if (tea575x_tuner > 0 && (tea575x_tuner & 0xffff) < 4) {
+		chip->tea.dev_nr = tea575x_tuner >> 16;
+		chip->tea.card = card;
+		chip->tea.freq_fixup = 10700;
+		chip->tea.private_data = chip;
+		chip->tea.ops = &snd_fm801_tea_ops[(tea575x_tuner & 0xffff) - 1];
+		snd_tea575x_init(&chip->tea);
+	}
+#endif
+
 	*rchip = chip;
 	return 0;
 }
@@ -1079,7 +1422,7 @@ static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
-	if ((err = snd_fm801_create(card, pci, &chip)) < 0) {
+	if ((err = snd_fm801_create(card, pci, tea575x_tuner[dev], &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -1160,7 +1503,7 @@ module_exit(alsa_card_fm801_exit)
 
 #ifndef MODULE
 
-/* format is: snd-fm801=enable,index,id */
+/* format is: snd-fm801=enable,index,id,tea575x_tuner */
 
 static int __init alsa_card_fm801_setup(char *str)
 {
@@ -1170,7 +1513,8 @@ static int __init alsa_card_fm801_setup(char *str)
 		return 0;
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&tea575x_tuner[nr_dev]));
 	nr_dev++;
 	return 1;
 }
