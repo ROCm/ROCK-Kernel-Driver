@@ -381,13 +381,15 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 				}
 			}
 			spin_unlock_irqrestore(&dev->list_lock, flags);
+			if (active)
+				break;
 
-			/*
-			 * We can exit If all the commands are complete
-			 */
-			if (active == 0)
-				return SUCCESS;
 		}
+		/*
+		 * We can exit If all the commands are complete
+		 */
+		if (active == 0)
+			return SUCCESS;
 		spin_unlock_irq(host->host_lock);
 		scsi_sleep(HZ);
 		spin_lock_irq(host->host_lock);

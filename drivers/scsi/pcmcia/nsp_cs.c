@@ -315,7 +315,7 @@ static void nsphw_init_sync(nsp_hw_data *data)
 	int i;
 
 	/* setup sync data */
-	for ( i = 0; i < NUMBER(data->Sync); i++ ) {
+	for ( i = 0; i < ARRAY_SIZE(data->Sync); i++ ) {
 		data->Sync[i] = tmp_sync;
 	}
 }
@@ -600,7 +600,7 @@ static int nsp_xfer(Scsi_Cmnd *SCpnt, int phase)
 	unsigned int  base = SCpnt->device->host->io_port;
 	nsp_hw_data  *data = (nsp_hw_data *)SCpnt->device->host->hostdata;
 	char	     *buf  = data->MsgBuffer;
-	int	      len  = MIN(MSGBUF_SIZE, data->MsgLen);
+	int	      len  = min(MSGBUF_SIZE, data->MsgLen);
 	int	      ptr;
 	int	      ret;
 
@@ -774,7 +774,7 @@ static void nsp_pio_read(Scsi_Cmnd *SCpnt)
 			continue;
 		}
 
-		res = MIN(res, SCpnt->SCp.this_residual);
+		res = min(res, SCpnt->SCp.this_residual);
 
 		switch (data->TransferMode) {
 		case MODE_IO32:
@@ -868,7 +868,7 @@ static void nsp_pio_write(Scsi_Cmnd *SCpnt)
 			continue;
 		}
 
-		res = MIN(SCpnt->SCp.this_residual, WFIFO_CRIT);
+		res = min(SCpnt->SCp.this_residual, WFIFO_CRIT);
 
 		//nsp_dbg(NSP_DEBUG_DATA_IO, "ptr=0x%p this=0x%x res=0x%x", SCpnt->SCp.ptr, SCpnt->SCp.this_residual, res);
 		switch (data->TransferMode) {
@@ -1490,7 +1490,7 @@ nsp_proc_info(
 	spin_unlock_irqrestore(&(data->Lock), flags);
 
 	SPRINTF("SDTR status\n");
-	for(id = 0; id < NUMBER(data->Sync); id++) {
+	for(id = 0; id < ARRAY_SIZE(data->Sync); id++) {
 
 		SPRINTF("id %d: ", id);
 
@@ -1534,7 +1534,7 @@ nsp_proc_info(
         }
 
 
-	thislength = MIN(thislength, length);
+	thislength = min(thislength, length);
 	*start = buffer + offset;
 
 	return thislength;

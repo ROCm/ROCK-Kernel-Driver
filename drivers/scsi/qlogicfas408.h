@@ -1,15 +1,9 @@
 /* to be used by qlogicfas and qlogic_cs */
-#ifndef __QLOGICFAS_H
-#define __QLOGICFAS_H
+#ifndef __QLOGICFAS408_H
+#define __QLOGICFAS408_H
 
 /*----------------------------------------------------------------*/
 /* Configuration */
-
-/* Set the following to 2 to use normal interrupt (active high/totempole-
-   tristate), otherwise use 0 (REQUIRED FOR PCMCIA) for active low, open
-   drain */
-
-#define QL_INT_ACTIVE_HIGH 2
 
 /* Set the following to max out the speed of the PIO PseudoDMA transfers,
    again, 0 tends to be slower, but more stable.  */
@@ -79,34 +73,22 @@
 	the assertion delay, also in 1/2 clocks (FASTCLK is ignored here). */
 
 /*----------------------------------------------------------------*/
-#ifdef PCMCIA
-#undef QL_INT_ACTIVE_HIGH
-#define QL_INT_ACTIVE_HIGH 0
-#endif
 
-struct qlogicfas_priv;
-typedef struct qlogicfas_priv *qlogicfas_priv_t;
-struct qlogicfas_priv {
+struct qlogicfas408_priv {
 	 int		qbase;		/* Port */
 	 int		qinitid;	/* initiator ID */
 	 int		qabort;		/* Flag to cause an abort */
 	 int		qlirq;		/* IRQ being used */
+	 int		int_type;	/* type of irq, 2 for ISA board, 0 for PCMCIA */
 	 char		qinfo[80];	/* description */
 	 Scsi_Cmnd 	*qlcmd;		/* current command being processed */
-	 struct Scsi_Host	*shost;	/* pointer back to host */
-	 qlogicfas_priv_t	next;	/* next private struct */
+	 struct Scsi_Host *shost;	/* pointer back to host */
+	 struct qlogicfas408_priv *next; /* next private struct */
 };
-
-extern int qlcfg5;
-extern int qlcfg6;
-extern int qlcfg7;
-extern int qlcfg8;
-extern int qlcfg9;
-extern int qlcfgc;
 
 /* The qlogic card uses two register maps - These macros select which one */
 #define REG0 ( outb( inb( qbase + 0xd ) & 0x7f , qbase + 0xd ), outb( 4 , qbase + 0xd ))
-#define REG1 ( outb( inb( qbase + 0xd ) | 0x80 , qbase + 0xd ), outb( 0xb4 | QL_INT_ACTIVE_HIGH , qbase + 0xd ))
+#define REG1 ( outb( inb( qbase + 0xd ) | 0x80 , qbase + 0xd ), outb( 0xb4 | int_type, qbase + 0xd ))
 
 /* following is watchdog timeout in microseconds */
 #define WATCHDOG 5000000
@@ -115,10 +97,24 @@ extern int qlcfgc;
 /* the following will set the monitor border color (useful to find
    where something crashed or gets stuck at and as a simple profiler) */
 
-#if 0
-#define rtrc(i) {inb(0x3da);outb(0x31,0x3c0);outb((i),0x3c0);}
-#else
 #define rtrc(i) {}
-#endif
-#endif	/* __QLOGICFAS_H */
+
+#define get_priv_by_cmd(x) (struct qlogicfas408_priv *)&((x)->device->host->hostdata[0])
+#define get_priv_by_host(x) (struct qlogicfas408_priv *)&((x)->hostdata[0])
+
+irqreturn_t qlogicfas408_ihandl(int irq, void *dev_id, struct pt_regs *regs);
+int qlogicfas408_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *));
+int qlogicfas408_biosparam(struct scsi_device * disk,
+		        struct block_device *dev,
+			sector_t capacity, int ip[]);
+int qlogicfas408_abort(Scsi_Cmnd * cmd);
+int qlogicfas408_bus_reset(Scsi_Cmnd * cmd);
+int qlogicfas408_host_reset(Scsi_Cmnd * cmd);
+int qlogicfas408_device_reset(Scsi_Cmnd * cmd);
+char *qlogicfas408_info(struct Scsi_Host *host);
+int qlogicfas408_get_chip_type(int qbase, int int_type);
+void qlogicfas408_setup(int qbase, int id, int int_type);
+int qlogicfas408_detect(int qbase, int int_type);
+void qlogicfas408_disable_ints(struct qlogicfas408_priv *priv);
+#endif	/* __QLOGICFAS408_H */
 

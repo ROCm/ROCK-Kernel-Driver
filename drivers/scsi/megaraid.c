@@ -4606,6 +4606,7 @@ megaraid_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (pci_enable_device(pdev))
 		goto out;
+	pci_set_master(pdev);
 
 	pci_bus = pdev->bus->number;
 	pci_dev_func = pdev->devfn;

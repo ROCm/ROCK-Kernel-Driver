@@ -181,7 +181,8 @@ struct class sdev_class = {
 /* all probing is done in the individual ->probe routines */
 static int scsi_bus_match(struct device *dev, struct device_driver *gendrv)
 {
-	return 1;
+	struct scsi_device *sdp = to_scsi_device(dev);
+	return (sdp->inq_periph_qual == SCSI_INQ_PQ_CON)? 1: 0;
 }
 
 struct bus_type scsi_bus_type = {
@@ -302,6 +303,26 @@ sdev_rd_attr (model, "%.16s\n");
 sdev_rd_attr (rev, "%.4s\n");
 
 static ssize_t
+sdev_show_timeout (struct device *dev, char *buf)
+{
+	struct scsi_device *sdev;
+	sdev = to_scsi_device(dev);
+	return snprintf (buf, 20, "%d\n", sdev->timeout / HZ);
+}
+
+static ssize_t
+sdev_store_timeout (struct device *dev, const char *buf, size_t count)
+{
+	struct scsi_device *sdev;
+	int timeout;
+	sdev = to_scsi_device(dev);
+	sscanf (buf, "%d\n", &timeout);
+	sdev->timeout = timeout * HZ;
+	return count;
+}
+static DEVICE_ATTR(timeout, S_IRUGO | S_IWUSR, sdev_show_timeout, sdev_store_timeout)
+
+static ssize_t
 store_rescan_field (struct device *dev, const char *buf, size_t count) 
 {
 	scsi_rescan_device(dev);
@@ -367,6 +388,7 @@ static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_rescan,
 	&dev_attr_delete,
 	&dev_attr_state,
+	&dev_attr_timeout,
 	NULL
 };
 

@@ -179,7 +179,16 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 		goto out;
 	sdkp = scsi_disk(disk);
 	if (!kref_get(&sdkp->kref))
-		sdkp = NULL;
+		goto out_sdkp;
+	if (scsi_device_get(sdkp->device))
+		goto out_put;
+	up(&sd_ref_sem);
+	return sdkp;
+
+ out_put:
+	kref_put(&sdkp->kref);
+ out_sdkp:
+	sdkp = NULL;
  out:
 	up(&sd_ref_sem);
 	return sdkp;
@@ -188,6 +197,7 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 static void scsi_disk_put(struct scsi_disk *sdkp)
 {
 	down(&sd_ref_sem);
+	scsi_device_put(sdkp->device);
 	kref_put(&sdkp->kref);
 	up(&sd_ref_sem);
 }
@@ -207,9 +217,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	sector_t block;
 	struct scsi_device *sdp = SCpnt->device;
 
-	timeout = SD_TIMEOUT;
-	if (SCpnt->device->type != TYPE_DISK)
-		timeout = SD_MOD_TIMEOUT;
+	timeout = sdp->timeout;
 
 	/*
 	 * these are already setup, just copy cdb basically
@@ -1342,16 +1350,13 @@ static int sd_probe(struct device *dev)
 	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
 		goto out;
 
-	if ((error = scsi_device_get(sdp)) != 0)
-		goto out;
-
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
 
 	error = -ENOMEM;
 	sdkp = kmalloc(sizeof(*sdkp), GFP_KERNEL);
 	if (!sdkp)
-		goto out_put_sdev;
+		goto out;
 
 	memset (sdkp, 0, sizeof(*sdkp));
 	kref_init(&sdkp->kref, scsi_disk_release);
@@ -1381,6 +1386,13 @@ static int sd_probe(struct device *dev)
 	sdkp->disk = gd;
 	sdkp->index = index;
 	sdkp->openers = 0;
+
+	if (!sdp->timeout) {
+		if (sdp->type == TYPE_DISK)
+			sdp->timeout = SD_TIMEOUT;
+		else
+			sdp->timeout = SD_MOD_TIMEOUT;
+	}
 
 	devno = make_sd_dev(index, 0);
 	gd->major = MAJOR(devno);
@@ -1427,8 +1439,6 @@ out_put:
 	put_disk(gd);
 out_free:
 	kfree(sdkp);
-out_put_sdev:
-	scsi_device_put(sdp);
 out:
 	return error;
 }
@@ -1450,7 +1460,9 @@ static int sd_remove(struct device *dev)
 
 	del_gendisk(sdkp->disk);
 	sd_shutdown(dev);
-	scsi_disk_put(sdkp);
+	down(&sd_ref_sem);
+	kref_put(&sdkp->kref);
+	up(&sd_ref_sem);
 
 	return 0;
 }
@@ -1467,7 +1479,6 @@ static int sd_remove(struct device *dev)
 static void scsi_disk_release(struct kref *kref)
 {
 	struct scsi_disk *sdkp = to_scsi_disk(kref);
-	struct scsi_device *sdev = sdkp->device;
 	struct gendisk *disk = sdkp->disk;
 	
 	spin_lock(&sd_index_lock);
@@ -1479,8 +1490,6 @@ static void scsi_disk_release(struct kref *kref)
 	put_disk(disk);
 
 	kfree(sdkp);
-
-	scsi_device_put(sdev);
 }
 
 /*

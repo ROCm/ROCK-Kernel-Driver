@@ -1820,6 +1820,8 @@
 	0010  DAC960PX
 	0050  AcceleRAID 352/170/160 support Device
 	b166  Gemstone chipset SCSI controller
+		1014 0266  Dual Channel PCI-X U320 SCSI Adapter
+		1014 0278  Dual Channel PCI-X U320 SCSI RAID Adapter
 	ba55  eXtremeRAID 1100 support Device
 	ba56  eXtremeRAID 2000/3000 support Device
 106a  Aten Research Inc

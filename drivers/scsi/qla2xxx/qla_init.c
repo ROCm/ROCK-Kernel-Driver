@@ -102,9 +102,9 @@ int
 qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 {
 	int	rval;
-	uint8_t	isp_init = 0;
 	uint8_t	restart_risc = 0;
 	uint8_t	retry;
+	uint32_t wait_time;
 
 	/* Clear adapter flags. */
 	ha->flags.online = FALSE;
@@ -133,13 +133,8 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	/* Initialize target map database. */
 	qla2x00_init_tgt_map(ha);
 
-	/* Get Flash Version */
-	qla2x00_get_flash_version(ha);
-
 	qla_printk(KERN_INFO, ha, "Configure NVRAM parameters...\n");
 	qla2x00_nvram_config(ha);
-
-	ha->retry_count = ql2xretrycount;
 
 	qla_printk(KERN_INFO, ha, "Verifying loaded RISC code...\n");
 
@@ -161,7 +156,6 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	 */
 	do {
 		restart_risc = 0;
-		isp_init = 0;
 
 		/* If firmware needs to be loaded */
 		if (qla2x00_isp_firmware(ha) != QLA_SUCCESS) {
@@ -180,21 +174,22 @@ check_fw_ready_again:
 			 * value OR a minimum of 4 seconds OR If no 
 			 * cable, only 5 seconds.
 			 */
-			if (!qla2x00_fw_ready(ha)) {
+			rval = qla2x00_fw_ready(ha);
+			if (rval == QLA_SUCCESS) {
 				clear_bit(RESET_MARKER_NEEDED, &ha->dpc_flags);
 
 				/*
-				 * Go setup flash database devices with proper
-				 * Loop ID's.
+				 * Wait at most MAX_TARGET RSCNs for a stable
+				 * link.
 				 */
+				wait_time = 256;
 				do {
 					clear_bit(LOOP_RESYNC_NEEDED,
 					    &ha->dpc_flags);
 					rval = qla2x00_configure_loop(ha);
 
-					if (test_bit(ISP_ABORT_NEEDED,
+					if (test_and_clear_bit(ISP_ABORT_NEEDED,
 					    &ha->dpc_flags)) {
-
 						restart_risc = 1;
 						break;
 					}
@@ -209,20 +204,22 @@ check_fw_ready_again:
 					    LOOP_DOWN && retry--) {
 						goto check_fw_ready_again;
 					}
+					wait_time--;
 				} while (!atomic_read(&ha->loop_down_timer) &&
 				    retry &&
-				    (test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)));
-			}
+				    wait_time &&
+				    (test_bit(LOOP_RESYNC_NEEDED,
+					&ha->dpc_flags)));
 
-			if (ha->mem_err) {
-				restart_risc = 1;
+				if (wait_time == 0)
+					rval = QLA_FUNCTION_FAILED;
+				if (ha->mem_err)
+					restart_risc = 1;
 			}
-			isp_init = 1;
-
 		}
 	} while (restart_risc && retry--);
 
-	if (isp_init) {
+	if (rval == QLA_SUCCESS) {
 		/* Retrieve firmware information */
 		qla2x00_get_fw_version(ha, &ha->fw_major_version,
 		    &ha->fw_minor_version, &ha->fw_subminor_version,
@@ -234,9 +231,7 @@ check_fw_ready_again:
 		ha->marker_needed = 0;
 
 		ha->flags.online = TRUE;
-	}
-
-	if (rval) {
+	} else {
 		DEBUG2_3(printk("%s(): **** FAILED ****\n", __func__));
 	}
 
@@ -290,7 +285,7 @@ qla2x00_pci_config(scsi_qla_host_t *ha)
 		/* PCI Specification Revision 2.3 changes */
 		if (IS_QLA2322(ha) || IS_QLA6322(ha))
 			/* Command Register - Reset Interrupt Disable. */
-			w &= ~BIT_10;
+			w &= ~PCI_COMMAND_INTX_DISABLE;
 
 		/*
 		 * If this is a 2300 card and not 2312, reset the
@@ -603,10 +598,11 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 	ha->product_id[3] = mb[4];
 
 	/* Adjust fw RISC transfer size */
-	if (REQUEST_ENTRY_CNT > 1024)
+	if (ha->request_q_length > 1024)
 		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * 1024;
 	else
-		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
+		ha->fw_transfer_size = REQUEST_ENTRY_SIZE *
+		    ha->request_q_length;
 
 	if (IS_QLA2200(ha) &&
 	    RD_MAILBOX_REG(ha, reg, 7) == QLA2200A_RISC_ROM_VER) {
@@ -774,6 +770,54 @@ qla2x00_init_response_q_entries(scsi_qla_host_t *ha)
 }
 
 /**
+ * qla2x00_update_fw_options() - Read and process firmware options.
+ * @ha: HA context
+ *
+ * Returns 0 on success.
+ */
+static void
+qla2x00_update_fw_options(scsi_qla_host_t *ha)
+{
+	/* Setup seriallink options */
+	uint16_t swing, emphasis;
+
+	memset(ha->fw_options, 0, sizeof(ha->fw_options));
+	qla2x00_get_fw_options(ha, ha->fw_options);
+
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		return;
+
+	/* Serial Link options. */
+	DEBUG3(printk("scsi(%ld): Serial link options:\n",
+	    ha->host_no));
+	DEBUG3(qla2x00_dump_buffer((uint8_t *)&ha->fw_seriallink_options,
+	    sizeof(ha->fw_seriallink_options)));
+
+	ha->fw_options[1] &= ~FO1_SET_EMPHASIS_SWING;
+	if (ha->fw_seriallink_options[1] & BIT_2)
+		ha->fw_options[1] |= FO1_SET_EMPHASIS_SWING;
+
+	/*  1G settings */
+	swing = ha->fw_seriallink_options[0] & (BIT_2 | BIT_1 | BIT_0);
+	emphasis = ha->fw_seriallink_options[0] & (BIT_4 | BIT_3);
+	emphasis >>= 3;
+	ha->fw_options[10] = (emphasis << 14) | (swing << 8) | 0x3;
+
+	/*  2G settings */
+	swing = ha->fw_seriallink_options[0] & (BIT_7 | BIT_6 | BIT_5);
+	swing >>= 5;
+	emphasis = ha->fw_seriallink_options[1] & (BIT_1 | BIT_0);
+	ha->fw_options[11] = (emphasis << 14) | (swing << 8) | 0x3;
+
+	/* FCP2 options. */
+	/*  Return command IOCBs without waiting for an ABTS to complete. */
+	ha->fw_options[3] |= BIT_13;
+
+	/* Update Serial Link options. */
+	qla2x00_set_fw_options(ha, ha->fw_options);
+}
+
+/**
  * qla2x00_init_rings() - Initializes firmware.
  * @ha: HA context
  *
@@ -805,7 +849,7 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 	/* Initialize firmware. */
 	ha->request_ring_ptr  = ha->request_ring;
 	ha->req_ring_index    = 0;
-	ha->req_q_cnt         = REQUEST_ENTRY_CNT;
+	ha->req_q_cnt         = ha->request_q_length;
 	ha->response_ring_ptr = ha->response_ring;
 	ha->rsp_ring_index    = 0;
 
@@ -826,35 +870,8 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 		DEBUG2_3(printk("scsi(%ld): Init firmware **** FAILED ****.\n",
 		    ha->host_no));
 	} else {
-		/* Setup seriallink options */
-		uint16_t swing, emphasis;
-
-		DEBUG3(printk("scsi(%ld): Serial link options:\n",
-		    ha->host_no));
-		DEBUG3(qla2x00_dump_buffer(
-		    (uint8_t *)&ha->fw_seriallink_options,
-		    sizeof(ha->fw_seriallink_options)));
-
-		memset(ha->fw_options, 0, sizeof(ha->fw_options));
-		qla2x00_get_fw_options(ha, ha->fw_options);
-
-		ha->fw_options[1] &= ~FO1_SET_EMPHASIS_SWING;
-		if (ha->fw_seriallink_options[1] & BIT_2)
-			ha->fw_options[1] |= FO1_SET_EMPHASIS_SWING;
-
-		/* 1G settings */
-		swing = ha->fw_seriallink_options[0] & (BIT_2 | BIT_1 | BIT_0);
-		emphasis = ha->fw_seriallink_options[0] & (BIT_4 | BIT_3);
-		emphasis >>= 3;
-		ha->fw_options[10] = (emphasis << 14) | (swing << 8) | 0x3;
-
-		/* 2G settings */
-		swing = ha->fw_seriallink_options[0] & (BIT_7 | BIT_6 | BIT_5);
-		swing >>= 5;
-		emphasis = ha->fw_seriallink_options[1] & (BIT_1 | BIT_0);
-		ha->fw_options[11] = (emphasis << 14) | (swing << 8) | 0x3;
-
-		qla2x00_set_fw_options(ha, ha->fw_options);
+		/* Update any ISP specific firmware options. */
+		qla2x00_update_fw_options(ha);
 
 		DEBUG3(printk("scsi(%ld): Init firmware -- success.\n",
 		    ha->host_no));
@@ -946,7 +963,7 @@ qla2x00_fw_ready(scsi_qla_host_t *ha)
 			break;
 
 		/* Delay for a while */
-		set_current_state(TASK_INTERRUPTIBLE);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ / 2);
 
 		DEBUG3(printk("scsi(%ld): fw_state=%x curr time=%lx.\n",
@@ -1004,10 +1021,6 @@ qla2x00_configure_hba(scsi_qla_host_t *ha)
 	}
 
 	ha->loop_id = loop_id;
-
-	/* Make sure 2100 only has loop, in case of any firmware bug. */
-	if (IS_QLA2100(ha))
-		topo = 0;
 
 	/* initialize */
 	ha->min_external_loopid = SNS_FIRST_LOOP_ID;
@@ -1381,7 +1394,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	 */
 	icb->request_q_outpointer = __constant_cpu_to_le16(0);
 	icb->response_q_inpointer = __constant_cpu_to_le16(0);
-	icb->request_q_length = __constant_cpu_to_le16(REQUEST_ENTRY_CNT);
+	icb->request_q_length = cpu_to_le16(ha->request_q_length);
 	icb->response_q_length = cpu_to_le16(ha->response_q_length);
 	icb->request_q_address[0] = cpu_to_le32(LSD(ha->request_dma));
 	icb->request_q_address[1] = cpu_to_le32(MSD(ha->request_dma));
@@ -1496,23 +1509,23 @@ static int
 qla2x00_configure_loop(scsi_qla_host_t *ha) 
 {
 	int  rval;
-	uint8_t  rval1 = 0;
 	unsigned long flags, save_flags;
 
 	rval = QLA_SUCCESS;
 
 	/* Get Initiator ID */
-	if (qla2x00_configure_hba(ha)) {
-		DEBUG(printk("scsi(%ld): Unable to configure HBA.\n",
-		    ha->host_no));
-		return (QLA_FUNCTION_FAILED);
+	if (test_bit(LOCAL_LOOP_UPDATE, &ha->dpc_flags)) {
+		rval = qla2x00_configure_hba(ha);
+		if (rval != QLA_SUCCESS) {
+			DEBUG(printk("scsi(%ld): Unable to configure HBA.\n",
+			    ha->host_no));
+			return (rval);
+		}
 	}
 
 	save_flags = flags = ha->dpc_flags;
 	DEBUG(printk("scsi(%ld): Configure loop -- dpc flags =0x%lx\n",
 	    ha->host_no, flags));
-
-	/* dg 02/26/02 ha->dpc_flags &= ~(LOCAL_LOOP_UPDATE | RSCN_UPDATE); */
 
 	/*
 	 * If we have both an RSCN and PORT UPDATE pending then handle them
@@ -1544,50 +1557,32 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 		set_bit(LOCAL_LOOP_UPDATE, &flags);
 	}
 
-	do {
-		if (test_bit(LOCAL_LOOP_UPDATE, &flags)) {
-			rval = rval | qla2x00_configure_local_loop(ha);
-		}
-
-		if (test_bit(RSCN_UPDATE, &flags)) {
-			rval1 = qla2x00_configure_fabric(ha);
-			if ((rval1 & BIT_0) && ha->sns_retry_cnt < 8) {
-				ha->sns_retry_cnt++;
-				set_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags);
-			}
-		}
-
-		/* Isolate error status. */
-		if (rval & BIT_0) {
-			rval = 1;
+	if (test_bit(LOCAL_LOOP_UPDATE, &flags)) {
+		if (test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
+			rval = QLA_FUNCTION_FAILED;
 		} else {
-			rval = QLA_SUCCESS;
+			rval = qla2x00_configure_local_loop(ha);
 		}
+	}
 
-	} while (rval != QLA_SUCCESS);
+	if (rval == QLA_SUCCESS && test_bit(RSCN_UPDATE, &flags)) {
+		if (test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
+			rval = QLA_FUNCTION_FAILED;
+		} else {
+			rval = qla2x00_configure_fabric(ha);
+		}
+	}
 
-	if (!atomic_read(&ha->loop_down_timer) &&
-	    !(test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags))) {
-
-		qla2x00_config_os(ha);
-
-		/* If we found all devices then go ready */
-		if (!(test_bit(LOGIN_RETRY_NEEDED, &ha->dpc_flags))) {
+	if (rval == QLA_SUCCESS) {
+		if (atomic_read(&ha->loop_down_timer) ||
+		    test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
+			rval = QLA_FUNCTION_FAILED;
+		} else {
+			qla2x00_config_os(ha);
 			atomic_set(&ha->loop_state, LOOP_READY);
 
 			DEBUG(printk("scsi(%ld): LOOP READY\n", ha->host_no));
-		} else {
-			if (test_bit(LOCAL_LOOP_UPDATE, &save_flags))
-				set_bit(LOCAL_LOOP_UPDATE, &ha->dpc_flags);
-			if (test_bit(RSCN_UPDATE, &save_flags))
-				set_bit(RSCN_UPDATE, &ha->dpc_flags);
 		}
-	} else {
-		DEBUG(printk("scsi(%ld): Loop down counter running= %d or "
-		    "Resync needed- dpc flags= %ld\n",
-		    ha->host_no,
-		    atomic_read(&ha->loop_down_timer), ha->dpc_flags));
-		/* ???? dg 02/26/02  rval = 1; */
 	}
 
 	if (rval) {
@@ -1619,7 +1614,6 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
  *
  * Returns:
  *	0 = success.
- *	BIT_0 = error.
  */
 static int
 qla2x00_configure_local_loop(scsi_qla_host_t *ha) 
@@ -1644,18 +1638,8 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 	uint16_t	loop_id;
 	uint8_t		domain, area, al_pa;
 
-	rval = QLA_SUCCESS;
 	found_devs = 0;
 	new_fcport = NULL;
-
-	/*
-	 * No point in continuing if the loop is in a volatile state -- 
-	 * reschedule LOCAL_LOOP_UPDATE for later processing
-	 */
-	if (test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
-		set_bit(LOCAL_LOOP_UPDATE, &ha->dpc_flags);
-		return (rval);
-	}
 
 	entries = MAX_FIBRE_DEVICES;
 	id_list = pci_alloc_consistent(ha->pdev, MAX_ID_LIST_SIZE,
@@ -1668,7 +1652,7 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 		    "Memory Allocation failed - port_list");
 
 		ha->mem_err++;
-		return (BIT_0);
+		return (QLA_MEMORY_ALLOC_FAILED);
 	}
 	memset(id_list, 0, MAX_ID_LIST_SIZE);
 
@@ -1677,8 +1661,7 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 
 	/* Get list of logged in devices. */
 	rval = qla2x00_get_id_list(ha, id_list, id_list_dma, &entries);
-	if (rval) {
-		rval = BIT_0;
+	if (rval != QLA_SUCCESS) {
 		goto cleanup_allocation;
 	}
 
@@ -1690,7 +1673,7 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 	/* Allocate temporary fcport for any new fcports discovered. */
 	new_fcport = qla2x00_alloc_fcport(ha, GFP_KERNEL);
 	if (new_fcport == NULL) {
-		rval = BIT_0;
+		rval = QLA_MEMORY_ALLOC_FAILED;
 		goto cleanup_allocation;
 	}
 	new_fcport->flags &= ~FCF_FABRIC_DEVICE;
@@ -1783,7 +1766,7 @@ qla2x00_configure_local_loop(scsi_qla_host_t *ha)
 			fcport = new_fcport;
 			new_fcport = qla2x00_alloc_fcport(ha, GFP_KERNEL);
 			if (new_fcport == NULL) {
-				rval = BIT_0;
+				rval = QLA_MEMORY_ALLOC_FAILED;
 				goto cleanup_allocation;
 			}
 			new_fcport->flags &= ~FCF_FABRIC_DEVICE;
@@ -1800,7 +1783,7 @@ cleanup_allocation:
 	if (new_fcport)
 		kfree(new_fcport);
 
-	if (rval & BIT_0) {
+	if (rval != QLA_SUCCESS) {
 		DEBUG2(printk("scsi(%ld): Configure local loop error exit: "
 		    "rval=%x\n", ha->host_no, rval));
 	}
@@ -2339,7 +2322,7 @@ qla2x00_configure_fabric(scsi_qla_host_t *ha)
 	/* Mark devices that need re-synchronization. */
 	rval2 = qla2x00_device_resync(ha);
 	if (rval2 == QLA_RSCNS_HANDLED) {
-		/* No, point doing the scan, just continue. */
+		/* No point doing the scan, just continue. */
 		return (QLA_SUCCESS);
 	}
 	do {
@@ -2489,7 +2472,6 @@ qla2x00_configure_fabric(scsi_qla_host_t *ha)
  *
  * Returns:
  *	0 = success.
- *	BIT_0 = error.
  *
  * Context:
  *	Kernel context.
@@ -3082,6 +3064,7 @@ int
 qla2x00_loop_resync(scsi_qla_host_t *ha) 
 {
 	int   rval;
+	uint32_t wait_time;
 
 	rval = QLA_SUCCESS;
 
@@ -3090,6 +3073,8 @@ qla2x00_loop_resync(scsi_qla_host_t *ha)
 	clear_bit(ISP_ABORT_RETRY, &ha->dpc_flags);
 	if (ha->flags.online) {
 		if (!(rval = qla2x00_fw_ready(ha))) {
+			/* Wait at most MAX_TARGET RSCNs for a stable link. */
+			wait_time = 256;
 			do {
 				/* v2.19.05b6 */
 				atomic_set(&ha->loop_state, LOOP_UPDATE);
@@ -3104,12 +3089,13 @@ qla2x00_loop_resync(scsi_qla_host_t *ha)
 				clear_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags);
 
 				qla2x00_configure_loop(ha);
-
+				wait_time--;
 			} while (!atomic_read(&ha->loop_down_timer) &&
 				!(test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags)) &&
+				wait_time &&
 				(test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)));
 		}
-		qla2x00_restart_queues(ha,TRUE);
+		qla2x00_restart_queues(ha, TRUE);
 	}
 
 	if (test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags)) {
@@ -3150,6 +3136,10 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 		spin_lock_irqsave(&ha->list_lock,flags);
 		list_for_each_safe(list, temp, &ha->pending_queue) {
 			sp = list_entry(list, srb_t, list);
+
+			if ((sp->flags & SRB_TAPE))
+				continue;
+			 
 			/* 
 			 * When time expire return request back to OS as BUSY 
 			 */
@@ -3292,6 +3282,7 @@ qla2x00_config_os(scsi_qla_host_t *ha)
 static uint16_t
 qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport) 
 {
+	int		found;
 	uint16_t	tgt;
 	os_tgt_t	*tq;
 
@@ -3300,18 +3291,32 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		if ((tq = TGT_Q(ha, tgt)) == NULL)
 			continue;
 
-		if (ha->binding_type == BIND_BY_PORT_ID &&
-		    fcport->d_id.b24 == tq->d_id.b24) {
-			memcpy(tq->node_name, fcport->node_name, WWN_SIZE);
-			memcpy(tq->port_name, fcport->port_name, WWN_SIZE);
+		found = 0;
+		switch (ha->binding_type) {
+		case BIND_BY_PORT_ID:
+			if (fcport->d_id.b24 == tq->d_id.b24) {
+				memcpy(tq->node_name, fcport->node_name,
+				    WWN_SIZE);
+				memcpy(tq->port_name, fcport->port_name,
+				    WWN_SIZE);
+				found++;
+			}
+			break;
+		case BIND_BY_PORT_NAME:    
+			if (memcmp(fcport->port_name, tq->port_name,
+			    WWN_SIZE) == 0) {
+				/*
+				 * In case of persistent binding, update the
+				 * WWNN.
+				 */
+				memcpy(tq->node_name, fcport->node_name,
+				    WWN_SIZE);
+				found++;
+			}
 			break;
 		}
-
-		if (memcmp(fcport->port_name, tq->port_name, WWN_SIZE) == 0) {
-			/* In case of persistent binding, update the WWNN */
-			memcpy(tq->node_name, fcport->node_name, WWN_SIZE);
-			break;
-		}
+		if (found)
+		    break;	
 	}
 
 	/* TODO: honor the ConfigRequired flag */
@@ -4226,6 +4231,7 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 	uint8_t		status = 0;
 	device_reg_t	*reg;
 	unsigned long	flags = 0;
+	uint32_t wait_time;
 
 	/* If firmware needs to be loaded */
 	if (qla2x00_isp_firmware(ha)) {
@@ -4269,11 +4275,15 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 					__func__,
 					status);)
 			ha->flags.online = TRUE;
+			/* Wait at most MAX_TARGET RSCNs for a stable link. */
+			wait_time = 256;
 			do {
 				clear_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags);
 				qla2x00_configure_loop(ha);
+				wait_time--;
 			} while (!atomic_read(&ha->loop_down_timer) &&
 				!(test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags)) &&
+				wait_time &&
 				(test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)));
 		}
 

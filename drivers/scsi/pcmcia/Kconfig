@@ -69,4 +69,14 @@ config PCMCIA_QLOGIC
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogic_cs.
 
+config PCMCIA_SYM53C500
+	tristate "Symbios 53c500 PCMCIA support"
+	depends on m
+	help
+	  Say Y here if you have a New Media Bus Toaster or other PCMCIA
+	  SCSI adapter based on the Symbios 53c500 controller.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sym53c500_cs.
+
 endmenu

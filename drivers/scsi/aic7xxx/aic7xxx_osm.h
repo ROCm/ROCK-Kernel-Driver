@@ -840,11 +840,17 @@ typedef enum
 
 #ifdef CONFIG_EISA
 extern uint32_t aic7xxx_probe_eisa_vl;
-void			 ahc_linux_eisa_init(void);
+int			 ahc_linux_eisa_init(void);
 void			 ahc_linux_eisa_exit(void);
 int			 aic7770_map_registers(struct ahc_softc *ahc,
 					       u_int port);
 int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
+#else
+static inline int	ahc_linux_eisa_init(void) {
+	return -ENODEV;
+}
+static inline void	ahc_linux_eisa_exit(void) {
+}
 #endif
 
 /******************************* PCI Routines *********************************/
@@ -931,6 +937,12 @@ static __inline int
 ahc_get_pci_bus(ahc_dev_softc_t pci)
 {
 	return (pci->bus->number);
+}
+#else
+static inline int ahc_linux_pci_init(void) {
+	return -ENODEV;
+}
+static inline void ahc_linux_pci_exit(void) {
 }
 #endif
 

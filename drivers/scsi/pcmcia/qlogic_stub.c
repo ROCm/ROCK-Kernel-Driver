@@ -47,7 +47,7 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "../qlogicfas.h"
+#include "../qlogicfas408.h"
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -56,13 +56,13 @@
 #include <pcmcia/ds.h>
 #include <pcmcia/ciscode.h>
 
+/* Set the following to 2 to use normal interrupt (active high/totempole-
+ * tristate), otherwise use 0 (REQUIRED FOR PCMCIA) for active low, open
+ * drain
+ */
+#define INT_TYPE	0
 
-extern Scsi_Host_Template qlogicfas_driver_template;
-extern void qlogicfas_preset(int port, int irq);
-extern int qlogicfas_bus_reset(Scsi_Cmnd *);
-extern irqreturn_t do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs);
-
-static char *qlogic_name = "qlogic_cs";
+static char qlogic_name[] = "qlogic_cs";
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
@@ -72,6 +72,24 @@ static char *version = "qlogic_cs.c 1.79-ac 2002/10/26 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
+
+static Scsi_Host_Template qlogicfas_driver_template = {
+	.module			= THIS_MODULE,
+	.name			= qlogic_name,
+	.proc_name		= qlogic_name,
+	.info			= qlogicfas408_info,
+	.queuecommand		= qlogicfas408_queuecommand,
+	.eh_abort_handler	= qlogicfas408_abort,
+	.eh_bus_reset_handler	= qlogicfas408_bus_reset,
+	.eh_device_reset_handler= qlogicfas408_device_reset,
+	.eh_host_reset_handler	= qlogicfas408_host_reset,
+	.bios_param		= qlogicfas408_biosparam,
+	.can_queue		= 1,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 
 /*====================================================================*/
 
@@ -110,29 +128,17 @@ static struct Scsi_Host *qlogic_detect(Scsi_Host_Template *host,
 	int qltyp;		/* type of chip */
 	int qinitid;
 	struct Scsi_Host *shost;	/* registered host structure */
-	qlogicfas_priv_t priv;
+	struct qlogicfas408_priv *priv;
 
-	qltyp = inb(qbase + 0xe) & 0xf8;
+	qltyp = qlogicfas408_get_chip_type(qbase, INT_TYPE);
 	qinitid = host->this_id;
 	if (qinitid < 0)
 		qinitid = 7;	/* if no ID, use 7 */
-	outb(1, qbase + 8);	/* set for PIO pseudo DMA */
-	REG0;
-	outb(0x40 | qlcfg8 | qinitid, qbase + 8);	/* (ini) bus id, disable scsi rst */
-	outb(qlcfg5, qbase + 5);	/* select timer */
-	outb(qlcfg9, qbase + 9);	/* prescaler */
 
-#if QL_RESET_AT_START
-	outb(3, qbase + 3);
-	REG1;
-	/* FIXME: timeout */
-	while (inb(qbase + 0xf) & 4)
-		cpu_relax();
-	REG0;
-#endif
+	qlogicfas408_setup(qbase, qinitid, INT_TYPE);
 
 	host->name = qlogic_name;
-	shost = scsi_host_alloc(host, sizeof(struct qlogicfas_priv));
+	shost = scsi_host_alloc(host, sizeof(struct qlogicfas408_priv));
 	if (!shost)
 		goto err;
 	shost->io_port = qbase;
@@ -141,12 +147,14 @@ static struct Scsi_Host *qlogic_detect(Scsi_Host_Template *host,
 	if (qlirq != -1)
 		shost->irq = qlirq;
 
-	priv = (qlogicfas_priv_t)&(shost->hostdata[0]);
+	priv = get_priv_by_host(shost);
 	priv->qlirq = qlirq;
 	priv->qbase = qbase;
 	priv->qinitid = qinitid;
+	priv->shost = shost;
+	priv->int_type = INT_TYPE;					
 
-	if (request_irq(qlirq, do_ql_ihandl, 0, qlogic_name, shost))
+	if (request_irq(qlirq, qlogicfas408_ihandl, 0, qlogic_name, shost))
 		goto free_scsi_host;
 
 	sprintf(priv->qinfo,
@@ -307,9 +315,6 @@ static void qlogic_config(dev_link_t * link)
 		outb(0x04, link->io.BasePort1 + 0xd);
 	}
 
-	qlogicfas_driver_template.name = qlogic_name;
-	qlogicfas_driver_template.proc_name = qlogic_name;
-
 	/* The KXL-810AN has a bigger IO port window */
 	if (link->io.NumPorts1 == 32)
 		host = qlogic_detect(&qlogicfas_driver_template, link,
@@ -402,7 +407,7 @@ static int qlogic_event(event_t event, int priority, event_callback_args_t * arg
 				outb(0x04, link->io.BasePort1 + 0xd);
 			}
 			/* Ugggglllyyyy!!! */
-			qlogicfas_bus_reset(NULL);
+			qlogicfas408_bus_reset(NULL);
 		}
 		break;
 	}

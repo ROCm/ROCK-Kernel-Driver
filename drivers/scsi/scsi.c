@@ -977,8 +977,6 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
  */
 int scsi_device_get(struct scsi_device *sdev)
 {
-	if(!sdev)
-		return -ENXIO;
 	if (sdev->sdev_state == SDEV_DEL || sdev->sdev_state == SDEV_CANCEL)
 		return -ENXIO;
 	if (!get_device(&sdev->sdev_gendev))

@@ -805,6 +805,14 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 
 		if (scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID)
 			copy_sense_data(sc, hd, mf, pScsiReply);
+                
+		/*
+		 *  Look for + dump FCP ResponseInfo[]!
+		 */
+		if (scsi_state & MPI_SCSI_STATE_RESPONSE_INFO_VALID) {
+			printk(KERN_NOTICE "  FCP_ResponseInfo=%08xh\n",
+			le32_to_cpu(pScsiReply->ResponseInfo));
+		}
 
 		switch(status) {
 		case MPI_IOCSTATUS_BUSY:			/* 0x0002 */
@@ -932,10 +940,6 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			break;
 
 		case MPI_IOCSTATUS_SCSI_PROTOCOL_ERROR:		/* 0x0047 */
-			if (pScsiReply->SCSIState & MPI_SCSI_STATE_TERMINATED) {
-				/*  Not real sure here either...  */
-				sc->result = DID_RESET << 16;
-			} else
 				sc->result = DID_SOFT_ERROR << 16;
 			break;
 
@@ -1106,16 +1110,21 @@ mptscsih_flush_running_cmds(MPT_SCSI_HOST *hd)
 			 * Do OS callback
 			 * Free driver resources (chain, msg buffers)
 			 */
-			if (SCpnt->use_sg) {
-				pci_unmap_sg(hd->ioc->pcidev, (struct scatterlist *) SCpnt->request_buffer,
-					    SCpnt->use_sg, scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-			} else if (SCpnt->request_bufflen) {
-				scPrivate	*my_priv;
+			if (scsi_device_online(SCpnt->device)) {
+				if (SCpnt->use_sg) {
+					pci_unmap_sg(hd->ioc->pcidev,
+						(struct scatterlist *) SCpnt->request_buffer,
+						SCpnt->use_sg,
+						scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+				} else if (SCpnt->request_bufflen) {
+					scPrivate	*my_priv;
 
-				my_priv = (scPrivate *) &SCpnt->SCp;
-				pci_unmap_single(hd->ioc->pcidev, (dma_addr_t)(ulong)my_priv->p1,
-					   SCpnt->request_bufflen,
-					   scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+					my_priv = (scPrivate *) &SCpnt->SCp;
+					pci_unmap_single(hd->ioc->pcidev,
+						(dma_addr_t)(ulong)my_priv->p1,
+						SCpnt->request_bufflen,
+						scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+				}
 			}
 			SCpnt->result = DID_RESET << 16;
 			SCpnt->host_scribble = NULL;
