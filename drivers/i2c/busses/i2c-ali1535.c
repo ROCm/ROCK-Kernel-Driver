@@ -507,7 +507,7 @@ static int __devinit ali1535_probe(struct pci_dev *dev, const struct pci_device_
 	/* set up the driverfs linkage to our parent device */
 	ali1535_adapter.dev.parent = &dev->dev;
 
-	snprintf(ali1535_adapter.name, DEVICE_NAME_SIZE, 
+	snprintf(ali1535_adapter.name, I2C_NAME_SIZE, 
 		"SMBus ALI1535 adapter at %04x", ali1535_smba);
 	return i2c_add_adapter(&ali1535_adapter);
 }

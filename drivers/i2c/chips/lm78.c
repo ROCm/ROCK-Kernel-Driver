@@ -638,7 +638,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put into the global list */
-	strlcpy(new_client->name, client_name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->name, client_name, I2C_NAME_SIZE);
 	data->type = kind;
 
 	data->valid = 0;

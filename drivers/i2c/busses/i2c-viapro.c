@@ -376,7 +376,7 @@ static int __devinit vt596_probe(struct pci_dev *pdev,
 	dev_dbg(&pdev->dev, "VT596_smba = 0x%X\n", vt596_smba);
 
 	vt596_adapter.dev.parent = &pdev->dev;
-	snprintf(vt596_adapter.name, DEVICE_NAME_SIZE,
+	snprintf(vt596_adapter.name, I2C_NAME_SIZE,
 			"SMBus Via Pro adapter at %04x", vt596_smba);
 	
 	return i2c_add_adapter(&vt596_adapter);
