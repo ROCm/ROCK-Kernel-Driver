@@ -153,7 +153,6 @@
 #include <linux/cdrom.h>
 #include <linux/seq_file.h>
 #include <linux/device.h>
-#include <linux/kmod.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -190,8 +189,6 @@ int noautodma = 1;
 
 EXPORT_SYMBOL(noautodma);
 EXPORT_SYMBOL(ide_bus_type);
-
-int (*ide_probe)(void);
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -442,21 +439,6 @@ u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 }
 
 EXPORT_SYMBOL(ide_dump_status);
-
-
-
-void ide_probe_module (void)
-{
-	if (!ide_probe) {
-#if defined(CONFIG_KMOD) && defined(CONFIG_BLK_DEV_IDE_MODULE)
-		(void) request_module("ide-probe-mod");
-#endif /* (CONFIG_KMOD) && (CONFIG_BLK_DEV_IDE_MODULE) */
-	} else {
-		(void)ide_probe();
-	}
-}
-
-EXPORT_SYMBOL(ide_probe_module);
 
 static int ide_open (struct inode * inode, struct file * filp)
 {
@@ -1033,7 +1015,7 @@ found:
 	hwif->chipset = hw->chipset;
 
 	if (!initializing) {
-		ide_probe_module();
+		probe_hwif_init(hwif);
 #ifdef CONFIG_PROC_FS
 		create_proc_ide_interfaces();
 #endif
@@ -2276,28 +2258,6 @@ static void __init probe_for_hwifs (void)
 #endif /* CONFIG_BLK_DEV_IDEPNP */
 }
 
-void __init ide_init_builtin_drivers (void)
-{
-	/*
-	 * Probe for special PCI and other "known" interface chipsets
-	 */
-	probe_for_hwifs ();
-
-#ifdef CONFIG_BLK_DEV_IDE
-	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET])
-		ide_get_lock(NULL, NULL); /* for atari only */
-
-	(void) ideprobe_init();
-
-	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET])
-		ide_release_lock();	/* for atari only */
-#endif /* CONFIG_BLK_DEV_IDE */
-
-#ifdef CONFIG_PROC_FS
-	proc_ide_create();
-#endif
-}
-
 /*
  *	Actually unregister the subdriver. Called with the
  *	request lock dropped.
@@ -2558,7 +2518,6 @@ EXPORT_SYMBOL(ide_fops);
  */
 
 EXPORT_SYMBOL(ide_lock);
-EXPORT_SYMBOL(ide_probe);
 
 struct bus_type ide_bus_type = {
 	.name		= "ide",
@@ -2601,9 +2560,13 @@ int __init ide_init (void)
 #endif
 
 	initializing = 1;
-	ide_init_builtin_drivers();
+	/* Probe for special PCI and other "known" interface chipsets. */
+	probe_for_hwifs();
 	initializing = 0;
 
+#ifdef CONFIG_PROC_FS
+	proc_ide_create();
+#endif
 	return 0;
 }
 

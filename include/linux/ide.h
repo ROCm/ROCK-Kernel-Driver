@@ -1231,7 +1231,6 @@ typedef struct ide_devices_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern int (*ide_probe)(void);
 
 extern ide_devices_t   *idedisk;
 extern ide_devices_t   *idecd;
