@@ -564,17 +564,17 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 }
 
 static struct file_operations tun_fops = {
-	owner:	THIS_MODULE,	
-	llseek:	no_llseek,
-	read:	tun_chr_read,
-	readv:	tun_chr_readv,
-	write:	tun_chr_write,
-	writev:	tun_chr_writev,
-	poll:	tun_chr_poll,
-	ioctl:	tun_chr_ioctl,
-	open:	tun_chr_open,
-	release:tun_chr_close,
-	fasync:	tun_chr_fasync		
+	.owner	= THIS_MODULE,	
+	.llseek = no_llseek,
+	.read	= tun_chr_read,
+	.readv	= tun_chr_readv,
+	.write	= tun_chr_write,
+	.writev = tun_chr_writev,
+	.poll	= tun_chr_poll,
+	.ioctl	= tun_chr_ioctl,
+	.open	= tun_chr_open,
+	.release = tun_chr_close,
+	.fasync = tun_chr_fasync		
 };
 
 static struct miscdevice tun_miscdev=

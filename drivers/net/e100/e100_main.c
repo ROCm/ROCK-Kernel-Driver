@@ -797,13 +797,15 @@ e100_remove1(struct pci_dev *pcid)
 MODULE_DEVICE_TABLE(pci, e100_id_table);
 
 static struct pci_driver e100_driver = {
-	name:           "e100",
-	id_table:       e100_id_table,
-	probe:          e100_found1,
-	remove:         __devexit_p(e100_remove1),
-#ifdef CONFIG_PM			
-	suspend:        e100_suspend,
-	resume:         e100_resume,
+	.name         = "e100",
+	.id_table     = e100_id_table,
+	.probe        = e100_found1,
+	.remove       = __devexit_p(e100_remove1),
+#ifdef CONFIG_PM
+	.suspend      = e100_suspend,
+	.resume       = e100_resume,
+	.save_state   = e100_save_state,
+	.enable_wake  = e100_enable_wake,
 #endif
 };
 

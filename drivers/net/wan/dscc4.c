@@ -1860,10 +1860,10 @@ static struct pci_device_id dscc4_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, dscc4_pci_tbl);
 
 static struct pci_driver dscc4_driver = {
-	name:           DRV_NAME,
-	id_table:       dscc4_pci_tbl,
-	probe:          dscc4_init_one,
-	remove:         dscc4_remove_one,
+	.name		= DRV_NAME,
+	.id_table	= dscc4_pci_tbl,
+	.probe		= dscc4_init_one,
+	.remove		= dscc4_remove_one,
 };
 
 static int __init dscc4_init_module(void)

@@ -1286,11 +1286,11 @@ static int fs_change_qos(struct atm_vcc *vcc,struct atm_qos *qos,int flags)
 
 
 static const struct atmdev_ops ops = {
-	open:           fs_open,
-	close:          fs_close,
-	send:           fs_send,
+	.open =         fs_open,
+	.close =        fs_close,
+	.send =         fs_send,
 #if 0
-	owner:          THIS_MODULE,
+	.owner =        THIS_MODULE,
 #endif
 	/*                 fs_sg_send */
 	/* ioctl:          fs_ioctl, */
@@ -2099,10 +2099,10 @@ static struct pci_device_id firestream_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, firestream_pci_tbl);
 
 static struct pci_driver firestream_driver = {
-	name:           "firestream",
-	id_table:       firestream_pci_tbl,
-	probe:          firestream_init_one,
-	remove:         __devexit_p(firestream_remove_one),
+	.name		= "firestream",
+	.id_table	= firestream_pci_tbl,
+	.probe		= firestream_init_one,
+	.remove		= __devexit_p(firestream_remove_one),
 };
 
 static int __init firestream_init_module (void)

@@ -2012,10 +2012,10 @@ static void __devexit starfire_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver starfire_driver = {
-	name:		DRV_NAME,
-	probe:		starfire_init_one,
-	remove:		__devexit_p(starfire_remove_one),
-	id_table:	starfire_pci_tbl,
+	.name		= DRV_NAME,
+	.probe		= starfire_init_one,
+	.remove		= __devexit_p(starfire_remove_one),
+	.id_table	= starfire_pci_tbl,
 };
 
 

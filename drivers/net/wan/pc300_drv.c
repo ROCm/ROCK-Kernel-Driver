@@ -3661,12 +3661,12 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 }
 
 static struct pci_driver cpc_driver = {
-	name:"pc300",
-	id_table:cpc_pci_dev_id,
-	probe:cpc_init_one,
-	remove:cpc_remove_one,
-	suspend:NULL,
-	resume:NULL,
+	.name = "pc300",
+	.id_table = cpc_pci_dev_id,
+	.probe = cpc_init_one,
+	.remove = cpc_remove_one,
+	.suspend = NULL,
+	.resume = NULL,
 };
 
 static int __init cpc_init(void)

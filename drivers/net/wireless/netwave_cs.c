@@ -902,12 +902,12 @@ static const iw_handler		netwave_private_handler[] =
 
 static const struct iw_handler_def	netwave_handler_def =
 {
-	num_standard:	sizeof(netwave_handler)/sizeof(iw_handler),
-	num_private:	sizeof(netwave_private_handler)/sizeof(iw_handler),
-	num_private_args: sizeof(netwave_private_args)/sizeof(struct iw_priv_args),
-	standard:	(iw_handler *) netwave_handler,
-	private:	(iw_handler *) netwave_private_handler,
-	private_args:	(struct iw_priv_args *) netwave_private_args,
+	.num_standard	= sizeof(netwave_handler)/sizeof(iw_handler),
+	.num_private	= sizeof(netwave_private_handler)/sizeof(iw_handler),
+	.num_private_args = sizeof(netwave_private_args)/sizeof(struct iw_priv_args),
+	.standard	= (iw_handler *) netwave_handler,
+	.private	= (iw_handler *) netwave_private_handler,
+	.private_args	= (struct iw_priv_args *) netwave_private_args,
 };
 #endif /* WIRELESS_EXT > 12 */
 

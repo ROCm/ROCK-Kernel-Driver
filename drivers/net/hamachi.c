@@ -2005,10 +2005,10 @@ static struct pci_device_id hamachi_pci_tbl[] __initdata = {
 MODULE_DEVICE_TABLE(pci, hamachi_pci_tbl);
 
 static struct pci_driver hamachi_driver = {
-	name:		DRV_NAME,
-	id_table:	hamachi_pci_tbl,
-	probe:		hamachi_init_one,
-	remove:		__devexit_p(hamachi_remove_one),
+	.name		= DRV_NAME,
+	.id_table	= hamachi_pci_tbl,
+	.probe		= hamachi_init_one,
+	.remove		= __devexit_p(hamachi_remove_one),
 };
 
 static int __init hamachi_init (void)

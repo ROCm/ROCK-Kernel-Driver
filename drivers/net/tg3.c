@@ -6154,12 +6154,12 @@ static int tg3_resume(struct pci_dev *pdev)
 }
 
 static struct pci_driver tg3_driver = {
-	name:		DRV_MODULE_NAME,
-	id_table:	tg3_pci_tbl,
-	probe:		tg3_init_one,
-	remove:		__devexit_p(tg3_remove_one),
-	suspend:	tg3_suspend,
-	resume:		tg3_resume
+	.name		= DRV_MODULE_NAME,
+	.id_table	= tg3_pci_tbl,
+	.probe		= tg3_init_one,
+	.remove		= __devexit_p(tg3_remove_one),
+	.suspend	= tg3_suspend,
+	.resume		= tg3_resume
 };
 
 static int __init tg3_init(void)

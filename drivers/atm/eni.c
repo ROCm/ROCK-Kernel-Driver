@@ -2226,17 +2226,17 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 
 
 static const struct atmdev_ops ops = {
-	open:		eni_open,
-	close:		eni_close,
-	ioctl:		eni_ioctl,
-	getsockopt:	eni_getsockopt,
-	setsockopt:	eni_setsockopt,
-	send:		eni_send,
-	sg_send:	eni_sg_send,
-	phy_put:	eni_phy_put,
-	phy_get:	eni_phy_get,
-	change_qos:	eni_change_qos,
-	proc_read:	eni_proc_read
+	.open		= eni_open,
+	.close		= eni_close,
+	.ioctl		= eni_ioctl,
+	.getsockopt	= eni_getsockopt,
+	.setsockopt	= eni_setsockopt,
+	.send		= eni_send,
+	.sg_send	= eni_sg_send,
+	.phy_put	= eni_phy_put,
+	.phy_get	= eni_phy_get,
+	.change_qos	= eni_change_qos,
+	.proc_read	= eni_proc_read
 };
 
 
@@ -2306,10 +2306,10 @@ static void __devexit eni_remove_one(struct pci_dev *pci_dev)
 
 
 static struct pci_driver eni_driver = {
-	name:		DEV_LABEL,
-	id_table:	eni_pci_tbl,
-	probe:		eni_init_one,
-	remove:		__devexit_p(eni_remove_one),
+	.name		= DEV_LABEL,
+	.id_table	= eni_pci_tbl,
+	.probe		= eni_init_one,
+	.remove		= __devexit_p(eni_remove_one),
 };
 
 

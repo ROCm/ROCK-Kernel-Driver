@@ -3148,18 +3148,18 @@ static int ia_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 }
   
 static const struct atmdev_ops ops = {  
-	open:		ia_open,  
-	close:		ia_close,  
-	ioctl:		ia_ioctl,  
-	getsockopt:	ia_getsockopt,  
-	setsockopt:	ia_setsockopt,  
-	send:		ia_send,  
-	sg_send:	ia_sg_send,  
-	phy_put:	ia_phy_put,  
-	phy_get:	ia_phy_get,  
-	change_qos:	ia_change_qos,  
-	proc_read:	ia_proc_read,
-	owner:		THIS_MODULE,
+	.open		= ia_open,  
+	.close		= ia_close,  
+	.ioctl		= ia_ioctl,  
+	.getsockopt	= ia_getsockopt,  
+	.setsockopt	= ia_setsockopt,  
+	.send		= ia_send,  
+	.sg_send	= ia_sg_send,  
+	.phy_put	= ia_phy_put,  
+	.phy_get	= ia_phy_get,  
+	.change_qos	= ia_change_qos,  
+	.proc_read	= ia_proc_read,
+	.owner		= THIS_MODULE,
 };  
 	  
   

@@ -286,10 +286,10 @@ static int suni_stop(struct atm_dev *dev)
 
 
 static const struct atmphy_ops suni_ops = {
-	start:		suni_start,
-	ioctl:		suni_ioctl,
-	interrupt:	suni_int,
-	stop:		suni_stop,
+	.start		= suni_start,
+	.ioctl		= suni_ioctl,
+	.interrupt	= suni_int,
+	.stop		= suni_stop,
 };
 
 

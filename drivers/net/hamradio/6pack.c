@@ -687,15 +687,15 @@ static int sp_open_dev(struct net_device *dev)
 
 /* Fill in our line protocol discipline */
 static struct tty_ldisc sp_ldisc = {
-	magic:		TTY_LDISC_MAGIC,
-	name:		"6pack",
-	open:		sixpack_open,
-	close:		sixpack_close,
-	ioctl:		(int (*)(struct tty_struct *, struct file *,
+	.magic	= TTY_LDISC_MAGIC,
+	.name		= "6pack",
+	.open		= sixpack_open,
+	.close	= sixpack_close,
+	.ioctl	= (int (*)(struct tty_struct *, struct file *,
 			unsigned int, unsigned long)) sixpack_ioctl,
-	receive_buf:	sixpack_receive_buf,
-	receive_room:	sixpack_receive_room,
-	write_wakeup:	sixpack_write_wakeup,
+	.receive_buf	= sixpack_receive_buf,
+	.receive_room	= sixpack_receive_room,
+	.write_wakeup	= sixpack_write_wakeup,
 };
 
 /* Initialize 6pack control device -- register 6pack line discipline */

@@ -313,11 +313,11 @@ e1000_check_options(struct e1000_adapter *adapter)
 
 	{ /* Transmit Descriptor Count */
 		struct e1000_option opt = {
-			type: range_option,
-			name: "Transmit Descriptors",
-			err:  "using default of " __MODULE_STRING(DEFAULT_TXD),
-			def:  DEFAULT_TXD,
-			arg: { r: { min: MIN_TXD }}
+			.type = range_option,
+			.name = "Transmit Descriptors",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_TXD),
+			.def  = DEFAULT_TXD,
+			.arg  = { r: { min: MIN_TXD }}
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
@@ -329,11 +329,11 @@ e1000_check_options(struct e1000_adapter *adapter)
 	}
 	{ /* Receive Descriptor Count */
 		struct e1000_option opt = {
-			type: range_option,
-			name: "Receive Descriptors",
-			err:  "using default of " __MODULE_STRING(DEFAULT_RXD),
-			def:  DEFAULT_RXD,
-			arg: { r: { min: MIN_RXD }}
+			.type = range_option,
+			.name = "Receive Descriptors",
+			.err  = "using default of " __MODULE_STRING(DEFAULT_RXD),
+			.def  = DEFAULT_RXD,
+			.arg  = { r: { min: MIN_RXD }}
 		};
 		struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
@@ -345,10 +345,10 @@ e1000_check_options(struct e1000_adapter *adapter)
 	}
 	{ /* Checksum Offload Enable/Disable */
 		struct e1000_option opt = {
-			type: enable_option,
-			name: "Checksum Offload",
-			err:  "defaulting to Enabled",
-			def:  OPTION_ENABLED
+			.type = enable_option,
+			.name = "Checksum Offload",
+			.err  = "defaulting to Enabled",
+			.def  = OPTION_ENABLED
 		};
 		
 		int rx_csum = XsumRX[bd];
@@ -365,11 +365,11 @@ e1000_check_options(struct e1000_adapter *adapter)
 			 { e1000_fc_default, "Flow Control Hardware Default" }};
 
 		struct e1000_option opt = {
-			type: list_option,
-			name: "Flow Control",
-			err:  "reading default settings from EEPROM",
-			def:  e1000_fc_default,
-			arg: { l: { nr: ARRAY_SIZE(fc_list), p: fc_list }}
+			.type = list_option,
+			.name = "Flow Control",
+			.err  = "reading default settings from EEPROM",
+			.def  = e1000_fc_default,
+			.arg  = { l: { nr: ARRAY_SIZE(fc_list), p: fc_list }}
 		};
 
 		int fc = FlowControl[bd];
@@ -380,9 +380,9 @@ e1000_check_options(struct e1000_adapter *adapter)
 		char *rdtr = "using default of " __MODULE_STRING(DEFAULT_RDTR);
 		char *radv = "using default of " __MODULE_STRING(DEFAULT_RADV);
 		struct e1000_option opt = {
-			type: range_option,
-			name: "Receive Interrupt Delay",
-			arg: { r: { min: MIN_RXDELAY, max: MAX_RXDELAY }}
+			.type = range_option,
+			.name = "Receive Interrupt Delay",
+			.arg  = { r: { min: MIN_RXDELAY, max: MAX_RXDELAY }}
 		};
 		e1000_mac_type mac_type = adapter->hw.mac_type;
 		opt.def = mac_type < e1000_82540 ? DEFAULT_RDTR : DEFAULT_RADV;
@@ -451,11 +451,11 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		                                      {  SPEED_100, "" },
 		                                      { SPEED_1000, "" }};
 		struct e1000_option opt = {
-			type: list_option,
-			name: "Speed",
-			err:  "parameter ignored",
-			def:  0,
-			arg: { l: { nr: ARRAY_SIZE(speed_list), p: speed_list }}
+			.type = list_option,
+			.name = "Speed",
+			.err  = "parameter ignored",
+			.def  = 0,
+			.arg  = { l: { nr: ARRAY_SIZE(speed_list), p: speed_list }}
 		};
 
 		speed = Speed[bd];
@@ -466,11 +466,11 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		                                     { HALF_DUPLEX, "" },
 		                                     { FULL_DUPLEX, "" }};
 		struct e1000_option opt = {
-			type: list_option,
-			name: "Duplex",
-			err:  "parameter ignored",
-			def:  0,
-			arg: { l: { nr: ARRAY_SIZE(dplx_list), p: dplx_list }}
+			.type = list_option,
+			.name = "Duplex",
+			.err  = "parameter ignored",
+			.def  = 0,
+			.arg  = { l: { nr: ARRAY_SIZE(dplx_list), p: dplx_list }}
 		};
 
 		dplx = Duplex[bd];
@@ -518,11 +518,11 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 			 { 0x2f, AA "1000/FD, 100/FD, 100/HD, 10/FD, 10/HD" }};
 
 		struct e1000_option opt = {
-			type: list_option,
-			name: "AutoNeg",
-			err:  "parameter ignored",
-			def:  AUTONEG_ADV_DEFAULT,
-			arg: { l: { nr: ARRAY_SIZE(an_list), p: an_list }}
+			.type = list_option,
+			.name = "AutoNeg",
+			.err  = "parameter ignored",
+			.def  = AUTONEG_ADV_DEFAULT,
+			.arg  = { l: { nr: ARRAY_SIZE(an_list), p: an_list }}
 		};
 
 		int an = AutoNeg[bd];

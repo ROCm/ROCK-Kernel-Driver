@@ -1591,10 +1591,10 @@ static void irda_usb_disconnect(struct usb_device *dev, void *ptr)
  * USB device callbacks
  */
 static struct usb_driver irda_driver = {
-	name:		"irda-usb",
-	probe:		irda_usb_probe,
-	disconnect:	irda_usb_disconnect,
-	id_table:	dongles,
+	.name		= "irda-usb",
+	.probe		= irda_usb_probe,
+	.disconnect	= irda_usb_disconnect,
+	.id_table	= dongles,
 };
 
 /************************* MODULE CALLBACKS *************************/

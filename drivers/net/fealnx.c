@@ -1926,10 +1926,10 @@ MODULE_DEVICE_TABLE(pci, fealnx_pci_tbl);
 
 
 static struct pci_driver fealnx_driver = {
-	name:		"fealnx",
-	id_table:	fealnx_pci_tbl,
-	probe:		fealnx_init_one,
-	remove:		__devexit_p(fealnx_remove_one),
+	.name		= "fealnx",
+	.id_table	= fealnx_pci_tbl,
+	.probe		= fealnx_init_one,
+	.remove		= __devexit_p(fealnx_remove_one),
 };
 
 static int __init fealnx_init(void)

@@ -1350,9 +1350,9 @@ static void plip_detach (struct parport *port)
 }
 
 static struct parport_driver plip_driver = {
-	name:	"plip",
-	attach:	plip_attach,
-	detach:	plip_detach
+	.name	= "plip",
+	.attach = plip_attach,
+	.detach = plip_detach
 };
 
 static void __exit plip_cleanup_module (void)
