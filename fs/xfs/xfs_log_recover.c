@@ -3416,6 +3416,7 @@ xlog_unpack_data_checksum(
 {
 	uint			*up = (uint *)dp;
 	uint			chksum = 0;
+	int			i;
 
 	/* divide length by 4 to get # words */
 	for (i=0; i < INT_GET(rhead->h_len, ARCH_CONVERT) >> 2; i++) {
@@ -3476,7 +3477,7 @@ xlog_valid_rec_header(
 	xlog_rec_header_t	*rhead,
 	xfs_daddr_t		blkno)
 {
-	int			bblks;
+	int			hlen;
 
 	if (unlikely(
 	    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
@@ -3495,8 +3496,8 @@ xlog_valid_rec_header(
 	}
 
 	/* LR body must have data or it wouldn't have been written */
-	bblks = INT_GET(rhead->h_len, ARCH_CONVERT);
-	if (unlikely( bblks <= 0 || bblks > INT_MAX )) {
+	hlen = INT_GET(rhead->h_len, ARCH_CONVERT);
+	if (unlikely( hlen <= 0 || hlen > INT_MAX )) {
 		XFS_ERROR_REPORT("xlog_valid_rec_header(2)",
 				XFS_ERRLEVEL_LOW, log->l_mp);
 		return XFS_ERROR(EFSCORRUPTED);
@@ -4041,7 +4042,7 @@ xlog_recover_check_summary(
 				XFS_FSS_TO_BB(mp, 1), 0);
 		if (XFS_BUF_ISERROR(agibp)) {
 			xfs_ioerror_alert("xlog_recover_check_summary(agi)",
-					  log->l_mp, agibp, agidaddr);
+					  mp, agibp, agidaddr);
 		}
 		agip = XFS_BUF_TO_AGI(agibp);
 		ASSERT(XFS_AGI_MAGIC ==
@@ -4057,7 +4058,8 @@ xlog_recover_check_summary(
 
 	sbbp = xfs_getsb(mp, 0);
 #ifdef XFS_LOUD_RECOVERY
-	sbp = XFS_BUF_TO_SBP(sbbp);
+	sbp = &mp->m_sb;
+	xfs_xlatesb(XFS_BUF_TO_SBP(sbbp), sbp, 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
 	cmn_err(CE_NOTE,
 		"xlog_recover_check_summary: sb_icount %Lu itotal %Lu",
 		sbp->sb_icount, itotal);
