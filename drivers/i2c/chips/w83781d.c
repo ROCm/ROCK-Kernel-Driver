@@ -36,10 +36,6 @@
 */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CHIP
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
