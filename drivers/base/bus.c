@@ -288,7 +288,7 @@ static int bus_match(struct device * dev, struct device_driver * drv)
  *	Walk the list of drivers that the bus has and call bus_match()
  *	for each pair. If a compatible pair is found, break out and return.
  */
-static int device_attach(struct device * dev)
+int device_attach(struct device * dev)
 {
  	struct bus_type * bus = dev->bus;
 	struct list_head * entry;
@@ -728,6 +728,8 @@ EXPORT_SYMBOL_GPL(bus_for_each_drv);
 
 EXPORT_SYMBOL_GPL(device_bind_driver);
 EXPORT_SYMBOL_GPL(device_release_driver);
+EXPORT_SYMBOL_GPL(device_attach);
+EXPORT_SYMBOL_GPL(driver_attach);
 
 EXPORT_SYMBOL_GPL(bus_add_device);
 EXPORT_SYMBOL_GPL(bus_remove_device);

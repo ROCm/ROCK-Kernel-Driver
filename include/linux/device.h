@@ -327,6 +327,7 @@ extern int device_for_each_child(struct device *, void *,
  */
 extern void device_bind_driver(struct device * dev);
 extern void device_release_driver(struct device * dev);
+extern int  device_attach(struct device * dev);
 extern void driver_attach(struct device_driver * drv);
 
 
