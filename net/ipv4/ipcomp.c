@@ -114,8 +114,8 @@ static int ipcomp_compress(struct xfrm_state *x, struct sk_buff *skb)
 		goto out;
 	}
 	
-	memcpy(start, scratch, dlen);
-	pskb_trim(skb, ihlen + dlen);
+	memcpy(start + sizeof(struct ip_comp_hdr), scratch, dlen);
+	pskb_trim(skb, ihlen + dlen + sizeof(struct ip_comp_hdr));
 	
 out:	
 	return err;
@@ -148,13 +148,9 @@ static int ipcomp_output(struct sk_buff **pskb)
 	int err;
 	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x = dst->xfrm;
-	struct iphdr *iph, *top_iph;
+	struct iphdr *iph;
 	struct ip_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
-	union {
-		struct iphdr	iph;
-		char 		buf[60];
-	} tmp_iph;
 	int hdr_len = 0;
 
 	if ((*pskb)->ip_summed == CHECKSUM_HW) {
@@ -211,19 +207,15 @@ static int ipcomp_output(struct sk_buff **pskb)
 
 	/* Install ipcomp header, convert into ipcomp datagram. */
 	iph = (*pskb)->nh.iph;
-	memcpy(&tmp_iph, iph, iph->ihl * 4);
-	top_iph = (struct iphdr *)skb_push(*pskb, sizeof(struct ip_comp_hdr));
-	memcpy(top_iph, &tmp_iph, iph->ihl * 4);
-	iph = top_iph;
 	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
 		IP_ECN_clear(iph);
 	iph->tot_len = htons((*pskb)->len);
-	iph->protocol = IPPROTO_COMP;
 	iph->check = 0;
 	ipch = (struct ip_comp_hdr *)((char *)iph + iph->ihl * 4);
-	ipch->nexthdr = x->props.mode ? IPPROTO_IPIP : tmp_iph.iph.protocol;
+	ipch->nexthdr = x->props.mode ? IPPROTO_IPIP : iph->protocol;
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
+	iph->protocol = IPPROTO_COMP;
 	ip_send_check(iph);
 	(*pskb)->nh.raw = (*pskb)->data;
 
@@ -365,7 +357,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 		goto error;
 
 	memset(ipcd, 0, sizeof(*ipcd));
-	x->props.header_len = sizeof(struct ip_comp_hdr);
+	x->props.header_len = 0;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
 
