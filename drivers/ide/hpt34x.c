@@ -253,7 +253,7 @@ static int hpt34x_udma_init(struct ata_device *drive, struct request *rq)
 	unsigned int count;
 	u8 cmd;
 
-	if (!(count = udma_new_table(ch, rq)))
+	if (!(count = udma_new_table(drive, rq)))
 		return 1;	/* try PIO instead of DMA */
 
 	if (rq_data_dir(rq) == READ)

@@ -229,10 +229,15 @@ static void hexdump(u8 *x, int len)
 	printk("]\n");
 }
 
+static inline idescsi_scsi_t *idescsi_private(struct Scsi_Host *host)
+{
+	return (idescsi_scsi_t*) &host[1];
+}
+
 static int idescsi_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	struct atapi_packet_command *pc = (struct atapi_packet_command *) rq->special;
 	int log = test_bit(IDESCSI_LOG_CMD, &scsi->log);
 	u8 *scsi_buf;
@@ -289,7 +294,7 @@ static inline unsigned long get_timeout(struct atapi_packet_command *pc)
 static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request *rq)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	u8 ireason;
 	int bcount;
 	struct atapi_packet_command *pc=scsi->pc;
@@ -372,7 +377,7 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct request *rq)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	struct atapi_packet_command *pc = scsi->pc;
 	byte ireason;
 	ide_startstop_t startstop;
@@ -398,7 +403,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 		struct atapi_packet_command *pc)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	int bcount;
 	int dma_ok = 0;
 
@@ -473,7 +478,6 @@ static int idescsi_cleanup (struct ata_device *drive)
 	if (ide_unregister_subdriver (drive)) {
 		return 1;
 	}
-	kfree((idescsi_scsi_t *) host->hostdata[0]);
 	scsi_unregister(host);
 
 	return 0;
@@ -515,7 +519,7 @@ static const char *idescsi_info(struct Scsi_Host *host)
 
 static int idescsi_ioctl(Scsi_Device *dev, int cmd, void *arg)
 {
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) dev->host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(dev->host);
 
 	if (cmd == SG_SET_TRANSFORM) {
 		if (arg)
@@ -612,7 +616,7 @@ static inline struct bio *idescsi_dma_bio(struct ata_device *drive, struct atapi
 static inline int should_transform(struct ata_device *drive, Scsi_Cmnd *cmd)
 {
 	struct Scsi_Host *host = drive->driver_data;
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(host);
 
 	if (major(cmd->request.rq_dev) == SCSI_GENERIC_MAJOR)
 		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
@@ -621,7 +625,7 @@ static inline int should_transform(struct ata_device *drive, Scsi_Cmnd *cmd)
 
 static int idescsi_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) cmd->host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(cmd->host);
 	struct ata_device *drive = scsi->drive;
 	struct request *rq = NULL;
 	struct atapi_packet_command *pc = NULL;
@@ -691,7 +695,7 @@ static int idescsi_device_reset(Scsi_Cmnd *cmd)
 
 static int idescsi_bios(Disk *disk, kdev_t dev, int *parm)
 {
-	idescsi_scsi_t *scsi = (idescsi_scsi_t *) disk->device->host->hostdata[0];
+	idescsi_scsi_t *scsi = idescsi_private(disk->device->host);
 	struct ata_device *drive = scsi->drive;
 
 	if (drive->bios_cyl && drive->bios_head && drive->bios_sect) {
@@ -758,8 +762,7 @@ static void idescsi_attach(struct ata_device *drive)
 	drive->driver_data = host;
 	drive->ready_stat = 0;
 
-	scsi = kmalloc(sizeof(*scsi), GFP_ATOMIC);
-	host->hostdata[0] = (unsigned long) scsi;
+	scsi = idescsi_private(host);
 	memset(scsi,0, sizeof (*scsi));
 	scsi->drive = drive;
 

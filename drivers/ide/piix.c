@@ -1,6 +1,5 @@
-/**** vi:set ts=8 sts=8 sw=8:************************************************
- *
- * $Id: piix.c,v 1.3 2002/03/29 16:06:06 vojtech Exp $
+/*
+ *  piix.c, v1.5 2002/05/03
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
  *
@@ -9,6 +8,7 @@
  *      Andre Hedrick
  *
  *  Thanks to Daniela Egbert for advice on PIIX bugs.
+ *  Thanks to Ulf Axelsson for noticing that ICH4 only documents UDMA100.
  */
 
 /*
@@ -85,20 +85,20 @@ static struct piix_ide_chip {
 	unsigned short id;
 	unsigned char flags;
 } piix_ide_chips[] = {
-	{ PCI_DEVICE_ID_INTEL_82801DB_9,	PIIX_UDMA_133 | PIIX_PINGPONG },                    /* Intel 82801DB ICH4 */
-	{ PCI_DEVICE_ID_INTEL_82801CA_11,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801CA ICH3/ICH3-S */
-	{ PCI_DEVICE_ID_INTEL_82801CA_10,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801CAM ICH3-M */
-	{ PCI_DEVICE_ID_INTEL_82801E_9,		PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801E C-ICH */
-	{ PCI_DEVICE_ID_INTEL_82801BA_9,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801BA ICH2 */
-	{ PCI_DEVICE_ID_INTEL_82801BA_8,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801BAM ICH2-M */
-	{ PCI_DEVICE_ID_INTEL_82801AB_1,	PIIX_UDMA_33  | PIIX_PINGPONG },                    /* Intel 82801AB ICH0 */
-	{ PCI_DEVICE_ID_INTEL_82801AA_1,	PIIX_UDMA_66  | PIIX_PINGPONG },                    /* Intel 82801AA ICH */
-	{ PCI_DEVICE_ID_INTEL_82372FB_1,	PIIX_UDMA_66 },	                                    /* Intel 82372FB PIIX5 */
-	{ PCI_DEVICE_ID_INTEL_82443MX_1,	PIIX_UDMA_33 },                                     /* Intel 82443MX MPIIX4 */
-	{ PCI_DEVICE_ID_INTEL_82371AB,		PIIX_UDMA_33 },                                     /* Intel 82371AB/EB PIIX4/PIIX4E */
-	{ PCI_DEVICE_ID_INTEL_82371SB_1,	PIIX_UDMA_NONE },                                   /* Intel 82371SB PIIX3 */
-	{ PCI_DEVICE_ID_INTEL_82371FB_1,	PIIX_UDMA_NONE | PIIX_NO_SITRE | PIIX_CHECK_REV },  /* Intel 82371FB PIIX */
-	{ PCI_DEVICE_ID_EFAR_SLC90E66_1,	PIIX_UDMA_66 | PIIX_VICTORY },                      /* Efar Victory66 */
+	{ PCI_DEVICE_ID_INTEL_82801DB_9,	PIIX_UDMA_100 | PIIX_PINGPONG },			/* Intel 82801DB ICH4 */
+	{ PCI_DEVICE_ID_INTEL_82801CA_11,	PIIX_UDMA_100 | PIIX_PINGPONG },			/* Intel 82801CA ICH3/ICH3-S */
+	{ PCI_DEVICE_ID_INTEL_82801CA_10,	PIIX_UDMA_100 | PIIX_PINGPONG },			/* Intel 82801CAM ICH3-M */
+	{ PCI_DEVICE_ID_INTEL_82801E_9,		PIIX_UDMA_100 | PIIX_PINGPONG },			/* Intel 82801E C-ICH */
+	{ PCI_DEVICE_ID_INTEL_82801BA_9,	PIIX_UDMA_100 | PIIX_PINGPONG },			/* Intel 82801BA ICH2 */
+	{ PCI_DEVICE_ID_INTEL_82801BA_8,	PIIX_UDMA_100 | PIIX_PINGPONG },			/* Intel 82801BAM ICH2-M */
+	{ PCI_DEVICE_ID_INTEL_82801AB_1,	PIIX_UDMA_33  | PIIX_PINGPONG},				/* Intel 82801AB ICH0 */
+	{ PCI_DEVICE_ID_INTEL_82801AA_1,	PIIX_UDMA_66  | PIIX_PINGPONG },			/* Intel 82801AA ICH */
+	{ PCI_DEVICE_ID_INTEL_82372FB_1,	PIIX_UDMA_66 },						/* Intel 82372FB PIIX5 */
+	{ PCI_DEVICE_ID_INTEL_82443MX_1,	PIIX_UDMA_33 },						/* Intel 82443MX MPIIX4 */
+	{ PCI_DEVICE_ID_INTEL_82371AB,		PIIX_UDMA_33 },						/* Intel 82371AB/EB PIIX4/PIIX4E */
+	{ PCI_DEVICE_ID_INTEL_82371SB_1,	PIIX_UDMA_NONE },					/* Intel 82371SB PIIX3 */
+	{ PCI_DEVICE_ID_INTEL_82371FB_1,	PIIX_UDMA_NONE | PIIX_NO_SITRE | PIIX_CHECK_REV },	/* Intel 82371FB PIIX */
+	{ PCI_DEVICE_ID_EFAR_SLC90E66_1,	PIIX_UDMA_66 | PIIX_VICTORY },				/* Efar Victory66 */
 	{ 0 }
 };
 
@@ -122,7 +122,7 @@ static void piix_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_tim
 
 	switch (dn & 1) {
 
-		case 1: 
+		case 1:
 			if (timing->cycle > 9) {
 				t &= ~0x30;
 				break;
@@ -177,7 +177,7 @@ static void piix_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_tim
 			&& ~piix_config->flags & PIIX_VICTORY) {
 
 			pci_read_config_dword(dev, PIIX_IDECFG, &c);
-			
+
 			if ((piix_config->flags & PIIX_UDMA) > PIIX_UDMA_66)
 				c &= ~(1 << (dn + 12));
 			c &= ~(1 << dn);
@@ -214,7 +214,7 @@ static int piix_set_drive(struct ata_device *drive, unsigned char speed)
 		umul = 2;
 	if (speed > XFER_UDMA_4 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100)
 		umul = 4;
-	
+
 	T = 1000000000 / system_bus_speed;
 	UT = T / umul;
 
@@ -280,6 +280,7 @@ static int piix_udma_setup(struct ata_device *drive)
  */
 static unsigned int __init piix_init_chipset(struct pci_dev *dev)
 {
+	struct pci_dev *orion = NULL;
 	unsigned int u;
 	unsigned short w;
 	unsigned char t;
@@ -293,55 +294,24 @@ static unsigned int __init piix_init_chipset(struct pci_dev *dev)
 		if (dev->device == piix_config->id)
 			break;
 
-	if (!piix_config->id) {
-		printk(KERN_WARNING "PIIX: Unknown PIIX/ICH chip %#x, contact Vojtech Pavlik <vojtech@ucw.cz>\n", dev->device);
-		return -ENODEV;
-	}
-
 /*
  * Check for possibly broken DMA configs.
  */
 
-	{
-		struct pci_dev *orion = NULL;
-
-		if (piix_config->flags & PIIX_CHECK_REV) {
-			pci_read_config_byte(dev, PCI_REVISION_ID, &t);
-			if (t < 2) {
-				printk(KERN_INFO "PIIX: Found buggy old PIIX rev %#x, disabling DMA\n", t);
-				piix_config->flags |= PIIX_NODMA;
-			}
-		}
-
-		if ((orion = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82454GX, NULL))) {
-			pci_read_config_byte(orion, PCI_REVISION_ID, &t);
-			if (t < 4) {
-				printk(KERN_INFO "PIIX: Found buggy 82454GX Orion bridge rev %#x, disabling DMA\n", t);
-				piix_config->flags |= PIIX_NODMA;
-			}
+	if (piix_config->flags & PIIX_CHECK_REV) {
+		pci_read_config_byte(dev, PCI_REVISION_ID, &t);
+		if (t < 2) {
+			printk(KERN_INFO "PIIX: Found buggy old PIIX rev %#x, disabling DMA\n", t);
+			piix_config->flags |= PIIX_NODMA;
 		}
 	}
 
-/*
- * Check 80-wire cable presence.
- */
-
-	switch (piix_config->flags & PIIX_UDMA) {
-
-		case PIIX_UDMA_66:
-			if (piix_config->flags && PIIX_VICTORY) {
-				pci_read_config_byte(dev, PIIX_IDESTAT, &t);
-				piix_80w = ((t & 2) ? 1 : 0) | ((t & 1) ? 2 : 0);
-				break;
-			}
-
-#ifndef CONFIG_BLK_DEV_PIIX_TRY133
-		case PIIX_UDMA_100:
-#endif
-		case PIIX_UDMA_133:
-			pci_read_config_dword(dev, PIIX_IDECFG, &u);
-			piix_80w = ((u & 0x30) ? 1 : 0) | ((u & 0xc0) ? 2 : 0);
-			break;
+	if ((orion = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82454GX, NULL))) {
+		pci_read_config_byte(orion, PCI_REVISION_ID, &t);
+		if (t < 4) {
+			printk(KERN_INFO "PIIX: Found buggy 82454GX Orion bridge rev %#x, disabling DMA\n", t);
+			piix_config->flags |= PIIX_NODMA;
+		}
 	}
 
 /*
@@ -377,32 +347,44 @@ static unsigned int __init piix_init_chipset(struct pci_dev *dev)
 	return 0;
 }
 
-static unsigned int __init piix_ata66_check(struct ata_channel *hwif)
+static unsigned int __init piix_ata66_check(struct ata_channel *ch)
 {
-	return ((piix_enabled & piix_80w) >> hwif->unit) & 1;
+	unsigned char t;
+	unsigned int u;
+
+	if ((piix_config->flags & PIIX_UDMA) < PIIX_UDMA_66)
+		return 0;
+
+	if (piix_config->flags & PIIX_VICTORY) {
+		pci_read_config_byte(ch->pci_dev, PIIX_IDESTAT, &t);
+		return ch->unit ? (t & 1) : !!(t & 2);
+	}
+
+	pci_read_config_dword(ch->pci_dev, PIIX_IDECFG, &u);
+	return ch->unit ? !!(u & 0xc0) : !!(u & 0x30);
 }
 
-static void __init piix_init_channel(struct ata_channel *hwif)
+static void __init piix_init_channel(struct ata_channel *ch)
 {
 	int i;
 
-	hwif->tuneproc = &piix_tune_drive;
-	hwif->speedproc = &piix_set_drive;
-	hwif->autodma = 0;
-	hwif->io_32bit = 1;
-	hwif->unmask = 1;
+	ch->tuneproc = &piix_tune_drive;
+	ch->speedproc = &piix_set_drive;
+	ch->autodma = 0;
+	ch->io_32bit = 1;
+	ch->unmask = 1;
 	for (i = 0; i < 2; i++) {
-		hwif->drives[i].autotune = 1;
-		hwif->drives[i].dn = hwif->unit * 2 + i;
+		ch->drives[i].autotune = 1;
+		ch->drives[i].dn = ch->unit * 2 + i;
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (hwif->dma_base) {
-		hwif->highmem = 1;
-		hwif->udma_setup = piix_udma_setup;
+	if (ch->dma_base) {
+		ch->highmem = 1;
+		ch->udma_setup = piix_udma_setup;
 # ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
-			hwif->autodma = 1;
+			ch->autodma = 1;
 # endif
 	}
 #endif
@@ -412,11 +394,11 @@ static void __init piix_init_channel(struct ata_channel *hwif)
  * We allow the BM-DMA driver only work on enabled interfaces,
  * and only if DMA is safe with the chip and bridge.
  */
-static void __init piix_init_dma(struct ata_channel *hwif, unsigned long dmabase)
+static void __init piix_init_dma(struct ata_channel *ch, unsigned long dmabase)
 {
-	if (((piix_enabled >> hwif->unit) & 1)
+	if (((piix_enabled >> ch->unit) & 1)
 		&& !(piix_config->flags & PIIX_NODMA))
-			ata_init_dma(hwif, dmabase);
+			ata_init_dma(ch, dmabase);
 }
 
 

@@ -614,7 +614,7 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 			return 0;
 		} else if (!pc->quiet) {
 			/* Otherwise, print an error. */
-			ide_dump_status(drive, rq, "packet command error", drive->status);
+			ata_dump(drive, rq, "packet command error");
 		}
 
 		/* Set the error flag and complete the request.
@@ -662,13 +662,13 @@ static int cdrom_decode_status(ide_startstop_t *startstop, struct ata_device *dr
 			   sense_key == DATA_PROTECT) {
 			/* No point in retrying after an illegal
 			   request or data protect error.*/
-			ide_dump_status(drive, rq, "command error", drive->status);
+			ata_dump(drive, rq, "command error");
 			cdrom_end_request(drive, rq,  0);
 		} else if (sense_key == MEDIUM_ERROR) {
 			/* No point in re-trying a zillion times on a bad
 			 * sector.  The error is not correctable at all.
 			 */
-			ide_dump_status(drive, rq, "media error (bad sector)", drive->status);
+			ata_dump(drive, rq, "media error (bad sector)");
 			cdrom_end_request(drive, rq, 0);
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
