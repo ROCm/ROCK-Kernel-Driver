@@ -58,7 +58,8 @@
     /* 3Com (0x10b7) */     \
     if (pdev->vendor == 0x10b7) {     \
         /* Gigabit Ethernet Adapter (0x1700) */     \
-        if ((pdev->device == 0x1700)) { \
+        if ((pdev->device == 0x1700) || \
+            (pdev->device == 0x80eb)) { \
             result = SK_TRUE;     \
         }     \
     /* SysKonnect (0x1148) */     \
