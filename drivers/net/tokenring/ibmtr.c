@@ -152,7 +152,7 @@ static char version[] __initdata =
 
 /* this allows displaying full adapter information */
 
-char *channel_def[] __initdata = { "ISA", "MCA", "ISA P&P" };
+char *channel_def[] __devinitdata = { "ISA", "MCA", "ISA P&P" };
 
 static char pcchannelid[] __devinitdata = {
 	0x05, 0x00, 0x04, 0x09,
@@ -864,7 +864,8 @@ static int tok_open(struct net_device *dev)
 	ti->sram_virt &= ~1; /* to reverse what we do in tok_close */
 	/* init the spinlock */
 	ti->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
-
+	init_timer(&ti->tr_timer);
+	
 	i = tok_init_card(dev);
 	if (i) return i;
 
@@ -1033,7 +1034,7 @@ static int tok_close(struct net_device *dev)
 
 	/* Important for PCMCIA hot unplug, otherwise, we'll pull the card, */
 	/* unloading the module from memory, and then if a timer pops, ouch */
-	del_timer(&ti->tr_timer);
+	del_timer_sync(&ti->tr_timer);
 	outb(0, dev->base_addr + ADAPTRESET);
 	ti->sram_virt |= 1;
 	ti->open_status = CLOSED;
