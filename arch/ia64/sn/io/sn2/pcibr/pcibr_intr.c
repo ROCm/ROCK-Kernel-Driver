@@ -41,8 +41,6 @@ void                    pcibr_intr_disconnect(pcibr_intr_t);
 
 vertex_hdl_t            pcibr_intr_cpu_get(pcibr_intr_t);
 
-void                    pcibr_intr_func(intr_arg_t);
-
 extern pcibr_info_t      pcibr_info_get(vertex_hdl_t);
 
 /* =====================================================================
@@ -563,7 +561,7 @@ pcibr_intr_connect(pcibr_intr_t pcibr_intr, intr_func_t intr_func, intr_arg_t in
 	    pcibr_soft->bs_intr[pcibr_int_bit].bsi_int_bit = 
 			       ((pcibr_soft->bs_busnum << 3) | pcibr_int_bit);
 	    xtalk_intr_connect(xtalk_intr,
-			       pcibr_intr_func,
+			       NULL,
 			       (intr_arg_t) intr_wrap,
 			       (xtalk_intr_setfunc_t) pcibr_setpciint,
 			       &pcibr_soft->bs_intr[pcibr_int_bit].bsi_int_bit);
@@ -653,7 +651,7 @@ pcibr_intr_disconnect(pcibr_intr_t pcibr_intr)
 	    pcibr_soft->bs_intr[pcibr_int_bit].bsi_int_bit =
 				((pcibr_soft->bs_busnum << 3) | pcibr_int_bit);
 	    xtalk_intr_connect(pcibr_soft->bs_intr[pcibr_int_bit].bsi_xtalk_intr,
-			       pcibr_intr_func,
+			       NULL,
 			       (intr_arg_t) intr_wrap,
 			       (xtalk_intr_setfunc_t) pcibr_setpciint,
 			       &pcibr_soft->bs_intr[pcibr_int_bit].bsi_int_bit);
@@ -700,134 +698,4 @@ pcibr_setwidint(xtalk_intr_t intr)
     pcireg_intr_dst_target_id_set(bridge, targ);
     pcireg_intr_dst_addr_set(bridge, addr);
     pcireg_intr_host_err_set(bridge, vect);
-}
-
-
-/*
- * pcibr_intr_func()
- *
- * This is the pcibr interrupt "wrapper" function that is called,
- * in interrupt context, to initiate the interrupt handler(s) registered
- * (via pcibr_intr_alloc/connect) for the occurring interrupt. Non-threaded 
- * handlers will be called directly, and threaded handlers will have their 
- * thread woken up.
- */
-void
-pcibr_intr_func(intr_arg_t arg)
-{
-    pcibr_intr_wrap_t       wrap = (pcibr_intr_wrap_t) arg;
-    intr_func_t             func;
-    pcibr_intr_t            intr;
-    pcibr_intr_list_t       list;
-    int                     clearit;
-    int			    do_nonthreaded = 1;
-    int			    is_threaded = 0;
-    pcibr_soft_t            pcibr_soft = wrap->iw_soft;
-    int			    bit = wrap->iw_ibit;
-
-	/*
-	 * PIC WAR.  PV#855272
-	 * Early attempt at a workaround for the runaway
-	 * interrupt problem.   Briefly disable the enable bit for
-	 * this device.
-	 */
-	if (PCIBR_WAR_ENABLED(PV855272, pcibr_soft)) {
-		unsigned long	s;
-
-		/* disable-enable interrupts for this bridge pin */
-		s = pcibr_lock(pcibr_soft);
-		pcireg_intr_enable_bit_clr(pcibr_soft, (1 << bit));
-		pcireg_intr_enable_bit_set(pcibr_soft, (1 << bit));
-		pcibr_unlock(pcibr_soft, s);
-	}
-
-	/*
-	 * If any handler is still running from a previous interrupt
-	 * just return. If there's a need to call the handler(s) again,
-	 * another interrupt will be generated either by the device or by
-	 * pcibr_force_interrupt().
-	 */
-
-	if (wrap->iw_hdlrcnt) {
-		return;
-	}
-
-    /*
-     * Call all interrupt handlers registered.
-     * First, the pcibr_intrd threads for any threaded handlers will be
-     * awoken, then any non-threaded handlers will be called sequentially.
-     */
-	
-	clearit = 1;
-	while (do_nonthreaded) {
-	    for (list = wrap->iw_list; list != NULL; list = list->il_next) {
-		if ((intr = list->il_intr) &&
-		    (intr->bi_flags & PCIIO_INTR_CONNECTED)) {
-
-
-		/*
-		 * This device may have initiated write
-		 * requests since the bridge last saw
-		 * an edge on this interrupt input; flushing
-		 * the buffer prior to invoking the handler
-		 * should help but may not be sufficient if we 
-		 * get more requests after the flush, followed
-		 * by the card deciding it wants service, before
-		 * the interrupt handler checks to see if things need
-		 * to be done.
-		 *
-		 * There is a similar race condition if
-		 * an interrupt handler loops around and
-		 * notices further service is requred.
-		 * Perhaps we need to have an explicit
-		 * call that interrupt handlers need to
-		 * do between noticing that DMA to memory
-		 * has completed, but before observing the
-		 * contents of memory?
-		 */
-
-		    if ((do_nonthreaded) && (!is_threaded)) {
-			/* Non-threaded -  Call the interrupt handler at interrupt level */
-			/* Only need to flush write buffers if sharing */
-
-			if (wrap->iw_shared) {
-			    pcireg_wrb_flush_get(list->il_soft, list->il_slot);
-			}
-			func = intr->bi_func;
-			if ( func )
-				func(intr->bi_arg);
-		    }
-		    clearit = 0;
-		}
-	    }
-	    do_nonthreaded = 0;
-
-	    /*
-	     * If the non-threaded handler was the last to complete,
-	     * (i.e., no threaded handlers still running) force an
-	     * interrupt to avoid a potential deadlock situation.
-	     */
-	    if (wrap->iw_hdlrcnt == 0) {
-		pcibr_force_interrupt((pcibr_intr_t) wrap);
-	    }
-	}
-
-	/* If there were no handlers,
-	 * disable the interrupt and return.
-	 * It will get enabled again after
-	 * a handler is connected.
-	 * If we don't do this, we would
-	 * sit here and spin through the
-	 * list forever.
-	 */
-	if (clearit) {
-	    uint64_t		    mask = 1 << wrap->iw_ibit;
-	    unsigned long	    s;
-
-	    s = pcibr_lock(pcibr_soft);
-	    pcireg_intr_enable_bit_clr(pcibr_soft, mask);
-	    pcireg_tflush_get(pcibr_soft);
-	    pcibr_unlock(pcibr_soft, s);
-	    return;
-	}
 }
