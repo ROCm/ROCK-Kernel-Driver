@@ -265,9 +265,9 @@ static int pd_ioctl(struct inode *inode, struct file *file,
 static int pd_release(struct inode *inode, struct file *file);
 static int pd_revalidate(struct gendisk *p);
 static int pd_detect(void);
-static void do_pd_read(void);
+static void do_pd_io(void);
+static void do_pd_io_start(void);
 static void do_pd_read_start(void);
-static void do_pd_write(void);
 static void do_pd_write_start(void);
 static void do_pd_read_drq(void);
 static void do_pd_write_done(void);
@@ -762,10 +762,8 @@ repeat:
 	pd_buf = pd_req->buffer;
 	pd_retries = 0;
 
-	if (pd_cmd == READ)
-		pi_do_claimed(pd_current->pi, do_pd_read);
-	else if (pd_cmd == WRITE)
-		pi_do_claimed(pd_current->pi, do_pd_write);
+	if (pd_cmd == READ || pd_cmd == WRITE)
+		pi_do_claimed(pd_current->pi, do_pd_io);
 	else {
 		end_request(pd_req, 0);
 		goto repeat;
@@ -809,10 +807,19 @@ static inline void next_request(int success)
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 }
 
-static void do_pd_read(void)
+static void do_pd_io(void)
 {
-	ps_continuation = do_pd_read_start;
+	ps_continuation = do_pd_io_start;
 	ps_set_intr();
+}
+
+static void do_pd_io_start(void)
+{
+	if (pd_cmd == READ) {
+		do_pd_read_start();
+	} else {
+		do_pd_write_start();
+	}
 }
 
 static void do_pd_read_start(void)
@@ -857,12 +864,6 @@ static void do_pd_read_drq(void)
 	}
 	pi_disconnect(pd_current->pi);
 	next_request(1);
-}
-
-static void do_pd_write(void)
-{
-	ps_continuation = do_pd_write_start;
-	ps_set_intr();
 }
 
 static void do_pd_write_start(void)
