@@ -47,10 +47,12 @@ struct ArcProto rfc1201_proto =
 {
 	.suffix		= 'a',
 	.mtu		= 1500,	/* could be more, but some receivers can't handle it... */
+	.is_ip          = 1,    /* This is for sending IP and ARP packages */
 	.rx		= rx,
 	.build_header	= build_header,
 	.prepare_tx	= prepare_tx,
 	.continue_tx	= continue_tx,
+	.ack_tx         = NULL
 };
 
 

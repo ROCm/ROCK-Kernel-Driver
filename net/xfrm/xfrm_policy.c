@@ -549,6 +549,8 @@ void xfrm_policy_delete(struct xfrm_policy *pol, int dir)
 	}
 }
 
+EXPORT_SYMBOL(xfrm_policy_delete);
+
 int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 {
 	struct xfrm_policy *old_pol;

@@ -42,7 +42,6 @@ static int build_header(struct sk_buff *skb, struct net_device *dev,
 static int prepare_tx(struct net_device *dev, struct archdr *pkt, int length,
 		      int bufnum);
 
-
 struct ArcProto rawmode_proto =
 {
 	.suffix		= 'r',
@@ -50,6 +49,8 @@ struct ArcProto rawmode_proto =
 	.rx		= rx,
 	.build_header	= build_header,
 	.prepare_tx	= prepare_tx,
+	.continue_tx    = NULL,
+	.ack_tx         = NULL
 };
 
 
@@ -121,7 +122,8 @@ static void rx(struct net_device *dev, int bufnum,
 
 	BUGLVL(D_SKB) arcnet_dump_skb(dev, skb, "rx");
 
-	skb->protocol = 0;
+	skb->protocol = __constant_htons(ETH_P_ARCNET);
+;
 	netif_rx(skb);
 	dev->last_rx = jiffies;
 }
@@ -189,6 +191,9 @@ static int prepare_tx(struct net_device *dev, struct archdr *pkt, int length,
 		hard->offset[1] = ofs = 512 - length - 3;
 	} else
 		hard->offset[0] = ofs = 256 - length;
+
+	BUGMSG(D_DURING, "prepare_tx: length=%d ofs=%d\n",
+	       length,ofs);
 
 	lp->hw.copy_to_card(dev, bufnum, 0, hard, ARC_HDR_SIZE);
 	lp->hw.copy_to_card(dev, bufnum, ofs, &pkt->soft, length);

@@ -334,6 +334,18 @@ config NET_CLS_IND
 	  Requires a new iproute2
 	  You MUST NOT turn this on if you dont have an update iproute2.
 
+config CLS_U32_MARK
+	bool "Use nfmark as a key in U32 classifier"
+	depends on NET_CLS_U32 && NETFILTER
+	help
+	  This allows you to match mark in a u32 filter.
+	  Example:
+	  tc filter add dev eth0 protocol ip parent 1:0 prio 5 u32 \
+		match mark 0x0090 0xffff \
+		match ip dst 4.4.4.4 \
+		flowid 1:90
+	  You must use a new iproute2 to use this feature.
+
 config NET_CLS_RSVP
 	tristate "Special RSVP classifier"
 	depends on NET_CLS && NET_QOS

@@ -274,29 +274,6 @@ out:
 
 static int fn_hash_last_dflt=-1;
 
-static int fib_detect_death(struct fib_info *fi, int order,
-			    struct fib_info **last_resort, int *last_idx)
-{
-	struct neighbour *n;
-	int state = NUD_NONE;
-
-	n = neigh_lookup(&arp_tbl, &fi->fib_nh[0].nh_gw, fi->fib_dev);
-	if (n) {
-		state = n->nud_state;
-		neigh_release(n);
-	}
-	if (state==NUD_REACHABLE)
-		return 0;
-	if ((state&NUD_VALID) && order != fn_hash_last_dflt)
-		return 0;
-	if ((state&NUD_VALID) ||
-	    (*last_idx<0 && order > fn_hash_last_dflt)) {
-		*last_resort = fi;
-		*last_idx = order;
-	}
-	return 1;
-}
-
 static void
 fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib_result *res)
 {
@@ -337,7 +314,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 				if (next_fi != res->fi)
 					break;
 			} else if (!fib_detect_death(fi, order, &last_resort,
-						     &last_idx)) {
+						     &last_idx, &fn_hash_last_dflt)) {
 				if (res->fi)
 					fib_info_put(res->fi);
 				res->fi = fi;
@@ -355,7 +332,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 		goto out;
 	}
 
-	if (!fib_detect_death(fi, order, &last_resort, &last_idx)) {
+	if (!fib_detect_death(fi, order, &last_resort, &last_idx, &fn_hash_last_dflt)) {
 		if (res->fi)
 			fib_info_put(res->fi);
 		res->fi = fi;
@@ -375,11 +352,6 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 out:
 	read_unlock(&fib_hash_lock);
 }
-
-static void rtmsg_fib(int, struct fib_node *, struct fib_alias *,
-		      int, int,
-		      struct nlmsghdr *n,
-		      struct netlink_skb_parms *);
 
 /* Insert node F to FZ. */
 static inline void fib_insert_node(struct fn_zone *fz, struct fib_node *f)
@@ -401,26 +373,6 @@ static struct fib_node *fib_find_node(struct fn_zone *fz, u32 key)
 			return f;
 	}
 
-	return NULL;
-}
-
-/* Return the first fib alias matching TOS with
- * priority less than or equal to PRIO.
- */
-static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
-{
-	if (fn) {
-		struct list_head *head = &fn->fn_alias;
-		struct fib_alias *fa;
-
-		list_for_each_entry(fa, head, fa_list) {
-			if (fa->fa_tos > tos)
-				continue;
-			if (fa->fa_info->fib_priority >= prio ||
-			    fa->fa_tos < tos)
-				return fa;
-		}
-	}
 	return NULL;
 }
 
@@ -463,7 +415,11 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		fn_rehash_zone(fz);
 
 	f = fib_find_node(fz, key);
-	fa = fib_find_alias(f, tos, fi->fib_priority);
+
+	if (!f)
+		fa = NULL;
+	else
+		fa = fib_find_alias(&f->fn_alias, tos, fi->fib_priority);
 
 	/* Now fa, if non-NULL, points to the first fib alias
 	 * with the same keys [prefix,tos,priority], if such key already
@@ -565,7 +521,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		fz->fz_nent++;
 	rt_cache_flush(-1);
 
-	rtmsg_fib(RTM_NEWROUTE, f, new_fa, z, tb->tb_id, n, req);
+	rtmsg_fib(RTM_NEWROUTE, key, new_fa, z, tb->tb_id, n, req);
 	return 0;
 
 out_free_new_fa:
@@ -603,7 +559,11 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	}
 
 	f = fib_find_node(fz, key);
-	fa = fib_find_alias(f, tos, 0);
+
+	if (!f)
+		fa = NULL;
+	else
+		fa = fib_find_alias(&f->fn_alias, tos, 0);
 	if (!fa)
 		return -ESRCH;
 
@@ -631,7 +591,7 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		int kill_fn;
 
 		fa = fa_to_delete;
-		rtmsg_fib(RTM_DELROUTE, f, fa, z, tb->tb_id, n, req);
+		rtmsg_fib(RTM_DELROUTE, key, fa, z, tb->tb_id, n, req);
 
 		kill_fn = 0;
 		write_lock_bh(&fib_hash_lock);
@@ -794,33 +754,6 @@ static int fn_hash_dump(struct fib_table *tb, struct sk_buff *skb, struct netlin
 	read_unlock(&fib_hash_lock);
 	cb->args[1] = m;
 	return skb->len;
-}
-
-static void rtmsg_fib(int event, struct fib_node *f, struct fib_alias *fa,
-		      int z, int tb_id,
-		      struct nlmsghdr *n, struct netlink_skb_parms *req)
-{
-	struct sk_buff *skb;
-	u32 pid = req ? req->pid : 0;
-	int size = NLMSG_SPACE(sizeof(struct rtmsg)+256);
-
-	skb = alloc_skb(size, GFP_KERNEL);
-	if (!skb)
-		return;
-
-	if (fib_dump_info(skb, pid, n->nlmsg_seq, event, tb_id,
-			  fa->fa_type, fa->fa_scope, &f->fn_key, z,
-			  fa->fa_tos,
-			  fa->fa_info) < 0) {
-		kfree_skb(skb);
-		return;
-	}
-	NETLINK_CB(skb).dst_groups = RTMGRP_IPV4_ROUTE;
-	if (n->nlmsg_flags&NLM_F_ECHO)
-		atomic_inc(&skb->users);
-	netlink_broadcast(rtnl, skb, pid, RTMGRP_IPV4_ROUTE, GFP_KERNEL);
-	if (n->nlmsg_flags&NLM_F_ECHO)
-		netlink_unicast(rtnl, skb, pid, MSG_DONTWAIT);
 }
 
 #ifdef CONFIG_IP_MULTIPLE_TABLES

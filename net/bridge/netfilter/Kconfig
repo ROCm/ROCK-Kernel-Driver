@@ -189,8 +189,22 @@ config BRIDGE_EBT_LOG
 	tristate "ebt: log support"
 	depends on BRIDGE_NF_EBTABLES
 	help
-	  This option adds the log target, that you can use in any rule in
-	  any ebtables table. It records the frame header to the syslog.
+	  This option adds the log watcher, that you can use in any rule
+	  in any ebtables table. It records info about the frame header
+	  to the syslog.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_ULOG
+	tristate "ebt: ulog support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the ulog watcher, that you can use in any rule
+	  in any ebtables table. The packet is passed to a userspace
+	  logging daemon using netlink multicast sockets. This differs
+	  from the log watcher in the sense that the complete packet is
+	  sent to userspace instead of a descriptive text and that
+	  netlink multicast sockets are used instead of the syslog.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
