@@ -1500,6 +1500,7 @@ static struct file_operations dvb_ca_fops = {
 };
 
 static struct dvb_device dvbdev_ca = {
+        .priv	= NULL,
 	.users	= 1,
 	.readers= 1,
 	.writers= 1,

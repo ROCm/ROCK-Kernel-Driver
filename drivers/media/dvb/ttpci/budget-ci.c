@@ -500,7 +500,7 @@ static void budget_ci_irq (struct saa7146_dev *dev, u32 *isr)
 {
         struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
 
-        DEB_EE(("dev: %p, budget_ci: %p\n", dev, budget_ci));
+	dprintk(8, "dev: %p, budget_ci: %p\n", dev, budget_ci);
 
         if (*isr & MASK_06)
                 tasklet_schedule (&budget_ci->msp430_irq_tasklet);
@@ -523,7 +523,7 @@ static int budget_ci_attach (struct saa7146_dev* dev,
 	if (!(budget_ci = kmalloc (sizeof(struct budget_ci), GFP_KERNEL)))
 		return -ENOMEM;
 
-	DEB_EE(("budget_ci: %p\n", budget_ci));
+	dprintk(2, "budget_ci: %p\n", budget_ci);
 
 	spin_lock_init(&budget_ci->debilock);
 	budget_ci->budget.ci_present = 0;
@@ -606,10 +606,8 @@ static int __init budget_ci_init(void)
 	return saa7146_register_extension(&budget_extension);
 }
 
-
 static void __exit budget_ci_exit(void)
 {
-	DEB_EE((".\n"));
 	saa7146_unregister_extension(&budget_extension); 
 }
 

@@ -416,8 +416,8 @@ static void __init init_hwif_amd74xx(ide_hwif_t *hwif)
 {
 	int i;
 
-	if (!hwif->irq)
-		hwif->irq = hwif->channel ? 15 : 14;
+	if (hwif->irq == 0) /* 0 is bogus but will do for now */
+		hwif->irq = pci_get_legacy_ide_irq(hwif->pci_dev, hwif->channel);
 
 	hwif->autodma = 0;
 

@@ -885,6 +885,43 @@ static int stv0299_set_voltage (struct i2c_adapter *i2c, fe_sec_voltage_t voltag
 }
 
 
+static int stv0299_send_legacy_dish_cmd(struct i2c_adapter *i2c, u32 cmd, 
+                                        int tuner_type)
+{
+	u8 last = 1;
+	int i;
+
+	/* reset voltage at the end
+	if((0x50 & stv0299_readreg (i2c, 0x0c)) == 0x50)
+		cmd |= 0x80;
+	else
+		cmd &= 0x7F;
+	*/
+
+	cmd = cmd << 1;
+	dprintk("%s switch command: 0x%04x\n",__FUNCTION__, cmd);
+
+	stv0299_set_voltage(i2c,SEC_VOLTAGE_18,tuner_type);
+	msleep(32);
+
+	for (i=0; i<9; i++) {
+		if((cmd & 0x01) != last) {
+			stv0299_set_voltage(i2c,
+					    last ? SEC_VOLTAGE_13 :
+					    	   SEC_VOLTAGE_18,
+					    tuner_type);
+			last = (last) ? 0 : 1;
+		}
+
+		cmd = cmd >> 1;
+
+		if (i != 8)
+			msleep(8);
+	}
+
+	return 0;
+}
+
 static int stv0299_set_symbolrate (struct i2c_adapter *i2c, u32 srate, int tuner_type)
 {
 	u64 big = srate;
@@ -1229,6 +1266,10 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return stv0299_set_voltage (i2c, (fe_sec_voltage_t) arg,
 					    state->tuner_type);
 
+	case FE_DISHNETWORK_SEND_LEGACY_CMD:
+		return stv0299_send_legacy_dish_cmd (i2c, (u32) arg,
+						     state->tuner_type);
+
 	case FE_GET_TUNE_SETTINGS:
 	{
 		struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
@@ -1276,12 +1317,12 @@ static long probe_tuner (struct i2c_adapter *adapter)
         u8 stat [] = { 0 };
 	u8 tda6100_buf [] = { 0, 0 };
 	int ret;
-	struct i2c_msg msg1 [] = {{ .addr = 0x68, .buf = rpt,  .len = 2 },
+	struct i2c_msg msg1 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
 			   { .addr = 0x60, .flags = I2C_M_RD, .buf = stat, .len = 1 }};
-	struct i2c_msg msg2 [] = {{ .addr = 0x68, .buf = rpt,  .len = 2 },
+	struct i2c_msg msg2 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
 			   { .addr = 0x61, .flags = I2C_M_RD, .buf = stat, .len = 1 }};
-	struct i2c_msg msg3 [] = {{ .addr = 0x68, .buf = rpt,  .len = 2 },
-			   { .addr = 0x60, .buf = tda6100_buf, .len = 2 }};
+	struct i2c_msg msg3 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
+			   { .addr = 0x60, .flags = 0, .buf = tda6100_buf, .len = 2 }};
 
 	stv0299_writereg (i2c, 0x01, 0x15);
 	stv0299_writereg (i2c, 0x02, 0x30);

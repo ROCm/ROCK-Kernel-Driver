@@ -50,7 +50,7 @@ MODULE_PARM_DESC(budget_debug, "Turn on/off budget debugging (default:off).");
 
 static int stop_ts_capture(struct budget *budget)
 {
-	DEB_EE(("budget: %p\n",budget));
+	dprintk(2, "budget: %p\n", budget);
 
         if (--budget->feeding)
                 return budget->feeding;
@@ -65,7 +65,7 @@ static int start_ts_capture (struct budget *budget)
 {
         struct saa7146_dev *dev=budget->dev;
 
-	DEB_EE(("budget: %p\n",budget));
+	dprintk(2, "budget: %p\n", budget);
 
         if (budget->feeding) 
                 return ++budget->feeding;
@@ -171,7 +171,7 @@ static int budget_start_feed(struct dvb_demux_feed *feed)
         struct budget *budget = (struct budget*) demux->priv;
 	int status;
 
-	DEB_EE(("budget: %p\n",budget));
+	dprintk(2, "budget: %p\n", budget);
 
         if (!demux->dmx.frontend)
                 return -EINVAL;
@@ -188,7 +188,7 @@ static int budget_stop_feed(struct dvb_demux_feed *feed)
         struct budget *budget = (struct budget *) demux->priv;
 	int status;
 
-	DEB_EE(("budget: %p\n",budget));
+	dprintk(2, "budget: %p\n", budget);
 
    	spin_lock(&budget->feedlock);
 	status = stop_ts_capture (budget);
@@ -202,7 +202,7 @@ static int budget_register(struct budget *budget)
         struct dvb_demux *dvbdemux=&budget->demux;
         int ret;
 
-	DEB_EE(("budget: %p\n",budget));
+	dprintk(2, "budget: %p\n", budget);
 
         dvbdemux->priv = (void *) budget;
 
@@ -251,7 +251,7 @@ static void budget_unregister(struct budget *budget)
 {
         struct dvb_demux *dvbdemux=&budget->demux;
 
-	DEB_EE(("budget: %p\n",budget));
+	dprintk(2, "budget: %p\n", budget);
 
 	dvb_net_release(&budget->dvb_net);
 
@@ -294,7 +294,7 @@ int ttpci_budget_init (struct budget *budget,
 
 	memset(budget, 0, sizeof(struct budget));
 
-	DEB_EE(("dev: %p, budget: %p\n", dev, budget));
+	dprintk(2, "dev: %p, budget: %p\n", dev, budget);
 
 	budget->card = bi;
 	budget->dev = (struct saa7146_dev *) dev;
@@ -377,7 +377,7 @@ int ttpci_budget_deinit (struct budget *budget)
 {
 	struct saa7146_dev *dev = budget->dev;
 
-	DEB_EE(("budget: %p\n", budget));
+	dprintk(2, "budget: %p\n", budget);
 
 	budget_unregister (budget);
 
@@ -398,7 +398,7 @@ void ttpci_budget_irq10_handler (struct saa7146_dev* dev, u32 *isr)
 {
 	struct budget *budget = (struct budget*)dev->ext_priv;
 
-	DEB_EE(("dev: %p, budget: %p\n",dev,budget));
+	dprintk(8, "dev: %p, budget: %p\n",dev,budget);
 
 	if (*isr & MASK_10)
 		tasklet_schedule (&budget->vpe_tasklet);

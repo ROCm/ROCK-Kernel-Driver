@@ -118,25 +118,16 @@ static int triflex_config_drive_xfer_rate(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct hd_driveid *id	= drive->id;
-	
-	if (id && (id->capability & 1) && drive->autodma) {
-		if (__ide_dma_bad_drive(drive))
-			goto tune_pio;
-		if (id->field_valid & 2) {
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-				(id->dma_1word & hwif->swdma_mask)) {
-				if (!triflex_config_drive_for_dma(drive))
-					goto tune_pio;
-			}
-		} else 
-			goto tune_pio;
-	} else {
-tune_pio:
-		hwif->tuneproc(drive, 255);
-		return hwif->ide_dma_off_quietly(drive);
+
+	if ((id->capability & 1) && drive->autodma) {
+		if (ide_use_dma(drive)) {
+			if (triflex_config_drive_for_dma(drive))
+				return hwif->ide_dma_on(drive);
+		}
 	}
 
-	return hwif->ide_dma_on(drive);
+	hwif->tuneproc(drive, 255);
+	return hwif->ide_dma_off_quietly(drive);
 }
 
 static void __init init_hwif_triflex(ide_hwif_t *hwif)

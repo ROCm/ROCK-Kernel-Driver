@@ -4,10 +4,15 @@
  *  Written by Holger Waechtler <holger@qanu.de>
  *	 and Daniel Mack <daniel@qanu.de>
  *
- *  Support for Samsung TDTC9251DH01C(M) tuner
+ *  AVerMedia AVerTV DVB-T 771 support by
+ *       Wolfram Joost <dbox2@frokaschwei.de>
  *
+ *  Support for Samsung TDTC9251DH01C(M) tuner
  *  Copyright (C) 2004 Antonio Mancuso <antonio.mancuso@digitaltelevision.it>
  *                     Amauri  Celani  <acelani@essegi.net>
+ *
+ *  DVICO FusionHDTV DVB-T1 and DVICO FusionHDTV DVB-T Lite support by
+ *       Christopher Pascoe <c.pascoe@itee.uq.edu.au>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,12 +34,13 @@
 #define _MT352_
 
 #define I2C_MT352_ADDR  0x0f
-#define I2C_TUNER_ADDR  0xc2
 #define ID_MT352        0x13
 
 #define CARD_AVDVBT771	    0x00
 #define CARD_TUA6034	    0x01
 #define CARD_TDTC9251DH01C  0x02
+#define CARD_DVICODVBT1	    0x03
+#define CARD_DVICODVBTLITE  0x04
 
 #define msb(x) (((x) >> 8) & 0xff)
 #define lsb(x) ((x) & 0xff)
@@ -123,6 +129,9 @@ enum mt352_reg_addr {
 };
 
 struct _tuner_info {
+	char *fe_name;
+#define FE_NAME tuner_info[card_type].fe_name
+
 	__u32 fe_frequency_min;
 #define FE_FREQ_MIN tuner_info[card_type].fe_frequency_min
 
@@ -132,26 +141,8 @@ struct _tuner_info {
 	__u32 fe_frequency_stepsize; //verificare se u32 e' corretto
 #define FE_FREQ_STEPSIZE  tuner_info[card_type].fe_frequency_stepsize
 
-	__u32 coderate_hp_shift; //verificare se u32 giusto
-#define CODERATE_HP_SHIFT tuner_info[card_type].coderate_hp_shift
-
-	__u32 coderate_lp_shift;
-#define CODERATE_LP_SHIFT tuner_info[card_type].coderate_lp_shift
-
-	int constellation_shift;
-#define CONSTELLATION_SHIFT tuner_info[card_type].constellation_shift
-
-	int tx_mode_shift;
-#define TX_MODE_SHIFT tuner_info[card_type].tx_mode_shift
-
-	int guard_interval_shift;
-#define GUARD_INTERVAL_SHIFT tuner_info[card_type].guard_interval_shift
-
-	int hierarchy_shift;
-#define HIERARCHY_SHIFT tuner_info[card_type].hierarchy_shift
-
-	int read_reg_flag;
-#define READ_REG_FLAG tuner_info[card_type].read_reg_flag
+	u8 pll_i2c_addr;
+#define PLL_I2C_ADDR tuner_info[card_type].pll_i2c_addr
 
 	int (* mt352_init) (struct i2c_adapter *i2c);
 #define MT352_INIT tuner_info[card_type].mt352_init
@@ -166,12 +157,18 @@ struct _tuner_info {
 static int mt352_init_TUA6034(struct i2c_adapter *i2c);
 static int mt352_init_AVERMEDIA771(struct i2c_adapter *i2c);
 static int mt352_init_TDTC9251DH01C(struct i2c_adapter *i2c);
+static int mt352_init_DVICODVBT1(struct i2c_adapter *i2c);
+static int mt352_init_DVICODVBTLITE(struct i2c_adapter *i2c);
 static unsigned char mt352_cp_TUA6034(u32 freq);
 static unsigned char mt352_cp_AVERMEDIA771(u32 freq);
 static unsigned char mt352_cp_TDTC9251DH01C(u32 freq);
+static unsigned char mt352_cp_DVICODVBT1(u32 freq);
+static unsigned char mt352_cp_DVICODVBTLITE(u32 freq);
 static unsigned char mt352_bs_TUA6034(u32 freq);
 static unsigned char mt352_bs_AVERMEDIA771(u32 freq);
 static unsigned char mt352_bs_TDTC9251DH01C(u32 freq);
-static int mt352_detect_avermedia_771(struct i2c_adapter *i2c);
+static unsigned char mt352_bs_DVICODVBT1(u32 freq);
+static unsigned char mt352_bs_DVICODVBTLITE(u32 freq);
+static u8 mt352_read_register(struct i2c_adapter *i2c, u8 reg);
 
 #endif                          /* _MT352_ */

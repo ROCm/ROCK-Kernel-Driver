@@ -68,20 +68,21 @@ static int dvb_bt8xx_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
 	struct dvb_demux *dvbdmx = dvbdmxfeed->demux;
 	struct dvb_bt8xx_card *card = dvbdmx->priv;
+	int rc;
 
 	dprintk("dvb_bt8xx: start_feed\n");
 	
 	if (!dvbdmx->dmx.frontend)
 		return -EINVAL;
 
-	if (card->active)
-		return 0;
-		
-	card->active = 1;
-	
-//	bt878_start(card->bt, card->gpio_mode);
-
-	return 0;
+	down(&card->lock);
+	card->nfeeds++;
+	rc = card->nfeeds;
+	if (card->nfeeds == 1)
+		bt878_start(card->bt, card->gpio_mode,
+			    card->op_sync_orin, card->irq_err_ignore);
+	up(&card->lock);
+	return rc;
 }
 
 static int dvb_bt8xx_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
@@ -94,12 +95,11 @@ static int dvb_bt8xx_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 	if (!dvbdmx->dmx.frontend)
 		return -EINVAL;
 		
-	if (!card->active)
-		return 0;
-
-//	bt878_stop(card->bt);
-
-	card->active = 0;
+	down(&card->lock);
+	card->nfeeds--;
+	if (card->nfeeds == 0)
+		bt878_stop(card->bt);
+	up(&card->lock);
 
 	return 0;
 }
@@ -207,8 +207,6 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 
 	tasklet_init(&card->bt->tasklet, dvb_bt8xx_task, (unsigned long) card);
 	
-	bt878_start(card->bt, card->gpio_mode, card->op_sync_orin, card->irq_err_ignore);
-
 	return 0;
 }
 
@@ -223,6 +221,7 @@ static int dvb_bt8xx_probe(struct device *dev)
 		return -ENOMEM;
 
 	memset(card, 0, sizeof(*card));
+	init_MUTEX(&card->lock);
 	card->bttv_nr = sub->core->nr;
 	strncpy(card->card_name, sub->core->name, sizeof(sub->core->name));
 	card->i2c_adapter = &sub->core->i2c_adap;
@@ -230,6 +229,9 @@ static int dvb_bt8xx_probe(struct device *dev)
 	switch(sub->core->type)
 	{
 	case BTTV_PINNACLESAT:
+#ifdef BTTV_DVICO_DVBT_LITE
+	case BTTV_DVICO_DVBT_LITE:
+#endif
 		card->gpio_mode = 0x0400C060;
 		card->op_sync_orin = 0;
 		card->irq_err_ignore = 0;
@@ -287,7 +289,10 @@ static int dvb_bt8xx_probe(struct device *dev)
 	}
 
 	if (!(card->bt = dvb_bt8xx_878_match(card->bttv_nr, bttv_pci_dev))) {
-		printk("dvb_bt8xx: unable to determine DMA core of card %d\n", card->bttv_nr);
+		printk("dvb_bt8xx: unable to determine DMA core of card %d,\n",
+		       card->bttv_nr);
+		printk("dvb_bt8xx: if you have the ALSA bt87x audio driver "
+		       "installed, try removing it.\n");
 
 		kfree(card);
 		return -EFAULT;
@@ -321,7 +326,6 @@ static int dvb_bt8xx_remove(struct device *dev)
 		dvb_dmx_release(&card->demux);
 		dvb_unregister_adapter(card->dvb_adapter);
 		
-		list_del(&card->list);
 		kfree(card);
 
 	return 0;
