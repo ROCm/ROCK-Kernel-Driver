@@ -1323,11 +1323,15 @@ int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof,
 int rndis_proc_write (struct file *file, const char __user *buffer, 
 		      unsigned long count, void *data)
 {
+	rndis_params *p = data;
 	u32 speed = 0;
 	int i, fl_speed = 0;
 	
 	for (i = 0; i < count; i++) {
-		switch (*buffer) {
+		char c;
+		if (get_user(c, buffer))
+			return -EFAULT;
+		switch (c) {
 		case '0':
 		case '1':
 		case '2':
@@ -1339,21 +1343,19 @@ int rndis_proc_write (struct file *file, const char __user *buffer,
 		case '8':
 		case '9':
 			fl_speed = 1;
-			speed = speed*10 + *buffer - '0';
+			speed = speed*10 + c - '0';
 			break;
 		case 'C':
 		case 'c':
-			rndis_signal_connect (((rndis_params *) data)
-				->confignr);
+			rndis_signal_connect (p->confignr);
 			break;
 		case 'D':
 		case 'd':
-			rndis_signal_disconnect (((rndis_params *) data)
-				->confignr);
+			rndis_signal_disconnect(p->confignr);
 			break;
 		default: 
-			if (fl_speed) ((rndis_params *) data)->speed = speed;
-			else DEBUG ("%c is not valid\n", *buffer);
+			if (fl_speed) p->speed = speed;
+			else DEBUG ("%c is not valid\n", c);
 			break;
 		}
 		
