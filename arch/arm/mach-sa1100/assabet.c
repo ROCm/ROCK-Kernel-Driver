@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/serial_core.h>
+#include <linux/delay.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -73,12 +74,19 @@ static void assabet_backlight_power(int on)
 		ASSABET_BCR_clear(ASSABET_BCR_LIGHT_ON);
 }
 
+/*
+ * Turn on/off the backlight.  When turning the backlight on,
+ * we wait 500us after turning it on so we don't cause the
+ * supplies to droop when we enable the LCD controller (and
+ * cause a hard reset.)
+ */
 static void assabet_lcd_power(int on)
 {
 #ifndef ASSABET_PAL_VIDEO
-	if (on)
+	if (on) {
 		ASSABET_BCR_set(ASSABET_BCR_LCD_ON);
-	else
+		udelay(500);
+	} else
 #endif
 		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
 }
@@ -87,6 +95,12 @@ static int __init assabet_init(void)
 {
 	if (!machine_is_assabet())
 		return -EINVAL;
+
+	/*
+	 * Ensure that the power supply is in "high power" mode.
+	 */
+	GPDR |= GPIO_GPIO16;
+	GPSR = GPIO_GPIO16;
 
 	/*
 	 * Ensure that these pins are set as outputs and are driving
