@@ -450,7 +450,7 @@ net2280_alloc_buffer (
 	struct net2280_ep	*ep;
 
 	ep = container_of (_ep, struct net2280_ep, ep);
-	if (!_ep || (!ep->desc && ep->num != 0))
+	if (!_ep)
 		return 0;
 
 	*dma = DMA_ADDR_INVALID;
