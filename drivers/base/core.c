@@ -96,9 +96,6 @@ void put_device(struct device * dev)
 	DBG("DEV: Unregistering device. ID = '%s', name = '%s'\n",
 	    dev->bus_id,dev->name);
 
-	/* remove the driverfs directory */
-	device_remove_dir(dev);
-
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
 	 */
@@ -111,6 +108,12 @@ void put_device(struct device * dev)
 	 */
 	if (dev->driver && dev->driver->remove)
 		dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
+
+	/* remove the driverfs directory */
+	device_remove_dir(dev);
+
+	if (dev->release)
+		dev->release(dev);
 
 	put_device(dev->parent);
 }

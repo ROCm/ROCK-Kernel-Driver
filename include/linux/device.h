@@ -92,6 +92,8 @@ struct device {
 					   being off. */
 
 	unsigned char *saved_state;	/* saved device state */
+
+	void	(*release)(struct device * dev);
 };
 
 static inline struct device *
