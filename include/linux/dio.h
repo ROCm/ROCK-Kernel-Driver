@@ -28,6 +28,9 @@
  * do with ioremap() though.
  */
 #ifdef __KERNEL__
+
+#include <asm/hp300hw.h>
+
 /* DIO/DIO-II boards all have the following 8bit registers.
  * These are offsets from the base of the device.
  */
@@ -35,26 +38,7 @@
 #define DIO_IPLOFF    0x03                        /* interrupt priority level */
 #define DIO_SECIDOFF  0x15                        /* secondary device ID */
 #define DIOII_SIZEOFF 0x101                       /* device size, DIO-II only */
-
-/* The internal HPIB device is special; this is its physaddr; its select code is 7. 
- * The reason why we have to treat it specially is because apparently it's broken:
- * the device ID isn't consistent/reliable. *sigh*
- */
-#define DIO_IHPIBADDR 0x47800
-#define DIO_IHPIBSCODE 7
-
-/* If we don't have the internal HPIB defined, then treat select code 7 like
- * any other. If we *do* have internal HPIB, then we just have to assume that
- * select code 7 is the internal HPIB regardless of the ID register :-<
- */
-#define CONFIG_IHPIB /* hack hack : not yet a proper config option */
-#ifdef CONFIG_IHPIB
-#define DIO_ISIHPIB(scode) ((scode) == DIO_IHPIBSCODE)
-#else
-#define DIO_ISIHPIB(scode) 0
-#endif
-
-#define DIO_VIRADDRBASE 0xf0000000                /* vir addr where IOspace is mapped */
+#define DIO_VIRADDRBASE 0xf0000000UL              /* vir addr where IOspace is mapped */
 
 #define DIO_BASE                0x600000        /* start of DIO space */
 #define DIO_END                 0x1000000       /* end of DIO space */
@@ -67,9 +51,10 @@
 /* Highest valid select code. If we add DIO-II support this should become
  * 256 for everything except HP320, which only has DIO.
  */
-#define DIO_SCMAX 32                             
+#define DIO_SCMAX (hp300_model == HP_320 ? 32 : 256)
 #define DIOII_SCBASE 132 /* lowest DIO-II select code */
 #define DIO_SCINHOLE(scode) (((scode) >= 32) && ((scode) < DIOII_SCBASE))
+#define DIO_ISDIOII(scode) ((scode) >= 132 && (scode) < 256)
 
 /* macros to read device IDs, given base address */
 #define DIO_ID(baseaddr) in_8((baseaddr) + DIO_IDOFF)
@@ -91,7 +76,7 @@
  * In practice this is only important for framebuffers,
  * and everybody else just sets ID fields equal to the DIO_ID_FOO value.
  */
-#define DIO_ENCODE_ID(pr,sec) ((((int)sec & 0xff) << 8) & ((int)pr & 0xff))
+#define DIO_ENCODE_ID(pr,sec) ((((int)sec & 0xff) << 8) | ((int)pr & 0xff))
 /* macro to determine whether a given primary ID requires a secondary ID byte */
 #define DIO_NEEDSSECID(id) ((id) == DIO_ID_FBUFFER)
 
@@ -112,10 +97,8 @@
 #define DIO_DESC_LAN "98643A LANCE ethernet"
 #define DIO_ID_FHPIB    0x08 /* 98625A/98625B fast HP-IB */
 #define DIO_DESC_FHPIB "98625A/98625B fast HPIB"
-#define DIO_ID_NHPIB    0x80 /* 98624A HP-IB (normal ie slow) */
+#define DIO_ID_NHPIB    0x01 /* 98624A HP-IB (normal ie slow) */
 #define DIO_DESC_NHPIB "98624A HPIB"
-#define DIO_ID_IHPIB    0x00 /* internal HPIB (not its real ID, it hasn't got one! */
-#define DIO_DESC_IHPIB "internal HPIB"
 #define DIO_ID_SCSI0    0x07 /* 98625A SCSI */
 #define DIO_DESC_SCSI0 "98625A SCSI0"
 #define DIO_ID_SCSI1    0x27 /* ditto */
@@ -193,7 +176,7 @@
  */
 
 extern int dio_find(int deviceid);
-extern void *dio_scodetoviraddr(int scode);
+extern unsigned long dio_scodetophysaddr(int scode);
 extern int dio_scodetoipl(int scode);
 extern const char *dio_scodetoname(int scode);
 extern void dio_config_board(int scode);
