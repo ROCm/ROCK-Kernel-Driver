@@ -11,6 +11,7 @@
  *  it under the terms of the GNU General Public License version 2 as
  *  published by the Free Software Foundation.
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
@@ -33,6 +34,16 @@
 
 #include "generic.h"
 
+
+void lubbock_set_misc_wr(unsigned int mask, unsigned int set)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	LUB_MISC_WR = (LUB_MISC_WR & ~mask) | (set & mask);
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL(lubbock_set_misc_wr);
 
 static unsigned long lubbock_irq_enabled;
 
