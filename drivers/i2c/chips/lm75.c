@@ -206,11 +206,6 @@ static int lm75_detach_client(struct i2c_client *client)
 	return 0;
 }
 
-static u16 swap_bytes(u16 val)
-{
-	return (val >> 8) | (val << 8);
-}
-
 /* All registers are word-sized, except for the configuration register.
    LM75 uses a high-byte first convention, which is exactly opposite to
    the usual practice. */
@@ -219,7 +214,7 @@ static int lm75_read_value(struct i2c_client *client, u8 reg)
 	if (reg == LM75_REG_CONF)
 		return i2c_smbus_read_byte_data(client, reg);
 	else
-		return swap_bytes(i2c_smbus_read_word_data(client, reg));
+		return swab16(i2c_smbus_read_word_data(client, reg));
 }
 
 /* All registers are word-sized, except for the configuration register.
@@ -230,8 +225,7 @@ static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value)
 	if (reg == LM75_REG_CONF)
 		return i2c_smbus_write_byte_data(client, reg, value);
 	else
-		return i2c_smbus_write_word_data(client, reg,
-						 swap_bytes(value));
+		return i2c_smbus_write_word_data(client, reg, swab16(value));
 }
 
 static void lm75_init_client(struct i2c_client *client)
