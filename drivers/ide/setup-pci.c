@@ -290,14 +290,16 @@ EXPORT_SYMBOL_GPL(ide_setup_pci_noise);
  
 static int ide_pci_enable(struct pci_dev *dev, ide_pci_device_t *d)
 {
-	
+	int ret;
+
 	if (pci_enable_device(dev)) {
-		if (pci_enable_device_bars(dev, 1 << 4)) {
+		ret = pci_enable_device_bars(dev, 1 << 4);
+		if (ret < 0) {
 			printk(KERN_WARNING "%s: (ide_setup_pci_device:) "
 				"Could not enable device.\n", d->name);
-			return -EBUSY;
-		} else
-			printk(KERN_WARNING "%s: BIOS configuration fixed.\n", d->name);
+			goto out;
+		}
+		printk(KERN_WARNING "%s: BIOS configuration fixed.\n", d->name);
 	}
 
 	/*
@@ -305,18 +307,23 @@ static int ide_pci_enable(struct pci_dev *dev, ide_pci_device_t *d)
 	 * dma mask field to the ide_pci_device_t if we need it (or let
 	 * lower level driver set the dma mask)
 	 */
-	if (pci_set_dma_mask(dev, 0xffffffff)) {
+	ret = pci_set_dma_mask(dev, DMA_32BIT_MASK);
+	if (ret < 0) {
 		printk(KERN_ERR "%s: can't set dma mask\n", d->name);
-		return -EBUSY;
+		pci_disable_device(dev);
+		goto out;
 	}
-	 
+
 	/* FIXME: Temporary - until we put in the hotplug interface logic
-	   Check that the bits we want are not in use by someone else */
-	if (pci_request_region(dev, 4, "ide_tmp"))
-		return -EBUSY;
+	   Check that the bits we want are not in use by someone else.
+	   As someone else uses it, we do not (yuck) disable the device */
+	ret = pci_request_region(dev, 4, "ide_tmp");
+	if (ret < 0)
+		goto out;
+
 	pci_release_region(dev, 4);
-	
-	return 0;	
+out:
+	return ret;
 }
 
 /**
@@ -515,22 +522,26 @@ static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwi
  
 static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, int noisy, int *config)
 {
+	int ret;
 	u32 class_rev;
 	u16 pcicmd;
 
 	if (noisy)
 		ide_setup_pci_noise(dev, d);
 
-	if (ide_pci_enable(dev, d))
-		return -EBUSY;
-		
-	if (pci_read_config_word(dev, PCI_COMMAND, &pcicmd)) {
+	ret = ide_pci_enable(dev, d);
+	if (ret < 0)
+		goto out;
+
+	ret = pci_read_config_word(dev, PCI_COMMAND, &pcicmd);
+	if (ret < 0) {
 		printk(KERN_ERR "%s: error accessing PCI regs\n", d->name);
-		return -EIO;
+		goto err_disable;
 	}
 	if (!(pcicmd & PCI_COMMAND_IO)) {	/* is device disabled? */
-		if (ide_pci_configure(dev, d))
-			return -ENODEV;
+		ret = ide_pci_configure(dev, d);
+		if (ret < 0)
+			goto err_disable;
 		*config = 1;
 		printk(KERN_INFO "%s: device enabled (Linux)\n", d->name);
 	}
@@ -539,7 +550,12 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 	class_rev &= 0xff;
 	if (noisy)
 		printk(KERN_INFO "%s: chipset revision %d\n", d->name, class_rev);
-	return 0;
+out:
+	return ret;
+
+err_disable:
+	pci_disable_device(dev);
+	goto out;
 }
 
 static void ide_release_pci_controller(struct pci_dev *dev, ide_pci_device_t *d,
