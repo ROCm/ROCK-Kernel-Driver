@@ -17,7 +17,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/xtalk/xbow.h>	/* Must be before iograph.h to get MAX_PORT_NUM */
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/labelcl.h>
@@ -1158,8 +1157,11 @@ pciio_device_info_new(
 		pciio_vendor_id_t vendor_id,
 		pciio_device_id_t device_id)
 {
-    if (!pciio_info)
-	NEW(pciio_info);
+    if (!pciio_info) {
+	pciio_info = kmalloc(sizeof (*(pciio_info)), GFP_KERNEL);
+	if ( pciio_info )
+		memset(pciio_info, 0, sizeof (*(pciio_info)));
+    }
     ASSERT(pciio_info != NULL);
 
     pciio_info->c_slot = slot;
@@ -1181,7 +1183,7 @@ pciio_device_info_free(pciio_info_t pciio_info)
     /* NOTE : pciio_info is a structure within the pcibr_info
      *	      and not a pointer to memory allocated on the heap !!
      */
-    BZERO((char *)pciio_info,sizeof(pciio_info));
+    memset((char *)pciio_info, 0, sizeof(pciio_info));
 }
 
 vertex_hdl_t

@@ -9,5 +9,5 @@
 # Makefile for the sn io routines.
 #
 
-obj-y += sgi_if.o xswitch.o sgi_io_sim.o cdl.o \
+obj-y += xswitch.o sgi_io_sim.o cdl.o \
 	 io.o machvec/ drivers/ platform_init/ sn2/ hwgfs/

@@ -18,7 +18,6 @@
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/kldir.h>
@@ -42,165 +41,6 @@ extern char arg_maxnodes[];
 extern u64 klgraph_addr[];
 void mark_cpuvertex_as_cpu(vertex_hdl_t vhdl, cpuid_t cpuid);
 
-
-/*
- * Support for verbose inventory via hardware graph. 
- * klhwg_invent_alloc allocates the necessary size of inventory information
- * and fills in the generic information.
- */
-invent_generic_t *
-klhwg_invent_alloc(cnodeid_t cnode, int class, int size)
-{
-	invent_generic_t *invent;
-
-	invent = kern_malloc(size);
-	if (!invent) return NULL;
-	
-	invent->ig_module = NODE_MODULEID(cnode);
-	invent->ig_slot = SLOTNUM_GETSLOT(NODE_SLOTID(cnode));
-	invent->ig_invclass = class;
-
-	return invent;
-}
-
-/*
- * Add detailed disabled cpu inventory info to the hardware graph.
- */
-void
-klhwg_disabled_cpu_invent_info(vertex_hdl_t cpuv,
-                               cnodeid_t cnode,
-                               klcpu_t *cpu, slotid_t slot)
-{
-	invent_cpuinfo_t *cpu_invent;
-	diag_inv_t       *diag_invent;
-
-	cpu_invent = (invent_cpuinfo_t *)
-	klhwg_invent_alloc(cnode, INV_PROCESSOR, sizeof(invent_cpuinfo_t));
-	if (!cpu_invent)
-		return;
-
-	/* Diag information on this processor */
-	diag_invent = (diag_inv_t *)
-	klhwg_invent_alloc(cnode, INV_CPUDIAGVAL, sizeof(diag_inv_t));
-
-	if (!diag_invent)
-		return;
-
-
-	/* Disabled CPU */
-	cpu_invent->ic_gen.ig_flag = 0x0;
-	cpu_invent->ic_gen.ig_slot = slot;
-	cpu_invent->ic_cpu_info.cpuflavor = cpu->cpu_prid;
-	cpu_invent->ic_cpu_info.cpufq = cpu->cpu_speed;
-	cpu_invent->ic_cpu_info.sdfreq = cpu->cpu_scachespeed;
-
-	cpu_invent->ic_cpu_info.sdsize = cpu->cpu_scachesz;
-	cpu_invent->ic_cpuid = cpu->cpu_info.virtid;
-	cpu_invent->ic_slice = cpu->cpu_info.physid;
-
-	/* Disabled CPU label */
-	hwgraph_info_add_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			(arbitrary_info_t) cpu_invent);
-	hwgraph_info_export_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			sizeof(invent_cpuinfo_t));
-
-	/* Diagval label - stores reason for disable +{virt,phys}id +diagval*/
-	hwgraph_info_add_LBL(cpuv, INFO_LBL_DIAGVAL,
-			(arbitrary_info_t) diag_invent);
-
-	hwgraph_info_export_LBL(cpuv, INFO_LBL_DIAGVAL,
-			sizeof(diag_inv_t));
-}
-
-/*
- * Add detailed cpu inventory info to the hardware graph.
- */
-void
-klhwg_cpu_invent_info(vertex_hdl_t cpuv,
-			cnodeid_t cnode,
-			klcpu_t *cpu)
-{
-	invent_cpuinfo_t *cpu_invent;
-
-	cpu_invent = (invent_cpuinfo_t *)
-		klhwg_invent_alloc(cnode, INV_PROCESSOR, sizeof(invent_cpuinfo_t));
-	if (!cpu_invent)
-		return;
-
-	if (KLCONFIG_INFO_ENABLED((klinfo_t *)cpu))
-		cpu_invent->ic_gen.ig_flag = INVENT_ENABLED;
-	else
-		cpu_invent->ic_gen.ig_flag = 0x0;
-
-	cpu_invent->ic_cpu_info.cpuflavor = cpu->cpu_prid;
-	cpu_invent->ic_cpu_info.cpufq = cpu->cpu_speed;
-	cpu_invent->ic_cpu_info.sdfreq = cpu->cpu_scachespeed;
-
-	cpu_invent->ic_cpu_info.sdsize = cpu->cpu_scachesz;
-	cpu_invent->ic_cpuid = cpu->cpu_info.virtid;
-	cpu_invent->ic_slice = cpu_physical_id_to_slice(cpu->cpu_info.virtid);
-
-	hwgraph_info_add_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			(arbitrary_info_t) cpu_invent);
-	hwgraph_info_export_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			sizeof(invent_cpuinfo_t));
-}
-
-/* 
- * Add information about the baseio prom version number
- * as a part of detailed inventory info in the hwgraph.
- */
-void
-klhwg_baseio_inventory_add(vertex_hdl_t baseio_vhdl,cnodeid_t cnode)
-{
-	invent_miscinfo_t	*baseio_inventory;
-	unsigned char		version = 0,revision = 0;
-
-	/* Allocate memory for the "detailed inventory" info
-	 * for the baseio
-	 */
-	baseio_inventory = (invent_miscinfo_t *) 
-		klhwg_invent_alloc(cnode, INV_PROM, sizeof(invent_miscinfo_t));
-	baseio_inventory->im_type = INV_IO6PROM;
-	/* Store the revision info  in the inventory */
-	baseio_inventory->im_version = version;
-	baseio_inventory->im_rev = revision;
-	/* Put the inventory info in the hardware graph */
-	hwgraph_info_add_LBL(baseio_vhdl, INFO_LBL_DETAIL_INVENT, 
-			     (arbitrary_info_t) baseio_inventory);
-	/* Make the information available to the user programs
-	 * thru hwgfs.
-	 */
-        hwgraph_info_export_LBL(baseio_vhdl, INFO_LBL_DETAIL_INVENT,
-				sizeof(invent_miscinfo_t));
-}
-
-/*
- * Add detailed cpu inventory info to the hardware graph.
- */
-void
-klhwg_hub_invent_info(vertex_hdl_t hubv,
-		      cnodeid_t cnode, 
-		      klhub_t *hub)
-{
-	invent_miscinfo_t *hub_invent;
-
-	hub_invent = (invent_miscinfo_t *) 
-	    klhwg_invent_alloc(cnode, INV_MISC, sizeof(invent_miscinfo_t));
-	if (!hub_invent)
-	    return;
-
-	if (KLCONFIG_INFO_ENABLED((klinfo_t *)hub))
-	    hub_invent->im_gen.ig_flag = INVENT_ENABLED;
-
-	hub_invent->im_type = INV_HUB;
-	hub_invent->im_rev = hub->hub_info.revision;
-	hub_invent->im_speed = hub->hub_speed;
-	hwgraph_info_add_LBL(hubv, INFO_LBL_DETAIL_INVENT, 
-			     (arbitrary_info_t) hub_invent);
-        hwgraph_info_export_LBL(hubv, INFO_LBL_DETAIL_INVENT,
-				sizeof(invent_miscinfo_t));
-}
 
 /* ARGSUSED */
 void
@@ -238,8 +78,6 @@ klhwg_add_disabled_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, 
 
 		mark_cpuvertex_as_cpu(my_cpu, cpu_id);
 		device_master_set(my_cpu, node_vertex);
-
-		klhwg_disabled_cpu_invent_info(my_cpu, cnode, cpu, slot);
 		return;
         }
 }
@@ -271,8 +109,6 @@ klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
                 sprintf(name, "%c", 'a' + cpu->cpu_info.physid);
                 (void) hwgraph_edge_add(cpu_dir, my_cpu, name);
         }
-
-        klhwg_cpu_invent_info(my_cpu, cnode, cpu);
 }
 
 

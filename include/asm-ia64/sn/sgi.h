@@ -73,6 +73,8 @@ typedef uint64_t vhandl_t;
 
 typedef cpuid_t cpu_cookie_t;
 #define CPU_NONE		(-1)
+#define GRAPH_VERTEX_NONE ((vertex_hdl_t)-1)
+
 
 /*
  * mutext support mapping
@@ -121,31 +123,6 @@ mutex_spinlock(spinlock_t *sem) {
 #endif	/* DISABLE_ASSERT */
 
 #define PRINT_PANIC		panic
-
-/* print_register() defs */
-
-/*
- * register values
- * map between numeric values and symbolic values
- */
-struct reg_values {
-	unsigned long long rv_value;
-	char *rv_name;
-};
-
-/*
- * register descriptors are used for formatted prints of register values
- * rd_mask and rd_shift must be defined, other entries may be null
- */
-struct reg_desc {
-	unsigned long long rd_mask;	/* mask to extract field */
-	int rd_shift;		/* shift for extracted value, - >>, + << */
-	char *rd_name;		/* field name */
-	char *rd_format;	/* format to print field */
-	struct reg_values *rd_values;	/* symbolic names of values */
-};
-
-extern void print_register(unsigned long long, struct reg_desc *);
 
 /******************************************
  * Definitions that do not exist in linux *

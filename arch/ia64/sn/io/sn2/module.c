@@ -11,7 +11,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/io.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xbow.h>

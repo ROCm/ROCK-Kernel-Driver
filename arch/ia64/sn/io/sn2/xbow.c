@@ -16,7 +16,6 @@
 #include <asm/sn/sn2/sn_private.h>
 #include <asm/sn/sn2/shubio.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/pci/bridge.h>

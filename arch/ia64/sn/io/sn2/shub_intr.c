@@ -18,7 +18,6 @@
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/addrs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/intr.h>
@@ -77,8 +76,9 @@ do_hub_intr_alloc(vertex_hdl_t dev,
 		xtalk_addr = SH_II_INT0 | ((unsigned long)nasid << 36) | (1UL << 47);
 	}
 
-	intr_hdl = snia_kmem_alloc_node(sizeof(struct hub_intr_s), KM_NOSLEEP, cnode);
+	intr_hdl = kmalloc(sizeof(struct hub_intr_s), GFP_KERNEL);
 	ASSERT_ALWAYS(intr_hdl);
+	memset(intr_hdl, 0, sizeof(struct hub_intr_s));
 
 	xtalk_info = &intr_hdl->i_xtalk_info;
 	xtalk_info->xi_dev = dev;

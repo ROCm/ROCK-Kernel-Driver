@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,7 +14,6 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xwidget.h>
@@ -33,7 +31,7 @@
 inline int
 compare_and_swap_ptr(void **location, void *old_ptr, void *new_ptr)
 {
-	FIXME("compare_and_swap_ptr : NOT ATOMIC");
+	/* FIXME - compare_and_swap_ptr NOT ATOMIC */
 	if (*location == old_ptr) {
 		*location = new_ptr;
 		return(1);
@@ -197,7 +195,7 @@ sn_dma_flush(unsigned long addr) {
 	if (flush_nasid_list[nasid].widget_p[wid_num] == NULL) return;
 	p = &flush_nasid_list[nasid].widget_p[wid_num][0];
 
-	// find a matching BAR
+	/* find a matching BAR */
 
 	for (i=0; i<DEV_PER_WIDGET;i++) {
 		for (j=0; j<PCI_ROM_RESOURCE;j++) {
@@ -208,7 +206,7 @@ sn_dma_flush(unsigned long addr) {
 		p++;
 	}
 
-	// if no matching BAR, return without doing anything.
+	/* if no matching BAR, return without doing anything. */
 
 	if (i == DEV_PER_WIDGET) return;
 
@@ -216,15 +214,15 @@ sn_dma_flush(unsigned long addr) {
 
 	p->flush_addr = 0;
 
-	// force an interrupt.
+	/* force an interrupt. */
 
 	*(bridgereg_t *)(p->force_int_addr) = 1;
 
-	// wait for the interrupt to come back.
+	/* wait for the interrupt to come back. */
 
 	while (p->flush_addr != 0x10f);
 
-	// okay, everything is synched up.
+	/* okay, everything is synched up. */
 	spin_unlock_irqrestore(&p->flush_lock, flags);
 
 	return;
@@ -326,9 +324,10 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		lines & 4 ? " INTC" : "",
 		lines & 8 ? " INTD" : ""));
 
-    NEW(pcibr_intr);
+    pcibr_intr = kmalloc(sizeof (*(pcibr_intr)), GFP_KERNEL);
     if (!pcibr_intr)
 	return NULL;
+    memset(pcibr_intr, 0, sizeof (*(pcibr_intr)));
 
     pcibr_intr->bi_dev = pconn_vhdl;
     pcibr_intr->bi_lines = lines;
@@ -400,15 +399,9 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		     * in xtalk_intr_p.
 		     */
 		    if (!*xtalk_intr_p) {
-#ifdef SUPPORT_PRINTING_V_FORMAT
-			printk(KERN_ALERT  
-				"pcibr_intr_alloc %v: unable to get xtalk interrupt resources",
-				xconn_vhdl);
-#else
-			printk(KERN_ALERT  
-				"pcibr_intr_alloc 0x%p: unable to get xtalk interrupt resources",
-				(void *)xconn_vhdl);
-#endif
+			printk(KERN_ALERT "pcibr_intr_alloc %s: "
+				"unable to get xtalk interrupt resources",
+				pcibr_soft->bs_name);
 			/* yes, we leak resources here. */
 			return 0;
 		    }
@@ -450,7 +443,15 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 
 	    pcibr_intr->bi_ibits |= 1 << pcibr_int_bit;
 
-	    NEW(intr_entry);
+	    intr_entry = kmalloc(sizeof (*(intr_entry)), GFP_KERNEL);
+	    if ( !intr_entry ) {
+		printk(KERN_ALERT "pcibr_intr_alloc %s: "
+			"unable to get memory",
+			pcibr_soft->bs_name);
+		return 0;
+	    }
+	    memset(intr_entry, 0, sizeof (*(intr_entry)));
+
 	    intr_entry->il_next = NULL;
 	    intr_entry->il_intr = pcibr_intr;
 	    intr_entry->il_wrbf = &(bridge->b_wr_req_buf[pciio_slot].reg);
@@ -476,7 +477,7 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		 * and we replaced it, so we
 		 * don't need our intr_entry.
 		 */
-		DEL(intr_entry);
+		kfree(intr_entry);
 		PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pconn_vhdl,
 			    "INT 0x%x (bridge bit %d) replaces erased first\n",
 			    pcibr_int_bits, pcibr_int_bit));
@@ -499,7 +500,7 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 		     * and we replaced it, so we
 		     * don't need our intr_entry.
 		     */
-		    DEL(intr_entry);
+		    kfree(intr_entry);
 
 		    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INTR_ALLOC, pconn_vhdl,
 				"INT 0x%x (bridge bit %d) replaces erase Nth\n",
@@ -522,9 +523,6 @@ pcibr_intr_alloc(vertex_hdl_t pconn_vhdl,
 	}
     }
 
-#if DEBUG && INTR_DEBUG
-    printk("%v pcibr_intr_alloc complete\n", pconn_vhdl);
-#endif
     hub_intr = (hub_intr_t)xtalk_intr;
     pcibr_intr->bi_irq = hub_intr->i_bit;
     pcibr_intr->bi_cpu = hub_intr->i_cpuid;
@@ -582,7 +580,7 @@ pcibr_intr_free(pcibr_intr_t pcibr_intr)
 	    }
 	}
     }
-    DEL(pcibr_intr);
+    kfree(pcibr_intr);
 }
 
 void

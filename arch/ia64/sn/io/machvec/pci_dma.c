@@ -21,7 +21,6 @@
 #include <asm/io.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>

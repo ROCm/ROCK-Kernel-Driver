@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,7 +14,6 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xwidget.h>
@@ -62,7 +60,29 @@ uint64_t bridge_errors_to_dump = BRIDGE_ISR_ERROR_FATAL |
 
 int                     pcibr_llp_control_war_cnt; /* PCIBR_LLP_CONTROL_WAR */
 
-static struct reg_values xio_cmd_pactyp[] =
+/*
+ * register values
+ * map between numeric values and symbolic values
+ */
+struct reg_values {
+	unsigned long long rv_value;
+	char *rv_name;
+};
+
+/*
+ * register descriptors are used for formatted prints of register values
+ * rd_mask and rd_shift must be defined, other entries may be null
+ */
+struct reg_desc {
+	unsigned long long rd_mask;	/* mask to extract field */
+	int rd_shift;		/* shift for extracted value, - >>, + << */
+	char *rd_name;		/* field name */
+	char *rd_format;	/* format to print field */
+	struct reg_values *rd_values;	/* symbolic names of values */
+};
+
+/* Crosstalk Packet Types */
+static struct reg_values xtalk_cmd_pactyp[] =
 {
     {0x0, "RdReq"},
     {0x1, "RdResp"},
@@ -83,11 +103,11 @@ static struct reg_values xio_cmd_pactyp[] =
     {0}
 };
 
-static struct reg_desc   xio_cmd_bits[] =
+static struct reg_desc   xtalk_cmd_bits[] =
 {
     {WIDGET_DIDN, -28, "DIDN", "%x"},
     {WIDGET_SIDN, -24, "SIDN", "%x"},
-    {WIDGET_PACTYP, -20, "PACTYP", 0, xio_cmd_pactyp},
+    {WIDGET_PACTYP, -20, "PACTYP", 0, xtalk_cmd_pactyp},
     {WIDGET_TNUM, -15, "TNUM", "%x"},
     {WIDGET_COHERENT, 0, "COHERENT"},
     {WIDGET_DS, 0, "DS"},
@@ -147,13 +167,6 @@ static struct reg_desc   device_bits[] =
     {0}
 };
 
-static void
-print_bridge_errcmd(uint32_t cmdword, char *errtype)
-{
-    printk("\t    Bridge %s Error Command Word Register ", errtype);
-    print_register(cmdword, xio_cmd_bits);
-}
-
 static char             *pcibr_isr_errs[] =
 {
     "", "", "", "", "", "", "", "",
@@ -199,11 +212,92 @@ static char             *pcibr_isr_errs[] =
     "45: PCI-X split completion message parity error",
 };
 
+/*
+ * print_register() allows formatted printing of bit fields.  individual
+ * bit fields are described by a struct reg_desc, multiple bit fields within
+ * a single word can be described by multiple reg_desc structures.
+ * %r outputs a string of the format "<bit field descriptions>"
+ * %R outputs a string of the format "0x%x<bit field descriptions>"
+ *
+ * The fields in a reg_desc are:
+ *	unsigned long long rd_mask; An appropriate mask to isolate the bit field
+ *				within a word, and'ed with val
+ *
+ *	int rd_shift;		A shift amount to be done to the isolated
+ *				bit field.  done before printing the isolate
+ *				bit field with rd_format and before searching
+ *				for symbolic value names in rd_values
+ *
+ *	char *rd_name;		If non-null, a bit field name to label any
+ *				out from rd_format or searching rd_values.
+ *				if neither rd_format or rd_values is non-null
+ *				rd_name is printed only if the isolated
+ *				bit field is non-null.
+ *
+ *	char *rd_format;	If non-null, the shifted bit field value
+ *				is printed using this format.
+ *
+ *	struct reg_values *rd_values;	If non-null, a pointer to a table
+ *				matching numeric values with symbolic names.
+ *				rd_values are searched and the symbolic
+ *				value is printed if a match is found, if no
+ *				match is found "???" is printed.
+ *				
+ */
+
+static void
+print_register(unsigned long long reg, struct reg_desc *addr)
+{
+	register struct reg_desc *rd;
+	register struct reg_values *rv;
+	unsigned long long field;
+	int any;
+
+	printk("<");
+	any = 0;
+	for (rd = addr; rd->rd_mask; rd++) {
+		field = reg & rd->rd_mask;
+		field = (rd->rd_shift > 0) ? field << rd->rd_shift : field >> -rd->rd_shift;
+		if (any && (rd->rd_format || rd->rd_values || (rd->rd_name && field)))
+			printk(",");
+		if (rd->rd_name) {
+			if (rd->rd_format || rd->rd_values || field) {
+				printk("%s", rd->rd_name);
+				any = 1;
+			}
+			if (rd->rd_format || rd->rd_values) {
+				printk("=");
+				any = 1;
+			}
+		}
+		/* You can have any format so long as it is %x */
+		if (rd->rd_format) {
+			printk("%llx", field);
+			any = 1;
+			if (rd->rd_values)
+				printk(":");
+		}
+		if (rd->rd_values) {
+			any = 1;
+			for (rv = rd->rd_values; rv->rv_name; rv++) {
+				if (field == rv->rv_value) {
+					printk("%s", rv->rv_name);
+					break;
+				}
+			}
+			if (rv->rv_name == NULL)
+				printk("???");
+		}
+	}
+	printk(">\n");
+}
+
 #define BEM_ADD_STR(s)  printk("%s", (s))
 #define BEM_ADD_VAR(v)  printk("\t%20s: 0x%llx\n", #v, ((unsigned long long)v))
 #define BEM_ADD_REG(r)  printk("\t%20s: ", #r); print_register((r), r ## _desc)
 #define BEM_ADD_NSPC(n,s)       printk("\t%20s: ", n); print_register(s, space_desc)
 #define BEM_ADD_SPC(s)          BEM_ADD_NSPC(#s, s)
+
 
 /*
  * display memory directory state
@@ -223,6 +317,13 @@ pcibr_show_dir_state(paddr_t paddr, char *prefix)
 	printk("%saddr 0x%lx: state 0x%x owner 0x%lx (%s)\n", 
 		prefix, paddr, state, vec_ptr, dir_state_str[state]);
 #endif
+}
+
+static void
+print_bridge_errcmd(uint32_t cmdword, char *errtype)
+{
+    printk("\t    Bridge %s Error Command Word Register ", errtype);
+    print_register(cmdword, xtalk_cmd_bits);
 }
 
 

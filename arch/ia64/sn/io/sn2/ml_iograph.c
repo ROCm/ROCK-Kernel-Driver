@@ -14,7 +14,6 @@
 #include <asm/sn/io.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/labelcl.h>
@@ -58,12 +57,15 @@ xswitch_vertex_init(vertex_hdl_t xswitch)
 {
 	xswitch_vol_t xvolinfo;
 	int rc;
-	extern void * snia_kmem_zalloc(size_t size, int flag);
 
-	xvolinfo = snia_kmem_zalloc(sizeof(struct xswitch_vol_s), GFP_KERNEL);
-	mutex_init(&xvolinfo->xswitch_volunteer_mutex);
-	rc = hwgraph_info_add_LBL(xswitch, 
-			INFO_LBL_XSWITCH_VOL,
+	xvolinfo = kmalloc(sizeof(struct xswitch_vol_s), GFP_KERNEL);
+	if (xvolinfo <= 0 ) {
+		printk("xswitch_vertex_init: out of memory\n");
+		return;
+	}
+       	memset(xvolinfo, 0, sizeof(struct xswitch_vol_s));
+	init_MUTEX(&xvolinfo->xswitch_volunteer_mutex);
+	rc = hwgraph_info_add_LBL(xswitch, INFO_LBL_XSWITCH_VOL,
 			(arbitrary_info_t)xvolinfo);
 	ASSERT(rc == GRAPH_SUCCESS); rc = rc;
 }
@@ -83,7 +85,8 @@ xswitch_volunteer_delete(vertex_hdl_t xswitch)
 	rc = hwgraph_info_remove_LBL(xswitch, 
 				INFO_LBL_XSWITCH_VOL,
 				(arbitrary_info_t *)&xvolinfo);
-	snia_kmem_free(xvolinfo, sizeof(struct xswitch_vol_s));
+	if (xvolinfo > 0)
+		kfree(xvolinfo);
 }
 /*
  * A Crosstalk master volunteers to manage xwidgets on the specified xswitch.

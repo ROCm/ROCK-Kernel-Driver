@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -19,7 +18,6 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/klconfig.h>
@@ -662,7 +660,12 @@ pcibr_device_info_new(
      * passed into us, into its external representation.  See comment
      * for the PCIBR_DEVICE_TO_SLOT macro for more information.
      */
-    NEW(pcibr_info);
+    pcibr_info = kmalloc(sizeof (*(pcibr_info)), GFP_KERNEL);
+    if ( !pcibr_info ) {
+	return NULL;
+    }
+    memset(pcibr_info, 0, sizeof (*(pcibr_info)));
+
     pciio_device_info_new(&pcibr_info->f_c, pcibr_soft->bs_vhdl,
 			  PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
 			  rfunc, vendor, device);
@@ -1025,10 +1028,13 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * allocate soft state structure, fill in some
      * fields, and hook it up to our vertex.
      */
-    NEW(pcibr_soft);
+    pcibr_soft = kmalloc(sizeof(*(pcibr_soft)), GFP_KERNEL);
     if (ret_softp)
 	*ret_softp = pcibr_soft;
-    BZERO(pcibr_soft, sizeof *pcibr_soft);
+    if (!pcibr_soft)
+	return -1;
+
+    memset(pcibr_soft, 0, sizeof *pcibr_soft);
     pcibr_soft_set(pcibr_vhdl, pcibr_soft);
     pcibr_soft->bs_conn = xconn_vhdl;
     pcibr_soft->bs_vhdl = pcibr_vhdl;
@@ -1094,7 +1100,10 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     {
 	pcibr_list_p            self;
 
-	NEW(self);
+	self = kmalloc(sizeof(*(self)), GFP_KERNEL);
+	if (!self)
+		return -1;
+	memset(self, 0, sizeof(*(self)));
 	self->bl_soft = pcibr_soft;
 	self->bl_vhdl = pcibr_vhdl;
 	self->bl_next = pcibr_list;
@@ -1910,7 +1919,8 @@ pcibr_detach(vertex_hdl_t xconn)
     /* Clear the software state maintained by the bridge driver for this
      * bridge.
      */
-    DEL(pcibr_soft);
+    kfree(pcibr_soft);
+
     /* Remove the Bridge revision labelled info */
     (void)hwgraph_info_remove_LBL(pcibr_vhdl, INFO_LBL_PCIBR_ASIC_REV, NULL);
     /* Remove the character device associated with this bridge */
@@ -2443,7 +2453,13 @@ pcibr_piomap_alloc(vertex_hdl_t pconn_vhdl,
 	mapptr = NULL;
     else {
 	pcibr_unlock(pcibr_soft, s);
-	NEW(pcibr_piomap);
+	pcibr_piomap = kmalloc(sizeof (*(pcibr_piomap)), GFP_KERNEL);
+	if ( !pcibr_piomap ) {
+		PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    	"pcibr_piomap_alloc: malloc fails\n"));
+		return NULL;
+	}
+	memset(pcibr_piomap, 0, sizeof (*(pcibr_piomap)));
     }
 
     pcibr_piomap->bp_dev = pconn_vhdl;
@@ -2647,11 +2663,18 @@ pcibr_piospace_alloc(vertex_hdl_t pconn_vhdl,
     if (!start_addr) {
 	pcibr_unlock(pcibr_soft, s);
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
-		    "pcibr_piospace_alloc: request 0x%x to big\n", req_size));
+		    "pcibr_piospace_alloc: request 0x%lx to big\n", req_size));
 	return 0;
     }
 
-    NEW(piosp);
+    piosp = kmalloc(sizeof (*(piosp)), GFP_KERNEL);
+    if ( !piosp ) {
+	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_PIOMAP, pconn_vhdl,
+		    "pcibr_piospace_alloc: malloc fails\n"));
+	return 0;
+    }
+    memset(piosp, 0, sizeof (*(piosp)));
+
     piosp->free = 0;
     piosp->space = space;
     piosp->start = start_addr;
@@ -2906,9 +2929,12 @@ pcibr_dmamap_alloc(vertex_hdl_t pconn_vhdl,
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DMAMAP | PCIBR_DEBUG_DMADIR, pconn_vhdl,
 		    "pcibr_dmamap_alloc: unable to use direct64\n"));
 
-	/* PIC only supports 64-bit direct mapping in PCI-X mode. */
-	if (IS_PCIX(pcibr_soft)) {
-	    DEL(pcibr_dmamap);
+	/* PIC in PCI-X mode only supports 64-bit direct mapping so
+	 * don't fall thru and try 32-bit direct mapping or 32-bit
+	 * page mapping
+	 */
+	if (IS_PIC_SOFT(pcibr_soft) && IS_PCIX(pcibr_soft)) {
+	    kfree(pcibr_dmamap);
 	    return 0;
 	}
 

@@ -9,7 +9,6 @@
 #define _ASM_IA64_SN_HCL_H
 
 #include <asm/sn/sgi.h>
-#include <asm/sn/invent.h>
 
 extern vertex_hdl_t hwgraph_root;
 extern vertex_hdl_t linux_busnum;

@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,7 +14,6 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xwidget.h>
@@ -38,31 +36,6 @@ extern void pcibr_driver_unreg_callback(vertex_hdl_t, int, int, int);
 
 
 /*
- * copy inventory_t from conn_v to peer_conn_v
- */
-int
-pic_bus1_inventory_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v)
-{
-	inventory_t *pinv, *peer_pinv;
-
-	if (hwgraph_info_get_LBL(conn_v, INFO_LBL_INVENT,
-				(arbitrary_info_t *)&pinv) == GRAPH_SUCCESS)
- {
-		NEW(peer_pinv);
-		memcpy(peer_pinv, pinv, sizeof(inventory_t));
-		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_INVENT,
-			    (arbitrary_info_t)peer_pinv) != GRAPH_SUCCESS) {
-			DEL(peer_pinv);
-			return 0;
-		}
-		return 1;
-	}
-
-	printk("pic_bus1_inventory_dup: cannot get INFO_LBL_INVENT from 0x%lx\n ", (uint64_t)conn_v);
-	return 0;
-}
-
-/*
  * copy xwidget_info_t from conn_v to peer_conn_v
  */
 int
@@ -83,21 +56,27 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 
 	if (hwgraph_info_get_LBL(conn_v, INFO_LBL_XWIDGET,
 			(arbitrary_info_t *)&widget_info) == GRAPH_SUCCESS) {
-		NEW(peer_widget_info);
-		peer_widget_info->w_vertex = peer_conn_v;
-		peer_widget_info->w_id = widget_info->w_id;
-		peer_widget_info->w_master = peer_hubv;
-		peer_widget_info->w_masterid = peer_hub_info->h_widgetid;
+		peer_widget_info = kmalloc(sizeof (*(peer_widget_info)), GFP_KERNEL);
+		if ( !peer_widget_info ) {
+			return 0;
+		}
+		memset(peer_widget_info, 0, sizeof (*(peer_widget_info)));
+
+		peer_widget_info->w_fingerprint = widget_info_fingerprint;
+    		peer_widget_info->w_vertex = peer_conn_v;
+    		peer_widget_info->w_id = widget_info->w_id;
+    		peer_widget_info->w_master = peer_hubv;
+    		peer_widget_info->w_masterid = peer_hub_info->h_widgetid;
 		/* structure copy */
-		peer_widget_info->w_hwid = widget_info->w_hwid;
-		peer_widget_info->w_efunc = 0;
-		peer_widget_info->w_einfo = 0;
+    		peer_widget_info->w_hwid = widget_info->w_hwid;
+    		peer_widget_info->w_efunc = 0;
+    		peer_widget_info->w_einfo = 0;
 		peer_widget_info->w_name = kmalloc(strlen(peer_path) + 1, GFP_KERNEL);
 		strcpy(peer_widget_info->w_name, peer_path);
 
 		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_XWIDGET,
 			(arbitrary_info_t)peer_widget_info) != GRAPH_SUCCESS) {
-				DEL(peer_widget_info);
+				kfree(peer_widget_info);
 				return 0;
 		}
 
@@ -172,11 +151,6 @@ pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 			     * vertex but that should be safe and we don't
 			     * really expect the additions to fail anyway.
 			     */
-#if 0
-			    if (!pic_bus1_inventory_dup(conn_v, peer_conn_v))
-					return 0;
-			    pic_bus1_device_desc_dup(conn_v, peer_conn_v);
-#endif
 			    if (!pic_bus1_widget_info_dup(conn_v, peer_conn_v, xbow_peer))
 					return 0;
 

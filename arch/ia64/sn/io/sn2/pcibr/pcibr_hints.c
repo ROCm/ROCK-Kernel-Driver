@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,7 +14,6 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xwidget.h>
@@ -48,7 +46,11 @@ pcibr_hints_get(vertex_hdl_t xconn_vhdl, int alloc)
 
     if (alloc && (rv != GRAPH_SUCCESS)) {
 
-	NEW(hint);
+	hint = kmalloc(sizeof (*(hint)), GFP_KERNEL);
+	if ( !hint )
+		goto abnormal_exit;
+	memset(hint, 0, sizeof (*(hint)));
+
 	hint->rrb_alloc_funct = NULL;
 	hint->ph_intr_bits = NULL;
 	rv = hwgraph_info_add_LBL(xconn_vhdl, 
@@ -68,10 +70,7 @@ pcibr_hints_get(vertex_hdl_t xconn_vhdl, int alloc)
     return (pcibr_hints_t) ainfo;
 
 abnormal_exit:
-#ifdef LATER
-    printf("SHOULD NOT BE HERE\n");
-#endif
-    DEL(hint);
+    kfree(hint);
     return(NULL);
 
 }
@@ -162,18 +161,19 @@ pcibr_hints_subdevs(vertex_hdl_t xconn_vhdl,
     if (ainfo == 0) {
 	uint64_t                *subdevp;
 
-	NEW(subdevp);
+	subdevp = kmalloc(sizeof (*(subdevp)), GFP_KERNEL);
 	if (!subdevp) {
 	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
 			"pcibr_hints_subdevs: subdev ptr alloc failed\n"));
 	    return;
 	}
+	memset(subdevp, 0, sizeof (*(subdevp)));
 	*subdevp = subdevs;
 	hwgraph_info_add_LBL(pconn_vhdl, INFO_LBL_SUBDEVS, (arbitrary_info_t) subdevp);
 	hwgraph_info_get_LBL(pconn_vhdl, INFO_LBL_SUBDEVS, &ainfo);
 	if (ainfo == (arbitrary_info_t) subdevp)
 	    return;
-	DEL(subdevp);
+	kfree(subdevp);
 	if (ainfo == (arbitrary_info_t) NULL) {
 	    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HINTS, xconn_vhdl,
 			"pcibr_hints_subdevs: null subdevs ptr\n"));

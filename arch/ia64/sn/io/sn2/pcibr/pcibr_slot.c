@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -16,7 +15,6 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xwidget.h>
@@ -319,9 +317,8 @@ pcibr_slot_info_return(pcibr_soft_t             pcibr_soft,
     reg_p                        b_respp;
     pcibr_slot_info_resp_t       slotp;
     pcibr_slot_func_info_resp_t  funcp;
-    extern void snia_kmem_free(void *, int);
 
-    slotp = snia_kmem_zalloc(sizeof(*slotp), 0);
+    slotp = kmalloc(sizeof(*slotp), GFP_KERNEL);
     if (slotp == NULL) {
         return(ENOMEM);
     }
@@ -395,7 +392,7 @@ pcibr_slot_info_return(pcibr_soft_t             pcibr_soft,
         return(EFAULT);
     }
 
-    snia_kmem_free(slotp, sizeof(*slotp));
+    kfree(slotp);
 
     return(0);
 }
@@ -611,7 +608,11 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
 	}
         cfgw = pcibr_slot_config_addr(bridge, slot, 0);
     }
-    NEWA(pcibr_infoh, nfunc);
+    pcibr_infoh = kmalloc(nfunc*sizeof (*(pcibr_infoh)), GFP_KERNEL);
+    if ( !pcibr_infoh ) {
+	return ENOMEM;
+    }
+    memset(pcibr_infoh, 0, nfunc*sizeof (*(pcibr_infoh)));
     
     pcibr_soft->bs_slot[slot].bss_ninfo = nfunc;
     pcibr_soft->bs_slot[slot].bss_infos = pcibr_infoh;
@@ -957,7 +958,7 @@ pcibr_slot_info_free(vertex_hdl_t pcibr_vhdl,
     pcibr_device_info_free(pcibr_vhdl, slot);
 
     pcibr_infoh = pcibr_soft->bs_slot[slot].bss_infos;
-    DELA(pcibr_infoh,nfunc);
+    kfree(pcibr_infoh);
     pcibr_soft->bs_slot[slot].bss_ninfo = 0;
 
     return(0);
@@ -1407,7 +1408,12 @@ pcibr_slot_guest_info_init(vertex_hdl_t pcibr_vhdl,
      * build verticies for them).
      */
     if (pcibr_soft->bs_slot[slot].bss_ninfo < 1) {
-	NEWA(pcibr_infoh, 1);
+	pcibr_infoh = kmalloc(sizeof (*(pcibr_infoh)), GFP_KERNEL);
+	if ( !pcibr_infoh ) {
+		return ENOMEM;
+	}
+	memset(pcibr_infoh, 0, sizeof (*(pcibr_infoh)));
+
 	pcibr_soft->bs_slot[slot].bss_ninfo = 1;
 	pcibr_soft->bs_slot[slot].bss_infos = pcibr_infoh;
 
@@ -1840,7 +1846,7 @@ pcibr_device_info_free(vertex_hdl_t pcibr_vhdl, pciio_slot_t slot)
 	pciio_device_info_unregister(pcibr_vhdl, &pcibr_info->f_c);
 	pciio_device_info_free(&pcibr_info->f_c);
 
-	DEL(pcibr_info);
+	kfree(pcibr_info);
     }
 
     /* Reset the mapping usage counters */

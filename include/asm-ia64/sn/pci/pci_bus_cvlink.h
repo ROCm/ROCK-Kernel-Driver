@@ -17,7 +17,6 @@
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/addrs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/intr.h>
