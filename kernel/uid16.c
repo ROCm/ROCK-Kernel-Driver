@@ -17,12 +17,12 @@
 
 #include <asm/uaccess.h>
 
-asmlinkage long sys_chown16(const char * filename, old_uid_t user, old_gid_t group)
+asmlinkage long sys_chown16(const char __user * filename, old_uid_t user, old_gid_t group)
 {
 	return sys_chown(filename, low2highuid(user), low2highgid(group));
 }
 
-asmlinkage long sys_lchown16(const char * filename, old_uid_t user, old_gid_t group)
+asmlinkage long sys_lchown16(const char __user * filename, old_uid_t user, old_gid_t group)
 {
 	return sys_lchown(filename, low2highuid(user), low2highgid(group));
 }
@@ -58,7 +58,7 @@ asmlinkage long sys_setresuid16(old_uid_t ruid, old_uid_t euid, old_uid_t suid)
 		low2highuid(suid));
 }
 
-asmlinkage long sys_getresuid16(old_uid_t *ruid, old_uid_t *euid, old_uid_t *suid)
+asmlinkage long sys_getresuid16(old_uid_t __user *ruid, old_uid_t __user *euid, old_uid_t __user *suid)
 {
 	int retval;
 
@@ -75,7 +75,7 @@ asmlinkage long sys_setresgid16(old_gid_t rgid, old_gid_t egid, old_gid_t sgid)
 		low2highgid(sgid));
 }
 
-asmlinkage long sys_getresgid16(old_gid_t *rgid, old_gid_t *egid, old_gid_t *sgid)
+asmlinkage long sys_getresgid16(old_gid_t __user *rgid, old_gid_t __user *egid, old_gid_t __user *sgid)
 {
 	int retval;
 
