@@ -840,7 +840,8 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	lo->lo_flags = 0;
 	lo->lo_queue.queuedata = NULL;
 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
-	memset(lo->lo_name, 0, LO_NAME_SIZE);
+	memset(lo->lo_crypt_name, 0, LO_NAME_SIZE);
+	memset(lo->lo_file_name, 0, LO_NAME_SIZE);
 	invalidate_bdev(bdev, 0);
 	set_capacity(disks[lo->lo_number], 0);
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
@@ -892,7 +893,10 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 			return -EFBIG;
 	}
 
-	strlcpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
+	memcpy(lo->lo_file_name, info->lo_file_name, LO_NAME_SIZE);
+	memcpy(lo->lo_crypt_name, info->lo_crypt_name, LO_NAME_SIZE);
+	lo->lo_file_name[LO_NAME_SIZE-1] = 0;
+	lo->lo_crypt_name[LO_NAME_SIZE-1] = 0;
 
 	if (!xfer)
 		xfer = &none_funcs;
@@ -931,7 +935,8 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 	info->lo_offset = lo->lo_offset;
 	info->lo_sizelimit = lo->lo_sizelimit;
 	info->lo_flags = lo->lo_flags;
-	strlcpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
+	memcpy(info->lo_file_name, lo->lo_file_name, LO_NAME_SIZE);
+	memcpy(info->lo_crypt_name, lo->lo_crypt_name, LO_NAME_SIZE);
 	info->lo_encrypt_type =
 		lo->lo_encryption ? lo->lo_encryption->number : 0;
 	if (lo->lo_encrypt_key_size && capable(CAP_SYS_ADMIN)) {
@@ -957,7 +962,10 @@ loop_info64_from_old(const struct loop_info *info, struct loop_info64 *info64)
 	info64->lo_flags = info->lo_flags;
 	info64->lo_init[0] = info->lo_init[0];
 	info64->lo_init[1] = info->lo_init[1];
-	memcpy(info64->lo_name, info->lo_name, LO_NAME_SIZE);
+	if (info->lo_encrypt_type == LO_CRYPT_CRYPTOAPI)
+		memcpy(info64->lo_crypt_name, info->lo_name, LO_NAME_SIZE);
+	else
+		memcpy(info64->lo_file_name, info->lo_name, LO_NAME_SIZE);
 	memcpy(info64->lo_encrypt_key, info->lo_encrypt_key, LO_KEY_SIZE);
 }
 
@@ -975,8 +983,11 @@ loop_info64_to_old(const struct loop_info64 *info64, struct loop_info *info)
 	info->lo_flags = info64->lo_flags;
 	info->lo_init[0] = info64->lo_init[0];
 	info->lo_init[1] = info64->lo_init[1];
-	memcpy(info->lo_name, info64->lo_name, LO_NAME_SIZE);
-	memcpy(info->lo_encrypt_key,info64->lo_encrypt_key,LO_KEY_SIZE);
+	if (info->lo_encrypt_type == LO_CRYPT_CRYPTOAPI)
+		memcpy(info->lo_name, info64->lo_crypt_name, LO_NAME_SIZE);
+	else
+		memcpy(info->lo_name, info64->lo_file_name, LO_NAME_SIZE);
+	memcpy(info->lo_encrypt_key, info64->lo_encrypt_key, LO_KEY_SIZE);
 
 	/* error in case values were truncated */
 	if (info->lo_device != info64->lo_device ||
