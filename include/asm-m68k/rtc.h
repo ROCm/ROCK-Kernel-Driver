@@ -17,10 +17,6 @@
 
 /* a few implementation details for the emulation : */
 
-extern unsigned gen_rtc_irq_flags; /* which sort(s) of interrupts caused int */
-extern unsigned gen_rtc_irq_ctrl;  /*                             are enabled */
-extern short q40rtc_oldsecs;
-
 #define RTC_PIE 0x40		/* periodic interrupt enable */
 #define RTC_AIE 0x20		/* alarm interrupt enable */
 #define RTC_UIE 0x10		/* update-finished interrupt enable */
