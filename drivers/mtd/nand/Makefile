@@ -1,7 +1,7 @@
 #
 # linux/drivers/nand/Makefile
 #
-# $Id: Makefile.common,v 1.14 2004/11/24 19:33:56 rpurdie Exp $
+# $Id: Makefile.common,v 1.15 2004/11/26 12:28:22 dedekind Exp $
 
 obj-$(CONFIG_MTD_NAND)			+= nand.o nand_ecc.o
 obj-$(CONFIG_MTD_NAND_IDS)		+= nand_ids.o
@@ -19,5 +19,6 @@ obj-$(CONFIG_MTD_NAND_DISKONCHIP)	+= diskonchip.o
 obj-$(CONFIG_MTD_NAND_H1900)		+= h1910.o
 obj-$(CONFIG_MTD_NAND_RTC_FROM4)	+= rtc_from4.o
 obj-$(CONFIG_MTD_NAND_SHARPSL)		+= sharpsl.o
+obj-$(CONFIG_MTD_NAND_NANDSIM)		+= nandsim.o
 
 nand-objs = nand_base.o nand_bbt.o
