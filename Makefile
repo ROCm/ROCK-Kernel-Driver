@@ -214,7 +214,7 @@ SUBDIRS		:=
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
-export include-config := 1
+export include_config := 1
 
 -include .config
 
@@ -238,7 +238,7 @@ drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
 libs-y		:= $(patsubst %/, %/lib.a, $(libs-y))
 
-ifdef include-config
+ifdef include_config
 
 # Here goes the main Makefile
 # ===========================================================================
@@ -602,7 +602,7 @@ rpm:	clean spec
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
-else # ifdef include-config
+else # ifdef include_config
 
 ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -828,7 +828,7 @@ else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	$(MAKE) $@
 
 endif # ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
-endif # ifdef include-config
+endif # ifdef include_config
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
