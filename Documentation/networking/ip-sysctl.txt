@@ -307,6 +307,15 @@ tcp_westwood - BOOLEAN
 	wired networks and throughput over wireless links.   
         Default: 0
 
+tcp_vegas_cong_avoid - BOOLEAN
+	Enable TCP Vegas congestion avoidance algorithm.
+	TCP Vegas is a sender-side only change to TCP that anticipates
+	the onset of congestion by estimating the bandwidth. TCP Vegas
+	adjusts the sending rate by modifying the congestion
+	window. TCP Vegas should provide less packet loss, but it is
+	not as aggressive as TCP Reno.
+	Default:0
+
 ip_local_port_range - 2 INTEGERS
 	Defines the local port range that is used by TCP and UDP to
 	choose the local port. The first number is the first, the 
@@ -714,13 +723,13 @@ temp_valid_lft - INTEGER
 	Default: 604800 (7 days)
 
 temp_prefered_lft - INTEGER
-	Preferred lifetime (in seconds) for temorary addresses.
+	Preferred lifetime (in seconds) for temporary addresses.
 	Default: 86400 (1 day)
 
 max_desync_factor - INTEGER
 	Maximum value for DESYNC_FACTOR, which is a random value
 	that ensures that clients don't synchronize with each 
-	other and generage new addresses at exactly the same time.
+	other and generate new addresses at exactly the same time.
 	value is in seconds.
 	Default: 600
 	
