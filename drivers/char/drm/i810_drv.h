@@ -122,7 +122,7 @@ extern int  i810_dma_init(struct inode *inode, struct file *filp,
 extern int  i810_dma_cleanup(drm_device_t *dev);
 extern int  i810_flush_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg);
-extern void i810_reclaim_buffers(struct file *filp);
+extern void i810_reclaim_buffers(drm_device_t *dev, struct file *filp);
 extern int  i810_getage(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long arg);
 extern int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
