@@ -183,15 +183,21 @@ show_##field (struct device *dev, char *buf)				\
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
+usb_intf_attr (bInterfaceNumber, "%02x\n")
 usb_intf_attr (bAlternateSetting, "%2d\n")
+usb_intf_attr (bNumEndpoints, "%02x\n")
 usb_intf_attr (bInterfaceClass, "%02x\n")
 usb_intf_attr (bInterfaceSubClass, "%02x\n")
 usb_intf_attr (bInterfaceProtocol, "%02x\n")
+usb_intf_attr (iInterface, "%02x\n")
 
 void usb_create_driverfs_intf_files (struct usb_interface *intf)
 {
+	device_create_file (&intf->dev, &dev_attr_bInterfaceNumber);
 	device_create_file (&intf->dev, &dev_attr_bAlternateSetting);
+	device_create_file (&intf->dev, &dev_attr_bNumEndpoints);
 	device_create_file (&intf->dev, &dev_attr_bInterfaceClass);
 	device_create_file (&intf->dev, &dev_attr_bInterfaceSubClass);
 	device_create_file (&intf->dev, &dev_attr_bInterfaceProtocol);
+	device_create_file (&intf->dev, &dev_attr_iInterface);
 }
