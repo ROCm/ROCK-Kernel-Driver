@@ -138,17 +138,11 @@ static struct card_ops mic_ops = {
 	.irq_func = hscxisac_irq,
 };
 
-int __init
-setup_mic(struct IsdnCard *card)
+static int __init
+mic_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
-
-	strcpy(tmp, mic_revision);
-	printk(KERN_INFO "HiSax: mic driver Rev. %s\n", HiSax_getrev(tmp));
-
-	cs->hw.mic.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
+	cs->hw.mic.cfg_reg = card->para[1];
 	cs->hw.mic.adr = cs->hw.mic.cfg_reg + MIC_ADR;
 	cs->hw.mic.isac = cs->hw.mic.cfg_reg + MIC_ISAC;
 	cs->hw.mic.hscx = cs->hw.mic.cfg_reg + MIC_HSCX;
@@ -158,11 +152,25 @@ setup_mic(struct IsdnCard *card)
   
 	printk(KERN_INFO "mic: defined at 0x%x IRQ %d\n",
 	       cs->hw.mic.cfg_reg, cs->irq);
+
 	cs->card_ops = &mic_ops;
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	return 1;
+	return 0;
  err:
 	hisax_release_resources(cs);
-	return 0;
+	return -EBUSY;
+}
+
+int __init
+setup_mic(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, mic_revision);
+	printk(KERN_INFO "HiSax: mic driver Rev. %s\n", HiSax_getrev(tmp));
+
+	if (mic_probe(card->cs, card) < 0)
+		return 0;
+	return 1;
 }

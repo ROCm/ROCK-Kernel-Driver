@@ -126,7 +126,7 @@ static char *strL1Event[] =
 };
 
 void
-debugl1(struct IsdnCardState *cs, char *fmt, ...)
+debugl1(struct IsdnCardState *cs, const char *fmt, ...)
 {
 	va_list args;
 	char tmp[8];

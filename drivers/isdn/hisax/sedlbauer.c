@@ -73,7 +73,6 @@ const char *Sedlbauer_Types[] =
 #define SEDL_SPEEDFAX_PYRAMID	7
 #define SEDL_SPEEDFAX_PCI	8
 
-#define SEDL_CHIP_TEST		0
 #define SEDL_CHIP_ISAC_HSCX	1
 #define SEDL_CHIP_ISAC_ISAR	2
 #define SEDL_CHIP_IPAC		3
@@ -452,6 +451,241 @@ static struct card_ops sedlbauer_isar_ops = {
 	.irq_func    = sedlbauer_isar_interrupt,
 };
 
+static int __init
+sedl_ipac_probe(struct IsdnCardState *cs)
+{
+	u8 val;
+
+	cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR;
+	val = readreg(cs, cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC, IPAC_ID);
+	printk(KERN_DEBUG "Sedlbauer: testing IPAC version %x\n", val);
+	return (val == 1 || val == 2);
+}
+
+static int __init
+sedl_ipac_init(struct IsdnCardState *cs)
+{
+	cs->card_ops = &sedlbauer_ipac_ops;
+	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+		return -ENODEV;
+	sedlbauer_reset(cs);
+	return 0;
+}
+
+static int __init
+sedl_isac_isar_init(struct IsdnCardState *cs)
+{
+	cs->bcs[0].hw.isar.reg = &cs->hw.sedl.isar;
+	cs->bcs[1].hw.isar.reg = &cs->hw.sedl.isar;
+	__set_bit(HW_ISAR, &cs->HW_Flags);
+	cs->card_ops = &sedlbauer_isar_ops;
+	cs->auxcmd = &isar_auxcmd;
+	isac_setup(cs, &isac_ops);
+	return isar_setup(cs, &isar_ops);
+}
+
+static int __init
+sedl_isac_hscx_init(struct IsdnCardState *cs)
+{
+	cs->card_ops = &sedlbauer_ops;
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		return -ENODEV;
+	sedlbauer_reset(cs);
+	return 0;
+}
+
+static int __init
+sedl_card_win_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->irq = card->para[0];
+	cs->hw.sedl.cfg_reg = card->para[1];
+	cs->hw.sedl.bus = SEDL_BUS_ISA;
+	if (!request_io(&cs->rs, cs->hw.sedl.cfg_reg, 8, "sedlbauer isdn"))
+		goto err;
+
+	if (sedl_ipac_probe(cs)) {
+		cs->subtyp = SEDL_SPEED_WIN2_PC104;
+		cs->hw.sedl.chip = SEDL_CHIP_IPAC;
+		cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR;
+		cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
+		if (sedl_ipac_init(cs))
+			goto err;
+	} else {
+		cs->subtyp = SEDL_SPEED_CARD_WIN;
+		cs->hw.sedl.chip = SEDL_CHIP_ISAC_HSCX;
+		cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_ADR;
+		cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_ISAC;
+		cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_HSCX;
+		cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_ON;
+		cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_OFF;
+		if (sedl_isac_hscx_init(cs))
+			goto err;
+	}
+	printk(KERN_INFO "Sedlbauer %s: defined at 0x%x-0x%x IRQ %d\n",
+	       Sedlbauer_Types[cs->subtyp],
+	       cs->hw.sedl.cfg_reg, cs->hw.sedl.cfg_reg + 8, cs->irq);
+
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+sedl_star_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->hw.sedl.bus = SEDL_BUS_PCMCIA;
+	if (sedl_ipac_probe(cs)) {
+		cs->subtyp = SEDL_SPEED_STAR2;
+		cs->hw.sedl.chip = SEDL_CHIP_IPAC;
+		cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR;
+		cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
+		if (sedl_ipac_init(cs))
+			goto err;
+	} else {
+		cs->subtyp = SEDL_SPEED_STAR;
+		cs->hw.sedl.chip = SEDL_CHIP_ISAC_HSCX;
+		cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_ADR;
+		cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_ISAC;
+		cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_HSCX;
+		cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_RESET;
+		cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_RESET;
+		if (sedl_isac_hscx_init(cs))
+			goto err;
+	}
+	printk(KERN_INFO "Sedlbauer %s: defined at 0x%x-0x%x IRQ %d\n",
+	       Sedlbauer_Types[cs->subtyp],
+	       cs->hw.sedl.cfg_reg, cs->hw.sedl.cfg_reg + 8, cs->irq);
+
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+sedl_fax_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->subtyp = SEDL_SPEED_FAX;
+	cs->hw.sedl.bus = SEDL_BUS_ISA;
+	cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
+	if (!request_io(&cs->rs, cs->hw.sedl.cfg_reg, 16, "sedlbauer isdn"))
+		goto err;
+
+	printk(KERN_INFO "Sedlbauer %s: defined at 0x%x-0x%x IRQ %d\n",
+	       Sedlbauer_Types[cs->subtyp],
+	       cs->hw.sedl.cfg_reg, cs->hw.sedl.cfg_reg + 16, cs->irq);
+
+	cs->hw.sedl.adr = cs->hw.sedl.cfg_reg  + SEDL_ISAR_ISA_ADR;
+	cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_ISAR_ISA_ISAC;
+	cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_ISAR_ISA_ISAR;
+	cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg + SEDL_ISAR_ISA_ISAR_RESET_ON;
+	cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_ISAR_ISA_ISAR_RESET_OFF;
+	if (sedl_isac_isar_init(cs))
+		goto err;
+
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+sedl_pci_init(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.sedl.cfg_reg = pci_resource_start(pdev, 0);
+	cs->hw.sedl.bus = SEDL_BUS_PCI;
+
+	if (!request_io(&cs->rs, cs->hw.sedl.cfg_reg, 256, "sedlbauer isdn"))
+		return -EBUSY;
+
+	printk(KERN_INFO "Sedlbauer %s: defined at 0x%x-0x%x IRQ %d\n",
+	       Sedlbauer_Types[cs->subtyp],
+	       cs->hw.sedl.cfg_reg, cs->hw.sedl.cfg_reg + 256, cs->irq);
+
+	cs->hw.sedl.reset_on = SEDL_ISAR_PCI_ISAR_RESET_ON;
+	cs->hw.sedl.reset_off = SEDL_ISAR_PCI_ISAR_RESET_OFF;
+	byteout(cs->hw.sedl.cfg_reg, 0xff);
+	byteout(cs->hw.sedl.cfg_reg, 0x00);
+	byteout(cs->hw.sedl.cfg_reg+ 2, 0xdd);
+	byteout(cs->hw.sedl.cfg_reg+ 5, 0x02);
+	byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_on);
+	current->state = TASK_UNINTERRUPTIBLE;
+	schedule_timeout((10*HZ)/1000);
+	byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
+	return 0;
+}
+
+static int __init
+sedl_fax_pyramid_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = SEDL_SPEEDFAX_PYRAMID;
+	cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
+	if (sedl_pci_init(cs, pdev))
+		goto err;
+
+	cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_ISAR_PCI_ADR;
+	cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_ISAR_PCI_ISAC;
+	cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_ISAR_PCI_ISAR;
+	if (sedl_isac_isar_init(cs))
+		goto err;
+
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+sedl_fax_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = SEDL_SPEEDFAX_PCI;
+	cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
+
+	if (sedl_pci_init(cs, pdev))
+		goto err;
+
+	cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_ISAR_PCI_ADR;
+	cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_ISAR_PCI_ISAC;
+	cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_ISAR_PCI_ISAR;
+	if (sedl_isac_isar_init(cs))
+		goto err;
+
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+sedl_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = SEDL_SPEED_PCI;
+	cs->hw.sedl.chip = SEDL_CHIP_IPAC;
+	if (sedl_pci_init(cs, pdev))
+		goto err;
+
+	cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_IPAC_PCI_ADR;
+	cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_PCI_IPAC;
+	if (sedl_ipac_init(cs))
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 static struct pci_dev *dev_sedl __devinitdata = NULL;
 
 #ifdef __ISAPNP__
@@ -472,265 +706,117 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __devinit
 setup_sedlbauer(struct IsdnCard *card)
 {
-	int bytecnt, val;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u16 sub_vendor_id, sub_id;
 
 	strcpy(tmp, Sedlbauer_revision);
-	printk(KERN_INFO "HiSax: Sedlbauer driver Rev. %s\n", HiSax_getrev(tmp));
+	printk(KERN_INFO "HiSax: Sedlbauer driver Rev. %s\n",
+	       HiSax_getrev(tmp));
 	
- 	if (cs->typ == ISDN_CTYPE_SEDLBAUER) {
- 		cs->subtyp = SEDL_SPEED_CARD_WIN;
-		cs->hw.sedl.bus = SEDL_BUS_ISA;
-		cs->hw.sedl.chip = SEDL_CHIP_TEST;
- 	} else if (cs->typ == ISDN_CTYPE_SEDLBAUER_PCMCIA) {	
- 		cs->subtyp = SEDL_SPEED_STAR;
-		cs->hw.sedl.bus = SEDL_BUS_PCMCIA;
-		cs->hw.sedl.chip = SEDL_CHIP_TEST;
- 	} else if (cs->typ == ISDN_CTYPE_SEDLBAUER_FAX) {	
- 		cs->subtyp = SEDL_SPEED_FAX;
-		cs->hw.sedl.bus = SEDL_BUS_ISA;
-		cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
- 	} else
-		return (0);
-
-	bytecnt = 8;
 	if (card->para[1]) {
-		cs->hw.sedl.cfg_reg = card->para[1];
-		cs->irq = card->para[0];
-		if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-			bytecnt = 16;
+		if (cs->typ == ISDN_CTYPE_SEDLBAUER) {
+			if (sedl_card_win_probe(card->cs, card) < 0)
+				return 0;
+			return 1;
+		} else if (cs->typ == ISDN_CTYPE_SEDLBAUER_PCMCIA) {	
+			if (sedl_star_probe(card->cs, card) < 0)
+				return 0;
+			return 1;
+		} else if (cs->typ == ISDN_CTYPE_SEDLBAUER_FAX) {	
+			if (sedl_fax_probe(card->cs, card) < 0)
+				return 0;
+			return 1;
 		}
-	} else {
+	}
 #ifdef __ISAPNP__
-		if (isapnp_present()) {
-			struct pnp_card *pb;
-			struct pnp_dev *pd;
-
-			while(pdev->card_vendor) {
-				if ((pb = pnp_find_card(pdev->card_vendor,
-						        pdev->card_device,
-						        pnp_c))) {
-					pnp_c = pb;
-					pd = NULL;
-					if ((pd = pnp_find_dev(pnp_c,
-							       pdev->vendor,
-							       pdev->function,
-							       pd))) {
-						printk(KERN_INFO "HiSax: %s detected\n",
-							(char *)pdev->driver_data);
-						if (pnp_device_attach(pd) < 0) {
-							printk(KERN_ERR "Sedlbauer PnP: attach failed\n");
-							return 0;
-						}
-						if (pnp_activate_dev(pd) < 0) {
-							printk(KERN_ERR "Sedlbauer PnP: activate failed\n");
-							pnp_device_detach(pd);
-							return 0;
-						}
-						if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
-							printk(KERN_ERR "Sedlbauer PnP:some resources are missing %ld/%lx\n",
-								pnp_irq(pd, 0), pnp_port_start(pd, 0));
-							pnp_device_detach(pd);
-							goto err;
-						}
-						card->para[1] = pnp_port_start(pd, 0);
-						card->para[0] = pnp_irq(pd, 0);
-						cs->hw.sedl.cfg_reg = card->para[1];
-						cs->irq = card->para[0];
-						if (pdev->function == ISAPNP_FUNCTION(0x2)) {
-							cs->subtyp = SEDL_SPEED_FAX;
-							cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
-							bytecnt = 16;
-						} else {
-							cs->subtyp = SEDL_SPEED_CARD_WIN;
-							cs->hw.sedl.chip = SEDL_CHIP_TEST;
-						}
-						goto ready;
-					} else {
-						printk(KERN_ERR "Sedlbauer PnP: PnP error card found, no device\n");
+	if (isapnp_present()) {
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
+		
+		while(pdev->card_vendor) {
+			if ((pb = pnp_find_card(pdev->card_vendor,
+						pdev->card_device,
+						pnp_c))) {
+				pnp_c = pb;
+				pd = NULL;
+				if ((pd = pnp_find_dev(pnp_c,
+						       pdev->vendor,
+						       pdev->function,
+						       pd))) {
+					printk(KERN_INFO "HiSax: %s detected\n",
+					       (char *)pdev->driver_data);
+					if (pnp_device_attach(pd) < 0) {
+						printk(KERN_ERR "Sedlbauer PnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pd) < 0) {
+						printk(KERN_ERR "Sedlbauer PnP: activate failed\n");
+						pnp_device_detach(pd);
+						return 0;
+					}
+					if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
+						printk(KERN_ERR "Sedlbauer PnP:some resources are missing %ld/%lx\n",
+						       pnp_irq(pd, 0), pnp_port_start(pd, 0));
+						pnp_device_detach(pd);
 						goto err;
 					}
+					card->para[1] = pnp_port_start(pd, 0);
+					card->para[0] = pnp_irq(pd, 0);
+					cs->hw.sedl.cfg_reg = card->para[1];
+					cs->irq = card->para[0];
+					if (pdev->function == ISAPNP_FUNCTION(0x2)) {
+						if (sedl_fax_probe(card->cs, card))
+							return 0;
+						return 1;
+					} else {
+						if (sedl_card_win_probe(card->cs, card))
+							return 0;
+						return 1;
+					}
+				} else {
+					printk(KERN_ERR "Sedlbauer PnP: PnP error card found, no device\n");
+					goto err;
 				}
-				pdev++;
-				pnp_c=NULL;
-			} 
-			if (!pdev->card_vendor) {
-				printk(KERN_INFO "Sedlbauer PnP: no ISAPnP card found\n");
 			}
+			pdev++;
+			pnp_c=NULL;
+		} 
+		if (!pdev->card_vendor) {
+			printk(KERN_INFO "Sedlbauer PnP: no ISAPnP card found\n");
 		}
+	}
 #endif
 /* Probe for Sedlbauer speed pci */
 #if CONFIG_PCI
-		if ((dev_sedl = pci_find_device(PCI_VENDOR_ID_TIGERJET,
-				PCI_DEVICE_ID_TIGERJET_100, dev_sedl))) {
-			if (pci_enable_device(dev_sedl))
-				goto err;
-			cs->irq = dev_sedl->irq;
-			if (!cs->irq) {
-				printk(KERN_WARNING "Sedlbauer: No IRQ for PCI card found\n");
-				goto err;
-			}
-			cs->hw.sedl.cfg_reg = pci_resource_start(dev_sedl, 0);
-		} else {
-			printk(KERN_WARNING "Sedlbauer: No PCI card found\n");
-			goto err;
-		}
-		cs->irq_flags |= SA_SHIRQ;
-		cs->hw.sedl.bus = SEDL_BUS_PCI;
+	dev_sedl = pci_find_device(PCI_VENDOR_ID_TIGERJET,
+				   PCI_DEVICE_ID_TIGERJET_100, dev_sedl);
+	if (dev_sedl) {
 		sub_vendor_id = dev_sedl->subsystem_vendor;
 		sub_id = dev_sedl->subsystem_device;
 		printk(KERN_INFO "Sedlbauer: PCI subvendor:%x subid %x\n",
-			sub_vendor_id, sub_id);
-		printk(KERN_INFO "Sedlbauer: PCI base adr %#x\n",
-			cs->hw.sedl.cfg_reg);
+		       sub_vendor_id, sub_id);
 		if (sub_id != PCI_SUB_ID_SEDLBAUER) {
 			printk(KERN_ERR "Sedlbauer: unknown sub id %#x\n", sub_id);
-			goto err;
+			return 0;
 		}
 		if (sub_vendor_id == PCI_SUBVENDOR_SPEEDFAX_PYRAMID) {
-			cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
-			cs->subtyp = SEDL_SPEEDFAX_PYRAMID;
+			if (sedl_fax_pyramid_probe(cs, dev_sedl))
+				return 0;
+			return 1;
 		} else if (sub_vendor_id == PCI_SUBVENDOR_SPEEDFAX_PCI) {
-			cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
-			cs->subtyp = SEDL_SPEEDFAX_PCI;
+			if (sedl_fax_pci_probe(cs, dev_sedl))
+				return 0;
+			return 1;
 		} else if (sub_vendor_id == PCI_SUBVENDOR_SEDLBAUER_PCI) {
-			cs->hw.sedl.chip = SEDL_CHIP_IPAC;
-			cs->subtyp = SEDL_SPEED_PCI;
-		} else {
-			printk(KERN_ERR "Sedlbauer: unknown sub vendor id %#x\n",
-				sub_vendor_id);
-			goto err;
+			if (sedl_pci_probe(cs, dev_sedl))
+				return 0;
+			return 1;
 		}
-		bytecnt = 256;
-		cs->hw.sedl.reset_on = SEDL_ISAR_PCI_ISAR_RESET_ON;
-		cs->hw.sedl.reset_off = SEDL_ISAR_PCI_ISAR_RESET_OFF;
-		byteout(cs->hw.sedl.cfg_reg, 0xff);
-		byteout(cs->hw.sedl.cfg_reg, 0x00);
-		byteout(cs->hw.sedl.cfg_reg+ 2, 0xdd);
-		byteout(cs->hw.sedl.cfg_reg+ 5, 0x02);
-		byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_on);
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((10*HZ)/1000);
-		byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
+		printk(KERN_ERR "Sedlbauer: unknown sub vendor id %#x\n",
+		       sub_vendor_id);
+		return 0;
+	}
 #endif /* CONFIG_PCI */
-	}	
-ready:	
-	/* In case of the sedlbauer pcmcia card, this region is in use,
-	 * reserved for us by the card manager. So we do not check it
-	 * here, it would fail.
-	 */
-	if (cs->hw.sedl.bus != SEDL_BUS_PCMCIA) {
-		if (!request_io(&cs->rs, cs->hw.sedl.cfg_reg, bytecnt, "sedlbauer isdn"))
-			goto err;
-	}
-
-	printk(KERN_INFO
-	       "Sedlbauer: defined at 0x%x-0x%x IRQ %d\n",
-	       cs->hw.sedl.cfg_reg,
-	       cs->hw.sedl.cfg_reg + bytecnt,
-	       cs->irq);
-
-/*
- * testing ISA and PCMCIA Cards for IPAC, default is ISAC
- * do not test for PCI card, because ports are different
- * and PCI card uses only IPAC (for the moment)
- */	
-	if (cs->hw.sedl.bus != SEDL_BUS_PCI) {
-		cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR;
-		val = readreg(cs, cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC,
-			      IPAC_ID);
-		printk(KERN_DEBUG "Sedlbauer: testing IPAC version %x\n", val);
-	        if ((val == 1) || (val == 2)) {
-			/* IPAC */
-			cs->subtyp = SEDL_SPEED_WIN2_PC104;
-			if (cs->hw.sedl.bus == SEDL_BUS_PCMCIA) {
-				cs->subtyp = SEDL_SPEED_STAR2;
-			}
-			cs->hw.sedl.chip = SEDL_CHIP_IPAC;
-		} else {
-			/* ISAC_HSCX oder ISAC_ISAR */
-			if (cs->hw.sedl.chip == SEDL_CHIP_TEST) {
-				cs->hw.sedl.chip = SEDL_CHIP_ISAC_HSCX;
-			}
-		}
-	}
-
-/*
- * hw.sedl.chip is now properly set
- */
-	printk(KERN_INFO "Sedlbauer: %s detected\n",
-		Sedlbauer_Types[cs->subtyp]);
-
-
-	if (cs->hw.sedl.chip == SEDL_CHIP_IPAC) {
-		if (cs->hw.sedl.bus == SEDL_BUS_PCI) {
-	                cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_IPAC_PCI_ADR;
-			cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_PCI_IPAC;
-			cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_IPAC_PCI_IPAC;
-		} else {
-	                cs->hw.sedl.adr  = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR;
-			cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
-			cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
-		}
-		cs->card_ops = &sedlbauer_ipac_ops;
-		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
-			goto err;
-		sedlbauer_reset(cs);
-	} else {
-		/* ISAC_HSCX oder ISAC_ISAR */
-		if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-			if (cs->hw.sedl.bus == SEDL_BUS_PCI) {
-				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_PCI_ADR;
-				cs->hw.sedl.isac = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_PCI_ISAC;
-				cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_PCI_ISAR;
-			} else {
-				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_ISA_ADR;
-				cs->hw.sedl.isac = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_ISA_ISAC;
-				cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_ISA_ISAR;
-				cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_ISA_ISAR_RESET_ON;
-				cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg +
-							SEDL_ISAR_ISA_ISAR_RESET_OFF;
-			}
-			cs->bcs[0].hw.isar.reg = &cs->hw.sedl.isar;
-			cs->bcs[1].hw.isar.reg = &cs->hw.sedl.isar;
-			test_and_set_bit(HW_ISAR, &cs->HW_Flags);
-			cs->card_ops = &sedlbauer_isar_ops;
-			cs->auxcmd = &isar_auxcmd;
-			isac_setup(cs, &isac_ops);
-			if (isar_setup(cs, &isar_ops))
-				goto err;
-		} else {
-			if (cs->hw.sedl.bus == SEDL_BUS_PCMCIA) {
-				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_ADR;
-				cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_ISAC;
-				cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_HSCX;
-				cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_RESET;
-				cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_RESET;
-			} else {
-				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_ADR;
-				cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_ISAC;
-				cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_HSCX;
-				cs->hw.sedl.reset_on = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_ON;
-				cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_OFF;
-			}
-			cs->card_ops = &sedlbauer_ops;
-			if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-				goto err;
-
-			sedlbauer_reset(cs);
-		}
-	}
-	return 1;
- err:
-	hisax_release_resources(cs);
 	return 0;
 }

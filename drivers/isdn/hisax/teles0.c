@@ -165,72 +165,95 @@ static struct card_ops teles0_ops = {
 	.irq_func = hscxisac_irq,
 };
 
-int __init
-setup_teles0(struct IsdnCard *card)
+static int __init
+teles0_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	u8 val;
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
-
-	strcpy(tmp, teles0_revision);
-	printk(KERN_INFO "HiSax: Teles 8.0/16.0 driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ == ISDN_CTYPE_16_0)
-		cs->hw.teles0.cfg_reg = card->para[2];
-	else			/* 8.0 */
-		cs->hw.teles0.cfg_reg = 0;
-
-	if (card->para[1] < 0x10000) {
-		card->para[1] <<= 4;
-		printk(KERN_INFO
-		   "Teles0: membase configured DOSish, assuming 0x%lx\n",
-		       (unsigned long) card->para[1]);
-	}
 	cs->irq = card->para[0];
-	if (cs->hw.teles0.cfg_reg) {
-		if (!request_io(&cs->rs, cs->hw.teles0.cfg_reg, 8, "teles cfg"))
-			goto err;
-
-		if ((val = bytein(cs->hw.teles0.cfg_reg + 0)) != 0x51) {
-			printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
-			       cs->hw.teles0.cfg_reg + 0, val);
-			goto err;
-		}
-		if ((val = bytein(cs->hw.teles0.cfg_reg + 1)) != 0x93) {
-			printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
-			       cs->hw.teles0.cfg_reg + 1, val);
-			goto err;
-		}
-		val = bytein(cs->hw.teles0.cfg_reg + 2);/* 0x1e=without AB
-							 * 0x1f=with AB
-							 * 0x1c 16.3 ???
-							 */
-		if (val != 0x1e && val != 0x1f) {
-			printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
-			       cs->hw.teles0.cfg_reg + 2, val);
-			goto err;
-		}
-	}
 	/* 16.0 and 8.0 designed for IOM1 */
 	test_and_set_bit(HW_IOM1, &cs->HW_Flags);
 	cs->hw.teles0.phymem = card->para[1];
-	cs->hw.teles0.membase = request_mmio(&cs->rs, cs->hw.teles0.phymem, TELES_IOMEM_SIZE, "teles iomem");
+	cs->hw.teles0.membase = request_mmio(&cs->rs, cs->hw.teles0.phymem,
+					     TELES_IOMEM_SIZE, "teles iomem");
 	if (!cs->hw.teles0.membase)
-		goto err;
+		return -EBUSY;
 
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d mem:0x%p cfg:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.teles0.membase, cs->hw.teles0.cfg_reg);
 	if (teles0_reset(cs)) {
 		printk(KERN_WARNING "Teles0: wrong IRQ\n");
-		goto err;
+		return -EBUSY;
 	}
 	cs->card_ops = &teles0_ops;
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-  		goto err;
-	return 1;
+		return -EBUSY;
 
+	return 0;
+}
+
+static int __init
+teles16_0_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	u8 val;
+
+	cs->hw.teles0.cfg_reg = card->para[2];
+	if (!request_io(&cs->rs, cs->hw.teles0.cfg_reg, 8, "teles cfg"))
+		goto err;
+		
+	if ((val = bytein(cs->hw.teles0.cfg_reg + 0)) != 0x51) {
+		printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
+		       cs->hw.teles0.cfg_reg + 0, val);
+		goto err;
+	}
+	if ((val = bytein(cs->hw.teles0.cfg_reg + 1)) != 0x93) {
+		printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
+		       cs->hw.teles0.cfg_reg + 1, val);
+		goto err;
+	}
+	val = bytein(cs->hw.teles0.cfg_reg + 2);/* 0x1e=without AB
+						 * 0x1f=with AB
+						 * 0x1c 16.3 ???
+						 */
+	if (val != 0x1e && val != 0x1f) {
+		printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
+		       cs->hw.teles0.cfg_reg + 2, val);
+		goto err;
+	}
+	if (teles0_probe(cs, card) < 0)
+		goto err;
+
+	return 0;
  err:
 	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+teles8_0_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->hw.teles0.cfg_reg = 0;
+
+	if (teles0_probe(cs, card) < 0)
+		goto err;
+
 	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+int __init
+setup_teles0(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, teles0_revision);
+	printk(KERN_INFO "HiSax: Teles 8.0/16.0 driver Rev. %s\n",
+	       HiSax_getrev(tmp));
+
+	if (card->cs->typ == ISDN_CTYPE_16_0) {
+		if (teles16_0_probe(card->cs, card) < 0)
+			return 0;
+	} else {
+		if (teles8_0_probe(card->cs, card) < 0)
+			return 0;
+	}
+	return 1;
 }

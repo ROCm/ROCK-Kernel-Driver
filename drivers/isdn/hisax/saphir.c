@@ -201,36 +201,21 @@ static struct card_ops saphir_ops = {
 	.irq_func = saphir_interrupt,
 };
 
-int __init
-setup_saphir(struct IsdnCard *card)
+static int __init
+saphir_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
-
-	strcpy(tmp, saphir_rev);
-	printk(KERN_INFO "HiSax: HST Saphir driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_HSTSAPHIR)
-		return (0);
-
-	init_timer(&cs->hw.saphir.timer);
-	/* IO-Ports */
 	cs->hw.saphir.cfg_reg = card->para[1];
 	cs->hw.saphir.isac = card->para[1] + ISAC_DATA;
 	cs->hw.saphir.hscx = card->para[1] + HSCX_DATA;
 	cs->hw.saphir.ale = card->para[1] + ADDRESS_REG;
 	cs->irq = card->para[0];
+
 	if (!request_io(&cs->rs, cs->hw.saphir.cfg_reg, 6, "saphir"))
 		goto err;
 
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d io:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.saphir.cfg_reg);
+	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
+	       CardType[cs->typ], cs->irq, cs->hw.saphir.cfg_reg);
 
-	cs->hw.saphir.timer.function = (void *) SaphirWatchDog;
-	cs->hw.saphir.timer.data = (long) cs;
-	cs->hw.saphir.timer.expires = jiffies + 4*HZ;
-	add_timer(&cs->hw.saphir.timer);
 	if (saphir_reset(cs))
 		goto err;
 
@@ -238,8 +223,27 @@ setup_saphir(struct IsdnCard *card)
 	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
 
-	return 1;
- err:
-	saphir_release(cs);
+	init_timer(&cs->hw.saphir.timer);
+	cs->hw.saphir.timer.function = (void *) SaphirWatchDog;
+	cs->hw.saphir.timer.data = (long) cs;
+	cs->hw.saphir.timer.expires = jiffies + 4*HZ;
+	add_timer(&cs->hw.saphir.timer);
 	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+int __init
+setup_saphir(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, saphir_rev);
+	printk(KERN_INFO "HiSax: HST Saphir driver Rev. %s\n",
+	       HiSax_getrev(tmp));
+
+	if (saphir_probe(card->cs, card) < 0)
+		return 0;
+	return 1;
 }
