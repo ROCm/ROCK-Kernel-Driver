@@ -92,10 +92,10 @@ struct inflate_blocks_state {
 extern uInt zlib_inflate_mask[17];
 
 /* copy as much as possible from the sliding window to the output area */
-extern int zlib_inflate_flush OF((
+extern int zlib_inflate_flush (
     inflate_blocks_statef *,
     z_streamp ,
-    int));
+    int);
 
 /* inflate private state */
 typedef enum {

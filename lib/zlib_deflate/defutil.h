@@ -264,14 +264,14 @@ typedef struct deflate_workspace {
  */
 
         /* in trees.c */
-void zlib_tr_init         OF((deflate_state *s));
-int  zlib_tr_tally        OF((deflate_state *s, unsigned dist, unsigned lc));
-ulg  zlib_tr_flush_block  OF((deflate_state *s, char *buf, ulg stored_len,
-			      int eof));
-void zlib_tr_align        OF((deflate_state *s));
-void zlib_tr_stored_block OF((deflate_state *s, char *buf, ulg stored_len,
-			      int eof));
-void zlib_tr_stored_type_only OF((deflate_state *));
+void zlib_tr_init         (deflate_state *s);
+int  zlib_tr_tally        (deflate_state *s, unsigned dist, unsigned lc);
+ulg  zlib_tr_flush_block  (deflate_state *s, char *buf, ulg stored_len,
+			   int eof);
+void zlib_tr_align        (deflate_state *s);
+void zlib_tr_stored_block (deflate_state *s, char *buf, ulg stored_len,
+			   int eof);
+void zlib_tr_stored_type_only (deflate_state *);
 
 
 /* ===========================================================================

@@ -63,22 +63,22 @@ typedef enum {
     finish_done     /* finish done, accept no more input or output */
 } block_state;
 
-typedef block_state (*compress_func) OF((deflate_state *s, int flush));
+typedef block_state (*compress_func) (deflate_state *s, int flush);
 /* Compression function. Returns the block state after the call. */
 
-local void fill_window    OF((deflate_state *s));
-local block_state deflate_stored OF((deflate_state *s, int flush));
-local block_state deflate_fast   OF((deflate_state *s, int flush));
-local block_state deflate_slow   OF((deflate_state *s, int flush));
-local void lm_init        OF((deflate_state *s));
-local void putShortMSB    OF((deflate_state *s, uInt b));
-local void flush_pending  OF((z_streamp strm));
-local int read_buf        OF((z_streamp strm, Byte *buf, unsigned size));
-local uInt longest_match  OF((deflate_state *s, IPos cur_match));
+local void fill_window    (deflate_state *s);
+local block_state deflate_stored (deflate_state *s, int flush);
+local block_state deflate_fast   (deflate_state *s, int flush);
+local block_state deflate_slow   (deflate_state *s, int flush);
+local void lm_init        (deflate_state *s);
+local void putShortMSB    (deflate_state *s, uInt b);
+local void flush_pending  (z_streamp strm);
+local int read_buf        (z_streamp strm, Byte *buf, unsigned size);
+local uInt longest_match  (deflate_state *s, IPos cur_match);
 
 #ifdef DEBUG_ZLIB
-local  void check_match OF((deflate_state *s, IPos start, IPos match,
-                            int length));
+local  void check_match (deflate_state *s, IPos start, IPos match,
+                         int length);
 #endif
 
 /* ===========================================================================

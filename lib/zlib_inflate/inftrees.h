@@ -35,14 +35,14 @@ struct inflate_huft_s {
    value below is more than safe. */
 #define MANY 1440
 
-extern int zlib_inflate_trees_bits OF((
+extern int zlib_inflate_trees_bits (
     uInt *,                     /* 19 code lengths */
     uInt *,                     /* bits tree desired/actual depth */
     inflate_huft **,            /* bits tree result */
     inflate_huft *,             /* space for trees */
-    z_streamp));                /* for messages */
+    z_streamp);                 /* for messages */
 
-extern int zlib_inflate_trees_dynamic OF((
+extern int zlib_inflate_trees_dynamic (
     uInt,                       /* number of literal/length codes */
     uInt,                       /* number of distance codes */
     uInt *,                     /* that many (total) code lengths */
@@ -51,13 +51,13 @@ extern int zlib_inflate_trees_dynamic OF((
     inflate_huft **,            /* literal/length tree result */
     inflate_huft **,            /* distance tree result */
     inflate_huft *,             /* space for trees */
-    z_streamp));                /* for messages */
+    z_streamp);                 /* for messages */
 
-extern int zlib_inflate_trees_fixed OF((
+extern int zlib_inflate_trees_fixed (
     uInt *,                     /* literal desired/actual bit depth */
     uInt *,                     /* distance desired/actual bit depth */
     inflate_huft **,            /* literal/length tree result */
     inflate_huft **,            /* distance tree result */
-    z_streamp));                /* for memory allocation */
+    z_streamp);                 /* for memory allocation */
 
 #endif /* _INFTREES_H */

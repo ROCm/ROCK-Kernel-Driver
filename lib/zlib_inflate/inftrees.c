@@ -22,7 +22,7 @@ struct internal_state;
 #define bits word.what.Bits
 
 
-local int huft_build OF((
+local int huft_build (
     uInt *,             /* code lengths in bits */
     uInt,               /* number of codes */
     uInt,               /* number of "simple" codes */
@@ -32,7 +32,7 @@ local int huft_build OF((
     uInt *,             /* maximum lookup bits (returns actual) */
     inflate_huft *,     /* space for trees */
     uInt *,             /* hufts used in space */
-    uInt * ));          /* space for values */
+    uInt * );           /* space for values */
 
 /* Tables for deflate from PKZIP's appnote.txt. */
 local const uInt cplens[31] = { /* Copy lengths for literal codes 257..285 */

@@ -62,8 +62,8 @@ typedef unsigned long  ulg;
 
          /* functions */
 
-typedef uLong (*check_func) OF((uLong check, const Byte *buf,
-				       uInt len));
+typedef uLong (*check_func) (uLong check, const Byte *buf,
+				       uInt len);
 
 
                         /* checksum functions */

@@ -37,14 +37,9 @@
 
                         /* Type declarations */
 
-#    define OF(args)  args
-
 typedef unsigned char  Byte;  /* 8 bits */
 typedef unsigned int   uInt;  /* 16 bits or more */
 typedef unsigned long  uLong; /* 32 bits or more */
 typedef void     *voidp;
-
-#include <linux/types.h> /* for off_t */
-#include <linux/unistd.h>    /* for SEEK_* and off_t */
 
 #endif /* _ZCONF_H */
