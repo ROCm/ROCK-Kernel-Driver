@@ -23,7 +23,7 @@ CFLAGS_KERNEL	:= -mconstant-gp
 
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
-GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC))
+GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\
