@@ -35,7 +35,7 @@ __kernel_vsyscall:
 	popl %edx
 	/* don't take the slow path if vgettimeofday is disabled */
 	cmpl $__NR_gettimeofday, %eax
-	je vgettimeofday_disabled
+	je .Lvgettimeofday_disabled
 	ret
 #endif /* CONFIG_VSYSCALL_GTOD */
 
