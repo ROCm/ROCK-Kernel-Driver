@@ -428,7 +428,11 @@ static int mmc_blk_suspend(struct mmc_card *card, u32 state)
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 
 	if (md) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&md->lock, flags);
 		blk_stop_queue(md->queue.queue);
+		spin_unlock_irqrestore(&md->lock, flags);
 	}
 	return 0;
 }
@@ -438,8 +442,12 @@ static int mmc_blk_resume(struct mmc_card *card)
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 
 	if (md) {
+		unsigned long flags;
+
 		mmc_blk_set_blksize(md, card);
+		spin_lock_irqsave(&md->lock, flags);
 		blk_start_queue(md->queue.queue);
+		spin_unlock_irqrestore(&md->lock, flags);
 	}
 	return 0;
 }
