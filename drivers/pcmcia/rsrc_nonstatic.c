@@ -791,6 +791,7 @@ static void nonstatic_release_resource_db(struct pcmcia_socket *s)
 	struct socket_data *data = s->resource_data;
 	struct resource_map *p, *q;
 
+	down(&rsrc_sem);
 	for (p = data->mem_db.next; p != &data->mem_db; p = q) {
 		q = p->next;
 		kfree(p);
@@ -799,6 +800,7 @@ static void nonstatic_release_resource_db(struct pcmcia_socket *s)
 		q = p->next;
 		kfree(p);
 	}
+	up(&rsrc_sem);
 }
 
 
