@@ -630,6 +630,9 @@
 	       Protected <scan_dir_for_removable> and <get_removable_partition>
 	       from changing directory contents.
   v1.16
+    20020514   Richard Gooch <rgooch@atnf.csiro.au>
+	       Minor cleanup of <scan_dir_for_removable>.
+  v1.17
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -662,7 +665,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.16 (20020512)"
+#define DEVFS_VERSION            "1.17 (20020514)"
 
 #define DEVFS_NAME "devfs"
 
@@ -2466,13 +2469,16 @@ static void scan_dir_for_removable (struct devfs_entry *dir)
 {
     struct devfs_entry *de;
 
-    if (dir->u.dir.num_removable < 1) return;
     read_lock (&dir->u.dir.lock);
-    for (de = dir->u.dir.first; de != NULL; de = de->next)
+    if (dir->u.dir.num_removable < 1) de = NULL;
+    else
     {
-	if (S_ISBLK (de->mode) && de->u.fcb.removable) break;
+	for (de = dir->u.dir.first; de != NULL; de = de->next)
+	{
+	    if (S_ISBLK (de->mode) && de->u.fcb.removable) break;
+	}
+	devfs_get (de);
     }
-    devfs_get (de);
     read_unlock (&dir->u.dir.lock);
     if (de) check_disc_changed (de);
     devfs_put (de);
