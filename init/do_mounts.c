@@ -130,7 +130,7 @@ fail:
  *	Driverfs is used to check if something is a disk name - it has
  *	all known disks under bus/block/devices.  If the disk name
  *	contains slashes, name of driverfs node has them replaced with
- *	dots.  try_name() does the actual checks, assuming that driverfs
+ *	bangs.  try_name() does the actual checks, assuming that driverfs
  *	is mounted on rootfs /sys.
  */
 
@@ -169,7 +169,7 @@ dev_t __init name_to_dev_t(char *name)
 	strcpy(s, name);
 	for (p = s; *p; p++)
 		if (*p == '/')
-			*p = '.';
+			*p = '!';
 	res = try_name(s, 0);
 	if (res)
 		goto done;
