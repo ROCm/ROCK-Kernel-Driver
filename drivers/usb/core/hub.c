@@ -1190,57 +1190,62 @@ static int hub_port_disable(struct usb_device *hdev, int port)
 /* USB 2.0 spec, 7.1.7.3 / fig 7-29:
  *
  * Between connect detection and reset signaling there must be a delay
- * of 100ms at least for debounce and power-settling. The corresponding
+ * of 100ms at least for debounce and power-settling.  The corresponding
  * timer shall restart whenever the downstream port detects a disconnect.
  * 
- * Apparently there are some bluetooth and irda-dongles and a number
- * of low-speed devices which require longer delays of about 200-400ms.
+ * Apparently there are some bluetooth and irda-dongles and a number of
+ * low-speed devices for which this debounce period may last over a second.
  * Not covered by the spec - but easy to deal with.
  *
- * This implementation uses 400ms minimum debounce timeout and checks
- * every 25ms for transient disconnects to restart the delay.
+ * This implementation uses a 400ms total debounce timeout; if the
+ * connection isn't stable by then it returns -ETIMEDOUT.  It checks
+ * every 25ms for transient disconnects.  When the port status has been
+ * unchanged for 100ms it returns the port status.
  */
 
-#define HUB_DEBOUNCE_TIMEOUT	400
-#define HUB_DEBOUNCE_STEP	 25
-#define HUB_DEBOUNCE_STABLE	  4
+#define HUB_DEBOUNCE_TIMEOUT	 400  /* 1500 */
+#define HUB_DEBOUNCE_STEP	  25
+#define HUB_DEBOUNCE_STABLE	 100
 
 static int hub_port_debounce(struct usb_device *hdev, int port)
 {
 	int ret;
-	int delay_time, stable_count;
+	int total_time, stable_time = 0;
 	u16 portchange, portstatus;
-	unsigned connection;
+	unsigned connection = 0xffff;
 
-	connection = 0;
-	stable_count = 0;
-	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; delay_time += HUB_DEBOUNCE_STEP) {
-		msleep(HUB_DEBOUNCE_STEP);
-
+	for (total_time = 0; ; total_time += HUB_DEBOUNCE_STEP) {
 		ret = hub_port_status(hdev, port, &portstatus, &portchange);
 		if (ret < 0)
 			return ret;
 
-		if ((portstatus & USB_PORT_STAT_CONNECTION) == connection) {
-			if (connection) {
-				if (++stable_count == HUB_DEBOUNCE_STABLE)
-					break;
-			}
+		if ( /* !(portchange & USB_PORT_STAT_C_CONNECTION) && */
+		     (portstatus & USB_PORT_STAT_CONNECTION) == connection) {
+			stable_time += HUB_DEBOUNCE_STEP;
+			if (stable_time >= HUB_DEBOUNCE_STABLE && connection /* */)
+				break;
 		} else {
-			stable_count = 0;
+			stable_time = 0;
+			connection = portstatus & USB_PORT_STAT_CONNECTION;
 		}
-		connection = portstatus & USB_PORT_STAT_CONNECTION;
 
-		if ((portchange & USB_PORT_STAT_C_CONNECTION)) {
-			clear_port_feature(hdev, port+1, USB_PORT_FEAT_C_CONNECTION);
+		if (portchange & USB_PORT_STAT_C_CONNECTION) {
+			clear_port_feature(hdev, port+1,
+					USB_PORT_FEAT_C_CONNECTION);
 		}
+
+		if (total_time >= HUB_DEBOUNCE_TIMEOUT)
+			break;
+		msleep(HUB_DEBOUNCE_STEP);
 	}
 
 	dev_dbg (hubdev (hdev),
-		"debounce: port %d: delay %dms stable %d status 0x%x\n",
-		port + 1, delay_time, stable_count, portstatus);
+		"debounce: port %d: total %dms stable %dms status 0x%x\n",
+		port + 1, total_time, stable_time, portstatus);
 
-	return (portstatus & USB_PORT_STAT_CONNECTION) ? 0 : -ENOTCONN;
+	if (stable_time < HUB_DEBOUNCE_STABLE)
+		return -ETIMEDOUT;
+	return portstatus;
 }
 
 static int hub_set_address(struct usb_device *udev)
@@ -1516,14 +1521,13 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
 		status = hub_port_debounce(hdev, port);
-		if (status == -ENOTCONN)
-			portstatus = 0;
-		else if (status < 0) {
+		if (status < 0) {
 			dev_err (hub_dev,
 				"connect-debounce failed, port %d disabled\n",
 				port+1);
 			goto done;
 		}
+		portstatus = status;
 	}
 
 	/* Return now if nothing is connected */
