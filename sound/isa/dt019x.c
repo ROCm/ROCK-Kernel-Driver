@@ -88,7 +88,7 @@ struct snd_card_dt019x {
 	struct pnp_dev *devopl;
 };
 
-static struct pnp_card_device_id snd_dt019x_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_dt019x_pnpids[] = {
 	/* DT197A30 */
 	{ .id = "RWB1688", .devs = { { "@@@0001" }, { "@X@0001" }, { "@H@0001" }, } },
 	/* DT0196 / ALS-007 */

@@ -98,7 +98,7 @@ struct snd_card_als100 {
 	struct pnp_dev *devopl;
 };
 
-static struct pnp_card_device_id snd_als100_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_als100_pnpids[] = {
 	/* ALS100 - PRO16PNP */
 	{ .id = "ALS0001", .devs = { { "@@@0001" }, { "@X@0001" }, { "@H@0001" } } },
 	/* ALS110 - MF1000 - Digimate 3D Sound */

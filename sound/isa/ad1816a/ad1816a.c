@@ -93,7 +93,7 @@ struct snd_card_ad1816a {
 	struct pnp_dev *devmpu;
 };
 
-static struct pnp_card_device_id snd_ad1816a_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_ad1816a_pnpids[] = {
 	/* Analog Devices AD1815 */
 	{ .id = "ADS7150", .devs = { { .id = "ADS7150" }, { .id = "ADS7151" } } },
 	/* Analog Devices AD1816A - added by Kenneth Platz <kxp@atl.hp.com> */
