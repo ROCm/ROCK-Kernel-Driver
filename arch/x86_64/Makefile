@@ -46,6 +46,7 @@ CFLAGS += -pipe
 CFLAGS += -fno-reorder-blocks	
 # should lower this a lot and see how much .text is saves	
 CFLAGS += -finline-limit=2000
+CFLAGS += -Wno-sign-compare
 #CFLAGS += -g
 # don't enable this when you use kgdb:
 ifneq ($(CONFIG_X86_REMOTE_DEBUG),y)

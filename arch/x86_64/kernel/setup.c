@@ -201,6 +201,11 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
+#ifdef CONFIG_DISCONTIGMEM
+		if (!memcmp(from, "numa=", 5))
+			numa_setup(from+5); 
+#endif
+
 #ifdef CONFIG_GART_IOMMU 
 		if (!memcmp(from,"iommu=",6)) { 
 			iommu_setup(from+6); 
@@ -236,8 +241,6 @@ static void __init contig_initmem_init(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	int i;
-
 	Dprintk("setup_arch\n");
 
  	ROOT_DEV = ORIG_ROOT_DEV;
@@ -367,9 +370,12 @@ void __init setup_arch(char **cmdline_p)
 
 	request_resource(&iomem_resource, &vram_resource);
 
+	{
+	unsigned i;
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, standard_io_resources+i);
+	}
 
 	pci_mem_start = IOMAP_START; 
 
@@ -694,7 +700,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	seq_printf(m, "power management:");
 	{
-		int i;
+		unsigned i;
 		for (i = 0; i < 32; i++) 
 			if (c->x86_power & (1 << i)) {
 				if (i < ARRAY_SIZE(x86_power_flags))

@@ -6,16 +6,13 @@
 
 #define FIX_ALIGNMENT 1
 		
-#define movnti movq  /* write to cache for now */
-#define prefetch prefetcht2
-		
 	#include <asm/current.h>
 	#include <asm/offset.h>
 	#include <asm/thread_info.h>
 
 /* Standard copy_to_user with segment limit checking */		
 	.globl copy_to_user
-	.p2align 	
+	.p2align 4	
 copy_to_user:
 	GET_THREAD_INFO(%rax)
 	movq %rdi,%rcx
@@ -27,7 +24,7 @@ copy_to_user:
 
 /* Standard copy_from_user with segment limit checking */	
 	.globl copy_from_user
-	.p2align 	
+	.p2align 4	
 copy_from_user:
 	GET_THREAD_INFO(%rax)
 	movq %rsi,%rcx
@@ -58,23 +55,23 @@ bad_to_user:
  * rdx count
  *
  * Output:		
- * eax uncopied bytes or 0 if successful. 
+ * eax uncopied bytes or 0 if successfull. 
  */
 	.globl copy_user_generic	
+	.p2align 4
 copy_user_generic:	
 	/* Put the first cacheline into cache. This should handle
 	   the small movements in ioctls etc., but not penalize the bigger
 	   filesystem data copies too much. */
 	pushq %rbx
-	prefetch (%rsi)
 	xorl %eax,%eax		/*zero for the exception handler */
 
 #ifdef FIX_ALIGNMENT
 	/* check for bad alignment of destination */
 	movl %edi,%ecx
 	andl $7,%ecx
-	jnz  bad_alignment
-after_bad_alignment:
+	jnz  .Lbad_alignment
+.Lafter_bad_alignment:
 #endif
 
 	movq %rdx,%rcx
@@ -82,133 +79,133 @@ after_bad_alignment:
 	movl $64,%ebx	
 	shrq $6,%rdx
 	decq %rdx
-	js   handle_tail
-	jz   loop_no_prefetch
+	js   .Lhandle_tail
 	
-loop:
-	prefetch 64(%rsi)
-	
-loop_no_prefetch:	
-s1:	movq (%rsi),%r11
-s2:	movq 1*8(%rsi),%r8
-s3:	movq 2*8(%rsi),%r9
-s4:	movq 3*8(%rsi),%r10
-d1:	movnti %r11,(%rdi)
-d2:	movnti %r8,1*8(%rdi)
-d3:	movnti %r9,2*8(%rdi)
-d4:	movnti %r10,3*8(%rdi)
+	.p2align 4
+.Lloop:
+.Ls1:	movq (%rsi),%r11
+.Ls2:	movq 1*8(%rsi),%r8
+.Ls3:	movq 2*8(%rsi),%r9
+.Ls4:	movq 3*8(%rsi),%r10
+.Ld1:	movq %r11,(%rdi)
+.Ld2:	movq %r8,1*8(%rdi)
+.Ld3:	movq %r9,2*8(%rdi)
+.Ld4:	movq %r10,3*8(%rdi)
 		
-s5:	movq 4*8(%rsi),%r11
-s6:	movq 5*8(%rsi),%r8
-s7:	movq 6*8(%rsi),%r9
-s8:	movq 7*8(%rsi),%r10
-d5:	movnti %r11,4*8(%rdi)
-d6:	movnti %r8,5*8(%rdi)
-d7:	movnti %r9,6*8(%rdi)
-d8:	movnti %r10,7*8(%rdi)
-
-	addq %rbx,%rsi	
-	addq %rbx,%rdi
+.Ls5:	movq 4*8(%rsi),%r11
+.Ls6:	movq 5*8(%rsi),%r8
+.Ls7:	movq 6*8(%rsi),%r9
+.Ls8:	movq 7*8(%rsi),%r10
+.Ld5:	movq %r11,4*8(%rdi)
+.Ld6:	movq %r8,5*8(%rdi)
+.Ld7:	movq %r9,6*8(%rdi)
+.Ld8:	movq %r10,7*8(%rdi)
 	
 	decq %rdx
-	jz   loop_no_prefetch
-	jns  loop
 
-handle_tail:
+	leaq 64(%rsi),%rsi
+	leaq 64(%rdi),%rdi
+	
+	jns  .Lloop
+
+	.p2align 4
+.Lhandle_tail:
 	movl %ecx,%edx
 	andl $63,%ecx
 	shrl $3,%ecx
-	jz   handle_7
+	jz   .Lhandle_7
 	movl $8,%ebx
-loop_8:
-s9:	movq (%rsi),%r8
-d9:	movq %r8,(%rdi)
-	addq %rbx,%rdi
-	addq %rbx,%rsi
+	.p2align 4
+.Lloop_8:
+.Ls9:	movq (%rsi),%r8
+.Ld9:	movq %r8,(%rdi)
 	decl %ecx
-	jnz loop_8
+	leaq 8(%rdi),%rdi
+	leaq 8(%rsi),%rsi
+	jnz .Lloop_8
 	
-handle_7:		
+.Lhandle_7:		
 	movl %edx,%ecx	
 	andl $7,%ecx
-	jz   ende
-loop_1:
-s10:	movb (%rsi),%bl
-d10:	movb %bl,(%rdi)
+	jz   .Lende
+	.p2align 4
+.Lloop_1:
+.Ls10:	movb (%rsi),%bl
+.Ld10:	movb %bl,(%rdi)
 	incq %rdi
 	incq %rsi
 	decl %ecx
-	jnz loop_1
+	jnz .Lloop_1
 			
-ende:
-	sfence
+.Lende:
 	popq %rbx
 	ret	
 
 #ifdef FIX_ALIGNMENT		  		
 	/* align destination */
-bad_alignment:
+	.p2align 4
+.Lbad_alignment:
 	movl $8,%r9d
 	subl %ecx,%r9d
 	movl %r9d,%ecx
 	subq %r9,%rdx
-	jz   small_align
-	js   small_align
-align_1:		
-s11:	movb (%rsi),%bl
-d11:	movb %bl,(%rdi)
+	jz   .Lsmall_align
+	js   .Lsmall_align
+.Lalign_1:		
+.Ls11:	movb (%rsi),%bl
+.Ld11:	movb %bl,(%rdi)
 	incq %rsi
 	incq %rdi
 	decl %ecx
-	jnz align_1
-	jmp after_bad_alignment
-small_align:
+	jnz .Lalign_1
+	jmp .Lafter_bad_alignment
+.Lsmall_align:
 	addq %r9,%rdx
-	jmp handle_7
+	jmp .Lhandle_7
 #endif
 	
 	/* table sorted by exception address */	
 	.section __ex_table,"a"
 	.align 8
-	.quad s1,s1e
-	.quad s2,s2e
-	.quad s3,s3e
-	.quad s4,s4e	
-	.quad d1,s1e
-	.quad d2,s2e
-	.quad d3,s3e
-	.quad d4,s4e
-	.quad s5,s5e
-	.quad s6,s6e
-	.quad s7,s7e
-	.quad s8,s8e	
-	.quad d5,s5e
-	.quad d6,s6e
-	.quad d7,s7e
-	.quad d8,s8e
-	.quad s9,e_quad
-	.quad d9,e_quad
-	.quad s10,e_byte
-	.quad d10,e_byte
+	.quad .Ls1,.Ls1e
+	.quad .Ls2,.Ls2e
+	.quad .Ls3,.Ls3e
+	.quad .Ls4,.Ls4e	
+	.quad .Ld1,.Ls1e
+	.quad .Ld2,.Ls2e
+	.quad .Ld3,.Ls3e
+	.quad .Ld4,.Ls4e
+	.quad .Ls5,.Ls5e
+	.quad .Ls6,.Ls6e
+	.quad .Ls7,.Ls7e
+	.quad .Ls8,.Ls8e	
+	.quad .Ld5,.Ls5e
+	.quad .Ld6,.Ls6e
+	.quad .Ld7,.Ls7e
+	.quad .Ld8,.Ls8e
+	.quad .Ls9,.Le_quad
+	.quad .Ld9,.Le_quad
+	.quad .Ls10,.Le_byte
+	.quad .Ld10,.Le_byte
 #ifdef FIX_ALIGNMENT	
-	.quad s11,e_byte
-	.quad d11,e_byte
+	.quad .Ls11,.Le_byte
+	.quad .Ld11,.Le_byte
 #endif
-	.quad e5,e_zero
+	.quad .Le5,.Le_zero
 	.previous
 
 	/* compute 64-offset for main loop. 8 bytes accuracy with error on the 
 	   pessimistic side. this is gross. it would be better to fix the 
 	   interface. */	
 	/* eax: zero, ebx: 64 */
-s1e: 	addl $8,%eax
-s2e: 	addl $8,%eax
-s3e: 	addl $8,%eax
-s4e: 	addl $8,%eax
-s5e: 	addl $8,%eax
-s6e: 	addl $8,%eax
-s7e: 	addl $8,%eax
-s8e: 	addl $8,%eax
+.Ls1e: 	addl $8,%eax
+.Ls2e: 	addl $8,%eax
+.Ls3e: 	addl $8,%eax
+.Ls4e: 	addl $8,%eax
+.Ls5e: 	addl $8,%eax
+.Ls6e: 	addl $8,%eax
+.Ls7e: 	addl $8,%eax
+.Ls8e: 	addl $8,%eax
 	addq %rbx,%rdi	/* +64 */
 	subq %rax,%rdi  /* correct destination with computed offset */
 
@@ -216,22 +213,22 @@ s8e: 	addl $8,%eax
 	addq %rax,%rdx	/* add offset to loopcnt */
 	andl $63,%ecx	/* remaining bytes */
 	addq %rcx,%rdx	/* add them */
-	jmp zero_rest
+	jmp .Lzero_rest
 
 	/* exception on quad word loop in tail handling */
 	/* ecx:	loopcnt/8, %edx: length, rdi: correct */
-e_quad:
+.Le_quad:
 	shll $3,%ecx
 	andl $7,%edx
 	addl %ecx,%edx
 	/* edx: bytes to zero, rdi: dest, eax:zero */
-zero_rest:
+.Lzero_rest:
 	movq %rdx,%rcx
-e_byte:
+.Le_byte:
 	xorl %eax,%eax
-e5:	rep 
+.Le5:	rep 
 	stosb
 	/* when there is another exception while zeroing the rest just return */
-e_zero:		
+.Le_zero:		
 	movq %rdx,%rax
-	jmp ende
+	jmp .Lende

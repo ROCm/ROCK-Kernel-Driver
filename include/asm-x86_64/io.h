@@ -120,6 +120,7 @@ __OUTS(l)
   #define __io_virt(x) ((void *)(x))
 #endif
 
+#ifndef __i386__
 /*
  * Change virtual addresses to physical addresses and vv.
  * These are pretty trivial
@@ -133,6 +134,7 @@ extern inline void * phys_to_virt(unsigned long address)
 {
 	return __va(address);
 }
+#endif
 
 /*
  * Change "struct page" to physical address.
@@ -259,6 +261,7 @@ out:
 	return retval;
 }
 
+#ifndef __i386__
 /**
  *	isa_check_signature		-	find BIOS signatures
  *	@io_addr: mmio address to check 
@@ -288,6 +291,7 @@ static inline int isa_check_signature(unsigned long io_addr,
 out:
 	return retval;
 }
+#endif
 
 /* Nothing to do */
 

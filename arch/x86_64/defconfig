@@ -4,7 +4,6 @@
 CONFIG_X86_64=y
 CONFIG_X86=y
 CONFIG_MMU=y
-CONFIG_SWAP=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
 CONFIG_X86_CMPXCHG=y
 CONFIG_EARLY_PRINTK=y
@@ -18,6 +17,7 @@ CONFIG_EXPERIMENTAL=y
 #
 # General setup
 #
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
@@ -47,8 +47,12 @@ CONFIG_X86_CPUID=y
 CONFIG_X86_IO_APIC=y
 CONFIG_X86_LOCAL_APIC=y
 CONFIG_MTRR=y
-CONFIG_HUGETLB_PAGE=y
+# CONFIG_HUGETLB_PAGE is not set
 CONFIG_SMP=y
+# CONFIG_PREEMPT is not set
+CONFIG_K8_NUMA=y
+CONFIG_DISCONTIGMEM=y
+CONFIG_NUMA=y
 CONFIG_HAVE_DEC_LOCK=y
 CONFIG_NR_CPUS=8
 CONFIG_GART_IOMMU=y
@@ -222,9 +226,8 @@ CONFIG_NET=y
 #
 CONFIG_PACKET=y
 # CONFIG_PACKET_MMAP is not set
-CONFIG_NETLINK_DEV=y
+# CONFIG_NETLINK_DEV is not set
 # CONFIG_NETFILTER is not set
-CONFIG_FILTER=y
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
@@ -239,8 +242,9 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_SYN_COOKIES is not set
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
-# CONFIG_XFRM_USER is not set
+# CONFIG_INET_IPCOMP is not set
 # CONFIG_IPV6 is not set
+# CONFIG_XFRM_USER is not set
 
 #
 #    SCTP Configuration (EXPERIMENTAL)
@@ -331,6 +335,11 @@ CONFIG_E1000=m
 # CONFIG_R8169 is not set
 # CONFIG_SK98LIN is not set
 CONFIG_TIGON3=y
+
+#
+# Ethernet (10000 Mbit)
+#
+# CONFIG_IXGB is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
 # CONFIG_PPP is not set
@@ -405,15 +414,7 @@ CONFIG_KEYBOARD_ATKBD=y
 CONFIG_INPUT_MOUSE=y
 CONFIG_MOUSE_PS2=y
 # CONFIG_MOUSE_SERIAL is not set
-CONFIG_INPUT_JOYSTICK=y
-# CONFIG_JOYSTICK_IFORCE is not set
-# CONFIG_JOYSTICK_WARRIOR is not set
-# CONFIG_JOYSTICK_MAGELLAN is not set
-# CONFIG_JOYSTICK_SPACEORB is not set
-# CONFIG_JOYSTICK_SPACEBALL is not set
-# CONFIG_JOYSTICK_STINGER is not set
-# CONFIG_JOYSTICK_TWIDDLER is not set
-# CONFIG_INPUT_JOYDUMP is not set
+# CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
 # CONFIG_INPUT_MISC is not set
 
@@ -452,6 +453,7 @@ CONFIG_UNIX98_PTY_COUNT=256
 #
 # I2C Hardware Sensors Chip support
 #
+# CONFIG_I2C_SENSOR is not set
 
 #
 # Mice
@@ -468,8 +470,7 @@ CONFIG_UNIX98_PTY_COUNT=256
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
-# CONFIG_INTEL_RNG is not set
-# CONFIG_AMD_RNG is not set
+CONFIG_HW_RANDOM=y
 # CONFIG_NVRAM is not set
 CONFIG_RTC=y
 # CONFIG_DTLK is not set
@@ -481,8 +482,8 @@ CONFIG_RTC=y
 # Ftape, the floppy tape device driver
 #
 # CONFIG_FTAPE is not set
-# CONFIG_AGP is not set
-# CONFIG_AGP_GART is not set
+CONFIG_AGP=y
+CONFIG_AGP_AMD_8151=y
 # CONFIG_DRM is not set
 # CONFIG_MWAVE is not set
 CONFIG_RAW_DRIVER=y
@@ -498,57 +499,75 @@ CONFIG_RAW_DRIVER=y
 # CONFIG_VIDEO_DEV is not set
 
 #
+# Digital Video Broadcasting Devices
+#
+# CONFIG_DVB is not set
+
+#
 # File systems
 #
-# CONFIG_QUOTA is not set
-CONFIG_AUTOFS_FS=y
-# CONFIG_AUTOFS4_FS is not set
+CONFIG_EXT2_FS=y
+# CONFIG_EXT2_FS_XATTR is not set
+CONFIG_EXT3_FS=y
+# CONFIG_EXT3_FS_XATTR is not set
+CONFIG_JBD=y
+# CONFIG_JBD_DEBUG is not set
 CONFIG_REISERFS_FS=y
 # CONFIG_REISERFS_CHECK is not set
 # CONFIG_REISERFS_PROC_INFO is not set
+# CONFIG_JFS_FS is not set
+CONFIG_XFS_FS=m
+# CONFIG_XFS_RT is not set
+# CONFIG_XFS_QUOTA is not set
+# CONFIG_XFS_POSIX_ACL is not set
+# CONFIG_MINIX_FS is not set
+# CONFIG_ROMFS_FS is not set
+# CONFIG_QUOTA is not set
+CONFIG_AUTOFS_FS=y
+# CONFIG_AUTOFS4_FS is not set
+
+#
+# CD-ROM/DVD Filesystems
+#
+CONFIG_ISO9660_FS=y
+# CONFIG_JOLIET is not set
+# CONFIG_ZISOFS is not set
+# CONFIG_UDF_FS is not set
+
+#
+# DOS/FAT/NT Filesystems
+#
+# CONFIG_FAT_FS is not set
+# CONFIG_NTFS_FS is not set
+
+#
+# Pseudo filesystems
+#
+CONFIG_PROC_FS=y
+# CONFIG_DEVFS_FS is not set
+CONFIG_DEVPTS_FS=y
+CONFIG_TMPFS=y
+CONFIG_RAMFS=y
+
+#
+# Miscellaneous filesystems
+#
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
-CONFIG_EXT3_FS=y
-# CONFIG_EXT3_FS_XATTR is not set
-CONFIG_JBD=y
-# CONFIG_JBD_DEBUG is not set
-# CONFIG_FAT_FS is not set
 # CONFIG_EFS_FS is not set
 # CONFIG_CRAMFS is not set
-CONFIG_TMPFS=y
-CONFIG_RAMFS=y
-CONFIG_HUGETLBFS=y
-CONFIG_ISO9660_FS=y
-# CONFIG_JOLIET is not set
-# CONFIG_ZISOFS is not set
-# CONFIG_JFS_FS is not set
-# CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
-# CONFIG_NTFS_FS is not set
 # CONFIG_HPFS_FS is not set
-CONFIG_PROC_FS=y
-# CONFIG_DEVFS_FS is not set
-CONFIG_DEVPTS_FS=y
 # CONFIG_QNX4FS_FS is not set
-# CONFIG_ROMFS_FS is not set
-CONFIG_EXT2_FS=y
-# CONFIG_EXT2_FS_XATTR is not set
 # CONFIG_SYSV_FS is not set
-# CONFIG_UDF_FS is not set
 # CONFIG_UFS_FS is not set
-CONFIG_XFS_FS=m
-# CONFIG_XFS_RT is not set
-# CONFIG_XFS_QUOTA is not set
-# CONFIG_XFS_POSIX_ACL is not set
 
 #
 # Network File Systems
 #
-# CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 CONFIG_NFS_V3=y
 # CONFIG_NFS_V4 is not set
@@ -556,14 +575,16 @@ CONFIG_NFSD=y
 CONFIG_NFSD_V3=y
 # CONFIG_NFSD_V4 is not set
 CONFIG_NFSD_TCP=y
-CONFIG_SUNRPC=y
-# CONFIG_SUNRPC_GSS is not set
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
 CONFIG_EXPORTFS=y
-# CONFIG_CIFS is not set
+CONFIG_SUNRPC=y
+# CONFIG_SUNRPC_GSS is not set
 # CONFIG_SMB_FS is not set
+# CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
+# CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -594,6 +615,7 @@ CONFIG_DUMMY_CONSOLE=y
 # USB support
 #
 # CONFIG_USB is not set
+# CONFIG_USB_GADGET is not set
 
 #
 # Bluetooth support
@@ -615,6 +637,9 @@ CONFIG_MAGIC_SYSRQ=y
 # CONFIG_INIT_DEBUG is not set
 CONFIG_KALLSYMS=y
 # CONFIG_FRAME_POINTER is not set
+CONFIG_IOMMU_DEBUG=y
+CONFIG_IOMMU_LEAK=y
+CONFIG_MCE_DEBUG=y
 
 #
 # Security options

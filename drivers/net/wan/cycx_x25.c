@@ -82,7 +82,7 @@
 #include <linux/errno.h>	/* return codes */
 #include <linux/if_arp.h>       /* ARPHRD_HWX25 */
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
-#include <linux/module.h>	/* SET_MODULE_OWNER */
+#include <linux/module.h>
 #include <linux/string.h>	/* inline memset(), etc. */
 #include <linux/slab.h>		/* kmalloc(), kfree() */
 #include <linux/stddef.h>	/* offsetof(), etc. */

@@ -7,7 +7,7 @@ EXTRA_AFLAGS	:= -traditional
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_x86_64.o \
 		pci-dma.o x8664_ksyms.o i387.o syscall.o vsyscall.o \
-		setup64.o bluesmoke.o bootflag.o e820.o reboot.o
+		setup64.o bluesmoke.o bootflag.o e820.o reboot.o warmreboot.o
 
 obj-$(CONFIG_MTRR)	+= mtrr/
 obj-$(CONFIG_ACPI)	+= acpi/

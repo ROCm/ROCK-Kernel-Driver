@@ -587,7 +587,7 @@ act2000_alloccard(int bus, int port, int irq, char *id)
 	INIT_WORK(&card->rcv_tq, (void *) (void *) actcapi_dispatch, card);
 	INIT_WORK(&card->poll_tq, (void *) (void *) act2000_receive, card);
 	init_timer(&card->ptimer);
-	SET_MODULE_OWNER(&card->interface);
+	card->interface.owner = THIS_MODULE;
         card->interface.channels = ACT2000_BCH;
         card->interface.maxbufsize = 4000;
         card->interface.command = if_command;

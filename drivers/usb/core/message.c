@@ -672,6 +672,7 @@ void usb_set_maxpacket(struct usb_device *dev)
 {
 	int i, b;
 
+	/* NOTE:  affects all endpoints _except_ ep0 */
 	for (i=0; i<dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *ifp = dev->actconfig->interface + i;
 		struct usb_host_interface *as = ifp->altsetting + ifp->act_altsetting;
@@ -862,6 +863,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		usb_settoggle (dev, ep, out, 0);
 		(out ? dev->epmaxpacketout : dev->epmaxpacketin) [ep]
 			= iface_as->endpoint [i].desc.wMaxPacketSize;
+		usb_endpoint_running (dev, ep, out);
 	}
 
 	return 0;
@@ -916,7 +918,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 
 	/* if it's already configured, clear out old state first. */
 	if (dev->state != USB_STATE_ADDRESS && disable) {
-		for (i = 0; i < 15; i++) {
+		for (i = 1 /* skip ep0 */; i < 15; i++) {
 			disable (dev, i);
 			disable (dev, USB_DIR_IN | i);
 		}

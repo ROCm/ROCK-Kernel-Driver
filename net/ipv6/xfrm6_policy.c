@@ -60,8 +60,8 @@ __xfrm6_find_bundle(struct flowi *fl, struct rtable *rt, struct xfrm_policy *pol
 	read_lock_bh(&policy->lock);
 	for (dst = policy->bundles; dst; dst = dst->next) {
 		struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
-		if (!ipv6_addr_cmp(&xdst->u.rt6.rt6i_dst.addr, fl->fl6_dst) &&
-		    !ipv6_addr_cmp(&xdst->u.rt6.rt6i_src.addr, fl->fl6_src) &&
+		if (!ipv6_addr_cmp(&xdst->u.rt6.rt6i_dst.addr, &fl->fl6_dst) &&
+		    !ipv6_addr_cmp(&xdst->u.rt6.rt6i_src.addr, &fl->fl6_src) &&
 		    __xfrm6_bundle_ok(xdst, fl)) {
 			dst_clone(dst);
 			break;
@@ -82,8 +82,8 @@ __xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int 
 	struct dst_entry *dst, *dst_prev;
 	struct rt6_info *rt0 = (struct rt6_info*)(*dst_p);
 	struct rt6_info *rt  = rt0;
-	struct in6_addr *remote = fl->fl6_dst;
-	struct in6_addr *local  = fl->fl6_src;
+	struct in6_addr *remote = &fl->fl6_dst;
+	struct in6_addr *local  = &fl->fl6_src;
 	int i;
 	int err = 0;
 	int header_len = 0;
@@ -116,13 +116,15 @@ __xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int 
 		trailer_len += xfrm[i]->props.trailer_len;
 	}
 
-	if (ipv6_addr_cmp(remote, fl->fl6_dst)) {
-		struct flowi fl_tunnel = { .nl_u = { .ip6_u =
-						     { .daddr = remote,
-						       .saddr = local }
-					           }
-				         };
-		err = xfrm_dst_lookup((struct xfrm_dst**)&rt, &fl_tunnel, AF_INET6);
+	if (ipv6_addr_cmp(remote, &fl->fl6_dst)) {
+		struct flowi fl_tunnel;
+
+		memset(&fl_tunnel, 0, sizeof(fl_tunnel));
+		ipv6_addr_copy(&fl_tunnel.fl6_dst, remote);
+		ipv6_addr_copy(&fl_tunnel.fl6_src, local);
+
+		err = xfrm_dst_lookup((struct xfrm_dst **) &rt,
+				      &fl_tunnel, AF_INET6);
 		if (err)
 			goto error;
 	} else {
@@ -175,8 +177,8 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
 	u8 nexthdr = skb->nh.ipv6h->nexthdr;
 
-	fl->fl6_dst = &hdr->daddr;
-	fl->fl6_src = &hdr->saddr;
+	ipv6_addr_copy(&fl->fl6_dst, &hdr->daddr);
+	ipv6_addr_copy(&fl->fl6_src, &hdr->saddr);
 
 	while (pskb_may_pull(skb, skb->nh.raw + offset + 1 - skb->data)) {
 		switch (nexthdr) {

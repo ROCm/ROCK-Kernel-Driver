@@ -653,7 +653,7 @@ static void source_sink_complete (struct usb_ep *ep, struct usb_request *req)
 	/* this endpoint is normally active while we're configured */
 	case -ECONNRESET:		/* request dequeued */
 	case -ESHUTDOWN:		/* disconnect from host */
-		DEBUG (dev, "%s gone (%d), %d/%d\n", ep->name, status,
+		VDEBUG (dev, "%s gone (%d), %d/%d\n", ep->name, status,
 				req->actual, req->length);
 		free_ep_req (ep, req);
 		return;
@@ -1035,9 +1035,6 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		if (ctrl->bRequestType != 0)
 			break;
 		spin_lock (&dev->lock);
-		/* change hardware configuration!
-		 * no response queued, just zero status == success
-		 */
 		value = zero_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
 		break;
@@ -1092,7 +1089,7 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	}
 
 	/* respond with data transfer before status phase? */
-	if (value > 0) {
+	if (value >= 0) {
 		req->length = value;
 		value = usb_ep_queue (gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0) {

@@ -226,17 +226,18 @@ bad_area:
 
 bad_area_nosemaphore:
 
-	/* User mode accesses just cause a SIGSEGV */
-	if (error_code & 4) {
 #ifdef CONFIG_IA32_EMULATION
 		/* 32bit vsyscall. map on demand. */
 		if (test_thread_flag(TIF_IA32) && 
-		    address >= 0xffffe000 && address < 0xffffefff-7) { 
+	    address >= 0xffffe000 && address < 0xffffe000 + PAGE_SIZE) { 
 			if (map_syscall32(mm, address) < 0) 
 				goto out_of_memory2;
 			return;
 		} 			
 #endif
+
+	/* User mode accesses just cause a SIGSEGV */
+	if (error_code & 4) {
 		printk(KERN_INFO 
 		       "%s[%d] segfault at rip:%lx rsp:%lx adr:%lx err:%lx\n",
 		       tsk->comm, tsk->pid, regs->rip, regs->rsp, address, 

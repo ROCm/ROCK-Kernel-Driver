@@ -270,7 +270,7 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (usin->sin6_family != AF_INET6) 
 	  	return -EAFNOSUPPORT;
 
-	fl.fl6_flowlabel = 0;
+	memset(&fl, 0, sizeof(fl));
 	if (np->sndflow) {
 		fl.fl6_flowlabel = usin->sin6_flowinfo&IPV6_FLOWINFO_MASK;
 		if (fl.fl6_flowlabel&IPV6_FLOWLABEL_MASK) {
@@ -350,8 +350,8 @@ ipv4_connected:
 	 */
 
 	fl.proto = IPPROTO_UDP;
-	fl.fl6_dst = &np->daddr;
-	fl.fl6_src = &saddr;
+	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
+	ipv6_addr_copy(&fl.fl6_src, &saddr);
 	fl.oif = sk->bound_dev_if;
 	fl.fl_ip_dport = inet->dport;
 	fl.fl_ip_sport = inet->sport;
@@ -362,11 +362,11 @@ ipv4_connected:
 	if (flowlabel) {
 		if (flowlabel->opt && flowlabel->opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) flowlabel->opt->srcrt;
-			fl.fl6_dst = rt0->addr;
+			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 	} else if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *)np->opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
 	dst = ip6_route_output(sk, &fl);
@@ -377,7 +377,7 @@ ipv4_connected:
 		return err;
 	}
 
-	ip6_dst_store(sk, dst, fl.fl6_dst);
+	ip6_dst_store(sk, dst, &fl.fl6_dst);
 
 	/* get the source address used in the appropriate device */
 
@@ -784,8 +784,8 @@ static int udp_v6_push_pending_frames(struct sock *sk, struct udp_opt *up)
 	if (skb_queue_len(&sk->write_queue) == 1) {
 		skb->csum = csum_partial((char *)uh,
 				sizeof(struct udphdr), skb->csum);
-		uh->check = csum_ipv6_magic(fl->fl6_src,
-					    fl->fl6_dst,
+		uh->check = csum_ipv6_magic(&fl->fl6_src,
+					    &fl->fl6_dst,
 					    up->len, fl->proto, skb->csum);
 	} else {
 		u32 tmp_csum = 0;
@@ -795,8 +795,8 @@ static int udp_v6_push_pending_frames(struct sock *sk, struct udp_opt *up)
 		}
 		tmp_csum = csum_partial((char *)uh,
 				sizeof(struct udphdr), tmp_csum);
-                tmp_csum = csum_ipv6_magic(fl->fl6_src,
-					   fl->fl6_dst,
+                tmp_csum = csum_ipv6_magic(&fl->fl6_src,
+					   &fl->fl6_dst,
 					   up->len, fl->proto, tmp_csum);
                 uh->check = tmp_csum;
 
@@ -819,7 +819,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) msg->msg_name;
-	struct in6_addr *daddr, *saddr = NULL;
+	struct in6_addr *daddr;
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
 	struct flowi fl;
@@ -849,8 +849,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	}
 	ulen += sizeof(struct udphdr);
 
-	fl.fl6_flowlabel = 0;
-	fl.oif = 0;
+	memset(&fl, 0, sizeof(fl));
 
 	if (sin6) {
 		if (sin6->sin6_family == AF_INET) {
@@ -919,7 +918,6 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 	if (!fl.oif)
 		fl.oif = sk->bound_dev_if;
-	fl.fl6_src = NULL;
 
 	if (msg->msg_controllen) {
 		opt = &opt_space;
@@ -944,26 +942,27 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
 
 	fl.proto = IPPROTO_UDP;
-	fl.fl6_dst = daddr;
-	if (fl.fl6_src == NULL && !ipv6_addr_any(&np->saddr))
-		fl.fl6_src = &np->saddr;
+	ipv6_addr_copy(&fl.fl6_dst, daddr);
+	if (ipv6_addr_any(&fl.fl6_src) && !ipv6_addr_any(&np->saddr))
+		ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 	fl.fl_ip_dport = up->dport;
 	fl.fl_ip_sport = inet->sport;
 	
 	/* merge ip6_build_xmit from ip6_output */
 	if (opt && opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	if (!fl.oif && ipv6_addr_is_multicast(fl.nl_u.ip6_u.daddr))
+	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	err = ip6_dst_lookup(sk, &dst, &fl, &saddr);
-	if (err) goto out;
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err)
+		goto out;
 
 	if (hlimit < 0) {
-		if (ipv6_addr_is_multicast(fl.fl6_dst))
+		if (ipv6_addr_is_multicast(&fl.fl6_dst))
 			hlimit = np->mcast_hops;
 		else
 			hlimit = np->hop_limit;
@@ -998,13 +997,14 @@ do_append_data:
 	else if (!corkreq)
 		err = udp_v6_push_pending_frames(sk, up);
 
-	ip6_dst_store(sk, dst, fl.nl_u.ip6_u.daddr == &np->daddr ? &np->daddr : NULL);
+	ip6_dst_store(sk, dst,
+		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+		      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	release_sock(sk);
 out:
 	fl6_sock_release(flowlabel);
-	if (saddr) kfree(saddr);
 	if (!err) {
 		UDP6_INC_STATS_USER(UdpOutDatagrams);
 		return len;

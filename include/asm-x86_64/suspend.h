@@ -54,13 +54,6 @@ extern unsigned long saved_ebx;
 extern unsigned long saved_esi;
 extern unsigned long saved_edi;
 
-static inline void acpi_save_register_state(unsigned long return_point)
-{
-	/* FIXME: This is probably no longer correct: we need to save all caller-saved registers */
-}
-
-#define acpi_restore_register_state()  do {} while (0)
-
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);
 extern int acpi_save_state_disk(void);

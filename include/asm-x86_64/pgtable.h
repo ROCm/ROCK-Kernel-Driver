@@ -28,6 +28,7 @@ extern unsigned long __supported_pte_mask;
 #define swapper_pg_dir NULL
 
 extern void paging_init(void);
+extern void clear_kernel_mapping(unsigned long addr, unsigned long size);
 
 extern unsigned long pgkern_mask;
 
@@ -165,11 +166,11 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define PAGE_NONE	__pgprot(_PAGE_PROTNONE | _PAGE_ACCESSED)
 #define PAGE_SHARED	__pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED | _PAGE_NX)
 #define PAGE_SHARED_EXEC __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED)
-#define PAGE_COPY    __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_NX)
+#define PAGE_COPY_NOEXEC __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_NX)
+#define PAGE_COPY PAGE_COPY_NOEXEC
 #define PAGE_COPY_EXEC __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
 #define PAGE_READONLY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_NX)
 #define PAGE_READONLY_EXEC __pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
-
 #define __PAGE_KERNEL \
 	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_NX)
 #define __PAGE_KERNEL_EXECUTABLE \
@@ -181,7 +182,7 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define __PAGE_KERNEL_VSYSCALL \
 	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
 #define __PAGE_KERNEL_LARGE \
-	(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED | _PAGE_PSE | _PAGE_NX)
+	(__PAGE_KERNEL | _PAGE_PSE)
 
 #define MAKE_GLOBAL(x) __pgprot((x) | _PAGE_GLOBAL)
 
@@ -241,6 +242,7 @@ static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+static inline int pte_user(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
 extern inline int pte_read(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
 extern inline int pte_exec(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
 extern inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }

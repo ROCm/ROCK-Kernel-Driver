@@ -89,7 +89,7 @@ struct fn_zone
 	int		fz_nent;	/* Number of entries	*/
 
 	int		fz_divisor;	/* Hash divisor		*/
-	u32		fz_hashmask;	/* (1<<fz_divisor) - 1	*/
+	u32		fz_hashmask;	/* (fz_divisor - 1)	*/
 #define FZ_HASHMASK(fz)	((fz)->fz_hashmask)
 
 	int		fz_order;	/* Zone order		*/
@@ -149,9 +149,30 @@ static __inline__ int fn_key_leq(fn_key_t a, fn_key_t b)
 
 static rwlock_t fib_hash_lock = RW_LOCK_UNLOCKED;
 
-#define FZ_MAX_DIVISOR 1024
+#define FZ_MAX_DIVISOR ((PAGE_SIZE<<MAX_ORDER) / sizeof(struct fib_node *))
 
-#ifdef CONFIG_IP_ROUTE_LARGE_TABLES
+static unsigned long size_to_order(unsigned long size)
+{
+	unsigned long order;
+
+	for (order = 0; order < MAX_ORDER; order++) {
+		if ((PAGE_SIZE << order) >= size)
+			break;
+	}
+	return order;
+}
+
+static struct fib_node **fz_hash_alloc(int divisor)
+{
+	unsigned long size = divisor * sizeof(struct fib_node *);
+
+	if (divisor <= 1024) {
+		return kmalloc(size, GFP_KERNEL);
+	} else {
+		return (struct fib_node **)
+			__get_free_pages(GFP_KERNEL, size_to_order(size));
+	}
+}
 
 /* The fib hash lock must be held when this is called. */
 static __inline__ void fn_rebuild_zone(struct fn_zone *fz,
@@ -174,6 +195,15 @@ static __inline__ void fn_rebuild_zone(struct fn_zone *fz,
 	}
 }
 
+static void fz_hash_free(struct fib_node **hash, int divisor)
+{
+	if (divisor <= 1024)
+		kfree(hash);
+	else
+		free_pages((unsigned long) hash,
+			   size_to_order(divisor * sizeof(struct fib_node *)));
+}
+
 static void fn_rehash_zone(struct fn_zone *fz)
 {
 	struct fib_node **ht, **old_ht;
@@ -185,24 +215,30 @@ static void fn_rehash_zone(struct fn_zone *fz)
 	switch (old_divisor) {
 	case 16:
 		new_divisor = 256;
-		new_hashmask = 0xFF;
 		break;
 	case 256:
 		new_divisor = 1024;
-		new_hashmask = 0x3FF;
 		break;
 	default:
-		printk(KERN_CRIT "route.c: bad divisor %d!\n", old_divisor);
-		return;
+		if ((old_divisor << 1) > FZ_MAX_DIVISOR) {
+			printk(KERN_CRIT "route.c: bad divisor %d!\n", old_divisor);
+			return;
+		}
+		new_divisor = (old_divisor << 1);
+		break;
 	}
+
+	new_hashmask = (new_divisor - 1);
+
 #if RT_CACHE_DEBUG >= 2
 	printk("fn_rehash_zone: hash for zone %d grows from %d\n", fz->fz_order, old_divisor);
 #endif
 
-	ht = kmalloc(new_divisor*sizeof(struct fib_node*), GFP_KERNEL);
+	ht = fz_hash_alloc(new_divisor);
 
 	if (ht)	{
 		memset(ht, 0, new_divisor*sizeof(struct fib_node*));
+
 		write_lock_bh(&fib_hash_lock);
 		old_ht = fz->fz_hash;
 		fz->fz_hash = ht;
@@ -210,10 +246,10 @@ static void fn_rehash_zone(struct fn_zone *fz)
 		fz->fz_divisor = new_divisor;
 		fn_rebuild_zone(fz, old_ht, old_divisor);
 		write_unlock_bh(&fib_hash_lock);
-		kfree(old_ht);
+
+		fz_hash_free(old_ht, old_divisor);
 	}
 }
-#endif /* CONFIG_IP_ROUTE_LARGE_TABLES */
 
 static void fn_free_node(struct fib_node * f)
 {
@@ -233,12 +269,11 @@ fn_new_zone(struct fn_hash *table, int z)
 	memset(fz, 0, sizeof(struct fn_zone));
 	if (z) {
 		fz->fz_divisor = 16;
-		fz->fz_hashmask = 0xF;
 	} else {
 		fz->fz_divisor = 1;
-		fz->fz_hashmask = 0;
 	}
-	fz->fz_hash = kmalloc(fz->fz_divisor*sizeof(struct fib_node*), GFP_KERNEL);
+	fz->fz_hashmask = (fz->fz_divisor - 1);
+	fz->fz_hash = fz_hash_alloc(fz->fz_divisor);
 	if (!fz->fz_hash) {
 		kfree(fz);
 		return NULL;
@@ -467,12 +502,10 @@ rta->rta_prefsrc ? *(u32*)rta->rta_prefsrc : 0);
 	if  ((fi = fib_create_info(r, rta, n, &err)) == NULL)
 		return err;
 
-#ifdef CONFIG_IP_ROUTE_LARGE_TABLES
-	if (fz->fz_nent > (fz->fz_divisor<<2) &&
+	if (fz->fz_nent > (fz->fz_divisor<<1) &&
 	    fz->fz_divisor < FZ_MAX_DIVISOR &&
 	    (z==32 || (1<<z) > fz->fz_divisor))
 		fn_rehash_zone(fz);
-#endif
 
 	fp = fz_chain_p(key, fz);
 

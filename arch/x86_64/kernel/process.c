@@ -216,7 +216,12 @@ void flush_thread(void)
 {
 	struct task_struct *tsk = current;
 
-	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
+	tsk->thread.debugreg0 = 0;
+	tsk->thread.debugreg1 = 0;
+	tsk->thread.debugreg2 = 0;
+	tsk->thread.debugreg3 = 0;
+	tsk->thread.debugreg6 = 0;
+	tsk->thread.debugreg7 = 0;
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
 	/*
 	 * Forget coprocessor state..
@@ -285,7 +290,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 
 	childregs->rax = 0;
 	childregs->rsp = rsp;
-	if (rsp == ~0) {
+	if (rsp == ~0UL) {
 		childregs->rsp = (unsigned long)childregs;
 	}
 	p->set_child_tid = p->clear_child_tid = NULL;
@@ -294,7 +299,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	p->thread.rsp0 = (unsigned long) (childregs+1);
 	p->thread.userrsp = me->thread.userrsp; 
 
-	p->thread.rip = (unsigned long) ret_from_fork;
+	set_ti_thread_flag(p->thread_info, TIF_FORK);
 
 	p->thread.fs = me->thread.fs;
 	p->thread.gs = me->thread.gs;
@@ -335,8 +340,7 @@ out:
 /*
  * This special macro can be used to load a debugging register
  */
-#define loaddebug(thread,register) \
-		set_debug(thread->debugreg[register], register)
+#define loaddebug(thread,r) set_debug(thread->debugreg ## r, r)
 
 /*
  *	switch_to(x,y) should switch tasks from x to y.
@@ -422,7 +426,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	/*
 	 * Now maybe reload the debug registers
 	 */
-	if (unlikely(next->debugreg[7])) {
+	if (unlikely(next->debugreg7)) {
 		loaddebug(next, 0);
 		loaddebug(next, 1);
 		loaddebug(next, 2);
@@ -490,19 +494,15 @@ void set_personality_64bit(void)
 
 asmlinkage long sys_fork(struct pt_regs regs)
 {
-	struct task_struct *p;
-	p = do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
 }
 
 asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *parent_tid, void *child_tid, struct pt_regs regs)
 {
-	struct task_struct *p;
 	if (!newsp)
 		newsp = regs.rsp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
+	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
 		    parent_tid, child_tid);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*
@@ -517,10 +517,8 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *
  */
 asmlinkage long sys_vfork(struct pt_regs regs)
 {
-	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, 
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, 
 		    NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 /*

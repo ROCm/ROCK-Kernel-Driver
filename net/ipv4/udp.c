@@ -1391,8 +1391,11 @@ static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	sk = v;
 	sk = sk->next;
-	if (sk) 
-		goto out;
+
+	for (; sk; sk = sk->next) {
+		if (sk->family == AF_INET)
+			goto out;
+	}
 
 	state = seq->private;
 	if (++state->bucket >= UDP_HTABLE_SIZE) 

@@ -32,13 +32,13 @@ static void flush_ldt(void *null)
 }
 #endif
 
-static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
+static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 {
 	void *oldldt;
 	void *newldt;
-	int oldsize;
+	unsigned oldsize;
 
-	if (mincount <= pc->size)
+	if (mincount <= (unsigned)pc->size)
 		return 0;
 	oldsize = pc->size;
 	mincount = (mincount+511)&(~511);
@@ -63,7 +63,7 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 #ifdef CONFIG_SMP
 		preempt_disable();
 		load_LDT(pc);
-		if (current->mm->cpu_vm_mask != (1<<smp_processor_id()))
+		if (current->mm->cpu_vm_mask != (1UL<<smp_processor_id()))
 			smp_call_function(flush_ldt, 0, 1, 1);
 		preempt_enable();
 #else
@@ -116,7 +116,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 void destroy_context(struct mm_struct *mm)
 {
 	if (mm->context.size) {
-		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
+		if ((unsigned)mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
 		else
 			kfree(mm->context.ldt);
@@ -190,7 +190,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 	}
 
 	down(&mm->context.sem);
-	if (ldt_info.entry_number >= mm->context.size) {
+	if (ldt_info.entry_number >= (unsigned)mm->context.size) {
 		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
 		if (error < 0)
 			goto out_unlock;
