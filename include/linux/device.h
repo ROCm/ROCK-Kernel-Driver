@@ -396,21 +396,21 @@ extern int firmware_register(struct subsystem *);
 extern void firmware_unregister(struct subsystem *);
 
 /* debugging and troubleshooting/diagnostic helpers. */
-#define dev_printk(sev, dev, format, arg...)	\
-	printk(sev "%s %s: " format , (dev).driver->name , (dev).bus_id , ## arg)
+#define dev_printk(level, dev, format, arg...)	\
+	printk(level "%s %s: " format , (dev)->driver->name , (dev)->bus_id , ## arg)
 
 #ifdef DEBUG
 #define dev_dbg(dev, format, arg...)		\
-	dev_printk(KERN_DEBUG , (dev) , format , ## arg)
+	dev_printk(KERN_DEBUG , dev , format , ## arg)
 #else
 #define dev_dbg(dev, format, arg...) do {} while (0)
 #endif
 
 #define dev_err(dev, format, arg...)		\
-	dev_printk(KERN_ERR , (dev) , format , ## arg)
+	dev_printk(KERN_ERR , dev , format , ## arg)
 #define dev_info(dev, format, arg...)		\
-	dev_printk(KERN_INFO , (dev) , format , ## arg)
+	dev_printk(KERN_INFO , dev , format , ## arg)
 #define dev_warn(dev, format, arg...)		\
-	dev_printk(KERN_WARNING , (dev) , format , ## arg)
+	dev_printk(KERN_WARNING , dev , format , ## arg)
 
 #endif /* _DEVICE_H_ */
