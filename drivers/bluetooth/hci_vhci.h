@@ -32,7 +32,7 @@
 #ifdef __KERNEL__
 
 struct hci_vhci_struct {
-	struct hci_dev       hdev;
+	struct hci_dev       *hdev;
 	__u32                flags;
 	wait_queue_head_t    read_wait;
 	struct sk_buff_head  readq;

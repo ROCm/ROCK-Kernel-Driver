@@ -138,7 +138,7 @@ comment "Old SIR device drivers"
 
 config IRPORT_SIR
 	tristate "IrPORT (IrDA serial driver)"
-	depends on IRDA
+	depends on IRDA && BROKEN_ON_SMP
 	---help---
 	  Say Y here if you want to build support for the IrPORT IrDA device
 	  driver.  To compile it as a module, choose M here: the module will be
@@ -156,7 +156,7 @@ comment "Old Serial dongle support"
 
 config DONGLE_OLD
 	bool "Old Serial dongle support"
-	depends on IRTTY_OLD || IRPORT_SIR
+	depends on (IRTTY_OLD || IRPORT_SIR) && BROKEN_ON_SMP
 	help
 	  Say Y here if you have an infrared device that connects to your
 	  computer's serial port. These devices are called dongles. Then say Y

@@ -1691,7 +1691,7 @@ int netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
 	int ret = NET_RX_DROP;
-	unsigned short type = skb->protocol;
+	unsigned short type;
 
 	if (!skb->stamp.tv_sec)
 		do_gettimeofday(&skb->stamp);
@@ -1725,6 +1725,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	if (__handle_bridge(skb, &pt_prev, &ret))
 		goto out;
 
+	type = skb->protocol;
 	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type)&15], list) {
 		if (ptype->type == type &&
 		    (!ptype->dev || ptype->dev == skb->dev)) {

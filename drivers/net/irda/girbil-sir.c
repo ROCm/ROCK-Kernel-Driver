@@ -72,12 +72,12 @@ static struct dongle_driver girbil = {
 	.set_speed	= girbil_change_speed,
 };
 
-static int __init girbil_init(void)
+static int __init girbil_sir_init(void)
 {
 	return irda_register_dongle(&girbil);
 }
 
-static void __exit girbil_cleanup(void)
+static void __exit girbil_sir_cleanup(void)
 {
 	irda_unregister_dongle(&girbil);
 }
@@ -254,5 +254,5 @@ MODULE_DESCRIPTION("Greenwich GIrBIL dongle driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("irda-dongle-4"); /* IRDA_GIRBIL_DONGLE */
 
-module_init(girbil_init);
-module_exit(girbil_cleanup);
+module_init(girbil_sir_init);
+module_exit(girbil_sir_cleanup);
