@@ -35,7 +35,7 @@
 #define DEVICE_NAME_SIZE	50
 #define DEVICE_NAME_HALF	__stringify(20)	/* Less than half to accommodate slop */
 #define DEVICE_ID_SIZE		32
-#define BUS_ID_SIZE		20
+#define BUS_ID_SIZE		KOBJ_NAME_LEN
 
 
 enum {
