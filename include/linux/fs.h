@@ -1230,8 +1230,8 @@ static inline int fsync_inode_data_buffers(struct inode *inode)
 	return fsync_buffers_list(&inode->i_dirty_data_buffers);
 }
 extern int inode_has_buffers(struct inode *);
-extern void filemap_fdatasync(struct address_space *);
-extern void filemap_fdatawait(struct address_space *);
+extern int filemap_fdatasync(struct address_space *);
+extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(kdev_t);
 extern int bmap(struct inode *, int);
 extern int notify_change(struct dentry *, struct iattr *);
@@ -1440,8 +1440,9 @@ sector_t generic_block_bmap(struct address_space *, sector_t, get_block_t *);
 int generic_commit_write(struct file *, struct page *, unsigned, unsigned);
 int block_truncate_page(struct address_space *, loff_t, get_block_t *);
 extern int generic_direct_IO(int, struct inode *, struct kiobuf *, unsigned long, int, get_block_t *);
+extern int waitfor_one_page(struct page *);
+extern int writeout_one_page(struct page *);
 
-extern int waitfor_one_page(struct page*);
 extern int generic_file_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);

@@ -52,8 +52,13 @@ static int ext2_commit_chunk(struct page *page, unsigned from, unsigned to)
 	int err = 0;
 	dir->i_version = ++event;
 	page->mapping->a_ops->commit_write(NULL, page, from, to);
-	if (IS_SYNC(dir))
-		err = waitfor_one_page(page);
+	if (IS_SYNC(dir)) {
+		int err2;
+		err = writeout_one_page(page);
+		err2 = waitfor_one_page(page);
+		if (err == 0)
+			err = err2;
+	}
 	return err;
 }
 

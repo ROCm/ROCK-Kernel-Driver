@@ -1,3 +1,9 @@
+Thu Feb 14 2002  Andrew Morton  <akpm@zip.com.au>
+
+	* dir_commit_chunk(): call writeout_one_page() as well as
+	  waitfor_one_page() for IS_SYNC directories, so that we
+	  actually do sync the directory. (forward-port from 2.4).
+
 Thu Feb  7 2002  Alexander Viro  <viro@math.psu.edu>
 
 	* super.c: switched to ->get_sb()
@@ -96,4 +102,5 @@ Fri Oct 26 2001  Christoph Hellwig  <hch@caldera.de>
 	  include/linux/sysv_fs_sb.h:
 	Remove symlink faking.	Noone really wants to use these as
 	linux filesystems and native OSes don't support it anyway.
+
 

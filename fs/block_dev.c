@@ -195,11 +195,15 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 
 static int __block_fsync(struct inode * inode)
 {
-	int ret;
+	int ret, err;
 
-	filemap_fdatasync(inode->i_mapping);
-	ret = sync_buffers(inode->i_rdev, 1);
-	filemap_fdatawait(inode->i_mapping);
+	ret = filemap_fdatasync(inode->i_mapping);
+	err = sync_buffers(inode->i_rdev, 1);
+	if (err && !ret)
+		ret = err;
+	err = filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
 
 	return ret;
 }

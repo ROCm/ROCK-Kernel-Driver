@@ -244,6 +244,7 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode * inode = filp->f_dentry->d_inode;
 	int	status = 0;
+	int	status2;
 
 	dprintk("NFS: nfs_lock(f=%s/%ld, t=%x, fl=%x, r=%Ld:%Ld)\n",
 			inode->i_sb->s_id, inode->i_ino,
@@ -278,11 +279,15 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 * Flush all pending writes before doing anything
 	 * with locks..
 	 */
-	filemap_fdatasync(inode->i_mapping);
+	status = filemap_fdatasync(inode->i_mapping);
 	down(&inode->i_sem);
-	status = nfs_wb_all(inode);
+	status2 = nfs_wb_all(inode);
+	if (status2 && !status)
+		status = status2;
 	up(&inode->i_sem);
-	filemap_fdatawait(inode->i_mapping);
+	status2 = filemap_fdatawait(inode->i_mapping);
+	if (status2 && !status)
+		status = status2;
 	if (status < 0)
 		return status;
 

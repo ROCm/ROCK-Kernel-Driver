@@ -410,9 +410,9 @@ asmlinkage long sys_fsync(unsigned int fd)
 	struct file * file;
 	struct dentry * dentry;
 	struct inode * inode;
-	int err;
+	int ret, err;
 
-	err = -EBADF;
+	ret = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -420,21 +420,27 @@ asmlinkage long sys_fsync(unsigned int fd)
 	dentry = file->f_dentry;
 	inode = dentry->d_inode;
 
-	err = -EINVAL;
-	if (!file->f_op || !file->f_op->fsync)
+	ret = -EINVAL;
+	if (!file->f_op || !file->f_op->fsync) {
+		/* Why?  We can still call filemap_fdatasync */
 		goto out_putf;
+	}
 
 	/* We need to protect against concurrent writers.. */
 	down(&inode->i_sem);
-	filemap_fdatasync(inode->i_mapping);
+	ret = filemap_fdatasync(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 0);
-	filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
+	err = filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
 	up(&inode->i_sem);
 
 out_putf:
 	fput(file);
 out:
-	return err;
+	return ret;
 }
 
 asmlinkage long sys_fdatasync(unsigned int fd)
@@ -442,9 +448,9 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	struct file * file;
 	struct dentry * dentry;
 	struct inode * inode;
-	int err;
+	int ret, err;
 
-	err = -EBADF;
+	ret = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -452,20 +458,24 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	dentry = file->f_dentry;
 	inode = dentry->d_inode;
 
-	err = -EINVAL;
+	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync)
 		goto out_putf;
 
 	down(&inode->i_sem);
-	filemap_fdatasync(inode->i_mapping);
+	ret = filemap_fdatasync(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 1);
-	filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
+	err = filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
 	up(&inode->i_sem);
 
 out_putf:
 	fput(file);
 out:
-	return err;
+	return ret;
 }
 
 /* After several hours of tedious analysis, the following hash
@@ -1431,6 +1441,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 	int err, i;
 	unsigned long block;
 	struct buffer_head *bh, *head;
+	int need_unlock;
 
 	if (!PageLocked(page))
 		BUG();
@@ -1486,8 +1497,34 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 	return 0;
 
 out:
+	/*
+	 * ENOSPC, or some other error.  We may already have added some
+	 * blocks to the file, so we need to write these out to avoid
+	 * exposing stale data.
+	 */
 	ClearPageUptodate(page);
-	UnlockPage(page);
+	bh = head;
+	need_unlock = 1;
+	/* Recovery: lock and submit the mapped buffers */
+	do {
+		if (buffer_mapped(bh)) {
+			lock_buffer(bh);
+			set_buffer_async_io(bh);
+			need_unlock = 0;
+		}
+		bh = bh->b_this_page;
+	} while (bh != head);
+	do {
+		struct buffer_head *next = bh->b_this_page;
+		if (buffer_mapped(bh)) {
+			set_bit(BH_Uptodate, &bh->b_state);
+			clear_bit(BH_Dirty, &bh->b_state);
+			submit_bh(WRITE, bh);
+		}
+		bh = next;
+	} while (bh != head);
+	if (need_unlock)
+		UnlockPage(page);
 	return err;
 }
 
@@ -1518,6 +1555,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 			continue;
 		if (block_start >= to)
 			break;
+		clear_bit(BH_New, &bh->b_state);
 		if (!buffer_mapped(bh)) {
 			err = get_block(inode, block, bh, 1);
 			if (err)
@@ -1552,12 +1590,35 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	 */
 	while(wait_bh > wait) {
 		wait_on_buffer(*--wait_bh);
-		err = -EIO;
 		if (!buffer_uptodate(*wait_bh))
-			goto out;
+			return -EIO;
 	}
 	return 0;
 out:
+	/*
+	 * Zero out any newly allocated blocks to avoid exposing stale
+	 * data.  If BH_New is set, we know that the block was newly
+	 * allocated in the above loop.
+	 */
+	bh = head;
+	block_start = 0;
+	do {
+		block_end = block_start+blocksize;
+		if (block_end <= from)
+			goto next_bh;
+		if (block_start >= to)
+			break;
+		if (buffer_new(bh)) {
+			if (buffer_uptodate(bh))
+				printk(KERN_ERR "%s: zeroing uptodate buffer!\n", __FUNCTION__);
+			memset(kaddr+block_start, 0, bh->b_size);
+			set_bit(BH_Uptodate, &bh->b_state);
+			mark_buffer_dirty(bh);
+		}
+next_bh:
+		block_start = block_end;
+		bh = bh->b_this_page;
+	} while (bh != head);
 	return err;
 }
 
@@ -1953,6 +2014,48 @@ done:
 	ClearPageUptodate(page);
 	goto done;
 }
+
+/*
+ * Commence writeout of all the buffers against a page.  The
+ * page must be locked.   Returns zero on success or a negative
+ * errno.
+ */
+int writeout_one_page(struct page *page)
+{
+	struct buffer_head *bh, *head = page->buffers;
+
+	if (!PageLocked(page))
+		BUG();
+	bh = head;
+	do {
+		if (buffer_locked(bh) || !buffer_dirty(bh) || !buffer_uptodate(bh))
+			continue;
+
+		bh->b_flushtime = jiffies;
+		ll_rw_block(WRITE, 1, &bh);	
+	} while ((bh = bh->b_this_page) != head);
+	return 0;
+}
+EXPORT_SYMBOL(writeout_one_page);
+
+/*
+ * Wait for completion of I/O of all buffers against a page.  The page
+ * must be locked.  Returns zero on success or a negative errno.
+ */
+int waitfor_one_page(struct page *page)
+{
+	int error = 0;
+	struct buffer_head *bh, *head = page->buffers;
+
+	bh = head;
+	do {
+		wait_on_buffer(bh);
+		if (buffer_req(bh) && !buffer_uptodate(bh))
+			error = -EIO;
+	} while ((bh = bh->b_this_page) != head);
+	return error;
+}
+EXPORT_SYMBOL(waitfor_one_page);
 
 sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 			    get_block_t *get_block)

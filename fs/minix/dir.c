@@ -36,8 +36,13 @@ static int dir_commit_chunk(struct page *page, unsigned from, unsigned to)
 	struct inode *dir = (struct inode *)page->mapping->host;
 	int err = 0;
 	page->mapping->a_ops->commit_write(NULL, page, from, to);
-	if (IS_SYNC(dir))
-		err = waitfor_one_page(page);
+	if (IS_SYNC(dir)) {
+		int err2;
+		err = writeout_one_page(page);
+		err2 = waitfor_one_page(page);
+		if (err == 0)
+			err = err2;
+	}
 	return err;
 }
 
@@ -236,10 +241,10 @@ int minix_delete_entry(struct minix_dir_entry *de, struct page *page)
 
 	lock_page(page);
 	err = mapping->a_ops->prepare_write(NULL, page, from, to);
-	if (err)
-		BUG();
-	de->inode = 0;
-	err = dir_commit_chunk(page, from, to);
+	if (err == 0) {
+		de->inode = 0;
+		err = dir_commit_chunk(page, from, to);
+	}
 	UnlockPage(page);
 	dir_put_page(page);
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
@@ -336,10 +341,10 @@ void minix_set_link(struct minix_dir_entry *de, struct page *page,
 
 	lock_page(page);
 	err = page->mapping->a_ops->prepare_write(NULL, page, from, to);
-	if (err)
-		BUG();
-	de->inode = inode->i_ino;
-	err = dir_commit_chunk(page, from, to);
+	if (err == 0) {
+		de->inode = inode->i_ino;
+		err = dir_commit_chunk(page, from, to);
+	}
 	UnlockPage(page);
 	dir_put_page(page);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
