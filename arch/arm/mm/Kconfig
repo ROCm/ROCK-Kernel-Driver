@@ -79,7 +79,7 @@ config CPU_ARM920T
 # ARM922T
 config CPU_ARM922T
 	bool
-	depends on ARCH_CAMELOT
+	depends on ARCH_CAMELOT || ARCH_LH7A40X
 	default y
 	select CPU_32v4
 	select CPU_ABRT_EV4T
