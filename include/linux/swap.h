@@ -182,6 +182,7 @@ extern int move_to_swap_cache(struct page *page, swp_entry_t entry);
 extern int move_from_swap_cache(struct page *page, unsigned long index,
 		struct address_space *mapping);
 extern void free_page_and_swap_cache(struct page *page);
+extern void free_pages_and_swap_cache(struct page **pages, int nr);
 extern struct page * lookup_swap_cache(swp_entry_t);
 extern struct page * read_swap_cache_async(swp_entry_t);
 

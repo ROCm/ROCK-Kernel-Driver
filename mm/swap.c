@@ -87,7 +87,7 @@ void __page_cache_release(struct page *page)
 
 /*
  * Batched page_cache_release().  Decrement the reference count on all the
- * pagevec's pages.  If it fell to zero then remove the page from the LRU and
+ * passed pages.  If it fell to zero then remove the page from the LRU and
  * free it.
  *
  * Avoid taking zone->lru_lock if possible, but if it is taken, retain it
@@ -96,18 +96,16 @@ void __page_cache_release(struct page *page)
  * The locking in this function is against shrink_cache(): we recheck the
  * page count inside the lock to see whether shrink_cache grabbed the page
  * via the LRU.  If it did, give up: shrink_cache will free it.
- *
- * This function reinitialises the caller's pagevec.
  */
-void __pagevec_release(struct pagevec *pvec)
+void release_pages(struct page **pages, int nr)
 {
 	int i;
 	struct pagevec pages_to_free;
 	struct zone *zone = NULL;
 
 	pagevec_init(&pages_to_free);
-	for (i = 0; i < pagevec_count(pvec); i++) {
-		struct page *page = pvec->pages[i];
+	for (i = 0; i < nr; i++) {
+		struct page *page = pages[i];
 		struct zone *pagezone;
 
 		if (PageReserved(page) || !put_page_testzero(page))
@@ -122,13 +120,24 @@ void __pagevec_release(struct pagevec *pvec)
 		}
 		if (TestClearPageLRU(page))
 			del_page_from_lru(zone, page);
-		if (page_count(page) == 0)
-			pagevec_add(&pages_to_free, page);
+		if (page_count(page) == 0) {
+			if (!pagevec_add(&pages_to_free, page)) {
+				spin_unlock_irq(&zone->lru_lock);
+				pagevec_free(&pages_to_free);
+				pagevec_init(&pages_to_free);
+				spin_lock_irq(&zone->lru_lock);
+			}
+		}
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
 
 	pagevec_free(&pages_to_free);
+}
+
+void __pagevec_release(struct pagevec *pvec)
+{
+	release_pages(pvec->pages, pagevec_count(pvec));
 	pagevec_init(pvec);
 }
 
