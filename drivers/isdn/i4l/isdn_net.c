@@ -1814,7 +1814,7 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local.isdn_slot = -1;
 	netdev->local.pre_device = -1;
 	netdev->local.pre_channel = -1;
-	netdev->local.exclusive = 0;
+	netdev->local.exclusive = -1;
 	netdev->local.ppp_slot = -1;
 	netdev->local.pppbind = -1;
 	skb_queue_head_init(&netdev->local.super_tx_queue);
@@ -1970,30 +1970,28 @@ isdn_net_bind(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 			goto out;
 		}
 	}
-	if (cfg->exclusive == lp->exclusive &&
+	if (cfg->exclusive == (lp->exclusive >= 0) &&
 	    drvidx == lp->pre_device && chidx == lp->pre_channel) {
 		/* no change */
 		retval = 0;
 		goto out;
 	}
-	if (lp->exclusive) {
+	if (lp->exclusive >= 0) {
 		isdn_unexclusive_channel(lp->pre_device, lp->pre_channel);
 		isdn_free_channel(lp->pre_device, lp->pre_channel, ISDN_USAGE_NET);
-		lp->exclusive = 0;
+		lp->exclusive = -1;
 	}
 	if (cfg->exclusive) {
 		/* If binding is exclusive, try to grab the channel */
-		i = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, 
-				       lp->l3_proto, drvidx, chidx, cfg->eaz);
-		printk("i %d\n", i);
-		if (i < 0) {
+		lp->exclusive = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, 
+						   lp->l3_proto, drvidx, chidx, cfg->eaz);
+		if (lp->exclusive < 0) {
 			/* Grab failed, because desired channel is in use */
 			retval = -EBUSY;
 			goto out;
 		}
 		/* All went ok, so update isdninfo */
-		isdn_slot_set_usage(i, ISDN_USAGE_EXCLUSIVE);
-		lp->exclusive = 1;
+		isdn_slot_set_usage(lp->exclusive, ISDN_USAGE_EXCLUSIVE);
 	}
 	lp->pre_device = drvidx;
 	lp->pre_channel = chidx;
@@ -2120,7 +2118,7 @@ isdn_net_getcfg(isdn_net_ioctl_cfg * cfg)
 		return -ENODEV;
 
 	strcpy(cfg->eaz, lp->msn);
-	cfg->exclusive = lp->exclusive;
+	cfg->exclusive = lp->exclusive >= 0;
 	if (lp->pre_device >= 0) {
 		sprintf(cfg->drvid, "%s,%d", dev->drvid[lp->pre_device],
 			lp->pre_channel);
@@ -2348,7 +2346,7 @@ isdn_net_realrm(isdn_net_dev *p)
 	/* Free all phone-entries */
 	isdn_net_rmallphone(p);
 	/* If interface is bound exclusive, free channel-usage */
-	if (p->local.exclusive)
+	if (p->local.exclusive >= 0)
 		isdn_unexclusive_channel(p->local.pre_device, p->local.pre_channel);
 	if (p->local.master) {
 		/* It's a slave-device, so update master's slave-pointer if necessary */

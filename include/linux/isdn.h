@@ -291,7 +291,7 @@ typedef struct isdn_net_local_s {
   int			 ppp_slot;     /* PPPD device slot number          */
   int                    pre_device;   /* Preselected isdn-device          */
   int                    pre_channel;  /* Preselected isdn-channel         */
-  int                    exclusive;    /* If non-zero idx to reserved chan.*/
+  int                    exclusive;    /* -1 if non excl./idx to excl chan */
   int                    flags;        /* Connection-flags                 */
   int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
