@@ -342,6 +342,10 @@ ia64_mmu_init (void *my_cpu_data)
 
 	ia64_tlb_init();
 
+#ifdef	CONFIG_HUGETLB_PAGE
+	ia64_set_rr(HPAGE_REGION_BASE, HPAGE_SHIFT << 2);
+#endif
+
 #ifdef	CONFIG_IA64_MCA
 	cpu = smp_processor_id();
 

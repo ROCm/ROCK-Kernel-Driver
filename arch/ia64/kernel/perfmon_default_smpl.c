@@ -178,6 +178,7 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	ent->tstamp    = stamp;
 	ent->cpu       = smp_processor_id();
 	ent->set       = arg->active_set;
+	ent->tgid      = current->tgid;
 
 	/*
 	 * selectively store PMDs in increasing index number

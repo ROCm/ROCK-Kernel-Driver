@@ -196,6 +196,7 @@ EXPORT_SYMBOL(die_chain);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);
+EXPORT_SYMBOL(smp_num_siblings);
 #endif
 
 extern void do_softirq_thunk(void);
