@@ -302,9 +302,10 @@ static int hub_configure(struct usb_hub *hub,
 	int maxp, ret;
 	char *message;
 
-	hub->buffer = kmalloc(sizeof(*hub->buffer), GFP_KERNEL);
+	hub->buffer = usb_buffer_alloc(dev, sizeof(*hub->buffer), GFP_KERNEL,
+			&hub->buffer_dma);
 	if (!hub->buffer) {
-		message = "can't kmalloc hub irq buffer";
+		message = "can't allocate hub irq buffer";
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -459,6 +460,8 @@ static int hub_configure(struct usb_hub *hub,
 
 	usb_fill_int_urb(hub->urb, dev, pipe, *hub->buffer, maxp, hub_irq,
 		hub, endpoint->bInterval);
+	hub->urb->transfer_dma = hub->buffer_dma;
+	hub->urb->transfer_flags |= URB_NO_DMA_MAP;
 	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
 	if (ret) {
 		message = "couldn't submit status urb";
@@ -522,7 +525,9 @@ static void hub_disconnect(struct usb_interface *intf)
 	}
 
 	if (hub->buffer) {
-		kfree(hub->buffer);
+		usb_buffer_free(interface_to_usbdev(intf),
+				sizeof(*hub->buffer), hub->buffer,
+				hub->buffer_dma);
 		hub->buffer = NULL;
 	}
 

@@ -175,6 +175,7 @@ struct usb_hub {
 
 	/* buffer for urb ... 1 bit each for hub and children, rounded up */
 	char			(*buffer)[(USB_MAXCHILDREN + 1 + 7) / 8];
+	dma_addr_t		buffer_dma;	/* DMA address for buffer */
 	union {
 		struct usb_hub_status	hub;
 		struct usb_port_status	port;
