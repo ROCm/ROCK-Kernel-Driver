@@ -93,7 +93,7 @@ int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		/* no settable parameters */
 
-		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
+		result=hdlc->attach(dev, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
 		if (result)
 			return result;
 

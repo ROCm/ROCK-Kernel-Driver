@@ -364,7 +364,7 @@ static void dscc4_release_ring(struct dscc4_dev_priv *);
 static void dscc4_timer(unsigned long);
 static void dscc4_tx_timeout(struct net_device *);
 static irqreturn_t dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
-static int dscc4_hdlc_attach(hdlc_device *, unsigned short, unsigned short);
+static int dscc4_hdlc_attach(struct net_device *, unsigned short, unsigned short);
 static int dscc4_set_iface(struct dscc4_dev_priv *, struct net_device *);
 static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
 #ifdef DSCC4_POLLING
@@ -1986,10 +1986,9 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 			   pci_resource_len(pdev, 0));
 }
 
-static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding,
+static int dscc4_hdlc_attach(struct net_device *dev, unsigned short encoding,
 	unsigned short parity)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 
 	if (encoding != ENCODING_NRZ &&

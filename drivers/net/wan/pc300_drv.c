@@ -290,7 +290,7 @@ static int clock_rate_calc(uclong, uclong, int *);
 static uclong detect_ram(pc300_t *);
 static void plx_init(pc300_t *);
 static void cpc_trace(struct net_device *, struct sk_buff *, char);
-static int cpc_attach(hdlc_device *, unsigned short, unsigned short);
+static int cpc_attach(struct net_device *, unsigned short, unsigned short);
 
 #ifdef CONFIG_PC300_MLPPP
 void cpc_tty_init(pc300dev_t * dev);
@@ -3064,10 +3064,9 @@ int tx_config(pc300dev_t * d)
 	return 0;
 }
 
-static int cpc_attach(hdlc_device * hdlc, unsigned short encoding,
+static int cpc_attach(struct net_device *dev, unsigned short encoding,
 		      unsigned short parity)
 {
-	struct net_device * dev = hdlc_to_dev(hdlc);
 	pc300dev_t *d = (pc300dev_t *)dev->priv;
 	pc300ch_t *chan = (pc300ch_t *)d->chan;
 	pc300_t *card = (pc300_t *)chan->card;

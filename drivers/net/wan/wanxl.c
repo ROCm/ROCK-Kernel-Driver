@@ -338,10 +338,10 @@ static int wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
 
 
 
-static int wanxl_attach(hdlc_device *hdlc, unsigned short encoding,
+static int wanxl_attach(struct net_device *dev, unsigned short encoding,
 			unsigned short parity)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = hdlc_to_port(dev_to_hdlc(dev));
 
 	if (encoding != ENCODING_NRZ &&
 	    encoding != ENCODING_NRZI)

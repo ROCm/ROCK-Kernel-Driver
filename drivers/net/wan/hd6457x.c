@@ -115,21 +115,10 @@ static inline int sca_intr_status(card_t *card)
 	return result;
 }
 
-
-
-static inline port_t* hdlc_to_port(hdlc_device *hdlc)
-{
-	return (port_t*)hdlc;
-}
-
-
-
 static inline port_t* dev_to_port(struct net_device *dev)
 {
-	return hdlc_to_port(dev_to_hdlc(dev));
+	return (port_t *)(dev_to_hdlc(dev));
 }
-
-
 
 static inline u16 next_desc(port_t *port, u16 desc, int transmit)
 {
@@ -639,7 +628,7 @@ static void sca_close(struct net_device *dev)
 
 
 
-static int sca_attach(hdlc_device *hdlc, unsigned short encoding,
+static int sca_attach(struct net_device *dev, unsigned short encoding,
 		      unsigned short parity)
 {
 	if (encoding != ENCODING_NRZ &&
@@ -660,8 +649,8 @@ static int sca_attach(hdlc_device *hdlc, unsigned short encoding,
 	    parity != PARITY_CRC16_PR1_CCITT)
 		return -EINVAL;
 
-	hdlc_to_port(hdlc)->encoding = encoding;
-	hdlc_to_port(hdlc)->parity = parity;
+	dev_to_port(dev)->encoding = encoding;
+	dev_to_port(dev)->parity = parity;
 	return 0;
 }
 

@@ -100,7 +100,7 @@ typedef struct hdlc_device_struct {
 	struct net_device_stats stats;
 
 	/* used by HDLC layer to take control over HDLC device from hw driver*/
-	int (*attach)(struct hdlc_device_struct *hdlc,
+	int (*attach)(struct net_device *dev,
 		      unsigned short encoding, unsigned short parity);
 
 	/* hardware driver must handle this instead of dev->hard_start_xmit */

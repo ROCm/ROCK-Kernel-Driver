@@ -1331,7 +1331,7 @@ fst_close ( struct net_device *dev )
 }
 
 static int
-fst_attach ( hdlc_device *hdlc, unsigned short encoding, unsigned short parity )
+fst_attach ( struct net_device *dev, unsigned short encoding, unsigned short parity )
 {
         /* Setting currently fixed in FarSync card so we check and forget */
         if ( encoding != ENCODING_NRZ || parity != PARITY_CRC16_PR1_CCITT )

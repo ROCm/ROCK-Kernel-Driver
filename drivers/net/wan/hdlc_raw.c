@@ -67,7 +67,7 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if (new_settings.parity == PARITY_DEFAULT)
 			new_settings.parity = PARITY_CRC16_PR1_CCITT;
 
-		result = hdlc->attach(hdlc, new_settings.encoding,
+		result = hdlc->attach(dev, new_settings.encoding,
 				      new_settings.parity);
 		if (result)
 			return result;
