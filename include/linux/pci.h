@@ -587,6 +587,7 @@ static inline struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *s
 	return pci_scan_bus_parented(NULL, bus, ops, sysdata);
 }
 int pci_scan_slot(struct pci_bus *bus, int devfn);
+struct pci_dev * pci_scan_single_device(struct pci_bus *bus, int devfn);
 void pci_bus_add_devices(struct pci_bus *bus);
 void pci_name_device(struct pci_dev *dev);
 char *pci_class_name(u32 class);

@@ -580,6 +580,30 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	return dev;
 }
 
+struct pci_dev * __devinit
+pci_scan_single_device(struct pci_bus *bus, int devfn)
+{
+	struct pci_dev *dev;
+
+	dev = pci_scan_device(bus, devfn);
+	pci_scan_msi_device(dev);
+
+	if (!dev)
+		return NULL;
+	
+	/* Fix up broken headers */
+	pci_fixup_device(PCI_FIXUP_HEADER, dev);
+
+	/*
+	 * Add the device to our list of discovered devices
+	 * and the bus list for fixup functions, etc.
+	 */
+	INIT_LIST_HEAD(&dev->global_list);
+	list_add_tail(&dev->bus_list, &bus->devices);
+
+	return dev;
+}
+
 /**
  * pci_scan_slot - scan a PCI slot on a bus for devices.
  * @bus: PCI bus to scan
@@ -596,34 +620,23 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 	for (func = 0; func < 8; func++, devfn++) {
 		struct pci_dev *dev;
 
-		dev = pci_scan_device(bus, devfn);
-		pci_scan_msi_device(dev);
-		if (func == 0) {
-			if (!dev)
-				break;
+		dev = pci_scan_single_device(bus, devfn);
+		if (dev) {
+			nr++;
+
+			/*
+		 	 * If this is a single function device,
+		 	 * don't scan past the first function.
+		 	 */
+			if (!dev->multifunction)
+				if (func > 0)
+					dev->multifunction = 1;
+				else
+ 					break;
 		} else {
-			if (!dev)
-				continue;
-			dev->multifunction = 1;
+			if (func == 0)
+				break;
 		}
-
-		/* Fix up broken headers */
-		pci_fixup_device(PCI_FIXUP_HEADER, dev);
-
-		/*
-		 * Add the device to our list of discovered devices
-		 * and the bus list for fixup functions, etc.
-		 */
-		INIT_LIST_HEAD(&dev->global_list);
-		list_add_tail(&dev->bus_list, &bus->devices);
-		nr++;
-
-		/*
-		 * If this is a single function device,
-		 * don't scan past the first function.
-		 */
-		if (!dev->multifunction)
-			break;
 	}
 	return nr;
 }
@@ -734,4 +747,5 @@ EXPORT_SYMBOL(pci_add_new_bus);
 EXPORT_SYMBOL(pci_do_scan_bus);
 EXPORT_SYMBOL(pci_scan_slot);
 EXPORT_SYMBOL(pci_scan_bridge);
+EXPORT_SYMBOL(pci_scan_single_device);
 #endif
