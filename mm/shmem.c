@@ -1186,22 +1186,6 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 			left = __copy_from_user(kaddr + offset, buf, bytes);
 			kunmap(page);
 		}
-		flush_dcache_page(page);
-		if (left) {
-			page_cache_release(page);
-			err = -EFAULT;
-			break;
-		}
-
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
-		set_page_dirty(page);
-		page_cache_release(page);
-
-		/*
-		 * Our dirty pages are not counted in nr_dirty,
-		 * and we do not attempt to balance dirty pages.
-		 */
 
 		written += bytes;
 		count -= bytes;
@@ -1209,6 +1193,24 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 		buf += bytes;
 		if (pos > inode->i_size)
 			inode->i_size = pos;
+
+		flush_dcache_page(page);
+		set_page_dirty(page);
+		if (!PageReferenced(page))
+			SetPageReferenced(page);
+		page_cache_release(page);
+
+		if (left) {
+			pos -= left;
+			written -= left;
+			err = -EFAULT;
+			break;
+		}
+
+		/*
+		 * Our dirty pages are not counted in nr_dirty,
+		 * and we do not attempt to balance dirty pages.
+		 */
 
 		cond_resched();
 	} while (count);
