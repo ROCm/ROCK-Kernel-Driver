@@ -34,6 +34,7 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/completion.h>
 #include <linux/suspend.h>
 #include <linux/workqueue.h>
 #include <scsi/scsi.h>
@@ -2310,7 +2311,6 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->ap = ap;
 		qc->dev = dev;
 		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
-		init_MUTEX_LOCKED(&qc->sem);
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
 
@@ -2367,7 +2367,8 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_l
 		do_clear = 1;
 	}
 
-	up(&qc->sem);
+	if (qc->waiting)
+		complete(qc->waiting);
 
 	if (likely(do_clear))
 		clear_bit(tag, &ap->qactive);

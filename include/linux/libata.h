@@ -243,7 +243,7 @@ struct ata_queued_cmd {
 
 	ata_qc_cb_t		callback;
 
-	struct semaphore	sem;
+	struct completion	*waiting;
 
 	void			*private_data;
 };
