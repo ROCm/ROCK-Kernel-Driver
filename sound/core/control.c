@@ -809,8 +809,6 @@ struct user_element {
 	unsigned long elem_data_size;	/* size of element data in bytes */
 	void *priv_data;		/* private data (like strings for enumerated type) */
 	unsigned long priv_data_size;	/* size of private data in bytes */
-	unsigned short dimen_count;	/* count of dimensions */
-	unsigned short dimen[0];	/* array of dimensions */
 };
 
 static int snd_ctl_elem_user_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -859,7 +857,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	snd_ctl_elem_info_t info;
 	snd_kcontrol_t kctl, *_kctl;
 	unsigned int access;
-	long private_size, dimen_size, extra_size;
+	long private_size, extra_size;
 	struct user_element *ue;
 	int idx, err;
 	
@@ -870,10 +868,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	if (info.count > 1024)
 		return -EINVAL;
 	access = info.access == 0 ? SNDRV_CTL_ELEM_ACCESS_READWRITE :
-		 (info.access & (SNDRV_CTL_ELEM_ACCESS_READWRITE|SNDRV_CTL_ELEM_ACCESS_INACTIVE|
-		 		 SNDRV_CTL_ELEM_ACCESS_DINDIRECT|SNDRV_CTL_ELEM_ACCESS_INDIRECT));
-	if (access & (SNDRV_CTL_ELEM_ACCESS_DINDIRECT | SNDRV_CTL_ELEM_ACCESS_INDIRECT))
-		return -EINVAL;
+		(info.access & (SNDRV_CTL_ELEM_ACCESS_READWRITE|SNDRV_CTL_ELEM_ACCESS_INACTIVE));
 	info.id.numid = 0;
 	memset(&kctl, 0, sizeof(kctl));
 	down_write(&card->controls_rwsem);
@@ -938,25 +933,14 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 		return -EINVAL;
 	}
 	private_size *= info.count;
-	if (private_size > 1024 * 1024)
-		return -EINVAL;
-	dimen_size = 0;
-	if (!(info.access & SNDRV_CTL_ELEM_ACCESS_DINDIRECT))
-		for (idx = 0; idx < 4 && info.dimen.d[idx]; idx++)
-			dimen_size += sizeof(unsigned short);
-	ue = kcalloc(1, sizeof(struct user_element) + dimen_size + private_size + extra_size, GFP_KERNEL);
+	ue = kcalloc(1, sizeof(struct user_element) + private_size + extra_size, GFP_KERNEL);
 	if (ue == NULL)
 		return -ENOMEM;
 	ue->info = info;
-	if (!(info.access & SNDRV_CTL_ELEM_ACCESS_DINDIRECT)) {
-		for (idx = 0; idx < 4 && info.dimen.d[idx]; idx++)
-			ue->dimen[idx] = info.dimen.d[idx];
-		ue->dimen_count = dimen_size / sizeof(unsigned short);
-	}
-	ue->elem_data = (char *)ue + sizeof(ue) + dimen_size;
+	ue->elem_data = (char *)ue + sizeof(ue);
 	ue->elem_data_size = private_size;
 	if (extra_size) {
-		ue->priv_data = (char *)ue + sizeof(ue) + dimen_size + private_size;
+		ue->priv_data = (char *)ue + sizeof(ue) + private_size;
 		ue->priv_data_size = extra_size;
 		if (ue->info.type == SNDRV_CTL_ELEM_TYPE_ENUMERATED) {
 			if (copy_from_user(ue->priv_data, *(char __user **)info.value.enumerated.name, extra_size))
