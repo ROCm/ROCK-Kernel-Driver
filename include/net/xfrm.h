@@ -353,7 +353,7 @@ extern int __xfrm_sk_clone_policy(struct sock *sk);
 static inline int xfrm_sk_clone_policy(struct sock *sk)
 {
 	if (unlikely(sk->policy[0] || sk->policy[1]))
-		return xfrm_sk_clone_policy(sk);
+		return __xfrm_sk_clone_policy(sk);
 	return 0;
 }
 
