@@ -56,11 +56,12 @@
  * FUNCTION:    acpi_ds_result_insert
  *
  * PARAMETERS:  Object              - Object to push
+ *              Index               - Where to insert the object
  *              walk_state          - Current Walk state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Push an object onto this walk's result stack
+ * DESCRIPTION: Insert an object onto this walk's result stack
  *
  ******************************************************************************/
 
@@ -114,6 +115,7 @@ acpi_ds_result_insert (
  * FUNCTION:    acpi_ds_result_remove
  *
  * PARAMETERS:  Object              - Where to return the popped object
+ *              Index               - Where to extract the object
  *              walk_state          - Current Walk state
  *
  * RETURN:      Status
@@ -233,6 +235,7 @@ acpi_ds_result_pop (
 	return (AE_AML_NO_RETURN_VALUE);
 }
 
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ds_result_pop_from_bottom
@@ -294,7 +297,6 @@ acpi_ds_result_pop_from_bottom (
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s], Results=%p State=%p\n",
 		*object, (*object) ? acpi_ut_get_object_type_name (*object) : "NULL",
 		state, walk_state));
-
 
 	return (AE_OK);
 }
@@ -358,8 +360,7 @@ acpi_ds_result_push (
  *
  * FUNCTION:    acpi_ds_result_stack_push
  *
- * PARAMETERS:  Object              - Object to push
- *              walk_state          - Current Walk state
+ * PARAMETERS:  walk_state          - Current Walk state
  *
  * RETURN:      Status
  *
@@ -419,7 +420,6 @@ acpi_ds_result_stack_pop (
 			walk_state));
 		return (AE_AML_NO_OPERAND);
 	}
-
 
 	state = acpi_ut_pop_generic_state (&walk_state->results);
 
@@ -572,6 +572,7 @@ acpi_ds_obj_stack_pop_object (
 }
 #endif
 
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ds_obj_stack_pop
@@ -640,6 +641,7 @@ acpi_ds_obj_stack_pop_and_delete (
 {
 	u32                             i;
 	union acpi_operand_object       *obj_desc;
+
 
 	ACPI_FUNCTION_NAME ("ds_obj_stack_pop_and_delete");
 
@@ -883,8 +885,15 @@ acpi_ds_create_walk_state (
  * FUNCTION:    acpi_ds_init_aml_walk
  *
  * PARAMETERS:  walk_state      - New state to be initialized
+ *              Op              - Current parse op
+ *              method_node     - Control method NS node, if any
+ *              aml_start       - Start of AML
+ *              aml_length      - Length of AML
+ *              Params          - Method args, if any
+ *              return_obj_desc - Where to store a return object, if any
+ *              pass_number     - 1, 2, or 3
  *
- * RETURN:      None
+ * RETURN:      Status
  *
  * DESCRIPTION: Initialize a walk state for a pass 1 or 2 parse tree walk
  *
@@ -927,9 +936,9 @@ acpi_ds_init_aml_walk (
 
 	if (method_node) {
 		walk_state->parser_state.start_node = method_node;
-		walk_state->walk_type               = ACPI_WALK_METHOD;
-		walk_state->method_node             = method_node;
-		walk_state->method_desc             = acpi_ns_get_attached_object (method_node);
+		walk_state->walk_type            = ACPI_WALK_METHOD;
+		walk_state->method_node          = method_node;
+		walk_state->method_desc          = acpi_ns_get_attached_object (method_node);
 
 		/* Push start scope on scope stack and make it current  */
 
@@ -956,6 +965,7 @@ acpi_ds_init_aml_walk (
 		while (extra_op && !extra_op->common.node) {
 			extra_op = extra_op->common.parent;
 		}
+
 		if (!extra_op) {
 			parser_state->start_node = NULL;
 		}
@@ -1014,7 +1024,7 @@ acpi_ds_delete_walk_state (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p walk still has a scope list\n", walk_state));
 	}
 
-   /* Always must free any linked control states */
+	/* Always must free any linked control states */
 
 	while (walk_state->control_state) {
 		state = walk_state->control_state;

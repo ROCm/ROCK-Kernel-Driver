@@ -234,7 +234,7 @@ acpi_ns_dump_one_object (
 
 		case ACPI_TYPE_DEVICE:
 
-			acpi_os_printf ("Notify object: %p", obj_desc);
+			acpi_os_printf ("Notify Object: %p\n", obj_desc);
 			break;
 
 
@@ -371,7 +371,7 @@ acpi_ns_dump_one_object (
 		case ACPI_TYPE_LOCAL_BANK_FIELD:
 		case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
-			acpi_os_printf (" Off %.2X Len %.2X Acc %.2hd\n",
+			acpi_os_printf ("Off %.2X Len %.2X Acc %.2hd\n",
 					(obj_desc->common_field.base_byte_offset * 8)
 						+ obj_desc->common_field.start_field_bit_offset,
 					obj_desc->common_field.bit_length,

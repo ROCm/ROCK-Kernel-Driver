@@ -248,6 +248,14 @@ acpi_ds_load1_begin_op (
 		 *       buffer_field, or Package), the name of the object is already
 		 *       in the namespace.
 		 */
+		if (walk_state->deferred_node) {
+			/* This name is already in the namespace, get the node */
+
+			node = walk_state->deferred_node;
+			status = AE_OK;
+			break;
+		}
+
 		flags = ACPI_NS_NO_UPSEARCH;
 		if ((walk_state->opcode != AML_SCOPE_OP) &&
 			(!(walk_state->parse_flags & ACPI_PARSE_DEFERRED_OP))) {
@@ -589,7 +597,17 @@ acpi_ds_load2_begin_op (
 		 * Enter the named type into the internal namespace.  We enter the name
 		 * as we go downward in the parse tree.  Any necessary subobjects that involve
 		 * arguments to the opcode must be created as we go back up the parse tree later.
+		 *
+		 * Note: Name may already exist if we are executing a deferred opcode.
 		 */
+		if (walk_state->deferred_node) {
+			/* This name is already in the namespace, get the node */
+
+			node = walk_state->deferred_node;
+			status = AE_OK;
+			break;
+		}
+
 		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
 				  ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
 		break;

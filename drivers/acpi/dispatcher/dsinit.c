@@ -135,7 +135,7 @@ acpi_ds_init_one_object (
 		}
 
 		/*
-		 * Always parse methods to detect errors, we may delete
+		 * Always parse methods to detect errors, we will delete
 		 * the parse tree below
 		 */
 		status = acpi_ds_parse_method (obj_handle);
@@ -150,7 +150,7 @@ acpi_ds_init_one_object (
 		}
 
 		/*
-		 * Delete the parse tree.  We simple re-parse the method
+		 * Delete the parse tree.  We simply re-parse the method
 		 * for every execution since there isn't much overhead
 		 */
 		acpi_ns_delete_namespace_subtree (obj_handle);

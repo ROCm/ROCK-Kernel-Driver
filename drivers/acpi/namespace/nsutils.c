@@ -175,6 +175,11 @@ acpi_ns_print_node_pathname (
 	acpi_status                     status;
 
 
+	if (!node) {
+		acpi_os_printf ("[NULL NAME]");
+		return;
+	}
+
 	/* Convert handle to a full pathname and print it (with supplied message) */
 
 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
@@ -470,11 +475,11 @@ acpi_ns_build_internal_name (
 	*result = 0;
 
 	if (info->fully_qualified) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "returning [%p] (abs) \"\\%s\"\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Returning [%p] (abs) \"\\%s\"\n",
 			internal_name, internal_name));
 	}
 	else {
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "returning [%p] (rel) \"%s\"\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Returning [%p] (rel) \"%s\"\n",
 			internal_name, internal_name));
 	}
 
