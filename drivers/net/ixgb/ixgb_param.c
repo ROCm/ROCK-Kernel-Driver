@@ -34,31 +34,21 @@
 
 #define IXGB_MAX_NIC 8
 
-#define OPTION_UNSET    -1
+#define OPTION_UNSET	-1
 #define OPTION_DISABLED 0
 #define OPTION_ENABLED  1
-
-/* Module Parameters are always initialized to -1, so that the driver
- * can tell the difference between no user specified value or the
- * user asking for the default value.
- * The true default values are loaded in when ixgb_check_options is called.
- *
- * This is a GCC extension to ANSI C.
- * See the item "Labeled Elements in Initializers" in the section
- * "Extensions to the C Language Family" of the GCC documentation.
- */
-
-#define IXGB_PARAM_INIT { [0 ... IXGB_MAX_NIC] = OPTION_UNSET }
 
 /* All parameters are treated the same, as an integer array of values.
  * This macro just reduces the need to repeat the same declaration code
  * over and over (plus this helps to avoid typo bugs).
  */
 
-#define IXGB_PARAM(X, S) \
-static const int __devinitdata X[IXGB_MAX_NIC + 1] = IXGB_PARAM_INIT; \
-MODULE_PARM(X, "1-" __MODULE_STRING(IXGB_MAX_NIC) "i"); \
-MODULE_PARM_DESC(X, S);
+#define IXGB_PARAM_INIT { [0 ... IXGB_MAX_NIC] = OPTION_UNSET }
+#define IXGB_PARAM(X, desc) \
+	static int __devinitdata X[IXGB_MAX_NIC+1] = IXGB_PARAM_INIT; \
+	static int num_##X = 0; \
+	module_param_array_named(X, X, int, &num_##X, 0); \
+	MODULE_PARM_DESC(X, desc);
 
 /* Transmit Descriptor Count
  *
@@ -290,8 +280,12 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 		};
 		struct ixgb_desc_ring *tx_ring = &adapter->tx_ring;
 
-		tx_ring->count = TxDescriptors[bd];
-		ixgb_validate_option(&tx_ring->count, &opt);
+		if(num_TxDescriptors > bd) {
+			tx_ring->count = TxDescriptors[bd];
+			ixgb_validate_option(&tx_ring->count, &opt);
+		} else {
+			tx_ring->count = opt.def;
+		}
 		IXGB_ROUNDUP(tx_ring->count, IXGB_REQ_TX_DESCRIPTOR_MULTIPLE);
 	}
 	{			/* Receive Descriptor Count */
@@ -305,8 +299,12 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 		};
 		struct ixgb_desc_ring *rx_ring = &adapter->rx_ring;
 
-		rx_ring->count = RxDescriptors[bd];
-		ixgb_validate_option(&rx_ring->count, &opt);
+		if(num_RxDescriptors > bd) {
+			rx_ring->count = RxDescriptors[bd];
+			ixgb_validate_option(&rx_ring->count, &opt);
+		} else {
+			rx_ring->count = opt.def;
+		}
 		IXGB_ROUNDUP(rx_ring->count, IXGB_REQ_RX_DESCRIPTOR_MULTIPLE);
 	}
 	{			/* Receive Checksum Offload Enable */
@@ -317,9 +315,13 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 			.def = OPTION_ENABLED
 		};
 
-		int rx_csum = XsumRX[bd];
-		ixgb_validate_option(&rx_csum, &opt);
-		adapter->rx_csum = rx_csum;
+		if(num_XsumRX > bd) {
+			int rx_csum = XsumRX[bd];
+			ixgb_validate_option(&rx_csum, &opt);
+			adapter->rx_csum = rx_csum;
+		} else {
+			adapter->rx_csum = opt.def;
+		}
 	}
 	{			/* Flow Control */
 
@@ -340,9 +342,13 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 				      .p = fc_list}}
 		};
 
-		int fc = FlowControl[bd];
-		ixgb_validate_option(&fc, &opt);
-		adapter->hw.fc.type = fc;
+		if(num_FlowControl > bd) {
+			int fc = FlowControl[bd];
+			ixgb_validate_option(&fc, &opt);
+			adapter->hw.fc.type = fc;
+		} else {
+			adapter->hw.fc.type = opt.def;
+		}
 	}
 	{			/* Receive Flow Control High Threshold */
 		struct ixgb_option opt = {
@@ -355,11 +361,15 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 				      .max = MAX_FCRTH}}
 		};
 
-		adapter->hw.fc.high_water = RxFCHighThresh[bd];
-		ixgb_validate_option(&adapter->hw.fc.high_water, &opt);
-		if (!(adapter->hw.fc.type & ixgb_fc_rx_pause))
-			printk(KERN_INFO
-			       "Ignoring RxFCHighThresh when no RxFC\n");
+		if(num_RxFCHighThresh > bd) {
+			adapter->hw.fc.high_water = RxFCHighThresh[bd];
+			ixgb_validate_option(&adapter->hw.fc.high_water, &opt);
+		} else {
+			adapter->hw.fc.high_water = opt.def;
+		}
+		if(!(adapter->hw.fc.type & ixgb_fc_rx_pause) )
+			printk (KERN_INFO 
+				"Ignoring RxFCHighThresh when no RxFC\n");
 	}
 	{			/* Receive Flow Control Low Threshold */
 		struct ixgb_option opt = {
@@ -372,11 +382,15 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 				      .max = MAX_FCRTL}}
 		};
 
-		adapter->hw.fc.low_water = RxFCLowThresh[bd];
-		ixgb_validate_option(&adapter->hw.fc.low_water, &opt);
-		if (!(adapter->hw.fc.type & ixgb_fc_rx_pause))
-			printk(KERN_INFO
-			       "Ignoring RxFCLowThresh when no RxFC\n");
+		if(num_RxFCLowThresh > bd) {
+			adapter->hw.fc.low_water = RxFCLowThresh[bd];
+			ixgb_validate_option(&adapter->hw.fc.low_water, &opt);
+		} else {
+			adapter->hw.fc.low_water = opt.def;
+		}
+		if(!(adapter->hw.fc.type & ixgb_fc_rx_pause) )
+			printk (KERN_INFO 
+				"Ignoring RxFCLowThresh when no RxFC\n");
 	}
 	{			/* Flow Control Pause Time Request */
 		struct ixgb_option opt = {
@@ -390,13 +404,16 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 				      .max = MAX_FCPAUSE}}
 		};
 
-		int pause_time = FCReqTimeout[bd];
-
-		ixgb_validate_option(&pause_time, &opt);
-		if (!(adapter->hw.fc.type & ixgb_fc_rx_pause))
-			printk(KERN_INFO
-			       "Ignoring FCReqTimeout when no RxFC\n");
-		adapter->hw.fc.pause_time = pause_time;
+		if(num_FCReqTimeout > bd) {
+			int pause_time = FCReqTimeout[bd];
+			ixgb_validate_option(&pause_time, &opt);
+			adapter->hw.fc.pause_time = pause_time;
+		} else {
+			adapter->hw.fc.pause_time = opt.def;
+		}
+		if(!(adapter->hw.fc.type & ixgb_fc_rx_pause) )
+			printk (KERN_INFO 
+				"Ignoring FCReqTimeout when no RxFC\n");
 	}
 	/* high low and spacing check for rx flow control thresholds */
 	if (adapter->hw.fc.type & ixgb_fc_rx_pause) {
@@ -421,8 +438,12 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 				      .max = MAX_RDTR}}
 		};
 
-		adapter->rx_int_delay = RxIntDelay[bd];
-		ixgb_validate_option(&adapter->rx_int_delay, &opt);
+		if(num_RxIntDelay > bd) {
+			adapter->rx_int_delay = RxIntDelay[bd];
+			ixgb_validate_option(&adapter->rx_int_delay, &opt);
+		} else {
+			adapter->rx_int_delay = opt.def;
+		}
 	}
 	{			/* Transmit Interrupt Delay */
 		struct ixgb_option opt = {
@@ -435,8 +456,12 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 				      .max = MAX_TIDV}}
 		};
 
-		adapter->tx_int_delay = TxIntDelay[bd];
-		ixgb_validate_option(&adapter->tx_int_delay, &opt);
+		if(num_TxIntDelay > bd) {
+			adapter->tx_int_delay = TxIntDelay[bd];
+			ixgb_validate_option(&adapter->tx_int_delay, &opt);
+		} else {
+			adapter->tx_int_delay = opt.def;
+		}
 	}
 
 	{			/* Transmit Interrupt Delay Enable */
@@ -446,9 +471,13 @@ void __devinit ixgb_check_options(struct ixgb_adapter *adapter)
 			.err = "defaulting to Enabled",
 			.def = OPTION_ENABLED
 		};
-		int ide = IntDelayEnable[bd];
 
-		ixgb_validate_option(&ide, &opt);
-		adapter->tx_int_delay_enable = ide;
+		if(num_IntDelayEnable > bd) {
+			int ide = IntDelayEnable[bd];
+			ixgb_validate_option(&ide, &opt);
+			adapter->tx_int_delay_enable = ide;
+		} else {
+			adapter->tx_int_delay_enable = opt.def;
+		}
 	}
 }
