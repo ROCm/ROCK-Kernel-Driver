@@ -293,7 +293,8 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 		goto bail_out_and_unlink;
 	}
 
-	acm_set_control(acm, acm->ctrlout = ACM_CTRL_DTR | ACM_CTRL_RTS);
+	if (0 > acm_set_control(acm, acm->ctrlout = ACM_CTRL_DTR | ACM_CTRL_RTS))
+		goto full_bailout;
 
 	/* force low_latency on so that our tty_push actually forces the data through, 
 	   otherwise it is scheduled, and with high data rates data can get lost. */
@@ -304,6 +305,8 @@ done:
 	up(&open_sem);
 	return 0;
 
+full_bailout:
+	usb_unlink_urb(acm->readurb);
 bail_out_and_unlink:
 	usb_unlink_urb(acm->ctrlurb);
 bail_out:
