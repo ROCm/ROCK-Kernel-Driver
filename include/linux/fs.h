@@ -525,9 +525,11 @@ struct file {
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
 
+#ifdef CONFIG_EPOLL
 	/* Used by fs/eventpoll.c to link all the hooks to this file */
 	struct list_head	f_ep_links;
 	spinlock_t		f_ep_lock;
+#endif /* #ifdef CONFIG_EPOLL */
 	struct address_space	*f_mapping;
 };
 extern spinlock_t files_lock;
