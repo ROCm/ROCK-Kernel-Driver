@@ -26,12 +26,12 @@
 
 static sector_t max_block(struct block_device *bdev)
 {
-	sector_t retval = ~0U;
+	sector_t retval = ~((sector_t)0);
 	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		sector_t size = block_size(bdev);
-		unsigned sizebits = blksize_bits(size);
+		unsigned int size = block_size(bdev);
+		unsigned int sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
 	return retval;

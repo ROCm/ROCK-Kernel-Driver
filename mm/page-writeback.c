@@ -136,6 +136,7 @@ void balance_dirty_pages(struct address_space *mapping)
 	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
 		pdflush_operation(background_writeout, 0);
 }
+EXPORT_SYMBOL_GPL(balance_dirty_pages);
 
 /**
  * balance_dirty_pages_ratelimited - balance dirty memory state

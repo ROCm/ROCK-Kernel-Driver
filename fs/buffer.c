@@ -180,7 +180,10 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
-		buffer_io_error(bh);
+		/*
+		 * This happens, due to failed READA attempts.
+		 * buffer_io_error(bh);
+		 */
 		clear_buffer_uptodate(bh);
 	}
 	unlock_buffer(bh);
@@ -2307,7 +2310,13 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 		return -EIO;
 	}
 
-	/* The page straddles i_size */
+	/*
+	 * The page straddles i_size.  It must be zeroed out on each and every
+	 * writepage invokation because it may be mmapped.  "A file is mapped
+	 * in multiples of the page size.  For a file that is not a multiple of
+	 * the  page size, the remaining memory is zeroed when mapped, and
+	 * writes to that region are not written out to the file."
+	 */
 	kaddr = kmap(page);
 	memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
 	flush_dcache_page(page);

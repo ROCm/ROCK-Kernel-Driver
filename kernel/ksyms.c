@@ -344,7 +344,7 @@ EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(wipe_partitions);
-EXPORT_SYMBOL(generic_file_direct_IO);
+EXPORT_SYMBOL_GPL(generic_file_direct_IO);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);

@@ -698,6 +698,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 			printk(KERN_ERR "EXT2-fs: get root inode failed\n");
 		goto failed_mount2;
 	}
+	if (EXT2_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_HAS_JOURNAL))
+		ext2_warning(sb, __FUNCTION__,
+			"mounting ext3 filesystem as ext2\n");
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);
 	return 0;
 failed_mount2:

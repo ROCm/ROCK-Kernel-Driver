@@ -209,11 +209,6 @@ int copy_strings(int argc,char ** argv, struct linux_binprm *bprm)
 		/* XXX: add architecture specific overflow check here. */ 
 		pos = bprm->p;
 
-		/*
-		 * The only sleeping function which we are allowed to call in
-		 * this loop is copy_from_user().  Otherwise, copy_user_state
-		 * could get trashed.
-		 */
 		while (len > 0) {
 			int i, new, err;
 			int offset, bytes_to_copy;
