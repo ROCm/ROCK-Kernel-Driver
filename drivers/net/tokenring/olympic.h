@@ -79,6 +79,7 @@
 #define EISR 0x34
 #define EISR_RWM 0x38
 #define EISR_MASK 0x3c
+#define EISR_MASK_OPTIONS 0x001FFF7F
 
 #define LAPA 0x60
 #define LAPWWO 0x64
