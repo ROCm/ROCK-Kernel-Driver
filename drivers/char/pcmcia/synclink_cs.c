@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/pcmcia/synclink_cs.c
  *
- * $Id: synclink_cs.c,v 4.10 2003/05/13 16:06:03 paulkf Exp $
+ * $Id: synclink_cs.c,v 4.13 2003/06/18 15:29:32 paulkf Exp $
  *
  * Device driver for Microgate SyncLink PC Card
  * multiprotocol serial adapter.
@@ -467,7 +467,6 @@ static int break_on_load=0;
  * assigned major number. May be forced as module parameter.
  */
 static int ttymajor=0;
-static int cuamajor=0;
 
 static int debug_level = 0;
 static int maxframe[MAX_DEVICE_COUNT] = {0,};
@@ -485,7 +484,6 @@ MODULE_PARM(irq_list, "1-4i");
 
 MODULE_PARM(break_on_load,"i");
 MODULE_PARM(ttymajor,"i");
-MODULE_PARM(cuamajor,"i");
 MODULE_PARM(debug_level,"i");
 MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_DEVICE_COUNT) "i");
 MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICE_COUNT) "i");
@@ -493,7 +491,7 @@ MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICE_COUNT) "i");
 MODULE_LICENSE("GPL");
 
 static char *driver_name = "SyncLink PC Card driver";
-static char *driver_version = "$Revision: 4.10 $";
+static char *driver_version = "$Revision: 4.13 $";
 
 static struct tty_driver *serial_driver;
 
@@ -1290,7 +1288,7 @@ void dcd_change(MGSLPC_INFO *info)
 			       (info->serial_signals & SerialSignal_DCD) ? "on" : "off");
 		if (info->serial_signals & SerialSignal_DCD)
 			wake_up_interruptible(&info->open_wait);
-		else if (!(info->flags & ASYNC_CALLOUT_NOHUP)) {
+		else {
 			if (debug_level >= DEBUG_LEVEL_ISR)
 				printk("doing serial hangup...");
 			if (info->tty)
@@ -2538,14 +2536,17 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 {
 	MGSLPC_INFO * info = (MGSLPC_INFO *)tty->driver_data;
 
-	if (!info || mgslpc_paranoia_check(info, tty->name, "mgslpc_close"))
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_close"))
 		return;
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_close(%s) entry, count=%d\n",
 			 __FILE__,__LINE__, info->device_name, info->count);
 			 
-	if (!info->count || tty_hung_up_p(filp))
+	if (!info->count)
+		return;
+
+	if (tty_hung_up_p(filp))
 		goto cleanup;
 			
 	if ((tty->count == 1) && (info->count != 1)) {
@@ -2822,16 +2823,11 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 	info = mgslpc_device_list;
 	while(info && info->line != line)
 		info = info->next_device;
-	if ( !info ){
-		printk("%s(%d):Can't find specified device on open (line=%d)\n",
-			__FILE__,__LINE__,line);
+	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_open"))
 		return -ENODEV;
-	}
 	
 	tty->driver_data = info;
 	info->tty = tty;
-	if (mgslpc_paranoia_check(info, tty->name, "mgslpc_open"))
-		return -ENODEV;
 		
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_open(%s), old ref count = %d\n",
@@ -2879,6 +2875,8 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 	
 cleanup:			
 	if (retval) {
+		if (tty->count == 1)
+			info->tty = 0; /* tty layer will release tty struct */
 		if(info->count)
 			info->count--;
 	}
