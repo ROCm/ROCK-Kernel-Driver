@@ -493,7 +493,6 @@ static inline int __try_stop_module(void *_sref)
 	}
 
 	/* Mark it as dying. */
-	sref->mod->waiter = current;
 	sref->mod->state = MODULE_STATE_GOING;
 	return 0;
 }
@@ -587,6 +586,9 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 			goto out;
 		}
 	}
+
+	/* Set this up before setting mod->state */
+	mod->waiter = current;
 
 	/* Stop the machine so refcounts can't move and disable module. */
 	ret = try_stop_module(mod, flags, &forced);
