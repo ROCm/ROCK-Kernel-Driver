@@ -1086,7 +1086,7 @@ void __init mp_parse_prt (void)
 
 	/*
 	 * Parsing through the PCI Interrupt Routing Table (PRT) and program
-	 * routing for all static (IOAPIC-direct) entries.
+	 * routing for all entries.
 	 */
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
@@ -1100,6 +1100,10 @@ void __init mp_parse_prt (void)
 		else
 			irq = entry->link.index;
 
+		/* Don't set up the ACPI SCI because it's already set up */
+		if (acpi_fadt.sci_int == irq)
+			continue;
+	
 		ioapic = mp_find_ioapic(irq);
 		if (ioapic < 0)
 			continue;
