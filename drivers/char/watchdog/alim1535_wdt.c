@@ -138,7 +138,7 @@ static int ali_settimer(int t)
  *	the next close to turn off the watchdog.
  */
 
-static ssize_t ali_write(struct file *file, const char *data,
+static ssize_t ali_write(struct file *file, const char __user *data,
 			      size_t len, loff_t * ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
@@ -184,6 +184,8 @@ static ssize_t ali_write(struct file *file, const char *data,
 static int ali_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident = {
 		.options =		WDIOF_KEEPALIVEPING |
 					WDIOF_SETTIMEOUT |
@@ -194,12 +196,12 @@ static int ali_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 		case WDIOC_GETSUPPORT:
-			return copy_to_user((struct watchdog_info *) arg, &ident,
+			return copy_to_user(argp, &ident,
 				sizeof (ident)) ? -EFAULT : 0;
 
 		case WDIOC_GETSTATUS:
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(0, (int *) arg);
+			return put_user(0, p);
 
 		case WDIOC_KEEPALIVE:
 			ali_keepalive();
@@ -209,7 +211,7 @@ static int ali_ioctl(struct inode *inode, struct file *file,
 		{
 			int new_options, retval = -EINVAL;
 
-			if (get_user (new_options, (int *) arg))
+			if (get_user (new_options, p))
 				return -EFAULT;
 
 			if (new_options & WDIOS_DISABLECARD) {
@@ -229,7 +231,7 @@ static int ali_ioctl(struct inode *inode, struct file *file,
 		{
 			int new_timeout;
 
-			if (get_user(new_timeout, (int *) arg))
+			if (get_user(new_timeout, p))
 				return -EFAULT;
 
 			if (ali_settimer(new_timeout))
@@ -240,7 +242,7 @@ static int ali_ioctl(struct inode *inode, struct file *file,
 		}
 
 		case WDIOC_GETTIMEOUT:
-			return put_user(timeout, (int *)arg);
+			return put_user(timeout, p);
 
 		default:
 			return -ENOIOCTLCMD;

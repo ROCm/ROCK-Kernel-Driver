@@ -286,7 +286,7 @@ static irqreturn_t wdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  *	write of data will do, as we we don't define content meaning.
  */
 
-static ssize_t wdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -327,6 +327,8 @@ static ssize_t wdt_write(struct file *file, const char *buf, size_t count, loff_
 static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	int new_heartbeat;
 	int status;
 
@@ -351,18 +353,18 @@ static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		default:
 			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
-			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
+			return copy_to_user(argp, &ident, sizeof(ident))?-EFAULT:0;
 
 		case WDIOC_GETSTATUS:
 			wdt_get_status(&status);
-			return put_user(status,(int *)arg);
+			return put_user(status, p);
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(0, (int *)arg);
+			return put_user(0, p);
 		case WDIOC_KEEPALIVE:
 			wdt_ping();
 			return 0;
 		case WDIOC_SETTIMEOUT:
-			if (get_user(new_heartbeat, (int *)arg))
+			if (get_user(new_heartbeat, p))
 				return -EFAULT;
 
 			if (wdt_set_heartbeat(new_heartbeat))
@@ -371,7 +373,7 @@ static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			wdt_ping();
 			/* Fall */
 		case WDIOC_GETTIMEOUT:
-			return put_user(heartbeat, (int *)arg);
+			return put_user(heartbeat, p);
 	}
 }
 
@@ -435,7 +437,7 @@ static int wdt_release(struct inode *inode, struct file *file)
  *	farenheit. It was designed by an imperial measurement luddite.
  */
 
-static ssize_t wdt_temp_read(struct file *file, char *buf, size_t count, loff_t *ptr)
+static ssize_t wdt_temp_read(struct file *file, char __user *buf, size_t count, loff_t *ptr)
 {
 	int temperature;
 

@@ -258,7 +258,7 @@ static int pcipcwd_get_temperature(int *temperature)
  *	/dev/watchdog handling
  */
 
-static ssize_t pcipcwd_write(struct file *file, const char *data,
+static ssize_t pcipcwd_write(struct file *file, const char __user *data,
 			      size_t len, loff_t *ppos)
 {
 	/* Can't seek (pwrite) on this device  */
@@ -293,6 +293,8 @@ static ssize_t pcipcwd_write(struct file *file, const char *data,
 static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident = {
 		.options =		WDIOF_OVERHEAT |
 					WDIOF_CARDRESET |
@@ -305,7 +307,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 		case WDIOC_GETSUPPORT:
-			return copy_to_user((struct watchdog_info *) arg, &ident,
+			return copy_to_user(argp, &ident,
 				sizeof (ident)) ? -EFAULT : 0;
 
 		case WDIOC_GETSTATUS:
@@ -314,11 +316,11 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 
 			pcipcwd_get_status(&status);
 
-			return put_user(status, (int *) arg);
+			return put_user(status, p);
 		}
 
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(pcipcwd_private.boot_status, (int *) arg);
+			return put_user(pcipcwd_private.boot_status, p);
 
 		case WDIOC_GETTEMP:
 		{
@@ -327,7 +329,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 			if (pcipcwd_get_temperature(&temperature))
 				return -EFAULT;
 
-			return put_user(temperature, (int *) arg);
+			return put_user(temperature, p);
 		}
 
 		case WDIOC_KEEPALIVE:
@@ -338,7 +340,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 		{
 			int new_options, retval = -EINVAL;
 
-			if (get_user (new_options, (int *) arg))
+			if (get_user (new_options, p))
 				return -EFAULT;
 
 			if (new_options & WDIOS_DISABLECARD) {
@@ -363,7 +365,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 		{
 			int new_heartbeat;
 
-			if (get_user(new_heartbeat, (int *) arg))
+			if (get_user(new_heartbeat, p))
 				return -EFAULT;
 
 			if (pcipcwd_set_heartbeat(new_heartbeat))
@@ -374,7 +376,7 @@ static int pcipcwd_ioctl(struct inode *inode, struct file *file,
 		}
 
 		case WDIOC_GETTIMEOUT:
-			return put_user(heartbeat, (int *)arg);
+			return put_user(heartbeat, p);
 
 		default:
 			return -ENOIOCTLCMD;
@@ -413,7 +415,7 @@ static int pcipcwd_release(struct inode *inode, struct file *file)
  *	/dev/temperature handling
  */
 
-static ssize_t pcipcwd_temp_read(struct file *file, char *data,
+static ssize_t pcipcwd_temp_read(struct file *file, char __user *data,
 				size_t len, loff_t *ppos)
 {
 	int temperature;

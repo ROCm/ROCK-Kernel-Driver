@@ -196,8 +196,8 @@ static void eurwdt_ping(void)
  * write of data will do, as we we don't define content meaning.
  */
 
-static ssize_t eurwdt_write(struct file *file, const char *buf, size_t count,
-loff_t *ppos)
+static ssize_t eurwdt_write(struct file *file, const char __user *buf,
+size_t count, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -237,6 +237,8 @@ loff_t *ppos)
 static int eurwdt_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident = {
 		.options	  = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
@@ -251,19 +253,18 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
-		return copy_to_user((struct watchdog_info *)arg, &ident,
-			sizeof(ident)) ? -EFAULT : 0;
+		return copy_to_user(argp, &ident, sizeof(ident)) ? -EFAULT : 0;
 
 	case WDIOC_GETSTATUS:
 	case WDIOC_GETBOOTSTATUS:
-		return put_user(0, (int *) arg);
+		return put_user(0, p);
 
 	case WDIOC_KEEPALIVE:
 		eurwdt_ping();
 		return 0;
 
 	case WDIOC_SETTIMEOUT:
-		if (copy_from_user(&time, (int *) arg, sizeof(int)))
+		if (copy_from_user(&time, p, sizeof(int)))
 			return -EFAULT;
 
 		/* Sanity check */
@@ -275,10 +276,10 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 		/* Fall */
 
 	case WDIOC_GETTIMEOUT:
-		return put_user(eurwdt_timeout, (int *)arg);
+		return put_user(eurwdt_timeout, p);
 
 	case WDIOC_SETOPTIONS:
-		if (get_user(options, (int *)arg))
+		if (get_user(options, p))
 			return -EFAULT;
 		if (options & WDIOS_DISABLECARD) {
 			eurwdt_disable_timer();

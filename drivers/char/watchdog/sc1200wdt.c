@@ -174,6 +174,8 @@ static int sc1200wdt_open(struct inode *inode, struct file *file)
 static int sc1200wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int new_timeout;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 0,
@@ -185,22 +187,22 @@ static int sc1200wdt_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -ENOIOCTLCMD;	/* Keep Pavel Machek amused ;) */
 
 		case WDIOC_GETSUPPORT:
-			if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof ident))
+			if (copy_to_user(argp, &ident, sizeof ident))
 				return -EFAULT;
 			return 0;
 
 		case WDIOC_GETSTATUS:
-			return put_user(sc1200wdt_status(), (int *)arg);
+			return put_user(sc1200wdt_status(), p);
 
 		case WDIOC_GETBOOTSTATUS:
-			return put_user(0, (int *)arg);
+			return put_user(0, p);
 
 		case WDIOC_KEEPALIVE:
 			sc1200wdt_write_data(WDTO, timeout);
 			return 0;
 
 		case WDIOC_SETTIMEOUT:
-			if (get_user(new_timeout, (int *)arg))
+			if (get_user(new_timeout, p))
 				return -EFAULT;
 
 			/* the API states this is given in secs */
@@ -213,13 +215,13 @@ static int sc1200wdt_ioctl(struct inode *inode, struct file *file, unsigned int 
 			/* fall through and return the new timeout */
 
 		case WDIOC_GETTIMEOUT:
-			return put_user(timeout * 60, (int *)arg);
+			return put_user(timeout * 60, p);
 
 		case WDIOC_SETOPTIONS:
 		{
 			int options, retval = -EINVAL;
 
-			if (get_user(options, (int *)arg))
+			if (get_user(options, p))
 				return -EFAULT;
 
 			if (options & WDIOS_DISABLECARD) {
@@ -254,7 +256,7 @@ static int sc1200wdt_release(struct inode *inode, struct file *file)
 }
 
 
-static ssize_t sc1200wdt_write(struct file *file, const char *data, size_t len, loff_t *ppos)
+static ssize_t sc1200wdt_write(struct file *file, const char __user *data, size_t len, loff_t *ppos)
 {
 	if (ppos != &file->f_pos)
 		return -ESPIPE;

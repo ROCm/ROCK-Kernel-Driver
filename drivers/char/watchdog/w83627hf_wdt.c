@@ -142,7 +142,7 @@ wdt_set_heartbeat(int t)
 }
 
 static ssize_t
-wdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -171,6 +171,8 @@ static int
 wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	int new_timeout;
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
@@ -180,20 +182,20 @@ wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case WDIOC_GETSUPPORT:
-	  if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)))
+	  if (copy_to_user(argp, &ident, sizeof(ident)))
 	    return -EFAULT;
 	  break;
 
 	case WDIOC_GETSTATUS:
 	case WDIOC_GETBOOTSTATUS:
-	  return put_user(0, (int *)arg);
+	  return put_user(0, p);
 
 	case WDIOC_KEEPALIVE:
 	  wdt_ping();
 	  break;
 
 	case WDIOC_SETTIMEOUT:
-	  if (get_user(new_timeout, (int *)arg))
+	  if (get_user(new_timeout, p))
 		  return -EFAULT;
 	  if (wdt_set_heartbeat(new_timeout))
 		  return -EINVAL;
@@ -201,13 +203,13 @@ wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  /* Fall */
 
 	case WDIOC_GETTIMEOUT:
-	  return put_user(timeout, (int *)arg);
+	  return put_user(timeout, p);
 
 	case WDIOC_SETOPTIONS:
 	{
 	  int options, retval = -EINVAL;
 
-	  if (get_user(options, (int *)arg))
+	  if (get_user(options, p))
 	    return -EFAULT;
 
 	  if (options & WDIOS_DISABLECARD) {

@@ -145,6 +145,7 @@ static int cpu5wdt_release(struct inode *inode, struct file *file)
 
 static int cpu5wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
 	unsigned int value;
 	static struct watchdog_info ident =
 	{
@@ -159,15 +160,15 @@ static int cpu5wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		case WDIOC_GETSTATUS:
 			value = inb(port + CPU5WDT_STATUS_REG);
 			value = (value >> 2) & 1;
-			if ( copy_to_user((int *)arg, (int *)&value, sizeof(int)) )
+			if ( copy_to_user(argp, &value, sizeof(int)) )
 				return -EFAULT;
 			break;
 		case WDIOC_GETSUPPORT:
-			if ( copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)) )
+			if ( copy_to_user(argp, &ident, sizeof(ident)) )
 				return -EFAULT;
 			break;
 		case WDIOC_SETOPTIONS:
-			if ( copy_from_user(&value, (int *)arg, sizeof(int)) )
+			if ( copy_from_user(&value, argp, sizeof(int)) )
 				return -EFAULT;
 			switch(value) {
 				case WDIOS_ENABLECARD:
@@ -185,7 +186,7 @@ static int cpu5wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	return 0;
 }
 
-static ssize_t cpu5wdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t cpu5wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	if ( !count )
 		return -EIO;

@@ -139,7 +139,7 @@ ibwdt_ping(void)
 }
 
 static ssize_t
-ibwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+ibwdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -170,6 +170,8 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  unsigned long arg)
 {
 	int i, new_margin;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
@@ -179,19 +181,19 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case WDIOC_GETSUPPORT:
-	  if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)))
+	  if (copy_to_user(argp, &ident, sizeof(ident)))
 	    return -EFAULT;
 	  break;
 
 	case WDIOC_GETSTATUS:
-	  return put_user(0, (int *) arg);
+	  return put_user(0, p);
 
 	case WDIOC_KEEPALIVE:
 	  ibwdt_ping();
 	  break;
 
 	case WDIOC_SETTIMEOUT:
-	  if (get_user(new_margin, (int *)arg))
+	  if (get_user(new_margin, p))
 		  return -EFAULT;
 	  if ((new_margin < 0) || (new_margin > 30))
 		  return -EINVAL;
@@ -203,7 +205,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  /* Fall */
 
 	case WDIOC_GETTIMEOUT:
-	  return put_user(wd_times[wd_margin], (int *)arg);
+	  return put_user(wd_times[wd_margin], p);
 	  break;
 
 	default:

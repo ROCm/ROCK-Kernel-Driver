@@ -111,7 +111,7 @@ static void acq_stop(void)
  *	/dev/watchdog handling.
  */
 
-static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+static ssize_t acq_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
@@ -146,6 +146,8 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
 	int options, retval = -EINVAL;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	static struct watchdog_info ident =
 	{
 		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
@@ -156,22 +158,22 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	switch(cmd)
 	{
 	case WDIOC_GETSUPPORT:
-	  return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident)) ? -EFAULT : 0;
+	  return copy_to_user(argp, &ident, sizeof(ident)) ? -EFAULT : 0;
 
 	case WDIOC_GETSTATUS:
 	case WDIOC_GETBOOTSTATUS:
-	  return put_user(0, (int *)arg);
+	  return put_user(0, p);
 
 	case WDIOC_KEEPALIVE:
 	  acq_keepalive();
 	  return 0;
 
 	case WDIOC_GETTIMEOUT:
-	  return put_user(WATCHDOG_HEARTBEAT, (int *)arg);
+	  return put_user(WATCHDOG_HEARTBEAT, p);
 
 	case WDIOC_SETOPTIONS:
 	{
-	    if (get_user(options, (int *)arg))
+	    if (get_user(options, p))
 	      return -EFAULT;
 
 	    if (options & WDIOS_DISABLECARD)
