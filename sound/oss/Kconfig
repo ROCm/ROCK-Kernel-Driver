@@ -113,15 +113,17 @@ config SOUND_EMU10K1
 	  Say Y or M if you have a PCI sound card using the EMU10K1 chipset,
 	  such as the Creative SBLive!, SB PCI512 or Emu-APS.
 
-	  For more information on this driver and the degree of support for the
-	  different card models please check <http://opensource.creative.com/>.
+	  For more information on this driver and the degree of support for
+	  the different card models please check:
+
+	        <http://sourceforge.net/projects/emu10k1/>
 
 	  It is now possible to load dsp microcode patches into the EMU10K1
 	  chip.  These patches are used to implement real time sound
 	  processing effects which include for example: signal routing,
 	  bass/treble control, AC3 passthrough, ...
 	  Userspace tools to create new patches and load/unload them can be
-	  found at <http://opensource.creative.com/dist.html>.
+	  found in the emu-tools package at the above URL.
 
 config MIDI_EMU10K1
 	bool "Creative SBLive! MIDI (EXPERIMENTAL)"
