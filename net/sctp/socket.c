@@ -102,8 +102,6 @@ static void sctp_sock_migrate(struct sock *, struct sock *,
 static char *sctp_hmac_alg = SCTP_COOKIE_HMAC_ALG;
 
 extern kmem_cache_t *sctp_bucket_cachep;
-
-
 extern int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc);
 
 /* Look up the association by its id.  If this is not a UDP-style
@@ -1620,7 +1618,7 @@ static int sctp_setsockopt_nodelay(struct sock *sk, char *optval,
 	sctp_sk(sk)->nodelay = (val == 0) ? 0 : 1;
 	return 0;
 }
-		
+
 /*
  *
  * 7.1.1 SCTP_RTOINFO
@@ -1705,10 +1703,10 @@ static int sctp_setsockopt_assocrtx(struct sock *sk, char *optval,
 		if (assocparams.sasoc_asocmaxrxt != 0)
 			asoc->max_retrans = assocparams.sasoc_asocmaxrxt;
 		if (assocparams.sasoc_cookie_life != 0) {
-			asoc->cookie_life.tv_sec = 
+			asoc->cookie_life.tv_sec =
 					assocparams.sasoc_cookie_life / 1000;
-			asoc->cookie_life.tv_usec = 
-					(assocparams.sasoc_cookie_life % 1000) 
+			asoc->cookie_life.tv_usec =
+					(assocparams.sasoc_cookie_life % 1000)
 					* 1000;
 		}
 	} else {
@@ -1716,9 +1714,9 @@ static int sctp_setsockopt_assocrtx(struct sock *sk, char *optval,
 		struct sctp_opt *sp = sctp_sk(sk);
 
 		if (assocparams.sasoc_asocmaxrxt != 0)
-			sp->assocparams.sasoc_asocmaxrxt = 
+			sp->assocparams.sasoc_asocmaxrxt =
 						assocparams.sasoc_asocmaxrxt;
-		if (assocparams.sasoc_cookie_life != 0) 
+		if (assocparams.sasoc_cookie_life != 0)
 			sp->assocparams.sasoc_cookie_life =
 						assocparams.sasoc_cookie_life;
 	}
@@ -2151,7 +2149,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->assocparams.sasoc_number_peer_destinations = 0;
 	sp->assocparams.sasoc_peer_rwnd = 0;
 	sp->assocparams.sasoc_local_rwnd = 0;
-	sp->assocparams.sasoc_cookie_life = (sctp_valid_cookie_life / HZ) 
+	sp->assocparams.sasoc_cookie_life = (sctp_valid_cookie_life / HZ)
 					* 1000;
 
 	/* Initialize default event subscriptions.
@@ -3197,7 +3195,6 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	snum = addr->v4.sin_port;
 
 	SCTP_DEBUG_PRINTK("sctp_get_port() begins, snum=%d\n", snum);
-
 	sctp_local_bh_disable();
 
 	if (snum == 0) {
@@ -3244,7 +3241,6 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * mutex.
 		 */
 		snum = rover;
-		pp = NULL;
 	} else {
 		/* We are given an specific port number; we verify
 		 * that it is not being used. If it is used, we will
@@ -3256,23 +3252,23 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		sctp_spin_lock(&head->lock);
 		for (pp = head->chain; pp; pp = pp->next) {
 			if (pp->port == snum)
-				break;
+				goto pp_found;
 		}
 	}
-
-
-	if (pp && !hlist_empty(&pp->sk_list)) {
+	pp = NULL;
+	goto pp_not_found;
+pp_found:
+	if (!hlist_empty(&pp->owner)) {
 		/* We had a port hash table hit - there is an
 		 * available port (pp != NULL) and it is being
-		 * used by other socket (pp->sk_list not empty); that other
+		 * used by other socket (pp->owner not empty); that other
 		 * socket is going to be sk2.
 		 */
 		int reuse = sk->sk_reuse;
 		struct sock *sk2;
 		struct hlist_node *node;
 
-		SCTP_DEBUG_PRINTK("sctp_get_port() found a "
-				  "possible match\n");
+		SCTP_DEBUG_PRINTK("sctp_get_port() found a possible match\n");
 		if (pp->fastreuse && sk->sk_reuse)
 			goto success;
 
@@ -3286,7 +3282,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * that this port/socket (sk) combination are already
 		 * in an endpoint.
 		 */
-		sk_for_each_bound(sk2, node, &pp->sk_list) {
+		sk_for_each_bound(sk2, node, &pp->owner) {
 			struct sctp_endpoint *ep2;
 			ep2 = sctp_sk(sk2)->ep;
 
@@ -3301,10 +3297,9 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		}
 		SCTP_DEBUG_PRINTK("sctp_get_port(): Found a match\n");
 	}
-
+pp_not_found:
 	/* If there was a hash table miss, create a new port.  */
 	ret = 1;
-
 	if (!pp && !(pp = sctp_bucket_create(head, snum)))
 		goto fail_unlock;
 
@@ -3312,7 +3307,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	 * if sk->sk_reuse is too (that is, if the caller requested
 	 * SO_REUSEADDR on this socket -sk-).
 	 */
-	if (hlist_empty(&pp->sk_list))
+	if (hlist_empty(&pp->owner))
 		pp->fastreuse = sk->sk_reuse ? 1 : 0;
 	else if (pp->fastreuse && !sk->sk_reuse)
 		pp->fastreuse = 0;
@@ -3324,7 +3319,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 success:
 	inet_sk(sk)->num = snum;
 	if (!sctp_sk(sk)->bind_hash) {
-		sk_add_bind_node(sk, &pp->sk_list);
+		sk_add_bind_node(sk, &pp->owner);
 		sctp_sk(sk)->bind_hash = pp;
 	}
 	ret = 0;
@@ -3334,8 +3329,6 @@ fail_unlock:
 
 fail:
 	sctp_local_bh_enable();
-
-	SCTP_DEBUG_PRINTK("sctp_get_port() ends, ret=%d\n", ret);
 	addr->v4.sin_port = htons(addr->v4.sin_port);
 	return ret;
 }
@@ -3561,7 +3554,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 	if (pp) {
 		pp->port = snum;
 		pp->fastreuse = 0;
-		INIT_HLIST_HEAD(&pp->sk_list);
+		INIT_HLIST_HEAD(&pp->owner);
 		if ((pp->next = head->chain) != NULL)
 			pp->next->pprev = &pp->next;
 		head->chain = pp;
@@ -3573,7 +3566,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 /* Caller must hold hashbucket lock for this tb with local BH disabled */
 static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 {
-	if (hlist_empty(&pp->sk_list)) {
+	if (hlist_empty(&pp->owner)) {
 		if (pp->next)
 			pp->next->pprev = pp->pprev;
 		*(pp->pprev) = pp->next;
@@ -3582,8 +3575,8 @@ static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 	}
 }
 
-/* FIXME: Comments! */
-static __inline__ void __sctp_put_port(struct sock *sk)
+/* Release this socket's reference to a local port.  */
+static inline void __sctp_put_port(struct sock *sk)
 {
 	struct sctp_bind_hashbucket *head =
 		&sctp_port_hashtable[sctp_phashfn(inet_sk(sk)->num)];
@@ -4187,6 +4180,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 {
 	struct sctp_opt *oldsp = sctp_sk(oldsk);
 	struct sctp_opt *newsp = sctp_sk(newsk);
+	struct sctp_bind_bucket *pp; /* hash list port iterator */
 	struct sctp_endpoint *newep = newsp->ep;
 	struct sk_buff *skb, *tmp;
 	struct sctp_ulpevent *event;
@@ -4196,13 +4190,20 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 */
 	newsk->sk_sndbuf = oldsk->sk_sndbuf;
 	newsk->sk_rcvbuf = oldsk->sk_rcvbuf;
-	*newsp = *oldsp;
+	/* Brute force copy old sctp opt. */
+	memcpy(newsp, oldsp, sizeof(struct sctp_opt));
 
 	/* Restore the ep value that was overwritten with the above structure
 	 * copy.
 	 */
 	newsp->ep = newep;
 	newsp->hmac = NULL;
+
+	/* Hook this new socket in to the bind_hash list. */
+	pp = sctp_sk(oldsk)->bind_hash;
+	sk_add_bind_node(newsk, &pp->owner);
+	sctp_sk(newsk)->bind_hash = pp;
+	inet_sk(newsk)->num = inet_sk(oldsk)->num;
 
 	/* Move any messages in the old socket's receive queue that are for the
 	 * peeled off association to the new socket's receive queue.

@@ -99,7 +99,7 @@ struct sctp_bind_bucket {
 	unsigned short	fastreuse;
 	struct sctp_bind_bucket *next;
 	struct sctp_bind_bucket **pprev;
-	struct hlist_head	sk_list;
+	struct hlist_head	owner;
 };
 
 struct sctp_bind_hashbucket {
