@@ -2762,27 +2762,23 @@ ctc_init_netdevice(struct net_device * dev, int alloc_device,
 }
 
 static ssize_t
-ctc_proto_show(struct device *dev, char *buf, size_t count, loff_t off)
+ctc_proto_show(struct device *dev, char *buf)
 {
 	struct ctc_priv *priv;
 
-	if (off)
-		return 0;
 	priv = dev->driver_data;
 	if (!priv)
 		return -ENODEV;
 
-	return snprintf(buf, count, "%d\n", priv->protocol);
+	return sprintf(buf, "%d\n", priv->protocol);
 }
 
 static ssize_t
-ctc_proto_store(struct device *dev, const char *buf, size_t count, loff_t off)
+ctc_proto_store(struct device *dev, const char *buf, size_t count)
 {
 	struct ctc_priv *priv;
 	int value;
 
-	if (off)
-		return 0;
 	priv = dev->driver_data;
 	if (!priv)
 		return -ENODEV;
