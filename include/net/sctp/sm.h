@@ -206,9 +206,6 @@ sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *,
 					sctp_chunk_t *,
 					const int priority);
 __u32 sctp_generate_verification_tag(void);
-sctpParam_t sctp_get_my_addrs_raw(const sctp_association_t *,
-				  const int priority, int *addrs_len);
-
 void sctp_populate_tie_tags(__u8 *cookie, __u32 curTag, __u32 hisTag);
 
 /* Prototypes for chunk-building functions.  */
@@ -336,7 +333,7 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *);
 /* 4th level prototypes */
 void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *,
 			 __u16 port);
-int sctp_addr2sockaddr(const sctpParam_t, sockaddr_storage_t *);
+int sctp_addr2sockaddr(const union sctp_params, sockaddr_storage_t *);
 int sockaddr2sctp_addr(const sockaddr_storage_t *, sctp_addr_param_t *);
 
 /* Extern declarations for major data structures.  */
