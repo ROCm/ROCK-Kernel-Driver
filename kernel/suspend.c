@@ -36,7 +36,6 @@
 
 #include <linux/module.h>
 #include <linux/mm.h>
-#include <linux/swapctl.h>
 #include <linux/suspend.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
