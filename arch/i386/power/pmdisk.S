@@ -1,5 +1,3 @@
-.text
-
 /* Originally gcc generated, modified by hand */
 
 #include <linux/linkage.h>
@@ -9,16 +7,11 @@
 	.text
 
 ENTRY(pmdisk_arch_suspend)
-	pushl %ebx
-	cmpl $0,8(%esp)
+	cmpl $0,4(%esp)
 	jne .L1450
-	call save_processor_state
 
 	movl %esp, saved_context_esp
-	movl %eax, saved_context_eax
 	movl %ebx, saved_context_ebx
-	movl %ecx, saved_context_ecx
-	movl %edx, saved_context_edx
 	movl %ebp, saved_context_ebp
 	movl %esi, saved_context_esi
 	movl %edi, saved_context_edi
@@ -31,64 +24,33 @@ ENTRY(pmdisk_arch_suspend)
 	movl $swapper_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
-	movl $0,loop
-	cmpl $0,pmdisk_pages
-	je .L1453
+	movl	pm_pagedir_nosave,%ebx
+	xorl	%eax, %eax
+	xorl	%edx, %edx
 	.p2align 4,,7
 .L1455:
-	movl $0,loop2
-	.p2align 4,,7
-.L1459:
-	movl pm_pagedir_nosave,%ecx
-	movl loop,%eax
-	movl loop2,%edx
-	sall $4,%eax
-	movl 4(%ecx,%eax),%ebx
-	movl (%ecx,%eax),%eax
-	movb (%edx,%eax),%al
-	movb %al,(%edx,%ebx)
-	movl %cr3, %eax;              
-	movl %eax, %cr3;  # flush TLB 
+	movl	4(%ebx,%edx),%edi
+	movl	(%ebx,%edx),%esi
 
-	movl loop2,%eax
-	leal 1(%eax),%edx
-	movl %edx,loop2
-	movl %edx,%eax
-	cmpl $4095,%eax
-	jbe .L1459
-	movl loop,%eax
-	leal 1(%eax),%edx
-	movl %edx,loop
-	movl %edx,%eax
-	cmpl pmdisk_pages,%eax
+	movl	$1024, %ecx
+	rep
+	movsl
+
+	movl	%cr3, %ecx;
+	movl	%ecx, %cr3;  # flush TLB 
+
+	incl	%eax
+	addl	$16, %edx
+	cmpl	pmdisk_pages,%eax
 	jb .L1455
 	.p2align 4,,7
 .L1453:
-	movl $__USER_DS,%eax
-
-	movw %ax, %ds
-	movw %ax, %es
 	movl saved_context_esp, %esp
 	movl saved_context_ebp, %ebp
-	movl saved_context_eax, %eax
 	movl saved_context_ebx, %ebx
-	movl saved_context_ecx, %ecx
-	movl saved_context_edx, %edx
 	movl saved_context_esi, %esi
 	movl saved_context_edi, %edi
 	pushl saved_context_eflags ; popfl
 	call pmdisk_resume
 .L1449:
-	popl	%ebx
-	pushl	%eax
-	call	restore_processor_state
-	popl	%eax
 	ret
-
-       .section .data.nosave
-loop:
-       .quad 0
-loop2:
-       .quad 0
-       .previous
-

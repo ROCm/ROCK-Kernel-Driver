@@ -1126,7 +1126,9 @@ int pmdisk_save(void)
 	if ((error = arch_prepare_suspend()))
 		return error;
 	local_irq_disable();
+	save_processor_state();
 	error = pmdisk_arch_suspend(0);
+	restore_processor_state();
 	local_irq_enable();
 	return error;
 }
@@ -1186,7 +1188,9 @@ int __init pmdisk_restore(void)
 {
 	int error;
 	local_irq_disable();
+	save_processor_state();
 	error = pmdisk_arch_suspend(1);
+	restore_processor_state();
 	local_irq_enable();
 	return error;
 }
