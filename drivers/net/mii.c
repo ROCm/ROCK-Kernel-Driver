@@ -124,13 +124,13 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		/* advertise only what has been requested */
 		advert = mii->mdio_read(dev, mii->phy_id, MII_ADVERTISE);
 		tmp = advert & ~(ADVERTISE_ALL | ADVERTISE_100BASE4);
-		if (ADVERTISED_10baseT_Half)
+		if (ecmd->advertising & ADVERTISED_10baseT_Half)
 			tmp |= ADVERTISE_10HALF;
-		if (ADVERTISED_10baseT_Full)
+		if (ecmd->advertising & ADVERTISED_10baseT_Full)
 			tmp |= ADVERTISE_10FULL;
-		if (ADVERTISED_100baseT_Half)
+		if (ecmd->advertising & ADVERTISED_100baseT_Half)
 			tmp |= ADVERTISE_100HALF;
-		if (ADVERTISED_100baseT_Full)
+		if (ecmd->advertising & ADVERTISED_100baseT_Full)
 			tmp |= ADVERTISE_100FULL;
 		if (advert != tmp) {
 			mii->mdio_write(dev, mii->phy_id, MII_ADVERTISE, tmp);

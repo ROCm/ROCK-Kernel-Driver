@@ -194,7 +194,7 @@ e1000_ethtool_gregs(struct e1000_adapter *adapter,
 	regs_buff[4]  = E1000_READ_REG(hw, RDH);
 	regs_buff[5]  = E1000_READ_REG(hw, RDT);
 	regs_buff[6]  = E1000_READ_REG(hw, RDTR);
-	
+
 	regs_buff[7]  = E1000_READ_REG(hw, TCTL);
 	regs_buff[8]  = E1000_READ_REG(hw, TDLEN);
 	regs_buff[9]  = E1000_READ_REG(hw, TDH);
@@ -233,7 +233,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	return 0;
 }
 
-static int 
+static int
 e1000_ethtool_seeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, void *user_data)
 {
@@ -306,12 +306,10 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		/* Fall Through */
 
 	default:
-		wol->supported = WAKE_PHY | WAKE_UCAST | 
-				 WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
-		
+		wol->supported = WAKE_UCAST | WAKE_MCAST
+			         | WAKE_BCAST | WAKE_MAGIC;
+
 		wol->wolopts = 0;
-		if(adapter->wol & E1000_WUFC_LNKC)
-			wol->wolopts |= WAKE_PHY;
 		if(adapter->wol & E1000_WUFC_EX)
 			wol->wolopts |= WAKE_UCAST;
 		if(adapter->wol & E1000_WUFC_MC)
@@ -343,13 +341,11 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		/* Fall Through */
 
 	default:
-		if(wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE))
+		if(wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE | WAKE_PHY))
 			return -EOPNOTSUPP;
 
 		adapter->wol = 0;
 
-		if(wol->wolopts & WAKE_PHY)
-			adapter->wol |= E1000_WUFC_LNKC;
 		if(wol->wolopts & WAKE_UCAST)
 			adapter->wol |= E1000_WUFC_EX;
 		if(wol->wolopts & WAKE_MCAST)
@@ -374,7 +370,7 @@ static void
 e1000_led_blink_callback(unsigned long data)
 {
 	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
-	
+
 	if(test_and_change_bit(E1000_LED_ON, &adapter->led_status))
 		e1000_led_off(&adapter->hw);
 	else
@@ -394,13 +390,13 @@ e1000_ethtool_led_blink(struct e1000_adapter *adapter, struct ethtool_value *id)
 
 	e1000_setup_led(&adapter->hw);
 	mod_timer(&adapter->blink_timer, jiffies);
-	
+
 	set_current_state(TASK_INTERRUPTIBLE);
 	if(id->data)
 		schedule_timeout(id->data * HZ);
 	else
 		schedule_timeout(MAX_SCHEDULE_TIMEOUT);
-	
+
 	del_timer_sync(&adapter->blink_timer);
 	e1000_led_off(&adapter->hw);
 	clear_bit(E1000_LED_ON, &adapter->led_status);
