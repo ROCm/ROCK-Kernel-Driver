@@ -26,6 +26,11 @@ struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset_name	= "Apollo Pro KX133",
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_VIA_8633_0,
+		.chipset	= VIA_APOLLO_PRO_266,
+		.chipset_name	= "Apollo Pro 266",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_8363_0,
 		.chipset	= VIA_APOLLO_KT133,
 		.chipset_name	= "Apollo Pro KT133",
@@ -44,6 +49,11 @@ struct agp_device_ids via_agp_device_ids[] __initdata =
 		.device_id	= PCI_DEVICE_ID_VIA_8653_0,
 		.chipset	= VIA_APOLLO_PRO,
 		.chipset_name	= "Apollo Pro266T",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_82C694X_0,
+		.chipset	= VIA_VT8605,
+		.chipset_name	= "PM133"
 	},
 	{
 		.device_id	= 0,
