@@ -279,12 +279,11 @@ void uart_write_wakeup(struct uart_port *port);
  * Baud rate helpers.
  */
 void uart_update_timeout(struct uart_port *port, unsigned int cflag,
-			 unsigned int quot);
+			 unsigned int baud);
 unsigned int uart_get_baud_rate(struct uart_port *port, struct termios *termios,
 				struct termios *old, unsigned int min,
 				unsigned int max);
-unsigned int uart_get_divisor(struct uart_port *port, struct termios *termios,
-			      struct termios *old_termios);
+unsigned int uart_get_divisor(struct uart_port *port, unsigned int baud);
 
 /*
  * Console helpers.

@@ -1325,7 +1325,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned char cval, fcr = 0;
 	unsigned long flags;
-	unsigned int quot;
+	unsigned int baud, quot;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -1357,7 +1357,8 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	/*
 	 * Work around a bug in the Oxford Semiconductor 952 rev B
@@ -1369,7 +1370,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		quot ++;
 
 	if (uart_config[up->port.type].flags & UART_USE_FIFO) {
-		if ((up->port.uartclk / quot) < (2400 * 16))
+		if (baud < 2400)
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
 #ifdef CONFIG_SERIAL_8250_RSA
 		else if (up->port.type == PORT_RSA)
@@ -1390,7 +1391,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
 	if (termios->c_iflag & INPCK)
