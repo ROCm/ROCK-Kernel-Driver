@@ -639,9 +639,9 @@ static void build_smp_wc(u64 wr_id, u16 slid, u16 pkey_index, u8 port_num,
  * Return 1 if SMP was consumed locally (whether or not solicited)
  * Return < 0 if error
  */
-static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
-			       struct ib_smp *smp,
-			       struct ib_send_wr *send_wr)
+static int handle_outgoing_dr_smp(struct ib_mad_agent_private *mad_agent_priv,
+				  struct ib_smp *smp,
+				  struct ib_send_wr *send_wr)
 {
 	int ret, alloc_flags, solicited;
 	unsigned long flags;
@@ -848,7 +848,8 @@ int ib_post_send_mad(struct ib_mad_agent *mad_agent,
 
 		smp = (struct ib_smp *)send_wr->wr.ud.mad_hdr;
 		if (smp->mgmt_class == IB_MGMT_CLASS_SUBN_DIRECTED_ROUTE) {
-			ret = handle_outgoing_smp(mad_agent_priv, smp, send_wr);
+			ret = handle_outgoing_dr_smp(mad_agent_priv, smp,
+						     send_wr);
 			if (ret < 0)		/* error */
 				goto error2;
 			else if (ret == 1)	/* locally consumed */
