@@ -228,7 +228,7 @@ int fcal_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t of
 #endif
 	SPRINTF ("Initiator AL-PA: %02x\n", fc->sid);
 
-	SPRINTF ("\nAttached devices: %s\n", !list_empty(&host->my_devices) ? "" : "none");
+	SPRINTF ("\nAttached devices:\n");
 	
 	for (i = 0; i < fc->posmap->len; i++) {
 		unsigned char alpa = fc->posmap->list[i];
