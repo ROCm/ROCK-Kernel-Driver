@@ -260,7 +260,6 @@ pci_acpi_scan_root (struct acpi_device *device, int domain, int bus)
 	unsigned int windows = 0;
 	char *name;
 
-	printk("PCI: Probing PCI hardware on bus (%04x:%02x)\n", domain, bus);
 	controller = alloc_pci_controller(domain);
 	if (!controller)
 		goto out1;
