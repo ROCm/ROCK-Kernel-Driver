@@ -479,6 +479,7 @@ static int ipip_rcv(struct sk_buff *skb)
 	read_lock(&ipip_lock);
 	if ((tunnel = ipip_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
 		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+			read_unlock(&ipip_lock);
 			kfree_skb(skb);
 			return 0;
 		}

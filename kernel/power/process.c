@@ -13,12 +13,6 @@
 #include <linux/suspend.h>
 #include <linux/module.h>
 
-#ifdef DEBUG_SLOW
-#define MDELAY(a) mdelay(a)
-#else
-#define MDELAY(a)
-#endif
-
 /* 
  * Timeout for stopping processes
  */
@@ -121,7 +115,6 @@ void thaw_processes(void)
 	read_unlock(&tasklist_lock);
 	schedule();
 	printk( " done\n" );
-	MDELAY(500);
 }
 
 EXPORT_SYMBOL(refrigerator);

@@ -23,6 +23,7 @@
 #include <linux/ptrace.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 #include <asm/siginfo.h>
 
 /*
@@ -2412,14 +2413,19 @@ out:
 	return error;
 }
 
+#ifdef __ARCH_WANT_SYS_SIGPENDING
+
 asmlinkage long
 sys_sigpending(old_sigset_t __user *set)
 {
 	return do_sigpending(set, sizeof(*set));
 }
 
-#if !defined(__alpha__)
-/* Alpha has its own versions with special arguments.  */
+#endif
+
+#ifdef __ARCH_WANT_SYS_SIGPROCMASK
+/* Some platforms have their own version with special arguments others
+   support only sys_rt_sigprocmask.  */
 
 asmlinkage long
 sys_sigprocmask(int how, old_sigset_t __user *set, old_sigset_t __user *oset)
@@ -2501,8 +2507,8 @@ out:
 #endif /* __sparc__ */
 #endif
 
-#if !defined(__alpha__) && !defined(__ia64__) && \
-    !defined(__arm__) && !defined(__s390__)
+#ifdef __ARCH_WANT_SYS_SGETMASK
+
 /*
  * For backwards compatibility.  Functionality superseded by sigprocmask.
  */
@@ -2528,10 +2534,9 @@ sys_ssetmask(int newmask)
 
 	return old;
 }
-#endif /* !defined(__alpha__) */
+#endif /* __ARCH_WANT_SGETMASK */
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__) && \
-    !defined(__arm__)
+#ifdef __ARCH_WANT_SYS_SIGNAL
 /*
  * For backwards compatibility.  Functionality superseded by sigaction.
  */
@@ -2548,9 +2553,9 @@ sys_signal(int sig, __sighandler_t handler)
 
 	return ret ? ret : (unsigned long)old_sa.sa.sa_handler;
 }
-#endif /* !alpha && !__ia64__ && !defined(__mips__) && !defined(__arm__) */
+#endif /* __ARCH_WANT_SYS_SIGNAL */
 
-#ifndef HAVE_ARCH_SYS_PAUSE
+#ifdef __ARCH_WANT_SYS_PAUSE
 
 asmlinkage long
 sys_pause(void)
@@ -2560,7 +2565,7 @@ sys_pause(void)
 	return -ERESTARTNOHAND;
 }
 
-#endif /* HAVE_ARCH_SYS_PAUSE */
+#endif
 
 void __init signals_init(void)
 {
@@ -2568,7 +2573,5 @@ void __init signals_init(void)
 		kmem_cache_create("sigqueue",
 				  sizeof(struct sigqueue),
 				  __alignof__(struct sigqueue),
-				  0, NULL, NULL);
-	if (!sigqueue_cachep)
-		panic("signals_init(): cannot create sigqueue SLAB cache");
+				  SLAB_PANIC, NULL, NULL);
 }

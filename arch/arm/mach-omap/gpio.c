@@ -587,15 +587,15 @@ static void gpio_ack_irq(unsigned int irq)
 
 #ifdef CONFIG_ARCH_OMAP1510
 	if (bank->method == METHOD_GPIO_1510)
-		omap_writew(1 << gpio, bank->base + OMAP1510_GPIO_INT_STATUS);
+		omap_writew(1 << (gpio & 0x0f), bank->base + OMAP1510_GPIO_INT_STATUS);
 #endif
 #if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
 	if (bank->method == METHOD_GPIO_1610)
-		omap_writew(1 << gpio, bank->base + OMAP1610_GPIO_IRQSTATUS1);
+		omap_writew(1 << (gpio & 0x0f), bank->base + OMAP1610_GPIO_IRQSTATUS1);
 #endif
 #ifdef CONFIG_ARCH_OMAP730
 	if (bank->method == METHOD_GPIO_730)
-		omap_writel(1 << gpio, bank->base + OMAP730_GPIO_INT_STATUS);
+		omap_writel(1 << (gpio & 0x1f), bank->base + OMAP730_GPIO_INT_STATUS);
 #endif
 }
 

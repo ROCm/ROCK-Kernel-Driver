@@ -212,6 +212,14 @@ ia64_sync_itc (unsigned int master)
 	} t[NUM_ROUNDS];
 #endif
 
+	/*
+	 * Make sure local timer ticks are disabled while we sync.  If
+	 * they were enabled, we'd have to worry about nasty issues
+	 * like setting the ITC ahead of (or a long time before) the
+	 * next scheduled tick.
+	 */
+	BUG_ON((ia64_get_itv() & (1 << 16)) == 0);
+
 	go[MASTER] = 1;
 
 	if (smp_call_function_single(master, sync_master, NULL, 1, 0) < 0) {
@@ -257,16 +265,6 @@ ia64_sync_itc (unsigned int master)
 
 	printk(KERN_INFO "CPU %d: synchronized ITC with CPU %u (last diff %ld cycles, "
 	       "maxerr %lu cycles)\n", smp_processor_id(), master, delta, rt);
-
-	/*
-	 * Check whether we sync'd the itc ahead of the next timer interrupt.  If so, just
-	 * reset it.
-	 */
-	if (time_after(ia64_get_itc(), local_cpu_data->itm_next)) {
-		Dprintk("CPU %d: oops, jumped a timer tick; resetting timer.\n",
-			smp_processor_id());
-		ia64_cpu_local_tick();
-	}
 }
 
 /*
@@ -302,16 +300,6 @@ smp_callin (void)
 
 	smp_setup_percpu_timer();
 
-	/*
-	 * Get our bogomips.
-	 */
-	ia64_init_itm();
-
-	/*
-	 * Set I/O port base per CPU
-	 */
-	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
-
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */
 
 #ifdef CONFIG_PERFMON
@@ -319,11 +307,6 @@ smp_callin (void)
 #endif
 
 	local_irq_enable();
-	calibrate_delay();
-	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
-#ifdef CONFIG_IA32_SUPPORT
-	ia32_gdt_init();
-#endif
 
 	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
 		/*
@@ -335,6 +318,17 @@ smp_callin (void)
 		Dprintk("Going to syncup ITC with BP.\n");
 		ia64_sync_itc(0);
 	}
+
+	/*
+	 * Get our bogomips.
+	 */
+	ia64_init_itm();
+	calibrate_delay();
+	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
+
+#ifdef CONFIG_IA32_SUPPORT
+	ia32_gdt_init();
+#endif
 
 	/*
 	 * Allow the master to continue.
@@ -351,6 +345,9 @@ int __devinit
 start_secondary (void *unused)
 {
 	extern int cpu_idle (void);
+
+	/* Early console may use I/O ports */
+	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
 
 	Dprintk("start_secondary: starting CPU 0x%x\n", hard_smp_processor_id());
 	efi_map_pal_code();

@@ -18,19 +18,11 @@ static ide_pci_device_t ali15x3_chipsets[] __devinitdata = {
 		.device		= PCI_DEVICE_ID_AL_M5229,
 		.name		= "ALI15X3",
 		.init_chipset	= init_chipset_ali15x3,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_ali15x3,
 		.init_dma	= init_dma_ali15x3,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

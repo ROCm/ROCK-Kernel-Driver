@@ -11,15 +11,15 @@
 #include <linux/pnpbios.h>
 #include <linux/device.h>
 #include <linux/pnp.h>
-#include <asm/page.h>
-#include <asm/system.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
-#include <asm/desc.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/completion.h>
 #include <linux/spinlock.h>
+
+#include <asm/page.h>
+#include <asm/desc.h>
 #include <asm/system.h>
 #include <asm/byteorder.h>
 

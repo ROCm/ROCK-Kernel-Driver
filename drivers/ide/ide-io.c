@@ -1388,6 +1388,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	err = 0;
 	if (must_wait) {
 		wait_for_completion(&wait);
+		rq->waiting = NULL;
 		if (rq->errors)
 			err = -EIO;
 

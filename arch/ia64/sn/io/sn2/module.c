@@ -196,7 +196,7 @@ io_module_init(void)
      * We do not support memoryless compute nodes.
      */
     for (node = 0; node < numnodes; node++) {
-	nasid = COMPACT_TO_NASID_NODEID(node);
+	nasid = cnodeid_to_nasid(node);
 	board = find_lboard_nasid((lboard_t *) KL_CONFIG_INFO(nasid), nasid, KLTYPE_SNIA);
 	ASSERT(board);
 
@@ -214,7 +214,7 @@ io_module_init(void)
 	nasid_t		nasid;
 	char		serial_number[16];
 
-        nasid = COMPACT_TO_NASID_NODEID(node);
+        nasid = cnodeid_to_nasid(node);
 	board = find_lboard_nasid((lboard_t *) KL_CONFIG_INFO(nasid), 
 				nasid, KLTYPE_SNIA);
 	ASSERT(board);

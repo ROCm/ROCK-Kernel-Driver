@@ -151,7 +151,7 @@ struct swap_list_t {
 extern void out_of_memory(void);
 
 /* linux/mm/memory.c */
-extern void swapin_readahead(swp_entry_t);
+extern void swapin_readahead(swp_entry_t, unsigned long, struct vm_area_struct *);
 
 /* linux/mm/page_alloc.c */
 extern unsigned long totalram_pages;
@@ -202,7 +202,8 @@ extern int move_from_swap_cache(struct page *, unsigned long,
 extern void free_page_and_swap_cache(struct page *);
 extern void free_pages_and_swap_cache(struct page **, int);
 extern struct page * lookup_swap_cache(swp_entry_t);
-extern struct page * read_swap_cache_async(swp_entry_t);
+extern struct page * read_swap_cache_async(swp_entry_t, struct vm_area_struct *vma,
+					   unsigned long addr);
 
 /* linux/mm/swapfile.c */
 extern int total_swap_pages;
@@ -244,7 +245,7 @@ extern spinlock_t swaplock;
 #define free_swap_and_cache(swp)		/*NOTHING*/
 #define swap_duplicate(swp)			/*NOTHING*/
 #define swap_free(swp)				/*NOTHING*/
-#define read_swap_cache_async(swp)		NULL
+#define read_swap_cache_async(swp,vma,addr)	NULL
 #define lookup_swap_cache(swp)			NULL
 #define valid_swaphandles(swp, off)		0
 #define can_share_swap_page(p)			0

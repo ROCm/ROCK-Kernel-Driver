@@ -208,6 +208,9 @@ extern void omap_set_dma_src_params(int lch, int src_port, int src_amode,
 extern void omap_set_dma_dest_params(int lch, int dest_port, int dest_amode,
 				     unsigned long dest_start);
 
+extern void omap_dma_link_lch (int lch_head, int lch_queue);
+extern void omap_dma_unlink_lch (int lch_head, int lch_queue);
+
 /* Returns 1 if the DMA module is in OMAP1510-compatible mode, 0 otherwise */
 extern int omap_dma_in_1510_mode(void);
 

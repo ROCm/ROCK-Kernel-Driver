@@ -138,7 +138,6 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 {
 	struct rt_sigframe *frame = (struct rt_sigframe *)(regs.rsp - 8);
 	sigset_t set;
-	stack_t st;
 	long eax;
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame))) { 
@@ -162,12 +161,8 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 	printk("%d sigreturn rip:%lx rsp:%lx frame:%p rax:%lx\n",current->pid,regs.rip,regs.rsp,frame,eax);
 #endif
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st))) {
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, regs.rsp) == -EFAULT)
 		goto badframe;
-	} 
-	/* It is more difficult to avoid calling this function than to
-	   call it and ignore errors.  */
-	do_sigaltstack(&st, NULL, regs.rsp);
 
 	return eax;
 

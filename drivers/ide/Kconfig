@@ -851,10 +851,6 @@ config BLK_DEV_IDEDMA_PMAC_AUTO
 	  hardware may have caused damage.  Saying Y should be safe on all
 	  Apple machines.
 
-config BLK_DEV_IDE_SWARM
-	bool "SWARM onboard IDE support"
-	depends on SIBYTE_SWARM
-
 config IDE_ARM
 	def_bool ARM && (ARCH_A5K || ARCH_CLPS7500 || ARCH_RPC || ARCH_SHARK)
 

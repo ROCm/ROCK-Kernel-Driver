@@ -1040,7 +1040,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_capget
 	.llong .sys_capset
 	.llong .sys_sigaltstack	        /* 185 */
-	.llong .sys_sendfile
+	.llong .sys_sendfile64
 	.llong .sys_ni_syscall		/* reserved for streams1 */
 	.llong .sys_ni_syscall		/* reserved for streams2 */
 	.llong .sys_vfork

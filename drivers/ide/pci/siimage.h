@@ -35,9 +35,7 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.init_hwif	= init_hwif_siimage,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},{	/* 1 */
 		.vendor		= PCI_VENDOR_ID_CMD,
 		.device		= PCI_DEVICE_ID_SII_3112,
@@ -47,9 +45,7 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.init_hwif	= init_hwif_siimage,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},{	/* 2 */
 		.vendor		= PCI_VENDOR_ID_CMD,
 		.device		= PCI_DEVICE_ID_SII_1210SA,
@@ -59,14 +55,7 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.init_hwif	= init_hwif_siimage,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

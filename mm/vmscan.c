@@ -247,7 +247,6 @@ static int
 shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		int *nr_scanned, int do_writepage)
 {
-	struct address_space *mapping;
 	LIST_HEAD(ret_pages);
 	struct pagevec freed_pvec;
 	int pgactivate = 0;
@@ -257,6 +256,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 
 	pagevec_init(&freed_pvec, 1);
 	while (!list_empty(page_list)) {
+		struct address_space *mapping;
 		struct page *page;
 		int may_enter_fs;
 		int referenced;
@@ -284,9 +284,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			goto activate_locked;
 		}
 
-		mapping = page_mapping(page);
-		may_enter_fs = (gfp_mask & __GFP_FS);
-
 #ifdef CONFIG_SWAP
 		/*
 		 * Anonymous process memory has backing store?
@@ -300,11 +297,11 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto activate_locked;
 			page_map_lock(page);
 		}
-		if (PageSwapCache(page)) {
-			mapping = &swapper_space;
-			may_enter_fs = (gfp_mask & __GFP_IO);
-		}
 #endif /* CONFIG_SWAP */
+
+		mapping = page_mapping(page);
+		may_enter_fs = (gfp_mask & __GFP_FS) ||
+			(PageSwapCache(page) && (gfp_mask & __GFP_IO));
 
 		/*
 		 * The page is mapped into the page tables of one or more

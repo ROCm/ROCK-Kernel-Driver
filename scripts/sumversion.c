@@ -374,7 +374,7 @@ static int parse_source_files(const char *objfile, struct md4_ctx *md)
 			break;
 		/* Terminate line at first space, to get rid of final ' \' */
 		while (*p) {
-			if isspace(*p) {
+                       if (isspace(*p)) {
 				*p = '\0';
 				break;
 			}

@@ -65,7 +65,7 @@ static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 	: "r"(&lock->lock)
 	: "cr0", "memory");
 
-	return tmp != 0;
+	return tmp == 0;
 }
 
 static __inline__ void _raw_spin_lock(spinlock_t *lock)

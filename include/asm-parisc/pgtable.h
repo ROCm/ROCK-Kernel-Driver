@@ -488,8 +488,6 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 #define pte_same(A,B)	(pte_val(A) == pte_val(B))
 
-typedef pte_t *pte_addr_t;
-
 #endif /* !__ASSEMBLY__ */
 
 #define io_remap_page_range remap_page_range

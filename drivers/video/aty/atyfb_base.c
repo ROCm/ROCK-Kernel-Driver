@@ -1231,10 +1231,7 @@ static void atyfb_palette(int enter)
 
 	for (i = 0; i < FB_MAX; i++) {
 		info = registered_fb[i];
-		if (info &&
-		    info->fbops == &atyfb_ops &&
-		    info->display_fg &&
-		    info->display_fg->vc_num == i) {
+		if (info && info->fbops == &atyfb_ops) {
 			par = (struct atyfb_par *) info->par;
 			
 			atyfb_save_palette(par, enter);

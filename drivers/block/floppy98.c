@@ -704,15 +704,16 @@ static int output_log_pos;
 
 static void reschedule_timeout(int drive, const char *message, int marg)
 {
+	unsigned long delay;
+
 	if (drive == current_reqD)
 		drive = current_drive;
-	del_timer(&fd_timeout);
 	if (drive < 0 || drive > N_DRIVE) {
-		fd_timeout.expires = jiffies + 20UL*HZ;
+		delay = 20UL*HZ;
 		drive=0;
 	} else
-		fd_timeout.expires = jiffies + UDP->timeout;
-	add_timer(&fd_timeout);
+		delay = UDP->timeout;
+	mod_timer(&fd_timeout, delay + jiffies);
 	if (UDP->flags & FD_DEBUG){
 		DPRINT("reschedule timeout ");
 		printk(message, marg);

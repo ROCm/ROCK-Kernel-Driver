@@ -451,10 +451,6 @@ sn_cpu_init(void)
 	}
 	pda->shub_1_1_found = shub_1_1_found;
 	
-	if (local_node_data->active_cpu_count == 1)
-		nodepda->node_first_cpu = cpuid;
-
-
 
 	/*
 	 * We must use different memory allocators for first cpu (bootmem 
@@ -474,7 +470,7 @@ sn_cpu_init(void)
 	pda->mem_write_status_addr = (volatile u64 *)
 			LOCAL_MMR_ADDR((slice < 2 ? SH_MEMORY_WRITE_STATUS_0 : SH_MEMORY_WRITE_STATUS_1 ) );
 
-	if (nodepda->node_first_cpu == cpuid) {
+	if (local_node_data->active_cpu_count++ == 0) {
 		int	buddy_nasid;
 		buddy_nasid = cnodeid_to_nasid(numa_node_id() == numnodes-1 ? 0 : numa_node_id()+ 1);
 		pda->pio_shub_war_cam_addr = (volatile unsigned long*)GLOBAL_MMR_ADDR(nasid, SH_PI_CAM_CONTROL);

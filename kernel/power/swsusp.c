@@ -222,10 +222,30 @@ static void mark_swapfiles(swp_entry_t prev, int mode)
 	__free_page(page);
 }
 
+
+/*
+ * Check whether the swap device is the specified resume
+ * device, irrespective of whether they are specified by
+ * identical names.
+ *
+ * (Thus, device inode aliasing is allowed.  You can say /dev/hda4
+ * instead of /dev/ide/host0/bus0/target0/lun0/part4 [if using devfs]
+ * and they'll be considered the same device.  This is *necessary* for
+ * devfs, since the resume code can only recognize the form /dev/hda4,
+ * but the suspend code would see the long name.)
+ */
+static int is_resume_device(const struct swap_info_struct *swap_info)
+{
+	struct file *file = swap_info->swap_file;
+	struct inode *inode = file->f_dentry->d_inode;
+
+	return S_ISBLK(inode->i_mode) &&
+		resume_device == MKDEV(imajor(inode), iminor(inode));
+}
+
 static void read_swapfiles(void) /* This is called before saving image */
 {
 	int i, len;
-	static char buff[sizeof(resume_file)], *sname;
 	
 	len=strlen(resume_file);
 	root_swap = 0xFFFF;
@@ -244,17 +264,10 @@ static void read_swapfiles(void) /* This is called before saving image */
 					swapfile_used[i] = SWAPFILE_IGNORED;				  
 			} else {
 	  			/* we ignore all swap devices that are not the resume_file */
-				sname = d_path(swap_info[i].swap_file->f_dentry,
-					       swap_info[i].swap_file->f_vfsmnt,
-					       buff,
-					       sizeof(buff));
-				if (!strcmp(sname, resume_file)) {
+				if (is_resume_device(&swap_info[i])) {
 					swapfile_used[i] = SWAPFILE_SUSPEND;
 					root_swap = i;
 				} else {
-#if 0
-					printk( "Resume: device %s (%x != %x) ignored\n", swap_info[i].swap_file->d_name.name, swap_info[i].swap_device, resume_device );				  
-#endif
 				  	swapfile_used[i] = SWAPFILE_IGNORED;
 				}
 			}
@@ -1098,7 +1111,7 @@ static int __init __read_suspend_image(struct block_device *bdev, union diskpage
 	return 0;
 }
 
-static int read_suspend_image(const char * specialfile, int noresume)
+static int __init read_suspend_image(const char * specialfile, int noresume)
 {
 	union diskpage *cur;
 	unsigned long scratch_page = 0;

@@ -28,7 +28,6 @@
 #include <linux/mm.h>
 #include <linux/cache.h>
 #include <linux/delay.h>
-#include <linux/cache.h>
 #include <linux/efi.h>
 
 #include <asm/atomic.h>

@@ -147,4 +147,4 @@ int param_array(const char *name,
 		void *elem, int elemsize,
 		int (*set)(const char *, struct kernel_param *kp),
 		int *num);
-#endif /* _LINUX_MODULE_PARAM_TYPES_H */
+#endif /* _LINUX_MODULE_PARAMS_H */

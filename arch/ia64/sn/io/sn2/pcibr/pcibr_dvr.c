@@ -758,7 +758,7 @@ pcibr_directmap_init(pcibr_soft_t pcibr_soft)
     cnodeid_t		cnodeid = 0;	/* We need api for diroff api */
     nasid_t		nasid;
 
-    nasid = COMPACT_TO_NASID_NODEID(cnodeid);
+    nasid = cnodeid_to_nasid(cnodeid);
     paddr = NODE_OFFSET(nasid) + 0;
 
     /* Assume that if we ask for a DMA mapping to zero the XIO host will
@@ -2092,7 +2092,7 @@ pcibr_get_dmatrans_node(vertex_hdl_t pconn_vhdl)
 	pciio_info_t	pciio_info = pciio_info_get(pconn_vhdl);
 	pcibr_soft_t	pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
 
-	return NASID_TO_COMPACT_NODEID(NASID_GET(pcibr_soft->bs_dir_xbase));
+	return nasid_to_cnodeid(NASID_GET(pcibr_soft->bs_dir_xbase));
 }
 
 /*ARGSUSED */
@@ -2645,7 +2645,7 @@ isIO9(nasid_t nasid)
                         brd = KLCF_NEXT(brd);
 	}
 	/* if it's dual ported, check the peer also */
-	nasid = NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->xbow_peer;
+	nasid = NODEPDA(nasid_to_cnodeid(nasid))->xbow_peer;
 	if (nasid < 0) return 0;
 	brd = (lboard_t *)KL_CONFIG_INFO(nasid);
 	while (brd) {

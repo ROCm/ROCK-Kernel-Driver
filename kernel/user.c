@@ -149,10 +149,7 @@ static int __init uid_cache_init(void)
 	int n;
 
 	uid_cachep = kmem_cache_create("uid_cache", sizeof(struct user_struct),
-				       0,
-				       SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if(!uid_cachep)
-		panic("Cannot create uid taskcount SLAB cache\n");
+			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 	for(n = 0; n < UIDHASH_SZ; ++n)
 		INIT_LIST_HEAD(uidhash_table + n);

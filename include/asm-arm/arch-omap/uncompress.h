@@ -25,8 +25,8 @@
 #include <asm/arch/serial.h>
 
 #define UART_OMAP_MDR1		0x08	/* mode definition register */
-
 #define check_port(base, shift) ((base[UART_OMAP_MDR1 << shift] & 7) == 0)
+#define omap_get_id() ((*(volatile unsigned int *)(0xfffed404)) >> 12) & 0xffff
 
 static void
 puts(const char *s)
@@ -34,17 +34,27 @@ puts(const char *s)
 	volatile u8 * uart = 0;
 	int shift = 0;
 
+#ifdef	CONFIG_OMAP_LL_DEBUG_UART3
+	uart = (volatile u8 *)(OMAP_UART3_BASE);
+#elif	CONFIG_OMAP_LL_DEBUG_UART2
+	uart = (volatile u8 *)(OMAP_UART2_BASE);
+#else
+	uart = (volatile u8 *)(OMAP_UART1_BASE);
+#endif
+
 	/* Determine which serial port to use */
 	do {
-		if (machine_is_omap_innovator() || machine_is_omap_osk()) {
+		/* MMU is not on, so cpu_is_omapXXXX() won't work here */
+		unsigned int omap_id = omap_get_id();
+
+		if (omap_id == OMAP_ID_1510 || omap_id == OMAP_ID_1610 ||
+		    omap_id == OMAP_ID_1710 || omap_id == OMAP_ID_5912) {
 			shift = 2;
-			uart = (volatile u8 *)(OMAP_UART1_BASE);
-		} else if (machine_is_omap_perseus2()) {
+		} else if (omap_id == OMAP_ID_730) {
 			shift = 0;
-			uart = (volatile u8 *)(OMAP_UART1_BASE);
 		} else {
-			/* Assume nothing for unknown machines.
-			 * Add an entry for your machine to select
+			/* Assume nothing for unknown OMAP processors.
+			 * Add an entry for your OMAP type to select
 			 * the default serial console here. If the
 			 * serial port is enabled, we'll use it to
 			 * display status messages. Else we'll be

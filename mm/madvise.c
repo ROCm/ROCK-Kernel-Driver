@@ -31,7 +31,9 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 			return -EAGAIN;
 	}
 
-	spin_lock(&mm->page_table_lock);
+	/*
+	 * vm_flags is protected by the mmap_sem held in write mode.
+	 */
 	VM_ClearReadHint(vma);
 
 	switch (behavior) {
@@ -44,7 +46,6 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 	default:
 		break;
 	}
-	spin_unlock(&mm->page_table_lock);
 
 	return 0;
 }
@@ -92,16 +93,14 @@ static long madvise_willneed(struct vm_area_struct * vma,
 static long madvise_dontneed(struct vm_area_struct * vma,
 			     unsigned long start, unsigned long end)
 {
-	struct zap_details details;
-
 	if (vma->vm_flags & VM_LOCKED)
 		return -EINVAL;
 
 	if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
-		details.check_mapping = NULL;
-		details.nonlinear_vma = vma;
-		details.first_index = 0;
-		details.last_index = ULONG_MAX;
+		struct zap_details details = {
+			.nonlinear_vma = vma,
+			.last_index = ULONG_MAX,
+		};
 		zap_page_range(vma, start, end - start, &details);
 	} else
 		zap_page_range(vma, start, end - start, NULL);
