@@ -16,6 +16,6 @@ ifdef CONFIG_FULLDEBUG
 AFLAGS += -DDEBUGGER_COMPATIBLE_CACHE=1
 endif
 
-obj-y := config.o pit.o
+obj-y := config.o
 
 extra-y := $(BOARD)/crt0_$(MODEL).o
