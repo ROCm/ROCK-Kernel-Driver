@@ -722,7 +722,7 @@ static struct sbpcd_drive {
 	u_char mode_xb_8;
 	u_char delay;
 	struct cdrom_device_info *sbpcd_infop;
-
+	struct gendisk disk;
 } D_S[NR_SBPCD];
 
 static struct sbpcd_drive *current_drive = D_S;
@@ -5777,6 +5777,7 @@ int __init sbpcd_init(void)
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		struct cdrom_device_info * sbpcd_infop;
+		struct gendisk *disk;
 		struct sbpcd_drive *p = D_S + j;
 
 		if (p->drv_id==-1) continue;
@@ -5829,6 +5830,12 @@ int __init sbpcd_init(void)
 		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
 		sbpcd_infop->handle = p;
 		p->sbpcd_infop = sbpcd_infop;
+		disk = &p->disk;
+		disk->major = MAJOR_NR;
+		disk->first_minor = j;
+		disk->minor_shift = 0;
+		disk->fops = &sbpcd_bdops;
+		disk->major_name = sbpcd_infop->name;
 		sprintf(nbuff, "c0t%d/cd", p->drv_id);
 		sbpcd_infop->de =
 		    devfs_register (devfs_handle, nbuff, DEVFS_FL_DEFAULT,
@@ -5838,6 +5845,12 @@ int __init sbpcd_init(void)
 		{
 			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
 		}
+		add_gendisk(disk);
+		register_disk(disk,
+			      mk_kdev(disk->major,disk->first_minor),
+			      1<<disk->minor_shift,
+			      disk->fops,
+			      0);
 	}
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CD_FRAMESIZE);
 
@@ -5863,6 +5876,7 @@ void sbpcd_exit(void)
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		if (D_S[j].drv_id==-1) continue;
+		del_gendisk(&D_S[j].disk);
 		vfree(D_S[j].sbp_buf);
 		if (D_S[j].sbp_audsiz>0) vfree(D_S[j].aud_buf);
 		if ((unregister_cdrom(D_S[j].sbpcd_infop) == -EINVAL))
