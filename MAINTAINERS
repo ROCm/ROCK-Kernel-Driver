@@ -169,8 +169,8 @@ W:	http://domsch.com/linux
 S:	Supported
 
 ACPI
-P:	Andy Grover
-M:	andrew.grover@intel.com
+P:	Len Brown
+M:	len.brown@intel.com
 L:	acpi-devel@lists.sourceforge.net
 W:	http://sf.net/projects/acpi/
 S:	Maintained
