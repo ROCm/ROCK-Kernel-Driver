@@ -457,11 +457,6 @@ config IDEDMA_ONLYDISK
 
 	  Generally say N here.
 
-config BLK_DEV_ADMA
-	bool
-	depends on PCI && BLK_DEV_IDEPCI
-	default BLK_DEV_IDEDMA_PCI
-
 config BLK_DEV_AEC62XX
 	tristate "AEC62XX chipset support"
 	help
