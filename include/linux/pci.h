@@ -601,8 +601,8 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 
 /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
 
-void pbus_assign_resources(struct pci_bus *bus);
-void pbus_size_bridges(struct pci_bus *bus);
+void pci_bus_assign_resources(struct pci_bus *bus);
+void pci_bus_size_bridges(struct pci_bus *bus);
 int pci_claim_resource(struct pci_dev *, int);
 void pci_assign_unassigned_resources(void);
 void pdev_enable_device(struct pci_dev *);
