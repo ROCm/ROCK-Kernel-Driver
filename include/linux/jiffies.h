@@ -1,6 +1,7 @@
 #ifndef _LINUX_JIFFIES_H
 #define _LINUX_JIFFIES_H
 
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/seqlock.h>
@@ -37,10 +38,16 @@ static inline u64 get_jiffies_64(void)
  * good compiler would generate better code (and a really good compiler
  * wouldn't care). Gcc is currently neither.
  */
-#define time_after(a,b)		((long)(b) - (long)(a) < 0)
+#define time_after(a,b)		\
+	(typecheck(unsigned long, a) && \
+	 typecheck(unsigned long, b) && \
+	 ((long)(b) - (long)(a) < 0))
 #define time_before(a,b)	time_after(b,a)
 
-#define time_after_eq(a,b)	((long)(a) - (long)(b) >= 0)
+#define time_after_eq(a,b)	\
+	(typecheck(unsigned long, a) && \
+	 typecheck(unsigned long, b) && \
+	 ((long)(a) - (long)(b) >= 0))
 #define time_before_eq(a,b)	time_after_eq(b,a)
 
 #endif

@@ -58,7 +58,7 @@ size_t parport_ieee1284_write_compat (struct parport *port,
 	parport_write_control (port, ctl);
 	parport_data_forward (port);
 	while (count < len) {
-		long expire = jiffies + dev->timeout;
+		unsigned long expire = jiffies + dev->timeout;
 		long wait = (HZ + 99) / 100;
 		unsigned char mask = (PARPORT_STATUS_ERROR
 				      | PARPORT_STATUS_BUSY);
@@ -431,7 +431,7 @@ size_t parport_ieee1284_ecp_write_data (struct parport *port,
 			      | PARPORT_CONTROL_INIT,
 			      PARPORT_CONTROL_INIT);
 	for (written = 0; written < len; written++, buf++) {
-		long expire = jiffies + port->cad->timeout;
+		unsigned long expire = jiffies + port->cad->timeout;
 		unsigned char byte;
 
 		byte = *buf;
@@ -520,7 +520,7 @@ size_t parport_ieee1284_ecp_read_data (struct parport *port,
 	parport_write_control (port,
 			       ctl | PARPORT_CONTROL_AUTOFD);
 	while (count < len) {
-		long expire = jiffies + dev->timeout;
+		unsigned long expire = jiffies + dev->timeout;
 		unsigned char byte;
 		int command;
 
@@ -668,7 +668,7 @@ size_t parport_ieee1284_ecp_write_addr (struct parport *port,
 			      PARPORT_CONTROL_AUTOFD
 			      | PARPORT_CONTROL_INIT);
 	for (written = 0; written < len; written++, buf++) {
-		long expire = jiffies + port->cad->timeout;
+		unsigned long expire = jiffies + port->cad->timeout;
 		unsigned char byte;
 
 		byte = *buf;
