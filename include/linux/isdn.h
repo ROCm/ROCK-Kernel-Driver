@@ -480,7 +480,6 @@ typedef struct modem_info {
   int                   dialing;         /* Dial in progress or ATA        */
   int                   rcvsched;        /* Receive needs schedule         */
   int                   isdn_slot;	 /* Index to isdn-driver/channel   */
-  int                   drv_index;       /* Index to dev->usage            */
   int                   ncarrier;        /* Flag: schedule NO CARRIER      */
   unsigned char         last_cause[8];   /* Last cause message             */
   unsigned char         last_num[ISDN_MSNLEN];

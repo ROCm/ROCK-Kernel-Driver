@@ -380,15 +380,11 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 			PARSE_ERROR1;
 		}
 		info->isdn_slot = i;
-		info->drv_index = i;
 		dev->m_idx[i] = info->line;
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &c);
 		isdn_slot_free(info->isdn_slot, ISDN_USAGE_FAX);
+		dev->m_idx[info->isdn_slot] = -1;
 		info->isdn_slot = -1;
-		if (info->drv_index >= 0) {
-			dev->m_idx[info->drv_index] = -1;
-			info->drv_index = -1;
-		}
 		restore_flags(flags);
 	} else {
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_FAXCMD, &c);
