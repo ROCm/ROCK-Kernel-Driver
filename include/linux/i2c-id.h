@@ -167,6 +167,7 @@
 #define I2C_DRIVERID_ASB100 1043
 #define I2C_DRIVERID_FSCHER 1046
 #define I2C_DRIVERID_W83L785TS 1047
+#define I2C_DRIVERID_SMSC47B397 1050
 
 /*
  * ---- Adapter types ----------------------------------------------------
