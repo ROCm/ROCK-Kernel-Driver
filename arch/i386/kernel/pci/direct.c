@@ -318,8 +318,9 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		    pci_sanity_check(&pci_direct_conf1)) {
 			outl (tmp, 0xCF8);
 			__restore_flags(flags);
-			printk("PCI: Using configuration type 1\n");
-			request_region(0xCF8, 8, "PCI conf1");
+			printk(KERN_INFO "PCI: Using configuration type 1\n");
+			if (!request_region(0xCF8, 8, "PCI conf1"))
+				return NULL;
 			return &pci_direct_conf1;
 		}
 		outl (tmp, 0xCF8);
@@ -335,8 +336,9 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		if (inb (0xCF8) == 0x00 && inb (0xCFA) == 0x00 &&
 		    pci_sanity_check(&pci_direct_conf2)) {
 			__restore_flags(flags);
-			printk("PCI: Using configuration type 2\n");
-			request_region(0xCF8, 4, "PCI conf2");
+			printk(KERN_INFO "PCI: Using configuration type 2\n");
+			if (!request_region(0xCF8, 4, "PCI conf2"))
+				return NULL;
 			return &pci_direct_conf2;
 		}
 	}
