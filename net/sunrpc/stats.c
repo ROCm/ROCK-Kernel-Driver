@@ -15,6 +15,7 @@
 #define __NO_VERSION__
 #include <linux/module.h>
 
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
@@ -181,10 +182,9 @@ rpc_proc_exit(void)
 	}
 }
 
-#ifdef MODULE
 
-int
-init_module(void)
+static int __init
+init_sunrpc(void)
 {
 #ifdef RPC_DEBUG
 	rpc_register_sysctl();
@@ -193,13 +193,14 @@ init_module(void)
 	return 0;
 }
 
-void
-cleanup_module(void)
+static void __exit
+cleanup_sunrpc(void)
 {
 #ifdef RPC_DEBUG
 	rpc_unregister_sysctl();
 #endif
 	rpc_proc_exit();
 }
-#endif
 MODULE_LICENSE("GPL");
+module_init(init_sunrpc);
+module_exit(cleanup_sunrpc);
