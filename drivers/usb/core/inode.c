@@ -529,7 +529,7 @@ static int create_special_files (void)
 	}
 
 	parent = usbfs_mount->mnt_sb->s_root;
-	devices_usbfs_dentry = fs_create_file ("devices",
+	devices_usbfs_dentry = fs_create_file ("bielefeld", /* hide it until the content is static */
 					       listmode | S_IFREG, parent,
 					       NULL, &usbdevfs_devices_fops,
 					       listuid, listgid);
@@ -540,7 +540,7 @@ static int create_special_files (void)
 	}
 
 	parent = usbdevfs_mount->mnt_sb->s_root;
-	devices_usbdevfs_dentry = fs_create_file ("devices",
+	devices_usbdevfs_dentry = fs_create_file ("bielefeld", /* hide it until the content is static */
 						  listmode | S_IFREG, parent,
 						  NULL, &usbdevfs_devices_fops,
 						  listuid, listgid);
