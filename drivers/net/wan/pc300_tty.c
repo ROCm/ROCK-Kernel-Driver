@@ -215,6 +215,7 @@ void cpc_tty_init(pc300dev_t *pc300dev)
 		/* initialize tty driver struct */
 		memset(&serial_drv,0,sizeof(struct tty_driver));
 		serial_drv.magic = TTY_DRIVER_MAGIC;
+		serial_drv.owner = THIS_MODULE;
 		serial_drv.driver_name = "pc300_tty";
 		serial_drv.name = "ttyCP";
 		serial_drv.major = CPC_TTY_MAJOR;

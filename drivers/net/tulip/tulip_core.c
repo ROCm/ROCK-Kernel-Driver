@@ -485,12 +485,9 @@ tulip_open(struct net_device *dev)
         struct tulip_private *tp = (struct tulip_private *)dev->priv;
 #endif
 	int retval;
-	MOD_INC_USE_COUNT;
 
-	if ((retval = request_irq(dev->irq, &tulip_interrupt, SA_SHIRQ, dev->name, dev))) {
-		MOD_DEC_USE_COUNT;
+	if ((retval = request_irq(dev->irq, &tulip_interrupt, SA_SHIRQ, dev->name, dev)))
 		return retval;
-	}
 
 	tulip_init_ring (dev);
 
@@ -822,8 +819,6 @@ static int tulip_close (struct net_device *dev)
 		tp->tx_buffers[i].skb = NULL;
 		tp->tx_buffers[i].mapping = 0;
 	}
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -1361,6 +1356,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 
+	SET_MODULE_OWNER(dev);
 	if (pci_resource_len (pdev, 0) < tulip_tbl[chip_idx].io_size) {
 		printk (KERN_ERR PFX "%s: I/O region (0x%lx@0x%lx) too small, "
 			"aborting\n", pdev->slot_name,

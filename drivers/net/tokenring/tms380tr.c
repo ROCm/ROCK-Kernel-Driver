@@ -257,7 +257,7 @@ int tms380tr_open(struct net_device *dev)
 	int err;
 	
 	/* init the spinlock */
-	spin_lock_init(tp->lock);
+	spin_lock_init(&tp->lock);
 
 	/* Reset the hardware here. Don't forget to set the station address. */
 
@@ -1458,7 +1458,7 @@ static int tms380tr_init_adapter(struct net_device *dev)
 	if(tms380tr_debug > 3)
 	{
 		printk(KERN_DEBUG "%s: buffer (real): %lx\n", dev->name, (long) &tp->scb);
-		printk(KERN_DEBUG "%s: buffer (virt): %lx\n", dev->name, (long) ((char *)&tp->scb - (char *)tp) + tp->dmabuffer);
+		printk(KERN_DEBUG "%s: buffer (virt): %lx\n", dev->name, (long) ((char *)&tp->scb - (char *)tp) + (long) tp->dmabuffer);
 		printk(KERN_DEBUG "%s: buffer (DMA) : %lx\n", dev->name, (long) tp->dmabuffer);
 		printk(KERN_DEBUG "%s: buffer (tp)  : %lx\n", dev->name, (long) tp);
 	}
