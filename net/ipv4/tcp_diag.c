@@ -555,8 +555,6 @@ skip_listen_ht:
 
 				if (num < s_num)
 					continue;
-				if (!(r->tcpdiag_states & (1 << sk->sk_zapped)))
-					continue;
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
 					continue;
