@@ -13,6 +13,7 @@
 #include <linux/file.h>
 #include <linux/locks.h>
 #include <linux/limits.h>
+#include <linux/init.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/smp_lock.h>
