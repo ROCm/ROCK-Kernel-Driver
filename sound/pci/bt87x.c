@@ -26,13 +26,13 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/control.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
@@ -46,17 +46,18 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int digital_rate[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* digital input rate */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Bt87x soundcard");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Bt87x soundcard");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Bt87x soundcard");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(digital_rate, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(digital_rate, int, boot_devs, 0444);
 MODULE_PARM_DESC(digital_rate, "Digital input rate for Bt87x soundcard");
 MODULE_PARM_SYNTAX(digital_rate, SNDRV_ENABLED);
 
@@ -808,7 +809,7 @@ static int __devinit snd_bt87x_probe(struct pci_dev *pci,
 	if (err < 0)
 		goto _error;
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	++dev;
 	return 0;
 
@@ -819,9 +820,7 @@ _error:
 
 static void __devexit snd_bt87x_remove(struct pci_dev *pci)
 {
-	bt87x_t *chip = snd_magic_cast(bt87x_t, pci_get_drvdata(pci), return);
-	if (chip)
-		snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -851,16 +850,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_bt87x_init(void)
 {
-	int err;
-
-	err = pci_module_init(&driver);
-	if (err < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "Bt87x soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_bt87x_exit(void)
@@ -870,24 +860,3 @@ static void __exit alsa_card_bt87x_exit(void)
 
 module_init(alsa_card_bt87x_init)
 module_exit(alsa_card_bt87x_exit)
-
-#ifndef MODULE
-
-/* format is: snd-bt87x=enable,index,id */
-
-static int __init alsa_card_bt87x_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-bt87x=", alsa_card_bt87x_setup);
-
-#endif /* ifndef MODULE */

@@ -255,13 +255,11 @@ void snd_pdacf_powerdown(pdacf_t *chip)
 
 #ifdef CONFIG_PM
 
-void snd_pdacf_suspend(pdacf_t *chip)
+int snd_pdacf_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	pdacf_t *chip = snd_magic_cast(pdacf_t, card->pm_private_data, return -EINVAL);
 	u16 val;
 	
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
 	snd_pcm_suspend_all(chip->pcm);
 	/* disable interrupts, but use direct write to preserve old register value in chip->regmap */
 	val = inw(chip->port + PDAUDIOCF_REG_IER);
@@ -270,6 +268,7 @@ void snd_pdacf_suspend(pdacf_t *chip)
 	chip->chip_status |= PDAUDIOCF_STAT_IS_SUSPENDED;	/* ignore interrupts from now */
 	snd_pdacf_powerdown(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
 static inline int check_signal(pdacf_t *chip)
@@ -277,13 +276,11 @@ static inline int check_signal(pdacf_t *chip)
 	return (chip->ak4117->rcs0 & AK4117_UNLCK) == 0;
 }
 
-void snd_pdacf_resume(pdacf_t *chip)
+int snd_pdacf_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	pdacf_t *chip = snd_magic_cast(pdacf_t, card->pm_private_data, return -EINVAL);
 	int timeout = 40;
 
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
 	pdacf_reinit(chip, 1);
 	/* wait for AK4117's PLL */
 	while (timeout-- > 0 &&
@@ -291,26 +288,6 @@ void snd_pdacf_resume(pdacf_t *chip)
 		mdelay(1);
 	chip->chip_status &= ~PDAUDIOCF_STAT_IS_SUSPENDED;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-int snd_pdacf_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	pdacf_t *chip = snd_magic_cast(pdacf_t, card->power_state_private_data, return -ENXIO);
-
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_pdacf_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_pdacf_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
 	return 0;
 }
-
 #endif

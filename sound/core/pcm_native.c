@@ -1038,7 +1038,7 @@ static int snd_pcm_resume(snd_pcm_substream_t *substream)
 
 	snd_power_lock(card);
 	if ((res = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile)) >= 0)
-		return snd_pcm_action_lock_irq(&snd_pcm_action_resume, substream, 0, 0);
+		res = snd_pcm_action_lock_irq(&snd_pcm_action_resume, substream, 0, 0);
 	snd_power_unlock(card);
 	return res;
 }
@@ -2335,6 +2335,39 @@ static int snd_pcm_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
 	return err;
 }
 		
+static int snd_pcm_sync_ptr(snd_pcm_substream_t *substream, struct sndrv_pcm_sync_ptr *_sync_ptr)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	struct sndrv_pcm_sync_ptr sync_ptr;
+	volatile struct sndrv_pcm_mmap_status *status;
+	volatile struct sndrv_pcm_mmap_control *control;
+	int err;
+
+	memset(&sync_ptr, 0, sizeof(sync_ptr));
+	if (get_user(sync_ptr.flags, (unsigned int *) &(_sync_ptr->flags)))
+		return -EFAULT;
+	if (copy_from_user(&sync_ptr.c.control, &(_sync_ptr->c.control), sizeof(struct sndrv_pcm_mmap_control)))
+		return -EFAULT;	
+	status = runtime->status;
+	control = runtime->control;
+	if (sync_ptr.flags & SNDRV_PCM_SYNC_PTR_HWSYNC) {
+		err = snd_pcm_hwsync(substream);
+		if (err < 0)
+			return err;
+	}
+	snd_pcm_stream_lock_irq(substream);
+	control->appl_ptr = sync_ptr.c.control.appl_ptr;
+	control->avail_min = sync_ptr.c.control.avail_min;
+	sync_ptr.s.status.state = status->state;
+	sync_ptr.s.status.hw_ptr = status->hw_ptr;
+	sync_ptr.s.status.tstamp = status->tstamp;
+	sync_ptr.s.status.suspended_state = status->suspended_state;
+	snd_pcm_stream_unlock_irq(substream);
+	if (copy_to_user(_sync_ptr, &sync_ptr, sizeof(sync_ptr)))
+		return -EFAULT;
+	return 0;
+}
+		
 static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 				   unsigned int cmd, void *arg);
 static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
@@ -2388,6 +2421,8 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_hwsync(substream);
 	case SNDRV_PCM_IOCTL_DELAY:
 		return snd_pcm_delay(substream, (snd_pcm_sframes_t *) arg);
+	case SNDRV_PCM_IOCTL_SYNC_PTR:
+		return snd_pcm_sync_ptr(substream, (struct sndrv_pcm_sync_ptr *) arg);
 	case SNDRV_PCM_IOCTL_HW_REFINE_OLD:
 		return snd_pcm_hw_refine_old_user(substream, (struct sndrv_pcm_hw_params_old *) arg);
 	case SNDRV_PCM_IOCTL_HW_PARAMS_OLD:

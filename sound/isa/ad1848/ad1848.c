@@ -25,9 +25,9 @@
 #include <linux/init.h>
 #include <linux/time.h>
 #include <linux/wait.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/ad1848.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #define chip_t ad1848_t
@@ -47,26 +47,27 @@ static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,11,12,15 */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
 static int thinkpad[SNDRV_CARDS];			/* Thinkpad special case */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for AD1848 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for AD1848 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable AD1848 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for AD1848 driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for AD1848 driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for AD1848 driver.");
 MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
-MODULE_PARM(thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(thinkpad, bool, boot_devs, 0444);
 MODULE_PARM_DESC(thinkpad, "Enable only for the onboard CS4248 of IBM Thinkpad 360/750/755 series.");
 MODULE_PARM_SYNTAX(thinkpad,  SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
@@ -159,29 +160,3 @@ static void __exit alsa_card_ad1848_exit(void)
 
 module_init(alsa_card_ad1848_init)
 module_exit(alsa_card_ad1848_exit)
-
-#ifndef MODULE
-
-/* format is: snd-ad1848=enable,index,id,port,
-			 irq,dma1 */
-
-static int __init alsa_card_ad1848_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option_long(&str,&port[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&dma1[nr_dev]) == 2 &&
-	       get_option(&str,&thinkpad[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-ad1848=", alsa_card_ad1848_setup);
-
-#endif /* ifndef MODULE */

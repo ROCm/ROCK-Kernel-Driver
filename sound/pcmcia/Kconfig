@@ -20,6 +20,7 @@ config SND_VXP440
 config SND_PDAUDIOCF
 	tristate "Sound Core PDAudioCF"
 	depends on SND && PCMCIA && ISA
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Sound Core PDAudioCF soundcard.
 

@@ -24,6 +24,7 @@
 
 #include "opl3_voice.h"
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Uros Bizjak <uros@kss-loka.si>");
@@ -32,7 +33,7 @@ MODULE_DESCRIPTION("ALSA driver for OPL3 FM synth");
 MODULE_CLASSES("{sound}");
 
 int use_internal_drums = 0;
-MODULE_PARM(use_internal_drums, "i");
+module_param(use_internal_drums, bool, 0444);
 MODULE_PARM_DESC(use_internal_drums, "Enable internal OPL2/3 drums.");
 
 int snd_opl3_synth_use_inc(opl3_t * opl3)

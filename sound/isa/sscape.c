@@ -26,12 +26,12 @@
 #include <linux/delay.h>
 #include <linux/pnp.h>
 #include <linux/spinlock.h>
+#include <linux/moduleparam.h>
 #include <asm/dma.h>
 #include <sound/core.h>
 #include <sound/hwdep.h>
 #include <sound/cs4231.h>
 #include <sound/mpu401.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include <sound/sscape_ioctl.h>
@@ -49,28 +49,29 @@ static long port[SNDRV_CARDS] __devinitdata = { [0 ... (SNDRV_CARDS-1)] = SNDRV_
 static int irq[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_IRQ;
 static int mpu_irq[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_IRQ;
 static int dma[SNDRV_CARDS] __devinitdata = SNDRV_DEFAULT_DMA;
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index number for SoundScape soundcard");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "Description for SoundScape card");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for SoundScape driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_ENABLED);
 
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for SoundScape driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 
-MODULE_PARM(mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU401 IRQ # for SoundScape driver.");
 MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 
-MODULE_PARM(dma, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma, "DMA # for SoundScape driver.");
 MODULE_PARM_SYNTAX(dma, SNDRV_DMA8_DESC);
   
@@ -1531,30 +1532,3 @@ static int __init sscape_init(void)
 
 module_init(sscape_init);
 module_exit(sscape_exit);
-
-#ifndef MODULE
-
-/* format is: snd-sscape=index,id,port,irq,mpu_irq,dma */
-
-static int __init builtin_sscape_setup(char *str)
-{
-	static unsigned __initdata nr_dev;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-
-	(void)((get_option(&str, &index[nr_dev]) == 2) &&
-	       (get_id(&str, &id[nr_dev]) == 2) &&
-	       (get_option_long(&str, &port[nr_dev]) == 2) &&
-	       (get_option(&str, &irq[nr_dev]) == 2) &&
-	       (get_option(&str, &mpu_irq[nr_dev]) == 2) &&
-	       (get_option(&str, &dma[nr_dev]) == 2)); 
- 
-	++nr_dev;
-	return 1;
-}
-
-__setup("snd-sscape=", builtin_sscape_setup);
-
-#endif
-

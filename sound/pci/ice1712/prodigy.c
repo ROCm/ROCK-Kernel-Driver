@@ -654,6 +654,7 @@ struct snd_ice1712_card_info snd_vt1724_prodigy_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_PRODIGY71,
 		.name = "Audiotrak Prodigy 7.1",
+		.model = "prodigy71",
 		.chip_init = prodigy_init,
 		.build_controls = prodigy_add_controls,
 		.eeprom_size = sizeof(prodigy71_eeprom),

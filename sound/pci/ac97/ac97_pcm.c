@@ -210,7 +210,7 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 	}
 
 	spin_lock(&ac97->reg_lock);
-	old = ac97->regs[reg] & mask;
+	old = snd_ac97_read(ac97, reg) & mask;
 	spin_unlock(&ac97->reg_lock);
 	if (old != bits) {
 		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);

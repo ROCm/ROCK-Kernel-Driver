@@ -295,7 +295,6 @@ struct _snd_cs4231 {
 	void (*set_capture_format) (cs4231_t *chip, snd_pcm_hw_params_t *hw_params, unsigned char cdfr);
 	void (*trigger) (cs4231_t *chip, unsigned int what, int start);
 #ifdef CONFIG_PM
-	struct pm_dev *pm_dev;
 	void (*suspend) (cs4231_t *chip);
 	void (*resume) (cs4231_t *chip);
 #endif

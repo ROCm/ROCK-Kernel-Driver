@@ -1737,9 +1737,6 @@ struct _snd_cs46xx {
 
 	struct snd_cs46xx_gameport *gameport;
 
-#ifdef CONFIG_PM
-	struct pm_dev *pm_dev;
-#endif
 #ifdef CONFIG_SND_CS46XX_DEBUG_GPIO
 	int current_gpio;
 #endif
@@ -1770,10 +1767,5 @@ int snd_cs46xx_mixer(cs46xx_t *chip);
 int snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rmidi);
 int snd_cs46xx_start_dsp(cs46xx_t *chip);
 void snd_cs46xx_gameport(cs46xx_t *chip);
-
-#ifdef CONFIG_PM
-void snd_cs46xx_suspend(cs46xx_t *chip);
-void snd_cs46xx_resume(cs46xx_t *chip);
-#endif
 
 #endif /* __SOUND_CS46XX_H */

@@ -26,6 +26,8 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/ctype.h>
+#include <linux/pci.h>
+#include <linux/pm.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -254,6 +256,12 @@ int snd_card_free(snd_card_t * card)
 
 #ifdef CONFIG_PM
 	wake_up(&card->power_sleep);
+#ifdef CONFIG_ISA
+	if (card->pm_dev) {
+		pm_unregister(card->pm_dev);
+		card->pm_dev = NULL;
+	}
+#endif
 #endif
 
 	/* wait, until all devices are ready for the free operation */
@@ -708,4 +716,93 @@ int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file
 	remove_wait_queue(&card->power_sleep, &wait);
 	return result;
 }
+
+/**
+ * snd_card_set_pm_callback - set the PCI power-management callbacks
+ * @card: soundcard structure
+ * @suspend: suspend callback function
+ * @resume: resume callback function
+ * @private_data: private data to pass to the callback functions
+ *
+ * Sets the power-management callback functions of the card.
+ * These callbacks are called from ALSA's common PCI suspend/resume
+ * handler and from the control API.
+ */
+int snd_card_set_pm_callback(snd_card_t *card,
+			     int (*suspend)(snd_card_t *, unsigned int),
+			     int (*resume)(snd_card_t *, unsigned int),
+			     void *private_data)
+{
+	card->pm_suspend = suspend;
+	card->pm_resume = resume;
+	card->pm_private_data = private_data;
+	return 0;
+}
+
+static int snd_generic_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+{
+	snd_card_t *card = dev->data;
+
+	switch (rqst) {
+	case PM_SUSPEND:
+		/* FIXME: the correct state value? */
+		card->pm_suspend(card, 0);
+		break;
+	case PM_RESUME:
+		/* FIXME: the correct state value? */
+		card->pm_resume(card, 0);
+		break;
+	}
+	return 0;
+}
+
+/**
+ * snd_card_set_dev_pm_callback - set the generic power-management callbacks
+ * @card: soundcard structure
+ * @type: PM device type (PM_XXX)
+ * @suspend: suspend callback function
+ * @resume: resume callback function
+ * @private_data: private data to pass to the callback functions
+ *
+ * Registers the power-management and sets the lowlevel callbacks for
+ * the given card with the given PM type.  These callbacks are called
+ * from the ALSA's common PM handler and from the control API.
+ */
+int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
+				 int (*suspend)(snd_card_t *, unsigned int),
+				 int (*resume)(snd_card_t *, unsigned int),
+				 void *private_data)
+{
+	card->pm_dev = pm_register(type, 0, snd_generic_pm_callback);
+	if (! card->pm_dev)
+		return -ENOMEM;
+	card->pm_dev->data = card;
+	snd_card_set_pm_callback(card, suspend, resume, private_data);
+	return 0;
+}
+
+#ifdef CONFIG_PCI
+int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
+{
+	snd_card_t *card = pci_get_drvdata(dev);
+	if (! card || ! card->pm_suspend)
+		return 0;
+	if (card->power_state == SNDRV_CTL_POWER_D3hot)
+		return 0;
+	/* FIXME: correct state value? */
+	return card->pm_suspend(card, 0);
+}
+
+int snd_card_pci_resume(struct pci_dev *dev)
+{
+	snd_card_t *card = pci_get_drvdata(dev);
+	if (! card || ! card->pm_resume)
+		return 0;
+	if (card->power_state == SNDRV_CTL_POWER_D0)
+		return 0;
+	/* FIXME: correct state value? */
+	return card->pm_resume(card, 0);
+}
+#endif
+
 #endif /* CONFIG_PM */

@@ -34,13 +34,13 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/moduleparam.h>
 
 #include <sound/driver.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/control.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include <asm/io.h>
@@ -50,14 +50,15 @@
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Sun AMD7930 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Sun AMD7930 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Sun AMD7930 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Thomas K. Dyas and David S. Miller");
@@ -1152,24 +1153,3 @@ static void __exit amd7930_exit(void)
 
 module_init(amd7930_init);
 module_exit(amd7930_exit);
-
-#ifndef MODULE
-
-/* format is: snd-sun-amd7930=index,id,enable */
-
-static int __init alsa_card_sun_amd7930_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&index[nr_dev]) == 2 &&
-	       get_option(&str,&id[nr_dev]) == 2 &&
-	       get_id(&str,&enable[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-sun-amd7930=", alsa_card_sun_amd7930_setup);
-
-#endif /* ifndef MODULE */

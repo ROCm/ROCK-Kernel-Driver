@@ -135,6 +135,47 @@ static void wm_put(ice1712_t *ice, int reg, unsigned short val)
 }
 
 /*
+ * DAC mute control
+ */
+static int wm_dac_mute_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int wm_dac_mute_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short val;
+
+	down(&ice->gpio_mutex);
+	val = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_MUTE);
+	ucontrol->value.integer.value[0] = ~val>>4 & 0x1;
+	up(&ice->gpio_mutex);
+	return 0;
+}
+
+static int wm_dac_mute_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short new, old;
+	int change;
+
+	snd_ice1712_save_gpio_status(ice);
+	old = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_MUTE);
+	new = (~ucontrol->value.integer.value[0]<<4&0x10) | (old&~0x10);
+	change = (new != old);
+	if (change)
+		wm_put(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_MUTE, new);
+	snd_ice1712_restore_gpio_status(ice);
+
+	return change;
+}
+
+/*
  * DAC volume attenuation mixer control
  */
 static int wm_dac_vol_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -192,6 +233,47 @@ static int wm_dac_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 }
 
 /*
+ * ADC mute control
+ */
+static int wm_adc_mute_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int wm_adc_mute_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short val;
+
+	down(&ice->gpio_mutex);
+	val = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_ADC_GAIN);
+	ucontrol->value.integer.value[0] = ~val>>5 & 0x1;
+	up(&ice->gpio_mutex);
+	return 0;
+}
+
+static int wm_adc_mute_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short new, old;
+	int change;
+
+	snd_ice1712_save_gpio_status(ice);
+	old = wm_get(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_ADC_GAIN);
+	new = (~ucontrol->value.integer.value[0]<<5&0x20) | (old&~0x20);
+	change = (new != old);
+	if (change)
+		wm_put(ice, snd_ctl_get_ioffidx(kcontrol, &ucontrol->id)+WM_ADC_GAIN, new);
+	snd_ice1712_restore_gpio_status(ice);
+
+	return change;
+}
+
+/*
  * ADC gain mixer control
  */
 static int wm_adc_vol_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -227,10 +309,10 @@ static int wm_adc_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	snd_ice1712_save_gpio_status(ice);
 	idx  = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id) + WM_ADC_GAIN;
 	nvol = ucontrol->value.integer.value[0];
-	ovol = wm_get(ice, idx) & 0x1f;
-	change = (ovol != nvol);
+	ovol = wm_get(ice, idx);
+	change = ((ovol & 0x1f)  != nvol);
 	if (change)
-		wm_put(ice, idx, nvol);
+		wm_put(ice, idx, nvol | (ovol & ~0x1f));
 	snd_ice1712_restore_gpio_status(ice);
 	return change;
 }
@@ -241,18 +323,15 @@ static int wm_adc_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 static int wm_adc_mux_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	static char *texts[] = {
-		"CD Left",
-		"CD Right",
-		"Aux Left",
-		"Aux Right",
-		"Line Left",
-		"Line Right",
-		"Mic Left",
-		"Mic Right",
+		"CD",		//AIN1
+		"Aux",		//AIN2
+		"Line",		//AIN3
+		"Mic",		//AIN4
+		"AC97"		//AIN5
 	};
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = 2;
-	uinfo->value.enumerated.items = 8;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 5;
 	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
 		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
 	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
@@ -291,6 +370,57 @@ static int wm_adc_mux_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucont
 }
 
 /*
+ * Headphone Amplifier
+ */
+static int aureon_set_headphone_amp(ice1712_t *ice, int enable)
+{
+	unsigned int tmp, tmp2;
+
+	tmp2 = tmp = snd_ice1712_gpio_read(ice);
+	if (enable)
+		tmp |= AUREON_HP_SEL;
+	else
+		tmp &= ~ AUREON_HP_SEL;
+	if (tmp != tmp2) {
+		snd_ice1712_gpio_write(ice, tmp);
+		return 1;
+	}
+	return 0;
+}
+
+static int aureon_get_headphone_amp(ice1712_t *ice)
+{
+	unsigned int tmp = snd_ice1712_gpio_read(ice);
+
+	return ( tmp & AUREON_HP_SEL )!= 0;
+}
+
+static int aureon_hpamp_info(snd_kcontrol_t *k, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int aureon_hpamp_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = aureon_get_headphone_amp(ice);
+	return 0;
+}
+
+
+static int aureon_hpamp_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	return aureon_set_headphone_amp(ice,ucontrol->value.integer.value[0]);
+}
+
+/*
  * mixers
  */
 
@@ -315,11 +445,27 @@ static snd_kcontrol_new_t aureon71_dac_control __devinitdata = {
 static snd_kcontrol_new_t wm_controls[] __devinitdata = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Master Playback Switch",
+		.info = wm_dac_mute_info,
+		.get = wm_dac_mute_get,
+		.put = wm_dac_mute_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Master Playback Volume",
 		.info = wm_dac_vol_info,
 		.get = wm_dac_vol_get,
 		.put = wm_dac_vol_put,
 		.private_value = 1,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "ADC Switch",
+		.count = 2,
+		.info = wm_adc_mute_info,
+		.get = wm_adc_mute_get,
+		.put = wm_adc_mute_put,
+
 	},
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -335,6 +481,13 @@ static snd_kcontrol_new_t wm_controls[] __devinitdata = {
 		.info = wm_adc_mux_info,
 		.get = wm_adc_mux_get,
 		.put = wm_adc_mux_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Headphone Amplifier Switch",
+		.info = aureon_hpamp_info,
+		.get = aureon_hpamp_get,
+		.put = aureon_hpamp_put
 	},
 };
 
@@ -496,6 +649,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON51_SKY,
 		.name = "Terratec Aureon 5.1-Sky",
+		.model = "aureon51",
 		.chip_init = aureon_init,
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon51_eeprom),
@@ -504,10 +658,19 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON71_SPACE,
 		.name = "Terratec Aureon 7.1-Space",
+		.model = "aureon71",
 		.chip_init = aureon_init,
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon71_eeprom),
 		.eeprom_data = aureon71_eeprom,
+	},
+ 	{
+ 		.subvendor = VT1724_SUBDEVICE_AUREON71_UNIVERSE,
+ 		.name = "Terratec Aureon 7.1-Universe",
+ 		.chip_init = aureon_init,
+ 		.build_controls = aureon_add_controls,
+ 		.eeprom_size = sizeof(aureon71_eeprom),
+ 		.eeprom_data = aureon71_eeprom,
 	},
 	{ } /* terminator */
 };

@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
+#include <linux/moduleparam.h>
 
 #include <sound/core.h>
 #include <sound/control.h>
@@ -35,7 +36,6 @@
 #include <sound/asoundef.h>
 #include <sound/rawmidi.h>
 #include <sound/hwdep.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/hdsp.h>
 
@@ -48,20 +48,21 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int precise_ptr[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* Enable precise pointer */
 static int line_outs_monitor[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Send all inputs/playback to line outs */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for RME Hammerfall DSP interface.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for RME Hammerfall DSP interface.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable/disable specific Hammerfall DSP soundcards.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(precise_ptr, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(precise_ptr, bool, boot_devs, 0444);
 MODULE_PARM_DESC(precise_ptr, "Enable precise pointer (doesn't work reliably).");
 MODULE_PARM_SYNTAX(precise_ptr, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(line_outs_monitor,"1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(line_outs_monitor, bool, boot_devs, 0444);
 MODULE_PARM_DESC(line_outs_monitor, "Send all input and playback streams to line outs by default.");
 MODULE_PARM_SYNTAX(line_outs_monitor, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_AUTHOR("Paul Davis <paul@linuxaudiosystems.com>, Marcus Andersson, Thomas Charbonnel <thomas@undata.org>");
@@ -634,6 +635,7 @@ static inline int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
 	case 0xa:
 		return (64 * out) + (32 + (in));
 	case 0x96:
+	case 0x97:
 		return (32 * out) + (16 + (in));
 	default:
 		return (52 * out) + (26 + (in));
@@ -646,6 +648,7 @@ static inline int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
 	case 0xa:
 		return (64 * out) + in;
 	case 0x96:
+	case 0x97:
 		return (32 * out) + in;
 	default:
 		return (52 * out) + in;
@@ -4120,10 +4123,10 @@ static int snd_hdsp_prepare(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock_irq(&hdsp->lock);
+	spin_lock(&hdsp->lock);
 	if (!hdsp->running)
 		hdsp_reset_hw_pointer(hdsp);
-	spin_unlock_irq(&hdsp->lock);
+	spin_unlock(&hdsp->lock);
 	return result;
 }
 
@@ -5018,6 +5021,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 		is_9652 = 1;
 		break;
 	case 0x96:
+	case 0x97:
 		hdsp->card_name = "RME HDSP 9632";
 		hdsp->max_channels = 16;
 		is_9632 = 1;
@@ -5198,14 +5202,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_hdsp_init(void)
 {
-	if (pci_module_init(&driver) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "RME Hammerfall-DSP: no cards found\n");
-#endif
-		return -ENODEV;
-	}
-
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_hdsp_exit(void)
@@ -5215,24 +5212,3 @@ static void __exit alsa_card_hdsp_exit(void)
 
 module_init(alsa_card_hdsp_init)
 module_exit(alsa_card_hdsp_exit)
-
-#ifndef MODULE
-
-/* format is: snd-hdsp=enable,index,id */
-
-static int __init alsa_card_hdsp_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-hdsp=", alsa_card_hdsp_setup);
-
-#endif /* ifndef MODULE */

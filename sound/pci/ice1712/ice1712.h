@@ -460,6 +460,7 @@ static inline u8 snd_ice1712_read(ice1712_t * ice, u8 addr)
 struct snd_ice1712_card_info {
 	unsigned int subvendor;
 	char *name;
+	char *model;
 	int (*chip_init)(ice1712_t *);
 	int (*build_controls)(ice1712_t *);
 	int no_mpu401: 1;

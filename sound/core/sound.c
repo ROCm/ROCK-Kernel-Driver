@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/info.h>
@@ -45,15 +46,15 @@ MODULE_DESCRIPTION("Advanced Linux Sound Architecture driver for soundcards.");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_SUPPORTED_DEVICE("sound");
-MODULE_PARM(major, "i");
+module_param(major, int, 0444);
 MODULE_PARM_DESC(major, "Major # for sound driver.");
 MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
-MODULE_PARM(cards_limit, "i");
+module_param(cards_limit, int, 0444);
 MODULE_PARM_DESC(cards_limit, "Count of auto-loadable soundcards.");
 MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
 MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 #ifdef CONFIG_DEVFS_FS
-MODULE_PARM(device_mode, "i");
+module_param(device_mode, int, 0444);
 MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
 MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
 #endif
@@ -465,6 +466,12 @@ EXPORT_SYMBOL(snd_card_file_add);
 EXPORT_SYMBOL(snd_card_file_remove);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL(snd_power_wait);
+EXPORT_SYMBOL(snd_card_set_pm_callback);
+EXPORT_SYMBOL(snd_card_set_dev_pm_callback);
+#ifdef CONFIG_PCI
+EXPORT_SYMBOL(snd_card_pci_suspend);
+EXPORT_SYMBOL(snd_card_pci_resume);
+#endif
 #endif
   /* device.c */
 EXPORT_SYMBOL(snd_device_new);
