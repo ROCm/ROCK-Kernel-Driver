@@ -53,7 +53,6 @@ show up in /proc/sys/kernel:
 - tainted
 - threads-max
 - version
-- zero-paged                  [ PPC only ]
 
 ==============================================================
 
@@ -313,11 +312,3 @@ can be ORed together:
       Set by modutils >= 2.4.9 and module-init-tools.
   4 - Unsafe SMP processors: SMP with CPUs not designed for SMP.
 
-==============================================================
-
-zero-paged: (PPC only)
-
-When enabled (non-zero), Linux-PPC will pre-zero pages in
-the idle loop, possibly speeding up get_free_pages. Since
-this only affects what the idle loop is doing, you should
-enable this and see if anything changes.
