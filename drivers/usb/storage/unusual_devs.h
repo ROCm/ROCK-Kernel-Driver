@@ -359,12 +359,18 @@ UNUSUAL_DEV(  0x057b, 0x0000, 0x0300, 0x9999,
 UNUSUAL_DEV(  0x0595, 0x4343, 0x0000, 0x2210,
 		"Fujifilm",
 		"Digital Camera EX-20 DSC",
-		US_SC_8070, US_PR_CBI, NULL, 0 ),
+		US_SC_8070, US_PR_DEVICE, NULL, 0 ),
 
 UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200, 
 		"LaCie",
 		"USB Hard Disk",
 		US_SC_RBC, US_PR_CB, NULL, 0 ), 
+
+/* Submitted by Jol Bourquard <numlock@freesurf.ch> */
+UNUSUAL_DEV(  0x05ab, 0x0060, 0x1104, 0x1110,
+		"In-System",
+		"PyroGate External CD-ROM Enclosure (FCD-523)",
+		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,

@@ -2302,17 +2302,6 @@ eth_bind (struct usb_gadget *gadget)
 		UTS_SYSNAME " " UTS_RELEASE "/%s",
 		gadget->name);
 
-	/* CDC subset ... recognized by Linux since 2.4.10, but Windows
-	 * drivers aren't widely available.
-	 */
-	if (!cdc) {
-		device_desc.bDeviceClass = USB_CLASS_VENDOR_SPEC;
-		device_desc.idVendor =
-			__constant_cpu_to_le16(SIMPLE_VENDOR_NUM);
-		device_desc.idProduct =
-			__constant_cpu_to_le16(SIMPLE_PRODUCT_NUM);
-	}
-
 	/* If there's an RNDIS configuration, that's what Windows wants to
 	 * be using ... so use these product IDs here and in the "linux.inf"
 	 * needed to install MSFT drivers.  Current Linux kernels will use
@@ -2326,6 +2315,16 @@ eth_bind (struct usb_gadget *gadget)
 			__constant_cpu_to_le16(RNDIS_PRODUCT_NUM);
 		snprintf (product_desc, sizeof product_desc,
 			"RNDIS/%s", driver_desc);
+
+	/* CDC subset ... recognized by Linux since 2.4.10, but Windows
+	 * drivers aren't widely available.
+	 */
+	} else if (!cdc) {
+		device_desc.bDeviceClass = USB_CLASS_VENDOR_SPEC;
+		device_desc.idVendor =
+			__constant_cpu_to_le16(SIMPLE_VENDOR_NUM);
+		device_desc.idProduct =
+			__constant_cpu_to_le16(SIMPLE_PRODUCT_NUM);
 	}
 
 	/* support optional vendor/distro customization */

@@ -1504,6 +1504,7 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 	if (status) {
 		err("%s - failed submitting write urb, error %d", __FUNCTION__, status);
 		count = status;
+		kfree (buffer);
 	}
 
 	/* we are done with this urb, so let the host driver

@@ -566,7 +566,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
  */
 int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char index, void *buf, int size)
 {
-	int i = 5;
+	int i = 3;
 	int result;
 	
 	memset(buf,0,size);	// Make sure we parse really received data
@@ -579,9 +579,6 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 				    HZ * USB_CTRL_GET_TIMEOUT)) > 0
 				|| result != -EPIPE)
 			break;
-
-		dev_dbg (&dev->dev, "RETRY descriptor, result %d\n", result);
-		result = -ENOMSG;
 	}
 	return result;
 }

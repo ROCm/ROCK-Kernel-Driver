@@ -761,6 +761,7 @@ static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, 
 			usblp->minor, usblp->readurb->status);
 		usblp->readurb->dev = usblp->dev;
  		usblp->readcount = 0;
+		usblp->rcomplete = 0;
 		if (usb_submit_urb(usblp->readurb, GFP_KERNEL) < 0)
 			dbg("error submitting urb");
 		count = -EIO;
