@@ -3,33 +3,33 @@
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001-2002 International Business Machines Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * This file is part of the implementation of the add-IP extension,
  * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
  * for the SCTP kernel reference Implementation.
- * 
- * The SCTP reference implementation  is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation  is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * the SCTP reference implementation  is distributed in the hope that it 
+ *
+ * the SCTP reference implementation  is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  *                 ************************
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to one of the following email
  * addresses:
- * 
+ *
  * La Monte H.P. Yarroll <piggy@acm.org>
  * Karl Knutson <karl@athena.chicago.il.us>
  * Randall Stewart <randall@stewart.chicago.il.us>
@@ -38,14 +38,14 @@
  * Xingang Guo <xingang.guo@intel.com>
  * Sridhar Samudrala <samudrala@us.ibm.com>
  * Daisy Chang <daisyc@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
- * 
+ *
  * There are still LOTS of bugs in this code... I always run on the motto
  * "it is a wonder any code ever works :)"
- * 
- * 
+ *
+ *
  */
 
 #ifndef __sctp_constants_h__
@@ -60,15 +60,6 @@
 enum { SCTP_MAX_STREAM = 0xffff };
 enum { SCTP_DEFAULT_OUTSTREAMS = 10 };
 enum { SCTP_DEFAULT_INSTREAMS = SCTP_MAX_STREAM };
-
-/* Define the amount of space to reserve for SCTP, IP, LL.
- * There is a little bit of waste that we are always allocating
- * for ipv6 headers, but this seems worth the simplicity.
- */
-
-#define SCTP_IP_OVERHEAD ((sizeof(struct sctphdr)\
-                          + sizeof(struct ipv6hdr)\
-                          + MAX_HEADER))
 
 /* Define the amount of space to reserve for SCTP, IP, LL.
  * There is a little bit of waste that we are always allocating
@@ -250,8 +241,13 @@ extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
 #define SCTP_ADDR_REACHABLE		2
 #define SCTP_ADDR_NOT_REACHABLE		1
 
+/* Maximum chunk length considering padding requirements. */
+enum { SCTP_MAX_CHUNK_LEN = ((1<<16) - sizeof(__u32)) };
 
-
+/* Encourage Cookie-Echo bundling by pre-fragmenting chunks a little
+ * harder (until reaching ESTABLISHED state).
+ */
+enum { SCTP_ARBITRARY_COOKIE_ECHO_LEN = 200 };
 
 /* Guess at how big to make the TSN mapping array.
  * We guarantee that we can handle at least this big a gap between the
@@ -271,7 +267,8 @@ extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
  * is enough room for 131 duplicate reports.  Round down to the
  * nearest power of 2.
  */
-#define SCTP_MAX_DUP_TSNS 128
+enum { SCTP_MIN_PMTU = 576 };
+enum { SCTP_MAX_DUP_TSNS = 128 };
 
 typedef enum {
 	SCTP_COUNTER_INIT_ERROR,
@@ -279,7 +276,6 @@ typedef enum {
 
 /* How many counters does an association need? */
 #define SCTP_NUMBER_COUNTERS	5
-
 
 /* Here we define the default timers.  */
 

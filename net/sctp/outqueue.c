@@ -571,6 +571,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 	sctp_chunk_t *first_frag, *frag;
 	struct list_head *frag_list;
 	int nfrags;
+	__u8 old_flags, flags;
 
 	/* nfrags = no. of max size fragments + any smaller last fragment. */
 	nfrags = ((chunk_data_len / max_frag_data_len) +
@@ -579,9 +580,16 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 	/* Start of the data in the chunk. */
 	data_ptr += sizeof(sctp_datahdr_t);
 
+	/* Are we fragmenting an already fragmented large message? */
+ 	old_flags = chunk->chunk_hdr->flags;
+	if (old_flags & SCTP_DATA_FIRST_FRAG)
+		flags = SCTP_DATA_FIRST_FRAG;
+	else 
+		flags = SCTP_DATA_MIDDLE_FRAG;
+
 	/* Make the first fragment. */
 	first_frag = sctp_make_datafrag(asoc, sinfo, max_frag_data_len,
-					data_ptr, SCTP_DATA_FIRST_FRAG, ssn);
+					data_ptr, flags, ssn);
 
 	if (!first_frag)
 		goto err;
@@ -609,9 +617,14 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
 		data_ptr += max_frag_data_len;
 	}
 
+	if (old_flags & SCTP_DATA_LAST_FRAG)
+		flags = SCTP_DATA_LAST_FRAG;
+	else
+		flags = SCTP_DATA_MIDDLE_FRAG;
+
 	/* Make the last fragment. */
 	frag = sctp_make_datafrag(asoc, sinfo, chunk_data_len, data_ptr,
-				  SCTP_DATA_LAST_FRAG, ssn);
+				  flags, ssn);
 	if (!frag)
 		goto err;
 	frag->has_ssn = 1;
