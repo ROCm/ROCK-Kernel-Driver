@@ -18,6 +18,7 @@
 #include <linux/buffer_head.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
