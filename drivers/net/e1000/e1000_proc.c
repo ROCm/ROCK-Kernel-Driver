@@ -490,7 +490,7 @@ e1000_proc_media_type(void *data, size_t len, char *buf)
 {
 	struct e1000_adapter *adapter = data;
 	sprintf(buf,
-		adapter->shared.media_type == e1000_media_type_copper ?
+		adapter->hw.media_type == e1000_media_type_copper ?
 		"Copper" : "Fiber");
 	return buf;
 }
@@ -591,7 +591,7 @@ e1000_proc_rx_status(void *data, size_t len, char *buf)
 static void __devinit
 e1000_proc_list_setup(struct e1000_adapter *adapter)
 {
-	struct e1000_hw *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 	struct list_head *proc_list_head = &adapter->proc_list_head;
 
 	INIT_LIST_HEAD(proc_list_head);
@@ -600,21 +600,21 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 	LIST_ADD_F("Part_Number", &adapter->part_num, e1000_proc_part_number);
 	LIST_ADD_S("Driver_Name", e1000_driver_name);
 	LIST_ADD_S("Driver_Version", e1000_driver_version);
-	LIST_ADD_H("PCI_Vendor", &shared->vendor_id);
-	LIST_ADD_H("PCI_Device_ID", &shared->device_id);
-	LIST_ADD_H("PCI_Subsystem_Vendor", &shared->subsystem_vendor_id);
-	LIST_ADD_H("PCI_Subsystem_ID", &shared->subsystem_id);
-	LIST_ADD_H("PCI_Revision_ID", &shared->revision_id);
+	LIST_ADD_H("PCI_Vendor", &hw->vendor_id);
+	LIST_ADD_H("PCI_Device_ID", &hw->device_id);
+	LIST_ADD_H("PCI_Subsystem_Vendor", &hw->subsystem_vendor_id);
+	LIST_ADD_H("PCI_Subsystem_ID", &hw->subsystem_id);
+	LIST_ADD_H("PCI_Revision_ID", &hw->revision_id);
 	LIST_ADD_U("PCI_Bus", &adapter->pdev->bus->number);
 	LIST_ADD_F("PCI_Slot", adapter, e1000_proc_slot);
 
-	if(adapter->shared.mac_type >= e1000_82543) {
+	if(adapter->hw.mac_type >= e1000_82543) {
 		LIST_ADD_F("PCI_Bus_Type",
-		           &shared->bus_type, e1000_proc_bus_type);
+		           &hw->bus_type, e1000_proc_bus_type);
 		LIST_ADD_F("PCI_Bus_Speed",
-		           &shared->bus_speed, e1000_proc_bus_speed);
+		           &hw->bus_speed, e1000_proc_bus_speed);
 		LIST_ADD_F("PCI_Bus_Width",
-		           &shared->bus_width, e1000_proc_bus_width);
+		           &hw->bus_width, e1000_proc_bus_width);
 	}
 
 	LIST_ADD_U("IRQ", &adapter->pdev->irq);
@@ -622,7 +622,7 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 	LIST_ADD_F("Current_HWaddr",
 	            adapter->netdev->dev_addr, e1000_proc_hwaddr);
 	LIST_ADD_F("Permanent_HWaddr",
-	            adapter->shared.perm_mac_addr, e1000_proc_hwaddr);
+	            adapter->hw.perm_mac_addr, e1000_proc_hwaddr);
 
 	LIST_ADD_BLANK();
 
@@ -669,7 +669,7 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 	LIST_ADD_U("Rx_Short_Length_Errors", &adapter->stats.ruc);
 	
 	/* The 82542 does not have an alignment error count register */
-	if(adapter->shared.mac_type >= e1000_82543)
+	if(adapter->hw.mac_type >= e1000_82543)
 		LIST_ADD_U("Rx_Align_Errors", &adapter->stats.algnerrc);
 	
 	LIST_ADD_U("Rx_Flow_Control_XON", &adapter->stats.xonrxc);
@@ -683,7 +683,7 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 
 	/* Cable diags */
 	LIST_ADD_F("PHY_Media_Type", adapter, e1000_proc_media_type);
-	if(adapter->shared.media_type == e1000_media_type_copper) {
+	if(adapter->hw.media_type == e1000_media_type_copper) {
 		LIST_ADD_F("PHY_Cable_Length",
 		           adapter, e1000_proc_cable_length);
 		LIST_ADD_F("PHY_Extended_10Base_T_Distance",

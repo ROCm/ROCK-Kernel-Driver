@@ -219,7 +219,7 @@ struct e1000_adapter {
 	struct net_device_stats net_stats;
 
 	/* structs defined in e1000_hw.h */
-	struct e1000_hw shared;
+	struct e1000_hw hw;
 	struct e1000_hw_stats stats;
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;

@@ -282,15 +282,15 @@ e1000_reset(struct e1000_adapter *adapter)
 	 */
 
 	if(adapter->rx_buffer_len > E1000_RXBUFFER_8192)
-		E1000_WRITE_REG(&adapter->shared, PBA, E1000_JUMBO_PBA);
+		E1000_WRITE_REG(&adapter->hw, PBA, E1000_JUMBO_PBA);
 	else
-		E1000_WRITE_REG(&adapter->shared, PBA, E1000_DEFAULT_PBA);
+		E1000_WRITE_REG(&adapter->hw, PBA, E1000_DEFAULT_PBA);
 
-	adapter->shared.fc = adapter->shared.original_fc;
-	e1000_reset_hw(&adapter->shared);
-	e1000_init_hw(&adapter->shared);
-	e1000_reset_adaptive(&adapter->shared);
-	e1000_phy_get_info(&adapter->shared, &adapter->phy_info);
+	adapter->hw.fc = adapter->hw.original_fc;
+	e1000_reset_hw(&adapter->hw);
+	e1000_init_hw(&adapter->hw);
+	e1000_reset_adaptive(&adapter->hw);
+	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
 
 	e1000_enable_WOL(adapter);
 }
@@ -347,13 +347,13 @@ e1000_probe(struct pci_dev *pdev,
 	adapter = netdev->priv;
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
-	adapter->shared.back = adapter;
+	adapter->hw.back = adapter;
 
 	mmio_start = pci_resource_start(pdev, BAR_0);
 	mmio_len = pci_resource_len(pdev, BAR_0);
 
-	adapter->shared.hw_addr = ioremap(mmio_start, mmio_len);
-	if(!adapter->shared.hw_addr)
+	adapter->hw.hw_addr = ioremap(mmio_start, mmio_len);
+	if(!adapter->hw.hw_addr)
 		goto err_ioremap;
 
 	netdev->open = &e1000_open;
@@ -377,7 +377,7 @@ e1000_probe(struct pci_dev *pdev,
 
 	e1000_sw_init(adapter);
 
-	if(adapter->shared.mac_type >= e1000_82543) {
+	if(adapter->hw.mac_type >= e1000_82543) {
 		netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM;
 	} else {
 		netdev->features = NETIF_F_SG;
@@ -388,19 +388,19 @@ e1000_probe(struct pci_dev *pdev,
 
 	/* make sure the EEPROM is good */
 
-	if(e1000_validate_eeprom_checksum(&adapter->shared) < 0)
+	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0)
 		goto err_eeprom;
 
 	/* copy the MAC address out of the EEPROM */
 
-	e1000_read_mac_addr(&adapter->shared);
-	memcpy(netdev->dev_addr, adapter->shared.mac_addr, netdev->addr_len);
+	e1000_read_mac_addr(&adapter->hw);
+	memcpy(netdev->dev_addr, adapter->hw.mac_addr, netdev->addr_len);
 
 	if(!is_valid_ether_addr(netdev->dev_addr))
 		goto err_eeprom;
 
-	e1000_read_part_num(&adapter->shared, &(adapter->part_num));
-	e1000_get_bus_info(&adapter->shared);
+	e1000_read_part_num(&adapter->hw, &(adapter->part_num));
+	e1000_get_bus_info(&adapter->hw);
 
 	init_timer(&adapter->watchdog_timer);
 	adapter->watchdog_timer.function = &e1000_watchdog;
@@ -429,7 +429,7 @@ e1000_probe(struct pci_dev *pdev,
 	return 0;
 
 err_eeprom:
-	iounmap(adapter->shared.hw_addr);
+	iounmap(adapter->hw.hw_addr);
 err_ioremap:
 	pci_release_regions(pdev);
 	kfree(netdev);
@@ -459,11 +459,11 @@ e1000_remove(struct pci_dev *pdev)
 
 	unregister_netdev(netdev);
 
-	e1000_phy_hw_reset(&adapter->shared);
+	e1000_phy_hw_reset(&adapter->hw);
 
 	e1000_proc_dev_free(adapter);
 
-	iounmap(adapter->shared.hw_addr);
+	iounmap(adapter->hw.hw_addr);
 	pci_release_regions(pdev);
 
 	kfree(netdev);
@@ -482,17 +482,17 @@ e1000_remove(struct pci_dev *pdev)
 static void __devinit
 e1000_sw_init(struct e1000_adapter *adapter)
 {
-	struct e1000_hw *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
 
 	/* PCI config space info */
 
-	uint16_t *vendor = &shared->vendor_id;
-	uint16_t *device = &shared->device_id;
-	uint16_t *subvendor = &shared->subsystem_vendor_id;
-	uint16_t *subsystem = &shared->subsystem_id;
-	uint8_t  *revision  = &shared->revision_id;
+	uint16_t *vendor = &hw->vendor_id;
+	uint16_t *device = &hw->device_id;
+	uint16_t *subvendor = &hw->subsystem_vendor_id;
+	uint16_t *subsystem = &hw->subsystem_id;
+	uint8_t  *revision  = &hw->revision_id;
 
 	pci_read_config_word(pdev, PCI_VENDOR_ID, vendor);
 	pci_read_config_word(pdev, PCI_DEVICE_ID, device);
@@ -500,11 +500,11 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, subvendor);
 	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, subsystem);
 
-	pci_read_config_word(pdev, PCI_COMMAND, &shared->pci_cmd_word);
+	pci_read_config_word(pdev, PCI_COMMAND, &hw->pci_cmd_word);
 
 	adapter->rx_buffer_len = E1000_RXBUFFER_2048;
-	shared->max_frame_size = netdev->mtu + ENET_HEADER_SIZE + CRC_LENGTH;
-	shared->min_frame_size = MINIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH;
+	hw->max_frame_size = netdev->mtu + ENET_HEADER_SIZE + CRC_LENGTH;
+	hw->min_frame_size = MINIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH;
 
 	/* identify the MAC */
 
@@ -512,28 +512,28 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	case E1000_DEV_ID_82542:
 		switch (*revision) {
 		case E1000_82542_2_0_REV_ID:
-			shared->mac_type = e1000_82542_rev2_0;
+			hw->mac_type = e1000_82542_rev2_0;
 			break;
 		case E1000_82542_2_1_REV_ID:
-			shared->mac_type = e1000_82542_rev2_1;
+			hw->mac_type = e1000_82542_rev2_1;
 			break;
 		default:
-			shared->mac_type = e1000_82542_rev2_0;
+			hw->mac_type = e1000_82542_rev2_0;
 			E1000_ERR("Could not identify 82542 revision\n");
 		}
 		break;
 	case E1000_DEV_ID_82543GC_FIBER:
 	case E1000_DEV_ID_82543GC_COPPER:
-		shared->mac_type = e1000_82543;
+		hw->mac_type = e1000_82543;
 		break;
 	case E1000_DEV_ID_82544EI_COPPER:
 	case E1000_DEV_ID_82544EI_FIBER:
 	case E1000_DEV_ID_82544GC_COPPER:
 	case E1000_DEV_ID_82544GC_LOM:
-		shared->mac_type = e1000_82544;
+		hw->mac_type = e1000_82544;
 		break;
 	case E1000_DEV_ID_82540EM:
-		shared->mac_type = e1000_82540;
+		hw->mac_type = e1000_82540;
 		break;
 	default:
 		/* should never have loaded on this device */
@@ -542,31 +542,31 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* flow control settings */
 
-	shared->fc_high_water = FC_DEFAULT_HI_THRESH;
-	shared->fc_low_water = FC_DEFAULT_LO_THRESH;
-	shared->fc_pause_time = FC_DEFAULT_TX_TIMER;
-	shared->fc_send_xon = 1;
+	hw->fc_high_water = FC_DEFAULT_HI_THRESH;
+	hw->fc_low_water = FC_DEFAULT_LO_THRESH;
+	hw->fc_pause_time = FC_DEFAULT_TX_TIMER;
+	hw->fc_send_xon = 1;
 
 	/* Media type - copper or fiber */
 
-	if(shared->mac_type >= e1000_82543) {
-		uint32_t status = E1000_READ_REG(shared, STATUS);
+	if(hw->mac_type >= e1000_82543) {
+		uint32_t status = E1000_READ_REG(hw, STATUS);
 
 		if(status & E1000_STATUS_TBIMODE)
-			shared->media_type = e1000_media_type_fiber;
+			hw->media_type = e1000_media_type_fiber;
 		else
-			shared->media_type = e1000_media_type_copper;
+			hw->media_type = e1000_media_type_copper;
 	} else {
-		shared->media_type = e1000_media_type_fiber;
+		hw->media_type = e1000_media_type_fiber;
 	}
 
-	if(shared->mac_type < e1000_82543)
-		shared->report_tx_early = 0;
+	if(hw->mac_type < e1000_82543)
+		hw->report_tx_early = 0;
 	else
-		shared->report_tx_early = 1;
+		hw->report_tx_early = 1;
 
-	shared->wait_autoneg_complete = FALSE;
-	shared->tbi_compatibility_en = TRUE;
+	hw->wait_autoneg_complete = FALSE;
+	hw->tbi_compatibility_en = TRUE;
 
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->stats_lock);
@@ -697,19 +697,19 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 	uint32_t tdlen = adapter->tx_ring.count * sizeof(struct e1000_tx_desc);
 	uint32_t tctl, tipg;
 
-	E1000_WRITE_REG(&adapter->shared, TDBAL, (tdba & 0x00000000FFFFFFFF));
-	E1000_WRITE_REG(&adapter->shared, TDBAH, (tdba >> 32));
+	E1000_WRITE_REG(&adapter->hw, TDBAL, (tdba & 0x00000000FFFFFFFF));
+	E1000_WRITE_REG(&adapter->hw, TDBAH, (tdba >> 32));
 
-	E1000_WRITE_REG(&adapter->shared, TDLEN, tdlen);
+	E1000_WRITE_REG(&adapter->hw, TDLEN, tdlen);
 
 	/* Setup the HW Tx Head and Tail descriptor pointers */
 
-	E1000_WRITE_REG(&adapter->shared, TDH, 0);
-	E1000_WRITE_REG(&adapter->shared, TDT, 0);
+	E1000_WRITE_REG(&adapter->hw, TDH, 0);
+	E1000_WRITE_REG(&adapter->hw, TDT, 0);
 
 	/* Set the default values for the Tx Inter Packet Gap timer */
 
-	switch (adapter->shared.mac_type) {
+	switch (adapter->hw.mac_type) {
 	case e1000_82542_rev2_0:
 	case e1000_82542_rev2_1:
 		tipg = DEFAULT_82542_TIPG_IPGT;
@@ -717,18 +717,18 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 		tipg |= DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
 		break;
 	default:
-		if(adapter->shared.media_type == e1000_media_type_fiber)
+		if(adapter->hw.media_type == e1000_media_type_fiber)
 			tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
 		else
 			tipg = DEFAULT_82543_TIPG_IPGT_COPPER;
 		tipg |= DEFAULT_82543_TIPG_IPGR1 << E1000_TIPG_IPGR1_SHIFT;
 		tipg |= DEFAULT_82543_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
 	}
-	E1000_WRITE_REG(&adapter->shared, TIPG, tipg);
+	E1000_WRITE_REG(&adapter->hw, TIPG, tipg);
 
 	/* Set the Tx Interrupt Delay register */
 
-	E1000_WRITE_REG(&adapter->shared, TIDV, adapter->tx_int_delay);
+	E1000_WRITE_REG(&adapter->hw, TIDV, adapter->tx_int_delay);
 
 	/* Program the Transmit Control Register */
 
@@ -741,14 +741,14 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 		tctl |= E1000_HDX_COLLISION_DISTANCE << E1000_COLD_SHIFT;
 	}
 
-	E1000_WRITE_REG(&adapter->shared, TCTL, tctl);
+	E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
 
 	/* Setup Transmit Descriptor Settings for this adapter */
 	adapter->txd_cmd = E1000_TXD_CMD_IFCS;
 
 	if(adapter->tx_int_delay > 0)
 		adapter->txd_cmd |= E1000_TXD_CMD_IDE;
-	if(adapter->shared.report_tx_early == 1)
+	if(adapter->hw.report_tx_early == 1)
 		adapter->txd_cmd |= E1000_TXD_CMD_RS;
 	else
 		adapter->txd_cmd |= E1000_TXD_CMD_RPS;
@@ -813,9 +813,9 @@ e1000_setup_rctl(struct e1000_adapter *adapter)
 	/* Setup the Receive Control Register */
 	rctl = E1000_RCTL_EN | E1000_RCTL_BAM |
 	       E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
-	       (adapter->shared.mc_filter_type << E1000_RCTL_MO_SHIFT);
+	       (adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT);
 
-	if(adapter->shared.tbi_compatibility_on == 1)
+	if(adapter->hw.tbi_compatibility_on == 1)
 		rctl |= E1000_RCTL_SBP;
 
 	switch (adapter->rx_buffer_len) {
@@ -834,7 +834,7 @@ e1000_setup_rctl(struct e1000_adapter *adapter)
 		break;
 	}
 
-	E1000_WRITE_REG(&adapter->shared, RCTL, rctl);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 }
 
 /**
@@ -854,47 +854,47 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	/* make sure receives are disabled while setting up the descriptors */
 
-	rctl = E1000_READ_REG(&adapter->shared, RCTL);
-	E1000_WRITE_REG(&adapter->shared, RCTL, rctl & ~E1000_RCTL_EN);
+	rctl = E1000_READ_REG(&adapter->hw, RCTL);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl & ~E1000_RCTL_EN);
 
 	/* set the Receive Delay Timer Register */
 
-	if(adapter->shared.mac_type == e1000_82540) {
-		E1000_WRITE_REG(&adapter->shared, RADV, adapter->rx_int_delay);
-		E1000_WRITE_REG(&adapter->shared, RDTR, 64);
+	if(adapter->hw.mac_type == e1000_82540) {
+		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_int_delay);
+		E1000_WRITE_REG(&adapter->hw, RDTR, 64);
 
 		/* Set the interrupt throttling rate.  Value is calculated
 		 * as DEFAULT_ITR = 1/(MAX_INTS_PER_SEC * 256ns) */
 #define MAX_INTS_PER_SEC        8000
 #define DEFAULT_ITR             1000000000/(MAX_INTS_PER_SEC * 256)
-		E1000_WRITE_REG(&adapter->shared, ITR, DEFAULT_ITR);
+		E1000_WRITE_REG(&adapter->hw, ITR, DEFAULT_ITR);
 
 	} else {
-		E1000_WRITE_REG(&adapter->shared, RDTR, adapter->rx_int_delay);
+		E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
 	}
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
 
-	E1000_WRITE_REG(&adapter->shared, RDBAL, (rdba & 0x00000000FFFFFFFF));
-	E1000_WRITE_REG(&adapter->shared, RDBAH, (rdba >> 32));
+	E1000_WRITE_REG(&adapter->hw, RDBAL, (rdba & 0x00000000FFFFFFFF));
+	E1000_WRITE_REG(&adapter->hw, RDBAH, (rdba >> 32));
 
-	E1000_WRITE_REG(&adapter->shared, RDLEN, rdlen);
+	E1000_WRITE_REG(&adapter->hw, RDLEN, rdlen);
 
 	/* Setup the HW Rx Head and Tail Descriptor Pointers */
-	E1000_WRITE_REG(&adapter->shared, RDH, 0);
-	E1000_WRITE_REG(&adapter->shared, RDT, 0);
+	E1000_WRITE_REG(&adapter->hw, RDH, 0);
+	E1000_WRITE_REG(&adapter->hw, RDT, 0);
 
 	/* Enable 82543 Receive Checksum Offload for TCP and UDP */
-	if((adapter->shared.mac_type >= e1000_82543) &&
+	if((adapter->hw.mac_type >= e1000_82543) &&
 	   (adapter->rx_csum == TRUE)) {
-		rxcsum = E1000_READ_REG(&adapter->shared, RXCSUM);
+		rxcsum = E1000_READ_REG(&adapter->hw, RXCSUM);
 		rxcsum |= E1000_RXCSUM_TUOFL;
-		E1000_WRITE_REG(&adapter->shared, RXCSUM, rxcsum);
+		E1000_WRITE_REG(&adapter->hw, RXCSUM, rxcsum);
 	}
 
 	/* Enable Receives */
 
-	E1000_WRITE_REG(&adapter->shared, RCTL, rctl);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 
 	return;
 }
@@ -963,8 +963,8 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
 	adapter->tx_ring.next_to_use = 0;
 	adapter->tx_ring.next_to_clean = 0;
 
-	E1000_WRITE_REG(&adapter->shared, TDH, 0);
-	E1000_WRITE_REG(&adapter->shared, TDT, 0);
+	E1000_WRITE_REG(&adapter->hw, TDH, 0);
+	E1000_WRITE_REG(&adapter->hw, TDT, 0);
 
 	return;
 }
@@ -1033,8 +1033,8 @@ e1000_clean_rx_ring(struct e1000_adapter *adapter)
 	adapter->rx_ring.next_to_clean = 0;
 	adapter->rx_ring.next_to_use = 0;
 
-	E1000_WRITE_REG(&adapter->shared, RDH, 0);
-	E1000_WRITE_REG(&adapter->shared, RDT, 0);
+	E1000_WRITE_REG(&adapter->hw, RDH, 0);
+	E1000_WRITE_REG(&adapter->hw, RDT, 0);
 
 	return;
 }
@@ -1047,7 +1047,7 @@ e1000_enter_82542_rst(struct e1000_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
 	struct net_device *netdev = adapter->netdev;
-	uint16_t pci_command_word = adapter->shared.pci_cmd_word;
+	uint16_t pci_command_word = adapter->hw.pci_cmd_word;
 	uint32_t rctl;
 
 	if(pci_command_word & PCI_COMMAND_INVALIDATE) {
@@ -1055,9 +1055,9 @@ e1000_enter_82542_rst(struct e1000_adapter *adapter)
 		pci_write_config_word(pdev, PCI_COMMAND, pci_command_word);
 	}
 
-	rctl = E1000_READ_REG(&adapter->shared, RCTL);
+	rctl = E1000_READ_REG(&adapter->hw, RCTL);
 	rctl |= E1000_RCTL_RST;
-	E1000_WRITE_REG(&adapter->shared, RCTL, rctl);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 	msec_delay(5);
 
 	if(netif_running(netdev))
@@ -1070,12 +1070,12 @@ e1000_leave_82542_rst(struct e1000_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
 	struct net_device *netdev = adapter->netdev;
-	uint16_t pci_command_word = adapter->shared.pci_cmd_word;
+	uint16_t pci_command_word = adapter->hw.pci_cmd_word;
 	uint32_t rctl;
 
-	rctl = E1000_READ_REG(&adapter->shared, RCTL);
+	rctl = E1000_READ_REG(&adapter->hw, RCTL);
 	rctl &= ~E1000_RCTL_RST;
-	E1000_WRITE_REG(&adapter->shared, RCTL, rctl);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 	msec_delay(5);
 
 	if(pci_command_word & PCI_COMMAND_INVALIDATE)
@@ -1104,15 +1104,15 @@ e1000_set_mac(struct net_device *netdev, void *p)
 
 	/* 82542 2.0 needs to be in reset to write receive address registers */
 
-	if(adapter->shared.mac_type == e1000_82542_rev2_0)
+	if(adapter->hw.mac_type == e1000_82542_rev2_0)
 		e1000_enter_82542_rst(adapter);
 
 	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
-	memcpy(adapter->shared.mac_addr, addr->sa_data, netdev->addr_len);
+	memcpy(adapter->hw.mac_addr, addr->sa_data, netdev->addr_len);
 
-	e1000_rar_set(&adapter->shared, adapter->shared.mac_addr, 0);
+	e1000_rar_set(&adapter->hw, adapter->hw.mac_addr, 0);
 
-	if(adapter->shared.mac_type == e1000_82542_rev2_0)
+	if(adapter->hw.mac_type == e1000_82542_rev2_0)
 		e1000_leave_82542_rst(adapter);
 
 	return 0;
@@ -1132,7 +1132,7 @@ static void
 e1000_set_multi(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
-	struct e1000_hw *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 	struct dev_mc_list *mc_ptr;
 	uint32_t rctl;
 	uint32_t hash_value;
@@ -1140,7 +1140,7 @@ e1000_set_multi(struct net_device *netdev)
 
 	/* Check for Promiscuous and All Multicast modes */
 
-	rctl = E1000_READ_REG(shared, RCTL);
+	rctl = E1000_READ_REG(hw, RCTL);
 
 	if(netdev->flags & IFF_PROMISC) {
 		rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
@@ -1151,11 +1151,11 @@ e1000_set_multi(struct net_device *netdev)
 		rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_MPE);
 	}
 
-	E1000_WRITE_REG(shared, RCTL, rctl);
+	E1000_WRITE_REG(hw, RCTL, rctl);
 
 	/* 82542 2.0 needs to be in reset to write receive address registers */
 
-	if(shared->mac_type == e1000_82542_rev2_0)
+	if(hw->mac_type == e1000_82542_rev2_0)
 		e1000_enter_82542_rst(adapter);
 
 	/* load the first 15 multicast address into the exact filters 1-15
@@ -1166,27 +1166,27 @@ e1000_set_multi(struct net_device *netdev)
 
 	for(i = 1; i < E1000_RAR_ENTRIES; i++) {
 		if(mc_ptr) {
-			e1000_rar_set(shared, mc_ptr->dmi_addr, i);
+			e1000_rar_set(hw, mc_ptr->dmi_addr, i);
 			mc_ptr = mc_ptr->next;
 		} else {
-			E1000_WRITE_REG_ARRAY(shared, RA, i << 1, 0);
-			E1000_WRITE_REG_ARRAY(shared, RA, (i << 1) + 1, 0);
+			E1000_WRITE_REG_ARRAY(hw, RA, i << 1, 0);
+			E1000_WRITE_REG_ARRAY(hw, RA, (i << 1) + 1, 0);
 		}
 	}
 
 	/* clear the old settings from the multicast hash table */
 
 	for(i = 0; i < E1000_NUM_MTA_REGISTERS; i++)
-		E1000_WRITE_REG_ARRAY(shared, MTA, i, 0);
+		E1000_WRITE_REG_ARRAY(hw, MTA, i, 0);
 
 	/* load any remaining addresses into the hash table */
 
 	for(; mc_ptr; mc_ptr = mc_ptr->next) {
-		hash_value = e1000_hash_mc_addr(shared, mc_ptr->dmi_addr);
-		e1000_mta_set(shared, hash_value);
+		hash_value = e1000_hash_mc_addr(hw, mc_ptr->dmi_addr);
+		e1000_mta_set(hw, hash_value);
 	}
 
-	if(shared->mac_type == e1000_82542_rev2_0)
+	if(hw->mac_type == e1000_82542_rev2_0)
 		e1000_leave_82542_rst(adapter);
 	return;
 }
@@ -1198,7 +1198,7 @@ static void
 e1000_update_phy_info(unsigned long data)
 {
 	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
-	e1000_phy_get_info(&adapter->shared, &adapter->phy_info);
+	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
 	return;
 }
 
@@ -1213,11 +1213,11 @@ e1000_watchdog(unsigned long data)
 	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
 	struct net_device *netdev = adapter->netdev;
 
-	e1000_check_for_link(&adapter->shared);
+	e1000_check_for_link(&adapter->hw);
 
-	if(E1000_READ_REG(&adapter->shared, STATUS) & E1000_STATUS_LU) {
+	if(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU) {
 		if(!netif_carrier_ok(netdev)) {
-			e1000_get_speed_and_duplex(&adapter->shared,
+			e1000_get_speed_and_duplex(&adapter->hw,
 			                           &adapter->link_speed,
 			                           &adapter->link_duplex);
 
@@ -1304,7 +1304,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	if (time_after(netdev->trans_start, adapter->trans_finish + HZ) &&
 	    /* If transmitting XOFFs, we're not really hung */
-	    !(E1000_READ_REG(&adapter->shared, STATUS) & E1000_STATUS_TXOFF)) {
+	    !(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_TXOFF)) {
 		adapter->trans_finish = jiffies;
 		netif_stop_queue(netdev);
 		return 1;
@@ -1395,7 +1395,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	/* Move the HW Tx Tail Pointer */
 
-	E1000_WRITE_REG(&adapter->shared, TDT, i);
+	E1000_WRITE_REG(&adapter->hw, TDT, i);
 
 	netdev->trans_start = jiffies;
 
@@ -1460,7 +1460,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 	if(max_frame <= MAXIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH) {
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
-	} else if(adapter->shared.mac_type < e1000_82543) {
+	} else if(adapter->hw.mac_type < e1000_82543) {
 		E1000_ERR("Jumbo Frames not supported on 82542\n");
 		return -EINVAL;
 
@@ -1486,7 +1486,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 	}
 
 	netdev->mtu = new_mtu;
-	adapter->shared.max_frame_size = max_frame;
+	adapter->hw.max_frame_size = max_frame;
 
 	return 0;
 }
@@ -1499,7 +1499,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 static void
 e1000_update_stats(struct e1000_adapter *adapter)
 {
-	struct e1000_hw *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 	unsigned long flags;
 	uint16_t phy_tmp;
 
@@ -1512,68 +1512,68 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	 * be written while holding adapter->stats_lock
 	 */
 
-	adapter->stats.crcerrs += E1000_READ_REG(shared, CRCERRS);
-	adapter->stats.gprc += E1000_READ_REG(shared, GPRC);
-	adapter->stats.gorcl += E1000_READ_REG(shared, GORCL);
-	adapter->stats.gorch += E1000_READ_REG(shared, GORCH);
-	adapter->stats.bprc += E1000_READ_REG(shared, BPRC);
-	adapter->stats.mprc += E1000_READ_REG(shared, MPRC);
-	adapter->stats.roc += E1000_READ_REG(shared, ROC);
-	adapter->stats.prc64 += E1000_READ_REG(shared, PRC64);
-	adapter->stats.prc127 += E1000_READ_REG(shared, PRC127);
-	adapter->stats.prc255 += E1000_READ_REG(shared, PRC255);
-	adapter->stats.prc511 += E1000_READ_REG(shared, PRC511);
-	adapter->stats.prc1023 += E1000_READ_REG(shared, PRC1023);
-	adapter->stats.prc1522 += E1000_READ_REG(shared, PRC1522);
+	adapter->stats.crcerrs += E1000_READ_REG(hw, CRCERRS);
+	adapter->stats.gprc += E1000_READ_REG(hw, GPRC);
+	adapter->stats.gorcl += E1000_READ_REG(hw, GORCL);
+	adapter->stats.gorch += E1000_READ_REG(hw, GORCH);
+	adapter->stats.bprc += E1000_READ_REG(hw, BPRC);
+	adapter->stats.mprc += E1000_READ_REG(hw, MPRC);
+	adapter->stats.roc += E1000_READ_REG(hw, ROC);
+	adapter->stats.prc64 += E1000_READ_REG(hw, PRC64);
+	adapter->stats.prc127 += E1000_READ_REG(hw, PRC127);
+	adapter->stats.prc255 += E1000_READ_REG(hw, PRC255);
+	adapter->stats.prc511 += E1000_READ_REG(hw, PRC511);
+	adapter->stats.prc1023 += E1000_READ_REG(hw, PRC1023);
+	adapter->stats.prc1522 += E1000_READ_REG(hw, PRC1522);
 
 	spin_unlock_irqrestore(&adapter->stats_lock, flags);
 
 	/* the rest of the counters are only modified here */
 
-	adapter->stats.symerrs += E1000_READ_REG(shared, SYMERRS);
-	adapter->stats.mpc += E1000_READ_REG(shared, MPC);
-	adapter->stats.scc += E1000_READ_REG(shared, SCC);
-	adapter->stats.ecol += E1000_READ_REG(shared, ECOL);
-	adapter->stats.mcc += E1000_READ_REG(shared, MCC);
-	adapter->stats.latecol += E1000_READ_REG(shared, LATECOL);
-	adapter->stats.colc += E1000_READ_REG(shared, COLC);
-	adapter->stats.dc += E1000_READ_REG(shared, DC);
-	adapter->stats.sec += E1000_READ_REG(shared, SEC);
-	adapter->stats.rlec += E1000_READ_REG(shared, RLEC);
-	adapter->stats.xonrxc += E1000_READ_REG(shared, XONRXC);
-	adapter->stats.xontxc += E1000_READ_REG(shared, XONTXC);
-	adapter->stats.xoffrxc += E1000_READ_REG(shared, XOFFRXC);
-	adapter->stats.xofftxc += E1000_READ_REG(shared, XOFFTXC);
-	adapter->stats.fcruc += E1000_READ_REG(shared, FCRUC);
-	adapter->stats.gptc += E1000_READ_REG(shared, GPTC);
-	adapter->stats.gotcl += E1000_READ_REG(shared, GOTCL);
-	adapter->stats.gotch += E1000_READ_REG(shared, GOTCH);
-	adapter->stats.rnbc += E1000_READ_REG(shared, RNBC);
-	adapter->stats.ruc += E1000_READ_REG(shared, RUC);
-	adapter->stats.rfc += E1000_READ_REG(shared, RFC);
-	adapter->stats.rjc += E1000_READ_REG(shared, RJC);
-	adapter->stats.torl += E1000_READ_REG(shared, TORL);
-	adapter->stats.torh += E1000_READ_REG(shared, TORH);
-	adapter->stats.totl += E1000_READ_REG(shared, TOTL);
-	adapter->stats.toth += E1000_READ_REG(shared, TOTH);
-	adapter->stats.tpr += E1000_READ_REG(shared, TPR);
-	adapter->stats.tpt += E1000_READ_REG(shared, TPT);
-	adapter->stats.ptc64 += E1000_READ_REG(shared, PTC64);
-	adapter->stats.ptc127 += E1000_READ_REG(shared, PTC127);
-	adapter->stats.ptc255 += E1000_READ_REG(shared, PTC255);
-	adapter->stats.ptc511 += E1000_READ_REG(shared, PTC511);
-	adapter->stats.ptc1023 += E1000_READ_REG(shared, PTC1023);
-	adapter->stats.ptc1522 += E1000_READ_REG(shared, PTC1522);
-	adapter->stats.mptc += E1000_READ_REG(shared, MPTC);
-	adapter->stats.bptc += E1000_READ_REG(shared, BPTC);
+	adapter->stats.symerrs += E1000_READ_REG(hw, SYMERRS);
+	adapter->stats.mpc += E1000_READ_REG(hw, MPC);
+	adapter->stats.scc += E1000_READ_REG(hw, SCC);
+	adapter->stats.ecol += E1000_READ_REG(hw, ECOL);
+	adapter->stats.mcc += E1000_READ_REG(hw, MCC);
+	adapter->stats.latecol += E1000_READ_REG(hw, LATECOL);
+	adapter->stats.colc += E1000_READ_REG(hw, COLC);
+	adapter->stats.dc += E1000_READ_REG(hw, DC);
+	adapter->stats.sec += E1000_READ_REG(hw, SEC);
+	adapter->stats.rlec += E1000_READ_REG(hw, RLEC);
+	adapter->stats.xonrxc += E1000_READ_REG(hw, XONRXC);
+	adapter->stats.xontxc += E1000_READ_REG(hw, XONTXC);
+	adapter->stats.xoffrxc += E1000_READ_REG(hw, XOFFRXC);
+	adapter->stats.xofftxc += E1000_READ_REG(hw, XOFFTXC);
+	adapter->stats.fcruc += E1000_READ_REG(hw, FCRUC);
+	adapter->stats.gptc += E1000_READ_REG(hw, GPTC);
+	adapter->stats.gotcl += E1000_READ_REG(hw, GOTCL);
+	adapter->stats.gotch += E1000_READ_REG(hw, GOTCH);
+	adapter->stats.rnbc += E1000_READ_REG(hw, RNBC);
+	adapter->stats.ruc += E1000_READ_REG(hw, RUC);
+	adapter->stats.rfc += E1000_READ_REG(hw, RFC);
+	adapter->stats.rjc += E1000_READ_REG(hw, RJC);
+	adapter->stats.torl += E1000_READ_REG(hw, TORL);
+	adapter->stats.torh += E1000_READ_REG(hw, TORH);
+	adapter->stats.totl += E1000_READ_REG(hw, TOTL);
+	adapter->stats.toth += E1000_READ_REG(hw, TOTH);
+	adapter->stats.tpr += E1000_READ_REG(hw, TPR);
+	adapter->stats.tpt += E1000_READ_REG(hw, TPT);
+	adapter->stats.ptc64 += E1000_READ_REG(hw, PTC64);
+	adapter->stats.ptc127 += E1000_READ_REG(hw, PTC127);
+	adapter->stats.ptc255 += E1000_READ_REG(hw, PTC255);
+	adapter->stats.ptc511 += E1000_READ_REG(hw, PTC511);
+	adapter->stats.ptc1023 += E1000_READ_REG(hw, PTC1023);
+	adapter->stats.ptc1522 += E1000_READ_REG(hw, PTC1522);
+	adapter->stats.mptc += E1000_READ_REG(hw, MPTC);
+	adapter->stats.bptc += E1000_READ_REG(hw, BPTC);
 
-	if(adapter->shared.mac_type >= e1000_82543) {
-		adapter->stats.algnerrc += E1000_READ_REG(shared, ALGNERRC);
-		adapter->stats.rxerrc += E1000_READ_REG(shared, RXERRC);
-		adapter->stats.tncrs += E1000_READ_REG(shared, TNCRS);
-		adapter->stats.cexterr += E1000_READ_REG(shared, CEXTERR);
-		adapter->stats.tsctc += E1000_READ_REG(shared, TSCTC);
-		adapter->stats.tsctfc += E1000_READ_REG(shared, TSCTFC);
+	if(adapter->hw.mac_type >= e1000_82543) {
+		adapter->stats.algnerrc += E1000_READ_REG(hw, ALGNERRC);
+		adapter->stats.rxerrc += E1000_READ_REG(hw, RXERRC);
+		adapter->stats.tncrs += E1000_READ_REG(hw, TNCRS);
+		adapter->stats.cexterr += E1000_READ_REG(hw, CEXTERR);
+		adapter->stats.tsctc += E1000_READ_REG(hw, TSCTC);
+		adapter->stats.tsctfc += E1000_READ_REG(hw, TSCTFC);
 	}
 
 	/* Fill out the OS statistics structure */
@@ -1609,14 +1609,14 @@ e1000_update_stats(struct e1000_adapter *adapter)
 
 	/* Phy Stats */
 
-	if(shared->media_type == e1000_media_type_copper) {
+	if(hw->media_type == e1000_media_type_copper) {
 		if((adapter->link_speed == SPEED_1000) &&
-		   (!e1000_read_phy_reg(shared, PHY_1000T_STATUS, &phy_tmp))) {
+		   (!e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_tmp))) {
 			phy_tmp &= PHY_IDLE_ERROR_COUNT_MASK;
 			adapter->phy_stats.idle_errors += phy_tmp;
 		}
 
-		if(!e1000_read_phy_reg(shared, M88E1000_RX_ERR_CNTR, &phy_tmp))
+		if(!e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
 			adapter->phy_stats.receive_errors += phy_tmp;
 	}
 }
@@ -1630,7 +1630,7 @@ static inline void
 e1000_irq_disable(struct e1000_adapter *adapter)
 {
 	atomic_inc(&adapter->irq_sem);
-	E1000_WRITE_REG(&adapter->shared, IMC, ~0);
+	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
 	synchronize_irq();
 	return;
 }
@@ -1644,7 +1644,7 @@ static inline void
 e1000_irq_enable(struct e1000_adapter *adapter)
 {
 	if(atomic_dec_and_test(&adapter->irq_sem))
-		E1000_WRITE_REG(&adapter->shared, IMS, IMS_ENABLE_MASK);
+		E1000_WRITE_REG(&adapter->hw, IMS, IMS_ENABLE_MASK);
 	return;
 }
 
@@ -1663,11 +1663,11 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	uint32_t icr;
 	int i = E1000_MAX_INTR;
 
-	while(i && (icr = E1000_READ_REG(&adapter->shared, ICR))) {
+	while(i && (icr = E1000_READ_REG(&adapter->hw, ICR))) {
 
 		if(icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
 			/* run the watchdog ASAP */
-			adapter->shared.get_link_status = 1;
+			adapter->hw.get_link_status = 1;
 			mod_timer(&adapter->watchdog_timer, jiffies);
 		}
 
@@ -1789,12 +1789,12 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 			last_byte = *(skb->data + length - 1);
 
-			if(TBI_ACCEPT(&adapter->shared, rx_desc->status,
+			if(TBI_ACCEPT(&adapter->hw, rx_desc->status,
 			              rx_desc->errors, length, last_byte)) {
 
 				spin_lock_irqsave(&adapter->stats_lock, flags);
 
-				e1000_tbi_adjust_stats(&adapter->shared,
+				e1000_tbi_adjust_stats(&adapter->hw,
 				                       &adapter->stats,
 				                       length, skb->data);
 
@@ -1896,7 +1896,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 		rx_desc->buffer_addr = cpu_to_le64(rx_ring->buffer_info[i].dma);
 
 		/* move tail */
-		E1000_WRITE_REG(&adapter->shared, RDT, i);
+		E1000_WRITE_REG(&adapter->hw, RDT, i);
 
 		atomic_dec(&rx_ring->unused);
 
@@ -1938,7 +1938,7 @@ e1000_rx_checksum(struct e1000_adapter *adapter,
                   struct sk_buff *skb)
 {
 	/* 82543 or newer only */
-	if((adapter->shared.mac_type < e1000_82543) ||
+	if((adapter->hw.mac_type < e1000_82543) ||
 	/* Ignore Checksum bit is set */
 	(rx_desc->status & E1000_RXD_STAT_IXSM) ||
 	/* TCP Checksum has not been calculated */
@@ -1972,26 +1972,26 @@ e1000_enable_WOL(struct e1000_adapter *adapter)
 {
 	uint32_t wuc;
 
-	if(adapter->shared.mac_type < e1000_82544)
+	if(adapter->hw.mac_type < e1000_82544)
 		return;
 
 	if(adapter->wol) {
 		wuc = E1000_WUC_APME | E1000_WUC_PME_EN |
 		      E1000_WUC_PME_STATUS | E1000_WUC_APMPME;
 
-		E1000_WRITE_REG(&adapter->shared, WUC, wuc);
+		E1000_WRITE_REG(&adapter->hw, WUC, wuc);
 
-		E1000_WRITE_REG(&adapter->shared, WUFC, adapter->wol);
+		E1000_WRITE_REG(&adapter->hw, WUFC, adapter->wol);
 	}
 
 	return;
 }
 
 void
-e1000_write_pci_cfg(struct e1000_hw *shared,
+e1000_write_pci_cfg(struct e1000_hw *hw,
                     uint32_t reg, uint16_t *value)
 {
-	struct e1000_adapter *adapter = shared->back;
+	struct e1000_adapter *adapter = hw->back;
 
 	pci_write_config_word(adapter->pdev, reg, *value);
 	return;

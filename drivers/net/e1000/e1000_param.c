@@ -367,7 +367,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 			arg: { r: { min: MIN_TXD }}
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
-		e1000_mac_type mac_type = adapter->shared.mac_type;
+		e1000_mac_type mac_type = adapter->hw.mac_type;
 		opt.arg.r.max = mac_type < e1000_82544 ? MAX_TXD : MAX_82544_TXD;
 
 		tx_ring->count = TxDescriptors[bd];
@@ -383,7 +383,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 			arg: { r: { min: MIN_RXD }}
 		};
 		struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
-		e1000_mac_type mac_type = adapter->shared.mac_type;
+		e1000_mac_type mac_type = adapter->hw.mac_type;
 		opt.arg.r.max = mac_type < e1000_82544 ? MAX_RXD : MAX_82544_RXD;
 
 		rx_ring->count = RxDescriptors[bd];
@@ -421,7 +421,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 
 		int fc = FlowControl[bd];
 		e1000_validate_option(&fc, &opt);
-		adapter->shared.fc = adapter->shared.original_fc = fc;
+		adapter->hw.fc = adapter->hw.original_fc = fc;
 	}
 	{ /* Transmit Interrupt Delay */
 		struct e1000_option opt = {
@@ -443,7 +443,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 			name: "Receive Interrupt Delay",
 			arg: { r: { min: MIN_RXDELAY, max: MAX_RXDELAY }}
 		};
-		e1000_mac_type mac_type = adapter->shared.mac_type;
+		e1000_mac_type mac_type = adapter->hw.mac_type;
 		opt.def = mac_type < e1000_82540 ? DEFAULT_RDTR : DEFAULT_RADV;
 		opt.err = mac_type < e1000_82540 ? rdtr : radv;
 
@@ -451,7 +451,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 		e1000_validate_option(&adapter->rx_int_delay, &opt);
 	}
 	
-	switch(adapter->shared.media_type) {
+	switch(adapter->hw.media_type) {
 	case e1000_media_type_fiber:
 		e1000_check_fiber_options(adapter);
 		break;
@@ -540,7 +540,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO
 		       "AutoNeg specified along with Speed or Duplex, "
 		       "parameter ignored\n");
-		adapter->shared.autoneg_advertised = AUTONEG_ADV_DEFAULT;
+		adapter->hw.autoneg_advertised = AUTONEG_ADV_DEFAULT;
 	} else { /* Autoneg */
 		struct e1000_opt_list an_list[] =
 			#define AA "Autoneg advertising "
@@ -586,12 +586,12 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 		int an = AutoNeg[bd];
 		e1000_validate_option(&an, &opt);
-		adapter->shared.autoneg_advertised = an;
+		adapter->hw.autoneg_advertised = an;
 	}
 
 	switch (speed + dplx) {
 	case 0:
-		adapter->shared.autoneg = 1;
+		adapter->hw.autoneg = 1;
 		if(Speed[bd] != OPTION_UNSET || Duplex[bd] != OPTION_UNSET)
 			printk(KERN_INFO
 			       "Speed and duplex autonegotiation enabled\n");
@@ -599,75 +599,75 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	case HALF_DUPLEX:
 		printk(KERN_INFO "Half Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Half Duplex only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_10_HALF | 
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF | 
 		                                     ADVERTISE_100_HALF;
 		break;
 	case FULL_DUPLEX:
 		printk(KERN_INFO "Full Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Full Duplex only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_10_FULL |
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_10_FULL |
 		                                     ADVERTISE_100_FULL |
 		                                     ADVERTISE_1000_FULL;
 		break;
 	case SPEED_10:
 		printk(KERN_INFO "10 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 10 Mbps only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_10_HALF |
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                     ADVERTISE_10_FULL;
 		break;
 	case SPEED_10 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Half Duplex\n");
-		adapter->shared.autoneg = 0;
-		adapter->shared.forced_speed_duplex = e1000_10_half;
-		adapter->shared.autoneg_advertised = 0;
+		adapter->hw.autoneg = 0;
+		adapter->hw.forced_speed_duplex = e1000_10_half;
+		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_10 + FULL_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Full Duplex\n");
-		adapter->shared.autoneg = 0;
-		adapter->shared.forced_speed_duplex = e1000_10_full;
-		adapter->shared.autoneg_advertised = 0;
+		adapter->hw.autoneg = 0;
+		adapter->hw.forced_speed_duplex = e1000_10_full;
+		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100:
 		printk(KERN_INFO "100 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 100 Mbps only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_100_HALF |
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_100_HALF |
 		                                     ADVERTISE_100_FULL;
 		break;
 	case SPEED_100 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Half Duplex\n");
-		adapter->shared.autoneg = 0;
-		adapter->shared.forced_speed_duplex = e1000_100_half;
-		adapter->shared.autoneg_advertised = 0;
+		adapter->hw.autoneg = 0;
+		adapter->hw.forced_speed_duplex = e1000_100_half;
+		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100 + FULL_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Full Duplex\n");
-		adapter->shared.autoneg = 0;
-		adapter->shared.forced_speed_duplex = e1000_100_full;
-		adapter->shared.autoneg_advertised = 0;
+		adapter->hw.autoneg = 0;
+		adapter->hw.forced_speed_duplex = e1000_100_full;
+		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_1000:
 		printk(KERN_INFO "1000 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_1000_FULL;
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	case SPEED_1000 + HALF_DUPLEX:
 		printk(KERN_INFO "Half Duplex is not supported at 1000 Mbps\n");
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_1000_FULL;
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	case SPEED_1000 + FULL_DUPLEX:
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->shared.autoneg = 1;
-		adapter->shared.autoneg_advertised = ADVERTISE_1000_FULL;
+		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	default:
 		BUG();
@@ -686,7 +686,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 		int mdix = MdiX[bd];
 		e1000_validate_option(&mdix, &opt);
-		adapter->shared.mdix = mdix;
+		adapter->hw.mdix = mdix;
 	}
 	{ /* Automatic Correction for Reverse Cable Polarity */
 	  /* option is actually to disable polarity correction,
@@ -700,11 +700,11 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 		int dpc = DisablePolarityCorrection[bd];
 		e1000_validate_option(&dpc, &opt);
-		adapter->shared.disable_polarity_correction = dpc;
+		adapter->hw.disable_polarity_correction = dpc;
 	}
 	
 	/* Speed, AutoNeg and MDI/MDI-X must all play nice */
-	if (e1000_validate_mdi_setting(&(adapter->shared)) < 0) {
+	if (e1000_validate_mdi_setting(&(adapter->hw)) < 0) {
 		printk(KERN_INFO "Speed, AutoNeg and MDI-X specifications are "
 		       "incompatible. Setting MDI-X to a compatible value.\n");
 	}
