@@ -987,7 +987,7 @@ dont_preserve_current_frame:
 	shladd in0=loc1,3,r17
 	mov in1=0
 	;;
-	.align 32
+	TEXT_ALIGN(32)
 rse_clear_invalid:
 #ifdef CONFIG_ITANIUM
 	// cycle 0
