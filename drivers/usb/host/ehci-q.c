@@ -778,10 +778,26 @@ static struct ehci_qh *qh_append_tds (
 			qtd = list_entry (qtd_list->next, struct ehci_qtd,
 					qtd_list);
 
-		/* maybe patch the qh used for set_address */
-		if (unlikely (epnum == 0
-				&& le32_to_cpu (qh->hw_info1 & 0x7f) == 0))
-			qh->hw_info1 |= cpu_to_le32 (usb_pipedevice(urb->pipe));
+		/* control qh may need patching after enumeration */
+		if (unlikely (epnum == 0)) {
+			/* set_address changes the address */
+			if (le32_to_cpu (qh->hw_info1 & 0x7f) == 0)
+				qh->hw_info1 |= cpu_to_le32 (
+						usb_pipedevice (urb->pipe));
+
+			/* for full speed, ep0 maxpacket can grow */
+			else if (!(qh->hw_info1 & cpu_to_le32 (0x3 << 12))) {
+				u32	info, max;
+
+				info = le32_to_cpu (qh->hw_info1);
+				max = urb->dev->descriptor.bMaxPacketSize0;
+				if (max > (0x07ff & (info >> 16))) {
+					info &= ~(0x07ff << 16);
+					info |= max << 16;
+					qh->hw_info1 = cpu_to_le32 (info);
+				}
+			}
+		}
 
 		/* append to tds already queued to this qh? */
 		if (unlikely (!list_empty (&qh->qtd_list) && qtd)) {
