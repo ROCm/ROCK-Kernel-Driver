@@ -250,6 +250,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	/* Kortex International */
 	/* KORTEX 14400 Externe PnP */
 	{	"ROK0100",		0	},
+	/* Rockwell 28.8 */
+	{	"ROK4120",		0	},
 	/* Viking Components, Inc */
 	/* Viking 28.8 INTERNAL Fax+Data+Voice PnP */
 	{	"ROK4920",		0	},
