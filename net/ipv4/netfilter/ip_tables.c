@@ -942,7 +942,7 @@ get_counters(const struct ipt_table_info *t,
 static int
 copy_entries_to_user(unsigned int total_size,
 		     struct ipt_table *table,
-		     void *userptr)
+		     void __user *userptr)
 {
 	unsigned int off, num, countersize;
 	struct ipt_entry *e;
@@ -1020,7 +1020,7 @@ copy_entries_to_user(unsigned int total_size,
 
 static int
 get_entries(const struct ipt_get_entries *entries,
-	    struct ipt_get_entries *uptr)
+	    struct ipt_get_entries __user *uptr)
 {
 	int ret;
 	struct ipt_table *t;
@@ -1047,7 +1047,7 @@ get_entries(const struct ipt_get_entries *entries,
 }
 
 static int
-do_replace(void *user, unsigned int len)
+do_replace(void __user *user, unsigned int len)
 {
 	int ret;
 	struct ipt_replace tmp;
@@ -1173,7 +1173,7 @@ add_counter_to_entry(struct ipt_entry *e,
 }
 
 static int
-do_add_counters(void *user, unsigned int len)
+do_add_counters(void __user *user, unsigned int len)
 {
 	unsigned int i;
 	struct ipt_counters_info tmp, *paddc;
@@ -1221,7 +1221,7 @@ do_add_counters(void *user, unsigned int len)
 }
 
 static int
-do_ipt_set_ctl(struct sock *sk,	int cmd, void *user, unsigned int len)
+do_ipt_set_ctl(struct sock *sk,	int cmd, void __user *user, unsigned int len)
 {
 	int ret;
 
@@ -1246,7 +1246,7 @@ do_ipt_set_ctl(struct sock *sk,	int cmd, void *user, unsigned int len)
 }
 
 static int
-do_ipt_get_ctl(struct sock *sk, int cmd, void *user, int *len)
+do_ipt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	int ret;
 

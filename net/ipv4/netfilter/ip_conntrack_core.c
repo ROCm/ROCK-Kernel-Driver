@@ -1300,7 +1300,7 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 /* Reversing the socket's dst/src point of view gives us the reply
    mapping. */
 static int
-getorigdst(struct sock *sk, int optval, void *user, int *len)
+getorigdst(struct sock *sk, int optval, void __user *user, int *len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;
