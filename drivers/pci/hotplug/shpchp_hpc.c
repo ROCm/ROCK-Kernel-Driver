@@ -1441,6 +1441,7 @@ int shpc_init(struct controller * ctrl,
 			err("%s : shpc_cap_offset == 0\n", __FUNCTION__);
 			goto abort_free_ctlr;
 		}
+		dbg("%s: shpc_cap_offset = %x\n", __FUNCTION__, shpc_cap_offset);	
 	
 		rc = pci_write_config_byte(pdev, (u8)shpc_cap_offset + DWORD_SELECT , BASE_OFFSET);
 		if (rc) {
@@ -1547,15 +1548,13 @@ int shpc_init(struct controller * ctrl,
 		start_int_poll_timer( php_ctlr, 10 );   /* start with 10 second delay */
 	} else {
 		/* Installs the interrupt handler */
-#ifdef CONFIG_PCI_USE_VECTOR 
 		rc = pci_enable_msi(pdev);
 		if (rc) {
-			err("Can't get msi for the hotplug controller\n");
+			info("Can't get msi for the hotplug controller\n");
+			info("Use INTx for the hotplug controller\n");
 			dbg("%s: rc = %x\n", __FUNCTION__, rc);
-			goto abort_free_ctlr;
-		}
-		php_ctlr->irq = pdev->irq;
-#endif
+		} else
+			php_ctlr->irq = pdev->irq;
 		
 		rc = request_irq(php_ctlr->irq, shpc_isr, SA_SHIRQ, MY_NAME, (void *) ctrl);
 		dbg("%s: request_irq %d for hpc%d (returns %d)\n", __FUNCTION__, php_ctlr->irq, ctlr_seq_num, rc);
