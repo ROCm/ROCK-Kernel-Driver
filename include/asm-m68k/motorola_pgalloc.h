@@ -11,7 +11,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long ad
 {
 	pte_t *pte;
 
-	pte = (pte_t *) __get_free_page(GFP_KERNEL);
+	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte) {
 		clear_page(pte);
 		__flush_page_to_ram(pte);
@@ -30,7 +30,7 @@ static inline void pte_free_kernel(pte_t *pte)
 
 static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	struct page *page = alloc_pages(GFP_KERNEL, 0);
+	struct page *page = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
 	pte_t *pte;
 
 	if(!page)
