@@ -41,6 +41,7 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
+#include <asm/ocp.h>
 #include <asm/pci-bridge.h>
 #include <asm/time.h>
 #include <asm/todc.h>
@@ -118,9 +119,6 @@ static u_char ebony_IRQ_initsenses[] __initdata = {
 };
 
 extern void abort(void);
-
-/* Global Variables */
-bd_t __res;
 
 static void __init
 ebony_calibrate_decr(void)
@@ -308,7 +306,9 @@ static void __init
 ebony_setup_arch(void)
 {
 	unsigned char * vpd_base;
-	struct ibm440gp_clocks clocks;
+	struct ibm44x_clocks clocks;
+	struct ocp_def *def;
+	struct ocp_func_emac_data *emacdata;
 
 #if !defined(CONFIG_BDI_SWITCH)
 	/*
@@ -318,10 +318,15 @@ ebony_setup_arch(void)
         mtspr(SPRN_DBCR0, (DBCR0_TDE | DBCR0_IDM));
 #endif
 
-	/* Retrieve MAC addresses */
+	/* Set mac_addr for each EMAC */
 	vpd_base = ioremap64(EBONY_VPD_BASE, EBONY_VPD_SIZE);
-	memcpy(__res.bi_enetaddr[0],EBONY_NA0_ADDR(vpd_base),6);
-	memcpy(__res.bi_enetaddr[1],EBONY_NA1_ADDR(vpd_base),6);
+	def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, 0);
+	emacdata = def->additions;
+	memcpy(emacdata->mac_addr, EBONY_NA0_ADDR(vpd_base), 6);
+	def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, 1);
+	emacdata = def->additions;
+	memcpy(emacdata->mac_addr, EBONY_NA1_ADDR(vpd_base), 6);
+	iounmap(vpd_base);
 
 	/*
 	 * Determine various clocks.
@@ -330,10 +335,7 @@ ebony_setup_arch(void)
 	 * --ebs
 	 */
 	ibm440gp_get_clocks(&clocks, 33333333, 6 * 1843200);
-	__res.bi_opb_busfreq = clocks.opb;
-
-	/* Use IIC in standard (100 kHz) mode */
-	__res.bi_iic_fast[0] = __res.bi_iic_fast[1] = 0;
+	ocp_sys_info.opb_bus_freq = clocks.opb;
 
 	/* Setup TODC access */
 	TODC_INIT(TODC_TYPE_DS1743,
