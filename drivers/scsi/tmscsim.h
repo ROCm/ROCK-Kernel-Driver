@@ -214,16 +214,12 @@ PSRB		pFreeSRB;
 PSRB		pTmpSRB;
 
 /* 0x2c: */
-ULONG		QueryCnt;
-struct list_head	cmdq;
-
-/* 0x38: */
 UCHAR		msgin123[4];
 UCHAR		DCBmap[MAX_SCSI_ID];
 UCHAR		Connected;
 UCHAR		pad;
 
-/* 0x3c: */
+/* 0x30: */
 #if defined(USE_SPINLOCKS) && USE_SPINLOCKS > 1 && (defined(CONFIG_SMP) || DEBUG_SPINLOCKS > 0)
 spinlock_t	lock;
 #endif
@@ -234,20 +230,20 @@ UCHAR		MsgLen;
 UCHAR		Ignore_IRQ;	/* Not used */
 
 PDEVDECL1;			/* Pointer to PCI cfg. space */
-/* 0x4c/0x48: */
+/* 0x40/0x3c: */
 ULONG		Cmds;
 UINT		SelLost;
 UINT		SelConn;
 UINT		CmdInQ;
 UINT		CmdOutOfSRB;
 	
-/* 0x60/0x5c: */
+/* 0x54/0x50: */
 struct timer_list	Waiting_Timer;
-/* 0x74/0x70: */
+/* 0x68/0x64: */
 DC390_SRB	TmpSRB;
-/* 0xd8/0xd4: */
+/* 0xcc/0xc8: */
 DC390_SRB	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
-/* 0xfb0/0xfac: */
+/* 0xfa4/0xfa0: */
 };
 
 typedef  struct  _ACB	 DC390_ACB, *PACB;
@@ -406,15 +402,8 @@ typedef  struct  _ACB	 DC390_ACB, *PACB;
  *	SISC query queue
  */
 typedef struct {
-	struct list_head	list;
 	dma_addr_t		saved_dma_handle;
 } dc390_cmd_scp_t;
-
-struct scsi_cmnd_list
-{
-	char dummy[offsetof(struct scsi_cmnd, SCp)];
-	dc390_cmd_scp_t scp;
-};
 
 /*
 **  Inquiry Data format
