@@ -1,142 +1,83 @@
 ====================================================================
-=    Adaptec Aic7xxx Fast -> Ultra160 Family Manager Set v6.2.10   =
+=             Adaptec Ultra320 Family Manager Set v1.1.1           =
+=                                                                  =
 =                            README for                            =
-=                     The Linux Operating System                   =
+=                    The Linux Operating System                    =
 ====================================================================
 
 The following information is available in this file:
 
   1. Supported Hardware
-  2. Command Line Options
-  3. Contacting Adaptec
+  2. Version History
+  3. Command Line Options
+  4. Additional Notes
+  5. Contacting Adaptec
+
 
 1. Supported Hardware
 
-   The following Adaptec SCSI Chips and Host Adapters are supported by
-   the aic7xxx driver. 
+   The following Adaptec SCSI Host Adapters are supported by this 
+   driver set. 
 
-   Chip    MIPS  Host Bus  MaxSync  MaxWidth  SCBs  Notes
-   ---------------------------------------------------------------
-   aic7770  10    EISA/VL   10MHz    16Bit      4   1
-   aic7850  10    PCI/32    10MHz    8Bit       3
-   aic7855  10    PCI/32    10MHz    8Bit       3
-   aic7856  10    PCI/32    10MHz    8Bit       3
-   aic7859  10    PCI/32    20MHz    8Bit       3
-   aic7860  10    PCI/32    20MHz    8Bit       3
-   aic7870  10    PCI/32    10MHz    16Bit      16
-   aic7880  10    PCI/32    20MHz    16Bit      16
-   aic7890  20    PCI/32    40MHz    16Bit      16      3 4 5 6 7 8
-   aic7891  20    PCI/64    40MHz    16Bit      16      3 4 5 6 7 8
-   aic7892  20   PCI/64-66  80MHz    16Bit      16      3 4 5 6 7 8
-   aic7895  15    PCI/32    20MHz    16Bit      16    2 3 4 5
-   aic7895C 15    PCI/32    20MHz    16Bit      16    2 3 4 5     8
-   aic7896  20    PCI/32    40MHz    16Bit      16    2 3 4 5 6 7 8
-   aic7897  20    PCI/64    40MHz    16Bit      16    2 3 4 5 6 7 8
-   aic7899  20   PCI/64-66  80MHz    16Bit      16    2 3 4 5 6 7 8
+   Ultra320 Adapters         Description
+   ----------------------------------------------------------------
+   Adaptec SCSI Card 39320   Dual Channel 64-bit PCI-X 133MHz to
+                             Ultra320 SCSI Card (one external 
+                             68-pin, two internal 68-pin)
+   Adaptec SCSI Card 39320D  Dual Channel 64-bit PCI-X 133MHz to
+                             Ultra320 SCSI Card (two external VHDC
+                             and one internal 68-pin)
+   Adaptec SCSI Card 29320   Single Channel 64-bit PCI-X 133MHz to
+                             Ultra320 SCSI Card (one external 
+                             68-pin, two internal 68-pin, one
+                             internal 50-pin)
+   Adaptec SCSI Card 29320LP Single Channel 64-bit Low Profile
+                             PCI-X 133MHz to Ultra320 SCSI Card
+                             (One external VHDC, one internal
+                             68-pin)
+   AIC-7901A                 Single Channel 64-bit PCI-X 133MHz to 
+                             Ultra320 SCSI ASIC
+   AIC-7902A4                Dual Channel 64-bit PCI-X 133MHz to 
+                             Ultra320 SCSI ASIC
 
-   1.   Multiplexed Twin Channel Device - One controller servicing two
-        busses.
-   2.   Multi-function Twin Channel Device - Two controllers on one chip.
-   3.   Command Channel Secondary DMA Engine - Allows scatter gather list
-        and SCB prefetch.
-   4.   64 Byte SCB Support - Allows disconnected, unttagged request table
-        for all possible target/lun combinations.
-   5.   Block Move Instruction Support - Doubles the speed of certain
-        sequencer operations.
-   6.   `Bayonet' style Scatter Gather Engine - Improves S/G prefetch
-	performance.
-   7.   Queuing Registers - Allows queuing of new transactions without
-	pausing the sequencer.
-   8.   Multiple Target IDs - Allows the controller to respond to selection
-        as a target on multiple SCSI IDs.
 
-   Controller      Chip   Host-Bus    Int-Connectors  Ext-Connectors  Notes
-   --------------------------------------------------------------------------
-   AHA-274X[A]    aic7770   EISA        SE-50M          SE-HD50F
-   AHA-274X[A]W   aic7770   EISA        SE-HD68F	SE-HD68F
-				 	SE-50M
-   AHA-274X[A]T   aic7770   EISA       2 X SE-50M	SE-HD50F
-   AHA-2842       aic7770    VL          SE-50M		SE-HD50F
-   AHA-2940AU     aic7860   PCI/32       SE-50M		SE-HD50F
-   AVA-2902I      aic7860   PCI/32       SE-50M
-   AVA-2902E      aic7860   PCI/32       SE-50M
-   AVA-2906       aic7856   PCI/32       SE-50M		SE-DB25F
-   APC-7850       aic7850   PCI/32       SE-50M			      1
-   AVA-2940       aic7860   PCI/32       SE-50M
-   AHA-2920B      aic7860   PCI/32       SE-50M
-   AHA-2930B      aic7860   PCI/32       SE-50M
-   AHA-2920C      aic7856   PCI/32       SE-50M		SE-HD50F
-   AHA-2930C      aic7860   PCI/32       SE-50M
-   AHA-2930C      aic7860   PCI/32       SE-50M
-   AHA-2910C      aic7860   PCI/32       SE-50M
-   AHA-2915C      aic7860   PCI/32       SE-50M
-   AHA-2940AU/CN  aic7860   PCI/32       SE-50M		SE-HD50F
-   AHA-2944W      aic7870   PCI/32     HVD-HD68F	HVD-HD68F
-				        HVD-50M
-   AHA-3940W      aic7870   PCI/32     2 X SE-HD68F	SE-HD68F        2
-   AHA-2940UW     aic7880   PCI/32       SE-HD68F
-					 SE-50M		SE-HD68F
-   AHA-2940U      aic7880   PCI/32       SE-50M		SE-HD50F
-   AHA-2940D      aic7880   PCI/32
-   AHA-2940 A/T   aic7880   PCI/32
-   AHA-2940D A/T  aic7880   PCI/32
-   AHA-3940UW     aic7880   PCI/32     2 X SE-HD68F	SE-HD68F          3
-   AHA-3940UWD    aic7880   PCI/32     2 X SE-HD68F   2 X SE-VHD68F       3
-   AHA-3940U      aic7880   PCI/32     2 X SE-50M	SE-HD50F          3
-   AHA-2944UW     aic7880   PCI/32      HVD-HD68F	HVD-HD68F
-					 HVD-50M
-   AHA-3944UWD    aic7880   PCI/32     2 X HVD-HD68F  2 X HVD-VHD68F      3
-   AHA-4944UW     aic7880   PCI/32
-   AHA-2930UW     aic7880   PCI/32
-   AHA-2940UW Pro aic7880   PCI/32      SE-HD68F	SE-HD68F            4
-					 SE-50M
-   AHA-2940UW/CN  aic7880   PCI/32
-   AHA-2940UDual  aic7895   PCI/32
-   AHA-2940UWDual aic7895   PCI/32
-   AHA-3940UWD    aic7895   PCI/32
-   AHA-3940AUW    aic7895   PCI/32
-   AHA-3940AUWD   aic7895   PCI/32
-   AHA-3940AU     aic7895   PCI/32
-   AHA-3944AUWD   aic7895   PCI/32     2 X HVD-HD68F  2 X HVD-VHD68F
-   AHA-2940U2B    aic7890   PCI/32      LVD-HD68F	LVD-HD68F
-   AHA-2940U2 OEM aic7891   PCI/64
-   AHA-2940U2W    aic7890   PCI/32      LVD-HD68F	LVD-HD68F
-				        SE-HD68F 
-					 SE-50M
-   AHA-2950U2B    aic7891   PCI/64      LVD-HD68F	LVD-HD68F
-   AHA-2930U2     aic7890   PCI/32      LVD-HD68F	SE-HD50F
-					 SE-50M 
-   AHA-3950U2B    aic7897   PCI/64
-   AHA-3950U2D    aic7897   PCI/64
-   AHA-29160      aic7892   PCI/64-66
-   AHA-29160 CPQ  aic7892   PCI/64-66
-   AHA-29160N     aic7892   PCI/32      LVD-HD68F	SE-HD50F
-					 SE-50M
-   AHA-29160LP    aic7892   PCI/64-66
-   AHA-19160      aic7892   PCI/64-66
-   AHA-29150LP    aic7892   PCI/64-66
-   AHA-29130LP    aic7892   PCI/64-66
-   AHA-3960D      aic7899   PCI/64-66  2 X LVD-HD68F  2 X LVD-VHD68F
-					 LVD-50M
-   AHA-3960D CPQ  aic7899   PCI/64-66  2 X LVD-HD68F  2 X LVD-VHD68F
-					 LVD-50M
-   AHA-39160      aic7899   PCI/64-66  2 X LVD-HD68F  2 X LVD-VHD68F
-					 LVD-50M
+2. Version History
 
-   1. No BIOS support
-   2. DEC21050 PCI-PCI bridge with multiple controller chips on secondary bus
-   3. DEC2115X PCI-PCI bridge with multiple controller chips on secondary bus
-   4. All three SCSI connectors may be used simultaneously without
-      SCSI "stub" effects.
+   (V1.1.1, September 2002) Added support for the Linux 2.5.X kernel series
 
-2. Command Line Options
+   (V1.1, August 2002) Added support for four additional SCSI
+   products: ASC-39320, ASC-29320, ASC-29320LP, AIC-7901.
+
+   (V1.0, May 2002) This is the initial release of the 
+   Ultra320 FMS.  The following is a list of supported features:
+
+   2.1. Software/Hardware Features
+        - Support for the SPI-4 "Ultra320" standard:
+          - 320MB/s transfer rates
+          - Packetized SCSI Protocol at 160MB/s and 320MB/s
+          - Quick Arbitration Selection (QAS)
+          - Initiator Mode (target mode not currently 
+            supported)
+          - Support for the PCI-x standard up to 133MHz
+          - Support for the PCI v2.2 standard
+
+   2.2. Operating System Support:
+        - Redhat Linux 7.2, 7.3, Advanced Server 2.1
+	- SuSE Linux 7.3, 8.0, Enterprise Server 7
+        - only Intel and AMD x86 supported at this time
+	- >4GB memory configurations supported.
+
+     Refer to the User's Guide for more details on this.
+
+
+3. Command Line Options
 
         WARNING: ALTERING OR ADDING THESE DRIVER PARAMETERS
                  INCORRECTLY CAN RENDER YOUR SYSTEM INOPERABLE.
                  USE THEM WITH CAUTION. 
 
    Edit the file "modules.conf" in the directory /etc and add/edit a
-   line containing 'options aic7xxx=[command[,command...]]' where
+   line containing 'options aic79xx=[command[,command...]]' where
    'command' is one or more of the following:
    -----------------------------------------------------------------
               Option: verbose
@@ -203,17 +144,105 @@ The following information is available in this file:
      Possible Values: 1 - 253
        Default Value: 32
    -----------------------------------------------------------------
+              Option: rd_strm: {rd_strm_bitmask[,rd_strm_bitmask...]}
+          Definition: Enable read streaming on a per target basis.
+                      The rd_strm_bitmask is a 16 bit hex value in which
+		      each bit represents a target.  Setting the target's
+                      bit to '1' enables read streaming for that
+                      target.  Controllers may be ommitted indicating that
+		      they should retain the default read streaming setting.
+	     Example: rd_strm:{0x0041}
+			On Controller 0
+			  enables read streaming for targets 0 and 6.
+			  disables read streaming for targets 1-5,7-15.
+			All other targets retain the default read
+			streaming setting.
+	     Example: rd_strm:{0x0023,,0xFFFF}
+			On Controller 0
+			  enables read streaming for targets 1,2, and 5.
+			  disables read streaming for targets 3,4,6-15.
+			On Controller 2
+			  enables read streaming for all targets.
+			All other targets retain the default read
+			streaming setting.
+		      
+     Possible Values: 0x0000 - 0xffff
+       Default Value: 0x0000
+   -----------------------------------------------------------------
+              Option: precomp: {value[,value...]}
+          Definition: Set IO Cell precompensation value on a per-controller
+		      basis.
+                      Controllers may be ommitted indicating that
+		      they should retain the default precompensation setting.
+	     Example: precomp:{0x1}
+			On Controller 0 set precompensation to 1.
+	     Example: precomp:{1,,7}
+			On Controller 0 set precompensation to 1.
+			On Controller 2 set precompensation to 8.
+		      
+     Possible Values: 0 - 7
+       Default Value: Varies based on chip revision
+   -----------------------------------------------------------------
+              Option: slewrate: {value[,value...]}
+          Definition: Set IO Cell slew rate on a per-controller basis.
+                      Controllers may be ommitted indicating that
+		      they should retain the default slew rate setting.
+	     Example: slewrate:{0x1}
+			On Controller 0 set slew rate to 1.
+	     Example: slewrate :{1,,8}
+			On Controller 0 set slew rate to 1.
+			On Controller 2 set slew rate to 8.
+		      
+     Possible Values: 0 - 15
+       Default Value: Varies based on chip revision
+   -----------------------------------------------------------------
+              Option: amplitude: {value[,value...]}
+          Definition: Set IO Cell signal amplitude on a per-controller basis.
+                      Controllers may be ommitted indicating that
+		      they should retain the default read streaming setting.
+	     Example: amplitude:{0x1}
+			On Controller 0 set amplitude to 1.
+	     Example: amplitude :{1,,7}
+			On Controller 0 set amplitude to 1.
+			On Controller 2 set amplitude to 7.
+		      
+     Possible Values: 1 - 7
+       Default Value: Varies based on chip revision
+   -----------------------------------------------------------------
               Option: seltime:[value]
           Definition: Specifies the selection timeout value
      Possible Values: 0 = 256ms, 1 = 128ms, 2 = 64ms, 3 = 32ms
        Default Value: 0
    -----------------------------------------------------------------
 
-   Example: 'options aic7xxx=verbose,no_probe,tag_info:{{},{,,10}},seltime:1"
-	enables verbose logging, Disable EISA/VLB probing,
-	and set tag depth on Controller 1/Target 2 to 10 tags.
+   Example: 'options aic79xx=verbose,rd_strm:{{0x0041}}'
+	enables verbose output in the driver and turns read streaming on
+	for targets 0 and 6 of Controller 0.
 
-3. Contacting Adaptec
+4. Additional Notes
+
+   4.1. Known/Unresolved or FYI Issues
+
+	* Domain Validation is not implemented.
+	* Under SuSE Linux Enterprise 7, the driver may fail to operate
+	  correctly due to a problem with PCI interrupt routing in the
+	  Linux kernel.  Please contact SuSE for an updated Linux
+	  kernel.
+
+   4.2. Third-Party Compatibility Issues
+
+        * Adaptec only supports Ultra320 hard drives running
+          the latest firmware available. Please check with
+          your hard drive manufacturer to ensure you have the
+          latest version.
+
+   4.3. Operating System or Technology Limitations
+        
+        * PCI Hot Plug is untested and may cause the operating system 
+          to stop responding.
+
+
+5. Contacting Adaptec
 
    A Technical Support Identification (TSID) Number is required for 
    Adaptec technical support.
