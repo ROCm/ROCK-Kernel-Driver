@@ -294,4 +294,5 @@ solaris_sys_table:
 	.word solaris_unimplemented	/* 			264	*/
 	.word solaris_unimplemented	/* 			265	*/
 	.word solaris_unimplemented	/* 			266	*/
+	.word solaris_unimplemented	/* 			267	*/
 
