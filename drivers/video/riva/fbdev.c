@@ -644,6 +644,9 @@ static void riva_load_video_mode(struct fb_info *info)
 
 	memcpy(&newmode, &reg_template, sizeof(struct riva_regs));
 
+	if ((info->var.vmode & FB_VMODE_MASK) == FB_VMODE_INTERLACED)
+		vTotal |= 1;
+
 	if (par->FlatPanel) {
 		vStart = vTotal - 3;
 		vEnd = vTotal - 2;
@@ -693,7 +696,12 @@ static void riva_load_video_mode(struct fb_info *info)
 		| SetBitField(vStart,11:11,4:4)
 		| SetBitField(vBlankStart,11:11,6:6); 
 
-	newmode.ext.interlace = 0xff; /* interlace off */
+	if ((info->var.vmode & FB_VMODE_MASK) == FB_VMODE_INTERLACED) {
+		int tmp = (hTotal >> 1) & ~1;
+		newmode.ext.interlace = Set8Bits(tmp);
+		newmode.ext.horiz |= SetBitField(tmp, 8:8,4:4);
+	} else 
+		newmode.ext.interlace = 0xff; /* interlace off */
 
 	if (par->riva.Architecture >= NV_ARCH_10)
 		par->riva.CURSOR = (U032 *)(info->screen_base + par->riva.CursorStart);
@@ -1033,7 +1041,7 @@ static int rivafb_set_par(struct fb_info *info)
 	
 	info->fix.line_length = (info->var.xres_virtual * (info->var.bits_per_pixel >> 3));
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
-				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
+				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
 	return 0;
 }
 

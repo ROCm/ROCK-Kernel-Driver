@@ -394,9 +394,7 @@ struct fb_info {
    char *screen_base;                   /* Virtual address */
    struct vc_data *display_fg;		/* Console visible on this display */
    int currcon;				/* Current VC. */	
-   void *pseudo_palette;                /* Fake palette of 16 colors and 
-					   the cursor's color for non
-                                           palette mode */
+   void *pseudo_palette;                /* Fake palette of 16 colors */ 
    /* From here on everything is device dependent */
    void *par;	
 };

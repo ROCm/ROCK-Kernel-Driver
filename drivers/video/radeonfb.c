@@ -2212,6 +2212,7 @@ static struct fb_ops radeonfb_ops = {
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
 #endif
+	.fb_cursor	= soft_cursor,
 };
 
 
