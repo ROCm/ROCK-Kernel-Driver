@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134.h,v 1.20 2004/09/30 12:21:15 kraxel Exp $
+ *
  * v4l2 device driver for philips saa7134 based TV cards
  *
  * (c) 2001,02 Gerd Knorr <kraxel@bytesex.org>
@@ -159,6 +161,10 @@ struct saa7134_format {
 #define SAA7134_BOARD_CINERGY200       38
 #define SAA7134_BOARD_FLYTVPLATINUM    39
 #define SAA7134_BOARD_VIDEOMATE_TV_PVR 40
+#define SAA7134_BOARD_VIDEOMATE_TV_GOLD_PLUS 41
+#define SAA7134_BOARD_SABRENT_SBTTVFM  42
+#define SAA7134_BOARD_ZOLID_XPERT_TV7134 43
+#define SAA7134_EMPIRE_PCI_TV_RADIO_LE 44
 
 #define SAA7134_INPUT_MAX 8
 
@@ -434,7 +440,7 @@ struct saa7134_dev {
 #define saa_setb(reg,bit)          saa_andorb((reg),(bit),(bit))
 #define saa_clearb(reg,bit)        saa_andorb((reg),(bit),0)
 
-#define saa_wait(d) { udelay(d); }
+#define saa_wait(us) { udelay(us); }
 
 /* ----------------------------------------------------------- */
 /* saa7134-core.c                                              */
@@ -474,7 +480,8 @@ extern struct saa7134_board saa7134_boards[];
 extern const unsigned int saa7134_bcount;
 extern struct pci_device_id __devinitdata saa7134_pci_tbl[];
 
-extern int saa7134_board_init(struct saa7134_dev *dev);
+extern int saa7134_board_init1(struct saa7134_dev *dev);
+extern int saa7134_board_init2(struct saa7134_dev *dev);
 
 
 /* ----------------------------------------------------------- */
