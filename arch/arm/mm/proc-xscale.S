@@ -298,7 +298,7 @@ ENTRY(xscale_dma_inv_range)
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
@@ -315,7 +315,7 @@ ENTRY(xscale_dma_clean_range)
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
@@ -333,7 +333,7 @@ ENTRY(xscale_dma_flush_range)
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 ENTRY(xscale_cache_fns)
