@@ -1215,11 +1215,13 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		if (!(clone_flags & CLONE_STOPPED))
-			wake_up_new_task(p, clone_flags);
-		else
-			p->state = TASK_STOPPED;
-		++total_forks;
+		if (likely(!(clone_flags & CLONE_IDLETASK))) {
+			if (!(clone_flags & CLONE_STOPPED))
+				wake_up_new_task(p, clone_flags);
+			else
+				p->state = TASK_STOPPED;
+			++total_forks;
+		}
 
 		if (unlikely (trace)) {
 			current->ptrace_message = pid;
