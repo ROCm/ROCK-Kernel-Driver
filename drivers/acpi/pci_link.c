@@ -220,7 +220,6 @@ acpi_pci_link_check_current (
 	return AE_CTRL_TERMINATE;
 }
 
-
 static int
 acpi_pci_link_get_current (
 	struct acpi_pci_link	*link)
@@ -279,6 +278,28 @@ end:
 	return_VALUE(result);
 }
 
+static int
+acpi_pci_link_try_get_current (
+	struct acpi_pci_link *link,
+	int irq)
+{
+	int result;
+
+	ACPI_FUNCTION_TRACE("acpi_pci_link_try_get_current");
+
+	result = acpi_pci_link_get_current(link);
+	if (result && link->irq.active) {
+ 		return_VALUE(result);
+ 	}
+
+	if (!link->irq.active) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "No active IRQ resource found\n"));
+		printk(KERN_WARNING "_CRS returns NULL! Using IRQ %d for device (%s [%s]).\n", irq, acpi_device_name(link->device), acpi_device_bid(link->device));
+		link->irq.active = irq;
+	}
+	
+	return 0;
+}
 
 static int
 acpi_pci_link_set (
@@ -361,7 +382,7 @@ acpi_pci_link_set (
 	}
 
 	/* Make sure the active IRQ is the one we requested. */
-	result = acpi_pci_link_get_current(link);
+	result = acpi_pci_link_try_get_current(link, irq);
 	if (result) {
 		return_VALUE(result);
 	}
@@ -574,10 +595,6 @@ acpi_pci_link_add (
 		else
 			printk(" %d", link->irq.possible[i]);
 	}
-	if (!link->irq.active)
-		printk(", disabled");
-	else if (!found)
-		printk(", enabled at IRQ %d", link->irq.active);
 	printk(")\n");
 
 	/* TBD: Acquire/release lock */
