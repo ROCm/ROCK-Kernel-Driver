@@ -331,7 +331,7 @@ static struct pci_driver parport_serial_pci_driver = {
 	name:		"parport_serial",
 	id_table:	parport_serial_pci_tbl,
 	probe:		parport_serial_pci_probe,
-	remove:		parport_serial_pci_remove,
+	remove:		__devexit_p(parport_serial_pci_remove),
 };
 
 

@@ -2310,7 +2310,7 @@ static struct pci_driver eni_driver = {
 	name:		DEV_LABEL,
 	id_table:	eni_pci_tbl,
 	probe:		eni_init_one,
-	remove:		eni_remove_one,
+	remove:		__devexit_p(eni_remove_one),
 };
 
 

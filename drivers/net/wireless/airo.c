@@ -63,7 +63,7 @@ static struct pci_driver airo_driver = {
 	name:     "airo",
 	id_table: card_ids,
 	probe:    airo_pci_probe,
-	remove:   airo_pci_remove,
+	remove:   __devexit_p(airo_pci_remove),
 };
 #endif /* CONFIG_PCI */
 

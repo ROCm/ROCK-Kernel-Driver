@@ -2082,7 +2082,7 @@ static struct pci_driver rivafb_driver = {
 	name:		"rivafb",
 	id_table:	rivafb_pci_tbl,
 	probe:		rivafb_init_one,
-	remove:		rivafb_remove_one,
+	remove:		__devexit_p(rivafb_remove_one),
 };
 
 

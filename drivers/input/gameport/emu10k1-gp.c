@@ -108,7 +108,7 @@ static struct pci_driver emu_driver = {
         name:           "Emu10k1 Gameport",
         id_table:       emu_tbl,
         probe:          emu_probe,
-        remove:         emu_remove,
+        remove:         __devexit_p(emu_remove),
 };
 
 int __init emu_init(void)

@@ -2288,7 +2288,7 @@ static struct pci_driver eepro100_driver = {
 	name:		"eepro100",
 	id_table:	eepro100_pci_tbl,
 	probe:		eepro100_init_one,
-	remove:		eepro100_remove_one,
+	remove:		__devexit_p(eepro100_remove_one),
 #ifdef CONFIG_PM
 	suspend:	eepro100_suspend,
 	resume:		eepro100_resume,

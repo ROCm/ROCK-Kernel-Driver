@@ -25,6 +25,11 @@ have_mcpu_ev6 := $(shell if $(CC) -mcpu=ev6 -S -o /dev/null -xc /dev/null > /dev
 
 have_mcpu_ev67 := $(shell if $(CC) -mcpu=ev67 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
 
+have_msmall_data := $(shell if $(CC) -msmall-data -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
+ifeq ($(have_msmall_data),y)
+  CFLAGS := $(CFLAGS) -msmall-data
+endif
+
 # Turn on the proper cpu optimizations.
 ifeq ($(have_mcpu),y)
   # If GENERIC, make sure to turn off any instruction set extensions that
