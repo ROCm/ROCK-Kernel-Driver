@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: nandsim.c,v 1.3 2004/11/26 13:00:24 dedekind Exp $
+ * $Id: nandsim.c,v 1.7 2004/12/06 11:53:06 dedekind Exp $
  */
 
 #include <linux/config.h>
@@ -49,7 +49,7 @@
     !defined(CONFIG_NANDSIM_THIRD_ID_BYTE)  || \
     !defined(CONFIG_NANDSIM_FOURTH_ID_BYTE)
 #define CONFIG_NANDSIM_FIRST_ID_BYTE  0x98
-#define CONFIG_NANDSIM_SECOND_ID_BYTE 0x36
+#define CONFIG_NANDSIM_SECOND_ID_BYTE 0x39
 #define CONFIG_NANDSIM_THIRD_ID_BYTE  0xFF /* No byte */
 #define CONFIG_NANDSIM_FOURTH_ID_BYTE 0xFF /* No byte */
 #endif
@@ -124,12 +124,6 @@ MODULE_PARM_DESC(do_delays,      "Simulate NAND delays using busy-waits if not z
 MODULE_PARM_DESC(log,            "Perform logging if not zero");
 MODULE_PARM_DESC(dbg,            "Output debug information if not zero");
 
-/* 
- * There is no macro for 0x30 command which is used in "large page"
- * devices in standard mtd header, define it here. 
- */
-#define NAND_CMD_READ2LP 0x30
-
 /* The largest possible page size */
 #define NS_LARGEST_PAGE_SIZE	2048
 	
@@ -138,13 +132,13 @@ MODULE_PARM_DESC(dbg,            "Output debug information if not zero");
 
 /* Simulator's output macros (logging, debugging, warning, error) */
 #define NS_LOG(args...) \
-	do { if (log) printk(KERN_INFO NS_OUTPUT_PREFIX " log: " args); } while(0)
+	do { if (log) printk(KERN_DEBUG NS_OUTPUT_PREFIX " log: " args); } while(0)
 #define NS_DBG(args...) \
-	do { if (dbg) printk(KERN_INFO NS_OUTPUT_PREFIX " debug: " args); } while(0)
+	do { if (dbg) printk(KERN_DEBUG NS_OUTPUT_PREFIX " debug: " args); } while(0)
 #define NS_WARN(args...) \
-	do { printk(KERN_INFO NS_OUTPUT_PREFIX " warnig: " args); } while(0)
+	do { printk(KERN_WARNING NS_OUTPUT_PREFIX " warnig: " args); } while(0)
 #define NS_ERR(args...) \
-	do { printk(KERN_INFO NS_OUTPUT_PREFIX " errorr: " args); } while(0)
+	do { printk(KERN_ERR NS_OUTPUT_PREFIX " errorr: " args); } while(0)
 
 /* Busy-wait delay macros (microseconds, milliseconds) */
 #define NS_UDELAY(us) \
@@ -171,7 +165,7 @@ MODULE_PARM_DESC(dbg,            "Output debug information if not zero");
 /* After a command is input, the simulator goes to one of the following states */
 #define STATE_CMD_READ0        0x00000001 /* read data from the beginning of page */
 #define STATE_CMD_READ1        0x00000002 /* read data from the second half of page */
-#define STATE_CMD_READ2LP      0x00000003 /* read data second command (large page devices) */
+#define STATE_CMD_READSTART      0x00000003 /* read data second command (large page devices) */
 #define STATE_CMD_PAGEPROG     0x00000004 /* start page programm */
 #define STATE_CMD_READOOB      0x00000005 /* read OOB area */
 #define STATE_CMD_ERASE1       0x00000006 /* sector erase first command */
@@ -343,7 +337,7 @@ static struct nandsim_operations {
 	/* Read ID */
 	{OPT_ANY, {STATE_CMD_READID, STATE_ADDR_ZERO, STATE_DATAOUT_ID, STATE_READY}},
 	/* Large page devices read page */
-	{OPT_LARGEPAGE, {STATE_CMD_READ0, STATE_ADDR_PAGE, STATE_CMD_READ2LP | ACTION_CPY,
+	{OPT_LARGEPAGE, {STATE_CMD_READ0, STATE_ADDR_PAGE, STATE_CMD_READSTART | ACTION_CPY,
 			       STATE_DATAOUT, STATE_READY}}
 };
 
@@ -522,8 +516,8 @@ get_state_name(uint32_t state)
 			return "STATE_CMD_PAGEPROG";
 		case STATE_CMD_READOOB:
 			return "STATE_CMD_READOOB";
-		case STATE_CMD_READ2LP:
-			return "STATE_CMD_READ2LP";
+		case STATE_CMD_READSTART:
+			return "STATE_CMD_READSTART";
 		case STATE_CMD_ERASE1:
 			return "STATE_CMD_ERASE1";
 		case STATE_CMD_STATUS:
@@ -575,7 +569,7 @@ check_command(int cmd)
 	switch (cmd) {
 		
 	case NAND_CMD_READ0:
-	case NAND_CMD_READ2LP:
+	case NAND_CMD_READSTART:
 	case NAND_CMD_PAGEPROG:
 	case NAND_CMD_READOOB:
 	case NAND_CMD_ERASE1:
@@ -606,8 +600,8 @@ get_state_by_command(unsigned command)
 			return STATE_CMD_READ1;
 		case NAND_CMD_PAGEPROG:
 			return STATE_CMD_PAGEPROG;
-		case NAND_CMD_READ2LP:
-			return STATE_CMD_READ2LP;
+		case NAND_CMD_READSTART:
+			return STATE_CMD_READSTART;
 		case NAND_CMD_READOOB:
 			return STATE_CMD_READOOB;
 		case NAND_CMD_ERASE1:
