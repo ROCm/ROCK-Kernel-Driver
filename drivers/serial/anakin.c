@@ -69,7 +69,8 @@ anakin_transmit_buffer(struct uart_port *port)
 {
 	struct circ_buf *xmit = &port->info->xmit;
 
-	while (!(anakin_in(port, 0x10) & TXEMPTY));
+	while (!(anakin_in(port, 0x10) & TXEMPTY))
+		barrier();
 	anakin_out(port, 0x14, xmit->buf[xmit->tail]);
 	anakin_out(port, 0x18, anakin_in(port, 0x18) | SENDREQUEST);
 	xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE-1);
@@ -386,7 +387,8 @@ anakin_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++, s++) {
-		while (!(anakin_in(port, 0x10) & TXEMPTY));
+		while (!(anakin_in(port, 0x10) & TXEMPTY))
+			barrier();
 
 		/*
 		 *	Send the character out.
@@ -396,7 +398,8 @@ anakin_console_write(struct console *co, const char *s, unsigned int count)
 		anakin_out(port, 0x18, anakin_in(port, 0x18) | SENDREQUEST);
 
 		if (*s == 10) {
-			while (!(anakin_in(port, 0x10) & TXEMPTY));
+			while (!(anakin_in(port, 0x10) & TXEMPTY))
+				barrier();
 			anakin_out(port, 0x14, 13);
 			anakin_out(port, 0x18, anakin_in(port, 0x18)
 					| SENDREQUEST);
@@ -407,7 +410,8 @@ anakin_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Finally, wait for transmitter to become empty
 	 *	and restore the interrupts
 	 */
-	while (!(anakin_in(port, 0x10) & TXEMPTY));
+	while (!(anakin_in(port, 0x10) & TXEMPTY))
+		barrier();
 
 	if (status & IRQENABLE) {
 		local_irq_save(flags);
