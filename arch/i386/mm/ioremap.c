@@ -213,9 +213,9 @@ void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 void iounmap(void *addr)
 {
 	struct vm_struct *p;
-	if (addr < high_memory) 
+	if (addr <= high_memory) 
 		return; 
-	p = remove_kernel_area(addr); 
+	p = remove_kernel_area(PAGE_MASK & (unsigned long) addr); 
 	if (!p) { 
 		printk("__iounmap: bad address %p\n", addr);
 		return;
