@@ -963,6 +963,7 @@ EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
 int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 {
 	unsigned long flags;
+	int ret;
 
 	if (!driver_data || !driver_data->verify || !driver_data->init ||
 	    ((!driver_data->setpolicy) && (!driver_data->target)))
@@ -976,7 +977,28 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	cpufreq_driver = driver_data;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
-	return sysdev_driver_register(&cpu_sysdev_class,&cpufreq_sysdev_driver);
+	ret = sysdev_driver_register(&cpu_sysdev_class,&cpufreq_sysdev_driver);
+
+	if ((!ret) && !(cpufreq_driver->flags & CPUFREQ_STICKY)) {
+		int i;
+		ret = -ENODEV;
+
+		/* check for at least one working CPU */
+		for (i=0; i<NR_CPUS; i++)
+			if (cpufreq_cpu_data[i])
+				ret = 0;
+
+		/* if all ->init() calls failed, unregister */
+		if (ret) {
+			sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
+
+			spin_lock_irqsave(&cpufreq_driver_lock, flags);
+			cpufreq_driver = NULL;
+			spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		}
+	}
+
+	return (ret);
 }
 EXPORT_SYMBOL_GPL(cpufreq_register_driver);
 
