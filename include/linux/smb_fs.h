@@ -33,7 +33,7 @@
 
 static inline struct smb_sb_info *SMB_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct smb_inode_info *SMB_I(struct inode *inode)

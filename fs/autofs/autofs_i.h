@@ -111,7 +111,7 @@ struct autofs_sb_info {
 
 static inline struct autofs_sb_info *autofs_sbi(struct super_block *sb)
 {
-	return (struct autofs_sb_info *)(sb->u.generic_sbp);
+	return (struct autofs_sb_info *)(sb->s_fs_info);
 }
 
 /* autofs_oz_mode(): do we see the man behind the curtain?  (The

@@ -98,7 +98,7 @@ static inline void shmem_swp_unmap(swp_entry_t *entry)
 
 static inline struct shmem_sb_info *SHMEM_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static struct super_operations shmem_ops;
@@ -1595,7 +1595,7 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	sbinfo = kmalloc(sizeof(struct shmem_sb_info), GFP_KERNEL);
 	if (!sbinfo)
 		return -ENOMEM;
-	sb->u.generic_sbp = sbinfo;
+	sb->s_fs_info = sbinfo;
 	memset(sbinfo, 0, sizeof(struct shmem_sb_info));
 
 	/*
@@ -1644,14 +1644,14 @@ failed_iput:
 	iput(inode);
 failed:
 	kfree(sbinfo);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	return err;
 }
 
 static void shmem_put_super(struct super_block *sb)
 {
-	kfree(sb->u.generic_sbp);
-	sb->u.generic_sbp = NULL;
+	kfree(sb->s_fs_info);
+	sb->s_fs_info = NULL;
 }
 
 static kmem_cache_t *shmem_inode_cachep;

@@ -174,7 +174,7 @@ struct iso_directory_record {
 
 static inline struct isofs_sb_info *ISOFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct iso_inode_info *ISOFS_I(struct inode *inode)

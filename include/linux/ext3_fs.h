@@ -455,7 +455,7 @@ struct ext3_super_block {
 #ifdef __KERNEL__
 static inline struct ext3_sb_info * EXT3_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
 {

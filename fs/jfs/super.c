@@ -248,7 +248,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi)
 		return -ENOSPC;
 	memset(sbi, 0, sizeof (struct jfs_sb_info));
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 
 	if (!parse_options((char *) data, sb, &newLVSize)) {
 		kfree(sbi);

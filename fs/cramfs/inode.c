@@ -181,8 +181,8 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 
 static void cramfs_put_super(struct super_block *sb)
 {
-	kfree(sb->u.generic_sbp);
-	sb->u.generic_sbp = NULL;
+	kfree(sb->s_fs_info);
+	sb->s_fs_info = NULL;
 }
 
 static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
@@ -195,7 +195,7 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	sbi = kmalloc(sizeof(struct cramfs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct cramfs_sb_info));
 
 	sb_set_blocksize(sb, PAGE_CACHE_SIZE);
@@ -258,7 +258,7 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 out:
 	kfree(sbi);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	return -EINVAL;
 }
 

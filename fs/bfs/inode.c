@@ -184,7 +184,7 @@ static void bfs_put_super(struct super_block *s)
 	brelse(info->si_sbh);
 	kfree(info->si_imap);
 	kfree(info);
-	s->u.generic_sbp = NULL;
+	s->s_fs_info = NULL;
 }
 
 static int bfs_statfs(struct super_block *s, struct statfs *buf)
@@ -294,7 +294,7 @@ static int bfs_fill_super(struct super_block *s, void *data, int silent)
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
-	s->u.generic_sbp = info;
+	s->s_fs_info = info;
 	memset(info, 0, sizeof(*info));
 
 	sb_set_blocksize(s, BFS_BSIZE);
@@ -370,7 +370,7 @@ static int bfs_fill_super(struct super_block *s, void *data, int silent)
 out:
 	brelse(bh);
 	kfree(info);
-	s->u.generic_sbp = NULL;
+	s->s_fs_info = NULL;
 	return -EINVAL;
 }
 

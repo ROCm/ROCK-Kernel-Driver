@@ -261,6 +261,6 @@ enum {
  * Get filesystem private data from VFS superblock.
  */
 #define VXFS_SBI(sbp) \
-	((struct vxfs_sb_info *)(sbp)->u.generic_sbp)
+	((struct vxfs_sb_info *)(sbp)->s_fs_info)
 
 #endif /* _VXFS_SUPER_H_ */

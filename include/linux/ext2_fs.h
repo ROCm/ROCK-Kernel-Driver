@@ -74,7 +74,7 @@
 #ifdef __KERNEL__
 static inline struct ext2_sb_info *EXT2_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 #else
 /* Assume that user mode programs are passing in an ext2fs superblock, not

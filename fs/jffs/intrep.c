@@ -614,7 +614,7 @@ jffs_build_fs(struct super_block *sb)
 		printk("JFFS: Failed to build file system.\n");
 		goto jffs_build_fs_fail;
 	}
-	sb->u.generic_sbp = (void *)c;
+	sb->s_fs_info = (void *)c;
 	c->building_fs = 0;
 
 	D1(jffs_print_hash_table(c));

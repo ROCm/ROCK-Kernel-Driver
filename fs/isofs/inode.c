@@ -74,7 +74,7 @@ static void isofs_put_super(struct super_block *sb)
 #endif
 
 	kfree(sbi);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	return;
 }
 
@@ -550,7 +550,7 @@ static int isofs_fill_super(struct super_block *s, void *data, int silent)
 	sbi = kmalloc(sizeof(struct isofs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	s->u.generic_sbp = sbi;
+	s->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct isofs_sb_info));
 
 	if (!parse_options((char *) data, &opt))
@@ -911,7 +911,7 @@ out_freebh:
 	brelse(bh);
 out_freesbi:
 	kfree(sbi);
-	s->u.generic_sbp = NULL;
+	s->s_fs_info = NULL;
 	return -EINVAL;
 }
 

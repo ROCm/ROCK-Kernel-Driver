@@ -192,7 +192,7 @@ struct ncp_entry_info {
 
 static inline struct ncp_server *NCP_SBP(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 #define NCP_SERVER(inode)	NCP_SBP((inode)->i_sb)

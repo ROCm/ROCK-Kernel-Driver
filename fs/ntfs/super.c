@@ -1051,7 +1051,7 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 		unload_nls(vol->nls_map);
 		vol->nls_map = NULL;
 	}
-	vfs_sb->u.generic_sbp = NULL;
+	vfs_sb->s_fs_info = NULL;
 	kfree(vol);
 	return;
 }
@@ -1336,8 +1336,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 #endif
-	/* Allocate a new ntfs_volume and place it in sb->u.generic_sbp. */
-	sb->u.generic_sbp = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
+	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */
+	sb->s_fs_info = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
 	vol = NTFS_SB(sb);
 	if (!vol) {
 		if (!silent)
@@ -1580,7 +1580,7 @@ cond_iput_mft_ino_err_out_now:
 	}
 	/* Errors at this stage are irrelevant. */
 err_out_now:
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(vol);
 	ntfs_debug("Failed, returning -EINVAL.");
 	return -EINVAL;

@@ -401,7 +401,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server = kmalloc(sizeof(struct ncp_server), GFP_KERNEL);
 	if (!server)
 		return -ENOMEM;
-	sb->u.generic_sbp = server;
+	sb->s_fs_info = server;
 	memset(server, 0, sizeof(struct ncp_server));
 
 	error = -EFAULT;
@@ -668,7 +668,7 @@ out_fput:
 	 */
 	fput(ncp_filp);
 out:
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(server);
 	return error;
 }
@@ -707,7 +707,7 @@ static void ncp_put_super(struct super_block *sb)
 	if (server->auth.object_name)
 		ncp_kfree_s(server->auth.object_name, server->auth.object_name_len);
 	vfree(server->packet);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(server);
 }
 

@@ -2483,7 +2483,7 @@ static int devfs_notify_change (struct dentry *dentry, struct iattr *iattr)
     int retval;
     struct devfs_entry *de;
     struct inode *inode = dentry->d_inode;
-    struct fs_info *fs_info = inode->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = inode->i_sb->s_fs_info;
 
     de = get_devfs_entry_from_vfs_inode (inode);
     if (de == NULL) return -ENODEV;
@@ -2630,7 +2630,7 @@ static int devfs_readdir (struct file *file, void *dirent, filldir_t filldir)
     struct devfs_entry *parent, *de, *next = NULL;
     struct inode *inode = file->f_dentry->d_inode;
 
-    fs_info = inode->i_sb->u.generic_sbp;
+    fs_info = inode->i_sb->s_fs_info;
     parent = get_devfs_entry_from_vfs_inode (file->f_dentry->d_inode);
     if ( (long) file->f_pos < 0 ) return -EINVAL;
     DPRINTK (DEBUG_F_READDIR, "(%s): fs_info: %p  pos: %ld\n",
@@ -2694,7 +2694,7 @@ static int devfs_open (struct inode *inode, struct file *file)
     int err;
     struct fcb_type *df;
     struct devfs_entry *de;
-    struct fs_info *fs_info = inode->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = inode->i_sb->s_fs_info;
     void *ops;
 
     de = get_devfs_entry_from_vfs_inode (inode);
@@ -2825,7 +2825,7 @@ static int devfs_d_delete (struct dentry *dentry)
 	DPRINTK (DEBUG_D_DELETE, "(%p): dropping negative dentry\n", dentry);
 	return 1;
     }
-    fs_info = inode->i_sb->u.generic_sbp;
+    fs_info = inode->i_sb->s_fs_info;
     de = get_devfs_entry_from_vfs_inode (inode);
     DPRINTK (DEBUG_D_DELETE, "(%p): inode: %p  devfs_entry: %p\n",
 	     dentry, inode, de);
@@ -2854,7 +2854,7 @@ struct devfs_lookup_struct
 static int devfs_d_revalidate_wait (struct dentry *dentry, int flags)
 {
     struct inode *dir = dentry->d_parent->d_inode;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
     devfs_handle_t parent = get_devfs_entry_from_vfs_inode (dir);
     struct devfs_lookup_struct *lookup_info = dentry->d_fsdata;
     DECLARE_WAITQUEUE (wait, current);
@@ -2907,7 +2907,7 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
 {
     struct devfs_entry tmp;  /*  Must stay in scope until devfsd idle again  */
     struct devfs_lookup_struct lookup_info;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
     struct devfs_entry *parent, *de;
     struct inode *inode;
     struct dentry *retval = NULL;
@@ -2996,7 +2996,7 @@ static int devfs_unlink (struct inode *dir, struct dentry *dentry)
     int unhooked;
     struct devfs_entry *de;
     struct inode *inode = dentry->d_inode;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
 
     de = get_devfs_entry_from_vfs_inode (inode);
     DPRINTK (DEBUG_I_UNLINK, "(%s): de: %p\n", dentry->d_name.name, de);
@@ -3018,7 +3018,7 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
 			  const char *symname)
 {
     int err;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
     struct devfs_entry *parent, *de;
     struct inode *inode;
 
@@ -3050,7 +3050,7 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
 static int devfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
 {
     int err;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
     struct devfs_entry *parent, *de;
     struct inode *inode;
 
@@ -3082,10 +3082,10 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
 {
     int err = 0;
     struct devfs_entry *de;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
     struct inode *inode = dentry->d_inode;
 
-    if (dir->i_sb->u.generic_sbp != inode->i_sb->u.generic_sbp) return -EINVAL;
+    if (dir->i_sb->s_fs_info != inode->i_sb->s_fs_info) return -EINVAL;
     de = get_devfs_entry_from_vfs_inode (inode);
     if (de == NULL) return -ENOENT;
     if ( !S_ISDIR (de->mode) ) return -ENOTDIR;
@@ -3113,7 +3113,7 @@ static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 			int rdev)
 {
     int err;
-    struct fs_info *fs_info = dir->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = dir->i_sb->s_fs_info;
     struct devfs_entry *parent, *de;
     struct inode *inode;
 
@@ -3201,7 +3201,7 @@ static int devfs_fill_super (struct super_block *sb, void *data, int silent)
     init_waitqueue_head (&fs_info.devfsd_wait_queue);
     init_waitqueue_head (&fs_info.revalidate_wait_queue);
     fs_info.sb = sb;
-    sb->u.generic_sbp = &fs_info;
+    sb->s_fs_info = &fs_info;
     sb->s_blocksize = 1024;
     sb->s_blocksize_bits = 10;
     sb->s_magic = DEVFS_SUPER_MAGIC;
@@ -3210,7 +3210,7 @@ static int devfs_fill_super (struct super_block *sb, void *data, int silent)
 	goto out_no_root;
     sb->s_root = d_alloc_root (root_inode);
     if (!sb->s_root) goto out_no_root;
-    DPRINTK (DEBUG_S_READ, "(): made devfs ptr: %p\n", sb->u.generic_sbp);
+    DPRINTK (DEBUG_S_READ, "(): made devfs ptr: %p\n", sb->s_fs_info);
     return 0;
 
 out_no_root:
@@ -3242,7 +3242,7 @@ static ssize_t devfsd_read (struct file *file, char *buf, size_t len,
     loff_t pos, devname_offset, tlen, rpos;
     devfs_handle_t de;
     struct devfsd_buf_entry *entry;
-    struct fs_info *fs_info = file->f_dentry->d_inode->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = file->f_dentry->d_inode->i_sb->s_fs_info;
     struct devfsd_notify_struct *info = fs_info->devfsd_info;
     DECLARE_WAITQUEUE (wait, current);
 
@@ -3343,7 +3343,7 @@ static int devfsd_ioctl (struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
     int ival;
-    struct fs_info *fs_info = inode->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = inode->i_sb->s_fs_info;
 
     switch (cmd)
     {
@@ -3400,7 +3400,7 @@ static int devfsd_ioctl (struct inode *inode, struct file *file,
 static int devfsd_close (struct inode *inode, struct file *file)
 {
     struct devfsd_buf_entry *entry, *next;
-    struct fs_info *fs_info = inode->i_sb->u.generic_sbp;
+    struct fs_info *fs_info = inode->i_sb->s_fs_info;
 
     if (fs_info->devfsd_file != file) return 0;
     fs_info->devfsd_event_mask = 0;

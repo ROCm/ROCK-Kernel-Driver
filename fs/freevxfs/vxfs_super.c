@@ -184,7 +184,7 @@ static int vxfs_fill_super(struct super_block *sbp, void *dp, int silent)
 #endif
 
 	sbp->s_magic = rsbp->vs_magic;
-	sbp->u.generic_sbp = (void *)infp;
+	sbp->s_fs_info = (void *)infp;
 
 	infp->vsi_raw = rsbp;
 	infp->vsi_bp = bp;

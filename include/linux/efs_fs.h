@@ -46,7 +46,7 @@ static inline struct efs_inode_info *INODE_INFO(struct inode *inode)
 
 static inline struct efs_sb_info *SUPER_INFO(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 extern struct inode_operations efs_dir_inode_operations;

@@ -1167,7 +1167,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 static int nfs_set_super(struct super_block *s, void *data)
 {
-	s->u.generic_sbp = data;
+	s->s_fs_info = data;
 	return set_anon_super(s, data);
 }
  

@@ -86,7 +86,7 @@ struct romfs_inode_info {
 /* instead of private superblock data */
 static inline unsigned long romfs_maxsize(struct super_block *sb)
 {
-	return (unsigned long)sb->u.generic_sbp;
+	return (unsigned long)sb->s_fs_info;
 }
 
 static inline struct romfs_inode_info *ROMFS_I(struct inode *inode)
@@ -144,7 +144,7 @@ static int romfs_fill_super(struct super_block *s, void *data, int silent)
 	}
 
 	s->s_magic = ROMFS_MAGIC;
-	s->u.generic_sbp = (void *)(long)sz;
+	s->s_fs_info = (void *)(long)sz;
 
 	s->s_flags |= MS_RDONLY;
 

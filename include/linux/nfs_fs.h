@@ -192,7 +192,7 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
 	return container_of(inode, struct nfs_inode, vfs_inode);
 }
-#define NFS_SB(s)		((struct nfs_server *)(s->u.generic_sbp))
+#define NFS_SB(s)		((struct nfs_server *)(s->s_fs_info))
 
 #define NFS_FH(inode)			(&NFS_I(inode)->fh)
 #define NFS_SERVER(inode)		(NFS_SB(inode->i_sb))

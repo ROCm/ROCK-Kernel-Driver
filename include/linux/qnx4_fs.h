@@ -135,7 +135,7 @@ extern int qnx4_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 
 static inline struct qnx4_sb_info *qnx4_sb(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct qnx4_inode_info *qnx4_i(struct inode *inode)

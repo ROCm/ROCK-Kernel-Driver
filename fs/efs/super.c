@@ -72,8 +72,8 @@ static void destroy_inodecache(void)
 
 void efs_put_super(struct super_block *s)
 {
-	kfree(s->u.generic_sbp);
-	s->u.generic_sbp = NULL;
+	kfree(s->s_fs_info);
+	s->s_fs_info = NULL;
 }
 
 static struct super_operations efs_superblock_operations = {
@@ -213,7 +213,7 @@ int efs_fill_super(struct super_block *s, void *d, int silent)
  	sb = kmalloc(sizeof(struct efs_sb_info), GFP_KERNEL);
 	if (!sb)
 		return -ENOMEM;
-	s->u.generic_sbp = sb;
+	s->s_fs_info = sb;
 	memset(sb, 0, sizeof(struct efs_sb_info));
  
 	s->s_magic		= EFS_SUPER_MAGIC;
@@ -272,7 +272,7 @@ int efs_fill_super(struct super_block *s, void *d, int silent)
 
 out_no_fs_ul:
 out_no_fs:
-	s->u.generic_sbp = NULL;
+	s->s_fs_info = NULL;
 	kfree(sb);
 	return -EINVAL;
 }

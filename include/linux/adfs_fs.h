@@ -63,7 +63,7 @@ static inline int adfs_checkbblk(unsigned char *ptr)
 
 static inline struct adfs_sb_info *ADFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct adfs_inode_info *ADFS_I(struct inode *inode)

@@ -73,7 +73,7 @@ static inline struct sysv_inode_info *SYSV_I(struct inode *inode)
 
 static inline struct sysv_sb_info *SYSV_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 

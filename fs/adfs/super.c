@@ -130,7 +130,7 @@ static void adfs_put_super(struct super_block *sb)
 		brelse(asb->s_map[i].dm_bh);
 	kfree(asb->s_map);
 	kfree(asb);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 }
 
 static int parse_options(struct super_block *sb, char *options)
@@ -330,7 +330,7 @@ static int adfs_fill_super(struct super_block *sb, void *data, int silent)
 	asb = kmalloc(sizeof(*asb), GFP_KERNEL);
 	if (!asb)
 		return -ENOMEM;
-	sb->u.generic_sbp = asb;
+	sb->s_fs_info = asb;
 	memset(asb, 0, sizeof(*asb));
 
 	/* set default options */
@@ -452,7 +452,7 @@ static int adfs_fill_super(struct super_block *sb, void *data, int silent)
 error_free_bh:
 	brelse(bh);
 error:
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(asb);
 	return -EINVAL;
 }

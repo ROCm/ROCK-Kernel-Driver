@@ -93,7 +93,7 @@ static int jffs2_sb_set(struct super_block *sb, void *data)
 	/* For persistence of NFS exports etc. we use the same s_dev
 	   each time we mount the device, don't just use an anonymous
 	   device */
-	sb->u.generic_sbp = p;
+	sb->s_fs_info = p;
 	p->os_priv = sb;
 	sb->s_dev = MKDEV(MTD_BLOCK_MAJOR, p->mtd->index);
 

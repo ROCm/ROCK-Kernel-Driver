@@ -35,7 +35,7 @@ struct bfs_inode_info {
 
 static inline struct bfs_sb_info *BFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct bfs_inode_info *BFS_I(struct inode *inode)

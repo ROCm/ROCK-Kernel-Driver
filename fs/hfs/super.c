@@ -181,8 +181,8 @@ static void hfs_put_super(struct super_block *sb)
 	/* release the MDB's resources */
 	hfs_mdb_put(mdb, sb->s_flags & MS_RDONLY);
 
-	kfree(sb->u.generic_sbp);
-	sb->u.generic_sbp = NULL;
+	kfree(sb->s_fs_info);
+	sb->s_fs_info = NULL;
 }
 
 /*
@@ -459,7 +459,7 @@ int hfs_fill_super(struct super_block *s, void *data, int silent)
 	sbi = kmalloc(sizeof(struct hfs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	s->u.generic_sbp = sbi;
+	s->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct hfs_sb_info));
 
 	if (!parse_options((char *)data, sbi, &part)) {
@@ -533,7 +533,7 @@ bail1:
 	hfs_mdb_put(mdb, s->s_flags & MS_RDONLY);
 bail2:
 	kfree(sbi);
-	s->u.generic_sbp = NULL;
+	s->s_fs_info = NULL;
 	return -EINVAL;	
 }
 

@@ -193,7 +193,7 @@ struct vfat_slot_info {
 
 static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)

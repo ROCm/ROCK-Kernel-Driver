@@ -667,9 +667,8 @@ struct super_block {
 
 	char s_id[32];				/* Informational name */
 
-	union {
-		void			*generic_sbp;
-	} u;
+	void 			*s_fs_info;	/* Filesystem private info */
+
 	/*
 	 * The next field is for VFS *only*. No filesystems have any business
 	 * even looking at it. You had been warned.

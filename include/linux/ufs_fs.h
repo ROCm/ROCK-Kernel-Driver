@@ -785,7 +785,7 @@ extern void ufs_truncate (struct inode *);
 
 static inline struct ufs_sb_info *UFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline struct ufs_inode_info *UFS_I(struct inode *inode)

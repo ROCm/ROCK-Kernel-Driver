@@ -402,8 +402,8 @@ static void reiserfs_put_super (struct super_block * s)
   reiserfs_proc_unregister( s, "version" );
   reiserfs_proc_info_done( s );
 
-  kfree(s->u.generic_sbp);
-  s->u.generic_sbp = NULL;
+  kfree(s->s_fs_info);
+  s->s_fs_info = NULL;
 
   return;
 }
@@ -1164,7 +1164,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 	errval = -ENOMEM;
 	goto error;
     }
-    s->u.generic_sbp = sbi;
+    s->s_fs_info = sbi;
     memset (sbi, 0, sizeof (struct reiserfs_sb_info));
     /* Set default values for options: non-aggressive tails */
     REISERFS_SB(s)->s_mount_opt = ( 1 << REISERFS_SMALLTAIL );
@@ -1335,7 +1335,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 	kfree(sbi);
     }
 
-    s->u.generic_sbp = NULL;
+    s->s_fs_info = NULL;
     return errval;
 }
 

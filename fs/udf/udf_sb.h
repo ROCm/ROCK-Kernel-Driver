@@ -32,7 +32,7 @@
 
 static inline struct udf_sb_info *UDF_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 #define UDF_SB_FREE(X)\

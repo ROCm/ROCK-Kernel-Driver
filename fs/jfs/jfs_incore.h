@@ -162,7 +162,7 @@ static inline struct jfs_inode_info *JFS_IP(struct inode *inode)
 
 static inline struct jfs_sb_info *JFS_SBI(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline int isReadOnly(struct inode *inode)

@@ -75,9 +75,9 @@
 
 
 #define LINVFS_GET_VFS(s) \
-	(vfs_t *)((s)->u.generic_sbp)
+	(vfs_t *)((s)->s_fs_info)
 #define LINVFS_SET_VFS(s, vfsp) \
-	((s)->u.generic_sbp = vfsp)
+	((s)->s_fs_info = vfsp)
 
 
 struct xfs_mount_args;

@@ -367,7 +367,7 @@ static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 
 	sbi->s_sb = sb;
 	sbi->s_block_base = 0;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	
 	sb_set_blocksize(sb, BLOCK_SIZE);
 
@@ -453,7 +453,7 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->s_block_base = 0;
 	sbi->s_type = FSTYPE_V7;
 	sbi->s_bytesex = BYTESEX_PDP;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	
 	sb_set_blocksize(sb, 512);
 

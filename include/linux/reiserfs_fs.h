@@ -294,7 +294,7 @@ static inline struct reiserfs_inode_info *REISERFS_I(struct inode *inode)
 
 static inline struct reiserfs_sb_info *REISERFS_SB(const struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 /** this says about version of key of all items (but stat data) the

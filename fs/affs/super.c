@@ -56,7 +56,7 @@ affs_put_super(struct super_block *sb)
 	kfree(sbi->s_bitmap);
 	affs_brelse(sbi->s_root_bh);
 	kfree(sbi);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	unlock_kernel();
 	return;
 }
@@ -298,7 +298,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 	sbi = kmalloc(sizeof(struct affs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(*AFFS_SB));
 	init_MUTEX(&sbi->s_bmlock);
 
@@ -483,7 +483,7 @@ out_error:
 	if (sbi->s_prefix)
 		kfree(sbi->s_prefix);
 	kfree(sbi);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	return -EINVAL;
 }
 

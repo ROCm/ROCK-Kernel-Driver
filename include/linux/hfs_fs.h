@@ -327,7 +327,7 @@ static inline struct hfs_inode_info *HFS_I(struct inode *inode)
 
 static inline struct hfs_sb_info *HFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 static inline void hfs_nameout(struct inode *dir, struct hfs_name *out,

@@ -468,7 +468,7 @@ smb_put_super(struct super_block *sb)
 		unload_nls(server->local_nls);
 		server->local_nls = NULL;
 	}
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	smb_unlock_server(server);
 	smb_kfree(server);
 }
@@ -499,7 +499,7 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server = smb_kmalloc(sizeof(struct smb_sb_info), GFP_KERNEL);
 	if (!server)
 		goto out_no_server;
-	sb->u.generic_sbp = server;
+	sb->s_fs_info = server;
 	memset(server, 0, sizeof(struct smb_sb_info));
 
 	server->super_block = sb;
@@ -592,7 +592,7 @@ out_bad_option:
 out_no_mem:
 	if (!server->mnt)
 		printk(KERN_ERR "smb_fill_super: allocation failure\n");
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	smb_kfree(server);
 	goto out_fail;
 out_wrong_data:

@@ -353,7 +353,7 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 	qs = kmalloc(sizeof(struct qnx4_sb_info), GFP_KERNEL);
 	if (!qs)
 		return -ENOMEM;
-	s->u.generic_sbp = qs;
+	s->s_fs_info = qs;
 	memset(qs, 0, sizeof(struct qnx4_sb_info));
 
 	sb_set_blocksize(s, QNX4_BLOCK_SIZE);
@@ -416,7 +416,7 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 	brelse(bh);
       outnobh:
 	kfree(qs);
-	s->u.generic_sbp = NULL;
+	s->s_fs_info = NULL;
 	return -EINVAL;
 }
 
@@ -425,7 +425,7 @@ static void qnx4_put_super(struct super_block *sb)
 	struct qnx4_sb_info *qs = qnx4_sb(sb);
 	kfree( qs->BitMap );
 	kfree( qs );
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	return;
 }
 

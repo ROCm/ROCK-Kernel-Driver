@@ -143,7 +143,7 @@ static void ext2_put_super (struct super_block * sb)
 			brelse (sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
 	brelse (sbi->s_sbh);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(sbi);
 
 	return;
@@ -475,7 +475,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(*sbi));
 
 	/*
@@ -710,7 +710,7 @@ failed_mount2:
 failed_mount:
 	brelse(bh);
 failed_sbi:
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(sbi);
 	return -EINVAL;
 }

@@ -457,7 +457,7 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 	sbi = kmalloc(sizeof(struct ufs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		goto failed_nomem;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct ufs_sb_info));
 
 	UFSD(("flag %u\n", (int)(sb->s_flags & MS_RDONLY)))
@@ -844,7 +844,7 @@ failed:
 	if (ubh) ubh_brelse_uspi (uspi);
 	if (uspi) kfree (uspi);
 	if (sbi) kfree(sbi);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	UFSD(("EXIT (FAILED)\n"))
 	return -EINVAL;
 
@@ -892,7 +892,7 @@ void ufs_put_super (struct super_block * sb)
 	ubh_brelse_uspi (sbi->s_uspi);
 	kfree (sbi->s_uspi);
 	kfree (sbi);
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	return;
 }
 

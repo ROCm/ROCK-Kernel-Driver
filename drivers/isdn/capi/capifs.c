@@ -61,7 +61,7 @@ struct capifs_sb_info {
 
 static inline struct capifs_sb_info *SBI(struct super_block *sb)
 {
-	return (struct capifs_sb_info *)(sb->u.generic_sbp);
+	return (struct capifs_sb_info *)(sb->s_fs_info);
 }
 
 /* ------------------------------------------------------------------ */
@@ -310,7 +310,7 @@ static int capifs_fill_super(struct super_block *s, void *data, int silent)
 	}
 	memset(sbi->nccis, 0, sizeof(struct capifs_ncci) * sbi->max_ncci);
 
-	s->u.generic_sbp = (void *) sbi;
+	s->s_fs_info = (void *) sbi;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
 	s->s_magic = CAPIFS_SUPER_MAGIC;

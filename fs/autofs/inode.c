@@ -33,7 +33,7 @@ static void autofs_put_super(struct super_block *sb)
 			kfree(sbi->symlink[n].data);
 	}
 
-	kfree(sb->u.generic_sbp);
+	kfree(sb->s_fs_info);
 
 	DPRINTK(("autofs: shutting down\n"));
 }
@@ -126,7 +126,7 @@ int autofs_fill_super(struct super_block *s, void *data, int silent)
 	memset(sbi, 0, sizeof(*sbi));
 	DPRINTK(("autofs: starting up, sbi = %p\n",sbi));
 
-	s->u.generic_sbp = sbi;
+	s->s_fs_info = sbi;
 	sbi->magic = AUTOFS_SBI_MAGIC;
 	sbi->catatonic = 0;
 	sbi->exp_timeout = 0;

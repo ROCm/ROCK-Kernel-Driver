@@ -80,7 +80,7 @@ static void autofs4_put_super(struct super_block *sb)
 {
 	struct autofs_sb_info *sbi = autofs4_sbi(sb);
 
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 
 	if ( !sbi->catatonic )
 		autofs4_catatonic_mode(sbi); /* Free wait queues, close pipe */
@@ -189,7 +189,7 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 
 	memset(sbi, 0, sizeof(*sbi));
 
-	s->u.generic_sbp = sbi;
+	s->s_fs_info = sbi;
 	sbi->magic = AUTOFS_SBI_MAGIC;
 	sbi->catatonic = 0;
 	sbi->exp_timeout = 0;

@@ -296,7 +296,7 @@ static inline struct hpfs_inode_info *hpfs_i(struct inode *inode)
 
 static inline struct hpfs_sb_info *hpfs_sb(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 /* super.c */

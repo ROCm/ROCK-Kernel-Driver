@@ -90,7 +90,7 @@ extern struct inode_operations ntfs_empty_inode_ops;
  */
 static inline ntfs_volume *NTFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 /**

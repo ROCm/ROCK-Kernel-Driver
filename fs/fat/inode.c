@@ -197,7 +197,7 @@ void fat_put_super(struct super_block *sb)
 		kfree(sbi->options.iocharset);
 		sbi->options.iocharset = NULL;
 	}
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(sbi);
 }
 
@@ -648,7 +648,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi = kmalloc(sizeof(struct msdos_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	sb->u.generic_sbp = sbi;
+	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct msdos_sb_info));
 
 	cvf_format[0] = '\0';
@@ -925,7 +925,7 @@ out_fail:
 	if (sbi->private_data)
 		kfree(sbi->private_data);
 	sbi->private_data = NULL;
-	sb->u.generic_sbp = NULL;
+	sb->s_fs_info = NULL;
 	kfree(sbi);
 
 	return error;

@@ -18,7 +18,7 @@
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 #define JFFS2_INODE_INFO(i) (list_entry(i, struct jffs2_inode_info, vfs_inode))
 #define OFNI_EDONI_2SFFJ(f)  (&(f)->vfs_inode)
-#define JFFS2_SB_INFO(sb) (sb->u.generic_sbp)
+#define JFFS2_SB_INFO(sb) (sb->s_fs_info)
 #define OFNI_BS_2SFFJ(c)  ((struct super_block *)c->os_priv)
 #elif defined(JFFS2_OUT_OF_KERNEL)
 #define JFFS2_INODE_INFO(i) ((struct jffs2_inode_info *) &(i)->u)

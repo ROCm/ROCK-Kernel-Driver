@@ -14,7 +14,7 @@ struct cramfs_sb_info {
 
 static inline struct cramfs_sb_info *CRAMFS_SB(struct super_block *sb)
 {
-	return sb->u.generic_sbp;
+	return sb->s_fs_info;
 }
 
 #endif
