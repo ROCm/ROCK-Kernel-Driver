@@ -1,4 +1,4 @@
-agpgart-y := backend.o frontend.o generic.o generic-3.0.o
+agpgart-y := backend.o frontend.o generic.o isoch.o
 
 obj-$(CONFIG_AGP)		+= agpgart.o
 obj-$(CONFIG_AGP_ALI)		+= ali-agp.o
