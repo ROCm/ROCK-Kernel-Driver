@@ -500,9 +500,9 @@ err_sw_init:
 err_eeprom:
 	iounmap(adapter->hw.hw_addr);
 err_ioremap:
-	pci_release_regions(pdev);
 	kfree(netdev);
 err_alloc_etherdev:
+	pci_release_regions(pdev);
 	return -ENOMEM;
 }
 
