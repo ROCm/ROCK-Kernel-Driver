@@ -198,8 +198,10 @@ static void fb_flashcursor(void *private)
 	/* Test to see if the cursor is erased but still on */
 	if (!info || (info->cursor.rop == ROP_COPY))
 		return;
+	acquire_console_sem();
 	info->cursor.enable ^= 1;
 	info->fbops->fb_cursor(info, &info->cursor);
+	release_console_sem();
 }
 
 #if (defined(__arm__) && defined(IRQ_VSYNCPULSE)) || defined(CONFIG_ATARI) || defined(CONFIG_MAC)
@@ -226,8 +228,7 @@ static void cursor_timer_handler(unsigned long dev_addr)
 	struct fb_info *info = (struct fb_info *) dev_addr;
 	
 	schedule_work(&info->queue);	
-	cursor_timer.expires = jiffies + HZ / 5;
-	add_timer(&cursor_timer);
+	mod_timer(&cursor_timer, jiffies + HZ/5);
 }
 
 int __init fb_console_setup(char *this_opt)
@@ -676,7 +677,7 @@ static const char *fbcon_startup(void)
 	if (!info->queue.func) {
 		INIT_WORK(&info->queue, fb_flashcursor, info);
 		
-		cursor_timer.expires = jiffies + HZ / 50;
+		cursor_timer.expires = jiffies + HZ / 5;
 		cursor_timer.data = (unsigned long ) info;
 		add_timer(&cursor_timer);
 	}

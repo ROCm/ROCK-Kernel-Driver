@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/linux_logo.h>
 #include <linux/proc_fs.h>
+#include <linux/console.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif
@@ -979,7 +980,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_con2fbmap con2fb;
 #endif
 	struct fb_cmap cmap;
-	int i;
+	int i, rc;
 	
 	if (!fb)
 		return -ENODEV;
@@ -990,7 +991,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
+		acquire_console_sem();
 		i = fb_set_var(info, &var);
+		release_console_sem();
 		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
@@ -1009,13 +1012,19 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		if ((i = fb_pan_display(info, &var)))
+		acquire_console_sem();
+		i = fb_pan_display(info, &var);
+		release_console_sem();
+		if (i)
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
 	case FBIO_CURSOR:
-		return (fb_cursor(info, (struct fb_cursor *) arg));
+		acquire_console_sem();
+		rc = fb_cursor(info, (struct fb_cursor *) arg);
+		release_console_sem();
+		return rc;
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
@@ -1045,7 +1054,10 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		return 0;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
-		return fb_blank(info, arg);
+		acquire_console_sem();
+		i = fb_blank(info, arg);
+		release_console_sem();
+		return i;
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;
