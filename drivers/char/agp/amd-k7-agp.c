@@ -20,6 +20,8 @@
 #define AMD_TLBFLUSH	0x0c	/* In mmio region (32-bit register) */
 #define AMD_CACHEENTRY	0x10	/* In mmio region (32-bit register) */
 
+static struct pci_device_id agp_amdk7_pci_table[];
+
 struct amd_page_map {
 	unsigned long *real;
 	unsigned long *remapped;
@@ -394,7 +396,6 @@ static struct agp_device_ids amd_agp_device_ids[] __devinitdata =
 static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
-	struct agp_device_ids *devs = amd_agp_device_ids;
 	struct agp_bridge_data *bridge;
 	u8 cap_ptr;
 	int j;
@@ -403,19 +404,10 @@ static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 	if (!cap_ptr)
 		return -ENODEV;
 
-	for (j = 0; devs[j].chipset_name; j++) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected AMD %s chipset\n",
-					devs[j].chipset_name);
-			goto found;
-		}
-	}
-
-	printk(KERN_ERR PFX "Unsupported AMD chipset (device id: %04x)\n",
-		    pdev->device);
-	return -ENODEV;
-
-found:
+	j = ent - agp_amdk7_pci_table;
+	printk(KERN_INFO PFX "Detected AMD %s chipset\n",  
+	       amd_agp_device_ids[j].chipset_name);
+	       
 	bridge = agp_alloc_bridge();
 	if (!bridge)
 		return -ENOMEM;
@@ -442,12 +434,29 @@ static void __devexit agp_amdk7_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+/* must be the same order as name table above */
 static struct pci_device_id agp_amdk7_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_AMD,
-	.device		= PCI_ANY_ID,
+	.device		= PCI_DEVICE_ID_AMD_FE_GATE_7006,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AMD,
+	.device		= PCI_DEVICE_ID_AMD_FE_GATE_700E,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AMD,
+	.device		= PCI_DEVICE_ID_AMD_FE_GATE_700C,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
