@@ -1469,7 +1469,7 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 	} else {
 confused:
 		printk ("%s: cdrom_pc_intr: The drive "
-			"appears confused (ireason = 0x%2x)\n",
+			"appears confused (ireason = 0x%02x)\n",
 			drive->name, ireason);
 		rq->flags |= REQ_FAILED;
 	}
@@ -1722,6 +1722,11 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 			blen = bio_iovec(rq->bio)->bv_len;
 		}
 
+		if (!ptr) {
+			printk("%s: confused, missing data\n", drive->name);
+			break;
+		}
+
 		if (blen > thislen)
 			blen = thislen;
 
@@ -1741,8 +1746,6 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 	 * pad, if necessary
 	 */
 	if (len) {
-		printk("%s: padding %u bytes\n", drive->name, len);
-
 		while (len) {
 			int pad = 0;
 
