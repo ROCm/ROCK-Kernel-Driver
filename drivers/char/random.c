@@ -253,6 +253,7 @@
 #include <linux/genhd.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
+#include <linux/percpu.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -279,6 +280,15 @@ static int random_read_wakeup_thresh = 64;
  * access to /dev/random.
  */
 static int random_write_wakeup_thresh = 128;
+
+/*
+ * When the input pool goes over trickle_thresh, start dropping most
+ * samples to avoid wasting CPU time and reduce lock contention.
+ */
+
+static int trickle_thresh = DEFAULT_POOL_SIZE * 7;
+
+static DEFINE_PER_CPU(int, trickle_count) = 0;
 
 /*
  * A pool of size .poolwords is stirred with a primitive polynomial
@@ -777,6 +787,11 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	__u32		time;
 	__s32		delta, delta2, delta3;
 	int		entropy = 0;
+
+	/* if over the trickle threshold, use only 1 in 4096 samples */
+	if ( random_state->entropy_count > trickle_thresh &&
+	     (__get_cpu_var(trickle_count)++ & 0xfff))
+		return;
 
 #if defined (__i386__) || defined (__x86_64__)
 	if (cpu_has_tsc) {
