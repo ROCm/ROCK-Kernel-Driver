@@ -453,9 +453,9 @@ static struct file_operations zf_fops = {
 };
 
 static struct miscdevice zf_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&zf_fops
+	.minor = WATCHDOG_MINOR,
+	.name = "watchdog",
+	.fops = &zf_fops
 };
                                                                         
 
@@ -464,9 +464,9 @@ static struct miscdevice zf_miscdev = {
  * turn the timebomb registers off.
  */
 static struct notifier_block zf_notifier = {
-	zf_notify_sys,
-	NULL,
-	0
+	.notifier_call = zf_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static void __init zf_show_action(int act)
