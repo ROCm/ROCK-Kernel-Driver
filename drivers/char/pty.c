@@ -5,6 +5,10 @@
  *
  *  Added support for a Unix98-style ptmx device.
  *    -- C. Scott Ananian <cananian@alumni.princeton.edu>, 14-Jan-1998
+ *  Added TTY_DO_WRITE_WAKEUP to enable n_tty to send POLL_OUT to
+ *      waiting writers -- Sapan Bhatia <sapan@corewars.org>
+ *
+ *
  */
 
 #include <linux/config.h>
@@ -329,6 +333,8 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 	clear_bit(TTY_OTHER_CLOSED, &tty->link->flags);
 	wake_up_interruptible(&pty->open_wait);
 	set_bit(TTY_THROTTLED, &tty->flags);
+	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
+
 	/*  Register a slave for the master  */
 	if (tty->driver.major == PTY_MASTER_MAJOR)
 		tty_register_devfs(&tty->link->driver,
