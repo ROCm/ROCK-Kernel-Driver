@@ -8,6 +8,8 @@
 #ifndef _ELFCORE32_H_
 #define _ELFCORE32_H_
 
+#include <asm/intrinsics.h>
+
 #define USE_ELF_CORE_DUMP 1
 
 /* Override elfcore.h */
@@ -79,8 +81,7 @@ struct elf_prpsinfo
 	pr_reg[11] = regs->r1; 				\
 	pr_reg[12] = regs->cr_iip;			\
 	pr_reg[13] = regs->r17 & 0xffff;		\
-	asm volatile ("mov %0=ar.eflag ;;"		\
-		      : "=r"(pr_reg[14]));		\
+	pr_reg[14] = ia64_getreg(_IA64_REG_AR_EFLAG);	\
 	pr_reg[15] = regs->r12;				\
 	pr_reg[16] = (regs->r17 >> 16) & 0xffff;
 
