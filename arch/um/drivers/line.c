@@ -511,11 +511,11 @@ void register_winch_irq(int fd, int tty_fd, int pid, void *line)
 		printk("register_winch_irq - kmalloc failed\n");
 		goto out;
 	}
-	*winch = ((struct winch) { list : 	LIST_HEAD_INIT(winch->list),
-				   fd : 	fd,
-				   tty_fd :	tty_fd,
-				   pid : 	pid,
-				   line :	line });
+	*winch = ((struct winch) { .list  	= LIST_HEAD_INIT(winch->list),
+				   .fd  	= fd,
+				   .tty_fd 	= tty_fd,
+				   .pid  	= pid,
+				   .line 	= line });
 	list_add(&winch->list, &winch_handlers);
 	if(um_request_irq(WINCH_IRQ, fd, IRQ_READ, winch_interrupt, 
 			  SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 

@@ -145,17 +145,17 @@ static int harddog_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations harddog_fops = {
-	owner:		THIS_MODULE,
-	write:		harddog_write,
-	ioctl:		harddog_ioctl,
-	open:		harddog_open,
-	release:	harddog_release,
+	.owner		= THIS_MODULE,
+	.write		= harddog_write,
+	.ioctl		= harddog_ioctl,
+	.open		= harddog_open,
+	.release	= harddog_release,
 };
 
 static struct miscdevice harddog_miscdev = {
-	minor:		WATCHDOG_MINOR,
-	name:		"watchdog",
-	fops:		&harddog_fops,
+	.minor		= WATCHDOG_MINOR,
+	.name		= "watchdog",
+	.fops		= &harddog_fops,
 };
 
 static char banner[] __initdata = KERN_INFO "UML Watchdog Timer\n";
