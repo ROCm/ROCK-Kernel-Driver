@@ -224,9 +224,10 @@ void new_thread(void *stack, void **switch_buf_ptr, void **fork_buf_ptr,
 	block_signals();
 	if(sigsetjmp(fork_buf, 1) == 0)
 		new_thread_proc(stack, handler);
-	set_signals(flags);
 
 	remove_sigstack();
+
+	set_signals(flags);
 }
 
 void thread_wait(void *sw, void *fb)
