@@ -1,6 +1,6 @@
 /* 8139cp.c: A Linux PCI Ethernet driver for the RealTek 8139C+ chips. */
 /*
-	Copyright 2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2001,2002 Jeff Garzik <jgarzik@mandrakesoft.com>
 
 	Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com) [sungem.c]
 	Copyright 2001 Manfred Spraul				    [natsemi.c]
@@ -44,8 +44,8 @@
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.0.6"
-#define DRV_RELDATE		"Nov 19, 2001"
+#define DRV_VERSION		"0.0.7"
+#define DRV_RELDATE		"Feb 27, 2002"
 
 
 #include <linux/module.h>
@@ -717,25 +717,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	dev->trans_start = jiffies;
 
 	return 0;
-}
-
-/* Set or clear the multicast filter for this adaptor.
-   This routine is not state sensitive and need not be SMP locked. */
-
-static unsigned const ethernet_polynomial = 0x04c11db7U;
-static inline u32 ether_crc (int length, unsigned char *data)
-{
-	int crc = -1;
-
-	while (--length >= 0) {
-		unsigned char current_octet = *data++;
-		int bit;
-		for (bit = 0; bit < 8; bit++, current_octet >>= 1)
-			crc = (crc << 1) ^ ((crc < 0) ^ (current_octet & 1) ?
-			     ethernet_polynomial : 0);
-	}
-
-	return crc;
 }
 
 static void __cp_set_rx_mode (struct net_device *dev)
