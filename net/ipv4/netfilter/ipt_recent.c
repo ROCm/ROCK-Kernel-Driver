@@ -91,8 +91,10 @@ static struct recent_ip_tables *r_tables = NULL;
  */
 static spinlock_t recent_lock = SPIN_LOCK_UNLOCKED;
 
+#ifdef CONFIG_PROC_FS
 /* Our /proc/net/ipt_recent entry */
 static struct proc_dir_entry *proc_net_ipt_recent = NULL;
+#endif
 
 /* Function declaration for later. */
 static int
@@ -959,8 +961,10 @@ static int __init init(void)
 	int count;
 
 	printk(version);
+#ifdef CONFIG_PROC_FS
 	proc_net_ipt_recent = proc_mkdir("ipt_recent",proc_net);
 	if(!proc_net_ipt_recent) return -ENOMEM;
+#endif
 
 	if(ip_list_hash_size && ip_list_hash_size <= ip_list_tot) {
 	  printk(KERN_WARNING RECENT_NAME ": ip_list_hash_size too small, resetting to default.\n");
