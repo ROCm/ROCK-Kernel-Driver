@@ -784,7 +784,8 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	struct dentry *res = NULL;
 
 	if (root_inode) {
-		res = d_alloc(NULL, &(const struct qstr) { "/", 1, 0 });
+		static const struct qstr name = { .name = "/", .len = 1, .hash = 0 };
+		res = d_alloc(NULL, &name);
 		if (res) {
 			res->d_sb = root_inode->i_sb;
 			res->d_parent = res;
