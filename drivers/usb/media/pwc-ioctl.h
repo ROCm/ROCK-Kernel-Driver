@@ -18,12 +18,13 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-/*         This is pwc-ioctl.h belonging to PWC 8.7                        */
+/*         This is pwc-ioctl.h belonging to PWC 8.10                        */
 
 /* 
    Changes
    2001/08/03  Alvarado   Added ioctl constants to access methods for 
                           changing white balance and red/blue gains
+   2002/12/15  G. H. Fernandez-Toribio   VIDIOCGREALSIZE
  */
 
 /* These are private ioctl() commands, specific for the Philips webcams.
@@ -104,7 +105,12 @@ struct pwc_leds
 	int led_off;			/* Led off-time; range = 0..25000  */
 };
 
-
+/* Image size (used with GREALSIZE) */
+struct pwc_imagesize
+{
+	int width;
+	int height;
+};
 
  /* Restore user settings */
 #define VIDIOCPWCRUSER		_IO('v', 192)
@@ -173,4 +179,7 @@ struct pwc_leds
 #define VIDIOCPWCSDYNNOISE	_IOW('v', 209, int)
 #define VIDIOCPWCGDYNNOISE	_IOR('v', 209, int)
 
+ /* Real image size as used by the camera; tells you whether or not there's a gray border around the image */
+#define VIDIOCPWCGREALSIZE	_IOR('v', 210, struct pwc_imagesize)
+ 
 #endif

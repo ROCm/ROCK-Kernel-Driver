@@ -65,9 +65,6 @@ struct ehci_hcd {			/* one per controller */
 	int			next_uframe;	/* scan periodic, start here */
 	unsigned		periodic_sched;	/* periodic activity count */
 
-	/* deferred work from IRQ, etc */
-	struct tasklet_struct	tasklet;
-
 	/* per root hub port */
 	unsigned long		reset_done [EHCI_MAX_ROOT_PORTS];
 
