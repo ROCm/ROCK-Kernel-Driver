@@ -67,7 +67,7 @@ static struct dibusb_device_parameter dibusb_dev_parm[3] = {
 		.data_pipe = 0x82,
 	},
 	{	.type = DIBUSB2_0,
-		.demod_addr = 0x10,
+		.demod_addr = 0x18,
 		.fw_filenames = dibusb_fw_filenames2_0,
 		.usb_controller = "Cypress FX2",
 		.usb_cpu_csreg = 0xe600,
@@ -109,6 +109,8 @@ struct dibusb_device {
 #define USB_VID_ANCHOR						0x0547
 #define USB_VID_AVERMEDIA					0x14aa
 #define USB_VID_COMPRO						0x185b
+#define USB_VID_COMPRO_UNK					0x145f
+#define USB_VID_CYPRESS						0x04b4
 #define USB_VID_DIBCOM						0x10b8
 #define USB_VID_EMPIA						0xeb1a
 #define USB_VID_GRANDTEC					0x5032
@@ -122,6 +124,8 @@ struct dibusb_device {
 #define USB_PID_AVERMEDIA_DVBT_USB_WARM		0x0002
 #define USB_PID_COMPRO_DVBU2000_COLD		0xd000
 #define USB_PID_COMPRO_DVBU2000_WARM		0xd001
+#define USB_PID_COMPRO_DVBU2000_UNK_COLD	0x010c
+#define USB_PID_COMPRO_DVBU2000_UNK_WARM	0x010d
 #define USB_PID_DIBCOM_MOD3000_COLD			0x0bb8
 #define USB_PID_DIBCOM_MOD3000_WARM			0x0bb9
 #define USB_PID_DIBCOM_MOD3001_COLD			0x0bc6
@@ -137,12 +141,15 @@ struct dibusb_device {
 #define USB_PID_ULTIMA_TVBOX_AN2235_COLD	0x8107
 #define USB_PID_ULTIMA_TVBOX_AN2235_WARM	0x8108
 #define USB_PID_ULTIMA_TVBOX_ANCHOR_COLD	0x2235
+#define USB_PID_ULTIMA_TVBOX_USB2_COLD		0x8109
+#define USB_PID_ULTIMA_TVBOX_USB2_FX_COLD	0x8613
+#define USB_PID_ULTIMA_TVBOX_USB2_FX_WARM	0x1002
 #define USB_PID_UNK_HYPER_PALTEK_COLD		0x005e
 #define USB_PID_UNK_HYPER_PALTEK_WARM		0x005f
 #define USB_PID_YAKUMO_DTT200U_COLD			0x0201
 #define USB_PID_YAKUMO_DTT200U_WARM			0x0301
 
-#define DIBUSB_SUPPORTED_DEVICES	12
+#define DIBUSB_SUPPORTED_DEVICES	15
 
 /* USB Driver stuff */
 static struct dibusb_device dibusb_devices[DIBUSB_SUPPORTED_DEVICES] = {
@@ -176,9 +183,24 @@ static struct dibusb_device dibusb_devices[DIBUSB_SUPPORTED_DEVICES] = {
 		.warm_product_id = 0, /* undefined, this design becomes USB_PID_DIBCOM_MOD3000_WARM in warm state */
 		.parm = &dibusb_dev_parm[2],
 	},
+	{	.name = "Artec T1 USB2.0 TVBOX (please report the warm ID)",
+		.cold_product_id = USB_PID_ULTIMA_TVBOX_USB2_COLD,
+		.warm_product_id = 0, /* don't know, it is most likely that the device will get another USB ID in warm state */
+		.parm = &dibusb_dev_parm[1],
+	},
+	{	.name = "Artec T1 USB2.0 TVBOX with FX2 IDs (misdesigned, please report the warm ID)",
+		.cold_product_id = USB_PID_ULTIMA_TVBOX_USB2_FX_COLD,
+		.warm_product_id = USB_PID_ULTIMA_TVBOX_USB2_FX_WARM, /* undefined, it could be that the device will get another USB ID in warm state */
+		.parm = &dibusb_dev_parm[1],
+	},
 	{	.name = "Compro Videomate DVB-U2000 - DVB-T USB1.1",
 		.cold_product_id = USB_PID_COMPRO_DVBU2000_COLD,
 		.warm_product_id = USB_PID_COMPRO_DVBU2000_WARM,
+		.parm = &dibusb_dev_parm[0],
+	},
+	{	.name = "Compro Videomate DVB-U2000 - DVB-T USB1.1 (really ?? please report the name!)",
+		.cold_product_id = USB_PID_COMPRO_DVBU2000_UNK_COLD,
+		.warm_product_id = USB_PID_COMPRO_DVBU2000_UNK_WARM,
 		.parm = &dibusb_dev_parm[0],
 	},
 	{	.name = "Unkown USB1.1 DVB-T device ???? please report the name to the author",
@@ -237,14 +259,18 @@ static struct usb_device_id dibusb_table [] = {
 	{ USB_DEVICE(USB_VID_ULTIMA_ELECTRONIC, USB_PID_ULTIMA_TVBOX_AN2235_WARM) },
 	{ USB_DEVICE(USB_VID_AVERMEDIA,		USB_PID_YAKUMO_DTT200U_COLD) },
 	{ USB_DEVICE(USB_VID_AVERMEDIA,		USB_PID_YAKUMO_DTT200U_WARM) },
+	{ USB_DEVICE(USB_PID_COMPRO_DVBU2000_UNK_COLD, USB_VID_COMPRO_UNK) },
+	{ USB_DEVICE(USB_VID_ULTIMA_ELECTRONIC,	USB_PID_ULTIMA_TVBOX_USB2_COLD) },
 
 /*
- * activate the following define when you have the device and want to compile
- * build from build-2.6 in dvb-kernel
+ * activate the following define when you have one of the devices and want to
+ * build it from build-2.6 in dvb-kernel
  */
-// #define CONFIG_DVB_DIBUSB_MISDESIGNED_AN2235
-#ifdef CONFIG_DVB_DIBUSB_MISDESIGNED_AN2235
+// #define CONFIG_DVB_DIBUSB_MISDESIGNED_DEVICES
+#ifdef CONFIG_DVB_DIBUSB_MISDESIGNED_DEVICES
 	{ USB_DEVICE(USB_VID_ANCHOR,		USB_PID_ULTIMA_TVBOX_ANCHOR_COLD) },
+	{ USB_DEVICE(USB_VID_CYPRESS,		USB_PID_ULTIMA_TVBOX_USB2_FX_COLD) },
+	{ USB_DEVICE(USB_VID_ANCHOR,		USB_PID_ULTIMA_TVBOX_USB2_FX_WARM) },
 #endif
 	{ }                 /* Terminating entry */
 };
@@ -260,6 +286,7 @@ struct usb_dibusb {
 	struct dibusb_device * dibdev;
 
 	int feedcount;
+	int pid_parse;
 	struct dib3000_xfer_ops xfer_ops;
 
 	struct urb **urb_list;

@@ -34,135 +34,38 @@
 #include "dib3000mb_priv.h"
 #include "dib3000.h"
 
-struct dib3000mb_state {
-
-	struct i2c_adapter* i2c;
-
-	struct dvb_frontend_ops ops;
-
-	/* configuration settings */
-	const struct dib3000_config* config;
-
-	spinlock_t pid_list_lock;
-	struct dib3000_pid pid_list[DIB3000MB_NUM_PIDS];
-	int feedcount;
-
-	struct dvb_frontend frontend;
-};
-
-
-/* debug */
-
-#ifdef CONFIG_DVB_DIBCOM_DEBUG
-#define dprintk(level,args...) \
-	do { if ((debug & level)) { printk(args); } } while (0)
-
-static int debug;
-module_param(debug, int, 0x644);
-MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore,8=setfe,16=getfe (|-able)).");
-#else
-#define dprintk(args...) do { } while (0);
-#endif
-
-#define deb_info(args...) dprintk(0x01,args)
-#define deb_xfer(args...) dprintk(0x02,args)
-#define deb_alot(args...) dprintk(0x04,args)
-#define deb_setf(args...) dprintk(0x08,args)
-#define deb_getf(args...) dprintk(0x10,args)
-
 /* Version information */
 #define DRIVER_VERSION "0.1"
 #define DRIVER_DESC "DiBcom 3000-MB DVB-T demodulator driver"
 #define DRIVER_AUTHOR "Patrick Boettcher, patrick.boettcher@desy.de"
 
-
-/* handy shortcuts */
-#define rd(reg) dib3000mb_read_reg(state,reg)
-#define wr(reg,val) if (dib3000mb_write_reg(state,reg,val)) \
-	{ err("while sending 0x%04x to 0x%04x.",val,reg); return -EREMOTEIO; }
-#define wr_foreach(a,v) { int i; \
-	deb_alot("sizeof: %d %d\n",sizeof(a),sizeof(v));\
-	for (i=0; i < sizeof(a)/sizeof(u16); i++) \
-		wr(a[i],v[i]); \
-}
-
-static int dib3000mb_read_reg(struct dib3000mb_state *state, u16 reg)
-{
-	u8 wb[] = { ((reg >> 8) | 0x80) & 0xff, reg & 0xff };
-	u8 rb[2];
-	struct i2c_msg msg[] = {
-		{ .addr = state->config->demod_address, .flags = 0,        .buf = wb, .len = 2 },
-		{ .addr = state->config->demod_address, .flags = I2C_M_RD, .buf = rb, .len = 2 },
-	};
-	deb_alot("reading from i2c bus (reg: %d)\n",reg);
-
-	if (i2c_transfer(state->i2c, msg, 2) != 2)
-		deb_alot("i2c read error\n");
-
-	return (rb[0] << 8) | rb[1];
-}
-
-static int dib3000mb_write_reg(struct dib3000mb_state *state, u16 reg, u16 val)
-{
-	u8 b[] = {
-		(reg >> 8) & 0xff, reg & 0xff,
-		(val >> 8) & 0xff, val & 0xff,
-	};
-	struct i2c_msg msg[] = { { .addr = state->config->demod_address, .flags = 0, .buf = b, .len = 4 } };
-	deb_alot("writing to i2c bus (reg: %d, val: %d)\n",reg,val);
-
-	return i2c_transfer(state->i2c,msg, 1) != 1 ? -EREMOTEIO : 0;
-}
-
-static int dib3000mb_set_frontend(struct dvb_frontend* fe,
-		struct dvb_frontend_parameters *fep, int tuner);
+#ifdef CONFIG_DVB_DIBCOM_DEBUG
+static int debug;
+module_param(debug, int, 0x644);
+MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=setfe,8=getfe (|-able)).");
+#endif
+#define deb_info(args...) dprintk(0x01,args)
+#define deb_xfer(args...) dprintk(0x02,args)
+#define deb_setf(args...) dprintk(0x04,args)
+#define deb_getf(args...) dprintk(0x08,args)
 
 static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 				  struct dvb_frontend_parameters *fep);
 
-static int dib3000mb_fe_read_search_status(struct dvb_frontend* fe)
-{
-	u16 irq;
-	struct dvb_frontend_parameters fep;
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
-
-	irq = rd(DIB3000MB_REG_AS_IRQ_PENDING);
-
-	if (irq & 0x02) {
-		if (rd(DIB3000MB_REG_LOCK2_VALUE) & 0x01) {
-			if (dib3000mb_get_frontend(fe, &fep) == 0) {
-				deb_setf("reading tuning data from frontend succeeded.\n");
-				return dib3000mb_set_frontend(fe, &fep, 0) == 0;
-			} else {
-				deb_setf("reading tuning data failed -> tuning failed.\n");
-				return 0;
-			}
-		} else {
-			deb_setf("AS IRQ was pending, but LOCK2 was not & 0x01.\n");
-			return 0;
-		}
-	} else if (irq & 0x01) {
-		deb_setf("Autosearch failed.\n");
-		return 0;
-	}
-
-	return -1;
-}
-
 static int dib3000mb_set_frontend(struct dvb_frontend* fe,
 		struct dvb_frontend_parameters *fep, int tuner)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 	struct dvb_ofdm_parameters *ofdm = &fep->u.ofdm;
 	fe_code_rate_t fe_cr = FEC_NONE;
 	int search_state,seq;
 
 	if (tuner) {
 		wr(DIB3000MB_REG_TUNER,
-				DIB3000_TUNER_WRITE_ENABLE(state->config->pll_addr));
-		state->config->pll_set(fe, fep);
+				DIB3000_TUNER_WRITE_ENABLE(state->config.pll_addr));
+		state->config.pll_set(fe, fep);
 		wr(DIB3000MB_REG_TUNER,
-				DIB3000_TUNER_WRITE_DISABLE(state->config->pll_addr));
+				DIB3000_TUNER_WRITE_DISABLE(state->config.pll_addr));
 
 		deb_setf("bandwidth: ");
 		switch (ofdm->bandwidth) {
@@ -389,10 +292,22 @@ static int dib3000mb_set_frontend(struct dvb_frontend* fe,
 		wr(DIB3000MB_REG_RESTART,DIB3000MB_RESTART_AUTO_SEARCH);
 		wr(DIB3000MB_REG_RESTART,DIB3000MB_RESTART_OFF);
 
-		while ((search_state = dib3000mb_fe_read_search_status(fe)) < 0 && as_count++ < 100)
+		while ((search_state =
+				dib3000_search_status(
+					rd(DIB3000MB_REG_AS_IRQ_PENDING),
+					rd(DIB3000MB_REG_LOCK2_VALUE))) < 0 && as_count++ < 100)
 			msleep(1);
 
 		deb_info("search_state after autosearch %d after %d checks\n",search_state,as_count);
+
+		if (search_state == 1) {
+			struct dvb_frontend_parameters feps;
+			if (dib3000mb_get_frontend(fe, &feps) == 0) {
+				deb_setf("reading tuning data from frontend succeeded.\n");
+				return dib3000mb_set_frontend(fe, &feps, 0);
+			}
+		}
+
 	} else {
 		wr(DIB3000MB_REG_RESTART,DIB3000MB_RESTART_CTRL);
 		wr(DIB3000MB_REG_RESTART,DIB3000MB_RESTART_OFF);
@@ -403,7 +318,7 @@ static int dib3000mb_set_frontend(struct dvb_frontend* fe,
 
 static int dib3000mb_fe_init(struct dvb_frontend* fe, int mobile_mode)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 
 	wr(DIB3000MB_REG_POWER_CONTROL,DIB3000MB_POWER_UP);
 
@@ -474,12 +389,12 @@ static int dib3000mb_fe_init(struct dvb_frontend* fe, int mobile_mode)
 
 	wr(DIB3000MB_REG_DATA_IN_DIVERSITY,DIB3000MB_DATA_DIVERSITY_IN_OFF);
 
-	if (state->config->pll_init) {
+	if (state->config.pll_init) {
 		wr(DIB3000MB_REG_TUNER,
-			DIB3000_TUNER_WRITE_ENABLE(state->config->pll_addr));
-		state->config->pll_init(fe);
+			DIB3000_TUNER_WRITE_ENABLE(state->config.pll_addr));
+		state->config.pll_init(fe);
 		wr(DIB3000MB_REG_TUNER,
-			DIB3000_TUNER_WRITE_DISABLE(state->config->pll_addr));
+			DIB3000_TUNER_WRITE_DISABLE(state->config.pll_addr));
 	}
 
 	return 0;
@@ -488,7 +403,7 @@ static int dib3000mb_fe_init(struct dvb_frontend* fe, int mobile_mode)
 static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 				  struct dvb_frontend_parameters *fep)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 	struct dvb_ofdm_parameters *ofdm = &fep->u.ofdm;
 	fe_code_rate_t *cr;
 	u16 tps_val;
@@ -499,7 +414,7 @@ static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 		return 0;
 
 	dds_val = ((rd(DIB3000MB_REG_DDS_VALUE_MSB) & 0xff) << 16) + rd(DIB3000MB_REG_DDS_VALUE_LSB);
-	if (dds_val & threshold)
+	if (dds_val < threshold)
 		inv_test1 = 0;
 	else if (dds_val == threshold)
 		inv_test1 = 1;
@@ -507,7 +422,7 @@ static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 		inv_test1 = 2;
 
 	dds_val = ((rd(DIB3000MB_REG_DDS_FREQ_MSB) & 0xff) << 16) + rd(DIB3000MB_REG_DDS_FREQ_LSB);
-	if (dds_val & threshold)
+	if (dds_val < threshold)
 		inv_test2 = 0;
 	else if (dds_val == threshold)
 		inv_test2 = 1;
@@ -516,7 +431,8 @@ static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 
 	fep->inversion =
 		((inv_test2 == 2) && (inv_test1==1 || inv_test1==0)) ||
-		((inv_test2 == 0) && (inv_test1==1 || inv_test1==2));
+		((inv_test2 == 0) && (inv_test1==1 || inv_test1==2)) ?
+		INVERSION_ON : INVERSION_OFF;
 
 	deb_getf("inversion %d %d, %d\n", inv_test2, inv_test1, fep->inversion);
 
@@ -541,10 +457,8 @@ static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 
 	if (rd(DIB3000MB_REG_TPS_HRCH)) {
 		deb_getf("HRCH ON\n");
-		tps_val = rd(DIB3000MB_REG_TPS_CODE_RATE_LP);
 		cr = &ofdm->code_rate_LP;
 		ofdm->code_rate_HP = FEC_NONE;
-
 		switch ((tps_val = rd(DIB3000MB_REG_TPS_VIT_ALPHA))) {
 			case DIB3000_ALPHA_0:
 				deb_getf("HIERARCHY_NONE ");
@@ -567,12 +481,15 @@ static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 				break;
 		}
 		deb_getf("TPS: %d\n", tps_val);
+
+		tps_val = rd(DIB3000MB_REG_TPS_CODE_RATE_LP);
 	} else {
 		deb_getf("HRCH OFF\n");
-		tps_val = rd(DIB3000MB_REG_TPS_CODE_RATE_HP);
 		cr = &ofdm->code_rate_HP;
 		ofdm->code_rate_LP = FEC_NONE;
 		ofdm->hierarchy_information = HIERARCHY_NONE;
+
+		tps_val = rd(DIB3000MB_REG_TPS_CODE_RATE_HP);
 	}
 
 	switch (tps_val) {
@@ -645,7 +562,7 @@ static int dib3000mb_get_frontend(struct dvb_frontend* fe,
 
 static int dib3000mb_read_status(struct dvb_frontend* fe, fe_status_t *stat)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 
 	*stat = 0;
 
@@ -684,7 +601,7 @@ static int dib3000mb_read_status(struct dvb_frontend* fe, fe_status_t *stat)
 
 static int dib3000mb_read_ber(struct dvb_frontend* fe, u32 *ber)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 
 	*ber = ((rd(DIB3000MB_REG_BER_MSB) << 16) | rd(DIB3000MB_REG_BER_LSB) );
 	return 0;
@@ -701,7 +618,7 @@ static int dib3000mb_read_ber(struct dvb_frontend* fe, u32 *ber)
 #define DIB3000MB_GAIN_DELTA_dBm	-2
 static int dib3000mb_read_signal_strength(struct dvb_frontend* fe, u16 *strength)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 
 /* TODO log10 
 	u16 sigpow = rd(DIB3000MB_REG_SIGNAL_POWER), 
@@ -737,7 +654,7 @@ static int dib3000mb_read_signal_strength(struct dvb_frontend* fe, u16 *strength
  */
 static int dib3000mb_read_snr(struct dvb_frontend* fe, u16 *snr)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 	short sigpow = rd(DIB3000MB_REG_SIGNAL_POWER);
 	int icipow = ((rd(DIB3000MB_REG_NOISE_POWER_MSB) & 0xff) << 16) |
 		rd(DIB3000MB_REG_NOISE_POWER_LSB);
@@ -757,7 +674,7 @@ static int dib3000mb_read_snr(struct dvb_frontend* fe, u16 *snr)
 
 static int dib3000mb_read_unc_blocks(struct dvb_frontend* fe, u32 *unc)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 
 	*unc = rd(DIB3000MB_REG_UNC);
 	return 0;
@@ -765,7 +682,7 @@ static int dib3000mb_read_unc_blocks(struct dvb_frontend* fe, u32 *unc)
 
 static int dib3000mb_sleep(struct dvb_frontend* fe)
 {
-	struct dib3000mb_state* state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state* state = (struct dib3000_state*) fe->demodulator_priv;
 
 	wr(DIB3000MB_REG_POWER_CONTROL,DIB3000MB_POWER_DOWN);
 	return 0;
@@ -792,48 +709,16 @@ static int dib3000mb_set_frontend_and_tuner(struct dvb_frontend* fe, struct dvb_
 
 static void dib3000mb_release(struct dvb_frontend* fe)
 {
-	struct dib3000mb_state *state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state *state = (struct dib3000_state*) fe->demodulator_priv;
 	kfree(state);
 }
 
 /* pid filter and transfer stuff */
-
-/* fetch a pid from pid_list */
-static int dib3000_get_pid_index(struct dib3000_pid pid_list[],
-		int num_pids, int pid, spinlock_t *pid_list_lock,int onoff)
-{
-	int i,ret = -1;
-	unsigned long flags;
-
-	spin_lock_irqsave(pid_list_lock,flags);
-	for (i=0; i < num_pids; i++)
-		if (onoff) {
-			if (!pid_list[i].active) {
-				pid_list[i].pid = pid;
-				pid_list[i].active = 1;
-				ret = i;
-			break;
-			}
-		} else {
-			if (pid_list[i].active && pid_list[i].pid == pid) {
-				pid_list[i].pid = 0;
-				pid_list[i].active = 0;
-				ret = i;
-			break;
-	}
-}
-
-	spin_unlock_irqrestore(pid_list_lock,flags);
-	return ret;
-}
-
 static int dib3000mb_pid_control(struct dvb_frontend *fe,int pid,int onoff)
 {
-	struct dib3000mb_state *state = fe->demodulator_priv;
+	struct dib3000_state *state = fe->demodulator_priv;
 	int index = dib3000_get_pid_index(state->pid_list, DIB3000MB_NUM_PIDS, pid, &state->pid_list_lock,onoff);
 	pid = (onoff ? pid | DIB3000_ACTIVATE_PID_FILTERING : 0);
-
-	deb_info("setting pid 0x%x on index %d\n",pid,index);
 
 	if (index >= 0) {
 		wr(index+DIB3000MB_REG_FIRST_PID,pid);
@@ -846,8 +731,9 @@ static int dib3000mb_pid_control(struct dvb_frontend *fe,int pid,int onoff)
 
 static int dib3000mb_fifo_control(struct dvb_frontend *fe, int onoff)
 {
-	struct dib3000mb_state *state = (struct dib3000mb_state*) fe->demodulator_priv;
+	struct dib3000_state *state = (struct dib3000_state*) fe->demodulator_priv;
 
+	deb_xfer("%s fifo\n",onoff ? "enabling" : "disabling");
 	if (onoff) {
 		wr(DIB3000MB_REG_FIFO, DIB3000MB_FIFO_ACTIVATE);
 	} else {
@@ -856,9 +742,9 @@ static int dib3000mb_fifo_control(struct dvb_frontend *fe, int onoff)
 	return 0;
 	}
 
-static int dib3000mb_pid_filter(struct dvb_frontend *fe, int onoff)
+static int dib3000mb_pid_parse(struct dvb_frontend *fe, int onoff)
 {
-	//struct dib3000mb_state *state = fe->demodulator_priv;
+	//struct dib3000_state *state = fe->demodulator_priv;
 	/* switch it off and on */
 	return 0;
 	}
@@ -868,17 +754,16 @@ static struct dvb_frontend_ops dib3000mb_ops;
 struct dvb_frontend* dib3000mb_attach(const struct dib3000_config* config,
 				      struct i2c_adapter* i2c, struct dib3000_xfer_ops *xfer_ops)
 {
-	struct dib3000mb_state* state = NULL;
-	int i;
+	struct dib3000_state* state = NULL;
 
 	/* allocate memory for the internal state */
-	state = (struct dib3000mb_state*) kmalloc(sizeof(struct dib3000mb_state), GFP_KERNEL);
+	state = (struct dib3000_state*) kmalloc(sizeof(struct dib3000_state), GFP_KERNEL);
 	if (state == NULL)
 		goto error;
 
 	/* setup the state */
-	state->config = config;
 	state->i2c = i2c;
+	memcpy(&state->config,config,sizeof(struct dib3000_config));
 	memcpy(&state->ops, &dib3000mb_ops, sizeof(struct dvb_frontend_ops));
 
 	/* check for the correct demod */
@@ -888,22 +773,15 @@ struct dvb_frontend* dib3000mb_attach(const struct dib3000_config* config,
 	if (rd(DIB3000_REG_DEVICE_ID) != DIB3000MB_DEVICE_ID)
 		goto error;
 
-	/* initialize the id_list */
-	deb_info("initializing %d pids for the pid_list.\n",DIB3000MB_NUM_PIDS);
-	state->pid_list_lock = SPIN_LOCK_UNLOCKED;
-	memset(state->pid_list,0,DIB3000MB_NUM_PIDS*(sizeof(struct dib3000_pid)));
-	for (i=0; i < DIB3000MB_NUM_PIDS; i++) {
-		state->pid_list[i].pid = 0;
-		state->pid_list[i].active = 0;
-}
-	state->feedcount = 0;
+	if (dib3000_init_pid_list(state,DIB3000MB_NUM_PIDS))
+		goto error;
 
 	/* create dvb_frontend */
 	state->frontend.ops = &state->ops;
 	state->frontend.demodulator_priv = state;
 
 	/* set the xfer operations */
-	xfer_ops->pid_filter = dib3000mb_pid_filter;
+	xfer_ops->pid_parse = dib3000mb_pid_parse;
 	xfer_ops->fifo_ctrl = dib3000mb_fifo_control;
 	xfer_ops->pid_ctrl = dib3000mb_pid_control;
 

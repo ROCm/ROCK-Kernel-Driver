@@ -7,9 +7,7 @@
  * Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de)
  *
  * based on GPL code from DiBcom, which has
- *
  * Copyright (C) 2004 Amaury Demol for DiBcom (ademol@dibcom.fr)
- *
  *
  * Remote control code added by David Matthews (dm@prolingua.co.uk)
  *
@@ -70,6 +68,9 @@ MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore,8=ts,16=e
 #define deb_err(args...)   dprintk(0x10,args)
 #define deb_rc(args...)   dprintk(0x20,args)
 
+static int pid_parse;
+module_param(pid_parse, int, 0x644);
+MODULE_PARM_DESC(pid_parse, "enable pid parsing (filtering) when running at USB2.0");
 
 /* Version information */
 #define DRIVER_VERSION "0.1"
@@ -91,7 +92,7 @@ static int dibusb_readwrite_usb(struct usb_dibusb *dib,
 		wbuf[0] == DIBUSB_REQ_I2C_WRITE &&
 		dib->dibdev->parm->type == DIBUSB1_1)
 		deb_err("BUG: writing to i2c, while TS-streaming destroys the stream."
-				"(%x reg: %x %x)", wbuf[0],wbuf[2],wbuf[3]);
+				"(%x reg: %x %x)\n", wbuf[0],wbuf[2],wbuf[3]);
 			
 	debug_dump(wbuf,wlen);
 
@@ -190,6 +191,7 @@ static int dibusb_ctrl_feed(struct usb_dibusb *dib, int pid, int onoff)
 
 	dib->feedcount += onoff ? 1 : -1;
 
+	if (dib->pid_parse) {
 	if (dib->xfer_ops.pid_ctrl != NULL) {
 		if (dib->xfer_ops.pid_ctrl(dib->fe,pid,onoff) < 0) {
 		err("no free pid in list.");
@@ -199,11 +201,20 @@ static int dibusb_ctrl_feed(struct usb_dibusb *dib, int pid, int onoff)
 		err("no pid ctrl callback.");
 		return -ENODEV;
 	}
+	}
 	/*
 	 * start the feed, either if there is the firmware bug or
 	 * if this was the first pid to set.
 	 */
 	if (dib->dibdev->parm->firmware_bug || dib->feedcount == onoff) {
+
+		deb_ts("controlling pid parser\n");
+		if (dib->xfer_ops.pid_parse != NULL) {
+			if (dib->xfer_ops.pid_parse(dib->fe,dib->pid_parse) < 0) {
+				err("could not handle pid_parser");
+			}
+		}
+
 		deb_ts("start feeding\n");
 		if (dib->xfer_ops.fifo_ctrl != NULL) {
 			if (dib->xfer_ops.fifo_ctrl(dib->fe,1)) {
@@ -269,6 +280,13 @@ static const struct { u8 c0, c1, c2; uint32_t key; } rc_keys [] =
 	{ 0x00, 0xff, 0x4c, KEY_PAUSE },
 	{ 0x00, 0xff, 0x4d, KEY_SCREEN }, /* Full screen mode. */
 	{ 0x00, 0xff, 0x54, KEY_AUDIO }, /* MTS - Switch to secondary audio. */
+	/* additional keys TwinHan VisionPlus, the Artec seemingly not have */
+	{ 0x00, 0xff, 0x0c, KEY_CANCEL }, /* Cancel */
+	{ 0x00, 0xff, 0x1c, KEY_EPG }, /* EPG */
+	{ 0x00, 0xff, 0x00, KEY_TAB }, /* Tab */
+	{ 0x00, 0xff, 0x48, KEY_INFO }, /* Preview */
+	{ 0x00, 0xff, 0x04, KEY_LIST }, /* RecordList */
+	{ 0x00, 0xff, 0x0f, KEY_TEXT }, /* Teletext */
 	/* Key codes for the KWorld/ADSTech/JetWay remote. */
 	{ 0x86, 0x6b, 0x12, KEY_POWER },
 	{ 0x86, 0x6b, 0x0f, KEY_SELECT }, /* source */
@@ -374,16 +392,10 @@ static void dibusb_query_rc (void *data)
  */
 
 #if 0
-
 /*
- * #if 0'ing the following 5 functions as they are not in use _now_,
+ * #if 0'ing the following functions as they are not in use _now_,
  * but probably will be sometime.
  */
-
-static int dibusb_write_usb(struct usb_dibusb *dib, u8 *buf, u16 len)
-{
-	return dibusb_readwrite_usb(dib,buf,len,NULL,0);
-}
 
 /*
  * do not use this, just a workaround for a bug,
@@ -393,6 +405,21 @@ static int dibusb_interrupt_read_loop(struct usb_dibusb *dib)
 {
 	u8 b[1] = { DIBUSB_REQ_INTR_READ };
 	return dibusb_write_usb(dib,b,1);
+}
+
+/*
+ * ioctl for power control
+ */
+static int dibusb_hw_sleep(struct usb_dibusb *dib)
+{
+	u8 b[1] = { DIBUSB_IOCTL_POWER_SLEEP };
+	return dibusb_ioctl_cmd(dib,DIBUSB_IOCTL_CMD_POWER_MODE, b,1);
+}
+
+#endif
+static int dibusb_write_usb(struct usb_dibusb *dib, u8 *buf, u16 len)
+{
+	return dibusb_readwrite_usb(dib,buf,len,NULL,0);
 }
 
 /*
@@ -409,22 +436,11 @@ static int dibusb_ioctl_cmd(struct usb_dibusb *dib, u8 cmd, u8 *param, int plen)
 	return dibusb_write_usb(dib,b,2+size);
 }
 
-/*
- * ioctl for power control
- */
-static int dibusb_hw_sleep(struct usb_dibusb *dib)
-{
-	u8 b[1] = { DIBUSB_IOCTL_POWER_SLEEP };
-	return dibusb_ioctl_cmd(dib,DIBUSB_IOCTL_CMD_POWER_MODE, b,1);
-}
-
 static int dibusb_hw_wakeup(struct usb_dibusb *dib)
 {
 	u8 b[1] = { DIBUSB_IOCTL_POWER_WAKEUP };
 	return dibusb_ioctl_cmd(dib,DIBUSB_IOCTL_CMD_POWER_MODE, b,1);
 }
-
-#endif
 
 /*
  * I2C
@@ -458,7 +474,8 @@ static u32 dibusb_i2c_func(struct i2c_adapter *adapter)
 	return I2C_FUNC_I2C;
 }
 
-static int thomson_cable_eu_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);
+static int thomson_cable_eu_pll_set(struct dvb_frontend* fe, struct
+		dvb_frontend_parameters* params);
 
 static struct dib3000_config thomson_cable_eu_config = {
 	.demod_address = 0x10,
@@ -466,7 +483,8 @@ static struct dib3000_config thomson_cable_eu_config = {
 	.pll_set = thomson_cable_eu_pll_set,
 };
 
-static int thomson_cable_eu_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
+static int thomson_cable_eu_pll_set(struct dvb_frontend* fe, struct
+		dvb_frontend_parameters* params)
 {
 	struct usb_dibusb* dib = (struct usb_dibusb*) fe->dvb->priv;
 	u8 buf[4];
@@ -493,7 +511,71 @@ static int thomson_cable_eu_pll_set(struct dvb_frontend* fe, struct dvb_frontend
    	buf[2] = 0x8e;
    	buf[3] = (vu << 7) | (p2 << 2) | (p1 << 1) | p0;
 
-	if (i2c_transfer (&dib->i2c_adap, &msg, 1) != 1) return -EIO;
+	if (i2c_transfer (&dib->i2c_adap, &msg, 1) != 1)
+		return -EIO;
+
+	msleep(1);
+	return 0;
+}
+
+static int panasonic_cofdm_env57h1xd5_pll_set(struct dvb_frontend *fe, struct
+		dvb_frontend_parameters *params);
+
+static struct dib3000_config panasonic_cofdm_env57h1xd5 = {
+	.demod_address = 0x18,
+	.pll_addr = 192,
+	.pll_set = panasonic_cofdm_env57h1xd5_pll_set,
+};
+
+static int panasonic_cofdm_env57h1xd5_pll_set(struct dvb_frontend *fe, struct
+		dvb_frontend_parameters *params)
+{
+	struct usb_dibusb* dib = (struct usb_dibusb*) fe->dvb->priv;
+	u8 buf[4];
+	u32 freq = params->frequency;
+	u32 tfreq = (freq + 36125000) / 1000000 * 6 + 1;
+	u8 TA, T210, R210, ctrl1, cp210, p4321;
+	struct i2c_msg msg = {
+		.addr = panasonic_cofdm_env57h1xd5.pll_addr,
+		.flags = 0,
+		.buf = buf,
+		.len = sizeof(buf)
+	};
+
+	if (freq > 858000000) {
+		err("frequency cannot be larger than 858 MHz.");
+		return -EINVAL;
+	}
+
+	// contol data 1 : 1 | T/A=1 | T2,T1,T0 = 0,0,0 | R2,R1,R0 = 0,1,0
+	TA = 1;
+	T210 = 0;
+	R210 = 0x2;
+	ctrl1 = (1 << 7) | (TA << 6) | (T210 << 3) | R210;
+
+// ********    CHARGE PUMP CONFIG vs RF FREQUENCIES     *****************
+	if (freq < 470000000)
+		cp210 = 2;  // VHF Low and High band ch E12 to E4 to E12
+	else if (freq < 526000000)
+		cp210 = 4;  // UHF band Ch E21 to E27
+	else // if (freq < 862000000)
+		cp210 = 5;  // UHF band ch E28 to E69
+
+//*********************    BW select  *******************************
+	if (freq < 153000000)
+		p4321  = 1; // BW selected for VHF low
+	else if (freq < 470000000)
+		p4321  = 2; // BW selected for VHF high E5 to E12
+	else // if (freq < 862000000)
+		p4321  = 4; // BW selection for UHF E21 to E69
+
+	buf[0] = (tfreq >> 8) & 0xff;
+	buf[1] = (tfreq >> 0) & 0xff;
+	buf[2] = 0xff & ctrl1;
+	buf[3] =  (cp210 << 5) | (p4321);
+
+	if (i2c_transfer (&dib->i2c_adap, &msg, 1) != 1)
+		return -EIO;
 
 	msleep(1);
 	return 0;
@@ -508,7 +590,15 @@ static struct i2c_algorithm dibusb_algo = {
 
 static void frontend_init(struct usb_dibusb* dib)
 {
+	switch (dib->dibdev->parm->type) {
+		case DIBUSB1_1:
+		case DIBUSB1_1_AN2235:
 	dib->fe = dib3000mb_attach(&thomson_cable_eu_config, &dib->i2c_adap,&dib->xfer_ops);
+			break;
+		case DIBUSB2_0:
+			dib->fe = dib3000mc_attach(&panasonic_cofdm_env57h1xd5,&dib->i2c_adap, &dib->xfer_ops);
+			break;
+	}
 
 	if (dib->fe == NULL) {
 		printk("dvb-dibusb: A frontend driver was not found for device %04x/%04x\n",
@@ -671,9 +761,11 @@ static int dibusb_init(struct usb_dibusb *dib)
 	deb_info("allocate %d bytes as buffersize for all URBs\n",bufsize);
 	/* allocate the actual buffer for the URBs */
 	if ((dib->buffer = pci_alloc_consistent(NULL,bufsize,&dib->dma_handle)) == NULL) {
+		deb_info("not enough memory.\n");
 		dibusb_exit(dib);
 		return -ENOMEM;
 	}
+	deb_info("allocation complete\n");
 	memset(dib->buffer,0,bufsize);
 
 	/* allocate and submit the URBs */
@@ -720,6 +812,8 @@ static int dibusb_init(struct usb_dibusb *dib)
 	dib->rc_input_event = KEY_MAX;
 
 	INIT_WORK(&dib->rc_query_work, dibusb_query_rc, dib);
+
+	dibusb_hw_wakeup(dib);
 
 	if ((ret = dibusb_dvb_init(dib))) {
 		dibusb_exit(dib);
@@ -844,27 +938,33 @@ static int dibusb_probe(struct usb_interface *intf,
 	if (cold)
 		ret = dibusb_loadfirmware(udev,dibdev);
 	else {
-		switch (udev->speed) {
-			case USB_SPEED_LOW:
-				err("cannot handle USB speed because it is to sLOW.");
-				break;
-			case USB_SPEED_FULL:
-				info("running at FULL speed, will use pid filter.");
-				break;
-			case USB_SPEED_HIGH:
-				info("running at HIGH speed, will deliver the complete TS.");
-				break;
-			case USB_SPEED_UNKNOWN: /* fall through */
-			default:
-				err("cannot handle USB speed because it is unkown.");
-				break;
-		}
 		dib = kmalloc(sizeof(struct usb_dibusb),GFP_KERNEL);
 		if (dib == NULL) {
 			err("no memory");
 			return ret;
 		}
 		memset(dib,0,sizeof(struct usb_dibusb));
+
+		dib->pid_parse = 1;
+		switch (udev->speed) {
+			case USB_SPEED_LOW:
+				err("cannot handle USB speed because it is to sLOW.");
+				break;
+			case USB_SPEED_FULL:
+				info("running at FULL speed, will use pid parsing.");
+				break;
+			case USB_SPEED_HIGH:
+				if (!pid_parse) {
+					dib->pid_parse = 0;
+				info("running at HIGH speed, will deliver the complete TS.");
+				} else
+					info("running at HIGH speed, will use pid_parsing anyway.");
+				break;
+			case USB_SPEED_UNKNOWN: /* fall through */
+			default:
+				err("cannot handle USB speed because it is unkown.");
+				break;
+		}
 
 		dib->udev = udev;
 		dib->dibdev = dibdev;

@@ -47,7 +47,7 @@ Produced and reselled by KWorld:
 Others:
 -------
 - Ultima Electronic/Artec T1 USB TVBOX (AN2135 and AN2235)
-	http://www.arteceuro.com/products-tvbox.html
+	http://82.161.246.249/products-tvbox.html
 
 - Compro Videomate DVB-U2000 - DVB-T USB
 	http://www.comprousa.com/products/vmu2000.htm
@@ -63,14 +63,23 @@ Others:
 
 Supported devices USB2.0
 ========================
+- Twinhan MagicBox II
+	http://www.twinhan.com/product_terrestrial_7.asp
+
 - Yakumo DVB-T mobile
 	http://www.yakumo.de/produkte/index.php?pid=1&ag=DVB-T
 
 - DiBcom USB2.0 DVB-T reference device (non-public)
 
 
-
 0. NEWS:
+  2004-12-06 - possibility for demod i2c-address probing
+             - new usb IDs (Compro,Artec)
+  2004-11-23 - merged changes from DiB3000MC_ver2.1
+             - revised the debugging
+             - possibility to deliver the complete TS for USB2.0
+  2004-11-21 - first working version of the dib3000mc/p frontend driver.
+  2004-11-12 - added additional remote control keys. Thanks to Uwe Hanke.
   2004-11-07 - added remote control support. Thanks to David Matthews.
   2004-11-05 - added support for a new devices (Grandtec/Avermedia/Artec)
              - merged my changes (for dib3000mb/dibusb) to the FE_REFACTORING, because it became HEAD
@@ -165,9 +174,7 @@ as a slave device in vdr, was not working for me. Some work has to be done
 2. Known problems and bugs
 
 TODO:
-- remote control
 - signal-quality and strength calculations
-- i2c address probing
 
 2.1. Adding support for devices 
 
@@ -189,7 +196,29 @@ the dvb-dibusb.h-file and create a patch and send it over to me or to
 the linux-dvb mailing list, _after_ you have tried compiling and modprobing
 it.
 
-2.2. Comments
+2.2. USB1.1 Bandwidth limitation
+
+Most of the current supported devices are USB1.1 and thus they have a
+maximum bandwidth of about 5-6 MBit/s when connected to a USB2.0 hub.
+This is not enough for receiving the complete transport stream of a
+DVB-T channel (which can be about 16 MBit/s). Normally this is not a
+problem, if you only want to watch TV, but watching a channel while
+recording another channel on the same frequency simply does not work.
+This applies to all USB1.1 DVB-T devices.
+
+A special problem of the dibusb for the USB1.1 is, that the USB control
+IC has a problem with write accesses while having MPEG2-streaming
+enabled. When you set another pid while receiving MPEG2-TS it happens, that
+the stream is disturbed and probably data is lost (results in distortions of
+the video or strange beeps within the audio stream). DiBcom is preparing a
+firmware especially for Linux which perhaps solves the problem.
+
+Especially VDR users are victoms of this bug. VDR frequently requests new PIDs
+due the automatic scanning (introduced in 1.3.x, afaik) and epg-scan. Disabling
+these features is maybe a solution. Additionally this behaviour of VDR exceeds
+the USB1.1 bandwidth.
+
+2.3. Comments
 
 Patches, comments and suggestions are very very welcome
 

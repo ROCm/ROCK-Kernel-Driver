@@ -3,6 +3,7 @@ config DVB_DIBUSB
 	depends on DVB_CORE && USB
 	select FW_LOADER
 	select DVB_DIB3000MB
+	select DVB_DIB3000MC
 	help
 	  Support for USB 1.1 and 2.0 DVB-T devices based on reference designs made by
 	  DiBcom (http://www.dibcom.fr).
@@ -32,19 +33,25 @@ config DVB_DIBUSB
 	  Say Y if you own such a device and want to use it. You should build it as
 	  a module.
 
-config DVB_DIBUSB_MISDESIGNED_AN2235
-	bool "Enable support for some Artec T1 device, which identifies as AN2235"
+config DVB_DIBUSB_MISDESIGNED_DEVICES
+	bool "Enable support for some misdesigned (see help) devices, which identify with wrong IDs"
 	depends on DVB_DIBUSB
 	help
-	  Somehow Artec forgot to program the eeprom for some of their T1 devices. So
-	  comes that they identify with the default Vendor and Product ID of the Cypress
-	  CY7C64613 (AN2235).
+	  Somehow Artec/Ultima Electronic forgot to program the eeprom of some of their
+	  USB1.1/USB2.0 devices.
+	  So comes that they identify with the default Vendor and Product ID of the Cypress
+	  CY7C64613 (AN2235) or Cypress FX2.
 
-	  Say Y if your Artec device has 0x0574 as Vendor ID and 0x2235 as Product ID.
+	  Affected device IDs:
+	    0x0574:0x2235 (Artec T1 USB1.1, cold)
+	    0x04b4:0x8613 (Artec T1 USB2.0, cold)
+	    0x0574:0x1002 (Artec T1 USB2.0, warm)
+
+	  Say Y if your device one of the mentioned IDs.
 
 config DVB_DIBCOM_DEBUG
 	bool "Enable extended debug support for DiBcom USB device"
 	depends on DVB_DIBUSB
 	help
 	  Say Y if you want to enable debuging. See modinfo dvb-dibusb for
-	  debug level.
+	  debug levels.

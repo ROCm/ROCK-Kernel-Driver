@@ -26,6 +26,8 @@
 #ifndef DIB3000_COMMON_H
 #define DIB3000_COMMON_H
 
+#include "dvb_frontend.h"
+#include "dib3000.h"
 
 /* info and err, taken from usb.h, if there is anything available like by default,
  * please change !
@@ -40,6 +42,63 @@ struct dib3000_pid
 	u16 pid;
 	int active;
 };
+
+/* frontend state */
+struct dib3000_state {
+	struct i2c_adapter* i2c;
+
+	struct dvb_frontend_ops ops;
+
+/* configuration settings */
+	struct dib3000_config config;
+
+	spinlock_t pid_list_lock;
+	struct dib3000_pid *pid_list;
+
+	int feedcount;
+
+	struct dvb_frontend frontend;
+	int timing_offset;
+	int timing_offset_comp_done;
+};
+
+/* commonly used methods by the dib3000mb/mc/p frontend */
+extern int dib3000_read_reg(struct dib3000_state *state, u16 reg);
+extern int dib3000_write_reg(struct dib3000_state *state, u16 reg, u16 val);
+
+extern int dib3000_init_pid_list(struct dib3000_state *state, int num);
+extern void dib3000_dealloc_pid_list(struct dib3000_state *state);
+extern int dib3000_get_pid_index(struct dib3000_pid pid_list[], int num_pids,
+	int pid, spinlock_t *pid_list_lock,int onoff);
+
+extern int dib3000_search_status(u16 irq,u16 lock);
+
+/* handy shortcuts */
+#define rd(reg) dib3000_read_reg(state,reg)
+
+#define wr(reg,val) if (dib3000_write_reg(state,reg,val)) \
+	{ err("while sending 0x%04x to 0x%04x.",val,reg); return -EREMOTEIO; }
+
+#define wr_foreach(a,v) { int i; \
+	if (sizeof(a) != sizeof(v)) \
+		err("sizeof: %d %d is different",sizeof(a),sizeof(v));\
+	for (i=0; i < sizeof(a)/sizeof(u16); i++) \
+		wr(a[i],v[i]); \
+	}
+
+#define set_or(reg,val) wr(reg,rd(reg) | val)
+
+#define set_and(reg,val) wr(reg,rd(reg) & val)
+
+
+/* debug */
+
+#ifdef CONFIG_DVB_DIBCOM_DEBUG
+#define dprintk(level,args...) \
+    do { if ((debug & level)) { printk(args); } } while (0)
+#else
+#define dprintk(args...) do { } while (0)
+#endif
 
 /* mask for enabling a specific pid for the pid_filter */
 #define DIB3000_ACTIVATE_PID_FILTERING	(0x2000)
@@ -81,17 +140,7 @@ struct dib3000_pid
 #define DIB3000_TUNER_WRITE_DISABLE(a)	(0xffff & ((a << 7) | (1 << 7)))
 
 /* for auto search */
-static u16 dib3000_seq[2][2][2] =     /* fft,gua,   inv   */
-	{ /* fft */
-		{ /* gua */
-			{ 0, 1 },                   /*  0   0   { 0,1 } */
-			{ 3, 9 },                   /*  0   1   { 0,1 } */
-		},
-		{
-			{ 2, 5 },                   /*  1   0   { 0,1 } */
-			{ 6, 11 },                  /*  1   1   { 0,1 } */
-		}
-	};
+extern u16 dib3000_seq[2][2][2];
 
 #define DIB3000_REG_MANUFACTOR_ID		(  1025)
 #define DIB3000_I2C_ID_DIBCOM			(0x01b3)

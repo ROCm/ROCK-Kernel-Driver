@@ -42,7 +42,7 @@ struct dib3000_config
 struct dib3000_xfer_ops
 {
 	/* pid and transfer handling is done in the demodulator */
-	int (*pid_filter)(struct dvb_frontend *fe, int onoff);
+	int (*pid_parse)(struct dvb_frontend *fe, int onoff);
 	int (*fifo_ctrl)(struct dvb_frontend *fe, int onoff);
 	int (*pid_ctrl)(struct dvb_frontend *fe, int pid, int onoff);
 };
@@ -50,4 +50,6 @@ struct dib3000_xfer_ops
 extern struct dvb_frontend* dib3000mb_attach(const struct dib3000_config* config,
 					     struct i2c_adapter* i2c, struct dib3000_xfer_ops *xfer_ops);
 
+extern struct dvb_frontend* dib3000mc_attach(const struct dib3000_config* config,
+					     struct i2c_adapter* i2c, struct dib3000_xfer_ops *xfer_ops);
 #endif // DIB3000_H
