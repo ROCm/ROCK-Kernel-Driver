@@ -74,6 +74,11 @@ config M5272
 	help
 	  Motorola ColdFire 5272 processor support.
 
+config M5282
+	bool "MCF5282"
+	help
+	  Motorola ColdFire 5282 processor support.
+
 config M5307
 	bool "MCF5307"
 	help
@@ -88,7 +93,7 @@ endchoice
 
 config COLDFIRE
 	bool
-	depends on (M5206 || M5206e || M5249 || M5272 || M5307 || M5407)
+	depends on (M5206 || M5206e || M5249 || M5272 || M5282 || M5307 || M5407)
 	default y
 
 choice
@@ -281,6 +286,12 @@ config M5272C3
 	help
 	  Support for the Motorola M5272C3 board.
 
+config M5282C3
+	bool "Motorola M5282C3 board support"
+	depends on M5282
+	help
+	  Support for the Motorola M5282C3 board.
+
 config ARN5307
 	bool "Arnewsh 5307 board support"
 	depends on M5307
@@ -349,7 +360,7 @@ config ARNEWSH
 config MOTOROLA
 	bool
 	default y
-	depends on (M5206eC3 || M5249C3 || M5272C3 || M5307C3 || M5407C3)
+	depends on (M5206eC3 || M5249C3 || M5272C3 || M5282C3 || M5307C3 || M5407C3)
 
 config LARGE_ALLOCS
 	bool "Allow allocating large blocks (> 1MB) of memory"
