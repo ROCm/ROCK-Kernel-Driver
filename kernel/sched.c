@@ -1691,6 +1691,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 {
 	struct sched_param lp;
 	int retval = -EINVAL;
+	int oldprio;
 	prio_array_t *array;
 	unsigned long flags;
 	runqueue_t *rq;
@@ -1757,12 +1758,24 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 	retval = 0;
 	p->policy = policy;
 	p->rt_priority = lp.sched_priority;
+	oldprio = p->prio;
 	if (policy != SCHED_NORMAL)
 		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
 	else
 		p->prio = p->static_prio;
-	if (array)
+	if (array) {
 		__activate_task(p, task_rq(p));
+		/*
+		 * Reschedule if we are currently running on this runqueue and
+		 * our priority decreased, or if we are not currently running on
+		 * this runqueue and our priority is higher than the current's
+		 */
+		if (rq->curr == p) {
+			if (p->prio > oldprio)
+				resched_task(rq->curr);
+		} else if (p->prio < rq->curr->prio)
+			resched_task(rq->curr);
+	}
 
 out_unlock:
 	task_rq_unlock(rq, &flags);
