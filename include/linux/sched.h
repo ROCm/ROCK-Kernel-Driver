@@ -752,8 +752,13 @@ extern void sched_exec(void);
 #define sched_exec()   {}
 #endif
 
-extern void sched_idle_next(void);
+#ifdef CONFIG_HOTPLUG_CPU
 extern void idle_task_exit(void);
+#else
+static inline void idle_task_exit(void) {}
+#endif
+
+extern void sched_idle_next(void);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(const task_t *p);
 extern int task_nice(const task_t *p);
