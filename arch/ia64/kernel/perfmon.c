@@ -375,8 +375,8 @@ static pmu_config_t	pmu_conf; 	/* PMU configuration */
 static pfm_session_t	pfm_sessions;	/* global sessions information */
 static struct proc_dir_entry *perfmon_dir; /* for debug only */
 static pfm_stats_t	pfm_stats;
-int __per_cpu_data pfm_syst_wide;
-static int __per_cpu_data pfm_dcr_pp;
+DEFINE_PER_CPU(int, pfm_syst_wide);
+static DEFINE_PER_CPU(int, pfm_dcr_pp);
 
 /* sysctl() controls */
 static pfm_sysctl_t pfm_sysctl;

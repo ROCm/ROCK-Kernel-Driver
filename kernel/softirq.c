@@ -151,8 +151,8 @@ struct tasklet_head
 
 /* Some compilers disobey section attribute on statics when not
    initialized -- RR */
-static struct tasklet_head tasklet_vec __per_cpu_data = { NULL };
-static struct tasklet_head tasklet_hi_vec __per_cpu_data = { NULL };
+static DEFINE_PER_CPU(struct tasklet_head, tasklet_vec) = { NULL };
+static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec) = { NULL };
 
 void __tasklet_schedule(struct tasklet_struct *t)
 {
