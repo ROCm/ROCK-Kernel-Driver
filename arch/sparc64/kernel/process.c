@@ -473,7 +473,7 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 
 	distance = fp - psp;
 	rval = (csp - distance);
-	if (copy_in_user(rval, psp, distance))
+	if (copy_in_user((void __user *) rval, (void __user *) psp, distance))
 		rval = 0;
 	else if (test_thread_flag(TIF_32BIT)) {
 		if (put_user(((u32)csp), &(((struct reg_window32 *)rval)->ins[6])))

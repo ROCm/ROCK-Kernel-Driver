@@ -113,7 +113,7 @@ out:
  * This is really horribly ugly.
  */
 
-asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
+asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fifth)
 {
 	int version, err;
 
@@ -123,7 +123,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 	if (call <= SEMCTL)
 		switch (call) {
 		case SEMOP:
-			err = sys_semop (first, (struct sembuf *)ptr, second);
+			err = sys_semop (first, (struct sembuf __user *)ptr, second);
 			goto out;
 		case SEMGET:
 			err = sys_semget (first, second, third);
@@ -134,7 +134,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 			if (!ptr)
 				goto out;
 			err = -EFAULT;
-			if(get_user(fourth.__pad, (void **)ptr))
+			if(get_user(fourth.__pad, (void __user **)ptr))
 				goto out;
 			err = sys_semctl (first, second, third, fourth);
 			goto out;
@@ -146,7 +146,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 	if (call <= MSGCTL) 
 		switch (call) {
 		case MSGSND:
-			err = sys_msgsnd (first, (struct msgbuf *) ptr, 
+			err = sys_msgsnd (first, (struct msgbuf __user *) ptr, 
 					  second, third);
 			goto out;
 		case MSGRCV:
@@ -157,7 +157,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 				if (!ptr)
 					goto out;
 				err = -EFAULT;
-				if(copy_from_user(&tmp,(struct ipc_kludge *) ptr, sizeof (tmp)))
+				if (copy_from_user(&tmp, (struct ipc_kludge __user *) ptr, sizeof (tmp)))
 					goto out;
 				err = sys_msgrcv (first, tmp.msgp, second, tmp.msgtyp, third);
 				goto out;
@@ -170,7 +170,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 			err = sys_msgget ((key_t) first, second);
 			goto out;
 		case MSGCTL:
-			err = sys_msgctl (first, second, (struct msqid_ds *) ptr);
+			err = sys_msgctl (first, second, (struct msqid_ds __user *) ptr);
 			goto out;
 		default:
 			err = -ENOSYS;
@@ -182,27 +182,27 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 			switch (version) {
 			case 0: default: {
 				ulong raddr;
-				err = sys_shmat (first, (char *) ptr, second, &raddr);
+				err = sys_shmat (first, (char __user *) ptr, second, &raddr);
 				if (err)
 					goto out;
 				err = -EFAULT;
-				if(put_user (raddr, (ulong *) third))
+				if (put_user (raddr, (ulong __user *) third))
 					goto out;
 				err = 0;
 				goto out;
 				}
 			case 1:	/* iBCS2 emulator entry point */
-				err = sys_shmat (first, (char *) ptr, second, (ulong *) third);
+				err = sys_shmat (first, (char __user *) ptr, second, (ulong __user *) third);
 				goto out;
 			}
 		case SHMDT: 
-			err = sys_shmdt ((char *)ptr);
+			err = sys_shmdt ((char __user *)ptr);
 			goto out;
 		case SHMGET:
 			err = sys_shmget (first, second, third);
 			goto out;
 		case SHMCTL:
-			err = sys_shmctl (first, second, (struct shmid_ds *) ptr);
+			err = sys_shmctl (first, second, (struct shmid_ds __user *) ptr);
 			goto out;
 		default:
 			err = -ENOSYS;
@@ -344,9 +344,11 @@ asmlinkage unsigned long
 c_sys_nis_syscall (struct pt_regs *regs)
 {
 	static int count = 0;
-	
-	if (count++ > 5) return -ENOSYS;
-	printk ("%s[%d]: Unimplemented SPARC system call %d\n", current->comm, current->pid, (int)regs->u_regs[1]);
+
+	if (count++ > 5)
+		return -ENOSYS;
+	printk ("%s[%d]: Unimplemented SPARC system call %d\n",
+		current->comm, current->pid, (int)regs->u_regs[1]);
 #ifdef DEBUG_UNIMP_SYSCALL	
 	show_regs (regs);
 #endif
@@ -378,8 +380,8 @@ sparc_breakpoint (struct pt_regs *regs)
 }
 
 asmlinkage int
-sparc_sigaction (int sig, const struct old_sigaction *act,
-		 struct old_sigaction *oact)
+sparc_sigaction (int sig, const struct old_sigaction __user *act,
+		 struct old_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -422,8 +424,11 @@ sparc_sigaction (int sig, const struct old_sigaction *act,
 }
 
 asmlinkage int
-sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
-		 void *restorer, size_t sigsetsize)
+sys_rt_sigaction(int sig,
+		 const struct sigaction __user *act,
+		 struct sigaction __user *oact,
+		 void __user *restorer,
+		 size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -453,7 +458,7 @@ sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
 	return ret;
 }
 
-asmlinkage int sys_getdomainname(char *name, int len)
+asmlinkage int sys_getdomainname(char __user *name, int len)
 {
  	int nlen;
  	int err = -EFAULT;
@@ -464,9 +469,9 @@ asmlinkage int sys_getdomainname(char *name, int len)
 
 	if (nlen < len)
 		len = nlen;
-	if(len > __NEW_UTS_LEN)
+	if (len > __NEW_UTS_LEN)
 		goto done;
-	if(copy_to_user(name, system_utsname.domainname, len))
+	if (copy_to_user(name, system_utsname.domainname, len))
 		goto done;
 	err = 0;
 done:

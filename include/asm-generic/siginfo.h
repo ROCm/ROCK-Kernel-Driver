@@ -1,6 +1,7 @@
 #ifndef _ASM_GENERIC_SIGINFO_H
 #define _ASM_GENERIC_SIGINFO_H
 
+#include <linux/compiler.h>
 #include <linux/types.h>
 
 typedef union sigval {
