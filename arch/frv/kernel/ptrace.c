@@ -1,13 +1,13 @@
-/*
- *  linux/arch/m68k/kernel/ptrace.c
+/* ptrace.c: FRV specific parts of process tracing
  *
- *  Copyright (C) 1994 by Hamish Macdonald
- *  Taken from linux/kernel/ptrace.c and modified for M680x0.
- *  linux/kernel/ptrace.c is by Ross Biro 1/23/92, edited by Linus Torvalds
+ * Copyright (C) 2003-5 Red Hat, Inc. All Rights Reserved.
+ * Written by David Howells (dhowells@redhat.com)
+ * - Derived from arch/m68k/kernel/ptrace.c
  *
- * This file is subject to the terms and conditions of the GNU General
- * Public License.  See the file COPYING in the main directory of
- * this archive for more details.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/kernel.h>
@@ -32,13 +32,6 @@
  * does not yet catch signals sent when the child dies.
  * in exit.c or in signal.c.
  */
-
-/* determines which bits in the SR the user has access to. */
-/* 1 = access 0 = no access */
-#define SR_MASK 0x001f
-
-/* sets the trace bits. */
-#define TRACE_BITS 0x8000
 
 /*
  * Get contents of register REGNO in task TASK.

@@ -1,15 +1,13 @@
-/*
- *  linux/arch/m68k/kernel/process.c
+/* process.c: FRV specific parts of process handling
  *
- *  Copyright (C) 1995  Hamish Macdonald
+ * Copyright (C) 2003-5 Red Hat, Inc. All Rights Reserved.
+ * Written by David Howells (dhowells@redhat.com)
+ * - Derived from arch/m68k/kernel/process.c
  *
- *  68060 fixes by Jesper Skov
- *
- *  uClinux changes Copyright (C) 2000-2002, David McCullough <davidm@snapgear.com>
- */
-
-/*
- * This file handles the architecture-dependent parts of process handling..
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/config.h>

@@ -1,18 +1,13 @@
-/*
- *  linux/arch/frvnommu/kernel/setup.c
+/* setup.c: FRV specific setup
  *
- *  Copyleft  ()) 2000       James D. Schettine {james@telos-systems.com}
- *  Copyright (C) 1999-2003  Greg Ungerer (gerg@snapgear.com)
- *  Copyright (C) 1998,1999  D. Jeff Dionne <jeff@lineo.ca>
- *  Copyright (C) 1998       Kenneth Albanowski <kjahds@kjahds.com>
- *  Copyright (C) 1995       Hamish Macdonald
- *  Copyright (C) 2000       Lineo Inc. (www.lineo.com)
- *  Copyright (C) 2001 	     Lineo, Inc. <www.lineo.com>
- *  Copyright (C) 2003,2004  David Howells <dhowells@redhat.com>, Red Hat, Inc.
- */
-
-/*
- * This file handles the architecture-dependent parts of system setup
+ * Copyright (C) 2003-5 Red Hat, Inc. All Rights Reserved.
+ * Written by David Howells (dhowells@redhat.com)
+ * - Derived from arch/m68k/kernel/setup.c
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/config.h>

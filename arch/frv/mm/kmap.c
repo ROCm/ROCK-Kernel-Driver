@@ -1,7 +1,13 @@
-/*
- *  linux/arch/m68knommu/mm/kmap.c
+/* kmap.c: ioremapping handlers
  *
- *  Copyright (C) 2000 Lineo, <davidm@lineo.com>
+ * Copyright (C) 2003-5 Red Hat, Inc. All Rights Reserved.
+ * Written by David Howells (dhowells@redhat.com)
+ * - Derived from arch/m68k/mm/kmap.c
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/config.h>

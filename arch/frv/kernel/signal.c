@@ -1,10 +1,13 @@
-/*
- *  linux/arch/frvnommu/kernel/signal.c
+/* signal.c: FRV specific bits of signal handling
  *
- *  Copyright (C) 1991, 1992  Linus Torvalds
+ * Copyright (C) 2003-5 Red Hat, Inc. All Rights Reserved.
+ * Written by David Howells (dhowells@redhat.com)
+ * - Derived from arch/m68k/kernel/signal.c
  *
- *  1997-11-28  Modified for POSIX.1b signals by Richard Henderson
- *  2000-06-20  Pentium III FXSR, SSE support by Gareth Hughes
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/sched.h>
