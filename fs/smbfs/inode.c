@@ -22,6 +22,7 @@
 #include <linux/smp_lock.h>
 #include <linux/nls.h>
 #include <linux/seq_file.h>
+#include <linux/mount.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>
