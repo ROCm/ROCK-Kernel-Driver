@@ -9,6 +9,8 @@
 #ifndef _MACSERIAL_H
 #define _MACSERIAL_H
 
+#include <linux/spinlock.h>
+
 #define NUM_ZSREGS    16
 
 struct serial_struct {
@@ -105,6 +107,7 @@ struct mac_serial {
 	struct mac_zschannel *zs_chan_a;	/* A side registers */
 	unsigned char read_reg_zero;
 	struct device_node* dev_node;
+	spinlock_t lock;
 
 	char soft_carrier;  /* Use soft carrier on this channel */
 	char break_abort;   /* Is serial console in, so process brk/abrt */
