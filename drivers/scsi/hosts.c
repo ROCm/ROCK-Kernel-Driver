@@ -260,7 +260,6 @@ active:
 int scsi_remove_host(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
-	struct list_head *le, *lh;
 
 	/*
 	 * FIXME Do ref counting.  We force all of the devices offline to
@@ -287,16 +286,9 @@ int scsi_remove_host(struct Scsi_Host *shost)
 			       sdev->attached);
 			return 1;
 		}
-		devfs_unregister(sdev->de);
-		device_unregister(&sdev->sdev_driverfs_dev);
 	}
 
-	/* Next we free up the Scsi_Cmnd structures for this host */
-
-	list_for_each_safe(le, lh, &shost->my_devices) {
-		scsi_free_sdev(list_entry(le, Scsi_Device, siblings));
-	}
-
+	scsi_forget_host(shost);
 	return 0;
 }
 
@@ -668,64 +660,6 @@ void __init scsi_host_init(void)
 	}
 }
 
-/*
- * Function:    scsi_get_host_dev()
- *
- * Purpose:     Create a Scsi_Device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     The Scsi_Device or NULL
- *
- * Notes:
- *	Attach a single Scsi_Device to the Scsi_Host - this should
- *	be made to look like a "pseudo-device" that points to the
- *	HA itself.
- *
- *	Note - this device is not accessible from any high-level
- *	drivers (including generics), which is probably not
- *	optimal.  We can add hooks later to attach 
- */
-struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
-{
-	struct scsi_device *sdev;
-
-	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
-	if (sdev) {
-		scsi_build_commandblocks(sdev);
-		if (sdev->current_queue_depth == 0)
-			goto fail;
-		sdev->borken = 0;
-	}
-
-	return sdev;
-
-fail:
-	kfree(sdev);
-	return NULL;
-}
-
-/*
- * Function:    scsi_free_host_dev()
- *
- * Purpose:     Free a scsi_device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     Nothing
- *
- * Notes:
- */
-void scsi_free_host_dev(struct scsi_device *sdev)
-{
-	BUG_ON(sdev->id != sdev->host->this_id);
-	scsi_free_sdev(sdev);
-}
-
 void scsi_host_busy_inc(struct Scsi_Host *shost, Scsi_Device *sdev)
 {
 	unsigned long flags;
@@ -765,22 +699,3 @@ void scsi_host_failed_inc_and_test(struct Scsi_Host *shost)
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 }
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

@@ -532,6 +532,8 @@ static inline void scsi_set_pci_device(struct Scsi_Host *shost,
  * Prototypes for functions/data in scsi_scan.c
  */
 extern void scsi_scan_host(struct Scsi_Host *);
+extern void scsi_forget_host(struct Scsi_Host *);
+
 
 struct Scsi_Device_Template
 {
