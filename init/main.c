@@ -600,6 +600,13 @@ static int init(void * unused)
 	smp_init();
 	do_basic_setup();
 
+       /*
+        * check if there is an early userspace init, if yes
+        * let it do all the work
+        */
+       if (sys_access("/init", 0) == 0)
+               execute_command = "/init";
+       else
 	prepare_namespace();
 
 	/*
