@@ -127,13 +127,15 @@ extern int CIFSSMBUnixQPathInfo(const int xid,
 extern int CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 			const unsigned char *searchName,
 			unsigned char **targetUNCs,
-			int *number_of_UNC_in_array,
+			unsigned int *number_of_UNC_in_array,
 			const struct nls_table *nls_codepage);
 
 extern int connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 			const char *old_path,
 			const struct nls_table *nls_codepage);
-
+extern int get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
+			const char *old_path, const struct nls_table *nls_codepage, 
+			unsigned int *pnum_referrals, unsigned char ** preferrals);
 extern int CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 			struct statfs *FSData,
 			const struct nls_table *nls_codepage);

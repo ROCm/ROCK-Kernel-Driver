@@ -115,7 +115,7 @@ AllocOplockQEntry(struct file * file, struct cifsTconInfo * tcon)
 		list_add_tail(&temp->qhead, &GlobalOplock_Q);
 		write_unlock(&GlobalMid_Lock);
 	}
-    return temp;
+	return temp;
 
 }
 
