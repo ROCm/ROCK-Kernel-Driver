@@ -50,6 +50,7 @@ static unsigned long in_xmon = 0;
 
 static unsigned long adrs;
 static int size = 1;
+#define MAX_DUMP (128 * 1024)
 static unsigned long ndump = 64;
 static unsigned long nidump = 16;
 static unsigned long ncsum = 4096;
@@ -145,8 +146,6 @@ extern int xmon_read_poll(void);
 extern int setjmp(long *);
 extern void longjmp(long *, int);
 extern unsigned long _ASR;
-
-pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 
 #define GETWORD(v)	(((v)[0] << 24) + ((v)[1] << 16) + ((v)[2] << 8) + (v)[3])
 
@@ -1884,18 +1883,22 @@ dump(void)
 	if ((isxdigit(c) && c != 'f' && c != 'd') || c == '\n')
 		termch = c;
 	scanhex((void *)&adrs);
-	if( termch != '\n')
+	if (termch != '\n')
 		termch = 0;
-	if( c == 'i' ){
+	if (c == 'i') {
 		scanhex(&nidump);
-		if( nidump == 0 )
+		if (nidump == 0)
 			nidump = 16;
+		else if (nidump > MAX_DUMP)
+			nidump = MAX_DUMP;
 		adrs += ppc_inst_dump(adrs, nidump, 1);
 		last_cmd = "di\n";
 	} else {
 		scanhex(&ndump);
-		if( ndump == 0 )
+		if (ndump == 0)
 			ndump = 64;
+		else if (ndump > MAX_DUMP)
+			ndump = MAX_DUMP;
 		prdump(adrs, ndump);
 		adrs += ndump;
 		last_cmd = "d\n";
