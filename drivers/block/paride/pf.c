@@ -841,7 +841,7 @@ static inline void next_request(int success)
 /* detach from the calling context - in case the spinlock is held */
 static void do_pf_read(void)
 {
-	ps_set_intr(do_pf_read_start, 0, 0, nice);
+	ps_set_intr(do_pf_read_start, NULL, 0, nice);
 }
 
 static void do_pf_read_start(void)
@@ -887,7 +887,7 @@ static void do_pf_read_drq(void)
 
 static void do_pf_write(void)
 {
-	ps_set_intr(do_pf_write_start, 0, 0, nice);
+	ps_set_intr(do_pf_write_start, NULL, 0, nice);
 }
 
 static void do_pf_write_start(void)

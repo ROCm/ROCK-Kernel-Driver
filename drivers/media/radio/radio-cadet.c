@@ -323,7 +323,7 @@ void cadet_handler(unsigned long data)
 
 
 
-static ssize_t cadet_read(struct file *file, char *data,
+static ssize_t cadet_read(struct file *file, char __user *data,
 			  size_t count, loff_t *ppos)
 {
         int i=0;

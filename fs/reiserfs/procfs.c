@@ -591,7 +591,7 @@ void reiserfs_proc_unregister_global( const char *name )
 int reiserfs_proc_info_global_init( void )
 {
 	if( proc_info_root == NULL ) {
-		proc_info_root = proc_mkdir( proc_info_root_name, 0 );
+		proc_info_root = proc_mkdir(proc_info_root_name, NULL);
 		if( proc_info_root ) {
 			proc_info_root -> owner = THIS_MODULE;
 		} else {
@@ -608,7 +608,7 @@ int reiserfs_proc_info_global_done( void )
 {
 	if ( proc_info_root != NULL ) {
 		proc_info_root = NULL;
-		remove_proc_entry( proc_info_root_name, 0 );
+		remove_proc_entry(proc_info_root_name, NULL);
 	}
 	return 0;
 }

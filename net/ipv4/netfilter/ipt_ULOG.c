@@ -217,6 +217,10 @@ static void ipt_ulog_packet(unsigned int hooknum,
 
 	pm = NLMSG_DATA(nlh);
 
+	/* We might not have a timestamp, get one */
+	if (skb->stamp.tv_sec == 0)
+		do_gettimeofday((struct timeval *)&skb->stamp);
+
 	/* copy hook, prefix, timestamp, payload, etc. */
 	pm->data_len = copy_len;
 	pm->timestamp_sec = skb->stamp.tv_sec;

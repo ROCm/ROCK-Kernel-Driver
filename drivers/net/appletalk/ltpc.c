@@ -501,7 +501,7 @@ static void idle(struct net_device *dev)
 	/* FIXME This is initialized to shut the warning up, but I need to
 	 * think this through again.
 	 */
-	struct xmitQel *q=0;
+	struct xmitQel *q = NULL;
 	int oops;
 	int i;
 	int base = dev->base_addr;
@@ -1203,7 +1203,7 @@ struct net_device * __init ltpc_probe(void)
 	if (err)
 		goto out4;
 
-	return 0;
+	return NULL;
 out4:
 	del_timer_sync(&ltpc_timer);
 	if (dev->irq)

@@ -245,7 +245,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	/* Throw away unacknowledged chunks. */
 	list_for_each(pos, &q->asoc->peer.transport_addr_list) {
 		transport = list_entry(pos, struct sctp_transport, transports);
-		while ((lchunk = sctp_list_dequeue(&transport->transmitted))) {
+		while ((lchunk = sctp_list_dequeue(&transport->transmitted)) != NULL) {
 			chunk = list_entry(lchunk, struct sctp_chunk,
 					   transmitted_list);
 			/* Mark as part of a failed message. */
@@ -282,7 +282,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	}
 
 	/* Throw away any leftover data chunks. */
-	while ((chunk = sctp_outq_dequeue_data(q))) {
+	while ((chunk = sctp_outq_dequeue_data(q)) != NULL) {
 
 		/* Mark as send failure. */
 		sctp_chunk_fail(chunk, q->error);
@@ -292,7 +292,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	q->error = 0;
 
 	/* Throw away any leftover control chunks. */
-	while ((chunk = (struct sctp_chunk *) skb_dequeue(&q->control)))
+	while ((chunk = (struct sctp_chunk *) skb_dequeue(&q->control)) != NULL)
 		sctp_chunk_free(chunk);
 }
 
@@ -681,7 +681,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	 */
 
 	queue = &q->control;
-	while ((chunk = (struct sctp_chunk *)skb_dequeue(queue))) {
+	while ((chunk = (struct sctp_chunk *)skb_dequeue(queue)) != NULL) {
 		/* Pick the right transport to use. */
 		new_transport = chunk->transport;
 
@@ -812,7 +812,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		start_timer = 0;
 		queue = &q->out;
 
-		while ((chunk = sctp_outq_dequeue_data(q))) {
+		while ((chunk = sctp_outq_dequeue_data(q)) != NULL) {
 			/* RFC 2960 6.5 Every DATA chunk MUST carry a valid
 			 * stream identifier.
 			 */
@@ -866,7 +866,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 			SCTP_DEBUG_PRINTK("TX TSN 0x%x skb->head "
 					"%p skb->users %d.\n",
 					ntohl(chunk->subh.data_hdr->tsn),
-					chunk->skb ?chunk->skb->head : 0,
+					chunk->skb ?chunk->skb->head : NULL,
 					chunk->skb ?
 					atomic_read(&chunk->skb->users) : -1);
 

@@ -1272,7 +1272,7 @@ static int smc_open(struct net_device *dev)
     link->open++;
 
     netif_start_queue(dev);
-    smc->saved_skb = 0;
+    smc->saved_skb = NULL;
     smc->packets_waiting = 0;
 
     smc_reset(dev);

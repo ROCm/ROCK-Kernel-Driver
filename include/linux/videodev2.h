@@ -433,9 +433,9 @@ struct v4l2_window
 	struct v4l2_rect        w;
 	enum v4l2_field  	field;
 	__u32			chromakey;
-	struct v4l2_clip	*clips;
+	struct v4l2_clip	__user *clips;
 	__u32			clipcount;
-	void			*bitmap;
+	void			__user *bitmap;
 };
 
 

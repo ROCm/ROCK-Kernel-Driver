@@ -734,7 +734,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	if (c == 'r') {
 	    char * p;
 	    
-	    p = 0;
+	    p = NULL;
 	    /* "resize=NNN" */
 	    *blocks = simple_strtoul (arg, &p, 0);
 	    if (*p != '\0') {
@@ -745,7 +745,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	}
 
 	if ( c == 'c' ) {
-		char *p = 0;
+		char *p = NULL;
 		unsigned long val = simple_strtoul (arg, &p, 0);
 		/* commit=NNN (time in seconds) */
 		if ( *p != '\0' || val >= (unsigned int)-1) {
@@ -755,7 +755,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	}
 
 	if ( c == 'w' ) {
-		char *p=0;
+		char *p=NULL;
 		int val = simple_strtoul (arg, &p, 0);
 
 		if ( *p != '\0') {

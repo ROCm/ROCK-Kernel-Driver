@@ -295,6 +295,24 @@ int br_del_bridge(const char *name)
 	return ret;
 }
 
+int br_min_mtu(const struct net_bridge *br)
+{
+	const struct net_bridge_port *p;
+	int mtu = 0;
+
+	ASSERT_RTNL();
+
+	if (list_empty(&br->port_list))
+		mtu = 1500;
+	else {
+		list_for_each_entry(p, &br->port_list, list) {
+			if (!mtu  || p->dev->mtu < mtu)
+				mtu = p->dev->mtu;
+		}
+	}
+	return mtu;
+}
+
 /* called with RTNL */
 int br_add_if(struct net_bridge *br, struct net_device *dev)
 {
@@ -328,6 +346,8 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 		if ((br->dev->flags & IFF_UP) && (dev->flags & IFF_UP))
 			br_stp_enable_port(p);
 		spin_unlock_bh(&br->lock);
+
+		br->dev->mtu = br_min_mtu(br);
 	}
 
 	return err;

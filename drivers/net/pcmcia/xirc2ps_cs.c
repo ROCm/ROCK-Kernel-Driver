@@ -815,7 +815,7 @@ xirc2ps_config(dev_link_t * link)
     cistpl_lan_node_id_t *node_id = (cistpl_lan_node_id_t*)parse.funce.data;
     cistpl_cftable_entry_t *cf = &parse.cftable_entry;
 
-    local->dingo_ccr = 0;
+    local->dingo_ccr = NULL;
 
     DEBUG(0, "config(0x%p)\n", link);
 

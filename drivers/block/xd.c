@@ -96,7 +96,7 @@ XD_INFO xd_info[XD_MAXDRIVES];
 #include <asm/page.h>
 #define xd_dma_mem_alloc(size) __get_dma_pages(GFP_KERNEL,get_order(size))
 #define xd_dma_mem_free(addr, size) free_pages(addr, get_order(size))
-static char *xd_dma_buffer = 0;
+static char *xd_dma_buffer;
 
 static XD_SIGNATURE xd_sigs[] __initdata = {
 	{ 0x0000,"Override geometry handler",NULL,xd_override_init_drive,"n unknown" }, /* Pat Mackinlay, pat@it.com.au */
@@ -344,7 +344,7 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 			if (nodma && xd_dma_buffer) {
 				xd_dma_mem_free((unsigned long)xd_dma_buffer,
 						xd_maxsectors * 0x200);
-				xd_dma_buffer = 0;
+				xd_dma_buffer = NULL;
 			} else if (!nodma && !xd_dma_buffer) {
 				xd_dma_buffer = (char *)xd_dma_mem_alloc(xd_maxsectors * 0x200);
 				if (!xd_dma_buffer) {
@@ -448,7 +448,7 @@ static void xd_recalibrate (u_char drive)
 	u_char cmdblk[6];
 	
 	xd_build(cmdblk,CMD_RECALIBRATE,drive,0,0,0,0,0);
-	if (xd_command(cmdblk,PIO_MODE,0,0,0,XD_TIMEOUT * 8))
+	if (xd_command(cmdblk,PIO_MODE,NULL,NULL,NULL,XD_TIMEOUT * 8))
 		printk("xd%c: warning! error recalibrating, controller may be unstable\n", 'a'+drive);
 }
 
@@ -607,7 +607,7 @@ static u_int xd_command (u_char *command,u_char mode,u_char *indata,u_char *outd
 
 	if (csb & CSB_ERROR) {									/* read sense data if error */
 		xd_build(cmdblk,CMD_SENSE,(csb & CSB_LUN) >> 5,0,0,0,0,0);
-		if (xd_command(cmdblk,0,sense,0,0,XD_TIMEOUT))
+		if (xd_command(cmdblk,0,sense,NULL,NULL,XD_TIMEOUT))
 			printk("xd: warning! sense command failed!\n");
 	}
 
@@ -624,7 +624,7 @@ static u_char __init xd_initdrives (void (*init_drive)(u_char drive))
 
 	for (i = 0; i < XD_MAXDRIVES; i++) {
 		xd_build(cmdblk,CMD_TESTREADY,i,0,0,0,0,0);
-		if (!xd_command(cmdblk,PIO_MODE,0,0,0,XD_TIMEOUT * 8)) {
+		if (!xd_command(cmdblk,PIO_MODE,NULL,NULL,NULL,XD_TIMEOUT*8)) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(XD_INIT_DISK_DELAY);
 
@@ -714,7 +714,7 @@ static void __init xd_dtc_init_drive (u_char drive)
 	u_char cmdblk[6],buf[64];
 
 	xd_build(cmdblk,CMD_DTCGETGEOM,drive,0,0,0,0,0);
-	if (!xd_command(cmdblk,PIO_MODE,buf,0,0,XD_TIMEOUT * 2)) {
+	if (!xd_command(cmdblk,PIO_MODE,buf,NULL,NULL,XD_TIMEOUT * 2)) {
 		xd_info[drive].heads = buf[0x0A];			/* heads */
 		xd_info[drive].cylinders = ((u_short *) (buf))[0x04];	/* cylinders */
 		xd_info[drive].sectors = 17;				/* sectors */
@@ -729,7 +729,7 @@ static void __init xd_dtc_init_drive (u_char drive)
 
 		xd_setparam(CMD_DTCSETPARAM,drive,xd_info[drive].heads,xd_info[drive].cylinders,((u_short *) (buf + 1))[0x05],((u_short *) (buf + 1))[0x06],buf[0x0F]);
 		xd_build(cmdblk,CMD_DTCSETSTEP,drive,0,0,0,0,7);
-		if (xd_command(cmdblk,PIO_MODE,0,0,0,XD_TIMEOUT * 2))
+		if (xd_command(cmdblk,PIO_MODE,NULL,NULL,NULL,XD_TIMEOUT * 2))
 			printk("xd_dtc_init_drive: error setting step rate for xd%c\n", 'a'+drive);
 	}
 	else
@@ -785,7 +785,7 @@ static void __init xd_wd_init_drive (u_char drive)
 		xd_irq = 9;
 	rll = (jumper_state & 0x30) ? (0x04 << wd_1002) : 0;
 	xd_build(cmdblk,CMD_READ,drive,0,0,0,1,0);
-	if (!xd_command(cmdblk,PIO_MODE,buf,0,0,XD_TIMEOUT * 2)) {
+	if (!xd_command(cmdblk,PIO_MODE,buf,NULL,NULL,XD_TIMEOUT * 2)) {
 		xd_info[drive].heads = buf[0x1AF];				/* heads */
 		xd_info[drive].cylinders = ((u_short *) (buf + 1))[0xD6];	/* cylinders */
 		xd_info[drive].sectors = 17;					/* sectors */
@@ -862,7 +862,7 @@ static void __init xd_seagate_init_drive (u_char drive)
 	u_char cmdblk[6],buf[0x200];
 
 	xd_build(cmdblk,CMD_ST11GETGEOM,drive,0,0,0,1,0);
-	if (!xd_command(cmdblk,PIO_MODE,buf,0,0,XD_TIMEOUT * 2)) {
+	if (!xd_command(cmdblk,PIO_MODE,buf,NULL,NULL,XD_TIMEOUT * 2)) {
 		xd_info[drive].heads = buf[0x04];				/* heads */
 		xd_info[drive].cylinders = (buf[0x02] << 8) | buf[0x03];	/* cylinders */
 		xd_info[drive].sectors = buf[0x05];				/* sectors */
@@ -987,7 +987,7 @@ static void __init xd_override_init_drive (u_char drive)
 			while (min[i] != max[i] - 1) {
 				test[i] = (min[i] + max[i]) / 2;
 				xd_build(cmdblk,CMD_SEEK,drive,(u_char) test[0],(u_short) test[1],(u_char) test[2],0,0);
-				if (!xd_command(cmdblk,PIO_MODE,0,0,0,XD_TIMEOUT * 2))
+				if (!xd_command(cmdblk,PIO_MODE,NULL,NULL,NULL,XD_TIMEOUT * 2))
 					min[i] = test[i];
 				else
 					max[i] = test[i];
@@ -1039,7 +1039,7 @@ static void __init xd_setparam (u_char command,u_char drive,u_char heads,u_short
 
 	/* Some controllers require geometry info as data, not command */
 
-	if (xd_command(cmdblk,PIO_MODE,0,&cmdblk[6],0,XD_TIMEOUT * 2))
+	if (xd_command(cmdblk,PIO_MODE,NULL,&cmdblk[6],NULL,XD_TIMEOUT * 2))
 		printk("xd: error setting characteristics for xd%c\n", 'a'+drive);
 }
 

@@ -89,6 +89,15 @@ static int br_dev_stop(struct net_device *dev)
 	return 0;
 }
 
+static int br_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if ((new_mtu < 68) || new_mtu > br_min_mtu(dev->priv))
+		return -EINVAL;
+
+	dev->mtu = new_mtu;
+	return 0;
+}
+
 static int br_dev_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 {
 	return -1;
@@ -105,6 +114,7 @@ void br_dev_setup(struct net_device *dev)
 	dev->hard_start_xmit = br_dev_xmit;
 	dev->open = br_dev_open;
 	dev->set_multicast_list = br_dev_set_multicast_list;
+	dev->change_mtu = br_change_mtu;
 	dev->destructor = free_netdev;
 	SET_MODULE_OWNER(dev);
 	dev->stop = br_dev_stop;

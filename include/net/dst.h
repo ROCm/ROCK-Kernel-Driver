@@ -149,7 +149,9 @@ void dst_release(struct dst_entry * dst)
 {
 	if (dst) {
 		if (atomic_read(&dst->__refcnt) < 1)
-			printk(dst_underflow_bug_msg, dst, current_text_addr());
+			printk(dst_underflow_bug_msg, 
+			       atomic_read(&dst->__refcnt), 
+			       dst, current_text_addr());
 		atomic_dec(&dst->__refcnt);
 	}
 }

@@ -109,7 +109,9 @@ static int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local
 static int ipmr_cache_report(struct sk_buff *pkt, vifi_t vifi, int assert);
 static int ipmr_fill_mroute(struct sk_buff *skb, struct mfc_cache *c, struct rtmsg *rtm);
 
+#ifdef CONFIG_IP_PIMSM_V2
 static struct net_protocol pim_protocol;
+#endif
 
 static struct timer_list ipmr_expire_timer;
 
@@ -1702,7 +1704,7 @@ static struct file_operations ipmr_vif_fops = {
 	.open    = ipmr_vif_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
-	.release = seq_release,
+	.release = seq_release_private,
 };
 
 struct ipmr_mfc_iter {
@@ -1737,6 +1739,9 @@ static struct mfc_cache *ipmr_mfc_seq_idx(struct ipmr_mfc_iter *it, loff_t pos)
 
 static void *ipmr_mfc_seq_start(struct seq_file *seq, loff_t *pos)
 {
+	struct ipmr_mfc_iter *it = seq->private;
+	it->cache = NULL;
+	it->ct = 0;
 	return *pos ? ipmr_mfc_seq_idx(seq->private, *pos - 1) 
 		: SEQ_START_TOKEN;
 }
@@ -1846,7 +1851,6 @@ static int ipmr_mfc_open(struct inode *inode, struct file *file)
 	if (rc)
 		goto out_kfree;
 
-	memset(s, 0, sizeof(*s));
 	seq = file->private_data;
 	seq->private = s;
 out:
@@ -1862,7 +1866,7 @@ static struct file_operations ipmr_mfc_fops = {
 	.open    = ipmr_mfc_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
-	.release = seq_release,
+	.release = seq_release_private,
 };
 #endif	
 

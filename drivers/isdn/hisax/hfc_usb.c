@@ -133,7 +133,7 @@ static const char *hfcusb_revision = "4.0";
 /**********/
 /* macros */
 /**********/
-#define write_usb(a,b,c) usb_control_msg((a)->dev,(a)->ctrl_out_pipe,0,0x40,(c),(b),0,0,HFC_CTRL_TIMEOUT)
+#define write_usb(a,b,c) usb_control_msg((a)->dev,(a)->ctrl_out_pipe,0,0x40,(c),(b),NULL,0,HFC_CTRL_TIMEOUT)
 #define read_usb(a,b,c) usb_control_msg((a)->dev,(a)->ctrl_in_pipe,1,0xC0,0,(b),(c),1,HFC_CTRL_TIMEOUT)
 
 /*************************************************/
@@ -353,7 +353,7 @@ vendor_data vdata[]=
 	{0x8e3, 0x0301, "Olitec USB RNIS",              LED_SCHEME1,  LED_NORMAL,   {2,0,1,4}},           /* Olitec TA  */
 	{0x675, 0x1688, "DrayTec USB ISDN TA",          LED_SCHEME1,  LED_NORMAL,   {4,0,2,1}},           /* Draytec TA */
 	{0x7fa, 0x0846, "Bewan Modem RNIS USB",         LED_SCHEME1,  LED_INVERTED, {8,0x40,0x20,0x10}},  /* Bewan TA   */
-	{0,0,0}			   // EOL element
+	{0}			   // EOL element
 };
 										
 /***************************************************/

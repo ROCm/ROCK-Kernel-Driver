@@ -401,7 +401,7 @@ static void rs_interrupt_elsa(int irq, struct IsdnCardState *cs)
 		if (status & UART_LSR_DR)
 			receive_chars(cs, &status);
 		if (status & UART_LSR_THRE)
-			transmit_chars(cs, 0);
+			transmit_chars(cs, NULL);
 		if (pass_counter++ > RS_ISR_PASS_LIMIT) {
 			printk("rs_single loop break.\n");
 			break;

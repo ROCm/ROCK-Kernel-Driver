@@ -47,6 +47,10 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		spin_unlock_bh(&br->lock);
 		break;
 
+	case NETDEV_CHANGEMTU:
+		br->dev->mtu = br_min_mtu(br);
+		break;
+
 	case NETDEV_DOWN:
 		if (br->dev->flags & IFF_UP) {
 			spin_lock_bh(&br->lock);

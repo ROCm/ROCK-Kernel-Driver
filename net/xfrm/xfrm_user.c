@@ -814,6 +814,20 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	return err;
 }
 
+static int xfrm_flush_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
+{
+	struct xfrm_usersa_flush *p = NLMSG_DATA(nlh);
+
+	xfrm_state_flush(p->proto);
+	return 0;
+}
+
+static int xfrm_flush_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
+{
+	xfrm_policy_flush();
+	return 0;
+}
+
 static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_usersa_info)),	/* NEW SA */
 	NLMSG_LENGTH(sizeof(struct xfrm_usersa_id)),	/* DEL SA */
@@ -826,6 +840,9 @@ static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_user_expire)),	/* EXPIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)),/* UPD POLICY */
 	NLMSG_LENGTH(sizeof(struct xfrm_usersa_info)),	/* UPD SA */
+	NLMSG_LENGTH(sizeof(struct xfrm_user_polexpire)), /* POLEXPIRE */
+	NLMSG_LENGTH(sizeof(struct xfrm_usersa_flush)),	/* FLUSH SA */
+	NLMSG_LENGTH(0),				/* FLUSH POLICY */
 };
 
 static struct xfrm_link {
@@ -849,6 +866,9 @@ static struct xfrm_link {
 	{},
 	{	.doit	=	xfrm_add_policy 	},
 	{	.doit	=	xfrm_add_sa, 		},
+	{},
+	{	.doit	=	xfrm_flush_sa		},
+	{	.doit	=	xfrm_flush_policy	},
 };
 
 static int xfrm_done(struct netlink_callback *cb)

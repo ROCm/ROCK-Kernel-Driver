@@ -92,8 +92,8 @@ static int grip_btn_c64[] = { BTN_JOYSTICK, -1 };
 static int grip_abs_gp[]  = { ABS_X, ABS_Y, -1 };
 static int grip_abs_c64[] = { ABS_X, ABS_Y, -1 };
 
-static int *grip_abs[] = { 0, 0, grip_abs_gp, grip_abs_c64 };
-static int *grip_btn[] = { 0, 0, grip_btn_gp, grip_btn_c64 };
+static int *grip_abs[] = { NULL, NULL, grip_abs_gp, grip_abs_c64 };
+static int *grip_btn[] = { NULL, NULL, grip_btn_gp, grip_btn_c64 };
 
 static char *grip_name[] = { NULL, NULL, "Gravis Grip Pad", "Commodore 64 Joystick" };
 

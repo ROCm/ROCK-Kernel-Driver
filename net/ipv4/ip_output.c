@@ -498,10 +498,6 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 			    skb_headroom(frag) < hlen)
 			    goto slow_path;
 
-			/* Correct socket ownership. */
-			if (frag->sk == NULL && skb->sk)
-				goto slow_path;
-
 			/* Partially cloned skb? */
 			if (skb_shared(frag))
 				goto slow_path;
@@ -1113,12 +1109,10 @@ int ip_push_pending_frames(struct sock *sk)
 		tail_skb = &(tmp_skb->next);
 		skb->len += tmp_skb->len;
 		skb->data_len += tmp_skb->len;
-#if 0 /* Logically correct, but useless work, ip_fragment() will have to undo */
 		skb->truesize += tmp_skb->truesize;
 		__sock_put(tmp_skb->sk);
 		tmp_skb->destructor = NULL;
 		tmp_skb->sk = NULL;
-#endif
 	}
 
 	/* Unless user demanded real pmtu discovery (IP_PMTUDISC_DO), we allow

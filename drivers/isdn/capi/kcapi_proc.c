@@ -246,7 +246,7 @@ create_seq_entry(char *name, mode_t mode, struct file_operations *f)
 
 static __inline__ struct capi_driver *capi_driver_get_idx(loff_t pos)
 {
-	struct capi_driver *drv = 0;
+	struct capi_driver *drv = NULL;
 	struct list_head *l;
 	loff_t i;
 
@@ -256,7 +256,7 @@ static __inline__ struct capi_driver *capi_driver_get_idx(loff_t pos)
 		if (i++ == pos)
 			return drv;
 	}
-	return 0;
+	return NULL;
 }
 
 static void *capi_driver_start(struct seq_file *seq, loff_t *pos)
@@ -271,7 +271,7 @@ static void *capi_driver_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct capi_driver *drv = (struct capi_driver *)v;
 	++*pos;
-	if (drv->list.next == &capi_drivers) return 0;
+	if (drv->list.next == &capi_drivers) return NULL;
 	return list_entry(drv->list.next, struct capi_driver, list);
 }
 

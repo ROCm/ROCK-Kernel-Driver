@@ -296,7 +296,7 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 		INIT_LIST_HEAD(&vcp->vc_pending);
 		INIT_LIST_HEAD(&vcp->vc_processing);
 		init_waitqueue_head(&vcp->vc_waitq);
-		vcp->vc_sb = 0;
+		vcp->vc_sb = NULL;
 		vcp->vc_seq = 0;
 	}
 	

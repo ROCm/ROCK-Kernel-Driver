@@ -342,7 +342,7 @@ struct inode *hfsplus_new_inode(struct super_block *sb, int mode)
 	HFSPLUS_I(inode).cached_start = 0;
 	HFSPLUS_I(inode).cached_blocks = 0;
 	HFSPLUS_I(inode).phys_size = 0;
-	HFSPLUS_I(inode).rsrc_inode = 0;
+	HFSPLUS_I(inode).rsrc_inode = NULL;
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_size = 2;
 		HFSPLUS_SB(sb).folder_count++;
