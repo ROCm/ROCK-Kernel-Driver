@@ -562,17 +562,17 @@ static ide_proc_entry_t idedisk_proc[] = {
  */
 static int set_multcount(ide_drive_t *drive, int arg)
 {
-	struct ata_taskfile args;
+	struct request rq;
 
 	if (drive->special_cmd & ATA_SPECIAL_MMODE)
 		return -EBUSY;
 
-	memset(&args, 0, sizeof(args));
+	ide_init_drive_cmd(&rq);
 
 	drive->mult_req = arg;
 	drive->special_cmd |= ATA_SPECIAL_MMODE;
 
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_do_drive_cmd (drive, &rq, ide_wait);
 
 	return (drive->mult_count == arg) ? 0 : -EIO;
 }
