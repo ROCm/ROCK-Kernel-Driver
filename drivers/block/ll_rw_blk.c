@@ -1826,7 +1826,11 @@ end_io:
 			break;
 		}
 
-		BUG_ON(bio_sectors(bio) > q->max_sectors);
+		if (unlikely(bio_sectors(bio) > q->max_sectors)) {
+			printk("bio too big (%u > %u)\n", bio_sectors(bio),
+							q->max_sectors);
+			goto end_io;
+		}
 
 		/*
 		 * If this device has partitions, remap block n
@@ -1835,8 +1839,6 @@ end_io:
 		blk_partition_remap(bio);
 
 		ret = q->make_request_fn(q, bio);
-		blk_put_queue(q);
-
 	} while (ret);
 }
 
