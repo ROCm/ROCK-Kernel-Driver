@@ -21,8 +21,14 @@
  *                            Eliminate fop_read
  *                            Eliminate extra spin_unlock
  *                            Added KERN_* tags to printks
+ *                            add CONFIG_WATCHDOG_NOWAYOUT support
+ *                            fix possible wdt_is_open race
+ *                            changed watchdog_info to correctly reflect what the driver offers
+ *                            added WDIOC_GETSTATUS, WDIOC_GETBOOTSTATUS
+ *                            and WDIOC_SETOPTIONS ioctls
  *           09/8 - 2003      [wim@iguana.be] cleanup of trailing spaces
  *                            added extra printk's for startup problems
+ *                            use module_param
  *
  *  This WDT driver is different from most other Linux WDT
  *  drivers in that the driver will ping the watchdog by itself,
@@ -73,11 +79,20 @@
 
 #define WDT_HEARTBEAT (HZ * 30)
 
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+module_param(nowayout, int, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 static void wdt_timer_ping(unsigned long);
 static struct timer_list timer;
 static unsigned long next_heartbeat;
 static unsigned long wdt_is_open;
-static int wdt_expect_close;
+static char wdt_expect_close;
 static spinlock_t wdt_spinlock;
 
 /*
@@ -168,62 +183,55 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 	if(ppos != &file->f_pos)
 		return -ESPIPE;
 
-	/* See if we got the magic character */
+	/* See if we got the magic character 'V' and reload the timer */
 	if(count)
 	{
-		size_t ofs;
-
-		/* note: just in case someone wrote the magic character
-		 * five months ago... */
-		wdt_expect_close = 0;
-
-		/* now scan */
-		for(ofs = 0; ofs != count; ofs++)
+		if (!nowayout)
 		{
-			char c;
-			if (get_user(c, buf + ofs))
-				return -EFAULT;
-			if (c == 'V')
-				wdt_expect_close = 1;
+			size_t ofs;
+
+			/* note: just in case someone wrote the magic character
+			 * five months ago... */
+			wdt_expect_close = 0;
+
+			/* scan to see wether or not we got the magic character */
+			for(ofs = 0; ofs != count; ofs++)
+			{
+				char c;
+				if (get_user(c, buf + ofs))
+					return -EFAULT;
+				if (c == 'V')
+					wdt_expect_close = 42;
+			}
 		}
 
 		/* someone wrote to us, we should restart timer */
 		next_heartbeat = jiffies + WDT_HEARTBEAT;
-		return 1;
-	};
-	return 0;
+	}
+	return count;
 }
 
 static int fop_open(struct inode * inode, struct file * file)
 {
-	switch(minor(inode->i_rdev))
-	{
-		case WATCHDOG_MINOR:
-			/* Just in case we're already talking to someone... */
-			if(test_and_set_bit(0, &wdt_is_open)) {
-				return -EBUSY;
-			}
-			/* Good, fire up the show */
-			wdt_startup();
-			return 0;
+	/* Just in case we're already talking to someone... */
+	if(test_and_set_bit(0, &wdt_is_open))
+		return -EBUSY;
 
-		default:
-			return -ENODEV;
-	}
+	/* Good, fire up the show */
+	wdt_startup();
+	return 0;
 }
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-	if(minor(inode->i_rdev) == WATCHDOG_MINOR)
-	{
-		if(wdt_expect_close)
-			wdt_turnoff();
-		else {
-			del_timer(&timer);
-			printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
-		}
+	if(wdt_expect_close == 42)
+		wdt_turnoff();
+	else {
+		del_timer(&timer);
+		printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
 	}
 	clear_bit(0, &wdt_is_open);
+	wdt_expect_close = 0;
 	return 0;
 }
 
@@ -232,7 +240,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	static struct watchdog_info ident=
 	{
-		.options = WDIOF_MAGICCLOSE,
+		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity = "W83877F",
 	};
@@ -243,9 +251,31 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
+		case WDIOC_GETSTATUS:
+		case WDIOC_GETBOOTSTATUS:
+			return put_user(0, (int *)arg);
 		case WDIOC_KEEPALIVE:
 			next_heartbeat = jiffies + WDT_HEARTBEAT;
 			return 0;
+		case WDIOC_SETOPTIONS:
+		{
+			int new_options, retval = -EINVAL;
+
+			if(get_user(new_options, (int *)arg))
+				return -EFAULT;
+
+			if(new_options & WDIOS_DISABLECARD) {
+				wdt_turnoff();
+				retval = 0;
+			}
+
+			if(new_options & WDIOS_ENABLECARD) {
+				wdt_startup();
+				retval = 0;
+			}
+
+			return retval;
+		}
 	}
 }
 
@@ -342,7 +372,8 @@ static int __init w83877f_wdt_init(void)
 		goto err_out_miscdev;
 	}
 
-	printk(KERN_INFO PFX "WDT driver for W83877F initialised.\n");
+	printk(KERN_INFO PFX "WDT driver for W83877F initialised. (nowayout=%d)\n",
+		nowayout);
 
 	return 0;
 
