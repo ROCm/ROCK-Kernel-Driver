@@ -1011,10 +1011,12 @@ call_verify(struct rpc_task *task)
 				break;
 			case RPC_MISMATCH:
 				printk(KERN_WARNING "%s: RPC call version mismatch!\n", __FUNCTION__);
-				goto out_eio;
+				rpc_exit(task, -ENOSYS);
+				return NULL;
 			default:
 				printk(KERN_WARNING "%s: RPC call rejected, unknown error: %x\n", __FUNCTION__, n);
-				goto out_eio;
+				rpc_exit(task, -ENOSYS);
+				return NULL;
 		}
 		if (--len < 0)
 			goto out_overflow;
