@@ -92,12 +92,6 @@ nj_s_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-NETjet_S_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static void
 nj_s_init(struct IsdnCardState *cs)
 {
@@ -203,7 +197,6 @@ setup_netjet_s(struct IsdnCard *card)
 	
 	nj_s_reset(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
-	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_s_ops;
 	ISACVersion(cs, "NETjet-S:");

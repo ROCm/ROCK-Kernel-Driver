@@ -146,12 +146,6 @@ reset_isurf(struct IsdnCardState *cs, u8 chips)
 }
 
 static int
-ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
-static int
 isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 	int ret;
 
@@ -265,7 +259,6 @@ setup_isurf(struct IsdnCard *card)
 	       card->para[2],
 	       cs->irq);
 
-	cs->cardmsg = &ISurf_card_msg;
 	cs->auxcmd = &isurf_auxcmd;
 	cs->card_ops = &isurf_ops;
 	cs->dc_hw_ops = &isac_ops;

@@ -121,12 +121,6 @@ reset_bkm(struct IsdnCardState *cs)
 	}
 }
 
-static int
-BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 bkm_a8_init(struct IsdnCardState *cs)
 {
@@ -302,7 +296,6 @@ setup_sct_quadro(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &ipac_dc_ops;
 	cs->bc_hw_ops = &ipac_bc_ops;
-	cs->cardmsg = &BKM_card_msg;
 	cs->card_ops = &bkm_a8_ops;
 
 	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",

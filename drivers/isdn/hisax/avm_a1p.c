@@ -189,12 +189,6 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-static int
-AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return 0;
-}
-
 static void
 avm_a1p_init(struct IsdnCardState *cs)
 {
@@ -257,7 +251,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &AVM_card_msg;
 	cs->card_ops = &avm_a1p_ops;
 
 	ISACVersion(cs, "AVM A1 PCMCIA:");

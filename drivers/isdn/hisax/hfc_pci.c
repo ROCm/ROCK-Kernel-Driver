@@ -1361,17 +1361,6 @@ inithfcpci(struct IsdnCardState *cs)
 	mode_hfcpci(cs->bcs + 1, 0, 1);
 }
 
-
-
-/*******************************************/
-/* handle card messages from control layer */
-/*******************************************/
-static int
-hfcpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 hfcpci_init(struct IsdnCardState *cs)
 {
@@ -1477,7 +1466,6 @@ setup_hfcpci(struct IsdnCard *card)
 	init_timer(&cs->hw.hfcpci.timer);
 
 	hfcpci_reset(cs);
-	cs->cardmsg = &hfcpci_card_msg;
 	cs->auxcmd = &hfcpci_auxcmd;
 	cs->card_ops = &hfcpci_ops;
 	return 1;

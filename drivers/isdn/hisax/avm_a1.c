@@ -146,12 +146,6 @@ avm_a1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-static int
-AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static void
 avm_a1_init(struct IsdnCardState *cs)
 {
@@ -238,7 +232,6 @@ setup_avm_a1(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &AVM_card_msg;
 	cs->card_ops = &avm_a1_ops;
 	ISACVersion(cs, "AVM A1:");
 	if (HscxVersion(cs, "AVM A1:")) {

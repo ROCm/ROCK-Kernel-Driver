@@ -240,12 +240,6 @@ teleint_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-TeleInt_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static void
 teleint_init(struct IsdnCardState *cs)
 {
@@ -325,7 +319,6 @@ setup_TeleInt(struct IsdnCard *card)
 	teleint_reset(cs);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hfc_ops;
-	cs->cardmsg = &TeleInt_card_msg;
 	cs->card_ops = &teleint_ops;
 	ISACVersion(cs, "TeleInt:");
 	return 1;

@@ -74,6 +74,20 @@ static char *strTeiEvent[] =
 	"EV_T202",
 };
 
+static inline void
+mdl_assign(struct IsdnCardState *cs)
+{
+	if (cs->cardmsg)
+		cs->cardmsg(cs, MDL_ASSIGN | REQUEST, NULL);
+}
+
+static inline void
+mdl_remove(struct IsdnCardState *cs)
+{
+	if (cs->cardmsg)
+		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
+}
+
 unsigned int
 random_ri(void)
 {
@@ -167,7 +181,7 @@ tei_id_assign(struct FsmInst *fi, int event, void *arg)
 		FsmChangeState(&st->ma.tei_m, ST_TEI_NOP);
 		L3L2(st, MDL_ASSIGN | REQUEST, (void *) (long) tei);
 		cs = (struct IsdnCardState *) st->l1.hardware;
-		cs->cardmsg(cs, MDL_ASSIGN | REQUEST, NULL);
+		mdl_assign(cs);
 	}
 }
 
@@ -241,7 +255,7 @@ tei_id_remove(struct FsmInst *fi, int event, void *arg)
 		FsmChangeState(&st->ma.tei_m, ST_TEI_NOP);
 		L3L2(st, MDL_REMOVE | REQUEST, 0);
 		cs = (struct IsdnCardState *) st->l1.hardware;
-		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
+		mdl_remove(cs);
 	}
 }
 
@@ -277,7 +291,7 @@ tei_id_req_tout(struct FsmInst *fi, int event, void *arg)
 		st->ma.tei_m.printdebug(&st->ma.tei_m, "assign req failed");
 		L3L2(st, MDL_ERROR | RESPONSE, 0);
 		cs = (struct IsdnCardState *) st->l1.hardware;
-		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
+		mdl_remove(cs);
 		FsmChangeState(fi, ST_TEI_NOP);
 	}
 }
@@ -300,7 +314,7 @@ tei_id_ver_tout(struct FsmInst *fi, int event, void *arg)
 			"verify req for tei %d failed", st->l2.tei);
 		L3L2(st, MDL_REMOVE | REQUEST, 0);
 		cs = (struct IsdnCardState *) st->l1.hardware;
-		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
+		mdl_remove(cs);
 		FsmChangeState(fi, ST_TEI_NOP);
 	}
 }
@@ -373,7 +387,7 @@ tei_l2tei(struct PStack *st, int pr, void *arg)
 					"fixed assign tei %d", st->l2.tei);
 			L3L2(st, MDL_ASSIGN | REQUEST, (void *) (long) st->l2.tei);
 			cs = (struct IsdnCardState *) st->l1.hardware;
-			cs->cardmsg(cs, MDL_ASSIGN | REQUEST, NULL);
+			mdl_assign(cs);
 		}
 		return;
 	}

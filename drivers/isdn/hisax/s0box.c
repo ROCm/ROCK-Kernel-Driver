@@ -166,12 +166,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
  
-static int
-S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops s0box_ops = {
 	.init     = inithscxisac,
 	.release  = hisax_release_resources,
@@ -208,7 +202,6 @@ setup_s0box(struct IsdnCard *card)
 	       cs->hw.teles3.hscx[0], cs->hw.teles3.hscx[1]);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &S0Box_card_msg;
 	cs->card_ops = &s0box_ops;
 	ISACVersion(cs, "S0Box:");
 	if (HscxVersion(cs, "S0Box:")) {

@@ -132,12 +132,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static int
-mic_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops mic_ops = {
 	.init     = inithscxisac,
 	.release  = hisax_release_resources,
@@ -170,7 +164,6 @@ setup_mic(struct IsdnCard *card)
 	       cs->irq);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &mic_card_msg;
 	cs->card_ops = &mic_ops;
 	ISACVersion(cs, "mic:");
 	if (HscxVersion(cs, "mic:")) {

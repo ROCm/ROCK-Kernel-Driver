@@ -152,12 +152,35 @@ reset_enpci(struct IsdnCardState *cs)
 	OutByte(cs->hw.njet.auxa, cs->hw.njet.auxd); // LED off
 }
 
+static void
+enpci_bc_activate(struct IsdnCardState *cs, int chan)
+{
+	if (cs->debug & L1_DEB_ISAC)
+		debugl1(cs, "enter:now PCI: assign phys. BC %d in AMD LMR1", chan);
+	
+	cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 | (chan + 1)), "MDL_BC_ASSIGN");
+	/* at least one b-channel in use, LED 2 on */
+	cs->hw.njet.auxd |= TJ_AMD_IRQ << 2;
+	OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
+}
+
+static void
+enpci_bc_deactivate(struct IsdnCardState *cs, int chan)
+{
+	if (cs->debug & L1_DEB_ISAC)
+		debugl1(cs, "enter:now PCI: release phys. BC %d in Amd LMR1", chan);
+	
+	cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 & ~(chan + 1)), "MDL_BC_RELEASE");
+	/* no b-channel active -> LED2 off */
+	if (!(cs->dc.amd7930.lmr1 & 3)) {
+		cs->hw.njet.auxd &= ~(TJ_AMD_IRQ << 2);
+		OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
+	}
+}
 
 static int
 enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-        BYTE *chan;
-
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "enter:now PCI: card_msg: 0x%04X", mt);
 
@@ -172,35 +195,6 @@ enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	                cs->hw.njet.auxd = 0;
                         OutByte(cs->hw.njet.base + NETJET_AUXDATA, 0x00);
                         break;
-                case MDL_BC_ASSIGN:
-                        /* activate B-channel */
-                        chan = (BYTE *)arg;
-
-                        if (cs->debug & L1_DEB_ISAC)
-		                debugl1(cs, "enter:now PCI: assign phys. BC %d in AMD LMR1", *chan);
-
-                        cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 | (*chan + 1)), "MDL_BC_ASSIGN");
-                        /* at least one b-channel in use, LED 2 on */
-                        cs->hw.njet.auxd |= TJ_AMD_IRQ << 2;
-                        OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
-                        break;
-                case MDL_BC_RELEASE:
-                        /* deactivate B-channel */
-                        chan = (BYTE *)arg;
-
-                        if (cs->debug & L1_DEB_ISAC)
-		                debugl1(cs, "enter:now PCI: release phys. BC %d in Amd LMR1", *chan);
-
-                        cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 & ~(*chan + 1)), "MDL_BC_RELEASE");
-                        /* no b-channel active -> LED2 off */
-                        if (!(cs->dc.amd7930.lmr1 & 3)) {
-                                cs->hw.njet.auxd &= ~(TJ_AMD_IRQ << 2);
-                                OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
-                        }
-                        break;
-                default:
-                        break;
-
 	}
 	return(0);
 }
@@ -351,6 +345,8 @@ setup_enternow_pci(struct IsdnCard *card)
 		return 0;
 	reset_enpci(cs);
 	cs->hw.njet.last_is0 = 0;
+	cs->hw.njet.bc_activate = enpci_bc_activate;
+	cs->hw.njet.bc_deactivate = enpci_bc_deactivate;
 	cs->dc_hw_ops = &enternow_ops;
         cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
 

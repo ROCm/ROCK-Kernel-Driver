@@ -221,12 +221,6 @@ reset_bkm(struct IsdnCardState *cs)
 	}
 }
 
-static int
-BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 bkm_a4t_init(struct IsdnCardState *cs)
 {
@@ -325,7 +319,6 @@ setup_bkm_a4t(struct IsdnCard *card)
 	reset_bkm(cs);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &jade_ops;
-	cs->cardmsg = &BKM_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &bkm_a4t_ops;
 	ISACVersion(cs, "Telekom A4T:");

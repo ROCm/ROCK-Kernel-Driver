@@ -113,12 +113,6 @@ hfcs_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static void
 hfcs_init(struct IsdnCardState *cs)
 {
@@ -253,7 +247,6 @@ setup_hfcs(struct IsdnCard *card)
 	cs->hw.hfcD.timer.data = (long) cs;
 	init_timer(&cs->hw.hfcD.timer);
 	hfcs_reset(cs);
-	cs->cardmsg = &hfcs_card_msg;
 	cs->card_ops = &hfcs_ops;
 	return (1);
 }

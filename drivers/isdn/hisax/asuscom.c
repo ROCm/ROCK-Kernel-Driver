@@ -217,12 +217,6 @@ asuscom_ipac_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops asuscom_ops = {
 	.init     = inithscxisac,
 	.reset    = asuscom_reset,
@@ -316,7 +310,6 @@ setup_asuscom(struct IsdnCard *card)
 		goto err;
 	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
 		cs->hw.asus.cfg_reg, cs->irq);
-	cs->cardmsg = &Asus_card_msg;
 	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
 	if ((val == 1) || (val == 2)) {

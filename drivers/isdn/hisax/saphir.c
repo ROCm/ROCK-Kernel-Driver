@@ -194,12 +194,6 @@ saphir_reset(struct IsdnCardState *cs)
 	return (0);
 }
 
-static int
-saphir_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops saphir_ops = {
 	.init     = inithscxisac,
 	.reset    = saphir_reset,
@@ -242,7 +236,6 @@ setup_saphir(struct IsdnCard *card)
 	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &saphir_card_msg;
 	cs->card_ops = &saphir_ops;
 	ISACVersion(cs, "saphir:");
 	if (HscxVersion(cs, "saphir:")) {

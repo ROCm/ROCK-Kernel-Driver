@@ -839,6 +839,7 @@ static void
 tiger_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
+	struct IsdnCardState *cs = st->l1.bcs->cs;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
@@ -853,13 +854,13 @@ tiger_l2l1(struct PStack *st, int pr, void *arg)
 		case (PH_ACTIVATE | REQUEST):
 			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
 			mode_tiger(st->l1.bcs, st->l1.mode, st->l1.bc);
-			/* 2001/10/04 Christoph Ersfeld, Formula-n Europe AG */
-			st->l1.bcs->cs->cardmsg(st->l1.bcs->cs, MDL_BC_ASSIGN, (void *)(&st->l1.bc));
+			if (cs->hw.njet.bc_activate)
+				(cs->hw.njet.bc_activate)(cs, st->l1.bc);
 			l1_msg_b(st, pr, arg);
 			break;
 		case (PH_DEACTIVATE | REQUEST):
-			/* 2001/10/04 Christoph Ersfeld, Formula-n Europe AG */
-			st->l1.bcs->cs->cardmsg(st->l1.bcs->cs, MDL_BC_RELEASE, (void *)(&st->l1.bc));
+			if (cs->hw.njet.bc_deactivate)
+				(cs->hw.njet.bc_deactivate)(cs, st->l1.bc);
 			l1_msg_b(st, pr, arg);
 			break;
 		case (PH_DEACTIVATE | CONFIRM):

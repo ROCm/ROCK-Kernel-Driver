@@ -225,12 +225,6 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-static int
-TelesPCI_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops telespci_ops = {
 	.init     = inithscxisac,
 	.release  = hisax_release_resources,
@@ -285,7 +279,6 @@ setup_telespci(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &TelesPCI_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &telespci_ops;
 	ISACVersion(cs, "TelesPCI:");

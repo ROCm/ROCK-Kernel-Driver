@@ -282,12 +282,6 @@ r742_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 gazel_init(struct IsdnCardState *cs)
 {
@@ -546,8 +540,6 @@ setup_gazel(struct IsdnCard *card)
 		if (setup_gazelpci(cs))
 			return (0);
 	}
-
-	cs->cardmsg = &Gazel_card_msg;
 
 	switch (cs->subtyp) {
 	case R647:

@@ -644,12 +644,6 @@ w6692_release(struct IsdnCardState *cs)
 	hisax_release_resources(cs);
 }
 
-static int
-w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static struct card_ops w6692_ops = {
 	.init     = w6692_init,
 	.reset    = w6692_reset,
@@ -745,7 +739,6 @@ setup_w6692(struct IsdnCard *card)
 	cs->bc_hw_ops = &w6692_bc_hw_ops;
 	dc_l1_init(cs, &w6692_dc_l1_ops);
 	cs->bc_l1_ops = &w6692_bc_l1_ops;
-	cs->cardmsg = &w6692_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &w6692_ops;
 	W6692Version(cs, "W6692:");

@@ -686,30 +686,18 @@ static void init_amd7930(struct IsdnCardState *cs)
 	Bchan_mode(cs->bcs + 1, 0, 0);
 }
 
-void
-release_amd7930(struct IsdnCardState *cs)
+static int
+amd7930_init(struct IsdnCardState *cs)
 {
+	cs->l1cmd = amd7930_l1cmd;
+	amd7930_liu_init(0, &amd7930_liu_callback, (void *)cs);
+	init_amd7930(cs);
+	return 0;
 }
 
-static int
-amd7930_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	switch (mt) {
-		case CARD_RESET:
-			return(0);
-		case CARD_RELEASE:
-			release_amd7930(cs);
-			return(0);
-		case CARD_INIT:
-			cs->l1cmd = amd7930_l1cmd;
-			amd7930_liu_init(0, &amd7930_liu_callback, (void *)cs);
-			init_amd7930(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
-	return(0);
-}
+static struct card_ops amd7930_ops = {
+	.init     = amd7930_init,
+};
 
 int __init
 setup_amd7930(struct IsdnCard *card)
@@ -720,13 +708,12 @@ setup_amd7930(struct IsdnCard *card)
 	strcpy(tmp, amd7930_revision);
 	printk(KERN_INFO "HiSax: AMD7930 driver Rev. %s\n", HiSax_getrev(tmp));
 	if (cs->typ != ISDN_CTYPE_AMD7930)
-		return (0);
+		return 0;
 
         cs->irq = amd7930_get_irqnum(0);
         if (cs->irq == 0)
-		return (0);
+		return 0;
 
-	cs->cardmsg = &amd7930_card_msg;
-
-	return (1);
+	cs->card_ops = &amd7930_ops;
+	return 1;
 }

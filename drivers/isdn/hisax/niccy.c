@@ -192,12 +192,6 @@ niccy_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-niccy_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops niccy_ops = {
 	.init     = inithscxisac,
 	.reset    = niccy_reset,
@@ -312,7 +306,6 @@ setup_niccy(struct IsdnCard *card)
 		cs->irq, cs->hw.niccy.isac, cs->hw.niccy.isac_ale);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &niccy_card_msg;
 	cs->card_ops = &niccy_ops;
 	ISACVersion(cs, "Niccy:");
 	if (HscxVersion(cs, "Niccy:")) {

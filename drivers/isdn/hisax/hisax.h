@@ -67,8 +67,6 @@
 #define DL_FLUSH	0x0224
 #define DL_UNIT_DATA	0x0230
 
-#define MDL_BC_RELEASE  0x0278  // Formula-n enter:now
-#define MDL_BC_ASSIGN   0x027C  // Formula-n enter:now
 #define MDL_ASSIGN	0x0280
 #define MDL_REMOVE	0x0284
 #define MDL_ERROR	0x0288
@@ -683,6 +681,8 @@ struct njet_hw {
 	unsigned char irqstat0;
 	unsigned char last_is0;
 	struct pci_dev *pdev;
+	void (*bc_activate)(struct IsdnCardState *cs, int bc);
+	void (*bc_deactivate)(struct IsdnCardState *cs, int bc);
 };
 
 struct hfcPCI_hw {

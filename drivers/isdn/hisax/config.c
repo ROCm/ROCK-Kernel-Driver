@@ -1744,7 +1744,6 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg);
 static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg);
 static void hisax_d_l2l1(struct PStack *st, int pr, void *arg);
 static void hisax_b_l2l1(struct PStack *st, int pr, void *arg);
-static int hisax_cardmsg(struct IsdnCardState *cs, int mt, void *arg);
 static int hisax_bc_setstack(struct PStack *st, struct BCState *bcs);
 static void hisax_bc_close(struct BCState *bcs);
 static void hisax_bh(void *data);
@@ -1782,7 +1781,6 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cs = cards[i].cs;
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
-	cs->cardmsg = hisax_cardmsg;
 	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
 	dc_l1_init(cs, &hisax_l1_ops);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
@@ -1959,11 +1957,6 @@ static void hisax_d_l2l1(struct PStack *st, int pr, void *arg)
 		D_L2L1(hisax_d_if, pr, arg);
 		break;
 	}
-}
-
-static int hisax_cardmsg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return 0;
 }
 
 static void hisax_b_l2l1(struct PStack *st, int pr, void *arg)

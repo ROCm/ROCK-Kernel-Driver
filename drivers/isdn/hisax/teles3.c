@@ -169,12 +169,6 @@ teles3_reset(struct IsdnCardState *cs)
 	return(0);
 }
 
-static int
-Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops teles3_ops = {
 	.init     = inithscxisac,
 	.reset    = teles3_reset,
@@ -344,7 +338,6 @@ setup_teles3(struct IsdnCard *card)
 	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &Teles_card_msg;
 	cs->card_ops = &teles3_ops;
 	ISACVersion(cs, "Teles3:");
 	if (HscxVersion(cs, "Teles3:")) {

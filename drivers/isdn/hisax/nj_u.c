@@ -94,12 +94,6 @@ nj_u_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-NETjet_U_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static void
 nj_u_init(struct IsdnCardState *cs)
 {
@@ -199,7 +193,6 @@ setup_netjet_u(struct IsdnCard *card)
 	
 	nj_u_reset(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
-	cs->cardmsg = &NETjet_U_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_u_ops;
 	ICCVersion(cs, "NETspider-U:");

@@ -205,13 +205,34 @@ lli_deliver_cause(struct Channel *chanp)
 }
 
 static inline void
+mdl_info_rel(struct Channel *chanp)
+{
+	if (chanp->cs->cardmsg)
+		chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
+}
+
+static inline void
+mdl_info_setup(struct Channel *chanp)
+{
+	if (chanp->cs->cardmsg)
+		chanp->cs->cardmsg(chanp->cs, MDL_INFO_SETUP, (void *) (long)chanp->chan);
+}
+
+static inline void
+mdl_info_conn(struct Channel *chanp)
+{
+	if (chanp->cs->cardmsg)
+		chanp->cs->cardmsg(chanp->cs, MDL_INFO_CONN, (void *) (long)chanp->chan);
+}
+
+static void
 lli_close(struct FsmInst *fi)
 {
 	struct Channel *chanp = fi->userdata;
 
 	FsmChangeState(fi, ST_NULL);
 	chanp->Flags = 0;
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
+	mdl_info_rel(chanp);
 }
 
 static void
@@ -223,7 +244,8 @@ lli_leased_in(struct FsmInst *fi, int event, void *arg)
 
 	if (!chanp->leased)
 		return;
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_SETUP, (void *) (long)chanp->chan);
+
+	mdl_info_setup(chanp);
 	FsmChangeState(fi, ST_IN_WAIT_LL);
 	if (chanp->debug & 1)
 		link_debug(chanp, 0, "STAT_ICALL_LEASED");
@@ -240,7 +262,7 @@ lli_leased_in(struct FsmInst *fi, int event, void *arg)
 	if (chanp->debug & 1)
 		link_debug(chanp, 1, "statcallb ret=%d", ret);
 	if (!ret) {
-		chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
+		mdl_info_rel(chanp);
 		FsmChangeState(fi, ST_NULL);
 	}
 }
@@ -270,7 +292,7 @@ lli_prep_dialout(struct FsmInst *fi, int event, void *arg)
 	FsmDelTimer(&chanp->dial_timer, 73);
 	chanp->l2_active_protocol = chanp->l2_protocol;
 	chanp->incoming = 0;
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_SETUP, (void *) (long)chanp->chan);
+	mdl_info_setup(chanp);
 	if (chanp->leased) {
 		lli_init_bchan_out(fi, event, arg);
 	} else {
@@ -288,7 +310,7 @@ lli_resume(struct FsmInst *fi, int event, void *arg)
 	FsmDelTimer(&chanp->dial_timer, 73);
 	chanp->l2_active_protocol = chanp->l2_protocol;
 	chanp->incoming = 0;
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_SETUP, (void *) (long)chanp->chan);
+	mdl_info_setup(chanp);
 	if (chanp->leased) {
 		lli_init_bchan_out(fi, event, arg);
 	} else {
@@ -316,7 +338,7 @@ lli_go_active(struct FsmInst *fi, int event, void *arg)
 	ic.command = ISDN_STAT_BCONN;
 	ic.arg = chanp->chan;
 	chanp->cs->iif.statcallb(&ic);
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_CONN, (void *) (long)chanp->chan);
+	mdl_info_conn(chanp);
 }
 
 
@@ -333,7 +355,7 @@ lli_deliver_call(struct FsmInst *fi, int event, void *arg)
 	isdn_ctrl ic;
 	int ret;
 
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_SETUP, (void *) (long)chanp->chan);
+	mdl_info_setup(chanp);
 	/*
 	 * Report incoming calls only once to linklevel, use CallFlags
 	 * which is set to 3 with each broadcast message in isdnl1.c
@@ -381,13 +403,13 @@ lli_deliver_call(struct FsmInst *fi, int event, void *arg)
 			case 0:	/* OK, nobody likes this call */
 			default:	/* statcallb problems */
 				L4L3(chanp->d_st, CC_IGNORE | REQUEST, chanp->proc);
-				chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
+				mdl_info_rel(chanp);
 				FsmChangeState(fi, ST_NULL);
 				break;
 		}
 	} else {
 		L4L3(chanp->d_st, CC_IGNORE | REQUEST, chanp->proc);
-		chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
+		mdl_info_rel(chanp);
 	}
 }
 
@@ -730,7 +752,7 @@ lli_failure_l(struct FsmInst *fi, int event, void *arg)
 	chanp->cs->iif.statcallb(&ic);
 	HL_LL(chanp, ISDN_STAT_DHUP);
 	chanp->Flags = 0;
-	chanp->cs->cardmsg(chanp->cs, MDL_INFO_REL, (void *) (long)chanp->chan);
+	mdl_info_rel(chanp);
 }
 
 static void

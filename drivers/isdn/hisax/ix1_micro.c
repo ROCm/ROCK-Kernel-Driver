@@ -155,12 +155,6 @@ ix1_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops ix1_ops = {
 	.init     = inithscxisac,
 	.reset    = ix1_reset,
@@ -250,7 +244,6 @@ setup_ix1micro(struct IsdnCard *card)
 	ix1_reset(cs);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &ix1_card_msg;
 	cs->card_ops = &ix1_ops;
 	ISACVersion(cs, "ix1-Micro:");
 	if (HscxVersion(cs, "ix1-Micro:")) {

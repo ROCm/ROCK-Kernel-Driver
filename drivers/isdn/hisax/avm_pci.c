@@ -557,12 +557,6 @@ avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static int
-AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
-static int
 avm_pcipnp_reset(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "AVM PCI/PnP: reset\n");
@@ -711,7 +705,6 @@ ready:
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hdlc_hw_ops;
 	cs->bc_l1_ops = &hdlc_l1_ops;
-	cs->cardmsg = &AVM_card_msg;
 	cs->card_ops = &avm_pci_ops;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");
 	return 1;

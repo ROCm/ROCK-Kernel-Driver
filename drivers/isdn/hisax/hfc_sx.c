@@ -1139,17 +1139,6 @@ inithfcsx(struct IsdnCardState *cs)
 	mode_hfcsx(cs->bcs + 1, 0, 1);
 }
 
-
-
-/*******************************************/
-/* handle card messages from control layer */
-/*******************************************/
-static int
-hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 hfcsx_init(struct IsdnCardState *cs)
 {
@@ -1290,7 +1279,6 @@ setup_hfcsx(struct IsdnCard *card)
 	init_timer(&cs->hw.hfcsx.timer);
 
 	hfcsx_reset(cs);
-	cs->cardmsg = &hfcsx_card_msg;
 	cs->auxcmd = &hfcsx_auxcmd;
 	cs->card_ops = &hfcsx_ops;
 	return (1);
