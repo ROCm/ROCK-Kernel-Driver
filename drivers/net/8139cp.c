@@ -399,7 +399,6 @@ static void cp_clean_rings (struct cp_private *cp);
 
 enum board_type {
 	RTL8139Cp,
-	RTL8169,
 };
 
 static struct cp_board_info {
@@ -407,18 +406,11 @@ static struct cp_board_info {
 } cp_board_tbl[] __devinitdata = {
 	/* RTL8139Cp */
 	{ "RTL-8139C+" },
-
-	/* RTL8169 */
-	{ "RTL-8169" },
 };
 
 static struct pci_device_id cp_pci_tbl[] = {
 	{ PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_REALTEK_8139,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139Cp },
-#if 0
-	{ PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_REALTEK_8169,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8169 },
-#endif
 	{ },
 };
 MODULE_DEVICE_TABLE(pci, cp_pci_tbl);
@@ -990,10 +982,7 @@ static void cp_reset_hw (struct cp_private *cp)
 static inline void cp_start_hw (struct cp_private *cp)
 {
 	u16 pci_dac = cp->pci_using_dac ? PCIDAC : 0;
-	if (cp->board_type == RTL8169)
-		cpw16(CpCmd, pci_dac | PCIMulRW | RxChkSum);
-	else
-		cpw16(CpCmd, pci_dac | PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
+	cpw16(CpCmd, pci_dac | PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
 	cpw8(Cmd, RxOn | TxOn);
 }
 
@@ -1022,8 +1011,6 @@ static void cp_init_hw (struct cp_private *cp)
 		cp->wol_enabled = 0;
 	}
 	cpw8(Config5, cpr8(Config5) & PMEStatus); 
-	if (cp->board_type == RTL8169)
-		cpw16(RxMaxSize, cp->rx_buf_sz);
 
 	cpw32_f(HiTxRingAddr, 0);
 	cpw32_f(HiTxRingAddr + 4, 0);
@@ -1216,8 +1203,6 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 
 	dev->mtu = new_mtu;
 	cp_set_rxbufsize(cp);		/* set new rx buf size */
-	if (cp->board_type == RTL8169)
-		cpw16(RxMaxSize, cp->rx_buf_sz);
 
 	rc = cp_init_rings(cp);		/* realloc and restart h/w */
 	cp_start_hw(cp);
