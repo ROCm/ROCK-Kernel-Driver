@@ -6,6 +6,7 @@
  *  SMP-safe vmalloc/vfree/ioremap, Tigran Aivazian <tigran@veritas.com>, May 2000
  */
 
+#include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/spinlock.h>
@@ -163,6 +164,7 @@ inline int vmalloc_area_pages (unsigned long address, unsigned long size,
 		ret = 0;
 	} while (address && (address < end));
 	spin_unlock(&init_mm.page_table_lock);
+	flush_cache_all();
 	return ret;
 }
 
@@ -273,6 +275,43 @@ long vread(char *buf, char *addr, unsigned long count)
 			if (count == 0)
 				goto finished;
 			*buf = *addr;
+			buf++;
+			addr++;
+			count--;
+		} while (--n > 0);
+	}
+finished:
+	read_unlock(&vmlist_lock);
+	return buf - buf_start;
+}
+
+long vwrite(char *buf, char *addr, unsigned long count)
+{
+	struct vm_struct *tmp;
+	char *vaddr, *buf_start = buf;
+	unsigned long n;
+
+	/* Don't allow overflow */
+	if ((unsigned long) addr + count < count)
+		count = -(unsigned long) addr;
+
+	read_lock(&vmlist_lock);
+	for (tmp = vmlist; tmp; tmp = tmp->next) {
+		vaddr = (char *) tmp->addr;
+		if (addr >= vaddr + tmp->size - PAGE_SIZE)
+			continue;
+		while (addr < vaddr) {
+			if (count == 0)
+				goto finished;
+			buf++;
+			addr++;
+			count--;
+		}
+		n = vaddr + tmp->size - PAGE_SIZE - addr;
+		do {
+			if (count == 0)
+				goto finished;
+			*addr = *buf;
 			buf++;
 			addr++;
 			count--;
