@@ -78,8 +78,8 @@ struct pte_freelist_batch
 	struct page *	pages[0];
 };
 
-#define PTE_FREELIST_SIZE	((PAGE_SIZE - sizeof(struct pte_freelist_batch) / \
-				  sizeof(struct page *)))
+#define PTE_FREELIST_SIZE	((PAGE_SIZE - sizeof(struct pte_freelist_batch)) / \
+				  sizeof(struct page *))
 
 extern void pte_free_now(struct page *ptepage);
 extern void pte_free_submit(struct pte_freelist_batch *batch);

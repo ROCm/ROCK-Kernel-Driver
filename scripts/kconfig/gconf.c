@@ -956,16 +956,10 @@ static void change_sym_value(struct menu *menu, gint col)
 
 static void toggle_sym_value(struct menu *menu)
 {
-	const tristate next_val[3] = { no, mod, yes };
-	tristate newval;
-
 	if (!menu->sym)
 		return;
 
-	newval = next_val[(sym_get_tristate_value(menu->sym) + 1) % 3];
-	if (!sym_tristate_within_range(menu->sym, newval))
-		newval = yes;
-	sym_set_tristate_value(menu->sym, newval);
+	sym_toggle_tristate_value(menu->sym);
 	if (view_mode == FULL_VIEW)
 		update_tree(&rootmenu, NULL);
 	else if (view_mode == SPLIT_VIEW) {

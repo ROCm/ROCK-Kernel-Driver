@@ -332,7 +332,7 @@ struct i387_fxsave_struct {
 	long	foo;
 	long	fos;
 	long	mxcsr;
-	long	reserved;
+	long	mxcsr_mask;
 	long	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
 	long	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
 	long	padding[56];

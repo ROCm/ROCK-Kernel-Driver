@@ -12,10 +12,13 @@
 #define __ASM_I386_I387_H
 
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <asm/processor.h>
 #include <asm/sigcontext.h>
 #include <asm/user.h>
 
+extern unsigned long mxcsr_feature_mask;
+extern void mxcsr_feature_mask_init(void);
 extern void init_fpu(struct task_struct *);
 /*
  * FPU lazy state save handling...
@@ -89,12 +92,6 @@ extern unsigned short get_fpu_mxcsr( struct task_struct *tsk );
 extern void set_fpu_cwd( struct task_struct *tsk, unsigned short cwd );
 extern void set_fpu_swd( struct task_struct *tsk, unsigned short swd );
 extern void set_fpu_twd( struct task_struct *tsk, unsigned short twd );
-extern void set_fpu_mxcsr( struct task_struct *tsk, unsigned short mxcsr );
-
-#define load_mxcsr( val ) do { \
-	unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf); \
-	asm volatile( "ldmxcsr %0" : : "m" (__mxcsr) ); \
-} while (0)
 
 /*
  * Signal frame handlers...

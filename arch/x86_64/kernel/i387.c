@@ -24,6 +24,20 @@
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 
+unsigned int mxcsr_feature_mask = 0xffffffff;
+
+void mxcsr_feature_mask_init(void)
+{
+	unsigned int mask;
+	clts();
+	memset(&current->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
+	asm volatile("fxsave %0" : : "m" (current->thread.i387.fxsave));
+	mask = current->thread.i387.fxsave.mxcsr_mask;
+	if (mask == 0) mask = 0x0000ffbf;
+	mxcsr_feature_mask &= mask;
+	stts();
+}
+
 /*
  * Called at bootup to set up the initial FPU state that is later cloned
  * into all processes.
@@ -40,8 +54,8 @@ void __init fpu_init(void)
 
 	write_cr0(oldcr0 & ~((1UL<<3)|(1UL<<2))); /* clear TS and EM */
 
+	mxcsr_feature_mask_init();
 	/* clean state in init */
-	stts();
 	current_thread_info()->status = 0;
 	current->used_math = 0;
 }
