@@ -10,6 +10,7 @@
  * published by the Free Software Foundation.
  *
  * Changelog:
+ *  14-Sep-2004 BJD  Fixed IRQ_USBOC definition
  *  06-Jan-2003 BJD  Linux 2.6.0 version
  */
 
@@ -18,7 +19,7 @@
 
 /* irq numbers to onboard peripherals */
 
-#define IRQ_USBOC      IRQ_EINT19
+#define IRQ_USBOC      IRQ_EINT18
 #define IRQ_IDE0       IRQ_EINT16
 #define IRQ_IDE1       IRQ_EINT17
 #define IRQ_PCSERIAL1  IRQ_EINT15

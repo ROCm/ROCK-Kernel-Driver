@@ -23,6 +23,7 @@
  *	13-Sep-2004  BJD  Implemented change of MISCCR
  *	14-Sep-2004  BJD  Added getpin call
  *	14-Sep-2004  BJD  Fixed bug in setpin() call
+ *	30-Sep-2004  BJD  Fixed cfgpin() mask bug
  */
 
 
@@ -40,23 +41,20 @@
 void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function)
 {
 	unsigned long base = S3C2410_GPIO_BASE(pin);
-	unsigned long shift = 1;
-	unsigned long mask = 3;
+	unsigned long mask;
 	unsigned long con;
 	unsigned long flags;
 
 	if (pin < S3C2410_GPIO_BANKB) {
-		shift = 0;
-		mask  = 1;
+		mask = 1 << S3C2410_GPIO_OFFSET(pin);
+	} else {
+		mask = 3 << S3C2410_GPIO_OFFSET(pin)*2;
 	}
-
-	mask <<= S3C2410_GPIO_OFFSET(pin);
 
 	local_irq_save(flags);
 
-	con = __raw_readl(base + 0x00);
-
-	con &= mask << shift;
+	con  = __raw_readl(base + 0x00);
+	con &= ~mask;
 	con |= function;
 
 	__raw_writel(con, base + 0x00);

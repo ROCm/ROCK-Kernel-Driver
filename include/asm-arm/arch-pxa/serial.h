@@ -9,6 +9,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <asm/arch/pxa-regs.h>
 
 #define BAUD_BASE	921600
 
