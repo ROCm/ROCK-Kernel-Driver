@@ -65,9 +65,9 @@
 #define GDT_ENTRY_APMBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 11)
 
 /*
- * The GDT has 23 entries but we pad it to cacheline boundary:
+ * The GDT has 25 entries but we pad it to cacheline boundary:
  */
-#define GDT_ENTRIES 24
+#define GDT_ENTRIES 28
 
 #define GDT_SIZE (GDT_ENTRIES * 8)
 
