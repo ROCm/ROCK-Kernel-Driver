@@ -282,15 +282,6 @@ acpi_enter_sleep_state (
 		return_ACPI_STATUS (status);
 	}
 
-	if (sleep_state != ACPI_STATE_S5) {
-		/* Disable BM arbitration */
-
-		status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-	}
-
 	/*
 	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all wakeup GPEs
@@ -580,13 +571,6 @@ acpi_leave_sleep_state (
 			1, ACPI_MTX_DO_NOT_LOCK);
 	(void) acpi_set_register(acpi_gbl_fixed_event_info[ACPI_EVENT_POWER_BUTTON].status_register_id,
 			1, ACPI_MTX_DO_NOT_LOCK);
-
-	/* Enable BM arbitration */
-
-	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_LOCK);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	arg.integer.value = ACPI_SST_WORKING;
 	status = acpi_evaluate_object (NULL, METHOD_NAME__SST, &arg_list, NULL);
