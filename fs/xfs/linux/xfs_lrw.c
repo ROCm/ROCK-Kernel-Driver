@@ -43,16 +43,16 @@
 						<< mp->m_writeio_log)
 #define XFS_STRAT_WRITE_IMAPS	2
 
-STATIC int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int, pb_bmap_t *,
-			int *, struct pm *);
-STATIC int xfs_iomap_write(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
-			int *, int, struct pm *);
-STATIC int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
+STATIC int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int, page_buf_bmap_t *,
+			int *);
+STATIC int xfs_iomap_write(xfs_iocore_t *, loff_t, size_t, page_buf_bmap_t *,
+			int *, int);
+STATIC int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, page_buf_bmap_t *,
 			int *, int, int);
-STATIC int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
+STATIC int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, page_buf_bmap_t *,
 			int *, int, int);
 STATIC int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
-			pb_bmap_t *, int, int);
+			page_buf_bmap_t *, int, int);
 
 
 /*
@@ -136,11 +136,14 @@ xfs_read(
 	xfs_fsize_t		n;
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
+	vnode_t			*vp;
 	unsigned long		seg;
 	int			direct = filp->f_flags & O_DIRECT;
 
 	ip = XFS_BHVTOI(bdp);
+	vp = BHV_TO_VNODE(bdp);
 	mp = ip->i_mount;
+	vn_trace_entry(vp, "xfs_read", (inst_t *)__return_address);
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 
@@ -194,7 +197,7 @@ xfs_read(
 
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
-	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(filp->f_mode & FINVIS)) {
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
@@ -230,8 +233,7 @@ xfs_zero_last_block(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
 	xfs_fsize_t	isize,
-	xfs_fsize_t	end_size,
-	struct pm	*pmp)
+	xfs_fsize_t	end_size)
 {
 	xfs_fileoff_t	last_fsb;
 	xfs_mount_t	*mp;
@@ -310,8 +312,7 @@ xfs_zero_eof(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,		/* starting I/O offset */
 	xfs_fsize_t	isize,		/* current inode size */
-	xfs_fsize_t	end_size,	/* terminal inode size */
-	struct pm	*pmp)
+	xfs_fsize_t	end_size)	/* terminal inode size */
 {
 	struct inode	*ip = LINVFS_GET_IP(vp);
 	xfs_fileoff_t	start_zero_fsb;
@@ -337,7 +338,7 @@ xfs_zero_eof(
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
 	 */
-	error = xfs_zero_last_block(ip, io, offset, isize, end_size, pmp);
+	error = xfs_zero_last_block(ip, io, offset, isize, end_size);
 	if (error) {
 		ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
 		ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
@@ -469,6 +470,7 @@ xfs_write(
 	XFS_STATS_INC(xfsstats.xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
+	vn_trace_entry(vp, "xfs_write", (inst_t *)__return_address);
 	xip = XFS_BHVTOI(bdp);
 
 	/* START copy & waste from filemap.c */
@@ -592,7 +594,7 @@ start:
 
 	if (!direct && (*offset > isize && isize)) {
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
-			isize, *offset + size, NULL);
+			isize, *offset + size);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return(-error);
@@ -755,112 +757,15 @@ retry:
 	return(ret);
 }
 
-/*
- * xfs_bmap() is the same as the irix xfs_bmap from xfs_rw.c
- * execpt for slight changes to the params
- */
+
 int
-xfs_bmap(bhv_desc_t	*bdp,
+xfs_strategy(xfs_inode_t *ip,
 	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags,
-	struct cred	*cred,
-	pb_bmap_t	*pbmapp,
+	page_buf_bmap_t	*pbmapp,
 	int		*npbmaps)
 {
-	xfs_inode_t	*ip;
-	int		error;
-	int		lockmode;
-	int		fsynced = 0;
-	vnode_t		*vp;
-
-	ip = XFS_BHVTOI(bdp);
-	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
-	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
-	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
-	ASSERT((flags & PBF_READ) || (flags & PBF_WRITE));
-
-	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
-		return XFS_ERROR(EIO);
-
-	if (flags & PBF_READ) {
-		lockmode = xfs_ilock_map_shared(ip);
-		error = xfs_iomap_read(&ip->i_iocore, offset, count,
-				 XFS_BMAPI_ENTIRE, pbmapp, npbmaps, NULL);
-		xfs_iunlock_map_shared(ip, lockmode);
-	} else { /* PBF_WRITE */
-		ASSERT(flags & PBF_WRITE);
-		vp = BHV_TO_VNODE(bdp);
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-
-		/*
-		 * Make sure that the dquots are there. This doesn't hold
-		 * the ilock across a disk read.
-		 */
-
-		if (XFS_IS_QUOTA_ON(ip->i_mount)) {
-			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
-				if ((error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED))) {
-					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					return XFS_ERROR(error);
-				}
-			}
-		}
-retry:
-		error = xfs_iomap_write(&ip->i_iocore, offset, count,
-					pbmapp, npbmaps, flags, NULL);
-		/* xfs_iomap_write unlocks/locks/unlocks */
-
-		if (error == ENOSPC) {
-			switch (fsynced) {
-			case 0:
-				if (ip->i_delayed_blks) {
-					filemap_fdatawrite(LINVFS_GET_IP(vp)->i_mapping);
-					fsynced = 1;
-				} else {
-					fsynced = 2;
-					flags |= PBF_SYNC;
-				}
-				error = 0;
-				xfs_ilock(ip, XFS_ILOCK_EXCL);
-				goto retry;
-			case 1:
-				fsynced = 2;
-				if (!(flags & PBF_SYNC)) {
-					flags |= PBF_SYNC;
-					error = 0;
-					xfs_ilock(ip, XFS_ILOCK_EXCL);
-					goto retry;
-				}
-			case 2:
-				sync_blockdev(vp->v_vfsp->vfs_super->s_bdev);
-				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
-						XFS_LOG_FORCE|XFS_LOG_SYNC);
-
-				error = 0;
-/**
-				delay(HZ);
-**/
-				fsynced++;
-				xfs_ilock(ip, XFS_ILOCK_EXCL);
-				goto retry;
-			}
-		}
-	}
-
-	return XFS_ERROR(error);
-}
-
-int
-xfs_strategy(bhv_desc_t *bdp,
-	xfs_off_t	offset,
-	ssize_t		count,
-	int		flags,
-	struct cred	*cred,
-	pb_bmap_t	*pbmapp,
-	int		*npbmaps)
-{
-	xfs_inode_t	*ip;
 	xfs_iocore_t	*io;
 	xfs_mount_t	*mp;
 	int		error;
@@ -876,19 +781,15 @@ xfs_strategy(bhv_desc_t *bdp,
 	xfs_bmbt_irec_t imap[XFS_MAX_RW_NBMAPS];
 	xfs_trans_t	*tp;
 
-	ip = XFS_BHVTOI(bdp);
 	io = &ip->i_iocore;
 	mp = ip->i_mount;
 	/* is_xfs = IO_IS_XFS(io); */
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((io->io_flags & XFS_IOCORE_RT) != 0));
-	ASSERT((flags & PBF_READ) || (flags & PBF_WRITE));
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-
-	ASSERT(flags & PBF_WRITE);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = min(XFS_MAX_RW_NBMAPS, *npbmaps);
@@ -1082,12 +983,110 @@ xfs_strategy(bhv_desc_t *bdp,
 }
 
 
+/*
+ * xfs_bmap() is the same as the irix xfs_bmap from xfs_rw.c
+ * execpt for slight changes to the params
+ */
+int
+xfs_bmap(bhv_desc_t	*bdp,
+	xfs_off_t	offset,
+	ssize_t		count,
+	int		flags,
+	page_buf_bmap_t	*pbmapp,
+	int		*npbmaps)
+{
+	xfs_inode_t	*ip;
+	int		error;
+	int		lockmode;
+	int		fsynced = 0;
+	vnode_t		*vp;
+
+	ip = XFS_BHVTOI(bdp);
+	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
+	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
+	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
+
+	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
+		return XFS_ERROR(EIO);
+
+	if (flags & PBF_READ) {
+		lockmode = xfs_ilock_map_shared(ip);
+		error = xfs_iomap_read(&ip->i_iocore, offset, count,
+				 XFS_BMAPI_ENTIRE, pbmapp, npbmaps);
+		xfs_iunlock_map_shared(ip, lockmode);
+	} else if (flags & PBF_FILE_ALLOCATE) {
+		error = xfs_strategy(ip, offset, count, flags,
+				pbmapp, npbmaps);
+	} else { /* PBF_WRITE */
+		ASSERT(flags & PBF_WRITE);
+		vp = BHV_TO_VNODE(bdp);
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+		/*
+		 * Make sure that the dquots are there. This doesn't hold
+		 * the ilock across a disk read.
+		 */
+
+		if (XFS_IS_QUOTA_ON(ip->i_mount)) {
+			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
+				if ((error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED))) {
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+					return XFS_ERROR(error);
+				}
+			}
+		}
+retry:
+		error = xfs_iomap_write(&ip->i_iocore, offset, count,
+					pbmapp, npbmaps, flags);
+		/* xfs_iomap_write unlocks/locks/unlocks */
+
+		if (error == ENOSPC) {
+			switch (fsynced) {
+			case 0:
+				if (ip->i_delayed_blks) {
+					filemap_fdatawrite(LINVFS_GET_IP(vp)->i_mapping);
+					fsynced = 1;
+				} else {
+					fsynced = 2;
+					flags |= PBF_SYNC;
+				}
+				error = 0;
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
+				goto retry;
+			case 1:
+				fsynced = 2;
+				if (!(flags & PBF_SYNC)) {
+					flags |= PBF_SYNC;
+					error = 0;
+					xfs_ilock(ip, XFS_ILOCK_EXCL);
+					goto retry;
+				}
+			case 2:
+				sync_blockdev(vp->v_vfsp->vfs_super->s_bdev);
+				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
+						XFS_LOG_FORCE|XFS_LOG_SYNC);
+
+				error = 0;
+/**
+				delay(HZ);
+**/
+				fsynced++;
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
+				goto retry;
+			}
+		}
+	}
+
+	return XFS_ERROR(error);
+}
+
+
 STATIC int
 _xfs_imap_to_bmap(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
 	xfs_bmbt_irec_t *imap,
-	pb_bmap_t	*pbmapp,
+	page_buf_bmap_t	*pbmapp,
 	int		imaps,			/* Number of imap entries */
 	int		pbmaps)			/* Number of pbmap entries */
 {
@@ -1138,9 +1137,8 @@ xfs_iomap_read(
 	loff_t		offset,
 	size_t		count,
 	int		flags,
-	pb_bmap_t	*pbmapp,
-	int		*npbmaps,
-	struct pm	*pmp)
+	page_buf_bmap_t	*pbmapp,
+	int		*npbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
@@ -1191,10 +1189,9 @@ xfs_iomap_write(
 	xfs_iocore_t	*io,
 	loff_t		offset,
 	size_t		count,
-	pb_bmap_t	*pbmapp,
+	page_buf_bmap_t	*pbmapp,
 	int		*npbmaps,
-	int		ioflag,
-	struct pm	*pmp)
+	int		ioflag)
 {
 	int		maps;
 	int		error = 0;
@@ -1211,7 +1208,7 @@ xfs_iomap_write(
 	 */
 
 	found = 0;
-	error = xfs_iomap_read(io, offset, count, flags, pbmapp, npbmaps, NULL);
+	error = xfs_iomap_read(io, offset, count, flags, pbmapp, npbmaps);
 	if (error)
 		goto out;
 
@@ -1260,7 +1257,7 @@ xfs_write_bmap(
 	xfs_mount_t	*mp,
 	xfs_iocore_t	*io,
 	xfs_bmbt_irec_t *imapp,
-	pb_bmap_t	*pbmapp,
+	page_buf_bmap_t	*pbmapp,
 	int		iosize,
 	xfs_fileoff_t	ioalign,
 	xfs_fsize_t	isize)
@@ -1330,7 +1327,7 @@ xfs_iomap_write_delay(
 	xfs_iocore_t	*io,
 	loff_t		offset,
 	size_t		count,
-	pb_bmap_t	*pbmapp,
+	page_buf_bmap_t	*pbmapp,
 	int		*npbmaps,
 	int		ioflag,
 	int		found)
@@ -1528,7 +1525,7 @@ xfs_iomap_write_direct(
 	xfs_iocore_t	*io,
 	loff_t		offset,
 	size_t		count,
-	pb_bmap_t	*pbmapp,
+	page_buf_bmap_t	*pbmapp,
 	int		*npbmaps,
 	int		ioflag,
 	int		found)
@@ -1830,36 +1827,22 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 }
 
 /*
- * In these two situations we disregard the readonly mount flag and
- * temporarily enable writes (we must, to ensure metadata integrity).
+ * If the underlying (log or data) device is readonly, there are some
+ * operations that cannot proceed.
  */
-STATIC int
-xfs_is_read_only(xfs_mount_t *mp)
+int
+xfs_dev_is_read_only(xfs_mount_t *mp, char *message)
 {
 	if (bdev_read_only(mp->m_ddev_targp->pbr_bdev) ||
-	    bdev_read_only(mp->m_logdev_targp->pbr_bdev)) {
+	    bdev_read_only(mp->m_logdev_targp->pbr_bdev) ||
+	   (mp->m_rtdev_targp && bdev_read_only(mp->m_rtdev_targp->pbr_bdev))) {
+		cmn_err(CE_NOTE,
+			"XFS: %s required on read-only device.", message);
 		cmn_err(CE_NOTE,
 			"XFS: write access unavailable, cannot proceed.");
 		return EROFS;
 	}
-	cmn_err(CE_NOTE,
-		"XFS: write access will be enabled during mount.");
-	XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
+
 	return 0;
 }
 
-int
-xfs_recover_read_only(xlog_t *log)
-{
-	cmn_err(CE_NOTE, "XFS: WARNING: "
-		"recovery required on readonly filesystem.");
-	return xfs_is_read_only(log->l_mp);
-}
-
-int
-xfs_quotacheck_read_only(xfs_mount_t *mp)
-{
-	cmn_err(CE_NOTE, "XFS: WARNING: "
-		"quotacheck required on readonly filesystem.");
-	return xfs_is_read_only(mp);
-}

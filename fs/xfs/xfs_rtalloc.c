@@ -170,7 +170,7 @@ xfs_growfs_rt_alloc(
 				error = XFS_ERROR(EIO);
 				goto error_exit;
 			}
-			bzero(XFS_BUF_PTR(bp), mp->m_sb.sb_blocksize);
+			memset(XFS_BUF_PTR(bp), 0, mp->m_sb.sb_blocksize);
 			xfs_trans_log_buf(tp, bp, 0, mp->m_sb.sb_blocksize - 1);
 			/*
 			 * Commit the transaction.
@@ -2322,7 +2322,7 @@ xfs_rtmount_inodes(
 		vmap_t		vmap;		/* vmap to delete vnode */
 
 		rbmvp = XFS_ITOV(mp->m_rbmip);
-		VMAP(rbmvp, mp->m_rbmip, vmap);
+		VMAP(rbmvp, vmap);
 		VN_RELE(rbmvp);
 		vn_purge(rbmvp, &vmap);
 		return error;

@@ -472,7 +472,7 @@ shutdown_abort:
 	 */
 #if defined(DEBUG)
 	if (XFS_BUF_ISSTALE(bp) && XFS_BUF_ISDELAYWRITE(bp))
-		cmn_err(CE_NOTE, "about to pop assert, bp == 0x%x\n", bp);
+		cmn_err(CE_NOTE, "about to pop assert, bp == 0x%x", bp);
 #endif
 	ASSERT((XFS_BUF_BFLAGS(bp) & (XFS_B_STALE|XFS_B_DELWRI)) !=
 						(XFS_B_STALE|XFS_B_DELWRI));
@@ -880,7 +880,7 @@ xfs_trans_binval(
 	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
 	bip->bli_format.blf_flags &= ~XFS_BLI_INODE_BUF;
 	bip->bli_format.blf_flags |= XFS_BLI_CANCEL;
-	bzero((char *)(bip->bli_format.blf_data_map),
+	memset((char *)(bip->bli_format.blf_data_map), 0,
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	tp->t_flags |= XFS_TRANS_DIRTY;

@@ -77,7 +77,6 @@ struct xfs_inode;
 struct xfs_perag;
 struct xfs_quotainfo;
 struct xfs_iocore;
-struct xfs_dio;
 struct xfs_bmbt_irec;
 struct xfs_bmap_free;
 
@@ -96,24 +95,18 @@ struct xfs_bmap_free;
  * minimize the number of memory indirections involved.
  */
 
-typedef int		(*xfs_dio_write_t)(struct xfs_dio *);
-typedef int		(*xfs_dio_read_t)(struct xfs_dio *);
-typedef int		(*xfs_strat_write_t)(struct xfs_iocore *, struct xfs_buf *);
 typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
 				xfs_fileoff_t, xfs_filblks_t, int,
 				xfs_fsblock_t *, xfs_extlen_t,
 				struct xfs_bmbt_irec *, int *,
 				struct xfs_bmap_free *);
 typedef int		(*xfs_bmap_eof_t)(void *, xfs_fileoff_t, int, int *);
-typedef int		(*xfs_rsync_t)(void *, int, xfs_off_t, xfs_off_t);
-typedef uint		(*xfs_lck_map_shared_t)(void *);
 typedef void		(*xfs_lock_t)(void *, uint);
 typedef void		(*xfs_lock_demote_t)(void *, uint);
 typedef int		(*xfs_lock_nowait_t)(void *, uint);
 typedef void		(*xfs_unlk_t)(void *, unsigned int);
 typedef void		(*xfs_chgtime_t)(void *, int);
 typedef xfs_fsize_t	(*xfs_size_t)(void *);
-typedef xfs_fsize_t	(*xfs_setsize_t)(void *, xfs_off_t);
 typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
 
 typedef struct xfs_ioops {
@@ -295,8 +288,7 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_NOUUID	0x00004000	/* ignore uuid during mount */
 #define XFS_MOUNT_32BITINODES	0x00008000	/* do not create inodes above
 						 * 32 bits in size */
-#define XFS_MOUNT_IRIXSGID	0x00010000	/* Irix-style sgid inheritance */
-#define XFS_MOUNT_NOLOGFLUSH	0x00020000
+#define XFS_MOUNT_NOLOGFLUSH	0x00010000
 
 /*
  * Flags for m_cxfstype
@@ -435,6 +427,11 @@ void		xfs_do_force_shutdown(bhv_desc_t *, int, char *, int);
 int		xfs_syncsub(xfs_mount_t *, int, int, int *);
 void		xfs_initialize_perag(xfs_mount_t *, int);
 void		xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t, __int64_t);
+
+int		xfs_blkdev_get(const char *, struct block_device **);
+void		xfs_blkdev_put(struct block_device *);
+struct xfs_buftarg *xfs_alloc_buftarg(struct block_device *);
+void		xfs_free_buftarg(struct xfs_buftarg *);
 
 /*
  * Flags for freeze operations.

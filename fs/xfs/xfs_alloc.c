@@ -494,13 +494,13 @@ xfs_alloc_trace_modagf(
 		(void *)(__psunsigned_t)INT_GET(agf->agf_seqno, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_length, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_roots[XFS_BTNUM_BNO],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_roots[XFS_BTNUM_CNT],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_levels[XFS_BTNUM_BNO],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_levels[XFS_BTNUM_CNT],
-						ARCH_CONVERT);
+						ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_flfirst, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_fllast, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_flcount, ARCH_CONVERT),
@@ -2597,7 +2597,7 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 	s = mutex_spinlock(&mp->m_perag[agno].pagb_lock);
 	cnt = mp->m_perag[agno].pagb_count;
 
-	uend = bno + len;
+	uend = bno + len - 1;
 
 	/* search pagb_list for this slot, skipping open slots */
 	for (bsy = mp->m_perag[agno].pagb_list, n = 0;
@@ -2607,16 +2607,16 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 		 * (start1,length1) within (start2, length2)
 		 */
 		if (bsy->busy_tp != NULL) {
-			bend = bsy->busy_start + bsy->busy_length;
-			if ( (bno >= bsy->busy_start && bno <= bend) ||
-			     (uend >= bsy->busy_start && uend <= bend) ||
-			     (bno <= bsy->busy_start && uend >= bsy->busy_start) ) {
+			bend = bsy->busy_start + bsy->busy_length - 1;
+			if ((bno > bend) ||
+			    (uend < bsy->busy_start)) {
+				cnt--;
+			} else {
 				TRACE_BUSYSEARCH("xfs_alloc_search_busy",
 						 "found1", agno, bno, len, n,
 						 tp);
 				break;
 			}
-			cnt--;
 		}
 	}
 
@@ -2626,7 +2626,7 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 	 */
 	if (cnt) {
 		TRACE_BUSYSEARCH("xfs_alloc_search_busy", "found", agno, bno, len, n, tp);
-		lsn = bsy->busy_tp->t_lsn;
+		lsn = bsy->busy_tp->t_commit_lsn;
 		mutex_spinunlock(&mp->m_perag[agno].pagb_lock, s);
 		xfs_log_force(mp, lsn, XFS_LOG_FORCE|XFS_LOG_SYNC);
 	} else {

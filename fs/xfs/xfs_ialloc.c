@@ -263,7 +263,7 @@ xfs_ialloc_ag_alloc(
 		INT_ZERO(dic.di_gid, ARCH_CONVERT);
 		INT_ZERO(dic.di_nlink, ARCH_CONVERT);
 		INT_ZERO(dic.di_projid, ARCH_CONVERT);
-		bzero(&(dic.di_pad[0]),sizeof(dic.di_pad));
+		memset(&(dic.di_pad[0]), 0, sizeof(dic.di_pad));
 		INT_SET(dic.di_atime.t_sec, ARCH_CONVERT, ztime.t_sec);
 		INT_SET(dic.di_atime.t_nsec, ARCH_CONVERT, ztime.t_nsec);
 
@@ -287,7 +287,7 @@ xfs_ialloc_ag_alloc(
 
 		for (i = 0; i < ninodes; i++) {
 			free = XFS_MAKE_IPTR(args.mp, fbuf, i);
-			bcopy (&dic, &(free->di_core), sizeof(xfs_dinode_core_t));
+			memcpy(&(free->di_core), &dic, sizeof(xfs_dinode_core_t));
 			INT_SET(free->di_next_unlinked, ARCH_CONVERT, NULLAGINO);
 			xfs_ialloc_log_di(tp, fbuf, i,
 				XFS_DI_CORE_BITS | XFS_DI_NEXT_UNLINKED);

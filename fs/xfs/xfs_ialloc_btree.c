@@ -139,9 +139,9 @@ xfs_inobt_delrec(
 		}
 #endif
 		if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
-			ovbcopy(&kp[ptr], &kp[ptr - 1],
+			memmove(&kp[ptr - 1], &kp[ptr],
 				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*kp));
-			ovbcopy(&pp[ptr], &pp[ptr - 1],
+			memmove(&pp[ptr - 1], &pp[ptr],
 				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*pp));
 			xfs_inobt_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
 			xfs_inobt_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
@@ -154,7 +154,7 @@ xfs_inobt_delrec(
 	else {
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
 		if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
-			ovbcopy(&rp[ptr], &rp[ptr - 1],
+			memmove(&rp[ptr - 1], &rp[ptr],
 				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*rp));
 			xfs_inobt_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
 		}
@@ -450,8 +450,8 @@ xfs_inobt_delrec(
 				return error;
 		}
 #endif
-		bcopy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lkp));
-		bcopy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lpp));
+		memcpy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lkp));
+		memcpy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lpp));
 		xfs_inobt_log_keys(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
 				   INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		xfs_inobt_log_ptrs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
@@ -462,7 +462,7 @@ xfs_inobt_delrec(
 		 */
 		lrp = XFS_INOBT_REC_ADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		bcopy(rrp, lrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lrp));
+		memcpy(lrp, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lrp));
 		xfs_inobt_log_recs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
 				   INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
 	}
@@ -690,9 +690,9 @@ xfs_inobt_insrec(
 				return error;
 		}
 #endif
-		ovbcopy(&kp[ptr - 1], &kp[ptr],
+		memmove(&kp[ptr], &kp[ptr - 1],
 			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*kp));
-		ovbcopy(&pp[ptr - 1], &pp[ptr],
+		memmove(&pp[ptr], &pp[ptr - 1],
 			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*pp));
 		/*
 		 * Now stuff the new data in, bump numrecs and log the new data.
@@ -711,7 +711,7 @@ xfs_inobt_insrec(
 		 * It's a leaf entry.  Make a hole for the new record.
 		 */
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-		ovbcopy(&rp[ptr - 1], &rp[ptr],
+		memmove(&rp[ptr], &rp[ptr - 1],
 			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*rp));
 		/*
 		 * Now stuff the new record in, bump numrecs
@@ -1170,12 +1170,12 @@ xfs_inobt_lshift(
 				return error;
 		}
 #endif
-		ovbcopy(rkp + 1, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
-		ovbcopy(rpp + 1, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
+		memmove(rkp, rkp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
+		memmove(rpp, rpp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
 		xfs_inobt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		xfs_inobt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 	} else {
-		ovbcopy(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
+		memmove(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
 		xfs_inobt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		key.ir_startino = rrp->ir_startino; /* INT_: direct copy */
 		rkp = &key;
@@ -1421,8 +1421,8 @@ xfs_inobt_rshift(
 				return error;
 		}
 #endif
-		ovbcopy(rkp, rkp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
-		ovbcopy(rpp, rpp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
+		memmove(rkp + 1, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
+		memmove(rpp + 1, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
 #ifdef DEBUG
 		if ((error = xfs_btree_check_sptr(cur, INT_GET(*lpp, ARCH_CONVERT), level)))
 			return error;
@@ -1434,7 +1434,7 @@ xfs_inobt_rshift(
 	} else {
 		lrp = XFS_INOBT_REC_ADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT), cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		ovbcopy(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
+		memmove(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
 		*rrp = *lrp;
 		xfs_inobt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) + 1);
 		key.ir_startino = rrp->ir_startino; /* INT_: direct copy */
@@ -1562,8 +1562,8 @@ xfs_inobt_split(
 				return error;
 		}
 #endif
-		bcopy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
-		bcopy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
+		memcpy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
+		memcpy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
 		xfs_inobt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		xfs_inobt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		*keyp = *rkp;
@@ -1574,7 +1574,7 @@ xfs_inobt_split(
 	else {
 		lrp = XFS_INOBT_REC_ADDR(left, i, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		bcopy(lrp, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
+		memcpy(rrp, lrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
 		xfs_inobt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		keyp->ir_startino = rrp->ir_startino; /* INT_: direct copy */
 	}

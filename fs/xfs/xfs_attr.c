@@ -120,7 +120,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	/*
 	 * Fill in the arg structure for this request.
 	 */
-	bzero((char *)&args, sizeof(args));
+	memset((char *)&args, 0, sizeof(args));
 	args.name = name;
 	args.namelen = namelen;
 	args.value = value;
@@ -215,7 +215,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	/*
 	 * Fill in the arg structure for this request.
 	 */
-	bzero((char *)&args, sizeof(args));
+	memset((char *)&args, 0, sizeof(args));
 	args.name = name;
 	args.namelen = namelen;
 	args.value = value;
@@ -469,7 +469,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	/*
 	 * Fill in the arg structure for this request.
 	 */
-	bzero((char *)&args, sizeof(args));
+	memset((char *)&args, 0, sizeof(args));
 	args.name = name;
 	args.namelen = namelen;
 	args.flags = flags;
