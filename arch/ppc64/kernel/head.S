@@ -1410,11 +1410,13 @@ _STATIC(copy_and_flush)
 copy_to_here:
 
 /*
+ * load_up_fpu(unused, unused, tsk)
  * Disable FP for the task which had the FPU previously,
  * and save its floating-point registers in its thread_struct.
  * Enables the FPU for use in the kernel on return.
  * On SMP we know the fpu is free, since we give it up every
- * switch.  -- Cort
+ * switch (ie, no lazy save of the FP registers).
+ * On entry: r13 == 'current' && last_task_used_math != 'current'
  */
 _STATIC(load_up_fpu)
 	mfmsr	r5                      /* grab the current MSR */
@@ -1432,27 +1434,30 @@ _STATIC(load_up_fpu)
 	ld	r4,last_task_used_math@l(r3)
 	cmpi	0,r4,0
 	beq	1f
-	addi	r4,r4,THREAD	       /* want THREAD of last_task_used_math */
+	/* Save FP state to last_task_used_math's THREAD struct */
+	addi	r4,r4,THREAD
 	SAVE_32FPRS(0, r4)
 	mffs	fr0
 	stfd	fr0,THREAD_FPSCR(r4)
+	/* Disable FP for last_task_used_math */
 	ld	r5,PT_REGS(r4)
 	ld	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 	li	r20,MSR_FP|MSR_FE0|MSR_FE1
-	andc	r4,r4,r20		/* disable FP for previous task */
+	andc	r4,r4,r20
 	std	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 1:
 #endif /* CONFIG_SMP */
 	/* enable use of FP after return */
 	ld	r4,PACACURRENT(r13)
 	addi	r5,r4,THREAD		/* Get THREAD */
-	lwz	r4,THREAD_FPEXC_MODE(r5)
+	ld	r4,THREAD_FPEXC_MODE(r5)
 	ori	r23,r23,MSR_FP
 	or	r23,r23,r4
 	lfd	fr0,THREAD_FPSCR(r5)
 	mtfsf	0xff,fr0
 	REST_32FPRS(0, r5)
 #ifndef CONFIG_SMP
+	/* Update last_task_used_math to 'current' */
 	subi	r4,r5,THREAD		/* Back to 'current' */
 	std	r4,last_task_used_math@l(r3)
 #endif /* CONFIG_SMP */

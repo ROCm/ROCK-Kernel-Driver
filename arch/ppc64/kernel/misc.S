@@ -574,7 +574,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_ssetmask
 	.llong .sys_setreuid	        /* 70 */
 	.llong .sys_setregid
-	.llong .sys_sigsuspend
+	.llong .sys32_sigsuspend
 	.llong .compat_sys_sigpending
 	.llong .sys32_sethostname
 	.llong .sys32_setrlimit	        /* 75 */
@@ -812,13 +812,13 @@ _GLOBAL(sys_call_table)
 	.llong .sys_getppid
 	.llong .sys_getpgrp		/* 65 */
 	.llong .sys_setsid
-	.llong .sys_sigaction
+	.llong .sys_ni_syscall
 	.llong .sys_sgetmask
 	.llong .sys_ssetmask
 	.llong .sys_setreuid		/* 70 */
 	.llong .sys_setregid
-	.llong .sys_sigsuspend
-	.llong .sys_sigpending
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
 	.llong .sys_sethostname
 	.llong .sys_setrlimit		/* 75 */
 	.llong .sys_ni_syscall		/* old getrlimit syscall */
@@ -864,14 +864,14 @@ _GLOBAL(sys_call_table)
 	.llong .sys_sysinfo
 	.llong .sys_ipc
 	.llong .sys_fsync
-	.llong .ppc64_sigreturn
+	.llong .sys_ni_syscall
 	.llong .sys_clone		/* 120 */
 	.llong .sys_setdomainname
 	.llong .ppc64_newuname
 	.llong .sys_ni_syscall		/* old modify_ldt syscall */
 	.llong .sys_adjtimex
 	.llong .sys_mprotect		/* 125 */
-	.llong .sys_sigprocmask
+	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall		/* old create_module syscall */
 	.llong .sys_init_module
 	.llong .sys_delete_module
