@@ -2241,7 +2241,7 @@ int __init atyfb_init(void)
 				    aty_ld_le32(CRTC_H_TOTAL_DISP, default_par);
 				crtc.h_sync_strt_wid =
 				    aty_ld_le32(CRTC_H_SYNC_STRT_WID,
-						defualt_par);
+						default_par);
 				crtc.v_tot_disp =
 				    aty_ld_le32(CRTC_V_TOTAL_DISP, default_par);
 				crtc.v_sync_strt_wid =

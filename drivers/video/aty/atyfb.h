@@ -158,7 +158,7 @@ static inline void aty_st_le32(int regindex, u32 val,
 		regindex -= 0x800;
 
 #ifdef CONFIG_ATARI
-	out_le32((volatile u32 *)(par->ati_regbase + regindex));
+	out_le32((volatile u32 *)(par->ati_regbase + regindex), val);
 #else
 	writel(val, par->ati_regbase + regindex);
 #endif
