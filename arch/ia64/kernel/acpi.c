@@ -473,7 +473,6 @@ static struct acpi_table_slit __initdata *slit_table;
 void __init
 acpi_numa_slit_init (struct acpi_table_slit *slit)
 {
-	int i, j, node_from, node_to;
 	u32 len;
 
 	len = sizeof(struct acpi_table_header) + 8
@@ -508,9 +507,6 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 
 	pxm = ma->proximity_domain;
 
-	/* record this node in proximity bitmap */
-	pxm_bit_set(pxm);
-
 	/* fill node memory chunk structure */
 	paddr = ma->base_addr_hi;
 	paddr = (paddr << 32) | ma->base_addr_lo;
@@ -522,6 +518,13 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 			size/(1024*1024), paddr);
 		return;
 	}
+
+	/* Ignore disabled entries */
+	if (!ma->flags.enabled)
+		return;
+
+	/* record this node in proximity bitmap */
+	pxm_bit_set(pxm);
 
 	/* Insertion sort based on base address */
 	pend = &node_memblk[num_memblks];
@@ -542,7 +545,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 void __init
 acpi_numa_arch_fixup(void)
 {
-	int i, j;
+	int i, j, node_from, node_to;
 
 	/* calculate total number of nodes in system from PXM bitmap */
 	numnodes = 0;		/* init total nodes in system */
