@@ -126,6 +126,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
 { 0x49434501, 0xffffffff, "ICE1230",		NULL },
 { 0x49434511, 0xffffffff, "ICE1232",		NULL }, // alias VIA VT1611A?
+{ 0x49434551, 0xffffffff, "VT1616", 		NULL }, 
 { 0x49544520, 0xffffffff, "IT2226E",		NULL },
 { 0x4e534300, 0xffffffff, "LM4540/43/45/46/48",	NULL }, // only guess --jk
 { 0x4e534331, 0xffffffff, "LM4549",		NULL },
@@ -677,6 +678,13 @@ AC97_SINGLE("Sigmatel ADC 6dB Attenuate", AC97_SIGMATEL_ANALOG, 0, 1, 0)
 
 static const snd_kcontrol_new_t snd_ac97_control_eapd =
 AC97_SINGLE("External Amplifier Power Down", AC97_POWERDOWN, 15, 1, 0);
+
+static const snd_kcontrol_new_t snd_ac97_controls_vt1616[] = {
+AC97_SINGLE("DC Offset removal", 0x5a, 10, 1, 0),
+AC97_SINGLE("Alternate Level to Surround Out", 0x5a, 15, 1, 0),
+AC97_SINGLE("Downmix LFE and Center to Front", 0x5a, 12, 1, 0),
+AC97_SINGLE("Downmix Surround to Front", 0x5a, 11, 1, 0),
+};
 
 static int snd_ac97_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1581,6 +1589,14 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	case AC97_ID_ALC650:
 		for (idx = 0; idx < ARRAY_SIZE(snd_ac97_controls_alc650); idx++)
 			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_alc650[idx], ac97))) < 0)
+				return err;
+		break;
+	case AC97_ID_VT1616:
+		if (snd_ac97_try_bit(ac97, 0x5a, 9))
+			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_vt1616[0], ac97))) < 0)
+				return err;
+		for (idx = 1; idx < ARRAY_SIZE(snd_ac97_controls_vt1616); idx++)
+			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_vt1616[idx], ac97))) < 0)
 				return err;
 		break;
 	default:

@@ -412,7 +412,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 	add_wait_queue(&rmidi->open_wait, &wait);
 	while (1) {
 		subdevice = -1;
-		read_lock(&card->control_rwlock);
+		down_read(&card->controls_rwsem);
 		list_for_each(list, &card->ctl_files) {
 			kctl = snd_ctl_file(list);
 			if (kctl->pid == current->pid) {
@@ -420,7 +420,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 				break;
 			}
 		}
-		read_unlock(&card->control_rwlock);
+		up_read(&card->controls_rwsem);
 		err = snd_rawmidi_kernel_open(cardnum, device, subdevice, fflags, rawmidi_file);
 		if (err >= 0)
 			break;

@@ -104,13 +104,13 @@ config SND_CMIPCI
 
 config SND_ENS1370
 	tristate "(Creative) Ensoniq AudioPCI 1370"
-	depends on SND
+	depends on SND && SOUND_GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1370.
 
 config SND_ENS1371
 	tristate "(Creative) Ensoniq AudioPCI 1371/1373"
-	depends on SND
+	depends on SND && SOUND_GAMEPORT
 	help
 	  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1371 and
 	  Sound Blaster PCI 64 or 128 soundcards.

@@ -99,8 +99,8 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	card->number = idx;
 	card->module = module;
 	INIT_LIST_HEAD(&card->devices);
-	rwlock_init(&card->control_rwlock);
-	rwlock_init(&card->control_owner_lock);
+	init_rwsem(&card->controls_rwsem);
+	rwlock_init(&card->ctl_files_rwlock);
 	INIT_LIST_HEAD(&card->controls);
 	INIT_LIST_HEAD(&card->ctl_files);
 	spin_lock_init(&card->files_lock);
@@ -393,8 +393,6 @@ static void choose_default_id(snd_card_t * card)
 			idx_flag++;
 		}
 	}
-		
-	strcpy(card->id, id);
 }
 
 int snd_card_register(snd_card_t * card)

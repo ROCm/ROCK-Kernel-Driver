@@ -24,6 +24,7 @@
 
 #include <linux/sched.h>		/* wake_up() */
 #include <asm/semaphore.h>		/* struct semaphore */
+#include <linux/rwsem.h>		/* struct rw_semaphore */
 
 /* Typedef's */
 typedef struct timeval snd_timestamp_t;
@@ -141,8 +142,8 @@ struct _snd_card {
 	struct list_head devices;	/* devices */
 
 	unsigned int last_numid;	/* last used numeric ID */
-	rwlock_t control_rwlock;	/* control list lock */
-	rwlock_t control_owner_lock;	/* control list lock */
+	struct rw_semaphore controls_rwsem;	/* controls list lock */
+	rwlock_t ctl_files_rwlock;	/* ctl_files list lock */
 	int controls_count;		/* count of all controls */
 	struct list_head controls;	/* all controls for this card */
 	struct list_head ctl_files;	/* active control files */

@@ -40,6 +40,9 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* MPU-401 port number */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* MPU-401 IRQ */
+#ifdef CONFIG_PC9800
+static int pc98ii[SNDRV_CARDS];				/* PC98-II dauther board */
+#endif
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for MPU-401 device.");
@@ -56,6 +59,11 @@ MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(irq, "IRQ # for MPU-401 device.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
+#ifdef CONFIG_PC9800
+MODULE_PARM(pc98ii, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pc98ii, "Roland MPU-PC98II support.");
+MODULE_PARM_SYNTAX(pc98ii, SNDRV_BOOLEAN_FALSE_DESC);
+#endif
 
 static snd_card_t *snd_mpu401_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -76,7 +84,11 @@ static int __init snd_card_mpu401_probe(int dev)
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
-	if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
+	if (snd_mpu401_uart_new(card, 0,
+#ifdef CONFIG_PC9800
+				pc98ii[dev] ? MPU401_HW_PC98II :
+#endif
+				MPU401_HW_MPU401,
 				port[dev], 0,
 				irq[dev], irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0) {
 		printk(KERN_ERR "MPU401 not detected at 0x%lx\n", port[dev]);

@@ -698,7 +698,7 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 		return -ENODEV;
 
 	card = pcm->card;
-	read_lock(&card->control_rwlock);
+	down_read(&card->controls_rwsem);
 	list_for_each(list, &card->ctl_files) {
 		kctl = snd_ctl_file(list);
 		if (kctl->pid == current->pid) {
@@ -706,7 +706,7 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 			break;
 		}
 	}
-	read_unlock(&card->control_rwlock);
+	up_read(&card->controls_rwsem);
 
 	if (pstr->substream_count == 0)
 		return -ENODEV;

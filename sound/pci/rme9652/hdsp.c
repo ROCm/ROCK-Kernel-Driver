@@ -3069,9 +3069,11 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 
 static int snd_hdsp_free(hdsp_t *hdsp)
 {
-	/* stop the audio, and cancel all interrupts */
-	hdsp->control_register &= ~(HDSP_Start|HDSP_AudioInterruptEnable|HDSP_Midi0InterruptEnable|HDSP_Midi1InterruptEnable);
-	hdsp_write (hdsp, HDSP_controlRegister, hdsp->control_register);
+	if (hdsp->res_port) {
+		/* stop the audio, and cancel all interrupts */
+		hdsp->control_register &= ~(HDSP_Start|HDSP_AudioInterruptEnable|HDSP_Midi0InterruptEnable|HDSP_Midi1InterruptEnable);
+		hdsp_write (hdsp, HDSP_controlRegister, hdsp->control_register);
+	}
 
 	if (hdsp->irq >= 0)
 		free_irq(hdsp->irq, (void *)hdsp);
