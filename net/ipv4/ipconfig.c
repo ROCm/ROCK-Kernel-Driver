@@ -1102,8 +1102,8 @@ static int __init ic_dynamic(void)
 
 		jiff = jiffies + (d->next ? CONF_INTER_TIMEOUT : timeout);
 		while (time_before(jiffies, jiff) && !ic_got_reply) {
-			barrier();
-			cpu_relax();
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1);
 		}
 #ifdef IPCONFIG_DHCP
 		/* DHCP isn't done until we get a DHCPACK. */
@@ -1245,7 +1245,6 @@ u32 __init root_nfs_parse_addr(char *name)
 
 static int __init ip_auto_config(void)
 {
-	unsigned long jiff;
 	u32 addr;
 
 #ifdef CONFIG_PROC_FS
@@ -1260,18 +1259,16 @@ static int __init ip_auto_config(void)
  try_try_again:
 #endif
 	/* Give hardware a chance to settle */
-	jiff = jiffies + CONF_PRE_OPEN;
-	while (time_before(jiffies, jiff))
-		cpu_relax();
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(CONF_PRE_OPEN);
 
 	/* Setup all network devices */
 	if (ic_open_devs() < 0)
 		return -1;
 
 	/* Give drivers a chance to settle */
-	jiff = jiffies + CONF_POST_OPEN;
-	while (time_before(jiffies, jiff))
-		cpu_relax();
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(CONF_POST_OPEN);
 
 	/*
 	 * If the config information is insufficient (e.g., our IP address or
