@@ -197,6 +197,7 @@ static void fb_flashcursor(void *private)
 
 	if (!info || !info->cursor.enable)
 		return;
+	info->cursor.set = FB_CUR_SETCUR;
 	info->fbops->fb_cursor(info, &info->cursor);
 }
 
@@ -220,7 +221,7 @@ static void cursor_timer_handler(unsigned long dev_addr)
 	struct fb_info *info = (struct fb_info *) dev_addr;
 	
 	schedule_work(&info->queue);	
-	cursor_timer.expires = jiffies + HZ / 50;
+	cursor_timer.expires = jiffies + HZ / 5;
 	add_timer(&cursor_timer);
 }
 
@@ -580,9 +581,6 @@ static const char *fbcon_startup(void)
 		return NULL;
 	}
 
-	/* Initialize the work queue */
-	INIT_WORK(&info->queue, fb_flashcursor, info);
-	
 	/* Setup default font */
 	vc->vc_font.data = font->data;
 	vc->vc_font.width = font->width;
@@ -663,9 +661,12 @@ static const char *fbcon_startup(void)
 	irqres = request_irq(IRQ_VSYNCPULSE, fb_vbl_handler, SA_SHIRQ,
 			     "framebuffer vbl", info);
 #endif
-
-	if (irqres) {
-		cursor_blink_rate = DEFAULT_CURSOR_BLINK_RATE;
+	/* Initialize the work queue. If the driver provides its
+	 * own work queue this means it will use something besides 
+	 * default timer to flash the cursor. */
+	if (!info->queue.func) {
+		INIT_WORK(&info->queue, fb_flashcursor, info);
+		
 		cursor_timer.expires = jiffies + HZ / 50;
 		cursor_timer.data = (unsigned long ) info;
 		add_timer(&cursor_timer);
@@ -986,13 +987,12 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
-	int w = (vc->vc_font.width + 7) >> 3, c;
 	struct display *p = &fb_display[vc->vc_num];
+	int w = (vc->vc_font.width + 7) >> 3, c;
 	int y = real_y(p, vc->vc_y);
 	struct fb_cursor cursor;
-	static char mask[64];
-	static int shape;
-
+	char *mask = NULL;
+	
 	if (mode & CM_SOFTBACK) {
 		mode &= ~CM_SOFTBACK;
 		if (softback_lines) {
@@ -1008,20 +1008,12 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 
 	cursor.image.data = vc->vc_font.data + ((c & charmask) * (w * vc->vc_font.height));
 	cursor.image.depth = 1;
-	
+
 	switch (mode) {
 	case CM_ERASE:
 		if (info->cursor.rop == ROP_XOR) {
 			cursor.set = 0;
-			cursor.image.dx = info->cursor.image.dx;
-			cursor.image.dy = info->cursor.image.dy;
-			cursor.image.width = info->cursor.image.width;
-			cursor.image.height = info->cursor.image.height;
-			cursor.image.fg_color = info->cursor.image.fg_color;
-			cursor.image.bg_color = info->cursor.image.bg_color;
-			cursor.mask = mask;
 			cursor.rop = ROP_COPY;
-
 			info->fbops->fb_cursor(info, &cursor);
 		}	
 		break;
@@ -1050,10 +1042,13 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			cursor.set |= FB_CUR_SETSIZE;
 		}
 
-		if ((vc->vc_cursor_type & 0x0f) != shape) {
+		if ((vc->vc_cursor_type & 0x0f) != p->cursor_shape) {
 			int cur_height, size, i = 0;
 
-			shape = vc->vc_cursor_type & 0x0f;
+			mask = kmalloc(w*vc->vc_font.height, GFP_ATOMIC);
+			if (!mask)	return;	
+			
+			p->cursor_shape = vc->vc_cursor_type & 0x0f;
 			cursor.set |= FB_CUR_SETSHAPE;
 
 			switch (vc->vc_cursor_type & 0x0f) {
@@ -1083,11 +1078,13 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			size = cur_height * w;
 			while (size--)
 				mask[i++] = 0xff;
+        		cursor.mask = mask;
 		}
-        	cursor.mask = mask;
         	cursor.rop = ROP_XOR;
 
 		info->fbops->fb_cursor(info, &cursor);
+		if (mask)	
+			kfree(mask);
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 		break;
 	}
