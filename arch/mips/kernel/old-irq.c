@@ -183,7 +183,7 @@ asmlinkage void i8259_do_irq(int irq, struct pt_regs *regs)
 		goto out;
 
 	if (!(action->flags & SA_INTERRUPT))
-		__sti();
+		local_irq_enable();
 	action = *(irq + irq_action);
 	do_random = 0;
        	do {
@@ -193,7 +193,7 @@ asmlinkage void i8259_do_irq(int irq, struct pt_regs *regs)
        	} while (action);
 	if (do_random & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
-	__cli();
+	local_irq_disable();
 	unmask_irq (irq);
 
 out:
@@ -219,7 +219,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 	action = *(irq + irq_action);
 	if (action) {
 		if (!(action->flags & SA_INTERRUPT))
-			__sti();
+			local_irq_enable();
 		action = *(irq + irq_action);
 		do_random = 0;
         	do {
@@ -229,7 +229,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
         	} while (action);
 		if (do_random & SA_SAMPLE_RANDOM)
 			add_interrupt_randomness(irq);
-		__cli();
+		local_irq_disable();
 	}
 	irq_exit(cpu, irq);
 

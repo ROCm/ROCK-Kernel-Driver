@@ -970,9 +970,9 @@ start_in__have_work:
 	mov r1, #1		; INbuf size counter
 start_in__loop:
 	mov a, rx_ring_in
-	cjne a, rx_ring_out, start_in__still_copying
+	cjne a, rx_ring_out, start_inlocal_irq_enablell_copying
 	sjmp start_in__kick
-start_in__still_copying:
+start_inlocal_irq_enablell_copying:
 	inc rx_ring_out
 	mov dpl, rx_ring_out
 	movx a, @dptr

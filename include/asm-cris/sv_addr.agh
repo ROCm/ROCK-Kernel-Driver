@@ -1142,7 +1142,7 @@
 #define R_SERIAL0_CTRL__rec_stick_par__BITNR 19
 #define R_SERIAL0_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL0_CTRL__rec_stick_par__normal 0
-#define R_SERIAL0_CTRL__rec_stick_par__stick 1
+#define R_SERIAL0_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL0_CTRL__rec_par__BITNR 18
 #define R_SERIAL0_CTRL__rec_par__WIDTH 1
 #define R_SERIAL0_CTRL__rec_par__even 0
@@ -1172,7 +1172,7 @@
 #define R_SERIAL0_CTRL__tr_stick_par__BITNR 11
 #define R_SERIAL0_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL0_CTRL__tr_stick_par__normal 0
-#define R_SERIAL0_CTRL__tr_stick_par__stick 1
+#define R_SERIAL0_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL0_CTRL__tr_par__BITNR 10
 #define R_SERIAL0_CTRL__tr_par__WIDTH 1
 #define R_SERIAL0_CTRL__tr_par__even 0
@@ -1246,7 +1246,7 @@
 #define R_SERIAL0_REC_CTRL__rec_stick_par__BITNR 3
 #define R_SERIAL0_REC_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL0_REC_CTRL__rec_stick_par__normal 0
-#define R_SERIAL0_REC_CTRL__rec_stick_par__stick 1
+#define R_SERIAL0_REC_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL0_REC_CTRL__rec_par__BITNR 2
 #define R_SERIAL0_REC_CTRL__rec_par__WIDTH 1
 #define R_SERIAL0_REC_CTRL__rec_par__even 0
@@ -1278,7 +1278,7 @@
 #define R_SERIAL0_TR_CTRL__tr_stick_par__BITNR 3
 #define R_SERIAL0_TR_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL0_TR_CTRL__tr_stick_par__normal 0
-#define R_SERIAL0_TR_CTRL__tr_stick_par__stick 1
+#define R_SERIAL0_TR_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL0_TR_CTRL__tr_par__BITNR 2
 #define R_SERIAL0_TR_CTRL__tr_par__WIDTH 1
 #define R_SERIAL0_TR_CTRL__tr_par__even 0
@@ -1434,7 +1434,7 @@
 #define R_SERIAL1_CTRL__rec_stick_par__BITNR 19
 #define R_SERIAL1_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL1_CTRL__rec_stick_par__normal 0
-#define R_SERIAL1_CTRL__rec_stick_par__stick 1
+#define R_SERIAL1_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL1_CTRL__rec_par__BITNR 18
 #define R_SERIAL1_CTRL__rec_par__WIDTH 1
 #define R_SERIAL1_CTRL__rec_par__even 0
@@ -1464,7 +1464,7 @@
 #define R_SERIAL1_CTRL__tr_stick_par__BITNR 11
 #define R_SERIAL1_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL1_CTRL__tr_stick_par__normal 0
-#define R_SERIAL1_CTRL__tr_stick_par__stick 1
+#define R_SERIAL1_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL1_CTRL__tr_par__BITNR 10
 #define R_SERIAL1_CTRL__tr_par__WIDTH 1
 #define R_SERIAL1_CTRL__tr_par__even 0
@@ -1538,7 +1538,7 @@
 #define R_SERIAL1_REC_CTRL__rec_stick_par__BITNR 3
 #define R_SERIAL1_REC_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL1_REC_CTRL__rec_stick_par__normal 0
-#define R_SERIAL1_REC_CTRL__rec_stick_par__stick 1
+#define R_SERIAL1_REC_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL1_REC_CTRL__rec_par__BITNR 2
 #define R_SERIAL1_REC_CTRL__rec_par__WIDTH 1
 #define R_SERIAL1_REC_CTRL__rec_par__even 0
@@ -1570,7 +1570,7 @@
 #define R_SERIAL1_TR_CTRL__tr_stick_par__BITNR 3
 #define R_SERIAL1_TR_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL1_TR_CTRL__tr_stick_par__normal 0
-#define R_SERIAL1_TR_CTRL__tr_stick_par__stick 1
+#define R_SERIAL1_TR_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL1_TR_CTRL__tr_par__BITNR 2
 #define R_SERIAL1_TR_CTRL__tr_par__WIDTH 1
 #define R_SERIAL1_TR_CTRL__tr_par__even 0
@@ -1726,7 +1726,7 @@
 #define R_SERIAL2_CTRL__rec_stick_par__BITNR 19
 #define R_SERIAL2_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL2_CTRL__rec_stick_par__normal 0
-#define R_SERIAL2_CTRL__rec_stick_par__stick 1
+#define R_SERIAL2_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL2_CTRL__rec_par__BITNR 18
 #define R_SERIAL2_CTRL__rec_par__WIDTH 1
 #define R_SERIAL2_CTRL__rec_par__even 0
@@ -1756,7 +1756,7 @@
 #define R_SERIAL2_CTRL__tr_stick_par__BITNR 11
 #define R_SERIAL2_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL2_CTRL__tr_stick_par__normal 0
-#define R_SERIAL2_CTRL__tr_stick_par__stick 1
+#define R_SERIAL2_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL2_CTRL__tr_par__BITNR 10
 #define R_SERIAL2_CTRL__tr_par__WIDTH 1
 #define R_SERIAL2_CTRL__tr_par__even 0
@@ -1830,7 +1830,7 @@
 #define R_SERIAL2_REC_CTRL__rec_stick_par__BITNR 3
 #define R_SERIAL2_REC_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL2_REC_CTRL__rec_stick_par__normal 0
-#define R_SERIAL2_REC_CTRL__rec_stick_par__stick 1
+#define R_SERIAL2_REC_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL2_REC_CTRL__rec_par__BITNR 2
 #define R_SERIAL2_REC_CTRL__rec_par__WIDTH 1
 #define R_SERIAL2_REC_CTRL__rec_par__even 0
@@ -1862,7 +1862,7 @@
 #define R_SERIAL2_TR_CTRL__tr_stick_par__BITNR 3
 #define R_SERIAL2_TR_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL2_TR_CTRL__tr_stick_par__normal 0
-#define R_SERIAL2_TR_CTRL__tr_stick_par__stick 1
+#define R_SERIAL2_TR_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL2_TR_CTRL__tr_par__BITNR 2
 #define R_SERIAL2_TR_CTRL__tr_par__WIDTH 1
 #define R_SERIAL2_TR_CTRL__tr_par__even 0
@@ -2018,7 +2018,7 @@
 #define R_SERIAL3_CTRL__rec_stick_par__BITNR 19
 #define R_SERIAL3_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL3_CTRL__rec_stick_par__normal 0
-#define R_SERIAL3_CTRL__rec_stick_par__stick 1
+#define R_SERIAL3_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL3_CTRL__rec_par__BITNR 18
 #define R_SERIAL3_CTRL__rec_par__WIDTH 1
 #define R_SERIAL3_CTRL__rec_par__even 0
@@ -2048,7 +2048,7 @@
 #define R_SERIAL3_CTRL__tr_stick_par__BITNR 11
 #define R_SERIAL3_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL3_CTRL__tr_stick_par__normal 0
-#define R_SERIAL3_CTRL__tr_stick_par__stick 1
+#define R_SERIAL3_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL3_CTRL__tr_par__BITNR 10
 #define R_SERIAL3_CTRL__tr_par__WIDTH 1
 #define R_SERIAL3_CTRL__tr_par__even 0
@@ -2122,7 +2122,7 @@
 #define R_SERIAL3_REC_CTRL__rec_stick_par__BITNR 3
 #define R_SERIAL3_REC_CTRL__rec_stick_par__WIDTH 1
 #define R_SERIAL3_REC_CTRL__rec_stick_par__normal 0
-#define R_SERIAL3_REC_CTRL__rec_stick_par__stick 1
+#define R_SERIAL3_REC_CTRL__rec_stick_parlocal_irq_enableck 1
 #define R_SERIAL3_REC_CTRL__rec_par__BITNR 2
 #define R_SERIAL3_REC_CTRL__rec_par__WIDTH 1
 #define R_SERIAL3_REC_CTRL__rec_par__even 0
@@ -2154,7 +2154,7 @@
 #define R_SERIAL3_TR_CTRL__tr_stick_par__BITNR 3
 #define R_SERIAL3_TR_CTRL__tr_stick_par__WIDTH 1
 #define R_SERIAL3_TR_CTRL__tr_stick_par__normal 0
-#define R_SERIAL3_TR_CTRL__tr_stick_par__stick 1
+#define R_SERIAL3_TR_CTRL__tr_stick_parlocal_irq_enableck 1
 #define R_SERIAL3_TR_CTRL__tr_par__BITNR 2
 #define R_SERIAL3_TR_CTRL__tr_par__WIDTH 1
 #define R_SERIAL3_TR_CTRL__tr_par__even 0

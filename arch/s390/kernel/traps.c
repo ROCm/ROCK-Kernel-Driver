@@ -280,7 +280,7 @@ static void inline do_trap(long interruption_code, int signr, char *str,
 	 * now safely switch on interrupts.
 	 */
         if (regs->psw.mask & PSW_PROBLEM_STATE)
-		__sti();
+		local_irq_enable();
 
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
                 struct task_struct *tsk = current;
@@ -416,7 +416,7 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	 * now safely switch on interrupts.
 	 */
 	if (regs->psw.mask & PSW_PROBLEM_STATE)
-		__sti();
+		local_irq_enable();
 
 	if (regs->psw.mask & PSW_PROBLEM_STATE)
 		get_user(*((__u16 *) opcode), location);
@@ -477,7 +477,7 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 	 * now safely switch on interrupts.
 	 */
 	if (regs->psw.mask & PSW_PROBLEM_STATE)
-		__sti();
+		local_irq_enable();
 		
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
 		get_user(*((__u16 *) opcode), location);
@@ -540,7 +540,7 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	 * now safely switch on interrupts.
 	 */
 	if (regs->psw.mask & PSW_PROBLEM_STATE)
-		__sti();
+		local_irq_enable();
 
 	if (MACHINE_HAS_IEEE)
 		__asm__ volatile ("stfpc %0\n\t" 

@@ -88,7 +88,7 @@ common_shutdown_1(void *generic_ptr)
 	int cpuid = smp_processor_id();
 
 	/* No point in taking interrupts anymore. */
-	__cli();
+	local_irq_disable();
 
 	cpup = (struct percpu_struct *)
 			((unsigned long)hwrpb + hwrpb->processor_offset

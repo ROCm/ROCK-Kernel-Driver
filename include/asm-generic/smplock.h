@@ -17,7 +17,7 @@ extern spinlock_t kernel_flag;
 do { \
 	if (task->lock_depth >= 0) \
 		spin_unlock(&kernel_flag); \
-	__sti(); \
+	local_irq_enable(); \
 } while (0)
 
 /*

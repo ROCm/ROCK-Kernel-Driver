@@ -65,10 +65,10 @@ int do_IRQ(struct pt_regs *regs)
 
 	lpq = paca->lpQueuePtr;
 	if ( lpq ) {
-		__save_flags( flags );
-		__cli();
+		local_save_flags( flags );
+		local_irq_disable();
 		lpEvent_count += ItLpQueue_process( lpq, regs );
-		__restore_flags( flags );
+		local_irq_restore( flags );
 	}
 
         hardirq_exit( cpu );

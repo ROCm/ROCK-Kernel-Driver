@@ -288,7 +288,7 @@ u8 ata_dump(struct ata_device *drive, struct request * rq, const char *msg)
 	u8 err = 0;
 
 	/* FIXME:  --bzolnier */
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_irq_enable();
 
 	printk("%s: %s: status=0x%02x", drive->name, msg, drive->status);
@@ -337,7 +337,7 @@ u8 ata_dump(struct ata_device *drive, struct request * rq, const char *msg)
 #endif
 		printk("\n");
 	}
-	__restore_flags (flags);
+	local_irq_restore (flags);
 
 	return err;
 }

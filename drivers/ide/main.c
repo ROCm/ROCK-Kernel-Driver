@@ -1082,18 +1082,18 @@ int ide_unregister_subdriver(struct ata_device *drive)
 {
 	unsigned long flags;
 
-	__save_flags(flags); // FIXME: is this safe?
-	__cli();
+	local_save_flags(flags); // FIXME: is this safe?
+	local_irq_disable();
 
 #if 0
 	if (__MOD_IN_USE(ata_ops(drive)->owner)) {
-		__restore_flags(flags); // FIXME: is this safe?
+		local_irq_restore(flags); // FIXME: is this safe?
 		return 1;
 	}
 #endif
 
 	if (drive->usage || drive->busy || !ata_ops(drive)) {
-		__restore_flags(flags);	// FIXME: is this safe?
+		local_irq_restore(flags);	// FIXME: is this safe?
 		return 1;
 	}
 
@@ -1102,7 +1102,7 @@ int ide_unregister_subdriver(struct ata_device *drive)
 #endif
 	drive->driver = NULL;
 
-	__restore_flags(flags); // FIXME: is this safe?
+	local_irq_restore(flags); // FIXME: is this safe?
 
 	return 0;
 }

@@ -199,7 +199,7 @@ void __init smp_callin(void)
 
 	smp_setup_percpu_timer();
 
-	__sti();
+	local_irq_enable();
 
 	calibrate_delay();
 	smp_store_cpu_info(cpuid);
@@ -243,7 +243,7 @@ void __init smp_boot_cpus(void)
 	int cpucount = 0, i;
 
 	printk("Entering UltraSMPenguin Mode...\n");
-	__sti();
+	local_irq_enable();
 	smp_store_cpu_info(boot_cpu_id);
 
 	if (linux_num_cpus == 1) {
@@ -1222,7 +1222,7 @@ static void __init smp_tune_scheduling(void)
 		__get_free_pages(GFP_KERNEL, order = get_order(ecache_size));
 
 	if (flush_base != 0UL) {
-		__save_and_cli(flags);
+		local_irq_save(flags);
 
 		/* Scan twice the size once just to get the TLB entries
 		 * loaded and make sure the second scan measures pure misses.
@@ -1271,7 +1271,7 @@ static void __init smp_tune_scheduling(void)
 				     : "g1", "g2", "g3", "g5");
 		}
 
-		__restore_flags(flags);
+		local_irq_restore(flags);
 
 		raw = (tick2 - tick1);
 

@@ -131,7 +131,7 @@ conf_read(unsigned long addr, unsigned char type1)
 	unsigned int stat0, value;
 	unsigned int haxr2 = 0;
 
-	__save_and_cli(flags);	/* avoid getting hit by machine check */
+	local_irq_save(flags);	/* avoid getting hit by machine check */
 
 	DBGC(("conf_read(addr=0x%lx, type1=%d)\n", addr, type1));
 
@@ -201,7 +201,7 @@ conf_read(unsigned long addr, unsigned char type1)
 		*(vuip)APECS_IOC_HAXR2 = haxr2 & ~1;
 		mb();
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return value;
 }
@@ -213,7 +213,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 	unsigned int stat0;
 	unsigned int haxr2 = 0;
 
-	__save_and_cli(flags);	/* avoid getting hit by machine check */
+	local_irq_save(flags);	/* avoid getting hit by machine check */
 
 	/* Reset status register to avoid losing errors.  */
 	stat0 = *(vuip)APECS_IOC_DCSR;
@@ -269,7 +269,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 		*(vuip)APECS_IOC_HAXR2 = haxr2 & ~1;
 		mb();
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static int

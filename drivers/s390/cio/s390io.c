@@ -163,11 +163,11 @@ s390_init_IRQ (void)
 	 *  function we resestablish the old environment.
 	 *
 	 * Note : as we don't need a system wide lock, therefore
-	 *        we shouldn't use cli(), but __cli() as this
+	 *        we shouldn't use cli(), but local_irq_disable() as this
 	 *        affects the current CPU only.
 	 */
-	__save_flags (flags);
-	__cli ();
+	local_save_flags (flags);
+	local_irq_disable ();
 
 	/*
 	 * disable all interrupts
@@ -204,7 +204,7 @@ s390_init_IRQ (void)
 
 	init_IRQ_complete = 1;
 
-	__restore_flags (flags);
+	local_irq_restore (flags);
 
 	return;
 }
@@ -578,10 +578,10 @@ read_dev_chars (int irq, void **buffer, int length)
 	 *   also require to run disabled.
 	 *
 	 * Note : as no global lock is required, we must not use
-	 *        cli(), but __cli() instead.   
+	 *        cli(), but local_irq_disable() instead.   
 	 */
-	__save_flags (flags);
-	__cli ();
+	local_save_flags (flags);
+	local_irq_disable ();
 
 	rdc_ccw = &ioinfo[irq]->senseccw;
 
@@ -643,7 +643,7 @@ read_dev_chars (int irq, void **buffer, int length)
 
 		}
 
-		__restore_flags (flags);
+		local_irq_restore (flags);
 
 		/*
 		 * on success we update the user input parms
@@ -720,8 +720,8 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 		int emulated = 0;	/* no i/O handler installed */
 		int retry = 5;	/* retry count */
 
-		__save_flags (flags);
-		__cli ();
+		local_save_flags (flags);
+		local_irq_disable ();
 
 		if (!ioinfo[irq]->ui.flags.ready) {
 			pdevstat = &devstat;
@@ -816,7 +816,7 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 
 			}
 
-			__restore_flags (flags);
+			local_irq_restore (flags);
 
 		}
 

@@ -133,7 +133,7 @@ adir_setup_arch(void)
 static void
 adir_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 	/* SRR0 has system reset vector, SRR1 has default MSR value */
 	/* rfi restores MSR from SRR1 and sets the PC to the SRR0 value */
 	__asm__ __volatile__

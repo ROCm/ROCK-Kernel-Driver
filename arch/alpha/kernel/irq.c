@@ -85,9 +85,9 @@ handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 
 	do {
 		if (!(action->flags & SA_INTERRUPT))
-			__sti();
+			local_irq_enable();
 		else
-			__cli();
+			local_irq_disable();
 
 		status |= action->flags;
 		action->handler(irq, action->dev_id, regs);
@@ -95,7 +95,7 @@ handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
-	__cli();
+	local_irq_disable();
 
 	irq_exit(cpu, irq);
 

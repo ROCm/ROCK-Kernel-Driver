@@ -132,7 +132,7 @@ conf_read(unsigned long addr, unsigned char type1)
 
 	cpu = smp_processor_id();
 
-	__save_and_cli(flags);	/* avoid getting hit by machine check */
+	local_irq_save(flags);	/* avoid getting hit by machine check */
 
 	DBG(("conf_read(addr=0x%lx, type1=%d)\n", addr, type1));
 
@@ -181,7 +181,7 @@ conf_read(unsigned long addr, unsigned char type1)
 	}
 	DBG(("conf_read(): finished\n"));
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return value;
 }
 
@@ -194,7 +194,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 
 	cpu = smp_processor_id();
 
-	__save_and_cli(flags);	/* avoid getting hit by machine check */
+	local_irq_save(flags);	/* avoid getting hit by machine check */
 
 #if 0
 	{
@@ -234,7 +234,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 		mb();
 	}
 	DBG(("conf_write(): finished\n"));
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static int
