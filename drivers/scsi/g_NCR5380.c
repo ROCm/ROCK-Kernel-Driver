@@ -501,6 +501,10 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
 {
 	NCR5380_local_declare();
 	NCR5380_setup(instance);
+	
+	if (instance->irq != SCSI_IRQ_NONE)
+		free_irq(instance->irq, NULL);
+	NCR5380_exit(instance);
 
 #ifndef CONFIG_SCSI_G_NCR5380_MEM
 	release_region(instance->NCR5380_instance_name, instance->n_io_port);
@@ -508,8 +512,6 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
 	release_mem_region(instance->NCR5380_instance_name, NCR5380_region_size);
 #endif
 
-	if (instance->irq != SCSI_IRQ_NONE)
-		free_irq(instance->irq, NULL);
 
 	return 0;
 }

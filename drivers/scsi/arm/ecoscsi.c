@@ -222,6 +222,7 @@ static void __exit ecoscsi_exit(void)
 
 	if (shpnt->irq != IRQ_NONE)
 		free_irq(shpnt->irq, NULL);
+	NCR5380_exit(host);
 	if (shpnt->io_port)
 		release_region(shpnt->io_port, shpnt->n_io_port);
 
