@@ -794,6 +794,21 @@ static int __aio_run_iocbs(struct kioctx *ctx)
 	return 0;
 }
 
+static void aio_queue_work(struct kioctx * ctx)
+{
+	unsigned long timeout;
+	/* 
+	 * if someone is waiting, get the work started right
+	 * away, otherwise, use a longer delay
+	 */
+	smp_mb();
+	if (waitqueue_active(&ctx->wait))
+		timeout = 1;
+	else
+		timeout = HZ/10;
+	queue_delayed_work(aio_wq, &ctx->wq, timeout);
+}
+
 /*
  * aio_run_iocbs:
  * 	Process all pending retries queued on the ioctx
@@ -809,7 +824,18 @@ static inline void aio_run_iocbs(struct kioctx *ctx)
 	requeue = __aio_run_iocbs(ctx);
 	spin_unlock_irq(&ctx->ctx_lock);
 	if (requeue)
-		queue_work(aio_wq, &ctx->wq);
+		aio_queue_work(ctx);
+}
+
+/* 
+ * just like aio_run_iocbs, but keeps running them until
+ * the list stays empty
+ */
+static inline void aio_run_all_iocbs(struct kioctx *ctx)
+{
+	spin_lock_irq(&ctx->ctx_lock);
+	while( __aio_run_iocbs(ctx));
+	spin_unlock_irq(&ctx->ctx_lock);
 }
 
 /*
@@ -834,6 +860,9 @@ static void aio_kick_handler(void *data)
 	unuse_mm(ctx->mm);
 	spin_unlock_irq(&ctx->ctx_lock);
 	set_fs(oldfs);
+	/* 
+	 * we're in a worker thread already, don't use queue_delayed_work,
+	 */
 	if (requeue)
 		queue_work(aio_wq, &ctx->wq);
 }
@@ -856,7 +885,7 @@ void queue_kicked_iocb(struct kiocb *iocb)
 	run = __queue_kicked_iocb(iocb);
 	spin_unlock_irqrestore(&ctx->ctx_lock, flags);
 	if (run) {
-		queue_delayed_work(aio_wq, &ctx->wq, HZ/10);
+		aio_queue_work(ctx);
 		aio_wakeups++;
 	}
 }
@@ -1131,7 +1160,7 @@ retry:
 	/* racey check, but it gets redone */
 	if (!retry && unlikely(!list_empty(&ctx->run_list))) {
 		retry = 1;
-		aio_run_iocbs(ctx);
+		aio_run_all_iocbs(ctx);
 		goto retry;
 	}
 
@@ -1533,7 +1562,8 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 
 	spin_lock_irq(&ctx->ctx_lock);
 	list_add_tail(&req->ki_run_list, &ctx->run_list);
-	__aio_run_iocbs(ctx);
+	/* drain the run list */
+	while(__aio_run_iocbs(ctx));
 	spin_unlock_irq(&ctx->ctx_lock);
   	aio_put_req(req);	/* drop extra ref to req */
 	return 0;
