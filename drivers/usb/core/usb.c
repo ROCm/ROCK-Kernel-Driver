@@ -649,7 +649,7 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 		scratch += length;
 
 	}
-	envp [i++] = 0;
+	envp[i++] = NULL;
 
 	return 0;
 }
@@ -975,7 +975,7 @@ void *usb_buffer_alloc (
 )
 {
 	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->buffer_alloc)
-		return 0;
+		return NULL;
 	return dev->bus->op->buffer_alloc (dev->bus, size, mem_flags, dma);
 }
 
@@ -1027,7 +1027,7 @@ struct urb *usb_buffer_map (struct urb *urb)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
 			|| !(controller = bus->controller))
-		return 0;
+		return NULL;
 
 	if (controller->dma_mask) {
 		urb->transfer_dma = dma_map_single (controller,

@@ -326,7 +326,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 {
 	struct usb_ctrlrequest *cmd;
  	u16		typeReq, wValue, wIndex, wLength;
-	const u8	*bufp = 0;
+	const u8	*bufp = NULL;
 	u8		*ubuf = urb->transfer_buffer;
 	int		len = 0;
 	int		patch_wakeup = 0;
@@ -536,7 +536,7 @@ static void rh_report_status (unsigned long ptr)
 		hcd->rh_timer.data = 0;
 		urb->actual_length = length;
 		urb->status = 0;
-		urb->hcpriv = 0;
+		urb->hcpriv = NULL;
 	} else
 		mod_timer (&hcd->rh_timer, jiffies + HZ/4);
 	spin_unlock (&hcd_data_lock);
@@ -578,7 +578,7 @@ void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	hcd->rh_timer.data = 0;
 
 	local_irq_save (flags);
-	urb->hcpriv = 0;
+	urb->hcpriv = NULL;
 	usb_hcd_giveback_urb (hcd, urb, NULL);
 	local_irq_restore (flags);
 }
@@ -1207,8 +1207,8 @@ static void unlink_complete (struct urb *urb, struct pt_regs *regs)
 static int hcd_unlink_urb (struct urb *urb)
 {
 	struct hcd_dev			*dev;
-	struct usb_hcd			*hcd = 0;
-	struct device			*sys = 0;
+	struct usb_hcd			*hcd = NULL;
+	struct device			*sys = NULL;
 	unsigned long			flags;
 	struct completion_splice	splice;
 	struct list_head		*tmp;

@@ -287,7 +287,7 @@ static int ext3_alloc_block (handle_t *handle,
 				 &ei->i_prealloc_count,
 				 &ei->i_prealloc_block, err);
 		else
-			result = ext3_new_block (inode, goal, 0, 0, err);
+			result = ext3_new_block(inode, goal, NULL, NULL, err);
 		/*
 		 * AKPM: this is somewhat sticky.  I'm not surprised it was
 		 * disabled in 2.2's ext3.  Need to integrate b_committed_data
@@ -296,7 +296,7 @@ static int ext3_alloc_block (handle_t *handle,
 		 */
 	}
 #else
-	result = ext3_new_block (handle, inode, goal, 0, 0, err);
+	result = ext3_new_block(handle, inode, goal, NULL, NULL, err);
 #endif
 	return result;
 }
@@ -859,7 +859,7 @@ changed:
 static int ext3_get_block(struct inode *inode, sector_t iblock,
 			struct buffer_head *bh_result, int create)
 {
-	handle_t *handle = 0;
+	handle_t *handle = NULL;
 	int ret;
 
 	if (create) {

@@ -334,7 +334,7 @@ static char *modem_names[] __devinitdata = {
 	"MODEM", "Modem", "modem", "FAX", "Fax", "fax",
 	"56K", "56k", "K56", "33.6", "28.8", "14.4",
 	"33,600", "28,800", "14,400", "33.600", "28.800", "14.400",
-	"33600", "28800", "14400", "V.90", "V.34", "V.32", 0
+	"33600", "28800", "14400", "V.90", "V.34", "V.32", NULL
 };
 
 static int __devinit check_name(char *name)

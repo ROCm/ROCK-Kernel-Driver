@@ -2498,7 +2498,7 @@ static void con_close(struct tty_struct *tty, struct file *filp)
 		vt = tty->driver_data;
 		if (vt)
 			vc_cons[vt->vc_num].d->vc_tty = NULL;
-		tty->driver_data = 0;
+		tty->driver_data = NULL;
 		release_console_sem();
 		vcs_remove_devfs(tty);
 		up(&tty_sem);

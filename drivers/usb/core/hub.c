@@ -288,9 +288,9 @@ done:
 static inline int
 hub_clear_tt_buffer (struct usb_device *hdev, u16 devinfo, u16 tt)
 {
-	return usb_control_msg (hdev, usb_rcvctrlpipe (hdev, 0),
-		HUB_CLEAR_TT_BUFFER, USB_RT_PORT,
-		devinfo, tt, 0, 0, HZ);
+	return usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
+			       HUB_CLEAR_TT_BUFFER, USB_RT_PORT, devinfo,
+			       tt, NULL, 0, HZ);
 }
 
 /*
@@ -1034,7 +1034,7 @@ static inline void show_string(struct usb_device *udev, char *id, int index)
 {}
 #endif
 
-/*
+/**
  * usb_new_device - perform initial device setup (usbcore-internal)
  * @udev: newly addressed device (in ADDRESS state)
  *
@@ -1333,13 +1333,14 @@ static int hub_set_address(struct usb_device *udev)
 	return retval;
 }
 
-/* reset device, (re)assign address, get device descriptor.
- * device connection is stable, no more debouncing needed.
- * returns device in USB_STATE_ADDRESS, except on error.
- * on error return, device is no longer usable (ref dropped).
+/* Reset device, (re)assign address, get device descriptor.
+ * Device connection must be stable, no more debouncing needed.
+ * Returns device in USB_STATE_ADDRESS, except on error.
  *
- * caller owns dev->serialize for the device, guarding against
- * config changes and disconnect processing.
+ * If this is called for an already-existing device (as part of
+ * usb_reset_device), the caller must own the device lock.  For a
+ * newly detected device that is not accessible through any global
+ * pointers, it's not necessary to lock the device.
  */
 static int
 hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
@@ -1571,6 +1572,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 	/* Disconnect any existing devices under this port */
 	if (hdev->children[port])
 		usb_disconnect(&hdev->children[port]);
+	clear_bit(port, hub->change_bits);
 
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
 		status = hub_port_debounce(hdev, port);
@@ -1785,12 +1787,15 @@ static void hub_events(void)
 
 		/* deal with port status changes */
 		for (i = 0; i < hub->descriptor->bNbrPorts; i++) {
-			if (!test_and_clear_bit(i+1, hub->event_bits))
+			connect_change = test_bit(i, hub->change_bits);
+			if (!test_and_clear_bit(i+1, hub->event_bits) &&
+					!connect_change)
 				continue;
-			ret = hub_port_status(hdev, i, &portstatus, &portchange);
+
+			ret = hub_port_status(hdev, i,
+					&portstatus, &portchange);
 			if (ret < 0)
 				continue;
-			connect_change = 0;
 
 			if (portchange & USB_PORT_STAT_C_CONNECTION) {
 				clear_port_feature(hdev,
@@ -1819,7 +1824,7 @@ static void hub_events(void)
 					dev_err (hub_dev,
 					    "port %i "
 					    "disabled by hub (EMI?), "
-					    "re-enabling...",
+					    "re-enabling...\n",
 						i + 1);
 					connect_change = 1;
 				}
@@ -1996,23 +2001,34 @@ static int config_descriptors_changed(struct usb_device *udev)
 				!= 0) {
 			dev_dbg(&udev->dev, "config index %d changed (#%d)\n",
 				index, buf->bConfigurationValue);
-/* FIXME enable this when we can re-enumerate after reset;
- * until then DFU-ish drivers need this and other workarounds
- */
-//			break;
+			break;
 		}
 	}
 	kfree(buf);
 	return index != udev->descriptor.bNumConfigurations;
 }
 
-/*
+/**
+ * usb_reset_devce - perform a USB port reset to reinitialize a device
+ * @udev: device to reset (not in SUSPENDED or NOTATTACHED state)
+ *
  * WARNING - don't reset any device unless drivers for all of its
  * interfaces are expecting that reset!  Maybe some driver->reset()
  * method should eventually help ensure sufficient cooperation.
  *
- * This is the same as usb_reset_device() except that the caller
- * already holds dev->serialize.  For example, it's safe to use
+ * Do a port reset, reassign the device's address, and establish its
+ * former operating configuration.  If the reset fails, or the device's
+ * descriptors change from their values before the reset, or the original
+ * configuration and altsettings cannot be restored, a flag will be set
+ * telling khubd to pretend the device has been disconnected and then
+ * re-connected.  All drivers will be unbound, and the device will be
+ * re-enumerated and probed all over again.
+ *
+ * Returns 0 if the reset succeeded, -ENODEV if the device has been
+ * flagged for logical disconnection, or some other negative error code
+ * if the reset wasn't even attempted.
+ *
+ * The caller must own the device lock.  For example, it's safe to use
  * this from a driver probe() routine after downloading new firmware.
  */
 int __usb_reset_device(struct usb_device *udev)
@@ -2020,13 +2036,23 @@ int __usb_reset_device(struct usb_device *udev)
 	struct usb_device *parent = udev->parent;
 	struct usb_device_descriptor descriptor = udev->descriptor;
 	int i, ret, port = -1;
+	struct usb_hub *hub;
 
+	if (udev->state == USB_STATE_NOTATTACHED ||
+			udev->state == USB_STATE_SUSPENDED) {
+		dev_dbg(&udev->dev, "device reset not allowed in state %d\n",
+				udev->state);
+		return -EINVAL;
+	}
+
+	/* FIXME: This should be legal for regular hubs.  Root hubs may
+	 * have special requirements. */
 	if (udev->maxchild) {
 		/* this requires hub- or hcd-specific logic;
 		 * see hub_reset() and OHCI hc_restart()
 		 */
 		dev_dbg(&udev->dev, "%s for hub!\n", __FUNCTION__);
-		return -EINVAL;
+		return -EISDIR;
 	}
 
 	for (i = 0; i < parent->maxchild; i++)
@@ -2035,8 +2061,11 @@ int __usb_reset_device(struct usb_device *udev)
 			break;
 		}
 
-	if (port < 0)
+	if (port < 0) {
+		/* If this ever happens, it's very bad */
+		dev_err(&udev->dev, "Can't locate device's port!\n");
 		return -ENOENT;
+	}
 
 	ret = hub_port_init(parent, udev, port);
 	if (ret < 0)
@@ -2088,8 +2117,18 @@ int __usb_reset_device(struct usb_device *udev)
 	return 0;
  
 re_enumerate:
-	/* FIXME make some task re-enumerate; don't just mark unusable */
 	hub_port_disable(parent, port);
+
+	hub = usb_get_intfdata(parent->actconfig->interface[0]);
+	set_bit(port, hub->change_bits);
+
+	spin_lock_irq(&hub_event_lock);
+	if (list_empty(&hub->event_list)) {
+		list_add_tail(&hub->event_list, &hub_event_list);
+		wake_up(&khubd_wait);
+	}
+	spin_unlock_irq(&hub_event_lock);
+
 	return -ENODEV;
 }
 EXPORT_SYMBOL(__usb_reset_device);

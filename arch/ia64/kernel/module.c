@@ -656,8 +656,26 @@ do_reloc (struct module *mod, uint8_t r_type, Elf64_Sym *sym, uint64_t addend,
 	      case RV_PCREL:
 		switch (r_type) {
 		      case R_IA64_PCREL21B:
-			/* special because it can cross into other module/kernel-core.  */
-			if (!is_internal(mod, val))
+			if (in_init(mod, val)) {
+				/* Calls to init code from core are bad news */
+				if (in_core(mod, (uint64_t)location)) {
+					printk(KERN_ERR "%s: init symbol 0x%lx used in module code at %p\n",
+						mod->name, val, location);
+					return -ENOEXEC;
+				}
+			} else if (in_core(mod, val)) {
+				/*
+				 * Init section may have been allocated far away from core,
+				 * if the branch won't reach, then allocate a plt for it.
+				 */
+				if (in_init(mod, (uint64_t)location)) {
+					uint64_t delta = ((int64_t)val - (int64_t)location) / 16;
+					if (delta + (1 << 20) >= (1 << 21)) {
+						val = get_fdesc(mod, val, &ok);
+						val = get_plt(mod, location, val, &ok);
+					}
+				}
+			} else
 				val = get_plt(mod, location, val, &ok);
 			/* FALL THROUGH */
 		      default:

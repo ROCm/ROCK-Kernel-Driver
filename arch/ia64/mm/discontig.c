@@ -549,7 +549,7 @@ void call_pernode_memory(unsigned long start, unsigned long len, void *arg)
 	if (!num_node_memblks) {
 		/* No SRAT table, so assume one node (node 0) */
 		if (start < end)
-			(*func)(start, len, 0);
+			(*func)(start, end - start, 0);
 		return;
 	}
 

@@ -113,12 +113,18 @@ struct obs_kernel_param {
 	int early;
 };
 
-/* Only for really core code.  See moduleparam.h for the normal way. */
+/*
+ * Only for really core code.  See moduleparam.h for the normal way.
+ *
+ * Force the alignment so the compiler doesn't space elements of the
+ * obs_kernel_param "array" too far apart in .init.setup.
+ */
 #define __setup_param(str, unique_id, fn, early)			\
 	static char __setup_str_##unique_id[] __initdata = str;	\
 	static struct obs_kernel_param __setup_##unique_id	\
-		 __attribute_used__				\
-		 __attribute__((__section__(".init.setup")))	\
+		__attribute_used__				\
+		__attribute__((__section__(".init.setup")))	\
+		__attribute__((aligned((sizeof(long)))))	\
 		= { __setup_str_##unique_id, fn, early }
 
 #define __setup_null_param(str, unique_id)			\

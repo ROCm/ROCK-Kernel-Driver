@@ -3612,6 +3612,14 @@ D: MD driver
 D: EISA/sysfs subsystem
 S: France
 
+N: Luiz Fernando N. Capitulino
+E: lcapitulino@terra.com.br
+E: lcapitulino@prefeitura.sp.gov.br
+W: http://www.telecentros.sp.gov.br
+D: Little fixes and a lot of janitorial work
+S: E-GOV Telecentros SP
+S: Brazil
+
 # Don't add your name here, unless you really _are_ after Marc
 # alphabetically. Leonard used to be very proud of being the 
 # last entry, and he'll get positively pissed if he can't even

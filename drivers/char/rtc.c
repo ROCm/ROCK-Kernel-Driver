@@ -99,7 +99,6 @@ static int rtc_irq = PCI_IRQ_NONE;
 
 #ifdef	CONFIG_HPET_RTC_IRQ
 #undef	RTC_IRQ
-#define	RTC_IRQ	0
 #endif
 
 #ifdef RTC_IRQ

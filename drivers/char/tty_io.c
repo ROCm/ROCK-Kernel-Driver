@@ -1363,13 +1363,8 @@ retry_open:
 	}
 #endif
 	if (device == MKDEV(TTYAUX_MAJOR,1)) {
-		struct console *c = console_drivers;
-		for (c = console_drivers; c; c = c->next) {
-			if (!c->device)
-				continue;
-			driver = c->device(c, &index);
-			if (!driver)
-				continue;
+		driver = console_device(&index);
+		if (driver) {
 			/* Don't let /dev/console block */
 			filp->f_flags |= O_NONBLOCK;
 			noctty = 1;

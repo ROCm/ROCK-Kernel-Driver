@@ -109,7 +109,6 @@ static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	char *iname_addr = iname;
 	int retval;
 	int fd_binary = -1;
-	char fd_str[12];
 	struct files_struct *files = NULL;
 
 	retval = -ENOEXEC;
@@ -130,7 +129,6 @@ static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	}
 
 	if (fmt->flags & MISC_FMT_OPEN_BINARY) {
-		char *fdsp = fd_str;
 
 		files = current->files;
 		retval = unshare_files();
@@ -158,27 +156,27 @@ static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		allow_write_access(bprm->file);
 		bprm->file = NULL;
 
-		/* make argv[1] be the file descriptor of the binary */
- 		snprintf(fd_str, sizeof(fd_str), "%d", fd_binary);
- 		retval = copy_strings_kernel(1, &fdsp, bprm);
-		if (retval < 0)
-			goto _error;
-		bprm->argc++;
+		/* mark the bprm that fd should be passed to interp */
+		bprm->interp_flags |= BINPRM_FLAGS_EXECFD;
+		bprm->interp_data = fd_binary;
 
  	} else {
  		allow_write_access(bprm->file);
  		fput(bprm->file);
  		bprm->file = NULL;
-		/* make argv[1] be the path to the binary */
- 		retval = copy_strings_kernel (1, &bprm->interp, bprm);
-		if (retval < 0)
-			goto _error;
-		bprm->argc++;
  	}
+	/* make argv[1] be the path to the binary */
+	retval = copy_strings_kernel (1, &bprm->interp, bprm);
+	if (retval < 0)
+		goto _error;
+	bprm->argc++;
+
+	/* add the interp as argv[0] */
 	retval = copy_strings_kernel (1, &iname_addr, bprm);
 	if (retval < 0)
 		goto _error;
 	bprm->argc ++;
+
 	bprm->interp = iname;	/* for binfmt_script */
 
 	interp_file = open_exec (iname);
@@ -215,6 +213,7 @@ _error:
 	if (fd_binary > 0)
 		sys_close(fd_binary);
 	bprm->interp_flags = 0;
+	bprm->interp_data = 0;
 _unshare:
 	if (files) {
 		put_files_struct(current->files);

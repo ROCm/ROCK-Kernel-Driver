@@ -80,7 +80,7 @@ void __init msg_init (void)
 	ipc_init_ids(&msg_ids,msg_ctlmni);
 
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry("sysvipc/msg", 0, 0, sysvipc_msg_read_proc, NULL);
+	create_proc_read_entry("sysvipc/msg", 0, NULL, sysvipc_msg_read_proc, NULL);
 #endif
 }
 

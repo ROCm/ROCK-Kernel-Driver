@@ -88,8 +88,8 @@ static struct
 	unsigned long long * base __attribute__ ((packed));
 }
 real_mode_gdt = { sizeof (real_mode_gdt_entries) - 1, real_mode_gdt_entries },
-real_mode_idt = { 0x3ff, 0 },
-no_idt = { 0, 0 };
+real_mode_idt = { 0x3ff, NULL },
+no_idt = { 0, NULL };
 
 
 /* This is 16-bit protected mode code to disable paging and the cache,
@@ -266,7 +266,7 @@ void machine_restart(char * __unused)
 
 	if (!reboot_thru_bios) {
 		if (efi_enabled) {
-			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, 0);
+			efi.reset_system(EFI_RESET_COLD, EFI_SUCCESS, 0, NULL);
 			__asm__ __volatile__("lidt %0": :"m" (no_idt));
 			__asm__ __volatile__("int3");
 		}
@@ -280,7 +280,7 @@ void machine_restart(char * __unused)
 		}
 	}
 	if (efi_enabled)
-		efi.reset_system(EFI_RESET_WARM, EFI_SUCCESS, 0, 0);
+		efi.reset_system(EFI_RESET_WARM, EFI_SUCCESS, 0, NULL);
 
 	machine_real_restart(jump_to_bios, sizeof(jump_to_bios));
 }
@@ -296,7 +296,7 @@ EXPORT_SYMBOL(machine_halt);
 void machine_power_off(void)
 {
 	if (efi_enabled)
-		efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, 0);
+		efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
 	if (pm_power_off)
 		pm_power_off();
 }

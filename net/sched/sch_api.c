@@ -1098,6 +1098,7 @@ int psched_tod_diff(int delta_sec, int bound)
 		delta = bound;
 	return delta;
 }
+EXPORT_SYMBOL(psched_tod_diff);
 #endif
 
 psched_time_t psched_time_base;
@@ -1105,10 +1106,14 @@ psched_time_t psched_time_base;
 #if PSCHED_CLOCK_SOURCE == PSCHED_CPU
 psched_tdiff_t psched_clock_per_hz;
 int psched_clock_scale;
+EXPORT_SYMBOL(psched_clock_per_hz);
+EXPORT_SYMBOL(psched_clock_scale);
 #endif
 
 #ifdef PSCHED_WATCHER
 PSCHED_WATCHER psched_time_mark;
+EXPORT_SYMBOL(psched_time_mark);
+EXPORT_SYMBOL(psched_time_base);
 
 static void psched_tick(unsigned long);
 
@@ -1214,4 +1219,3 @@ EXPORT_SYMBOL(qdisc_get_rtab);
 EXPORT_SYMBOL(qdisc_put_rtab);
 EXPORT_SYMBOL(register_qdisc);
 EXPORT_SYMBOL(unregister_qdisc);
-PSCHED_EXPORTLIST;

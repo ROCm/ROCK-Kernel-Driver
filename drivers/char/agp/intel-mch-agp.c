@@ -167,7 +167,7 @@ static int intel_i830_create_gatt_table(void)
 	size = agp_bridge->current_size;
 	page_order = size->page_order;
 	num_entries = size->num_entries;
-	agp_bridge->gatt_table_real = 0;
+	agp_bridge->gatt_table_real = NULL;
 
 	pci_read_config_dword(intel_i830_private.i830_dev,I810_MMADDR,&temp);
 	temp &= 0xfff80000;

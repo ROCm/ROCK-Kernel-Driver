@@ -215,10 +215,10 @@ cifs_open(struct inode *inode, struct file *file)
 				}
 				if (pTcon->ses->capabilities & CAP_UNIX)
 					rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
-						full_path, inode->i_sb);
+						full_path, inode->i_sb,xid);
 				else
 					rc = cifs_get_inode_info(&file->f_dentry->d_inode,
-						full_path, buf, inode->i_sb);
+						full_path, buf, inode->i_sb,xid);
 
 				if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 					pCifsInode->clientCanCacheAll = TRUE;
@@ -367,10 +367,10 @@ and we can never tell if the caller already has the rename_sem */
 				pCifsInode->clientCanCacheRead = FALSE;
 				if (pTcon->ses->capabilities & CAP_UNIX)
 					rc = cifs_get_inode_info_unix(&inode,
-						full_path, inode->i_sb);
+						full_path, inode->i_sb,xid);
 				else
 					rc = cifs_get_inode_info(&inode,
-						full_path, NULL, inode->i_sb);
+						full_path, NULL, inode->i_sb,xid);
 			} /* else we are writing out data to server already
 			and could deadlock if we tried to flush data, and 
 			since we do not know if we have data that would
@@ -627,7 +627,6 @@ cifs_write(struct file * file, const char *write_data,
 			while we blocked so return what we managed to write */
 				return total_written;
 			} 
-                        open_file = (struct cifsFileInfo *) file->private_data;
 			if(open_file->closePend) {
 				FreeXid(xid);
 				if(total_written)
@@ -1535,6 +1534,7 @@ construct_dentry(struct qstr *qstring, struct file *file,
 			if(*ptmp_inode == NULL)
 				return;
 			d_instantiate(tmp_dentry, *ptmp_inode);
+			insert_inode_hash(*ptmp_inode);
 		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
@@ -1546,12 +1546,11 @@ construct_dentry(struct qstr *qstring, struct file *file,
 			
 		*ptmp_inode = new_inode(file->f_dentry->d_sb);
 		tmp_dentry->d_op = &cifs_dentry_ops;
-		cFYI(0, (" instantiate dentry 0x%p with inode 0x%p ",
-			 tmp_dentry, *ptmp_inode));
 		if(*ptmp_inode == NULL)
 			return;
 		d_instantiate(tmp_dentry, *ptmp_inode);
 		d_rehash(tmp_dentry);
+		insert_inode_hash(*ptmp_inode);
 	}
 
 	tmp_dentry->d_time = jiffies;
@@ -2137,6 +2136,7 @@ struct address_space_operations cifs_addr_ops = {
 	.writepage = cifs_writepage,
 	.prepare_write = cifs_prepare_write, 
 	.commit_write = cifs_commit_write,
+	.set_page_dirty = __set_page_dirty_nobuffers,
    /* .sync_page = cifs_sync_page, */
 	/*.direct_IO = */
 };

@@ -667,7 +667,7 @@ void sk_free(struct sock *sk)
 void __init sk_init(void)
 {
 	sk_cachep = kmem_cache_create("sock", sizeof(struct sock), 0,
-				      SLAB_HWCACHE_ALIGN, 0, 0);
+				      SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!sk_cachep)
 		printk(KERN_CRIT "sk_init: Cannot create sock SLAB cache!");
 

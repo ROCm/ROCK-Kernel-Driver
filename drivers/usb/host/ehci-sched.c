@@ -89,7 +89,7 @@ static int periodic_unlink (struct ehci_hcd *ehci, unsigned frame, void *ptr)
 
 	/* unlink from shadow list; HCD won't see old structure again */
 	*prev_p = *next_p;
-	next_p->ptr = 0;
+	next_p->ptr = NULL;
 
 	return 1;
 }
@@ -317,7 +317,7 @@ static void intr_deschedule (
 	} while (frame < ehci->periodic_size);
 
 	qh->qh_state = QH_STATE_UNLINK;
-	qh->qh_next.ptr = 0;
+	qh->qh_next.ptr = NULL;
 	ehci->periodic_sched--;
 
 	/* maybe turn off periodic schedule */
@@ -718,7 +718,7 @@ iso_stream_put(struct ehci_hcd *ehci, struct ehci_iso_stream *stream)
 
 		is_in = (stream->bEndpointAddress & USB_DIR_IN) ? 0x10 : 0;
 		stream->bEndpointAddress &= 0x0f;
-		dev->ep [is_in + stream->bEndpointAddress] = 0;
+		dev->ep[is_in + stream->bEndpointAddress] = NULL;
 
 		if (stream->rescheduled) {
 			ehci_info (ehci, "ep%d%s-iso rescheduled "
@@ -772,7 +772,7 @@ iso_stream_find (struct ehci_hcd *ehci, struct urb *urb)
 		ehci_dbg (ehci, "dev %s ep%d%s, not iso??\n",
 			urb->dev->devpath, epnum & 0x0f,
 			(epnum & 0x10) ? "in" : "out");
-		stream = 0;
+		stream = NULL;
 	}
 
 	/* caller guarantees an eventual matching iso_stream_put */
@@ -896,7 +896,7 @@ itd_urb_transaction (
 			list_del (&itd->itd_list);
 			itd_dma = itd->itd_dma;
 		} else
-			itd = 0;
+			itd = NULL;
 
 		if (!itd) {
 			spin_unlock_irqrestore (&ehci->lock, flags);
@@ -1116,7 +1116,7 @@ iso_stream_schedule (
 
 fail:
 	iso_sched_free (stream, sched);
-	urb->hcpriv = 0;
+	urb->hcpriv = NULL;
 	return status;
 
 ready:
@@ -1215,8 +1215,8 @@ itd_link_urb (
 	hcd_to_bus (&ehci->hcd)->bandwidth_isoc_reqs++;
 
 	/* fill iTDs uframe by uframe */
-	for (packet = 0, itd = 0; packet < urb->number_of_packets; ) {
-		if (itd == 0) {
+	for (packet = 0, itd = NULL; packet < urb->number_of_packets; ) {
+		if (itd == NULL) {
 			/* ASSERT:  we have all necessary itds */
 			// BUG_ON (list_empty (&iso_sched->td_list));
 
@@ -1247,14 +1247,14 @@ itd_link_urb (
 		if (((next_uframe >> 3) != frame)
 				|| packet == urb->number_of_packets) {
 			itd_link (ehci, frame % ehci->periodic_size, itd);
-			itd = 0;
+			itd = NULL;
 		}
 	}
 	stream->next_uframe = next_uframe;
 
 	/* don't need that schedule data any more */
 	iso_sched_free (stream, iso_sched);
-	urb->hcpriv = 0;
+	urb->hcpriv = NULL;
 
 	timer_action (ehci, TIMER_IO_WATCHDOG);
 	if (unlikely (!ehci->periodic_sched++))
@@ -1311,8 +1311,8 @@ itd_complete (
 	}
 
 	usb_put_urb (urb);
-	itd->urb = 0;
-	itd->stream = 0;
+	itd->urb = NULL;
+	itd->stream = NULL;
 	list_move (&itd->itd_list, &stream->free_list);
 	iso_stream_put (ehci, stream);
 
@@ -1328,7 +1328,7 @@ itd_complete (
 	/* give urb back to the driver ... can be out-of-order */
 	dev = usb_get_dev (urb->dev);
 	ehci_urb_done (ehci, urb, regs);
-	urb = 0;
+	urb = NULL;
 
 	/* defer stopping schedule; completion can submit */
 	ehci->periodic_sched--;
@@ -1903,7 +1903,7 @@ restart:
 				dbg ("corrupt type %d frame %d shadow %p",
 					type, frame, q.ptr);
 				// BUG ();
-				q.ptr = 0;
+				q.ptr = NULL;
 			}
 
 			/* assume completion callbacks modify the queue */

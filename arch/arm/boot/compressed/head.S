@@ -324,7 +324,7 @@ wont_overwrite:	mov	r0, r4
 LC0:		.word	LC0			@ r1
 		.word	__bss_start		@ r2
 		.word	_end			@ r3
-		.word	_load_addr		@ r4
+		.word	zreladdr		@ r4
 		.word	_start			@ r5
 		.word	_got_start		@ r6
 		.word	_got_end		@ ip

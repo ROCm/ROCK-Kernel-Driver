@@ -54,7 +54,7 @@
 
 #define INIT_SIGHAND(sighand) {	\
 	.count		= ATOMIC_INIT(1), 		\
-	.action		= { {{0,}}, }, 			\
+	.action		= { {{NULL,}}, },		\
 	.siglock	= SPIN_LOCK_UNLOCKED, 		\
 }
 

@@ -625,4 +625,4 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
 
 /* A blank transport template that is used in drivers that don't
  * yet implement Transport Attributes */
-struct scsi_transport_template blank_transport_template = { 0, };
+struct scsi_transport_template blank_transport_template = { NULL, };

@@ -398,7 +398,7 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, s
 	return result;
 }
 
-static inline int __vfs_follow_link(struct nameidata *, const char *);
+static int __vfs_follow_link(struct nameidata *, const char *);
 
 /*
  * This limits recursive symlink follows to 8, while
@@ -2211,8 +2211,7 @@ int generic_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 	return res;
 }
 
-static inline int
-__vfs_follow_link(struct nameidata *nd, const char *link)
+static int __vfs_follow_link(struct nameidata *nd, const char *link)
 {
 	int res = 0;
 	char *name;

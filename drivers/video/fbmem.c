@@ -721,7 +721,6 @@ int fb_show_logo(struct fb_info *info)
 	u32 *palette = NULL, *saved_pseudo_palette = NULL;
 	unsigned char *logo_new = NULL;
 	struct fb_image image;
-	struct fb_fillrect rect;
 	int x;
 
 	/* Return if the frame buffer is not mapped or suspended */
@@ -767,12 +766,6 @@ int fb_show_logo(struct fb_info *info)
 	image.height = fb_logo.logo->height;
 	image.dy = 0;
 
-	rect.dx = 0;
-	rect.dy = 0;
-	rect.color = 0;
-	rect.width = info->var.xres;
-	rect.height = fb_logo.logo->height;
-	info->fbops->fb_fillrect(info, &rect);
 	for (x = 0; x < num_online_cpus() * (fb_logo.logo->width + 8) &&
 	     x <= info->var.xres-fb_logo.logo->width; x += (fb_logo.logo->width + 8)) {
 		image.dx = x;

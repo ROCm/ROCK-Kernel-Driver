@@ -199,7 +199,7 @@ struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
 	}
 
 	write_lock(&vmlist_lock);
-	for (p = &vmlist; (tmp = *p) ;p = &tmp->next) {
+	for (p = &vmlist; (tmp = *p) != NULL ;p = &tmp->next) {
 		if ((unsigned long)tmp->addr < addr)
 			continue;
 		if ((size + addr) < addr)
@@ -260,7 +260,7 @@ struct vm_struct *remove_vm_area(void *addr)
 	struct vm_struct **p, *tmp;
 
 	write_lock(&vmlist_lock);
-	for (p = &vmlist ; (tmp = *p) ;p = &tmp->next) {
+	for (p = &vmlist ; (tmp = *p) != NULL ;p = &tmp->next) {
 		 if (tmp->addr == addr)
 			 goto found;
 	}

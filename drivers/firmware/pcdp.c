@@ -56,6 +56,7 @@ setup_serial_console(int rev, struct pcdp_uart *uart)
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 	struct uart_port port;
 	static char options[16];
+	int mapsize = 64;
 
 	memset(&port, 0, sizeof(port));
 	port.uartclk = uart->clock_rate;
@@ -64,11 +65,16 @@ setup_serial_console(int rev, struct pcdp_uart *uart)
 
 	if (uart->addr.address_space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
 		port.mapbase = uart->addr.address;
-		port.membase = ioremap(port.mapbase, 64);
-		port.iotype = SERIAL_IO_MEM;
+		port.membase = ioremap(port.mapbase, mapsize);
+		if (!port.membase) {
+			printk(KERN_ERR "%s: couldn't ioremap 0x%lx-0x%lx\n",
+				__FUNCTION__, port.mapbase, port.mapbase + mapsize);
+			return;
+		}
+		port.iotype = UPIO_MEM;
 	} else if (uart->addr.address_space_id == ACPI_ADR_SPACE_SYSTEM_IO) {
 		port.iobase = uart->addr.address;
-		port.iotype = SERIAL_IO_PORT;
+		port.iotype = UPIO_PORT;
 	} else
 		return;
 
@@ -102,7 +108,7 @@ setup_serial_console(int rev, struct pcdp_uart *uart)
 	add_preferred_console("ttyS", port.line, options);
 
 	printk(KERN_INFO "PCDP: serial console at %s 0x%lx (ttyS%d, options %s)\n",
-		port.iotype == SERIAL_IO_MEM ? "MMIO" : "I/O",
+		port.iotype == UPIO_MEM ? "MMIO" : "I/O",
 		uart->addr.address, port.line, options);
 #endif
 }

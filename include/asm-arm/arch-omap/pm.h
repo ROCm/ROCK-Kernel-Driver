@@ -85,9 +85,6 @@ extern void omap_pm_idle(void);
 extern void omap_pm_suspend(void);
 extern int omap_cpu_suspend(unsigned short, unsigned short);
 extern int omap_idle_loop_suspend(void);
-extern struct async_struct *omap_pm_sercons;
-extern unsigned int serial_in(struct async_struct *, int);
-extern unsigned int serial_out(struct async_struct *, int, int);
 
 #ifdef CONFIG_ARCH_OMAP1510
 #define OMAP_SRAM_IDLE_SUSPEND	0xd002F000

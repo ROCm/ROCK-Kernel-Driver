@@ -8,12 +8,6 @@
  * published by the Free Software Foundation.
  */
 
-/*
- * The size of struct machine_desc
- *   (for assembler code)
- */
-#define SIZEOF_MACHINE_DESC	52
-
 #ifndef __ASSEMBLY__
 
 struct tag;

@@ -378,10 +378,8 @@ static unsigned long csz_update(struct Qdisc *sch)
 	unsigned long		R_c;
 
 	PSCHED_GET_TIME(now);
-	delay = PSCHED_TDIFF_SAFE(now, q->t_c, 0, goto do_reset);
-
+	delay = PSCHED_TDIFF(now, q->t_c);
 	if (delay>>q->delta_log) {
-do_reset:
 		/* Delta is too large.
 		   It is possible if MTU/BW > 1<<q->delta_log
 		   (i.e. configuration error) or because of hardware

@@ -67,7 +67,7 @@ unsigned long ip_ct_tcp_timeout_time_wait =     2 MINS;
 unsigned long ip_ct_tcp_timeout_close =        10 SECS;
 
 static unsigned long * tcp_timeouts[]
-= { 0,                                 /*      TCP_CONNTRACK_NONE */
+= { NULL,                              /*      TCP_CONNTRACK_NONE */
     &ip_ct_tcp_timeout_established,    /*      TCP_CONNTRACK_ESTABLISHED,      */
     &ip_ct_tcp_timeout_syn_sent,       /*      TCP_CONNTRACK_SYN_SENT, */
     &ip_ct_tcp_timeout_syn_recv,       /*      TCP_CONNTRACK_SYN_RECV, */
@@ -76,7 +76,7 @@ static unsigned long * tcp_timeouts[]
     &ip_ct_tcp_timeout_close,          /*      TCP_CONNTRACK_CLOSE,    */
     &ip_ct_tcp_timeout_close_wait,     /*      TCP_CONNTRACK_CLOSE_WAIT,       */
     &ip_ct_tcp_timeout_last_ack,       /*      TCP_CONNTRACK_LAST_ACK, */
-    0,                                 /*      TCP_CONNTRACK_LISTEN */
+    NULL,                              /*      TCP_CONNTRACK_LISTEN */
  };
  
 #define sNO TCP_CONNTRACK_NONE

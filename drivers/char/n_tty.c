@@ -903,7 +903,7 @@ static void n_tty_close(struct tty_struct *tty)
 	n_tty_flush_buffer(tty);
 	if (tty->read_buf) {
 		free_buf(tty->read_buf);
-		tty->read_buf = 0;
+		tty->read_buf = NULL;
 	}
 }
 
@@ -920,7 +920,7 @@ static int n_tty_open(struct tty_struct *tty)
 	memset(tty->read_buf, 0, N_TTY_BUF_SIZE);
 	reset_buffer_flags(tty);
 	tty->column = 0;
-	n_tty_set_termios(tty, 0);
+	n_tty_set_termios(tty, NULL);
 	tty->minimum_to_wake = 1;
 	tty->closing = 0;
 	return 0;

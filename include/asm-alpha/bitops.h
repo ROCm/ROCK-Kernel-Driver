@@ -418,9 +418,9 @@ find_next_zero_bit(void * addr, unsigned long size, unsigned long offset)
  * Find next one bit in a bitmap reasonably efficiently.
  */
 static inline unsigned long
-find_next_bit(void * addr, unsigned long size, unsigned long offset)
+find_next_bit(const void * addr, unsigned long size, unsigned long offset)
 {
-	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
+	const unsigned long * p = ((const unsigned long *) addr) + (offset >> 6);
 	unsigned long result = offset & ~63UL;
 	unsigned long tmp;
 

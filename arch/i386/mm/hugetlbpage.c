@@ -146,9 +146,6 @@ follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 	struct page *page;
 	struct vm_area_struct *vma;
 
-	if (! mm->used_hugetlb)
-		return ERR_PTR(-EINVAL);
-
 	vma = find_vma(mm, addr);
 	if (!vma || !is_vm_hugetlb_page(vma))
 		return ERR_PTR(-EINVAL);

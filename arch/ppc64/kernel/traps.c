@@ -285,7 +285,7 @@ UnknownException(struct pt_regs *regs)
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = 0;
-	info.si_addr = 0;
+	info.si_addr = NULL;
 	_exception(SIGTRAP, &info, regs);	
 }
 

@@ -37,7 +37,7 @@ static int populate_dir(struct kobject * kobj)
 	int i;
 	
 	if (t && t->default_attrs) {
-		for (i = 0; (attr = t->default_attrs[i]); i++) {
+		for (i = 0; (attr = t->default_attrs[i]) != NULL; i++) {
 			if ((error = sysfs_create_file(kobj,attr)))
 				break;
 		}
@@ -145,7 +145,7 @@ static void kset_hotplug(const char *action, struct kset *kset,
 
 	argv [0] = hotplug_path;
 	argv [1] = name;
-	argv [2] = 0;
+	argv [2] = NULL;
 
 	/* minimal command environment */
 	envp [i++] = "HOME=/";

@@ -53,6 +53,32 @@ struct usb_serial_device_type usb_serial_generic_device = {
 	.num_ports =		1,
 	.shutdown =		usb_serial_generic_shutdown,
 };
+
+/* we want to look at all devices, as the vendor/product id can change
+ * depending on the command line argument */
+static struct usb_device_id generic_serial_ids[] = {
+	{.driver_info = 42},
+	{}
+};
+
+static int generic_probe(struct usb_interface *interface,
+			       const struct usb_device_id *id)
+{
+	const struct usb_device_id *id_pattern;
+
+	id_pattern = usb_match_id(interface, generic_device_ids);
+	if (id_pattern != NULL)
+		return usb_serial_probe(interface, id);
+	return -ENODEV;
+}
+
+static struct usb_driver generic_driver = {
+	.owner =	THIS_MODULE,
+	.name =		"usbserial_generic",
+	.probe =	generic_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	generic_serial_ids,
+};
 #endif
 
 int usb_serial_generic_register (int _debug)
@@ -67,6 +93,12 @@ int usb_serial_generic_register (int _debug)
 
 	/* register our generic driver with ourselves */
 	retval = usb_serial_register (&usb_serial_generic_device);
+	if (retval)
+		goto exit;
+	retval = usb_register(&generic_driver);
+	if (retval)
+		usb_serial_deregister(&usb_serial_generic_device);
+exit:
 #endif
 	return retval;
 }
@@ -75,6 +107,7 @@ void usb_serial_generic_deregister (void)
 {
 #ifdef CONFIG_USB_SERIAL_GENERIC
 	/* remove our generic driver */
+	usb_deregister(&generic_driver);
 	usb_serial_deregister (&usb_serial_generic_device);
 #endif
 }
