@@ -227,6 +227,7 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 	if (opts->fs_gid != 0)
 		seq_printf(m, ",gid=%d", opts->fs_gid);
 	seq_printf(m, ",umask=%04o", opts->fs_umask);
+	seq_printf(m, ",dmask=%04o", opts->fs_dmask);
 	if (sbi->nls_disk)
 		seq_printf(m, ",codepage=%s", sbi->nls_disk->charset);
 	if (isvfat) {
@@ -290,7 +291,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 
 	opts->fs_uid = current->uid;
 	opts->fs_gid = current->gid;
-	opts->fs_umask = current->fs->umask;
+	opts->fs_umask = opts->fs_dmask = current->fs->umask;
 	opts->codepage = 0;
 	opts->iocharset = NULL;
 	if (is_vfat)
@@ -365,6 +366,13 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			if (!value || !*value) ret = 0;
 			else {
 				opts->fs_umask = simple_strtoul(value,&value,8);
+				if (*value) ret = 0;
+			}
+		}
+		else if (!strcmp(this_char,"dmask")) {
+			if (!value || !*value) ret = 0;
+			else {
+				opts->fs_dmask = simple_strtoul(value,&value,8);
 				if (*value) ret = 0;
 			}
 		}
@@ -530,7 +538,7 @@ static int fat_read_root(struct inode *inode)
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
 	inode->i_generation = 0;
-	inode->i_mode = (S_IRWXUGO & ~sbi->options.fs_umask) | S_IFDIR;
+	inode->i_mode = (S_IRWXUGO & ~sbi->options.fs_dmask) | S_IFDIR;
 	inode->i_op = sbi->dir_ops;
 	inode->i_fop = &fat_dir_operations;
 	if (sbi->fat_bits == 32) {
@@ -1157,8 +1165,8 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	
 	if ((de->attr & ATTR_DIR) && !IS_FREE(de->name)) {
 		inode->i_generation &= ~1;
-		inode->i_mode = MSDOS_MKMODE(de->attr,S_IRWXUGO &
-		    ~sbi->options.fs_umask) | S_IFDIR;
+		inode->i_mode = MSDOS_MKMODE(de->attr,
+			S_IRWXUGO & ~sbi->options.fs_dmask) | S_IFDIR;
 		inode->i_op = sbi->dir_ops;
 		inode->i_fop = &fat_dir_operations;
 
@@ -1278,9 +1286,9 @@ retry:
 
 int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 {
-	struct super_block *sb = dentry->d_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(dentry->d_sb);
 	struct inode *inode = dentry->d_inode;
-	int error = 0;
+	int mask, error = 0;
 
 	lock_kernel();
 
@@ -1294,21 +1302,21 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 
 	error = inode_change_ok(inode, attr);
 	if (error) {
-		if( MSDOS_SB(sb)->options.quiet )
-		    error = 0; 
+		if (sbi->options.quiet)
+			error = 0;
  		goto out;
 	}
 
 	if (((attr->ia_valid & ATTR_UID) && 
-	     (attr->ia_uid != MSDOS_SB(sb)->options.fs_uid)) ||
+	     (attr->ia_uid != sbi->options.fs_uid)) ||
 	    ((attr->ia_valid & ATTR_GID) && 
-	     (attr->ia_gid != MSDOS_SB(sb)->options.fs_gid)) ||
+	     (attr->ia_gid != sbi->options.fs_gid)) ||
 	    ((attr->ia_valid & ATTR_MODE) &&
 	     (attr->ia_mode & ~MSDOS_VALID_MODE)))
 		error = -EPERM;
 
 	if (error) {
-		if( MSDOS_SB(sb)->options.quiet )  
+		if (sbi->options.quiet)  
 			error = 0;
 		goto out;
 	}
@@ -1317,11 +1325,10 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 		goto out;
 
 	if (S_ISDIR(inode->i_mode))
-		inode->i_mode |= S_IXUGO;
-
-	inode->i_mode = ((inode->i_mode & S_IFMT) | ((((inode->i_mode & S_IRWXU
-	    & ~MSDOS_SB(sb)->options.fs_umask) | S_IRUSR) >> 6)*S_IXUGO)) &
-	    ~MSDOS_SB(sb)->options.fs_umask;
+		mask = sbi->options.fs_dmask;
+	else
+		mask = sbi->options.fs_umask;
+	inode->i_mode &= S_IFMT | (S_IRWXUGO & ~mask);
 out:
 	unlock_kernel();
 	return error;

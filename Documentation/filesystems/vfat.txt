@@ -8,6 +8,10 @@ if you want to format from within Linux.
 
 VFAT MOUNT OPTIONS
 ----------------------------------------------------------------------
+umask=###     -- The permission mask (see umask(1)) for the regulare file.
+                 The default is the umask of current process.
+dmask=###     -- The permission mask for the directory.
+                 The default is the umask of current process.
 codepage=###  -- Sets the codepage for converting to shortname characters
 		 on FAT and VFAT filesystems.  By default, codepage 437
 		 is used.  This is the default for the U.S. and some
