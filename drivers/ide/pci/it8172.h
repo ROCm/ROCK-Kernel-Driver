@@ -20,8 +20,6 @@ static void init_hwif_it8172(ide_hwif_t *);
 
 static ide_pci_device_t it8172_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_ITE,
-		.device		= PCI_DEVICE_ID_ITE_IT8172G,
 		.name		= "IT8172G",
 		.init_setup	= init_setup_it8172,
 		.init_chipset	= init_chipset_it8172,

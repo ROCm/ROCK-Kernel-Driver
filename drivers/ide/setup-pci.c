@@ -285,14 +285,8 @@ second_chance_to_dma:
 
 void ide_setup_pci_noise (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	if ((d->vendor != dev->vendor) && (d->device != dev->device)) {
-		printk(KERN_INFO "%s: unknown IDE controller at PCI slot "
-			"%s, VID=%04x, DID=%04x\n",
-			d->name, pci_name(dev), dev->vendor, dev->device);
-        } else {
-		printk(KERN_INFO "%s: IDE controller at PCI slot %s\n",
-			d->name, pci_name(dev));
-	}
+	printk(KERN_INFO "%s: IDE controller at PCI slot %s\n",
+			 d->name, pci_name(dev));
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_pci_noise);
@@ -422,8 +416,7 @@ static ide_hwif_t *ide_hwif_configure(struct pci_dev *dev, ide_pci_device_t *d, 
 	unsigned long ctl = 0, base = 0;
 	ide_hwif_t *hwif;
 
-	if(!d->isa_ports)
-	{
+	if ((d->flags & IDEPCI_FLAG_ISA_PORTS) == 0) {
 		/*  Possibly we should fail if these checks report true */
 		ide_pci_check_iomem(dev, d, 2*port);
 		ide_pci_check_iomem(dev, d, 2*port+1);
@@ -495,9 +488,7 @@ static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwi
  			 * Set up BM-DMA capability
 			 * (PnP BIOS should have done this)
  			 */
-			if (!((d->device == PCI_DEVICE_ID_CYRIX_5530_IDE && d->vendor == PCI_VENDOR_ID_CYRIX)
-			    ||(d->device == PCI_DEVICE_ID_NS_SCx200_IDE && d->vendor == PCI_VENDOR_ID_NS)))
-			{
+			if ((d->flags & IDEPCI_FLAG_FORCE_MASTER) == 0) {
 				/*
 				 * default DMA off if we had to
 				 * configure it here
@@ -613,9 +604,7 @@ void ide_pci_setup_ports(struct pci_dev *dev, ide_pci_device_t *d, int autodma, 
 		 * by the bios for raid purposes. 
 		 * Skip the normal "is it enabled" test for those.
 		 */
-		if (((d->vendor == PCI_VENDOR_ID_PROMISE) &&
-		     ((d->device == PCI_DEVICE_ID_PROMISE_20262) ||
-		      (d->device == PCI_DEVICE_ID_PROMISE_20265))) &&
+		if ((d->flags & IDEPCI_FLAG_FORCE_PDC) &&
 		    (secondpdc++==1) && (port==1))
 			goto controller_ok;
 			

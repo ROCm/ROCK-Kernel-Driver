@@ -744,8 +744,6 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
 {
 	ide_pci_device_t *d = &piix_pci_info[id->driver_data];
 
-	if (dev->device != d->device)
-		BUG();
 	d->init_setup(dev, d);
 	return 0;
 }

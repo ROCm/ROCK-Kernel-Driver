@@ -514,8 +514,6 @@ static int __devinit pdc202new_init_one(struct pci_dev *dev, const struct pci_de
 {
 	ide_pci_device_t *d = &pdcnew_chipsets[id->driver_data];
 
-	if (dev->device != d->device)
-		BUG();
 	d->init_setup(dev, d);
 	return 0;
 }

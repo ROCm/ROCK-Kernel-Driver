@@ -1552,9 +1552,15 @@ typedef struct ide_pci_enablebit_s {
 	u8	val;	/* value of masked reg when "enabled" */
 } ide_pci_enablebit_t;
 
+enum {
+	/* Uses ISA control ports not PCI ones. */
+	IDEPCI_FLAG_ISA_PORTS		= (1 << 0),
+
+	IDEPCI_FLAG_FORCE_MASTER	= (1 << 1),
+	IDEPCI_FLAG_FORCE_PDC		= (1 << 2),
+};
+
 typedef struct ide_pci_device_s {
-	u16			vendor;
-	u16			device;
 	char			*name;
 	void			(*init_setup)(struct pci_dev *, struct ide_pci_device_s *);
 	void			(*init_setup_dma)(struct pci_dev *, struct ide_pci_device_s *, ide_hwif_t *);
@@ -1568,7 +1574,7 @@ typedef struct ide_pci_device_s {
 	u8			bootable;
 	unsigned int		extra;
 	struct ide_pci_device_s	*next;
-	u8			isa_ports; 	/* Uses ISA control ports not PCI ones */
+	u8			flags;
 } ide_pci_device_t;
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);

@@ -220,13 +220,9 @@ static unsigned int __init init_chipset_triflex(struct pci_dev *dev,
 static int __devinit triflex_init_one(struct pci_dev *dev, 
 		const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &triflex_devices[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &triflex_devices[id->driver_data]);
 	triflex_dev = dev;
-	
+
 	return 0;
 }
 

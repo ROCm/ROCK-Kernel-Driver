@@ -12,8 +12,6 @@ static void init_hwif_sis5513(ide_hwif_t *);
 
 static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_SI,
-		.device		= PCI_DEVICE_ID_SI_5513,
 		.name		= "SIS5513",
 		.init_chipset	= init_chipset_sis5513,
 		.init_hwif	= init_hwif_sis5513,

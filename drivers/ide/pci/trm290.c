@@ -397,10 +397,7 @@ void __init init_hwif_trm290 (ide_hwif_t *hwif)
 
 static int __devinit trm290_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &trm290_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &trm290_chipsets[id->driver_data]);
 	return 0;
 }
 

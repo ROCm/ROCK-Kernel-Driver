@@ -483,10 +483,7 @@ static void __init init_hwif_sl82c105(ide_hwif_t *hwif)
 
 static int __devinit sl82c105_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &sl82c105_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &sl82c105_chipsets[id->driver_data]);
 	return 0;
 }
 

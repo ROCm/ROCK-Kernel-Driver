@@ -355,10 +355,7 @@ static void __init init_setup_opti621 (struct pci_dev *dev, ide_pci_device_t *d)
 
 static int __devinit opti621_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &opti621_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &opti621_chipsets[id->driver_data]);
 	return 0;
 }
 

@@ -219,10 +219,7 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 
 static int __devinit ns87415_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &ns87415_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &ns87415_chipsets[id->driver_data]);
 	return 0;
 }
 

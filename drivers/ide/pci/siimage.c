@@ -1183,10 +1183,7 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
  
 static int __devinit siimage_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &siimage_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &siimage_chipsets[id->driver_data]);
 	return 0;
 }
 

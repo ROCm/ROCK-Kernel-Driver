@@ -12,8 +12,6 @@ static void init_hwif_sc1200(ide_hwif_t *);
 
 static ide_pci_device_t sc1200_chipsets[] __devinitdata = {
 	{	/* 0 */
-		.vendor		= PCI_VENDOR_ID_NS,
-		.device		= PCI_DEVICE_ID_NS_SCx200_IDE,
 		.name		= "SC1200",
 		.init_chipset	= init_chipset_sc1200,
 		.init_hwif	= init_hwif_sc1200,

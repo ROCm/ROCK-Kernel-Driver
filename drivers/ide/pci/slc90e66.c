@@ -366,10 +366,7 @@ static void __init init_hwif_slc90e66 (ide_hwif_t *hwif)
 
 static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &slc90e66_chipsets[id->driver_data];
-	if (dev->device != d->device)
-		BUG();
-	ide_setup_pci_device(dev, d);
+	ide_setup_pci_device(dev, &slc90e66_chipsets[id->driver_data]);
 	return 0;
 }
 
