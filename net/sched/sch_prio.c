@@ -124,18 +124,18 @@ prio_dequeue(struct Qdisc* sch)
 
 }
 
-static int
-prio_drop(struct Qdisc* sch)
+static unsigned int prio_drop(struct Qdisc* sch)
 {
 	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
 	int prio;
+	unsigned int len;
 	struct Qdisc *qdisc;
 
 	for (prio = q->bands-1; prio >= 0; prio--) {
 		qdisc = q->queues[prio];
-		if (qdisc->ops->drop(qdisc)) {
+		if ((len = qdisc->ops->drop(qdisc)) != 0) {
 			sch->q.qlen--;
-			return 1;
+			return len;
 		}
 	}
 	return 0;

@@ -7,6 +7,8 @@
  *		2 of the License, or (at your option) any later version.
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
+ *		Dmitry Torokhov <dtor@mail.ru> - allow attaching inner qdiscs -
+ *						 original idea by Martin Devera
  *
  */
 
@@ -123,62 +125,63 @@ struct tbf_sched_data
 	long	ptokens;		/* Current number of P tokens */
 	psched_time_t	t_c;		/* Time check-point */
 	struct timer_list wd_timer;	/* Watchdog timer */
+	struct Qdisc	*qdisc;		/* Inner qdisc, default - bfifo queue */
 };
 
 #define L2T(q,L)   ((q)->R_tab->data[(L)>>(q)->R_tab->rate.cell_log])
 #define L2T_P(q,L) ((q)->P_tab->data[(L)>>(q)->P_tab->rate.cell_log])
 
-static int
-tbf_enqueue(struct sk_buff *skb, struct Qdisc* sch)
+static int tbf_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 {
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
+	int ret;
 
-	if (skb->len > q->max_size)
-		goto drop;
-	__skb_queue_tail(&sch->q, skb);
-	if ((sch->stats.backlog += skb->len) <= q->limit) {
-		sch->stats.bytes += skb->len;
-		sch->stats.packets++;
-		return 0;
-	}
-
-	/* Drop action: undo the things that we just did,
-	 * i.e. make tail drop
-	 */
-
-	__skb_unlink(skb, &sch->q);
-	sch->stats.backlog -= skb->len;
-
-drop:
-	sch->stats.drops++;
-#ifdef CONFIG_NET_CLS_POLICE
-	if (sch->reshape_fail==NULL || sch->reshape_fail(skb, sch))
-#endif
-		kfree_skb(skb);
-	return NET_XMIT_DROP;
-}
-
-static int
-tbf_requeue(struct sk_buff *skb, struct Qdisc* sch)
-{
-	__skb_queue_head(&sch->q, skb);
-	sch->stats.backlog += skb->len;
-	return 0;
-}
-
-static int
-tbf_drop(struct Qdisc* sch)
-{
-	struct sk_buff *skb;
-
-	skb = __skb_dequeue_tail(&sch->q);
-	if (skb) {
-		sch->stats.backlog -= skb->len;
+	if (skb->len > q->max_size || sch->stats.backlog + skb->len > q->limit) {
 		sch->stats.drops++;
-		kfree_skb(skb);
-		return 1;
+#ifdef CONFIG_NET_CLS_POLICE
+		if (sch->reshape_fail == NULL || sch->reshape_fail(skb, sch))
+#endif
+			kfree_skb(skb);
+	
+		return NET_XMIT_DROP;
 	}
+	
+	if ((ret = q->qdisc->enqueue(skb, q->qdisc)) != 0) {
+		sch->stats.drops++;
+		return ret;
+	}	
+	
+	sch->q.qlen++;
+	sch->stats.backlog += skb->len;
+	sch->stats.bytes += skb->len;
+	sch->stats.packets++;
 	return 0;
+}
+
+static int tbf_requeue(struct sk_buff *skb, struct Qdisc* sch)
+{
+	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
+	int ret;
+	
+	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0) {
+		sch->q.qlen++; 
+		sch->stats.backlog += skb->len;
+	}
+	
+	return ret;
+}
+
+static unsigned int tbf_drop(struct Qdisc* sch)
+{
+	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
+	unsigned int len;
+	
+	if ((len = q->qdisc->ops->drop(q->qdisc)) != 0) {
+		sch->q.qlen--;
+		sch->stats.backlog -= len;
+		sch->stats.drops++;
+	}
+	return len;
 }
 
 static void tbf_watchdog(unsigned long arg)
@@ -189,19 +192,19 @@ static void tbf_watchdog(unsigned long arg)
 	netif_schedule(sch->dev);
 }
 
-static struct sk_buff *
-tbf_dequeue(struct Qdisc* sch)
+static struct sk_buff *tbf_dequeue(struct Qdisc* sch)
 {
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
 	struct sk_buff *skb;
 	
-	skb = __skb_dequeue(&sch->q);
+	skb = q->qdisc->dequeue(q->qdisc);
 
 	if (skb) {
 		psched_time_t now;
 		long toks;
 		long ptoks = 0;
-
+		unsigned int len = skb->len;
+		
 		PSCHED_GET_TIME(now);
 
 		toks = PSCHED_TDIFF_SAFE(now, q->t_c, q->buffer, 0);
@@ -210,18 +213,19 @@ tbf_dequeue(struct Qdisc* sch)
 			ptoks = toks + q->ptokens;
 			if (ptoks > (long)q->mtu)
 				ptoks = q->mtu;
-			ptoks -= L2T_P(q, skb->len);
+			ptoks -= L2T_P(q, len);
 		}
 		toks += q->tokens;
 		if (toks > (long)q->buffer)
 			toks = q->buffer;
-		toks -= L2T(q, skb->len);
+		toks -= L2T(q, len);
 
 		if ((toks|ptoks) >= 0) {
 			q->t_c = now;
 			q->tokens = toks;
 			q->ptokens = ptoks;
-			sch->stats.backlog -= skb->len;
+			sch->stats.backlog -= len;
+			sch->q.qlen--;
 			sch->flags &= ~TCQ_F_THROTTLED;
 			return skb;
 		}
@@ -245,20 +249,25 @@ tbf_dequeue(struct Qdisc* sch)
 		   This is the main idea of all FQ algorithms
 		   (cf. CSZ, HPFQ, HFSC)
 		 */
-		__skb_queue_head(&sch->q, skb);
-
+		
+		if (q->qdisc->ops->requeue(skb, q->qdisc) != NET_XMIT_SUCCESS) {
+			/* When requeue fails skb is dropped */ 
+			sch->q.qlen--;
+			sch->stats.backlog -= len;
+			sch->stats.drops++;
+		}	
+		
 		sch->flags |= TCQ_F_THROTTLED;
 		sch->stats.overlimits++;
 	}
 	return NULL;
 }
 
-
-static void
-tbf_reset(struct Qdisc* sch)
+static void tbf_reset(struct Qdisc* sch)
 {
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
 
+	qdisc_reset(q->qdisc);
 	skb_queue_purge(&sch->q);
 	sch->stats.backlog = 0;
 	PSCHED_GET_TIME(q->t_c);
@@ -266,6 +275,31 @@ tbf_reset(struct Qdisc* sch)
 	q->ptokens = q->mtu;
 	sch->flags &= ~TCQ_F_THROTTLED;
 	del_timer(&q->wd_timer);
+}
+
+static struct Qdisc *tbf_create_dflt_qdisc(struct net_device *dev, u32 limit)
+{
+	struct Qdisc *q = qdisc_create_dflt(dev, &bfifo_qdisc_ops);
+        struct rtattr *rta;
+	int ret;
+	
+	if (q) {
+		rta = kmalloc(RTA_LENGTH(sizeof(struct tc_fifo_qopt)), GFP_KERNEL);
+		if (rta) {
+			rta->rta_type = RTM_NEWQDISC;
+			rta->rta_len = RTA_LENGTH(sizeof(struct tc_fifo_qopt)); 
+			((struct tc_fifo_qopt *)RTA_DATA(rta))->limit = limit;
+			
+			ret = q->ops->change(q, rta);
+			kfree(rta);
+			
+			if (ret == 0)
+				return q;
+		}
+		qdisc_destroy(q);
+	}
+
+	return NULL;	
 }
 
 static int tbf_change(struct Qdisc* sch, struct rtattr *opt)
@@ -276,6 +310,7 @@ static int tbf_change(struct Qdisc* sch, struct rtattr *opt)
 	struct tc_tbf_qopt *qopt;
 	struct qdisc_rate_table *rtab = NULL;
 	struct qdisc_rate_table *ptab = NULL;
+	struct Qdisc *child = NULL;
 	int max_size,n;
 
 	if (rtattr_parse(tb, TCA_TBF_PTAB, RTA_DATA(opt), RTA_PAYLOAD(opt)) ||
@@ -308,8 +343,14 @@ static int tbf_change(struct Qdisc* sch, struct rtattr *opt)
 	}
 	if (max_size < 0)
 		goto done;
+	
+	if (q->qdisc == &noop_qdisc) {
+		if ((child = tbf_create_dflt_qdisc(sch->dev, qopt->limit)) == NULL)
+			goto done;
+	}
 
 	sch_tree_lock(sch);
+	if (child) q->qdisc = child;
 	q->limit = qopt->limit;
 	q->mtu = qopt->mtu;
 	q->max_size = max_size;
@@ -339,6 +380,8 @@ static int tbf_init(struct Qdisc* sch, struct rtattr *opt)
 	init_timer(&q->wd_timer);
 	q->wd_timer.function = tbf_watchdog;
 	q->wd_timer.data = (unsigned long)sch;
+
+	q->qdisc = &noop_qdisc;
 	
 	return tbf_change(sch, opt);
 }
@@ -353,6 +396,9 @@ static void tbf_destroy(struct Qdisc *sch)
 		qdisc_put_rtab(q->P_tab);
 	if (q->R_tab)
 		qdisc_put_rtab(q->R_tab);
+	
+	qdisc_destroy(q->qdisc);
+	q->qdisc = &noop_qdisc;
 }
 
 static int tbf_dump(struct Qdisc *sch, struct sk_buff *skb)
@@ -383,9 +429,92 @@ rtattr_failure:
 	return -1;
 }
 
+static int tbf_dump_class(struct Qdisc *sch, unsigned long cl,
+	       		  struct sk_buff *skb, struct tcmsg *tcm)
+{
+	struct tbf_sched_data *q = (struct tbf_sched_data*)sch->data;
+
+	if (cl != 1) 	/* only one class */ 
+		return -ENOENT;
+    
+	tcm->tcm_parent = TC_H_ROOT;
+	tcm->tcm_handle = 1;
+	tcm->tcm_info = q->qdisc->handle;
+
+	return 0;
+}
+
+static int tbf_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
+		     struct Qdisc **old)
+{
+	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
+
+	if (new == NULL)
+		new = &noop_qdisc;
+
+	sch_tree_lock(sch);	
+	*old = xchg(&q->qdisc, new);
+	qdisc_reset(*old);
+	sch_tree_unlock(sch);
+	
+	return 0;
+}
+
+static struct Qdisc *tbf_leaf(struct Qdisc *sch, unsigned long arg)
+{
+	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
+	return q->qdisc;
+}
+
+static unsigned long tbf_get(struct Qdisc *sch, u32 classid)
+{
+	return 1;
+}
+
+static void tbf_put(struct Qdisc *sch, unsigned long arg)
+{
+}
+
+static int tbf_change_class(struct Qdisc *sch, u32 classid, u32 parentid, 
+			struct rtattr **tca, unsigned long *arg)
+{
+	return -ENOSYS;
+}
+
+static int tbf_delete(struct Qdisc *sch, unsigned long arg)
+{
+	return -ENOSYS;
+}
+
+static void tbf_walk(struct Qdisc *sch, struct qdisc_walker *walker)
+{
+	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
+
+	if (!walker->stop) {
+		if (walker->count >= walker->skip) 
+			if (walker->fn(sch, (unsigned long)q, walker) < 0) { 
+				walker->stop = 1;
+				return;
+			}
+		walker->count++;
+	}
+}
+
+static struct Qdisc_class_ops tbf_class_ops =
+{
+	.graft		= 	tbf_graft,
+	.leaf		=	tbf_leaf,
+	.get		=	tbf_get,
+	.put		=	tbf_put,
+	.change		=	tbf_change_class,
+	.delete		=	tbf_delete,
+	.walk		=	tbf_walk,
+	.dump		=	tbf_dump_class,
+};
+
 struct Qdisc_ops tbf_qdisc_ops = {
 	.next		=	NULL,
-	.cl_ops		=	NULL,
+	.cl_ops		=	&tbf_class_ops,
 	.id		=	"tbf",
 	.priv_size	=	sizeof(struct tbf_sched_data),
 	.enqueue	=	tbf_enqueue,
@@ -397,6 +526,7 @@ struct Qdisc_ops tbf_qdisc_ops = {
 	.destroy	=	tbf_destroy,
 	.change		=	tbf_change,
 	.dump		=	tbf_dump,
+	.owner		=	THIS_MODULE,
 };
 
 

@@ -1059,7 +1059,7 @@ fin:
 }
 
 /* try to drop from each class (by prio) until one succeed */
-static int htb_drop(struct Qdisc* sch)
+static unsigned int htb_drop(struct Qdisc* sch)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
 	int prio;
@@ -1067,14 +1067,15 @@ static int htb_drop(struct Qdisc* sch)
 	for (prio = TC_HTB_NUMPRIO - 1; prio >= 0; prio--) {
 		struct list_head *p;
 		list_for_each (p,q->drops+prio) {
-			struct htb_class *cl = list_entry(p,struct htb_class,
-					un.leaf.drop_list);
+			struct htb_class *cl = list_entry(p, struct htb_class,
+							  un.leaf.drop_list);
+			unsigned int len;
 			if (cl->un.leaf.q->ops->drop && 
-				cl->un.leaf.q->ops->drop(cl->un.leaf.q)) {
+				(len = cl->un.leaf.q->ops->drop(cl->un.leaf.q))) {
 				sch->q.qlen--;
 				if (!cl->un.leaf.q->q.qlen)
 					htb_deactivate (q,cl);
-				return 1;
+				return len;
 			}
 		}
 	}

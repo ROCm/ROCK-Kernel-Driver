@@ -342,19 +342,19 @@ red_dequeue(struct Qdisc* sch)
 	return NULL;
 }
 
-static int
-red_drop(struct Qdisc* sch)
+static unsigned int red_drop(struct Qdisc* sch)
 {
 	struct sk_buff *skb;
 	struct red_sched_data *q = (struct red_sched_data *)sch->data;
 
 	skb = __skb_dequeue_tail(&sch->q);
 	if (skb) {
-		sch->stats.backlog -= skb->len;
+		unsigned int len = skb->len;
+		sch->stats.backlog -= len;
 		sch->stats.drops++;
 		q->st.other++;
 		kfree_skb(skb);
-		return 1;
+		return len;
 	}
 	PSCHED_GET_TIME(q->qidlestart);
 	return 0;

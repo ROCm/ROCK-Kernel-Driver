@@ -302,17 +302,18 @@ static int dsmark_requeue(struct sk_buff *skb,struct Qdisc *sch)
 }
 
 
-static int dsmark_drop(struct Qdisc *sch)
+static unsigned int dsmark_drop(struct Qdisc *sch)
 {
 	struct dsmark_qdisc_data *p = PRIV(sch);
-
+	unsigned int len;
+	
 	DPRINTK("dsmark_reset(sch %p,[qdisc %p])\n",sch,p);
 	if (!p->q->ops->drop)
 		return 0;
-	if (!p->q->ops->drop(p->q))
+	if (!(len = p->q->ops->drop(p->q)))
 		return 0;
 	sch->q.qlen--;
-	return 1;
+	return len;
 }
 
 

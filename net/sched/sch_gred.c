@@ -259,8 +259,7 @@ gred_dequeue(struct Qdisc* sch)
 	return NULL;
 }
 
-static int
-gred_drop(struct Qdisc* sch)
+static unsigned int gred_drop(struct Qdisc* sch)
 {
 	struct sk_buff *skb;
 
@@ -269,20 +268,21 @@ gred_drop(struct Qdisc* sch)
 
 	skb = __skb_dequeue_tail(&sch->q);
 	if (skb) {
-		sch->stats.backlog -= skb->len;
+		unsigned int len = skb->len;
+		sch->stats.backlog -= len;
 		sch->stats.drops++;
 		q= t->tab[(skb->tc_index&0xf)];
 		if (q) {
-			q->backlog -= skb->len;
+			q->backlog -= len;
 			q->other++;
 			if (!q->backlog && !t->eqp)
 				PSCHED_GET_TIME(q->qidlestart);
-			} else {
-				D2PRINTK("gred_dequeue: skb has bad tcindex %x\n",skb->tc_index&0xf); 
-			}
+		} else {
+			D2PRINTK("gred_dequeue: skb has bad tcindex %x\n",skb->tc_index&0xf); 
+		}
 
 		kfree_skb(skb);
-		return 1;
+		return len;
 	}
 
 	q=t->tab[t->def];
