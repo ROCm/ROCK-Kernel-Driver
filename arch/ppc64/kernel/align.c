@@ -20,6 +20,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/cache.h>
+#include <asm/cputable.h>
 
 void disable_kernel_fp(void); /* asm function from head.S */
 
@@ -238,12 +239,11 @@ fix_alignment(struct pt_regs *regs)
 
 	dsisr = regs->dsisr;
 
-	/* Power4 doesn't set DSISR for an alignment interrupt */
-	if (!cpu_alignexc_sets_dsisr()) {
-		unsigned int real_instr;
-		if (__get_user(real_instr, (unsigned int *)regs->nip))
-			return 0;
-		dsisr = make_dsisr(real_instr);
+	if (cur_cpu_spec->cpu_features & CPU_FTR_NODSISRALIGN) {
+	    unsigned int real_instr;
+	    if (__get_user(real_instr, (unsigned int *)regs->nip))
+		return 0;
+	    dsisr = make_dsisr(*((unsigned *)regs->nip));
 	}
 
 	/* extract the operation and registers from the dsisr */

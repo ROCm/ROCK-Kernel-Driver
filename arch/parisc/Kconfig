@@ -233,12 +233,8 @@ source "drivers/parport/Kconfig"
 
 source "drivers/block/Kconfig"
 
-
-menu "ATA/IDE/MFM/RLL support"
-config IDE
-	tristate "ATA/IDE/MFM/RLL support"
 source "drivers/ide/Kconfig"
-endmenu
+
 
 menu "SCSI support"
 

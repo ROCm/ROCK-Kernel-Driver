@@ -21,6 +21,7 @@
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
+#include <asm/cputable.h>
 
 #define HPTE_LOCK_BIT 3
 
@@ -217,7 +218,7 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	}
 
 	/* Ensure it is out of the tlb too */
-	if (cpu_has_tlbiel() && !large && local) {
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		_tlbiel(va);
 	} else {
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
@@ -283,7 +284,7 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 	}
 
 	/* Invalidate the tlb */
-	if (cpu_has_tlbiel() && !large && local) {
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		_tlbiel(va);
 	} else {
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
@@ -346,7 +347,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 		j++;
 	}
 
-	if (cpu_has_tlbiel() && !large && local) {
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		asm volatile("ptesync":::"memory");
 
 		for (i = 0; i < j; i++) {

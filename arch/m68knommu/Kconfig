@@ -532,22 +532,7 @@ source "drivers/pnp/Kconfig"
 
 source "drivers/block/Kconfig"
 
-
-menu "ATA/IDE/MFM/RLL support"
-
-config IDE
-	tristate "ATA/ATAPI/MFM/RLL device support"
-	---help---
-	  If you say Y here, your kernel will be able to manage low cost mass
-	  storage units such as ATA/(E)IDE and ATAPI units. The most common
-	  cases are IDE hard drives and ATAPI CD-ROM drives.
-
-	  It only makes sense to choose this option if your board actually
-	  has an IDE interface. If unsure, say N.
-
 source "drivers/ide/Kconfig"
-
-endmenu
 
 
 menu "SCSI device support"

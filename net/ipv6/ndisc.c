@@ -1487,6 +1487,9 @@ int __init ndisc_init(struct net_proto_family *ops)
 
 void ndisc_cleanup(void)
 {
+#ifdef CONFIG_SYSCTL
+	neigh_sysctl_unregister(&nd_tbl.parms);
+#endif
 	neigh_table_clear(&nd_tbl);
 	sock_release(ndisc_socket);
 	ndisc_socket = NULL; /* For safety. */

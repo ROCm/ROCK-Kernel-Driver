@@ -3253,6 +3253,45 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 
 static int ide_cdrom_attach (ide_drive_t *drive);
 
+/*
+ * Power Management state machine.
+ *
+ * We don't do much for CDs right now.
+ */
+
+static void ide_cdrom_complete_power_step (ide_drive_t *drive, struct request *rq, u8 stat, u8 error)
+{
+}
+
+static ide_startstop_t ide_cdrom_start_power_step (ide_drive_t *drive, struct request *rq)
+{
+	ide_task_t *args = rq->special;
+
+	memset(args, 0, sizeof(*args));
+
+	switch (rq->pm->pm_step) {
+	case ide_pm_state_start_suspend:
+		break;
+
+	case ide_pm_state_start_resume:	/* Resume step 1 (restore DMA) */
+		/*
+		 * Right now, all we do is call hwif->ide_dma_check(drive),
+		 * we could be smarter and check for current xfer_speed
+		 * in struct drive etc...
+		 * Also, this step could be implemented as a generic helper
+		 * as most subdrivers will use it.
+		 */
+		if ((drive->id->capability & 1) == 0)
+			break;
+		if (HWIF(drive)->ide_dma_check == NULL)
+			break;
+		HWIF(drive)->ide_dma_check(drive);
+		break;
+	}
+	rq->pm->pm_step = ide_pm_state_completed;
+	return ide_stopped;
+}
+
 static ide_driver_t ide_cdrom_driver = {
 	.owner			= THIS_MODULE,
 	.name			= "ide-cdrom",
@@ -3269,6 +3308,12 @@ static ide_driver_t ide_cdrom_driver = {
 	.capacity		= ide_cdrom_capacity,
 	.attach			= ide_cdrom_attach,
 	.drives			= LIST_HEAD_INIT(ide_cdrom_driver.drives),
+	.start_power_step	= ide_cdrom_start_power_step,
+	.complete_power_step	= ide_cdrom_complete_power_step,
+	.gen_driver		= {
+		.suspend	= generic_ide_suspend,
+		.resume		= generic_ide_resume,
+	}
 };
 
 static int idecd_open(struct inode * inode, struct file * file)

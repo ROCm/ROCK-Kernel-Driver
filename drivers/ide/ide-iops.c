@@ -1320,3 +1320,33 @@ ide_startstop_t ide_do_reset (ide_drive_t *drive)
 
 EXPORT_SYMBOL(ide_do_reset);
 
+/*
+ * ide_wait_not_busy() waits for the currently selected device on the hwif
+ * to report a non-busy status, see comments in probe_hwif().
+ */
+int ide_wait_not_busy(ide_hwif_t *hwif, unsigned long timeout)
+{
+	u8 stat = 0;
+
+	while(timeout--) {
+		/*
+		 * Turn this into a schedule() sleep once I'm sure
+		 * about locking issues (2.5 work ?).
+		 */
+		mdelay(1);
+		stat = hwif->INB(hwif->io_ports[IDE_STATUS_OFFSET]);
+		if ((stat & BUSY_STAT) == 0)
+			return 0;
+		/*
+		 * Assume a value of 0xff means nothing is connected to
+		 * the interface and it doesn't implement the pull-down
+		 * resistor on D7.
+		 */
+		if (stat == 0xff)
+			return -ENODEV;
+	}
+	return -EBUSY;
+}
+
+EXPORT_SYMBOL_GPL(ide_wait_not_busy);
+

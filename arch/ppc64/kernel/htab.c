@@ -46,6 +46,7 @@
 #include <asm/eeh.h>
 #include <asm/tlb.h>
 #include <asm/cacheflush.h>
+#include <asm/cputable.h>
 
 /*
  * Note:  pte   --> Linux PTE
@@ -165,7 +166,8 @@ htab_initialize(void)
 	mode_rw = _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX;
 
 	/* XXX we currently map kernel text rw, should fix this */
-	if (cpu_has_largepage() && systemcfg->physicalMemorySize > 256*MB) {
+	if ((cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+	    && systemcfg->physicalMemorySize > 256*MB) {
 		create_pte_mapping((unsigned long)KERNELBASE, 
 				   KERNELBASE + 256*MB, mode_rw, 0);
 		create_pte_mapping((unsigned long)KERNELBASE + 256*MB, 
@@ -279,7 +281,8 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 #define PPC64_HWNOEXEC (1 << 2)
 
 	/* We do lazy icache flushing on cpus that support it */
-	if (unlikely(cpu_has_noexecute() && pfn_valid(pte_pfn(new_pte)))) {
+	if (unlikely((cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)
+		     && pfn_valid(pte_pfn(new_pte)))) {
 		struct page *page = pte_page(new_pte);
 
 		/* page is dirty */

@@ -61,6 +61,7 @@
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
 #include <linux/random.h>
+#include <linux/seq_file.h>
 
 #include <net/protocol.h>
 #include <net/tcp.h>
@@ -578,6 +579,13 @@ static int sctp_v6_is_ce(const struct sk_buff *skb)
 	return *((__u32 *)(skb->nh.ipv6h)) & htonl(1<<20);
 }
 
+/* Dump the v6 addr to the seq file. */
+static void sctp_v6_seq_dump_addr(struct seq_file *seq, union sctp_addr *addr)
+{
+	seq_printf(seq, "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
+		   NIP6(addr->v6.sin6_addr));
+}
+
 /* Initialize a PF_INET6 socket msg_name. */
 static void sctp_inet6_msgname(char *msgname, int *addr_len)
 {
@@ -840,6 +848,7 @@ static struct sctp_af sctp_ipv6_specific = {
 	.available       = sctp_v6_available,
 	.skb_iif         = sctp_v6_skb_iif,
 	.is_ce           = sctp_v6_is_ce,
+	.seq_dump_addr   = sctp_v6_seq_dump_addr,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),
 	.sa_family       = AF_INET6,

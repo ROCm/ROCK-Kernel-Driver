@@ -15,7 +15,7 @@
 #ifdef CONFIG_MELAN
 #  define CLOCK_TICK_RATE 1189200 /* AMD Elan has different frequency! */
 #else
-#  define CLOCK_TICK_RATE 1193180 /* Underlying HZ */
+#  define CLOCK_TICK_RATE 1193182 /* Underlying HZ */
 #endif
 #endif
 

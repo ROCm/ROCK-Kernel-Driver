@@ -32,13 +32,6 @@ static inline void *kmap(struct page *page)
 
 #endif /* CONFIG_HIGHMEM */
 
-#if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_HIGHMEM)
-extern void check_highmem_ptes(void);
-#else
-static inline void check_highmem_ptes(void)
-{}
-#endif
-
 /* when CONFIG_HIGHMEM is not set these will be plain clear/copy_page */
 static inline void clear_user_highpage(struct page *page, unsigned long vaddr)
 {

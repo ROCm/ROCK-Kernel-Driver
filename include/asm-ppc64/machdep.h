@@ -67,7 +67,6 @@ struct machdep_calls {
 	void		(*get_cpuinfo)(struct seq_file *m);
 
 	void		(*init_IRQ)(void);
-	void		(*init_ras_IRQ)(void);
 	int		(*get_irq)(struct pt_regs *);
 
 	/* Optional, may be NULL. */

@@ -40,7 +40,6 @@ extern int		eth_header_parse(struct sk_buff *skb,
 					 unsigned char *haddr);
 extern struct net_device *init_etherdev(struct net_device *dev, int sizeof_priv);
 extern struct net_device *alloc_etherdev(int sizeof_priv);
-
 static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, int len, int base)
 {
 	memcpy (dest->data, src, len);

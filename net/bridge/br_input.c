@@ -40,7 +40,7 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 	br->statistics.rx_bytes += skb->len;
 
 	indev = skb->dev;
-	skb->dev = &br->dev;
+	skb->dev = br->dev;
 
 	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
 			br_pass_frame_up_finish);
@@ -67,7 +67,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 
 	br = p->br;
 	passedup = 0;
-	if (br->dev.flags & IFF_PROMISC) {
+	if (br->dev->flags & IFF_PROMISC) {
 		struct sk_buff *skb2;
 
 		skb2 = skb_clone(skb, GFP_ATOMIC);
@@ -140,7 +140,7 @@ int br_handle_frame(struct sk_buff *skb)
 			return -1;
 		}
 
-		if (!memcmp(p->br->dev.dev_addr, dest, ETH_ALEN))
+		if (!memcmp(p->br->dev->dev_addr, dest, ETH_ALEN))
 			skb->pkt_type = PACKET_HOST;
 
 		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,

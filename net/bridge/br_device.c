@@ -110,10 +110,6 @@ static int br_dev_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 	return -1;
 }
 
-static void br_dev_destruct(struct net_device *dev) 
-{
-	kfree(dev->priv);
-}
 
 void br_dev_setup(struct net_device *dev)
 {
@@ -124,10 +120,13 @@ void br_dev_setup(struct net_device *dev)
 	dev->hard_start_xmit = br_dev_xmit;
 	dev->open = br_dev_open;
 	dev->set_multicast_list = br_dev_set_multicast_list;
-	dev->destructor = br_dev_destruct;
+	dev->destructor = (void (*)(struct net_device *))kfree;
 	SET_MODULE_OWNER(dev);
 	dev->stop = br_dev_stop;
 	dev->accept_fastpath = br_dev_accept_fastpath;
 	dev->tx_queue_len = 0;
 	dev->set_mac_address = NULL;
+	dev->priv_flags = IFF_EBRIDGE;
+
+	ether_setup(dev);
 }
