@@ -142,17 +142,6 @@ static void jfs_put_super(struct super_block *sb)
 	unload_nls(sbi->nls_tab);
 	sbi->nls_tab = NULL;
 
-	/*
-	 * We need to clean out the direct_inode pages since this inode
-	 * is not in the inode hash.
-	 */
-	filemap_fdatawrite(sbi->direct_inode->i_mapping);
-	filemap_fdatawait(sbi->direct_inode->i_mapping);
-	truncate_inode_pages(sbi->direct_mapping, 0);
-	iput(sbi->direct_inode);
-	sbi->direct_inode = NULL;
-	sbi->direct_mapping = NULL;
-
 	kfree(sbi);
 }
 
@@ -221,7 +210,6 @@ cleanup:
 
 int jfs_remount(struct super_block *sb, int *flags, char *data)
 {
-	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	s64 newLVSize = 0;
 	int rc = 0;
 
@@ -239,15 +227,9 @@ int jfs_remount(struct super_block *sb, int *flags, char *data)
 			return rc;
 	}
 
-	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
-		/*
-		 * Invalidate any previously read metadata.  fsck may
-		 * have changed the on-disk data since we mounted r/o
-		 */
-		truncate_inode_pages(sbi->direct_mapping, 0);
-
+	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY))
 		return jfs_mount_rw(sb, 1);
-	} else if ((!(sb->s_flags & MS_RDONLY)) && (*flags & MS_RDONLY))
+	else if ((!(sb->s_flags & MS_RDONLY)) && (*flags & MS_RDONLY))
 		return jfs_umount_rw(sb);
 
 	return 0;
@@ -289,28 +271,13 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &jfs_super_operations;
 	sb->s_export_op = &jfs_export_operations;
 
-	/*
-	 * Initialize direct-mapping inode/address-space
-	 */
-	inode = new_inode(sb);
-	if (inode == NULL)
-		goto out_kfree;
-	inode->i_ino = 0;
-	inode->i_nlink = 1;
-	inode->i_size = 0x0000010000000000LL;
-	inode->i_mapping->a_ops = &direct_aops;
-	inode->i_mapping->gfp_mask = GFP_NOFS;
-
-	sbi->direct_inode = inode;
-	sbi->direct_mapping = inode->i_mapping;
-
 	rc = jfs_mount(sb);
 	if (rc) {
 		if (!silent) {
 			jERROR(1,
 			       ("jfs_mount failed w/return code = %d\n", rc));
 		}
-		goto out_mount_failed;
+		goto out_kfree;
 	}
 	if (sb->s_flags & MS_RDONLY)
 		sbi->log = 0;
@@ -360,14 +327,6 @@ out_no_rw:
 	if (rc) {
 		jERROR(1, ("jfs_umount failed with return code %d\n", rc));
 	}
-out_mount_failed:
-	filemap_fdatawrite(sbi->direct_inode->i_mapping);
-	filemap_fdatawait(sbi->direct_inode->i_mapping);
-	truncate_inode_pages(sbi->direct_mapping, 0);
-	make_bad_inode(sbi->direct_inode);
-	iput(sbi->direct_inode);
-	sbi->direct_inode = NULL;
-	sbi->direct_mapping = NULL;
 out_kfree:
 	if (sbi->nls_tab)
 		unload_nls(sbi->nls_tab);

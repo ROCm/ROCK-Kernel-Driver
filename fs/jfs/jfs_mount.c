@@ -48,6 +48,8 @@
  */
 
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
+
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_superblock.h"
@@ -314,18 +316,18 @@ int jfs_mount_rw(struct super_block *sb, int remount)
 static int chkSuper(struct super_block *sb)
 {
 	int rc = 0;
-	metapage_t *mp;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	struct jfs_superblock *j_sb;
+	struct buffer_head *bh;
 	int AIM_bytesize, AIT_bytesize;
 	int expected_AIM_bytesize, expected_AIT_bytesize;
 	s64 AIM_byte_addr, AIT_byte_addr, fsckwsp_addr;
 	s64 byte_addr_diff0, byte_addr_diff1;
 	s32 bsize;
 
-	if ((rc = readSuper(sb, &mp)))
+	if ((rc = readSuper(sb, &bh)))
 		return rc;
-	j_sb = (struct jfs_superblock *) (mp->data);
+	j_sb = (struct jfs_superblock *)bh->b_data;
 
 	/*
 	 * validate superblock
@@ -414,8 +416,7 @@ static int chkSuper(struct super_block *sb)
 	sbi->ait2 = j_sb->s_ait2;
 
       out:
-	release_metapage(mp);
-
+	brelse(bh);
 	return rc;
 }
 
@@ -429,7 +430,7 @@ int updateSuper(struct super_block *sb, uint state)
 {
 	struct jfs_superblock *j_sb;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
-	metapage_t *mp;
+	struct buffer_head *bh;
 	int rc;
 
 	/*
@@ -438,10 +439,10 @@ int updateSuper(struct super_block *sb, uint state)
 	if (sbi->state == FM_DIRTY)
 		return 0;
 
-	if ((rc = readSuper(sb, &mp)))
+	if ((rc = readSuper(sb, &bh)))
 		return rc;
 
-	j_sb = (struct jfs_superblock *) (mp->data);
+	j_sb = (struct jfs_superblock *)bh->b_data;
 
 	j_sb->s_state = cpu_to_le32(state);
 	sbi->state = state;
@@ -459,7 +460,10 @@ int updateSuper(struct super_block *sb, uint state)
 			j_sb->s_flag |= cpu_to_le32(JFS_DASD_PRIME);
 	}
 
-	flush_metapage(mp);
+	mark_buffer_dirty(bh);
+	ll_rw_block(WRITE, 1, &bh);
+	wait_on_buffer(bh);
+	brelse(bh);
 
 	return 0;
 }
@@ -470,18 +474,19 @@ int updateSuper(struct super_block *sb, uint state)
  *
  * read superblock by raw sector address
  */
-int readSuper(struct super_block *sb, metapage_t ** mpp)
+int readSuper(struct super_block *sb, struct buffer_head **bpp)
 {
 	/* read in primary superblock */
-	*mpp = read_metapage(JFS_SBI(sb)->direct_inode,
-			     SUPER1_OFF >> sb->s_blocksize_bits, PSIZE, 1);
-	if (*mpp == NULL) {
-		/* read in secondary/replicated superblock */
-		*mpp = read_metapage(JFS_SBI(sb)->direct_inode,
-				     SUPER2_OFF >> sb->s_blocksize_bits,
-				     PSIZE, 1);
-	}
-	return *mpp ? 0 : 1;
+	*bpp = sb_bread(sb, SUPER1_OFF >> sb->s_blocksize_bits);
+	if (bpp)
+		return 0;
+
+	/* read in secondary/replicated superblock */
+	*bpp = sb_bread(sb, SUPER2_OFF >> sb->s_blocksize_bits);
+	if (bpp)
+		return 0;
+
+	return -EIO;
 }
 
 
