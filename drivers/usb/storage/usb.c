@@ -218,6 +218,7 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 };
 
 struct usb_driver usb_storage_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usb-storage",
 	.probe =	storage_probe,
 	.disconnect =	storage_disconnect,
