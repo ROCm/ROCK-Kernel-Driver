@@ -152,4 +152,6 @@ typedef int (*llc_prim_call_t)(struct llc_prim_if_block *prim_if);
 extern struct llc_sap *llc_sap_open(llc_prim_call_t network_indicate,
 				    llc_prim_call_t network_confirm, u8 lsap);
 extern void llc_sap_close(struct llc_sap *sap);
+
+extern int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb);
 #endif /* LLC_IF_H */

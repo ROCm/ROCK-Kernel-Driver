@@ -215,22 +215,14 @@ out:
 static int llc_ui_send_data(struct llc_sap *sap, struct sock* sk,
 			    struct sk_buff *skb, struct sockaddr_llc *addr)
 {
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
 	struct llc_ui_opt* llc_ui = llc_ui_sk(sk);
 	struct llc_opt* llc_core = llc_sk(llc_ui->core_sk);
 	int rc;
 
-	prim.data	   = &prim_data;
-	prim.sap	   = sap;
-	prim.prim	   = LLC_DATA_PRIM;
-	prim_data.data.skb = skb;
-	prim_data.data.pri = 0;
-	prim_data.data.sk  = llc_ui->core_sk;
-	skb->protocol	   = llc_ui_protocol_type(addr->sllc_arphrd);
+	skb->protocol = llc_ui_protocol_type(addr->sllc_arphrd);
 	sock_hold(sk);
 try:
-	rc = sap->req(&prim);
+	rc = llc_build_and_send_pkt(llc_ui->core_sk, skb);
 	if (rc != -EBUSY)
 		goto out;
 	rc = wait_event_interruptible(sk->socket->wait, !llc_ui->core_sk ||

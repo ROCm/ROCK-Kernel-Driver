@@ -31,7 +31,6 @@ static int llc_sap_req(struct llc_prim_if_block *prim);
 static int llc_unitdata_req_handler(struct llc_prim_if_block *prim);
 static int llc_test_req_handler(struct llc_prim_if_block *prim);
 static int llc_xid_req_handler(struct llc_prim_if_block *prim);
-static int llc_data_req_handler(struct llc_prim_if_block *prim);
 static int llc_conn_req_handler(struct llc_prim_if_block *prim);
 static int llc_disc_req_handler(struct llc_prim_if_block *prim);
 static int llc_rst_req_handler(struct llc_prim_if_block *prim);
@@ -45,7 +44,7 @@ static int llc_no_rsp_handler(struct llc_prim_if_block *prim);
 static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
 	[LLC_DATAUNIT_PRIM]	= llc_unitdata_req_handler,
 	[LLC_CONN_PRIM]		= llc_conn_req_handler,
-	[LLC_DATA_PRIM]		= llc_data_req_handler,
+	[LLC_DATA_PRIM]		= NULL, /* replaced by llc_build_and_send_pkt */
 	[LLC_DISC_PRIM]		= llc_disc_req_handler,
 	[LLC_RESET_PRIM]	= llc_rst_req_handler,
 	[LLC_FLOWCONTROL_PRIM]	= llc_flowcontrol_req_handler,
@@ -233,7 +232,7 @@ out:
 }
 
 /**
- *	llc_data_req_handler - Connection data sending for upper layers.
+ *	llc_build_and_send_pkt - Connection data sending for upper layers.
  *	@prim: pointer to structure that contains service parameters
  *
  *	This function is called when upper layer wants to send data using
@@ -244,15 +243,10 @@ out:
  *	LLC has send an I pdu with p bit set to 1 and is waiting for it's
  *	response.
  */
-static int llc_data_req_handler(struct llc_prim_if_block *prim)
+int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev;
 	int rc = -ECONNABORTED;
-	/* accept data frame from network layer to be sent using connection
-	 * mode communication; timeout/retries handled by this layer;
-	 * package primitive as an event and send to connection event handler
-	 */
-	struct sock *sk = prim->data->data.sk;
 	struct llc_opt *llc = llc_sk(sk);
 
 	lock_sock(sk);
@@ -267,13 +261,13 @@ static int llc_data_req_handler(struct llc_prim_if_block *prim)
 		llc->failed_data_req = 1;
 		goto out;
 	}
-	ev = llc_conn_ev(prim->data->data.skb);
-	ev->type		  = LLC_CONN_EV_TYPE_PRIM;
-	ev->data.prim.prim	  = LLC_DATA_PRIM;
-	ev->data.prim.type	  = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data	  = prim;
-	prim->data->data.skb->dev = llc->dev;
-	rc = llc_conn_state_process(sk, prim->data->data.skb);
+	ev = llc_conn_ev(skb);
+	ev->type	    = LLC_CONN_EV_TYPE_PRIM;
+	ev->data.prim.prim  = LLC_DATA_PRIM;
+	ev->data.prim.type  = LLC_PRIM_TYPE_REQ;
+	ev->data.prim.data  = NULL;
+	skb->dev	    = llc->dev;
+	rc = llc_conn_state_process(sk, skb);
 out:
 	release_sock(sk);
 	return rc;
