@@ -389,6 +389,7 @@ struct net2280_ep_regs {	/* [11.9] */
 	u32		ep_rsp;
 #define     SET_NAK_OUT_PACKETS                                 15
 #define     SET_EP_HIDE_STATUS_PHASE                            14
+#define     SET_EP_FORCE_CRC_ERROR                              13
 #define     SET_INTERRUPT_MODE                                  12
 #define     SET_CONTROL_STATUS_PHASE_HANDSHAKE                  11
 #define     SET_NAK_OUT_PACKETS_MODE                            10
@@ -396,6 +397,7 @@ struct net2280_ep_regs {	/* [11.9] */
 #define     SET_ENDPOINT_HALT                                   8
 #define     CLEAR_NAK_OUT_PACKETS                               7
 #define     CLEAR_EP_HIDE_STATUS_PHASE                          6
+#define     CLEAR_EP_FORCE_CRC_ERROR                            5
 #define     CLEAR_INTERRUPT_MODE                                4
 #define     CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE                3
 #define     CLEAR_NAK_OUT_PACKETS_MODE                          2
@@ -476,6 +478,9 @@ set_idx_reg (struct net2280_regs *regs, u32 index, u32 value)
 #define REG_CHIPREV		0x03	/* in bcd */
 #define	REG_HS_NAK_RATE		0x0a	/* NAK per N uframes */
 
+#define	CHIPREV_1	0x0100
+#define	CHIPREV_1A	0x0110
+
 #ifdef	__KERNEL__
 
 /* ep a-f highspeed and fullspeed maxpacket, addresses
@@ -529,24 +534,6 @@ static inline void allow_status (struct net2280_ep *ep)
 	ep->stopped = 1;
 }
 
-static inline void set_halt (struct net2280_ep *ep)
-{
-	/* ep0 and bulk/intr endpoints */
-	writel (  (1 << CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE)
-		    /* set NAK_OUT for erratum 0114 */
-		| (1 << SET_NAK_OUT_PACKETS)
-		| (1 << SET_ENDPOINT_HALT)
-		, &ep->regs->ep_rsp);
-}
-
-static inline void clear_halt (struct net2280_ep *ep)
-{
-	/* bulk/intr endpoints */
-	writel (  (1 << CLEAR_ENDPOINT_HALT)
-		| (1 << CLEAR_ENDPOINT_TOGGLE)
-		, &ep->regs->ep_rsp);
-}
-
 /* count (<= 4) bytes in the next fifo write will be valid */
 static inline void set_fifo_bytecount (struct net2280_ep *ep, unsigned count)
 {
@@ -588,6 +575,28 @@ struct net2280 {
 	struct pci_pool			*requests;
 	// statistics...
 };
+
+static inline void set_halt (struct net2280_ep *ep)
+{
+	/* ep0 and bulk/intr endpoints */
+	writel (  (1 << CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE)
+		    /* set NAK_OUT for erratum 0114 */
+		| ((ep->dev->chiprev == CHIPREV_1) << SET_NAK_OUT_PACKETS)
+		| (1 << SET_ENDPOINT_HALT)
+		, &ep->regs->ep_rsp);
+}
+
+static inline void clear_halt (struct net2280_ep *ep)
+{
+	/* ep0 and bulk/intr endpoints */
+	writel (  (1 << CLEAR_ENDPOINT_HALT)
+		| (1 << CLEAR_ENDPOINT_TOGGLE)
+		    /* unless the gadget driver left a short packet in the
+		     * fifo, this reverses the erratum 0114 workaround.
+		     */
+		| ((ep->dev->chiprev == CHIPREV_1) << CLEAR_NAK_OUT_PACKETS)
+		, &ep->regs->ep_rsp);
+}
 
 #ifdef USE_RDK_LEDS
 
