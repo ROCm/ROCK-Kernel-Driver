@@ -188,9 +188,9 @@ clean_3:
 	}
 	hcd->irq = dev->irq;
 
-	dev_info (hcd->self.controller, "irq %s, %s %p\n", bufp,
+	dev_info (hcd->self.controller, "irq %s, %s 0x%lx\n", bufp,
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
-		base);
+		resource);
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
