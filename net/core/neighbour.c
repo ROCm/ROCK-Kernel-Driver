@@ -123,20 +123,12 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 		np = &tbl->hash_buckets[i];
 		while ((n = *np) != NULL) {
 			/* Neighbour record may be discarded if:
-			   - nobody refers to it.
-			   - it is not permanent
-			   - (NEW and probably wrong)
-			     INCOMPLETE entries are kept at least for
-			     n->parms->retrans_time, otherwise we could
-			     flood network with resolution requests.
-			     It is not clear, what is better table overflow
-			     or flooding.
+			 * - nobody refers to it.
+			 * - it is not permanent
 			 */
 			write_lock(&n->lock);
 			if (atomic_read(&n->refcnt) == 1 &&
-			    !(n->nud_state & NUD_PERMANENT) &&
-			    (n->nud_state != NUD_INCOMPLETE ||
-			     time_after(jiffies, n->used + n->parms->retrans_time))) {
+			    !(n->nud_state & NUD_PERMANENT)) {
 				*np	= n->next;
 				n->dead = 1;
 				shrunk	= 1;
