@@ -188,7 +188,7 @@ static inline void dump_cache(const char *prefix, unsigned int cache)
 {
 	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
-	printk("%s size %dK associativity %d line length %d sets %d\n",
+	printk("%s: %d bytes, associativity %d, %d byte lines, %d sets\n",
 		prefix,
 		mult << (8 + CACHE_SIZE(cache)),
 		(mult << CACHE_ASSOC(cache)) >> 1,

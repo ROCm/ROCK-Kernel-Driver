@@ -7,11 +7,11 @@
 #define __ASM_ARCH_SYSTEM_H
 
 #include <asm/hardware/iomd.h>
+#include <asm/io.h>
 
-static void arch_idle(void)
+static inline void arch_idle(void)
 {
-	while (!need_resched() && !hlt_counter)
-		iomd_writeb(0, IOMD_SUSMODE);
+	iomd_writeb(0, IOMD_SUSMODE);
 }
 
 #define arch_reset(mode)			\

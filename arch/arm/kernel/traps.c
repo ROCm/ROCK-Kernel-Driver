@@ -546,12 +546,14 @@ void abort(void)
 
 void __init trap_init(void)
 {
-	extern void __trap_init(void *);
+	extern void __trap_init(unsigned long);
+	unsigned long base = vectors_base();
 
-	__trap_init((void *)vectors_base());
-	if (vectors_base() != 0)
-		printk(KERN_DEBUG "Relocating machine vectors to 0x%08x\n",
-			vectors_base());
+	__trap_init(base);
+	flush_icache_range(base, base + PAGE_SIZE);
+	if (base != 0)
+		printk(KERN_DEBUG "Relocating machine vectors to 0x%08lx\n",
+			base);
 #ifdef CONFIG_CPU_32
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 #endif

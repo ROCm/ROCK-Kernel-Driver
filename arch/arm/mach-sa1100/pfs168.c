@@ -35,40 +35,7 @@ static int __init pfs168_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe(0x40000000);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * We found it.  Wake the chip up.
-	 */
-	sa1111_wake();
-
-	/*
-	 * The SDRAM configuration of the SA1110 and the SA1111 must
-	 * match.  This is very important to ensure that SA1111 accesses
-	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
-	 * MBGNT signal, so we must have called sa1110_mb_disable()
-	 * beforehand.
-	 */
-	sa1111_configure_smc(1,
-			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
-			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
-
-	/*
-	 * We only need to turn on DCLK whenever we want to use the
-	 * DMA.  It can otherwise be held firmly in the off position.
-	 */
-	SKPCR |= SKPCR_DCLKEN;
-
-	/*
-	 * Enable the SA1110 memory bus request and grant signals.
-	 */
-	sa1110_mb_enable();
-
-	sa1111_init_irq(IRQ_GPIO25);	/* SA1111 IRQ on GPIO 25 */
-
-	return 0;
+	return sa1111_init(NULL, 0x40000000, IRQ_GPIO25);
 }
 
 __initcall(pfs168_init);

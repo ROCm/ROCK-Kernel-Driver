@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sun Mar 24 11:48:10 2002
+# Last update: Fri Mar 29 15:51:20 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -179,3 +179,4 @@ jornada56x		ARCH_JORNADA56X		JORNADA56X		167
 active			SA1100_ACTIVE		ACTIVE			168
 iq80321			ARCH_IQ80321		IQ80321			169
 wid			SA1100_WID		WID			170
+sabinal			ARCH_SABINAL		SABINAL			171

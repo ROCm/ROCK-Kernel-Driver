@@ -13,26 +13,9 @@
 #include <asm/leds.h>
 #include <asm/mach-types.h>
 
-static void arch_idle(void)
+static inline void arch_idle(void)
 {
-	unsigned long start_idle;
-
-	start_idle = jiffies;
-
-	do {
-		if (need_resched() || hlt_counter)
-			goto slow_out;
-		cpu_do_idle(IDLE_WAIT_FAST);
-	} while (time_before(jiffies, start_idle + HZ/50));
-
-	cpu_do_idle(IDLE_CLOCK_SLOW);
-
-	while (!need_resched() && !hlt_counter) {
-		cpu_do_idle(IDLE_WAIT_SLOW);
-	}
-
-	cpu_do_idle(IDLE_CLOCK_FAST);
-slow_out:
+	cpu_do_idle();
 }
 
 static inline void arch_reset(char mode)

@@ -20,31 +20,18 @@
  * Instead, we spin, polling the IRQ_STAT register for the occurrence
  * of any interrupt with core clock down to the memory clock.
  */
-static void arch_idle(void)
+static inline void arch_idle(void)
 {
 	const char *irq_stat = (char *)0xff000000;
-	long flags;
 
-	if (!hlt_counter)
-		return;
+	/* disable clock switching */
+	asm volatile ("mcr%? p15, 0, ip, c15, c2, 2");
 
-	do {
-		/* disable interrupts */
-		cli();
-		/* check need_resched here to avoid races */
-		if (need_resched()) {
-			sti();
-			return;
-		}
-		/* disable clock switching */
-		asm volatile ("mcr%? p15, 0, ip, c15, c2, 2");
-		/* wait for an interrupt to occur */
-		while (!*irq_stat);
-		/* enable clock switching */
-		asm volatile ("mcr%? p15, 0, ip, c15, c1, 2");
-		/* allow the interrupt to happen */
-		sti();
-	} while (!need_resched());
+	/* wait for an interrupt to occur */
+	while (!*irq_stat);
+
+	/* enable clock switching */
+	asm volatile ("mcr%? p15, 0, ip, c15, c1, 2");
 }
 
 #define arch_reset(mode)	cpu_reset(0x80000000)
