@@ -186,7 +186,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		err("%s - Out of memory", __FUNCTION__);
 		return -ENOMEM;
 	}
-	port->private = (void *)priv;
+	usb_set_serial_port_data(port, priv);
 	priv->active = 0;
 	priv->queue_len = 0;
 	INIT_LIST_HEAD(&priv->queue);
@@ -281,7 +281,7 @@ error:
 static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial	*serial;
-	struct ipaq_private	*priv = port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
 	if (port_paranoia_check(port, __FUNCTION__)) {
 		return; 
@@ -301,7 +301,7 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 	usb_unlink_urb(port->read_urb);
 	ipaq_destroy_lists(port);
 	kfree(priv);
-	port->private = NULL;
+	usb_set_serial_port_data(port, NULL);
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -385,7 +385,7 @@ static int ipaq_write(struct usb_serial_port *port, int from_user, const unsigne
 static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const unsigned char *buf,
 			   int count)
 {
-	struct ipaq_private	*priv = port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	struct ipaq_packet	*pkt = NULL;
 	int			result = 0;
 	unsigned long		flags;
@@ -436,7 +436,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 
 static void ipaq_write_gather(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	struct usb_serial	*serial = port->serial;
 	int			count, room;
 	struct ipaq_packet	*pkt;
@@ -478,7 +478,7 @@ static void ipaq_write_gather(struct usb_serial_port *port)
 static void ipaq_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port	*port = (struct usb_serial_port *)urb->context;
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	unsigned long		flags;
 	int			result;
 
@@ -510,7 +510,7 @@ static void ipaq_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 
 static int ipaq_write_room(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
 	dbg("%s - freelen %d", __FUNCTION__, priv->free_len);
 	return priv->free_len;
@@ -518,7 +518,7 @@ static int ipaq_write_room(struct usb_serial_port *port)
 
 static int ipaq_chars_in_buffer(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
 	dbg("%s - queuelen %d", __FUNCTION__, priv->queue_len);
 	return priv->queue_len;
@@ -526,7 +526,7 @@ static int ipaq_chars_in_buffer(struct usb_serial_port *port)
 
 static void ipaq_destroy_lists(struct usb_serial_port *port)
 {
-	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
+	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 	struct list_head	*tmp;
 	struct ipaq_packet	*pkt;
 

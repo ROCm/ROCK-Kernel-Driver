@@ -1672,7 +1672,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 		     __FUNCTION__);
 		return;
 	}
-	edge_port = port->private;
+	edge_port = usb_get_serial_port_data(port);
 	if (!edge_port) {
 		dbg ("%s - edge_port not found", __FUNCTION__);
 		return;
@@ -1821,7 +1821,7 @@ static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 
 static int edge_open (struct usb_serial_port *port, struct file * filp)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)port->private;
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct edgeport_serial *edge_serial;
 	struct usb_device *dev;
 	struct urb *urb;
@@ -1991,7 +1991,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 		return;
 	
 	edge_serial = (struct edgeport_serial *)serial->private;
-	edge_port = (struct edgeport_port *)port->private;
+	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
 	
@@ -2030,7 +2030,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 static int edge_write (struct usb_serial_port *port, int from_user, const unsigned char *data, int count)
 {
 	struct usb_serial *serial = port->serial;
-	struct edgeport_port *edge_port = port->private;
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int result;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
@@ -2084,7 +2084,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 
 static int edge_write_room (struct usb_serial_port *port)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int room = 0;
 
 	dbg("%s", __FUNCTION__);
@@ -2105,7 +2105,7 @@ static int edge_write_room (struct usb_serial_port *port)
 
 static int edge_chars_in_buffer (struct usb_serial_port *port)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int chars = 0;
 
 	dbg("%s", __FUNCTION__);
@@ -2126,7 +2126,7 @@ static int edge_chars_in_buffer (struct usb_serial_port *port)
 
 static void edge_throttle (struct usb_serial_port *port)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct tty_struct *tty;
 	int status;
 
@@ -2159,7 +2159,7 @@ static void edge_throttle (struct usb_serial_port *port)
 
 static void edge_unthrottle (struct usb_serial_port *port)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct tty_struct *tty;
 	int status;
 
@@ -2350,7 +2350,7 @@ static void change_port_settings (struct edgeport_port *edge_port, struct termio
 
 static void edge_set_termios (struct usb_serial_port *port, struct termios *old_termios)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct tty_struct *tty = port->tty;
 	unsigned int cflag;
 
@@ -2484,7 +2484,7 @@ static int get_serial_info (struct edgeport_port *edge_port, struct serial_struc
 
 static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct async_icount cnow;
 	struct async_icount cprev;
 
@@ -2558,7 +2558,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 
 static void edge_break (struct usb_serial_port *port, int break_state)
 {
-	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
+	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int status;
 
 	dbg ("%s - state = %d", __FUNCTION__, break_state);
@@ -2613,7 +2613,7 @@ static int edge_startup (struct usb_serial *serial)
 		memset (edge_port, 0, sizeof(struct edgeport_port));
 		edge_port->port = &serial->port[i];
 		edge_port->edge_serial = edge_serial;
-		serial->port[i].private = edge_port;
+		usb_set_serial_port_data(&serial->port[i], edge_port);
 	}
 	
 	return 0;
@@ -2626,8 +2626,8 @@ static void edge_shutdown (struct usb_serial *serial)
 	dbg ("%s", __FUNCTION__);
 
 	for (i=0; i < serial->num_ports; ++i) {
-		kfree (serial->port[i].private);
-		serial->port[i].private = NULL;
+		kfree (usb_get_serial_port_data(&serial->port[i]));
+		usb_set_serial_port_data(&serial->port[i], NULL);
 	}
 	kfree (serial->private);
 	serial->private = NULL;

@@ -114,15 +114,15 @@ static int cyberjack_startup (struct usb_serial *serial)
 	dbg("%s", __FUNCTION__);
 
 	/* allocate the private data structure */
-	serial->port->private = kmalloc(sizeof(struct cyberjack_private), GFP_KERNEL);
-	if (!serial->port->private)
-		return (-1); /* error */
+	priv = kmalloc(sizeof(struct cyberjack_private), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
 
 	/* set initial values */
-	priv = (struct cyberjack_private *)serial->port->private;
 	priv->rdtodo = 0;
 	priv->wrfilled = 0;
 	priv->wrsent = 0;
+	usb_set_serial_port_data(serial->port, priv);
 
 	init_waitqueue_head(&serial->port->write_wait);
 
@@ -137,8 +137,8 @@ static void cyberjack_shutdown (struct usb_serial *serial)
 
 	for (i=0; i < serial->num_ports; ++i) {
 		/* My special items, the standard routines free my urbs */
-		if (serial->port[i].private)
-			kfree(serial->port[i].private);
+		kfree(usb_get_serial_port_data(&serial->port[i]));
+		usb_set_serial_port_data(&serial->port[i], NULL);
 	}
 }
 	
@@ -158,7 +158,7 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 	 */
 	port->tty->low_latency = 1;
 
-	priv = (struct cyberjack_private *)port->private;
+	priv = usb_get_serial_port_data(port);
 	priv->rdtodo = 0;
 	priv->wrfilled = 0;
 	priv->wrsent = 0;
@@ -192,7 +192,7 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 static int cyberjack_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
-	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;
+	struct cyberjack_private *priv = usb_get_serial_port_data(port);
 	int result;
 	int wrexpected;
 
@@ -280,7 +280,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;
+	struct cyberjack_private *priv = usb_get_serial_port_data(port);
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 
@@ -334,7 +334,7 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;
+	struct cyberjack_private *priv = usb_get_serial_port_data(port);
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
@@ -389,7 +389,7 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;
+	struct cyberjack_private *priv = usb_get_serial_port_data(port);
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
