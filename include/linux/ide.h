@@ -47,7 +47,7 @@
 # define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
 #endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
-# define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
+# define OK_TO_RESET_CONTROLLER	0	/* 0 for use with AH2372A/B interface */
 #endif
 #ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
 # define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
@@ -327,19 +327,9 @@ struct ata_device {
 	 */
 	request_queue_t	queue;	/* per device request queue */
 
-
 	unsigned long sleep;	/* sleep until this time */
 
-	/* Flags requesting/indicating one of the following special commands
-	 * executed on the request queue.
-	 */
-#define ATA_SPECIAL_GEOMETRY		0x01
-#define ATA_SPECIAL_RECALIBRATE		0x02
-#define ATA_SPECIAL_MMODE		0x04
-#define ATA_SPECIAL_TUNE		0x08
-	unsigned char special_cmd;
-	u8 mult_req;			/* requested multiple sector setting */
-	u8 tune_req;			/* requested drive tuning setting */
+	u8 XXX_tune_req;			/* requested drive tuning setting */
 
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 using_tcq;		/* disk is using queueing */
@@ -409,6 +399,7 @@ struct ata_device {
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 	struct device	device;		/* global device tree handle */
+
 	/*
 	 * tcq statistics
 	 */
@@ -517,6 +508,8 @@ struct ata_channel {
 	/* driver soft-power interface */
 	int (*busproc)(struct ata_device *, int);
 	byte		bus_state;	/* power state of the IDE bus */
+
+	unsigned long poll_timeout; /* timeout value during polled operations */
 };
 
 /*
@@ -565,17 +558,19 @@ static inline int ata_can_queue(struct ata_device *drive)
 	return 1;
 }
 #else
-#define ata_pending_commands(drive)	(0)
-#define ata_can_queue(drive)		(1)
+# define ata_pending_commands(drive)	(0)
+# define ata_can_queue(drive)		(1)
 #endif
 
 typedef struct hwgroup_s {
+	/* FIXME: We should look for busy request queues instead of looking at
+	 * the !NULL state of this field.
+	 */
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	unsigned long flags;		/* BUSY, SLEEPING */
 	struct ata_device *XXX_drive;	/* current drive */
 	struct request *rq;		/* current request */
 	struct timer_list timer;	/* failsafe timer */
-	unsigned long poll_timeout;	/* timeout value during long polls */
 	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
 } ide_hwgroup_t;
 
@@ -675,9 +670,7 @@ struct ata_operations {
 	int (*check_media_change)(struct ata_device *);
 	void (*revalidate)(struct ata_device *);
 
-	void (*pre_reset)(struct ata_device *);
 	sector_t (*capacity)(struct ata_device *);
-	ide_startstop_t	(*special)(struct ata_device *);
 
 	ide_proc_entry_t *proc;
 };
@@ -827,15 +820,13 @@ extern ide_startstop_t ata_taskfile(struct ata_device *,
  */
 
 extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
-extern ide_startstop_t set_geometry_intr(struct ata_device *, struct request *);
-extern ide_startstop_t set_multmode_intr(struct ata_device *, struct request *);
 extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 
 
 /* This is setting up all fields in args, which depend upon the command type.
  */
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
-extern int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *cmd, byte *buf);
+extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 void ide_delay_50ms(void);

@@ -193,7 +193,7 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 #ifdef CONFIG_BLK_DEV_HD
 	if (ch->io_ports[IDE_DATA_OFFSET] == HD_DATA)
 		ch->noprobe = 1; /* may be overridden by ide_setup() */
-#endif /* CONFIG_BLK_DEV_HD */
+#endif
 	ch->major = ide_major[index];
 	sprintf(ch->name, "ide%d", index);
 	ch->bus_state = BUSSTATE_ON;
@@ -201,15 +201,14 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		struct ata_device *drive = &ch->drives[unit];
 
-		drive->type			= ATA_DISK;
-		drive->select.all		= (unit<<4)|0xa0;
-		drive->channel			= ch;
-		drive->ctl			= 0x08;
-		drive->ready_stat		= READY_STAT;
-		drive->bad_wstat		= BAD_W_STAT;
-		drive->special_cmd = (ATA_SPECIAL_RECALIBRATE | ATA_SPECIAL_GEOMETRY);
+		drive->type		= ATA_DISK;
+		drive->select.all	= (unit<<4)|0xa0;
+		drive->channel		= ch;
+		drive->ctl		= 0x08;
+		drive->ready_stat	= READY_STAT;
+		drive->bad_wstat	= BAD_W_STAT;
 		sprintf(drive->name, "hd%c", 'a' + (index * MAX_DRIVES) + unit);
-		drive->max_failures		= IDE_DEFAULT_MAX_FAILURES;
+		drive->max_failures	= IDE_DEFAULT_MAX_FAILURES;
 
 		init_waitqueue_head(&drive->wqueue);
 	}
@@ -354,11 +353,8 @@ void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-static void ata_pre_reset(struct ata_device *drive)
+static void check_crc_errors(struct ata_device *drive)
 {
-	if (ata_ops(drive) && ata_ops(drive)->pre_reset)
-		ata_ops(drive)->pre_reset(drive);
-
 	if (!drive->using_dma)
 	    return;
 
@@ -390,38 +386,6 @@ sector_t ata_capacity(struct ata_device *drive)
 	 */
 
 	return ~0UL;
-}
-
-/*
- * This is used to issue WIN_SPECIFY, WIN_RESTORE, and WIN_SETMULT commands to
- * a drive.
- */
-static ide_startstop_t ata_special(struct ata_device *drive)
-{
-	unsigned char special_cmd = drive->special_cmd;
-
-#ifdef DEBUG
-	printk("%s: ata_special: 0x%02x\n", drive->name, special_cmd);
-#endif
-	if (special_cmd & ATA_SPECIAL_TUNE) {
-		drive->special_cmd &= ~ATA_SPECIAL_TUNE;
-		if (drive->channel->tuneproc != NULL)
-			drive->channel->tuneproc(drive, drive->tune_req);
-	} else if (drive->driver != NULL) {
-		if (ata_ops(drive)->special)
-			return ata_ops(drive)->special(drive);
-		else {
-			drive->special_cmd = 0;
-			drive->mult_req = 0;
-
-			return ide_stopped;
-		}
-	} else if (special_cmd) {
-		printk("%s: bad special flag: 0x%02x\n", drive->name, special_cmd);
-		drive->special_cmd = 0;
-	}
-
-	return ide_stopped;
 }
 
 extern struct block_device_operations ide_fops[];
@@ -460,24 +424,24 @@ static ide_startstop_t do_reset1(struct ata_device *, int); /* needed below */
  */
 static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	byte stat;
+	struct ata_channel *ch = drive->channel;
+	u8 stat;
 
-	SELECT_DRIVE(drive->channel,drive);
+	SELECT_DRIVE(ch,drive);
 	udelay (10);
 
 	if (OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
 		printk("%s: ATAPI reset complete\n", drive->name);
 	} else {
-		if (time_before(jiffies, hwgroup->poll_timeout)) {
+		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler (drive, atapi_reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
-		hwgroup->poll_timeout = 0;	/* end of polling */
+		ch->poll_timeout = 0;	/* end of polling */
 		printk("%s: ATAPI reset timed-out, status=0x%02x\n", drive->name, stat);
 		return do_reset1 (drive, 1);	/* do it the old fashioned way */
 	}
-	hwgroup->poll_timeout = 0;	/* done polling */
+	ch->poll_timeout = 0;	/* done polling */
 
 	return ide_stopped;
 }
@@ -489,19 +453,18 @@ static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct req
  */
 static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	struct ata_channel *hwif = drive->channel;
+	struct ata_channel *ch = drive->channel;
 	u8 stat;
 
 	if (!OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
-		if (time_before(jiffies, hwgroup->poll_timeout)) {
+		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
-		printk("%s: reset timed-out, status=0x%02x\n", hwif->name, stat);
+		printk("%s: reset timed-out, status=0x%02x\n", ch->name, stat);
 		drive->failures++;
 	} else  {
-		printk("%s: reset: ", hwif->name);
+		printk("%s: reset: ", ch->name);
 		if ((stat = GET_ERR()) == 1) {
 			printk("success\n");
 			drive->failures = 0;
@@ -531,7 +494,8 @@ static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *
 			drive->failures++;
 		}
 	}
-	hwgroup->poll_timeout = 0;	/* done polling */
+	ch->poll_timeout = 0;	/* done polling */
+
 	return ide_stopped;
 }
 
@@ -555,21 +519,21 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 {
 	unsigned int unit;
 	unsigned long flags;
-	struct ata_channel *hwif = drive->channel;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 
 	__save_flags(flags);	/* local CPU only */
 	__cli();		/* local CPU only */
 
 	/* For an ATAPI device, first try an ATAPI SRST. */
 	if (drive->type != ATA_DISK && !do_not_try_atapi) {
-		ata_pre_reset(drive);
-		SELECT_DRIVE(hwif,drive);
+		check_crc_errors(drive);
+		SELECT_DRIVE(ch, drive);
 		udelay (20);
 		OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
-		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 		ide_set_handler(drive, atapi_reset_pollfunc, HZ/20, NULL);
 		__restore_flags(flags);	/* local CPU only */
+
 		return ide_started;
 	}
 
@@ -578,11 +542,12 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 	 * for any of the drives on this interface.
 	 */
 	for (unit = 0; unit < MAX_DRIVES; ++unit)
-		ata_pre_reset(&hwif->drives[unit]);
+		check_crc_errors(&ch->drives[unit]);
 
 #if OK_TO_RESET_CONTROLLER
 	if (!IDE_CONTROL_REG) {
 		__restore_flags(flags);
+
 		return ide_stopped;
 	}
 	/*
@@ -601,7 +566,7 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 		OUT_BYTE(drive->ctl|2,IDE_CONTROL_REG);	/* clear SRST, leave nIEN */
 	}
 	udelay(10);			/* more than enough time */
-	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+	ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 	ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
 
 	/*
@@ -609,9 +574,10 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 	 * state when the disks are reset this way. At least, the Winbond
 	 * 553 documentation says that
 	 */
-	if (hwif->resetproc != NULL)
-		hwif->resetproc(drive);
+	if (ch->resetproc != NULL)
+		ch->resetproc(drive);
 
+	/* FIXME: we should handle mulit mode setting here as well ! */
 #endif
 
 	__restore_flags (flags);	/* local CPU only */
@@ -789,6 +755,36 @@ static void try_to_flush_leftover_data(struct ata_device *drive)
 	}
 }
 
+#ifdef CONFIG_BLK_DEV_PDC4030
+# define IS_PDC4030_DRIVE (drive->channel->chipset == ide_pdc4030)
+#else
+# define IS_PDC4030_DRIVE (0)	/* auto-NULLs out pdc4030 code */
+#endif
+
+/*
+ * We are still on the old request path here so issuing the recalibrate command
+ * directly should just work.
+ */
+static int do_recalibrate(struct ata_device *drive)
+{
+	printk(KERN_INFO "%s: recalibrating!\n", drive->name);
+
+	if (drive->type != ATA_DISK)
+		return ide_stopped;
+
+	if (!IS_PDC4030_DRIVE) {
+		struct ata_taskfile args;
+
+		memset(&args, 0, sizeof(args));
+		args.taskfile.sector_count = drive->sect;
+		args.taskfile.command = WIN_RESTORE;
+		args.handler = recal_intr;
+		ata_taskfile(drive, &args, NULL);
+	}
+
+	return IS_PDC4030_DRIVE ? ide_stopped : ide_started;
+}
+
 /*
  * Take action based on the error returned by the drive.
  */
@@ -835,13 +831,11 @@ ide_startstop_t ide_error(struct ata_device *drive, const char *msg, byte stat)
 		else
 			ide_end_request(drive, rq, 0);
 	} else {
-		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
-			++rq->errors;
-			return do_reset1(drive, 0);
-		}
-		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
-			drive->special_cmd |= ATA_SPECIAL_RECALIBRATE;
 		++rq->errors;
+		if ((rq->errors & ERROR_RESET) == ERROR_RESET)
+			return do_reset1(drive, 0);
+		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
+			return do_recalibrate(drive);
 	}
 	return ide_stopped;
 }
@@ -960,7 +954,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		goto kill_rq;
 	}
 
-	block    = rq->sector;
+	block = rq->sector;
 
 	/* Strange disk manager remap.
 	 */
@@ -991,14 +985,6 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		}
 	}
 
-	/* FIXME: We can see nicely here that all commands should be submitted
-	 * through the request queue and that the special field in drive should
-	 * go as soon as possible!
-	 */
-
-	if (drive->special_cmd)
-		return ata_special(drive);
-
 	/* This issues a special drive command, usually initiated by ioctl()
 	 * from the external hdparm program.
 	 */
@@ -1011,7 +997,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		ata_taskfile(drive, args, NULL);
 
 		if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
-					(args->command_type == IDE_DRIVE_TASK_OUT)) &&
+		     (args->command_type == IDE_DRIVE_TASK_OUT)) &&
 				args->prehandler && args->handler)
 			return args->prehandler(drive, rq);
 
@@ -1053,6 +1039,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 			return ata_ops(drive)->do_request(drive, rq, block);
 		else {
 			ide_end_request(drive, rq, 0);
+
 			return ide_stopped;
 		}
 	}
@@ -1499,7 +1486,7 @@ void ide_timer_expiry(unsigned long data)
 			disable_irq(ch->irq);	/* disable_irq_nosync ?? */
 #endif
 			__cli();	/* local CPU only, as if we were handling an interrupt */
-			if (hwgroup->poll_timeout != 0) {
+			if (ch->poll_timeout != 0) {
 				startstop = handler(drive, ch->hwgroup->rq);
 			} else if (drive_is_ready(drive)) {
 				if (drive->waiting_for_dma)
@@ -1598,7 +1585,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	if (!ide_ack_intr(ch))
 		goto out_lock;
 
-	if (handler == NULL || hwgroup->poll_timeout != 0) {
+	if (handler == NULL || ch->poll_timeout != 0) {
 #if 0
 		printk(KERN_INFO "ide: unexpected interrupt %d %d\n", ch->unit, irq);
 #endif
@@ -2327,23 +2314,24 @@ int ide_read_setting(struct ata_device *drive, ide_settings_t *setting)
 int ide_spin_wait_hwgroup(struct ata_device *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	unsigned long timeout = jiffies + (3 * HZ);
+
+	/* FIXME: Wait on a proper timer. Instead of playing games on the
+	 * spin_lock().
+	 */
+
+	unsigned long timeout = jiffies + (10 * HZ);
 
 	spin_lock_irq(&ide_lock);
 
 	while (test_bit(IDE_BUSY, &hwgroup->flags)) {
-		unsigned long lflags;
 		spin_unlock_irq(&ide_lock);
-		__save_flags(lflags);	/* local CPU only */
-		__sti();		/* local CPU only; needed for jiffies */
-		if (0 < (signed long)(jiffies - timeout)) {
-			__restore_flags(lflags);	/* local CPU only */
+		if (time_after(jiffies, timeout)) {
 			printk("%s: channel busy\n", drive->name);
 			return -EBUSY;
 		}
-		__restore_flags(lflags);	/* local CPU only */
 		spin_lock_irq(&ide_lock);
 	}
+
 	return 0;
 }
 
@@ -2411,18 +2399,17 @@ static int set_using_dma(struct ata_device *drive, int arg)
 
 static int set_pio_mode(struct ata_device *drive, int arg)
 {
-	struct request rq;
-
 	if (!drive->channel->tuneproc)
 		return -ENOSYS;
 
-	if (drive->special_cmd & ATA_SPECIAL_TUNE)
+	/* FIXME: This is very much the same kind of problem as we have with
+	 * set_mutlmode() see for a edscription there.
+	 */
+	if (HWGROUP(drive)->handler)
 		return -EBUSY;
 
-	ide_init_drive_cmd(&rq);
-	drive->tune_req = (u8) arg;
-	drive->special_cmd |= ATA_SPECIAL_TUNE;
-	ide_do_drive_cmd(drive, &rq, ide_wait);
+	if (drive->channel->tuneproc != NULL)
+		drive->channel->tuneproc(drive, (u8) arg);
 
 	return 0;
 }

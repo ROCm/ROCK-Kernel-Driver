@@ -4273,16 +4273,6 @@ static void idetape_blkdev_release (struct inode *inode, struct file *filp, ide_
 }
 
 /*
- *	idetape_pre_reset is called before an ATAPI/ATA software reset.
- */
-static void idetape_pre_reset (ide_drive_t *drive)
-{
-	idetape_tape_t *tape = drive->driver_data;
-	if (tape != NULL)
-		set_bit (IDETAPE_IGNORE_DSC, &tape->flags);
-}
-
-/*
  *	Character device interface functions
  */
 static ide_drive_t *get_drive_ptr (kdev_t i_rdev)
@@ -6164,8 +6154,6 @@ static struct ata_operations idetape_driver = {
 	release:		idetape_blkdev_release,
 	check_media_change:	NULL,
 	revalidate:		idetape_revalidate,
-	pre_reset:		idetape_pre_reset,
-	capacity:		NULL,
 	proc:			idetape_proc
 };
 

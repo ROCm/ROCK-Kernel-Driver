@@ -489,40 +489,6 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 }
 
 /*
- * This is invoked on completion of a WIN_SETMULT cmd.
- */
-ide_startstop_t set_multmode_intr(struct ata_device *drive, struct request *__rq)
-{
-	u8 stat;
-
-	if (OK_STAT(stat = GET_STAT(),READY_STAT,BAD_STAT)) {
-		drive->mult_count = drive->mult_req;
-	} else {
-		drive->mult_req = drive->mult_count = 0;
-		drive->special_cmd |= ATA_SPECIAL_RECALIBRATE;
-		ide_dump_status(drive, "set_multmode", stat);
-	}
-	return ide_stopped;
-}
-
-/*
- * This is invoked on completion of a WIN_SPECIFY cmd.
- */
-ide_startstop_t set_geometry_intr(struct ata_device *drive, struct request *__rq)
-{
-	u8 stat;
-
-	if (OK_STAT(stat=GET_STAT(),READY_STAT,BAD_STAT))
-		return ide_stopped;
-
-	if (stat & (ERR_STAT|DRQ_STAT))
-		return ide_error(drive, "set_geometry_intr", stat);
-
-	ide_set_handler(drive, set_geometry_intr, WAIT_CMD, NULL);
-	return ide_started;
-}
-
-/*
  * This is invoked on completion of a WIN_RESTORE (recalibrate) cmd.
  */
 ide_startstop_t recal_intr(struct ata_device *drive, struct request *__rq)
@@ -729,11 +695,11 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			args->command_type = IDE_DRIVE_TASK_IN;
 			return;
 
+		case CFA_WRITE_SECT_WO_ERASE:
 		case WIN_WRITE:
 		case WIN_WRITE_EXT:
 		case WIN_WRITE_VERIFY:
 		case WIN_WRITE_BUFFER:
-		case CFA_WRITE_SECT_WO_ERASE:
 		case WIN_DOWNLOAD_MICROCODE:
 			args->prehandler = pre_task_out_intr;
 			args->handler = task_out_intr;
@@ -832,7 +798,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			}
 
 		case WIN_SPECIFY:
-			args->handler = set_geometry_intr;
+			args->handler = task_no_data_intr;
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
@@ -874,7 +840,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			return;
 
 		case WIN_SETMULT:
-			args->handler = set_multmode_intr;
+			args->handler = task_no_data_intr;
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
@@ -894,19 +860,19 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 	}
 }
 
-int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *args, byte *buf)
+int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *args)
 {
 	struct request rq;
 
 	memset(&rq, 0, sizeof(rq));
 	rq.flags = REQ_DRIVE_ACB;
-	rq.buffer = buf;
 
+#if 0
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors
 			= (args->hobfile.sector_count << 8)
 			| args->taskfile.sector_count;
-
+#endif
 	rq.special = args;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
@@ -996,8 +962,6 @@ EXPORT_SYMBOL(atapi_read);
 EXPORT_SYMBOL(atapi_write);
 EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);
-EXPORT_SYMBOL(set_geometry_intr);
-EXPORT_SYMBOL(set_multmode_intr);
 EXPORT_SYMBOL(task_no_data_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);
 EXPORT_SYMBOL(ide_cmd_type_parser);
