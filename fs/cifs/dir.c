@@ -165,7 +165,9 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&direntry->d_sb->s_vfs_rename_sem);
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -304,7 +306,9 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&direntry->d_sb->s_vfs_rename_sem);
 	if(full_path == NULL)
 		rc = -ENOMEM;
 	
@@ -355,6 +359,9 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	cifs_sb = CIFS_SB(parent_dir_inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	/* can not grab the rename sem here since it would
+	deadlock in the cases (beginning of sys_rename itself)
+	in which we already have the sb rename sem */
 	full_path = build_path_from_dentry(direntry);
 	if(full_path == NULL) {
 		FreeXid(xid);

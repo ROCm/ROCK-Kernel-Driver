@@ -39,7 +39,11 @@ int cifs_directory_notify(unsigned long arg, struct file * file)
 	xid = GetXid();
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
+
+	down(&file->f_dentry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(file->f_dentry);
+	up(&file->f_dentry->d_sb->s_vfs_rename_sem);
+
 	if(full_path == NULL) {
 		rc = -ENOMEM;
 	} else {

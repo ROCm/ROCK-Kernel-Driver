@@ -44,10 +44,13 @@ cifs_hardlink(struct dentry *old_file, struct inode *inode,
 	cifs_sb_target = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb_target->tcon;
 
-/* No need to check for cross device links since server will do that - BB note DFS case in future though (when we may have to check) */
+/* No need to check for cross device links since server will do that
+   BB note DFS case in future though (when we may have to check) */
 
+	down(&inode->i_sb->s_vfs_rename_sem);
 	fromName = build_path_from_dentry(old_file);
 	toName = build_path_from_dentry(direntry);
+	up(&inode->i_sb->s_vfs_rename_sem);
 	if((fromName == NULL) || (toName == NULL)) {
 		rc = -ENOMEM;
 		goto cifs_hl_exit;
@@ -96,7 +99,11 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	struct cifsTconInfo *pTcon;
 
 	xid = GetXid();
+
+	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&direntry->d_sb->s_vfs_rename_sem);
+
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -159,7 +166,10 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&inode->i_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&inode->i_sb->s_vfs_rename_sem);
+
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -219,7 +229,13 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	xid = GetXid();
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
+
+/* BB would it be safe against deadlock to grab this sem 
+      even though rename itself grabs the sem and calls lookup? */
+/*       down(&inode->i_sb->s_vfs_rename_sem);*/
 	full_path = build_path_from_dentry(direntry);
+/*       up(&inode->i_sb->s_vfs_rename_sem);*/
+
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
