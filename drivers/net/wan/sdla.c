@@ -1719,9 +1719,9 @@ static void __exit exit_sdla(void)
 	
 	unregister_frad(devname);
 }
-#endif
 
 MODULE_LICENSE("GPL");
 
 module_init(init_sdla);
 module_exit(exit_sdla);
+#endif
