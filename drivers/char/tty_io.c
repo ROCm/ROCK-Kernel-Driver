@@ -1836,6 +1836,8 @@ static void __do_SAK(void *arg)
 #else
 	struct tty_struct *tty = arg;
 	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pid;
 	int session;
 	int		i;
 	struct file	*filp;
@@ -1848,9 +1850,8 @@ static void __do_SAK(void *arg)
 	if (tty->driver.flush_buffer)
 		tty->driver.flush_buffer(tty);
 	read_lock(&tasklist_lock);
-	for_each_process(p) {
-		if ((p->tty == tty) ||
-		    ((session > 0) && (p->session == session))) {
+	for_each_task_pid(session, PIDTYPE_SID, p, l, pid) {
+		if (p->tty == tty || session > 0) {
 			printk(KERN_NOTICE "SAK: killed process %d"
 			    " (%s): p->session==tty->session\n",
 			    p->pid, p->comm);

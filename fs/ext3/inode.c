@@ -1098,20 +1098,14 @@ out:
 	return ret;
 }
 
-static int journal_dirty_sync_data(handle_t *handle, struct buffer_head *bh)
+static int
+ext3_journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 {
-	return ext3_journal_dirty_data(handle, bh, 0);
-}
-
-/*
- * For ext3_writepage().  We also brelse() the buffer to account for
- * the bget() which ext3_writepage() performs.
- */
-static int journal_dirty_async_data(handle_t *handle, struct buffer_head *bh)
-{
-	int ret = ext3_journal_dirty_data(handle, bh, 1);
-	__brelse(bh);
-	return ret;
+	int err = journal_dirty_data(handle, bh);
+	if (err)
+		ext3_journal_abort_handle(__FUNCTION__, __FUNCTION__,
+						bh, handle,err);
+	return err;
 }
 
 /* For commit_write() in data=journal mode */
@@ -1154,7 +1148,7 @@ static int ext3_commit_write(struct file *file, struct page *page,
 	} else {
 		if (ext3_should_order_data(inode)) {
 			ret = walk_page_buffers(handle, page_buffers(page),
-				from, to, NULL, journal_dirty_sync_data);
+				from, to, NULL, ext3_journal_dirty_data);
 		}
 		/* Be careful here if generic_commit_write becomes a
 		 * required invocation after block_prepare_write. */
@@ -1228,7 +1222,13 @@ static sector_t ext3_bmap(struct address_space *mapping, sector_t block)
 
 static int bget_one(handle_t *handle, struct buffer_head *bh)
 {
-	atomic_inc(&bh->b_count);
+	get_bh(bh);
+	return 0;
+}
+
+static int bput_one(handle_t *handle, struct buffer_head *bh)
+{
+	put_bh(bh);
 	return 0;
 }
 
@@ -1348,7 +1348,9 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 	/* And attach them to the current transaction */
 	if (order_data) {
 		err = walk_page_buffers(handle, page_bufs,
-			0, PAGE_CACHE_SIZE, NULL, journal_dirty_async_data);
+			0, PAGE_CACHE_SIZE, NULL, ext3_journal_dirty_data);
+		walk_page_buffers(handle, page_bufs, 0,
+				PAGE_CACHE_SIZE, NULL, bput_one);
 		if (!ret)
 			ret = err;
 	}
@@ -1587,7 +1589,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 		err = ext3_journal_dirty_metadata(handle, bh);
 	} else {
 		if (ext3_should_order_data(inode))
-			err = ext3_journal_dirty_data(handle, bh, 0);
+			err = ext3_journal_dirty_data(handle, bh);
 		mark_buffer_dirty(bh);
 	}
 

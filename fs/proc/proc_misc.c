@@ -140,9 +140,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	struct page_state ps;
 	unsigned long inactive;
 	unsigned long active;
+	unsigned long free;
 
 	get_page_state(&ps);
-	get_zone_counts(&active, &inactive);
+	get_zone_counts(&active, &inactive, &free);
 
 /*
  * display in kilobytes.

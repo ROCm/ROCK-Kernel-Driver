@@ -48,6 +48,8 @@ int nr_threads;
 int max_threads;
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
 
+DEFINE_PER_CPU(unsigned long, process_counts) = 0;
+
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
 /*
@@ -56,6 +58,18 @@ rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
  * preemption turned off.
  */
 static task_t *task_cache[NR_CPUS] __cacheline_aligned;
+
+int nr_processes(void)
+{
+	int cpu;
+	int total = 0;
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (cpu_online(cpu))
+			total += per_cpu(process_counts, cpu);
+	}
+	return total;
+}
 
 void __put_task_struct(struct task_struct *tsk)
 {
@@ -931,6 +945,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, p->pgrp);
 		attach_pid(p, PIDTYPE_SID, p->session);
+		if (p->pid)
+			per_cpu(process_counts, smp_processor_id())++;
 	} else
 		link_pid(p, p->pids + PIDTYPE_TGID, &p->group_leader->pids[PIDTYPE_TGID].pid);
 

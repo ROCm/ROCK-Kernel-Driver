@@ -457,11 +457,8 @@ static struct address_space_operations hugetlbfs_aops = {
 };
 
 struct file_operations hugetlbfs_file_operations = {
-	.read		= generic_file_read,
-	.write		= generic_file_write,
 	.mmap		= hugetlbfs_file_mmap,
 	.fsync		= simple_sync_file,
-	.sendfile	= generic_file_sendfile,
 };
 
 static struct inode_operations hugetlbfs_dir_inode_operations = {
