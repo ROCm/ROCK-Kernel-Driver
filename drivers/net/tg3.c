@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.11"
-#define DRV_MODULE_RELDATE	"October 20, 2004"
+#define DRV_MODULE_VERSION	"3.13"
+#define DRV_MODULE_RELDATE	"November 1, 2004"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -414,6 +414,20 @@ static void tg3_enable_ints(struct tg3 *tp)
 	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+
+	tg3_cond_int(tp);
+}
+
+/* tg3_restart_ints
+ *  similar to tg3_enable_ints, but it can return without flushing the
+ *  PIO write which reenables interrupts
+ */
+static void tg3_restart_ints(struct tg3 *tp)
+{
+	tw32(TG3PCI_MISC_HOST_CTRL,
+		(tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
+	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
+	mmiowb();
 
 	tg3_cond_int(tp);
 }
@@ -2145,7 +2159,16 @@ static int tg3_setup_fiber_hw_autoneg(struct tg3 *tp, u32 mac_status)
 		tp->tg3_flags2 |= TG3_FLG2_PHY_JUST_INITTED;
 	} else if (mac_status & (MAC_STATUS_PCS_SYNCED |
 				 MAC_STATUS_SIGNAL_DET)) {
-		sg_dig_status = tr32(SG_DIG_STATUS);
+		int i;
+
+		/* Giver time to negotiate (~200ms) */
+		for (i = 0; i < 40000; i++) {
+			sg_dig_status = tr32(SG_DIG_STATUS);
+			if (sg_dig_status & (0x3))
+				break;
+			udelay(5);
+		}
+		mac_status = tr32(MAC_STATUS);
 
 		if ((sg_dig_status & (1 << 1)) &&
 		    (mac_status & MAC_STATUS_PCS_SYNCED)) {
@@ -2730,6 +2753,7 @@ next_pkt_nopost:
 		tw32_rx_mbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
 			     sw_idx);
 	}
+	mmiowb();
 
 	return received;
 }
@@ -2788,7 +2812,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 	if (done) {
 		spin_lock_irqsave(&tp->lock, flags);
 		__netif_rx_complete(netdev);
-		tg3_enable_ints(tp);
+		tg3_restart_ints(tp);
 		spin_unlock_irqrestore(&tp->lock, flags);
 	}
 
@@ -3177,6 +3201,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 out_unlock:
+    	mmiowb();
 	spin_unlock_irqrestore(&tp->tx_lock, flags);
 
 	dev->trans_start = jiffies;
@@ -8224,7 +8249,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	spin_lock_init(&tp->indirect_lock);
 	INIT_WORK(&tp->reset_task, tg3_reset_task, tp);
 
-	tp->regs = ioremap(tg3reg_base, tg3reg_len);
+	tp->regs = ioremap_nocache(tg3reg_base, tg3reg_len);
 	if (tp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");

@@ -98,16 +98,6 @@ static inline void sctp_outq_tail_data(struct sctp_outq *q,
 	return;
 }
 
-/* Insert a chunk behind chunk 'pos'. */
-static inline void sctp_outq_insert_data(struct sctp_outq *q,
-					 struct sctp_chunk *ch,
-					 struct sctp_chunk *pos)
-{
-	__skb_insert((struct sk_buff *)ch, (struct sk_buff *)pos->prev,
-		     (struct sk_buff *)pos, pos->list);
-	q->out_qlen += ch->skb->len;
-}
-
 /*
  * SFR-CACC algorithm:
  * D) If count_of_newacks is greater than or equal to 2

@@ -161,7 +161,9 @@ struct hci_conn {
 
 extern struct hci_proto *hci_proto[];
 extern struct list_head hci_dev_list;
+extern struct list_head hci_cb_list;
 extern rwlock_t hci_dev_list_lock;
+extern rwlock_t hci_cb_list_lock;
 
 /* ----- Inquiry cache ----- */
 #define INQUIRY_CACHE_AGE_MAX   (HZ*30)   // 30 seconds
@@ -229,7 +231,7 @@ static inline void hci_conn_hash_del(struct hci_dev *hdev, struct hci_conn *c)
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	list_del(&c->list);
 	if (c->type == ACL_LINK)
-		h->acl_num++;
+		h->acl_num--;
 	else
 		h->sco_num--;
 }
@@ -491,6 +493,50 @@ static inline void hci_proto_encrypt_cfm(struct hci_conn *conn, __u8 status)
 
 int hci_register_proto(struct hci_proto *hproto);
 int hci_unregister_proto(struct hci_proto *hproto);
+
+/* ----- HCI callbacks ----- */
+struct hci_cb {
+	struct list_head list;
+
+	char *name;
+
+	void (*auth_cfm)	(struct hci_conn *conn, __u8 status);
+	void (*encrypt_cfm)	(struct hci_conn *conn, __u8 status, __u8 encrypt);
+};
+
+static inline void hci_auth_cfm(struct hci_conn *conn, __u8 status)
+{
+	struct list_head *p;
+
+	hci_proto_auth_cfm(conn, status);
+
+	read_lock_bh(&hci_cb_list_lock);
+	list_for_each(p, &hci_cb_list) {
+		struct hci_cb *cb = list_entry(p, struct hci_cb, list);
+		if (cb->auth_cfm)
+			cb->auth_cfm(conn, status);
+	}
+	read_unlock_bh(&hci_cb_list_lock);
+}
+
+static inline void hci_encrypt_cfm(struct hci_conn *conn, __u8 status, __u8 encrypt)
+{
+	struct list_head *p;
+
+	hci_proto_encrypt_cfm(conn, status);
+
+	read_lock_bh(&hci_cb_list_lock);
+	list_for_each(p, &hci_cb_list) {
+		struct hci_cb *cb = list_entry(p, struct hci_cb, list);
+		if (cb->encrypt_cfm)
+			cb->encrypt_cfm(conn, status, encrypt);
+	}
+	read_unlock_bh(&hci_cb_list_lock);
+}
+
+int hci_register_cb(struct hci_cb *hcb);
+int hci_unregister_cb(struct hci_cb *hcb);
+
 int hci_register_notifier(struct notifier_block *nb);
 int hci_unregister_notifier(struct notifier_block *nb);
 

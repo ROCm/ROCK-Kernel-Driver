@@ -211,17 +211,6 @@ static int msb_index (__u16 word)
 	return index;
 }
 
-static inline __u32 byte_value(__u8 byte, __u32 *array) 
-{
-	int index;
-
-	ASSERT(array != NULL, return -1;);
-
-	index = msb_index(byte);
-
-	return index_value(index, array);
-}
-
 /*
  * Function value_lower_bits (value, array)
  *

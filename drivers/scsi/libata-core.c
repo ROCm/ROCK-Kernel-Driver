@@ -2169,14 +2169,20 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 	struct scatterlist *sg = qc->sg;
 	struct ata_port *ap = qc->ap;
 	struct page *page;
+	unsigned int offset;
 	unsigned char *buf;
 
 	if (qc->cursect == (qc->nsect - 1))
 		ap->pio_task_state = PIO_ST_LAST;
 
 	page = sg[qc->cursg].page;
-	buf = kmap(page) +
-	      sg[qc->cursg].offset + (qc->cursg_ofs * ATA_SECT_SIZE);
+	offset = sg[qc->cursg].offset + qc->cursg_ofs * ATA_SECT_SIZE;
+
+	/* get the current page and offset */
+	page = nth_page(page, (offset >> PAGE_SHIFT));
+	offset %= PAGE_SIZE;
+
+	buf = kmap(page) + offset;
 
 	qc->cursect++;
 	qc->cursg_ofs++;
@@ -2202,17 +2208,28 @@ static void __atapi_pio_bytes(struct ata_queued_cmd *qc, unsigned int bytes)
 	struct ata_port *ap = qc->ap;
 	struct page *page;
 	unsigned char *buf;
-	unsigned int count;
+	unsigned int offset, count;
 
 	if (qc->curbytes == qc->nbytes - bytes)
 		ap->pio_task_state = PIO_ST_LAST;
 
 next_sg:
 	sg = &qc->sg[qc->cursg];
+
+next_page:
 	page = sg->page;
+	offset = sg->offset + qc->cursg_ofs;
+
+	/* get the current page and offset */
+	page = nth_page(page, (offset >> PAGE_SHIFT));
+	offset %= PAGE_SIZE;
 
 	count = min(sg_dma_len(sg) - qc->cursg_ofs, bytes);
-	buf = kmap(page) + sg->offset + qc->cursg_ofs;
+
+	/* don't cross page boundaries */
+	count = min(count, (unsigned int)PAGE_SIZE - offset);
+
+	buf = kmap(page) + offset;
 
 	bytes -= count;
 	qc->curbytes += count;
@@ -2230,8 +2247,11 @@ next_sg:
 
 	kunmap(page);
 
-	if (bytes)
+	if (bytes) {
+		if (qc->cursg_ofs < sg_dma_len(sg))
+			goto next_page;
 		goto next_sg;
+	}
 }
 
 static void atapi_pio_bytes(struct ata_queued_cmd *qc)

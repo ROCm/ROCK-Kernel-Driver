@@ -364,6 +364,8 @@ inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 	return sk;
 }
 
+EXPORT_SYMBOL_GPL(tcp_v6_lookup);
+
 
 /*
  * Open request hash tables.
