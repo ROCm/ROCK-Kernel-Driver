@@ -64,7 +64,6 @@ MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 static int enable_slot		(struct hotplug_slot *slot);
 static int disable_slot		(struct hotplug_slot *slot);
 static int set_attention_status (struct hotplug_slot *slot, u8 value);
-static int hardware_test	(struct hotplug_slot *slot, u32 value);
 static int get_power_status	(struct hotplug_slot *slot, u8 *value);
 static int get_attention_status	(struct hotplug_slot *slot, u8 *value);
 static int get_address		(struct hotplug_slot *slot, u32 *value);
@@ -78,7 +77,6 @@ static struct hotplug_slot_ops acpi_hotplug_slot_ops = {
 	.enable_slot		= enable_slot,
 	.disable_slot		= disable_slot,
 	.set_attention_status	= set_attention_status,
-	.hardware_test		= hardware_test,
 	.get_power_status	= get_power_status,
 	.get_attention_status	= get_attention_status,
 	.get_latch_status	= get_latch_status,
@@ -151,24 +149,6 @@ static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
 
 	return 0;
 }
-
-
-/**
- * hardware_test - hardware test
- *
- * We have nothing to do for now...
- *
- */
-static int hardware_test(struct hotplug_slot *hotplug_slot, u32 value)
-{
-	struct slot *slot = hotplug_slot->private;
-
-	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
-
-	err("No hardware tests are defined for this driver\n");
-	return -ENODEV;
-}
-
 
 /**
  * get_power_status - get power status of a slot
