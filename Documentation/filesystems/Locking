@@ -137,6 +137,9 @@ prototypes:
 	int (*writepage)(struct page *);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
+	int (*writeback_mapping)(struct address_space *, int *nr_to_write);
+	int (*vm_writeback)(struct page *, int *nr_to_write);
+	int (*set_page_dirty)(struct page *page);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*bmap)(struct address_space *, long);
@@ -145,32 +148,71 @@ prototypes:
 	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
 
 locking rules:
-	All may block
-		BKL	PageLocked(page)
-writepage:	no	yes, unlocks
-readpage:	no	yes, unlocks
-sync_page:	no	maybe
-prepare_write:	no	yes
-commit_write:	no	yes
-bmap:		yes
-flushpage:	no	yes
-releasepage:	no	yes
+	All except set_page_dirty may block
+
+			BKL	PageLocked(page)
+writepage:		no	yes, unlocks
+readpage:		no	yes, unlocks
+sync_page:		no	maybe
+writeback_mapping:	no
+vm_writeback:		no	yes
+set_page_dirty		no	no
+prepare_write:		no	yes
+commit_write:		no	yes
+bmap:			yes
+flushpage:		no	yes
+releasepage:		no	yes
 
 	->prepare_write(), ->commit_write(), ->sync_page() and ->readpage()
 may be called from the request handler (/dev/loop).
-	->readpage() and ->writepage() unlock the page.
+
+	->readpage() unlocks the page, either synchronously or via I/O
+completion.
+
+	->writepage() unlocks the page synchronously, before returning to
+the caller.  If the page has write I/O underway against it, writepage()
+should run SetPageWriteback() against the page prior to unlocking it.
+The write I/O completion handler should run ClearPageWriteback against
+the page.
+
+	That is: after 2.5.12, pages which are under writeout are *not*
+locked.
+
 	->sync_page() locking rules are not well-defined - usually it is called
 with lock on page, but that is not guaranteed. Considering the currently
 existing instances of this method ->sync_page() itself doesn't look
 well-defined...
+
+	->writeback_mapping() is used for periodic writeback and for
+systemcall-initiated sync operations. The address_space should start
+I/O against at least *nr_to_write pages.  *nr_to_write must be decremented
+for each page which is written.  *nr_to_write must not go negative (this
+will be relaxed later).  If nr_to_write is NULL, all dirty pages must
+be written.
+
+	->vm_writeback() is called from the VM.  The address_space should
+start I/O against at least *nr_to_write pages, including the passed page. As
+each page is written its PG_launder flag must be set (inside the page lock).
+
+	The vm_writeback() function is provided so that filesytems can perform
+clustered writeback around the page which the VM is trying to clean.
+If a_ops.vm_writeback is NULL the VM will fall back to single-page writepage().
+
+	->set_page_dirty() is called from various places in the kernel
+when the target page is marked as needing writeback.  It may be called
+under spinlock (it cannot block) and is sometimes called with the page
+not locked.
+
 	->bmap() is currently used by legacy ioctl() (FIBMAP) provided by some
 filesystems and by the swapper. The latter will eventually go away. All
 instances do not actually need the BKL. Please, keep it that way and don't
 breed new callers.
+
 	->flushpage() is called when the filesystem must attempt to drop
 some or all of the buffers from the page when it is being truncated.  It
 returns zero on success.  If ->flushpage is zero, the kernel uses
 block_flushpage() instead.
+
 	->releasepage() is called when the kernel is about to try to drop the
 buffers from the page in preparation for freeing it.  It returns zero to
 indicate that the buffers are (or may be) freeable.  If ->releasepage is zero,

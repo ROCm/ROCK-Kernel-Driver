@@ -43,8 +43,7 @@
  *  pagemap_lru_lock
  *  ->i_shared_lock		(vmtruncate)
  *    ->i_bufferlist_lock	(__free_pte->__set_page_dirty_buffers)
- *      ->unused_list_lock	(try_to_free_buffers)
- *        ->mapping->page_lock
+ *      ->mapping->page_lock
  *      ->inode_lock		(__mark_inode_dirty)
  *        ->sb_lock		(fs/fs-writeback.c)
  */
