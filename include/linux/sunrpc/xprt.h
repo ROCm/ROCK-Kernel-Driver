@@ -66,15 +66,6 @@ struct rpc_timeout {
 };
 
 /*
- * This is the RPC buffer
- */
-struct rpc_iov {
-	struct iovec		io_vec[MAX_IOVEC];
-	unsigned int		io_nr;
-	unsigned int		io_len;
-};
-
-/*
  * This describes a complete RPC request
  */
 struct rpc_rqst {

@@ -174,24 +174,6 @@ void xdr_shift_iovec(struct iovec *iov, int nr, size_t len)
 }
 
 /*
- * Zero the last n bytes in an iovec array of 'nr' elements
- */
-void xdr_zero_iovec(struct iovec *iov, int nr, size_t n)
-{
-	struct iovec *pvec;
-
-	for (pvec = iov + nr - 1; n && nr > 0; nr--, pvec--) {
-		if (n < pvec->iov_len) {
-			memset((char *)pvec->iov_base + pvec->iov_len - n, 0, n);
-			n = 0;
-		} else {
-			memset(pvec->iov_base, 0, pvec->iov_len);
-			n -= pvec->iov_len;
-		}
-	}
-}
-
-/*
  * Map a struct xdr_buf into an iovec array.
  */
 int xdr_kmap(struct iovec *iov_base, struct xdr_buf *xdr, unsigned int base)

@@ -131,41 +131,6 @@ xprt_from_sock(struct sock *sk)
 }
 
 /*
- *	Adjust the iovec to move on 'n' bytes
- */
- 
-extern inline void
-xprt_move_iov(struct msghdr *msg, struct iovec *niv, unsigned amount)
-{
-	struct iovec *iv=msg->msg_iov;
-	int i;
-	
-	/*
-	 *	Eat any sent iovecs
-	 */
-	while (iv->iov_len <= amount) {
-		amount -= iv->iov_len;
-		iv++;
-		msg->msg_iovlen--;
-	}
-
-	/*
-	 *	And chew down the partial one
-	 */
-	niv[0].iov_len = iv->iov_len-amount;
-	niv[0].iov_base =((unsigned char *)iv->iov_base)+amount;
-	iv++;
-
-	/*
-	 *	And copy any others
-	 */
-	for(i = 1; i < msg->msg_iovlen; i++)
-		niv[i]=*iv++;
-
-	msg->msg_iov=niv;
-}
-
-/*
  * Serialize write access to sockets, in order to prevent different
  * requests from interfering with each other.
  * Also prevents TCP socket reconnections from colliding with writes.

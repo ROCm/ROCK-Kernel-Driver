@@ -87,17 +87,6 @@ xdr_decode_fhandle(u32 *p, struct nfs_fh *fhandle)
 	return p + XDR_QUADLEN(NFS2_FHSIZE);
 }
 
-static inline u32 *
-xdr_decode_string2(u32 *p, char **string, unsigned int *len,
-			unsigned int maxlen)
-{
-	*len = ntohl(*p++);
-	if (*len > maxlen)
-		return NULL;
-	*string = (char *) p;
-	return p + XDR_QUADLEN(*len);
-}
-
 static inline u32*
 xdr_decode_time(u32 *p, u64 *timep)
 {
@@ -106,7 +95,7 @@ xdr_decode_time(u32 *p, u64 *timep)
 	return p;
 }
 
-static inline u32 *
+static u32 *
 xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 {
 	fattr->type = (enum nfs_ftype) ntohl(*p++);

@@ -153,18 +153,7 @@ xdr_encode_time3(u32 *p, u64 time)
 	return p;
 }
 
-static inline u32 *
-xdr_decode_string2(u32 *p, char **string, unsigned int *len,
-			unsigned int maxlen)
-{
-	*len = ntohl(*p++);
-	if (*len > maxlen)
-		return NULL;
-	*string = (char *) p;
-	return p + XDR_QUADLEN(*len);
-}
-
-static inline u32 *
+static u32 *
 xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 {
 	unsigned int	type;
