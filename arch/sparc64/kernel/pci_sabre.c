@@ -1602,10 +1602,8 @@ void __init sabre_init(int pnode, char *model_name)
 
 	upa_portid = prom_getintdefault(pnode, "upa-portid", 0xff);
 
-	spin_lock_irqsave(&pci_controller_lock, flags);
 	p->next = pci_controller_root;
 	pci_controller_root = p;
-	spin_unlock_irqrestore(&pci_controller_lock, flags);
 
 	p->pbm_A.portid = upa_portid;
 	p->pbm_B.portid = upa_portid;

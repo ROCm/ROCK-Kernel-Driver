@@ -1487,22 +1487,18 @@ void __init psycho_init(int node, char *model_name)
 	struct linux_prom64_registers pr_regs[3];
 	struct pci_controller_info *p;
 	struct pci_iommu *iommu;
-	unsigned long flags;
 	u32 upa_portid;
 	int is_pbm_a, err;
 
 	upa_portid = prom_getintdefault(node, "upa-portid", 0xff);
 
-	spin_lock_irqsave(&pci_controller_lock, flags);
 	for(p = pci_controller_root; p; p = p->next) {
 		if (p->pbm_A.portid == upa_portid) {
-			spin_unlock_irqrestore(&pci_controller_lock, flags);
 			is_pbm_a = (p->pbm_A.prom_node == 0);
 			psycho_pbm_init(p, node, is_pbm_a);
 			return;
 		}
 	}
-	spin_unlock_irqrestore(&pci_controller_lock, flags);
 
 	p = kmalloc(sizeof(struct pci_controller_info), GFP_ATOMIC);
 	if (!p) {
@@ -1518,10 +1514,8 @@ void __init psycho_init(int node, char *model_name)
 	memset(iommu, 0, sizeof(*iommu));
 	p->pbm_A.iommu = p->pbm_B.iommu = iommu;
 
-	spin_lock_irqsave(&pci_controller_lock, flags);
 	p->next = pci_controller_root;
 	pci_controller_root = p;
-	spin_unlock_irqrestore(&pci_controller_lock, flags);
 
 	p->pbm_A.portid = upa_portid;
 	p->pbm_B.portid = upa_portid;
