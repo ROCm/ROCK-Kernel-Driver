@@ -88,6 +88,10 @@
 #ifndef __HAVE_SG
 #define __HAVE_SG			0
 #endif
+/* __HAVE_KERNEL_CTX_SWITCH isn't used by any of the drm modules in
+ * the DRI cvs tree, but it is required by the kernel tree's sparc
+ * driver.
+ */
 #ifndef __HAVE_KERNEL_CTX_SWITCH
 #define __HAVE_KERNEL_CTX_SWITCH	0
 #endif
@@ -1108,6 +1112,10 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 			DRIVER_DMA_QUIESCENT();
 		}
 #endif
+		/* __HAVE_KERNEL_CTX_SWITCH isn't used by any of the
+		 * drm modules in the DRI cvs tree, but it is required
+		 * by the Sparc driver.
+		 */
 #if __HAVE_KERNEL_CTX_SWITCH
 		if ( dev->last_context != lock.context ) {
 			DRM(context_switch)(dev, dev->last_context,
@@ -1150,6 +1158,10 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 
 	atomic_inc( &dev->counts[_DRM_STAT_UNLOCKS] );
 
+	/* __HAVE_KERNEL_CTX_SWITCH isn't used by any of the drm
+	 * modules in the DRI cvs tree, but it is required by the
+	 * Sparc driver.
+	 */
 #if __HAVE_KERNEL_CTX_SWITCH
 	/* We no longer really hold it, but if we are the next
 	 * agent to request it then we should just be able to
@@ -1175,13 +1187,9 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 	DRM(dma_schedule)( dev, 1 );
 #endif
 
-	/* FIXME: Do we ever really need to check this???
-	 */
-	if ( 1 /* !dev->context_flag */ ) {
-		if ( DRM(lock_free)( dev, &dev->lock.hw_lock->lock,
-				     DRM_KERNEL_CONTEXT ) ) {
-			DRM_ERROR( "\n" );
-		}
+	if ( DRM(lock_free)( dev, &dev->lock.hw_lock->lock,
+			     DRM_KERNEL_CONTEXT ) ) {
+		DRM_ERROR( "\n" );
 	}
 #endif /* !__HAVE_KERNEL_CTX_SWITCH */
 
