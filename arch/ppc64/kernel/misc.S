@@ -518,8 +518,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_execve
 	.llong .sys_chdir
 	.llong .sys32_time
-	.llong .sys32_mknod
-	.llong .sys32_chmod		/* 15 */
+	.llong .sys_mknod
+	.llong .sys_chmod		/* 15 */
 	.llong .sys_lchown
 	.llong .sys_ni_syscall			/* old break syscall holder */
 	.llong .sys32_stat

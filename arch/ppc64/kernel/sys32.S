@@ -19,8 +19,6 @@
 #include <asm/errno.h>
 #include <asm/processor.h>
 
-/* NOTE: call as jump breaks return stack, we have to avoid that */
-
 	.text
 
 _GLOBAL(sys32_mmap)
@@ -31,14 +29,6 @@ _GLOBAL(sys32_mmap)
 _GLOBAL(sys32_lseek)
 	extsw		r4,r4		/* sign extend off_t offset parm */
 	b		.sys_lseek
-
-_GLOBAL(sys32_chmod)
-/* Ken Aaker.. hmmm maybe I don't need to do anything here */
-	b		.sys_chmod
-
-_GLOBAL(sys32_mknod)
-/* Ken Aaker.. hmmm maybe I don't need to do anything here */
-	b		.sys_mknod
 
 _GLOBAL(sys32_sendto)
 	clrldi		r7, r7, 32	/* struct sockaddr *addr parm */
