@@ -948,6 +948,7 @@ static struct dst_entry *xfrm4_dst_check(struct dst_entry *dst, u32 cookie)
 			dst_release(dst);
 			return NULL;
 		}
+		child = child->child;
 	}
 
 	return dst;
