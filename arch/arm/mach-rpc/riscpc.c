@@ -16,6 +16,7 @@
 #include <linux/init.h>
 
 #include <asm/elf.h>
+#include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
 #include <asm/hardware.h>
@@ -70,6 +71,11 @@ static struct map_desc rpc_io_desc[] __initdata = {
 void __init rpc_map_io(void)
 {
 	iotable_init(rpc_io_desc, ARRAY_SIZE(rpc_io_desc));
+
+	/*
+	 * Turn off floppy.
+	 */
+	outb(0xc, 0x3f2);
 
 	/*
 	 * RiscPC can't handle half-word loads and stores

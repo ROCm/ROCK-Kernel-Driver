@@ -34,9 +34,9 @@
 #define PLX_SET_CONFIG							\
 	{ unsigned long flags;						\
 	local_irq_save(flags);						\
-	__raw_writel((1<<31 | (dev->bus->number << 16)			\
-		| (dev->devfn << 8) | (where & ~3)			\
-		| ((dev->bus->number == 0)?0:1)), PLX_BASE + 0xac);	\
+	__raw_writel((1<<31 | (bus->number << 16)			\
+		| (devfn << 8) | (where & ~3)				\
+		| ((bus->number == 0)?0:1)), PLX_BASE + 0xac);		\
 
 #define PLX_CONFIG_WRITE(size)						\
 	PLX_SET_CONFIG							\
@@ -58,47 +58,47 @@
 
 /* Configuration space access routines */
 
-static int
-plx90x0_read_config_byte (struct pci_dev *dev,
-			  int where, u8 *value)
+static int 
+plx90x0_read_config (struct pci_bus *bus, unsigned int devfn, int where,
+		     int where, int size, u32 *value)
 {
-	PLX_CONFIG_READ(b)
-}
-
-static int
-plx90x0_read_config_word (struct pci_dev *dev,
-			  int where, u16 *value)
-{
-	PLX_CONFIG_READ(w)
+	switch (size) {
+	case 1:
+		PLX_CONFIG_READ(b)
+		break;
+	case 2:
+		PLX_CONFIG_READ(w)
+		break;
+	case 4:
+		PLX_CONFIG_READ(l)
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
 static int 
-plx90x0_read_config_dword (struct pci_dev *dev,
-			   int where, u32 *value)
+plx90x0_write_config (struct pci_bus *bus, unsigned int devfn, int where,
+		      int where, int size, u32 value)
 {
-	PLX_CONFIG_READ(l)
+	switch (size) {
+	case 1:
+		PLX_CONFIG_WRITE(b)
+		break;
+	case 2:
+		PLX_CONFIG_WRITE(w)
+		break;
+	case 4:
+		PLX_CONFIG_WRITE(l)
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
-static int 
-plx90x0_write_config_byte (struct pci_dev *dev,
-			   int where, u8 value)
+static struct pci_ops plx90x0_ops = 
 {
-	PLX_CONFIG_WRITE(b)
-}
-
-static int 
-plx90x0_write_config_word (struct pci_dev *dev,
-			   int where, u16 value)
-{
-	PLX_CONFIG_WRITE(w)
-}
-
-static int 
-plx90x0_write_config_dword (struct pci_dev *dev,
-			    int where, u32 value)
-{
-	PLX_CONFIG_WRITE(l)
-}
+	.read	= plx90x0_read_config,
+	.write	= plx90x0_write_config,
+};
 
 static void 
 plx_syserr_handler(int irq, void *handle, struct pt_regs *regs)
@@ -107,17 +107,6 @@ plx_syserr_handler(int irq, void *handle, struct pt_regs *regs)
 	       readw(PLX_BASE + 6), regs->ARM_pc);
 	__raw_writew(0xf000, PLX_BASE + 6);
 }
-
-static struct pci_ops 
-plx90x0_ops = 
-{
-	plx90x0_read_config_byte,
-	plx90x0_read_config_word,
-	plx90x0_read_config_dword,
-	plx90x0_write_config_byte,
-	plx90x0_write_config_word,
-	plx90x0_write_config_dword,
-};
 
 /*
  * Initialise the PCI system.

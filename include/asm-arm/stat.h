@@ -40,6 +40,8 @@ struct stat {
 
 /* This matches struct stat64 in glibc2.1, hence the absolutely
  * insane amounts of padding around dev_t's.
+ * Note: The kernel zero's the padded region because glibc might read them
+ * in the hope that the kernel has stretched to using larger sizes.
  */
 struct stat64 {
 #if defined(__ARMEB__)

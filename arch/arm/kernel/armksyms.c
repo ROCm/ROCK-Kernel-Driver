@@ -73,6 +73,7 @@ extern void abort(void);
 extern void ret_from_exception(void);
 extern void fpundefinstr(void);
 extern void fp_enter(void);
+extern void fp_init(union fp_state *);
 
 /*
  * This has a special calling convention; it doesn't
@@ -129,6 +130,7 @@ EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(set_irq_type);
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
+EXPORT_SYMBOL(fp_init);
 
 	/* processor dependencies */
 EXPORT_SYMBOL(__machine_arch_type);

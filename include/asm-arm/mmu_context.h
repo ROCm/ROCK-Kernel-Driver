@@ -34,13 +34,17 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 
 /*
  * This is the actual mm switch as far as the scheduler
- * is concerned.  No registers are touched.
+ * is concerned.  No registers are touched.  We avoid
+ * calling the CPU specific function when the mm hasn't
+ * actually changed.
  */
 static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk, unsigned int cpu)
 {
-	cpu_switch_mm(next->pgd, next);
+	if (prev != next) {
+		cpu_switch_mm(next->pgd, next);
+	}
 }
 
 static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)

@@ -44,4 +44,4 @@ sa1100_leds_init(void)
 	return 0;
 }
 
-__initcall(sa1100_leds_init);
+core_initcall(sa1100_leds_init);
