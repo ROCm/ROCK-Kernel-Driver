@@ -290,7 +290,6 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 		return -ESRCH;
 	}
 	us = (struct us_data*)hostptr->hostdata[0];
-	scsi_host_put(hostptr);
 
 	/* if we couldn't find it, we return an error */
 	if (!us) {
@@ -308,6 +307,9 @@ static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
 	/* show the protocol and transport */
 	SPRINTF("     Protocol: %s\n", us->protocol_name);
 	SPRINTF("    Transport: %s\n", us->transport_name);
+
+	/* release the reference count on this host */
+	scsi_host_put(hostptr);
 
 	/*
 	 * Calculate start of next buffer, and return value.
