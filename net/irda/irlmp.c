@@ -93,9 +93,6 @@ int __init irlmp_init(void)
 	irlmp->cachelog = hashbin_new(HB_GLOBAL);
 	
 	irlmp->free_lsap_sel = 0x10; /* Reserved 0x00-0x0f */
-#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-	irlmp->cache.valid = FALSE;
-#endif
 	strcpy(sysctl_devname, "Linux");
 	
 	/* Do discovery every 3 seconds */
@@ -208,10 +205,6 @@ static void __irlmp_close_lsap(struct lsap_cb *self)
 	if (self->conn_skb)
 		dev_kfree_skb(self->conn_skb);
 
-#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-	ASSERT(irlmp != NULL, return;);
-	irlmp->cache.valid = FALSE;
-#endif
 	kfree(self);
 }
 
@@ -247,6 +240,9 @@ void irlmp_close_lsap(struct lsap_cb *self)
 		}
 		/* Now, remove from the link */
 		lsap = hashbin_remove(lap->lsaps, (int) self, NULL);
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+		lap->cache.valid = FALSE;
+#endif
 	}
 	self->lap = NULL;
 	/* Check if we found the LSAP! If not then try the unconnected lsaps */
@@ -292,6 +288,9 @@ void irlmp_register_link(struct irlap_cb *irlap, __u32 saddr, notify_t *notify)
 	lap->saddr = saddr;
 	lap->daddr = DEV_ADDR_ANY;
 	lap->lsaps = hashbin_new(HB_GLOBAL);
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	lap->cache.valid = FALSE;
+#endif
 
 	lap->lap_state = LAP_STANDBY;
 	
@@ -602,7 +601,7 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 
 	/* Make sure that we invalidate the cache */
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-	irlmp->cache.valid = FALSE;
+	new->lap->cache.valid = FALSE;
 #endif /* CONFIG_IRDA_CACHE_LAST_LSAP */
 
 	return new;
@@ -692,17 +691,16 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
 		return;
 	}
 
-#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-	irlmp->cache.valid = FALSE;
-#endif
-
 	/* 
 	 *  Remove association between this LSAP and the link it used 
 	 */
 	ASSERT(self->lap != NULL, return;);
 	ASSERT(self->lap->lsaps != NULL, return;);
-
+	
 	lsap = hashbin_remove(self->lap->lsaps, (int) self, NULL);
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	self->lap->cache.valid = FALSE;
+#endif
 
 	ASSERT(lsap != NULL, return;);
 	ASSERT(lsap == self, return;);
