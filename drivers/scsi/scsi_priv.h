@@ -107,15 +107,17 @@ extern void scsi_exit_procfs(void);
 /* scsi_scan.c */
 extern void scsi_scan_host(struct Scsi_Host *shost);
 extern void scsi_forget_host(struct Scsi_Host *shost);
+extern void scsi_free_sdev(struct scsi_device *);
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
 extern void scsi_device_unregister(struct scsi_device *);
 extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
 extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
+extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
+extern void scsi_sysfs_remove_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
-
 
 /*
  * dev_info: for the black/white list in the old scsi_static_device_list

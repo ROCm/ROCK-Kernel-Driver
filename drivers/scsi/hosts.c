@@ -193,52 +193,6 @@ static int scsi_host_legacy_release(struct Scsi_Host *shost)
 	return 0;
 }
 
-static int scsi_check_device_busy(struct scsi_device *sdev)
-{
-	struct Scsi_Host *shost = sdev->host;
-	struct scsi_cmnd *scmd;
-	unsigned long flags;
-
-	/*
-	 * Loop over all of the commands associated with the
-	 * device.  If any of them are busy, then set the state
-	 * back to inactive and bail.
-	 */
-	spin_lock_irqsave(&sdev->list_lock, flags);
-	list_for_each_entry(scmd, &sdev->cmd_list, list) {
-		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE)
-			goto active;
-
-		/*
-		 * No, this device is really free.  Mark it as such, and
-		 * continue on.
-		 */
-		scmd->state = SCSI_STATE_DISCONNECTING;
-		if (scmd->request)
-			scmd->request->rq_status = RQ_SCSI_DISCONNECTING;
-	}
-	spin_unlock_irqrestore(&sdev->list_lock, flags);
-
-	return 0;
-
-active:
-	printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, "
-			"pid=%ld, state=%d, owner=%d.\n",
-			scmd->request->rq_status, scmd->device->id,
-			scmd->pid, scmd->state, scmd->owner);
-
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		list_for_each_entry(scmd, &sdev->cmd_list, list) {
-			if (scmd->request->rq_status == RQ_SCSI_DISCONNECTING)
-				scmd->request->rq_status = RQ_INACTIVE;
-		}
-	}
-
-	spin_unlock_irqrestore(&sdev->list_lock, flags);
-	printk(KERN_ERR "Device busy???\n");
-	return 1;
-}
-
 /**
  * scsi_remove_host - check a scsi host for release and release
  * @shost:	a pointer to a scsi host to release

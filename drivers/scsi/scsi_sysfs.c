@@ -53,7 +53,7 @@ static struct class_device_attribute *const shost_attrs[] = {
 	&class_device_attr_unchecked_isa_dma,
 };
 
-struct class shost_class = {
+static struct class shost_class = {
 	.name		= "scsi_host",
 };
 

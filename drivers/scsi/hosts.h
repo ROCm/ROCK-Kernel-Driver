@@ -590,16 +590,4 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
         return NULL;
 }
 
-/*
- * sysfs support
- */
-extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
-extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
-extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
-extern void scsi_sysfs_remove_host(struct Scsi_Host *);
-
-extern void scsi_free_sdev(struct scsi_device *);
-
-extern struct class shost_class;
-
 #endif

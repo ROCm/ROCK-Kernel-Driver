@@ -105,8 +105,3 @@ EXPORT_SYMBOL(scsi_calculate_bounce_limit);
  */
 EXPORT_SYMBOL(scsi_add_timer);
 EXPORT_SYMBOL(scsi_delete_timer);
-
-/*
- * sysfs support
- */
-EXPORT_SYMBOL(shost_class);
