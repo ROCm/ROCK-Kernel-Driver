@@ -38,75 +38,91 @@ static rwlock_t resource_lock = RW_LOCK_UNLOCKED;
 
 #ifdef CONFIG_PROC_FS
 
-#define MAX_IORES_LEVEL		5
+enum { MAX_IORES_LEVEL = 5 };
 
-/*
- * do_resource_list():
- * for reports of /proc/ioports and /proc/iomem;
- * do current entry, then children, then siblings;
- */
-static int do_resource_list(struct seq_file *m, struct resource *res, const char *fmt, int level)
+static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	while (res) {
-		const char *name;
+	struct resource *p = v;
+	(*pos)++;
+	if (p->child)
+		return p->child;
+	while (!p->sibling && p->parent)
+		p = p->parent;
+	return p->sibling;
+}
 
-		name = res->name ? res->name : "<BAD>";
-		if (level > MAX_IORES_LEVEL)
-			level = MAX_IORES_LEVEL;
-		seq_printf (m, fmt + 2 * MAX_IORES_LEVEL - 2 * level,
-				res->start, res->end, name);
+static void *r_start(struct seq_file *m, loff_t *pos)
+{
+	struct resource *p = m->private;
+	loff_t l = 0;
+	read_lock(&resource_lock);
+	for (p = p->child; p && l < *pos; p = r_next(m, p, &l))
+		;
+	return p;
+}
 
-		if (res->child)
-			do_resource_list(m, res->child, fmt, level + 1);
+static void r_stop(struct seq_file *m, void *v)
+{
+	read_unlock(&resource_lock);
+}
 
-		res = res->sibling;
-	}
+static int r_show(struct seq_file *m, void *v)
+{
+	struct resource *root = m->private;
+	struct resource *r = v, *p;
+	int width = root->end < 0x10000 ? 4 : 8;
+	int depth;
 
+	for (depth = 0, p = r; depth < MAX_IORES_LEVEL; depth++, p = p->parent)
+		if (p->parent == root)
+			break;
+	seq_printf(m, "%*s%0*lx-%0*lx : %s\n",
+			depth * 2, "",
+			width, r->start,
+			width, r->end,
+			r->name ? r->name : "<BAD>");
 	return 0;
 }
 
-static int ioresources_show(struct seq_file *m, void *v)
-{
-	struct resource *root = m->private;
-	char *fmt;
-	int retval;
-
-	fmt = root->end < 0x10000
-		? "          %04lx-%04lx : %s\n"
-		: "          %08lx-%08lx : %s\n";
-	read_lock(&resource_lock);
-	retval = do_resource_list(m, root->child, fmt, 0);
-	read_unlock(&resource_lock);
-	return retval;
-}
-
-static int ioresources_open(struct file *file, struct resource *root)
-{
-	return single_open(file, ioresources_show, root);
-}
+struct seq_operations resource_op = {
+	.start	= r_start,
+	.next	= r_next,
+	.stop	= r_stop,
+	.show	= r_show,
+};
 
 static int ioports_open(struct inode *inode, struct file *file)
 {
-	return ioresources_open(file, &ioport_resource);
+	int res = seq_open(file, &resource_op);
+	if (!res) {
+		struct seq_file *m = file->private_data;
+		m->private = &ioport_resource;
+	}
+	return res;
+}
+
+static int iomem_open(struct inode *inode, struct file *file)
+{
+	int res = seq_open(file, &resource_op);
+	if (!res) {
+		struct seq_file *m = file->private_data;
+		m->private = &iomem_resource;
+	}
+	return res;
 }
 
 static struct file_operations proc_ioports_operations = {
 	.open		= ioports_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= single_release,
+	.release	= seq_release,
 };
-
-static int iomem_open(struct inode *inode, struct file *file)
-{
-	return ioresources_open(file, &iomem_resource);
-}
 
 static struct file_operations proc_iomem_operations = {
 	.open		= iomem_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= single_release,
+	.release	= seq_release,
 };
 
 static int __init ioresources_init(void)
