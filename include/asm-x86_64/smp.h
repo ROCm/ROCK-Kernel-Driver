@@ -47,7 +47,7 @@ extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
 void smp_stop_cpu(void);
-extern char cpu_sibling_map[];
+extern cpumask_t cpu_sibling_map[NR_CPUS];
 extern char phys_proc_id[NR_CPUS];
 
 #define SMP_TRAMPOLINE_BASE 0x6000

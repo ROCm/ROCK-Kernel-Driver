@@ -73,7 +73,7 @@ struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 /* Set when the idlers are all forked */
 int smp_threads_ready;
 
-char cpu_sibling_map[NR_CPUS] __cacheline_aligned;
+cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
 /*
  * Trampoline 80x86 program as an array.
@@ -874,31 +874,36 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	}
 
 	/*
-	 * If Hyper-Threading is avaialble, construct cpu_sibling_map[], so
-	 * that we can tell the sibling CPU efficiently.
+	 * Construct cpu_sibling_map[], so that we can tell the
+	 * sibling CPU efficiently.
 	 */
-	if (cpu_has_ht && smp_num_siblings > 1) {
-		for (cpu = 0; cpu < NR_CPUS; cpu++)
-			cpu_sibling_map[cpu] = NO_PROC_ID;
-		
-		for (cpu = 0; cpu < NR_CPUS; cpu++) {
-			int 	i;
-			if (!cpu_isset(cpu, cpu_callout_map))
-				continue;
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
+		cpus_clear(cpu_sibling_map[cpu]);
 
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		int siblings = 0;
+		int i;
+		if (!cpu_isset(cpu, cpu_callout_map))
+			continue;
+
+		if (smp_num_siblings > 1) {
 			for (i = 0; i < NR_CPUS; i++) {
-				if (i == cpu || !cpu_isset(i, cpu_callout_map))
+				if (!cpu_isset(i, cpu_callout_map))
 					continue;
 				if (phys_proc_id[cpu] == phys_proc_id[i]) {
-					cpu_sibling_map[cpu] = i;
-					break;
+					siblings++;
+					cpu_set(i, cpu_sibling_map[cpu]);
 				}
 			}
-			if (cpu_sibling_map[cpu] == (char)NO_PROC_ID) {
-				smp_num_siblings = 1;
-				printk(KERN_WARNING "WARNING: No sibling found for CPU %d.\n", cpu);
-			}
+		} else {
+			siblings++;
+			cpu_set(cpu, cpu_sibling_map[cpu]);
 		}
+
+		if (siblings != smp_num_siblings)
+			printk(KERN_WARNING
+	       "WARNING: %d siblings found for CPU%d, should be %d\n",
+			       siblings, cpu, smp_num_siblings);
 	}
 
 	Dprintk("Boot done.\n");
