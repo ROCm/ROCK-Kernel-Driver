@@ -20,6 +20,11 @@
 
 /* $Id: i2c-velleman.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
@@ -28,11 +33,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
 #include <asm/io.h>
-
-/* ----- global defines -----------------------------------------------	*/
-#define DEB(x)		/* should be reasonable open, close &c. 	*/
-#define DEB2(x) 	/* low level debugging - very slow 		*/
-#define DEBE(x)	x	/* error messages 				*/
 
 					/* Pin Port  Inverted	name	*/
 #define I2C_SDA		0x02		/*  ctrl bit 1 	(inv)	*/
@@ -140,7 +140,7 @@ static int __init i2c_bitvelle_init(void)
 			return -ENODEV;
 		}
 	}
-	printk(KERN_DEBUG "i2c-velleman: found device at %#x.\n",base);
+	pr_debug("i2c-velleman: found device at %#x.\n",base);
 	return 0;
 }
 

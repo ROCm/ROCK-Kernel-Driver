@@ -43,6 +43,11 @@
     sound driver to be happy
 */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -65,20 +70,13 @@
 
 #include "i2c-keywest.h"
 
-#define DBG(x...) do {\
-	if (debug > 0) \
-		printk(KERN_DEBUG "KW:" x); \
-	} while(0)
-
 
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("I2C driver for Apple's Keywest");
 MODULE_LICENSE("GPL");
 MODULE_PARM(probe, "i");
-MODULE_PARM(debug, "i");
 
-int probe = 0;
-int debug = 0;
+static int probe = 0;
 
 static void
 do_stop(struct keywest_iface* iface, int result)
@@ -95,7 +93,7 @@ handle_interrupt(struct keywest_iface *iface, u8 isr)
 	int ack;
 	int rearm_timer = 1;
 	
-	DBG("handle_interrupt(), got: %x, status: %x, state: %d\n",
+	pr_debug("handle_interrupt(), got: %x, status: %x, state: %d\n",
 		isr, read_reg(reg_status), iface->state);
 	if (isr == 0 && iface->state != state_stop) {
 		do_stop(iface, -1);
@@ -112,7 +110,7 @@ handle_interrupt(struct keywest_iface *iface, u8 isr)
 			break;
 		}
 		ack = read_reg(reg_status);
-		DBG("ack on set address: %x\n", ack);
+		pr_debug("ack on set address: %x\n", ack);
 		if ((ack & KW_I2C_STAT_LAST_AAK) == 0) {
 			do_stop(iface, -1);
 			break;
@@ -127,7 +125,7 @@ handle_interrupt(struct keywest_iface *iface, u8 isr)
 					| KW_I2C_CTL_AAK);
 		} else {
 			iface->state = state_write;
-			DBG("write byte: %x\n", *(iface->data));
+			pr_debug("write byte: %x\n", *(iface->data));
 			write_reg(reg_data, *(iface->data++));
 			iface->datalen--;
 		}
@@ -139,7 +137,7 @@ handle_interrupt(struct keywest_iface *iface, u8 isr)
 			break;
 		}
 		*(iface->data++) = read_reg(reg_data);
-		DBG("read byte: %x\n", *(iface->data-1));
+		pr_debug("read byte: %x\n", *(iface->data-1));
 		iface->datalen--;
 		if (iface->datalen == 0)
 			iface->state = state_stop;
@@ -153,13 +151,13 @@ handle_interrupt(struct keywest_iface *iface, u8 isr)
 		}
 		/* Check ack status */
 		ack = read_reg(reg_status);
-		DBG("ack on data write: %x\n", ack);
+		pr_debug("ack on data write: %x\n", ack);
 		if ((ack & KW_I2C_STAT_LAST_AAK) == 0) {
 			do_stop(iface, -1);
 			break;
 		}
 		if (iface->datalen) {
-			DBG("write byte: %x\n", *(iface->data));
+			pr_debug("write byte: %x\n", *(iface->data));
 			write_reg(reg_data, *(iface->data++));
 			iface->datalen--;
 		} else
@@ -203,7 +201,7 @@ keywest_timeout(unsigned long data)
 {
 	struct keywest_iface *iface = (struct keywest_iface *)data;
 
-	DBG("timeout !\n");
+	pr_debug("timeout !\n");
 	spin_lock_irq(&iface->lock);
 	if (handle_interrupt(iface, read_reg(reg_isr)))
 		mod_timer(&iface->timeout_timer, jiffies + POLL_TIMEOUT);
@@ -271,7 +269,7 @@ keywest_smbus_xfer(	struct i2c_adapter*	adap,
 
 	down(&iface->sem);
 
-	DBG("chan: %d, addr: 0x%x, transfer len: %d, read: %d\n",
+	pr_debug("chan: %d, addr: 0x%x, transfer len: %d, read: %d\n",
 		chan->chan_no, addr, len, read_write == I2C_SMBUS_READ);
 
 	iface->data = buffer;
@@ -306,7 +304,7 @@ keywest_smbus_xfer(	struct i2c_adapter*	adap,
 	wait_for_completion(&iface->complete);	
 
 	rc = iface->result;	
-	DBG("transfer done, result: %d\n", rc);
+	pr_debug("transfer done, result: %d\n", rc);
 
 	if (rc == 0 && size == I2C_SMBUS_WORD_DATA && read_write == I2C_SMBUS_READ)
 	    	data->word = le16_to_cpu(cur_word);
@@ -348,7 +346,7 @@ keywest_xfer(	struct i2c_adapter *adap,
 			rc = -EINVAL;
 			break;
 		}
-		DBG("xfer: chan: %d, doing %s %d bytes to 0x%02x - %d of %d messages\n",
+		pr_debug("xfer: chan: %d, doing %s %d bytes to 0x%02x - %d of %d messages\n",
 		     chan->chan_no,
 		     pmsg->flags & I2C_M_RD ? "read" : "write",
                      pmsg->len, addr, i, num);
@@ -388,7 +386,7 @@ keywest_xfer(	struct i2c_adapter *adap,
 		rc = iface->result;
 		if (rc == 0)
 			completed++;
-		DBG("transfer done, result: %d\n", rc);
+		pr_debug("transfer done, result: %d\n", rc);
 	}
 
 	/* Release sem */

@@ -24,6 +24,11 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  * ------------------------------------------------------------------------ */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -162,7 +167,7 @@ static void i2c_parport_attach (struct parport *port)
 	}
 	memset(adapter, 0x00, sizeof(struct i2c_par));
 
-	printk(KERN_DEBUG "i2c-parport: attaching to %s\n", port->name);
+	pr_debug("i2c-parport: attaching to %s\n", port->name);
 	adapter->pdev = parport_register_device(port, "i2c-parport",
 		NULL, NULL, NULL, PARPORT_FLAG_EXCL, NULL);
 	if (!adapter->pdev) {

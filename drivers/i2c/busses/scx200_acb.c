@@ -25,6 +25,11 @@
 */
 
 #include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -373,7 +378,7 @@ static s32 scx200_acb_smbus_xfer(struct i2c_adapter *adapter,
 	    	data->word = le16_to_cpu(cur_word);
 
 #ifdef DEBUG
-	printk(KERN_DEBUG NAME ": transfer done, result: %d", rc);
+	DBG(": transfer done, result: %d", rc);
 	if (buffer) {
 		int i;
 		printk(" data:");
@@ -505,7 +510,7 @@ static int __init scx200_acb_init(void)
 	int i;
 	int rc;
 
-	printk(KERN_DEBUG NAME ": NatSemi SCx200 ACCESS.bus Driver\n");
+	pr_debug(NAME ": NatSemi SCx200 ACCESS.bus Driver\n");
 
 	/* Verify that this really is a SCx200 processor */
 	if (pci_find_device(PCI_VENDOR_ID_NS,

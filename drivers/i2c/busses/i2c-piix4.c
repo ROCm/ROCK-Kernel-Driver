@@ -28,7 +28,10 @@
    Note: we assume there can only be one device, with one SMBus interface.
 */
 
-/* #define DEBUG 1 */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>

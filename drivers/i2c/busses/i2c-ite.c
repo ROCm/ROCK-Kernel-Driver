@@ -33,6 +33,11 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
@@ -58,17 +63,9 @@ static int irq   = 0;
 static int clock = 0;
 static int own   = 0;
 
-static int i2c_debug=0;
 static struct iic_ite gpi;
 static wait_queue_head_t iic_wait;
 static int iic_pending;
-
-/* ----- global defines -----------------------------------------------	*/
-#define DEB(x)	if (i2c_debug>=1) x
-#define DEB2(x) if (i2c_debug>=2) x
-#define DEB3(x) if (i2c_debug>=3) x
-#define DEBE(x)	x	/* error messages 				*/
-
 
 /* ----- local functions ----------------------------------------------	*/
 
@@ -76,8 +73,11 @@ static void iic_ite_setiic(void *data, int ctl, short val)
 {
         unsigned long j = jiffies + 10;
 
-	DEB3(printk(" Write 0x%02x to 0x%x\n",(unsigned short)val, ctl&0xff));
-	DEB3({while (time_before(jiffies, j)) schedule();})
+	pr_debug(" Write 0x%02x to 0x%x\n",(unsigned short)val, ctl&0xff);
+#ifdef DEBUG
+	while (time_before(jiffies, j))
+		schedule();
+#endif
 	outw(val,ctl);
 }
 
@@ -86,7 +86,7 @@ static short iic_ite_getiic(void *data, int ctl)
 	short val;
 
 	val = inw(ctl);
-	DEB3(printk("Read 0x%02x from 0x%x\n",(unsigned short)val, ctl&0xff));  
+	pr_debug("Read 0x%02x from 0x%x\n",(unsigned short)val, ctl&0xff);
 	return (val);
 }
 
@@ -145,7 +145,6 @@ static void iic_ite_handler(int this_irq, void *dev_id, struct pt_regs *regs)
 	
    iic_pending = 1;
 
-   DEB2(printk("iic_ite_handler: in interrupt handler\n"));
    wake_up_interruptible(&iic_wait);
 }
 
@@ -263,7 +262,6 @@ MODULE_PARM(base, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM(clock, "i");
 MODULE_PARM(own, "i");
-MODULE_PARM(i2c_debug,"i");
 
 
 /* Called when module is loaded or when kernel is initialized.

@@ -31,6 +31,10 @@
 
   ---------------------------------------------------------------------------*/
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
 
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -529,8 +533,3 @@ module_exit (i2c_iop3xx_exit);
 MODULE_AUTHOR("D-TACQ Solutions Ltd <www.d-tacq.com>");
 MODULE_DESCRIPTION("IOP3xx iic algorithm and driver");
 MODULE_LICENSE("GPL");
-
-MODULE_PARM(i2c_debug,"i");
-
-MODULE_PARM_DESC(i2c_debug, "debug level - 0 off; 1 normal; 2,3 more verbose; 9 iic-protocol");
-
