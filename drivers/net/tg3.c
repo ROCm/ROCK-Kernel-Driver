@@ -399,7 +399,7 @@ static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
 		tw32_f(MAC_MI_MODE,
 		     (tp->mi_mode & ~MAC_MI_MODE_AUTO_POLL));
-		udelay(40);
+		udelay(80);
 	}
 
 	*val = 0xffffffff;
@@ -432,7 +432,7 @@ static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
 		tw32_f(MAC_MI_MODE, tp->mi_mode);
-		udelay(40);
+		udelay(80);
 	}
 
 	return ret;
@@ -446,7 +446,7 @@ static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
 		tw32_f(MAC_MI_MODE,
 		     (tp->mi_mode & ~MAC_MI_MODE_AUTO_POLL));
-		udelay(40);
+		udelay(80);
 	}
 
 	frame_val  = ((PHY_ADDR << MI_COM_PHY_ADDR_SHIFT) &
@@ -475,7 +475,7 @@ static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 
 	if ((tp->mi_mode & MAC_MI_MODE_AUTO_POLL) != 0) {
 		tw32_f(MAC_MI_MODE, tp->mi_mode);
-		udelay(40);
+		udelay(80);
 	}
 
 	return ret;
@@ -1316,7 +1316,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 
 	tp->mi_mode = MAC_MI_MODE_BASE;
 	tw32_f(MAC_MI_MODE, tp->mi_mode);
-	udelay(40);
+	udelay(80);
 
 	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x02);
 
@@ -1519,7 +1519,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 	    tp->pci_chip_rev_id == CHIPREV_ID_5700_ALTIMA) {
 		tp->mi_mode |= MAC_MI_MODE_AUTO_POLL;
 		tw32_f(MAC_MI_MODE, tp->mi_mode);
-		udelay(40);
+		udelay(80);
 	}
 
 	tw32_f(MAC_MODE, tp->mac_mode);
@@ -5079,7 +5079,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tp->mi_mode = MAC_MI_MODE_BASE;
 	tw32_f(MAC_MI_MODE, tp->mi_mode);
-	udelay(40);
+	udelay(80);
 
 	tw32(MAC_LED_CTRL, 0);
 	tw32(MAC_MI_STAT, MAC_MI_STAT_LNKSTAT_ATTN_ENAB);
@@ -7150,7 +7150,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 
 	/* Initialize MAC MI mode, polling disabled. */
 	tw32_f(MAC_MI_MODE, tp->mi_mode);
-	udelay(40);
+	udelay(80);
 
 	/* Initialize data/descriptor byte/word swapping. */
 	val = tr32(GRC_MODE);
