@@ -210,6 +210,18 @@ smp_flush_tlb_all (void)
 	local_flush_tlb_all();
 }
 
+void
+smp_flush_tlb_mm (struct mm_struct *mm)
+{
+	local_flush_tlb_mm(mm);
+
+	/* this happens for the common case of a single-threaded fork():  */
+	if (likely(mm == current->active_mm && atomic_read(&mm->mm_users) == 1))
+		return;
+
+	smp_call_function((void (*)(void *))local_flush_tlb_mm, mm, 1, 1);
+}
+
 /*
  * Run a function on another CPU
  *  <func>	The function to run. This must be fast and non-blocking.
