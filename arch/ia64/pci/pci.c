@@ -138,6 +138,11 @@ pci_acpi_init (void)
 
 	printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
 
+#ifdef CONFIG_NUMA
+extern acpi_status acpi_map_iosapic (acpi_handle, u32, void*, void**);
+
+	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
+#endif
 	/*
 	 * PCI IRQ routing is set up by pci_enable_device(), but we
 	 * also do it here in case there are still broken drivers that

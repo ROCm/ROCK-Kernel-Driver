@@ -643,4 +643,71 @@ acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 	return 0;
 }
 
+#ifdef CONFIG_NUMA
+acpi_status __init
+acpi_map_iosapic (acpi_handle handle, u32 depth, void *context, void **ret)
+{
+	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object *obj;
+	struct acpi_table_iosapic *iosapic;
+	unsigned int gsi_base;
+	int node;
+
+	/* Only care about objects w/ a method that returns the MADT */
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
+		return AE_OK;
+
+	if (!buffer.length || !buffer.pointer)
+		return AE_OK;
+
+	obj = buffer.pointer;
+	if (obj->type != ACPI_TYPE_BUFFER ||
+	    obj->buffer.length < sizeof(*iosapic)) {
+		acpi_os_free(buffer.pointer);
+		return AE_OK;
+	}
+
+	iosapic = (struct acpi_table_iosapic *)obj->buffer.pointer;
+
+	if (iosapic->header.type != ACPI_MADT_IOSAPIC) {
+		acpi_os_free(buffer.pointer);
+		return AE_OK;
+	}
+
+	gsi_base = iosapic->global_irq_base;
+
+	acpi_os_free(buffer.pointer);
+	buffer.length = ACPI_ALLOCATE_BUFFER;
+	buffer.pointer = NULL;
+
+	/*
+	 * OK, it's an IOSAPIC MADT entry, look for a _PXM method to tell
+	 * us which node to associate this with.
+	 */
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_PXM", NULL, &buffer)))
+		return AE_OK;
+
+	if (!buffer.length || !buffer.pointer)
+		return AE_OK;
+
+	obj = buffer.pointer;
+
+	if (obj->type != ACPI_TYPE_INTEGER ||
+	    obj->integer.value >= MAX_PXM_DOMAINS) {
+		acpi_os_free(buffer.pointer);
+		return AE_OK;
+	}
+
+	node = pxm_to_nid_map[obj->integer.value];
+	acpi_os_free(buffer.pointer);
+
+	if (node >= MAX_NUMNODES || !node_online(node) ||
+	    cpus_empty(node_to_cpumask(node)))
+		return AE_OK;
+
+	/* We know a gsi to node mapping! */
+	map_iosapic_to_node(gsi_base, node);
+	return AE_OK;
+}
+#endif /* CONFIG_NUMA */
 #endif /* CONFIG_ACPI_BOOT */
