@@ -115,6 +115,7 @@ int swap_readpage(struct file *file, struct page *page)
 	struct bio *bio;
 	int ret = 0;
 
+	BUG_ON(!PageLocked(page));
 	ClearPageUptodate(page);
 	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
 	if (bio == NULL) {
