@@ -387,6 +387,7 @@ MODULE_DEVICE_TABLE(pci, rhine_pci_tbl);
 /* Offsets to the device registers. */
 enum register_offsets {
 	StationAddr=0x00, RxConfig=0x06, TxConfig=0x07, ChipCmd=0x08,
+	ChipCmd1=0x09,
 	IntrStatus=0x0C, IntrEnable=0x0E,
 	MulticastFilter0=0x10, MulticastFilter1=0x14,
 	RxRingPtr=0x18, TxRingPtr=0x1C, GFIFOTest=0x54,
@@ -456,10 +457,10 @@ enum desc_status_bits {
 
 /* Bits in ChipCmd. */
 enum chip_cmd_bits {
-	CmdInit=0x0001, CmdStart=0x0002, CmdStop=0x0004, CmdRxOn=0x0008,
-	CmdTxOn=0x0010, CmdTxDemand=0x0020, CmdRxDemand=0x0040,
-	CmdEarlyRx=0x0100, CmdEarlyTx=0x0200, CmdFDuplex=0x0400,
-	CmdNoTxPoll=0x0800, CmdReset=0x8000,
+	CmdInit=0x01, CmdStart=0x02, CmdStop=0x04, CmdRxOn=0x08,
+	CmdTxOn=0x10, Cmd1TxDemand=0x20, CmdRxDemand=0x40,
+	Cmd1EarlyRx=0x01, Cmd1EarlyTx=0x02, Cmd1FDuplex=0x04,
+	Cmd1NoTxPoll=0x08, Cmd1Reset=0x80,
 };
 
 struct rhine_private {
@@ -493,7 +494,6 @@ struct rhine_private {
 	unsigned int cur_rx, dirty_rx;	/* Producer/consumer ring indices */
 	unsigned int cur_tx, dirty_tx;
 	unsigned int rx_buf_sz;		/* Based on MTU+slack. */
-	u16 chip_cmd;			/* Current setting for ChipCmd */
 
 	/* These values are keep track of the transceiver/media in use. */
 	u8 tx_thresh, rx_thresh;
@@ -519,6 +519,15 @@ static struct net_device_stats *rhine_get_stats(struct net_device *dev);
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static struct ethtool_ops netdev_ethtool_ops;
 static int  rhine_close(struct net_device *dev);
+
+#define RHINE_WAIT_FOR(condition) do {					\
+	int i=1024;							\
+	while (!(condition) && --i)					\
+		;							\
+	if (debug > 1 && i < 512)					\
+		printk(KERN_INFO "%s: %4d cycles used @ %s:%d\n",	\
+				DRV_NAME, 1024-i, __func__, __LINE__);	\
+} while(0)
 
 static inline u32 get_intr_status(struct net_device *dev)
 {
@@ -566,12 +575,11 @@ static void rhine_chip_reset(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
 	struct rhine_private *rp = netdev_priv(dev);
-	int boguscnt = 20;
 
-	writew(CmdReset, ioaddr + ChipCmd);
+	writeb(Cmd1Reset, ioaddr + ChipCmd1);
 	IOSYNC;
 
-	if (readw(ioaddr + ChipCmd) & CmdReset) {
+	if (readb(ioaddr + ChipCmd1) & Cmd1Reset) {
 		printk(KERN_INFO "%s: Reset not complete yet. "
 			"Trying harder.\n", DRV_NAME);
 
@@ -580,13 +588,13 @@ static void rhine_chip_reset(struct net_device *dev)
 			writeb(0x40, ioaddr + MiscCmd);
 
 		/* Reset can take somewhat longer (rare) */
-		while ((readw(ioaddr + ChipCmd) & CmdReset) && --boguscnt)
-			udelay(5);
+		RHINE_WAIT_FOR(!(readb(ioaddr + ChipCmd1) & Cmd1Reset));
 	}
 
 	if (debug > 1)
-		printk(KERN_INFO "%s: Reset %s.\n", pci_name(rp->pdev),
-			boguscnt ? "succeeded" : "failed");
+		printk(KERN_INFO "%s: Reset %s.\n", dev->name,
+			(readb(ioaddr + ChipCmd1) & Cmd1Reset) ?
+			"failed" : "succeeded");
 }
 
 #ifdef USE_MMIO
@@ -612,13 +620,9 @@ static void __devinit rhine_reload_eeprom(long pioaddr, struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
 	struct rhine_private *rp = netdev_priv(dev);
-	int i;
 
 	outb(0x20, pioaddr + MACRegEEcsr);
-	/* Typically 2 cycles to reload. */
-	for (i = 0; i < 150; i++)
-		if (! (inb(pioaddr + MACRegEEcsr) & 0x20))
-			break;
+	RHINE_WAIT_FOR(!(inb(pioaddr + MACRegEEcsr) & 0x20));
 
 #ifdef USE_MMIO
 	/*
@@ -1057,10 +1061,14 @@ static void init_registers(struct net_device *dev)
 	       IntrPCIErr | IntrStatsMax | IntrLinkChange,
 	       ioaddr + IntrEnable);
 
-	rp->chip_cmd = CmdStart|CmdTxOn|CmdRxOn|CmdNoTxPoll;
+	writew(CmdStart|CmdTxOn|CmdRxOn|(Cmd1NoTxPoll << 8),
+	       ioaddr + ChipCmd);
 	if (rp->mii_if.force_media)
-		rp->chip_cmd |= CmdFDuplex;
-	writew(rp->chip_cmd, ioaddr + ChipCmd);
+		writeb(readb(ioaddr + ChipCmd1) | Cmd1FDuplex,
+		       ioaddr + ChipCmd1);
+	else
+		writeb(readb(ioaddr + ChipCmd1) & ~Cmd1FDuplex,
+		       ioaddr + ChipCmd1);
 
 	rhine_check_duplex(dev);
 }
@@ -1070,18 +1078,14 @@ static void init_registers(struct net_device *dev)
 static int mdio_read(struct net_device *dev, int phy_id, int regnum)
 {
 	long ioaddr = dev->base_addr;
-	int boguscnt = 1024;
 
 	/* Wait for a previous command to complete. */
-	while ((readb(ioaddr + MIICmd) & 0x60) && --boguscnt > 0)
-		;
+	RHINE_WAIT_FOR(!(readb(ioaddr + MIICmd) & 0x60));
 	writeb(0x00, ioaddr + MIICmd);
 	writeb(phy_id, ioaddr + MIIPhyAddr);
 	writeb(regnum, ioaddr + MIIRegAddr);
 	writeb(0x40, ioaddr + MIICmd);		/* Trigger read */
-	boguscnt = 1024;
-	while ((readb(ioaddr + MIICmd) & 0x40) && --boguscnt > 0)
-		;
+	RHINE_WAIT_FOR(!(readb(ioaddr + MIICmd) & 0x40));
 	return readw(ioaddr + MIIData);
 }
 
@@ -1089,7 +1093,6 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 {
 	struct rhine_private *rp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
-	int boguscnt = 1024;
 
 	if (phy_id == rp->mii_if.phy_id) {
 		switch (regnum) {
@@ -1106,8 +1109,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 	}
 
 	/* Wait for a previous command to complete. */
-	while ((readb(ioaddr + MIICmd) & 0x60) && --boguscnt > 0)
-		;
+	RHINE_WAIT_FOR(!(readb(ioaddr + MIICmd) & 0x60));
 	writeb(0x00, ioaddr + MIICmd);
 	writeb(phy_id, ioaddr + MIIPhyAddr);
 	writeb(regnum, ioaddr + MIIRegAddr);
@@ -1175,10 +1177,11 @@ static void rhine_check_duplex(struct net_device *dev)
 			       dev->name, duplex ? "full" : "half",
 			       rp->mii_if.phy_id, mii_lpa);
 		if (duplex)
-			rp->chip_cmd |= CmdFDuplex;
+			writeb(readb(ioaddr + ChipCmd1) | Cmd1FDuplex,
+			       ioaddr + ChipCmd1);
 		else
-			rp->chip_cmd &= ~CmdFDuplex;
-		writew(rp->chip_cmd, ioaddr + ChipCmd);
+			writeb(readb(ioaddr + ChipCmd1) & ~Cmd1FDuplex,
+			       ioaddr + ChipCmd1);
 	}
 }
 
@@ -1311,7 +1314,8 @@ static int rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 	 */
 	intr_status = get_intr_status(dev);
 	if ((intr_status & IntrTxErrSummary) == 0) {
-		writew(CmdTxDemand | rp->chip_cmd, dev->base_addr + ChipCmd);
+		writeb(readb(dev->base_addr + ChipCmd1) | Cmd1TxDemand,
+		       dev->base_addr + ChipCmd1);
 	}
 	IOSYNC;
 
@@ -1360,11 +1364,10 @@ static irqreturn_t rhine_interrupt(int irq, void *dev_instance, struct pt_regs *
 
 		if (intr_status & (IntrTxErrSummary | IntrTxDone)) {
 			if (intr_status & IntrTxErrSummary) {
-				int cnt = 20;
 				/* Avoid scavenging before Tx engine turned off */
-				while ((readw(ioaddr+ChipCmd) & CmdTxOn) && --cnt)
-					udelay(5);
-				if (debug > 2 && !cnt)
+				RHINE_WAIT_FOR(!(readb(ioaddr+ChipCmd) & CmdTxOn));
+				if (debug > 2 &&
+				    readb(ioaddr+ChipCmd) & CmdTxOn)
 					printk(KERN_WARNING "%s: "
 					       "rhine_interrupt() Tx engine"
 					       "still on.\n", dev->name);
@@ -1579,10 +1582,6 @@ static void rhine_rx(struct net_device *dev)
 		}
 		rp->rx_ring[entry].rx_status = cpu_to_le32(DescOwn);
 	}
-
-	/* Pre-emptively restart Rx engine. */
-	writew(readw(dev->base_addr + ChipCmd) | CmdRxOn | CmdRxDemand,
-	       dev->base_addr + ChipCmd);
 }
 
 /*
@@ -1616,7 +1615,11 @@ static void rhine_restart_tx(struct net_device *dev) {
 		writel(rp->tx_ring_dma + entry * sizeof(struct tx_desc),
 		       ioaddr + TxRingPtr);
 
-		writew(CmdTxDemand | rp->chip_cmd, ioaddr + ChipCmd);
+		writeb(readb(ioaddr + ChipCmd) | CmdTxOn,
+		       ioaddr + ChipCmd);
+		writeb(readb(ioaddr + ChipCmd1) | Cmd1TxDemand,
+		       ioaddr + ChipCmd1);
+
 		IOSYNC;
 	}
 	else {
