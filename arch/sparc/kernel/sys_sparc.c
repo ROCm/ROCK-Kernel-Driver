@@ -269,11 +269,7 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
 	return do_mmap2(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
 }
 
-extern int sys_remap_file_pages(unsigned long start, unsigned long size,
-				unsigned long prot, unsigned long pgoff,
-				unsigned long flags);
-
-int sparc_remap_file_pages(unsigned long start, unsigned long size,
+long sparc_remap_file_pages(unsigned long start, unsigned long size,
 			   unsigned long prot, unsigned long pgoff,
 			   unsigned long flags)
 {
