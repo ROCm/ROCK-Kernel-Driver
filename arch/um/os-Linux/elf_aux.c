@@ -20,10 +20,10 @@ typedef Elf64_auxv_t elf_auxv_t;
 char * elf_aux_platform;
 long elf_aux_hwcap;
 
-long vsyscall_ehdr;
-long vsyscall_end;
+unsigned long vsyscall_ehdr;
+unsigned long vsyscall_end;
 
-long __kernel_vsyscall;
+unsigned long __kernel_vsyscall;
 
 
 __init void scan_elf_aux( char **envp)

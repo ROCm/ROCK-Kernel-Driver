@@ -58,9 +58,9 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 } while(0);
 
 
-extern long vsyscall_ehdr;
-extern long vsyscall_end;
-extern long __kernel_vsyscall;
+extern unsigned long vsyscall_ehdr;
+extern unsigned long vsyscall_end;
+extern unsigned long __kernel_vsyscall;
 
 #define VSYSCALL_BASE vsyscall_ehdr
 #define VSYSCALL_END vsyscall_end
