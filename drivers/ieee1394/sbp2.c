@@ -80,7 +80,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1018 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1034 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -1002,9 +1002,8 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	sbp2scsi_complete_all_commands(scsi_id, DID_NO_CONNECT);
 
 	/* Remove it from the scsi layer now */
-	if (sdev) {
+	if (sdev)
 		scsi_remove_device(sdev);
-	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
 

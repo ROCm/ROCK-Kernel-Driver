@@ -104,7 +104,7 @@ static void fill_async_stream_packet(struct hpsb_packet *packet, int length,
 				     int channel, int tag, int sync)
 {
 	packet->header[0] = (length << 16) | (tag << 14) | (channel << 8)
-		| (TCODE_STREAM_DATA << 4) | sync;
+	                  | (TCODE_STREAM_DATA << 4) | sync;
 
 	packet->header_size = 4;
 	packet->data_size = length;
@@ -313,6 +313,35 @@ struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node
 		if (buffer)
 			memcpy(packet->data, buffer, length);
 	}
+
+	return packet;
+}
+
+struct hpsb_packet *hpsb_make_streampacket(struct hpsb_host *host, u8 *buffer, int length,
+                                           int channel, int tag, int sync)
+{
+	struct hpsb_packet *packet;
+
+	if (length == 0)
+		return NULL;
+
+	packet = alloc_hpsb_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	if (!packet)
+		return NULL;
+
+	if (length % 4) { /* zero padding bytes */
+		packet->data[length >> 2] = 0;
+	}
+	packet->host = host;
+    
+	if (hpsb_get_tlabel(packet)) {
+		free_hpsb_packet(packet);
+		return NULL;
+	}
+
+	fill_async_stream_packet(packet, length, channel, tag, sync);
+	if (buffer)
+		memcpy(packet->data, buffer, length);
 
 	return packet;
 }
@@ -580,25 +609,18 @@ int hpsb_send_gasp(struct hpsb_host *host, int channel, unsigned int generation,
 	u16 specifier_id_hi = (specifier_id & 0x00ffff00) >> 8;
 	u8 specifier_id_lo = specifier_id & 0xff;
 
-	HPSB_VERBOSE("Send GASP: channel = %d, length = %d", channel, length);
+	HPSB_VERBOSE("Send GASP: channel = %d, length = %Zd", channel, length);
 
 	length += 8;
-
-	packet = alloc_hpsb_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+    
+	packet = hpsb_make_streampacket(host, NULL, length, channel, 3, 0);
 	if (!packet)
 		return -ENOMEM;
 
-	if (length % 4) {
-		packet->data[length / 4] = 0;
-	}
-
-	packet->host = host;
-	fill_async_stream_packet(packet, length, channel, 3, 0);
-        
 	packet->data[0] = cpu_to_be32((host->node_id << 16) | specifier_id_hi);
 	packet->data[1] = cpu_to_be32((specifier_id_lo << 24) | (version & 0x00ffffff));
 
-	memcpy(&(packet->data[2]), buffer, length - 4);
+	memcpy(&(packet->data[2]), buffer, length - 8);
 
 	packet->generation = generation;
 

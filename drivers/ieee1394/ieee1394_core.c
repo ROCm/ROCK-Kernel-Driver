@@ -1237,6 +1237,7 @@ EXPORT_SYMBOL(hpsb_get_tlabel);
 EXPORT_SYMBOL(hpsb_free_tlabel);
 EXPORT_SYMBOL(hpsb_make_readpacket);
 EXPORT_SYMBOL(hpsb_make_writepacket);
+EXPORT_SYMBOL(hpsb_make_streampacket);
 EXPORT_SYMBOL(hpsb_make_lockpacket);
 EXPORT_SYMBOL(hpsb_make_lock64packet);
 EXPORT_SYMBOL(hpsb_make_phypacket);

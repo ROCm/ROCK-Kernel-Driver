@@ -161,7 +161,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1023 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1045 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -1451,7 +1451,7 @@ static int ohci_iso_recv_start(struct hpsb_iso *iso, int cycle, int tag_mask, in
 	if (sync != -1) {
 		/* set sync flag on first DMA descriptor */
 		struct dma_cmd *cmd = &recv->block[recv->block_dma];
-		cmd->control |= DMA_CTL_WAIT;
+		cmd->control |= cpu_to_le32(DMA_CTL_WAIT);
 
 		/* match sync field */
 		contextMatch |= (sync&0xf)<<8;
@@ -1675,10 +1675,10 @@ static void ohci_iso_recv_bufferfill_task(struct hpsb_iso *iso, struct ohci_iso_
 		struct dma_cmd *im = &recv->block[recv->block_dma];
 		
 		/* check the DMA descriptor for new writes to xferStatus */
-		u16 xferstatus = im->status >> 16;
+		u16 xferstatus = le32_to_cpu(im->status) >> 16;
 		
 		/* rescount is the number of bytes *remaining to be written* in the block */
-		u16 rescount = im->status & 0xFFFF;
+		u16 rescount = le32_to_cpu(im->status) & 0xFFFF;
 
 		unsigned char event = xferstatus & 0x1F;
 
