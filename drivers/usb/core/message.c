@@ -1320,7 +1320,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	 */
 
 	err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
-	if (err == -EPIPE) {
+	if (err == -EPIPE || err == 0) {
 		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, 2);
 		err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
 	}
@@ -1329,7 +1329,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	len=tbuf[0];	
 	
 	err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
-	if (err == -EPIPE) {
+	if (err == -EPIPE || err == 0) {
 		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, len);
 		err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
 	}
