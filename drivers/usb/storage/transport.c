@@ -297,10 +297,11 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 
 	/* stalled */
 	case -EPIPE:
-		/* for control endpoints, a stall indicates a protocol error */
+		/* for control endpoints, (used by CB[I]) a stall indicates
+		 * a failed command */
 		if (usb_pipecontrol(pipe)) {
 			US_DEBUGP("-- stall on control pipe\n");
-			return USB_STOR_XFER_ERROR;
+			return USB_STOR_XFER_STALLED;
 		}
 
 		/* for other sorts of endpoint, clear the stall */
@@ -750,8 +751,14 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* check the return code for the command */
 	US_DEBUGP("Call to usb_stor_ctrl_transfer() returned %d\n", result);
+
+	/* if we stalled the command, it means command failed */
+	if (result == USB_STOR_XFER_STALLED) {
+		return USB_STOR_TRANSPORT_FAILED;
+	}
+
+	/* Uh oh... serious problem here */
 	if (result != USB_STOR_XFER_GOOD) {
-		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 
@@ -834,8 +841,14 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* check the return code for the command */
 	US_DEBUGP("Call to usb_stor_ctrl_transfer() returned %d\n", result);
+
+	/* if we stalled the command, it means command failed */
+	if (result == USB_STOR_XFER_STALLED) {
+		return USB_STOR_TRANSPORT_FAILED;
+	}
+
+	/* Uh oh... serious problem here */
 	if (result != USB_STOR_XFER_GOOD) {
-		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 
