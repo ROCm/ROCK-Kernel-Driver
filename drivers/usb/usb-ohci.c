@@ -2,7 +2,7 @@
  * URB OHCI HCD (Host Controller Driver) for USB.
  *
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
+ * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * [ Initialisation is based on Linus'  ]
  * [ uhci code and gregs ohci fragments ]
@@ -11,6 +11,11 @@
  * 
  * 
  * History:
+ *
+ * 2002/03/08 interrupt unlink fix (Matt Hughes), better cleanup on
+ *	load failure (Matthew Frederickson)
+ * 2002/01/20 async unlink fixes:  return -EINPROGRESS (per spec) and
+ *	make interrupt unlink-in-completion work (db)
  * 
  * 2001/09/19 USB_ZERO_PACKET support (Jean Tourrilhes)
  * 2001/07/17 power management and pmac cleanup (Benjamin Herrenschmidt)
@@ -489,8 +494,7 @@ static int sohci_return_urb (struct ohci *hc, struct urb * urb)
 			/* implicitly requeued */
   			urb->actual_length = 0;
   			urb->status = -EINPROGRESS;
-  			if (urb_priv->state != URB_DEL)
-  				td_submit_urb (urb);
+ 			td_submit_urb (urb);
   			break;
   			
 		case PIPE_ISOCHRONOUS:
@@ -800,6 +804,7 @@ static int sohci_unlink_urb (struct urb * urb)
 				/* usb_dec_dev_use done in dl_del_list() */
 				urb->status = -EINPROGRESS;
 				spin_unlock_irqrestore (&usb_ed_lock, flags);
+				return -EINPROGRESS;
 			}
 		} else {
 			urb_rm_priv (urb);
@@ -1083,6 +1088,28 @@ static int ep_link (ohci_t * ohci, ed_t * edi)
 
 /*-------------------------------------------------------------------------*/
 
+/* scan the periodic table to find and unlink this ED */
+static void periodic_unlink (
+	struct ohci	*ohci,
+	struct ed	*ed,
+	unsigned	index,
+	unsigned	period
+) {
+	for (; index < NUM_INTS; index += period) {
+		__u32	*ed_p = &ohci->hcca->int_table [index];
+
+		/* ED might have been unlinked through another path */
+		while (*ed_p != 0) {
+			if ((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
+				*ed_p = ed->hwNextED;		
+				break;
+			}
+			ed_p = & ((dma_to_ed (ohci,
+				le32_to_cpup (ed_p)))->hwNextED);
+		}
+	}	
+}
+
 /* unlink an ed from one of the HC chains. 
  * just the link to the ed is unlinked.
  * the link from the ed still points to another operational ed or 0
@@ -1090,11 +1117,7 @@ static int ep_link (ohci_t * ohci, ed_t * edi)
 
 static int ep_unlink (ohci_t * ohci, ed_t * ed) 
 {
-	int int_branch;
 	int i;
-	int inter;
-	int interval;
-	__u32 * ed_p;
 
 	ed->hwINFO |= cpu_to_le32 (OHCI_ED_SKIP);
 
@@ -1134,21 +1157,8 @@ static int ep_unlink (ohci_t * ohci, ed_t * ed)
 		break;
       
 	case PIPE_INTERRUPT:
-		int_branch = ed->int_branch;
-		interval = ed->int_interval;
-
-		for (i = 0; i < ep_rev (6, interval); i += inter) {
-			for (ed_p = &(ohci->hcca->int_table[ep_rev (5, i) + int_branch]), inter = 1; 
-				(*ed_p != 0) && (*ed_p != ed->hwNextED); 
-				ed_p = &((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED), 
-				inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval)) {				
-					if((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
-			  			*ed_p = ed->hwNextED;		
-			  			break;
-			  		}
-			  }
-		}
-		for (i = int_branch; i < 32; i += interval)
+		periodic_unlink (ohci, ed, 0, 1);
+		for (i = ed->int_branch; i < 32; i += ed->int_interval)
 		    ohci->ohci_int_load[i] -= ed->int_load;
 #ifdef DEBUG
 		ep_print_int_eds (ohci, "UNLINK_INT");
@@ -1159,23 +1169,13 @@ static int ep_unlink (ohci_t * ohci, ed_t * ed)
 		if (ohci->ed_isotail == ed)
 			ohci->ed_isotail = ed->ed_prev;
 		if (ed->hwNextED != 0) 
-		    (dma_to_ed (ohci, le32_to_cpup (&ed->hwNextED)))->ed_prev = ed->ed_prev;
+		    (dma_to_ed (ohci, le32_to_cpup (&ed->hwNextED)))
+		    	->ed_prev = ed->ed_prev;
 				    
-		if (ed->ed_prev != NULL) {
+		if (ed->ed_prev != NULL)
 			ed->ed_prev->hwNextED = ed->hwNextED;
-		} else {
-			for (i = 0; i < 32; i++) {
-				for (ed_p = &(ohci->hcca->int_table[ep_rev (5, i)]); 
-						*ed_p != 0; 
-						ed_p = &((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED)) {
-					// inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval);
-					if((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
-						*ed_p = ed->hwNextED;		
-						break;
-					}
-				}
-			}	
-		}	
+		else
+			periodic_unlink (ohci, ed, 0, 1);
 #ifdef DEBUG
 		ep_print_int_eds (ohci, "UNLINK_ISO");
 #endif
@@ -2363,7 +2363,6 @@ static void hc_interrupt (int irq, void * __ohci, struct pt_regs * r)
 static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
 {
 	ohci_t * ohci;
-	struct usb_bus * bus;
 
 	ohci = (ohci_t *) kmalloc (sizeof *ohci, GFP_KERNEL);
 	if (!ohci)
@@ -2392,14 +2391,15 @@ static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
 
 	INIT_LIST_HEAD (&ohci->timeout_list);
 
-	bus = usb_alloc_bus (&sohci_device_operations);
-	if (!bus) {
+	ohci->bus = usb_alloc_bus (&sohci_device_operations);
+	if (!ohci->bus) {
+		pci_set_drvdata (dev, NULL);
+		pci_free_consistent (ohci->ohci_dev, sizeof *ohci->hcca,
+				ohci->hcca, ohci->hcca_dma);
 		kfree (ohci);
 		return NULL;
 	}
-
-	ohci->bus = bus;
-	bus->hcpriv = (void *) ohci;
+	ohci->bus->hcpriv = (void *) ohci;
 
 	return ohci;
 } 
@@ -2425,9 +2425,11 @@ static void hc_release_ohci (ohci_t * ohci)
 		ohci->irq = -1;
 	}
 	pci_set_drvdata(ohci->ohci_dev, NULL);
-
-	usb_deregister_bus (ohci->bus);
-	usb_free_bus (ohci->bus);
+	if (ohci->bus) {
+		if (ohci->bus->busnum)
+			usb_deregister_bus (ohci->bus);
+		usb_free_bus (ohci->bus);
+	}
 
 	list_del (&ohci->ohci_hcd_list);
 	INIT_LIST_HEAD (&ohci->ohci_hcd_list);
@@ -2575,12 +2577,14 @@ ohci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 {
 	unsigned long mem_resource, mem_len;
 	void *mem_base;
+	int status;
 
 	if (pci_enable_device(dev) < 0)
 		return -ENODEV;
 
         if (!dev->irq) {
         	err("found OHCI device with no IRQ assigned. check BIOS settings!");
+		pci_disable_device (dev);
    	        return -ENODEV;
         }
 	
@@ -2589,19 +2593,28 @@ ohci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	mem_len = pci_resource_len(dev, 0);
 	if (!request_mem_region (mem_resource, mem_len, ohci_pci_driver.name)) {
 		dbg ("controller already in use");
+		pci_disable_device (dev);
 		return -EBUSY;
 	}
 
 	mem_base = ioremap_nocache (mem_resource, mem_len);
 	if (!mem_base) {
 		err("Error mapping OHCI memory");
+		release_mem_region (mem_resource, mem_len);
+		pci_disable_device (dev);
 		return -EFAULT;
 	}
 
 	/* controller writes into our memory */
 	pci_set_master (dev);
 
-	return hc_found_ohci (dev, dev->irq, mem_base, id);
+	status = hc_found_ohci (dev, dev->irq, mem_base, id);
+	if (status < 0) {
+		iounmap (mem_base);
+		release_mem_region (mem_resource, mem_len);
+		pci_disable_device (dev);
+	}
+	return status;
 } 
 
 /*-------------------------------------------------------------------------*/
@@ -2639,6 +2652,7 @@ ohci_pci_remove (struct pci_dev *dev)
 	hc_release_ohci (ohci);
 
 	release_mem_region (pci_resource_start (dev, 0), pci_resource_len (dev, 0));
+	pci_disable_device (dev);
 }
 
 
