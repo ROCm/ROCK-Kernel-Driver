@@ -798,7 +798,7 @@ int dtInsert(tid_t tid, struct inode *ip,
 	 *      insert entry for new key
 	 */
 	if (DO_INDEX(ip)) {
-		if (JFS_IP(ip)->next_index == -1) {
+		if (JFS_IP(ip)->next_index == DIREND) {
 			DT_PUTPAGE(mp);
 			return EMLINK;
 		}
@@ -2885,7 +2885,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int do_index = 0;
 	uint loop_count = 0;
 
-	if (filp->f_pos == -1)
+	if (filp->f_pos == DIREND)
 		return 0;
 
 	if (DO_INDEX(ip)) {
@@ -2904,25 +2904,25 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			dir_table_slot_t dirtab_slot;
 
 			if (dtEmpty(ip)) {
-				filp->f_pos = -1;
+				filp->f_pos = DIREND;
 				return 0;
 			}
 		      repeat:
 			rc = get_index(ip, dir_index, &dirtab_slot);
 			if (rc) {
-				filp->f_pos = -1;
+				filp->f_pos = DIREND;
 				return rc;
 			}
 			if (dirtab_slot.flag == DIR_INDEX_FREE) {
 				if (loop_count++ > JFS_IP(ip)->next_index) {
 					jERROR(1, ("jfs_readdir detected "
 						   "infinite loop!\n"));
-					filp->f_pos = -1;
+					filp->f_pos = DIREND;
 					return 0;
 				}
 				dir_index = le32_to_cpu(dirtab_slot.addr2);
 				if (dir_index == -1) {
-					filp->f_pos = -1;
+					filp->f_pos = DIREND;
 					return 0;
 				}
 				goto repeat;
@@ -2931,7 +2931,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			index = dirtab_slot.slot;
 			DT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 			if (rc) {
-				filp->f_pos = -1;
+				filp->f_pos = DIREND;
 				return 0;
 			}
 			if (p->header.flag & BT_INTERNAL) {
@@ -2968,7 +2968,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			 * Find first entry of left-most leaf
 			 */
 			if (dtEmpty(ip)) {
-				filp->f_pos = -1;
+				filp->f_pos = DIREND;
 				return 0;
 			}
 
@@ -3013,7 +3013,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		}
 
 		if (dtEmpty(ip)) {
-			filp->f_pos = -1;
+			filp->f_pos = DIREND;
 			return 0;
 		}
 
@@ -3021,7 +3021,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			jERROR(1,
 			       ("jfs_readdir: unexpected rc = %d from dtReadNext\n",
 				rc));
-			filp->f_pos = -1;
+			filp->f_pos = DIREND;
 			return 0;
 		}
 		/* get start leaf page and index */
@@ -3029,7 +3029,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 		/* offset beyond directory eof ? */
 		if (bn < 0) {
-			filp->f_pos = -1;
+			filp->f_pos = DIREND;
 			return 0;
 		}
 	}
@@ -3038,7 +3038,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	if (d_name == NULL) {
 		DT_PUTPAGE(mp);
 		jERROR(1, ("jfs_readdir: kmalloc failed!\n"));
-		filp->f_pos = -1;
+		filp->f_pos = DIREND;
 		return 0;
 	}
 	while (1) {
@@ -3087,13 +3087,13 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 
 		if (p->header.flag & BT_ROOT) {
-			filp->f_pos = -1;
+			filp->f_pos = DIREND;
 			break;
 		}
 
 		bn = le64_to_cpu(p->header.next);
 		if (bn == 0) {
-			filp->f_pos = -1;
+			filp->f_pos = DIREND;
 			break;
 		}
 
