@@ -212,9 +212,6 @@
 
 #define dprintk(x)
 
-#undef abs
-extern int abs(int __x) __attribute_const__; /* Shut up warning */
-
 /* --------------------------------------------------------------------- */
 
 /*
@@ -396,17 +393,6 @@ struct usb_audio_state {
 #define AFMT_BYTESSHIFT(x) ((AFMT_ISSTEREO(x) ? 1 : 0) + (AFMT_IS16BIT(x) ? 1 : 0))
 #define AFMT_BYTES(x)      (1<<AFMT_BYTESSHFIT(x))
 
-/* --------------------------------------------------------------------- */
-
-/* prevent picking up a bogus abs macro */
-#undef abs
-static inline int abs(int x)
-{
-        if (x < 0)
-		return -x;
-	return x;
-}
-                                
 /* --------------------------------------------------------------------- */
 
 static inline unsigned ld2(unsigned int x)
