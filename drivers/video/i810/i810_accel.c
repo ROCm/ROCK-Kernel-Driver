@@ -9,6 +9,7 @@
  *  more details.
  */
 #include <linux/kernel.h>
+#include <linux/string.h>
 #include <linux/fb.h>
 
 #include "i810_regs.h"
@@ -54,8 +55,9 @@ static inline void i810_report_error(u8 *mmio)
  * The function waits until a free space from the ringbuffer
  * is available 
  */	
-static inline int wait_for_space(struct i810fb_par *par, u32 space)
+static inline int wait_for_space(struct fb_info *info, u32 space)
 {
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u32 head, count = WAIT_COUNT, tail;
 	u8 *mmio = par->mmio_start_virtual;
 
@@ -72,6 +74,7 @@ static inline int wait_for_space(struct i810fb_par *par, u32 space)
 	printk("ringbuffer lockup!!!\n");
 	i810_report_error(mmio); 
 	par->dev_flags |= LOCKUP;
+	info->pixmap.scan_align = 1;
 	return 1;
 }
 
@@ -83,10 +86,14 @@ static inline int wait_for_space(struct i810fb_par *par, u32 space)
  * This waits for lring(0), iring(1), and batch(3), etc to finish and
  * waits until ringbuffer is empty.
  */
-static inline int wait_for_engine_idle(struct i810fb_par *par)
+static inline int wait_for_engine_idle(struct fb_info *info)
 {
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u8 *mmio = par->mmio_start_virtual;
 	int count = WAIT_COUNT;
+
+	if (wait_for_space(info, par->iring.size)) /* flush */
+		return 1;
 
 	while((i810_readw(INSTDONE, mmio) & 0x7B) != 0x7B && --count); 
 	if (count) return 0;
@@ -95,6 +102,7 @@ static inline int wait_for_engine_idle(struct i810fb_par *par)
 	printk("INSTDONE: 0x%04x\n", i810_readl(INSTDONE, mmio));
 	i810_report_error(mmio); 
 	par->dev_flags |= LOCKUP;
+	info->pixmap.scan_align = 1;
 	return 1;
 }
 
@@ -106,11 +114,13 @@ static inline int wait_for_engine_idle(struct i810fb_par *par)
  * Checks/waits for sufficent space in ringbuffer of size
  * space.  Returns the tail of the buffer
  */ 
-static inline u32 begin_iring(struct i810fb_par *par, u32 space)
+static inline u32 begin_iring(struct fb_info *info, u32 space)
 {
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+
 	if (par->dev_flags & ALWAYS_SYNC) 
-		wait_for_engine_idle(par);
-	return wait_for_space(par, space);
+		wait_for_engine_idle(info);
+	return wait_for_space(info, space);
 }
 
 /**
@@ -149,9 +159,11 @@ static inline void end_iring(struct i810fb_par *par)
  */
 static inline void source_copy_blit(int dwidth, int dheight, int dpitch, 
 				    int xdir, int src, int dest, int rop, 
-				    int blit_bpp, struct i810fb_par *par)
+				    int blit_bpp, struct fb_info *info)
 {
-	if (begin_iring(par, 24 + IRING_PAD)) return;
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+
+	if (begin_iring(info, 24 + IRING_PAD)) return;
 
 	PUT_RING(BLIT | SOURCE_COPY_BLIT | 4);
 	PUT_RING(xdir | rop << 16 | dpitch | DYN_COLOR_EN | blit_bpp);
@@ -181,9 +193,11 @@ static inline void source_copy_blit(int dwidth, int dheight, int dpitch,
  */
 static inline void color_blit(int width, int height, int pitch,  int dest, 
 			      int rop, int what, int blit_bpp, 
-			      struct i810fb_par *par)
+			      struct fb_info *info)
 {
-	if (begin_iring(par, 24 + IRING_PAD)) return;
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+
+	if (begin_iring(info, 24 + IRING_PAD)) return;
 
 	PUT_RING(BLIT | COLOR_BLT | 3);
 	PUT_RING(rop << 16 | pitch | SOLIDPATTERN | DYN_COLOR_EN | blit_bpp);
@@ -220,9 +234,11 @@ static inline void color_blit(int width, int height, int pitch,  int dest,
 static inline void mono_src_copy_imm_blit(int dwidth, int dheight, int dpitch,
 					  int dsize, int blit_bpp, int rop,
 					  int dest, const u32 *src, int bg,
-					  int fg, struct i810fb_par *par)
+					  int fg, struct fb_info *info)
 {
-	if (begin_iring(par, 24 + (dsize << 2) + IRING_PAD)) return;
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+
+	if (begin_iring(info, 24 + (dsize << 2) + IRING_PAD)) return;
 
 	PUT_RING(BLIT | MONO_SOURCE_COPY_IMMEDIATE | (4 + dsize));
 	PUT_RING(DYN_COLOR_EN | blit_bpp | rop << 16 | dpitch);
@@ -261,9 +277,11 @@ static inline void mono_src_copy_imm_blit(int dwidth, int dheight, int dpitch,
 static inline void mono_src_copy_blit(int dwidth, int dheight, int dpitch, 
 				      int qsize, int blit_bpp, int rop, 
 				      int dest, int src, int bg,
-				      int fg, struct i810fb_par *par)
+				      int fg, struct fb_info *info)
 {
-	if (begin_iring(par, 32 + IRING_PAD)) return;
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+
+	if (begin_iring(info, 32 + IRING_PAD)) return;
 
 	PUT_RING(BLIT | MONO_SOURCE_COPY_BLIT | 6);
 	PUT_RING(DYN_COLOR_EN | blit_bpp | rop << 16 | dpitch | 1 << 27);
@@ -277,19 +295,23 @@ static inline void mono_src_copy_blit(int dwidth, int dheight, int dpitch,
 	end_iring(par);
 }
 
-static u32 get_buffer_offset(u32 size, struct i810fb_par *par) 
+static inline void load_front(int offset, struct fb_info *info)
 {
-	u32 offset;
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
 
-	if (par->pixmap_offset + size > par->pixmap.size) {
-		wait_for_engine_idle(par);
-		par->pixmap_offset = 0;
-	}
+	if (begin_iring(info, 8 + IRING_PAD)) return;
 
-	offset = par->pixmap_offset;
-	par->pixmap_offset += size;
+	PUT_RING(PARSER | FLUSH);
+	PUT_RING(NOP);
 
-	return offset;
+	end_iring(par);
+
+	if (begin_iring(info, 8 + IRING_PAD)) return;
+
+	PUT_RING(PARSER | FRONT_BUFFER | ((par->pitch >> 3) << 8));
+	PUT_RING((par->fb.offset << 12) + offset);
+
+	end_iring(par);
 }
 
 /**
@@ -338,7 +360,7 @@ void i810fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 
 	dest = info->fix.smem_start + (dy * info->fix.line_length) + dx;
 	color_blit(width, height, info->fix.line_length, dest, rop, color, 
-		   par->blit_bpp, par);
+		   par->blit_bpp, info);
 }
 	
 void i810fb_copyarea(struct fb_info *info, const struct fb_copyarea *region) 
@@ -377,14 +399,13 @@ void i810fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 	dest = info->fix.smem_start + (dy * info->fix.line_length) + dx;
 
 	source_copy_blit(width, height, pitch, xdir, src, dest,
-			 PAT_COPY_ROP, par->blit_bpp, par);
+			 PAT_COPY_ROP, par->blit_bpp, info);
 }
 
 void i810fb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
-	u32 fg = 0, bg = 0, s_pitch, d_pitch, size, offset, dst, i, j;
-	u8 *s_addr, *d_addr;
+	u32 fg = 0, bg = 0, size, dst;
 	
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP ||
 	    par->depth == 4 || image->depth != 1) 
@@ -405,43 +426,17 @@ void i810fb_imageblit(struct fb_info *info, const struct fb_image *image)
 	dst = info->fix.smem_start + (image->dy * info->fix.line_length) + 
 		(image->dx * par->depth);
 
-	s_pitch = (image->width+7)/8;
-	d_pitch = (s_pitch + 1) & ~1;
-	size = d_pitch * image->height;
-	if (s_pitch != d_pitch || size & 7) {
-		size += 7;
-		size &= ~7;
-		offset = get_buffer_offset(size, par);		
-		d_addr = par->pixmap.virtual + offset;
-		s_addr = (u8 *) image->data;
-		
-		if (s_pitch == d_pitch) {
-			memcpy_toio(d_addr, s_addr, s_pitch * image->height);
-		} else { 
-			for (i = image->height; i--; ) {
-				for (j = 0; j < s_pitch; j++) 
-					i810_writeb(j, d_addr, s_addr[j]);
-				s_addr += s_pitch;
-				d_addr += d_pitch;
-			}
-		}
-		mono_src_copy_blit(image->width * par->depth, image->height, 
-				   info->fix.line_length, size/8, 
-				   par->blit_bpp, PAT_COPY_ROP, dst, 
-				   par->pixmap.physical + offset,
-				   bg, fg, par);
-	}
-	/*
-	 * immediate blit if width is a multiple of 16 (hardware requirement)
-	 */
-	else {
-		mono_src_copy_imm_blit(image->width * par->depth, 
-				       image->height, info->fix.line_length, 
-				       size/4, par->blit_bpp,
-				       PAT_COPY_ROP, dst, (u32 *) image->data, 
-				       bg, fg, par);
-	} 
-}
+	size = (image->width+7)/8 + 1;
+	size &= ~1;
+	size *= image->height;
+	size += 7;
+	size &= ~7;
+	mono_src_copy_imm_blit(image->width * par->depth, 
+			       image->height, info->fix.line_length, 
+			       size/4, par->blit_bpp,
+			       PAT_COPY_ROP, dst, (u32 *) image->data, 
+			       bg, fg, info);
+} 
 
 int i810fb_sync(struct fb_info *info)
 {
@@ -450,9 +445,19 @@ int i810fb_sync(struct fb_info *info)
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP)
 		return 0;
 
-	return wait_for_engine_idle(par);
+	return wait_for_engine_idle(info);
 }
 
+void i810fb_load_front(u32 offset, struct fb_info *info)
+{
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+	u8 *mmio = par->mmio_start_virtual;
+
+	if (!info->var.accel_flags || par->dev_flags & LOCKUP)
+		i810_writel(DPLYBASE, mmio, par->fb.physical + offset);
+	else 
+		load_front(offset, info);
+}
 
 /**
  * i810fb_init_ringbuffer - initialize the ringbuffer
@@ -463,12 +468,13 @@ int i810fb_sync(struct fb_info *info)
  * size and location of the ringbuffer.  It also sets 
  * the head and tail pointers = 0
  */
-void i810fb_init_ringbuffer(struct i810fb_par *par)
+void i810fb_init_ringbuffer(struct fb_info *info)
 {
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u32 tmp1, tmp2;
 	u8 *mmio = par->mmio_start_virtual;
 	
-	wait_for_engine_idle(par);
+	wait_for_engine_idle(info);
 	i810fb_iring_enable(par, OFF);
 	i810_writel(IRING, mmio, 0);
 	i810_writel(IRING + 4, mmio, 0);

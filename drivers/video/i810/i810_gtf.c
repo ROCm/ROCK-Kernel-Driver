@@ -1,5 +1,5 @@
 /*-*- linux-c -*-
- *  linux/drivers/video/i810_main.h -- Intel 810 Nondiscrete Video Timings 
+ *  linux/drivers/video/i810_main.h -- Intel 810 Non-discrete Video Timings 
  *                                     (VESA GTF)
  *
  *      Copyright (C) 2001 Antonino Daplas<adaplas@pol.net>
@@ -213,7 +213,7 @@ void i810fb_fill_var_timings(struct fb_var_screeninfo *var) { }
  * @par: pointer to i810fb_par structure
  *
  * DESCRIPTION:
- * Get's the required watermark based on 
+ * Gets the required watermark based on 
  * pixelclock and RAMBUS frequency.
  * 
  * RETURNS:
@@ -240,8 +240,7 @@ u32 i810_get_watermark(const struct fb_var_screeninfo *var,
 			wmark = i810_wm_24_100;
 			size = ARRAY_SIZE(i810_wm_24_100);
 		}
-	}	
-	else {
+	} else {
 		switch(var->bits_per_pixel) {
 		case 8:
 			wmark = i810_wm_8_133;

@@ -631,8 +631,7 @@ static void i810_calc_dclk(u32 freq, u32 *m, u32 *n, u32 *p)
 		if (f_out <= target_freq) {
 			n_reg++;
 			diff = target_freq - f_out;
-		}
-		else {
+		} else {
 			m_reg++;
 			diff = f_out - target_freq;
 		}
@@ -926,20 +925,21 @@ static int i810_check_params(struct fb_var_screeninfo *var,
 	/*
 	 * Monitor limit
 	 */
+	switch (var->bits_per_pixel) {
+	case 8:
+		info->monspecs.dclkmax = 234000000;
+		break;
+	case 16:
+		info->monspecs.dclkmax = 229000000;
+		break;
+	case 24:
+	case 32:
+		info->monspecs.dclkmax = 204000000;
+		break;
+	}
+	info->monspecs.dclkmin = 15000000;
+
 	if (fb_validate_mode(var, info)) {
-		switch (var->bits_per_pixel) {
-		case 8:
-			info->monspecs.dclkmax = 234000000;
-			break;
-		case 16:
-			info->monspecs.dclkmax = 229000000;
-			break;
-		case 24:
-		case 32:
-			info->monspecs.dclkmax = 204000000;
-			break;
-		}
-		info->monspecs.dclkmin = 15000000;
 		if (fb_get_mode(FB_MAXTIMINGS, 0, var, info))
 			return -EINVAL;
 	}
@@ -1177,31 +1177,21 @@ static int i810fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		for (i = 0; i < 8; i++) 
 			i810_write_dac((u8) (regno * 8) + i, (u8) red, 
 				       (u8) green, (u8) blue, mmio);
-	}
-				
-	else if (info->fix.visual == FB_VISUAL_DIRECTCOLOR && 
+	} else if (info->fix.visual == FB_VISUAL_DIRECTCOLOR && 
 		 info->var.green.length == 6) {
-		if (!regno) {
-			memset(par->red, 0, 64);
-			memset(par->green, 0, 64);
-			memset(par->blue, 0, 64);
-		}
-
-		par->red[regno] = (u8) red;
-		par->green[regno] = (u8) green;
-		par->blue[regno] = (u8) blue;
+		u8 r, g, b;
 
 		if (regno < 32) {
 			for (i = 0; i < 8; i++) 
 				i810_write_dac((u8) (regno * 8) + i,
-					       (u8) red, par->green[regno*2], 
+					       (u8) red, (u8) green, 
 					       (u8) blue, mmio);
 		}
+		i810_read_dac((u8) (regno*4), &r, &g, &b, mmio);
 		for (i = 0; i < 4; i++) 
-			i810_write_dac((u8) (regno*4) + i, par->red[regno/2],
-				       (u8) green, par->blue[regno/2], mmio);
-	}
-	else {
+			i810_write_dac((u8) (regno*4) + i, r, (u8) green, 
+				       b, mmio);
+	} else if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR) {
 		i810_write_dac((u8) regno, (u8) red, (u8) green,
 			       (u8) blue, mmio);
 	}
@@ -1220,16 +1210,14 @@ static int i810fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 					((u32 *)info->pseudo_palette)[regno] = 
 						(regno << 11) | (regno << 5) |
 						regno;
-			}
-			else {
+			} else {
 				if (info->var.green.length == 5) {
 					/* RGB 555 */
 					((u32 *)info->pseudo_palette)[regno] = 
 						((red & 0xf800) >> 1) |
 						((green & 0xf800) >> 6) |
 						((blue & 0xf800) >> 11);
-				}
-				else {
+				} else {
 					/* RGB 565 */
 					((u32 *)info->pseudo_palette)[regno] =
 						(red & 0xf800) |
@@ -1260,11 +1248,10 @@ static int i810fb_pan_display(struct fb_var_screeninfo *var,
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u32 total;
-	u8 *mmio = par->mmio_start_virtual;
 	
 	total = var->xoffset * par->depth + 
 		var->yoffset * info->fix.line_length;
-	i810_writel(DPLYBASE, mmio, par->fb.physical + total);
+	i810fb_load_front(total, info);
 
 	return 0;
 }
@@ -1315,8 +1302,14 @@ static int i810fb_set_par(struct fb_info *info)
 	i810_load_regs(par);
 	i810_init_cursor(par);
 	par->cursor_reset = 1;
+
 	encode_fix(&info->fix, info);
 
+	if (info->var.accel_flags && !(par->dev_flags & LOCKUP)) 
+		info->pixmap.scan_align = 2;
+	else 
+		info->pixmap.scan_align = 1;
+	
 	return 0;
 }
 
@@ -1512,10 +1505,6 @@ static void __init i810_fix_pointers(struct i810fb_par *par)
 		(par->iring.offset << 12);
 	par->cursor_heap.virtual = par->aperture.virtual+
 		(par->cursor_heap.offset << 12);
-	par->pixmap.virtual = par->aperture.virtual + 
-		(par->pixmap.offset << 12);
-	par->pixmap.physical = par->aperture.physical + 
-		(par->pixmap.offset << 12);
 }
 
 static void __init i810_fix_offsets(struct i810fb_par *par)
@@ -1531,10 +1520,7 @@ static void __init i810_fix_offsets(struct i810fb_par *par)
 	par->fb.offset = v_offset_default << 20;
 	par->fb.offset >>= 12;
 
-	par->pixmap.offset = par->fb.offset + (par->fb.size >> 12);
-	par->pixmap.size = PIXMAP_SIZE;
-
-	par->iring.offset = par->pixmap.offset + (PIXMAP_SIZE >> 12);
+	par->iring.offset = par->fb.offset + (par->fb.size >> 12);
 	par->iring.size = RINGBUFFER_SIZE;
 
 	par->cursor_heap.offset = par->iring.offset + (RINGBUFFER_SIZE >> 12);
@@ -1547,7 +1533,7 @@ static int __init i810_alloc_agp_mem(struct fb_info *info)
 	int size;
 	
 	i810_fix_offsets(par);
-	size = par->fb.size + par->iring.size + par->pixmap.size;
+	size = par->fb.size + par->iring.size;
 
 	par->drm_agp = (drm_agp_t *) inter_module_get("drm_agp");
 	if (!par->drm_agp) {
@@ -1637,23 +1623,20 @@ static void __init i810_init_monspecs(struct fb_info *info)
 static void __init i810_init_defaults(struct i810fb_par *par, 
 				      struct fb_info *info)
 {
-	if (voffset) {
+	if (voffset) 
 		v_offset_default = voffset;
-	}
-	else {
-		if (par->aperture.size > 32 * 1024 * 1024)
-			v_offset_default = 16;
-		else
-			v_offset_default = 8;
-	}
+	else if (par->aperture.size > 32 * 1024 * 1024)
+		v_offset_default = 16;
+	else
+		v_offset_default = 8;
 
 	if (!vram) 
 		vram = 1;
 
-	if (accel)
+	if (accel) 
 		par->dev_flags |= HAS_ACCELERATION;
 
-	if (sync)
+	if (sync) 
 		par->dev_flags |= ALWAYS_SYNC;
 
 	if (bpp < 8)
@@ -1698,8 +1681,6 @@ static void __init i810_init_device(struct i810fb_par *par)
 	pci_read_config_byte(par->dev, 0x50, &reg);
 	reg &= FREQ_MASK;
 	par->mem_freq = (reg) ? 133 : 100;
-
-	i810fb_init_ringbuffer(par);
 }
 
 static int __init 
@@ -1718,8 +1699,7 @@ i810_allocate_pci_resource(struct i810fb_par *par,
 		par->aperture.physical = pci_resource_start(par->dev, 0);
 		par->aperture.size = pci_resource_len(par->dev, 0);
 		par->mmio_start_phys = pci_resource_start(par->dev, 1);
-	}
-	else {
+	} else {
 		par->aperture.physical = pci_resource_start(par->dev, 1);
 		par->aperture.size = pci_resource_len(par->dev, 1);
 		par->mmio_start_phys = pci_resource_start(par->dev, 0);
@@ -1737,7 +1717,7 @@ i810_allocate_pci_resource(struct i810fb_par *par,
 	}
 	par->res_flags |= FRAMEBUFFER_REQ;
 
-	par->aperture.virtual = ioremap(par->aperture.physical, 
+	par->aperture.virtual = ioremap_nocache(par->aperture.physical, 
 					par->aperture.size);
 	if (!par->aperture.virtual) {
 		printk("i810fb_init: cannot remap framebuffer region\n");
@@ -1766,7 +1746,6 @@ int __init i810fb_setup(char *options)
 {
 	char *this_opt, *suffix = NULL;
 
-	i810_init = 1;
 	if (!options || !*options)
 		return 0;
 	
@@ -1795,13 +1774,11 @@ int __init i810fb_setup(char *options)
 			hsync1 = simple_strtoul(this_opt+7, &suffix, 0);
 			if (strncmp(suffix, "H", 1)) 
 				hsync1 *= 1000;
-		} 
-		else if (!strncmp(this_opt, "hsync2:", 7)) {
+		} else if (!strncmp(this_opt, "hsync2:", 7)) {
 			hsync2 = simple_strtoul(this_opt+7, &suffix, 0);
 			if (strncmp(suffix, "H", 1)) 
 				hsync2 *= 1000;
-		} 
-		else if (!strncmp(this_opt, "vsync1:", 7)) 
+		} else if (!strncmp(this_opt, "vsync1:", 7)) 
 			vsync1 = simple_strtoul(this_opt+7, NULL, 0);
 		else if (!strncmp(this_opt, "vsync2:", 7))
 			vsync2 = simple_strtoul(this_opt+7, NULL, 0);
@@ -1812,14 +1789,11 @@ int __init i810fb_setup(char *options)
 }
 
 static int __init i810fb_init_pci (struct pci_dev *dev, 
-				      const struct pci_device_id *entry)
+				   const struct pci_device_id *entry)
 {
 	struct fb_info    *info;
 	struct i810fb_par *par = NULL;
 	int err, vfreq, hfreq, pixclock;
-
-	if (!i810_init)
-		return -EINVAL;
 
 	if (!(info = kmalloc(sizeof(struct fb_info), GFP_KERNEL))) {
 		i810fb_release_resource(info, par);
@@ -1835,6 +1809,15 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
 
 	par->dev = dev;
 	info->par = par;
+
+	if (!(info->pixmap.addr = kmalloc(64*1024, GFP_KERNEL))) {
+		i810fb_release_resource(info, par);
+		return -ENOMEM;
+	}
+	memset(info->pixmap.addr, 0, 64*1024);
+	info->pixmap.size = 64*1024;
+	info->pixmap.buf_align = 8;
+	info->pixmap.flags = FB_PIXMAP_SYSTEM;
 
 	if ((err = i810_allocate_pci_resource(par, entry))) {
 		i810fb_release_resource(info, par);
@@ -1864,6 +1847,7 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
 	}
 	encode_fix(&info->fix, info); 
 	 	    
+	i810fb_init_ringbuffer(info);
 	err = register_framebuffer(info);
 	if (err < 0) {
     		i810fb_release_resource(info, par); 
@@ -1894,7 +1878,7 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
 }
 
 /***************************************************************
- *                     Deinitialization                        *
+ *                     De-initialization                        *
  ***************************************************************/
 
 static void i810fb_release_resource(struct fb_info *info, 
@@ -1931,7 +1915,7 @@ static void i810fb_release_resource(struct fb_info *info,
 
 		kfree(par);
 	}
-	if (info)
+	if (info) 
 		kfree(info);
 }
 
@@ -1974,7 +1958,6 @@ int __init i810fb_init(void)
 
 int __init i810fb_init(void)
 {
-	i810_init = 1;
 	hsync1 *= 1000;
 	hsync2 *= 1000;
 
@@ -1994,14 +1977,14 @@ MODULE_PARM(bpp, "i");
 MODULE_PARM_DESC(bpp, "Color depth for display in bits per pixel"
 		 " (default = 8)");
 MODULE_PARM(xres, "i");
-MODULE_PARM_DESC(xres, "Hozizontal resolution in pixels (default = 640)");
+MODULE_PARM_DESC(xres, "Horizontal resolution in pixels (default = 640)");
 MODULE_PARM(yres, "i");
 MODULE_PARM_DESC(yres, "Vertical resolution in scanlines (default = 480)");
 MODULE_PARM(vyres, "i");
 MODULE_PARM_DESC(vyres, "Virtual vertical resolution in scanlines"
 		 " (default = 480)");
 MODULE_PARM(hsync1, "i");
-MODULE_PARM_DESC(hsync1, "Mimimum horizontal frequency of monitor in KHz"
+MODULE_PARM_DESC(hsync1, "Minimum horizontal frequency of monitor in KHz"
 		 " (default = 31)");
 MODULE_PARM(hsync2, "i");
 MODULE_PARM_DESC(hsync2, "Maximum horizontal frequency of monitor in KHz"

@@ -455,7 +455,7 @@ static void accel_putc(struct vc_data *vc, struct fb_info *info,
 	image.height = vc->vc_font.height;
 	image.fg_color = attr_fgcol(fgshift, c);
 	image.bg_color = attr_bgcol(bgshift, c);
-	image.depth = 0;
+	image.depth = 1;
 
 	pitch = width + scan_align;
 	pitch &= ~scan_align;
@@ -486,7 +486,7 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 	image.dx = xx * vc->vc_font.width;
 	image.dy = yy * vc->vc_font.height;
 	image.height = vc->vc_font.height;
-	image.depth = 0;
+	image.depth = 1;
 
 	if (!(vc->vc_font.width & 7))
                putcs_aligned(vc, info, &image, count, s);
@@ -530,7 +530,6 @@ void accel_clear_margins(struct vc_data *vc, struct fb_info *info,
  *  Low Level Operations
  */
 /* NOTE: fbcon cannot be __init: it may be called from take_over_console later */
-
 static const char *fbcon_startup(void)
 {
 	const char *display_desc = "frame buffer device";
@@ -1000,105 +999,97 @@ static void accel_cursor(struct vc_data *vc, struct fb_info *info,
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
-	int height, width, size, c;
-	int w, cur_height, i = 0;
-	char *font, *mask, *data;
-	
-	if (cursor->set & FB_CUR_SETCUR)
-		cursor->enable = 1;
-	else
-		cursor->enable = 0;
+	static int fgcolor, bgcolor, shape, width, height;
+	static char mask[64], image[64], *dest;
+        char *font;
+        int c;
 
-	cursor->set |= FB_CUR_SETPOS;
+        if (cursor->set & FB_CUR_SETCUR)
+                cursor->enable = 1;
+        else
+                cursor->enable = 0;
 
-	height = info->cursor.image.height;
-	width = info->cursor.image.width;
+	cursor->set = FB_CUR_SETPOS;
 
-	if (width != vc->vc_font.width || 
-	    height != vc->vc_font.height) {
-		width = vc->vc_font.width;
-		height = vc->vc_font.height;
-		cursor->set |= FB_CUR_SETSIZE;
-	}	
+	if (width != vc->vc_font.width || height != vc->vc_font.height) {
+                width = vc->vc_font.width;
+                height = vc->vc_font.height;
+                cursor->set |= FB_CUR_SETSIZE;
+        }
 
-	size = ((width + 7) >> 3) * height;
-
-	data = kmalloc(size, GFP_KERNEL);
-		
-	if (!data) return; 	
-
-	mask = kmalloc(size, GFP_KERNEL);
-
-	if (!mask) {
-		kfree(data);
-		return;	
-	}
-	
-	if (cursor->set & FB_CUR_SETSIZE) {
-		memset(data, 0xff, size);
+        if ((vc->vc_cursor_type & 0x0f) != shape) {
+                shape = vc->vc_cursor_type & 0x0f;
 		cursor->set |= FB_CUR_SETSHAPE;
-	}
+        }
 
-	c = scr_readw((u16 *) vc->vc_pos);
+        c = scr_readw((u16 *) vc->vc_pos);
 
-	if (info->cursor.image.fg_color != attr_fgcol(fgshift, c) ||
-	    info->cursor.image.bg_color != attr_bgcol(bgshift, c)) {
-		cursor->image.fg_color = attr_fgcol(fgshift, c);
-		cursor->image.bg_color = attr_bgcol(bgshift, c);
-		cursor->set |= FB_CUR_SETCMAP;
-	}
-	font = vc->vc_font.data + ((c & charmask) * size);
-	if (font != info->cursor.dest) {
-		cursor->dest = font;
-		cursor->set |= FB_CUR_SETDEST;
-	}
+	if (fgcolor != (int) attr_fgcol(fgshift, c) ||
+            bgcolor != (int) attr_bgcol(bgshift, c)) {
+                fgcolor = (int) attr_fgcol(fgshift, c);
+                bgcolor = (int) attr_bgcol(bgshift, c);
+                cursor->set |= FB_CUR_SETCMAP;
+        }
+        c &= charmask;
+        font = vc->vc_font.data + (c * ((width + 7) / 8) * height);
+        if (font != dest) {
+                dest = font;
+                cursor->set |= FB_CUR_SETDEST;
+        }
 
-	w = (width + 7) >> 3;
+        if (cursor->set & FB_CUR_SETSIZE) {
+                memset(image, 0xff, 64);
+                cursor->set |= FB_CUR_SETSHAPE;
+        }
 
-	switch (vc->vc_cursor_type & 0x0f) {
-		case CUR_NONE:
-			cur_height = 0;
-			break;
-		case CUR_UNDERLINE:
-			cur_height = (height < 10) ? 1 : 2;
-			break;
-		case CUR_LOWER_THIRD:
-			cur_height = height/3;
-			break;
-		case CUR_LOWER_HALF:
-			cur_height = height/2;
-			break;
-		case CUR_TWO_THIRDS:
-			cur_height = (height * 2)/3;
-			break;
-		case CUR_BLOCK:
-		default:
-			cur_height = height;
-			break;
-	}
+	if (cursor->set & FB_CUR_SETSHAPE) {
+                int w, cur_height, size, i = 0;
 
+                w = (width + 7) / 8;
+
+                switch (shape) {
+                        case CUR_NONE:
+                                cur_height = 0;
+                                break;
+                        case CUR_UNDERLINE:
+                                cur_height = (height < 10) ? 1 : 2;
+                                break;
+                        case CUR_LOWER_THIRD:
+                                cur_height = height/3;
+                                break;
+                        case CUR_LOWER_HALF:
+                                cur_height = height/2;
+                                break;
+                        case CUR_TWO_THIRDS:
+                                cur_height = (height * 2)/3;
+                                break;
+                        case CUR_BLOCK:
+                        default:
+                                cur_height = height;
+                                break;
+                }
 	size = (height - cur_height) * w;
-	while (size--)
-		mask[i++] = 0;
-	size = cur_height * w;
-	while (size--)
-		mask[i++] = 0xff;
+                while (size--)
+                        mask[i++] = 0;
+                size = cur_height * w;
+                while (size--)
+                        mask[i++] = 0xff;
+        }
 
-	if (!info->cursor.mask ||  (memcmp(mask, info->cursor.mask, w*height)))
-		cursor->set |= FB_CUR_SETSHAPE;
+        cursor->image.width = width;
+        cursor->image.height = height;
+        cursor->image.dx = vc->vc_x * width;
+        cursor->image.dy = yy * height;
+        cursor->image.depth = 1;
+        cursor->image.data = image;
+        cursor->image.bg_color = bgcolor;
+        cursor->image.fg_color = fgcolor;
+        cursor->mask = mask;
+        cursor->dest = dest;
+        cursor->rop = ROP_XOR;
 
-	cursor->image.width = width;
-	cursor->image.height = height;
-	cursor->image.dx = vc->vc_x * width;
-	cursor->image.dy = yy * height;
-	cursor->image.depth = 0;
-	cursor->image.data = data;
-	cursor->mask = mask;
-	cursor->rop = ROP_XOR;
-
-	info->fbops->fb_cursor(info, cursor);
-	kfree(data);
-	kfree(mask);
+        if (info->fbops->fb_cursor)
+                info->fbops->fb_cursor(info, cursor);
 }
 	
 static void fbcon_cursor(struct vc_data *vc, int mode)

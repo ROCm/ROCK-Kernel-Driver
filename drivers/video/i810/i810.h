@@ -120,7 +120,6 @@
 #define MMIO_SIZE                   (512*1024)
 #define GTT_SIZE                    (16*1024) 
 #define RINGBUFFER_SIZE             (64*1024)
-#define PIXMAP_SIZE                 (4 * 4096)
 #define CURSOR_SIZE                 4096 
 #define OFF                         0
 #define ON                          1
@@ -251,7 +250,6 @@ struct i810fb_par {
 	struct heap_data         fb;
 	struct heap_data         iring;
 	struct heap_data         cursor_heap;
-	struct heap_data         pixmap;
 	struct vgastate          state;
 	drm_agp_t                *drm_agp;
 	atomic_t                 use_count;
@@ -260,10 +258,6 @@ struct i810fb_par {
 	unsigned long mmio_start_phys;
 	u8 *mmio_start_virtual;
 	u32 cursor_reset;
-	u8  red[64];
-	u8  green[64];
-	u8  blue[64];
-	u32 pixmap_offset;
 	u32 pitch;
 	u32 pixconf;
 	u32 watermark;

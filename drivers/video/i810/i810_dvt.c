@@ -289,8 +289,7 @@ u32 i810_get_watermark(struct fb_var_screeninfo *var,
 		case 32:
 			wmark = params->bpp24_100;
 		}
-	}
-	else {					
+	} else {					
 		switch (var->bits_per_pixel) {
 		case 8:
 			wmark = params->bpp8_133;

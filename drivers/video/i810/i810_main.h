@@ -55,7 +55,6 @@ static struct pci_driver i810fb_driver = {
 	.resume   =     i810fb_resume,
 };	
 
-static int i810_init  __initdata = 0;
 static int vram       __initdata = 4;
 static int bpp        __initdata = 8;
 static int mtrr       __initdata = 0;
@@ -132,7 +131,8 @@ extern void i810fb_copyarea (struct fb_info *p,
 extern void i810fb_imageblit(struct fb_info *p, const struct fb_image *image);
 extern int  i810fb_sync     (struct fb_info *p);
 
-extern void i810fb_init_ringbuffer   (struct i810fb_par *par);
+extern void i810fb_init_ringbuffer(struct fb_info *info);
+extern void i810fb_load_front     (u32 offset, struct fb_info *info);
 
 /* Conditionals */
 #if defined(__i386__)
