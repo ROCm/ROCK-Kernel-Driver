@@ -330,9 +330,6 @@ typedef struct ORC_Ha_Ctrl_Struc {
 	ORC_TCS HCS_Tcs[16];	/* 28 */
 	U32 BitAllocFlag[MAX_CHANNELS][8];	/* Max STB is 256, So 256/32 */
 	spinlock_t BitAllocFlagLock;
-	struct scsi_cmnd *pSRB_head;
-	struct scsi_cmnd *pSRB_tail;
-	spinlock_t pSRB_lock;
 	struct pci_dev *pdev;
 } ORC_HCS;
 

@@ -117,50 +117,6 @@ extern int orc_abort_srb(ORC_HCS * hcsp, struct scsi_cmnd *SCpnt);
 extern int init_orchid(ORC_HCS * hcsp);
 
 /*****************************************************************************
- Function name  : inia100AppendSRBToQueue
- Description    : This function will push current request into save list
- Input          : pSRB  -       Pointer to SCSI request block.
-		  pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : None.
-*****************************************************************************/
-static void inia100AppendSRBToQueue(ORC_HCS * pHCB, struct scsi_cmnd * pSRB)
-{
-	ULONG flags;
-
-	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
-
-	pSRB->SCp.ptr = NULL;	/* Pointer to next */
-	if (pHCB->pSRB_head == NULL)
-		pHCB->pSRB_head = pSRB;
-	else
-		pHCB->pSRB_tail->SCp.ptr = (char *)pSRB;	/* Pointer to next */
-	pHCB->pSRB_tail = pSRB;
-	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
-	return;
-}
-
-/*****************************************************************************
- Function name  : inia100PopSRBFromQueue
- Description    : This function will pop current request from save list
- Input          : pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : pSRB  -       Pointer to SCSI request block.
-*****************************************************************************/
-static struct scsi_cmnd *inia100PopSRBFromQueue(ORC_HCS * pHCB)
-{
-	struct scsi_cmnd *pSRB;
-	ULONG flags;
-	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
-	if ((pSRB = (struct scsi_cmnd *) pHCB->pSRB_head) != NULL) {
-		pHCB->pSRB_head = (struct scsi_cmnd *) pHCB->pSRB_head->SCp.ptr;
-		pSRB->SCp.ptr = NULL;
-	}
-	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
-	return (pSRB);
-}
-
-/*****************************************************************************
  Function name  : inia100BuildSCB
  Description    : 
  Input          : pHCB  -       Pointer to host adapter structure
@@ -248,11 +204,9 @@ static int inia100_queue(struct scsi_cmnd * SCpnt, void (*done) (struct scsi_cmn
 	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
 	SCpnt->scsi_done = done;
 	/* Get free SCSI control block  */
-	if ((pSCB = orc_alloc_scb(pHCB)) == NULL) {
-		inia100AppendSRBToQueue(pHCB, SCpnt);	/* Buffer this request  */
-		/* printk("inia100_entry: can't allocate SCB\n"); */
-		return (0);
-	}
+	if ((pSCB = orc_alloc_scb(pHCB)) == NULL)
+		return SCSI_MLQUEUE_HOST_BUSY;
+
 	inia100BuildSCB(pHCB, pSCB, SCpnt);
 	orc_exec_scb(pHCB, pSCB);	/* Start execute SCB            */
 
@@ -374,14 +328,7 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 	orc_release_dma(pHCB, pSRB);  /* release DMA before we call scsi_done */
 	pSRB->scsi_done(pSRB);	/* Notify system DONE           */
 
-	/* Find the next pending SRB    */
-	if ((pSRB = inia100PopSRBFromQueue(pHCB)) != NULL) {	/* Assume resend will success   */
-		inia100BuildSCB(pHCB, pSCB, pSRB);	/* Create corresponding SCB     */
-		orc_exec_scb(pHCB, pSCB);	/* Start execute SCB            */
-	} else {
-		orc_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
-	}
-	return;
+	orc_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
 }
 
 /*
@@ -453,9 +400,6 @@ static int __devinit inia100_probe_one(struct pci_dev *pdev,
 	pHCB->pdev = pdev;
 	pHCB->HCS_Base = port;
 	pHCB->HCS_BIOS = bios;
-	pHCB->pSRB_head = NULL;	/* Initial SRB save queue       */
-	pHCB->pSRB_tail = NULL;	/* Initial SRB save queue       */
-	pHCB->pSRB_lock = SPIN_LOCK_UNLOCKED; /* SRB save queue lock */
 	pHCB->BitAllocFlagLock = SPIN_LOCK_UNLOCKED;
 
 	/* Get total memory needed for SCB */
