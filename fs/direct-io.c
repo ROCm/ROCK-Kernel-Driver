@@ -958,7 +958,15 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio->bio_list = NULL;
 	dio->waiter = NULL;
 
-	dio->pages_in_io = 0;
+	/*
+	 * In case of non-aligned buffers, we may need 2 more
+	 * pages since we need to zero out first and last block.
+	 */
+	if (unlikely(dio->blkfactor))
+		dio->pages_in_io = 2;
+	else
+		dio->pages_in_io = 0;
+
 	for (seg = 0; seg < nr_segs; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
 		dio->pages_in_io +=
