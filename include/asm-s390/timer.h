@@ -45,6 +45,4 @@ extern void add_virt_timer_periodic(void *new);
 extern int mod_virt_timer(struct vtimer_list *timer, __u64 expires);
 extern int del_virt_timer(struct vtimer_list *timer);
 
-int stop_timers(void);
-
 #endif
