@@ -3,9 +3,9 @@
  *
  *	vlsi_ir.h:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Version:	0.4
+ *	Version:	0.4a
  *
- *	Copyright (c) 2001-2002 Martin Diehl
+ *	Copyright (c) 2001-2003 Martin Diehl
  *
  *	This program is free software; you can redistribute it and/or 
  *	modify it under the terms of the GNU General Public License as 
@@ -730,9 +730,7 @@ typedef struct vlsi_irda_dev {
 
 	u32			cfg_space[64/sizeof(u32)];
 	u8			resume_ok;	
-#ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*proc_entry;
-#endif
 
 } vlsi_irda_dev_t;
 

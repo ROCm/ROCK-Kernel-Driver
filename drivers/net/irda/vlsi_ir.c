@@ -2,7 +2,7 @@
  *
  *	vlsi_ir.c:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Copyright (c) 2001-2002 Martin Diehl
+ *	Copyright (c) 2001-2003 Martin Diehl
  *
  *	This program is free software; you can redistribute it and/or 
  *	modify it under the terms of the GNU General Public License as 
@@ -28,7 +28,7 @@ MODULE_AUTHOR("Martin Diehl <info@mdiehl.de>");
 MODULE_LICENSE("GPL");
 
 #define DRIVER_NAME "vlsi_ir"
-#define DRIVER_VERSION "v0.4"
+#define DRIVER_VERSION "v0.4a"
 
 /********************************************************/
 
@@ -148,6 +148,9 @@ static void vlsi_ring_debug(struct vlsi_ring *r)
 }
 
 /********************************************************/
+
+/* needed regardless of CONFIG_PROC_FS */
+static struct proc_dir_entry *vlsi_proc_root = NULL;
 
 #ifdef CONFIG_PROC_FS
 
@@ -394,8 +397,6 @@ static int vlsi_proc_print(struct net_device *ndev, char *buf, int len)
 	return out - buf;
 }
 
-static struct proc_dir_entry *vlsi_proc_root = NULL;
-
 struct vlsi_proc_data {
 	int size;
 	char *data;
@@ -494,11 +495,18 @@ static int vlsi_proc_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations vlsi_proc_fops = {
+	/* protect individual procdir file entry against rmmod */
+	.owner		= THIS_MODULE,
 	.open		= vlsi_proc_open,
 	.llseek		= vlsi_proc_lseek,
 	.read		= vlsi_proc_read,
 	.release	= vlsi_proc_release,
 };
+
+#define VLSI_PROC_FOPS		(&vlsi_proc_fops)
+
+#else	/* CONFIG_PROC_FS */
+#define VLSI_PROC_FOPS		NULL
 #endif
 
 /********************************************************/
@@ -1800,8 +1808,7 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto out_freedev;
 	}
 
-#ifdef CONFIG_PROC_FS
-	{
+	if (vlsi_proc_root != NULL) {
 		struct proc_dir_entry *ent;
 
 		ent = create_proc_entry(ndev->name, S_IFREG|S_IRUGO, vlsi_proc_root);
@@ -1810,11 +1817,11 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			goto out_unregister;
 		}
 		ent->data = ndev;
-		ent->proc_fops = &vlsi_proc_fops;
+		ent->proc_fops = VLSI_PROC_FOPS;
 		ent->size = 0;
 		idev->proc_entry = ent;
-	}
-#endif
+	} else
+		idev->proc_entry = NULL;
 
 	printk(KERN_INFO "%s: registered device %s\n", drivername, ndev->name);
 
@@ -1851,12 +1858,10 @@ static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
 	down(&idev->sem);
 	pci_set_drvdata(pdev, NULL);
 	pci_disable_device(pdev);
-#ifdef CONFIG_PROC_FS
 	if (idev->proc_entry) {
 		remove_proc_entry(ndev->name, vlsi_proc_root);
 		idev->proc_entry = NULL;
 	}
-#endif
 	up(&idev->sem);
 
 	unregister_netdev(ndev);
@@ -1993,9 +1998,7 @@ static struct pci_driver vlsi_irda_driver = {
 #endif
 };
 
-#ifdef CONFIG_PROC_FS
 #define PROC_DIR ("driver/" DRIVER_NAME)
-#endif
 
 static int __init vlsi_mod_init(void)
 {
@@ -2025,18 +2028,23 @@ static int __init vlsi_mod_init(void)
 
 	sirpulse = !!sirpulse;
 
-#ifdef CONFIG_PROC_FS
+	/* create_proc_entry returns NULL if !CONFIG_PROC_FS.
+	 * Failure to create the procfs entry is handled like running
+	 * without procfs - it's not required for the driver to work.
+	 */
 	vlsi_proc_root = create_proc_entry(PROC_DIR, S_IFDIR, 0);
-	if (!vlsi_proc_root)
-		return -ENOMEM;
-#endif
+	if (vlsi_proc_root) {
+		/* protect registered procdir against module removal.
+		 * Because we are in the module init path there's no race
+		 * window after create_proc_entry (and no barrier needed).
+		 */
+		vlsi_proc_root->owner = THIS_MODULE;
+	}
 
 	ret = pci_module_init(&vlsi_irda_driver);
 
-#ifdef CONFIG_PROC_FS
-	if (ret)
+	if (ret && vlsi_proc_root)
 		remove_proc_entry(PROC_DIR, 0);
-#endif
 	return ret;
 
 }
@@ -2044,7 +2052,8 @@ static int __init vlsi_mod_init(void)
 static void __exit vlsi_mod_exit(void)
 {
 	pci_unregister_driver(&vlsi_irda_driver);
-	remove_proc_entry(PROC_DIR, 0);
+	if (vlsi_proc_root)
+		remove_proc_entry(PROC_DIR, 0);
 }
 
 module_init(vlsi_mod_init);
