@@ -29,7 +29,6 @@ typedef struct {
  * PREEMPT_MASK: 0x000000ff
  * HARDIRQ_MASK: 0x0000ff00
  * SOFTIRQ_MASK: 0x00ff0000
- * IRQ_MASK:     0x00ffff00
  */
 
 #define PREEMPT_BITS	8
@@ -53,8 +52,6 @@ typedef struct {
 #define PREEMPT_OFFSET	(1UL << PREEMPT_SHIFT)
 #define SOFTIRQ_OFFSET	(1UL << SOFTIRQ_SHIFT)
 #define HARDIRQ_OFFSET	(1UL << HARDIRQ_SHIFT)
-
-#define IRQ_MASK	(HARDIRQ_MASK | SOFTIRQ_MASK)
 
 /*
  * The hardirq mask has to be large enough to have
