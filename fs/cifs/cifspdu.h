@@ -1700,7 +1700,7 @@ struct fea {
 #define FEA_NEEDEA         0x80	/* need EA bit */
 
 struct fealist {
-	unsigned long list_len;
+	__u32 list_len;
 	struct fea list[1];
 };
 

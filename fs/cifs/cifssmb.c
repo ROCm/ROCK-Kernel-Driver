@@ -2955,8 +2955,21 @@ QAllEAsRetry:
 			memcpy((char *) pFindData,
 			       (char *) &pSMBr->hdr.Protocol +
 			       pSMBr->DataOffset, kl);
-		}*/ else
-		    rc = -ENOMEM;
+		}*/ else {
+			/* check that length of list is not more than bcc */
+			/* check that each entry does not go beyond length
+			   of list */
+			/* check that each element of each entry does not
+			   go beyond end of list */
+			struct fealist * ea_response_data;
+			rc = 0;
+			/* validate_trans2_offsets() */
+			/* BB to check if(start of smb + pSMBr->DataOffset > &bcc+ bcc)*/
+			ea_response_data = (struct fealist *)
+				(((char *) &pSMBr->hdr.Protocol) +
+				pSMBr->DataOffset);
+			cFYI(1,("ea length %d",ea_response_data->list_len));
+		}
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
