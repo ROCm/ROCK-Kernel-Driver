@@ -185,6 +185,8 @@ extern int scsi_set_medium_removal(struct scsi_device *, char);
 extern int scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 			   unsigned char *buffer, int len, int timeout,
 			   int retries, struct scsi_mode_data *data);
+extern int scsi_test_unit_ready(struct scsi_device *sdev, int timeout,
+				int retries);
 extern int scsi_device_set_state(struct scsi_device *sdev,
 				 enum scsi_device_state state);
 extern int scsi_device_quiesce(struct scsi_device *sdev);

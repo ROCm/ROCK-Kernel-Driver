@@ -1572,6 +1572,34 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 	return ret;
 }
 
+int
+scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)
+{
+	struct scsi_request *sreq;
+	char cmd[] = {
+		TEST_UNIT_READY, 0, 0, 0, 0, 0,
+	};
+	int result;
+	
+	sreq = scsi_allocate_request(sdev, GFP_KERNEL);
+	if (!sreq)
+		return -ENOMEM;
+
+		sreq->sr_data_direction = DMA_NONE;
+        scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
+
+	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
+	    (sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION &&
+	    sdev->removable) {
+		sdev->changed = 1;
+		sreq->sr_result = 0;
+	}
+	result = sreq->sr_result;
+	scsi_release_request(sreq);
+	return result;
+}
+EXPORT_SYMBOL(scsi_test_unit_ready);
+
 /**
  *	scsi_device_set_state - Take the given device through the device
  *		state model.

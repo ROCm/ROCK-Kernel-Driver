@@ -648,7 +648,7 @@ static int sd_media_changed(struct gendisk *disk)
 	 */
 	retval = -ENODEV;
 	if (scsi_block_when_processing_errors(sdp))
-		retval = scsi_ioctl(sdp, SCSI_IOCTL_TEST_UNIT_READY, NULL);
+		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT, SD_MAX_RETRIES);
 
 	/*
 	 * Unable to test, unit probably not ready.   This usually
