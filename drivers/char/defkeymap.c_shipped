@@ -139,10 +139,10 @@ u_short ctrl_alt_map[NR_KEYS] = {
 };
 
 ushort *key_maps[MAX_NR_KEYMAPS] = {
-	plain_map, shift_map, altgr_map, 0,
-	ctrl_map, shift_ctrl_map, 0, 0,
-	alt_map, 0, 0, 0,
-	ctrl_alt_map,	0
+	plain_map, shift_map, altgr_map, NULL,
+	ctrl_map, shift_ctrl_map, NULL, NULL,
+	alt_map, NULL, NULL, NULL,
+	ctrl_alt_map, NULL
 };
 
 unsigned int keymap_count = 7;
@@ -216,10 +216,10 @@ char *func_table[MAX_NR_FUNC] = {
 	func_buf + 135,
 	func_buf + 140,
 	func_buf + 145,
-	0,
-	0,
+	NULL,
+	NULL,
 	func_buf + 149,
-	0,
+	NULL,
 };
 
 struct kbdiacr accent_table[MAX_DIACR] = {

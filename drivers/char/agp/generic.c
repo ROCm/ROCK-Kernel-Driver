@@ -883,7 +883,7 @@ void *agp_generic_alloc_page(void)
 
 	page = alloc_page(GFP_KERNEL);
 	if (page == NULL)
-		return 0;
+		return NULL;
 
 	map_page_into_agp(page);
 

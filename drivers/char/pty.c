@@ -144,14 +144,14 @@ static int pty_write(struct tty_struct * tty, int from_user,
 			buf   += n; 
 			c     += n;
 			count -= n;
-			to->ldisc.receive_buf(to, temp_buffer, 0, n);
+			to->ldisc.receive_buf(to, temp_buffer, NULL, n);
 		}
 		up(&tty->flip.pty_sem);
 	} else {
 		c = to->ldisc.receive_room(to);
 		if (c > count)
 			c = count;
-		to->ldisc.receive_buf(to, buf, 0, c);
+		to->ldisc.receive_buf(to, buf, NULL, c);
 	}
 	
 	return c;
