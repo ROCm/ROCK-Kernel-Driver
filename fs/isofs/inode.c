@@ -34,11 +34,6 @@
 
 #include "zisofs.h"
 
-/*
- * We have no support for "multi volume" CDs, but more and more disks carry
- * wrong information within the volume descriptors.
- */
-#define IGNORE_WRONG_MULTI_VOLUME_SPECS
 #define BEQUIET
 
 #ifdef LEAK_CHECK
@@ -556,19 +551,6 @@ static int isofs_fill_super(struct super_block *s, void *data, int silent)
 	if (!parse_options((char *) data, &opt))
 		goto out_freesbi;
 
-#if 0
-	printk("map = %c\n", opt.map);
-	printk("rock = %c\n", opt.rock);
-	printk("joliet = %c\n", opt.joliet);
-	printk("check = %c\n", opt.check);
-	printk("cruft = %c\n", opt.cruft);
-	printk("unhide = %c\n", opt.unhide);
-	printk("blocksize = %d\n", opt.blocksize);
-	printk("gid = %d\n", opt.gid);
-	printk("uid = %d\n", opt.uid);
-	printk("iocharset = %s\n", opt.iocharset);
-#endif
-
 	/*
 	 * First of all, get the hardware blocksize for this device.
 	 * If we don't know what it is, or the hardware blocksize is
@@ -673,19 +655,11 @@ root_found:
 
 	if(sbi->s_high_sierra){
 	  rootp = (struct iso_directory_record *) h_pri->root_directory_record;
-#ifndef IGNORE_WRONG_MULTI_VOLUME_SPECS
-	  if (isonum_723 (h_pri->volume_set_size) != 1)
-		goto out_no_support;
-#endif /* IGNORE_WRONG_MULTI_VOLUME_SPECS */
 	  sbi->s_nzones = isonum_733 (h_pri->volume_space_size);
 	  sbi->s_log_zone_size = isonum_723 (h_pri->logical_block_size);
 	  sbi->s_max_size = isonum_733(h_pri->volume_space_size);
 	} else {
 	  rootp = (struct iso_directory_record *) pri->root_directory_record;
-#ifndef IGNORE_WRONG_MULTI_VOLUME_SPECS
-	  if (isonum_723 (pri->volume_set_size) != 1)
-		goto out_no_support;
-#endif /* IGNORE_WRONG_MULTI_VOLUME_SPECS */
 	  sbi->s_nzones = isonum_733 (pri->volume_space_size);
 	  sbi->s_log_zone_size = isonum_723 (pri->logical_block_size);
 	  sbi->s_max_size = isonum_733(pri->volume_space_size);
@@ -898,11 +872,6 @@ out_bad_size:
 	printk(KERN_WARNING "Logical zone size(%d) < hardware blocksize(%u)\n",
 		orig_zonesize, opt.blocksize);
 	goto out_freebh;
-#ifndef IGNORE_WRONG_MULTI_VOLUME_SPECS
-out_no_support:
-	printk(KERN_WARNING "Multi-volume disks not supported.\n");
-	goto out_freebh;
-#endif
 out_unknown_format:
 	if (!silent)
 		printk(KERN_WARNING "Unable to identify CD-ROM format.\n");
@@ -1314,7 +1283,7 @@ static void isofs_read_inode(struct inode * inode)
 		iso_date(de->date, high_sierra);
 
 	ei->i_first_extent = (isonum_733 (de->extent) +
-					   isonum_711 (de->ext_attr_length));
+			      isonum_711 (de->ext_attr_length));
 
 	/* Set the number of blocks for stat() - should be done before RR */
 	inode->i_blksize = PAGE_CACHE_SIZE; /* For stat() only */
@@ -1335,51 +1304,30 @@ static void isofs_read_inode(struct inode * inode)
 	/* get the volume sequence number */
 	volume_seq_no = isonum_723 (de->volume_sequence_number) ;
 
-	/*
-	 * Disable checking if we see any volume number other than 0 or 1.
-	 * We could use the cruft option, but that has multiple purposes, one
-	 * of which is limiting the file size to 16Mb.  Thus we silently allow
-	 * volume numbers of 0 to go through without complaining.
-	 */
-	if (sbi->s_cruft == 'n' &&
-	    (volume_seq_no != 0) && (volume_seq_no != 1)) {
-		printk(KERN_WARNING "Warning: defective CD-ROM "
-		       "(volume sequence number %d). "
-		       "Enabling \"cruft\" mount option.\n", volume_seq_no);
-		sbi->s_cruft = 'y';
-	}
-
 	/* Install the inode operations vector */
-#ifndef IGNORE_WRONG_MULTI_VOLUME_SPECS
-	if (sbi->s_cruft != 'y' &&
-	    (volume_seq_no != 0) && (volume_seq_no != 1)) {
-		printk(KERN_WARNING "Multi-volume CD somehow got mounted.\n");
-	} else
-#endif /*IGNORE_WRONG_MULTI_VOLUME_SPECS */
-	{
-		if (S_ISREG(inode->i_mode)) {
-			inode->i_fop = &generic_ro_fops;
-			switch ( ei->i_file_format ) {
+	if (S_ISREG(inode->i_mode)) {
+		inode->i_fop = &generic_ro_fops;
+		switch ( ei->i_file_format ) {
 #ifdef CONFIG_ZISOFS
-			case isofs_file_compressed:
-				inode->i_data.a_ops = &zisofs_aops;
-				break;
+		case isofs_file_compressed:
+			inode->i_data.a_ops = &zisofs_aops;
+			break;
 #endif
-			default:
-				inode->i_data.a_ops = &isofs_aops;
-				break;
-			}
-		} else if (S_ISDIR(inode->i_mode)) {
-			inode->i_op = &isofs_dir_inode_operations;
-			inode->i_fop = &isofs_dir_operations;
-		} else if (S_ISLNK(inode->i_mode)) {
-			inode->i_op = &page_symlink_inode_operations;
-			inode->i_data.a_ops = &isofs_symlink_aops;
-		} else
-			/* XXX - parse_rock_ridge_inode() had already set i_rdev. */
-			init_special_inode(inode, inode->i_mode,
-					   kdev_t_to_nr(inode->i_rdev));
-	}
+		default:
+			inode->i_data.a_ops = &isofs_aops;
+			break;
+		}
+	} else if (S_ISDIR(inode->i_mode)) {
+		inode->i_op = &isofs_dir_inode_operations;
+		inode->i_fop = &isofs_dir_operations;
+	} else if (S_ISLNK(inode->i_mode)) {
+		inode->i_op = &page_symlink_inode_operations;
+		inode->i_data.a_ops = &isofs_symlink_aops;
+	} else
+		/* XXX - parse_rock_ridge_inode() had already set i_rdev. */
+		init_special_inode(inode, inode->i_mode,
+				   kdev_t_to_nr(inode->i_rdev));
+
  out:
 	if (tmpde)
 		kfree(tmpde);
