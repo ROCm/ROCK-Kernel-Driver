@@ -572,10 +572,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	pci_set_drvdata(pcid, dev);
 	SET_NETDEV_DEV(dev, &pcid->dev);
 
-	if ((rc = e100_alloc_space(bdp)) != 0) {
-		goto err_dev;
-	}
-
 	bdp->flags = 0;
 	bdp->ifs_state = 0;
 	bdp->ifs_value = 0;
@@ -592,7 +588,11 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	bdp->watchdog_timer.function = (void *) &e100_watchdog;
 
 	if ((rc = e100_pci_setup(pcid, bdp)) != 0) {
-		goto err_dealloc;
+		goto err_dev;
+	}
+
+	if ((rc = e100_alloc_space(bdp)) != 0) {
+		goto err_pci;
 	}
 
 	if (((bdp->pdev->device > 0x1030)
@@ -637,7 +637,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 		
 	if ((rc = register_netdev(dev)) != 0) {
-		goto err_pci;
+		goto err_dealloc;
 	}
 
 	e100_check_options(e100nics, bdp);
@@ -688,12 +688,12 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 err_unregister_netdev:
 	unregister_netdev(dev);
+err_dealloc:
+	e100_dealloc_space(bdp);
 err_pci:
 	iounmap(bdp->scb);
 	pci_release_regions(pcid);
 	pci_disable_device(pcid);
-err_dealloc:
-	e100_dealloc_space(bdp);
 err_dev:
 	pci_set_drvdata(pcid, NULL);
 	kfree(dev);
