@@ -790,8 +790,10 @@ restart:
 					goto error;
 				}
 				if (err == -EAGAIN ||
-				    genid != atomic_read(&flow_cache_genid))
+				    genid != atomic_read(&flow_cache_genid)) {
+					xfrm_pol_put(policy);
 					goto restart;
+				}
 			}
 			if (err)
 				goto error;

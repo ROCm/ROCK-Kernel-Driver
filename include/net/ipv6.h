@@ -276,8 +276,10 @@ static inline void ipv6_addr_prefix(struct in6_addr *pfx,
 	    b = plen & 0x7;
 
 	memcpy(pfx->s6_addr, addr, o);
-	if (b != 0)
+	if (b != 0) {
 		pfx->s6_addr[o] = addr->s6_addr[o] & (0xff00 >> b);
+		o++;
+	}
 	if (o < 16)
 		memset(pfx->s6_addr + o, 0, 16 - o);
 }

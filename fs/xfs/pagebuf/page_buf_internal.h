@@ -85,18 +85,19 @@ struct pagebuf_trace_buf {
  * Tunable pagebuf parameters
  */
 
-#define P_PARAM	4
+typedef struct pb_sysctl_val {
+	ulong min;
+	ulong val;
+	ulong max;
+} pb_sysctl_val_t;
 
-typedef union pagebuf_param {
-	struct {
-		ulong	flush_interval;	/* interval between runs of the
+typedef struct pagebuf_param {
+	pb_sysctl_val_t	flush_interval;	/* interval between runs of the
 					 * delwri flush daemon.  */
-		ulong	age_buffer;	/* time for buffer to age before
+	pb_sysctl_val_t	age_buffer;	/* time for buffer to age before
 					 * we flush it.  */
-		ulong	debug;		/* debug tracing on or off */
-		ulong	stats_clear;	/* clear the pagebuf stats */
-	} p_un;
-	ulong data[P_PARAM];
+	pb_sysctl_val_t	stats_clear;	/* clear the pagebuf stats */
+	pb_sysctl_val_t	debug;		/* debug tracing on or off */
 } pagebuf_param_t;
 
 enum {

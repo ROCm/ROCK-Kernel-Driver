@@ -92,7 +92,7 @@ pb_trace_func(
 	int		j;
 	unsigned long	flags;
 
-	if (!pb_params.p_un.debug) return;
+	if (!pb_params.debug.val) return;
 
 	if (ra == NULL) ra = (void *)__builtin_return_address(0);
 
@@ -129,10 +129,13 @@ STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
  * /proc/sys/vm/pagebuf
  */
 
-unsigned long pagebuf_min[P_PARAM] = {  HZ/2,   1*HZ, 0, 0 };
-unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 1, 1 };
-
-pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
+pagebuf_param_t pb_params = {
+			/*	MIN	DFLT	MAX	*/
+	flush_interval:	{	HZ/2,	HZ,	30*HZ	},
+	age_buffer:	{	1*HZ,	15*HZ,	300*HZ	},
+	stats_clear:	{	0,	0,	1	},
+	debug:		{	0,	0,	1	},
+};
 
 /*
  * Pagebuf statistics variables
@@ -1556,7 +1559,7 @@ pagebuf_delwri_queue(
 	}
 
 	list_add_tail(&pb->pb_list, &pbd_delwrite_queue);
-	pb->pb_flushtime = jiffies + pb_params.p_un.age_buffer;
+	pb->pb_flushtime = jiffies + pb_params.age_buffer.val;
 	spin_unlock(&pbd_delwrite_lock);
 
 	if (unlock && (pb->pb_flags & _PBF_LOCKABLE)) {
@@ -1621,7 +1624,7 @@ pagebuf_daemon(
 
 		if (pbd_active == 1) {
 			mod_timer(&pb_daemon_timer,
-				  jiffies + pb_params.p_un.flush_interval);
+				  jiffies + pb_params.flush_interval.val);
 			interruptible_sleep_on(&pbd_waitq);
 		}
 
@@ -1824,7 +1827,7 @@ pb_stats_clear_handler(
 	if (!ret && write && *valp) {
 		printk("XFS Clearing pbstats\n");
 		memset(&pbstats, 0, sizeof(pbstats));
-		pb_params.p_un.stats_clear = 0;
+		pb_params.stats_clear.val = 0;
 	}
 
 	return ret;
@@ -1833,22 +1836,26 @@ pb_stats_clear_handler(
 STATIC struct ctl_table_header *pagebuf_table_header;
 
 STATIC ctl_table pagebuf_table[] = {
-	{PB_FLUSH_INT, "flush_int", &pb_params.data[0],
+	{PB_FLUSH_INT, "flush_int", &pb_params.flush_interval.val,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
-	&sysctl_intvec, NULL, &pagebuf_min[0], &pagebuf_max[0]},
+	&sysctl_intvec, NULL,
+	&pb_params.flush_interval.min, &pb_params.flush_interval.max},
 
-	{PB_FLUSH_AGE, "flush_age", &pb_params.data[1],
+	{PB_FLUSH_AGE, "flush_age", &pb_params.age_buffer.val,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
-	&sysctl_intvec, NULL, &pagebuf_min[1], &pagebuf_max[1]},
+	&sysctl_intvec, NULL, 
+	&pb_params.age_buffer.min, &pb_params.age_buffer.max},
 
-	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[2],
+	{PB_STATS_CLEAR, "stats_clear", &pb_params.stats_clear.val,
 	sizeof(ulong), 0644, NULL, &pb_stats_clear_handler,
-	&sysctl_intvec, NULL, &pagebuf_min[2], &pagebuf_max[2]},
+	&sysctl_intvec, NULL, 
+	&pb_params.stats_clear.min, &pb_params.stats_clear.max},
 
 #ifdef PAGEBUF_TRACE
-	{PB_DEBUG, "debug", &pb_params.data[3],
+	{PB_DEBUG, "debug", &pb_params.debug.val,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
-	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
+	&sysctl_intvec, NULL, 
+	&pb_params.debug.min, &pb_params.debug.max},
 #endif
 	{0}
 };

@@ -39,17 +39,22 @@
  * Tunable xfs parameters
  */
 
-#define XFS_PARAM	(sizeof(struct xfs_param) / sizeof(ulong))
+typedef struct xfs_sysctl_val {
+	ulong min;
+	ulong val;
+	ulong max;
+} xfs_sysctl_val_t;
 
 typedef struct xfs_param {
-	ulong	restrict_chown;	/* Root/non-root can give away files.    */
-	ulong	sgid_inherit;	/* Inherit ISGID bit if process' GID is  */
-				/*  not a member of the parent dir GID.  */
-	ulong	symlink_mode;	/* Symlink creat mode affected by umask. */
-	ulong	panic_mask;	/* bitmask to specify panics on errors.  */
-	ulong	error_level;	/* Degree of reporting for internal probs*/
-	ulong	sync_interval;	/* time between sync calls		 */
-	ulong	stats_clear;	/* Reset all XFS statistics to zero.     */
+	xfs_sysctl_val_t restrict_chown;/* Root/non-root can give away files.*/
+	xfs_sysctl_val_t sgid_inherit;	/* Inherit ISGID bit if process' GID 
+					 * is not a member of the parent dir
+					 * GID */
+	xfs_sysctl_val_t symlink_mode;	/* Link creat mode affected by umask */
+	xfs_sysctl_val_t panic_mask;	/* bitmask to cause panic on errors. */
+	xfs_sysctl_val_t error_level;	/* Degree of reporting for problems  */
+	xfs_sysctl_val_t sync_interval;	/* time between sync calls           */
+	xfs_sysctl_val_t stats_clear;	/* Reset all XFS statistics to zero. */
 } xfs_param_t;
 
 /*
