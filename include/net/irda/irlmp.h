@@ -183,7 +183,6 @@ struct irlmp_cb {
 	hashbin_t *services;
 
 	hashbin_t *cachelog;	/* Current discovery log */
-	spinlock_t log_lock;	/* discovery log spinlock */
 
 	int running;
 
@@ -197,12 +196,12 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap, notify_t *notify, __u8 pid);
 void irlmp_close_lsap( struct lsap_cb *self);
 
 __u16 irlmp_service_to_hint(int service);
-__u32 irlmp_register_service(__u16 hints);
-int irlmp_unregister_service(__u32 handle);
-__u32 irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
+void *irlmp_register_service(__u16 hints);
+int irlmp_unregister_service(void *handle);
+void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 			    DISCOVERY_CALLBACK1 expir_clb, void *priv);
-int irlmp_unregister_client(__u32 handle);
-int irlmp_update_client(__u32 handle, __u16 hint_mask, 
+int irlmp_unregister_client(void *handle);
+int irlmp_update_client(void *handle, __u16 hint_mask, 
 			DISCOVERY_CALLBACK1 disco_clb,
 			DISCOVERY_CALLBACK1 expir_clb, void *priv);
 
@@ -221,7 +220,7 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
 				 struct sk_buff *userdata);
 int  irlmp_disconnect_request(struct lsap_cb *, struct sk_buff *userdata);
 
-void irlmp_discovery_confirm(hashbin_t *discovery_log, DISCOVERY_MODE);
+void irlmp_discovery_confirm(hashbin_t *discovery_log, DISCOVERY_MODE mode);
 void irlmp_discovery_request(int nslots);
 struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots);
 void irlmp_do_expiry(void);
@@ -257,8 +256,6 @@ extern int sysctl_discovery_slots;
 extern int sysctl_discovery;
 extern int sysctl_lap_keepalive_time;	/* in ms, default is LM_IDLE_TIMEOUT */
 extern struct irlmp_cb *irlmp;
-
-static inline hashbin_t *irlmp_get_cachelog(void) { return irlmp->cachelog; }
 
 /* Check if LAP queue is full.
  * Used by IrTTP for low control, see comments in irlap.h - Jean II */

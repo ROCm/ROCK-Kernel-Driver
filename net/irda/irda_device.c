@@ -91,13 +91,13 @@ int irda_device_proc_read(char *buf, char **start, off_t offset, int len,
 
 int __init irda_device_init( void)
 {
-	dongles = hashbin_new(HB_GLOBAL);
+	dongles = hashbin_new(HB_LOCK);
 	if (dongles == NULL) {
 		printk(KERN_WARNING "IrDA: Can't allocate dongles hashbin!\n");
 		return -ENOMEM;
 	}
 
-	tasks = hashbin_new(HB_GLOBAL);
+	tasks = hashbin_new(HB_LOCK);
 	if (tasks == NULL) {
 		printk(KERN_WARNING "IrDA: Can't allocate tasks hashbin!\n");
 		return -ENOMEM;
@@ -438,7 +438,7 @@ dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 	}
 #endif
 
-	if (!(reg = hashbin_find(dongles, type, NULL))) {
+	if (!(reg = hashbin_lock_find(dongles, type, NULL))) {
 		ERROR("IrDA: Unable to find requested dongle\n");
 		return NULL;
 	}
@@ -477,7 +477,7 @@ int irda_device_dongle_cleanup(dongle_t *dongle)
 int irda_device_register_dongle(struct dongle_reg *new)
 {
 	/* Check if this dongle has been registred before */
-	if (hashbin_find(dongles, new->type, NULL)) {
+	if (hashbin_lock_find(dongles, new->type, NULL)) {
 		MESSAGE("%s: Dongle already registered\n", __FUNCTION__);
                 return 0;
         }

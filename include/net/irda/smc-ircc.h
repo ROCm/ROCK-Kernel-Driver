@@ -165,7 +165,9 @@ struct ircc_cb {
 
 	struct irport_cb *irport;
 
-	spinlock_t lock;           /* For serializing operations */
+	/* Locking : half of our operations are done with irport, so we
+	 * use the irport spinlock to make sure *everything* is properly
+	 * synchronised - Jean II */
 	
 	__u32 new_speed;
 	__u32 flags;               /* Interface flags */
