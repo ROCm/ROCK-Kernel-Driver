@@ -9,6 +9,7 @@
 #include <linux/sched.h>
 #include <linux/unistd.h>
 #include <linux/cpu.h>
+#include <linux/module.h>
 #include <asm/semaphore.h>
 
 /* This protects CPUs going up and down... */
