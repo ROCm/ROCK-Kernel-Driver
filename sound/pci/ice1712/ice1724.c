@@ -1071,7 +1071,7 @@ static int snd_vt1724_playback_indep_open(snd_pcm_substream_t *substream)
 		return -EBUSY; /* FIXME: should handle blocking mode properly */
 	}
 	up(&ice->open_mutex);
-	runtime->private_data = (void*)(1 << (substream->number + 4));
+	runtime->private_data = (void*)(1UL << (substream->number + 4));
 	ice->playback_con_substream_ds[substream->number] = substream;
 	runtime->hw = snd_vt1724_2ch_stereo;
 	snd_pcm_set_sync(substream);
