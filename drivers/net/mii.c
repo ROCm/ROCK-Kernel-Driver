@@ -170,6 +170,75 @@ int mii_nway_restart (struct mii_if_info *mii)
 	return r;
 }
 
+void mii_check_link (struct mii_if_info *mii)
+{
+	if (mii_link_ok(mii))
+		netif_carrier_on(mii->dev);
+	else
+		netif_carrier_off(mii->dev);
+}
+
+unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
+{
+	unsigned int old_carrier, new_carrier;
+	int advertise, lpa, media, duplex;
+
+	/* if forced media, go no further */
+	if (mii->duplex_lock)
+		return 0; /* duplex did not change */
+
+	/* check current and old link status */
+	old_carrier = netif_carrier_ok(mii->dev) ? 1 : 0;
+	new_carrier = (unsigned int) mii_link_ok(mii);
+
+	/* if carrier state did not change, this is a "bounce",
+	 * just exit as everything is already set correctly
+	 */
+	if (old_carrier == new_carrier)
+		return 0; /* duplex did not change */
+
+	/* no carrier, nothing much to do */
+	if (!new_carrier) {
+		netif_carrier_off(mii->dev);
+		if (ok_to_print)
+			printk(KERN_INFO "%s: link down\n", mii->dev->name);
+		return 0; /* duplex did not change */
+	}
+
+	/*
+	 * we have carrier, see who's on the other end
+	 */
+	netif_carrier_on(mii->dev);
+
+	/* get MII advertise and LPA values */
+	if (mii->advertising)
+		advertise = mii->advertising;
+	else {
+		advertise = mii->mdio_read(mii->dev, mii->phy_id, MII_ADVERTISE);
+		mii->advertising = advertise;
+	}
+	lpa = mii->mdio_read(mii->dev, mii->phy_id, MII_LPA);
+
+	/* figure out media and duplex from advertise and LPA values */
+	media = mii_nway_result(lpa & advertise);
+	duplex = (media & (ADVERTISE_100FULL | ADVERTISE_10FULL)) ? 1 : 0;
+
+	if (ok_to_print)
+		printk(KERN_INFO "%s: link up, %sMbps, %s-duplex, lpa 0x%04X\n",
+		       mii->dev->name,
+		       media & (ADVERTISE_100FULL | ADVERTISE_100HALF) ?
+		       		"100" : "10",
+		       duplex ? "full" : "half",
+		       lpa);
+
+	if (mii->full_duplex != duplex) {
+		mii->full_duplex = duplex;
+		return 1; /* duplex changed */
+	}
+
+	return 0; /* duplex did not change */
+}
+
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
 MODULE_DESCRIPTION ("MII hardware support library");
 MODULE_LICENSE("GPL");
@@ -178,3 +247,6 @@ EXPORT_SYMBOL(mii_link_ok);
 EXPORT_SYMBOL(mii_nway_restart);
 EXPORT_SYMBOL(mii_ethtool_gset);
 EXPORT_SYMBOL(mii_ethtool_sset);
+EXPORT_SYMBOL(mii_check_link);
+EXPORT_SYMBOL(mii_check_media);
+

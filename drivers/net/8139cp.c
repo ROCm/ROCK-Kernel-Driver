@@ -22,11 +22,11 @@
 	
 		Wake-on-LAN support - Felipe Damasio <felipewd@terra.com.br>
 		PCI suspend/resume  - Felipe Damasio <felipewd@terra.com.br>
+		LinkChg interrupt   - Felipe Damasio <felipewd@terra.com.br>
 			
 	TODO, in rough priority order:
 	* Test Tx checksumming thoroughly
 	* dev->tx_timeout
-	* LinkChg interrupt
 	* Support forcing media type with a module parameter,
 	  like dl2k.c/sundance.c
 	* Constants (module parms?) for Rx work limit
@@ -677,6 +677,8 @@ static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 		cp_rx(cp);
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
+	if (status & LinkChg)
+		mii_check_media(&cp->mii_if, netif_msg_link(cp));
 
 	if (status & PciErr) {
 		u16 pci_status;
@@ -1192,6 +1194,8 @@ static int cp_open (struct net_device *dev)
 	if (rc)
 		goto err_out_hw;
 
+	netif_carrier_off(dev);
+	mii_check_media(&cp->mii_if, netif_msg_link(cp));
 	netif_start_queue(dev);
 
 	return 0;
@@ -1210,6 +1214,7 @@ static int cp_close (struct net_device *dev)
 		printk(KERN_DEBUG "%s: disabling interface\n", dev->name);
 
 	netif_stop_queue(dev);
+	netif_carrier_off(dev);
 
 	spin_lock_irq(&cp->lock);
 	cp_stop_hw(cp);
