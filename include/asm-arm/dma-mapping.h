@@ -22,12 +22,12 @@ extern void consistent_sync(void *kaddr, size_t size, int rw);
  * For SA-1111 these functions are "magic" and utilize bounce
  * bufferes as needed to work around SA-1111 DMA bugs.
  */
-dma_addr_t sa1111_map_single(void *, size_t, int);
-void sa1111_unmap_single(dma_addr_t, size_t, int);
-int sa1111_map_sg(struct scatterlist *, int, int);
-void sa1111_unmap_sg(struct scatterlist *, int, int);
-void sa1111_dma_sync_single(dma_addr_t, size_t, int);
-void sa1111_dma_sync_sg(struct scatterlist *, int, int);
+dma_addr_t sa1111_map_single(struct device *dev, void *, size_t, enum dma_data_direction);
+void sa1111_unmap_single(struct device *dev, dma_addr_t, size_t, enum dma_data_direction);
+int sa1111_map_sg(struct device *dev, struct scatterlist *, int, enum dma_data_direction);
+void sa1111_unmap_sg(struct device *dev, struct scatterlist *, int, enum dma_data_direction);
+void sa1111_dma_sync_single(struct device *dev, dma_addr_t, size_t, enum dma_data_direction);
+void sa1111_dma_sync_sg(struct device *dev, struct scatterlist *, int, enum dma_data_direction);
 
 #ifdef CONFIG_SA1111
 
@@ -122,7 +122,7 @@ dma_map_single(struct device *dev, void *cpu_addr, size_t size,
 	       enum dma_data_direction dir)
 {
 	if (dmadev_is_sa1111(dev))
-		return sa1111_map_single(cpu_addr, size, dir);
+		return sa1111_map_single(dev, cpu_addr, size, dir);
 
 	consistent_sync(cpu_addr, size, dir);
 	return __virt_to_bus((unsigned long)cpu_addr);
@@ -169,7 +169,7 @@ dma_unmap_single(struct device *dev, dma_addr_t handle, size_t size,
 		 enum dma_data_direction dir)
 {
 	if (dmadev_is_sa1111(dev))
-		sa1111_unmap_single(handle, size, dir);
+		sa1111_unmap_single(dev, handle, size, dir);
 
 	/* nothing to do */
 }
@@ -224,7 +224,7 @@ dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	int i;
 
 	if (dmadev_is_sa1111(dev))
-		return sa1111_map_sg(sg, nents, dir);
+		return sa1111_map_sg(dev, sg, nents, dir);
 
 	for (i = 0; i < nents; i++, sg++) {
 		char *virt;
@@ -253,7 +253,7 @@ dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 	     enum dma_data_direction dir)
 {
 	if (dmadev_is_sa1111(dev)) {
-		sa1111_unmap_sg(sg, nents, dir);
+		sa1111_unmap_sg(dev, sg, nents, dir);
 		return;
 	}
 
@@ -281,7 +281,7 @@ dma_sync_single(struct device *dev, dma_addr_t handle, size_t size,
 		enum dma_data_direction dir)
 {
 	if (dmadev_is_sa1111(dev)) {
-		sa1111_dma_sync_single(handle, size, dir);
+		sa1111_dma_sync_single(dev, handle, size, dir);
 		return;
 	}
 
@@ -308,7 +308,7 @@ dma_sync_sg(struct device *dev, struct scatterlist *sg, int nents,
 	int i;
 
 	if (dmadev_is_sa1111(dev)) {
-		sa1111_dma_sync_sg(sg, nents, dir);
+		sa1111_dma_sync_sg(dev, sg, nents, dir);
 		return;
 	}
 
