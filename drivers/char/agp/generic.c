@@ -39,11 +39,12 @@
 
 __u32 *agp_gatt_table; 
 int agp_memory_reserved;
-/* Needed by the Nforce GART driver for the time being. Would be
- * nice to do this some other way instead of needing this export. */
-EXPORT_SYMBOL_GPL(agp_memory_reserved);
 
-EXPORT_SYMBOL(agp_memory_reserved);
+/*
+ * Needed by the Nforce GART driver for the time being. Would be
+ * nice to do this some other way instead of needing this export.
+ */
+EXPORT_SYMBOL_GPL(agp_memory_reserved);
 
 /* 
  * Generic routines for handling agp_memory structures -
