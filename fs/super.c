@@ -23,6 +23,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/acct.h>
 #include <linux/blkdev.h>
@@ -33,6 +34,7 @@
 #include <linux/security.h>
 #include <linux/vfs.h>
 #include <linux/writeback.h>		/* for the emergency remount stuff */
+#include <linux/idr.h>
 #include <asm/uaccess.h>
 
 
@@ -535,22 +537,26 @@ void emergency_remount(void)
  * filesystems which don't use real block-devices.  -- jrs
  */
 
-enum {Max_anon = 256};
-static unsigned long unnamed_dev_in_use[Max_anon/(8*sizeof(unsigned long))];
+static struct idr unnamed_dev_idr;
 static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
 
 int set_anon_super(struct super_block *s, void *data)
 {
 	int dev;
+
 	spin_lock(&unnamed_dev_lock);
-	dev = find_first_zero_bit(unnamed_dev_in_use, Max_anon);
-	if (dev == Max_anon) {
+	if (idr_pre_get(&unnamed_dev_idr, GFP_ATOMIC) == 0) {
 		spin_unlock(&unnamed_dev_lock);
+		return -ENOMEM;
+	}
+	dev = idr_get_new(&unnamed_dev_idr, NULL);
+	spin_unlock(&unnamed_dev_lock);
+
+	if ((dev & MAX_ID_MASK) == (1 << MINORBITS)) {
+		idr_remove(&unnamed_dev_idr, dev);
 		return -EMFILE;
 	}
-	set_bit(dev, unnamed_dev_in_use);
-	spin_unlock(&unnamed_dev_lock);
-	s->s_dev = MKDEV(0, dev);
+	s->s_dev = MKDEV(0, dev & MINORMASK);
 	return 0;
 }
 
@@ -559,13 +565,19 @@ EXPORT_SYMBOL(set_anon_super);
 void kill_anon_super(struct super_block *sb)
 {
 	int slot = MINOR(sb->s_dev);
+
 	generic_shutdown_super(sb);
 	spin_lock(&unnamed_dev_lock);
-	clear_bit(slot, unnamed_dev_in_use);
+	idr_remove(&unnamed_dev_idr, slot);
 	spin_unlock(&unnamed_dev_lock);
 }
 
 EXPORT_SYMBOL(kill_anon_super);
+
+void __init unnamed_dev_init(void)
+{
+	idr_init(&unnamed_dev_idr);
+}
 
 void kill_litter_super(struct super_block *sb)
 {

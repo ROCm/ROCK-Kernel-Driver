@@ -426,7 +426,7 @@ sys_timer_create(clockid_t which_clock,
 
 	spin_lock_init(&new_timer->it_lock);
 	do {
-		if (unlikely(!idr_pre_get(&posix_timers_id))) {
+		if (unlikely(!idr_pre_get(&posix_timers_id, GFP_KERNEL))) {
 			error = -EAGAIN;
 			new_timer->it_id = (timer_t)-1;
 			goto out;

@@ -62,13 +62,13 @@
  *   to the rest of the functions.  The structure is defined in the
  *   header.
 
- * int idr_pre_get(struct idr *idp)
+ * int idr_pre_get(struct idr *idp, unsigned gfp_mask)
 
  *   This function should be called prior to locking and calling the
  *   following function.  It pre allocates enough memory to satisfy the
- *   worst possible allocation.  It can sleep, so must not be called
- *   with any spinlocks held.  If the system is REALLY out of memory
- *   this function returns 0, other wise 1.
+ *   worst possible allocation.  Unless gfp_mask is GFP_ATOMIC, it can
+ *   sleep, so must not be called with any spinlocks held.  If the system is
+ *   REALLY out of memory this function returns 0, other wise 1.
 
  * int idr_get_new(struct idr *idp, void *ptr);
  
@@ -135,11 +135,11 @@ static inline void free_layer(struct idr *idp, struct idr_layer *p)
 	spin_unlock(&idp->lock);
 }
 
-int idr_pre_get(struct idr *idp)
+int idr_pre_get(struct idr *idp, unsigned gfp_mask)
 {
 	while (idp->id_free_cnt < idp->layers + 1) {
 		struct idr_layer *new;
-		new = kmem_cache_alloc(idr_layer_cache, GFP_KERNEL);
+		new = kmem_cache_alloc(idr_layer_cache, gfp_mask);
 		if(new == NULL)
 			return (0);
 		free_layer(idp, new);
