@@ -191,7 +191,6 @@ void driver_detach(struct device_driver * drv)
 int device_register(struct device *dev)
 {
 	int error;
-	struct device *prev_dev;
 
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
@@ -199,6 +198,8 @@ int device_register(struct device *dev)
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->g_list);
+	INIT_LIST_HEAD(&dev->driver_list);
+	INIT_LIST_HEAD(&dev->bus_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
@@ -208,12 +209,7 @@ int device_register(struct device *dev)
 		get_device(dev->parent);
 
 		spin_lock(&device_lock);
-		if (list_empty(&dev->parent->children))
-			prev_dev = dev->parent;
-		else
-			prev_dev = list_entry(dev->parent->children.prev, struct device, node);
-		list_add(&dev->g_list, &prev_dev->g_list);
-
+		list_add_tail(&dev->g_list,&dev->parent->g_list);
 		list_add_tail(&dev->node,&dev->parent->children);
 		spin_unlock(&device_lock);
 	}
@@ -234,9 +230,15 @@ int device_register(struct device *dev)
 		platform_notify(dev);
 
  register_done:
+	if (error) {
+		spin_lock(&device_lock);
+		list_del_init(&dev->g_list);
+		list_del_init(&dev->node);
+		spin_unlock(&device_lock);
+		if (dev->parent)
+			put_device(dev->parent);
+	}
 	put_device(dev);
-	if (error && dev->parent)
-		put_device(dev->parent);
 	return error;
 }
 
