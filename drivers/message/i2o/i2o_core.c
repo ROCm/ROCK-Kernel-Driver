@@ -892,8 +892,7 @@ int i2o_release_device(struct i2o_device *d, struct i2o_handler *h)
 		if((err=i2o_issue_claim(I2O_CMD_UTIL_RELEASE, d->controller, d->lct_data.tid, I2O_CLAIM_PRIMARY)) )
 		{
 			err = -ENXIO;
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
+			msleep(1000);
 		}
 		else
 		{
