@@ -278,10 +278,12 @@ static ssize_t
 driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct driver_file_entry * entry;
+	struct driver_dir_entry * dir;
 	unsigned char *page;
 	ssize_t retval = 0;
 	struct device * dev;
 
+	dir = file->f_dentry->d_parent->d_fsdata;
 	entry = (struct driver_file_entry *)file->f_dentry->d_fsdata;
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
@@ -293,7 +295,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
 
-	dev = to_device(entry->parent);
+	dev = to_device(dir);
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -342,9 +344,12 @@ static ssize_t
 driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct driver_file_entry * entry;
+	struct driver_dir_entry * dir;
 	struct device * dev;
 	ssize_t retval = 0;
 	char * page;
+
+	dir = file->f_dentry->d_parent->d_fsdata;
 
 	entry = (struct driver_file_entry *)file->f_dentry->d_fsdata;
 	if (!entry) {
@@ -354,7 +359,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	if (!entry->store)
 		return 0;
 
-	dev = to_device(entry->parent);
+	dev = to_device(dir);
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -414,26 +419,24 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 
 static int driverfs_open_file(struct inode * inode, struct file * filp)
 {
-	struct driver_file_entry * entry;
+	struct driver_dir_entry * dir;
 	struct device * dev;
 
-	entry = (struct driver_file_entry *)filp->f_dentry->d_fsdata;
-	if (!entry)
+	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
+	if (!dir)
 		return -EFAULT;
-	dev = to_device(entry->parent);
+	dev = to_device(dir);
 	get_device(dev);
 	return 0;
 }
 
 static int driverfs_release(struct inode * inode, struct file * filp)
 {
-	struct driver_file_entry * entry;
+	struct driver_dir_entry * dir;
 	struct device * dev;
 
-	entry = (struct driver_file_entry *)filp->f_dentry->d_fsdata;
-	if (!entry)
-		return -EFAULT;
-	dev = to_device(entry->parent);
+	dir = (struct driver_dir_entry *)filp->f_dentry->d_parent->d_fsdata;
+	dev = to_device(dir);
 	put_device(dev);
 	return 0;
 }
