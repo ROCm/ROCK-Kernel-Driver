@@ -91,7 +91,7 @@
 */
 
 /* Name and version of the driver */
-#define SCSI_NCR_DRIVER_NAME	"ncr53c8xx-3.4.3e"
+#define SCSI_NCR_DRIVER_NAME	"ncr53c8xx-3.4.3f"
 
 #define SCSI_NCR_DEBUG_FLAGS	(0)
 
@@ -839,7 +839,7 @@ struct dsb {
 	struct scr_tblmove smsg  ;
 	struct scr_tblmove cmd   ;
 	struct scr_tblmove sense ;
-	struct scr_tblmove data [MAX_SCATTER];
+	struct scr_tblmove data[MAX_SCATTER];
 };
 
 
@@ -3845,7 +3845,7 @@ static int ncr_queue_command (struct ncb *np, struct scsi_cmnd *cmd)
 
 	direction = scsi_data_direction(cmd);
 	if (direction != SCSI_DATA_NONE) {
-		segments = ncr_scatter (np, cp, cp->cmd);
+		segments = ncr_scatter(np, cp, cp->cmd);
 		if (segments < 0) {
 			ncr_free_ccb(np, cp);
 			return(DID_ERROR);
@@ -7575,44 +7575,57 @@ fail:
 **	sizes to the data segment array.
 */
 
-static	int	ncr_scatter(struct ncb *np, struct ccb *cp, struct scsi_cmnd *cmd)
+static int ncr_scatter_no_sglist(struct ncb *np, struct ccb *cp, struct scsi_cmnd *cmd)
 {
-	struct scr_tblmove *data;
+	struct scr_tblmove *data = &cp->phys.data[MAX_SCATTER - 1];
+	int segment;
+
+	cp->data_len = cmd->request_bufflen;
+
+	if (cmd->request_bufflen) {
+		dma_addr_t baddr = map_scsi_single_data(np, cmd);
+		if (baddr) {
+			ncr_build_sge(np, data, baddr, cmd->request_bufflen);
+			segment = 1;
+		} else {
+			segment = -2;
+		}
+	} else {
+		segment = 0;
+	}
+
+	return segment;
+}
+
+static int ncr_scatter(struct ncb *np, struct ccb *cp, struct scsi_cmnd *cmd)
+{
 	int segment	= 0;
 	int use_sg	= (int) cmd->use_sg;
 
-	data		= cp->phys.data;
 	cp->data_len	= 0;
 
-	if (!use_sg) {
-		if (cmd->request_bufflen) {
-			u_long baddr = map_scsi_single_data(np, cmd);
-
-			data = &data[MAX_SCATTER - 1];
-			data[0].addr = cpu_to_scr(baddr);
-			data[0].size = cpu_to_scr(cmd->request_bufflen);
-			cp->data_len = cmd->request_bufflen;
-			segment = 1;
-		}
-	}
-	else if (use_sg <= MAX_SCATTER) {
+	if (!use_sg)
+		segment = ncr_scatter_no_sglist(np, cp, cmd);
+	else if ((use_sg = map_scsi_sg_data(np, cmd)) > 0) {
 		struct scatterlist *scatter = (struct scatterlist *)cmd->buffer;
+		struct scr_tblmove *data;
 
-		use_sg = map_scsi_sg_data(np, cmd);
-		data = &data[MAX_SCATTER - use_sg];
-
-		while (segment < use_sg) {
-			u_long baddr = scsi_sg_dma_address(&scatter[segment]);
-			unsigned int len = scsi_sg_dma_len(&scatter[segment]);
-
-			data[segment].addr = cpu_to_scr(baddr);
-			data[segment].size = cpu_to_scr(len);
-			cp->data_len	  += len;
-			++segment;
+		if (use_sg > MAX_SCATTER) {
+			unmap_scsi_data(np, cmd);
+			return -1;
 		}
-	}
-	else {
-		return -1;
+
+		data = &cp->phys.data[MAX_SCATTER - use_sg];
+
+		for (segment = 0; segment < use_sg; segment++) {
+			dma_addr_t baddr = sg_dma_address(&scatter[segment]);
+			unsigned int len = sg_dma_len(&scatter[segment]);
+
+			ncr_build_sge(np, &data[segment], baddr, len);
+			cp->data_len += len;
+		}
+	} else {
+		segment = -2;
 	}
 
 	return segment;

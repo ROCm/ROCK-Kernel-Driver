@@ -48,6 +48,18 @@ typedef	u_long		vm_offset_t;
 
 #include "sym53c8xx_defs.h"
 
+/*
+	Build a scatter/gather entry.
+	see sym53c8xx_2/sym_hipd.h for more detailed sym_build_sge()
+	implementation ;)
+ */
+
+#define ncr_build_sge(np, data, badd, len)	\
+do {						\
+	(data)->addr = cpu_to_scr(badd);	\
+	(data)->size = cpu_to_scr(len);		\
+} while (0)
+
 /*==========================================================
 **
 **	Structures used by the detection routine to transmit 
