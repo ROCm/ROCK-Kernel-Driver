@@ -532,17 +532,17 @@ static struct i2c_client client_template =
 	.driver     = &driver, 
 };
 
-static int tda7432_init(void)
+static int __init tda7432_init(void)
 {
 	if ( (loudness < 0) || (loudness > 15) ) {
 		printk(KERN_ERR "tda7432: loudness parameter must be between 0 and 15\n");
 		return -EINVAL;
 	}
-	i2c_add_driver(&driver);
-	return 0;
+
+	return i2c_add_driver(&driver);
 }
 
-static void tda7432_fini(void)
+static void __exit tda7432_fini(void)
 {
 	i2c_del_driver(&driver);
 }
