@@ -1378,7 +1378,6 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 
 	if ((handler = hwgroup->handler) == NULL ||
 	    hwgroup->poll_timeout != 0) {
-		printk("ide_intr: unexpected interrupt!\n");
 		/*
 		 * Not expecting an interrupt from this drive.
 		 * That means this could be:
