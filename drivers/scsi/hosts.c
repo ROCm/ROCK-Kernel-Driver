@@ -158,7 +158,8 @@ static void scsi_host_dev_release(struct device *dev)
 	scsi_proc_hostdir_rm(shost->hostt);
 	scsi_destroy_command_freelist(shost);
 
-	put_device(parent);
+	if (parent)
+		put_device(parent);
 	kfree(shost);
 }
 
