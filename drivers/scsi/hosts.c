@@ -36,7 +36,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
-#include <linux/smp_lock.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -50,7 +49,6 @@ static LIST_HEAD(scsi_host_list);
 static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
-static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
 static char *scsihosts;
 
 MODULE_PARM(scsihosts, "s");
@@ -192,7 +190,7 @@ static void scsi_host_legacy_release(struct Scsi_Host *shost)
 
 static int scsi_remove_legacy_host(struct Scsi_Host *shost)
 {
-	int error, pcount = scsi_hosts_registered;
+	int error;
 
 	error = scsi_remove_host(shost);
 	if (error)
@@ -203,8 +201,6 @@ static int scsi_remove_legacy_host(struct Scsi_Host *shost)
 	else
 		scsi_host_legacy_release(shost);
 
-	if (pcount == scsi_hosts_registered)
-		scsi_unregister(shost);
 	return 0;
 }
 
@@ -335,7 +331,6 @@ void scsi_unregister(struct Scsi_Host *shost)
 		shost->eh_notify = NULL;
 	}
 
-	scsi_hosts_registered--;
 	shost->hostt->present--;
 
 	/* Cleanup proc and driverfs */
@@ -387,7 +382,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	memset(shost, 0, sizeof(struct Scsi_Host) + xtr_bytes);
 
 	shost->host_no = scsi_alloc_host_num(shost_tp->proc_name);
-	scsi_hosts_registered++;
 
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
@@ -483,7 +477,6 @@ found:
 int scsi_register_host(Scsi_Host_Template *shost_tp)
 {
 	struct Scsi_Host *shost;
-	int cur_cnt;
 
 	/*
 	 * Check no detect routine.
@@ -494,8 +487,6 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	/* If max_sectors isn't set, default to max */
 	if (!shost_tp->max_sectors)
 		shost_tp->max_sectors = 1024;
-
-	cur_cnt = scsi_hosts_registered;
 
 	/*
 	 * The detect routine must carefully spinunlock/spinlock if it
@@ -512,28 +503,6 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	if (!shost_tp->present)
 		return 0;
 
-	if (cur_cnt == scsi_hosts_registered) {
-		if (shost_tp->present > 1) {
-			printk(KERN_ERR "scsi: Failure to register"
-			       "low-level scsi driver");
-			scsi_unregister_host(shost_tp);
-			return 1;
-		}
-
-		/*
-		 * The low-level driver failed to register a driver.
-		 * We can do this now.
-		 *
-	 	 * XXX Who needs manual registration and why???
-		 */
-		if (!scsi_register(shost_tp, 0)) {
-			printk(KERN_ERR "scsi: register failed.\n");
-			scsi_unregister_host(shost_tp);
-			return 1;
-		}
-	}
-
-	
 	/*
 	 * XXX(hch) use scsi_tp_for_each_host() once it propagates
 	 *	    error returns properly.
@@ -567,20 +536,7 @@ out_of_space:
  **/
 int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 {
-	int pcount;
-
-	/* get the big kernel lock, so we don't race with open() */
-	lock_kernel();
-
-	pcount = scsi_hosts_registered;
-
 	scsi_tp_for_each_host(shost_tp, scsi_remove_legacy_host);
-
-	if (pcount != scsi_hosts_registered)
-		printk(KERN_INFO "scsi : %d host%s left.\n", scsi_hosts_registered,
-		       (scsi_hosts_registered == 1) ? "" : "s");
-
-	unlock_kernel();
 	return 0;
 
 }
