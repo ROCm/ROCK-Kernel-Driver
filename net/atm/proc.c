@@ -75,7 +75,7 @@ static void add_stats(char *buf,const char *aal,
 }
 
 
-static void dev_info(const struct atm_dev *dev,char *buf)
+static void atm_dev_info(const struct atm_dev *dev,char *buf)
 {
 	int off,i;
 
@@ -319,7 +319,7 @@ static int atm_devices_info(loff_t pos,char *buf)
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
 		if (left-- == 0) {
-			dev_info(dev,buf);
+			atm_dev_info(dev,buf);
 			spin_unlock(&atm_dev_lock);
 			return strlen(buf);
 		}
