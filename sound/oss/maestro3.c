@@ -2316,7 +2316,7 @@ static int __devinit m3_codec_install(struct m3_card *card)
         return -1;
     }
 
-    if ((codec->dev_mixer = register_sound_mixer(&m3_mixer_fops, -1, &card->pcidev->dev)) < 0) {
+    if ((codec->dev_mixer = register_sound_mixer(&m3_mixer_fops, -1)) < 0) {
         printk(KERN_ERR PFX "couldn't register mixer!\n");
         ac97_release_codec(codec);
         return -1;
@@ -2687,7 +2687,7 @@ static int __devinit m3_probe(struct pci_dev *pci_dev, const struct pci_device_i
         if(s->dma_adc.ready || s->dma_dac.ready || s->dma_adc.rawbuf)
             printk(KERN_WARNING PFX "initing a dsp device that is already in use?\n");
         /* register devices */
-        if ((s->dev_audio = register_sound_dsp(&m3_audio_fops, -1, &pci_dev->dev)) < 0) {
+        if ((s->dev_audio = register_sound_dsp(&m3_audio_fops, -1)) < 0) {
             break;
         }
 

@@ -1388,7 +1388,7 @@ static int __init attach_multisound(void)
 		return err;
 	}
 
-	if ((dev.dsp_minor = register_sound_dsp(&dev_fileops, -1, NULL)) < 0) {
+	if ((dev.dsp_minor = register_sound_dsp(&dev_fileops, -1)) < 0) {
 		printk(KERN_ERR LOGNAME ": Unable to register DSP operations\n");
 		msnd_unregister(&dev);
 		release_region(dev.io, dev.numio);
@@ -1396,7 +1396,7 @@ static int __init attach_multisound(void)
 		return dev.dsp_minor;
 	}
 
-	if ((dev.mixer_minor = register_sound_mixer(&dev_fileops, -1, NULL)) < 0) {
+	if ((dev.mixer_minor = register_sound_mixer(&dev_fileops, -1)) < 0) {
 		printk(KERN_ERR LOGNAME ": Unable to register mixer operations\n");
 		unregister_sound_mixer(dev.mixer_minor);
 		msnd_unregister(&dev);

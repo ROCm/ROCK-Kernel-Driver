@@ -2798,7 +2798,7 @@ static int __init wavefront_init (int atboot)
 static int __init install_wavefront (void)
 
 {
-	if ((dev.synth_dev = register_sound_synth (&wavefront_fops, -1, NULL)) < 0) {
+	if ((dev.synth_dev = register_sound_synth (&wavefront_fops, -1)) < 0) {
 		printk (KERN_ERR LOGNAME "cannot register raw synth\n");
 		return -1;
 	}

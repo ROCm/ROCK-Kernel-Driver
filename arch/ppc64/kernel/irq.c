@@ -78,7 +78,6 @@
  * interrupts.
  */
 
-#define MAX_IRQS (1<<24)
 #define IRQ_BASE_INDEX_SIZE  10
 #define IRQ_MID_INDEX_SIZE  9
 #define IRQ_BOT_DESC_SIZE 5
@@ -93,11 +92,6 @@
 #define IRQ_MID_IDX_MASK  ((1 << IRQ_MID_INDEX_SIZE) - 1)
 #define IRQ_BOT_IDX_MASK  ((1 << IRQ_BOT_DESC_SIZE) - 1)
 
-
-/* Define a way to iterate across irqs fairly efficiently. */
-#define for_each_irq(i) \
-	for ((i) = 0; (i) < MAX_IRQS; (i) = _next_irq(i))
-unsigned int _next_irq(unsigned int irq);
 
 /* The hw_irq_stat struct is stored directly after the irq_desc_t
  * in the same cacheline.  We need to use care to make sure we don't
@@ -877,7 +871,9 @@ int do_IRQ(struct pt_regs *regs)
 
 	return 1; /* lets ret_from_int know we can do checks */
 }
+
 #else	/* CONFIG_PPC_ISERIES */
+
 int do_IRQ(struct pt_regs *regs)
 {
 	int irq, first = 1;

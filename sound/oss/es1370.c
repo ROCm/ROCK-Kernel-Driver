@@ -2624,19 +2624,19 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	       (s->ctrl & CTRL_XCTL0) ? "out" : "in",
 		       (s->ctrl & CTRL_XCTL1) ? "1" : "0");
 	/* register devices */
-	if ((s->dev_audio = register_sound_dsp(&es1370_audio_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_audio = register_sound_dsp(&es1370_audio_fops, -1)) < 0) {
 		ret = s->dev_audio;
 		goto err_dev1;
 	}
-	if ((s->dev_mixer = register_sound_mixer(&es1370_mixer_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_mixer = register_sound_mixer(&es1370_mixer_fops, -1)) < 0) {
 		ret = s->dev_mixer;
 		goto err_dev2;
 	}
-	if ((s->dev_dac = register_sound_dsp(&es1370_dac_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_dac = register_sound_dsp(&es1370_dac_fops, -1)) < 0) {
 		ret = s->dev_dac;
 		goto err_dev3;
 	}
-	if ((s->dev_midi = register_sound_midi(&es1370_midi_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_midi = register_sound_midi(&es1370_midi_fops, -1)) < 0) {
 		ret = s->dev_midi;
 		goto err_dev4;
 	}

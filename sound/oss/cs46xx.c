@@ -4286,7 +4286,7 @@ static int __init cs_ac97_init(struct cs_card *card)
 		
 		card->ac97_features = eid;
 			
-		if ((codec->dev_mixer = register_sound_mixer(&cs_mixer_fops, -1, &card->pci_dev->dev)) < 0) {
+		if ((codec->dev_mixer = register_sound_mixer(&cs_mixer_fops, -1)) < 0) {
 			printk(KERN_ERR "cs46xx: couldn't register mixer!\n");
 			ac97_release_codec(codec);
 			break;
@@ -5504,13 +5504,13 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 		goto fail2;
 	}
 	/* register /dev/dsp */
-	if ((card->dev_audio = register_sound_dsp(&cs461x_fops, -1, &card->pci_dev->dev)) < 0) {
+	if ((card->dev_audio = register_sound_dsp(&cs461x_fops, -1)) < 0) {
 		printk(KERN_ERR "cs46xx: unable to register dsp\n");
 		goto fail;
 	}
 
         /* register /dev/midi */
-        if((card->dev_midi = register_sound_midi(&cs_midi_fops, -1, &card->pci_dev->dev)) < 0)
+        if((card->dev_midi = register_sound_midi(&cs_midi_fops, -1)) < 0)
                 printk(KERN_ERR "cs46xx: unable to register midi\n");
                 
 	card->pm.flags |= CS46XX_PM_IDLE;

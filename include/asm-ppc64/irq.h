@@ -11,22 +11,30 @@
 
 #include <asm/atomic.h>
 
-#define NR_IRQS			512
+/*
+ * This definition means virtually nothing now and could/should go away.
+ */
+#define NR_IRQS		512
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
+
+/*
+ * Valid interrupt numbers are from 0 to MAX_IRQS - 1.
+ */
+#define MAX_IRQS	(1<<24)
 
 extern void *_get_irq_desc(unsigned int irq);
 extern void *_get_real_irq_desc(unsigned int irq);
 #define get_irq_desc(irq) ((irq_desc_t *)_get_irq_desc(irq))
 #define get_real_irq_desc(irq) ((irq_desc_t *)_get_real_irq_desc(irq))
 
-/*
- * This gets called from serial.c, which is now used on
- * powermacs as well as prep/chrp boxes.
- * Prep and chrp both have cascaded 8259 PICs.
- */
+/* Define a way to iterate across irqs fairly efficiently. */
+#define for_each_irq(i) \
+	for ((i) = 0; (i) < MAX_IRQS; (i) = _next_irq(i))
+unsigned int _next_irq(unsigned int irq);
+
 static __inline__ int irq_canonicalize(int irq)
 {
 	return irq;

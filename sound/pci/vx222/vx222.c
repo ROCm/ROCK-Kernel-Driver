@@ -243,8 +243,6 @@ static int __devinit snd_vx222_probe(struct pci_dev *pci,
 	if ((err = snd_vx_hwdep_new(&vx->core)) < 0) {
 		snd_card_free(card);
 		return err;
-	} else {
-		(vx->core).hwdep->dev = &pci->dev;
 	}
 
 	if ((err = snd_card_register(card)) < 0) {

@@ -138,7 +138,7 @@ config HOTPLUG_PCI_RPA
 	  When in doubt, say N.
 
 config HOTPLUG_PCI_RPA_DLPAR
-	tristate "PPC64 Dynamic Logical Partitioning for I/O slots"
+	tristate "RPA Dynamic Logical Partitioning for I/O slots"
  	depends on HOTPLUG_PCI_RPA
  	help
 	  Say Y here if your system supports Dynamic Logical Partitioning

@@ -65,9 +65,6 @@ struct _snd_hwdep {
 	int used;
 	unsigned int dsp_loaded;
 	unsigned int exclusive: 1;
-	void (*release)(snd_hwdep_t *hwdep);
-	struct class_device class_dev;
-	struct device *dev;
 };
 
 extern int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep);

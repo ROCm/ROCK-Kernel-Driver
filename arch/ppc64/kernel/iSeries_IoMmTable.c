@@ -31,7 +31,6 @@
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <asm/ppcdebug.h>
-#include <asm/flight_recorder.h>
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/iSeries_pci.h>
 

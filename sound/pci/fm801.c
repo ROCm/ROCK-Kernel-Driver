@@ -663,7 +663,6 @@ static int __devinit snd_fm801_pcm(fm801_t *chip, int device, snd_pcm_t ** rpcm)
 	pcm->private_free = snd_fm801_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "FM801");
-	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, chip->multichannel ? 128*1024 : 64*1024, 128*1024);
@@ -1081,8 +1080,6 @@ static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 				       chip->irq, 0, &chip->rmidi)) < 0) {
 		snd_card_free(card);
 		return err;
-	} else {
-		chip->rmidi->dev_ptr = &pci->dev;
 	}
 	if ((err = snd_opl3_create(card, FM801_REG(chip, OPL3_BANK0),
 				   FM801_REG(chip, OPL3_BANK1),
@@ -1090,7 +1087,6 @@ static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	opl3->dev = &pci->dev;
 	if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

@@ -3,10 +3,6 @@
 #
 
 subdir-$(CONFIG_SECURITY_SELINUX)	+= selinux
-subdir-$(CONFIG_SECURITY_RSA)	+= rsa
-ifeq ($(CONFIG_SECURITY_RSA),y)
-	obj-$(CONFIG_SECURITY_RSA)	+= rsa/built-in.o
-endif
 
 # if we don't select a security model, use the default capabilities
 ifneq ($(CONFIG_SECURITY),y)

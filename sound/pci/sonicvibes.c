@@ -884,7 +884,6 @@ static int __devinit snd_sonicvibes_pcm(sonicvibes_t * sonic, int device, snd_pc
 	pcm->private_free = snd_sonicvibes_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "S3 SonicVibes");
-	pcm->dev = &sonic->pci->dev;
 	sonic->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(sonic->pci, pcm, 64*1024, 128*1024);
@@ -1482,8 +1481,6 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 				       &midi_uart)) < 0) {
 		snd_card_free(card);
 		return err;
-	} else {
-		midi_uart->dev_ptr = &pci->dev;
 	}
 	snd_sonicvibes_midi(sonic, midi_uart);
 	if ((err = snd_opl3_create(card, sonic->synth_port,
@@ -1492,7 +1489,6 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	opl3->dev = &pci->dev;
 	if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

@@ -915,7 +915,6 @@ snd_nm256_pcm(nm256_t *chip, int device)
 
 	pcm->private_data = chip;
 	pcm->info_flags = 0;
-	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 
 	return 0;

@@ -36,7 +36,6 @@
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
-#include <asm/flight_recorder.h>
 #include <asm/pci_dma.h>
 
 #include <asm/iSeries/HvCallPci.h>
@@ -50,16 +49,10 @@
 #include "iSeries_IoMmTable.h"
 #include "pci.h"
 
-extern struct pci_controller *hose_head;
-extern struct pci_controller **hose_tail;
-extern int global_phb_number;
 extern int panic_timeout;
 
-extern struct device_node *allnodes;
 extern unsigned long iSeries_Base_Io_Memory;    
 
-extern struct pci_ops iSeries_pci_ops;
-extern struct flightRecorder *PciFr;
 extern struct TceTable *tceTables[256];
 
 extern void iSeries_MmIoTest(void);
@@ -67,8 +60,7 @@ extern void iSeries_MmIoTest(void);
 /*
  * Forward declares of prototypes. 
  */
-static struct iSeries_Device_Node *find_Device_Node(struct pci_dev *PciDev);
-unsigned long find_and_init_phbs(void);
+static struct iSeries_Device_Node *find_Device_Node(int bus, int devfn);
 static void iSeries_Scan_PHBs_Slots(struct pci_controller *Phb);
 static void iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus,
 		int IdSel);
@@ -90,7 +82,8 @@ static long Pci_Error_Count;
 
 static int Pci_Retry_Max = 3;	/* Only retry 3 times  */	
 static int Pci_Error_Flag = 1;	/* Set Retry Error on. */
-static int Pci_Trace_Flag;
+
+static struct pci_ops iSeries_pci_ops;
 
 /*
  * Log Error infor in Flight Recorder to system Console.
@@ -102,14 +95,11 @@ static int Pci_Trace_Flag;
 static void pci_Log_Error(char *Error_Text, int Bus, int SubBus,
 		int AgentId, int HvRc)
 {
-	if (HvRc != 0x0302) { 
-		char ErrorString[128];
+	if (HvRc == 0x0302)
+		return;
 
-		sprintf(ErrorString, "%s Failed: 0x%02X.%02X.%02X Rc: 0x%04X",
-				Error_Text, Bus, SubBus, AgentId, HvRc);
-		PCIFR(ErrorString);
-		printk("PCI: %s\n", ErrorString);
-	}
+	printk(KERN_ERR "PCI: %s Failed: 0x%02X.%02X.%02X Rc: 0x%04X",
+	       Error_Text, Bus, SubBus, AgentId, HvRc);
 }
 
 #if 0
@@ -159,95 +149,68 @@ static void list_device_nodes(void)
 static struct iSeries_Device_Node *build_device_node(HvBusNumber Bus,
 		HvSubBusNumber SubBus, int AgentId, int Function)
 {
-	struct iSeries_Device_Node *DeviceNode;
+	struct iSeries_Device_Node *node;
 
 	PPCDBG(PPCDBG_BUSWALK,
 			"-build_device_node 0x%02X.%02X.%02X Function: %02X\n",
 			Bus, SubBus, AgentId, Function);
 
-	DeviceNode = kmalloc(sizeof(struct iSeries_Device_Node), GFP_KERNEL);
-	if (DeviceNode == NULL)
+	node = kmalloc(sizeof(struct iSeries_Device_Node), GFP_KERNEL);
+	if (node == NULL)
 		return NULL;
 
-	memset(DeviceNode, 0, sizeof(struct iSeries_Device_Node));
-	list_add_tail(&DeviceNode->Device_List, &iSeries_Global_Device_List);
-	/* DeviceNode->DsaAddr =
-		((u64)Bus << 48) + ((u64)SubBus << 40) + ((u64)0x10 << 32); */
-	ISERIES_BUS(DeviceNode) = Bus;
-	ISERIES_SUBBUS(DeviceNode) = SubBus;
-	DeviceNode->DsaAddr.deviceId = 0x10;
-	DeviceNode->DsaAddr.barNumber = 0;
-	DeviceNode->AgentId = AgentId;
-	DeviceNode->DevFn = PCI_DEVFN(ISERIES_ENCODE_DEVICE(AgentId), Function);
-	DeviceNode->IoRetry = 0;
-	iSeries_Get_Location_Code(DeviceNode);
-	PCIFR("Device 0x%02X.%2X, Node:0x%p ", ISERIES_BUS(DeviceNode),
-			ISERIES_DEVFUN(DeviceNode), DeviceNode);
-	return DeviceNode;
+	memset(node, 0, sizeof(struct iSeries_Device_Node));
+	list_add_tail(&node->Device_List, &iSeries_Global_Device_List);
+#if 0
+	node->DsaAddr = ((u64)Bus << 48) + ((u64)SubBus << 40) + ((u64)0x10 << 32);
+#endif
+	node->DsaAddr.DsaAddr = 0;
+	node->DsaAddr.Dsa.busNumber = Bus;
+	node->DsaAddr.Dsa.subBusNumber = SubBus;
+	node->DsaAddr.Dsa.deviceId = 0x10;
+	node->AgentId = AgentId;
+	node->DevFn = PCI_DEVFN(ISERIES_ENCODE_DEVICE(AgentId), Function);
+	node->IoRetry = 0;
+	iSeries_Get_Location_Code(node);
+	PCIFR("Device 0x%02X.%2X, Node:0x%p ", ISERIES_BUS(node),
+			ISERIES_DEVFUN(node), node);
+	return node;
 }
 
 /*
- * Allocate pci_controller(phb) initialized common variables.
- */
-static struct pci_controller *pci_alloc_pci_controllerX(char *model,
-		enum phb_types controller_type)
-{
-	struct pci_controller *hose;
-
-	hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller),
-			GFP_KERNEL);
-	if (hose == NULL)
-		return NULL;
-
-	memset(hose, 0, sizeof(struct pci_controller));
-	if (strlen(model) < 8)
-		strcpy(hose->what, model);
-	else
-		memcpy(hose->what, model, 7);
-	hose->type = controller_type;
-	hose->global_number = global_phb_number;
-	global_phb_number++;
-
-	*hose_tail = hose;
-	hose_tail = &hose->next;
-	return hose;
-}
-
-/*
- * unsigned int __init find_and_init_phbs(void)
+ * unsigned long __init find_and_init_phbs(void)
  *
  * Description:
  *   This function checks for all possible system PCI host bridges that connect
  *   PCI buses.  The system hypervisor is queried as to the guest partition
- *   ownership status.  A pci_controller is build for any bus which is partially
+ *   ownership status.  A pci_controller is built for any bus which is partially
  *   owned or fully owned by this guest partition.
  */
 unsigned long __init find_and_init_phbs(void)
 {
 	struct pci_controller *phb;
-	HvBusNumber BusNumber;
+	HvBusNumber bus;
 
 	PPCDBG(PPCDBG_BUSWALK, "find_and_init_phbs Entry\n");
 
 	/* Check all possible buses. */
-	for (BusNumber = 0; BusNumber < 256; BusNumber++) {
-		int RtnCode = HvCallXm_testBus(BusNumber);
-		if (RtnCode == 0) {
-			phb = pci_alloc_pci_controllerX("PHB HV",
-					phb_type_hypervisor);
+	for (bus = 0; bus < 256; bus++) {
+		int ret = HvCallXm_testBus(bus);
+		if (ret == 0) {
+			printk("bus %d appears to exist\n", bus);
+			phb = pci_alloc_pci_controller(phb_type_hypervisor);
 			if (phb == NULL) {
-				printk("PCI: Allocate pci_controller failed.\n");
 				PCIFR("Allocate pci_controller failed.");
 				return -1;
 			}
-			phb->pci_mem_offset = phb->local_number = BusNumber;
-			phb->first_busno = BusNumber;
-			phb->last_busno = BusNumber;
+			phb->pci_mem_offset = phb->local_number = bus;
+			phb->first_busno = bus;
+			phb->last_busno = bus;
 			phb->ops = &iSeries_pci_ops;
 
 			PPCDBG(PPCDBG_BUSWALK, "PCI:Create iSeries pci_controller(%p), Bus: %04X\n",
-					phb, BusNumber);
-			PCIFR("Create iSeries PHB controller: %04X", BusNumber);
+					phb, bus);
+			PCIFR("Create iSeries PHB controller: %04X", bus);
 
 			/* Find and connect the devices. */
 			iSeries_Scan_PHBs_Slots(phb);
@@ -256,9 +219,9 @@ unsigned long __init find_and_init_phbs(void)
 		 * Check for Unexpected Return code, a clue that something
 		 * has gone wrong.
 		 */
-		else if (RtnCode != 0x0301)
-			PCIFR("Unexpected Return on Probe(0x%04X): 0x%04X",
-					BusNumber, RtnCode);
+		else if (ret != 0x0301)
+			printk(KERN_ERR "Unexpected Return on Probe(0x%04X): 0x%04X",
+			       bus, ret);
 	}
 	return 0;
 }
@@ -267,17 +230,6 @@ unsigned long __init find_and_init_phbs(void)
  * iSeries_pcibios_init
  *  
  * Chance to initialize and structures or variable before PCI Bus walk.
- *  
- * <4>buswalk [swapper : iSeries_pcibios_init Entry.
- * <4>buswalk [swapper : IoMmTable Initialized 0xC00000000034BD30
- * <4>buswalk [swapper : find_and_init_phbs Entry
- * <4>buswalk [swapper : Create iSeries pci_controller:(0xC00000001F5C7000), Bus 0x0017
- * <4>buswalk [swapper : Connect EADs: 0x17.00.12 = 0x00
- * <4>buswalk [swapper : iSeries_assign_IRQ   0x0017.00.12 = 0x0091
- * <4>buswalk [swapper : - allocate and assign IRQ 0x17.00.12 = 0x91
- * <4>buswalk [swapper : - FoundDevice: 0x17.28.10 = 0x12AE
- * <4>buswalk [swapper : - build_device_node 0x17.28.12
- * <4>buswalk [swapper : iSeries_pcibios_init Exit.
  */
 void iSeries_pcibios_init(void)
 {
@@ -293,8 +245,8 @@ void iSeries_pcibios_init(void)
  */
 void __init pcibios_final_fixup(void)
 {
-	struct pci_dev *PciDev = NULL;
-	struct iSeries_Device_Node *DeviceNode;
+	struct pci_dev *pdev = NULL;
+	struct iSeries_Device_Node *node;
 	char Buffer[256];
     	int DeviceCount = 0;
 
@@ -303,24 +255,28 @@ void __init pcibios_final_fixup(void)
 	/* Fix up at the device node and pci_dev relationship */
 	mf_displaySrc(0xC9000100);
 
-	while ((PciDev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, PciDev))
+	printk("pcibios_final_fixup\n");
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev))
 			!= NULL) {
-		DeviceNode = find_Device_Node(PciDev);
-		if (DeviceNode != NULL) {
+		node = find_Device_Node(pdev->bus->number, pdev->devfn);
+		printk("pci dev %p (%x.%x), node %p\n", pdev,
+		       pdev->bus->number, pdev->devfn, node);
+
+		if (node != NULL) {
 			++DeviceCount;
-			PciDev->sysdata = (void *)DeviceNode;
-			DeviceNode->PciDev = PciDev;
+			pdev->sysdata = (void *)node;
+			node->PciDev = pdev;
 			PPCDBG(PPCDBG_BUSWALK,
-					"PciDev 0x%p <==> DevNode 0x%p\n",
-					PciDev, DeviceNode);
-			iSeries_allocateDeviceBars(PciDev);
-			iSeries_Device_Information(PciDev, Buffer,
+					"pdev 0x%p <==> DevNode 0x%p\n",
+					pdev, node);
+			iSeries_allocateDeviceBars(pdev);
+			iSeries_Device_Information(pdev, Buffer,
 					sizeof(Buffer));
 			printk("%d. %s\n", DeviceCount, Buffer);
-			create_pci_bus_tce_table((unsigned long)DeviceNode);
+			create_pci_bus_tce_table((unsigned long)node);
 		} else
 			printk("PCI: Device Tree not found for 0x%016lX\n",
-					(unsigned long)PciDev);
+					(unsigned long)pdev);
 	}
 	iSeries_IoMmTable_Status();
 	iSeries_activate_IRQs();
@@ -333,9 +289,9 @@ void pcibios_fixup_bus(struct pci_bus *PciBus)
 			PciBus->number); 
 }
 
-void pcibios_fixup_resources(struct pci_dev *PciDev)
+void pcibios_fixup_resources(struct pci_dev *pdev)
 {
-	PPCDBG(PPCDBG_BUSWALK, "fixup_resources PciDev %p\n", PciDev);
+	PPCDBG(PPCDBG_BUSWALK, "fixup_resources pdev %p\n", pdev);
 }   
 
 /*
@@ -344,11 +300,11 @@ void pcibios_fixup_resources(struct pci_dev *PciDev)
 static void iSeries_Scan_PHBs_Slots(struct pci_controller *Phb)
 {
 	struct HvCallPci_DeviceInfo *DevInfo;
-	HvBusNumber Bus = Phb->local_number;	/* System Bus */	
-	HvSubBusNumber SubBus = 0;		/* EADs is always 0. */
+	HvBusNumber bus = Phb->local_number;	/* System Bus */	
+	const HvSubBusNumber SubBus = 0;	/* EADs is always 0. */
 	int HvRc = 0;
-	int IdSel = 1;	
-	int MaxAgents = 8;
+	int IdSel;	
+	const int MaxAgents = 8;
 
 	DevInfo = (struct HvCallPci_DeviceInfo*)
 		kmalloc(sizeof(struct HvCallPci_DeviceInfo), GFP_KERNEL);
@@ -358,24 +314,25 @@ static void iSeries_Scan_PHBs_Slots(struct pci_controller *Phb)
 	/*
 	 * Probe for EADs Bridges      
 	 */
-	for (IdSel=1; IdSel < MaxAgents; ++IdSel) {
-    		HvRc = HvCallPci_getDeviceInfo(Bus, SubBus, IdSel,
+	for (IdSel = 1; IdSel < MaxAgents; ++IdSel) {
+    		HvRc = HvCallPci_getDeviceInfo(bus, SubBus, IdSel,
 				REALADDR(DevInfo),
 				sizeof(struct HvCallPci_DeviceInfo));
 		if (HvRc == 0) {
 			if (DevInfo->deviceType == HvCallPci_NodeDevice)
-				iSeries_Scan_EADs_Bridge(Bus, SubBus, IdSel);
+				iSeries_Scan_EADs_Bridge(bus, SubBus, IdSel);
 			else
-				printk("PCI: Invalid System Configuration(0x%02X.\n",
-						DevInfo->deviceType);
+				printk("PCI: Invalid System Configuration(0x%02X)"
+				       " for bus 0x%02x id 0x%02x.\n",
+				       DevInfo->deviceType, bus, IdSel);
 		}
 		else
-			pci_Log_Error("getDeviceInfo",Bus, SubBus, IdSel,HvRc);
+			pci_Log_Error("getDeviceInfo", bus, SubBus, IdSel, HvRc);
 	}
 	kfree(DevInfo);
 }
 
-static void iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus,
+static void iSeries_Scan_EADs_Bridge(HvBusNumber bus, HvSubBusNumber SubBus,
 		int IdSel)
 {
 	struct HvCallPci_BridgeInfo *BridgeInfo;
@@ -391,26 +348,26 @@ static void iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus,
 	/* Note: hvSubBus and irq is always be 0 at this level! */
 	for (Function = 0; Function < 8; ++Function) {
 	  	AgentId = ISERIES_PCI_AGENTID(IdSel, Function);
-		HvRc = HvCallXm_connectBusUnit(Bus, SubBus, AgentId, 0);
+		HvRc = HvCallXm_connectBusUnit(bus, SubBus, AgentId, 0);
  		if (HvRc == 0) {
+			printk("found device at bus %d idsel %d func %d (AgentId %x)\n",
+			       bus, IdSel, Function, AgentId);
   			/*  Connect EADs: 0x18.00.12 = 0x00 */
 			PPCDBG(PPCDBG_BUSWALK,
 					"PCI:Connect EADs: 0x%02X.%02X.%02X\n",
-					Bus, SubBus, AgentId);
-			PCIFR("Connect EADs: 0x%02X.%02X.%02X",
-					Bus, SubBus, AgentId);
-	    		HvRc = HvCallPci_getBusUnitInfo(Bus, SubBus, AgentId,
+					bus, SubBus, AgentId);
+	    		HvRc = HvCallPci_getBusUnitInfo(bus, SubBus, AgentId,
 					REALADDR(BridgeInfo),
 					sizeof(struct HvCallPci_BridgeInfo));
 	 		if (HvRc == 0) {
-				PPCDBG(PPCDBG_BUSWALK,
-					"PCI: BridgeInfo, Type:0x%02X, SubBus:0x%02X, MaxAgents:0x%02X, MaxSubBus: 0x%02X, LSlot: 0x%02X\n",
+				printk("bridge info: type %x subbus %x maxAgents %x maxsubbus %x logslot %x\n",
 					BridgeInfo->busUnitInfo.deviceType,
 					BridgeInfo->subBusNumber,
 					BridgeInfo->maxAgents,
 					BridgeInfo->maxSubBusNumber,
 					BridgeInfo->logicalSlotNumber);
-				PCIFR("BridgeInfo, Type:0x%02X, SubBus:0x%02X, MaxAgents:0x%02X, MaxSubBus: 0x%02X, LSlot: 0x%02X",
+				PPCDBG(PPCDBG_BUSWALK,
+					"PCI: BridgeInfo, Type:0x%02X, SubBus:0x%02X, MaxAgents:0x%02X, MaxSubBus: 0x%02X, LSlot: 0x%02X\n",
 					BridgeInfo->busUnitInfo.deviceType,
 					BridgeInfo->subBusNumber,
 					BridgeInfo->maxAgents,
@@ -420,16 +377,14 @@ static void iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus,
 				if (BridgeInfo->busUnitInfo.deviceType ==
 						HvCallPci_BridgeDevice)  {
 					/* Scan_Bridge_Slot...: 0x18.00.12 */
-					iSeries_Scan_Bridge_Slot(Bus,
-							BridgeInfo);
+					iSeries_Scan_Bridge_Slot(bus, BridgeInfo);
 				} else
 					printk("PCI: Invalid Bridge Configuration(0x%02X)",
 						BridgeInfo->busUnitInfo.deviceType);
 			}
-    		}
-		else if (HvRc != 0x000B)
+    		} else if (HvRc != 0x000B)
 			pci_Log_Error("EADs Connect",
-					Bus, SubBus, AgentId, HvRc);
+					bus, SubBus, AgentId, HvRc);
 	}
 	kfree(BridgeInfo);
 }
@@ -440,20 +395,18 @@ static void iSeries_Scan_EADs_Bridge(HvBusNumber Bus, HvSubBusNumber SubBus,
 static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 		struct HvCallPci_BridgeInfo *BridgeInfo)
 {
-	struct iSeries_Device_Node *DeviceNode;
+	struct iSeries_Device_Node *node;
 	HvSubBusNumber SubBus = BridgeInfo->subBusNumber;
 	u16 VendorId = 0;
 	int HvRc = 0;
 	u8 Irq = 0;
 	int IdSel = ISERIES_GET_DEVICE_FROM_SUBBUS(SubBus);
 	int Function = ISERIES_GET_FUNCTION_FROM_SUBBUS(SubBus);
-	HvAgentId AgentId = ISERIES_PCI_AGENTID(IdSel, Function);
 	HvAgentId EADsIdSel = ISERIES_PCI_AGENTID(IdSel, Function);
-	int FirstSlotId = 0; 	
 
 	/* iSeries_allocate_IRQ.: 0x18.00.12(0xA3) */
-  	Irq = iSeries_allocate_IRQ(Bus, 0, AgentId);
-	iSeries_assign_IRQ(Irq, Bus, 0, AgentId);
+  	Irq = iSeries_allocate_IRQ(Bus, 0, EADsIdSel);
+	iSeries_assign_IRQ(Irq, Bus, 0, EADsIdSel);
 	PPCDBG(PPCDBG_BUSWALK,
 		"PCI:- allocate and assign IRQ 0x%02X.%02X.%02X = 0x%02X\n",
 		Bus, 0, AgentId, Irq);
@@ -463,53 +416,42 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 	 */
   	for (IdSel = 1; IdSel <= BridgeInfo->maxAgents; ++IdSel) {
     		for (Function = 0; Function < 8; ++Function) {
-			AgentId = ISERIES_PCI_AGENTID(IdSel, Function);
+			HvAgentId AgentId = ISERIES_PCI_AGENTID(IdSel, Function);
 			HvRc = HvCallXm_connectBusUnit(Bus, SubBus,
 					AgentId, Irq);
-			if (HvRc == 0) {
-				HvRc = HvCallPci_configLoad16(Bus, SubBus,
-						AgentId, PCI_VENDOR_ID,
-						&VendorId);
-				if (HvRc == 0) {
-					/* FoundDevice: 0x18.28.10 = 0x12AE */
-					PPCDBG(PPCDBG_BUSWALK,
-						"PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X\n",
-						Bus, SubBus, AgentId, VendorId);
-					HvRc = HvCallPci_configStore8(Bus,
-							SubBus, AgentId,
-							PCI_INTERRUPT_LINE, Irq);  
-					if (HvRc != 0)
-						pci_Log_Error("PciCfgStore Irq Failed!",
-								Bus, SubBus,
-								AgentId, HvRc);
-					++DeviceCount;
-					DeviceNode = build_device_node(Bus,
-							SubBus, EADsIdSel,
-							Function);
-					DeviceNode->Vendor = VendorId;
-					DeviceNode->Irq = Irq;
-					DeviceNode->LogicalSlot =
-						BridgeInfo->logicalSlotNumber;
-					PCIFR("Device(%4d): 0x%02X.%02X.%02X 0x%02X 0x%04X",
-						DeviceCount, Bus, SubBus,
-						AgentId,
-						DeviceNode->LogicalSlot,DeviceNode->Vendor);
-
-					/*
-					 * On the first device/function,
-					 * assign irq to slot
-					 */
-					if (Function == 0) { 
-						FirstSlotId = AgentId;
-						/* AHT iSeries_assign_IRQ(Irq,
-							Bus, SubBus, AgentId); */
-    					}
-				} else
-					pci_Log_Error("Read Vendor",
-						Bus, SubBus, AgentId, HvRc);
-			} else
+			if (HvRc != 0) {
 				pci_Log_Error("Connect Bus Unit",
-					Bus, SubBus, AgentId, HvRc);
+					      Bus, SubBus, AgentId, HvRc);
+				continue;
+			}
+			printk("connected bus unit at bus %d subbus 0x%x agentid 0x%x (idsel=%d func=%d)\n",
+			       Bus, SubBus, AgentId, IdSel, Function);
+
+			HvRc = HvCallPci_configLoad16(Bus, SubBus, AgentId,
+						      PCI_VENDOR_ID, &VendorId);
+			if (HvRc != 0) {
+				pci_Log_Error("Read Vendor",
+					      Bus, SubBus, AgentId, HvRc);
+				continue;
+			}
+			printk("read vendor ID: %x\n", VendorId);
+
+			/* FoundDevice: 0x18.28.10 = 0x12AE */
+			PPCDBG(PPCDBG_BUSWALK,
+			       "PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X\n",
+			       Bus, SubBus, AgentId, VendorId);
+			HvRc = HvCallPci_configStore8(Bus, SubBus, AgentId,
+						      PCI_INTERRUPT_LINE, Irq);  
+			if (HvRc != 0)
+				pci_Log_Error("PciCfgStore Irq Failed!",
+					      Bus, SubBus, AgentId, HvRc);
+
+			++DeviceCount;
+			node = build_device_node(Bus, SubBus, EADsIdSel, Function);
+			node->Vendor = VendorId;
+			node->Irq = Irq;
+			node->LogicalSlot = BridgeInfo->logicalSlotNumber;
+
 		} /* for (Function = 0; Function < 8; ++Function) */
 	} /* for (IdSel = 1; IdSel <= MaxAgents; ++IdSel) */
 	return HvRc;
@@ -562,19 +504,16 @@ void *iSeries_memcpy_fromio(void *dest, void *source, size_t count)
 /*
  * Look down the chain to find the matching Device Device
  */
-static struct iSeries_Device_Node *find_Device_Node(struct pci_dev *PciDev)
+static struct iSeries_Device_Node *find_Device_Node(int bus, int devfn)
 {
-	struct list_head *Device_Node_Ptr = iSeries_Global_Device_List.next;
-	int Bus = PciDev->bus->number;
-	int DevFn = PciDev->devfn;
+	struct list_head *pos;
 
-	while (Device_Node_Ptr != &iSeries_Global_Device_List) { 
-		struct iSeries_Device_Node *DevNode =
-			(struct iSeries_Device_Node*)Device_Node_Ptr;
+	list_for_each(pos, &iSeries_Global_Device_List) {
+		struct iSeries_Device_Node *node =
+			list_entry(pos, struct iSeries_Device_Node, Device_List);
 
-		if ((Bus == ISERIES_BUS(DevNode)) && (DevFn == DevNode->DevFn))
-			return DevNode;
-		Device_Node_Ptr = Device_Node_Ptr->next;
+		if ((bus == ISERIES_BUS(node)) && (devfn == node->DevFn))
+			return node;
 	}
 	return NULL;
 }
@@ -585,90 +524,82 @@ static struct iSeries_Device_Node *find_Device_Node(struct pci_dev *PciDev)
  * Sanity Check Node PciDev to passed pci_dev
  * If none is found, returns a NULL which the client must handle.
  */
-static struct iSeries_Device_Node *get_Device_Node(struct pci_dev *PciDev)
+static struct iSeries_Device_Node *get_Device_Node(struct pci_dev *pdev)
 {
-	struct iSeries_Device_Node *Node;
+	struct iSeries_Device_Node *node;
 
-	Node = (struct iSeries_Device_Node *)PciDev->sysdata;
-	if (Node == NULL)
-		Node = find_Device_Node(PciDev);
-	else if (Node->PciDev != PciDev)
-		Node = find_Device_Node(PciDev);
-	return Node;
+	node = pdev->sysdata;
+	if (node == NULL || node->PciDev != pdev)
+		node = find_Device_Node(pdev->bus->number, pdev->devfn);
+	return node;
 }
 #endif
 
 /*
- * Read PCI Config Space Code 
+ * Config space read and write functions.
+ * For now at least, we look for the device node for the bus and devfn
+ * that we are asked to access.  It may be possible to translate the devfn
+ * to a subbus and deviceid more directly.
  */
-#if 0
-/** BYTE  ********************************************************************/
-int iSeries_Node_read_config_byte(struct iSeries_Device_Node* DevNode, int Offset, u8* ReadValue)
-{
-	u8  ReadData; 
-	if(DevNode == NULL) { return 0x301; } 
-	++Pci_Cfg_Read_Count;
-	DevNode->ReturnCode = HvCallPci_configLoad8(ISERIES_BUS(DevNode),ISERIES_SUBBUS(DevNode),0x10,
-	                                                Offset,&ReadData);
-	if(Pci_Trace_Flag == 1) {
-		PCIFR("RCB: 0x%04X.%02X 0x%04X = 0x%02X",ISERIES_BUS(DevNode),DevNode->DevFn,Offset,ReadData);
-	}
-	if(DevNode->ReturnCode != 0 ) { 
-		printk("PCI: RCB: 0x%04X.%02X  Error: 0x%04X\n",ISERIES_BUS(DevNode),DevNode->DevFn,DevNode->ReturnCode);
-		PCIFR(      "RCB: 0x%04X.%02X  Error: 0x%04X",  ISERIES_BUS(DevNode),DevNode->DevFn,DevNode->ReturnCode);
-	}
-	*ReadValue = ReadData; 
- 	return DevNode->ReturnCode;
-}
+static u64 hv_cfg_read_func[4]  = {
+	HvCallPciConfigLoad8, HvCallPciConfigLoad16,
+	HvCallPciConfigLoad32, HvCallPciConfigLoad32
+};
 
-int iSeries_pci_read_config_byte(struct pci_dev* PciDev, int Offset, u8* ReadValue) { 
-	struct iSeries_Device_Node* DevNode = get_Device_Node(PciDev);
-	if(DevNode == NULL) return 0x0301;
-	return iSeries_Node_read_config_byte( DevNode ,Offset,ReadValue);
-}
-#endif
+static u64 hv_cfg_write_func[4] = {
+	HvCallPciConfigStore8, HvCallPciConfigStore16,
+	HvCallPciConfigStore32, HvCallPciConfigStore32
+};
 
+/*
+ * Read PCI config space
+ */
 static int iSeries_pci_read_config(struct pci_bus *bus, unsigned int devfn,
 		int offset, int size, u32 *val)
 {
-	return PCIBIOS_DEVICE_NOT_FOUND;
+	struct iSeries_Device_Node *node = find_Device_Node(bus->number, devfn);
+	u64 fn;
+	struct HvCallPci_LoadReturn ret;
+
+	if (node == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	fn = hv_cfg_read_func[(size - 1) & 3];
+	HvCall3Ret16(fn, &ret, node->DsaAddr.DsaAddr, offset, 0);
+
+	if (ret.rc != 0) {
+		*val = ~0;
+		return PCIBIOS_DEVICE_NOT_FOUND;	/* or something */
+	}
+
+	*val = ret.value;
+	return 0;
 }
 
 /*
- * Write PCI Config Space
+ * Write PCI config space
  */
-#if 0
-/** BYTE  ********************************************************************/
-int iSeries_Node_write_config_byte(struct iSeries_Device_Node* DevNode, int Offset, u8 WriteData)
-{
-	++Pci_Cfg_Write_Count;
-	DevNode->ReturnCode = HvCallPci_configStore8(ISERIES_BUS(DevNode),ISERIES_SUBBUS(DevNode),0x10,
-	                                                  Offset,WriteData);
-	if(Pci_Trace_Flag == 1) {
-		PCIFR("WCB: 0x%04X.%02X 0x%04X = 0x%02X",ISERIES_BUS(DevNode),DevNode->DevFn,Offset,WriteData);
-	}
-	if(DevNode->ReturnCode != 0 ) { 
-		printk("PCI: WCB: 0x%04X.%02X  Error: 0x%04X\n",ISERIES_BUS(DevNode),DevNode->DevFn,DevNode->ReturnCode);
-		PCIFR(      "WCB: 0x%04X.%02X  Error: 0x%04X",  ISERIES_BUS(DevNode),DevNode->DevFn,DevNode->ReturnCode);
-	}
- 	return DevNode->ReturnCode;
-}
-
-int iSeries_pci_write_config_byte( struct pci_dev* PciDev,int Offset, u8 WriteValue)
-{
-	struct iSeries_Device_Node* DevNode = get_Device_Node(PciDev);
-	if(DevNode == NULL) return 0x0301;
-	return iSeries_Node_write_config_byte( DevNode,Offset,WriteValue);
-}
-#endif
 
 static int iSeries_pci_write_config(struct pci_bus *bus, unsigned int devfn,
 		int offset, int size, u32 val)
 {
-	return PCIBIOS_DEVICE_NOT_FOUND;
+	struct iSeries_Device_Node *node = find_Device_Node(bus->number, devfn);
+	u64 fn;
+	u64 ret;
+
+	if (node == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	fn = hv_cfg_write_func[(size - 1) & 3];
+	ret = HvCall4(fn, node->DsaAddr.DsaAddr, offset, val, 0);
+
+	if (ret != 0)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	return 0;
 }
 
-struct pci_ops iSeries_pci_ops = {
+static struct pci_ops iSeries_pci_ops = {
 	.read = iSeries_pci_read_config,
 	.write = iSeries_pci_write_config
 };
@@ -683,18 +614,15 @@ struct pci_ops iSeries_pci_ops = {
  * PCI: Device 23.90 ReadL Retry( 1)
  * PCI: Device 23.90 ReadL Retry Successful(1)
  */
-int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
-		u64 RtnCode)
+static int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
+		u64 ret)
 {
-	if (RtnCode != 0)  {
+	if (ret != 0)  {
 		++Pci_Error_Count;
 		++DevNode->IoRetry;
-		PCIFR("%s: Device 0x%04X:%02X  I/O Error(%2d): 0x%04X",
-				TextHdr, ISERIES_BUS(DevNode), DevNode->DevFn,
-				DevNode->IoRetry, (int)RtnCode);
 		printk("PCI: %s: Device 0x%04X:%02X  I/O Error(%2d): 0x%04X\n",
-				TextHdr, ISERIES_BUS(DevNode), DevNode->DevFn,
-				DevNode->IoRetry, (int)RtnCode);
+				TextHdr, DevNode->DsaAddr.Dsa.busNumber, DevNode->DevFn,
+				DevNode->IoRetry, (int)ret);
 		/*
 		 * Bump the retry and check for retry count exceeded.
 		 * If, Exceeded, panic the system.
@@ -711,7 +639,7 @@ int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
 	/* If retry was in progress, log success and rest retry count */
 	if (DevNode->IoRetry > 0) {
 		PCIFR("%s: Device 0x%04X:%02X Retry Successful(%2d).",
-				TextHdr, ISERIES_BUS(DevNode), DevNode->DevFn,
+				TextHdr, DevNode->DsaAddr.Dsa.busNumber, DevNode->DevFn,
 				DevNode->IoRetry);
 		DevNode->IoRetry = 0;
 	}
@@ -724,16 +652,16 @@ int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
  * the exposure of being device global.
  */
 static inline struct iSeries_Device_Node *xlateIoMmAddress(void *IoAddress,
-		union HvDsaMap *DsaPtr, u64 *BarOffsetPtr)
+		 u64 *dsaptr, u64 *BarOffsetPtr)
 {
 	unsigned long BaseIoAddr =
 		(unsigned long)IoAddress - iSeries_Base_Io_Memory;
 	long TableIndex = BaseIoAddr / iSeries_IoMmTable_Entry_Size;
-	struct iSeries_Device_Node *DevNode = *(iSeries_IoMmTable + TableIndex);
+	struct iSeries_Device_Node *DevNode = iSeries_IoMmTable[TableIndex];
 
 	if (DevNode != NULL) {
-		DsaPtr->DsaAddr = ISERIES_DSA(DevNode);
-		DsaPtr->Dsa.barNumber = *(iSeries_IoBarTable + TableIndex);
+		int barnum = iSeries_IoBarTable[TableIndex];
+		*dsaptr = DevNode->DsaAddr.DsaAddr | (barnum << 24);
 		*BarOffsetPtr = BaseIoAddr % iSeries_IoMmTable_Entry_Size;
 	} else
 		panic("PCI: Invalid PCI IoAddress detected!\n");
@@ -752,61 +680,51 @@ static inline struct iSeries_Device_Node *xlateIoMmAddress(void *IoAddress,
 u8 iSeries_Read_Byte(void *IoAddress)
 {
 	u64 BarOffset;
-	union HvDsaMap DsaData;
-	struct HvCallPci_LoadReturn Return;
+	u64 dsa;
+	struct HvCallPci_LoadReturn ret;
 	struct iSeries_Device_Node *DevNode =
-		xlateIoMmAddress(IoAddress, &DsaData, &BarOffset);
+		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
 	do {
 		++Pci_Io_Read_Count;
-		HvCall3Ret16(HvCallPciBarLoad8, &Return, DsaData.DsaAddr,
-				BarOffset, 0);
-	} while (CheckReturnCode("RDB", DevNode, Return.rc) != 0);
+		HvCall3Ret16(HvCallPciBarLoad8, &ret, dsa, BarOffset, 0);
+	} while (CheckReturnCode("RDB", DevNode, ret.rc) != 0);
 
-	if (Pci_Trace_Flag == 1)
-		PCIFR("RDB: IoAddress 0x%p = 0x%02X", IoAddress,
-				(u8)Return.value); 
-	return (u8)Return.value;
+	return (u8)ret.value;
 }
 
 u16 iSeries_Read_Word(void *IoAddress)
 {
 	u64 BarOffset;
-	union HvDsaMap DsaData;
-	struct HvCallPci_LoadReturn Return;
+	u64 dsa;
+	struct HvCallPci_LoadReturn ret;
 	struct iSeries_Device_Node *DevNode =
-		xlateIoMmAddress(IoAddress, &DsaData, &BarOffset);
+		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
 	do {
 		++Pci_Io_Read_Count;
-		HvCall3Ret16(HvCallPciBarLoad16, &Return, DsaData.DsaAddr,
+		HvCall3Ret16(HvCallPciBarLoad16, &ret, dsa,
 				BarOffset, 0);
-	} while (CheckReturnCode("RDW", DevNode, Return.rc) != 0);
+	} while (CheckReturnCode("RDW", DevNode, ret.rc) != 0);
 
-	if (Pci_Trace_Flag == 1)
-		PCIFR("RDW: IoAddress 0x%p = 0x%04X", IoAddress,
-				swab16((u16)Return.value));
-	return swab16((u16)Return.value);
+	return swab16((u16)ret.value);
 }
 
 u32 iSeries_Read_Long(void *IoAddress)
 {
 	u64 BarOffset;
-	union HvDsaMap DsaData;
-	struct HvCallPci_LoadReturn Return;
+	u64 dsa;
+	struct HvCallPci_LoadReturn ret;
 	struct iSeries_Device_Node *DevNode =
-		xlateIoMmAddress(IoAddress, &DsaData, &BarOffset);
+		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
 	do {
 		++Pci_Io_Read_Count;
-		HvCall3Ret16(HvCallPciBarLoad32, &Return, DsaData.DsaAddr,
+		HvCall3Ret16(HvCallPciBarLoad32, &ret, dsa,
 				BarOffset, 0);
-	} while (CheckReturnCode("RDL", DevNode, Return.rc) != 0);
+	} while (CheckReturnCode("RDL", DevNode, ret.rc) != 0);
 
-	if (Pci_Trace_Flag == 1)
-		PCIFR("RDL: IoAddress 0x%p = 0x%04X", IoAddress,
-				swab32((u32)Return.value));
-	return swab32((u32)Return.value);
+	return swab32((u32)ret.value);
 }
 
 /*
@@ -816,55 +734,46 @@ u32 iSeries_Read_Long(void *IoAddress)
  * iSeries_Write_Word = Write Word(16 bit)
  * iSeries_Write_Long = Write Long(32 bit)
  */
-void iSeries_Write_Byte(u8 Data, void *IoAddress)
+void iSeries_Write_Byte(u8 data, void *IoAddress)
 {
 	u64 BarOffset;
-	union HvDsaMap DsaData;
-	struct HvCallPci_LoadReturn Return;
+	u64 dsa;
+	u64 rc;
 	struct iSeries_Device_Node *DevNode =
-		xlateIoMmAddress(IoAddress, &DsaData, &BarOffset);
+		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
 	do {
 		++Pci_Io_Write_Count;
-		Return.rc = HvCall4(HvCallPciBarStore8, DsaData.DsaAddr,
-				BarOffset, Data, 0);
-	} while (CheckReturnCode("WWB", DevNode, Return.rc) != 0);
-	if (Pci_Trace_Flag == 1)
-		PCIFR("WWB: IoAddress 0x%p = 0x%02X", IoAddress, Data);
+		rc = HvCall4(HvCallPciBarStore8, dsa, BarOffset, data, 0);
+	} while (CheckReturnCode("WWB", DevNode, rc) != 0);
 }
 
-void iSeries_Write_Word(u16 Data, void *IoAddress)
+void iSeries_Write_Word(u16 data, void *IoAddress)
 {
 	u64 BarOffset;
-	union HvDsaMap DsaData;
-	struct HvCallPci_LoadReturn Return;
+	u64 dsa;
+	u64 rc;
 	struct iSeries_Device_Node *DevNode =
-		xlateIoMmAddress(IoAddress, &DsaData, &BarOffset);
+		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
 	do {
 		++Pci_Io_Write_Count;
-		Return.rc = HvCall4(HvCallPciBarStore16, DsaData.DsaAddr,
-				BarOffset, swab16(Data), 0);
-	} while (CheckReturnCode("WWW", DevNode, Return.rc) != 0);
-	if (Pci_Trace_Flag == 1)
-		PCIFR("WWW: IoAddress 0x%p = 0x%04X", IoAddress, Data);
+		rc = HvCall4(HvCallPciBarStore16, dsa, BarOffset, swab16(data), 0);
+	} while (CheckReturnCode("WWW", DevNode, rc) != 0);
 }
 
-void iSeries_Write_Long(u32 Data, void *IoAddress)
+void iSeries_Write_Long(u32 data, void *IoAddress)
 {
 	u64 BarOffset;
-	union HvDsaMap DsaData;
-	struct HvCallPci_LoadReturn Return;
+	u64 dsa;
+	u64 rc;
 	struct iSeries_Device_Node *DevNode =
-		xlateIoMmAddress(IoAddress, &DsaData, &BarOffset);
+		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
 	do {
 		++Pci_Io_Write_Count;
-		Return.rc = HvCall4(HvCallPciBarStore32, DsaData.DsaAddr,
-				BarOffset, swab32(Data), 0);
-	} while (CheckReturnCode("WWL", DevNode, Return.rc) != 0);
-	if (Pci_Trace_Flag == 1)
-		PCIFR("WWL: IoAddress 0x%p = 0x%08X", IoAddress, Data);
+		rc = HvCall4(HvCallPciBarStore32, dsa, BarOffset, swab32(data), 0);
+	} while (CheckReturnCode("WWL", DevNode, rc) != 0);
 }
 
 void pcibios_name_device(struct pci_dev *dev)

@@ -1221,7 +1221,6 @@ static int __devinit snd_ensoniq_pcm(ensoniq_t * ensoniq, int device, snd_pcm_t 
 
 	pcm->private_data = ensoniq;
 	pcm->private_free = snd_ensoniq_pcm_free;
-	pcm->dev = &ensoniq->pci->dev;
 	pcm->info_flags = 0;
 #ifdef CHIP1370
 	strcpy(pcm->name, "ES1370 DAC2/ADC");
@@ -1266,7 +1265,6 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
 #endif
 	pcm->private_data = ensoniq;
 	pcm->private_free = snd_ensoniq_pcm_free2;
-	pcm->dev = &ensoniq->pci->dev;
 	pcm->info_flags = 0;
 #ifdef CHIP1370
 	strcpy(pcm->name, "ES1370 DAC1");
@@ -2239,7 +2237,6 @@ static int __devinit snd_ensoniq_midi(ensoniq_t * ensoniq, int device, snd_rawmi
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT, &snd_ensoniq_midi_input);
 	rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT | SNDRV_RAWMIDI_INFO_INPUT | SNDRV_RAWMIDI_INFO_DUPLEX;
 	rmidi->private_data = ensoniq;
-	rmidi->dev_ptr = &ensoniq->pci->dev;
 	ensoniq->rmidi = rmidi;
 	if (rrawmidi)
 		*rrawmidi = rmidi;

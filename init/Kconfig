@@ -272,12 +272,4 @@ config KMOD
 	  runs modprobe with the appropriate arguments, thereby
 	  loading the module if it is available.  If unsure, say Y.
 
-config MODULE_SIG
-	bool "Module signature checking"
-	depends on MODULES && SECURITY_RSA
-	help
-	  If you say Y here, signed module support will be enabled.
-	  If unsure, say N.
-
 endmenu
-

@@ -1,6 +1,6 @@
 /************************************************************************/
 /* Provides the Hypervisor PCI calls for iSeries Linux Parition.        */
-/* Copyright (C) 20yy  <Wayne G Holm> <IBM Corporation>                 */
+/* Copyright (C) 2001  <Wayne G Holm> <IBM Corporation>                 */
 /*                                                                      */
 /* This program is free software; you can redistribute it and/or modify */
 /* it under the terms of the GNU General Public License as published by */
@@ -21,40 +21,25 @@
 /* Change Activity:                                                     */
 /*   Created, Jan 9, 2001                                               */
 /************************************************************************/
-//============================================================================
-//							 Header File Id
-// Name______________:	HvCallPci.H
-//
-// Description_______:
-//
-//	This file contains the "hypervisor call" interface which is used to
-//	drive the hypervisor from SLIC.
-//
-//============================================================================
+
 #ifndef _HVCALLPCI_H
 #define _HVCALLPCI_H
 
-//-------------------------------------------------------------------
-// Forward declarations 
-//-------------------------------------------------------------------
-
-//-------------------------------------------------------------------
-// Standard Includes
-//-------------------------------------------------------------------
 #include <asm/iSeries/HvCallSc.h>
 #include <asm/iSeries/HvTypes.h>
 
-//-----------------------------------------------------------------------------
-// Constants
-//-----------------------------------------------------------------------------
-
-struct HvCallPci_DsaAddr { // make sure this struct size is 64-bits total
-	u16		busNumber;
-	u8		subBusNumber; 
-	u8		deviceId;     
+/*
+ * DSA == Direct Select Address
+ * this struct must be 64 bits in total
+ */
+struct HvCallPci_DsaAddr {
+	u16		busNumber;		/* PHB index? */
+	u8		subBusNumber; 		/* PCI bus number? */
+	u8		deviceId;     		/* device and function? */
 	u8		barNumber;
 	u8		reserved[3];
 };
+
 union HvDsaMap {
 	u64	DsaAddr;
 	struct HvCallPci_DsaAddr Dsa;
@@ -65,12 +50,13 @@ struct HvCallPci_LoadReturn {
 	u64		value;
 };
 
-enum HvCallPci_DeviceType {HvCallPci_NodeDevice	= 1,
-                        HvCallPci_SpDevice	= 2,	
-                        HvCallPci_IopDevice     = 3,	
-                        HvCallPci_BridgeDevice	= 4,	
-                        HvCallPci_MultiFunctionDevice = 5,	
-                        HvCallPci_IoaDevice	= 6	
+enum HvCallPci_DeviceType {
+	HvCallPci_NodeDevice	= 1,
+	HvCallPci_SpDevice	= 2,	
+	HvCallPci_IopDevice     = 3,	
+	HvCallPci_BridgeDevice	= 4,	
+	HvCallPci_MultiFunctionDevice = 5,	
+	HvCallPci_IoaDevice	= 6	
 };
 
 
@@ -138,9 +124,9 @@ enum HvCallPci_VpdType {
 #define HvCallPciGetBusUnitInfo		HvCallPci + 50
 
 //============================================================================
-static inline u64	HvCallPci_configLoad8(u16 busNumber, u8 subBusNumber,
-					      u8 deviceId, u32 offset,
-					      u8 *value)
+static inline u64 HvCallPci_configLoad8(u16 busNumber, u8 subBusNumber,
+					u8 deviceId, u32 offset,
+					u8 *value)
 {
 	struct HvCallPci_DsaAddr dsa;
 	struct HvCallPci_LoadReturn retVal;
@@ -160,9 +146,9 @@ static inline u64	HvCallPci_configLoad8(u16 busNumber, u8 subBusNumber,
 	return retVal.rc;
 }
 //============================================================================
-static inline u64	HvCallPci_configLoad16(u16 busNumber, u8 subBusNumber,
-					      u8 deviceId, u32 offset,
-					      u16 *value)
+static inline u64 HvCallPci_configLoad16(u16 busNumber, u8 subBusNumber,
+					 u8 deviceId, u32 offset,
+					 u16 *value)
 {
 	struct HvCallPci_DsaAddr dsa;
 	struct HvCallPci_LoadReturn retVal;

@@ -55,45 +55,13 @@ static hw_irq_controller iSeries_IRQ_handler = {
 	.end = iSeries_end_IRQ
 };
 
-struct iSeries_irqEntry {
-	u32 dsa;
-	struct iSeries_irqEntry* next;
-};
-
-struct iSeries_irqAnchor {
-	u8  valid : 1;
-	u8  reserved : 7;
-	u16  entryCount;
-	struct iSeries_irqEntry* head;
-};
-
-static struct iSeries_irqAnchor iSeries_irqMap[NR_IRQS];
-
-#if 0
-static void iSeries_init_irqMap(int irq);
-#endif
-
 void iSeries_init_irq_desc(irq_desc_t *desc)
 {
-	desc->handler = &iSeries_IRQ_handler;
 }
 
 /* This is called by init_IRQ.  set in ppc_md.init_IRQ by iSeries_setup.c */
 void __init iSeries_init_IRQ(void)
 {
-#if 0
-	int i;
-	irq_desc_t *desc;
-
-	for (i = 0; i < NR_IRQS; i++) {
-		desc = get_irq_desc(i);
-		desc->handler = &iSeries_IRQ_handler;
-		desc->status = 0;
-		desc->status |= IRQ_DISABLED;
-		desc->depth = 1;
-		iSeries_init_irqMap(i);
-	}
-#endif
 	/* Register PCI event handler and open an event path */
 	PPCDBG(PPCDBG_BUSWALK,
 			"Register PCI event handler and open an event path\n");
@@ -101,34 +69,23 @@ void __init iSeries_init_IRQ(void)
 	return;
 }
 
-#if 0
-/*
- *  Called by iSeries_init_IRQ 
- * Prevent IRQs 0 and 255 from being used.  IRQ 0 appears in
- * uninitialized devices.  IRQ 255 appears in the PCI interrupt
- * line register if a PCI error occurs,
- */
-static void __init iSeries_init_irqMap(int irq)
-{
-	iSeries_irqMap[irq].valid = ((irq == 0) || (irq == 255)) ? 0 : 1;
-	iSeries_irqMap[irq].entryCount = 0;
-	iSeries_irqMap[irq].head = NULL;
-}
-#endif
-
 /*
  * This is called out of iSeries_scan_slot to allocate an IRQ for an EADS slot
  * It calculates the irq value for the slot.
+ * Note that subBusNumber is always 0 (at the moment at least).
  */
 int __init iSeries_allocate_IRQ(HvBusNumber busNumber,
 		HvSubBusNumber subBusNumber, HvAgentId deviceId)
 {
 	u8 idsel = (deviceId >> 4);
-	u8 function = deviceId & 0x0F;
+	u8 function = deviceId & 7;
 
-	return ((((busNumber - 1) * 16 + (idsel - 1) * 8
-					+ function) * 9 / 8) % 253) + 2;
+	return ((busNumber - 1) << 6) + ((idsel - 1) << 3) + function + 1;
 }
+
+#define IRQ_TO_BUS(irq)		(((((irq) - 1) >> 6) & 0xff) + 1)
+#define IRQ_TO_IDSEL(irq)	(((((irq) - 1) >> 3) & 7) + 1)
+#define IRQ_TO_FUNC(irq)	(((irq) - 1) & 7)
 
 /*
  * This is called out of iSeries_scan_slot to assign the EADS slot
@@ -137,66 +94,33 @@ int __init iSeries_allocate_IRQ(HvBusNumber busNumber,
 int __init iSeries_assign_IRQ(int irq, HvBusNumber busNumber,
 		HvSubBusNumber subBusNumber, HvAgentId deviceId)
 {
-	int rc;
-	u32 dsa = (busNumber << 16) | (subBusNumber << 8) | deviceId;
-	struct iSeries_irqEntry *newEntry;
-	unsigned long flags;
-	irq_desc_t *desc = get_irq_desc(irq);
+	irq_desc_t *desc = get_real_irq_desc(irq);
 
-	if ((irq < 0) || (irq >= NR_IRQS))
+	if (desc == NULL)
 		return -1;
-
-	newEntry = kmalloc(sizeof(*newEntry), GFP_KERNEL);
-	if (newEntry == NULL)
-		return -ENOMEM;
-
-	newEntry->dsa  = dsa;
-	newEntry->next = NULL;
-	/*
-	 * Probably not necessary to lock the irq since allocation is only 
-	 * done during buswalk, but it should not hurt anything except a 
-	 * little performance to be smp safe.
-	 */
-	spin_lock_irqsave(&desc->lock, flags);
-
-	if (iSeries_irqMap[irq].valid) {
-		/* Push the new element onto the irq stack */
-		newEntry->next = iSeries_irqMap[irq].head;
-		iSeries_irqMap[irq].head = newEntry;
-		++iSeries_irqMap[irq].entryCount;
-		rc = 0;
-		PPCDBG(PPCDBG_BUSWALK, "iSeries_assign_IRQ   0x%04X.%02X.%02X = 0x%04X\n",
-				busNumber, subBusNumber, deviceId, irq);
-	} else {
-		printk("PCI: Something is wrong with the iSeries_irqMap.\n");
-		kfree(newEntry);
-		rc = -1;
-	}
-	spin_unlock_irqrestore(&desc->lock, flags);
-	return rc;
+	desc->handler = &iSeries_IRQ_handler;
+	return 0;
 }
 
 
 /* This is called by iSeries_activate_IRQs */
 static unsigned int iSeries_startup_IRQ(unsigned int irq)
 {
-	struct iSeries_irqEntry *entry;
-	u32 bus, subBus, deviceId, function, mask;
+	u32 bus, deviceId, function, mask;
+	const u32 subBus = 0;
 
-	for (entry = iSeries_irqMap[irq].head; entry != NULL;
-			entry = entry->next) {
-		bus = (entry->dsa >> 16) & 0xFFFF;
-		subBus = (entry->dsa >> 8) & 0xFF;
-		deviceId = entry->dsa & 0xFF;
-		function = deviceId & 0x0F;
-		/* Link the IRQ number to the bridge */
-		HvCallXm_connectBusUnit(bus, subBus, deviceId, irq);
-        	/* Unmask bridge interrupts in the FISR */
-		mask = 0x01010000 << function;
-		HvCallPci_unmaskFisr(bus, subBus, deviceId, mask);
-		PPCDBG(PPCDBG_BUSWALK, "iSeries_activate_IRQ 0x%02X.%02X.%02X  Irq:0x%02X\n",
+	bus = IRQ_TO_BUS(irq);
+	function = IRQ_TO_FUNC(irq);
+	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+
+	/* Link the IRQ number to the bridge */
+	HvCallXm_connectBusUnit(bus, subBus, deviceId, irq);
+
+	/* Unmask bridge interrupts in the FISR */
+	mask = 0x01010000 << function;
+	HvCallPci_unmaskFisr(bus, subBus, deviceId, mask);
+	PPCDBG(PPCDBG_BUSWALK, "iSeries_activate_IRQ 0x%02X.%02X.%02X  Irq:0x%02X\n",
 				bus, subBus, deviceId, irq);
-	}
 	return 0;
 }
 
@@ -209,7 +133,7 @@ void __init iSeries_activate_IRQs()
 	int irq;
 	unsigned long flags;
 
-	for (irq = 0; irq < NR_IRQS; irq++) {
+	for_each_irq (irq) {
 		irq_desc_t *desc = get_irq_desc(irq);
 
 		if (desc && desc->handler && desc->handler->startup) {
@@ -223,22 +147,20 @@ void __init iSeries_activate_IRQs()
 /*  this is not called anywhere currently */
 static void iSeries_shutdown_IRQ(unsigned int irq)
 {
-	struct iSeries_irqEntry *entry;
-	u32 bus, subBus, deviceId, function, mask;
+	u32 bus, deviceId, function, mask;
+	const u32 subBus = 0;
 
 	/* irq should be locked by the caller */
+	bus = IRQ_TO_BUS(irq);
+	function = IRQ_TO_FUNC(irq);
+	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
 
-	for (entry = iSeries_irqMap[irq].head; entry; entry = entry->next) {
-		bus = (entry->dsa >> 16) & 0xFFFF;
-		subBus = (entry->dsa >> 8) & 0xFF;
-		deviceId = entry->dsa & 0xFF;
-		function = deviceId & 0x0F;
-		/* Invalidate the IRQ number in the bridge */
-		HvCallXm_connectBusUnit(bus, subBus, deviceId, 0);
-		/* Mask bridge interrupts in the FISR */
-		mask = 0x01010000 << function;
-		HvCallPci_maskFisr(bus, subBus, deviceId, mask);
-	}
+	/* Invalidate the IRQ number in the bridge */
+	HvCallXm_connectBusUnit(bus, subBus, deviceId, 0);
+
+	/* Mask bridge interrupts in the FISR */
+	mask = 0x01010000 << function;
+	HvCallPci_maskFisr(bus, subBus, deviceId, mask);
 }
 
 /*
@@ -247,21 +169,19 @@ static void iSeries_shutdown_IRQ(unsigned int irq)
  */
 static void iSeries_disable_IRQ(unsigned int irq)
 {
-	struct iSeries_irqEntry *entry;
-	u32 bus, subBus, deviceId, mask;
+	u32 bus, deviceId, function, mask;
+	const u32 subBus = 0;
 
 	/* The IRQ has already been locked by the caller */
-	for (entry = iSeries_irqMap[irq].head; entry; entry = entry->next) {
-		bus = (entry->dsa >> 16) & 0xFFFF;
-		subBus = (entry->dsa >> 8) & 0xFF;
-		deviceId = entry->dsa & 0xFF;
-		/* Mask secondary INTA   */
-		mask = 0x80000000;
-		HvCallPci_maskInterrupts(bus, subBus, deviceId, mask);
-		PPCDBG(PPCDBG_BUSWALK,
-				"iSeries_disable_IRQ 0x%02X.%02X.%02X 0x%04X\n",
-				bus, subBus, deviceId, irq);
-    	}
+	bus = IRQ_TO_BUS(irq);
+	function = IRQ_TO_FUNC(irq);
+	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+
+	/* Mask secondary INTA   */
+	mask = 0x80000000;
+	HvCallPci_maskInterrupts(bus, subBus, deviceId, mask);
+	PPCDBG(PPCDBG_BUSWALK, "iSeries_disable_IRQ 0x%02X.%02X.%02X 0x%04X\n",
+	       bus, subBus, deviceId, irq);
 }
 
 /*
@@ -270,21 +190,19 @@ static void iSeries_disable_IRQ(unsigned int irq)
  */
 static void iSeries_enable_IRQ(unsigned int irq)
 {
-	struct iSeries_irqEntry *entry;
-	u32 bus, subBus, deviceId, mask;
+	u32 bus, deviceId, function, mask;
+	const u32 subBus = 0;
 
 	/* The IRQ has already been locked by the caller */
-	for (entry = iSeries_irqMap[irq].head; entry; entry = entry->next) {
-		bus = (entry->dsa >> 16) & 0xFFFF;
-		subBus = (entry->dsa >> 8) & 0xFF;
-		deviceId = entry->dsa & 0xFF;
-		/* Unmask secondary INTA */
-		mask = 0x80000000;
-		HvCallPci_unmaskInterrupts(bus, subBus, deviceId, mask);
-		PPCDBG(PPCDBG_BUSWALK,
-				"iSeries_enable_IRQ 0x%02X.%02X.%02X 0x%04X\n",
-				bus, subBus, deviceId, irq);
-	}
+	bus = IRQ_TO_BUS(irq);
+	function = IRQ_TO_FUNC(irq);
+	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+
+	/* Unmask secondary INTA */
+	mask = 0x80000000;
+	HvCallPci_unmaskInterrupts(bus, subBus, deviceId, mask);
+	PPCDBG(PPCDBG_BUSWALK, "iSeries_enable_IRQ 0x%02X.%02X.%02X 0x%04X\n",
+	       bus, subBus, deviceId, irq);
 }
 
 /*

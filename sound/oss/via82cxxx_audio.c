@@ -1770,7 +1770,7 @@ static int __devinit via_ac97_init (struct via_info *card)
 	card->ac97->codec_write = via_ac97_write_reg;
 	card->ac97->codec_wait = via_ac97_codec_wait;
 
-	card->ac97->dev_mixer = register_sound_mixer (&via_mixer_fops, -1, &card->pdev->dev);
+	card->ac97->dev_mixer = register_sound_mixer (&via_mixer_fops, -1);
 	if (card->ac97->dev_mixer < 0) {
 		printk (KERN_ERR PFX "unable to register AC97 mixer, aborting\n");
 		DPRINTK ("EXIT, returning -EIO\n");
@@ -2090,7 +2090,7 @@ static int __devinit via_dsp_init (struct via_info *card)
 
 	via_stop_everything (card);
 
-	card->dev_dsp = register_sound_dsp (&via_dsp_fops, -1, &card->pdev->dev);
+	card->dev_dsp = register_sound_dsp (&via_dsp_fops, -1);
 	if (card->dev_dsp < 0) {
 		DPRINTK ("EXIT, returning -ENODEV\n");
 		return -ENODEV;

@@ -940,7 +940,6 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 			break;
 		}
 
-		hub->children[port] = dev;
 		dev->state = USB_STATE_POWERED;
 
 		/* Reset the device, and detect its speed */
@@ -993,8 +992,10 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 		dev->dev.parent = dev->parent->dev.parent->parent;
 
 		/* Run it through the hoops (find a driver, etc) */
-		if (!usb_new_device(dev, &hub->dev))
+		if (!usb_new_device(dev, &hub->dev)) {
+			hub->children[port] = dev;
 			goto done;
+		}
 
 		/* Free the configuration if there was an error */
 		usb_put_dev(dev);
@@ -1003,7 +1004,6 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 		delay = HUB_LONG_RESET_TIME;
 	}
 
-	hub->children[port] = NULL;
 	hub_port_disable(hub, port);
 done:
 	up(&usb_address0_sem);
@@ -1356,6 +1356,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 			dev->devpath, ret);
 		return ret;
 	}
+	dev->state = USB_STATE_CONFIGURED;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = dev->actconfig->interface[i];

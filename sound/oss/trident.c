@@ -4045,7 +4045,7 @@ static int __devinit trident_ac97_init(struct trident_card *card)
 		if (ac97_probe_codec(codec) == 0)
 			break;
 
-		if ((codec->dev_mixer = register_sound_mixer(&trident_mixer_fops, -1, &card->pci_dev->dev)) < 0) {
+		if ((codec->dev_mixer = register_sound_mixer(&trident_mixer_fops, -1)) < 0) {
 			printk(KERN_ERR "trident: couldn't register mixer!\n");
 			ac97_release_codec(codec);
 			break;
@@ -4261,7 +4261,7 @@ static int __devinit trident_probe(struct pci_dev *pci_dev, const struct pci_dev
 		goto out_proc_fs;
 	}
 	/* register /dev/dsp */
-	if ((card->dev_audio = register_sound_dsp(&trident_audio_fops, -1, &pci_dev->dev)) < 0) {
+	if ((card->dev_audio = register_sound_dsp(&trident_audio_fops, -1)) < 0) {
 		printk(KERN_ERR "trident: couldn't register DSP device!\n");
 		goto out_free_irq;
 	}

@@ -2184,7 +2184,6 @@ int __devinit snd_trident_pcm(trident_t * trident, int device, snd_pcm_t ** rpcm
 	pcm->info_flags = 0;
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
 	strcpy(pcm->name, "Trident 4DWave");
-	pcm->dev = &trident->pci->dev;
 	trident->pcm = pcm;
 
 	if (trident->tlb.entries) {
@@ -2228,7 +2227,6 @@ int __devinit snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_
 
 	foldback->private_data = trident;
 	foldback->private_free = snd_trident_foldback_pcm_free;
-	foldback->dev = &trident->pci->dev;
 	if (trident->tlb.entries)
 		snd_pcm_set_ops(foldback, SNDRV_PCM_STREAM_CAPTURE, &snd_trident_nx_foldback_ops);
 	else
@@ -2280,7 +2278,6 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 
 	spdif->private_data = trident;
 	spdif->private_free = snd_trident_spdif_pcm_free;
-	spdif->dev = &trident->pci->dev;
 	if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
 		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_spdif_ops);
 	} else {

@@ -27,7 +27,6 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/wait.h>
-#include <linux/sound.h>
 #include <sound/rawmidi.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -1450,22 +1449,6 @@ static void snd_rawmidi_dev_seq_free(snd_seq_device_t *device)
 }
 #endif
 
-static void snd_rawmidi_dev_release(snd_rawmidi_t *rmidi)
-{
-	return;
-}
-
-#define to_rawmidi_dev(rmidi) container_of(rmidi, snd_rawmidi_t, class_dev)
-
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	snd_rawmidi_t *rmidi = to_rawmidi_dev(class_dev);
-	int minor = SNDRV_MINOR(rmidi->card->number, SNDRV_DEVICE_TYPE_RAWMIDI + rmidi->device);
-	return sprintf(buf, "%d:%d\n", CONFIG_SND_MAJOR, minor);
-}
-
-static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
 static int snd_rawmidi_dev_register(snd_device_t *device)
 {
 	int idx, err;
@@ -1482,7 +1465,6 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 		return -EBUSY;
 	}
 	snd_rawmidi_devices[idx] = rmidi;
-	rmidi->release = snd_rawmidi_dev_release;
 	sprintf(name, "midiC%iD%i", rmidi->card->number, rmidi->device);
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_RAWMIDI,
 				       rmidi->card, rmidi->device,
@@ -1492,13 +1474,10 @@ static int snd_rawmidi_dev_register(snd_device_t *device)
 		up(&register_mutex);
 		return err;
 	}
-	sound_add_class_device(name, &rmidi->class_dev, rmidi->dev_ptr);
-	class_device_create_file(&rmidi->class_dev, &class_device_attr_dev);
 	if (rmidi->ops && rmidi->ops->dev_register &&
 	    (err = rmidi->ops->dev_register(rmidi)) < 0) {
 		snd_unregister_device(SNDRV_DEVICE_TYPE_RAWMIDI, rmidi->card, rmidi->device);
 		snd_rawmidi_devices[idx] = NULL;
-		sound_remove_class_device(&rmidi->class_dev);
 		up(&register_mutex);
 		return err;
 	}
@@ -1591,7 +1570,6 @@ static int snd_rawmidi_dev_unregister(snd_device_t *device)
 #endif /* CONFIG_SND_OSSEMUL */
 	if (rmidi->ops && rmidi->ops->dev_unregister)
 		rmidi->ops->dev_unregister(rmidi);
-	sound_remove_class_device(&rmidi->class_dev);
 	snd_unregister_device(SNDRV_DEVICE_TYPE_RAWMIDI, rmidi->card, rmidi->device);
 	up(&register_mutex);
 #if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))

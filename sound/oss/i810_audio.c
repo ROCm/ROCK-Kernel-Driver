@@ -2996,7 +2996,7 @@ static int __devinit i810_ac97_init(struct i810_card *card)
 			printk("i810_audio: AC'97 codec %d Unable to map surround DAC's (or DAC's not present), total channels = %d\n", ac97_id, total_channels);
 		}
 
-		if ((codec->dev_mixer = register_sound_mixer(&i810_mixer_fops, -1, &card->pci_dev->dev)) < 0) {
+		if ((codec->dev_mixer = register_sound_mixer(&i810_mixer_fops, -1)) < 0) {
 			printk(KERN_ERR "i810_audio: couldn't register mixer!\n");
 			ac97_release_codec(codec);
 			break;
@@ -3225,7 +3225,7 @@ static int __devinit i810_probe(struct pci_dev *pci_dev, const struct pci_device
 	}
 
 	/* register /dev/dsp */
-	if ((card->dev_audio = register_sound_dsp(&i810_audio_fops, -1, &pci_dev->dev)) < 0) {
+	if ((card->dev_audio = register_sound_dsp(&i810_audio_fops, -1)) < 0) {
 		int i;
 		printk(KERN_ERR "i810_audio: couldn't register DSP device!\n");
 		free_irq(card->irq, card);

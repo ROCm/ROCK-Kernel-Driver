@@ -510,7 +510,6 @@ int snd_opl3_hwdep_new(opl3_t * opl3,
 		return err;
 	}
 	hw->private_data = opl3;
-	hw->dev = opl3->dev;
 #ifdef CONFIG_SND_OSSEMUL
 	if (device == 0) {
 		hw->oss_type = SNDRV_OSS_DEVICE_TYPE_DMFM;

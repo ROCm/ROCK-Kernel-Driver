@@ -4360,19 +4360,19 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 			  printk(KERN_ERR "cs4281: irq %u in use\n", s->irq));
 		goto err_irq;
 	}
-	if ((s->dev_audio = register_sound_dsp(&cs4281_audio_fops, -1, &pcidev->dev)) <
+	if ((s->dev_audio = register_sound_dsp(&cs4281_audio_fops, -1)) <
 	    0) {
 		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
 			 "cs4281: probe() register_sound_dsp() failed.\n"));
 		goto err_dev1;
 	}
-	if ((s->dev_mixer = register_sound_mixer(&cs4281_mixer_fops, -1, &pcidev->dev)) <
+	if ((s->dev_mixer = register_sound_mixer(&cs4281_mixer_fops, -1)) <
 	    0) {
 		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
 			 "cs4281: probe() register_sound_mixer() failed.\n"));
 		goto err_dev2;
 	}
-	if ((s->dev_midi = register_sound_midi(&cs4281_midi_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_midi = register_sound_midi(&cs4281_midi_fops, -1)) < 0) {
 		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
 			 "cs4281: probe() register_sound_midi() failed.\n"));
 		goto err_dev3;

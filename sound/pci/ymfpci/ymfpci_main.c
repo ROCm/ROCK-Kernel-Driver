@@ -1101,7 +1101,6 @@ int __devinit snd_ymfpci_pcm(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	/* global setup */
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI");
-	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
@@ -1146,7 +1145,6 @@ int __devinit snd_ymfpci_pcm2(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	/* global setup */
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - AC'97");
-	pcm->dev = &chip->pci->dev;
 	chip->pcm2 = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
@@ -1191,7 +1189,6 @@ int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm
 	/* global setup */
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - IEC958");
-	pcm->dev = &chip->pci->dev;
 	chip->pcm_spdif = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
@@ -1236,7 +1233,6 @@ int __devinit snd_ymfpci_pcm_4ch(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	/* global setup */
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - Rear PCM");
-	pcm->dev = &chip->pci->dev;
 	chip->pcm_4ch = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);

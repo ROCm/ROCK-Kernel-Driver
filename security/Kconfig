@@ -46,7 +46,5 @@ config SECURITY_ROOTPLUG
 
 source security/selinux/Kconfig
 
-source security/rsa/Kconfig
-
 endmenu
 

@@ -1713,7 +1713,6 @@ snd_rme96_create(rme96_t *rme96)
 	rme96->spdif_pcm->private_data = rme96;
 	rme96->spdif_pcm->private_free = snd_rme96_free_spdif_pcm;
 	strcpy(rme96->spdif_pcm->name, "Digi96 IEC958");
-	rme96->spdif_pcm->dev = &rme96->pci->dev;
 	snd_pcm_set_ops(rme96->spdif_pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_rme96_playback_spdif_ops);
 	snd_pcm_set_ops(rme96->spdif_pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_rme96_capture_spdif_ops);
 
@@ -1734,7 +1733,6 @@ snd_rme96_create(rme96_t *rme96)
 		rme96->adat_pcm->private_data = rme96;
 		rme96->adat_pcm->private_free = snd_rme96_free_adat_pcm;
 		strcpy(rme96->adat_pcm->name, "Digi96 ADAT");
-		rme96->adat_pcm->dev = &rme96->pci->dev;
 		snd_pcm_set_ops(rme96->adat_pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_rme96_playback_adat_ops);
 		snd_pcm_set_ops(rme96->adat_pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_rme96_capture_adat_ops);
 		

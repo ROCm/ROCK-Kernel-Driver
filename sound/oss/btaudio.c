@@ -971,7 +971,7 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 	/* register devices */
 	if (digital) {
 		rc = bta->dsp_digital =
-			register_sound_dsp(&btaudio_digital_dsp_fops,dsp1, &pci_dev->dev);
+			register_sound_dsp(&btaudio_digital_dsp_fops,dsp1);
 		if (rc < 0) {
 			printk(KERN_WARNING
 			       "btaudio: can't register digital dsp (rc=%d)\n",rc);
@@ -982,7 +982,7 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 	}
 	if (analog) {
 		rc = bta->dsp_analog =
-			register_sound_dsp(&btaudio_analog_dsp_fops,dsp2, &pci_dev->dev);
+			register_sound_dsp(&btaudio_analog_dsp_fops,dsp2);
 		if (rc < 0) {
 			printk(KERN_WARNING
 			       "btaudio: can't register analog dsp (rc=%d)\n",rc);
@@ -990,7 +990,7 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 		}
 		printk(KERN_INFO "btaudio: registered device dsp%d [analog]\n",
 		       bta->dsp_analog >> 4);
-		rc = bta->mixer_dev = register_sound_mixer(&btaudio_mixer_fops,mixer, &pci_dev->dev);
+		rc = bta->mixer_dev = register_sound_mixer(&btaudio_mixer_fops,mixer);
 		if (rc < 0) {
 			printk(KERN_WARNING
 			       "btaudio: can't register mixer (rc=%d)\n",rc);

@@ -11,6 +11,8 @@ obj-$(CONFIG_HOTPLUG_PCI_AMD)		+= amdshpc.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_ZT5550)	+= cpcihp_zt5550.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_GENERIC)	+= cpcihp_generic.o
 obj-$(CONFIG_HOTPLUG_PCI_FAKE)		+= fakephp.o 
+obj-$(CONFIG_HOTPLUG_PCI_RPA)		+= rpaphp.o
+obj-$(CONFIG_HOTPLUG_PCI_RPA_DLPAR)	+= rpadlpar_io.o
 
 pci_hotplug-objs	:=	pci_hotplug_core.o
 

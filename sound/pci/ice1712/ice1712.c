@@ -884,7 +884,6 @@ static int __devinit snd_ice1712_pcm(ice1712_t * ice, int device, snd_pcm_t ** r
 	pcm->private_free = snd_ice1712_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1712 consumer");
-	pcm->dev = &ice->pci->dev;
 	ice->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 64*1024);
@@ -921,7 +920,6 @@ static int __devinit snd_ice1712_pcm_ds(ice1712_t * ice, int device, snd_pcm_t *
 	pcm->private_free = snd_ice1712_pcm_free_ds;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1712 consumer (DS)");
-	pcm->dev = &ice->pci->dev;
 	ice->pcm_ds = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 128*1024);
@@ -1267,7 +1265,6 @@ static int __devinit snd_ice1712_pcm_profi(ice1712_t * ice, int device, snd_pcm_
 	pcm->private_free = snd_ice1712_pcm_profi_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1712 multi");
-	pcm->dev = &ice->pci->dev;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 256*1024, 256*1024);
 
@@ -2544,21 +2541,16 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 					       &ice->rmidi[0])) < 0) {
 			snd_card_free(card);
 			return err;
-		} else {
-			ice->rmidi[0]->dev_ptr = &pci->dev;
 		}
 
-		if (ice->eeprom.data[ICE_EEP1_CODEC] & ICE1712_CFG_2xMPU401) {
+		if (ice->eeprom.data[ICE_EEP1_CODEC] & ICE1712_CFG_2xMPU401)
 			if ((err = snd_mpu401_uart_new(card, 1, MPU401_HW_ICE1712,
 						       ICEREG(ice, MPU2_CTRL), 1,
 						       ice->irq, 0,
 						       &ice->rmidi[1])) < 0) {
 				snd_card_free(card);
 				return err;
-			} else {
-				ice->rmidi[1]->dev_ptr = &pci->dev;
 			}
-		}
 	}
 
 	sprintf(card->longname, "%s at 0x%lx, irq %i",

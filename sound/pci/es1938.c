@@ -1017,7 +1017,6 @@ static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t **
 	pcm->private_free = snd_es1938_free_pcm;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ESS Solo-1");
-	pcm->dev = &chip->pci->dev;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 64*1024);
 
@@ -1653,7 +1652,6 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	                snd_card_free(card);
 	                return err;
 		}
-		opl3->dev = &pci->dev;
 	        if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 	                snd_card_free(card);
 	                return err;
@@ -1662,8 +1660,6 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 				chip->mpu_port, 1, chip->irq, 0, &chip->rmidi) < 0) {
 		printk(KERN_ERR "es1938: unable to initialize MPU-401\n");
-	} else {
-		chip->rmidi->dev_ptr = &pci->dev;
 	} /*else
 	    snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0x40);*/
 

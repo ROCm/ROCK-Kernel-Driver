@@ -590,11 +590,6 @@ int rpaphp_remove_slot(struct slot *slot)
 	retval = pci_hp_deregister(slot->hotplug_slot);
 	if (retval)
 		err("Problem unregistering a slot %s\n", slot->name);
-
-	kfree(slot->hotplug_slot->info);
-	kfree(slot->hotplug_slot->name);
-	kfree(slot->hotplug_slot);
-	kfree(slot);
 	num_slots--;
 
 	dbg("%s - Exit: rc[%d]\n", __FUNCTION__, retval);
@@ -604,23 +599,23 @@ int rpaphp_remove_slot(struct slot *slot)
 static int is_php_dn(struct device_node *dn, int **indexes,  int **names, int **types, int **power_domains)
 {
 	*indexes = (int *)get_property(dn, "ibm,drc-indexes", NULL);
-	if (!indexes)
+	if (!*indexes)
 		return(0);
 
 	/* &names[1] contains NULL terminated slot names */
 	*names = (int *)get_property(dn, "ibm,drc-names", NULL);
-	if (!names) 
+	if (!*names) 
 		return(0);
 
 	/* &types[1] contains NULL terminated slot types */
 	*types = (int *)get_property(dn, "ibm,drc-types", NULL);
-	if (!types)
+	if (!*types)
 		return(0);
 
 	/* power_domains[1...n] are the slot power domains */
 	*power_domains = (int *)get_property(dn,
 		"ibm,drc-power-domains", NULL);
-	if (!power_domains) 
+	if (!*power_domains) 
 		return(0);
 
 	if (!get_property(dn, "ibm,fw-pci-hot-plug-ctrl", NULL))
@@ -775,6 +770,7 @@ int rpaphp_add_slot(char *slot_name)
 				slot->type = simple_strtoul(type, NULL, 10);	
 				if (slot->type < 1  || slot->type > 16)
 					slot->type = 0;
+
 				slot->power_domain = power_domains[i + 1];
 				slot->magic = SLOT_MAGIC;
 				slot->hotplug_slot->private = slot;

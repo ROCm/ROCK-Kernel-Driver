@@ -1814,7 +1814,6 @@ snd_m3_pcm(m3_t * chip, int device)
 	pcm->private_data = chip;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, chip->card->driver);
-	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 	
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 64*1024);

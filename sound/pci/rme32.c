@@ -1370,7 +1370,6 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 	rme32->spdif_pcm->private_data = rme32;
 	rme32->spdif_pcm->private_free = snd_rme32_free_spdif_pcm;
 	strcpy(rme32->spdif_pcm->name, "Digi32 IEC958");
-	rme32->spdif_pcm->dev = &rme32->pci->dev;
 	snd_pcm_set_ops(rme32->spdif_pcm, SNDRV_PCM_STREAM_PLAYBACK,
 			&snd_rme32_playback_spdif_ops);
 	snd_pcm_set_ops(rme32->spdif_pcm, SNDRV_PCM_STREAM_CAPTURE,
@@ -1398,7 +1397,6 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 		rme32->adat_pcm->private_data = rme32;
 		rme32->adat_pcm->private_free = snd_rme32_free_adat_pcm;
 		strcpy(rme32->adat_pcm->name, "Digi32 ADAT");
-		rme32->adat_pcm->dev = &rme32->pci->dev;
 		snd_pcm_set_ops(rme32->adat_pcm, SNDRV_PCM_STREAM_PLAYBACK, 
 				&snd_rme32_playback_adat_ops);
 		snd_pcm_set_ops(rme32->adat_pcm, SNDRV_PCM_STREAM_CAPTURE, 

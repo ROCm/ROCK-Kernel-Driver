@@ -2355,19 +2355,19 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	}
 	printk(KERN_INFO "solo1: joystick port at %#x\n", s->gameport.io+1);
 	/* register devices */
-	if ((s->dev_audio = register_sound_dsp(&solo1_audio_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_audio = register_sound_dsp(&solo1_audio_fops, -1)) < 0) {
 		ret = s->dev_audio;
 		goto err_dev1;
 	}
-	if ((s->dev_mixer = register_sound_mixer(&solo1_mixer_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_mixer = register_sound_mixer(&solo1_mixer_fops, -1)) < 0) {
 		ret = s->dev_mixer;
 		goto err_dev2;
 	}
-	if ((s->dev_midi = register_sound_midi(&solo1_midi_fops, -1, &pcidev->dev)) < 0) {
+	if ((s->dev_midi = register_sound_midi(&solo1_midi_fops, -1)) < 0) {
 		ret = s->dev_midi;
 		goto err_dev3;
 	}
-	if ((s->dev_dmfm = register_sound_special(&solo1_dmfm_fops, 15, &pcidev->dev /* ?? */)) < 0) {
+	if ((s->dev_dmfm = register_sound_special(&solo1_dmfm_fops, 15 /* ?? */)) < 0) {
 		ret = s->dev_dmfm;
 		goto err_dev4;
 	}

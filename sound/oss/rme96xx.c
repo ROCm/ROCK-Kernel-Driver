@@ -1007,11 +1007,11 @@ static int __devinit rme96xx_probe(struct pci_dev *pcidev, const struct pci_devi
 		goto err_devices;
 	}
 	for (i=0;i<devices;i++) {
-		if ((s->dspnum[i] = register_sound_dsp(&rme96xx_audio_fops, -1, &pcidev->dev)) < 0)
+		if ((s->dspnum[i] = register_sound_dsp(&rme96xx_audio_fops, -1)) < 0)
 			goto err_devices;
 	}
 
-	if ((s->mixer = register_sound_mixer(&rme96xx_mixer_fops, -1, &pcidev->dev)) < 0)
+	if ((s->mixer = register_sound_mixer(&rme96xx_mixer_fops, -1)) < 0)
 		goto err_devices;
 
 	pci_set_drvdata(pcidev, s);

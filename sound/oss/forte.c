@@ -1954,7 +1954,7 @@ forte_chip_init (struct forte_chip *chip)
 
 	/* Register mixer */
 	if ((codec->dev_mixer = 
-	     register_sound_mixer (&forte_mixer_fops, -1, &chip->pci_dev->dev)) < 0) {
+	     register_sound_mixer (&forte_mixer_fops, -1)) < 0) {
 		printk (KERN_ERR PFX "couldn't register mixer!\n");
 		ac97_release_codec(codec);
 		return -1;
@@ -1963,7 +1963,7 @@ forte_chip_init (struct forte_chip *chip)
 	chip->ac97 = codec;
 
 	/* Register DSP */
-	if ((chip->dsp = register_sound_dsp (&forte_dsp_fops, -1, &chip->pci_dev->dev) ) < 0) {
+	if ((chip->dsp = register_sound_dsp (&forte_dsp_fops, -1) ) < 0) {
 		printk (KERN_ERR PFX "couldn't register dsp!\n");
 		return -1;
 	}

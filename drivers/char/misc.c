@@ -407,4 +407,4 @@ static int __init misc_init(void)
 	}
 	return 0;
 }
-module_init(misc_init);
+subsys_initcall(misc_init);

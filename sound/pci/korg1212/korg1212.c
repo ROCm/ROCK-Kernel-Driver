@@ -2438,7 +2438,6 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 	korg1212->pcm->private_data = korg1212;
         korg1212->pcm->private_free = snd_korg1212_free_pcm;
         strcpy(korg1212->pcm->name, "korg1212");
-	korg1212->pcm->dev = &pci->dev;
 
         snd_pcm_set_ops(korg1212->pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_korg1212_playback_ops);
         

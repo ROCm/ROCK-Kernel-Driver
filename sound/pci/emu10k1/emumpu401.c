@@ -325,7 +325,6 @@ static int __devinit emu10k1_midi_init(emu10k1_t *emu, emu10k1_midi_t *midi, int
 	                     SNDRV_RAWMIDI_INFO_DUPLEX;
 	rmidi->private_data = midi;
 	rmidi->private_free = snd_emu10k1_midi_free;
-	rmidi->dev_ptr = &emu->pci->dev;
 	midi->rmidi = rmidi;
 	return 0;
 }

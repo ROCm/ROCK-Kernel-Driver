@@ -1329,7 +1329,6 @@ static int __devinit snd_hdsp_create_midi (snd_card_t *card, hdsp_t *hdsp, int i
 
 	sprintf (hdsp->midi[id].rmidi->name, "%s MIDI %d", card->id, id+1);
 	hdsp->midi[id].rmidi->private_data = &hdsp->midi[id];
-	hdsp->midi[id].rmidi->dev_ptr = &hdsp->pci->dev;
 
 	snd_rawmidi_set_ops (hdsp->midi[id].rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT, &snd_hdsp_midi_output);
 	snd_rawmidi_set_ops (hdsp->midi[id].rmidi, SNDRV_RAWMIDI_STREAM_INPUT, &snd_hdsp_midi_input);
@@ -3964,7 +3963,6 @@ static int __devinit snd_hdsp_create_hwdep(snd_card_t *card,
 	hdsp->hwdep = hw;
 	hw->private_data = hdsp;
 	strcpy(hw->name, "HDSP hwdep interface");
-	hw->dev = &hdsp->pci->dev;
 
 	hw->ops.open = snd_hdsp_hwdep_dummy_op;
 	hw->ops.ioctl = snd_hdsp_hwdep_ioctl;
@@ -3985,7 +3983,6 @@ static int __devinit snd_hdsp_create_pcm(snd_card_t *card,
 	hdsp->pcm = pcm;
 	pcm->private_data = hdsp;
 	strcpy(pcm->name, hdsp->card_name);
-	pcm->dev = &hdsp->pci->dev;
 
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_hdsp_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_hdsp_capture_ops);

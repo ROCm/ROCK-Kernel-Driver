@@ -3321,7 +3321,7 @@ static int __devinit ali_ac97_init(struct ali_card *card)
 
 		if ((eid & 0xc000) == 0)	/* primary codec */
 			total_channels += 2;
-		if ((codec->dev_mixer = register_sound_mixer(&ali_mixer_fops, -1, &card->pci_dev->dev)) < 0) {
+		if ((codec->dev_mixer = register_sound_mixer(&ali_mixer_fops, -1)) < 0) {
 			printk(KERN_ERR "ali_audio: couldn't register mixer!\n");
 			kfree(codec);
 			break;
@@ -3492,7 +3492,7 @@ static int __devinit ali_probe(struct pci_dev *pci_dev,
 	}
 
 	/* register /dev/dsp */
-	if ((card->dev_audio = register_sound_dsp(&ali_audio_fops, -1, &pci_dev->dev)) < 0) {
+	if ((card->dev_audio = register_sound_dsp(&ali_audio_fops, -1)) < 0) {
 		int i;
 		printk(KERN_ERR"ali_audio: couldn't register DSP device!\n");
 		release_region(card->iobase, 256);
