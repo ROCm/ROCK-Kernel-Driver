@@ -7,5 +7,3 @@
 
 obj-y := hpzx1_misc.o
 obj-$(CONFIG_IA64_GENERIC) += hpzx1_machvec.o
-
-include $(TOPDIR)/Rules.make
