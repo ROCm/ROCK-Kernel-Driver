@@ -1265,7 +1265,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
-		if (inet->cork.length + length > IPV6_MAXPLEN - fragheaderlen) {
+		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
 			ipv6_local_error(sk, EMSGSIZE, fl, mtu-exthdrlen);
 			return -EMSGSIZE;
 		}
@@ -1461,7 +1461,7 @@ int ip6_push_pending_frames(struct sock *sk)
 	
 	*(u32*)hdr = fl->fl6_flowlabel | htonl(0x60000000);
 
-	if (skb->len <= IPV6_MAXPLEN)
+	if (skb->len <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN)
 		hdr->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	else
 		hdr->payload_len = 0;
