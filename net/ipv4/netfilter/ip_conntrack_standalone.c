@@ -159,6 +159,7 @@ list_conntracks(char *buffer, char **start, off_t offset, int length)
 	}
 
 	/* Now iterate through expecteds. */
+	READ_LOCK(&ip_conntrack_expect_tuple_lock);
 	list_for_each(e, &ip_conntrack_expect_list) {
 		unsigned int last_len;
 		struct ip_conntrack_expect *expect
@@ -169,10 +170,12 @@ list_conntracks(char *buffer, char **start, off_t offset, int length)
 		len += print_expect(buffer + len, expect);
 		if (len > length) {
 			len = last_len;
-			goto finished;
+			goto finished_expects;
 		}
 	}
 
+ finished_expects:
+	READ_UNLOCK(&ip_conntrack_expect_tuple_lock);
  finished:
 	READ_UNLOCK(&ip_conntrack_lock);
 
