@@ -1,7 +1,7 @@
 /*
  *  $Id: longhaul.c,v 1.87 2003/02/22 10:23:46 db Exp $
  *
- *  (C) 2001  Dave Jones. <davej@suse.de>
+ *  (C) 2001-2003  Dave Jones. <davej@suse.de>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
@@ -294,7 +294,6 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 {
 	unsigned long lo, hi;
 	unsigned int bits;
-	int revkey;
 	int vidindex, i;
 	struct cpufreq_freqs freqs;
 	
@@ -321,11 +320,11 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	switch (longhaul) {
 	case 1:
 		rdmsr (MSR_VIA_BCR2, lo, hi);
-		revkey = (lo & 0xf)<<4; /* Rev key. */
+		/* Enable software clock multiplier */
+		lo |= (1<<19);
+		/* desired multiplier */
 		lo &= ~(1<<23|1<<24|1<<25|1<<26);
-		lo |= (1<<19);		/* Enable software clock multiplier */
-		lo |= (bits<<23);	/* desired multiplier */
-		lo |= revkey;
+		lo |= (bits<<23);
 		wrmsr (MSR_VIA_BCR2, lo, hi);
 
 		__hlt();
@@ -333,17 +332,17 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		/* Disable software clock multiplier */
 		rdmsr (MSR_VIA_BCR2, lo, hi);
 		lo &= ~(1<<19);
-		lo |= revkey;
 		wrmsr (MSR_VIA_BCR2, lo, hi);
 		break;
 
 	case 2:
 		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		revkey = (lo & 0xf)<<4;	/* Rev key. */
 		lo &= 0xfff0bf0f;	/* reset [19:16,14](bus ratio) and [7:4](rev key) to 0 */
 		lo |= (bits<<16);
 		lo |= (1<<8);	/* EnableSoftBusRatio */
-		lo |= revkey;
+		/* We must program the revision key only with values we
+		 * know about, not blindly copy it from 0:3 */
+		lo |= 1;
 
 		if (can_scale_voltage) {
 			/* PB: TODO fix this up */
@@ -374,24 +373,25 @@ bad_voltage:
 		lo &= ~(1<<8);
 		if (can_scale_voltage)
 			lo &= ~(1<<9);
-		lo |= revkey;
+		lo |= 1;	/* Revision Key */
 		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
 		break;
 
 	case 3:
 		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
-		revkey = (lo & 0xf)<<4;	/* Rev key. */
 		lo &= 0xfff0bf0f;	/* reset longhaul[19:16,14] to 0 */
 		lo |= (bits<<16);
 		lo |= (1<<8);	/* EnableSoftBusRatio */
-		lo |= revkey;
+		/* We must program the revision key only with values we
+		 * know about, not blindly copy it from 0:3 */
+		lo |= 3;	/* SoftVID & SoftBSEL */
 
 		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
 		__hlt();
 
 		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
 		lo &= ~(1<<8);
-		lo |= revkey;
+		lo |= 3;
 		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
 		break;
 	}
@@ -471,7 +471,6 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 {
 	int revkey;
 
-
 	minvid = (hi & (1<<20|1<<21|1<<22|1<<23|1<<24)) >> 20; /* 56:52 */
 	maxvid = (hi & (1<<4|1<<5|1<<6|1<<7|1<<8)) >> 4;       /* 40:36 */
 	vrmrev = (lo & (1<<15))>>15;
@@ -503,9 +502,9 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 	/* Current voltage isn't readable at first, so we need to
 	   set it to a known value. The spec says to use maxvid */
 	revkey = (lo & 0xf)<<4;	/* Rev key. */
+	lo |= revkey;		/* Reinsert key FIXME: This is bad. */
 	lo &= 0xfe0fff0f;	/* Mask unneeded bits */
 	lo |= (1<<9);		/* EnableSoftVID */
-	lo |= revkey;		/* Reinsert key */
 	lo |= maxvid << 20;
 	wrmsr (MSR_VIA_LONGHAUL, lo, hi);
 	minvid = voltage_table[minvid];
