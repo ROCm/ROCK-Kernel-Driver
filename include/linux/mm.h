@@ -199,11 +199,12 @@ struct page {
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 extern void FASTCALL(__page_cache_release(struct page *));
-#define put_page(p)					\
-	do {						\
-		if (put_page_testzero(p))		\
-			__page_cache_release(p);	\
+#define put_page(p)							\
+	do {								\
+		if (!PageReserved(p) && put_page_testzero(p))		\
+			__page_cache_release(p);			\
 	} while (0)
+void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
 
 /*
  * Multiple processes may "see" the same page. E.g. for untouched

@@ -852,14 +852,14 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 
 struct file_operations isdn_ppp_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		isdn_ppp_read,
-	write:		isdn_ppp_write,
-	poll:		isdn_ppp_poll,
-	ioctl:		isdn_ppp_ioctl,
-	open:		isdn_ppp_open,
-	release:	isdn_ppp_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= isdn_ppp_read,
+	.write		= isdn_ppp_write,
+	.poll		= isdn_ppp_poll,
+	.ioctl		= isdn_ppp_ioctl,
+	.open		= isdn_ppp_open,
+	.release	= isdn_ppp_release,
 };
 
 /*
