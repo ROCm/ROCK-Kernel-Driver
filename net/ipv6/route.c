@@ -573,6 +573,8 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 
 /* Protected by rt6_lock.  */
 static struct dst_entry *ndisc_dst_gc_list;
+static int ipv6_get_mtu(struct net_device *dev);
+static inline unsigned int ipv6_advmss(unsigned int mtu);
 
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,
@@ -598,6 +600,8 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 	rt->rt6i_metric   = 0;
 	atomic_set(&rt->u.dst.__refcnt, 1);
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
+	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.output  = output;
 
 	write_lock_bh(&rt6_lock);
