@@ -106,6 +106,22 @@ config IXP2000_WATCHDOG
 
 	  Say N if you are unsure.
 
+config S3C2410_WATCHDOG
+	tristate "S3C2410 Watchdog"
+	depends on WATCHDOG && ARCH_S3C2410
+	help
+	  Watchdog timer block in the Samsung S3C2410 chips. This will
+	  reboot the system when the timer expires with the watchdog
+	  enabled.
+
+	  The driver is limited by the speed of the system's PCLK
+	  signal, so with reasonbaly fast systems (PCLK around 50-66MHz)
+	  then watchdog intervals of over approximately 20seconds are
+	  unavailable.
+
+	  The driver can be built as a module by choosing M, and will
+	  be called s3c2410_wdt
+
 config SA1100_WATCHDOG
 	tristate "SA1100/PXA2xx watchdog"
 	depends on WATCHDOG && ( ARCH_SA1100 || ARCH_PXA )
