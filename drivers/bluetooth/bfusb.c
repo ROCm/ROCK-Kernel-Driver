@@ -779,13 +779,13 @@ static int __init bfusb_init(void)
 	return err;
 }
 
-static void __exit bfusb_cleanup(void)
+static void __exit bfusb_exit(void)
 {
 	usb_deregister(&bfusb_driver);
 }
 
 module_init(bfusb_init);
-module_exit(bfusb_cleanup);
+module_exit(bfusb_exit);
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("BlueFRITZ! USB driver ver " VERSION);

@@ -521,7 +521,7 @@ int bcsp_init(void);
 int bcsp_deinit(void);
 #endif
 
-int __init hci_uart_init(void)
+static int __init hci_uart_init(void)
 {
 	static struct tty_ldisc hci_uart_ldisc;
 	int err;
@@ -559,7 +559,7 @@ int __init hci_uart_init(void)
 	return 0;
 }
 
-void hci_uart_cleanup(void)
+static void __exit hci_uart_exit(void)
 {
 	int err;
 
@@ -576,7 +576,7 @@ void hci_uart_cleanup(void)
 }
 
 module_init(hci_uart_init);
-module_exit(hci_uart_cleanup);
+module_exit(hci_uart_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth HCI UART driver ver " VERSION);

@@ -296,13 +296,13 @@ static int __init bcm203x_init(void)
 	return err;
 }
 
-static void __exit bcm203x_cleanup(void)
+static void __exit bcm203x_exit(void)
 {
 	usb_deregister(&bcm203x_driver);
 }
 
 module_init(bcm203x_init);
-module_exit(bcm203x_cleanup);
+module_exit(bcm203x_exit);
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Broadcom Blutonium firmware driver ver " VERSION);

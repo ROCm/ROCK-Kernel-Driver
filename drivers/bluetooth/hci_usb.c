@@ -991,7 +991,7 @@ static struct usb_driver hci_usb_driver = {
 	.id_table   =  bluetooth_ids,
 };
 
-int hci_usb_init(void)
+static int __init hci_usb_init(void)
 {
 	int err;
 
@@ -1003,13 +1003,13 @@ int hci_usb_init(void)
 	return err;
 }
 
-void hci_usb_cleanup(void)
+static void __exit hci_usb_exit(void)
 {
 	usb_deregister(&hci_usb_driver);
 }
 
 module_init(hci_usb_init);
-module_exit(hci_usb_cleanup);
+module_exit(hci_usb_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);

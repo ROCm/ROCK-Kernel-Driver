@@ -672,7 +672,7 @@ int bnep_get_conninfo(struct bnep_conninfo *ci)
 	return err;
 }
 
-static int  __init bnep_init_module(void)
+static int __init bnep_init(void)
 {	
 	char flt[50] = "";
 
@@ -694,13 +694,13 @@ static int  __init bnep_init_module(void)
 	return 0;
 }
 
-static void __exit bnep_cleanup_module(void)
+static void __exit bnep_exit(void)
 {
 	bnep_sock_cleanup();
 }
 
-module_init(bnep_init_module);
-module_exit(bnep_cleanup_module);
+module_init(bnep_init);
+module_exit(bnep_exit);
 
 MODULE_AUTHOR("David Libault <david.libault@inventel.fr>, Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth BNEP ver " VERSION);
