@@ -289,6 +289,8 @@ typedef struct _XENA_dev_config {
 	u64 tda_err_alarm;
 
 	u64 pcc_err_reg;
+#define PCC_FB_ECC_DB_ERR		vBIT(0xFF, 16, 8)
+
 	u64 pcc_err_mask;
 	u64 pcc_err_alarm;
 
@@ -512,6 +514,7 @@ typedef struct _XENA_dev_config {
 #define RX_PA_CFG_IGNORE_FRM_ERR           BIT(1)
 #define RX_PA_CFG_IGNORE_SNAP_OUI          BIT(2)
 #define RX_PA_CFG_IGNORE_LLC_CTRL          BIT(3)
+#define RX_PA_CFG_IGNORE_L2_ERR            BIT(6)
 
 	u8 unused12[0x700 - 0x1D8];
 
@@ -773,3 +776,67 @@ typedef struct _XENA_dev_config {
 #define	XENA_EEPROM_SPACE (0x01 << 11)
 
 #endif				/* _REGS_H */
+/*
+ *$Log: regs.h,v $
+ *Revision 1.26  2004/05/31 12:21:20  rkoushik
+ *Bug: 986
+ *
+ *In this check in Iam making the fixes listed below,
+ *1. Handling the PCC_FB_ECC_ERR interrupt as specified in the new UG.
+ *2. Also queuing a task to reset the NIC when a serious Error is detected.
+ *3. The rmac_err_reg is cleared immediately in the Intr handler itself instead of the queued task 's2io_set_link'.
+ *
+ *Koushik
+ *
+ *Revision 1.25  2004/05/20 23:06:09  aravi
+ *Bug: 973
+ *Fixed compilation error in 2 buffer mode.
+ *Defined RX_PA_CFG_IGNORE_L2_ERR.
+ *
+ *Revision 1.24  2004/02/10 11:58:41  rkoushik
+ *Bug: 668
+ *Eliminated usage of self declared type 'dmaaddr_t' and also
+ *eliminated the usage of PPC64_ARCH macro which was prevalent in the older code.
+ *Further details in the bug.
+ *
+ *Koushik
+ *
+ *Revision 1.23  2004/02/04 04:52:44  rkoushik
+ *Bug: 667
+ * Indented the code using indent utility. Details of the options
+ *used are specified in bug # 667
+ *
+ *Koushik
+ *
+ *Revision 1.22  2004/01/23 12:08:39  rkoushik
+ *Bug: 549
+ *Added the beacon feature for new celestica cards using GPIO.
+ *test it out using the ethtool utility on both
+ *the new and old cards in both Link Up and Down states.
+ *
+ *Koushik
+ *
+ *Revision 1.21  2004/01/19 09:51:09  rkoushik
+ *Bug: 598
+ * Added GPL notices on the driver source files, namely
+ *s2io.c, s2io.h and regs.h
+ *
+ *Koushik
+ *
+ *Revision 1.20  2003/12/30 13:03:32  rkoushik
+ *Bug: 177
+ *The driver has been updated with support for funtionalities in ethtool
+ *version 1.8. Interrupt moderation has been skipped as the methodology to
+ *set it using ethtool is different to our methodology.
+ *
+ *-Koushik
+ *
+ *Revision 1.19  2003/12/01 22:02:38  ukiran
+ *Bug:510
+ *Cleanup of  chars
+ *
+ *Revision 1.18  2003/11/04 02:06:47  ukiran
+ *Bug:484
+ *Enabling Logs in source code
+ *
+ */
