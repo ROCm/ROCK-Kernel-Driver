@@ -617,6 +617,13 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 		sdev->borken = 0;
 
 	/*
+	 * Apparently some really broken devices (contrary to the SCSI
+	 * standards) need to be selected without asserting ATN
+	 */
+	if (*bflags & BLIST_SELECT_NO_ATN)
+		sdev->select_no_atn = 1;
+
+	/*
 	 * Some devices may not want to have a start command automatically
 	 * issued when a device is added.
 	 */

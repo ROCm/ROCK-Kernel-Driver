@@ -83,6 +83,7 @@ static struct {
 	{"SONY", "CD-ROM CDU-55S", "1.0i", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-561", "1.7x", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-8012", NULL, BLIST_NOLUN},
+	{"SONY", "SDT-5000", "3.17", BLIST_SELECT_NO_ATN},
 	{"TANDBERG", "TDC 3600", "U07", BLIST_NOLUN},	/* locks up */
 	{"TEAC", "CD-R55S", "1.0H", BLIST_NOLUN},	/* locks up */
 	/*
@@ -196,6 +197,9 @@ static struct {
 	{"TOSHIBA", "CDROM", NULL, BLIST_ISROM},
 	{"TOSHIBA", "CD-ROM", NULL, BLIST_ISROM},
 	{"USB2.0", "SMARTMEDIA/XD", NULL, BLIST_FORCELUN | BLIST_INQUIRY_36},
+	{"WangDAT", "Model 2600", "01.7", BLIST_SELECT_NO_ATN},
+	{"WangDAT", "Model 3200", "02.2", BLIST_SELECT_NO_ATN},
+	{"WangDAT", "Model 1300", "02.4", BLIST_SELECT_NO_ATN},
 	{"XYRATEX", "RS", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
 	{"Zzyzx", "RocketStor 500S", NULL, BLIST_SPARSELUN},
 	{"Zzyzx", "RocketStor 2000", NULL, BLIST_SPARSELUN},

@@ -107,6 +107,7 @@ struct scsi_device {
 	unsigned no_start_on_add:1;	/* do not issue start on add */
 	unsigned allow_restart:1; /* issue START_UNIT in error handler */
 	unsigned no_uld_attach:1; /* disable connecting to upper level drivers */
+	unsigned select_no_atn:1;
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 

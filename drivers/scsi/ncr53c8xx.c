@@ -398,20 +398,6 @@ typedef u32 tagmap_t;
 
 /*==========================================================
 **
-**	"Special features" of targets.
-**	quirks field		of struct tcb.
-**	actualquirks field	of struct ccb.
-**
-**==========================================================
-*/
-
-#define	QUIRK_AUTOSAVE	(0x01)
-#define	QUIRK_NOMSG	(0x02)
-#define QUIRK_NOSYNC	(0x10)
-#define QUIRK_NOWIDE16	(0x20)
-
-/*==========================================================
-**
 **	Capability bits in Inquire response byte 7.
 **
 **==========================================================
@@ -1151,7 +1137,7 @@ struct script {
 #endif
 	ncrcmd  save_dp		[  7];
 	ncrcmd  restore_dp	[  5];
-	ncrcmd  disconnect	[ 17];
+	ncrcmd  disconnect	[ 10];
 	ncrcmd	msg_out		[  9];
 	ncrcmd	msg_out_done	[  7];
 	ncrcmd  idle		[  2];
@@ -1251,7 +1237,6 @@ static	int	ncr_int_par	(struct ncb *np);
 static	void	ncr_int_ma	(struct ncb *np);
 static	void	ncr_int_sir	(struct ncb *np);
 static  void    ncr_int_sto     (struct ncb *np);
-static	u_long	ncr_lookup	(char* id);
 static	void	ncr_negotiate	(struct ncb* np, struct tcb* tp);
 static	int	ncr_prepare_nego(struct ncb *np, struct ccb *cp, u_char *msgptr);
 
@@ -1844,21 +1829,6 @@ static	struct script script0 __initdata = {
 	*/
 	SCR_LOAD_REG (HS_REG, HS_DISCONNECT),
 		0,
-	/*
-	**	If QUIRK_AUTOSAVE is set,
-	**	do an "save pointer" operation.
-	*/
-	SCR_FROM_REG (QU_REG),
-		0,
-	SCR_JUMP ^ IFFALSE (MASK (QUIRK_AUTOSAVE, QUIRK_AUTOSAVE)),
-		PADDR (cleanup_ok),
-	/*
-	**	like SAVE_DP message:
-	**	Copy TEMP register to SAVEP in header.
-	*/
-	SCR_COPY (4),
-		RADDR (temp),
-		NADDR (header.savep),
 	SCR_JUMP,
 		PADDR (cleanup_ok),
 
@@ -3740,7 +3710,7 @@ static int ncr_queue_command (struct ncb *np, struct scsi_cmnd *cmd)
 	/*
 	**	status
 	*/
-	cp->actualquirks		= tp->quirks;
+	cp->actualquirks		= 0;
 	cp->host_status			= cp->nego_status ? HS_NEGOTIATE : HS_BUSY;
 	cp->scsi_status			= S_ILLEGAL;
 	cp->parity_status		= 0;
@@ -6071,7 +6041,7 @@ static void ncr_sir_to_redo(struct ncb *np, int num, struct ccb *cp)
 		/*
 		**	Select without ATN for quirky devices.
 		*/
-		if (tp->quirks & QUIRK_NOMSG)
+		if (cmd->device->select_no_atn)
 			cp->start.schedule.l_paddr =
 			cpu_to_scr(NCB_SCRIPTH_PHYS (np, select_no_atn));
 
@@ -7062,15 +7032,6 @@ static struct lcb *ncr_setup_lcb (struct ncb *np, u_char tn, u_char ln, u_char *
 		goto fail;
 
 	/*
-	**	Get device quirks from a speciality table.
-	*/
-	tp->quirks = ncr_lookup (inq_data);
-	if (tp->quirks && bootverbose) {
-		PRINT_LUN(np, tn, ln);
-		printk ("quirks=%x.\n", tp->quirks);
-	}
-
-	/*
 	**	Evaluate trustable target/unit capabilities.
 	**	We only believe device version >= SCSI-2 that 
 	**	use appropriate response data format (2).
@@ -7338,62 +7299,6 @@ static int __init ncr_snooptest (struct ncb* np)
 		err |= 4;
 	};
 	return (err);
-}
-
-/*==========================================================
-**
-**
-**	Device lookup.
-**
-**	@GENSCSI@ should be integrated to scsiconf.c
-**
-**
-**==========================================================
-*/
-
-struct table_entry {
-	char *	manufacturer;
-	char *	model;
-	char *	version;
-	u_long	info;
-};
-
-static struct table_entry device_tab[] =
-{
-#if 0
-	{"", "", "", QUIRK_NOMSG},
-#endif
-	{"SONY", "SDT-5000", "3.17", QUIRK_NOMSG},
-	{"WangDAT", "Model 2600", "01.7", QUIRK_NOMSG},
-	{"WangDAT", "Model 3200", "02.2", QUIRK_NOMSG},
-	{"WangDAT", "Model 1300", "02.4", QUIRK_NOMSG},
-	{"", "", "", 0} /* catch all: must be last entry. */
-};
-
-static u_long ncr_lookup(char * id)
-{
-	struct table_entry * p = device_tab;
-	char *d, *r, c;
-
-	for (;;p++) {
-
-		d = id+8;
-		r = p->manufacturer;
-		while ((c=*r++)) if (c!=*d++) break;
-		if (c) continue;
-
-		d = id+16;
-		r = p->model;
-		while ((c=*r++)) if (c!=*d++) break;
-		if (c) continue;
-
-		d = id+32;
-		r = p->version;
-		while ((c=*r++)) if (c!=*d++) break;
-		if (c) continue;
-
-		return (p->info);
-	}
 }
 
 /*==========================================================
