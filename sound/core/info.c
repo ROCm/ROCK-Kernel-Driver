@@ -699,12 +699,10 @@ int __exit snd_info_done(void)
  */
 
 
-int snd_info_card_register(snd_card_t * card)
+int snd_info_card_create(snd_card_t * card)
 {
 	char str[8];
-	char *s;
 	snd_info_entry_t *entry;
-	struct proc_dir_entry *p;
 
 	snd_assert(card != NULL, return -ENXIO);
 
@@ -717,11 +715,20 @@ int snd_info_card_register(snd_card_t * card)
 		return -ENOMEM;
 	}
 	card->proc_root = entry;
+	return 0;
+}
 
-	if (!strcmp(card->id, str))
+int snd_info_card_register(snd_card_t * card)
+{
+	char *s;
+	struct proc_dir_entry *p;
+
+	snd_assert(card != NULL, return -ENXIO);
+
+	if (!strcmp(card->id, card->proc_root->name))
 		return 0;
 
-	s = snd_kmalloc_strdup(str, GFP_KERNEL);
+	s = snd_kmalloc_strdup(card->proc_root->name, GFP_KERNEL);
 	if (s == NULL)
 		return -ENOMEM;
 	p = snd_create_proc_entry(card->id, S_IFLNK | S_IRUGO | S_IWUGO | S_IXUGO, snd_proc_root);
@@ -738,7 +745,7 @@ int snd_info_card_register(snd_card_t * card)
 	return 0;
 }
 
-int snd_info_card_unregister(snd_card_t * card)
+int snd_info_card_free(snd_card_t * card)
 {
 	void *data;
 
