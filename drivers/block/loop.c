@@ -544,7 +544,6 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 {
 	struct bio *new_bio = NULL;
 	struct loop_device *lo = q->queuedata;
-	unsigned long IV;
 	int rw = bio_rw(old_bio);
 
 	if (!lo)
@@ -580,7 +579,6 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 	 * piggy old buffer on original, and submit for I/O
 	 */
 	new_bio = loop_get_buffer(lo, old_bio);
-	IV = loop_get_iv(lo, old_bio->bi_sector);
 	if (rw == WRITE) {
 		if (loop_transfer_bio(lo, new_bio, old_bio))
 			goto err;
