@@ -41,7 +41,6 @@
 #include <linux/usb.h>
 #include <linux/moduleparam.h>
 
-#include <linux/version.h>
 #include "../core/hcd.h"
 
 #include <asm/byteorder.h>
