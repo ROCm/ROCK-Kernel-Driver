@@ -185,11 +185,14 @@ static void
 __writeback_single_inode(struct inode *inode,
 			struct writeback_control *wbc)
 {
-	if (current_is_pdflush() && (inode->i_state & I_LOCK)) {
+	if ((wbc->sync_mode != WB_SYNC_ALL) && (inode->i_state & I_LOCK)) {
 		list_move(&inode->i_list, &inode->i_sb->s_dirty);
 		return;
 	}
 
+	/*
+	 * It's a data-integrity sync.  We must wait.
+	 */
 	while (inode->i_state & I_LOCK) {
 		__iget(inode);
 		spin_unlock(&inode_lock);
