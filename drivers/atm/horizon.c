@@ -2765,15 +2765,13 @@ static int __init hrz_probe (void) {
     u32 * membase = bus_to_virt (pci_resource_start (pci_dev, 1));
     u8 irq = pci_dev->irq;
     
-    // check IO region
-    if (check_region (iobase, HRZ_IO_EXTENT)) {
-      PRINTD (DBG_WARN, "IO range already in use");
-      continue;
-    }
+    /* XXX DEV_LABEL is a guess */
+    if (!request_region (iobase, HRZ_IO_EXTENT, DEV_LABEL))
+  	  continue;
 
     if (pci_enable_device (pci_dev))
       continue;
-
+    
     dev = kmalloc (sizeof(hrz_dev), GFP_KERNEL);
     if (!dev) {
       // perhaps we should be nice: deregister all adapters and abort?
@@ -2806,9 +2804,6 @@ static int __init hrz_probe (void) {
 		dev->atm_dev->number, dev, dev->atm_dev);
 	dev->atm_dev->dev_data = (void *) dev;
 	dev->pci_dev = pci_dev; 
-	
-	/* XXX DEV_LABEL is a guess */
-	request_region (iobase, HRZ_IO_EXTENT, DEV_LABEL);
 	
 	// enable bus master accesses
 	pci_set_master (pci_dev);
@@ -2901,8 +2896,10 @@ static int __init hrz_probe (void) {
 	atm_dev_deregister (dev->atm_dev);
       } /* atm_dev_register */
       free_irq (irq, dev);
+	
     } /* request_irq */
     kfree (dev);
+    release_region(iobase, HRZ_IO_EXTENT);
   } /* kmalloc and while */
   return devs;
 }
