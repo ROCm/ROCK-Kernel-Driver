@@ -2112,8 +2112,8 @@ static int rtl8139_poll(struct net_device *dev, int *budget)
 		 * again when we think we are done.
 		 */
 		local_irq_disable();
-		netif_rx_complete(dev);
 		RTL_W16_F(IntrMask, rtl8139_intr_mask);
+		__netif_rx_complete(dev);
 		local_irq_enable();
 	}
 	spin_unlock(&tp->rx_lock);
