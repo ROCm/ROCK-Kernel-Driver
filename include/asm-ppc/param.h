@@ -9,7 +9,7 @@
 #define HZ		100		/* internal timer frequency */
 #define USER_HZ		100		/* for user interfaces in "ticks" */
 #define CLOCKS_PER_SEC	(USER_HZ)	/* frequency at which times() counts */
-#endif
+#endif /* __KERNEL__ */
 
 #define EXEC_PAGESIZE	4096
 

@@ -16,6 +16,9 @@
 #include <platforms/4xx/ibm405gp.h>
 
 #ifndef __ASSEMBLY__
+
+#include <linux/types.h>
+
 typedef struct board_info {
 	unsigned int	 bi_memsize;		/* DRAM installed, in bytes */
 	unsigned char	 bi_enetaddr[6];	/* Local Ethernet MAC address */

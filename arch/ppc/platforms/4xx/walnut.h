@@ -60,10 +60,6 @@ extern void *walnut_rtc_base;
 #define WALNUT_RTC_VADDR	WALNUT_RTC_PADDR
 #define WALNUT_RTC_SIZE		((uint)8*1024)
 
-/* ps2 keyboard and mouse */
-#define KEYBOARD_IRQ		25
-#define AUX_IRQ			26
-
 #ifdef CONFIG_PPC405GP_INTERNAL_CLOCK
 #define BASE_BAUD		201600
 #else

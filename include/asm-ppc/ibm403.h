@@ -1,8 +1,8 @@
 /*
  * ibm403.h
  *
- *	This was dirived from the ibm4xx.h and all 403 specific definitions
- *	where moved here.
+ *	This was derived from the ibm4xx.h and all 403 specific definitions
+ *	were moved here.
  *	
  *      Armin Kuster <akuster@mvista.com>
  *      Tom Rini <trini@mvista.com>
@@ -30,11 +30,6 @@
  *  You should have received a copy of the  GNU General Public License along
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
- *
- *	Version 1.0 Oct 10, 2001 - A. Kuster
- *	Initial version	 - moved 403  specific out of ibm4xx.h 
- *	Version 1.1 Oct 25, 2001 - T. Rini
- *	Lots of cleanups.
  */
 
 

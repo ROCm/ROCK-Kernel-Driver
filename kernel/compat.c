@@ -18,6 +18,20 @@
 
 #include <asm/uaccess.h>
 
+int get_compat_timespec(struct timespec *ts, struct compat_timespec *cts)
+{
+	return (verify_area(VERIFY_READ, cts, sizeof(*cts)) ||
+			__get_user(ts->tv_sec, &cts->tv_sec) ||
+			__get_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
+}
+
+int put_compat_timespec(struct timespec *ts, struct compat_timespec *cts)
+{
+	return (verify_area(VERIFY_WRITE, cts, sizeof(*cts)) ||
+			__put_user(ts->tv_sec, &cts->tv_sec) ||
+			__put_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
+}
+
 static long compat_nanosleep_restart(struct restart_block *restart)
 {
 	unsigned long expire = restart->arg0, now = jiffies;
@@ -50,15 +64,12 @@ static long compat_nanosleep_restart(struct restart_block *restart)
 asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 		struct compat_timespec *rmtp)
 {
-	struct compat_timespec ct;
 	struct timespec t;
 	struct restart_block *restart;
 	unsigned long expire;
 
-	if (copy_from_user(&ct, rqtp, sizeof(ct)))
+	if (get_compat_timespec(&t, rqtp))
 		return -EFAULT;
-	t.tv_sec = ct.tv_sec;
-	t.tv_nsec = ct.tv_nsec;
 
 	if ((t.tv_nsec >= 1000000000L) || (t.tv_nsec < 0) || (t.tv_sec < 0))
 		return -EINVAL;
@@ -71,9 +82,7 @@ asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 
 	if (rmtp) {
 		jiffies_to_timespec(expire, &t);
-		ct.tv_sec = t.tv_sec;
-		ct.tv_nsec = t.tv_nsec;
-		if (copy_to_user(rmtp, &ct, sizeof(ct)))
+		if (put_compat_timespec(&t, rmtp))
 			return -EFAULT;
 	}
 	restart = &current_thread_info()->restart_block;

@@ -453,7 +453,7 @@ bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
 	int totalwidth   = tvnorm->totalwidth;
 	int scaledtwidth = tvnorm->scaledtwidth;
 
-	if (btv->digital_video) {
+	if (bttv_tvcards[btv->type].muxsel[btv->input] < 0) {
 		swidth       = 720;
 		totalwidth   = 858;
 		scaledtwidth = 858;
@@ -764,15 +764,15 @@ bttv_buffer_risc(struct bttv *btv, struct bttv_buffer *buf)
 		case V4L2_FIELD_INTERLACED:
 			bttv_calc_geo(btv,&buf->geo,buf->vb.width,
 				      buf->vb.height,1,buf->tvnorm);
-			lines     = buf->vb.height >> 1;
-			ypadding  = buf->vb.width;
+			lines    = buf->vb.height >> 1;
+			ypadding = buf->vb.width;
 			cpadding = buf->vb.width >> buf->fmt->hshift;
 			bttv_risc_planar(btv,&buf->top,
 					 buf->vb.dma.sglist,
 					 0,buf->vb.width,ypadding,lines,
 					 uoffset,voffset,
 					 buf->fmt->hshift,
-					 buf->fmt->vshift >> 1,
+					 buf->fmt->vshift,
 					 cpadding);
 			bttv_risc_planar(btv,&buf->bottom,
 					 buf->vb.dma.sglist,
@@ -780,7 +780,7 @@ bttv_buffer_risc(struct bttv *btv, struct bttv_buffer *buf)
 					 uoffset+cpadding,
 					 voffset+cpadding,
 					 buf->fmt->hshift,
-					 buf->fmt->vshift >> 1,
+					 buf->fmt->vshift,
 					 cpadding);
 			break;
 		default:

@@ -17,11 +17,12 @@
 /* External Global Variables */
 
 extern struct hw_interrupt_type *ppc4xx_pic;
-
+extern unsigned int ibm4xxPIC_NumInitSenses;
+extern unsigned char *ibm4xxPIC_InitSenses;
 
 /* Function Prototypes */
 
-extern void	 ppc4xx_pic_init(void);
-extern int	 ppc4xx_pic_get_irq(struct pt_regs *regs);
+extern void ppc4xx_pic_init(void);
+extern int ppc4xx_pic_get_irq(struct pt_regs *regs);
 
-#endif /* __PPC4XX_PIC_H__ */
+#endif				/* __PPC4XX_PIC_H__ */

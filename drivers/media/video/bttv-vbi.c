@@ -65,14 +65,17 @@ vbi_buffer_risc(struct bttv *btv, struct bttv_buffer *buf, int lines)
 static int vbi_buffer_setup(struct file *file, int *count, int *size)
 {
 	struct bttv_fh *fh = file->private_data;
+	struct bttv *btv = fh->btv;
 
 	if (0 == *count)
 		*count = vbibufs;
 	*size = fh->lines * 2 * 2048;
+	dprintk("setup: lines=%d\n",fh->lines);
 	return 0;
 }
 
-static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb)
+static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+			      enum v4l2_field field)
 {
 	struct bttv_fh *fh = file->private_data;
 	struct bttv *btv = fh->btv;
@@ -90,8 +93,10 @@ static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb)
 			goto fail;
 	}
 	buf->vb.state = STATE_PREPARED;
-	dprintk("buf prepare %p: top=%p bottom=%p\n",
-		vb,&buf->top,&buf->bottom);
+	buf->vb.field = field;
+	dprintk("buf prepare %p: top=%p bottom=%p field=%s\n",
+		vb, &buf->top, &buf->bottom,
+		v4l2_field_names[buf->vb.field]);
 	return 0;
 
  fail:

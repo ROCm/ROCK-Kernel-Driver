@@ -1440,7 +1440,7 @@ static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
 	server->mnt_path = p;
 
 	p = nfs_copy_user_string(server->ip_addr, &data->client_addr,
-			sizeof(server->ip_addr));
+			sizeof(server->ip_addr) - 1);
 	if (IS_ERR(p))
 		goto out_err;
 

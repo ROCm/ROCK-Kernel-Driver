@@ -193,7 +193,6 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 #define memcpy_fromio(a,b,c)   memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
 
-#ifdef __KERNEL__
 /*
  * Map in an area of physical address space, for accessing
  * I/O devices etc.
@@ -264,8 +263,6 @@ extern inline void * phys_to_virt(unsigned long address)
  */
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 #define page_to_bus(page)	(page_to_phys(page) + PCI_DRAM_OFFSET)
-
-#endif /* __KERNEL__ */
 
 /*
  * Enforce In-order Execution of I/O:

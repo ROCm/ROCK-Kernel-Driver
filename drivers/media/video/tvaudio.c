@@ -146,17 +146,7 @@ static unsigned short normal_i2c[] = {
 	I2C_PIC16C54  >> 1,
 	I2C_CLIENT_END };
 static unsigned short normal_i2c_range[2] = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short probe[2]            = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short probe_range[2]      = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore[2]           = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore_range[2]     = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short force[2]            = { I2C_CLIENT_END, I2C_CLIENT_END };
-static struct i2c_client_address_data addr_data = {
-	normal_i2c, normal_i2c_range, 
-	probe, probe_range, 
-	ignore, ignore_range, 
-	force
-};
+I2C_CLIENT_INSMOD;
 
 static struct i2c_driver driver;
 static struct i2c_client client_template;
@@ -1088,6 +1078,19 @@ static int tea6300_shift12(int val) { return val >> 12; }
 static int tda8425_shift10(int val) { return (val >> 10) | 0xc0; }
 static int tda8425_shift12(int val) { return (val >> 12) | 0xf0; }
 
+static int tda8425_initialize(struct CHIPSTATE *chip)
+{
+	struct CHIPDESC *desc = chiplist + chip->type;
+	int inputmap[8] = { /* tuner	*/ TDA8425_S1_CH2, /* radio  */ TDA8425_S1_CH1,
+			    /* extern	*/ TDA8425_S1_CH1, /* intern */ TDA8425_S1_OFF,
+			    /* off	*/ TDA8425_S1_OFF, /* on     */ TDA8425_S1_CH2};
+
+	if (chip->c.adapter->id == (I2C_ALGO_BIT | I2C_HW_B_RIVA)) {
+		memcpy (desc->inputmap, inputmap, sizeof (inputmap));
+	}
+	return 0;
+}
+
 static void tda8425_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int s1 = chip->shadow.bytes[TDA8425_S1+1] & 0xe1;
@@ -1188,7 +1191,7 @@ static struct CHIPDESC chiplist[] = {
 		.inputreg   = TDA9873_SW,
 		.inputmute  = TDA9873_MUTE | TDA9873_AUTOMUTE,
 		.inputmap   = {0xa0, 0xa2, 0xa0, 0xa0, 0xc0},
-		.inputmask  = TDA9873_INP_MASK | TDA9873_MUTE | TDA9873_AUTOMUTE
+		.inputmask  = TDA9873_INP_MASK|TDA9873_MUTE|TDA9873_AUTOMUTE,
 		
 	},
 	{
@@ -1285,8 +1288,8 @@ static struct CHIPDESC chiplist[] = {
 		.registers  = 9,
 		.flags      = CHIP_HAS_VOLUME | CHIP_HAS_BASSTREBLE | CHIP_HAS_INPUTSEL,
 
-		.leftreg    = TDA8425_VR,
-		.rightreg   = TDA8425_VL,
+		.leftreg    = TDA8425_VL,
+		.rightreg   = TDA8425_VR,
 		.bassreg    = TDA8425_BA,
 		.treblereg  = TDA8425_TR,
 		.volfunc    = tda8425_shift10,
@@ -1298,6 +1301,7 @@ static struct CHIPDESC chiplist[] = {
 		.inputmute  = TDA8425_S1_OFF,
 
 		.setmode    = tda8425_setmode,
+		.initialize = tda8425_initialize,
 	},
 	{
 		.name       = "pic16c54 (PV951)",
@@ -1316,7 +1320,7 @@ static struct CHIPDESC chiplist[] = {
 			     PIC16C54_MISC_SND_NOTMUTE},
 		.inputmute  = PIC16C54_MISC_SND_MUTE,
 	},
-	{ .name = NULL } /* EOF */
+	{ name: NULL } /* EOF */
 };
 
 
@@ -1544,19 +1548,20 @@ static int chip_command(struct i2c_client *client,
 
 
 static struct i2c_driver driver = {
-	.name		= "generic i2c audio driver",
-	.id		= I2C_DRIVERID_TVAUDIO,
-	.flags		= I2C_DF_NOTIFY,
-	.attach_adapter	= chip_probe,
-	.detach_client	= chip_detach,
-	.command	= chip_command,
+	.owner           = THIS_MODULE,
+        .name            = "generic i2c audio driver",
+        .id              = I2C_DRIVERID_TVAUDIO,
+        .flags           = I2C_DF_NOTIFY,
+        .attach_adapter  = chip_probe,
+        .detach_client   = chip_detach,
+        .command         = chip_command,
 };
 
 static struct i2c_client client_template =
 {
-	.name		= "(unset)",
-	.flags		= I2C_CLIENT_ALLOW_USE,
-	.driver		= &driver,
+        .name   = "(unset)",
+	.flags  = I2C_CLIENT_ALLOW_USE,
+        .driver = &driver,
 };
 
 static int audiochip_init_module(void)
