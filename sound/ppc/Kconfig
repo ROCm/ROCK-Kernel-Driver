@@ -6,6 +6,7 @@ menu "ALSA PowerMac devices"
 config SND_POWERMAC
 	tristate "PowerMac (AWACS, DACA, Burgundy, Tumbler, Keywest)"
 	depends on SND
+	select SND_PCM
 
 endmenu
 

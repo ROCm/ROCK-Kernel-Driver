@@ -257,17 +257,12 @@ static int midisynth_unuse(void *private_data, snd_seq_port_subscribe_t *info)
 /* delete given midi synth port */
 static void snd_seq_midisynth_delete(seq_midisynth_t *msynth)
 {
-	snd_seq_port_info_t port;
-	
 	if (msynth == NULL)
 		return;
 
 	if (msynth->seq_client > 0) {
 		/* delete port */
-		memset(&port, 0, sizeof(port));
-		port.addr.client = msynth->seq_client;
-		port.addr.port = msynth->seq_port;
-		snd_seq_kernel_client_ctl(port.addr.client, SNDRV_SEQ_IOCTL_DELETE_PORT, &port);
+		snd_seq_event_port_detach(msynth->seq_client, msynth->seq_port);
 	}
 
 	if (msynth->parser)
@@ -285,7 +280,7 @@ static int set_client_name(seq_midisynth_client_t *client, snd_card_t *card,
 	cinfo.client = client->seq_client;
 	cinfo.type = KERNEL_CLIENT;
 	name = rmidi->name[0] ? (const char *)rmidi->name : "External MIDI";
-	snprintf(cinfo.name, sizeof(cinfo.name), "Rawmidi %d - %s", card->number, name);
+	snprintf(cinfo.name, sizeof(cinfo.name), "%s - Rawmidi %d", name, card->number);
 	return snd_seq_kernel_client_ctl(client->seq_client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, &cinfo);
 }
 
@@ -443,7 +438,6 @@ snd_seq_midisynth_unregister_port(snd_seq_device_t *dev)
 		up(&register_mutex);
 		return -ENODEV;
 	}
-	snd_seq_event_port_detach(client->seq_client, client->ports[device]->seq_port);
 	ports = client->ports_per_device[device];
 	client->ports_per_device[device] = 0;
 	msynth = client->ports[device];

@@ -292,6 +292,9 @@ int patch_wolfson11(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * Tritech codec
+ */
 int patch_tritech_tr28028(ac97_t * ac97)
 {
 	snd_ac97_write_cache(ac97, 0x26, 0x0300);
@@ -301,6 +304,9 @@ int patch_tritech_tr28028(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * Sigmatel STAC97xx codecs
+ */
 static int patch_sigmatel_stac9700_3d(ac97_t * ac97)
 {
 	snd_kcontrol_t *kctl;
@@ -441,6 +447,9 @@ int patch_sigmatel_stac9756(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * Cirrus Logic CS42xx codecs
+ */
 static const snd_kcontrol_new_t snd_ac97_cirrus_controls_spdif[2] = {
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH), AC97_CSR_SPDIF, 15, 1, 0),
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA", AC97_CSR_ACMODE, 0, 3, 0)
@@ -499,6 +508,9 @@ int patch_cirrus_cs4299(ac97_t * ac97)
 	return patch_cirrus_spdif(ac97);
 }
 
+/*
+ * Conexant codecs
+ */
 static const snd_kcontrol_new_t snd_ac97_conexant_controls_spdif[1] = {
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH), AC97_CXR_AUDIO_MISC, 3, 1, 0),
 };
@@ -530,6 +542,9 @@ int patch_conexant(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * Analog Device AD18xx, AD19xx codecs
+ */
 int patch_ad1819(ac97_t * ac97)
 {
 	// patch for Analog Devices
@@ -652,7 +667,7 @@ int patch_ad1881(ac97_t * ac97)
 
 static const snd_kcontrol_new_t snd_ac97_controls_ad1885[] = {
 	AC97_SINGLE("Digital Mono Direct", AC97_AD_MISC, 11, 1, 0),
-	AC97_SINGLE("Digital Audio Mode", AC97_AD_MISC, 12, 1, 0),
+	/* AC97_SINGLE("Digital Audio Mode", AC97_AD_MISC, 12, 1, 0), */ /* seems problematic */
 	AC97_SINGLE("Low Power Mixer", AC97_AD_MISC, 14, 1, 0),
 	AC97_SINGLE("Zero Fill DAC", AC97_AD_MISC, 15, 1, 0),
 };
@@ -681,6 +696,9 @@ int patch_ad1885(ac97_t * ac97)
 	/* turn off jack sense bits D8 & D9 */
 	jack = snd_ac97_read(ac97, AC97_AD_JACK_SPDIF);
 	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, jack | 0x0300);
+
+	/* set default */
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, 0x0404);
 
 	ac97->build_ops = &patch_ad1885_build_ops;
 	return 0;
@@ -799,7 +817,7 @@ int patch_ad1981b(ac97_t *ac97)
 	return 0;
 }
 
-static int snd_ac97_ad1980_lohpsel_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+static int snd_ac97_ad1888_lohpsel_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
 	uinfo->count = 1;
@@ -808,7 +826,7 @@ static int snd_ac97_ad1980_lohpsel_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_i
 	return 0;
 }
 
-static int snd_ac97_ad1980_lohpsel_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t* ucontrol)
+static int snd_ac97_ad1888_lohpsel_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t* ucontrol)
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	unsigned short val;
@@ -818,7 +836,7 @@ static int snd_ac97_ad1980_lohpsel_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_va
 	return 0;
 }
 
-static int snd_ac97_ad1980_lohpsel_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+static int snd_ac97_ad1888_lohpsel_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	unsigned short val;
@@ -829,7 +847,7 @@ static int snd_ac97_ad1980_lohpsel_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_va
 				    AC97_AD198X_LOSEL | AC97_AD198X_HPSEL, val);
 }
 
-static int snd_ac97_ad1980_downmix_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+static int snd_ac97_ad1888_downmix_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	static char *texts[3] = {"Off", "6 -> 4", "6 -> 2"};
 
@@ -842,7 +860,7 @@ static int snd_ac97_ad1980_downmix_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_i
 	return 0;
 }
 
-static int snd_ac97_ad1980_downmix_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t* ucontrol)
+static int snd_ac97_ad1888_downmix_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t* ucontrol)
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	unsigned short val;
@@ -855,7 +873,7 @@ static int snd_ac97_ad1980_downmix_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_va
 	return 0;
 }
 
-static int snd_ac97_ad1980_downmix_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+static int snd_ac97_ad1888_downmix_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	unsigned short val;
@@ -871,51 +889,47 @@ static int snd_ac97_ad1980_downmix_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_va
 				    AC97_AD198X_DMIX0 | AC97_AD198X_DMIX1, val);
 }
 
-static const snd_kcontrol_new_t snd_ac97_ad1980_controls[] = {
+static const snd_kcontrol_new_t snd_ac97_ad1888_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Exchange Front/Surround",
-		.info = snd_ac97_ad1980_lohpsel_info,
-		.get = snd_ac97_ad1980_lohpsel_get,
-		.put = snd_ac97_ad1980_lohpsel_put
+		.info = snd_ac97_ad1888_lohpsel_info,
+		.get = snd_ac97_ad1888_lohpsel_get,
+		.put = snd_ac97_ad1888_lohpsel_put
 	},
 	AC97_SINGLE("Spread Front to Surround and Center/LFE", AC97_AD_MISC, 7, 1, 0),
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Downmix",
-		.info = snd_ac97_ad1980_downmix_info,
-		.get = snd_ac97_ad1980_downmix_get,
-		.put = snd_ac97_ad1980_downmix_put
+		.info = snd_ac97_ad1888_downmix_info,
+		.get = snd_ac97_ad1888_downmix_get,
+		.put = snd_ac97_ad1888_downmix_put
 	},
 	AC97_SINGLE("Surround Jack as Input", AC97_AD_MISC, 12, 1, 0),
 	AC97_SINGLE("Center/LFE Jack as Input", AC97_AD_MISC, 11, 1, 0),
 };
 
-static int patch_ad1980_specific(ac97_t *ac97)
+static int patch_ad1888_specific(ac97_t *ac97)
 {
-	int err;
-
 	/* rename 0x04 as "Master" and 0x02 as "Master Surround" */
 	snd_ac97_rename_ctl(ac97, "Master Playback Switch", "Master Surround Playback Switch");
 	snd_ac97_rename_ctl(ac97, "Master Playback Volume", "Master Surround Playback Volume");
 	snd_ac97_rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
 	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
-	if ((err = patch_build_controls(ac97, &snd_ac97_ad198x_2cmic, 1)) < 0)
-		return err;
-	return patch_build_controls(ac97, snd_ac97_ad1980_controls, ARRAY_SIZE(snd_ac97_ad1980_controls));
+	return patch_build_controls(ac97, snd_ac97_ad1888_controls, ARRAY_SIZE(snd_ac97_ad1888_controls));
 }
 
-static struct snd_ac97_build_ops patch_ad1980_build_ops = {
+static struct snd_ac97_build_ops patch_ad1888_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
-	.build_specific = patch_ad1980_specific
+	.build_specific = patch_ad1888_specific
 };
 
-int patch_ad1980(ac97_t * ac97)
+int patch_ad1888(ac97_t * ac97)
 {
 	unsigned short misc;
 	
 	patch_ad1881(ac97);
-	ac97->build_ops = &patch_ad1980_build_ops;
+	ac97->build_ops = &patch_ad1888_build_ops;
 	/* Switch FRONT/SURROUND LINE-OUT/HP-OUT default connection */
 	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
 	/* AD-compatible mode */
@@ -927,6 +941,27 @@ int patch_ad1980(ac97_t * ac97)
 			     AC97_AD198X_MSPLT |
 			     AC97_AD198X_AC97NC);
 	ac97->flags |= AC97_STEREO_MUTES;
+	return 0;
+}
+
+static int patch_ad1980_specific(ac97_t *ac97)
+{
+	int err;
+
+	if ((err = patch_ad1888_specific(ac97)) < 0)
+		return err;
+	return patch_build_controls(ac97, &snd_ac97_ad198x_2cmic, 1);
+}
+
+static struct snd_ac97_build_ops patch_ad1980_build_ops = {
+	.build_post_spdif = patch_ad198x_post_spdif,
+	.build_specific = patch_ad1980_specific
+};
+
+int patch_ad1980(ac97_t * ac97)
+{
+	patch_ad1888(ac97);
+	ac97->build_ops = &patch_ad1980_build_ops;
 	return 0;
 }
 
@@ -972,6 +1007,36 @@ int patch_ad1985(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * realtek ALC65x codecs
+ */
+static int snd_ac97_alc650_mic_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+        ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+        ucontrol->value.integer.value[0] = (ac97->regs[AC97_ALC650_MULTICH] >> 10) & 1;
+        return 0;
+}
+
+static int snd_ac97_alc650_mic_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+        ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	int change, val;
+	val = !!(snd_ac97_read(ac97, AC97_ALC650_MULTICH) & (1 << 10));
+	change = (ucontrol->value.integer.value[0] != val);
+	if (change) {
+		/* disable/enable vref */
+		snd_ac97_update_bits(ac97, AC97_ALC650_CLOCK, 1 << 12,
+				     ucontrol->value.integer.value[0] ? (1 << 12) : 0);
+		/* turn on/off center-on-mic */
+		snd_ac97_update_bits(ac97, AC97_ALC650_MULTICH, 1 << 10,
+				     ucontrol->value.integer.value[0] ? (1 << 10) : 0);
+		/* GPIO0 high for mic */
+		snd_ac97_update_bits(ac97, AC97_ALC650_GPIO_STATUS, 0x100,
+				     ucontrol->value.integer.value[0] ? 0 : 0x100);
+        }
+        return change;
+}
+
 static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("Duplicate Front", AC97_ALC650_MULTICH, 0, 1, 0),
 	AC97_SINGLE("Surround Down Mix", AC97_ALC650_MULTICH, 1, 1, 0),
@@ -994,42 +1059,13 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("Center/LFE DAC Switch", AC97_ALC650_LFE_DAC_VOL, 15, 1, 1),
 	AC97_DOUBLE("Center/LFE DAC Volume", AC97_ALC650_LFE_DAC_VOL, 8, 0, 31, 1),
 #endif
-};
-
-static const snd_kcontrol_new_t snd_ac97_control_alc650_mic =
-AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0);
-
-static int snd_ac97_alc650_mic_gpio_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
-{
-        ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
-        ucontrol->value.integer.value[0] = (ac97->regs[AC97_ALC650_MULTICH] >> 10) & 1;
-        return 0;
-}
-
-static int snd_ac97_alc650_mic_gpio_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
-{
-        ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
-        int change;
-        change = snd_ac97_update_bits(ac97, AC97_ALC650_MULTICH, 1 << 10,
-                                      ucontrol->value.integer.value[0] ? (1 << 10) : 0);
-        if (change) {
-                /* GPIO0 write for mic */
-                snd_ac97_update_bits(ac97, 0x76, 0x01,
-                                     ucontrol->value.integer.value[0] ? 0 : 0x01);
-                /* GPIO0 high for mic */
-                snd_ac97_update_bits(ac97, 0x78, 0x100,
-                                     ucontrol->value.integer.value[0] ? 0 : 0x100);
-        }
-        return change;
-}
-
-static const snd_kcontrol_new_t snd_ac97_control_alc650_mic_gpio = {
-        .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-        .name = "Mic As Center/LFE",
-        .info = snd_ac97_info_single,
-        .get = snd_ac97_alc650_mic_gpio_get,
-        .put = snd_ac97_alc650_mic_gpio_put,
-        .private_value = (1 << 16), /* for info */
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Mic As Center/LFE",
+		.info = snd_ac97_info_single,
+		.get = snd_ac97_alc650_mic_get,
+		.put = snd_ac97_alc650_mic_put,
+	},
 };
 
 static const snd_kcontrol_new_t snd_ac97_spdif_controls_alc650[] = {
@@ -1043,11 +1079,6 @@ static int patch_alc650_specific(ac97_t * ac97)
 	int err;
 
 	if ((err = patch_build_controls(ac97, snd_ac97_controls_alc650, ARRAY_SIZE(snd_ac97_controls_alc650))) < 0)
-		return err;
-	if ((err = patch_build_controls(ac97,
-					ac97->spec.dev_flags ?
-						&snd_ac97_control_alc650_mic :
-						&snd_ac97_control_alc650_mic_gpio, 1)) < 0)
 		return err;
 	if (ac97->ext_id & AC97_EI_SPDIF) {
 		if ((err = patch_build_controls(ac97, snd_ac97_spdif_controls_alc650, ARRAY_SIZE(snd_ac97_spdif_controls_alc650))) < 0)
@@ -1076,34 +1107,25 @@ int patch_alc650(ac97_t * ac97)
 		snd_ac97_read(ac97, AC97_ALC650_GPIO_STATUS) | 0x8000);
 
 	/* Enable SPDIF-IN only on Rev.E and above */
-	if (ac97->spec.dev_flags) {
-		/* enable spdif in */
-		snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
-				     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
-	}
+	val = snd_ac97_read(ac97, AC97_ALC650_CLOCK);
+	/* SPDIF IN with pin 47 */
+	if (ac97->spec.dev_flags)
+		val |= 0x03; /* enable */
+	else
+		val &= ~0x03; /* disable */
+	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK, val);
 
 	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
 	val &= ~0xc000; /* slot: 3,4,7,8,6,9 */
+	val &= ~(1 << 10); /* center-on-mic off */
 	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
 
-	if (! ac97->spec.dev_flags) {
-		/* set GPIO */
-		int mic_off;
-		mic_off = snd_ac97_read(ac97, AC97_ALC650_MULTICH) & (1 << 10);
-		/* GPIO0 direction */
-		val = snd_ac97_read(ac97, AC97_ALC650_GPIO_SETUP);
-		if (mic_off)
-			val &= ~0x01;
-		else
-			val |= 0x01;
-		snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_SETUP, val);
-		val = snd_ac97_read(ac97, AC97_ALC650_GPIO_STATUS);
-		if (mic_off)
-			val &= ~0x100;
-		else
-			val = val | 0x100;
-		snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_STATUS, val);
-	}
+	/* set GPIO0 for mic bias */
+	/* GPIO0 pin output, no interrupt, high */
+	snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_SETUP,
+			     snd_ac97_read(ac97, AC97_ALC650_GPIO_SETUP) | 0x01);
+	snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_STATUS,
+			     (snd_ac97_read(ac97, AC97_ALC650_GPIO_STATUS) | 0x100) & ~0x10);
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);
@@ -1111,10 +1133,37 @@ int patch_alc650(ac97_t * ac97)
 	return 0;
 }
 
+static int snd_ac97_alc655_mic_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+        ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+        ucontrol->value.integer.value[0] = (ac97->regs[AC97_ALC650_MULTICH] >> 10) & 1;
+        return 0;
+}
+
+static int snd_ac97_alc655_mic_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+        ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+        int change;
+
+	/* misc control; vrefout disable */
+	snd_ac97_update_bits(ac97, AC97_ALC650_CLOCK, 1 << 12,
+			     ucontrol->value.integer.value[0] ? (1 << 12) : 0);
+	change = snd_ac97_update_bits(ac97, AC97_ALC650_MULTICH, 1 << 10,
+				      ucontrol->value.integer.value[0] ? (1 << 10) : 0);
+	return change;
+}
+
+
 static const snd_kcontrol_new_t snd_ac97_controls_alc655[] = {
 	AC97_SINGLE("Duplicate Front", AC97_ALC650_MULTICH, 0, 1, 0),
 	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
-	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Mic As Center/LFE",
+		.info = snd_ac97_info_single,
+		.get = snd_ac97_alc655_mic_get,
+		.put = snd_ac97_alc655_mic_put,
+	},
 };
 
 static int alc655_iec958_route_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -1187,15 +1236,21 @@ static struct snd_ac97_build_ops patch_alc655_ops = {
 
 int patch_alc655(ac97_t * ac97)
 {
+	unsigned int val;
+
 	ac97->spec.dev_flags = (ac97->id == 0x414c4780); /* ALC658 */
 
 	ac97->build_ops = &patch_alc655_ops;
 
-	/* enable spdif in */
-	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
-			     snd_ac97_read(ac97, AC97_ALC650_MULTICH) | 0x8000);
-	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
-			     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x02);
+	/* adjust default values */
+	val = snd_ac97_read(ac97, 0x7a); /* misc control */
+	val |= (1 << 1); /* spdif input pin */
+	val &= ~(1 << 12); /* vref enable */
+	snd_ac97_write_cache(ac97, 0x7a, val);
+	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
+	val |= (1 << 15); /* enable spdif in */
+	val &= ~(1 << 10); /* disable center on mic */
+	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);
@@ -1203,6 +1258,9 @@ int patch_alc655(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * C-Media CM97xx codecs
+ */
 static const snd_kcontrol_new_t snd_ac97_cm9738_controls[] = {
 	AC97_SINGLE("Line-In As Surround", AC97_CM9738_VENDOR_CTRL, 10, 1, 0),
 	AC97_SINGLE("Duplicate Front", AC97_CM9738_VENDOR_CTRL, 13, 1, 0),
@@ -1312,7 +1370,10 @@ int patch_cm9739(ac97_t * ac97)
 	/* bit 13: enable internal vref output for mic */
 	/* bit 12: enable center/lfe */
 	/* bit 14: 0 = SPDIF, 1 = EAPD */
-	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, 0x3000);
+	val = (1 << 12) | (1 << 13);
+	if (! (ac97->ext_id & AC97_EI_SPDIF))
+		val |= (1 << 14);
+	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, val);
 
 	/* FIXME: set up GPIO */
 	snd_ac97_write_cache(ac97, 0x70, 0x0100);
@@ -1321,6 +1382,9 @@ int patch_cm9739(ac97_t * ac97)
 	return 0;
 }
 
+/*
+ * VIA VT1616 codec
+ */
 static const snd_kcontrol_new_t snd_ac97_controls_vt1616[] = {
 AC97_SINGLE("DC Offset removal", 0x5a, 10, 1, 0),
 AC97_SINGLE("Alternate Level to Surround Out", 0x5a, 15, 1, 0),

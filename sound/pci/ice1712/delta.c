@@ -511,20 +511,25 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
 		ice->num_total_dacs = 2;
+		ice->num_total_adcs = 2;
 		break;
 	case ICE1712_SUBDEVICE_DELTA410:
 		ice->num_total_dacs = 8;
+		ice->num_total_adcs = 2;
 		break;
 	case ICE1712_SUBDEVICE_DELTA44:
 	case ICE1712_SUBDEVICE_DELTA66:
 		ice->num_total_dacs = ice->omni ? 8 : 4;
+		ice->num_total_adcs = ice->omni ? 8 : 4;
 		break;
 	case ICE1712_SUBDEVICE_DELTA1010:
 	case ICE1712_SUBDEVICE_DELTA1010LT:
 		ice->num_total_dacs = 8;
+		ice->num_total_adcs = 8;
 		break;
 	case ICE1712_SUBDEVICE_VX442:
 		ice->num_total_dacs = 4;
+		ice->num_total_adcs = 4;
 		break;
 	}
 

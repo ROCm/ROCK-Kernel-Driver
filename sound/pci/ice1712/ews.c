@@ -406,15 +406,18 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_EWX2496:
 		ice->num_total_dacs = 2;
+		ice->num_total_adcs = 2;
 		break;	
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
 		ice->num_total_dacs = 8;
+		ice->num_total_adcs = 8;
 		break;
 	case ICE1712_SUBDEVICE_EWS88D:
 		break; /* no analog */
 	case ICE1712_SUBDEVICE_DMX6FIRE:
 		ice->num_total_dacs = 6;
+		ice->num_total_adcs = 6;
 		break;
 	}
 
