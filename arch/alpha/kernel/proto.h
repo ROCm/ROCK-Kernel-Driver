@@ -41,6 +41,18 @@ extern void lca_init_arch(void);
 extern void lca_machine_check(u64, u64, struct pt_regs *);
 extern void lca_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
+/* core_marvel.c */
+extern struct pci_ops marvel_pci_ops;
+extern void marvel_init_arch(void);
+extern void marvel_kill_arch(int);
+extern void marvel_machine_check(u64, u64, struct pt_regs *);
+extern void marvel_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
+extern int marvel_pa_to_nid(unsigned long);
+extern int marvel_cpuid_to_nid(int);
+extern unsigned long marvel_node_mem_start(int);
+extern unsigned long marvel_node_mem_size(int);
+extern int marvel_srmcons_allowed(void);
+
 /* core_mcpcia.c */
 extern struct pci_ops mcpcia_pci_ops;
 extern void mcpcia_init_arch(void);

@@ -147,6 +147,12 @@ extern int cdl_register_subpacket_annotation(struct el_subpacket_annotation *);
 extern int cdl_register_subpacket_handler(struct el_subpacket_handler *);
 
 /*
+ * err_marvel.c
+ */
+extern void marvel_machine_check(u64, u64, struct pt_regs *);
+extern void marvel_register_error_handlers(void);
+
+/*
  * err_titan.c
  */
 extern int titan_process_logout_frame(struct el_common *, int);
