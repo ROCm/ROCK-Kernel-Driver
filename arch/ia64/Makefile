@@ -79,12 +79,19 @@ check: vmlinux
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-CLEAN_FILES += include/asm-ia64/offsets.h vmlinux.gz bootloader
+CLEAN_FILES += include/asm-ia64/.offsets.h.stamp include/asm-ia64/offsets.h vmlinux.gz bootloader
 
 prepare: include/asm-ia64/offsets.h
 
 include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
+
+arch/ia64/kernel/asm-offsets.s: include/asm-ia64/.offsets.h.stamp
+
+include/asm-ia64/.offsets.h.stamp:
+	[ -s include/asm-ia64/offsets.h ] \
+	 || echo "#define IA64_TASK_SIZE 0" > include/asm-ia64/offsets.h
+	touch $@
 
 boot:	lib/lib.a vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
