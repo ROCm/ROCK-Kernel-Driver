@@ -655,7 +655,6 @@ io_init_node(cnodeid_t cnodeid)
 	struct semaphore *peer_sema = 0;
 	uint32_t	widget_partnum;
 	cpu_cookie_t	c = 0;
-	extern int hubdev_docallouts(vertex_hdl_t);
 
 	npdap = NODEPDA(cnodeid);
 
@@ -670,8 +669,6 @@ io_init_node(cnodeid_t cnodeid)
 	DBG("io_init_node: Initialize IO for cnode %d hubv(node) 0x%p npdap 0x%p\n", cnodeid, hubv, npdap);
 
 	ASSERT(hubv != GRAPH_VERTEX_NONE);
-
-	hubdev_docallouts(hubv);
 
 	/*
 	 * Read mfg info on this hub

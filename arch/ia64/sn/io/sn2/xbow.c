@@ -289,7 +289,7 @@ xbow_attach(vertex_hdl_t conn)
      */
     vhdl = NULL;
     vhdl = hwgraph_register(conn, EDGE_LBL_XBOW, 0,
-	   DEVFS_FL_AUTO_DEVNUM, 0, 0,
+	   0, 0, 0,
 	   S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
 	   (struct file_operations *)&xbow_fops, (void *)xbow);
     if (!vhdl) {

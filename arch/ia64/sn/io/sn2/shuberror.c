@@ -35,7 +35,7 @@
 
 extern void hubni_eint_init(cnodeid_t cnode);
 extern void hubii_eint_init(cnodeid_t cnode);
-extern void hubii_eint_handler (int irq, void *arg, struct pt_regs *ep);
+extern irqreturn_t hubii_eint_handler (int irq, void *arg, struct pt_regs *ep);
 int hubiio_crb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo);
 int hubiio_prb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo);
 extern void bte_crb_error_handler(vertex_hdl_t hub_v, int btenum, int crbnum, ioerror_t *ioe, int bteop);
@@ -168,7 +168,7 @@ hubii_eint_init(cnodeid_t cnode)
 
 
 /*ARGSUSED*/
-void
+irqreturn_t
 hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
 {
     vertex_hdl_t	hub_v;
@@ -263,6 +263,8 @@ hubii_eint_handler (int irq, void *arg, struct pt_regs *ep)
      */
     (void)hubiio_crb_error_handler(hub_v, hinfo);
     (void)hubiio_prb_error_handler(hub_v, hinfo);
+
+    return IRQ_HANDLED;
 }
 
 /*

@@ -284,7 +284,7 @@ int __init init_ifconfig_net(void)
 {
 	ifconfig_net_handle = NULL;
 	ifconfig_net_handle = hwgraph_register(hwgraph_root, ".ifconfig_net",
-			0, DEVFS_FL_AUTO_DEVNUM,
+ 		        0, 0,
 			0, 0,
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
 			&ifconfig_net_fops, NULL);

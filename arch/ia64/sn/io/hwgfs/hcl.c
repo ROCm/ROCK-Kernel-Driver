@@ -164,7 +164,7 @@ int __init init_hcl(void)
 	 *
 	 */
 	hcl_handle = hwgraph_register(hwgraph_root, ".hcl",
-			0, DEVFS_FL_AUTO_DEVNUM,
+		        0, 0,
 			0, 0,
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
 			&hcl_fops, NULL);

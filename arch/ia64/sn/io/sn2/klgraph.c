@@ -216,7 +216,7 @@ klhwg_add_hub(vertex_hdl_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 	(void) hwgraph_path_add(node_vertex, EDGE_LBL_HUB, &myhubv);
 	rc = device_master_set(myhubv, node_vertex);
 	hub_mon = hwgraph_register(myhubv, EDGE_LBL_PERFMON,
-		0, DEVFS_FL_AUTO_DEVNUM,
+		0, 0,
 		0, 0,
 		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
 		&shub_mon_fops, (void *)(long)cnode);

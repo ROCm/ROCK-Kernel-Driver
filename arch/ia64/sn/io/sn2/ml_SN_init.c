@@ -62,9 +62,6 @@ mlreset(int slave)
 
 	/* early initialization of iograph */
 	iograph_early_init();
-
-	/* Initialize Hub Pseudodriver Management */
-	hubdev_init();
 }
 
 

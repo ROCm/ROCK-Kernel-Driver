@@ -3629,15 +3629,6 @@ extern int kl_ioerror_handler(cnodeid_t, cnodeid_t, cpuid_t,
 extern int hub_error_devenable(vertex_hdl_t, int, int);
 extern int  hub_dma_enabled(vertex_hdl_t);
 
-/* hubdev */
-extern void hubdev_init(void);
-extern void hubdev_register(int (*attach_method)(vertex_hdl_t));
-extern int hubdev_unregister(int (*attach_method)(vertex_hdl_t));
-extern int hubdev_docallouts(vertex_hdl_t hub);
-
-extern caddr_t hubdev_prombase_get(vertex_hdl_t hub);
-extern cnodeid_t hubdev_cnodeid_get(vertex_hdl_t hub);
-
 #endif /* __ASSEMBLY__ */
 #endif /* _KERNEL */
 #endif /* _ASM_IA64_SN_SN2_SHUBIO_H */

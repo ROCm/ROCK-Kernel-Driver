@@ -63,7 +63,7 @@ config IA64_GENERIC
 	  HP-simulator   For the HP simulator
 	  (<http://software.hp.com/ia64linux/>).
 	  HP-zx1         For HP zx1-based systems.
-	  SN1-simulator  For the SGI SN1 simulator.
+	  SGI-SN2	 For SGI Altix systems
 	  DIG-compliant  For DIG ("Developer's Interface Guide") compliant
 	  systems.
 
@@ -187,8 +187,8 @@ config ITANIUM_BSTEP_SPECIFIC
 # align cache-sensitive data to 128 bytes
 config IA64_L1_CACHE_SHIFT
 	int
-	default "7" if MCKINLEY || ITANIUM && IA64_SGI_SN1
-	default "6" if ITANIUM && !IA64_SGI_SN1
+	default "7" if MCKINLEY
+	default "6" if ITANIUM
 
 # align cache-sensitive data to 64 bytes
 config MCKINLEY_ASTEP_SPECIFIC
@@ -207,7 +207,7 @@ config MCKINLEY_A0_SPECIFIC
 
 config NUMA
 	bool "Enable NUMA support" if IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
-	default y if IA64_SGI_SN1 || IA64_SGI_SN2
+	default y if IA64_SGI_SN2
 	help
 	  Say Y to compile the kernel to support NUMA (Non-Uniform Memory
 	  Access).  This option is for configuring high-end multiprocessor
@@ -231,7 +231,7 @@ endchoice
 
 config DISCONTIGMEM
 	bool
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2 || (IA64_GENERIC || IA64_DIG || IA64_HP_ZX1) && NUMA
+	depends on IA64_SGI_SN2 || (IA64_GENERIC || IA64_DIG || IA64_HP_ZX1) && NUMA
 	default y
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
@@ -256,7 +256,7 @@ config VIRTUAL_MEM_MAP
 
 config IA64_MCA
 	bool "Enable IA-64 Machine Check Abort" if IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
-	default y if IA64_SGI_SN1 || IA64_SGI_SN2
+	default y if IA64_SGI_SN2
 	help
 	  Say Y here to enable machine check support for IA-64.  If you're
 	  unsure, answer Y.
@@ -290,17 +290,17 @@ config IOSAPIC
 
 config IA64_SGI_SN
 	bool
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	default y
 
 config HWGFS_FS
 	bool
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	default y
 
 config IA64_SGI_SN_DEBUG
 	bool "Enable extra debugging code"
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	help
 	  Turns on extra debugging code in the SGI SN (Scalable NUMA) platform
 	  for IA-64.  Unless you are debugging problems on an SGI SN IA-64 box,
@@ -308,14 +308,14 @@ config IA64_SGI_SN_DEBUG
 
 config IA64_SGI_SN_SIM
 	bool "Enable SGI Medusa Simulator Support"
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	help
 	  If you are compiling a kernel that will run under SGI's IA-64
 	  simulator (Medusa) then say Y, otherwise say N.
 
 config IA64_SGI_AUTOTEST
 	bool "Enable autotest (llsc). Option to run cache test instead of booting"
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	help
 	  Build a kernel used for hardware validation. If you include the
 	  keyword "autotest" on the boot command line, the kernel does NOT boot.
@@ -325,7 +325,7 @@ config IA64_SGI_AUTOTEST
 
 config SERIAL_SGI_L1_PROTOCOL
 	bool "Enable protocol mode for the L1 console"
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	help
 	  Uses protocol mode instead of raw mode for the level 1 console on the
 	  SGI SN (Scalable NUMA) platform for IA-64.  If you are compiling for
@@ -333,12 +333,12 @@ config SERIAL_SGI_L1_PROTOCOL
 
 config PERCPU_IRQ
 	bool
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	default y
 
 config PCIBA
 	tristate "PCIBA support"
-	depends on IA64_SGI_SN1 || IA64_SGI_SN2
+	depends on IA64_SGI_SN2
 	help
 	  IRIX PCIBA-inspired user mode PCI interface for the SGI SN (Scalable
 	  NUMA) platform for IA-64.  Unless you are compiling a kernel for an

@@ -11,13 +11,5 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN -DSHUB_SWAP_WAR
 
-obj-$(CONFIG_IA64_SGI_SN) += sgi_if.o xswitch.o sgi_io_sim.o cdl.o ate_utils.o \
-			     io.o machvec/ drivers/ platform_init/
-
-obj-$(CONFIG_IA64_SGI_SN2) += sn2/
-
-ifdef CONFIG_HWGFS_FS
-obj-$(CONFIG_HWGFS_FS) += hwgfs/
-else
-obj-$(CONFIG_DEVFS_FS) += hwgdfs/
-endif
+obj-y += sgi_if.o xswitch.o sgi_io_sim.o cdl.o ate_utils.o \
+	 io.o machvec/ drivers/ platform_init/ sn2/ hwgfs/

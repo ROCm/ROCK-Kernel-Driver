@@ -361,7 +361,7 @@ int init_ioconfig_bus(void)
 {
 	ioconfig_bus_handle = NULL;
 	ioconfig_bus_handle = hwgraph_register(hwgraph_root, ".ioconfig_bus",
-			0, DEVFS_FL_AUTO_DEVNUM,
+		        0, 0,
 			0, 0,
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
 			&ioconfig_bus_fops, NULL);

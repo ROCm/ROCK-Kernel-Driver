@@ -1215,7 +1215,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 
     ctlr_vhdl = NULL;
     ctlr_vhdl = hwgraph_register(pcibr_vhdl, EDGE_LBL_CONTROLLER, 0, 
-                DEVFS_FL_AUTO_DEVNUM, 0, 0,
+                0, 0, 0,
 		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0, 
 		(struct file_operations *)&pcibr_fops, (void *)pcibr_vhdl);
     ASSERT(ctlr_vhdl != NULL);

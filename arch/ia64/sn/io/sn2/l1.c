@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
