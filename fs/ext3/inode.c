@@ -2476,7 +2476,7 @@ ext3_mark_iloc_dirty(handle_t *handle,
 		/* ext3_do_update_inode() does journal_dirty_metadata */
 		brelse(iloc->bh);
 	} else {
-		printk(KERN_EMERG __FUNCTION__ ": called with no handle!\n");
+		printk(KERN_EMERG "%s: called with no handle!\n", __FUNCTION__);
 	}
 	return err;
 }
@@ -2564,7 +2564,8 @@ void ext3_dirty_inode(struct inode *inode)
 	if (current_handle &&
 		current_handle->h_transaction != handle->h_transaction) {
 		/* This task has a transaction open against a different fs */
-		printk(KERN_EMERG __FUNCTION__": transactions do not match!\n");
+		printk(KERN_EMERG "%s: transactions do not match!\n",
+		       __FUNCTION__);
 	} else {
 		jbd_debug(5, "marking dirty.  outer handle=%p\n",
 				current_handle);
