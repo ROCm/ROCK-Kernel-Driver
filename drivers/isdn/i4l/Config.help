@@ -1,0 +1,88 @@
+CONFIG_ISDN
+  This driver allows you to use an ISDN-card for networking
+  connections and as dialin/out device.  The isdn-tty's have a built
+  in AT-compatible modem emulator.  Network devices support autodial,
+  channel-bundling, callback and caller-authentication without having
+  a daemon running.  A reduced T.70 protocol is supported with tty's
+  suitable for German BTX.  On D-Channel, the protocols EDSS1
+  (Euro-ISDN) and 1TR6 (German style) are supported.  See
+  <file:Documentation/isdn/README> for more information.
+
+  ISDN support in the linux kernel is moving towards a new API,
+  called CAPI (Common ISDN Application Programming Interface).
+  Therefore the old ISDN4Linux layer is becoming obsolete. It is 
+  still usable, though, if you select this option.
+
+CONFIG_ISDN_PPP
+  Over digital connections such as ISDN, there is no need to
+  synchronize sender and recipient's clocks with start and stop bits
+  as is done over analog telephone lines. Instead, one can use
+  "synchronous PPP". Saying Y here will include this protocol. This
+  protocol is used by Cisco and Sun for example. So you want to say Y
+  here if the other end of your ISDN connection supports it. You will
+  need a special version of pppd (called ipppd) for using this
+  feature. See <file:Documentation/isdn/README.syncppp> and
+  <file:Documentation/isdn/syncPPP.FAQ> for more information.
+
+CONFIG_ISDN_MPP
+  With synchronous PPP enabled, it is possible to increase throughput
+  by bundling several ISDN-connections, using this protocol. See
+  <file:Documentation/isdn/README.syncppp> for more information.
+
+CONFIG_ISDN_PPP_VJ
+  This enables Van Jacobson header compression for synchronous PPP.
+  Say Y if the other end of the connection supports it.
+
+CONFIG_ISDN_PPP_BSDCOMP
+  Support for the BSD-Compress compression method for PPP, which uses
+  the LZW compression method to compress each PPP packet before it is
+  sent over the wire. The machine at the other end of the PPP link
+  (usually your ISP) has to support the BSD-Compress compression
+  method as well for this to be useful. Even if they don't support it,
+  it is safe to say Y here.
+
+CONFIG_ISDN_AUDIO
+  If you say Y here, the modem-emulator will support a subset of the
+  EIA Class 8 Voice commands. Using a getty with voice-support
+  (mgetty+sendfax by gert@greenie.muc.de with an extension, available
+  with the ISDN utility package for example), you will be able to use
+  your Linux box as an ISDN-answering machine. Of course, this must be
+  supported by the lowlevel driver also. Currently, the HiSax driver
+  is the only voice-supporting driver. See
+  <file:Documentation/isdn/README.audio> for more information.
+
+CONFIG_ISDN_X25
+  This feature provides the X.25 protocol over ISDN connections.
+  See <file:Documentation/isdn/README.x25> for more information
+  if you are thinking about using this.
+
+CONFIG_ISDN_DIVERSION
+  This option allows you to use some supplementary diversion
+  services in conjunction with the HiSax driver on an EURO/DSS1
+  line.
+
+  Supported options are CD (call deflection), CFU (Call forward
+  unconditional), CFB (Call forward when busy) and CFNR (call forward
+  not reachable). Additionally the actual CFU, CFB and CFNR state may
+  be interrogated.
+
+  The use of CFU, CFB, CFNR and interrogation may be limited to some
+  countries. The keypad protocol is still not implemented. CD should
+  work in all countries if the service has been subscribed to.
+
+  Please read the file <file:Documentation/isdn/README.diversion>.
+
+CONFIG_ISDN_TTY_FAX
+  If you say Y here, the modem-emulator will support a subset of the
+  Fax Class 1 and 2 commands. Using a getty with fax-support
+  (mgetty+sendfax, hylafax), you will be able to use your Linux box as
+  an ISDN-fax-machine. This must be supported by the lowlevel driver
+  also. See <file:Documentation/isdn/README.fax> for more information.
+
+CONFIG_ISDN_DRV_LOOP
+  This driver provides a virtual ISDN card. Its primary purpose is
+  testing of linklevel features or configuration without getting
+  charged by your service-provider for lots of phone calls.
+  You need will need the loopctrl utility from the latest isdn4k-utils
+  package to set up this driver.
+
