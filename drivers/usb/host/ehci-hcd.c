@@ -290,7 +290,7 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 		int msec = 500;
 
 		/* request handoff to OS */
-		cap &= 1 << 24;
+		cap |= 1 << 24;
 		pci_write_config_dword (to_pci_dev(ehci->hcd.self.controller), where, cap);
 
 		/* and wait a while for it to happen */
