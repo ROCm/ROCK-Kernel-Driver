@@ -436,7 +436,13 @@ DelFileRetry:
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Error in RMFile = %d", rc));
-	}
+	} 
+#ifdef CONFIG_CIFS_STATS
+        else {
+		atomic_inc(&tcon->num_deletes);
+        }
+#endif
+
 	if (pSMB)
 		cifs_buf_release(pSMB);
 	if (rc == -EAGAIN)
@@ -483,6 +489,12 @@ RmDirRetry:
 	if (rc) {
 		cFYI(1, ("Error in RMDir = %d", rc));
 	}
+#ifdef CONFIG_CIFS_STATS
+        else {
+		atomic_inc(&tcon->num_rmdirs);
+        }
+#endif
+
 	if (pSMB)
 		cifs_buf_release(pSMB);
 	if (rc == -EAGAIN)
@@ -528,6 +540,11 @@ MkDirRetry:
 	if (rc) {
 		cFYI(1, ("Error in Mkdir = %d", rc));
 	}
+#ifdef CONFIG_CIFS_STATS
+        else {
+		atomic_inc(&tcon->num_mkdirs);
+        }
+#endif
 	if (pSMB)
 		cifs_buf_release(pSMB);
 	if (rc == -EAGAIN)
@@ -624,6 +641,10 @@ openRetry:
 		    pfile_info->EndOfFile = pSMBr->EndOfFile;
 		    pfile_info->NumberOfLinks = cpu_to_le32(1);
 		}
+
+#ifdef CONFIG_CIFS_STATS
+		atomic_inc(&tcon->num_opens);
+#endif
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);

@@ -84,12 +84,12 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x\n\tSMB session status: %d\tTCP session status: %d",
+			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x\n\tSMB session status: %d\tTCP status: %d",
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
 				ses->serverOS, ses->serverNOS, ses->capabilities,ses->status,ses->server->tcpStatus);
 		buf += length;
 		if(ses->server) {
-			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x Req Active: %d",
+			buf += sprintf(buf, "\n\tLocal Users To Server: %d SecMode: 0x%x Req Active: %d",
 				atomic_read(&ses->server->socketUseCount),
 				ses->server->secMode,
 				atomic_read(&ses->server->inFlight));
@@ -125,7 +125,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) %s Uses: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\nPathComponentMax: %d Status: %d",
+			    "\n%d) %s Uses: %d Type: %s Characteristics: 0x%x Attributes: 0x%x\nPathComponentMax: %d Status: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,
@@ -145,13 +145,24 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		if(tcon->tidStatus == CifsNeedReconnect)
 			buf += sprintf(buf, "\tDISCONNECTED ");
 #ifdef CONFIG_CIFS_STATS
-		length = sprintf(buf,
-			"\nTotal SMBs: %d Reads: %d BytesRead %lld Writes: %d BytesWritten %lld",
+		length = sprintf(buf,"\nSMBs: %d Oplock Breaks: %d",
 			atomic_read(&tcon->num_smbs_sent),
+			atomic_read(&tcon->num_oplock_brks));
+		buf += length;
+		length = sprintf(buf,"\nReads: %d Bytes %lld",
 			atomic_read(&tcon->num_reads),
-			(long long)(tcon->bytes_read),
+			(long long)(tcon->bytes_read));
+		buf += length;
+		length = sprintf(buf,"\nWrites: %d Bytes: %lld",
 			atomic_read(&tcon->num_writes),
 			(long long)(tcon->bytes_written));
+		buf += length;
+		length = sprintf(buf,
+                        "\nOpens: %d Deletes: %d\nMkdirs: %d Rmdirs: %d",
+			atomic_read(&tcon->num_opens),
+			atomic_read(&tcon->num_deletes),
+			atomic_read(&tcon->num_mkdirs),
+			atomic_read(&tcon->num_rmdirs));
 		buf += length;
 #endif
 

@@ -1,7 +1,7 @@
-version 1.14 May 14, 2004
+version 1.16 May 27, 2004
 
-A Partial List of Known Problems and Missing Features
-=====================================================
+A Partial List of Missing Features
+==================================
 
 Contributions are welcome.  There are plenty of opportunities
 for visible, important contributions to this module.  Here
@@ -54,7 +54,8 @@ than resending (helps reduce server resource utilization and avoid
 spurious oplock breaks).
 
 p) Improve performance of readpages by sending more than one read
-at a time when 8 pages or more are requested.
+at a time when 8 pages or more are requested.  Evaluate whether
+reads larger than 16K would be helpful.
 
 q) For support of Windows9x/98 we need to retry failed mounts
 to *SMBSERVER (default server name) with the uppercase hostname
@@ -66,8 +67,10 @@ to Windows servers)
 s) Finish fcntl D_NOTIFY support so kde and gnome file list windows
 will autorefresh
 
+t) Add GUI tool to configure /proc/fs/cifs settings and for display of
+the CIFS statistics
 
-KNOWN BUGS (updated May 14, 2004)
+KNOWN BUGS (updated May 27, 2004)
 ====================================
 1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
@@ -88,9 +91,19 @@ than to Windows.
 page writes begin in the middle of a page (pages can get zeroed).
 6) Write caching done incorrectly when files are only opened
 with write permission by the application.
+7) Rename of files that are hardlinked does not work correctly e.g.
+	ln source target
+	mv source target 
+This should be no op since files are linked but in cifs it causes
+the source file to go away. This may require implementation of
+the cifs POSIX extensions (Unix Extensions version 2) for
+it to be done correctly since Samba is failing the rename,
+(rather than ignoring it) so the client not knowing they
+are linked proceeds to delete the target and then retry the
+move which succeeds this time (but the source is gone).
 
 Misc testing to do
-=================
+==================
 1) check out max path names and max path name components against various server
 types. Return max path name in stat -f information
 
@@ -102,5 +115,6 @@ there are some easy changes that can be done to parallelize sequential writes,
 and when signing is disabled to request larger read sizes (larger than 
 negotiated size) and send larger write sizes to modern servers.
 
-4) More exhaustively test the recently added NT4 support
+4) More exhaustively test the recently added NT4 support against various
+NT4 service pack levels.
 
