@@ -118,7 +118,7 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 		writel (temp, &ehci->regs->port_status [i]);
 	}
 	i = HCS_N_PORTS (ehci->hcs_params);
-	wait_ms (20);
+	msleep (20);
 	while (i--) {
 		temp = readl (&ehci->regs->port_status [i]);
 		if ((temp & PORT_SUSPEND) == 0)

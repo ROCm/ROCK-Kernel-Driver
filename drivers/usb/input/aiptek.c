@@ -922,7 +922,7 @@ aiptek_query(struct aiptek *aiptek, unsigned char command, unsigned char data)
 		kfree(buf);
 		return -EIO;
 	}
-	wait_ms(aiptek->curSetting.programmableDelay);
+	msleep(aiptek->curSetting.programmableDelay);
 
 	if ((ret =
 	     aiptek_get_report(aiptek, 3, 2, buf, sizeof_buf)) != sizeof_buf) {

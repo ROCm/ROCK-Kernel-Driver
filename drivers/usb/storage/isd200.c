@@ -806,7 +806,7 @@ static int isd200_srst( struct us_data *us )
 		retStatus = ISD200_ERROR;
 	} else {
 		/* delay 10ms to give the drive a chance to see it */
-		wait_ms(10);
+		msleep(10);
 
 		transferStatus = isd200_action( us, ACTION_REENABLE, NULL, 0 );
 		if (transferStatus != ISD200_TRANSPORT_GOOD) {
@@ -814,7 +814,7 @@ static int isd200_srst( struct us_data *us )
 			retStatus = ISD200_ERROR;
 		} else {
 			/* delay 50ms to give the drive a chance to recover after SRST */
-			wait_ms(50);
+			msleep(50);
 		}
 	}
 

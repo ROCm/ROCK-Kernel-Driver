@@ -297,7 +297,7 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 
 		/* and wait a while for it to happen */
 		do {
-			wait_ms (10);
+			msleep(10);
 			msec -= 10;
 			pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), where, &cap);
 		} while ((cap & (1 << 16)) && msec);
