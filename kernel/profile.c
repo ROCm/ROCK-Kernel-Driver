@@ -8,12 +8,14 @@
 #include <linux/bootmem.h>
 #include <linux/notifier.h>
 #include <linux/mm.h>
+#include <linux/cpumask.h>
 #include <asm/sections.h>
 
 unsigned int * prof_buffer;
 unsigned long prof_len;
 unsigned long prof_shift;
 int prof_on;
+cpumask_t prof_cpu_mask = CPU_MASK_ALL;
 
 int __init profile_setup(char * str)
 {
@@ -163,3 +165,46 @@ EXPORT_SYMBOL_GPL(unregister_profile_notifier);
 
 EXPORT_SYMBOL_GPL(profile_event_register);
 EXPORT_SYMBOL_GPL(profile_event_unregister);
+
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+#include <asm/uaccess.h>
+
+static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
+			int count, int *eof, void *data)
+{
+	int len = cpumask_scnprintf(page, count, *(cpumask_t *)data);
+	if (count - len < 2)
+		return -EINVAL;
+	len += sprintf(page + len, "\n");
+	return len;
+}
+
+static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
+					unsigned long count, void *data)
+{
+	cpumask_t *mask = (cpumask_t *)data;
+	unsigned long full_count = count, err;
+	cpumask_t new_value;
+
+	err = cpumask_parse(buffer, count, new_value);
+	if (err)
+		return err;
+
+	*mask = new_value;
+	return full_count;
+}
+
+void create_prof_cpu_mask(struct proc_dir_entry *root_irq_dir)
+{
+	struct proc_dir_entry *entry;
+
+	/* create /proc/irq/prof_cpu_mask */
+	if (!(entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir)))
+		return;
+	entry->nlink = 1;
+	entry->data = (void *)&prof_cpu_mask;
+	entry->read_proc = prof_cpu_mask_read_proc;
+	entry->write_proc = prof_cpu_mask_write_proc;
+}
+#endif /* CONFIG_PROC_FS */

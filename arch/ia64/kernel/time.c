@@ -196,7 +196,6 @@ static inline void
 ia64_do_profile (struct pt_regs * regs)
 {
 	unsigned long ip, slot;
-	extern cpumask_t prof_cpu_mask;
 
 	profile_hook(regs);
 

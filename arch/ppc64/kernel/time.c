@@ -117,7 +117,6 @@ static unsigned adjusting_time = 0;
 static inline void ppc64_do_profile(struct pt_regs *regs)
 {
 	unsigned long nip;
-	extern unsigned long prof_cpu_mask;
 
 	profile_hook(regs);
 
@@ -133,7 +132,7 @@ static inline void ppc64_do_profile(struct pt_regs *regs)
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
 	 * (default is all CPUs.)
 	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
 		return;
 
 	nip -= (unsigned long)_stext;

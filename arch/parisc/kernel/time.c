@@ -51,9 +51,6 @@ static inline void
 parisc_do_profile(struct pt_regs *regs)
 {
 	unsigned long pc = regs->iaoq[0];
-#if 0
-	extern unsigned long prof_cpu_mask;
-#endif
 	extern char _stext;
 
 	profile_hook(regs);
@@ -69,7 +66,7 @@ parisc_do_profile(struct pt_regs *regs)
 	 * only look at the cpus specified in this mask 
 	 */
 
-	if (!((1 << smp_processor_id()) & prof_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
 		return;
 #endif
 

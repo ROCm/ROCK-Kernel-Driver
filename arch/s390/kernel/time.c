@@ -185,7 +185,6 @@ extern char _stext, _etext;
 static inline void s390_do_profile(struct pt_regs * regs)
 {
 	unsigned long eip;
-	extern cpumask_t prof_cpu_mask;
 
 	profile_hook(regs);
 

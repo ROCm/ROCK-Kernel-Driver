@@ -70,8 +70,6 @@ extern atomic_t irq_mis_count;
 
 static inline void __do_profile(unsigned long eip)
 {
-	extern unsigned long prof_cpu_mask;
- 
 	if (!prof_buffer)
 		return;
 
@@ -79,7 +77,7 @@ static inline void __do_profile(unsigned long eip)
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
 	 * (default is all CPUs.)
 	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
 		return;
 
 	eip -= (unsigned long)_stext;

@@ -251,7 +251,6 @@ EXPORT_SYMBOL(do_settimeofday);
 static long last_rtc_update;
 
 /* Profiling definitions */
-extern unsigned long prof_cpu_mask;
 extern unsigned int * prof_buffer;
 extern unsigned long prof_len;
 extern unsigned long prof_shift;

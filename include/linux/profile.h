@@ -6,18 +6,23 @@
 #include <linux/kernel.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/cpumask.h>
 #include <asm/errno.h>
+
+struct proc_dir_entry;
 
 /* parse command line */
 int __init profile_setup(char * str);
 
 /* init basic kernel profiler */
 void __init profile_init(void);
+void create_prof_cpu_mask(struct proc_dir_entry *);
 
 extern unsigned int * prof_buffer;
 extern unsigned long prof_len;
 extern unsigned long prof_shift;
 extern int prof_on;
+extern cpumask_t prof_cpu_mask;
 
 
 enum profile_type {

@@ -132,7 +132,6 @@ __asm__( \
 static inline void x86_do_profile (struct pt_regs *regs) 
 {
 	unsigned long rip;
-	extern unsigned long prof_cpu_mask;
 	extern char _stext[];
  
 	profile_hook(regs);
@@ -148,7 +147,7 @@ static inline void x86_do_profile (struct pt_regs *regs)
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
 	 * (default is all CPUs.)
 	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
 		return;
 
 	rip -= (unsigned long) &_stext;

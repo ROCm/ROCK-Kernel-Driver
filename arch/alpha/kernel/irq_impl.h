@@ -41,8 +41,6 @@ extern void init_i8259a_irqs(void);
 
 extern void handle_irq(int irq, struct pt_regs * regs);
 
-extern unsigned long prof_cpu_mask;
-
 static inline void
 alpha_do_profile(unsigned long pc)
 {
@@ -55,7 +53,7 @@ alpha_do_profile(unsigned long pc)
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
 	 * (default is all CPUs.)
 	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
 		return;
 
 	pc -= (unsigned long) &_stext;
