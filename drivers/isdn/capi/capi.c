@@ -1594,10 +1594,6 @@ static int __init alloc_init(void)
 	return 0;
 }
 
-static struct capi_interface_user cuser = {
-	name: "capi20",
-};
-
 static char rev[32];
 
 static int __init capi_init(void)
@@ -1626,11 +1622,8 @@ static int __init capi_init(void)
 			&capi_fops, NULL);
 	printk(KERN_NOTICE "capi20: started up with major %d\n", capi_major);
 
-	attach_capi_interface(&cuser);
-
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {
-		(void) detach_capi_interface(&cuser);
 		devfs_unregister_chrdev(capi_major, "capi20");
 		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
@@ -1641,7 +1634,6 @@ static int __init capi_init(void)
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 		capinc_tty_exit();
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
-		(void) detach_capi_interface(&cuser);
 		devfs_unregister_chrdev(capi_major, "capi20");
 		devfs_unregister(devfs_find_handle(NULL, "capi20",
 						   capi_major, 0,
@@ -1679,7 +1671,6 @@ static void __exit capi_exit(void)
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	capinc_tty_exit();
 #endif
-	(void) detach_capi_interface(&cuser);
 	printk(KERN_NOTICE "capi: Rev %s: unloaded\n", rev);
 }
 

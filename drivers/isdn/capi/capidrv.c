@@ -2291,10 +2291,6 @@ static void __exit proc_exit(void)
     }
 }
 
-static struct capi_interface_user cuser = {
-	name: "capidrv",
-};
-
 static int __init capidrv_init(void)
 {
 	struct capi_register_params rparam;
@@ -2305,8 +2301,6 @@ static int __init capidrv_init(void)
 	u16 errcode;
 
 	MOD_INC_USE_COUNT;
-
-	attach_capi_interface(&cuser);
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
@@ -2321,7 +2315,6 @@ static int __init capidrv_init(void)
 	rparam.datablklen = 2048;
 	errcode = capi20_register(&rparam, &global.appid);
 	if (errcode) {
-		detach_capi_interface(&cuser);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
@@ -2331,7 +2324,6 @@ static int __init capidrv_init(void)
 	errcode = capi20_get_profile(0, &profile);
 	if (errcode != CAPI_NOERROR) {
 		capi20_release(global.appid);
-		detach_capi_interface(&cuser);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
@@ -2367,8 +2359,6 @@ static void __exit capidrv_exit(void)
 	}
 
 	capi20_release(global.appid);
-
-	detach_capi_interface(&cuser);
 
 	proc_exit();
 

@@ -96,9 +96,6 @@ static struct capi_ctr *cards[CAPI_MAXCONTR];
 static int ncards;
 static struct sk_buff_head recv_queue;
 
-static LIST_HEAD(users);
-static spinlock_t users_lock = SPIN_LOCK_UNLOCKED;
-
 static LIST_HEAD(drivers);
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 
@@ -271,39 +268,6 @@ endloop:
 }
 
 /*
- * /proc/capi/users:
- *	name
- */
-static int proc_users_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct list_head *l;
-        struct capi_interface_user *cp;
-	int len = 0;
-
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		cp = list_entry(l, struct capi_interface_user, user_list);
-		len += sprintf(page+len, "%s\n", cp->name);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-endloop:
-	spin_unlock(&users_lock);
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
  * /proc/capi/controller:
  *	cnr driver cardstate name driverinfo
  */
@@ -427,7 +391,6 @@ static struct procfsentries {
    { "capi",		  S_IFDIR, 0 },
    { "capi/applications", 0	 , proc_applications_read_proc },
    { "capi/driver",       0	 , proc_driver_read_proc },
-   { "capi/users", 	  0	 , proc_users_read_proc },
    { "capi/controller",   0	 , proc_controller_read_proc },
    { "capi/applstats",    0	 , proc_applstats_read_proc },
    { "capi/contrstats",   0	 , proc_contrstats_read_proc },
@@ -1330,31 +1293,6 @@ void capi20_set_callback(u16 applid, void (*callback) (unsigned int cmd, __u32 c
 }
 
 EXPORT_SYMBOL(capi20_set_callback);
-
-/* ------------------------------------------------------------- */
-/* -------- Exported Functions --------------------------------- */
-/* ------------------------------------------------------------- */
-
-void attach_capi_interface(struct capi_interface_user *userp)
-{
-
-	spin_lock(&users_lock);
-	list_add_tail(&userp->user_list, &users);
-	spin_unlock(&users_lock);
-	printk(KERN_NOTICE "kcapi: %s attached\n", userp->name);
-}
-
-EXPORT_SYMBOL(attach_capi_interface);
-
-void detach_capi_interface(struct capi_interface_user *userp)
-{
-	spin_lock(&users_lock);
-	list_del(&userp->user_list);
-	spin_unlock(&users_lock);
-	printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
-}
-
-EXPORT_SYMBOL(detach_capi_interface);
 
 /* ------------------------------------------------------------- */
 /* -------- Init & Cleanup ------------------------------------- */

@@ -52,15 +52,6 @@ typedef struct kcapi_carddef {
 #define	KCI_CONTRUP	0	/* struct capi_profile */
 #define	KCI_CONTRDOWN	1	/* NULL */
 
-struct capi_interface_user {
-	char name[20];
-	/* internal */
-	struct list_head user_list;
-};
-
-void attach_capi_interface(struct capi_interface_user *);
-void detach_capi_interface(struct capi_interface_user *);
-
 u16 capi20_isinstalled(void);
 u16 capi20_register(capi_register_params * rparam, u16 * applidp);
 u16 capi20_release(u16 applid);
