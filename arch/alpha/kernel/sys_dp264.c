@@ -463,7 +463,7 @@ monet_swizzle(struct pci_dev *dev, u8 *pinp)
 	struct pci_controller *hose = dev->sysdata;
 	int slot, pin = *pinp;
 
-	if (hose->bus == dev->bus) {
+	if (!dev->bus->parent) {
 		slot = PCI_SLOT(dev->devfn);
 	}
 	/* Check for the built-in bridge on hose 1. */

@@ -29,8 +29,17 @@
 /* FIXME FIXME FIXME */
 
 
+/*
+  WARNING NOTE
+
+  It is very possible that turning on additional messages may cause
+  kernel image corruption due to stack usage to do the printing.
+
+*/
+
 #undef DEBUG_CHECK_RANGE
-#define DEBUG_ADDRESSES
+#undef DEBUG_ADDRESSES
+#undef DEBUG_LAST_STEPS
 
 #define DEBUG_SP(x) \
     {register long sp asm("30"); srm_printk("%s (sp=%lx)\n", x, sp);}
@@ -433,15 +442,25 @@ start_kernel(void)
 	}
 	
 	/* Clear the zero page, then move the argument list in. */
+#ifdef DEBUG_LAST_STEPS
+	srm_printk("Preparing ZERO_PGE...\n");
+#endif
 	memset((char*)ZERO_PGE, 0, PAGE_SIZE);
 	strcpy((char*)ZERO_PGE, envval);
 
 #ifdef INITRD_IMAGE_SIZE
+
+#ifdef DEBUG_LAST_STEPS
+	srm_printk("Preparing INITRD info...\n");
+#endif
 	/* Finally, set the INITRD paramenters for the kernel. */
 	((long *)(ZERO_PGE+256))[0] = initrd_image_start;
 	((long *)(ZERO_PGE+256))[1] = INITRD_IMAGE_SIZE;
 
 #endif /* INITRD_IMAGE_SIZE */
 
+#ifdef DEBUG_LAST_STEPS
+	srm_printk("Doing 'runkernel()'...\n");
+#endif
 	runkernel();
 }
