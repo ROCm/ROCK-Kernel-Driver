@@ -639,23 +639,23 @@ error:
 	return err;
 }
 
-static int bfusb_probe(struct usb_interface *iface, const struct usb_device_id *id)
+static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	const struct firmware *firmware;
-	struct usb_device *udev = interface_to_usbdev(iface);
+	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_host_endpoint *bulk_out_ep;
 	struct usb_host_endpoint *bulk_in_ep;
 	struct hci_dev *hdev;
 	struct bfusb *bfusb;
 
-	BT_DBG("iface %p id %p", iface, id);
+	BT_DBG("intf %p id %p", intf, id);
 
 	/* Check number of endpoints */
-	if (iface->altsetting[0].desc.bNumEndpoints < 2)
+	if (intf->altsetting[0].desc.bNumEndpoints < 2)
 		return -EIO;
 
-	bulk_out_ep = &iface->altsetting[0].endpoint[0];
-	bulk_in_ep  = &iface->altsetting[0].endpoint[1];
+	bulk_out_ep = &intf->altsetting[0].endpoint[0];
+	bulk_in_ep  = &intf->altsetting[0].endpoint[1];
 
 	if (!bulk_out_ep || !bulk_in_ep) {
 		BT_ERR("Bulk endpoints not found");
@@ -702,6 +702,7 @@ static int bfusb_probe(struct usb_interface *iface, const struct usb_device_id *
 
 	hdev->type = HCI_USB;
 	hdev->driver_data = bfusb;
+	SET_HCIDEV_DEV(hdev, &intf->dev);
 
 	hdev->open     = bfusb_open;
 	hdev->close    = bfusb_close;
@@ -717,7 +718,7 @@ static int bfusb_probe(struct usb_interface *iface, const struct usb_device_id *
 		goto error;
 	}
 
-	usb_set_intfdata(iface, bfusb);
+	usb_set_intfdata(intf, bfusb);
 
 	return 0;
 
@@ -731,17 +732,17 @@ done:
 	return -EIO;
 }
 
-static void bfusb_disconnect(struct usb_interface *iface)
+static void bfusb_disconnect(struct usb_interface *intf)
 {
-	struct bfusb *bfusb = usb_get_intfdata(iface);
+	struct bfusb *bfusb = usb_get_intfdata(intf);
 	struct hci_dev *hdev = &bfusb->hdev;
 
-	BT_DBG("iface %p", iface);
+	BT_DBG("intf %p", intf);
 
 	if (!hdev)
 		return;
 
-	usb_set_intfdata(iface, NULL);
+	usb_set_intfdata(intf, NULL);
 
 	bfusb_close(hdev);
 
