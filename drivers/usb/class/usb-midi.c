@@ -55,39 +55,39 @@
 /* ------------------------------------------------------------------------- */
 
 static int singlebyte = 0;
-MODULE_PARM(singlebyte,"i");
+module_param(singlebyte, int, 0);
 MODULE_PARM_DESC(singlebyte,"Enable sending MIDI messages with single message packet");
 
 static int maxdevices = 4;
-MODULE_PARM(maxdevices,"i");
+module_param(maxdevices, int, 0);
 MODULE_PARM_DESC(maxdevices,"Max number of allocatable MIDI device");
 
 static int uvendor     = -1;
-MODULE_PARM(uvendor,"i");
+module_param(uvendor, int, 0);
 MODULE_PARM_DESC(uvendor, "The USB Vendor ID of a semi-compliant interface");
 
 static int uproduct    = -1;
-MODULE_PARM(uproduct,"i");
+module_param(uproduct, int, 0);
 MODULE_PARM_DESC(uproduct, "The USB Product ID of a semi-compliant interface");
 
 static int uinterface  = -1;
-MODULE_PARM(uinterface,"i");
+module_param(uinterface, int, 0);
 MODULE_PARM_DESC(uinterface, "The Interface number of a semi-compliant interface");
 
 static int ualt        = -1;
-MODULE_PARM(ualt,"i");
+module_param(ualt, int, 0);
 MODULE_PARM_DESC(ualt, "The optional alternative setting of a semi-compliant interface");
 
 static int umin        = -1;
-MODULE_PARM(umin,"i");
+module_param(umin, int, 0);
 MODULE_PARM_DESC(umin, "The input endpoint of a semi-compliant interface");
 
 static int umout       = -1;
-MODULE_PARM(umout,"i");
+module_param(umout, int, 0);
 MODULE_PARM_DESC(umout, "The output endpoint of a semi-compliant interface");
 
 static int ucable      = -1;
-MODULE_PARM(ucable,"i");
+module_param(ucable, int, 0);
 MODULE_PARM_DESC(ucable, "The cable number used for a semi-compliant interface");
 
 /** Note -- the usb_string() returns only Latin-1 characters.
@@ -95,7 +95,7 @@ MODULE_PARM_DESC(ucable, "The cable number used for a semi-compliant interface")
  * unicode16LE-to-JIS routine is needed to wrap around usb_get_string().
  **/
 static unsigned short ulangid      = 0x0409; /** 0x0411 for Japanese **/
-MODULE_PARM(ulangid,"h");
+module_param(ulangid, ushort, 0);
 MODULE_PARM_DESC(ulangid, "The optional preferred USB Language ID for all devices");
 
 MODULE_AUTHOR("NAGANO Daisuke <breeze.nagano@nifty.ne.jp>");

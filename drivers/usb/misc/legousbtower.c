@@ -103,7 +103,7 @@
 #define DRIVER_DESC "LEGO USB Tower Driver"
 
 /* Module parameters */
-MODULE_PARM(debug, "i");
+module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 /* The defaults are chosen to work with the latest versions of leJOS and NQC.
@@ -114,7 +114,7 @@ MODULE_PARM_DESC(debug, "Debug enabled or not");
  * (417 for datalog uploads), and packet_timeout should be set.
  */
 static size_t read_buffer_size = 480;
-MODULE_PARM(read_buffer_size, "i");
+module_param(read_buffer_size, int, 0);
 MODULE_PARM_DESC(read_buffer_size, "Read buffer size");
 
 /* Some legacy software likes to send packets in one piece.
@@ -124,7 +124,7 @@ MODULE_PARM_DESC(read_buffer_size, "Read buffer size");
  * if the software is not prepared to wait long enough.
  */
 static size_t write_buffer_size = 480;
-MODULE_PARM(write_buffer_size, "i");
+module_param(write_buffer_size, int, 0);
 MODULE_PARM_DESC(write_buffer_size, "Write buffer size");
 
 /* Some legacy software expects reads to contain whole LASM packets.
@@ -138,7 +138,7 @@ MODULE_PARM_DESC(write_buffer_size, "Write buffer size");
  * Set it to 0 to disable.
  */
 static int packet_timeout = 50;
-MODULE_PARM(packet_timeout, "i");
+module_param(packet_timeout, int, 0);
 MODULE_PARM_DESC(packet_timeout, "Packet timeout in ms");
 
 /* Some legacy software expects blocking reads to time out.
@@ -146,7 +146,7 @@ MODULE_PARM_DESC(packet_timeout, "Packet timeout in ms");
  * Set it to 0 to disable.
  */
 static int read_timeout = 200;
-MODULE_PARM(read_timeout, "i");
+module_param(read_timeout, int, 0);
 MODULE_PARM_DESC(read_timeout, "Read timeout in ms");
 
 /* As of kernel version 2.6.4 ehci-hcd uses an
@@ -159,11 +159,11 @@ MODULE_PARM_DESC(read_timeout, "Read timeout in ms");
  * or set to 0 to use the standard interval from the endpoint descriptors.
  */
 static int interrupt_in_interval = 2;
-MODULE_PARM(interrupt_in_interval, "i");
+module_param(interrupt_in_interval, int, 0);
 MODULE_PARM_DESC(interrupt_in_interval, "Interrupt in interval in ms");
 
 static int interrupt_out_interval = 8;
-MODULE_PARM(interrupt_out_interval, "i");
+module_param(interrupt_out_interval, int, 0);
 MODULE_PARM_DESC(interrupt_out_interval, "Interrupt out interval in ms");
 
 /* Define these values to match your device */

@@ -82,7 +82,7 @@ static int debug = 1;
 #else
 static int debug = 0;
 #endif
-MODULE_PARM(debug, "i");
+module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug level");
 static char *errbuf;
 #define ERRBUF_LEN    (32 * 1024)

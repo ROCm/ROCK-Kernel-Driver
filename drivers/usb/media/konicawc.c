@@ -68,7 +68,7 @@ static const int debug = 0;
 /* Some default values for initial camera settings,
    can be set by modprobe */
 
-static enum frame_sizes size;	
+static int size;	
 static int speed = 6;		/* Speed (fps) 0 (slowest) to 6 (fastest) */
 static int brightness =	MAX_BRIGHTNESS/2;
 static int contrast =	MAX_CONTRAST/2;
@@ -928,23 +928,23 @@ MODULE_DEVICE_TABLE(usb, id_table);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Simon Evans <spse@secret.org.uk>");
 MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_PARM(speed, "i");
+module_param(speed, int, 0);
 MODULE_PARM_DESC(speed, "Initial speed: 0 (slowest) - 6 (fastest)");
-MODULE_PARM(size, "i");
+module_param(size, int, 0);
 MODULE_PARM_DESC(size, "Initial Size 0: 160x120 1: 160x136 2: 176x144 3: 320x240");
-MODULE_PARM(brightness, "i");
+module_param(brightness, int, 0);
 MODULE_PARM_DESC(brightness, "Initial brightness 0 - 108");
-MODULE_PARM(contrast, "i");
+module_param(contrast, int, 0);
 MODULE_PARM_DESC(contrast, "Initial contrast 0 - 108");
-MODULE_PARM(saturation, "i");
+module_param(saturation, int, 0);
 MODULE_PARM_DESC(saturation, "Initial saturation 0 - 108");
-MODULE_PARM(sharpness, "i");
+module_param(sharpness, int, 0);
 MODULE_PARM_DESC(sharpness, "Initial brightness 0 - 108");
-MODULE_PARM(whitebal, "i");
+module_param(whitebal, int, 0);
 MODULE_PARM_DESC(whitebal, "Initial white balance 0 - 363");
 
 #ifdef CONFIG_USB_DEBUG
-MODULE_PARM(debug, "i");
+module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug level: 0-9 (default=0)");
 #endif
 

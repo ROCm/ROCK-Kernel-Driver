@@ -268,7 +268,7 @@ static const char driver_name [] = "usbnet";
 
 /* use ethtool to change the level for any given device */
 static int msg_level = 1;
-MODULE_PARM (msg_level, "i");
+module_param (msg_level, int, 0);
 MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 
 

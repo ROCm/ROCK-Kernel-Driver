@@ -53,9 +53,9 @@ MODULE_DEVICE_TABLE(usb, device_table);
 MODULE_AUTHOR("Jeroen Vreeken <pe1rxq@amsat.org>");
 MODULE_DESCRIPTION("SE401 USB Camera Driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(flickerless, "i");
+module_param(flickerless, int, 0);
 MODULE_PARM_DESC(flickerless, "Net frequency to adjust exposure time to (0/50/60)");
-MODULE_PARM(video_nr, "i");
+module_param(video_nr, int, 0);
 
 static struct usb_driver se401_driver;
 

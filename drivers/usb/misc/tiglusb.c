@@ -560,7 +560,7 @@ MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE (DRIVER_LICENSE);
 
-MODULE_PARM (timeout, "i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC (timeout, "Timeout in tenths of seconds (default=1.5 seconds)");
 
 /* --------------------------------------------------------------------- */
