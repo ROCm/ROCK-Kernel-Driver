@@ -92,6 +92,15 @@ static void __devinit  pci_fixup_ide_trash(struct pci_dev *d)
 	int i;
 
 	/*
+	 * Runs the fixup only for the first IDE controller
+	 * (Shai Fultheim - shai@ftcon.com)
+	 */
+	static int called = 0;
+	if (called)
+		return;
+	called = 1;
+
+	/*
 	 * There exist PCI IDE controllers which have utter garbage
 	 * in first four base registers. Ignore that.
 	 */
