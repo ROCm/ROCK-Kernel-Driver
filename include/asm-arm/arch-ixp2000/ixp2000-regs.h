@@ -115,7 +115,7 @@
 
 /*
  * Mask of valid IRQs in the 32-bit IRQ register. We use
- * this to mark certain IRQs as being in-valid.
+ * this to mark certain IRQs as being invalid.
  */
 #define	IXP2000_VALID_IRQ_MASK	0x0f0fffff
 
@@ -251,7 +251,7 @@
 #define	SLOWPORT_CCR_DIV_30		0x0f
 
 /*
- * PCR values.  PCR configure the mode of the interfac3
+ * PCR values.  PCR configure the mode of the interface.
  */
 #define	SLOWPORT_MODE_FLASH		0x00
 #define	SLOWPORT_MODE_LUCENT		0x01
@@ -260,7 +260,7 @@
 #define	SLOWPORT_MODE_MOTOROLA_UP	0x04
 
 /*
- * ADC values.  Defines data and address bus widths
+ * ADC values.  Defines data and address bus widths.
  */
 #define	SLOWPORT_ADDR_WIDTH_8		0x00
 #define	SLOWPORT_ADDR_WIDTH_16		0x01
@@ -272,7 +272,7 @@
 #define	SLOWPORT_DATA_WIDTH_32		0x30
 
 /*
- * Masks and shifts for various fields in the WTC and RTC registers
+ * Masks and shifts for various fields in the WTC and RTC registers.
  */
 #define	SLOWPORT_WRTC_MASK_HD		0x0003
 #define	SLOWPORT_WRTC_MASK_SU		0x003c
@@ -284,7 +284,7 @@
 
 
 /*
- * GPIO registers & GPIO interface
+ * GPIO registers & GPIO interface.
  */
 #define IXP2000_GPIO_REG(x)		((volatile unsigned long*)(IXP2000_GPIO_VIRT_BASE+(x)))
 #define IXP2000_GPIO_PLR		IXP2000_GPIO_REG(0x00)

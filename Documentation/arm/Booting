@@ -118,6 +118,10 @@ to store page tables.  The recommended placement is 32KiB into RAM.
 
 In either case, the following conditions must be met:
 
+- Quiesce all DMA capable devicess so that memory does not get
+  corrupted by bogus network packets or disk data. This will save
+  you many hours of debug.
+
 - CPU register settings
   r0 = 0,
   r1 = machine type number discovered in (3) above.

@@ -46,13 +46,12 @@
 #define	IRQ_IXP2000_PCI   		15 /* PCI INTA or INTB */
 #define	IRQ_IXP2000_THDA0   		16 /* thread 0-31A */
 #define	IRQ_IXP2000_THDA1  		17 /* thread 32-63A */
-#define	IRQ_IXP2000_THDA2		18 /* thread 64-95A */
-#define	IRQ_IXP2000_THDA3 		19 /* thread 96-127A */
-#define	IRQ_IXP2000_THDB0		24 /* thread 0-31 B */
+#define	IRQ_IXP2000_THDA2		18 /* thread 64-95A, IXP2800 only */
+#define	IRQ_IXP2000_THDA3 		19 /* thread 96-127A, IXP2800 only */
+#define	IRQ_IXP2000_THDB0		24 /* thread 0-31B */
 #define	IRQ_IXP2000_THDB1		25 /* thread 32-63B */
-/* only 64 threads supported for IXP2400, rest or for IXP2800*/
-#define	IRQ_IXP2000_THDB2		26 /* thread 64-95B */
-#define	IRQ_IXP2000_THDB3		27 /* thread 96-127B */
+#define	IRQ_IXP2000_THDB2		26 /* thread 64-95B, IXP2800 only */
+#define	IRQ_IXP2000_THDB3		27 /* thread 96-127B, IXP2800 only */
 
 /* define generic GPIOs */
 #define IRQ_IXP2000_GPIO0		32
