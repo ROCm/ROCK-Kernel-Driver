@@ -246,6 +246,21 @@ config DISCONTIGMEM
 	  or have huge holes in the physical address space for other reasons.
 	  See <file:Documentation/vm/numa> for more.
 
+config VIRTUAL_MEM_MAP
+	bool "Enable Virtual Mem Map"
+	depends on !NUMA
+	default y if IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
+	help
+	  Say Y to compile the kernel with support for a virtual mem map.
+	  This is an alternate method of supporting large holes in the
+	  physical address space on non NUMA machines. Since the DISCONTIGMEM
+	  option is not supported on machines with the ZX1 chipset, this is
+	  the only way of supporting more than 1 Gb of memory on those
+	  machines. This code also only takes effect if a memory hole of
+	  greater than 1 Gb is found during boot, so it is safe to enable
+	  unless you require the DISCONTIGMEM option for your machine. If you
+	  are unsure, say Y.
+
 config IA64_MCA
 	bool "Enable IA-64 Machine Check Abort" if IA64_GENERIC || IA64_DIG || IA64_HP_ZX1
 	default y if IA64_SGI_SN1 || IA64_SGI_SN2
