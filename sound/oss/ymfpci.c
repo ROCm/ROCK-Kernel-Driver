@@ -334,7 +334,7 @@ static int alloc_dmabuf(ymfpci_t *unit, struct ymf_dmabuf *dmabuf)
 	dmabuf->dma_addr = dma_addr;
 	dmabuf->buforder = order;
 
-	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
+	/* now mark the pages as reserved; otherwise remap_pfn_range doesn't do what we want */
 	mapend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (map = virt_to_page(rawbuf); map <= mapend; map++)
 		set_bit(PG_reserved, &map->flags);
@@ -1545,7 +1545,8 @@ static int ymf_mmap(struct file *file, struct vm_area_struct *vma)
 	size = vma->vm_end - vma->vm_start;
 	if (size > (PAGE_SIZE << dmabuf->buforder))
 		return -EINVAL;
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(dmabuf->rawbuf),
+	if (remap_pfn_range(vma, vma->vm_start,
+			     virt_to_phys(dmabuf->rawbuf) >> PAGE_SHIFT,
 			     size, vma->vm_page_prot))
 		return -EAGAIN;
 	dmabuf->mapped = 1;
