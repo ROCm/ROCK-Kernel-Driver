@@ -14,18 +14,25 @@ struct scsi_mode_data;
 /*
  * sdev state
  */
-enum {
-	SDEV_ADD,
-	SDEV_DEL,
-	SDEV_CANCEL,
-	SDEV_RECOVERY,
+enum scsi_device_state {
+	SDEV_CREATED,		/* device created but not added to sysfs
+				 * Only internal commands allowed (for inq) */
+	SDEV_RUNNING,		/* device properly configured
+				 * All commands allowed */
+	SDEV_CANCEL,		/* beginning to delete device
+				 * Only error handler commands allowed */
+	SDEV_DEL,		/* device deleted 
+				 * no commands allowed */
 };
 
 struct scsi_device {
-	struct list_head    siblings;   /* list of all devices on this host */
-	struct list_head    same_target_siblings; /* just the devices sharing same target id */
 	struct Scsi_Host *host;
 	struct request_queue *request_queue;
+
+	/* the next two are protected by the host->host_lock */
+	struct list_head    siblings;   /* list of all devices on this host */
+	struct list_head    same_target_siblings; /* just the devices sharing same target id */
+
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
 	spinlock_t sdev_lock;           /* also the request queue_lock */
 	spinlock_t list_lock;
@@ -44,8 +51,6 @@ struct scsi_device {
 	unsigned int manufacturer;	/* Manufacturer of device, for using 
 					 * vendor-specific cmd's */
 	unsigned sector_size;	/* size in bytes */
-
-	atomic_t access_count;	/* Count of open channels/mounts */
 
 	void *hostdata;		/* available to low-level driver */
 	char devfs_name[256];	/* devfs junk */
@@ -98,7 +103,7 @@ struct scsi_device {
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;
 
-	unsigned long sdev_state;
+	enum scsi_device_state sdev_state;
 };
 #define	to_scsi_device(d)	\
 	container_of(d, struct scsi_device, sdev_gendev)
@@ -108,14 +113,48 @@ struct scsi_device {
 extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint);
 extern void scsi_remove_device(struct scsi_device *);
-extern int scsi_device_cancel_cb(struct device *, void *);
 extern int scsi_device_cancel(struct scsi_device *, int);
 
 extern int scsi_device_get(struct scsi_device *);
 extern void scsi_device_put(struct scsi_device *);
+extern struct scsi_device *scsi_device_lookup(struct Scsi_Host *,
+					      uint, uint, uint);
+extern struct scsi_device *__scsi_device_lookup(struct Scsi_Host *,
+						uint, uint, uint);
 
+/* only exposed to implement shost_for_each_device */
+extern struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *,
+						  struct scsi_device *);
+
+/**
+ * shost_for_each_device  -  iterate over all devices of a host
+ * @sdev:	iterator
+ * @host:	host whiches devices we want to iterate over
+ *
+ * This traverses over each devices of @shost.  The devices have
+ * a reference that must be released by scsi_host_put when breaking
+ * out of the loop.
+ */
 #define shost_for_each_device(sdev, shost) \
-	list_for_each_entry((sdev), &((shost)->my_devices), siblings)
+	for ((sdev) = __scsi_iterate_devices((shost), NULL); \
+	     (sdev); \
+	     (sdev) = __scsi_iterate_devices((shost), (sdev)))
+
+/**
+ * __shost_for_each_device  -  iterate over all devices of a host (UNLOCKED)
+ * @sdev:	iterator
+ * @host:	host whiches devices we want to iterate over
+ *
+ * This traverses over each devices of @shost.  It does _not_ take a
+ * reference on the scsi_device, thus it the whole loop must be protected
+ * by shost->host_lock.
+ *
+ * Note:  The only reason why drivers would want to use this is because
+ * they're need to access the device list in irq context.  Otherwise you
+ * really want to use shost_for_each_device instead.
+ */
+#define __shost_for_each_device(sdev, shost) \
+	list_for_each_entry((sdev), &((shost)->__devices), siblings)
 
 extern void scsi_adjust_queue_depth(struct scsi_device *, int, int);
 extern int scsi_track_queue_full(struct scsi_device *, int);

@@ -1,6 +1,7 @@
 /*
  *  scsi.c Copyright (C) 1992 Drew Eckhardt
  *         Copyright (C) 1993, 1994, 1995, 1999 Eric Youngdale
+ *         Copyright (C) 2002, 2003 Christoph Hellwig
  *
  *  generic mid-level SCSI driver
  *      Initial versions: Drew Eckhardt
@@ -36,7 +37,6 @@
  *  out_of_space hacks, D. Gilbert (dpg) 990608
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -54,8 +54,8 @@
 #include <linux/kmod.h>
 #include <linux/interrupt.h>
 
+#include <scsi/scsi_host.h>
 #include "scsi.h"
-#include "hosts.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -367,6 +367,16 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	unsigned long timeout;
 	int rtn = 0;
 
+	/* check if the device is still usable */
+	if (unlikely(cmd->device->sdev_state == SDEV_DEL)) {
+		/* in SDEV_DEL we error all commands. DID_NO_CONNECT
+		 * returns an immediate error upwards, and signals
+		 * that the device is no longer present */
+		cmd->result = DID_NO_CONNECT << 16;
+		scsi_done(cmd);
+		/* return 0 (because the command has been processed) */
+		goto out;
+	}
 	/* Assign a unique nonzero serial_number. */
 	/* XXX(hch): this is racy */
 	if (++serial_number == 0)
@@ -883,49 +893,124 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 	return depth;
 }
 
+/**
+ * scsi_device_get  -  get an addition reference to a scsi_device
+ * @sdev:	device to get a reference to
+ *
+ * Gets a reference to the scsi_device and increments the use count
+ * of the underlying LLDD module.  You must hold host_lock of the
+ * parent Scsi_Host or already have a reference when calling this.
+ */
 int scsi_device_get(struct scsi_device *sdev)
 {
-	struct class *class = class_get(&sdev_class);
-
-	if (!class)
-		goto out;
-	if (test_bit(SDEV_DEL, &sdev->sdev_state))
-		goto out;
-	if (!try_module_get(sdev->host->hostt->module))
-		goto out;
+	if (sdev->sdev_state == SDEV_DEL)
+		return -ENXIO;
 	if (!get_device(&sdev->sdev_gendev))
-		goto out_put_module;
-	atomic_inc(&sdev->access_count);
-	class_put(&sdev_class);
+		return -ENXIO;
+	if (!try_module_get(sdev->host->hostt->module)) {
+		put_device(&sdev->sdev_gendev);
+		return -ENXIO;
+	}
 	return 0;
-
- out_put_module:
-	module_put(sdev->host->hostt->module);
- out:
-	class_put(&sdev_class);
-	return -ENXIO;
 }
+EXPORT_SYMBOL(scsi_device_get);
 
+/**
+ * scsi_device_put  -  release a reference to a scsi_device
+ * @sdev:	device to release a reference on.
+ *
+ * Release a reference to the scsi_device and decrements the use count
+ * of the underlying LLDD module.  The device is freed once the last
+ * user vanishes.
+ */
 void scsi_device_put(struct scsi_device *sdev)
 {
-	struct class *class = class_get(&sdev_class);
-
-	if (!class)
-		return;
-
 	module_put(sdev->host->hostt->module);
-	atomic_dec(&sdev->access_count);
 	put_device(&sdev->sdev_gendev);
-	class_put(&sdev_class);
 }
+EXPORT_SYMBOL(scsi_device_put);
 
-int scsi_device_cancel_cb(struct device *dev, void *data)
+/* helper for shost_for_each_device, thus not documented */
+struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
+					   struct scsi_device *prev)
 {
-	struct scsi_device *sdev = to_scsi_device(dev);
-	int recovery = *(int *)data;
+	struct list_head *list = (prev ? &prev->siblings : &shost->__devices);
+	struct scsi_device *next = NULL;
+	unsigned long flags;
 
-	return scsi_device_cancel(sdev, recovery);
+	spin_lock_irqsave(shost->host_lock, flags);
+	while (list->next != &shost->__devices) {
+		next = list_entry(list->next, struct scsi_device, siblings);
+		/* skip devices that we can't get a reference to */
+		if (!scsi_device_get(next))
+			break;
+		list = list->next;
+	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	if (prev)
+		scsi_device_put(prev);
+	return next;
 }
+EXPORT_SYMBOL(__scsi_iterate_devices);
+
+/**
+ * scsi_device_lookup - find a device given the host (UNLOCKED)
+ * @shost:	SCSI host pointer
+ * @channel:	SCSI channel (zero if only one channel)
+ * @pun:	SCSI target number (physical unit number)
+ * @lun:	SCSI Logical Unit Number
+ *
+ * Looks up the scsi_device with the specified @channel, @id, @lun for a
+ * give host. The returned scsi_device does not have an additional reference.
+ * You must hold the host's host_lock over this call and any access to the
+ * returned scsi_device.
+ *
+ * Note:  The only reason why drivers would want to use this is because
+ * they're need to access the device list in irq context.  Otherwise you
+ * really want to use scsi_device_lookup instead.
+ **/
+struct scsi_device *__scsi_device_lookup(struct Scsi_Host *shost,
+		uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdev;
+
+	list_for_each_entry(sdev, &shost->__devices, siblings) {
+		if (sdev->channel == channel && sdev->id == id &&
+				sdev->lun ==lun)
+			return sdev;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(__scsi_device_lookup);
+
+/**
+ * scsi_device_lookup - find a device given the host
+ * @shost:	SCSI host pointer
+ * @channel:	SCSI channel (zero if only one channel)
+ * @id:		SCSI target number (physical unit number)
+ * @lun:	SCSI Logical Unit Number
+ *
+ * Looks up the scsi_device with the specified @channel, @id, @lun for a
+ * give host.  The returned scsi_device has an additional reference that
+ * needs to be release with scsi_host_put once you're done with it.
+ **/
+struct scsi_device *scsi_device_lookup(struct Scsi_Host *shost,
+		uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdev;
+	unsigned long flags;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	sdev = __scsi_device_lookup(shost, channel, id, lun);
+	if (sdev && scsi_device_get(sdev))
+		sdev = NULL;
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	return sdev;
+}
+EXPORT_SYMBOL(scsi_device_lookup);
 
 /**
  * scsi_device_cancel - cancel outstanding IO to this device
@@ -940,7 +1025,7 @@ int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 	struct list_head *lh, *lh_sf;
 	unsigned long flags;
 
-	set_bit(SDEV_CANCEL, &sdev->sdev_state);
+	sdev->sdev_state = SDEV_CANCEL;
 
 	spin_lock_irqsave(&sdev->list_lock, flags);
 	list_for_each_entry(scmd, &sdev->cmd_list, list) {

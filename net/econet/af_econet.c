@@ -1041,12 +1041,15 @@ static int econet_rcv(struct sk_buff *skb, struct net_device *dev, struct packet
 	if (!sk)
 		goto drop;
 
-	return ec_queue_packet(sk, skb, edev->net, hdr->src_stn, hdr->cb, 
-			       hdr->port);
+	if (ec_queue_packet(sk, skb, edev->net, hdr->src_stn, hdr->cb,
+			    hdr->port))
+		goto drop;
+
+	return 0;
 
 drop:
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_DROP;
 }
 
 static struct packet_type econet_packet_type = {

@@ -198,6 +198,7 @@ void proc_tty_register_driver(struct tty_driver *driver)
 		return;
 	ent->read_proc = driver->read_proc;
 	ent->write_proc = driver->write_proc;
+	ent->owner = driver->owner;
 	ent->data = driver;
 
 	driver->proc_entry = ent;

@@ -720,6 +720,9 @@ restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *
 {
 	unsigned int err = 0;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	if (!access_ok(VERIFY_READ, sc, sizeof(*sc)))
 		return(-EFAULT);
 

@@ -949,7 +949,8 @@ SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 drop_tx:
 	tp->stats.tx_dropped++;
-	dev_kfree_skb(skb);
+	if (skb)
+		dev_kfree_skb(skb);
 	return 0;
 }
 

@@ -32,10 +32,10 @@
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 
-#include "scsi.h"
-#include "hosts.h"
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_host.h>
+#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -190,13 +190,13 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	       	uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev, *device;
+	unsigned long flags;
 
 	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
 	if (!sdev)
 		goto out;
 
 	memset(sdev, 0, sizeof(*sdev));
-	atomic_set(&sdev->access_count, 0);
 	sdev->vendor = scsi_null_device_strs;
 	sdev->model = scsi_null_device_strs;
 	sdev->rev = scsi_null_device_strs;
@@ -205,6 +205,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	sdev->lun = lun;
 	sdev->channel = channel;
 	sdev->online = TRUE;
+	sdev->sdev_state = SDEV_CREATED;
 	INIT_LIST_HEAD(&sdev->siblings);
 	INIT_LIST_HEAD(&sdev->same_target_siblings);
 	INIT_LIST_HEAD(&sdev->cmd_list);
@@ -236,11 +237,31 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			goto out_free_queue;
 	}
 
+	if (get_device(&sdev->host->shost_gendev)) {
+
+		device_initialize(&sdev->sdev_gendev);
+		sdev->sdev_gendev.parent = &sdev->host->shost_gendev;
+		sdev->sdev_gendev.bus = &scsi_bus_type;
+		sdev->sdev_gendev.release = scsi_device_dev_release;
+		sprintf(sdev->sdev_gendev.bus_id,"%d:%d:%d:%d",
+			sdev->host->host_no, sdev->channel, sdev->id,
+			sdev->lun);
+
+		class_device_initialize(&sdev->sdev_classdev);
+		sdev->sdev_classdev.dev = &sdev->sdev_gendev;
+		sdev->sdev_classdev.class = &sdev_class;
+		snprintf(sdev->sdev_classdev.class_id, BUS_ID_SIZE,
+			 "%d:%d:%d:%d", sdev->host->host_no,
+			 sdev->channel, sdev->id, sdev->lun);
+	} else
+		goto out_free_queue;
+
 	/*
 	 * If there are any same target siblings, add this to the
 	 * sibling list
 	 */
-	list_for_each_entry(device, &shost->my_devices, siblings) {
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_for_each_entry(device, &shost->__devices, siblings) {
 		if (device->id == sdev->id &&
 		    device->channel == sdev->channel) {
 			list_add_tail(&sdev->same_target_siblings,
@@ -258,10 +279,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	if (!sdev->scsi_level)
 		sdev->scsi_level = SCSI_2;
 
-	/*
-	 * Add it to the end of the shost->my_devices list.
-	 */
-	list_add_tail(&sdev->siblings, &shost->my_devices);
+	list_add_tail(&sdev->siblings, &shost->__devices);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 	return sdev;
 
 out_free_queue:
@@ -271,36 +290,6 @@ out_free_dev:
 out:
 	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 	return NULL;
-}
-
-/**
- * scsi_free_sdev - cleanup and free a scsi_device
- * @sdev:	cleanup and free this scsi_device
- *
- * Description:
- *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
- *     the list, and freeing @sdev.
- **/
-void scsi_free_sdev(struct scsi_device *sdev)
-{
-	unsigned long flags;
-
-	list_del(&sdev->siblings);
-	list_del(&sdev->same_target_siblings);
-
-	if (sdev->request_queue)
-		scsi_free_queue(sdev->request_queue);
-	if (sdev->inquiry)
-		kfree(sdev->inquiry);
-	spin_lock_irqsave(sdev->host->host_lock, flags);
-	list_del(&sdev->starved_entry);
-	if (sdev->single_lun) {
-		if (--sdev->sdev_target->starget_refcnt == 0)
-			kfree(sdev->sdev_target);
-	}
-	spin_unlock_irqrestore(sdev->host->host_lock, flags);
-
-	kfree(sdev);
 }
 
 /**
@@ -643,7 +632,7 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	 * register it and tell the rest of the kernel
 	 * about it.
 	 */
-	scsi_device_register(sdev);
+	scsi_sysfs_add_sdev(sdev);
 
 	return SCSI_SCAN_LUN_PRESENT;
 }
@@ -678,7 +667,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	 * host adapter calls into here with rescan == 0.
 	 */
 	if (rescan) {
-		sdev = scsi_find_device(host, channel, id, lun);
+		sdev = scsi_device_lookup(host, channel, id, lun);
 		if (sdev) {
 			SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
 				"scsi scan: device exists on <%d:%d:%d:%d>\n",
@@ -689,6 +678,8 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 				*bflagsp = scsi_get_device_flags(sdev,
 								 sdev->vendor,
 								 sdev->model);
+			/* XXX: bandaid until callers do refcounting */
+			scsi_device_put(sdev);
 			return SCSI_SCAN_LUN_PRESENT;
 		}
 	}
@@ -747,8 +738,11 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	if (res == SCSI_SCAN_LUN_PRESENT) {
 		if (sdevp)
 			*sdevp = sdev;
-	} else
-		scsi_free_sdev(sdev);
+	} else {
+		if (sdev->host->hostt->slave_destroy)
+			sdev->host->hostt->slave_destroy(sdev);
+		put_device(&sdev->sdev_gendev);
+	}
  out:
 	return res;
 }
@@ -1232,14 +1226,25 @@ void scsi_scan_host(struct Scsi_Host *shost)
 
 void scsi_forget_host(struct Scsi_Host *shost)
 {
-	struct list_head *le, *lh;
-	struct scsi_device *sdev;
+	struct scsi_device *sdev, *tmp;
+	unsigned long flags;
 
-	list_for_each_safe(le, lh, &shost->my_devices) {
-		sdev = list_entry(le, struct scsi_device, siblings);
-		
+	/*
+	 * Ok, this look a bit strange.  We always look for the first device
+	 * on the list as scsi_remove_device removes them from it - thus we
+	 * also have to release the lock.
+	 * We don't need to get another reference to the device before
+	 * releasing the lock as we already own the reference from
+	 * scsi_register_device that's release in scsi_remove_device.  And
+	 * after that we don't look at sdev anymore.
+	 */
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_for_each_entry_safe(sdev, tmp, &shost->__devices, siblings) {
+		spin_unlock_irqrestore(shost->host_lock, flags);
 		scsi_remove_device(sdev);
+		spin_lock_irqsave(shost->host_lock, flags);
 	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /*
@@ -1289,5 +1294,8 @@ struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
 void scsi_free_host_dev(struct scsi_device *sdev)
 {
 	BUG_ON(sdev->id != sdev->host->this_id);
-	scsi_free_sdev(sdev);
+
+	if (sdev->host->hostt->slave_destroy)
+		sdev->host->hostt->slave_destroy(sdev);
+	put_device(&sdev->sdev_gendev);
 }

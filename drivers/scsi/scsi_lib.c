@@ -16,9 +16,9 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 
-#include "scsi.h"
-#include "hosts.h"
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_host.h>
+#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -335,13 +335,14 @@ void scsi_device_unbusy(struct scsi_device *sdev)
  */
 static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
-	struct scsi_device *sdev;
+	struct Scsi_Host *shost = current_sdev->host;
+	struct scsi_device *sdev, *tmp;
 	unsigned long flags;
 
-	spin_lock_irqsave(current_sdev->host->host_lock, flags);
+	spin_lock_irqsave(shost->host_lock, flags);
 	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
 	current_sdev->sdev_target->starget_sdev_user = NULL;
-	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	/*
 	 * Call blk_run_queue for all LUNs on the target, starting with
@@ -351,21 +352,26 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	 */
 	blk_run_queue(current_sdev->request_queue);
 
-	spin_lock_irqsave(current_sdev->host->host_lock, flags);
-	if (current_sdev->sdev_target->starget_sdev_user) {
-		/*
-		 * After unlock, this races with anyone clearing
-		 * starget_sdev_user, but we (should) always enter this
-		 * function again, avoiding any problems.
-		 */
-		spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
-		return;
-	}
-	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+	/*
+	 * After unlock, this races with anyone clearing starget_sdev_user,
+	 * but we always enter this function again, avoiding any problems.
+	 */
+	spin_lock_irqsave(shost->host_lock, flags);
+	if (current_sdev->sdev_target->starget_sdev_user)
+		goto out;
+	list_for_each_entry_safe(sdev, tmp, &current_sdev->same_target_siblings,
+			same_target_siblings) {
+		if (scsi_device_get(sdev))
+			continue;
 
-	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
-			    same_target_siblings)
+		spin_unlock_irqrestore(shost->host_lock, flags);
 		blk_run_queue(sdev->request_queue);
+		spin_lock_irqsave(shost->host_lock, flags);
+	
+		scsi_device_put(sdev);
+	}
+ out:
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /*
@@ -917,6 +923,22 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
 	struct scsi_device *sdev = q->queuedata;
 	struct scsi_cmnd *cmd;
+	int specials_only = 0;
+
+	if(unlikely(sdev->sdev_state != SDEV_RUNNING)) {
+		/* OK, we're not in a running state don't prep
+		 * user commands */
+		if(sdev->sdev_state == SDEV_DEL) {
+			/* Device is fully deleted, no commands
+			 * at all allowed down */
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to dead device\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			return BLKPREP_KILL;
+		}
+		/* OK, we only allow special commands (i.e. not
+		 * user initiated ones */
+		specials_only = 1;
+	}
 
 	/*
 	 * Find the actual device driver associated with this command.
@@ -939,6 +961,14 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		} else
 			cmd = req->special;
 	} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+
+		if(unlikely(specials_only)) {
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to device being removed\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			return BLKPREP_KILL;
+		}
+			
+			
 		/*
 		 * Just check to see if the device is online.  If
 		 * it isn't, we refuse to process ordinary commands
@@ -1121,6 +1151,10 @@ static void scsi_request_fn(struct request_queue *q)
 	struct scsi_cmnd *cmd;
 	struct request *req;
 
+	if(!get_device(&sdev->sdev_gendev))
+		/* We must be tearing the block queue down already */
+		return;
+
 	/*
 	 * To start with, we keep looping until the queue is empty, or until
 	 * the host is no longer able to accept any more requests.
@@ -1193,7 +1227,7 @@ static void scsi_request_fn(struct request_queue *q)
 		}
 	}
 
-	return;
+	goto out;
 
  not_ready:
 	spin_unlock_irq(shost->host_lock);
@@ -1211,6 +1245,12 @@ static void scsi_request_fn(struct request_queue *q)
 	sdev->device_busy--;
 	if(sdev->device_busy == 0)
 		blk_plug_device(q);
+ out:
+	/* must be careful here...if we trigger the ->remove() function
+	 * we cannot be holding the q lock */
+	spin_unlock_irq(q->queue_lock);
+	put_device(&sdev->sdev_gendev);
+	spin_lock_irq(q->queue_lock);
 }
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)

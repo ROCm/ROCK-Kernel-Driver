@@ -288,6 +288,10 @@ EXPORT_SYMBOL(__strncpy_from_user);
 /* Networking helper routines. */
 /* XXX This is NOVERS because C_LABEL_STR doesn't get the version number. -DaveM */
 EXPORT_SYMBOL_NOVERS(__csum_partial_copy_sparc_generic);
+EXPORT_SYMBOL(csum_partial);
+
+/* Cache flushing.  */
+EXPORT_SYMBOL(sparc_flush_page_to_ram);
 
 /* No version information on this, heavily used in inline asm,
  * and will always be 'void __ret_efault(void)'.

@@ -1014,6 +1014,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 		if (current->signal->group_exit) {
 			spin_unlock(&current->sighand->siglock);
 			write_unlock_irq(&tasklist_lock);
+			retval = -EAGAIN;
 			goto bad_fork_cleanup_namespace;
 		}
 		p->tgid = current->tgid;
