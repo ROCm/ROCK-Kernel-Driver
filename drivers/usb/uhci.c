@@ -1476,7 +1476,7 @@ out:
 	return u;
 }
 
-static int uhci_submit_urb(struct urb *urb)
+static int uhci_submit_urb(struct urb *urb, int mem_flags)
 {
 	int ret = -EINVAL;
 	struct uhci *uhci;
@@ -1823,11 +1823,11 @@ static int uhci_get_current_frame_number(struct usb_device *dev)
 }
 
 struct usb_operations uhci_device_operations = {
-	uhci_alloc_dev,
-	uhci_free_dev,
-	uhci_get_current_frame_number,
-	uhci_submit_urb,
-	uhci_unlink_urb
+	allocate:		uhci_alloc_dev,
+	deallocate:		uhci_free_dev,
+	get_frame_number:	uhci_get_current_frame_number,
+	submit_urb:		uhci_submit_urb,
+	unlink_urb:		uhci_unlink_urb,
 };
 
 /* Virtual Root Hub */
@@ -2294,7 +2294,7 @@ static void uhci_call_completion(struct urb *urb)
 	} else {
 		if (is_ring && !killed) {
 			urb->dev = dev;
-			uhci_submit_urb(urb);
+			uhci_submit_urb(urb, GFP_KERNEL);
 		} else {
 			/* We decrement the usage count after we're done */
 			/*  with everything */

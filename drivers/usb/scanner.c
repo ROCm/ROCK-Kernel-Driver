@@ -992,7 +992,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 			     // endpoint[(int)have_intr].bInterval);
 			     250);
 
-	        if (usb_submit_urb(scn->scn_irq)) {
+	        if (usb_submit_urb(scn->scn_irq, GFP_KERNEL)) {
 			err("probe_scanner(%d): Unable to allocate INT URB.", scn_minor);
                 	kfree(scn);
 			up(&scn_mutex);

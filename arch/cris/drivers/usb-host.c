@@ -210,12 +210,12 @@ static int etrax_usb_allocate_epid(void);
 static void etrax_usb_free_epid(char epid);
 static void cleanup_sb(USB_SB_Desc_t *sb);
 
-static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen);
-static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen);
+static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen, int mem_flags);
+static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen, int mem_flags);
 
-static int etrax_usb_submit_ctrl_urb(struct urb *urb);
+static int etrax_usb_submit_ctrl_urb(struct urb *urb, int mem_flags);
 
-static int etrax_usb_submit_urb(struct urb *urb);
+static int etrax_usb_submit_urb(struct urb *urb, int mem_flags);
 static int etrax_usb_unlink_urb(struct urb *urb);
 static int etrax_usb_get_frame_number(struct usb_device *usb_dev);
 static int etrax_usb_allocate_dev(struct usb_device *usb_dev);
@@ -512,7 +512,7 @@ void etrax_usb_do_intr_recover(int epid)
 	} while (tmp_ep != first_ep);
 }
 
-static int etrax_usb_submit_intr_urb(struct urb *urb)
+static int etrax_usb_submit_intr_urb(struct urb *urb, mem_flags)
 {
 	USB_EP_Desc_t *tmp_ep;
 	USB_EP_Desc_t *first_ep;
@@ -556,7 +556,7 @@ static int etrax_usb_submit_intr_urb(struct urb *urb)
 	}
 	/* Ok, now we got valid endpoint, lets insert some traffic */
 
-	urb_priv = (etrax_urb_priv_t *)kmalloc(sizeof(etrax_urb_priv_t), GFP_KERNEL);
+	urb_priv = (etrax_urb_priv_t *)kmalloc(sizeof(etrax_urb_priv_t), mem_flags);
 	urb_priv->first_sb = 0;
 	urb_priv->rx_offset = 0;
 	urb_priv->eot = 0;
@@ -591,9 +591,9 @@ static int etrax_usb_submit_intr_urb(struct urb *urb)
 				USB_SB_Desc_t *traffic_sb;
 
 				traffic_ep = (USB_EP_Desc_t *)
-					kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
+					kmem_cache_alloc(usb_desc_cache, mem_flags);
 				traffic_sb = (USB_SB_Desc_t *)
-					kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
+					kmem_cache_alloc(usb_desc_cache, mem_flags);
 
 				traffic_ep->hw_len = 0;
 				traffic_ep->command = IO_FIELD(USB_EP_command, epid, epid) |
@@ -904,7 +904,7 @@ static int etrax_usb_allocate_epid(void)
 	return -1;
 }
 
-static int etrax_usb_submit_bulk_urb(struct urb *urb)
+static int etrax_usb_submit_bulk_urb(struct urb *urb, int mem_flags)
 {
 	char epid;
 	char devnum;
@@ -954,7 +954,7 @@ static int etrax_usb_submit_bulk_urb(struct urb *urb)
 		/* If this is the first URB, add the URB and do HW add */
 		URB_List[epid] = urb;
 		restore_flags(flags);
-		etrax_usb_do_bulk_hw_add(urb, epid, maxlen);
+		etrax_usb_do_bulk_hw_add(urb, epid, maxlen, mem_flags);
 	}
 
 	DBFEXIT;
@@ -962,7 +962,7 @@ static int etrax_usb_submit_bulk_urb(struct urb *urb)
 	return 0;
 }
 
-static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen)
+static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen, int mem_flags)
 {
 	USB_SB_Desc_t *sb_desc_1;
 
@@ -973,8 +973,8 @@ static int etrax_usb_do_bulk_hw_add(struct urb *urb, char epid, char maxlen)
 
 	DBFENTER;
 
-	urb_priv = kmalloc(sizeof(etrax_urb_priv_t), GFP_KERNEL);
-	sb_desc_1 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
+	urb_priv = kmalloc(sizeof(etrax_urb_priv_t), mem_flags);
+	sb_desc_1 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, mem_flags);
 
 	if (usb_pipeout(urb->pipe)) {
 
@@ -1135,7 +1135,8 @@ static int handle_bulk_transfer_attn(char epid, int status)
 	if (URB_List[epid]) {
 		etrax_usb_do_bulk_hw_add(URB_List[epid], epid,
 					 usb_maxpacket(URB_List[epid]->dev, URB_List[epid]->pipe,
-						       usb_pipeout(URB_List[epid]->pipe)));
+						       usb_pipeout(URB_List[epid]->pipe)),
+					 GFP_KERNEL);
 	}
 #if 1
 	else {
@@ -1159,7 +1160,7 @@ static int handle_bulk_transfer_attn(char epid, int status)
 
 /* ---------------------------------------------------------------------------- */
 
-static int etrax_usb_submit_ctrl_urb(struct urb *urb)
+static int etrax_usb_submit_ctrl_urb(struct urb *urb, int mem_flags)
 {
 	char epid;
 	char devnum;
@@ -1209,7 +1210,7 @@ static int etrax_usb_submit_ctrl_urb(struct urb *urb)
 		/* If this is the first URB, add the URB and do HW add */
 		URB_List[epid] = urb;
 		restore_flags(flags);
-		etrax_usb_do_ctrl_hw_add(urb, epid, maxlen);
+		etrax_usb_do_ctrl_hw_add(urb, epid, maxlen, mem_flags);
 	}
 
 	DBFEXIT;
@@ -1217,7 +1218,7 @@ static int etrax_usb_submit_ctrl_urb(struct urb *urb)
 	return 0;
 }
 
-static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen)
+static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen, int mem_flags)
 {
 	USB_SB_Desc_t *sb_desc_1;
 	USB_SB_Desc_t *sb_desc_2;
@@ -1231,9 +1232,9 @@ static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen)
 
 	DBFENTER;
 
-	urb_priv = kmalloc(sizeof(etrax_urb_priv_t), GFP_KERNEL);
-	sb_desc_1 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
-	sb_desc_2 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
+	urb_priv = kmalloc(sizeof(etrax_urb_priv_t), mem_flags);
+	sb_desc_1 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, mem_flags);
+	sb_desc_2 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, mem_flags);
 
 	if (!(sb_desc_1 && sb_desc_2)) {
 		panic("kmem_cache_alloc in ctrl_hw_add gave NULL pointers !!!\n");
@@ -1257,7 +1258,7 @@ static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen)
 		
 		if (urb->transfer_buffer) {
 			dbg_ctrl("This OUT transfer has an extra data stage");
-			sb_desc_3 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
+			sb_desc_3 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, mem_flags);
 
 			sb_desc_1->next = virt_to_phys(sb_desc_3);
 			
@@ -1285,7 +1286,7 @@ static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen)
 		dbg_ctrl("transfer_buffer_length = %d", urb->transfer_buffer_length);
 		dbg_ctrl("rem is calculated to %d", urb->transfer_buffer_length % maxlen);
 
-		sb_desc_3 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, GFP_KERNEL);
+		sb_desc_3 = (USB_SB_Desc_t*)kmem_cache_alloc(usb_desc_cache, mem_flags);
 		
 		sb_desc_2->sw_len = urb->transfer_buffer_length ?
 			(urb->transfer_buffer_length - 1) / maxlen + 1 : 0;
@@ -1358,7 +1359,7 @@ static int etrax_usb_do_ctrl_hw_add(struct urb *urb, char epid, char maxlen)
 	DBFEXIT;
 }
 
-static int etrax_usb_submit_urb(struct urb *urb)
+static int etrax_usb_submit_urb(struct urb *urb, int mem_flags)
 {
 	etrax_hc_t *hc;
 	int rval = -EINVAL;
@@ -1375,10 +1376,10 @@ static int etrax_usb_submit_urb(struct urb *urb)
 		rval = etrax_rh_submit_urb(urb);
 		
 	} else if (usb_pipetype(urb->pipe) == PIPE_CONTROL) {
-		rval = etrax_usb_submit_ctrl_urb(urb);
+		rval = etrax_usb_submit_ctrl_urb(urb, mem_flags);
 
 	} else if (usb_pipetype(urb->pipe) == PIPE_BULK) {
-		rval = etrax_usb_submit_bulk_urb(urb);
+		rval = etrax_usb_submit_bulk_urb(urb, mem_flags);
 
 	} else if (usb_pipetype(urb->pipe) == PIPE_INTERRUPT) {
 		int bustime;
@@ -1389,7 +1390,7 @@ static int etrax_usb_submit_urb(struct urb *urb)
 				rval = bustime;
 			} else {
 				usb_claim_bandwidth(urb->dev, urb, bustime, 0);
-				rval = etrax_usb_submit_intr_urb(urb);
+				rval = etrax_usb_submit_intr_urb(urb, mem_flags);
 			}
 			
 		}
@@ -1683,7 +1684,8 @@ static int handle_control_transfer_attn(char epid, int status)
 	if (URB_List[epid]) {
 		etrax_usb_do_ctrl_hw_add(URB_List[epid], epid,
 					 usb_maxpacket(URB_List[epid]->dev, URB_List[epid]->pipe,
-						       usb_pipeout(URB_List[epid]->pipe)));
+						       usb_pipeout(URB_List[epid]->pipe)),
+					 GFP_KERNEL);
 	}
 #if 1
 	else {

@@ -115,7 +115,7 @@ static void usb_b_out(struct st5481_bcs *bcs,int buf_nr)
 
 	DBG_ISO_PACKET(0x200,urb);
 
-	SUBMIT_URB(urb);
+	SUBMIT_URB(urb, GFP_KERNEL);
 }
 
 /*

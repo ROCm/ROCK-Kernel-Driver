@@ -261,7 +261,7 @@ static void acm_read_bulk(struct urb *urb)
 	urb->actual_length = 0;
 	urb->dev = acm->dev;
 
-	if (usb_submit_urb(urb))
+	if (usb_submit_urb(urb, GFP_KERNEL))
 		dbg("failed resubmitting read urb");
 }
 
@@ -316,11 +316,11 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
         unlock_kernel();
 
 	acm->ctrlurb.dev = acm->dev;
-	if (usb_submit_urb(&acm->ctrlurb))
+	if (usb_submit_urb(&acm->ctrlurb, GFP_KERNEL))
 		dbg("usb_submit_urb(ctrl irq) failed");
 
 	acm->readurb.dev = acm->dev;
-	if (usb_submit_urb(&acm->readurb))
+	if (usb_submit_urb(&acm->readurb, GFP_KERNEL))
 		dbg("usb_submit_urb(read bulk) failed");
 
 	acm_set_control(acm, acm->ctrlout = ACM_CTRL_DTR | ACM_CTRL_RTS);
@@ -371,7 +371,7 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 	acm->writeurb.transfer_buffer_length = count;
 	acm->writeurb.dev = acm->dev;
 
-	if (usb_submit_urb(&acm->writeurb))
+	if (usb_submit_urb(&acm->writeurb, GFP_KERNEL))
 		dbg("usb_submit_urb(write bulk) failed");
 
 	return count;

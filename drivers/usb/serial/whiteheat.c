@@ -240,7 +240,7 @@ static void command_port_read_callback (struct urb *urb)
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      command_port_read_callback, port);
-	result = usb_submit_urb(port->read_urb);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
 		dbg(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 }
@@ -265,7 +265,7 @@ static int whiteheat_send_cmd (struct usb_serial *serial, __u8 command, __u8 *da
 	memcpy (&transfer_buffer[1], data, datasize);
 	port->write_urb->transfer_buffer_length = datasize + 1;
 	port->write_urb->dev = serial->dev;
-	retval = usb_submit_urb (port->write_urb);
+	retval = usb_submit_urb (port->write_urb, GFP_KERNEL);
 	if (retval) {
 		dbg (__FUNCTION__" - submit urb failed");
 		goto exit;
@@ -327,7 +327,7 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 			command_port->read_urb->complete = command_port_read_callback;
 			command_port->read_urb->dev = port->serial->dev;
 			command_port->tty = port->tty;		/* need this to "fake" our our sanity check macros */
-			retval = usb_submit_urb (command_port->read_urb);
+			retval = usb_submit_urb (command_port->read_urb, GFP_KERNEL);
 			if (retval) {
 				err(__FUNCTION__ " - failed submitting read urb, error %d", retval);
 				goto error_exit;
@@ -336,7 +336,7 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 		
 		/* Start reading from the device */
 		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb);
+		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (retval) {
 			err(__FUNCTION__ " - failed submitting read urb, error %d", retval);
 			goto error_exit;

@@ -431,7 +431,9 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 		      skel_write_bulk_callback, dev);
 
 	/* send the data out the bulk port */
-	retval = usb_submit_urb(dev->write_urb);
+	/* a character device write uses GFP_KERNEL,
+	 unless a spinlock is held */
+	retval = usb_submit_urb(dev->write_urb, GFP_KERNEL);
 	if (retval) {
 		err(__FUNCTION__ " - failed submitting write urb, error %d",
 		    retval);

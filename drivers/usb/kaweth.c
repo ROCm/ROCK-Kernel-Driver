@@ -447,7 +447,8 @@ static void kaweth_usb_receive(struct urb *);
 /****************************************************************
  *     kaweth_resubmit_rx_urb
  ****************************************************************/
-static inline void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth)
+static inline void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
+						int mem_flags)
 {
 	int result;
 
@@ -461,7 +462,7 @@ static inline void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth)
 		      kaweth_usb_receive,
 		      kaweth);
 
-	if((result = usb_submit_urb(kaweth->rx_urb))) {
+	if((result = usb_submit_urb(kaweth->rx_urb, mem_flags))) {
 		kaweth_err("resubmitting rx_urb %d failed", result);
 	}
 }
@@ -493,7 +494,7 @@ static void kaweth_usb_receive(struct urb *urb)
 			   urb->status,
 			   count, 
 			   (int)pkt_len);
-		kaweth_resubmit_rx_urb(kaweth);
+		kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
                 return;
 	}
 
@@ -502,12 +503,12 @@ static void kaweth_usb_receive(struct urb *urb)
 			kaweth_err("Packet length too long for USB frame (pkt_len: %x, count: %x)",pkt_len, count);
 			kaweth_err("Packet len & 2047: %x", pkt_len & 2047);
 			kaweth_err("Count 2: %x", count2);
-		        kaweth_resubmit_rx_urb(kaweth);
+		        kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
                         return;
                 }
 		
 		if(!(skb = dev_alloc_skb(pkt_len+2))) {
-		        kaweth_resubmit_rx_urb(kaweth);
+		        kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
                         return;
 		}
 
@@ -525,7 +526,7 @@ static void kaweth_usb_receive(struct urb *urb)
 		kaweth->stats.rx_bytes += pkt_len;
 	}
 
-	kaweth_resubmit_rx_urb(kaweth);
+	kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
 }
 
 /****************************************************************
@@ -539,11 +540,11 @@ static int kaweth_open(struct net_device *net)
 
 	kaweth_dbg("Opening network device.");
 
-	kaweth_resubmit_rx_urb(kaweth);
+	MOD_INC_USE_COUNT;
+
+	kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
 
 	netif_start_queue(net);
-
-	MOD_INC_USE_COUNT;
 
 	kaweth_async_set_rx_mode(kaweth);
 	return 0;
@@ -621,7 +622,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		      kaweth_usb_transmit_complete,
 		      kaweth);
 
-	if((res = usb_submit_urb(kaweth->tx_urb)))
+	if((res = usb_submit_urb(kaweth->tx_urb, GFP_ATOMIC)))
 	{
 		kaweth_warn("kaweth failed tx_urb %d", res);
 		kaweth->stats.tx_errors++;
@@ -975,7 +976,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
         set_current_state(TASK_INTERRUPTIBLE);
         add_wait_queue(&awd.wqh, &wait);
         urb->context = &awd;
-        status = usb_submit_urb(urb);
+        status = usb_submit_urb(urb, GFP_KERNEL);
         if (status) {
                 // something went wrong
                 usb_free_urb(urb);

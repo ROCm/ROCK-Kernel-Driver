@@ -458,7 +458,7 @@ static int dabusb_startrek (pdabusb_t s)
 
 			end = list_entry (s->rec_buff_list.prev, buff_t, buff_list);
 
-			ret = usb_submit_urb (end->purb);
+			ret = usb_submit_urb (end->purb, GFP_KERNEL);
 			if (ret) {
 				err("usb_submit_urb returned:%d", ret);
 				if (dabusb_add_buf_tail (s, &s->free_buff_list, &s->rec_buff_list))

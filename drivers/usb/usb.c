@@ -1148,6 +1148,7 @@ struct urb * usb_get_urb(struct urb *urb)
 /**
  * usb_submit_urb - asynchronously issue a transfer request for an endpoint
  * @urb: pointer to the urb describing the request
+ * @mem_flags: the type of memory to allocate, see kmalloc() for a list of valid options for this.
  *
  * This submits a transfer request, and transfers control of the URB
  * describing that request to the USB subsystem.  Request completion will
@@ -1197,12 +1198,49 @@ struct urb * usb_get_urb(struct urb *urb)
  *
  * If the USB subsystem can't reserve sufficient bandwidth to perform
  * the periodic request, and bandwidth reservation is being done for
- * this controller, submitting such a periodic request will fail. 
+ * this controller, submitting such a periodic request will fail.
+ *
+ * Memory Flags:
+ *
+ * General rules for how to decide which mem_flags to use:
+ * 
+ * Basically the rules are the same as for kmalloc.  There are four
+ * different possible values; GFP_KERNEL, GFP_NOFS, GFP_NOIO and
+ * GFP_ATOMIC.
+ *
+ * GFP_NOFS is not ever used, as it has not been implemented yet.
+ *
+ * There are three situations you must use GFP_ATOMIC.
+ *    a) you are inside a completion handler, an interrupt, bottom half,
+ *       tasklet or timer.
+ *    b) you are holding a spinlock or rwlock (does not apply to
+ *       semaphores)
+ *    c) current->state != TASK_RUNNING, this is the case only after
+ *       you've changed it.
+ * 
+ * GFP_NOIO is used in the block io path and error handling of storage
+ * devices.
+ *
+ * All other situations use GFP_KERNEL.
+ *
+ * Specfic rules for how to decide which mem_flags to use:
+ *
+ *    - start_xmit, timeout, and receive methods of network drivers must
+ *      use GFP_ATOMIC (spinlock)
+ *    - queuecommand methods of scsi drivers must use GFP_ATOMIC (spinlock)
+ *    - If you use a kernel thread with a network driver you must use
+ *      GFP_NOIO, unless b) or c) apply
+ *    - After you have done a down() you use GFP_KERNEL, unless b) or c)
+ *      apply or your are in a storage driver's block io path
+ *    - probe and disconnect use GFP_KERNEL unless b) or c) apply
+ *    - Changing firmware on a running storage or net device uses
+ *      GFP_NOIO, unless b) or c) apply
+ *
  */
-int usb_submit_urb(struct urb *urb)
+int usb_submit_urb(struct urb *urb, int mem_flags)
 {
 	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
-		return urb->dev->bus->op->submit_urb(urb);
+		return urb->dev->bus->op->submit_urb(urb, mem_flags);
 	else
 		return -ENODEV;
 }
@@ -1272,7 +1310,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 	add_wait_queue(&awd.wqh, &wait);
 
 	urb->context = &awd;
-	status = usb_submit_urb(urb);
+	status = usb_submit_urb(urb, GFP_KERNEL);
 	if (status) {
 		// something went wrong
 		usb_free_urb(urb);
