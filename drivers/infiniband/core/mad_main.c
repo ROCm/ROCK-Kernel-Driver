@@ -175,7 +175,7 @@ static int ib_mad_init_one(tTS_IB_DEVICE_HANDLE device_handle)
 		pd_param.special_qp = 1;
 
 		ret = tsIbPdCreate(device_handle, &pd_param, &priv->pd);
-	} else {
+	} else
 #endif
 		ret = tsIbPdCreate(device_handle, NULL, &priv->pd);
 

@@ -788,7 +788,7 @@ int dump_passthru_add_data(unsigned long loc, unsigned long sz)
 		printk("dump_verify_lcrash_data failed\n");
 		printk("Invalid data for pfn 0x%lx\n", page_to_pfn(page));
 		printk("Page flags 0x%lx\n", page->flags);
-		printk("Page count 0x%x\n", atomic_read(&page->count));
+		printk("Page count 0x%x\n", page_count(page->count));
 		return err;
 	}
 
