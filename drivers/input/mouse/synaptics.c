@@ -528,10 +528,7 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	/* Post events */
 	if (hw.z > 0) {
 		input_report_abs(dev, ABS_X, hw.x);
-		if (SYN_MODEL_ROT180(priv->model_id))
-			input_report_abs(dev, ABS_Y, YMAX_NOMINAL + YMIN_NOMINAL - hw.y);
-		else
-			input_report_abs(dev, ABS_Y, hw.y);
+		input_report_abs(dev, ABS_Y, YMAX_NOMINAL + YMIN_NOMINAL - hw.y);
 	}
 	input_report_abs(dev, ABS_PRESSURE, hw.z);
 
