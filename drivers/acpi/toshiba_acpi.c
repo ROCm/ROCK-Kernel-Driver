@@ -33,7 +33,7 @@
  *
  */
 
-#define TOSHIBA_ACPI_VERSION	"0.17"
+#define TOSHIBA_ACPI_VERSION	"0.18"
 #define PROC_INTERFACE_VERSION	1
 
 #include <linux/kernel.h>
@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
+#include <asm/uaccess.h>
 
 #include <acpi/acpi_drivers.h>
 
@@ -103,24 +104,6 @@ static __inline__ void
 _set_bit(u32* word, u32 mask, int value)
 {
 	*word = (*word & ~mask) | (mask * value);
-}
-
-/* an sscanf that takes explicit string length */
-static int
-snscanf(const char* str, int n, const char* format, ...)
-{
-	va_list args;
-	int result;
-	char* str2 = kmalloc(n + 1, GFP_KERNEL);
-	if (str2 == 0) return 0;
-	/* NOTE: don't even _think_ about replacing this with strlcpy */
-	strncpy(str2, str, n);
-	str2[n] = 0;
-	va_start(args, format);
-	result = vsscanf(str2, format, args);
-	va_end(args);
-	kfree(str2);
-	return result;
 }
 
 /* acpi interface wrappers
@@ -269,10 +252,26 @@ dispatch_read(char* page, char** start, off_t off, int count, int* eof,
 }
 
 static int
-dispatch_write(struct file* file, const char* buffer, unsigned long count,
-	ProcItem* item)
+dispatch_write(struct file* file, __user const char* buffer,
+	unsigned long count, ProcItem* item)
 {
-	return item->write_func(buffer, count);
+	int result;
+	char* tmp_buffer;
+
+	/* Arg buffer points to userspace memory, which can't be accessed
+	 * directly.  Since we're making a copy, zero-terminate the
+	 * destination so that sscanf can be used on it safely.
+	 */
+	tmp_buffer = kmalloc(count + 1, GFP_KERNEL);
+	if (copy_from_user(tmp_buffer, buffer, count)) {
+		result = -EFAULT;
+	}
+	else {
+		tmp_buffer[count] = 0;
+		result = item->write_func(tmp_buffer, count);
+	}
+	kfree(tmp_buffer);
+	return result;
 }
 
 static char*
@@ -300,7 +299,7 @@ write_lcd(const char* buffer, unsigned long count)
 	int value;
 	u32 hci_result;
 
-	if (snscanf(buffer, count, " brightness : %i", &value) == 1 &&
+	if (sscanf(buffer, " brightness : %i", &value) == 1 &&
 			value >= 0 && value < HCI_LCD_BRIGHTNESS_LEVELS) {
 		value = value << HCI_LCD_BRIGHTNESS_SHIFT;
 		hci_write1(HCI_LCD_BRIGHTNESS, value, &hci_result);
@@ -350,11 +349,11 @@ write_video(const char* buffer, unsigned long count)
 	 *  NOTE: to keep scanning simple, invalid fields are ignored
 	 */
 	while (remain) {
-		if (snscanf(buffer, remain, " lcd_out : %i", &value) == 1)
+		if (sscanf(buffer, " lcd_out : %i", &value) == 1)
 			lcd_out = value & 1;
-		else if (snscanf(buffer, remain, " crt_out : %i", &value) == 1)
+		else if (sscanf(buffer, " crt_out : %i", &value) == 1)
 			crt_out = value & 1;
-		else if (snscanf(buffer, remain, " tv_out : %i", &value) == 1)
+		else if (sscanf(buffer, " tv_out : %i", &value) == 1)
 			tv_out = value & 1;
 		/* advance to one character past the next ; */
 		do {
@@ -407,7 +406,7 @@ write_fan(const char* buffer, unsigned long count)
 	int value;
 	u32 hci_result;
 
-	if (snscanf(buffer, count, " force_on : %i", &value) == 1 &&
+	if (sscanf(buffer, " force_on : %i", &value) == 1 &&
 			value >= 0 && value <= 1) {
 		hci_write1(HCI_FAN, value, &hci_result);
 		if (hci_result != HCI_SUCCESS)
@@ -458,7 +457,7 @@ write_keys(const char* buffer, unsigned long count)
 {
 	int value;
 
-	if (snscanf(buffer, count, " hotkey_ready : %i", &value) == 1 &&
+	if (sscanf(buffer, " hotkey_ready : %i", &value) == 1 &&
 			value == 0) {
 		key_event_valid = 0;
 	} else {
