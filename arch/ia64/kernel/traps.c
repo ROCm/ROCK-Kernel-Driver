@@ -1,7 +1,7 @@
 /*
  * Architecture-specific trap handling.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 05/12/00 grao <goutham.rao@intel.com> : added isr in siginfo for SIGFPE
@@ -524,6 +524,23 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	      case 29: /* Debug */
 	      case 35: /* Taken Branch Trap */
 	      case 36: /* Single Step Trap */
+		if (fsys_mode(current, regs)) {
+			extern char syscall_via_break[], __start_gate_section[];
+			/*
+			 * Got a trap in fsys-mode: Taken Branch Trap and Single Step trap
+			 * need special handling; Debug trap is not supposed to happen.
+			 */
+			if (unlikely(vector == 29)) {
+				die("Got debug trap in fsys-mode---not supposed to happen!",
+				    regs, 0);
+				return;
+			}
+			/* re-do the system call via break 0x100000: */
+			regs->cr_iip = GATE_ADDR + (syscall_via_break - __start_gate_section);
+			ia64_psr(regs)->ri = 0;
+			ia64_psr(regs)->cpl = 3;
+			return;
+		}
 		switch (vector) {
 		      case 29:
 			siginfo.si_code = TRAP_HWBKPT;
@@ -563,19 +580,31 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		}
 		return;
 
-	      case 34:		/* Unimplemented Instruction Address Trap */
-		if (user_mode(regs)) {
-			siginfo.si_signo = SIGILL;
-			siginfo.si_code = ILL_BADIADDR;
-			siginfo.si_errno = 0;
-			siginfo.si_flags = 0;
-			siginfo.si_isr = 0;
-			siginfo.si_imm = 0;
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
-			force_sig_info(SIGILL, &siginfo, current);
+	      case 34:
+		if (isr & 0x2) {
+			/* Lower-Privilege Transfer Trap */
+			/*
+			 * Just clear PSR.lp and then return immediately: all the
+			 * interesting work (e.g., signal delivery is done in the kernel
+			 * exit path).
+			 */
+			ia64_psr(regs)->lp = 0;
 			return;
+		} else {
+			/* Unimplemented Instr. Address Trap */
+			if (user_mode(regs)) {
+				siginfo.si_signo = SIGILL;
+				siginfo.si_code = ILL_BADIADDR;
+				siginfo.si_errno = 0;
+				siginfo.si_flags = 0;
+				siginfo.si_isr = 0;
+				siginfo.si_imm = 0;
+				siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+				force_sig_info(SIGILL, &siginfo, current);
+				return;
+			}
+			sprintf(buf, "Unimplemented Instruction Address fault");
 		}
-		sprintf(buf, "Unimplemented Instruction Address fault");
 		break;
 
 	      case 45:

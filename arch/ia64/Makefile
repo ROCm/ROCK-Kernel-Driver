@@ -58,9 +58,13 @@ all compressed: vmlinux.gz
 vmlinux.gz: vmlinux
 	$(call makeboot,vmlinux.gz)
 
+check: vmlinux
+	arch/ia64/scripts/unwcheck.sh vmlinux
+
 archmrproper:
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ia64/boot
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ia64/tools
 
 CLEAN_FILES += include/asm-ia64/offsets.h vmlinux.gz bootloader
 

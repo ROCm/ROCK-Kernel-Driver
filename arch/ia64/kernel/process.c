@@ -1,7 +1,7 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #define __KERNEL_SYSCALLS__	/* see <asm/unistd.h> */
@@ -96,7 +96,7 @@ show_regs (struct pt_regs *regs)
 {
 	unsigned long ip = regs->cr_iip + ia64_psr(regs)->ri;
 
-	printk("\nPid: %d, comm: %20s\n", current->pid, current->comm);
+	printk("\nPid: %d, CPU %d, comm: %20s\n", current->pid, smp_processor_id(), current->comm);
 	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
 	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted());
 	print_symbol("ip is at %s\n", ip);
@@ -144,6 +144,13 @@ show_regs (struct pt_regs *regs)
 void
 do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 {
+	if (fsys_mode(current, &scr->pt)) {
+		/* defer signal-handling etc. until we return to privilege-level 0.  */
+		if (!ia64_psr(&scr->pt)->lp)
+			ia64_psr(&scr->pt)->lp = 1;
+		return;
+	}
+
 #ifdef CONFIG_PERFMON
 	if (current->thread.pfm_ovfl_block_reset)
 		pfm_ovfl_block_reset();
@@ -198,6 +205,10 @@ cpu_idle (void *unused)
 void
 ia64_save_extra (struct task_struct *task)
 {
+#ifdef CONFIG_PERFMON
+	unsigned long info;
+#endif
+
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_save_debug_regs(&task->thread.dbr[0]);
 
@@ -205,8 +216,9 @@ ia64_save_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_save_regs(task);
 
-	if (__get_cpu_var(pfm_syst_wide))
-		pfm_syst_wide_update_task(task, 0);
+	info = __get_cpu_var(pfm_syst_info);
+	if (info & PFM_CPUINFO_SYST_WIDE)
+		pfm_syst_wide_update_task(task, info, 0);
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -218,6 +230,10 @@ ia64_save_extra (struct task_struct *task)
 void
 ia64_load_extra (struct task_struct *task)
 {
+#ifdef CONFIG_PERFMON
+	unsigned long info;
+#endif
+
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_load_debug_regs(&task->thread.dbr[0]);
 
@@ -225,8 +241,9 @@ ia64_load_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_load_regs(task);
 
-	if (__get_cpu_var(pfm_syst_wide)) 
-		pfm_syst_wide_update_task(task, 1);
+	info = __get_cpu_var(pfm_syst_info);
+	if (info & PFM_CPUINFO_SYST_WIDE) 
+		pfm_syst_wide_update_task(task, info, 1);
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT

@@ -331,12 +331,8 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 		return;
 	}
 
-	/*
-	 * Avoid using user_mode() here: with "epc", we cannot use the privilege level to
-	 * infer whether the interrupt task was running on the kernel backing store.
-	 */
-	if (regs->r12 >= TASK_SIZE) {
-		DPRINT("ignoring kernel write to r%lu; register isn't on the RBS!", r1);
+	if (!user_stack(current, regs)) {
+		DPRINT("ignoring kernel write to r%lu; register isn't on the kernel RBS!", r1);
 		return;
 	}
 
@@ -406,11 +402,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 		return;
 	}
 
-	/*
-	 * Avoid using user_mode() here: with "epc", we cannot use the privilege level to
-	 * infer whether the interrupt task was running on the kernel backing store.
-	 */
-	if (regs->r12 >= TASK_SIZE) {
+	if (!user_stack(current, regs)) {
 		DPRINT("ignoring kernel read of r%lu; register isn't on the RBS!", r1);
 		goto fail;
 	}

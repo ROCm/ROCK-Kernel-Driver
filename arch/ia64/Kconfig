@@ -768,6 +768,9 @@ source "arch/ia64/hp/sim/Kconfig"
 
 menu "Kernel hacking"
 
+config FSYS
+	bool "Light-weight system-call support (via epc)"
+
 choice
 	prompt "Physical memory granularity"
 	default IA64_GRANULE_64MB

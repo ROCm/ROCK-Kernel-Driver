@@ -2,7 +2,7 @@
 #define _ASM_IA64_PTRACE_H
 
 /*
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -218,6 +218,13 @@ struct switch_stack {
 # define ia64_task_regs(t)		(((struct pt_regs *) ((char *) (t) + IA64_STK_OFFSET)) - 1)
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
+# define user_stack(task,regs)	((long) regs - (long) task == IA64_STK_OFFSET - sizeof(*regs))
+# define fsys_mode(task,regs)				\
+  ({							\
+	  struct task_struct *_task = (task);		\
+	  struct pt_regs *_regs = (regs);		\
+	  !user_mode(regs) && user_stack(task, regs);	\
+  })
 
   struct task_struct;			/* forward decl */
 

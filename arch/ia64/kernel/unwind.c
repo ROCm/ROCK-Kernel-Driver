@@ -1997,16 +1997,18 @@ unw_create_gate_table (void)
 {
 	extern char __start_gate_section[], __stop_gate_section[];
 	unsigned long *lp, start, end, segbase = unw.kernel_table.segment_base;
-	const struct unw_table_entry *entry, *first;
+	const struct unw_table_entry *entry, *first, *unw_table_end;
+	extern int ia64_unw_end;
 	size_t info_size, size;
 	char *info;
 
 	start = (unsigned long) __start_gate_section - segbase;
 	end   = (unsigned long) __stop_gate_section - segbase;
+	unw_table_end = (struct unw_table_entry *) &ia64_unw_end;
 	size  = 0;
 	first = lookup(&unw.kernel_table, start);
 
-	for (entry = first; entry->start_offset < end; ++entry)
+	for (entry = first; entry < unw_table_end && entry->start_offset < end; ++entry)
 		size += 3*8 + 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 	size += 8;	/* reserve space for "end of table" marker */
 
@@ -2021,7 +2023,7 @@ unw_create_gate_table (void)
 	lp = unw.gate_table;
 	info = (char *) unw.gate_table + size;
 
-	for (entry = first; entry->start_offset < end; ++entry, lp += 3) {
+	for (entry = first; entry < unw_table_end && entry->start_offset < end; ++entry, lp += 3) {
 		info_size = 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 		info -= info_size;
 		memcpy(info, (char *) segbase + entry->info_offset, info_size);

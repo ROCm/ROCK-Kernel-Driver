@@ -265,7 +265,7 @@ smp_callin (void)
 	extern void ia64_init_itm(void);
 
 #ifdef CONFIG_PERFMON
-	extern void perfmon_init_percpu(void);
+	extern void pfm_init_percpu(void);
 #endif
 
 	cpuid = smp_processor_id();
@@ -300,7 +300,7 @@ smp_callin (void)
 #endif
 
 #ifdef CONFIG_PERFMON
-	perfmon_init_percpu();
+	pfm_init_percpu();
 #endif
 
 	local_irq_enable();

@@ -131,10 +131,6 @@ SECTIONS
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - PAGE_OFFSET)
         { *(.data.cacheline_aligned) }
 
-  /* Kernel symbol names for modules: */
-  .kstrtab : AT(ADDR(.kstrtab) - PAGE_OFFSET)
-	{ *(.kstrtab) }
-
   /* Per-cpu data: */
   . = ALIGN(PERCPU_PAGE_SIZE);
   __phys_per_cpu_start = .;

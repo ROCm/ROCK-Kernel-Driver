@@ -1,7 +1,7 @@
 /*
  * Utility to generate asm-ia64/offsets.h.
  *
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Note that this file has dual use: when building the kernel
@@ -53,7 +53,9 @@ tab[] =
     { "UNW_FRAME_INFO_SIZE",		sizeof (struct unw_frame_info) },
     { "", 0 },			/* spacer */
     { "IA64_TASK_THREAD_KSP_OFFSET",	offsetof (struct task_struct, thread.ksp) },
+    { "IA64_TASK_THREAD_ON_USTACK_OFFSET", offsetof (struct task_struct, thread.on_ustack) },
     { "IA64_TASK_PID_OFFSET",		offsetof (struct task_struct, pid) },
+    { "IA64_TASK_TGID_OFFSET",		offsetof (struct task_struct, tgid) },
     { "IA64_PT_REGS_CR_IPSR_OFFSET",	offsetof (struct pt_regs, cr_ipsr) },
     { "IA64_PT_REGS_CR_IIP_OFFSET",	offsetof (struct pt_regs, cr_iip) },
     { "IA64_PT_REGS_CR_IFS_OFFSET",	offsetof (struct pt_regs, cr_ifs) },

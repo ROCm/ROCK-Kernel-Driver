@@ -2011,6 +2011,10 @@ semctl32 (int first, int second, int third, void *uptr)
 	else
 		fourth.__pad = (void *)A(pad);
 	switch (third) {
+	      default:
+		err = -EINVAL;
+		break;
+
 	      case IPC_INFO:
 	      case IPC_RMID:
 	      case IPC_SET:

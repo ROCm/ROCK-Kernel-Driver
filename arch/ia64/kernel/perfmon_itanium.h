@@ -15,7 +15,7 @@
 static int pfm_ita_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs);
 static int pfm_write_ibr_dbr(int mode, struct task_struct *task, void *arg, int count, struct pt_regs *regs);
 
-static pfm_reg_desc_t pfm_pmc_desc[PMU_MAX_PMCS]={
+static pfm_reg_desc_t pfm_ita_pmc_desc[PMU_MAX_PMCS]={
 /* pmc0  */ { PFM_REG_CONTROL , 0, 0x1UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc1  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc2  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -33,7 +33,7 @@ static pfm_reg_desc_t pfm_pmc_desc[PMU_MAX_PMCS]={
 	    { PFM_REG_END     , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}}, /* end marker */
 };
 
-static pfm_reg_desc_t pfm_pmd_desc[PMU_MAX_PMDS]={
+static pfm_reg_desc_t pfm_ita_pmd_desc[PMU_MAX_PMDS]={
 /* pmd0  */ { PFM_REG_BUFFER  , 0, 0UL, -1UL, NULL, NULL, {RDEP(1),0UL, 0UL, 0UL}, {RDEP(10),0UL, 0UL, 0UL}},
 /* pmd1  */ { PFM_REG_BUFFER  , 0, 0UL, -1UL, NULL, NULL, {RDEP(0),0UL, 0UL, 0UL}, {RDEP(10),0UL, 0UL, 0UL}},
 /* pmd2  */ { PFM_REG_BUFFER  , 0, 0UL, -1UL, NULL, NULL, {RDEP(3)|RDEP(17),0UL, 0UL, 0UL}, {RDEP(11),0UL, 0UL, 0UL}},
@@ -54,6 +54,19 @@ static pfm_reg_desc_t pfm_pmd_desc[PMU_MAX_PMDS]={
 /* pmd17 */ { PFM_REG_BUFFER  , 0, 0UL, -1UL, NULL, NULL, {RDEP(2)|RDEP(3),0UL, 0UL, 0UL}, {RDEP(11),0UL, 0UL, 0UL}},
 	    { PFM_REG_END     , 0, 0UL, -1UL, NULL, NULL, {0,}, {0,}}, /* end marker */
 };
+
+/*
+ * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
+ */
+static pmu_config_t pmu_conf={
+	disabled:	1,
+	ovfl_val:	(1UL << 32) - 1,
+	num_ibrs:	8,
+	num_dbrs:	8,
+	pmd_desc:	pfm_ita_pmd_desc,
+	pmc_desc:	pfm_ita_pmc_desc
+};
+
 
 static int
 pfm_ita_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
