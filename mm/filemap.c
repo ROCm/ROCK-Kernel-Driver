@@ -277,6 +277,7 @@ int sync_page_range(struct inode *inode, struct address_space *mapping,
 		ret = wait_on_page_writeback_range(mapping, start, end);
 	return ret;
 }
+EXPORT_SYMBOL(sync_page_range);
 
 /**
  * filemap_fdatawait - walk the list of under-writeback pages of the given
