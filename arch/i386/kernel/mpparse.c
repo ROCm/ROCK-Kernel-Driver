@@ -808,6 +808,7 @@ void __init find_smp_config (void)
 		smp_scan_config(address, 0x400);
 }
 
+int (*platform_rename_gsi)(int ioapic, int gsi);
 
 /* --------------------------------------------------------------------------
                             ACPI-based MP Configuration
@@ -1054,8 +1055,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 			panic("Max # of irq sources exceeded!\n");
 	}
 }
-
-int (*platform_rename_gsi)(int ioapic, int gsi);
 
 void mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 {
