@@ -1126,7 +1126,7 @@ static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		}
 	}
 
-	if (!mode_valid && !list_empty(&info->modelist))
+	if (!mode_valid && info->monspecs.modedb_len)
 		return -EINVAL;
 
 	if (var->xres_virtual < var->xres)
@@ -2017,7 +2017,6 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	}
 
 	fb_destroy_modedb(info->monspecs.modedb);
-	info->monspecs.modedb_len = 0;
 	info->monspecs.modedb = NULL;
 	if (register_framebuffer(info) < 0) {
 		printk(KERN_ERR PFX
