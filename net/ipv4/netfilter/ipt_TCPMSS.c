@@ -186,10 +186,9 @@ ipt_tcpmss_target(struct sk_buff **pskb,
 	       newmss);
 
  retmodified:
-	/* If we had a hardware checksum before, it's now invalid */
-	if ((*pskb)->ip_summed == CHECKSUM_HW)
-		if (skb_checksum_help(pskb, 0))
-			return NF_DROP;
+	/* We never hw checksum SYN packets.  */
+	BUG_ON((*pskb)->ip_summed == CHECKSUM_HW);
+
 	(*pskb)->nfcache |= NFC_UNKNOWN | NFC_ALTERED;
 	return IPT_CONTINUE;
 }
