@@ -89,6 +89,21 @@ vfs_unmount(
 }
 
 int
+vfs_mntupdate(
+	struct bhv_desc		*bdp,
+	int			*fl,
+	struct xfs_mount_args	*args)
+{
+	struct bhv_desc		*next = bdp;
+
+	ASSERT(next);
+	while (! (bhvtovfsops(next))->vfs_mntupdate)
+		next = BHV_NEXT(next);
+	return ((*bhvtovfsops(next)->vfs_mntupdate)(next, fl, args));
+}
+
+
+int
 vfs_root(
 	struct bhv_desc		*bdp,
 	struct vnode		**vpp)

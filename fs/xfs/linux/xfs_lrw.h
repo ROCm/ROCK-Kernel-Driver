@@ -76,8 +76,6 @@ extern int xfs_iomap_write_unwritten(struct xfs_inode *, loff_t, size_t);
 
 extern int xfs_dev_is_read_only(struct xfs_mount *, char *);
 
-extern void XFS_log_write_unmount_ro(struct bhv_desc *);
-
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \
 		 XFS_FSB_TO_BB((io)->io_mount, (fsb)) : \

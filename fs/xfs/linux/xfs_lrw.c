@@ -857,33 +857,6 @@ XFS_bflush(xfs_buftarg_t *target)
 	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
 }
 
-
-/* Push all fs state out to disk
- */
-
-void
-XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
-{
-	xfs_mount_t	*mp;
-	int pincount = 0;
-	int count = 0;
-	int error;
-
-	mp = XFS_BHVTOM(bdp);
-	pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT, &pincount);
-	xfs_finish_reclaim_all(mp);
-
-	do {
-		VFS_SYNC(XFS_MTOVFS(mp), SYNC_ATTR|SYNC_WAIT, NULL, error);
-		pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT, &pincount);
-		if (pincount == 0) {delay(50); count++;}
-	}  while (count < 2);
-
-	/* Ok now write out an unmount record */
-	xfs_log_unmount_write(mp);
-	xfs_unmountfs_writesb(mp);
-}
-
 /*
  * If the underlying (log or data) device is readonly, there are some
  * operations that cannot proceed.

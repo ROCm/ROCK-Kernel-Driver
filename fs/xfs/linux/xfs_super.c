@@ -42,22 +42,6 @@ STATIC struct super_operations linvfs_sops;
 STATIC struct export_operations linvfs_export_ops;
 STATIC kmem_cache_t * linvfs_inode_cachep;
 
-#define MNTOPT_LOGBUFS	"logbufs"	/* number of XFS log buffers */
-#define MNTOPT_LOGBSIZE	"logbsize"	/* size of XFS log buffers */
-#define MNTOPT_LOGDEV	"logdev"	/* log device */
-#define MNTOPT_RTDEV	"rtdev"		/* realtime I/O device */
-#define MNTOPT_BIOSIZE	"biosize"	/* log2 of preferred buffered io size */
-#define MNTOPT_WSYNC	"wsync"		/* safe-mode nfs compatible mount */
-#define MNTOPT_INO64	"ino64"		/* force inodes into 64-bit range */
-#define MNTOPT_NOALIGN	"noalign"	/* turn off stripe alignment */
-#define MNTOPT_SUNIT	"sunit"		/* data volume stripe unit */
-#define MNTOPT_SWIDTH	"swidth"	/* data volume stripe width */
-#define MNTOPT_NOUUID	"nouuid"	/* ignore filesystem UUID */
-#define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
-#define MNTOPT_NORECOVERY   "norecovery"   /* don't run XFS recovery */
-#define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
-#define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
-
 STATIC struct xfs_mount_args *
 args_allocate(
 	struct super_block	*sb)
@@ -76,221 +60,6 @@ args_allocate(
 	args->flags |= XFSMNT_32BITINODES;
 
 	return args;
-}
-
-int
-xfs_parseargs(
-	struct bhv_desc		*bhv,
-	char			*options,
-	struct xfs_mount_args	*args,
-	int			update)
-{
-	struct vfs		*vfsp = bhvtovfs(bhv);
-	char			*this_char, *value, *eov;
-	int			dsunit, dswidth, vol_dsunit, vol_dswidth;
-	int			iosize;
-
-	if (!options)
-		return 0;
-
-	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
-
-	while ((this_char = strsep(&options, ",")) != NULL) {
-		if (!*this_char)
-			continue;
-		if ((value = strchr(this_char, '=')) != NULL)
-			*value++ = 0;
-
-		if (!strcmp(this_char, MNTOPT_LOGBUFS)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_LOGBUFS);
-				return -EINVAL;
-			}
-			args->logbufs = simple_strtoul(value, &eov, 10);
-		} else if (!strcmp(this_char, MNTOPT_LOGBSIZE)) {
-			int	last, in_kilobytes = 0;
-
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_LOGBSIZE);
-				return -EINVAL;
-			}
-			last = strlen(value) - 1;
-			if (value[last] == 'K' || value[last] == 'k') {
-				in_kilobytes = 1;
-				value[last] = '\0';
-			}
-			args->logbufsize = simple_strtoul(value, &eov, 10);
-			if (in_kilobytes)
-				args->logbufsize <<= 10;
-		} else if (!strcmp(this_char, MNTOPT_LOGDEV)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_LOGDEV);
-				return -EINVAL;
-			}
-			strncpy(args->logname, value, MAXNAMELEN);
-		} else if (!strcmp(this_char, MNTOPT_MTPT)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_MTPT);
-				return -EINVAL;
-			}
-			strncpy(args->mtpt, value, MAXNAMELEN);
-		} else if (!strcmp(this_char, MNTOPT_RTDEV)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_RTDEV);
-				return -EINVAL;
-			}
-			strncpy(args->rtname, value, MAXNAMELEN);
-		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_BIOSIZE); 
-				return -EINVAL;
-			}
-			iosize = simple_strtoul(value, &eov, 10);
-			args->flags |= XFSMNT_IOSIZE;
-			args->iosizelog = (uint8_t) iosize;
-		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
-			args->flags |= XFSMNT_WSYNC;
-		} else if (!strcmp(this_char, MNTOPT_OSYNCISOSYNC)) {
-			args->flags |= XFSMNT_OSYNCISOSYNC;
-		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
-			args->flags |= XFSMNT_NORECOVERY;
-		} else if (!strcmp(this_char, MNTOPT_INO64)) {
-			args->flags |= XFSMNT_INO64;
-#ifndef XFS_BIG_FILESYSTEMS
-			printk("XFS: %s option not allowed on this system\n",
-				MNTOPT_INO64);
-			return -EINVAL;
-#endif
-		} else if (!strcmp(this_char, MNTOPT_NOALIGN)) {
-			args->flags |= XFSMNT_NOALIGN;
-		} else if (!strcmp(this_char, MNTOPT_SUNIT)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_SUNIT);
-				return -EINVAL;
-			}
-			dsunit = simple_strtoul(value, &eov, 10);
-		} else if (!strcmp(this_char, MNTOPT_SWIDTH)) {
-			if (!value || !*value) {
-				printk("XFS: %s option requires an argument\n",
-					MNTOPT_SWIDTH);
-				return -EINVAL;
-			}
-			dswidth = simple_strtoul(value, &eov, 10);
-		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
-			args->flags |= XFSMNT_NOUUID;
-		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {
-			args->flags |= XFSMNT_NOLOGFLUSH;
-		} else if (!strcmp(this_char, "osyncisdsync")) {
-			/* no-op, this is now the default */
-printk("XFS: osyncisdsync is now the default, option is deprecated.\n");
-		} else if (!strcmp(this_char, "irixsgid")) {
-printk("XFS: irixsgid is now a sysctl(2) variable, option is deprecated.\n");
-		} else {
-			printk("XFS: unknown mount option [%s].\n", this_char);
-			return -EINVAL;
-		}
-	}
-
-	if (args->flags & XFSMNT_NORECOVERY) {
-		if ((vfsp->vfs_flag & VFS_RDONLY) == 0) {
-			printk("XFS: no-recovery mounts must be read-only.\n");
-			return -EINVAL;
-		}
-	}
-
-	if ((args->flags & XFSMNT_NOALIGN) && (dsunit || dswidth)) {
-		printk(
-	"XFS: sunit and swidth options incompatible with the noalign option\n");
-		return -EINVAL;
-	}
-
-	if ((dsunit && !dswidth) || (!dsunit && dswidth)) {
-		printk("XFS: sunit and swidth must be specified together\n");
-		return -EINVAL;
-	}
-
-	if (dsunit && (dswidth % dsunit != 0)) {
-		printk(
-	"XFS: stripe width (%d) must be a multiple of the stripe unit (%d)\n",
-			dswidth, dsunit);
-		return -EINVAL;
-	}
-
-	if ((args->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
-		if (dsunit) {
-			args->sunit = dsunit;
-			args->flags |= XFSMNT_RETERR;
-		} else {
-			args->sunit = vol_dsunit;
-		}
-		dswidth ? (args->swidth = dswidth) :
-			  (args->swidth = vol_dswidth);
-	} else {
-		args->sunit = args->swidth = 0;
-	}
-
-	return 0;
-}
-
-int
-xfs_showargs(
-	struct bhv_desc		*bhv,
-	struct seq_file		*m)
-{
-	static struct proc_xfs_info {
-		int	flag;
-		char	*str;
-	} xfs_info[] = {
-		/* the few simple ones we can get from the mount struct */
-		{ XFS_MOUNT_NOALIGN,		"," MNTOPT_NOALIGN },
-		{ XFS_MOUNT_NORECOVERY,		"," MNTOPT_NORECOVERY },
-		{ XFS_MOUNT_OSYNCISOSYNC,	"," MNTOPT_OSYNCISOSYNC },
-		{ XFS_MOUNT_NOUUID,		"," MNTOPT_NOUUID },
-		{ 0, NULL }
-	};
-	struct proc_xfs_info	*xfs_infop;
-	struct xfs_mount	*mp = XFS_BHVTOM(bhv);
-	char			b[BDEVNAME_SIZE];
-
-	for (xfs_infop = xfs_info; xfs_infop->flag; xfs_infop++) {
-		if (mp->m_flags & xfs_infop->flag)
-			seq_puts(m, xfs_infop->str);
-	}
-
-	if (mp->m_flags & XFS_MOUNT_DFLT_IOSIZE)
-		seq_printf(m, "," MNTOPT_BIOSIZE "=%d", mp->m_writeio_log);
-
-	if (mp->m_logbufs > 0)
-		seq_printf(m, "," MNTOPT_LOGBUFS "=%d", mp->m_logbufs);
-
-	if (mp->m_logbsize > 0)
-		seq_printf(m, "," MNTOPT_LOGBSIZE "=%d", mp->m_logbsize);
-
-	if (mp->m_ddev_targp->pbr_dev != mp->m_logdev_targp->pbr_dev)
-		seq_printf(m, "," MNTOPT_LOGDEV "=%s",
-				bdevname(mp->m_logdev_targp->pbr_bdev, b));
-
-	if (mp->m_rtdev_targp &&
-	    mp->m_ddev_targp->pbr_dev != mp->m_rtdev_targp->pbr_dev)
-		seq_printf(m, "," MNTOPT_RTDEV "=%s",
-				bdevname(mp->m_rtdev_targp->pbr_bdev, b));
-
-	if (mp->m_dalign > 0)
-		seq_printf(m, "," MNTOPT_SUNIT "=%d",
-				(int)XFS_FSB_TO_BB(mp, mp->m_dalign));
-
-	if (mp->m_swidth > 0)
-		seq_printf(m, "," MNTOPT_SWIDTH "=%d",
-				(int)XFS_FSB_TO_BB(mp, mp->m_swidth));
-
-	return 0;
 }
 
 STATIC __inline__ void
@@ -616,7 +385,6 @@ linvfs_remount(
 	char			*options)
 {
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
-	xfs_mount_t		*mp = XFS_VFSTOM(vfsp);
 	struct xfs_mount_args	*args = args_allocate(sb);
 	int			error;
 
@@ -624,24 +392,7 @@ linvfs_remount(
 	if (error)
 		goto out;
 
-	if (args->flags & XFSMNT_NOATIME)
-		mp->m_flags |= XFS_MOUNT_NOATIME;
-	else
-		mp->m_flags &= ~XFS_MOUNT_NOATIME;
-
-	set_posix_acl_flag(sb);
-	linvfs_write_super(sb);
-
-	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
-		goto out;
-
-	if (*flags & MS_RDONLY) {
-		sb->s_flags |= MS_RDONLY;
-		XFS_log_write_unmount_ro(&mp->m_bhv);
-		vfsp->vfs_flag |= VFS_RDONLY;
-	} else {
-		vfsp->vfs_flag &= ~VFS_RDONLY;
-	}
+	VFS_MNTUPDATE(vfsp, flags, args, error);
 
 out:
 	kmem_free(args, sizeof(*args));
