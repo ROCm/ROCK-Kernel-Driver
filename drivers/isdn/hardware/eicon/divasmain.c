@@ -508,15 +508,11 @@ int
 diva_os_register_io_port(int on, unsigned long port, unsigned long length,
 			 const char *name)
 {
-	int ret;
-
 	if (on) {
-		if ((ret = check_region(port, length)) < 0) {
-			DBG_ERR(("A: I/O: can't register port=%08x, error=%d",
-				 port, ret))
+		if (!request_region(port, length, name)) {
+			DBG_ERR(("A: I/O: can't register port=%08x", port))
 			return (-1);
 		}
-		request_region(port, length, name);
 	} else {
 		release_region(port, length);
 	}
@@ -880,8 +876,6 @@ static int DIVA_INIT_FUNCTION divas_init(void)
 	char tmprev[50];
 	int ret = 0;
 
-	MOD_INC_USE_COUNT;
-
 	printk(KERN_INFO "%s\n", DRIVERNAME);
 	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
 	strcpy(tmprev, main_revision);
@@ -932,7 +926,6 @@ static int DIVA_INIT_FUNCTION divas_init(void)
 	}
 
       out:
-	MOD_DEC_USE_COUNT;
 	return (ret);
 }
 

@@ -1208,6 +1208,7 @@ static int ax8817x_bind(struct usb_interface *intf,
 	net->init = ax8817x_net_init;
 	net->priv = ax_info;
 
+	SET_NETDEV_DEV(net, &intf->dev);
 	ret = register_netdev(net);
 	if (ret < 0) {
 		err("%s: Failed net init (%d)\n", __FUNCTION__, ret);

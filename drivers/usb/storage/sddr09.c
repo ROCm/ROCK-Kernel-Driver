@@ -261,12 +261,13 @@ sddr09_send_scsi_command(struct us_data *us,
  */
 static int
 sddr09_test_unit_ready(struct us_data *us) {
-	unsigned char command[6] = {
-		0, LUNBITS, 0, 0, 0, 0
-	};
+	unsigned char *command = us->iobuf;
 	int result;
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	memset(command, 0, 6);
+	command[1] = LUNBITS;
+
+	result = sddr09_send_scsi_command(us, command, 6);
 
 	US_DEBUGP("sddr09_test_unit_ready returns %d\n", result);
 
@@ -281,12 +282,15 @@ sddr09_test_unit_ready(struct us_data *us) {
  */
 static int
 sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
-	unsigned char command[12] = {
-		0x03, LUNBITS, 0, 0, buflen, 0, 0, 0, 0, 0, 0, 0
-	};
+	unsigned char *command = us->iobuf;
 	int result;
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	memset(command, 0, 12);
+	command[0] = 0x03;
+	command[1] = LUNBITS;
+	command[4] = buflen;
+
+	result = sddr09_send_scsi_command(us, command, 12);
 	if (result != USB_STOR_TRANSPORT_GOOD) {
 		US_DEBUGP("request sense failed\n");
 		return result;
@@ -331,20 +335,23 @@ sddr09_readX(struct us_data *us, int x, unsigned long fromaddress,
 	     int nr_of_pages, int bulklen, unsigned char *buf,
 	     int use_sg) {
 
-	unsigned char command[12] = {
-		0xe8, LUNBITS | x, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
+	unsigned char *command = us->iobuf;
 	int result;
 
+	command[0] = 0xE8;
+	command[1] = LUNBITS | x;
 	command[2] = MSB_of(fromaddress>>16);
 	command[3] = LSB_of(fromaddress>>16); 
 	command[4] = MSB_of(fromaddress & 0xFFFF);
 	command[5] = LSB_of(fromaddress & 0xFFFF); 
-
+	command[6] = 0;
+	command[7] = 0;
+	command[8] = 0;
+	command[9] = 0;
 	command[10] = MSB_of(nr_of_pages);
 	command[11] = LSB_of(nr_of_pages);
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	result = sddr09_send_scsi_command(us, command, 12);
 
 	if (result != USB_STOR_TRANSPORT_GOOD) {
 		US_DEBUGP("Result for send_control in sddr09_read2%d %d\n",
@@ -458,17 +465,18 @@ sddr09_read23(struct us_data *us, unsigned long fromaddress,
  */
 static int
 sddr09_erase(struct us_data *us, unsigned long Eaddress) {
-	unsigned char command[12] = {
-		0xea, LUNBITS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
+	unsigned char *command = us->iobuf;
 	int result;
 
+	memset(command, 0, 12);
+	command[0] = 0xEA;
+	command[1] = LUNBITS;
 	command[6] = MSB_of(Eaddress>>16);
 	command[7] = LSB_of(Eaddress>>16);
 	command[8] = MSB_of(Eaddress & 0xFFFF);
 	command[9] = LSB_of(Eaddress & 0xFFFF);
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	result = sddr09_send_scsi_command(us, command, 12);
 
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		US_DEBUGP("Result for send_control in sddr09_erase %d\n",
@@ -493,10 +501,11 @@ sddr09_writeX(struct us_data *us,
 	      unsigned long Waddress, unsigned long Eaddress,
 	      int nr_of_pages, int bulklen, unsigned char *buf, int use_sg) {
 
-	unsigned char command[12] = {
-		0xe9, LUNBITS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
+	unsigned char *command = us->iobuf;
 	int result;
+
+	command[0] = 0xE9;
+	command[1] = LUNBITS;
 
 	command[2] = MSB_of(Waddress>>16);
 	command[3] = LSB_of(Waddress>>16);
@@ -511,7 +520,7 @@ sddr09_writeX(struct us_data *us,
 	command[10] = MSB_of(nr_of_pages);
 	command[11] = LSB_of(nr_of_pages);
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	result = sddr09_send_scsi_command(us, command, 12);
 
 	if (result != USB_STOR_TRANSPORT_GOOD) {
 		US_DEBUGP("Result for send_control in sddr09_writeX %d\n",
@@ -554,15 +563,15 @@ sddr09_write_inplace(struct us_data *us, unsigned long address,
  */
 static int
 sddr09_read_sg_test_only(struct us_data *us) {
-	unsigned char command[15] = {
-		0xe7, LUNBITS, 0
-	};
+	unsigned char *command = us->iobuf;
 	int result, bulklen, nsg, ct;
 	unsigned char *buf;
 	unsigned long address;
 
 	nsg = bulklen = 0;
-
+	command[0] = 0xE7;
+	command[1] = LUNBITS;
+	command[2] = 0;
 	address = 040000; ct = 1;
 	nsg++;
 	bulklen += (ct << 9);
@@ -628,20 +637,22 @@ sddr09_read_sg_test_only(struct us_data *us) {
 static int
 sddr09_read_status(struct us_data *us, unsigned char *status) {
 
-	unsigned char command[12] = {
-		0xec, LUNBITS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
-	unsigned char data[64];
+	unsigned char *command = us->iobuf;
+	unsigned char *data = us->iobuf;
 	int result;
 
 	US_DEBUGP("Reading status...\n");
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	memset(command, 0, 12);
+	command[0] = 0xEC;
+	command[1] = LUNBITS;
+
+	result = sddr09_send_scsi_command(us, command, 12);
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		return result;
 
 	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				       data, sizeof(data), NULL);
+				       data, 64, NULL);
 	*status = data[0];
 	return (result == USB_STOR_XFER_GOOD ?
 			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
@@ -953,13 +964,15 @@ sddr09_read_control(struct us_data *us,
  */
 static int
 sddr09_read_deviceID(struct us_data *us, unsigned char *deviceID) {
-	unsigned char command[12] = {
-		0xed, LUNBITS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
-	unsigned char content[64];
+	unsigned char *command = us->iobuf;
+	unsigned char *content = us->iobuf;
 	int result, i;
 
-	result = sddr09_send_scsi_command(us, command, sizeof(command));
+	memset(command, 0, 12);
+	command[0] = 0xED;
+	command[1] = LUNBITS;
+
+	result = sddr09_send_scsi_command(us, command, 12);
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		return result;
 
@@ -1006,11 +1019,13 @@ sddr09_get_wp(struct us_data *us, struct sddr09_card_info *info) {
 static int
 sddr09_reset(struct us_data *us) {
 
-	unsigned char command[12] = {
-		0xeb, LUNBITS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
+	unsigned char *command = us->iobuf;
 
-	return sddr09_send_scsi_command(us, command, sizeof(command));
+	memset(command, 0, 12);
+	command[0] = 0xEB;
+	command[1] = LUNBITS;
+
+	return sddr09_send_scsi_command(us, command, 12);
 }
 #endif
 
@@ -1313,7 +1328,7 @@ sddr09_init_card_info(struct us_data *us) {
 int
 sddr09_init(struct us_data *us) {
 	int result;
-	unsigned char data[18];
+	unsigned char *data = us->iobuf;
 
 	result = sddr09_send_command(us, 0x01, USB_DIR_IN, data, 2);
 	if (result != USB_STOR_TRANSPORT_GOOD) {
@@ -1333,10 +1348,10 @@ sddr09_init(struct us_data *us) {
 	US_DEBUGP("SDDR09init: %02X %02X\n", data[0], data[1]);
 	// get 07 00
 
-	result = sddr09_request_sense(us, data, sizeof(data));
+	result = sddr09_request_sense(us, data, 18);
 	if (result == USB_STOR_TRANSPORT_GOOD && data[2] != 0) {
 		int j;
-		for (j=0; j<sizeof(data); j++)
+		for (j=0; j<18; j++)
 			printk(" %02X", data[j]);
 		printk("\n");
 		// get 70 00 00 00 00 00 00 * 00 00 00 00 00 00

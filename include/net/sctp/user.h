@@ -1,38 +1,39 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
- * 
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
+ * Copyright (c) 2002 Intel Corp.
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * This header represents the structures and constants needed to support
- * the SCTP Extension to the Sockets API. 
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ * the SCTP Extension to the Sockets API.
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll    <piggy@acm.org>
  *    R. Stewart               <randall@sctp.chicago.il.us>
  *    K. Morneau               <kmorneau@cisco.com>
@@ -41,61 +42,62 @@
  *    Jon Grimm                <jgrimm@us.ibm.com>
  *    Daisy Chang              <daisyc@us.ibm.com>
  *    Ryan Layer               <rmlayer@us.ibm.com>
- * 
- * 
+ *    Ardelle Fan	       <ardelle.fan@intel.com>
+ *    Sridhar Samudrala        <sri@us.ibm.com>
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
-#include <linux/types.h>
-#include <linux/socket.h>
 
 #ifndef __net_sctp_user_h__
 #define __net_sctp_user_h__
 
+#include <linux/types.h>
+#include <linux/socket.h>
 
 typedef void * sctp_assoc_t;
 
 /* The following symbols come from the Sockets API Extensions for
- * SCTP <draft-ietf-tsvwg-sctpsocket-04.txt>.
+ * SCTP <draft-ietf-tsvwg-sctpsocket-07.txt>.
  */
 enum sctp_optname {
 	SCTP_RTOINFO,
 #define SCTP_RTOINFO SCTP_RTOINFO
-	SCTP_ASSOCRTXINFO,
-#define SCTP_ASSOCRTXINFO SCTP_ASSOCRTXINFO
+	SCTP_ASSOCINFO,
+#define SCTP_ASSOCINFO SCTP_ASSOCINFO
 	SCTP_INITMSG,
 #define SCTP_INITMSG SCTP_INITMSG
-	SCTP_AUTO_CLOSE,
-#define SCTP_AUTO_CLOSE SCTP_AUTO_CLOSE
-	SCTP_SET_PRIMARY_ADDR,
-#define SCTP_SET_PRIMARY_ADDR SCTP_SET_PRIMARY_ADDR
+	SCTP_NODELAY, 	/* Get/set nodelay option. */
+#define SCTP_NODELAY	SCTP_NODELAY
+	SCTP_AUTOCLOSE,
+#define SCTP_AUTOCLOSE SCTP_AUTOCLOSE
 	SCTP_SET_PEER_PRIMARY_ADDR, 
 #define SCTP_SET_PEER_PRIMARY_ADDR SCTP_SET_PEER_PRIMARY_ADDR
-	SCTP_SET_ADAPTATION_LAYER,      
-#define SCTP_SET_ADAPTATION_LAYER SCTP_SET_ADAPTATION_LAYER
-	SCTP_SET_STREAM_TIMEOUTS,
-#define SCTP_SET_STREAM_TIMEOUTS SCTP_SET_STREAM_TIMEOUTS
+	SCTP_PRIMARY_ADDR,
+#define SCTP_PRIMARY_ADDR SCTP_PRIMARY_ADDR
+	SCTP_ADAPTION_LAYER,      
+#define SCTP_ADAPTION_LAYER SCTP_ADAPTION_LAYER
 	SCTP_DISABLE_FRAGMENTS,
 #define SCTP_DISABLE_FRAGMENTS SCTP_DISABLE_FRAGMENTS
-	SCTP_SET_PEER_ADDR_PARAMS,
-#define SCTP_SET_PEER_ADDR_PARAMS SCTP_SET_PEER_ADDR_PARAMS
-	SCTP_GET_PEER_ADDR_PARAMS,
-#define SCTP_GET_PEER_ADDR_PARAMS SCTP_GET_PEER_ADDR_PARAMS
+	SCTP_PEER_ADDR_PARAMS,
+#define SCTP_PEER_ADDR_PARAMS SCTP_PEER_ADDR_PARAMS
+	SCTP_DEFAULT_SEND_PARAM,
+#define SCTP_DEFAULT_SEND_PARAM SCTP_DEFAULT_SEND_PARAM
+	SCTP_EVENTS,
+#define SCTP_EVENTS SCTP_EVENTS
+	SCTP_I_WANT_MAPPED_V4_ADDR,  /* Turn on/off mapped v4 addresses  */
+#define SCTP_I_WANT_MAPPED_V4_ADDR SCTP_I_WANT_MAPPED_V4_ADDR
+	SCTP_MAXSEG, 	/* Get/set maximum fragment. */
+#define SCTP_MAXSEG 	SCTP_MAXSEG
 	SCTP_STATUS,
 #define SCTP_STATUS SCTP_STATUS
 	SCTP_GET_PEER_ADDR_INFO,
 #define SCTP_GET_PEER_ADDR_INFO SCTP_GET_PEER_ADDR_INFO
-	SCTP_SET_EVENTS,
-#define SCTP_SET_EVENTS SCTP_SET_EVENTS
-	SCTP_AUTOCLOSE,
-#define SCTP_AUTOCLOSE SCTP_AUTOCLOSE
-	SCTP_SET_DEFAULT_SEND_PARAM,
-#define SCTP_SET_DEFAULT_SEND_PARAM SCTP_SET_DEFAULT_SEND_PARAM
 
-	SCTP_SOCKOPT_DEBUG_NAME = 42, /* FIXME */
-#define SCTP_SOCKOPT_DEBUG_NAME	SCTP_SOCKOPT_DEBUG_NAME
-
-	SCTP_SOCKOPT_BINDX_ADD, /* BINDX requests for adding addresses. */
+	/* Internal Socket Options. Some of the sctp library functions are 
+	 * implemented using these socket options.
+	 */
+	SCTP_SOCKOPT_BINDX_ADD = 100,/* BINDX requests for adding addresses. */
 #define SCTP_SOCKOPT_BINDX_ADD	SCTP_SOCKOPT_BINDX_ADD
 	SCTP_SOCKOPT_BINDX_REM, /* BINDX requests for removing addresses. */
 #define SCTP_SOCKOPT_BINDX_REM	SCTP_SOCKOPT_BINDX_REM
@@ -109,28 +111,7 @@ enum sctp_optname {
 #define SCTP_GET_LOCAL_ADDRS_NUM	SCTP_GET_LOCAL_ADDRS_NUM
 	SCTP_GET_LOCAL_ADDRS, 	/* Get all local addresss. */
 #define SCTP_GET_LOCAL_ADDRS	SCTP_GET_LOCAL_ADDRS
-	SCTP_NODELAY, 	/* Get/set nodelay option. */
-#define SCTP_NODELAY	SCTP_NODELAY
-	SCTP_I_WANT_MAPPED_V4_ADDR,  /* Turn on/off mapped v4 addresses  */
-#define SCTP_I_WANT_MAPPED_V4_ADDR SCTP_I_WANT_MAPPED_V4_ADDR
-	SCTP_MAXSEG, 	/* Get/set maximum fragment. */
-#define SCTP_MAXSEG 	SCTP_MAXSEG
 };
-
-
-/*
- * 5.2 SCTP msg_control Structures
- *
- * A key element of all SCTP-specific socket extensions is the use of
- * ancillary data to specify and access SCTP-specific data via the
- * struct msghdr's msg_control member used in sendmsg() and recvmsg().
- * Fine-grained control over initialization and sending parameters are
- * handled with ancillary data.
- *
- * Each ancillary data item is preceeded by a struct cmsghdr (see
- * Section 5.1), which defines the function and purpose of the data
- * contained in in the cmsg_data[] member.
- */
 
 /*
  * 5.2.1 SCTP Initiation Structure (SCTP_INIT)
@@ -151,7 +132,6 @@ struct sctp_initmsg {
 	__u16 sinit_max_attempts;
 	__u16 sinit_max_init_timeo;
 };
-
 
 /*
  * 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
@@ -214,7 +194,6 @@ typedef enum sctp_cmsg_type {
  *   following format:
  *
  */
-
 struct sctp_assoc_change {
 	__u16 sac_type;
 	__u16 sac_flags;
@@ -267,11 +246,11 @@ struct sctp_paddr_change {
  *   event that happened to the address.  They include:
  */
 enum sctp_spc_state {
-	ADDRESS_AVAILABLE,
-	ADDRESS_UNREACHABLE,
-	ADDRESS_REMOVED,
-	ADDRESS_ADDED,
-	ADDRESS_MADE_PRIM,
+	SCTP_ADDR_REACHABLE,
+	SCTP_ADDR_UNREACHABLE,
+	SCTP_ADDR_REMOVED,
+	SCTP_ADDR_ADDED,
+	SCTP_ADDR_MADE_PRIM,
 };
 
 
@@ -290,7 +269,6 @@ struct sctp_remote_error {
 	__u16 sre_flags;
 	__u32 sre_length;
 	__u16 sre_error;
-	__u16 sre_len;
 	sctp_assoc_t sre_assoc_id;
 	__u8 sre_data[0];
 };
@@ -324,7 +302,6 @@ struct sctp_send_failed {
  *                       Note that this does not necessarily mean that the
  *                       data was (or was not) successfully delivered.
  */
-
 enum sctp_ssf_flags {
 	SCTP_DATA_UNSENT,
 	SCTP_DATA_SENT,
@@ -336,7 +313,6 @@ enum sctp_ssf_flags {
  *   When a peer sends a SHUTDOWN, SCTP delivers this notification to
  *   inform the application that it should cease sending data.
  */
-
 struct sctp_shutdown_event {
 	__u16 sse_type;
 	__u16 sse_flags;
@@ -355,8 +331,8 @@ struct sctp_adaption_event {
 	__u16 sai_type;
 	__u16 sai_flags;
 	__u32 sai_length;
-	__u32 sai_adaptation_bits;
-	sctp_assoc_t sse_assoc_id;
+	__u32 sai_adaption_ind;
+	sctp_assoc_t sai_assoc_id;
 };
 
 /*
@@ -366,8 +342,7 @@ struct sctp_adaption_event {
  *   message this notification will be used to inidicate
  *   various events.
  */
-
-struct sctp_rcv_pdapi_event {
+struct sctp_pdapi_event {
 	__u16 pdapi_type;
 	__u16 pdapi_flags;
 	__u32 pdapi_length;
@@ -404,14 +379,14 @@ union sctp_notification {
 		__u16 sn_type;             /* Notification type. */
 		__u16 sn_flags;
 		__u32 sn_length;
-	} h;
+	} sn_header;
 	struct sctp_assoc_change sn_assoc_change;
-	struct sctp_paddr_change sn_padr_change;
+	struct sctp_paddr_change sn_paddr_change;
 	struct sctp_remote_error sn_remote_error;
 	struct sctp_send_failed sn_send_failed;
 	struct sctp_shutdown_event sn_shutdown_event;
 	struct sctp_adaption_event sn_adaption_event;
-	struct sctp_rcv_pdapi_event sn_rcv_pdapi_event;
+	struct sctp_pdapi_event sn_pdapi_event;
 };
 
 /* Section 5.3.1
@@ -448,8 +423,72 @@ typedef enum sctp_sn_error {
 } sctp_sn_error_t;
 
 /*
+ * 7.1.1 Retransmission Timeout Parameters (SCTP_RTOINFO)
  *
- * 7.1.14 Peer Address Parameters
+ *   The protocol parameters used to initialize and bound retransmission
+ *   timeout (RTO) are tunable.  See [SCTP] for more information on how
+ *   these parameters are used in RTO calculation. 
+ */
+struct sctp_rtoinfo {
+	sctp_assoc_t	srto_assoc_id;
+	__u32		srto_initial;
+	__u32		srto_max;
+	__u32		srto_min;
+};
+
+/*
+ * 7.1.2 Association Parameters (SCTP_ASSOCINFO)
+ *
+ *   This option is used to both examine and set various association and
+ *   endpoint parameters.
+ */
+struct sctp_assocparams {
+	sctp_assoc_t	sasoc_assoc_id;
+	__u16		sasoc_asocmaxrxt;
+	__u16		sasoc_number_peer_destinations;
+	__u32		sasoc_peer_rwnd;
+	__u32		sasoc_local_rwnd;
+	__u32		sasoc_cookie_life;
+};
+
+/*
+ * 7.1.9 Set Peer Primary Address (SCTP_SET_PEER_PRIMARY_ADDR)
+ *
+ *  Requests that the peer mark the enclosed address as the association
+ *  primary. The enclosed address must be one of the association's
+ *  locally bound addresses. The following structure is used to make a
+ *   set primary request:
+ */
+struct sctp_setpeerprim {
+	sctp_assoc_t            sspp_assoc_id;
+	struct sockaddr_storage sspp_addr;
+};
+
+/*
+ * 7.1.10 Set Primary Address (SCTP_PRIMARY_ADDR)
+ *
+ *  Requests that the local SCTP stack use the enclosed peer address as
+ *  the association primary. The enclosed address must be one of the
+ *  association peer's addresses. The following structure is used to
+ *  make a set peer primary request:
+ */
+struct sctp_prim {
+	sctp_assoc_t            ssp_assoc_id;
+	struct sockaddr_storage ssp_addr;
+};
+
+/*
+ * 7.1.11 Set Adaption Layer Indicator (SCTP_ADAPTION_LAYER)
+ *
+ * Requests that the local endpoint set the specified Adaption Layer
+ * Indication parameter for all future INIT and INIT-ACK exchanges.
+ */
+struct sctp_setadaption {
+	__u32	ssb_adaption_ind;
+};
+
+/*
+ * 7.1.13 Peer Address Parameters  (SCTP_PEER_ADDR_PARAMS)
  *
  *   Applications can enable or disable heartbeats for any peer address
  *   of an association, modify an address's heartbeat interval, force a
@@ -458,12 +497,11 @@ typedef enum sctp_sn_error {
  *   unreachable. The following structure is used to access and modify an
  *   address's parameters:
  */
-
 struct sctp_paddrparams {
+	sctp_assoc_t		spp_assoc_id;
 	struct sockaddr_storage	spp_address;
 	__u32			spp_hbinterval;
 	__u16			spp_pathmaxrxt;
-	sctp_assoc_t		spp_assoc_id;
 };
 
 /*
@@ -475,7 +513,6 @@ struct sctp_paddrparams {
  *   read-only. The following structure is used to access this
  *   information:
  */
-
 struct sctp_paddrinfo {
 	sctp_assoc_t		spinfo_assoc_id;
 	struct sockaddr_storage	spinfo_address;
@@ -490,68 +527,6 @@ struct sctp_paddrinfo {
 enum sctp_spinfo_state {
 	SCTP_INACTIVE,
 	SCTP_ACTIVE,
-};
-
-/*
- * 7.1.1 Retransmission Timeout Parameters (SCTP_RTOINFO)
- *
- *   The protocol parameters used to initialize and bound retransmission
- *   timeout (RTO) are tunable.  See [SCTP] for more information on how
- *   these parameters are used in RTO calculation.  The peer address
- *   parameter is ignored for TCP style socket.
- */
-
-struct sctp_rtoinfo {
-	__u32		srto_initial;
-	__u32		srto_max;
-	__u32		srto_min;
-	sctp_assoc_t	srto_assoc_id;
-};
-
-/*
- * 7.1.2 Association Retransmission Parameter (SCTP_ASSOCRTXINFO)
- *
- *   The protocol parameter used to set the number of retransmissions
- *   sent before an association is considered unreachable.
- *   See [SCTP] for more information on how this parameter is used.  The
- *   peer address parameter is ignored for TCP style socket.
- */
-
-struct sctp_assocparams {
-	sctp_assoc_t	sasoc_assoc_id;
-	__u16		sasoc_asocmaxrxt;
-	__u16		sasoc_number_peer_destinations;
-	__u32		sasoc_peer_rwnd;
-	__u32		sasoc_local_rwnd;
-	__u32		sasoc_cookie_life;
-};
-
-/*
- * 7.1.9 Set Primary Address (SCTP_SET_PRIMARY_ADDR)
- *
- *  Requests that the peer mark the enclosed address as the association
- *  primary. The enclosed address must be one of the association's
- *  locally bound addresses. The following structure is used to make a
- *   set primary request:
- */
-
-struct sctp_setprim {
-	struct sockaddr_storage ssp_addr;
-	sctp_assoc_t            ssp_assoc_id;
-};
-
-/*
- * 7.1.10 Set Peer Primary Address (SCTP_SET_PEER_PRIMARY_ADDR)
- *
- *  Requests that the local SCTP stack use the enclosed peer address as
- *  the association primary. The enclosed address must be one of the
- *  association peer's addresses. The following structure is used to
- *  make a set peer primary request:
- */
-
-struct sctp_setpeerprim {
-	struct sockaddr_storage sspp_addr;
-	sctp_assoc_t            sspp_assoc_id;
 };
 
 /*
@@ -575,34 +550,8 @@ struct sctp_status {
 	struct sctp_paddrinfo	sstat_primary;
 };
 
-
 /*
- * 7.1.12 Set Adaption Layer Indicator
- *
- * Requests that the local endpoint set the specified Adaption Layer
- * Indication parameter for all future
- *  INIT and INIT-ACK exchanges.
- */
-
-struct sctp_setadaption {
-	__u32	ssb_adaption_ind;
-};
-
-/*
- * 7.1.12 Set default message time outs (SCTP_SET_STREAM_TIMEOUTS)
- *
- * This option requests that the requested stream apply a
- *  default time-out for messages in queue.
- */
-struct sctp_setstrm_timeout   {
-	sctp_assoc_t	ssto_assoc_id;
-	__u32		ssto_timeout;
-	__u16		ssto_streamid_start;
-	__u16		ssto_streamid_end;
-};
-
-/*
- * 8.3 8.5 get all peer/local addresses on a socket
+ * 8.3, 8.5 get all peer/local addresses on a socket
  * This parameter struct is for getsockopt
  */
 struct sctp_getaddrs {
@@ -624,8 +573,8 @@ enum sctp_msg_flags {
  * The flags parameter is formed from the bitwise OR of zero or more of the
  * following currently defined flags:
  */
-#define BINDX_ADD_ADDR 0x01
-#define BINDX_REM_ADDR 0x02
+#define SCTP_BINDX_ADD_ADDR 0x01
+#define SCTP_BINDX_REM_ADDR 0x02
 
 /* This is the structure that is passed as an argument(optval) to
  * getsockopt(SCTP_SOCKOPT_PEELOFF).
@@ -636,6 +585,3 @@ typedef struct {
 } sctp_peeloff_arg_t;
 
 #endif /* __net_sctp_user_h__ */
-
-
-

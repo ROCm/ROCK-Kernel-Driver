@@ -424,7 +424,14 @@ static void nodemgr_release_ne(struct device *dev)
 static void nodemgr_remove_ud(struct unit_directory *ud)
 {
 	struct device *dev = &ud->device;
+	struct list_head *lh, *next;
 	int i;
+
+	list_for_each_safe(lh, next, &ud->device.children) {
+		struct unit_directory *ud;
+		ud = container_of(list_to_dev(lh), struct unit_directory, device);
+		nodemgr_remove_ud(ud);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(fw_ud_attrs); i++)
 		device_remove_file(dev, fw_ud_attrs[i]);
@@ -462,8 +469,8 @@ static void nodemgr_update_ud_names(struct host_info *hi, struct node_entry *ne)
 		ud = container_of(list_to_dev(lh), struct unit_directory, device);
 
 		snprintf(ud->device.name, DEVICE_NAME_SIZE,
-			 "IEEE-1394 unit directory %d-" NODE_BUS_FMT "-%u",
-			 hi->host->id, NODE_BUS_ARGS(ne->nodeid), ud->id);
+			 "IEEE-1394 unit directory " NODE_BUS_FMT "-%u",
+			 NODE_BUS_ARGS(hi->host, ne->nodeid), ud->id);
 	}
 }
 
@@ -714,8 +721,8 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 	snprintf(ne->device.bus_id, BUS_ID_SIZE, "%016Lx",
 		 (unsigned long long)(ne->guid));
 	snprintf(ne->device.name, DEVICE_NAME_SIZE,
-		 "IEEE-1394 device %d-" NODE_BUS_FMT, host->id,
-		 NODE_BUS_ARGS(ne->nodeid));
+		 "IEEE-1394 device " NODE_BUS_FMT,
+		 NODE_BUS_ARGS(host, ne->nodeid));
 
 	device_register(&ne->device);
 
@@ -727,9 +734,9 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 
 	nodemgr_update_ud_names(hi, ne);
 
-	HPSB_DEBUG("%s added: ID:BUS[%d-" NODE_BUS_FMT "]  GUID[%016Lx]",
+	HPSB_DEBUG("%s added: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   (host->node_id == nodeid) ? "Host" : "Node",
-		   host->id, NODE_BUS_ARGS(nodeid), (unsigned long long)guid);
+		   NODE_BUS_ARGS(host, nodeid), (unsigned long long)guid);
 
         return ne;
 }
@@ -911,7 +918,8 @@ static struct unit_directory *nodemgr_scan_unit_directory
  * immediate unit directories looking for software_id and
  * software_version entries, in order to get driver autoloading working. */
 static struct unit_directory *nodemgr_process_unit_directory
-	(struct host_info *hi, struct node_entry *ne, octlet_t address, unsigned int *id)
+	(struct host_info *hi, struct node_entry *ne, octlet_t address, unsigned int *id,
+	 struct unit_directory *parent)
 {
 	struct unit_directory *ud;
 	quadlet_t quad;
@@ -1001,37 +1009,38 @@ static struct unit_directory *nodemgr_process_unit_directory
 			break;
 
 		case CONFIG_ROM_LOGICAL_UNIT_DIRECTORY:
-			/* TODO: Parent this with it's UD */
-			ud_temp = nodemgr_process_unit_directory(hi, ne, address + value * 4, id);
+			ud->flags |= UNIT_DIRECTORY_HAS_LUN_DIRECTORY;
+			ud_temp = nodemgr_process_unit_directory(hi, ne, address + value * 4, id,
+								 parent);
+
+			if (ud_temp == NULL)
+				break;
 
 			/* inherit unspecified values */
-			if (ud_temp != NULL)
+			if ((ud->flags & UNIT_DIRECTORY_VENDOR_ID) &&
+				!(ud_temp->flags & UNIT_DIRECTORY_VENDOR_ID))
 			{
-				if ((ud->flags & UNIT_DIRECTORY_VENDOR_ID) &&
-					!(ud_temp->flags & UNIT_DIRECTORY_VENDOR_ID))
-				{
-					ud_temp->flags |=  UNIT_DIRECTORY_VENDOR_ID;
-					ud_temp->vendor_id = ud->vendor_id;
-					ud_temp->vendor_oui = ud->vendor_oui;
-				}
-				if ((ud->flags & UNIT_DIRECTORY_MODEL_ID) &&
-					!(ud_temp->flags & UNIT_DIRECTORY_MODEL_ID))
-				{
-					ud_temp->flags |=  UNIT_DIRECTORY_MODEL_ID;
-					ud_temp->model_id = ud->model_id;
-				}
-				if ((ud->flags & UNIT_DIRECTORY_SPECIFIER_ID) &&
-					!(ud_temp->flags & UNIT_DIRECTORY_SPECIFIER_ID))
-				{
-					ud_temp->flags |=  UNIT_DIRECTORY_SPECIFIER_ID;
-					ud_temp->specifier_id = ud->specifier_id;
-				}
-				if ((ud->flags & UNIT_DIRECTORY_VERSION) &&
-					!(ud_temp->flags & UNIT_DIRECTORY_VERSION))
-				{
-					ud_temp->flags |=  UNIT_DIRECTORY_VERSION;
-					ud_temp->version = ud->version;
-				}
+				ud_temp->flags |=  UNIT_DIRECTORY_VENDOR_ID;
+				ud_temp->vendor_id = ud->vendor_id;
+				ud_temp->vendor_oui = ud->vendor_oui;
+			}
+			if ((ud->flags & UNIT_DIRECTORY_MODEL_ID) &&
+				!(ud_temp->flags & UNIT_DIRECTORY_MODEL_ID))
+			{
+				ud_temp->flags |=  UNIT_DIRECTORY_MODEL_ID;
+				ud_temp->model_id = ud->model_id;
+			}
+			if ((ud->flags & UNIT_DIRECTORY_SPECIFIER_ID) &&
+				!(ud_temp->flags & UNIT_DIRECTORY_SPECIFIER_ID))
+			{
+				ud_temp->flags |=  UNIT_DIRECTORY_SPECIFIER_ID;
+				ud_temp->specifier_id = ud->specifier_id;
+			}
+			if ((ud->flags & UNIT_DIRECTORY_VERSION) &&
+				!(ud_temp->flags & UNIT_DIRECTORY_VERSION))
+			{
+				ud_temp->flags |=  UNIT_DIRECTORY_VERSION;
+				ud_temp->version = ud->version;
 			}
 
 			break;
@@ -1049,7 +1058,13 @@ static struct unit_directory *nodemgr_process_unit_directory
 
 	memcpy(&ud->device, &nodemgr_dev_template_ud,
 	       sizeof(ud->device));
-	ud->device.parent = &ne->device;
+
+	if (parent) {
+		ud->flags |= UNIT_DIRECTORY_LUN_DIRECTORY;
+		ud->device.parent = &parent->device;
+	} else
+		ud->device.parent = &ne->device;
+
 	snprintf(ud->device.bus_id, BUS_ID_SIZE, "%s-%u",
 		 ne->device.bus_id, ud->id);
 
@@ -1125,7 +1140,8 @@ static void nodemgr_process_root_directory(struct host_info *hi, struct node_ent
 			break;
 
 		case CONFIG_ROM_UNIT_DIRECTORY:
-			nodemgr_process_unit_directory(hi, ne, address + value * 4, &ud_id);
+			nodemgr_process_unit_directory(hi, ne, address + value * 4, &ud_id,
+						       NULL);
 			break;			
 
 		case CONFIG_ROM_DESCRIPTOR_LEAF:
@@ -1239,14 +1255,13 @@ static void nodemgr_process_config_rom(struct host_info *hi,
 	ne->busopt.generation	= (busoptions >> 4) & 0xf;
 	ne->busopt.lnkspd	= busoptions & 0x7;
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	HPSB_DEBUG("NodeMgr: raw=0x%08x irmc=%d cmc=%d isc=%d bmc=%d pmc=%d "
-		   "cyc_clk_acc=%d max_rec=%d gen=%d lspd=%d",
-		   busoptions, ne->busopt.irmc, ne->busopt.cmc,
-		   ne->busopt.isc, ne->busopt.bmc, ne->busopt.pmc,
-		   ne->busopt.cyc_clk_acc, ne->busopt.max_rec,
-		   ne->busopt.generation, ne->busopt.lnkspd);
-#endif
+	HPSB_VERBOSE("NodeMgr: raw=0x%08x irmc=%d cmc=%d isc=%d bmc=%d pmc=%d "
+		     "cyc_clk_acc=%d max_rec=%d gen=%d lspd=%d",
+		     busoptions, ne->busopt.irmc, ne->busopt.cmc,
+		     ne->busopt.isc, ne->busopt.bmc, ne->busopt.pmc,
+		     ne->busopt.cyc_clk_acc, ne->busopt.max_rec,
+		     ne->busopt.generation, ne->busopt.lnkspd);
+
 	device_remove_file(&ne->device, &dev_attr_ne_vendor_oui);
 
 	nodemgr_process_root_directory(hi, ne);
@@ -1301,11 +1316,11 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 
 	if (ne->nodeid != nodeid) {
 		snprintf(ne->device.name, DEVICE_NAME_SIZE,
-			 "IEEE-1394 device %d-" NODE_BUS_FMT,
-			 hi->host->id, NODE_BUS_ARGS(ne->nodeid));
-		HPSB_DEBUG("Node changed: %d-" NODE_BUS_FMT " -> %d-" NODE_BUS_FMT,
-			   ne->host->id, NODE_BUS_ARGS(ne->nodeid),
-			   ne->host->id, NODE_BUS_ARGS(nodeid));
+			 "IEEE-1394 device " NODE_BUS_FMT,
+			 NODE_BUS_ARGS(hi->host, ne->nodeid));
+		HPSB_DEBUG("Node changed: " NODE_BUS_FMT " -> " NODE_BUS_FMT,
+			   NODE_BUS_ARGS(ne->host, ne->nodeid),
+			   NODE_BUS_ARGS(ne->host, nodeid));
 		ne->nodeid = nodeid;
 
 		update_ud_names++;
@@ -1345,10 +1360,9 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 	 * work though, and we are forced to doing quadlet sized
 	 * reads.  */
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	HPSB_INFO("Initiating ConfigROM request for node " NODE_BUS_FMT,
-		  NODE_BUS_ARGS(nodeid));
-#endif
+	HPSB_VERBOSE("Initiating ConfigROM request for node " NODE_BUS_FMT,
+		     NODE_BUS_ARGS(host, nodeid));
+
 	/* 
 	 * Must retry a few times if config rom read returns zero (how long?). Will
 	 * not normally occur, but we should do the right thing. For example, with
@@ -1360,7 +1374,7 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 		if (nodemgr_read_quadlet(host, nodeid, generation,
 					 addr, &buffer[0]) < 0) {
 			HPSB_ERR("ConfigROM quadlet transaction error for node "
-				 NODE_BUS_FMT, NODE_BUS_ARGS(nodeid));
+				 NODE_BUS_FMT, NODE_BUS_ARGS(host, nodeid));
 			return -1;
 		}
 		if (buffer[0])
@@ -1377,14 +1391,14 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 	if (header_size == 1) {
 		HPSB_INFO("Node " NODE_BUS_FMT " has a minimal ROM.  "
 			  "Vendor is %08x",
-			  NODE_BUS_ARGS(nodeid), buffer[0] & 0x00ffffff);
+			  NODE_BUS_ARGS(host, nodeid), buffer[0] & 0x00ffffff);
 		return -1;
 	}
 
 	if (header_size < 4) {
 		HPSB_INFO("Node " NODE_BUS_FMT " has non-standard ROM "
 			  "format (%d quads), cannot parse",
-			  NODE_BUS_ARGS(nodeid), header_size);
+			  NODE_BUS_ARGS(host, nodeid), header_size);
 		return -1;
 	}
 
@@ -1393,7 +1407,7 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 					 addr, &buffer[i]) < 0) {
 			HPSB_ERR("ConfigROM quadlet transaction "
 				 "error for node " NODE_BUS_FMT,
-				 NODE_BUS_ARGS(nodeid));
+				 NODE_BUS_ARGS(host, nodeid));
 			return -1;
 		}
 	}
@@ -1428,7 +1442,7 @@ static void nodemgr_node_probe_one(struct host_info *hi,
 		 * shouldn't be held responsible, so we'll allow it with a
 		 * warning.  */
 		HPSB_WARN("Node " NODE_BUS_FMT " has invalid busID magic [0x%08x]",
-			 NODE_BUS_ARGS(nodeid), buffer[1]);
+			 NODE_BUS_ARGS(host, nodeid), buffer[1]);
 	}
 
 	guid = ((u64)buffer[3] << 32) | buffer[4];
@@ -1508,8 +1522,8 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 					nodemgr_remove_node)) {
 			struct node_entry *ne = cleanup.ne;
 
-			HPSB_DEBUG("Node removed: ID:BUS[%d-" NODE_BUS_FMT "]  GUID[%016Lx]",
-				   host->id, NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
+			HPSB_DEBUG("Node removed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
+				   NODE_BUS_ARGS(host, ne->nodeid), (unsigned long long)ne->guid);
 
 			nodemgr_remove_ne(ne);
 		}
@@ -1618,11 +1632,12 @@ static int nodemgr_host_thread(void *__hi)
 	 * happens when we get a bus reset. */
 	while (!down_interruptible(&hi->reset_sem) &&
 	       !down_interruptible(&nodemgr_serialize)) {
-		unsigned int generation;
+		unsigned int generation = 0;
 		int i;
 
-		/* Pause for 1/4 second, to make sure things settle down. */
-		for (i = HZ/4; i > 0; i-= HZ/16) {
+		/* Pause for 1/4 second in 1/16 second intervals,
+		 * to make sure things settle down. */
+		for (i = 0; i < 4 ; i++) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			if (schedule_timeout(HZ/16))
 				goto caught_signal;
@@ -1637,7 +1652,7 @@ static int nodemgr_host_thread(void *__hi)
 			/* If we get a reset before we are done waiting, then
 			 * start the the waiting over again */
 			while (!down_trylock(&hi->reset_sem))
-				i = HZ/4;
+				i = 0;
 		}
 
 		if (!nodemgr_check_irm_capability(host, reset_cycles++)) {
@@ -1658,9 +1673,7 @@ static int nodemgr_host_thread(void *__hi)
 	}
 
 caught_signal:
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	HPSB_DEBUG ("NodeMgr: Exiting thread");
-#endif
+	HPSB_VERBOSE("NodeMgr: Exiting thread");
 
 	complete_and_exit(&hi->exited, 0);
 }
@@ -1782,9 +1795,7 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 	struct host_info *hi = hpsb_get_hostinfo(&nodemgr_highlevel, host);
 
 	if (hi != NULL) {
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-		HPSB_DEBUG ("NodeMgr: Processing host reset for %s", hi->daemon_name);
-#endif
+		HPSB_VERBOSE("NodeMgr: Processing host reset for %s", hi->daemon_name);
 		up(&hi->reset_sem);
 	} else
 		HPSB_ERR ("NodeMgr: could not process reset of unused host");

@@ -20,22 +20,23 @@ static void __init report_dev(struct sparc_isa_device *isa_dev, int child)
 		printk(" [%s", isa_dev->prom_name);
 }
 
-static void __init isa_dev_get_resource(struct sparc_isa_device *isa_dev)
+static void __init isa_dev_get_resource(struct sparc_isa_device *isa_dev,
+					struct linux_prom_registers *pregs,
+					int pregs_size)
 {
-	struct linux_prom_registers regs[PROMREG_MAX];
 	unsigned long base, len;
 	int prop_len;
 
 	prop_len = prom_getproperty(isa_dev->prom_node, "reg",
-				    (char *) regs, sizeof(regs));
+				    (char *) pregs, pregs_size);
 
 	if (prop_len <= 0)
 		return;
 
 	/* Only the first one is interesting. */
-	len = regs[0].reg_size;
-	base = (((unsigned long)regs[0].which_io << 32) |
-		(unsigned long)regs[0].phys_addr);
+	len = pregs[0].reg_size;
+	base = (((unsigned long)pregs[0].which_io << 32) |
+		(unsigned long)pregs[0].phys_addr);
 	base += isa_dev->bus->parent->io_space.start;
 
 	isa_dev->resource.start = base;
@@ -53,6 +54,9 @@ static void __init isa_dev_get_resource(struct sparc_isa_device *isa_dev)
  *
  * The P1275 standard for ISA devices seems to also have been
  * totally ignored.
+ *
+ * On later systems, an interrupt-map and interrupt-map-mask scheme
+ * akin to EBUS is used.
  */
 static struct {
 	int	obp_irq;
@@ -67,33 +71,72 @@ static struct {
 	{ 0, 0x00 }	/* end of table */
 };
 
-static void __init isa_dev_get_irq(struct sparc_isa_device *isa_dev)
+static int __init isa_dev_get_irq_using_imap(struct sparc_isa_device *isa_dev,
+					     struct sparc_isa_bridge *isa_br,
+					     int *interrupt,
+					     struct linux_prom_registers *pregs)
+{
+	unsigned int hi, lo, irq;
+	int i;
+
+	hi = pregs->which_io & isa_br->isa_intmask.phys_hi;
+	lo = pregs->phys_addr & isa_br->isa_intmask.phys_lo;
+	irq = *interrupt & isa_br->isa_intmask.interrupt;
+	for (i = 0; i < isa_br->num_isa_intmap; i++) {
+		if ((isa_br->isa_intmap[i].phys_hi == hi) &&
+		    (isa_br->isa_intmap[i].phys_lo == lo) &&
+		    (isa_br->isa_intmap[i].interrupt == irq)) {
+			*interrupt = isa_br->isa_intmap[i].cinterrupt;
+			return 0;
+		}
+	}
+	return -1;
+}
+
+static void __init isa_dev_get_irq(struct sparc_isa_device *isa_dev,
+				   struct linux_prom_registers *pregs)
 {
 	int irq_prop;
 
 	irq_prop = prom_getintdefault(isa_dev->prom_node,
 				      "interrupts", -1);
 	if (irq_prop <= 0) {
-		isa_dev->irq = PCI_IRQ_NONE;
+		goto no_irq;
 	} else {
+		struct pci_controller_info *pcic;
+		struct pci_pbm_info *pbm;
 		int i;
+
+		if (isa_dev->bus->num_isa_intmap) {
+			if (!isa_dev_get_irq_using_imap(isa_dev,
+							isa_dev->bus,
+							&irq_prop,
+							pregs))
+				goto route_irq;
+		}
 
 		for (i = 0; grover_irq_table[i].obp_irq != 0; i++) {
 			if (grover_irq_table[i].obp_irq == irq_prop) {
-				struct pci_controller_info *pcic;
-				struct pci_pbm_info *pbm;
 				int ino = grover_irq_table[i].pci_ino;
 
-				if (ino == 0) {
-					isa_dev->irq = PCI_IRQ_NONE;
-				} else {
-					pbm = isa_dev->bus->parent;
-					pcic = pbm->parent;
-					isa_dev->irq = pcic->irq_build(pbm, NULL, ino);
-				}
+				if (ino == 0)
+					goto no_irq;
+ 
+				irq_prop = ino;
+				goto route_irq;
 			}
 		}
+		goto no_irq;
+
+route_irq:
+		pbm = isa_dev->bus->parent;
+		pcic = pbm->parent;
+		isa_dev->irq = pcic->irq_build(pbm, NULL, irq_prop);
+		return;
 	}
+
+no_irq:
+	isa_dev->irq = PCI_IRQ_NONE;
 }
 
 static void __init isa_fill_children(struct sparc_isa_device *parent_isa_dev)
@@ -105,6 +148,7 @@ static void __init isa_fill_children(struct sparc_isa_device *parent_isa_dev)
 
 	printk(" ->");
 	while (node != 0) {
+		struct linux_prom_registers regs[PROMREG_MAX];
 		struct sparc_isa_device *isa_dev;
 		int prop_len;
 
@@ -138,8 +182,8 @@ static void __init isa_fill_children(struct sparc_isa_device *parent_isa_dev)
 		if (prop_len <= 0)
 			isa_dev->compatible[0] = '\0';
 
-		isa_dev_get_resource(isa_dev);
-		isa_dev_get_irq(isa_dev);
+		isa_dev_get_resource(isa_dev, regs, sizeof(regs));
+		isa_dev_get_irq(isa_dev, regs);
 
 		report_dev(isa_dev, 1);
 
@@ -152,6 +196,7 @@ static void __init isa_fill_devices(struct sparc_isa_bridge *isa_br)
 	int node = prom_getchild(isa_br->prom_node);
 
 	while (node != 0) {
+		struct linux_prom_registers regs[PROMREG_MAX];
 		struct sparc_isa_device *isa_dev;
 		int prop_len;
 
@@ -194,8 +239,8 @@ static void __init isa_fill_devices(struct sparc_isa_bridge *isa_br)
 		if (prop_len <= 0)
 			isa_dev->compatible[0] = '\0';
 
-		isa_dev_get_resource(isa_dev);
-		isa_dev_get_irq(isa_dev);
+		isa_dev_get_resource(isa_dev, regs, sizeof(regs));
+		isa_dev_get_irq(isa_dev, regs);
 
 		report_dev(isa_dev, 0);
 
@@ -259,6 +304,21 @@ void __init isa_init(void)
 		else
 			isa_br->num_isa_ranges =
 				(prop_len / sizeof(struct linux_prom_isa_ranges));
+
+		prop_len = prom_getproperty(isa_br->prom_node,
+					    "interrupt-map",
+					    (char *) isa_br->isa_intmap,
+					    sizeof(isa_br->isa_intmap));
+		if (prop_len <= 0)
+			isa_br->num_isa_intmap = 0;
+		else
+			isa_br->num_isa_intmap =
+				(prop_len / sizeof(struct linux_prom_isa_intmap));
+
+		prop_len = prom_getproperty(isa_br->prom_node,
+					    "interrupt-map-mask",
+					    (char *) &(isa_br->isa_intmask),
+					    sizeof(isa_br->isa_intmask));
 
 		printk("isa%d:", isa_br->index);
 

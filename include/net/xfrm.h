@@ -104,10 +104,10 @@ struct xfrm_state
 
 	/* Parameters of this state. */
 	struct {
+		u32		reqid;
 		u8		mode;
 		u8		replay_window;
 		u8		aalgo, ealgo, calgo;
-		u16		reqid;
 		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;
@@ -193,7 +193,7 @@ struct xfrm_state_afinfo {
 						struct xfrm_tmpl *tmpl,
 						xfrm_address_t *daddr, xfrm_address_t *saddr);
 	struct xfrm_state	*(*state_lookup)(xfrm_address_t *daddr, u32 spi, u8 proto);
-	struct xfrm_state	*(*find_acq)(u8 mode, u16 reqid, u8 proto, 
+	struct xfrm_state	*(*find_acq)(u8 mode, u32 reqid, u8 proto, 
 					     xfrm_address_t *daddr, xfrm_address_t *saddr, 
 					     int create);
 };
@@ -244,7 +244,7 @@ struct xfrm_tmpl
 /* Source address of tunnel. Ignored, if it is not a tunnel. */
 	xfrm_address_t		saddr;
 
-	__u16			reqid;
+	__u32			reqid;
 
 /* Mode: transport/tunnel */
 	__u8			mode;
@@ -801,7 +801,7 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
 void xfrm_policy_flush(void);
 u32 xfrm_get_acqseq(void);
 void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
-struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, 
+struct xfrm_state * xfrm_find_acq(u8 mode, u32 reqid, u8 proto, 
 				  xfrm_address_t *daddr, xfrm_address_t *saddr, 
 				  int create, unsigned short family);
 extern void xfrm_policy_flush(void);

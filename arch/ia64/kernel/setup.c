@@ -41,6 +41,7 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
+#include <asm/sections.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
@@ -48,8 +49,6 @@
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"
 #endif
-
-extern char _end;
 
 #ifdef CONFIG_SMP
 unsigned long __per_cpu_offset[NR_CPUS];
@@ -279,7 +278,6 @@ sort_regions (struct rsvd_region *rsvd_region, int max)
 static void
 find_memory (void)
 {
-#	define KERNEL_END	(&_end)
 	unsigned long bootmap_size;
 	int n = 0;
 
@@ -300,7 +298,7 @@ find_memory (void)
 	n++;
 
 	rsvd_region[n].start = (unsigned long) ia64_imva((void *)KERNEL_START);
-	rsvd_region[n].end   = (unsigned long) ia64_imva(KERNEL_END);
+	rsvd_region[n].end   = (unsigned long) ia64_imva(_end);
 	n++;
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -363,13 +361,12 @@ find_memory (void)
 void __init
 setup_arch (char **cmdline_p)
 {
-	extern unsigned long *__start___vtop_patchlist[], *__end____vtop_patchlist[];
 	extern unsigned long ia64_iobase;
 	unsigned long phys_iobase;
 
 	unw_init();
 
-	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end____vtop_patchlist);
+	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
@@ -389,19 +386,6 @@ setup_arch (char **cmdline_p)
 #endif /* CONFIG_APCI_BOOT */
 
 	find_memory();
-
-#if 0
-	/* XXX fix me */
-	init_mm.start_code = (unsigned long) &_stext;
-	init_mm.end_code = (unsigned long) &_etext;
-	init_mm.end_data = (unsigned long) &_edata;
-	init_mm.brk = (unsigned long) &_end;
-
-	code_resource.start = virt_to_bus(&_text);
-	code_resource.end = virt_to_bus(&_etext) - 1;
-	data_resource.start = virt_to_bus(&_etext);
-	data_resource.end = virt_to_bus(&_edata) - 1;
-#endif
 
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
@@ -687,7 +671,6 @@ get_max_cacheline_size (void)
 void
 cpu_init (void)
 {
-	extern char __per_cpu_start[], __phys_per_cpu_start[];
 	extern void __init ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
@@ -696,7 +679,6 @@ cpu_init (void)
 	void *cpu_data;
 
 #ifdef CONFIG_SMP
-	extern char __per_cpu_end[];
 	int cpu;
 
 	/*
@@ -812,9 +794,6 @@ cpu_init (void)
 void
 check_bugs (void)
 {
-	extern char __start___mckinley_e9_bundles[];
-	extern char __end___mckinley_e9_bundles[];
-
 	ia64_patch_mckinley_e9((unsigned long) __start___mckinley_e9_bundles,
 			       (unsigned long) __end___mckinley_e9_bundles);
 }

@@ -1855,6 +1855,7 @@
 	8001  Schizo PCI Bus Module
 	a000  Ultra IIi
 	a001  Ultra IIe
+	a801  Tomatillo PCI Bus Module
 108f  Systemsoft
 1090  Encore Computer Corporation
 1091  Intergraph Corporation
@@ -5831,6 +5832,7 @@
 1737  Linksys
 173b  Altima (nee Broadcom)
 	03e8  AC1000 Gigabit Ethernet
+	03e9  AC1001 Gigabit Ethernet
 	03ea  AC9100 Gigabit Ethernet
 1743  Peppercon AG
 	8139  ROL/F-100 Fast Ethernet Adapter with ROL

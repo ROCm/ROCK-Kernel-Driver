@@ -14,8 +14,6 @@
 extern spinlock_t pci_controller_lock;
 extern struct pci_controller_info *pci_controller_root;
 
-extern struct pci_pbm_info *pci_bus2pbm[256];
-extern unsigned char pci_highest_busnum;
 extern int pci_num_controllers;
 
 /* PCI bus scanning and fixup support. */

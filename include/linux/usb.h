@@ -80,7 +80,8 @@ struct usb_host_interface {
  * @act_altsetting: index of current altsetting.  this number is always
  *	less than num_altsetting.  after the device is configured, each
  *	interface uses its default setting of zero.
- * @max_altsetting:
+ * @max_altsetting: the max number of altsettings for this interface.
+ * @driver: the USB driver that is bound to this interface.
  * @minor: the minor number assigned to this interface, if this
  *	interface is bound to a driver that uses the USB major number.
  *	If this interface does not use the USB major, this field should
@@ -409,7 +410,11 @@ static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
  *	do (or don't) show up otherwise in the filesystem.
  * @id_table: USB drivers use ID table to support hotplugging.
  *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
- *	or your driver's probe function will never get called. 
+ *	or your driver's probe function will never get called.
+ * @driver: the driver model core driver structure.
+ * @serialize: a semaphore used to serialize access to this driver.  Used
+ * 	in the probe and disconnect functions.  Only the USB core should use
+ * 	this lock.
  *
  * USB drivers must provide a name, probe() and disconnect() methods,
  * and an id_table.  Other driver fields are optional.
@@ -575,6 +580,8 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  *	it likes with the URB, including resubmitting or freeing it.
  * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to 
  *	collect the transfer status for each buffer.
+ * @timeout: If set to zero, the urb will never timeout.  Otherwise this is
+ *	the time in jiffies that this urb will timeout in.
  *
  * This structure identifies USB transfer requests.  URBs must be allocated by
  * calling usb_alloc_urb() and freed with a call to usb_free_urb().
@@ -677,10 +684,14 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  */
 struct urb
 {
+	/* private, usb core and host controller only fields in the urb */
 	spinlock_t lock;		/* lock for the URB */
 	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
+	int bandwidth;			/* bandwidth for INT/ISO request */
+
+	/* public, documented fields in the urb that can be used by drivers */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */
@@ -689,7 +700,6 @@ struct urb
 	dma_addr_t transfer_dma;	/* (in) dma addr for transfer_buffer */
 	int transfer_buffer_length;	/* (in) data buffer length */
 	int actual_length;		/* (return) actual transfer length */
-	int bandwidth;			/* bandwidth for INT/ISO request */
 	unsigned char *setup_packet;	/* (in) setup packet (control only) */
 	dma_addr_t setup_dma;		/* (in) dma addr for setup_packet */
 	int start_frame;		/* (modify) start frame (INT/ISO) */
@@ -891,8 +901,10 @@ struct usb_sg_request {
 	int			status;
 	size_t			bytes;
 
-	// members not documented above are private to usbcore,
-	// and are not provided for driver access!
+	/* 
+	 * members below are private to usbcore,
+	 * and are not provided for driver access!
+	 */
 	spinlock_t		lock;
 
 	struct usb_device	*dev;

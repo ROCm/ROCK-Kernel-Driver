@@ -200,6 +200,13 @@ int hpsb_iso_recv_set_channel_mask(struct hpsb_iso *iso, u64 mask)
 	return iso->host->driver->isoctl(iso, RECV_SET_CHANNEL_MASK, (unsigned long) &mask);
 }
 
+int hpsb_iso_recv_flush(struct hpsb_iso *iso)
+{
+	if (iso->type != HPSB_ISO_RECV)
+		return -EINVAL;
+	return iso->host->driver->isoctl(iso, RECV_FLUSH, 0);
+}
+
 static int do_iso_xmit_start(struct hpsb_iso *iso, int cycle)
 {
 	int retval = iso->host->driver->isoctl(iso, XMIT_START, cycle);

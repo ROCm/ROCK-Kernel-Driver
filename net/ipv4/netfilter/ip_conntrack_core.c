@@ -251,7 +251,7 @@ static void unexpect_related(struct ip_conntrack_expect *expect)
 }
 
 /* delete all unconfirmed expectations for this conntrack */
-static void remove_expectations(struct ip_conntrack *ct)
+static void remove_expectations(struct ip_conntrack *ct, int drop_refcount)
 {
 	struct list_head *exp_entry, *next;
 	struct ip_conntrack_expect *exp;
@@ -266,8 +266,11 @@ static void remove_expectations(struct ip_conntrack *ct)
 		 * the un-established ones only */
 		if (exp->sibling) {
 			DEBUGP("remove_expectations: skipping established %p of %p\n", exp->sibling, ct);
-			/* Indicate that this expectations parent is dead */
-			exp->expectant = NULL;
+			if (drop_refcount) {
+				/* Indicate that this expectations parent is dead */
+				ip_conntrack_put(exp->expectant);
+				exp->expectant = NULL;
+			}
 			continue;
 		}
 
@@ -292,7 +295,7 @@ clean_from_lists(struct ip_conntrack *ct)
 		    &ct->tuplehash[IP_CT_DIR_REPLY]);
 
 	/* Destroy all un-established, pending expectations */
-	remove_expectations(ct);
+	remove_expectations(ct, 1);
 }
 
 static void
@@ -1117,7 +1120,7 @@ static inline int unhelp(struct ip_conntrack_tuple_hash *i,
 {
 	if (i->ctrack->helper == me) {
 		/* Get rid of any expected. */
-		remove_expectations(i->ctrack);
+		remove_expectations(i->ctrack, 0);
 		/* And *then* set helper to NULL */
 		i->ctrack->helper = NULL;
 	}

@@ -16,6 +16,7 @@
 #include <linux/kmod.h>
 #include <linux/elf.h>
 #include <linux/stringify.h>
+#include <asm/local.h>
 
 #include <asm/module.h>
 
@@ -171,7 +172,7 @@ void *__symbol_get_gpl(const char *symbol);
 
 struct module_ref
 {
-	atomic_t count;
+	local_t count;
 } ____cacheline_aligned;
 
 enum module_state
@@ -276,18 +277,16 @@ struct module *module_get_kallsym(unsigned int symnum,
 				  char *type,
 				  char namebuf[128]);
 int is_exported(const char *name, const struct module *mod);
-#ifdef CONFIG_MODULE_UNLOAD
 
+extern void __module_put_and_exit(struct module *mod, long code)
+	__attribute__((noreturn));
+#define module_put_and_exit(code) __module_put_and_exit(THIS_MODULE, code);
+
+#ifdef CONFIG_MODULE_UNLOAD
 unsigned int module_refcount(struct module *mod);
 void __symbol_put(const char *symbol);
 #define symbol_put(x) __symbol_put(MODULE_SYMBOL_PREFIX #x)
 void symbol_put_addr(void *addr);
-
-/* We only need protection against local interrupts. */
-#ifndef __HAVE_ARCH_LOCAL_INC
-#define local_inc(x) atomic_inc(x)
-#define local_dec(x) atomic_dec(x)
-#endif
 
 /* Sometimes we know we already have a refcount, and it's easier not
    to handle the error case (which only happens with rmmod --wait). */
@@ -444,6 +443,8 @@ static inline int unregister_module_notifier(struct notifier_block * nb)
 {
 	return 0;
 }
+
+#define module_put_and_exit(code) do_exit(code)
 
 #endif /* CONFIG_MODULES */
 

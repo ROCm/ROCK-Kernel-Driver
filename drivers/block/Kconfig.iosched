@@ -1,0 +1,8 @@
+config IOSCHED_AS
+	bool "Anticipatory I/O scheduler" if EMBEDDED
+	default y
+
+config IOSCHED_DEADLINE
+	bool "Deadline I/O scheduler" if EMBEDDED
+	default y
+

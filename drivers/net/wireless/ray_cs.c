@@ -25,6 +25,8 @@
  * - reorganize kmallocs in ray_attach, checking all for failure
  *   and releasing the previous allocations if one fails
  *
+ * Daniele Bellucci <bellucda@tiscali.it> - 07/10/2003
+ * - Audit copy_to_user in ioctl(SIOCGIWESSID)
  * 
 =============================================================================*/
 
@@ -1315,7 +1317,8 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	  /* Push it out ! */
 	  wrq->u.data.length = strlen(essid) + 1;
 	  wrq->u.data.flags = 1; /* active */
-	  copy_to_user(wrq->u.data.pointer, essid, sizeof(essid));
+	  if (copy_to_user(wrq->u.data.pointer, essid, sizeof(essid)))
+		  err = -EFAULT;
 	}
       break;
 

@@ -104,9 +104,8 @@ static int softdog_open(struct inode *inode, struct file *file)
 {
 	if(test_and_set_bit(0, &timer_alive))
 		return -EBUSY;
-	if (nowayout) {
-		MOD_INC_USE_COUNT;
-	}
+	if (nowayout) 
+		__module_get(THIS_MODULE);
 	/*
 	 *	Activate timer
 	 */

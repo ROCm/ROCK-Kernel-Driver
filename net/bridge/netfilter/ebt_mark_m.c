@@ -28,7 +28,7 @@ static int ebt_mark_check(const char *tablename, unsigned int hookmask,
 {
         struct ebt_mark_m_info *info = (struct ebt_mark_m_info *) data;
 
-	if (datalen != sizeof(struct ebt_mark_m_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_mark_m_info)))
 		return -EINVAL;
 	if (info->bitmask & ~EBT_MARK_MASK)
 		return -EINVAL;

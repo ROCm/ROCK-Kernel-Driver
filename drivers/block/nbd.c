@@ -258,7 +258,8 @@ void nbd_send_req(struct nbd_device *lo, struct request *req)
 	dprintk(DBG_TX, "%s: request %p: sending control (%s@%llu,%luB)\n",
 			lo->disk->disk_name, req,
 			nbdcmd_to_ascii(nbd_cmd(req)),
-			req->sector << 9, req->nr_sectors << 9);
+			(unsigned long long)req->sector << 9,
+			req->nr_sectors << 9);
 	result = sock_xmit(sock, 1, &request, sizeof(request),
 			(nbd_cmd(req) == NBD_CMD_WRITE)? MSG_MORE: 0);
 	if (result <= 0) {

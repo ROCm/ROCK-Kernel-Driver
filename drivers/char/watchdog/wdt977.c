@@ -16,6 +16,8 @@
  *	19-Dec-2001 Woody Suwalski: Netwinder fixes, ioctl interface
  *	06-Jan-2002 Woody Suwalski: For compatibility, convert all timeouts
  *				    from minutes to seconds.
+ *      07-Jul-2003 Daniele Bellucci: Audit return code of misc_register in
+ *                                    nwwatchdog_init.
  */
 
 #include <linux/module.h>
@@ -99,7 +101,7 @@ static int wdt977_open(struct inode *inode, struct file *file)
 
 	if (nowayout)
 	{
-		MOD_INC_USE_COUNT;
+		__module_get(THIS_MODULE);
 
 		/* do not permit disabling the watchdog by writing 0 to reg. 0xF2 */
 		if (!timeoutM) timeoutM = DEFAULT_TIMEOUT;
@@ -343,12 +345,14 @@ static struct miscdevice wdt977_miscdev=
 
 static int __init nwwatchdog_init(void)
 {
+	int retval;
 	if (!machine_is_netwinder())
 		return -ENODEV;
 
-	misc_register(&wdt977_miscdev);
-	printk(KERN_INFO "Wdt977 Watchdog sleeping.\n");
-	return 0;
+	retval = misc_register(&wdt977_miscdev);
+	if (!retval)
+		printk(KERN_INFO "Wdt977 Watchdog sleeping.\n");
+	return retval;
 }
 
 static void __exit nwwatchdog_exit(void)

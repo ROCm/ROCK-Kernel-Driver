@@ -291,12 +291,13 @@ struct arcnet_local {
 
 	/* hardware-specific functions */
 	struct {
+		struct module *owner;
 		void (*command) (struct net_device * dev, int cmd);
 		int (*status) (struct net_device * dev);
 		void (*intmask) (struct net_device * dev, int mask);
 		bool (*reset) (struct net_device * dev, bool really_reset);
-		void (*open_close) (struct net_device * dev, bool open);
-		void (*open_close_ll) (struct net_device * dev, bool open);
+		void (*open) (struct net_device * dev);
+		void (*close) (struct net_device * dev);
 
 		void (*copy_to_card) (struct net_device * dev, int bufnum, int offset,
 				      void *buf, int count);
@@ -312,7 +313,6 @@ struct arcnet_local {
 #define ACOMMAND(x)  (lp->hw.command(dev, (x)))
 #define ASTATUS()    (lp->hw.status(dev))
 #define AINTMASK(x)  (lp->hw.intmask(dev, (x)))
-#define ARCOPEN(x)   (lp->hw.open_close(dev, (x)))
 
 
 

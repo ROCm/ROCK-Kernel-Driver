@@ -245,6 +245,7 @@ struct priv
 	int cmdr_addr;
 	int cardno;
 	int features;
+	spinlock_t ring_lock;
 };
 
 static int  ni65_probe1(struct net_device *dev,int);
@@ -299,7 +300,7 @@ static int ni65_open(struct net_device *dev)
 	int irqval = request_irq(dev->irq, &ni65_interrupt,0,
                         cards[p->cardno].cardname,dev);
 	if (irqval) {
-		printk ("%s: unable to get IRQ %d (irqval=%d).\n",
+		printk(KERN_ERR "%s: unable to get IRQ %d (irqval=%d).\n",
 		          dev->name,dev->irq, irqval);
 		return -EAGAIN;
 	}
@@ -409,12 +410,14 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 	p = (struct priv *) dev->priv;
 	p->cmdr_addr = ioaddr + cards[i].cmd_offset;
 	p->cardno = i;
+	spin_lock_init(&p->ring_lock);
 
-	printk("%s: %s found at %#3x, ", dev->name, cards[p->cardno].cardname , ioaddr);
+	printk(KERN_INFO "%s: %s found at %#3x, ", dev->name, cards[p->cardno].cardname , ioaddr);
 
 	outw(inw(PORT+L_RESET),PORT+L_RESET); /* first: reset the card */
 	if( (j=readreg(CSR0)) != 0x4) {
-		 printk(KERN_ERR "can't RESET card: %04x\n",j);
+		 printk("failed.\n");
+		 printk(KERN_ERR "%s: Can't RESET card: %04x\n", dev->name, j);
 		 ni65_free_buffer(p);
 		 release_region(ioaddr, cards[p->cardno].total_size);
 		 return -EAGAIN;
@@ -467,7 +470,8 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 					break;
 			}
 			if(i == 5) {
-				printk("Can't detect DMA channel!\n");
+				printk("failed.\n");
+				printk(KERN_ERR "%s: Can't detect DMA channel!\n", dev->name);
 				ni65_free_buffer(p);
 				release_region(ioaddr, cards[p->cardno].total_size);
 				return -EAGAIN;
@@ -480,13 +484,13 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 
 		if(dev->irq < 2)
 		{
-			unsigned long irq_mask, delay;
+			unsigned long irq_mask;
 
 			ni65_init_lance(p,dev->dev_addr,0,0);
 			irq_mask = probe_irq_on();
 			writereg(CSR0_INIT|CSR0_INEA,CSR0); /* trigger interrupt */
-			delay = jiffies + HZ/50;
-			while (time_before(jiffies, delay)) ;
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/50);
 			dev->irq = probe_irq_off(irq_mask);
 			if(!dev->irq)
 			{
@@ -503,7 +507,7 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 
 	if(request_dma(dev->dma, cards[p->cardno].cardname ) != 0)
 	{
-		printk("%s: Can't request dma-channel %d\n",dev->name,(int) dev->dma);
+		printk(KERN_ERR "%s: Can't request dma-channel %d\n",dev->name,(int) dev->dma);
 		ni65_free_buffer(p);
 		release_region(ioaddr, cards[p->cardno].total_size);
 		return -EAGAIN;
@@ -570,7 +574,7 @@ static void *ni65_alloc_mem(struct net_device *dev,char *what,int size,int type)
 	if(type) {
 		ret = skb = alloc_skb(2+16+size,GFP_KERNEL|GFP_DMA);
 		if(!skb) {
-			printk("%s: unable to allocate %s memory.\n",dev->name,what);
+			printk(KERN_WARNING "%s: unable to allocate %s memory.\n",dev->name,what);
 			return NULL;
 		}
 		skb->dev = dev;
@@ -581,12 +585,12 @@ static void *ni65_alloc_mem(struct net_device *dev,char *what,int size,int type)
 	else {
 		ret = ptr = kmalloc(T_BUF_SIZE,GFP_KERNEL | GFP_DMA);
 		if(!ret) {
-			printk("%s: unable to allocate %s memory.\n",dev->name,what);
+			printk(KERN_WARNING "%s: unable to allocate %s memory.\n",dev->name,what);
 			return NULL;
 		}
 	}
 	if( (u32) virt_to_phys(ptr+size) > 0x1000000) {
-		printk("%s: unable to allocate %s memory in lower 16MB!\n",dev->name,what);
+		printk(KERN_WARNING "%s: unable to allocate %s memory in lower 16MB!\n",dev->name,what);
 		if(type)
 			kfree_skb(skb);
 		else
@@ -692,7 +696,7 @@ static void ni65_stop_start(struct net_device *dev,struct priv *p)
 	writedatareg(CSR0_STOP);
 
 	if(debuglevel > 1)
-		printk("ni65_stop_start\n");
+		printk(KERN_DEBUG "ni65_stop_start\n");
 
 	if(p->features & INIT_RING_BEFORE_START) {
 		int i;
@@ -846,6 +850,8 @@ static irqreturn_t ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 
 	p = (struct priv *) dev->priv;
 
+	spin_lock(&p->ring_lock);
+	
 	while(--bcnt) {
 		csr0 = inw(PORT+L_DATAREG);
 
@@ -867,7 +873,7 @@ static irqreturn_t ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		{
 			struct priv *p = (struct priv *) dev->priv;
 			if(debuglevel > 1)
-				printk("%s: general error: %04x.\n",dev->name,csr0);
+				printk(KERN_ERR "%s: general error: %04x.\n",dev->name,csr0);
 			if(csr0 & CSR0_BABL)
 				p->stats.tx_errors++;
 			if(csr0 & CSR0_MISS) {
@@ -879,7 +885,7 @@ static irqreturn_t ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 			}
 			if(csr0 & CSR0_MERR) {
 				if(debuglevel > 1)
-					printk("%s: Ooops .. memory error: %04x.\n",dev->name,csr0);
+					printk(KERN_ERR "%s: Ooops .. memory error: %04x.\n",dev->name,csr0);
 				ni65_stop_start(dev,p);
 			}
 		}
@@ -932,12 +938,13 @@ static irqreturn_t ni65_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 #endif
 
 	if( (csr0 & (CSR0_RXON | CSR0_TXON)) != (CSR0_RXON | CSR0_TXON) ) {
-		printk("%s: RX or TX was offline -> restart\n",dev->name);
+		printk(KERN_DEBUG "%s: RX or TX was offline -> restart\n",dev->name);
 		ni65_stop_start(dev,p);
 	}
 	else
 		writedatareg(CSR0_INEA);
 
+	spin_unlock(&p->ring_lock);
 	return IRQ_HANDLED;
 }
 
@@ -1147,9 +1154,7 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 				memset((char *)p->tmdbounce[p->tmdbouncenum]+skb->len, 0, len-skb->len);
 			dev_kfree_skb (skb);
 
-			save_flags(flags);
-			cli();
-
+			spin_lock_irqsave(&p->ring_lock, flags);
 			tmdp = p->tmdhead + p->tmdnum;
 			tmdp->u.buffer = (u32) isa_virt_to_bus(p->tmdbounce[p->tmdbouncenum]);
 			p->tmdbouncenum = (p->tmdbouncenum + 1) & (TMDNUM - 1);
@@ -1157,8 +1162,7 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 #ifdef XMT_VIA_SKB
 		}
 		else {
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&p->ring_lock, flags);
 
 			tmdp = p->tmdhead + p->tmdnum;
 			tmdp->u.buffer = (u32) isa_virt_to_bus(skb->data);
@@ -1178,8 +1182,8 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 			
 		p->lock = 0;
 		dev->trans_start = jiffies;
-
-		restore_flags(flags);
+		
+		spin_unlock_irqrestore(&p->ring_lock, flags);
 	}
 
 	return 0;
@@ -1238,10 +1242,8 @@ void cleanup_module(void)
 {
 	struct priv *p;
 	p = (struct priv *) dev_ni65.priv;
-	if(!p) {
-		printk("Ooops .. no private struct\n");
-		return;
-	}
+	if(!p)
+		BUG();
 	disable_dma(dev_ni65.dma);
 	free_dma(dev_ni65.dma);
 	unregister_netdev(&dev_ni65);
@@ -1250,6 +1252,7 @@ void cleanup_module(void)
 	dev_ni65.priv = NULL;
 }
 #endif /* MODULE */
+
 MODULE_LICENSE("GPL");
 
 /*

@@ -232,6 +232,8 @@ void fat_cache_add(struct inode *inode, int f_clu, int d_clu)
 	struct fat_cache *walk, *last;
 	int first, prev_f_clu, prev_d_clu;
 
+	if (f_clu == 0)
+		return;
 	first = MSDOS_I(inode)->i_start;
 	if (!first)
 		return;
@@ -287,31 +289,65 @@ out:
 	spin_unlock(&sbi->cache_lock);
 }
 
-static int fat_get_cluster(struct inode *inode, int cluster)
+int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 {
 	struct super_block *sb = inode->i_sb;
-	int nr,count;
+	const int limit = sb->s_maxbytes >> MSDOS_SB(sb)->cluster_bits;
+	int nr;
 
-	if (!(nr = MSDOS_I(inode)->i_start)) return 0;
-	if (!cluster) return nr;
-	count = 0;
-	for (fat_cache_lookup(inode, cluster, &count, &nr);
-	     count < cluster;
-	     count++) {
-		nr = fat_access(sb, nr, -1);
-		if (nr == FAT_ENT_EOF) {
-			fat_fs_panic(sb, "%s: request beyond EOF (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
+	BUG_ON(MSDOS_I(inode)->i_start == 0);
+	
+	*fclus = 0;
+	*dclus = MSDOS_I(inode)->i_start;
+	if (cluster == 0)
+		return 0;
+
+	fat_cache_lookup(inode, cluster, fclus, dclus);
+	while (*fclus < cluster) {
+		/* prevent the infinite loop of cluster chain */
+		if (*fclus > limit) {
+			fat_fs_panic(sb, "%s: detected the cluster chain loop"
+				     " (i_pos %llu)", __FUNCTION__,
+				     MSDOS_I(inode)->i_pos);
 			return -EIO;
-		} else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "%s: invalid cluster chain (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
+		}
+
+		nr = fat_access(sb, *dclus, -1);
+		if (nr < 0)
+ 			return nr;
+		else if (nr == FAT_ENT_FREE) {
+			fat_fs_panic(sb, "%s: invalid cluster chain"
+				     " (i_pos %llu)", __FUNCTION__,
+				     MSDOS_I(inode)->i_pos);
 			return -EIO;
-		} else if (nr < 0)
-			return nr;
+		} else if (nr == FAT_ENT_EOF) {
+			fat_cache_add(inode, *fclus, *dclus);
+			return FAT_ENT_EOF;
+		}
+		(*fclus)++;
+		*dclus = nr;
 	}
-	fat_cache_add(inode, cluster, nr);
-	return nr;
+	fat_cache_add(inode, *fclus, *dclus);
+	return 0;
+}
+
+static int fat_bmap_cluster(struct inode *inode, int cluster)
+{
+	struct super_block *sb = inode->i_sb;
+	int ret, fclus, dclus;
+
+	if (MSDOS_I(inode)->i_start == 0)
+		return 0;
+
+	ret = fat_get_cluster(inode, cluster, &fclus, &dclus);
+	if (ret < 0)
+		return ret;
+	else if (ret == FAT_ENT_EOF) {
+		fat_fs_panic(sb, "%s: request beyond EOF (i_pos %llu)",
+			     __FUNCTION__, MSDOS_I(inode)->i_pos);
+		return -EIO;
+	}
+	return dclus;
 }
 
 int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
@@ -335,52 +371,58 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 		return 0;
 
 	cluster = sector >> (sbi->cluster_bits - sb->s_blocksize_bits);
-	offset  = sector & (sbi->cluster_size - 1);
-	cluster = fat_get_cluster(inode, cluster);
+	offset  = sector & (sbi->sec_per_clus - 1);
+	cluster = fat_bmap_cluster(inode, cluster);
 	if (cluster < 0)
 		return cluster;
 	else if (cluster) {
-		*phys = ((sector_t)cluster - 2) * sbi->cluster_size
+		*phys = ((sector_t)cluster - 2) * sbi->sec_per_clus
 			+ sbi->data_start + offset;
 	}
 	return 0;
 }
 
-
-/* Free all clusters after the skip'th cluster. Doesn't use the cache,
-   because this way we get an additional sanity check. */
-
-int fat_free(struct inode *inode,int skip)
+/* Free all clusters after the skip'th cluster. */
+int fat_free(struct inode *inode, int skip)
 {
 	struct super_block *sb = inode->i_sb;
-	int nr,last;
+	int nr, ret, fclus, dclus;
 
-	if (!(nr = MSDOS_I(inode)->i_start)) return 0;
-	last = 0;
-	while (skip--) {
-		last = nr;
-		nr = fat_access(sb, nr, -1);
+	if (MSDOS_I(inode)->i_start == 0)
+		return 0;
+
+	if (skip) {
+		ret = fat_get_cluster(inode, skip - 1, &fclus, &dclus);
+		if (ret < 0)
+			return ret;
+		else if (ret == FAT_ENT_EOF)
+			return 0;
+
+		nr = fat_access(sb, dclus, -1);
 		if (nr == FAT_ENT_EOF)
 			return 0;
-		else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "%s: invalid cluster chain (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
-			return -EIO;
-		} else if (nr < 0)
+		else if (nr > 0) {
+			/*
+			 * write a new EOF, and get the remaining cluster
+			 * chain for freeing.
+			 */
+			nr = fat_access(sb, dclus, FAT_ENT_EOF);
+		}
+		if (nr < 0)
 			return nr;
-	}
-	if (last) {
-		fat_access(sb, last, FAT_ENT_EOF);
+
 		fat_cache_inval_inode(inode);
 	} else {
 		fat_cache_inval_inode(inode);
+
+		nr = MSDOS_I(inode)->i_start;
 		MSDOS_I(inode)->i_start = 0;
 		MSDOS_I(inode)->i_logstart = 0;
 		mark_inode_dirty(inode);
 	}
 
 	lock_fat(sb);
-	while (nr != FAT_ENT_EOF) {
+	do {
 		nr = fat_access(sb, nr, FAT_ENT_FREE);
 		if (nr < 0)
 			goto error;
@@ -392,8 +434,8 @@ int fat_free(struct inode *inode,int skip)
 		}
 		if (MSDOS_SB(sb)->free_clusters != -1)
 			MSDOS_SB(sb)->free_clusters++;
-		inode->i_blocks -= (1 << MSDOS_SB(sb)->cluster_bits) >> 9;
-	}
+		inode->i_blocks -= MSDOS_SB(sb)->cluster_size >> 9;
+	} while (nr != FAT_ENT_EOF);
 	fat_clusters_flush(sb);
 	nr = 0;
 error:

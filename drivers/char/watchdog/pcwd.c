@@ -431,7 +431,7 @@ static int pcwd_open(struct inode *ino, struct file *filep)
 			atomic_inc( &open_allowed );
 			return -EBUSY;
 		}
-		MOD_INC_USE_COUNT;
+		__module_get(THIS_MODULE);
 		/*  Enable the port  */
 		if (revision == PCWD_REVISION_C) {
 			spin_lock(&io_lock);

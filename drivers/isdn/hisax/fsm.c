@@ -20,7 +20,7 @@
 
 #define FSM_TIMER_DEBUG 0
 
-int __init
+int
 FsmNew(struct Fsm *fsm, struct FsmNode *fnlist, int fncount)
 {
 	int i;

@@ -1,4 +1,4 @@
-/***************************************************************************** 
+/*****************************************************************************
  *                          USBLCD Kernel Driver                             *
  *        See http://www.usblcd.de for Hardware and Documentation.           *
  *                            Version 1.03                                   *
@@ -18,7 +18,7 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
-#define DRIVER_VERSION "USBLCD Driver Version 1.03"
+#define DRIVER_VERSION "USBLCD Driver Version 1.04"
 
 #define USBLCD_MINOR		144
 
@@ -257,7 +257,7 @@ static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 	struct lcd_usb_data *lcd = &lcd_instance;
 	int i;
 	int retval;
-	
+
 	if (dev->descriptor.idProduct != 0x0001  ) {
 		warn(KERN_INFO "USBLCD model not supported.");
 		return -ENODEV;
@@ -274,29 +274,31 @@ static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 		(i & 0xF000)>>12,(i & 0xF00)>>8,(i & 0xF0)>>4,(i & 0xF),
 		dev->devnum);
 
-	retval = usb_register_dev(intf, &usb_lcd_class);
-	if (retval) {
-		err("Not able to get a minor for this device.");
-		return -ENOMEM;
-	}
+
 
 	lcd->present = 1;
 	lcd->lcd_dev = dev;
 
 	if (!(lcd->obuf = (char *) kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_lcd: Not enough memory for the output buffer");
-		usb_deregister_dev(intf, &usb_lcd_class);
 		return -ENOMEM;
 	}
 	dbg("probe_lcd: obuf address:%p", lcd->obuf);
 
 	if (!(lcd->ibuf = (char *) kmalloc(IBUF_SIZE, GFP_KERNEL))) {
 		err("probe_lcd: Not enough memory for the input buffer");
-		usb_deregister_dev(intf, &usb_lcd_class);
 		kfree(lcd->obuf);
 		return -ENOMEM;
 	}
 	dbg("probe_lcd: ibuf address:%p", lcd->ibuf);
+
+	retval = usb_register_dev(intf, &usb_lcd_class);
+	if (retval) {
+		err("Not able to get a minor for this device.");
+		kfree(lcd->obuf);
+		kfree(lcd->ibuf);
+		return -ENOMEM;
+	}
 
 	usb_set_intfdata (intf, lcd);
 	return 0;

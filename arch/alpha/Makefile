@@ -11,7 +11,6 @@
 NM := $(NM) -B
 
 LDFLAGS_vmlinux	:= -static -N #-relax
-LDFLAGS_BLOB	:= --format binary --oformat elf64-alpha
 cflags-y	:= -pipe -mno-fp-regs -ffixed-8
 
 # Determine if we can use the BWX instructions with GAS.

@@ -45,7 +45,7 @@ char *avail_high;
 unsigned int heap_use;
 unsigned int heap_max;
 
-extern char _end[];
+extern char _start[];
 extern char _vmlinux_start[];
 extern char _vmlinux_end[];
 extern char _sysmap_start[];
@@ -85,7 +85,6 @@ void
 start(unsigned long a1, unsigned long a2, void *promptr)
 {
 	unsigned long i, claim_addr, claim_size;
-	extern char _start;
 	struct bi_record *bi_recs;
 	kernel_entry_t kernel_entry;
 	Elf64_Ehdr *elf64;
@@ -101,7 +100,7 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 	if (getprop(chosen_handle, "stdin", &stdin, sizeof(stdin)) != 4)
 		exit();
 
-	printf("zImage starting: loaded at 0x%x\n\r", (unsigned)&_start);
+	printf("zImage starting: loaded at 0x%x\n\r", (unsigned)_start);
 
 #if 0
 	sysmap.size = (unsigned long)(_sysmap_end - _sysmap_start);

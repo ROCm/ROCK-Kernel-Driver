@@ -78,10 +78,11 @@
  *          Cleaned up poll() functions (audio and midi). Don't start input.
  *	    Restrict DMA pages used to 512Mib range.
  *	    New AC97_BOOST mixer ioctl.
- *     0.19 Real fix for kernel with highmem support (cast dma_handle to u32).
+ *    0.19a Added Support for Audigy Cards
+ *	    Real fix for kernel with highmem support (cast dma_handle to u32).
  *	    Fix recording buffering parameters calculation.
  *	    Use unsigned long for variables in bit ops.
- *     0.20 Fixed recording startup
+ *    0.20a Fixed recording startup
  *	    Fixed timer rate setting (it's a 16-bit register)
  *********************************************************************/
 
@@ -114,7 +115,6 @@
 #define SNDCARD_EMU10K1 46
 #endif
  
-#define DRIVER_VERSION "0.20"
 
 /* the emu10k1 _seems_ to only supports 29 bit (512MiB) bit bus master */
 #define EMU10K1_DMA_MASK                0x1fffffff	/* DMA buffer mask for pci_alloc_consist */
@@ -126,20 +126,27 @@
 #ifndef PCI_DEVICE_ID_CREATIVE_EMU10K1
 #define PCI_DEVICE_ID_CREATIVE_EMU10K1 0x0002
 #endif
+#ifndef PCI_DEVICE_ID_CREATIVE_AUDIGY
+#define PCI_DEVICE_ID_CREATIVE_AUDIGY 0x0004
+#endif
 
 #define EMU_APS_SUBID	0x40011102
  
 enum {
 	EMU10K1 = 0,
+	AUDIGY,
 };
 
 static char *card_names[] __devinitdata = {
 	"EMU10K1",
+	"Audigy",
 };
 
 static struct pci_device_id emu10k1_pci_tbl[] = {
 	{PCI_VENDOR_ID_CREATIVE, PCI_DEVICE_ID_CREATIVE_EMU10K1,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, EMU10K1},
+	{PCI_VENDOR_ID_CREATIVE, PCI_DEVICE_ID_CREATIVE_AUDIGY,
+	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, AUDIGY},
 	{0,}
 };
 
@@ -161,6 +168,67 @@ extern irqreturn_t emu10k1_interrupt(int, void *, struct pt_regs *s);
 
 static int __devinit emu10k1_audio_init(struct emu10k1_card *card)
 {
+	/* Assign default playback voice parameters */
+	if (card->is_audigy)
+		card->mchannel_fx = 0;
+	else
+		card->mchannel_fx = 8;
+
+
+	if (card->is_audigy) {
+		/* mono voice */
+		card->waveout.send_dcba[SEND_MONO] = 0xffffffff;
+		card->waveout.send_hgfe[SEND_MONO] = 0x0000ffff;
+	
+		/* stereo voice */
+		/* left */
+		card->waveout.send_dcba[SEND_LEFT] = 0x00ff00ff;
+		card->waveout.send_hgfe[SEND_LEFT] = 0x00007f7f;	
+		/* right */
+		card->waveout.send_dcba[SEND_RIGHT] = 0xff00ff00;
+		card->waveout.send_hgfe[SEND_RIGHT] = 0x00007f7f;
+
+		card->waveout.send_routing[ROUTE_PCM] = 0x03020100; // Regular pcm
+		card->waveout.send_routing2[ROUTE_PCM] = 0x07060504;
+
+		card->waveout.send_routing[ROUTE_PT] = 0x3f3f3d3c; // Passthrough
+		card->waveout.send_routing2[ROUTE_PT] = 0x3f3f3f3f;
+		
+		card->waveout.send_routing[ROUTE_PCM1] = 0x03020100; // Spare
+		card->waveout.send_routing2[ROUTE_PCM1] = 0x07060404;
+		
+	} else {
+		/* mono voice */
+		card->waveout.send_dcba[SEND_MONO] = 0x0000ffff;
+	
+		/* stereo voice */
+		/* left */
+		card->waveout.send_dcba[SEND_LEFT] = 0x000000ff;
+		/* right */
+		card->waveout.send_dcba[SEND_RIGHT] = 0x0000ff00;
+
+		card->waveout.send_routing[ROUTE_PCM] = 0x3210; // pcm
+		card->waveout.send_routing[ROUTE_PT] = 0x3210; // passthrough
+		card->waveout.send_routing[ROUTE_PCM1] = 0x7654; // /dev/dsp1
+	}
+
+	/* Assign default recording parameters */
+	/* FIXME */
+	if (card->is_aps)
+		card->wavein.recsrc = WAVERECORD_FX;
+	else
+		card->wavein.recsrc = WAVERECORD_AC97;
+
+	card->wavein.fxwc = 0x0003;
+	return 0;
+}
+
+static void emu10k1_audio_cleanup(struct emu10k1_card *card)
+{
+}
+
+static int __devinit emu10k1_register_devices(struct emu10k1_card *card)
+{
 	card->audio_dev = register_sound_dsp(&emu10k1_audio_fops, -1);
 	if (card->audio_dev < 0) {
 		printk(KERN_ERR "emu10k1: cannot register first audio device!\n");
@@ -173,56 +241,167 @@ static int __devinit emu10k1_audio_init(struct emu10k1_card *card)
 		goto err_dev1;
 	}
 
-	/* Assign default playback voice parameters */
-	card->mchannel_fx = 8;
-	/* mono voice */
-	card->waveout.send_a[0] = 0xff;
-	card->waveout.send_b[0] = 0xff;
-	card->waveout.send_c[0] = 0x00;
-	card->waveout.send_d[0] = 0x00;
-	card->waveout.send_routing[0] = 0x3210;
+	card->ac97->dev_mixer = register_sound_mixer(&emu10k1_mixer_fops, -1);
+	if (card->ac97->dev_mixer < 0) {
+		printk(KERN_ERR "emu10k1: cannot register mixer device\n");
+		goto err_mixer;
+        }
 
-	/* stereo voice */
-	/* left */
-	card->waveout.send_a[1] = 0xff;
-	card->waveout.send_b[1] = 0x00;
-	card->waveout.send_c[1] = 0x00;
-	card->waveout.send_d[1] = 0x00;
-	card->waveout.send_routing[1] = 0x3210;
+	card->midi_dev = register_sound_midi(&emu10k1_midi_fops, -1);
+	if (card->midi_dev < 0) {
+                printk(KERN_ERR "emu10k1: cannot register midi device!\n");
+		goto err_midi;
+        }
 
-	/* right */
-	card->waveout.send_a[2] = 0x00;
-	card->waveout.send_b[2] = 0xff;
-	card->waveout.send_c[2] = 0x00;
-	card->waveout.send_d[2] = 0x00;
-	card->waveout.send_routing[2] = 0x3210;
+#ifdef EMU10K1_SEQUENCER
+	card->seq_dev = sound_alloc_mididev();
+	if (card->seq_dev == -1)
+		printk(KERN_WARNING "emu10k1: unable to register sequencer device!");
+	else {
+		std_midi_synth.midi_dev = card->seq_dev;
+		midi_devs[card->seq_dev] = 
+			(struct midi_operations *)
+			kmalloc(sizeof(struct midi_operations), GFP_KERNEL);
 
-	/* Assign default recording parameters */
-	/* FIXME */
-	if (card->is_aps)
-		card->wavein.recsrc = WAVERECORD_FX;
-	else
-		card->wavein.recsrc = WAVERECORD_AC97;
-
-	card->wavein.fxwc = 0x0003;
+		if (midi_devs[card->seq_dev] == NULL) {
+			printk(KERN_ERR "emu10k1: unable to allocate memory!");
+			sound_unload_mididev(card->seq_dev);
+			card->seq_dev = -1;
+			/* return without error */
+		} else {
+			memcpy((char *)midi_devs[card->seq_dev], 
+				(char *)&emu10k1_midi_operations, 
+				sizeof(struct midi_operations));
+			midi_devs[card->seq_dev]->devc = card;
+			sequencer_init();
+			card->seq_mididev = NULL;
+		}
+	}
+#endif
 	return 0;
 
+err_midi:
+	unregister_sound_mixer(card->ac97->dev_mixer);
+err_mixer:
+	unregister_sound_dsp(card->audio_dev);
 err_dev1:
 	unregister_sound_dsp(card->audio_dev);
 err_dev:
 	return -ENODEV;
 }
 
-static void emu10k1_audio_cleanup(struct emu10k1_card *card)
+static void emu10k1_unregister_devices(struct emu10k1_card *card)
 {
+#ifdef EMU10K1_SEQUENCER
+	if (card->seq_dev > -1) {
+		kfree(midi_devs[card->seq_dev]);
+		midi_devs[card->seq_dev] = NULL;
+		sound_unload_mididev(card->seq_dev);
+		card->seq_dev = -1;
+	}
+#endif
+
+	unregister_sound_midi(card->midi_dev);
+	unregister_sound_mixer(card->ac97->dev_mixer);
 	unregister_sound_dsp(card->audio_dev1);
 	unregister_sound_dsp(card->audio_dev);
 }
 
+int emu10k1_info_proc (char *page, char **start, off_t off,
+		    int count, int *eof, void *data)
+{
+	struct emu10k1_card *card = data;
+	int len = 0;
+	
+	if (card == NULL)
+		return -ENODEV;
+
+	len += sprintf (page + len, "Driver Version : %s\n", DRIVER_VERSION);
+	len += sprintf (page + len, "Card type      : %s\n", card->is_aps ? "Aps" : (card->is_audigy ? "Audigy" : "Emu10k1"));
+	len += sprintf (page + len, "Revision       : %d\n", card->chiprev);
+	len += sprintf (page + len, "Model          : %#06x\n", card->model);
+	len += sprintf (page + len, "IO             : %#06lx-%#06lx\n", card->iobase, card->iobase + card->length - 1);
+	len += sprintf (page + len, "IRQ            : %d\n\n", card->irq);
+	
+	len += sprintf (page + len, "Registered /dev Entries:\n");
+	len += sprintf (page + len, "/dev/dsp%d\n", card->audio_dev / 16);
+	len += sprintf (page + len, "/dev/dsp%d\n", card->audio_dev1 / 16);
+	len += sprintf (page + len, "/dev/mixer%d\n", card->ac97->dev_mixer / 16);
+	len += sprintf (page + len, "/dev/midi%d\n", card->midi_dev / 16);
+
+#ifdef EMU10K1_SEQUENCER
+	len += sprintf (page + len, "/dev/sequencer\n");
+#endif
+
+	return len;
+}
+
+static int __devinit emu10k1_proc_init(struct emu10k1_card *card)
+{
+	char s[48];
+
+	if (!proc_mkdir ("driver/emu10k1", 0)) {
+		printk(KERN_ERR "emu10k1: unable to create proc directory driver/emu10k1\n");
+		goto err_out;
+	}
+
+	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
+	if (!proc_mkdir (s, 0)) {
+		printk(KERN_ERR "emu10k1: unable to create proc directory %s\n", s);
+		goto err_emu10k1_proc;
+	}
+
+	sprintf(s, "driver/emu10k1/%s/info", card->pci_dev->slot_name);
+	if (!create_proc_read_entry (s, 0, 0, emu10k1_info_proc, card)) {
+		printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
+		goto err_dev_proc;
+	}
+
+	if (!card->is_aps) {
+		sprintf(s, "driver/emu10k1/%s/ac97", card->pci_dev->slot_name);
+		if (!create_proc_read_entry (s, 0, 0, ac97_read_proc, card->ac97)) {
+			printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
+			goto err_proc_ac97;
+		}
+	}
+
+	return 0;
+
+err_proc_ac97:
+	sprintf(s, "driver/emu10k1/%s/info", card->pci_dev->slot_name);
+	remove_proc_entry(s, NULL);
+
+err_dev_proc:
+	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
+	remove_proc_entry(s, NULL);
+
+err_emu10k1_proc:
+	remove_proc_entry("driver/emu10k1", NULL);
+
+err_out:
+	return -EIO;
+}
+
+static void emu10k1_proc_cleanup(struct emu10k1_card *card)
+{
+	char s[48];
+
+	if (!card->is_aps) {
+		sprintf(s, "driver/emu10k1/%s/ac97", card->pci_dev->slot_name);
+		remove_proc_entry(s, NULL);
+	}
+
+	sprintf(s, "driver/emu10k1/%s/info", card->pci_dev->slot_name);
+	remove_proc_entry(s, NULL);
+
+	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
+	remove_proc_entry(s, NULL);
+		
+	remove_proc_entry("driver/emu10k1", NULL);
+}
+
 static int __devinit emu10k1_mixer_init(struct emu10k1_card *card)
 {
-	char s[32];
-
 	struct ac97_codec *codec  = ac97_alloc_codec();
 	
 	if(codec == NULL)
@@ -231,15 +410,6 @@ static int __devinit emu10k1_mixer_init(struct emu10k1_card *card)
 		return -EIO;
 	}
 	card->ac97 = codec;
-	
-#warning "Initialisation order race. Must register after usable"
-
-	card->ac97->dev_mixer = register_sound_mixer(&emu10k1_mixer_fops, -1);
-	if (card->ac97->dev_mixer < 0) {
-		printk(KERN_ERR "emu10k1: cannot register mixer device\n");
-		goto err_codec;
-        }
-
 	card->ac97->private_data = card;
 
 	if (!card->is_aps) {
@@ -261,23 +431,6 @@ static int __devinit emu10k1_mixer_init(struct emu10k1_card *card)
 		// Force 5bit:		    
 		//card->ac97->bit_resolution=5;
 
-		if (!proc_mkdir ("driver/emu10k1", 0)) {
-			printk(KERN_ERR "emu10k1: unable to create proc directory driver/emu10k1\n");
-			goto err_out;
-		}
-
-		sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
-		if (!proc_mkdir (s, 0)) {
-			printk(KERN_ERR "emu10k1: unable to create proc directory %s\n", s);
-			goto err_emu10k1_proc;
-		}
-	
-		sprintf(s, "driver/emu10k1/%s/ac97", card->pci_dev->slot_name);
-		if (!create_proc_read_entry (s, 0, 0, ac97_read_proc, card->ac97)) {
-			printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
-			goto err_ac97_proc;
-		}
-
 		/* these will store the original values and never be modified */
 		card->ac97_supported_mixers = card->ac97->supported_mixers;
 		card->ac97_stereo_mixers = card->ac97->stereo_mixers;
@@ -285,47 +438,19 @@ static int __devinit emu10k1_mixer_init(struct emu10k1_card *card)
 
 	return 0;
 
- err_ac97_proc:
-	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
-	remove_proc_entry(s, NULL);
-
- err_emu10k1_proc:
-	remove_proc_entry("driver/emu10k1", NULL);
  err_out:
-	unregister_sound_mixer (card->ac97->dev_mixer);
- err_codec:
  	ac97_release_codec(card->ac97);
 	return -EIO;
 }
 
 static void emu10k1_mixer_cleanup(struct emu10k1_card *card)
 {
-	char s[32];
-
-	if (!card->is_aps) {
-		sprintf(s, "driver/emu10k1/%s/ac97", card->pci_dev->slot_name);
-		remove_proc_entry(s, NULL);
-
-		sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
-		remove_proc_entry(s, NULL);
-
-		remove_proc_entry("driver/emu10k1", NULL);
-	}
-
-	unregister_sound_mixer (card->ac97->dev_mixer);
 	ac97_release_codec(card->ac97);
 }
 
 static int __devinit emu10k1_midi_init(struct emu10k1_card *card)
 {
 	int ret;
-
-	card->midi_dev = register_sound_midi(&emu10k1_midi_fops, -1);
-	if (card->midi_dev < 0) {
-                printk(KERN_ERR "emu10k1: cannot register midi device!\n");
-		return -ENODEV;
-        }
-
 
 	card->mpuout = kmalloc(sizeof(struct emu10k1_mpuout), GFP_KERNEL);
 	if (card->mpuout == NULL) {
@@ -366,31 +491,6 @@ static int __devinit emu10k1_midi_init(struct emu10k1_card *card)
 		goto err_out3;
 	}
 
-#ifdef EMU10K1_SEQUENCER
-	card->seq_dev = sound_alloc_mididev();
-	if (card->seq_dev == -1)
-			printk(KERN_WARNING "emu10k1: unable to register sequencer device!");
-	else {
-			std_midi_synth.midi_dev = card->seq_dev;
-			midi_devs[card->seq_dev] = 
-					(struct midi_operations *)
-					kmalloc(sizeof(struct midi_operations), GFP_KERNEL);
-			
-			if (midi_devs[card->seq_dev] == NULL) {
-				printk(KERN_ERR "emu10k1: unable to allocate memory!");
-				sound_unload_mididev(card->seq_dev);
-				card->seq_dev = -1;
-				return 0;
-			} else {
-				memcpy((char *)midi_devs[card->seq_dev], 
-					(char *)&emu10k1_midi_operations, 
-					sizeof(struct midi_operations));
-				midi_devs[card->seq_dev]->devc = card;
-				sequencer_init();
-			}
-	}
-	card->seq_mididev = 0;
-#endif
 	return 0;
 
 err_out3:
@@ -398,7 +498,6 @@ err_out3:
 err_out2:
 	kfree(card->mpuout);
 err_out1:
-	unregister_sound_midi(card->midi_dev);
 	return ret;
 }
 
@@ -409,17 +508,6 @@ static void emu10k1_midi_cleanup(struct emu10k1_card *card)
 
 	tasklet_kill(&card->mpuin->tasklet);
 	kfree(card->mpuin);
-
-#ifdef EMU10K1_SEQUENCER
-	if (card->seq_dev > -1) {
-		kfree(midi_devs[card->seq_dev]);
-		midi_devs[card->seq_dev] = NULL;
-		sound_unload_mididev(card->seq_dev);
-		card->seq_dev = -1;
-	}
-#endif
-
-	unregister_sound_midi(card->midi_dev);
 }
 
 static void __devinit voice_init(struct emu10k1_card *card)
@@ -465,24 +553,25 @@ static int __devinit fx_init(struct emu10k1_card *card)
 	s32 left, right;
 	int i;
 	u32 pc = 0;
-	u32 patch_n;
+	u32 patch_n=0;
+	struct emu_efx_info_t emu_efx_info[2]=
+		{{ 20, 10, 0x400, 0x100, 0x20 },
+		 { 24, 12, 0x600, 0x400, 0x60 },
+		}; 
+			
 
 	for (i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
 		mgr->ctrl_gpr[i][0] = -1;
 		mgr->ctrl_gpr[i][1] = -1;
 	}
 
-	for (i = 0; i < 512; i++)
-		OP(6, 0x40, 0x40, 0x40, 0x40);
 
-	for (i = 0; i < 256; i++)
-		sblive_writeptr_tag(card, 0,
-				    FXGPREGBASE + i, 0,
-				    TANKMEMADDRREGBASE + i, 0,
-				    TAGLIST_END);
-
-	/* !! The number bellow must equal the number of patches, currently 11 !! */
-	mgr->current_pages = (11 + PATCHES_PER_PAGE - 1) / PATCHES_PER_PAGE;
+	if (card->is_audigy)
+		mgr->current_pages = (2 + PATCHES_PER_PAGE - 1) / PATCHES_PER_PAGE;
+	else
+		/* !! The number below must equal the number of patches, currently 11 !! */
+		mgr->current_pages = (11 + PATCHES_PER_PAGE - 1) / PATCHES_PER_PAGE;
+	
 	for (i = 0; i < mgr->current_pages; i++) {
 		mgr->patch[i] = (void *)__get_free_page(GFP_KERNEL);
 		if (mgr->patch[i] == NULL) {
@@ -493,215 +582,298 @@ static int __devinit fx_init(struct emu10k1_card *card)
 		memset(mgr->patch[i], 0, PAGE_SIZE);
 	}
 
-	pc = 0;
-	patch_n = 0;
-	//first free GPR = 0x11b
+	if (card->is_audigy) {
+		for (i = 0; i < 1024; i++)
+			OP(0xf, 0x0c0, 0x0c0, 0x0cf, 0x0c0);
 
-	/* FX volume correction and Volume control*/
-	INPUT_PATCH_START(patch, "Pcm L vol", 0x0, 0);
-	GET_OUTPUT_GPR(patch, 0x100, 0x0);
-	GET_CONTROL_GPR(patch, 0x106, "Vol", 0, 0x7fffffff);
-	GET_DYNAMIC_GPR(patch, 0x112);
+		for (i = 0; i < 512 ; i++)
+			sblive_writeptr(card, A_GPR_BASE+i,0,0);
 
-	OP(4, 0x112, 0x40, PCM_IN_L, 0x44); //*4
-	OP(0, 0x100, 0x040, 0x112, 0x106);  //*vol
-	INPUT_PATCH_END(patch);
+		pc=0;
 
+		//Pcm input volume
+		OP(0, 0x402, 0x0c0, 0x406, 0x000);
+		OP(0, 0x403, 0x0c0, 0x407, 0x001);
 
-	INPUT_PATCH_START(patch, "Pcm R vol", 0x1, 0);
-	GET_OUTPUT_GPR(patch, 0x101, 0x1);
-	GET_CONTROL_GPR(patch, 0x107, "Vol", 0, 0x7fffffff);
-	GET_DYNAMIC_GPR(patch, 0x112);
+		//CD-Digital input Volume
+		OP(0, 0x404, 0x0c0, 0x40d, 0x42);
+		OP(0, 0x405, 0x0c0, 0x40f, 0x43);
 
-	OP(4, 0x112, 0x40, PCM_IN_R, 0x44); 
-	OP(0, 0x101, 0x040, 0x112, 0x107);
+		// CD + PCM 
+		OP(6, 0x400, 0x0c0, 0x402, 0x404);
+		OP(6, 0x401, 0x0c0, 0x403, 0x405);
+		
+		// Front Output + Master Volume
+		OP(0, 0x68, 0x0c0, 0x408, 0x400);
+		OP(0, 0x69, 0x0c0, 0x409, 0x401);
 
-	INPUT_PATCH_END(patch);
+		// Add-in analog inputs for other speakers
+		OP(6, 0x400, 0x40, 0x400, 0xc0);
+		OP(6, 0x401, 0x41, 0x401, 0xc0);
 
+		// Digital Front + Master Volume
+		OP(0, 0x60, 0x0c0, 0x408, 0x400);
+		OP(0, 0x61, 0x0c0, 0x409, 0x401);
 
-	// CD-Digital In Volume control
-	INPUT_PATCH_START(patch, "CD-Digital Vol L", 0x12, 0);
-	GET_OUTPUT_GPR(patch, 0x10c, 0x12);
-	GET_CONTROL_GPR(patch, 0x10d, "Vol", 0, 0x7fffffff);
+		// Rear Output + Rear Volume
+		OP(0, 0x06e, 0x0c0, 0x419, 0x400);
+		OP(0, 0x06f, 0x0c0, 0x41a, 0x401);		
 
-	OP(0, 0x10c, 0x040, SPDIF_CD_L, 0x10d);
-	INPUT_PATCH_END(patch);
+		// Digital Rear Output + Rear Volume
+		OP(0, 0x066, 0x0c0, 0x419, 0x400);
+		OP(0, 0x067, 0x0c0, 0x41a, 0x401);		
 
-	INPUT_PATCH_START(patch, "CD-Digital Vol R", 0x13, 0);
-	GET_OUTPUT_GPR(patch, 0x10e, 0x13);
-	GET_CONTROL_GPR(patch, 0x10f, "Vol", 0, 0x7fffffff);
+		// Audigy Drive, Headphone out
+		OP(6, 0x64, 0x0c0, 0x0c0, 0x400);
+		OP(6, 0x65, 0x0c0, 0x0c0, 0x401);
 
-	OP(0, 0x10e, 0x040, SPDIF_CD_R, 0x10f);
-	INPUT_PATCH_END(patch);
+		// ac97 Recording
+		OP(6, 0x76, 0x0c0, 0x0c0, 0x40);
+		OP(6, 0x77, 0x0c0, 0x0c0, 0x41);
+		
+		// Center = sub = Left/2 + Right/2
+		OP(0xe, 0x400, 0x401, 0xcd, 0x400);
 
-	//Volume Correction for Multi-channel Inputs
-	INPUT_PATCH_START(patch, "Multi-Channel Gain", 0x08, 0);
-	patch->input=patch->output=0x3F00;
+		// center/sub  Volume (master)
+		OP(0, 0x06a, 0x0c0, 0x408, 0x400);
+		OP(0, 0x06b, 0x0c0, 0x409, 0x400);
 
-	GET_OUTPUT_GPR(patch, 0x113, MULTI_FRONT_L);
-	GET_OUTPUT_GPR(patch, 0x114, MULTI_FRONT_R);
-	GET_OUTPUT_GPR(patch, 0x115, MULTI_REAR_L);
-	GET_OUTPUT_GPR(patch, 0x116, MULTI_REAR_R);
-	GET_OUTPUT_GPR(patch, 0x117, MULTI_CENTER);
-	GET_OUTPUT_GPR(patch, 0x118, MULTI_LFE);
+		// Digital center/sub  Volume (master)
+		OP(0, 0x062, 0x0c0, 0x408, 0x400);
+		OP(0, 0x063, 0x0c0, 0x409, 0x400);
 
-	OP(4, 0x113, 0x40, MULTI_FRONT_L, 0x44);
-	OP(4, 0x114, 0x40, MULTI_FRONT_R, 0x44);
-	OP(4, 0x115, 0x40, MULTI_REAR_L, 0x44);
-	OP(4, 0x116, 0x40, MULTI_REAR_R, 0x44);
-	OP(4, 0x117, 0x40, MULTI_CENTER, 0x44);
-	OP(4, 0x118, 0x40, MULTI_LFE, 0x44);
+		ROUTING_PATCH_START(rpatch, "Routing");
+		ROUTING_PATCH_END(rpatch);
+
+		/* delimiter patch */
+		patch = PATCH(mgr, patch_n);
+		patch->code_size = 0;
+
 	
-	INPUT_PATCH_END(patch);
+		sblive_writeptr(card, 0x53, 0, 0);
+	} else {
+		for (i = 0; i < 512 ; i++)
+			OP(6, 0x40, 0x40, 0x40, 0x40);
 
+		for (i = 0; i < 256; i++)
+			sblive_writeptr_tag(card, 0,
+					    FXGPREGBASE + i, 0,
+					    TANKMEMADDRREGBASE + i, 0,
+					    TAGLIST_END);
 
-	//Routing patch start
-	ROUTING_PATCH_START(rpatch, "Routing");
-	GET_INPUT_GPR(rpatch, 0x100, 0x0);
-	GET_INPUT_GPR(rpatch, 0x101, 0x1);
-	GET_INPUT_GPR(rpatch, 0x10c, 0x12);
-	GET_INPUT_GPR(rpatch, 0x10e, 0x13);
-	GET_INPUT_GPR(rpatch, 0x113, MULTI_FRONT_L);
-	GET_INPUT_GPR(rpatch, 0x114, MULTI_FRONT_R);
-	GET_INPUT_GPR(rpatch, 0x115, MULTI_REAR_L);
-	GET_INPUT_GPR(rpatch, 0x116, MULTI_REAR_R);
-	GET_INPUT_GPR(rpatch, 0x117, MULTI_CENTER);
-	GET_INPUT_GPR(rpatch, 0x118, MULTI_LFE);
+		
+		pc = 0;
 
-	GET_DYNAMIC_GPR(rpatch, 0x102);
-	GET_DYNAMIC_GPR(rpatch, 0x103);
-
-	GET_OUTPUT_GPR(rpatch, 0x104, 0x8);
-	GET_OUTPUT_GPR(rpatch, 0x105, 0x9);
-	GET_OUTPUT_GPR(rpatch, 0x10a, 0x2);
-	GET_OUTPUT_GPR(rpatch, 0x10b, 0x3);
-
-
-	/* input buffer */
-	OP(6, 0x102, AC97_IN_L, 0x40, 0x40);
-	OP(6, 0x103, AC97_IN_R, 0x40, 0x40);
-
-
-	/* Digital In + PCM + MULTI_FRONT-> AC97 out (front speakers)*/
-	OP(6, AC97_FRONT_L, 0x100, 0x10c, 0x113);
-
-	CONNECT(MULTI_FRONT_L, AC97_FRONT_L);
-	CONNECT(PCM_IN_L, AC97_FRONT_L);
-	CONNECT(SPDIF_CD_L, AC97_FRONT_L);
-
-	OP(6, AC97_FRONT_R, 0x101, 0x10e, 0x114);
-
-	CONNECT(MULTI_FRONT_R, AC97_FRONT_R);
-	CONNECT(PCM_IN_R, AC97_FRONT_R);
-	CONNECT(SPDIF_CD_R, AC97_FRONT_R);
-
-	/* Digital In + PCM + AC97 In + PCM1 + MULTI_REAR --> Rear Channel */ 
-	OP(6, 0x104, PCM1_IN_L, 0x100, 0x115);
-	OP(6, 0x104, 0x104, 0x10c, 0x102);
-
-	CONNECT(MULTI_REAR_L, ANALOG_REAR_L);
-	CONNECT(AC97_IN_L, ANALOG_REAR_L);
-	CONNECT(PCM_IN_L, ANALOG_REAR_L);
-	CONNECT(SPDIF_CD_L, ANALOG_REAR_L);
-	CONNECT(PCM1_IN_L, ANALOG_REAR_L);
-
-	OP(6, 0x105, PCM1_IN_R, 0x101, 0x116);
-	OP(6, 0x105, 0x105, 0x10e, 0x103);
-
-	CONNECT(MULTI_REAR_R, ANALOG_REAR_R);
-	CONNECT(AC97_IN_R, ANALOG_REAR_R);
-	CONNECT(PCM_IN_R, ANALOG_REAR_R);
-	CONNECT(SPDIF_CD_R, ANALOG_REAR_R);
-	CONNECT(PCM1_IN_R, ANALOG_REAR_R);
-
-	/* Digital In + PCM + AC97 In + MULTI_FRONT --> Digital out */
-	OP(6, 0x10a, 0x100, 0x102, 0x10c);
-	OP(6, 0x10a, 0x10a, 0x113, 0x40);
-
-	CONNECT(MULTI_FRONT_L, DIGITAL_OUT_L);
-	CONNECT(PCM_IN_L, DIGITAL_OUT_L);
-	CONNECT(AC97_IN_L, DIGITAL_OUT_L);
-	CONNECT(SPDIF_CD_L, DIGITAL_OUT_L);
-
-	OP(6, 0x10b, 0x101, 0x103, 0x10e);
-	OP(6, 0x10b, 0x10b, 0x114, 0x40);
-
-	CONNECT(MULTI_FRONT_R, DIGITAL_OUT_R);
-	CONNECT(PCM_IN_R, DIGITAL_OUT_R);
-	CONNECT(AC97_IN_R, DIGITAL_OUT_R);
-	CONNECT(SPDIF_CD_R, DIGITAL_OUT_R);
-
-	/* AC97 In --> ADC Recording Buffer */
-	OP(6, ADC_REC_L, 0x102, 0x40, 0x40);
-
-	CONNECT(AC97_IN_L, ADC_REC_L);
-
-	OP(6, ADC_REC_R, 0x103, 0x40, 0x40);
-
-	CONNECT(AC97_IN_R, ADC_REC_R);
-
-
-	/* fx12:Analog-Center */
-	OP(6, ANALOG_CENTER, 0x117, 0x40, 0x40);
-	CONNECT(MULTI_CENTER, ANALOG_CENTER);
-
-	/* fx11:Analog-LFE */
-	OP(6, ANALOG_LFE, 0x118, 0x40, 0x40);
-	CONNECT(MULTI_LFE, ANALOG_LFE);
-
-	/* fx12:Digital-Center */
-	OP(6, DIGITAL_CENTER, 0x117, 0x40, 0x40);
-	CONNECT(MULTI_CENTER, DIGITAL_CENTER);
-
-	/* fx11:Analog-LFE */
-	OP(6, DIGITAL_LFE, 0x118, 0x40, 0x40);
-	CONNECT(MULTI_LFE, DIGITAL_LFE);
+		//first free GPR = 0x11b
 	
-	ROUTING_PATCH_END(rpatch);
+		
+		/* FX volume correction and Volume control*/
+		INPUT_PATCH_START(patch, "Pcm L vol", 0x0, 0);
+		GET_OUTPUT_GPR(patch, 0x100, 0x0);
+		GET_CONTROL_GPR(patch, 0x106, "Vol", 0, 0x7fffffff);
+		GET_DYNAMIC_GPR(patch, 0x112);
+
+		OP(4, 0x112, 0x40, PCM_IN_L, 0x44); //*4	
+		OP(0, 0x100, 0x040, 0x112, 0x106);  //*vol	
+		INPUT_PATCH_END(patch);
 
 
-	// Rear volume control
-	OUTPUT_PATCH_START(patch, "Vol Rear L", 0x8, 0);
-	GET_INPUT_GPR(patch, 0x104, 0x8);
-	GET_CONTROL_GPR(patch, 0x119, "Vol", 0, 0x7fffffff);
+		INPUT_PATCH_START(patch, "Pcm R vol", 0x1, 0);
+		GET_OUTPUT_GPR(patch, 0x101, 0x1);
+		GET_CONTROL_GPR(patch, 0x107, "Vol", 0, 0x7fffffff);
+		GET_DYNAMIC_GPR(patch, 0x112);
 
-	OP(0, ANALOG_REAR_L, 0x040, 0x104, 0x119);
-	OUTPUT_PATCH_END(patch);
+		OP(4, 0x112, 0x40, PCM_IN_R, 0x44); 
+		OP(0, 0x101, 0x040, 0x112, 0x107);
 
-
-	OUTPUT_PATCH_START(patch, "Vol Rear R", 0x9, 0);
-	GET_INPUT_GPR(patch, 0x105, 0x9);
-	GET_CONTROL_GPR(patch, 0x11a, "Vol", 0, 0x7fffffff);
-
-	OP(0, ANALOG_REAR_R, 0x040, 0x105, 0x11a);
-	OUTPUT_PATCH_END(patch);
+		INPUT_PATCH_END(patch);
 
 
-	//Master volume control on front-digital
-	OUTPUT_PATCH_START(patch, "Vol Master L", 0x2, 1);
-	GET_INPUT_GPR(patch, 0x10a, 0x2);
-	GET_CONTROL_GPR(patch, 0x108, "Vol", 0, 0x7fffffff);
+		// CD-Digital In Volume control	
+		INPUT_PATCH_START(patch, "CD-Digital Vol L", 0x12, 0);
+		GET_OUTPUT_GPR(patch, 0x10c, 0x12);
+		GET_CONTROL_GPR(patch, 0x10d, "Vol", 0, 0x7fffffff);
 
-	OP(0, DIGITAL_OUT_L, 0x040, 0x10a, 0x108);
-	OUTPUT_PATCH_END(patch);
+		OP(0, 0x10c, 0x040, SPDIF_CD_L, 0x10d);
+		INPUT_PATCH_END(patch);
+
+		INPUT_PATCH_START(patch, "CD-Digital Vol R", 0x13, 0);
+		GET_OUTPUT_GPR(patch, 0x10e, 0x13);
+		GET_CONTROL_GPR(patch, 0x10f, "Vol", 0, 0x7fffffff);
+
+		OP(0, 0x10e, 0x040, SPDIF_CD_R, 0x10f);
+		INPUT_PATCH_END(patch);
+
+		//Volume Correction for Multi-channel Inputs	
+		INPUT_PATCH_START(patch, "Multi-Channel Gain", 0x08, 0);
+		patch->input=patch->output=0x3F00;
+
+		GET_OUTPUT_GPR(patch, 0x113, MULTI_FRONT_L);
+		GET_OUTPUT_GPR(patch, 0x114, MULTI_FRONT_R);
+		GET_OUTPUT_GPR(patch, 0x115, MULTI_REAR_L);
+		GET_OUTPUT_GPR(patch, 0x116, MULTI_REAR_R);
+		GET_OUTPUT_GPR(patch, 0x117, MULTI_CENTER);
+		GET_OUTPUT_GPR(patch, 0x118, MULTI_LFE);
+
+		OP(4, 0x113, 0x40, MULTI_FRONT_L, 0x44);
+		OP(4, 0x114, 0x40, MULTI_FRONT_R, 0x44);
+		OP(4, 0x115, 0x40, MULTI_REAR_L, 0x44);
+		OP(4, 0x116, 0x40, MULTI_REAR_R, 0x44);
+		OP(4, 0x117, 0x40, MULTI_CENTER, 0x44);
+		OP(4, 0x118, 0x40, MULTI_LFE, 0x44);
+	
+		INPUT_PATCH_END(patch);
 
 
-	OUTPUT_PATCH_START(patch, "Vol Master R", 0x3, 1);
-	GET_INPUT_GPR(patch, 0x10b, 0x3);
-	GET_CONTROL_GPR(patch, 0x109, "Vol", 0, 0x7fffffff);
+		//Routing patch start	
+		ROUTING_PATCH_START(rpatch, "Routing");
+		GET_INPUT_GPR(rpatch, 0x100, 0x0);
+		GET_INPUT_GPR(rpatch, 0x101, 0x1);
+		GET_INPUT_GPR(rpatch, 0x10c, 0x12);
+		GET_INPUT_GPR(rpatch, 0x10e, 0x13);
+		GET_INPUT_GPR(rpatch, 0x113, MULTI_FRONT_L);
+		GET_INPUT_GPR(rpatch, 0x114, MULTI_FRONT_R);
+		GET_INPUT_GPR(rpatch, 0x115, MULTI_REAR_L);
+		GET_INPUT_GPR(rpatch, 0x116, MULTI_REAR_R);
+		GET_INPUT_GPR(rpatch, 0x117, MULTI_CENTER);
+		GET_INPUT_GPR(rpatch, 0x118, MULTI_LFE);
 
-	OP(0, DIGITAL_OUT_R, 0x040, 0x10b, 0x109);
-	OUTPUT_PATCH_END(patch);
+		GET_DYNAMIC_GPR(rpatch, 0x102);
+		GET_DYNAMIC_GPR(rpatch, 0x103);
+
+		GET_OUTPUT_GPR(rpatch, 0x104, 0x8);
+		GET_OUTPUT_GPR(rpatch, 0x105, 0x9);
+		GET_OUTPUT_GPR(rpatch, 0x10a, 0x2);
+		GET_OUTPUT_GPR(rpatch, 0x10b, 0x3);
+		
+		
+		/* input buffer */
+		OP(6, 0x102, AC97_IN_L, 0x40, 0x40);
+		OP(6, 0x103, AC97_IN_R, 0x40, 0x40);
 
 
-	/* delimiter patch */
-	patch = PATCH(mgr, patch_n);
-	patch->code_size = 0;
+		/* Digital In + PCM + MULTI_FRONT-> AC97 out (front speakers)*/
+		OP(6, AC97_FRONT_L, 0x100, 0x10c, 0x113);
 
-	sblive_writeptr(card, DBG, 0, 0);
+		CONNECT(MULTI_FRONT_L, AC97_FRONT_L);
+		CONNECT(PCM_IN_L, AC97_FRONT_L);
+		CONNECT(SPDIF_CD_L, AC97_FRONT_L);
+
+		OP(6, AC97_FRONT_R, 0x101, 0x10e, 0x114);
+
+		CONNECT(MULTI_FRONT_R, AC97_FRONT_R);
+		CONNECT(PCM_IN_R, AC97_FRONT_R);
+		CONNECT(SPDIF_CD_R, AC97_FRONT_R);
+
+		/* Digital In + PCM + AC97 In + PCM1 + MULTI_REAR --> Rear Channel */ 
+		OP(6, 0x104, PCM1_IN_L, 0x100, 0x115);
+		OP(6, 0x104, 0x104, 0x10c, 0x102);
+
+		CONNECT(MULTI_REAR_L, ANALOG_REAR_L);
+		CONNECT(AC97_IN_L, ANALOG_REAR_L);
+		CONNECT(PCM_IN_L, ANALOG_REAR_L);
+		CONNECT(SPDIF_CD_L, ANALOG_REAR_L);
+		CONNECT(PCM1_IN_L, ANALOG_REAR_L);
+
+		OP(6, 0x105, PCM1_IN_R, 0x101, 0x116);
+		OP(6, 0x105, 0x105, 0x10e, 0x103);
+
+		CONNECT(MULTI_REAR_R, ANALOG_REAR_R);
+		CONNECT(AC97_IN_R, ANALOG_REAR_R);
+		CONNECT(PCM_IN_R, ANALOG_REAR_R);
+		CONNECT(SPDIF_CD_R, ANALOG_REAR_R);
+		CONNECT(PCM1_IN_R, ANALOG_REAR_R);
+
+		/* Digital In + PCM + AC97 In + MULTI_FRONT --> Digital out */
+		OP(6, 0x10b, 0x100, 0x102, 0x10c);
+		OP(6, 0x10b, 0x10b, 0x113, 0x40);
+
+		CONNECT(MULTI_FRONT_L, DIGITAL_OUT_L);
+		CONNECT(PCM_IN_L, DIGITAL_OUT_L);
+		CONNECT(AC97_IN_L, DIGITAL_OUT_L);
+		CONNECT(SPDIF_CD_L, DIGITAL_OUT_L);
+
+		OP(6, 0x10a, 0x101, 0x103, 0x10e);
+		OP(6, 0x10b, 0x10b, 0x114, 0x40);
+
+		CONNECT(MULTI_FRONT_R, DIGITAL_OUT_R);
+		CONNECT(PCM_IN_R, DIGITAL_OUT_R);
+		CONNECT(AC97_IN_R, DIGITAL_OUT_R);
+		CONNECT(SPDIF_CD_R, DIGITAL_OUT_R);
+
+		/* AC97 In --> ADC Recording Buffer */
+		OP(6, ADC_REC_L, 0x102, 0x40, 0x40);
+
+		CONNECT(AC97_IN_L, ADC_REC_L);
+
+		OP(6, ADC_REC_R, 0x103, 0x40, 0x40);
+
+		CONNECT(AC97_IN_R, ADC_REC_R);
+
+
+		/* fx12:Analog-Center */
+		OP(6, ANALOG_CENTER, 0x117, 0x40, 0x40);
+		CONNECT(MULTI_CENTER, ANALOG_CENTER);
+
+		/* fx11:Analog-LFE */
+		OP(6, ANALOG_LFE, 0x118, 0x40, 0x40);
+		CONNECT(MULTI_LFE, ANALOG_LFE);
+
+		/* fx12:Digital-Center */
+		OP(6, DIGITAL_CENTER, 0x117, 0x40, 0x40);
+		CONNECT(MULTI_CENTER, DIGITAL_CENTER);
+		
+		/* fx11:Analog-LFE */
+		OP(6, DIGITAL_LFE, 0x118, 0x40, 0x40);
+		CONNECT(MULTI_LFE, DIGITAL_LFE);
+	
+		ROUTING_PATCH_END(rpatch);
+
+
+		// Rear volume control	
+		OUTPUT_PATCH_START(patch, "Vol Rear L", 0x8, 0);
+		GET_INPUT_GPR(patch, 0x104, 0x8);
+		GET_CONTROL_GPR(patch, 0x119, "Vol", 0, 0x7fffffff);
+
+		OP(0, ANALOG_REAR_L, 0x040, 0x104, 0x119);
+		OUTPUT_PATCH_END(patch);
+
+		OUTPUT_PATCH_START(patch, "Vol Rear R", 0x9, 0);
+		GET_INPUT_GPR(patch, 0x105, 0x9);
+		GET_CONTROL_GPR(patch, 0x11a, "Vol", 0, 0x7fffffff);
+
+		OP(0, ANALOG_REAR_R, 0x040, 0x105, 0x11a);
+		OUTPUT_PATCH_END(patch);
+
+
+		//Master volume control on front-digital	
+		OUTPUT_PATCH_START(patch, "Vol Master L", 0x2, 1);
+		GET_INPUT_GPR(patch, 0x10a, 0x2);
+		GET_CONTROL_GPR(patch, 0x108, "Vol", 0, 0x7fffffff);
+
+		OP(0, DIGITAL_OUT_L, 0x040, 0x10a, 0x108);
+		OUTPUT_PATCH_END(patch);
+
+
+		OUTPUT_PATCH_START(patch, "Vol Master R", 0x3, 1);
+		GET_INPUT_GPR(patch, 0x10b, 0x3);
+		GET_CONTROL_GPR(patch, 0x109, "Vol", 0, 0x7fffffff);
+
+		OP(0, DIGITAL_OUT_R, 0x040, 0x10b, 0x109);
+		OUTPUT_PATCH_END(patch);
+
+
+		/* delimiter patch */
+		patch = PATCH(mgr, patch_n);
+		patch->code_size = 0;
+
+	
+		sblive_writeptr(card, DBG, 0, 0);
+	}
 
 	mgr->lock = SPIN_LOCK_UNLOCKED;
 
+	// Set up Volume controls, try to keep this the same for both Audigy and Live
 
 	//Master volume
 	mgr->ctrl_gpr[SOUND_MIXER_VOLUME][0] = 8;
@@ -749,8 +921,16 @@ static int __devinit fx_init(struct emu10k1_card *card)
 	emu10k1_set_volume_gpr(card, 0xd, left, VOL_5BIT);
 	emu10k1_set_volume_gpr(card, 0xf, right, VOL_5BIT);
 
-	//hard wire the ac97's pcm, we'll do that in dsp code instead.
-	emu10k1_ac97_write(card->ac97, 0x18, 0x0);
+
+	//hard wire the ac97's pcm, pcm volume is done above using dsp code.
+	if (card->is_audigy)
+		//for Audigy, we mute it and use the philips 6 channel DAC instead
+		emu10k1_ac97_write(card->ac97, 0x18, 0x8000);
+	else
+		//For the Live we hardwire it to full volume
+		emu10k1_ac97_write(card->ac97, 0x18, 0x0);
+
+	//remove it from the ac97_codec's control
 	card->ac97_supported_mixers &= ~SOUND_MASK_PCM;
 	card->ac97_stereo_mixers &= ~SOUND_MASK_PCM;
 
@@ -789,6 +969,13 @@ static int __devinit hw_init(struct emu10k1_card *card)
 			    SOLEH, 0,
 			    TAGLIST_END);
 
+	if (card->is_audigy) {
+		sblive_writeptr_tag(card,0,
+				    0x5e,0xf00,
+				    0x5f,0x3,
+				    TAGLIST_END);
+	}
+
 	/* Init envelope engine */
 	for (nCh = 0; nCh < NUM_G; nCh++) {
 		sblive_writeptr_tag(card, nCh,
@@ -824,6 +1011,21 @@ static int __devinit hw_init(struct emu10k1_card *card)
 				    ENVVAL, 0,
                                     TAGLIST_END);
 		sblive_writeptr(card, CPF, nCh, 0);
+		/*
+		  Audigy FXRT initialization
+		  reversed eng'd, may not be accurate.
+		 */
+		if (card->is_audigy) {
+			sblive_writeptr_tag(card,nCh,
+					    0x4c,0x0,
+					    0x4d,0x0,
+					    0x4e,0x0,
+					    0x4f,0x0,
+					    A_FXRT1, 0x3f3f3f3f,
+					    A_FXRT2, 0x3f3f3f3f,
+					    A_SENDAMOUNTS, 0,
+					    TAGLIST_END);
+		}
 	}
 	
 
@@ -857,6 +1059,25 @@ static int __devinit hw_init(struct emu10k1_card *card)
 				    SPCS_CHANNELNUM_LEFT | SPCS_SOURCENUM_UNSPEC | SPCS_GENERATIONSTATUS | 0x00001200 | SPCS_EMPHASIS_NONE | SPCS_COPYRIGHT),
 
 			    TAGLIST_END);
+
+	if (card->is_audigy && (card->chiprev == 4)) {
+		/* Hacks for Alice3 to work independent of haP16V driver */
+		u32 tmp;
+
+		//Setup SRCMulti_I2S SamplingRate
+		tmp = sblive_readptr(card, A_SPDIF_SAMPLERATE, 0);
+		tmp &= 0xfffff1ff;
+		tmp |= (0x2<<9);
+		sblive_writeptr(card, A_SPDIF_SAMPLERATE, 0, tmp);
+
+		/* Setup SRCSel (Enable Spdif,I2S SRCMulti) */
+		emu10k1_writefn0(card, 0x20, 0x600000);
+		emu10k1_writefn0(card, 0x24, 0x14);
+
+		/* Setup SRCMulti Input Audio Enable */
+		emu10k1_writefn0(card, 0x20, 0x6E0000);
+		emu10k1_writefn0(card, 0x24, 0xFF00FF00);
+	}
 
 	ret = fx_init(card);		/* initialize effects engine */
 	if (ret < 0)
@@ -905,16 +1126,30 @@ static int __devinit hw_init(struct emu10k1_card *card)
 	/* Lock Tank Memory = 1 */
 	/* Lock Sound Memory = 0 */
 	/* Auto Mute = 1 */
-
-	if (card->model == 0x20 || card->model == 0xc400 ||
-	  (card->model == 0x21 && card->chiprev < 6))
-	        emu10k1_writefn0(card, HCFG, HCFG_AUDIOENABLE  | HCFG_LOCKTANKCACHE_MASK | HCFG_AUTOMUTE);
-	else
-		emu10k1_writefn0(card, HCFG, HCFG_AUDIOENABLE  | HCFG_LOCKTANKCACHE_MASK | HCFG_AUTOMUTE | HCFG_JOYENABLE);
-
+	if (card->is_audigy) {
+		if (card->chiprev == 4)
+			emu10k1_writefn0(card, HCFG, HCFG_AUDIOENABLE  | HCFG_AC3ENABLE_CDSPDIF | HCFG_AC3ENABLE_GPSPDIF | HCFG_AUTOMUTE | HCFG_JOYENABLE);
+		else
+			emu10k1_writefn0(card, HCFG, HCFG_AUDIOENABLE  | HCFG_AUTOMUTE | HCFG_JOYENABLE);
+	} else {
+		if (card->model == 0x20 || card->model == 0xc400 ||
+		 (card->model == 0x21 && card->chiprev < 6))
+	        	emu10k1_writefn0(card, HCFG, HCFG_AUDIOENABLE  | HCFG_LOCKTANKCACHE_MASK | HCFG_AUTOMUTE);
+		else
+			emu10k1_writefn0(card, HCFG, HCFG_AUDIOENABLE  | HCFG_LOCKTANKCACHE_MASK | HCFG_AUTOMUTE | HCFG_JOYENABLE);
+	}
 	/* Enable Vol_Ctrl irqs */
 	emu10k1_irq_enable(card, INTE_VOLINCRENABLE | INTE_VOLDECRENABLE | INTE_MUTEENABLE | INTE_FXDSPENABLE);
 
+	if (card->is_audigy && (card->chiprev == 4)) {
+		/* Unmute Analog now.  Set GPO6 to 1 for Apollo.
+		 * This has to be done after init ALice3 I2SOut beyond 48KHz.
+		 * So, sequence is important. */
+		u32 tmp = emu10k1_readfn0(card, A_IOCFG);
+		tmp |= 0x0040;
+		emu10k1_writefn0(card, A_IOCFG, tmp);
+	}
+	
 	/* FIXME: TOSLink detection */
 	card->has_toslink = 0;
 
@@ -1012,6 +1247,8 @@ static void emu10k1_cleanup(struct emu10k1_card *card)
 			    SOLEH, 0,
 			    TAGLIST_END);
 
+	if (card->is_audigy)
+		sblive_writeptr(card, 0, A_DBG,  A_DBG_SINGLE_STEP);
 
 	pci_free_consistent(card->pci_dev, card->virtualpagetable.size, card->virtualpagetable.addr, card->virtualpagetable.dma_handle);
 	pci_free_consistent(card->pci_dev, card->silentpage.size, card->silentpage.addr, card->silentpage.dma_handle);
@@ -1074,6 +1311,9 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 		card_names[pci_id->driver_data], card->chiprev, card->model, card->iobase,
 		card->iobase + card->length - 1, card->irq);
 
+	if (pci_id->device == PCI_DEVICE_ID_CREATIVE_AUDIGY)
+		card->is_audigy = 1;
+
 	pci_read_config_dword(pci_dev, PCI_SUBSYSTEM_VENDOR_ID, &subsysvid);
 	card->is_aps = (subsysvid == EMU_APS_SUBID);
 
@@ -1083,13 +1323,13 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 	init_waitqueue_head(&card->open_wait);
 
 	ret = emu10k1_audio_init(card);
-	if(ret < 0) {
+	if (ret < 0) {
                 printk(KERN_ERR "emu10k1: cannot initialize audio devices\n");
                 goto err_audio;
         }
 
 	ret = emu10k1_mixer_init(card);
-	if(ret < 0) {
+	if (ret < 0) {
 		printk(KERN_ERR "emu10k1: cannot initialize AC97 codec\n");
                 goto err_mixer;
 	}
@@ -1109,10 +1349,28 @@ static int __devinit emu10k1_probe(struct pci_dev *pci_dev, const struct pci_dev
 	if (card->is_aps)
 		emu10k1_ecard_init(card);
 
+	ret = emu10k1_register_devices(card);
+	if (ret < 0)
+		goto err_register;
+
+	/* proc entries must be created after registering devices, as
+	 * emu10k1_info_proc prints card->audio_dev &co. */
+	ret = emu10k1_proc_init(card);
+	if (ret < 0) {
+		printk(KERN_ERR "emu10k1: cannot initialize proc directory\n");
+                goto err_proc;
+	}
+	
 	list_add(&card->list, &emu10k1_devs);
 
 	return 0;
 
+err_proc:
+	emu10k1_unregister_devices(card);
+
+err_register:
+	emu10k1_cleanup(card);
+	
 err_emu10k1_init:
 	emu10k1_midi_cleanup(card);
 
@@ -1141,9 +1399,11 @@ static void __devexit emu10k1_remove(struct pci_dev *pci_dev)
 
 	list_del(&card->list);
 
+	emu10k1_unregister_devices(card);
 	emu10k1_cleanup(card);
 	emu10k1_midi_cleanup(card);
 	emu10k1_mixer_cleanup(card);
+	emu10k1_proc_cleanup(card);
 	emu10k1_audio_cleanup(card);	
 	free_irq(card->irq, card);
 	release_region(card->iobase, card->length);

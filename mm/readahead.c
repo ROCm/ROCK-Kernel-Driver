@@ -94,9 +94,14 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 {
 	unsigned page_idx;
 	struct pagevec lru_pvec;
+	int ret = 0;
 
-	if (mapping->a_ops->readpages)
-		return mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
+	current->flags |= PF_READAHEAD;
+
+	if (mapping->a_ops->readpages) {
+		ret = mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
+		goto out;
+	}
 
 	pagevec_init(&lru_pvec, 0);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
@@ -112,7 +117,9 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 		}
 	}
 	pagevec_lru_add(&lru_pvec);
-	return 0;
+out:
+	current->flags &= ~PF_READAHEAD;
+	return ret;
 }
 
 /*

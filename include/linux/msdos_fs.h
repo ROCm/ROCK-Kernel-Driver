@@ -44,7 +44,7 @@ struct statfs;
 #define CASE_LOWER_EXT  16	/* extension is lower case */
 
 #define DELETED_FLAG 0xe5 /* marks file as deleted when in name[0] */
-#define IS_FREE(n) (!*(n) || *(const unsigned char *) (n) == DELETED_FLAG)
+#define IS_FREE(n) (!*(n) || *(n) == DELETED_FLAG)
 
 #define MSDOS_VALID_MODE (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO)
 	/* valid file mode bits */
@@ -113,11 +113,11 @@ struct statfs;
 #define CT_LE_L(v) cpu_to_le32(v)
 
 struct fat_boot_sector {
-	__s8	ignored[3];	/* Boot strap short or near jump */
-	__s8	system_id[8];	/* Name - can be used to special case
+	__u8	ignored[3];	/* Boot strap short or near jump */
+	__u8	system_id[8];	/* Name - can be used to special case
 				   partition manager volumes */
 	__u8	sector_size[2];	/* bytes per logical sector */
-	__u8	cluster_size;	/* sectors/cluster */
+	__u8	sec_per_clus;	/* sectors/cluster */
 	__u16	reserved;	/* reserved sectors */
 	__u8	fats;		/* number of FATs */
 	__u8	dir_entries[2];	/* root directory entries */
@@ -149,7 +149,7 @@ struct fat_boot_fsinfo {
 };
 
 struct msdos_dir_entry {
-	__s8	name[8],ext[3];	/* name and extension */
+	__u8	name[8],ext[3];	/* name and extension */
 	__u8	attr;		/* attribute bits */
 	__u8    lcase;		/* Case for base and extension */
 	__u8	ctime_ms;	/* Creation time, milliseconds */
@@ -237,12 +237,15 @@ extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
 			     int *d_clu);
 extern void fat_cache_add(struct inode *inode, int f_clu, int d_clu);
 extern void fat_cache_inval_inode(struct inode *inode);
+extern int fat_get_cluster(struct inode *inode, int cluster,
+			   int *fclus, int *dclus);
 extern int fat_free(struct inode *inode, int skip);
 
 /* fat/dir.c */
 extern struct file_operations fat_dir_operations;
-extern int fat_search_long(struct inode *inode, const char *name, int name_len,
-			   int anycase, loff_t *spos, loff_t *lpos);
+extern int fat_search_long(struct inode *inode, const unsigned char *name,
+			   int name_len, int anycase,
+			   loff_t *spos, loff_t *lpos);
 extern int fat_readdir(struct file *filp, void *dirent, filldir_t filldir);
 extern int fat_dir_ioctl(struct inode * inode, struct file * filp,
 			 unsigned int cmd, unsigned long arg);
@@ -302,7 +305,7 @@ static __inline__ int fat_get_entry(struct inode *dir, loff_t *pos,
 	return fat__get_entry(dir, pos, bh, de, i_pos);
 }
 extern int fat_subdirs(struct inode *dir);
-extern int fat_scan(struct inode *dir, const char *name,
+extern int fat_scan(struct inode *dir, const unsigned char *name,
 		    struct buffer_head **res_bh,
 		    struct msdos_dir_entry **res_de, loff_t *i_pos);
 

@@ -11,6 +11,7 @@
  *
  * Contributors:
  * Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 0.86
+ * Daniele Bellucci         <bellucda@tiscali.it>   - 0.87
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -42,9 +43,12 @@
  *		- printk cleanups
  * Version 0.86 (00/08/15):
  * 		- resource release on failure at COMX_init
+ *
+ * Version 0.87 (03/07/09)
+ *              - audit copy_from_user in comxhw_write_proc
  */
 
-#define VERSION "0.86"
+#define VERSION "0.87"
 
 #include <linux/module.h>
 #include <linux/version.h>
@@ -1084,7 +1088,8 @@ static int comxhw_write_proc(struct file *file, const char *buffer,
 		if (hw->firmware->data) {
 			kfree(hw->firmware->data);
 		}
-		copy_from_user(tmp + file->f_pos, buffer, count);
+		if (copy_from_user(tmp + file->f_pos, buffer, count))
+			return -EFAULT;
 		hw->firmware->len = entry->size = file->f_pos + count;
 		hw->firmware->data = tmp;
 		file->f_pos += count;

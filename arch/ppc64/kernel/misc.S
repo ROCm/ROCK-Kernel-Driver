@@ -838,6 +838,20 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
+	.llong .sys_ni_syscall		/* 240 */
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall		/* 245 */
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
+	.llong .sys32_tgkill		/* 250 */
+	.llong .sys32_utimes
+	.llong .sys_statfs64
+	.llong .sys_fstatfs64
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1081,3 +1095,17 @@ _GLOBAL(sys_call_table)
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
+	.llong .sys_timer_create	/* 240 */
+	.llong .sys_timer_settime
+	.llong .sys_timer_gettime
+	.llong .sys_timer_getoverrun
+	.llong .sys_timer_delete
+	.llong .sys_clock_settime	/* 245 */
+	.llong .sys_clock_gettime
+	.llong .sys_clock_getres
+	.llong .sys_clock_nanosleep
+	.llong .sys_ni_syscall
+	.llong .sys_tgkill		/* 250 */
+	.llong .sys_utimes
+	.llong .sys_statfs64
+	.llong .sys_fstatfs64

@@ -41,6 +41,7 @@
 #include <asm/isa.h>
 #include <asm/starfire.h>
 #include <asm/smp.h>
+#include <asm/sections.h>
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -449,7 +450,6 @@ void sparc64_do_profile(struct pt_regs *regs)
 		return;
 
 	{
-		extern int _stext;
 		extern int rwlock_impl_begin, rwlock_impl_end;
 		extern int atomic_impl_begin, atomic_impl_end;
 		extern int __memcpy_begin, __memcpy_end;
@@ -468,7 +468,7 @@ void sparc64_do_profile(struct pt_regs *regs)
 		     pc < (unsigned long) &__bitops_end))
 			pc = o7;
 
-		pc -= (unsigned long) &_stext;
+		pc -= (unsigned long) _stext;
 		pc >>= prof_shift;
 
 		if(pc >= prof_len)
@@ -792,6 +792,7 @@ void __init clock_probe(void)
 		    strcmp(model, "mk48t08") &&
 		    strcmp(model, "mk48t59") &&
 		    strcmp(model, "m5819") &&
+		    strcmp(model, "m5819p") &&
 		    strcmp(model, "ds1287")) {
 			if (cbus != NULL) {
 				prom_printf("clock_probe: Central bus lacks timer chip.\n");
@@ -850,7 +851,8 @@ void __init clock_probe(void)
 			}
 
 			if (!strcmp(model, "ds1287") ||
-			    !strcmp(model, "m5819")) {
+			    !strcmp(model, "m5819") ||
+			    !strcmp(model, "m5819p")) {
 				ds1287_regs = edev->resource[0].start;
 			} else {
 				mstk48t59_regs = edev->resource[0].start;
@@ -870,7 +872,8 @@ try_isa_clock:
 				prom_halt();
 			}
 			if (!strcmp(model, "ds1287") ||
-			    !strcmp(model, "m5819")) {
+			    !strcmp(model, "m5819") ||
+			    !strcmp(model, "m5819p")) {
 				ds1287_regs = isadev->resource.start;
 			} else {
 				mstk48t59_regs = isadev->resource.start;

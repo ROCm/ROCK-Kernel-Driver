@@ -2496,7 +2496,7 @@ static void net2280_remove (struct pci_dev *pdev)
 	device_remove_file (&pdev->dev, &dev_attr_registers);
 	pci_set_drvdata (pdev, 0);
 
-	INFO (dev, "unbind from pci %s\n", pdev->slot_name);
+	INFO (dev, "unbind from pci %s\n", pci_name(pdev));
 
 	kfree (dev);
 	the_controller = 0;
@@ -2518,7 +2518,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	 * usb_gadget_driver_{register,unregister}() must change.
 	 */
 	if (the_controller) {
-		WARN (the_controller, "ignoring %s\n", pdev->slot_name);
+		WARN (the_controller, "ignoring %s\n", pci_name(pdev));
 		return -EBUSY;
 	}
 
@@ -2534,7 +2534,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->pdev = pdev;
 	dev->gadget.ops = &net2280_ops;
 
-	strcpy (dev->gadget.dev.bus_id, pdev->slot_name);
+	strcpy (dev->gadget.dev.bus_id, pci_name(pdev));
 	strcpy (dev->gadget.dev.name, pdev->dev.name);
 	dev->gadget.dev.parent = &pdev->dev;
 	dev->gadget.dev.dma_mask = pdev->dev.dma_mask;

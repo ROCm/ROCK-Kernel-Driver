@@ -39,6 +39,7 @@
 #include "iSeries_setup.h"
 #include <asm/naca.h>
 #include <asm/paca.h>
+#include <asm/sections.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvCallHpt.h>
 #include <asm/iSeries/HvLpConfig.h>
@@ -90,9 +91,6 @@ extern unsigned long embedded_sysmap_end;
 
 extern unsigned long iSeries_recal_tb;
 extern unsigned long iSeries_recal_titan;
-
-extern char _stext;
-extern char _etext;
 
 static int mf_initialized = 0;
 
@@ -387,7 +385,7 @@ iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5,
                         if (p > cmd_line && p[-1] != ' ')
                                 continue;
                         dprof_shift = simple_strtoul(q, &q, 0);
-			dprof_len = (unsigned long)&_etext - (unsigned long)&_stext;
+			dprof_len = (unsigned long)_etext - (unsigned long)_stext;
 			dprof_len >>= dprof_shift;
 			size = ((dprof_len * sizeof(unsigned int)) + (PAGE_SIZE-1)) & PAGE_MASK;
 			dprof_buffer = (unsigned int *)((klimit + (PAGE_SIZE-1)) & PAGE_MASK);
@@ -868,7 +866,7 @@ static void iSeries_setup_dprofile(void)
 			paca[i].prof_shift = dprof_shift;
 			paca[i].prof_len = dprof_len-1;
 			paca[i].prof_buffer = dprof_buffer;
-			paca[i].prof_stext = (unsigned *)&_stext;
+			paca[i].prof_stext = (unsigned *)_stext;
 			mb();
 			paca[i].prof_enabled = 1;
 		}

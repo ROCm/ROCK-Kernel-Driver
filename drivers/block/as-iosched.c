@@ -833,10 +833,11 @@ static void as_update_iohist(struct as_io_context *aic, struct request *rq)
 							+ 2*1024*64);
 
 		aic->seek_samples += 256;
-		aic->seek_total += 256*seek_dist;
+		aic->seek_total += (u64)256*seek_dist;
 		if (aic->seek_samples) {
-			aic->seek_mean = aic->seek_total + 128;
-			sector_div(aic->seek_mean, aic->seek_samples);
+			u64 total = aic->seek_total + (aic->seek_samples>>1);
+			do_div(total, aic->seek_samples);
+			aic->seek_mean = (sector_t)total;
 		}
 		aic->seek_samples = (aic->seek_samples>>1)
 					+ (aic->seek_samples>>2);
@@ -1303,6 +1304,15 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 	list_add_tail(&arq->fifo, &ad->fifo_list[data_dir]);
 	arq->state = AS_RQ_QUEUED;
 	as_update_arq(ad, arq); /* keep state machine up to date */
+}
+
+/*
+ * FIXME: HACK for AS requeue problems
+ */
+static void as_requeue_request(request_queue_t *q, struct request *rq)
+{
+	elv_completed_request(q, rq);
+	__elv_add_request(q, rq, 0, 0);
 }
 
 static void
@@ -1820,6 +1830,7 @@ elevator_t iosched_as = {
 	.elevator_next_req_fn =		as_next_request,
 	.elevator_add_req_fn =		as_insert_request,
 	.elevator_remove_req_fn =	as_remove_request,
+	.elevator_requeue_req_fn = 	as_requeue_request,
 	.elevator_queue_empty_fn =	as_queue_empty,
 	.elevator_completed_req_fn =	as_completed_request,
 	.elevator_former_req_fn =	as_former_request,
@@ -1831,6 +1842,7 @@ elevator_t iosched_as = {
 	.elevator_exit_fn =		as_exit,
 
 	.elevator_ktype =		&as_ktype,
+	.elevator_name =		"anticipatory scheduling",
 };
 
 EXPORT_SYMBOL(iosched_as);

@@ -133,7 +133,6 @@ char *bootdevice;
 struct device_node *allnodes;
 
 extern char *klimit;
-extern char _stext;
 
 static void __init
 prom_exit(void)
@@ -601,7 +600,7 @@ prom_hold_cpus(unsigned long mem)
 	/* copy the holding pattern code to someplace safe (0) */
 	/* the holding pattern is now within the first 0x100
 	   bytes of the kernel image -- paulus */
-	memcpy((void *)0, &_stext, 0x100);
+	memcpy((void *)0, _stext, 0x100);
 	flush_icache_range(0, 0x100);
 
 	/* look for cpus */
@@ -631,7 +630,7 @@ prom_hold_cpus(unsigned long mem)
 		prom_print(path);
 		*(ulong *)(0x4) = 0;
 		call_prom("start-cpu", 3, 0, node,
-			  (char *)__secondary_hold - &_stext, cpu);
+			  (char *)__secondary_hold - _stext, cpu);
 		prom_print("...");
 		for ( i = 0 ; (i < 10000) && (*(ulong *)(0x4) == 0); i++ )
 			;

@@ -297,9 +297,13 @@ cumanascsi1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	printk("\n");
 
 	ret = scsi_add_host(host, &ec->dev);
-	if (ret == 0)
-		goto out;
+	if (ret)
+		goto out_free_irq;
 
+	scsi_scan_host(host);
+	goto out;
+
+ out_free_irq:
 	free_irq(host->irq, host);
  out_release:
 	release_region(host->io_port, host->n_io_port);

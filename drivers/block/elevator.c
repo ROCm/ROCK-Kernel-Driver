@@ -213,6 +213,18 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 		e->elevator_merge_req_fn(q, rq, next);
 }
 
+void elv_requeue_request(request_queue_t *q, struct request *rq)
+{
+	/*
+	 * if iosched has an explicit requeue hook, then use that. otherwise
+	 * just put the request at the front of the queue
+	 */
+	if (q->elevator.elevator_requeue_req_fn)
+		q->elevator.elevator_requeue_req_fn(q, rq);
+	else
+		__elv_add_request(q, rq, 0, 0);
+}
+
 void __elv_add_request(request_queue_t *q, struct request *rq, int at_end,
 		       int plug)
 {
@@ -408,6 +420,7 @@ elevator_t elevator_noop = {
 	.elevator_merge_req_fn		= elevator_noop_merge_requests,
 	.elevator_next_req_fn		= elevator_noop_next_request,
 	.elevator_add_req_fn		= elevator_noop_add_request,
+	.elevator_name			= "noop",
 };
 
 module_init(elevator_global_init);
@@ -416,6 +429,7 @@ EXPORT_SYMBOL(elevator_noop);
 
 EXPORT_SYMBOL(elv_add_request);
 EXPORT_SYMBOL(__elv_add_request);
+EXPORT_SYMBOL(elv_requeue_request);
 EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);
 EXPORT_SYMBOL(elv_queue_empty);

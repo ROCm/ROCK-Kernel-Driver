@@ -43,7 +43,7 @@
 
 // #define DEBUG
 
-#define DRIVER_VERSION "0.4.13"
+#define DRIVER_VERSION "0.4.14"
 #define DRIVER_DESC "USB Scanner Driver"
 
 #include <linux/usb.h>
@@ -103,6 +103,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Avision */
 	{ USB_DEVICE(0x0638, 0x0268) }, /* iVina 1200U */
 	{ USB_DEVICE(0x0638, 0x0a10) },	/* iVina FB1600 (=Umax Astra 4500) */
+	{ USB_DEVICE(0x0638, 0x0a20) }, /* iVina FB1800 (=Umax Astra 4700) */
 	/* Benq: see Acer */
 	/* Brother */
 	{ USB_DEVICE(0x04f9, 0x010f) },	/* MFC 5100C */
@@ -115,10 +116,12 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04a9, 0x2206) }, /* CanoScan N650U/N656U */
 	{ USB_DEVICE(0x04a9, 0x2207) }, /* CanoScan N1220U */
 	{ USB_DEVICE(0x04a9, 0x2208) }, /* CanoScan D660U */ 
+	{ USB_DEVICE(0x04a9, 0x220a) },	/* CanoScan D2400UF */
 	{ USB_DEVICE(0x04a9, 0x220b) }, /* CanoScan D646U */
 	{ USB_DEVICE(0x04a9, 0x220c) },	/* CanoScan D1250U2 */
 	{ USB_DEVICE(0x04a9, 0x220d) }, /* CanoScan N670U/N676U/LIDE 20 */
 	{ USB_DEVICE(0x04a9, 0x220e) }, /* CanoScan N1240U/LIDE 30 */
+	{ USB_DEVICE(0x04a9, 0x220f) },	/* CanoScan 8000F */
 	{ USB_DEVICE(0x04a9, 0x2213) },	/* LIDE 50 */
 	{ USB_DEVICE(0x04a9, 0x3042) }, /* FS4000US */
 	/* Colorado -- See Primax/Colorado below */
@@ -158,6 +161,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x03f0, 0x0901) }, /* ScanJet 2300C */
 	{ USB_DEVICE(0x03F0, 0x1005) },	/* ScanJet 5400C */
 	{ USB_DEVICE(0x03F0, 0x1105) },	/* ScanJet 5470C */
+	{ USB_DEVICE(0x03f0, 0x1205) }, /* ScanJet 5550C */
 	{ USB_DEVICE(0x03f0, 0x1305) },	/* Scanjet 4570c */
 	{ USB_DEVICE(0x03f0, 0x1411) }, /* PSC 750 */
 	{ USB_DEVICE(0x03f0, 0x2005) },	/* ScanJet 3570c */
@@ -173,6 +177,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Memorex */
 	{ USB_DEVICE(0x0461, 0x0346) }, /* 6136u - repackaged Primax ? */
 	/* Microtek */
+	{ USB_DEVICE(0x05da, 0x20c9) }, /* ScanMaker 6700 */
 	{ USB_DEVICE(0x05da, 0x30ce) },	/* ScanMaker 3800 */
 	{ USB_DEVICE(0x05da, 0x30cf) },	/* ScanMaker 4800 */
 	{ USB_DEVICE(0x04a7, 0x0224) },	/* Scanport 3000 (actually Visioneer?)*/
@@ -250,6 +255,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x06dc, 0x0014) }, /* Winscan Pro 2448U */
 	/* Relisis */
 	// { USB_DEVICE(0x0475, 0x0103) },	/* Episode - undetected endpoint */
+	{ USB_DEVICE(0x0475, 0x0210) }, /* Scorpio Ultra 3 */
 	/* Seiko/Epson Corp. */
 	{ USB_DEVICE(0x04b8, 0x0101) },	/* Perfection 636U and 636Photo */
 	{ USB_DEVICE(0x04b8, 0x0102) }, /* GT-2200 */

@@ -110,23 +110,38 @@ static int br_dev_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 	return -1;
 }
 
+/* convert later to direct kfree */
+static void br_dev_free(struct net_device *dev)
+{
+	struct net_bridge *br = dev->priv;
+
+	WARN_ON(!list_empty(&br->port_list));
+	WARN_ON(!list_empty(&br->age_list));
+
+	BUG_ON(timer_pending(&br->hello_timer));
+	BUG_ON(timer_pending(&br->tcn_timer));
+	BUG_ON(timer_pending(&br->topology_change_timer));
+	BUG_ON(timer_pending(&br->gc_timer));
+
+	kfree(dev);
+}
 
 void br_dev_setup(struct net_device *dev)
 {
 	memset(dev->dev_addr, 0, ETH_ALEN);
+
+	ether_setup(dev);
 
 	dev->do_ioctl = br_dev_do_ioctl;
 	dev->get_stats = br_dev_get_stats;
 	dev->hard_start_xmit = br_dev_xmit;
 	dev->open = br_dev_open;
 	dev->set_multicast_list = br_dev_set_multicast_list;
-	dev->destructor = (void (*)(struct net_device *))kfree;
+	dev->destructor = br_dev_free;
 	SET_MODULE_OWNER(dev);
 	dev->stop = br_dev_stop;
 	dev->accept_fastpath = br_dev_accept_fastpath;
 	dev->tx_queue_len = 0;
 	dev->set_mac_address = NULL;
 	dev->priv_flags = IFF_EBRIDGE;
-
-	ether_setup(dev);
 }

@@ -1123,8 +1123,9 @@ static int kaweth_probe(
 	if (dma_supported (&intf->dev, 0xffffffffffffffffULL))
 		kaweth->net->features |= NETIF_F_HIGHDMA;
 
+	SET_NETDEV_DEV(netdev, &intf->dev);
 	if (register_netdev(netdev) != 0) {
-		kaweth_err("Error calling init_etherdev.");
+		kaweth_err("Error registering netdev.");
 		goto err_intfdata;
 	}
 

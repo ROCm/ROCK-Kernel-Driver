@@ -190,7 +190,9 @@ struct sadb_x_ipsecrequest {
 	uint16_t	sadb_x_ipsecrequest_proto;
 	uint8_t		sadb_x_ipsecrequest_mode;
 	uint8_t		sadb_x_ipsecrequest_level;
-	uint16_t	sadb_x_ipsecrequest_reqid;
+	uint16_t	sadb_x_ipsecrequest_reserved1;
+	uint32_t	sadb_x_ipsecrequest_reqid;
+	uint32_t	sadb_x_ipsecrequest_reserved2;
 } __attribute__((packed));
 /* sizeof(struct sadb_x_ipsecrequest) == 16 */
 

@@ -14,17 +14,12 @@ struct namespace {
 
 extern void umount_tree(struct vfsmount *);
 extern int copy_namespace(int, struct task_struct *);
+void __put_namespace(struct namespace *namespace);
 
 static inline void put_namespace(struct namespace *namespace)
 {
-	if (atomic_dec_and_test(&namespace->count)) {
-		down_write(&namespace->sem);
-		spin_lock(&vfsmount_lock);
-		umount_tree(namespace->root);
-		spin_unlock(&vfsmount_lock);
-		up_write(&namespace->sem);
-		kfree(namespace);
-	}
+	if (atomic_dec_and_test(&namespace->count))
+		__put_namespace(namespace);
 }
 
 static inline void exit_namespace(struct task_struct *p)

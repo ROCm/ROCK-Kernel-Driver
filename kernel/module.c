@@ -98,6 +98,17 @@ int init_module(void)
 }
 EXPORT_SYMBOL(init_module);
 
+/* A thread that wants to hold a reference to a module only while it
+ * is running can call ths to safely exit.
+ * nfsd and lockd use this.
+ */
+void __module_put_and_exit(struct module *mod, long code)
+{
+	module_put(mod);
+	do_exit(code);
+}
+EXPORT_SYMBOL(__module_put_and_exit);
+	
 /* Find a module section: 0 means not found. */
 static unsigned int find_sec(Elf_Ehdr *hdr,
 			     Elf_Shdr *sechdrs,
@@ -374,9 +385,9 @@ static void module_unload_init(struct module *mod)
 
 	INIT_LIST_HEAD(&mod->modules_which_use_me);
 	for (i = 0; i < NR_CPUS; i++)
-		atomic_set(&mod->ref[i].count, 0);
+		local_set(&mod->ref[i].count, 0);
 	/* Hold reference count during initialization. */
-	atomic_set(&mod->ref[smp_processor_id()].count, 1);
+	local_set(&mod->ref[smp_processor_id()].count, 1);
 	/* Backwards compatibility macros put refcount during init. */
 	mod->waiter = current;
 }
@@ -599,7 +610,7 @@ unsigned int module_refcount(struct module *mod)
 	unsigned int i, total = 0;
 
 	for (i = 0; i < NR_CPUS; i++)
-		total += atomic_read(&mod->ref[i].count);
+		total += local_read(&mod->ref[i].count);
 	return total;
 }
 EXPORT_SYMBOL(module_refcount);
@@ -610,7 +621,10 @@ static void free_module(struct module *mod);
 #ifdef CONFIG_MODULE_FORCE_UNLOAD
 static inline int try_force(unsigned int flags)
 {
-	return (flags & O_TRUNC);
+	int ret = (flags & O_TRUNC);
+	if (ret)
+		tainted |= TAINT_FORCED_MODULE;
+	return ret;
 }
 #else
 static inline int try_force(unsigned int flags)

@@ -645,10 +645,17 @@ spitfire_vpte_base:
 	 nop
 
 not_starfire:
+	BRANCH_IF_JALAPENO(g1,g5,is_jalapeno)
 	BRANCH_IF_ANY_CHEETAH(g1,g5,is_cheetah)
 
 	ba,pt	%xcc, not_cheetah
 	 nop
+
+is_jalapeno:
+	ldxa		[%g0] ASI_JBUS_CONFIG, %g1
+	srlx		%g1, 17, %g1
+	ba,pt		%xcc, set_worklist
+	 and		%g1, 0x1f, %g1		! 5bit JBUS ID
 
 is_cheetah:
 	ldxa		[%g0] ASI_SAFARI_CONFIG, %g1

@@ -830,6 +830,7 @@ static int rtl8150_probe(struct usb_interface *intf,
 	
 	usb_set_intfdata(intf, dev);
 
+	SET_NETDEV_DEV(netdev, &intf->dev);
 	if (register_netdev(netdev) != 0) {
 		err("couldn't register the device");
 		goto out2;

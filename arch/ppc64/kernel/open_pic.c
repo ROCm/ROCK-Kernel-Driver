@@ -158,7 +158,6 @@ void __init openpic_init_IRQ(void)
         openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
         for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
                 irq_desc[i].handler = &i8259_pic;
-        i8259_init();
 }
 
 static inline u_int openpic_read(volatile u_int *addr)
@@ -384,17 +383,29 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 	ppc64_boot_msg(0x24, "OpenPic Spurious");
 	openpic_set_spurious(openpic_vec_spurious);
 
-	/* Initialize the cascade */
-	if (offset) {
-		if (request_irq(offset, no_action, SA_INTERRUPT,
-				"82c59 cascade", NULL))
-			printk(KERN_ERR "Unable to get OpenPIC IRQ 0 for cascade\n");
-	}
 	openpic_set_priority(0);
 	openpic_disable_8259_pass_through();
 
 	ppc64_boot_msg(0x25, "OpenPic Done");
 }
+
+/* 
+ * We cant do this in init_IRQ because we need the memory subsystem up for
+ * request_irq()
+ */
+static int __init openpic_setup_i8259(void)
+{
+	if (naca->interrupt_controller == IC_OPEN_PIC) {
+		/* Initialize the cascade */
+		if (request_irq(NUM_8259_INTERRUPTS, no_action, SA_INTERRUPT,
+				"82c59 cascade", NULL))
+			printk(KERN_ERR "Unable to get OpenPIC IRQ 0 for cascade\n");
+		i8259_init();
+	}
+
+	return 0;
+}
+arch_initcall(openpic_setup_i8259);
 
 void openpic_setup_ISU(int isu_num, unsigned long addr)
 {

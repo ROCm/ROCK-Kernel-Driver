@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION = -test1
+EXTRAVERSION = -test2
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -781,7 +781,8 @@ rpm:	clean spec
 	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
 	rm $(KERNELPATH) ; \
 	cd $(TOPDIR) ; \
-	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .version ; \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .tmp_version ; \
+	mv -f .tmp_version .version; \
 	$(RPM) -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 

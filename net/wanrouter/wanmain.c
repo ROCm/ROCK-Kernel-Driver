@@ -305,7 +305,6 @@ int register_wan_device(struct wan_device *wandev)
 	wandev->dev  = NULL;
 	wandev->next = wanrouter_router_devlist;
 	wanrouter_router_devlist = wandev;
-        MOD_INC_USE_COUNT;	/* prevent module from unloading */
 	return 0;
 }
 
@@ -350,7 +349,6 @@ int unregister_wan_device(char *name)
 		wanrouter_router_devlist = wandev->next;
 
 	wanrouter_proc_delete(wandev);
-        MOD_DEC_USE_COUNT;
 	return 0;
 }
 

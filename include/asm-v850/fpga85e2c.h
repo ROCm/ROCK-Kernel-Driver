@@ -2,8 +2,8 @@
  * include/asm-v850/fpga85e2c.h -- Machine-dependent defs for
  *	FPGA implementation of V850E2/NA85E2C
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -15,11 +15,10 @@
 #ifndef __V850_FPGA85E2C_H__
 #define __V850_FPGA85E2C_H__
 
-
+#include <asm/v850e2.h>
 #include <asm/clinkage.h>
 
 
-#define CPU_ARCH 	"v850e2"
 #define CPU_MODEL	"v850e2/fpga85e2c"
 #define CPU_MODEL_LONG	"NEC V850E2/NA85E2C"
 #define PLATFORM	"fpga85e2c"
@@ -42,27 +41,6 @@
 #define CSDEV_ADDR(n)		(0xFFE80110 + 2*(n))
 #define CSDEV(n)		(*(volatile unsigned char *)CSDEV_ADDR (n))
 
-/* The BSC register controls bus-sizing.  Each memory area CSn uses a pair
-   of bits N*2 and N*2+1, where 00 means an 8-bit bus size, 01 16-bit, and
-   10 32-bit.  */
-#define BSC_ADDR		0xFFFFF066
-#define BSC			(*(volatile unsigned short *)BSC_ADDR)
-
-#define DWC_ADDR(n)		(0xFFFFF484 + 2*(n))
-#define DWC(n)			(*(volatile unsigned short *)DWC_ADDR (n))
-
-#define ASC_ADDR		0xFFFFF48A
-#define ASC			(*(volatile unsigned short *)ASC_ADDR)
-
-#define BTSC_ADDR		0xFFFFF070
-#define BTSC			(*(volatile unsigned short *)BTSC_ADDR)
-
-#define BHC_ADDR		0xFFFFF06A
-#define BHC			(*(volatile unsigned short *)BHC_ADDR)
-
-
-/* NB85E-style interrupt system.  */
-#include <asm/nb85e_intc.h>
 
 /* Timer interrupts 0-3, interrupt at intervals from CLK/4096 to CLK/16384.  */
 #define IRQ_RPU(n)		(60 + (n))

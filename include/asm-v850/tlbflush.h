@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/tlbflush.h
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,7 +14,6 @@
 #ifndef __V850_TLBFLUSH_H__
 #define __V850_TLBFLUSH_H__
 
-#include <asm/setup.h>
 #include <asm/machdep.h>
 
 

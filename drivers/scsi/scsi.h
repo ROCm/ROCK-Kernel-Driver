@@ -174,11 +174,6 @@ extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
 #define SCSI_MLQUEUE_EH_RETRY    0x1057
 
-extern int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
-					    struct device_attribute *attr);
-extern int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_attrs,
-					     struct class_device_attribute *attr);
-
 /*
  * Legacy dma direction interfaces.
  *

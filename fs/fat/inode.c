@@ -159,7 +159,9 @@ void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	fat_clusters_flush(sb);
+	if (!(sb->s_flags & MS_RDONLY))
+		fat_clusters_flush(sb);
+
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
 		sbi->nls_disk = NULL;
@@ -463,32 +465,17 @@ out:
 
 static int fat_calc_dir_size(struct inode *inode)
 {
-	struct super_block *sb = inode->i_sb;
-	int nr;
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	int ret, fclus, dclus;
 
 	inode->i_size = 0;
 	if (MSDOS_I(inode)->i_start == 0)
 		return 0;
 
-	nr = MSDOS_I(inode)->i_start;
-	do {
-		inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
-		nr = fat_access(sb, nr, -1);
-		if (nr < 0)
-			return nr;
-		else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "Directory %lu: invalid cluster chain",
-				     inode->i_ino);
-			return -EIO;
-		}
-		if (inode->i_size > FAT_MAX_DIR_SIZE) {
-			fat_fs_panic(sb, "Directory %lu: "
-				     "exceeded the maximum size of directory",
-				     inode->i_ino);
-			inode->i_size = FAT_MAX_DIR_SIZE;
-			break;
-		}
-	} while (nr != FAT_ENT_EOF);
+	ret = fat_get_cluster(inode, FAT_ENT_EOF, &fclus, &dclus);
+	if (ret < 0)
+		return ret;
+	inode->i_size = (fclus + 1) << sbi->cluster_bits;
 
 	return 0;
 }
@@ -499,6 +486,7 @@ static int fat_read_root(struct inode *inode)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int error;
 
+	MSDOS_I(inode)->file_cluster = MSDOS_I(inode)->disk_cluster = 0;
 	MSDOS_I(inode)->i_pos = 0;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
@@ -516,9 +504,9 @@ static int fat_read_root(struct inode *inode)
 		MSDOS_I(inode)->i_start = 0;
 		inode->i_size = sbi->dir_entries * sizeof(struct msdos_dir_entry);
 	}
-	inode->i_blksize = 1 << sbi->cluster_bits;
-	inode->i_blocks = ((inode->i_size + inode->i_blksize - 1)
-			   & ~((loff_t)inode->i_blksize - 1)) >> 9;
+	inode->i_blksize = sbi->cluster_size;
+	inode->i_blocks = ((inode->i_size + (sbi->cluster_size - 1))
+			   & ~((loff_t)sbi->cluster_size - 1)) >> 9;
 	MSDOS_I(inode)->i_logstart = 0;
 	MSDOS_I(inode)->mmu_private = inode->i_size;
 
@@ -746,7 +734,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct msdos_sb_info *sbi;
 	int logical_sector_size, fat_clusters, debug, cp, first;
 	unsigned int total_sectors, rootdir_sectors;
-	unsigned char media;
+	unsigned int media;
 	long error;
 	char buf[50];
 
@@ -822,12 +810,12 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	sbi->cluster_size = b->cluster_size;
-	if (!sbi->cluster_size
-	    || (sbi->cluster_size & (sbi->cluster_size - 1))) {
+	sbi->sec_per_clus = b->sec_per_clus;
+	if (!sbi->sec_per_clus
+	    || (sbi->sec_per_clus & (sbi->sec_per_clus - 1))) {
 		if (!silent)
-			printk(KERN_ERR "FAT: bogus cluster size %d\n",
-			       sbi->cluster_size);
+			printk(KERN_ERR "FAT: bogus sectors per cluster %d\n",
+			       sbi->sec_per_clus);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -856,7 +844,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		b = (struct fat_boot_sector *) bh->b_data;
 	}
 
-	sbi->cluster_bits = ffs(sb->s_blocksize * sbi->cluster_size) - 1;
+	sbi->cluster_size = sb->s_blocksize * sbi->sec_per_clus;
+	sbi->cluster_bits = ffs(sbi->cluster_size) - 1;
 	sbi->fats = b->fats;
 	sbi->fat_bits = 0;		/* Don't know yet */
 	sbi->fat_start = CF_LE_W(b->reserved);
@@ -924,7 +913,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	total_sectors = CF_LE_W(get_unaligned((unsigned short *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
-	sbi->clusters = (total_sectors - sbi->data_start) / sbi->cluster_size;
+	sbi->clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
 
 	if (sbi->fat_bits != 32)
 		sbi->fat_bits = (sbi->clusters > MSDOS_FAT12) ? 16 : 12;
@@ -1021,22 +1010,26 @@ out_fail:
 
 int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
-	int free,nr;
+	int free, nr;
        
-	lock_fat(sb);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		free = MSDOS_SB(sb)->free_clusters;
 	else {
-		free = 0;
-		for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
-			if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
-				free++;
-		MSDOS_SB(sb)->free_clusters = free;
+		lock_fat(sb);
+		if (MSDOS_SB(sb)->free_clusters != -1)
+			free = MSDOS_SB(sb)->free_clusters;
+		else {
+			free = 0;
+			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
+				if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
+					free++;
+			MSDOS_SB(sb)->free_clusters = free;
+		}
+		unlock_fat(sb);
 	}
-	unlock_fat(sb);
 
 	buf->f_type = sb->s_magic;
-	buf->f_bsize = 1 << MSDOS_SB(sb)->cluster_bits;
+	buf->f_bsize = MSDOS_SB(sb)->cluster_size;
 	buf->f_blocks = MSDOS_SB(sb)->clusters;
 	buf->f_bfree = free;
 	buf->f_bavail = free;
@@ -1045,9 +1038,9 @@ int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;
 }
 
-static int is_exec(char *extension)
+static int is_exec(unsigned char *extension)
 {
-	char *exe_extensions = "EXECOMBAT", *walk;
+	unsigned char *exe_extensions = "EXECOMBAT", *walk;
 
 	for (walk = exe_extensions; *walk; walk += 3)
 		if (!strncmp(extension, walk, 3))
@@ -1149,9 +1142,9 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 			inode->i_flags |= S_IMMUTABLE;
 	MSDOS_I(inode)->i_attrs = de->attr & ATTR_UNUSED;
 	/* this is as close to the truth as we can get ... */
-	inode->i_blksize = 1 << sbi->cluster_bits;
-	inode->i_blocks = ((inode->i_size + inode->i_blksize - 1)
-			   & ~((loff_t)inode->i_blksize - 1)) >> 9;
+	inode->i_blksize = sbi->cluster_size;
+	inode->i_blocks = ((inode->i_size + (sbi->cluster_size - 1))
+			   & ~((loff_t)sbi->cluster_size - 1)) >> 9;
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec =
 		date_dos2unix(CF_LE_W(de->time),CF_LE_W(de->date));
 	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = 0;

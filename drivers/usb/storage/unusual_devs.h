@@ -119,7 +119,7 @@ UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
-		US_SC_8070, US_PR_CBI, NULL, US_FL_FIX_INQUIRY),
+		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
 /* Reported by Peter Wächtler <pwaechtler@loewe-komp.de>
  * The device needs the flags only.
@@ -236,7 +236,7 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
 		"DSC-S30/S70/S75/505V/F505/F707/F717/P8", 
-		US_SC_SCSI, US_PR_CB, NULL,
+		US_SC_SCSI, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
 
 /* Reported by wim@geeks.nl */
@@ -555,7 +555,7 @@ UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
 UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
 		"AIPTEK",
 		"PocketCAM 3Mega",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ),
 
 /* aeb */

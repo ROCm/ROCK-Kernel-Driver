@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/highres_timer.h -- High resolution timing routines
  *
- *  Copyright (C) 2001  NEC Corporation
- *  Copyright (C) 2001  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -25,7 +25,7 @@
    counter overflows).  */
 #define HIGHRES_TIMER_SLOW_TICK_RATE	25
 
-/* Which timer in the nb85e `Timer D' we use.  */
+/* Which timer in the V850E `Timer D' we use.  */
 #define HIGHRES_TIMER_TIMER_D_UNIT	3
 
 

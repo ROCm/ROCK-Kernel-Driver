@@ -233,11 +233,11 @@ static int dafb_setpalette (unsigned int regno, unsigned int red,
 		
 		/* Loop until we get to the register we want */
 		for (i = 0; i < regno; i++) {
-			nubus_writeb(info->cmap[i].red >> 8, &dafb_cmap_regs->lut);
+			nubus_writeb(info->cmap.red[i] >> 8, &dafb_cmap_regs->lut);
 			nop();
-			nubus_writeb(info->cmap[i].green >> 8, &dafb_cmap_regs->lut);
+			nubus_writeb(info->cmap.green[i] >> 8, &dafb_cmap_regs->lut);
 			nop();
-			nubus_writeb(info->cmap[i].blue >> 8, &dafb_cmap_regs->lut);
+			nubus_writeb(info->cmap.blue[i] >> 8, &dafb_cmap_regs->lut);
 			nop();
 		}
 	}
@@ -528,10 +528,10 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	 *  != 0 for invalid regno.
 	 */
 	
-	if (regno >= info->cmap.len)
+	if (regno >= fb_info->cmap.len)
 		return 1;
 
-	switch (info->var.bits_per_pixel) {
+	switch (fb_info->var.bits_per_pixel) {
 	case 1:
 		/* We shouldn't get here */
 		break;
@@ -539,21 +539,21 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	case 4:
 	case 8:
 		if (macfb_setpalette)
-			macfb_setpalette(regno, red, green, blue, info);
+			macfb_setpalette(regno, red, green, blue, fb_info);
 		else
 			return 1;
 		break;
 	case 16:
-		if (info->var.red.offset == 10) {
+		if (fb_info->var.red.offset == 10) {
 			/* 1:5:5:5 */
-			((u32*) (info->pseudo_palette))[regno] =
+			((u32*) (fb_info->pseudo_palette))[regno] =
 					((red   & 0xf800) >>  1) |
 					((green & 0xf800) >>  6) |
 					((blue  & 0xf800) >> 11) |
 					((transp != 0) << 15);
 		} else {
 			/* 0:5:6:5 */
-			((u32*) (info->pseudo_palette))[regno] =
+			((u32*) (fb_info->pseudo_palette))[regno] =
 					((red   & 0xf800)      ) |
 					((green & 0xfc00) >>  5) |
 					((blue  & 0xf800) >> 11);
@@ -565,19 +565,19 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		red   >>= 8;
 		green >>= 8;
 		blue  >>= 8;
-		((u32 *)(info->pseudo_palette))[regno] =
-			(red   << info->var.red.offset)   |
-			(green << info->var.green.offset) |
-			(blue  << info->var.blue.offset);
+		((u32 *)(fb_info->pseudo_palette))[regno] =
+			(red   << fb_info->var.red.offset)   |
+			(green << fb_info->var.green.offset) |
+			(blue  << fb_info->var.blue.offset);
 		break;
 	case 32:
 		red   >>= 8;
 		green >>= 8;
 		blue  >>= 8;
-		((u32 *)(info->pseudo_palette))[regno] =
-			(red   << info->var.red.offset)   |
-			(green << info->var.green.offset) |
-			(blue  << info->var.blue.offset);
+		((u32 *)(fb_info->pseudo_palette))[regno] =
+			(red   << fb_info->var.red.offset)   |
+			(green << fb_info->var.green.offset) |
+			(blue  << fb_info->var.blue.offset);
 		break;
     }
     return 0;

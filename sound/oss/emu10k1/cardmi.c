@@ -113,7 +113,7 @@ int emu10k1_mpuin_close(struct emu10k1_card *card)
 	}
 
 	/* Disable RX interrupt */
-	emu10k1_irq_disable(card, INTE_MIDIRXENABLE);
+	emu10k1_irq_disable(card, card->is_audigy ? A_INTE_MIDIRXENABLE : INTE_MIDIRXENABLE);
 
 	emu10k1_mpu_release(card);
 
@@ -189,7 +189,7 @@ int emu10k1_mpuin_start(struct emu10k1_card *card)
 		card_mpuin->qhead = 0;
 		card_mpuin->qtail = 0;
 
-		emu10k1_irq_enable(card, INTE_MIDIRXENABLE);
+		emu10k1_irq_enable(card, card->is_audigy ? A_INTE_MIDIRXENABLE : INTE_MIDIRXENABLE);
 	}
 
 	return 0;
@@ -207,7 +207,7 @@ int emu10k1_mpuin_stop(struct emu10k1_card *card)
 
 	DPF(2, "emu10k1_mpuin_stop()\n");
 
-	emu10k1_irq_disable(card, INTE_MIDIRXENABLE);
+	emu10k1_irq_disable(card, card->is_audigy ? A_INTE_MIDIRXENABLE : INTE_MIDIRXENABLE);
 
 	card_mpuin->status &= ~FLAGS_MIDM_STARTED;	/* clear */
 
@@ -246,7 +246,7 @@ int emu10k1_mpuin_reset(struct emu10k1_card *card)
 
 	DPF(2, "emu10k1_mpuin_reset()\n");
 
-	emu10k1_irq_disable(card, INTE_MIDIRXENABLE);
+	emu10k1_irq_disable(card, card->is_audigy ? A_INTE_MIDIRXENABLE : INTE_MIDIRXENABLE);
 
 	while (card_mpuin->firstmidiq) {
 		midiq = card_mpuin->firstmidiq;

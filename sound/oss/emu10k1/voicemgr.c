@@ -32,6 +32,34 @@
 #include "voicemgr.h"
 #include "8010.h"
 
+#define PITCH_48000 0x00004000
+#define PITCH_96000 0x00008000
+#define PITCH_85000 0x00007155
+#define PITCH_80726 0x00006ba2
+#define PITCH_67882 0x00005a82
+#define PITCH_57081 0x00004c1c
+
+u32 emu10k1_select_interprom(struct emu10k1_card *card, struct emu_voice *voice)
+{
+	if(voice->pitch_target==PITCH_48000)
+		return CCCA_INTERPROM_0;
+	else if(voice->pitch_target<PITCH_48000)
+		return CCCA_INTERPROM_1;
+	else  if(voice->pitch_target>=PITCH_96000)
+		return CCCA_INTERPROM_0;
+	else  if(voice->pitch_target>=PITCH_85000)
+		return CCCA_INTERPROM_6;
+	else  if(voice->pitch_target>=PITCH_80726)
+		return CCCA_INTERPROM_5;
+	else  if(voice->pitch_target>=PITCH_67882)
+		return CCCA_INTERPROM_4;
+	else  if(voice->pitch_target>=PITCH_57081)
+		return CCCA_INTERPROM_3;
+	else  
+		return CCCA_INTERPROM_2;
+}
+
+
 /**
  * emu10k1_voice_alloc_buffer -
  *
@@ -216,17 +244,25 @@ void emu10k1_voice_playback_setup(struct emu_voice *voice)
 	voice->start += start;
 
 	for (i = 0; i < (voice->flags & VOICE_FLAGS_STEREO ? 2 : 1); i++) {
-		sblive_writeptr(card, FXRT, voice->num + i, voice->params[i].send_routing << 16);
+		if (card->is_audigy) {
+			sblive_writeptr(card, A_FXRT1, voice->num + i, voice->params[i].send_routing);
+			sblive_writeptr(card, A_FXRT2, voice->num + i, voice->params[i].send_routing2);
+			sblive_writeptr(card,  A_SENDAMOUNTS, voice->num + i, voice->params[i].send_hgfe);
+		} else {
+			sblive_writeptr(card, FXRT, voice->num + i, voice->params[i].send_routing << 16);
+		}
 
 		/* Stop CA */
 		/* Assumption that PT is already 0 so no harm overwriting */
-		sblive_writeptr(card, PTRX, voice->num + i, (voice->params[i].send_a << 8) | voice->params[i].send_b);
+		sblive_writeptr(card, PTRX, voice->num + i, ((voice->params[i].send_dcba & 0xff) << 8)
+				| ((voice->params[i].send_dcba & 0xff00) >> 8));
 
 		sblive_writeptr_tag(card, voice->num + i,
 				/* CSL, ST, CA */
-				    DSL, voice->endloop | (voice->params[i].send_d << 24),
-				    PSST, voice->startloop | (voice->params[i].send_c << 24),
-				    CCCA, (voice->start) | CCCA_INTERPROM_0 | ((voice->flags & VOICE_FLAGS_16BIT) ? 0 : CCCA_8BITSELECT),
+				    DSL, voice->endloop | (voice->params[i].send_dcba & 0xff000000),
+				    PSST, voice->startloop | ((voice->params[i].send_dcba & 0x00ff0000) << 8),
+				    CCCA, (voice->start) |  emu10k1_select_interprom(card,voice) |
+				        ((voice->flags & VOICE_FLAGS_16BIT) ? 0 : CCCA_8BITSELECT),
 				    /* Clear filter delay memory */
 				    Z1, 0,
 				    Z2, 0,

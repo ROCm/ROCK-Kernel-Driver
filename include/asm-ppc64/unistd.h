@@ -259,8 +259,13 @@
 #define __NR_clock_gettime	246
 #define __NR_clock_getres	247
 #define __NR_clock_nanosleep	248
+#define __NR_swapcontext	249
+#define __NR_tgkill		250
+#define __NR_utimes		251
+#define __NR_statfs64		252
+#define __NR_fstatfs64		253
 
-#define __NR_syscalls		239
+#define __NR_syscalls		254
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif

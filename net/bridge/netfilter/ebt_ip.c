@@ -75,7 +75,7 @@ static int ebt_ip_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_ip_info *info = (struct ebt_ip_info *)data;
 
-	if (datalen != sizeof(struct ebt_ip_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_ip_info)))
 		return -EINVAL;
 	if (e->ethproto != __constant_htons(ETH_P_IP) ||
 	   e->invflags & EBT_IPROTO)
