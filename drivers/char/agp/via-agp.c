@@ -296,10 +296,10 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8601 */
-/*	{
-		.device_id	= PCI_DEVICE_ID_VIA_8601_0,	// 0x0601
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_8601_0,
 		.chipset_name	= "PLE133 ProMedia",
-	},*/
+	},
 
 	/* VT82C693A / VT28C694T */
 	{
