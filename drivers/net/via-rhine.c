@@ -1563,15 +1563,10 @@ static void rhine_rx(struct net_device *dev)
 				   eth_copy_and_sum is memcpy for all archs so
 				   this is kind of pointless right now
 				   ... or? */
-#if HAS_IP_COPYSUM		/* Call copy + cksum if available. */
 				eth_copy_and_sum(skb,
 						 rp->rx_skbuff[entry]->tail,
 						 pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len),
-				       rp->rx_skbuff[entry]->tail, pkt_len);
-#endif
 				pci_dma_sync_single_for_device(rp->pdev,
 							       rp->rx_skbuff_dma[entry],
 							       rp->rx_buf_sz,
