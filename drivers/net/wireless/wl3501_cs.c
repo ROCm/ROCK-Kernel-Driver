@@ -319,6 +319,21 @@ static void wl3501_esbq_req(struct wl3501_card *this, u16 *ptr)
 		this->esbq_req_head = this->esbq_req_start;
 }
 
+static int wl3501_esbq_exec(struct wl3501_card *this, void *sig, int sig_size)
+{
+	int rc = -EIO;
+
+	if (wl3501_esbq_req_test(this)) {
+		u16 ptr = wl3501_get_tx_buffer(this, sig_size);
+		if (ptr) {
+			wl3501_set_to_wla(this, ptr, sig, sig_size);
+			wl3501_esbq_req(this, &ptr);
+			rc = 0;
+		}
+	}
+	return rc;
+}
+
 static int wl3501_get_mib_value(struct wl3501_card *this, u8 index,
 				void *bf, int size)
 {
@@ -445,28 +460,16 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 static int wl3501_mgmt_resync(struct wl3501_card *this)
 {
 	struct wl3501_resync_req signal;
-	int rc = 1;
 
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_RESYNC_REQ;
-
-	if (wl3501_esbq_req_test(this)) {
-		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
-		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
-			wl3501_esbq_req(this, &ptr);
-			rc = 0;
-		}
-	}
-	return rc;
+	return wl3501_esbq_exec(this, &signal, sizeof(signal));
 }
 
 static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 {
 	struct wl3501_scan_req signal;
-	int rc = 1;
 
-	dprintk(3, "entry");
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_SCAN_REQ;
 	signal.ssid[0] = signal.ssid[1] = 0;
@@ -480,17 +483,7 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 		signal.bss_type = WL3501_NET_TYPE_ADHOC;
 
 	this->bss_cnt = this->join_sta_bss = 0;
-
-	if (wl3501_esbq_req_test(this)) {
-		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
-		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
-			wl3501_esbq_req(this, &ptr);
-			rc = 0;
-		}
-	}
-	dprintk(3, "exit, rc=%d", rc);
-	return rc;
+	return wl3501_esbq_exec(this, &signal, sizeof(signal));
 }
 
 static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
@@ -503,22 +496,12 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 	memcpy((char *)&(signal.beacon_period),
 	       (char *)&(this->bss_set[stas].beacon_period), 72);
 	signal.phy_pset[2] = this->def_chan;
-
-	if (wl3501_esbq_req_test(this)) {
-		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
-		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
-			wl3501_esbq_req(this, &ptr);
-			return 0;
-		}
-	}
-	return 1;
+	return wl3501_esbq_exec(this, &signal, sizeof(signal));
 }
 
 static int wl3501_mgmt_start(struct wl3501_card *this)
 {
 	struct wl3501_start_req signal;
-	int rc = 1;
 
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_START_REQ;
@@ -549,16 +532,7 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 	signal.ibss_pset[1] = 2;
 	signal.ibss_pset[2] = 10;
 	signal.ibss_pset[3] = 0;
-
-	if (wl3501_esbq_req_test(this)) {
-		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
-		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
-			wl3501_esbq_req(this, &ptr);
-			rc = 0;
-		}
-	}
-	return rc;
+	return wl3501_esbq_exec(this, &signal, sizeof(signal));
 }
 
 static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
@@ -788,7 +762,6 @@ static void wl3501_esbq_confirm_done(struct wl3501_card *this)
 static int wl3501_mgmt_auth(struct wl3501_card *this)
 {
 	struct wl3501_auth_req signal;
-	u16 ptr;
 
 	dprintk(3, "entry");
 	signal.next_blk = 0;
@@ -796,21 +769,12 @@ static int wl3501_mgmt_auth(struct wl3501_card *this)
 	signal.type = WL3501_SYS_TYPE_OPEN;
 	signal.timeout = 1000;
 	memcpy((char *)&(signal.mac_addr), (char *)&(this->bssid), ETH_ALEN);
-	if (wl3501_esbq_req_test(this)) {
-		ptr = wl3501_get_tx_buffer(this, sizeof(signal));
-		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
-			wl3501_esbq_req(this, &ptr);
-			return 0;
-		}
-	}
-	return 1;
+	return wl3501_esbq_exec(this, &signal, sizeof(signal));
 }
 
 static int wl3501_mgmt_association(struct wl3501_card *this)
 {
 	struct wl3501_assoc_req signal;
-	u16 ptr;
 
 	dprintk(3, "entry");
 	signal.next_blk		= 0;
@@ -819,15 +783,7 @@ static int wl3501_mgmt_association(struct wl3501_card *this)
 	signal.listen_interval	= 5;
 	signal.cap_info		= this->cap_info;
 	memcpy((char *)&(signal.mac_addr), (char *)&(this->bssid), ETH_ALEN);
-	if (wl3501_esbq_req_test(this)) {
-		ptr = wl3501_get_tx_buffer(this, sizeof(signal));
-		if (ptr) {
-			wl3501_set_to_wla(this, ptr, &signal, sizeof(signal));
-			wl3501_esbq_req(this, &ptr);
-			return 0;
-		}
-	}
-	return 1;
+	return wl3501_esbq_exec(this, &signal, sizeof(signal));
 }
 
 static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
