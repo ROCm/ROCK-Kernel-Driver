@@ -67,7 +67,7 @@ start_ap:
 	 * Initialize kernel region registers:
 	 *	rr[5]: VHPT enabled, page size = PAGE_SHIFT
 	 *	rr[6]: VHPT disabled, page size = IA64_GRANULE_SHIFT
-	 *	rr[5]: VHPT disabled, page size = IA64_GRANULE_SHIFT
+	 *	rr[7]: VHPT disabled, page size = IA64_GRANULE_SHIFT
 	 */
 	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, (5<<61)) << 8) | (PAGE_SHIFT << 2) | 1)
 	movl r17=(5<<61)
