@@ -18,7 +18,7 @@ enum tcp_conntrack {
 };
 
 /* Window scaling is advertised by the sender */
-#define IP_CT_TCP_STATE_FLAG_WINDOW_SCALE	0x01
+#define IP_CT_TCP_FLAG_WINDOW_SCALE		0x01
 
 /* SACK is permitted by the sender */
 #define IP_CT_TCP_FLAG_SACK_PERM		0x02
