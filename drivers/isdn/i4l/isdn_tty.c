@@ -1876,7 +1876,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	 * line status register.
 	 */
 	if (info->flags & ISDN_ASYNC_INITIALIZED) {
-		tty_wait_until_sent(tty, 3000);	/* 30 seconds timeout */
+		tty_wait_until_sent(tty, 30 * HZ);	/* 30 seconds timeout */
 		/*
 		 * Before we drop DTR, make sure the UART transmitter
 		 * has completely drained; this is especially
@@ -1901,7 +1901,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	tty->closing = 0;
 	if (info->blocked_open) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(50);
+		schedule_timeout(HZ/2);
 		wake_up_interruptible(&info->open_wait);
 	}
 	info->flags &= ~(ISDN_ASYNC_NORMAL_ACTIVE | ISDN_ASYNC_CALLOUT_ACTIVE |
