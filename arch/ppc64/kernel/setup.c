@@ -517,10 +517,29 @@ static int __init set_preferred_console(void)
 					return -ENODEV;
 			}
 		}
-	} else if (strcmp(name, "vty") == 0)
-		/* pSeries LPAR virtual console */
-		return add_preferred_console("hvc", 0, NULL);
-	else if (strcmp(name, "ch-a") == 0)
+	} else if (strcmp(name, "vty") == 0) {
+ 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", NULL);
+ 		char *compat = (char *)get_property(prom_stdout, "compatible", NULL);
+
+ 		if (reg && compat && (strcmp(compat, "hvterm-protocol") == 0)) {
+ 			/* Host Virtual Serial Interface */
+ 			int offset;
+ 			switch (reg[0]) {
+ 				case 0x30000000:
+ 					offset = 0;
+ 					break;
+ 				case 0x30000001:
+ 					offset = 1;
+ 					break;
+ 				default:
+ 					return -ENODEV;
+ 			}
+ 			return add_preferred_console("hvsi", offset, NULL);
+ 		} else {
+ 			/* pSeries LPAR virtual console */
+ 			return add_preferred_console("hvc", 0, NULL);
+ 		}
+	} else if (strcmp(name, "ch-a") == 0)
 		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
 		offset = 1;
