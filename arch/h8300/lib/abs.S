@@ -1,4 +1,4 @@
-;;; memcpy.S
+;;; abs.S
 
 #include <asm/linkage.h>
 
