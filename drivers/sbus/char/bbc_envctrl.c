@@ -59,7 +59,7 @@ static int errno;
  * before the hardware based power-off event is triggered.
  */
 
-/* These settings are in celcius.  We use these defaults only
+/* These settings are in Celsius.  We use these defaults only
  * if we cannot interrogate the cpu-fru SEEPROM.
  */
 struct temp_limits {
