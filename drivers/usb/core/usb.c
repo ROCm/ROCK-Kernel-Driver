@@ -922,10 +922,6 @@ void usb_disconnect(struct usb_device **pdev)
 	}
 	up(&dev->serialize);
 	device_unregister(&dev->dev);
-
-	/* Decrement the reference count, it'll auto free everything when */
-	/* it hits 0 which could very well be now */
-	usb_put_dev(dev);
 }
 
 /**
@@ -1009,7 +1005,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
 	dev->dev.driver_data = &usb_generic_driver_data;
-	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
 			 dev->bus->busnum, dev->devpath);
@@ -1135,7 +1130,6 @@ fail:
 	dev->state = USB_STATE_DEFAULT;
 	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 	dev->devnum = -1;
-	usb_put_dev(dev);
 	return err;
 }
 
