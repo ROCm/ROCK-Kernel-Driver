@@ -571,6 +571,7 @@ struct sctp_chunk {
 		struct sctp_ecnehdr *ecne_hdr;
 		struct sctp_cwrhdr *ecn_cwr_hdr;
 		struct sctp_errhdr *err_hdr;
+		struct sctp_addiphdr *addip_hdr;
 	} subh;
 
 	__u8 *chunk_end;
@@ -1385,8 +1386,10 @@ struct sctp_association {
 		int cookie_len;
 		void *cookie;
 
-		/* ADDIP Extention (ADDIP)		--xguo */
-		/* <expected peer-serial-number> minus 1 (ADDIP sec. 4.2 C1) */
+		/* ADDIP Section 4.2 Upon reception of an ASCONF Chunk.
+		 * C1) ... "Peer-Serial-Number'. This value MUST be initialized to the
+		 * Initial TSN Value minus 1
+		 */
 		__u32 addip_serial;
 	} peer;
 
@@ -1623,12 +1626,12 @@ struct sctp_association {
 	/* ADDIP Section 4.1 ASCONF Chunk Procedures
 	 *
 	 * A2) A serial number should be assigned to the Chunk. The
-	 * serial number should be a monotonically increasing
-	 * number. All serial numbers are defined to be initialized at
+	 * serial number SHOULD be a monotonically increasing
+	 * number. The serial number SHOULD be initialized at
 	 * the start of the association to the same value as the
-	 * Initial TSN.
-	 *
-	 * [and]
+	 * Initial TSN and every time a new ASCONF chunk is created
+	 * it is incremented by one after assigning the serial number
+	 * to the newly created chunk.
 	 *
 	 * ADDIP
 	 * 3.1.1  Address/Stream Configuration Change Chunk (ASCONF)
@@ -1637,13 +1640,10 @@ struct sctp_association {
 	 *
 	 * This value represents a Serial Number for the ASCONF
 	 * Chunk. The valid range of Serial Number is from 0 to
-	 * 4294967295 (2**32 - 1).  Serial Numbers wrap back to 0
+	 * 4294967295 (2^32 - 1).  Serial Numbers wrap back to 0
 	 * after reaching 4294967295.
 	 */
 	__u32 addip_serial;
-
-	/* Is the ADDIP extension enabled for this association? */
-	char addip_enable;
 
 	/* Need to send an ECNE Chunk? */
 	char need_ecne;

@@ -471,12 +471,53 @@ typedef struct sctp_cwr_chunk {
 	sctp_cwrhdr_t cwr_hdr;
 } sctp_cwr_chunk_t __attribute__((packed));
 
-
-/* FIXME:  Cleanup needs to continue below this line. */
-
 /*
  * ADDIP Section 3.1 New Chunk Types
  */
+
+/* ADDIP
+ * Section 3.1.1 Address Configuration Change Chunk (ASCONF)
+ *
+ * 	Serial Number: 32 bits (unsigned integer)
+ *	This value represents a Serial Number for the ASCONF Chunk. The
+ *	valid range of Serial Number is from 0 to 2^32-1.
+ *	Serial Numbers wrap back to 0 after reaching 2^32 -1.
+ *
+ *	Address Parameter: 8 or 20 bytes (depending on type)
+ *	The address is an address of the sender of the ASCONF chunk,
+ *	the address MUST be considered part of the association by the
+ *	peer endpoint. This field may be used by the receiver of the 
+ *	ASCONF to help in finding the association. This parameter MUST
+ *	be present in every ASCONF message i.e. it is a mandatory TLV
+ *	parameter.
+ *
+ *	ASCONF Parameter: TLV format
+ *	Each Address configuration change is represented by a TLV
+ *	parameter as defined in Section 3.2. One or more requests may
+ *	be present in an ASCONF Chunk.
+ *
+ * Section 3.1.2 Address Configuration Acknowledgement Chunk (ASCONF-ACK)
+ * 
+ *	Serial Number: 32 bits (unsigned integer)
+ *	This value represents the Serial Number for the received ASCONF
+ *	Chunk that is acknowledged by this chunk. This value is copied
+ *	from the received ASCONF Chunk. 
+ *
+ *	ASCONF Parameter Response: TLV format
+ *	The ASCONF Parameter Response is used in the ASCONF-ACK to
+ *	report status of ASCONF processing.
+ */
+typedef struct sctp_addiphdr {
+	__u32	serial;
+	__u8	params[0];
+} sctp_addiphdr_t __attribute__((packed));
+
+typedef struct sctp_addip_chunk {
+	sctp_chunkhdr_t chunk_hdr;
+	sctp_addiphdr_t addip_hdr;
+} sctp_addip_chunk_t __attribute__((packed));
+
+/* FIXME:  Cleanup needs to continue below this line. */
 
 
 /* ADDIP Section 3.1.1

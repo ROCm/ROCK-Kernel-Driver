@@ -294,6 +294,12 @@ void sctp_generate_t2_shutdown_event(unsigned long data)
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T2_SHUTDOWN);
 }
 
+void sctp_generate_t4_rto_event(unsigned long data)
+{
+	struct sctp_association *asoc = (struct sctp_association *) data;
+	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T4_RTO);
+}
+
 void sctp_generate_t5_shutdown_guard_event(unsigned long data)
 {
         struct sctp_association *asoc = (struct sctp_association *)data;
@@ -359,6 +365,7 @@ sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES] = {
 	sctp_generate_t1_init_event,
 	sctp_generate_t2_shutdown_event,
 	NULL,
+	sctp_generate_t4_rto_event,
 	sctp_generate_t5_shutdown_guard_event,
 	sctp_generate_heartbeat_event,
 	sctp_generate_sack_event,
@@ -664,6 +671,23 @@ static void sctp_cmd_delete_tcb(sctp_cmd_seq_t *cmds,
 
 	sctp_unhash_established(asoc);
 	sctp_association_free(asoc);
+}
+
+/*
+ * ADDIP Section 4.1 ASCONF Chunk Procedures
+ * A4) Start a T-4 RTO timer, using the RTO value of the selected
+ * destination address (normally the primary path; see RFC2960
+ * section 6.4 for details).
+ */
+static void sctp_cmd_setup_t4(sctp_cmd_seq_t *cmds,
+				struct sctp_association *asoc,
+				struct sctp_chunk *chunk)
+{
+	struct sctp_transport *t;
+
+	t = asoc->peer.primary_path;
+	asoc->timeouts[SCTP_EVENT_TIMEOUT_T4_RTO] = t->rto;
+	chunk->transport = t;
 }
 
 /* These three macros allow us to pull the debugging code out of the
@@ -1175,6 +1199,10 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		case SCTP_CMD_RENEGE:
 			sctp_ulpq_renege(&asoc->ulpq, cmd->obj.ptr,
 					 GFP_ATOMIC);
+			break;
+
+		case SCTP_CMD_SETUP_T4:
+			sctp_cmd_setup_t4(commands, asoc, cmd->obj.ptr);
 			break;
 
 		default:

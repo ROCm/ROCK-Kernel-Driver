@@ -2088,3 +2088,85 @@ int sockaddr2sctp_addr(const union sctp_addr *sa, union sctp_addr_param *p)
 
 	return len;
 }
+
+/*
+ * ADDIP 3.1.1 Address Configuration Change Chunk (ASCONF)
+ *      0                   1                   2                   3
+ *      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     | Type = 0xC1   |  Chunk Flags  |      Chunk Length             |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                       Serial Number                           |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                    Address Parameter                          |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                     ASCONF Parameter #1                       |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     \                                                               \
+ *     /                             ....                              /
+ *     \                                                               \
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                     ASCONF Parameter #N                       |
+ *      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * Address Parameter and other parameter will not be wrapped in this function 
+ */
+struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
+				    union sctp_addr *addr, int vparam_len)
+{
+	sctp_addiphdr_t asconf;
+	struct sctp_chunk *retval;
+	int length = sizeof(asconf) + vparam_len;
+	union sctp_params addrparam;
+	int addrlen;
+
+	addrlen = sockaddr2sctp_addr(addr, (union sctp_addr_param *)&addrparam);
+	if (!addrlen)
+		return NULL;
+	length += addrlen;
+
+	/* Create the chunk.  */
+	retval = sctp_make_chunk(asoc, SCTP_CID_ASCONF, 0, length);
+	if (!retval)
+		return NULL;
+
+	asconf.serial = asoc->addip_serial++;
+
+	retval->subh.addip_hdr =
+		sctp_addto_chunk(retval, sizeof(asconf), &asconf);
+	retval->param_hdr.v =
+		sctp_addto_chunk(retval, addrlen, &addr);
+
+	return retval;
+}
+
+/*
+ * Unpack the parameters in an ASCONF chunk into an association and
+ * generate ASCONF-ACK chunk.
+ *
+ * ADDIP 3.1.2 Address Configuration Acknowledgement Chunk (ASCONF-ACK)
+ *      0                   1                   2                   3
+ *      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     | Type = 0x80   |  Chunk Flags  |      Chunk Length             |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                       Serial Number                           |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                 ASCONF Parameter Response#1                   |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     \                                                               \
+ *     /                             ....                              /
+ *     \                                                               \
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                 ASCONF Parameter Response#N                   |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * All the parameter respoinces will be added in this function.
+ */
+struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
+					struct sctp_chunk *asconf,
+					int vparam_len)
+{
+	// FIXME: process asconf chunk
+	return NULL;
+}
