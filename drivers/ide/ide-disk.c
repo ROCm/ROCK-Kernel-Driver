@@ -1500,7 +1500,7 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 {
 	ide_drive_t *drive = dev->driver_data;
 
-	printk("Suspending device %lx\n", dev->driver_data);
+	printk("Suspending device %p\n", dev->driver_data);
 
 	/* I hope that every freeze operation from the upper levels have
 	 * already been done...
