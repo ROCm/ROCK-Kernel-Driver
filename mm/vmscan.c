@@ -989,7 +989,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		if (to_free > 0)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
-	if (priority < 0) {
+	if (priority <= 0) {
 		for (i = 0; i < pgdat->nr_zones; i++) {
 			struct zone *zone = pgdat->node_zones + i;
 
