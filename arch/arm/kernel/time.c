@@ -27,11 +27,14 @@
 #include <linux/errno.h>
 #include <linux/profile.h>
 #include <linux/sysdev.h>
+#include <linux/timer.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/leds.h>
+
+#include <asm/mach/time.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
@@ -83,7 +86,7 @@ unsigned long long __attribute__((weak)) sched_clock(void)
 /*
  * Handle kernel profile stuff...
  */
-static inline void do_profile(struct pt_regs *regs)
+void do_profile(struct pt_regs *regs)
 {
 
 	profile_hook(regs);
@@ -113,7 +116,7 @@ static unsigned long next_rtc_update;
  * called as close as possible to 500 ms before the new second
  * starts.
  */
-static inline void do_set_rtc(void)
+void do_set_rtc(void)
 {
 	if (time_status & STA_UNSYNC || set_rtc == NULL)
 		return;
@@ -237,8 +240,7 @@ device_initcall(leds_init);
 EXPORT_SYMBOL(leds_event);
 #endif
 
-#ifdef CONFIG_LEDS_TIMER
-static void do_leds(void)
+void do_leds(void)
 {
 	static unsigned int count = 50;
 
@@ -247,9 +249,6 @@ static void do_leds(void)
 		leds_event(led_timer);
 	}
 }
-#else
-#define do_leds()
-#endif
 
 void do_gettimeofday(struct timeval *tv)
 {
@@ -316,12 +315,10 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
-static struct irqaction timer_irq = {
-	.name	= "timer",
-	.flags	= SA_INTERRUPT,
-};
+void (*init_arch_time)(void);
 
-/*
- * Include architecture specific code
- */
-#include <asm/arch/time.h>
+void __init time_init(void)
+{
+	init_arch_time();
+}
+

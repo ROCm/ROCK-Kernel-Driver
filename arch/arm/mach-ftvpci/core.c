@@ -88,6 +88,53 @@ static void __init ftvpci_map_io(void)
 	iotable_init(ftvpci_io_desc, ARRAY_SIZE(ftvpci_io_desc));
 }
 
+static irqreturn_t
+ftvpci_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	static int count = 25;
+	unsigned char stat = __raw_readb(DUART_BASE + 0x14);
+	if (!(stat & 0x10))
+		return;		/* Not for us */
+
+	/* Reset counter */
+	__raw_writeb(0x90, DUART_BASE + 8);
+
+	if (--count == 0) {
+		static int state = 1;
+		state ^= 1;
+		__raw_writeb(0x1a + state, INTCONT_BASE);
+		__raw_writeb(0x18 + state, INTCONT_BASE);
+		count = 50;
+	}
+
+	/* Wait for slow rise time */
+	__raw_readb(DUART_BASE + 0x14);
+	__raw_readb(DUART_BASE + 0x14);
+	__raw_readb(DUART_BASE + 0x14);
+	__raw_readb(DUART_BASE + 0x14);
+	__raw_readb(DUART_BASE + 0x14);
+	__raw_readb(DUART_BASE + 0x14);
+
+	do_timer(regs);
+
+	return IRQ_HANDLED;
+}
+
+void __init ftvpci_time_init(void)
+{
+	int tick = 3686400 / 16 / 2 / 100;
+
+	__raw_writeb(tick & 0xff, DUART_BASE + 0x1c);
+	__raw_writeb(tick >> 8, DUART_BASE + 0x18);
+	__raw_writeb(0x80, DUART_BASE + 8);
+	__raw_writeb(0x10, DUART_BASE + 0x14);
+
+	timer_irq.handler = timer_interrupt;
+	timer_irq.flags = SA_SHIRQ;
+
+	set_timer_irq_handler(IRQ_TIMER, timer_interrupt);
+}
+
 MACHINE_START(NEXUSPCI, "FTV/PCI")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x40000000, 0x10000000, 0xe0000000)

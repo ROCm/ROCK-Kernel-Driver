@@ -324,5 +324,6 @@ MACHINE_START(ASSABET, "Intel-Assabet")
 	FIXUP(fixup_assabet)
 	MAPIO(assabet_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 	INIT_MACHINE(assabet_init)
 MACHINE_END

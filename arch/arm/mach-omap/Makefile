@@ -3,7 +3,7 @@
 #
 
 # Common support
-obj-y := common.o irq.o dma.o clocks.o mux.o bus.o gpio.o
+obj-y := common.o irq.o dma.o clocks.o mux.o bus.o gpio.o time.o
 obj-m :=
 obj-n :=
 obj-  :=

@@ -17,12 +17,23 @@
 #define RTC_PORT(x)		(rtc_base+(x))
 #define RTC_ALWAYS_BCD		0
 
+#include <linux/timex.h>
+#include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/sched.h>
 #include <linux/mc146818rtc.h>
 #include <linux/bcd.h>
 
 #include <asm/hardware/dec21285.h>
+
+#include <asm/hardware.h>
+#include <asm/irq.h>
 #include <asm/leds.h>
 #include <asm/mach-types.h>
+#include <asm/io.h>
+#include <asm/hardware/clps7111.h>
+
+#include <asm/mach/time.h>
 
 static int rtc_base;
 
@@ -204,13 +215,15 @@ timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+static struct irqaction footbridge_timer_irq = {
+	.flags	= SA_INTERRUPT
+};
+
 /*
  * Set up timer interrupt.
  */
-void __init time_init(void)
+void __init footbridge_init_time(void)
 {
-	int irq;
-
 	if (machine_is_co285() ||
 	    machine_is_personal_server())
 		/*
@@ -270,8 +283,11 @@ void __init time_init(void)
 		*CSR_TIMER1_LOAD = timer1_latch;
 		*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD | TIMER_CNTL_DIV16;
 
-		timer_irq.handler = timer1_interrupt;
-		irq = IRQ_TIMER1;
+		footbridge_timer_irq.name = "Timer1 Timer Tick";
+		footbrdige_timer_irq.handler = timer1_interrupt;
+		
+		setup_irq(IRQ_TIMER1, &footbridge_timer_irq);
+
 	} else {
 		/* enable PIT timer */
 		/* set for periodic (4) and LSB/MSB write (0x30) */
@@ -280,8 +296,10 @@ void __init time_init(void)
 		outb((mSEC_10_from_14/6) >> 8, 0x40);
 
 		gettimeoffset = isa_gettimeoffset;
-		timer_irq.handler = isa_timer_interrupt;
-		irq = IRQ_ISA_TIMER;
+
+		footbridge_timer_irq.name = "ISA Timer Tick";
+		footbrdige_timer_irq.handler = isa_timer_interrupt;
+		
+		setup_irq(IRQ_ISA, &footbridge_timer_irq);
 	}
-	setup_irq(irq, &timer_irq);
 }

@@ -137,5 +137,6 @@ MACHINE_START(MAINSTONE, "Intel HCDDBBVA0 Development Platform (aka Mainstone)")
 	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(mainstone_map_io)
 	INITIRQ(mainstone_init_irq)
+	INITTIME(pxa_init_time)
 	INIT_MACHINE(mainstone_init)
 MACHINE_END

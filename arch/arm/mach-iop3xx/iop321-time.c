@@ -23,7 +23,9 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
+
 #include <asm/mach/irq.h>
+#include <asm/mach/time.h>
 
 static unsigned long iop321_gettimeoffset(void)
 {
@@ -66,22 +68,21 @@ iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-extern unsigned long (*gettimeoffset)(void);
-
-static struct irqaction timer_irq = {
-	.name		= "timer",
+static struct irqaction iop321_timer_irq = {
+	.name		= "IOP321 Timer Tick",
 	.handler	= iop321_timer_interrupt,
+	.flags		= SA_INTERRUPT
 };
 
 extern int setup_arm_irq(int, struct irqaction*);
 
-void __init time_init(void)
+void __init iop321_init_time(void)
 {
 	u32 timer_ctl;
 	u32 latch = LATCH;
 
 	gettimeoffset = iop321_gettimeoffset;
-	setup_irq(IRQ_IOP321_TIMER0, &timer_irq);
+	setup_irq(IRQ_IOP321_TIMER0, &iop321_timer_irq);
 
 	timer_ctl = IOP321_TMR_EN | IOP321_TMR_PRIVILEGED | IOP321_TMR_RELOAD |
 			IOP321_TMR_RATIO_1_1;

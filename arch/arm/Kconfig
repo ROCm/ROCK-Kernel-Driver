@@ -191,6 +191,11 @@ config ARCH_ACORN
 	depends on ARCH_RPC
 	default y
 
+config TIMER_ACORN
+	bool
+	depends on ARCH_ACORN || ARCH_CLPS7500
+	default y
+
 #####################################################################
 # Footbridge support
 config FOOTBRIDGE

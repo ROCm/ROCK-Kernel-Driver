@@ -18,12 +18,17 @@
  */
 #include <linux/timex.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/sched.h>
 
 #include <asm/hardware.h>
+#include <asm/irq.h>
+#include <asm/leds.h>
 #include <asm/io.h>
 #include <asm/hardware/clps7111.h>
 
-extern unsigned long (*gettimeoffset)(void);
+#include <asm/mach/time.h>
+
 
 /*
  * gettimeoffset() returns time since last timer tick, in usecs.
@@ -38,18 +43,37 @@ static unsigned long clps711x_gettimeoffset(void)
 	return (hwticks * (tick_nsec / 1000)) / LATCH;
 }
 
-void __init clps711x_setup_timer(void)
+/*
+ * IRQ handler for the timer
+ */
+static irqreturn_t
+p720t_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	do_leds();
+	do_timer(regs);
+	do_profile(regs);
+	return IRQ_HANDLED;
+}
+
+static struct irqaction clps711x_timer_irq = {
+	.name		= "CLPS711x Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= p720t_timer_interrupt
+};
+
+void __init clps711x_init_time(void)
 {
 	struct timespec tv;
 	unsigned int syscon;
-
-	gettimeoffset = clps711x_gettimeoffset;
 
 	syscon = clps_readl(SYSCON1);
 	syscon |= SYSCON1_TC2S | SYSCON1_TC2M;
 	clps_writel(syscon, SYSCON1);
 
 	clps_writel(LATCH-1, TC2D); /* 512kHz / 100Hz - 1 */
+
+	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
+	gettimeoffset = clps711x_gettimeoffset;
 
 	tv.tv_nsec = 0;
 	tv.tv_sec = clps_readl(RTCDR);

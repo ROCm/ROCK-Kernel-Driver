@@ -9,6 +9,8 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/sched.h>
 
 #include <asm/elf.h>
 #include <asm/setup.h>
@@ -19,6 +21,7 @@
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+#include <asm/mach/time.h>
 
 extern unsigned long soft_irq_mask;
 
@@ -64,10 +67,34 @@ static void __init tbox_map_io(void)
 	iotable_init(tbox_io_desc, ARRAY_SIZE(tbox_io_desc));
 }
 
+static irqreturn_t
+tbox_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
+{
+	/* Clear irq */
+	__raw_writel(1, FPGA1CONT + 0xc); 
+	__raw_writel(0, FPGA1CONT + 0xc);
+
+	do_timer(regs);
+
+	return IRQ_HANDLED;
+}
+
+static struct irqaction tbox_timer_irq = {
+	.name		= "TBOX Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= tbox_timer_interrupt
+};
+
+void __init tbox_init_time(void)
+{
+	setup_irq(IRQ_TIMER, &timer_irq);
+}
+
 MACHINE_START(TBOX, "unknown-TBOX")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x80000000, 0x00400000, 0xe0000000)
 	MAPIO(tbox_map_io)
 	INITIRQ(tbox_init_irq)
+	INITIME(tbox_init_time)
 MACHINE_END
 

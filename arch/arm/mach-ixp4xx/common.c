@@ -36,6 +36,7 @@
 
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
+#include <asm/mach/time.h>
 
 
 /*************************************************************************
@@ -234,17 +235,15 @@ static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id, struct pt_regs 
 	return IRQ_HANDLED;
 }
 
-extern unsigned long (*gettimeoffset)(void);
-
-static struct irqaction timer_irq = {
-	.name	= "IXP4xx Timer Tick",
-	.flags	= SA_INTERRUPT
+static struct irqaction ixp4xx_timer_irq = {
+	.name		= "IXP4xx Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= ixp4xx_timer_interrupt
 };
 
-void __init time_init(void)
+void __init ixp4xx_init_time(void)
 {
 	gettimeoffset = ixp4xx_gettimeoffset;
-	timer_irq.handler = ixp4xx_timer_interrupt;
 
 	/* Clear Pending Interrupt by writing '1' to it */
 	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
@@ -257,7 +256,7 @@ void __init time_init(void)
 	last_jiffy_time = 0;
 
 	/* Connect the interrupt handler and enable the interrupt */
-	setup_irq(IRQ_IXP4XX_TIMER1, &timer_irq);
+	setup_irq(IRQ_IXP4XX_TIMER1, &ixp4xx_timer_irq);
 }
 
 
