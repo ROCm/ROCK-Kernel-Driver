@@ -928,7 +928,7 @@ static void poll_vortex(struct net_device *dev)
 	local_save_flags(flags);
 	local_irq_disable();
 	(vp->full_bus_master_rx ? boomerang_interrupt:vortex_interrupt)(dev->irq,dev,NULL);
-	local_restore_flags(flags);
+	local_irq_restore(flags);
 } 
 #endif
 
