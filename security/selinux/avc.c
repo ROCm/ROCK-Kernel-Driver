@@ -281,7 +281,7 @@ static inline int avc_reclaim_node(void)
 			continue;
 
 		list_for_each_entry(node, &avc_cache.slots[hvalue], list) {
-			if (!atomic_dec_and_test(&node->ae.used)) {
+			if (atomic_dec_and_test(&node->ae.used)) {
 				/* Recently Unused */
 				avc_node_delete(node);
 				ecx++;
