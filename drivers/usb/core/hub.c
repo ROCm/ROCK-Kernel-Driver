@@ -36,7 +36,9 @@
 #include "hcd.h"
 #include "hub.h"
 
-/* Protect struct usb_device state and children members */
+/* Protect struct usb_device->state and ->children members
+ * Note: Both are also protected by ->serialize, except that ->state can
+ * change to USB_STATE_NOTATTACHED even when the semaphore isn't held. */
 static spinlock_t device_state_lock = SPIN_LOCK_UNLOCKED;
 
 /* khubd's worklist and its lock */
@@ -857,17 +859,6 @@ static void hub_start_disconnect(struct usb_device *hdev)
 }
 
 
-static void recursively_mark_NOTATTACHED(struct usb_device *udev)
-{
-	int i;
-
-	for (i = 0; i < udev->maxchild; ++i) {
-		if (udev->children[i])
-			recursively_mark_NOTATTACHED(udev->children[i]);
-	}
-	udev->state = USB_STATE_NOTATTACHED;
-}
-
 /* grab device/port lock, returning index of that port (zero based).
  * protects the upstream link used by this device from concurrent
  * tree operations like suspend, resume, reset, and disconnect, which
@@ -884,21 +875,16 @@ static int locktree(struct usb_device *udev)
 	/* root hub is always the first lock in the series */
 	hdev = udev->parent;
 	if (!hdev) {
-		down(&udev->serialize);
+		usb_lock_device(udev);
 		return 0;
 	}
 
 	/* on the path from root to us, lock everything from
 	 * top down, dropping parent locks when not needed
-	 *
-	 * NOTE: if disconnect were to ignore the locking, we'd need
-	 * to get extra refcounts to everything since hdev->children
-	 * and udev->parent could be invalidated while we work...
 	 */
 	t = locktree(hdev);
 	if (t < 0)
 		return t;
-	spin_lock_irq(&device_state_lock);
 	for (t = 0; t < hdev->maxchild; t++) {
 		if (hdev->children[t] == udev) {
 			/* everything is fail-fast once disconnect
@@ -910,15 +896,24 @@ static int locktree(struct usb_device *udev)
 			/* when everyone grabs locks top->bottom,
 			 * non-overlapping work may be concurrent
 			 */
-			spin_unlock_irq(&device_state_lock);
 			down(&udev->serialize);
 			up(&hdev->serialize);
 			return t;
 		}
 	}
-	spin_unlock_irq(&device_state_lock);
-	up(&hdev->serialize);
+	usb_unlock_device(hdev);
 	return -ENODEV;
+}
+
+static void recursively_mark_NOTATTACHED(struct usb_device *udev)
+{
+	int i;
+
+	for (i = 0; i < udev->maxchild; ++i) {
+		if (udev->children[i])
+			recursively_mark_NOTATTACHED(udev->children[i]);
+	}
+	udev->state = USB_STATE_NOTATTACHED;
 }
 
 /**
@@ -926,17 +921,20 @@ static int locktree(struct usb_device *udev)
  * @udev: pointer to device whose state should be changed
  * @new_state: new state value to be stored
  *
- * udev->state is _not_ protected by the device lock.  This
+ * udev->state is _not_ fully protected by the device lock.  Although
+ * most transitions are made only while holding the lock, the state can
+ * can change to USB_STATE_NOTATTACHED at almost any time.  This
  * is so that devices can be marked as disconnected as soon as possible,
- * without having to wait for the semaphore to be released.  Instead,
- * changes to the state must be protected by the device_state_lock spinlock.
+ * without having to wait for any semaphores to be released.  As a result,
+ * all changes to any device's state must be protected by the
+ * device_state_lock spinlock.
  *
  * Once a device has been added to the device tree, all changes to its state
  * should be made using this routine.  The state should _not_ be set directly.
  *
  * If udev->state is already USB_STATE_NOTATTACHED then no change is made.
  * Otherwise udev->state is set to new_state, and if new_state is
- * USB_STATE_NOTATTACHED then all of udev's descendant's states are also set
+ * USB_STATE_NOTATTACHED then all of udev's descendants' states are also set
  * to USB_STATE_NOTATTACHED.
  */
 void usb_set_device_state(struct usb_device *udev,
@@ -987,11 +985,12 @@ static void release_address(struct usb_device *udev)
 
 /**
  * usb_disconnect - disconnect a device (usbcore-internal)
- * @pdev: pointer to device being disconnected, into a locked hub
+ * @pdev: pointer to device being disconnected
  * Context: !in_interrupt ()
  *
- * Something got disconnected. Get rid of it, and all of its children.
- * If *pdev is a normal device then the parent hub should be locked.
+ * Something got disconnected. Get rid of it and all of its children.
+ *
+ * If *pdev is a normal device then the parent hub must already be locked.
  * If *pdev is a root hub then this routine will acquire the
  * usb_bus_list_lock on behalf of the caller.
  *
@@ -1017,9 +1016,11 @@ void usb_disconnect(struct usb_device **pdev)
 	usb_set_device_state(udev, USB_STATE_NOTATTACHED);
 
 	/* lock the bus list on behalf of HCDs unregistering their root hubs */
-	if (!udev->parent)
+	if (!udev->parent) {
 		down(&usb_bus_list_lock);
-	down(&udev->serialize);
+		usb_lock_device(udev);
+	} else
+		down(&udev->serialize);
 
 	dev_info (&udev->dev, "USB disconnect, address %d\n", udev->devnum);
 
@@ -1044,14 +1045,16 @@ void usb_disconnect(struct usb_device **pdev)
 	usbfs_remove_device(udev);
 	usb_remove_sysfs_dev_files(udev);
 
-	/* Avoid races with recursively_mark_NOTATTACHED() and locktree() */
+	/* Avoid races with recursively_mark_NOTATTACHED() */
 	spin_lock_irq(&device_state_lock);
 	*pdev = NULL;
 	spin_unlock_irq(&device_state_lock);
 
-	up(&udev->serialize);
-	if (!udev->parent)
+	if (!udev->parent) {
+		usb_unlock_device(udev);
 		up(&usb_bus_list_lock);
+	} else
+		up(&udev->serialize);
 
 	device_unregister(&udev->dev);
 }
@@ -1516,16 +1519,14 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 {
 	int	status;
 
+	/* caller owns the udev device lock */
 	if (port < 0)
 		return port;
-
-	/* NOTE:  udev->serialize released on all real returns! */
 
 	if (state <= udev->dev.power.power_state
 			|| state < PM_SUSPEND_MEM
 			|| udev->state == USB_STATE_SUSPENDED
 			|| udev->state == USB_STATE_NOTATTACHED) {
-		up(&udev->serialize);
 		return 0;
 	}
 
@@ -1605,7 +1606,6 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 
 	if (status == 0)
 		udev->dev.power.power_state = state;
-	up(&udev->serialize);
 	return status;
 }
 
@@ -1629,7 +1629,15 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
  */
 int usb_suspend_device(struct usb_device *udev, u32 state)
 {
-	return __usb_suspend_device(udev, locktree(udev), state);
+	int	port, status;
+
+	port = locktree(udev);
+	if (port < 0)
+		return port;
+
+	status = __usb_suspend_device(udev, port, state);
+	usb_unlock_device(udev);
+	return status;
 }
 
 /*
@@ -1642,7 +1650,7 @@ static int finish_port_resume(struct usb_device *udev)
 	int	status;
 	u16	devstatus;
 
-	/* caller owns udev->serialize */
+	/* caller owns the udev device lock */
 	dev_dbg(&udev->dev, "usb resume\n");
 	udev->dev.power.power_state = PM_SUSPEND_ON;
 
@@ -1822,10 +1830,12 @@ int usb_resume_device(struct usb_device *udev)
 			status);
 	}
 
-	up(&udev->serialize);
+	usb_unlock_device(udev);
 
 	/* rebind drivers that had no suspend() */
+	usb_lock_all_devices();
 	bus_rescan_devices(&usb_bus_type);
+	usb_unlock_all_devices();
 
 	return status;
 }
@@ -1867,6 +1877,7 @@ static int hub_suspend(struct usb_interface *intf, u32 state)
 			continue;
 		down(&udev->serialize);
 		status = __usb_suspend_device(udev, port, state);
+		up(&udev->serialize);
 		if (status < 0)
 			dev_dbg(&intf->dev, "suspend port %d --> %d\n",
 				port, status);
@@ -2595,7 +2606,7 @@ static void hub_events(void)
 		}
 
 loop:
-		up(&hdev->serialize);
+		usb_unlock_device(hdev);
 		usb_put_dev(hdev);
 
         } /* end while (1) */

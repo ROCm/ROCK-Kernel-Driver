@@ -1132,6 +1132,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
  * use usb_set_interface() on the interfaces it claims.  Resetting the whole
  * configuration would affect other drivers' interfaces.
  *
+ * The caller must own the device lock.
+ *
  * Returns zero on success, else a negative error code.
  */
 int usb_reset_configuration(struct usb_device *dev)
@@ -1142,9 +1144,9 @@ int usb_reset_configuration(struct usb_device *dev)
 	if (dev->state == USB_STATE_SUSPENDED)
 		return -EHOSTUNREACH;
 
-	/* caller must own dev->serialize (config won't change)
-	 * and the usb bus readlock (so driver bindings are stable);
-	 * so calls during probe() are fine
+	/* caller must have locked the device and must own
+	 * the usb bus readlock (so driver bindings are stable);
+	 * calls during probe() are fine
 	 */
 
 	for (i = 1; i < 16; ++i) {
@@ -1199,7 +1201,7 @@ static void release_interface(struct device *dev)
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
- * Context: !in_interrupt(), caller holds dev->serialize
+ * Context: !in_interrupt(), caller owns the device lock
  *
  * This is used to enable non-default device modes.  Not all devices
  * use this kind of configurability; many devices only have one
@@ -1220,8 +1222,8 @@ static void release_interface(struct device *dev)
  * usb_set_interface().
  *
  * This call is synchronous. The calling context must be able to sleep,
- * and must not hold the driver model lock for USB; usb device driver
- * probe() methods may not use this routine.
+ * must own the device lock, and must not hold the driver model's USB
+ * bus rwsem; usb device driver probe() methods cannot use this routine.
  *
  * Returns zero on success, or else the status code returned by the
  * underlying call that failed.  On succesful completion, each interface
@@ -1235,8 +1237,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	struct usb_host_config *cp = NULL;
 	struct usb_interface **new_interfaces = NULL;
 	int n, nintf;
-
-	/* dev->serialize guards all config changes */
 
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {

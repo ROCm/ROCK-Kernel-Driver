@@ -451,7 +451,7 @@ static char *usb_dump_string(char *start, char *end, const struct usb_device *de
  * nbytes - the maximum number of bytes to write
  * skip_bytes - the number of bytes to skip before writing anything
  * file_offset - the offset into the devices file on completion
- * The caller must own the usbdev->serialize semaphore.
+ * The caller must own the device lock.
  */
 static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *skip_bytes, loff_t *file_offset,
 				struct usb_device *usbdev, struct usb_bus *bus, int level, int index, int count)
@@ -586,9 +586,9 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 		/* recurse through all children of the root hub */
 		if (!bus->root_hub)
 			continue;
-		down(&bus->root_hub->serialize);
+		usb_lock_device(bus->root_hub);
 		ret = usb_device_dump(&buf, &nbytes, &skip_bytes, ppos, bus->root_hub, bus, 0, 0, 0);
-		up(&bus->root_hub->serialize);
+		usb_unlock_device(bus->root_hub);
 		if (ret < 0) {
 			up(&usb_bus_list_lock);
 			return ret;

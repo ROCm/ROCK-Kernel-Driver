@@ -797,9 +797,9 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 		return (retval < 0) ? retval : -EMSGSIZE;
 	}
 
-	down (&usb_dev->serialize);
+	usb_lock_device (usb_dev);
 	retval = usb_new_device (usb_dev);
-	up (&usb_dev->serialize);
+	usb_unlock_device (usb_dev);
 	if (retval) {
 		usb_dev->bus->root_hub = NULL;
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",

@@ -22,6 +22,8 @@ extern int usb_get_device_descriptor(struct usb_device *dev,
 		unsigned int size);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 
+extern void usb_lock_all_devices(void);
+extern void usb_unlock_all_devices(void);
 
 /* for labeling diagnostics */
 extern const char *usbcore_name;

@@ -121,9 +121,9 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 #ifdef	CONFIG_USB_SUSPEND
 	(void) usb_suspend_device (hcd->self.root_hub, state);
 #else
-	down (&hcd->self.root_hub->serialize);
+	usb_lock_device (hcd->self.root_hub);
 	(void) ohci_hub_suspend (hcd);
-	up (&hcd->self.root_hub->serialize);
+	usb_unlock_device (hcd->self.root_hub);
 #endif
 
 	/* let things settle down a bit */
@@ -169,9 +169,9 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	/* get extra cleanup even if remote wakeup isn't in use */
 	retval = usb_resume_device (hcd->self.root_hub);
 #else
-	down (&hcd->self.root_hub->serialize);
+	usb_lock_device (hcd->self.root_hub);
 	retval = ohci_hub_resume (hcd);
-	up (&hcd->self.root_hub->serialize);
+	usb_unlock_device (hcd->self.root_hub);
 #endif
 
 	if (retval == 0) {

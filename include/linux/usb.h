@@ -281,6 +281,14 @@ struct usb_bus {
 
 struct usb_tt;
 
+/*
+ * struct usb_device - kernel's representation of a USB device
+ *
+ * FIXME: Write the kerneldoc!
+ *
+ * Usbcore drivers should not set usbdev->state directly.  Instead use
+ * usb_set_device_state().
+ */
 struct usb_device {
 	int		devnum;		/* Address on USB bus */
 	char		devpath [16];	/* Use in messages: /port/port/... */
@@ -330,6 +338,10 @@ struct usb_device {
 
 extern struct usb_device *usb_get_dev(struct usb_device *dev);
 extern void usb_put_dev(struct usb_device *dev);
+
+extern void usb_lock_device(struct usb_device *udev);
+extern int usb_trylock_device(struct usb_device *udev);
+extern void usb_unlock_device(struct usb_device *udev);
 
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);

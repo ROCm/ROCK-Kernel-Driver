@@ -138,7 +138,7 @@ static inline struct ed *find_head (struct ed *ed)
 	return ed;
 }
 
-/* caller owns root->serialize */
+/* caller has locked the root hub */
 static int ohci_hub_resume (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
@@ -282,9 +282,9 @@ static void ohci_rh_resume (void *_hcd)
 {
 	struct usb_hcd	*hcd = _hcd;
 
-	down (&hcd->self.root_hub->serialize);
+	usb_lock_device (hcd->self.root_hub);
 	(void) ohci_hub_resume (hcd);
-	up (&hcd->self.root_hub->serialize);
+	usb_unlock_device (hcd->self.root_hub);
 }
 
 #else
@@ -362,12 +362,12 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 			&& ((OHCI_CTRL_HCFS | OHCI_SCHED_ENABLES)
 					& ohci->hc_control)
 				== OHCI_USB_OPER
-			&& down_trylock (&hcd->self.root_hub->serialize) == 0
+			&& usb_trylock_device (hcd->self.root_hub)
 			) {
 		ohci_vdbg (ohci, "autosuspend\n");
 		(void) ohci_hub_suspend (&ohci->hcd);
 		ohci->hcd.state = USB_STATE_RUNNING;
-		up (&hcd->self.root_hub->serialize);
+		usb_unlock_device (hcd->self.root_hub);
 	}
 #endif
 

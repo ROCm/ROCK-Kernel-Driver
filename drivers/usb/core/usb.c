@@ -39,6 +39,7 @@
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
+#include <linux/rwsem.h>
 #include <linux/usb.h>
 
 #include <asm/io.h>
@@ -61,6 +62,8 @@ const char *usbcore_name = "usbcore";
 
 int nousb;		/* Disable USB when built into kernel image */
 			/* Not honored on modular build */
+
+static DECLARE_RWSEM(usb_all_devices_rwsem);
 
 
 static int generic_probe (struct device *dev)
@@ -151,7 +154,9 @@ int usb_register(struct usb_driver *new_driver)
 	new_driver->driver.probe = usb_probe_interface;
 	new_driver->driver.remove = usb_unbind_interface;
 
+	usb_lock_all_devices();
 	retval = driver_register(&new_driver->driver);
+	usb_unlock_all_devices();
 
 	if (!retval) {
 		pr_info("%s: registered new driver %s\n",
@@ -180,7 +185,9 @@ void usb_deregister(struct usb_driver *driver)
 {
 	pr_info("%s: deregistering driver %s\n", usbcore_name, driver->name);
 
+	usb_lock_all_devices();
 	driver_unregister (&driver->driver);
+	usb_unlock_all_devices();
 
 	usbfs_update_special();
 }
@@ -202,7 +209,7 @@ void usb_deregister(struct usb_driver *driver)
  * alternate settings available for this interfaces.
  *
  * Don't call this function unless you are bound to one of the interfaces
- * on this device or you own the dev->serialize semaphore!
+ * on this device or you have locked the device!
  */
 struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 {
@@ -235,7 +242,7 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
  * drivers avoid such mistakes.
  *
  * Don't call this function unless you are bound to the intf interface
- * or you own the device's ->serialize semaphore!
+ * or you have locked the device!
  */
 struct usb_host_interface *usb_altnum_to_altsetting(struct usb_interface *intf,
 		unsigned int altnum)
@@ -303,11 +310,12 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
  * way to bind to an interface is to return the private data from
  * the driver's probe() method.
  *
- * Callers must own the driver model's usb bus writelock.  So driver
- * probe() entries don't need extra locking, but other call contexts
- * may need to explicitly claim that lock.
+ * Callers must own the device lock and the driver model's usb_bus_type.subsys
+ * writelock.  So driver probe() entries don't need extra locking,
+ * but other call contexts may need to explicitly claim those locks.
  */
-int usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *iface, void* priv)
+int usb_driver_claim_interface(struct usb_driver *driver,
+				struct usb_interface *iface, void* priv)
 {
 	struct device *dev = &iface->dev;
 
@@ -336,8 +344,8 @@ int usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *
  * also causes the driver disconnect() method to be called.
  *
  * This call is synchronous, and may not be used in an interrupt context.
- * Callers must own the usb_device serialize semaphore and the driver model's
- * usb bus writelock.  So driver disconnect() entries don't need extra locking,
+ * Callers must own the device lock and the driver model's usb_bus_type.subsys
+ * writelock.  So driver disconnect() entries don't need extra locking,
  * but other call contexts may need to explicitly claim those locks.
  */
 void usb_driver_release_interface(struct usb_driver *driver,
@@ -830,6 +838,112 @@ void usb_put_intf(struct usb_interface *intf)
 		put_device(&intf->dev);
 }
 
+
+/*			USB device locking
+ *
+ * Although locking USB devices should be straightforward, it is
+ * complicated by the way the driver-model core works.  When a new USB
+ * driver is registered or unregistered, the core will automatically
+ * probe or disconnect all matching interfaces on all USB devices while
+ * holding the USB subsystem writelock.  There's no good way for us to
+ * tell which devices will be used or to lock them beforehand; our only
+ * option is to effectively lock all the USB devices.
+ *
+ * We do that by using a private rw-semaphore, usb_all_devices_rwsem.
+ * When locking an individual device you must first acquire the rwsem's
+ * readlock.  When a driver is registered or unregistered the writelock
+ * must be held.  These actions are encapsulated in the subroutines
+ * below, so all a driver needs to do is call usb_lock_device() and
+ * usb_unlock_device().
+ *
+ * Complications arise when several devices are to be locked at the same
+ * time.  Only hub-aware drivers that are part of usbcore ever have to
+ * do this; nobody else needs to worry about it.  The problem is that
+ * usb_lock_device() must not be called to lock a second device since it
+ * would acquire the rwsem's readlock reentrantly, leading to deadlock if
+ * another thread was waiting for the writelock.  The solution is simple:
+ *
+ *	When locking more than one device, call usb_lock_device()
+ *	to lock the first one.  Lock the others by calling
+ *	down(&udev->serialize) directly.
+ *
+ *	When unlocking multiple devices, use up(&udev->serialize)
+ *	to unlock all but the last one.  Unlock the last one by
+ *	calling usb_unlock_device().
+ *
+ *	When locking both a device and its parent, always lock the
+ *	the parent first.
+ */
+
+/**
+ * usb_lock_device - acquire the lock for a usb device structure
+ * @udev: device that's being locked
+ *
+ * Use this routine when you don't hold any other device locks;
+ * to acquire nested inner locks call down(&udev->serialize) directly.
+ * This is necessary for proper interaction with usb_lock_all_devices().
+ */
+void usb_lock_device(struct usb_device *udev)
+{
+	down_read(&usb_all_devices_rwsem);
+	down(&udev->serialize);
+}
+
+/**
+ * usb_trylock_device - attempt to acquire the lock for a usb device structure
+ * @udev: device that's being locked
+ *
+ * Don't use this routine if you already hold a device lock;
+ * use down_trylock(&udev->serialize) instead.
+ * This is necessary for proper interaction with usb_lock_all_devices().
+ *
+ * Returns 1 if successful, 0 if contention.
+ */
+int usb_trylock_device(struct usb_device *udev)
+{
+	if (!down_read_trylock(&usb_all_devices_rwsem))
+		return 0;
+	if (down_trylock(&udev->serialize)) {
+		up_read(&usb_all_devices_rwsem);
+		return 0;
+	}
+	return 1;
+}
+
+/**
+ * usb_unlock_device - release the lock for a usb device structure
+ * @udev: device that's being unlocked
+ *
+ * Use this routine when releasing the only device lock you hold;
+ * to release inner nested locks call up(&udev->serialize) directly.
+ * This is necessary for proper interaction with usb_lock_all_devices().
+ */
+void usb_unlock_device(struct usb_device *udev)
+{
+	up(&udev->serialize);
+	up_read(&usb_all_devices_rwsem);
+}
+
+/**
+ * usb_lock_all_devices - acquire the lock for all usb device structures
+ *
+ * This is necessary when registering a new driver or probing a bus,
+ * since the driver-model core may try to use any usb_device.
+ */
+void usb_lock_all_devices(void)
+{
+	down_write(&usb_all_devices_rwsem);
+}
+
+/**
+ * usb_unlock_all_devices - release the lock for all usb device structures
+ */
+void usb_unlock_all_devices(void)
+{
+	up_write(&usb_all_devices_rwsem);
+}
+
+
 static struct usb_device *match_device(struct usb_device *dev,
 				       u16 vendor_id, u16 product_id)
 {
@@ -851,8 +965,10 @@ static struct usb_device *match_device(struct usb_device *dev,
 	/* look through all of the children of this device */
 	for (child = 0; child < dev->maxchild; ++child) {
 		if (dev->children[child]) {
+			down(&dev->children[child]->serialize);
 			ret_dev = match_device(dev->children[child],
 					       vendor_id, product_id);
+			up(&dev->children[child]->serialize);
 			if (ret_dev)
 				goto exit;
 		}
@@ -887,7 +1003,9 @@ struct usb_device *usb_find_device(u16 vendor_id, u16 product_id)
 		bus = container_of(buslist, struct usb_bus, bus_list);
 		if (!bus->root_hub)
 			continue;
+		usb_lock_device(bus->root_hub);
 		dev = match_device(bus->root_hub, vendor_id, product_id);
+		usb_unlock_device(bus->root_hub);
 		if (dev)
 			goto exit;
 	}
@@ -1372,6 +1490,10 @@ EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_put_dev);
 EXPORT_SYMBOL(usb_get_dev);
 EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
+
+EXPORT_SYMBOL(usb_lock_device);
+EXPORT_SYMBOL(usb_trylock_device);
+EXPORT_SYMBOL(usb_unlock_device);
 
 EXPORT_SYMBOL(usb_driver_claim_interface);
 EXPORT_SYMBOL(usb_driver_release_interface);
