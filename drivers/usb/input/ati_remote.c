@@ -418,6 +418,7 @@ static int ati_remote_sendpacket(struct ati_remote *ati_remote, u16 cmd, unsigne
 
 	while (timeout && (ati_remote->out_urb->status == -EINPROGRESS) 
 	       && !(ati_remote->send_flags & SEND_FLAG_COMPLETE)) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
 		rmb();
 	}
