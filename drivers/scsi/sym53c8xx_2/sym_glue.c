@@ -667,14 +667,15 @@ void sym_log_bus_error(struct sym_hcb *np)
  */
 static void sym_requeue_awaiting_cmds(struct sym_hcb *np)
 {
-	struct scsi_cmnd *cmd;
-	struct sym_ucmd *ucp = SYM_UCMD_PTR(cmd);
+	struct sym_ucmd *ucp;
 	SYM_QUEHEAD tmp_cmdq;
 	int sts;
 
 	sym_que_move(&np->s.wait_cmdq, &tmp_cmdq);
 
 	while ((ucp = (struct sym_ucmd *) sym_remque_head(&tmp_cmdq)) != 0) {
+		struct scsi_cmnd *cmd;
+
 		sym_insque_tail(&ucp->link_cmdq, &np->s.busy_cmdq);
 		cmd = SYM_SCMD_PTR(ucp);
 		sts = sym_queue_command(np, cmd);
