@@ -3914,7 +3914,7 @@ static void __init register_devfs_entries (int drive)
     {NULL, t360, t1200, t3in+5+8, t3in+5, t3in, t3in};
 
     base_minor = (drive < 4) ? drive : (124 + drive);
-    if (UDP->cmos <= NUMBER(default_drive_params)) {
+    if (UDP->cmos < NUMBER(default_drive_params)) {
 	i = 0;
 	do {
 	    char name[16];

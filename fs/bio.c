@@ -377,7 +377,7 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 		/*
 		 * iterate iovec list and alloc pages + copy data
 		 */
-		bio_for_each_segment(bv, bio, i) {
+		__bio_for_each_segment(bv, bio, i, 0) {
 			struct bio_vec *bbv = &b->bi_io_vec[i];
 			char *vfrom, *vto;
 
@@ -392,8 +392,7 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 				vfrom = kmap(bv->bv_page);
 				vto = kmap(bbv->bv_page);
 			} else {
-				__save_flags(flags);
-				__cli();
+				local_irq_save(flags);
 				vfrom = kmap_atomic(bv->bv_page, KM_BIO_IRQ);
 				vto = kmap_atomic(bbv->bv_page, KM_BIO_IRQ);
 			}
@@ -405,7 +404,7 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 			} else {
 				kunmap_atomic(vto, KM_BIO_IRQ);
 				kunmap_atomic(vfrom, KM_BIO_IRQ);
-				__restore_flags(flags);
+				local_irq_restore(flags);
 			}
 
 fill_in:
@@ -424,10 +423,8 @@ fill_in:
 	return b;
 
 oom:
-	while (i >= 0) {
+	while (--i >= 0)
 		__free_page(b->bi_io_vec[i].bv_page);
-		i--;
-	}
 
 	bio_pool_put(b);
 	return NULL;
@@ -613,6 +610,11 @@ out:
 	if (err)
 		kio->errno = err;
 
+	/*
+	 * final atomic_dec of io_count to match our initial setting of 1.
+	 * I/O may or may not have completed at this point, final completion
+	 * handler is only run on last decrement.
+	 */
 	end_kio_request(kio, !err);
 }
 

@@ -113,10 +113,6 @@ struct iobus_driver {
 	int	(*add_device)	(struct iobus*, char*);
 };
 
-extern int iobus_register_driver(struct iobus_driver * driver);
-extern void iobus_unregister_driver(struct iobus_driver * driver);
-extern struct iobus_driver * iobus_find_driver(char *name);
-
 struct iobus {
 	spinlock_t	lock;		/* lock for bus */
 	atomic_t	refcount;

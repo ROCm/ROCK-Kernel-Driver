@@ -61,6 +61,12 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
 	BUG_ON(next_rq->flags & REQ_STARTED);
 
 	/*
+	 * not a sector based request
+	 */
+	if (!(next_rq->flags & REQ_CMD))
+		return 0;
+
+	/*
 	 * if the device is different (not a normal case) just check if
 	 * bio is after rq
 	 */
@@ -95,6 +101,9 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
  */
 inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 {
+	if (!(rq->flags & REQ_CMD))
+		return 0;
+
 	/*
 	 * different data direction or already started, don't merge
 	 */
@@ -133,6 +142,8 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 			break;
 		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
+		if (!(__rq->flags & REQ_CMD))
+			continue;
 
 		if (!*req && bio_rq_in_between(bio, __rq, &q->queue_head))
 			*req = __rq;
@@ -225,6 +236,9 @@ int elevator_noop_merge(request_queue_t *q, struct request **req,
 
 		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
+
+		if (!(__rq->flags & REQ_CMD))
+			continue;
 
 		if (!elv_rq_merge_ok(__rq, bio))
 			continue;

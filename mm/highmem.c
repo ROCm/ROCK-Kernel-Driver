@@ -214,7 +214,7 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	struct bio_vec *tovec, *fromvec;
 	int i;
 
-	bio_for_each_segment(tovec, to, i) {
+	__bio_for_each_segment(tovec, to, i, 0) {
 		fromvec = &from->bi_io_vec[i];
 
 		/*
@@ -225,12 +225,11 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 
 		vfrom = page_address(fromvec->bv_page) + fromvec->bv_offset;
 
-		__save_flags(flags);
-		__cli();
+		local_irq_save(flags);
 		vto = kmap_atomic(tovec->bv_page, KM_BOUNCE_READ);
-		memcpy(vto + tovec->bv_offset, vfrom, to->bi_size);
+		memcpy(vto + tovec->bv_offset, vfrom, tovec->bv_len);
 		kunmap_atomic(vto, KM_BOUNCE_READ);
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -263,28 +262,39 @@ __initcall(init_emergency_pool);
 static inline int bounce_end_io (struct bio *bio, int nr_sectors)
 {
 	struct bio *bio_orig = bio->bi_private;
-	struct page *page = bio_page(bio);
+	struct bio_vec *bvec, *org_vec;
 	unsigned long flags;
-	int ret;
+	int ret, i;
 
-	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
-		set_bit(BIO_UPTODATE, &bio_orig->bi_flags);
+	if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
+		goto out_eio;
 
-	ret = bio_orig->bi_end_io(bio_orig, nr_sectors);
+	set_bit(BIO_UPTODATE, &bio_orig->bi_flags);
 
+	/*
+	 * free up bounce indirect pages used
+	 */
 	spin_lock_irqsave(&emergency_lock, flags);
-	if (nr_emergency_pages >= POOL_SIZE) {
-		spin_unlock_irqrestore(&emergency_lock, flags);
-		__free_page(page);
-	} else {
-		/*
-		 * We are abusing page->list to manage
-		 * the highmem emergency pool:
-		 */
-		list_add(&page->list, &emergency_pages);
-		nr_emergency_pages++;
-		spin_unlock_irqrestore(&emergency_lock, flags);
+	__bio_for_each_segment(bvec, bio, i, 0) {
+		org_vec = &bio_orig->bi_io_vec[i];
+		if (bvec->bv_page == org_vec->bv_page)
+			continue;
+	
+		if (nr_emergency_pages >= POOL_SIZE)
+			__free_page(bvec->bv_page);
+		else {
+			/*
+			 * We are abusing page->list to manage
+			 * the highmem emergency pool:
+			 */
+			list_add(&bvec->bv_page->list, &emergency_pages);
+			nr_emergency_pages++;
+		}
 	}
+	spin_unlock_irqrestore(&emergency_lock, flags);
+
+out_eio:
+	ret = bio_orig->bi_end_io(bio_orig, nr_sectors);
 
 	bio_put(bio);
 	return ret;

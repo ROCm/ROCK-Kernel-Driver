@@ -291,12 +291,12 @@ static int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
 	if (!(rq->flags & REQ_CMD))
 		return 0;
 
+	memset(rq->cmd, 0, sizeof(rq->cmd));
+
 	if (rq_data_dir(rq) == READ)
 		rq->cmd[0] = READ_10;
 	else 
 		rq->cmd[0] = WRITE_10;
-
-	rq->cmd[1] = 0;
 
 	/*
 	 * fill in lba
@@ -305,7 +305,6 @@ static int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
 	rq->cmd[3] = (block >> 16) & 0xff;
 	rq->cmd[4] = (block >>  8) & 0xff;
 	rq->cmd[5] = block & 0xff;
-	rq->cmd[6] = 0;
 
 	/*
 	 * and transfer length
@@ -347,7 +346,7 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 	unsigned long long lastend;
 	struct bio_vec *bvec;
 	struct bio *bio;
-	int nsegs, i, cluster, j;
+	int nsegs, i, cluster;
 
 	nsegs = 0;
 	bio = rq->bio;
@@ -357,9 +356,7 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 	/*
 	 * for each bio in rq
 	 */
-	j = 0;
 	rq_for_each_bio(bio, rq) {
-		j++;
 		/*
 		 * for each segment in bio
 		 */
@@ -386,7 +383,6 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 new_segment:
 				if (nsegs > q->max_segments) {
 					printk("map: %d >= %d\n", nsegs, q->max_segments);
-					printk("map %d, %d, bio_sectors %d, vcnt %d\n", i, j, bio_sectors(bio), bio->bi_vcnt);
 					BUG();
 				}
 
@@ -411,7 +407,7 @@ new_segment:
 static inline int ll_new_segment(request_queue_t *q, struct request *req,
 				 struct bio *bio)
 {
-	if (req->nr_segments + bio->bi_vcnt < q->max_segments) {
+	if (req->nr_segments + bio->bi_vcnt <= q->max_segments) {
 		req->nr_segments += bio->bi_vcnt;
 		return 1;
 	}
@@ -480,9 +476,17 @@ void blk_plug_device(request_queue_t *q)
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
-	if (test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
-		if (!elv_queue_empty(q))
-			q->request_fn(q);
+	/*
+	 * not plugged
+	 */
+	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+		return;
+
+	/*
+	 * was plugged, fire request_fn if queue has stuff to do
+	 */
+	if (!elv_queue_empty(q))
+		q->request_fn(q);
 }
 
 /**

@@ -50,11 +50,6 @@ int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
 static spinlock_t device_lock;
-static LIST_HEAD(device_gc_list);
-
-static int kdeviced_pid = 0;
-static DECLARE_WAIT_QUEUE_HEAD(kdeviced_wait);
-static DECLARE_COMPLETION(kdeviced_exited);
 
 static ssize_t device_read_status(char *, size_t, loff_t, void *);
 static ssize_t device_write_status(const char *, size_t, loff_t, void *);
@@ -379,12 +374,24 @@ void put_device(struct device * dev)
 	list_del_init(&dev->node);
 	unlock_iobus(parent);
 
-	/* queue the device to be removed by the reaper. */
-	spin_lock(&device_lock);
-	list_add_tail(&dev->node,&device_gc_list);
-	spin_unlock(&device_lock);
+	/* remove the driverfs directory */
+	device_remove_dir(dev);
 
-	wake_up(&kdeviced_wait);
+	if (dev->subordinate)
+		iobus_remove_dir(dev->subordinate);
+
+	/* Notify the platform of the removal, in case they
+	 * need to do anything...
+	 */
+	if (platform_notify_remove)
+		platform_notify_remove(dev);
+
+	/* Tell the driver to clean up after itself.
+	 * Note that we likely didn't allocate the device,
+	 * so this is the driver's chance to free that up...
+	 */
+	if (dev->driver && dev->driver->remove)
+		dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
 
 	put_iobus(parent);
 }
@@ -875,76 +882,6 @@ static ssize_t iobus_write_status(const char *buf, size_t count, loff_t off, voi
 	return error < 0 ? error : count;
 }
 
-/* Device Garbage Collection
- * When a device's reference count reaches 0, it is removed from it's
- * parent's list and added to a list of devices waiting to be removed.
- *
- * We don't directly remove it ourselves, because someone could have an
- * open file.
- *
- * We don't allocate an event for keventd, becuase we may be here from
- * an interrupt; and how do those things get freed, anyway?
- *
- * Instead, when a device's reference count reaches 0, it is removed
- * from its parent's list of children and added to the list of devices
- * to be reaped.
- *
- * When we spawn a thread that gets woken up every time a device is added
- * to the unused list.
- */
-static inline void __reap_device(struct device * dev)
-{
-	/* FIXME: What do we do for a bridge? */
-
-	/* remove the driverfs directory */
-	device_remove_dir(dev);
-
-	if (dev->subordinate)
-		iobus_remove_dir(dev->subordinate);
-
-	/* Notify the platform of the removal, in case they
-	 * need to do anything...
-	 */
-	if (platform_notify_remove)
-		platform_notify_remove(dev);
-
-	/* Tell the driver to clean up after itself.
-	 * Note that we likely didn't allocate the device,
-	 * so this is the driver's chance to free that up...
-	 */
-	if (dev->driver && dev->driver->remove)
-		dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
-}
-
-static int device_cleanup_thread(void * data)
-{
-	daemonize();
-
-	strcpy(current->comm,"kdeviced");
-
-	do {
-		struct list_head * node;
-
-		spin_lock(&device_lock);
-		node = device_gc_list.next;
-		while(node != &device_gc_list) {
-			list_del_init(node);
-			spin_unlock(&device_lock);
-			__reap_device(list_to_dev(node));
-
-			spin_lock(&device_lock);
-			node = device_gc_list.next;
-		}
-		spin_unlock(&device_lock);
-
-		interruptible_sleep_on(&kdeviced_wait);
-	} while(!signal_pending(current));
-
-	DBG("kdeviced exiting\n");
-	complete_and_exit(&kdeviced_exited,0);
-	return 0;
-}
-
 static int __init device_init_root(void)
 {
 	/* initialize parent bus lists */
@@ -981,27 +918,13 @@ int __init device_driver_init(void)
 		return error;
 	}
 
-	/* initialise the garbage collection */
-	pid = kernel_thread(device_cleanup_thread,NULL,
-			    (CLONE_FS | CLONE_FILES | CLONE_SIGHAND));
-	if (pid > 0)
-		kdeviced_pid = pid;
-	else {
-		DBG("DEV: Could not start cleanup thread\n");
-		return pid;
-	}
-
 	DBG("DEV: Done Initialising\n");
 	return error;
 }
 
 void __exit device_driver_exit(void)
 {
-	if (kdeviced_pid) {
-		kill_proc(kdeviced_pid,SIGTERM,1);
-		kdeviced_pid = 0;
-		wait_for_completion(&kdeviced_exited);
-	}
+
 }
 
 static int __init device_setup(char *str)

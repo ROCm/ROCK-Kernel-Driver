@@ -21,35 +21,20 @@
  */
 
 #include <linux/config.h>
-#include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/fd.h>
-#include <linux/init.h>
 #include <linux/major.h>
-#include <linux/quotaops.h>
 #include <linux/acct.h>
 
 #include <asm/uaccess.h>
-
-#include <linux/nfs_fs.h>
-#include <linux/nfs_fs_sb.h>
-#include <linux/nfs_mount.h>
 
 #include <linux/kmod.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 
-extern void wait_for_keypress(void);
-
-extern int root_mountflags;
-
 int do_remount_sb(struct super_block *sb, int flags, void * data);
-
-/* this is initialized in init/main.c */
-kdev_t ROOT_DEV;
 
 LIST_HEAD(super_blocks);
 spinlock_t sb_lock = SPIN_LOCK_UNLOCKED;
@@ -429,10 +414,6 @@ struct vfsmount *alloc_vfsmnt(void);
 void free_vfsmnt(struct vfsmount *mnt);
 void set_devname(struct vfsmount *mnt, const char *name);
 
-/* Will go away */
-extern struct vfsmount *root_vfsmnt;
-extern int graft_tree(struct vfsmount *mnt, struct nameidata *nd);
-
 static inline struct super_block * find_super(kdev_t dev)
 {
 	struct list_head *p;
@@ -547,37 +528,6 @@ asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
         err = copy_to_user(ubuf,&tmp,sizeof(struct ustat)) ? -EFAULT : 0;
 out:
 	return err;
-}
-
-static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
-				       struct file_system_type *type, int flags,
-				       void *data)
-{
-	struct super_block * s;
-	s = alloc_super();
-	if (!s)
-		goto out;
-	s->s_dev = dev;
-	s->s_bdev = bdev;
-	s->s_flags = flags;
-	spin_lock(&sb_lock);
-	insert_super(s, type);
-	lock_super(s);
-	if (!type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
-		goto out_fail;
-	s->s_flags |= MS_ACTIVE;
-	unlock_super(s);
-	/* tell bdcache that we are going to keep this one */
-	if (bdev)
-		atomic_inc(&bdev->bd_count);
-out:
-	return s;
-
-out_fail:
-	unlock_super(s);
-	deactivate_super(s);
-	remove_super(s);
-	return NULL;
 }
 
 /*
@@ -708,17 +658,30 @@ out:
 static struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void * data)
 {
-	kdev_t dev;
-	int error = -EMFILE;
-	dev = get_unnamed_dev();
-	if (dev) {
-		struct super_block * sb;
-		error = -EINVAL;
-		sb = read_super(dev, NULL, fs_type, flags, data);
-		if (sb)
-			return sb;
+	struct super_block *s = alloc_super();
+
+	if (!s)
+		return ERR_PTR(-ENOMEM);
+	s->s_dev = get_unnamed_dev();
+	if (!s->s_dev) {
+		destroy_super(s);
+		return ERR_PTR(-EMFILE);
 	}
-	return ERR_PTR(error);
+	s->s_flags = flags;
+	spin_lock(&sb_lock);
+	insert_super(s, fs_type);
+	lock_super(s);
+	if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
+		goto out_fail;
+	s->s_flags |= MS_ACTIVE;
+	unlock_super(s);
+	return s;
+
+out_fail:
+	unlock_super(s);
+	deactivate_super(s);
+	remove_super(s);
+	return ERR_PTR(-EINVAL);
 }
 
 static struct super_block *get_sb_single(struct file_system_type *fs_type,
@@ -743,13 +706,12 @@ retry:
 		do_remount_sb(old, flags, data);
 		return old;
 	} else {
-		kdev_t dev = get_unnamed_dev();
-		if (!dev) {
+		s->s_dev = get_unnamed_dev();
+		if (!s->s_dev) {
 			spin_unlock(&sb_lock);
 			destroy_super(s);
 			return ERR_PTR(-EMFILE);
 		}
-		s->s_dev = dev;
 		s->s_flags = flags;
 		insert_super(s, fs_type);
 		lock_super(s);
@@ -898,213 +860,4 @@ fs_out:
 struct vfsmount *kern_mount(struct file_system_type *type)
 {
 	return do_kern_mount((char *)type->name, 0, (char *)type->name, NULL);
-}
-
-static char * __initdata root_mount_data;
-static int __init root_data_setup(char *str)
-{
-	root_mount_data = str;
-	return 1;
-}
-
-static char * __initdata root_fs_names;
-static int __init fs_names_setup(char *str)
-{
-	root_fs_names = str;
-	return 1;
-}
-
-__setup("rootflags=", root_data_setup);
-__setup("rootfstype=", fs_names_setup);
-
-static void __init get_fs_names(char *page)
-{
-	char *s = page;
-
-	if (root_fs_names) {
-		strcpy(page, root_fs_names);
-		while (*s++) {
-			if (s[-1] == ',')
-				s[-1] = '\0';
-		}
-	} else {
-		int len = get_filesystem_list(page);
-		char *p, *next;
-
-		page[len] = '\0';
-		for (p = page-1; p; p = next) {
-			next = strchr(++p, '\n');
-			if (*p++ != '\t')
-				continue;
-			while ((*s++ = *p++) != '\n')
-				;
-			s[-1] = '\0';
-		}
-	}
-	*s = '\0';
-}
-
-void __init mount_root(void)
-{
-	struct nameidata root_nd;
-	struct super_block * sb;
-	struct vfsmount *vfsmnt;
-	struct block_device *bdev = NULL;
-	mode_t mode;
-	int retval;
-	void *handle;
-	char path[64];
-	char *name = "/dev/root";
-	char *fs_names, *p;
-#ifdef CONFIG_ROOT_NFS
-	void *data;
-#endif
-	root_mountflags |= MS_VERBOSE;
-
-#ifdef CONFIG_ROOT_NFS
-	if (MAJOR(ROOT_DEV) != UNNAMED_MAJOR)
-		goto skip_nfs;
-	data = nfs_root_data();
-	if (!data)
-		goto no_nfs;
-	vfsmnt = do_kern_mount("nfs", root_mountflags, "/dev/root", data);
-	if (!IS_ERR(vfsmnt)) {
-		printk ("VFS: Mounted root (%s filesystem).\n", "nfs");
-		ROOT_DEV = vfsmnt->mnt_sb->s_dev;
-		goto attach_it;
-	}
-no_nfs:
-	printk(KERN_ERR "VFS: Unable to mount root fs via NFS, trying floppy.\n");
-	ROOT_DEV = MKDEV(FLOPPY_MAJOR, 0);
-skip_nfs:
-#endif
-
-#ifdef CONFIG_BLK_DEV_FD
-	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {
-#ifdef CONFIG_BLK_DEV_RAM
-		extern int rd_doload;
-		extern void rd_load_secondary(void);
-#endif
-		floppy_eject();
-#ifndef CONFIG_BLK_DEV_RAM
-		printk(KERN_NOTICE "(Warning, this kernel has no ramdisk support)\n");
-#else
-		/* rd_doload is 2 for a dual initrd/ramload setup */
-		if(rd_doload==2)
-			rd_load_secondary();
-		else
-#endif
-		{
-			printk(KERN_NOTICE "VFS: Insert root floppy and press ENTER\n");
-			wait_for_keypress();
-		}
-	}
-#endif
-
-	fs_names = __getname();
-	get_fs_names(fs_names);
-
-	devfs_make_root (root_device_name);
-	handle = devfs_find_handle (NULL, ROOT_DEVICE_NAME,
-	                            MAJOR (ROOT_DEV), MINOR (ROOT_DEV),
-				    DEVFS_SPECIAL_BLK, 1);
-	if (handle) {
-		int n;
-		unsigned major, minor;
-
-		devfs_get_maj_min (handle, &major, &minor);
-		ROOT_DEV = MKDEV (major, minor);
-		if (!ROOT_DEV)
-			panic("I have no root and I want to scream");
-		n = devfs_generate_path (handle, path + 5, sizeof (path) - 5);
-		if (n >= 0) {
-			name = path + n;
-			devfs_mk_symlink (NULL, "root", DEVFS_FL_DEFAULT,
-					  name + 5, NULL, NULL);
-			memcpy (name, "/dev/", 5);
-		}
-	}
-
-retry:
-	bdev = bdget(kdev_t_to_nr(ROOT_DEV));
-	if (!bdev)
-		panic(__FUNCTION__ ": unable to allocate root device");
-	bdev->bd_op = devfs_get_ops (handle);
-	mode = FMODE_READ;
-	if (!(root_mountflags & MS_RDONLY))
-		mode |= FMODE_WRITE;
-	retval = blkdev_get(bdev, mode, 0, BDEV_FS);
-	if (retval == -EROFS) {
-		root_mountflags |= MS_RDONLY;
-		goto retry;
-	}
-	if (retval) {
-	        /*
-		 * Allow the user to distinguish between failed open
-		 * and bad superblock on root device.
-		 */
-Eio:
-		printk ("VFS: Cannot open root device \"%s\" or %s\n",
-			root_device_name, kdevname (ROOT_DEV));
-		printk ("Please append a correct \"root=\" boot option\n");
-		panic("VFS: Unable to mount root fs on %s",
-			kdevname(ROOT_DEV));
-	}
-
-	check_disk_change(ROOT_DEV);
-	sb = get_super(ROOT_DEV);
-	if (sb) {
-		/* FIXME */
-		p = (char *)sb->s_type->name;
-		atomic_inc(&sb->s_active);
-		up_read(&sb->s_umount);
-		down_write(&sb->s_umount);
-		goto mount_it;
-	}
-
-	for (p = fs_names; *p; p += strlen(p)+1) {
-		struct file_system_type * fs_type = get_fs_type(p);
-		if (!fs_type)
-  			continue;
-		atomic_inc(&bdev->bd_count);
-		retval = blkdev_get(bdev, mode, 0, BDEV_FS);
-		if (retval)
-			goto Eio;
-  		sb = read_super(ROOT_DEV, bdev, fs_type,
-				root_mountflags, root_mount_data);
-		put_filesystem(fs_type);
-		if (sb) {
-			blkdev_put(bdev, BDEV_FS);
-			goto mount_it;
-		}
-	}
-	panic("VFS: Unable to mount root fs on %s", kdevname(ROOT_DEV));
-
-mount_it:
-	/* FIXME */
-	up_write(&sb->s_umount);
-	printk ("VFS: Mounted root (%s filesystem)%s.\n", p,
-		(sb->s_flags & MS_RDONLY) ? " readonly" : "");
-	putname(fs_names);
-	vfsmnt = alloc_vfsmnt();
-	if (!vfsmnt)
-		panic("VFS: alloc_vfsmnt failed for root fs");
-
-	set_devname(vfsmnt, name);
-	vfsmnt->mnt_sb = sb;
-	vfsmnt->mnt_root = dget(sb->s_root);
-	bdput(bdev); /* sb holds a reference */
-
-
-#ifdef CONFIG_ROOT_NFS
-attach_it:
-#endif
-	root_nd.mnt = root_vfsmnt;
-	root_nd.dentry = root_vfsmnt->mnt_sb->s_root;
-	graft_tree(vfsmnt, &root_nd);
-
-	set_fs_root(current->fs, vfsmnt, vfsmnt->mnt_root);
-	set_fs_pwd(current->fs, vfsmnt, vfsmnt->mnt_root);
-
-	mntput(vfsmnt);
 }

@@ -1090,6 +1090,7 @@ static int open_aux(struct inode * inode, struct file * file)
 		spin_unlock_irqrestore(&aux_count_lock, flags);
 		return -EBUSY;
 	}
+	spin_unlock_irqrestore(&aux_count_lock, flags);
 	kbd_write_command_w(KBD_CCMD_MOUSE_ENABLE);	/* Enable the
 							   auxiliary port on
 							   controller. */
@@ -1099,7 +1100,6 @@ static int open_aux(struct inode * inode, struct file * file)
 	mdelay(2);			/* Ensure we follow the kbc access delay rules.. */
 
 	send_data(KBD_CMD_ENABLE);	/* try to workaround toshiba4030cdt problem */
-	spin_unlock_irqrestore(&aux_count_lock, flags);
 	return 0;
 }
 

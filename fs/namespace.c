@@ -15,11 +15,9 @@
 #include <linux/quotaops.h>
 #include <linux/acct.h>
 #include <linux/module.h>
-#include <linux/devfs_fs_kernel.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
-
-#include <linux/seq_file.h>
 
 struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data);
 int do_remount_sb(struct super_block *sb, int flags, void * data);
@@ -31,9 +29,7 @@ static kmem_cache_t *mnt_cache;
 
 static LIST_HEAD(vfsmntlist);
 static DECLARE_MUTEX(mount_sem);
-
-/* Will be static */
-struct vfsmount *root_vfsmnt;
+static struct vfsmount *root_vfsmnt;
 
 static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 {
@@ -462,8 +458,7 @@ Enomem:
 	return NULL;
 }
 
-/* Will become static */
-int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
+static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 {
 	int err;
 	if (mnt->mnt_sb->s_flags & MS_NOUSER)
@@ -928,6 +923,44 @@ out3:
  * In 2.5 we'll use ramfs or tmpfs, but for now it's all we need - just
  * something to go with root vfsmount.
  */
+static struct inode_operations rootfs_dir_inode_operations;
+static struct file_operations rootfs_dir_operations;
+static int rootfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+{
+	struct inode * inode = new_inode(dir->i_sb);
+	int error = -ENOSPC;
+	if (inode) {
+		inode->i_mode = S_IFDIR|mode;
+		inode->i_uid = current->fsuid;
+		inode->i_gid = current->fsgid;
+		inode->i_op = &rootfs_dir_inode_operations;
+		inode->i_fop = &rootfs_dir_operations;
+		d_instantiate(dentry, inode);
+		dget(dentry);
+		error = 0;
+	}
+	return error;
+}
+static int rootfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
+{
+	struct inode * inode = new_inode(dir->i_sb);
+	int error = -ENOSPC;
+	if (inode) {
+		inode->i_uid = current->fsuid;
+		inode->i_gid = current->fsgid;
+		init_special_inode(inode, mode, dev);
+		d_instantiate(dentry, inode);
+		dget(dentry);
+		error = 0;
+	}
+	return error;
+}
+static int rootfs_unlink(struct inode * dir, struct dentry *dentry)
+{
+	dentry->d_inode->i_nlink--;
+	dput(dentry);
+	return 0;
+}
 static struct dentry *rootfs_lookup(struct inode *dir, struct dentry *dentry)
 {
 	d_add(dentry, NULL);
@@ -939,6 +972,9 @@ static struct file_operations rootfs_dir_operations = {
 };
 static struct inode_operations rootfs_dir_inode_operations = {
 	lookup:		rootfs_lookup,
+	mkdir:		rootfs_mkdir,
+	mknod:		rootfs_mknod,
+	unlink:		rootfs_unlink,
 };
 static struct super_block *rootfs_read_super(struct super_block * sb, void * data, int silent)
 {
@@ -1030,93 +1066,3 @@ void __init mnt_init(unsigned long mempages)
 	} while (i);
 	init_mount_tree();
 }
-
-#ifdef CONFIG_BLK_DEV_INITRD
-
-int __init change_root(kdev_t new_root_dev,const char *put_old)
-{
-	struct vfsmount *old_rootmnt;
-	struct nameidata devfs_nd, nd;
-	struct nameidata parent_nd;
-	char *new_devname = kmalloc(strlen("/dev/root.old")+1, GFP_KERNEL);
-	int error = 0;
-
-	if (new_devname)
-		strcpy(new_devname, "/dev/root.old");
-
-	read_lock(&current->fs->lock);
-	old_rootmnt = mntget(current->fs->rootmnt);
-	read_unlock(&current->fs->lock);
-	/*  First unmount devfs if mounted  */
-	if (path_init("/dev", LOOKUP_FOLLOW|LOOKUP_POSITIVE, &devfs_nd))
-		error = path_walk("/dev", &devfs_nd);
-	if (!error) {
-		if (devfs_nd.mnt->mnt_sb->s_magic == DEVFS_SUPER_MAGIC &&
-		    devfs_nd.dentry == devfs_nd.mnt->mnt_root) {
-			do_umount(devfs_nd.mnt, 0);
-		}
-		path_release(&devfs_nd);
-	}
-	set_fs_pwd(current->fs, root_vfsmnt, root_vfsmnt->mnt_root);
-	set_fs_root(current->fs, root_vfsmnt, root_vfsmnt->mnt_root);
-	spin_lock(&dcache_lock);
-	detach_mnt(old_rootmnt, &parent_nd);
-	spin_unlock(&dcache_lock);
-	ROOT_DEV = new_root_dev;
-	mount_root();
-#if 1
-	shrink_dcache();
-	printk("change_root: old root has d_count=%d\n", 
-	       atomic_read(&old_rootmnt->mnt_root->d_count));
-#endif
-	mount_devfs_fs ();
-	/*
-	 * Get the new mount directory
-	 */
-	error = 0;
-	if (path_init(put_old, LOOKUP_FOLLOW|LOOKUP_POSITIVE|LOOKUP_DIRECTORY, &nd))
-		error = path_walk(put_old, &nd);
-	if (error) {
-		int blivet;
-		struct block_device *ramdisk = old_rootmnt->mnt_sb->s_bdev;
-
-		atomic_inc(&ramdisk->bd_count);
-		blivet = blkdev_get(ramdisk, FMODE_READ, 0, BDEV_FS);
-		printk(KERN_NOTICE "Trying to unmount old root ... ");
-		if (!blivet) {
-			spin_lock(&dcache_lock);
-			list_del_init(&old_rootmnt->mnt_list);
- 			spin_unlock(&dcache_lock);
- 			mntput(old_rootmnt);
-			mntput(old_rootmnt);
-			blivet = ioctl_by_bdev(ramdisk, BLKFLSBUF, 0);
-			path_release(&parent_nd);
-			blkdev_put(ramdisk, BDEV_FS);
-		}
-		if (blivet) {
-			printk(KERN_ERR "error %d\n", blivet);
-		} else {
-			printk("okay\n");
-			error = 0;
-		}			
-		kfree(new_devname);
-		return error;
-	}
-
-	spin_lock(&dcache_lock);
-	attach_mnt(old_rootmnt, &nd);
-	if (new_devname) {
-		if (old_rootmnt->mnt_devname)
-			kfree(old_rootmnt->mnt_devname);
-		old_rootmnt->mnt_devname = new_devname;
-	}
-	spin_unlock(&dcache_lock);
-
-	/* put the old stuff */
-	path_release(&parent_nd);
-	mntput(old_rootmnt);
-	path_release(&nd);
-	return 0;
-}
-
-#endif

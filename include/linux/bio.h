@@ -100,7 +100,6 @@ struct bio {
 #define bio_iovec_idx(bio, idx)	(&((bio)->bi_io_vec[(idx)]))
 #define bio_iovec(bio)		bio_iovec_idx((bio), (bio)->bi_idx)
 #define bio_page(bio)		bio_iovec((bio))->bv_page
-#define __bio_offset(bio, idx)	bio_iovec_idx((bio), (idx))->bv_offset
 #define bio_offset(bio)		bio_iovec((bio))->bv_offset
 #define bio_sectors(bio)	((bio)->bi_size >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
@@ -136,10 +135,17 @@ struct bio {
 
 #define bio_io_error(bio) bio_endio((bio), 0, bio_sectors((bio)))
 
-#define bio_for_each_segment(bvl, bio, i)				\
-	for (bvl = bio_iovec((bio)), i = (bio)->bi_idx;			\
+/*
+ * drivers should not use the __ version unless they _really_ want to
+ * run through the entire bio and not just pending pieces
+ */
+#define __bio_for_each_segment(bvl, bio, i, start_idx)			\
+	for (bvl = bio_iovec_idx((bio), (start_idx)), i = (start_idx);	\
 	     i < (bio)->bi_vcnt;					\
 	     bvl++, i++)
+
+#define bio_for_each_segment(bvl, bio, i)				\
+	__bio_for_each_segment(bvl, bio, i, (bio)->bi_idx)
 
 /*
  * get a reference to a bio, so it won't disappear. the intended use is
