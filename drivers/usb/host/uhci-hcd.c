@@ -1880,10 +1880,11 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 
 	/*
 	 * Read the interrupt status, and write it back to clear the
-	 * interrupt cause
+	 * interrupt cause.  Contrary to the UHCI specification, the
+	 * "HC Halted" status bit is persistent: it is RO, not R/WC.
 	 */
 	status = inw(io_addr + USBSTS);
-	if (!status)	/* shared interrupt, not mine */
+	if (!(status & ~USBSTS_HCH))	/* shared interrupt, not mine */
 		return IRQ_NONE;
 	outw(status, io_addr + USBSTS);		/* Clear it */
 
