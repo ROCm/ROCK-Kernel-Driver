@@ -44,6 +44,8 @@
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/tlbflush.h>
+#define ACPI_C
+#include <asm/suspend.h>
 
 
 #define PREFIX			"ACPI: "
@@ -621,6 +623,34 @@ void __init acpi_reserve_bootmem(void)
 {
 	acpi_wakeup_address = (unsigned long)alloc_bootmem_low(PAGE_SIZE);
 	printk(KERN_DEBUG "ACPI: have wakeup address 0x%8.8lx\n", acpi_wakeup_address);
+}
+
+/*
+ * (KG): Since we affect stack here, we make this function as flat and easy
+ * as possible in order to not provoke gcc to use local variables on the stack.
+ * Note that on resume, all (expect nosave) variables will have the state from
+ * the time of writing (suspend_save_image) and the registers (including the
+ * stack pointer, but excluding the instruction pointer) will be loaded with 
+ * the values saved at save_processor_context() time.
+ */
+void do_suspend_magic(int resume)
+{
+	/* DANGER WILL ROBINSON!
+	 *
+	 * If this function is too difficult for gcc to optimize, it will crash and burn!
+	 * see above.
+	 *
+	 * DO NOT TOUCH.
+	 */
+	if (!resume) {
+		save_processor_context();
+		acpi_save_register_state((unsigned long)&&acpi_sleep_done);
+		acpi_enter_sleep_state(3);
+		return;
+	}
+acpi_sleep_done:
+	restore_processor_context();
+	printk("CPU context restored...\n");
 }
 
 #endif /*CONFIG_ACPI_SLEEP*/

@@ -50,7 +50,7 @@
 #include <linux/pci.h>
 #include <linux/wrapper.h>
 #include <linux/version.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/smp_lock.h>	/* For (un)lock_kernel */
 #include <linux/mm.h>
 #if defined(__alpha__) || defined(__powerpc__)

@@ -11,12 +11,11 @@
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/smp_lock.h>
+#include <linux/namei.h>
 #ifdef CONFIG_QIFACE_COMPAT
 #include <linux/quotacompat.h>
 #endif
 
-
-int nr_dquots, nr_free_dquots;
 
 /* Check validity of quotactl */
 static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
@@ -411,7 +410,7 @@ static int v1_set_dqblk(struct super_block *sb, int type, int cmd, qid_t id, str
 
 static void v1_get_stats(struct v1c_dqstats *dst)
 {
-	memcpy(dst, &dqstats, sizeof(dqstats));
+	memcpy(dst, &dqstats_array, sizeof(dqstats_array));
 }
 #endif
 
@@ -490,7 +489,7 @@ static int v2_set_dqblk(struct super_block *sb, int type, int cmd, qid_t id, str
 
 static void v2_get_stats(struct v2c_dqstats *dst)
 {
-	memcpy(dst, &dqstats, sizeof(dqstats));
+	memcpy(dst, &dqstats_array, sizeof(dqstats_array));
 	dst->version = __DQUOT_NUM_VERSION__;
 }
 #endif

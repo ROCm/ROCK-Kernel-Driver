@@ -5,7 +5,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/smp.h>
 #include <linux/config.h>
 #include <linux/irq.h>
@@ -68,11 +68,11 @@ static void __init intel_init_thermal(struct cpuinfo_x86 *c)
 	unsigned int cpu = smp_processor_id();
 
 	/* Thermal monitoring */
-	if (!test_bit(X86_FEATURE_ACPI, c->x86_capability))
+	if (!cpu_has(c, X86_FEATURE_ACPI))
 		return;	/* -ENODEV */
 
 	/* Clock modulation */
-	if (!test_bit(X86_FEATURE_ACC, c->x86_capability))
+	if (!cpu_has(c, X86_FEATURE_ACC))
 		return;	/* -ENODEV */
 
 	rdmsr(MSR_IA32_MISC_ENABLE, l, h);
@@ -274,7 +274,7 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 	 *	Check for MCE support
 	 */
 
-	if( !test_bit(X86_FEATURE_MCE, c->x86_capability) )
+	if( !cpu_has(c, X86_FEATURE_MCE) )
 		return;	
 
 	/*
@@ -304,7 +304,7 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 	 *	Check for PPro style MCA
 	 */
  		
-	if( !test_bit(X86_FEATURE_MCA, c->x86_capability) )
+	if( !cpu_has(c, X86_FEATURE_MCA) )
 		return;
 
 	/* Ok machine check is available */

@@ -111,7 +111,6 @@ static void hpt34x_clear_chipset (ide_drive_t *drive)
 
 static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	int			err;
 	byte			hi_speed, lo_speed;
 	unsigned int reg1	= 0, tmp1 = 0;
 	unsigned int reg2	= 0, tmp2 = 0;
@@ -129,12 +128,8 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 	pci_read_config_dword(drive->channel->pci_dev, 0x48, &reg2);
 	tmp1 = ((lo_speed << (3*drive->dn)) | (reg1 & ~(7 << (3*drive->dn))));
 	tmp2 = ((hi_speed << drive->dn) | reg2);
-	err = ide_config_drive_speed(drive, speed);
 	pci_write_config_dword(drive->channel->pci_dev, 0x44, tmp1);
 	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
-
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 
 #if HPT343_DEBUG_DRIVE_INFO
 	printk("%s: %s drive%d (0x%04x 0x%04x) (0x%04x 0x%04x)" \
@@ -144,8 +139,10 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 		hi_speed, lo_speed, err);
 #endif /* HPT343_DEBUG_DRIVE_INFO */
 
+	if (!drive->init_speed)
+		drive->init_speed = speed;
 	drive->current_speed = speed;
-	return(err);
+	return ide_config_drive_speed(drive, speed);
 }
 
 static void config_chipset_for_pio(ide_drive_t *drive)
@@ -201,55 +198,25 @@ static void hpt34x_tune_drive (ide_drive_t *drive, byte pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-/*
- * This allows the configuration of ide_pci chipset registers
- * for cards that learn about the drive's UDMA, DMA, PIO capabilities
- * after the drive is reported by the OS.  Initally for designed for
- * HPT343 UDMA chipset by HighPoint|Triones Technologies, Inc.
- */
-static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
+static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
-	struct hd_driveid *id	= drive->id;
-	byte speed		= 0x00;
+	int map;
+	u8 mode;
 
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	hpt34x_clear_chipset(drive);
+	if (udma)
+		map = XFER_UDMA;
+	else
+		map = XFER_SWDMA | XFER_MWDMA;
 
-	if ((id->dma_ultra & 0x0010) && ultra) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0008) && ultra) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0004) && ultra) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0002) && ultra) {
-		speed = XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0001) && ultra) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_mword & 0x0001) {
-		speed = XFER_MW_DMA_0;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-	} else if (id->dma_1word & 0x0002) {
-		speed = XFER_SW_DMA_1;
-	} else if (id->dma_1word & 0x0001) {
-		speed = XFER_SW_DMA_0;
-        } else {
+	mode = ata_timing_mode(drive, map);
+	if (mode < XFER_SW_DMA_0)
 		return 0;
-	}
 
-	(void) hpt34x_tune_chipset(drive, speed);
-
-	return ((int)	((id->dma_ultra >> 11) & 3) ? 0 :
-			((id->dma_ultra >> 8) & 7) ? 1 :
-			((id->dma_mword >> 8) & 7) ? 1 :
-			((id->dma_1word >> 8) & 7) ? 1 :
-						     0);
+	hpt34x_clear_chipset(drive);
+	return !hpt34x_tune_chipset(drive, mode);
 }
 
 static int config_drive_xfer_rate(struct ata_device *drive)

@@ -6,10 +6,9 @@
 
 #include <linux/time.h>
 #include <linux/string.h>
-#include <linux/bfs_fs.h>
+#include <linux/fs.h>
 #include <linux/smp_lock.h>
-
-#include "bfs_defs.h"
+#include "bfs.h"
 
 #undef DEBUG
 

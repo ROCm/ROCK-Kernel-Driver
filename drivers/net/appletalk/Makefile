@@ -6,6 +6,8 @@
 # unless it's something special (ie not a .c file).
 #
 
+O_TARGET := built-in.o
+
 obj-y   :=
 obj-n   :=
 obj-m   :=
@@ -15,8 +17,6 @@ export-objs :=
 obj-$(CONFIG_IPDDP) += ipddp.o
 obj-$(CONFIG_COPS) += cops.o
 obj-$(CONFIG_LTPC) += ltpc.o
-
-O_TARGET := appletalk.o
 
 include $(TOPDIR)/Rules.make
 

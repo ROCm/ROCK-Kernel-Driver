@@ -484,7 +484,7 @@ limited number of scatter-gather entries) and returns the actual number
 of sg entries it mapped them to.
 
 Then you should loop count times (note: this can be less than nents times)
-and use sg_dma_address() and sg_dma_length() macros where you previously
+and use sg_dma_address() and sg_dma_len() macros where you previously
 accessed sg->address and sg->length as shown above.
 
 To unmap a scatterlist, just call:

@@ -839,8 +839,6 @@ static struct xor_block_template xor_block_pIII_sse = {
 /* Also try the generic routines.  */
 #include <asm-generic/xor.h>
 
-#define cpu_has_mmx	(test_bit(X86_FEATURE_MMX,  boot_cpu_data.x86_capability))
-
 #undef XOR_TRY_TEMPLATES
 #define XOR_TRY_TEMPLATES				\
 	do {						\

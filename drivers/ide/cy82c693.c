@@ -121,7 +121,7 @@ static int calc_clk (int time, int bus_speed)
 {
 	int clocks;
 
-	clocks = (time*bus_speed+999)/1000 -1;
+	clocks = (time*bus_speed+999999)/1000000 -1;
 
 	if (clocks < 0)
 		clocks = 0;

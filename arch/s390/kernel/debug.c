@@ -71,7 +71,6 @@ static int debug_close(struct inode *inode, struct file *file);
 static struct proc_dir_entry 
 *debug_create_proc_dir_entry(struct proc_dir_entry *root,
 			     const char *name, mode_t mode,
-			     struct inode_operations *iops,
 			     struct file_operations *fops);
 static void debug_delete_proc_dir_entry(struct proc_dir_entry *root,
 					struct proc_dir_entry *entry);
@@ -151,27 +150,17 @@ unsigned int debug_feature_version = __DEBUG_FEATURE_VERSION;
 
 static debug_info_t *debug_area_first = NULL;
 static debug_info_t *debug_area_last = NULL;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,98))
-static struct semaphore debug_lock = MUTEX;
-#else
 DECLARE_MUTEX(debug_lock);
-#endif
 
 static int initialized = 0;
 
 static struct file_operations debug_file_ops = {
+	owner:	THIS_MODULE,
 	read:    debug_output,
 	write:   debug_input,	
 	open:    debug_open,
 	release: debug_close,
 };
-
-static struct inode_operations debug_inode_ops = {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,98))
-	default_file_ops: &debug_file_ops,	/* file ops */
-#endif
-};
-
 
 static struct proc_dir_entry *debug_proc_root_entry;
 
@@ -277,19 +266,15 @@ static debug_info_t*  debug_info_create(char *name, int page_order,
 
 	/* create proc rood directory */
 
-        rc->proc_root_entry =
-            debug_create_proc_dir_entry(debug_proc_root_entry, rc->name,
-                                        S_IFDIR | S_IRUGO | S_IXUGO |
-                                        S_IWUSR | S_IWGRP, NULL, NULL);
+        rc->proc_root_entry = proc_mkdir(rc->name, debug_proc_root_entry);
 
 	/* append new element to linked list */
 
-        if(debug_area_first == NULL){
+        if (debug_area_first == NULL) {
                 /* first element in list */
                 debug_area_first = rc;
                 rc->prev = NULL;
-        }
-        else{
+        } else {
                 /* append element to end of list */
                 debug_area_last->next = rc;
                 rc->prev = debug_area_last;
@@ -513,7 +498,6 @@ static int debug_open(struct inode *inode, struct file *file)
 #ifdef DEBUG
 	printk("debug_open\n");
 #endif
-	MOD_INC_USE_COUNT;
 	down(&debug_lock);
 
 	/* find debug log and view */
@@ -523,8 +507,8 @@ static int debug_open(struct inode *inode, struct file *file)
 		for (i = 0; i < DEBUG_MAX_VIEWS; i++) {
 			if (debug_info->views[i] == NULL)
 				continue;
-			else if (debug_info->proc_entries[i]->low_ino ==
-				 file->f_dentry->d_inode->i_ino) {
+			else if (debug_info->proc_entries[i] ==
+				 PDE(file->f_dentry->d_inode)) {
 				goto found;	/* found view ! */
 			}
 		}
@@ -566,8 +550,6 @@ static int debug_open(struct inode *inode, struct file *file)
 
       out:
 	up(&debug_lock);
-	if (rc != 0)
-		MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -587,7 +569,6 @@ static int debug_close(struct inode *inode, struct file *file)
 	debug_info_free(p_info->debug_info_snap);
 	debug_info_put(p_info->debug_info_org);
 	kfree(file->private_data);
-	MOD_DEC_USE_COUNT;
 	return 0;		/* success */
 }
 
@@ -598,42 +579,11 @@ static int debug_close(struct inode *inode, struct file *file)
 
 static struct proc_dir_entry *debug_create_proc_dir_entry
     (struct proc_dir_entry *root, const char *name, mode_t mode,
-     struct inode_operations *iops, struct file_operations *fops) 
+     struct file_operations *fops) 
 {
-	struct proc_dir_entry *rc = NULL;
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,98))
-	const char *fn = name;
-	int len;
-	len = strlen(fn);
-
-	rc = (struct proc_dir_entry *) kmalloc(sizeof(struct proc_dir_entry)
-					       + len + 1, GFP_ATOMIC);
-	if (!rc)
-		goto out;
-
-	memset(rc, 0, sizeof(struct proc_dir_entry));
-	memcpy(((char *) rc) + sizeof(*rc), fn, len + 1);
-	rc->name = ((char *) rc) + sizeof(*rc);
-	rc->namelen = len;
-	rc->low_ino = 0, rc->mode = mode;
-	rc->nlink = 1;
-	rc->uid = 0;
-	rc->gid = 0;
-	rc->size = 0;
-	rc->get_info = NULL;
-	rc->ops = iops;
-
-	proc_register(root, rc);
-#else
-	rc = create_proc_entry(name, mode, root);
-	if (!rc)
-		goto out;
-	if (fops)
+	struct proc_dir_entry *rc = create_proc_entry(name, mode, root);
+	if (rc && fops)
 		rc->proc_fops = fops;
-#endif
-
-      out:
 	return rc;
 }
 
@@ -645,13 +595,7 @@ static struct proc_dir_entry *debug_create_proc_dir_entry
 static void debug_delete_proc_dir_entry
     (struct proc_dir_entry *root, struct proc_dir_entry *proc_entry) 
 {
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,98))
-	proc_unregister(root, proc_entry->low_ino);
-	kfree(proc_entry);
-#else
 	remove_proc_entry(proc_entry->name, root);
-#endif
 }
 
 /*
@@ -906,11 +850,7 @@ int debug_init(void)
 
 	down(&debug_lock);
 	if (!initialized) {
-		debug_proc_root_entry =
-		    debug_create_proc_dir_entry(&proc_root, DEBUG_DIR_ROOT,
-						S_IFDIR | S_IRUGO | S_IXUGO
-						| S_IWUSR | S_IWGRP, NULL,
-						NULL);
+		debug_proc_root_entry = proc_mkdir(DEBUG_DIR_ROOT, NULL);
 		printk(KERN_INFO "debug: Initialization complete\n");
 		initialized = 1;
 	}
@@ -953,7 +893,6 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 		id->proc_entries[i] =
 		    debug_create_proc_dir_entry(id->proc_root_entry,
 						view->name, mode,
-						&debug_inode_ops,
 						&debug_file_ops);
 		rc = 0;
 	}
@@ -1271,7 +1210,7 @@ void cleanup_module(void)
 #ifdef DEBUG
 	printk("debug_cleanup_module: \n");
 #endif
-	debug_delete_proc_dir_entry(&proc_root, debug_proc_root_entry);
+	debug_delete_proc_dir_entry(NULL, debug_proc_root_entry);
 	return;
 }
 

@@ -57,7 +57,8 @@ static int v1_read_dqblk(struct dquot *dquot)
 	if (dquot->dq_dqb.dqb_bhardlimit == 0 && dquot->dq_dqb.dqb_bsoftlimit == 0 &&
 	    dquot->dq_dqb.dqb_ihardlimit == 0 && dquot->dq_dqb.dqb_isoftlimit == 0)
 		dquot->dq_flags |= DQ_FAKE;
-	dqstats.reads++;
+	++dqstats_array[DQSTATS_READS];
+
 	return 0;
 }
 
@@ -100,7 +101,8 @@ static int v1_commit_dqblk(struct dquot *dquot)
 
 out:
 	set_fs(fs);
-	dqstats.writes++;
+	++dqstats_array[DQSTATS_WRITES];
+
 	return ret;
 }
 

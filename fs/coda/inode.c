@@ -237,7 +237,15 @@ static void coda_clear_inode(struct inode *inode)
 	coda_cache_clear_inode(inode);
 }
 
-int coda_notify_change(struct dentry *de, struct iattr *iattr)
+int coda_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int err = coda_revalidate_inode(dentry);
+	if (!err)
+		generic_fillattr(dentry->d_inode, stat);
+	return err;
+}
+
+int coda_setattr(struct dentry *de, struct iattr *iattr)
 {
 	struct inode *inode = de->d_inode;
         struct coda_vattr vattr;
@@ -266,8 +274,8 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
 
 struct inode_operations coda_file_inode_operations = {
 	permission:	coda_permission,
-	revalidate:	coda_revalidate_inode,
-	setattr:	coda_notify_change,
+	getattr:	coda_getattr,
+	setattr:	coda_setattr,
 };
 
 static int coda_statfs(struct super_block *sb, struct statfs *buf)

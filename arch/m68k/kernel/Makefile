@@ -7,8 +7,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := -traditional
 
 ifndef CONFIG_SUN3

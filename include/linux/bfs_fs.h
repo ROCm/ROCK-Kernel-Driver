@@ -6,9 +6,6 @@
 #ifndef _LINUX_BFS_FS_H
 #define _LINUX_BFS_FS_H
 
-#include <linux/bfs_fs_i.h>
-#include <linux/bfs_fs_sb.h>
-
 #define BFS_BSIZE_BITS		9
 #define BFS_BSIZE		(1<<BFS_BSIZE_BITS)
 
@@ -79,26 +76,4 @@ struct bfs_super_block {
 #define BFS_UNCLEAN(bfs_sb, sb)	\
 	((bfs_sb->s_from != -1) && (bfs_sb->s_to != -1) && !(sb->s_flags & MS_RDONLY))
 
-#ifdef __KERNEL__
-
-/* file.c */
-extern struct inode_operations bfs_file_inops;
-extern struct file_operations bfs_file_operations;
-extern struct address_space_operations bfs_aops;
-
-/* dir.c */
-extern struct inode_operations bfs_dir_inops;
-extern struct file_operations bfs_dir_operations;
-
-static inline struct bfs_sb_info *BFS_SB(struct super_block *sb)
-{
-	return sb->u.generic_sbp;
-}
-
-static inline struct bfs_inode_info *BFS_I(struct inode *inode)
-{
-	return list_entry(inode, struct bfs_inode_info, vfs_inode);
-}
-
-#endif /* __KERNEL__ */
 #endif	/* _LINUX_BFS_FS_H */

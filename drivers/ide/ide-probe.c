@@ -580,10 +580,14 @@ static int init_irq(struct ata_channel *ch)
 	int i;
 	spinlock_t *lock;
 	spinlock_t *new_lock;
+	unsigned long *active;
+	unsigned long *new_active;
 	struct ata_channel *match = NULL;
 
 	/* Spare allocation before sleep. */
 	new_lock = kmalloc(sizeof(*lock), GFP_KERNEL);
+	new_active = kmalloc(sizeof(*active), GFP_KERNEL);
+	*new_active = 0L;
 
 	spin_lock_irqsave(&ide_lock, flags);
 	ch->lock = NULL;
@@ -619,6 +623,7 @@ static int init_irq(struct ata_channel *ch)
 	 */
 	if (!match) {
 		lock = new_lock;
+		active = new_active;
 		if (!lock) {
 			spin_unlock_irqrestore(&ide_lock, flags);
 
@@ -627,6 +632,7 @@ static int init_irq(struct ata_channel *ch)
 		spin_lock_init(lock);
 	} else {
 		lock = match->lock;
+		active = match->active;
 		if(new_lock)
 			kfree(new_lock);
 	}
@@ -645,8 +651,10 @@ static int init_irq(struct ata_channel *ch)
 			OUT_BYTE(0x08, ch->io_ports[IDE_CONTROL_OFFSET]); /* clear nIEN */
 
 		if (request_irq(ch->irq, &ata_irq_request, sa, ch->name, ch)) {
-			if (!match)
+			if (!match) {
 				kfree(lock);
+				kfree(active);
+			}
 
 			spin_unlock_irqrestore(&ide_lock, flags);
 
@@ -658,6 +666,7 @@ static int init_irq(struct ata_channel *ch)
 	 * Everything is okay. Tag us as member of this lock group.
 	 */
 	ch->lock = lock;
+	ch->active = active;
 
 	init_timer(&ch->timer);
 	ch->timer.function = &ide_timer_expiry;

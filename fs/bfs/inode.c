@@ -9,12 +9,10 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/bfs_fs.h>
+#include <linux/fs.h>
 #include <linux/smp_lock.h>
-
 #include <asm/uaccess.h>
-
-#include "bfs_defs.h"
+#include "bfs.h"
 
 MODULE_AUTHOR("Tigran A. Aivazian <tigran@veritas.com>");
 MODULE_DESCRIPTION("SCO UnixWare BFS filesystem for Linux");

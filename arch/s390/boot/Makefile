@@ -7,8 +7,6 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
-
 OBJCOPY = $(CROSS_COMPILE)objcopy
 
 O_TARGET := 

@@ -8,8 +8,6 @@
 # Tom Rini	January 2001
 #
 
-USE_STANDARD_AS_RULE	:= true
-
 coffcrt0.o:
 	$(CC) $(AFLAGS) -DXCOFF -traditional -c -o coffcrt0.o crt0.S
 

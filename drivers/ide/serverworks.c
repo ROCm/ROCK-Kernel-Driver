@@ -242,9 +242,9 @@ static struct pci_dev *isa_dev;
 
 static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 {
-	byte udma_modes[]	= { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
-	byte dma_modes[]	= { 0x77, 0x21, 0x20 };
-	byte pio_modes[]	= { 0x5d, 0x47, 0x34, 0x22, 0x20 };
+	static u8 udma_modes[]	= { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
+	static u8 dma_modes[]	= { 0x77, 0x21, 0x20 };
+	static u8 pio_modes[]	= { 0x5d, 0x47, 0x34, 0x22, 0x20 };
 
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -253,7 +253,7 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	unsigned long dma_base	= hwif->dma_base;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 	int err;
 
 	byte drive_pci		= 0x00;

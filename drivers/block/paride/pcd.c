@@ -760,8 +760,11 @@ static void do_pcd_request (request_queue_t * q)
 
 	if (pcd_busy) return;
         while (1) {
-	    if (QUEUE_EMPTY || (CURRENT->rq_status == RQ_INACTIVE)) return;
-	    INIT_REQUEST;
+	    if (blk_queue_empty(QUEUE)) {
+		    CLEAR_INTR;
+		    return;
+	    }
+
 	    if (rq_data_dir(CURRENT) == READ) {
 		unit = minor(CURRENT->rq_dev);
 		if (unit != pcd_unit) {

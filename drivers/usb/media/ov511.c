@@ -227,7 +227,11 @@ static struct ov51x_decomp_ops *ov518_mmx_decomp_ops;
 static int i2c_detect_tries = 5;
 
 /* MMX support is present in kernel and CPU. Checked upon decomp module load. */
-static int ov51x_mmx_available;
+#if defined(__i386__) || defined(__x86_64__)
+#define ov51x_mmx_available (cpu_has_mmx)
+#else
+#define ov51x_mmx_available (0)
+#endif
 
 static __devinitdata struct usb_device_id device_table [] = {
 	{ USB_DEVICE(VEND_OMNIVISION, PROD_OV511) },
@@ -6472,11 +6476,6 @@ usb_ov511_init(void)
 
 	if (usb_register(&ov511_driver) < 0)
 		return -1;
-
-#if defined (__i386__)
-	if (test_bit(X86_FEATURE_MMX, boot_cpu_data.x86_capability))
-		ov51x_mmx_available = 1;
-#endif
 
 	info(DRIVER_VERSION " : " DRIVER_DESC);
 

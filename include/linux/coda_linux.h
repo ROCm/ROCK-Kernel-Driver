@@ -40,7 +40,8 @@ int coda_flush(struct file *f);
 int coda_release(struct inode *i, struct file *f);
 int coda_permission(struct inode *inode, int mask);
 int coda_revalidate_inode(struct dentry *);
-int coda_notify_change(struct dentry *, struct iattr *);
+int coda_getattr(struct vfsmount *, struct dentry *, struct kstat *);
+int coda_setattr(struct dentry *, struct iattr *);
 int coda_isnullfid(ViceFid *fid);
 
 /* global variables */

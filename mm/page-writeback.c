@@ -117,15 +117,14 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	} ____cacheline_aligned ratelimits[NR_CPUS];
 	int cpu;
 
-	preempt_disable();
-	cpu = smp_processor_id();
+	cpu = get_cpu();
 	if (ratelimits[cpu].count++ >= 1000) {
 		ratelimits[cpu].count = 0;
-		preempt_enable();
+		put_cpu();
 		balance_dirty_pages(mapping);
 		return;
 	}
-	preempt_enable();
+	put_cpu();
 }
 
 /*

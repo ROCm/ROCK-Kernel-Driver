@@ -571,25 +571,13 @@ abort:
 	return ret;
 }
 
-static kdev_t dev_unit(kdev_t dev)
-{
-	unsigned int mask;
-	struct gendisk *hd = get_gendisk(dev);
-
-	if (!hd)
-		return NODEV;
-	mask = ~((1 << hd->minor_shift) - 1);
-
-	return mk_kdev(major(dev), minor(dev) & mask);
-}
-
-static mdk_rdev_t * match_dev_unit(mddev_t *mddev, kdev_t dev)
+static mdk_rdev_t * match_dev_unit(mddev_t *mddev, mdk_rdev_t *dev)
 {
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 
 	ITERATE_RDEV(mddev,rdev,tmp)
-		if (kdev_same(dev_unit(rdev->dev), dev_unit(dev)))
+		if (rdev->bdev->bd_contains == dev->bdev->bd_contains)
 			return rdev;
 
 	return NULL;
@@ -601,7 +589,7 @@ static int match_mddev_units(mddev_t *mddev1, mddev_t *mddev2)
 	mdk_rdev_t *rdev;
 
 	ITERATE_RDEV(mddev1,rdev,tmp)
-		if (match_dev_unit(mddev2, rdev->dev))
+		if (match_dev_unit(mddev2, rdev))
 			return 1;
 
 	return 0;
@@ -618,7 +606,7 @@ static void bind_rdev_to_array(mdk_rdev_t * rdev, mddev_t * mddev)
 		MD_BUG();
 		return;
 	}
-	same_pdev = match_dev_unit(mddev, rdev->dev);
+	same_pdev = match_dev_unit(mddev, rdev);
 	if (same_pdev)
 		printk( KERN_WARNING
 "md%d: WARNING: %s appears to be on the same physical disk as %s. True\n"

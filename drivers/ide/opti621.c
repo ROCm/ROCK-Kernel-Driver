@@ -175,7 +175,7 @@ static int cmpt_clk(int time, int bus_speed)
  * Use idebus=xx to select right frequency.
  */
 {
-	return ((time*bus_speed+999)/1000);
+	return ((time*bus_speed+999999)/1000000);
 }
 
 static void write_reg(byte value, int reg)

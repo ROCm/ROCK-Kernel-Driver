@@ -112,11 +112,15 @@ static void mtdblock_request(RQFUNC_ARG)
 
    while (1)
    {
-      /* Grab the Request and unlink it from the request list, INIT_REQUEST
-       	 will execute a return if we are done. */
-      INIT_REQUEST;
+      /* Grab the Request and unlink it from the request list, we
+	 will execute a return if we are done. */
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
+		return;
+	}
+
       current_request = CURRENT;
-   
+
       if (minor(current_request->rq_dev) >= MAX_MTD_DEVICES)
       {
 	 printk("mtd: Unsupported device!\n");

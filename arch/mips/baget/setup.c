@@ -17,7 +17,6 @@
 long int vac_memory_upper;
 
 #define CACHEABLE_STR(val) ((val) ? "not cached" : "cached")
-#define MIN(a,b)           (((a)<(b)) ? (a):(b)) 
 		
 static void __init vac_show(void)
 { 
@@ -102,7 +101,7 @@ static void __init vac_show(void)
 		if (a24_addr >= from && a24_addr < to)
 			printk("\ta24 at %08lx (%dMB)\t[vme, A24/%s, %s]\n",
 			       a24_addr,
-			       MIN((unsigned int)(a24_addr - from)>>20, 32),
+			       min((unsigned int)(a24_addr - from)>>20, 32U),
 			       (a24_base & VAC_A24_DATAPATH) ?  "user" :
 			       ((a24_base & VAC_A24_D32_ENABLE)  ?  
 				"D32" : "D16"),

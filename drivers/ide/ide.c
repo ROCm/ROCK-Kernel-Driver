@@ -139,34 +139,6 @@ int noautodma = 0;
  */
 struct ata_channel ide_hwifs[MAX_HWIFS];	/* master data repository */
 
-#if (DISK_RECOVERY_TIME > 0)
-/*
- * For really screwed hardware (hey, at least it *can* be used with Linux)
- * we can enforce a minimum delay time between successive operations.
- */
-static unsigned long read_timer (void)
-{
-	unsigned long t, flags;
-	int i;
-
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
-	t = jiffies * 11932;
-	outb_p(0, 0x43);
-	i = inb_p(0x40);
-	i |= inb(0x40) << 8;
-	__restore_flags(flags);	/* local CPU only */
-	return (t - i);
-}
-#endif
-
-static inline void set_recovery_timer(struct ata_channel *channel)
-{
-#if (DISK_RECOVERY_TIME > 0)
-	channel->last_time = read_timer();
-#endif
-}
-
 static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 {
 	static const byte ide_major[] = {
@@ -241,8 +213,6 @@ static void __init init_ide_data (void)
 
 	/* Add default hw interfaces */
 	ide_init_default_hwifs();
-
-	idebus_parameter = 0;
 }
 
 /*
@@ -284,7 +254,7 @@ int drive_is_flashcard(struct ata_device *drive)
 	return 0;
 }
 
-int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate, int nr_secs)
+int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate, unsigned int nr_secs)
 {
 	unsigned long flags;
 	int ret = 1;
@@ -667,6 +637,50 @@ void ide_end_drive_cmd(struct ata_device *drive, struct request *rq, u8 stat, u8
 	end_that_request_last(rq);
 }
 
+#if FANCY_STATUS_DUMPS
+struct ata_bit_messages {
+	u8 mask;
+	u8 match;
+	const char *msg;
+};
+
+static struct ata_bit_messages ata_status_msgs[] = {
+	{ BUSY_STAT,  BUSY_STAT,  "Busy"           },
+	{ READY_STAT, READY_STAT, "DriveReady"     },
+	{ WRERR_STAT, WRERR_STAT, "DeviceFault"    },
+	{ SEEK_STAT,  SEEK_STAT,  "SeekComplete"   },
+	{ DRQ_STAT,   DRQ_STAT,   "DataRequest"    },
+	{ ECC_STAT,   ECC_STAT,   "CorrectedError" },
+	{ INDEX_STAT, INDEX_STAT, "Index"          },
+	{ ERR_STAT,   ERR_STAT,   "Error"          }
+};
+
+static struct ata_bit_messages ata_error_msgs[] = {
+	{ ICRC_ERR|ABRT_ERR,	ABRT_ERR,		"DriveStatusError"   },
+	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR,		"BadSector"	     },
+	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR|ABRT_ERR,	"BadCRC"	     },
+	{ ECC_ERR,		ECC_ERR,		"UncorrectableError" },
+	{ ID_ERR,		ID_ERR,			"SectorIdNotFound"   },
+	{ TRK0_ERR,		TRK0_ERR,		"TrackZeroNotFound"  },
+	{ MARK_ERR,		MARK_ERR,		"AddrMarkNotFound"   }
+};
+
+static void ata_dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
+{
+	int i;
+
+	printk(" { ");
+
+	for (i = 0; i < nr; i++, msgs++)
+		if ((bits & msgs->mask) == msgs->match)
+			printk("%s ", msgs->msg);
+
+	printk("} ");
+}
+#else
+#define ata_dump_bits(msgs,nr,bits) do { } while (0)
+#endif
+
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
  */
@@ -674,49 +688,22 @@ u8 ide_dump_status(struct ata_device *drive, struct request * rq, const char *ms
 {
 	unsigned long flags;
 	byte err = 0;
+	int i;
 
 	__save_flags (flags);	/* local CPU only */
 	ide__sti();		/* local CPU only */
-#if !(FANCY_STATUS_DUMPS)
-	printk("%s: %s: status=0x%02x\n", drive->name, msg, stat);
-#else
-	printk(" { ");
-	{
-		char *msg = "";
-		if (stat & BUSY_STAT)
-			msg = "Busy";
-		else {
-			if (stat & READY_STAT)
-				msg = "DriveReady";
-			if (stat & WRERR_STAT)
-				msg = "DeviceFault";
-			if (stat & SEEK_STAT)
-				msg = "SeekComplete";
-			if (stat & DRQ_STAT)
-				msg = "DataRequest";
-			if (stat & ECC_STAT)
-				msg = "CorrectedError";
-			if (stat & INDEX_STAT)
-				msg = "Index";
-			if (stat & ERR_STAT)
-				msg = "Error";
-		}
-	}
-	printk("%s }\n", msg);
-#endif
+
+	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
+	ata_dump_bits(ata_status_msgs, ARRAY_SIZE(ata_status_msgs), stat);
+	printk("\n");
+
 	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
 		err = GET_ERR();
 		printk("%s: %s: error=0x%02x", drive->name, msg, err);
 #if FANCY_STATUS_DUMPS
 		if (drive->type == ATA_DISK) {
-			printk(" { ");
-			if (err & ABRT_ERR)	printk("DriveStatusError ");
-			if (err & ICRC_ERR)	printk("%s", (err & ABRT_ERR) ? "BadCRC " : "BadSector ");
-			if (err & ECC_ERR)	printk("UncorrectableError ");
-			if (err & ID_ERR)	printk("SectorIdNotFound ");
-			if (err & TRK0_ERR)	printk("TrackZeroNotFound ");
-			if (err & MARK_ERR)	printk("AddrMarkNotFound ");
-			printk("}");
+			ata_dump_bits(ata_error_msgs, ARRAY_SIZE(ata_error_msgs), err);
+
 			if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR || (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
 				if ((drive->id->command_set_2 & 0x0400) &&
 				    (drive->id->cfs_enable_2 & 0x0400) &&
@@ -988,11 +975,6 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 	 */
 	if (block == 0 && drive->remap_0_to_1 == 1)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
-
-#if (DISK_RECOVERY_TIME > 0)
-	while ((read_timer() - ch->last_time) < DISK_RECOVERY_TIME);
-#endif
-
 	{
 		ide_startstop_t res;
 
@@ -1199,14 +1181,14 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 		if (timer_pending(&channel->timer))
 			printk(KERN_ERR "ide_set_handler: timer already active\n");
 #endif
-		set_bit(IDE_SLEEP, &channel->active);
+		set_bit(IDE_SLEEP, channel->active);
 		mod_timer(&channel->timer, sleep);
 		/* we purposely leave hwgroup busy while sleeping */
 	} else {
 		/* Ugly, but how can we sleep for the lock otherwise? perhaps
 		 * from tq_disk? */
 		ide_release_lock(&irq_lock);/* for atari only */
-		clear_bit(IDE_BUSY, &channel->active);
+		clear_bit(IDE_BUSY, channel->active);
 	}
 
 	return NULL;
@@ -1225,7 +1207,7 @@ static void queue_commands(struct ata_device *drive)
 	for (;;) {
 		struct request *rq = NULL;
 
-		if (!test_bit(IDE_BUSY, &ch->active))
+		if (!test_bit(IDE_BUSY, ch->active))
 			printk(KERN_ERR "%s: error: not busy while queueing!\n", drive->name);
 
 		/* Abort early if we can't queue another command. for non
@@ -1234,13 +1216,13 @@ static void queue_commands(struct ata_device *drive)
 		 */
 		if (!ata_can_queue(drive)) {
 			if (!ata_pending_commands(drive))
-				clear_bit(IDE_BUSY, &ch->active);
+				clear_bit(IDE_BUSY, ch->active);
 			break;
 		}
 
 		drive->sleep = 0;
 
-		if (test_bit(IDE_DMA, &ch->active)) {
+		if (test_bit(IDE_DMA, ch->active)) {
 			printk(KERN_ERR "%s: error: DMA in progress...\n", drive->name);
 			break;
 		}
@@ -1258,7 +1240,7 @@ static void queue_commands(struct ata_device *drive)
 
 		if (!(rq = elv_next_request(&drive->queue))) {
 			if (!ata_pending_commands(drive))
-				clear_bit(IDE_BUSY, &ch->active);
+				clear_bit(IDE_BUSY, ch->active);
 			drive->rq = NULL;
 			break;
 		}
@@ -1305,7 +1287,7 @@ static void do_request(struct ata_channel *channel)
 	ide_get_lock(&irq_lock, ata_irq_request, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
 //	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
 
-	while (!test_and_set_bit(IDE_BUSY, &channel->active)) {
+	while (!test_and_set_bit(IDE_BUSY, channel->active)) {
 		struct ata_channel *ch;
 		struct ata_device *drive;
 
@@ -1408,8 +1390,8 @@ void ide_timer_expiry(unsigned long data)
 		 * complain about anything.
 		 */
 
-		if (test_and_clear_bit(IDE_SLEEP, &ch->active))
-			clear_bit(IDE_BUSY, &ch->active);
+		if (test_and_clear_bit(IDE_SLEEP, ch->active))
+			clear_bit(IDE_BUSY, ch->active);
 	} else {
 		struct ata_device *drive = ch->drive;
 		if (!drive) {
@@ -1419,7 +1401,7 @@ void ide_timer_expiry(unsigned long data)
 			ide_startstop_t startstop;
 
 			/* paranoia */
-			if (!test_and_set_bit(IDE_BUSY, &ch->active))
+			if (!test_and_set_bit(IDE_BUSY, ch->active))
 				printk(KERN_ERR "%s: ide_timer_expiry: IRQ handler was not busy??\n", drive->name);
 			if ((expiry = ch->expiry) != NULL) {
 				/* continue */
@@ -1464,13 +1446,12 @@ void ide_timer_expiry(unsigned long data)
 				} else
 					startstop = ide_error(drive, drive->rq, "irq timeout", GET_STAT());
 			}
-			set_recovery_timer(ch);
 			enable_irq(ch->irq);
 
 			spin_lock_irq(ch->lock);
 
 			if (startstop == ide_stopped)
-				clear_bit(IDE_BUSY, &ch->active);
+				clear_bit(IDE_BUSY, ch->active);
 		}
 	}
 
@@ -1593,7 +1574,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 		goto out_lock;
 	}
 	/* paranoia */
-	if (!test_and_set_bit(IDE_BUSY, &ch->active))
+	if (!test_and_set_bit(IDE_BUSY, ch->active))
 		printk(KERN_ERR "%s: %s: hwgroup was not busy!?\n", drive->name, __FUNCTION__);
 	ch->handler = NULL;
 	del_timer(&ch->timer);
@@ -1614,10 +1595,9 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	 * same irq as is currently being serviced here, and Linux
 	 * won't allow another of the same (on any CPU) until we return.
 	 */
-	set_recovery_timer(drive->channel);
 	if (startstop == ide_stopped) {
 		if (!ch->handler) {	/* paranoia */
-			clear_bit(IDE_BUSY, &ch->active);
+			clear_bit(IDE_BUSY, ch->active);
 			do_request(ch);
 		} else {
 			printk("%s: %s: huh? expected NULL handler on exit\n", drive->name, __FUNCTION__);
@@ -1951,10 +1931,12 @@ void ide_unregister(struct ata_channel *ch)
 		free_irq(ch->irq, ch);
 	if (n_ch == 1) {
 		kfree(ch->lock);
+		kfree(ch->active);
 		ch->lock = NULL;
+		ch->active = NULL;
 	}
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	ide_release_dma(ch);
 #endif
 
@@ -2133,7 +2115,7 @@ int ide_spin_wait_hwgroup(struct ata_device *drive)
 
 	spin_lock_irq(drive->channel->lock);
 
-	while (test_bit(IDE_BUSY, &drive->channel->active)) {
+	while (test_bit(IDE_BUSY, drive->channel->active)) {
 
 		spin_unlock_irq(drive->channel->lock);
 
@@ -2785,10 +2767,7 @@ int __init ide_setup (char *s)
 	if (!strncmp(s, "idebus", 6)) {
 		if (match_parm(&s[6], NULL, vals, 1) != 1)
 			goto bad_option;
-		if (vals[0] >= 20 && vals[0] <= 66) {
-			idebus_parameter = vals[0];
-		} else
-			printk(" -- BAD BUS SPEED! Expected value from 20 to 66");
+		idebus_parameter = vals[0];
 		goto done;
 	}
 
@@ -3217,27 +3196,40 @@ static int __init ata_module_init(void)
 
 	ide_devfs_handle = devfs_mk_dir (NULL, "ide", NULL);
 
-	/* Initialize system bus speed.
-	 *
-	 * This can be changed by a particular chipse initialization module.
-	 * Otherwise we assume 33MHz as a safe value for PCI bus based systems.
-	 * 50MHz will be assumed for abolitions like VESA, since higher values
-	 * result in more conservative timing setups.
-	 *
-	 * The kernel parameter idebus=XX overrides the default settings.
-	 */
+/*
+ * Because most of the ATA adapters represent the timings in unit of bus
+ * clocks, and there is no known reliable way to detect the bus clock
+ * frequency, we assume 50 MHz for non-PCI (VLB, EISA) and 33 MHz for PCI based
+ * systems. Since assuming only hurts performance and not stability, this is
+ * OK. The user can change this on the command line by using the "idebus=XX"
+ * parameter. While the system_bus_speed variable is in kHz units, we accept
+ * both MHz and kHz entry on the command line for backward compatibility.
+ */
 
-	system_bus_speed = 50;
-	if (idebus_parameter)
+	system_bus_speed = 50000;
+
+	if (pci_present())
+	    system_bus_speed = 33333;
+
+	if (idebus_parameter >= 20 && idebus_parameter <= 80) {
+
+		system_bus_speed = idebus_parameter * 1000;
+
+		switch (system_bus_speed) {
+			case 33000: system_bus_speed = 33333; break;
+			case 37000: system_bus_speed = 37500; break;
+			case 41000: system_bus_speed = 41666; break;
+			case 66000: system_bus_speed = 66666; break;
+		}
+	}
+
+	if (idebus_parameter >= 20000 && idebus_parameter <= 80000)
 	    system_bus_speed = idebus_parameter;
-#ifdef CONFIG_PCI
-	else if (pci_present())
-	    system_bus_speed = 33;
-#endif
+	
+	printk(KERN_INFO "ATA: %s bus speed %d.%dMHz\n",
+		pci_present() ? "PCI" : "System", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 
-	printk(KERN_INFO "ATA: system bus speed %dMHz\n", system_bus_speed);
-
-	init_ide_data ();
+	init_ide_data();
 
 	initializing = 1;
 

@@ -376,6 +376,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 	if (rd_bdev[unit] == NULL) {
 		rd_bdev[unit] = bdget(kdev_t_to_nr(inode->i_rdev));
 		rd_bdev[unit]->bd_openers++;
+		rd_bdev[unit]->bd_block_size = rd_blocksize;
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 	}
 

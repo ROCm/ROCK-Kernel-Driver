@@ -51,6 +51,7 @@
  */
 
 #include "transport.h"
+#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -60,131 +61,48 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 
-extern int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
-			     unsigned int len, unsigned int *act_len);
-
-static int datafab_determine_lun(struct us_data *us, struct datafab_info *info);
+static int datafab_determine_lun(struct us_data *us,
+				 struct datafab_info *info);
 
 
-static void datafab_dump_data(unsigned char *data, int len)
-{
-	unsigned char buf[80];
-	int sofar = 0;
+static inline int
+datafab_bulk_read(struct us_data *us, unsigned char *data, unsigned int len) {
+	unsigned int act_len;	/* ignored */
 
-	if (!data)
-		return;
-
-	memset(buf, 0, sizeof(buf));
-
-	for (sofar = 0; sofar < len; sofar++) {
-		sprintf(buf + strlen(buf), "%02x ",
-			((unsigned int) data[sofar]) & 0xFF);
-
-		if (sofar % 16 == 15) {
-			US_DEBUGP("datafab:  %s\n", buf);
-			memset(buf, 0, sizeof(buf));
-		}
-	}
-
-	if (strlen(buf) != 0)
-		US_DEBUGP("datafab:  %s\n", buf);
-}
-
-
-static int datafab_raw_bulk(int direction,
-			    struct us_data *us,
-			    unsigned char *data, 
-		            unsigned int len)
-{
-	int result;
-	int act_len;
-	int pipe;
-
-	if (direction == SCSI_DATA_READ)
-		pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
-	else
-		pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
-
-	result = usb_stor_bulk_msg(us, data, pipe, len, &act_len);
-
-	// if we stall, we need to clear it before we go on 
-	if (result == -EPIPE) {
-		US_DEBUGP("datafab_raw_bulk: EPIPE. clearing endpoint halt for"
-			  " pipe 0x%x, stalled at %d bytes\n", pipe, act_len);
-		usb_stor_clear_halt(us, pipe);
-	}
-
-	if (result) {
-		// NAK - that means we've retried a few times already 
-		if (result == -ETIMEDOUT) {
-			US_DEBUGP("datafab_raw_bulk:  device NAKed\n");
-			return US_BULK_TRANSFER_FAILED;
-		}
-
-		// -ENOENT -- we canceled this transfer
-		if (result == -ENOENT) {
-			US_DEBUGP("datafab_raw_bulk:  transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
-		}
-
-		if (result == -EPIPE) {
-			US_DEBUGP("datafab_raw_bulk:  output pipe stalled\n");
-			return USB_STOR_TRANSPORT_FAILED;
-		}
-
-		// the catch-all case
-		US_DEBUGP("datafab_raw_bulk:  unknown error\n");
-		return US_BULK_TRANSFER_FAILED;
-	}
-
-	if (act_len != len) {
-		US_DEBUGP("datafab_raw_bulk:  Warning. Transferred only %d bytes\n", act_len);
-		return US_BULK_TRANSFER_SHORT;
-	}
-
-	US_DEBUGP("datafab_raw_bulk:  Transfered %d of %d bytes\n", act_len, len);
-	return US_BULK_TRANSFER_GOOD;
-}
-
-static inline int datafab_bulk_read(struct us_data *us,
-			            unsigned char *data, 
-		                    unsigned int len)
-{
 	if (len == 0)
 		return USB_STOR_TRANSPORT_GOOD;
 
 	US_DEBUGP("datafab_bulk_read:  len = %d\n", len);
-	return datafab_raw_bulk(SCSI_DATA_READ, us, data, len);
+	return usb_storage_raw_bulk(us, SCSI_DATA_READ, data, len, &act_len);
 }
 
 
-static inline int datafab_bulk_write(struct us_data *us,
-			             unsigned char *data, 
-		                     unsigned int len)
-{
+static inline int
+datafab_bulk_write(struct us_data *us, unsigned char *data, unsigned int len) {
+	unsigned int act_len;	/* ignored */
+
 	if (len == 0)
 		return USB_STOR_TRANSPORT_GOOD;
 
 	US_DEBUGP("datafab_bulk_write:  len = %d\n", len);
-	return datafab_raw_bulk(SCSI_DATA_WRITE, us, data, len);
+	return usb_storage_raw_bulk(us, SCSI_DATA_WRITE, data, len, &act_len);
 }
 
 
 static int datafab_read_data(struct us_data *us,
-		             struct datafab_info *info,
-		             u32 sector,
-		             u32 sectors, 
-		             unsigned char *dest, 
-		             int use_sg)
+			     struct datafab_info *info,
+			     u32 sector,
+			     u32 sectors, 
+			     unsigned char *dest, 
+			     int use_sg)
 {
 	unsigned char command[8] = { 0, 0, 0, 0, 0, 0xE0, 0x20, 0x01 };
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
 	unsigned char  thistime;
-	struct scatterlist *sg = NULL;
 	int totallen, len, result;
-	int sg_idx = 0, current_sg_offset = 0;
-	int transferred, rc;
+	int sg_idx = 0, sg_offset = 0;
+	int rc;
 
 	// we're working in LBA mode.  according to the ATA spec, 
 	// we can support up to 28-bit addressing.  I don't know if Datafab
@@ -202,28 +120,17 @@ static int datafab_read_data(struct us_data *us,
 
 	command[5] += (info->lun << 4);
 
-	// If we're using scatter-gather, we have to create a new
-	// buffer to read all of the data in first, since a
-	// scatter-gather buffer could in theory start in the middle
-	// of a page, which would be bad. A developer who wants a
-	// challenge might want to write a limited-buffer
-	// version of this code.
-
 	totallen = sectors * info->ssize;
 
 	do {
-		// loop, never allocate or transfer more than 64k at once (min(128k, 255*info->ssize) is the real limit)
+		// loop, never allocate or transfer more than 64k at once
+		// (min(128k, 255*info->ssize) is the real limit)
+
 		len = min_t(int, totallen, 65536);
 
-		if (use_sg) {
-			sg = (struct scatterlist *) dest;
-			buffer = kmalloc(len, GFP_NOIO);
-			if (buffer == NULL)
-				return USB_STOR_TRANSPORT_ERROR;
-			ptr = buffer;
-		} else {
-			ptr = dest;
-		}
+		ptr = buffer = (use_sg ? kmalloc(len, GFP_NOIO) : dest);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
 
 		thistime = (len / info->ssize) & 0xff;
 
@@ -235,53 +142,22 @@ static int datafab_read_data(struct us_data *us,
 	
 		command[5] |= (sector >> 24) & 0x0F;
 
-		// send the command
-		US_DEBUGP("datafab_read_data:  sending following command\n");
-		datafab_dump_data(command, sizeof(command));
-
+		// send the read command
 		result = datafab_bulk_write(us, command, sizeof(command));
-		if (result != USB_STOR_TRANSPORT_GOOD) {
-			if (use_sg)
-				kfree(buffer);
-			return result;
-		}
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			goto leave;
 
 		// read the result
 		result = datafab_bulk_read(us, ptr, len);
-		if (result != USB_STOR_TRANSPORT_GOOD) {
-			if (use_sg)
-				kfree(buffer);
-			return result;
-		}
-
-		US_DEBUGP("datafab_read_data results:  %d bytes\n", len);
-		// datafab_dump_data(ptr, len);
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			goto leave;
 
 		sectors -= thistime;
 		sector  += thistime;
 
 		if (use_sg) {
-			transferred = 0;
-			while (sg_idx < use_sg && transferred < len) {
-				if (len - transferred >= sg[sg_idx].length - current_sg_offset) {
-					US_DEBUGP("datafab_read_data:  adding %d bytes to %d byte sg buffer\n", sg[sg_idx].length - current_sg_offset, sg[sg_idx].length);
-					memcpy(page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
-					       buffer + transferred,
-					       sg[sg_idx].length - current_sg_offset);
-					transferred += sg[sg_idx].length - current_sg_offset;
-					current_sg_offset = 0;
-					// on to the next sg buffer
-					++sg_idx;
-				} else {
-					US_DEBUGP("datafab_read_data:  adding %d bytes to %d byte sg buffer\n", len - transferred, sg[sg_idx].length);
-					memcpy(page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
-					       buffer + transferred,
-					       len - transferred);
-					current_sg_offset += len - transferred;
-					// this sg buffer is only partially full and we're out of data to copy in
-					break;
-				}
-			}
+			us_copy_to_sgbuf(buffer, len, dest,
+					 &sg_idx, &sg_offset, use_sg);
 			kfree(buffer);
 		} else {
 			dest += len;
@@ -291,25 +167,28 @@ static int datafab_read_data(struct us_data *us,
 	} while (totallen > 0);
 
 	return USB_STOR_TRANSPORT_GOOD;
+
+ leave:
+	if (use_sg)
+		kfree(buffer);
+	return result;
 }
 
 
 static int datafab_write_data(struct us_data *us,
-		              struct datafab_info *info,
-		              u32 sector,
-		              u32 sectors, 
-		              unsigned char *src, 
-		              int use_sg)
+			      struct datafab_info *info,
+			      u32 sector,
+			      u32 sectors, 
+			      unsigned char *src, 
+			      int use_sg)
 {
 	unsigned char command[8] = { 0, 0, 0, 0, 0, 0xE0, 0x30, 0x02 };
 	unsigned char reply[2] = { 0, 0 };
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
 	unsigned char thistime;
-	struct scatterlist *sg = NULL;
-	int totallen, len, result;
-	int sg_idx = 0, current_sg_offset = 0;
-	int transferred, rc;
+	int totallen, len, result, rc;
+	int sg_idx = 0, sg_offset = 0;
 
 	// we're working in LBA mode.  according to the ATA spec, 
 	// we can support up to 28-bit addressing.  I don't know if Datafab
@@ -337,44 +216,20 @@ static int datafab_write_data(struct us_data *us,
 	totallen = sectors * info->ssize;
 
 	do {
-		// loop, never allocate or transfer more than 64k at once (min(128k, 255*info->ssize) is the real limit)
+		// loop, never allocate or transfer more than 64k at once
+		// (min(128k, 255*info->ssize) is the real limit)
+
 		len = min_t(int, totallen, 65536);
 
-		if (use_sg) {
-			sg = (struct scatterlist *) src;
-			buffer = kmalloc(len, GFP_NOIO);
-			if (buffer == NULL)
-				return USB_STOR_TRANSPORT_ERROR;
-			ptr = buffer;
+		// if we are using scatter-gather,
+		// first copy all to one big buffer
 
-			memset(buffer, 0, len);
+		buffer = us_copy_from_sgbuf(src, len, &sg_idx,
+					    &sg_offset, use_sg);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
 
-			// copy the data from the sg bufs into the big contiguous buf
-			//
-			transferred = 0;
-			while (transferred < len) {
-				if (len - transferred >= sg[sg_idx].length - current_sg_offset) {
-					US_DEBUGP("datafab_write_data:  getting %d bytes from %d byte sg buffer\n", sg[sg_idx].length - current_sg_offset, sg[sg_idx].length);
-					memcpy(ptr + transferred,
-					       page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
-					       sg[sg_idx].length - current_sg_offset);
-					transferred += sg[sg_idx].length - current_sg_offset;
-					current_sg_offset = 0;
-					// on to the next sg buffer
-					++sg_idx;
-				} else {
-					US_DEBUGP("datafab_write_data:  getting %d bytes from %d byte sg buffer\n", len - transferred, sg[sg_idx].length);
-					memcpy(ptr + transferred,
-					       page_address(sg[sg_idx].page) + sg[sg_idx].offset + current_sg_offset,
-					       len - transferred);
-					current_sg_offset += len - transferred;
-					// we only copied part of this sg buffer
-					break;
-				}
-			}
-		} else {
-			ptr = src;
-		}
+		ptr = buffer;
 
 		thistime = (len / info->ssize) & 0xff;
 
@@ -387,64 +242,57 @@ static int datafab_write_data(struct us_data *us,
 		command[5] |= (sector >> 24) & 0x0F;
 
 		// send the command
-		US_DEBUGP("datafab_write_data:  sending following command\n");
-		datafab_dump_data(command, sizeof(command));
-
 		result = datafab_bulk_write(us, command, sizeof(command));
-		if (result != USB_STOR_TRANSPORT_GOOD) {
-			if (use_sg)
-				kfree(buffer);
-			return result;
-		}
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			goto leave;
 
 		// send the data
 		result = datafab_bulk_write(us, ptr, len);
-		if (result != USB_STOR_TRANSPORT_GOOD) {
-			if (use_sg)
-				kfree(buffer);
-			return result;
-		}
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			goto leave;
 
 		// read the result
 		result = datafab_bulk_read(us, reply, sizeof(reply));
-		if (result != USB_STOR_TRANSPORT_GOOD) {
-			if (use_sg)
-				kfree(buffer);
-			return result;
-		}
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			goto leave;
 
 		if (reply[0] != 0x50 && reply[1] != 0) {
-			US_DEBUGP("datafab_write_data:  Gah! write return code: %02x %02x\n", reply[0], reply[1]);
-			if (use_sg)
-				kfree(buffer);
-			return USB_STOR_TRANSPORT_ERROR;
+			US_DEBUGP("datafab_write_data:  Gah! "
+				  "write return code: %02x %02x\n",
+				  reply[0], reply[1]);
+			result = USB_STOR_TRANSPORT_ERROR;
+			goto leave;
 		}
 
 		sectors -= thistime;
 		sector  += thistime;
 
-		if (use_sg) {
+		if (use_sg)
 			kfree(buffer);
-		} else {
+		else
 			src += len;
-		}
 
 		totallen -= len;
 	} while (totallen > 0);
 
 	return USB_STOR_TRANSPORT_GOOD;
+
+ leave:
+	if (use_sg)
+		kfree(buffer);
+	return result;
 }
 
 
 static int datafab_determine_lun(struct us_data *us,
 				 struct datafab_info *info)
 {
-	// dual-slot readers can be thought of as dual-LUN devices.  we need to
-	// determine which card slot is being used.  we'll send an IDENTIFY DEVICE
-	// command and see which LUN responds...
+	// Dual-slot readers can be thought of as dual-LUN devices.
+	// We need to determine which card slot is being used.
+	// We'll send an IDENTIFY DEVICE command and see which LUN responds...
 	//
-	// there might be a better way of doing this?
-	//
+	// There might be a better way of doing this?
+
 	unsigned char command[8] = { 0, 1, 0, 0, 0, 0xa0, 0xec, 1 };
 	unsigned char buf[512];
 	int count = 0, rc;
@@ -454,9 +302,9 @@ static int datafab_determine_lun(struct us_data *us,
 
 	US_DEBUGP("datafab_determine_lun:  locating...\n");
 
-	// we'll try 10 times before giving up...
+	// we'll try 3 times before giving up...
 	//
-	while (count++ < 10) {
+	while (count++ < 3) {
 		command[5] = 0xa0;
 
 		rc = datafab_bulk_write(us, command, 8);
@@ -481,7 +329,7 @@ static int datafab_determine_lun(struct us_data *us,
 			return USB_STOR_TRANSPORT_GOOD;
 		}
 
-                wait_ms(20);
+		wait_ms(20);
 	}
 
 	return USB_STOR_TRANSPORT_FAILED;
@@ -531,7 +379,7 @@ static int datafab_id_device(struct us_data *us,
 
 static int datafab_handle_mode_sense(struct us_data *us,
 				     Scsi_Cmnd * srb, 
-		                     unsigned char *ptr,
+				     unsigned char *ptr,
 				     int sense_6)
 {
 	unsigned char mode_param_header[8] = {
@@ -557,7 +405,7 @@ static int datafab_handle_mode_sense(struct us_data *us,
 	// datafab reader doesn't present a SCSI interface so we
 	// fudge the SCSI commands...
 	//
-        
+	
 	if (sense_6)
 		param_len = srb->cmnd[4];
 	else
@@ -676,7 +524,8 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 	if (!us->extra) {
 		us->extra = kmalloc(sizeof(struct datafab_info), GFP_NOIO);
 		if (!us->extra) {
-			US_DEBUGP("datafab_transport:  Gah! Can't allocate storage for Datafab info struct!\n");
+			US_DEBUGP("datafab_transport:  Gah! "
+				  "Can't allocate storage for Datafab info struct!\n");
 			return USB_STOR_TRANSPORT_ERROR;
 		}
 		memset(us->extra, 0, sizeof(struct datafab_info));
@@ -728,7 +577,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 	//
 	if (srb->cmnd[0] == READ_10) {
 		block = ((u32)(srb->cmnd[2]) << 24) | ((u32)(srb->cmnd[3]) << 16) |
-		        ((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
+			((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
 
 		blocks = ((u32)(srb->cmnd[7]) << 8) | ((u32)(srb->cmnd[8]));
 
@@ -740,10 +589,10 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		// we'll probably never see a READ_12 but we'll do it anyway...
 		//
 		block = ((u32)(srb->cmnd[2]) << 24) | ((u32)(srb->cmnd[3]) << 16) |
-		        ((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
+			((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
 
 		blocks = ((u32)(srb->cmnd[6]) << 24) | ((u32)(srb->cmnd[7]) << 16) |
-		         ((u32)(srb->cmnd[8]) <<  8) | ((u32)(srb->cmnd[9]));
+			 ((u32)(srb->cmnd[8]) <<  8) | ((u32)(srb->cmnd[9]));
 
 		US_DEBUGP("datafab_transport:  READ_12: read block 0x%04lx  count %ld\n", block, blocks);
 		return datafab_read_data(us, info, block, blocks, ptr, srb->use_sg);
@@ -751,7 +600,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 
 	if (srb->cmnd[0] == WRITE_10) {
 		block = ((u32)(srb->cmnd[2]) << 24) | ((u32)(srb->cmnd[3]) << 16) |
-		        ((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
+			((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
 
 		blocks = ((u32)(srb->cmnd[7]) << 8) | ((u32)(srb->cmnd[8]));
 
@@ -763,10 +612,10 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		// we'll probably never see a WRITE_12 but we'll do it anyway...
 		//
 		block = ((u32)(srb->cmnd[2]) << 24) | ((u32)(srb->cmnd[3]) << 16) |
-		        ((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
+			((u32)(srb->cmnd[4]) <<  8) | ((u32)(srb->cmnd[5]));
 
 		blocks = ((u32)(srb->cmnd[6]) << 24) | ((u32)(srb->cmnd[7]) << 16) |
-		         ((u32)(srb->cmnd[8]) <<  8) | ((u32)(srb->cmnd[9]));
+			 ((u32)(srb->cmnd[8]) <<  8) | ((u32)(srb->cmnd[9]));
 
 		US_DEBUGP("datafab_transport:  WRITE_12: write block 0x%04lx  count %ld\n", block, blocks);
 		return datafab_write_data(us, info, block, blocks, ptr, srb->use_sg);
@@ -825,8 +674,9 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 			srb->result = CHECK_CONDITION << 1;
 		}
 		return rc;
-        }
+	}
 
-	US_DEBUGP("datafab_transport:  Gah! Unknown command: %d (0x%x)\n", srb->cmnd[0], srb->cmnd[0]);
+	US_DEBUGP("datafab_transport:  Gah! Unknown command: %d (0x%x)\n",
+		  srb->cmnd[0], srb->cmnd[0]);
 	return USB_STOR_TRANSPORT_ERROR;
 }

@@ -184,20 +184,22 @@ extern inline void mark_info_dirty(struct mem_dqinfo *info)
 
 #define sb_dqopt(sb) (&(sb)->s_dquot)
 
-extern int nr_dquots, nr_free_dquots;
-
-struct dqstats {
-	__u32 lookups;
-	__u32 drops;
-	__u32 reads;
-	__u32 writes;
-	__u32 cache_hits;
-	__u32 allocated_dquots;
-	__u32 free_dquots;
-	__u32 syncs;
+/*
+ * Statistics about disc quota.
+ */
+enum {
+	DQSTATS_LOOKUPS,
+	DQSTATS_DROPS,
+	DQSTATS_READS,
+	DQSTATS_WRITES,
+	DQSTATS_CACHE_HITS,
+	DQSTATS_ALLOCATED,
+	DQSTATS_FREE,
+	DQSTATS_SYNCS,
+	DQSTATS_SIZE
 };
 
-extern struct dqstats dqstats;
+extern __u32 dqstats_array[DQSTATS_SIZE];
 
 #define NR_DQHASH 43            /* Just an arbitrary number */
 

@@ -57,6 +57,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
+#include <linux/suspend.h> 
 
 /* the number of mounted filesystems.  This is used to decide when to
 ** start and kill the commit thread
@@ -1886,6 +1887,7 @@ static int reiserfs_journal_commit_thread(void *nullp) {
   spin_unlock_irq(&current->sigmask_lock);
 
   sprintf(current->comm, "kreiserfsd") ;
+  current->flags |= PF_KERNTHREAD;
   lock_kernel() ;
   while(1) {
 
@@ -1899,7 +1901,12 @@ static int reiserfs_journal_commit_thread(void *nullp) {
       break ;
     }
     wake_up(&reiserfs_commit_thread_done) ;
-    interruptible_sleep_on_timeout(&reiserfs_commit_thread_wait, 5 * HZ) ;
+#ifdef CONFIG_SOFTWARE_SUSPEND
+    if (current->flags & PF_FREEZE) {
+	    refrigerator(PF_IOTHREAD);
+    } else
+#endif
+	    interruptible_sleep_on_timeout(&reiserfs_commit_thread_wait, 5 * HZ) ;
   }
   unlock_kernel() ;
   wake_up(&reiserfs_commit_thread_done) ;

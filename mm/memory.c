@@ -127,9 +127,6 @@ void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr)
 		free_one_pgd(tlb, page_dir);
 		page_dir++;
 	} while (--nr);
-
-	/* keep the page table cache within bounds */
-	check_pgt_cache();
 }
 
 pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
@@ -346,13 +343,14 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 		if (pte_present(pte)) {
 			unsigned long pfn = pte_pfn(pte);
 
-			pte_clear(ptep);
-			pfn = pte_pfn(pte);
+			pte = ptep_get_and_clear(ptep);
+			tlb_remove_tlb_entry(tlb, pte, address+offset);
 			if (pfn_valid(pfn)) {
 				struct page *page = pfn_to_page(pfn);
 				if (!PageReserved(page)) {
 					if (pte_dirty(pte))
 						set_page_dirty(page);
+					tlb->freed++;
 					tlb_remove_page(tlb, page);
 				}
 			}
@@ -389,18 +387,19 @@ static void zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address,
 
 void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned long address, unsigned long end)
 {
+	unsigned long start = address;
 	pgd_t * dir;
 
 	if (address >= end)
 		BUG();
 	dir = pgd_offset(vma->vm_mm, address);
-	tlb_start_vma(tlb, vma);
+	tlb_start_vma(tlb, vma, start, end);
 	do {
 		zap_pmd_range(tlb, dir, address, end - address);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	tlb_end_vma(tlb, vma);
+	tlb_end_vma(tlb, vma, start, end);
 }
 
 /*

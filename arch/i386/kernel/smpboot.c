@@ -1087,8 +1087,7 @@ void __init smp_boot_cpus(void)
 	/*
 	 * If we couldn't find a local APIC, then get out of here now!
 	 */
-	if (APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]) &&
-	    !test_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability)) {
+	if (APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]) && !cpu_has_apic) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_physical_apicid);
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
@@ -1203,8 +1202,7 @@ void __init smp_boot_cpus(void)
 	 * If Hyper-Threading is avaialble, construct cpu_sibling_map[], so
 	 * that we can tell the sibling CPU efficiently.
 	 */
-	if (test_bit(X86_FEATURE_HT, boot_cpu_data.x86_capability)
-	    && smp_num_siblings > 1) {
+	if (cpu_has_ht && smp_num_siblings > 1) {
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
 			cpu_sibling_map[cpu] = NO_PROC_ID;
 		

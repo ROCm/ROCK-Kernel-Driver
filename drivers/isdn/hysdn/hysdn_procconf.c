@@ -255,7 +255,7 @@ hysdn_conf_open(struct inode *ino, struct file *filep)
 	card = card_root;
 	while (card) {
 		pd = card->procconf;
-		if (pd->low_ino == (ino->i_ino & 0xFFFF))
+		if (pd == PDE(ino))
 			break;
 		card = card->next;	/* search next entry */
 	}
@@ -340,7 +340,7 @@ hysdn_conf_close(struct inode *ino, struct file *filep)
 	card = card_root;
 	while (card) {
 		pd = card->procconf;
-		if (pd->low_ino == (ino->i_ino & 0xFFFF))
+		if (pd == PDE(ino))
 			break;
 		card = card->next;	/* search next entry */
 	}

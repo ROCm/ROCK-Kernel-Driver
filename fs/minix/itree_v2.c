@@ -58,3 +58,8 @@ void V2_minix_truncate(struct inode * inode)
 {
 	truncate(inode);
 }
+
+unsigned V2_minix_blocks(loff_t size)
+{
+	return nblocks(size);
+}

@@ -27,8 +27,6 @@ static loff_t proc_file_lseek(struct file *, loff_t, int);
 
 int proc_match(int len, const char *name,struct proc_dir_entry * de)
 {
-	if (!de || !de->low_ino)
-		return 0;
 	if (de->namelen != len)
 		return 0;
 	return !memcmp(name, de->name, len);
@@ -266,8 +264,6 @@ struct dentry *proc_lookup(struct inode * dir, struct dentry *dentry)
 	de = PDE(dir);
 	if (de) {
 		for (de = de->subdir; de ; de = de->next) {
-			if (!de || !de->low_ino)
-				continue;
 			if (de->namelen != dentry->d_name.len)
 				continue;
 			if (!memcmp(dentry->d_name.name, de->name, de->namelen)) {

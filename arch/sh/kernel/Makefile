@@ -80,6 +80,4 @@ ifeq ($(CONFIG_SH_GENERIC),y)
 obj-y		+= $(machine-specific-objs)
 endif
 
-USE_STANDARD_AS_RULE := true
-
 include $(TOPDIR)/Rules.make

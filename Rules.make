@@ -43,6 +43,27 @@ obj-m := $(filter-out $(obj-y),$(obj-m))
 #
 first_rule: all_targets
 
+# Handle objects in subdirs
+# ---------------------------------------------------------------------------
+# o if we encounter foo/ in $(obj-y), replace it by foo/built-in.o
+#   and add the directory to the list of dirs to descend into: $(subdir-y)
+# o if we encounter foo/ in $(obj-m), remove it from $(obj-m) 
+#   and add the directory to the list of dirs to descend into: $(subdir-m)
+
+__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
+subdir-y	+= $(__subdir-y)
+__subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
+subdir-m	+= $(__subdir-m)
+__subdir-n	:= $(patsubst %/,%,$(filter %/, $(obj-n)))
+subdir-n	+= $(__subdir-n)
+__subdir-	:= $(patsubst %/,%,$(filter %/, $(obj-)))
+subdir-		+= $(__subdir-)
+obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
+obj-m		:= $(filter-out %/, $(obj-m))
+
+# If a dir is selected in $(subdir-y) and also mentioned in $(mod-subdirs),
+# add it to $(subdir-m)
+
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
 SUB_DIRS	:= $(subdir-y)
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
@@ -51,6 +72,9 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 #
 # Common rules
 #
+
+# Compile C sources (.c)
+# ---------------------------------------------------------------------------
 
 # export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
 
@@ -71,11 +95,9 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 %.o: %.c dummy
 	$(call if_changed,cmd_cc_o_c)
 
-# Old makefiles define their own rules for compiling .S files,
-# but these standard rules are available for any Makefile that
-# wants to use them.  Our plan is to incrementally convert all
-# the Makefiles to these standard rules.  -- rmk, mec
-ifdef USE_STANDARD_AS_RULE
+
+# Compile assembler sources (.S)
+# ---------------------------------------------------------------------------
 
 a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
@@ -89,11 +111,7 @@ cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S dummy
 	$(call if_changed,cmd_as_o_S)
 
-endif
-
-# FIXME is anybody using this rule? Why does it have EXTRA_CFLAGS?
-%.o: %.s
-	$(AS) $(AFLAGS) $(EXTRA_CFLAGS) -o $@ $<
+# ---------------------------------------------------------------------------
 
 %.lst: %.c
 	$(CC) $(c_flags) -g -c -o $*.o $<
@@ -378,7 +396,7 @@ endif
 # function to only execute the passed command if necessary
 
 if_changed = $(if $(strip $? \
-		          $(filter-out $($(1)),$(cmd_$@))\
-			  $(filter-out $(cmd_$@),$($(1)))),\
-	       @echo $($(1)); $($(1)); echo 'cmd_$@ := $($(1))' > .$@.cmd)
+		          $(filter-out $($(1)),$(cmd_$(@F)))\
+			  $(filter-out $(cmd_$(@F)),$($(1)))),\
+	       @echo '$($(1))' && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
 

@@ -59,7 +59,9 @@ static char *nfs_getlink(struct inode *inode, struct page **ppage)
 	struct page *page;
 	u32 *p;
 
-	/* Caller revalidated the directory inode already. */
+	page = ERR_PTR(nfs_revalidate_inode(NFS_SERVER(inode), inode));
+	if (page)
+		goto read_failed;
 	page = read_cache_page(&inode->i_data, 0,
 				(filler_t *)nfs_symlink_filler, inode);
 	if (IS_ERR(page))
@@ -69,10 +71,10 @@ static char *nfs_getlink(struct inode *inode, struct page **ppage)
 	*ppage = page;
 	p = kmap(page);
 	return (char*)(p+1);
-		
+
 getlink_read_error:
 	page_cache_release(page);
-	return ERR_PTR(-EIO);
+	page = ERR_PTR(-EIO);
 read_failed:
 	return (char*)page;
 }
@@ -107,6 +109,6 @@ static int nfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 struct inode_operations nfs_symlink_inode_operations = {
 	readlink:	nfs_readlink,
 	follow_link:	nfs_follow_link,
-	revalidate:	nfs_revalidate,
-	setattr:	nfs_notify_change,
+	getattr:	nfs_getattr,
+	setattr:	nfs_setattr,
 };

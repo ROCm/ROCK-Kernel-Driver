@@ -911,12 +911,8 @@ static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned 
 	new->vm_start = addr;
 	new->vm_pgoff = mpnt->vm_pgoff + ((addr - mpnt->vm_start) >> PAGE_SHIFT);
 	new->vm_raend = 0;
-	if (mpnt->vm_file) {
-		struct file *file = mpnt->vm_file;
-		get_file(file);
-		if (mpnt->vm_flags & VM_DENYWRITE)
-			atomic_dec(&file->f_dentry->d_inode->i_writecount);
-	}
+	if (mpnt->vm_file)
+		get_file(mpnt->vm_file);
 
 	if (mpnt->vm_ops && mpnt->vm_ops->open)
 		mpnt->vm_ops->open(mpnt);

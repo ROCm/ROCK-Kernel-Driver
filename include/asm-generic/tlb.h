@@ -16,8 +16,17 @@
 #include <linux/config.h>
 #include <asm/tlbflush.h>
 
-/* aim for something that fits in the L1 cache */
-#define FREE_PTE_NR	508
+/*
+ * For UP we don't need to worry about TLB flush
+ * and page free order so much..
+ */
+#ifdef CONFIG_SMP
+  #define FREE_PTE_NR	507
+  #define tlb_fast_mode(tlb) ((tlb)->nr == ~0UL) 
+#else
+  #define FREE_PTE_NR	1
+  #define tlb_fast_mode(tlb) 1
+#endif
 
 /* mmu_gather_t is an opaque type used by the mm code for passing around any
  * data needed by arch specific code for tlb_remove_page.  This structure can
@@ -33,10 +42,6 @@ typedef struct free_pte_ctx {
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
 extern mmu_gather_t	mmu_gathers[NR_CPUS];
-
-/* Do me later */
-#define tlb_start_vma(tlb, vma) do { } while (0)
-#define tlb_end_vma(tlb, vma) do { } while (0)
 
 /* tlb_gather_mmu
  *	Return a pointer to an initialized mmu_gather_t.
@@ -57,9 +62,9 @@ static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigne
 {
 	unsigned long nr;
 
-	flush_tlb_mm(tlb->mm);
+	tlb_flush(tlb);
 	nr = tlb->nr;
-	if (nr != ~0UL) {
+	if (!tlb_fast_mode(tlb)) {
 		unsigned long i;
 		tlb->nr = 0;
 		for (i=0; i < nr; i++)
@@ -81,6 +86,9 @@ static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsign
 		freed = rss;
 	mm->rss = rss - freed;
 	tlb_flush_mmu(tlb, start, end);
+
+	/* keep the page table cache within bounds */
+	check_pgt_cache();
 }
 
 
@@ -91,8 +99,7 @@ static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsign
  */
 static inline void tlb_remove_page(mmu_gather_t *tlb, struct page *page)
 {
-	/* Handle the common case fast, first. */\
-	if (tlb->nr == ~0UL) {
+	if (tlb_fast_mode(tlb)) {
 		free_page_and_swap_cache(page);
 		return;
 	}

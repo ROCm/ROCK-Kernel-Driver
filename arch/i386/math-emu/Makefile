@@ -9,7 +9,6 @@ DEBUG	=
 PARANOID = -DPARANOID
 CFLAGS	:= $(CFLAGS) $(PARANOID) $(DEBUG) -fno-builtin $(MATH_EMULATION)
 
-USE_STANDARD_AS_RULE	:= true
 EXTRA_AFLAGS	:= $(PARANOID)
 
 # From 'C' language sources:

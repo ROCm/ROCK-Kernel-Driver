@@ -11,6 +11,7 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/syscall.h>
 #include <linux/linkage.h>
+#include <linux/namei.h>
 #include <asm/uaccess.h>
 
 /*

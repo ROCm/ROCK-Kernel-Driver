@@ -7,9 +7,11 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-O_TARGET := e1000.o
+O_TARGET := built-in.o
 
-obj-y   := e1000_main.o e1000_hw.o e1000_ethtool.o e1000_param.o e1000_proc.o
-obj-m   := $(O_TARGET)
+obj-$(CONFIG_E1000) += e1000.o
+
+e1000-objs := e1000_main.o e1000_hw.o e1000_ethtool.o e1000_param.o \
+	      e1000_proc.o
 
 include $(TOPDIR)/Rules.make

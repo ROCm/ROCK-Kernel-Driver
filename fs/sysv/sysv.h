@@ -137,6 +137,7 @@ extern void sysv_write_inode(struct inode *, int);
 extern int sysv_sync_inode(struct inode *);
 extern int sysv_sync_file(struct file *, struct dentry *, int);
 extern void sysv_set_inode(struct inode *, dev_t);
+extern int sysv_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 
 /* dir.c */
 extern struct sysv_dir_entry *sysv_find_entry(struct dentry *, struct page **);

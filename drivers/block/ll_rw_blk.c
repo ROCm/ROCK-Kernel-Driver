@@ -523,42 +523,6 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 	printk("\n");
 }
 
-/*
- * standard prep_rq_fn that builds 10 byte cmds
- */
-int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
-{
-	int hard_sect = queue_hardsect_size(q);
-	sector_t block = rq->hard_sector / (hard_sect >> 9);
-	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
-
-	if (!(rq->flags & REQ_CMD))
-		return 0;
-
-	memset(rq->cmd, 0, sizeof(rq->cmd));
-
-	if (rq_data_dir(rq) == READ)
-		rq->cmd[0] = READ_10;
-	else 
-		rq->cmd[0] = WRITE_10;
-
-	/*
-	 * fill in lba
-	 */
-	rq->cmd[2] = (block >> 24) & 0xff;
-	rq->cmd[3] = (block >> 16) & 0xff;
-	rq->cmd[4] = (block >>  8) & 0xff;
-	rq->cmd[5] = block & 0xff;
-
-	/*
-	 * and transfer length
-	 */
-	rq->cmd[7] = (blocks >> 8) & 0xff;
-	rq->cmd[8] = blocks & 0xff;
-
-	return 0;
-}
-
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
 {
 	struct bio_vec *bv, *bvprv = NULL;
@@ -1418,7 +1382,9 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	if (bio->bi_bdev)
+		req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	else	req->rq_dev = NODEV;
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -1763,9 +1729,8 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
 	if (rq->flags & REQ_CMD) {
 		rq->hard_sector += nsect;
-		rq->hard_nr_sectors -= nsect;
+		rq->nr_sectors = rq->hard_nr_sectors -= nsect;
 		rq->sector = rq->hard_sector;
-		rq->nr_sectors = rq->hard_nr_sectors;
 
 		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 		rq->hard_cur_sectors = rq->current_nr_sectors;
@@ -1942,7 +1907,6 @@ EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
 
-EXPORT_SYMBOL(ll_10byte_cmd_build);
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
 EXPORT_SYMBOL(blk_queue_init_tags);

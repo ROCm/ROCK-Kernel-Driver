@@ -1221,6 +1221,7 @@ static int usbout_prepare_desc(struct usbout *u, struct urb *urb)
 		offs += cnt;
 		cp += cnt;
 	}
+	urb->interval = 1;
 	if (err)
 		u->dma.error++;
 	if (u->dma.mapped) {
@@ -1291,6 +1292,7 @@ static int usbout_sync_prepare_desc(struct usbout *u, struct urb *urb)
 		urb->iso_frame_desc[i].length = 3;
 		urb->iso_frame_desc[i].offset = offs;
 	}
+	urb->interval = 1;
 	return 0;
 }
 

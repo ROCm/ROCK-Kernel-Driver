@@ -47,7 +47,7 @@ struct inode_operations smb_dir_inode_operations =
 	mkdir:		smb_mkdir,
 	rmdir:		smb_rmdir,
 	rename:		smb_rename,
-	revalidate:	smb_revalidate_inode,
+	getattr:	smb_getattr,
 	setattr:	smb_notify_change,
 };
 

@@ -1,5 +1,6 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
+#include <linux/init.h>
 
 /*
  * PCI Power management..
@@ -109,7 +110,7 @@ static int pci_pm_save_state(u32 state)
 	return error;
 }
 
-static int pci_pm_suspend(u32 state)
+int pci_pm_suspend(u32 state)
 {
 	struct list_head *list;
 	struct pci_bus *bus;
@@ -122,7 +123,7 @@ static int pci_pm_suspend(u32 state)
 	return 0;
 }
 
-static int pci_pm_resume(void)
+int pci_pm_resume(void)
 {
 	struct list_head *list;
 	struct pci_bus *bus;

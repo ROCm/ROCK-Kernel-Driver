@@ -91,6 +91,7 @@ extern struct cpuinfo_x86 cpu_data[];
 #define cpu_has_de 1
 #define cpu_has_vme 1
 #define cpu_has_fxsr 1
+#define cpu_has_mmx 1
 #define cpu_has_xmm 1
 #define cpu_has_apic 1
 

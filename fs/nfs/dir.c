@@ -30,6 +30,7 @@
 #include <linux/nfs_mount.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/namei.h>
 
 #define NFS_PARANOIA 1
 /* #define NFS_DEBUG_VERBOSE 1 */
@@ -64,8 +65,8 @@ struct inode_operations nfs_dir_inode_operations = {
 	mknod:		nfs_mknod,
 	rename:		nfs_rename,
 	permission:	nfs_permission,
-	revalidate:	nfs_revalidate,
-	setattr:	nfs_notify_change,
+	getattr:	nfs_getattr,
+	setattr:	nfs_setattr,
 };
 
 typedef u32 * (*decode_dirent_t)(u32 *, struct nfs_entry *, int);
@@ -357,7 +358,7 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	lock_kernel();
 
-	res = nfs_revalidate(dentry);
+	res = nfs_revalidate_inode(NFS_SERVER(inode), inode);
 	if (res < 0) {
 		unlock_kernel();
 		return res;

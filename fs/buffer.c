@@ -32,12 +32,10 @@
 #include <linux/writeback.h>
 #include <linux/mempool.h>
 #include <linux/hash.h>
+#include <linux/suspend.h>
 #include <asm/bitops.h>
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
-
-/* This is used by some architectures to estimate available memory. */
-atomic_t buffermem_pages = ATOMIC_INIT(0);
 
 /*
  * Hashed waitqueue_head's for wait_on_buffer()
@@ -123,6 +121,8 @@ void unlock_buffer(struct buffer_head *bh)
 	wake_up_buffer(bh);
 }
 
+DECLARE_TASK_QUEUE(tq_bdflush);
+
 /*
  * Block until a buffer comes unlocked.  This doesn't stop it
  * from becoming locked again - you have to lock it yourself
@@ -151,10 +151,6 @@ void __wait_on_buffer(struct buffer_head * bh)
 static inline void
 __set_page_buffers(struct page *page, struct buffer_head *head)
 {
-	struct inode *inode = page->mapping->host;
-
-	if (inode && S_ISBLK(inode->i_mode))
-		atomic_inc(&buffermem_pages);
 	if (page_has_buffers(page))
 		buffer_error();
 	set_page_buffers(page, head);
@@ -164,14 +160,6 @@ __set_page_buffers(struct page *page, struct buffer_head *head)
 static inline void
 __clear_page_buffers(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
-
-	if (mapping) {
-		struct inode *inode = mapping->host;
-
-		if (S_ISBLK(inode->i_mode))
-			atomic_dec(&buffermem_pages);
-	}
 	clear_page_buffers(page);
 	page_cache_release(page);
 }

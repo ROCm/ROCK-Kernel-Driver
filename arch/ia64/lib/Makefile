@@ -2,8 +2,6 @@
 # Makefile for ia64-specific library routines..
 #
 
-USE_STANDARD_AS_RULE := true
-
 L_TARGET = lib.a
 
 export-objs := io.o swiotlb.o

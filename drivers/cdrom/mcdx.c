@@ -562,18 +562,10 @@ void do_mcdx_request(request_queue_t * q)
 
       again:
 
-	if (QUEUE_EMPTY) {
-		xtrace(REQUEST, "end_request(0): CURRENT == NULL\n");
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
 		return;
 	}
-
-	if (CURRENT->rq_status == RQ_INACTIVE) {
-		xtrace(REQUEST,
-		       "end_request(0): rq_status == RQ_INACTIVE\n");
-		return;
-	}
-
-	INIT_REQUEST;
 
 	dev = minor(CURRENT->rq_dev);
 	stuffp = mcdx_stuffp[dev];

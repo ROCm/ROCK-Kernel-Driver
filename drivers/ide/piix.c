@@ -105,7 +105,6 @@ static struct piix_ide_chip {
 static struct piix_ide_chip *piix_config;
 static unsigned char piix_enabled;
 static unsigned int piix_80w;
-static unsigned int piix_clock;
 
 static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
 
@@ -147,7 +146,7 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 								: piix_dma[piix_config->flags & PIIX_UDMA]);
 
 	piix_print("BM-DMA base:                        %#x", piix_base);
-	piix_print("PCI clock:                          %d.%dMHz", piix_clock / 1000, piix_clock / 100 % 10);
+	piix_print("PCI clock:                          %d.%dMHz", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 
 	piix_print("-----------------------Primary IDE-------Secondary IDE------");
 
@@ -160,7 +159,7 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	piix_print("Cable Type:            %10s%20s", (piix_80w & 1) ? "80w" : "40w", (piix_80w & 2) ? "80w" : "40w");
 
-	if (!piix_clock)
+	if (!system_bus_speed)
                 return p - buffer;
 
 	piix_print("-------------------drive0----drive1----drive2----drive3-----");
@@ -192,8 +191,8 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 		}
 
 		dmaen[i] = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
-		cycle[i] = 1000000 / piix_clock * (active[i] + recover[i]);
-		speed[i] = 2 * piix_clock / (active[i] + recover[i]);
+		cycle[i] = 1000000 / system_bus_speed * (active[i] + recover[i]);
+		speed[i] = 2 * system_bus_speed / (active[i] + recover[i]);
 
 		if (!(piix_config->flags & PIIX_UDMA))
 			continue;
@@ -213,17 +212,17 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 			udma[i] = (4 - ((e >> (i << 2)) & 3)) * umul;
 		} else  udma[i] = (8 - ((e >> (i << 2)) & 7)) * 2;
 
-		speed[i] = 8 * piix_clock / udma[i];
-		cycle[i] = 250000 * udma[i] / piix_clock;
+		speed[i] = 8 * system_bus_speed / udma[i];
+		cycle[i] = 250000 * udma[i] / system_bus_speed;
 	}
 
 	piix_print_drive("Transfer Mode: ", "%10s", dmaen[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
-	piix_print_drive("Address Setup: ", "%8dns", (1000000 / piix_clock) * 3);
-	piix_print_drive("Cmd Active:    ", "%8dns", (1000000 / piix_clock) * 12);
-	piix_print_drive("Cmd Recovery:  ", "%8dns", (1000000 / piix_clock) * 18);
-	piix_print_drive("Data Active:   ", "%8dns", (1000000 / piix_clock) * active[i]);
-	piix_print_drive("Data Recovery: ", "%8dns", (1000000 / piix_clock) * recover[i]);
+	piix_print_drive("Address Setup: ", "%8dns", (1000000 / system_bus_speed) * 3);
+	piix_print_drive("Cmd Active:    ", "%8dns", (1000000 / system_bus_speed) * 12);
+	piix_print_drive("Cmd Recovery:  ", "%8dns", (1000000 / system_bus_speed) * 18);
+	piix_print_drive("Data Active:   ", "%8dns", (1000000 / system_bus_speed) * active[i]);
+	piix_print_drive("Data Recovery: ", "%8dns", (1000000 / system_bus_speed) * recover[i]);
 	piix_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
 	piix_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
@@ -324,9 +323,9 @@ static void piix_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_tim
  * by upper layers.
  */
 
-static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
+static int piix_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int err, T, UT, umul = 1;
 
@@ -339,7 +338,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
 	if (speed > XFER_UDMA_4 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100)
 		umul = 4;
 	
-	T = 1000000000 / piix_clock;
+	T = 1000000000 / system_bus_speed;
 	UT = T / umul;
 
 	ata_timing_compute(drive, speed, &t, T, UT);
@@ -364,7 +363,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void piix_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void piix_tune_drive(struct ata_device *drive, unsigned char pio)
 {
 	if (!((piix_enabled >> drive->channel->unit) & 1))
 		return;
@@ -491,24 +490,6 @@ static unsigned int __init piix_init_chipset(struct pci_dev *dev)
 		if (~piix_config->flags & PIIX_NO_SITRE) w |= 0x4000;
 		w |= 0x44;
 		pci_write_config_word(dev, PIIX_IDETIM0 + (i << 1), w);
-	}
-
-/*
- * Determine the system bus clock.
- */
-
-	piix_clock = system_bus_speed * 1000;
-
-	switch (piix_clock) {
-		case 33000: piix_clock = 33333; break;
-		case 37000: piix_clock = 37500; break;
-		case 41000: piix_clock = 41666; break;
-	}
-
-	if (piix_clock < 20000 || piix_clock > 50000) {
-		printk(KERN_WARNING "PIIX: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", piix_clock);
-		printk(KERN_WARNING "PIIX: Use ide0=ata66 if you want to assume 80-wire cable\n");
-		piix_clock = 33333;
 	}
 
 /*

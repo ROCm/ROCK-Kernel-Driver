@@ -5,7 +5,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := fc.o
+O_TARGET := built-in.o
 
 obj-$(CONFIG_IPHASE5526)	+= iph5526.o
 

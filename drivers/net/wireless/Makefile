@@ -4,7 +4,7 @@
 # Makefile for the Linux Wireless network device drivers.
 #
 
-O_TARGET := wireless_net.o
+O_TARGET := built-in.o
 
 obj-y		:=
 obj-m		:=

@@ -27,6 +27,9 @@ static int autofs4_root_ioctl(struct inode *, struct file *,unsigned int,unsigne
 static struct dentry *autofs4_root_lookup(struct inode *,struct dentry *);
 
 struct file_operations autofs4_root_operations = {
+	open:		dcache_dir_open,
+	release:	dcache_dir_close,
+	llseek:		dcache_dir_lseek,
 	read:		generic_read_dir,
 	readdir:	dcache_readdir,
 	ioctl:		autofs4_root_ioctl,

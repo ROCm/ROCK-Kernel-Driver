@@ -17,7 +17,7 @@
 
 #include <linux/module.h>
 
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/msdos_fs.h>
 #include <linux/ctype.h>
 #include <linux/slab.h>

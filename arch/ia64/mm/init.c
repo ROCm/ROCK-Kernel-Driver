@@ -187,7 +187,6 @@ show_mem(void)
 			pgdat = pgdat->node_next;
 		} while (pgdat);
 		printk("Total of %ld pages in page table cache\n", pgtable_cache_size);
-		printk("%ld buffermem pages\n", nr_buffermem_pages());
 		printk("%d free buffer pages\n", nr_free_buffer_pages());
 	}
 #else /* !CONFIG_DISCONTIGMEM */

@@ -219,8 +219,8 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 		/*
 		 *  Cycle times should be Vesa bus cycles
 		 */
-		active_cycles   = (active_time   * system_bus_speed + 999) / 1000;
-		recovery_cycles = (recovery_time * system_bus_speed + 999) / 1000;
+		active_cycles   = (active_time   * system_bus_speed + 999999) / 1000000;
+		recovery_cycles = (recovery_time * system_bus_speed + 999999) / 1000000;
 		/*
 		 *  Upper and lower limits
 		 */

@@ -42,9 +42,8 @@ prototypes:
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
 	int (*permission) (struct inode *, int);
-	int (*revalidate) (struct dentry *);
 	int (*setattr) (struct dentry *, struct iattr *);
-	int (*getattr) (struct dentry *, struct iattr *);
+	int (*getattr) (struct vfsmount *, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *, void *, size_t, int);
 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
@@ -67,8 +66,7 @@ follow_link:	no	no
 truncate:	no	yes		(see below)
 setattr:	no	yes
 permission:	yes	no
-getattr:				(see below)
-revalidate:	no			(see below)
+getattr:	no	no
 setxattr:	no	yes
 getxattr:	no	yes
 listxattr:	no	yes
@@ -76,14 +74,11 @@ removexattr:	no	yes
 	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_sem on
 victim.
 	cross-directory ->rename() has (per-superblock) ->s_vfs_rename_sem.
-	->revalidate(), it may be called both with and without the i_sem
-on dentry->d_inode.
 	->truncate() is never called directly - it's a callback, not a
 method. It's called by vmtruncate() - library function normally used by
 ->setattr(). Locking information above applies to that call (i.e. is
 inherited from ->setattr() - vmtruncate() is used when ATTR_SIZE had been
 passed).
-	->getattr() is currently unused.
 
 See Documentation/filesystems/directory-locking for more detailed discussion
 of the locking scheme for directory operations.

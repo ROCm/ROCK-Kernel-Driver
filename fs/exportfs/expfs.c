@@ -2,6 +2,7 @@
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
+#include <linux/namei.h>
 
 struct export_operations export_op_default;
 
@@ -457,7 +458,6 @@ static int export_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 		   int connectable)
 {
 	struct inode * inode = dentry->d_inode;
-	struct inode *parent = dentry->d_parent->d_inode;
 	int len = *max_len;
 	int type = 1;
 	
@@ -468,8 +468,12 @@ static int export_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 	fh[0] = inode->i_ino;
 	fh[1] = inode->i_generation;
 	if (connectable && !S_ISDIR(inode->i_mode)) {
+		struct inode *parent;
+		read_lock(&dparent_lock);
+		parent = dentry->d_parent->d_inode;
 		fh[2] = parent->i_ino;
 		fh[3] = parent->i_generation;
+		read_unlock(&dparent_lock);
 		len = 4;
 		type = 2;
 	}

@@ -47,6 +47,7 @@
 #include <linux/completion.h>
 #include <linux/seq_file.h>
 #include <linux/binfmts.h>
+#include <linux/namei.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -258,6 +259,7 @@ EXPORT_SYMBOL(vfs_lstat);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(unlock_rename);
 EXPORT_SYMBOL(generic_read_dir);
+EXPORT_SYMBOL(generic_fillattr);
 EXPORT_SYMBOL(generic_file_llseek);
 EXPORT_SYMBOL(remote_llseek);
 EXPORT_SYMBOL(no_llseek);
@@ -280,6 +282,9 @@ EXPORT_SYMBOL(__get_lease);
 EXPORT_SYMBOL(lease_get_mtime);
 EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
+EXPORT_SYMBOL(dcache_dir_open);
+EXPORT_SYMBOL(dcache_dir_close);
+EXPORT_SYMBOL(dcache_dir_lseek);
 EXPORT_SYMBOL(dcache_readdir);
 EXPORT_SYMBOL(simple_statfs);
 EXPORT_SYMBOL(simple_lookup);
@@ -518,6 +523,8 @@ EXPORT_SYMBOL(seq_open);
 EXPORT_SYMBOL(seq_release);
 EXPORT_SYMBOL(seq_read);
 EXPORT_SYMBOL(seq_lseek);
+EXPORT_SYMBOL(single_open);
+EXPORT_SYMBOL(single_release);
 
 /* Program loader interfaces */
 EXPORT_SYMBOL(setup_arg_pages);
@@ -568,8 +575,6 @@ EXPORT_SYMBOL(strspn);
 EXPORT_SYMBOL(strsep);
 
 /* software interrupts */
-EXPORT_SYMBOL(tasklet_hi_vec);
-EXPORT_SYMBOL(tasklet_vec);
 EXPORT_SYMBOL(bh_task_vec);
 EXPORT_SYMBOL(init_bh);
 EXPORT_SYMBOL(remove_bh);

@@ -15,18 +15,6 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
    dep_tristate '  Include IDE/ATA-2 DISK support' CONFIG_BLK_DEV_IDEDISK $CONFIG_BLK_DEV_IDE
    dep_mbool '    Use multi-mode by default' CONFIG_IDEDISK_MULTI_MODE $CONFIG_BLK_DEV_IDEDISK
    dep_mbool '    Auto-Geometry Resizing support' CONFIG_IDEDISK_STROKE $CONFIG_BLK_DEV_IDEDISK
-
-   define_bool CONFIG_BLK_DEV_IDEDISK_VENDOR n
-   dep_mbool '    Fujitsu Vendor Specific' CONFIG_BLK_DEV_IDEDISK_FUJITSU $CONFIG_BLK_DEV_IDEDISK_VENDOR
-   dep_mbool '    IBM Vendor Specific' CONFIG_BLK_DEV_IDEDISK_IBM $CONFIG_BLK_DEV_IDEDISK_VENDOR
-   dep_mbool '    Maxtor Vendor Specific' CONFIG_BLK_DEV_IDEDISK_MAXTOR $CONFIG_BLK_DEV_IDEDISK_VENDOR
-   dep_mbool '    Quantum Vendor Specific' CONFIG_BLK_DEV_IDEDISK_QUANTUM $CONFIG_BLK_DEV_IDEDISK_VENDOR
-   dep_mbool '    Seagate Vendor Specific' CONFIG_BLK_DEV_IDEDISK_SEAGATE $CONFIG_BLK_DEV_IDEDISK_VENDOR
-   dep_mbool '    Western Digital Vendor Specific' CONFIG_BLK_DEV_IDEDISK_WD $CONFIG_BLK_DEV_IDEDISK_VENDOR
-
-   define_bool CONFIG_BLK_DEV_COMMERIAL n
-   dep_mbool '    TiVo Commerial Application Specific' CONFIG_BLK_DEV_TIVO $CONFIG_BLK_DEV_COMMERIAL
-
    dep_tristate '  PCMCIA IDE support' CONFIG_BLK_DEV_IDECS $CONFIG_BLK_DEV_IDE $CONFIG_PCMCIA
    dep_tristate '  Include IDE/ATAPI CDROM support' CONFIG_BLK_DEV_IDECD $CONFIG_BLK_DEV_IDE
    dep_tristate '  Include IDE/ATAPI TAPE support' CONFIG_BLK_DEV_IDETAPE $CONFIG_BLK_DEV_IDE
@@ -54,6 +42,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       dep_bool '    Good-Bad DMA Model-Firmware (EXPERIMENTAL)' CONFIG_IDEDMA_NEW_DRIVE_LISTINGS $CONFIG_EXPERIMENTAL
       dep_bool '    AEC62XX chip set support' CONFIG_BLK_DEV_AEC62XX $CONFIG_BLK_DEV_IDEDMA_PCI
       dep_mbool '      AEC62XX Tuning support' CONFIG_AEC62XX_TUNING $CONFIG_BLK_DEV_AEC62XX
+      dep_mbool '      AEC6280 Burst mode' CONFIG_AEC6280_BURST $CONFIG_BLK_DEV_AEC62XX
       dep_bool '    ALI M15x3 chipset support' CONFIG_BLK_DEV_ALI15X3 $CONFIG_BLK_DEV_IDEDMA_PCI
       dep_mbool '      ALI M15x3 WDC support (DANGEROUS)' CONFIG_WDC_ALI15X3 $CONFIG_BLK_DEV_ALI15X3 $CONFIG_EXPERIMENTAL
       dep_bool '    AMD and nVidia chipset support' CONFIG_BLK_DEV_AMD74XX $CONFIG_BLK_DEV_IDEDMA_PCI
@@ -141,6 +130,13 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
         "$CONFIG_BLK_DEV_IDEDMA_ICS" = "y" ]; then
       bool '  IGNORE word93 Validation BITS' CONFIG_IDEDMA_IVB
    fi
+   
+   if [ "$CONFIG_BLK_DEV_IDECD" != "n" -o \
+        "$CONFIG_BLK_DEV_IDETAPE" != "n" -o \
+        "$CONFIG_BLK_DEV_IDEFLOPPY" != "n" -o \
+        "$CONFIG_BLK_DEV_IDESCSI" != "n" ]; then
+	define_bool  CONFIG_ATAPI y
+   fi
 else
    bool 'Old hard disk (MFM/RLL/IDE) driver' CONFIG_BLK_DEV_HD_ONLY
    define_bool CONFIG_BLK_DEV_HD $CONFIG_BLK_DEV_HD_ONLY
@@ -152,12 +148,6 @@ if [ "$CONFIG_IDEDMA_PCI_AUTO" = "y" -o \
    define_bool CONFIG_IDEDMA_AUTO y
 else
    define_bool CONFIG_IDEDMA_AUTO n
-fi
-
-if [ "$CONFIG_BLK_DEV_TIVO" = "y" ]; then
-  define_bool CONFIG_DMA_NONPCI y
-else
-  define_bool CONFIG_DMA_NONPCI n
 fi
 
 dep_tristate 'Support for IDE Raid controllers' CONFIG_BLK_DEV_ATARAID $CONFIG_BLK_DEV_IDE $CONFIG_EXPERIMENTAL

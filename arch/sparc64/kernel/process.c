@@ -582,6 +582,17 @@ barf:
 	do_exit(SIGILL);
 }
 
+asmlinkage int sparc_do_fork(unsigned long clone_flags,
+			     unsigned long stack_start,
+			     struct pt_regs *regs,
+			     unsigned long stack_size)
+{
+	struct task_struct *p = do_fork(clone_flags, stack_start,
+					regs, stack_size);
+
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+}
+
 /* Copy a Sparc thread.  The fork() return value conventions
  * under SunOS are nothing short of bletcherous:
  * Parent -->  %o0 == childs  pid, %o1 == 0
