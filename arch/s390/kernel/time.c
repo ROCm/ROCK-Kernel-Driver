@@ -266,7 +266,7 @@ void __init time_init(void)
 	jiffies_timer_cc = init_timer_cc - jiffies_64 * CLK_TICKS_PER_JIFFY;
 
 	/* set xtime */
-	xtime_cc = init_timer_cc;
+	xtime_cc = init_timer_cc + CLK_TICKS_PER_JIFFY;
 	set_time_cc = init_timer_cc - 0x8126d60e46000000LL +
 		(0x3c26700LL*1000000*4096);
         tod_to_timeval(set_time_cc, &xtime);

@@ -232,9 +232,7 @@
 #define __NR_futex		238
 #define __NR_sched_setaffinity	239
 #define __NR_sched_getaffinity	240
-/*
- * Number 241 is currently unused
- */
+#define __NR_tgkill		241
 /*
  * Number 242 is reserved for tux
  */
@@ -258,8 +256,11 @@
 #define __NR_clock_gettime	(__NR_timer_create+6)
 #define __NR_clock_getres	(__NR_timer_create+7)
 #define __NR_clock_nanosleep	(__NR_timer_create+8)
+/*
+ * Number 263 is reserved for vserver
+ */
 
-#define NR_syscalls 263
+#define NR_syscalls 264
 
 /* 
  * There are some system calls that are not present on 64 bit, some
