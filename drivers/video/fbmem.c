@@ -107,8 +107,6 @@ extern int platinumfb_init(void);
 extern int platinumfb_setup(char*);
 extern int control_init(void);
 extern int control_setup(char*);
-extern int platinum_init(void);
-extern int platinum_setup(char*);
 extern int valkyriefb_init(void);
 extern int valkyriefb_setup(char*);
 extern int chips_init(void);
