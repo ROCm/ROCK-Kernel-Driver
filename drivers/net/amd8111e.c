@@ -670,7 +670,7 @@ This is the receive indication function for packets with vlan tag.
 static int amd8111e_vlan_rx(struct amd8111e_priv *lp, struct sk_buff *skb, u16 vlan_tag)
 {
 #ifdef CONFIG_AMD8111E_NAPI
-	vlan_hwaccel_receive_skb(skb, lp->vlgrp,vlan_tag);
+	return vlan_hwaccel_receive_skb(skb, lp->vlgrp,vlan_tag);
 #else
 	return vlan_hwaccel_rx(skb, lp->vlgrp, vlan_tag);
 #endif /* CONFIG_AMD8111E_NAPI */
