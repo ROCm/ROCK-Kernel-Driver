@@ -30,11 +30,12 @@
 #define ESID_MASK	0xfffffffff0000000UL
 #define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)
 
-#ifdef CONFIG_HUGETLB_PAGE
-
 #define HPAGE_SHIFT	24
 #define HPAGE_SIZE	((1UL) << HPAGE_SHIFT)
 #define HPAGE_MASK	(~(HPAGE_SIZE - 1))
+
+#ifdef CONFIG_HUGETLB_PAGE
+
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 
 /* For 64-bit processes the hugepage range is 1T-1.5T */
