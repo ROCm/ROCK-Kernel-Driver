@@ -91,7 +91,7 @@ static irqreturn_t gscps2_interrupt(int irq, void *dev, struct pt_regs *regs);
 struct gscps2port {
 	struct list_head node;
 	struct parisc_device *padev;
-	struct serio port;
+	struct serio *port;
 	spinlock_t lock;
 	char *addr;
 	u8 act, append; /* position in buffer[] */
@@ -100,7 +100,6 @@ struct gscps2port {
 		u8 str;
 	} buffer[BUFFER_SIZE+1];
 	int id;
-	char name[32];
 };
 
 /*
@@ -272,7 +271,7 @@ static irqreturn_t gscps2_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    rxflags =	((status & GSC_STAT_TERR) ? SERIO_TIMEOUT : 0 ) |
 			((status & GSC_STAT_PERR) ? SERIO_PARITY  : 0 );
 
-	    serio_interrupt(&ps2port->port, data, rxflags, regs);
+	    serio_interrupt(ps2port->port, data, rxflags, regs);
 
 	  } /* while() */
 
@@ -343,7 +342,8 @@ static struct serio gscps2_serio_port =
 
 static int __init gscps2_probe(struct parisc_device *dev)
 {
-        struct gscps2port *ps2port;
+	struct gscps2port *ps2port;
+	struct serio *serio;
 	unsigned long hpa = dev->hpa;
 	int ret;
 
@@ -355,34 +355,44 @@ static int __init gscps2_probe(struct parisc_device *dev)
 		hpa += GSC_DINO_OFFSET;
 
 	ps2port = kmalloc(sizeof(struct gscps2port), GFP_KERNEL);
-	if (!ps2port)
-		return -ENOMEM;
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (!ps2port || !serio) {
+		ret = -ENOMEM;
+		goto fail_nomem;
+	}
 
 	dev_set_drvdata(&dev->dev, ps2port);
 
 	memset(ps2port, 0, sizeof(struct gscps2port));
+	memset(serio, 0, sizeof(struct serio));
+	ps2port->port = serio;
 	ps2port->padev = dev;
 	ps2port->addr = ioremap(hpa, GSC_STATUS + 4);
 	spin_lock_init(&ps2port->lock);
 
 	gscps2_reset(ps2port);
-	ps2port->id = readb(ps2port->addr+GSC_ID) & 0x0f;
-	snprintf(ps2port->name, sizeof(ps2port->name)-1, "%s %s",
-		gscps2_serio_port.name,
-		(ps2port->id == GSC_ID_KEYBOARD) ? "keyboard" : "mouse" );
+	ps2port->id = readb(ps2port->addr + GSC_ID) & 0x0f;
 
-	memcpy(&ps2port->port, &gscps2_serio_port, sizeof(gscps2_serio_port));
-	ps2port->port.port_data = ps2port;
-	ps2port->port.name = ps2port->name;
-	ps2port->port.phys = dev->dev.bus_id;
+	snprintf(serio->name, sizeof(serio->name), "GSC PS/2 %s",
+		 (ps2port->id == GSC_ID_KEYBOARD) ? "keyboard" : "mouse");
+	strlcpy(serio->phys, dev->dev.bus_id, sizeof(serio->phys));
+	serio->idbus		= BUS_GSC;
+	serio->idvendor		= PCI_VENDOR_ID_HP;
+	serio->idproduct	= 0x0001;
+	serio->idversion	= 0x0010;
+	serio->type		= SERIO_8042;
+	serio->write		= gscps2_write;
+	serio->open		= gscps2_open;
+	serio->close		= gscps2_close;
+	serio->port_data	= ps2port;
 
 	list_add_tail(&ps2port->node, &ps2port_list);
 
 	ret = -EBUSY;
-	if (request_irq(dev->irq, gscps2_interrupt, SA_SHIRQ, ps2port->name, ps2port))
+	if (request_irq(dev->irq, gscps2_interrupt, SA_SHIRQ, ps2port->port->name, ps2port))
 		goto fail_miserably;
 
-	if ( (ps2port->id != GSC_ID_KEYBOARD) && (ps2port->id != GSC_ID_MOUSE) ) {
+	if (ps2port->id != GSC_ID_KEYBOARD && ps2port->id != GSC_ID_MOUSE) {
 		printk(KERN_WARNING PFX "Unsupported PS/2 port at 0x%08lx (id=%d) ignored\n",
 				hpa, ps2port->id);
 		ret = -ENODEV;
@@ -395,12 +405,12 @@ static int __init gscps2_probe(struct parisc_device *dev)
 #endif
 
 	printk(KERN_INFO "serio: %s port at 0x%p irq %d @ %s\n",
-		ps2port->name,
+		ps2port->port->name,
 		ps2port->addr,
 		ps2port->padev->irq,
-		ps2port->port.phys);
+		ps2port->port->phys);
 
-	serio_register_port(&ps2port->port);
+	serio_register_port(ps2port->port);
 
 	return 0;
 
@@ -411,7 +421,10 @@ fail_miserably:
 	list_del(&ps2port->node);
 	iounmap(ps2port->addr);
 	release_mem_region(dev->hpa, GSC_STATUS + 4);
+
+fail_nomem:
 	kfree(ps2port);
+	kfree(serio);
 	return ret;
 }
 
@@ -424,7 +437,7 @@ static int __devexit gscps2_remove(struct parisc_device *dev)
 {
 	struct gscps2port *ps2port = dev_get_drvdata(&dev->dev);
 
-	serio_unregister_port(&ps2port->port);
+	serio_unregister_port(ps2port->port);
 	free_irq(dev->irq, ps2port);
 	gscps2_flush(ps2port);
 	list_del(&ps2port->node);

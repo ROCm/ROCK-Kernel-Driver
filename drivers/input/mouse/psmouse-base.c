@@ -659,7 +659,7 @@ static void psmouse_disconnect(struct serio *serio)
 	if (psmouse->ptport) {
 		if (psmouse->ptport->deactivate)
 			psmouse->ptport->deactivate(psmouse);
-		__serio_unregister_port(&psmouse->ptport->serio); /* we have serio_sem */
+		__serio_unregister_port(psmouse->ptport->serio); /* we have serio_sem */
 		kfree(psmouse->ptport);
 		psmouse->ptport = NULL;
 	}
@@ -740,8 +740,8 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse_initialize(psmouse);
 
 	if (psmouse->ptport) {
-		printk(KERN_INFO "serio: %s port at %s\n", psmouse->ptport->serio.name, psmouse->phys);
-		__serio_register_port(&psmouse->ptport->serio); /* we have serio_sem */
+		printk(KERN_INFO "serio: %s port at %s\n", psmouse->ptport->serio->name, psmouse->phys);
+		__serio_register_port(psmouse->ptport->serio); /* we have serio_sem */
 		if (psmouse->ptport->activate)
 			psmouse->ptport->activate(psmouse);
 	}
@@ -780,9 +780,9 @@ static int psmouse_reconnect(struct serio *serio)
 	psmouse_initialize(psmouse);
 
 	if (psmouse->ptport) {
-       		if (psmouse_reconnect(&psmouse->ptport->serio)) {
-			__serio_unregister_port(&psmouse->ptport->serio);
-			__serio_register_port(&psmouse->ptport->serio);
+       		if (psmouse_reconnect(psmouse->ptport->serio)) {
+			__serio_unregister_port(psmouse->ptport->serio);
+			__serio_register_port(psmouse->ptport->serio);
 			if (psmouse->ptport->activate)
 				psmouse->ptport->activate(psmouse);
 		}

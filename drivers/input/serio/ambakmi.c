@@ -29,7 +29,7 @@
 #define KMI_BASE	(kmi->base)
 
 struct amba_kmi_port {
-	struct serio		io;
+	struct serio		*io;
 	struct clk		*clk;
 	unsigned char		*base;
 	unsigned int		irq;
@@ -44,7 +44,7 @@ static irqreturn_t amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
 	int handled = IRQ_NONE;
 
 	while (status & KMIIR_RXINTR) {
-		serio_interrupt(&kmi->io, readb(KMIDATA), 0, regs);
+		serio_interrupt(kmi->io, readb(KMIDATA), 0, regs);
 		status = readb(KMIIR);
 		handled = IRQ_HANDLED;
 	}
@@ -117,6 +117,7 @@ static void amba_kmi_close(struct serio *io)
 static int amba_kmi_probe(struct amba_device *dev, void *id)
 {
 	struct amba_kmi_port *kmi;
+	struct serio *io;
 	int ret;
 
 	ret = amba_request_regions(dev, NULL);
@@ -124,22 +125,25 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 		return ret;
 
 	kmi = kmalloc(sizeof(struct amba_kmi_port), GFP_KERNEL);
-	if (!kmi) {
+	io = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (!kmi || !io) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
 	memset(kmi, 0, sizeof(struct amba_kmi_port));
+	memset(io, 0, sizeof(struct serio));
 
-	kmi->io.type		= SERIO_8042;
-	kmi->io.write		= amba_kmi_write;
-	kmi->io.open		= amba_kmi_open;
-	kmi->io.close		= amba_kmi_close;
-	kmi->io.name		= dev->dev.bus_id;
-	kmi->io.phys		= dev->dev.bus_id;
-	kmi->io.port_data	= kmi;
+	io->type	= SERIO_8042;
+	io->write	= amba_kmi_write;
+	io->open	= amba_kmi_open;
+	io->close	= amba_kmi_close;
+	strlcpy(io->name, dev->dev.bus_id, sizeof(io->name));
+	strlcpy(io->phys, dev->dev.bus_id, sizeof(io->phys));
+	io->port_data	= kmi;
 
-	kmi->base		= ioremap(dev->res.start, KMI_SIZE);
+	kmi->io 	= io;
+	kmi->base	= ioremap(dev->res.start, KMI_SIZE);
 	if (!kmi->base) {
 		ret = -ENOMEM;
 		goto out;
@@ -154,13 +158,14 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 	kmi->irq = dev->irq[0];
 	amba_set_drvdata(dev, kmi);
 
-	serio_register_port(&kmi->io);
+	serio_register_port(kmi->io);
 	return 0;
 
  unmap:
 	iounmap(kmi->base);
  out:
 	kfree(kmi);
+	kfree(io);
 	amba_release_regions(dev);
 	return ret;
 }
@@ -171,7 +176,7 @@ static int amba_kmi_remove(struct amba_device *dev)
 
 	amba_set_drvdata(dev, NULL);
 
-	serio_unregister_port(&kmi->io);
+	serio_unregister_port(kmi->io);
 	clk_put(kmi->clk);
 	iounmap(kmi->base);
 	kfree(kmi);
@@ -184,7 +189,7 @@ static int amba_kmi_resume(struct amba_device *dev)
 	struct amba_kmi_port *kmi = amba_get_drvdata(dev);
 
 	/* kick the serio layer to rescan this port */
-	serio_rescan(&kmi->io);
+	serio_reconnect(kmi->io);
 
 	return 0;
 }
@@ -214,7 +219,7 @@ static int __init amba_kmi_init(void)
 
 static void __exit amba_kmi_exit(void)
 {
-	return amba_driver_unregister(&ambakmi_driver);
+	amba_driver_unregister(&ambakmi_driver);
 }
 
 module_init(amba_kmi_init);

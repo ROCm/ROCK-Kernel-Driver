@@ -38,7 +38,7 @@
 #define PS2_STAT_TXEMPTY	(1<<7)
 
 struct pcips2_data {
-	struct serio	io;
+	struct serio	*io;
 	unsigned int	base;
 	struct pci_dev	*dev;
 };
@@ -80,7 +80,7 @@ static irqreturn_t pcips2_interrupt(int irq, void *devid, struct pt_regs *regs)
 		if (hweight8(scancode) & 1)
 			flag ^= SERIO_PARITY;
 
-		serio_interrupt(&ps2if->io, scancode, flag, regs);
+		serio_interrupt(ps2if->io, scancode, flag, regs);
 	} while (1);
 	return IRQ_RETVAL(handled);
 }
@@ -129,6 +129,7 @@ static void pcips2_close(struct serio *io)
 static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct pcips2_data *ps2if;
+	struct serio *serio;
 	int ret;
 
 	ret = pci_enable_device(dev);
@@ -142,29 +143,34 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
 	}
 
 	ps2if = kmalloc(sizeof(struct pcips2_data), GFP_KERNEL);
-	if (!ps2if) {
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (!ps2if || !serio) {
 		ret = -ENOMEM;
 		goto release;
 	}
 
 	memset(ps2if, 0, sizeof(struct pcips2_data));
+	memset(serio, 0, sizeof(struct serio));
 
-	ps2if->io.type		= SERIO_8042;
-	ps2if->io.write		= pcips2_write;
-	ps2if->io.open		= pcips2_open;
-	ps2if->io.close		= pcips2_close;
-	ps2if->io.name		= pci_name(dev);
-	ps2if->io.phys		= dev->dev.bus_id;
-	ps2if->io.port_data	= ps2if;
+	serio->type		= SERIO_8042;
+	serio->write		= pcips2_write;
+	serio->open		= pcips2_open;
+	serio->close		= pcips2_close;
+	strlcpy(serio->name, pci_name(dev), sizeof(serio->name));
+	strlcpy(serio->phys, dev->dev.bus_id, sizeof(serio->phys));
+	serio->port_data	= ps2if;
+	ps2if->io		= serio;
 	ps2if->dev		= dev;
 	ps2if->base		= pci_resource_start(dev, 0);
 
 	pci_set_drvdata(dev, ps2if);
 
-	serio_register_port(&ps2if->io);
+	serio_register_port(ps2if->io);
 	return 0;
 
  release:
+	kfree(ps2if);
+	kfree(serio);
 	release_region(pci_resource_start(dev, 0),
 		       pci_resource_len(dev, 0));
  disable:
@@ -176,7 +182,7 @@ static void __devexit pcips2_remove(struct pci_dev *dev)
 {
 	struct pcips2_data *ps2if = pci_get_drvdata(dev);
 
-	serio_unregister_port(&ps2if->io);
+	serio_unregister_port(ps2if->io);
 	release_region(pci_resource_start(dev, 0),
 		       pci_resource_len(dev, 0));
 	pci_set_drvdata(dev, NULL);

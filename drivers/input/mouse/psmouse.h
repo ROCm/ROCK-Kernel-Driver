@@ -37,7 +37,8 @@ typedef enum {
 struct psmouse;
 
 struct psmouse_ptport {
-	struct serio serio;
+	struct serio *serio;
+	struct psmouse *parent;
 
 	void (*activate)(struct psmouse *parent);
 	void (*deactivate)(struct psmouse *parent);

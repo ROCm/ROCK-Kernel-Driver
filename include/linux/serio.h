@@ -22,8 +22,9 @@
 struct serio {
 	void *private;
 	void *port_data;
-	char *name;
-	char *phys;
+
+	char name[32];
+	char phys[32];
 
 	unsigned short idbus;
 	unsigned short idvendor;

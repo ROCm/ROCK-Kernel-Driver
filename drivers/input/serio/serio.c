@@ -283,6 +283,7 @@ void __serio_unregister_port(struct serio *serio)
 	list_del_init(&serio->node);
 	if (serio->drv)
 		serio->drv->disconnect(serio);
+	kfree(serio);
 }
 
 /*

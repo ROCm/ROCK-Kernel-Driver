@@ -26,7 +26,7 @@
 #include <asm/hardware/sa1111.h>
 
 struct ps2if {
-	struct serio		io;
+	struct serio		*io;
 	struct sa1111_dev	*dev;
 	unsigned long		base;
 	unsigned int		open;
@@ -59,7 +59,7 @@ static irqreturn_t ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
 		if (hweight8(scancode) & 1)
 			flag ^= SERIO_PARITY;
 
-		serio_interrupt(&ps2if->io, scancode, flag, regs);
+		serio_interrupt(ps2if->io, scancode, flag, regs);
 
 		status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
         }
@@ -232,22 +232,27 @@ static int __init ps2_test(struct ps2if *ps2if)
 static int ps2_probe(struct sa1111_dev *dev)
 {
 	struct ps2if *ps2if;
+	struct serio *serio;
 	int ret;
 
 	ps2if = kmalloc(sizeof(struct ps2if), GFP_KERNEL);
-	if (!ps2if) {
-		return -ENOMEM;
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (!ps2if || !serio) {
+		ret = -ENOMEM;
+		goto free;
 	}
 
 	memset(ps2if, 0, sizeof(struct ps2if));
+	memset(serio, 0, sizeof(struct serio));
 
-	ps2if->io.type		= SERIO_8042;
-	ps2if->io.write		= ps2_write;
-	ps2if->io.open		= ps2_open;
-	ps2if->io.close		= ps2_close;
-	ps2if->io.name		= dev->dev.bus_id;
-	ps2if->io.phys		= dev->dev.bus_id;
-	ps2if->io.port_data	= ps2if;
+	serio->type		= SERIO_8042;
+	serio->write		= ps2_write;
+	serio->open		= ps2_open;
+	serio->close		= ps2_close;
+	strlcpy(serio->name, dev->dev.bus_id, sizeof(serio->name));
+	strlcpy(serio->phys, dev->dev.bus_id, sizeof(serio->phys));
+	serio->port_data	= ps2if;
+	ps2if->io		= serio;
 	ps2if->dev		= dev;
 	sa1111_set_drvdata(dev, ps2if);
 
@@ -292,7 +297,7 @@ static int ps2_probe(struct sa1111_dev *dev)
 	ps2_clear_input(ps2if);
 
 	sa1111_disable_device(ps2if->dev);
-	serio_register_port(&ps2if->io);
+	serio_register_port(ps2if->io);
 	return 0;
 
  out:
@@ -302,6 +307,7 @@ static int ps2_probe(struct sa1111_dev *dev)
  free:
 	sa1111_set_drvdata(dev, NULL);
 	kfree(ps2if);
+	kfree(serio);
 	return ret;
 }
 
@@ -312,7 +318,7 @@ static int ps2_remove(struct sa1111_dev *dev)
 {
 	struct ps2if *ps2if = sa1111_get_drvdata(dev);
 
-	serio_unregister_port(&ps2if->io);
+	serio_unregister_port(ps2if->io);
 	release_mem_region(dev->res.start,
 			   dev->res.end - dev->res.start + 1);
 	sa1111_set_drvdata(dev, NULL);
