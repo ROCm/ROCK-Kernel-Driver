@@ -117,7 +117,5 @@ extern int set_fpxregs( struct task_struct *tsk,
  */
 extern int dump_fpu( struct pt_regs *regs,
 		     struct user_i387_struct *fpu );
-extern int dump_extended_fpu( struct pt_regs *regs,
-			      struct user_fxsr_struct *fpu );
 
 #endif /* __ASM_I386_I387_H */
