@@ -311,6 +311,22 @@ static int raid0_run (mddev_t *mddev)
 		conf->hash_spacing++;
 	}
 
+	/* calculate the max read-ahead size.
+	 * For read-ahead of large files to be effective, we need to
+	 * readahead at least a whole stripe. i.e. number of devices
+	 * multiplied by chunk size.
+	 * If an individual device has an ra_pages greater than the
+	 * chunk size, then we will not drive that device as hard as it
+	 * wants.  We consider this a configuration error: a larger
+	 * chunksize should be used in that case.
+	 */
+	{
+		int stripe = mddev->raid_disks * mddev->chunk_size / PAGE_CACHE_SIZE;
+		if (mddev->queue->backing_dev_info.ra_pages < stripe)
+			mddev->queue->backing_dev_info.ra_pages = stripe;
+	}
+
+
 	blk_queue_merge_bvec(mddev->queue, raid0_mergeable_bvec);
 	return 0;
 
