@@ -51,7 +51,6 @@
 
 #define MAJOR_NR SCSI_CDROM_MAJOR
 #define LOCAL_END_REQUEST
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -196,8 +195,7 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 	int this_count = SCpnt->bufflen >> 9;
 	int good_sectors = (result == 0 ? this_count : 0);
 	int block_sectors = 0;
-	int device_nr = DEVICE_NR(SCpnt->request->rq_dev);
-	Scsi_CD *cd = &scsi_CDs[device_nr];
+	Scsi_CD *cd = SCpnt->request->rq_disk->private_data;
 
 #ifdef DEBUG
 	printk("sr.c done: %x %p\n", result, SCpnt->request->bh->b_data);
@@ -247,31 +245,14 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 	scsi_io_completion(SCpnt, good_sectors, block_sectors);
 }
 
-
-static request_queue_t *sr_find_queue(kdev_t dev)
-{
-	Scsi_CD *cd;
-
-	if (minor(dev) >= sr_template.dev_max)
-		return NULL;
-	cd = &scsi_CDs[minor(dev)];
-	if (!cd->device)
-		return NULL;
-	return &cd->device->request_queue;
-}
-
 static int sr_init_command(Scsi_Cmnd * SCpnt)
 {
-	int dev, devm, block=0, this_count, s_size;
-	Scsi_CD *cd;
+	int block=0, this_count, s_size;
+	Scsi_CD *cd = SCpnt->request->rq_disk->private_data;
 
-	devm = minor(SCpnt->request->rq_dev);
-	dev = DEVICE_NR(SCpnt->request->rq_dev);
-	cd = &scsi_CDs[dev];
+	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %s, block = %d\n", disk->disk_name, block));
 
-	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d, block = %d\n", devm, block));
-
-	if (dev >= sr_template.nr_dev || !cd->device || !cd->device->online) {
+	if (!cd->device || !cd->device->online) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
@@ -742,8 +723,6 @@ void sr_finish()
 {
 	int i;
 
-	blk_dev[MAJOR_NR].queue = sr_find_queue;
-
 	for (i = 0; i < sr_template.nr_dev; ++i) {
 		struct gendisk *disk;
 		Scsi_CD *cd = &scsi_CDs[i];
@@ -795,6 +774,7 @@ void sr_finish()
 		register_cdrom(&cd->cdi);
 		set_capacity(disk, cd->capacity);
 		disk->private_data = cd;
+		disk->queue = &cd->device->request_queue;
 		add_disk(disk);
 	}
 }
