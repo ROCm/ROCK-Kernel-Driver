@@ -167,6 +167,7 @@ static inline void
 __ipq_reset(void)
 {
 	peer_pid = 0;
+	net_disable_timestamp();
 	__ipq_set_mode(IPQ_COPY_NONE, 0);
 	__ipq_flush(NF_DROP);
 }
@@ -520,9 +521,10 @@ ipq_rcv_skb(struct sk_buff *skb)
 			write_unlock_bh(&queue_lock);
 			RCV_SKB_FAIL(-EBUSY);
 		}
-	}
-	else
+	} else {
+		net_enable_timestamp();
 		peer_pid = pid;
+	}
 		
 	write_unlock_bh(&queue_lock);
 	
