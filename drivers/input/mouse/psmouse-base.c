@@ -203,8 +203,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		}
 	}
 
-	rc = psmouse->type == PSMOUSE_SYNAPTICS ?
-		synaptics_process_byte(psmouse, regs) : psmouse_process_byte(psmouse, regs);
+	rc = psmouse->protocol_handler(psmouse, regs);
 
 	switch (rc) {
 		case PSMOUSE_BAD_DATA:
@@ -394,6 +393,7 @@ static int psmouse_extensions(struct psmouse *psmouse, unsigned int max_proto)
 	psmouse->vendor = "Generic";
 	psmouse->name = "Mouse";
 	psmouse->model = 0;
+	psmouse->protocol_handler = psmouse_process_byte;
 
 /*
  * Try Synaptics TouchPad

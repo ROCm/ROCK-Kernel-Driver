@@ -60,6 +60,7 @@ struct psmouse {
 	char devname[64];
 	char phys[32];
 
+	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs); 
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
 };
