@@ -29,6 +29,21 @@
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
+#include <asm/desc.h>
+#include <asm/arch_hooks.h>
+
+void __init apic_intr_init(void)
+{
+#ifdef CONFIG_SMP
+	smp_intr_init();
+#endif
+	/* self generated IPI for local APIC timer */
+	set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
+
+	/* IPI vectors for APIC spurious and error interrupts */
+	set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
+	set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
+}
 
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
