@@ -427,7 +427,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       fi
    fi
    bool '  Support only 8 pixels wide fonts' CONFIG_FBCON_FONTWIDTH8_ONLY
-   if [ "$ARCH" = "sparc" -o "$ARCH" = "sparc64" ]; then
+   if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
       bool '  Sparc console 8x16 font' CONFIG_FONT_SUN8x16
       if [ "$CONFIG_FBCON_FONTWIDTH8_ONLY" = "n" ]; then
 	 bool '  Sparc console 12x22 font (not supported by all drivers)' CONFIG_FONT_SUN12x22
