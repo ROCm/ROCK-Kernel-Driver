@@ -36,7 +36,7 @@
 
 #define PREFIX			"ACPI: "
 
-#define ACPI_MAX_TABLES		ACPI_TABLE_COUNT
+#define ACPI_MAX_TABLES		256
 
 static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_TABLE_UNKNOWN]	= "????",
@@ -338,7 +338,7 @@ acpi_table_get_sdt (
 		sdt.count = (header->length - sizeof(struct acpi_table_header)) >> 3;
 		if (sdt.count > ACPI_MAX_TABLES) {
 			printk(KERN_WARNING PREFIX "Truncated %lu XSDT entries\n",
-				(ACPI_MAX_TABLES - sdt.count));
+				(sdt.count - ACPI_MAX_TABLES));
 			sdt.count = ACPI_MAX_TABLES;
 		}
 
@@ -383,7 +383,7 @@ acpi_table_get_sdt (
 		sdt.count = (header->length - sizeof(struct acpi_table_header)) >> 2;
 		if (sdt.count > ACPI_MAX_TABLES) {
 			printk(KERN_WARNING PREFIX "Truncated %lu RSDT entries\n",
-				(ACPI_TABLE_COUNT - sdt.count));
+				(sdt.count - ACPI_TABLE_COUNT));
 			sdt.count = ACPI_MAX_TABLES;
 		}
 

@@ -62,6 +62,7 @@ EXPORT_SYMBOL(acpi_get_object_info);
 EXPORT_SYMBOL(acpi_get_next_object);
 EXPORT_SYMBOL(acpi_evaluate_object);
 EXPORT_SYMBOL(acpi_get_table);
+EXPORT_SYMBOL(acpi_get_firmware_table);
 EXPORT_SYMBOL(acpi_install_notify_handler);
 EXPORT_SYMBOL(acpi_remove_notify_handler);
 EXPORT_SYMBOL(acpi_install_gpe_handler);
