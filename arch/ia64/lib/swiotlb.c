@@ -498,6 +498,12 @@ swiotlb_sync_sg_for_device (struct device *hwdev, struct scatterlist *sg, int ne
 			sync_single(hwdev, (void *) sg->dma_address, sg->dma_length, dir);
 }
 
+int
+swiotlb_dma_mapping_error (dma_addr_t dma_addr)
+{
+	return 0;
+}
+
 /*
  * Return whether the given PCI device DMA address mask can be supported properly.  For
  * example, if your device can only drive the low 24-bits during PCI bus mastering, then
@@ -518,6 +524,7 @@ EXPORT_SYMBOL(swiotlb_sync_single_for_cpu);
 EXPORT_SYMBOL(swiotlb_sync_single_for_device);
 EXPORT_SYMBOL(swiotlb_sync_sg_for_cpu);
 EXPORT_SYMBOL(swiotlb_sync_sg_for_device);
+EXPORT_SYMBOL(swiotlb_dma_mapping_error);
 EXPORT_SYMBOL(swiotlb_alloc_coherent);
 EXPORT_SYMBOL(swiotlb_free_coherent);
 EXPORT_SYMBOL(swiotlb_dma_supported);

@@ -42,6 +42,7 @@ typedef void ia64_mv_dma_sync_single_for_cpu (struct device *, dma_addr_t, size_
 typedef void ia64_mv_dma_sync_sg_for_cpu (struct device *, struct scatterlist *, int, int);
 typedef void ia64_mv_dma_sync_single_for_device (struct device *, dma_addr_t, size_t, int);
 typedef void ia64_mv_dma_sync_sg_for_device (struct device *, struct scatterlist *, int, int);
+typedef int ia64_mv_dma_mapping_error (dma_addr_t dma_addr);
 typedef int ia64_mv_dma_supported (struct device *, u64);
 
 /*
@@ -105,6 +106,7 @@ extern void machvec_dma_sync_sg (struct device *, struct scatterlist *, int, int
 #  define platform_dma_sync_sg_for_cpu	ia64_mv.dma_sync_sg_for_cpu
 #  define platform_dma_sync_single_for_device ia64_mv.dma_sync_single_for_device
 #  define platform_dma_sync_sg_for_device ia64_mv.dma_sync_sg_for_device
+#  define platform_dma_mapping_error		ia64_mv.dma_mapping_error
 #  define platform_dma_supported	ia64_mv.dma_supported
 #  define platform_irq_desc		ia64_mv.irq_desc
 #  define platform_irq_to_vector	ia64_mv.irq_to_vector
@@ -149,6 +151,7 @@ struct ia64_machine_vector {
 	ia64_mv_dma_sync_sg_for_cpu *dma_sync_sg_for_cpu;
 	ia64_mv_dma_sync_single_for_device *dma_sync_single_for_device;
 	ia64_mv_dma_sync_sg_for_device *dma_sync_sg_for_device;
+	ia64_mv_dma_mapping_error *dma_mapping_error;
 	ia64_mv_dma_supported *dma_supported;
 	ia64_mv_irq_desc *irq_desc;
 	ia64_mv_irq_to_vector *irq_to_vector;
@@ -189,6 +192,7 @@ struct ia64_machine_vector {
 	platform_dma_sync_sg_for_cpu,		\
 	platform_dma_sync_single_for_device,	\
 	platform_dma_sync_sg_for_device,	\
+	platform_dma_mapping_error,			\
 	platform_dma_supported,			\
 	platform_irq_desc,			\
 	platform_irq_to_vector,			\
@@ -230,6 +234,7 @@ extern ia64_mv_dma_sync_single_for_cpu	swiotlb_sync_single_for_cpu;
 extern ia64_mv_dma_sync_sg_for_cpu	swiotlb_sync_sg_for_cpu;
 extern ia64_mv_dma_sync_single_for_device swiotlb_sync_single_for_device;
 extern ia64_mv_dma_sync_sg_for_device	swiotlb_sync_sg_for_device;
+extern ia64_mv_dma_mapping_error		swiotlb_dma_mapping_error;
 extern ia64_mv_dma_supported		swiotlb_dma_supported;
 
 /*
@@ -287,6 +292,9 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
 #endif
 #ifndef platform_dma_sync_sg_for_device
 # define platform_dma_sync_sg_for_device	swiotlb_sync_sg_for_device
+#endif
+#ifndef platform_dma_mapping_error
+# define platform_dma_mapping_error		swiotlb_dma_mapping_error
 #endif
 #ifndef platform_dma_supported
 # define  platform_dma_supported	swiotlb_dma_supported
