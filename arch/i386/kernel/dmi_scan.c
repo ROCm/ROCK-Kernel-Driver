@@ -340,6 +340,21 @@ static int __init need_local_apic(struct dmi_blacklist *d)
 	return 0;
 } 
 
+static int __init need_io_apic(struct dmi_blacklist *d)
+{ 
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int enable_local_apic;
+#ifdef CONFIG_X86_IO_APIC
+	extern int skip_ioapic_setup;
+	skip_ioapic_setup = 0;
+#endif
+	enable_local_apic = 0;
+	printk(KERN_WARNING "%s machine detected. Enablig LAPIC and IO-APIC\n",
+		       d->ident);
+#endif
+	return 0;
+} 
+
 /* 
  * Don't access SMBus on IBM systems which get corrupted eeproms 
  */
@@ -1059,9 +1074,10 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_NAME, "C440GX+"),
 			NO_MATCH}},
 	
-
-
-
+	{ need_io_apic, "IBM x445", {
+			MATCH(DMI_SYS_VENDOR, "IBM"),
+			MATCH(DMI_PRODUCT_NAME, "xSeries 445"),
+			NO_MATCH}},
 
 	{ NULL, }
 };
