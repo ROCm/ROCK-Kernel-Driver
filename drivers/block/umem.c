@@ -819,7 +819,7 @@ static void del_battery_timer(void)
 static int mm_revalidate(kdev_t i_rdev)
 {
 	int card_number = DEVICE_NR(i_rdev);
-	kdev_t device = mk_mdev(MAJOR_NR, card_number << MM_SHIFT);
+	kdev_t device = mk_kdev(MAJOR_NR, card_number << MM_SHIFT);
 	int res = dev_lock_part(device);
 	if (res < 0)
 		return res;
@@ -862,7 +862,7 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 		size = cards[card_number].mm_size * (1024 / MM_HARDSECT);
 		geo.heads     = 64;
 		geo.sectors   = 32;
-		geo.start     = get_start_sect(inode->i_bdev);
+		geo.start     = get_start_sect(i->i_bdev);
 		geo.cylinders = size / (geo.heads * geo.sectors);
 
 		if (copy_to_user((void *) arg, &geo, sizeof(geo)))
