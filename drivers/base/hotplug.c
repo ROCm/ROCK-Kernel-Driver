@@ -97,7 +97,7 @@ int dev_hotplug (struct device *dev, const char *action)
 	scratch += sprintf (scratch, "ACTION=%s", action) + 1;
 
 	envp [i++] = scratch;
-	scratch += sprintf (scratch, "DEVICE=%s", dev_path) + 1;
+	scratch += sprintf (scratch, "DEVPATH=%s", dev_path) + 1;
 	
 	if (dev->bus->hotplug) {
 		/* have the bus specific function add its stuff */
