@@ -3290,6 +3290,7 @@ qla2x00_config_os(scsi_qla_host_t *ha)
 static uint16_t
 qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport) 
 {
+	int		found;
 	uint16_t	tgt;
 	os_tgt_t	*tq;
 
@@ -3298,18 +3299,32 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		if ((tq = TGT_Q(ha, tgt)) == NULL)
 			continue;
 
-		if (ha->binding_type == BIND_BY_PORT_ID &&
-		    fcport->d_id.b24 == tq->d_id.b24) {
-			memcpy(tq->node_name, fcport->node_name, WWN_SIZE);
-			memcpy(tq->port_name, fcport->port_name, WWN_SIZE);
+		found = 0;
+		switch (ha->binding_type) {
+		case BIND_BY_PORT_ID:
+			if (fcport->d_id.b24 == tq->d_id.b24) {
+				memcpy(tq->node_name, fcport->node_name,
+				    WWN_SIZE);
+				memcpy(tq->port_name, fcport->port_name,
+				    WWN_SIZE);
+				found++;
+			}
+			break;
+		case BIND_BY_PORT_NAME:    
+			if (memcmp(fcport->port_name, tq->port_name,
+			    WWN_SIZE) == 0) {
+				/*
+				 * In case of persistent binding, update the
+				 * WWNN.
+				 */
+				memcpy(tq->node_name, fcport->node_name,
+				    WWN_SIZE);
+				found++;
+			}
 			break;
 		}
-
-		if (memcmp(fcport->port_name, tq->port_name, WWN_SIZE) == 0) {
-			/* In case of persistent binding, update the WWNN */
-			memcpy(tq->node_name, fcport->node_name, WWN_SIZE);
-			break;
-		}
+		if (found)
+		    break;	
 	}
 
 	/* TODO: honor the ConfigRequired flag */
