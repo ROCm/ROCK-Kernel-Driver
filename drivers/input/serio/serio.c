@@ -246,11 +246,6 @@ static ssize_t serio_show_description(struct device *dev, char *buf)
 	return sprintf(buf, "%s\n", serio->name);
 }
 
-static ssize_t serio_show_driver(struct device *dev, char *buf)
-{
-	return sprintf(buf, "%s\n", dev->driver ? dev->driver->name : "(none)");
-}
-
 static ssize_t serio_rebind_driver(struct device *dev, const char *buf, size_t count)
 {
 	struct serio *serio = to_serio_port(dev);
@@ -307,7 +302,7 @@ static ssize_t serio_set_bind_mode(struct device *dev, const char *buf, size_t c
 
 static struct device_attribute serio_device_attrs[] = {
 	__ATTR(description, S_IRUGO, serio_show_description, NULL),
-	__ATTR(driver, S_IWUSR | S_IRUGO, serio_show_driver, serio_rebind_driver),
+	__ATTR(drvctl, S_IWUSR, NULL, serio_rebind_driver),
 	__ATTR(bind_mode, S_IWUSR | S_IRUGO, serio_show_bind_mode, serio_set_bind_mode),
 	__ATTR_NULL
 };

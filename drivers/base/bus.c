@@ -246,6 +246,7 @@ void device_bind_driver(struct device * dev)
 	list_add_tail(&dev->driver_list, &dev->driver->devices);
 	sysfs_create_link(&dev->driver->kobj, &dev->kobj,
 			  kobject_name(&dev->kobj));
+	sysfs_create_link(&dev->kobj, &dev->driver->kobj, "driver");
 }
 
 
@@ -370,6 +371,7 @@ void device_release_driver(struct device * dev)
 	struct device_driver * drv = dev->driver;
 	if (drv) {
 		sysfs_remove_link(&drv->kobj, kobject_name(&dev->kobj));
+		sysfs_remove_link(&dev->kobj, "driver");
 		list_del_init(&dev->driver_list);
 		device_detach_shutdown(dev);
 		if (drv->remove)
