@@ -124,7 +124,6 @@ static void qe_init_rings(struct sunqe *qep)
 		qb->qe_rxd[i].rx_flags =
 			(RXD_OWN | ((RXD_PKT_SZ) & RXD_LENGTH));
 	}
-	return IRQ_HANDLED;
 }
 
 static int qe_init(struct sunqe *qep, int from_irq)
