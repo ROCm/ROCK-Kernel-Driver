@@ -36,6 +36,8 @@
 		power management.
 		support for big endian descriptors
 			Copyright (C) 2001 Manfred Spraul
+  	* ethtool support (jgarzik)
+	* Replace some MII-related magic numbers with constants (jgarzik)
   
 	TODO:
 	* enable pci_power_off
@@ -43,8 +45,8 @@
 */
   
 #define DRV_NAME	"winbond-840"
-#define DRV_VERSION	"1.01-c"
-#define DRV_RELDATE	"6/30/2000"
+#define DRV_VERSION	"1.01-d"
+#define DRV_RELDATE	"Nov-17-2001"
 
 
 /* Automatically extracted configuration info:
@@ -364,14 +366,11 @@ struct netdev_private {
 	unsigned int cur_tx, dirty_tx;
 	unsigned int tx_q_bytes;
 	unsigned int tx_full;				/* The Tx queue is full. */
-	/* These values are keep track of the transceiver/media in use. */
-	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
-	unsigned int duplex_lock:1;
 	/* MII transceiver section. */
 	int mii_cnt;						/* MII device addresses. */
-	u16 advertising;					/* NWay media advertisement */
 	unsigned char phys[MII_CNT];		/* MII device addresses, but only the first is used */
 	u32 mii;
+	struct mii_if_info mii_if;
 };
 
 static int  eeprom_read(long ioaddr, int location);
@@ -453,6 +452,9 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	np->chip_id = chip_idx;
 	np->drv_flags = pci_id_tbl[chip_idx].drv_flags;
 	spin_lock_init(&np->lock);
+	np->mii_if.dev = dev;
+	np->mii_if.mdio_read = mdio_read;
+	np->mii_if.mdio_write = mdio_write;
 	
 	pci_set_drvdata(pdev, dev);
 
@@ -462,16 +464,16 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	/* The lower four bits are the media type. */
 	if (option > 0) {
 		if (option & 0x200)
-			np->full_duplex = 1;
+			np->mii_if.full_duplex = 1;
 		if (option & 15)
 			printk(KERN_INFO "%s: ignoring user supplied media type %d",
 				dev->name, option & 15);
 	}
 	if (find_cnt < MAX_UNITS  &&  full_duplex[find_cnt] > 0)
-		np->full_duplex = 1;
+		np->mii_if.full_duplex = 1;
 
-	if (np->full_duplex)
-		np->duplex_lock = 1;
+	if (np->mii_if.full_duplex)
+		np->mii_if.duplex_lock = 1;
 
 	/* The chip-specific entries in the device structure. */
 	dev->open = &netdev_open;
@@ -496,18 +498,19 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	if (np->drv_flags & CanHaveMII) {
 		int phy, phy_idx = 0;
 		for (phy = 1; phy < 32 && phy_idx < MII_CNT; phy++) {
-			int mii_status = mdio_read(dev, phy, 1);
+			int mii_status = mdio_read(dev, phy, MII_BMSR);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				np->phys[phy_idx++] = phy;
-				np->advertising = mdio_read(dev, phy, 4);
-				np->mii = (mdio_read(dev, phy, 2) << 16)+
-						mdio_read(dev, phy, 3);
+				np->mii_if.advertising = mdio_read(dev, phy, MII_ADVERTISE);
+				np->mii = (mdio_read(dev, phy, MII_PHYSID1) << 16)+
+						mdio_read(dev, phy, MII_PHYSID2);
 				printk(KERN_INFO "%s: MII PHY %8.8xh found at address %d, status "
 					   "0x%4.4x advertising %4.4x.\n",
-					   dev->name, np->mii, phy, mii_status, np->advertising);
+					   dev->name, np->mii, phy, mii_status, np->mii_if.advertising);
 			}
 		}
 		np->mii_cnt = phy_idx;
+		np->mii_if.phy_id = np->phys[0];
 		if (phy_idx == 0) {
 				printk(KERN_WARNING "%s: MII PHY not found -- this device may "
 					   "not operate correctly.\n", dev->name);
@@ -654,7 +657,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 	int i;
 
 	if (location == 4  &&  phy_id == np->phys[0])
-		np->advertising = value;
+		np->mii_if.advertising = value;
 
 	if (mii_preamble_required)
 		mdio_sync(mdio_addr);
@@ -728,12 +731,12 @@ static int update_link(struct net_device *dev)
 	int duplex, fasteth, result, mii_reg;
 
 	/* BSMR */
-	mii_reg = mdio_read(dev, np->phys[0], 1);
+	mii_reg = mdio_read(dev, np->phys[0], MII_BMSR);
 
 	if (mii_reg == 0xffff)
 		return np->csr6;
 	/* reread: the link status bit is sticky */
-	mii_reg = mdio_read(dev, np->phys[0], 1);
+	mii_reg = mdio_read(dev, np->phys[0], MII_BMSR);
 	if (!(mii_reg & 0x4)) {
 		if (netif_carrier_ok(dev)) {
 			if (debug)
@@ -759,18 +762,18 @@ static int update_link(struct net_device *dev)
 		 * Instead bit 9 and 13 of the BMCR are updated to the result
 		 * of the negotiation..
 		 */
-		mii_reg = mdio_read(dev, np->phys[0], 0);
-		duplex = mii_reg & 0x100;
-		fasteth = mii_reg & 0x2000;
+		mii_reg = mdio_read(dev, np->phys[0], MII_BMCR);
+		duplex = mii_reg & BMCR_FULLDPLX;
+		fasteth = mii_reg & BMCR_SPEED100;
 	} else {
 		int negotiated;
-		mii_reg	= mdio_read(dev, np->phys[0], 5);
-		negotiated = mii_reg & np->advertising;
+		mii_reg	= mdio_read(dev, np->phys[0], MII_LPA);
+		negotiated = mii_reg & np->mii_if.advertising;
 
-		duplex = (negotiated & 0x0100) || ((negotiated & 0x02C0) == 0x0040);
+		duplex = (negotiated & LPA_100FULL) || ((negotiated & 0x02C0) == LPA_10FULL);
 		fasteth = negotiated & 0x380;
 	}
-	duplex |= np->duplex_lock;
+	duplex |= np->mii_if.duplex_lock;
 	/* remove fastether and fullduplex */
 	result = np->csr6 & ~0x20000200;
 	if (duplex)
@@ -822,7 +825,7 @@ static inline void update_csr6(struct net_device *dev, int new)
 	/* and restart them with the new configuration */
 	writel(np->csr6, ioaddr + NetworkConfig);
 	if (new & 0x200)
-		np->full_duplex = 1;
+		np->mii_if.full_duplex = 1;
 }
 
 static void netdev_timer(unsigned long data)
@@ -1131,7 +1134,7 @@ static void netdev_tx_done(struct net_device *dev)
 			if (tx_status & 0x0C80) np->stats.tx_carrier_errors++;
 			if (tx_status & 0x0200) np->stats.tx_window_errors++;
 			if (tx_status & 0x0002) np->stats.tx_fifo_errors++;
-			if ((tx_status & 0x0080) && np->full_duplex == 0)
+			if ((tx_status & 0x0080) && np->mii_if.full_duplex == 0)
 				np->stats.tx_heartbeat_errors++;
 #ifdef ETHER_STATS
 			if (tx_status & 0x0100) np->stats.collisions16++;
@@ -1469,6 +1472,56 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		return 0;
 	}
 
+	/* get settings */
+	case ETHTOOL_GSET: {
+		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+		spin_lock_irq(&np->lock);
+		mii_ethtool_gset(&np->mii_if, &ecmd);
+		spin_unlock_irq(&np->lock);
+		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set settings */
+	case ETHTOOL_SSET: {
+		int r;
+		struct ethtool_cmd ecmd;
+		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
+			return -EFAULT;
+		spin_lock_irq(&np->lock);
+		r = mii_ethtool_sset(&np->mii_if, &ecmd);
+		spin_unlock_irq(&np->lock);
+		return r;
+	}
+	/* restart autonegotiation */
+	case ETHTOOL_NWAY_RST: {
+		return mii_nway_restart(&np->mii_if);
+	}
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		edata.data = mii_link_ok(&np->mii_if);
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		debug = edata.data;
+		return 0;
+	}
         }
 	
 	return -EOPNOTSUPP;
