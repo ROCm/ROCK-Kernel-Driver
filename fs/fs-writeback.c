@@ -147,12 +147,6 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	inode->i_state |= I_LOCK;
 	inode->i_state &= ~I_DIRTY;
 
-	/*
-	 * smp_rmb(); note: if you remove write_lock below, you must add this.
-	 * mark_inode_dirty doesn't take spinlock, make sure that inode is not
-	 * read speculatively by this cpu before &= ~I_DIRTY  -- mikulas
-	 */
-
 	spin_unlock(&inode_lock);
 
 	ret = do_writepages(mapping, wbc);
@@ -170,18 +164,46 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	spin_lock(&inode_lock);
 	inode->i_state &= ~I_LOCK;
 	if (!(inode->i_state & I_FREEING)) {
-		if (mapping_tagged(mapping, PAGECACHE_TAG_DIRTY)) {
-			/* Redirtied */
-			inode->i_state |= I_DIRTY_PAGES;
-			inode->dirtied_when = jiffies;
-			list_move(&inode->i_list, &sb->s_dirty);
+		if (!(inode->i_state & I_DIRTY) &&
+		    mapping_tagged(mapping, PAGECACHE_TAG_DIRTY)) {
+			/*
+			 * We didn't write back all the pages.  Redirty the
+			 * inode.  It is still on sb->s_dirty.
+			 */
+			if (wbc->for_kupdate) {
+				/*
+				 * For the kupdate function we leave the inode
+				 * where it is on sb_dirty so it will get more
+				 * writeout as soon as the queue becomes
+				 * uncongested.
+				 */
+				inode->i_state |= I_DIRTY_PAGES;
+			} else {
+				/*
+				 * Otherwise fully redirty the inode so that
+				 * other inodes on this superblock will get some
+				 * writeout.  Otherwise heavy writing to one
+				 * file would indefinitely suspend writeout of
+				 * all the other files.
+				 */
+				inode->i_state |= I_DIRTY_PAGES;
+				inode->dirtied_when = jiffies;
+				list_move(&inode->i_list, &sb->s_dirty);
+			}
 		} else if (inode->i_state & I_DIRTY) {
-			/* Redirtied */
-			inode->dirtied_when = jiffies;
-			list_move(&inode->i_list, &sb->s_dirty);
+			/*
+			 * Someone redirtied the inode while were writing back
+			 * the pages: nothing to do.
+			 */
 		} else if (atomic_read(&inode->i_count)) {
+			/*
+			 * The inode is clean, inuse
+			 */
 			list_move(&inode->i_list, &inode_in_use);
 		} else {
+			/*
+			 * The inode is clean, unused
+			 */
 			list_move(&inode->i_list, &inode_unused);
 		}
 	}
