@@ -191,9 +191,6 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			belkin_sa_close (&serial->port[i], NULL);
-		}
 		/* My special items, the standard routines free my urbs */
 		if (serial->port[i].private)
 			kfree(serial->port[i].private);
@@ -207,26 +204,22 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		/*Start reading from the device*/
-		/* TODO: Look at possibility of submitting mulitple URBs to device to
-		 *       enhance buffering.  Win trace shows 16 initial read URBs.
-		 */
-		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (retval) {
-			err("usb_submit_urb(read bulk) failed");
-			goto exit;
-		}
-
-		port->interrupt_in_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-		if (retval)
-			err(" usb_submit_urb(read int) failed");
+	/*Start reading from the device*/
+	/* TODO: Look at possibility of submitting mulitple URBs to device to
+	 *       enhance buffering.  Win trace shows 16 initial read URBs.
+	 */
+	port->read_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (retval) {
+		err("usb_submit_urb(read bulk) failed");
+		goto exit;
 	}
-	
+
+	port->interrupt_in_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
+	if (retval)
+		err(" usb_submit_urb(read int) failed");
+
 exit:
 	return retval;
 } /* belkin_sa_open */
@@ -245,16 +238,11 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* shutdown our bulk reads and writes */
-			usb_unlink_urb (port->write_urb);
-			usb_unlink_urb (port->read_urb);
-			usb_unlink_urb (port->interrupt_in_urb);
-		}
-		port->open_count = 0;
+	if (serial->dev) {
+		/* shutdown our bulk reads and writes */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->read_urb);
+		usb_unlink_urb (port->interrupt_in_urb);
 	}
 } /* belkin_sa_close */
 
@@ -336,12 +324,31 @@ static void belkin_sa_set_termios (struct usb_serial_port *port, struct termios 
 {
 	struct usb_serial *serial = port->serial;
 	struct belkin_sa_private *priv = (struct belkin_sa_private *)port->private;
-	unsigned int iflag = port->tty->termios->c_iflag;
-	unsigned int cflag = port->tty->termios->c_cflag;
-	unsigned int old_iflag = old_termios->c_iflag;
-	unsigned int old_cflag = old_termios->c_cflag;
+	unsigned int iflag;
+	unsigned int cflag;
+	unsigned int old_iflag = 0;
+	unsigned int old_cflag = 0;
 	__u16 urb_value = 0; /* Will hold the new flags */
 	
+	if ((!port->tty) || (!port->tty->termios)) {
+		dbg ("%s - no tty or termios structure", __FUNCTION__);
+		return;
+	}
+
+	iflag = port->tty->termios->c_iflag;
+	cflag = port->tty->termios->c_cflag;
+
+	/* check that they really want us to change something */
+	if (old_termios) {
+		if ((cflag == old_termios->c_cflag) &&
+		    (RELEVANT_IFLAG(port->tty->termios->c_iflag) == RELEVANT_IFLAG(old_termios->c_iflag))) {
+			dbg("%s - nothing to change...", __FUNCTION__);
+			return;
+		}
+		old_iflag = old_termios->c_iflag;
+		old_cflag = old_termios->c_cflag;
+	}
+
 	/* Set the baud rate */
 	if( (cflag&CBAUD) != (old_cflag&CBAUD) ) {
 		/* reassert DTR and (maybe) RTS on transition from B0 */

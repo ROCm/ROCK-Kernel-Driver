@@ -20,7 +20,7 @@
  * This string-include defines all string functions as inline
  * functions. Use gcc. It also assumes ds=es=data space, this should be
  * normal. Most of the string-functions are rather heavily hand-optimized,
- * see especially strtok,strstr,str[c]spn. They should work, but are not
+ * see especially strsep,strstr,str[c]spn. They should work, but are not
  * very easy to understand. Everything is done entirely within the register
  * set, making the functions fast and clean. String instructions have been
  * used through-out, making for "slightly" unclear code :-)

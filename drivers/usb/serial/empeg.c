@@ -157,35 +157,29 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	++port->open_count;
+	/* Force default termio settings */
+	empeg_set_termios (port, NULL) ;
 
-	if (port->open_count == 1) {
+	bytes_in = 0;
+	bytes_out = 0;
 
-		/* Force default termio settings */
-		empeg_set_termios (port, NULL) ;
+	/* Start reading from the device */
+	FILL_BULK_URB(
+		port->read_urb,
+		serial->dev, 
+		usb_rcvbulkpipe(serial->dev,
+			port->bulk_in_endpointAddress),
+		port->read_urb->transfer_buffer,
+		port->read_urb->transfer_buffer_length,
+		empeg_read_bulk_callback,
+		port);
 
-		bytes_in = 0;
-		bytes_out = 0;
+	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
-		/* Start reading from the device */
-		FILL_BULK_URB(
-			port->read_urb,
-			serial->dev, 
-			usb_rcvbulkpipe(serial->dev,
-				port->bulk_in_endpointAddress),
-			port->read_urb->transfer_buffer,
-			port->read_urb->transfer_buffer_length,
-			empeg_read_bulk_callback,
-			port);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 
-		port->read_urb->transfer_flags |= USB_QUEUE_BULK;
-
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-
-		if (result)
-			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-
-	}
+	if (result)
+		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 
 	return result;
 }
@@ -204,16 +198,10 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* shutdown our bulk read */
-			usb_unlink_urb (port->read_urb);
-		}
-		port->open_count = 0;
+	if (serial->dev) {
+		/* shutdown our bulk read */
+		usb_unlink_urb (port->read_urb);
 	}
-
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
 }
@@ -491,17 +479,7 @@ static int  empeg_startup (struct usb_serial *serial)
 
 static void empeg_shutdown (struct usb_serial *serial)
 {
-	int i;
-
 	dbg (__FUNCTION__);
-
-	/* stop reads and writes on all ports */
-	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			empeg_close (&serial->port[i], NULL);
-		}
-	}
-
 }
 
 

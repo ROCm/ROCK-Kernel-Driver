@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -47,6 +46,7 @@
 #include <linux/locks.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -81,9 +81,9 @@ static struct {
 static int nTxBlock = 512;	/* number of transaction blocks */
 struct tblock *TxBlock;	        /* transaction block table */
 
-static int nTxLock = 2048;	/* number of transaction locks */
-static int TxLockLWM = 2048*.4;	/* Low water mark for number of txLocks used */
-static int TxLockHWM = 2048*.8;	/* High water mark for number of txLocks used */
+static int nTxLock = 4096;	/* number of transaction locks */
+static int TxLockLWM = 4096*.4;	/* Low water mark for number of txLocks used */
+static int TxLockHWM = 4096*.8;	/* High water mark for number of txLocks used */
 struct tlock *TxLock;           /* transaction lock table */
 static int TlocksLow = 0;	/* Indicates low number of available tlocks */
 
@@ -2777,6 +2777,7 @@ int jfs_lazycommit(void)
 	complete(&jfsIOwait);
 
 	do {
+		LAZY_LOCK(flags);
 restart:
 		WorkDone = 0;
 		while ((tblk = TxAnchor.unlock_queue)) {
@@ -2788,7 +2789,6 @@ restart:
 			 */
 			WorkDone = 1;
 
-			LAZY_LOCK(flags);
 			/*
 			 * Remove first transaction from queue
 			 */
@@ -2808,11 +2808,13 @@ restart:
 				current->state = TASK_RUNNING;
 				schedule();
 			}
+			LAZY_LOCK(flags);
 		}
 
 		if (WorkDone)
 			goto restart;
-		
+
+		LAZY_UNLOCK(flags);
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
 	} while (!jfs_thread_stopped());

@@ -6,8 +6,7 @@
  *  minix regular file handling primitives
  */
 
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
+#include "minix.h"
 
 /*
  * We have mostly NULLs here: the current defaults are OK for

@@ -12,6 +12,26 @@ CONFIG_USB_SERIAL
   The module will be called usbserial.o. If you want to compile it
   as a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_USB_SERIAL_CONSOLE
+  If you say Y here, it will be possible to use a USB to serial
+  converter port as the system console (the system console is the
+  device which receives all kernel messages and warnings and which
+  allows logins in single user mode). This could be useful if some
+  terminal or printer is connected to that serial port.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyUSB0". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+  If you don't have a VGA card installed and you say Y here, the
+  kernel will automatically use the first USB to serial converter
+  port, /dev/ttyUSB0, as system console.
+
+  If unsure, say N.
+
 CONFIG_USB_SERIAL_GENERIC
   Say Y here if you want to use the generic USB serial driver.  Please
   read <file:Documentation/usb/usb-serial.txt> for more information on

@@ -21,6 +21,7 @@
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/reiserfs_fs_i.h>
+#include <linux/reiserfs_fs_sb.h>
 #endif
 
 /*
@@ -96,7 +97,7 @@ if( !( cond ) ) 								\
 /***************************************************************************/
 
 /*
- * Structure of super block on disk, a version of which in RAM is often accessed as s->u.reiserfs_sb.s_rs
+ * Structure of super block on disk, a version of which in RAM is often accessed as REISERFS_SB(s)->s_rs
  * the version in RAM is part of a larger structure containing fields never written to disk.
  */
 #define UNSET_HASH 0 // read_super will guess about, what hash names
@@ -176,7 +177,7 @@ struct reiserfs_super_block
 
 
 // on-disk super block fields converted to cpu form
-#define SB_DISK_SUPER_BLOCK(s) ((s)->u.reiserfs_sb.s_rs)
+#define SB_DISK_SUPER_BLOCK(s) (REISERFS_SB(s)->s_rs)
 #define SB_V1_DISK_SUPER_BLOCK(s) (&(SB_DISK_SUPER_BLOCK(s)->s_v1))
 #define SB_BLOCKSIZE(s) \
         le32_to_cpu ((SB_V1_DISK_SUPER_BLOCK(s)->s_blocksize))
@@ -287,6 +288,12 @@ static inline struct reiserfs_inode_info *REISERFS_I(struct inode *inode)
 {
 	return list_entry(inode, struct reiserfs_inode_info, vfs_inode);
 }
+
+static inline struct reiserfs_sb_info *REISERFS_SB(const struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
 /** this says about version of key of all items (but stat data) the
     object consists of */
 #define get_inode_item_key_version( inode )                                    \
@@ -1284,7 +1291,7 @@ static inline loff_t max_reiserfs_offset (struct inode * inode)
 #define REISERFS_KERNEL_MEM		0	/* reiserfs kernel memory mode	*/
 #define REISERFS_USER_MEM		1	/* reiserfs user memory mode		*/
 
-#define fs_generation(s) ((s)->u.reiserfs_sb.s_generation_counter)
+#define fs_generation(s) (REISERFS_SB(s)->s_generation_counter)
 #define get_generation(s) atomic_read (&fs_generation(s))
 #define FILESYSTEM_CHANGED_TB(tb)  (get_generation((tb)->tb_sb) != (tb)->fs_gen)
 #define fs_changed(gen,s) (gen != get_generation (s))
@@ -1884,10 +1891,10 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 #define PROC_EXP( e )   e
 
 #define MAX( a, b ) ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
-#define __PINFO( sb ) ( sb ) -> u.reiserfs_sb.s_proc_info_data
+#define __PINFO( sb ) REISERFS_SB(sb) -> s_proc_info_data
 #define PROC_INFO_MAX( sb, field, value )								\
     __PINFO( sb ).field =												\
-        MAX( ( sb ) -> u.reiserfs_sb.s_proc_info_data.field, value )
+        MAX( REISERFS_SB( sb ) -> s_proc_info_data.field, value )
 #define PROC_INFO_INC( sb, field ) ( ++ ( __PINFO( sb ).field ) )
 #define PROC_INFO_ADD( sb, field, val ) ( __PINFO( sb ).field += ( val ) )
 #define PROC_INFO_BH_STAT( sb, bh, level )							\

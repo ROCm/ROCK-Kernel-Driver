@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,8 +14,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
-*/ 
+ */ 
 #ifndef _H_JFS_INCORE
 #define _H_JFS_INCORE
 
@@ -123,7 +121,7 @@ struct jfs_sb_info {
 	short		nbperpage;	/* 2: blocks per page		*/
 	short		l2nbperpage;	/* 2: log2 blocks per page	*/
 	short		l2niperblk;	/* 2: log2 inodes per page	*/
-	short		reserved;	/* 2: log2 inodes per page	*/
+	kdev_t		logdev;		/* 2: external log device	*/
 	pxd_t		logpxd;		/* 8: pxd describing log	*/
 	pxd_t		ait2;		/* 8: pxd describing AIT copy	*/
 	/* Formerly in ipimap */

@@ -405,9 +405,10 @@ static void __exit rd_cleanup (void)
 	for (i = 0 ; i < NUM_RAMDISKS; i++) {
 		struct block_device *bdev = rd_bdev[i];
 		rd_bdev[i] = NULL;
-		if (bdev)
+		if (bdev) {
+			invalidate_bdev(bdev, 1);
 			blkdev_put(bdev, BDEV_FILE);
-		destroy_buffers(mk_kdev(MAJOR_NR, i));
+		}
 	}
 
 	devfs_unregister (devfs_handle);

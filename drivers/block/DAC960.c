@@ -5295,7 +5295,7 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
       DAC960_ComputeGenericDiskInfo(Controller);
       DAC960_RegisterDisk(Controller, LogicalDriveNumber);
     }
-  if (Controller->GenericDiskInfo.sizes[MINOR(Inode->i_rdev)] == 0)
+  if (Controller->GenericDiskInfo.sizes[minor(Inode->i_rdev)] == 0)
     return -ENXIO;
   /*
     Increment Controller and Logical Drive Usage Counts.
@@ -6902,3 +6902,5 @@ static void DAC960_DestroyProcEntries(void)
 
 module_init(DAC960_Initialize);
 module_exit(DAC960_Finalize);
+
+MODULE_LICENSE("GPL");

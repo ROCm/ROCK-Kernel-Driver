@@ -623,10 +623,10 @@ static void balance_internal_when_delete (struct tree_balance * tb,
 		new_root = tb->L[h-1];
 	    /* switch super block's tree root block number to the new value */
             PUT_SB_ROOT_BLOCK( tb->tb_sb, new_root->b_blocknr );
-	    //tb->tb_sb->u.reiserfs_sb.s_rs->s_tree_height --;
+	    //REISERFS_SB(tb->tb_sb)->s_rs->s_tree_height --;
             PUT_SB_TREE_HEIGHT( tb->tb_sb, SB_TREE_HEIGHT(tb->tb_sb) - 1 );
 
-	    do_balance_mark_sb_dirty (tb, tb->tb_sb->u.reiserfs_sb.s_sbh, 1);
+	    do_balance_mark_sb_dirty (tb, REISERFS_SB(tb->tb_sb)->s_sbh, 1);
 	    /*&&&&&&&&&&&&&&&&&&&&&&*/
 	    if (h > 1)
 		/* use check_internal if new root is an internal node */
@@ -949,7 +949,7 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 	/* Change root in structure super block. */
         PUT_SB_ROOT_BLOCK( tb->tb_sb, tbSh->b_blocknr );
         PUT_SB_TREE_HEIGHT( tb->tb_sb, SB_TREE_HEIGHT(tb->tb_sb) + 1 );
-	do_balance_mark_sb_dirty (tb, tb->tb_sb->u.reiserfs_sb.s_sbh, 1);
+	do_balance_mark_sb_dirty (tb, REISERFS_SB(tb->tb_sb)->s_sbh, 1);
 	tb->tb_sb->s_dirt = 1;
     }
 	

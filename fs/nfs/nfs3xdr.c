@@ -1085,8 +1085,8 @@ static struct rpc_procinfo	nfs3_procedures[22] = {
 };
 
 struct rpc_version		nfs_version3 = {
-	3,
-	sizeof(nfs3_procedures)/sizeof(nfs3_procedures[0]),
-	nfs3_procedures
+	number:			3,
+	nrprocs:		sizeof(nfs3_procedures)/sizeof(nfs3_procedures[0]),
+	procs:			nfs3_procedures
 };
 

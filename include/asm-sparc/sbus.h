@@ -94,7 +94,8 @@ sbus_is_slave(struct sbus_dev *dev)
         for((device) = (bus)->devices; (device); (device)=(device)->next)
         
 #define for_all_sbusdev(device, bus) \
-	for((bus) = sbus_root, ((device) = (bus) ? (bus)->devices : 0); (bus); (device)=((device)->next ? (device)->next : ((bus) = (bus)->next, (bus) ? (bus)->devices : 0)))
+	for ((bus) = sbus_root; (bus); (bus) = (bus)->next) \
+		for ((device) = (bus)->devices; (device); (device) = (device)->next)
 
 /* Driver DVMA interfaces. */
 #define sbus_can_dma_64bit(sdev)	(0) /* actually, sparc_cpu_model==sun4d */

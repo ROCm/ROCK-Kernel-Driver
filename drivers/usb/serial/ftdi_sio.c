@@ -294,14 +294,8 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 
 static void ftdi_sio_shutdown (struct usb_serial *serial)
 {
-	
 	dbg (__FUNCTION__);
 
-
-	/* stop reads and writes on all ports */
-	while (serial->port[0].open_count > 0) {
-	        ftdi_sio_close (&serial->port[0], NULL);
-	}
 	if (serial->port[0].private){
 		kfree(serial->port[0].private);
 		serial->port[0].private = NULL;
@@ -319,45 +313,41 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__);
 
-	++port->open_count;
+	/* This will push the characters through immediately rather 
+	   than queue a task to deliver them */
+	port->tty->low_latency = 1;
 
-	if (port->open_count == 1){
-		/* This will push the characters through immediately rather 
-		   than queue a task to deliver them */
-		port->tty->low_latency = 1;
+	/* No error checking for this (will get errors later anyway) */
+	/* See ftdi_sio.h for description of what is reset */
+	usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+			FTDI_SIO_RESET_REQUEST, FTDI_SIO_RESET_REQUEST_TYPE, 
+			FTDI_SIO_RESET_SIO, 
+			0, buf, 0, WDR_TIMEOUT);
 
-		/* No error checking for this (will get errors later anyway) */
-		/* See ftdi_sio.h for description of what is reset */
-		usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
-				FTDI_SIO_RESET_REQUEST, FTDI_SIO_RESET_REQUEST_TYPE, 
-				FTDI_SIO_RESET_SIO, 
-				0, buf, 0, WDR_TIMEOUT);
+	/* Setup termios defaults. According to tty_io.c the 
+	   settings are driver specific */
+	port->tty->termios->c_cflag =
+		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 
-		/* Setup termios defaults. According to tty_io.c the 
-		   settings are driver specific */
-		port->tty->termios->c_cflag =
-			B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	/* ftdi_sio_set_termios  will send usb control messages */
+	ftdi_sio_set_termios(port, &tmp_termios);	
 
-		/* ftdi_sio_set_termios  will send usb control messages */
-		ftdi_sio_set_termios(port, &tmp_termios);	
-
-		/* Turn on RTS and DTR since we are not flow controlling by default */
-		if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0),HIGH) < 0) {
-			err(__FUNCTION__ " Error from DTR HIGH urb");
-		}
-		if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),HIGH) < 0){
-			err(__FUNCTION__ " Error from RTS HIGH urb");
-		}
-	
-		/* Start reading from the device */
-		FILL_BULK_URB(port->read_urb, serial->dev, 
-			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-			      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
-			      ftdi_sio_read_bulk_callback, port);
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (result)
-			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
+	/* Turn on RTS and DTR since we are not flow controlling by default */
+	if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0),HIGH) < 0) {
+		err(__FUNCTION__ " Error from DTR HIGH urb");
 	}
+	if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),HIGH) < 0){
+		err(__FUNCTION__ " Error from RTS HIGH urb");
+	}
+
+	/* Start reading from the device */
+	FILL_BULK_URB(port->read_urb, serial->dev, 
+		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
+		      ftdi_sio_read_bulk_callback, port);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (result)
+		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 
 	return result;
 } /* ftdi_sio_open */
@@ -371,41 +361,31 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 
 	dbg( __FUNCTION__);
 
-	--port->open_count;
+	if (serial->dev) {
+		if (c_cflag & HUPCL){
+			/* Disable flow control */
+			if (usb_control_msg(serial->dev, 
+					    usb_sndctrlpipe(serial->dev, 0),
+					    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
+					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
+					    0, 0, buf, 0, WDR_TIMEOUT) < 0) {
+				err("error from flowcontrol urb");
+			}	    
 
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			if (c_cflag & HUPCL){
-				/* Disable flow control */
-				if (usb_control_msg(serial->dev, 
-						    usb_sndctrlpipe(serial->dev, 0),
-						    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
-						    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-						    0, 0, buf, 0, WDR_TIMEOUT) < 0) {
-					err("error from flowcontrol urb");
-				}	    
+			/* drop DTR */
+			if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0), LOW) < 0){
+				err("Error from DTR LOW urb");
+			}
+			/* drop RTS */
+			if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),LOW) < 0) {
+				err("Error from RTS LOW urb");
+			}	
+		} /* Note change no line is hupcl is off */
 
-				/* drop DTR */
-				if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0), LOW) < 0){
-					err("Error from DTR LOW urb");
-				}
-				/* drop RTS */
-				if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),LOW) < 0) {
-					err("Error from RTS LOW urb");
-				}	
-			} /* Note change no line is hupcl is off */
-
-			/* shutdown our bulk reads and writes */
-			/* ***CHECK*** behaviour when there is nothing queued */
-			usb_unlink_urb (port->write_urb);
-			usb_unlink_urb (port->read_urb);
-		}
-		port->open_count = 0;
-	} else {  
-		/* Send a HUP if necessary */
-		if (!(port->tty->termios->c_cflag & CLOCAL)){
-			tty_hangup(port->tty);
-		}
+		/* shutdown our bulk reads and writes */
+		/* ***CHECK*** behaviour when there is nothing queued */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->read_urb);
 	}
 } /* ftdi_sio_close */
 

@@ -6,9 +6,7 @@
  *  minix directory handling functions
  */
 
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
-#include <linux/pagemap.h>
+#include "minix.h"
 
 typedef struct minix_dir_entry minix_dirent;
 

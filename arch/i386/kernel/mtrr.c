@@ -498,7 +498,6 @@ static int have_wrcomb (void)
     case MTRR_IF_INTEL:
 	rdmsr (MTRRcap_MSR, config, dummy);
 	return (config & (1<<10));
-	return 1;
     case MTRR_IF_AMD_K6:
     case MTRR_IF_CENTAUR_MCR:
     case MTRR_IF_CYRIX_ARR:

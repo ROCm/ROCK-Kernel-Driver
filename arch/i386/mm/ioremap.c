@@ -11,6 +11,10 @@
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
+#include <asm/fixmap.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
+
 
 static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 	unsigned long phys_addr, unsigned long flags)
@@ -162,7 +166,6 @@ void iounmap(void *addr)
 		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
 
-#include <asm/fixmap.h>
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	unsigned long offset, last_addr;

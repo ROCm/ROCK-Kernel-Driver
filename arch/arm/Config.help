@@ -678,23 +678,6 @@ CONFIG_CPU_ARM922T
   Say Y if you want support for the ARM922T processor.
   Otherwise, say N.
 
-CONFIG_CPU_ARM922_CPU_IDLE
-  Saying Y here will allow the processor to enter a low power
-  mode whilst waiting for an interrupt in idle. If you're unsure
-  say Y.
-
-CONFIG_CPU_ARM922_I_CACHE_ON
-  Say Y here to enable the processor instruction cache. Unless
-  you have a reason not to, say Y.
-
-CONFIG_CPU_ARM922_D_CACHE_ON
-  Say Y here to enable the processor data cache. Unless
-  you have a reason not to, say Y.
-
-CONFIG_CPU_ARM922_WRITETHROUGH
-  Say Y here to use the data cache in writethough mode. Unless you
-  specifically require this, say N.
-
 CONFIG_CPU_ARM1020
   The ARM1020 is the cached version of the ARM10 processor,
   with an addition of a floating-point unit.
@@ -710,6 +693,25 @@ CONFIG_CPU_SA110
 
   Say Y if you want support for the SA-110 processor.
   Otherwise, say N.
+
+CONFIG_CPU_ICACHE_DISABLE
+  Say Y here to disable the processor instruction cache. Unless
+  you have a reason not to or are unsure, say N.
+
+CONFIG_CPU_DCACHE_DISABLE
+  Say Y here to disable the processor data cache. Unless
+  you have a reason not to or are unsure, say N.
+
+CONFIG_CPU_DCACHE_WRITETHROUGH
+  Say Y here to use the data cache in writethough mode. Unless you
+  specifically require this or are unsure, say N.
+
+CONFIG_CPU_CACHE_ROUND_ROBIN
+  Say Y here to use the predictable round-robin cache replacement
+  policy.  Unless you specifically require this or are unsure, say N.
+
+CONFIG_CPU_BPREDICT_DISABLE
+  Say Y here to disable branch prediction.  If unsure, say N.
 
 CONFIG_FPE_NWFPE
   Say Y to include the NWFPE floating point emulator in the kernel.

@@ -25,6 +25,10 @@
  *
  *	(c) Copyright 1995    Alan Cox <alan@redhat.com>
  *
+ *      14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
+ *           Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
+ *           Added timeout module option to override default
+ * 
  */
 
 #include <linux/config.h>
@@ -92,15 +96,36 @@ static spinlock_t ibwdt_lock;
 
 #define WD_TIMO 0		/* 30 seconds +/- 20%, from table */
 
+static int timeout_val = WD_TIMO;	/* value in table */
+static int timeout = 30;	        /* in seconds */
+MODULE_PARM(timeout,"i");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds, 0 < n < 30, must be even (default=30)");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 /*
  *	Kernel methods.
  */
+
+static void __init
+ibwdt_validate_timeout(void)
+{
+	timeout_val = (30 - timeout) / 2;
+	if (timeout_val < 0 || timeout_val > 0xF) timeout_val = WD_TIMO;
+}
 
 static void
 ibwdt_ping(void)
 {
 	/* Write a watchdog value */
-	outb_p(WD_TIMO, WDT_START);
+	outb_p(timeout_val, WDT_START);
 }
 
 static ssize_t
@@ -162,6 +187,9 @@ ibwdt_open(struct inode *inode, struct file *file)
 				spin_unlock(&ibwdt_lock);
 				return -EBUSY;
 			}
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			/*
 			 *	Activate
 			 */
@@ -181,9 +209,9 @@ ibwdt_close(struct inode *inode, struct file *file)
 	lock_kernel();
 	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&ibwdt_lock);
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-		outb_p(WD_TIMO, WDT_STOP);
-#endif
+		if (!nowayout) {
+			outb_p(timeout_val, WDT_STOP);
+		}
 		ibwdt_is_open = 0;
 		spin_unlock(&ibwdt_lock);
 	}
@@ -201,7 +229,7 @@ ibwdt_notify_sys(struct notifier_block *this, unsigned long code,
 {
 	if (code == SYS_DOWN || code == SYS_HALT) {
 		/* Turn the WDT off */
-		outb_p(WD_TIMO, WDT_STOP);
+		outb_p(timeout_val, WDT_STOP);
 	}
 	return NOTIFY_DONE;
 }
@@ -241,6 +269,7 @@ ibwdt_init(void)
 {
 	printk("WDT driver for IB700 single board computer initialising.\n");
 
+	ibwdt_validate_timeout();
 	spin_lock_init(&ibwdt_lock);
 	misc_register(&ibwdt_miscdev);
 #if WDT_START != WDT_STOP

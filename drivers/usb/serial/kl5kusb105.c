@@ -317,9 +317,6 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 		struct klsi_105_private *priv = 
 			(struct klsi_105_private*) serial->port[i].private;
 		unsigned long flags;
-		while (serial->port[i].open_count > 0) {
-			klsi_105_close (&serial->port[i], NULL);
-		}
 
 		if (priv) {
 			/* kill our write urb pool */
@@ -355,84 +352,79 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	struct klsi_105_private *priv = (struct klsi_105_private *)port->private;
 	int retval = 0;
+	int rc;
+	int i;
+	unsigned long line_state;
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	++port->open_count;
+	/* force low_latency on so that our tty_push actually forces
+	 * the data through
+	 * port->tty->low_latency = 1; */
 
-	if (port->open_count == 1) {
-		int rc;
-		int i;
-		unsigned long line_state;
-
-		/* force low_latency on so that our tty_push actually forces
-		 * the data through
-		 * port->tty->low_latency = 1; */
-
-		/* Do a defined restart:
-		 * Set up sane default baud rate and send the 'READ_ON'
-		 * vendor command. 
-		 * FIXME: set modem line control (how?)
-		 * Then read the modem line control and store values in
-		 * priv->line_state.
-		 */
-		priv->cfg.pktlen   = 5;
-		priv->cfg.baudrate = kl5kusb105a_sio_b9600;
-		priv->cfg.databits = kl5kusb105a_dtb_8;
-		priv->cfg.unknown1 = 0;
-		priv->cfg.unknown2 = 1;
-		klsi_105_chg_port_settings(serial, &(priv->cfg));
-		
-		/* set up termios structure */
-		priv->termios.c_iflag = port->tty->termios->c_iflag;
-		priv->termios.c_oflag = port->tty->termios->c_oflag;
-		priv->termios.c_cflag = port->tty->termios->c_cflag;
-		priv->termios.c_lflag = port->tty->termios->c_lflag;
-		for (i=0; i<NCCS; i++)
-			priv->termios.c_cc[i] = port->tty->termios->c_cc[i];
+	/* Do a defined restart:
+	 * Set up sane default baud rate and send the 'READ_ON'
+	 * vendor command. 
+	 * FIXME: set modem line control (how?)
+	 * Then read the modem line control and store values in
+	 * priv->line_state.
+	 */
+	priv->cfg.pktlen   = 5;
+	priv->cfg.baudrate = kl5kusb105a_sio_b9600;
+	priv->cfg.databits = kl5kusb105a_dtb_8;
+	priv->cfg.unknown1 = 0;
+	priv->cfg.unknown2 = 1;
+	klsi_105_chg_port_settings(serial, &(priv->cfg));
+	
+	/* set up termios structure */
+	priv->termios.c_iflag = port->tty->termios->c_iflag;
+	priv->termios.c_oflag = port->tty->termios->c_oflag;
+	priv->termios.c_cflag = port->tty->termios->c_cflag;
+	priv->termios.c_lflag = port->tty->termios->c_lflag;
+	for (i=0; i<NCCS; i++)
+		priv->termios.c_cc[i] = port->tty->termios->c_cc[i];
 
 
-		/* READ_ON and urb submission */
-		FILL_BULK_URB(port->read_urb, serial->dev, 
-			      usb_rcvbulkpipe(serial->dev,
-					      port->bulk_in_endpointAddress),
-			      port->read_urb->transfer_buffer,
-			      port->read_urb->transfer_buffer_length,
-			      klsi_105_read_bulk_callback,
-			      port);
-		port->read_urb->transfer_flags |= USB_QUEUE_BULK;
+	/* READ_ON and urb submission */
+	FILL_BULK_URB(port->read_urb, serial->dev, 
+		      usb_rcvbulkpipe(serial->dev,
+				      port->bulk_in_endpointAddress),
+		      port->read_urb->transfer_buffer,
+		      port->read_urb->transfer_buffer_length,
+		      klsi_105_read_bulk_callback,
+		      port);
+	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
-		rc = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (rc) {
-			err(__FUNCTION__ 
-			    " - failed submitting read urb, error %d", rc);
-			retval = rc;
-			goto exit;
-		}
-
-		rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev,0),
-				     KL5KUSB105A_SIO_CONFIGURE,
-				     USB_TYPE_VENDOR|USB_DIR_OUT|USB_RECIP_INTERFACE,
-				     KL5KUSB105A_SIO_CONFIGURE_READ_ON,
-				     0, /* index */
-				     NULL,
-				     0,
-				     KLSI_TIMEOUT);
-		if (rc < 0) {
-			err("Enabling read failed (error = %d)", rc);
-			retval = rc;
-		} else 
-			dbg(__FUNCTION__ " - enabled reading");
-
-		rc = klsi_105_get_line_state(serial, &line_state);
-		if (rc >= 0) {
-			priv->line_state = line_state;
-			dbg(__FUNCTION__ 
-			    " - read line state 0x%lx", line_state);
-			retval = 0;
-		} else
-			retval = rc;
+	rc = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (rc) {
+		err(__FUNCTION__ 
+		    " - failed submitting read urb, error %d", rc);
+		retval = rc;
+		goto exit;
 	}
+
+	rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev,0),
+			     KL5KUSB105A_SIO_CONFIGURE,
+			     USB_TYPE_VENDOR|USB_DIR_OUT|USB_RECIP_INTERFACE,
+			     KL5KUSB105A_SIO_CONFIGURE_READ_ON,
+			     0, /* index */
+			     NULL,
+			     0,
+			     KLSI_TIMEOUT);
+	if (rc < 0) {
+		err("Enabling read failed (error = %d)", rc);
+		retval = rc;
+	} else 
+		dbg(__FUNCTION__ " - enabled reading");
+
+	rc = klsi_105_get_line_state(serial, &line_state);
+	if (rc >= 0) {
+		priv->line_state = line_state;
+		dbg(__FUNCTION__ 
+		    " - read line state 0x%lx", line_state);
+		retval = 0;
+	} else
+		retval = rc;
 
 exit:
 	return retval;
@@ -444,6 +436,7 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial;
 	struct klsi_105_private *priv 
 		= (struct klsi_105_private *)port->private;
+	int rc;
 	dbg(__FUNCTION__" port %d", port->number);
 
 	serial = get_usb_serial (port, __FUNCTION__);
@@ -451,31 +444,26 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 	if(!serial)
 		return;
 
-	--port->open_count;
+	/* send READ_OFF */
+	rc = usb_control_msg (serial->dev,
+			      usb_sndctrlpipe(serial->dev, 0),
+			      KL5KUSB105A_SIO_CONFIGURE,
+			      USB_TYPE_VENDOR | USB_DIR_OUT,
+			      KL5KUSB105A_SIO_CONFIGURE_READ_OFF,
+			      0, /* index */
+			      NULL, 0,
+			      KLSI_TIMEOUT);
+	if (rc < 0)
+		    err("Disabling read failed (error = %d)", rc);
 
-	if (port->open_count <= 0) {
-		/* send READ_OFF */
-		int rc = usb_control_msg(serial->dev,
-					 usb_sndctrlpipe(serial->dev, 0),
-					 KL5KUSB105A_SIO_CONFIGURE,
-					 USB_TYPE_VENDOR | USB_DIR_OUT,
-					 KL5KUSB105A_SIO_CONFIGURE_READ_OFF,
-					 0, /* index */
-					 NULL, 0,
-					 KLSI_TIMEOUT);
-		if (rc < 0)
-			    err("Disabling read failed (error = %d)", rc);
-
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
-		/* unlink our write pool */
-		/* FIXME */
-		/* wgg - do I need this? I think so. */
-		usb_unlink_urb (port->interrupt_in_urb);
-		port->open_count = 0;
-		info("kl5kusb105 port stats: %ld bytes in, %ld bytes out", priv->bytes_in, priv->bytes_out);
-	}
+	/* shutdown our bulk reads and writes */
+	usb_unlink_urb (port->write_urb);
+	usb_unlink_urb (port->read_urb);
+	/* unlink our write pool */
+	/* FIXME */
+	/* wgg - do I need this? I think so. */
+	usb_unlink_urb (port->interrupt_in_urb);
+	info("kl5kusb105 port stats: %ld bytes in, %ld bytes out", priv->bytes_in, priv->bytes_out);
 } /* klsi_105_close */
 
 

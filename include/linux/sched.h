@@ -79,7 +79,6 @@ extern int nr_threads;
 extern int last_pid;
 extern unsigned long nr_running(void);
 
-#include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/param.h>
 #include <linux/resource.h>

@@ -201,12 +201,12 @@ static inline void ser12_set_divisor(struct net_device *dev,
 /* --------------------------------------------------------------------- */
 
 #if 0
-extern inline unsigned int hweight16(unsigned int w)
+static inline unsigned int hweight16(unsigned int w)
         __attribute__ ((unused));
-extern inline unsigned int hweight8(unsigned int w)
+static inline unsigned int hweight8(unsigned int w)
         __attribute__ ((unused));
 
-extern inline unsigned int hweight16(unsigned int w)
+static inline unsigned int hweight16(unsigned int w)
 {
         unsigned short res = (w & 0x5555) + ((w >> 1) & 0x5555);
         res = (res & 0x3333) + ((res >> 2) & 0x3333);
@@ -214,7 +214,7 @@ extern inline unsigned int hweight16(unsigned int w)
         return (res & 0x00FF) + ((res >> 8) & 0x00FF);
 }
 
-extern inline unsigned int hweight8(unsigned int w)
+static inline unsigned int hweight8(unsigned int w)
 {
         unsigned short res = (w & 0x55) + ((w >> 1) & 0x55);
         res = (res & 0x33) + ((res >> 2) & 0x33);
@@ -609,6 +609,7 @@ MODULE_PARM_DESC(baud, "baycom baud rate (300 to 4800)");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
 MODULE_DESCRIPTION("Baycom ser12 full duplex amateur radio modem driver");
+MODULE_LICENSE("GPL");
 
 /* --------------------------------------------------------------------- */
 

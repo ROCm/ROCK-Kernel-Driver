@@ -80,7 +80,7 @@ dep_bool '  Debug devfs' CONFIG_DEVFS_DEBUG $CONFIG_DEVFS_FS
 # breaks.
 dep_bool '/dev/pts file system for Unix98 PTYs' CONFIG_DEVPTS_FS $CONFIG_UNIX98_PTYS
 
-dep_tristate 'QNX4 file system support (read only) (EXPERIMENTAL)' CONFIG_QNX4FS_FS $CONFIG_EXPERIMENTAL
+tristate 'QNX4 file system support (read only)' CONFIG_QNX4FS_FS
 dep_mbool '  QNX4FS write support (DANGEROUS)' CONFIG_QNX4FS_RW $CONFIG_QNX4FS_FS $CONFIG_EXPERIMENTAL
 
 tristate 'ROM file system support' CONFIG_ROMFS_FS

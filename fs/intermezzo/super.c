@@ -120,12 +120,12 @@ static char *presto_options(char *options, char *cache_data,
         store_opt(prestodev, NULL, PRESTO_PSDEV_NAME "0"); 
 
         CDEBUG(D_SUPER, "parsing options\n");
-        for (this_char = strtok (options, ",");
-             this_char != NULL;
-             this_char = strtok (NULL, ",")) {
+        while ((this_char = strsep (&options, ",")) != NULL) {
                 char *opt;
                 CDEBUG(D_SUPER, "this_char %s\n", this_char);
 
+        	if (!*this_char)
+        		continue;
                 if ( (opt = read_opt("fileset", this_char)) ) {
                         store_opt(fileset, opt, NULL);
                         continue;

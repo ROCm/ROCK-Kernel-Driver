@@ -141,7 +141,7 @@
 
 static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned int reg;
 	unsigned long flags;
 
@@ -153,14 +153,14 @@ static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 
 	if (reg != hwif->select_data) {
 		hwif->select_data = reg;
-		outb(0x51|(hwif->channel<<3), hwif->config_data+1);	/* set PIO/DMA */
+		outb(0x51|(hwif->unit<<3), hwif->config_data+1);	/* set PIO/DMA */
 		outw(reg & 0xff, hwif->config_data);
 	}
 
 	/* enable IRQ if not probing */
 	if (drive->present) {
 		reg = inw(hwif->config_data+3) & 0x13;
-		reg &= ~(1 << hwif->channel);
+		reg &= ~(1 << hwif->unit);
 		outw(reg, hwif->config_data+3);
 	}
 
@@ -175,7 +175,7 @@ static void trm290_selectproc (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned int count, reading = 2, writing = 0;
 
 	switch (func) {
@@ -194,6 +194,7 @@ static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			outw((count * 2) - 1, hwif->dma_base+2); /* start DMA */
 			if (drive->type != ATA_DISK)
 				return 0;
+			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
 			OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 			return 0;
@@ -216,7 +217,7 @@ static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 /*
  * Invoked from ide-dma.c at boot time.
  */
-void __init ide_init_trm290 (ide_hwif_t *hwif)
+void __init ide_init_trm290(struct ata_channel *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;
@@ -237,7 +238,7 @@ void __init ide_init_trm290 (ide_hwif_t *hwif)
 	__save_flags(flags);	/* local CPU only */
 	__cli();		/* local CPU only */
 	/* put config reg into first byte of hwif->select_data */
-	outb(0x51|(hwif->channel<<3), hwif->config_data+1);
+	outb(0x51|(hwif->unit<<3), hwif->config_data+1);
 	hwif->select_data = 0x21;			/* select PIO as default */
 	outb(hwif->select_data, hwif->config_data);
 	reg = inb(hwif->config_data+3);			/* get IRQ info */
@@ -246,10 +247,10 @@ void __init ide_init_trm290 (ide_hwif_t *hwif)
 	__restore_flags(flags);	/* local CPU only */
 
 	if ((reg & 0x10))
-		hwif->irq = hwif->channel ? 15 : 14;	/* legacy mode */
+		hwif->irq = hwif->unit ? 15 : 14;	/* legacy mode */
 	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
 		hwif->irq = hwif->mate->irq;		/* sharing IRQ with mate */
-	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->channel ? 0x0080 : 0x0000), 3);
+	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->unit ? 0x0080 : 0x0000), 3);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->dmaproc = &trm290_dmaproc;
@@ -264,10 +265,10 @@ void __init ide_init_trm290 (ide_hwif_t *hwif)
 		 * for the control basereg, so this kludge ensures that we use only
 		 * values that are known to work.  Ugh.		-ml
 		 */
-		unsigned short old, compat = hwif->channel ? 0x374 : 0x3f4;
+		unsigned short old, compat = hwif->unit ? 0x374 : 0x3f4;
 		static unsigned short next_offset = 0;
 
-		outb(0x54|(hwif->channel<<3), hwif->config_data+1);
+		outb(0x54|(hwif->unit<<3), hwif->config_data+1);
 		old = inw(hwif->config_data) & ~1;
 		if (old != compat && inb(old+2) == 0xff) {
 			compat += (next_offset += 0x400);	/* leave lower 10 bits untouched */

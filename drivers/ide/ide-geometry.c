@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/types.h>
 #include <linux/ide.h>
 #include <linux/mc146818rtc.h>
 #include <asm/io.h>

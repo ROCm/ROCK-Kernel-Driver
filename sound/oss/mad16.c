@@ -42,6 +42,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/gameport.h>
 
 #include "sound_config.h"
 
@@ -51,6 +52,7 @@
 
 static int      mad16_conf;
 static int      mad16_cdsel;
+static struct gameport gameport;
 
 static int      already_initialized = 0;
 
@@ -664,13 +666,13 @@ static void __init attach_mad16(struct address_info *hw_config)
 
 	outb((bits | dma_bits[dma] | dma2_bit), config_port);	/* Write IRQ+DMA setup */
 
-	hw_config->slots[0] = ad1848_init("MAD16 WSS", hw_config->io_base + 4,
+	hw_config->slots[0] = ad1848_init("mad16 WSS", hw_config->io_base + 4,
 					  hw_config->irq,
 					  dma,
 					  dma2, 0,
 					  hw_config->osp,
 					  THIS_MODULE);
-	request_region(hw_config->io_base, 4, "MAD16 WSS config");
+	request_region(hw_config->io_base, 4, "mad16 WSS config");
 }
 
 static int __init probe_mad16_mpu(struct address_info *hw_config)
@@ -1010,14 +1012,6 @@ static int __init init_mad16(void)
 	}
 
 	printk(".\n");
-        printk(KERN_INFO "Joystick port ");
-        if (joystick == 1)
-                printk("enabled.\n");
-        else
-        {
-                joystick = 0;
-                printk("disabled.\n");
-        }
 
 	cfg.io_base = io;
 	cfg.irq = irq;
@@ -1038,6 +1032,18 @@ static int __init init_mad16(void)
 	attach_mad16(&cfg);
 
 	found_mpu = probe_mad16_mpu(&cfg_mpu);
+
+	if (joystick == 1) {
+	        /* register gameport */
+                if (!request_region(0x201, 1, "mad16 gameport"))
+                        printk(KERN_ERR "mad16: gameport address 0x201 already in use\n");
+                else {
+			printk(KERN_ERR "mad16: gameport enabled at 0x201\n");
+                        gameport.io = 0x201;
+		        gameport_register_port(&gameport);
+                }
+	}
+	else printk(KERN_ERR "mad16: gameport disabled.\n");
 	return 0;
 }
 
@@ -1055,16 +1061,17 @@ module_exit(cleanup_mad16);
 static int __init setup_mad16(char *str)
 {
         /* io, irq */
-	int ints[7];
+	int ints[8];
 	
 	str = get_options(str, ARRAY_SIZE(ints), ints);
 
-	io	= ints[1];
-	irq	= ints[2];
-	dma	= ints[3];
-	dma16	= ints[4];
-	mpu_io	= ints[5];
-	mpu_irq = ints[6];
+	io	 = ints[1];
+	irq	 = ints[2];
+	dma	 = ints[3];
+	dma16	 = ints[4];
+	mpu_io	 = ints[5];
+	mpu_irq  = ints[6];
+	joystick = ints[7];
 
 	return 1;
 }

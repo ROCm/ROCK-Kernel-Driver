@@ -235,6 +235,8 @@ affs_notify_change(struct dentry *dentry, struct iattr *attr)
 	struct inode *inode = dentry->d_inode;
 	int error;
 
+	lock_kernel();
+
 	pr_debug("AFFS: notify_change(%lu,0x%x)\n",inode->i_ino,attr->ia_valid);
 
 	error = inode_change_ok(inode,attr);
@@ -254,6 +256,7 @@ affs_notify_change(struct dentry *dentry, struct iattr *attr)
 	if (!error && (attr->ia_valid & ATTR_MODE))
 		mode_to_prot(inode);
 out:
+	unlock_kernel();
 	return error;
 }
 

@@ -569,6 +569,8 @@ void disassociate_ctty(int on_exit)
 	struct task_struct *p;
 	int tty_pgrp = -1;
 
+	lock_kernel();
+
 	if (tty) {
 		tty_pgrp = tty->pgrp;
 		if (on_exit && tty->driver.type != TTY_DRIVER_TYPE_PTY)
@@ -578,6 +580,7 @@ void disassociate_ctty(int on_exit)
 			kill_pg(current->tty_old_pgrp, SIGHUP, on_exit);
 			kill_pg(current->tty_old_pgrp, SIGCONT, on_exit);
 		}
+		unlock_kernel();	
 		return;
 	}
 	if (tty_pgrp > 0) {
@@ -595,6 +598,7 @@ void disassociate_ctty(int on_exit)
 	  	if (p->session == current->session)
 			p->tty = NULL;
 	read_unlock(&tasklist_lock);
+	unlock_kernel();
 }
 
 void stop_tty(struct tty_struct *tty)

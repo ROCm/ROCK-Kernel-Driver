@@ -161,7 +161,7 @@ void sbus_iounmap(unsigned long addr, unsigned long size)
 static void *_sparc_alloc_io(unsigned int busno, unsigned long phys,
     unsigned long size, char *name)
 {
-	static int printed_full = 0;
+	static int printed_full;
 	struct xresource *xres;
 	struct resource *res;
 	char *tack;

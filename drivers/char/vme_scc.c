@@ -214,7 +214,7 @@ static int mvme147_scc_init(void)
 {
 	struct scc_port *port;
 
-	printk("SCC: MVME147 Serial Driver\n");
+	printk(KERN_INFO "SCC: MVME147 Serial Driver\n");
 	/* Init channel A */
 	port = &scc_ports[0];
 	port->channel = CHANNEL_A;
@@ -284,7 +284,7 @@ static int mvme162_scc_init(void)
 	if (!(mvme16x_config & MVME16x_CONFIG_GOT_SCCA))
 		return (-ENODEV);
 
-	printk("SCC: MVME162 Serial Driver\n");
+	printk(KERN_INFO "SCC: MVME162 Serial Driver\n");
 	/* Init channel A */
 	port = &scc_ports[0];
 	port->channel = CHANNEL_A;
@@ -352,7 +352,7 @@ static int bvme6000_scc_init(void)
 {
 	struct scc_port *port;
 
-	printk("SCC: BVME6000 Serial Driver\n");
+	printk(KERN_INFO "SCC: BVME6000 Serial Driver\n");
 	/* Init channel A */
 	port = &scc_ports[0];
 	port->channel = CHANNEL_A;
@@ -449,7 +449,7 @@ static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
 
 	ch = SCCread_NB(RX_DATA_REG);
 	if (!tty) {
-		printk ("scc_rx_int with NULL tty!\n");
+		printk(KERN_WARNING "scc_rx_int with NULL tty!\n");
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 		return;
 	}
@@ -487,7 +487,7 @@ static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 	SCC_ACCESS_INIT(port);
 	
 	if (!tty) {
-		printk ("scc_spcond_int with NULL tty!\n");
+		printk(KERN_WARNING "scc_spcond_int with NULL tty!\n");
 		SCCwrite(COMMAND_REG, CR_ERROR_RESET);
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 		return;
@@ -533,7 +533,7 @@ static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
 	SCC_ACCESS_INIT(port);
 
 	if (!port->gs.tty) {
-		printk ("scc_tx_int with NULL tty!\n");
+		printk(KERN_WARNING "scc_tx_int with NULL tty!\n");
 		SCCmod (INT_AND_DMA_REG, ~IDR_TX_INT_ENAB, 0);
 		SCCwrite(COMMAND_REG, CR_TX_PENDING_RESET);
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
@@ -719,7 +719,7 @@ static int scc_set_real_termios (void *ptr)
 	else if ((MACH_IS_MVME16x && (baud < 50 || baud > 38400)) ||
 		 (MACH_IS_MVME147 && (baud < 50 || baud > 19200)) ||
 		 (MACH_IS_BVME6000 &&(baud < 50 || baud > 76800))) {
-		printk("SCC: Bad speed requested, %d\n", baud);
+		printk(KERN_NOTICE "SCC: Bad speed requested, %d\n", baud);
 		return 0;
 	}
 

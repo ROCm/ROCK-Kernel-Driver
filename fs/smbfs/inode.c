@@ -621,6 +621,8 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 	int error, changed, refresh = 0;
 	struct smb_fattr fattr;
 
+	lock_kernel();
+
 	error = smb_revalidate_inode(dentry);
 	if (error)
 		goto out;
@@ -714,6 +716,7 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 out:
 	if (refresh)
 		smb_refresh_inode(dentry);
+	unlock_kernel();
 	return error;
 }
 

@@ -449,11 +449,17 @@ static int de620_open(struct net_device *dev)
 		return ret;
 	}
 
-	if (adapter_init(dev))
-		return -EIO;
+	if (adapter_init(dev)) {
+		ret = -EIO;
+		goto out_free_irq;
+	}
 
 	netif_start_queue(dev);
 	return 0;
+
+out_free_irq:
+	free_irq(dev->irq, dev);
+	return ret;
 }
 
 /************************************************
@@ -850,7 +856,10 @@ int __init de620_probe(struct net_device *dev)
 		return -EBUSY;
 	}
 #endif
-	request_region(dev->base_addr, 3, "de620");
+	if (!request_region(dev->base_addr, 3, "de620")) {
+		printk(KERN_ERR "io 0x%3lX, which is busy.\n", dev->base_addr);
+		return -EBUSY;
+	}
 
 	/* else, got it! */
 	printk(", Ethernet Address: %2.2X",

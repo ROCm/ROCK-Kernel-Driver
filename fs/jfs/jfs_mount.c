@@ -1,10 +1,5 @@
 /*
- *   MODULE_NAME:		jfs_mount.c
- *
- *   COMPONENT_NAME:		sysjfs
- *
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,11 +14,6 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- */
-
-/*
- * Change History :
- *
  */
 
 /*
@@ -283,24 +273,6 @@ int jfs_mount_rw(struct super_block *sb, int remount)
 			return rc;
 		}
 	}
-#ifdef _STILL_TO_PORT
-	/*
-	 * get log device associated with the fs being mounted;
-	 */
-	if (ipmnt->i_mntflag & JFS_INLINELOG) {
-		vfsp->vfs_logVPB = vfsp->vfs_hVPB;
-		vfsp->vfs_logvpfs = vfsp->vfs_vpfsi;
-	} else if (vfsp->vfs_logvpfs == NULL) {
-		/*
-		 * XXX: there's only one external log per system;
-		 */
-		jERROR(1, ("jfs_mount: Mount Failure! No Log Device.\n"));
-		goto errout30;
-	}
-
-	logdev = vfsp->vfs_logvpfs->vpi_unit;
-	ipmnt->i_logdev = logdev;
-#endif				/* _STILL_TO_PORT */
 
 	/*
 	 * open/initialize log
@@ -360,7 +332,7 @@ static int chkSuper(struct super_block *sb)
 	 */
 	/* validate fs signature */
 	if (strncmp(j_sb->s_magic, JFS_MAGIC, 4) ||
-	    j_sb->s_version != cpu_to_le32(JFS_VERSION)) {
+	    j_sb->s_version > cpu_to_le32(JFS_VERSION)) {
 		//rc = EFORMAT;
 		rc = EINVAL;
 		goto out;
@@ -398,10 +370,6 @@ static int chkSuper(struct super_block *sb)
 			j_sb->s_flag |= cpu_to_le32(JFS_BAD_SAIT);
 	}
 
-	/* in release 1, the flag MUST reflect inline log, and group commit */
-	if ((j_sb->s_flag & cpu_to_le32(JFS_INLINELOG)) !=
-	    cpu_to_le32(JFS_INLINELOG))
-		j_sb->s_flag |= cpu_to_le32(JFS_INLINELOG);
 	if ((j_sb->s_flag & cpu_to_le32(JFS_GROUPCOMMIT)) !=
 	    cpu_to_le32(JFS_GROUPCOMMIT))
 		j_sb->s_flag |= cpu_to_le32(JFS_GROUPCOMMIT);
@@ -437,6 +405,8 @@ static int chkSuper(struct super_block *sb)
 	sbi->l2niperblk = sbi->l2bsize - L2DISIZE;
 	if (sbi->mntflag & JFS_INLINELOG)
 		sbi->logpxd = j_sb->s_logpxd;
+	else
+		sbi->logdev = to_kdev_t(le32_to_cpu(j_sb->s_logdev));
 	sbi->ait2 = j_sb->s_ait2;
 
       out:
@@ -476,6 +446,10 @@ int updateSuper(struct super_block *sb, uint state)
 		j_sb->s_logdev =
 			cpu_to_le32(kdev_t_to_nr(JFS_SBI(sb)->log->dev));
 		j_sb->s_logserial = cpu_to_le32(JFS_SBI(sb)->log->serial);
+		/* record our own device number in case the location
+		 * changes after a reboot
+		 */
+		j_sb->s_device = cpu_to_le32(kdev_t_to_nr(sb->s_dev));
 	} else if (state == FM_CLEAN) {
 		/*
 		 * If this volume is shared with OS/2, OS/2 will need to

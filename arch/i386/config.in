@@ -25,6 +25,7 @@ choice 'Processor family' \
 	 Pentium-4				CONFIG_MPENTIUM4 \
 	 K6/K6-II/K6-III			CONFIG_MK6 \
 	 Athlon/Duron/K7			CONFIG_MK7 \
+	 Elan					CONFIG_MELAN \
 	 Crusoe					CONFIG_MCRUSOE \
 	 Winchip-C6				CONFIG_MWINCHIPC6 \
 	 Winchip-2				CONFIG_MWINCHIP2 \
@@ -119,6 +120,11 @@ if [ "$CONFIG_MK7" = "y" ]; then
    define_bool CONFIG_X86_PGE y
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
 fi
+if [ "$CONFIG_MELAN" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 4
+   define_bool CONFIG_X86_USE_STRING_486 y
+   define_bool CONFIG_X86_ALIGNMENT_16 y
+fi
 if [ "$CONFIG_MCYRIXIII" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 5
    define_bool CONFIG_X86_TSC y
@@ -150,6 +156,10 @@ if [ "$CONFIG_MWINCHIP3D" = "y" ]; then
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
    define_bool CONFIG_X86_OOSTORE y
 fi
+
+bool 'Machine Check Exception' CONFIG_X86_MCE
+dep_bool 'Check for non-fatal errors' CONFIG_X86_MCE_NONFATAL $CONFIG_X86_MCE
+
 tristate 'Toshiba Laptop support' CONFIG_TOSHIBA
 tristate 'Dell laptop support' CONFIG_I8K
 
@@ -160,23 +170,18 @@ tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
 choice 'High Memory Support' \
 	"off           CONFIG_NOHIGHMEM \
 	 4GB           CONFIG_HIGHMEM4G \
-	 4GB-highpte   CONFIG_HIGHMEM4G_HIGHPTE \
-	 64GB          CONFIG_HIGHMEM64G \
-	 64GB-highpte  CONFIG_HIGHMEM64G_HIGHPTE" off
+	 64GB          CONFIG_HIGHMEM64G" off
+
+if [ "$CONFIG_HIGHMEM4G" = "y" -o "$CONFIG_HIGHMEM64G" = "y" ]; then
+   bool 'Use high memory pte support' CONFIG_HIGHPTE
+fi
+
 if [ "$CONFIG_HIGHMEM4G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y
 fi
-if [ "$CONFIG_HIGHMEM4G_HIGHPTE" = "y" ]; then
-   define_bool CONFIG_HIGHMEM y
-   define_bool CONFIG_HIGHPTE y
-fi
+
 if [ "$CONFIG_HIGHMEM64G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y
-   define_bool CONFIG_X86_PAE y
-fi
-if [ "$CONFIG_HIGHMEM64G_HIGHPTE" = "y" ]; then
-   define_bool CONFIG_HIGHMEM y
-   define_bool CONFIG_HIGHPTE y
    define_bool CONFIG_X86_PAE y
 fi
 

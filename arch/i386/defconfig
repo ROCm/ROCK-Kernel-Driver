@@ -39,6 +39,7 @@ CONFIG_MPENTIUMIII=y
 # CONFIG_MPENTIUM4 is not set
 # CONFIG_MK6 is not set
 # CONFIG_MK7 is not set
+# CONFIG_MELAN is not set
 # CONFIG_MCRUSOE is not set
 # CONFIG_MWINCHIPC6 is not set
 # CONFIG_MWINCHIP2 is not set
@@ -57,6 +58,8 @@ CONFIG_X86_TSC=y
 CONFIG_X86_GOOD_APIC=y
 CONFIG_X86_PGE=y
 CONFIG_X86_USE_PPRO_CHECKSUM=y
+CONFIG_X86_MCE=y
+# CONFIG_X86_MCE_NONFATAL is not set
 # CONFIG_TOSHIBA is not set
 # CONFIG_I8K is not set
 # CONFIG_MICROCODE is not set
@@ -64,9 +67,7 @@ CONFIG_X86_USE_PPRO_CHECKSUM=y
 # CONFIG_X86_CPUID is not set
 CONFIG_NOHIGHMEM=y
 # CONFIG_HIGHMEM4G is not set
-# CONFIG_HIGHMEM4G_HIGHPTE is not set
 # CONFIG_HIGHMEM64G is not set
-# CONFIG_HIGHMEM64G_HIGHPTE is not set
 # CONFIG_MATH_EMULATION is not set
 # CONFIG_MTRR is not set
 CONFIG_SMP=y
@@ -103,7 +104,6 @@ CONFIG_CARDBUS=y
 # CONFIG_I82092 is not set
 # CONFIG_I82365 is not set
 # CONFIG_TCIC is not set
-# CONFIG_PCMCIA_SA1100 is not set
 
 #
 # PCI Hotplug Support
@@ -268,7 +268,6 @@ CONFIG_BLK_DEV_IDEDMA=y
 # CONFIG_BLK_DEV_ALI15X3 is not set
 # CONFIG_WDC_ALI15X3 is not set
 # CONFIG_BLK_DEV_AMD74XX is not set
-# CONFIG_AMD74XX_OVERRIDE is not set
 # CONFIG_BLK_DEV_CMD64X is not set
 # CONFIG_BLK_DEV_CY82C693 is not set
 # CONFIG_BLK_DEV_CS5530 is not set
@@ -276,7 +275,6 @@ CONFIG_BLK_DEV_IDEDMA=y
 # CONFIG_HPT34X_AUTODMA is not set
 # CONFIG_BLK_DEV_HPT366 is not set
 CONFIG_BLK_DEV_PIIX=y
-CONFIG_PIIX_TUNING=y
 # CONFIG_BLK_DEV_NS87415 is not set
 # CONFIG_BLK_DEV_OPTI621 is not set
 # CONFIG_BLK_DEV_PDC_ADMA is not set
@@ -291,7 +289,6 @@ CONFIG_PIIX_TUNING=y
 # CONFIG_IDEDMA_IVB is not set
 CONFIG_IDEDMA_AUTO=y
 # CONFIG_DMA_NONPCI is not set
-CONFIG_BLK_DEV_IDE_MODES=y
 # CONFIG_BLK_DEV_ATARAID is not set
 # CONFIG_BLK_DEV_ATARAID_PDC is not set
 # CONFIG_BLK_DEV_ATARAID_HPT is not set
@@ -851,10 +848,16 @@ CONFIG_USB_STORAGE=y
 #
 # USB Human Interface Devices (HID)
 #
+# CONFIG_USB_HID is not set
 
 #
-#   Input core support is needed for USB HID
+#     Input core support is needed for USB HID input layer or HIDBP support
 #
+# CONFIG_USB_HIDINPUT is not set
+# CONFIG_USB_HIDDEV is not set
+# CONFIG_USB_KBD is not set
+# CONFIG_USB_MOUSE is not set
+# CONFIG_USB_WACOM is not set
 
 #
 # USB Imaging devices
@@ -877,6 +880,7 @@ CONFIG_USB_STORAGE=y
 # USB Network adaptors
 #
 # CONFIG_USB_PEGASUS is not set
+# CONFIG_USB_RTL8150 is not set
 # CONFIG_USB_KAWETH is not set
 # CONFIG_USB_CATC is not set
 # CONFIG_USB_CDCETHER is not set
@@ -911,9 +915,11 @@ CONFIG_USB_STORAGE=y
 # CONFIG_USB_SERIAL_KEYSPAN_USA18X is not set
 # CONFIG_USB_SERIAL_KEYSPAN_USA19W is not set
 # CONFIG_USB_SERIAL_KEYSPAN_USA49W is not set
-# CONFIG_USB_SERIAL_MCT_U232 is not set
 # CONFIG_USB_SERIAL_KLSI is not set
+# CONFIG_USB_SERIAL_MCT_U232 is not set
 # CONFIG_USB_SERIAL_PL2303 is not set
+# CONFIG_USB_SERIAL_SAFE is not set
+# CONFIG_USB_SERIAL_SAFE_PADDED is not set
 # CONFIG_USB_SERIAL_CYBERJACK is not set
 # CONFIG_USB_SERIAL_XIRCOM is not set
 # CONFIG_USB_SERIAL_OMNINET is not set
@@ -923,6 +929,7 @@ CONFIG_USB_STORAGE=y
 #
 # CONFIG_USB_RIO500 is not set
 # CONFIG_USB_AUERSWALD is not set
+# CONFIG_USB_TIGL is not set
 
 #
 # Kernel hacking

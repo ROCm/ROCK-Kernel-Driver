@@ -98,12 +98,12 @@ static void hpt34x_clear_chipset (ide_drive_t *drive)
 	unsigned int reg1	= 0, tmp1 = 0;
 	unsigned int reg2	= 0, tmp2 = 0;
 
-	pci_read_config_dword(HWIF(drive)->pci_dev, 0x44, &reg1);
-	pci_read_config_dword(HWIF(drive)->pci_dev, 0x48, &reg2);
-	tmp1 = ((0x00 << (3*drive->dn)) | (reg1 & ~(7 << (3*drive->dn))));
+	pci_read_config_dword(drive->channel->pci_dev, 0x44, &reg1);
+	pci_read_config_dword(drive->channel->pci_dev, 0x48, &reg2);
+	tmp1 = ((0x00 << (3 * drive->dn)) | (reg1 & ~(7 << (3 * drive->dn))));
 	tmp2 = (reg2 & ~(0x11 << drive->dn));
-	pci_write_config_dword(HWIF(drive)->pci_dev, 0x44, tmp1);
-	pci_write_config_dword(HWIF(drive)->pci_dev, 0x48, tmp2);
+	pci_write_config_dword(drive->channel->pci_dev, 0x44, tmp1);
+	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
 }
 
 static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
@@ -122,13 +122,13 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 		lo_speed >>= 5;
 	}
 
-	pci_read_config_dword(HWIF(drive)->pci_dev, 0x44, &reg1);
-	pci_read_config_dword(HWIF(drive)->pci_dev, 0x48, &reg2);
+	pci_read_config_dword(drive->channel->pci_dev, 0x44, &reg1);
+	pci_read_config_dword(drive->channel->pci_dev, 0x48, &reg2);
 	tmp1 = ((lo_speed << (3*drive->dn)) | (reg1 & ~(7 << (3*drive->dn))));
 	tmp2 = ((hi_speed << drive->dn) | reg2);
 	err = ide_config_drive_speed(drive, speed);
-	pci_write_config_dword(HWIF(drive)->pci_dev, 0x44, tmp1);
-	pci_write_config_dword(HWIF(drive)->pci_dev, 0x48, tmp2);
+	pci_write_config_dword(drive->channel->pci_dev, 0x44, tmp1);
+	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
 
 	if (!drive->init_speed)
 		drive->init_speed = speed;
@@ -254,7 +254,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 	struct hd_driveid *id = drive->id;
 	ide_dma_action_t dma_func = ide_dma_on;
 
-	if (id && (id->capability & 1) && HWIF(drive)->autodma) {
+	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
 			dma_func = ide_dma_off;
@@ -301,7 +301,7 @@ no_dma_set:
 		dma_func = ide_dma_off;
 #endif /* CONFIG_HPT34X_AUTODMA */
 
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 /*
@@ -314,7 +314,7 @@ no_dma_set:
 
 int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
 	unsigned int count, reading = 0;
 	byte dma_stat;
@@ -334,6 +334,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			drive->waiting_for_dma = 1;
 			if (drive->type != ATA_DISK)
 				return 0;
+			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);	/* issue cmd to drive */
 			OUT_BYTE((reading == 9) ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 			return 0;
@@ -408,7 +409,7 @@ unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 	return dev->irq;
 }
 
-void __init ide_init_hpt34x (ide_hwif_t *hwif)
+void __init ide_init_hpt34x(struct ata_channel *hwif)
 {
 	hwif->tuneproc = &hpt34x_tune_drive;
 	hwif->speedproc = &hpt34x_tune_chipset;

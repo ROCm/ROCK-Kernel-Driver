@@ -247,8 +247,8 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFLSBUF:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			fsync_dev(dev);
-			invalidate_buffers(dev);
+			fsync_bdev(bdev);
+			invalidate_bdev(bdev, 0);
 			return 0;
 
 		case BLKSSZGET:

@@ -115,7 +115,7 @@ __volatile__ unsigned int *master_l10_limit;
 void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	/* last time the cmos clock got updated */
-	static long last_rtc_update=0;
+	static long last_rtc_update;
 
 #ifndef CONFIG_SMP
 	if(!user_mode(regs))

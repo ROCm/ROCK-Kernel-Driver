@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,17 +14,10 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Module: jfs/namei.c
- *
- */
-
-/*
- * Change History :
- *
  */
 
 #include <linux/fs.h>
+#include <linux/locks.h>
 #include "jfs_incore.h"
 #include "jfs_inode.h"
 #include "jfs_dinode.h"
@@ -33,8 +25,6 @@
 #include "jfs_unicode.h"
 #include "jfs_metapage.h"
 #include "jfs_debug.h"
-#include <linux/locks.h>
-#include <linux/slab.h>
 
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;
@@ -588,7 +578,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
  */
 s64 commitZeroLink(tid_t tid, struct inode *ip)
 {
-	int filetype, committype;
+	int filetype;
 	tblock_t *tblk;
 
 	jFYI(1, ("commitZeroLink: tid = %d, ip = 0x%p\n", tid, ip));
@@ -609,66 +599,25 @@ s64 commitZeroLink(tid_t tid, struct inode *ip)
 		return 0;
 	}
 
-#ifdef _STILL_TO_PORT
-	/*
-	 *      free from block allocation map:
-	 *
-	 * if there is no cache control element associated with 
-	 * the file, free resources in both persistent and work map;
-	 * otherwise just persistent map. 
-	 */
-	if (ip->i_cacheid) {
-		committype = COMMIT_PMAP;
-
-		/* mark for iClose() to free from working map */
-		set_cflag(COMMIT_Freewmap, ip);
-	} else
-		committype = COMMIT_PWMAP;
-#else				/* _STILL_TO_PORT */
-
 	set_cflag(COMMIT_Freewmap, ip);
-	committype = COMMIT_PMAP;
-#endif				/* _STILL_TO_PORT */
 
 	/* mark transaction of block map update type */
 	tblk = tid_to_tblock(tid);
-	tblk->xflag |= committype;
+	tblk->xflag |= COMMIT_PMAP;
 
 	/*
 	 * free EA
 	 */
-	if (JFS_IP(ip)->ea.flag & DXD_EXTENT) {
-#ifdef _STILL_TO_PORT
-		/* free EA pages from cache */
-		if (committype == COMMIT_PWMAP)
-			bmExtentInvalidate(ip, addressDXD(&ip->i_ea),
-					   lengthDXD(&ip->i_ea));
-#endif				/* _STILL_TO_PORT */
-
+	if (JFS_IP(ip)->ea.flag & DXD_EXTENT)
 		/* acquire maplock on EA to be freed from block map */
 		txEA(tid, ip, &JFS_IP(ip)->ea, NULL);
-
-		if (committype == COMMIT_PWMAP)
-			JFS_IP(ip)->ea.flag = 0;
-	}
 
 	/*
 	 * free ACL
 	 */
-	if (JFS_IP(ip)->acl.flag & DXD_EXTENT) {
-#ifdef _STILL_TO_PORT
-		/* free ACL pages from cache */
-		if (committype == COMMIT_PWMAP)
-			bmExtentInvalidate(ip, addressDXD(&ip->i_acl),
-					   lengthDXD(&ip->i_acl));
-#endif				/* _STILL_TO_PORT */
-
+	if (JFS_IP(ip)->acl.flag & DXD_EXTENT)
 		/* acquire maplock on EA to be freed from block map */
 		txEA(tid, ip, &JFS_IP(ip)->acl, NULL);
-
-		if (committype == COMMIT_PWMAP)
-			JFS_IP(ip)->acl.flag = 0;
-	}
 
 	/*
 	 * free xtree/data (truncate to zero length):
@@ -1402,12 +1351,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 		goto out1;
 	}
 
-	if (S_ISREG(ip->i_mode)) {
-		ip->i_op = &jfs_file_inode_operations;
-		ip->i_fop = &jfs_file_operations;
-		ip->i_mapping->a_ops = &jfs_aops;
-	} else
-		init_special_inode(ip, ip->i_mode, rdev);
+	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);

@@ -328,7 +328,7 @@ static void bio_end_io_kio(struct bio *bio)
  * ll_rw_kio - submit a &struct kiobuf for I/O
  * @rw:   %READ or %WRITE
  * @kio:   the kiobuf to do I/O on
- * @dev:   target device
+ * @bdev:   target device
  * @sector:   start location on disk
  *
  * Description:
@@ -336,11 +336,12 @@ static void bio_end_io_kio(struct bio *bio)
  *   &struct bio and queue them for I/O. The kiobuf given must describe
  *   a continous range of data, and must be fully prepared for I/O.
  **/
-void ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t sector)
+void ll_rw_kio(int rw, struct kiobuf *kio, struct block_device *bdev, sector_t sector)
 {
 	int i, offset, size, err, map_i, total_nr_pages, nr_pages;
 	struct bio_vec *bvec;
 	struct bio *bio;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	err = 0;
 	if ((rw & WRITE) && is_read_only(dev)) {

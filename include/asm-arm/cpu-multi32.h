@@ -56,10 +56,6 @@ extern struct processor {
 		 * flush a specific page or pages
 		 */
 		void (*clean_invalidate_range)(unsigned long address, unsigned long end, int flags);
-		/*
-		 * flush a page to RAM
-		 */
-		void (*_flush_ram_page)(void *virt_page);
 	} cache;
 
 	struct {	/* D-cache */
@@ -121,7 +117,6 @@ extern const struct processor sa110_processor_functions;
 
 #define cpu_cache_clean_invalidate_all()	processor.cache.clean_invalidate_all()
 #define cpu_cache_clean_invalidate_range(s,e,f)	processor.cache.clean_invalidate_range(s,e,f)
-#define cpu_flush_ram_page(vp)			processor.cache._flush_ram_page(vp)
 
 #define cpu_dcache_clean_page(vp)		processor.dcache.clean_page(vp)
 #define cpu_dcache_clean_entry(addr)		processor.dcache.clean_entry(addr)

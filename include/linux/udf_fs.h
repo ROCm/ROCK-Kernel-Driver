@@ -34,6 +34,10 @@
 #ifndef _UDF_FS_H
 #define _UDF_FS_H 1
 
+#include <linux/config.h>
+
+#include <linux/config.h>
+
 #define UDF_PREALLOCATE
 #define UDF_DEFAULT_PREALLOC_BLOCKS	8
 

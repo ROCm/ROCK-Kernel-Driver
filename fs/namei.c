@@ -881,6 +881,8 @@ static inline int may_delete(struct inode *dir,struct dentry *victim, int isdir)
 			return -EBUSY;
 	} else if (S_ISDIR(victim->d_inode->i_mode))
 		return -EISDIR;
+	if (IS_DEADDIR(dir))
+		return -ENOENT;
 	return 0;
 }
 
@@ -1390,9 +1392,7 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 	down(&dentry->d_inode->i_sem);
 	d_unhash(dentry);
-	if (IS_DEADDIR(dir))
-		error = -ENOENT;
-	else if (d_mountpoint(dentry))
+	if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
 		error = dir->i_op->rmdir(dir, dentry);
@@ -1776,8 +1776,6 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (!old_dir->i_op || !old_dir->i_op->rename)
 		return -EPERM;
 
-	if (IS_DEADDIR(old_dir)||IS_DEADDIR(new_dir))
-		return -ENOENT;
 	DQUOT_INIT(old_dir);
 	DQUOT_INIT(new_dir);
 

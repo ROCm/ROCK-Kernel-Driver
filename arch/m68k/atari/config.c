@@ -205,14 +205,16 @@ void __init atari_switches_setup( const char *str, unsigned len )
     char switches[len+1];
     char *p;
     int ovsc_shift;
+    char *args = switches;
 
-    /* copy string to local array, strtok works destructively... */
+    /* copy string to local array, strsep works destructively... */
     strncpy( switches, str, len );
     switches[len] = 0;
     atari_switches = 0;
 
     /* parse the options */
-    for( p = strtok( switches, "," ); p; p = strtok( NULL, "," ) ) {
+    while ((p = strsep(&args, ",")) != NULL) {
+	if (!*p) continue;
 	ovsc_shift = 0;
 	if (strncmp( p, "ov_", 3 ) == 0) {
 	    p += 3;

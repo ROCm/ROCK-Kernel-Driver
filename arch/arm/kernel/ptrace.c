@@ -620,15 +620,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_attach(child);
 		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
-		goto out_tsk;
-	if (child->state != TASK_STOPPED && request != PTRACE_KILL)
-		goto out_tsk;
-	if (child->p_pptr != current)
-		goto out_tsk;
-
-	ret = do_ptrace(request, child, addr, data);
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret == 0)
+		ret = do_ptrace(request, child, addr, data);
 
 out_tsk:
 	put_task_struct(child);

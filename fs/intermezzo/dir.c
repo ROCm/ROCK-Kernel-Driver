@@ -282,11 +282,13 @@ int presto_setattr(struct dentry *de, struct iattr *iattr)
         struct presto_file_set *fset;
         struct lento_vfs_context info = { 0, 0, 0 };
 
+	lock_kernel();	
+
         ENTRY;
         error = presto_prep(de, &cache, &fset);
         if ( error ) {
                 EXIT;
-                return error;
+                goto out;        
         }
 
         if (!iattr->ia_valid)
@@ -300,7 +302,8 @@ int presto_setattr(struct dentry *de, struct iattr *iattr)
         
         if ( presto_get_permit(de->d_inode) < 0 ) {
                 EXIT;
-                return -EROFS;
+                error = -EROFS;
+                goto out;
         }
 
         if (!ISLENTO(presto_c2m(cache)))
@@ -308,6 +311,8 @@ int presto_setattr(struct dentry *de, struct iattr *iattr)
 	info.flags |= LENTO_FL_IGNORE_TIME;
         error = presto_do_setattr(fset, de, iattr, &info);
         presto_put_permit(de->d_inode);
+out:
+        unlock_kernel();
         return error;
 }
 

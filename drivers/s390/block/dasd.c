@@ -2618,7 +2618,7 @@ dasd_release (struct inode *inp, struct file *filp)
 	}
         count = atomic_dec_return (&device->open_count);
         if ( count == 0) {
-                invalidate_buffers (inp->i_rdev);
+                invalidate_bdev (inp->i_bdev, 0);
                 if ( device->discipline->owner )
                         __MOD_DEC_USE_COUNT(device->discipline->owner);
                 MOD_DEC_USE_COUNT;

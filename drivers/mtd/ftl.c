@@ -195,7 +195,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg);
 static int ftl_open(struct inode *inode, struct file *file);
 static release_t ftl_close(struct inode *inode, struct file *file);
-static int ftl_reread_partitions(int minor);
+static int ftl_reread_partitions(kdev_t dev);
 
 static void ftl_erase_callback(struct erase_info *done);
 
@@ -842,7 +842,7 @@ static u_int32_t find_free(partition_t *part)
 
 static int ftl_open(struct inode *inode, struct file *file)
 {
-    int minor = MINOR(inode->i_rdev);
+    int minor = minor(inode->i_rdev);
     partition_t *partition;
 
     if (minor>>4 >= MAX_MTD_DEVICES)
@@ -878,7 +878,7 @@ static int ftl_open(struct inode *inode, struct file *file)
 
 static release_t ftl_close(struct inode *inode, struct file *file)
 {
-    int minor = MINOR(inode->i_rdev);
+    int minor = minor(inode->i_rdev);
     partition_t *part = myparts[minor >> 4];
     int i;
     
@@ -1114,7 +1114,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg)
 {
     struct hd_geometry *geo = (struct hd_geometry *)arg;
-    int ret = 0, minor = MINOR(inode->i_rdev);
+    int ret = 0, minor = minor(inode->i_rdev);
     partition_t *part= myparts[minor >> 4];
     u_long sect;
 
@@ -1139,7 +1139,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 	ret = put_user((u64)ftl_hd[minor].nr_sects << 9, (u64 *)arg);
 	break;
     case BLKRRPART:
-	ret = ftl_reread_partitions(minor);
+	ret = ftl_reread_partitions(inode->i_rdev);
 	break;
     case BLKROSET:
     case BLKROGET:
@@ -1161,7 +1161,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 
 static int ftl_reread_partitions(kdev_t dev)
 {
-    int minor = MINOR(dev);
+    int minor = minor(dev);
     partition_t *part = myparts[minor >> 4];
     int res;
 
@@ -1197,7 +1197,7 @@ static void do_ftl_request(request_arg_t)
       //	    sti();
 	INIT_REQUEST;
 
-	minor = MINOR(CURRENT->rq_dev);
+	minor = minor(CURRENT->rq_dev);
 	
 	part = myparts[minor >> 4];
 	if (part) {
@@ -1369,7 +1369,7 @@ static void __exit cleanup_ftl(void)
 
     unregister_blkdev(FTL_MAJOR, "ftl");
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR));
-    bklk_clear(FTL_MAJOR);
+    blk_clear(FTL_MAJOR);
 
     del_gendisk(&ftl_gendisk);
 }

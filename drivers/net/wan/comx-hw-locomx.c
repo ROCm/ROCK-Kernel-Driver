@@ -154,11 +154,9 @@ static int LOCOMX_open(struct net_device *dev)
 		return -ENODEV;
 	}
 
-	if (check_region(dev->base_addr, hw->io_extent)) {
+	if (!request_region(dev->base_addr, hw->io_extent, dev->name)) {
 		return -EAGAIN;
 	}
-
-	request_region(dev->base_addr, hw->io_extent, dev->name);
 
 	hw->board.chanA.ctrlio=dev->base_addr + 5;
 	hw->board.chanA.dataio=dev->base_addr + 7;

@@ -348,7 +348,7 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
 
 	if (dev) {
 		for (i = 0; i < 3; i++) {
-			if(root->resource[i]) {
+			if (root->resource[i]) {
 				bus->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES+i];
 				bus->resource[i]->end  = root->resource[i]->end;
 				bus->resource[i]->name = bus->name;
@@ -357,13 +357,8 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
 		bus->resource[0]->flags |= pci_bridge_check_io(dev);
 		bus->resource[1]->flags |= IORESOURCE_MEM;
 
-		if (root->resource[2])
+		if (bus->resource[2] && root->resource[2])
 			bus->resource[2]->flags = root->resource[2]->flags;
-		else {
-			/* no prefetchable memory region - disable it */
-			bus->resource[2]->start = 1024*1024;
-			bus->resource[2]->end   = bus->resource[2]->start - 1;
-		}
 	} else {
 		/*
 		 * Assign root bus resources.
@@ -552,12 +547,12 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
 				panic("PCI: unable to scan bus!");
 
 			busnr = sys->bus->subordinate + 1;
-		} else if (ret < 0)
-			break;
+		} else {
+			kfree(sys);
+			if (ret < 0)
+				break;
+		}
 	}
-
-	kfree(sys);
-
 }
 
 extern struct hw_pci ebsa285_pci;

@@ -11,12 +11,8 @@
 static struct nls_table *p_nls;
 
 static struct nls_table table = {
-	"sjis",
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	THIS_MODULE,
+	charset:	"sjis",
+	owner:		THIS_MODULE,
 };
 
 static int __init init_nls_sjis(void)

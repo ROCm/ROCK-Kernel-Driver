@@ -593,3 +593,102 @@ e100_config_wol(struct e100_private *bdp)
 }
 #endif
 
+#ifdef ETHTOOL_TEST
+/**
+ * e100_config_loopback_mode
+ * @bdp: atapter's private data struct
+ * @mode: loopback mode(phy/mac/none)
+ *
+ */
+unsigned char
+e100_config_loopback_mode(struct e100_private *bdp, u8 mode)
+{
+	unsigned char bc_changed = false;
+	u8 config_byte;
+
+	spin_lock_bh(&(bdp->config_lock));
+
+	switch (mode) {
+	case NO_LOOPBACK:
+		config_byte = CB_CFIG_LOOPBACK_NORMAL;
+		break;
+	case MAC_LOOPBACK:
+		config_byte = CB_CFIG_LOOPBACK_INTERNAL;
+		break;
+	case PHY_LOOPBACK:
+		config_byte = CB_CFIG_LOOPBACK_EXTERNAL;
+		break;
+	default:
+		printk(KERN_NOTICE "e100_config_loopback_mode: "
+		       "Invalid argument 'mode': %d\n", mode);
+		goto exit;
+	}
+
+	if ((bdp->config[10] & CB_CFIG_LOOPBACK_MODE) != config_byte) {
+
+		bdp->config[10] &= (~CB_CFIG_LOOPBACK_MODE);
+		bdp->config[10] |= config_byte;
+		E100_CONFIG(bdp, 10);
+		bc_changed = true;
+	}
+
+exit:
+	spin_unlock_bh(&(bdp->config_lock));
+	return bc_changed;
+}
+unsigned char
+e100_config_tcb_ext_enable(struct e100_private *bdp, unsigned char enable)
+{
+        unsigned char bc_changed = false;
+ 
+        spin_lock_bh(&(bdp->config_lock));
+ 
+        if (enable) {
+                if (bdp->config[6] & CB_CFIG_EXT_TCB_DIS) {
+ 
+                        bdp->config[6] &= (~CB_CFIG_EXT_TCB_DIS);
+                        E100_CONFIG(bdp, 6);
+                        bc_changed = true;
+                }
+ 
+        } else {
+                if (!(bdp->config[6] & CB_CFIG_EXT_TCB_DIS)) {
+ 
+                        bdp->config[6] |= CB_CFIG_EXT_TCB_DIS;
+                        E100_CONFIG(bdp, 6);
+                        bc_changed = true;
+                }
+        }
+        spin_unlock_bh(&(bdp->config_lock));
+ 
+        return bc_changed;
+}
+unsigned char
+e100_config_dynamic_tbd(struct e100_private *bdp, unsigned char enable)
+{
+        unsigned char bc_changed = false;
+ 
+        spin_lock_bh(&(bdp->config_lock));
+ 
+        if (enable) {
+                if (!(bdp->config[7] & CB_CFIG_DYNTBD_EN)) {
+ 
+                        bdp->config[7] |= CB_CFIG_DYNTBD_EN;
+                        E100_CONFIG(bdp, 7);
+                        bc_changed = true;
+                }
+ 
+        } else {
+                if (bdp->config[7] & CB_CFIG_DYNTBD_EN) {
+ 
+                        bdp->config[7] &= (~CB_CFIG_DYNTBD_EN);
+                        E100_CONFIG(bdp, 7);
+                        bc_changed = true;
+                }
+        }
+        spin_unlock_bh(&(bdp->config_lock));
+ 
+        return bc_changed;
+}
+#endif
+

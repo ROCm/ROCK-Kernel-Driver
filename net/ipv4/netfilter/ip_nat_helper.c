@@ -1,11 +1,18 @@
 /* ip_nat_mangle.c - generic support functions for NAT helpers 
  *
- * (C) 2000 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2000-2002 by Harald Welte <laforge@gnumonks.org>
  *
  * distributed under the terms of GNU GPL
+ *
+ * 	14 Jan 2002 Harald Welte <laforge@gnumonks.org>:
+ *		- add support for SACK adjustment 
+ *	14 Mar 2002 Harald Welte <laforge@gnumonks.org>:
+ *		- merge SACK support into newnat API
  */
 #include <linux/version.h>
+#include <linux/config.h>
 #include <linux/module.h>
+#include <linux/kmod.h>
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/skbuff.h>
@@ -19,6 +26,8 @@
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
 
+#include <linux/netfilter_ipv4/ip_conntrack.h>
+#include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_protocol.h>
 #include <linux/netfilter_ipv4/ip_nat_core.h>
@@ -32,7 +41,7 @@
 #define DEBUGP(format, args...)
 #define DUMP_OFFSET(x)
 #endif
-	
+
 DECLARE_LOCK(ip_nat_seqofs_lock);
 			 
 static inline int 
@@ -199,6 +208,103 @@ ip_nat_mangle_tcp_packet(struct sk_buff **skb,
 	return 1;
 }
 
+/* Adjust one found SACK option including checksum correction */
+static void
+sack_adjust(struct tcphdr *tcph, 
+	    unsigned char *ptr, 
+	    struct ip_nat_seq *natseq)
+{
+	struct tcp_sack_block *sp = (struct tcp_sack_block *)(ptr+2);
+	int num_sacks = (ptr[1] - TCPOLEN_SACK_BASE)>>3;
+	int i;
+
+	for (i = 0; i < num_sacks; i++, sp++) {
+		u_int32_t new_start_seq, new_end_seq;
+
+		if (after(ntohl(sp->start_seq) - natseq->offset_before,
+			  natseq->correction_pos))
+			new_start_seq = ntohl(sp->start_seq) 
+					- natseq->offset_after;
+		else
+			new_start_seq = ntohl(sp->start_seq) 
+					- natseq->offset_before;
+		new_start_seq = htonl(new_start_seq);
+
+		if (after(ntohl(sp->end_seq) - natseq->offset_before,
+			  natseq->correction_pos))
+			new_end_seq = ntohl(sp->end_seq)
+				      - natseq->offset_after;
+		else
+			new_end_seq = ntohl(sp->end_seq)
+				      - natseq->offset_before;
+		new_end_seq = htonl(new_end_seq);
+
+		DEBUGP("sack_adjust: start_seq: %d->%d, end_seq: %d->%d\n",
+			ntohl(sp->start_seq), new_start_seq,
+			ntohl(sp->end_seq), new_end_seq);
+
+		tcph->check = 
+			ip_nat_cheat_check(~sp->start_seq, new_start_seq,
+					   ip_nat_cheat_check(~sp->end_seq, 
+						   	      new_end_seq,
+							      tcph->check));
+
+		sp->start_seq = new_start_seq;
+		sp->end_seq = new_end_seq;
+	}
+}
+			
+
+/* TCP SACK sequence number adjustment, return 0 if sack found and adjusted */
+static inline int
+ip_nat_sack_adjust(struct sk_buff *skb,
+			struct ip_conntrack *ct,
+			enum ip_conntrack_info ctinfo)
+{
+	struct iphdr *iph;
+	struct tcphdr *tcph;
+	unsigned char *ptr;
+	int length, dir, sack_adjusted = 0;
+
+	iph = skb->nh.iph;
+	tcph = (void *)iph + iph->ihl*4;
+	length = (tcph->doff*4)-sizeof(struct tcphdr);
+	ptr = (unsigned char *)(tcph+1);
+
+	dir = CTINFO2DIR(ctinfo);
+
+	while (length > 0) {
+		int opcode = *ptr++;
+		int opsize;
+
+		switch (opcode) {
+		case TCPOPT_EOL:
+			return !sack_adjusted;
+		case TCPOPT_NOP:
+			length--;
+			continue;
+		default:
+			opsize = *ptr++;
+			if (opsize > length) /* no partial opts */
+				return !sack_adjusted;
+			if (opcode == TCPOPT_SACK) {
+				/* found SACK */
+				if((opsize >= (TCPOLEN_SACK_BASE
+					       +TCPOLEN_SACK_PERBLOCK)) &&
+				   !((opsize - TCPOLEN_SACK_BASE)
+				     % TCPOLEN_SACK_PERBLOCK))
+					sack_adjust(tcph, ptr-2,
+						    &ct->nat.info.seq[!dir]);
+				
+				sack_adjusted = 1;
+			}
+			ptr += opsize-2;
+			length -= opsize;
+		}
+	}
+	return !sack_adjusted;
+}
+
 /* TCP sequence number adjustment */
 int 
 ip_nat_seq_adjust(struct sk_buff *skb, 
@@ -243,51 +349,9 @@ ip_nat_seq_adjust(struct sk_buff *skb,
 	tcph->seq = newseq;
 	tcph->ack_seq = newack;
 
+	ip_nat_sack_adjust(skb, ct, ctinfo);
+
 	return 0;
-}
-
-/* Grrr... SACK.  Fuck me even harder.  Don't want to fix it on the
-   fly, so blow it away. */
-void
-ip_nat_delete_sack(struct sk_buff *skb, struct tcphdr *tcph)
-{
-	unsigned int i;
-	u_int8_t *opt = (u_int8_t *)tcph;
-
-	DEBUGP("Seeking SACKPERM in SYN packet (doff = %u).\n",
-	       tcph->doff * 4);
-	for (i = sizeof(struct tcphdr); i < tcph->doff * 4;) {
-		DEBUGP("%u ", opt[i]);
-		switch (opt[i]) {
-		case TCPOPT_NOP:
-		case TCPOPT_EOL:
-			i++;
-			break;
-
-		case TCPOPT_SACK_PERM:
-			goto found_opt;
-
-		default:
-			/* Worst that can happen: it will take us over. */
-			i += opt[i+1] ?: 1;
-		}
-	}
-	DEBUGP("\n");
-	return;
-
- found_opt:
-	DEBUGP("\n");
-	DEBUGP("Found SACKPERM at offset %u.\n", i);
-
-	/* Must be within TCP header, and valid SACK perm. */
-	if (i + opt[i+1] <= tcph->doff*4 && opt[i+1] == 2) {
-		/* Replace with NOPs. */
-		tcph->check
-			= ip_nat_cheat_check(*((u_int16_t *)(opt + i))^0xFFFF,
-					     (TCPOPT_NOP<<8)|TCPOPT_NOP, tcph->check);
-		opt[i] = opt[i+1] = TCPOPT_NOP;
-	}
-	else DEBUGP("Something wrong with SACK_PERM.\n");
 }
 
 static inline int
@@ -297,10 +361,51 @@ helper_cmp(const struct ip_nat_helper *helper,
 	return ip_ct_tuple_mask_cmp(tuple, &helper->tuple, &helper->mask);
 }
 
+#define MODULE_MAX_NAMELEN		32
+
 int ip_nat_helper_register(struct ip_nat_helper *me)
 {
 	int ret = 0;
 
+	if (me->me && !(me->flags & IP_NAT_HELPER_F_STANDALONE)) {
+		struct ip_conntrack_helper *ct_helper;
+		
+		if ((ct_helper = ip_ct_find_helper(&me->tuple))
+		    && ct_helper->me) {
+			__MOD_INC_USE_COUNT(ct_helper->me);
+		} else {
+
+			/* We are a NAT helper for protocol X.  If we need
+			 * respective conntrack helper for protoccol X, compute
+			 * conntrack helper name and try to load module */
+			char name[MODULE_MAX_NAMELEN];
+			const char *tmp = me->me->name;
+			
+			if (strlen(tmp) + 6 > MODULE_MAX_NAMELEN) {
+				printk(__FUNCTION__ ": unable to "
+				       "compute conntrack helper name "
+				       "from %s\n", tmp);
+				return -EBUSY;
+			}
+			tmp += 6;
+			sprintf(name, "ip_conntrack%s", tmp);
+#ifdef CONFIG_KMOD
+			if (!request_module(name)
+			    && (ct_helper = ip_ct_find_helper(&me->tuple))
+			    && ct_helper->me) {
+				__MOD_INC_USE_COUNT(ct_helper->me);
+			} else {
+				printk("unable to load module %s\n", name);
+				return -EBUSY;
+			}
+#else
+			printk("unable to load module %s automatically "
+			       "because kernel was compiled without kernel "
+			       "module loader support\n", name);
+			return -EBUSY;
+#endif
+		}
+	}
 	WRITE_LOCK(&ip_nat_lock);
 	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple))
 		ret = -EBUSY;
@@ -327,8 +432,14 @@ kill_helper(const struct ip_conntrack *i, void *helper)
 
 void ip_nat_helper_unregister(struct ip_nat_helper *me)
 {
+	int found = 0;
+	
 	WRITE_LOCK(&ip_nat_lock);
-	LIST_DELETE(&helpers, me);
+	/* Autoloading conntrack helper might have failed */
+	if (LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,&me->tuple)) {
+		LIST_DELETE(&helpers, me);
+		found = 1;
+	}
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	/* Someone could be still looking at the helper in a bh. */
@@ -344,5 +455,19 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 	   worse. --RR */
 	ip_ct_selective_cleanup(kill_helper, me);
 
-	MOD_DEC_USE_COUNT;
+	if (found)
+		MOD_DEC_USE_COUNT;
+
+	/* If we are no standalone NAT helper, we need to decrement usage count
+	 * on our conntrack helper */
+	if (me->me && !(me->flags & IP_NAT_HELPER_F_STANDALONE)) {
+		struct ip_conntrack_helper *ct_helper;
+		
+		if ((ct_helper = ip_ct_find_helper(&me->tuple))
+		    && ct_helper->me) {
+			__MOD_DEC_USE_COUNT(ct_helper->me);
+		} else 
+			printk(__FUNCTION__ ": unable to decrement usage count"
+			       " of conntrack helper %s\n", me->me->name);
+	}
 }

@@ -206,6 +206,8 @@ int __init init_netlink(void)
 
 #ifdef MODULE
 
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	printk(KERN_INFO "Network Kernel/User communications module 0.04\n");

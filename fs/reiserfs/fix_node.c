@@ -1988,13 +1988,13 @@ void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s)
 
     vp = kmalloc (size, flags);
     if (vp) {
-	s->u.reiserfs_sb.s_kmallocs += size;
-	if (s->u.reiserfs_sb.s_kmallocs > malloced + 200000) {
-	    reiserfs_warning ("vs-8301: reiserfs_kmalloc: allocated memory %d\n", s->u.reiserfs_sb.s_kmallocs);
-	    malloced = s->u.reiserfs_sb.s_kmallocs;
+	REISERFS_SB(s)->s_kmallocs += size;
+	if (REISERFS_SB(s)->s_kmallocs > malloced + 200000) {
+	    reiserfs_warning ("vs-8301: reiserfs_kmalloc: allocated memory %d\n", REISERFS_SB(s)->s_kmallocs);
+	    malloced = REISERFS_SB(s)->s_kmallocs;
 	}
     }
-/*printk ("malloc : size %d, allocated %d\n", size, s->u.reiserfs_sb.s_kmallocs);*/
+/*printk ("malloc : size %d, allocated %d\n", size, REISERFS_SB(s)->s_kmallocs);*/
     return vp;
 }
 
@@ -2002,9 +2002,9 @@ void reiserfs_kfree (const void * vp, size_t size, struct super_block * s)
 {
     kfree (vp);
   
-    s->u.reiserfs_sb.s_kmallocs -= size;
-    if (s->u.reiserfs_sb.s_kmallocs < 0)
-	reiserfs_warning ("vs-8302: reiserfs_kfree: allocated memory %d\n", s->u.reiserfs_sb.s_kmallocs);
+    REISERFS_SB(s)->s_kmallocs -= size;
+    if (REISERFS_SB(s)->s_kmallocs < 0)
+	reiserfs_warning ("vs-8302: reiserfs_kfree: allocated memory %d\n", REISERFS_SB(s)->s_kmallocs);
 
 }
 #endif
@@ -2062,7 +2062,7 @@ static int get_mem_for_virtual_node (struct tree_balance * tb)
 #ifdef CONFIG_REISERFS_CHECK
 		reiserfs_warning ("vs-8345: get_mem_for_virtual_node: "
 				  "kmalloc failed. reiserfs kmalloced %d bytes\n",
-				  tb->tb_sb->u.reiserfs_sb.s_kmallocs);
+				  REISERFS_SB(tb->tb_sb)->s_kmallocs);
 #endif
 		tb->vn_buf_size = 0;
 	    }
@@ -2290,7 +2290,7 @@ int fix_nodes (int n_op_mode,
     int windex ;
     struct buffer_head  * p_s_tbS0 = PATH_PLAST_BUFFER(p_s_tb->tb_path);
 
-    ++ p_s_tb -> tb_sb -> u.reiserfs_sb.s_fix_nodes;
+    ++ REISERFS_SB(p_s_tb -> tb_sb) -> s_fix_nodes;
 
     n_pos_in_item = p_s_tb->tb_path->pos_in_item;
 

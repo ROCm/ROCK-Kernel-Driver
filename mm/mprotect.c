@@ -9,11 +9,13 @@
 #include <linux/shm.h>
 #include <linux/mman.h>
 #include <linux/fs.h>
+#include <linux/highmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
-#include <linux/highmem.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 static inline void change_pte_range(pmd_t * pmd, unsigned long address,
 	unsigned long size, pgprot_t newprot)

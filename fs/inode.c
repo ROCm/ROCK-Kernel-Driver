@@ -657,10 +657,14 @@ int invalidate_inodes(struct super_block * sb)
 int invalidate_device(kdev_t dev, int do_sync)
 {
 	struct super_block *sb;
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
 	int res;
 
+	if (!bdev)
+		return 0;
+
 	if (do_sync)
-		fsync_dev(dev);
+		fsync_bdev(bdev);
 
 	res = 0;
 	sb = get_super(dev);
@@ -675,7 +679,8 @@ int invalidate_device(kdev_t dev, int do_sync)
 		res = invalidate_inodes(sb);
 		drop_super(sb);
 	}
-	invalidate_buffers(dev);
+	invalidate_bdev(bdev, 0);
+	bdput(bdev);
 	return res;
 }
 
@@ -1191,6 +1196,8 @@ static inline void do_atime_update(struct inode *inode)
  
 void update_atime (struct inode *inode)
 {
+	if (inode->i_atime == CURRENT_TIME)
+		return;
 	if ( IS_NOATIME (inode) ) return;
 	if ( IS_NODIRATIME (inode) && S_ISDIR (inode->i_mode) ) return;
 	if ( IS_RDONLY (inode) ) return;

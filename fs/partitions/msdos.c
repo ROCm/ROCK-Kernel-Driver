@@ -41,6 +41,7 @@ EXPORT_SYMBOL(ide_xlate_1024_hook);
 
 #include "check.h"
 #include "msdos.h"
+#include "efi.h"
 
 #if CONFIG_BLK_DEV_MD
 extern void md_autodetect_dev(kdev_t dev);
@@ -536,6 +537,16 @@ int msdos_partition(struct gendisk *hd, struct block_device *bdev,
 		return 0;
 	}
 	p = (struct partition *) (data + 0x1be);
+#ifdef CONFIG_EFI_PARTITION
+	for (i=1 ; i<=4 ; i++,p++) {
+		/* If this is an EFI GPT disk, msdos should ignore it. */
+		if (SYS_IND(p) == EFI_PMBR_OSTYPE_EFI_GPT) {
+			put_dev_sector(sect);
+			return 0;
+		}
+	}
+	p = (struct partition *) (data + 0x1be);
+#endif
 
 	/*
 	 * Look for partitions in two passes:

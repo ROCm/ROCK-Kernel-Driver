@@ -358,6 +358,8 @@ static int packet_sendmsg_spkt(struct socket *sock, struct msghdr *msg, int len,
 	if (dev->hard_header) {
 		skb->data -= dev->hard_header_len;
 		skb->tail -= dev->hard_header_len;
+		if (len < dev->hard_header_len)
+			skb->nh.raw = skb->data;
 	}
 
 	/* Returns -EFAULT on error */

@@ -90,7 +90,7 @@ void clear_local_APIC(void)
 		apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
 	v = GET_APIC_VERSION(apic_read(APIC_LVR));
 	if (APIC_INTEGRATED(v)) {	/* !82489DX */
-		if (maxlvt > 3)
+		if (maxlvt > 3)		/* Due to Pentium errata 3AP and 11AP. */
 			apic_write(APIC_ESR, 0);
 		apic_read(APIC_ESR);
 	}
@@ -449,6 +449,7 @@ static struct {
 	unsigned int apic_lvterr;
 	unsigned int apic_tmict;
 	unsigned int apic_tdcr;
+	unsigned int apic_thmr;
 } apic_pm_state;
 
 static void apic_pm_suspend(void *data)
@@ -470,6 +471,7 @@ static void apic_pm_suspend(void *data)
 	apic_pm_state.apic_lvterr = apic_read(APIC_LVTERR);
 	apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
 	apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
+	apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
 	__save_flags(flags);
 	__cli();
 	disable_local_APIC();
@@ -498,6 +500,7 @@ static void apic_pm_resume(void *data)
 	apic_write(APIC_SPIV, apic_pm_state.apic_spiv);
 	apic_write(APIC_LVT0, apic_pm_state.apic_lvt0);
 	apic_write(APIC_LVT1, apic_pm_state.apic_lvt1);
+	apic_write(APIC_LVTTHMR, apic_pm_state.apic_thmr);
 	apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
 	apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
 	apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);

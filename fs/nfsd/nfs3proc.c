@@ -658,27 +658,34 @@ struct nfsd3_voidargs { int dummy; };
    cache,					\
    respsize,					\
  }
+
+#define ST 1		/* status*/
+#define FH 17		/* filehandle with length */
+#define AT 21		/* attributes */
+#define pAT (1+AT)	/* post attributes - conditional */
+#define WC (7+pAT)	/* WCC attributes */
+
 struct svc_procedure		nfsd_procedures3[22] = {
-  PROC(null,	 void,		void,		void,	 RC_NOCACHE, 1),
-  PROC(getattr,	 fhandle,	attrstat,	fhandle, RC_NOCACHE, 1+21),
-  PROC(setattr,  sattr,		wccstat,	fhandle,  RC_REPLBUFF, 1+7+22),
-  PROC(lookup,	 dirop,		dirop,		fhandle2, RC_NOCACHE, 1+9+22+22),
-  PROC(access,	 access,	access,		fhandle,  RC_NOCACHE, 1+22+1),
-  PROC(readlink, fhandle,	readlink,	fhandle,  RC_NOCACHE, 1+22+1+256),
-  PROC(read,	 read,		read,		fhandle, RC_NOCACHE, 1+22+4+NFSSVC_MAXBLKSIZE),
-  PROC(write,	 write,		write,		fhandle,  RC_REPLBUFF, 1+7+22+4),
-  PROC(create,	 create,	create,		fhandle2, RC_REPLBUFF, 1+(1+9+22)+7+22),
-  PROC(mkdir,	 mkdir,		create,		fhandle2, RC_REPLBUFF, 1+(1+9+22)+7+22),
-  PROC(symlink,	 symlink,	create,		fhandle2, RC_REPLBUFF, 1+(1+9+22)+7+22),
-  PROC(mknod,	 mknod,		create,		fhandle2, RC_REPLBUFF, 1+(1+9+22)+7+22),
-  PROC(remove,	 dirop,		wccstat,	fhandle,  RC_REPLBUFF, 1+7+22),
-  PROC(rmdir,	 dirop,		wccstat,	fhandle,  RC_REPLBUFF, 1+7+22),
-  PROC(rename,	 rename,	rename,		fhandle2, RC_REPLBUFF, 1+7+22+7+22),
-  PROC(link,	 link,		link,		fhandle2, RC_REPLBUFF, 1+22+7+22),
+  PROC(null,	 void,		void,		void,	  RC_NOCACHE, ST),
+  PROC(getattr,	 fhandle,	attrstat,	fhandle,  RC_NOCACHE, ST+AT),
+  PROC(setattr,  sattr,		wccstat,	fhandle,  RC_REPLBUFF, ST+WC),
+  PROC(lookup,	 dirop,		dirop,		fhandle2, RC_NOCACHE, ST+FH+pAT+pAT),
+  PROC(access,	 access,	access,		fhandle,  RC_NOCACHE, ST+pAT+1),
+  PROC(readlink, fhandle,	readlink,	fhandle,  RC_NOCACHE, ST+pAT+1+256),
+  PROC(read,	 read,		read,		fhandle,  RC_NOCACHE, ST+pAT+4+NFSSVC_MAXBLKSIZE),
+  PROC(write,	 write,		write,		fhandle,  RC_REPLBUFF, ST+WC+4),
+  PROC(create,	 create,	create,		fhandle2, RC_REPLBUFF, ST+(1+FH+pAT)+WC),
+  PROC(mkdir,	 mkdir,		create,		fhandle2, RC_REPLBUFF, ST+(1+FH+pAT)+WC),
+  PROC(symlink,	 symlink,	create,		fhandle2, RC_REPLBUFF, ST+(1+FH+pAT)+WC),
+  PROC(mknod,	 mknod,		create,		fhandle2, RC_REPLBUFF, ST+(1+FH+pAT)+WC),
+  PROC(remove,	 dirop,		wccstat,	fhandle,  RC_REPLBUFF, ST+WC),
+  PROC(rmdir,	 dirop,		wccstat,	fhandle,  RC_REPLBUFF, ST+WC),
+  PROC(rename,	 rename,	rename,		fhandle2, RC_REPLBUFF, ST+WC+WC),
+  PROC(link,	 link,		link,		fhandle2, RC_REPLBUFF, ST+pAT+WC),
   PROC(readdir,	 readdir,	readdir,	fhandle,  RC_NOCACHE, 0),
   PROC(readdirplus,readdirplus,	readdir,	fhandle,  RC_NOCACHE, 0),
-  PROC(fsstat,	 fhandle,	fsstat,		void,     RC_NOCACHE, 1+14),
-  PROC(fsinfo,   fhandle,	fsinfo,		void,     RC_NOCACHE, 1+13),
-  PROC(pathconf, fhandle,	pathconf,	void,     RC_NOCACHE, 1+6),
-  PROC(commit,	 commit,	commit,		fhandle,  RC_NOCACHE, 1+7+22+2),
+  PROC(fsstat,	 fhandle,	fsstat,		void,     RC_NOCACHE, ST+pAT+2*6+1),
+  PROC(fsinfo,   fhandle,	fsinfo,		void,     RC_NOCACHE, ST+pAT+12),
+  PROC(pathconf, fhandle,	pathconf,	void,     RC_NOCACHE, ST+pAT+6),
+  PROC(commit,	 commit,	commit,		fhandle,  RC_NOCACHE, ST+WC+2),
 };

@@ -123,6 +123,10 @@ struct svc_rqst {
 	/* Catering to nfsd */
 	struct svc_client *	rq_client;	/* RPC peer info */
 	struct svc_cacherep *	rq_cacherep;	/* cache info */
+	struct knfsd_fh *	rq_reffh;	/* Referrence filehandle, used to
+						 * determine what device number
+						 * to report (real or virtual)
+						 */
 
 	wait_queue_head_t	rq_wait;	/* synchronozation */
 };

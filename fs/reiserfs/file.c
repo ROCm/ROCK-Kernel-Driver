@@ -95,14 +95,16 @@ static int reiserfs_sync_file(
 static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
     struct inode *inode = dentry->d_inode ;
     int error ;
+    lock_kernel();
     if (attr->ia_valid & ATTR_SIZE) {
 	/* version 2 items will be caught by the s_maxbytes check
 	** done for us in vmtruncate
 	*/
 	if (get_inode_item_key_version(inode) == KEY_FORMAT_3_5 &&
-	    attr->ia_size > MAX_NON_LFS)
-            return -EFBIG ;
-
+	    attr->ia_size > MAX_NON_LFS) {
+	    error = -EFBIG ;
+	    goto out;
+	}
 	/* fill in hole pointers in the expanding truncate case. */
         if (attr->ia_size > inode->i_size) {
 	    error = generic_cont_expand(inode, attr->ia_size) ;
@@ -114,20 +116,24 @@ static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
 		journal_end(&th, inode->i_sb, 4) ;
 	    }
 	    if (error)
-	        return error ;
+	        goto out;
 	}
     }
 
     if ((((attr->ia_valid & ATTR_UID) && (attr->ia_uid & ~0xffff)) ||
 	 ((attr->ia_valid & ATTR_GID) && (attr->ia_gid & ~0xffff))) &&
-	(get_inode_sd_version (inode) == STAT_DATA_V1))
+	(get_inode_sd_version (inode) == STAT_DATA_V1)) {
 		/* stat data of format v3.5 has 16 bit uid and gid */
-	    return -EINVAL;
+	    error = -EINVAL;
+	    goto out;	
+	}
 
     error = inode_change_ok(inode, attr) ;
     if (!error)
         inode_setattr(inode, attr) ;
 
+out:
+    unlock_kernel();
     return error ;
 }
 

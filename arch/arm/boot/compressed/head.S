@@ -18,14 +18,14 @@
  * Please select one of the following when turning on debugging.
  */
 #ifdef DEBUG
-#if 0 /* DC21285-type */
+#if defined(CONFIG_DEBUG_DC21285_PORT)
 		.macro	loadsp,	rb
 		mov	\rb, #0x7c000000
 		.endm
 		.macro	writeb,	rb
 		strb	\rb, [r3, #0x3f8]
 		.endm
-#elif 0 /* RiscPC-type */
+#elif defined(CONFIG_ARCH_RPC)
 		.macro	loadsp,	rb
 		mov	\rb, #0x03000000
 		orr	\rb, \rb, #0x00010000
@@ -33,7 +33,7 @@
 		.macro	writeb,	rb
 		strb	\rb, [r3, #0x3f8 << 2]
 		.endm
-#elif 0 /* integrator-type */
+#elif defined(CONFIG_ARCH_INTEGRATOR)
 		.macro	loadsp, rb
 		mov	\rb, #0x16000000
 		.endm

@@ -337,7 +337,7 @@ static struct block_device *bdfind(dev_t dev, struct list_head *head)
 {
 	struct list_head *p;
 	struct block_device *bdev;
-	for (p=head->next; p!=head; p=p->next) {
+	list_for_each(p, head) {
 		bdev = list_entry(p, struct block_device, bd_hash);
 		if (bdev->bd_dev != dev)
 			continue;

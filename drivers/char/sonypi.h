@@ -34,8 +34,8 @@
 
 #ifdef __KERNEL__
 
-#define SONYPI_DRIVER_MAJORVERSION	1
-#define SONYPI_DRIVER_MINORVERSION	8
+#define SONYPI_DRIVER_MAJORVERSION	 1
+#define SONYPI_DRIVER_MINORVERSION	10
 
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -132,15 +132,17 @@ static struct sonypi_irq_list sonypi_type2_irq_list[] = {
 #define SONYPI_CAMERA_ROMVERSION 		9
 
 /* key press event data (ioport2) */
-#define SONYPI_TYPE1_JOGGER_EV	0x10
-#define SONYPI_TYPE2_JOGGER_EV	0x08
-#define SONYPI_CAPTURE_EV	0x60
-#define SONYPI_TYPE1_FNKEY_EV	0x20
-#define SONYPI_TYPE2_FNKEY_EV	0x08
-#define SONYPI_BLUETOOTH_EV	0x30
-#define SONYPI_TYPE1_PKEY_EV	0x40
-#define SONYPI_BACK_EV		0x08
-#define SONYPI_LID_EV		0x38
+#define SONYPI_TYPE1_JOGGER_EV		0x10
+#define SONYPI_TYPE2_JOGGER_EV		0x08
+#define SONYPI_TYPE1_CAPTURE_EV		0x60
+#define SONYPI_TYPE2_CAPTURE_EV		0x08
+#define SONYPI_TYPE1_FNKEY_EV		0x20
+#define SONYPI_TYPE2_FNKEY_EV		0x08
+#define SONYPI_TYPE1_BLUETOOTH_EV	0x30
+#define SONYPI_TYPE2_BLUETOOTH_EV	0x08
+#define SONYPI_TYPE1_PKEY_EV		0x40
+#define SONYPI_BACK_EV			0x08
+#define SONYPI_LID_EV			0x38
 
 struct sonypi_event {
 	u8	data;
@@ -203,6 +205,8 @@ static struct sonypi_event sonypi_pkeyev[] = {
 /* The set of possible bluetooth events */
 static struct sonypi_event sonypi_blueev[] = {
 	{ 0x55, SONYPI_EVENT_BLUETOOTH_PRESSED },
+	{ 0x59, SONYPI_EVENT_BLUETOOTH_ON },
+	{ 0x5a, SONYPI_EVENT_BLUETOOTH_OFF },
 	{ 0x00, 0x00 }
 };
 
@@ -241,6 +245,7 @@ struct sonypi_device {
 	u16 ioport2;
 	u16 region_size;
 	int camera_power;
+	int bluetooth_power;
 	struct semaphore lock;
 	struct sonypi_queue queue;
 	int open_count;

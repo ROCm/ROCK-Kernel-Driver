@@ -434,7 +434,7 @@ extern char *ide_xfer_verbose (byte xfer_rate);
 /* Enables per-drive prefetch and postwrite */
 static void config_drive_art_rwp (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 
 	byte reg4bh		= 0;
@@ -460,7 +460,7 @@ static void config_drive_art_rwp (ide_drive_t *drive)
 /* Set per-drive active and recovery time */
 static void config_art_rwp_pio (ide_drive_t *drive, byte pio)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 
 	byte			timing, drive_pci, test1, test2;
@@ -560,7 +560,7 @@ static int config_chipset_for_pio (ide_drive_t *drive, byte pio)
 
 static int sis5513_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 
 	byte			drive_pci, reg;
@@ -640,12 +640,12 @@ static void sis5513_tune_drive (ide_drive_t *drive, byte pio)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 /*
- * ((id->hw_config & 0x4000|0x2000) && (HWIF(drive)->udma_four))
+ * ((id->hw_config & 0x4000|0x2000) && (drive->channel->udma_four))
  */
 static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 {
-	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct hd_driveid *id = drive->id;
+	struct ata_channel *hwif = drive->channel;
 
 	byte			speed = 0;
 
@@ -700,7 +700,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 	struct hd_driveid *id		= drive->id;
 	ide_dma_action_t dma_func	= ide_dma_off_quietly;
 
-	if (id && (id->capability & 1) && HWIF(drive)->autodma) {
+	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
 			dma_func = ide_dma_off;
@@ -740,7 +740,7 @@ no_dma_set:
 		(void) config_chipset_for_pio(drive, 5);
 	}
 
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 /* initiates/aborts (U)DMA read/write operations on a drive. */
@@ -841,10 +841,10 @@ unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 	return 0;
 }
 
-unsigned int __init ata66_sis5513 (ide_hwif_t *hwif)
+unsigned int __init ata66_sis5513(struct ata_channel *hwif)
 {
 	byte reg48h = 0, ata66 = 0;
-	byte mask = hwif->channel ? 0x20 : 0x10;
+	byte mask = hwif->unit ? 0x20 : 0x10;
 	pci_read_config_byte(hwif->pci_dev, 0x48, &reg48h);
 
 	if (dma_capability >= ATA_66) {
@@ -853,10 +853,10 @@ unsigned int __init ata66_sis5513 (ide_hwif_t *hwif)
         return ata66;
 }
 
-void __init ide_init_sis5513 (ide_hwif_t *hwif)
+void __init ide_init_sis5513(struct ata_channel *hwif)
 {
 
-	hwif->irq = hwif->channel ? 15 : 14;
+	hwif->irq = hwif->unit ? 15 : 14;
 
 	hwif->tuneproc = &sis5513_tune_drive;
 	hwif->speedproc = &sis5513_tune_chipset;

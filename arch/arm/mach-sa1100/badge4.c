@@ -187,9 +187,9 @@ fixup_badge4(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc badge4_io_desc[] __initdata = {
   /*  virtual    physical    length      domain     r w c b		   */
-  {0xf1000000, 0x08000000, 0x00100000, DOMAIN_IO, 1,1,0,0},/* SRAM  bank 1 */
-  {0xf2000000, 0x10000000, 0x00100000, DOMAIN_IO, 1,1,0,0},/* SRAM  bank 2 */
-  {0xf4000000, 0x48000000, 0x00100000, DOMAIN_IO, 1,1,0,0},/* SA-1111      */
+  {0xf1000000, 0x08000000, 0x00100000, DOMAIN_IO, 0,1,0,0},/* SRAM  bank 1 */
+  {0xf2000000, 0x10000000, 0x00100000, DOMAIN_IO, 0,1,0,0},/* SRAM  bank 2 */
+  {0xf4000000, 0x48000000, 0x00100000, DOMAIN_IO, 0,1,0,0},/* SA-1111      */
   LAST_DESC
 };
 

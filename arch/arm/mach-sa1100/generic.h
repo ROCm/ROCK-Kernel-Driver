@@ -15,3 +15,5 @@ extern void __init sa1100_init_irq(void);
 extern void (*sa1100fb_backlight_power)(int on);
 extern void (*sa1100fb_lcd_power)(int on);
 
+extern void sa1110_mb_enable(void);
+extern void sa1110_mb_disable(void);

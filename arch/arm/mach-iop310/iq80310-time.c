@@ -62,7 +62,7 @@ static u_long iq80310_read_timer (void)
  */
 static unsigned long iq80310_gettimeoffset (void)
 {
-	unsigned long elapsed, usec, tmp1;
+	unsigned long elapsed, usec;
 	unsigned int stat1, stat2;
 
 	stat1 = *(volatile u8 *)IQ80310_INT_STAT;

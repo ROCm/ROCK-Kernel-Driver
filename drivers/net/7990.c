@@ -630,3 +630,4 @@ void lance_set_multicast (struct net_device *dev)
 		netif_start_queue (dev);
 }
 
+MODULE_LICENSE("GPL");

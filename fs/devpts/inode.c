@@ -66,9 +66,9 @@ static int devpts_parse_options(char *options, struct devpts_sb_info *sbi)
 	char *this_char, *value;
 
 	this_char = NULL;
-	if ( options )
-		this_char = strtok(options,",");
-	for ( ; this_char; this_char = strtok(NULL,",")) {
+	while ((this_char = strsep(&options, ",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr(this_char,'=')) != NULL)
 			*value++ = 0;
 		if (!strcmp(this_char,"uid")) {
@@ -123,9 +123,10 @@ static int devpts_fill_super(struct super_block *s, void *data, int silent)
 	struct inode * inode;
 	struct devpts_sb_info *sbi;
 
-	sbi = (struct devpts_sb_info *) kmalloc(sizeof(struct devpts_sb_info), GFP_KERNEL);
+	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if ( !sbi )
 		goto fail;
+	memset(sbi, 0, sizeof(*sbi));
 
 	sbi->magic  = DEVPTS_SBI_MAGIC;
 	sbi->max_ptys = unix98_max_ptys;

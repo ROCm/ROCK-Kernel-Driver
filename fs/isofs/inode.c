@@ -42,8 +42,8 @@
 #define BEQUIET
 
 #ifdef LEAK_CHECK
-static int check_malloc = 0;
-static int check_bread = 0;
+static int check_malloc;
+static int check_bread;
 #endif
 
 static int isofs_hashi(struct dentry *parent, struct qstr *qstr);
@@ -341,7 +341,9 @@ static int parse_options(char *options, struct iso9660_options * popt)
 	popt->session=-1;
 	popt->sbsector=-1;
 	if (!options) return 1;
-	for (this_char = strtok(options,","); this_char; this_char = strtok(NULL,",")) {
+	while ((this_char = strsep(&options,",")) != NULL) {
+		if (!*this_char)
+			continue;
 	        if (strncmp(this_char,"norock",6) == 0) {
 		  popt->rock = 'n';
 		  continue;

@@ -303,15 +303,18 @@ void hpfs_write_inode_nolock(struct inode *i)
 int hpfs_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
-	int error;
-	if ((attr->ia_valid & ATTR_SIZE) && attr->ia_size > inode->i_size) 
-		return -EINVAL;
-	if (inode->i_sb->s_hpfs_root == inode->i_ino) return -EINVAL;
-	if ((error = inode_change_ok(inode, attr))) return error;
-	error = inode_setattr(inode, attr);
-	if (error) return error;
-	hpfs_write_inode(inode);
-	return 0;
+	int error=0;
+	lock_kernel();
+	if ( ((attr->ia_valid & ATTR_SIZE) && attr->ia_size > inode->i_size) ||
+	     (inode->i_sb->s_hpfs_root == inode->i_ino) ) {
+		error = -EINVAL;
+	} else if ((error = inode_change_ok(inode, attr))) {
+	} else if ((error = inode_setattr(inode, attr))) {
+	} else {
+		hpfs_write_inode(inode);
+	}
+	unlock_kernel();
+	return error;
 }
 
 void hpfs_write_if_changed(struct inode *inode)

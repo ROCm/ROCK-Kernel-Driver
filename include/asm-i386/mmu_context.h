@@ -5,6 +5,7 @@
 #include <asm/desc.h>
 #include <asm/atomic.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 /*
  * possibly do the LDT unload here?

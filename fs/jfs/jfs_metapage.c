@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -15,9 +14,6 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Module: jfs/jfs_metapage.c
- *
  */
 
 #include <linux/fs.h>
@@ -511,10 +507,26 @@ static void __write_metapage(metapage_t * mp)
 	jFYI(1, ("__write_metapage done\n"));
 }
 
+static inline void sync_metapage(metapage_t *mp)
+{
+	struct page *page = mp->page;
+
+	page_cache_get(page);
+	lock_page(page);
+
+	/* we're done with this page - no need to check for errors */
+	if (page->buffers) {
+		writeout_one_page(page);
+		waitfor_one_page(page);
+	}
+
+	UnlockPage(page);
+	page_cache_release(page);
+}
+
 void release_metapage(metapage_t * mp)
 {
 	log_t *log;
-	struct inode *ip;
 
 	jFYI(1,
 	     ("release_metapage: mp = 0x%p, flag = 0x%lx\n", mp,
@@ -527,8 +539,6 @@ void release_metapage(metapage_t * mp)
 		spin_unlock(&meta_lock);
 		return;
 	}
-
-	ip = (struct inode *) mp->mapping->host;
 
 	assert(mp->count);
 	if (--mp->count || atomic_read(&mp->nohomeok)) {

@@ -36,6 +36,9 @@
  * Al Viro too.
  * Jens Axboe <axboe@suse.de>, Nov 2000
  *
+ * Support up to 256 loop devices
+ * Heinz Mauelshagen <mge@sistina.com>, Feb 2002
+ *
  * Still To Fix:
  * - Advisory locking is ignored here. 
  * - Should use an own CAP_* category instead of CAP_SYS_ADMIN 
@@ -927,7 +930,7 @@ static struct block_device_operations lo_fops = {
  * And now the modules code and kernel interface.
  */
 MODULE_PARM(max_loop, "i");
-MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-255)");
+MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-256)");
 MODULE_LICENSE("GPL");
 
 int loop_register_transfer(struct loop_func_table *funcs)
@@ -963,9 +966,9 @@ int __init loop_init(void)
 {
 	int	i;
 
-	if ((max_loop < 1) || (max_loop > 255)) {
+	if ((max_loop < 1) || (max_loop > 256)) {
 		printk(KERN_WARNING "loop: invalid max_loop (must be between"
-				    " 1 and 255), using default (8)\n");
+				    " 1 and 256), using default (8)\n");
 		max_loop = 8;
 	}
 

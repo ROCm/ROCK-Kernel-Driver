@@ -80,7 +80,10 @@ static int
 nfs_proc_setattr(struct inode *inode, struct nfs_fattr *fattr,
 		 struct iattr *sattr)
 {
-	struct nfs_sattrargs	arg = { NFS_FH(inode), sattr };
+	struct nfs_sattrargs	arg = { 
+		fh:	NFS_FH(inode),
+		sattr:	sattr
+	};
 	int	status;
 
 	dprintk("NFS call  setattr\n");
@@ -94,8 +97,15 @@ static int
 nfs_proc_lookup(struct inode *dir, struct qstr *name,
 		struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
-	struct nfs_diropargs	arg = { NFS_FH(dir), name->name, name->len };
-	struct nfs_diropok	res = { fhandle, fattr };
+	struct nfs_diropargs	arg = {
+		fh:		NFS_FH(dir),
+		name:		name->name,
+		len:		name->len
+	};
+	struct nfs_diropok	res = {
+		fh:		fhandle,
+		fattr:		fattr
+	};
 	int			status;
 
 	dprintk("NFS call  lookup %s\n", name->name);
@@ -108,8 +118,15 @@ nfs_proc_lookup(struct inode *dir, struct qstr *name,
 static int
 nfs_proc_readlink(struct inode *inode, void *buffer, unsigned int bufsiz)
 {
-	struct nfs_readlinkargs	args = { NFS_FH(inode), buffer, bufsiz };
-	struct nfs_readlinkres	res = { buffer, bufsiz };
+	struct nfs_readlinkargs	args = {
+		fh:		NFS_FH(inode),
+		buffer:		buffer,
+		bufsiz:		bufsiz
+	};
+	struct nfs_readlinkres	res = {
+		buffer:		buffer,
+		bufsiz:		bufsiz
+	};
 	int			status;
 
 	dprintk("NFS call  readlink\n");
@@ -124,11 +141,23 @@ nfs_proc_read(struct inode *inode, struct rpc_cred *cred,
 	      struct nfs_fattr *fattr, int flags,
 	      loff_t offset, unsigned int count, void *buffer, int *eofp)
 {
-	struct nfs_readargs	arg = { NFS_FH(inode), offset, count, 1,
-				       {{ buffer, count }, {0,0}, {0,0}, {0,0},
-					{0,0}, {0,0}, {0,0}, {0,0}} };
-	struct nfs_readres	res = { fattr, count, 0};
-	struct rpc_message	msg = { NFSPROC_READ, &arg, &res, cred };
+	struct nfs_readargs	arg = {
+		fh:		NFS_FH(inode),
+		offset:		offset,
+		count:		count,
+		nriov:		1,
+		iov:		{{ buffer, count }, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}}
+	};
+	struct nfs_readres	res = {
+		fattr:		fattr,
+		count:		count
+	};
+	struct rpc_message	msg = {
+		rpc_proc:	NFSPROC_READ,
+		rpc_argp:	&arg,
+		rpc_resp:	&res,
+		rpc_cred:	cred
+	};
 	int			status;
 
 	dprintk("NFS call  read %d @ %Ld\n", count, (long long)offset);
@@ -146,12 +175,25 @@ nfs_proc_write(struct inode *inode, struct rpc_cred *cred,
 	       loff_t offset, unsigned int count,
 	       void *buffer, struct nfs_writeverf *verf)
 {
-	struct nfs_writeargs	arg = {NFS_FH(inode), offset, count,
-					NFS_FILE_SYNC, 1,
-					{{buffer, count}, {0,0}, {0,0}, {0,0},
-					 {0,0}, {0,0}, {0,0}, {0,0}}};
-	struct nfs_writeres     res = {fattr, verf, count};
-	struct rpc_message	msg = { NFSPROC_WRITE, &arg, &res, cred };
+	struct nfs_writeargs	arg = {
+		fh:		NFS_FH(inode),
+		offset:		offset,
+		count:		count,
+		stable:		NFS_FILE_SYNC,
+		nriov:		1,
+		iov:		{{buffer, count}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}}
+	};
+	struct nfs_writeres     res = {
+		fattr:		fattr,
+		verf:		verf,
+		count:		count
+	};
+	struct rpc_message	msg = {
+		rpc_proc:	NFSPROC_WRITE,
+		rpc_argp:	&arg,
+		rpc_resp:	&res,
+		rpc_cred:	cred
+	};
 	int			status, flags = 0;
 
 	dprintk("NFS call  write %d @ %Ld\n", count, (long long)offset);
@@ -169,9 +211,16 @@ static int
 nfs_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 		int flags, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
-	struct nfs_createargs	arg = { NFS_FH(dir), name->name,
-					name->len, sattr };
-	struct nfs_diropok	res = { fhandle, fattr };
+	struct nfs_createargs	arg = {
+		fh:		NFS_FH(dir),
+		name:		name->name,
+		len:		name->len,
+		sattr:		sattr
+	};
+	struct nfs_diropok	res = {
+		fh:		fhandle,
+		fattr:		fattr
+	};
 	int			status;
 
 	fattr->valid = 0;
@@ -188,9 +237,16 @@ static int
 nfs_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	       dev_t rdev, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
-	struct nfs_createargs	arg = { NFS_FH(dir), name->name,
-						     name->len, sattr };
-	struct nfs_diropok	res = { fhandle, fattr };
+	struct nfs_createargs	arg = {
+		fh:		NFS_FH(dir),
+		name:		name->name,
+		len:		name->len,
+		sattr:		sattr
+	};
+	struct nfs_diropok	res = {
+		fh:		fhandle,
+		fattr:		fattr
+	};
 	int			status, mode;
 
 	dprintk("NFS call  mknod %s\n", name->name);
@@ -219,8 +275,17 @@ nfs_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 static int
 nfs_proc_remove(struct inode *dir, struct qstr *name)
 {
-	struct nfs_diropargs	arg = { NFS_FH(dir), name->name, name->len };
-	struct rpc_message	msg = { NFSPROC_REMOVE, &arg, NULL, NULL };
+	struct nfs_diropargs	arg = {
+		fh:		NFS_FH(dir),
+		name:		name->name,
+		len:		name->len
+	};
+	struct rpc_message	msg = { 
+		rpc_proc:	NFSPROC_REMOVE,
+		rpc_argp:	&arg,
+		rpc_resp:	NULL,
+		rpc_cred:	NULL
+	};
 	int			status;
 
 	dprintk("NFS call  remove %s\n", name->name);
@@ -259,10 +324,14 @@ static int
 nfs_proc_rename(struct inode *old_dir, struct qstr *old_name,
 		struct inode *new_dir, struct qstr *new_name)
 {
-	struct nfs_renameargs	arg = { NFS_FH(old_dir), old_name->name,
-					old_name->len,
-					NFS_FH(new_dir), new_name->name,
-					new_name->len};
+	struct nfs_renameargs	arg = {
+		fromfh:		NFS_FH(old_dir),
+		fromname:	old_name->name,
+		fromlen:	old_name->len,
+		tofh:		NFS_FH(new_dir),
+		toname:		new_name->name,
+		tolen:		new_name->len
+	};
 	int			status;
 
 	dprintk("NFS call  rename %s -> %s\n", old_name->name, new_name->name);
@@ -274,8 +343,12 @@ nfs_proc_rename(struct inode *old_dir, struct qstr *old_name,
 static int
 nfs_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 {
-	struct nfs_linkargs	arg = { NFS_FH(inode), NFS_FH(dir),
-					name->name, name->len };
+	struct nfs_linkargs	arg = {
+		fromfh:		NFS_FH(inode),
+		tofh:		NFS_FH(dir),
+		toname:		name->name,
+		tolen:		name->len
+	};
 	int			status;
 
 	dprintk("NFS call  link %s\n", name->name);
@@ -289,8 +362,14 @@ nfs_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 		 struct iattr *sattr, struct nfs_fh *fhandle,
 		 struct nfs_fattr *fattr)
 {
-	struct nfs_symlinkargs	arg = { NFS_FH(dir), name->name, name->len,
-					path->name, path->len, sattr };
+	struct nfs_symlinkargs	arg = {
+		fromfh:		NFS_FH(dir),
+		fromname:	name->name,
+		fromlen:	name->len,
+		topath:		path->name,
+		tolen:		path->len,
+		sattr:		sattr
+	};
 	int			status;
 
 	dprintk("NFS call  symlink %s -> %s\n", name->name, path->name);
@@ -304,9 +383,16 @@ static int
 nfs_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	       struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
-	struct nfs_createargs	arg = { NFS_FH(dir), name->name, name->len,
-					sattr };
-	struct nfs_diropok	res = { fhandle, fattr };
+	struct nfs_createargs	arg = {
+		fh:		NFS_FH(dir),
+		name:		name->name,
+		len:		name->len,
+		sattr:		sattr
+	};
+	struct nfs_diropok	res = {
+		fh:		fhandle,
+		fattr:		fattr
+	};
 	int			status;
 
 	dprintk("NFS call  mkdir %s\n", name->name);
@@ -319,7 +405,11 @@ nfs_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 static int
 nfs_proc_rmdir(struct inode *dir, struct qstr *name)
 {
-	struct nfs_diropargs	arg = { NFS_FH(dir), name->name, name->len };
+	struct nfs_diropargs	arg = {
+		fh:		NFS_FH(dir),
+		name:		name->name,
+		len:		name->len
+	};
 	int			status;
 
 	dprintk("NFS call  rmdir %s\n", name->name);
@@ -342,7 +432,12 @@ nfs_proc_readdir(struct inode *dir, struct rpc_cred *cred,
 {
 	struct nfs_readdirargs	arg;
 	struct nfs_readdirres	res;
-	struct rpc_message	msg = { NFSPROC_READDIR, &arg, &res, cred };
+	struct rpc_message	msg = {
+		rpc_proc:	NFSPROC_READDIR,
+		rpc_argp:	&arg,
+		rpc_resp:	&res,
+		rpc_cred:	cred
+	};
 	int			status;
 
 	arg.fh = NFS_FH(dir);
@@ -374,28 +469,28 @@ nfs_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 
 extern u32 * nfs_decode_dirent(u32 *, struct nfs_entry *, int);
 
-struct nfs_rpc_ops     nfs_v2_clientops = {
-       2,		       /* protocol version */
-       nfs_proc_get_root,
-       nfs_proc_getattr,
-       nfs_proc_setattr,
-       nfs_proc_lookup,
-       NULL,		       /* access */
-       nfs_proc_readlink,
-       nfs_proc_read,
-       nfs_proc_write,
-       NULL,		       /* commit */
-       nfs_proc_create,
-       nfs_proc_remove,
-       nfs_proc_unlink_setup,
-       nfs_proc_unlink_done,
-       nfs_proc_rename,
-       nfs_proc_link,
-       nfs_proc_symlink,
-       nfs_proc_mkdir,
-       nfs_proc_rmdir,
-       nfs_proc_readdir,
-       nfs_proc_mknod,
-       nfs_proc_statfs,
-       nfs_decode_dirent,
+struct nfs_rpc_ops	nfs_v2_clientops = {
+	version:	2,		       /* protocol version */
+	getroot:	nfs_proc_get_root,
+	getattr:	nfs_proc_getattr,
+	setattr:	nfs_proc_setattr,
+	lookup:		nfs_proc_lookup,
+	access:		NULL,		       /* access */
+	readlink:	nfs_proc_readlink,
+	read:		nfs_proc_read,
+	write:		nfs_proc_write,
+	commit:		NULL,		       /* commit */
+	create:		nfs_proc_create,
+	remove:		nfs_proc_remove,
+	unlink_setup:	nfs_proc_unlink_setup,
+	unlink_done:	nfs_proc_unlink_done,
+	rename:		nfs_proc_rename,
+	link:		nfs_proc_link,
+	symlink:	nfs_proc_symlink,
+	mkdir:		nfs_proc_mkdir,
+	rmdir:		nfs_proc_rmdir,
+	readdir:	nfs_proc_readdir,
+	mknod:		nfs_proc_mknod,
+	statfs:		nfs_proc_statfs,
+	decode_dirent:	nfs_decode_dirent,
 };

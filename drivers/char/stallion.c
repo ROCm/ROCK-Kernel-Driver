@@ -2458,7 +2458,7 @@ static inline int stl_initeio(stlbrd_t *brdp)
 	}
 
 /*
- *	We have verfied that the board is actually present, so now we
+ *	We have verified that the board is actually present, so now we
  *	can complete the setup.
  */
 

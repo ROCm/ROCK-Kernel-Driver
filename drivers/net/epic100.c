@@ -60,11 +60,14 @@
 	LK1.1.12:
 	* fix power-up sequence
 
+	LK1.1.13:
+	* revert version 1.1.12, power-up sequence "fix"
+
 */
 
 #define DRV_NAME	"epic100"
-#define DRV_VERSION	"1.11+LK1.1.12"
-#define DRV_RELDATE	"Jan 18, 2002"
+#define DRV_VERSION	"1.11+LK1.1.13"
+#define DRV_RELDATE	"Mar 20, 2002"
 
 
 /* The user-configurable values.
@@ -678,8 +681,9 @@ static int epic_open(struct net_device *dev)
 	   required by the details of which bits are reset and the transceiver
 	   wiring on the Ositech CardBus card.
 	*/
-
-	outl(0x12, ioaddr + MIICfg);
+#if 0
+	outl(dev->if_port == 1 ? 0x13 : 0x12, ioaddr + MIICfg);
+#endif
 	if (ep->chip_flags & MII_PWRDWN)
 		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 

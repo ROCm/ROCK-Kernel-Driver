@@ -58,9 +58,9 @@ struct inode_operations hfs_hdr_inode_operations = {
 };
 
 const struct hfs_hdr_layout hfs_dbl_fil_hdr_layout = {
-	__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
-	__constant_htonl(HFS_HDR_VERSION_2),	/* version */
-	6,					/* entries */
+	magic:		__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
+	version:	__constant_htonl(HFS_HDR_VERSION_2),	/* version */
+	entries:	6,					/* entries */
 	{					/* descr[] */
 		{HFS_HDR_FNAME, offsetof(struct hfs_dbl_hdr, real_name),   ~0},
 		{HFS_HDR_DATES, offsetof(struct hfs_dbl_hdr, create_time), 16},
@@ -80,9 +80,9 @@ const struct hfs_hdr_layout hfs_dbl_fil_hdr_layout = {
 };
 
 const struct hfs_hdr_layout hfs_dbl_dir_hdr_layout = {
-	__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
-	__constant_htonl(HFS_HDR_VERSION_2),	/* version */
-	5,					/* entries */
+	magic:		__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
+	version:	__constant_htonl(HFS_HDR_VERSION_2),	/* version */
+	entries:	5,					/* entries */
 	{					/* descr[] */
 		{HFS_HDR_FNAME, offsetof(struct hfs_dbl_hdr, real_name),   ~0},
 		{HFS_HDR_DATES, offsetof(struct hfs_dbl_hdr, create_time), 16},
@@ -100,9 +100,9 @@ const struct hfs_hdr_layout hfs_dbl_dir_hdr_layout = {
 };
 
 const struct hfs_hdr_layout hfs_nat2_hdr_layout = {
-	__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
-	__constant_htonl(HFS_HDR_VERSION_2),	/* version */
-	9,					/* entries */
+	magic:		__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
+	version:	__constant_htonl(HFS_HDR_VERSION_2),	/* version */
+	entries:	9,					/* entries */
 	{					/* descr[] */
 		{HFS_HDR_FNAME, offsetof(struct hfs_dbl_hdr, real_name),   ~0},
 		{HFS_HDR_COMNT, offsetof(struct hfs_dbl_hdr, comment),      0},
@@ -128,9 +128,9 @@ const struct hfs_hdr_layout hfs_nat2_hdr_layout = {
 };
 
 const struct hfs_hdr_layout hfs_nat_hdr_layout = {
-	__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
-	__constant_htonl(HFS_HDR_VERSION_1),	/* version */
-	5,					/* entries */
+	magic:		__constant_htonl(HFS_DBL_MAGIC),	/* magic   */
+	version:	__constant_htonl(HFS_HDR_VERSION_1),	/* version */
+	entries:	5,					/* entries */
 	{					/* descr[] */
 		{HFS_HDR_FNAME, offsetof(struct hfs_dbl_hdr, real_name),   ~0},
 		{HFS_HDR_COMNT, offsetof(struct hfs_dbl_hdr, comment),      0},

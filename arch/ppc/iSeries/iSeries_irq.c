@@ -36,7 +36,7 @@
 
 #include <linux/irq.h>
 #include <linux/spinlock.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/HvCallXm.h>

@@ -2080,6 +2080,7 @@ static void deliver_packet(struct strip *strip_info, STRIP_Header *header, __u16
 #ifdef EXT_COUNTERS
         strip_info->rx_bytes += packetlen;
 #endif
+        skb->dev->last_rx = jiffies;
         netif_rx(skb);
     }
 }

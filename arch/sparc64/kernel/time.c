@@ -62,7 +62,7 @@ unsigned long timer_ticks_per_usec_quotient;
 static __inline__ void timer_check_rtc(void)
 {
 	/* last time the cmos clock got updated */
-	static long last_rtc_update=0;
+	static long last_rtc_update;
 
 	/* Determine when to update the Mostek clock. */
 	if ((time_status & STA_UNSYNC) == 0 &&
@@ -410,7 +410,7 @@ void __init clock_probe(void)
 	struct linux_ebus *ebus = NULL;
 	struct isa_bridge *isa_br = NULL;
 #endif
-	static int invoked = 0;
+	static int invoked;
 
 	if (invoked)
 		return;

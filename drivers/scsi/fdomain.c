@@ -78,7 +78,7 @@
  Please note that the drive ordering that Future Domain implemented in BIOS
  versions 3.4 and 3.5 is the opposite of the order (currently) used by the
  rest of the SCSI industry.  If you have BIOS version 3.4 or 3.5, and have
- more then one drive, then the drive ordering will be the reverse of that
+ more than one drive, then the drive ordering will be the reverse of that
  which you see under DOS.  For example, under DOS SCSI ID 0 will be D: and
  SCSI ID 1 will be C: (the boot device).  Under Linux, SCSI ID 0 will be
  /dev/sda and SCSI ID 1 will be /dev/sdb.  The Linux ordering is consistent

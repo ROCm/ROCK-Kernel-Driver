@@ -43,7 +43,7 @@ do {									 \
 		   netplay... */					 \
 		printk("ASSERT: %s:%i(%s)\n",				 \
 		       __FILE__, __LINE__, __FUNCTION__);		 \
-} while(0);
+} while(0)
 #else
 #define IP_NF_ASSERT(x)
 #endif

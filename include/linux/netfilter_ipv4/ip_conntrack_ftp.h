@@ -11,6 +11,8 @@
 /* Protects ftp part of conntracks */
 DECLARE_LOCK_EXTERN(ip_ftp_lock);
 
+#define FTP_PORT	21
+
 enum ip_ct_ftp_type
 {
 	/* PORT command from client */
@@ -23,18 +25,20 @@ enum ip_ct_ftp_type
 	IP_CT_FTP_EPSV,
 };
 
-/* We record seq number and length of ftp ip/port text here: all in
-   host order. */
-struct ip_ct_ftp
+/* This structure is per expected connection */
+struct ip_ct_ftp_expect
 {
-	/* This tells NAT that this is an ftp connection */
-	int is_ftp;
-	u_int32_t seq;
-	/* 0 means not found yet */
-	u_int32_t len;
-	enum ip_ct_ftp_type ftptype;
-	/* Port that was to be used */
-	u_int16_t port;
+	/* We record seq number and length of ftp ip/port text here: all in
+	 * host order. */
+
+ 	/* sequence number of IP address in packet is in ip_conntrack_expect */
+	u_int32_t len;			/* length of IP address */
+	enum ip_ct_ftp_type ftptype;	/* PORT or PASV ? */
+	u_int16_t port; 		/* TCP port that was to be used */
+};
+
+/* This structure exists only once per master */
+struct ip_ct_ftp_master {
 	/* Next valid seq position for cmd matching after newline */
 	u_int32_t seq_aft_nl[IP_CT_DIR_MAX];
 	/* 0 means seq_match_aft_nl not set */

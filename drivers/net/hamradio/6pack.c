@@ -256,7 +256,7 @@ static void sp_bump(struct sixpack *sp, char cmd)
 	skb->mac.raw = skb->data;
 	skb->protocol = htons(ETH_P_AX25);
 	netif_rx(skb);
-	dev->last_rx = jiffies;
+	sp->dev->last_rx = jiffies;
 	sp->stats.rx_packets++;
 }
 
@@ -701,7 +701,6 @@ static struct tty_ldisc sp_ldisc = {
 /* Initialize 6pack control device -- register 6pack line discipline */
 
 static char msg_banner[]  __initdata = KERN_INFO "AX.25: 6pack driver, " SIXPACK_VERSION " (dynamic channels, max=%d)\n";
-static char msg_invparm[] __initdata = KERN_ERR  "6pack: sixpack_maxdev parameter too large.\n";
 static char msg_nomem[]   __initdata = KERN_ERR  "6pack: can't allocate sixpack_ctrls[] array! No 6pack available.\n";
 static char msg_regfail[] __initdata = KERN_ERR  "6pack: can't register line discipline (err = %d)\n";
 
@@ -1064,6 +1063,7 @@ static void decode_data(unsigned char inbyte, struct sixpack *sp)
 
 MODULE_AUTHOR("Andreas Könsgen <ajk@ccac.rwth-aachen.de>");
 MODULE_DESCRIPTION("6pack driver for AX.25");
+MODULE_LICENSE("GPL");
 
 module_init(sixpack_init_driver);
 module_exit(sixpack_exit_driver);

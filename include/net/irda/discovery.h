@@ -39,6 +39,14 @@
 #define DISCOVERY_EXPIRE_TIMEOUT 6*HZ
 #define DISCOVERY_DEFAULT_SLOTS  0
 
+/* Types of discovery */
+typedef enum {
+	DISCOVERY_LOG,		/* What's in our discovery log */
+	DISCOVERY_ACTIVE,	/* Doing our own discovery on the medium */
+	DISCOVERY_PASSIVE,	/* Peer doing discovery on the medium */
+	EXPIRY_TIMEOUT,		/* Entry expired due to timeout */
+} DISCOVERY_MODE;
+
 #define NICKNAME_MAX_LEN 21
 
 /*

@@ -3768,7 +3768,7 @@ static int __init md_setup(char *str)
 		printk(KERN_WARNING "md: md=%d, Minor device number too high.\n", minor);
 		return 0;
 	} else if (md_setup_args.device_names[minor]) {
-		printk(KERN_WARNING "md: md=%d, Specified more then once. "
+		printk(KERN_WARNING "md: md=%d, Specified more than once. "
 		       "Replacing previous definition.\n", minor);
 	}
 	switch (get_option(&str, &level)) {	/* RAID Personality */
