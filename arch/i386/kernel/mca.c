@@ -123,13 +123,13 @@ static void mca_configure_adapter_status(struct mca_device *mca_dev) {
 /*--------------------------------------------------------------------*/
 
 static struct resource mca_standard_resources[] = {
-	{ "system control port B (MCA)", 0x60, 0x60 },
-	{ "arbitration (MCA)", 0x90, 0x90 },
-	{ "card Select Feedback (MCA)", 0x91, 0x91 },
-	{ "system Control port A (MCA)", 0x92, 0x92 },
-	{ "system board setup (MCA)", 0x94, 0x94 },
-	{ "POS (MCA)", 0x96, 0x97 },
-	{ "POS (MCA)", 0x100, 0x107 }
+	{ .start = 0x60, .end = 0x60, .name = "system control port B (MCA)" },
+	{ .start = 0x90, .end = 0x90, .name = "arbitration (MCA)" },
+	{ .start = 0x91, .end = 0x91, .name = "card Select Feedback (MCA)" },
+	{ .start = 0x92, .end = 0x92, .name = "system Control port A (MCA)" },
+	{ .start = 0x94, .end = 0x94, .name = "system board setup (MCA)" },
+	{ .start = 0x96, .end = 0x97, .name = "POS (MCA)" },
+	{ .start = 0x100, .end = 0x107, .name = "POS (MCA)" }
 };
 
 #define MCA_STANDARD_RESOURCES	(sizeof(mca_standard_resources)/sizeof(struct resource))
