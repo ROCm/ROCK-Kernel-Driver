@@ -44,7 +44,7 @@ extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 extern int isdn_net_stat_callback(int, isdn_ctrl *);
 extern int isdn_net_find_icall(int, int, int, setup_parm *);
 extern int isdn_net_dev_dial(isdn_net_dev *idev);
-extern void isdn_net_hangup(isdn_net_dev *);
+extern int isdn_net_hangup(isdn_net_dev *);
 extern int isdn_net_rcv_skb(int, struct sk_buff *);
 extern int isdn_net_dial_req(isdn_net_dev *);
 extern void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);

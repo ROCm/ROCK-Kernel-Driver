@@ -47,8 +47,7 @@ enum {
 /* keep clear of ISDN_CMD_* and ISDN_STAT_* */
 enum {
 	EV_NET_DIAL            = 0x200,
-	EV_NET_TIMER_IN_DCONN  = 0x201,
-	EV_NET_TIMER_IN_BCONN  = 0x202,
+	EV_NET_TIMER_INCOMING  = 0x201,
 	EV_NET_TIMER_DIAL      = 0x203,
 	EV_NET_TIMER_DIAL_WAIT = 0x204,
 	EV_NET_TIMER_CB_OUT    = 0x205,
@@ -170,7 +169,7 @@ int isdn_net_online(isdn_net_dev *idev)
 
 /* Prototypes */
 
-static void do_dialout(isdn_net_dev *idev);
+static int do_dialout(isdn_net_dev *idev);
 int isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
@@ -250,41 +249,6 @@ isdn_net_bind_channel(isdn_net_dev *idev, int idx)
 	return retval;
 }
 
-static void isdn_net_lp_disconnected(isdn_net_dev *idev)
-{
-	isdn_net_rm_from_bundle(idev);
-}
-
-static void isdn_net_connected(isdn_net_dev *idev)
-{
-	isdn_net_local *mlp = idev->mlp;
-
-	idev->dialstate = ST_ACTIVE;
-
-	idev->huptimer = 0;
-	idev->dial_event = EV_NET_TIMER_HUP;
-	idev->dial_timer.expires = jiffies + HZ;
-	add_timer(&idev->dial_timer);
-
-	if (mlp->p_encap != ISDN_NET_ENCAP_SYNCPPP)
-		isdn_net_add_to_bundle(mlp, idev);
-
-	printk(KERN_INFO "isdn_net: %s connected\n", idev->name);
-	/* If first Chargeinfo comes before B-Channel connect,
-	 * we correct the timestamp here.
-	 */
-	idev->chargetime = jiffies;
-	
-	idev->transcount = 0;
-	idev->cps = 0;
-	idev->last_jiffies = jiffies;
-
-	if (mlp->ops->connected)
-		mlp->ops->connected(idev);
-	else
-		isdn_net_dev_wake_queue(idev);
-}
-
 /*
  * Handle status-messages from ISDN-interfacecard.
  * This function is called from within the main-status-dispatcher
@@ -304,26 +268,12 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 	return isdn_net_handle_event(idev, c->command, c);
 }
 
-/* Initiate dialout. Set phone-number-pointer to first number
- * of interface, number of retries to 0.
- */
-static void
-init_dialout(isdn_net_dev *idev)
-{
-	isdn_net_local *mlp = idev->mlp;
+/* ---------------------------------------------------------------------- */
+/* call management                                                        */
+/* ---------------------------------------------------------------------- */
 
-	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF)
-		return;
-	
-	if (list_empty(&mlp->phone[1]))
-		return;
+/* Find the idev->dial'th outgoing number. */
 
-	idev->dial = 0;
-	idev->dialretry = 0;
-	do_dialout(idev);
-}
-
-/* find the idev->dial'th outgoing number */
 static struct isdn_net_phone *
 get_outgoing_phone(isdn_net_dev *idev)
 {
@@ -338,11 +288,27 @@ get_outgoing_phone(isdn_net_dev *idev)
 	return NULL;
 }
 
-/* Setup interface, dial current phone-number, switch to next number.
- * If list of phone-numbers is exhausted, increment
- * retry-counter.
- */
-static void
+/* Initiate dialout. */
+
+static int
+init_dialout(isdn_net_dev *idev)
+{
+	isdn_net_local *mlp = idev->mlp;
+
+	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF)
+		return 1;
+	
+	if (list_empty(&mlp->phone[1]))
+		return 1;
+
+	idev->dial = 0;
+	idev->dialretry = 0;
+	return do_dialout(idev);
+}
+
+/* Try dialing the next number. */
+
+static int
 do_dialout(isdn_net_dev *idev)
 {
 	isdn_net_local *mlp = idev->mlp;
@@ -377,12 +343,13 @@ do_dialout(isdn_net_dev *idev)
 
 	/* Dial */
 	isdn_slot_dial(idev->isdn_slot, &dial);
+	return 1;
 }
 
 /* If we didn't connect within dialtimeout, we give up for now
  * and wait for dialwait jiffies before trying again.
  */
-static void
+static int
 dial_timeout(isdn_net_dev *idev)
 {
 	isdn_net_local *mlp = idev->mlp;
@@ -399,87 +366,190 @@ dial_timeout(isdn_net_dev *idev)
 	}
 	if (idev->dialretry >= mlp->dialmax) {
 		isdn_net_hangup(idev);
-		return;
+		return 1;
 	}
-
 	idev->dial_event = EV_NET_TIMER_DIAL_WAIT;
 	mod_timer(&idev->dial_timer, jiffies + mlp->dialwait);
+	return 1;
 }
 
-static void
+static int
+isdn_net_connect_failure(isdn_net_dev *idev)
+{
+	del_timer(&idev->dial_timer);
+	isdn_slot_all_eaz(idev->isdn_slot);
+	printk(KERN_INFO "%s: connection failed\n", idev->name);
+	isdn_net_unbind_channel(idev);
+	return 1;
+}
+
+static int
+isdn_net_out_dconn(isdn_net_dev *idev)
+{
+	isdn_ctrl cmd;
+
+	idev->dialstate = ST_OUT_WAIT_BCONN;
+	isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+	return 1;
+}
+
+static int
+isdn_net_in_dconn(isdn_net_dev *idev)
+{
+	isdn_ctrl cmd;
+
+	idev->dialstate = ST_IN_WAIT_BCONN;
+	isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+	return 1;
+}
+
+static int
+isdn_net_bconn(isdn_net_dev *idev)
+{
+	isdn_net_local *mlp = idev->mlp;
+
+	idev->dialstate = ST_ACTIVE;
+
+	if (mlp->onhtime) {
+		idev->huptimer = 0;
+		idev->dial_event = EV_NET_TIMER_HUP;
+		mod_timer(&idev->dial_timer, jiffies + HZ);
+	} else {
+		del_timer(&idev->dial_timer);
+	}
+
+	isdn_net_add_to_bundle(mlp, idev);
+
+	printk(KERN_INFO "isdn_net: %s connected\n", idev->name);
+	/* If first Chargeinfo comes before B-Channel connect,
+	 * we correct the timestamp here.
+	 */
+	idev->chargetime = jiffies;
+	
+	idev->transcount = 0;
+	idev->cps = 0;
+	idev->last_jiffies = jiffies;
+
+	if (mlp->ops->connected)
+		mlp->ops->connected(idev);
+	else
+		isdn_net_dev_wake_queue(idev);
+
+	return 1;
+}
+
+/* Check if it's time for idle hang-up */
+
+static int
 isdn_net_check_hup(isdn_net_dev *idev)
 {
 	isdn_net_local *mlp = idev->mlp;
 
-	if (!isdn_net_online(idev)) {
-		isdn_BUG();
-		return;
-	}
-	
-	dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
+	dbg_net_dial("%s: huptimer %d onhtime %d chargetime %ld chargeint %d\n",
 		     idev->name, idev->huptimer, mlp->onhtime, idev->chargetime, idev->chargeint);
 
-	if (mlp->onhtime == 0)
-		return;
-	
 	if (idev->huptimer++ <= mlp->onhtime)
 		goto mod_timer;
 
-	if ((mlp->hupflags & (ISDN_MANCHARGE | ISDN_CHARGEHUP)) == (ISDN_MANCHARGE | ISDN_CHARGEHUP)) {
-		while (time_after(jiffies, idev->chargetime + idev->chargeint))
-			idev->chargetime += idev->chargeint;
-		
-		if (time_after(jiffies, idev->chargetime + idev->chargeint - 2 * HZ)) {
-			if (idev->outgoing || mlp->hupflags & ISDN_INHUP) {
-				isdn_net_hangup(idev);
-				return;
-			}
-		}
-	} else if (idev->outgoing) {
-		if (mlp->hupflags & ISDN_CHARGEHUP) {
-			if (idev->charge_state != ST_CHARGE_HAVE_CINT) {
-				dbg_net_dial("%s: did not get CINT\n", idev->name);
-				isdn_net_hangup(idev);
-				return;
-			} else if (time_after(jiffies, idev->chargetime + idev->chargeint)) {
-				dbg_net_dial("%s: chtime = %lu, chint = %d\n",
-					     idev->name, idev->chargetime, idev->chargeint);
-				isdn_net_hangup(idev);
-				return;
-			}
-		}
-	} else if (mlp->hupflags & ISDN_INHUP) {
-		isdn_net_hangup(idev);
-		return;
+	if (mlp->hupflags & ISDN_CHARGEHUP &&
+	    idev->charge_state == ST_CHARGE_HAVE_CINT) {
+		if (!time_after(jiffies, idev->chargetime 
+				+ idev->chargeint - 2 * HZ))
+			goto mod_timer;
 	}
+	if (idev->outgoing || mlp->hupflags & ISDN_INHUP)
+		return isdn_net_hangup(idev);
+
  mod_timer:
 	mod_timer(&idev->dial_timer, idev->dial_timer.expires + HZ);
+	return 1;
 }
+
+/* A packet has successfully been sent out. */
+
+static int
+isdn_net_bsent(isdn_net_dev *idev, isdn_ctrl *c)
+{
+	isdn_net_local *mlp = idev->mlp;
+
+	isdn_net_dec_frame_cnt(idev);
+	mlp->stats.tx_packets++;
+	mlp->stats.tx_bytes += c->parm.length;
+	return 1;
+}
+
+/* Charge-info from TelCo. */
+
+static int
+isdn_net_cinf(isdn_net_dev *idev)
+{
+	idev->charge++;
+	switch (idev->charge_state) {
+	case ST_CHARGE_NULL:
+		idev->charge_state = ST_CHARGE_GOT_CINF;
+		break;
+	case ST_CHARGE_GOT_CINF:
+		idev->charge_state = ST_CHARGE_HAVE_CINT;
+		/* fall through */
+	case ST_CHARGE_HAVE_CINT:
+		idev->chargeint = jiffies - idev->chargetime;
+		break;
+	}
+	idev->chargetime = jiffies;
+	dbg_net_dial("%s: got CINF\n", idev->name);
+	return 1;
+}
+
+static int
+isdn_net_disconnected(isdn_net_dev *idev)
+{
+	isdn_net_local *mlp = idev->mlp;
+
+	del_timer(&idev->dial_timer);
+	if (mlp->ops->disconnected)
+		mlp->ops->disconnected(idev);
+	
+	isdn_net_rm_from_bundle(idev);
+
+	printk(KERN_INFO "%s: disconnected\n", idev->name);
+	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name,
+	       idev->charge);
+	isdn_slot_all_eaz(idev->isdn_slot);
+	isdn_net_unbind_channel(idev);
+
+	return 1;
+}
+
+/* Perform hangup for a net-interface. */
+
+int
+isdn_net_hangup(isdn_net_dev *idev)
+{
+	isdn_ctrl cmd;
+
+	del_timer(&idev->dial_timer);
+	if (!isdn_net_bound(idev)) {
+		isdn_BUG();
+		return 1;
+	}
+	printk(KERN_INFO "%s: local hangup\n", idev->name);
+	isdn_slot_command(idev->isdn_slot, ISDN_CMD_HANGUP, &cmd);
+	return 1;
+}
+
 
 static int
 isdn_net_event_out_wait_dconn(isdn_net_dev *idev, int pr, void *arg)
 {
-	isdn_ctrl cmd;
-
 	switch (pr) {
 	case EV_NET_TIMER_DIAL:
-		dial_timeout(idev);
-		return 1;
+		return dial_timeout(idev);
 	case EV_NET_TIMER_CB_OUT:
-		printk(KERN_INFO "%s: hangup waiting for callback ...\n", idev->name);
-		isdn_net_hangup(idev);
-		return 1;
+		return isdn_net_hangup(idev);
 	case ISDN_STAT_DCONN:
-		/* Got D-Channel-Connect, send B-Channel-request */
-		idev->dialstate = ST_OUT_WAIT_BCONN;
-		isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-		return 1;
+		return isdn_net_out_dconn(idev);
 	case ISDN_STAT_DHUP:
-		del_timer(&idev->dial_timer);
-		isdn_slot_all_eaz(idev->isdn_slot);
-		printk(KERN_INFO "%s: remote hangup\n", idev->name);
-		isdn_net_unbind_channel(idev);
-		return 1;
+		return isdn_net_connect_failure(idev);
 	}
 	isdn_BUG();
 	return 0;
@@ -490,19 +560,11 @@ isdn_net_event_out_wait_bconn(isdn_net_dev *idev, int pr, void *arg)
 {
 	switch (pr) {
 	case EV_NET_TIMER_DIAL:
-		dial_timeout(idev);
-		return 1;
+		return dial_timeout(idev);
 	case ISDN_STAT_BCONN:
-		del_timer(&idev->dial_timer);
-		isdn_slot_set_usage(idev->isdn_slot, isdn_slot_usage(idev->isdn_slot) | ISDN_USAGE_OUTGOING);
-		isdn_net_connected(idev);
-		return 1;
+		return isdn_net_bconn(idev);
 	case ISDN_STAT_DHUP:
-		del_timer(&idev->dial_timer);
-		isdn_slot_all_eaz(idev->isdn_slot);
-		printk(KERN_INFO "%s: remote hangup\n", idev->name);
-		isdn_net_unbind_channel(idev);
-		return 1;
+		return isdn_net_connect_failure(idev);
 	}
 	isdn_BUG();
 	return 0;
@@ -511,26 +573,13 @@ isdn_net_event_out_wait_bconn(isdn_net_dev *idev, int pr, void *arg)
 static int
 isdn_net_event_in_wait_dconn(isdn_net_dev *idev, int pr, void *arg)
 {
-	isdn_ctrl cmd;
-
 	switch (pr) {
-	case EV_NET_TIMER_IN_DCONN:
-		isdn_net_hangup(idev);
-		return 1;
+	case EV_NET_TIMER_INCOMING:
+		return isdn_net_hangup(idev);
 	case ISDN_STAT_DCONN:
-		del_timer(&idev->dial_timer);
-		idev->dialstate = ST_IN_WAIT_BCONN;
-		isdn_slot_command(idev->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-		idev->dial_timer.expires = jiffies + 10 * HZ;
-		idev->dial_event = EV_NET_TIMER_IN_BCONN;
-		add_timer(&idev->dial_timer);
-		return 1;
+		return isdn_net_in_dconn(idev);
 	case ISDN_STAT_DHUP:
-		del_timer(&idev->dial_timer);
-		isdn_slot_all_eaz(idev->isdn_slot);
-		printk(KERN_INFO "%s: remote hangup\n", idev->name);
-		isdn_net_unbind_channel(idev);
-		return 1;
+		return isdn_net_connect_failure(idev);
 	}
 	isdn_BUG();
 	return 0;
@@ -540,19 +589,12 @@ static int
 isdn_net_event_in_wait_bconn(isdn_net_dev *idev, int pr, void *arg)
 {
 	switch (pr) {
-	case EV_NET_TIMER_IN_BCONN:
-		isdn_net_hangup(idev);
-		break;
+	case EV_NET_TIMER_INCOMING:
+		return isdn_net_hangup(idev);
 	case ISDN_STAT_BCONN:
-		del_timer(&idev->dial_timer);
-		isdn_net_connected(idev);
-		return 1;
+		return isdn_net_bconn(idev);
 	case ISDN_STAT_DHUP:
-		del_timer(&idev->dial_timer);
-		isdn_slot_all_eaz(idev->isdn_slot);
-		printk(KERN_INFO "%s: remote hangup\n", idev->name);
-		isdn_net_unbind_channel(idev);
-		return 1;
+		return isdn_net_connect_failure(idev);
 	}
 	isdn_BUG();
 	return 0;
@@ -563,8 +605,7 @@ isdn_net_event_wait_before_cb(isdn_net_dev *idev, int pr, void *arg)
 {
 	switch (pr) {
 	case EV_NET_TIMER_CB_IN:
-		init_dialout(idev);
-		return 1;
+		return init_dialout(idev);
 	}
 	isdn_BUG();
 	return 0;
@@ -573,50 +614,16 @@ isdn_net_event_wait_before_cb(isdn_net_dev *idev, int pr, void *arg)
 static int
 isdn_net_event_active(isdn_net_dev *idev, int pr, void *arg)
 {
-	isdn_net_local *mlp = idev->mlp;
-	isdn_ctrl *c = arg;
-
 	switch (pr) {
 	case EV_NET_TIMER_HUP:
-		isdn_net_check_hup(idev);
-		return 1;
+		return isdn_net_check_hup(idev);
 	case ISDN_STAT_BSENT:
-		/* A packet has successfully been sent out */
-		isdn_net_dec_frame_cnt(idev);
-		mlp->stats.tx_packets++;
-		mlp->stats.tx_bytes += c->parm.length;
-		return 1;
+		return isdn_net_bsent(idev, arg);
+	case ISDN_STAT_BHUP:
 	case ISDN_STAT_DHUP:
-		if (mlp->ops->disconnected)
-			mlp->ops->disconnected(idev);
-		
-		isdn_net_lp_disconnected(idev);
-		isdn_slot_all_eaz(idev->isdn_slot);
-		printk(KERN_INFO "%s: remote hangup\n", idev->name);
-		printk(KERN_INFO "%s: Chargesum is %d\n", idev->name,
-		       idev->charge);
-		isdn_net_unbind_channel(idev);
-		return 1;
+		return isdn_net_disconnected(idev);
 	case ISDN_STAT_CINF:
-		/* Charge-info from TelCo. Calculate interval between
-		 * charge-infos and set timestamp for last info for
-		 * usage by isdn_net_autohup()
-		 */
-		idev->charge++;
-		switch (idev->charge_state) {
-		case ST_CHARGE_NULL:
-			idev->charge_state = ST_CHARGE_GOT_CINF;
-			break;
-		case ST_CHARGE_GOT_CINF:
-			idev->charge_state = ST_CHARGE_HAVE_CINT;
-			/* fall through */
-		case ST_CHARGE_HAVE_CINT:
-			idev->chargeint = jiffies - idev->chargetime - 2 * HZ;
-			break;
-		}
-		idev->chargetime = jiffies;
-		dbg_net_dial("%s: got CINF\n", idev->name);
-		return 1;
+		return isdn_net_cinf(idev);
 	}
 	isdn_BUG();
 	return 0;
@@ -627,14 +634,13 @@ isdn_net_event_dial_wait(isdn_net_dev *idev, int pr, void *arg)
 {
 	switch (pr) {
 	case EV_NET_TIMER_DIAL_WAIT:
-		do_dialout(idev);
-		return 1;
+		return do_dialout(idev);
 	}
 	isdn_BUG();
 	return 0;
 }
 
-/* For EV_NET_DIAL, returns 1 if timer callback is needed 
+/*
  * For ISDN_STAT_*, returns 1 if event was for us 
  */
 int
@@ -663,32 +669,6 @@ isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg)
 		return 0;
 	}
 }
-
-/*
- * Perform hangup for a net-interface.
- */
-void
-isdn_net_hangup(isdn_net_dev *idev)
-{
-	isdn_net_local *mlp = idev->mlp;
-	isdn_ctrl cmd;
-
-	del_timer_sync(&idev->dial_timer);
-	if (!isdn_net_bound(idev))
-		return;
-
-	printk(KERN_INFO "isdn_net: local hangup %s\n", idev->name);
-	if (mlp->ops->disconnected)
-		mlp->ops->disconnected(idev);
-	
-	isdn_net_lp_disconnected(idev);
-	
-	isdn_slot_command(idev->isdn_slot, ISDN_CMD_HANGUP, &cmd);
-	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, idev->charge);
-	isdn_slot_all_eaz(idev->isdn_slot);
-	isdn_net_unbind_channel(idev);
-}
-
 
 static void
 isdn_net_log_skb(struct sk_buff *skb, isdn_net_dev *idev)
@@ -972,6 +952,8 @@ isdn_net_do_callback(isdn_net_dev *idev)
 	if (slot < 0)
 		goto err;
 
+	isdn_slot_set_usage(slot, isdn_slot_usage(slot) | ISDN_USAGE_OUTGOING);
+
 	if (isdn_net_bind_channel(idev, slot) < 0)
 		goto err;
 
@@ -1151,8 +1133,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		cmd.arg = mlp->l3_proto << 8;
 		isdn_slot_command(idev->isdn_slot, ISDN_CMD_SETL3, &cmd);
 		
-		idev->dial_timer.expires = jiffies + 15 * HZ;
-		idev->dial_event = EV_NET_TIMER_IN_DCONN;
+		idev->dial_timer.expires = jiffies + mlp->dialtimeout;
+		idev->dial_event = EV_NET_TIMER_INCOMING;
 		add_timer(&idev->dial_timer);
 		idev->dialstate = ST_IN_WAIT_DCONN;
 		
@@ -1186,8 +1168,10 @@ isdn_net_dev_dial(isdn_net_dev *idev)
 	if (slot < 0)
 		goto err;
 
+	isdn_slot_set_usage(slot, isdn_slot_usage(slot) | ISDN_USAGE_OUTGOING);
+
 	if (isdn_net_bind_channel(idev, slot) < 0)
-		goto err;;
+		goto err;
 
 	/* Initiate dialing */
 	init_dialout(idev);
