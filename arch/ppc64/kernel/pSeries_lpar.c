@@ -439,7 +439,7 @@ void hpte_init_lpar(void)
 	ppc_md.hpte_insert	= pSeries_lpar_hpte_insert;
 	ppc_md.hpte_remove	= pSeries_lpar_hpte_remove;
 	ppc_md.flush_hash_range	= pSeries_lpar_flush_hash_range;
-	ppc_md.htpe_clear_all   = pSeries_lpar_hptab_clear;
+	ppc_md.hpte_clear_all   = pSeries_lpar_hptab_clear;
 
 	htab_finish_init();
 }
