@@ -66,17 +66,6 @@ struct llc_addr {
 };
 
 /* Primitive-specific data */
-struct llc_prim_conn {
-	struct llc_addr	   saddr;	/* used by request only */
-	struct llc_addr	   daddr;	/* used by request only */
-	u8		   status;	/* reason for failure */
-	u8		   pri;		/* service_class */
-	struct net_device *dev;
-	struct sock	  *sk;		/* returned from REQUEST */
-	u16		   link;
-	struct sk_buff	  *skb;		/* received SABME  */
-};
-
 struct llc_prim_disc {
 	struct sock *sk;
 	u16	     link;
@@ -119,7 +108,6 @@ struct llc_prim_test {
 };
 
 union llc_u_prim_data {
-	struct llc_prim_conn	  conn;
 	struct llc_prim_disc	  disc;
 	struct llc_prim_reset	  res;
 	struct llc_prim_flow_ctrl fc;
@@ -142,5 +130,7 @@ extern struct llc_sap *llc_sap_open(llc_prim_call_t network_indicate,
 				    llc_prim_call_t network_confirm, u8 lsap);
 extern void llc_sap_close(struct llc_sap *sap);
 
+extern int llc_establish_connection(struct sock *sk, u8 *lmac,
+				    u8 *dmac, u8 dsap);
 extern int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb);
 #endif /* LLC_IF_H */

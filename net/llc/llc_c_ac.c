@@ -81,21 +81,9 @@ int llc_conn_ac_conn_ind(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_conn_confirm(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->conn.sk     = sk;
-	prim_data->conn.pri    = 0;
-	prim_data->conn.status = ev->status;
-	prim_data->conn.link   = llc->link;
-	prim_data->conn.dev    = skb->dev;
-	prim->data   = prim_data;
-	prim->prim   = LLC_CONN_PRIM;
-	prim->sap    = sap;
-	ev->flag     = 1;
-	ev->cfm_prim = prim;
+	ev->flag     = LLC_CONN_PRIM + 1;
+	ev->cfm_prim = (void *)1;
 	return 0;
 }
 
@@ -1451,6 +1439,7 @@ void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data)
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_P_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
@@ -1468,6 +1457,7 @@ static void llc_conn_busy_tmr_cb(unsigned long timeout_data)
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_BUSY_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
@@ -1485,6 +1475,7 @@ void llc_conn_ack_tmr_cb(unsigned long timeout_data)
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_ACK_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);
@@ -1502,6 +1493,7 @@ static void llc_conn_rej_tmr_cb(unsigned long timeout_data)
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
+		skb->sk  = sk;
 		ev->type = LLC_CONN_EV_TYPE_REJ_TMR;
 		ev->data.tmr.timer_specific = NULL;
 		llc_process_tmr_ev(sk, skb);

@@ -32,35 +32,20 @@ static int llc_sap_req(struct llc_prim_if_block *prim);
 static int llc_unitdata_req_handler(struct llc_prim_if_block *prim);
 static int llc_test_req_handler(struct llc_prim_if_block *prim);
 static int llc_xid_req_handler(struct llc_prim_if_block *prim);
-static int llc_conn_req_handler(struct llc_prim_if_block *prim);
 static int llc_disc_req_handler(struct llc_prim_if_block *prim);
 static int llc_rst_req_handler(struct llc_prim_if_block *prim);
 static int llc_flowcontrol_req_handler(struct llc_prim_if_block *prim);
-static int llc_sap_resp(struct llc_prim_if_block *prim);
-static int llc_conn_rsp_handler(struct llc_prim_if_block *prim);
-static int llc_rst_rsp_handler(struct llc_prim_if_block *prim);
-static int llc_no_rsp_handler(struct llc_prim_if_block *prim);
 
 /* table of request handler functions */
 static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
 	[LLC_DATAUNIT_PRIM]	= llc_unitdata_req_handler,
-	[LLC_CONN_PRIM]		= llc_conn_req_handler,
+	[LLC_CONN_PRIM]		= NULL, /* replaced by + llc_establish_connection */
 	[LLC_DATA_PRIM]		= NULL, /* replaced by llc_build_and_send_pkt */
 	[LLC_DISC_PRIM]		= llc_disc_req_handler,
 	[LLC_RESET_PRIM]	= llc_rst_req_handler,
 	[LLC_FLOWCONTROL_PRIM]	= llc_flowcontrol_req_handler,
 	[LLC_XID_PRIM]		= llc_xid_req_handler,
 	[LLC_TEST_PRIM]		= llc_test_req_handler,
-};
-
-/* table of response handler functions */
-static llc_prim_call_t llc_resp_prim[LLC_NBR_PRIMITIVES] = {
-	[LLC_DATAUNIT_PRIM]	= llc_no_rsp_handler,
-	[LLC_CONN_PRIM]		= llc_conn_rsp_handler,
-	[LLC_DATA_PRIM]		= llc_no_rsp_handler,
-	[LLC_DISC_PRIM]		= llc_no_rsp_handler,
-	[LLC_RESET_PRIM]	= llc_rst_rsp_handler,
-	[LLC_FLOWCONTROL_PRIM]	= llc_no_rsp_handler,
 };
 
 /**
@@ -93,7 +78,6 @@ struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
 	/* allocated a SAP; initialize it and clear out its memory pool */
 	sap->laddr.lsap = lsap;
 	sap->req = llc_sap_req;
-	sap->resp = llc_sap_resp;
 	sap->ind = nw_indicate;
 	sap->conf = nw_confirm;
 	sap->parent_station = llc_station_get();
@@ -273,21 +257,11 @@ out:
 }
 
 /**
- *	llc_confirm_impossible - Informs upper layer about failed connection
- *	@prim: pointer to structure that contains confirmation data.
- *
- *	Informs upper layer about failing in connection establishment. This
- *	function is called by llc_conn_req_handler.
- */
-static void llc_confirm_impossible(struct llc_prim_if_block *prim)
-{
-	prim->data->conn.status = LLC_STATUS_IMPOSSIBLE;
-	prim->sap->conf(prim);
-}
-
-/**
- *	llc_conn_req_handler - Called by upper layer to establish a conn
- *	@prim: pointer to structure that contains service parameters.
+ *	llc_establish_connection - Called by upper layer to establish a conn
+ *	@sk: connection
+ *	@lmac: local mac address
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
  *
  *	Upper layer calls this to establish an LLC connection with a remote
  *	machine. This function packages a proper event and sends it connection
@@ -295,37 +269,28 @@ static void llc_confirm_impossible(struct llc_prim_if_block *prim)
  *	establishment will inform to upper layer via calling it's confirm
  *	function and passing proper information.
  */
-static int llc_conn_req_handler(struct llc_prim_if_block *prim)
+int llc_establish_connection(struct sock *sk, u8 *lmac, u8 *dmac, u8 dsap)
 {
-	int rc = -EBUSY;
-	struct llc_sap *sap = prim->sap;
-	struct sk_buff *skb;
-	struct net_device *ddev = mac_dev_peer(prim->data->conn.dev,
-					       prim->data->conn.dev->type,
-					       prim->data->conn.daddr.mac),
-			  *sdev = (ddev->flags & IFF_LOOPBACK) ?
-				  ddev : prim->data->conn.dev;
+	int rc = -EISCONN;
 	struct llc_addr laddr, daddr;
-	/* network layer supplies addressing required to establish connection;
-	 * package as an event and send it to the connection event handler
-	 */
-	struct sock *sk;
+	struct sk_buff *skb;
+	struct llc_opt *llc = llc_sk(sk);
+	struct sock *existing;
 
-	memcpy(laddr.mac, sdev->dev_addr, sizeof(laddr.mac));
-	laddr.lsap = prim->data->conn.saddr.lsap;
-	memcpy(daddr.mac, prim->data->conn.daddr.mac, sizeof(daddr.mac));
-	daddr.lsap = prim->data->conn.daddr.lsap;
-	sk = llc_lookup_established(sap, &daddr, &laddr);
-	if (sk) {
-		if (sk->state == TCP_ESTABLISHED) {
-			llc_confirm_impossible(prim);
+	laddr.lsap = llc->sap->laddr.lsap;
+	daddr.lsap = dsap;
+	memcpy(daddr.mac, dmac, sizeof(daddr.mac));
+	memcpy(laddr.mac, lmac, sizeof(laddr.mac));
+	existing = llc_lookup_established(llc->sap, &daddr, &laddr);
+	if (existing) {
+		if (existing->state == TCP_ESTABLISHED) {
+			sk = existing;
 			goto out_put;
 		} else
-			sock_put(sk);
+			sock_put(existing);
 	}
-	rc = -ENOMEM;
-	sk = prim->data->conn.sk;
 	sock_hold(sk);
+	rc = -ENOMEM;
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -333,11 +298,9 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 		ev->type	   = LLC_CONN_EV_TYPE_PRIM;
 		ev->data.prim.prim = LLC_CONN_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-		ev->data.prim.data = prim;
+		ev->data.prim.data = NULL;
 		rc = llc_conn_state_process(sk, skb);
 	}
-	if (rc)
-		llc_confirm_impossible(prim);
 out_put:
 	sock_put(sk);
 	return rc;
@@ -415,74 +378,6 @@ static int llc_rst_req_handler(struct llc_prim_if_block *prim)
 static int llc_flowcontrol_req_handler(struct llc_prim_if_block *prim)
 {
 	return 1;
-}
-
-/**
- *	llc_sap_resp - Sends response to peer
- *	@prim: pointer to structure that contains service parameters
- *
- *	This function is a interface function to upper layer. Each one who
- *	wants to response to an indicate can call this function via calling
- *	sap_resp with proper service parameters. Returns 0 for success, 1
- *	otherwise.
- */
-static int llc_sap_resp(struct llc_prim_if_block *prim)
-{
-	u16 rc = 1;
-	/* network layer RESPONSE primitive received; package primitive
-	 * as an event and send it to the connection event handler
-	 */
-	if (prim->prim < LLC_NBR_PRIMITIVES)
-	       /* valid primitive; call the function to handle it */
-		rc = llc_resp_prim[prim->prim](prim);
-	return rc;
-}
-
-/**
- *	llc_conn_rsp_handler - Response to connect indication
- *	@prim: pointer to structure that contains response info.
- *
- *	Response to connect indication.
- */
-static int llc_conn_rsp_handler(struct llc_prim_if_block *prim)
-{
-	struct sock *sk = prim->data->conn.sk;
-
-	llc_sk(sk)->link = prim->data->conn.link;
-	return 0;
-}
-
-/**
- *	llc_rst_rsp_handler - Response to RESET indication
- *	@prim: pointer to structure that contains response info
- *
- *	Returns 0 for success, 1 otherwise
- */
-static int llc_rst_rsp_handler(struct llc_prim_if_block *prim)
-{
-	int rc = 1;
-	/*
-	 * Network layer supplies connection handle; map it to a connection;
-	 * package as event and send it to connection event handler
-	 */
-	struct sock *sk = prim->data->res.sk;
-	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
-
-	if (skb) {
-		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-		ev->type	   = LLC_CONN_EV_TYPE_PRIM;
-		ev->data.prim.prim = LLC_RESET_PRIM;
-		ev->data.prim.type = LLC_PRIM_TYPE_RESP;
-		ev->data.prim.data = prim;
-		rc = llc_conn_state_process(sk, skb);
-	}
-	return rc;
-}
-
-static int llc_no_rsp_handler(struct llc_prim_if_block *prim)
-{
-	return 0;
 }
 
 EXPORT_SYMBOL(llc_sap_open);

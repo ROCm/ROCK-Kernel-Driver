@@ -103,9 +103,23 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	}
 	if (!cfm_prim)  /* confirmation not required */
 		goto out;
-	/* data confirm has preconditions */
+	/* data and conn confirm have preconditions */
 	/* FIXME: see FIXMEs above */
-	if (flag != LLC_DATA_PRIM + 1) {
+	if (flag == LLC_CONN_PRIM + 1) {
+		struct sock *sk = skb->sk;
+
+		if (sk->type != SOCK_STREAM || sk->state != TCP_SYN_SENT)
+			goto out_kfree_skb;
+		if (ev->status) {
+			sk->socket->state = SS_UNCONNECTED;
+			sk->state         = TCP_CLOSE;
+		} else {
+			sk->socket->state = SS_CONNECTED;
+			sk->state         = TCP_ESTABLISHED;
+		}
+		sk->state_change(sk);
+		goto out_kfree_skb;
+	} else if (flag != LLC_DATA_PRIM + 1) {
 		llc->sap->conf(cfm_prim);
 		goto out;
 	}
@@ -115,6 +129,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 			skb->sk->write_space(skb->sk);
 	} else
 		rc = llc->failed_data_req = 1;
+out_kfree_skb:
 	kfree_skb(skb);
 out:
 	return rc;

@@ -125,38 +125,6 @@ static __inline__ u8 llc_ui_header_len(struct sock *sk,
 }
 
 /**
- *	llc_ui_send_conn - send connect command for new llc2 connection
- *	@sap : Sap the socket is bound to.
- *	@addr: Source and destination fields provided by the user.
- *	@dev : Device which this connection should use.
- *	@link: Link number to assign to this connection.
- *
- *	Send a connect command to the llc layer for a new llc2 connection.
- *	Returns 0 upon success, non-zero if action didn't succeed.
- */
-static int llc_ui_send_conn(struct sock *sk, struct llc_sap *sap,
-			    struct sockaddr_llc *addr,
-			    struct net_device *dev, int link)
-{
-	struct llc_opt *llc = llc_sk(sk);
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
-
-	prim.data		= &prim_data;
-	prim.sap		= sap;
-	prim.prim		= LLC_CONN_PRIM;
-	prim_data.conn.dev	= dev;
-	prim_data.conn.link	= link;
-	prim_data.conn.sk	= sk;
-	prim_data.conn.pri	= 0;
-	prim_data.conn.saddr.lsap = llc->addr.sllc_ssap;
-	prim_data.conn.daddr.lsap = addr->sllc_dsap;
-	memcpy(prim_data.conn.saddr.mac, dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.conn.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
-	return sap->req(&prim);
-}
-
-/**
  *	llc_ui_send_disc - send disc command to llc layer
  *	@sk: Socket with valid llc information.
  *
@@ -709,7 +677,8 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 	sock->state = SS_CONNECTING;
 	sk->state   = TCP_SYN_SENT;
 	llc->link   = llc_ui_next_link_no(llc->sap->laddr.lsap);
-	rc = llc_ui_send_conn(sk, llc->sap, addr, dev, llc->link);
+	rc = llc_establish_connection(sk, dev->dev_addr,
+				      addr->sllc_dmac, addr->sllc_dsap);
 	if (rc) {
 		dprintk("%s: llc_ui_send_conn failed :-(\n", __FUNCTION__);
 		sock->state = SS_UNCONNECTED;
@@ -1441,32 +1410,6 @@ static int llc_ui_indicate(struct llc_prim_if_block *prim)
 }
 
 /**
- *	llc_ui_conf_conn - handle CONN confirm.
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle CONN confirm.
- */
-static void llc_ui_conf_conn(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_conn *prim_data = &prim->data->conn;
-	struct sock* sk = prim_data->sk;
-
-	sock_hold(sk);
-	if (sk->type != SOCK_STREAM || sk->state != TCP_SYN_SENT)
-		goto out_put;
-	if (!prim->data->conn.status) {
-		sk->socket->state = SS_CONNECTED;
-		sk->state	  = TCP_ESTABLISHED;
-	} else {
-		sk->socket->state = SS_UNCONNECTED;
-		sk->state	  = TCP_CLOSE;
-	}
-	sk->state_change(sk);
-out_put:
-	sock_put(sk);
-}
-
-/**
  *	llc_ui_conf_disc - handle DISC confirm.
  *	@prim: Primitive block provided by the llc layer.
  *
@@ -1499,7 +1442,9 @@ static int llc_ui_confirm(struct llc_prim_if_block *prim)
 {
 	switch (prim->prim) {
 		case LLC_CONN_PRIM:
-			llc_ui_conf_conn(prim);		break;
+			dprintk("%s: shouldn't happen, LLC_CONN_PRIM "
+				"is gone for ->conf()...\n", __FUNCTION__);
+			break;
 		case LLC_DATA_PRIM:
 			dprintk("%s: shouldn't happen, LLC_DATA_PRIM "
 				"is gone for ->conf()...\n", __FUNCTION__);
