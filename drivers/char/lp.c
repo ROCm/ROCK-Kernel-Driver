@@ -648,7 +648,7 @@ static void lp_console_write (struct console *co, const char *s,
 	do {
 		/* Write the data, converting LF->CRLF as we go. */
 		ssize_t canwrite = count;
-		char *lf = strchr (s, '\n');
+		char *lf = memchr (s, '\n', count);
 		if (lf)
 			canwrite = lf - s;
 
