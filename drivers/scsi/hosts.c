@@ -350,6 +350,13 @@ void scsi_unregister(struct Scsi_Host *shost)
 	/* Cleanup proc */
 	scsi_proc_host_rm(shost);
 
+	while (!list_empty(&shost->free_list)) {
+		struct scsi_cmnd *cmd;
+		cmd = list_entry(shost->free_list.next,struct scsi_cmnd,list);
+		list_del_init(&cmd->list);
+		kmem_cache_free(scsi_core->scsi_cmd_cache, cmd);
+	}
+
 	kfree(shost);
 }
 
@@ -370,6 +377,7 @@ extern int blk_nohighio;
 struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 {
 	struct Scsi_Host *shost, *shost_scr;
+	struct scsi_cmnd *cmd = NULL;
 	int gfp_mask;
 	DECLARE_COMPLETION(sem);
 
@@ -458,6 +466,16 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	list_add_tail(&shost->sh_list, &scsi_host_list);
 found:
 	spin_unlock(&scsi_host_list_lock);
+
+	spin_lock_init(&shost->free_list_lock);
+	INIT_LIST_HEAD(&shost->free_list);
+
+	/* Get one backup command for this host. */
+	cmd = scsi_get_command(shost, GFP_KERNEL);
+	if (cmd)
+		list_add(&cmd->list, &shost->free_list);		
+	else
+		printk(KERN_NOTICE "The system is running low in memory.\n");
 
 	scsi_proc_host_add(shost);
 

@@ -375,6 +375,9 @@ struct Scsi_Host
     struct list_head      sh_list;
     struct list_head	  my_devices;
 
+    spinlock_t            free_list_lock;
+    struct list_head      free_list;   /* backup store of cmd structs */
+
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
 

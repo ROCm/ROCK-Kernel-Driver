@@ -971,7 +971,7 @@ ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	struct	 ahd_linux_device *dev;
 	u_long	 flags;
 
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 
 	/*
 	 * Save the callback on completion function.
@@ -995,8 +995,8 @@ ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 		ahd_midlayer_entrypoint_unlock(ahd, &flags);
 		return (0);
 	}
-	dev = ahd_linux_get_device(ahd, cmd->channel, cmd->target,
-				   cmd->lun, /*alloc*/TRUE);
+	dev = ahd_linux_get_device(ahd, cmd->device->channel, cmd->device->id,
+				   cmd->device->lun, /*alloc*/TRUE);
 	if (dev == NULL) {
 		ahd_midlayer_entrypoint_unlock(ahd, &flags);
 		printf("aic79xx_linux_queue: Unable to allocate device!\n");
@@ -1217,7 +1217,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	int    found;
 #endif
 
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 #if NOTYET
 	int error;
 
@@ -1251,7 +1251,7 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	int    found;
 #endif
 
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 #ifdef AHD_DEBUG
 	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0)
 		printf("%s: Dev reset called for cmd %p\n",
@@ -1283,14 +1283,14 @@ ahd_linux_bus_reset(Scsi_Cmnd *cmd)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	spin_unlock_irq(&io_request_lock);
 #endif
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+	ahd = *(struct ahd_softc **)cmd->device->host->hostdata;
 #ifdef AHD_DEBUG
 	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0)
 		printf("%s: Bus reset called for cmd %p\n",
 		       ahd_name(ahd), cmd);
 #endif
 	ahd_midlayer_entrypoint_lock(ahd, &s);
-	found = ahd_reset_channel(ahd, cmd->channel + 'A',
+	found = ahd_reset_channel(ahd, cmd->device->channel + 'A',
 				  /*initiate reset*/TRUE);
 	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
 	TAILQ_INIT(&ahd->platform_data->completeq);
@@ -1415,7 +1415,7 @@ static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahd, cmd)						\
-	((((cmd)->target << TID_SHIFT) & TID) | (ahd)->our_id)
+	((((cmd)->device->id << TID_SHIFT) & TID) | (ahd)->our_id)
 
 /******************************** Bus DMA *************************************/
 int
@@ -3687,7 +3687,7 @@ ahd_linux_dv_timeout(struct scsi_cmnd *cmd)
 	struct	scb *scb;
 	u_long	flags;
 
-	ahd = *((struct ahd_softc **)cmd->host->hostdata);
+	ahd = *((struct ahd_softc **)cmd->device->host->hostdata);
 	ahd_lock(ahd, &flags);
 
 #ifdef AHD_DEBUG
@@ -3715,7 +3715,7 @@ ahd_linux_dv_timeout(struct scsi_cmnd *cmd)
 		ahd_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
 	else
 		ahd_set_transaction_status(scb, CAM_CMD_TIMEOUT);
-	ahd_reset_channel(ahd, cmd->channel + 'A', /*initiate*/TRUE);
+	ahd_reset_channel(ahd, cmd->device->channel + 'A', /*initiate*/TRUE);
 
 	/*
 	 * Add a minimal bus settle delay for devices that are slow to
@@ -3765,7 +3765,7 @@ ahd_linux_dv_complete(struct scsi_cmnd *cmd)
 {
 	struct ahd_softc *ahd;
 
-	ahd = *((struct ahd_softc **)cmd->host->hostdata);
+	ahd = *((struct ahd_softc **)cmd->device->host->hostdata);
 
 	/* Delete the DV timer before it goes off! */
 	scsi_delete_timer(cmd);
@@ -3773,7 +3773,8 @@ ahd_linux_dv_complete(struct scsi_cmnd *cmd)
 #ifdef AHD_DEBUG
 	if (ahd_debug & AHD_SHOW_DV)
 		printf("%s:%c:%d: Command completed, status= 0x%x\n",
-		       ahd_name(ahd), cmd->channel, cmd->target, cmd->result);
+		       ahd_name(ahd), cmd->device->channel,
+		       cmd->device->id, cmd->result);
 #endif
 
 	/* Wake up the state machine */
@@ -3967,12 +3968,13 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		 * Get an scb to use.
 		 */
 		tinfo = ahd_fetch_transinfo(ahd, 'A', ahd->our_id,
-					    cmd->target, &tstate);
+					    cmd->device->id, &tstate);
 		if ((dev->flags & (AHD_DEV_Q_TAGGED|AHD_DEV_Q_BASIC)) == 0
 		 || (tinfo->curr.ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
 			col_idx = AHD_NEVER_COL_IDX;
 		} else {
-			col_idx = AHD_BUILD_COL_IDX(cmd->target, cmd->lun);
+			col_idx = AHD_BUILD_COL_IDX(cmd->device->id,
+						    cmd->device->lun);
 		}
 		if ((scb = ahd_get_scb(ahd, col_idx)) == NULL) {
 			TAILQ_INSERT_TAIL(&ahd->platform_data->device_runq,
@@ -3992,7 +3994,7 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahd, cmd);
-		hscb->lun = cmd->lun;
+		hscb->lun = cmd->device->lun;
 		mask = SCB_GET_TARGET_MASK(ahd, scb);
 
 		if ((ahd->user_discenable & mask) != 0)
@@ -4660,8 +4662,9 @@ ahd_linux_queue_cmd_complete(struct ahd_softc *ahd, Scsi_Cmnd *cmd)
 			struct ahd_devinfo devinfo;
 			uint32_t action;
 
-			dev = ahd_linux_get_device(ahd, cmd->channel,
-						   cmd->target, cmd->lun,
+			dev = ahd_linux_get_device(ahd, cmd->device->channel,
+						   cmd->device->id,
+						   cmd->device->lun,
 						   /*alloc*/FALSE);
 
 			if (dev == NULL)
