@@ -1205,7 +1205,7 @@ int __init ip_conntrack_init(void)
 
 	ip_conntrack_cachep = kmem_cache_create("ip_conntrack",
 	                                        sizeof(struct ip_conntrack), 0,
-	                                        SLAB_HWCACHE_ALIGN, NULL,NULL);
+	                                        0, NULL, NULL);
 	if (!ip_conntrack_cachep) {
 		printk(KERN_ERR "Unable to create ip_conntrack slab cache\n");
 		goto err_free_hash;
@@ -1213,7 +1213,7 @@ int __init ip_conntrack_init(void)
 
 	ip_conntrack_expect_cachep = kmem_cache_create("ip_conntrack_expect",
 					sizeof(struct ip_conntrack_expect),
-					0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+					0, 0, NULL, NULL);
 	if (!ip_conntrack_expect_cachep) {
 		printk(KERN_ERR "Unable to create ip_expect slab cache\n");
 		goto err_free_conntrack_slab;

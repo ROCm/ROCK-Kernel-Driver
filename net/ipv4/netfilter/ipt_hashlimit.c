@@ -668,11 +668,9 @@ static int init_or_fini(int fini)
 		goto cleanup_nothing;
 	}
 
-	/* FIXME: do we really want HWCACHE_ALIGN since our objects are
-	 * quite small ? */
 	hashlimit_cachep = kmem_cache_create("ipt_hashlimit",
 					    sizeof(struct dsthash_ent), 0,
-					    SLAB_HWCACHE_ALIGN, NULL, NULL);
+					    0, NULL, NULL);
 	if (!hashlimit_cachep) {
 		printk(KERN_ERR "Unable to create ipt_hashlimit slab cache\n");
 		ret = -ENOMEM;
