@@ -221,24 +221,26 @@ static void __init sbni_devsetup(struct net_device *dev)
 	SET_MODULE_OWNER( dev );
 }
 
-int __init sbni_probe(void)
+int __init sbni_probe(int unit)
 {
 	struct net_device *dev;
 	static unsigned  version_printed __initdata = 0;
+	int err;
 
-	if( version_printed++ == 0 )
-		printk( KERN_INFO "%s", version );
-
-	dev = alloc_netdev(sizeof(struct net_local), "sbni%d", sbni_devsetup);
+	dev = alloc_netdev(sizeof(struct net_local), "sbni", sbni_devsetup);
 	if (!dev)
 		return -ENOMEM;
 
+	sprintf(dev->name, "sbni%d", unit);
 	netdev_boot_setup_check(dev);
 
-	if (register_netdev(dev)) {
-		kfree(dev);
-		return -ENODEV;
+	err = register_netdev(dev);
+	if (err) {
+		free_netdev(dev);
+		return err;
 	}
+	if( version_printed++ == 0 )
+		printk( KERN_INFO "%s", version );
 	return 0;
 }
 
