@@ -589,7 +589,6 @@ static struct mapped_device *alloc_dev(unsigned int minor)
 		return NULL;
 	}
 
-	DMWARN("allocating minor %d.", minor);
 	memset(md, 0, sizeof(*md));
 	init_rwsem(&md->lock);
 	atomic_set(&md->holders, 1);
@@ -693,7 +692,6 @@ void dm_get(struct mapped_device *md)
 void dm_put(struct mapped_device *md)
 {
 	if (atomic_dec_and_test(&md->holders)) {
-		DMWARN("destroying md");
 		if (!test_bit(DMF_SUSPENDED, &md->flags))
 			dm_table_suspend_targets(md->map);
 		__unbind(md);

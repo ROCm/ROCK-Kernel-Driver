@@ -243,8 +243,6 @@ void table_destroy(struct dm_table *t)
 {
 	unsigned int i;
 
-	DMWARN("destroying table");
-
 	/* destroying the table counts as an event */
 	dm_table_event(t);
 
