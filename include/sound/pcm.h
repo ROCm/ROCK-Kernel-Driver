@@ -810,6 +810,7 @@ int snd_pcm_hw_param_set(snd_pcm_substream_t *pcm,
 int snd_pcm_hw_params_choose(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
 
 int snd_pcm_hw_refine(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
+int snd_pcm_hw_params(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
 
 int snd_pcm_hw_constraints_init(snd_pcm_substream_t *substream);
 int snd_pcm_hw_constraints_complete(snd_pcm_substream_t *substream);
