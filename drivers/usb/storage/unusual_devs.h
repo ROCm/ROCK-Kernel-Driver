@@ -631,6 +631,16 @@ UNUSUAL_DEV( 0x0d96, 0x410a, 0x0001, 0xffff,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY),
 
+/*
+ * Entry for Jenoptik JD 5200z3
+ *
+ * email: car.busse@gmx.de
+ */
+UNUSUAL_DEV(  0x0d96, 0x5200, 0x0001, 0x0200,
+		"Jenoptik",
+		"JD 5200 z3",
+		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+		
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
  * Entry is needed only for the initializer function override.
