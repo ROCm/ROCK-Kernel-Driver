@@ -54,7 +54,7 @@ static inline int shmem_acl_init(struct inode *inode, struct inode *dir)
 {
 	return 0;
 }
-void shmem_acl_destroy_inode(struct inode *inode)
+static inline void shmem_acl_destroy_inode(struct inode *inode)
 {
 }
 #endif  /* CONFIG_TMPFS_POSIX_ACL */

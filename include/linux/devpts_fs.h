@@ -17,23 +17,6 @@
 
 #ifdef CONFIG_UNIX98_PTYS
 
-#ifdef CONFIG_DEVPTS_POSIX_ACL
-struct devpts_inode_info {
-	struct posix_acl	*i_acl;
-	struct inode		vfs_inode;
-};
-
-static inline struct devpts_inode_info *DEVPTS_I(struct inode *inode)
-{
-	return container_of(inode, struct devpts_inode_info, vfs_inode);
-}
-
-/* acl.c */
-int devpts_setattr(struct dentry *, struct iattr *);
-int devpts_permission(struct inode *, int, struct nameidata *);
-#endif  /* CONFIG_DEVPTS_POSIX_ACL */
-
-/* inode.c */
 int devpts_pty_new(struct tty_struct *tty);      /* mknod in devpts */
 struct tty_struct *devpts_get_tty(int number);	 /* get tty structure */
 void devpts_pty_kill(int number);		 /* unlink */

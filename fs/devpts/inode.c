@@ -19,42 +19,14 @@
 #include <linux/tty.h>
 #include <linux/devpts_fs.h>
 #include <linux/xattr.h>
-#include <linux/generic_acl.h>
 
 #define DEVPTS_SUPER_MAGIC 0x1cd1
 
-#ifdef CONFIG_DEVPTS_POSIX_ACL
-static struct inode *
-devpts_alloc_inode(struct super_block *sb)
-{
-	struct devpts_inode_info *ei;
-	ei = kmalloc(sizeof(*ei), SLAB_KERNEL);
-	if (!ei)
-		return NULL;
-	inode_init_once(&ei->vfs_inode);
-	ei->i_acl = NULL;
-	return &ei->vfs_inode;
-}
-
-static void
-devpts_destroy_inode(struct inode *inode)
-{
-	struct devpts_inode_info *ei = DEVPTS_I(inode);
-	if (ei->i_acl)
-		posix_acl_release(ei->i_acl);
-	kfree(ei);
-}
-#endif  /* CONFIG_DEVPTS_POSIX_ACL */
-
 extern struct xattr_handler devpts_xattr_security_handler;
-extern struct xattr_handler devpts_xattr_acl_access_handler;
 
 static struct xattr_handler *devpts_xattr_handlers[] = {
 #ifdef CONFIG_DEVPTS_FS_SECURITY
 	&devpts_xattr_security_handler,
-#endif
-#ifdef CONFIG_DEVPTS_POSIX_ACL
-	&devpts_xattr_acl_access_handler,
 #endif
 	NULL
 };
@@ -65,10 +37,6 @@ static struct inode_operations devpts_file_inode_operations = {
 	.getxattr	= generic_getxattr,
 	.listxattr	= generic_listxattr,
 	.removexattr	= generic_removexattr,
-#endif
-#ifdef CONFIG_DEVPTS_POSIX_ACL
-	.setattr	= devpts_setattr,
-	.permission	= devpts_permission,
 #endif
 };
 
@@ -121,10 +89,6 @@ static int devpts_remount(struct super_block *sb, int *flags, char *data)
 }
 
 static struct super_operations devpts_sops = {
-#ifdef CONFIG_DEVPTS_POSIX_ACL
-	.alloc_inode    = devpts_alloc_inode,
-	.destroy_inode	= devpts_destroy_inode,
-#endif
 	.statfs		= simple_statfs,
 	.remount_fs	= devpts_remount,
 };
@@ -153,9 +117,6 @@ devpts_fill_super(struct super_block *s, void *data, int silent)
 	inode->i_op = &simple_dir_inode_operations;
 	inode->i_fop = &simple_dir_operations;
 	inode->i_nlink = 2;
-#ifdef CONFIG_TMPFS_POSIX_ACL
-	s->s_flags |= MS_POSIXACL;
-#endif
 
 	devpts_root = s->s_root = d_alloc_root(inode);
 	if (s->s_root)
