@@ -368,12 +368,44 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 	return stat;
 }
 
+static inline void ide_pio_datablock(ide_drive_t *drive, struct request *rq,
+				     unsigned int write)
+{
+	switch (drive->hwif->data_phase) {
+	case TASKFILE_MULTI_IN:
+	case TASKFILE_MULTI_OUT:
+		task_multi_sectors(drive, rq, write);
+		break;
+	default:
+		task_sectors(drive, rq, 1, write);
+		break;
+	}
+}
+
 #ifdef CONFIG_IDE_TASKFILE_IO
 static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
-				  const char *s, u8 stat, unsigned cur_bad)
+				  const char *s, u8 stat)
 {
 	if (rq->bio) {
-		int sectors = rq->hard_nr_sectors - rq->nr_sectors - cur_bad;
+		int sectors = rq->hard_nr_sectors - rq->nr_sectors;
+
+		switch (drive->hwif->data_phase) {
+		case TASKFILE_IN:
+			if (rq->nr_sectors)
+				break;
+			/* fall through */
+		case TASKFILE_OUT:
+			sectors--;
+			break;
+		case TASKFILE_MULTI_IN:
+			if (rq->nr_sectors)
+				break;
+			/* fall through */
+		case TASKFILE_MULTI_OUT:
+			sectors -= drive->mult_count;
+		default:
+			break;
+		}
 
 		if (sectors > 0)
 			drive->driver->end_request(drive, 1, sectors);
@@ -381,7 +413,7 @@ static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
 	return drive->driver->error(drive, s, stat);
 }
 #else
-# define task_error(d, rq, s, stat, cur_bad) drive->driver->error(d, s, stat)
+# define task_error(d, rq, s, stat) drive->driver->error(d, s, stat)
 #endif
 
 static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)
@@ -399,7 +431,7 @@ static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)
 }
 
 /*
- * Handler for command with PIO data-in phase (Read).
+ * Handler for command with PIO data-in phase (Read/Read Multiple).
  */
 ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
@@ -408,19 +440,19 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
-			return task_error(drive, rq, __FUNCTION__, stat, 0);
+			return task_error(drive, rq, __FUNCTION__, stat);
 		/* No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
 
-	task_sectors(drive, rq, 1, IDE_PIO_IN);
+	ide_pio_datablock(drive, rq, 0);
 
 	/* If it was the last datablock check status and finish transfer. */
 	if (!rq->nr_sectors) {
 		stat = wait_drive_not_busy(drive);
 		if (!OK_STAT(stat, 0, BAD_R_STAT))
-			return task_error(drive, rq, __FUNCTION__, stat, 1);
+			return task_error(drive, rq, __FUNCTION__, stat);
 		task_end_request(drive, rq, stat);
 		return ide_stopped;
 	}
@@ -433,41 +465,7 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 EXPORT_SYMBOL(task_in_intr);
 
 /*
- * Handler for command with PIO data-in phase (Read Multiple).
- */
-ide_startstop_t task_mulin_intr (ide_drive_t *drive)
-{
-	struct request *rq = HWGROUP(drive)->rq;
-	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
-
-	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
-		if (stat & (ERR_STAT | DRQ_STAT))
-			return task_error(drive, rq, __FUNCTION__, stat, 0);
-		/* No data yet, so wait for another IRQ. */
-		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
-		return ide_started;
-	}
-
-	task_multi_sectors(drive, rq, IDE_PIO_IN);
-
-	/* If it was the last datablock check status and finish transfer. */
-	if (!rq->nr_sectors) {
-		stat = wait_drive_not_busy(drive);
-		if (!OK_STAT(stat, 0, BAD_R_STAT))
-			return task_error(drive, rq, __FUNCTION__, stat, drive->mult_count);
-		task_end_request(drive, rq, stat);
-		return ide_stopped;
-	}
-
-	/* Still data left to transfer. */
-	ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
-
-	return ide_started;
-}
-EXPORT_SYMBOL(task_mulin_intr);
-
-/*
- * Handler for command with PIO data-out phase (Write).
+ * Handler for command with PIO data-out phase (Write/Write Multiple).
  */
 ide_startstop_t task_out_intr (ide_drive_t *drive)
 {
@@ -476,11 +474,11 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
 	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
-		return task_error(drive, rq, __FUNCTION__, stat, 1);
+		return task_error(drive, rq, __FUNCTION__, stat);
 
 	/* Deal with unexpected ATA data phase. */
 	if (((stat & DRQ_STAT) == 0) ^ !rq->nr_sectors)
-		return task_error(drive, rq, __FUNCTION__, stat, 1);
+		return task_error(drive, rq, __FUNCTION__, stat);
 
 	if (!rq->nr_sectors) {
 		task_end_request(drive, rq, stat);
@@ -488,7 +486,7 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	}
 
 	/* Still data left to transfer. */
-	task_sectors(drive, rq, 1, IDE_PIO_OUT);
+	ide_pio_datablock(drive, rq, 1);
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
 
 	return ide_started;
@@ -502,8 +500,10 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
 			  drive->bad_wstat, WAIT_DRQ)) {
-		printk(KERN_ERR "%s: no DRQ after issuing WRITE%s\n",
-				drive->name, drive->addressing ? "_EXT" : "");
+		printk(KERN_ERR "%s: no DRQ after issuing %sWRITE%s\n",
+				drive->name,
+				drive->hwif->data_phase ? "MULT" : "",
+				drive->addressing ? "_EXT" : "");
 		return startstop;
 	}
 
@@ -511,61 +511,11 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 		local_irq_disable();
 
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
-	task_sectors(drive, rq, 1, IDE_PIO_OUT);
+	ide_pio_datablock(drive, rq, 1);
 
 	return ide_started;
 }
 EXPORT_SYMBOL(pre_task_out_intr);
-
-/*
- * Handler for command with PIO data-out phase (Write Multiple).
- */
-ide_startstop_t task_mulout_intr (ide_drive_t *drive)
-{
-	struct request *rq = HWGROUP(drive)->rq;
-	u8 stat;
-
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
-		return task_error(drive, rq, __FUNCTION__, stat, drive->mult_count);
-
-	/* Deal with unexpected ATA data phase. */
-	if (((stat & DRQ_STAT) == 0) ^ !rq->nr_sectors)
-		return task_error(drive, rq, __FUNCTION__, stat, drive->mult_count);
-
-	if (!rq->nr_sectors) {
-		task_end_request(drive, rq, stat);
-		return ide_stopped;
-	}
-
-	/* Still data left to transfer. */
-	task_multi_sectors(drive, rq, IDE_PIO_OUT);
-	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-
-	return ide_started;
-}
-EXPORT_SYMBOL(task_mulout_intr);
-
-ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
-{
-	ide_startstop_t startstop;
-
-	if (ide_wait_stat(&startstop, drive, DATA_READY,
-			  drive->bad_wstat, WAIT_DRQ)) {
-		printk(KERN_ERR "%s: no DRQ after issuing MULTWRITE%s\n",
-				drive->name, drive->addressing ? "_EXT" : "");
-		return startstop;
-	}
-
-	if (!drive->unmask)
-		local_irq_disable();
-
-	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-	task_multi_sectors(drive, rq, IDE_PIO_OUT);
-
-	return ide_started;
-}
-EXPORT_SYMBOL(pre_task_mulout_intr);
 
 int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_size, u8 *buf)
 {
@@ -711,10 +661,7 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 				err = -EPERM;
 				goto abort;
 			}
-			args.prehandler = &pre_task_mulout_intr;
-			args.handler = &task_mulout_intr;
-			err = ide_diag_taskfile(drive, &args, taskout, outbuf);
-			break;
+			/* fall through */
 		case TASKFILE_OUT:
 			args.prehandler = &pre_task_out_intr;
 			args.handler = &task_out_intr;
@@ -729,9 +676,7 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 				err = -EPERM;
 				goto abort;
 			}
-			args.handler = &task_mulin_intr;
-			err = ide_diag_taskfile(drive, &args, taskin, inbuf);
-			break;
+			/* fall through */
 		case TASKFILE_IN:
 			args.handler = &task_in_intr;
 			err = ide_diag_taskfile(drive, &args, taskin, inbuf);

@@ -1424,11 +1424,8 @@ extern ide_startstop_t set_geometry_intr(ide_drive_t *);
 extern ide_startstop_t recal_intr(ide_drive_t *);
 extern ide_startstop_t task_no_data_intr(ide_drive_t *);
 extern ide_startstop_t task_in_intr(ide_drive_t *);
-extern ide_startstop_t task_mulin_intr(ide_drive_t *);
 extern ide_startstop_t pre_task_out_intr(ide_drive_t *, struct request *);
 extern ide_startstop_t task_out_intr(ide_drive_t *);
-extern ide_startstop_t pre_task_mulout_intr(ide_drive_t *, struct request *);
-extern ide_startstop_t task_mulout_intr(ide_drive_t *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
 

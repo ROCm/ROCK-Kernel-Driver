@@ -508,27 +508,24 @@ static u8 get_command(ide_drive_t *drive, struct request *rq, ide_task_t *task)
 		task->command_type = IDE_DRIVE_TASK_IN;
 		if (dma)
 			return lba48 ? WIN_READDMA_EXT : WIN_READDMA;
+		task->handler = &task_in_intr;
 		if (drive->mult_count) {
 			task->data_phase = TASKFILE_MULTI_IN;
-			task->handler = &task_mulin_intr;
 			return lba48 ? WIN_MULTREAD_EXT : WIN_MULTREAD;
 		}
 		task->data_phase = TASKFILE_IN;
-		task->handler = &task_in_intr;
 		return lba48 ? WIN_READ_EXT : WIN_READ;
 	} else {
 		task->command_type = IDE_DRIVE_TASK_RAW_WRITE;
 		if (dma)
 			return lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+		task->prehandler = &pre_task_out_intr;
+		task->handler = &task_out_intr;
 		if (drive->mult_count) {
 			task->data_phase = TASKFILE_MULTI_OUT;
-			task->prehandler = &pre_task_mulout_intr;
-			task->handler = &task_mulout_intr;
 			return lba48 ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
 		}
 		task->data_phase = TASKFILE_OUT;
-		task->prehandler = &pre_task_out_intr;
-		task->handler = &task_out_intr;
 		return lba48 ? WIN_WRITE_EXT : WIN_WRITE;
 	}
 }
