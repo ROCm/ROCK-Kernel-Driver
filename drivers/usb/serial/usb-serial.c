@@ -1242,7 +1242,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	/* register all of the individual ports with the driver core */
 	for (i = 0; i < num_ports; ++i) {
 		port = serial->port[i];
-		port->dev.parent = &serial->dev->dev;
+		port->dev.parent = &interface->dev;
 		port->dev.driver = NULL;
 		port->dev.bus = &usb_serial_bus_type;
 		port->dev.release = &port_release;
