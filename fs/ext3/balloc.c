@@ -46,18 +46,18 @@ struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 	unsigned long desc;
 	struct ext3_group_desc * gdp;
 
-	if (block_group >= sb->u.ext3_sb.s_groups_count) {
+	if (block_group >= EXT3_SB(sb)->s_groups_count) {
 		ext3_error (sb, "ext3_get_group_desc",
 			    "block_group >= groups_count - "
 			    "block_group = %d, groups_count = %lu",
-			    block_group, sb->u.ext3_sb.s_groups_count);
+			    block_group, EXT3_SB(sb)->s_groups_count);
 
 		return NULL;
 	}
 	
 	group_desc = block_group / EXT3_DESC_PER_BLOCK(sb);
 	desc = block_group % EXT3_DESC_PER_BLOCK(sb);
-	if (!sb->u.ext3_sb.s_group_desc[group_desc]) {
+	if (!EXT3_SB(sb)->s_group_desc[group_desc]) {
 		ext3_error (sb, "ext3_get_group_desc",
 			    "Group descriptor not loaded - "
 			    "block_group = %d, group_desc = %lu, desc = %lu",
@@ -66,9 +66,9 @@ struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 	}
 	
 	gdp = (struct ext3_group_desc *) 
-	      sb->u.ext3_sb.s_group_desc[group_desc]->b_data;
+	      EXT3_SB(sb)->s_group_desc[group_desc]->b_data;
 	if (bh)
-		*bh = sb->u.ext3_sb.s_group_desc[group_desc];
+		*bh = EXT3_SB(sb)->s_group_desc[group_desc];
 	return gdp + desc;
 }
 
@@ -119,7 +119,7 @@ void ext3_free_blocks (handle_t *handle, struct inode * inode,
 		return;
 	}
 	lock_super (sb);
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	if (block < le32_to_cpu(es->s_first_data_block) || 
 	    (block + count) > le32_to_cpu(es->s_blocks_count)) {
 		ext3_error (sb, "ext3_free_blocks",
@@ -155,9 +155,9 @@ do_more:
 	if (in_range (le32_to_cpu(gdp->bg_block_bitmap), block, count) ||
 	    in_range (le32_to_cpu(gdp->bg_inode_bitmap), block, count) ||
 	    in_range (block, le32_to_cpu(gdp->bg_inode_table),
-		      sb->u.ext3_sb.s_itb_per_group) ||
+		      EXT3_SB(sb)->s_itb_per_group) ||
 	    in_range (block + count - 1, le32_to_cpu(gdp->bg_inode_table),
-		      sb->u.ext3_sb.s_itb_per_group))
+		      EXT3_SB(sb)->s_itb_per_group))
 		ext3_error (sb, "ext3_free_blocks",
 			    "Freeing blocks in system zones - "
 			    "Block = %lu, count = %lu",
@@ -183,8 +183,8 @@ do_more:
 	if (err)
 		goto error_return;
 
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "get_write_access");
-	err = ext3_journal_get_write_access(handle, sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get_write_access");
+	err = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
 	if (err)
 		goto error_return;
 
@@ -253,8 +253,8 @@ do_more:
 	if (!err) err = ret;
 
 	/* And the superblock */
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "dirtied superblock");
-	ret = ext3_journal_dirty_metadata(handle, sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "dirtied superblock");
+	ret = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 	if (!err) err = ret;
 
 	if (overflow && !err) {
@@ -408,12 +408,12 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	}
 
 	lock_super(sb);
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	if (le32_to_cpu(es->s_free_blocks_count) <=
 			le32_to_cpu(es->s_r_blocks_count) &&
-	    ((sb->u.ext3_sb.s_resuid != current->fsuid) &&
-	     (sb->u.ext3_sb.s_resgid == 0 ||
-	      !in_group_p(sb->u.ext3_sb.s_resgid)) && 
+	    ((EXT3_SB(sb)->s_resuid != current->fsuid) &&
+	     (EXT3_SB(sb)->s_resgid == 0 ||
+	      !in_group_p(EXT3_SB(sb)->s_resgid)) && 
 	     !capable(CAP_SYS_RESOURCE)))
 		goto out;
 
@@ -464,9 +464,9 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	 * Now search the rest of the groups.  We assume that 
 	 * i and gdp correctly point to the last group visited.
 	 */
-	for (bit = 0; bit < sb->u.ext3_sb.s_groups_count; bit++) {
+	for (bit = 0; bit < EXT3_SB(sb)->s_groups_count; bit++) {
 		group_no++;
-		if (group_no >= sb->u.ext3_sb.s_groups_count)
+		if (group_no >= EXT3_SB(sb)->s_groups_count)
 			group_no = 0;
 		gdp = ext3_get_group_desc(sb, group_no, &gdp_bh);
 		if (!gdp) {
@@ -518,8 +518,8 @@ got_block:
 	if (fatal)
 		goto out;
 
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "get_write_access");
-	fatal = ext3_journal_get_write_access(handle, sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get_write_access");
+	fatal = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
 	if (fatal)
 		goto out;
 
@@ -529,7 +529,7 @@ got_block:
 	if (target_block == le32_to_cpu(gdp->bg_block_bitmap) ||
 	    target_block == le32_to_cpu(gdp->bg_inode_bitmap) ||
 	    in_range(target_block, le32_to_cpu(gdp->bg_inode_table),
-		      sb->u.ext3_sb.s_itb_per_group))
+		      EXT3_SB(sb)->s_itb_per_group))
 		ext3_error(sb, "ext3_new_block",
 			    "Allocating block in system zone - "
 			    "block = %u", target_block);
@@ -594,9 +594,9 @@ got_block:
 	if (!fatal)
 		fatal = err;
 
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh,
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh,
 			"journal_dirty_metadata for superblock");
-	err = ext3_journal_dirty_metadata(handle, sb->u.ext3_sb.s_sbh);
+	err = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 	if (!fatal)
 		fatal = err;
 
@@ -637,11 +637,11 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 	int i;
 	
 	lock_super(sb);
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	desc_count = 0;
 	bitmap_count = 0;
 	gdp = NULL;
-	for (i = 0; i < sb->u.ext3_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT3_SB(sb)->s_groups_count; i++) {
 		gdp = ext3_get_group_desc(sb, i, NULL);
 		if (!gdp)
 			continue;
@@ -662,7 +662,7 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 	unlock_super(sb);
 	return bitmap_count;
 #else
-	return le32_to_cpu(sb->u.ext3_sb.s_es->s_free_blocks_count);
+	return le32_to_cpu(EXT3_SB(sb)->s_es->s_free_blocks_count);
 #endif
 }
 
@@ -671,7 +671,7 @@ static inline int block_in_use(unsigned long block,
 				unsigned char * map)
 {
 	return ext3_test_bit ((block -
-		le32_to_cpu(sb->u.ext3_sb.s_es->s_first_data_block)) %
+		le32_to_cpu(EXT3_SB(sb)->s_es->s_first_data_block)) %
 			 EXT3_BLOCKS_PER_GROUP(sb), map);
 }
 
@@ -738,11 +738,11 @@ void ext3_check_blocks_bitmap (struct super_block * sb)
 	struct ext3_group_desc *gdp;
 	int i;
 
-	es = sb->u.ext3_sb.s_es;
+	es = EXT3_SB(sb)->s_es;
 	desc_count = 0;
 	bitmap_count = 0;
 	gdp = NULL;
-	for (i = 0; i < sb->u.ext3_sb.s_groups_count; i++) {
+	for (i = 0; i < EXT3_SB(sb)->s_groups_count; i++) {
 		gdp = ext3_get_group_desc (sb, i, NULL);
 		if (!gdp)
 			continue;
@@ -776,7 +776,7 @@ void ext3_check_blocks_bitmap (struct super_block * sb)
 				    "Inode bitmap for group %d is marked free",
 				    i);
 
-		for (j = 0; j < sb->u.ext3_sb.s_itb_per_group; j++)
+		for (j = 0; j < EXT3_SB(sb)->s_itb_per_group; j++)
 			if (!block_in_use (le32_to_cpu(gdp->bg_inode_table) + j,
 							sb, bitmap_bh->b_data))
 				ext3_error (sb, "ext3_check_blocks_bitmap",

@@ -97,9 +97,9 @@
 # define EXT3_BLOCK_SIZE_BITS(s)	((s)->s_log_block_size + 10)
 #endif
 #ifdef __KERNEL__
-#define	EXT3_ADDR_PER_BLOCK_BITS(s)	((s)->u.ext3_sb.s_addr_per_block_bits)
-#define EXT3_INODE_SIZE(s)		((s)->u.ext3_sb.s_inode_size)
-#define EXT3_FIRST_INO(s)		((s)->u.ext3_sb.s_first_ino)
+#define	EXT3_ADDR_PER_BLOCK_BITS(s)	(EXT3_SB(s)->s_addr_per_block_bits)
+#define EXT3_INODE_SIZE(s)		(EXT3_SB(s)->s_inode_size)
+#define EXT3_FIRST_INO(s)		(EXT3_SB(s)->s_first_ino)
 #else
 #define EXT3_INODE_SIZE(s)	(((s)->s_rev_level == EXT3_GOOD_OLD_REV) ? \
 				 EXT3_GOOD_OLD_INODE_SIZE : \
@@ -116,8 +116,8 @@
 #define	EXT3_MAX_FRAG_SIZE		4096
 #define EXT3_MIN_FRAG_LOG_SIZE		  10
 #ifdef __KERNEL__
-# define EXT3_FRAG_SIZE(s)		((s)->u.ext3_sb.s_frag_size)
-# define EXT3_FRAGS_PER_BLOCK(s)	((s)->u.ext3_sb.s_frags_per_block)
+# define EXT3_FRAG_SIZE(s)		(EXT3_SB(s)->s_frag_size)
+# define EXT3_FRAGS_PER_BLOCK(s)	(EXT3_SB(s)->s_frags_per_block)
 #else
 # define EXT3_FRAG_SIZE(s)		(EXT3_MIN_FRAG_SIZE << (s)->s_log_frag_size)
 # define EXT3_FRAGS_PER_BLOCK(s)	(EXT3_BLOCK_SIZE(s) / EXT3_FRAG_SIZE(s))
@@ -164,10 +164,10 @@ struct ext3_group_desc
  * Macro-instructions used to manage group descriptors
  */
 #ifdef __KERNEL__
-# define EXT3_BLOCKS_PER_GROUP(s)	((s)->u.ext3_sb.s_blocks_per_group)
-# define EXT3_DESC_PER_BLOCK(s)		((s)->u.ext3_sb.s_desc_per_block)
-# define EXT3_INODES_PER_GROUP(s)	((s)->u.ext3_sb.s_inodes_per_group)
-# define EXT3_DESC_PER_BLOCK_BITS(s)	((s)->u.ext3_sb.s_desc_per_block_bits)
+# define EXT3_BLOCKS_PER_GROUP(s)	(EXT3_SB(s)->s_blocks_per_group)
+# define EXT3_DESC_PER_BLOCK(s)		(EXT3_SB(s)->s_desc_per_block)
+# define EXT3_INODES_PER_GROUP(s)	(EXT3_SB(s)->s_inodes_per_group)
+# define EXT3_DESC_PER_BLOCK_BITS(s)	(EXT3_SB(s)->s_desc_per_block_bits)
 #else
 # define EXT3_BLOCKS_PER_GROUP(s)	((s)->s_blocks_per_group)
 # define EXT3_DESC_PER_BLOCK(s)		(EXT3_BLOCK_SIZE(s) / sizeof (struct ext3_group_desc))
@@ -346,7 +346,7 @@ struct ext3_inode {
 #ifndef _LINUX_EXT2_FS_H
 #define clear_opt(o, opt)		o &= ~EXT3_MOUNT_##opt
 #define set_opt(o, opt)			o |= EXT3_MOUNT_##opt
-#define test_opt(sb, opt)		((sb)->u.ext3_sb.s_mount_opt & \
+#define test_opt(sb, opt)		(EXT3_SB(sb)->s_mount_opt & \
 					 EXT3_MOUNT_##opt)
 #else
 #define EXT2_MOUNT_NOLOAD		EXT3_MOUNT_NOLOAD
@@ -444,7 +444,10 @@ struct ext3_super_block {
 };
 
 #ifdef __KERNEL__
-#define EXT3_SB(sb)	(&((sb)->u.ext3_sb))
+static inline struct ext3_sb_info * EXT3_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
 {
 	return container_of(inode, struct ext3_inode_info, vfs_inode);

@@ -120,7 +120,7 @@ static int ext3_error_behaviour(struct super_block *sb)
 	/* If no overrides were specified on the mount, then fall back
 	 * to the default behaviour set in the filesystem's superblock
 	 * on disk. */
-	switch (le16_to_cpu(sb->u.ext3_sb.s_es->s_errors)) {
+	switch (le16_to_cpu(EXT3_SB(sb)->s_es->s_errors)) {
 	case EXT3_ERRORS_PANIC:
 		return EXT3_ERRORS_PANIC;
 	case EXT3_ERRORS_RO:
@@ -268,9 +268,9 @@ void ext3_abort (struct super_block * sb, const char * function,
 		return;
 	
 	printk (KERN_CRIT "Remounting filesystem read-only\n");
-	sb->u.ext3_sb.s_mount_state |= EXT3_ERROR_FS;
+	EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
 	sb->s_flags |= MS_RDONLY;
-	sb->u.ext3_sb.s_mount_opt |= EXT3_MOUNT_ABORT;
+	EXT3_SB(sb)->s_mount_opt |= EXT3_MOUNT_ABORT;
 	journal_abort(EXT3_SB(sb)->s_journal, -EIO);
 }
 
@@ -439,7 +439,8 @@ void ext3_put_super (struct super_block * sb)
 		ext3_blkdev_remove(sbi);
 	}
 	clear_ro_after(sb);
-
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 	return;
 }
 
@@ -877,7 +878,7 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 		sb->s_flags &= ~MS_RDONLY;
 	}
 
-	if (sb->u.ext3_sb.s_mount_state & EXT3_ERROR_FS) {
+	if (EXT3_SB(sb)->s_mount_state & EXT3_ERROR_FS) {
 		if (es->s_last_orphan)
 			jbd_debug(1, "Errors on filesystem, "
 				  "clearing orphan list.\n");
@@ -949,7 +950,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head * bh;
 	struct ext3_super_block *es = 0;
-	struct ext3_sb_info *sbi = EXT3_SB(sb);
+	struct ext3_sb_info *sbi;
 	unsigned long sb_block = 1;
 	unsigned long logic_sb_block = 1;
 	unsigned long offset = 0;
@@ -970,7 +971,11 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * This is important for devices that have a hardware
 	 * sectorsize that is larger than the default.
 	 */
-
+	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(*sbi));
 	sbi->s_mount_opt = 0;
 	sbi->s_resuid = EXT3_DEF_RESUID;
 	sbi->s_resgid = EXT3_DEF_RESGID;
@@ -1266,6 +1271,8 @@ failed_mount:
 	ext3_blkdev_remove(sbi);
 	brelse(bh);
 out_fail:
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 	return -EINVAL;
 }
 
@@ -1520,11 +1527,11 @@ static void ext3_commit_super (struct super_block * sb,
 			       int sync)
 {
 	es->s_wtime = cpu_to_le32(CURRENT_TIME);
-	BUFFER_TRACE(sb->u.ext3_sb.s_sbh, "marking dirty");
-	mark_buffer_dirty(sb->u.ext3_sb.s_sbh);
+	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "marking dirty");
+	mark_buffer_dirty(EXT3_SB(sb)->s_sbh);
 	if (sync) {
-		ll_rw_block(WRITE, 1, &sb->u.ext3_sb.s_sbh);
-		wait_on_buffer(sb->u.ext3_sb.s_sbh);
+		ll_rw_block(WRITE, 1, &EXT3_SB(sb)->s_sbh);
+		wait_on_buffer(EXT3_SB(sb)->s_sbh);
 	}
 }
 
@@ -1575,7 +1582,7 @@ static void ext3_clear_journal_err(struct super_block * sb,
 		ext3_warning(sb, __FUNCTION__, "Marking fs in need of "
 			     "filesystem check.");
 		
-		sb->u.ext3_sb.s_mount_state |= EXT3_ERROR_FS;
+		EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
 		es->s_state |= cpu_to_le16(EXT3_ERROR_FS);
 		ext3_commit_super (sb, es, 1);
 
