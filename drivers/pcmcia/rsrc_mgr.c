@@ -34,122 +34,6 @@
 #include <pcmcia/cistpl.h>
 #include "cs_internal.h"
 
-static DECLARE_MUTEX(rsrc_sem);
-
-#ifdef CONFIG_PCMCIA_PROBE
-
-typedef struct irq_info_t {
-    u_int			Attributes;
-    int				time_share, dyn_share;
-    struct pcmcia_socket	*Socket;
-} irq_info_t;
-
-/* Table of IRQ assignments */
-static irq_info_t irq_table[NR_IRQS];
-
-#endif
-
-
-/*======================================================================
-
-    This checks to see if an interrupt is available, with support
-    for interrupt sharing.  We don't support reserving interrupts
-    yet.  If the interrupt is available, we allocate it.
-    
-======================================================================*/
-
-#ifdef CONFIG_PCMCIA_PROBE
-
-static irqreturn_t fake_irq(int i, void *d, struct pt_regs *r) { return IRQ_NONE; }
-static inline int check_irq(int irq)
-{
-    if (request_irq(irq, fake_irq, 0, "bogus", NULL) != 0)
-	return -1;
-    free_irq(irq, NULL);
-    return 0;
-}
-
-int try_irq(u_int Attributes, int irq, int specific)
-{
-    irq_info_t *info = &irq_table[irq];
-    int ret = 0;
-
-    down(&rsrc_sem);
-    if (info->Attributes & RES_ALLOCATED) {
-	switch (Attributes & IRQ_TYPE) {
-	case IRQ_TYPE_EXCLUSIVE:
-	    ret = CS_IN_USE;
-	    break;
-	case IRQ_TYPE_DYNAMIC_SHARING:
-	    if ((info->Attributes & RES_IRQ_TYPE)
-		!= RES_IRQ_TYPE_DYNAMIC) {
-		ret = CS_IN_USE;
-		break;
-	    }
-	    if (Attributes & IRQ_FIRST_SHARED) {
-		ret = CS_BAD_ATTRIBUTE;
-		break;
-	    }
-	    info->Attributes |= RES_IRQ_TYPE_DYNAMIC | RES_ALLOCATED;
-	    info->dyn_share++;
-	    break;
-	}
-    } else {
-	if ((info->Attributes & RES_RESERVED) && !specific) {
-	    ret = CS_IN_USE;
-	    goto out;
-	}
-	if (check_irq(irq) != 0) {
-	    ret = CS_IN_USE;
-	    goto out;
-	}
-	switch (Attributes & IRQ_TYPE) {
-	case IRQ_TYPE_EXCLUSIVE:
-	    info->Attributes |= RES_ALLOCATED;
-	    break;
-	case IRQ_TYPE_DYNAMIC_SHARING:
-	    if (!(Attributes & IRQ_FIRST_SHARED)) {
-		ret = CS_BAD_ATTRIBUTE;
-		break;
-	    }
-	    info->Attributes |= RES_IRQ_TYPE_DYNAMIC | RES_ALLOCATED;
-	    info->dyn_share = 1;
-	    break;
-	}
-    }
- out:
-    up(&rsrc_sem);
-    return ret;
-}
-
-#endif
-
-/*====================================================================*/
-
-#ifdef CONFIG_PCMCIA_PROBE
-
-void undo_irq(u_int Attributes, int irq)
-{
-    irq_info_t *info;
-
-    info = &irq_table[irq];
-    down(&rsrc_sem);
-    switch (Attributes & IRQ_TYPE) {
-    case IRQ_TYPE_EXCLUSIVE:
-	info->Attributes &= RES_RESERVED;
-	break;
-    case IRQ_TYPE_DYNAMIC_SHARING:
-	info->dyn_share--;
-	if (info->dyn_share == 0)
-	    info->Attributes &= RES_RESERVED;
-	break;
-    }
-    up(&rsrc_sem);
-}
-
-#endif
-
-/*====================================================================*/
 
 #ifdef CONFIG_PCMCIA_PROBE
 
@@ -167,7 +51,7 @@ static int adjust_irq(struct pcmcia_socket *s, adjust_t *adj)
 
 	mask = 1 << irq;
 
-	if !(s->irq_mask & mask)
+	if (!(s->irq_mask & mask))
 		return 0;
 
 	s->irq_mask &= ~mask;

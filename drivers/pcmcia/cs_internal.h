@@ -140,8 +140,6 @@ int adjust_io_region(struct resource *res, unsigned long r_start,
 		     unsigned long r_end, struct pcmcia_socket *s);
 struct resource *find_mem_region(u_long base, u_long num, u_long align,
 		    int low, struct pcmcia_socket *s);
-int try_irq(u_int Attributes, int irq, int specific);
-void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
 void release_resource_db(struct pcmcia_socket *s);
 
