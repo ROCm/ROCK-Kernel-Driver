@@ -76,6 +76,7 @@
 #include	<linux/config.h>
 #include	<linux/slab.h>
 #include	<linux/mm.h>
+#include	<linux/swap.h>
 #include	<linux/cache.h>
 #include	<linux/interrupt.h>
 #include	<linux/init.h>
@@ -734,6 +735,7 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 {
 	unsigned long i = (1<<cachep->gfporder);
 	struct page *page = virt_to_page(addr);
+	const unsigned long nr_freed = i;
 
 	/* free_pages() does not clear the type bit - we do that.
 	 * The pages have been unlinked from their cache-slab,
@@ -742,9 +744,11 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	 */
 	while (i--) {
 		ClearPageSlab(page);
-		dec_page_state(nr_slab);
 		page++;
 	}
+	sub_page_state(nr_slab, nr_freed);
+	if (current->reclaim_state)
+		current->reclaim_state->reclaimed_slab += nr_freed;
 	free_pages((unsigned long)addr, cachep->gfporder);
 }
 

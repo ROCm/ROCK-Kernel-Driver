@@ -294,6 +294,7 @@ extern struct user_struct root_user;
 
 typedef struct prio_array prio_array_t;
 struct backing_dev_info;
+struct reclaim_state;
 
 /* POSIX.1b interval timer structure. */
 struct k_itimer {
@@ -433,6 +434,10 @@ struct task_struct {
 
 /* journalling filesystem info */
 	void *journal_info;
+
+/* VM state */
+	struct reclaim_state *reclaim_state;
+
 	struct dentry *proc_dentry;
 	struct backing_dev_info *backing_dev_info;
 
