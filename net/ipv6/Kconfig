@@ -17,5 +17,20 @@ config IPV6_PRIVACY
 
 	  See <file:Documentation/networking/ip-sysctl.txt> for details.
 
-source "net/ipv6/netfilter/Kconfig"
+config INET6_AH
+	tristate "IPv6: AH transformation"
+	depends on IPV6
+	---help---
+	  Support for IPsec AH.
 
+	  If unsure, say Y.
+
+config INET6_ESP
+	tristate "IPv6: ESP transformation"
+	depends on IPV6
+	---help---
+	  Support for IPsec ESP.
+
+	  If unsure, say Y.
+
+source "net/ipv6/netfilter/Kconfig"

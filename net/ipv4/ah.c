@@ -7,25 +7,8 @@
 #include <net/icmp.h>
 #include <asm/scatterlist.h>
 
+
 #define AH_HLEN_NOICV	12
-
-typedef void (icv_update_fn_t)(struct crypto_tfm *,
-                               struct scatterlist *, unsigned int);
-
-struct ah_data
-{
-	u8			*key;
-	int			key_len;
-	u8			*work_icv;
-	int			icv_full_len;
-	int			icv_trunc_len;
-
-	void			(*icv)(struct ah_data*,
-	                               struct sk_buff *skb, u8 *icv);
-
-	struct crypto_tfm	*tfm;
-};
-
 
 /* Clear mutable options and find final destination to substitute
  * into IP header for icv calculation. Options are already checked
@@ -69,92 +52,6 @@ static int ip_clear_mutable_options(struct iphdr *iph, u32 *daddr)
 		optptr += optlen;
 	}
 	return 0;
-}
-
-static void skb_ah_walk(const struct sk_buff *skb,
-                        struct crypto_tfm *tfm, icv_update_fn_t icv_update)
-{
-	int offset = 0;
-	int len = skb->len;
-	int start = skb->len - skb->data_len;
-	int i, copy = start - offset;
-	struct scatterlist sg;
-
-	/* Checksum header. */
-	if (copy > 0) {
-		if (copy > len)
-			copy = len;
-		
-		sg.page = virt_to_page(skb->data + offset);
-		sg.offset = (unsigned long)(skb->data + offset) % PAGE_SIZE;
-		sg.length = copy;
-		
-		icv_update(tfm, &sg, 1);
-		
-		if ((len -= copy) == 0)
-			return;
-		offset += copy;
-	}
-
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-		int end;
-
-		BUG_TRAP(start <= offset + len);
-
-		end = start + skb_shinfo(skb)->frags[i].size;
-		if ((copy = end - offset) > 0) {
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-
-			if (copy > len)
-				copy = len;
-			
-			sg.page = frag->page;
-			sg.offset = frag->page_offset + offset-start;
-			sg.length = copy;
-			
-			icv_update(tfm, &sg, 1);
-			
-			if (!(len -= copy))
-				return;
-			offset += copy;
-		}
-		start = end;
-	}
-
-	if (skb_shinfo(skb)->frag_list) {
-		struct sk_buff *list = skb_shinfo(skb)->frag_list;
-
-		for (; list; list = list->next) {
-			int end;
-
-			BUG_TRAP(start <= offset + len);
-
-			end = start + list->len;
-			if ((copy = end - offset) > 0) {
-				if (copy > len)
-					copy = len;
-				skb_ah_walk(list, tfm, icv_update);
-				if ((len -= copy) == 0)
-					return;
-				offset += copy;
-			}
-			start = end;
-		}
-	}
-	if (len)
-		BUG();
-}
-
-static void
-ah_hmac_digest(struct ah_data *ahp, struct sk_buff *skb, u8 *auth_data)
-{
-	struct crypto_tfm *tfm = ahp->tfm;
-
-	memset(auth_data, 0, ahp->icv_trunc_len);
- 	crypto_hmac_init(tfm, ahp->key, &ahp->key_len);
-  	skb_ah_walk(skb, tfm, crypto_hmac_update);
-	crypto_hmac_final(tfm, ahp->key, &ahp->key_len, ahp->work_icv);
-	memcpy(auth_data, ahp->work_icv, ahp->icv_trunc_len);
 }
 
 static int ah_output(struct sk_buff *skb)
@@ -330,7 +227,7 @@ void ah4_err(struct sk_buff *skb, u32 info)
 	    skb->h.icmph->code != ICMP_FRAG_NEEDED)
 		return;
 
-	x = xfrm_state_lookup(iph->daddr, ah->spi, IPPROTO_AH);
+	x = xfrm4_state_lookup(iph->daddr, ah->spi, IPPROTO_AH);
 	if (!x)
 		return;
 	printk(KERN_DEBUG "pmtu discvovery on SA AH/%08x/%08x\n",

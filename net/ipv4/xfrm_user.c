@@ -234,8 +234,8 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 
 	switch (x->props.family) {
 	case AF_INET:
-		x1 = xfrm_state_lookup(x->props.saddr.xfrm4_addr,
-				       x->id.spi, x->id.proto);
+		x1 = xfrm4_state_lookup(x->props.saddr.xfrm4_addr,
+					x->id.spi, x->id.proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:
@@ -265,7 +265,7 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 
 	switch (p->family) {
 	case AF_INET:
-		x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+		x = xfrm4_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:
@@ -395,7 +395,7 @@ static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 
 	switch (p->family) {
 	case AF_INET:
-		x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+		x = xfrm4_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
 		break;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	case AF_INET6:

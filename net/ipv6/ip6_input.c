@@ -150,7 +150,8 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	   It would be stupid to detect for optional headers,
 	   which are missing with probability of 200%
 	 */
-	if (nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP) {
+	if (nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
+	    nexthdr != NEXTHDR_AUTH && nexthdr != NEXTHDR_ESP) {
 		nhoff = ipv6_parse_exthdrs(&skb, nhoff);
 		if (nhoff < 0)
 			return 0;
