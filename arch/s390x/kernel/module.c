@@ -2,7 +2,8 @@
  *  arch/s390x/kernel/module.c - Kernel module help for s390x.
  *
  *  S390 version
- *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ *    Copyright (C) 2002, 2003 IBM Deutschland Entwicklung GmbH,
+ *			       IBM Corporation
  *    Author(s): Arnd Bergmann (arndb@de.ibm.com)
  *		 Martin Schwidefsky (schwidefsky@de.ibm.com)
  *
@@ -36,6 +37,9 @@
 #define DEBUGP(fmt , ...)
 #endif
 
+#define GOT_ENTRY_SIZE 8
+#define PLT_ENTRY_SIZE 20
+
 void *module_alloc(unsigned long size)
 {
 	if (size == 0)
@@ -51,126 +55,322 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
-/* s390/s390x needs additional memory for GOT/PLT sections. */
-int module_frob_arch_sections(Elf_Ehdr *hdr,
-			      Elf_Shdr *sechdrs,
-			      char *secstrings,
-			      struct module *mod)
+static inline void
+check_rela(Elf64_Rela *rela, struct module *me)
 {
-	// FIXME: add space needed for GOT/PLT
+	struct mod_arch_syminfo *info;
+
+	info = me->arch.syminfo + ELF64_R_SYM (rela->r_info);
+	switch (ELF64_R_TYPE (rela->r_info)) {
+	case R_390_GOT12:	/* 12 bit GOT offset.  */
+	case R_390_GOT16:	/* 16 bit GOT offset.  */
+	case R_390_GOT32:	/* 32 bit GOT offset.  */
+	case R_390_GOT64:	/* 64 bit GOT offset.  */
+	case R_390_GOTENT:	/* 32 bit PC rel. to GOT entry shifted by 1. */
+	case R_390_GOTPLT12:	/* 12 bit offset to jump slot.	*/
+	case R_390_GOTPLT16:	/* 16 bit offset to jump slot. */
+	case R_390_GOTPLT32:	/* 32 bit offset to jump slot. */
+	case R_390_GOTPLT64:	/* 64 bit offset to jump slot.	*/
+	case R_390_GOTPLTENT:	/* 32 bit rel. offset to jump slot >> 1. */
+		if (info->got_offset == -1UL) {
+			info->got_offset = me->arch.got_size;
+			me->arch.got_size += GOT_ENTRY_SIZE;
+		}
+		break;
+	case R_390_PLT16DBL:	/* 16 bit PC rel. PLT shifted by 1.  */
+	case R_390_PLT32DBL:	/* 32 bit PC rel. PLT shifted by 1.  */
+	case R_390_PLT32:	/* 32 bit PC relative PLT address.  */
+	case R_390_PLT64:	/* 64 bit PC relative PLT address.  */
+	case R_390_PLTOFF16:	/* 16 bit offset from GOT to PLT. */
+	case R_390_PLTOFF32:	/* 32 bit offset from GOT to PLT. */
+	case R_390_PLTOFF64:	/* 16 bit offset from GOT to PLT. */
+		if (info->plt_offset == -1UL) {
+			info->plt_offset = me->arch.plt_size;
+			me->arch.plt_size += PLT_ENTRY_SIZE;
+		}
+		break;
+	case R_390_COPY:
+	case R_390_GLOB_DAT:
+	case R_390_JMP_SLOT:
+	case R_390_RELATIVE:
+		/* Only needed if we want to support loading of 
+		   modules linked with -shared. */
+		break;
+	}
+}
+
+/*
+ * Account for GOT and PLT relocations. We can't add sections for
+ * got and plt but we can increase the core module size.
+ */
+int
+module_frob_arch_sections(Elf64_Ehdr *hdr, Elf64_Shdr *sechdrs,
+			  char *secstrings, struct module *me)
+{
+	Elf64_Shdr *symtab;
+	Elf64_Sym *symbols;
+	Elf64_Rela *rela;
+	char *strings;
+	int nrela, i, j;
+
+	/* Find symbol table and string table. */
+	symtab = 0;
+	for (i = 0; i < hdr->e_shnum; i++)
+		switch (sechdrs[i].sh_type) {
+		case SHT_SYMTAB:
+			symtab = sechdrs + i;
+			break;
+		}
+	if (!symtab) {
+		printk(KERN_ERR "module %s: no symbol table\n", me->name);
+		return -ENOEXEC;
+	}
+
+	/* Allocate one syminfo structure per symbol. */
+	me->arch.nsyms = symtab->sh_size / sizeof(Elf64_Sym);
+	me->arch.syminfo = kmalloc(me->arch.nsyms *
+				   sizeof(struct mod_arch_syminfo),
+				   GFP_KERNEL);
+	if (!me->arch.syminfo)
+		return -ENOMEM;
+	symbols = (void *) hdr + symtab->sh_offset;
+	strings = (void *) hdr + sechdrs[symtab->sh_link].sh_offset;
+	for (i = 0; i < me->arch.nsyms; i++) {
+		if (symbols[i].st_shndx == SHN_UNDEF &&
+		    strcmp(strings + symbols[i].st_name,
+			   "_GLOBAL_OFFSET_TABLE_") == 0)
+			/* "Define" it as absolute. */
+			symbols[i].st_shndx = SHN_ABS;
+		me->arch.syminfo[i].got_offset = -1UL;
+		me->arch.syminfo[i].plt_offset = -1UL;
+		me->arch.syminfo[i].got_initialized = 0;
+		me->arch.syminfo[i].plt_initialized = 0;
+	}
+
+	/* Search for got/plt relocations. */
+	me->arch.got_size = me->arch.plt_size = 0;
+	for (i = 0; i < hdr->e_shnum; i++) {
+		if (sechdrs[i].sh_type != SHT_RELA)
+			continue;
+		nrela = sechdrs[i].sh_size / sizeof(Elf64_Rela);
+		rela = (void *) hdr + sechdrs[i].sh_offset;
+		for (j = 0; j < nrela; j++)
+			check_rela(rela + j, me);
+	}
+
+	/* Increase core size by size of got & plt and set start
+	   offsets for got and plt. */
+	me->core_size = ALIGN(me->core_size, 4);
+	me->arch.got_offset = me->core_size;
+	me->core_size += me->arch.got_size;
+	me->arch.plt_offset = me->core_size;
+	me->core_size += me->arch.plt_size;
 	return 0;
 }
 
-int apply_relocate(Elf_Shdr *sechdrs,
-		   const char *strtab,
-		   unsigned int symindex,
-		   unsigned int relsec,
-		   struct module *me)
+int
+apply_relocate(Elf_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+	       unsigned int relsec, struct module *me)
 {
-	unsigned int i;
-	ElfW(Rel) *rel = (void *)sechdrs[relsec].sh_addr;
-	ElfW(Sym) *sym;
-	ElfW(Addr) *location;
+	printk(KERN_ERR "module %s: RELOCATION unsupported\n",
+	       me->name);
+	return -ENOEXEC;
+}
 
-	DEBUGP("Applying relocate section %u to %u\n", relsec,
-	       sechdrs[relsec].sh_info);
-	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
-		/* This is where to make the change */
-		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
-			+ rel[i].r_offset;
-		/* This is the symbol it is referring to.  Note that all
-		   undefined symbols have been resolved.  */
-		sym = (ElfW(Sym) *)sechdrs[symindex].sh_addr
-			+ ELFW(R_SYM)(rel[i].r_info);
+static inline int
+apply_rela(Elf64_Rela *rela, Elf64_Addr base, Elf64_Sym *symtab, 
+	   struct module *me)
+{
+	struct mod_arch_syminfo *info;
+	Elf64_Addr loc, val;
+	int r_type, r_sym;
 
-		switch (ELF_R_TYPE(rel[i].r_info)) {
-		case R_390_8:		/* Direct 8 bit.   */
-			*(u8*) location += sym->st_value;
-			break;
-		case R_390_12:		/* Direct 12 bit.  */
-			*(u16*) location = (*(u16*) location & 0xf000) | 
-				(sym->st_value & 0xfff);
-			break;
-		case R_390_16:		/* Direct 16 bit.  */
-			*(u16*) location += sym->st_value;
-			break;
-		case R_390_32:		/* Direct 32 bit.  */
-			*(u32*) location += sym->st_value;
-			break;
-		case R_390_64:		/* Direct 64 bit.  */
-			*(u64*) location += sym->st_value;
-			break;
-		case R_390_PC16:	/* PC relative 16 bit.  */
-			*(u16*) location += sym->st_value
-					    - (unsigned long )location;
+	/* This is where to make the change */
+	loc = base + rela->r_offset;
+	/* This is the symbol it is referring to.  Note that all
+	   undefined symbols have been resolved.  */
+	r_sym = ELF64_R_SYM(rela->r_info);
+	r_type = ELF64_R_TYPE(rela->r_info);
+	info = me->arch.syminfo + r_sym;
+	val = symtab[r_sym].st_value;
 
-		case R_390_PC16DBL:	/* PC relative 16 bit shifted by 1.  */
-			*(u16*) location += (sym->st_value
-					     - (unsigned long )location) >> 1;
-		case R_390_PC32:	/* PC relative 32 bit.  */
-			*(u32*) location += sym->st_value
-					    - (unsigned long )location;
-			break;
-		case R_390_PC32DBL:	/* PC relative 32 bit shifted by 1.  */
-			*(u32*) location += (sym->st_value
-					     - (unsigned long )location) >> 1;
-			break;
-		case R_390_PC64:	/* PC relative 64 bit.  */
-			*(u64*) location += sym->st_value
-					    - (unsigned long )location;
-			break;
-		case R_390_GOT12:	/* 12 bit GOT offset.  */
-		case R_390_GOT16:	/* 16 bit GOT offset.  */
-		case R_390_GOT32:	/* 32 bit GOT offset.  */
-		case R_390_GOT64:	/* 64 bit GOT offset.  */
-		case R_390_GOTENT:	/* 32 bit PC rel. to GOT entry >> 1. */
-			// FIXME: TODO
-			break;
-
-		case R_390_PLT16DBL:	/* 16 bit PC rel. PLT shifted by 1.  */
-		case R_390_PLT32:	/* 32 bit PC relative PLT address.  */
-		case R_390_PLT32DBL:	/* 32 bit PC rel. PLT shifted by 1.  */
-		case R_390_PLT64:	/* 64 bit PC relative PLT address.   */
-			// FIXME: TODO
-			break;
-		case R_390_GLOB_DAT:	/* Create GOT entry.  */
-		case R_390_JMP_SLOT:	/* Create PLT entry.  */
-			*location = sym->st_value;
-			break;
-		case R_390_RELATIVE:	/* Adjust by program base.  */
-			// FIXME: TODO
-			break;
-		case R_390_GOTOFF:	/* 32 bit offset to GOT.  */
-			// FIXME: TODO
-			break;
-		case R_390_GOTPC:	/* 32 bit PC relative offset to GOT. */
-		case R_390_GOTPCDBL:	/* 32 bit PC rel. GOT shifted by 1.  */
-			// FIXME: TODO
-			break;
-		default:
-			printk(KERN_ERR "module %s: Unknown relocation: %lu\n",
-			       me->name,
-			       (unsigned long)ELF_R_TYPE(rel[i].r_info));
-			return -ENOEXEC;
+	switch (r_type) {
+	case R_390_8:		/* Direct 8 bit.   */
+	case R_390_12:		/* Direct 12 bit.  */
+	case R_390_16:		/* Direct 16 bit.  */
+	case R_390_32:		/* Direct 32 bit.  */
+	case R_390_64:		/* Direct 64 bit.  */
+		val += rela->r_addend;
+		if (r_type == R_390_8)
+			*(unsigned char *) loc = val;
+		else if (r_type == R_390_12)
+			*(unsigned short *) loc = (val & 0xfff) |
+				(*(unsigned short *) loc & 0xf000);
+		else if (r_type == R_390_16)
+			*(unsigned short *) loc = val;
+		else if (r_type == R_390_32)
+			*(unsigned int *) loc = val;
+		else if (r_type == R_390_64)
+			*(unsigned long *) loc = val;
+		break;
+	case R_390_PC16:	/* PC relative 16 bit.  */
+	case R_390_PC16DBL:	/* PC relative 16 bit shifted by 1.  */
+	case R_390_PC32DBL:	/* PC relative 32 bit shifted by 1.  */
+	case R_390_PC32:	/* PC relative 32 bit.  */
+	case R_390_PC64:	/* PC relative 64 bit.	*/
+		val += rela->r_addend - loc;
+		if (r_type == R_390_PC16)
+			*(unsigned short *) loc = val;
+		else if (r_type == R_390_PC16DBL)
+			*(unsigned short *) loc = val >> 1;
+		else if (r_type == R_390_PC32DBL)
+			*(unsigned int *) loc = val >> 1;
+		else if (r_type == R_390_PC32)
+			*(unsigned int *) loc = val;
+		else if (r_type == R_390_PC64)
+			*(unsigned long *) loc = val;
+		break;
+	case R_390_GOT12:	/* 12 bit GOT offset.  */
+	case R_390_GOT16:	/* 16 bit GOT offset.  */
+	case R_390_GOT32:	/* 32 bit GOT offset.  */
+	case R_390_GOT64:	/* 64 bit GOT offset.  */
+	case R_390_GOTENT:	/* 32 bit PC rel. to GOT entry shifted by 1. */
+	case R_390_GOTPLT12:	/* 12 bit offset to jump slot.	*/
+	case R_390_GOTPLT16:	/* 16 bit offset to jump slot. */
+	case R_390_GOTPLT32:	/* 32 bit offset to jump slot. */
+	case R_390_GOTPLT64:	/* 64 bit offset to jump slot.	*/
+	case R_390_GOTPLTENT:	/* 32 bit rel. offset to jump slot >> 1. */
+		if (info->got_initialized == 0) {
+			Elf64_Addr *gotent;
+			gotent = me->module_core + me->arch.got_offset +
+				info->got_offset;
+			*gotent = val;
+			info->got_initialized = 1;
 		}
+		val = info->got_offset + rela->r_addend;
+		if (r_type == R_390_GOT12 ||
+		    r_type == R_390_GOTPLT12)
+			*(unsigned short *) loc = (val & 0xfff) |
+				(*(unsigned short *) loc & 0xf000);
+		else if (r_type == R_390_GOT16 ||
+			 r_type == R_390_GOTPLT16)
+			*(unsigned short *) loc = val;
+		else if (r_type == R_390_GOT32 ||
+			 r_type == R_390_GOTPLT32)
+			*(unsigned int *) loc = val;
+		else if (r_type == R_390_GOTENT ||
+			 r_type == R_390_GOTPLTENT)
+			*(unsigned int *) loc = val >> 1;
+		else if (r_type == R_390_GOT64 ||
+			 r_type == R_390_GOTPLT64)
+			*(unsigned long *) loc = val;
+		break;
+	case R_390_PLT16DBL:	/* 16 bit PC rel. PLT shifted by 1.  */
+	case R_390_PLT32DBL:	/* 32 bit PC rel. PLT shifted by 1.  */
+	case R_390_PLT32:	/* 32 bit PC relative PLT address.  */
+	case R_390_PLT64:	/* 64 bit PC relative PLT address.  */
+	case R_390_PLTOFF16:	/* 16 bit offset from GOT to PLT. */
+	case R_390_PLTOFF32:	/* 32 bit offset from GOT to PLT. */
+	case R_390_PLTOFF64:	/* 16 bit offset from GOT to PLT. */
+		if (info->plt_initialized == 0) {
+			unsigned int *ip;
+			ip = me->module_core + me->arch.plt_offset +
+				info->plt_offset;
+			ip[0] = 0x0d10e310; /* basr 1,0; lg 1,10(1); br 1 */
+			ip[1] = 0x100a0004;
+			ip[2] = 0x07f10000;
+			ip[3] = (unsigned int) (val >> 32);
+			ip[4] = (unsigned int) val;
+			info->plt_initialized = 1;
+		}
+		if (r_type == R_390_PLTOFF16 ||
+		    r_type == R_390_PLTOFF32 ||
+		    r_type == R_390_PLTOFF64)
+			val = me->arch.plt_offset - me->arch.got_offset +
+				info->plt_offset + rela->r_addend;
+		else
+			val =  (Elf64_Addr) me->module_core +
+				me->arch.plt_offset + info->plt_offset + 
+				rela->r_addend - loc;
+		if (r_type == R_390_PLT16DBL)
+			*(unsigned short *) loc = val >> 1;
+		else if (r_type == R_390_PLTOFF16)
+			*(unsigned short *) loc = val;
+		else if (r_type == R_390_PLT32DBL)
+			*(unsigned int *) loc = val >> 1;
+		else if (r_type == R_390_PLT32 ||
+			 r_type == R_390_PLTOFF32)
+			*(unsigned int *) loc = val;
+		else if (r_type == R_390_PLT64 ||
+			 r_type == R_390_PLTOFF64)
+			*(unsigned long *) loc = val;
+		break;
+	case R_390_GOTOFF16:	/* 16 bit offset to GOT.  */
+	case R_390_GOTOFF32:	/* 32 bit offset to GOT.  */
+	case R_390_GOTOFF64:	/* 64 bit offset to GOT. */
+		val = val + rela->r_addend -
+			((Elf64_Addr) me->module_core + me->arch.got_offset);
+		if (r_type == R_390_GOTOFF16)
+			*(unsigned short *) loc = val;
+		else if (r_type == R_390_GOTOFF32)
+			*(unsigned int *) loc = val;
+		else if (r_type == R_390_GOTOFF64)
+			*(unsigned long *) loc = val;
+		break;
+	case R_390_GOTPC:	/* 32 bit PC relative offset to GOT. */
+	case R_390_GOTPCDBL:	/* 32 bit PC rel. off. to GOT shifted by 1. */
+		val = (Elf64_Addr) me->module_core + me->arch.got_offset +
+			rela->r_addend - loc;
+		if (r_type == R_390_GOTPC)
+			*(unsigned int *) loc = val;
+		else if (r_type == R_390_GOTPCDBL)
+			*(unsigned int *) loc = val >> 1;
+		break;
+	case R_390_COPY:
+	case R_390_GLOB_DAT:	/* Create GOT entry.  */
+	case R_390_JMP_SLOT:	/* Create PLT entry.  */
+	case R_390_RELATIVE:	/* Adjust by program base.  */
+		/* Only needed if we want to support loading of 
+		   modules linked with -shared. */
+		break;
+	default:
+		printk(KERN_ERR "module %s: Unknown relocation: %u\n",
+		       me->name, r_type);
+		return -ENOEXEC;
 	}
 	return 0;
 }
 
-int apply_relocate_add(Elf32_Shdr *sechdrs,
-		       const char *strtab,
-		       unsigned int symindex,
-		       unsigned int relsec,
-		       struct module *me)
+int
+apply_relocate_add(Elf64_Shdr *sechdrs, const char *strtab,
+		   unsigned int symindex, unsigned int relsec,
+		   struct module *me)
 {
-	printk(KERN_ERR "module %s: ADD RELOCATION unsupported\n",
-	       me->name);
-	return -ENOEXEC;
+	Elf64_Addr base;
+	Elf64_Sym *symtab;
+	Elf64_Rela *rela;
+	unsigned long i, n;
+	int rc;
+
+	DEBUGP("Applying relocate section %u to %u\n",
+	       relsec, sechdrs[relsec].sh_info);
+	base = sechdrs[sechdrs[relsec].sh_info].sh_addr;
+	symtab = (Elf64_Sym *) sechdrs[symindex].sh_addr;
+	rela = (Elf64_Rela *) sechdrs[relsec].sh_addr;
+	n = sechdrs[relsec].sh_size / sizeof(Elf64_Rela);
+	for (i = 0; i < n; i++, rela++) {
+		rc = apply_rela(rela, base, symtab, me);
+		if (rc)
+			return rc;
+	}
+	return 0;
 }
 
 int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
+	if (me->arch.syminfo)
+		kfree(me->arch.syminfo);
 	return 0;
 }
