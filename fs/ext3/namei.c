@@ -1616,7 +1616,7 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 }
 
 static int ext3_mknod (struct inode * dir, struct dentry *dentry,
-			int mode, int rdev)
+			int mode, dev_t rdev)
 {
 	handle_t *handle;
 	struct inode *inode;

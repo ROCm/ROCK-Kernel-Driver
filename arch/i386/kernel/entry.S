@@ -130,12 +130,16 @@ ENTRY(lcall7)
 				# gates, which has to be cleaned up later..
 	pushl %eax
 	SAVE_ALL
-	movl EIP(%esp), %eax	# due to call gates, this is eflags, not eip..
-	movl CS(%esp), %edx	# this is eip..
-	movl EFLAGS(%esp), %ecx	# and this is cs..
-	movl %eax,EFLAGS(%esp)	#
-	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
-	movl %ecx,CS(%esp)	#
+	movl %esp, %ebx
+	pushl %ebx
+	pushl $0x7
+do_lcall:
+	movl EIP(%ebx), %eax	# due to call gates, this is eflags, not eip..
+	movl CS(%ebx), %edx	# this is eip..
+	movl EFLAGS(%ebx), %ecx	# and this is cs..
+	movl %eax,EFLAGS(%ebx)	#
+	movl %edx,EIP(%ebx)	# Now we move them to their "normal" places
+	movl %ecx,CS(%ebx)	#
 
 	#
 	# Call gates don't clear TF and NT in eflags like
@@ -147,13 +151,9 @@ ENTRY(lcall7)
 	pushl %eax
 	popfl
 
-	movl %esp, %ebx
-	pushl %ebx
 	andl $-8192, %ebx	# GET_THREAD_INFO
 	movl TI_EXEC_DOMAIN(%ebx), %edx	# Get the execution domain
-	movl 4(%edx), %edx	# Get the lcall7 handler for the domain
-	pushl $0x7
-	call *%edx
+	call *4(%edx)		# Call the lcall7 handler for the domain
 	addl $4, %esp
 	popl %eax
 	jmp resume_userspace
@@ -163,33 +163,10 @@ ENTRY(lcall27)
 				# gates, which has to be cleaned up later..
 	pushl %eax
 	SAVE_ALL
-	movl EIP(%esp), %eax	# due to call gates, this is eflags, not eip..
-	movl CS(%esp), %edx	# this is eip..
-	movl EFLAGS(%esp), %ecx	# and this is cs..
-	movl %eax,EFLAGS(%esp)	#
-	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
-	movl %ecx,CS(%esp)	#
-
-	#
-	# Call gates don't clear TF and NT in eflags like
-	# traps do, so we need to do it ourselves.
-	# %eax already contains eflags (but it may have
-	# DF set, clear that also)
-	#
-	andl $~(DF_MASK | TF_MASK | NT_MASK),%eax
-	pushl %eax
-	popfl
-
 	movl %esp, %ebx
 	pushl %ebx
-	andl $-8192, %ebx	# GET_THREAD_INFO
-	movl TI_EXEC_DOMAIN(%ebx), %edx	# Get the execution domain
-	movl 4(%edx), %edx	# Get the lcall7 handler for the domain
 	pushl $0x27
-	call *%edx
-	addl $4, %esp
-	popl %eax
-	jmp resume_userspace
+	jmp do_lcall
 
 
 ENTRY(ret_from_fork)

@@ -14,6 +14,7 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 #include <asm/io.h>

@@ -8,6 +8,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/string.h>
 #include <asm/residual.h>
 #include <linux/config.h>
 #include <linux/threads.h>

@@ -85,6 +85,7 @@ typedef struct pegasus {
 	struct usb_device	*usb;
 	struct net_device	*net;
 	struct net_device_stats	stats;
+	struct mii_if_info	mii;
 	unsigned		flags;
 	unsigned		features;
 	int			dev_index;
@@ -97,6 +98,7 @@ typedef struct pegasus {
 	wait_queue_head_t	ctrl_wait;
 	struct semaphore	sem;
 	spinlock_t		rx_pool_lock;
+	int			chip;
 	unsigned char		intr_buff[8];
 	__u8			tx_buff[PEGASUS_MTU];
 	__u8			eth_regs[4];
@@ -131,11 +133,11 @@ struct usb_eth_dev {
 #define	VENDOR_LANEED		0x056e
 #define	VENDOR_LINKSYS		0x066b
 #define	VENDOR_MELCO		0x0411
+#define	VENDOR_NETGEAR		0x0846
 #define	VENDOR_SMARTBRIDGES	0x08d1
 #define	VENDOR_SMC		0x0707
 #define	VENDOR_SOHOWARE		0x15e8
 #define	VENDOR_SIEMENS		0x067c
-#define	VENDOR_JTEC		0x11ad
 
 
 #else	/* PEGASUS_DEV */
@@ -169,7 +171,10 @@ PEGASUS_DEV( "SpeedStream USB 10/100 Ethernet", VENDOR_ACCTON, 0x5046,
 PEGASUS_DEV( "ADMtek ADM8511 \"Pegasus II\" USB Ethernet",
 		VENDOR_ADMTEK, 0x8511,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
-PEGASUS_DEV( "ADMtek AN986 \"Pegasus\" USB Ethernet (eval. board)",
+PEGASUS_DEV( "ADMtek ADM8513 \"Pegasus II\" USB Ethernet",
+		VENDOR_ADMTEK, 0x8513,
+		DEFAULT_GPIO_RESET | PEGASUS_II )
+PEGASUS_DEV( "ADMtek AN986 \"Pegasus\" USB Ethernet (evaluation board)",
 		VENDOR_ADMTEK, 0x0986,
 		DEFAULT_GPIO_RESET | HAS_HOME_PNA )
 PEGASUS_DEV( "AN986A USB MAC", VENDOR_ADMTEK, 1986,
@@ -192,7 +197,7 @@ PEGASUS_DEV( "Billionton USBE-100", VENDOR_BILLIONTON, 0x8511,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "Corega FEter USB-TX", VENDOR_COREGA, 0x0004,
 		DEFAULT_GPIO_RESET )
-PEGASUS_DEV( "Corega FEter", VENDOR_COREGA, 0x000d,
+PEGASUS_DEV( "Corega FEter USB-TXS", VENDOR_COREGA, 0x000d,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "D-Link DSB-650TX", VENDOR_DLINK, 0x4001,
 		LINKSYS_GPIO_RESET )
@@ -246,6 +251,8 @@ PEGASUS_DEV( "MELCO/BUFFALO LUA-TX", VENDOR_MELCO, 0x0005,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "MELCO/BUFFALO LUA2-TX", VENDOR_MELCO, 0x0009,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
+PEGASUS_DEV( "NETGEAR FA101", VENDOR_NETGEAR, 0x1020,
+		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "smartNIC 2 PnP Adapter", VENDOR_SMARTBRIDGES, 0x0003,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "SMC 202 USB Ethernet", VENDOR_SMC, 0x0200,
@@ -257,8 +264,6 @@ PEGASUS_DEV( "SOHOware NUB100 Ethernet", VENDOR_SOHOWARE, 0x9100,
 PEGASUS_DEV( "SOHOware NUB110 Ethernet", VENDOR_SOHOWARE, 0x9110,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "SpeedStream USB 10/100 Ethernet", VENDOR_SIEMENS, 0x1001,
-		DEFAULT_GPIO_RESET | PEGASUS_II )
-PEGASUS_DEV( "FA8101 USB To ETHERNET", VENDOR_JTEC, 0x8101,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 
 

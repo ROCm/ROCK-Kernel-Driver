@@ -277,14 +277,10 @@
 #undef MODULE
 #endif
 
+#include <linux/config.h>	/* for CONFIG_PCI */
 #include <linux/init.h>
-#include <linux/sched.h>
-#include <asm/io.h>
+#include <linux/interrupt.h>
 #include <linux/blk.h>
-#include "scsi.h"
-#include "hosts.h"
-#include "fdomain.h"
-#include <asm/system.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -294,7 +290,12 @@
 #include <linux/stat.h>
 #include <linux/delay.h>
 
-#include <linux/config.h>	/* for CONFIG_PCI */
+#include <asm/io.h>
+#include <asm/system.h>
+
+#include "scsi.h"
+#include "hosts.h"
+#include "fdomain.h"
   
 #define VERSION          "$Revision: 5.50 $"
 

@@ -28,8 +28,6 @@
 #define MODULE_AUTHOR(name)
 #define MODULE_DESCRIPTION(desc)
 #define MODULE_SUPPORTED_DEVICE(name)
-#define MODULE_GENERIC_TABLE(gtype,name)
-#define MODULE_DEVICE_TABLE(type,name)
 #define MODULE_PARM_DESC(var,desc)
 #define print_modules()
 
@@ -41,13 +39,27 @@ struct kernel_symbol
 };
 
 #ifdef MODULE
+
+#define MODULE_GENERIC_TABLE(gtype,name)	\
+static const unsigned long __module_##gtype##_size \
+  __attribute__ ((unused)) = sizeof(struct gtype##_id); \
+static const struct gtype##_id * __module_##gtype##_table \
+  __attribute__ ((unused)) = name
+
 /* This is magically filled in by the linker, but THIS_MODULE must be
    a constant so it works in initializers. */
 extern struct module __this_module;
 #define THIS_MODULE (&__this_module)
-#else
+
+#else  /* !MODULE */
+
+#define MODULE_GENERIC_TABLE(gtype,name)
 #define THIS_MODULE ((struct module *)0)
+
 #endif
+
+#define MODULE_DEVICE_TABLE(type,name)		\
+  MODULE_GENERIC_TABLE(type##_device,name)
 
 struct kernel_symbol_group
 {

@@ -29,7 +29,7 @@
 
 /* dir inode-ops */
 static int coda_create(struct inode *dir, struct dentry *new, int mode);
-static int coda_mknod(struct inode *dir, struct dentry *new, int mode, int rdev);
+static int coda_mknod(struct inode *dir, struct dentry *new, int mode, dev_t rdev);
 static struct dentry *coda_lookup(struct inode *dir, struct dentry *target);
 static int coda_link(struct dentry *old_dentry, struct inode *dir_inode, 
 		     struct dentry *entry);
@@ -230,7 +230,7 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode)
         return 0;
 }
 
-static int coda_mknod(struct inode *dir, struct dentry *de, int mode, int rdev)
+static int coda_mknod(struct inode *dir, struct dentry *de, int mode, dev_t rdev)
 {
         int error=0;
 	const char *name=de->d_name.name;
@@ -740,4 +740,3 @@ return_bad:
 	unlock_kernel();
 	return -EIO;
 }
-

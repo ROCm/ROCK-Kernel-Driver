@@ -17,26 +17,24 @@
  */
 
 #include <linux/module.h>
-
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
-#include <asm/system.h>
-#include <asm/io.h>
 #include <linux/pci.h>
 #include <linux/blk.h>
+#include <linux/stat.h>
+
+#include <asm/system.h>
+#include <asm/io.h>
+
 #include "scsi.h"
 #include "hosts.h"
-
-
 #include "atp870u.h"
-
-#include<linux/stat.h>
 
 /*
  *   static const char RCSid[] = "$Header: /usr/src/linux/kernel/blk_drv/scsi/RCS/atp870u.c,v 1.0 1997/05/07 15:22:00 root Exp root $";

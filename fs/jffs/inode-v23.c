@@ -1072,7 +1072,7 @@ jffs_remove_end:
 
 
 static int
-jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
+jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct jffs_raw_inode raw_inode;
 	struct jffs_file *dir_f;
