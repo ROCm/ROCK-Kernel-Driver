@@ -175,12 +175,7 @@ check_terminal:
 #endif
 #ifdef CONFIG_NET_CLS_ACT
 				if (n->action) {
-					int pol_res = tcf_action_exec(skb, n->action);
-					if (skb->tc_classid > 0) {
-						res->classid = skb->tc_classid;
-						skb->tc_classid = 0;
-					}
-
+					int pol_res = tcf_action_exec(skb, n->action, res);
 					if (pol_res >= 0)
 						return pol_res;
 				} else

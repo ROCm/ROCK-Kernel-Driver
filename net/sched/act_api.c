@@ -155,7 +155,7 @@ struct tc_action_ops *tc_lookup_action_id(u32 type)
 	return a;
 }
 
-int tcf_action_exec(struct sk_buff *skb,struct tc_action *act)
+int tcf_action_exec(struct sk_buff *skb,struct tc_action *act, struct tcf_result *res)
 {
 
 	struct tc_action *a;
@@ -164,7 +164,8 @@ int tcf_action_exec(struct sk_buff *skb,struct tc_action *act)
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
 		D2PRINTK("(%p)tcf_action_exec: cleared TC_NCLS in %s out %s\n",skb,skb->input_dev?skb->input_dev->name:"xxx",skb->dev->name);
-		return TC_ACT_OK;
+		ret = TC_ACT_OK;
+		goto exec_done;
 	}
 	while ((a = act) != NULL) {
 repeat:
@@ -186,6 +187,11 @@ repeat:
 	}
 
 exec_done:
+	if (skb->tc_classid > 0) {
+		res->classid = skb->tc_classid;
+		res->class = 0;
+		skb->tc_classid = 0;
+	}
 
 	return ret;
 }
