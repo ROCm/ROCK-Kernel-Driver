@@ -168,6 +168,15 @@ static void figure_loop_size(struct loop_device *lo)
 					
 }
 
+static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
+				 char *lbuf, int size, int rblock)
+{
+	if (!lo->transfer)
+		return 0;
+
+	return lo->transfer(lo, cmd, rbuf, lbuf, size, rblock);
+}
+
 static int
 do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 {
@@ -454,20 +463,43 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 out_bh:
 	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
 	bio->bi_rw = rbh->bi_rw;
-	spin_lock_irq(&lo->lo_lock);
 	bio->bi_bdev = lo->lo_device;
-	spin_unlock_irq(&lo->lo_lock);
 
 	return bio;
 }
 
-static int loop_make_request(request_queue_t *q, struct bio *rbh)
+static int
+bio_transfer(struct loop_device *lo, struct bio *to_bio,
+			      struct bio *from_bio)
 {
-	struct bio *bh = NULL;
+	unsigned long IV = loop_get_iv(lo, from_bio->bi_sector);
+	struct bio_vec *from_bvec, *to_bvec;
+	char *vto, *vfrom;
+	int ret = 0, i;
+
+	__bio_for_each_segment(from_bvec, from_bio, i, 0) {
+		to_bvec = &to_bio->bi_io_vec[i];
+
+		kmap(from_bvec->bv_page);
+		kmap(to_bvec->bv_page);
+		vfrom = page_address(from_bvec->bv_page) + from_bvec->bv_offset;
+		vto = page_address(to_bvec->bv_page) + to_bvec->bv_offset;
+		ret |= lo_do_transfer(lo, bio_data_dir(to_bio), vto, vfrom,
+					from_bvec->bv_len, IV);
+		kunmap(from_bvec->bv_page);
+		kunmap(to_bvec->bv_page);
+	}
+
+	return ret;
+}
+		
+static int loop_make_request(request_queue_t *q, struct bio *old_bio)
+{
+	struct bio *new_bio = NULL;
 	struct loop_device *lo;
 	unsigned long IV;
-	int rw = bio_rw(rbh);
-	int unit = minor(to_kdev_t(rbh->bi_bdev->bd_dev));
+	int rw = bio_rw(old_bio);
+	int unit = minor(to_kdev_t(old_bio->bi_bdev->bd_dev));
 
 	if (unit >= max_loop)
 		goto out;
@@ -489,58 +521,39 @@ static int loop_make_request(request_queue_t *q, struct bio *rbh)
 		goto err;
 	}
 
-	blk_queue_bounce(q, &rbh);
+	blk_queue_bounce(q, &old_bio);
 
 	/*
 	 * file backed, queue for loop_thread to handle
 	 */
 	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
-		loop_add_bio(lo, rbh);
+		loop_add_bio(lo, old_bio);
 		return 0;
 	}
 
 	/*
 	 * piggy old buffer on original, and submit for I/O
 	 */
-	bh = loop_get_buffer(lo, rbh);
-	IV = loop_get_iv(lo, rbh->bi_sector);
+	new_bio = loop_get_buffer(lo, old_bio);
+	IV = loop_get_iv(lo, old_bio->bi_sector);
 	if (rw == WRITE) {
-		if (lo_do_transfer(lo, WRITE, bio_data(bh), bio_data(rbh),
-				   bh->bi_size, IV))
+		if (bio_transfer(lo, new_bio, old_bio))
 			goto err;
 	}
 
-	generic_make_request(bh);
+	generic_make_request(new_bio);
 	return 0;
 
 err:
 	if (atomic_dec_and_test(&lo->lo_pending))
 		up(&lo->lo_bh_mutex);
-	loop_put_buffer(bh);
+	loop_put_buffer(new_bio);
 out:
-	bio_io_error(rbh);
+	bio_io_error(old_bio);
 	return 0;
 inactive:
 	spin_unlock_irq(&lo->lo_lock);
 	goto out;
-}
-
-static int do_bio_blockbacked(struct loop_device *lo, struct bio *bio,
-			      struct bio *rbh)
-{
-	unsigned long IV = loop_get_iv(lo, rbh->bi_sector);
-	struct bio_vec *from;
-	char *vto, *vfrom;
-	int ret = 0, i;
-
-	bio_for_each_segment(from, rbh, i) {
-		vfrom = page_address(from->bv_page) + from->bv_offset;
-		vto = page_address(bio->bi_io_vec[i].bv_page) + bio->bi_io_vec[i].bv_offset;
-		ret |= lo_do_transfer(lo, bio_data_dir(bio), vto, vfrom,
-					from->bv_len, IV);
-	}
-
-	return ret;
 }
 
 static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
@@ -556,7 +569,7 @@ static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 	} else {
 		struct bio *rbh = bio->bi_private;
 
-		ret = do_bio_blockbacked(lo, bio, rbh);
+		ret = bio_transfer(lo, bio, rbh);
 
 		bio_endio(rbh, !ret);
 		loop_put_buffer(bio);
@@ -588,10 +601,8 @@ static int loop_thread(void *data)
 
 	set_user_nice(current, -20);
 
-	spin_lock_irq(&lo->lo_lock);
 	lo->lo_state = Lo_bound;
 	atomic_inc(&lo->lo_pending);
-	spin_unlock_irq(&lo->lo_lock);
 
 	/*
 	 * up sem, we are running
