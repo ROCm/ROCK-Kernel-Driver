@@ -2,7 +2,7 @@
 
     A driver for PCMCIA IDE/ATA disk cards
 
-    ide_cs.c 1.26 1999/11/16 02:10:49
+    ide-cs.c 1.3 2002/10/26 05:45:31
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -19,8 +19,8 @@
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
-    terms of the GNU General Public License version 2 (the "GPL"), in which
-    case the provisions of the GPL are applicable instead of the
+    terms of the GNU General Public License version 2 (the "GPL"), in
+    which case the provisions of the GPL are applicable instead of the
     above.  If you wish to allow the use of your version of this file
     only under the terms of the GPL and not to allow others to use
     your version of this file under the MPL, indicate your decision
@@ -40,10 +40,9 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
+#include <linux/ide.h>
 #include <linux/hdreg.h>
 #include <linux/major.h>
-#include <linux/ide.h>
-
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -53,38 +52,37 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/cisreg.h>
+#include <pcmcia/ciscode.h>
+
+/*====================================================================*/
+
+/* Module parameters */
+
+MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
+MODULE_DESCRIPTION("PCMCIA ATA/IDE card driver");
+MODULE_LICENSE("Dual MPL/GPL");
+
+#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+
+/* Bit map of interrupts to choose from */
+INT_MODULE_PARM(irq_mask, 0xdeb8);
+static int irq_list[4] = { -1 };
+MODULE_PARM(irq_list, "1-4i");
 
 #ifdef PCMCIA_DEBUG
-static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"ide_cs.c 1.26 1999/11/16 02:10:49 (David Hinds)";
+"ide-cs.c 1.3 2002/10/26 05:45:31 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
 
 /*====================================================================*/
 
-/* Parameters that can be set with 'insmod' */
-
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-
-MODULE_LICENSE("GPL");
-
-
-/*====================================================================*/
-
 static const char ide_major[] = {
     IDE0_MAJOR, IDE1_MAJOR, IDE2_MAJOR, IDE3_MAJOR,
-#ifdef IDE4_MAJOR
     IDE4_MAJOR, IDE5_MAJOR
-#endif
 };
 
 typedef struct ide_info_t {
@@ -94,7 +92,6 @@ typedef struct ide_info_t {
     int		hd;
 } ide_info_t;
 
-static void ide_config(dev_link_t *link);
 static void ide_release(u_long arg);
 static int ide_event(event_t event, int priority,
 		     event_callback_args_t *args);
@@ -227,13 +224,13 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 #define CFG_CHECK(fn, args...) \
 if (CardServices(fn, args) != 0) goto next_entry
 
-int idecs_register (int arg1, int arg2, int irq)
+static int idecs_register(int io, int ctl, int irq)
 {
-        hw_regs_t hw;
-        ide_init_hwif_ports(&hw, (ide_ioreg_t) arg1, (ide_ioreg_t) arg2, NULL);
-        hw.irq = irq;
-        hw.chipset = ide_pci; /* this enables IRQ sharing w/ PCI irqs */
-        return ide_register_hw(&hw, NULL);
+    hw_regs_t hw;
+    ide_init_hwif_ports(&hw, (ide_ioreg_t)io, (ide_ioreg_t)ctl, NULL);
+    hw.irq = irq;
+    hw.chipset = ide_pci;
+    return ide_register_hw(&hw, NULL);
 }
 
 void ide_config(dev_link_t *link)
@@ -246,7 +243,7 @@ void ide_config(dev_link_t *link)
     config_info_t conf;
     cistpl_cftable_entry_t *cfg = &parse.cftable_entry;
     cistpl_cftable_entry_t dflt = { 0 };
-    int i, pass, last_ret, last_fn, hd=-1, io_base, ctl_base;
+    int i, pass, last_ret, last_fn, hd, io_base, ctl_base, is_kme = 0;
 
     DEBUG(0, "ide_config(0x%p)\n", link);
     
@@ -259,7 +256,15 @@ void ide_config(dev_link_t *link)
     CS_CHECK(ParseTuple, handle, &tuple, &parse);
     link->conf.ConfigBase = parse.config.base;
     link->conf.Present = parse.config.rmask[0];
-    
+
+    tuple.DesiredTuple = CISTPL_MANFID;
+    if (!CardServices(GetFirstTuple, handle, &tuple) &&
+	!CardServices(GetTupleData, handle, &tuple) &&
+	!CardServices(ParseTuple, handle, &tuple, &parse))
+	is_kme = ((parse.manfid.manf == MANFID_KME) &&
+		  ((parse.manfid.card == PRODID_KME_KXLC005_A) ||
+		   (parse.manfid.card == PRODID_KME_KXLC005_B)));
+
     /* Configure card */
     link->state |= DEV_CONFIG;
 
@@ -303,7 +308,7 @@ void ide_config(dev_link_t *link)
 	    if (io->nwin == 2) {
 		link->io.NumPorts1 = 8;
 		link->io.BasePort2 = io->win[1].base;
-		link->io.NumPorts2 = 1;
+		link->io.NumPorts2 = (is_kme) ? 2 : 1;
 		CFG_CHECK(RequestIO, link->handle, &link->io);
 		io_base = link->io.BasePort1;
 		ctl_base = link->io.BasePort2;
@@ -337,17 +342,20 @@ void ide_config(dev_link_t *link)
     if (link->io.NumPorts2)
 	release_region(link->io.BasePort2, link->io.NumPorts2);
 
+    /* disable drive interrupts during IDE probe */
+    outb(0x02, ctl_base);
+
+    /* special setup for KXLC005 card */
+    if (is_kme) outb(0x81, ctl_base+1);
+
     /* retry registration in case device is still spinning up */
-    for (i = 0; i < 10; i++) {
-	if (ctl_base)
-	    outb(0x02, ctl_base); /* Set nIEN = disable device interrupts */
+    for (hd = -1, i = 0; i < 10; i++) {
 	hd = idecs_register(io_base, ctl_base, link->irq.AssignedIRQ);
 	if (hd >= 0) break;
 	if (link->io.NumPorts1 == 0x20) {
-	    if (ctl_base)
-		outb(0x02, ctl_base+0x10);
+	    outb(0x02, ctl_base+0x10);
 	    hd = idecs_register(io_base+0x10, ctl_base+0x10,
-			      link->irq.AssignedIRQ);
+				link->irq.AssignedIRQ);
 	    if (hd >= 0) {
 		io_base += 0x10; ctl_base += 0x10;
 		break;
@@ -358,7 +366,7 @@ void ide_config(dev_link_t *link)
     }
     
     if (hd < 0) {
-	printk(KERN_NOTICE "ide_cs: ide_register() at 0x%03x & 0x%03x"
+	printk(KERN_NOTICE "ide-cs: ide_register() at 0x%3x & 0x%3x"
 	       ", irq %u failed\n", io_base, ctl_base,
 	       link->irq.AssignedIRQ);
 	goto failed;
@@ -371,7 +379,7 @@ void ide_config(dev_link_t *link)
     info->node.minor = 0;
     info->hd = hd;
     link->dev = &info->node;
-    printk(KERN_INFO "ide_cs: %s: Vcc = %d.%d, Vpp = %d.%d\n",
+    printk(KERN_INFO "ide-cs: %s: Vcc = %d.%d, Vpp = %d.%d\n",
 	   info->node.dev_name, link->conf.Vcc/10, link->conf.Vcc%10,
 	   link->conf.Vpp1/10, link->conf.Vpp1%10);
 
@@ -382,6 +390,7 @@ cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
     ide_release((u_long)link);
+    link->state &= ~DEV_CONFIG_PENDING;
 
 } /* ide_config */
 
@@ -402,13 +411,14 @@ void ide_release(u_long arg)
 
     if (info->ndev) {
 	ide_unregister(info->hd);
+	/* deal with brain dead IDE resource management */
+	request_region(link->io.BasePort1, link->io.NumPorts1,
+		       info->node.dev_name);
+	if (link->io.NumPorts2)
+	    request_region(link->io.BasePort2, link->io.NumPorts2,
+			   info->node.dev_name);
 	MOD_DEC_USE_COUNT;
     }
-
-    request_region(link->io.BasePort1, link->io.NumPorts1,"ide-cs");
-    if (link->io.NumPorts2)
-	request_region(link->io.BasePort2, link->io.NumPorts2,"ide-cs");
-    
     info->ndev = 0;
     link->dev = NULL;
     
@@ -472,9 +482,9 @@ static int __init init_ide_cs(void)
     DEBUG(0, "%s\n", version);
     CardServices(GetCardServicesInfo, &serv);
     if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "ide_cs: Card Services release "
+	printk(KERN_NOTICE "ide-cs: Card Services release "
 	       "does not match!\n");
-	return -1;
+	return -EINVAL;
     }
     register_pccard_driver(&dev_info, &ide_attach, &ide_detach);
     return 0;
@@ -482,7 +492,7 @@ static int __init init_ide_cs(void)
 
 static void __exit exit_ide_cs(void)
 {
-    DEBUG(0, "ide_cs: unloading\n");
+    DEBUG(0, "ide-cs: unloading\n");
     unregister_pccard_driver(&dev_info);
     while (dev_list != NULL)
 	ide_detach(dev_list);
