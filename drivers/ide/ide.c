@@ -315,13 +315,6 @@ static void __init init_ide_data (void)
 #endif
 	}
 
-/* OBSOLETE: still needed on arm26 and arm */
-#ifdef CONFIG_ARM
-	/* Add default hw interfaces */
-	initializing = 1;
-	ide_init_default_hwifs();
-	initializing = 0;
-#endif
 #ifdef CONFIG_IDE_ARM
 	ide_arm_init();
 #endif

@@ -609,7 +609,9 @@ source "drivers/acorn/block/Kconfig"
 
 source "net/Kconfig"
 
+if ARCH_CLPS7500 || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_L7200 || ARCH_LH7A40X || ARCH_FTVPCI || ARCH_PXA || ARCH_RPC || ARCH_S3C2410 || ARCH_SA1100 || ARCH_SHARK || FOOTBRIDGE
 source "drivers/ide/Kconfig"
+endif
 
 source "drivers/scsi/Kconfig"
 

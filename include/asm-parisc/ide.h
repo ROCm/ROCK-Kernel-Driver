@@ -22,6 +22,9 @@
 #define ide_default_irq(base) (0)
 #define ide_default_io_base(index) (0)
 
+#define IDE_ARCH_OBSOLETE_INIT
+#define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
+
 #define ide_init_default_irq(base)	(0)
 
 #define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))

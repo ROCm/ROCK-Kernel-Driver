@@ -26,28 +26,7 @@
 #define __ide_mm_outsw(port,addr,len)   writesw(port,addr,len)
 #define __ide_mm_outsl(port,addr,len)   writesl(port,addr,len)
 
-/*
- * Set up a hw structure for a specified data port, control port and IRQ.
- * This should follow whatever the default interface uses.
- */
-static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
-				       unsigned long ctrl_port, int *irq)
-{
-	unsigned long reg = data_port;
-        int i;
-
-        for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-                hw->io_ports[i] = reg;
-                reg += 1;
-        }
-	hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
-        if (irq)
-                *irq = 0;
-}
-
 #define ide_init_default_irq(base)	(0)
-
-static inline void ide_init_default_hwifs(void) { ; }
 
 /*
  * We always use the new IDE port registering,
@@ -55,6 +34,9 @@ static inline void ide_init_default_hwifs(void) { ; }
  */
 #define ide_default_io_base(i)		(0)
 #define ide_default_irq(b)		(0)
+
+#define IDE_ARCH_OBSOLETE_INIT
+#define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
 
 #endif /* __KERNEL__ */
 
