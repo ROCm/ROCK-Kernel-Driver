@@ -143,7 +143,7 @@ typedef struct {
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
-#define ELF_ET_DYN_BASE         (0x08000000)
+#define ELF_ET_DYN_BASE         (TASK_UNMAPPED_BASE)
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this cpu supports.  This can NOT be done in userspace
