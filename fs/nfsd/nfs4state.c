@@ -1708,28 +1708,24 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 {
 	struct nfs4_stateowner *sop = open->op_stateowner;
 	struct nfs4_file *fp = NULL;
-	struct inode *ino;
+	struct inode *ino = current_fh->fh_dentry->d_inode;
 	unsigned int fi_hashval;
 	struct nfs4_stateid *stp = NULL;
-	int status;
-
-	status = nfserr_resource;
-	if (!sop)
-		return status;
-
-	ino = current_fh->fh_dentry->d_inode;
+	int status, delegflag = 0;
 
 	status = nfserr_inval;
 	if (!TEST_ACCESS(open->op_share_access) || !TEST_DENY(open->op_share_deny))
 		goto out;
 	/*
-	 * Lookup file; if found, lookup stateid and check open request;
-	 * not found, create
+	 * Lookup file; if found, lookup stateid and check open request,
+	 * and check for delegations in the process of being recalled.
+	 * If not found, create the nfs4_file struct
 	 */
 	fi_hashval = file_hashval(ino);
 	if (find_file(fi_hashval, ino, &fp)) {
-		status = nfs4_check_open(fp, sop, open, &stp);
-		if (status)
+		if ((status = nfs4_check_open(fp, sop, open, &stp)))
+			goto out;
+		if ((status = nfs4_check_deleg_recall(fp, open, &delegflag)))
 			goto out;
 	} else {
 		status = nfserr_resource;
@@ -1769,14 +1765,20 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			}
 		}
 	}
+	memcpy(&open->op_stateid, &stp->st_stateid, sizeof(stateid_t));
+
+	/*
+	* Attempt to hand out a delegation. No error return, because the
+	* OPEN succeeds even if we fail.
+	*/
+	nfs4_open_delegation(current_fh, open, stp, &delegflag);
+	open->op_delegate_type = delegflag;
+
+	status = nfs_ok;
+
 	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
 	            stp->st_stateid.si_fileid, stp->st_stateid.si_generation);
-
-	memcpy(&open->op_stateid, &stp->st_stateid, sizeof(stateid_t));
-
-	open->op_delegate_type = NFS4_OPEN_DELEGATE_NONE;
-	status = nfs_ok;
 out:
 	/* take the opportunity to clean up unused state */
 	if (fp && list_empty(&fp->fi_perfile))
