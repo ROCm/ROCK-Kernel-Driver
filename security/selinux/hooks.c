@@ -1476,6 +1476,7 @@ static int selinux_syslog(int type)
 
 	switch (type) {
 		case 3:         /* Read last kernel messages */
+		case 10:        /* Return size of the log buffer */
 			rc = task_has_system(current, SYSTEM__SYSLOG_READ);
 			break;
 		case 6:         /* Disable logging to console */

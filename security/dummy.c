@@ -99,7 +99,7 @@ static int dummy_quota_on (struct file *f)
 
 static int dummy_syslog (int type)
 {
-	if ((type != 3) && current->euid)
+	if ((type != 3 && type != 10) && current->euid)
 		return -EPERM;
 	return 0;
 }
