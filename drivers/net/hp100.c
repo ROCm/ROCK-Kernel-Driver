@@ -326,16 +326,21 @@ static __init const char *hp100_read_id(int ioaddr)
 	return str;
 }
 
-static __init int hp100_isa_probe1(struct net_device *dev, int addr)
+static __init int hp100_isa_probe1(struct net_device *dev, int ioaddr)
 {
 	const char *sig;
 	int i;
 
-	if (!request_region(addr, HP100_REGION_SIZE, "hp100"))
+	if (!request_region(ioaddr, HP100_REGION_SIZE, "hp100"))
 		goto err;
 
-	sig = hp100_read_id(addr);
-	release_region(addr, HP100_REGION_SIZE);
+	if (hp100_inw(HW_ID) != HP100_HW_ID_CASCADE) {
+		release_region(ioaddr, HP100_REGION_SIZE);
+		goto err;
+	}
+
+	sig = hp100_read_id(ioaddr);
+	release_region(ioaddr, HP100_REGION_SIZE);
 
 	if (sig == NULL)
 		goto err;
@@ -347,7 +352,7 @@ static __init int hp100_isa_probe1(struct net_device *dev, int addr)
 	}
 
 	if (i < ARRAY_SIZE(hp100_isa_tbl))
-		return hp100_probe1(dev, addr, HP100_BUS_ISA, NULL);
+		return hp100_probe1(dev, ioaddr, HP100_BUS_ISA, NULL);
  err:
 	return -ENODEV;
 
