@@ -1356,6 +1356,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 				// NOTE usb and ohci handle up to 2^15
 				temp = 1024;
 			}
+			break;
 		default:
 			return -EINVAL;
 		}
