@@ -413,7 +413,7 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	if (dec->iso_stream_count)
-		usb_submit_urb(urb, GFP_KERNEL);
+		usb_submit_urb(urb, GFP_ATOMIC);
 #endif
 }
 

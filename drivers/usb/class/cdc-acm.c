@@ -593,7 +593,14 @@ static int acm_probe (struct usb_interface *intf,
 				epwrite = &ifdata->endpoint[0].desc;
 			}
 
-			usb_set_configuration(dev, cfacm->desc.bConfigurationValue);
+			/* FIXME don't scan every config. it's either correct
+			 * when we probe(), or some other task must fix this.
+			 */
+			if (dev->actconfig != cfacm) {
+				err("need inactive config #%d",
+					cfacm->desc.bConfigurationValue);
+				return -ENODEV;
+			}
 
 			for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
 			if (acm_table[minor]) {

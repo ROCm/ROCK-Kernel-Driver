@@ -16,77 +16,66 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/timer.h>
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
 #include "usb.h"
 
-struct usb_api_data {
-	wait_queue_head_t wqh;
-	int done;
-};
-
 static void usb_api_blocking_completion(struct urb *urb, struct pt_regs *regs)
 {
-	struct usb_api_data *awd = (struct usb_api_data *)urb->context;
+	complete((struct completion *)urb->context);
+}
 
-	awd->done = 1;
-	wmb();
-	wake_up(&awd->wqh);
+
+static void timeout_kill(unsigned long data)
+{
+	struct urb	*urb = (struct urb *) data;
+
+	dev_warn(&urb->dev->dev, "%s timeout on ep%d%s\n",
+		usb_pipecontrol(urb->pipe) ? "control" : "bulk",
+		usb_pipeendpoint(urb->pipe),
+		usb_pipein(urb->pipe) ? "in" : "out");
+	usb_unlink_urb(urb);
 }
 
 // Starts urb and waits for completion or timeout
+// note that this call is NOT interruptible, while
+// many device driver i/o requests should be interruptible
 static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 { 
-	DECLARE_WAITQUEUE(wait, current);
-	struct usb_api_data awd;
-	int status;
+	struct completion	done;
+	struct timer_list	timer;
+	int			status;
 
-	init_waitqueue_head(&awd.wqh); 	
-	awd.done = 0;
+	init_completion(&done); 	
+	urb->context = &done;
+	urb->transfer_flags |= URB_ASYNC_UNLINK;
+	urb->actual_length = 0;
+	status = usb_submit_urb(urb, GFP_NOIO);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&awd.wqh, &wait);
-
-	urb->context = &awd;
-	status = usb_submit_urb(urb, GFP_ATOMIC);
-	if (status) {
-		// something went wrong
-		usb_free_urb(urb);
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&awd.wqh, &wait);
-		return status;
-	}
-
-	while (timeout && !awd.done)
-	{
-		timeout = schedule_timeout(timeout);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		rmb();
-	}
-
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&awd.wqh, &wait);
-
-	if (!timeout && !awd.done) {
-		if (urb->status != -EINPROGRESS) {	/* No callback?!! */
-			printk(KERN_ERR "usb: raced timeout, "
-			    "pipe 0x%x status %d time left %d\n",
-			    urb->pipe, urb->status, timeout);
-			status = urb->status;
-		} else {
-			warn("usb_control/bulk_msg: timeout");
-			usb_unlink_urb(urb);  // remove urb safely
-			status = -ETIMEDOUT;
+	if (status == 0) {
+		if (timeout > 0) {
+			init_timer(&timer);
+			timer.expires = jiffies + timeout;
+			timer.data = (unsigned long)urb;
+			timer.function = timeout_kill;
+			/* grr.  timeout _should_ include submit delays. */
+			add_timer(&timer);
 		}
-	} else
+		wait_for_completion(&done);
 		status = urb->status;
+		/* note:  HCDs return ETIMEDOUT for other reasons too */
+		if (status == -ECONNRESET)
+			status = -ETIMEDOUT;
+		if (timeout > 0)
+			del_timer_sync(&timer);
+	}
 
 	if (actual_length)
 		*actual_length = urb->actual_length;
-
 	usb_free_urb(urb);
-  	return status;
+	return status;
 }
 
 /*-------------------------------------------------------------------*/
@@ -964,6 +953,55 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 }
 
 /**
+ * usb_reset_configuration - lightweight device reset
+ * @dev: the device whose configuration is being reset
+ *
+ * This issues a standard SET_CONFIGURATION request to the device using
+ * the current configuration.  The effect is to reset most USB-related
+ * state in the device, including interface altsettings (reset to zero),
+ * endpoint halts (cleared), and data toggle (only for bulk and interrupt
+ * endpoints).  Other usbcore state is unchanged, including bindings of
+ * usb device drivers to interfaces.
+ *
+ * Because this affects multiple interfaces, avoid using this with composite
+ * (multi-interface) devices.  Instead, the driver for each interface may
+ * use usb_set_interface() on the interfaces it claims.  Resetting the whole
+ * configuration would affect other drivers' interfaces.
+ *
+ * Returns zero on success, else a negative error code.
+ */
+int usb_reset_configuration(struct usb_device *dev)
+{
+	int			i, retval;
+	struct usb_host_config	*config;
+
+	for (i = 1; i < 16; ++i) {
+		usb_disable_endpoint(dev, i);
+		usb_disable_endpoint(dev, i + USB_DIR_IN);
+	}
+
+	config = dev->actconfig;
+	retval = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			USB_REQ_SET_CONFIGURATION, 0,
+			config->desc.bConfigurationValue, 0,
+			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+	if (retval < 0)
+		return retval;
+
+	dev->toggle[0] = dev->toggle[1] = 0;
+	dev->halted[0] = dev->halted[1] = 0;
+
+	/* re-init hc/hcd interface/endpoint state */
+	for (i = 0; i < config->desc.bNumInterfaces; i++) {
+		struct usb_interface *intf = config->interface[i];
+
+		intf->act_altsetting = 0;
+		usb_enable_interface(dev, intf);
+	}
+	return 0;
+}
+
+/**
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
@@ -1136,7 +1174,10 @@ EXPORT_SYMBOL(usb_get_device_descriptor);
 EXPORT_SYMBOL(usb_get_status);
 EXPORT_SYMBOL(usb_get_string);
 EXPORT_SYMBOL(usb_string);
+
+// synchronous calls that also maintain usbcore state
 EXPORT_SYMBOL(usb_clear_halt);
+EXPORT_SYMBOL(usb_reset_configuration);
 EXPORT_SYMBOL(usb_set_configuration);
 EXPORT_SYMBOL(usb_set_interface);
 

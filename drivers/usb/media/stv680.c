@@ -225,8 +225,9 @@ static int stv_sndctrl (int set, struct usb_stv *stv680, unsigned short req, uns
 static int stv_set_config (struct usb_stv *dev, int configuration, int interface, int alternate)
 {
 
-	if (usb_set_configuration (dev->udev, configuration) < 0) {
-		PDEBUG (1, "STV(e): FAILED to set configuration %i", configuration);
+	if (configuration != dev->udev->actconfig->desc.bConfigurationValue
+			|| usb_reset_configuration (dev->udev) < 0) {
+		PDEBUG (1, "STV(e): FAILED to reset configuration %i", configuration);
 		return -1;
 	}
 	if (usb_set_interface (dev->udev, interface, alternate) < 0) {

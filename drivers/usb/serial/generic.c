@@ -300,7 +300,7 @@ void usb_serial_generic_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		generic_cleanup (&serial->port[i]);
+		generic_cleanup(serial->port[i]);
 	}
 }
 

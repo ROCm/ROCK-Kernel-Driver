@@ -1017,7 +1017,7 @@ static int ttusb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 static int ttusb_setup_interfaces(struct ttusb *ttusb)
 {
-	usb_set_configuration(ttusb->dev, 1);
+	usb_reset_configuration(ttusb->dev);
 	usb_set_interface(ttusb->dev, 1, 1);
 
 	ttusb->bulk_out_pipe = usb_sndbulkpipe(ttusb->dev, 1);

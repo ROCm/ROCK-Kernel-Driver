@@ -981,7 +981,7 @@ check_and_exit:
 /* Called from ftdi_SIO_startup, etc. */
 static int ftdi_common_startup (struct usb_serial *serial)
 {
-	struct usb_serial_port *port = &serial->port[0];
+	struct usb_serial_port *port = serial->port[0];
 	struct ftdi_private *priv;
 	
 	dbg("%s",__FUNCTION__);
@@ -1022,7 +1022,7 @@ static int ftdi_common_startup (struct usb_serial *serial)
 		port->bulk_out_buffer = NULL;
 	}
 
-	usb_set_serial_port_data(serial->port, priv);
+	usb_set_serial_port_data(serial->port[0], priv);
 	
 	return (0);
 }
@@ -1042,7 +1042,7 @@ static int ftdi_SIO_startup (struct usb_serial *serial)
 		return (err);
 	}
 
-	priv = usb_get_serial_port_data(serial->port);
+	priv = usb_get_serial_port_data(serial->port[0]);
 	priv->chip_type = SIO;
 	priv->baud_base = 12000000 / 16;
 	priv->write_offset = 1;
@@ -1063,7 +1063,7 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 		return (err);
 	}
 
-	priv = usb_get_serial_port_data(serial->port);
+	priv = usb_get_serial_port_data(serial->port[0]);
 	priv->chip_type = FT8U232AM;
 	priv->baud_base = 48000000 / 2; /* Would be / 16, but FTDI supports 0.125, 0.25 and 0.5 divisor fractions! */
 	
@@ -1083,7 +1083,7 @@ static int ftdi_FT232BM_startup (struct usb_serial *serial)
 		return (err);
 	}
 
-	priv = usb_get_serial_port_data(serial->port);
+	priv = usb_get_serial_port_data(serial->port[0]);
 	priv->chip_type = FT232BM;
 	priv->baud_base = 48000000 / 2; /* Would be / 16, but FT232BM supports multiple of 0.125 divisor fractions! */
 	
@@ -1103,7 +1103,7 @@ static int ftdi_USB_UIRT_startup (struct usb_serial *serial)
 		return (err);
 	}
 
-	priv = usb_get_serial_port_data(serial->port);
+	priv = usb_get_serial_port_data(serial->port[0]);
 	priv->flags |= ASYNC_SPD_CUST;
 	priv->custom_divisor = 77;
 	priv->force_baud = B38400;
@@ -1124,7 +1124,7 @@ static int ftdi_HE_TIRA1_startup (struct usb_serial *serial)
 		return (err);
 	}
 
-	priv = usb_get_serial_port_data(serial->port);
+	priv = usb_get_serial_port_data(serial->port[0]);
 	priv->flags |= ASYNC_SPD_CUST;
 	priv->custom_divisor = 240;
 	priv->force_baud = B38400;
@@ -1146,7 +1146,7 @@ static int ftdi_HE_TIRA1_startup (struct usb_serial *serial)
 static void ftdi_shutdown (struct usb_serial *serial)
 { /* ftdi_shutdown */
 	
-	struct usb_serial_port *port = serial->port;	
+	struct usb_serial_port *port = serial->port[0];
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 
 	dbg("%s", __FUNCTION__);

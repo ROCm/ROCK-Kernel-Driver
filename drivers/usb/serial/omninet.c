@@ -170,7 +170,7 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 	}
 
 	usb_set_serial_port_data(port, od);
-	wport = &serial->port[1];
+	wport = serial->port[1];
 	wport->tty = port->tty;
 
 	/* Start reading from the device */
@@ -201,7 +201,7 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 		return;
 
 	if (serial->dev) {
-		wport = &serial->port[1];
+		wport = serial->port[1];
 		usb_unlink_urb (wport->write_urb);
 		usb_unlink_urb (port->read_urb);
 	}
@@ -271,7 +271,7 @@ static void omninet_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static int omninet_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
 {
 	struct usb_serial 	*serial	= port->serial;
-	struct usb_serial_port 	*wport	= &serial->port[1];
+	struct usb_serial_port 	*wport	= serial->port[1];
 
 	struct omninet_data 	*od 	= usb_get_serial_port_data(port);
 	struct omninet_header	*header = (struct omninet_header *) wport->write_urb->transfer_buffer;
@@ -326,7 +326,7 @@ exit:
 static int omninet_write_room (struct usb_serial_port *port)
 {
 	struct usb_serial 	*serial = port->serial;
-	struct usb_serial_port 	*wport 	= &serial->port[1];
+	struct usb_serial_port 	*wport 	= serial->port[1];
 
 	int room = 0; // Default: no room
 

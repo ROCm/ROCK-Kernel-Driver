@@ -1675,7 +1675,7 @@ static int digi_startup_device( struct usb_serial *serial )
 	/* set USB_DISABLE_SPD flag for write bulk urbs */
 	for( i=0; i<serial->type->num_ports+1; i++ ) {
 
-		port = &serial->port[i];
+		port = serial->port[i];
 
 		port->write_urb->dev = port->serial->dev;
 
@@ -1711,7 +1711,7 @@ dbg( "digi_startup: TOP" );
 			GFP_KERNEL );
 		if( priv == (struct digi_port *)0 ) {
 			while( --i >= 0 )
-				kfree( usb_get_serial_port_data(&serial->port[i]) );
+				kfree( usb_get_serial_port_data(serial->port[i]) );
 			return( 1 );			/* error */
 		}
 
@@ -1734,9 +1734,9 @@ dbg( "digi_startup: TOP" );
 				(void *)(&serial->port[i]));
 
 		/* initialize write wait queue for this port */
-		init_waitqueue_head( &serial->port[i].write_wait );
+		init_waitqueue_head( &serial->port[i]->write_wait );
 
-		usb_set_serial_port_data(&serial->port[i], priv);
+		usb_set_serial_port_data(serial->port[i], priv);
 	}
 
 	/* allocate serial private structure */
@@ -1744,14 +1744,14 @@ dbg( "digi_startup: TOP" );
 		GFP_KERNEL );
 	if( serial_priv == (struct digi_serial *)0 ) {
 		for( i=0; i<serial->type->num_ports+1; i++ )
-			kfree( usb_get_serial_port_data(&serial->port[i]) );
+			kfree( usb_get_serial_port_data(serial->port[i]) );
 		return( 1 );			/* error */
 	}
 
 	/* initialize serial private structure */
 	spin_lock_init( &serial_priv->ds_serial_lock );
 	serial_priv->ds_oob_port_num = serial->type->num_ports;
-	serial_priv->ds_oob_port = &serial->port[serial_priv->ds_oob_port_num];
+	serial_priv->ds_oob_port = serial->port[serial_priv->ds_oob_port_num];
 	serial_priv->ds_device_started = 0;
 	usb_set_serial_data(serial, serial_priv);
 
@@ -1770,14 +1770,14 @@ dbg( "digi_shutdown: TOP, in_interrupt()=%ld", in_interrupt() );
 
 	/* stop reads and writes on all ports */
 	for( i=0; i<serial->type->num_ports+1; i++ ) {
-		usb_unlink_urb( serial->port[i].read_urb );
-		usb_unlink_urb( serial->port[i].write_urb );
+		usb_unlink_urb( serial->port[i]->read_urb );
+		usb_unlink_urb( serial->port[i]->write_urb );
 	}
 
 	/* free the private data structures for all ports */
 	/* number of regular ports + 1 for the out-of-band port */
 	for( i=0; i<serial->type->num_ports+1; i++ )
-		kfree( usb_get_serial_port_data(&serial->port[i]) );
+		kfree( usb_get_serial_port_data(serial->port[i]) );
 	kfree( usb_get_serial_data(serial) );
 }
 
@@ -1980,7 +1980,7 @@ opcode, line, status, val );
 		if( status != 0 || line >= serial->type->num_ports )
 			continue;
 
-		port = &serial->port[line];
+		port = serial->port[line];
 
 		if( port_paranoia_check( port, __FUNCTION__ )
 		|| (priv=usb_get_serial_port_data(port)) == NULL )

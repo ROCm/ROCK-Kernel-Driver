@@ -388,6 +388,12 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN ),
 #endif
 
+/* Submitted by Benny Sjostrand <benny@hostmobility.com> */
+UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
+		"Minolta",
+		"Dimage F300",
+		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
+
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
 		"FlashGate SmartMedia",

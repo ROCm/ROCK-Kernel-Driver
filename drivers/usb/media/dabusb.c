@@ -747,8 +747,8 @@ static int dabusb_probe (struct usb_interface *intf,
 	s->usbdev = usbdev;
 	s->devnum = intf->minor;
 
-	if (usb_set_configuration (usbdev, usbdev->config[0].desc.bConfigurationValue) < 0) {
-		err("set_configuration failed");
+	if (usb_reset_configuration (usbdev) < 0) {
+		err("reset_configuration failed");
 		goto reject;
 	}
 	if (usbdev->descriptor.idProduct == 0x2131) {
@@ -800,7 +800,7 @@ static void dabusb_disconnect (struct usb_interface *intf)
 }
 
 static struct usb_device_id dabusb_ids [] = {
-	{ USB_DEVICE(0x0547, 0x2131) },
+	// { USB_DEVICE(0x0547, 0x2131) },	/* An2131 chip, no boot ROM */
 	{ USB_DEVICE(0x0547, 0x9999) },
 	{ }						/* Terminating entry */
 };

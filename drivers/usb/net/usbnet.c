@@ -600,7 +600,9 @@ next_desc:
 	/* claim data interface and set it up ... with side effects.
 	 * network traffic can't flow until an altsetting is enabled.
 	 */
-	usb_driver_claim_interface (&usbnet_driver, info->data, dev);
+	status = usb_driver_claim_interface (&usbnet_driver, info->data, dev);
+	if (status < 0)
+		return status;
 	status = get_endpoints (dev, info->data);
 	if (status < 0) {
 		usb_driver_release_interface (&usbnet_driver, info->data);
@@ -984,6 +986,8 @@ genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 		skb2 = skb_copy_expand (skb, (4 + 4*1) , padlen, flags);
 		dev_kfree_skb_any (skb);
 		skb = skb2;
+		if (!skb)
+			return NULL;
 	}
 
 	// attach the packet count to the header
@@ -2338,7 +2342,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		if (!((skb->len + sizeof *trailer) & 0x01))
 			*skb_put (skb, 1) = PAD_BYTE;
 		trailer = (struct nc_trailer *) skb_put (skb, sizeof *trailer);
-	} else
+	} 
 #endif	/* CONFIG_USB_NET1080 */
 
 	usb_fill_bulk_urb (urb, dev->udev, dev->out,
