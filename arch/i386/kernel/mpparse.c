@@ -110,7 +110,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
 
-	apicid = mpc_apic_id(m, translation_table[mpc_record]->trans_quad);
+	apicid = mpc_apic_id(m, translation_table[mpc_record]);
 
 	if (m->mpc_featureflag&(1<<0))
 		Dprintk("    Floating point unit present.\n");
