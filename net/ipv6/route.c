@@ -211,6 +211,16 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 struct rt6_info *rt6_dflt_pointer;
 spinlock_t rt6_dflt_lock = SPIN_LOCK_UNLOCKED;
 
+void rt6_reset_dflt_pointer(struct rt6_info *rt)
+{
+	spin_lock_bh(&rt6_dflt_lock);
+	if (rt == NULL || rt == rt6_dflt_pointer) {
+		RT6_TRACE("reset default router: %p->NULL\n", rt6_dflt_pointer);
+		rt6_dflt_pointer = NULL;
+	}
+	spin_unlock_bh(&rt6_dflt_lock);
+}
+
 /* Default Router Selection (RFC 2461 6.3.6) */
 static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 {
@@ -960,9 +970,7 @@ int ip6_del_rt(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 
 	write_lock_bh(&rt6_lock);
 
-	spin_lock_bh(&rt6_dflt_lock);
-	rt6_dflt_pointer = NULL;
-	spin_unlock_bh(&rt6_dflt_lock);
+	rt6_reset_dflt_pointer(NULL);
 
 	dst_release(&rt->u.dst);
 
@@ -1289,9 +1297,7 @@ restart:
 		if (rt->rt6i_flags & flags) {
 			dst_hold(&rt->u.dst);
 
-			spin_lock_bh(&rt6_dflt_lock);
-			rt6_dflt_pointer = NULL;
-			spin_unlock_bh(&rt6_dflt_lock);
+			rt6_reset_dflt_pointer(NULL);
 
 			read_unlock_bh(&rt6_lock);
 

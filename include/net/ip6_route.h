@@ -89,6 +89,8 @@ extern struct rt6_info *	rt6_add_dflt_router(struct in6_addr *gwaddr,
 
 extern void			rt6_purge_dflt_routers(int lst_resort);
 
+extern void			rt6_reset_dflt_pointer(struct rt6_info *rt);
+
 extern void			rt6_redirect(struct in6_addr *dest,
 					     struct in6_addr *saddr,
 					     struct neighbour *neigh,

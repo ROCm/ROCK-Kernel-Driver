@@ -49,9 +49,6 @@
 
 struct rt6_statistics	rt6_stats;
 
-extern struct rt6_info *rt6_dflt_pointer;
-extern spinlock_t rt6_dflt_lock;
-
 static kmem_cache_t * fib6_node_kmem;
 
 enum fib_walk_state_t
@@ -1187,10 +1184,7 @@ static int fib6_age(struct rt6_info *rt, void *arg)
 	if (rt->rt6i_flags&RTF_EXPIRES && rt->rt6i_expires) {
 		if (time_after(now, rt->rt6i_expires)) {
 			RT6_TRACE("expiring %p\n", rt);
-			spin_lock_bh(&rt6_dflt_lock);
-			if (rt == rt6_dflt_pointer)
-				rt6_dflt_pointer = NULL;
-			spin_unlock_bh(&rt6_dflt_lock);
+			rt6_reset_dflt_pointer(rt);
 			return -1;
 		}
 		gc_args.more++;
