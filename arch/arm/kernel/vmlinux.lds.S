@@ -71,6 +71,7 @@ SECTIONS
 		_text = .;		/* Text and read-only data	*/
 			*(.text)
 			SCHED_TEXT
+			LOCK_TEXT
 			*(.fixup)
 			*(.gnu.warning)
 			*(.rodata)
