@@ -410,6 +410,8 @@ static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
  *	the "usbfs" filesystem.  This lets devices provide ways to
  *	expose information to user space regardless of where they
  *	do (or don't) show up otherwise in the filesystem.
+ * @suspend: Called when the device is going to be suspended by the system.
+ * @resume: Called when the device is being resumed by the system.
  * @id_table: USB drivers use ID table to support hotplugging.
  *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
  *	or your driver's probe function will never get called.
@@ -444,6 +446,9 @@ struct usb_driver {
 	void (*disconnect) (struct usb_interface *intf);
 
 	int (*ioctl) (struct usb_interface *intf, unsigned int code, void *buf);
+
+	int (*suspend) (struct usb_interface *intf, u32 state);
+	int (*resume) (struct usb_interface *intf);
 
 	const struct usb_device_id *id_table;
 
