@@ -82,7 +82,7 @@ struct diskparm
 /*
  *	Host side memory scatter gather list
  *	Used by the adapter for read, write, and readdirplus operations
- *	We have seperate 32 and 64 bit version because even
+ *	We have separate 32 and 64 bit version because even
  *	on 64 bit systems not all cards support the 64 bit version
  */
 struct sgentry {
@@ -533,7 +533,7 @@ struct aac_driver_ident
 /*
  *	The adapter interface specs all queues to be located in the same
  *	physically contigous block. The host structure that defines the
- *	commuication queues will assume they are each a seperate physically
+ *	commuication queues will assume they are each a separate physically
  *	contigous memory region that will support them all being one big
  *	contigous block. 
  *	There is a command and response queue for each level and direction of
@@ -730,7 +730,7 @@ struct fsa_scsi_hba {
 	u8		ro[MAXIMUM_NUM_CONTAINERS];
 	u8		locked[MAXIMUM_NUM_CONTAINERS];
 	u8		deleted[MAXIMUM_NUM_CONTAINERS];
-	s32		devno[MAXIMUM_NUM_CONTAINERS];
+	char		devname[MAXIMUM_NUM_CONTAINERS][8];
 };
 
 struct fib {
@@ -1453,6 +1453,21 @@ struct aac_aifcmd {
 	u32 seqnum;		/* To allow ordering of reports (if necessary) */
 	u8 data[1];		/* Undefined length (from kernel viewpoint) */
 };
+
+/**
+ * 	Convert capacity to cylinders
+ *  	accounting for the fact capacity could be a 64 bit value
+ *
+ */
+static inline u32 cap_to_cyls(sector_t capacity, u32 divisor)
+{
+#ifdef CONFIG_LBD
+	do_div(capacity, divisor);
+#else
+	capacity /= divisor;
+#endif
+	return (u32) capacity;
+}
 
 const char *aac_driverinfo(struct Scsi_Host *);
 struct fib *fib_alloc(struct aac_dev *dev);

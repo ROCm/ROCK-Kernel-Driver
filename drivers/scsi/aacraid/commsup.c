@@ -827,8 +827,8 @@ int aac_command_thread(struct aac_dev * dev)
 	 *	Set up the name that will appear in 'ps'
 	 *	stored in  task_struct.comm[16].
 	 */
-	sprintf(current->comm, "aacraid");
-	daemonize();
+	daemonize("aacraid");
+	allow_signal(SIGKILL);
 	/*
 	 *	Let the DPC know it has a place to send the AIF's to.
 	 */

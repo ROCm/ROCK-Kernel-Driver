@@ -207,7 +207,7 @@ int aac_detach(struct aac_dev *detach)
 
 /**
  *	aac_comm_init	-	Initialise FSA data structures
- *	@dev:	Adapter to intialise
+ *	@dev:	Adapter to initialise
  *
  *	Initializes the data structures that are required for the FSA commuication
  *	interface to operate. 

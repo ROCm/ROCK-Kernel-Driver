@@ -53,9 +53,10 @@
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsicam.h>
 
 #include "aacraid.h"
-#include "sd.h"
+
 
 #define AAC_DRIVERNAME	"aacraid"
 
@@ -127,16 +128,17 @@ static int aac_cfg_open(struct inode * inode, struct file * file);
 static int aac_cfg_release(struct inode * inode,struct file * file);
 
 static struct file_operations aac_cfg_fops = {
-	owner: THIS_MODULE,
-	ioctl: aac_cfg_ioctl,
-	open: aac_cfg_open,
-	release: aac_cfg_release
+	.owner		= THIS_MODULE,
+	.ioctl		= aac_cfg_ioctl,
+	.open		= aac_cfg_open,
+	.release	= aac_cfg_release
 };
 
 static int aac_detect(Scsi_Host_Template *);
 static int aac_release(struct Scsi_Host *);
 static int aac_queuecommand(Scsi_Cmnd *, void (*CompletionRoutine)(Scsi_Cmnd *));
-static int aac_biosparm(Scsi_Disk *, kdev_t, int *);
+static int aac_biosparm(struct scsi_device *, struct block_device *,
+			sector_t, int *);
 static int aac_procinfo(char *, char **, off_t, int, int, int);
 static int aac_ioctl(Scsi_Device *, int, void *);
 static int aac_eh_abort(Scsi_Cmnd * cmd);
@@ -144,7 +146,7 @@ static int aac_eh_device_reset(Scsi_Cmnd* cmd);
 static int aac_eh_bus_reset(Scsi_Cmnd* cmd);
 static int aac_eh_reset(Scsi_Cmnd* cmd);
 
-static void aac_queuedepth(struct Scsi_Host *, Scsi_Device *);
+static int aac_slave_configure(struct scsi_device *);
 
 /**
  *	aac_detect	-	Probe for aacraid cards
@@ -180,7 +182,6 @@ static int aac_detect(Scsi_Host_Template *template)
 
 	/* setting up the proc directory structure */
 	template->proc_name = "aacraid";
-	spin_unlock_irq(&io_request_lock);
 
 	for( index = 0; index != num_aacdrivers; index++ ) {
 		device_id = aac_drivers[index].device;
@@ -227,7 +228,7 @@ static int aac_detect(Scsi_Host_Template *template)
 			host_ptr->irq = dev->irq;		/* Adapter IRQ number */
 			/* host_ptr->base = ( char * )(dev->resource[0].start & ~0xff); */
 			host_ptr->base = dev->resource[0].start;
-			scsi_set_pci_device(host_ptr, dev);
+			scsi_set_device(host_ptr, &dev->dev);
 			dprintk((KERN_DEBUG "Device base address = 0x%lx [0x%lx].\n", host_ptr->base, dev->resource[0].start));
 			dprintk((KERN_DEBUG "Device irq = 0x%x.\n", dev->irq));
 			/*
@@ -240,12 +241,6 @@ static int aac_detect(Scsi_Host_Template *template)
 			 * value returned as aac->id.
 			 */
 			host_ptr->unique_id = aac_count - 1;
-			/*
-			 *	This function is called after the device list has
-			 *	been built to find the tagged queueing depth 
-			 *	supported for each device.
-			 */
-			host_ptr->select_queue_depths = aac_queuedepth;
 			aac = (struct aac_dev *)host_ptr->hostdata;
 			/* attach a pointer back to Scsi_Host */
 			aac->scsi_host_ptr = host_ptr;	
@@ -260,7 +255,7 @@ static int aac_detect(Scsi_Host_Template *template)
 			/* Initialize the ordinal number of the device to -1 */
 			fsa_dev_ptr = &(aac->fsa_dev);
 			for( container = 0; container < MAXIMUM_NUM_CONTAINERS; container++ )
-				fsa_dev_ptr->devno[container] = -1;
+				fsa_dev_ptr->devname[container][0] = '\0';
 
 			dprintk((KERN_DEBUG "Initializing Hardware...\n"));
 			if((*aac_drivers[index].init)(aac , host_ptr->unique_id) != 0)
@@ -302,7 +297,6 @@ static int aac_detect(Scsi_Host_Template *template)
 		if((aac_cfg_major = register_chrdev( 0, "aac", &aac_cfg_fops))<0)
 			printk(KERN_WARNING "aacraid: unable to register \"aac\" device.\n");
 	}
-	spin_lock_irq(&io_request_lock);
 
 	template->present = aac_count; /* # of cards of this type found */
 	return aac_count;
@@ -399,8 +393,9 @@ struct aac_driver_ident* aac_get_driver_ident(int devtype)
 
 /**
  *	aac_biosparm	-	return BIOS parameters for disk
- *	@disk: SCSI disk object to process
- *	@device: kdev_t of the disk in question
+ *	@sdev: The scsi device corresponding to the disk
+ *	@bdev: the block device corresponding to the disk
+ *	@capacity: the sector capacity of the disk
  *	@geom: geometry block to fill in
  *
  *	Return the Heads/Sectors/Cylinders BIOS Disk Parameters for Disk.  
@@ -418,19 +413,20 @@ struct aac_driver_ident* aac_get_driver_ident(int devtype)
  *	be displayed.
  */
  
-static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
+static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
+			sector_t capacity, int *geom)
 {
 	struct diskparm *param = (struct diskparm *)geom;
-	struct buffer_head * buf;
+	unsigned char *buf;
 
 	dprintk((KERN_DEBUG "aac_biosparm.\n"));
 
 	/*
 	 *	Assuming extended translation is enabled - #REVISIT#
 	 */
-	if( disk->capacity >= 2 * 1024 * 1024 ) /* 1 GB in 512 byte sectors */
+	if( capacity >= 2 * 1024 * 1024 ) /* 1 GB in 512 byte sectors */
 	{
-		if( disk->capacity >= 4 * 1024 * 1024 ) /* 2 GB in 512 byte sectors */
+		if( capacity >= 4 * 1024 * 1024 ) /* 2 GB in 512 byte sectors */
 		{
 			param->heads = 255;
 			param->sectors = 63;
@@ -447,24 +443,23 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
 		param->sectors = 32;
 	}
 
-	param->cylinders = disk->capacity/(param->heads * param->sectors);
+	param->cylinders = cap_to_cyls(capacity, param->heads * param->sectors);
 
 	/*
 	 *	Read the first 1024 bytes from the disk device
 	 */
 
-	buf = bread(MKDEV(MAJOR(dev), MINOR(dev)&~0xf), 0, block_size(dev));
-	if(buf == NULL)
-		return 0;
+	buf = scsi_bios_ptable(bdev);
+
 	/* 
 	 *	If the boot sector partition table is valid, search for a partition 
 	 *	table entry whose end_head matches one of the standard geometry 
 	 *	translations ( 64/32, 128/32, 255/63 ).
 	 */
 	 
-	if(*(unsigned short *)(buf->b_data + 0x1fe) == cpu_to_le16(0xaa55))
+	if(*(unsigned short *)(buf + 0x40) == cpu_to_le16(0xaa55))
 	{
-		struct partition *first = (struct partition * )(buf->b_data + 0x1be);
+		struct partition *first = (struct partition * )buf;
 		struct partition *entry = first;
 		int saved_cylinders = param->cylinders;
 		int num;
@@ -502,7 +497,7 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
 			end_sec = first->end_sector & 0x3f;
 		}
 
-		param->cylinders = disk->capacity / (param->heads * param->sectors);
+		param->cylinders = cap_to_cyls(capacity, param->heads * param->sectors);
 
 		if(num < 4 && end_sec == param->sectors)
 		{
@@ -518,7 +513,7 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
 					param->heads, param->sectors));
 		}
 	}
-	brelse(buf);
+	kfree(buf);
 	return 0;
 }
 
@@ -532,22 +527,18 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
  *	A queue depth of one automatically disables tagged queueing.
  */
 
-static void aac_queuedepth(struct Scsi_Host * host, Scsi_Device * dev )
+static int aac_slave_configure(struct scsi_device * dev )
 {
-	Scsi_Device * dptr;
+	if(dev->tagged_supported)
+		scsi_adjust_queue_depth(dev, MSG_ORDERED_TAG, 128);
+	else
+		scsi_adjust_queue_depth(dev, 0, 1);
 
-	dprintk((KERN_DEBUG "aac_queuedepth.\n"));
-	dprintk((KERN_DEBUG "Device #   Q Depth   Online\n"));
-	dprintk((KERN_DEBUG "---------------------------\n"));
-	for(dptr = dev; dptr != NULL; dptr = dptr->next)
-	{
-		if(dptr->host == host)
-		{
-			dptr->queue_depth = 10;		
-			dprintk((KERN_DEBUG "  %2d         %d        %d\n", 
-				dptr->id, dptr->queue_depth, dptr->online));
-		}
-	}
+	dprintk((KERN_DEBUG "(scsi%d:%d:%d:%d) Tagged Queue depth %2d, "
+				"%s\n", dev->host->host_no, dev->channel,
+				dev->id, dev->lun, dev->queue_depth,
+				dev->online ? "OnLine" : "OffLine"));
+	return 0;
 }
 
 /*------------------------------------------------------------------------------
@@ -578,7 +569,7 @@ static int aac_ioctl(Scsi_Device * scsi_dev_ptr, int cmd, void * arg)
 
 static int aac_cfg_open(struct inode * inode, struct file * file )
 {
-	unsigned minor_number = MINOR(inode->i_rdev);
+	unsigned minor_number = minor(inode->i_rdev);
 	if(minor_number >= aac_count)
 		return -ENODEV;
 	return 0;
@@ -614,7 +605,7 @@ static int aac_cfg_release(struct inode * inode, struct file * file )
  
 static int aac_cfg_ioctl(struct inode * inode,  struct file * file, unsigned int cmd, unsigned long arg )
 {
-	struct aac_dev *dev = aac_devices[MINOR(inode->i_rdev)];
+	struct aac_dev *dev = aac_devices[minor(inode->i_rdev)];
 	return aac_do_ioctl(dev, cmd, (void *)arg);
 }
 
@@ -625,27 +616,26 @@ static int aac_cfg_ioctl(struct inode * inode,  struct file * file, unsigned int
  */
  
 static Scsi_Host_Template driver_template = {
-	module:			THIS_MODULE,
-	name:           	"AAC",
-	proc_info:      	aac_procinfo,
-	detect:         	aac_detect,
-	release:        	aac_release,
-	info:           	aac_driverinfo,
-	ioctl:          	aac_ioctl,
-	queuecommand:   	aac_queuecommand,
-	bios_param:     	aac_biosparm,	
-	can_queue:      	AAC_NUM_IO_FIB,	
-	this_id:        	16,
-	sg_tablesize:   	16,
-	max_sectors:    	128,
-	cmd_per_lun:    	AAC_NUM_IO_FIB, 
-	eh_abort_handler:	aac_eh_abort,
-	eh_device_reset_handler: aac_eh_device_reset,
-	eh_bus_reset_handler:	aac_eh_bus_reset,
-	eh_host_reset_handler:	aac_eh_reset,
-	use_new_eh_code:	1, 
-
-	use_clustering:		ENABLE_CLUSTERING,
+	.module				= THIS_MODULE,
+	.name           		= "AAC",
+	.proc_info      		= aac_procinfo,
+	.detect         		= aac_detect,
+	.release        		= aac_release,
+	.info           		= aac_driverinfo,
+	.ioctl          		= aac_ioctl,
+	.queuecommand   		= aac_queuecommand,
+	.bios_param     		= aac_biosparm,	
+	.slave_configure		= aac_slave_configure,
+	.can_queue      		= AAC_NUM_IO_FIB,	
+	.this_id        		= 16,
+	.sg_tablesize   		= 16,
+	.max_sectors    		= 128,
+	.cmd_per_lun    		= AAC_NUM_IO_FIB, 
+	.eh_abort_handler		= aac_eh_abort,
+	.eh_device_reset_handler	= aac_eh_device_reset,
+	.eh_bus_reset_handler		= aac_eh_bus_reset,
+	.eh_host_reset_handler		= aac_eh_reset,
+	.use_clustering			= ENABLE_CLUSTERING,
 };
 
 /*===========================================================================
@@ -726,5 +716,3 @@ static int aac_procinfo(char *proc_buffer, char **start_ptr,off_t offset,
 	*start_ptr = proc_buffer;
 	return sprintf(proc_buffer, "%s  %d\n", "Raid Controller, scsi hba number", host_no);
 }
-
-EXPORT_NO_SYMBOLS;
