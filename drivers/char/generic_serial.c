@@ -112,7 +112,7 @@ int gs_write(struct tty_struct * tty, int from_user,
 
 	if (!tty) return 0;
 
-	port = tty->driver;
+	port = tty->driver_data;
 
 	if (!port) return 0;
 

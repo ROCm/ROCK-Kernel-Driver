@@ -383,17 +383,9 @@ extern inline tub_t *INODE2TUB(struct inode *ip)
 {
 	unsigned int minor = minor(ip->i_rdev);
 	tub_t *tubp = NULL;
-	if (minor == 0 && current->tty != NULL) {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-#ifdef CONFIG_TN3270_CONSOLE
-		if (tub3270_con_tubp != NULL &&
-		    current->tty->device == S390_CONSOLE_DEV)
-			minor = tub3270_con_tubp->minor;
-		else
-#endif
-#endif
-		if (tub_major(current->tty->device) == IBM_TTY3270_MAJOR)
-			minor = tub_minor(current->tty->device);
+	if (minor == 0 && current->tty) {
+		if (current->tty->driver == &tty3270_driver)
+			minor = current->tty->index;
 	}
 	if (minor <= tubnummins && minor > 0)
 		tubp = (*tubminors)[minor];
@@ -405,18 +397,11 @@ extern inline tub_t *INODE2TUB(struct inode *ip)
  */
 extern inline tub_t *TTY2TUB(struct tty_struct *tty)
 {
-	unsigned int minor = minor(tty->device);
+	unsigned index = tty->index;
 	tub_t *tubp = NULL;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-#ifdef CONFIG_TN3270_CONSOLE
-	if (tty->device == S390_CONSOLE_DEV)
-		tubp = tub3270_con_tubp;
-	else
-#endif
-#endif
-	if (minor <= tubnummins && minor > 0)
-		tubp = (*tubminors)[minor];
+	if (index <= tubnummins && index > 0)
+		tubp = (*tubminors)[index];
 	return tubp;
 }
 
