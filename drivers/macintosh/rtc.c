@@ -34,14 +34,13 @@ static int rtc_busy = 0;
 void get_rtc_time(struct rtc_time *t)
 {
 	unsigned long nowtime;
-    
+
 	nowtime = (ppc_md.get_rtc_time)();
 
 	to_tm(nowtime, t);
 
 	t->tm_year -= 1900;
-	t->tm_mon -= 1;
-	t->tm_wday -= 1;
+	t->tm_mon -= 1; /* Make sure userland has a 0-based month */
 }
 
 /* Set the current date and time in the real time clock. */
@@ -49,7 +48,8 @@ void set_rtc_time(struct rtc_time *t)
 {
 	unsigned long nowtime;
 
-	nowtime = mktime(t->tm_year+1900, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
+	nowtime = mktime(t->tm_year+1900, t->tm_mon+1, t->tm_mday,
+			t->tm_hour, t->tm_min, t->tm_sec);
 
 	(ppc_md.set_rtc_time)(nowtime);
 }
