@@ -249,6 +249,9 @@ out:
  * We really don't want to intermingle reads and writes like that.
  *
  * Returns the number of pages requested, or the maximum amount of I/O allowed.
+ *
+ * do_page_cache_readahead() returns -1 if it encountered request queue
+ * congestion.
  */
 static inline int
 __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
@@ -359,13 +362,45 @@ int check_ra_success(struct file_ra_state *ra, unsigned long nr_to_read,
 }
 
 /*
- * Issue the I/O. If pages already in cache, increment the hit count until
- * we exceed max, then turn RA off until we start missing again.
+ * This version skips the IO if the queue is read-congested, and will tell the
+ * block layer to abandon the readahead if request allocation would block.
+ *
+ * force_page_cache_readahead() will ignore queue congestion and will block on
+ * request queues.
  */
 int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read)
 {
-	return  __do_page_cache_readahead(mapping, filp, offset, nr_to_read);
+	if (bdi_read_congested(mapping->backing_dev_info))
+		return -1;
+
+	return __do_page_cache_readahead(mapping, filp, offset, nr_to_read);
+}
+
+/*
+ * Read 'nr_to_read' pages starting at page 'offset'. If the flag 'block'
+ * is set wait till the read completes.  Otherwise attempt to read without
+ * blocking.
+ * Returns 1 meaning 'success' if read is succesfull without switching off
+ * readhaead mode. Otherwise return failure.
+ */
+static int
+blockable_page_cache_readahead(struct address_space *mapping, struct file *filp,
+			unsigned long offset, unsigned long nr_to_read,
+			struct file_ra_state *ra, int block)
+{
+	int actual;
+
+	if (block) {
+		actual = __do_page_cache_readahead(mapping, filp,
+						offset, nr_to_read);
+	} else {
+		actual = do_page_cache_readahead(mapping, filp,
+						offset, nr_to_read);
+		if (actual == -1)
+			return 0;
+	}
+	return check_ra_success(ra, nr_to_read, actual);
 }
 
 /*
@@ -379,7 +414,7 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 {
 	unsigned long max, min;
 	unsigned long newsize = req_size;
-	unsigned long actual=0;
+	unsigned long block;
 
 	/*
 	 * Here we detect the case where the application is performing
@@ -392,7 +427,6 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 
 	max = get_max_readahead(ra);
 	min = get_min_readahead(ra);
-//	maxsane = max_sane_readahead(max);
 	newsize = min(req_size, max);
 
 	if (newsize == 0 || (ra->flags & RA_FLAG_INCACHE)) {
@@ -407,12 +441,11 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	if ((ra->size == 0 && offset == 0)	/* first io and start of file */
 	    || (ra->size == -1 && ra->prev_page == offset - 1)) {
 		/* First sequential */
-		ra->prev_page  = offset + newsize-1;
+		ra->prev_page  = offset + newsize - 1;
 		ra->size = get_init_ra_size(newsize, max);
 		ra->start = offset;
-		actual = do_page_cache_readahead(mapping, filp, offset,
-						ra->size);
-		if (!check_ra_success(ra, ra->size, actual))
+		if (!blockable_page_cache_readahead(mapping, filp, offset,
+							 ra->size, ra, 1))
 			goto out;
 
 		/*
@@ -427,9 +460,8 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 			ra->ahead_size = get_next_ra_size(ra->size, max, min,
 							  &ra->flags);
 			ra->ahead_start = ra->start + ra->size;
-			actual = do_page_cache_readahead(mapping, filp,
-					 ra->ahead_start, ra->ahead_size);
-			check_ra_success(ra, ra->ahead_size, actual);
+			blockable_page_cache_readahead(mapping, filp,
+				 ra->ahead_start, ra->ahead_size, ra, 1);
 		}
 		goto out;
 	}
@@ -441,10 +473,9 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	 */
 	if ((offset != (ra->prev_page+1) || (ra->size == 0))) {
 		ra_off(ra);
-		ra->prev_page  = offset + newsize-1;
-		actual = do_page_cache_readahead(mapping, filp, offset,
-						 newsize);
-		check_ra_success(ra, newsize, actual);
+		ra->prev_page  = offset + newsize - 1;
+		blockable_page_cache_readahead(mapping, filp, offset,
+				 newsize, ra, 1);
 		goto out;
 	}
 
@@ -454,33 +485,62 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	 */
 
 	if (ra->ahead_start == 0) {	 /* no ahead window yet */
-		ra->ahead_size = get_next_ra_size(max(newsize,ra->size),
-						  max, min, &ra->flags);
+		ra->ahead_size = get_next_ra_size(ra->size, max, min,
+						  &ra->flags);
 		ra->ahead_start = ra->start + ra->size;
-		newsize = min (newsize, ra->ahead_start - offset);
-		actual = do_page_cache_readahead(mapping, filp,
-					 ra->ahead_start, ra->ahead_size);
-		if (!check_ra_success(ra, ra->ahead_size, actual))
+		block = ((offset + newsize -1) >= ra->ahead_start);
+		if (!blockable_page_cache_readahead(mapping, filp,
+		    ra->ahead_start, ra->ahead_size, ra, block)) {
+			/* A read failure in blocking mode, implies pages are
+			 * all cached. So we can safely assume we have taken
+			 * care of all the pages requested in this call. A read
+			 * failure in non-blocking mode, implies we are reading
+			 * more pages than requested in this call.  So we safely
+			 * assume we have taken care of all the pages requested
+			 * in this call.
+			 *
+			 * Just reset the ahead window in case we failed due to
+			 * congestion.  The ahead window will any way be closed
+			 * in case we failed due to exessive page cache hits.
+			 */
+			ra->ahead_start = 0;
+			ra->ahead_size = 0;
 			goto out;
+		}
 	}
 	/*
-	 * Already have an ahead window, check if we crossed into it if so,
-	 * shift windows and issue a new ahead window.
-	 * Only return the #pages that are in the current window, so that we
-	 * get called back on the first page of the ahead window which will
-	 * allow us to submit more IO.
+	 * Already have an ahead window, check if we crossed into it.
+	 * If so, shift windows and issue a new ahead window.
+	 * Only return the #pages that are in the current window, so that
+	 * we get called back on the first page of the ahead window which
+	 * will allow us to submit more IO.
 	 */
-	if ((offset + newsize -1) >= ra->ahead_start) {
+	if ((offset + newsize - 1) >= ra->ahead_start) {
 		ra->start = ra->ahead_start;
 		ra->size = ra->ahead_size;
 		ra->ahead_start = ra->ahead_start + ra->ahead_size;
 		ra->ahead_size = get_next_ra_size(ra->ahead_size,
 						  max, min, &ra->flags);
-		newsize = min (newsize, ra->ahead_start - offset);
-		actual = do_page_cache_readahead(mapping, filp,
-				 ra->ahead_start, ra->ahead_size);
-		check_ra_success(ra, ra->ahead_size, actual);
+		block = ((offset + newsize - 1) >= ra->ahead_start);
+		if (!blockable_page_cache_readahead(mapping, filp,
+			ra->ahead_start, ra->ahead_size, ra, block)) {
+			/* A read failure in blocking mode, implies pages are
+			 * all cached. So we can safely assume we have taken
+			 * care of all the pages requested in this call.
+			 * A read failure in non-blocking mode, implies we are
+			 * reading more pages than requested in this call.  So
+			 * we safely assume we have taken care of all the pages
+			 * requested in this call.
+			 *
+			 * Just reset the ahead window in case we failed due to
+			 * congestion.  The ahead window will any way be closed
+			 * in case we failed due to excessive page cache hits.
+			 */
+			ra->ahead_start = 0;
+			ra->ahead_size = 0;
+		}
 	}
+
 out:
 	ra->prev_page = offset + newsize - 1;
 	return(newsize);
