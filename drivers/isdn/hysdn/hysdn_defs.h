@@ -235,7 +235,6 @@ extern hysdn_card *card_root;	/* pointer to first card */
 /*************************/
 /* im/exported functions */
 /*************************/
-extern int printk(const char *fmt,...);
 extern char *hysdn_getrev(const char *);
 
 /* hysdn_procconf.c */

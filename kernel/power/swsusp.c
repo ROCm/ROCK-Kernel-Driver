@@ -71,8 +71,6 @@
 
 unsigned char software_suspend_enabled = 0;
 
-extern void do_magic(int resume);
-
 #define NORESUME		1
 #define RESUME_SPECIFIED	2
 
@@ -583,7 +581,7 @@ static void suspend_power_down(void)
  * Magic happens here
  */
 
-void do_magic_resume_1(void)
+asmlinkage void do_magic_resume_1(void)
 {
 	barrier();
 	mb();
@@ -596,7 +594,7 @@ void do_magic_resume_1(void)
 			   driver scheduled DMA, we have good chance for DMA to finish ;-). */
 }
 
-void do_magic_resume_2(void)
+asmlinkage void do_magic_resume_2(void)
 {
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
@@ -640,7 +638,7 @@ void do_magic_resume_2(void)
 
  */
 
-void do_magic_suspend_1(void)
+asmlinkage void do_magic_suspend_1(void)
 {
 	mb();
 	barrier();
@@ -648,7 +646,7 @@ void do_magic_suspend_1(void)
 	spin_lock_irq(&suspend_pagedir_lock);
 }
 
-void do_magic_suspend_2(void)
+asmlinkage void do_magic_suspend_2(void)
 {
 	int is_problem;
 	read_swapfiles();
