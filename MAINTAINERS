@@ -2147,14 +2147,6 @@ L:	linux-usb-devel@lists.sourceforge.net
 W:	http://pegasus2.sourceforge.net/
 S:	Maintained
 
-USB SCANNER DRIVER
-P:	Henning Meier-Geinitz
-M:	henning@meier-geinitz.de
-L:	linux-usb-users@lists.sourceforge.net
-L:	linux-usb-devel@lists.sourceforge.net
-W:	http://www.meier-geinitz.de/kernel/
-S:	Maintained
-
 USB SE401 DRIVER
 P:	Jeroen Vreeken
 M:	pe1rxq@amsat.org
