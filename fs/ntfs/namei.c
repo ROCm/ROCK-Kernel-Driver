@@ -92,6 +92,8 @@
  *    file name in the WIN32 namespace corresponding to the matched short file
  *    name. We then convert the name to the current NLS code page, and proceed
  *    searching for a dentry with this name, etc, as in case 2), above.
+ *
+ * Locking: Caller must hold i_sem on the directory.
  */
 static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent,
 		struct nameidata *nd)
@@ -383,7 +385,7 @@ struct dentry *ntfs_get_parent(struct dentry *child_dent)
 		return ERR_PTR(-ENOMEM);
 	}
 try_next:
-	if (unlikely(!lookup_attr(AT_FILE_NAME, NULL, 0, IGNORE_CASE, 0,
+	if (unlikely(!lookup_attr(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0,
 			NULL, 0, ctx))) {
 		put_attr_search_ctx(ctx);
 		unmap_mft_record(ni);

@@ -963,7 +963,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (!lookup_attr(ni->type, ni->name, ni->name_len, IGNORE_CASE, vcn,
+	if (!lookup_attr(ni->type, ni->name, ni->name_len, CASE_SENSITIVE, vcn,
 			NULL, 0, ctx)) {
 		put_attr_search_ctx(ctx);
 		err = -ENOENT;
@@ -1343,8 +1343,8 @@ err_out:
  * base inode).
  *
  * After finishing with the attribute/mft record you need to call
- * release_attr_search_ctx() to cleanup the search context (unmapping any
- * mapped inodes, etc).
+ * put_attr_search_ctx() to cleanup the search context (unmapping any mapped
+ * inodes, etc).
  *
  * Return TRUE if the search was successful and FALSE if not. When TRUE,
  * @ctx->attr is the found attribute and it is in mft record @ctx->mrec. When
@@ -1614,8 +1614,8 @@ not_found:
  * continue searches where they were left off at.
  *
  * After finishing with the attribute/mft record you need to call
- * release_attr_search_ctx() to cleanup the search context (unmapping any
- * mapped inodes, etc).
+ * put_attr_search_ctx() to cleanup the search context (unmapping any mapped
+ * inodes, etc).
  *
  * Return TRUE if the search was successful and FALSE if not. When TRUE,
  * @ctx->attr is the found attribute and it is in mft record @ctx->mrec. When

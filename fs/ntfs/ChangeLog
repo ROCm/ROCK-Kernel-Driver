@@ -55,6 +55,7 @@ ToDo/Notes:
 	  PAGE_CACHE_SHIFT by casting page->index to s64 in fs/ntfs/aops.c.
 	- Use atomic kmap instead of kmap() in fs/ntfs/aops.c::ntfs_read_page()
 	  and ntfs_read_block().
+	- Use case sensitive attribute lookups instead of case insensitive ones.
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 

@@ -403,7 +403,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 		goto unm_err_out;
 	}
 	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
-			IGNORE_CASE, 0, NULL, 0, ctx))) {
+			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
 		goto put_unm_err_out;
 	}
@@ -899,7 +899,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		goto err_out;
 	}
 	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
-			IGNORE_CASE, 0, NULL, 0, ctx))) {
+			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
 		goto err_out;
 	}
@@ -1673,7 +1673,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 		goto err_out;
 	}
 	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
-			IGNORE_CASE, 0, NULL, 0, ctx))) {
+			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
 		goto err_out;
 	}

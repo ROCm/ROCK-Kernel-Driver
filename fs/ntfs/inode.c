@@ -1169,7 +1169,7 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	}
 
 	/* Find the attribute. */
-	if (!lookup_attr(ni->type, ni->name, ni->name_len, IGNORE_CASE, 0,
+	if (!lookup_attr(ni->type, ni->name, ni->name_len, CASE_SENSITIVE, 0,
 			NULL, 0, ctx))
 		goto unm_err_out;
 
@@ -2348,7 +2348,7 @@ void ntfs_write_inode(struct inode *vi, int sync)
 		goto unm_err_out;
 	}
 	if (unlikely(!lookup_attr(AT_STANDARD_INFORMATION, NULL, 0,
-			IGNORE_CASE, 0, NULL, 0, ctx))) {
+			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		put_attr_search_ctx(ctx);
 		err = -ENOENT;
 		goto unm_err_out;
