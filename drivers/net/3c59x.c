@@ -2321,7 +2321,6 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	long ioaddr;
 	int status;
 	int work_done = max_interrupt_work;
-	int handled;
 
 	ioaddr = dev->base_addr;
 
@@ -2336,18 +2335,14 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (vortex_debug > 6)
 		printk(KERN_DEBUG "boomerang_interrupt. status=0x%4x\n", status);
 
-	if ((status & IntLatch) == 0) {
-		handled = 0;
+	if ((status & IntLatch) == 0)
 		goto handler_exit;		/* No interrupt: shared IRQs can cause this */
-	}
 
 	if (status == 0xffff) {		/* h/w no longer present (hotplug)? */
 		if (vortex_debug > 1)
 			printk(KERN_DEBUG "boomerang_interrupt(1): status = 0xffff\n");
-		handled = 0;
 		goto handler_exit;
 	}
-	handled = 1;
 
 	if (status & IntReq) {
 		status |= vp->deferred;
@@ -2442,7 +2437,7 @@ boomerang_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			   dev->name, status);
 handler_exit:
 	spin_unlock(&vp->lock);
-	return IRQ_RETVAL(handled);
+	return IRQ_HANDLED;
 }
 
 static int vortex_rx(struct net_device *dev)
