@@ -757,7 +757,7 @@ made_progress:
 		if (vcc->pop)
 			vcc->pop (vcc, skb);
 		else
-			kfree_skb (skb);
+			dev_kfree_skb (skb);
 		instance->current_skb = NULL;
 
 		if (vcc->stats)
@@ -780,7 +780,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 			if (vcc->pop)
 				vcc->pop (vcc, skb);
 			else
-				kfree_skb (skb);
+				dev_kfree_skb (skb);
 		}
 	spin_unlock_irq (&instance->sndqueue.lock);
 
@@ -791,7 +791,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 		if (vcc->pop)
 			vcc->pop (vcc, skb);
 		else
-			kfree_skb (skb);
+			dev_kfree_skb (skb);
 	}
 	tasklet_enable (&instance->send_tasklet);
 	dbg ("udsl_cancel_send done");
@@ -987,7 +987,7 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	tasklet_enable (&instance->receive_tasklet);
 
 	if (vcc_data->skb)
-		kfree_skb (vcc_data->skb);
+		dev_kfree_skb (vcc_data->skb);
 	vcc_data->skb = NULL;
 
 	kfree (vcc_data);
@@ -1219,7 +1219,7 @@ fail:
 		usb_free_urb (rcv->urb);
 
 		if (rcv->skb)
-			kfree_skb (rcv->skb);
+			dev_kfree_skb (rcv->skb);
 	}
 
 	kfree (instance);
@@ -1291,7 +1291,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		struct udsl_receiver *rcv = &(instance->receivers [i]);
 
 		usb_free_urb (rcv->urb);
-		kfree_skb (rcv->skb);
+		dev_kfree_skb (rcv->skb);
 	}
 
 	/* send finalize */
