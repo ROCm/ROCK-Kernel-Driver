@@ -89,36 +89,34 @@ static struct controller *alloc_ebda_hpc (u32 slot_count, u32 bus_count)
 
 	controller = kmalloc (sizeof (struct controller), GFP_KERNEL);
 	if (!controller)
-		return NULL;
+		goto error;
 	memset (controller, 0, sizeof (*controller));
 
 	slots = kmalloc (sizeof (struct ebda_hpc_slot) * slot_count, GFP_KERNEL);
-	if (!slots) {
-		kfree (controller);
-		return NULL;
-	}
+	if (!slots)
+		goto error_contr;
 	memset (slots, 0, sizeof (*slots) * slot_count);
 	controller->slots = slots;
 
 	buses = kmalloc (sizeof (struct ebda_hpc_bus) * bus_count, GFP_KERNEL);
-	if (!buses) {
-		kfree (controller->slots);
-		kfree (controller);
-		return NULL;
-	}
+	if (!buses)
+		goto error_slots;
 	memset (buses, 0, sizeof (*buses) * bus_count);
 	controller->buses = buses;
 
 	return controller;
+error_slots:
+	kfree(controller->slots);
+error_contr:
+	kfree(controller);
+error:
+	return NULL;
 }
 
 static void free_ebda_hpc (struct controller *controller)
 {
 	kfree (controller->slots);
-	controller->slots = NULL;
 	kfree (controller->buses);
-	controller->buses = NULL;
-	controller->ctrl_dev = NULL;
 	kfree (controller);
 }
 
@@ -286,7 +284,8 @@ static void __init print_ebda_hpc (void)
 int __init ibmphp_access_ebda (void)
 {
 	u8 format, num_ctlrs, rio_complete, hs_complete;
-	u16 ebda_seg, num_entries, next_offset, offset, blk_id, sub_addr, rc, re, rc_id, re_id, base;
+	u16 ebda_seg, num_entries, next_offset, offset, blk_id, sub_addr, re, rc_id, re_id, base;
+	int rc = 0;
 
 
 	rio_complete = 0;
@@ -324,10 +323,8 @@ int __init ibmphp_access_ebda (void)
 			format = readb (io_mem + offset);
 
 			offset += 1;
-			if (format != 4) {
-				iounmap (io_mem);
-				return -ENODEV;
-			}
+			if (format != 4)
+				goto error_nodev;
 			debug ("hot blk format: %x\n", format);
 			/* hot swap sub blk */
 			base = offset;
@@ -339,18 +336,16 @@ int __init ibmphp_access_ebda (void)
 			rc_id = readw (io_mem + sub_addr); 	/* sub blk id */
 
 			sub_addr += 2;
-			if (rc_id != 0x5243) {
-				iounmap (io_mem);
-				return -ENODEV;
-			}
+			if (rc_id != 0x5243)
+				goto error_nodev;
 			/* rc sub blk signature  */
 			num_ctlrs = readb (io_mem + sub_addr);
 
 			sub_addr += 1;
 			hpc_list_ptr = alloc_ebda_hpc_list ();
 			if (!hpc_list_ptr) {
-				iounmap (io_mem);
-				return -ENOMEM;
+				rc = -ENOMEM;
+				goto out;
 			}
 			hpc_list_ptr->format = format;
 			hpc_list_ptr->num_ctlrs = num_ctlrs;
@@ -361,16 +356,15 @@ int __init ibmphp_access_ebda (void)
 			debug ("offset of hpc data structure enteries: %x\n ", sub_addr);
 
 			sub_addr = base + re;	/* re sub blk */
+			/* FIXME: rc is never used/checked */
 			rc = readw (io_mem + sub_addr);	/* next sub blk */
 
 			sub_addr += 2;
 			re_id = readw (io_mem + sub_addr);	/* sub blk id */
 
 			sub_addr += 2;
-			if (re_id != 0x5245) {
-				iounmap (io_mem);
-				return -ENODEV;
-			}
+			if (re_id != 0x5245)
+				goto error_nodev;
 
 			/* signature of re */
 			num_entries = readw (io_mem + sub_addr);
@@ -378,8 +372,8 @@ int __init ibmphp_access_ebda (void)
 			sub_addr += 2;	/* offset of RSRC_ENTRIES blk */
 			rsrc_list_ptr = alloc_ebda_rsrc_list ();
 			if (!rsrc_list_ptr ) {
-				iounmap (io_mem);
-				return -ENOMEM;
+				rc = -ENOMEM;
+				goto out;
 			}
 			rsrc_list_ptr->format = format;
 			rsrc_list_ptr->num_entries = num_entries;
@@ -391,9 +385,8 @@ int __init ibmphp_access_ebda (void)
 			debug ("offset of rsrc data structure enteries: %x\n ", sub_addr);
 
 			hs_complete = 1;
-		}
-		/* found rio table */
-		else if (blk_id == 0x4752) {
+		} else {
+		/* found rio table, blk_id == 0x4752 */
 			debug ("now enter io table ---\n");
 			debug ("rio blk id: %x\n", blk_id);
 
@@ -406,41 +399,36 @@ int __init ibmphp_access_ebda (void)
 			rio_table_ptr->riodev_count = readb (io_mem + offset + 2);
 			rio_table_ptr->offset = offset +3 ;
 			
-			debug ("info about rio table hdr ---\n");
-			debug ("ver_num: %x\nscal_count: %x\nriodev_count: %x\noffset of rio table: %x\n ", rio_table_ptr->ver_num, rio_table_ptr->scal_count, rio_table_ptr->riodev_count, rio_table_ptr->offset);
+			debug("info about rio table hdr ---\n");
+			debug("ver_num: %x\nscal_count: %x\nriodev_count: %x\noffset of rio table: %x\n ",
+				rio_table_ptr->ver_num, rio_table_ptr->scal_count,
+				rio_table_ptr->riodev_count, rio_table_ptr->offset);
 
 			rio_complete = 1;
 		}
 	}
 
-	if (!hs_complete && !rio_complete) {
-		iounmap (io_mem);
-		return -ENODEV;
-	}
+	if (!hs_complete && !rio_complete)
+		goto error_nodev;
 
 	if (rio_table_ptr) {
-		if (rio_complete == 1 && rio_table_ptr->ver_num == 3) {
+		if (rio_complete && rio_table_ptr->ver_num == 3) {
 			rc = ebda_rio_table ();
-			if (rc) {
-				iounmap (io_mem);
-				return rc;
-			}
+			if (rc)
+				goto out;
 		}
 	}
 	rc = ebda_rsrc_controller ();
-	if (rc) {
-		iounmap (io_mem);
-		return rc;
-	}
+	if (rc)
+		goto out;
 
 	rc = ebda_rsrc_rsrc ();
-	if (rc) {
-		iounmap (io_mem);
-		return rc;
-	}
-
+	goto out;
+error_nodev:
+	rc = -ENODEV;
+out:
 	iounmap (io_mem);
-	return 0;
+	return rc;
 }
 
 /*
