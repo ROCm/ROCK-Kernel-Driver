@@ -225,10 +225,9 @@ static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 
 static void __devinit sis_get_driver(struct agp_bridge_data *bridge)
 {
-	if (bridge->dev->device == PCI_DEVICE_ID_SI_648 ||
-	    bridge->dev->device == PCI_DEVICE_ID_SI_746) {
+	if (bridge->dev->device == PCI_DEVICE_ID_SI_648) { 
+		sis_driver.agp_enable=sis_648_enable;
 		if (agp_bridge->major_version == 3) {
-			sis_driver.agp_enable			= sis_648_enable;
 			sis_driver.aperture_sizes		= agp3_generic_sizes;
 			sis_driver.size_type			= U16_APER_SIZE;
 			sis_driver.num_aperture_sizes	= AGP_GENERIC_SIZES_ENTRIES;
@@ -236,9 +235,16 @@ static void __devinit sis_get_driver(struct agp_bridge_data *bridge)
 			sis_driver.fetch_size			= agp3_generic_fetch_size;
 			sis_driver.cleanup				= agp3_generic_cleanup;
 			sis_driver.tlb_flush			= agp3_generic_tlbflush;
-		} else {
-			sis_driver.agp_enable=sis_648_enable;
 		}
+	}
+
+	if (bridge->dev->device == PCI_DEVICE_ID_SI_746) {
+		/*
+		 * We don't know enough about the 746 to enable it properly.
+		 * Though we do know that it needs the 'delay' hack to settle
+		 * after changing modes.
+		 */
+		sis_driver.agp_enable=sis_648_enable;
 	}
 }
 
