@@ -221,4 +221,8 @@ void snd_usbmidi_disconnect(struct list_head *p, struct usb_driver *driver);
 #define snd_usb_complete_callback(x) (x)
 #endif
 
+#ifndef snd_usb_get_speed
+#define snd_usb_get_speed(dev) ((dev)->speed)
+#endif
+
 #endif /* __USBAUDIO_H */
