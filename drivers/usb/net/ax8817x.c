@@ -445,7 +445,7 @@ static int ax_phy_cmd_callback(struct ax8817x_info *ax_info,
 		req->devreq.wIndex = cpu_to_le16(MII_BMSR);
 		req->devreq.wLength = cpu_to_le16(2);
 		req->data_size = 2;
-		(long) req->priv = 0;	/* This is the retry count */
+		req->priv = 0;	/* This is the retry count */
 		return 1;
 
 		/* Done reading BMSR */
@@ -948,7 +948,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int loc,
 	write_mii_word(ax_info, phy_id, loc, val);
 }
 
-static int ax8817x_ethtool_ioctl(struct net_device *net, void *uaddr)
+static int ax8817x_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 {
 	struct ax8817x_info *ax_info;
 	int cmd;
@@ -1056,7 +1056,7 @@ static int ax8817x_ioctl(struct net_device *net, struct ifreq *ifr,
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		res = ax8817x_ethtool_ioctl(net, ifr->ifr_data);
+		res = ax8817x_ethtool_ioctl(net, (void __user *)ifr->ifr_data);
 		break;
 	case SIOCGMIIPHY:	/* Get address of PHY in use */
 	case SIOCGMIIREG:	/* Read from MII PHY register */
