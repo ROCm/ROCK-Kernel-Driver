@@ -37,7 +37,6 @@
 #include <linux/smb_fs.h>
 #include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
-#include <linux/quota.h>
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/personality.h>
@@ -72,34 +71,41 @@ struct timespec32 {
 };
 
 struct sigregs32 {
-    /***********************************************************************/
-    /* the gp_regs array is 32 bit representation of the pt_regs structure */
-    /*  that was stored on the kernle stack during the system call that    */
-    /*  was interrupted for the signal.                                    */
-    /*                                                                     */
-    /* Note that the entire pt_regs regs structure will fit in the gp_regs */
-    /*   structure because the ELF_NREG value is 48 for PPC and the pt_regs*/
-    /*   structure contains 44 registers                                   */
-    /*                                                                     */ 
-    /***********************************************************************/ 
+	/*
+	 * the gp_regs array is 32 bit representation of the pt_regs
+	 * structure that was stored on the kernle stack during the
+	 * system call that was interrupted for the signal.
+	 *
+	 * Note that the entire pt_regs regs structure will fit in
+	 * the gp_regs structure because the ELF_NREG value is 48 for
+	 * PPC and the pt_regs structure contains 44 registers
+	 */
 	elf_gregset_t32	gp_regs;
 	double		fp_regs[ELF_NFPREG];
 	unsigned int	tramp[2];
-	/* Programs using the rs6000/xcoff abi can save up to 19 gp regs
-	   and 18 fp regs below sp before decrementing it. */
+	/*
+	 * Programs using the rs6000/xcoff abi can save up to 19 gp
+	 * regs and 18 fp regs below sp before decrementing it.
+	 */
 	int		abigap[56];
 };
 
 
 struct rt_sigframe_32 {
-	/* Unused space at start of frame to allow for storing of stack pointers */
+	/*
+	 * Unused space at start of frame to allow for storing of
+	 * stack pointers
+	 */
 	unsigned long _unused;
-	/* This is a 32 bit pointer in user address space 
-	 *     it is a pointer to the siginfo stucture in the rt stack frame 
+	/*
+	 * This is a 32 bit pointer in user address space 
+	 * it is a pointer to the siginfo stucture in the rt stack frame 
 	 */
 	u32 pinfo;
-	/* This is a 32 bit pointer in user address space */
-	/*     it is a pointer to the user context in the rt stack frame  */
+	/*
+	 * This is a 32 bit pointer in user address space
+	 * it is a pointer to the user context in the rt stack frame
+	 */
 	u32 puc;
 	struct siginfo32  info;
 	struct ucontext32 uc;
@@ -192,10 +198,12 @@ asmlinkage long sys32_sigpending(old_sigset_t32 *set)
 
 extern asmlinkage long sys_sigprocmask(int how, old_sigset_t *set, old_sigset_t *oset);
 
-/* Note: it is necessary to treat how as an unsigned int, 
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
+/*
+ * Note: it is necessary to treat how as an unsigned int, with the
+ * corresponding cast to a signed int to insure that the proper
+ * conversion (sign extension) between the register representation
+ * of a signed int (msr in 32-bit mode) and the register representation
+ * of a signed int (msr in 64-bit mode) is performed.
  */
 asmlinkage long sys32_sigprocmask(u32 how, old_sigset_t32 *set, old_sigset_t32 *oset)
 {
@@ -224,7 +232,7 @@ asmlinkage long sys32_sigprocmask(u32 how, old_sigset_t32 *set, old_sigset_t32 *
  *
  * Each of these things must be a multiple of 16 bytes in size.
  *
-*/
+ */
 
 
 /*
@@ -244,8 +252,10 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
 		goto badframe;
 
-	/* Note that PPC32 puts the upper 32 bits of the sigmask in the  */
-	/*   unused part of the signal stackframe                        */
+	/*
+	 * Note that PPC32 puts the upper 32 bits of the sigmask in the
+	 * unused part of the signal stackframe
+	 */
 	set.sig[0] = sigctx.oldmask + ((long)(sigctx._unused[3])<< 32);
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
@@ -433,12 +443,12 @@ setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 		goto badframe;
 
 
-	/*****************************************************************************/
-	/* Now copy the floating point registers onto the user stack                 */
-	/*                                                                           */
-	/* Also set up so on the completion of the signal handler, the sys_sigreturn */
-	/*   will get control to reset the stack                                     */
-	/*****************************************************************************/
+	/*
+	 * Now copy the floating point registers onto the user stack 
+	 *
+	 * Also set up so on the completion of the signal handler, the
+	 * sys_sigreturn will get control to reset the stack
+	 */
 	if (__copy_to_user(&frame->fp_regs, current->thread.fpr,
 			   ELF_NFPREG * sizeof(double))
 	    || __put_user(0x38000000U + __NR_sigreturn, &frame->tramp[0])    /* li r0, __NR_sigreturn */
@@ -456,12 +466,12 @@ setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 		goto badframe;
 
 	regs->gpr[1] = newsp & 0xFFFFFFFF;
-	/**************************************************************/
-	/* first parameter to the signal handler is the signal number */
-	/*  - the value is in gpr3                                    */  
-	/* second parameter to the signal handler is the sigcontext   */
-	/*   - set the value into gpr4                                */ 
-	/**************************************************************/
+	/*
+	 * first parameter to the signal handler is the signal number
+	 *  - the value is in gpr3
+	 * second parameter to the signal handler is the sigcontext
+	 *   - set the value into gpr4
+	 */
 	regs->gpr[4] = (unsigned long) sc;
 	regs->link = (unsigned long) frame->tramp;
 	return;
@@ -475,31 +485,31 @@ badframe:
 }
 
 
-/****************************************************************************/
-/*  Start of RT signal support                                              */
-/*                                                                          */
-/*     sigset_t is 64 bits for rt signals                                   */
-/*                                                                          */
-/*  System Calls                                                            */
-/*       sigaction                sys32_rt_sigaction                        */
-/*       sigpending               sys32_rt_sigpending                       */
-/*       sigprocmask              sys32_rt_sigprocmask                      */
-/*       sigreturn                sys32_rt_sigreturn                        */
-/*       sigtimedwait             sys32_rt_sigtimedwait                     */
-/*       sigqueueinfo             sys32_rt_sigqueueinfo                     */
-/*       sigsuspend               sys32_rt_sigsuspend                       */ 
-/*                                                                          */
-/*  Other routines                                                          */
-/*        setup_rt_frame32                                                  */
-/*        siginfo64to32                                                     */
-/*        siginfo32to64                                                     */
-/*                                                                          */
-/*                                                                          */
-/****************************************************************************/
+/*
+ *  Start of RT signal support
+ *
+ *     sigset_t is 64 bits for rt signals
+ *
+ *  System Calls
+ *       sigaction                sys32_rt_sigaction
+ *       sigpending               sys32_rt_sigpending
+ *       sigprocmask              sys32_rt_sigprocmask
+ *       sigreturn                sys32_rt_sigreturn
+ *       sigtimedwait             sys32_rt_sigtimedwait
+ *       sigqueueinfo             sys32_rt_sigqueueinfo
+ *       sigsuspend               sys32_rt_sigsuspend
+ *
+ *  Other routines
+ *        setup_rt_frame32
+ *        siginfo64to32
+ *        siginfo32to64
+ */
 
 
-// This code executes after the rt signal handler in 32 bit mode has completed and 
-//  returned  
+/*
+ * This code executes after the rt signal handler in 32 bit mode has
+ * completed and returned  
+ */
 long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 			unsigned long r6, unsigned long r7, unsigned long r8,
 			struct pt_regs * regs)
@@ -507,7 +517,6 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	struct rt_sigframe_32 *rt_stack_frame;
 	struct sigcontext32_struct sigctx;
 	struct sigregs32 *signalregs;
- 
 	int ret;
 	elf_gregset_t32 saved_regs;   /* an array of 32 bit register values */
 	sigset_t signal_set; 
@@ -525,7 +534,8 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		goto badframe;
 	}
 
-	/* Unblock the signal that was processed 
+	/*
+	 * Unblock the signal that was processed 
 	 *   After a signal handler runs - 
 	 *     if the signal is blockable - the signal will be unblocked  
 	 *       ( sigkill and sigstop are not blockable)
@@ -537,8 +547,9 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
-	/* Set to point to the next rt_sigframe - this is used to determine whether this 
-	 *   is the last signal to process
+	/*
+	 * Set to point to the next rt_sigframe - this is used to
+	 * determine whether this is the last signal to process
 	 */
 	signalregs = (struct sigregs32 *) (u64)sigctx.regs;
 	/* If currently owning the floating point - give them up */
@@ -657,15 +668,12 @@ asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act, struc
 		case 1: new_ka.sa.sa_mask.sig[0] = set32.sig[0]
 				| (((long)set32.sig[1]) << 32);
 		}
-
 		ret |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
-		
 		if (ret)
 			return -EFAULT;
 	}
 
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
-
 	if (!ret && oact) {
 		switch (_NSIG_WORDS) {
 		case 4:
@@ -686,7 +694,6 @@ asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act, struc
 				      sizeof(sigset32_t));
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 	}
-
 	return ret;
 }
 
@@ -694,10 +701,12 @@ asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act, struc
 extern asmlinkage long sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset,
 					  size_t sigsetsize);
 
-/* Note: it is necessary to treat how as an unsigned int, 
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
+/*
+ * Note: it is necessary to treat how as an unsigned int, with the
+ * corresponding cast to a signed int to insure that the proper
+ * conversion (sign extension) between the register representation
+ * of a signed int (msr in 32-bit mode) and the register representation
+ * of a signed int (msr in 64-bit mode) is performed.
  */
 asmlinkage long sys32_rt_sigprocmask(u32 how, sigset32_t *set, sigset32_t *oset, size_t sigsetsize)
 {
@@ -743,7 +752,6 @@ extern asmlinkage long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 asmlinkage long sys32_rt_sigpending(sigset32_t *set,   __kernel_size_t32 sigsetsize)
 {
-
 	sigset_t s;
 	sigset32_t s32;
 	int ret;
@@ -778,7 +786,6 @@ siginfo64to32(siginfo_t32 *d, siginfo_t *s)
 	if (s->si_signo >= SIGRTMIN) {
 		d->si_pid = s->si_pid;
 		d->si_uid = s->si_uid;
-		
 		d->si_int = s->si_int;
 	} else switch (s->si_signo) {
 	/* XXX: What about POSIX1.b timers */
@@ -895,10 +902,12 @@ siginfo32to64(siginfo_t *d, siginfo_t32 *s)
 
 extern asmlinkage long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 
-/* Note: it is necessary to treat pid and sig as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
+/*
+ * Note: it is necessary to treat pid and sig as unsigned ints, with the
+ * corresponding cast to a signed int to insure that the proper conversion
+ * (sign extension) between the register representation of a signed int
+ * (msr in 32-bit mode) and the register representation of a signed int
+ * (msr in 64-bit mode) is performed.
  */
 asmlinkage long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 {
@@ -923,7 +932,6 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs);
 int sys32_rt_sigsuspend(sigset32_t* unewset, size_t sigsetsize, int p3, int p4, int p6, int p7, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
-	
 	sigset32_t s32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
@@ -958,12 +966,6 @@ int sys32_rt_sigsuspend(sigset32_t* unewset, size_t sigsetsize, int p3, int p4, 
 			return regs->gpr[3];
 	}
 }
-
-
-
-
-
-
 
 
 /*
@@ -1048,14 +1050,12 @@ setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 		goto badframe;
 
 
-	/*****************************************************************************/
-	/* Now copy the floating point registers onto the user stack                 */
-	/*                                                                           */
-	/* Also set up so on the completion of the signal handler, the sys_sigreturn */
-	/*   will get control to reset the stack                                     */
-	/*****************************************************************************/
-
-
+	/*
+	 * Now copy the floating point registers onto the user stack
+	 *
+	 * Also set up so on the completion of the signal handler, the
+	 * sys_sigreturn will get control to reset the stack
+	 */
 	if (__copy_to_user(&frame->fp_regs, current->thread.fpr,
 			   ELF_NFPREG * sizeof(double))
 	    || __put_user(0x38000000U + __NR_rt_sigreturn, &frame->tramp[0])    /* li r0, __NR_rt_sigreturn */
@@ -1066,10 +1066,10 @@ setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 			   (unsigned long) &frame->tramp[2]);
 	current->thread.fpscr = 0;	/* turn off all fp exceptions */
 
-  
-	/* Retrieve rt_sigframe from stack and
-	   set up registers for signal handler
-	*/
+	/*
+	 * Retrieve rt_sigframe from stack and
+	 * set up registers for signal handler
+	 */
 	newsp -= __SIGNAL_FRAMESIZE32;
       
 
@@ -1082,12 +1082,8 @@ setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 
 	regs->gpr[4] = copyreg4;
 	regs->gpr[5] = copyreg5;
-
-   
 	regs->gpr[1] = newsp;
 	regs->gpr[6] = (unsigned long) rt_sf;
-
-
 	regs->link = (unsigned long) frame->tramp;
 
 	return;
@@ -1099,6 +1095,7 @@ badframe:
 #endif
 	do_exit(SIGSEGV);
 }
+
 
 /*
  * OK, we're invoking a handler
@@ -1155,9 +1152,10 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		sc = (struct sigcontext32_struct *)(u64)*newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
 			goto badframe;
-
-		/* Note the upper 32 bits of the signal mask are stored in the */
-		/*   unused part of the signal stack frame                     */  
+		/*
+		 * Note the upper 32 bits of the signal mask are stored
+		 * in the unused part of the signal stack frame
+		 */
 		if (__put_user((u32)(u64)ka->sa.sa_handler, &sc->handler)
 		    || __put_user(oldset->sig[0], &sc->oldmask)
 		    || __put_user((oldset->sig[0] >> 32), &sc->_unused[3])
@@ -1176,6 +1174,7 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 	}
+	
 	return;
 
 badframe:
@@ -1188,16 +1187,12 @@ badframe:
 }
 
 
-/****************************************************************************/
-/*  Start Alternate signal stack support                                    */
-/*                                                                          */
-/*                                                                          */
-/*                                                                          */
-/*  System Calls                                                            */
-/*       sigaltatck               sys32_sigaltstack                         */
-/*                                                                          */
-/****************************************************************************/
-
+/*
+ *  Start Alternate signal stack support
+ *
+ *  System Calls
+ *       sigaltatck               sys32_sigaltstack
+ */
 
 asmlinkage int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3, int p4, int p6,
 				 int p7, struct pt_regs *regs)
@@ -1207,8 +1202,10 @@ asmlinkage int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3, int p4, int
 	mm_segment_t old_fs;
 	unsigned long sp;
 
-	/* set sp to the user stack on entry to the system call                  */
-	/*   the system call router sets R9 to the saved registers               */
+	/*
+	 * set sp to the user stack on entry to the system call
+	 * the system call router sets R9 to the saved registers
+	 */
 	sp = regs->gpr[1];
 
 	/*  Put new stack info in local 64 bit stack struct                      */ 
@@ -1217,7 +1214,6 @@ asmlinkage int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3, int p4, int
 			 __get_user(uss.ss_size, &((stack_32_t *)(long)newstack)->ss_size)))
 		return -EFAULT; 
 
-   
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = do_sigaltstack(newstack ? &uss : NULL, oldstack ? &uoss : NULL, sp);
@@ -1232,15 +1228,14 @@ asmlinkage int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3, int p4, int
 
 
 
-/****************************************************************************/
-/*  Start of do_signal32 routine                                            */
-/*                                                                          */
-/*   This routine gets control when a pemding signal needs to be processed  */
-/*     in the 32 bit target thread -                                        */
-/*                                                                          */
-/*   It handles both rt and non-rt signals                                  */
-/*                                                                          */
-/****************************************************************************/
+/*
+ *  Start of do_signal32 routine
+ *
+ *   This routine gets control when a pemding signal needs to be processed
+ *     in the 32 bit target thread -
+ *
+ *   It handles both rt and non-rt signals
+ */
 
 /*
  * Note that 'init' is a special process: it doesn't get signals it doesn't
@@ -1270,7 +1265,6 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		else
 			newsp = regs->gpr[1];
 		newsp = frame = newsp - sizeof(struct sigregs32);
-
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal32(signr, &info, oldset, regs, &newsp, frame);
 	}
@@ -1292,5 +1286,6 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		setup_rt_frame32(regs, (struct sigregs32*)(u64)frame, newsp);
 	else
 		setup_frame32(regs, (struct sigregs32*)(u64)frame, newsp);
+
 	return 1;
 }
