@@ -596,7 +596,10 @@ acpi_early_init (void)
 	acpi_status		status = AE_OK;
 	struct acpi_buffer	buffer = {sizeof(acpi_fadt), &acpi_fadt};
 
-	ACPI_FUNCTION_TRACE("acpi_bus_init");
+	ACPI_FUNCTION_TRACE("acpi_early_init");
+
+	if (acpi_disabled)
+		return;
 
 	/* enable workarounds, unless strict ACPI spec. compliance */
 	if (!acpi_strict)
@@ -737,9 +740,6 @@ static int __init acpi_init (void)
 
 	printk(KERN_INFO PREFIX "Subsystem revision %08x\n",
 		ACPI_CA_VERSION);
-
-	/* Initial core debug level excludes drivers, so include them now */
-	acpi_set_debug(ACPI_DEBUG_LOW);
 
 	if (acpi_disabled) {
 		printk(KERN_INFO PREFIX "Interpreter disabled.\n");

@@ -830,9 +830,15 @@ acpi_boot_init (void)
 	 */
 	error = acpi_blacklisted();
 	if (error) {
-		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
-		disable_acpi();
-		return error;
+		extern int acpi_force;
+
+		if (acpi_force) {
+			printk(KERN_WARNING PREFIX "acpi=force override\n");
+		} else {
+			printk(KERN_WARNING PREFIX "Disabling ACPI support\n");
+			disable_acpi();
+			return error;
+		}
 	}
 
 	/*

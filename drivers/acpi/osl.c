@@ -55,6 +55,9 @@ struct acpi_os_dpc
     void		    *context;
 };
 
+#ifdef CONFIG_ACPI_CUSTOM_DSDT
+#include CONFIG_ACPI_CUSTOM_DSDT_FILE
+#endif
 
 #ifdef ENABLE_DEBUGGER
 #include <linux/kdb.h>
@@ -241,7 +244,14 @@ acpi_os_table_override (struct acpi_table_header *existing_table,
 	if (!existing_table || !new_table)
 		return AE_BAD_PARAMETER;
 
+#ifdef CONFIG_ACPI_CUSTOM_DSDT
+	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
+		*new_table = (struct acpi_table_header*)AmlCode;
+	else
+		*new_table = NULL;
+#else
 	*new_table = NULL;
+#endif
 	return AE_OK;
 }
 

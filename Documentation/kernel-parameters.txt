@@ -138,6 +138,20 @@ running once the system is up.
 			Recognize and ignore IRQ0/pin2 Interrupt Override.
 			For broken nForce2 BIOS resulting in XT-PIC timer.
 
+	acpi_dbg_layer=	[HW,ACPI]
+			Format: <int>
+			Each bit of the <int> indicates an acpi debug layer,
+			1: enable, 0: disable. It is useful for boot time
+			debugging. After system has booted up, it can be set
+			via /proc/acpi/debug_layer.
+
+	acpi_dbg_level=	[HW,ACPI]
+			Format: <int>
+			Each bit of the <int> indicates an acpi debug level,
+			1: enable, 0: disable. It is useful for boot time
+			debugging. After system has booted up, it can be set
+			via /proc/acpi/debug_level.
+
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
 			See also Documentation/sound/oss/AD1816.
