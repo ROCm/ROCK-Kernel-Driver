@@ -331,7 +331,8 @@ static int ehci_start (struct usb_hcd *hcd)
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = (struct ehci_caps *) hcd->regs;
-	ehci->regs = (struct ehci_regs *) (hcd->regs + ehci->caps->length);
+	ehci->regs = (struct ehci_regs *) (hcd->regs +
+				readb (&ehci->caps->length));
 	dbg_hcs_params (ehci, "ehci_start");
 	dbg_hcc_params (ehci, "ehci_start");
 
