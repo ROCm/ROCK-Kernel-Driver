@@ -206,7 +206,9 @@ static int fop_open(struct inode * inode, struct file * file)
 			/* Just in case we're already talking to someone... */
 			if(wdt_is_open)
 				return -EBUSY;
-
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			/* Good, fire up the show */
 			wdt_is_open = 1;
 			wdt_startup();
