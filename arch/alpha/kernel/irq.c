@@ -12,11 +12,11 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/kernel_stat.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
+#include <linux/ptrace.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/random.h>
