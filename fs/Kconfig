@@ -766,7 +766,7 @@ config PROC_KCORE
 	default y if !ARM
 
 config DEVFS_FS
-	bool "/dev file system support (EXPERIMENTAL)"
+	bool "/dev file system support (OBSOLETE)"
 	depends on EXPERIMENTAL
 	help
 	  This is support for devfs, a virtual file system (like /proc) which
@@ -784,6 +784,13 @@ config DEVFS_FS
 	  Note that devfs no longer manages /dev/pts!  If you are using UNIX98
 	  ptys, you will also need to enable (and mount) the /dev/pts
 	  filesystem (CONFIG_DEVPTS_FS).
+
+	  Note that devfs has been obsoleted by udev,
+	  <http://www.kernel.org/pub/linux/utils/kernel/hotplug/>.
+	  It has been stripped down to a bare minimum and is only provided for
+	  legacy installations that use its naming scheme which is
+	  unfortunately different from the names normal Linux installations
+	  use.
 
 	  If unsure, say N.
 
