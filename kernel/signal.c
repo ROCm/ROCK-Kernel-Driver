@@ -336,7 +336,7 @@ void __exit_signal(struct task_struct *tsk)
 		 * If there is any task waiting for the group exit
 		 * then notify it:
 		 */
-		if (sig->group_exit_task && atomic_read(&sig->count) <= 2) {
+		if (sig->group_exit_task && atomic_read(&sig->count) == sig->notify_count) {
 			wake_up_process(sig->group_exit_task);
 			sig->group_exit_task = NULL;
 		}
