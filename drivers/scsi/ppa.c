@@ -31,7 +31,8 @@ typedef struct {
 	unsigned long jstart;	/* Jiffies at start             */
 	unsigned long recon_tmo;	/* How many usecs to wait for reconnection (6th bit) */
 	unsigned int failed:1;	/* Failure flag                 */
-	unsigned int p_busy:1;	/* Parport sharing busy flag    */
+	unsigned wanted:1;	/* Parport sharing busy flag    */
+	wait_queue_head_t *waiting;
 } ppa_struct;
 
 #include  "ppa.h"
@@ -44,33 +45,56 @@ static inline ppa_struct *ppa_dev(struct Scsi_Host *host)
 	return &ppa_hosts[host->unique_id];
 }
 
+static spinlock_t arbitration_lock = SPIN_LOCK_UNLOCKED;
+
+static void got_it(ppa_struct *dev)
+{
+	dev->base = dev->dev->port->base;
+	if (dev->cur_cmd)
+		dev->cur_cmd->SCp.phase = 1;
+	else
+		wake_up(dev->waiting);
+}
+
 static void ppa_wakeup(void *ref)
 {
 	ppa_struct *dev = (ppa_struct *) ref;
+	unsigned long flags;
 
-	if (!dev->p_busy)
-		return;
-
-	if (parport_claim(dev->dev)) {
-		printk("ppa: bug in ppa_wakeup\n");
-		return;
+	spin_lock_irqsave(&arbitration_lock, flags);
+	if (dev->wanted) {
+		parport_claim(dev->dev);
+		got_it(dev);
+		dev->wanted = 0;
 	}
-	dev->p_busy = 0;
-	dev->base = dev->dev->port->base;
-	if (dev->cur_cmd)
-		dev->cur_cmd->SCp.phase++;
+	spin_unlock_irqrestore(&arbitration_lock, flags);
 	return;
 }
 
 static int ppa_pb_claim(ppa_struct *dev)
 {
-	if (parport_claim(dev->dev)) {
-		dev->p_busy = 1;
-		return 1;
+	unsigned long flags;
+	int res = 1;
+	spin_lock_irqsave(&arbitration_lock, flags);
+	if (parport_claim(dev->dev) == 0) {
+		got_it(dev);
+		res = 0;
 	}
-	if (dev->cur_cmd)
-		dev->cur_cmd->SCp.phase++;
-	return 0;
+	dev->wanted = res;
+	spin_unlock_irqrestore(&arbitration_lock, flags);
+	return res;
+}
+
+static void ppa_pb_dismiss(ppa_struct *dev)
+{
+	unsigned long flags;
+	int wanted;
+	spin_lock_irqsave(&arbitration_lock, flags);
+	wanted = dev->wanted;
+	dev->wanted = 0;
+	spin_unlock_irqrestore(&arbitration_lock, flags);
+	if (!wanted)
+		parport_release(dev->dev);
 }
 
 static inline void ppa_pb_release(ppa_struct *dev)
@@ -90,6 +114,8 @@ static Scsi_Host_Template ppa_template;
 static int ppa_probe(ppa_struct *dev, struct parport *pb)
 {
 	struct Scsi_Host *host;
+	DECLARE_WAIT_QUEUE_HEAD(waiting);
+	DEFINE_WAIT(wait);
 	int ports;
 	int err;
 	int modes, ppb, ppb_hi;
@@ -97,6 +123,7 @@ static int ppa_probe(ppa_struct *dev, struct parport *pb)
 	dev->base = -1;
 	dev->mode = PPA_AUTODETECT;
 	dev->recon_tmo = PPA_RECON_TMO;
+	init_waitqueue_head(&waiting);
 	dev->dev = parport_register_device(pb, "ppa", NULL, ppa_wakeup,
 					    NULL, 0, dev);
 
@@ -107,19 +134,21 @@ static int ppa_probe(ppa_struct *dev, struct parport *pb)
 	 * registers. [ CTR and ECP ]
 	 */
 	err = -EBUSY;
-	if (ppa_pb_claim(dev)) {
-		unsigned long now = jiffies;
-		while (dev->p_busy) {
-			schedule();	/* We are safe to schedule here */
-			if (time_after(jiffies, now + 3 * HZ)) {
-				printk(KERN_ERR
-				       "ppa%d: failed to claim parport because a "
-				       "pardevice is owning the port for too longtime!\n",
-				       dev - ppa_hosts);
-				goto out;
-			}
-		}
+	dev->waiting = &waiting;
+	prepare_to_wait(&waiting, &wait, TASK_UNINTERRUPTIBLE);
+	if (ppa_pb_claim(dev))
+		schedule_timeout(3 * HZ);
+	if (dev->wanted) {
+		printk(KERN_ERR "ppa%d: failed to claim parport because "
+				"a pardevice is owning the port for too long "
+				"time!\n", dev - ppa_hosts);
+		ppa_pb_dismiss(dev);
+		dev->waiting = NULL;
+		finish_wait(&waiting, &wait);
+		goto out;
 	}
+	dev->waiting = NULL;
+	finish_wait(&waiting, &wait);
 	ppb = dev->base = dev->dev->port->base;
 	ppb_hi = dev->dev->port->base_hi;
 	w_ctr(ppb, 0x0c);
@@ -759,8 +788,8 @@ static void ppa_interrupt(void *data)
 
 	if (cmd->SCp.phase > 1)
 		ppa_disconnect(dev);
-	if (cmd->SCp.phase > 0)
-		ppa_pb_release(dev);
+
+	ppa_pb_dismiss(dev);
 
 	dev->cur_cmd = 0;
 
@@ -784,7 +813,7 @@ static int ppa_engine(ppa_struct *dev, Scsi_Cmnd *cmd)
 
 	switch (cmd->SCp.phase) {
 	case 0:		/* Phase 0 - Waiting for parport */
-		if ((jiffies - dev->jstart) > HZ) {
+		if (time_after(jiffies, dev->jstart + HZ)) {
 			/*
 			 * We waited more than a second
 			 * for parport to call us
@@ -905,10 +934,10 @@ static int ppa_queuecommand(Scsi_Cmnd *cmd, void (*done) (Scsi_Cmnd *))
 	cmd->result = DID_ERROR << 16;	/* default return code */
 	cmd->SCp.phase = 0;	/* bus free */
 
-	ppa_pb_claim(dev);
-
 	dev->ppa_tq.data = dev;
 	schedule_work(&dev->ppa_tq);
+
+	ppa_pb_claim(dev);
 
 	return 0;
 }
