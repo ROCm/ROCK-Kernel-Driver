@@ -412,9 +412,11 @@ config BLK_DEV_IDEDMA_PCI
 
 	  It is safe to say Y to this question.
 
+if BLK_DEV_IDEDMA_PCI
+
 config BLK_DEV_IDE_TCQ
 	bool "ATA tagged command queueing (EXPERIMENTAL)"
-	depends on BLK_DEV_IDEDMA_PCI && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	help
 	  Support for tagged command queueing on ATA disk drives. This enables
 	  the IDE layer to have multiple in-flight requests on hardware that
@@ -455,7 +457,6 @@ config BLK_DEV_IDE_TCQ_DEPTH
 
 config BLK_DEV_IDEDMA_FORCED
 	bool "Force enable legacy 2.0.X HOSTS to use DMA"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This is an old piece of lost code from Linux 2.0 Kernels.
 
@@ -463,7 +464,6 @@ config BLK_DEV_IDEDMA_FORCED
 
 config IDEDMA_PCI_AUTO
 	bool "Use PCI DMA by default when available"
-	depends on BLK_DEV_IDEDMA_PCI
 	---help---
 	  Prior to kernel version 2.1.112, Linux used to automatically use
 	  DMA for IDE drives and chipsets which support it. Due to concerns
@@ -488,7 +488,7 @@ config IDEDMA_ONLYDISK
 
 config IDEDMA_PCI_WIP
 	bool "ATA Work(s) In Progress (EXPERIMENTAL)"
-	depends on BLK_DEV_IDEDMA_PCI && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	help
 	  If you enable this you will be able to use and test highly
 	  developmental projects. If you say N, the configurator will
@@ -514,7 +514,6 @@ config BLK_DEV_ADMA
 
 config BLK_DEV_AEC62XX
 	tristate "AEC62XX chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds explicit support for Acard AEC62xx (Artop ATP8xx)
 	  IDE controllers. This allows the kernel to change PIO, DMA and UDMA
@@ -522,7 +521,6 @@ config BLK_DEV_AEC62XX
 
 config BLK_DEV_ALI15X3
 	tristate "ALI M15x3 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver ensures (U)DMA support for ALI 1533, 1543 and 1543C
 	  onboard chipsets.  It also tests for Simplex mode and enables
@@ -551,7 +549,6 @@ config WDC_ALI15X3
 
 config BLK_DEV_AMD74XX
 	tristate "AMD and nVidia IDE support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds explicit support for AMD-7xx and AMD-8111 chips
 	  and also for the nVidia nForce chip.  This allows the kernel to
@@ -560,21 +557,18 @@ config BLK_DEV_AMD74XX
 
 config BLK_DEV_CMD64X
 	tristate "CMD64{3|6|8|9} chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  Say Y here if you have an IDE controller which uses any of these
 	  chipsets: CMD643, CMD646, or CMD648.
 
 config BLK_DEV_TRIFLEX
 	tristate "Compaq Triflex IDE support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  Say Y here if you have a Compaq Triflex IDE controller, such
 	  as those commonly found on Compaq Pentium-Pro systems
 
 config BLK_DEV_CY82C693
 	tristate "CY82C693 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds detection and support for the CY82C693 chipset
 	  used on Digital's PC-Alpha 164SX boards.
@@ -584,7 +578,7 @@ config BLK_DEV_CY82C693
 
 config BLK_DEV_CS5520
 	tristate "Cyrix CS5510/20 MediaGX chipset support (VERY EXPERIMENTAL)"
-	depends on BLK_DEV_IDEDMA_PCI && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	help
 	  Include support for PIO tuning an virtual DMA on the Cyrix MediaGX 
 	  5510/5520 chipset. This will automatically be detected and
@@ -594,7 +588,6 @@ config BLK_DEV_CS5520
 
 config BLK_DEV_CS5530
 	tristate "Cyrix/National Semiconductor CS5530 MediaGX chipset support"
-	depends on BLK_DEV_IDEDMA_PCIOA
 	help
 	  Include support for UDMA on the Cyrix MediaGX 5530 chipset. This
 	  will automatically be detected and configured if found.
@@ -603,7 +596,6 @@ config BLK_DEV_CS5530
 
 config BLK_DEV_HPT34X
 	tristate "HPT34X chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds up to 4 more EIDE devices sharing a single
 	  interrupt. The HPT343 chipset in its current form is a non-bootable
@@ -624,7 +616,6 @@ config HPT34X_AUTODMA
 
 config BLK_DEV_HPT366
 	tristate "HPT36X/37X chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	---help---
 	  HPT366 is an Ultra DMA chipset for ATA-66.
 	  HPT368 is an Ultra DMA chipset for ATA-66 RAID Based.
@@ -649,14 +640,12 @@ config BLK_DEV_HPT366
 
 config BLK_DEV_SC1200
 	tristate "National SCx200 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds support for the built in IDE on the National
 	  SCx200 series of embedded x86 "Geode" systems
 
 config BLK_DEV_PIIX
 	tristate "Intel PIIXn chipsets support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds explicit support for Intel PIIX and ICH chips
 	  and also for the Efar Victory66 (slc90e66) chip.  This allows
@@ -665,7 +654,7 @@ config BLK_DEV_PIIX
 
 config BLK_DEV_IT8172
 	bool "IT8172 IDE support"
-	depends on (MIPS_ITE8172 || MIPS_IVR) && BLK_DEV_IDEDMA_PCI
+	depends on (MIPS_ITE8172 || MIPS_IVR)
 	help
 	  Say Y here to support the on-board IDE controller on the Integrated
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
@@ -674,7 +663,6 @@ config BLK_DEV_IT8172
 
 config BLK_DEV_NS87415
 	tristate "NS87415 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds detection and support for the NS87415 chip
 	  (used in SPARC64, among others).
@@ -683,7 +671,6 @@ config BLK_DEV_NS87415
 
 config BLK_DEV_PDC202XX_OLD
 	tristate "PROMISE PDC202{46|62|65|67} support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  Promise Ultra33 or PDC20246
 	  Promise Ultra66 or PDC20262
@@ -708,7 +695,7 @@ config BLK_DEV_PDC202XX_OLD
 
 config PDC202XX_BURST
 	bool "Special UDMA Feature"
-	depends on BLK_DEV_PDC202XX_OLD=y && CONFI_BLK_DEV_IDEDMA_PCI
+	depends on BLK_DEV_PDC202XX_OLD=y
 	---help---
 	  This option causes the pdc202xx driver to enable UDMA modes on the
 	  PDC202xx even when the PDC202xx BIOS has not done so.
@@ -725,7 +712,6 @@ config PDC202XX_BURST
 
 config BLK_DEV_PDC202XX_NEW
 	tristate "PROMISE PDC202{68|69|70|71|75|76|77} support"
-	depends on BLK_DEV_IDEDMA_PCI
 
 # FIXME - probably wants to be one for old and for new
 config PDC202XX_FORCE
@@ -736,21 +722,19 @@ config PDC202XX_FORCE
 
 config BLK_DEV_SVWKS
 	tristate "ServerWorks OSB4/CSB5/CSB6 chipsets support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds PIO/(U)DMA support for the ServerWorks OSB4/CSB5
 	  chipsets.
 
 config BLK_DEV_SIIMAGE
 	tristate "Silicon Image chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds PIO/(U)DMA support for the SI CMD680 and SII
 	  3112 (Serial ATA) chips.
 
 config BLK_DEV_SIS5513
 	tristate "SiS5513 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI && X86
+	depends on X86
 	---help---
 	  This driver ensures (U)DMA support for SIS5513 chipset family based
 	  mainboards.
@@ -769,7 +753,6 @@ config BLK_DEV_SIS5513
 
 config BLK_DEV_SLC90E66
 	tristate "SLC90E66 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver ensures (U)DMA support for Victroy66 SouthBridges for
 	  SMsC with Intel NorthBridges.  This is an Ultra66 based chipset.
@@ -785,7 +768,6 @@ config BLK_DEV_SLC90E66
 
 config BLK_DEV_TRM290
 	tristate "Tekram TRM290 chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds support for bus master DMA transfers
 	  using the Tekram TRM290 PCI IDE chip. Volunteers are
@@ -794,11 +776,12 @@ config BLK_DEV_TRM290
 
 config BLK_DEV_VIA82CXXX
 	tristate "VIA82CXXX chipset support"
-	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds explicit support for VIA BusMastering IDE chips.
 	  This allows the kernel to change PIO, DMA and UDMA speeds and to
 	  configure the chip to optimum performance.
+
+endif
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
