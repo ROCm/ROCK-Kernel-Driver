@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -48,8 +48,11 @@ linvfs_unwritten_done(
 	clear_buffer_unwritten(bh);
 	if (!uptodate)
 		pagebuf_ioerror(pb, -EIO);
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1)
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb, 1, 1);
+		pb->pb_flags &= ~_PBF_LOCKABLE;
+		pagebuf_rele(pb);
+	}
 	end_buffer_async_write(bh, uptodate);
 }
 
@@ -438,8 +441,11 @@ map_unwritten(
 	XFS_BUF_SET_FSPRIVATE(pb, LINVFS_GET_VP(inode)->v_fbhv);
 	XFS_BUF_SET_IODONE_FUNC(pb, xfs_unwritten_conv);
 
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1)
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb, 1, 1);
+		pb->pb_flags &= ~_PBF_LOCKABLE;
+		pagebuf_rele(pb);
+	}
 
 	return 0;
 }
