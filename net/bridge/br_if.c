@@ -295,6 +295,7 @@ int br_del_bridge(const char *name)
 	return ret;
 }
 
+/* Mtu of the bridge pseudo-device 1500 or the minimum of the ports */
 int br_min_mtu(const struct net_bridge *br)
 {
 	const struct net_bridge_port *p;
@@ -347,7 +348,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 			br_stp_enable_port(p);
 		spin_unlock_bh(&br->lock);
 
-		br->dev->mtu = br_min_mtu(br);
+		dev_set_mtu(br->dev, br_min_mtu(br));
 	}
 
 	return err;

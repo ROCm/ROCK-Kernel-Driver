@@ -48,7 +48,7 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		break;
 
 	case NETDEV_CHANGEMTU:
-		br->dev->mtu = br_min_mtu(br);
+		dev_set_mtu(br->dev, br_min_mtu(br));
 		break;
 
 	case NETDEV_DOWN:
