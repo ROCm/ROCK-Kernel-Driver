@@ -25,7 +25,7 @@
  *	a0  = unaligned address of the last *word* written
  *	a2  = the number of full words left in COUNT
  *
- * Furthermore, v0, a3-a5, t11, t12, and $at are untouched.
+ * Furthermore, v0, a3-a5, t11, and $at are untouched.
  *
  * Much of the information about 21264 scheduling/coding comes from:
  *	Compiler Writer's Guide for the Alpha 21264
@@ -324,7 +324,7 @@ $u_eoc:
 	extqh	t2, a1, t0	# U : extract low bits for last word (stall)
 	or	t1, t0, t1	# E : (stall)
 
-	cmpbge	zero, t1, t8	# E :
+1:	cmpbge	zero, t1, t8	# E :
 	mov	t1, t0		# E :
 
 $u_eocfin:			# end-of-count, final word
@@ -350,17 +350,17 @@ $unaligned:
 	mskql	t6, a0, t6	# U :
 	nop
 	nop
-1:	subq	a1, t4, a1	# E : sub dest misalignment from src addr
+	subq	a1, t4, a1	# E : sub dest misalignment from src addr
 
 	/* If source misalignment is larger than dest misalignment, we need
 	   extra startup checks to avoid SEGV.  */
 
-	cmplt	t4, t5, t12	# E :
+1:	cmplt	t4, t5, t12	# E :
 	extql	t1, a1, t1	# U : shift src into place
 	lda	t2, -1		# E : for creating masks later
 	beq	t12, $u_head	# U : (stall)
 
-	mskqh	t2, t5, t2	# U : begin src byte validity mask
+	nop
 	cmpbge	zero, t1, t8	# E : is there a zero?
 	extql	t2, a1, t2	# U :
 	or	t8, t10, t5	# E : test for end-of-count too

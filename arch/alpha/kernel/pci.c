@@ -99,20 +99,13 @@ quirk_cypress(struct pci_dev *dev)
 	   them on.  So if we use a large direct-map window, or a large SG
 	   window, we must avoid the entire 0xfff00000-0xffffffff region.  */
 	else if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA) {
-#define DMAPSZ (max_low_pfn << PAGE_SHIFT) /* memory size, not window size */
-		if ((__direct_map_base + DMAPSZ - 1) >= 0xfff00000UL) {
+		if (__direct_map_base + __direct_map_size >= 0xfff00000UL)
 			__direct_map_size = 0xfff00000UL - __direct_map_base;
-			printk("%s: adjusting direct map size to 0x%lx\n",
-			       __FUNCTION__, __direct_map_size);
-		} else {
+		else {
 			struct pci_controller *hose = dev->sysdata;
 			struct pci_iommu_arena *pci = hose->sg_pci;
-			if (pci &&
-			    (pci->dma_base + pci->size - 1) >= 0xfff00000UL) {
+			if (pci && pci->dma_base + pci->size >= 0xfff00000UL)
 				pci->size = 0xfff00000UL - pci->dma_base;
- 				printk("%s: adjusting PCI S/G size to 0x%x\n",
-				       __FUNCTION__, pci->size);
-			}
 		}
 	}
 }
@@ -263,9 +256,20 @@ pcibios_fixup_bus(struct pci_bus *bus)
 	struct pci_dev *dev = bus->self;
 
 	if (!dev) {
-		/* Root bus */
+		/* Root bus. */
+		u32 pci_mem_end;
+		u32 sg_base = hose->sg_pci ? hose->sg_pci->dma_base : ~0;
+		unsigned long end;
+
 		bus->resource[0] = hose->io_space;
 		bus->resource[1] = hose->mem_space;
+
+		/* Adjust hose mem_space limit to prevent PCI allocations
+		   in the iommu windows. */
+		pci_mem_end = min((u32)__direct_map_base, sg_base) - 1;
+		end = hose->mem_space->start + pci_mem_end;
+		if (hose->mem_space->end > end)
+			hose->mem_space->end = end;
 	}
 
 	for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
@@ -276,10 +280,11 @@ pcibios_fixup_bus(struct pci_bus *bus)
 }
 
 void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
+pcibios_update_resource(struct pci_dev *dev, struct resource *parent,
 			struct resource *res, int resource)
 {
 	struct pci_controller *hose = dev->sysdata;
+	struct resource *root;
 	int where;
 	u32 reg;
 
@@ -294,8 +299,11 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	/* Point root at the hose root. */
 	if (res->flags & IORESOURCE_IO)
 		root = hose->io_space;
-	if (res->flags & IORESOURCE_MEM)
+	else if (res->flags & IORESOURCE_MEM)
 		root = hose->mem_space;
+	else {
+		return; /* Don't update non-standard resources here. */
+	}
 
 	reg = (res->start - root->start) | (res->flags & 0xf);
 	pci_write_config_dword(dev, where, reg);
@@ -359,7 +367,27 @@ pcibios_fixup_pbus_ranges(struct pci_bus * bus,
 int
 pcibios_enable_device(struct pci_dev *dev, int mask)
 {
-	/* Nothing to do, since we enable all devices at startup.  */
+	u16 cmd, oldcmd;
+	int i;
+
+	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+	oldcmd = cmd;
+
+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+		struct resource *res = &dev->resource[i];
+
+		if (res->flags & IORESOURCE_IO)
+			cmd |= PCI_COMMAND_IO;
+		else if (res->flags & IORESOURCE_MEM)
+			cmd |= PCI_COMMAND_MEMORY;
+	}
+
+	if (cmd != oldcmd) {
+		printk(KERN_DEBUG "PCI: Enabling device: (%s), cmd %x\n",
+		       dev->slot_name, cmd);
+		/* Enable the appropriate bits in the PCI command register.  */
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+	}
 	return 0;
 }
 
