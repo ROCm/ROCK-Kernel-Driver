@@ -103,7 +103,11 @@ if [ "$CONFIG_SCSI" != "n" ]; then
 fi
 endmenu
 
+source drivers/message/fusion/Config.in
+
 source drivers/ieee1394/Config.in
+
+source drivers/message/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
    mainmenu_option next_comment
@@ -181,6 +185,9 @@ if [ "$CONFIG_VIOCD" = "y" ]; then
 fi
 
 source drivers/char/Config.in
+
+source drivers/media/Config.in
+
 source fs/Config.in
 
 mainmenu_option next_comment
@@ -193,6 +200,8 @@ fi
 endmenu
 
 source drivers/usb/Config.in
+
+source net/bluetooth/Config.in
 
 mainmenu_option next_comment
 comment 'Kernel hacking'

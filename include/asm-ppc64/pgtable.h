@@ -167,24 +167,16 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  *
- * mk_pte_phys takes a physical address as input 
- *
  * mk_pte takes a (struct page *) as input
  */
+#define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
-#define mk_pte_phys(physpage,pgprot)                                      \
-({									  \
-	pte_t pte;							  \
-	pte_val(pte) = (((physpage)<<(PTE_SHIFT-PAGE_SHIFT)) | pgprot_val(pgprot)); \
-	pte;							          \
-})
-
-#define mk_pte(page,pgprot)                                               \
-({									  \
-	pte_t pte;							  \
-	pte_val(pte) = ((unsigned long)((page) - mem_map) << PTE_SHIFT) |   \
-                        pgprot_val(pgprot);                               \
-	pte;							          \
+#define pfn_pte(pfn,pgprot)						\
+({									\
+	pte_t pte;							\
+	pte_val(pte) = ((unsigned long)(pfn) << PTE_SHIFT) |   		\
+                        pgprot_val(pgprot);				\
+	pte;								\
 })
 
 #define pte_modify(_pte, newprot) \
@@ -195,8 +187,8 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 /* pte_clear moved to later in this file */
 
-#define pte_pagenr(x)		((unsigned long)((pte_val(x) >> PTE_SHIFT)))
-#define pte_page(x)		(mem_map+pte_pagenr(x))
+#define pte_pfn(x)		((unsigned long)((pte_val(x) >> PTE_SHIFT)))
+#define pte_page(x)		pfn_to_page(pte_pfn(x))
 
 #define pmd_set(pmdp, ptep) 	(pmd_val(*(pmdp)) = (__ba_to_bpn(ptep)))
 #define pmd_none(pmd)		(!pmd_val(pmd))

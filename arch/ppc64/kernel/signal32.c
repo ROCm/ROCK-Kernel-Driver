@@ -136,8 +136,6 @@ asmlinkage long sys32_sigaction(int sig, struct old_sigaction32 *act, struct old
 	struct k_sigaction new_ka, old_ka;
 	int ret;
 	
-	PPCDBG(PPCDBG_SYS32, "sys32_sigaction - entered - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
-
 	if (sig < 0)
 	{
 		sig = -sig;
@@ -153,12 +151,11 @@ asmlinkage long sys32_sigaction(int sig, struct old_sigaction32 *act, struct old
 		ret |= __get_user(mask, &act->sa_mask);
 		if (ret)
 			return ret;
-		PPCDBG(PPCDBG_SIGNAL, "sys32_sigaction flags =%lx  \n", new_ka.sa.sa_flags);
 
 		siginitset(&new_ka.sa.sa_mask, mask);
 	}
 
-	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
+	ret = do_sigaction(sig, (act? &new_ka: NULL), (oact? &old_ka: NULL));
 
 	if (!ret && oact)
 	{
@@ -167,9 +164,6 @@ asmlinkage long sys32_sigaction(int sig, struct old_sigaction32 *act, struct old
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 		ret |= __put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
 	}
-
-	
-	PPCDBG(PPCDBG_SYS32, "sys32_sigaction - exited - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
 
 	return ret;
 }
@@ -185,15 +179,11 @@ asmlinkage long sys32_sigpending(old_sigset_t32 *set)
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	PPCDBG(PPCDBG_SYS32, "sys32_sigpending - entered - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
-		
 	set_fs (KERNEL_DS);
 	ret = sys_sigpending(&s);
 	set_fs (old_fs);
 	if (put_user (s, set)) return -EFAULT;
 	
-	PPCDBG(PPCDBG_SYS32, "sys32_sigpending - exited - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
-
 	return ret;
 }
 
@@ -213,8 +203,6 @@ asmlinkage long sys32_sigprocmask(u32 how, old_sigset_t32 *set, old_sigset_t32 *
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	PPCDBG(PPCDBG_SYS32, "sys32_sigprocmask - entered - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
-	
 	if (set && get_user (s, set)) return -EFAULT;
 	set_fs (KERNEL_DS);
 	ret = sys_sigprocmask((int)how, set ? &s : NULL, oset ? &s : NULL);
@@ -222,8 +210,6 @@ asmlinkage long sys32_sigprocmask(u32 how, old_sigset_t32 *set, old_sigset_t32 *
 	if (ret) return ret;
 	if (oset && put_user (s, oset)) return -EFAULT;
 	
-	PPCDBG(PPCDBG_SYS32, "sys32_sigprocmask - exited - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
-
 	return 0;
 }
 
@@ -254,8 +240,6 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	elf_gregset_t32 saved_regs;  /* an array of ELF_NGREG unsigned ints (32 bits) */
 	sigset_t set;
 	unsigned int prevsp;
-
-	PPCDBG(PPCDBG_SIGNAL, "sys32_sigreturn - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
 
 	sc = (struct sigcontext32_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
@@ -380,12 +364,9 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		    || put_user(prevsp, (unsigned int*) regs->gpr[1]))
 			goto badframe;
 	}
-  
-	PPCDBG(PPCDBG_SIGNAL, "sys32_sigreturn - normal exit returning %ld - pid=%ld current=%lx comm=%s \n", ret, current->pid, current, current->comm);
 	return ret;
 
 badframe:
-	PPCDBG(PPCDBG_SYS32NI, "sys32_sigreturn - badframe - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
 	do_exit(SIGSEGV);
 }	
 
@@ -505,8 +486,7 @@ setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 	regs->link = (unsigned long) frame->tramp;
 	return;
 
- badframe:
-	udbg_printf("setup_frame32 - badframe in setup_frame, regs=%p frame=%p newsp=%lx\n", regs, frame, newsp);  PPCDBG_ENTER_DEBUGGER();
+badframe:
 #if DEBUG_SIG
 	printk("badframe in setup_frame32, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
@@ -715,8 +695,6 @@ asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act, struc
 	int ret;
 	sigset32_t set32;
 
-	PPCDBG(PPCDBG_SIGNAL, "sys32_rt_sigaction - entered - sig=%x \n", sig);
-
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
 	if (sigsetsize != sizeof(sigset32_t))
 		return -EINVAL;
@@ -765,8 +743,6 @@ asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act, struc
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 	}
 
-  
-	PPCDBG(PPCDBG_SIGNAL, "sys32_rt_sigaction - exiting - sig=%x \n", sig);
 	return ret;
 }
 
@@ -786,8 +762,6 @@ asmlinkage long sys32_rt_sigprocmask(u32 how, sigset32_t *set, sigset32_t *oset,
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	PPCDBG(PPCDBG_SIGNAL, "sys32_rt_sigprocmask - entered how=%x \n", (int)how);
-	
 	if (set) {
 		if (copy_from_user (&s32, set, sizeof(sigset32_t)))
 			return -EFAULT;
@@ -1172,16 +1146,13 @@ setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 
 	return;
 
-
- badframe:
-	udbg_printf("setup_frame32 - badframe in setup_frame, regs=%p frame=%p newsp=%lx\n", regs, frame, newsp);  PPCDBG_ENTER_DEBUGGER();
+badframe:
 #if DEBUG_SIG
 	printk("badframe in setup_frame32, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
 #endif
 	do_exit(SIGSEGV);
 }
-
 
 /*
  * OK, we're invoking a handler
@@ -1259,7 +1230,6 @@ handle_signal32(unsigned long sig, struct k_sigaction *ka,
 		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 	}
-	
 	return;
 
 badframe:
@@ -1345,14 +1315,10 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 
 	for (;;) {
 		unsigned long signr;
-		
+
 		spin_lock_irq(&current->sigmask_lock);
 		signr = dequeue_signal(&current->blocked, &info);
 		spin_unlock_irq(&current->sigmask_lock);
-		ifppcdebug(PPCDBG_SYS32) {
-			if (signr)
-				udbg_printf("do_signal32 - processing signal=%2lx - pid=%ld, comm=%s \n", signr, current->pid, current->comm);
-		}
 
 		if (!signr)
 			break;
@@ -1390,7 +1356,6 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		}
 
 		ka = &current->sig->action[signr-1];
-
 		if (ka->sa.sa_handler == SIG_IGN) {
 			if (signr != SIGCHLD)
 				continue;
@@ -1408,7 +1373,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 				continue;
 
 			switch (signr) {
-			case SIGCONT: case SIGCHLD: case SIGWINCH:
+			case SIGCONT: case SIGCHLD: case SIGWINCH: case SIGURG:
 				continue;
 
 			case SIGTSTP: case SIGTTIN: case SIGTTOU:
@@ -1437,19 +1402,10 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 			}
 		}
 
-		PPCDBG(PPCDBG_SIGNAL, " do signal :sigaction flags = %lx \n" ,ka->sa.sa_flags);
-		PPCDBG(PPCDBG_SIGNAL, " do signal :on sig stack  = %lx \n" ,on_sig_stack(regs->gpr[1]));
-		PPCDBG(PPCDBG_SIGNAL, " do signal :reg1  = %lx \n" ,regs->gpr[1]);
-		PPCDBG(PPCDBG_SIGNAL, " do signal :alt stack  = %lx \n" ,current->sas_ss_sp);
-		PPCDBG(PPCDBG_SIGNAL, " do signal :alt stack size  = %lx \n" ,current->sas_ss_size);
-
-
-
 		if ( (ka->sa.sa_flags & SA_ONSTACK)
 		     && (! on_sig_stack(regs->gpr[1])))
-		{
 			newsp = (current->sas_ss_sp + current->sas_ss_size);
-		} else
+		else
 			newsp = regs->gpr[1];
 		newsp = frame = newsp - sizeof(struct sigregs32);
 
@@ -1468,15 +1424,12 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	}
 
 	if (newsp == frame)
-	{
 		return 0;		/* no signals delivered */
-	}
-	// Invoke correct stack setup routine 
-	if (ka->sa.sa_flags & SA_SIGINFO) 
+
+	/* Invoke correct stack setup routine */
+	if (ka->sa.sa_flags & SA_SIGINFO)
 		setup_rt_frame32(regs, (struct sigregs32*)(u64)frame, newsp);
 	else
 		setup_frame32(regs, (struct sigregs32*)(u64)frame, newsp);
-
 	return 1;
-
 }
