@@ -521,7 +521,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 		addr = 1;
 
 	case PTRACE_CONT: { /* restart after signal. */
-		if ((unsigned long) data > _NSIG) {
+		if (data > _NSIG) {
 			pt_error_return(regs, EIO);
 			goto out_tsk;
 		}
@@ -545,11 +545,10 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 
 		child->exit_code = data;
 #ifdef DEBUG_PTRACE
-		printk("CONT: %s [%d]: set exit_code = %x %x %x\n", child->comm,
-			child->pid, child->exit_code,
+		printk("CONT: %s [%d]: set exit_code = %x %lx %lx\n",
+			child->comm, child->pid, child->exit_code,
 			child->thread.kregs->pc,
 			child->thread.kregs->npc);
-		       
 #endif
 		wake_up_process(child);
 		pt_succ_return(regs, 0);
