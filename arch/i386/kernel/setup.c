@@ -612,7 +612,7 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 				to--;
 			if (!memcmp(from+4, "nopentium", 9)) {
 				from += 9+4;
-				clear_bit(X86_FEATURE_PSE, &boot_cpu_data.x86_capability);
+				clear_bit(X86_FEATURE_PSE, boot_cpu_data.x86_capability);
 			} else if (!memcmp(from+4, "exactmap", 8)) {
 				from += 8+4;
 				e820.nr_map = 0;
@@ -1121,7 +1121,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	clear_bit(0*32+31, &c->x86_capability);
+	clear_bit(0*32+31, c->x86_capability);
 	
 	r = get_model_name(c);
 
@@ -1132,8 +1132,8 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 			{
 				/* Based on AMD doc 20734R - June 2000 */
 				if ( c->x86_model == 0 ) {
-					clear_bit(X86_FEATURE_APIC, &c->x86_capability);
-					set_bit(X86_FEATURE_PGE, &c->x86_capability);
+					clear_bit(X86_FEATURE_APIC, c->x86_capability);
+					set_bit(X86_FEATURE_PGE, c->x86_capability);
 				}
 				break;
 			}
@@ -1213,7 +1213,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 				/*  Set MTRR capability flag if appropriate */
 				if (c->x86_model == 13 || c->x86_model == 9 ||
 				   (c->x86_model == 8 && c->x86_mask >= 8))
-					set_bit(X86_FEATURE_K6_MTRR, &c->x86_capability);
+					set_bit(X86_FEATURE_K6_MTRR, c->x86_capability);
 				break;
 			}
 			break;
@@ -1226,12 +1226,12 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 			 * here.
 			 */
 			if (c->x86_model == 6 || c->x86_model == 7) {
-				if (!test_bit(X86_FEATURE_XMM, &c->x86_capability)) {
+				if (!test_bit(X86_FEATURE_XMM, c->x86_capability)) {
 					printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
 					rdmsr(MSR_K7_HWCR, l, h);
 					l &= ~0x00008000;
 					wrmsr(MSR_K7_HWCR, l, h);
-					set_bit(X86_FEATURE_XMM, &c->x86_capability);
+					set_bit(X86_FEATURE_XMM, c->x86_capability);
 				}
 			}
 			break;
@@ -1348,12 +1348,12 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	clear_bit(0*32+31, &c->x86_capability);
+	clear_bit(0*32+31, c->x86_capability);
 
 	/* Cyrix used bit 24 in extended (AMD) CPUID for Cyrix MMX extensions */
-	if ( test_bit(1*32+24, &c->x86_capability) ) {
-		clear_bit(1*32+24, &c->x86_capability);
-		set_bit(X86_FEATURE_CXMMX, &c->x86_capability);
+	if ( test_bit(1*32+24, c->x86_capability) ) {
+		clear_bit(1*32+24, c->x86_capability);
+		set_bit(X86_FEATURE_CXMMX, c->x86_capability);
 	}
 
 	do_cyrix_devid(&dir0, &dir1);
@@ -1400,7 +1400,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		} else             /* 686 */
 			p = Cx86_cb+1;
 		/* Emulate MTRRs using Cyrix's ARRs. */
-		set_bit(X86_FEATURE_CYRIX_ARR, &c->x86_capability);
+		set_bit(X86_FEATURE_CYRIX_ARR, c->x86_capability);
 		/* 6x86's contain this bug */
 		c->coma_bug = 1;
 		break;
@@ -1444,7 +1444,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 			p = Cx86_cb+2;
 			c->x86_model = (dir1 & 0x20) ? 1 : 2;
 #ifndef CONFIG_CS5520
-			clear_bit(X86_FEATURE_TSC, &c->x86_capability);
+			clear_bit(X86_FEATURE_TSC, c->x86_capability);
 #endif
 		}
 		break;
@@ -1466,7 +1466,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 	 	if (((dir1 & 0x0f) > 4) || ((dir1 & 0xf0) == 0x20))
 			(c->x86_model)++;
 		/* Emulate MTRRs using Cyrix's ARRs. */
-		set_bit(X86_FEATURE_CYRIX_ARR, &c->x86_capability);
+		set_bit(X86_FEATURE_CYRIX_ARR, c->x86_capability);
 		break;
 
 	case 0xf:  /* Cyrix 486 without DEVID registers */
@@ -1765,7 +1765,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 
 	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	clear_bit(0*32+31, &c->x86_capability);
+	clear_bit(0*32+31, c->x86_capability);
 
 	switch (c->x86) {
 
@@ -1776,7 +1776,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 				fcr_set=ECX8|DSMC|EDCTLB|EMMX|ERETSTK;
 				fcr_clr=DPDC;
 				printk(KERN_NOTICE "Disabling bugged TSC.\n");
-				clear_bit(X86_FEATURE_TSC, &c->x86_capability);
+				clear_bit(X86_FEATURE_TSC, c->x86_capability);
 #ifdef CONFIG_X86_OOSTORE
 				winchip_create_optimal_mcr();
 				/* Enable
@@ -1855,12 +1855,12 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 				printk(KERN_INFO "Centaur FCR is 0x%X\n",lo);
 			}
 			/* Emulate MTRRs using Centaur's MCR. */
-			set_bit(X86_FEATURE_CENTAUR_MCR, &c->x86_capability);
+			set_bit(X86_FEATURE_CENTAUR_MCR, c->x86_capability);
 			/* Report CX8 */
-			set_bit(X86_FEATURE_CX8, &c->x86_capability);
+			set_bit(X86_FEATURE_CX8, c->x86_capability);
 			/* Set 3DNow! on Winchip 2 and above. */
 			if (c->x86_model >=8)
-				set_bit(X86_FEATURE_3DNOW, &c->x86_capability);
+				set_bit(X86_FEATURE_3DNOW, c->x86_capability);
 			/* See if we can find out some more. */
 			if ( cpuid_eax(0x80000000) >= 0x80000005 ) {
 				/* Yes, we can. */
@@ -1878,8 +1878,8 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 					lo |= (1<<1 | 1<<7);	/* Report CX8 & enable PGE */
 					wrmsr (MSR_VIA_FCR, lo, hi);
 
-					set_bit(X86_FEATURE_CX8, &c->x86_capability);
-					set_bit(X86_FEATURE_3DNOW, &c->x86_capability);
+					set_bit(X86_FEATURE_CX8, c->x86_capability);
+					set_bit(X86_FEATURE_3DNOW, c->x86_capability);
 
 					get_model_name(c);
 					display_cacheinfo(c);
@@ -1973,7 +1973,7 @@ static void __init init_rise(struct cpuinfo_x86 *c)
 		"movl $0x2333313a, %%edx\n\t"
 		"cpuid\n\t" : : : "eax", "ebx", "ecx", "edx"
 	);
-	set_bit(X86_FEATURE_CX8, &c->x86_capability);
+	set_bit(X86_FEATURE_CX8, c->x86_capability);
 }
 
 
@@ -2123,7 +2123,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 
 	/* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it */
 	if ( c->x86 == 6 && c->x86_model < 3 && c->x86_mask < 3 )
-		clear_bit(X86_FEATURE_SEP, &c->x86_capability);
+		clear_bit(X86_FEATURE_SEP, c->x86_capability);
 	
 	/* Names for the Pentium II/Celeron processors 
 	   detectable only by also checking the cache size.
@@ -2153,7 +2153,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		strcpy(c->x86_model_id, p);
 	
 #ifdef CONFIG_SMP
-	if (test_bit(X86_FEATURE_HT, &c->x86_capability)) {
+	if (test_bit(X86_FEATURE_HT, c->x86_capability)) {
 		extern	int phys_proc_id[NR_CPUS];
 		
 		u32 	eax, ebx, ecx, edx;
@@ -2322,7 +2322,7 @@ static int __init deep_magic_nexgen_probe(void)
 
 static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
-	if( test_bit(X86_FEATURE_PN, &c->x86_capability) &&
+	if( test_bit(X86_FEATURE_PN, c->x86_capability) &&
 	    disable_x86_serial_nr ) {
 		/* Disable processor serial number */
 		unsigned long lo,hi;
@@ -2330,7 +2330,7 @@ static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 		lo |= 0x200000;
 		wrmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
 		printk(KERN_NOTICE "CPU serial number disabled.\n");
-		clear_bit(X86_FEATURE_PN, &c->x86_capability);
+		clear_bit(X86_FEATURE_PN, c->x86_capability);
 
 		/* Disabling the serial number may affect the cpuid level */
 		c->cpuid_level = cpuid_eax(0);
@@ -2496,8 +2496,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 		/* Intel-defined flags: level 0x00000001 */
 		if ( c->cpuid_level >= 0x00000001 ) {
-			cpuid(0x00000001, &tfms, &junk, &junk,
-			      &c->x86_capability[0]);
+			u32 capability;
+			cpuid(0x00000001, &tfms, &junk, &junk, &capability);
+			c->x86_capability[0] = capability;
 			c->x86 = (tfms >> 8) & 15;
 			c->x86_model = (tfms >> 4) & 15;
 			c->x86_mask = tfms & 15;
@@ -2523,7 +2524,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		}
 	}
 
-	printk(KERN_DEBUG "CPU: Before vendor init, caps: %08x %08x %08x, vendor = %d\n",
+	printk(KERN_DEBUG "CPU: Before vendor init, caps: %08lx %08lx %08lx, vendor = %d\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2588,7 +2589,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	}
 
-	printk(KERN_DEBUG "CPU: After vendor init, caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU: After vendor init, caps: %08lx %08lx %08lx %08lx\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2602,13 +2603,13 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	/* TSC disabled? */
 #ifndef CONFIG_X86_TSC
 	if ( tsc_disable )
-		clear_bit(X86_FEATURE_TSC, &c->x86_capability);
+		clear_bit(X86_FEATURE_TSC, c->x86_capability);
 #endif
 
 	/* FXSR disabled? */
 	if (disable_x86_fxsr) {
-		clear_bit(X86_FEATURE_FXSR, &c->x86_capability);
-		clear_bit(X86_FEATURE_XMM, &c->x86_capability);
+		clear_bit(X86_FEATURE_FXSR, c->x86_capability);
+		clear_bit(X86_FEATURE_XMM, c->x86_capability);
 	}
 
 	/* Disable the PN if appropriate */
@@ -2631,7 +2632,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	printk(KERN_DEBUG "CPU:     After generic, caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU:     After generic, caps: %08lx %08lx %08lx %08lx\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2649,7 +2650,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 
-	printk(KERN_DEBUG "CPU:             Common caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU:             Common caps: %08lx %08lx %08lx %08lx\n",
 	       boot_cpu_data.x86_capability[0],
 	       boot_cpu_data.x86_capability[1],
 	       boot_cpu_data.x86_capability[2],
@@ -2759,7 +2760,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "stepping\t: unknown\n");
 
-	if ( test_bit(X86_FEATURE_TSC, &c->x86_capability) ) {
+	if ( test_bit(X86_FEATURE_TSC, c->x86_capability) ) {
 		seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
 			cpu_khz / 1000, (cpu_khz % 1000));
 	}
@@ -2789,7 +2790,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		     c->wp_works_ok ? "yes" : "no");
 
 	for ( i = 0 ; i < 32*NCAPINTS ; i++ )
-		if ( test_bit(i, &c->x86_capability) &&
+		if ( test_bit(i, c->x86_capability) &&
 		     x86_cap_flags[i] != NULL )
 			seq_printf(m, " %s", x86_cap_flags[i]);
 
