@@ -639,25 +639,6 @@ unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu)
 	tp->pmtu_cookie = pmtu;
 	tp->mss_cache = tp->mss_cache_std = mss_now;
 
-	if (sk->sk_route_caps & NETIF_F_TSO) {
-		int large_mss, factor;
-
-		large_mss = 65535 - tp->af_specific->net_header_len -
-			tp->ext_header_len - tp->ext2_header_len - tp->tcp_header_len;
-
-		if (tp->max_window && large_mss > (tp->max_window>>1))
-			large_mss = max((tp->max_window>>1), 68U - tp->tcp_header_len);
-
-		/* Always keep large mss multiple of real mss, but
-		 * do not exceed congestion window.
-		 */
-		factor = large_mss / mss_now;
-		if (factor > tp->snd_cwnd)
-			factor = tp->snd_cwnd;
-
-		tp->mss_cache = mss_now * factor;
-	}
-
 	return mss_now;
 }
 
@@ -675,17 +656,41 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 	struct dst_entry *dst = __sk_dst_get(sk);
 	int do_large, mss_now;
 
-	do_large = (large &&
-		    (sk->sk_route_caps & NETIF_F_TSO) &&
-		    !tp->urg_mode);
-	mss_now = do_large ? tp->mss_cache : tp->mss_cache_std;
-
+	mss_now = tp->mss_cache_std;
 	if (dst) {
 		u32 mtu = dst_pmtu(dst);
 		if (mtu != tp->pmtu_cookie ||
 		    tp->ext2_header_len != dst->header_len)
 			mss_now = tcp_sync_mss(sk, mtu);
 	}
+
+	do_large = (large &&
+		    (sk->sk_route_caps & NETIF_F_TSO) &&
+		    !tp->urg_mode);
+
+	if (do_large) {
+		int large_mss, factor;
+
+		large_mss = 65535 - tp->af_specific->net_header_len -
+			tp->ext_header_len - tp->ext2_header_len -
+			tp->tcp_header_len;
+
+		if (tp->max_window && large_mss > (tp->max_window>>1))
+			large_mss = max((tp->max_window>>1),
+					68U - tp->tcp_header_len);
+
+		/* Always keep large mss multiple of real mss, but
+		 * do not exceed congestion window.
+		 */
+		factor = large_mss / mss_now;
+		if (factor > tp->snd_cwnd)
+			factor = tp->snd_cwnd;
+
+		tp->mss_cache = mss_now * factor;
+
+		mss_now = tp->mss_cache;
+	}
+
 	if (tp->eff_sacks)
 		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
 			    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
