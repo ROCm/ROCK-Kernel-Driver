@@ -136,6 +136,7 @@ struct xfrm_encap_tmpl {
 	__u16		encap_type;
 	__u16		encap_sport;
 	__u16		encap_dport;
+	xfrm_address_t	encap_oa;
 };
 
 /* Netlink message attributes.  */
