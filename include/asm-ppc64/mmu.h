@@ -198,7 +198,7 @@ extern void htab_finish_init(void);
 #define STAB0_PHYS_ADDR	(STAB0_PAGE<<PAGE_SHIFT)
 #define STAB0_VIRT_ADDR	(KERNELBASE+STAB0_PHYS_ADDR)
 
-#define SLB_NUM_BOLTED		2
+#define SLB_NUM_BOLTED		3
 #define SLB_CACHE_ENTRIES	8
 
 /* Bits in the SLB ESID word */

@@ -100,7 +100,6 @@ typedef struct drm_r128_private {
 	drm_local_map_t *mmio;
 	drm_local_map_t *cce_ring;
 	drm_local_map_t *ring_rptr;
-	drm_local_map_t *buffers;
 	drm_local_map_t *agp_textures;
 } drm_r128_private_t;
 

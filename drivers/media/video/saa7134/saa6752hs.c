@@ -387,13 +387,12 @@ static struct i2c_client client_template =
         .driver     = &driver,
 };
 
-static int saa6752hs_init_module(void)
+static int __init saa6752hs_init_module(void)
 {
-	i2c_add_driver(&driver);
-	return 0;
+	return i2c_add_driver(&driver);
 }
 
-static void saa6752hs_cleanup_module(void)
+static void __exit saa6752hs_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }

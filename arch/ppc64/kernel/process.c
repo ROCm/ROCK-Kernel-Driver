@@ -356,6 +356,16 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	kregs = (struct pt_regs *) sp;
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
+		unsigned long sp_vsid = get_kernel_vsid(sp);
+
+		sp_vsid <<= SLB_VSID_SHIFT;
+		sp_vsid |= SLB_VSID_KERNEL;
+		if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+			sp_vsid |= SLB_VSID_L;
+
+		p->thread.ksp_vsid = sp_vsid;
+	}
 
 	/*
 	 * The PPC64 ABI makes use of a TOC to contain function 

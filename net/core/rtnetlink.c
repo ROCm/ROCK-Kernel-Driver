@@ -177,6 +177,11 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	if (1) {
+		u32 weight = dev->weight;
+		RTA_PUT(skb, IFLA_WEIGHT, sizeof(weight), &weight);
+	}
+
+	if (1) {
 		struct ifmap map = {
 			.mem_start   = dev->mem_start,
 			.mem_end     = dev->mem_end,
@@ -331,6 +336,13 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 			goto out;
 
 		dev->tx_queue_len = *((u32 *) RTA_DATA(ida[IFLA_TXQLEN - 1]));
+	}
+
+	if (ida[IFLA_WEIGHT - 1]) {
+		if (ida[IFLA_WEIGHT - 1]->rta_len != RTA_LENGTH(sizeof(u32)))
+			goto out;
+
+		dev->weight = *((u32 *) RTA_DATA(ida[IFLA_WEIGHT - 1]));
 	}
 
 	err = 0;

@@ -202,13 +202,14 @@ static int nfs3_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 	return status;
 }
 
-static int
-nfs3_proc_readlink(struct inode *inode, struct page *page)
+static int nfs3_proc_readlink(struct inode *inode, struct page *page,
+		unsigned int pgbase, unsigned int pglen)
 {
 	struct nfs_fattr	fattr;
 	struct nfs3_readlinkargs args = {
 		.fh		= NFS_FH(inode),
-		.count		= PAGE_CACHE_SIZE,
+		.pgbase		= pgbase,
+		.pglen		= pglen,
 		.pages		= &page
 	};
 	int			status;
@@ -417,20 +418,21 @@ nfs3_proc_remove(struct inode *dir, struct qstr *name)
 static int
 nfs3_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr *name)
 {
-	struct nfs3_diropargs	*arg;
-	struct nfs_fattr	*res;
+	struct unlinkxdr {
+		struct nfs3_diropargs arg;
+		struct nfs_fattr res;
+	} *ptr;
 
-	arg = (struct nfs3_diropargs *)kmalloc(sizeof(*arg)+sizeof(*res), GFP_KERNEL);
-	if (!arg)
+	ptr = (struct unlinkxdr *)kmalloc(sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
 		return -ENOMEM;
-	res = (struct nfs_fattr*)(arg + 1);
-	arg->fh = NFS_FH(dir->d_inode);
-	arg->name = name->name;
-	arg->len = name->len;
-	res->valid = 0;
+	ptr->arg.fh = NFS_FH(dir->d_inode);
+	ptr->arg.name = name->name;
+	ptr->arg.len = name->len;
+	ptr->res.valid = 0;
 	msg->rpc_proc = &nfs3_procedures[NFS3PROC_REMOVE];
-	msg->rpc_argp = arg;
-	msg->rpc_resp = res;
+	msg->rpc_argp = &ptr->arg;
+	msg->rpc_resp = &ptr->res;
 	return 0;
 }
 

@@ -1124,14 +1124,13 @@ static task_t *copy_process(unsigned long clone_flags,
 		__ptrace_link(p, current->parent);
 
 	attach_pid(p, PIDTYPE_PID, p->pid);
+	attach_pid(p, PIDTYPE_TGID, p->tgid);
 	if (thread_group_leader(p)) {
-		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, process_group(p));
 		attach_pid(p, PIDTYPE_SID, p->signal->session);
 		if (p->pid)
 			__get_cpu_var(process_counts)++;
-	} else
-		link_pid(p, p->pids + PIDTYPE_TGID, &p->group_leader->pids[PIDTYPE_TGID].pid);
+	}
 
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);

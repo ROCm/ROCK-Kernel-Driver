@@ -625,7 +625,7 @@ static int p4_check_ctrs(unsigned int const cpu,
 {
 	unsigned long ctr, low, high, stag, real;
 	int i;
-	unsigned long eip = instruction_pointer(regs);
+	unsigned long eip = profile_pc(regs);
 	int is_kernel = !user_mode(regs);
 
 	stag = get_stagger();

@@ -41,10 +41,6 @@
 
 /* General customization:
  */
-#define __HAVE_AGP		1
-#define __MUST_HAVE_AGP		0
-#define __HAVE_MTRR		1
-#define __HAVE_CTX_BITMAP	1
 
 #define DRIVER_AUTHOR		"SIS"
 #define DRIVER_NAME		"sis"
@@ -63,16 +59,5 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_SIS_FB_INIT)]	= { sis_fb_init,	1, 1 }
 
 #define __HAVE_COUNTERS		5
-
-/* Buffer customization:
- */
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
-	((drm_sis_private_t *)((dev)->dev_private))->buffers
-
-extern int sis_init_context(int context);
-extern int sis_final_context(int context);
-
-#define DRIVER_CTX_CTOR sis_init_context
-#define DRIVER_CTX_DTOR sis_final_context
 
 #endif

@@ -1651,7 +1651,7 @@ static struct i2c_client client_template =
         .driver     = &driver,
 };
 
-static int audiochip_init_module(void)
+static int __init audiochip_init_module(void)
 {
 	struct CHIPDESC  *desc;
 	printk(KERN_INFO "tvaudio: TV audio decoder + audio/video mux driver\n");
@@ -1659,11 +1659,11 @@ static int audiochip_init_module(void)
 	for (desc = chiplist; desc->name != NULL; desc++)
 		printk("%s%s", (desc == chiplist) ? "" : ",",desc->name);
 	printk("\n");
-	i2c_add_driver(&driver);
-	return 0;
+
+	return i2c_add_driver(&driver);
 }
 
-static void audiochip_cleanup_module(void)
+static void __exit audiochip_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }

@@ -46,6 +46,7 @@
 #include <asm/atomic.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/rcupdate.h>
 
 #include <linux/err.h>
 #include <linux/sysctl.h>
@@ -65,6 +66,8 @@ struct neigh_parms
 	void	*priv;
 
 	void	*sysctl_table;
+
+	struct rcu_head rcu_head;
 
 	int	base_reachable_time;
 	int	retrans_time;

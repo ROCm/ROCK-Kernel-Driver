@@ -494,10 +494,6 @@ static struct tty_driver *serial_driver;
 static void mgslpc_change_params(MGSLPC_INFO *info);
 static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout);
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /* PCMCIA prototypes */
 
 static void mgslpc_config(dev_link_t *link);
@@ -1191,7 +1187,7 @@ void tx_ready(MGSLPC_INFO *info)
 		return;
 
 	while (info->tx_count && fifo_count) {
-		c = MIN(2, MIN(fifo_count, MIN(info->tx_count, TXBUFSIZE - info->tx_get)));
+		c = min(2, min_t(int, fifo_count, min(info->tx_count, TXBUFSIZE - info->tx_get)));
 		
 		if (c == 1) {
 			write_reg(info, CHA + TXFIFO, *(info->tx_buf + info->tx_get));
@@ -1754,8 +1750,8 @@ static int mgslpc_write(struct tty_struct * tty, int from_user,
 	}
 
 	for (;;) {
-		c = MIN(count,
-			MIN(TXBUFSIZE - info->tx_count - 1,
+		c = min(count,
+			min(TXBUFSIZE - info->tx_count - 1,
 			    TXBUFSIZE - info->tx_put));
 		if (c <= 0)
 			break;
@@ -2641,7 +2637,7 @@ static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout)
 		char_time = 1;
 		
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 		
 	if (info->params.mode == MGSL_MODE_HDLC) {
 		while (info->tx_active) {

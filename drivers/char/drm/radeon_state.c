@@ -43,12 +43,14 @@ static __inline__ int radeon_check_and_fixup_offset( drm_radeon_private_t *dev_p
 						     drm_file_t *filp_priv,
 						     u32 *offset ) {
 	u32 off = *offset;
+	struct drm_radeon_driver_file_fields *radeon_priv;
 
 	if ( off >= dev_priv->fb_location &&
 	     off < ( dev_priv->gart_vm_start + dev_priv->gart_size ) )
 		return 0;
 
-	off += filp_priv->radeon_fb_delta;
+	radeon_priv = filp_priv->driver_priv;
+	off += radeon_priv->radeon_fb_delta;
 
 	DRM_DEBUG( "offset fixed up to 0x%x\n", off );
 
@@ -1247,7 +1249,7 @@ static void radeon_cp_dispatch_indirect( drm_device_t *dev,
 		 */
 		if ( dwords & 1 ) {
 			u32 *data = (u32 *)
-				((char *)dev_priv->buffers->handle
+				((char *)dev->agp_buffer_map->handle
 				 + buf->offset + start);
 			data[dwords++] = RADEON_CP_PACKET2;
 		}
@@ -1301,7 +1303,7 @@ static void radeon_cp_dispatch_indices( drm_device_t *dev,
 
 	dwords = (prim->finish - prim->start + 3) / sizeof(u32);
 
-	data = (u32 *)((char *)dev_priv->buffers->handle +
+	data = (u32 *)((char *)dev->agp_buffer_map->handle +
 		       elt_buf->offset + prim->start);
 
 	data[0] = CP_PACKET3( RADEON_3D_RNDR_GEN_INDX_PRIM, dwords-2 );
@@ -1445,7 +1447,7 @@ static int radeon_cp_dispatch_texture( DRMFILE filp,
 
 		/* Dispatch the indirect buffer.
 		 */
-		buffer = (u32*)((char*)dev_priv->buffers->handle + buf->offset);
+		buffer = (u32*)((char*)dev->agp_buffer_map->handle + buf->offset);
 		dwords = size / 4;
 		buffer[0] = CP_PACKET3( RADEON_CNTL_HOSTDATA_BLT, dwords + 6 );
 		buffer[1] = (RADEON_GMC_DST_PITCH_OFFSET_CNTL |
@@ -2525,6 +2527,7 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_file_t *filp_priv;
 	drm_radeon_setparam_t sp;
+	struct drm_radeon_driver_file_fields *radeon_priv;
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
@@ -2538,7 +2541,8 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 
 	switch( sp.param ) {
 	case RADEON_SETPARAM_FB_LOCATION:
-		filp_priv->radeon_fb_delta = dev_priv->fb_location - sp.value;
+		radeon_priv = filp_priv->driver_priv;
+		radeon_priv->radeon_fb_delta = dev_priv->fb_location - sp.value;
 		break;
 	default:
 		DRM_DEBUG( "Invalid parameter %d\n", sp.param );
@@ -2546,4 +2550,63 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 	}
 
 	return 0;
+}
+
+/* When a client dies:
+ *    - Check for and clean up flipped page state
+ *    - Free any alloced GART memory.
+ *
+ * DRM infrastructure takes care of reclaiming dma buffers.
+ */
+static void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp)
+{
+	if ( dev->dev_private ) {				
+		drm_radeon_private_t *dev_priv = dev->dev_private; 
+		if ( dev_priv->page_flipping ) {		
+			radeon_do_cleanup_pageflip( dev );	
+		}						
+		radeon_mem_release( filp, dev_priv->gart_heap ); 
+		radeon_mem_release( filp, dev_priv->fb_heap );	
+	}				
+}
+
+static void radeon_driver_pretakedown(drm_device_t *dev)
+{
+	radeon_do_release(dev);
+}
+
+static int radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
+{
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	struct drm_radeon_driver_file_fields *radeon_priv;
+	
+	radeon_priv = (struct drm_radeon_driver_file_fields *)DRM(alloc)(sizeof(*radeon_priv), DRM_MEM_FILES);
+	
+	if (!radeon_priv)
+		return -ENOMEM;
+
+	filp_priv->driver_priv = radeon_priv;
+	if ( dev_priv )
+		radeon_priv->radeon_fb_delta = dev_priv->fb_location;
+	else
+		radeon_priv->radeon_fb_delta = 0;
+	return 0;
+}
+
+
+static void radeon_driver_free_filp_priv(drm_device_t *dev, drm_file_t *filp_priv)
+{
+	 struct drm_radeon_driver_file_fields *radeon_priv = filp_priv->driver_priv;
+	 
+	 DRM(free)(radeon_priv, sizeof(*radeon_priv), DRM_MEM_FILES);
+}
+
+void radeon_driver_register_fns(struct drm_device *dev)
+{	
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG;
+	dev->dev_priv_size = sizeof(drm_radeon_buf_priv_t);
+	dev->fn_tbl.prerelease = radeon_driver_prerelease;
+	dev->fn_tbl.pretakedown = radeon_driver_pretakedown;
+	dev->fn_tbl.open_helper = radeon_driver_open_helper;
+	dev->fn_tbl.free_filp_priv = radeon_driver_free_filp_priv;
 }

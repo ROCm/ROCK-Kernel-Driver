@@ -1713,7 +1713,7 @@ static int __devinit riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 }
 #endif /* CONFIG_PPC_OF */
 
-#ifdef CONFIG_FB_RIVA_I2C
+#if defined(CONFIG_FB_RIVA_I2C) && !defined(CONFIG_PPC_OF)
 static int __devinit riva_get_EDID_i2c(struct fb_info *info)
 {
 	struct riva_par *par = (struct riva_par *) info->par;

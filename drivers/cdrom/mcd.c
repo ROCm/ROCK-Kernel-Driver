@@ -1021,10 +1021,9 @@ static int mcd_open(struct cdrom_device_info *cdi, int purpose)
 		st = statusCmd();	/* check drive status */
 		if (st == -1)
 			goto err_out;	/* drive doesn't respond */
-		if ((st & MST_READY) == 0) {	/* no disk? wait a sec... */
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
+		if ((st & MST_READY) == 0) 	/* no disk? wait a sec... */
+			msleep(1000);
+
 	} while (((st & MST_READY) == 0) && count++ < MCD_RETRY_ATTEMPTS);
 
 	if (updateToc() < 0)

@@ -268,12 +268,12 @@ struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int
 			return NULL;
 		}
 		UDF_I_ALLOCTYPE(inode) = alloctype;
-		sfi->descTag.tagLocation = *block;
+		sfi->descTag.tagLocation = cpu_to_le32(*block);
 		dfibh.soffset = dfibh.eoffset;
 		dfibh.eoffset += (sfibh.eoffset - sfibh.soffset);
 		dfi = (struct fileIdentDesc *)(dbh->b_data + dfibh.soffset);
 		if (udf_write_fi(inode, sfi, dfi, &dfibh, sfi->impUse,
-			sfi->fileIdent + sfi->lengthOfImpUse))
+			sfi->fileIdent + le16_to_cpu(sfi->lengthOfImpUse)))
 		{
 			UDF_I_ALLOCTYPE(inode) = ICBTAG_FLAG_AD_IN_ICB;
 			udf_release_data(dbh);
@@ -1411,11 +1411,11 @@ udf_update_inode(struct inode *inode, int do_sync)
 				udf_add_extendedattr(inode,
 					sizeof(struct deviceSpec) +
 					sizeof(regid), 12, 0x3);
-			dsea->attrType = 12;
+			dsea->attrType = cpu_to_le32(12);
 			dsea->attrSubtype = 1;
-			dsea->attrLength = sizeof(struct deviceSpec) +
-				sizeof(regid);
-			dsea->impUseLength = sizeof(regid);
+			dsea->attrLength = cpu_to_le32(sizeof(struct deviceSpec) +
+				sizeof(regid));
+			dsea->impUseLength = cpu_to_le32(sizeof(regid));
 		}
 		eid = (regid *)dsea->impUse;
 		memset(eid, 0, sizeof(regid));

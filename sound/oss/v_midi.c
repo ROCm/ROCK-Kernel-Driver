@@ -90,11 +90,12 @@ static void v_midi_close (int dev)
 static int v_midi_out (int dev, unsigned char midi_byte)
 {
 	vmidi_devc *devc = midi_devs[dev]->devc;
-	vmidi_devc *pdevc = midi_devs[devc->pair_mididev]->devc;
+	vmidi_devc *pdevc;
 
 	if (devc == NULL)
-		return -(ENXIO);
+		return -ENXIO;
 
+	pdevc = midi_devs[devc->pair_mididev]->devc;
 	if (pdevc->input_opened > 0){
 		if (MIDIbuf_avail(pdevc->my_mididev) > 500)
 			return 0;

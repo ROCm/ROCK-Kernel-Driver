@@ -118,10 +118,6 @@ static struct serial_state rs_table[1];
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
  * lock it in case the copy_from_user blocks while swapping in a page,
@@ -1610,7 +1606,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 	if (char_time == 0)
 		char_time = 1;
 	if (timeout)
-	  char_time = MIN(char_time, timeout);
+	  char_time = min_t(unsigned long, char_time, timeout);
 	/*
 	 * If the transmitter hasn't cleared in twice the approximate
 	 * amount of time to send the entire FIFO, it probably won't

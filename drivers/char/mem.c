@@ -86,7 +86,7 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 	 * above the IO hole... Ah, and of course, XFree86 doesn't pass
 	 * O_SYNC when mapping us to tap IO space. Surprised ?
 	 */
-	return !page_is_ram(addr);
+	return !page_is_ram(addr >> PAGE_SHIFT);
 #else
 	/*
 	 * Accessing memory above the top the kernel knows about or through a file pointer

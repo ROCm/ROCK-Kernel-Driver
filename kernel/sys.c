@@ -310,8 +310,6 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 {
 	struct task_struct *g, *p;
 	struct user_struct *user;
-	struct pid *pid;
-	struct list_head *l;
 	int error = -EINVAL;
 
 	if (which > 2 || which < 0)
@@ -336,8 +334,9 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 		case PRIO_PGRP:
 			if (!who)
 				who = process_group(current);
-			for_each_task_pid(who, PIDTYPE_PGID, p, l, pid)
+			do_each_task_pid(who, PIDTYPE_PGID, p) {
 				error = set_one_prio(p, niceval, error);
+			} while_each_task_pid(who, PIDTYPE_PGID, p);
 			break;
 		case PRIO_USER:
 			if (!who)
@@ -371,8 +370,6 @@ out:
 asmlinkage long sys_getpriority(int which, int who)
 {
 	struct task_struct *g, *p;
-	struct list_head *l;
-	struct pid *pid;
 	struct user_struct *user;
 	long niceval, retval = -ESRCH;
 
@@ -394,11 +391,11 @@ asmlinkage long sys_getpriority(int which, int who)
 		case PRIO_PGRP:
 			if (!who)
 				who = process_group(current);
-			for_each_task_pid(who, PIDTYPE_PGID, p, l, pid) {
+			do_each_task_pid(who, PIDTYPE_PGID, p) {
 				niceval = 20 - task_nice(p);
 				if (niceval > retval)
 					retval = niceval;
-			}
+			} while_each_task_pid(who, PIDTYPE_PGID, p);
 			break;
 		case PRIO_USER:
 			if (!who)
@@ -1044,12 +1041,11 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 
 	if (pgid != pid) {
 		struct task_struct *p;
-		struct pid *pid;
-		struct list_head *l;
 
-		for_each_task_pid(pgid, PIDTYPE_PGID, p, l, pid)
+		do_each_task_pid(pgid, PIDTYPE_PGID, p) {
 			if (p->signal->session == current->signal->session)
 				goto ok_pgid;
+		} while_each_task_pid(pgid, PIDTYPE_PGID, p);
 		goto out;
 	}
 

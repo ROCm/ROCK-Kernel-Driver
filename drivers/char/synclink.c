@@ -851,8 +851,6 @@ static int mgsl_rxenable(struct mgsl_struct * info, int enable);
 static int mgsl_wait_event(struct mgsl_struct * info, int __user *mask);
 static int mgsl_loopmode_send_done( struct mgsl_struct * info );
 
-#define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
-
 /* set non-zero on successful registration with PCI subsystem */
 static int pci_registered;
 
@@ -929,10 +927,6 @@ static struct tty_driver *serial_driver;
 
 static void mgsl_change_params(struct mgsl_struct *info);
 static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout);
-
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
 
 /*
  * 1st function defined in .text section. Calling this function in
@@ -2246,8 +2240,8 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 		if (from_user) {
 			down(&tmp_buf_sem);
 			while (1) {
-				c = MIN(count,
-					MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				c = min_t(int, count,
+					min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					    SERIAL_XMIT_SIZE - info->xmit_head));
 				if (c <= 0)
 					break;
@@ -2260,7 +2254,7 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 					break;
 				}
 				spin_lock_irqsave(&info->irq_spinlock,flags);
-				c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					       SERIAL_XMIT_SIZE - info->xmit_head));
 				memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 				info->xmit_head = ((info->xmit_head + c) &
@@ -2275,8 +2269,8 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 		} else {
 			while (1) {
 				spin_lock_irqsave(&info->irq_spinlock,flags);
-				c = MIN(count,
-					MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				c = min_t(int, count,
+					min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 					    SERIAL_XMIT_SIZE - info->xmit_head));
 				if (c <= 0) {
 					spin_unlock_irqrestore(&info->irq_spinlock,flags);
@@ -3314,7 +3308,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 		char_time = 1;
 		
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 		
 	if ( info->params.mode == MGSL_MODE_HDLC ||
 		info->params.mode == MGSL_MODE_RAW ) {
@@ -4175,7 +4169,7 @@ int load_next_tx_holding_buffer(struct mgsl_struct *info)
 				info->get_tx_holding_index=0;
 
 			/* restart transmit timer */
-			mod_timer(&info->tx_timer, jiffies + jiffies_from_ms(5000));
+			mod_timer(&info->tx_timer, jiffies + msecs_to_jiffies(5000));
 
 			ret = 1;
 		}
@@ -5804,7 +5798,7 @@ void usc_start_transmitter( struct mgsl_struct *info )
 			
 			usc_TCmd( info, TCmd_SendFrame );
 			
-			info->tx_timer.expires = jiffies + jiffies_from_ms(5000);
+			info->tx_timer.expires = jiffies + msecs_to_jiffies(5000);
 			add_timer(&info->tx_timer);	
 		}
 		info->tx_active = 1;
@@ -6767,7 +6761,7 @@ int mgsl_get_rx_frame(struct mgsl_struct *info)
 			
 	if ( debug_level >= DEBUG_LEVEL_DATA )
 		mgsl_trace_block(info,info->rx_buffer_list[StartIndex].virt_addr,
-			MIN(framesize,DMABUFFERSIZE),0);	
+			min_t(int, framesize, DMABUFFERSIZE),0);
 		
 	if (framesize) {
 		if ( ( (info->params.crc_type & HDLC_CRC_RETURN_EX) &&
@@ -6982,7 +6976,7 @@ int mgsl_get_raw_rx_frame(struct mgsl_struct *info)
 
 		if ( debug_level >= DEBUG_LEVEL_DATA )
 			mgsl_trace_block(info,info->rx_buffer_list[CurrentIndex].virt_addr,
-				MIN(framesize,DMABUFFERSIZE),0);
+				min_t(int, framesize, DMABUFFERSIZE),0);
 
 		if (framesize) {
 			/* copy dma buffer(s) to contiguous intermediate buffer */
@@ -7042,7 +7036,7 @@ void mgsl_load_tx_dma_buffer(struct mgsl_struct *info, const char *Buffer,
 	DMABUFFERENTRY *pBufEntry;
 	
 	if ( debug_level >= DEBUG_LEVEL_DATA )
-		mgsl_trace_block(info,Buffer, MIN(BufferSize,DMABUFFERSIZE), 1);	
+		mgsl_trace_block(info,Buffer, min_t(int, BufferSize, DMABUFFERSIZE), 1);
 
 	if (info->params.flags & HDLC_FLAG_HDLC_LOOPMODE) {
 		/* set CMR:13 to start transmit when
@@ -7200,7 +7194,7 @@ BOOLEAN mgsl_irq_test( struct mgsl_struct *info )
 	EndTime=100;
 	while( EndTime-- && !info->irq_occurred ) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_from_ms(10));
+		schedule_timeout(msecs_to_jiffies(10));
 	}
 	
 	spin_lock_irqsave(&info->irq_spinlock,flags);
@@ -7339,7 +7333,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 	/*************************************************************/
 
 	/* Wait 100ms for interrupt. */
-	EndTime = jiffies + jiffies_from_ms(100);
+	EndTime = jiffies + msecs_to_jiffies(100);
 
 	for(;;) {
 		if (time_after(jiffies, EndTime)) {
@@ -7395,7 +7389,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 	/**********************************/
 	
 	/* Wait 100ms */
-	EndTime = jiffies + jiffies_from_ms(100);
+	EndTime = jiffies + msecs_to_jiffies(100);
 
 	for(;;) {
 		if (time_after(jiffies, EndTime)) {
@@ -7437,7 +7431,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		/******************************/
 
 		/* Wait 100ms */
-		EndTime = jiffies + jiffies_from_ms(100);
+		EndTime = jiffies + msecs_to_jiffies(100);
 
 		/* While timer not expired wait for transmit complete */
 
@@ -7468,7 +7462,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		/* WAIT FOR RECEIVE COMPLETE */
 
 		/* Wait 100ms */
-		EndTime = jiffies + jiffies_from_ms(100);
+		EndTime = jiffies + msecs_to_jiffies(100);
 
 		/* Wait for 16C32 to write receive status to buffer entry. */
 		status=info->rx_buffer_list[0].status;

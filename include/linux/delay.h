@@ -39,6 +39,7 @@ extern unsigned long loops_per_jiffy;
 #endif
 
 void msleep(unsigned int msecs);
+unsigned long msleep_interruptible(unsigned int msecs);
 
 static inline void ssleep(unsigned int seconds)
 {

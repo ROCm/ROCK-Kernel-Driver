@@ -364,15 +364,15 @@ static int i810_dma_initialize(drm_device_t *dev,
 	   	DRM_ERROR("can not find sarea!\n");
 	   	return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->mmio_map, init->mmio_offset );
+	dev_priv->mmio_map = drm_core_findmap(dev, init->mmio_offset);
 	if (!dev_priv->mmio_map) {
 		dev->dev_private = (void *)dev_priv;
 	   	i810_dma_cleanup(dev);
 	   	DRM_ERROR("can not find mmio map!\n");
 	   	return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->buffer_map, init->buffers_offset );
-	if (!dev_priv->buffer_map) {
+	dev->agp_buffer_map = drm_core_findmap(dev, init->buffers_offset);
+	if (!dev->agp_buffer_map) {
 		dev->dev_private = (void *)dev_priv;
 	   	i810_dma_cleanup(dev);
 	   	DRM_ERROR("can not find dma buffer map!\n");
@@ -1388,3 +1388,29 @@ int i810_flip_bufs(struct inode *inode, struct file *filp,
 	i810_dma_dispatch_flip( dev );
    	return 0;
 }
+
+static void i810_driver_pretakedown(drm_device_t *dev)
+{
+	i810_dma_cleanup( dev );
+}
+
+static void i810_driver_release(drm_device_t *dev, struct file *filp)
+{
+	i810_reclaim_buffers(filp);
+}
+
+static int i810_driver_dma_quiescent(drm_device_t *dev)
+{
+	i810_dma_quiescent( dev );
+	return 0;
+}
+
+void i810_driver_register_fns(drm_device_t *dev)
+{
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR;
+	dev->dev_priv_size = sizeof(drm_i810_buf_priv_t);
+	dev->fn_tbl.pretakedown = i810_driver_pretakedown;
+	dev->fn_tbl.release = i810_driver_release;
+	dev->fn_tbl.dma_quiescent = i810_driver_dma_quiescent;
+}
+

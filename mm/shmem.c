@@ -179,7 +179,7 @@ static struct backing_dev_info shmem_backing_dev_info = {
 	.unplug_io_fn = default_unplug_io_fn,
 };
 
-LIST_HEAD(shmem_inodes);
+static LIST_HEAD(shmem_inodes);
 static spinlock_t shmem_ilock = SPIN_LOCK_UNLOCKED;
 
 static void shmem_free_block(struct inode *inode)

@@ -52,6 +52,7 @@ SECTIONS
   .text ALIGN(16) : {
 	*(.text)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.text.do_softirq)
 	*(.text.sys_exit)
 	*(.text.do_sigaltstack)

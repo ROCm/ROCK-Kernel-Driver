@@ -161,7 +161,8 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			   RAS_VECTOR_OFFSET,
 			   virt_irq_to_real(irq_offset_down(irq)),
 			   RTAS_EPOW_WARNING | RTAS_POWERMGM_EVENTS,
-			   critical, __pa(&ras_log_buf), RTAS_ERROR_LOG_MAX);
+			   critical, __pa(&ras_log_buf),
+				rtas_get_error_log_max());
 
 	udbg_printf("EPOW <0x%lx 0x%x 0x%x>\n",
 		    *((unsigned long *)&ras_log_buf), status, state);
@@ -196,7 +197,8 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			   RAS_VECTOR_OFFSET,
 			   virt_irq_to_real(irq_offset_down(irq)),
 			   RTAS_INTERNAL_ERROR, 1 /*Time Critical */,
-			   __pa(&ras_log_buf), RTAS_ERROR_LOG_MAX);
+			   __pa(&ras_log_buf),
+				rtas_get_error_log_max());
 
 	rtas_elog = (struct rtas_error_log *)ras_log_buf;
 

@@ -639,12 +639,12 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
  			break;
  		}
  	}
-
-	DRM_FIND_MAP( dev_priv->mmio0, init->mmio0 );
-	DRM_FIND_MAP( dev_priv->mmio1, init->mmio1 );
-	DRM_FIND_MAP( dev_priv->mmio2, init->mmio2 );
-	DRM_FIND_MAP( dev_priv->mmio3, init->mmio3 );
-
+	
+	dev_priv->mmio0 = drm_core_findmap(dev, init->mmio0);
+	dev_priv->mmio1 = drm_core_findmap(dev, init->mmio1);
+	dev_priv->mmio2 = drm_core_findmap(dev, init->mmio2);
+	dev_priv->mmio3 = drm_core_findmap(dev, init->mmio3);
+	
 	dev_priv->sarea_priv = (drm_gamma_sarea_t *)
 		((u8 *)dev_priv->sarea->handle +
 		 init->sarea_priv_offset);
@@ -661,9 +661,8 @@ static int gamma_do_init_dma( drm_device_t *dev, drm_gamma_init_t *init )
 
 		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
 	} else {
-		DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-
-		DRM_IOREMAP( dev_priv->buffers, dev );
+		dev->agp_buffer_map = drm_core_findmap(dev, init->buffers_offset);
+		drm_core_ioremap( dev->agp_buffer_map, dev);
 
 		buf = dma->buflist[GLINT_DRI_BUF_COUNT];
 		pgt = buf->address;
@@ -699,10 +698,9 @@ int gamma_do_cleanup_dma( drm_device_t *dev )
 #endif
 
 	if ( dev->dev_private ) {
-		drm_gamma_private_t *dev_priv = dev->dev_private;
 
-		if ( dev_priv->buffers != NULL )
-			DRM_IOREMAPFREE( dev_priv->buffers, dev );
+		if ( dev->agp_buffer_map != NULL )
+			drm_core_ioremapfree( dev->agp_buffer_map, dev );
 
 		DRM(free)( dev->dev_private, sizeof(drm_gamma_private_t),
 			   DRM_MEM_DRIVER );
@@ -903,4 +901,46 @@ void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
 	GAMMA_WRITE( GAMMA_GDELAYTIMER,		0x00000000 );
 	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000000 );
 	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00000000 );
+}
+
+extern drm_ioctl_desc_t DRM(ioctls)[];
+
+static int gamma_driver_preinit(drm_device_t *dev)
+{
+	/* reset the finish ioctl */
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_FINISH)].func = DRM(finish);
+	return 0;
+}
+
+static void gamma_driver_pretakedown(drm_device_t *dev)
+{
+	gamma_do_cleanup_dma(dev);
+}
+
+static void gamma_driver_dma_ready(drm_device_t *dev)
+{
+	gamma_dma_ready(dev);
+}
+
+static int gamma_driver_dma_quiescent(drm_device_t *dev)
+{
+	drm_gamma_private_t *dev_priv =	(
+		drm_gamma_private_t *)dev->dev_private;
+	if (dev_priv->num_rast == 2)
+		gamma_dma_quiescent_dual(dev);
+	else gamma_dma_quiescent_single(dev);
+	return 0;
+}
+
+void gamma_driver_register_fns(drm_device_t *dev)
+{
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA;
+	DRM(fops).read = gamma_fops_read;
+	DRM(fops).poll = gamma_fops_poll;
+	dev->fn_tbl.preinit = gamma_driver_preinit;
+	dev->fn_tbl.pretakedown = gamma_driver_pretakedown;
+	dev->fn_tbl.dma_ready = gamma_driver_dma_ready;
+	dev->fn_tbl.dma_quiescent = gamma_driver_dma_quiescent;
+	dev->fn_tbl.dma_flush_block_and_flush = gamma_flush_block_and_flush;
+	dev->fn_tbl.dma_flush_unblock = gamma_flush_unblock;
 }

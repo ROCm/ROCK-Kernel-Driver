@@ -126,6 +126,10 @@
 #define BTTV_LMLBT4         0x76
 #define BTTV_PICOLO_TETRA_CHIP 0x79
 #define BTTV_AVDVBT_771     0x7b
+#define BTTV_AVDVBT_761     0x7c
+#define BTTV_MATRIX_VISIONSQ  0x7d
+#define BTTV_MATRIX_VISIONSLC 0x7e
+#define BTTV_APAC_VIEWCOMP  0x7f
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -298,6 +302,8 @@ struct bttv_sub_driver {
 	struct device_driver   drv;
 	char                   wanted[BUS_ID_SIZE];
 	void                   (*gpio_irq)(struct bttv_sub_device *sub);
+	void                   (*i2c_info)(struct bttv_sub_device *sub,
+					   struct i2c_client *client, int attach);
 };
 #define to_bttv_sub_drv(x) container_of((x), struct bttv_sub_driver, drv)
 

@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include "miropcm20-rds-core.h"
 
@@ -60,8 +61,7 @@ static ssize_t rds_f_read(struct file *file, char __user *buffer, size_t length,
 	char c;
 	char bits[8];
 
-	current->state=TASK_UNINTERRUPTIBLE;
-	schedule_timeout(2*HZ);
+	msleep(2000);
 	aci_rds_cmd(RDS_STATUS, &c, 1);
 	print_matrix(&c, bits);
 	if (copy_to_user(buffer, bits, 8))

@@ -254,8 +254,8 @@ void fat_date_unix2dos(int unix_date,unsigned short *time,
 	if (unix_date < 315532800)
 		unix_date = 315532800;
 
-	*time = (unix_date % 60)/2+(((unix_date/60) % 60) << 5)+
-	    (((unix_date/3600) % 24) << 11);
+	*time = cpu_to_le16((unix_date % 60)/2+(((unix_date/60) % 60) << 5)+
+	    (((unix_date/3600) % 24) << 11));
 	day = unix_date/86400-3652;
 	year = day/365;
 	if ((year+3)/4+365*year > day) year--;
@@ -269,7 +269,7 @@ void fat_date_unix2dos(int unix_date,unsigned short *time,
 		for (month = 0; month < 12; month++)
 			if (day_n[month] > nl_day) break;
 	}
-	*date = nl_day-day_n[month-1]+1+(month << 5)+(year << 9);
+	*date = cpu_to_le16(nl_day-day_n[month-1]+1+(month << 5)+(year << 9));
 }
 
 

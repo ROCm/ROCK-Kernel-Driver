@@ -59,6 +59,7 @@ SECTIONS
 	*(.text64)
         *(.text..SHmedia32)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 #ifdef CONFIG_LITTLE_ENDIAN

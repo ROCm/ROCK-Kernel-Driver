@@ -412,7 +412,7 @@ static void ec3104_keyb_clear_state(void)
 	k->last_msr = 0;
 
 	for (;;) {
-		schedule_timeout(HZ/10);
+		msleep(100);
 
 		msr = ctrl_inb(EC3104_SER4_MSR);
 	

@@ -116,9 +116,6 @@ void DRM(dma_takedown)(drm_device_t *dev)
 				  dma->bufs[i].buf_count *
 				  sizeof(*dma->bufs[0].buflist),
 				  DRM_MEM_BUFS);
-#if __HAVE_DMA_FREELIST
-		   	DRM(freelist_destroy)(&dma->bufs[i].freelist);
-#endif
 		}
 	}
 
@@ -158,16 +155,6 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 	if ( __HAVE_DMA_WAITQUEUE && waitqueue_active(&buf->dma_wait)) {
 		wake_up_interruptible(&buf->dma_wait);
 	}
-#if __HAVE_DMA_FREELIST
-	else {
-		drm_device_dma_t *dma = dev->dma;
-				/* If processes are waiting, the last one
-				   to wake will put the buffer on the free
-				   list.  If no processes are waiting, we
-				   put the buffer on the freelist here. */
-		DRM(freelist_put)(dev, &dma->bufs[buf->order].freelist, buf);
-	}
-#endif
 }
 
 #if !__HAVE_DMA_RECLAIM

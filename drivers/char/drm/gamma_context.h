@@ -42,7 +42,7 @@
    the circular buffer), is based on Alessandro Rubini's LINUX DEVICE
    DRIVERS (Cambridge: O'Reilly, 1998), pages 111-113. */
 
-ssize_t DRM(read)(struct file *filp, char __user *buf, size_t count, loff_t *off)
+ssize_t gamma_fops_read(struct file *filp, char __user *buf, size_t count, loff_t *off)
 {
 	drm_file_t    *priv   = filp->private_data;
 	drm_device_t  *dev    = priv->dev;
@@ -128,7 +128,7 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 	return 0;
 }
 
-unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
+unsigned int gamma_fops_poll(struct file *filp, struct poll_table_struct *wait)
 {
 	drm_file_t   *priv = filp->private_data;
 	drm_device_t *dev  = priv->dev;

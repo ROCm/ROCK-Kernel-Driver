@@ -78,6 +78,7 @@
 #include <net/raw.h>
 #include <net/checksum.h>
 #include <net/inetpeer.h>
+#include <net/checksum.h>
 #include <linux/igmp.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_bridge.h>
@@ -734,10 +735,10 @@ int ip_append_data(struct sock *sk,
 	int hh_len;
 	int exthdrlen;
 	int mtu;
-	int copy = 0;
+	int copy;
 	int err;
 	int offset = 0;
-	unsigned int maxfraglen, fragheaderlen, fraggap = 0;
+	unsigned int maxfraglen, fragheaderlen;
 	int csummode = CHECKSUM_NONE;
 
 	if (flags&MSG_PROBE)
@@ -780,6 +781,7 @@ int ip_append_data(struct sock *sk,
 	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
+	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen;
 
 	if (inet->cork.length + length > 0xFFFF - fragheaderlen) {
 		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport, mtu-exthdrlen);
@@ -787,26 +789,11 @@ int ip_append_data(struct sock *sk,
 	}
 
 	/*
-	 * Let's try using as much space as possible to avoid generating
-	 * additional unnecessary small fragment of length 
-	 * (mtu-fragheaderlen)%8 if mtu-fragheaderlen is not 0 modulo 8.
-	 * -- yoshfuji
-	 */
-	if (fragheaderlen + inet->cork.length + length <= mtu)
-		maxfraglen = mtu;
-	else
-		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen;
-
-	if (fragheaderlen + inet->cork.length <= mtu &&
-	    fragheaderlen + inet->cork.length + length > mtu)
-		fraggap = 1;
-
-	/*
 	 * transhdrlen > 0 means that this is the first fragment and we wish
 	 * it won't be fragmented in the future.
 	 */
 	if (transhdrlen &&
-	    length + fragheaderlen <= maxfraglen &&
+	    length + fragheaderlen <= mtu &&
 	    rt->u.dst.dev->features&(NETIF_F_IP_CSUM|NETIF_F_NO_CSUM|NETIF_F_HW_CSUM) &&
 	    !exthdrlen)
 		csummode = CHECKSUM_HW;
@@ -820,34 +807,33 @@ int ip_append_data(struct sock *sk,
 	 * adding appropriate IP header.
 	 */
 
-	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL) {
-		fraggap = 0;
+	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		goto alloc_new_skb;
-	}
 
 	while (length > 0) {
-		if ((copy = maxfraglen - skb->len) <= 0) {
+		if ((copy = mtu - skb->len) <= 0) {
 			char *data;
 			unsigned int datalen;
 			unsigned int fraglen;
+			unsigned int fraggap;
 			unsigned int alloclen;
 			struct sk_buff *skb_prev;
-			BUG_TRAP(fraggap || copy == 0);
+			BUG_TRAP(copy == 0);
 
 alloc_new_skb:
 			skb_prev = skb;
+			fraggap = 0;
+			if (skb_prev)
+				fraggap = mtu - maxfraglen;
 
-			if (fraggap)
-				fraggap = -copy;
-
-			datalen = maxfraglen - fragheaderlen;
+			datalen = mtu - fragheaderlen;
 			if (datalen > length + fraggap)
 				datalen = length + fraggap;
 
 			fraglen = datalen + fragheaderlen;
 			if ((flags & MSG_MORE) && 
 			    !(rt->u.dst.dev->features&NETIF_F_SG))
-				alloclen = maxfraglen;
+				alloclen = mtu;
 			else
 				alloclen = datalen + fragheaderlen;
 
@@ -892,14 +878,17 @@ alloc_new_skb:
 			skb->h.raw = data + exthdrlen;
 
 			if (fraggap) {
-				skb_copy_bits(skb_prev, maxfraglen, 
-					      data + transhdrlen, fraggap);
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data + transhdrlen, fraggap, 0);
+				skb_prev->csum = csum_sub(skb_prev->csum,
+							  skb->csum);
 				data += fraggap;
 				skb_trim(skb_prev, maxfraglen);
 			}
 
 			copy = datalen - transhdrlen - fraggap;
-			if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, 0, skb) < 0) {
+			if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;
@@ -909,7 +898,6 @@ alloc_new_skb:
 			length -= datalen - fraggap;
 			transhdrlen = 0;
 			exthdrlen = 0;
-			fraggap = 0;
 			csummode = CHECKSUM_NONE;
 
 			/*
@@ -1002,7 +990,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	int mtu;
 	int len;
 	int err;
-	unsigned int maxfraglen, fragheaderlen, fraggap = 0;
+	unsigned int maxfraglen, fragheaderlen, fraggap;
 
 	if (inet->hdrincl)
 		return -EPERM;
@@ -1024,26 +1012,12 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	mtu = inet->cork.fragsize;
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
+	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen;
 
 	if (inet->cork.length + size > 0xFFFF - fragheaderlen) {
 		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport, mtu);
 		return -EMSGSIZE;
 	}
-
-	/*
-	 * Let's try using as much space as possible to avoid generating
-	 * additional unnecessary small fragment of length 
-	 * (mtu-fragheaderlen)%8 if mtu-fragheaderlen is not 0 modulo 8.
-	 * -- yoshfuji
-	 */
-	if (fragheaderlen + inet->cork.length + size <= mtu)
-		maxfraglen = mtu;
-	else
-		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen;
-
-	if (fragheaderlen + inet->cork.length <= mtu &&
-	    fragheaderlen + inet->cork.length + size > mtu)
-		fraggap = 1;
 
 	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		return -EINVAL;
@@ -1052,17 +1026,18 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 
 	while (size > 0) {
 		int i;
-		if ((len = maxfraglen - skb->len) <= 0) {
+		if ((len = mtu - skb->len) <= 0) {
 			struct sk_buff *skb_prev;
 			char *data;
 			struct iphdr *iph;
 			int alloclen;
 
-			BUG_TRAP(fraggap || len == 0);
+			BUG_TRAP(len == 0);
 
 			skb_prev = skb;
-			if (fraggap)
-				fraggap = -len;
+			fraggap = 0;
+			if (skb_prev)
+				fraggap = mtu - maxfraglen;
 
 			alloclen = fragheaderlen + hh_len + fraggap + 15;
 			skb = sock_wmalloc(sk, alloclen, 1, sk->sk_allocation);
@@ -1087,8 +1062,11 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 			skb->h.raw = data;
 
 			if (fraggap) {
-				skb_copy_bits(skb_prev, maxfraglen,
-					      data, fraggap);
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data, fraggap, 0);
+				skb_prev->csum = csum_sub(skb_prev->csum,
+							  skb->csum);
 				skb_trim(skb_prev, maxfraglen);
 			}
 

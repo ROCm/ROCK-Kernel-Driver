@@ -97,6 +97,7 @@ typedef struct _snd_pcm_ops {
 	int (*silence)(snd_pcm_substream_t *substream, int channel, 
 		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
 	struct page *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
+	int (*mmap)(snd_pcm_substream_t *substream, struct vm_area_struct *vma);
 	int (*ack)(snd_pcm_substream_t *substream);
 } snd_pcm_ops_t;
 
@@ -937,6 +938,28 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream);
 #define snd_pcm_sgbuf_pages(size) snd_sgbuf_aligned_pages(size)
 #define snd_pcm_sgbuf_get_addr(sgbuf,ofs) snd_sgbuf_get_addr(sgbuf,ofs)
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);
+
+/* handle mmap counter - PCM mmap callback should handle this counter properly */
+static inline void snd_pcm_mmap_data_open(struct vm_area_struct *area)
+{
+	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
+	atomic_inc(&substream->runtime->mmap_count);
+}
+
+static inline void snd_pcm_mmap_data_close(struct vm_area_struct *area)
+{
+	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
+	atomic_dec(&substream->runtime->mmap_count);
+}
+
+/* mmap for io-memory area */
+#if defined(CONFIG_X86) || defined(CONFIG_PPC) || defined(CONFIG_ALPHA)
+#define SNDRV_PCM_INFO_MMAP_IOMEM	SNDRV_PCM_INFO_MMAP
+int snd_pcm_lib_mmap_iomem(snd_pcm_substream_t *substream, struct vm_area_struct *area);
+#else
+#define SNDRV_PCM_INFO_MMAP_IOMEM	0
+#define snd_pcm_lib_mmap_iomem	NULL
+#endif
 
 static inline void snd_pcm_limit_isa_dma_size(int dma, size_t *max)
 {

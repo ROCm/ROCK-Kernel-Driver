@@ -352,7 +352,7 @@ void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
 	}
 }
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 
 DRM_AGP_MEM *DRM(alloc_agp)(int pages, u32 type)
 {

@@ -327,8 +327,10 @@ static int attach_inform(struct i2c_client *client)
 {
         struct saa7134_dev *dev = client->adapter->algo_data;
 	int tuner = dev->tuner_type;
+	int conf  = dev->tda9887_conf;
 
 	saa7134_i2c_call_clients(dev,TUNER_SET_TYPE,&tuner);
+	saa7134_i2c_call_clients(dev,TDA9887_SET_CONFIG,&conf);
         return 0;
 }
 

@@ -1437,8 +1437,7 @@ static int do_erase_oneblock(struct map_info *map, struct flchip *chip,
 
 	spin_unlock(chip->mutex);
 	INVALIDATE_CACHED_RANGE(map, adr, len);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout((chip->erase_time*HZ)/(2*1000));
+	msleep(chip->erase_time / 2);
 	spin_lock(chip->mutex);
 
 	/* FIXME. Use a timer to check this, and return immediately. */

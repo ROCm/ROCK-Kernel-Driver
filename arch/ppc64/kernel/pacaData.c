@@ -27,13 +27,6 @@ struct systemcfg *systemcfg;
  * field correctly */
 extern unsigned long __toc_start;
 
-/* Stack space used when we detect a bad kernel stack pointer, and
- * early in SMP boots before relocation is enabled.
- *
- * ABI requires stack to be 128-byte aligned
- */
-char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
-
 /* The Paca is an array with one entry per processor.  Each contains an 
  * ItLpPaca, which contains the information shared between the 
  * hypervisor and Linux.  Each also contains an ItLpRegSave area which
@@ -55,7 +48,6 @@ char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
 	.kernel_toc = (unsigned long)(&__toc_start) + 0x8000UL,		    \
 	.stab_real = (asrr), 		/* Real pointer to segment table */ \
 	.stab_addr = (asrv),		/* Virt pointer to segment table */ \
-	.emergency_sp = &emergency_stack[((number)+1) * PAGE_SIZE],	    \
 	.cpu_start = (start),		/* Processor start */		    \
 	.lppaca = {							    \
 		.xDesc = 0xd397d781,	/* "LpPa" */			    \

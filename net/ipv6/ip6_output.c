@@ -54,6 +54,7 @@
 #include <net/rawv6.h>
 #include <net/icmp.h>
 #include <net/xfrm.h>
+#include <net/checksum.h>
 
 static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**));
 
@@ -813,11 +814,11 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sk_buff *skb;
-	unsigned int maxfraglen, fragheaderlen, fraggap = 0;
+	unsigned int maxfraglen, fragheaderlen;
 	int exthdrlen;
 	int hh_len;
 	int mtu;
-	int copy = 0;
+	int copy;
 	int err;
 	int offset = 0;
 	int csummode = CHECKSUM_NONE;
@@ -866,6 +867,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
+	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
@@ -882,46 +884,37 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	 *
 	 * Note that we may need to "move" the data from the tail of
 	 * of the buffer to the new fragment when we split 
-	 * the message at the first time.
+	 * the message.
 	 *
 	 * FIXME: It may be fragmented into multiple chunks 
 	 *        at once if non-fragmentable extension headers
 	 *        are too large.
 	 * --yoshfuji 
 	 */
-	if (fragheaderlen + inet->cork.length + length <= mtu)
-		maxfraglen = mtu;
-	else
-		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen 
-			     - sizeof(struct frag_hdr);
-
-	if (fragheaderlen + inet->cork.length <= mtu &&
-	    fragheaderlen + inet->cork.length + length > mtu)
-		fraggap = 1;
 
 	inet->cork.length += length;
 
-	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL) {
-		fraggap = 0;
+	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		goto alloc_new_skb;
-	}
 
 	while (length > 0) {
-		if ((copy = maxfraglen - skb->len) <= 0) {
+		if ((copy = mtu - skb->len) <= 0) {
 			char *data;
 			unsigned int datalen;
 			unsigned int fraglen;
+			unsigned int fraggap;
 			unsigned int alloclen;
 			struct sk_buff *skb_prev;
-			BUG_TRAP(fraggap || copy == 0);
+			BUG_TRAP(copy == 0);
 alloc_new_skb:
 			skb_prev = skb;
 
 			/* There's no room in the current skb */
-			if (fraggap)
-				fraggap = -copy;
+			fraggap = 0;
+			if (skb_prev)
+				fraggap = mtu - maxfraglen;
 
-			datalen = maxfraglen - fragheaderlen;
+			datalen = mtu - fragheaderlen;
 
 			if (datalen > length + fraggap)
 				datalen = length + fraggap;
@@ -929,7 +922,7 @@ alloc_new_skb:
 			fraglen = datalen + fragheaderlen;
 			if ((flags & MSG_MORE) &&
 			    !(rt->u.dst.dev->features&NETIF_F_SG))
-				alloclen = maxfraglen;
+				alloclen = mtu;
 			else
 				alloclen = datalen + fragheaderlen;
 
@@ -981,8 +974,11 @@ alloc_new_skb:
 			skb->h.raw = data + exthdrlen;
 
 			if (fraggap) {
-				skb_copy_bits(skb_prev, maxfraglen, 
-					      data + transhdrlen, fraggap);
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data + transhdrlen, fraggap, 0);
+				skb_prev->csum = csum_sub(skb_prev->csum,
+							  skb->csum);
 				data += fraggap;
 				skb_trim(skb_prev, maxfraglen);
 			}
@@ -991,7 +987,7 @@ alloc_new_skb:
 				err = -EINVAL;
 				kfree_skb(skb);
 				goto error;
-			} else if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, 0, skb) < 0) {
+			} else if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;
@@ -1001,7 +997,6 @@ alloc_new_skb:
 			length -= datalen - fraggap;
 			transhdrlen = 0;
 			exthdrlen = 0;
-			fraggap = 0;
 			csummode = CHECKSUM_NONE;
 
 			/*

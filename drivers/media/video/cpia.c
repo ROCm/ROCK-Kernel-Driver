@@ -29,6 +29,7 @@
 #include <linux/config.h>
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/vmalloc.h>
@@ -61,6 +62,15 @@ MODULE_DESCRIPTION("V4L-driver for Vision CPiA based cameras");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("video");
 #endif
+
+static unsigned short colorspace_conv = 0;
+module_param(colorspace_conv, ushort, 0444);
+MODULE_PARM_DESC(colorspace_conv,
+                 "\n<n> Colorspace conversion:"
+                 "\n0 = disable"
+                 "\n1 = enable"
+                 "\nDefault value is 0"
+                 "\n");
 
 #define ABOUT "V4L-Driver for Vision CPiA based cameras"
 
@@ -1428,14 +1438,19 @@ static void __exit proc_cpia_destroy(void)
 /* supported frame palettes and depths */
 static inline int valid_mode(u16 palette, u16 depth)
 {
-	return (palette == VIDEO_PALETTE_GREY && depth == 8) ||
-	       (palette == VIDEO_PALETTE_RGB555 && depth == 16) ||
-	       (palette == VIDEO_PALETTE_RGB565 && depth == 16) ||
-	       (palette == VIDEO_PALETTE_RGB24 && depth == 24) ||
-	       (palette == VIDEO_PALETTE_RGB32 && depth == 32) ||
-	       (palette == VIDEO_PALETTE_YUV422 && depth == 16) ||
-	       (palette == VIDEO_PALETTE_YUYV && depth == 16) ||
-	       (palette == VIDEO_PALETTE_UYVY && depth == 16);
+	if ((palette == VIDEO_PALETTE_YUV422 && depth == 16) ||
+	    (palette == VIDEO_PALETTE_YUYV && depth == 16))
+		return 1;
+
+	if (colorspace_conv)
+		return (palette == VIDEO_PALETTE_GREY && depth == 8) ||
+		       (palette == VIDEO_PALETTE_RGB555 && depth == 16) ||
+		       (palette == VIDEO_PALETTE_RGB565 && depth == 16) ||
+		       (palette == VIDEO_PALETTE_RGB24 && depth == 24) ||
+		       (palette == VIDEO_PALETTE_RGB32 && depth == 32) ||
+		       (palette == VIDEO_PALETTE_UYVY && depth == 16);
+
+	return 0;
 }
 
 static int match_videosize( int width, int height )
@@ -4040,6 +4055,13 @@ static int __init cpia_init(void)
 {
 	printk(KERN_INFO "%s v%d.%d.%d\n", ABOUT,
 	       CPIA_MAJ_VER, CPIA_MIN_VER, CPIA_PATCH_VER);
+
+	printk(KERN_WARNING "Since in-kernel colorspace conversion is not "
+	       "allowed, it is disabled by default now. Users should fix the "
+	       "applications in case they don't work without conversion "
+	       "reenabled by setting the 'colorspace_conv' module "
+	       "parameter to 1");
+
 #ifdef CONFIG_PROC_FS
 	proc_cpia_create();
 #endif

@@ -7,7 +7,7 @@
 #ifndef __ASM_X8664_CPUFEATURE_H
 #define __ASM_X8664_CPUFEATURE_H
 
-#define NCAPINTS	5	/* Currently we have 4 32-bit words worth of info */
+#define NCAPINTS	6
 
 /* Intel-defined CPU features, CPUID level 0x00000001, word 0 */
 #define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
@@ -71,6 +71,9 @@
 #define X86_FEATURE_CID		(4*32+10) /* Context ID */
 #define X86_FEATURE_CX16	(4*32+13) /* CMPXCHG16B */
 #define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
+
+/* More extended AMD flags: CPUID level 0x80000001, ecx, word 5 */
+#define X86_FEATURE_HTVALID	(5*32+ 0) /* HyperThreading valid, otherwise CMP */
 
 #define cpu_has(c, bit)                test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)      test_bit(bit, boot_cpu_data.x86_capability)

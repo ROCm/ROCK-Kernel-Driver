@@ -60,6 +60,9 @@ typedef struct drm_radeon_depth_clear_t {
 	u32 se_cntl;
 } drm_radeon_depth_clear_t;
 
+struct drm_radeon_driver_file_fields {
+	int64_t radeon_fb_delta;
+};
 
 struct mem_block {
 	struct mem_block *next;
@@ -138,7 +141,6 @@ typedef struct drm_radeon_private {
 	drm_local_map_t *mmio;
 	drm_local_map_t *cp_ring;
 	drm_local_map_t *ring_rptr;
-	drm_local_map_t *buffers;
 	drm_local_map_t *gart_textures;
 
 	struct mem_block *gart_heap;

@@ -745,12 +745,12 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 	memcpy(de[0].name,MSDOS_DOT,MSDOS_NAME);
 	memcpy(de[1].name,MSDOS_DOTDOT,MSDOS_NAME);
 	de[0].attr = de[1].attr = ATTR_DIR;
-	de[0].time = de[1].time = CT_LE_W(time);
-	de[0].date = de[1].date = CT_LE_W(date);
+	de[0].time = de[1].time = time;
+	de[0].date = de[1].date = date;
 	if (is_vfat) {	/* extra timestamps */
-		de[0].ctime = de[1].ctime = CT_LE_W(time);
+		de[0].ctime = de[1].ctime = time;
 		de[0].adate = de[0].cdate =
-			de[1].adate = de[1].cdate = CT_LE_W(date);
+			de[1].adate = de[1].cdate = date;
 	}
 	de[0].start = CT_LE_W(MSDOS_I(dir)->i_logstart);
 	de[0].starthi = CT_LE_W(MSDOS_I(dir)->i_logstart>>16);

@@ -233,8 +233,6 @@ extern int fat_access(struct super_block *sb, int nr, int new_value);
 extern int __fat_access(struct super_block *sb, int nr, int new_value);
 extern int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys);
 extern void fat_cache_init(struct super_block *sb);
-extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
-			     int *d_clu);
 extern void fat_cache_add(struct inode *inode, int f_clu, int d_clu);
 extern void fat_cache_inval_inode(struct inode *inode);
 extern int fat_get_cluster(struct inode *inode, int cluster,

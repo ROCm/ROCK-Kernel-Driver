@@ -240,12 +240,14 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	int i, ret;
-	pnp_info_buffer_t *buffer = (pnp_info_buffer_t *)
-				pnp_alloc(sizeof(pnp_info_buffer_t));
-	if (!buffer)
-		return -ENOMEM;
+	pnp_info_buffer_t *buffer;
+
 	if (!dev)
 		return -EINVAL;
+
+	buffer = (pnp_info_buffer_t *) pnp_alloc(sizeof(pnp_info_buffer_t));
+	if (!buffer)
+		return -ENOMEM;
 	buffer->len = PAGE_SIZE;
 	buffer->buffer = buf;
 	buffer->curr = buffer->buffer;

@@ -383,7 +383,7 @@ static int do_insert_tree(struct dquot *dquot, uint *treeblk, int depth)
 	if (depth == V2_DQTREEDEPTH-1) {
 #ifdef __QUOTA_V2_PARANOIA
 		if (newblk) {
-			printk(KERN_ERR "VFS: Inserting already present quota entry (block %u).\n", ref[GETIDINDEX(dquot->dq_id, depth)]);
+			printk(KERN_ERR "VFS: Inserting already present quota entry (block %u).\n", le32_to_cpu(ref[GETIDINDEX(dquot->dq_id, depth)]));
 			ret = -EIO;
 			goto out_buf;
 		}

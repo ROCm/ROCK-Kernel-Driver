@@ -789,6 +789,7 @@ int __init hpet_alloc(struct hpet_data *hdp)
 	size_t siz;
 	struct hpet *hpet;
 	static struct hpets *last __initdata = (struct hpets *)0;
+	unsigned long ns;
 
 	/*
 	 * hpet_alloc can be called by platform dependent code.
@@ -839,6 +840,18 @@ int __init hpet_alloc(struct hpet_data *hdp)
 
 	hpetp->hp_period = (cap & HPET_COUNTER_CLK_PERIOD_MASK) >>
 	    HPET_COUNTER_CLK_PERIOD_SHIFT;
+
+	printk(KERN_INFO "hpet%d: at MMIO 0x%p, IRQ%s",
+		hpetp->hp_which, hpet, hpetp->hp_ntimer > 1 ? "s" : "");
+	for (i = 0; i < hpetp->hp_ntimer; i++)
+		printk("%s %d", i > 0 ? "," : "", hdp->hd_irq[i]);
+	printk("\n");
+
+	ns = hpetp->hp_period;	/* femptoseconds, 10^-15 */
+	do_div(ns, 1000000);	/* convert to nanoseconds, 10^-9 */
+	printk(KERN_INFO "hpet%d: %ldns tick, %d %d-bit timers\n",
+		hpetp->hp_which, ns, hpetp->hp_ntimer,
+		cap & HPET_COUNTER_SIZE_MASK ? 64 : 32);
 
 	mcfg = readq(&hpet->hpet_config);
 	if ((mcfg & HPET_ENABLE_CNF_MASK) == 0) {
@@ -946,7 +959,6 @@ static int __init hpet_acpi_remove(struct acpi_device *device, int type)
 
 static struct acpi_driver hpet_acpi_driver __initdata = {
 	.name = "hpet",
-	.class = "",
 	.ids = "PNP0103",
 	.ops = {
 		.add = hpet_acpi_add,

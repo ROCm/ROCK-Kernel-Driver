@@ -16,10 +16,6 @@
 
 /* General customization:
  */
-#define __HAVE_AGP		1
-#define __MUST_HAVE_AGP		1
-#define __HAVE_MTRR		1
-#define __HAVE_CTX_BITMAP	1
 
 #define DRIVER_AUTHOR		"Tungsten Graphics, Inc."
 
@@ -54,27 +50,6 @@
 #define __HAVE_COUNTER7         _DRM_STAT_PRIMARY
 #define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
 #define __HAVE_COUNTER9         _DRM_STAT_DMA
-
-/* Driver customization:
- */
-#define DRIVER_PRETAKEDOWN() do {					\
-	if ( dev->dev_private ) {					\
-		drm_i915_private_t *dev_priv = dev->dev_private;	\
-	        i915_mem_takedown( &(dev_priv->agp_heap) );             \
- 	}								\
-	i915_dma_cleanup( dev );					\
-} while (0)
-
-/* When a client dies:
- *    - Free any alloced agp memory.
- */
-#define DRIVER_PRERELEASE() 						\
-do {									\
-	if ( dev->dev_private ) {					\
-		drm_i915_private_t *dev_priv = dev->dev_private;	\
-                i915_mem_release( dev, filp, dev_priv->agp_heap );	\
-	}								\
-} while (0)
 
 /* We use our own dma mechanisms, not the drm template code.  However,
  * the shared IRQ code is useful to us:

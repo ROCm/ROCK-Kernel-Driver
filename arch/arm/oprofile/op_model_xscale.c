@@ -343,7 +343,7 @@ static void inline __xsc2_check_ctrs(void)
 
 static irqreturn_t xscale_pmu_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
-	unsigned long eip = instruction_pointer(regs);
+	unsigned long pc = profile_pc(regs);
 	int i, is_kernel = !user_mode(regs);
 	u32 pmnc;
 
@@ -357,7 +357,7 @@ static irqreturn_t xscale_pmu_interrupt(int irq, void *arg, struct pt_regs *regs
 			continue;
 
 		write_counter(i, -(u32)results[i].reset_counter);
-		oprofile_add_sample(eip, is_kernel, i, smp_processor_id());
+		oprofile_add_sample(pc, is_kernel, i, smp_processor_id());
 		results[i].ovf--;
 	}
 

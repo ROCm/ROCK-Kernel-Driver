@@ -200,6 +200,19 @@ unsigned long long monotonic_clock(void)
 }
 EXPORT_SYMBOL(monotonic_clock);
 
+#if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+
+	if (pc >= (unsigned long)&__lock_text_start &&
+	    pc <= (unsigned long)&__lock_text_end)
+		return *(unsigned long *)(regs->ebp + 4);
+
+	return pc;
+}
+EXPORT_SYMBOL(profile_pc);
+#endif
 
 /*
  * timer_interrupt() needs to keep up the real-time clock,

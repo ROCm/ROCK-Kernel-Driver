@@ -84,6 +84,9 @@
   Oskar Schirmer    : oskar@scara.com
                     : HiCO.SH4 (superh) support added (irq#1, cs89x0_media=)
 
+  Deepak Saxena     : dsaxena@plexity.net
+                    : Intel IXDP2x01 (XScale ixp2x00 NPU) platform support
+
 */
 
 /* Always include 'config.h' first in case the user wants to turn on
@@ -97,7 +100,11 @@
  * Note that even if DMA is turned off we still support the 'dma' and  'use_dma'
  * module options so we don't break any startup scripts.
  */
+#ifndef CONFIG_ARCH_IXDP2X01
+#define ALLOW_DMA	0
+#else
 #define ALLOW_DMA	1
+#endif
 
 /*
  * Set this to zero to remove all the debug statements via
@@ -162,6 +169,10 @@ static unsigned int cs8900_irq_map[] = {12,0,0,0};
 static unsigned int netcard_portlist[] __initdata =
    { 0x0300, 0};
 static unsigned int cs8900_irq_map[] = {1,0,0,0};
+#elif defined(CONFIG_ARCH_IXDP2X01)
+#include <asm/irq.h>
+static unsigned int netcard_portlist[] __initdata = {IXDP2X01_CS8900_VIRT_BASE, 0};
+static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
 #else
 static unsigned int netcard_portlist[] __initdata =
    { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
@@ -454,10 +465,11 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
 		        	retval = -ENODEV;
 				goto out2;
 			}
-		ioaddr &= ~3;
-		outw(PP_ChipID, ioaddr + ADD_PORT);
 	}
 printk("PP_addr=0x%x\n", inw(ioaddr + ADD_PORT));
+
+	ioaddr &= ~3;
+	outw(PP_ChipID, ioaddr + ADD_PORT);
 
 	if (inw(ioaddr + DATA_PORT) != CHIP_EISA_ID_SIG) {
 		printk(KERN_ERR "%s: incorrect signature 0x%x\n",
@@ -665,6 +677,9 @@ printk("PP_addr=0x%x\n", inw(ioaddr + ADD_PORT));
 	} else {
 		i = lp->isa_config & INT_NO_MASK;
 		if (lp->chip_type == CS8900) {
+#ifdef CONFIG_ARCH_IXDP2X01
+		        i = cs8900_irq_map[0];
+#else
 			/* Translate the IRQ using the IRQ mapping table. */
 			if (i >= sizeof(cs8900_irq_map)/sizeof(cs8900_irq_map[0]))
 				printk("\ncs89x0: invalid ISA interrupt number %d\n", i);
@@ -681,6 +696,7 @@ printk("PP_addr=0x%x\n", inw(ioaddr + ADD_PORT));
 				if ((irq_map_buff[0] & 0xff) == PNP_IRQ_FRMT)
 					lp->irq_map = (irq_map_buff[0]>>8) | (irq_map_buff[1] << 8);
 			}
+#endif
 		}
 		if (!dev->irq)
 			dev->irq = i;
@@ -884,8 +900,10 @@ skip_this_frame:
 
 void  __init reset_chip(struct net_device *dev)
 {
+#ifndef CONFIG_ARCH_IXDP2X01
 	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
+#endif
 	int reset_start_time;
 
 	writereg(dev, PP_SelfCTL, readreg(dev, PP_SelfCTL) | POWER_ON_RESET);
@@ -894,6 +912,7 @@ void  __init reset_chip(struct net_device *dev)
 	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(30*HZ/1000);
 
+#ifndef CONFIG_ARCH_IXDP2X01
 	if (lp->chip_type != CS8900) {
 		/* Hardware problem requires PNP registers to be reconfigured after a reset */
 		outw(PP_CS8920_ISAINT, ioaddr + ADD_PORT);
@@ -904,6 +923,8 @@ void  __init reset_chip(struct net_device *dev)
 		outb((dev->mem_start >> 16) & 0xff, ioaddr + DATA_PORT);
 		outb((dev->mem_start >> 8) & 0xff,   ioaddr + DATA_PORT + 1);
 	}
+#endif	/* IXDP2x01 */
+
 	/* Wait until the chip is reset */
 	reset_start_time = jiffies;
 	while( (readreg(dev, PP_SelfST) & INIT_DONE) == 0 && jiffies - reset_start_time < 2)
@@ -1155,12 +1176,14 @@ net_open(struct net_device *dev)
 	else
 #endif
 	{
+#ifndef CONFIG_ARCH_IXDP2X01
 		if (((1 << dev->irq) & lp->irq_map) == 0) {
 			printk(KERN_ERR "%s: IRQ %d is not in our map of allowable IRQs, which is %x\n",
                                dev->name, dev->irq, lp->irq_map);
 			ret = -EAGAIN;
 			goto bad_out;
 		}
+#endif
 /* FIXME: Cirrus' release had this: */
 		writereg(dev, PP_BusCTL, readreg(dev, PP_BusCTL)|ENABLE_IRQ );
 /* And 2.3.47 had this: */
@@ -1575,7 +1598,9 @@ static void release_dma_buff(struct net_local *lp)
 static int
 net_close(struct net_device *dev)
 {
+#if ALLOW_DMA
 	struct net_local *lp = netdev_priv(dev);
+#endif
 
 	netif_stop_queue(dev);
 	
