@@ -262,9 +262,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 			break;
 
 		really_sync = (wbc->sync_mode == WB_SYNC_ALL);
-		if ((wbc->sync_mode == WB_SYNC_LAST) && (head->prev == head))
-			really_sync = 1;
-
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
 		list_move(&inode->i_list, &sb->s_dirty);

@@ -27,10 +27,9 @@ static inline int current_is_pdflush(void)
  * fs/fs-writeback.c
  */
 enum writeback_sync_modes {
-	WB_SYNC_NONE =  0,	/* Don't wait on anything */
-	WB_SYNC_LAST =  1,	/* Wait on the last-written mapping */
-	WB_SYNC_ALL =   2,	/* Wait on every mapping */
-	WB_SYNC_HOLD =  3,	/* Hold the inode on sb_dirty for sys_sync() */
+	WB_SYNC_NONE,	/* Don't wait on anything */
+	WB_SYNC_ALL,	/* Wait on every mapping */
+	WB_SYNC_HOLD,	/* Hold the inode on sb_dirty for sys_sync() */
 };
 
 /*
@@ -65,7 +64,6 @@ static inline void wait_on_inode(struct inode *inode)
 /* These 5 are exported to sysctl. */
 extern int dirty_background_ratio;
 extern int dirty_async_ratio;
-extern int dirty_sync_ratio;
 extern int dirty_writeback_centisecs;
 extern int dirty_expire_centisecs;
 

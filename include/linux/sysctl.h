@@ -147,12 +147,11 @@ enum
 	VM_PAGE_CLUSTER=10,	/* int: set number of pages to swap together */
 	VM_DIRTY_BACKGROUND=11,	/* dirty_background_ratio */
 	VM_DIRTY_ASYNC=12,	/* dirty_async_ratio */
-	VM_DIRTY_SYNC=13,	/* dirty_sync_ratio */
-	VM_DIRTY_WB_CS=14,	/* dirty_writeback_centisecs */
-	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
-	VM_NR_PDFLUSH_THREADS=16, /* nr_pdflush_threads */
-	VM_OVERCOMMIT_RATIO=17, /* percent of RAM to allow overcommit in */
-	VM_PAGEBUF=18		/* struct: Control pagebuf parameters */
+	VM_DIRTY_WB_CS=13,	/* dirty_writeback_centisecs */
+	VM_DIRTY_EXPIRE_CS=14,	/* dirty_expire_centisecs */
+	VM_NR_PDFLUSH_THREADS=15, /* nr_pdflush_threads */
+	VM_OVERCOMMIT_RATIO=16, /* percent of RAM to allow overcommit in */
+	VM_PAGEBUF=17,		/* struct: Control pagebuf parameters */
 };
 
 

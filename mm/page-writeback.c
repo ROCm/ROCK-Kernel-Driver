@@ -73,11 +73,6 @@ int dirty_background_ratio = 10;
 int dirty_async_ratio = 40;
 
 /*
- * The generator of dirty data performs sync writeout at this level
- */
-int dirty_sync_ratio = 50;
-
-/*
  * The interval between `kupdate'-style writebacks, in centiseconds
  * (hundredths of a second)
  */
@@ -105,15 +100,11 @@ static void background_writeout(unsigned long _min_pages);
  * - Does nothing at all.
  *
  * balance_dirty_pages() can sleep.
- *
- * FIXME: WB_SYNC_LAST doesn't actually work.  It waits on the last dirty
- * inode on the superblock list.  It should wait when nr_to_write is
- * exhausted.  Doesn't seem to matter.
  */
 void balance_dirty_pages(struct address_space *mapping)
 {
 	struct page_state ps;
-	long background_thresh, async_thresh, sync_thresh;
+	long background_thresh, async_thresh;
 	unsigned long dirty_and_writeback;
 	struct backing_dev_info *bdi;
 
@@ -122,20 +113,9 @@ void balance_dirty_pages(struct address_space *mapping)
 
 	background_thresh = (dirty_background_ratio * total_pages) / 100;
 	async_thresh = (dirty_async_ratio * total_pages) / 100;
-	sync_thresh = (dirty_sync_ratio * total_pages) / 100;
 	bdi = mapping->backing_dev_info;
 
-	if (dirty_and_writeback > sync_thresh) {
-		struct writeback_control wbc = {
-			.bdi		= bdi,
-			.sync_mode	= WB_SYNC_LAST,
-			.older_than_this = NULL,
-			.nr_to_write	= sync_writeback_pages(),
-		};
-
-		writeback_inodes(&wbc);
-		get_page_state(&ps);
-	} else if (dirty_and_writeback > async_thresh) {
+	if (dirty_and_writeback > async_thresh) {
 		struct writeback_control wbc = {
 			.bdi		= bdi,
 			.sync_mode	= WB_SYNC_NONE,
@@ -331,8 +311,6 @@ static int __init page_writeback_init(void)
 		dirty_background_ratio /= 100;
 		dirty_async_ratio *= correction;
 		dirty_async_ratio /= 100;
-		dirty_sync_ratio *= correction;
-		dirty_sync_ratio /= 100;
 	}
 
 	init_timer(&wb_timer);
