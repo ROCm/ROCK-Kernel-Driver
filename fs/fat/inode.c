@@ -60,17 +60,17 @@ void fat_hash_init(void)
 	}
 }
 
-static inline unsigned long fat_hash(struct super_block *sb, int i_pos)
+static inline unsigned long fat_hash(struct super_block *sb, loff_t i_pos)
 {
 	unsigned long tmp = (unsigned long)i_pos | (unsigned long) sb;
 	tmp = tmp + (tmp >> FAT_HASH_BITS) + (tmp >> FAT_HASH_BITS * 2);
 	return tmp & FAT_HASH_MASK;
 }
 
-void fat_attach(struct inode *inode, int i_pos)
+void fat_attach(struct inode *inode, loff_t i_pos)
 {
 	spin_lock(&fat_inode_lock);
-	MSDOS_I(inode)->i_location = i_pos;
+	MSDOS_I(inode)->i_pos = i_pos;
 	list_add(&MSDOS_I(inode)->i_fat_hash,
 		fat_inode_hashtable + fat_hash(inode->i_sb, i_pos));
 	spin_unlock(&fat_inode_lock);
@@ -79,12 +79,12 @@ void fat_attach(struct inode *inode, int i_pos)
 void fat_detach(struct inode *inode)
 {
 	spin_lock(&fat_inode_lock);
-	MSDOS_I(inode)->i_location = 0;
+	MSDOS_I(inode)->i_pos = 0;
 	list_del_init(&MSDOS_I(inode)->i_fat_hash);
 	spin_unlock(&fat_inode_lock);
 }
 
-struct inode *fat_iget(struct super_block *sb, int i_pos)
+struct inode *fat_iget(struct super_block *sb, loff_t i_pos)
 {
 	struct list_head *p = fat_inode_hashtable + fat_hash(sb, i_pos);
 	struct list_head *walk;
@@ -96,7 +96,7 @@ struct inode *fat_iget(struct super_block *sb, int i_pos)
 		i = list_entry(walk, struct msdos_inode_info, i_fat_hash);
 		if (i->vfs_inode.i_sb != sb)
 			continue;
-		if (i->i_location != i_pos)
+		if (i->i_pos != i_pos)
 			continue;
 		inode = igrab(&i->vfs_inode);
 		if (inode)
@@ -109,11 +109,11 @@ struct inode *fat_iget(struct super_block *sb, int i_pos)
 static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de);
 
 struct inode *fat_build_inode(struct super_block *sb,
-				struct msdos_dir_entry *de, int ino, int *res)
+			struct msdos_dir_entry *de, loff_t i_pos, int *res)
 {
 	struct inode *inode;
 	*res = 0;
-	inode = fat_iget(sb, ino);
+	inode = fat_iget(sb, i_pos);
 	if (inode)
 		goto out;
 	inode = new_inode(sb);
@@ -128,7 +128,7 @@ struct inode *fat_build_inode(struct super_block *sb,
 		inode = NULL;
 		goto out;
 	}
-	fat_attach(inode, ino);
+	fat_attach(inode, i_pos);
 	insert_inode_hash(inode);
 out:
 	return inode;
@@ -500,7 +500,7 @@ static int fat_read_root(struct inode *inode)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int error;
 
-	MSDOS_I(inode)->i_location = 0;
+	MSDOS_I(inode)->i_pos = 0;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
@@ -537,9 +537,10 @@ static int fat_read_root(struct inode *inode)
  *  0/  i_ino - for fast, reliable lookup if still in the cache
  *  1/  i_generation - to see if i_ino is still valid
  *          bit 0 == 0 iff directory
- *  2/  i_location - if ino has changed, but still in cache
- *  3/  i_logstart - to semi-verify inode found at i_location
- *  4/  parent->i_logstart - maybe used to hunt for the file on disc
+ *  2/  i_pos - if ino has changed, but still in cache (hi)
+ *  3/  i_pos - if ino has changed, but still in cache (low)
+ *  4/  i_logstart - to semi-verify inode found at i_location
+ *  5/  parent->i_logstart - maybe used to hunt for the file on disc
  *
  */
 
@@ -551,7 +552,7 @@ struct dentry *fat_decode_fh(struct super_block *sb, __u32 *fh,
 
 	if (fhtype != 3)
 		return ERR_PTR(-ESTALE);
-	if (len < 5)
+	if (len < 6)
 		return ERR_PTR(-ESTALE);
 
 	return sb->s_export_op->find_exported_dentry(sb, fh, NULL, acceptable, context);
@@ -570,13 +571,15 @@ struct dentry *fat_get_dentry(struct super_block *sb, void *inump)
 		inode = NULL;
 	}
 	if (!inode) {
-		/* try 2 - see if i_location is in F-d-c
+		loff_t i_pos = ((loff_t)fh[2] << 32) | fh[3];
+
+		/* try 2 - see if i_pos is in F-d-c
 		 * require i_logstart to be the same
 		 * Will fail if you truncate and then re-write
 		 */
 
-		inode = fat_iget(sb, fh[2]);
-		if (inode && MSDOS_I(inode)->i_logstart != fh[3]) {
+		inode = fat_iget(sb, i_pos);
+		if (inode && MSDOS_I(inode)->i_logstart != fh[4]) {
 			iput(inode);
 			inode = NULL;
 		}
@@ -616,15 +619,16 @@ int fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 	int len = *lenp;
 	struct inode *inode =  de->d_inode;
 	
-	if (len < 5)
+	if (len < 6)
 		return 255; /* no room */
-	*lenp = 5;
+	*lenp = 6;
 	fh[0] = inode->i_ino;
 	fh[1] = inode->i_generation;
-	fh[2] = MSDOS_I(inode)->i_location;
-	fh[3] = MSDOS_I(inode)->i_logstart;
+	fh[2] = (__u32)(MSDOS_I(inode)->i_pos >> 32);
+	fh[3] = (__u32)MSDOS_I(inode)->i_pos;
+	fh[4] = MSDOS_I(inode)->i_logstart;
 	spin_lock(&de->d_lock);
-	fh[4] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
+	fh[5] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
 	spin_unlock(&de->d_lock);
 	return 3;
 }
@@ -635,15 +639,15 @@ struct dentry *fat_get_parent(struct dentry *child)
 	struct msdos_dir_entry *de = NULL;
 	struct dentry *parent = NULL;
 	int res;
-	int ino = 0;
+	loff_t i_pos = 0;
 	struct inode *inode;
 
 	lock_kernel();
-	res = fat_scan(child->d_inode, MSDOS_DOTDOT, &bh, &de, &ino);
+	res = fat_scan(child->d_inode, MSDOS_DOTDOT, &bh, &de, &i_pos);
 
 	if (res < 0)
 		goto out;
-	inode = fat_build_inode(child->d_sb, de, ino, &res);
+	inode = fat_build_inode(child->d_sb, de, i_pos, &res);
 	if (res)
 		goto out;
 	if (!inode)
@@ -1098,7 +1102,7 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int error;
 
-	MSDOS_I(inode)->i_location = 0;
+	MSDOS_I(inode)->i_pos = 0;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
@@ -1112,10 +1116,9 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		inode->i_fop = &fat_dir_operations;
 
 		MSDOS_I(inode)->i_start = CF_LE_W(de->start);
-		if (sbi->fat_bits == 32) {
-			MSDOS_I(inode)->i_start |=
-				(CF_LE_W(de->starthi) << 16);
-		}
+		if (sbi->fat_bits == 32)
+			MSDOS_I(inode)->i_start |= (CF_LE_W(de->starthi) << 16);
+
 		MSDOS_I(inode)->i_logstart = MSDOS_I(inode)->i_start;
 		error = fat_calc_dir_size(inode);
 		if (error < 0)
@@ -1131,10 +1134,9 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		    	? S_IRUGO|S_IWUGO : S_IRWXUGO)
 		    & ~sbi->options.fs_fmask) | S_IFREG;
 		MSDOS_I(inode)->i_start = CF_LE_W(de->start);
-		if (sbi->fat_bits == 32) {
-			MSDOS_I(inode)->i_start |=
-				(CF_LE_W(de->starthi) << 16);
-		}
+		if (sbi->fat_bits == 32)
+			MSDOS_I(inode)->i_start |= (CF_LE_W(de->starthi) << 16);
+
 		MSDOS_I(inode)->i_logstart = MSDOS_I(inode)->i_start;
 		inode->i_size = CF_LE_L(de->size);
 	        inode->i_op = &fat_file_inode_operations;
@@ -1168,22 +1170,22 @@ void fat_write_inode(struct inode *inode, int wait)
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh;
 	struct msdos_dir_entry *raw_entry;
-	unsigned int i_pos;
+	loff_t i_pos;
 
 retry:
-	i_pos = MSDOS_I(inode)->i_location;
+	i_pos = MSDOS_I(inode)->i_pos;
 	if (inode->i_ino == MSDOS_ROOT_INO || !i_pos) {
 		return;
 	}
 	lock_kernel();
 	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
-		fat_fs_panic(sb, "unable to read i-node block (ino %lu)",
+		fat_fs_panic(sb, "unable to read i-node block (i_pos %llu)",
 			     i_pos);
 		unlock_kernel();
 		return;
 	}
 	spin_lock(&fat_inode_lock);
-	if (i_pos != MSDOS_I(inode)->i_location) {
+	if (i_pos != MSDOS_I(inode)->i_pos) {
 		spin_unlock(&fat_inode_lock);
 		brelse(bh);
 		unlock_kernel();
