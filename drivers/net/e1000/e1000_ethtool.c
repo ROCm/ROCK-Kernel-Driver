@@ -75,7 +75,6 @@
 
 #include "e1000.h"
 
-#include <linux/ethtool.h>
 #include <asm/uaccess.h>
 
 extern char e1000_driver_name[];
@@ -83,7 +82,6 @@ extern char e1000_driver_version[];
 
 extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
-extern void e1000_enable_WOL(struct e1000_adapter *adapter);
 
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
@@ -128,7 +126,11 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 				     SUPPORTED_Autoneg);
 
 		ecmd->port = PORT_FIBRE;
-		ecmd->transceiver = XCVR_EXTERNAL;
+
+		if(hw->mac_type >= e1000_82545)
+			ecmd->transceiver = XCVR_INTERNAL;
+		else
+			ecmd->transceiver = XCVR_EXTERNAL;
 	}
 
 	if(netif_carrier_ok(adapter->netdev)) {
@@ -211,7 +213,35 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->version, e1000_driver_version, 32);
 	strncpy(drvinfo->fw_version, "", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
+#define E1000_REGS_LEN 32
+	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
 	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
+}
+
+static void
+e1000_ethtool_gregs(struct e1000_adapter *adapter,
+                    struct ethtool_regs *regs, uint32_t *regs_buff)
+{
+	struct e1000_hw *hw = &adapter->hw;
+
+	regs->version = (1 << 24) | (hw->revision_id << 16) | hw->device_id;
+
+	regs_buff[0]  = E1000_READ_REG(hw, CTRL);
+	regs_buff[1]  = E1000_READ_REG(hw, STATUS);
+
+	regs_buff[2]  = E1000_READ_REG(hw, RCTL);
+	regs_buff[3]  = E1000_READ_REG(hw, RDLEN);
+	regs_buff[4]  = E1000_READ_REG(hw, RDH);
+	regs_buff[5]  = E1000_READ_REG(hw, RDT);
+	regs_buff[6]  = E1000_READ_REG(hw, RDTR);
+	
+	regs_buff[7]  = E1000_READ_REG(hw, TCTL);
+	regs_buff[8]  = E1000_READ_REG(hw, TDLEN);
+	regs_buff[9]  = E1000_READ_REG(hw, TDH);
+	regs_buff[10] = E1000_READ_REG(hw, TDT);
+	regs_buff[11] = E1000_READ_REG(hw, TIDV);
+
+	return;
 }
 
 static void
@@ -228,7 +258,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	if ((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
 
-	for(i = 0; i < max_len; i++)
+	for(i = 0; i < (max_len >> 1); i++)
 		e1000_read_eeprom(&adapter->hw, i, &eeprom_buff[i]);
 }
 
@@ -236,27 +266,50 @@ static void
 e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	
-	if(hw->mac_type < e1000_82544) {
+
+	switch(adapter->hw.device_id) {
+	case E1000_DEV_ID_82542:
+	case E1000_DEV_ID_82543GC_FIBER:
+	case E1000_DEV_ID_82543GC_COPPER:
+	case E1000_DEV_ID_82544EI_FIBER:
+	default:
 		wol->supported = 0;
 		wol->wolopts   = 0;
 		return;
-	}
 
-	wol->supported = WAKE_PHY | WAKE_UCAST | 
-	                 WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
-	
-	wol->wolopts = 0;
-	if(adapter->wol & E1000_WUFC_LNKC)
-		wol->wolopts |= WAKE_PHY;
-	if(adapter->wol & E1000_WUFC_EX)
-		wol->wolopts |= WAKE_UCAST;
-	if(adapter->wol & E1000_WUFC_MC)
-		wol->wolopts |= WAKE_MCAST;
-	if(adapter->wol & E1000_WUFC_BC)
-		wol->wolopts |= WAKE_BCAST;
-	if(adapter->wol & E1000_WUFC_MAG)
-		wol->wolopts |= WAKE_MAGIC;
+	case E1000_DEV_ID_82546EB_FIBER:
+		/* Wake events only supported on port A for dual fiber */
+		if(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1) {
+			wol->supported = 0;
+			wol->wolopts   = 0;
+			return;
+		}
+		/* Fall Through */
+
+	case E1000_DEV_ID_82544EI_COPPER:
+	case E1000_DEV_ID_82544GC_COPPER:
+	case E1000_DEV_ID_82544GC_LOM:
+	case E1000_DEV_ID_82540EM:
+	case E1000_DEV_ID_82540EM_LOM:
+	case E1000_DEV_ID_82545EM_COPPER:
+	case E1000_DEV_ID_82545EM_FIBER:
+	case E1000_DEV_ID_82546EB_COPPER:
+		wol->supported = WAKE_PHY | WAKE_UCAST | 
+				 WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
+		
+		wol->wolopts = 0;
+		if(adapter->wol & E1000_WUFC_LNKC)
+			wol->wolopts |= WAKE_PHY;
+		if(adapter->wol & E1000_WUFC_EX)
+			wol->wolopts |= WAKE_UCAST;
+		if(adapter->wol & E1000_WUFC_MC)
+			wol->wolopts |= WAKE_MCAST;
+		if(adapter->wol & E1000_WUFC_BC)
+			wol->wolopts |= WAKE_BCAST;
+		if(adapter->wol & E1000_WUFC_MAG)
+			wol->wolopts |= WAKE_MAGIC;
+		return;
+	}
 }
 
 static int
@@ -264,25 +317,95 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
 	struct e1000_hw *hw = &adapter->hw;
 
-	if(hw->mac_type < e1000_82544)
+	switch(adapter->hw.device_id) {
+	case E1000_DEV_ID_82542:
+	case E1000_DEV_ID_82543GC_FIBER:
+	case E1000_DEV_ID_82543GC_COPPER:
+	case E1000_DEV_ID_82544EI_FIBER:
+	default:
 		return wol->wolopts ? -EOPNOTSUPP : 0;
 
-	adapter->wol = 0;
+	case E1000_DEV_ID_82546EB_FIBER:
+		/* Wake events only supported on port A for dual fiber */
+		if(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
+			return wol->wolopts ? -EOPNOTSUPP : 0;
+		/* Fall Through */
 
-	if(wol->wolopts & WAKE_PHY)
-		adapter->wol |= E1000_WUFC_LNKC;
-	if(wol->wolopts & WAKE_UCAST)
-		adapter->wol |= E1000_WUFC_EX;
-	if(wol->wolopts & WAKE_MCAST)
-		adapter->wol |= E1000_WUFC_MC;
-	if(wol->wolopts & WAKE_BCAST)
-		adapter->wol |= E1000_WUFC_BC;
-	if(wol->wolopts & WAKE_MAGIC)
-		adapter->wol |= E1000_WUFC_MAG;
+	case E1000_DEV_ID_82544EI_COPPER:
+	case E1000_DEV_ID_82544GC_COPPER:
+	case E1000_DEV_ID_82544GC_LOM:
+	case E1000_DEV_ID_82540EM:
+	case E1000_DEV_ID_82540EM_LOM:
+	case E1000_DEV_ID_82545EM_COPPER:
+	case E1000_DEV_ID_82545EM_FIBER:
+	case E1000_DEV_ID_82546EB_COPPER:
+		if(wol->wolopts & WAKE_ARP)
+			return -EOPNOTSUPP;
 
-	e1000_enable_WOL(adapter);
+		adapter->wol = 0;
+
+		if(wol->wolopts & WAKE_PHY)
+			adapter->wol |= E1000_WUFC_LNKC;
+		if(wol->wolopts & WAKE_UCAST)
+			adapter->wol |= E1000_WUFC_EX;
+		if(wol->wolopts & WAKE_MCAST)
+			adapter->wol |= E1000_WUFC_MC;
+		if(wol->wolopts & WAKE_BCAST)
+			adapter->wol |= E1000_WUFC_BC;
+		if(wol->wolopts & WAKE_MAGIC)
+			adapter->wol |= E1000_WUFC_MAG;
+	}
+
 	return 0;
 }
+
+#ifdef	ETHTOOL_PHYS_ID
+
+/* toggle LED 4 times per second = 2 "blinks" per second */
+#define E1000_ID_INTERVAL	(HZ/4)
+
+/* bit defines for adapter->led_status */
+#define E1000_LED_ON		0
+
+static void
+e1000_led_blink_callback(unsigned long data)
+{
+	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
+	
+	if(test_and_change_bit(E1000_LED_ON, &adapter->led_status))
+		e1000_led_off(&adapter->hw);
+	else
+		e1000_led_on(&adapter->hw);
+
+	mod_timer(&adapter->blink_timer, jiffies + E1000_ID_INTERVAL);
+}
+
+static int
+e1000_ethtool_led_blink(struct e1000_adapter *adapter, struct ethtool_value *id)
+{
+	if(!adapter->blink_timer.function) {
+		init_timer(&adapter->blink_timer);
+		adapter->blink_timer.function = e1000_led_blink_callback;
+		adapter->blink_timer.data = (unsigned long) adapter;
+	}
+
+	e1000_setup_led(&adapter->hw);
+	mod_timer(&adapter->blink_timer, jiffies);
+	
+	set_current_state(TASK_INTERRUPTIBLE);
+	if(id->data)
+		schedule_timeout(id->data * HZ);
+	else
+		schedule_timeout(MAX_SCHEDULE_TIMEOUT);
+	
+	del_timer_sync(&adapter->blink_timer);
+	e1000_led_off(&adapter->hw);
+	clear_bit(E1000_LED_ON, &adapter->led_status);
+	e1000_cleanup_led(&adapter->hw);
+
+	return 0;
+}
+#endif	/* ETHTOOL_PHYS_ID */
 
 int
 e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
@@ -317,6 +440,22 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 		return 0;
 	}
+	case ETHTOOL_GREGS: {
+		struct ethtool_regs regs = {ETHTOOL_GREGS};
+		uint32_t regs_buff[E1000_REGS_LEN];
+
+		if(copy_from_user(&regs, addr, sizeof(regs)))
+			return -EFAULT;
+		e1000_ethtool_gregs(adapter, &regs, regs_buff);
+		if(copy_to_user(addr, &regs, sizeof(regs)))
+			return -EFAULT;
+
+		addr += offsetof(struct ethtool_regs, data);
+		if(copy_to_user(addr, regs_buff, regs.len))
+			return -EFAULT;
+
+		return 0;
+	}
 	case ETHTOOL_NWAY_RST: {
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
@@ -324,6 +463,14 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		e1000_up(adapter);
 		return 0;
 	}
+#ifdef	ETHTOOL_PHYS_ID
+	case ETHTOOL_PHYS_ID: {
+		struct ethtool_value id;
+		if(copy_from_user(&id, addr, sizeof(id)))
+			return -EFAULT;
+		return e1000_ethtool_led_blink(adapter, &id);
+	}
+#endif	/* ETHTOOL_PHYS_ID */
 	case ETHTOOL_GLINK: {
 		struct ethtool_value link = {ETHTOOL_GLINK};
 		link.data = netif_carrier_ok(netdev);

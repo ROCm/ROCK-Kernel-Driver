@@ -593,7 +593,6 @@ e100_config_wol(struct e100_private *bdp)
 }
 #endif
 
-#ifdef ETHTOOL_TEST
 /**
  * e100_config_loopback_mode
  * @bdp: atapter's private data struct
@@ -690,5 +689,4 @@ e100_config_dynamic_tbd(struct e100_private *bdp, unsigned char enable)
  
         return bc_changed;
 }
-#endif
 

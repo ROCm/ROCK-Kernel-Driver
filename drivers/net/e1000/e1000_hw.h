@@ -92,6 +92,8 @@ typedef enum {
     e1000_82543,
     e1000_82544,
     e1000_82540,
+    e1000_82545,
+    e1000_82546,
     e1000_num_macs
 } e1000_mac_type;
 
@@ -260,6 +262,7 @@ void e1000_reset_adaptive(struct e1000_hw *hw);
 void e1000_update_adaptive(struct e1000_hw *hw);
 void e1000_tbi_adjust_stats(struct e1000_hw *hw, struct e1000_hw_stats *stats, uint32_t frame_len, uint8_t * mac_addr);
 void e1000_get_bus_info(struct e1000_hw *hw);
+void e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 
 /* PCI Device IDs */
@@ -272,7 +275,11 @@ void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 #define E1000_DEV_ID_82544GC_LOM    0x100D
 #define E1000_DEV_ID_82540EM        0x100E
 #define E1000_DEV_ID_82540EM_LOM    0x1015
-#define NUM_DEV_IDS 9
+#define E1000_DEV_ID_82545EM_COPPER 0x100F
+#define E1000_DEV_ID_82545EM_FIBER  0x1011
+#define E1000_DEV_ID_82546EB_COPPER 0x1010
+#define E1000_DEV_ID_82546EB_FIBER  0x1012
+#define NUM_DEV_IDS 13
 
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6
@@ -882,7 +889,9 @@ struct e1000_hw {
     uint32_t num_mc_addrs;
     uint32_t collision_delta;
     uint32_t tx_packet_delta;
-    uint32_t ledctl;
+    uint32_t ledctl_default;
+    uint32_t ledctl_mode1;
+    uint32_t ledctl_mode2;
     uint16_t autoneg_advertised;
     uint16_t pci_cmd_word;
     uint16_t fc_high_water;
@@ -1324,10 +1333,28 @@ struct e1000_hw {
 #define EEPROM_EWDS_OPCODE  0x10 /* EERPOM erast/write disable */
 
 /* EEPROM Word Offsets */
-#define EEPROM_INIT_CONTROL1_REG 0x000A
-#define EEPROM_INIT_CONTROL2_REG 0x000F
-#define EEPROM_FLASH_VERSION     0x0032
-#define EEPROM_CHECKSUM_REG      0x003F
+#define EEPROM_ID_LED_SETTINGS     0x0004
+#define EEPROM_INIT_CONTROL1_REG   0x000A
+#define EEPROM_INIT_CONTROL2_REG   0x000F
+#define EEPROM_FLASH_VERSION       0x0032
+#define EEPROM_CHECKSUM_REG        0x003F
+
+/* Word definitions for ID LED Settings */
+#define ID_LED_RESERVED_0000 0x0000
+#define ID_LED_RESERVED_FFFF 0xFFFF
+#define ID_LED_DEFAULT       ((ID_LED_OFF1_ON2 << 12) | \
+		              (ID_LED_OFF1_OFF2 << 8) | \
+		              (ID_LED_DEF1_DEF2 << 4) | \
+			      (ID_LED_DEF1_DEF2))
+#define ID_LED_DEF1_DEF2     0x1
+#define ID_LED_DEF1_ON2      0x2
+#define ID_LED_DEF1_OFF2     0x3
+#define ID_LED_ON1_DEF2      0x4
+#define ID_LED_ON1_ON2       0x5
+#define ID_LED_ON1_OFF2      0x6
+#define ID_LED_OFF1_DEF2     0x7
+#define ID_LED_OFF1_ON2      0x8
+#define ID_LED_OFF1_OFF2     0x9
 
 /* Mask bits for fields in Word 0x0a of the EEPROM */
 #define EEPROM_WORD0A_ILOS   0x0010
@@ -1413,6 +1440,16 @@ struct e1000_hw {
 #define FC_DEFAULT_HI_THRESH        (0x8000)    /* 32KB */
 #define FC_DEFAULT_LO_THRESH        (0x4000)    /* 16KB */
 #define FC_DEFAULT_TX_TIMER         (0x100)     /* ~130 us */
+
+/* PCIX Config space */
+#define PCIX_COMMAND_REGISTER    0xE6
+#define PCIX_STATUS_REGISTER_LO  0xE8
+#define PCIX_STATUS_REGISTER_HI  0xEA
+
+#define PCIX_COMMAND_MMRBC_MASK      0x000C
+#define PCIX_COMMAND_MMRBC_SHIFT     0x2
+#define PCIX_STATUS_HI_MMRBC_MASK    0x0060
+#define PCIX_STATUS_HI_MMRBC_SHIFT   0x5
 
 
 /* The number of bits that we need to shift right to move the "pause"

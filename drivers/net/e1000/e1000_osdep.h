@@ -86,12 +86,14 @@
 #include <linux/interrupt.h>
 
 #define usec_delay(x) udelay(x)
+#ifndef msec_delay
 #define msec_delay(x)	do { if(in_interrupt()) { \
 	                	mdelay(x); \
 			} else { \
 				set_current_state(TASK_UNINTERRUPTIBLE); \
 				schedule_timeout((x * HZ)/1000); \
 			} } while(0)
+#endif
 
 #define PCI_COMMAND_REGISTER   PCI_COMMAND
 #define CMD_MEM_WRT_INVALIDATE PCI_COMMAND_INVALIDATE
