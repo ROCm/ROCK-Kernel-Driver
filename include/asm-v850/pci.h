@@ -17,6 +17,8 @@
 /* Get any platform-dependent definitions.  */
 #include <asm/machdep.h>
 
+#define pcibios_scan_all_fns(a, b)	0
+
 /* Generic declarations.  */
 
 struct scatterlist;

@@ -61,6 +61,7 @@
  * interfaces.  It would be really nice to abstract this above an RDMA
  * layer.
  */
+
 #include <linux/module.h>
 #include <asm/vio.h>
 #include "ibmvscsi.h"
@@ -343,14 +344,9 @@ void ibmvscsi_task(unsigned long data)
 			crq->valid = 0x00;
 		}
 
-		/* Re-enable interrupts */
-		vio_enable_interrupts((void*)hostdata->dma_dev);
-
-		/* Pull off any messages that have showed up while we re-enabled
-		 * interrupts
-		 */
+		ibmvscsi_enable_interrupts((void*)hostdata->dma_dev);
 		if ((crq = crq_queue_next_crq(&hostdata->queue)) != NULL) {
-			vio_disable_interrupts((void*)hostdata->dma_dev);
+			ibmvscsi_disable_interrupts((void*)hostdata->dma_dev);
 			ibmvscsi_handle_crq(crq, hostdata);
 			crq->valid = 0x00;
 		} else {
@@ -949,7 +945,11 @@ static int ibmvscsi_bios(struct scsi_device *sdev, struct block_device *bdev, se
 #endif
 	parm[0] = 255;
 	parm[1] = 63;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	parm[2] = capacity / (parm[0] * parm[1]);
+#else
 	sector_div(capacity, 255*63);
+#endif
 	parm[2] = capacity;
 	return 0;
 }

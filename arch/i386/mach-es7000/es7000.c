@@ -51,8 +51,6 @@ struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
 
-static int		es7000_plat;
-
 /*
  * Parse the OEM Table
  */

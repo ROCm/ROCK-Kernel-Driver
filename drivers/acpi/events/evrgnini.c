@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -177,7 +177,7 @@ acpi_ev_pci_config_region_setup (
 	ACPI_FUNCTION_TRACE ("ev_pci_config_region_setup");
 
 
-	handler_obj = region_obj->region.address_space;
+	handler_obj = region_obj->region.handler;
 	if (!handler_obj) {
 		/*
 		 * No installed handler. This shouldn't happen because the dispatch
@@ -239,7 +239,7 @@ acpi_ev_pci_config_region_setup (
 						else {
 							ACPI_REPORT_ERROR ((
 								"Could not install pci_config handler for Root Bridge %4.4s, %s\n",
-								pci_root_node->name.ascii, acpi_format_exception (status)));
+								acpi_ut_get_node_name (pci_root_node), acpi_format_exception (status)));
 						}
 					}
 					break;
@@ -469,7 +469,7 @@ acpi_ev_initialize_region (
 
 	/* Setup defaults */
 
-	region_obj->region.address_space = NULL;
+	region_obj->region.handler = NULL;
 	region_obj2->extra.method_REG = NULL;
 	region_obj->common.flags &= ~(AOPOBJ_SETUP_COMPLETE);
 	region_obj->common.flags |= AOPOBJ_OBJECT_INITIALIZED;
@@ -502,17 +502,17 @@ acpi_ev_initialize_region (
 			switch (node->type) {
 			case ACPI_TYPE_DEVICE:
 
-				handler_obj = obj_desc->device.address_space;
+				handler_obj = obj_desc->device.handler;
 				break;
 
 			case ACPI_TYPE_PROCESSOR:
 
-				handler_obj = obj_desc->processor.address_space;
+				handler_obj = obj_desc->processor.handler;
 				break;
 
 			case ACPI_TYPE_THERMAL:
 
-				handler_obj = obj_desc->thermal_zone.address_space;
+				handler_obj = obj_desc->thermal_zone.handler;
 				break;
 
 			default:
@@ -532,6 +532,26 @@ acpi_ev_initialize_region (
 
 					status = acpi_ev_attach_region (handler_obj, region_obj,
 							 acpi_ns_locked);
+
+					/*
+					 * Tell all users that this region is usable by running the _REG
+					 * method
+					 */
+					if (acpi_ns_locked) {
+						status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+						if (ACPI_FAILURE (status)) {
+							return_ACPI_STATUS (status);
+						}
+					}
+
+					status = acpi_ev_execute_reg_method (region_obj, 1);
+
+					if (acpi_ns_locked) {
+						status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+						if (ACPI_FAILURE (status)) {
+							return_ACPI_STATUS (status);
+						}
+					}
 
 					return_ACPI_STATUS (AE_OK);
 				}

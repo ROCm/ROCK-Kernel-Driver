@@ -60,6 +60,9 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_HPET]		= "HPET",
 };
 
+static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
+static char *mps_inti_flags_trigger[] = { "dfl", "edge", "res", "level" };
+
 /* System Description Table (RSDT/XSDT) */
 struct acpi_table_sdt {
 	unsigned long		pa;
@@ -136,8 +139,14 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_int_src_ovr *p =
 			(struct acpi_table_int_src_ovr*) header;
-		printk(KERN_INFO PREFIX "INT_SRC_OVR (bus[%d] irq[0x%x] global_irq[0x%x] polarity[0x%x] trigger[0x%x])\n",
-			p->bus, p->bus_irq, p->global_irq, p->flags.polarity, p->flags.trigger);
+		printk(KERN_INFO PREFIX "INT_SRC_OVR (bus %d bus_irq %d global_irq %d %s %s)\n",
+			p->bus, p->bus_irq, p->global_irq,
+			mps_inti_flags_polarity[p->flags.polarity],
+			mps_inti_flags_trigger[p->flags.trigger]);
+		if(p->flags.reserved)
+			printk(KERN_INFO PREFIX "INT_SRC_OVR unexpected reserved flags: 0x%x\n",
+				p->flags.reserved);
+
 	}
 		break;
 
@@ -145,8 +154,9 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_nmi_src *p =
 			(struct acpi_table_nmi_src*) header;
-		printk(KERN_INFO PREFIX "NMI_SRC (polarity[0x%x] trigger[0x%x] global_irq[0x%x])\n",
-			p->flags.polarity, p->flags.trigger, p->global_irq);
+		printk(KERN_INFO PREFIX "NMI_SRC (%s %s global_irq %d)\n",
+			mps_inti_flags_polarity[p->flags.polarity],
+			mps_inti_flags_trigger[p->flags.trigger], p->global_irq);
 	}
 		break;
 
@@ -154,8 +164,10 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_lapic_nmi *p =
 			(struct acpi_table_lapic_nmi*) header;
-		printk(KERN_INFO PREFIX "LAPIC_NMI (acpi_id[0x%02x] polarity[0x%x] trigger[0x%x] lint[0x%x])\n",
-			p->acpi_id, p->flags.polarity, p->flags.trigger, p->lint);
+		printk(KERN_INFO PREFIX "LAPIC_NMI (acpi_id[0x%02x] %s %s lint[0x%x])\n",
+			p->acpi_id,
+			mps_inti_flags_polarity[p->flags.polarity],
+			mps_inti_flags_trigger[p->flags.trigger], p->lint);
 	}
 		break;
 
@@ -190,8 +202,10 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_plat_int_src *p =
 			(struct acpi_table_plat_int_src*) header;
-		printk(KERN_INFO PREFIX "PLAT_INT_SRC (polarity[0x%x] trigger[0x%x] type[0x%x] id[0x%04x] eid[0x%x] iosapic_vector[0x%x] global_irq[0x%x]\n",
-			p->flags.polarity, p->flags.trigger, p->type, p->id, p->eid, p->iosapic_vector, p->global_irq);
+		printk(KERN_INFO PREFIX "PLAT_INT_SRC (%s %s type[0x%x] id[0x%04x] eid[0x%x] iosapic_vector[0x%x] global_irq[0x%x]\n",
+			mps_inti_flags_polarity[p->flags.polarity],
+			mps_inti_flags_trigger[p->flags.trigger],
+			p->type, p->id, p->eid, p->iosapic_vector, p->global_irq);
 	}
 		break;
 

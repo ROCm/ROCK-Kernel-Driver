@@ -65,7 +65,11 @@ unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 int acpi_disabled = 0;
-int acpi_ht = 0;
+
+#ifdef	CONFIG_ACPI_BOOT
+extern int __initdata acpi_ht;
+/* int __initdata acpi_force = 0; */
+#endif
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
@@ -195,6 +199,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (c != ' ') 
 			goto next_char; 
  
+#ifdef CONFIG_ACPI_BOOT
 		/* "acpi=off" disables both ACPI table parsing and interpreter init */
 		if (!memcmp(from, "acpi=off", 8))
 			acpi_disabled = 1;
@@ -210,6 +215,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "acpi=ht", 7)) { 
 			acpi_ht = 1; 
 		}
+#endif
 
 		if (!memcmp(from, "nolapic", 7) ||
 		    !memcmp(from, "disableapic", 11))

@@ -2,11 +2,12 @@
 #define _ASM_IA64_SOCKIOS_H
 
 /*
- * Socket-level I/O control calls.  This mostly mirrors the Linux/x86
- * version.
+ * Socket-level I/O control calls.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Based on <asm-i386/sockios.h>.
+ *
+ * Modified 1998, 1999
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 #define FIOSETOWN 	0x8901
 #define SIOCSPGRP	0x8902

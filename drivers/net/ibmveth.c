@@ -91,6 +91,7 @@ static int ibmveth_poll(struct net_device *dev, int *budget);
 static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static struct net_device_stats *ibmveth_get_stats(struct net_device *dev);
 static void ibmveth_set_multicast_list(struct net_device *dev);
+static int ibmveth_change_mtu(struct net_device *dev, int new_mtu);
 static void ibmveth_proc_register_driver(void);
 static void ibmveth_proc_unregister_driver(void);
 static void ibmveth_proc_register_adapter(struct ibmveth_adapter *adapter);
@@ -271,6 +272,15 @@ static inline int ibmveth_is_replenishing_needed(struct ibmveth_adapter *adapter
 /* replenish tasklet routine */
 static void ibmveth_replenish_task(struct ibmveth_adapter *adapter) 
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&adapter->lock, flags);
+
+	if(!ibmveth_is_replenishing_needed(adapter)) {
+		spin_unlock_irqrestore(&adapter->lock, flags);
+		return;
+	}
+
 	adapter->replenish_task_cycles++;
 
 	ibmveth_replenish_buffer_pool(adapter, &adapter->rx_buff_pool[0]);
@@ -278,12 +288,22 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 	ibmveth_replenish_buffer_pool(adapter, &adapter->rx_buff_pool[2]);
 
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
+
+	spin_unlock_irqrestore(&adapter->lock, flags);
+
 }
 
 /* kick the replenish tasklet if we need replenishing and it isn't already running */
 static inline void ibmveth_schedule_replenishing(struct ibmveth_adapter *adapter)
 {
-	if(ibmveth_is_replenishing_needed(adapter)) {	
+	unsigned long flags;
+	int replenish;
+
+	spin_lock_irqsave(&adapter->lock, flags);
+	replenish = ibmveth_is_replenishing_needed(adapter);
+	spin_unlock_irqrestore(&adapter->lock, flags);
+
+	if(replenish) {	
 		SCHEDULE_BOTTOM_HALF(&adapter->replenish_task);
 	}
 }
@@ -856,6 +876,14 @@ static void ibmveth_set_multicast_list(struct net_device *netdev)
 	}
 }
 
+static int ibmveth_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if ((new_mtu < 68) || (new_mtu > (1<<20)))
+		return -EINVAL;
+	dev->mtu = new_mtu;
+	return 0;	
+}
+
 static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_id *id)
 {
 	int rc;
@@ -922,6 +950,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	netdev->set_multicast_list = ibmveth_set_multicast_list;
 	netdev->do_ioctl           = ibmveth_ioctl;
 	netdev->ethtool_ops           = &netdev_ethtool_ops;
+	netdev->change_mtu         = ibmveth_change_mtu;
 
 	memcpy(&netdev->dev_addr, &adapter->mac_addr, netdev->addr_len);
 
@@ -936,6 +965,8 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	adapter->buffer_list_dma = NO_TCE;
 	adapter->filter_list_dma = NO_TCE;
 	adapter->rx_queue.queue_dma = NO_TCE;
+
+	spin_lock_init(&adapter->lock);
 
 	ibmveth_debug_printk("registering netdev...\n");
 
@@ -954,7 +985,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	return 0;
 }
 
-static void __devexit ibmveth_remove(struct vio_dev *dev)
+static int __devexit ibmveth_remove(struct vio_dev *dev)
 {
 	struct net_device *netdev = dev->driver_data;
 	struct ibmveth_adapter *adapter = netdev->priv;
@@ -964,7 +995,7 @@ static void __devexit ibmveth_remove(struct vio_dev *dev)
 	ibmveth_proc_unregister_adapter(adapter);
 
 	free_netdev(netdev);
-	return;
+	return 0;
 }
 
 #ifdef CONFIG_PROC_FS

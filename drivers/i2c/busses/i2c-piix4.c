@@ -68,6 +68,9 @@ struct sd {
 #define SMBSLVEVT	(0xA + piix4_smba)
 #define SMBSLVDAT	(0xC + piix4_smba)
 
+/* count for request_region */
+#define SMBIOSIZE	8
+
 /* PCI Address Constants */
 #define SMBBA		0x090
 #define SMBHSTCFG	0x0D2
@@ -112,14 +115,13 @@ MODULE_PARM_DESC(fix_hstcfg,
 
 static int piix4_transaction(void);
 
-
 static unsigned short piix4_smba = 0;
 static struct i2c_adapter piix4_adapter;
 
 /*
  * Get DMI information.
  */
-static int ibm_dmi_probe(void)
+static int __devinit ibm_dmi_probe(void)
 {
 #ifdef CONFIG_X86
 	extern int is_unsafe_smbus;
@@ -129,9 +131,9 @@ static int ibm_dmi_probe(void)
 #endif
 }
 
-static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id)
+static int __devinit piix4_setup(struct pci_dev *PIIX4_dev,
+				const struct pci_device_id *id)
 {
-	int error_return = 0;
 	unsigned char temp;
 
 	/* match up the function */
@@ -144,8 +146,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 		dev_err(&PIIX4_dev->dev, "IBM Laptop detected; this module "
 			"may corrupt your serial eeprom! Refusing to load "
 			"module!\n");
-		error_return = -EPERM;
-		goto END;
+		return -EPERM;
 	}
 
 	/* Determine the address of the SMBus areas */
@@ -163,11 +164,10 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 		}
 	}
 
-	if (!request_region(piix4_smba, 8, "piix4-smbus")) {
+	if (!request_region(piix4_smba, SMBIOSIZE, "piix4-smbus")) {
 		dev_err(&PIIX4_dev->dev, "SMB region 0x%x already in use!\n",
 			piix4_smba);
-		error_return = -ENODEV;
-		goto END;
+		return -ENODEV;
 	}
 
 	pci_read_config_byte(PIIX4_dev, SMBHSTCFG, &temp);
@@ -214,8 +214,9 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 		} else {
 			dev_err(&PIIX4_dev->dev,
 				"Host SMBus controller not enabled!\n");
-			error_return = -ENODEV;
-			goto END;
+			release_region(piix4_smba, SMBIOSIZE);
+			piix4_smba = 0;
+			return -ENODEV;
 		}
 	}
 
@@ -231,8 +232,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 	dev_dbg(&PIIX4_dev->dev, "SMBREV = 0x%X\n", temp);
 	dev_dbg(&PIIX4_dev->dev, "SMBA = 0x%X\n", piix4_smba);
 
-END:
-	return error_return;
+	return 0;
 }
 
 /* Another internally used function */
@@ -465,7 +465,8 @@ static struct pci_device_id piix4_ids[] = {
 	{ 0, }
 };
 
-static int __devinit piix4_probe(struct pci_dev *dev, const struct pci_device_id *id)
+static int __devinit piix4_probe(struct pci_dev *dev,
+				const struct pci_device_id *id)
 {
 	int retval;
 
@@ -479,16 +480,23 @@ static int __devinit piix4_probe(struct pci_dev *dev, const struct pci_device_id
 	snprintf(piix4_adapter.name, I2C_NAME_SIZE,
 		"SMBus PIIX4 adapter at %04x", piix4_smba);
 
-	retval = i2c_add_adapter(&piix4_adapter);
+	if ((retval = i2c_add_adapter(&piix4_adapter))) {
+		dev_err(&dev->dev, "Couldn't register adapter!\n");
+		release_region(piix4_smba, SMBIOSIZE);
+		piix4_smba = 0;
+	}
 
 	return retval;
 }
 
 static void __devexit piix4_remove(struct pci_dev *dev)
 {
-	i2c_del_adapter(&piix4_adapter);
+	if (piix4_smba) {
+		i2c_del_adapter(&piix4_adapter);
+		release_region(piix4_smba, SMBIOSIZE);
+		piix4_smba = 0;
+	}
 }
-
 
 static struct pci_driver piix4_driver = {
 	.name		= "piix4-smbus",
@@ -502,15 +510,13 @@ static int __init i2c_piix4_init(void)
 	return pci_module_init(&piix4_driver);
 }
 
-
 static void __exit i2c_piix4_exit(void)
 {
 	pci_unregister_driver(&piix4_driver);
-	release_region(piix4_smba, 8);
 }
 
-MODULE_AUTHOR
-    ("Frodo Looijaard <frodol@dds.nl> and Philip Edelbrock <phil@netroedge.com>");
+MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and "
+		"Philip Edelbrock <phil@netroedge.com>");
 MODULE_DESCRIPTION("PIIX4 SMBus driver");
 MODULE_LICENSE("GPL");
 

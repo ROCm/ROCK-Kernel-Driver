@@ -57,8 +57,9 @@ bootup_user_stack:
 
 	/* History:
 	 *
-	 * 0x0202 : Supports kernel params string
 	 * 0x0300 : Supports being located at other than 0x4000
+	 * 0x0202 : Supports kernel params string
+	 * 0x0201 : Supports reboot_command
 	 */
         .half   0x0300          /* HdrS version */
 

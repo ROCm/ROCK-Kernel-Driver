@@ -195,6 +195,15 @@ int ibmvscsi_detect(Scsi_Host_Template * host_template)
 	return ibmvscsi_host_count;
 }
 
+int ibmvscsi_enable_interrupts(void* dma_dev)
+{
+	return vio_enable_interrupts(dma_dev);
+}
+
+int ibmvscsi_disable_interrupts(void* dma_dev)
+{
+	return vio_disable_interrupts(dma_dev);
+}
 
 /* ------------------------------------------------------------
  * Routines to complete Linux SCSI Host support

@@ -109,6 +109,12 @@ static long iSeries_hpte_remove(unsigned long hpte_group)
 	return -1;
 }
 
+/*
+ * The HyperVisor expects the "flags" argument in this form:
+ * 	bits  0..59 : reserved
+ * 	bit      60 : N
+ * 	bits 61..63 : PP2,PP1,PP0
+ */
 static long iSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 				  unsigned long va, int large, int local)
 {
@@ -117,7 +123,7 @@ static long iSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 
 	HvCallHpt_get(&hpte, slot);
 	if ((hpte.dw0.dw0.avpn == avpn) && (hpte.dw0.dw0.v)) {
-		HvCallHpt_setPp(slot, newpp);
+		HvCallHpt_setPp(slot, (newpp & 0x3) | ((newpp & 0x4) << 1));
 		return 0;
 	}
 	return -1;

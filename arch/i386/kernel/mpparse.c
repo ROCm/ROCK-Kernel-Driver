@@ -1081,8 +1081,14 @@ found:
 
 	ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
 
+	/*
+	 * MPS INTI flags:
+	 *  trigger: 0=default, 1=edge, 3=level
+	 *  polarity: 0=default, 1=high, 3=low
+	 * Per ACPI spec, default for SCI means level/low.
+	 */
 	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 
-				(flags.trigger >> 1) , (flags.polarity >> 1));
+		(flags.trigger == 1 ? 0 : 1), (flags.polarity == 1 ? 0 : 1));
 }
 
 #ifdef CONFIG_ACPI_PCI
@@ -1129,8 +1135,11 @@ void __init mp_parse_prt (void)
 			continue;
 		ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
 
-		if (!ioapic && (irq < 16))
-			irq += 16;
+		if (es7000_plat) {
+			if (!ioapic && (irq < 16))
+				irq += 16;
+		}
+
 		/* 
 		 * Avoid pin reprogramming.  PRTs typically include entries  
 		 * with redundant pin->irq mappings (but unique PCI devices);
@@ -1166,6 +1175,10 @@ void __init mp_parse_prt (void)
 			mp_ioapic_routing[ioapic].apic_id, ioapic_pin, 
 			entry->irq);
 	}
+
+	print_IO_APIC();
+
+	return;
 }
 
 #endif /*CONFIG_ACPI_PCI*/

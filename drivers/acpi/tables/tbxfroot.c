@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -211,8 +211,7 @@ acpi_get_firmware_table (
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 		"RSDP located at %p, RSDT physical=%8.8X%8.8X \n",
 		acpi_gbl_RSDP,
-		ACPI_HIDWORD (address.pointer.value),
-		ACPI_LODWORD (address.pointer.value)));
+		ACPI_FORMAT_UINT64 (address.pointer.value)));
 
 	/* Insert processor_mode flags */
 
@@ -242,11 +241,11 @@ acpi_get_firmware_table (
 		/* Get the next table pointer, handle RSDT vs. XSDT */
 
 		if (acpi_gbl_RSDP->revision < 2) {
-			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
+			address.pointer.value = (ACPI_CAST_PTR (RSDT_DESCRIPTOR, rsdt_info.pointer))->table_offset_entry[i];
 		}
 		else {
 			address.pointer.value =
-				((XSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
+				(ACPI_CAST_PTR (XSDT_DESCRIPTOR, rsdt_info.pointer))->table_offset_entry[i];
 		}
 
 		/* Get the table header */

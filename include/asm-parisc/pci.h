@@ -174,6 +174,7 @@ extern inline void pcibios_register_hba(struct pci_hba_data *x)
 **   to zero for legacy platforms and one for PAT platforms.
 */
 #define pcibios_assign_all_busses()     (pdc_type == PDC_TYPE_PAT)
+#define pcibios_scan_all_fns(a, b)	0
 
 #define PCIBIOS_MIN_IO          0x10
 #define PCIBIOS_MIN_MEM         0x1000 /* NBPG - but pci/setup-res.c dies */

@@ -93,6 +93,8 @@ struct VIOSRP_CRQ *crq_queue_next_crq(struct crq_queue *queue);
 int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2);
 void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq, struct ibmvscsi_host_data *hostdata);
 void ibmvscsi_task(unsigned long data);
+int ibmvscsi_enable_interrupts(void* dma_dev);
+int ibmvscsi_disable_interrupts(void* dma_dev);
 
 /* the rest of the routines for SCSI support */
 int add_host(struct dma_dev *dma_dev, Scsi_Host_Template *template); 

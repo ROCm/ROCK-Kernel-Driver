@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -312,8 +312,8 @@ acpi_rs_byte_stream_to_list (
 		 * Set the Buffer to the next structure
 		 */
 		resource = ACPI_CAST_PTR (struct acpi_resource, buffer);
-		resource->length = ACPI_ALIGN_RESOURCE_SIZE(resource->length);
-		buffer += ACPI_ALIGN_RESOURCE_SIZE(structure_size);
+		resource->length = (u32) ACPI_ALIGN_RESOURCE_SIZE (resource->length);
+		buffer += ACPI_ALIGN_RESOURCE_SIZE (structure_size);
 
 	} /*  end while */
 

@@ -2,8 +2,10 @@
 #define _ASM_IA64_IOCTLS_H
 
 /*
- * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Based on <asm-i386/ioctls.h>
+ *
+ * Modified 1998, 1999, 2002
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 #include <asm/ioctl.h>

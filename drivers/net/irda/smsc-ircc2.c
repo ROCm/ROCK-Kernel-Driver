@@ -322,7 +322,7 @@ static inline void register_bank(int iobase, int bank)
  *    Initialize chip. Just try to find out how many chips we are dealing with
  *    and where they are
  */
-int __init smsc_ircc_init(void)
+static int __init smsc_ircc_init(void)
 {
 	int ret=-ENODEV;
 
@@ -1727,7 +1727,7 @@ static int __exit smsc_ircc_close(struct smsc_ircc_cb *self)
 	return 0;
 }
 
-void __exit smsc_ircc_cleanup(void)
+static void __exit smsc_ircc_cleanup(void)
 {
 	int i;
 

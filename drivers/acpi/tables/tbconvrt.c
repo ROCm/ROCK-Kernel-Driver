@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -138,11 +138,11 @@ acpi_tb_convert_to_xsdt (
 	for (i = 0; i < acpi_gbl_rsdt_table_count; i++) {
 		if (acpi_gbl_RSDP->revision < 2) {
 			ACPI_STORE_ADDRESS (new_table->table_offset_entry[i],
-				((struct rsdt_descriptor_rev1 *) table_info->pointer)->table_offset_entry[i]);
+				(ACPI_CAST_PTR (struct rsdt_descriptor_rev1, table_info->pointer))->table_offset_entry[i]);
 		}
 		else {
 			new_table->table_offset_entry[i] =
-				((XSDT_DESCRIPTOR *) table_info->pointer)->table_offset_entry[i];
+				(ACPI_CAST_PTR (XSDT_DESCRIPTOR, table_info->pointer))->table_offset_entry[i];
 		}
 	}
 
@@ -152,7 +152,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Point the table descriptor to the new table */
 
-	table_info->pointer     = (struct acpi_table_header *) new_table;
+	table_info->pointer     = ACPI_CAST_PTR (struct acpi_table_header, new_table);
 	table_info->length      = table_size;
 	table_info->allocation  = ACPI_MEM_ALLOCATED;
 
@@ -469,7 +469,7 @@ acpi_tb_convert_table_fadt (void)
 
 	/* Install the new table */
 
-	table_desc->pointer     = (struct acpi_table_header *) acpi_gbl_FADT;
+	table_desc->pointer     = ACPI_CAST_PTR (struct acpi_table_header, acpi_gbl_FADT);
 	table_desc->allocation  = ACPI_MEM_ALLOCATED;
 	table_desc->length      = sizeof (struct fadt_descriptor_rev2);
 

@@ -71,12 +71,12 @@ static struct dongle_reg dongle = {
 	.owner = THIS_MODULE,
 };
 
-int __init girbil_init(void)
+static int __init girbil_init(void)
 {
 	return irda_device_register_dongle(&dongle);
 }
 
-void __exit girbil_cleanup(void)
+static void __exit girbil_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }

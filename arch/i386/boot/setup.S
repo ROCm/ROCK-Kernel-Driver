@@ -307,7 +307,7 @@ loader_ok:
 # a whole bunch of different types, and allows memory holes and
 # everything.  We scan through this memory map and build a list
 # of the first 32 memory areas, which we return at [E820MAP].
-# This is documented at http://www.teleport.com/~acpi/acpihtml/topic245.htm
+# This is documented at http://www.acpi.info/, in the ACPI 2.0 specification.
 
 #define SMAP  0x534d4150
 

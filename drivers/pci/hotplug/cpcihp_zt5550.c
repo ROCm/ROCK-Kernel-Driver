@@ -133,6 +133,8 @@ static int zt5550_hc_cleanup(void)
 {
 	if(!hc_dev)
 		return -ENODEV;
+
+	iounmap(hc_registers);
 	release_mem_region(pci_resource_start(hc_dev, 1),
 			   pci_resource_len(hc_dev, 1));
 	return 0;

@@ -22,7 +22,6 @@
 #define PCI_ASSIGN_ROMS		0x1000
 #define PCI_BIOS_IRQ_SCAN	0x2000
 #define PCI_ASSIGN_ALL_BUSSES	0x4000
-#define PCI_NO_ACPI_ROUTING	0x8000
 
 extern unsigned int pci_probe;
 

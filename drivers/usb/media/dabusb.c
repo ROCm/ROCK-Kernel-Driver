@@ -781,17 +781,25 @@ static int dabusb_probe (struct usb_interface *intf,
 
 static void dabusb_disconnect (struct usb_interface *intf)
 {
+	wait_queue_t __wait;
 	pdabusb_t s = usb_get_intfdata (intf);
 
 	dbg("dabusb_disconnect");
-
+	
+	init_waitqueue_entry(&__wait, current);
+	
 	usb_set_intfdata (intf, NULL);
 	if (s) {
 		usb_deregister_dev (intf, &dabusb_class);
 		s->remove_pending = 1;
 		wake_up (&s->wait);
+		add_wait_queue(&s->remove_ok, &__wait);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (s->state == _started)
-			sleep_on (&s->remove_ok);
+			schedule();
+		current->state = TASK_RUNNING;
+		remove_wait_queue(&s->remove_ok, &__wait);
+		
 		s->usbdev = NULL;
 		s->overruns = 0;
 	}

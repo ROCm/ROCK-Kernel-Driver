@@ -654,10 +654,9 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	unsigned long hpteflags, prpn, flags;
 	long slot;
 
-	ea &= ~(HPAGE_SIZE-1);
-
 	/* We have to find the first hugepte in the batch, since
 	 * that's the one that will store the HPTE flags */
+	ea &= HPAGE_MASK;
 	ptep = hugepte_offset(mm, ea);
 
 	/* Search the Linux page table for a match with va */
@@ -885,10 +884,11 @@ static int __init hugetlb_init(void)
 			spin_unlock(&htlbpage_lock);
 		}
 		htlbpage_max = htlbpage_free = htlbpage_total = i;
-		printk("Total HugeTLB memory allocated, %d\n", htlbpage_free);
+		printk(KERN_INFO "Total HugeTLB memory allocated, %d\n",
+		       htlbpage_free);
 	} else {
 		htlbpage_max = 0;
-		printk("CPU does not support HugeTLB\n");
+		printk(KERN_INFO "CPU does not support HugeTLB\n");
 	}
 
 	return 0;

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -139,12 +139,10 @@ acpi_ev_gpe_detect (
 {
 	u32                             int_status = ACPI_INTERRUPT_NOT_HANDLED;
 	u8                              enabled_status_byte;
-	u8                              bit_mask;
 	struct acpi_gpe_register_info   *gpe_register_info;
 	u32                             in_value;
 	acpi_status                     status;
 	struct acpi_gpe_block_info      *gpe_block;
-	u32                             gpe_number;
 	u32                             i;
 	u32                             j;
 
@@ -187,11 +185,9 @@ acpi_ev_gpe_detect (
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
 				"GPE pair: Status %8.8X%8.8X = %02X, Enable %8.8X%8.8X = %02X\n",
-				ACPI_HIDWORD (gpe_register_info->status_address.address),
-				ACPI_LODWORD (gpe_register_info->status_address.address),
+				ACPI_FORMAT_UINT64 (gpe_register_info->status_address.address),
 				gpe_register_info->status,
-				ACPI_HIDWORD (gpe_register_info->enable_address.address),
-				ACPI_LODWORD (gpe_register_info->enable_address.address),
+				ACPI_FORMAT_UINT64 (gpe_register_info->enable_address.address),
 				gpe_register_info->enable));
 
 			/* First check if there is anything active at all in this register */
@@ -206,19 +202,17 @@ acpi_ev_gpe_detect (
 
 			/* Now look at the individual GPEs in this byte register */
 
-			for (j = 0, bit_mask = 1; j < ACPI_GPE_REGISTER_WIDTH; j++, bit_mask <<= 1) {
+			for (j = 0; j < ACPI_GPE_REGISTER_WIDTH; j++) {
 				/* Examine one GPE bit */
 
-				if (enabled_status_byte & bit_mask) {
+				if (enabled_status_byte & acpi_gbl_decode_to8bit[j]) {
 					/*
 					 * Found an active GPE. Dispatch the event to a handler
 					 * or method.
 					 */
-					gpe_number = (i * ACPI_GPE_REGISTER_WIDTH) + j;
-
 					int_status |= acpi_ev_gpe_dispatch (
-							&gpe_block->event_info[gpe_number],
-							j + gpe_register_info->base_gpe_number);
+							  &gpe_block->event_info[(i * ACPI_GPE_REGISTER_WIDTH) + j],
+							  j + gpe_register_info->base_gpe_number);
 				}
 			}
 		}
@@ -294,7 +288,7 @@ acpi_ev_asynch_execute_gpe_method (
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("%s while evaluating method [%4.4s] for GPE[%2X]\n",
 				acpi_format_exception (status),
-				local_gpe_event_info.method_node->name.ascii, gpe_number));
+				acpi_ut_get_node_name (local_gpe_event_info.method_node), gpe_number));
 		}
 	}
 
@@ -367,6 +361,18 @@ acpi_ev_gpe_dispatch (
 		/* Invoke the installed handler (at interrupt level) */
 
 		gpe_event_info->handler (gpe_event_info->context);
+
+		/* It is now safe to clear level-triggered events. */
+
+		if (gpe_event_info->flags & ACPI_EVENT_LEVEL_TRIGGERED) {
+			status = acpi_hw_clear_gpe (gpe_event_info);
+			if (ACPI_FAILURE (status)) {
+				ACPI_REPORT_ERROR ((
+					"acpi_ev_gpe_dispatch: Unable to clear GPE[%2X]\n",
+					gpe_number));
+				return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
+			}
+		}
 	}
 	else if (gpe_event_info->method_node) {
 		/*
@@ -375,13 +381,16 @@ acpi_ev_gpe_dispatch (
 		 */
 		status = acpi_hw_disable_gpe (gpe_event_info);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("acpi_ev_gpe_dispatch: Unable to disable GPE[%2X]\n",
+			ACPI_REPORT_ERROR ((
+				"acpi_ev_gpe_dispatch: Unable to disable GPE[%2X]\n",
 				gpe_number));
 			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 		}
 
-		/* Execute the method associated with the GPE. */
-
+		/*
+		 * Execute the method associated with the GPE
+		 * NOTE: Level-triggered GPEs are cleared after the method completes.
+		 */
 		if (ACPI_FAILURE (acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
 				 acpi_ev_asynch_execute_gpe_method,
 				 gpe_event_info))) {
@@ -399,22 +408,12 @@ acpi_ev_gpe_dispatch (
 
 		/*
 		 * Disable the GPE.  The GPE will remain disabled until the ACPI
-		 * Core Subsystem is restarted, or the handler is reinstalled.
+		 * Core Subsystem is restarted, or a handler is installed.
 		 */
 		status = acpi_hw_disable_gpe (gpe_event_info);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("acpi_ev_gpe_dispatch: Unable to disable GPE[%2X]\n",
-				gpe_number));
-			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
-		}
-	}
-
-	/* It is now safe to clear level-triggered events. */
-
-	if (gpe_event_info->flags & ACPI_EVENT_LEVEL_TRIGGERED) {
-		status = acpi_hw_clear_gpe (gpe_event_info);
-		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("acpi_ev_gpe_dispatch: Unable to clear GPE[%2X]\n",
+			ACPI_REPORT_ERROR ((
+				"acpi_ev_gpe_dispatch: Unable to disable GPE[%2X]\n",
 				gpe_number));
 			return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 		}

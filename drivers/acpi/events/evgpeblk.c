@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -477,7 +477,7 @@ unlock_and_exit:
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Install new GPE block with mutex support
+ * DESCRIPTION: Remove a GPE block
  *
  ******************************************************************************/
 
@@ -743,8 +743,7 @@ acpi_ev_create_gpe_block (
 				((gpe_block->register_count * ACPI_GPE_REGISTER_WIDTH) -1)),
 		gpe_device->name.ascii,
 		gpe_block->register_count,
-		ACPI_HIDWORD (gpe_block->block_address.address),
-		ACPI_LODWORD (gpe_block->block_address.address),
+		ACPI_FORMAT_UINT64 (gpe_block->block_address.address),
 		interrupt_level));
 
 	/* Find all GPE methods (_Lxx, _Exx) for this block */

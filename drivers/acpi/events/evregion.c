@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,7 +52,7 @@
 
 #define ACPI_NUM_DEFAULT_SPACES     4
 
-u8                              acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPACES] = {
+static u8                   acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPACES] = {
 			 ACPI_ADR_SPACE_SYSTEM_MEMORY,
 			 ACPI_ADR_SPACE_SYSTEM_IO,
 			 ACPI_ADR_SPACE_PCI_CONFIG,
@@ -136,7 +136,7 @@ acpi_ev_init_address_spaces (
  *
  ******************************************************************************/
 
-static acpi_status
+acpi_status
 acpi_ev_execute_reg_method (
 	union acpi_operand_object      *region_obj,
 	u32                             function)
@@ -202,7 +202,7 @@ cleanup:
  *
  * FUNCTION:    acpi_ev_address_space_dispatch
  *
- * PARAMETERS:  region_obj          - internal region object
+ * PARAMETERS:  region_obj          - Internal region object
  *              space_id            - ID of the address space (0-255)
  *              Function            - Read or Write operation
  *              Address             - Where in the space to read or write
@@ -243,9 +243,11 @@ acpi_ev_address_space_dispatch (
 
 	/* Ensure that there is a handler associated with this region */
 
-	handler_desc = region_obj->region.address_space;
+	handler_desc = region_obj->region.handler;
 	if (!handler_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "no handler for region(%p) [%s]\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"No handler for Region [%4.4s] (%p) [%s]\n",
+			acpi_ut_get_node_name (region_obj->region.node),
 			region_obj, acpi_ut_get_region_name (region_obj->region.space_id)));
 
 		return_ACPI_STATUS (AE_NOT_EXIST);
@@ -320,8 +322,8 @@ acpi_ev_address_space_dispatch (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 		"Handler %p (@%p) Address %8.8X%8.8X [%s]\n",
-		&region_obj->region.address_space->address_space, handler,
-		ACPI_HIDWORD (address), ACPI_LODWORD (address),
+		&region_obj->region.handler->address_space, handler,
+		ACPI_FORMAT_UINT64 (address),
 		acpi_ut_get_region_name (region_obj->region.space_id)));
 
 	if (!(handler_desc->address_space.flags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {
@@ -358,6 +360,7 @@ acpi_ev_address_space_dispatch (
 
 	return_ACPI_STATUS (status);
 }
+
 
 /*******************************************************************************
  *
@@ -398,7 +401,7 @@ acpi_ev_detach_region(
 
 	/* Get the address handler from the region object */
 
-	handler_obj = region_obj->region.address_space;
+	handler_obj = region_obj->region.handler;
 	if (!handler_obj) {
 		/* This region has no handler, all done */
 
@@ -472,7 +475,7 @@ acpi_ev_detach_region(
 			 * If the region is on the handler's list
 			 * this better be the region's handler
 			 */
-			region_obj->region.address_space = NULL;
+			region_obj->region.handler = NULL;
 			acpi_ut_remove_reference (handler_obj);
 
 			return_VOID;
@@ -515,17 +518,15 @@ acpi_ev_attach_region (
 	union acpi_operand_object       *region_obj,
 	u8                              acpi_ns_is_locked)
 {
-	acpi_status                     status;
-	acpi_status                     status2;
-
 
 	ACPI_FUNCTION_TRACE ("ev_attach_region");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
-		"Adding Region %p to address handler %p [%s]\n",
-		region_obj, handler_obj, acpi_ut_get_region_name (region_obj->region.space_id)));
-
+		"Adding Region [%4.4s] %p to address handler %p [%s]\n",
+		acpi_ut_get_node_name (region_obj->region.node),
+		region_obj, handler_obj,
+		acpi_ut_get_region_name (region_obj->region.space_id)));
 
 	/* Link this region to the front of the handler's list */
 
@@ -534,34 +535,14 @@ acpi_ev_attach_region (
 
 	/* Install the region's handler */
 
-	if (region_obj->region.address_space) {
+	if (region_obj->region.handler) {
 		return_ACPI_STATUS (AE_ALREADY_EXISTS);
 	}
 
-	region_obj->region.address_space = handler_obj;
+	region_obj->region.handler = handler_obj;
 	acpi_ut_add_reference (handler_obj);
 
-	/*
-	 * Tell all users that this region is usable by running the _REG
-	 * method
-	 */
-	if (acpi_ns_is_locked) {
-		status2 = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-		if (ACPI_FAILURE (status2)) {
-			return_ACPI_STATUS (status2);
-		}
-	}
-
-	status = acpi_ev_execute_reg_method (region_obj, 1);
-
-	if (acpi_ns_is_locked) {
-		status2 = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
-		if (ACPI_FAILURE (status2)) {
-			return_ACPI_STATUS (status2);
-		}
-	}
-
-	return_ACPI_STATUS (status);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -569,9 +550,7 @@ acpi_ev_attach_region (
  *
  * FUNCTION:    acpi_ev_install_handler
  *
- * PARAMETERS:  Handle              - Node to be dumped
- *              Level               - Nesting level of the handle
- *              Context             - Passed into acpi_ns_walk_namespace
+ * PARAMETERS:  walk_namespace callback
  *
  * DESCRIPTION: This routine installs an address handler into objects that are
  *              of type Region or Device.
@@ -640,7 +619,7 @@ acpi_ev_install_handler (
 	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_DEVICE) {
 		/* Check if this Device already has a handler for this address space */
 
-		next_handler_obj = obj_desc->device.address_space;
+		next_handler_obj = obj_desc->device.handler;
 		while (next_handler_obj) {
 			/* Found a handler, is it for the same address space? */
 
@@ -697,4 +676,74 @@ acpi_ev_install_handler (
 	return (status);
 }
 
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_reg_run
+ *
+ * PARAMETERS:  walk_namespace callback
+ *
+ * DESCRIPTION: Run _REg method for region objects of the requested space_iD
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_reg_run (
+	acpi_handle                     obj_handle,
+	u32                             level,
+	void                            *context,
+	void                            **return_value)
+{
+	union acpi_operand_object       *handler_obj;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+
+
+	handler_obj = (union acpi_operand_object   *) context;
+
+	/* Parameter validation */
+
+	if (!handler_obj) {
+		return (AE_OK);
+	}
+
+	/* Convert and validate the device handle */
+
+	node = acpi_ns_map_handle_to_node (obj_handle);
+	if (!node) {
+		return (AE_BAD_PARAMETER);
+	}
+
+	/*
+	 * We only care about regions.and objects
+	 * that are allowed to have address space handlers
+	 */
+	if ((node->type != ACPI_TYPE_REGION) &&
+		(node != acpi_gbl_root_node)) {
+		return (AE_OK);
+	}
+
+	/* Check for an existing internal object */
+
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (!obj_desc) {
+		/* No object, just exit */
+
+		return (AE_OK);
+	}
+
+
+	/* Object is a Region */
+
+	if (obj_desc->region.space_id != handler_obj->address_space.space_id) {
+		/*
+		 * This region is for a different address space
+		 * -- just ignore it
+		 */
+		return (AE_OK);
+	}
+
+	status = acpi_ev_execute_reg_method (obj_desc, 1);
+	return (status);
+}
 

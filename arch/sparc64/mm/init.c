@@ -47,7 +47,18 @@ unsigned long *sparc64_valid_addr_bitmap;
 
 /* Ugly, but necessary... -DaveM */
 unsigned long phys_base;
+unsigned long kern_base;
+unsigned long kern_size;
 unsigned long pfn_base;
+
+/* This is even uglier. We have a problem where the kernel may not be
+ * located at phys_base. However, initial __alloc_bootmem() calls need to
+ * be adjusted to be within the 4-8Megs that the kernel is mapped to, else
+ * those page mappings wont work. Things are ok after inherit_prom_mappings
+ * is called though. Dave says he'll clean this up some other time.
+ * -- BenC
+ */
+static unsigned long bootmap_base;
 
 /* get_new_mmu_context() uses "cache + 1".  */
 spinlock_t ctx_alloc_lock = SPIN_LOCK_UNLOCKED;
@@ -433,7 +444,7 @@ static void inherit_prom_mappings(void)
 	n += 5 * sizeof(struct linux_prom_translation);
 	for (tsz = 1; tsz < n; tsz <<= 1)
 		/* empty */;
-	trans = __alloc_bootmem(tsz, SMP_CACHE_BYTES, 0UL);
+	trans = __alloc_bootmem(tsz, SMP_CACHE_BYTES, bootmap_base);
 	if (trans == NULL) {
 		prom_printf("inherit_prom_mappings: Cannot alloc translations.\n");
 		prom_halt();
@@ -453,7 +464,7 @@ static void inherit_prom_mappings(void)
 	 * in inherit_locked_prom_mappings()).
 	 */
 #define OBP_PMD_SIZE 2048
-	prompmd = __alloc_bootmem(OBP_PMD_SIZE, OBP_PMD_SIZE, 0UL);
+	prompmd = __alloc_bootmem(OBP_PMD_SIZE, OBP_PMD_SIZE, bootmap_base);
 	if (prompmd == NULL)
 		early_pgtable_allocfail("pmd");
 	memset(prompmd, 0, OBP_PMD_SIZE);
@@ -471,7 +482,7 @@ static void inherit_prom_mappings(void)
 				if (pmd_none(*pmdp)) {
 					ptep = __alloc_bootmem(BASE_PAGE_SIZE,
 							       BASE_PAGE_SIZE,
-							       0UL);
+							       bootmap_base);
 					if (ptep == NULL)
 						early_pgtable_allocfail("pte");
 					memset(ptep, 0, BASE_PAGE_SIZE);
@@ -1327,15 +1338,8 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	 * image.  The kernel is hard mapped below PAGE_OFFSET in a
 	 * 4MB locked TLB translation.
 	 */
-	start_pfn  = PAGE_ALIGN((unsigned long) _end) -
-		((unsigned long) KERNBASE);
+	start_pfn = PAGE_ALIGN(kern_base + kern_size) >> PAGE_SHIFT;
 
-	/* Adjust up to the physical address where the kernel begins. */
-	start_pfn += phys_base;
-
-	/* Now shift down to get the real physical page frame number. */
-	start_pfn >>= PAGE_SHIFT;
-	
 	bootmap_pfn = start_pfn;
 
 	end_pfn = end_of_phys_memory >> PAGE_SHIFT;
@@ -1365,10 +1369,12 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	min_low_pfn = pfn_base;
 
 #ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("init_bootmem(spfn[%lx], bpfn[%lx], mlpfn[%lx])\n",
-		    start_pfn, bootmap_pfn, max_low_pfn);
+	prom_printf("init_bootmem(min[%lx], bootmap[%lx], max[%lx])\n",
+		    min_low_pfn, bootmap_pfn, max_low_pfn);
 #endif
 	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn, pfn_base, end_pfn);
+
+	bootmap_base = bootmap_pfn << PAGE_SHIFT;
 
 	/* Now register the available physical memory with the
 	 * allocator.
@@ -1378,8 +1384,7 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 		prom_printf("free_bootmem(sp_banks:%d): base[%lx] size[%lx]\n",
 			    i, sp_banks[i].base_addr, sp_banks[i].num_bytes);
 #endif
-		free_bootmem(sp_banks[i].base_addr,
-			     sp_banks[i].num_bytes);
+		free_bootmem(sp_banks[i].base_addr, sp_banks[i].num_bytes);
 	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -1395,12 +1400,11 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	}
 #endif
 	/* Reserve the kernel text/data/bss. */
-	size = (start_pfn << PAGE_SHIFT) - phys_base;
 #ifdef CONFIG_DEBUG_BOOTMEM
-	prom_printf("reserve_bootmem(kernel): base[%lx] size[%lx]\n", phys_base, size);
+	prom_printf("reserve_bootmem(kernel): base[%lx] size[%lx]\n", kern_base, kern_size);
 #endif
-	reserve_bootmem(phys_base, size);
-	*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
+	reserve_bootmem(kern_base, kern_size);
+	*pages_avail -= PAGE_ALIGN(kern_size) >> PAGE_SHIFT;
 
 	/* Reserve the bootmem map.   We do not account for it
 	 * in pages_avail because we will release that memory
@@ -1429,7 +1433,7 @@ void __init paging_init(void)
 	extern pmd_t swapper_pmd_dir[1024];
 	extern unsigned int sparc64_vpte_patchme1[1];
 	extern unsigned int sparc64_vpte_patchme2[1];
-	unsigned long alias_base = phys_base + PAGE_OFFSET;
+	unsigned long alias_base = kern_base + PAGE_OFFSET;
 	unsigned long second_alias_page = 0;
 	unsigned long pt, flags, end_pfn, pages_avail;
 	unsigned long shift = alias_base - ((unsigned long)KERNBASE);
@@ -1449,7 +1453,7 @@ void __init paging_init(void)
 	 * if this were not true we wouldn't boot up to this point
 	 * anyways.
 	 */
-	pt  = phys_base | _PAGE_VALID | _PAGE_SZ4MB;
+	pt  = kern_base | _PAGE_VALID | _PAGE_SZ4MB;
 	pt |= _PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W;
 	local_irq_save(flags);
 	if (tlb_type == spitfire) {
@@ -1543,7 +1547,16 @@ void __init paging_init(void)
 	}
 
 	inherit_locked_prom_mappings(1);
-	
+
+#ifdef CONFIG_SUN_SERIAL
+	/* This does not logically belong here, but we need to call it at
+	 * the moment we are able to use the bootmem allocator. This _has_
+	 * to be done after the prom_mappings above so since
+	 * __alloc_bootmem() doesn't work correctly until then.
+	 */
+	sun_serial_setup();
+#endif
+
 	/* We only created DTLB mapping of this stuff. */
 	spitfire_flush_dtlb_nucleus_page(alias_base);
 	if (second_alias_page)
@@ -1714,17 +1727,15 @@ void __init mem_init(void)
 	i = last_valid_pfn >> ((22 - PAGE_SHIFT) + 6);
 	i += 1;
 	sparc64_valid_addr_bitmap = (unsigned long *)
-		__alloc_bootmem(i << 3, SMP_CACHE_BYTES, 0UL);
+		__alloc_bootmem(i << 3, SMP_CACHE_BYTES, bootmap_base);
 	if (sparc64_valid_addr_bitmap == NULL) {
 		prom_printf("mem_init: Cannot alloc valid_addr_bitmap.\n");
 		prom_halt();
 	}
 	memset(sparc64_valid_addr_bitmap, 0, i << 3);
 
-	addr = PAGE_OFFSET + phys_base;
-	last = PAGE_ALIGN((unsigned long)_end) -
-		((unsigned long) KERNBASE);
-	last += PAGE_OFFSET + phys_base;
+	addr = PAGE_OFFSET + kern_base;
+	last = PAGE_ALIGN(kern_size) + addr;
 	while (addr < last) {
 		set_bit(__pa(addr) >> 22, sparc64_valid_addr_bitmap);
 		addr += PAGE_SIZE;
@@ -1764,7 +1775,7 @@ void __init mem_init(void)
 		/* Put empty_pg_dir on pgd_quicklist */
 		extern pgd_t empty_pg_dir[1024];
 		unsigned long addr = (unsigned long)empty_pg_dir;
-		unsigned long alias_base = phys_base + PAGE_OFFSET -
+		unsigned long alias_base = kern_base + PAGE_OFFSET -
 			(long)(KERNBASE);
 		
 		memset(empty_pg_dir, 0, sizeof(empty_pg_dir));
@@ -1800,7 +1811,7 @@ void free_initmem (void)
 		struct page *p;
 
 		page = (addr +
-			((unsigned long) __va(phys_base)) -
+			((unsigned long) __va(kern_base)) -
 			((unsigned long) KERNBASE));
 		p = virt_to_page(page);
 

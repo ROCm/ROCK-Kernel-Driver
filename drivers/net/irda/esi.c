@@ -52,12 +52,12 @@ static struct dongle_reg dongle = {
 	.owner = THIS_MODULE,
 };
 
-int __init esi_init(void)
+static int __init esi_init(void)
 {
 	return irda_device_register_dongle(&dongle);
 }
 
-void __exit esi_cleanup(void)
+static void __exit esi_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }

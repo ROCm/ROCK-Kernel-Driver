@@ -96,6 +96,23 @@ running once the system is up.
 			ht -- run only enough ACPI to enable Hyper Threading
 			See also Documentation/pm.txt.
  
+	acpi_pic_sci=	[HW,ACPI] ACPI System Control Interrupt trigger mode
+			Format: { level | edge }
+			level   Force PIC-mode SCI to Level Trigger (default)
+			edge    Force PIC-mode SCI to Edge Trigge
+
+	acpi_irq_balance	[HW,ACPI] ACPI will balance active IRQs
+				default in APIC mode
+
+	acpi_irq_nobalance	[HW,ACPI] ACPI will not move active IRQs (default)
+				default in PIC mode
+
+	acpi_irq_pci=	[HW,ACPI] If irq_balance, Clear listed IRQs for use by PCI
+			Format: <irq>,<irq>...
+
+	acpi_irq_isa=	[HW,ACPI] If irq_balance, Mark listed IRQs used by ISA
+			Format: <irq>,<irq>...
+
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
 			See also Documentation/sound/oss/AD1816.

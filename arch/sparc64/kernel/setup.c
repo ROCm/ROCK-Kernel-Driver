@@ -45,6 +45,7 @@
 #include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/timer.h>
+#include <asm/sections.h>
 
 #ifdef CONFIG_IP_PNP
 #include <net/ipconfig.h>
@@ -521,6 +522,22 @@ void __init setup_arch(char **cmdline_p)
 			highest_paddr = top;
 	}
 	pfn_base = phys_base >> PAGE_SHIFT;
+
+	switch (tlb_type) {
+	default:
+	case spitfire:
+		kern_base = spitfire_get_itlb_data(sparc64_highest_locked_tlbent());
+		kern_base &= _PAGE_PADDR_SF;
+		break;
+
+	case cheetah:
+	case cheetah_plus:
+		kern_base = cheetah_get_litlb_data(sparc64_highest_locked_tlbent());
+		kern_base &= _PAGE_PADDR;
+		break;
+	};
+
+	kern_size = (unsigned long)&_end - (unsigned long)KERNBASE;
 
 	if (!root_flags)
 		root_mountflags &= ~MS_RDONLY;

@@ -374,7 +374,7 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		cx22700_set_inversion (i2c, p->inversion);
                 cx22700_set_tps (i2c, &p->u.ofdm);
 		cx22700_writereg (i2c, 0x37, 0x01);  /* PAL loop filter off */
-		cx22700_writereg (i2c, 0x00, 0x01);  /* restart aquire */
+		cx22700_writereg (i2c, 0x00, 0x01);  /* restart acquire */
                 break;
         }
 

@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -201,7 +201,7 @@ acpi_ds_get_buffer_field_arguments (
 
 	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_BUFFER_FIELD, node, NULL));
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] buffer_field Arg Init\n",
-		node->name.ascii));
+		acpi_ut_get_node_name (node)));
 
 	/* Execute the AML code for the term_arg arguments */
 
@@ -346,7 +346,7 @@ acpi_ds_get_region_arguments (
 	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_REGION, node, NULL));
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] op_region Arg Init at AML %p\n",
-		node->name.ascii, extra_desc->extra.aml_start));
+		acpi_ut_get_node_name (node), extra_desc->extra.aml_start));
 
 	/* Execute the argument AML */
 
@@ -438,8 +438,8 @@ acpi_ds_init_buffer_field (
 	 * after resolution in acpi_ex_resolve_operands().
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (result_desc) != ACPI_DESC_TYPE_NAMED) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "(%s) destination must be a NS Node\n",
-			acpi_ps_get_opcode_name (aml_opcode)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "(%s) destination not a NS Node [%s]\n",
+				acpi_ps_get_opcode_name (aml_opcode), acpi_ut_get_descriptor_name (result_desc)));
 
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
@@ -514,14 +514,16 @@ acpi_ds_init_buffer_field (
 		goto cleanup;
 	}
 
-
 	/* Entire field must fit within the current length of the buffer */
 
 	if ((bit_offset + bit_count) >
 		(8 * (u32) buffer_desc->buffer.length)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Field size %d exceeds Buffer size %d (bits)\n",
-			 bit_offset + bit_count, 8 * (u32) buffer_desc->buffer.length));
+			"Field [%4.4s] size %d exceeds Buffer [%4.4s] size %d (bits)\n",
+			 acpi_ut_get_node_name (result_desc),
+			 bit_offset + bit_count,
+			 acpi_ut_get_node_name (buffer_desc->buffer.node),
+			 8 * (u32) buffer_desc->buffer.length));
 		status = AE_AML_BUFFER_LIMIT;
 		goto cleanup;
 	}
@@ -742,7 +744,7 @@ acpi_ds_eval_region_operands (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "rgn_obj %p Addr %8.8X%8.8X Len %X\n",
 		obj_desc,
-		ACPI_HIDWORD (obj_desc->region.address), ACPI_LODWORD (obj_desc->region.address),
+		ACPI_FORMAT_UINT64 (obj_desc->region.address),
 		obj_desc->region.length));
 
 	/* Now the address and length are valid for this opregion */

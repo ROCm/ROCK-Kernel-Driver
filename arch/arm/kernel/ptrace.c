@@ -602,8 +602,9 @@ static int ptrace_getfpregs(struct task_struct *tsk, void *ufp)
  */
 static int ptrace_setfpregs(struct task_struct *tsk, void *ufp)
 {
-	tsk->used_math = 1;
-	return copy_from_user(&tsk->thread_info->fpstate, ufp,
+	struct thread_info *thread = tsk->thread_info;
+	thread->used_cp[1] = thread->used_cp[2] = 1;
+	return copy_from_user(&thread->fpstate, ufp,
 			      sizeof(struct user_fp)) ? -EFAULT : 0;
 }
 

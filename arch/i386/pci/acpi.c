@@ -18,7 +18,7 @@ static int __init pci_acpi_init(void)
 	if (pcibios_scanned)
 		return 0;
 
-	if (!(pci_probe & PCI_NO_ACPI_ROUTING)) {
+	if (!acpi_noirq) {
 		if (!acpi_pci_irq_init()) {
 			printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
 			printk(KERN_INFO "PCI: if you experience problems, try using option 'pci=noacpi' or even 'acpi=off'\n");
@@ -31,15 +31,4 @@ static int __init pci_acpi_init(void)
 
 	return 0;
 }
-
-/*
- * pci_disable_acpi()
- * act like pci=noacpi seen on command line
- * called by DMI blacklist code
- */
-__init void pci_disable_acpi(void)
-{
-        pci_probe |= PCI_NO_ACPI_ROUTING;
-}
-
 subsys_initcall(pci_acpi_init);

@@ -2818,7 +2818,6 @@ __init int migration_init(void)
 
 #endif
 
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 /*
  * The 'big kernel lock'
  *
@@ -2828,11 +2827,11 @@ __init int migration_init(void)
  * been migrated to a proper locking design yet.
  *
  * Don't use in new code.
+ *
+ * Note: spinlock debugging needs this even on !CONFIG_SMP.
  */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 EXPORT_SYMBOL(kernel_flag);
-#endif
 
 static void kstat_init_cpu(int cpu)
 {
