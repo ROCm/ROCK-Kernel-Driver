@@ -234,7 +234,7 @@ ip6_packet_match(const struct sk_buff *skb,
 			 * we will change the return 0 to 1*/
 			if ((currenthdr == IPPROTO_NONE) || 
 				(currenthdr == IPPROTO_ESP))
-				return 0;
+				break;
 
 			hp = skb_header_pointer(skb, ptr, sizeof(_hdr), &_hdr);
 			BUG_ON(hp == NULL);
