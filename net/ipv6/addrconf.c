@@ -368,7 +368,8 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 				dev, dev->name);
 			ndev->cnf.use_tempaddr = -1;
 		} else {
-			__ipv6_regen_rndid(ndev);
+			in6_dev_hold(ndev);
+			ipv6_regen_rndid((unsigned long) ndev);
 		}
 #endif
 
@@ -1122,9 +1123,6 @@ static int __ipv6_regen_rndid(struct inet6_dev *idev)
 	sg[1].offset = ((long) eui64 & ~PAGE_MASK);
 	sg[1].length = 8;
 
-	if (!del_timer(&idev->regen_timer))
-		in6_dev_hold(idev);
-
 	dev = idev->dev;
 
 	if (ipv6_generate_eui64(eui64, dev)) {
@@ -1137,7 +1135,6 @@ regen:
 	spin_lock(&md5_tfm_lock);
 	if (unlikely(md5_tfm == NULL)) {
 		spin_unlock(&md5_tfm_lock);
-		in6_dev_put(idev);
 		return -1;
 	}
 	crypto_digest_init(md5_tfm);
@@ -1170,33 +1167,41 @@ regen:
 		if ((idev->rndid[2]|idev->rndid[3]|idev->rndid[4]|idev->rndid[5]|idev->rndid[6]|idev->rndid[7]) == 0x00)
 			goto regen;
 	}
-	
-	idev->regen_timer.expires = jiffies +
-					idev->cnf.temp_prefered_lft * HZ - 
-					idev->cnf.regen_max_retry * idev->cnf.dad_transmits * idev->nd_parms->retrans_time - desync_factor;
-	if (time_before(idev->regen_timer.expires, jiffies)) {
-		idev->regen_timer.expires = 0;
-		printk(KERN_WARNING
-			"__ipv6_regen_rndid(): too short regeneration interval; timer disabled for %s.\n",
-			idev->dev->name);
-		in6_dev_put(idev);
-		return -1;
-	}
 
-	add_timer(&idev->regen_timer);
 	return 0;
 }
 
 static void ipv6_regen_rndid(unsigned long data)
 {
 	struct inet6_dev *idev = (struct inet6_dev *) data;
+	unsigned long expires;
 
 	read_lock_bh(&addrconf_lock);
 	write_lock_bh(&idev->lock);
-	if (!idev->dead)
-		__ipv6_regen_rndid(idev);
+
+	if (idev->dead)
+		goto out;
+
+	if (__ipv6_regen_rndid(idev) < 0)
+		goto out;
+	
+	expires = jiffies +
+		idev->cnf.temp_prefered_lft * HZ - 
+		idev->cnf.regen_max_retry * idev->cnf.dad_transmits * idev->nd_parms->retrans_time - desync_factor;
+	if (time_before(expires, jiffies)) {
+		printk(KERN_WARNING
+			"ipv6_regen_rndid(): too short regeneration interval; timer disabled for %s.\n",
+			idev->dev->name);
+		goto out;
+	}
+
+	if (!mod_timer(&idev->regen_timer, expires))
+		in6_dev_hold(idev);
+
+out:
 	write_unlock_bh(&idev->lock);
 	read_unlock_bh(&addrconf_lock);
+	in6_dev_put(idev);
 }
 
 static int __ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmpaddr) {
@@ -1928,6 +1933,27 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	/* Step 3: clear address list */
 
 	write_lock_bh(&idev->lock);
+#ifdef CONFIG_IPV6_PRIVACY
+	if (how == 1 && del_timer(&idev->regen_timer))
+		in6_dev_put(idev);
+
+	/* clear tempaddr list */
+	while ((ifa = idev->tempaddr_list) != NULL) {
+		idev->tempaddr_list = ifa->tmp_next;
+		ifa->tmp_next = NULL;
+		ifa->dead = 1;
+		write_unlock_bh(&idev->lock);
+		spin_lock_bh(&ifa->lock);
+
+		if (ifa->ifpub) {
+			in6_ifa_put(ifa->ifpub);
+			ifa->ifpub = NULL;
+		}
+		spin_unlock_bh(&ifa->lock);
+		in6_ifa_put(ifa);
+		write_lock_bh(&idev->lock);
+	}
+#endif
 	while ((ifa = idev->addr_list) != NULL) {
 		idev->addr_list = ifa->if_next;
 		ifa->if_next = NULL;
