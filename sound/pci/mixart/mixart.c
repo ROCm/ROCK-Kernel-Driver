@@ -263,6 +263,9 @@ mixart_pipe_t* snd_mixart_add_ref_pipe( mixart_t *chip, int pcm_number, int capt
 
 		for (i=0; i<stream_count; i++) {
 			int j;
+			struct mixart_flowinfo *flowinfo;
+			struct mixart_bufferinfo *bufferinfo;
+			
 			/* we don't yet know the format, so config 16 bit pcm audio for instance */
 			streaming_group_req.stream_info[i].size_max_byte_frame = 1024;
 			streaming_group_req.stream_info[i].size_max_sample_frame = 256;
@@ -274,16 +277,18 @@ mixart_pipe_t* snd_mixart_add_ref_pipe( mixart_t *chip, int pcm_number, int capt
 
 			streaming_group_req.flow_entry[i] = j;
 
-			chip->mgr->flowinfo_array[j].bufferinfo_array_phy_address = (u32)chip->mgr->bufferinfo_physaddr + (j * sizeof(mixart_bufferinfo_t));
-			chip->mgr->flowinfo_array[j].bufferinfo_count = 1;               /* 1 will set the miXart to ring-buffer mode ! */
+			flowinfo = (struct mixart_flowinfo *)chip->mgr->flowinfo.area;
+			flowinfo[j].bufferinfo_array_phy_address = (u32)chip->mgr->bufferinfo.addr + (j * sizeof(mixart_bufferinfo_t));
+			flowinfo[j].bufferinfo_count = 1;               /* 1 will set the miXart to ring-buffer mode ! */
 
-			chip->mgr->bufferinfo_array[j].buffer_address = 0;               /* buffer is not yet allocated */
-			chip->mgr->bufferinfo_array[j].available_length = 0;             /* buffer is not yet allocated */
+			bufferinfo = (struct mixart_bufferinfo *)chip->mgr->bufferinfo.area;
+			bufferinfo[j].buffer_address = 0;               /* buffer is not yet allocated */
+			bufferinfo[j].available_length = 0;             /* buffer is not yet allocated */
 
 			/* construct the identifier of the stream buffer received in the interrupts ! */
-			chip->mgr->bufferinfo_array[j].buffer_id = (chip->chip_idx << MIXART_NOTIFY_CARD_OFFSET) + (pcm_number << MIXART_NOTIFY_PCM_OFFSET ) + i;
+			bufferinfo[j].buffer_id = (chip->chip_idx << MIXART_NOTIFY_CARD_OFFSET) + (pcm_number << MIXART_NOTIFY_PCM_OFFSET ) + i;
 			if(capture) {
-				chip->mgr->bufferinfo_array[j].buffer_id |= MIXART_NOTIFY_CAPT_MASK;
+				bufferinfo[j].buffer_id |= MIXART_NOTIFY_CAPT_MASK;
 			}
 		}
 
@@ -602,13 +607,16 @@ static int snd_mixart_hw_params(snd_pcm_substream_t *subs,
 	err = snd_pcm_lib_malloc_pages(subs, params_buffer_bytes(hw));
 
 	if (err > 0) {
+		struct mixart_bufferinfo *bufferinfo;
 		int i = (chip->chip_idx * MIXART_MAX_STREAM_PER_CARD) + (stream->pcm_number * (MIXART_PLAYBACK_STREAMS+MIXART_CAPTURE_STREAMS)) + subs->number;
 		if( subs->stream == SNDRV_PCM_STREAM_CAPTURE ) {
 			i += MIXART_PLAYBACK_STREAMS; /* in array capture is behind playback */
 		}
-		mgr->bufferinfo_array[i].buffer_address = subs->runtime->dma_addr;
-		mgr->bufferinfo_array[i].available_length = subs->runtime->dma_bytes;
-		/* mgr->bufferinfo_array[i].buffer_id  is already defined */
+		
+		bufferinfo = (struct mixart_bufferinfo *)chip->mgr->bufferinfo.area;
+		bufferinfo[i].buffer_address = subs->runtime->dma_addr;
+		bufferinfo[i].available_length = subs->runtime->dma_bytes;
+		/* bufferinfo[i].buffer_id  is already defined */
 
 		snd_printdd("snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i, subs->runtime->dma_addr, subs->runtime->dma_bytes, subs->number);
 	}
@@ -902,7 +910,8 @@ static void preallocate_buffers(mixart_t *chip, snd_pcm_t *pcm)
 				subs->stream << 8 | (subs->number + 1) |
 				(chip->chip_idx + 1) << 24;
 	}
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->mgr->pci, pcm, 32*1024, 32*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      chip->mgr->pci, 32*1024, 32*1024);
 }
 
 /*
@@ -1070,14 +1079,14 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 	}
 
 	/* free flowarray */
-	if(mgr->flowinfo_array) {
-		snd_free_pci_pages(mgr->pci, PAGE_ALIGN(MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_flowinfo_t)),
-				   mgr->flowinfo_array, mgr->flowinfo_physaddr);
+	if(mgr->flowinfo.area) {
+		snd_dma_free_pages(&mgr->dma_dev, &mgr->flowinfo);
+		mgr->flowinfo.area = NULL;
 	}
 	/* free bufferarray */
-	if(mgr->bufferinfo_array) {
-		snd_free_pci_pages(mgr->pci, PAGE_ALIGN(MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_bufferinfo_t)),
-				   mgr->bufferinfo_array, mgr->bufferinfo_physaddr);
+	if(mgr->bufferinfo.area) {
+		snd_dma_free_pages(&mgr->dma_dev, &mgr->bufferinfo);
+		mgr->bufferinfo.area = NULL;
 	}
 
 	snd_magic_kfree(mgr);
@@ -1380,25 +1389,27 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	/* init firmware status (mgr->hwdep->dsp_loaded reset in hwdep_new) */
 	mgr->board_type = MIXART_DAUGHTER_TYPE_NONE;
 
+	memset(&mgr->dma_dev, 0, sizeof(mgr->dma_dev));
+	mgr->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	mgr->dma_dev.dev.pci = mgr->pci;
+
 	/* create array of streaminfo */
 	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_flowinfo_t)) );
-	mgr->flowinfo_array = snd_malloc_pci_pages(mgr->pci, size, &mgr->flowinfo_physaddr);
-	if(!mgr->flowinfo_array) {
+	if (snd_dma_alloc_pages(&mgr->dma_dev, size, &mgr->flowinfo) < 0) {
 		snd_mixart_free(mgr);
 		return -ENOMEM;
 	}
 	/* init streaminfo_array */
-	memset(mgr->flowinfo_array, 0, size);
+	memset(mgr->flowinfo.area, 0, size);
 
 	/* create array of bufferinfo */
 	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_bufferinfo_t)) );
-	mgr->bufferinfo_array = snd_malloc_pci_pages(mgr->pci, size, &mgr->bufferinfo_physaddr);
-	if(!mgr->bufferinfo_array) {
+	if (snd_dma_alloc_pages(&mgr->dma_dev, size, &mgr->bufferinfo) < 0) {
 		snd_mixart_free(mgr);
 		return -ENOMEM;
 	}
 	/* init bufferinfo_array */
-	memset(mgr->bufferinfo_array, 0, size);
+	memset(mgr->bufferinfo.area, 0, size);
 
 	pci_set_drvdata(pci, mgr);
 	dev++;

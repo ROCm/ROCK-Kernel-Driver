@@ -946,17 +946,14 @@ static int snd_es1938_playback_open(snd_pcm_substream_t * substream)
 static int snd_es1938_capture_close(snd_pcm_substream_t * substream)
 {
 	es1938_t *chip = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	chip->capture_substream = NULL;
-	snd_free_pci_pages(chip->pci, runtime->dma_bytes, runtime->dma_area, runtime->dma_addr);
 	return 0;
 }
 
 static int snd_es1938_playback_close(snd_pcm_substream_t * substream)
 {
 	es1938_t *chip = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	switch (substream->number) {
 	case 0:
@@ -969,7 +966,6 @@ static int snd_es1938_playback_close(snd_pcm_substream_t * substream)
 		snd_BUG();
 		return -EINVAL;
 	}
-	snd_free_pci_pages(chip->pci, runtime->dma_bytes, runtime->dma_area, runtime->dma_addr);
 	return 0;
 }
 
@@ -1018,7 +1014,8 @@ static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t **
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ESS Solo-1");
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      chip->pci, 64*1024, 64*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

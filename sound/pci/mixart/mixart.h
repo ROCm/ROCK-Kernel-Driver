@@ -114,10 +114,9 @@ struct snd_mixart_mgr {
 	snd_hwdep_t *hwdep;
 	unsigned int board_type;      /* read from embedded once elf file is loaded, 250 = miXart8, 251 = with AES, 252 = with Cobranet */
 
-	mixart_flowinfo_t*   flowinfo_array;
-	dma_addr_t           flowinfo_physaddr;
-	mixart_bufferinfo_t* bufferinfo_array;
-	dma_addr_t           bufferinfo_physaddr;
+	struct snd_dma_device dma_dev;
+	struct snd_dma_buffer flowinfo;
+	struct snd_dma_buffer bufferinfo;
 
 	mixart_uid_t         uid_console_manager;
 	int sample_rate;

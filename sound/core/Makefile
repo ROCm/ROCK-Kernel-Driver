@@ -15,10 +15,7 @@ endif
 snd-pcm-objs := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
 		pcm_memory.o
 
-snd-page-alloc-objs := memalloc.o
-ifeq ($(CONFIG_PCI),y)
-snd-page-alloc-objs += sgbuf.o
-endif
+snd-page-alloc-objs := memalloc.o sgbuf.o
 
 snd-rawmidi-objs  := rawmidi.o
 snd-timer-objs    := timer.o

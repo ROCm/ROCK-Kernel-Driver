@@ -97,7 +97,8 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	unsigned int silent_page;
 
 	emu->fx8010.itram_size = (16 * 1024)/2;
-	emu->fx8010.etram_size = 0;
+	emu->fx8010.etram_pages.area = NULL;
+	emu->fx8010.etram_pages.bytes = 0;
 
 	/* disable audio and lock cache */
 	outl(HCFG_LOCKSOUNDCACHE | HCFG_LOCKTANKCACHE_MASK | HCFG_MUTEBUTTONENABLE, emu->port + HCFG);
@@ -184,15 +185,15 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	/*
 	 *  Clear page with silence & setup all pointers to this page
 	 */
-	memset(emu->silent_page, 0, PAGE_SIZE);
-	silent_page = emu->silent_page_dmaaddr << 1;
+	memset(emu->silent_page.area, 0, PAGE_SIZE);
+	silent_page = emu->silent_page.addr << 1;
 	for (idx = 0; idx < MAXPAGES; idx++)
-		emu->ptb_pages[idx] = cpu_to_le32(silent_page | idx);
-	snd_emu10k1_ptr_write(emu, PTB, 0, emu->ptb_pages_dmaaddr);
+		((u32 *)emu->ptb_pages.area)[idx] = cpu_to_le32(silent_page | idx);
+	snd_emu10k1_ptr_write(emu, PTB, 0, emu->ptb_pages.addr);
 	snd_emu10k1_ptr_write(emu, TCB, 0, 0);	/* taken from original driver */
 	snd_emu10k1_ptr_write(emu, TCBS, 0, 4);	/* taken from original driver */
 
-	silent_page = (emu->silent_page_dmaaddr << 1) | MAP_PTI_MASK;
+	silent_page = (emu->silent_page.addr << 1) | MAP_PTI_MASK;
 	for (ch = 0; ch < NUM_G; ch++) {
 		snd_emu10k1_ptr_write(emu, MAPA, ch, silent_page);
 		snd_emu10k1_ptr_write(emu, MAPB, ch, silent_page);
@@ -546,10 +547,10 @@ static int snd_emu10k1_free(emu10k1_t *emu)
        	}
 	if (emu->memhdr)
 		snd_util_memhdr_free(emu->memhdr);
-	if (emu->silent_page)
-		snd_free_pci_pages(emu->pci, EMUPAGESIZE, emu->silent_page, emu->silent_page_dmaaddr);
-	if (emu->ptb_pages)
-		snd_free_pci_pages(emu->pci, 32 * 1024, (void *)emu->ptb_pages, emu->ptb_pages_dmaaddr);
+	if (emu->silent_page.area)
+		snd_dma_free_pages(&emu->dma_dev, &emu->silent_page);
+	if (emu->ptb_pages.area)
+		snd_dma_free_pages(&emu->dma_dev, &emu->ptb_pages);
 	if (emu->page_ptr_table)
 		vfree(emu->page_ptr_table);
 	if (emu->page_addr_table)
@@ -638,9 +639,12 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	}
 	emu->irq = pci->irq;
 
+	memset(&emu->dma_dev, 0, sizeof(emu->dma_dev));
+	emu->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	emu->dma_dev.dev.pci = pci;
+
 	emu->max_cache_pages = max_cache_bytes >> PAGE_SHIFT;
-	emu->ptb_pages = snd_malloc_pci_pages(pci, 32 * 1024, &emu->ptb_pages_dmaaddr);
-	if (emu->ptb_pages == NULL) {
+	if (snd_dma_alloc_pages(&emu->dma_dev, 32 * 1024, &emu->ptb_pages) < 0) {
 		snd_emu10k1_free(emu);
 		return -ENOMEM;
 	}
@@ -652,8 +656,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		return -ENOMEM;
 	}
 
-	emu->silent_page = snd_malloc_pci_pages(pci, EMUPAGESIZE, &emu->silent_page_dmaaddr);
-	if (emu->silent_page == NULL) {
+	if (snd_dma_alloc_pages(&emu->dma_dev, EMUPAGESIZE, &emu->silent_page) < 0) {
 		snd_emu10k1_free(emu);
 		return -ENOMEM;
 	}

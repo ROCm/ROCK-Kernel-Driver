@@ -441,7 +441,7 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 		}
 
 		/* miXart waits at this point on the pointer to the flow table */
-		writel_be( (u32)mgr->flowinfo_physaddr, MIXART_MEM( mgr, MIXART_FLOWTABLE_PTR ) ); /* give pointer of flow table to miXart */
+		writel_be( (u32)mgr->flowinfo.addr, MIXART_MEM( mgr, MIXART_FLOWTABLE_PTR ) ); /* give pointer of flow table to miXart */
 
 		return 0;  /* return, another xilinx file has to be loaded before */
 

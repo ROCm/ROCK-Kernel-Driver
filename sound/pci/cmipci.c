@@ -2087,7 +2087,8 @@ static int __devinit snd_cmipci_pcm_new(cmipci_t *cm, int device)
 	strcpy(pcm->name, "C-Media PCI DAC/ADC");
 	cm->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      cm->pci, 64*1024, 128*1024);
 
 	return 0;
 }
@@ -2109,7 +2110,8 @@ static int __devinit snd_cmipci_pcm2_new(cmipci_t *cm, int device)
 	strcpy(pcm->name, "C-Media PCI 2nd DAC");
 	cm->pcm2 = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      cm->pci, 64*1024, 128*1024);
 
 	return 0;
 }
@@ -2139,7 +2141,8 @@ static int __devinit snd_cmipci_pcm_spdif_new(cmipci_t *cm, int device)
 	strcpy(pcm->name, "C-Media PCI IEC958");
 	cm->pcm_spdif = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      cm->pci, 64*1024, 128*1024);
 
 	return 0;
 }
