@@ -27,8 +27,8 @@
 
 #define DRV_MODULE_NAME		"b44"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.93"
-#define DRV_MODULE_RELDATE	"Mar, 2004"
+#define DRV_MODULE_VERSION	"0.94"
+#define DRV_MODULE_RELDATE	"May 4, 2004"
 
 #define B44_DEF_MSG_ENABLE	  \
 	(NETIF_MSG_DRV		| \
@@ -96,7 +96,7 @@ MODULE_DEVICE_TABLE(pci, b44_pci_tbl);
 
 static void b44_halt(struct b44 *);
 static void b44_init_rings(struct b44 *);
-static int b44_init_hw(struct b44 *);
+static void b44_init_hw(struct b44 *);
 
 static int b44_wait_bit(struct b44 *bp, unsigned long reg,
 			u32 bit, unsigned long timeout, const int clear)
@@ -329,6 +329,29 @@ static int b44_writephy(struct b44 *bp, int reg, u32 val)
 			     (MDIO_TA_VALID << MDIO_DATA_TA_SHIFT) |
 			     (val & MDIO_DATA_DATA)));
 	return b44_wait_bit(bp, B44_EMAC_ISTAT, EMAC_INT_MII, 100, 0);
+}
+
+/* miilib interface */
+/* FIXME FIXME: phy_id is ignored, bp->phy_addr use is unconditional
+ * due to code existing before miilib use was added to this driver.
+ * Someone should remove this artificial driver limitation in
+ * b44_{read,write}phy.  bp->phy_addr itself is fine (and needed).
+ */
+static int b44_mii_read(struct net_device *dev, int phy_id, int location)
+{
+	u32 val;
+	struct b44 *bp = netdev_priv(dev);
+	int rc = b44_readphy(bp, location, &val);
+	if (rc)
+		return 0xffffffff;
+	return val;
+}
+
+static void b44_mii_write(struct net_device *dev, int phy_id, int location,
+			 int val)
+{
+	struct b44 *bp = netdev_priv(dev);
+	b44_writephy(bp, location, val);
 }
 
 static int b44_phy_reset(struct b44 *bp)
@@ -771,7 +794,7 @@ static int b44_rx(struct b44 *bp, int budget)
 
 static int b44_poll(struct net_device *netdev, int *budget)
 {
-	struct b44 *bp = netdev->priv;
+	struct b44 *bp = netdev_priv(netdev);
 	int done;
 
 	spin_lock_irq(&bp->lock);
@@ -821,7 +844,7 @@ static int b44_poll(struct net_device *netdev, int *budget)
 static irqreturn_t b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	unsigned long flags;
 	u32 istat, imask;
 	int handled = 0;
@@ -858,7 +881,7 @@ static irqreturn_t b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void b44_tx_timeout(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
 	       dev->name);
@@ -878,7 +901,7 @@ static void b44_tx_timeout(struct net_device *dev)
 
 static int b44_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	dma_addr_t mapping;
 	u32 len, entry, ctrl;
 
@@ -932,7 +955,7 @@ static int b44_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static int b44_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	if (new_mtu < B44_MIN_MTU || new_mtu > B44_MAX_MTU)
 		return -EINVAL;
@@ -1161,7 +1184,7 @@ static void __b44_set_mac_addr(struct b44 *bp)
 
 static int b44_set_mac_addr(struct net_device *dev, void *p)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	struct sockaddr *addr = p;
 
 	if (netif_running(dev))
@@ -1180,7 +1203,7 @@ static int b44_set_mac_addr(struct net_device *dev, void *p)
  * packet processing.  Invoked with bp->lock held.
  */
 static void __b44_set_rx_mode(struct net_device *);
-static int b44_init_hw(struct b44 *bp)
+static void b44_init_hw(struct b44 *bp)
 {
 	u32 val;
 
@@ -1212,13 +1235,11 @@ static int b44_init_hw(struct b44 *bp)
 
 	val = br32(B44_ENET_CTRL);
 	bw32(B44_ENET_CTRL, (val | ENET_CTRL_ENABLE));
-
-	return 0;
 }
 
 static int b44_open(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	int err;
 
 	err = b44_alloc_consistent(bp);
@@ -1232,9 +1253,7 @@ static int b44_open(struct net_device *dev)
 	spin_lock_irq(&bp->lock);
 
 	b44_init_rings(bp);
-	err = b44_init_hw(bp);
-	if (err)
-		goto err_out_noinit;
+	b44_init_hw(bp);
 	bp->flags |= B44_FLAG_INIT_COMPLETE;
 
 	spin_unlock_irq(&bp->lock);
@@ -1249,11 +1268,6 @@ static int b44_open(struct net_device *dev)
 
 	return 0;
 
-err_out_noinit:
-	b44_halt(bp);
-	b44_free_rings(bp);
-	spin_unlock_irq(&bp->lock);
-	free_irq(dev->irq, dev);
 err_out_free:
 	b44_free_consistent(bp);
 	return err;
@@ -1273,7 +1287,7 @@ err_out_free:
 
 static int b44_close(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -1300,7 +1314,7 @@ static int b44_close(struct net_device *dev)
 
 static struct net_device_stats *b44_get_stats(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	struct net_device_stats *nstat = &bp->stats;
 	struct b44_hw_stats *hwstat = &bp->hw_stats;
 
@@ -1351,7 +1365,7 @@ static void __b44_load_mcast(struct b44 *bp, struct net_device *dev)
 
 static void __b44_set_rx_mode(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	u32 val;
 
 	val = br32(B44_RXCONFIG);
@@ -1375,295 +1389,252 @@ static void __b44_set_rx_mode(struct net_device *dev)
 
 static void b44_set_rx_mode(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	spin_lock_irq(&bp->lock);
 	__b44_set_rx_mode(dev);
 	spin_unlock_irq(&bp->lock);
 }
 
-static int b44_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
+static u32 b44_get_msglevel(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
+	return bp->msg_enable;
+}
+
+static void b44_set_msglevel(struct net_device *dev, u32 value)
+{
+	struct b44 *bp = netdev_priv(dev);
+	bp->msg_enable = value;
+}
+
+static void b44_get_drvinfo (struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct b44 *bp = netdev_priv(dev);
 	struct pci_dev *pci_dev = bp->pdev;
-	u32 ethcmd;
 
-	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
+	strcpy (info->driver, DRV_MODULE_NAME);
+	strcpy (info->version, DRV_MODULE_VERSION);
+	strcpy (info->bus_info, pci_name(pci_dev));
+}
 
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_MODULE_NAME);
-		strcpy (info.version, DRV_MODULE_VERSION);
-		memset(&info.fw_version, 0, sizeof(info.fw_version));
-		strcpy (info.bus_info, pci_name(pci_dev));
-		info.eedump_len = 0;
-		info.regdump_len = 0;
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
+static int b44_nway_reset(struct net_device *dev)
+{
+	struct b44 *bp = netdev_priv(dev);
+	u32 bmcr;
+	int r;
+
+	spin_lock_irq(&bp->lock);
+	b44_readphy(bp, MII_BMCR, &bmcr);
+	b44_readphy(bp, MII_BMCR, &bmcr);
+	r = -EINVAL;
+	if (bmcr & BMCR_ANENABLE) {
+		b44_writephy(bp, MII_BMCR,
+			     bmcr | BMCR_ANRESTART);
+		r = 0;
 	}
+	spin_unlock_irq(&bp->lock);
 
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd cmd = { ETHTOOL_GSET };
+	return r;
+}
 
-		if (!(bp->flags & B44_FLAG_INIT_COMPLETE))
-			return -EAGAIN;
-		cmd.supported = (SUPPORTED_Autoneg);
-		cmd.supported |= (SUPPORTED_100baseT_Half |
-				  SUPPORTED_100baseT_Full |
-				  SUPPORTED_10baseT_Half |
-				  SUPPORTED_10baseT_Full |
-				  SUPPORTED_MII);
+static int b44_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct b44 *bp = netdev_priv(dev);
 
-		cmd.advertising = 0;
-		if (bp->flags & B44_FLAG_ADV_10HALF)
-			cmd.advertising |= ADVERTISE_10HALF;
-		if (bp->flags & B44_FLAG_ADV_10FULL)
-			cmd.advertising |= ADVERTISE_10FULL;
-		if (bp->flags & B44_FLAG_ADV_100HALF)
-			cmd.advertising |= ADVERTISE_100HALF;
-		if (bp->flags & B44_FLAG_ADV_100FULL)
-			cmd.advertising |= ADVERTISE_100FULL;
-		cmd.advertising |= ADVERTISE_PAUSE_CAP | ADVERTISE_PAUSE_ASYM;
-		cmd.speed = (bp->flags & B44_FLAG_100_BASE_T) ?
-			SPEED_100 : SPEED_10;
-		cmd.duplex = (bp->flags & B44_FLAG_FULL_DUPLEX) ?
-			DUPLEX_FULL : DUPLEX_HALF;
-		cmd.port = 0;
-		cmd.phy_address = bp->phy_addr;
-		cmd.transceiver = (bp->flags & B44_FLAG_INTERNAL_PHY) ?
-			XCVR_INTERNAL : XCVR_EXTERNAL;
-		cmd.autoneg = (bp->flags & B44_FLAG_FORCE_LINK) ?
-			AUTONEG_DISABLE : AUTONEG_ENABLE;
-		cmd.maxtxpkt = 0;
-		cmd.maxrxpkt = 0;
-		if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SSET: {
-		struct ethtool_cmd cmd;
+	if (!(bp->flags & B44_FLAG_INIT_COMPLETE))
+		return -EAGAIN;
+	cmd->supported = (SUPPORTED_Autoneg);
+	cmd->supported |= (SUPPORTED_100baseT_Half |
+			  SUPPORTED_100baseT_Full |
+			  SUPPORTED_10baseT_Half |
+			  SUPPORTED_10baseT_Full |
+			  SUPPORTED_MII);
 
-		if (!(bp->flags & B44_FLAG_INIT_COMPLETE))
-			return -EAGAIN;
+	cmd->advertising = 0;
+	if (bp->flags & B44_FLAG_ADV_10HALF)
+		cmd->advertising |= ADVERTISE_10HALF;
+	if (bp->flags & B44_FLAG_ADV_10FULL)
+		cmd->advertising |= ADVERTISE_10FULL;
+	if (bp->flags & B44_FLAG_ADV_100HALF)
+		cmd->advertising |= ADVERTISE_100HALF;
+	if (bp->flags & B44_FLAG_ADV_100FULL)
+		cmd->advertising |= ADVERTISE_100FULL;
+	cmd->advertising |= ADVERTISE_PAUSE_CAP | ADVERTISE_PAUSE_ASYM;
+	cmd->speed = (bp->flags & B44_FLAG_100_BASE_T) ?
+		SPEED_100 : SPEED_10;
+	cmd->duplex = (bp->flags & B44_FLAG_FULL_DUPLEX) ?
+		DUPLEX_FULL : DUPLEX_HALF;
+	cmd->port = 0;
+	cmd->phy_address = bp->phy_addr;
+	cmd->transceiver = (bp->flags & B44_FLAG_INTERNAL_PHY) ?
+		XCVR_INTERNAL : XCVR_EXTERNAL;
+	cmd->autoneg = (bp->flags & B44_FLAG_FORCE_LINK) ?
+		AUTONEG_DISABLE : AUTONEG_ENABLE;
+	cmd->maxtxpkt = 0;
+	cmd->maxrxpkt = 0;
+	return 0;
+}
 
-		if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
-			return -EFAULT;
+static int b44_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct b44 *bp = netdev_priv(dev);
 
-		/* We do not support gigabit. */
-		if (cmd.autoneg == AUTONEG_ENABLE) {
-			if (cmd.advertising &
-			    (ADVERTISED_1000baseT_Half |
-			     ADVERTISED_1000baseT_Full))
-				return -EINVAL;
-		} else if ((cmd.speed != SPEED_100 &&
-			    cmd.speed != SPEED_10) ||
-			   (cmd.duplex != DUPLEX_HALF &&
-			    cmd.duplex != DUPLEX_FULL)) {
-				return -EINVAL;
-		}
+	if (!(bp->flags & B44_FLAG_INIT_COMPLETE))
+		return -EAGAIN;
 
-		spin_lock_irq(&bp->lock);
-
-		if (cmd.autoneg == AUTONEG_ENABLE) {
-			bp->flags &= ~B44_FLAG_FORCE_LINK;
-			bp->flags &= ~(B44_FLAG_ADV_10HALF |
-				       B44_FLAG_ADV_10FULL |
-				       B44_FLAG_ADV_100HALF |
-				       B44_FLAG_ADV_100FULL);
-			if (cmd.advertising & ADVERTISE_10HALF)
-				bp->flags |= B44_FLAG_ADV_10HALF;
-			if (cmd.advertising & ADVERTISE_10FULL)
-				bp->flags |= B44_FLAG_ADV_10FULL;
-			if (cmd.advertising & ADVERTISE_100HALF)
-				bp->flags |= B44_FLAG_ADV_100HALF;
-			if (cmd.advertising & ADVERTISE_100FULL)
-				bp->flags |= B44_FLAG_ADV_100FULL;
-		} else {
-			bp->flags |= B44_FLAG_FORCE_LINK;
-			if (cmd.speed == SPEED_100)
-				bp->flags |= B44_FLAG_100_BASE_T;
-			if (cmd.duplex == DUPLEX_FULL)
-				bp->flags |= B44_FLAG_FULL_DUPLEX;
-		}
-
-		b44_setup_phy(bp);
-
-		spin_unlock_irq(&bp->lock);
-
-		return 0;
-	}
-
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = { ETHTOOL_GMSGLVL };
-		edata.data = bp->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		bp->msg_enable = edata.data;
-		return 0;
-	}
-	case ETHTOOL_NWAY_RST: {
-		u32 bmcr;
-		int r;
-
-		spin_lock_irq(&bp->lock);
-		b44_readphy(bp, MII_BMCR, &bmcr);
-		b44_readphy(bp, MII_BMCR, &bmcr);
-		r = -EINVAL;
-		if (bmcr & BMCR_ANENABLE) {
-			b44_writephy(bp, MII_BMCR,
-				     bmcr | BMCR_ANRESTART);
-			r = 0;
-		}
-		spin_unlock_irq(&bp->lock);
-
-		return r;
-	}
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-		edata.data = netif_carrier_ok(bp->dev) ? 1 : 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_GRINGPARAM: {
-		struct ethtool_ringparam ering = { ETHTOOL_GRINGPARAM };
-
-		ering.rx_max_pending = B44_RX_RING_SIZE - 1;
-		ering.rx_pending = bp->rx_pending;
-
-		/* XXX ethtool lacks a tx_max_pending, oops... */
-
-		if (copy_to_user(useraddr, &ering, sizeof(ering)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SRINGPARAM: {
-		struct ethtool_ringparam ering;
-
-		if (copy_from_user(&ering, useraddr, sizeof(ering)))
-			return -EFAULT;
-
-		if ((ering.rx_pending > B44_RX_RING_SIZE - 1) ||
-		    (ering.rx_mini_pending != 0) ||
-		    (ering.rx_jumbo_pending != 0) ||
-		    (ering.tx_pending > B44_TX_RING_SIZE - 1))
+	/* We do not support gigabit. */
+	if (cmd->autoneg == AUTONEG_ENABLE) {
+		if (cmd->advertising &
+		    (ADVERTISED_1000baseT_Half |
+		     ADVERTISED_1000baseT_Full))
 			return -EINVAL;
+	} else if ((cmd->speed != SPEED_100 &&
+		    cmd->speed != SPEED_10) ||
+		   (cmd->duplex != DUPLEX_HALF &&
+		    cmd->duplex != DUPLEX_FULL)) {
+			return -EINVAL;
+	}
 
-		spin_lock_irq(&bp->lock);
+	spin_lock_irq(&bp->lock);
 
-		bp->rx_pending = ering.rx_pending;
-		bp->tx_pending = ering.tx_pending;
+	if (cmd->autoneg == AUTONEG_ENABLE) {
+		bp->flags &= ~B44_FLAG_FORCE_LINK;
+		bp->flags &= ~(B44_FLAG_ADV_10HALF |
+			       B44_FLAG_ADV_10FULL |
+			       B44_FLAG_ADV_100HALF |
+			       B44_FLAG_ADV_100FULL);
+		if (cmd->advertising & ADVERTISE_10HALF)
+			bp->flags |= B44_FLAG_ADV_10HALF;
+		if (cmd->advertising & ADVERTISE_10FULL)
+			bp->flags |= B44_FLAG_ADV_10FULL;
+		if (cmd->advertising & ADVERTISE_100HALF)
+			bp->flags |= B44_FLAG_ADV_100HALF;
+		if (cmd->advertising & ADVERTISE_100FULL)
+			bp->flags |= B44_FLAG_ADV_100FULL;
+	} else {
+		bp->flags |= B44_FLAG_FORCE_LINK;
+		if (cmd->speed == SPEED_100)
+			bp->flags |= B44_FLAG_100_BASE_T;
+		if (cmd->duplex == DUPLEX_FULL)
+			bp->flags |= B44_FLAG_FULL_DUPLEX;
+	}
 
+	b44_setup_phy(bp);
+
+	spin_unlock_irq(&bp->lock);
+
+	return 0;
+}
+
+static void b44_get_ringparam(struct net_device *dev,
+			      struct ethtool_ringparam *ering)
+{
+	struct b44 *bp = netdev_priv(dev);
+
+	ering->rx_max_pending = B44_RX_RING_SIZE - 1;
+	ering->rx_pending = bp->rx_pending;
+
+	/* XXX ethtool lacks a tx_max_pending, oops... */
+}
+
+static int b44_set_ringparam(struct net_device *dev,
+			     struct ethtool_ringparam *ering)
+{
+	struct b44 *bp = netdev_priv(dev);
+
+	if ((ering->rx_pending > B44_RX_RING_SIZE - 1) ||
+	    (ering->rx_mini_pending != 0) ||
+	    (ering->rx_jumbo_pending != 0) ||
+	    (ering->tx_pending > B44_TX_RING_SIZE - 1))
+		return -EINVAL;
+
+	spin_lock_irq(&bp->lock);
+
+	bp->rx_pending = ering->rx_pending;
+	bp->tx_pending = ering->tx_pending;
+
+	b44_halt(bp);
+	b44_init_rings(bp);
+	b44_init_hw(bp);
+	netif_wake_queue(bp->dev);
+	spin_unlock_irq(&bp->lock);
+
+	b44_enable_ints(bp);
+	
+	return 0;
+}
+
+static void b44_get_pauseparam(struct net_device *dev,
+				struct ethtool_pauseparam *epause)
+{
+	struct b44 *bp = netdev_priv(dev);
+
+	epause->autoneg =
+		(bp->flags & B44_FLAG_PAUSE_AUTO) != 0;
+	epause->rx_pause =
+		(bp->flags & B44_FLAG_RX_PAUSE) != 0;
+	epause->tx_pause =
+		(bp->flags & B44_FLAG_TX_PAUSE) != 0;
+}
+
+static int b44_set_pauseparam(struct net_device *dev,
+				struct ethtool_pauseparam *epause)
+{
+	struct b44 *bp = netdev_priv(dev);
+
+	spin_lock_irq(&bp->lock);
+	if (epause->autoneg)
+		bp->flags |= B44_FLAG_PAUSE_AUTO;
+	else
+		bp->flags &= ~B44_FLAG_PAUSE_AUTO;
+	if (epause->rx_pause)
+		bp->flags |= B44_FLAG_RX_PAUSE;
+	else
+		bp->flags &= ~B44_FLAG_RX_PAUSE;
+	if (epause->tx_pause)
+		bp->flags |= B44_FLAG_TX_PAUSE;
+	else
+		bp->flags &= ~B44_FLAG_TX_PAUSE;
+	if (bp->flags & B44_FLAG_PAUSE_AUTO) {
 		b44_halt(bp);
 		b44_init_rings(bp);
 		b44_init_hw(bp);
-		netif_wake_queue(bp->dev);
-		spin_unlock_irq(&bp->lock);
-
-		b44_enable_ints(bp);
-		
-		return 0;
+	} else {
+		__b44_set_flow_ctrl(bp, bp->flags);
 	}
-	case ETHTOOL_GPAUSEPARAM: {
-		struct ethtool_pauseparam epause = { ETHTOOL_GPAUSEPARAM };
+	spin_unlock_irq(&bp->lock);
 
-		epause.autoneg =
-			(bp->flags & B44_FLAG_PAUSE_AUTO) != 0;
-		epause.rx_pause =
-			(bp->flags & B44_FLAG_RX_PAUSE) != 0;
-		epause.tx_pause =
-			(bp->flags & B44_FLAG_TX_PAUSE) != 0;
-		if (copy_to_user(useraddr, &epause, sizeof(epause)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SPAUSEPARAM: {
-		struct ethtool_pauseparam epause;
-
-		if (copy_from_user(&epause, useraddr, sizeof(epause)))
-			return -EFAULT;
-
-		spin_lock_irq(&bp->lock);
-		if (epause.autoneg)
-			bp->flags |= B44_FLAG_PAUSE_AUTO;
-		else
-			bp->flags &= ~B44_FLAG_PAUSE_AUTO;
-		if (epause.rx_pause)
-			bp->flags |= B44_FLAG_RX_PAUSE;
-		else
-			bp->flags &= ~B44_FLAG_RX_PAUSE;
-		if (epause.tx_pause)
-			bp->flags |= B44_FLAG_TX_PAUSE;
-		else
-			bp->flags &= ~B44_FLAG_TX_PAUSE;
-		if (bp->flags & B44_FLAG_PAUSE_AUTO) {
-			b44_halt(bp);
-			b44_init_rings(bp);
-			b44_init_hw(bp);
-		} else {
-			__b44_set_flow_ctrl(bp, bp->flags);
-		}
-		spin_unlock_irq(&bp->lock);
-
-		b44_enable_ints(bp);
-		
-		return 0;
-	}
-	};
-
-	return -EOPNOTSUPP;
+	b44_enable_ints(bp);
+	
+	return 0;
 }
+
+static struct ethtool_ops b44_ethtool_ops = {
+	.get_drvinfo		= b44_get_drvinfo,
+	.get_settings		= b44_get_settings,
+	.set_settings		= b44_set_settings,
+	.nway_reset		= b44_nway_reset,
+	.get_link		= ethtool_op_get_link,
+	.get_ringparam		= b44_get_ringparam,
+	.set_ringparam		= b44_set_ringparam,
+	.get_pauseparam		= b44_get_pauseparam,
+	.set_pauseparam		= b44_set_pauseparam,
+	.get_msglevel		= b44_get_msglevel,
+	.set_msglevel		= b44_set_msglevel,
+};
 
 static int b44_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data __user *data = (struct mii_ioctl_data __user *)&ifr->ifr_data;
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	int err;
 
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return b44_ethtool_ioctl(dev, (void __user*) ifr->ifr_data);
+	spin_lock_irq(&bp->lock);
+	err = generic_mii_ioctl(&bp->mii_if, data, cmd, NULL);
+	spin_unlock_irq(&bp->lock);
 
-	case SIOCGMIIPHY:
-		data->phy_id = bp->phy_addr;
-
-		/* fallthru */
-	case SIOCGMIIREG: {
-		u32 mii_regval;
-
-		spin_lock_irq(&bp->lock);
-		err = b44_readphy(bp, data->reg_num & 0x1f, &mii_regval);
-		spin_unlock_irq(&bp->lock);
-
-		data->val_out = mii_regval;
-
-		return err;
-	}
-
-	case SIOCSMIIREG:
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
-		spin_lock_irq(&bp->lock);
-		err = b44_writephy(bp, data->reg_num & 0x1f, data->val_in);
-		spin_unlock_irq(&bp->lock);
-
-		return err;
-
-	default:
-		/* do nothing */
-		break;
-	};
-	return -EOPNOTSUPP;
+	return err;
 }
 
 /* Read 128-bytes of EEPROM. */
@@ -1772,7 +1743,7 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	/* No interesting netdevice features in this card... */
 	dev->features |= 0;
 
-	bp = dev->priv;
+	bp = netdev_priv(dev);
 	bp->pdev = pdev;
 	bp->dev = dev;
 	if (b44_debug >= 0)
@@ -1806,6 +1777,7 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	dev->watchdog_timeo = B44_TX_TIMEOUT;
 	dev->change_mtu = b44_change_mtu;
 	dev->irq = pdev->irq;
+	SET_ETHTOOL_OPS(dev, &b44_ethtool_ops);
 
 	err = b44_get_invariants(bp);
 	if (err) {
@@ -1813,6 +1785,13 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 		       "aborting.\n");
 		goto err_out_iounmap;
 	}
+
+	bp->mii_if.dev = dev;
+	bp->mii_if.mdio_read = b44_mii_read;
+	bp->mii_if.mdio_write = b44_mii_write;
+	bp->mii_if.phy_id = bp->phy_addr;
+	bp->mii_if.phy_id_mask = 0x1f;
+	bp->mii_if.reg_num_mask = 0x1f;
 
 	/* By default, advertise all speed/duplex settings. */
 	bp->flags |= (B44_FLAG_ADV_10HALF | B44_FLAG_ADV_10FULL |
@@ -1859,8 +1838,10 @@ static void __devexit b44_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev) {
+		struct b44 *bp = netdev_priv(dev);
+
 		unregister_netdev(dev);
-		iounmap((void *) ((struct b44 *)(dev->priv))->regs);
+		iounmap((void *) bp->regs);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
