@@ -217,7 +217,7 @@ xfs_offset_to_map(
 
 	if (full_offset < iomapp->iomap_offset)
 		return NULL;
-	if (iomapp->iomap_offset + iomapp->iomap_bsize > full_offset)
+	if (iomapp->iomap_offset + (iomapp->iomap_bsize -1) >= full_offset)
 		return iomapp;
 	return NULL;
 }
