@@ -163,6 +163,8 @@ void gen_set_disp(int con, struct fb_info *info)
 #ifdef FBCON_HAS_ACCEL
 	display->scrollmode = SCROLL_YNOMOVE;
 	display->dispsw = &fbcon_accel;
+#else
+	display->dispsw = &fbcon_dummy;
 #endif
 	return;
 }
