@@ -40,8 +40,6 @@
 
 #include <net/irda/wrapper.h>
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
-#include <net/irda/irlap_frame.h>
 #include <net/irda/irda_device.h>
 
 #include <net/irda/ali-ircc.h>
@@ -88,9 +86,7 @@ static char *dongle_types[] = {
 /* Some prototypes */
 static int  ali_ircc_open(int i, chipio_t *info);
 
-#ifdef MODULE
 static int  ali_ircc_close(struct ali_ircc_cb *self);
-#endif /* MODULE */
 
 static int  ali_ircc_setup(chipio_t *info);
 static int  ali_ircc_is_receiving(struct ali_ircc_cb *self);
@@ -228,8 +224,7 @@ int __init ali_ircc_init(void)
  *    Close all configured chips
  *
  */
-#ifdef MODULE
-static void ali_ircc_cleanup(void)
+static void __exit ali_ircc_cleanup(void)
 {
 	int i;
 
@@ -244,7 +239,6 @@ static void ali_ircc_cleanup(void)
 	
 	IRDA_DEBUG(2, __FUNCTION__ "(), ----------------- End -----------------\n");
 }
-#endif /* MODULE */
 
 /*
  * Function ali_ircc_open (int i, chipio_t *inf)
@@ -387,14 +381,13 @@ static int ali_ircc_open(int i, chipio_t *info)
 }
 
 
-#ifdef MODULE
 /*
  * Function ali_ircc_close (self)
  *
  *    Close driver instance
  *
  */
-static int ali_ircc_close(struct ali_ircc_cb *self)
+static int __exit ali_ircc_close(struct ali_ircc_cb *self)
 {
 	int iobase;
 
@@ -428,7 +421,6 @@ static int ali_ircc_close(struct ali_ircc_cb *self)
 	
 	return 0;
 }
-#endif /* MODULE */
 
 /*
  * Function ali_ircc_init_43 (chip, info)
@@ -2288,7 +2280,6 @@ static void FIR2SIR(int iobase)
 	IRDA_DEBUG(1, __FUNCTION__ "(), ----------------- End ------------------\n");
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Benjamin Kong <benjamin_kong@ali.com.tw>");
 MODULE_DESCRIPTION("ALi FIR Controller Driver");
 MODULE_LICENSE("GPL");
@@ -2301,13 +2292,5 @@ MODULE_PARM_DESC(irq, "IRQ lines");
 MODULE_PARM(dma, "1-4i");
 MODULE_PARM_DESC(dma, "DMA channels");
 
-int init_module(void)
-{
-	return ali_ircc_init();	
-}
-
-void cleanup_module(void)
-{
-	ali_ircc_cleanup();
-}
-#endif /* MODULE */
+module_init(ali_ircc_init);
+module_exit(ali_ircc_cleanup);

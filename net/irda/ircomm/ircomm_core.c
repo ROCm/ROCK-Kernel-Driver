@@ -76,8 +76,7 @@ int __init ircomm_init(void)
 	return 0;
 }
 
-#ifdef MODULE
-void ircomm_cleanup(void)
+void __exit ircomm_cleanup(void)
 {
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
 
@@ -87,7 +86,6 @@ void ircomm_cleanup(void)
 	remove_proc_entry("ircomm", proc_irda);
 #endif /* CONFIG_PROC_FS */
 }
-#endif /* MODULE */
 
 /*
  * Function ircomm_open (client_notify)
@@ -543,18 +541,9 @@ int ircomm_proc_read(char *buf, char **start, off_t offset, int len)
 }
 #endif /* CONFIG_PROC_FS */
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dag@brattli.net>");
 MODULE_DESCRIPTION("IrCOMM protocol");
 MODULE_LICENSE("GPL");
 
-int init_module(void) 
-{
-	return ircomm_init();
-}
-	
-void cleanup_module(void)
-{
-	ircomm_cleanup();
-}
-#endif /* MODULE */
+module_init(ircomm_init);
+module_exit(ircomm_cleanup);

@@ -29,8 +29,7 @@
 #include <linux/time.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irlap.h>
-#include <net/irda/irda_device.h>
+#include <net/irda/irda_device.h>      /* struct irlap_cb */
 
 #define RX_COPY_THRESHOLD 200
 #define IRDA_USB_MAX_MTU 2051

@@ -31,6 +31,8 @@
 #ifndef IRCOMM_EVENT_H
 #define IRCOMM_EVENT_H
 
+#include <net/irda/irmod.h>
+
 typedef enum {
         IRCOMM_IDLE,
         IRCOMM_WAITI,

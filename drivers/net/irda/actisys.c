@@ -42,7 +42,6 @@
 #include <linux/init.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irda_device.h>
 
 /* 
@@ -110,7 +109,7 @@ int __init actisys_init(void)
 	return 0;
 }
 
-void actisys_cleanup(void)
+void __exit actisys_cleanup(void)
 {
 	/* We have to remove both dongles */
 	irda_device_unregister_dongle(&dongle);
@@ -269,7 +268,6 @@ static int actisys_reset(struct irda_task *task)
 	return ret;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no> - Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("ACTiSYS IR-220L and IR-220L+ dongle driver");	
 MODULE_LICENSE("GPL");
@@ -281,10 +279,7 @@ MODULE_LICENSE("GPL");
  *    Initialize Actisys module
  *
  */
-int init_module(void)
-{
-	return actisys_init();
-}
+module_init(actisys_init);
 
 /*
  * Function cleanup_module (void)
@@ -292,8 +287,4 @@ int init_module(void)
  *    Cleanup Actisys module
  *
  */
-void cleanup_module(void)
-{
-	actisys_cleanup();
-}
-#endif /* MODULE */
+module_exit(actisys_cleanup);

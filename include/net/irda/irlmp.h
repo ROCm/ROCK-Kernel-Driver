@@ -11,7 +11,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -34,7 +34,7 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/qos.h>
-#include <net/irda/irlap.h>
+#include <net/irda/irlap.h>		/* LAP_MAX_HEADER, ... */
 #include <net/irda/irlmp_event.h>
 #include <net/irda/irqueue.h>
 #include <net/irda/discovery.h>
@@ -90,8 +90,6 @@ typedef struct {
 	DISCOVERY_CALLBACK1 expir_callback;	/* Selective expiration */
 	void *priv;                /* Used to identify client */
 } irlmp_client_t;
-
-struct lap_cb; /* Forward decl. */
 
 /*
  *  Information about each logical LSAP connection

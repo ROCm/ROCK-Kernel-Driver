@@ -27,6 +27,7 @@
 #include <linux/mm.h>
 #include <linux/ctype.h>
 #include <linux/sysctl.h>
+#include <linux/init.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irias_object.h>
@@ -156,7 +157,7 @@ static struct ctl_table_header *irda_table_header;
  *    Register our sysctl interface
  *
  */
-int irda_sysctl_register(void)
+int __init irda_sysctl_register(void)
 {
 	irda_table_header = register_sysctl_table(irda_root_table, 0);
 	if (!irda_table_header)
@@ -171,7 +172,7 @@ int irda_sysctl_register(void)
  *    Unregister our sysctl interface
  *
  */
-void irda_sysctl_unregister(void) 
+void __exit irda_sysctl_unregister(void) 
 {
 	unregister_sysctl_table(irda_table_header);
 }
