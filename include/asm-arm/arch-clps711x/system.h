@@ -22,7 +22,7 @@
 
 #include <asm/hardware/clps7111.h>
 
-static void arch_idle(void)
+static inline void arch_idle(void)
 {
 	clps_writel(1, HALT);
 	__asm__ __volatile__(

@@ -538,7 +538,7 @@ static inline void n_tty_receive_char(struct tty_struct *tty, unsigned char c)
 	 * handle specially, do shortcut processing to speed things
 	 * up.
 	 */
-	if (!test_bit(c, &tty->process_char_map) || tty->lnext) {
+	if (!test_bit(c, tty->process_char_map) || tty->lnext) {
 		finish_erasing(tty);
 		tty->lnext = 0;
 		if (L_ECHO(tty)) {
@@ -659,7 +659,7 @@ send_signal:
 
 		handle_newline:
 			spin_lock_irqsave(&tty->read_lock, flags);
-			set_bit(tty->read_head, &tty->read_flags);
+			set_bit(tty->read_head, tty->read_flags);
 			put_tty_queue_nolock(c, tty);
 			tty->canon_head = tty->read_head;
 			tty->canon_data++;
@@ -811,38 +811,38 @@ static void n_tty_set_termios(struct tty_struct *tty, struct termios * old)
 		memset(tty->process_char_map, 0, 256/8);
 
 		if (I_IGNCR(tty) || I_ICRNL(tty))
-			set_bit('\r', &tty->process_char_map);
+			set_bit('\r', tty->process_char_map);
 		if (I_INLCR(tty))
-			set_bit('\n', &tty->process_char_map);
+			set_bit('\n', tty->process_char_map);
 
 		if (L_ICANON(tty)) {
-			set_bit(ERASE_CHAR(tty), &tty->process_char_map);
-			set_bit(KILL_CHAR(tty), &tty->process_char_map);
-			set_bit(EOF_CHAR(tty), &tty->process_char_map);
-			set_bit('\n', &tty->process_char_map);
-			set_bit(EOL_CHAR(tty), &tty->process_char_map);
+			set_bit(ERASE_CHAR(tty), tty->process_char_map);
+			set_bit(KILL_CHAR(tty), tty->process_char_map);
+			set_bit(EOF_CHAR(tty), tty->process_char_map);
+			set_bit('\n', tty->process_char_map);
+			set_bit(EOL_CHAR(tty), tty->process_char_map);
 			if (L_IEXTEN(tty)) {
 				set_bit(WERASE_CHAR(tty),
-					&tty->process_char_map);
+					tty->process_char_map);
 				set_bit(LNEXT_CHAR(tty),
-					&tty->process_char_map);
+					tty->process_char_map);
 				set_bit(EOL2_CHAR(tty),
-					&tty->process_char_map);
+					tty->process_char_map);
 				if (L_ECHO(tty))
 					set_bit(REPRINT_CHAR(tty),
-						&tty->process_char_map);
+						tty->process_char_map);
 			}
 		}
 		if (I_IXON(tty)) {
-			set_bit(START_CHAR(tty), &tty->process_char_map);
-			set_bit(STOP_CHAR(tty), &tty->process_char_map);
+			set_bit(START_CHAR(tty), tty->process_char_map);
+			set_bit(STOP_CHAR(tty), tty->process_char_map);
 		}
 		if (L_ISIG(tty)) {
-			set_bit(INTR_CHAR(tty), &tty->process_char_map);
-			set_bit(QUIT_CHAR(tty), &tty->process_char_map);
-			set_bit(SUSP_CHAR(tty), &tty->process_char_map);
+			set_bit(INTR_CHAR(tty), tty->process_char_map);
+			set_bit(QUIT_CHAR(tty), tty->process_char_map);
+			set_bit(SUSP_CHAR(tty), tty->process_char_map);
 		}
-		clear_bit(__DISABLED_CHAR, &tty->process_char_map);
+		clear_bit(__DISABLED_CHAR, tty->process_char_map);
 		sti();
 		tty->raw = 0;
 		tty->real_raw = 0;
@@ -1058,7 +1058,7 @@ do_it_again:
  				int eol;
 
 				eol = test_and_clear_bit(tty->read_tail,
-						&tty->read_flags);
+						tty->read_flags);
 				c = tty->read_buf[tty->read_tail];
 				spin_lock_irqsave(&tty->read_lock, flags);
 				tty->read_tail = ((tty->read_tail+1) &

@@ -10,6 +10,7 @@
 #include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/serial_core.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -21,6 +22,10 @@
 
 #include "sa1111.h"
 
+static struct device neponset_device = {
+	name:	"Neponset",
+	bus_id:	"nep_bus",
+};
 
 /*
  * Install handler for Neponset IRQ.  Note that we have to loop here
@@ -125,6 +130,10 @@ static int __init neponset_init(void)
 		return -ENODEV;
 	}
 
+	ret = device_register(&neponset_device);
+	if (ret)
+		return ret;
+
 	neponset_init_irq();
 
 	/*
@@ -139,45 +148,9 @@ static int __init neponset_init(void)
 	/* FIXME: setup MSC2 */
 
 	/*
-	 * Probe for a SA1111.
+	 * Probe and initialise the SA1111.
 	 */
-	ret = sa1111_probe(0x40000000);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * We found it.  Wake the chip up.
-	 */
-	sa1111_wake();
-
-	/*
-	 * The SDRAM configuration of the SA1110 and the SA1111 must
-	 * match.  This is very important to ensure that SA1111 accesses
-	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
-	 * MBGNT signal, so we must have called sa1110_mb_disable()
-	 * beforehand.
-	 */
-	sa1111_configure_smc(1,
-			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
-			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
-
-	/*
-	 * We only need to turn on DCLK whenever we want to use the
-	 * DMA.  It can otherwise be held firmly in the off position.
-	 */
-	SKPCR |= SKPCR_DCLKEN;
-
-	/*
-	 * Enable the SA1110 memory bus request and grant signals.
-	 */
-	sa1110_mb_enable();
-
-	/*
-	 * Initialise SA1111 IRQs
-	 */
-	sa1111_init_irq(IRQ_NEPONSET_SA1111);
-
-	return 0;
+	return sa1111_init(&neponset_device, 0x40000000, IRQ_NEPONSET_SA1111);
 }
 
 __initcall(neponset_init);

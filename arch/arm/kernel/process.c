@@ -31,14 +31,6 @@
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 
-/*
- * Values for cpu_do_idle()
- */
-#define IDLE_WAIT_SLOW	0
-#define IDLE_WAIT_FAST	1
-#define IDLE_CLOCK_SLOW	2
-#define IDLE_CLOCK_FAST	3
-
 extern const char *processor_modes[];
 extern void setup_mm_for_reboot(char mode);
 
@@ -78,6 +70,18 @@ void (*pm_idle)(void);
 void (*pm_power_off)(void);
 
 /*
+ * This is our default idle handler.  We need to disable
+ * interrupts here to ensure we don't miss a wakeup call.
+ */
+static void default_idle(void)
+{
+	__cli();
+	if (!need_resched() && !hlt_counter)
+		arch_idle();
+	__sti();
+}
+
+/*
  * The idle thread.  We try to conserve power, while trying to keep
  * overall latency low.  The architecture specific idle is passed
  * a value to indicate the level of "idleness" of the system.
@@ -89,7 +93,7 @@ void cpu_idle(void)
 	while (1) {
 		void (*idle)(void) = pm_idle;
 		if (!idle)
-			idle = arch_idle;
+			idle = default_idle;
 		leds_event(led_idle_start);
 		while (!need_resched())
 			idle();

@@ -109,7 +109,7 @@ extern void __remove_inode_page(struct page *);
 struct task_struct;
 struct vm_area_struct;
 struct sysinfo;
-
+struct address_space;
 struct zone_t;
 
 /* linux/mm/swap.c */
@@ -139,6 +139,9 @@ extern void show_swap_cache_info(void);
 extern int add_to_swap_cache(struct page *, swp_entry_t);
 extern void __delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache(struct page *page);
+extern int move_to_swap_cache(struct page *page, swp_entry_t entry);
+extern int move_from_swap_cache(struct page *page, unsigned long index,
+		struct address_space *mapping);
 extern void free_page_and_swap_cache(struct page *page);
 extern struct page * lookup_swap_cache(swp_entry_t);
 extern struct page * read_swap_cache_async(swp_entry_t);

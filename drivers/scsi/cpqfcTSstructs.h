@@ -95,14 +95,11 @@
 
 #define DEV_NAME "cpqfcTS"
 
-#define CPQ_DEVICE_ID     0xA0FC
-#define AGILENT_XL2_ID    0x1029
-
-typedef struct
+struct SupportedPCIcards
 {
   __u16 vendor_id;
   __u16 device_id;
-} SupportedPCIcards;
+};
 			 
 // nn:nn denotes bit field
                             // TachyonHeader struct def.

@@ -160,13 +160,7 @@ compute_loop_size(struct loop_device *lo,
 {
 	loff_t size = 0;
 
-	if (S_ISREG(lo_dentry->d_inode->i_mode)) {
-		size = lo_dentry->d_inode->i_size;
-	} else {
-		size = blkdev_size_in_bytes(lodev);
-		if (size == 0)
-			return MAX_DISK_SIZE;
-	}
+	size = lo_dentry->d_inode->i_mapping->host->i_size;
 	return (size - lo->lo_offset) >> BLOCK_SIZE_BITS;
 }
 

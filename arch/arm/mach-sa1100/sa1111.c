@@ -23,8 +23,11 @@
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
+#include <linux/device.h>
+#include <linux/slab.h>
 
 #include <asm/hardware.h>
+#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
 
@@ -32,11 +35,9 @@
 
 #include "sa1111.h"
 
-struct resource sa1111_resource = {
-	name:	"SA1111",
-};
+struct sa1111_device *sa1111;
 
-EXPORT_SYMBOL(sa1111_resource);
+EXPORT_SYMBOL(sa1111);
 
 /*
  * SA1111 interrupt support.  Since clearing an IRQ while there are
@@ -65,6 +66,9 @@ sa1111_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	for (i = IRQ_SA1111_START + 32; stat1; i++, stat1 >>= 1)
 		if (stat1 & 1)
 			do_edge_IRQ(i, irq_desc + i, regs);
+
+	/* For level-based interrupts */
+	desc->chip->unmask(irq);
 }
 
 #define SA1111_IRQMASK_LO(x)	(1 << (x - IRQ_SA1111_START))
@@ -198,7 +202,7 @@ static struct irqchip sa1111_high_chip = {
 	type:		sa1111_type_highirq,
 };
 
-void __init sa1111_init_irq(int irq_nr)
+static void __init sa1111_init_irq(int irq_nr)
 {
 	unsigned int irq;
 
@@ -239,6 +243,21 @@ void __init sa1111_init_irq(int irq_nr)
 	set_irq_chained_handler(irq_nr, sa1111_irq_handler);
 }
 
+static int sa1111_suspend(struct device *dev, u32 state, u32 level)
+{
+	return 0;
+}
+
+static int sa1111_resume(struct device *dev, u32 level)
+{
+	return 0;
+}
+
+static struct device_driver sa1111_device_driver = {
+	suspend:	sa1111_suspend,
+	resume:		sa1111_resume,
+};
+
 /**
  *	sa1111_probe - probe for a single SA1111 chip.
  *	@phys_addr: physical address of device.
@@ -251,38 +270,71 @@ void __init sa1111_init_irq(int irq_nr)
  *	%-EBUSY		physical address already marked in-use.
  *	%0		successful.
  */
-int __init sa1111_probe(unsigned long phys_addr)
+static int __init
+sa1111_probe(struct device *parent, unsigned long phys_addr)
 {
+	struct sa1111_device *sa;
 	unsigned long id;
 	int ret = -ENODEV;
 
-	sa1111_resource.start = phys_addr;
-	sa1111_resource.end = phys_addr + 0x2000;
+	sa = kmalloc(sizeof(struct sa1111_device), GFP_KERNEL);
+	if (!sa)
+		return -ENOMEM;
 
-	if (request_resource(&iomem_resource, &sa1111_resource)) {
+	memset(sa, 0, sizeof(struct sa1111_device));
+
+	sa->resource.name  = "SA1111";
+	sa->resource.start = phys_addr;
+	sa->resource.end   = phys_addr + 0x2000;
+
+	if (request_resource(&iomem_resource, &sa->resource)) {
 		ret = -EBUSY;
 		goto out;
+	}
+
+	/* eventually ioremap... */
+	sa->base = (void *)0xf4000000;
+	if (!sa->base) {
+		ret = -ENOMEM;
+		goto release;
 	}
 
 	/*
 	 * Probe for the chip.  Only touch the SBI registers.
 	 */
-	id = SBI_SKID;
+	id = readl(sa->base + SA1111_SKID);
 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
 		printk(KERN_DEBUG "SA1111 not detected: ID = %08lx\n", id);
 		ret = -ENODEV;
-		goto release;
+		goto unmap;
 	}
+
+	/*
+	 * We found the chip.
+	 */
+	strcpy(sa->dev.name, "SA1111");
+	sprintf(sa->dev.bus_id, "%8.8lx", phys_addr);
+	sa->dev.parent = parent;
+	sa->dev.driver = &sa1111_device_driver;
+
+	ret = device_register(&sa->dev);
+	if (ret)
+		printk("sa1111 device_register failed: %d\n", ret);
 
 	printk(KERN_INFO "SA1111 Microprocessor Companion Chip: "
 		"silicon revision %lx, metal revision %lx\n",
 		(id & SKID_SIREV_MASK)>>4, (id & SKID_MTREV_MASK));
 
+	sa1111 = sa;
+
 	return 0;
 
+ unmap:
+//	iounmap(sa->base);
  release:
-	release_resource(&sa1111_resource);
+	release_resource(&sa->resource);
  out:
+	kfree(sa);
 	return ret;
 }
 
@@ -302,7 +354,8 @@ int __init sa1111_probe(unsigned long phys_addr)
  */
 void sa1111_wake(void)
 {
-	unsigned long flags;
+	struct sa1111_device *sa = sa1111;
+	unsigned long flags, r;
 
 	local_irq_save(flags);
 
@@ -317,8 +370,11 @@ void sa1111_wake(void)
 	/*
 	 * Turn VCO on, and disable PLL Bypass.
 	 */
-	SBI_SKCR &= ~SKCR_VCO_OFF;
-	SBI_SKCR |= SKCR_PLL_BYPASS | SKCR_OE_EN;
+	r = readl(sa->base + SA1111_SKCR);
+	r &= ~SKCR_VCO_OFF;
+	writel(r, sa->base + SA1111_SKCR);
+	r |= SKCR_PLL_BYPASS | SKCR_OE_EN;
+	writel(r, sa->base + SA1111_SKCR);
 
 	/*
 	 * Wait lock time.  SA1111 manual _doesn't_
@@ -329,7 +385,8 @@ void sa1111_wake(void)
 	/*
 	 * Enable RCLK.  We also ensure that RDYEN is set.
 	 */
-	SBI_SKCR |= SKCR_RCLKEN | SKCR_RDYEN;
+	r |= SKCR_RCLKEN | SKCR_RDYEN;
+	writel(r, sa->base + SA1111_SKCR);
 
 	/*
 	 * Wait 14 RCLK cycles for the chip to finish coming out
@@ -340,18 +397,26 @@ void sa1111_wake(void)
 	/*
 	 * Ensure all clocks are initially off.
 	 */
-	SKPCR = 0;
+	writel(0, sa->base + SA1111_SKPCR);
 
 	local_irq_restore(flags);
 }
 
 void sa1111_doze(void)
 {
-	if (SKPCR & SKPCR_UCLKEN) {
+	struct sa1111_device *sa = sa1111;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	if (readl(sa->base + SA1111_SKPCR) & SKPCR_UCLKEN) {
+		local_irq_restore(flags);
 		printk("SA1111 doze mode refused\n");
 		return;
 	}
-	SBI_SKCR &= ~SKCR_RCLKEN;
+
+	writel(readl(sa->base + SA1111_SKCR) & ~SKCR_RCLKEN, sa->base + SA1111_SKCR);
+	local_irq_restore(flags);
 }
 
 /*
@@ -359,12 +424,13 @@ void sa1111_doze(void)
  */
 void sa1111_configure_smc(int sdram, unsigned int drac, unsigned int cas_latency)
 {
+	struct sa1111_device *sa = sa1111;
 	unsigned int smcr = SMCR_DTIM | SMCR_MBGE | FInsrt(drac, SMCR_DRAC);
 
 	if (cas_latency == 3)
 		smcr |= SMCR_CLAT;
 
-	SBI_SMCR = smcr;
+	writel(smcr, sa->base + SA1111_SMCR);
 }
 
 /* According to the "Intel StrongARM SA-1111 Microprocessor Companion
@@ -432,3 +498,46 @@ int sa1111_check_dma_bug(dma_addr_t addr)
 }
 
 EXPORT_SYMBOL(sa1111_check_dma_bug);
+
+int sa1111_init(struct device *parent, unsigned long phys, unsigned int irq)
+{
+	int ret;
+
+	ret = sa1111_probe(parent, phys);
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * We found it.  Wake the chip up.
+	 */
+	sa1111_wake();
+
+	/*
+	 * The SDRAM configuration of the SA1110 and the SA1111 must
+	 * match.  This is very important to ensure that SA1111 accesses
+	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
+	 * MBGNT signal, so we must have called sa1110_mb_disable()
+	 * beforehand.
+	 */
+	sa1111_configure_smc(1,
+			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
+			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
+
+	/*
+	 * We only need to turn on DCLK whenever we want to use the
+	 * DMA.  It can otherwise be held firmly in the off position.
+	 */
+	SKPCR |= SKPCR_DCLKEN;
+
+	/*
+	 * Enable the SA1110 memory bus request and grant signals.
+	 */
+	sa1110_mb_enable();
+
+	/*
+	 * Initialise SA1111 IRQs
+	 */
+	sa1111_init_irq(irq);
+
+	return 0;
+}

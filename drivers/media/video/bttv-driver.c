@@ -1650,8 +1650,8 @@ static void release_buffer(struct file *file, struct videobuf_buffer *vb)
 	bttv_dma_free(fh->btv,buf);
 }
 
-static int bttv_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, void *arg)
+static int bttv_do_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, void *arg)
 {
 	struct bttv_fh *fh  = file->private_data;
 	struct bttv    *btv = fh->btv;
@@ -2432,6 +2432,12 @@ static int bttv_ioctl(struct inode *inode, struct file *file,
 	return retval;
 }
 
+static int bttv_ioctl(struct inode *inode, struct file *file,
+		      unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, bttv_do_ioctl);
+}
+
 /* start capture to a kernel bounce buffer */
 static int bttv_read_capture(struct bttv_fh *fh)
 {
@@ -2647,7 +2653,7 @@ static struct file_operations bttv_fops =
 	owner:	  THIS_MODULE,
 	open:	  bttv_open,
 	release:  bttv_release,
-	ioctl:	  video_generic_ioctl,
+	ioctl:	  bttv_ioctl,
 	llseek:	  no_llseek,
 	read:	  bttv_read,
 	mmap:	  bttv_mmap,
@@ -2661,7 +2667,6 @@ static struct video_device bttv_template =
 	          VID_TYPE_CLIPPING|VID_TYPE_SCALES,
 	hardware: VID_HARDWARE_BT848,
 	fops:     &bttv_fops,
-	kernel_ioctl: bttv_ioctl,
 	minor:    -1,
 };
 
@@ -2712,8 +2717,8 @@ static int radio_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int radio_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg)
+static int radio_do_ioctl(struct inode *inode, struct file *file,
+			  unsigned int cmd, void *arg)
 {
 	struct bttv    *btv = file->private_data;
 
@@ -2763,12 +2768,18 @@ static int radio_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
+static int radio_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, radio_do_ioctl);
+}
+
 static struct file_operations radio_fops =
 {
 	owner:	  THIS_MODULE,
 	open:	  radio_open,
 	release:  radio_release,
-	ioctl:	  video_generic_ioctl,
+	ioctl:	  radio_ioctl,
 	llseek:	  no_llseek,
 };
 
@@ -2778,7 +2789,6 @@ static struct video_device radio_template =
 	type:     VID_TYPE_TUNER|VID_TYPE_TELETEXT,
 	hardware: VID_HARDWARE_BT848,
 	fops:     &radio_fops,
-	kernel_ioctl: radio_ioctl,
 	minor:    -1,
 };
 

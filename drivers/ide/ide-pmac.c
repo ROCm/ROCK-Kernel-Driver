@@ -52,7 +52,6 @@
 #endif
 #include "ata-timing.h"
 
-extern char *ide_dmafunc_verbose(ide_dma_action_t dmafunc);
 extern spinlock_t ide_lock;
 
 #undef IDE_PMAC_DEBUG
@@ -1055,13 +1054,13 @@ pmac_ide_build_sglist (int ix, struct request *rq)
 }
 
 static int
-pmac_ide_raw_build_sglist (int ix, struct request *rq)
+pmac_raw_build_sglist (int ix, struct request *rq)
 {
 	struct ata_channel *hwif = &ide_hwifs[ix];
 	struct pmac_ide_hwif *pmif = &pmac_ide[ix];
 	struct scatterlist *sg = pmif->sg_table;
 	int nents = 0;
-	ide_task_t *args = rq->special;
+	struct ata_taskfile *args = rq->special;
 	unsigned char *virt_addr = rq->buffer;
 	int sector_count = rq->nr_sectors;
 
@@ -1111,7 +1110,7 @@ pmac_ide_build_dmatable(ide_drive_t *drive, int ix, int wr)
 
 	/* Build sglist */
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		pmac_ide[ix].sg_nents = i = pmac_ide_raw_build_sglist(ix, rq);
+		pmac_ide[ix].sg_nents = i = pmac_raw_build_sglist(ix, rq);
 	} else {
 		pmac_ide[ix].sg_nents = i = pmac_ide_build_sglist(ix, rq);
 	}
@@ -1389,7 +1388,7 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
 		if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
 		    (drive->addressing == 1)) {
-			ide_task_t *args = HWGROUP(drive)->rq->special;
+			struct ata_taskfile *args = HWGROUP(drive)->rq->special;
 			OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 		} else if (drive->addressing) {
 			OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
@@ -1460,10 +1459,10 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 	case ide_dma_retune:
 	case ide_dma_lostirq:
 	case ide_dma_timeout:
-		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported %s func only: %d\n", ide_dmafunc_verbose(func),  func);
+		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported func only: %d\n", func);
 		return 1;
 	default:
-		printk(KERN_WARNING "ide_pmac_dmaproc: unsupported %s func: %d\n", ide_dmafunc_verbose(func), func);
+		printk(KERN_WARNING "ide_pmac_dmaproc: unsupported func: %d\n", func);
 		return 1;
 	}
 	return 0;

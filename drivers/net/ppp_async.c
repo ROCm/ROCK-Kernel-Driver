@@ -17,7 +17,7 @@
  * PPP driver, written by Michael Callahan and Al Longyear, and
  * subsequently hacked by Paul Mackerras.
  *
- * ==FILEVERSION 20000227==
+ * ==FILEVERSION 20020125==
  */
 
 #include <linux/module.h>
@@ -33,7 +33,7 @@
 #include <linux/init.h>
 #include <asm/uaccess.h>
 
-#define PPP_VERSION	"2.4.1"
+#define PPP_VERSION	"2.4.2"
 
 #define OBUFSIZE	256
 
@@ -62,6 +62,8 @@ struct asyncppp {
 	struct sk_buff	*rpkt;
 	int		lcp_fcs;
 
+	atomic_t	refcnt;
+	struct semaphore dead_sem;
 	struct ppp_channel chan;	/* interface to generic ppp layer */
 	unsigned char	obuf[OBUFSIZE];
 };
@@ -108,6 +110,35 @@ static struct ppp_channel_ops async_ops = {
  */
 
 /*
+ * We have a potential race on dereferencing tty->disc_data,
+ * because the tty layer provides no locking at all - thus one
+ * cpu could be running ppp_asynctty_receive while another
+ * calls ppp_asynctty_close, which zeroes tty->disc_data and
+ * frees the memory that ppp_asynctty_receive is using.  The best
+ * way to fix this is to use a rwlock in the tty struct, but for now
+ * we use a single global rwlock for all ttys in ppp line discipline.
+ */
+static rwlock_t disc_data_lock = RW_LOCK_UNLOCKED;
+
+static struct asyncppp *ap_get(struct tty_struct *tty)
+{
+	struct asyncppp *ap;
+
+	read_lock(&disc_data_lock);
+	ap = tty->disc_data;
+	if (ap != NULL)
+		atomic_inc(&ap->refcnt);
+	read_unlock(&disc_data_lock);
+	return ap;
+}
+
+static void ap_put(struct asyncppp *ap)
+{
+	if (atomic_dec_and_test(&ap->refcnt))
+		up(&ap->dead_sem);
+}
+
+/*
  * Called when a tty is put into PPP line discipline.
  */
 static int
@@ -135,6 +166,9 @@ ppp_asynctty_open(struct tty_struct *tty)
 	ap->olim = ap->obuf;
 	ap->lcp_fcs = -1;
 
+	atomic_set(&ap->refcnt, 1);
+	init_MUTEX_LOCKED(&ap->dead_sem);
+
 	ap->chan.private = ap;
 	ap->chan.ops = &async_ops;
 	ap->chan.mtu = PPP_MRU;
@@ -155,19 +189,34 @@ ppp_asynctty_open(struct tty_struct *tty)
 
 /*
  * Called when the tty is put into another line discipline
- * or it hangs up.
- * We assume that while we are in this routine, the tty layer
- * won't call any of the other line discipline entries for the
- * same tty.
+ * or it hangs up.  We have to wait for any cpu currently
+ * executing in any of the other ppp_asynctty_* routines to
+ * finish before we can call ppp_unregister_channel and free
+ * the asyncppp struct.  This routine must be called from
+ * process context, not interrupt or softirq context.
  */
 static void
 ppp_asynctty_close(struct tty_struct *tty)
 {
-	struct asyncppp *ap = tty->disc_data;
+	struct asyncppp *ap;
 
+	write_lock(&disc_data_lock);
+	ap = tty->disc_data;
+	tty->disc_data = 0;
+	write_unlock(&disc_data_lock);
 	if (ap == 0)
 		return;
-	tty->disc_data = 0;
+
+	/*
+	 * We have now ensured that nobody can start using ap from now
+	 * on, but we have to wait for all existing users to finish.
+	 * Note that ppp_unregister_channel ensures that no calls to
+	 * our channel ops (i.e. ppp_async_send/ioctl) are in progress
+	 * by the time it returns.
+	 */
+	if (!atomic_dec_and_test(&ap->refcnt))
+		down(&ap->dead_sem);
+
 	ppp_unregister_channel(&ap->chan);
 	if (ap->rpkt != 0)
 		kfree_skb(ap->rpkt);
@@ -203,9 +252,11 @@ static int
 ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		   unsigned int cmd, unsigned long arg)
 {
-	struct asyncppp *ap = tty->disc_data;
+	struct asyncppp *ap = ap_get(tty);
 	int err, val;
 
+	if (ap == 0)
+		return -ENXIO;
 	err = -EFAULT;
 	switch (cmd) {
 	case PPPIOCGCHAN:
@@ -251,6 +302,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		err = -ENOIOCTLCMD;
 	}
 
+	ap_put(ap);
 	return err;
 }
 
@@ -271,13 +323,14 @@ static void
 ppp_asynctty_receive(struct tty_struct *tty, const unsigned char *buf,
 		  char *flags, int count)
 {
-	struct asyncppp *ap = tty->disc_data;
+	struct asyncppp *ap = ap_get(tty);
 
 	if (ap == 0)
 		return;
 	spin_lock_bh(&ap->recv_lock);
 	ppp_async_input(ap, buf, flags, count);
 	spin_unlock_bh(&ap->recv_lock);
+	ap_put(ap);
 	if (test_and_clear_bit(TTY_THROTTLED, &tty->flags)
 	    && tty->driver.unthrottle)
 		tty->driver.unthrottle(tty);
@@ -286,13 +339,14 @@ ppp_asynctty_receive(struct tty_struct *tty, const unsigned char *buf,
 static void
 ppp_asynctty_wakeup(struct tty_struct *tty)
 {
-	struct asyncppp *ap = tty->disc_data;
+	struct asyncppp *ap = ap_get(tty);
 
 	clear_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 	if (ap == 0)
 		return;
 	if (ppp_async_push(ap))
 		ppp_output_wakeup(&ap->chan);
+	ap_put(ap);
 }
 
 

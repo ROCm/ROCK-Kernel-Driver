@@ -40,7 +40,7 @@ extern const struct processor arm3_processor_functions;
 #define cpu_proc_init()				processor._proc_init()
 #define cpu_proc_fin()				processor._proc_fin()
 #define cpu_do_idle()				do { } while (0)
-#define cpu_switch_mm(pgd,tsk)			processor._set_pgd(pgd)
+#define cpu_switch_mm(pgd,mm)			processor._set_pgd(pgd)
 #define cpu_xchg_1(x,ptr)			processor._xchg_1(x,ptr)
 #define cpu_xchg_4(x,ptr)			processor._xchg_4(x,ptr)
 

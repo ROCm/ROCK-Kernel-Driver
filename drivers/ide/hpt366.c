@@ -75,8 +75,6 @@
 #include <linux/proc_fs.h>
 #endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-extern char *ide_dmafunc_verbose(ide_dma_action_t dmafunc);
-
 const char *quirk_drives[] = {
 	"QUANTUM FIREBALLlct08 08",
 	"QUANTUM FIREBALLP KA6.4",
@@ -815,10 +813,8 @@ int hpt366_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			pci_read_config_byte(drive->channel->pci_dev, 0x50, &reg50h);
 			pci_read_config_byte(drive->channel->pci_dev, 0x52, &reg52h);
 			pci_read_config_byte(drive->channel->pci_dev, 0x5a, &reg5ah);
-			printk("%s: (%s)  reg50h=0x%02x, reg52h=0x%02x, reg5ah=0x%02x\n",
-				drive->name,
-				ide_dmafunc_verbose(func),
-				reg50h, reg52h, reg5ah);
+			printk("%s: (ide_dma_lostirq)  reg50h=0x%02x, reg52h=0x%02x, reg5ah=0x%02x\n",
+				drive->name, reg50h, reg52h, reg5ah);
 			if (reg5ah & 0x10)
 				pci_write_config_byte(drive->channel->pci_dev, 0x5a, reg5ah & ~0x10);
 			/* fall through to a reset */

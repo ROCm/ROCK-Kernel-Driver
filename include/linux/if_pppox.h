@@ -147,13 +147,14 @@ extern void pppox_unbind_sock(struct sock *sk);/* delete ppp-channel binding */
 extern int pppox_channel_ioctl(struct ppp_channel *pc, unsigned int cmd,
 			       unsigned long arg);
 
-/* PPPoE socket states */
+/* PPPoX socket states */
 enum {
     PPPOX_NONE		= 0,  /* initial state */
     PPPOX_CONNECTED	= 1,  /* connection established ==TCP_ESTABLISHED */
     PPPOX_BOUND		= 2,  /* bound to ppp device */
     PPPOX_RELAY		= 4,  /* forwarding is enabled */
-    PPPOX_DEAD		= 8
+    PPPOX_ZOMBIE	= 8,  /* dead, but still bound to ppp device */
+    PPPOX_DEAD		= 16  /* dead, useless, please clean me up!*/
 };
 
 extern struct ppp_channel_ops pppoe_chan_ops;

@@ -77,7 +77,7 @@ struct notifier_block *adb_client_list = NULL;
 static int adb_got_sleep = 0;
 static int adb_inited = 0;
 static pid_t adb_probe_task_pid;
-static int adb_probe_task_flag;
+static unsigned long adb_probe_task_flag;
 static wait_queue_head_t adb_probe_task_wq;
 static int sleepy_trackpad;
 int __adb_probe_sync;
@@ -439,7 +439,7 @@ adb_probe_wakeup(struct adb_request *req)
 }
 
 static struct adb_request adb_sreq;
-static int adb_sreq_lock; // Use semaphore ! */ 
+static unsigned long adb_sreq_lock; // Use semaphore ! */ 
 
 int
 adb_request(struct adb_request *req, void (*done)(struct adb_request *),

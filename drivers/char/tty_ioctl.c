@@ -188,7 +188,7 @@ static unsigned long inq_canon(struct tty_struct * tty)
 	nr = (head - tail) & (N_TTY_BUF_SIZE-1);
 	/* Skip EOF-chars.. */
 	while (head != tail) {
-		if (test_bit(tail, &tty->read_flags) &&
+		if (test_bit(tail, tty->read_flags) &&
 		    tty->read_buf[tail] == __DISABLED_CHAR)
 			nr--;
 		tail = (tail+1) & (N_TTY_BUF_SIZE-1);

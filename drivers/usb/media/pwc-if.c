@@ -126,7 +126,7 @@ static int pwc_video_read(struct file *file, char *buf,
 			  size_t count, loff_t *ppos);
 static unsigned int pwc_video_poll(struct file *file, poll_table *wait);
 static int  pwc_video_ioctl(struct inode *inode, struct file *file,
-			    unsigned int ioctlnr, void *arg);
+			    unsigned int ioctlnr, unsigned long arg);
 static int  pwc_video_mmap(struct file *file, struct vm_area_struct *vma);
 
 static struct file_operations pwc_fops = {
@@ -136,7 +136,7 @@ static struct file_operations pwc_fops = {
 	read:		pwc_video_read,
 	poll:		pwc_video_poll,
 	mmap:		pwc_video_mmap,
-	ioctl:          video_generic_ioctl,
+	ioctl:          pwc_video_ioctl,
 	llseek:         no_llseek,
 };
 static struct video_device pwc_template = {
@@ -145,7 +145,6 @@ static struct video_device pwc_template = {
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_PWC,
 	fops:           &pwc_fops,
-	kernel_ioctl:	pwc_video_ioctl,
 };
 
 /***************************************************************************/
@@ -1171,8 +1170,8 @@ static unsigned int pwc_video_poll(struct file *file, poll_table *wait)
 	return 0;
 }
         
-static int pwc_video_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, void *arg)
+static int pwc_video_do_ioctl(struct inode *inode, struct file *file,
+			      unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
@@ -1493,6 +1492,13 @@ static int pwc_video_ioctl(struct inode *inode, struct file *file,
 	} /* ..switch */
 	return 0;
 }	
+
+static int pwc_video_ioctl(struct inode *inode, struct file *file,
+			   unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, pwc_video_do_ioctl);
+}
+
 
 static int pwc_video_mmap(struct file *file, struct vm_area_struct *vma)
 {

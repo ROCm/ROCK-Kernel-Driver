@@ -38,6 +38,7 @@
 #include <asm/residual.h>
 #include <asm/time.h>
 #include <asm/thread_info.h>
+#include <asm/tlbflush.h>
 
 int smp_threads_ready;
 volatile int smp_commenced;

@@ -32,6 +32,7 @@
 #include <asm/btext.h>
 #include <asm/pci-bridge.h>
 #include <asm/open_pic.h>
+#include <asm/cacheflush.h>
 
 #ifdef CONFIG_FB
 #include <asm/linux_logo.h>

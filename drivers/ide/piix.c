@@ -199,7 +199,7 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 
 		if (~piix_config->flags & PIIX_VICTORY) {
 			if ((piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_66 && (u & (1 << i))) umul = 2;
-			if ((piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 && (u & ((1 << i) + 12))) umul = 1;
+			if ((piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 && (u & (1 << (i + 12)))) umul = 1;
 			udma[i] = (4 - ((e >> (i << 2)) & 3)) * umul;
 		} else  udma[i] = (8 - ((e >> (i << 2)) & 7)) * 2;
 

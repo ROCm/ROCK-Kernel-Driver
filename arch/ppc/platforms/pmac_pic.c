@@ -492,7 +492,7 @@ pmac_pic_init(void)
  * and disables all interrupts except for the nominated one.
  * sleep_restore_intrs() restores the states of all interrupt enables.
  */
-unsigned int sleep_save_mask[2];
+unsigned long sleep_save_mask[2];
 
 void __pmac
 pmac_sleep_save_intrs(int viaint)
