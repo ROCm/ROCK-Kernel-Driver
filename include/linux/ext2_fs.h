@@ -191,10 +191,11 @@ struct ext2_group_desc
 #define EXT2_JOURNAL_DATA_FL		0x00004000 /* Reserved for ext3 */
 #define EXT2_NOTAIL_FL			0x00008000 /* file tail should not be merged */
 #define EXT2_DIRSYNC_FL			0x00010000 /* dirsync behaviour (directories only) */
+#define EXT2_TOPDIR_FL			0x00020000 /* Top of directory hierarchies*/
 #define EXT2_RESERVED_FL		0x80000000 /* reserved for ext2 lib */
 
-#define EXT2_FL_USER_VISIBLE		0x00011FFF /* User visible flags */
-#define EXT2_FL_USER_MODIFIABLE		0x000100FF /* User modifiable flags */
+#define EXT2_FL_USER_VISIBLE		0x0003DFFF /* User visible flags */
+#define EXT2_FL_USER_MODIFIABLE		0x000380FF /* User modifiable flags */
 
 /*
  * ioctl commands
@@ -300,6 +301,7 @@ struct ext2_inode {
  * Mount flags
  */
 #define EXT2_MOUNT_CHECK		0x0001	/* Do mount-time checks */
+#define EXT2_MOUNT_OLDALLOC		0x0002  /* Don't use the new Orlov allocator */
 #define EXT2_MOUNT_GRPID		0x0004	/* Create files with directory's group */
 #define EXT2_MOUNT_DEBUG		0x0008	/* Some debugging messages */
 #define EXT2_MOUNT_ERRORS_CONT		0x0010	/* Continue on errors */

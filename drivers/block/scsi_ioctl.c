@@ -226,6 +226,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	/*
 	 * fill in request structure
 	 */
+	rq->cmd_len = hdr.cmd_len;
 	copy_from_user(rq->cmd, hdr.cmdp, hdr.cmd_len);
 	if (sizeof(rq->cmd) != hdr.cmd_len)
 		memset(rq->cmd + hdr.cmd_len, 0, sizeof(rq->cmd) - hdr.cmd_len);
@@ -348,6 +349,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	 * get command and data to send to device, if any
 	 */
 	err = -EFAULT;
+	rq->cmd_len = cmdlen;
 	if (copy_from_user(rq->cmd, sic->data, cmdlen))
 		goto error;
 

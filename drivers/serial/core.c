@@ -65,11 +65,9 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
  * This routine is used by the interrupt handler to schedule processing in
  * the software interrupt portion of the driver.
  */
-void uart_event(struct uart_port *port, int event)
+void uart_write_wakeup(struct uart_port *port)
 {
 	struct uart_info *info = port->info;
-
-	set_bit(0, &info->event);
 	tasklet_schedule(&info->tlet);
 }
 
@@ -112,13 +110,12 @@ static void uart_tasklet_action(unsigned long data)
 	struct tty_struct *tty;
 
 	tty = info->tty;
-	if (!tty || !test_and_clear_bit(EVT_WRITE_WAKEUP, &info->event))
-		return;
-
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-	wake_up_interruptible(&tty->write_wait);
+	if (tty) {
+		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+		    tty->ldisc.write_wakeup)
+			tty->ldisc.write_wakeup(tty);
+		wake_up_interruptible(&tty->write_wait);
+	}
 }
 
 static inline void
@@ -1981,7 +1978,8 @@ static int uart_pm(struct pm_dev *dev, pm_request_t rqst, void *data)
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
-	printk("%s%d at ", drv->dev_name, port->line);
+	printk(drv->dev_name, port->line);
+	printk(" at ");
 	switch (port->iotype) {
 	case UPIO_PORT:
 		printk("I/O 0x%x", port->iobase);
@@ -2005,7 +2003,6 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	state->port = port;
 
 	spin_lock_init(&port->lock);
-	port->type = PORT_UNKNOWN;
 	port->cons = drv->cons;
 	port->info = state->info;
 
@@ -2022,8 +2019,10 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	flags = UART_CONFIG_TYPE;
 	if (port->flags & UPF_AUTO_IRQ)
 		flags |= UART_CONFIG_IRQ;
-	if (port->flags & UPF_BOOT_AUTOCONF)
+	if (port->flags & UPF_BOOT_AUTOCONF) {
+		port->type = PORT_UNKNOWN;
 		port->ops->config_port(port, flags);
+	}
 
 	/*
 	 * Register the port whether it's detected or not.  This allows
@@ -2439,8 +2438,9 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 	struct uart_state *state;
 
 	if (line < 0 || line >= drv->nr) {
-		printk(KERN_ERR "Attempt to unregister %s%d\n",
-			drv->dev_name, line);
+		printk(KERN_ERR "Attempt to unregister ");
+		printk(drv->dev_name, line);
+		printk("\n");
 		return;
 	}
 
@@ -2453,7 +2453,7 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 	up(&port_sem);
 }
 
-EXPORT_SYMBOL(uart_event);
+EXPORT_SYMBOL(uart_write_wakeup);
 EXPORT_SYMBOL(uart_register_driver);
 EXPORT_SYMBOL(uart_unregister_driver);
 EXPORT_SYMBOL(uart_register_port);

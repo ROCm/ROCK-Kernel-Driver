@@ -523,7 +523,7 @@ static void sunzilog_transmit_chars(struct uart_sunzilog_port *up,
 	up->port.icount.tx++;
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(&up->port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(&up->port);
 
 	if (!uart_circ_empty(xmit))
 		return;
@@ -1003,7 +1003,7 @@ static struct uart_driver sunzilog_reg = {
 #ifdef CONFIG_DEVFS_FS
 	.dev_name	=	"ttyS%d",
 #else
-	.dev_name	=	"ttyS",
+	.dev_name	=	"ttyS%d",
 #endif
 	.major		=	TTY_MAJOR,
 };

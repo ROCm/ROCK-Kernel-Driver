@@ -215,7 +215,7 @@ static void uart00_tx_chars(struct uart_port *port)
 	} while (--count > 0);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
 		uart00_stop_tx(port, 0);

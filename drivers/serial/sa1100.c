@@ -305,7 +305,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 	}
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(&sport->port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(&sport->port);
 
 	if (uart_circ_empty(xmit))
 		sa1100_stop_tx(&sport->port, 0);
@@ -661,7 +661,7 @@ void __init sa1100_register_uart_fns(struct sa1100_port_fns *fns)
 void __init sa1100_register_uart(int idx, int port)
 {
 	if (idx >= NR_PORTS) {
-		printk(KERN_ERR __FUNCTION__ ": bad index number %d\n", idx);
+		printk(KERN_ERR "%s: bad index number %d\n", __FUNCTION__, idx);
 		return;
 	}
 
@@ -688,7 +688,7 @@ void __init sa1100_register_uart(int idx, int port)
 		break;
 
 	default:
-		printk(KERN_ERR __FUNCTION__ ": bad port number %d\n", port);
+		printk(KERN_ERR "%s: bad port number %d\n", __FUNCTION__, port);
 	}
 }
 
@@ -827,11 +827,7 @@ void __init sa1100_rs_console_init(void)
 static struct uart_driver sa1100_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttySA",
-#ifdef CONFIG_DEVFS_FS
 	.dev_name		= "ttySA%d",
-#else
-	.dev_name		= "ttySA",
-#endif
 	.major			= SERIAL_SA1100_MAJOR,
 	.minor			= MINOR_START,
 	.nr			= NR_PORTS,

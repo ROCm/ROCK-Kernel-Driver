@@ -196,7 +196,7 @@ int isapnp_proc_init(void);
 int isapnp_proc_done(void);
 #else
 static inline isapnp_proc_init(void) { return 0; }
-static inline isapnp_proc_done(void) { return 0; )
+static inline isapnp_proc_done(void) { return 0; }
 #endif
 
 /* misc */
