@@ -324,8 +324,9 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		ip_conntrack_destroyed(ct);
 
 	WRITE_LOCK(&ip_conntrack_lock);
-	/* Delete us from our own list to prevent corruption later */
-	list_del(&ct->sibling_list);
+	/* Make sure don't leave any orphaned expectations lying around */
+	if (ct->expecting)
+		remove_expectations(ct, 1);
 
 	/* Delete our master expectation */
 	if (ct->master) {
