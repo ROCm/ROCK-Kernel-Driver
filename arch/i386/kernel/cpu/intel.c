@@ -103,6 +103,7 @@ static struct _cache_table cache_table[] __initdata =
 	{ 0x7b, LVL_2,      512 },
 	{ 0x7c, LVL_2,      1024 },
 	{ 0x7d, LVL_2,	    2048 },
+	{ 0x7f, LVL_2,	    512 },
 	{ 0x82, LVL_2,      256 },
 	{ 0x83, LVL_2,      512 },
 	{ 0x84, LVL_2,      1024 },
