@@ -73,7 +73,7 @@ static int check_size_prot(struct hugetlb_key *key, unsigned long len, int prot,
 /*
  * Call without htlbpage_lock, returns with htlbpage_lock held.
  */
-struct hugetlb_key *alloc_key(int key, unsigned long len, int prot, int flag, int *new)
+struct hugetlb_key *alloc_key(int key, unsigned long len, int prot, int flag)
 {
 	struct hugetlb_key *hugetlb_key;
 
@@ -101,8 +101,6 @@ struct hugetlb_key *alloc_key(int key, unsigned long len, int prot, int flag, in
 					hugetlb_key->gid = current->fsgid;
 					hugetlb_key->mode = prot;
 					hugetlb_key->size = len;
-					atomic_set(&hugetlb_key->count, 1);
-					*new = 1;
 				}
 			}
 		} else if (key_busy(hugetlb_key)) {
@@ -111,26 +109,35 @@ struct hugetlb_key *alloc_key(int key, unsigned long len, int prot, int flag, in
 		} else if (check_size_prot(hugetlb_key, len, prot, flag) < 0) {
 			hugetlb_key->key = 0;
 			hugetlb_key = ERR_PTR(-EINVAL);
-		} else
-			*new = 0;
+		} 
 	} while (hugetlb_key == ERR_PTR(-EAGAIN));
+	if (!IS_ERR(hugetlb_key))
+		atomic_inc(&hugetlb_key->count);
 	return hugetlb_key;
 }
 
 void hugetlb_release_key(struct hugetlb_key *key)
 {
 	unsigned long index;
+	unsigned long max_idx;
 
-	if (!atomic_dec_and_lock(&key->count, &htlbpage_lock))
+	if (!atomic_dec_and_test(&key->count)) {
+		spin_lock(&htlbpage_lock);
+		clear_key_busy(key);
+		spin_unlock(&htlbpage_lock);
 		return;	
+	}
 
-	for (index = 0; index < key->size; ++index) {
+	max_idx = (key->size >> HPAGE_SHIFT);
+	for (index = 0; index < max_idx; ++index) {
 		struct page *page = radix_tree_lookup(&key->tree, index);
 		if (!page)
 			continue;
 		huge_page_release(page);
 	}
+	spin_lock(&htlbpage_lock);
 	key->key = 0;
+	clear_key_busy(key);
 	INIT_RADIX_TREE(&key->tree, GFP_ATOMIC);
 	spin_unlock(&htlbpage_lock);
 }
@@ -334,16 +341,23 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsig
 	unsigned long address;
 	pte_t *pte;
 	struct page *page;
+	struct hugetlb_key *key = vma->vm_private_data;
 
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
+	spin_lock(&htlbpage_lock);
+	if (key ) 
+		mark_key_busy(key);
+	spin_unlock(&htlbpage_lock);
 	for (address = start; address < end; address += HPAGE_SIZE) {
 		pte = huge_pte_offset(mm, address);
 		page = pte_page(*pte);
 		huge_page_release(page);
 		pte_clear(pte);
 	}
+	if (key)
+		hugetlb_release_key(key);
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 	flush_tlb_range(vma, start, end);
 }
@@ -417,7 +431,6 @@ static int prefault_key(struct hugetlb_key *key, struct vm_area_struct *vma)
 				goto out;
 			}
 			key_add_page(page, key, idx);
-			unlock_page(page);
 		}
 		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
 	}
@@ -433,14 +446,11 @@ static int alloc_shared_hugetlb_pages(int key, unsigned long addr, unsigned long
 	struct vm_area_struct *vma;
 	struct hugetlb_key *hugetlb_key;
 	int retval = -ENOMEM;
-	int newalloc = 0;
 
-	hugetlb_key = alloc_key(key, len, prot, flag, &newalloc);
-	if (IS_ERR(hugetlb_key)) {
-		spin_unlock(&htlbpage_lock);
+	hugetlb_key = alloc_key(key, len, prot, flag );
+	spin_unlock(&htlbpage_lock);
+	if (IS_ERR(hugetlb_key)) 
 		return PTR_ERR(hugetlb_key);
-	} else
-		spin_unlock(&htlbpage_lock);
 
 	addr = do_mmap_pgoff(NULL, addr, len, (unsigned long) prot,
 			MAP_NORESERVE|MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0);
