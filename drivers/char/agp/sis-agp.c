@@ -93,9 +93,13 @@ static void sis_648_enable(u32 mode)
 
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 
-		if(device->device == PCI_DEVICE_ID_SI_648) {
-			// weird: on 648 and 648fx chipsets any rate change in the target command register
-			// triggers a 5ms screwup during which the master cannot be configured
+		/*
+		 * Weird: on 648(fx) and 746(fx) chipsets any rate change in the target
+		 * command register triggers a 5ms screwup during which the master
+		 * cannot be configured		 
+		 */
+		if (device->device == PCI_DEVICE_ID_SI_648 ||
+			device->device == PCI_DEVICE_ID_SI_746) {
 			printk(KERN_INFO PFX "sis 648 agp fix - giving bridge time to recover\n");
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout (1+(HZ*10)/1000);
