@@ -291,6 +291,9 @@ struct agp_bridge_data {
 #define VIA_APSIZE	0x84
 #define VIA_ATTBASE	0x88
 
+/* VIA KT400 */
+#define VIA_AGPSEL	0xfd
+
 /* SiS registers */
 #define SIS_APBASE	0x10
 #define SIS_ATTBASE	0x90
