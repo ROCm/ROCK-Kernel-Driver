@@ -1396,20 +1396,6 @@ dumpbufs(self->rx_bufs[self->rxs],len,'<');
   return IRQ_HANDLED;
 }
 
-static int
-toshoboe_net_init (struct net_device *dev)
-{
-  IRDA_DEBUG (4, "%s()\n", __FUNCTION__);
-
-  /* Keep track of module usage */
-  SET_MODULE_OWNER(dev);
-
-  /* Setup to be a normal IrDA network device driver */
-  irda_device_setup (dev);
-
-  /* Insert overrides below this line! */
-  return 0;
-}
 
 static int
 toshoboe_net_open (struct net_device *dev)
@@ -1589,14 +1575,13 @@ toshoboe_close (struct pci_dev *pci_dev)
       self->rx_bufs[i] = NULL;
     }
 
-  if (self->netdev)
-      unregister_netdev(self->netdev);
+  unregister_netdev(self->netdev);
 
   kfree (self->ringbuf);
   self->ringbuf = NULL;
   self->ring = NULL;
 
-  return;
+  free_netdev(self->netdev);
 }
 
 static int
@@ -1613,17 +1598,17 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
   if ((err=pci_enable_device(pci_dev)))
     return err;
 
-  self = kmalloc (sizeof (struct toshoboe_cb), GFP_KERNEL);
-
-  if (self == NULL)
+  dev = alloc_netdev(sizeof (struct toshoboe_cb), "irda%d",
+		     irda_device_setup);
+  if (dev == NULL)
     {
       printk (KERN_ERR DRIVER_NAME ": can't allocate memory for "
               "IrDA control block\n");
       return -ENOMEM;
     }
 
-  memset (self, 0, sizeof (struct toshoboe_cb));
-
+  self = dev->priv;
+  self->netdev = dev;
   self->pdev = pci_dev;
   self->base = pci_resource_start(pci_dev,0);
 
@@ -1732,33 +1717,20 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
       }
 #endif
 
-  if (!(dev = dev_alloc ("irda%d", &err)))
-    {
-      printk (KERN_ERR DRIVER_NAME ": dev_alloc() failed\n");
-      err = -ENOMEM;
-      goto freebufs;
-    }
-
-  dev->priv = (void *) self;
-  self->netdev = dev;
-
-  printk (KERN_INFO "IrDA: Registered device %s\n", dev->name);
-
-  dev->init = toshoboe_net_init;
+  SET_MODULE_OWNER(dev);
   dev->hard_start_xmit = toshoboe_hard_xmit;
   dev->open = toshoboe_net_open;
   dev->stop = toshoboe_net_close;
   dev->do_ioctl = toshoboe_net_ioctl;
 
-  rtnl_lock ();
-  err = register_netdevice (dev);
-  rtnl_unlock ();
+  err = register_netdev(dev);
   if (err)
     {
       printk (KERN_ERR DRIVER_NAME ": register_netdev() failed\n");
       err = -ENOMEM;
       goto freebufs;
     }
+  printk (KERN_INFO "IrDA: Registered device %s\n", dev->name);
 
   pci_set_drvdata(pci_dev,self);
 
@@ -1779,7 +1751,7 @@ freeregion:
   release_region (self->io.fir_base, self->io.fir_ext);
 
 freeself:
-  kfree (self);
+  free_netdev(dev);
 
   return err;
 }
