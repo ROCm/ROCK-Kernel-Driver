@@ -395,7 +395,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	size = ma->length_hi;
 	size = (size << 32) | ma->length_lo;
 
-	if (num_memblks >= NR_MEMBLKS) {
+	if (num_node_memblks >= NR_NODE_MEMBLKS) {
 		printk(KERN_ERR "Too many mem chunks in SRAT. Ignoring %ld MBytes at %lx\n",
 		       size/(1024*1024), paddr);
 		return;
