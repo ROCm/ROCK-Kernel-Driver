@@ -607,9 +607,6 @@ int pci_dma_supported(struct pci_dev *dev, u64 mask)
 		return 0; 
 	}
 
-	if (no_iommu && (mask < (end_pfn << PAGE_SHIFT)) && !swiotlb)
-		return 0;
-
 	return 1;
 } 
 
