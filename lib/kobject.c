@@ -243,10 +243,9 @@ void kobject_hotplug(const char *action, struct kobject *kobj)
  *	kobject_init - initialize object.
  *	@kobj:	object in question.
  */
-
 void kobject_init(struct kobject * kobj)
 {
-	atomic_set(&kobj->refcount,1);
+ 	kref_init(&kobj->kref);
 	INIT_LIST_HEAD(&kobj->entry);
 	kobj->kset = kset_get(kobj->kset);
 }
@@ -447,10 +446,8 @@ void kobject_unregister(struct kobject * kobj)
 
 struct kobject * kobject_get(struct kobject * kobj)
 {
-	if (kobj) {
-		WARN_ON(!atomic_read(&kobj->refcount));
-		atomic_inc(&kobj->refcount);
-	}
+	if (kobj)
+		kref_get(&kobj->kref);
 	return kobj;
 }
 
@@ -477,17 +474,21 @@ void kobject_cleanup(struct kobject * kobj)
 		kobject_put(parent);
 }
 
+static void kobject_release(struct kref *kref)
+{
+	kobject_cleanup(container_of(kref, struct kobject, kref));
+}
+
 /**
  *	kobject_put - decrement refcount for object.
  *	@kobj:	object.
  *
  *	Decrement the refcount, and if 0, call kobject_cleanup().
  */
-
 void kobject_put(struct kobject * kobj)
 {
-	if (atomic_dec_and_test(&kobj->refcount))
-		kobject_cleanup(kobj);
+	if (kobj)
+		kref_put(&kobj->kref, kobject_release);
 }
 
 
