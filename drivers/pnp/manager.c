@@ -543,14 +543,18 @@ int pnp_auto_config_dev(struct pnp_dev *dev)
 int pnp_manual_config_dev(struct pnp_dev *dev, struct pnp_resource_table * res, int mode)
 {
 	int i;
-	struct pnp_resource_table bak = dev->res;
+	struct pnp_resource_table * bak;
 	if (!dev || !res)
 		return -EINVAL;
 	if (dev->active)
 		return -EBUSY;
+	bak = pnp_alloc(sizeof(struct pnp_resource_table));
+	if (!bak)
+		return -ENOMEM;
+	*bak = dev->res;
+
 	spin_lock(&pnp_lock);
 	dev->res = *res;
-
 	if (!(mode & PNP_CONFIG_FORCE)) {
 		for (i = 0; i < PNP_MAX_PORT; i++) {
 			if(pnp_check_port(dev,i))
@@ -569,15 +573,17 @@ int pnp_manual_config_dev(struct pnp_dev *dev, struct pnp_resource_table * res, 
 				goto fail;
 		}
 	}
+	dev->config_mode = PNP_CONFIG_MANUAL;
 	spin_unlock(&pnp_lock);
 
 	pnp_resolve_conflicts(dev);
-	dev->config_mode = PNP_CONFIG_MANUAL;
+	kfree(bak);
 	return 0;
 
 fail:
-	dev->res = bak;
+	dev->res = *bak;
 	spin_unlock(&pnp_lock);
+	kfree(bak);
 	return -EINVAL;
 }
 
@@ -596,10 +602,6 @@ int pnp_activate_dev(struct pnp_dev *dev)
 		pnp_info("res: The PnP device '%s' is already active.", dev->dev.bus_id);
 		return -EBUSY;
 	}
-	spin_lock(&pnp_lock);	/* we lock just in case the device is being configured during this call */
-	dev->active = 1;
-	spin_unlock(&pnp_lock); /* once the device is claimed active we know it won't be configured so we can unlock */
-
 	/* If this condition is true, advanced configuration failed, we need to get this device up and running
 	 * so we use the simple config engine which ignores cold conflicts, this of course may lead to new failures */
 	if (!pnp_is_active(dev)) {
@@ -608,6 +610,11 @@ int pnp_activate_dev(struct pnp_dev *dev)
 			goto fail;
 		}
 	}
+
+	spin_lock(&pnp_lock);	/* we lock just in case the device is being configured during this call */
+	dev->active = 1;
+	spin_unlock(&pnp_lock); /* once the device is claimed active we know it won't be configured so we can unlock */
+
 	if (dev->config_mode & PNP_CONFIG_INVALID) {
 		pnp_info("res: Unable to activate the PnP device '%s' because its resource configuration is invalid.", dev->dev.bus_id);
 		goto fail;
@@ -625,10 +632,13 @@ int pnp_activate_dev(struct pnp_dev *dev)
 		goto fail;
 	}
 	if (pnp_can_read(dev)) {
-		struct pnp_resource_table res;
-		dev->protocol->get(dev, &res);
-		if (pnp_compare_resources(&dev->res, &res)) /* if this happens we may be in big trouble but it's best just to continue */
+		struct pnp_resource_table * res = pnp_alloc(sizeof(struct pnp_resource_table));
+		if (!res)
+			goto fail;
+		dev->protocol->get(dev, res);
+		if (pnp_compare_resources(&dev->res, res)) /* if this happens we may be in big trouble but it's best just to continue */
 			pnp_err("res: The resources requested do not match those set for the PnP device '%s'.", dev->dev.bus_id);
+		kfree(res);
 	} else
 		dev->active = pnp_is_active(dev);
 	pnp_dbg("res: the device '%s' has been activated.", dev->dev.bus_id);

@@ -268,7 +268,7 @@ struct pnp_dev * pnp_check_port_conflicts(struct pnp_dev * dev, int idx, int mod
 	/* check for cold conflicts */
 	pnp_for_each_dev(tdev) {
 		/* Is the device configurable? */
-		if (tdev == dev || (mode ? !dev->active : dev->active))
+		if (tdev == dev || (mode ? !tdev->active : tdev->active))
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_PORT; tmp++) {
 			if (tdev->res.port_resource[tmp].flags & IORESOURCE_IO) {
@@ -339,7 +339,7 @@ struct pnp_dev * pnp_check_mem_conflicts(struct pnp_dev * dev, int idx, int mode
 	/* check for cold conflicts */
 	pnp_for_each_dev(tdev) {
 		/* Is the device configurable? */
-		if (tdev == dev || (mode ? !dev->active : dev->active))
+		if (tdev == dev || (mode ? !tdev->active : tdev->active))
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_MEM; tmp++) {
 			if (tdev->res.mem_resource[tmp].flags & IORESOURCE_MEM) {
@@ -408,7 +408,7 @@ struct pnp_dev * pnp_check_irq_conflicts(struct pnp_dev * dev, int idx, int mode
 	/* check for cold conflicts */
 	pnp_for_each_dev(tdev) {
 		/* Is the device configurable? */
-		if (tdev == dev || (mode ? !dev->active : dev->active))
+		if (tdev == dev || (mode ? !tdev->active : tdev->active))
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_IRQ; tmp++) {
 			if (tdev->res.irq_resource[tmp].flags & IORESOURCE_IRQ) {
@@ -490,7 +490,7 @@ struct pnp_dev * pnp_check_dma_conflicts(struct pnp_dev * dev, int idx, int mode
 	/* check for cold conflicts */
 	pnp_for_each_dev(tdev) {
 		/* Is the device configurable? */
-		if (tdev == dev || (mode ? !dev->active : dev->active))
+		if (tdev == dev || (mode ? !tdev->active : tdev->active))
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_DMA; tmp++) {
 			if (tdev->res.dma_resource[tmp].flags & IORESOURCE_DMA) {

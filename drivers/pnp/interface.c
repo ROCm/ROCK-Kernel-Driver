@@ -32,18 +32,16 @@ int pnp_printf(pnp_info_buffer_t * buffer, char *fmt,...)
 {
 	va_list args;
 	int res;
-	char sbuffer[512];
 
 	if (buffer->stop || buffer->error)
 		return 0;
 	va_start(args, fmt);
-	res = vsprintf(sbuffer, fmt, args);
+	res = vsnprintf(buffer->curr, buffer->len - buffer->size, fmt, args);
 	va_end(args);
 	if (buffer->size + res >= buffer->len) {
 		buffer->stop = 1;
 		return 0;
 	}
-	strcpy(buffer->curr, sbuffer);
 	buffer->curr += res;
 	buffer->size += res;
 	return res;
@@ -432,13 +430,13 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		goto done;
 	}
 	if (!strnicmp(buf,"set",3)) {
-		struct pnp_resource_table res;
 		int nport = 0, nmem = 0, nirq = 0, ndma = 0;
-
 		if (dev->active)
 			goto done;
 		buf += 3;
-		pnp_init_resource_table(&res);
+		spin_lock(&pnp_lock);
+		dev->config_mode = PNP_CONFIG_MANUAL;
+		pnp_init_resource_table(&dev->res);
 		while (1) {
 			while (isspace(*buf))
 				++buf;
@@ -446,17 +444,17 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 				buf += 2;
 				while (isspace(*buf))
 					++buf;
-				res.port_resource[nport].start = simple_strtoul(buf,&buf,0);
+				dev->res.port_resource[nport].start = simple_strtoul(buf,&buf,0);
 				while (isspace(*buf))
 					++buf;
 				if(*buf == '-') {
 					buf += 1;
 					while (isspace(*buf))
 						++buf;
-					res.port_resource[nport].end = simple_strtoul(buf,&buf,0);
+					dev->res.port_resource[nport].end = simple_strtoul(buf,&buf,0);
 				} else
-					res.port_resource[nport].end = res.port_resource[nport].start;
-				res.port_resource[nport].flags = IORESOURCE_IO;
+					dev->res.port_resource[nport].end = dev->res.port_resource[nport].start;
+				dev->res.port_resource[nport].flags = IORESOURCE_IO;
 				nport++;
 				if (nport >= PNP_MAX_PORT)
 					break;
@@ -466,17 +464,17 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 				buf += 3;
 				while (isspace(*buf))
 					++buf;
-				res.mem_resource[nmem].start = simple_strtoul(buf,&buf,0);
+				dev->res.mem_resource[nmem].start = simple_strtoul(buf,&buf,0);
 				while (isspace(*buf))
 					++buf;
 				if(*buf == '-') {
 					buf += 1;
 					while (isspace(*buf))
 						++buf;
-					res.mem_resource[nmem].end = simple_strtoul(buf,&buf,0);
+					dev->res.mem_resource[nmem].end = simple_strtoul(buf,&buf,0);
 				} else
-					res.mem_resource[nmem].end = res.mem_resource[nmem].start;
-				res.mem_resource[nmem].flags = IORESOURCE_MEM;
+					dev->res.mem_resource[nmem].end = dev->res.mem_resource[nmem].start;
+				dev->res.mem_resource[nmem].flags = IORESOURCE_MEM;
 				nmem++;
 				if (nmem >= PNP_MAX_MEM)
 					break;
@@ -486,9 +484,9 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 				buf += 3;
 				while (isspace(*buf))
 					++buf;
-				res.irq_resource[nirq].start =
-				res.irq_resource[nirq].end = simple_strtoul(buf,&buf,0);
-				res.irq_resource[nirq].flags = IORESOURCE_IRQ;
+				dev->res.irq_resource[nirq].start =
+				dev->res.irq_resource[nirq].end = simple_strtoul(buf,&buf,0);
+				dev->res.irq_resource[nirq].flags = IORESOURCE_IRQ;
 				nirq++;
 				if (nirq >= PNP_MAX_IRQ)
 					break;
@@ -498,9 +496,9 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 				buf += 3;
 				while (isspace(*buf))
 					++buf;
-				res.dma_resource[ndma].start =
-				res.dma_resource[ndma].end = simple_strtoul(buf,&buf,0);
-				res.dma_resource[ndma].flags = IORESOURCE_DMA;
+				dev->res.dma_resource[ndma].start =
+				dev->res.dma_resource[ndma].end = simple_strtoul(buf,&buf,0);
+				dev->res.dma_resource[ndma].flags = IORESOURCE_DMA;
 				ndma++;
 				if (ndma >= PNP_MAX_DMA)
 					break;
@@ -508,9 +506,6 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 			}
 			break;
 		}
-		spin_lock(&pnp_lock);
-		dev->config_mode = PNP_CONFIG_MANUAL;
-		dev->res = res;
 		spin_unlock(&pnp_lock);
 		goto done;
 	}

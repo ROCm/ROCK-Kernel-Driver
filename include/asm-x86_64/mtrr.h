@@ -35,11 +35,15 @@ struct mtrr_sentry
     unsigned int type;     /*  Type of region   */
 };
 
+/* Warning: this structure has a different order from i386
+   on x86-64. The 32bit emulation code takes care of that.
+   But you need to use this for 64bit, otherwise your X server
+   will break. */
 struct mtrr_gentry
 {
     unsigned long base;    /*  Base address     */
-    unsigned int regnum;   /*  Register number  */
     unsigned int size;    /*  Size of region   */
+    unsigned int regnum;   /*  Register number  */
     unsigned int type;     /*  Type of region   */
 };
 
