@@ -24,6 +24,8 @@ create_params (unsigned long *buffer)
 	int j,i,m,k,nr_banks,size;
 	unsigned char *c;
 
+	k = 0;
+
 	/* Head of the taglist */
 	tag->hdr.tag  = ATAG_CORE;
 	tag->hdr.size = tag_size(tag_core);
