@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -382,7 +382,7 @@ int dbFree(struct inode *ip, s64 blkno, s64 nblocks)
 	IREAD_LOCK(ipbmap);
 
 	/* block to be freed better be within the mapsize. */
-	if (blkno + nblocks > bmp->db_mapsize) {
+	if (unlikely((blkno == 0) || (blkno + nblocks > bmp->db_mapsize))) {
 		IREAD_UNLOCK(ipbmap);
 		printk(KERN_ERR "blkno = %Lx, nblocks = %Lx\n",
 		       (unsigned long long) blkno,

@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -766,11 +766,12 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 		 */
 	      getChild:
 		/* update max. number of pages to split */
-		if (btstack->nsplit >= 8) {
+		if (BT_STACK_FULL(btstack)) {
 			/* Something's corrupted, mark filesytem dirty so
 			 * chkdsk will fix it.
 			 */
 			jfs_error(sb, "stack overrun in dtSearch!");
+			BT_STACK_DUMP(btstack);
 			rc = -EIO;
 			goto out;
 		}
@@ -3346,6 +3347,12 @@ static int dtReadFirst(struct inode *ip, struct btstack * btstack)
 		/*
 		 * descend down to leftmost child page
 		 */
+		if (BT_STACK_FULL(btstack)) {
+			DT_PUTPAGE(mp);
+			jfs_error(ip->i_sb, "dtReadFirst: btstack overrun");
+			BT_STACK_DUMP(btstack);
+			return -EIO;
+		}
 		/* push (bn, index) of the parent page/entry */
 		BT_PUSH(btstack, bn, 0);
 
