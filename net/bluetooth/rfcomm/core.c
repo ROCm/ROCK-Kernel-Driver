@@ -1312,6 +1312,9 @@ static int rfcomm_recv_mcc(struct rfcomm_session *s, struct sk_buff *skb)
 			rfcomm_send_test(s, 0, skb->data, skb->len);
 		break;
 
+	case RFCOMM_NSC:
+		break;
+
 	default:
 		BT_ERR("Unknown control type 0x%02x", type);
 		rfcomm_send_nsc(s, cr, type);
@@ -1442,7 +1445,7 @@ static inline int rfcomm_process_tx(struct rfcomm_dlc *d)
 
 	/* Send pending MSC */
 	if (test_and_clear_bit(RFCOMM_MSC_PENDING, &d->flags))
-		rfcomm_send_msc(d->session, d->dlci, 1, d->v24_sig); 
+		rfcomm_send_msc(d->session, 1, d->dlci, d->v24_sig); 
 	
 	if (d->credits) {
 		/* CFC enabled. 
@@ -1831,7 +1834,7 @@ static int __init rfcomm_proc_init(void)
 
 static void __init rfcomm_proc_cleanup(void)
 {
-        return 0;
+        return;
 }
 #endif /* CONFIG_PROC_FS */
 
