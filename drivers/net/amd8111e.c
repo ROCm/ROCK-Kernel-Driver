@@ -124,7 +124,7 @@ This function will read the PHY registers.
 */
 static int amd8111e_read_phy(struct amd8111e_priv* lp, int phy_id, int reg, u32* val)
 {
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int reg_val;
 	unsigned int repeat= REPEAT_CNT;
 
@@ -155,7 +155,7 @@ This function will write into PHY registers.
 static int amd8111e_write_phy(struct amd8111e_priv* lp,int phy_id, int reg, u32 val)
 {
 	unsigned int repeat = REPEAT_CNT
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int reg_val;
 
 	reg_val = readl(mmio + PHY_ACCESS);
@@ -384,7 +384,7 @@ static int amd8111e_set_coalesce(struct net_device * dev, enum coal_mode cmod)
 	unsigned int event_count;
 
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void* mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	struct amd8111e_coalesce_conf * coal_conf = &lp->coal_conf;
 
 
@@ -442,7 +442,7 @@ This function initializes the device registers  and starts the device.
 static int amd8111e_restart(struct net_device *dev)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	int i,reg_val;
 
 	/* stop the chip */
@@ -522,7 +522,7 @@ static void amd8111e_init_hw_default( struct amd8111e_priv* lp)
 {
 	unsigned int reg_val;
 	unsigned int logic_filter[2] ={0,};
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 
 
         /* stop the chip */
@@ -723,9 +723,9 @@ static int amd8111e_tx(struct net_device *dev)
 /* This function handles the driver receive operation in polling mode */
 static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 {
-	struct amd8111e_priv *lp = dev->priv;
+	struct amd8111e_priv *lp = netdev_priv(dev);
 	int rx_index = lp->rx_idx & RX_RING_DR_MOD_MASK;
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	struct sk_buff *skb,*new_skb;
 	int min_pkt_len, status;
 	unsigned int intr0;
@@ -1004,7 +1004,7 @@ static int amd8111e_link_change(struct net_device* dev)
 /*
 This function reads the mib counters. 	 
 */
-static int amd8111e_read_mib(void* mmio, u8 MIB_COUNTER)
+static int amd8111e_read_mib(void __iomem *mmio, u8 MIB_COUNTER)
 {
 	unsigned int  status;
 	unsigned  int data;
@@ -1027,7 +1027,7 @@ This function reads the mib registers and returns the hardware statistics. It  u
 static struct net_device_stats *amd8111e_get_stats(struct net_device * dev)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned long flags;
 	/* struct net_device_stats *prev_stats = &lp->prev_stats; */
 	struct net_device_stats* new_stats = &lp->stats;
@@ -1260,7 +1260,7 @@ static irqreturn_t amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *reg
 
 	struct net_device * dev = (struct net_device *) dev_id;
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int intr0;
 	unsigned int handled = 1;
 
@@ -1465,8 +1465,8 @@ static int amd8111e_start_xmit(struct sk_buff *skb, struct net_device * dev)
 This function returns all the memory mapped registers of the device.
 */
 static void amd8111e_read_regs(struct amd8111e_priv *lp, u32 *buf)
-{    	
-	void *mmio = lp->mmio;
+{
+	void __iomem *mmio = lp->mmio;
 	/* Read only necessary registers */
 	buf[0] = readl(mmio + XMT_RING_BASE_ADDR0);
 	buf[1] = readl(mmio + XMT_RING_LEN0);
@@ -1697,7 +1697,7 @@ static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 }
 static int amd8111e_set_mac_address(struct net_device *dev, void *p)
 {
-	struct amd8111e_priv *lp = dev->priv;
+	struct amd8111e_priv *lp = netdev_priv(dev);
 	int i;
 	struct sockaddr *addr = p;
 
@@ -1873,7 +1873,7 @@ static void __devexit amd8111e_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	if (dev) {
 		unregister_netdev(dev);
-		iounmap((void *) ((struct amd8111e_priv *)(dev->priv))->mmio);
+		iounmap(((struct amd8111e_priv *)netdev_priv(dev))->mmio);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
@@ -1884,7 +1884,7 @@ static void amd8111e_config_ipg(struct net_device* dev)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
 	struct ipg_info* ipg_data = &lp->ipg_data;
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int prev_col_cnt = ipg_data->col_cnt;
 	unsigned int total_col_cnt;
 	unsigned int tmp_ipg;
@@ -2098,7 +2098,7 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
     	printk( "\n");	
     	return 0;
 err_iounmap:
-	iounmap((void *) lp->mmio);
+	iounmap(lp->mmio);
 
 err_free_dev:
 	free_netdev(dev);
