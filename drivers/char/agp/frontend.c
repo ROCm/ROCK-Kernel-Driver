@@ -1050,14 +1050,14 @@ ioctl_out:
 
 static struct file_operations agp_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		agp_read,
-	write:		agp_write,
-	ioctl:		agp_ioctl,
-	mmap:		agp_mmap,
-	open:		agp_open,
-	release:	agp_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= agp_read,
+	.write		= agp_write,
+	.ioctl		= agp_ioctl,
+	.mmap		= agp_mmap,
+	.open		= agp_open,
+	.release	= agp_release,
 };
 
 static struct miscdevice agp_miscdev =

@@ -533,8 +533,8 @@ static void intel_i460_destroy_page(void *page)
 static struct gatt_mask intel_i460_masks[] =
 {
 	{
-	  mask: INTEL_I460_GATT_VALID | INTEL_I460_GATT_COHERENT,
-	  type: 0
+	  .mask = INTEL_I460_GATT_VALID | INTEL_I460_GATT_COHERENT,
+	  .type = 0
 	}
 };
 

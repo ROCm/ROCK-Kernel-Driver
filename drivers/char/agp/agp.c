@@ -751,396 +751,396 @@ static struct {
 
 #ifdef CONFIG_AGP_ALI
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1541_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1541,
-		vendor_name:	"Ali",
-		chipset_name:	"M1541",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1541_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1541,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1541",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1621_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1621,
-		vendor_name:	"Ali",
-		chipset_name:	"M1621",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1621_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1621,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1621",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1631_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1631,
-		vendor_name:	"Ali",
-		chipset_name:	"M1631",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1631_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1631,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1631",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1632_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1632,
-		vendor_name:	"Ali",
-		chipset_name:	"M1632",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1632_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1632,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1632",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1641_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1641,
-		vendor_name:	"Ali",
-		chipset_name:	"M1641",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1641_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1641,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1641",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1644_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1644,
-		vendor_name:	"Ali",
-		chipset_name:	"M1644",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1644_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1644,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1644",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1647_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1647,
-		vendor_name:	"Ali",
-		chipset_name:	"M1647",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1647_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1647,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1647",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AL_M1651_0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_M1651,
-		vendor_name:	"Ali",
-		chipset_name:	"M1651",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= PCI_DEVICE_ID_AL_M1651_0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_M1651,
+		.vendor_name	= "Ali",
+		.chipset_name	= "M1651",
+		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		device_id:	0,
-		vendor_id:	PCI_VENDOR_ID_AL,
-		chipset:	ALI_GENERIC,
-		vendor_name:	"Ali",
-		chipset_name:	"Generic",
-		chipset_setup:	ali_generic_setup,
+		.device_id	= 0,
+		.vendor_id	= PCI_VENDOR_ID_AL,
+		.chipset	= ALI_GENERIC,
+		.vendor_name	= "Ali",
+		.chipset_name	= "Generic",
+		.chipset_setup	= ali_generic_setup,
 	},
 #endif /* CONFIG_AGP_ALI */
 
 #ifdef CONFIG_AGP_AMD
 	{
-		device_id:	PCI_DEVICE_ID_AMD_IRONGATE_0,
-		vendor_id:	PCI_VENDOR_ID_AMD,
-		chipset:	AMD_IRONGATE,
-		vendor_name:	"AMD",
-		chipset_name:	"Irongate",
-		chipset_setup:	amd_irongate_setup,
+		.device_id	= PCI_DEVICE_ID_AMD_IRONGATE_0,
+		.vendor_id	= PCI_VENDOR_ID_AMD,
+		.chipset	= AMD_IRONGATE,
+		.vendor_name	= "AMD",
+		.chipset_name	= "Irongate",
+		.chipset_setup	= amd_irongate_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AMD_761_0,
-		vendor_id:	PCI_VENDOR_ID_AMD,
-		chipset:	AMD_761,
-		vendor_name:	"AMD",
-		chipset_name:	"761",
-		chipset_setup:	amd_irongate_setup,
+		.device_id	= PCI_DEVICE_ID_AMD_761_0,
+		.vendor_id	= PCI_VENDOR_ID_AMD,
+		.chipset	= AMD_761,
+		.vendor_name	= "AMD",
+		.chipset_name	= "761",
+		.chipset_setup	= amd_irongate_setup,
 	},
 	{
-		device_id:	PCI_DEVICE_ID_AMD_762_0,
-		vendor_id:	PCI_VENDOR_ID_AMD,
-		chipset:	AMD_762,
-		vendor_name:	"AMD",
-		chipset_name:	"760MP",
-		chipset_setup:	amd_irongate_setup,
+		.device_id	= PCI_DEVICE_ID_AMD_762_0,
+		.vendor_id	= PCI_VENDOR_ID_AMD,
+		.chipset	= AMD_762,
+		.vendor_name	= "AMD",
+		.chipset_name	= "760MP",
+		.chipset_setup	= amd_irongate_setup,
 	},
 	{
-		device_id:	0,
-		vendor_id:	PCI_VENDOR_ID_AMD,
-		chipset:	AMD_GENERIC,
-		vendor_name:	"AMD",
-		chipset_name:	"Generic",
-		chipset_setup:	amd_irongate_setup,
+		.device_id	= 0,
+		.vendor_id	= PCI_VENDOR_ID_AMD,
+		.chipset	= AMD_GENERIC,
+		.vendor_name	= "AMD",
+		.chipset_name	= "Generic",
+		.chipset_setup	= amd_irongate_setup,
 	},
 #endif /* CONFIG_AGP_AMD */
 
 #ifdef CONFIG_AGP_INTEL
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_82443LX_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_LX,
-		vendor_name:	"Intel",
-		chipset_name:	"440LX",
-		chipset_setup:	intel_generic_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_82443LX_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_LX,
+		.vendor_name	= "Intel",
+		.chipset_name	= "440LX",
+		.chipset_setup	= intel_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_82443BX_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_BX,
-		vendor_name:	"Intel",
-		chipset_name:	"440BX",
-		chipset_setup:	intel_generic_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_82443BX_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_BX,
+		.vendor_name	= "Intel",
+		.chipset_name	= "440BX",
+		.chipset_setup	= intel_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_82443GX_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_GX,
-		vendor_name:	"Intel",
-		chipset_name:	"440GX",
-		chipset_setup:	intel_generic_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_82443GX_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_GX,
+		.vendor_name	= "Intel",
+		.chipset_name	= "440GX",
+		.chipset_setup	= intel_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_815_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I815,
-		vendor_name:	"Intel",
-		chipset_name:	"i815",
-		chipset_setup:	intel_815_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_815_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I815,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i815",
+		.chipset_setup	= intel_815_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_820_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I820,
-		vendor_name:	"Intel",
-		chipset_name:	"i820",
-		chipset_setup:	intel_820_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_820_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I820,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i820",
+		.chipset_setup	= intel_820_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_820_UP_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I820,
-		vendor_name:	"Intel",
-		chipset_name:	"i820",
-		chipset_setup:	intel_820_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_820_UP_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I820,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i820",
+		.chipset_setup	= intel_820_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_830_M_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I830_M,
-		vendor_name:	"Intel",
-		chipset_name:	"i830M",
-		chipset_setup:	intel_830mp_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_830_M_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I830_M,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i830M",
+		.chipset_setup	= intel_830mp_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_845_G_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I845_G,
-		vendor_name:	"Intel",
-		chipset_name:	"i845G",
-		chipset_setup:	intel_830mp_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_845_G_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I845_G,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i845G",
+		.chipset_setup	= intel_830mp_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_840_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I840,
-		vendor_name:	"Intel",
-		chipset_name:	"i840",
-		chipset_setup:	intel_840_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_840_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I840,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i840",
+		.chipset_setup	= intel_840_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_845_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I845,
-		vendor_name:	"Intel",
-		chipset_name:	"i845",
-		chipset_setup:	intel_845_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_845_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I845,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i845",
+		.chipset_setup	= intel_845_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_850_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I850,
-		vendor_name:	"Intel",
-		chipset_name:	"i850",
-		chipset_setup:	intel_850_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_850_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I850,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i850",
+		.chipset_setup	= intel_850_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_INTEL_860_0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_I860,
-		vendor_name:	"Intel",
-		chipset_name:	"i860",
-		chipset_setup:	intel_860_setup
+		.device_id	= PCI_DEVICE_ID_INTEL_860_0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_I860,
+		.vendor_name	= "Intel",
+		.chipset_name	= "i860",
+		.chipset_setup	= intel_860_setup
 	},
 	{
-		device_id:	0,
-		vendor_id:	PCI_VENDOR_ID_INTEL,
-		chipset:	INTEL_GENERIC,
-		vendor_name:	"Intel",
-		chipset_name:	"Generic",
-		chipset_setup:	intel_generic_setup
+		.device_id	= 0,
+		.vendor_id	= PCI_VENDOR_ID_INTEL,
+		.chipset	= INTEL_GENERIC,
+		.vendor_name	= "Intel",
+		.chipset_name	= "Generic",
+		.chipset_setup	= intel_generic_setup
 	},
 
 #endif /* CONFIG_AGP_INTEL */
 
 #ifdef CONFIG_AGP_SIS
 	{
-		device_id:	PCI_DEVICE_ID_SI_740,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"740",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_740,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "740",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_650,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"650",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_650,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "650",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_645,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"645",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_645,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "645",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_735,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"735",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_735,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "735",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_745,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"745",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_745,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "745",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_730,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"730",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_730,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "730",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_630,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"630",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_630,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "630",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_540,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"540",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_540,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "540",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_620,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"620",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_620,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "620",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_SI_530,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"530",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_530,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "530",
+		.chipset_setup	= sis_generic_setup
 	},
         {
-		device_id:	PCI_DEVICE_ID_SI_550,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"550",
-		chipset_setup:	sis_generic_setup
+		.device_id	= PCI_DEVICE_ID_SI_550,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "550",
+		.chipset_setup	= sis_generic_setup
 	},
 	{
-		device_id:	0,
-		vendor_id:	PCI_VENDOR_ID_SI,
-		chipset:	SIS_GENERIC,
-		vendor_name:	"SiS",
-		chipset_name:	"Generic",
-		chipset_setup:	sis_generic_setup
+		.device_id	= 0,
+		.vendor_id	= PCI_VENDOR_ID_SI,
+		.chipset	= SIS_GENERIC,
+		.vendor_name	= "SiS",
+		.chipset_name	= "Generic",
+		.chipset_setup	= sis_generic_setup
 	},
 #endif /* CONFIG_AGP_SIS */
 
 #ifdef CONFIG_AGP_VIA
 	{
-		device_id:	PCI_DEVICE_ID_VIA_8501_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_MVP4,
-		vendor_name:	"Via",
-		chipset_name:	"MVP4",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_8501_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_MVP4,
+		.vendor_name	= "Via",
+		.chipset_name	= "MVP4",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_VIA_82C597_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_VP3,
-		vendor_name:	"Via",
-		chipset_name:	"VP3",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_82C597_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_VP3,
+		.vendor_name	= "Via",
+		.chipset_name	= "VP3",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_VIA_82C598_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_MVP3,
-		vendor_name:	"Via",
-		chipset_name:	"MVP3",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_82C598_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_MVP3,
+		.vendor_name	= "Via",
+		.chipset_name	= "MVP3",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_VIA_82C691_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_APOLLO_PRO,
-		vendor_name:	"Via",
-		chipset_name:	"Apollo Pro",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_82C691_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_APOLLO_PRO,
+		.vendor_name	= "Via",
+		.chipset_name	= "Apollo Pro",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_VIA_8371_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_APOLLO_KX133,
-		vendor_name:	"Via",
-		chipset_name:	"Apollo Pro KX133",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_8371_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_APOLLO_KX133,
+		.vendor_name	= "Via",
+		.chipset_name	= "Apollo Pro KX133",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_VIA_8363_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_APOLLO_KT133,
-		vendor_name:	"Via",
-		chipset_name:	"Apollo Pro KT133",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_8363_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_APOLLO_KT133,
+		.vendor_name	= "Via",
+		.chipset_name	= "Apollo Pro KT133",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	PCI_DEVICE_ID_VIA_8367_0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_APOLLO_KT133,
-		vendor_name:	"Via",
-		chipset_name:	"Apollo Pro KT266",
-		chipset_setup:	via_generic_setup
+		.device_id	= PCI_DEVICE_ID_VIA_8367_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_APOLLO_KT133,
+		.vendor_name	= "Via",
+		.chipset_name	= "Apollo Pro KT266",
+		.chipset_setup	= via_generic_setup
 	},
 	{
-		device_id:	0,
-		vendor_id:	PCI_VENDOR_ID_VIA,
-		chipset:	VIA_GENERIC,
-		vendor_name:	"Via",
-		chipset_name:	"Generic",
-		chipset_setup:	via_generic_setup
+		.device_id	= 0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_GENERIC,
+		.vendor_name	= "Via",
+		.chipset_name	= "Generic",
+		.chipset_setup	= via_generic_setup
 	},
 #endif /* CONFIG_AGP_VIA */
 
 #ifdef CONFIG_AGP_HP_ZX1
 	{
-		device_id:	PCI_DEVICE_ID_HP_ZX1_LBA,
-		vendor_id:	PCI_VENDOR_ID_HP,
-		chipset:	HP_ZX1,
-		vendor_name:	"HP",
-		chipset_name:	"ZX1",
-		chipset_setup:	hp_zx1_setup
+		.device_id	= PCI_DEVICE_ID_HP_ZX1_LBA,
+		.vendor_id	= PCI_VENDOR_ID_HP,
+		.chipset	= HP_ZX1,
+		.vendor_name	= "HP",
+		.chipset_name	= "ZX1",
+		.chipset_setup	= hp_zx1_setup
 	},
 #endif
 
@@ -1461,8 +1461,8 @@ static int __init agp_find_max (void)
 
 static struct agp_version agp_current_version =
 {
-	major:	AGPGART_VERSION_MAJOR,
-	minor:	AGPGART_VERSION_MINOR,
+	.major	= AGPGART_VERSION_MAJOR,
+	.minor	= AGPGART_VERSION_MINOR,
 };
 
 static int __init agp_backend_initialize(struct pci_dev *dev)
@@ -1614,12 +1614,12 @@ static int agp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 
 static struct pci_device_id agp_pci_table[] __initdata = {
 	{
-	class:		(PCI_CLASS_BRIDGE_HOST << 8),
-	class_mask:	~0,
-	vendor:		PCI_ANY_ID,
-	device:		PCI_ANY_ID,
-	subvendor:	PCI_ANY_ID,
-	subdevice:	PCI_ANY_ID,
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_ANY_ID,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
 	},
 	{ }
 };
@@ -1627,9 +1627,9 @@ static struct pci_device_id agp_pci_table[] __initdata = {
 MODULE_DEVICE_TABLE(pci, agp_pci_table);
 
 static struct pci_driver agp_pci_driver = {
-	name:		"agpgart",
-	id_table:	agp_pci_table,
-	probe:		agp_probe,
+	.name		= "agpgart",
+	.id_table	= agp_pci_table,
+	.probe		= agp_probe,
 };
 
 static int __init agp_init(void)
