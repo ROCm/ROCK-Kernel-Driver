@@ -94,7 +94,7 @@ static void matrox_w1_write_ddc_bit(unsigned long, u8);
 /*
  * These functions read and write DDC Data bit.
  *
- * Using tristate pins, since i can't  fin any open-drain pin in whole motherboard.
+ * Using tristate pins, since i can't find any open-drain pin in whole motherboard.
  * Unfortunately we can't connect to Intel's 82801xx IO controller
  * since we don't know motherboard schema, wich has pretty unused(may be not) GPIO.
  *
