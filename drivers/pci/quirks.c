@@ -277,6 +277,22 @@ static void __devinit quirk_piix4_acpi(struct pci_dev *dev)
 }
 
 /*
+ * ICH4, ICH4-M, ICH5, ICH5-M ACPI: Three IO regions pointed to by longwords at
+ *	0x40 (128 bytes of ACPI, GPIO & TCO registers)
+ *	0x58 (64 bytes of GPIO I/O space)
+ */
+static void __devinit quirk_ich4_lpc_acpi(struct pci_dev *dev)
+{
+	u32 region;
+
+	pci_read_config_dword(dev, 0x40, &region);
+	quirk_io_region(dev, region, 128, PCI_BRIDGE_RESOURCES);
+
+	pci_read_config_dword(dev, 0x58, &region);
+	quirk_io_region(dev, region, 64, PCI_BRIDGE_RESOURCES+1);
+}
+
+/*
  * VIA ACPI: One IO region pointed to by longword at
  *	0x48 or 0x20 (256 bytes of ACPI registers)
  */
@@ -858,6 +874,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_vt82c586_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_vt82c686_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	quirk_piix4_acpi },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	quirk_ich4_lpc_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_AL,	PCI_DEVICE_ID_AL_M7101,		quirk_ali7101_acpi },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371SB_2,	quirk_piix3_usb },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_2,	quirk_piix3_usb },
