@@ -30,7 +30,33 @@
 
 /* Change Log
  *
- * 5.2.30.1	1/29/03
+ * 5.2.39	3/12/04
+ *   o Added support to read/write eeprom data in proper order.
+ *     By default device eeprom is always little-endian, word
+ *     addressable 
+ *   o Disable TSO as the default for the driver until hangs
+ *     reported against non-IA acrhs can be root-caused.
+ *   o Back out the CSA fix for 82547 as it continues to cause
+ *     systems lock-ups with production systems.
+ *   o Fixed FC high/low water mark values to actually be in the
+ *     range of the Rx FIFO area.  It was a math error.
+ *     [Dainis Jonitis (dainis_jonitis@exigengroup.lv)]
+ *   o Handle failure to get new resources when doing ethtool
+ *     ring paramater changes.  Previously, driver would free old,
+ *     but fails to allocate new, causing problems.  Now, driver 
+ *     allocates new, and if sucessful, frees old.
+ *   o Changed collision threshold from 16 to 15 to comply with IEEE
+ *     spec.
+ *   o Toggle chip-select when checking ready status on SPI eeproms.
+ *   o Put PHY into class A mode to pass IEEE tests on some designs.
+ *     Designs with EEPROM word 0x7, bit 15 set will have their PHYs
+ *     set to class A mode, rather than the default class AB.
+ *   o Handle failures of register_netdev.  Stephen Hemminger
+ *     [shemminger@osdl.org].
+ *   o updated README & MAN pages, number of Transmit/Receive
+ *     descriptors may be denied depending on system resources.
+ *
+ * 5.2.30	1/14/03
  *   o Set VLAN filtering to IEEE 802.1Q after reset so we don't break
  *     SoL connections that use VLANs.
  *   o Allow 1000/Full setting for AutoNeg param for Fiber connections
@@ -45,30 +71,11 @@
  *   o Added ethtool RINGPARAM support.
  *
  * 5.2.22	10/15/03
- *   o Bug fix: SERDES devices might be connected to a back-plane
- *     switch that doesn't support auto-neg, so add the capability
- *     to force 1000/Full.  Also, since forcing 1000/Full, sample
- *     RxSynchronize bit to detect link state.
- *   o Bug fix: Flow control settings for hi/lo watermark didn't
- *     consider changes in the Rx FIFO size, which could occur with
- *     Jumbo Frames or with the reduced FIFO in 82547.
- *   o Better propagation of error codes. [Janice Girouard 
- *     (janiceg@us.ibm.com)].
- *   o Bug fix: hang under heavy Tx stress when running out of Tx
- *     descriptors; wasn't clearing context descriptor when backing
- *     out of send because of no-resource condition.
- *   o Bug fix: check netif_running in dev->poll so we don't have to
- *     hang in dev->close until all polls are finished.  [Robert
- *     Ollson (robert.olsson@data.slu.se)].
- *   o Revert TxDescriptor ring size back to 256 since change to 1024
- *     wasn't accepted into the kernel.
- *
- * 5.2.16	8/8/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.30.1-k2";
+char e1000_driver_version[] = "5.2.39-k2";
 char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -1661,7 +1668,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 		 * we mapped the skb, but because of all the workarounds
 		 * (above), it's too difficult to predict how many we're
 		 * going to need.*/
-		i = adapter->tx_ring.next_to_use;
+		i = tx_ring->next_to_use;
 
 		if(i == first) {
 			/* Cleanup after e1000_tx_[csum|tso] scribbling
@@ -1686,7 +1693,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 			if(++i == tx_ring->count) i = 0;
 		}
 
-		adapter->tx_ring.next_to_use = first;
+		tx_ring->next_to_use = first;
 
 		return 0;
 	}
@@ -1694,7 +1701,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 	i = (i == 0) ? tx_ring->count - 1 : i - 1;
 	tx_ring->buffer_info[i].skb = skb;
 	tx_ring->buffer_info[first].next_to_watch = i;
-
+	
 	return count;
 }
 
