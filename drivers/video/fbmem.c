@@ -377,7 +377,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 		if (*fi)
 			clen += sprintf(buf + clen, "%d %s\n",
 				        GET_FB_IDX((*fi)->node),
-				        (*fi)->modename);
+				        (*fi)->fix.id);
 	*start = buf + offset;
 	if (clen > offset)
 		clen -= offset;
@@ -466,10 +466,10 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int fbidx = GET_FB_IDX(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
-	struct fb_cmap cmap;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;
 	struct fb_con2fbmap con2fb;
+	struct fb_cmap cmap;
 	int i;
 	
 	if (! fb)
@@ -481,11 +481,13 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUT_VSCREENINFO:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		i = var.activate & FB_ACTIVATE_ALL
-			    ? set_all_vcs(fbidx, fb, &var, info)
-			    : fb->fb_set_var(&var, PROC_CONSOLE(info), info);
-		if (i)
-			return i;
+		if (var.activate & FB_ACTIVATE_ALL) {
+			i = set_all_vcs(fbidx, fb, &var, info);
+			if (i) return i;
+		} else {
+			i = fb_set_var(&var, info);
+			if (i) return i;
+		}
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
@@ -494,21 +496,22 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb->fb_set_cmap(&cmap, 0, PROC_CONSOLE(info), info));
+		return (fb_set_cmap(&cmap, 0, info));
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb->fb_get_cmap(&cmap, 0, PROC_CONSOLE(info), info));
+		fb_copy_cmap(&info->cmap, &cmap, 0);
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
 		if (fb->fb_pan_display == NULL)
 			return (var.xoffset || var.yoffset) ? -EINVAL : 0;
-		if ((i=fb->fb_pan_display(&var, PROC_CONSOLE(info), info)))
+		if ((i=fb->fb_pan_display(&var, info)))
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
 		return i;
+#ifdef CONFIG_VT
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
 			return -EFAULT;
@@ -537,6 +540,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		    for (i = 0; i < MAX_NR_CONSOLES; i++)
 			set_con2fb_map(i, con2fb.framebuffer);
 		return 0;
+#endif
 	case FBIOBLANK:
 		if (fb->fb_blank == NULL)
 			return -EINVAL;
@@ -544,8 +548,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	default:
 		if (fb->fb_ioctl == NULL)
 			return -EINVAL;
-		return fb->fb_ioctl(inode, file, cmd, arg, PROC_CONSOLE(info),
-				    info);
+		return fb->fb_ioctl(inode, file, cmd, arg, info);
 	}
 }
 
@@ -746,6 +749,7 @@ register_framebuffer(struct fb_info *fb_info)
 		if (!registered_fb[i])
 			break;
 	fb_info->node = mk_kdev(FB_MAJOR, i);
+	fb_info->currcon = -1;
 	registered_fb[i] = fb_info;
 	if (!fb_ever_opened[i]) {
 		struct module *owner = fb_info->fbops->owner;
