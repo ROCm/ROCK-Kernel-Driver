@@ -321,7 +321,7 @@ void show_regs(struct pt_regs * regs)
 	trap = TRAP(regs);
 	if (trap == 0x300 || trap == 0x600)
 		printk("DAR: %08lX, DSISR: %08lX\n", regs->dar, regs->dsisr);
-	printk("TASK = %p[%d] '%s' THREAD: %p",
+	printk("TASK = %p[%d] '%s' THREAD: %p\n",
 	       current, current->pid, current->comm, current->thread_info);
 	printk("Last syscall: %ld ", current->thread.last_syscall);
 
@@ -370,6 +370,10 @@ void exit_thread(void)
 		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = NULL;
+#ifdef CONFIG_SPE
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+#endif
 }
 
 void flush_thread(void)
@@ -378,6 +382,10 @@ void flush_thread(void)
 		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = NULL;
+#ifdef CONFIG_SPE
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+#endif
 }
 
 void
@@ -480,6 +488,10 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = NULL;
+#ifdef CONFIG_SPE
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+#endif
 	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
 	current->thread.fpscr = 0;
 #ifdef CONFIG_ALTIVEC
