@@ -476,12 +476,29 @@ static loff_t ext2_max_size(int bits)
 	return res;
 }
 
+static unsigned long descriptor_loc(struct super_block *sb,
+				    unsigned long logic_sb_block,
+				    int nr)
+{
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
+	unsigned long bg, first_data_block, first_meta_bg;
+	
+	first_data_block = le32_to_cpu(sbi->s_es->s_first_data_block);
+	first_meta_bg = le32_to_cpu(sbi->s_es->s_first_meta_bg);
+
+	if (!EXT2_HAS_INCOMPAT_FEATURE(sb, EXT2_FEATURE_INCOMPAT_META_BG) ||
+	    nr < first_meta_bg)
+		return (logic_sb_block + nr + 1);
+	bg = sbi->s_desc_per_block * nr;
+	return (first_data_block + 1 + (bg * sbi->s_blocks_per_group));
+}
+
 static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head * bh;
 	struct ext2_sb_info * sbi;
 	struct ext2_super_block * es;
-	unsigned long sb_block = 1;
+	unsigned long block, sb_block = 1;
 	unsigned long logic_sb_block = get_sb_block(&data);
 	unsigned long offset = 0;
 	unsigned long def_mount_opts;
@@ -689,7 +706,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 	for (i = 0; i < db_count; i++) {
-		sbi->s_group_desc[i] = sb_bread(sb, logic_sb_block + i + 1);
+		block = descriptor_loc(sb, logic_sb_block, i);
+		sbi->s_group_desc[i] = sb_bread(sb, block);
 		if (!sbi->s_group_desc[i]) {
 			for (j = 0; j < i; j++)
 				brelse (sbi->s_group_desc[j]);
