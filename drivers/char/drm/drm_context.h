@@ -42,11 +42,6 @@
 
 #include "drmP.h"
 
-#if !__HAVE_CTX_BITMAP
-#error "__HAVE_CTX_BITMAP must be defined"
-#endif
-
-
 /******************************************************************/
 /** \name Context bitmap support */
 /*@{*/
@@ -580,3 +575,4 @@ int DRM(rmctx)( struct inode *inode, struct file *filp,
 }
 
 /*@}*/
+

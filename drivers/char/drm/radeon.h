@@ -37,12 +37,6 @@
 
 /* General customization:
  */
-#define __HAVE_AGP		1
-#define __MUST_HAVE_AGP		0
-#define __HAVE_MTRR		1
-#define __HAVE_CTX_BITMAP	1
-#define __HAVE_SG		1
-#define __HAVE_PCI_DMA		1
 
 #define DRIVER_AUTHOR		"Gareth Hughes, Keith Whitwell, others."
 
@@ -114,9 +108,6 @@
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_EMIT)]   = { radeon_irq_emit,    1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_WAIT)]   = { radeon_irq_wait,    1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_SETPARAM)]   = { radeon_cp_setparam, 1, 0 }, \
-
-#define DRIVER_FILE_FIELDS						\
-	int64_t radeon_fb_delta;					\
 
 /* DMA customization:
  */

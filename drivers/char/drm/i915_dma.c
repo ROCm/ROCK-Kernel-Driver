@@ -732,6 +732,7 @@ static void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 
 void i915_driver_register_fns(drm_device_t *dev)
 {
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR;
 	dev->fn_tbl.pretakedown = i915_driver_pretakedown;
 	dev->fn_tbl.prerelease = i915_driver_prerelease;
 }

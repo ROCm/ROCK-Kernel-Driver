@@ -1602,6 +1602,7 @@ static int i830_driver_dma_quiescent(drm_device_t *dev)
 
 void i830_driver_register_fns(drm_device_t *dev)
 {
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR;
 	dev->dev_priv_size = sizeof(drm_i830_buf_priv_t);
 	dev->fn_tbl.pretakedown = i830_driver_pretakedown;
 	dev->fn_tbl.release = i830_driver_release;

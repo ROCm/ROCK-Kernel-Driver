@@ -813,6 +813,7 @@ static int mga_driver_dma_quiescent(drm_device_t *dev)
 
 void mga_driver_register_fns(drm_device_t *dev)
 {
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR;
 	dev->fn_tbl.pretakedown = mga_driver_pretakedown;
 	dev->fn_tbl.dma_quiescent = mga_driver_dma_quiescent;
 }

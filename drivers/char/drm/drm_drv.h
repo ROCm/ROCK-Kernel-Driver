@@ -52,12 +52,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __MUST_HAVE_AGP
-#define __MUST_HAVE_AGP			0
-#endif
-#ifndef __HAVE_CTX_BITMAP
-#define __HAVE_CTX_BITMAP		0
-#endif
+
 #ifndef __HAVE_IRQ
 #define __HAVE_IRQ			0
 #endif
@@ -69,9 +64,6 @@
 #endif
 #ifndef __HAVE_COUNTERS
 #define __HAVE_COUNTERS			0
-#endif
-#ifndef __HAVE_SG
-#define __HAVE_SG			0
 #endif
 
 #ifndef DRIVER_IOCTLS
@@ -133,10 +125,8 @@ drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { DRM(addmap),      1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_RM_MAP)]        = { DRM(rmmap),       1, 0 },
 
-#if __HAVE_CTX_BITMAP
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_SAREA_CTX)] = { DRM(setsareactx), 1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_SAREA_CTX)] = { DRM(getsareactx), 1, 0 },
-#endif
 
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_CTX)]       = { DRM(addctx),      1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_RM_CTX)]        = { DRM(rmctx),       1, 1 },
@@ -166,7 +156,7 @@ drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control),     1, 1 },
 #endif
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ACQUIRE)]   = { DRM(agp_acquire), 1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_RELEASE)]   = { DRM(agp_release), 1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ENABLE)]    = { DRM(agp_enable),  1, 1 },
@@ -177,10 +167,8 @@ drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_UNBIND)]    = { DRM(agp_unbind),  1, 1 },
 #endif
 
-#if __HAVE_SG
 	[DRM_IOCTL_NR(DRM_IOCTL_SG_ALLOC)]      = { DRM(sg_alloc),    1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_SG_FREE)]       = { DRM(sg_free),     1, 1 },
-#endif
 
 #ifdef __HAVE_VBL_IRQ
 	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)]   = { DRM(wait_vblank), 0, 0 },
@@ -367,9 +355,8 @@ static int DRM(takedown)( drm_device_t *dev )
 		dev->magiclist[i].head = dev->magiclist[i].tail = NULL;
 	}
 
-#if __REALLY_HAVE_AGP
 				/* Clear AGP information */
-	if ( dev->agp ) {
+	if (drm_core_has_AGP(dev) && dev->agp) {
 		drm_agp_mem_t *entry;
 		drm_agp_mem_t *nexte;
 
@@ -388,7 +375,6 @@ static int DRM(takedown)( drm_device_t *dev )
 		dev->agp->acquired = 0;
 		dev->agp->enabled  = 0;
 	}
-#endif
 
 				/* Clear vma list (only built for debugging) */
 	if ( dev->vmalist ) {
@@ -407,15 +393,15 @@ static int DRM(takedown)( drm_device_t *dev )
 				switch ( map->type ) {
 				case _DRM_REGISTERS:
 				case _DRM_FRAME_BUFFER:
-#if __REALLY_HAVE_MTRR
-					if ( map->mtrr >= 0 ) {
-						int retcode;
-						retcode = mtrr_del( map->mtrr,
-								    map->offset,
-								    map->size );
-						DRM_DEBUG( "mtrr_del=%d\n", retcode );
+					if (drm_core_has_MTRR(dev)) {
+						if ( map->mtrr >= 0 ) {
+							int retcode;
+							retcode = mtrr_del( map->mtrr,
+									    map->offset,
+									    map->size );
+							DRM_DEBUG( "mtrr_del=%d\n", retcode );
+						}
 					}
-#endif
 					DRM(ioremapfree)( map->handle, map->size, dev );
 					break;
 				case _DRM_SHM:
@@ -428,15 +414,11 @@ static int DRM(takedown)( drm_device_t *dev )
 					 */
 					break;
 				case _DRM_SCATTER_GATHER:
-					/* Handle it, but do nothing, if HAVE_SG
-					 * isn't defined.
-					 */
-#if __HAVE_SG
-					if(dev->sg) {
+					/* Handle it */
+					if (drm_core_check_feature(dev, DRIVER_SG) && dev->sg) {
 						DRM(sg_cleanup)(dev->sg);
 						dev->sg = NULL;
 					}
-#endif
 					break;
 				}
 				DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
@@ -488,9 +470,7 @@ static struct pci_device_id DRM(pciidlist)[] = {
 static int DRM(probe)(struct pci_dev *pdev)
 {
 	drm_device_t *dev;
-#if __HAVE_CTX_BITMAP
 	int retcode;
-#endif
 	int i;
 	int is_compat = 0;
 
@@ -540,34 +520,32 @@ static int DRM(probe)(struct pci_dev *pdev)
 	if (dev->fn_tbl.preinit)
 	  dev->fn_tbl.preinit(dev);
 
-#if __REALLY_HAVE_AGP
-	dev->agp = DRM(agp_init)();
-#if __MUST_HAVE_AGP
-	if ( dev->agp == NULL ) {
-		DRM_ERROR( "Cannot initialize the agpgart module.\n" );
-		DRM(stub_unregister)(dev->minor);
-		DRM(takedown)( dev );
-		return -EINVAL;
+	if (drm_core_has_AGP(dev))
+	{
+		dev->agp = DRM(agp_init)();
+		if (drm_core_check_feature(dev, DRIVER_REQUIRE_AGP) && (dev->agp == NULL)) {
+			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
+			DRM(stub_unregister)(dev->minor);
+			DRM(takedown)( dev );
+			return -EINVAL;
+		}
+		if (drm_core_has_MTRR(dev)) {
+			if (dev->agp)
+				dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
+							       dev->agp->agp_info.aper_size*1024*1024,
+							       MTRR_TYPE_WRCOMB,
+							       1 );
+		}
 	}
-#endif
-#if __REALLY_HAVE_MTRR
-	if (dev->agp)
-		dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
-					dev->agp->agp_info.aper_size*1024*1024,
-					MTRR_TYPE_WRCOMB,
-					1 );
-#endif
-#endif
 
-#if __HAVE_CTX_BITMAP
 	retcode = DRM(ctxbitmap_init)( dev );
 	if( retcode ) {
 		DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
 		DRM(stub_unregister)(dev->minor);
 		DRM(takedown)( dev );
 		return retcode;
- 	}
-#endif
+	}
+
 	DRM(numdevs)++; /* no errors, mark it reserved */
 	
 	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
@@ -640,29 +618,26 @@ static void __exit drm_cleanup( void )
 				DRM_INFO( "Module unloaded\n" );
 			}
 		}
-#if __HAVE_CTX_BITMAP
-		DRM(ctxbitmap_cleanup)( dev );
-#endif
 
-#if __REALLY_HAVE_AGP && __REALLY_HAVE_MTRR
-		if ( dev->agp && dev->agp->agp_mtrr >= 0) {
+		DRM(ctxbitmap_cleanup)( dev );
+
+		if (drm_core_has_MTRR(dev) && drm_core_has_AGP(dev) &&
+		    dev->agp && dev->agp->agp_mtrr >= 0) {
 			int retval;
 			retval = mtrr_del( dev->agp->agp_mtrr,
 				   dev->agp->agp_info.aper_base,
 				   dev->agp->agp_info.aper_size*1024*1024 );
 			DRM_DEBUG( "mtrr_del=%d\n", retval );
 		}
-#endif
 
 		DRM(takedown)( dev );
 
-#if __REALLY_HAVE_AGP
-		if ( dev->agp ) {
+		if (drm_core_has_AGP(dev) && dev->agp ) {
 			DRM(agp_uninit)();
 			DRM(free)( dev->agp, sizeof(*dev->agp), DRM_MEM_AGPLISTS );
 			dev->agp = NULL;
 		}
-#endif
+
 		if (dev->fn_tbl.postcleanup)
 		  dev->fn_tbl.postcleanup(dev);
 
@@ -860,9 +835,9 @@ int DRM(release)( struct inode *inode, struct file *filp )
 			     pos->handle != DRM_KERNEL_CONTEXT ) {
 				if (dev->fn_tbl.context_dtor)
 					dev->fn_tbl.context_dtor(dev, pos->handle);
-#if __HAVE_CTX_BITMAP
+
 				DRM(ctxbitmap_free)( dev, pos->handle );
-#endif
+
 				list_del( &pos->head );
 				DRM(free)( pos, sizeof(*pos), DRM_MEM_CTXLIST );
 			}
@@ -890,6 +865,9 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	}
 	up( &dev->struct_sem );
 	
+	if (dev->fn_tbl.free_filp_priv)
+		dev->fn_tbl.free_filp_priv(dev, priv);
+
 	DRM(free)( priv, sizeof(*priv), DRM_MEM_FILES );
 
 	/* ========================================================

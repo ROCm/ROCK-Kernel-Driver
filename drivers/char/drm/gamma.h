@@ -36,8 +36,6 @@
 
 /* General customization:
  */
-#define __HAVE_MTRR			1
-
 #define DRIVER_AUTHOR		"VA Linux Systems Inc."
 
 #define DRIVER_NAME		"gamma"
@@ -72,10 +70,7 @@
 /* DMA customization:
  */
 #define __HAVE_DMA			1
-#define __HAVE_AGP			1
-#define __MUST_HAVE_AGP			0
 #define __HAVE_OLD_DMA			1
-#define __HAVE_PCI_DMA			1
 
 #define __HAVE_MULTIPLE_DMA_QUEUES	1
 #define __HAVE_DMA_WAITQUEUE		1
