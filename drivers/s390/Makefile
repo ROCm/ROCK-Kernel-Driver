@@ -7,6 +7,6 @@ export-objs := s390dyn.o qdio.o
 obj-$(CONFIG_QDIO) += qdio.o
 
 obj-y += s390mach.o s390dyn.o sysinfo.o
-obj-y += block/ char/ misc/ net/ scsi/ cio/
+obj-y += block/ char/ misc/ net/ cio/
 
 include $(TOPDIR)/Rules.make
