@@ -315,6 +315,7 @@ struct pnp_driver {
 #define	to_pnp_driver(drv) container_of(drv, struct pnp_driver, driver)
 
 struct pnp_card_driver {
+	struct list_head global_list;
 	char * name;
 	const struct pnp_card_id *id_table;
 	unsigned int flags;
