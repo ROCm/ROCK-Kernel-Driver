@@ -166,7 +166,7 @@ struct klsi_105_private {
 	unsigned long			line_state; /* modem line settings */
 	/* write pool */
 	struct urb *			write_urb_pool[NUM_URBS];
-	spinlock_t			write_urb_pool_lock;
+	spinlock_t			lock;
 	unsigned long			bytes_in;
 	unsigned long			bytes_out;
 };
@@ -284,7 +284,7 @@ static int klsi_105_startup (struct usb_serial *serial)
 		priv->bytes_out	    = 0;
 		usb_set_serial_port_data(&serial->port[i], priv);
 
-		spin_lock_init (&priv->write_urb_pool_lock);
+		spin_lock_init (&priv->lock);
 		for (i=0; i<NUM_URBS; i++) {
 			struct urb* urb = usb_alloc_urb(0, GFP_KERNEL);
 
@@ -326,7 +326,7 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 			/* kill our write urb pool */
 			int j;
 			struct urb **write_urbs = priv->write_urb_pool;
-			spin_lock_irqsave(&priv->write_urb_pool_lock,flags);
+			spin_lock_irqsave(&priv->lock,flags);
 
 			for (j = 0; j < NUM_URBS; j++) {
 				if (write_urbs[j]) {
@@ -343,8 +343,7 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 				}
 			}
 
-			spin_unlock_irqrestore (&priv->write_urb_pool_lock,
-					       	flags);
+			spin_unlock_irqrestore (&priv->lock, flags);
 
 			kfree(priv);
 			usb_set_serial_port_data(&serial->port[i], NULL);
@@ -360,6 +359,8 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 	int rc;
 	int i;
 	unsigned long line_state;
+	struct klsi_105_port_settings cfg;
+	unsigned long flags;
 
 	dbg("%s port %d", __FUNCTION__, port->number);
 
@@ -374,21 +375,27 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 	 * Then read the modem line control and store values in
 	 * priv->line_state.
 	 */
-	priv->cfg.pktlen   = 5;
-	priv->cfg.baudrate = kl5kusb105a_sio_b9600;
-	priv->cfg.databits = kl5kusb105a_dtb_8;
-	priv->cfg.unknown1 = 0;
-	priv->cfg.unknown2 = 1;
-	klsi_105_chg_port_settings(serial, &(priv->cfg));
+	cfg.pktlen   = 5;
+	cfg.baudrate = kl5kusb105a_sio_b9600;
+	cfg.databits = kl5kusb105a_dtb_8;
+	cfg.unknown1 = 0;
+	cfg.unknown2 = 1;
+	klsi_105_chg_port_settings(serial, &cfg);
 	
 	/* set up termios structure */
+	spin_lock_irqsave (&priv->lock, flags);
 	priv->termios.c_iflag = port->tty->termios->c_iflag;
 	priv->termios.c_oflag = port->tty->termios->c_oflag;
 	priv->termios.c_cflag = port->tty->termios->c_cflag;
 	priv->termios.c_lflag = port->tty->termios->c_lflag;
 	for (i=0; i<NCCS; i++)
 		priv->termios.c_cc[i] = port->tty->termios->c_cc[i];
-
+	priv->cfg.pktlen   = cfg.pktlen;
+	priv->cfg.baudrate = cfg.baudrate;
+	priv->cfg.databits = cfg.databits;
+	priv->cfg.unknown1 = cfg.unknown1;
+	priv->cfg.unknown2 = cfg.unknown2;
+	spin_unlock_irqrestore (&priv->lock, flags);
 
 	/* READ_ON and urb submission */
 	usb_fill_bulk_urb(port->read_urb, serial->dev, 
@@ -422,7 +429,9 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 
 	rc = klsi_105_get_line_state(serial, &line_state);
 	if (rc >= 0) {
+		spin_lock_irqsave (&priv->lock, flags);
 		priv->line_state = line_state;
+		spin_unlock_irqrestore (&priv->lock, flags);
 		dbg("%s - read line state 0x%lx", __FUNCTION__, line_state);
 		retval = 0;
 	} else
@@ -492,7 +501,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		unsigned long flags;
 		int i;
 		/* since the pool is per-port we might not need the spin lock !? */
-		spin_lock_irqsave (&priv->write_urb_pool_lock, flags);
+		spin_lock_irqsave (&priv->lock, flags);
 		for (i=0; i<NUM_URBS; i++) {
 			if (priv->write_urb_pool[i]->status != -EINPROGRESS) {
 				urb = priv->write_urb_pool[i];
@@ -500,7 +509,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 				break;
 			}
 		}
-		spin_unlock_irqrestore (&priv->write_urb_pool_lock, flags);
+		spin_unlock_irqrestore (&priv->lock, flags);
 
 		if (urb==NULL) {
 			dbg("%s - no more free urbs", __FUNCTION__);
@@ -552,6 +561,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		count -= size;
 	}
 exit:
+	/* lockless, but it's for debug info only... */
 	priv->bytes_out+=bytes_sent;
 
 	return bytes_sent;	/* that's how much we wrote */
@@ -588,7 +598,7 @@ static int klsi_105_chars_in_buffer (struct usb_serial_port *port)
 	unsigned long flags;
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 
-	spin_lock_irqsave (&priv->write_urb_pool_lock, flags);
+	spin_lock_irqsave (&priv->lock, flags);
 
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (priv->write_urb_pool[i]->status == -EINPROGRESS) {
@@ -596,7 +606,7 @@ static int klsi_105_chars_in_buffer (struct usb_serial_port *port)
 		}
 	}
 
-	spin_unlock_irqrestore (&priv->write_urb_pool_lock, flags);
+	spin_unlock_irqrestore (&priv->lock, flags);
 
 	dbg("%s - returns %d", __FUNCTION__, chars);
 	return (chars);
@@ -609,14 +619,14 @@ static int klsi_105_write_room (struct usb_serial_port *port)
 	int room = 0;
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 
-	spin_lock_irqsave (&priv->write_urb_pool_lock, flags);
+	spin_lock_irqsave (&priv->lock, flags);
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (priv->write_urb_pool[i]->status != -EINPROGRESS) {
 			room += URB_TRANSFER_BUFFER_SIZE;
 		}
 	}
 
-	spin_unlock_irqrestore (&priv->write_urb_pool_lock, flags);
+	spin_unlock_irqrestore (&priv->lock, flags);
 
 	dbg("%s - returns %d", __FUNCTION__, room);
 	return (room);
@@ -690,6 +700,8 @@ static void klsi_105_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			tty_insert_flip_char(tty, ((__u8*) data)[i], 0);
 		}
 		tty_flip_buffer_push(tty);
+
+		/* again lockless, but debug info only */
 		priv->bytes_in += bytes_sent;
 	}
 	/* Continue trying to always read  */
@@ -715,6 +727,11 @@ static void klsi_105_set_termios (struct usb_serial_port *port,
 	unsigned int old_iflag = old_termios->c_iflag;
 	unsigned int cflag = port->tty->termios->c_cflag;
 	unsigned int old_cflag = old_termios->c_cflag;
+	struct klsi_105_port_settings cfg;
+	unsigned long flags;
+	
+	/* lock while we are modifying the settings */
+	spin_lock_irqsave (&priv->lock, flags);
 	
 	/*
 	 * Update baud rate
@@ -838,9 +855,11 @@ static void klsi_105_set_termios (struct usb_serial_port *port,
 #endif
 		;
 	}
-
+	memcpy (&cfg, &priv->cfg, sizeof(cfg));
+	spin_unlock_irqrestore (&priv->lock, flags);
+	
 	/* now commit changes to device */
-	klsi_105_chg_port_settings(serial, &(priv->cfg));
+	klsi_105_chg_port_settings(serial, &cfg);
 } /* klsi_105_set_termios */
 
 
@@ -866,6 +885,7 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 	struct usb_serial *serial = port->serial;
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	int mask;
+	unsigned long flags;
 	
 	dbg("%scmd=0x%x", __FUNCTION__, cmd);
 
@@ -881,11 +901,12 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 			err("Reading line control failed (error = %d)", rc);
 			/* better return value? EAGAIN? */
 			return -ENOIOCTLCMD;
-		} else {
-			priv->line_state = line_state;
-			dbg("%s - read line state 0x%lx", __FUNCTION__, line_state);
 		}
-		return put_user(priv->line_state, (unsigned long *) arg); 
+		spin_lock_irqsave (&priv->lock, flags);
+		priv->line_state = line_state;
+		spin_unlock_irqrestore (&priv->lock, flags);
+		dbg("%s - read line state 0x%lx", __FUNCTION__, line_state);
+		return put_user(line_state, (unsigned long *) arg); 
 	       };
 
 	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
