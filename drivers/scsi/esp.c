@@ -4392,7 +4392,6 @@ static Scsi_Host_Template driver_template = {
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= 1,
 	.use_clustering		= ENABLE_CLUSTERING,
-	.highmem_io		= 1,
 };
 
 #include "scsi_module.c"

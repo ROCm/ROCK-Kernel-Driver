@@ -306,8 +306,6 @@ struct scsi_host_template {
 	 */
 	unsigned emulated:1;
 
-	unsigned highmem_io:1;
-
 	/* 
 	 * True if the driver wishes to use the generic block layer
 	 * tag queueing functions

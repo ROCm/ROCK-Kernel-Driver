@@ -2123,7 +2123,6 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
 	instance->max_cmd_len	= 16;
 #endif
-	instance->highmem_io	= 1;
 
 	SYM_UNLOCK_HCB(np, flags);
 
@@ -2958,7 +2957,6 @@ static Scsi_Host_Template driver_template = {
 	.eh_host_reset_handler	= sym53c8xx_eh_host_reset_handler,
 	.this_id		= 7,
 	.use_clustering		= DISABLE_CLUSTERING,
-	.highmem_io		= 1,
 #ifdef SYM_LINUX_PROC_INFO_SUPPORT
 	.proc_info		= sym53c8xx_proc_info,
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
