@@ -81,8 +81,7 @@ struct bio {
 	unsigned short		bi_hw_segments;
 
 	unsigned int		bi_size;	/* residual I/O count */
-	unsigned int		bi_max;		/* max bvl_vecs we can hold,
-						   used as index into pool */
+	unsigned int		bi_max_vecs;	/* max bvl_vecs we can hold */
 
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
 
@@ -103,6 +102,14 @@ struct bio {
 #define BIO_SEG_VALID	3	/* nr_hw_seg valid */
 #define BIO_CLONED	4	/* doesn't own data */
 #define bio_flagged(bio, flag)	((bio)->bi_flags & (1 << (flag)))
+
+/*
+ * top 4 bits of bio flags indicate the pool this bio came from
+ */
+#define BIO_POOL_BITS		(4)
+#define BIO_POOL_OFFSET		(BITS_PER_LONG - BIO_POOL_BITS)
+#define BIO_POOL_MASK		(1UL << BIO_POOL_OFFSET)
+#define BIO_POOL_IDX(bio)	((bio)->bi_flags >> BIO_POOL_OFFSET)	
 
 /*
  * bio bi_rw flags

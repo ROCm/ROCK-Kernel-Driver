@@ -61,7 +61,7 @@ static void slab_pool_free(void *ptr, void *data)
 	kmem_cache_free(data, ptr);
 }
 
-static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
+static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, unsigned long *idx)
 {
 	struct biovec_pool *bp;
 	struct bio_vec *bvl;
@@ -95,9 +95,11 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
  */
 void bio_destructor(struct bio *bio)
 {
-	struct biovec_pool *bp = bvec_array + bio->bi_max;
+	const int pool_idx = BIO_POOL_IDX(bio);
+	struct biovec_pool *bp = bvec_array + pool_idx;
 
-	BIO_BUG_ON(bio->bi_max >= BIOVEC_NR_POOLS);
+	BIO_BUG_ON(pool_idx >= BIOVEC_NR_POOLS);
+
 	/*
 	 * cloned bio doesn't own the veclist
 	 */
@@ -117,6 +119,7 @@ inline void bio_init(struct bio *bio)
 	bio->bi_phys_segments = 0;
 	bio->bi_hw_segments = 0;
 	bio->bi_size = 0;
+	bio->bi_max_vecs = 0;
 	bio->bi_end_io = NULL;
 	atomic_set(&bio->bi_cnt, 1);
 }
@@ -133,27 +136,35 @@ inline void bio_init(struct bio *bio)
  **/
 struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
-	struct bio *bio;
-	struct bio_vec *bvl = NULL;
 	int pf_flags = current->flags;
+	struct bio_vec *bvl = NULL;
+	unsigned long idx;
+	struct bio *bio;
 
 	current->flags |= PF_NOWARN;
 	bio = mempool_alloc(bio_pool, gfp_mask);
 	if (unlikely(!bio))
 		goto out;
 
-	if (!nr_iovecs || (bvl = bvec_alloc(gfp_mask,nr_iovecs,&bio->bi_max))) {
-		bio_init(bio);
-		bio->bi_destructor = bio_destructor;
-		bio->bi_io_vec = bvl;
+	bio_init(bio);
+
+	if (unlikely(!nr_iovecs))
 		goto out;
+
+	bvl = bvec_alloc(gfp_mask, nr_iovecs, &idx);
+	if (bvl) {
+		bio->bi_flags |= idx << BIO_POOL_OFFSET;
+		bio->bi_max_vecs = bvec_array[idx].nr_vecs;
+		bio->bi_io_vec = bvl;
+		bio->bi_destructor = bio_destructor;
+out:
+		current->flags = pf_flags;
+		return bio;
 	}
 
 	mempool_free(bio, bio_pool);
 	bio = NULL;
-out:
-	current->flags = pf_flags;
-	return bio;
+	goto out;
 }
 
 /**
@@ -212,8 +223,8 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 	bio->bi_rw = bio_src->bi_rw;
 
 	/*
-	 * notes -- maybe just leave bi_idx alone. bi_max has no use
-	 * on a cloned bio. assume identical mapping for the clone
+	 * notes -- maybe just leave bi_idx alone. assume identical mapping
+	 * for the clone
 	 */
 	bio->bi_vcnt = bio_src->bi_vcnt;
 	bio->bi_idx = bio_src->bi_idx;
@@ -223,7 +234,14 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 		bio->bi_flags |= (1 << BIO_SEG_VALID);
 	}
 	bio->bi_size = bio_src->bi_size;
-	bio->bi_max = bio_src->bi_max;
+
+	/*
+	 * cloned bio does not own the bio_vec, so users cannot fiddle with
+	 * it. clear bi_max_vecs and clear the BIO_POOL_BITS to make this
+	 * apparent
+	 */
+	bio->bi_max_vecs = 0;
+	bio->bi_flags &= (BIO_POOL_MASK - 1);
 }
 
 /**
@@ -368,12 +386,7 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 	if (unlikely(bio_flagged(bio, BIO_CLONED)))
 		return 1;
 
-	/*
-	 * FIXME: change bi_max?
-	 */
-	BUG_ON(bio->bi_max > BIOVEC_NR_POOLS);
-
-	if (bio->bi_vcnt >= bvec_array[bio->bi_max].nr_vecs)
+	if (bio->bi_vcnt >= bio->bi_max_vecs)
 		return 1;
 
 	if (((bio->bi_size + len) >> 9) > q->max_sectors)
