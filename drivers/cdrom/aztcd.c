@@ -1724,16 +1724,18 @@ int __init aztcd_init(void)
 	long int count, max_count;
 	unsigned char result[50];
 	int st;
+	void* status = NULL;
 	int i = 0;
+	int ret = 0;
 
 	if (azt_port == 0) {
-		printk("aztcd: no Aztech CD-ROM Initialization");
+		printk(KERN_INFO "aztcd: no Aztech CD-ROM Initialization");
 		return -EIO;
 	}
 
-	printk
-	    ("aztcd: AZTECH, ORCHID, OKANO, WEARNES, TXC, CyDROM CD-ROM Driver\n");
-	printk("aztcd: (C) 1994-98 W.Zimmermann\n");
+	printk(KERN_INFO "aztcd: AZTECH, ORCHID, OKANO, WEARNES, TXC, CyDROM "
+	       "CD-ROM Driver\n");
+	printk(KERN_INFO "aztcd: (C) 1994-98 W.Zimmermann\n");
 	if (azt_port == -1) {
 		printk
 		    ("aztcd: KernelVersion=%s DriverVersion=%s For IDE/ATAPI-drives use ide-cd.c\n",
@@ -1742,8 +1744,8 @@ int __init aztcd_init(void)
 		printk
 		    ("aztcd: DriverVersion=%s BaseAddress=0x%x  For IDE/ATAPI-drives use ide-cd.c\n",
 		     AZT_VERSION, azt_port);
-	printk
-	    ("aztcd: If you have problems, read /usr/src/linux/Documentation/cdrom/aztcd\n");
+	printk(KERN_INFO "aztcd: If you have problems, read /usr/src/linux/"
+	       "Documentation/cdrom/aztcd\n");
 
 
 #ifdef AZT_SW32			/*CDROM connected to Soundwave32 card */
@@ -1764,15 +1766,15 @@ int __init aztcd_init(void)
 
 	/* check for presence of drive */
 
-	if (azt_port == -1) {	/* autoprobing */
+	if (azt_port == -1) {	/* autoprobing for proprietary interface  */
 		for (i = 0; (azt_port_auto[i] != 0) && (i < 16); i++) {
 			azt_port = azt_port_auto[i];
-			printk("aztcd: Autoprobing BaseAddress=0x%x \n",
-			       azt_port);
-			st = check_region(azt_port, 4);	/*proprietary interfaces need 4 bytes */
-			if (st)
+			printk(KERN_INFO "aztcd: Autoprobing BaseAddress=0x%x"
+			       "\n", azt_port);
+			 /*proprietary interfaces need 4 bytes */
+			if (!request_region(azt_port, 4, "aztcd")) {
 				continue;
-
+			}
 			outb(POLLED, MODE_PORT);
 			inb(CMD_PORT);
 			inb(CMD_PORT);
@@ -1785,22 +1787,25 @@ int __init aztcd_init(void)
 				if (aztTimeOutCount >= AZT_FAST_TIMEOUT)
 					break;
 			} while (aztIndatum & AFL_STATUS);
-			if (inb(DATA_PORT) == AFL_OP_OK)
+			if (inb(DATA_PORT) == AFL_OP_OK) { /* OK drive found */
 				break;
+			}
+			else {  /* Drive not found on this port - try next one */
+				release_region(azt_port, 4);
+			}
 		}
 		if ((azt_port_auto[i] == 0) || (i == 16)) {
-			printk("aztcd: no AZTECH CD-ROM drive found\n");
+			printk(KERN_INFO "aztcd: no AZTECH CD-ROM drive found\n");
 			return -EIO;
 		}
 	} else {		/* no autoprobing */
 		if ((azt_port == 0x1f0) || (azt_port == 0x170))
-			st = check_region(azt_port, 8);	/*IDE-interfaces need 8 bytes */
+			status = request_region(azt_port, 8, "aztcd");	/*IDE-interfaces need 8 bytes */
 		else
-			st = check_region(azt_port, 4);	/*proprietary interfaces need 4 bytes */
-		if (st) {
-			printk
-			    ("aztcd: conflict, I/O port (%X) already used\n",
-			     azt_port);
+			status = request_region(azt_port, 4, "aztcd");	/*proprietary interfaces need 4 bytes */
+		if (!status) {
+			printk(KERN_WARNING "aztcd: conflict, I/O port (%X) "
+			       "already used\n", azt_port);
 			return -EIO;
 		}
 
@@ -1823,17 +1828,19 @@ int __init aztcd_init(void)
 		if (inb(DATA_PORT) != AFL_OP_OK) {	/*OP_OK? If not, reset and try again */
 #ifndef MODULE
 			if (azt_cont != 0x79) {
-				printk
-				    ("aztcd: no AZTECH CD-ROM drive found-Try boot parameter aztcd=<BaseAddress>,0x79\n");
-				return -EIO;
+				printk(KERN_WARNING "aztcd: no AZTECH CD-ROM "
+				       "drive found-Try boot parameter aztcd="
+				       "<BaseAddress>,0x79\n");
+				ret = -EIO;
+				goto err_out;
 			}
 #else
 			if (0) {
 			}
 #endif
 			else {
-				printk
-				    ("aztcd: drive reset - please wait\n");
+				printk(KERN_INFO "aztcd: drive reset - "
+				       "please wait\n");
 				for (count = 0; count < 50; count++) {
 					inb(STATUS_PORT);	/*removing all data from earlier tries */
 					inb(DATA_PORT);
@@ -1845,9 +1852,10 @@ int __init aztcd_init(void)
 				outb(ACMD_SOFT_RESET, CMD_PORT);	/*send reset */
 				STEN_LOW;
 				if (inb(DATA_PORT) != AFL_OP_OK) {	/*OP_OK? */
-					printk
-					    ("aztcd: no AZTECH CD-ROM drive found\n");
-					return -EIO;
+					printk(KERN_WARNING "aztcd: no AZTECH "
+					       "CD-ROM drive found\n");
+					ret = -EIO;
+					goto err_out;
 				}
 
 				for (count = 0; count < AZT_TIMEOUT;
@@ -1855,13 +1863,13 @@ int __init aztcd_init(void)
 					barrier();	/* Stop gcc 2.96 being smart */
 
 				if ((st = getAztStatus()) == -1) {
-					printk
-					    ("aztcd: Drive Status Error Status=%x\n",
-					     st);
-					return -EIO;
+					printk(KERN_WARNING "aztcd: Drive Status"
+					       " Error Status=%x\n", st);
+					ret = -EIO;
+					goto err_out;
 				}
 #ifdef AZT_DEBUG
-				printk("aztcd: Status = %x\n", st);
+				printk(KERN_DEBUG "aztcd: Status = %x\n", st);
 #endif
 				outb(POLLED, MODE_PORT);
 				inb(CMD_PORT);
@@ -1916,29 +1924,34 @@ int __init aztcd_init(void)
 				printk("%c", result[count]);
 			printk("<<>> ");
 			printk("Aborted\n");
-			return -EIO;
+			ret = -EIO;
+			goto err_out;
 		}
 	}
 	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &azt_fops, NULL);
 	if (devfs_register_blkdev(MAJOR_NR, "aztcd", &azt_fops) != 0) {
-		printk("aztcd: Unable to get major %d for Aztech CD-ROM\n",
-		       MAJOR_NR);
-		return -EIO;
+		printk(KERN_WARNING "aztcd: Unable to get major %d for Aztech"
+		       " CD-ROM\n", MAJOR_NR);
+		ret = -EIO;
+		goto err_out;
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_aztcd_request, &aztSpin);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &azt_fops, 0);
 
-	if ((azt_port == 0x1f0) || (azt_port == 0x170))
-		request_region(azt_port, 8, "aztcd");	/*IDE-interface */
-	else
-		request_region(azt_port, 4, "aztcd");	/*proprietary interface */
-
 	azt_invalidate_buffers();
 	aztPresent = 1;
 	aztCloseDoor();
 	return (0);
+ err_out:
+	if ((azt_port == 0x1f0) || (azt_port == 0x170)) {
+		SWITCH_IDE_MASTER;
+		release_region(azt_port, 8);	/*IDE-interface */
+	} else
+		release_region(azt_port, 4);	/*proprietary interface */
+	return ret;
+
 }
 
 void __exit aztcd_exit(void)
