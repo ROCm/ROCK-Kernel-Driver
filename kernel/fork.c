@@ -873,7 +873,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		goto bad_fork_cleanup_sighand;
 	if (copy_mm(clone_flags, p))
 		goto bad_fork_cleanup_signal;
-	if (copy_namespace(clone_flags, p))
+	retval = copy_namespace(clone_flags, p);
+	if (retval)
 		goto bad_fork_cleanup_mm;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
