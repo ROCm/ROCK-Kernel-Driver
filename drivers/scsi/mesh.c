@@ -10,9 +10,13 @@
  * Apr. 21 2002  - BenH		Rework bus reset code for new error handler
  *                              Add delay after initial bus reset
  *                              Add module parameters
+ *
+ * Sep. 27 2003  - BenH		Move to new driver model, fix some write posting
+ *				issues
  * To do:
  * - handle aborts correctly
  * - retry arbitration if lost (unless higher levels do this for us)
+ * - power down the chip when no device is detected
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -38,10 +42,7 @@
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <asm/pci-bridge.h>
-#ifdef CONFIG_PMAC_PBOOK
-#include <linux/adb.h>
-#include <linux/pmu.h>
-#endif
+#include <asm/macio.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -164,10 +165,12 @@ struct mesh_state {
 	int	last_n_msgout;
 	u8	msgout[16];
 	struct dbdma_cmd *dma_cmds;	/* space for dbdma commands, aligned */
+	dma_addr_t dma_cmd_bus;
+	void	*dma_cmd_space;
+	int	dma_cmd_size;
 	int	clk_freq;
 	struct mesh_target tgts[8];
-	void	*dma_cmd_space;
-	struct device_node *ofnode;
+	struct macio_dev *mdev;
 	struct pci_dev* pdev;
 #ifdef MESH_DBG
 	int	log_ix;
@@ -176,13 +179,114 @@ struct mesh_state {
 #endif
 };
 
+/*
+ * Driver is too messy, we need a few prototypes...
+ */
+static void mesh_done(struct mesh_state *ms, int start_next);
+static void mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
+static void cmd_complete(struct mesh_state *ms);
+static void set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd);
+static void halt_dma(struct mesh_state *ms);
+static void phase_mismatch(struct mesh_state *ms);
+
+
+/*
+ * Some debugging & logging routines
+ */
+
 #ifdef MESH_DBG
 
-static void dlog(struct mesh_state *ms, char *fmt, int a);
-static void dumplog(struct mesh_state *ms, int tgt);
-static void dumpslog(struct mesh_state *ms);
+static inline u32 readtb(void)
+{
+	u32 tb;
+
+#ifdef DBG_USE_TB
+	/* Beware: if you enable this, it will crash on 601s. */
+	asm ("mftb %0" : "=r" (tb) : );
+#else
+	tb = 0;
+#endif
+	return tb;
+}
+
+static void dlog(struct mesh_state *ms, char *fmt, int a)
+{
+	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
+	struct dbglog *tlp, *slp;
+
+	tlp = &tp->log[tp->log_ix];
+	slp = &ms->log[ms->log_ix];
+	tlp->fmt = fmt;
+	tlp->tb = readtb();
+	tlp->phase = (ms->msgphase << 4) + ms->phase;
+	tlp->bs0 = ms->mesh->bus_status0;
+	tlp->bs1 = ms->mesh->bus_status1;
+	tlp->tgt = ms->conn_tgt;
+	tlp->d = a;
+	*slp = *tlp;
+	if (++tp->log_ix >= N_DBG_LOG)
+		tp->log_ix = 0;
+	if (tp->n_log < N_DBG_LOG)
+		++tp->n_log;
+	if (++ms->log_ix >= N_DBG_SLOG)
+		ms->log_ix = 0;
+	if (ms->n_log < N_DBG_SLOG)
+		++ms->n_log;
+}
+
+static void dumplog(struct mesh_state *ms, int t)
+{
+	struct mesh_target *tp = &ms->tgts[t];
+	struct dbglog *lp;
+	int i;
+
+	if (tp->n_log == 0)
+		return;
+	i = tp->log_ix - tp->n_log;
+	if (i < 0)
+		i += N_DBG_LOG;
+	tp->n_log = 0;
+	do {
+		lp = &tp->log[i];
+		printk(KERN_DEBUG "mesh log %d: bs=%.2x%.2x ph=%.2x ",
+		       t, lp->bs1, lp->bs0, lp->phase);
+#ifdef DBG_USE_TB
+		printk("tb=%10u ", lp->tb);
+#endif
+		printk(lp->fmt, lp->d);
+		printk("\n");
+		if (++i >= N_DBG_LOG)
+			i = 0;
+	} while (i != tp->log_ix);
+}
+
+static void dumpslog(struct mesh_state *ms)
+{
+	struct dbglog *lp;
+	int i;
+
+	if (ms->n_log == 0)
+		return;
+	i = ms->log_ix - ms->n_log;
+	if (i < 0)
+		i += N_DBG_SLOG;
+	ms->n_log = 0;
+	do {
+		lp = &ms->log[i];
+		printk(KERN_DEBUG "mesh log: bs=%.2x%.2x ph=%.2x t%d ",
+		       lp->bs1, lp->bs0, lp->phase, lp->tgt);
+#ifdef DBG_USE_TB
+		printk("tb=%10u ", lp->tb);
+#endif
+		printk(lp->fmt, lp->d);
+		printk("\n");
+		if (++i >= N_DBG_SLOG)
+			i = 0;
+	} while (i != ms->log_ix);
+}
 
 #else
+
 static inline void dlog(struct mesh_state *ms, char *fmt, int a)
 {}
 static inline void dumplog(struct mesh_state *ms, int tgt)
@@ -191,309 +295,8 @@ static inline void dumpslog(struct mesh_state *ms)
 {}
 
 #endif /* MESH_DBG */
+
 #define MKWORD(a, b, c, d)	(((a) << 24) + ((b) << 16) + ((c) << 8) + (d))
-
-static struct mesh_state *all_meshes;
-
-static void mesh_init(struct mesh_state *);
-static int mesh_notify_reboot(struct notifier_block *, unsigned long, void *);
-static void mesh_dump_regs(struct mesh_state *);
-static void mesh_start(struct mesh_state *);
-static void mesh_start_cmd(struct mesh_state *, Scsi_Cmnd *);
-static void add_sdtr_msg(struct mesh_state *);
-static void set_sdtr(struct mesh_state *, int, int);
-static void start_phase(struct mesh_state *);
-static void get_msgin(struct mesh_state *);
-static int msgin_length(struct mesh_state *);
-static void cmd_complete(struct mesh_state *);
-static void phase_mismatch(struct mesh_state *);
-static void reselected(struct mesh_state *);
-static void handle_reset(struct mesh_state *);
-static void handle_error(struct mesh_state *);
-static void handle_exception(struct mesh_state *);
-static void mesh_interrupt(int, void *, struct pt_regs *);
-static irqreturn_t do_mesh_interrupt(int, void *, struct pt_regs *);
-static void handle_msgin(struct mesh_state *);
-static void mesh_done(struct mesh_state *, int);
-static void mesh_completed(struct mesh_state *, Scsi_Cmnd *);
-static void set_dma_cmds(struct mesh_state *, Scsi_Cmnd *);
-static void halt_dma(struct mesh_state *);
-static int data_goes_out(Scsi_Cmnd *);
-static void do_abort(struct mesh_state *ms);
-static void set_mesh_power(struct mesh_state *ms, int state);
-
-#ifdef CONFIG_PMAC_PBOOK
-static int mesh_notify_sleep(struct pmu_sleep_notifier *self, int when);
-static struct pmu_sleep_notifier mesh_sleep_notifier = {
-	mesh_notify_sleep,
-	SLEEP_LEVEL_BLOCK,
-};
-#endif
-
-static struct notifier_block mesh_notifier = {
-	mesh_notify_reboot,
-	NULL,
-	0
-};
-
-int
-mesh_detect(Scsi_Host_Template *tp)
-{
-	struct device_node *mesh;
-	int nmeshes, tgt, *cfp, minper;
-	struct mesh_state *ms, **prev_statep;
-	struct Scsi_Host *mesh_host;
-	void *dma_cmd_space;
-
-	if (_machine == _MACH_Pmac) {
-	    use_active_neg = (find_devices("mac-io") ? 0 : SEQ_ACTIVE_NEG);
-	} else {
-	    /* CHRP mac-io */
-	    use_active_neg = SEQ_ACTIVE_NEG;
-	}
-
-	/* Calculate sync rate from module parameters */
-	if (sync_rate > 10)
-		sync_rate = 10;
-	if (sync_rate > 0) {
-		printk(KERN_INFO "mesh: configured for synchronous %d MB/s\n", sync_rate);
-		mesh_sync_period = 1000 / sync_rate;	/* ns */
-		mesh_sync_offset = 15;
-	} else
-		printk(KERN_INFO "mesh: configured for asynchronous\n");
-
-	nmeshes = 0;
-	prev_statep = &all_meshes;
-	/*
-	 * On powermacs, the MESH node has device_type "mesh".
-	 * On chrp machines, its device_type is "scsi" with
-	 * "chrp,mesh0" as its `compatible' property.
-	 */
-	mesh = find_devices("mesh");
-	if (mesh == 0)
-		mesh = find_compatible_devices("scsi", "chrp,mesh0");
-	for (; mesh != 0; mesh = mesh->next) {
-		u8 pci_bus, pci_devfn;
-		struct pci_dev* pdev = NULL;
-		
-		if (mesh->n_addrs != 2 || mesh->n_intrs != 2) {
-			printk(KERN_ERR "mesh: expected 2 addrs and 2 intrs"
-			       " (got %d,%d)\n", mesh->n_addrs, mesh->n_intrs);
-			continue;
-		}
-		if (mesh->parent != NULL
-		    && pci_device_from_OF_node(mesh->parent, &pci_bus,
-					       &pci_devfn) == 0)
-			pdev = pci_find_slot(pci_bus, pci_devfn);
-		if (pdev == NULL) {
-			printk(KERN_ERR "mesh: Can't locate PCI entry\n");
-			continue;
-		}
-
-		mesh_host = scsi_register(tp, sizeof(struct mesh_state));
-		if (mesh_host == 0) {
-			printk(KERN_ERR "mesh: couldn't register host");
-			continue;
-		}
-		mesh_host->unique_id = nmeshes;
-#if !defined(MODULE)
-		note_scsi_host(mesh, mesh_host);
-#endif
-
-		ms = (struct mesh_state *) mesh_host->hostdata;
-		if (ms == 0)
-			panic("no mesh state");
-		memset(ms, 0, sizeof(*ms));
-		ms->host = mesh_host;
-		ms->ofnode = mesh;
-		ms->pdev = pdev;
-		ms->mesh = (volatile struct mesh_regs *)
-			ioremap(mesh->addrs[0].address, 0x1000);
-		ms->dma = (volatile struct dbdma_regs *)
-			ioremap(mesh->addrs[1].address, 0x1000);
-		ms->meshintr = mesh->intrs[0].line;
-		ms->dmaintr = mesh->intrs[1].line;
-
-		/* Space for dma command list: +1 for stop command,
-		   +1 to allow for aligning. */
-		dma_cmd_space = kmalloc((mesh_host->sg_tablesize + 2) *
-					sizeof(struct dbdma_cmd), GFP_KERNEL);
-		if (dma_cmd_space == 0)
-			panic("mesh: couldn't allocate dma command space");
-		ms->dma_cmds = (struct dbdma_cmd *) DBDMA_ALIGN(dma_cmd_space);
-		memset(ms->dma_cmds, 0, (mesh_host->sg_tablesize + 1)
-		       * sizeof(struct dbdma_cmd));
-		ms->dma_cmd_space = dma_cmd_space;
-
-		ms->current_req = 0;
-		for (tgt = 0; tgt < 8; ++tgt) {
-			ms->tgts[tgt].sdtr_state = do_sdtr;
-			ms->tgts[tgt].sync_params = ASYNC_PARAMS;
-			ms->tgts[tgt].current_req = 0;
-		}
-		*prev_statep = ms;
-		prev_statep = &ms->next;
-
-		if ((cfp = (int *) get_property(mesh, "clock-frequency",
-						NULL))) {
-			ms->clk_freq = *cfp;
-		} else {
-			printk(KERN_INFO "mesh: assuming 50MHz clock frequency\n");
-			ms->clk_freq = 50000000;
-		}
-		/* The maximum sync rate is clock / 5; increase
-		   mesh_sync_period if necessary. */
-		minper = 1000000000 / (ms->clk_freq / 5);	/* ns */
-		if (mesh_sync_period < minper)
-			mesh_sync_period = minper;
-
-		set_mesh_power(ms, 1);
-
-		mesh_init(ms);
-
-		if (request_irq(ms->meshintr, do_mesh_interrupt, 0, "MESH", ms)) {
-			printk(KERN_ERR "MESH: can't get irq %d\n", ms->meshintr);
-		}
-
-		++nmeshes;
-	}
-
-	if ((_machine == _MACH_Pmac) && (nmeshes > 0)) {
-#ifdef CONFIG_PMAC_PBOOK
-		pmu_register_sleep_notifier(&mesh_sleep_notifier);
-#endif /* CONFIG_PMAC_PBOOK */
-		register_reboot_notifier(&mesh_notifier);
-	}
-
-	return nmeshes;
-}
-
-int
-mesh_release(struct Scsi_Host *host)
-{
-	struct mesh_state *ms = (struct mesh_state *) host->hostdata;
-
-	if (ms == 0)
-		return 0;
-	if (ms->mesh)
-		iounmap((void *) ms->mesh);
-	if (ms->dma)
-		iounmap((void *) ms->dma);
-	kfree(ms->dma_cmd_space);
-	free_irq(ms->meshintr, ms);
-	pmac_call_feature(PMAC_FTR_MESH_ENABLE, ms->ofnode, 0, 0);
-	return 0;
-}
-
-static void
-set_mesh_power(struct mesh_state *ms, int state)
-{
-	if (_machine != _MACH_Pmac)
-		return;
-	if (state) {
-		pmac_call_feature(PMAC_FTR_MESH_ENABLE, ms->ofnode, 0, 1);
-		mdelay(200);
-	} else {
-		pmac_call_feature(PMAC_FTR_MESH_ENABLE, ms->ofnode, 0, 0);
-		mdelay(10);
-	}
-}			
-
-#ifdef CONFIG_PMAC_PBOOK
-/*
- * notify clients before sleep and reset bus afterwards
- */
-int
-mesh_notify_sleep(struct pmu_sleep_notifier *self, int when)
-{
-	struct mesh_state *ms;
-	
-	switch (when) {
-	case PBOOK_SLEEP_REQUEST:
-		/* XXX We should wait for current transactions and queue
-		 * new ones that would be posted beyond this point 
-		 */ 
-		break;
-	case PBOOK_SLEEP_REJECT:
-		break;
-		
-	case PBOOK_SLEEP_NOW:
-		for (ms = all_meshes; ms != 0; ms = ms->next) {
-			unsigned long flags;
-
-			scsi_block_requests(ms->host);
-			spin_lock_irqsave(ms->host->host_lock, flags);
-			while(ms->phase != idle) {
-				spin_unlock_irqrestore(ms->host->host_lock, flags);
-				current->state = TASK_UNINTERRUPTIBLE;
-				schedule_timeout(1);
-				spin_lock_irqsave(ms->host->host_lock, flags);
-			}
-			ms->phase = sleeping;
-			spin_unlock_irqrestore(ms->host->host_lock, flags);
-			disable_irq(ms->meshintr);
-			set_mesh_power(ms, 0);
-		}
-		break;
-	case PBOOK_WAKE:
-		for (ms = all_meshes; ms != 0; ms = ms->next) {
-			unsigned long flags;
-			
-			set_mesh_power(ms, 1);
-			mesh_init(ms);
-			spin_lock_irqsave(ms->host->host_lock, flags);
-			mesh_start(ms);
-			spin_unlock_irqrestore(ms->host->host_lock, flags);
-			enable_irq(ms->meshintr);
-			scsi_unblock_requests(ms->host);
-		}
-		break;
-	}
-	return PBOOK_SLEEP_OK;
-}
-#endif /* CONFIG_PMAC_PBOOK */
-
-/*
- * Called by midlayer with host locked to queue a new
- * request
- */
-int
-mesh_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
-{
-	struct mesh_state *ms;
-
-	cmd->scsi_done = done;
-	cmd->host_scribble = NULL;
-
-	ms = (struct mesh_state *) cmd->device->host->hostdata;
-
-	if (ms->request_q == NULL)
-		ms->request_q = cmd;
-	else
-		ms->request_qtail->host_scribble = (void *) cmd;
-	ms->request_qtail = cmd;
-
-	if (ms->phase == idle)
-		mesh_start(ms);
-
-	return 0;
-}
-
-/* Todo: here we can at least try to remove the command from the
- * queue if it isn't connected yet, and for pending command, assert
- * ATN until the bus gets freed.
- */
-int
-mesh_abort(Scsi_Cmnd *cmd)
-{
-	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
-
-	printk(KERN_DEBUG "mesh_abort(%p)\n", cmd);
-	mesh_dump_regs(ms);
-	dumplog(ms, cmd->device->id);
-	dumpslog(ms);
-	return SCSI_ABORT_SNOOZE;
-}
 
 static void
 mesh_dump_regs(struct mesh_state *ms)
@@ -528,79 +331,35 @@ mesh_dump_regs(struct mesh_state *ms)
 	}
 }
 
-/*
- * Called by the midlayer with the lock held to reset the
- * SCSI host and bus.
- * The midlayer will wait for devices to come back, we don't need
- * to do that ourselves
- */
-int
-mesh_host_reset(Scsi_Cmnd *cmd)
-{
-	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
-	volatile struct mesh_regs *mr = ms->mesh;
-	volatile struct dbdma_regs *md = ms->dma;
-
-	printk(KERN_DEBUG "mesh_host_reset\n");
-
-	/* Reset the controller & dbdma channel */
-	out_le32(&md->control, (RUN|PAUSE|FLUSH|WAKE) << 16);	/* stop dma */
-	out_8(&mr->exception, 0xff);	/* clear all exception bits */
-	out_8(&mr->error, 0xff);	/* clear all error bits */
-	out_8(&mr->sequence, SEQ_RESETMESH);
-	udelay(1);
-	out_8(&mr->intr_mask, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
-	out_8(&mr->source_id, ms->host->this_id);
-	out_8(&mr->sel_timeout, 25);	/* 250ms */
-	out_8(&mr->sync_params, ASYNC_PARAMS);
-
-	/* Reset the bus */
-	out_8(&mr->bus_status1, BS1_RST);	/* assert RST */
-	udelay(30);			/* leave it on for >= 25us */
-	out_8(&mr->bus_status1, 0);	/* negate RST */
-
-	/* Complete pending commands */
-	handle_reset(ms);
-	
-	return SUCCESS;
-}
 
 /*
- * If we leave drives set for synchronous transfers (especially
- * CDROMs), and reboot to MacOS, it gets confused, poor thing.
- * So, on reboot we reset the SCSI bus.
+ * Flush write buffers on the bus path to the mesh
  */
-static int
-mesh_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
+static inline void mesh_flush_io(volatile struct mesh_regs *mr)
 {
-	struct mesh_state *ms;
-	volatile struct mesh_regs *mr;
-
-	if (code == SYS_DOWN) {
-		printk(KERN_INFO "resetting MESH scsi bus(es)\n");
-		for (ms = all_meshes; ms != 0; ms = ms->next) {
-			mr = ms->mesh;
-			out_8(&mr->intr_mask, 0);
-			out_8(&mr->interrupt,
-			      INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
-			out_8(&mr->bus_status1, BS1_RST);
-			udelay(30);
-			out_8(&mr->bus_status1, 0);
-		}
-	}
-	return NOTIFY_DONE;
+	(void)in_8(&mr->mesh_id);
 }
+
+
+/*
+ * Complete a SCSI command
+ */
+static void mesh_completed(struct mesh_state *ms, Scsi_Cmnd *cmd)
+{
+	(*cmd->scsi_done)(cmd);
+}
+
 
 /* Called with  meshinterrupt disabled, initialize the chipset
  * and eventually do the initial bus reset. The lock must not be
  * held since we can schedule.
  */
-static void
-mesh_init(struct mesh_state *ms)
+static void mesh_init(struct mesh_state *ms)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
 	volatile struct dbdma_regs *md = ms->dma;
 
+	mesh_flush_io(mr);
 	udelay(100);
 
 	/* Reset controller */
@@ -608,6 +367,7 @@ mesh_init(struct mesh_state *ms)
 	out_8(&mr->exception, 0xff);	/* clear all exception bits */
 	out_8(&mr->error, 0xff);	/* clear all error bits */
 	out_8(&mr->sequence, SEQ_RESETMESH);
+	mesh_flush_io(mr);
 	udelay(10);
 	out_8(&mr->intr_mask, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
 	out_8(&mr->source_id, ms->host->this_id);
@@ -619,8 +379,10 @@ mesh_init(struct mesh_state *ms)
 		
 		/* Reset bus */
 		out_8(&mr->bus_status1, BS1_RST);	/* assert RST */
+		mesh_flush_io(mr);
 		udelay(30);			/* leave it on for >= 25us */
 		out_8(&mr->bus_status1, 0);	/* negate RST */
+		mesh_flush_io(mr);
 
 		/* Wait for bus to come back */
 		current->state = TASK_UNINTERRUPTIBLE;
@@ -630,6 +392,7 @@ mesh_init(struct mesh_state *ms)
 	/* Reconfigure controller */
 	out_8(&mr->interrupt, 0xff);	/* clear all interrupt bits */
 	out_8(&mr->sequence, SEQ_FLUSHFIFO);
+	mesh_flush_io(mr);
 	udelay(1);
 	out_8(&mr->sync_params, ASYNC_PARAMS);
 	out_8(&mr->sequence, SEQ_ENBRESEL);
@@ -638,51 +401,15 @@ mesh_init(struct mesh_state *ms)
 	ms->msgphase = msg_none;
 }
 
-/*
- * Start the next command for a MESH.
- * Should be called with interrupts disabled.
- */
-static void
-mesh_start(struct mesh_state *ms)
-{
-	Scsi_Cmnd *cmd, *prev, *next;
 
-	if (ms->phase != idle || ms->current_req != NULL) {
-		printk(KERN_ERR "inappropriate mesh_start (phase=%d, ms=%p)",
-		       ms->phase, ms);
-		return;
-	}
-
-	while (ms->phase == idle) {
-		prev = NULL;
-		for (cmd = ms->request_q; ; cmd = (Scsi_Cmnd *) cmd->host_scribble) {
-			if (cmd == NULL)
-				return;
-			if (ms->tgts[cmd->device->id].current_req == NULL)
-				break;
-			prev = cmd;
-		}
-		next = (Scsi_Cmnd *) cmd->host_scribble;
-		if (prev == NULL)
-			ms->request_q = next;
-		else
-			prev->host_scribble = (void *) next;
-		if (next == NULL)
-			ms->request_qtail = prev;
-
-		mesh_start_cmd(ms, cmd);
-	}
-}
-
-static void
-mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
+static void mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
 	int t, id;
 
 	id = cmd->device->id;
 	ms->current_req = cmd;
-	ms->tgts[id].data_goes_out = data_goes_out(cmd);
+	ms->tgts[id].data_goes_out = cmd->sc_data_direction == SCSI_DATA_WRITE;
 	ms->tgts[id].current_req = cmd;
 
 #if 1
@@ -720,9 +447,10 @@ mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
 	     MKWORD(mr->interrupt, mr->exception, mr->error, mr->fifo_count));
 	out_8(&mr->interrupt, INT_CMDDONE);
 	out_8(&mr->sequence, SEQ_ENBRESEL);
+	mesh_flush_io(mr);
 	udelay(1);
 
-	if (mr->bus_status1 & (BS1_BSY | BS1_SEL)) {
+	if (in_8(&mr->bus_status1) & (BS1_BSY | BS1_SEL)) {
 		/*
 		 * Some other device has the bus or is arbitrating for it -
 		 * probably a target which is about to reselect us.
@@ -731,7 +459,7 @@ mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
 		     MKWORD(mr->interrupt, mr->exception,
 			    mr->error, mr->fifo_count));
 		for (t = 100; t > 0; --t) {
-			if ((mr->bus_status1 & (BS1_BSY | BS1_SEL)) == 0)
+			if ((in_8(&mr->bus_status1) & (BS1_BSY | BS1_SEL)) == 0)
 				break;
 			if (in_8(&mr->interrupt) != 0) {
 				dlog(ms, "intr b4 arb, intr/exc/err/fc=%.8x",
@@ -743,7 +471,7 @@ mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
 			}
 			udelay(1);
 		}
-		if (mr->bus_status1 & (BS1_BSY | BS1_SEL)) {
+		if (in_8(&mr->bus_status1) & (BS1_BSY | BS1_SEL)) {
 			/* XXX should try again in a little while */
 			ms->stat = DID_BUS_BUSY;
 			ms->phase = idle;
@@ -792,23 +520,25 @@ mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
 	}
 	dlog(ms, "after arb, intr/exc/err/fc=%.8x",
 	     MKWORD(mr->interrupt, mr->exception, mr->error, mr->fifo_count));
-	if (mr->interrupt == 0 && (mr->bus_status1 & BS1_SEL)
-	    && (mr->bus_status0 & BS0_IO)) {
+	if (in_8(&mr->interrupt) == 0 && (in_8(&mr->bus_status1) & BS1_SEL)
+	    && (in_8(&mr->bus_status0) & BS0_IO)) {
 		/* looks like a reselection - try resetting the mesh */
 		dlog(ms, "resel? after arb, intr/exc/err/fc=%.8x",
 		     MKWORD(mr->interrupt, mr->exception, mr->error, mr->fifo_count));
 		out_8(&mr->sequence, SEQ_RESETMESH);
+		mesh_flush_io(mr);
 		udelay(10);
 		out_8(&mr->interrupt, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
 		out_8(&mr->intr_mask, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
 		out_8(&mr->sequence, SEQ_ENBRESEL);
-		for (t = 10; t > 0 && mr->interrupt == 0; --t)
+		mesh_flush_io(mr);
+		for (t = 10; t > 0 && in_8(&mr->interrupt) == 0; --t)
 			udelay(1);
 		dlog(ms, "tried reset after arb, intr/exc/err/fc=%.8x",
 		     MKWORD(mr->interrupt, mr->exception, mr->error, mr->fifo_count));
 #ifndef MESH_MULTIPLE_HOSTS
-		if (mr->interrupt == 0 && (mr->bus_status1 & BS1_SEL)
-		    && (mr->bus_status0 & BS0_IO)) {
+		if (in_8(&mr->interrupt) == 0 && (in_8(&mr->bus_status1) & BS1_SEL)
+		    && (in_8(&mr->bus_status0) & BS0_IO)) {
 			printk(KERN_ERR "mesh: controller not responding"
 			       " to reselection!\n");
 			/*
@@ -822,8 +552,76 @@ mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
 	}
 }
 
-static inline void
-add_sdtr_msg(struct mesh_state *ms)
+/*
+ * Start the next command for a MESH.
+ * Should be called with interrupts disabled.
+ */
+static void mesh_start(struct mesh_state *ms)
+{
+	Scsi_Cmnd *cmd, *prev, *next;
+
+	if (ms->phase != idle || ms->current_req != NULL) {
+		printk(KERN_ERR "inappropriate mesh_start (phase=%d, ms=%p)",
+		       ms->phase, ms);
+		return;
+	}
+
+	while (ms->phase == idle) {
+		prev = NULL;
+		for (cmd = ms->request_q; ; cmd = (Scsi_Cmnd *) cmd->host_scribble) {
+			if (cmd == NULL)
+				return;
+			if (ms->tgts[cmd->device->id].current_req == NULL)
+				break;
+			prev = cmd;
+		}
+		next = (Scsi_Cmnd *) cmd->host_scribble;
+		if (prev == NULL)
+			ms->request_q = next;
+		else
+			prev->host_scribble = (void *) next;
+		if (next == NULL)
+			ms->request_qtail = prev;
+
+		mesh_start_cmd(ms, cmd);
+	}
+}
+
+static void mesh_done(struct mesh_state *ms, int start_next)
+{
+	Scsi_Cmnd *cmd;
+	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
+
+	cmd = ms->current_req;
+	ms->current_req = 0;
+	tp->current_req = 0;
+	if (cmd) {
+		cmd->result = (ms->stat << 16) + cmd->SCp.Status;
+		if (ms->stat == DID_OK)
+			cmd->result += (cmd->SCp.Message << 8);
+		if (DEBUG_TARGET(cmd)) {
+			printk(KERN_DEBUG "mesh_done: result = %x, data_ptr=%d, buflen=%d\n",
+			       cmd->result, ms->data_ptr, cmd->request_bufflen);
+			if ((cmd->cmnd[0] == 0 || cmd->cmnd[0] == 0x12 || cmd->cmnd[0] == 3)
+			    && cmd->request_buffer != 0) {
+				unsigned char *b = cmd->request_buffer;
+				printk(KERN_DEBUG "buffer = %x %x %x %x %x %x %x %x\n",
+				       b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+			}
+		}
+		cmd->SCp.this_residual -= ms->data_ptr;
+		mesh_completed(ms, cmd);
+	}
+	if (start_next) {
+		out_8(&ms->mesh->sequence, SEQ_ENBRESEL);
+		mesh_flush_io(ms->mesh);
+		udelay(1);
+		ms->phase = idle;
+		mesh_start(ms);
+	}
+}
+
+static inline void add_sdtr_msg(struct mesh_state *ms)
 {
 	int i = ms->n_msgout;
 
@@ -835,8 +633,7 @@ add_sdtr_msg(struct mesh_state *ms)
 	ms->n_msgout = i + 5;
 }
 
-static void
-set_sdtr(struct mesh_state *ms, int period, int offset)
+static void set_sdtr(struct mesh_state *ms, int period, int offset)
 {
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 	volatile struct mesh_regs *mr = ms->mesh;
@@ -877,8 +674,7 @@ set_sdtr(struct mesh_state *ms, int period, int offset)
 	       ms->conn_tgt, tr/10, tr%10);
 }
 
-static void
-start_phase(struct mesh_state *ms)
+static void start_phase(struct mesh_state *ms)
 {
 	int i, seq, nb;
 	volatile struct mesh_regs *mr = ms->mesh;
@@ -925,14 +721,16 @@ start_phase(struct mesh_state *ms)
 						ms->msgout[1], ms->msgout[2]));
 		out_8(&mr->count_hi, 0);
 		out_8(&mr->sequence, SEQ_FLUSHFIFO);
+		mesh_flush_io(mr);
 		udelay(1);
 		/*
 		 * If ATN is not already asserted, we assert it, then
 		 * issue a SEQ_MSGOUT to get the mesh to drop ACK.
 		 */
-		if ((mr->bus_status0 & BS0_ATN) == 0) {
+		if ((in_8(&mr->bus_status0) & BS0_ATN) == 0) {
 			dlog(ms, "bus0 was %.2x explictly asserting ATN", mr->bus_status0);
 			out_8(&mr->bus_status0, BS0_ATN); /* explicit ATN */
+			mesh_flush_io(mr);
 			udelay(1);
 			out_8(&mr->count_lo, 1);
 			out_8(&mr->sequence, SEQ_MSGOUT + seq);
@@ -1006,6 +804,7 @@ start_phase(struct mesh_state *ms)
 	case busfreeing:
 	case disconnecting:
 		out_8(&mr->sequence, SEQ_ENBRESEL);
+		mesh_flush_io(mr);
 		udelay(1);
 		dlog(ms, "enbresel intr/exc/err/fc=%.8x",
 		     MKWORD(mr->interrupt, mr->exception, mr->error,
@@ -1020,8 +819,7 @@ start_phase(struct mesh_state *ms)
 
 }
 
-static inline void
-get_msgin(struct mesh_state *ms)
+static inline void get_msgin(struct mesh_state *ms)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
 	int i, n;
@@ -1035,8 +833,7 @@ get_msgin(struct mesh_state *ms)
 	}
 }
 
-static inline int
-msgin_length(struct mesh_state *ms)
+static inline int msgin_length(struct mesh_state *ms)
 {
 	int b, n;
 
@@ -1054,265 +851,7 @@ msgin_length(struct mesh_state *ms)
 	return n;
 }
 
-static void
-cmd_complete(struct mesh_state *ms)
-{
-	volatile struct mesh_regs *mr = ms->mesh;
-	Scsi_Cmnd *cmd = ms->current_req;
-	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
-	int seq, n, t;
-
-	dlog(ms, "cmd_complete fc=%x", mr->fifo_count);
-	seq = use_active_neg + (ms->n_msgout? SEQ_ATN: 0);
-	switch (ms->msgphase) {
-	case msg_out_xxx:
-		/* huh?  we expected a phase mismatch */
-		ms->n_msgin = 0;
-		ms->msgphase = msg_in;
-		/* fall through */
-
-	case msg_in:
-		/* should have some message bytes in fifo */
-		get_msgin(ms);
-		n = msgin_length(ms);
-		if (ms->n_msgin < n) {
-			out_8(&mr->count_lo, n - ms->n_msgin);
-			out_8(&mr->sequence, SEQ_MSGIN + seq);
-		} else {
-			ms->msgphase = msg_none;
-			handle_msgin(ms);
-			start_phase(ms);
-		}
-		break;
-
-	case msg_in_bad:
-		out_8(&mr->sequence, SEQ_FLUSHFIFO);
-		udelay(1);
-		out_8(&mr->count_lo, 1);
-		out_8(&mr->sequence, SEQ_MSGIN + SEQ_ATN + use_active_neg);
-		break;
-
-	case msg_out:
-		/*
-		 * To get the right timing on ATN wrt ACK, we have
-		 * to get the MESH to drop ACK, wait until REQ gets
-		 * asserted, then drop ATN.  To do this we first
-		 * issue a SEQ_MSGOUT with ATN and wait for REQ,
-		 * then change the command to a SEQ_MSGOUT w/o ATN.
-		 * If we don't see REQ in a reasonable time, we
-		 * change the command to SEQ_MSGIN with ATN,
-		 * wait for the phase mismatch interrupt, then
-		 * issue the SEQ_MSGOUT without ATN.
-		 */
-		out_8(&mr->count_lo, 1);
-		out_8(&mr->sequence, SEQ_MSGOUT + use_active_neg + SEQ_ATN);
-		t = 30;		/* wait up to 30us */
-		while ((mr->bus_status0 & BS0_REQ) == 0 && --t >= 0)
-			udelay(1);
-		dlog(ms, "last_mbyte err/exc/fc/cl=%.8x",
-		     MKWORD(mr->error, mr->exception,
-			    mr->fifo_count, mr->count_lo));
-		if (in_8(&mr->interrupt) & (INT_ERROR | INT_EXCEPTION)) {
-			/* whoops, target didn't do what we expected */
-			ms->last_n_msgout = ms->n_msgout;
-			ms->n_msgout = 0;
-			if (in_8(&mr->interrupt) & INT_ERROR) {
-				printk(KERN_ERR "mesh: error %x in msg_out\n",
-				       in_8(&mr->error));
-				handle_error(ms);
-				return;
-			}
-			if (in_8(&mr->exception) != EXC_PHASEMM)
-				printk(KERN_ERR "mesh: exc %x in msg_out\n",
-				       in_8(&mr->exception));
-			else
-				printk(KERN_DEBUG "mesh: bs0=%x in msg_out\n",
-				       in_8(&mr->bus_status0));
-			handle_exception(ms);
-			return;
-		}
-		if (mr->bus_status0 & BS0_REQ) {
-			out_8(&mr->sequence, SEQ_MSGOUT + use_active_neg);
-			udelay(1);
-			out_8(&mr->fifo, ms->msgout[ms->n_msgout-1]);
-			ms->msgphase = msg_out_last;
-		} else {
-			out_8(&mr->sequence, SEQ_MSGIN + use_active_neg + SEQ_ATN);
-			ms->msgphase = msg_out_xxx;
-		}
-		break;
-
-	case msg_out_last:
-		ms->last_n_msgout = ms->n_msgout;
-		ms->n_msgout = 0;
-		ms->msgphase = ms->expect_reply? msg_in: msg_none;
-		start_phase(ms);
-		break;
-
-	case msg_none:
-		switch (ms->phase) {
-		case idle:
-			printk(KERN_ERR "mesh: interrupt in idle phase?\n");
-			dumpslog(ms);
-			return;
-		case selecting:
-			dlog(ms, "Selecting phase at command completion",0);
-			ms->msgout[0] = IDENTIFY(ALLOW_RESEL(ms->conn_tgt),
-						 (cmd? cmd->device->lun: 0));
-			ms->n_msgout = 1;
-			ms->expect_reply = 0;
-			if (ms->aborting) {
-				ms->msgout[0] = ABORT;
-				ms->n_msgout++;
-			} else if (tp->sdtr_state == do_sdtr) {
-				/* add SDTR message */
-				add_sdtr_msg(ms);
-				ms->expect_reply = 1;
-				tp->sdtr_state = sdtr_sent;
-			}
-			ms->msgphase = msg_out;
-			/*
-			 * We need to wait for REQ before dropping ATN.
-			 * We wait for at most 30us, then fall back to
-			 * a scheme where we issue a SEQ_COMMAND with ATN,
-			 * which will give us a phase mismatch interrupt
-			 * when REQ does come, and then we send the message.
-			 */
-			t = 230;		/* wait up to 230us */
-			while ((mr->bus_status0 & BS0_REQ) == 0) {
-				if (--t < 0) {
-					dlog(ms, "impatient for req", ms->n_msgout);
-					ms->msgphase = msg_none;
-					break;
-				}
-				udelay(1);
-			}
-			break;
-		case dataing:
-			if (ms->dma_count != 0) {
-				start_phase(ms);
-				return;
-			}
-			/*
-			 * We can get a phase mismatch here if the target
-			 * changes to the status phase, even though we have
-			 * had a command complete interrupt.  Then, if we
-			 * issue the SEQ_STATUS command, we'll get a sequence
-			 * error interrupt.  Which isn't so bad except that
-			 * occasionally the mesh actually executes the
-			 * SEQ_STATUS *as well as* giving us the sequence
-			 * error and phase mismatch exception.
-			 */
-			out_8(&mr->sequence, 0);
-			out_8(&mr->interrupt,
-			      INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
-			halt_dma(ms);
-			break;
-		case statusing:
-			if (cmd) {
-				cmd->SCp.Status = mr->fifo;
-				if (DEBUG_TARGET(cmd))
-					printk(KERN_DEBUG "mesh: status is %x\n",
-					       cmd->SCp.Status);
-			}
-			ms->msgphase = msg_in;
-			break;
-		case busfreeing:
-			mesh_done(ms, 1);
-			return;
-		case disconnecting:
-			ms->current_req = 0;
-			ms->phase = idle;
-			mesh_start(ms);
-			return;
-		default:
-			break;
-		}
-		++ms->phase;
-		start_phase(ms);
-		break;
-	}
-}
-
-static void phase_mismatch(struct mesh_state *ms)
-{
-	volatile struct mesh_regs *mr = ms->mesh;
-	int phase;
-
-	dlog(ms, "phasemm ch/cl/seq/fc=%.8x",
-	     MKWORD(mr->count_hi, mr->count_lo, mr->sequence, mr->fifo_count));
-	phase = mr->bus_status0 & BS0_PHASE;
-	if (ms->msgphase == msg_out_xxx && phase == BP_MSGOUT) {
-		/* output the last byte of the message, without ATN */
-		out_8(&mr->count_lo, 1);
-		out_8(&mr->sequence, SEQ_MSGOUT + use_active_neg);
-		udelay(1);
-		out_8(&mr->fifo, ms->msgout[ms->n_msgout-1]);
-		ms->msgphase = msg_out_last;
-		return;
-	}
-
-	if (ms->msgphase == msg_in) {
-		get_msgin(ms);
-		if (ms->n_msgin)
-			handle_msgin(ms);
-	}
-
-	if (ms->dma_started)
-		halt_dma(ms);
-	if (mr->fifo_count) {
-		out_8(&mr->sequence, SEQ_FLUSHFIFO);
-		udelay(1);
-	}
-
-	ms->msgphase = msg_none;
-	switch (phase) {
-	case BP_DATAIN:
-		ms->tgts[ms->conn_tgt].data_goes_out = 0;
-		ms->phase = dataing;
-		break;
-	case BP_DATAOUT:
-		ms->tgts[ms->conn_tgt].data_goes_out = 1;
-		ms->phase = dataing;
-		break;
-	case BP_COMMAND:
-		ms->phase = commanding;
-		break;
-	case BP_STATUS:
-		ms->phase = statusing;
-		break;
-	case BP_MSGIN:
-		ms->msgphase = msg_in;
-		ms->n_msgin = 0;
-		break;
-	case BP_MSGOUT:
-		ms->msgphase = msg_out;
-		if (ms->n_msgout == 0) {
-			if (ms->aborting) {
-				do_abort(ms);
-			} else {
-				if (ms->last_n_msgout == 0) {
-					printk(KERN_DEBUG
-					       "mesh: no msg to repeat\n");
-					ms->msgout[0] = NOP;
-					ms->last_n_msgout = 1;
-				}
-				ms->n_msgout = ms->last_n_msgout;
-			}
-		}
-		break;
-	default:
-		printk(KERN_DEBUG "mesh: unknown scsi phase %x\n", phase);
-		ms->stat = DID_ERROR;
-		mesh_done(ms, 1);
-		return;
-	}
-
-	start_phase(ms);
-}
-
-static void
-reselected(struct mesh_state *ms)
+static void reselected(struct mesh_state *ms)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
 	Scsi_Cmnd *cmd;
@@ -1360,26 +899,30 @@ reselected(struct mesh_state *ms)
 	/*
 	 * We seem to get abortive reselections sometimes.
 	 */
-	while ((mr->bus_status1 & BS1_BSY) == 0) {
+	while ((in_8(&mr->bus_status1) & BS1_BSY) == 0) {
 		static int mesh_aborted_resels;
 		mesh_aborted_resels++;
 		out_8(&mr->interrupt, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
+		mesh_flush_io(mr);
 		udelay(1);
 		out_8(&mr->sequence, SEQ_ENBRESEL);
+		mesh_flush_io(mr);
 		udelay(5);
 		dlog(ms, "extra resel err/exc/fc = %.6x",
 		     MKWORD(0, mr->error, mr->exception, mr->fifo_count));
 	}
 	out_8(&mr->interrupt, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
+       	mesh_flush_io(mr);
 	udelay(1);
 	out_8(&mr->sequence, SEQ_ENBRESEL);
+       	mesh_flush_io(mr);
 	udelay(1);
 	out_8(&mr->sync_params, ASYNC_PARAMS);
 
 	/*
 	 * Find out who reselected us.
 	 */
-	if (mr->fifo_count == 0) {
+	if (in_8(&mr->fifo_count) == 0) {
 		printk(KERN_ERR "mesh: reselection but nothing in fifo?\n");
 		ms->conn_tgt = ms->host->this_id;
 		goto bogus;
@@ -1438,8 +981,7 @@ static void do_abort(struct mesh_state *ms)
 	dlog(ms, "abort", 0);
 }
 
-static void
-handle_reset(struct mesh_state *ms)
+static void handle_reset(struct mesh_state *ms)
 {
 	int tgt;
 	struct mesh_target *tp;
@@ -1466,13 +1008,13 @@ handle_reset(struct mesh_state *ms)
 	ms->msgphase = msg_none;
 	out_8(&mr->interrupt, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
 	out_8(&mr->sequence, SEQ_FLUSHFIFO);
+       	mesh_flush_io(mr);
 	udelay(1);
 	out_8(&mr->sync_params, ASYNC_PARAMS);
 	out_8(&mr->sequence, SEQ_ENBRESEL);
 }
 
-static irqreturn_t
-do_mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t do_mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	unsigned long flags;
 	struct Scsi_Host *dev = ((struct mesh_state *)dev_id)->host;
@@ -1497,7 +1039,7 @@ static void handle_error(struct mesh_state *ms)
 		/* SCSI bus was reset */
 		printk(KERN_INFO "mesh: SCSI bus reset detected: "
 		       "waiting for end...");
-		while ((mr->bus_status1 & BS1_RST) != 0)
+		while ((in_8(&mr->bus_status1) & BS1_RST) != 0)
 			udelay(1);
 		printk("done\n");
 		handle_reset(ms);
@@ -1567,7 +1109,7 @@ static void handle_error(struct mesh_state *ms)
 	}
 	mesh_dump_regs(ms);
 	dumplog(ms, ms->conn_tgt);
-	if (ms->phase > selecting && (mr->bus_status1 & BS1_BSY)) {
+	if (ms->phase > selecting && (in_8(&mr->bus_status1) & BS1_BSY)) {
 		/* try to do what the target wants */
 		do_abort(ms);
 		phase_mismatch(ms);
@@ -1609,36 +1151,7 @@ static void handle_exception(struct mesh_state *ms)
 	}
 }
 
-static void
-mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
-{
-	struct mesh_state *ms = (struct mesh_state *) dev_id;
-	volatile struct mesh_regs *mr = ms->mesh;
-	int intr;
-
-#if 0
-	if (ALLOW_DEBUG(ms->conn_tgt))
-		printk(KERN_DEBUG "mesh_intr, bs0=%x int=%x exc=%x err=%x "
-		       "phase=%d msgphase=%d\n", mr->bus_status0,
-		       mr->interrupt, mr->exception, mr->error,
-		       ms->phase, ms->msgphase);
-#endif
-	while ((intr = in_8(&mr->interrupt)) != 0) {
-		dlog(ms, "interrupt intr/err/exc/seq=%.8x", 
-		     MKWORD(intr, mr->error, mr->exception, mr->sequence));
-		if (intr & INT_ERROR) {
-			handle_error(ms);
-		} else if (intr & INT_EXCEPTION) {
-			handle_exception(ms);
-		} else if (intr & INT_CMDDONE) {
-			out_8(&mr->interrupt, INT_CMDDONE);
-			cmd_complete(ms);
-		}
-	}
-}
-
-static void
-handle_msgin(struct mesh_state *ms)
+static void handle_msgin(struct mesh_state *ms)
 {
 	int i, code;
 	Scsi_Cmnd *cmd = ms->current_req;
@@ -1736,51 +1249,10 @@ handle_msgin(struct mesh_state *ms)
 	ms->msgphase = msg_out;
 }
 
-static void
-mesh_done(struct mesh_state *ms, int start_next)
-{
-	Scsi_Cmnd *cmd;
-	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
-
-	cmd = ms->current_req;
-	ms->current_req = 0;
-	tp->current_req = 0;
-	if (cmd) {
-		cmd->result = (ms->stat << 16) + cmd->SCp.Status;
-		if (ms->stat == DID_OK)
-			cmd->result += (cmd->SCp.Message << 8);
-		if (DEBUG_TARGET(cmd)) {
-			printk(KERN_DEBUG "mesh_done: result = %x, data_ptr=%d, buflen=%d\n",
-			       cmd->result, ms->data_ptr, cmd->request_bufflen);
-			if ((cmd->cmnd[0] == 0 || cmd->cmnd[0] == 0x12 || cmd->cmnd[0] == 3)
-			    && cmd->request_buffer != 0) {
-				unsigned char *b = cmd->request_buffer;
-				printk(KERN_DEBUG "buffer = %x %x %x %x %x %x %x %x\n",
-				       b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
-			}
-		}
-		cmd->SCp.this_residual -= ms->data_ptr;
-		mesh_completed(ms, cmd);
-	}
-	if (start_next) {
-		out_8(&ms->mesh->sequence, SEQ_ENBRESEL);
-		udelay(1);
-		ms->phase = idle;
-		mesh_start(ms);
-	}
-}
-
-static void
-mesh_completed(struct mesh_state *ms, Scsi_Cmnd *cmd)
-{
-	(*cmd->scsi_done)(cmd);
-}
-
 /*
  * Set up DMA commands for transferring data.
  */
-static void
-set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd)
+static void set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd)
 {
 	int i, dma_cmd, total, off, dtot;
 	struct scatterlist *scl;
@@ -1848,8 +1320,7 @@ set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd)
 	ms->dma_count = dtot;
 }
 
-static void
-halt_dma(struct mesh_state *ms)
+static void halt_dma(struct mesh_state *ms)
 {
 	volatile struct dbdma_regs *md = ms->dma;
 	volatile struct mesh_regs *mr = ms->mesh;
@@ -1859,7 +1330,7 @@ halt_dma(struct mesh_state *ms)
 	if (!ms->tgts[ms->conn_tgt].data_goes_out) {
 		/* wait a little while until the fifo drains */
 		t = 50;
-		while (t > 0 && mr->fifo_count != 0
+		while (t > 0 && in_8(&mr->fifo_count) != 0
 		       && (in_le32(&md->status) & ACTIVE) != 0) {
 			--t;
 			udelay(1);
@@ -1899,154 +1370,471 @@ halt_dma(struct mesh_state *ms)
 	ms->dma_started = 0;
 }
 
-/*
- * Work out whether we expect data to go out from the host adaptor or into it.
- */
-static int
-data_goes_out(Scsi_Cmnd *cmd)
+static void phase_mismatch(struct mesh_state *ms)
 {
-	switch (cmd->sc_data_direction) {
-	case SCSI_DATA_WRITE:
-		return 1;
-	case SCSI_DATA_READ:
-		return 0;
+	volatile struct mesh_regs *mr = ms->mesh;
+	int phase;
+
+	dlog(ms, "phasemm ch/cl/seq/fc=%.8x",
+	     MKWORD(mr->count_hi, mr->count_lo, mr->sequence, mr->fifo_count));
+	phase = in_8(&mr->bus_status0) & BS0_PHASE;
+	if (ms->msgphase == msg_out_xxx && phase == BP_MSGOUT) {
+		/* output the last byte of the message, without ATN */
+		out_8(&mr->count_lo, 1);
+		out_8(&mr->sequence, SEQ_MSGOUT + use_active_neg);
+		mesh_flush_io(mr);
+		udelay(1);
+		out_8(&mr->fifo, ms->msgout[ms->n_msgout-1]);
+		ms->msgphase = msg_out_last;
+		return;
 	}
 
-	/* for SCSI_DATA_UNKNOWN or SCSI_DATA_NONE, fall back on the
-	   old method for now... */
-	switch (cmd->cmnd[0]) {
-	case CHANGE_DEFINITION: 
-	case COMPARE:	  
-	case COPY:
-	case COPY_VERIFY:	    
-	case FORMAT_UNIT:	 
-	case LOG_SELECT:
-	case MEDIUM_SCAN:	  
-	case MODE_SELECT:
-	case MODE_SELECT_10:
-	case REASSIGN_BLOCKS: 
-	case RESERVE:
-	case SEARCH_EQUAL:	  
-	case SEARCH_EQUAL_12: 
-	case SEARCH_HIGH:	 
-	case SEARCH_HIGH_12:  
-	case SEARCH_LOW:
-	case SEARCH_LOW_12:
-	case SEND_DIAGNOSTIC: 
-	case SEND_VOLUME_TAG:	     
-	case SET_WINDOW: 
-	case UPDATE_BLOCK:	
-	case WRITE_BUFFER:
- 	case WRITE_6:	
-	case WRITE_10:	
-	case WRITE_12:	  
-	case WRITE_LONG:	
-	case WRITE_LONG_2:      /* alternate code for WRITE_LONG */
-	case WRITE_SAME:	
-	case WRITE_VERIFY:
-	case WRITE_VERIFY_12:
-		return 1;
+	if (ms->msgphase == msg_in) {
+		get_msgin(ms);
+		if (ms->n_msgin)
+			handle_msgin(ms);
+	}
+
+	if (ms->dma_started)
+		halt_dma(ms);
+	if (mr->fifo_count) {
+		out_8(&mr->sequence, SEQ_FLUSHFIFO);
+		mesh_flush_io(mr);
+		udelay(1);
+	}
+
+	ms->msgphase = msg_none;
+	switch (phase) {
+	case BP_DATAIN:
+		ms->tgts[ms->conn_tgt].data_goes_out = 0;
+		ms->phase = dataing;
+		break;
+	case BP_DATAOUT:
+		ms->tgts[ms->conn_tgt].data_goes_out = 1;
+		ms->phase = dataing;
+		break;
+	case BP_COMMAND:
+		ms->phase = commanding;
+		break;
+	case BP_STATUS:
+		ms->phase = statusing;
+		break;
+	case BP_MSGIN:
+		ms->msgphase = msg_in;
+		ms->n_msgin = 0;
+		break;
+	case BP_MSGOUT:
+		ms->msgphase = msg_out;
+		if (ms->n_msgout == 0) {
+			if (ms->aborting) {
+				do_abort(ms);
+			} else {
+				if (ms->last_n_msgout == 0) {
+					printk(KERN_DEBUG
+					       "mesh: no msg to repeat\n");
+					ms->msgout[0] = NOP;
+					ms->last_n_msgout = 1;
+				}
+				ms->n_msgout = ms->last_n_msgout;
+			}
+		}
+		break;
 	default:
-		return 0;
+		printk(KERN_DEBUG "mesh: unknown scsi phase %x\n", phase);
+		ms->stat = DID_ERROR;
+		mesh_done(ms, 1);
+		return;
+	}
+
+	start_phase(ms);
+}
+
+static void cmd_complete(struct mesh_state *ms)
+{
+	volatile struct mesh_regs *mr = ms->mesh;
+	Scsi_Cmnd *cmd = ms->current_req;
+	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
+	int seq, n, t;
+
+	dlog(ms, "cmd_complete fc=%x", mr->fifo_count);
+	seq = use_active_neg + (ms->n_msgout? SEQ_ATN: 0);
+	switch (ms->msgphase) {
+	case msg_out_xxx:
+		/* huh?  we expected a phase mismatch */
+		ms->n_msgin = 0;
+		ms->msgphase = msg_in;
+		/* fall through */
+
+	case msg_in:
+		/* should have some message bytes in fifo */
+		get_msgin(ms);
+		n = msgin_length(ms);
+		if (ms->n_msgin < n) {
+			out_8(&mr->count_lo, n - ms->n_msgin);
+			out_8(&mr->sequence, SEQ_MSGIN + seq);
+		} else {
+			ms->msgphase = msg_none;
+			handle_msgin(ms);
+			start_phase(ms);
+		}
+		break;
+
+	case msg_in_bad:
+		out_8(&mr->sequence, SEQ_FLUSHFIFO);
+		mesh_flush_io(mr);
+		udelay(1);
+		out_8(&mr->count_lo, 1);
+		out_8(&mr->sequence, SEQ_MSGIN + SEQ_ATN + use_active_neg);
+		break;
+
+	case msg_out:
+		/*
+		 * To get the right timing on ATN wrt ACK, we have
+		 * to get the MESH to drop ACK, wait until REQ gets
+		 * asserted, then drop ATN.  To do this we first
+		 * issue a SEQ_MSGOUT with ATN and wait for REQ,
+		 * then change the command to a SEQ_MSGOUT w/o ATN.
+		 * If we don't see REQ in a reasonable time, we
+		 * change the command to SEQ_MSGIN with ATN,
+		 * wait for the phase mismatch interrupt, then
+		 * issue the SEQ_MSGOUT without ATN.
+		 */
+		out_8(&mr->count_lo, 1);
+		out_8(&mr->sequence, SEQ_MSGOUT + use_active_neg + SEQ_ATN);
+		t = 30;		/* wait up to 30us */
+		while ((in_8(&mr->bus_status0) & BS0_REQ) == 0 && --t >= 0)
+			udelay(1);
+		dlog(ms, "last_mbyte err/exc/fc/cl=%.8x",
+		     MKWORD(mr->error, mr->exception,
+			    mr->fifo_count, mr->count_lo));
+		if (in_8(&mr->interrupt) & (INT_ERROR | INT_EXCEPTION)) {
+			/* whoops, target didn't do what we expected */
+			ms->last_n_msgout = ms->n_msgout;
+			ms->n_msgout = 0;
+			if (in_8(&mr->interrupt) & INT_ERROR) {
+				printk(KERN_ERR "mesh: error %x in msg_out\n",
+				       in_8(&mr->error));
+				handle_error(ms);
+				return;
+			}
+			if (in_8(&mr->exception) != EXC_PHASEMM)
+				printk(KERN_ERR "mesh: exc %x in msg_out\n",
+				       in_8(&mr->exception));
+			else
+				printk(KERN_DEBUG "mesh: bs0=%x in msg_out\n",
+				       in_8(&mr->bus_status0));
+			handle_exception(ms);
+			return;
+		}
+		if (in_8(&mr->bus_status0) & BS0_REQ) {
+			out_8(&mr->sequence, SEQ_MSGOUT + use_active_neg);
+			mesh_flush_io(mr);
+			udelay(1);
+			out_8(&mr->fifo, ms->msgout[ms->n_msgout-1]);
+			ms->msgphase = msg_out_last;
+		} else {
+			out_8(&mr->sequence, SEQ_MSGIN + use_active_neg + SEQ_ATN);
+			ms->msgphase = msg_out_xxx;
+		}
+		break;
+
+	case msg_out_last:
+		ms->last_n_msgout = ms->n_msgout;
+		ms->n_msgout = 0;
+		ms->msgphase = ms->expect_reply? msg_in: msg_none;
+		start_phase(ms);
+		break;
+
+	case msg_none:
+		switch (ms->phase) {
+		case idle:
+			printk(KERN_ERR "mesh: interrupt in idle phase?\n");
+			dumpslog(ms);
+			return;
+		case selecting:
+			dlog(ms, "Selecting phase at command completion",0);
+			ms->msgout[0] = IDENTIFY(ALLOW_RESEL(ms->conn_tgt),
+						 (cmd? cmd->device->lun: 0));
+			ms->n_msgout = 1;
+			ms->expect_reply = 0;
+			if (ms->aborting) {
+				ms->msgout[0] = ABORT;
+				ms->n_msgout++;
+			} else if (tp->sdtr_state == do_sdtr) {
+				/* add SDTR message */
+				add_sdtr_msg(ms);
+				ms->expect_reply = 1;
+				tp->sdtr_state = sdtr_sent;
+			}
+			ms->msgphase = msg_out;
+			/*
+			 * We need to wait for REQ before dropping ATN.
+			 * We wait for at most 30us, then fall back to
+			 * a scheme where we issue a SEQ_COMMAND with ATN,
+			 * which will give us a phase mismatch interrupt
+			 * when REQ does come, and then we send the message.
+			 */
+			t = 230;		/* wait up to 230us */
+			while ((in_8(&mr->bus_status0) & BS0_REQ) == 0) {
+				if (--t < 0) {
+					dlog(ms, "impatient for req", ms->n_msgout);
+					ms->msgphase = msg_none;
+					break;
+				}
+				udelay(1);
+			}
+			break;
+		case dataing:
+			if (ms->dma_count != 0) {
+				start_phase(ms);
+				return;
+			}
+			/*
+			 * We can get a phase mismatch here if the target
+			 * changes to the status phase, even though we have
+			 * had a command complete interrupt.  Then, if we
+			 * issue the SEQ_STATUS command, we'll get a sequence
+			 * error interrupt.  Which isn't so bad except that
+			 * occasionally the mesh actually executes the
+			 * SEQ_STATUS *as well as* giving us the sequence
+			 * error and phase mismatch exception.
+			 */
+			out_8(&mr->sequence, 0);
+			out_8(&mr->interrupt,
+			      INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
+			halt_dma(ms);
+			break;
+		case statusing:
+			if (cmd) {
+				cmd->SCp.Status = mr->fifo;
+				if (DEBUG_TARGET(cmd))
+					printk(KERN_DEBUG "mesh: status is %x\n",
+					       cmd->SCp.Status);
+			}
+			ms->msgphase = msg_in;
+			break;
+		case busfreeing:
+			mesh_done(ms, 1);
+			return;
+		case disconnecting:
+			ms->current_req = 0;
+			ms->phase = idle;
+			mesh_start(ms);
+			return;
+		default:
+			break;
+		}
+		++ms->phase;
+		start_phase(ms);
+		break;
 	}
 }
 
-#ifdef MESH_DBG
-static inline u32 readtb(void)
-{
-	u32 tb;
 
-#ifdef DBG_USE_TB
-	/* Beware: if you enable this, it will crash on 601s. */
-	asm ("mftb %0" : "=r" (tb) : );
-#else
-	tb = 0;
+/*
+ * Called by midlayer with host locked to queue a new
+ * request
+ */
+static int mesh_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+{
+	struct mesh_state *ms;
+
+	cmd->scsi_done = done;
+	cmd->host_scribble = NULL;
+
+	ms = (struct mesh_state *) cmd->device->host->hostdata;
+
+	if (ms->request_q == NULL)
+		ms->request_q = cmd;
+	else
+		ms->request_qtail->host_scribble = (void *) cmd;
+	ms->request_qtail = cmd;
+
+	if (ms->phase == idle)
+		mesh_start(ms);
+
+	return 0;
+}
+
+/*
+ * Called to handle interrupts, either call by the interrupt
+ * handler (do_mesh_interrupt) or by other functions in
+ * exceptional circumstances
+ */
+static void mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
+{
+	struct mesh_state *ms = (struct mesh_state *) dev_id;
+	volatile struct mesh_regs *mr = ms->mesh;
+	int intr;
+
+#if 0
+	if (ALLOW_DEBUG(ms->conn_tgt))
+		printk(KERN_DEBUG "mesh_intr, bs0=%x int=%x exc=%x err=%x "
+		       "phase=%d msgphase=%d\n", mr->bus_status0,
+		       mr->interrupt, mr->exception, mr->error,
+		       ms->phase, ms->msgphase);
 #endif
-	return tb;
+	while ((intr = in_8(&mr->interrupt)) != 0) {
+		dlog(ms, "interrupt intr/err/exc/seq=%.8x", 
+		     MKWORD(intr, mr->error, mr->exception, mr->sequence));
+		if (intr & INT_ERROR) {
+			handle_error(ms);
+		} else if (intr & INT_EXCEPTION) {
+			handle_exception(ms);
+		} else if (intr & INT_CMDDONE) {
+			out_8(&mr->interrupt, INT_CMDDONE);
+			cmd_complete(ms);
+		}
+	}
 }
 
-static void dlog(struct mesh_state *ms, char *fmt, int a)
+/* Todo: here we can at least try to remove the command from the
+ * queue if it isn't connected yet, and for pending command, assert
+ * ATN until the bus gets freed.
+ */
+static int mesh_abort(Scsi_Cmnd *cmd)
 {
-	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
-	struct dbglog *tlp, *slp;
+	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
 
-	tlp = &tp->log[tp->log_ix];
-	slp = &ms->log[ms->log_ix];
-	tlp->fmt = fmt;
-	tlp->tb = readtb();
-	tlp->phase = (ms->msgphase << 4) + ms->phase;
-	tlp->bs0 = ms->mesh->bus_status0;
-	tlp->bs1 = ms->mesh->bus_status1;
-	tlp->tgt = ms->conn_tgt;
-	tlp->d = a;
-	*slp = *tlp;
-	if (++tp->log_ix >= N_DBG_LOG)
-		tp->log_ix = 0;
-	if (tp->n_log < N_DBG_LOG)
-		++tp->n_log;
-	if (++ms->log_ix >= N_DBG_SLOG)
-		ms->log_ix = 0;
-	if (ms->n_log < N_DBG_SLOG)
-		++ms->n_log;
+	printk(KERN_DEBUG "mesh_abort(%p)\n", cmd);
+	mesh_dump_regs(ms);
+	dumplog(ms, cmd->device->id);
+	dumpslog(ms);
+	return SCSI_ABORT_SNOOZE;
 }
 
-static void dumplog(struct mesh_state *ms, int t)
+/*
+ * Called by the midlayer with the lock held to reset the
+ * SCSI host and bus.
+ * The midlayer will wait for devices to come back, we don't need
+ * to do that ourselves
+ */
+static int mesh_host_reset(Scsi_Cmnd *cmd)
 {
-	struct mesh_target *tp = &ms->tgts[t];
-	struct dbglog *lp;
-	int i;
+	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
+	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct dbdma_regs *md = ms->dma;
 
-	if (tp->n_log == 0)
+	printk(KERN_DEBUG "mesh_host_reset\n");
+
+	/* Reset the controller & dbdma channel */
+	out_le32(&md->control, (RUN|PAUSE|FLUSH|WAKE) << 16);	/* stop dma */
+	out_8(&mr->exception, 0xff);	/* clear all exception bits */
+	out_8(&mr->error, 0xff);	/* clear all error bits */
+	out_8(&mr->sequence, SEQ_RESETMESH);
+       	mesh_flush_io(mr);
+	udelay(1);
+	out_8(&mr->intr_mask, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
+	out_8(&mr->source_id, ms->host->this_id);
+	out_8(&mr->sel_timeout, 25);	/* 250ms */
+	out_8(&mr->sync_params, ASYNC_PARAMS);
+
+	/* Reset the bus */
+	out_8(&mr->bus_status1, BS1_RST);	/* assert RST */
+       	mesh_flush_io(mr);
+	udelay(30);			/* leave it on for >= 25us */
+	out_8(&mr->bus_status1, 0);	/* negate RST */
+
+	/* Complete pending commands */
+	handle_reset(ms);
+	
+	return SUCCESS;
+}
+
+static void set_mesh_power(struct mesh_state *ms, int state)
+{
+	if (_machine != _MACH_Pmac)
 		return;
-	i = tp->log_ix - tp->n_log;
-	if (i < 0)
-		i += N_DBG_LOG;
-	tp->n_log = 0;
-	do {
-		lp = &tp->log[i];
-		printk(KERN_DEBUG "mesh log %d: bs=%.2x%.2x ph=%.2x ",
-		       t, lp->bs1, lp->bs0, lp->phase);
-#ifdef DBG_USE_TB
-		printk("tb=%10u ", lp->tb);
-#endif
-		printk(lp->fmt, lp->d);
-		printk("\n");
-		if (++i >= N_DBG_LOG)
-			i = 0;
-	} while (i != tp->log_ix);
-}
+	if (state) {
+		pmac_call_feature(PMAC_FTR_MESH_ENABLE, macio_get_of_node(ms->mdev), 0, 1);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/5);
+	} else {
+		pmac_call_feature(PMAC_FTR_MESH_ENABLE, macio_get_of_node(ms->mdev), 0, 0);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/100);
+	}
+}			
 
-static void dumpslog(struct mesh_state *ms)
+
+#ifdef CONFIG_PM
+static int mesh_suspend(struct macio_dev *mdev, u32 state)
 {
-	struct dbglog *lp;
-	int i;
+	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
+	unsigned long flags;
 
-	if (ms->n_log == 0)
-		return;
-	i = ms->log_ix - ms->n_log;
-	if (i < 0)
-		i += N_DBG_SLOG;
-	ms->n_log = 0;
-	do {
-		lp = &ms->log[i];
-		printk(KERN_DEBUG "mesh log: bs=%.2x%.2x ph=%.2x t%d ",
-		       lp->bs1, lp->bs0, lp->phase, lp->tgt);
-#ifdef DBG_USE_TB
-		printk("tb=%10u ", lp->tb);
-#endif
-		printk(lp->fmt, lp->d);
-		printk("\n");
-		if (++i >= N_DBG_SLOG)
-			i = 0;
-	} while (i != ms->log_ix);
+	if (state == mdev->ofdev.dev.power_state || state < 2)
+		return 0;
+
+	scsi_block_requests(ms->host);
+	spin_lock_irqsave(ms->host->host_lock, flags);
+	while(ms->phase != idle) {
+		spin_unlock_irqrestore(ms->host->host_lock, flags);
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout(HZ/100);
+		spin_lock_irqsave(ms->host->host_lock, flags);
+	}
+	ms->phase = sleeping;
+	spin_unlock_irqrestore(ms->host->host_lock, flags);
+	disable_irq(ms->meshintr);
+	set_mesh_power(ms, 0);
+
+	mdev->ofdev.dev.power_state = state;
+
+	return 0;
 }
-#endif /* MESH_DBG */
 
-static Scsi_Host_Template driver_template = {
+static int mesh_resume(struct macio_dev *mdev)
+{
+	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
+	unsigned long flags;
+
+	if (mdev->ofdev.dev.power_state == 0)
+		return 0;
+
+	set_mesh_power(ms, 1);
+	mesh_init(ms);
+	spin_lock_irqsave(ms->host->host_lock, flags);
+	mesh_start(ms);
+	spin_unlock_irqrestore(ms->host->host_lock, flags);
+	enable_irq(ms->meshintr);
+	scsi_unblock_requests(ms->host);
+
+	mdev->ofdev.dev.power_state = 0;
+
+	return 0;
+}
+
+#endif /* CONFIG_PM */
+
+/*
+ * If we leave drives set for synchronous transfers (especially
+ * CDROMs), and reboot to MacOS, it gets confused, poor thing.
+ * So, on reboot we reset the SCSI bus.
+ */
+static int mesh_shutdown(struct macio_dev *mdev)
+{
+	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
+	volatile struct mesh_regs *mr;
+	unsigned long flags;
+
+       	printk(KERN_INFO "resetting MESH scsi bus(es)\n");
+	spin_lock_irqsave(ms->host->host_lock, flags);
+       	mr = ms->mesh;
+	out_8(&mr->intr_mask, 0);
+	out_8(&mr->interrupt, INT_ERROR | INT_EXCEPTION | INT_CMDDONE);
+	out_8(&mr->bus_status1, BS1_RST);
+	mesh_flush_io(mr);
+	udelay(30);
+	out_8(&mr->bus_status1, 0);
+	spin_unlock_irqrestore(ms->host->host_lock, flags);
+
+	return 0;
+}
+
+static Scsi_Host_Template mesh_template = {
 	.proc_name			= "mesh",
 	.name				= "MESH",
-	.detect				= mesh_detect,
-	.release			= mesh_release,
 	.queuecommand			= mesh_queue,
 	.eh_abort_handler		= mesh_abort,
 	.eh_host_reset_handler		= mesh_host_reset,
@@ -2057,4 +1845,222 @@ static Scsi_Host_Template driver_template = {
 	.use_clustering			= DISABLE_CLUSTERING,
 };
 
-#include "scsi_module.c"
+static int mesh_probe(struct macio_dev *mdev, const struct of_match *match)
+{
+	struct device_node *mesh = macio_get_of_node(mdev);
+	struct pci_dev* pdev = macio_get_pci_dev(mdev);
+	int tgt, *cfp, minper;
+	struct mesh_state *ms;
+	struct Scsi_Host *mesh_host;
+	void *dma_cmd_space;
+	dma_addr_t dma_cmd_bus;
+
+	switch (mdev->bus->chip->type) {
+	case macio_heathrow:
+	case macio_gatwick:
+	case macio_paddington:
+		use_active_neg = 0;
+		break;
+	default:
+		use_active_neg = SEQ_ACTIVE_NEG;
+	}
+
+	if (macio_resource_count(mdev) != 2 || macio_irq_count(mdev) != 2) {
+       		printk(KERN_ERR "mesh: expected 2 addrs and 2 intrs"
+	       	       " (got %d,%d)\n", mesh->n_addrs, mesh->n_intrs);
+		return -ENODEV;
+	}
+
+	if (macio_request_resources(mdev, "mesh") != 0) {
+       		printk(KERN_ERR "mesh: unable to request memory resources");
+		return -EBUSY;
+	}
+       	mesh_host = scsi_host_alloc(&mesh_template, sizeof(struct mesh_state));
+	if (mesh_host == NULL) {
+		printk(KERN_ERR "mesh: couldn't register host");
+		goto out_release;
+	}
+	
+	/* Old junk for root discovery, that will die ultimately */
+#if !defined(MODULE)
+       	note_scsi_host(mesh, mesh_host);
+#endif
+
+	mesh_host->base = macio_resource_start(mdev, 0);
+	mesh_host->irq = macio_irq(mdev, 0);
+       	ms = (struct mesh_state *) mesh_host->hostdata;
+	macio_set_drvdata(mdev, ms);
+	ms->host = mesh_host;
+	ms->mdev = mdev;
+	ms->pdev = pdev;
+	
+	ms->mesh = (volatile struct mesh_regs *)
+		ioremap(macio_resource_start(mdev, 0), 0x1000);
+	if (ms->mesh == NULL) {
+		printk(KERN_ERR "mesh: can't map registers\n");
+		goto out_free;
+	}		
+	ms->dma = (volatile struct dbdma_regs *)
+	       	ioremap(macio_resource_start(mdev, 1), 0x1000);
+	if (ms->dma == NULL) {
+		printk(KERN_ERR "mesh: can't map registers\n");
+		iounmap((void *)ms->mesh);
+		goto out_free;
+	}
+
+       	ms->meshintr = macio_irq(mdev, 0);
+       	ms->dmaintr = macio_irq(mdev, 1);
+
+       	/* Space for dma command list: +1 for stop command,
+       	 * +1 to allow for aligning.
+	 */
+	ms->dma_cmd_size = (mesh_host->sg_tablesize + 2) * sizeof(struct dbdma_cmd);
+
+	/* We use the PCI APIs for now until the generic one gets fixed
+	 * enough or until we get some macio-specific versions
+	 */
+	dma_cmd_space = pci_alloc_consistent(macio_get_pci_dev(mdev),
+					     ms->dma_cmd_size,
+					     &dma_cmd_bus);
+	if (dma_cmd_space == NULL) {
+		printk(KERN_ERR "mesh: can't allocate DMA table\n");
+		goto out_unmap;
+	}
+	memset(dma_cmd_space, 0, ms->dma_cmd_size);
+
+	ms->dma_cmds = (struct dbdma_cmd *) DBDMA_ALIGN(dma_cmd_space);
+       	ms->dma_cmd_space = dma_cmd_space;
+	ms->dma_cmd_bus = dma_cmd_bus + ((unsigned long)ms->dma_cmds)
+		- (unsigned long)dma_cmd_space;
+	ms->current_req = NULL;
+       	for (tgt = 0; tgt < 8; ++tgt) {
+	       	ms->tgts[tgt].sdtr_state = do_sdtr;
+	       	ms->tgts[tgt].sync_params = ASYNC_PARAMS;
+	       	ms->tgts[tgt].current_req = 0;
+       	}
+
+	if ((cfp = (int *) get_property(mesh, "clock-frequency", NULL)))
+       		ms->clk_freq = *cfp;
+	else {
+       		printk(KERN_INFO "mesh: assuming 50MHz clock frequency\n");
+	       	ms->clk_freq = 50000000;
+       	}
+
+       	/* The maximum sync rate is clock / 5; increase
+       	 * mesh_sync_period if necessary.
+	 */
+	minper = 1000000000 / (ms->clk_freq / 5); /* ns */
+	if (mesh_sync_period < minper)
+		mesh_sync_period = minper;
+
+	/* Power up the chip */
+	set_mesh_power(ms, 1);
+
+	/* Set it up */
+       	mesh_init(ms);
+
+	/* XXX FIXME: error should be fatal */
+       	if (request_irq(ms->meshintr, do_mesh_interrupt, 0, "MESH", ms))
+	       	printk(KERN_ERR "MESH: can't get irq %d\n", ms->meshintr);
+
+	/* XXX FIXME: handle failure */
+	scsi_add_host(mesh_host, &mdev->ofdev.dev);
+	scsi_scan_host(mesh_host);
+
+	return 0;
+
+out_unmap:
+	iounmap((void *)ms->dma);
+	iounmap((void *)ms->mesh);
+out_free:
+	scsi_host_put(mesh_host);
+out_release:
+	macio_release_resources(mdev);
+
+	return -ENODEV;
+}
+
+static int mesh_remove(struct macio_dev *mdev)
+{
+	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
+	struct Scsi_Host *mesh_host = ms->host;
+
+	scsi_remove_host(mesh_host);
+
+	free_irq(ms->meshintr, ms);
+
+	/* Reset scsi bus */
+	mesh_shutdown(mdev);
+
+	/* Shut down chip & termination */
+	set_mesh_power(ms, 0);
+
+	/* Unmap registers & dma controller */
+	iounmap((void *) ms->mesh);
+       	iounmap((void *) ms->dma);
+
+	/* Free DMA commands memory */
+	pci_free_consistent(macio_get_pci_dev(mdev), ms->dma_cmd_size,
+			  ms->dma_cmd_space, ms->dma_cmd_bus);
+
+	/* Release memory resources */
+	macio_release_resources(mdev);
+
+	scsi_host_put(mesh_host);
+
+	return 0;
+}
+
+
+static struct of_match mesh_match[] = 
+{
+	{
+	.name 		= "mesh",
+	.type		= OF_ANY_MATCH,
+	.compatible	= OF_ANY_MATCH
+	},
+	{
+	.name 		= OF_ANY_MATCH,
+	.type		= "scsi",
+	.compatible	= "chrp,mesh0"
+	},
+	{},
+};
+
+static struct macio_driver mesh_driver = 
+{
+	.name 		= "mesh",
+	.match_table	= mesh_match,
+	.probe		= mesh_probe,
+	.remove		= mesh_remove,
+	.shutdown	= mesh_shutdown,
+#ifdef CONFIG_PM
+	.suspend	= mesh_suspend,
+	.resume		= mesh_resume,
+#endif
+};
+
+
+static int __init init_mesh(void)
+{
+
+	/* Calculate sync rate from module parameters */
+	if (sync_rate > 10)
+		sync_rate = 10;
+	if (sync_rate > 0) {
+		printk(KERN_INFO "mesh: configured for synchronous %d MB/s\n", sync_rate);
+		mesh_sync_period = 1000 / sync_rate;	/* ns */
+		mesh_sync_offset = 15;
+	} else
+		printk(KERN_INFO "mesh: configured for asynchronous\n");
+
+	return macio_register_driver(&mesh_driver);
+}
+
+static void __exit exit_mesh(void)
+{
+	return macio_unregister_driver(&mesh_driver);
+}
+
+module_init(init_mesh);
+module_exit(exit_mesh);
