@@ -22,6 +22,7 @@
 
 #include <sound/driver.h>
 #include <linux/delay.h>
+#include <linux/firmware.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <asm/io.h>
@@ -351,12 +352,11 @@ static int put_xilinx_data(vx_core_t *chip, unsigned int port, unsigned int coun
 /*
  * load the xilinx image
  */
-static int vx2_load_xilinx_binary(vx_core_t *chip, const snd_hwdep_dsp_image_t *xilinx)
+static int vx2_load_xilinx_binary(vx_core_t *chip, const struct firmware *xilinx)
 {
 	unsigned int i;
 	unsigned int port;
-	unsigned char data;
-	unsigned char __user *image;
+	unsigned char *image;
 
 	/* XILINX reset (wait at least 1 milisecond between reset on and off). */
 	vx_outl(chip, CNTRL, VX_CNTRL_REGISTER_VALUE | VX_XILINX_RESET_MASK);
@@ -371,10 +371,9 @@ static int vx2_load_xilinx_binary(vx_core_t *chip, const snd_hwdep_dsp_image_t *
 	else
 		port = VX_GPIOC; /* VX222 V2 and VX222_MIC_BOARD with new PLX9030 use this register */
 
-	image = xilinx->image;
-	for (i = 0; i < xilinx->length; i++, image++) {
-		__get_user(data, image);
-		if (put_xilinx_data(chip, port, 8, data) < 0)
+	image = xilinx->data;
+	for (i = 0; i < xilinx->size; i++, image++) {
+		if (put_xilinx_data(chip, port, 8, *image) < 0)
 			return -EINVAL;
 		/* don't take too much time in this loop... */
 		cond_resched();
@@ -400,25 +399,22 @@ static int vx2_load_xilinx_binary(vx_core_t *chip, const snd_hwdep_dsp_image_t *
 /*
  * load the boot/dsp images
  */
-static int vx2_load_dsp(vx_core_t *vx, const snd_hwdep_dsp_image_t *dsp)
+static int vx2_load_dsp(vx_core_t *vx, int index, const struct firmware *dsp)
 {
 	int err;
 
-	if (*dsp->name)
-		snd_printdd("loading dsp [%d] %s, size = %Zd\n",
-			dsp->index, dsp->name, dsp->length);
-	switch (dsp->index) {
-	case 0:
+	switch (index) {
+	case 1:
 		/* xilinx image */
 		if ((err = vx2_load_xilinx_binary(vx, dsp)) < 0)
 			return err;
 		if ((err = vx2_test_xilinx(vx)) < 0)
 			return err;
 		return 0;
-	case 1:
+	case 2:
 		/* DSP boot */
 		return snd_vx_dsp_boot(vx, dsp);
-	case 2:
+	case 3:
 		/* DSP image */
 		return snd_vx_dsp_load(vx, dsp);
 	default:
