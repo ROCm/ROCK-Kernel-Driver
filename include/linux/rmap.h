@@ -14,7 +14,10 @@
 
 #ifdef CONFIG_MMU
 
-void page_add_anon_rmap(struct page *, struct mm_struct *, unsigned long);
+/*
+ * rmap interfaces called when adding or removing pte of page
+ */
+void page_add_anon_rmap(struct page *, struct vm_area_struct *, unsigned long);
 void page_add_file_rmap(struct page *);
 void page_remove_rmap(struct page *);
 

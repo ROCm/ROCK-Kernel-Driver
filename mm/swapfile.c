@@ -433,7 +433,7 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 	vma->vm_mm->rss++;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
-	page_add_anon_rmap(page, vma->vm_mm, address);
+	page_add_anon_rmap(page, vma, address);
 	swap_free(entry);
 }
 

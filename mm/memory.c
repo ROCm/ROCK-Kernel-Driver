@@ -1088,7 +1088,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			page_remove_rmap(old_page);
 		break_cow(vma, new_page, address, page_table);
 		lru_cache_add_active(new_page);
-		page_add_anon_rmap(new_page, mm, address);
+		page_add_anon_rmap(new_page, vma, address);
 
 		/* Free the old page.. */
 		new_page = old_page;
@@ -1366,7 +1366,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 	flush_icache_page(vma, page);
 	set_pte(page_table, pte);
-	page_add_anon_rmap(page, mm, address);
+	page_add_anon_rmap(page, vma, address);
 
 	if (write_access || mremap_moved_anon_rmap(page, address)) {
 		if (do_wp_page(mm, vma, address,
@@ -1425,7 +1425,7 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 				      vma);
 		lru_cache_add_active(page);
 		mark_page_accessed(page);
-		page_add_anon_rmap(page, mm, addr);
+		page_add_anon_rmap(page, vma, addr);
 	}
 
 	set_pte(page_table, entry);
@@ -1532,7 +1532,7 @@ retry:
 		set_pte(page_table, entry);
 		if (anon) {
 			lru_cache_add_active(new_page);
-			page_add_anon_rmap(new_page, mm, address);
+			page_add_anon_rmap(new_page, vma, address);
 		} else
 			page_add_file_rmap(new_page);
 		pte_unmap(page_table);

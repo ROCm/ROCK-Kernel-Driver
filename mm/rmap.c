@@ -365,15 +365,15 @@ int page_referenced(struct page *page)
 /**
  * page_add_anon_rmap - add pte mapping to an anonymous page
  * @page:	the page to add the mapping to
- * @mm:		the mm in which the mapping is added
+ * @vma:	the vm area in which the mapping is added
  * @address:	the user virtual address mapped
  *
  * The caller needs to hold the mm->page_table_lock.
  */
 void page_add_anon_rmap(struct page *page,
-	struct mm_struct *mm, unsigned long address)
+	struct vm_area_struct *vma, unsigned long address)
 {
-	struct anonmm *anonmm = mm->anonmm;
+	struct anonmm *anonmm = vma->vm_mm->anonmm;
 
 	BUG_ON(PageReserved(page));
 
