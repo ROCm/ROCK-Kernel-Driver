@@ -1,8 +1,5 @@
 /*
- * BK Id: SCCS/s.syscalls.c 1.11 10/16/01 15:58:42 trini
- */
-/*
- * linux/arch/ppc/kernel/sys_ppc.c
+ * arch/ppc/kernel/sys_ppc.c
  *
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)

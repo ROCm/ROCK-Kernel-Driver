@@ -1,6 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  * arch/ppc/boot/prep/misc.c
  *
  * Adapted for PowerPC by Gary Thomas

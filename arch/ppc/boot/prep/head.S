@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 #include <asm/ppc_asm.h>
 #include <asm/processor.h>
 #include <asm/cache.h>

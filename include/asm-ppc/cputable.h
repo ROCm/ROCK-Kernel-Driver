@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.cputable.h 1.3 08/19/01 22:31:46 paulus
- */
-/*
  *  include/asm-ppc/cputable.h
  *
  *  Copyright (C) 2001 Ben. Herrenschmidt (benh@kernel.crashing.org)

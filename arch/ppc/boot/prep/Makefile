@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 # arch/ppc/boot/Makefile
 #
 # This file is subject to the terms and conditions of the GNU General Public

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * This file contains assembly-language implementations
  * of IP-style 1's complement checksum routines.
  *	

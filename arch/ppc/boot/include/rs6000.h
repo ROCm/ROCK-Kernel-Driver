@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.rs6000.h 1.7 05/18/01 15:17:23 cort
- */
 /* IBM RS/6000 "XCOFF" file definitions for BFD.
    Copyright (C) 1990, 1991 Free Software Foundation, Inc.
    FIXME: Can someone provide a transliteration of this name into ASCII?

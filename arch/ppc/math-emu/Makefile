@@ -1,9 +1,3 @@
-# BK Id: SCCS/s.Makefile 1.3 05/17/01 18:14:22 cort
-#
-#
-#
-#
-
 O_TARGET			:= math-emu.o
 
 obj-y				:= math.o fmr.o lfd.o stfd.o

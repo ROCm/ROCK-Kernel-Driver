@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.op-2.h 1.5 05/17/01 18:14:23 cort
- */
-/*
  * Basic two-word fraction declaration and manipulation.
  */
 

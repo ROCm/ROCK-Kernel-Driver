@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.string.S 1.8 05/18/01 06:20:29 patch
- */
-/*
  * String handling functions for PowerPC.
  *
  * Copyright (C) 1996 Paul Mackerras.

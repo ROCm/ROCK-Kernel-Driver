@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 # Makefile for making ELF bootable images for booting on CHRP
 # using Open Firmware.
 #

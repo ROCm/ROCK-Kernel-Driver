@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Time routes for iSeries LPAR.
  *
  * Copyright (C) 2001 IBM Corp.

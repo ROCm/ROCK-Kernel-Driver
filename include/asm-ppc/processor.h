@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef __ASM_PPC_PROCESSOR_H
 #define __ASM_PPC_PROCESSOR_H

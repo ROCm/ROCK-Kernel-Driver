@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.sfp-machine.h 1.5 05/17/01 18:14:23 cort
- */
 /* Machine-dependent software floating-point definitions.  PPC version.
    Copyright (C) 1997 Free Software Foundation, Inc.
    This file is part of the GNU C Library.

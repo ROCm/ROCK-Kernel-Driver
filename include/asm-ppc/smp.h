@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 /* smp.h: PPC specific SMP stuff.
  *
  * Original was a copy of sparc smp.h.  Now heavily modified

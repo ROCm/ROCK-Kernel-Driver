@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Copyright (C) 2000   Ani Joshi <ajoshi@unixbox.com>
  *
  *

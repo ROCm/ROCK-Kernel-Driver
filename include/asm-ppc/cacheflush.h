@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * include/asm-ppc/cacheflush.h
  *
  *  This program is free software; you can redistribute it and/or

@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.addnote.c 1.7 05/18/01 15:17:23 cort
- */
-/*
  * Program to hack in a PT_NOTE program header entry in an ELF file.
  * This is needed for OF on RS/6000s to load an image correctly.
  * Note that OF needs a program header entry for the note, not an

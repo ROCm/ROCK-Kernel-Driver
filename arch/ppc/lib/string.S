@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * String handling functions for PowerPC.
  *
  * Copyright (C) 1996 Paul Mackerras.

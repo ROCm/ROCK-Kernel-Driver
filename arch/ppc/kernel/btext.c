@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Procedures for drawing on the screen early on in the boot process.
  *
  * Benjamin Herrenschmidt <benh@kernel.crashing.org>

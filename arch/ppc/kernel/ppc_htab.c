@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.ppc_htab.c 1.19 10/16/01 15:58:42 trini
- */
-/*
  * PowerPC hash table management proc entry.  Will show information
  * about the current hash table and will allow changes to it.
  *

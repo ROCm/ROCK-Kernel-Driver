@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Software emulation of some PPC instructions for the 8xx core.
  *
  * Copyright (C) 1998 Dan Malek (dmalek@jlc.net)

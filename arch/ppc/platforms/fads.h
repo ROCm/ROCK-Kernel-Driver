@@ -1,8 +1,4 @@
 /*
- * BK Id: SCCS/s.fads.h 1.14 10/26/01 10:14:09 trini
- */
-
-/*
  * A collection of structures, addresses, and values associated with
  * the Motorola 860T FADS board.  Copied from the MBX stuff.
  *

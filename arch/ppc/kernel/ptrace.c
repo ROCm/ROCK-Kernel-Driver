@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  linux/arch/ppc/kernel/ptrace.c
+ *  arch/ppc/kernel/ptrace.c
  *
  *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)

@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.mkprep.c 1.7 05/18/01 06:20:29 patch
- */
-/*
  * Makes a prep bootable image which can be dd'd onto
  * a disk device to make a bootdisk.  Will take
  * as input a elf executable, strip off the header

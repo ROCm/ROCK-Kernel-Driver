@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.misc.S 1.6 05/18/01 15:16:59 cort
- */
-/*
  * Copyright (C) Paul Mackerras 1997.
  *
  * This program is free software; you can redistribute it and/or

@@ -1,8 +1,4 @@
 /*
- * BK Id: SCCS/s.bseip.h 1.10 08/17/01 15:23:17 paulus
- */
-
-/*
  * A collection of structures, addresses, and values associated with
  * the Bright Star Engineering ip-Engine board.  Copied from the MBX stuff.
  *

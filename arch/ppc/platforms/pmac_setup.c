@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/platforms/setup.c
  *
  *  PowerPC version 

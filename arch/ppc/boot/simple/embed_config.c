@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 /* Board specific functions for those embedded 8xx boards that do
  * not have boot monitor support for board information.
  *

@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifndef __ASM_SPINLOCK_H
 #define __ASM_SPINLOCK_H
 

@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef _PPC_UACCESS_H
 #define _PPC_UACCESS_H

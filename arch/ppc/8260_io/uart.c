@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  UART driver for MPC8260 CPM SCC or SMC
  *  Copyright (c) 1999 Dan Malek (dmalek@jlc.net)
  *  Copyright (c) 2000 MontaVista Software, Inc. (source@mvista.com)

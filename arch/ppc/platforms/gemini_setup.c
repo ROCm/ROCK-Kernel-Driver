@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  arch/ppc/platforms/setup.c
+ *  arch/ppc/platforms/gemini_setup.c
  *
  *  Copyright (C) 1995 Linus Torvalds
  *  Adapted from 'alpha' version by Gary Thomas

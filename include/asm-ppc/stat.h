@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.stat.h 1.5 05/17/01 18:14:26 cort
- */
 #ifndef _PPC_STAT_H
 #define _PPC_STAT_H
 

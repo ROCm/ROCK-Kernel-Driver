@@ -1,6 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  * Originally adapted by Gary Thomas.  Much additional work by
  * Cort Dougan <cort@fsmlabs.com>.  On top of that still more work by
  * Dan Malek <dmalek@jlc.net>.

@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifndef __PPC_PLATFORMS_PMAC_PIC_H
 #define __PPC_PLATFORMS_PMAC_PIC_H
 

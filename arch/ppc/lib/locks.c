@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Locks for smp ppc 
  * 
  * Written by Cort Dougan (cort@cs.nmt.edu)

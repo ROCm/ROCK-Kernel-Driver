@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 # Makefile for making XCOFF bootable images for booting on PowerMacs
 # using Open Firmware.
 #

@@ -1,8 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
-/*
  * General Purpose functions for the global management of the
  * Communication Processor Module.
  * Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
