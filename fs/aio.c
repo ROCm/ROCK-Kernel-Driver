@@ -552,7 +552,7 @@ int aio_complete(struct kiocb *iocb, long res, long res2)
 		iocb->ki_users--;
 		ret = (0 == iocb->ki_users);
 		spin_unlock_irq(&ctx->ctx_lock);
-		return 0;
+		return ret;
 	}
 
 	info = &ctx->ring_info;
