@@ -7523,25 +7523,6 @@ qeth_rebuild_header(struct sk_buff *skb)
 
 	return card->rebuild_header(skb);
 }
-
-int
-qeth_ipv6_generate_eui64(u8 * eui, struct net_device *dev)
-{
-	switch (dev->type) {
-	case ARPHRD_ETHER:
-	case ARPHRD_FDDI:
-	case ARPHRD_IEEE802_TR:
-		if (dev->addr_len != ETH_ALEN)
-			return -1;
-		memcpy(eui, dev->dev_addr, 3);
-		memcpy(eui + 5, dev->dev_addr + 3, 3);
-		eui[3] = (dev->dev_id >> 8) & 0xff;
-		eui[4] = dev->dev_id & 0xff;
-		return 0;
-	}
-	return -1;
-
-}
 #endif /* QETH_IPV6 */
 
 static void
@@ -7554,9 +7535,6 @@ qeth_ipv6_init_card(struct qeth_card *card)
 	card->header_cache_update =
 	    qeth_get_header_cache_update(card->link_type);
 	card->type_trans = qeth_get_type_trans(card->link_type);
-	card->dev->dev_id = card->unique_id & 0xffff;
-	if (!(card->unique_id & UNIQUE_ID_NOT_BY_CARD))
-		card->dev->generate_eui64 = qeth_ipv6_generate_eui64;
 #endif /* QETH_IPV6 */
 }
 
