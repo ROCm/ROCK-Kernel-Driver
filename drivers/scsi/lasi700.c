@@ -118,6 +118,8 @@ lasi700_driver_callback(struct parisc_device *dev)
 		hostdata->dmode_extra = DMODE_FC2;
 	}
 
+	NCR_700_set_mem_mapped(hostdata);
+
 	host = NCR_700_detect(&lasi700_template, hostdata);
 	if (!host)
 		goto out_release_mem_region;

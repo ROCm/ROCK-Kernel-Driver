@@ -197,6 +197,8 @@ NCR_D700_probe_one(struct NCR_D700_private *p, int siop,
 	hostdata->differential = (((1<<siop) & differential) != 0);
 	hostdata->clock = NCR_D700_CLOCK_MHZ;
 
+	NCR_700_set_io_mapped(hostdata);
+
 	/* and register the siop */
 	host = NCR_700_detect(&NCR_D700_driver_template, hostdata);
 	if (!host) {
