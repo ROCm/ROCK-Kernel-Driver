@@ -1633,6 +1633,8 @@ static int snd_via8233_init_misc(via82xx_t *chip, int dev)
 	int i, err, caps;
 	unsigned char val;
 
+	pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE,
+			      chip->old_legacy & ~(VIA_FUNC_ENABLE_SB|VIA_FUNC_ENABLE_FM));
 	caps = chip->chip_type == TYPE_VIA8233A ? 1 : 2;
 	for (i = 0; i < caps; i++) {
 		snd_via8233_capture_source.index = i;
@@ -1669,6 +1671,7 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 	legacy_cfg = chip->old_legacy_cfg;
 	legacy |= VIA_FUNC_MIDI_IRQMASK;	/* FIXME: correct? (disable MIDI) */
 	legacy &= ~VIA_FUNC_ENABLE_GAME;	/* disable joystick */
+	legacy &= ~(VIA_FUNC_ENABLE_SB|VIA_FUNC_ENABLE_FM);	/* diable SB & FM */
 	if (chip->revision >= VIA_REV_686_H) {
 		rev_h = 1;
 		if (mpu_port[dev] >= 0x200) {	/* force MIDI */
