@@ -23,7 +23,7 @@
  *   registers on taking a 32-bit syscall are zero
  * - if you can, you should call sys_keyctl directly
  */
-asmlinkage long compat_keyctl(u32 option,
+asmlinkage long compat_sys_keyctl(u32 option,
 			      u32 arg2, u32 arg3, u32 arg4, u32 arg5)
 {
 	switch (option) {
@@ -75,4 +75,4 @@ asmlinkage long compat_keyctl(u32 option,
 		return -EOPNOTSUPP;
 	}
 
-} /* end compat_keyctl() */
+} /* end compat_sys_keyctl() */

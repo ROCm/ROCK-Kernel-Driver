@@ -965,7 +965,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */
 	.llong .sys32_add_key
 	.llong .sys32_request_key
-	.llong .compat_keyctl
+	.llong .compat_sys_keyctl
 
 	.balign 8
 _GLOBAL(sys_call_table)
