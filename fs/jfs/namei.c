@@ -528,6 +528,9 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 		txEnd(tid);
 	}
 
+	if (ip->i_nlink == 0)
+		set_cflag(COMMIT_Nolink, ip);
+
 	if (!test_cflag(COMMIT_Holdlock, ip))
 		IWRITE_UNLOCK(ip);
 
@@ -1273,6 +1276,8 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			rc = txCommit(tid, 1, &new_ip, COMMIT_SYNC);
 		txEnd(tid);
 	}
+	if (new_ip && (new_ip->i_nlink == 0))
+		set_cflag(COMMIT_Nolink, new_ip);
       out3:
 	free_UCSname(&new_dname);
       out2:

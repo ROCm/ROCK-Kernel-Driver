@@ -1225,11 +1225,10 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	 */
 	if (tblk->xflag & (COMMIT_CREATE | COMMIT_DELETE))
 		atomic_inc(&tblk->ip->i_count);
-	if (tblk->xflag & COMMIT_DELETE) {
-		ip = tblk->ip;
-		assert((ip->i_nlink == 0) && !test_cflag(COMMIT_Nolink, ip));
-		set_cflag(COMMIT_Nolink, ip);
-	}
+
+	ASSERT((!(tblk->xflag & COMMIT_DELETE)) ||
+	       ((tblk->ip->i_nlink == 0) &&
+		!test_cflag(COMMIT_Nolink, tblk->ip)));
 
 	/*
 	 *      write COMMIT log record
