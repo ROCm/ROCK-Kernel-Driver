@@ -1268,6 +1268,7 @@ static int snd_azf3328_free(azf3328_t *chip)
         if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 
         kfree(chip);
         return 0;
@@ -1317,8 +1318,10 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	chip->card = card;
 	chip->pci = pci;
@@ -1328,11 +1331,13 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	if ((err = pci_request_regions(pci, "Aztech AZF3328")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 

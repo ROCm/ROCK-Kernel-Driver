@@ -2885,6 +2885,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	}
 #endif
 	
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -3678,6 +3679,7 @@ static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
 	/* disable CLKRUN */
 	chip->active_ctrl(chip, -chip->amplifier);
 	chip->amplifier = amp_saved; /* restore the status */
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -3688,6 +3690,7 @@ static int snd_cs46xx_resume(snd_card_t *card, unsigned int state)
 	int amp_saved;
 
 	pci_enable_device(chip->pci);
+	pci_set_master(chip->pci);
 	amp_saved = chip->amplifier;
 	chip->amplifier = 0;
 	chip->active_ctrl(chip, 1); /* force to on */
@@ -3744,8 +3747,10 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	init_MUTEX(&chip->spos_mutex);

@@ -561,6 +561,7 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 		free_irq(emu->irq, (void *)emu);
 	if (emu->port)
 		pci_release_regions(emu->pci);
+	pci_disable_device(emu->pci);
 	kfree(emu);
 	return 0;
 }
@@ -596,14 +597,17 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		return err;
 
 	emu = kcalloc(1, sizeof(*emu), GFP_KERNEL);
-	if (emu == NULL)
+	if (emu == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	/* set the DMA transfer mask */
 	emu->dma_mask = is_audigy ? AUDIGY_DMA_MASK : EMU10K1_DMA_MASK;
 	if (pci_set_dma_mask(pci, emu->dma_mask) < 0 ||
 	    pci_set_consistent_dma_mask(pci, emu->dma_mask) < 0) {
 		snd_printk(KERN_ERR "architecture does not support PCI busmaster DMA with mask 0x%lx\n", emu->dma_mask);
 		kfree(emu);
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 	emu->card = card;
@@ -629,6 +633,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "EMU10K1")) < 0) {
 		kfree(emu);
+		pci_disable_device(pci);
 		return err;
 	}
 	emu->port = pci_resource_start(pci, 0);

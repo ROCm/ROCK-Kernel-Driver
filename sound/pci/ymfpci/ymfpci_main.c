@@ -2098,6 +2098,7 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 
 	pci_write_config_word(chip->pci, 0x40, chip->old_legacy_ctrl);
 	
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2153,6 +2154,7 @@ static int snd_ymfpci_suspend(snd_card_t *card, unsigned int state)
 	chip->saved_ydsxgr_mode = snd_ymfpci_readl(chip, YDSXGR_MODE);
 	snd_ymfpci_writel(chip, YDSXGR_NATIVEDACOUTVOL, 0);
 	snd_ymfpci_disable_dsp(chip);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2204,8 +2206,10 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	chip->old_legacy_ctrl = old_legacy_ctrl;
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->voice_lock);
