@@ -1250,30 +1250,6 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 			return retval;
 
 		return 0;
-
-	case AVMB1_REMOVECARD:
-		if ((retval = copy_from_user((void *) &rdef, data,
-					 sizeof(avmb1_resetdef))))
-			return retval;
-
-		card = get_capi_ctr_by_nr(rdef.contr);
-		if (!card)
-			return -ESRCH;
-
-		if (card->cardstate != CARD_DETECTED)
-			return -EBUSY;
-
-		card->driver->remove_ctr(card);
-
-		while (cards[rdef.contr]) {
-
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);	/* 0.1 sec */
-
-			if (signal_pending(current))
-				return -EINTR;
-		}
-		return 0;
 	}
 	return -EINVAL;
 }

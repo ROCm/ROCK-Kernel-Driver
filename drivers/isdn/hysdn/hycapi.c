@@ -693,7 +693,6 @@ static struct capi_driver hycapi_driver = {
 	revision: "0.0",
 	load_firmware: hycapi_load_firmware, 
 	reset_ctr: hycapi_reset_ctr,
-	remove_ctr: hycapi_remove_ctr,
 	register_appl: hycapi_register_appl,
 	release_appl: hycapi_release_appl,
 	send_message: hycapi_send_message,

@@ -80,7 +80,6 @@ struct capi_driver {
 	char revision[32];
 	int (*load_firmware)(struct capi_ctr *, capiloaddata *);
 	void (*reset_ctr)(struct capi_ctr *);
-	void (*remove_ctr)(struct capi_ctr *);
 	void (*register_appl)(struct capi_ctr *, __u16 appl,
 			      capi_register_params *);
 	void (*release_appl)(struct capi_ctr *, __u16 appl);

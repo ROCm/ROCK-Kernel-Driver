@@ -901,9 +901,9 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
 	card->nlogcontr = 0;
 }
 
-static void c4_remove_ctr(struct capi_ctr *ctrl)
+static void c4_remove(struct pci_dev *pdev)
 {
-	avmcard *card = ((avmctrl_info *)(ctrl->driverdata))->card;
+	avmcard *card = pci_get_drvdata(pdev);
 	avmctrl_info *cinfo;
 	int i;
 
@@ -920,7 +920,6 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
-	ctrl->driverdata = 0;
         avmcard_dma_free(card->dma);
 	b1_free_card(card);
 }
@@ -1215,7 +1214,6 @@ static struct capi_driver c2_driver = {
 	revision: "0.0",
 	load_firmware: c4_load_firmware,
 	reset_ctr: c4_reset_ctr,
-	remove_ctr: c4_remove_ctr,
 	register_appl: c4_register_appl,
 	release_appl: c4_release_appl,
 	send_message: c4_send_message,
@@ -1223,8 +1221,6 @@ static struct capi_driver c2_driver = {
 	procinfo: c4_procinfo,
 	ctr_read_proc: c4_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: 0, /* no add_card function */
 };
 
 static struct capi_driver c4_driver = {
@@ -1233,7 +1229,6 @@ static struct capi_driver c4_driver = {
 	revision: "0.0",
 	load_firmware: c4_load_firmware,
 	reset_ctr: c4_reset_ctr,
-	remove_ctr: c4_remove_ctr,
 	register_appl: c4_register_appl,
 	release_appl: c4_release_appl,
 	send_message: c4_send_message,
@@ -1241,8 +1236,6 @@ static struct capi_driver c4_driver = {
 	procinfo: c4_procinfo,
 	ctr_read_proc: c4_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: 0, /* no add_card function */
 };
 
 static int __devinit c4_probe(struct pci_dev *dev,
@@ -1282,6 +1275,7 @@ static struct pci_driver c4_pci_driver = {
        name:           "c4",
        id_table:       c4_pci_tbl,
        probe:          c4_probe,
+       remove:         c4_remove,
 };
 
 static int __init c4_init(void)
