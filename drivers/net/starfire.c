@@ -804,7 +804,7 @@ static void	netdev_media_change(struct net_device *dev);
 #ifdef VLAN_SUPPORT
 static void netdev_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
-        struct netdev_private *np = dev->priv;
+        struct netdev_private *np = netdev_priv(dev);
 
         spin_lock(&np->lock);
 	if (debug > 2)
@@ -816,7 +816,7 @@ static void netdev_vlan_rx_register(struct net_device *dev, struct vlan_group *g
 
 static void netdev_vlan_rx_add_vid(struct net_device *dev, unsigned short vid)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	spin_lock(&np->lock);
 	if (debug > 1)
@@ -827,7 +827,7 @@ static void netdev_vlan_rx_add_vid(struct net_device *dev, unsigned short vid)
 
 static void netdev_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	spin_lock(&np->lock);
 	if (debug > 1)
@@ -951,7 +951,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 
-	np = dev->priv;
+	np = netdev_priv(dev);
 	spin_lock_init(&np->lock);
 	pci_set_drvdata(pdev, dev);
 
@@ -1102,7 +1102,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 
 static int netdev_open(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i, retval;
 	size_t tx_done_q_size, rx_done_q_size, tx_ring_size, rx_ring_size;
@@ -1267,7 +1267,7 @@ static int netdev_open(struct net_device *dev)
 
 static void check_duplex(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 reg0;
 	int silly_count = 1000;
 
@@ -1302,7 +1302,7 @@ static void check_duplex(struct net_device *dev)
 
 static void tx_timeout(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int old_debug;
 
@@ -1332,7 +1332,7 @@ static void tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void init_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	np->cur_rx = np->cur_tx = np->reap_tx = 0;
@@ -1378,7 +1378,7 @@ static void init_ring(struct net_device *dev)
 
 static int start_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	unsigned int entry;
 	u32 status;
 	int i;
@@ -1497,7 +1497,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 	int handled = 0;
 
 	ioaddr = dev->base_addr;
-	np = dev->priv;
+	np = netdev_priv(dev);
 
 	do {
 		u32 intr_status = readl(ioaddr + IntrClear);
@@ -1597,7 +1597,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
    for clarity, code sharing between NAPI/non-NAPI, and better register allocation. */
 static int __netdev_rx(struct net_device *dev, int *quota)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 desc_status;
 	int retcode = 0;
 
@@ -1752,7 +1752,7 @@ static int netdev_poll(struct net_device *dev, int *budget)
 
 static void refill_rx_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	struct sk_buff *skb;
 	int entry = -1;
 
@@ -1780,7 +1780,7 @@ static void refill_rx_ring(struct net_device *dev)
 
 static void netdev_media_change(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	u16 reg0, reg1, reg4, reg5;
 	u32 new_tx_mode;
@@ -1855,7 +1855,7 @@ static void netdev_media_change(struct net_device *dev)
 
 static void netdev_error(struct net_device *dev, int intr_status)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* Came close to underrunning the Tx FIFO, increase threshold. */
 	if (intr_status & IntrTxDataLow) {
@@ -1883,7 +1883,7 @@ static void netdev_error(struct net_device *dev, int intr_status)
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* This adapter architecture needs no SMP locks. */
 	np->stats.tx_bytes = readl(ioaddr + 0x57010);
@@ -1917,7 +1917,7 @@ static void set_rx_mode(struct net_device *dev)
 	struct dev_mc_list *mclist;
 	int i;
 #ifdef VLAN_SUPPORT
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	rx_mode |= VlanMode;
 	if (np->vlgrp) {
@@ -2000,7 +2000,7 @@ static void set_rx_mode(struct net_device *dev)
 static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_cmd ecmd;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
 		return -EFAULT;
@@ -2078,7 +2078,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int rc;
 
 	if (!netif_running(dev))
@@ -2103,7 +2103,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static int netdev_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	netif_stop_queue(dev);
@@ -2174,15 +2174,16 @@ static int netdev_close(struct net_device *dev)
 static void __devexit starfire_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct netdev_private *np;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (!dev)
 		BUG();
 
 	unregister_netdev(dev);
-	np = dev->priv;
+
 	if (np->queue_mem)
 		pci_free_consistent(pdev, np->queue_mem_size, np->queue_mem, np->queue_mem_dma);
+
 
 	/* XXX: add wakeup code -- requires firmware for MagicPacket */
 	pci_set_power_state(pdev, 3);	/* go to sleep in D3 mode */
