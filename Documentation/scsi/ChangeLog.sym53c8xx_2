@@ -142,7 +142,3 @@ Sat Dec 01 18:00 2001 Gerard Roudier
 	  consistent with what archs are expecting.
 	- Use MMIO per default for Power PC instead of some fake normal IO,
 	  as Paul Mackerras stated that MMIO works fine now on this arch.
-
-
-
-
