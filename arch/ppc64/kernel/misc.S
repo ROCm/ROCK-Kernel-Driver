@@ -857,7 +857,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_newstat
 	.llong .sys_newlstat
 	.llong .sys_newfstat
-	.llong .sys_uname
+	.llong .sys_ni_syscall		/* old uname syscall */
 	.llong .sys_ni_syscall		/* 110 old iopl syscall */
 	.llong .sys_vhangup
 	.llong .sys_ni_syscall		/* old idle syscall */
