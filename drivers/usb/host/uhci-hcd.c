@@ -1852,17 +1852,12 @@ static void uhci_finish_completion(struct usb_hcd *hcd, struct pt_regs *regs)
 
 static void uhci_remove_pending_urbps(struct uhci_hcd *uhci)
 {
-	struct list_head *tmp, *head;
-
 	spin_lock(&uhci->urb_remove_list_lock);
-	head = &uhci->urb_remove_list;
-	tmp = head->next;
-	while (tmp != head) {
-		struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
+	spin_lock(&uhci->complete_list_lock);
 
-		tmp = tmp->next;
-		uhci_moveto_complete(uhci, urbp);
-	}
+	/* Splice the urb_remove_list onto the end of the complete_list */
+	list_splice_init(&uhci->urb_remove_list, uhci->complete_list.prev);
+	spin_unlock(&uhci->complete_list_lock);
 	spin_unlock(&uhci->urb_remove_list_lock);
 }
 
