@@ -2698,7 +2698,6 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	}
 
 	hp = dev->priv;
-	memset(hp, 0, sizeof(*hp));
 
 	hp->happy_dev = sdev;
 

@@ -32,7 +32,6 @@
 #ifndef __XFS_DIR2_H__
 #define __XFS_DIR2_H__
 
-struct dirent;
 struct uio;
 struct xfs_dabuf;
 struct xfs_da_args;

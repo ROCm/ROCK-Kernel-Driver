@@ -96,16 +96,22 @@ int xfs_alloc_block_minrecs(int lev, struct xfs_btree_cur *cur);
 #endif
 
 /*
- * Minimum and maximum blocksize.
+ * Minimum and maximum blocksize and sectorsize.
  * The blocksize upper limit is pretty much arbitrary.
+ * The sectorsize upper limit is due to sizeof(sb_sectsize).
  */
 #define XFS_MIN_BLOCKSIZE_LOG	9	/* i.e. 512 bytes */
 #define XFS_MAX_BLOCKSIZE_LOG	16	/* i.e. 65536 bytes */
 #define XFS_MIN_BLOCKSIZE	(1 << XFS_MIN_BLOCKSIZE_LOG)
 #define XFS_MAX_BLOCKSIZE	(1 << XFS_MAX_BLOCKSIZE_LOG)
+#define XFS_MIN_SECTORSIZE_LOG	9       /* i.e. 512 bytes */
+#define XFS_MAX_SECTORSIZE_LOG	15      /* i.e. 32768 bytes */
+#define XFS_MIN_SECTORSIZE	(1 << XFS_MIN_SECTORSIZE_LOG)
+#define XFS_MAX_SECTORSIZE	(1 << XFS_MAX_SECTORSIZE_LOG)
 
 /*
- * block numbers in the AG; SB is BB 0, AGF is BB 1, AGI is BB 2, AGFL is BB 3
+ * Block numbers in the AG:
+ * SB is sector 0, AGF is sector 1, AGI is sector 2, AGFL is sector 3.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BNO_BLOCK)
 xfs_agblock_t xfs_bno_block(struct xfs_mount *mp);

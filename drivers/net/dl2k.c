@@ -50,7 +50,7 @@
 
 */
 #define DRV_NAME	"D-Link DL2000-based linux driver"
-#define DRV_VERSION	"v1.17"
+#define DRV_VERSION	"v1.17a"
 #define DRV_RELDATE	"2002/10/04"
 #include "dl2k.h"
 
@@ -1007,7 +1007,9 @@ get_stats (struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
+#ifdef MEM_MAPPING
 	int i;
+#endif
 	unsigned int stat_reg;
 
 	/* All statistics registers need to be acknowledged,
@@ -1050,9 +1052,10 @@ get_stats (struct net_device *dev)
 	readw (ioaddr + MacControlFramesXmtd);
 	readw (ioaddr + FramesWEXDeferal);
 
-
+#ifdef MEM_MAPPING
 	for (i = 0x100; i <= 0x150; i += 4)
 		readl (ioaddr + i);
+#endif
 	readw (ioaddr + TxJumboFrames);
 	readw (ioaddr + RxJumboFrames);
 	readw (ioaddr + TCPCheckSumErrors);
@@ -1065,7 +1068,9 @@ static int
 clear_stats (struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
+#ifdef MEM_MAPPING
 	int i;
+#endif 
 
 	/* All statistics registers need to be acknowledged,
 	   else statistic overflow could cause problems */
@@ -1101,9 +1106,10 @@ clear_stats (struct net_device *dev)
 	readw (ioaddr + BcstFramesXmtdOk);
 	readw (ioaddr + MacControlFramesXmtd);
 	readw (ioaddr + FramesWEXDeferal);
-
+#ifdef MEM_MAPPING
 	for (i = 0x100; i <= 0x150; i += 4)
 		readl (ioaddr + i);
+#endif 
 	readw (ioaddr + TxJumboFrames);
 	readw (ioaddr + RxJumboFrames);
 	readw (ioaddr + TCPCheckSumErrors);

@@ -83,12 +83,14 @@ static int max_interrupt_work = 20;
 #define NEW_MULTICAST
 #include <linux/delay.h>
 
+#define MAX_UNITS 8
+
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("3Com 3c515 Corkscrew driver");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(debug, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(8) "i");
+MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM_DESC(debug, "3c515 debug level (0-6)");
@@ -408,7 +410,7 @@ static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 */
 /* This driver uses 'options' to pass the media type, full-duplex flag, etc. */
 /* Note: this is the only limit on the number of cards supported!! */
-static int options[8] = { -1, -1, -1, -1, -1, -1, -1, -1, };
+static int options[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1, };
 
 #ifdef MODULE
 static int debug = -1;
@@ -545,9 +547,10 @@ no_pnp:
 		printk(KERN_INFO "3c515 Resource configuration register %#4.4x, DCR %4.4x.\n",
 		     inl(ioaddr + 0x2002), inw(ioaddr + 0x2000));
 		irq = inw(ioaddr + 0x2002) & 15;
-		corkscrew_found_device(dev, ioaddr, irq, CORKSCREW_ID, dev
-				       && dev->mem_start ? dev->
-				       mem_start : options[cards_found]);
+		corkscrew_found_device(dev, ioaddr, irq, CORKSCREW_ID,
+				       dev && dev->mem_start ?  dev->mem_start :
+				         (cards_found >= MAX_UNITS ? -1 :
+						options[cards_found]));
 		dev = 0;
 		cards_found++;
 	}

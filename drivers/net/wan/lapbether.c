@@ -186,6 +186,7 @@ static int lapbeth_data_indication(void *token, struct sk_buff *skb)
 	skb->mac.raw  = skb->data;
 	skb->pkt_type = PACKET_HOST;
 
+	skb->dev->last_rx = jiffies;
 	return netif_rx(skb);
 }
 
@@ -283,6 +284,7 @@ static void lapbeth_connected(void *token, int reason)
 	skb->mac.raw  = skb->data;
 	skb->pkt_type = PACKET_HOST;
 
+	skb->dev->last_rx = jiffies;
 	netif_rx(skb);
 }
 
@@ -305,6 +307,7 @@ static void lapbeth_disconnected(void *token, int reason)
 	skb->mac.raw  = skb->data;
 	skb->pkt_type = PACKET_HOST;
 
+	skb->dev->last_rx = jiffies;
 	netif_rx(skb);
 }
 

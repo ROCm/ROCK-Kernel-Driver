@@ -146,7 +146,7 @@ clean_3:
 		goto clean_2;
 	}
 
-	info ("%s @ %s, %s", hcd->description,  dev->slot_name, dev->dev.name);
+	dev_info (*hcd->controller, "%s\n", hcd->product_desc);
 
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
@@ -155,7 +155,8 @@ clean_3:
 #endif
 	if (request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ, hcd->description, hcd)
 			!= 0) {
-		err ("request interrupt %s failed", bufp);
+		dev_err (*hcd->controller,
+				"request interrupt %s failed\n", bufp);
 		retval = -EBUSY;
 		goto clean_3;
 	}
@@ -163,7 +164,7 @@ clean_3:
 
 	hcd->regs = base;
 	hcd->region = region;
-	info ("irq %s, %s %p", bufp,
+	dev_info (*hcd->controller, "irq %s, %s %p\n", bufp,
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
 		base);
 
@@ -205,19 +206,20 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	hcd = pci_get_drvdata(dev);
 	if (!hcd)
 		return;
-	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
+	dev_info (*hcd->controller, "remove, state %x\n", hcd->state);
 
 	if (in_interrupt ()) BUG ();
 
 	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;
 
-	dbg ("%s: roothub graceful disconnect", hcd->self.bus_name);
+	dev_dbg (*hcd->controller, "roothub graceful disconnect\n");
 	usb_disconnect (&hub);
 
 	hcd->driver->stop (hcd);
 	hcd_buffer_destroy (hcd);
 	hcd->state = USB_STATE_HALT;
+	pci_set_drvdata (dev, 0);
 
 	free_irq (hcd->irq, hcd);
 	if (hcd->driver->flags & HCD_MEMORY) {
@@ -230,9 +232,12 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	}
 
 	usb_deregister_bus (&hcd->self);
-	if (atomic_read (&hcd->self.refcnt) != 1)
-		err ("usb_hcd_pci_remove %s, count != 1", hcd->self.bus_name);
-
+	if (atomic_read (&hcd->self.refcnt) != 1) {
+		dev_warn (*hcd->controller,
+			"dangling refs (%d) to bus %d!\n",
+			atomic_read (&hcd->self.refcnt) - 1,
+			hcd->self.busnum);
+	}
 	hcd->driver->hcd_free (hcd);
 }
 EXPORT_SYMBOL (usb_hcd_pci_remove);
@@ -279,7 +284,7 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	int			retval;
 
 	hcd = pci_get_drvdata(dev);
-	info ("suspend %s to state %d", hcd->self.bus_name, state);
+	dev_info (*hcd->controller, "suspend to state %d\n", state);
 
 	pci_save_state (dev, hcd->pci_state);
 
@@ -308,19 +313,19 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	int			retval;
 
 	hcd = pci_get_drvdata(dev);
-	info ("resume %s", hcd->self.bus_name);
+	dev_info (*hcd->controller, "resume\n");
 
 	/* guard against multiple resumes (APM bug?) */
 	atomic_inc (&hcd->resume_count);
 	if (atomic_read (&hcd->resume_count) != 1) {
-		err ("concurrent PCI resumes for %s", hcd->self.bus_name);
+		dev_err (*hcd->controller, "concurrent PCI resumes\n");
 		retval = 0;
 		goto done;
 	}
 
 	retval = -EBUSY;
 	if (hcd->state != USB_STATE_SUSPENDED) {
-		dbg ("can't resume, not suspended!");
+		dev_dbg (*hcd->controller, "can't resume, not suspended!\n");
 		goto done;
 	}
 	hcd->state = USB_STATE_RESUMING;
@@ -330,7 +335,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 
 	retval = hcd->driver->resume (hcd);
 	if (!HCD_IS_RUNNING (hcd->state)) {
-		dbg ("resume %s failure, retval %d", hcd->self.bus_name, retval);
+		dev_dbg (*hcd->controller, "resume fail, retval %d\n", retval);
 		usb_hc_died (hcd);
 // FIXME:  recover, reset etc.
 	} else {

@@ -60,8 +60,8 @@
 /* local variables */
 static int debug;
 
-#define DRIVER_VERSION	"0.4"
-#define DRIVER_AUTHOR	"Greg Kroah-Hartman <greg@kroah.com>"
+#define DRIVER_VERSION	"0.5"
+#define DRIVER_AUTHOR	"Greg Kroah-Hartman <greg@kroah.com>, Scott Murray <scottm@somanetworks.com>"
 #define DRIVER_DESC	"PCI Hot Plug PCI Core"
 
 
@@ -89,7 +89,7 @@ static int pcihpfs_mount_count;		/* times we have mounted our fs */
 static spinlock_t mount_lock;		/* protects our mount_count */
 static spinlock_t list_lock;
 
-LIST_HEAD(pci_hotplug_slot_list);
+static LIST_HEAD(pci_hotplug_slot_list);
 
 /* these strings match up with the values in pci_bus_speed */
 static char *pci_bus_speed_strings[] = {
@@ -119,6 +119,14 @@ static char *pci_bus_speed_strings[] = {
 extern struct proc_dir_entry *proc_bus_pci_dir;
 static struct proc_dir_entry *slotdir = NULL;
 static const char *slotdir_name = "slots";
+#endif
+
+#ifdef CONFIG_HOTPLUG_PCI_CPCI
+extern int cpci_hotplug_init(int debug);
+extern void cpci_hotplug_exit(void);
+#else
+static inline int cpci_hotplug_init(int debug) { return 0; }
+static inline void cpci_hotplug_exit(void) { }
 #endif
 
 static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, dev_t dev)
@@ -311,19 +319,19 @@ static struct file_operations presence_file_operations = {
 /* file ops for the "max bus speed" files */
 static ssize_t max_bus_speed_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static struct file_operations max_bus_speed_file_operations = {
-	read:		max_bus_speed_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read		= max_bus_speed_read_file,
+	.write		= default_write_file,
+	.open		= default_open,
+	.llseek		= default_file_lseek,
 };
 
 /* file ops for the "current bus speed" files */
 static ssize_t cur_bus_speed_read_file (struct file *file, char *buf, size_t count, loff_t *offset);
 static struct file_operations cur_bus_speed_file_operations = {
-	read:		cur_bus_speed_read_file,
-	write:		default_write_file,
-	open:		default_open,
-	llseek:		default_file_lseek,
+	.read		= cur_bus_speed_read_file,
+	.write		= default_write_file,
+	.open		= default_open,
+	.llseek		= default_file_lseek,
 };
 
 /* file ops for the "test" files */
@@ -1273,19 +1281,30 @@ static int __init pci_hotplug_init (void)
 		goto exit;
 	}
 
+	result = cpci_hotplug_init(debug);
+	if (result) {
+		err ("cpci_hotplug_init with error %d\n", result);
+		goto error_fs;
+	}
+
 #ifdef CONFIG_PROC_FS
 	/* create mount point for pcihpfs */
 	slotdir = proc_mkdir(slotdir_name, proc_bus_pci_dir);
 #endif
 
 	info (DRIVER_DESC " version: " DRIVER_VERSION "\n");
-
+	goto exit;
+	
+error_fs:
+	unregister_filesystem(&pcihpfs_type);
 exit:
 	return result;
 }
 
 static void __exit pci_hotplug_exit (void)
 {
+	cpci_hotplug_exit();
+
 	unregister_filesystem(&pcihpfs_type);
 
 #ifdef CONFIG_PROC_FS

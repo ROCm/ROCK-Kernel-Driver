@@ -37,66 +37,16 @@
 #define ITRACE(ip)	vn_trace_ref(XFS_ITOV(ip), __FILE__, __LINE__, \
 				(inst_t *)__return_address)
 
-struct bhv_desc;
-struct cred;
-struct vnode;
-struct xfs_inode;
-struct xfs_mount;
-struct xfs_trans;
+extern int xfs_rename (bhv_desc_t *, vname_t *, vnode_t *, vname_t *, cred_t *);
+extern int xfs_get_dir_entry (vname_t *, xfs_inode_t **);
+extern int xfs_dir_lookup_int (bhv_desc_t *, uint, vname_t *, xfs_ino_t *,
+				xfs_inode_t **);
+extern int xfs_truncate_file (xfs_mount_t *, xfs_inode_t *);
+extern int xfs_dir_ialloc (xfs_trans_t **, xfs_inode_t *, mode_t, nlink_t,
+				xfs_dev_t, cred_t *, prid_t, int,
+				xfs_inode_t **, int *);
+extern int xfs_droplink (xfs_trans_t *, xfs_inode_t *);
+extern int xfs_bumplink (xfs_trans_t *, xfs_inode_t *);
+extern void xfs_bump_ino_vers2 (xfs_trans_t *, xfs_inode_t *);
 
-extern int
-xfs_rename(
-	struct bhv_desc *src_dir_bdp,
-	struct dentry	*src_dentry,
-	struct vnode	*target_dir_vp,
-	struct dentry	*target_dentry,
-	struct cred	*credp);
-
-extern int
-xfs_get_dir_entry(
-	struct dentry		*dentry,
-	xfs_inode_t		**ipp);
-
-extern int
-xfs_dir_lookup_int(
-	struct bhv_desc		*dir_bdp,
-	uint			lock_mode,
-	struct dentry		*dentry,
-	xfs_ino_t		*inum,
-	struct xfs_inode	**ipp);
-
-extern int
-xfs_truncate_file(
-	struct xfs_mount	*mp,
-	struct xfs_inode	*ip);
-
-extern int
-xfs_dir_ialloc(
-	struct xfs_trans	**tpp,
-	struct xfs_inode	*dp,
-	mode_t			mode,
-	nlink_t			nlink,
-	xfs_dev_t		rdev,
-	struct cred		*credp,
-	prid_t			prid,
-	int			okalloc,
-	struct xfs_inode	**ipp,
-	int			*committed);
-
-extern int
-xfs_droplink(
-	struct xfs_trans	*tp,
-	struct xfs_inode	*ip);
-
-extern int
-xfs_bumplink(
-	struct xfs_trans	*tp,
-	struct xfs_inode	*ip);
-
-extern void
-xfs_bump_ino_vers2(
-	struct xfs_trans	*tp,
-	struct xfs_inode	*ip);
-
-#endif /* XFS_UTILS_H */
-
+#endif	/* __XFS_UTILS_H__ */

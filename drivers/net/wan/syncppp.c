@@ -276,6 +276,7 @@ invalid:        if (sp->pp_flags & PP_DEBUG)
 					printk(KERN_DEBUG "Yow an IP frame.\n");
 				skb->protocol=htons(ETH_P_IP);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				return;
 			}
 			break;
@@ -285,6 +286,7 @@ invalid:        if (sp->pp_flags & PP_DEBUG)
 			if (sp->lcp.state == LCP_STATE_OPENED) {
 				skb->protocol=htons(ETH_P_IPX);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				return;
 			}
 			break;
@@ -312,12 +314,14 @@ invalid:        if (sp->pp_flags & PP_DEBUG)
 		case ETH_P_IP:
 			skb->protocol=htons(ETH_P_IP);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			return;
 #endif
 #ifdef CONFIG_IPX
 		case ETH_P_IPX:
 			skb->protocol=htons(ETH_P_IPX);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			return;
 #endif
 		}

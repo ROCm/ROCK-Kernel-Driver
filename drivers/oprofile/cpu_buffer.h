@@ -12,6 +12,7 @@
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
+#include <linux/cache.h>
  
 struct task_struct;
  

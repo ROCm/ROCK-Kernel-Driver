@@ -447,7 +447,7 @@ out:
 		kfree(iov);
 	if ((ret + (type == READ)) > 0)
 		dnotify_parent(file->f_dentry,
-				(type == READ) ? DN_MODIFY : DN_ACCESS);
+				(type == READ) ? DN_ACCESS : DN_MODIFY);
 	return ret;
 }
 

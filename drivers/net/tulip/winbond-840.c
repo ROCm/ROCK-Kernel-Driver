@@ -341,7 +341,6 @@ enum desc_status_bits {
 	DescIntr=0x80000000,
 };
 
-#define PRIV_ALIGN	15 	/* Required alignment mask */
 #define MII_CNT		1 /* winbond only supports one MII */
 struct netdev_private {
 	struct w840_rx_desc *rx_ring;
@@ -1585,10 +1584,10 @@ static int netdev_close(struct net_device *dev)
 	if (debug > 2) {
 		int i;
 
-		printk("\n"KERN_DEBUG"  Tx ring at %8.8x:\n",
+		printk(KERN_DEBUG"  Tx ring at %8.8x:\n",
 			   (int)np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++)
-			printk(" #%d desc. %4.4x %4.4x %8.8x.\n",
+			printk(KERN_DEBUG " #%d desc. %4.4x %4.4x %8.8x.\n",
 				   i, np->tx_ring[i].length,
 				   np->tx_ring[i].status, np->tx_ring[i].buffer1);
 		printk("\n"KERN_DEBUG "  Rx ring %8.8x:\n",
@@ -1688,7 +1687,6 @@ static int w840_suspend (struct pci_dev *pdev, u32 state)
 	return 0;
 }
 
-
 static int w840_resume (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
@@ -1712,8 +1710,7 @@ static int w840_resume (struct pci_dev *pdev)
 
 		netif_wake_queue(dev);
 
-		np->timer.expires = jiffies + 1*HZ;
-		add_timer(&np->timer);
+		mod_timer(&np->timer, jiffies + 1*HZ);
 	} else {
 		netif_device_attach(dev);
 	}

@@ -138,6 +138,22 @@ linvfs_aio_write(
 	return linvfs_writev(iocb->ki_filp, &iov, 1, &iocb->ki_pos);
 }
 
+STATIC ssize_t
+linvfs_sendfile(
+	struct file		*filp,
+	loff_t			*ppos,
+	size_t			count,
+	read_actor_t		actor,
+	void			*target)
+{
+	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	int			error;
+
+	VOP_SENDFILE(vp, filp, ppos, count, actor, target, NULL, error);
+
+	return error;
+}
+
 
 STATIC int
 linvfs_open(
@@ -186,7 +202,7 @@ linvfs_fsync(
 
 	ASSERT(vp);
 
-	VOP_FSYNC(vp, flags, NULL, (off_t)0, (off_t)-1, error);
+	VOP_FSYNC(vp, flags, NULL, (xfs_off_t)0, (xfs_off_t)-1, error);
 
 	return -error;
 }
@@ -212,7 +228,7 @@ linvfs_readdir(
 	caddr_t		read_buf;
 	int		namelen, size = 0;
 	size_t		rlen = PAGE_CACHE_SIZE << 2;
-	off_t		start_offset;
+	xfs_off_t	start_offset;
 	xfs_dirent_t	*dbp = NULL;
 
 	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
@@ -280,7 +296,7 @@ linvfs_file_mmap(
 {
 	struct inode	*ip = filp->f_dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(ip);
-	vattr_t		va = { .va_mask = AT_UPDATIME };
+	vattr_t		va = { .va_mask = XFS_AT_UPDATIME };
 	int		error;
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
@@ -291,7 +307,7 @@ linvfs_file_mmap(
 
 	vma->vm_ops = &linvfs_file_vm_ops;
 
-	VOP_SETATTR(vp, &va, AT_UPDATIME, NULL, error);
+	VOP_SETATTR(vp, &va, XFS_AT_UPDATIME, NULL, error);
 	UPDATE_ATIME(ip);
 	return 0;
 }
@@ -348,6 +364,7 @@ struct file_operations linvfs_file_operations = {
 	.writev		= linvfs_writev,
 	.aio_read	= linvfs_aio_read,
 	.aio_write	= linvfs_aio_write,
+	.sendfile	= linvfs_sendfile,
 	.ioctl		= linvfs_ioctl,
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,

@@ -467,9 +467,12 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	down (&port->sem);
 	port->tty = tty;
 	 
-	/* lock this module before we call it */
-	if (serial->type->owner)
-		__MOD_INC_USE_COUNT(serial->type->owner);
+	/* lock this module before we call it,
+	   this may, which means we must bail out, safe because we are called with BKL held */
+	if (!try_module_get(serial->type->owner)) {
+		retval = -ENODEV;
+		goto bailout;
+	}
 
 	++port->open_count;
 	if (port->open_count == 1) {
@@ -481,10 +484,10 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 			retval = usb_serial_generic_open(port, filp);
 		if (retval) {
 			port->open_count = 0;
-			if (serial->type->owner)
-				__MOD_DEC_USE_COUNT(serial->type->owner);
+			module_put(serial->type->owner);
 		}
 	}
+bailout:
 
 	up (&port->sem);
 	return retval;
@@ -508,8 +511,7 @@ static void __serial_close(struct usb_serial_port *port, struct file *filp)
 		port->open_count = 0;
 	}
 
-	if (port->serial->type->owner)
-		__MOD_DEC_USE_COUNT(port->serial->type->owner);
+	module_put(port->serial->type->owner);
 }
 
 static void serial_close(struct tty_struct *tty, struct file * filp)
@@ -899,11 +901,13 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	/* if this device type has a probe function, call it */
 	if (type->probe) {
-		if (type->owner)
-			__MOD_INC_USE_COUNT(type->owner);
+		if (!try_module_get(type->owner)) {
+			err ("module get failed, exiting");
+			kfree (serial);
+			return -EIO;
+		}
 		retval = type->probe (serial);
-		if (type->owner)
-			__MOD_DEC_USE_COUNT(type->owner);
+		module_put(type->owner);
 
 		if (retval < 0) {
 			dbg ("sub driver rejected device");
@@ -996,11 +1000,13 @@ int usb_serial_probe(struct usb_interface *interface,
 	if (!num_ports) {
 		/* if this device type has a calc_num_ports function, call it */
 		if (type->calc_num_ports) {
-			if (type->owner)
-				__MOD_INC_USE_COUNT(type->owner);
+			if (!try_module_get(type->owner)) {
+				err ("module get failed, exiting");
+				kfree (serial);
+				return -EIO;
+			}
 			num_ports = type->calc_num_ports (serial);
-			if (type->owner)
-				__MOD_DEC_USE_COUNT(type->owner);
+			module_put(type->owner);
 		}
 		if (!num_ports)
 			num_ports = type->num_ports;
@@ -1110,11 +1116,12 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	/* if this device type has an attach function, call it */
 	if (type->attach) {
-		if (type->owner)
-			__MOD_INC_USE_COUNT(type->owner);
+		if (!try_module_get(type->owner)) {
+			err ("module get failed, exiting");
+			goto probe_error;
+		}
 		retval = type->attach (serial);
-		if (type->owner)
-			__MOD_DEC_USE_COUNT(type->owner);
+		module_put(type->owner);
 		if (retval < 0)
 			goto probe_error;
 		if (retval > 0) {

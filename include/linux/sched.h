@@ -203,9 +203,8 @@ struct mm_struct {
 	mm_context_t context;
 
 	/* coredumping support */
-	struct semaphore core_sem;
-	atomic_t core_waiters;
-	wait_queue_head_t core_wait;
+	int core_waiters;
+	struct completion *core_startup_done, core_done;
 
 	/* aio bits */
 	rwlock_t		ioctx_list_lock;
@@ -397,8 +396,6 @@ struct task_struct {
 	void *journal_info;
 	struct dentry *proc_dentry;
 	struct backing_dev_info *backing_dev_info;
-/* threaded coredumping support */
-	int core_waiter;
 
 	unsigned long ptrace_message;
 };

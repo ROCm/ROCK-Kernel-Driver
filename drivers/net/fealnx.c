@@ -1198,7 +1198,6 @@ static void tx_timeout(struct net_device *dev)
 		printk("\n");
 	}
 
-	   + dev->if_port = np->default_port;
 	/* Reinit. Gross */
 
 	/* Reset the chip's Tx and Rx processes. */
