@@ -109,7 +109,7 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
-	return (page - mem_map) * PAGE_SIZE + offset;
+	return (dma_addr_t)(page - mem_map) * PAGE_SIZE + offset;
 }
 
 static inline void pci_unmap_page(struct pci_dev *hwdev, dma_addr_t dma_address,
