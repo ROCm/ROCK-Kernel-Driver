@@ -698,7 +698,7 @@ MRPROPER_DIRS += \
 clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
 $(addprefix _clean_,$(clean-dirs)):
-	+@$(call descend,$(patsubst _clean_%,%,$@), subdirclean)
+	$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
