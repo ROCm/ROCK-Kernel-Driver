@@ -51,12 +51,6 @@ struct xtalk_intr_s {
 /*
  * Xtalk interrupt handler structure access functions
  */
-#define	xtalk_intr_arg(xt)	((xt)->xi_sfarg)
-
-#define	xwidget_hwid_is_sn0_xswitch(_hwid)	\
-		(((_hwid)->part_num == XBOW_WIDGET_PART_NUM ) &&  	\
-		 ((_hwid)->mfg_num == XBOW_WIDGET_MFGR_NUM ))
-
 #define	xwidget_hwid_is_sn1_xswitch(_hwid)	\
 		(((_hwid)->part_num == XXBOW_WIDGET_PART_NUM ||		\
 		  (_hwid)->part_num == PXBOW_WIDGET_PART_NUM) &&  	\

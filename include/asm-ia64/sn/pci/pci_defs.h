@@ -275,16 +275,6 @@ extern void pci_write(void * address, int data, int type);
 #define CFG1_DEVICE_SHIFT		11
 #define CFG1_BUS_SHIFT			16
 
-#ifdef CONFIG_SGI_IP32
- /* Definitions related to IP32 PCI Bridge policy
-  * XXX- should probaly be moved to a mace-specific header
-  */
-#define PCI_CONFIG_BITS			0xfe0085ff
-#define	PCI_CONTROL_MRMRA_ENABLE	0x00000800
-#define PCI_FIRST_IO_ADDR		0x1000
-#define PCI_IO_MAP_INCR			0x1000
-#endif /* CONFIG_SGI_IP32 */
-
 /*
  * Class codes
  */

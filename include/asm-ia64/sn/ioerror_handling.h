@@ -203,12 +203,6 @@ enum error_priority_e {
 
 typedef uint64_t  error_priority_t;
 
-/* Error state interfaces */
-#if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-extern error_return_code_t	error_state_set(vertex_hdl_t,error_state_t);
-extern error_state_t		error_state_get(vertex_hdl_t);
-#endif
-
 /* Error action interfaces */
 
 extern error_return_code_t	error_action_set(vertex_hdl_t,
@@ -230,42 +224,6 @@ hwgraph_info_get_LBL(v, INFO_LBL_ERROR_SKIP_ENV, (arbitrary_info_t *)&l)
 
 #define v_error_skip_env_clear(v)		\
 hwgraph_info_remove_LBL(v, INFO_LBL_ERROR_SKIP_ENV, 0)
-
-/* REFERENCED */
-#if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-
-inline static int
-error_skip_point_mark(vertex_hdl_t  v)  			 
-{									
-	label_t		*error_env = NULL;	 			
-	int		code = 0;		
-
-	/* Check if we have a valid hwgraph vertex */
-#ifdef	LATER
-	if (!dev_is_vertex(v))
-		return(code);
-#endif
-				
-	/* There is no error jump buffer for this device vertex. Allocate
-	 * one.								 
-	 */								 
-	if (v_error_skip_env_get(v, error_env) != GRAPH_SUCCESS) {	 
-		error_env = kmalloc(sizeof(label_t), GFP_KERNEL);	 
-		/* Unable to allocate memory for jum buffer. This should 
-		 * be a very rare occurrence.				 
-		 */							 
-		if (!error_env)						 
-			return(-1);					 
-		memset(error_env, 0, sizeof(label_t));
-		/* Store the jump buffer information on the vertex.*/	 
-		if (v_error_skip_env_set(v, error_env, 0) != GRAPH_SUCCESS)
-			return(-2);					   
-	}								   
-	ASSERT(v_error_skip_env_get(v, error_env) == GRAPH_SUCCESS);
-	code = setjmp(*error_env);					   
-	return(code);							     
-}
-#endif	/* CONFIG_SGI_IO_ERROR_HANDLING */
 
 typedef uint64_t		counter_t;
 

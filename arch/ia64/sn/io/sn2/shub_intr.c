@@ -61,7 +61,6 @@ do_hub_intr_alloc(vertex_hdl_t dev,
 	iopaddr_t	xtalk_addr;
 	struct xtalk_intr_s	*xtalk_info;
 	xwidget_info_t	xwidget_info;
-	ilvl_t		intr_swlevel = 0;
 
 	cpu = intr_heuristic(dev, -1, &vector);
 	if (cpu == CPU_NONE) {
@@ -94,7 +93,6 @@ do_hub_intr_alloc(vertex_hdl_t dev,
 		xtalk_info->xi_target = xwidget_info_masterid_get(xwidget_info);
 	}
 
-	intr_hdl->i_swlevel = intr_swlevel;
 	intr_hdl->i_cpuid = cpu;
 	intr_hdl->i_bit = vector;
 	intr_hdl->i_flags |= HUB_INTR_IS_ALLOCED;

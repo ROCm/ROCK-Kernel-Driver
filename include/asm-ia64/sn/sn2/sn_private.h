@@ -153,7 +153,6 @@ struct hub_dmamap_s {
  */
 struct hub_intr_s {
 	struct xtalk_intr_s	i_xtalk_info;	/* standard crosstalk intr info */
-	ilvl_t			i_swlevel;	/* software level for blocking intr */
 	cpuid_t			i_cpuid;	/* which cpu */
 	int			i_bit;		/* which bit */
 	int			i_flags;

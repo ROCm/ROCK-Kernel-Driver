@@ -69,6 +69,8 @@ u64 sn_partition_serial_number;
 
 short physical_node_map[MAX_PHYSNODE_ID];
 
+int     numionodes;
+
 /*
  * This is the address of the RRegs in the HSpace of the global
  * master.  It is used by a hack in serial.c (serial_[in|out],
@@ -302,6 +304,7 @@ void
 sn_init_pdas(char **cmdline_p)
 {
 	cnodeid_t	cnode;
+	void scan_for_ionodes(void);
 
 	/*
 	 * Make sure that the PDA fits entirely in the same page as the 
@@ -313,6 +316,9 @@ sn_init_pdas(char **cmdline_p)
 	memset(pda->cnodeid_to_nasid_table, -1, sizeof(pda->cnodeid_to_nasid_table));
 	for (cnode=0; cnode<numnodes; cnode++)
 		pda->cnodeid_to_nasid_table[cnode] = pxm_to_nasid(nid_to_pxm_map[cnode]);
+
+	numionodes = numnodes;
+	scan_for_ionodes();
 
         /*
          * Allocate & initalize the nodepda for each node.
@@ -414,4 +420,34 @@ sn_cpu_init(void)
 	}
 
 	bte_init_cpu();
+}
+
+/*
+ * Scan klconfig for ionodes.  Add the nasids to the
+ * physical_node_map and the pda and increment numionodes.
+ */
+
+void
+scan_for_ionodes(void) {
+	int nasid = 0;
+	lboard_t *brd;
+
+	/* Setup ionodes with memory */
+	for (nasid = 0; nasid < MAX_PHYSNODE_ID; nasid +=2) {
+		u64 klgraph_header;
+		cnodeid_t cnodeid;
+
+		if (physical_node_map[nasid] == -1) 
+			continue;
+
+		klgraph_header = cnodeid = -1;
+		klgraph_header = ia64_sn_get_klconfig_addr(nasid);
+		if (klgraph_header <= 0)
+			BUG(); /* All nodes must have klconfig tables! */
+		cnodeid = nasid_to_cnodeid(nasid);
+		root_lboard[cnodeid] = (lboard_t *)
+					NODE_OFFSET_TO_LBOARD( (nasid),
+					((kl_config_hdr_t *)(klgraph_header))->
+					ch_board_info);
+	}
 }

@@ -490,70 +490,6 @@ io_init_xswitch_widgets(vertex_hdl_t xswitchv, cnodeid_t cnode)
 }
 
 /*
- * For each PCI bridge connected to the xswitch, add a link from the
- * board's klconfig info to the bridge's hwgraph vertex.  This lets
- * the FRU analyzer find the bridge without traversing the hardware
- * graph and risking hangs.
- */
-static void
-io_link_xswitch_widgets(vertex_hdl_t xswitchv, cnodeid_t cnodeid)
-{
-	xwidgetnum_t		widgetnum;
-	char 			pathname[128];
-	vertex_hdl_t		vhdl;
-	nasid_t			nasid, peer_nasid;
-	lboard_t		*board;
-
-
-
-	/* And its connected hub's nasids */
-	nasid = COMPACT_TO_NASID_NODEID(cnodeid);
-	peer_nasid = NODEPDA(cnodeid)->xbow_peer;
-
-	/* 
-	 * Look for paths matching "<widgetnum>/pci" under xswitchv.
-	 * For every widget, init. its lboard's hwgraph link.  If the
-	 * board has a PCI bridge, point the link to it.
-	 */
-	for (widgetnum = HUB_WIDGET_ID_MIN; widgetnum <= HUB_WIDGET_ID_MAX;
-		 widgetnum++) {
-		sprintf(pathname, "%d", widgetnum);
-		if (hwgraph_traverse(xswitchv, pathname, &vhdl) !=
-		    GRAPH_SUCCESS)
-			continue;
-
-		board = find_lboard_module((lboard_t *)KL_CONFIG_INFO(nasid),
-				NODEPDA(cnodeid)->geoid);
-		if (board == NULL && peer_nasid != INVALID_NASID) {
-			/*
-			 * Try to find the board on our peer
-			 */
-			board = find_lboard_module(
-				(lboard_t *)KL_CONFIG_INFO(peer_nasid),
-				NODEPDA(cnodeid)->geoid);
-		}
-		if (board == NULL) {
-			printk(KERN_WARNING  "Could not find PROM info for vertex 0x%p, "
-				"FRU analyzer may fail",
-				(void *)vhdl);
-			return;
-		}
-
-		/* Check both buses */
-		sprintf(pathname, "%d/"EDGE_LBL_PCIX_0, widgetnum);
-		if (hwgraph_traverse(xswitchv, pathname, &vhdl) == GRAPH_SUCCESS)
-			board->brd_graph_link = vhdl;
-		else {
-			sprintf(pathname, "%d/"EDGE_LBL_PCIX_1, widgetnum);
-			if (hwgraph_traverse(xswitchv, pathname, &vhdl) == GRAPH_SUCCESS)
-				board->brd_graph_link = vhdl;
-			else
-				board->brd_graph_link = GRAPH_VERTEX_NONE;
-		}
-	}
-}
-
-/*
  * Initialize all I/O on the specified node.
  */
 static void
@@ -724,7 +660,6 @@ io_init_node(cnodeid_t cnodeid)
 
 	/* Now both nodes can safely inititialize widgets */
 	io_init_xswitch_widgets(switchv, cnodeid);
-	io_link_xswitch_widgets(switchv, cnodeid);
 
 	DBG("\nio_init_node: DONE INITIALIZED ALL I/O FOR CNODEID %d\n\n", cnodeid);
 }
