@@ -115,6 +115,10 @@ struct pccard_operations {
 	int (*set_mem_map)(struct pcmcia_socket *sock, struct pccard_mem_map *mem);
 };
 
+struct pccard_resource_ops {
+	void	(*validate_mem) (struct pcmcia_socket *s);
+};
+
 /*
  *  Calls to set up low-level "Socket Services" drivers
  */
@@ -194,6 +198,7 @@ struct pcmcia_socket {
 
 	/* socket operations */
 	struct pccard_operations *	ops;
+	struct pccard_resource_ops *	resource_ops;
 
 	/* Zoom video behaviour is so chip specific its not worth adding
 	   this to _ops */

@@ -473,11 +473,12 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 
 #endif /* CONFIG_PCMCIA_PROBE */
 
+
 /*
  * Locking note: this is the only place where we take
  * both rsrc_sem and skt_sem.
  */
-void pcmcia_validate_mem(struct pcmcia_socket *s)
+static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 {
 	if (probe_mem) {
 		unsigned int probe_mask;
@@ -503,6 +504,11 @@ void pcmcia_validate_mem(struct pcmcia_socket *s)
 	}
 }
 
+void pcmcia_validate_mem(struct pcmcia_socket *s)
+{
+	if (s->resource_ops->validate_mem)
+		s->resource_ops->validate_mem(s);
+}
 EXPORT_SYMBOL(pcmcia_validate_mem);
 
 struct pcmcia_align_data {
@@ -981,3 +987,12 @@ void release_resource_db(struct pcmcia_socket *s)
 	kfree(p);
     }
 }
+
+
+struct pccard_resource_ops pccard_static_ops = {
+	.validate_mem = NULL,
+};
+
+struct pccard_resource_ops pccard_nonstatic_ops = {
+	.validate_mem = pcmcia_nonstatic_validate_mem,
+};
