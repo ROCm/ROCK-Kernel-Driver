@@ -1266,6 +1266,11 @@ static inline int security_init(void)
 # define COND_SECURITY(seop, def) def
 #endif
 
+#ifdef CONFIG_SECURITY_NETWORK
+#define COND_SECU_NET(seop, def) COND_SECURITY(seop, def)
+#else
+#define COND_SECU_NET(seop, def) def
+#endif
 /* SELinux noop */
 #define SE_NOP ({})
 
@@ -2049,12 +2054,12 @@ static inline int security_netlink_recv(struct sk_buff * skb)
 			 cap_netlink_recv (skb));
 }
 
-#ifdef CONFIG_SECURITY_NETWORK
+/* CONFIG_SECURITY_NETWORK stubs */
 static inline int security_unix_stream_connect(struct socket * sock,
 					       struct socket * other, 
 					       struct sock * newsk)
 {
-	return COND_SECURITY(unix_stream_connect(sock, other, newsk),
+	return COND_SECU_NET(unix_stream_connect(sock, other, newsk),
 			 0);
 }
 
@@ -2062,14 +2067,14 @@ static inline int security_unix_stream_connect(struct socket * sock,
 static inline int security_unix_may_send(struct socket * sock, 
 					 struct socket * other)
 {
-	return COND_SECURITY(unix_may_send(sock, other),
+	return COND_SECU_NET(unix_may_send(sock, other),
 			 0);
 }
 
 static inline int security_socket_create (int family, int type,
 					  int protocol, int kern)
 {
-	return COND_SECURITY(socket_create(family, type, protocol, kern),
+	return COND_SECU_NET(socket_create(family, type, protocol, kern),
 			 0);
 }
 
@@ -2078,7 +2083,7 @@ static inline void security_socket_post_create(struct socket * sock,
 					       int type, 
 					       int protocol, int kern)
 {
-	COND_SECURITY(socket_post_create(sock, family, type, protocol, kern),
+	COND_SECU_NET(socket_post_create(sock, family, type, protocol, kern),
 		  SE_NOP);
 }
 
@@ -2086,7 +2091,7 @@ static inline int security_socket_bind(struct socket * sock,
 				       struct sockaddr * address, 
 				       int addrlen)
 {
-	return COND_SECURITY(socket_bind(sock, address, addrlen),
+	return COND_SECU_NET(socket_bind(sock, address, addrlen),
 			 0);
 }
 
@@ -2094,34 +2099,34 @@ static inline int security_socket_connect(struct socket * sock,
 					  struct sockaddr * address, 
 					  int addrlen)
 {
-	return COND_SECURITY(socket_connect(sock, address, addrlen),
+	return COND_SECU_NET(socket_connect(sock, address, addrlen),
 			 0);
 }
 
 static inline int security_socket_listen(struct socket * sock, int backlog)
 {
-	return COND_SECURITY(socket_listen(sock, backlog),
+	return COND_SECU_NET(socket_listen(sock, backlog),
 			 0);
 }
 
 static inline int security_socket_accept(struct socket * sock, 
 					 struct socket * newsock)
 {
-	return COND_SECURITY(socket_accept(sock, newsock),
+	return COND_SECU_NET(socket_accept(sock, newsock),
 			 0);
 }
 
 static inline void security_socket_post_accept(struct socket * sock, 
 					       struct socket * newsock)
 {
-	COND_SECURITY(socket_post_accept(sock, newsock),
+	COND_SECU_NET(socket_post_accept(sock, newsock),
 		  SE_NOP);
 }
 
 static inline int security_socket_sendmsg(struct socket * sock, 
 					  struct msghdr * msg, int size)
 {
-	return COND_SECURITY(socket_sendmsg(sock, msg, size),
+	return COND_SECU_NET(socket_sendmsg(sock, msg, size),
 			 0);
 }
 
@@ -2129,68 +2134,67 @@ static inline int security_socket_recvmsg(struct socket * sock,
 					  struct msghdr * msg, int size, 
 					  int flags)
 {
-	return COND_SECURITY(socket_recvmsg(sock, msg, size, flags),
+	return COND_SECU_NET(socket_recvmsg(sock, msg, size, flags),
 			 0);
 }
 
 static inline int security_socket_getsockname(struct socket * sock)
 {
-	return COND_SECURITY(socket_getsockname(sock),
+	return COND_SECU_NET(socket_getsockname(sock),
 			 0);
 }
 
 static inline int security_socket_getpeername(struct socket * sock)
 {
-	return COND_SECURITY(socket_getpeername(sock),
+	return COND_SECU_NET(socket_getpeername(sock),
 			 0);
 }
 
 static inline int security_socket_getsockopt(struct socket * sock, 
 					     int level, int optname)
 {
-	return COND_SECURITY(socket_getsockopt(sock, level, optname),
+	return COND_SECU_NET(socket_getsockopt(sock, level, optname),
 			 0);
 }
 
 static inline int security_socket_setsockopt(struct socket * sock, 
 					     int level, int optname)
 {
-	return COND_SECURITY(socket_setsockopt(sock, level, optname),
+	return COND_SECU_NET(socket_setsockopt(sock, level, optname),
 			 0);
 }
 
 static inline int security_socket_shutdown(struct socket * sock, int how)
 {
-	return COND_SECURITY(socket_shutdown(sock, how),
+	return COND_SECU_NET(socket_shutdown(sock, how),
 			 0);
 }
 
 static inline int security_sock_rcv_skb (struct sock * sk, 
 					 struct sk_buff * skb)
 {
-	return COND_SECURITY(socket_sock_rcv_skb(sk, skb),
+	return COND_SECU_NET(socket_sock_rcv_skb(sk, skb),
 			 0);
 }
 
 static inline int security_socket_getpeersec(struct socket *sock, char __user *optval,
 					     int __user *optlen, unsigned len)
 {
-	return COND_SECURITY(socket_getpeersec(sock, optval, optlen, len),
+	return COND_SECU_NET(socket_getpeersec(sock, optval, optlen, len),
 			 -ENOPROTOOPT);
 }
 
 static inline int security_sk_alloc(struct sock *sk, int family, int priority)
 {
-	return COND_SECURITY(sk_alloc_security(sk, family, priority),
+	return COND_SECU_NET(sk_alloc_security(sk, family, priority),
 			 0);
 }
 
 static inline void security_sk_free(struct sock *sk)
 {
-	return COND_SECURITY(sk_free_security(sk),
-		  	 0);
+	COND_SECU_NET(sk_free_security(sk),
+		  	 SE_NOP);
 }
-#endif	/* CONFIG_SECURITY_NETWORK */
 
 #endif /* ! __LINUX_SECURITY_H */
 
