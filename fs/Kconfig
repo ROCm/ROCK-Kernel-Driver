@@ -1338,7 +1338,7 @@ config QNX4FS_FS
 
 config QNX4FS_RW
 	bool "QNX4FS write support (DANGEROUS)"
-	depends on QNX4FS_FS && EXPERIMENTAL
+	depends on QNX4FS_FS && EXPERIMENTAL && BROKEN
 	help
 	  Say Y if you want to test write support for QNX4 file systems.
 
