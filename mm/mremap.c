@@ -194,7 +194,8 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 				prev->vm_end = next->vm_end;
 				__vma_unlink(mm, next, prev);
 				spin_unlock(&mm->page_table_lock);
-
+				if (vma == next)
+					vma = prev;
 				mm->map_count--;
 				kmem_cache_free(vm_area_cachep, next);
 			}
