@@ -24,6 +24,9 @@ ifeq ($(CONFIG_ALL_PPC),y)
 obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
 endif
 obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
+ifeq ($(CONFIG_ALL_PPC),y)
+obj-$(CONFIG_CPU_FREQ_PMAC)	+= pmac_cpufreq.o
+endif
 obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
 obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_ADIR)		+= adir_setup.o adir_pic.o adir_pci.o
