@@ -4,8 +4,8 @@
 #ifndef __IEEE1394_IOCTL_H
 #define __IEEE1394_IOCTL_H
 
-#include <asm/ioctl.h>
-#include <asm/types.h>
+#include <linux/ioctl.h>
+#include <linux/types.h>
 
 
 /* AMDTP Gets 6 */
@@ -91,7 +91,7 @@
 #define RAW1394_IOC_ISO_RECV_UNLISTEN_CHANNEL	\
 	_IOW ('#', 0x23, unsigned char)
 #define RAW1394_IOC_ISO_RECV_SET_CHANNEL_MASK	\
-	_IOW ('#', 0x24, u64)
+	_IOW ('#', 0x24, __u64)
 #define RAW1394_IOC_ISO_RECV_PACKETS		\
 	_IOW ('#', 0x25, struct raw1394_iso_packets)
 #define RAW1394_IOC_ISO_RECV_RELEASE_PACKETS	\

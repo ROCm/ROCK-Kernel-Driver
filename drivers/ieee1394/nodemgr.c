@@ -1210,6 +1210,52 @@ static void nodemgr_node_probe(struct hpsb_host *host)
 	return;
 }
 
+/* Because we are a 1394a-2000 compliant IRM, we need to inform all the other
+ * nodes of the broadcast channel.  (Really we're only setting the validity
+ * bit). */
+static void nodemgr_do_irm_duties(struct hpsb_host *host)
+{
+	quadlet_t bc;
+        
+	if (!host->is_irm)
+		return;
+
+	host->csr.broadcast_channel |= 0x40000000;  /* set validity bit */
+
+	bc = cpu_to_be32(host->csr.broadcast_channel);
+
+	hpsb_write(host, LOCAL_BUS | ALL_NODES, get_hpsb_generation(host),
+		   (CSR_REGISTER_BASE | CSR_BROADCAST_CHANNEL),
+		   &bc,
+		   sizeof(quadlet_t));
+}
+
+/* We need to ensure that if we are not the IRM, that the IRM node is capable of
+ * everything we can do, otherwise issue a bus reset and try to become the IRM
+ * ourselves. */
+static int nodemgr_check_root_capability(struct hpsb_host *host)
+{
+	quadlet_t bc;
+	int status;
+
+	if (host->is_irm)
+		return 1;
+
+	status = hpsb_read(host, LOCAL_BUS | (host->irm_id),
+			   get_hpsb_generation(host),
+			   (CSR_REGISTER_BASE | CSR_BROADCAST_CHANNEL),
+			   &bc, sizeof(quadlet_t));
+
+	if (status < 0 || !(be32_to_cpu(bc) & 0x80000000)) {
+		/* The root node does not have a valid BROADCAST_CHANNEL
+		 * register and we do, so reset the bus with force_root set */
+		HPSB_INFO("Remote root is not IRM capable, resetting...");
+		hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
+		return 0;
+	}
+	return 1;
+}
+
 static int nodemgr_host_thread(void *__hi)
 {
 	struct host_info *hi = (struct host_info *)__hi;
@@ -1217,12 +1263,21 @@ static int nodemgr_host_thread(void *__hi)
 	/* No userlevel access needed */
 	daemonize("knodemgrd");
 	allow_signal(SIGTERM);
-
+	
 	/* Sit and wait for a signal to probe the nodes on the bus. This
 	 * happens when we get a bus reset. */
 	while (!down_interruptible(&hi->reset_sem) &&
 	       !down_interruptible(&nodemgr_serialize)) {
+
+		if (!nodemgr_check_root_capability(hi->host)) {
+			/* Do nothing, we are resetting */
+			up(&nodemgr_serialize);
+			continue;
+		}
+
 		nodemgr_node_probe(hi->host);
+		nodemgr_do_irm_duties(hi->host);
+
 		up(&nodemgr_serialize);
 	}
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG

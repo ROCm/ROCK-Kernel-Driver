@@ -18,6 +18,7 @@
 #include <linux/stat.h>
 #include <linux/cache.h>
 #include <linux/radix-tree.h>
+#include <linux/kobject.h>
 #include <asm/atomic.h>
 
 struct iovec;
@@ -353,7 +354,7 @@ struct block_device {
 };
 
 struct inode {
-	struct list_head	i_hash;
+	struct hlist_node	i_hash;
 	struct list_head	i_list;
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
@@ -601,7 +602,7 @@ struct super_block {
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */
-	struct list_head	s_anon;		/* anonymous dentries for (nfs) exporting */
+	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;
@@ -610,6 +611,7 @@ struct super_block {
 
 	char s_id[32];				/* Informational name */
 
+	struct kobject           kobj;          /* anchor for sysfs */
 	void 			*s_fs_info;	/* Filesystem private info */
 
 	/*
@@ -913,6 +915,7 @@ struct export_operations {
 
 struct file_system_type {
 	const char *name;
+	struct subsystem subsys;
 	int fs_flags;
 	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
 	void (*kill_sb) (struct super_block *);

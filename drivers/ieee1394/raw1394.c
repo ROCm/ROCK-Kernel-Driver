@@ -238,7 +238,7 @@ static void remove_host(struct hpsb_host *host)
                 list_del(&hi->list);
                 host_count--;
                 /* 
-                   FIXME: addressranges should be removed 
+                   FIXME: address ranges should be removed 
                    and fileinfo states should be initialized
                    (including setting generation to 
                    internal-generation ...)
@@ -281,8 +281,8 @@ static void host_reset(struct hpsb_host *host)
                                         req->req.misc = (host->node_id << 16)
                                                 | host->node_count;
                                         if (fi->protocol_version > 3) {
-                                                req->req.misc |= ((host->irm_id
-                                                                   & NODE_MASK) << 8);
+                                                req->req.misc |= (NODEID_TO_NODE(host->irm_id)
+                                                                  << 8);
                                         }
 
                                         queue_complete_req(req);
@@ -571,8 +571,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                         req->req.misc = (fi->host->node_id << 16) 
                                 | fi->host->node_count;
                         if (fi->protocol_version > 3) {
-                                req->req.misc |=
-                                        (fi->host->irm_id & NODE_MASK) << 8;
+                                req->req.misc |= NODEID_TO_NODE(fi->host->irm_id) << 8;
                         }
                 } else {
                         req->req.error = RAW1394_ERROR_INVALID_ARG;

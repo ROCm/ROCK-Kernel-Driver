@@ -509,7 +509,7 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 {
 	struct sis900_private * sis_priv = net_dev->priv;
 	u16 poll_bit = MII_STAT_LINK, status = 0;
-	unsigned int timeout = jiffies + 5 * HZ;
+	unsigned long timeout = jiffies + 5 * HZ;
 	int phy_addr;
 	u8 revision;
 

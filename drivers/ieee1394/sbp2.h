@@ -22,15 +22,6 @@
 #ifndef SBP2_H
 #define SBP2_H
 
-/* Some compatibility code */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#define SCSI_REGISTER_HOST(tmpl)	scsi_register_module(MODULE_SCSI_HA, tmpl)
-#define SCSI_UNREGISTER_HOST(tmpl)	scsi_unregister_module(MODULE_SCSI_HA, tmpl)
-#else
-#define SCSI_REGISTER_HOST(tmpl)	scsi_register_host(tmpl)
-#define SCSI_UNREGISTER_HOST(tmpl)	scsi_unregister_host(tmpl)
-#endif
-
 #define SBP2_DEVICE_NAME		"sbp2"
 
 /*
@@ -442,8 +433,6 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
 static void sbp2_add_host(struct hpsb_host *host);
 static struct sbp2scsi_host_info *sbp2_find_host_info(struct hpsb_host *host);
 static void sbp2_remove_host(struct hpsb_host *host);
-int sbp2_init(void);
-void sbp2_cleanup(void);
 static int sbp2_probe(struct unit_directory *ud);
 static void sbp2_disconnect(struct unit_directory *ud);
 static void sbp2_update(struct unit_directory *ud);
@@ -486,24 +475,5 @@ static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id, Scsi
 static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id);
 static int sbp2_set_busy_timeout(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id);
 static int sbp2_max_speed_and_size(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id);
-
-/*
- * Scsi interface related prototypes
- */
-static int sbp2scsi_detect (Scsi_Host_Template *tpnt);
-static const char *sbp2scsi_info (struct Scsi_Host *host);
-void sbp2scsi_setup(char *str, int *ints);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,44)
-static int sbp2scsi_biosparam (struct scsi_device *sdev, struct block_device *dev, sector_t capacity, int geom[]);
-#else
-static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]);
-#endif
-static int sbp2scsi_abort (Scsi_Cmnd *SCpnt); 
-static int sbp2scsi_reset (Scsi_Cmnd *SCpnt); 
-static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
-static void sbp2scsi_complete_all_commands(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, 
-					   u32 status);
-static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, 
-				      u32 scsi_status, Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 
 #endif /* SBP2_H */
