@@ -730,10 +730,10 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			    !list_empty(&info->modelist))
 				fb_add_videomode(&mode, &info->modelist);
 
-			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+			if (info->flags & FBINFO_MISC_USEREVENT) {
 				struct fb_event event;
 
-				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+				info->flags &= ~FBINFO_MISC_USEREVENT;
 				event.info = info;
 				notifier_call_chain(&fb_notifier_list,
 						    FB_EVENT_MODE_CHANGE, &event);
@@ -746,15 +746,23 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 int
 fb_blank(struct fb_info *info, int blank)
 {	
-	int err = -EINVAL;
-	
+ 	int ret = -EINVAL;
+
  	if (blank > FB_BLANK_POWERDOWN)
  		blank = FB_BLANK_POWERDOWN;
 
 	if (info->fbops->fb_blank)
- 		err = info->fbops->fb_blank(blank, info);
+ 		ret = info->fbops->fb_blank(blank, info);
 
-	return err;
+ 	if (!ret) {
+		struct fb_event event;
+
+		event.info = info;
+		event.data = &blank;
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_BLANK, &event);
+	}
+
+ 	return ret;
 }
 
 static int 
@@ -782,9 +790,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;
 		acquire_console_sem();
-		info->flags |= FBINFO_MISC_MODECHANGEUSER;
+		info->flags |= FBINFO_MISC_USEREVENT;
 		i = fb_set_var(info, &var);
-		info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+		info->flags &= ~FBINFO_MISC_USEREVENT;
 		release_console_sem();
 		if (i) return i;
 		if (copy_to_user(argp, &var, sizeof(var)))
@@ -846,7 +854,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					   &event);
 	case FBIOBLANK:
 		acquire_console_sem();
+		info->flags |= FBINFO_MISC_USEREVENT;
 		i = fb_blank(info, arg);
+		info->flags &= ~FBINFO_MISC_USEREVENT;
 		release_console_sem();
 		return i;
 	default:

@@ -2824,7 +2824,7 @@ void do_blank_screen(int entering_gfx)
     	if (vesa_blank_mode)
 		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1, 0);
 }
-
+EXPORT_SYMBOL(do_blank_screen);
 
 /*
  * Called by timer as well as from vt_console_driver
@@ -2861,6 +2861,7 @@ void do_unblank_screen(int leaving_gfx)
 	set_palette(currcons);
 	set_cursor(fg_console);
 }
+EXPORT_SYMBOL(do_unblank_screen);
 
 /*
  * This is called by the outside world to cause a forced unblank, mostly for
