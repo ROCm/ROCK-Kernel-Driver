@@ -20,7 +20,7 @@ LDFLAGS_vmlinux	= -T arch/ppc64/vmlinux.lds -Bstatic \
 		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		:= $(CFLAGS) -fsigned-char -msoft-float -pipe \
 		-Wno-uninitialized -mminimal-toc -mtraceback=full \
-		-Wa,-mpower4 -finline-limit-2000
+		-Wa,-mpower4 -finline-limit-2000 -mcpu=630
 CPP		= $(CC) -E $(CFLAGS)
 
 
