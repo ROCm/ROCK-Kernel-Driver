@@ -406,6 +406,9 @@ void global_cache_flush(void);
 void get_agp_version(struct agp_bridge_data *bridge);
 unsigned long agp_generic_mask_memory(unsigned long addr, int type);
 
+extern int agp_off;
+extern int agp_try_unsupported_boot;
+
 /* Standard agp registers */
 #define AGPSTAT			0x4
 #define AGPCMD			0x8
