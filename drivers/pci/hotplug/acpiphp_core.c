@@ -51,6 +51,7 @@ int acpiphp_debug;
 
 /* local variables */
 static int num_slots;
+static struct acpiphp_attention_info *attention_info;
 
 #define DRIVER_VERSION	"0.4"
 #define DRIVER_AUTHOR	"Greg Kroah-Hartman <gregkh@us.ibm.com>, Takayoshi Kochi <t-kochi@bq.jp.nec.com>"
@@ -62,10 +63,15 @@ MODULE_LICENSE("GPL");
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 module_param(debug, bool, 644);
 
+/* export the attention callback registration methods */
+EXPORT_SYMBOL_GPL(acpiphp_register_attention);
+EXPORT_SYMBOL_GPL(acpiphp_unregister_attention);
+
 static int enable_slot		(struct hotplug_slot *slot);
 static int disable_slot		(struct hotplug_slot *slot);
 static int set_attention_status (struct hotplug_slot *slot, u8 value);
 static int get_power_status	(struct hotplug_slot *slot, u8 *value);
+static int get_attention_status (struct hotplug_slot *slot, u8 *value);
 static int get_address		(struct hotplug_slot *slot, u32 *value);
 static int get_latch_status	(struct hotplug_slot *slot, u8 *value);
 static int get_adapter_status	(struct hotplug_slot *slot, u8 *value);
@@ -76,10 +82,53 @@ static struct hotplug_slot_ops acpi_hotplug_slot_ops = {
 	.disable_slot		= disable_slot,
 	.set_attention_status	= set_attention_status,
 	.get_power_status	= get_power_status,
+	.get_attention_status	= get_attention_status,
 	.get_latch_status	= get_latch_status,
 	.get_adapter_status	= get_adapter_status,
 	.get_address		= get_address,
 };
+
+
+/**
+ * acpiphp_register_attention - set attention LED callback
+ * @info: must be completely filled with LED callbacks
+ *
+ * Description: this is used to register a hardware specific ACPI
+ * driver that manipulates the attention LED.  All the fields in
+ * info must be set.
+ **/
+int acpiphp_register_attention(struct acpiphp_attention_info *info)
+{
+	int retval = -EINVAL;
+
+	if (info && info->owner && info->set_attn &&
+			info->get_attn && !attention_info) {
+		retval = 0;
+		attention_info = info;
+	}
+	return retval;
+}
+
+
+/**
+ * acpiphp_unregister_attention - unset attention LED callback
+ * @info: must match the pointer used to register
+ *
+ * Description: this is used to un-register a hardware specific acpi
+ * driver that manipulates the attention LED.  The pointer to the 
+ * info struct must be the same as the one used to set it.
+ **/
+int acpiphp_unregister_attention(struct acpiphp_attention_info *info)
+{
+	int retval = -EINVAL;
+
+	if (info && attention_info == info) {
+		attention_info = NULL;
+		retval = 0;
+	}
+	return retval;
+}
+
 
 /**
  * enable_slot - power on and enable a slot
@@ -117,33 +166,29 @@ static int disable_slot(struct hotplug_slot *hotplug_slot)
 }
 
 
-/**
- * set_attention_status - set attention LED
+ /**
+  * set_attention_status - set attention LED
+ * @hotplug_slot: slot to set attention LED on
+ * @status: value to set attention LED to (0 or 1)
  *
- * TBD:
- * ACPI doesn't have known method to manipulate
- * attention status LED.
- *
- */
-static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
-{
-	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+ * attention status LED, so we use a callback that
+ * was registered with us.  This allows hardware specific
+ * ACPI implementations to blink the light for us.
+ **/
+ static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
+ {
+	int retval = -ENODEV;
 
-	switch (status) {
-		case 0:
-			/* FIXME turn light off */
-			hotplug_slot->info->attention_status = 0;
-			break;
-
-		case 1:
-		default:
-			/* FIXME turn light on */
-			hotplug_slot->info->attention_status = 1;
-			break;
-	}
-
-	return 0;
-}
+ 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+ 
+	if (attention_info && try_module_get(attention_info->owner)) {
+		retval = attention_info->set_attn(hotplug_slot, status);
+		module_put(attention_info->owner);
+	} else
+		attention_info = NULL;
+	return retval;
+ }
+ 
 
 /**
  * get_power_status - get power status of a slot
@@ -164,6 +209,32 @@ static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 
 	return 0;
 }
+
+
+ /**
+ * get_attention_status - get attention LED status
+ * @hotplug_slot: slot to get status from
+ * @value: returns with value of attention LED
+ *
+ * ACPI doesn't have known method to determine the state
+ * of the attention status LED, so we use a callback that
+ * was registered with us.  This allows hardware specific
+ * ACPI implementations to determine its state
+ **/
+static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 *value)
+{
+	int retval = -EINVAL;
+
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+
+	if (attention_info && try_module_get(attention_info->owner)) {
+		retval = attention_info->get_attn(hotplug_slot, value);
+		module_put(attention_info->owner);
+	} else
+		attention_info = NULL;
+	return retval;
+}
+
 
 /**
  * get_latch_status - get latch status of a slot
@@ -307,7 +378,7 @@ static int __init init_slots(void)
 
 		slot->acpi_slot = get_slot_from_id(i);
 		slot->hotplug_slot->info->power_status = acpiphp_get_power_status(slot->acpi_slot);
-		slot->hotplug_slot->info->attention_status = acpiphp_get_attention_status(slot->acpi_slot);
+		slot->hotplug_slot->info->attention_status = 0;
 		slot->hotplug_slot->info->latch_status = acpiphp_get_latch_status(slot->acpi_slot);
 		slot->hotplug_slot->info->adapter_status = acpiphp_get_adapter_status(slot->acpi_slot);
 		slot->hotplug_slot->info->max_bus_speed = PCI_SPEED_UNKNOWN;

@@ -1302,20 +1302,6 @@ u8 acpiphp_get_power_status(struct acpiphp_slot *slot)
 
 
 /*
- * attention LED ON: 1
- *		OFF: 0
- *
- * TBD
- * no direct attention led status information via ACPI
- *
- */
-u8 acpiphp_get_attention_status(struct acpiphp_slot *slot)
-{
-	return 0;
-}
-
-
-/*
  * latch closed:  1
  * latch   open:  0
  */

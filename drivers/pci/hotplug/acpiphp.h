@@ -171,6 +171,18 @@ struct acpiphp_func {
 	struct pci_resource *bus_head;
 };
 
+/**
+ * struct acpiphp_attention_info - device specific attention registration
+ *
+ * ACPI has no generic method of setting/getting attention status
+ * this allows for device specific driver registration
+ */
+struct acpiphp_attention_info
+{
+	int (*set_attn)(struct hotplug_slot *slot, u8 status);
+	int (*get_attn)(struct hotplug_slot *slot, u8 *status);
+	struct module *owner;
+};
 
 /* PCI bus bridge HID */
 #define ACPI_PCI_HOST_HID		"PNP0A03"
@@ -211,6 +223,10 @@ struct acpiphp_func {
 #define FUNC_HAS_PS3		(0x00000080)
 
 /* function prototypes */
+
+/* acpiphp_core.c */
+extern int acpiphp_register_attention(struct acpiphp_attention_info*info);
+extern int acpiphp_unregister_attention(struct acpiphp_attention_info *info);
 
 /* acpiphp_glue.c */
 extern int acpiphp_glue_init (void);
