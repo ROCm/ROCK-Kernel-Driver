@@ -930,7 +930,7 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
 		   /* The next are ASC 0x24 ASCQ 0x00: Invalid field in CDB */
 		   && SRpnt->sr_sense_buffer[12] == 0x24
 		   && SRpnt->sr_sense_buffer[13] == 0x00) {
-			printk(KERN_NOTICE "SCSI device %s: cache data unavailable\n");
+			printk(KERN_NOTICE "SCSI device %s: cache data unavailable\n", diskname);
 		} else {
 			printk(KERN_ERR "%s : MODE SENSE failed.\n"
 			       "%s : status = %x, message = %02x, host = %d, driver = %02x \n",
