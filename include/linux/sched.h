@@ -264,15 +264,6 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
-
-	/* job control IDs */
-	pid_t pgrp;
-	pid_t tty_old_pgrp;
-	pid_t session;
-	/* boolean value for session group leader */
-	int leader;
-
-	struct tty_struct *tty; /* NULL if no tty */
 };
 
 /*
@@ -375,7 +366,12 @@ struct task_struct {
 	unsigned long personality;
 	int did_exec:1;
 	pid_t pid;
+	pid_t __pgrp;		/* Accessed via process_group() */
+	pid_t tty_old_pgrp;
+	pid_t session;
 	pid_t tgid;
+	/* boolean value for session group leader */
+	int leader;
 	/* 
 	 * pointers to (original) parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with 
@@ -419,6 +415,7 @@ struct task_struct {
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
+	struct tty_struct *tty; /* NULL if no tty */
 /* ipc stuff */
 	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */
@@ -471,22 +468,7 @@ struct task_struct {
 
 static inline pid_t process_group(struct task_struct *tsk)
 {
-	return tsk->signal->pgrp;
-}
-
-static inline pid_t process_session(struct task_struct *tsk)
-{
-	return tsk->signal->session;
-}
-
-static inline int process_session_leader(struct task_struct *tsk)
-{
-	return tsk->signal->leader;
-}
-
-static inline struct tty_struct *process_tty(struct task_struct *tsk)
-{
-	return tsk->signal->tty;
+	return tsk->group_leader->__pgrp;
 }
 
 extern void __put_task_struct(struct task_struct *tsk);

@@ -615,7 +615,7 @@ static void sppp_channel_init(struct channel_data *chan)
 	d->get_stats = cosa_net_stats;
 	d->tx_timeout = cosa_sppp_timeout;
 	d->watchdog_timeo = TX_TIMEOUT;
-	if (register_netdev(d) == -1) {
+	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(chan->pppdev.dev);
 		free_netdev(chan->pppdev.dev);

@@ -119,13 +119,13 @@ int session_of_pgrp(int pgrp)
 
 	read_lock(&tasklist_lock);
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid)
-		if (process_session(p) > 0) {
-			sid = process_session(p);
+		if (p->session > 0) {
+			sid = p->session;
 			goto out;
 		}
 	p = find_task_by_pid(pgrp);
 	if (p)
-		sid = process_session(p);
+		sid = p->session;
 out:
 	read_unlock(&tasklist_lock);
 	
@@ -153,7 +153,7 @@ static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 				|| p->real_parent->pid == 1)
 			continue;
 		if (process_group(p->real_parent) != pgrp
-			    && process_session(p->real_parent) == process_session(p)) {
+			    && p->real_parent->session == p->session) {
 			ret = 0;
 			break;
 		}
@@ -242,14 +242,14 @@ void __set_special_pids(pid_t session, pid_t pgrp)
 {
 	struct task_struct *curr = current;
 
-	if (process_session(curr) != session) {
+	if (curr->session != session) {
 		detach_pid(curr, PIDTYPE_SID);
-		curr->signal->session = session;
+		curr->session = session;
 		attach_pid(curr, PIDTYPE_SID, session);
 	}
 	if (process_group(curr) != pgrp) {
 		detach_pid(curr, PIDTYPE_PGID);
-		curr->signal->pgrp = pgrp;
+		curr->group_leader->__pgrp = pgrp;
 		attach_pid(curr, PIDTYPE_PGID, pgrp);
 	}
 }
@@ -303,7 +303,7 @@ void daemonize(const char *name, ...)
 	exit_mm(current);
 
 	set_special_pids(1, 1);
-	current->signal->tty = NULL;
+	current->tty = NULL;
 
 	/* Block and flush all signals */
 	sigfillset(&blocked);
@@ -515,7 +515,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	 * outside, so the child pgrp is now orphaned.
 	 */
 	if ((process_group(p) != process_group(father)) &&
-	    (process_session(p) == process_session(father))) {
+	    (p->session == father->session)) {
 		int pgrp = process_group(p);
 
 		if (will_become_orphaned_pgrp(pgrp, NULL) && has_stopped_jobs(pgrp)) {
@@ -625,7 +625,7 @@ static void exit_notify(struct task_struct *tsk)
 	t = tsk->real_parent;
 	
 	if ((process_group(t) != process_group(tsk)) &&
-	    (process_session(t) == process_session(tsk)) &&
+	    (t->session == tsk->session) &&
 	    will_become_orphaned_pgrp(process_group(tsk), tsk) &&
 	    has_stopped_jobs(process_group(tsk))) {
 		__kill_pg_info(SIGHUP, (void *)1, process_group(tsk));
@@ -720,7 +720,7 @@ NORET_TYPE void do_exit(long code)
 	exit_itimers(tsk);
 	exit_thread();
 
-	if (process_session_leader(tsk))
+	if (tsk->leader)
 		disassociate_ctty(1);
 
 	module_put(tsk->thread_info->exec_domain->module);
