@@ -16,7 +16,6 @@ obj-$(CONFIG_NET)		+= ethernet/ 802/ sched/ netlink/
 obj-$(CONFIG_INET)		+= ipv4/
 obj-$(CONFIG_UNIX)		+= unix/
 obj-$(CONFIG_IPV6)		+= ipv6/
-obj-$(CONFIG_KHTTPD)		+= khttpd/
 obj-$(CONFIG_PACKET)		+= packet/
 obj-$(CONFIG_NET_SCHED)		+= sched/
 obj-$(CONFIG_BRIDGE)		+= bridge/
