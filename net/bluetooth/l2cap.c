@@ -57,7 +57,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.3"
+#define VERSION "2.4"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -1453,7 +1453,7 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	BT_DBG("dcid 0x%4.4x scid 0x%4.4x result 0x%2.2x status 0x%2.2x", dcid, scid, result, status);
 
 	if (!(sk = l2cap_get_chan_by_scid(&conn->chan_list, scid)))
-		return -ENOENT;
+		return 0;
 
 	switch (result) {
 	case L2CAP_CR_SUCCESS:
@@ -1527,7 +1527,6 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 	struct l2cap_conf_rsp *rsp = (struct l2cap_conf_rsp *)data;
 	u16 scid, flags, result;
 	struct sock *sk;
-	int err = 0;
 
 	scid   = __le16_to_cpu(rsp->scid);
 	flags  = __le16_to_cpu(rsp->flags);
@@ -1536,7 +1535,7 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 	BT_DBG("scid 0x%4.4x flags 0x%2.2x result 0x%2.2x", scid, flags, result);
 
 	if (!(sk = l2cap_get_chan_by_scid(&conn->chan_list, scid)))
-		return -ENOENT;
+		return 0;
 
 	switch (result) {
 	case L2CAP_CONF_SUCCESS:
@@ -1581,7 +1580,7 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 
 done:
 	bh_unlock_sock(sk);
-	return err;
+	return 0;
 }
 
 static inline int l2cap_disconnect_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
@@ -1625,6 +1624,7 @@ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn, struct l2cap_cmd
 
 	if (!(sk = l2cap_get_chan_by_scid(&conn->chan_list, scid)))
 		return 0;
+
 	l2cap_chan_del(sk, 0);
 	bh_unlock_sock(sk);
 
@@ -1632,7 +1632,7 @@ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn, struct l2cap_cmd
 	return 0;
 }
 
-static inline int l2cap_info_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
+static inline int l2cap_information_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
 {
 	struct l2cap_info_req *req = (struct l2cap_info_req *) data;
 	struct l2cap_info_rsp rsp;
@@ -1645,10 +1645,11 @@ static inline int l2cap_info_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr *
 	rsp.type   = __cpu_to_le16(type);
 	rsp.result = __cpu_to_le16(L2CAP_IR_NOTSUPP);
 	l2cap_send_rsp(conn, cmd->ident, L2CAP_INFO_RSP, sizeof(rsp), &rsp);
+
 	return 0;
 }
 
-static inline int l2cap_info_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
+static inline int l2cap_information_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
 {
 	struct l2cap_info_rsp *rsp = (struct l2cap_info_rsp *) data;
 	u16 type, result;
@@ -1721,11 +1722,11 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 			break;
 
 		case L2CAP_INFO_REQ:
-			err = l2cap_info_req(conn, &cmd, data);
+			err = l2cap_information_req(conn, &cmd, data);
 			break;
 
 		case L2CAP_INFO_RSP:
-			err = l2cap_info_rsp(conn, &cmd, data);
+			err = l2cap_information_rsp(conn, &cmd, data);
 			break;
 
 		default:
