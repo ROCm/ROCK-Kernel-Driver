@@ -43,6 +43,7 @@
  *    Hui Huang 	    <hui.huang@nokia.com>
  *    Dajiang Zhang 	    <dajiang.zhang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -3401,13 +3402,14 @@ sctp_disposition_t sctp_sf_do_9_1_prm_abort(const sctp_endpoint_t *ep,
 	 * from its upper layer, but retransmits data to the far end
 	 * if necessary to fill gaps.
 	 */
+	struct msghdr *msg = arg;
 	sctp_chunk_t *abort;
 	sctp_disposition_t retval;
 
 	retval = SCTP_DISPOSITION_CONSUME;
 
 	/* Generate ABORT chunk to send the peer.  */
-	abort = sctp_make_abort(asoc, NULL, 0);
+	abort = sctp_make_abort_user(asoc, NULL, msg);
 	if (!abort)
 		retval = SCTP_DISPOSITION_NOMEM;
 	else
@@ -3525,6 +3527,7 @@ sctp_disposition_t sctp_sf_cookie_wait_prm_abort(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
+	struct msghdr *msg = arg;
 	sctp_chunk_t *abort;
 	sctp_disposition_t retval;
 
@@ -3534,7 +3537,7 @@ sctp_disposition_t sctp_sf_cookie_wait_prm_abort(const sctp_endpoint_t *ep,
 	retval = SCTP_DISPOSITION_CONSUME;
 
 	/* Generate ABORT chunk to send the peer */
-	abort = sctp_make_abort(asoc, NULL, 0);
+	abort = sctp_make_abort_user(asoc, NULL, msg);
 	if (!abort)
 		retval = SCTP_DISPOSITION_NOMEM;
 	else
