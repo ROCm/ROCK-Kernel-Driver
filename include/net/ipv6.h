@@ -193,7 +193,7 @@ struct ip6_flowlabel
 	struct in6_addr		dst;
 	struct ipv6_txoptions	*opt;
 	atomic_t		users;
-	u32			linger;
+	unsigned long		linger;
 	u8			share;
 	u32			owner;
 	unsigned long		lastuse;
