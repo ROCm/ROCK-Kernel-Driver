@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/gayle.c -- Amiga Gayle IDE Driver
+ *  linux/drivers/ide/legacy/gayle.c -- Amiga Gayle IDE Driver
  *
  *     Created 9 Jul 1997 by Geert Uytterhoeven
  *
@@ -122,7 +122,7 @@ void __init gayle_init(void)
 	return;
 
     for (i = 0; i < GAYLE_NUM_PROBE_HWIFS; i++) {
-	ide_ioreg_t base, ctrlport, irqport;
+	unsigned long base, ctrlport, irqport;
 	ide_ack_intr_t *ack_intr;
 	hw_regs_t hw;
 	int index;
@@ -130,11 +130,11 @@ void __init gayle_init(void)
 
 	if (a4000) {
 	    phys_base = GAYLE_BASE_4000;
-	    irqport = (ide_ioreg_t)ZTWO_VADDR(GAYLE_IRQ_4000);
+	    irqport = (unsigned long)ZTWO_VADDR(GAYLE_IRQ_4000);
 	    ack_intr = gayle_ack_intr_a4000;
 	} else {
 	    phys_base = GAYLE_BASE_1200;
-	    irqport = (ide_ioreg_t)ZTWO_VADDR(GAYLE_IRQ_1200);
+	    irqport = (unsigned long)ZTWO_VADDR(GAYLE_IRQ_1200);
 	    ack_intr = gayle_ack_intr_a1200;
 	}
 /*
@@ -149,7 +149,7 @@ void __init gayle_init(void)
 	if (!request_mem_region(res_start, res_n, "IDE"))
 	    continue;
 
-	base = (ide_ioreg_t)ZTWO_VADDR(phys_base);
+	base = (unsigned long)ZTWO_VADDR(phys_base);
 	ctrlport = GAYLE_HAS_CONTROL_REG ? (base + GAYLE_CONTROL) : 0;
 
 	ide_setup_ports(&hw, base, gayle_offsets,

@@ -351,8 +351,10 @@ acpi_pci_irq_enable (
 			printk(" - using IRQ %d\n", dev->irq);
 			return_VALUE(dev->irq);
 		}
-		else
+		else {
+			printk("\n");
 			return_VALUE(0);
+		}
  	}
 
 	dev->irq = irq;

@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/dtc2278.c		Version 0.02	Feb 10, 1996
+ *  linux/drivers/ide/legacy/dtc2278.c		Version 0.02	Feb 10, 1996
  *
  *  Copyright (C) 1996  Linus Torvalds & author (see below)
  */

@@ -460,6 +460,7 @@ void end_lazy_tlb(struct mm_struct *mm)
 	mmdrop(active_mm);
 }
 
+
 /*
  * Turn us into a lazy TLB process if we
  * aren't already..
@@ -741,6 +742,7 @@ NORET_TYPE void do_exit(long code)
 	__exit_files(tsk);
 	__exit_fs(tsk);
 	exit_namespace(tsk);
+	exit_itimers(tsk);
 	exit_thread();
 
 	if (tsk->leader)

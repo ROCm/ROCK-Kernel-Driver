@@ -731,7 +731,7 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 			        printk("qlogicfc%d : could not register host.\n", hosts);
 				continue;
 			}
- 			scsi_set_pci_device(host, pdev);
+ 			scsi_set_device(host, &pdev->dev);
 			host->max_id = QLOGICFC_MAX_ID + 1;
 			host->max_lun = QLOGICFC_MAX_LUN;
 			hostdata = (struct isp2x00_hostdata *) host->hostdata;

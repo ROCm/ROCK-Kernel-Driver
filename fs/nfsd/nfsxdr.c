@@ -396,6 +396,7 @@ nfssvc_encode_readlinkres(struct svc_rqst *rqstp, u32 *p,
 	rqstp->rq_res.page_len = resp->len;
 	if (resp->len & 3) {
 		/* need to pad the tail */
+		rqstp->rq_restailpage = 0;
 		rqstp->rq_res.tail[0].iov_base = p;
 		*p = 0;
 		rqstp->rq_res.tail[0].iov_len = 4 - (resp->len&3);
@@ -415,6 +416,7 @@ nfssvc_encode_readres(struct svc_rqst *rqstp, u32 *p,
 	rqstp->rq_res.page_len = resp->count;
 	if (resp->count & 3) {
 		/* need to pad the tail */
+		rqstp->rq_restailpage = 0;
 		rqstp->rq_res.tail[0].iov_base = p;
 		*p = 0;
 		rqstp->rq_res.tail[0].iov_len = 4 - (resp->count&3);

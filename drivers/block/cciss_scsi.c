@@ -737,7 +737,7 @@ cciss_scsi_detect(Scsi_Host_Template *tpnt)
 	sh->hostdata[0] = (unsigned long) hba[i];
 	sh->irq = hba[i]->intr;
 	sh->unique_id = sh->irq;
-	scsi_set_pci_device(sh, hba[i]->pdev);
+	scsi_set_device(sh, &hba[i]->pdev->dev);
 
 	return 1;	/* Say we have 1 scsi adapter, this will be */
 			/* called multiple times, once for each adapter */

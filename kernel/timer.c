@@ -52,12 +52,11 @@ typedef struct tvec_root_s {
 	struct list_head vec[TVR_SIZE];
 } tvec_root_t;
 
-typedef struct timer_list timer_t;
 
 struct tvec_t_base_s {
 	spinlock_t lock;
 	unsigned long timer_jiffies;
-	timer_t *running_timer;
+	struct timer_list *running_timer;
 	tvec_root_t tv1;
 	tvec_t tv2;
 	tvec_t tv3;
@@ -70,7 +69,7 @@ typedef struct tvec_t_base_s tvec_base_t;
 /* Fake initialization */
 static DEFINE_PER_CPU(tvec_base_t, tvec_bases) = { SPIN_LOCK_UNLOCKED };
 
-static void check_timer_failed(timer_t *timer)
+static void check_timer_failed(struct timer_list *timer)
 {
 	static int whine_count;
 	if (whine_count < 16) {
@@ -88,13 +87,13 @@ static void check_timer_failed(timer_t *timer)
 	timer->magic = TIMER_MAGIC;
 }
 
-static inline void check_timer(timer_t *timer)
+static inline void check_timer(struct timer_list *timer)
 {
 	if (timer->magic != TIMER_MAGIC)
 		check_timer_failed(timer);
 }
 
-static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
+static inline void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 {
 	unsigned long expires = timer->expires;
 	unsigned long idx = expires - base->timer_jiffies;
@@ -146,7 +145,7 @@ static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
  * Timers with an ->expired field in the past will be executed in the next
  * timer tick. It's illegal to add an already pending timer.
  */
-void add_timer(timer_t *timer)
+void add_timer(struct timer_list *timer)
 {
 	int cpu = get_cpu();
 	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
@@ -204,7 +203,7 @@ void add_timer_on(struct timer_list *timer, int cpu)
  * (ie. mod_timer() of an inactive timer returns 0, mod_timer() of an
  * active timer returns 1.)
  */
-int mod_timer(timer_t *timer, unsigned long expires)
+int mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	tvec_base_t *old_base, *new_base;
 	unsigned long flags;
@@ -281,7 +280,7 @@ repeat:
  * (ie. del_timer() of an inactive timer returns 0, del_timer() of an
  * active timer returns 1.)
  */
-int del_timer(timer_t *timer)
+int del_timer(struct timer_list *timer)
 {
 	unsigned long flags;
 	tvec_base_t *base;
@@ -320,7 +319,7 @@ repeat:
  *
  * The function returns whether it has deactivated a pending timer or not.
  */
-int del_timer_sync(timer_t *timer)
+int del_timer_sync(struct timer_list *timer)
 {
 	tvec_base_t *base;
 	int i, ret = 0;
@@ -363,9 +362,9 @@ static int cascade(tvec_base_t *base, tvec_t *tv)
 	 * detach them individually, just clear the list afterwards.
 	 */
 	while (curr != head) {
-		timer_t *tmp;
+		struct timer_list *tmp;
 
-		tmp = list_entry(curr, timer_t, entry);
+		tmp = list_entry(curr, struct timer_list, entry);
 		if (tmp->base != base)
 			BUG();
 		next = curr->next;
@@ -404,9 +403,9 @@ repeat:
 		if (curr != head) {
 			void (*fn)(unsigned long);
 			unsigned long data;
-			timer_t *timer;
+			struct timer_list *timer;
 
-			timer = list_entry(curr, timer_t, entry);
+			timer = list_entry(curr, struct timer_list, entry);
  			fn = timer->function;
  			data = timer->data;
 
@@ -508,6 +507,7 @@ static void second_overflow(void)
 	if (xtime.tv_sec % 86400 == 0) {
 	    xtime.tv_sec--;
 	    time_state = TIME_OOP;
+	    clock_was_set();
 	    printk(KERN_NOTICE "Clock: inserting leap second 23:59:60 UTC\n");
 	}
 	break;
@@ -516,6 +516,7 @@ static void second_overflow(void)
 	if ((xtime.tv_sec + 1) % 86400 == 0) {
 	    xtime.tv_sec++;
 	    time_state = TIME_WAIT;
+	    clock_was_set();
 	    printk(KERN_NOTICE "Clock: deleting leap second 23:59:59 UTC\n");
 	}
 	break;
@@ -968,7 +969,7 @@ static void process_timeout(unsigned long __data)
  */
 signed long schedule_timeout(signed long timeout)
 {
-	timer_t timer;
+	struct timer_list timer;
 	unsigned long expire;
 
 	switch (timeout)
@@ -1023,6 +1024,7 @@ asmlinkage long sys_gettid(void)
 {
 	return current->pid;
 }
+#ifndef FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
 
 static long nanosleep_restart(struct restart_block *restart)
 {
@@ -1081,6 +1083,7 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 	}
 	return ret;
 }
+#endif // ! FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
 
 /*
  * sys_sysinfo - fill in sysinfo struct

@@ -1027,8 +1027,19 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 		while ((void *) entry < madt_end) {
                 	if (entry->header.type == ACPI_MADT_INT_SRC_OVR &&
-			    acpi_fadt.sci_int == entry->global_irq)
-                		return;
+			    acpi_fadt.sci_int == entry->bus_irq) {
+				/*
+				 * See the note at the end of ACPI 2.0b section
+				 * 5.2.10.8 for what this is about.
+				 */
+				if (entry->bus_irq != entry->global_irq) {
+					acpi_fadt.sci_int = entry->global_irq;
+					irq = entry->global_irq;
+					break;
+				}
+				else
+                			return;
+			}
 
                 	entry = (struct acpi_table_int_src_ovr *)
                 	        ((unsigned long) entry + entry->header.length);

@@ -1,7 +1,7 @@
 /*
  *  acpi_numa.c - ACPI NUMA support
  *
- *  Copyright (C) 2002 Takayoshi Kochi <t-kouchi@cq.jp.nec.com>
+ *  Copyright (C) 2002 Takayoshi Kochi <t-kochi@bq.jp.nec.com>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *

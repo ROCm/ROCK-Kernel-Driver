@@ -34,6 +34,7 @@ struct r1_private_data_s {
 
 	mempool_t *r1bio_pool;
 	mempool_t *r1buf_pool;
+	char thread_name[MD_THREAD_NAME_MAX];
 };
 
 typedef struct r1_private_data_s conf_t;

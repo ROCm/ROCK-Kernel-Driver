@@ -913,6 +913,7 @@ static void handle_stripe(struct stripe_head *sh)
 				struct bio *nextbi = bi->bi_next;
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
 				if (--bi->bi_phys_segments == 0) {
+					md_write_end(conf->mddev, conf->thread);
 					bi->bi_next = return_bi;
 					return_bi = bi;
 				}
@@ -963,16 +964,19 @@ static void handle_stripe(struct stripe_head *sh)
 			/* We can return any write requests */
 			    struct bio *wbi, *wbi2;
 			    PRINTK("Return write for disc %d\n", i);
+			    spin_lock_irq(&conf->device_lock);
 			    wbi = dev->written;
 			    dev->written = NULL;
 			    while (wbi && wbi->bi_sector < dev->sector + STRIPE_SECTORS) {
 				    wbi2 = wbi->bi_next;
 				    if (--wbi->bi_phys_segments == 0) {
+					    md_write_end(conf->mddev, conf->thread);
 					    wbi->bi_next = return_bi;
 					    return_bi = wbi;
 				    }
 				    wbi = wbi2;
 			    }
+			    spin_unlock_irq(&conf->device_lock);
 		    }
 		}
 	}
@@ -1275,6 +1279,8 @@ static int make_request (request_queue_t *q, struct bio * bi)
 
 	bi->bi_next = NULL;
 	bi->bi_phys_segments = 1;	/* over-loaded to count active stripes */
+	if ( bio_data_dir(bi) == WRITE )
+		md_write_start(mddev);
 	for (;logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
 		
 		new_sector = raid5_compute_sector(logical_sector,
@@ -1297,6 +1303,8 @@ static int make_request (request_queue_t *q, struct bio * bi)
 	if (--bi->bi_phys_segments == 0) {
 		int bytes = bi->bi_size;
 
+		if ( bio_data_dir(bi) == WRITE )
+			md_write_end(mddev,conf->thread);
 		bi->bi_size = 0;
 		bi->bi_end_io(bi, bytes, 0);
 	}
@@ -1357,6 +1365,7 @@ static void raid5d (void *data)
 
 	PRINTK("+++ raid5d active\n");
 
+	md_handle_safemode(mddev);
 	handled = 0;
 	spin_lock_irq(&conf->device_lock);
 	while (1) {
@@ -1477,9 +1486,9 @@ static int run (mddev_t *mddev)
 	}
 
 	{
-		const char * name = "raid5d";
+		snprintf(conf->thread_name,MD_THREAD_NAME_MAX,"raid5d_md%d",mdidx(mddev));
 
-		conf->thread = md_register_thread(raid5d, conf, name);
+		conf->thread = md_register_thread(raid5d, conf, conf->thread_name);
 		if (!conf->thread) {
 			printk(KERN_ERR "raid5: couldn't allocate thread for md%d\n", mdidx(mddev));
 			goto abort;

@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/ide-m8xx.c
+ *  linux/drivers/ide/ppc/ide-m8xx.c
  *
  *  Copyright (C) 2000, 2001 Wolfgang Denk, wd@denx.de
  *  Modified for direct IDE interface
@@ -54,7 +54,7 @@ static void m8xx_ide_tuneproc(ide_drive_t *drive, u8 pio);
 
 typedef	struct ide_ioport_desc {
 	unsigned long	base_off;		/* Offset to PCMCIA memory	*/
-	ide_ioreg_t	reg_off[IDE_NR_PORTS];	/* controller register offsets	*/
+	unsigned long	reg_off[IDE_NR_PORTS];	/* controller register offsets	*/
 	int		irq;			/* IRQ				*/
 } ide_ioport_desc_t;
 
@@ -113,7 +113,7 @@ static int _slot_ = -1;			/* will be read from PCMCIA registers   */
  * IDE stuff.
  */
 static int
-m8xx_ide_default_irq(ide_ioreg_t base)
+m8xx_ide_default_irq(unsigned long base)
 {
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
 	if (base >= MAX_HWIFS)
@@ -127,7 +127,7 @@ m8xx_ide_default_irq(ide_ioreg_t base)
 #endif
 }
 
-static ide_ioreg_t
+static unsigned long
 m8xx_ide_default_io_base(int index)
 {
         return index;
@@ -161,10 +161,10 @@ static int pcmcia_schlvl = PCMCIA_SCHLVL;
  */
 #if defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_DIRECT)
 static void
-m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, 
-		ide_ioreg_t ctrl_port, int *irq)
+m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port, 
+		unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t *p = hw->io_ports;
+	unsigned long *p = hw->io_ports;
 	int i;
 
 	typedef struct {
@@ -346,9 +346,9 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port,
  */
 #if defined(CONFIG_IDE_EXT_DIRECT)
 void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
-	ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
+	unsigned long data_port, unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t *p = hw->io_ports;
+	unsigned long *p = hw->io_ports;
 	int i;
 
 	u32 ide_phy_base;

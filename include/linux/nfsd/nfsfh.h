@@ -165,8 +165,8 @@ typedef struct svc_fh {
 
 	/* Pre-op attributes saved during fh_lock */
 	__u64			fh_pre_size;	/* size before operation */
-	time_t			fh_pre_mtime;	/* mtime before oper */
-	time_t			fh_pre_ctime;	/* ctime before oper */
+	struct timespec		fh_pre_mtime;	/* mtime before oper */
+	struct timespec		fh_pre_ctime;	/* ctime before oper */
 
 	/* Post-op attributes saved in fh_unlock */
 	umode_t			fh_post_mode;	/* i_mode */
@@ -177,9 +177,9 @@ typedef struct svc_fh {
 	unsigned long		fh_post_blocks; /* i_blocks */
 	unsigned long		fh_post_blksize;/* i_blksize */
 	__u32			fh_post_rdev[2];/* i_rdev */
-	time_t			fh_post_atime;	/* i_atime */
-	time_t			fh_post_mtime;	/* i_mtime */
-	time_t			fh_post_ctime;	/* i_ctime */
+	struct timespec		fh_post_atime;	/* i_atime */
+	struct timespec		fh_post_mtime;	/* i_mtime */
+	struct timespec		fh_post_ctime;	/* i_ctime */
 #endif /* CONFIG_NFSD_V3 */
 
 } svc_fh;
@@ -263,8 +263,8 @@ fill_pre_wcc(struct svc_fh *fhp)
 
 	inode = fhp->fh_dentry->d_inode;
 	if (!fhp->fh_pre_saved) {
-		fhp->fh_pre_mtime = inode->i_mtime.tv_sec;
-		fhp->fh_pre_ctime = inode->i_ctime.tv_sec;
+		fhp->fh_pre_mtime = inode->i_mtime;
+		fhp->fh_pre_ctime = inode->i_ctime;
 			fhp->fh_pre_size  = inode->i_size;
 			fhp->fh_pre_saved = 1;
 	}
@@ -296,9 +296,9 @@ fill_post_wcc(struct svc_fh *fhp)
 	}
 	fhp->fh_post_rdev[0]    = htonl((u32)major(inode->i_rdev));
 	fhp->fh_post_rdev[1]    = htonl((u32)minor(inode->i_rdev));
-	fhp->fh_post_atime      = inode->i_atime.tv_sec;
-	fhp->fh_post_mtime      = inode->i_mtime.tv_sec;
-	fhp->fh_post_ctime      = inode->i_ctime.tv_sec;
+	fhp->fh_post_atime      = inode->i_atime;
+	fhp->fh_post_mtime      = inode->i_mtime;
+	fhp->fh_post_ctime      = inode->i_ctime;
 	fhp->fh_post_saved      = 1;
 }
 #else

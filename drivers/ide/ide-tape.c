@@ -6221,11 +6221,7 @@ static ide_driver_t idetape_driver = {
 	.version		= IDETAPE_VERSION,
 	.media			= ide_tape,
 	.busy			= 1,
-#ifdef CONFIG_IDEDMA_ONLYDISK
-	.supports_dma		= 0,
-#else
 	.supports_dma		= 1,
-#endif
 	.supports_dsc_overlap 	= 1,
 	.cleanup		= idetape_cleanup,
 	.do_request		= idetape_do_request,

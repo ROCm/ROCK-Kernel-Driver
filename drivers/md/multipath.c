@@ -283,6 +283,7 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 			p->rdev = rdev;
 			conf->working_disks++;
 			rdev->raid_disk = path;
+			rdev->in_sync = 1;
 			found = 1;
 		}
 	spin_unlock_irq(&conf->device_lock);

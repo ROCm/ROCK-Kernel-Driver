@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/pdc202xx.c	Version 0.36	Sept 11, 2002
+ *  linux/drivers/ide/pci/pdc202xx_old.c	Version 0.36	Sept 11, 2002
  *
  *  Copyright (C) 1998-2002		Andre Hedrick <andre@linux-ide.org>
  *
@@ -323,7 +323,7 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	decode_registers(REG_D, DP);
 #endif /* PDC202XX_DECODE_REGISTER_INFO */
 #if PDC202XX_DEBUG_DRIVE_INFO
-	printk("%s: %s drive%d 0x%08x ",
+	printk(KERN_DEBUG "%s: %s drive%d 0x%08x ",
 		drive->name, ide_xfer_verbose(speed),
 		drive->dn, drive_conf);
 		pci_read_config_dword(dev, drive_pci, &drive_conf);
@@ -379,7 +379,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 		case PCI_DEVICE_ID_PROMISE_20262:
 			cable = pdc202xx_old_cable_detect(hwif);
 #if PDC202_DEBUG_CABLE
-			printk("%s: %s-pin cable, %s-pin cable, %d\n",
+			printk(KERN_DEBUG "%s: %s-pin cable, %s-pin cable, %d\n",
 				hwif->name, hwif->udma_four ? "80" : "40",
 				cable ? "40" : "80", cable);
 #endif /* PDC202_DEBUG_CABLE */
@@ -408,16 +408,16 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 
 	if ((ultra_66) && (cable)) {
 #ifdef DEBUG
-		printk("ULTRA 66/100/133: %s channel of Ultra 66/100/133 "
+		printk(KERN_DEBUG "ULTRA 66/100/133: %s channel of Ultra 66/100/133 "
 			"requires an 80-pin cable for Ultra66 operation.\n",
 			hwif->channel ? "Secondary" : "Primary");
-		printk("         Switching to Ultra33 mode.\n");
+		printk(KERN_DEBUG "         Switching to Ultra33 mode.\n");
 #endif /* DEBUG */
 		/* Primary   : zero out second bit */
 		/* Secondary : zero out fourth bit */
 		hwif->OUTB(CLKSPD & ~mask, (hwif->dma_master + 0x11));
-		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
-		printk("%s reduced to Ultra33 mode.\n", drive->name);
+		printk(KERN_WARNING "Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
+		printk(KERN_WARNING "%s reduced to Ultra33 mode.\n", drive->name);
 	} else {
 		if (ultra_66) {
 			/*
@@ -620,7 +620,7 @@ static void pdc202xx_reset_host (ide_hwif_t *hwif)
 	hwif->OUTB((udma_speed_flag & ~0x10), (high_16|0x001f));
 	mdelay(2000);	/* 2 seconds ?! */
 
-	printk("PDC202XX: %s channel reset.\n",
+	printk(KERN_WARNING "PDC202XX: %s channel reset.\n",
 		hwif->channel ? "Secondary" : "Primary");
 }
 
@@ -699,7 +699,7 @@ static unsigned int __init init_chipset_pdc202xx (struct pci_dev *dev, const cha
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS,
 			dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n",
+		printk(KERN_INFO "%s: ROM enabled at 0x%08lx\n",
 			name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 
@@ -780,7 +780,7 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->drives[1].autodma = hwif->autodma;
 #if PDC202_DEBUG_CABLE
-	printk("%s: %s-pin cable\n",
+	printk(KERN_DEBUG "%s: %s-pin cable\n",
 		hwif->name, hwif->udma_four ? "80" : "40");
 #endif /* PDC202_DEBUG_CABLE */	
 }
@@ -797,7 +797,7 @@ static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
 	udma_speed_flag	= hwif->INB((dmabase|0x1f));
 	primary_mode	= hwif->INB((dmabase|0x1a));
 	secondary_mode	= hwif->INB((dmabase|0x1b));
-	printk("%s: (U)DMA Burst Bit %sABLED " \
+	printk(KERN_INFO "%s: (U)DMA Burst Bit %sABLED " \
 		"Primary %s Mode " \
 		"Secondary %s Mode.\n", hwif->cds->name,
 		(udma_speed_flag & 1) ? "EN" : "DIS",
@@ -806,7 +806,7 @@ static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
 
 #ifdef CONFIG_PDC202XX_BURST
 	if (!(udma_speed_flag & 1)) {
-		printk("%s: FORCING BURST BIT 0x%02x->0x%02x ",
+		printk(KERN_INFO "%s: FORCING BURST BIT 0x%02x->0x%02x ",
 			hwif->cds->name, udma_speed_flag,
 			(udma_speed_flag|1));
 		hwif->OUTB(udma_speed_flag|1,(dmabase|0x1f));
@@ -816,7 +816,7 @@ static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
 #endif /* CONFIG_PDC202XX_BURST */
 #ifdef CONFIG_PDC202XX_MASTER
 	if (!(primary_mode & 1)) {
-		printk("%s: FORCING PRIMARY MODE BIT "
+		printk(KERN_INFO "%s: FORCING PRIMARY MODE BIT "
 			"0x%02x -> 0x%02x ", hwif->cds->name,
 			primary_mode, (primary_mode|1));
 		hwif->OUTB(primary_mode|1, (dmabase|0x1a));
@@ -825,7 +825,7 @@ static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
 	}
 
 	if (!(secondary_mode & 1)) {
-		printk("%s: FORCING SECONDARY MODE BIT "
+		printk(KERN_INFO "%s: FORCING SECONDARY MODE BIT "
 			"0x%02x -> 0x%02x ", hwif->cds->name,
 			secondary_mode, (secondary_mode|1));
 		hwif->OUTB(secondary_mode|1, (dmabase|0x1b));
@@ -850,7 +850,7 @@ static void __init init_setup_pdc202ata4 (struct pci_dev *dev, ide_pci_device_t 
 		if (irq != irq2) {
 			pci_write_config_byte(dev,
 				(PCI_INTERRUPT_LINE)|0x80, irq);     /* 0xbc */
-			printk("%s: pci-config space interrupt "
+			printk(KERN_INFO "%s: pci-config space interrupt "
 				"mirror fixed.\n", d->name);
 		}
 	}
