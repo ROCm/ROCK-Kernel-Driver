@@ -842,8 +842,9 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 					    CDROM_AUDIO_NO_STATUS;
 				}
 
-				copy_from_user(&sjcd_msf, (void *) arg,
-					       sizeof(sjcd_msf));
+				if (copy_from_user(&sjcd_msf, (void *) arg,
+					       sizeof(sjcd_msf)))
+					return (-EFAULT);
 
 				sjcd_playing.start.min =
 				    bin2bcd(sjcd_msf.cdmsf_min0);
@@ -893,9 +894,9 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 					 sizeof(toc_entry))) == 0) {
 				struct sjcd_hw_disk_info *tp;
 
-				copy_from_user(&toc_entry, (void *) arg,
-					       sizeof(toc_entry));
-
+				if (copy_from_user(&toc_entry, (void *) arg,
+					       sizeof(toc_entry)))
+					return (-EFAULT);
 				if (toc_entry.cdte_track == CDROM_LEADOUT)
 					tp = &sjcd_table_of_contents[0];
 				else if (toc_entry.cdte_track <
@@ -948,8 +949,10 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 					 sizeof(subchnl))) == 0) {
 				struct sjcd_hw_qinfo q_info;
 
-				copy_from_user(&subchnl, (void *) arg,
-					       sizeof(subchnl));
+				if (copy_from_user(&subchnl, (void *) arg,
+					       sizeof(subchnl)))
+					return (-EFAULT);
+
 				if (sjcd_get_q_info(&q_info) < 0)
 					return (-EIO);
 
@@ -1005,8 +1008,9 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 					 sizeof(vol_ctrl))) == 0) {
 				unsigned char dummy[4];
 
-				copy_from_user(&vol_ctrl, (void *) arg,
-					       sizeof(vol_ctrl));
+				if (copy_from_user(&vol_ctrl, (void *) arg,
+					       sizeof(vol_ctrl)))
+					return (-EFAULT);
 				sjcd_send_4_cmd(SCMD_SET_VOLUME,
 						vol_ctrl.channel0, 0xFF,
 						vol_ctrl.channel1, 0xFF);
