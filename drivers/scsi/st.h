@@ -94,6 +94,8 @@ typedef struct {
 	int current_mode;
 	devfs_handle_t de_r[ST_NBR_MODES];  /*  Rewind entries     */
 	devfs_handle_t de_n[ST_NBR_MODES];  /*  No-rewind entries  */
+	struct device driverfs_dev_r[ST_NBR_MODES];
+	struct device driverfs_dev_n[ST_NBR_MODES];
 
 	/* Status variables */
 	int partition;

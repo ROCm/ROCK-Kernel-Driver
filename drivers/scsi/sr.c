@@ -731,6 +731,32 @@ cleanup_devfs:
 	return 1;
 }
 
+/* Driverfs file support */
+static ssize_t sr_device_kdev_read(struct device *driverfs_dev, 
+				   char *page, size_t count, loff_t off)
+{
+	kdev_t kdev; 
+	kdev.value=(int)driverfs_dev->driver_data;
+	return off ? 0 : sprintf(page, "%x\n",kdev.value);
+}
+static struct driver_file_entry sr_device_kdev_file = {
+	name: "kdev",
+	mode: S_IRUGO,
+	show: sr_device_kdev_read,
+};
+
+static ssize_t sr_device_type_read(struct device *driverfs_dev, 
+				   char *page, size_t count, loff_t off) 
+{
+	return off ? 0 : sprintf (page, "CHR\n");
+}
+static struct driver_file_entry sr_device_type_file = {
+	name: "type",
+	mode: S_IRUGO,
+	show: sr_device_type_read,
+};
+
+
 void sr_finish()
 {
 	int i;
@@ -776,6 +802,20 @@ void sr_finish()
 
 		sprintf(name, "sr%d", i);
 		strcpy(SCp->cdi.name, name);
+		sprintf(SCp->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
+			SCp->device->sdev_driverfs_dev.bus_id);
+		sprintf(SCp->cdi.cdrom_driverfs_dev.name, "%scdrom",
+			SCp->device->sdev_driverfs_dev.name);
+		SCp->cdi.cdrom_driverfs_dev.parent = 
+			&SCp->device->sdev_driverfs_dev;
+		SCp->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
+		SCp->cdi.cdrom_driverfs_dev.driver_data = 
+			(void *)__mkdev(MAJOR_NR, i);
+		device_register(&SCp->cdi.cdrom_driverfs_dev);
+		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
+				&sr_device_type_file);
+		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
+				&sr_device_kdev_file);
                 SCp->cdi.de = devfs_register(SCp->device->de, "cd",
                                     DEVFS_FL_DEFAULT, MAJOR_NR, i,
                                     S_IFBLK | S_IRUGO | S_IWUGO,
@@ -816,7 +856,14 @@ static void sr_detach(Scsi_Device * SDp)
 
 static int __init init_sr(void)
 {
-	return scsi_register_device(&sr_template);
+	int rc;
+	rc = scsi_register_device(&sr_template);
+	if (!rc) {
+		sr_template.scsi_driverfs_driver.name = (char *)sr_template.tag;
+		sr_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+		driver_register(&sr_template.scsi_driverfs_driver);
+	}
+	return rc;
 }
 
 static void __exit exit_sr(void)
@@ -833,6 +880,7 @@ static void __exit exit_sr(void)
 	blk_clear(MAJOR_NR);
 
 	sr_template.dev_max = 0;
+	remove_driver(&sr_template.scsi_driverfs_driver);
 }
 
 module_init(init_sr);

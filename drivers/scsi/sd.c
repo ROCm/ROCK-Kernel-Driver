@@ -129,6 +129,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt);
 
 static Scsi_Disk * sd_get_sdisk(int index);
 
+extern void driverfs_remove_partitions(struct gendisk *hd, int minor);
 
 #if defined(CONFIG_PPC32)
 /**
@@ -1277,12 +1278,15 @@ static int sd_init()
 
 		init_mem_lth(sd_gendisks[k].de_arr, N);
 		init_mem_lth(sd_gendisks[k].flags, N);
+		init_mem_lth(sd_gendisks[k].driverfs_dev_arr, N);
 
-		if (!sd_gendisks[k].de_arr || !sd_gendisks[k].flags)
+		if (!sd_gendisks[k].de_arr || !sd_gendisks[k].flags ||
+				!sd_gendisks[k].driverfs_dev_arr)
 			goto cleanup_gendisks;
 
 		zero_mem_lth(sd_gendisks[k].de_arr, N);
 		zero_mem_lth(sd_gendisks[k].flags, N);
+		zero_mem_lth(sd_gendisks[k].driverfs_dev_arr, N);
 
 		sd_gendisks[k].major = SD_MAJOR(k);
 		sd_gendisks[k].major_name = "sd";
@@ -1291,7 +1295,6 @@ static int sd_init()
 		sd_gendisks[k].sizes = sd_sizes + k * (N << 4);
 		sd_gendisks[k].nr_real = 0;
 	}
-
 	return 0;
 
 #undef init_mem_lth
@@ -1302,6 +1305,7 @@ cleanup_gendisks:
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		vfree(sd_gendisks[k].de_arr);
 		vfree(sd_gendisks[k].flags);
+		vfree(sd_gendisks[k].driverfs_dev_arr);
 	}
 cleanup_mem:
 	vfree(sd_gendisks);
@@ -1436,6 +1440,8 @@ static int sd_attach(Scsi_Device * sdp)
 	SD_GENDISK(dsk_nr).nr_real++;
         devnum = dsk_nr % SCSI_DISKS_PER_MAJOR;
         SD_GENDISK(dsk_nr).de_arr[devnum] = sdp->de;
+        SD_GENDISK(dsk_nr).driverfs_dev_arr[devnum] = 
+		&sdp->sdev_driverfs_dev;
         if (sdp->removable)
 		SD_GENDISK(dsk_nr).flags[devnum] |= GENHD_FL_REMOVABLE;
 	sd_dskname(dsk_nr, diskname);
@@ -1535,6 +1541,8 @@ static void sd_detach(Scsi_Device * sdp)
 	max_p = 1 << sd_gendisk.minor_shift;
 	start = dsk_nr << sd_gendisk.minor_shift;
 	dev = MKDEV_SD_PARTITION(start);
+	driverfs_remove_partitions(&SD_GENDISK (dsk_nr), 
+					SD_MINOR_NUMBER (start));
 	wipe_partitions(dev);
 	for (j = max_p - 1; j >= 0; j--)
 		sd_sizes[start + j] = 0;
@@ -1556,9 +1564,16 @@ static void sd_detach(Scsi_Device * sdp)
  **/
 static int __init init_sd(void)
 {
+	int rc;
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
 	sd_template.module = THIS_MODULE;
-	return scsi_register_device(&sd_template);
+	rc = scsi_register_device(&sd_template);
+	if (!rc) {
+		sd_template.scsi_driverfs_driver.name = (char *)sd_template.tag;
+		sd_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+		driver_register(&sd_template.scsi_driverfs_driver);
+	}
+	return rc;
 }
 
 /**
@@ -1591,6 +1606,7 @@ static void __exit exit_sd(void)
 	sd_template.dev_max = 0;
 	if (sd_gendisks != &sd_gendisk)
 		vfree(sd_gendisks);
+	remove_driver(&sd_template.scsi_driverfs_driver);
 }
 
 static Scsi_Disk * sd_get_sdisk(int index)
