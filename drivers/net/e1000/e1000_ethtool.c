@@ -1112,8 +1112,9 @@ e1000_ethtool_test(struct e1000_adapter *adapter,
 
 		if(if_running)
 			e1000_down(adapter);
-
-		e1000_reset(adapter);
+		else
+			e1000_reset(adapter);
+		
 		if(e1000_reg_test(adapter, &data[0]))
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
