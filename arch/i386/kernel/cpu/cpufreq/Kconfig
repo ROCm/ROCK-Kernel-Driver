@@ -105,7 +105,8 @@ config X86_SPEEDSTEP_ICH
 	help
 	  This adds the CPUFreq driver for certain mobile Intel Pentium III
 	  (Coppermine), all mobile Intel Pentium III-M (Tualatin) and all
-	  mobile Intel Pentium 4 P4-Ms.
+	  mobile Intel Pentium 4 P4-Ms, with an Intel ICH2, ICH3,
+	  or ICH4 southbridge.
 
 	  For details, take a look at linux/Documentation/cpu-freq. 
 
