@@ -137,9 +137,14 @@ static void x25_heartbeat_expiry(unsigned long param)
 	switch (x25_sk(sk)->state) {
 
 		case X25_STATE_0:
-			/* Magic here: If we listen() and a new link dies before it
-			   is accepted() it isn't 'dead' so doesn't get removed. */
-			if (test_bit(SOCK_DESTROY, &sk->flags) || (sk->state == TCP_LISTEN && test_bit(SOCK_DEAD, &sk->flags))) {
+			/*
+			 * Magic here: If we listen() and a new link dies
+			 * before it is accepted() it isn't 'dead' so doesn't
+			 * get removed.
+			 */
+			if (sock_flag(sk, SOCK_DESTROY) ||
+			    (sk->state == TCP_LISTEN &&
+			     sock_flag(sk, SOCK_DEAD))) {
 				x25_destroy_socket(sk);
 				goto unlock;
 			}

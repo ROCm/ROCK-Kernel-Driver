@@ -334,8 +334,7 @@ static void unix_dgram_disconnected(struct sock *sk, struct sock *other)
 		 * we signal error. Messages are lost. Do not make this,
 		 * when peer was not connected to us.
 		 */
-		if (!test_bit(SOCK_DEAD, &other->flags) &&
-				unix_peer(other) == sk) {
+		if (!sock_flag(other, SOCK_DEAD) && unix_peer(other) == sk) {
 			other->err = ECONNRESET;
 			other->error_report(other);
 		}
@@ -351,7 +350,7 @@ static void unix_sock_destructor(struct sock *sk)
 	BUG_TRAP(atomic_read(&sk->wmem_alloc) == 0);
 	BUG_TRAP(!u->list);
 	BUG_TRAP(sk->socket==NULL);
-	if (!test_bit(SOCK_DEAD, &sk->flags)) {
+	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive unix socket: %p\n", sk);
 		return;
 	}
@@ -863,9 +862,9 @@ static long unix_wait_for_peer(unix_socket *other, long timeo)
 
 	prepare_to_wait_exclusive(&u->peer_wait, &wait, TASK_INTERRUPTIBLE);
 
-	sched = (!test_bit(SOCK_DEAD, &other->flags) &&
-		 !(other->shutdown&RCV_SHUTDOWN) &&
-		 skb_queue_len(&other->receive_queue) > other->max_ack_backlog);
+	sched = !sock_flag(other, SOCK_DEAD) &&
+		!(other->shutdown & RCV_SHUTDOWN) &&
+		skb_queue_len(&other->receive_queue) > other->max_ack_backlog;
 
 	unix_state_runlock(other);
 
@@ -927,7 +926,7 @@ restart:
 	unix_state_rlock(other);
 
 	/* Apparently VFS overslept socket death. Retry. */
-	if (test_bit(SOCK_DEAD, &other->flags)) {
+	if (sock_flag(other, SOCK_DEAD)) {
 		unix_state_runlock(other);
 		sock_put(other);
 		goto restart;
@@ -1267,7 +1266,7 @@ restart:
 	if (!unix_may_send(sk, other))
 		goto out_unlock;
 
-	if (test_bit(SOCK_DEAD, &other->flags)) {
+	if (sock_flag(other, SOCK_DEAD)) {
 		/*
 		 *	Check with 1003.1g - what should
 		 *	datagram error
@@ -1418,8 +1417,8 @@ static int unix_stream_sendmsg(struct kiocb *kiocb, struct socket *sock,
 
 		unix_state_rlock(other);
 
-		if (test_bit(SOCK_DEAD, &other->flags) ||
-				(other->shutdown & RCV_SHUTDOWN))
+		if (sock_flag(other, SOCK_DEAD) ||
+		    (other->shutdown & RCV_SHUTDOWN))
 			goto pipe_err_free;
 
 		skb_queue_tail(&other->receive_queue, skb);

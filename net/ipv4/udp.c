@@ -609,8 +609,8 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			goto out;
 
 		err = -EACCES;
-		if (rt->rt_flags&RTCF_BROADCAST &&
-				!test_bit(SOCK_BROADCAST, &sk->flags))
+		if ((rt->rt_flags & RTCF_BROADCAST) &&
+		    !sock_flag(sk, SOCK_BROADCAST))
 			goto out;
 		if (connected)
 			sk_dst_set(sk, dst_clone(&rt->u.dst));
@@ -891,8 +891,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 			       inet->sport, usin->sin_port, sk);
 	if (err)
 		return err;
-	if ((rt->rt_flags&RTCF_BROADCAST) &&
-			!test_bit(SOCK_BROADCAST, &sk->flags)) {
+	if ((rt->rt_flags & RTCF_BROADCAST) && !sock_flag(sk, SOCK_BROADCAST)) {
 		ip_rt_put(rt);
 		return -EACCES;
 	}
