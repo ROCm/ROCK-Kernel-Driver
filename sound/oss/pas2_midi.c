@@ -14,9 +14,12 @@
  */
 
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "pas2.h"
+
+extern spinlock_t lock;
 
 static int      midi_busy = 0, input_opened = 0;
 static int      my_dev;
@@ -48,12 +51,11 @@ static int pas_midi_open(int dev, int mode,
 	pas_write(0x20 | 0x40,
 		  0x178b);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	if ((err = pas_set_intr(0x10)) < 0)
 	{
-		restore_flags(flags);
+		spin_unlock_irqrestore(&lock, flags);
 		return err;
 	}
 	/*
@@ -81,7 +83,7 @@ static int pas_midi_open(int dev, int mode,
 
 	pas_write(0xff, 0x1B88);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 
 	midi_busy = 1;
 	qlen = qhead = qtail = 0;
@@ -131,8 +133,7 @@ static int pas_midi_out(int dev, unsigned char midi_byte)
 	 * Drain the local queue first
 	 */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	while (qlen && dump_to_midi(tmp_queue[qhead]))
 	{
@@ -140,7 +141,7 @@ static int pas_midi_out(int dev, unsigned char midi_byte)
 		qhead++;
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 
 	/*
 	 *	Output the byte if the local queue is empty.
@@ -157,14 +158,13 @@ static int pas_midi_out(int dev, unsigned char midi_byte)
 	if (qlen >= 256)
 		return 0;	/* Local queue full */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	tmp_queue[qtail] = midi_byte;
 	qlen++;
 	qtail++;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 
 	return 1;
 }
@@ -226,7 +226,6 @@ void pas_midi_interrupt(void)
 {
 	unsigned char   stat;
 	int             i, incount;
-	unsigned long   flags;
 
 	stat = pas_read(0x1B88);
 
@@ -245,8 +244,7 @@ void pas_midi_interrupt(void)
 	}
 	if (stat & (0x08 | 0x10))
 	{
-		save_flags(flags);
-		cli();
+		spin_lock(&lock);/* called in irq context */
 
 		while (qlen && dump_to_midi(tmp_queue[qhead]))
 		{
@@ -254,7 +252,7 @@ void pas_midi_interrupt(void)
 			qhead++;
 		}
 
-		restore_flags(flags);
+		spin_unlock(&lock);
 	}
 	if (stat & 0x40)
 	{
