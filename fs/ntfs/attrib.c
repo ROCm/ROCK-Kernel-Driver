@@ -22,7 +22,6 @@
 
 #include <linux/buffer_head.h>
 #include "ntfs.h"
-//#include "dir.h"
 
 /**
  * ntfs_map_runlist - map (a part of) a runlist of an ntfs inode
@@ -66,10 +65,11 @@ int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 
 	down_write(&ni->runlist.lock);
 	/* Make sure someone else didn't do the work while we were sleeping. */
-	if (likely(ntfs_vcn_to_lcn(ni->runlist.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
+	if (likely(ntfs_rl_vcn_to_lcn(ni->runlist.rl, vcn) <=
+			LCN_RL_NOT_MAPPED)) {
 		runlist_element *rl;
 
-		rl = decompress_mapping_pairs(ni->vol, ctx->attr,
+		rl = ntfs_mapping_pairs_decompress(ni->vol, ctx->attr,
 				ni->runlist.rl);
 		if (IS_ERR(rl))
 			err = PTR_ERR(rl);
@@ -398,14 +398,14 @@ int load_attribute_list(ntfs_volume *vol, runlist *runlist, u8 *al_start,
 	rl = runlist->rl;
 	/* Read all clusters specified by the runlist one run at a time. */
 	while (rl->length) {
-		lcn = ntfs_vcn_to_lcn(rl, rl->vcn);
+		lcn = ntfs_rl_vcn_to_lcn(rl, rl->vcn);
 		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
 				(unsigned long long)rl->vcn,
 				(unsigned long long)lcn);
 		/* The attribute list cannot be sparse. */
 		if (lcn < 0) {
-			ntfs_error(sb, "ntfs_vcn_to_lcn() failed. Cannot read "
-					"attribute list.");
+			ntfs_error(sb, "ntfs_rl_vcn_to_lcn() failed.  Cannot "
+					"read attribute list.");
 			goto err_out;
 		}
 		block = lcn << vol->cluster_size_bits >> block_size_bits;

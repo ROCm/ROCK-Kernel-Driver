@@ -685,7 +685,7 @@ critical_error:
 }
 
 /**
- * decompress_mapping_pairs - convert mapping pairs array to runlist
+ * ntfs_mapping_pairs_decompress - convert mapping pairs array to runlist
  * @vol:	ntfs volume on which the attribute resides
  * @attr:	attribute record whose mapping pairs array to decompress
  * @old_rl:	optional runlist in which to insert @attr's runlist
@@ -712,7 +712,7 @@ critical_error:
  * two into one, if that is possible (we check for overlap and discard the new
  * runlist if overlap present before returning ERR_PTR(-ERANGE)).
  */
-runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
+runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl)
 {
 	VCN vcn;		/* Current vcn. */
@@ -929,7 +929,7 @@ err_out:
 }
 
 /**
- * ntfs_vcn_to_lcn - convert a vcn into a lcn given a runlist
+ * ntfs_rl_vcn_to_lcn - convert a vcn into a lcn given a runlist
  * @rl:		runlist to use for conversion
  * @vcn:	vcn to convert
  *
@@ -951,7 +951,7 @@ err_out:
  * Locking: - The caller must have locked the runlist (for reading or writing).
  *	    - This function does not touch the lock.
  */
-LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
+LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 {
 	int i;
 

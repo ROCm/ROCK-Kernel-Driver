@@ -28,7 +28,7 @@
 #include "layout.h"
 #include "volume.h"
 
-static inline void init_runlist(runlist *rl)
+static inline void ntfs_init_runlist(runlist *rl)
 {
 	rl->rl = NULL;
 	init_rwsem(&rl->lock);
@@ -40,9 +40,9 @@ typedef enum {
 	LCN_ENOENT		= -3,
 } LCN_SPECIAL_VALUES;
 
-extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
+extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 		const ATTR_RECORD *attr, runlist_element *old_rl);
 
-extern LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
+extern LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
 #endif /* _LINUX_NTFS_RUNLIST_H */

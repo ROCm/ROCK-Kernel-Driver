@@ -27,6 +27,9 @@ ToDo/Notes:
 	  fs/ntfs/mft.c::ntfs_extent_mft_record_free().
 	- Splitt runlist related functions off from attrib.[hc] to runlist.[hc].
 	- Add vol->mft_data_pos and initialize it at mount time.
+	- Rename init_runlist() to ntfs_init_runlist(), ntfs_vcn_to_lcn() to
+	  ntfs_rl_vcn_to_lcn(), decompress_mapping_pairs() to
+	  ntfs_mapping_pairs_decompress() and adapt all callers.
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 

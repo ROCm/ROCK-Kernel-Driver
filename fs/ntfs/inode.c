@@ -376,13 +376,13 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	ni->seq_no = 0;
 	atomic_set(&ni->count, 1);
 	ni->vol = NTFS_SB(sb);
-	init_runlist(&ni->runlist);
+	ntfs_init_runlist(&ni->runlist);
 	init_MUTEX(&ni->mrec_lock);
 	ni->page = NULL;
 	ni->page_ofs = 0;
 	ni->attr_list_size = 0;
 	ni->attr_list = NULL;
-	init_runlist(&ni->attr_list_rl);
+	ntfs_init_runlist(&ni->attr_list_rl);
 	ni->itype.index.bmp_ino = NULL;
 	ni->itype.index.block_size = 0;
 	ni->itype.index.vcn_size = 0;
@@ -701,7 +701,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 			 * Setup the runlist. No need for locking as we have
 			 * exclusive access to the inode at this time.
 			 */
-			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
+			ni->attr_list_rl.rl = ntfs_mapping_pairs_decompress(vol,
 					ctx->attr, NULL);
 			if (IS_ERR(ni->attr_list_rl.rl)) {
 				err = PTR_ERR(ni->attr_list_rl.rl);
@@ -1672,7 +1672,7 @@ err_out:
  *
  * We solve these problems by starting with the $DATA attribute before anything
  * else and iterating using ntfs_attr_lookup($DATA) over all extents.  As each
- * extent is found, we decompress_mapping_pairs() including the implied
+ * extent is found, we ntfs_mapping_pairs_decompress() including the implied
  * ntfs_merge_runlists().  Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
@@ -1810,7 +1810,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 				goto put_err_out;
 			}
 			/* Setup the runlist. */
-			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
+			ni->attr_list_rl.rl = ntfs_mapping_pairs_decompress(vol,
 					ctx->attr, NULL);
 			if (IS_ERR(ni->attr_list_rl.rl)) {
 				err = PTR_ERR(ni->attr_list_rl.rl);
@@ -1942,11 +1942,11 @@ int ntfs_read_inode_mount(struct inode *vi)
 		 * as we have exclusive access to the inode at this time and we
 		 * are a mount in progress task, too.
 		 */
-		nrl = decompress_mapping_pairs(vol, attr, ni->runlist.rl);
+		nrl = ntfs_mapping_pairs_decompress(vol, attr, ni->runlist.rl);
 		if (IS_ERR(nrl)) {
-			ntfs_error(sb, "decompress_mapping_pairs() failed with "
-					"error code %ld. $MFT is corrupt.",
-					PTR_ERR(nrl));
+			ntfs_error(sb, "ntfs_mapping_pairs_decompress() "
+					"failed with error code %ld.  $MFT is "
+					"corrupt.", PTR_ERR(nrl));
 			goto put_err_out;
 		}
 		ni->runlist.rl = nrl;
