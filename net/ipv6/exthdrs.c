@@ -155,7 +155,7 @@ static struct tlvtype_proc tlvprocdestopt_lst[] = {
 static int ipv6_destopt_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp;
-	struct inet6_skb_parm *opt = (struct inet6_skb_parm *)skb->cb;
+	struct inet6_skb_parm *opt = IP6CB(skb);
 
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
 	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
@@ -217,7 +217,7 @@ void __init ipv6_nodata_init(void)
 static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp;
-	struct inet6_skb_parm *opt = (struct inet6_skb_parm *)skb->cb;
+	struct inet6_skb_parm *opt = IP6CB(skb);
 	struct in6_addr *addr;
 	struct in6_addr daddr;
 	int n, i;
@@ -288,7 +288,7 @@ looped_back:
 			return -1;
 		}
 		*skbp = skb = skb2;
-		opt = (struct inet6_skb_parm *)skb2->cb;
+		opt = IP6CB(skb2);
 		hdr = (struct ipv6_rt_hdr *) skb2->h.raw;
 	}
 
@@ -418,7 +418,7 @@ ipv6_invert_rthdr(struct sock *sk, struct ipv6_rt_hdr *hdr)
 static int ipv6_hop_ra(struct sk_buff *skb, int optoff)
 {
 	if (skb->nh.raw[optoff+1] == 2) {
-		((struct inet6_skb_parm*)skb->cb)->ra = optoff;
+		IP6CB(skb)->ra = optoff;
 		return 1;
 	}
 	LIMIT_NETDEBUG(
@@ -482,7 +482,7 @@ static struct tlvtype_proc tlvprochopopt_lst[] = {
 
 int ipv6_parse_hopopts(struct sk_buff *skb, int nhoff)
 {
-	((struct inet6_skb_parm*)skb->cb)->hop = sizeof(struct ipv6hdr);
+	IP6CB(skb)->hop = sizeof(struct ipv6hdr);
 	if (ip6_parse_tlv(tlvprochopopt_lst, skb))
 		return sizeof(struct ipv6hdr);
 	return -1;

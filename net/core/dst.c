@@ -230,8 +230,8 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 				if (event!=NETDEV_DOWN &&
 				    dst->output == dst_discard_out) {
 					dst->dev = &loopback_dev;
-					dev_put(dev);
 					dev_hold(&loopback_dev);
+					dev_put(dev);
 					dst->output = dst_discard_out;
 					if (dst->neighbour && dst->neighbour->dev == dev) {
 						dst->neighbour->dev = &loopback_dev;
@@ -242,6 +242,8 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 					dst->input = dst_discard_in;
 					dst->output = dst_discard_out;
 				}
+				if (dst->ops->ifdown)
+					dst->ops->ifdown(dst, event != NETDEV_DOWN);
 			}
 		}
 		spin_unlock_bh(&dst_lock);

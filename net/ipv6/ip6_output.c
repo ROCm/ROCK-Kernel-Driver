@@ -107,7 +107,7 @@ static int ip6_dev_loopback_xmit(struct sk_buff *newskb)
 }
 
 
-int ip6_output2(struct sk_buff **pskb)
+static int ip6_output2(struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
@@ -349,7 +349,7 @@ int ip6_forward(struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb->dst;
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
-	struct inet6_skb_parm *opt =(struct inet6_skb_parm*)skb->cb;
+	struct inet6_skb_parm *opt = IP6CB(skb);
 	
 	if (ipv6_devconf.forwarding == 0)
 		goto error;
