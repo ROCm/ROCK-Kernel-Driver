@@ -2104,6 +2104,44 @@ static int wl3501_get_frag_threshold(struct net_device *dev,
 	return rc;
 }
 
+static int wl3501_get_encode(struct net_device *dev,
+			     struct iw_request_info *info,
+			     union iwreq_data *wrqu, char *extra)
+{
+	u8 implemented, restricted, keys[100], len_keys, tocopy;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	int rc = wl3501_get_mib_value(this,
+				      WL3501_MIB_ATTR_PRIV_OPT_IMPLEMENTED,
+				      &implemented, sizeof(implemented));
+	if (rc)
+		goto out;
+	if (!implemented) {
+		wrqu->encoding.flags = IW_ENCODE_DISABLED;
+		goto out;
+	}
+	rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_EXCLUDE_UNENCRYPTED,
+				  &restricted, sizeof(restricted));
+	if (rc)
+		goto out;
+	wrqu->encoding.flags = restricted ? IW_ENCODE_RESTRICTED :
+					    IW_ENCODE_OPEN;
+	rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_WEP_KEY_MAPPINGS_LEN,
+				  &len_keys, sizeof(len_keys));
+	if (rc)
+		goto out;
+	rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_WEP_KEY_MAPPINGS,
+				  keys, len_keys);
+	if (rc)
+		goto out;
+	tocopy = min_t(u8, len_keys, wrqu->encoding.length);
+	tocopy = min_t(u8, tocopy, 100);
+	wrqu->encoding.length = tocopy;
+	memset(extra, 0, tocopy);
+	memcpy(extra, keys, tocopy);
+out:
+	return rc;
+}
+
 static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWNAME	- SIOCIWFIRST] = wl3501_get_name,
 	[SIOCSIWFREQ	- SIOCIWFIRST] = wl3501_set_freq,
@@ -2125,6 +2163,7 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWRATE	- SIOCIWFIRST] = wl3501_get_rate,
 	[SIOCGIWRTS	- SIOCIWFIRST] = wl3501_get_rts_threshold,
 	[SIOCGIWFRAG	- SIOCIWFIRST] = wl3501_get_frag_threshold,
+	[SIOCGIWENCODE	- SIOCIWFIRST] = wl3501_get_encode,
 };
 
 static const struct iw_handler_def wl3501_handler_def = {
