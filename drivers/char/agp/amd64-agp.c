@@ -38,6 +38,7 @@
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 
+static struct resource *aperture_resource;
 static int __initdata agp_try_unsupported;
 
 static int gart_iterator;
@@ -250,7 +251,6 @@ struct agp_bridge_driver amd_8151_driver = {
 /* Some basic sanity checks for the aperture. */
 static int __devinit aperture_valid(u64 aper, u32 size)
 { 
-	static int not_first_call; 
 	u32 pfn, c;
 	if (aper == 0) { 
 		printk(KERN_ERR PFX "No aperture\n");
@@ -279,12 +279,11 @@ static int __devinit aperture_valid(u64 aper, u32 size)
 
 	   Maybe better to use pci_assign_resource/pci_enable_device instead trusting
 	   the bridges? */
-	if (!not_first_call && !request_mem_region(aper, size, "aperture")) { 
+	if (!aperture_resource &&
+	    !(aperture_resource = request_mem_region(aper, size, "aperture"))) {
 		printk(KERN_ERR PFX "Aperture conflicts with PCI mapping.\n"); 
 		return 0;
 	}
-
-	not_first_call = 1;
 	return 1;
 } 
 
@@ -537,6 +536,8 @@ int __init agp_amd64_init(void)
 
 static void __exit agp_amd64_cleanup(void)
 {
+	if (aperture_resource)
+		release_resource(aperture_resource);
 	pci_unregister_driver(&agp_amd64_pci_driver);
 }
 
