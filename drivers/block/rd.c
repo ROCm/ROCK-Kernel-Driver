@@ -176,33 +176,24 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
 
 	do {
 		int count;
-		struct page * page;
-		char * src, * dst;
-		int unlock = 0;
+		struct page *page;
+		char *src;
+		char *dst;
 
 		count = PAGE_CACHE_SIZE - offset;
 		if (count > size)
 			count = size;
 		size -= count;
 
-		page = find_get_page(mapping, index);
+		page = grab_cache_page(mapping, index);
 		if (!page) {
-			page = grab_cache_page(mapping, index);
 			err = -ENOMEM;
-			if (!page)
-				goto out;
-			err = 0;
+			goto out;
+		}
 
-			if (!PageUptodate(page)) {
-				void *kaddr = kmap_atomic(page, KM_USER0);
-
-				memset(kaddr, 0, PAGE_CACHE_SIZE);
-				flush_dcache_page(page);
-				kunmap_atomic(kaddr, KM_USER0);
-				SetPageUptodate(page);
-			}
-
-			unlock = 1;
+		if (!PageUptodate(page)) {
+			clear_highpage(page);
+			SetPageUptodate(page);
 		}
 
 		index++;
@@ -227,8 +218,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
 		} else {
 			set_page_dirty(page);
 		}
-		if (unlock)
-			unlock_page(page);
+		unlock_page(page);
 		put_page(page);
 	} while (size);
 
