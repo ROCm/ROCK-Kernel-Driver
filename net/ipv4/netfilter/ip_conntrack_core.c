@@ -912,7 +912,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 	old = LIST_FIND(&ip_conntrack_expect_list, resent_expect,
 		        struct ip_conntrack_expect *, &expect->tuple, 
 			&expect->mask);
-	if (old) {
+	if (old && old->expectant == related_to) {
 		/* Helper private data may contain offsets but no pointers
 		   pointing into the payload - otherwise we should have to copy 
 		   the data filled out by the helper over the old one */
@@ -929,8 +929,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 		}
 
 		WRITE_UNLOCK(&ip_conntrack_lock);
-		/* This expectation is not inserted so no need to lock */
-		kmem_cache_free(ip_conntrack_expect_cachep, expect);
+		ip_conntrack_expect_put(expect);
 		return -EEXIST;
 
 	} else if (related_to->helper->max_expected && 
@@ -948,7 +947,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 				       related_to->helper->name,
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
-			kmem_cache_free(ip_conntrack_expect_cachep, expect);
+			ip_conntrack_expect_put(expect);	
 			return -EPERM;
 		}
 		DEBUGP("ip_conntrack: max number of expected "
@@ -982,7 +981,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 		WRITE_UNLOCK(&ip_conntrack_lock);
 		DEBUGP("expect_related: busy!\n");
 
-		kmem_cache_free(ip_conntrack_expect_cachep, expect);
+		ip_conntrack_expect_put(expect);	
 		return -EBUSY;
 	}
 
