@@ -622,22 +622,22 @@ int show_atari_interrupts(struct seq_file *p, void *v)
 		if (vectors[IRQ_SOURCE_TO_VECTOR(i)] == bad_interrupt)
 			continue;
 		if (i < STMFP_SOURCE_BASE)
-			seq_printf(p,, "auto %2d: %10u ",
+			seq_printf(p, "auto %2d: %10u ",
 				       i, kstat.irqs[0][i]);
 		else
-			seq_printf(p,, "vec $%02x: %10u ",
+			seq_printf(p, "vec $%02x: %10u ",
 				       IRQ_SOURCE_TO_VECTOR(i),
 				       kstat.irqs[0][i]);
 
 		if (irq_handler[i].handler != atari_call_irq_list) {
-			seq_printf(p,, "%s\n", irq_param[i].devname);
+			seq_printf(p, "%s\n", irq_param[i].devname);
 		}
 		else {
-			irq_node_t *p;
-			for( p = (irq_node_t *)irq_handler[i].dev_id; p; p = p->next ) {
-				seq_printf(p,, "%s\n", p->devname);
-				if (p->next)
-					seq_puts(p,, "                    " );
+			irq_node_t *n;
+			for( n = (irq_node_t *)irq_handler[i].dev_id; n; n = n->next ) {
+				seq_printf(p, "%s\n", n->devname);
+				if (n->next)
+					seq_puts(p, "                    " );
 			}
 		}
 	}
