@@ -142,7 +142,7 @@ DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
 DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
 DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
 DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
-DRIVERS-$(CONFIG_FUSION_BOOT) += drivers/message/fusion/fusion.o
+DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
 DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
 
 ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
@@ -167,7 +167,7 @@ DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
 DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
 DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
 DRIVERS-$(CONFIG_SERIO) += drivers/input/serio/seriodrv.o
-DRIVERS-$(CONFIG_I2O) += drivers/message/i2o/i2o.o
+DRIVERS-$(CONFIG_I2O) += drivers/message/message.o
 DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
 DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
 DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
