@@ -3,8 +3,6 @@
 #
 # $Id: Makefile,v 1.7 2001/10/05 06:53:51 dwmw2 Exp $
 
-O_TARGET	:= chipslink.o
-
 export-objs	:= chipreg.o gen_probe.o
 
 #                       *** BIG UGLY NOTE ***

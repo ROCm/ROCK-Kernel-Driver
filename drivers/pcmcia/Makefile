@@ -2,8 +2,6 @@
 # Makefile for the kernel pcmcia subsystem (c/o David Hinds)
 #
 
-O_TARGET := pcmcia.o
-
 export-objs := ds.o cs.o yenta.o pci_socket.o
 
 obj-$(CONFIG_PCMCIA)			+= pcmcia_core.o ds.o

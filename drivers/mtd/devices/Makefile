@@ -3,8 +3,6 @@
 #
 # $Id: Makefile,v 1.4 2001/06/26 21:10:05 spse Exp $
 
-O_TARGET	:= devlink.o
-
 #                       *** BIG UGLY NOTE ***
 #
 # The removal of get_module_symbol() and replacement with

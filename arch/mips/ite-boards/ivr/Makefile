@@ -6,18 +6,12 @@
 # Makefile for the Globespan IVR board,
 # board-specific files.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-
-all: ivr.o
 
 O_TARGET := ivr.o
 
 obj-y := init.o 
 
-obj-CONFIG_PCI += pci_fixup.o
-obj-CONFIG_BLK_DEV_INITRD += le_ramdisk.o
+obj-$(CONFIG_PCI) += pci_fixup.o
+obj-$(CONFIG_BLK_DEV_INITRD) += le_ramdisk.o
 
 include $(TOPDIR)/Rules.make

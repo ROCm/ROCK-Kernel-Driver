@@ -1,5 +1,5 @@
 
-# s390/Makefile
+# s390x/Makefile
 #
 # This file is included by the global makefile so that you can add your own
 # architecture-specific flags and dependencies. Remember to do have actions
@@ -33,7 +33,7 @@ HEAD := arch/s390x/kernel/head.o arch/s390x/kernel/init_task.o
 SUBDIRS := $(SUBDIRS) arch/s390x/mm arch/s390x/kernel arch/s390x/lib \
            drivers/s390
 CORE_FILES := arch/s390x/mm/mm.o arch/s390x/kernel/kernel.o $(CORE_FILES)
-DRIVERS := $(DRIVERS) drivers/s390/io.o
+DRIVERS := $(DRIVERS) drivers/s390/built-in.o
 LIBS := $(TOPDIR)/arch/s390x/lib/lib.a $(LIBS) $(TOPDIR)/arch/s390x/lib/lib.a
 
 all: image listing

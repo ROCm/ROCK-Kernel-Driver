@@ -1,15 +1,8 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
-EXTRA_AFLAGS	:= -traditional
-
-all: kernel.o head.o init_task.o
+EXTRA_TARGETS := head.o init_task.o
 
 O_TARGET := kernel.o
 
@@ -35,5 +28,7 @@ ifdef CONFIG_VISWS
 obj-y += setup-visws.o
 obj-$(CONFIG_X86_VISWS_APIC)	+= visws_apic.o
 endif
+
+EXTRA_AFLAGS	:= -traditional
 
 include $(TOPDIR)/Rules.make

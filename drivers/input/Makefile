@@ -2,10 +2,6 @@
 # Makefile for the input core drivers.
 #
 
-# The target object and module list name.
-
-O_TARGET	:= inputdrv.o
-
 # Objects that export symbols.
 
 mod-subdirs	:= joystick

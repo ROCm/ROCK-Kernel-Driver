@@ -1,25 +1,19 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
-all: kernel.o init_task.o pdc_cons.o process.o head.o
-O_TARGET = kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o process.o pdc_cons.o
 
 # Object file lists.
 
-obj-y		+= cache.o setup.o traps.o time.o irq.o \
-		syscall.o entry.o sys_parisc.o pdc.o ptrace.o hardware.o \
-		inventory.o drivers.o semaphore.o pa7300lc.o pci-dma.o \
-		signal.o hpmc.o \
-		real1.o real2.o led.o parisc_ksyms.o
+obj-y	     	:= cache.o setup.o traps.o time.o irq.o \
+		   syscall.o entry.o sys_parisc.o pdc.o ptrace.o hardware.o \
+		   inventory.o drivers.o semaphore.o pa7300lc.o pci-dma.o \
+		   signal.o hpmc.o \
+		   real1.o real2.o led.o parisc_ksyms.o
 
 export-objs	:= parisc_ksyms.o
-
 
 obj-$(CONFIG_PCI) += pci.o
 obj-$(CONFIG_VT) += keyboard.o
@@ -32,6 +26,6 @@ obj-$(CONFIG_IOMMU_SBA) += sba_iommu.o
 # obj-$(CONFIG_IOMMU_CCIO) += ccio-rm-dma.o
 obj-$(CONFIG_IOMMU_CCIO) += ccio-dma.o
 
-EXTRA_AFLAGS := -traditional
+EXTRA_AFLAGS	:= -traditional
 
 include $(TOPDIR)/Rules.make

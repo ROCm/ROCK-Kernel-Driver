@@ -5,14 +5,6 @@
 #
 # Makefile for the Alchemy Au1000 CPU, generic files.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-
-EXTRA_AFLAGS := $(CFLAGS)
-
-all: au1000.o
 
 O_TARGET := au1000.o
 
@@ -22,7 +14,9 @@ obj-$(CONFIG_AU1000_UART) += serial.o
 obj-$(CONFIG_REMOTE_DEBUG) += dbg_io.o             
 obj-$(CONFIG_BLK_DEV_INITRD) += ramdisk.o
 
-ramdisk.o: 
-	mkramobj ramdisk ramdisk.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 include $(TOPDIR)/Rules.make
+
+ramdisk.o: 
+	mkramobj ramdisk ramdisk.o
