@@ -2,7 +2,7 @@
  * This file implements the perfmon subsystem which is used
  * to program the IA-64 Performance Monitoring Unit (PMU).
  *
- * Originaly Written by Ganesh Venkitachalam, IBM Corp.
+ * Originally Written by Ganesh Venkitachalam, IBM Corp.
  * Copyright (C) 1999 Ganesh Venkitachalam <venkitac@us.ibm.com>
  *
  * Modifications by Stephane Eranian, Hewlett-Packard Co.
@@ -649,7 +649,7 @@ pfm_vm_close(struct vm_area_struct *vma)
 
 /*
  * This function is called from pfm_destroy_context() and also from pfm_inherit()
- * to explicitely remove the sampling buffer mapping from the user level address space.
+ * to explicitly remove the sampling buffer mapping from the user level address space.
  */
 static int
 pfm_remove_smpl_mapping(struct task_struct *task)
@@ -1670,7 +1670,7 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 		if (!PMD_IS_IMPL(cnum)) goto abort_mission;
 		/*
 		 * we can only read the register that we use. That includes
-		 * the one we explicitely initialize AND the one we want included
+		 * the one we explicitly initialize AND the one we want included
 		 * in the sampling buffer (smpl_regs).
 		 *
 		 * Having this restriction allows optimization in the ctxsw routine
@@ -1882,7 +1882,7 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	 * if blocking, then post the semaphore.
 	 * if non-blocking, then we ensure that the task will go into
 	 * pfm_overflow_must_block() before returning to user mode. 
-	 * We cannot explicitely reset another task, it MUST always
+	 * We cannot explicitly reset another task, it MUST always
 	 * be done by the task itself. This works for system wide because
 	 * the tool that is controlling the session is doing "self-monitoring".
 	 *
@@ -2914,7 +2914,7 @@ pfm_record_sample(struct task_struct *task, pfm_context_t *ctx, unsigned long ov
 
 /*
  * main overflow processing routine.
- * it can be called from the interrupt path or explicitely during the context switch code
+ * it can be called from the interrupt path or explicitly during the context switch code
  * Arguments:
  *	mode: 0=coming from PMU interrupt, 1=coming from ctxsw 
  *	
@@ -3833,7 +3833,7 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	/*
 	 * if there was a virtual mapping for the sampling buffer
 	 * the mapping is NOT inherited across fork() (see VM_DONTCOPY), 
-	 * so we don't have to explicitely remove it here. 
+	 * so we don't have to explicitly remove it here. 
 	 *
 	 *
 	 * Part of the clearing of fields is also done in
