@@ -146,7 +146,7 @@ void write_cis_mem(struct pcmcia_socket *s, int attr,
 void release_cis_mem(struct pcmcia_socket *s);
 void destroy_cis_cache(struct pcmcia_socket *s);
 int verify_cis_cache(struct pcmcia_socket *s);
-int read_tuple(client_handle_t handle, cisdata_t code, void *parse);
+int pccard_read_tuple(struct pcmcia_socket *s, unsigned int function, cisdata_t code, void *parse);
 
 /* In bulkmem.c */
 int pcmcia_get_first_region(client_handle_t handle, region_info_t *rgn);

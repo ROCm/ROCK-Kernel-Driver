@@ -1367,7 +1367,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     if ((!(s->state & SOCKET_CARDBUS)) && (s->functions == 0) &&
 	(client->Function != BIND_FN_ALL)) {
 	cistpl_longlink_mfc_t mfc;
-	if (read_tuple(client, CISTPL_LONGLINK_MFC, &mfc)
+	if (pccard_read_tuple(s, client->Function, CISTPL_LONGLINK_MFC, &mfc)
 	    == CS_SUCCESS)
 	    s->functions = mfc.nfn;
 	else

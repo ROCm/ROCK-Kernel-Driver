@@ -83,16 +83,16 @@ static void setup_regions(client_handle_t handle, int attr,
 	   handle, attr, list);
 
     code = (attr) ? CISTPL_DEVICE_A : CISTPL_DEVICE;
-    if (read_tuple(handle, code, &device) != CS_SUCCESS)
+    if (pccard_read_tuple(handle->Socket, handle->Function, code, &device) != CS_SUCCESS)
 	return;
     code = (attr) ? CISTPL_JEDEC_A : CISTPL_JEDEC_C;
-    has_jedec = (read_tuple(handle, code, &jedec) == CS_SUCCESS);
+    has_jedec = (pccard_read_tuple(handle->Socket, handle->Function, code, &jedec) == CS_SUCCESS);
     if (has_jedec && (device.ndev != jedec.nid)) {
 	ds_dbg(SOCKET(handle), 0, "Device info does not match JEDEC info.\n");
 	has_jedec = 0;
     }
     code = (attr) ? CISTPL_DEVICE_GEO_A : CISTPL_DEVICE_GEO;
-    has_geo = (read_tuple(handle, code, &geo) == CS_SUCCESS);
+    has_geo = (pccard_read_tuple(handle->Socket, handle->Function, code, &geo) == CS_SUCCESS);
     if (has_geo && (device.ndev != geo.ngeo)) {
 	ds_dbg(SOCKET(handle), 0, "Device info does not match geometry tuple.\n");
 	has_geo = 0;

@@ -1402,7 +1402,7 @@ EXPORT_SYMBOL(pccard_parse_tuple);
     
 ======================================================================*/
 
-int read_tuple(client_handle_t handle, cisdata_t code, void *parse)
+int pccard_read_tuple(struct pcmcia_socket *s, unsigned int function, cisdata_t code, void *parse)
 {
     tuple_t tuple;
     cisdata_t *buf;
@@ -1413,19 +1413,19 @@ int read_tuple(client_handle_t handle, cisdata_t code, void *parse)
 	return CS_OUT_OF_RESOURCE;
     tuple.DesiredTuple = code;
     tuple.Attributes = TUPLE_RETURN_COMMON;
-    ret = pccard_get_first_tuple(handle->Socket, handle->Function, &tuple);
+    ret = pccard_get_first_tuple(s, function, &tuple);
     if (ret != CS_SUCCESS) goto done;
     tuple.TupleData = buf;
     tuple.TupleOffset = 0;
     tuple.TupleDataMax = 255;
-    ret = pcmcia_get_tuple_data(handle, &tuple);
+    ret = pccard_get_tuple_data(s, &tuple);
     if (ret != CS_SUCCESS) goto done;
-    ret = pcmcia_parse_tuple(handle, &tuple, parse);
+    ret = pccard_parse_tuple(&tuple, parse);
 done:
     kfree(buf);
     return ret;
 }
-EXPORT_SYMBOL(read_tuple);
+EXPORT_SYMBOL(pccard_read_tuple);
 
 /*======================================================================
 
@@ -1442,9 +1442,15 @@ int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
     tuple_t *tuple;
     cisparse_t *p;
     int ret, reserved, dev_ok = 0, ident_ok = 0;
+    struct pcmcia_socket *s;
+    unsigned int function;
 
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
+    s = SOCKET(handle);
+    if (!s)
+	return CS_BAD_HANDLE;
+    function = handle->Function;
     tuple = kmalloc(sizeof(*tuple), GFP_KERNEL);
     if (tuple == NULL)
 	return CS_OUT_OF_RESOURCE;
@@ -1457,23 +1463,23 @@ int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
     info->Chains = reserved = 0;
     tuple->DesiredTuple = RETURN_FIRST_TUPLE;
     tuple->Attributes = TUPLE_RETURN_COMMON;
-    ret = pccard_get_first_tuple(handle->Socket, handle->Function, tuple);
+    ret = pccard_get_first_tuple(s, function, tuple);
     if (ret != CS_SUCCESS)
 	goto done;
 
     /* First tuple should be DEVICE; we should really have either that
        or a CFTABLE_ENTRY of some sort */
     if ((tuple->TupleCode == CISTPL_DEVICE) ||
-	(read_tuple(handle, CISTPL_CFTABLE_ENTRY, p) == CS_SUCCESS) ||
-	(read_tuple(handle, CISTPL_CFTABLE_ENTRY_CB, p) == CS_SUCCESS))
+	(pccard_read_tuple(s, function, CISTPL_CFTABLE_ENTRY, p) == CS_SUCCESS) ||
+	(pccard_read_tuple(s, function, CISTPL_CFTABLE_ENTRY_CB, p) == CS_SUCCESS))
 	dev_ok++;
 
     /* All cards should have a MANFID tuple, and/or a VERS_1 or VERS_2
        tuple, for card identification.  Certain old D-Link and Linksys
        cards have only a broken VERS_2 tuple; hence the bogus test. */
-    if ((read_tuple(handle, CISTPL_MANFID, p) == CS_SUCCESS) ||
-	(read_tuple(handle, CISTPL_VERS_1, p) == CS_SUCCESS) ||
-	(read_tuple(handle, CISTPL_VERS_2, p) != CS_NO_MORE_ITEMS))
+    if ((pccard_read_tuple(s, function, CISTPL_MANFID, p) == CS_SUCCESS) ||
+	(pccard_read_tuple(s, function, CISTPL_VERS_1, p) == CS_SUCCESS) ||
+	(pccard_read_tuple(s, function, CISTPL_VERS_2, p) != CS_NO_MORE_ITEMS))
 	ident_ok++;
 
     if (!dev_ok && !ident_ok)
