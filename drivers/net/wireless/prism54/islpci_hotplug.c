@@ -321,6 +321,9 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	DEBUG(SHOW_TRACING, "%s: pci_set_master(pdev)\n", DRV_NAME);
 	pci_set_master(pdev);
 
+	/* enable MWI */
+	pci_set_mwi(pdev);
+
 	/* setup the network device interface and its structure */
 	if (!(ndev = islpci_setup(pdev))) {
 		/* error configuring the driver as a network device */
