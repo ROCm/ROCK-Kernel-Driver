@@ -177,6 +177,12 @@ out_kfree:
 	goto out;
 }
 
+static void in_dev_rcu_put(struct rcu_head *head)
+{
+	struct in_device *idev = container_of(head, struct in_device, rcu_head);
+	in_dev_put(idev);
+}
+
 static void inetdev_destroy(struct in_device *in_dev)
 {
 	struct in_ifaddr *ifa;
@@ -204,7 +210,7 @@ static void inetdev_destroy(struct in_device *in_dev)
 	neigh_sysctl_unregister(in_dev->arp_parms);
 #endif
 	neigh_parms_release(&arp_tbl, in_dev->arp_parms);
-	in_dev_put(in_dev);
+	call_rcu(&in_dev->rcu_head, in_dev_rcu_put);
 }
 
 int inet_addr_onlink(struct in_device *in_dev, u32 a, u32 b)

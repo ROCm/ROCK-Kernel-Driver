@@ -158,16 +158,10 @@ __in_dev_get(const struct net_device *dev)
 
 extern void in_dev_finish_destroy(struct in_device *idev);
 
-static inline void in_dev_rcu_destroy(struct rcu_head *head)
-{
-	struct in_device *idev = container_of(head, struct in_device, rcu_head);
-	in_dev_finish_destroy(idev);
-}
-
 static inline void in_dev_put(struct in_device *idev)
 {
 	if (atomic_dec_and_test(&idev->refcnt))
-		call_rcu(&idev->rcu_head, in_dev_rcu_destroy);
+		in_dev_finish_destroy(idev);
 }
 
 #define __in_dev_put(idev)  atomic_dec(&(idev)->refcnt)
