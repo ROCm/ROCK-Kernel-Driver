@@ -44,7 +44,7 @@
 /*
  * log of the size of each IO TLB slab.  The number of slabs is command line controllable.
  */
-#define IO_TLB_SHIFT 11
+#define IO_TLB_SHIFT 16
 
 /*
  * Used to do a quick range check in swiotlb_unmap_single and swiotlb_sync_single_*, to see
