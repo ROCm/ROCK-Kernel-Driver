@@ -688,7 +688,7 @@ enum {
  * Different cardbus controllers have slightly different
  * initialization sequences etc details. List them here..
  */
-struct cardbus_type cardbus_type[] = {
+static struct cardbus_type cardbus_type[] = {
 	[CARDBUS_TYPE_TI]	= {
 		.override	= ti_override,
 		.save_state	= ti_save_state,
