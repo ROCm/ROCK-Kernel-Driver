@@ -40,12 +40,11 @@ struct kernel_symbol
 	char name[MODULE_NAME_LEN];
 };
 
-#ifdef MODULE
+/* These are either module local, or the kernel's dummy ones. */
+extern int init_module(void);
+extern void cleanup_module(void);
 
-#ifdef KBUILD_MODNAME
-static const char __module_name[MODULE_NAME_LEN] __attribute__((section(".gnu.linkonce.modname"))) = \
-  __stringify(KBUILD_MODNAME);
-#endif
+#ifdef MODULE
 
 /* For replacement modutils, use an alias not a pointer. */
 #define MODULE_GENERIC_TABLE(gtype,name)			\
@@ -56,9 +55,6 @@ static const struct gtype##_id * __module_##gtype##_table	\
 extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
-/* This is magically filled in by the linker, but THIS_MODULE must be
-   a constant so it works in initializers. */
-extern struct module __this_module;
 #define THIS_MODULE (&__this_module)
 
 #else  /* !MODULE */
@@ -176,7 +172,7 @@ struct module
 
 	/* The command line arguments (may be mangled).  People like
 	   keeping pointers to this stuff */
-	char args[0];
+	char *args;
 };
 
 /* FIXME: It'd be nice to isolate modules during init, too, so they
@@ -289,6 +285,19 @@ static inline const char *module_address_lookup(unsigned long addr,
 }
 #endif /* CONFIG_MODULES */
 
+#if defined(MODULE) && defined(KBUILD_MODNAME)
+/* We make the linker do some of the work. */
+struct module __this_module
+__attribute__((section(".gnu.linkonce.this_module"))) = {
+	.name = __stringify(KBUILD_MODNAME),
+	.symbols = { .owner = &__this_module },
+	.init = init_module,
+#ifdef CONFIG_MODULE_UNLOAD
+	.exit = cleanup_module,
+#endif
+};
+#endif /* MODULE && KBUILD_MODNAME */
+
 /* For archs to search exception tables */
 extern struct list_head extables;
 extern spinlock_t modlist_lock;
@@ -359,13 +368,6 @@ extern int module_dummy_usage;
 (((m)->module_init						\
   && __mod_between((p),(n),(m)->module_init,(m)->init_size))	\
  || __mod_between((p),(n),(m)->module_core,(m)->core_size))
-
-/* Old-style "I'll just call it init_module and it'll be run at
-   insert".  Use module_init(myroutine) instead. */
-#ifdef MODULE
-#define init_module(voidarg) __initfn(void)
-#define cleanup_module(voidarg) __exitfn(void)
-#endif
 
 /*
  * The exception and symbol tables, and the lock
