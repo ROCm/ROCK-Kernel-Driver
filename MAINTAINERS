@@ -413,6 +413,15 @@ L:	dev-etrax@axis.com
 W:	http://developer.axis.com
 S:	Maintained
 
+CRYPTO API
+P:	James Morris
+M:	jmorris@intercode.com.au
+P:	David S. Miller
+M:	davem@redhat.com
+W	http://samba.org/~jamesm/crypto/
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 CYBERPRO FB DRIVER
 P:	Russell King
 M:	rmk@arm.linux.org.uk
