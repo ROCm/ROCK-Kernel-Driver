@@ -448,7 +448,6 @@ struct fb_info {
 	char *screen_base;		/* Virtual address */
 	struct vc_data *display_fg;	/* Console visible on this display */
 	int currcon;			/* Current VC. */
-	struct class_device class_dev;	/* Sysfs data */	
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
 	/* From here on everything is device dependent */
 	void *par;	
@@ -533,9 +532,6 @@ extern int num_registered_fb;
 /* drivers/video/fbsysfs.c */
 extern struct fb_info *framebuffer_alloc(size_t size, struct device *dev);
 extern void framebuffer_release(struct fb_info *info);
-extern int fb_add_class_device(struct fb_info *info);
-
-extern struct class fb_class;
 
 /* drivers/video/fbmon.c */
 #define FB_MAXTIMINGS       0

@@ -1228,9 +1228,6 @@ register_framebuffer(struct fb_info *fb_info)
 			break;
 	fb_info->node = i;
 	
-	if (fb_add_class_device(fb_info))
-		return -EINVAL;
-	
 	if (fb_info->pixmap.addr == NULL) {
 		fb_info->pixmap.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
 		if (fb_info->pixmap.addr) {
@@ -1279,7 +1276,6 @@ unregister_framebuffer(struct fb_info *fb_info)
 		kfree(fb_info->pixmap.addr);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
-	class_device_del(&fb_info->class_dev);
 	return 0;
 }
 
@@ -1307,8 +1303,6 @@ fbmem_init(void)
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
 
-	class_register(&fb_class);
-	
 #ifdef CONFIG_FB_OF
 	if (ofonly) {
 		offb_init();
