@@ -122,33 +122,6 @@ do {									\
 #define IP_NF_ASSERT(x)
 #endif
 
-struct ip_conntrack_expect
-{
-	/* Internal linked list (global expectation list) */
-	struct list_head list;
-
-	/* We expect this tuple, with the following mask */
-	struct ip_conntrack_tuple tuple, mask;
- 
-	/* Function to call after setup and insertion */
-	void (*expectfn)(struct ip_conntrack *new,
-			 struct ip_conntrack_expect *this);
-
-	/* The conntrack of the master connection */
-	struct ip_conntrack *master;
-
-	/* Timer function; deletes the expectation. */
-	struct timer_list timeout;
-
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-	/* This is the original per-proto part, used to map the
-	 * expected connection the way the recipient expects. */
-	union ip_conntrack_manip_proto saved_proto;
-	/* Direction relative to the master connection. */
-	enum ip_conntrack_dir dir;
-#endif
-};
-
 struct ip_conntrack_counter
 {
 	u_int64_t packets;
@@ -204,6 +177,33 @@ struct ip_conntrack
 	/* Traversed often, so hopefully in different cacheline to top */
 	/* These are my tuples; original and reply */
 	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
+};
+
+struct ip_conntrack_expect
+{
+	/* Internal linked list (global expectation list) */
+	struct list_head list;
+
+	/* We expect this tuple, with the following mask */
+	struct ip_conntrack_tuple tuple, mask;
+ 
+	/* Function to call after setup and insertion */
+	void (*expectfn)(struct ip_conntrack *new,
+			 struct ip_conntrack_expect *this);
+
+	/* The conntrack of the master connection */
+	struct ip_conntrack *master;
+
+	/* Timer function; deletes the expectation. */
+	struct timer_list timeout;
+
+#ifdef CONFIG_IP_NF_NAT_NEEDED
+	/* This is the original per-proto part, used to map the
+	 * expected connection the way the recipient expects. */
+	union ip_conntrack_manip_proto saved_proto;
+	/* Direction relative to the master connection. */
+	enum ip_conntrack_dir dir;
+#endif
 };
 
 static inline struct ip_conntrack *
@@ -301,6 +301,7 @@ struct ip_conntrack_stat
 
 #define CONNTRACK_STAT_INC(count) (__get_cpu_var(ip_conntrack_stat).count++)
 
+#ifdef CONFIG_IP_NF_NAT_NEEDED
 static inline int ip_nat_initialized(struct ip_conntrack *conntrack,
 				     enum ip_nat_manip_type manip)
 {
@@ -308,5 +309,7 @@ static inline int ip_nat_initialized(struct ip_conntrack *conntrack,
 		return test_bit(IPS_SRC_NAT_DONE_BIT, &conntrack->status);
 	return test_bit(IPS_DST_NAT_DONE_BIT, &conntrack->status);
 }
+#endif /* CONFIG_IP_NF_NAT_NEEDED */
+
 #endif /* __KERNEL__ */
 #endif /* _IP_CONNTRACK_H */
