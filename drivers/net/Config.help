@@ -797,6 +797,14 @@ CONFIG_SUNGEM
   Support for the Sun GEM chip, aka Sun GigabitEthernet/P 2.0.  See also
   <http://www.sun.com/products-n-solutions/hardware/docs/pdf/806-3985-10.pdf>.
 
+CONFIG_TIGON3
+  This driver supports Broadcom Tigon3 based gigabit Ethernet cards.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  This is
+  recommended.  The module will be called tg3.o.
+
 CONFIG_MYRI_SBUS
   This driver supports MyriCOM Sbus gigabit Ethernet cards.
 
