@@ -262,18 +262,14 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	argp->buf += 5;
 	argp->len -= 5;
 
-	/* Used by nfsd to only allow the NULL procedure for amd. */
-	if (rqstp->rq_auth && !rqstp->rq_client && proc) {
-		auth_stat = rpc_autherr_badcred;
-		goto err_bad_auth;
-	}
-
 	/*
 	 * Decode auth data, and add verifier to reply buffer.
 	 * We do this before anything else in order to get a decent
 	 * auth verifier.
 	 */
-	svc_authenticate(rqstp, &rpc_stat, &auth_stat);
+	if (svc_authenticate(rqstp, &rpc_stat, &auth_stat, proc))
+		/* drop the request, it has probably been deferred */
+		goto dropit;
 
 	if (rpc_stat != rpc_success)
 		goto err_garbage;
@@ -347,10 +343,14 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 
 	if (procp->pc_encode == NULL)
 		goto dropit;
-sendit:
+
+ sendit:
+	if (svc_authorise(rqstp))
+		goto dropit;
 	return svc_send(rqstp);
 
-dropit:
+ dropit:
+	svc_authorise(rqstp);	/* doesn't hurt to call this twice */
 	dprintk("svc: svc_process dropit\n");
 	svc_drop(rqstp);
 	return 0;

@@ -98,6 +98,7 @@ struct svc_rqst {
 
 	struct svc_serv *	rq_server;	/* RPC service definition */
 	struct svc_procedure *	rq_procinfo;	/* procedure info */
+	struct auth_ops *	rq_authop;	/* authentication flavour */
 	struct svc_cred		rq_cred;	/* auth info */
 	struct sk_buff *	rq_skbuff;	/* fast recv inet buffer */
 	struct svc_buf		rq_defbuf;	/* default buffer */
@@ -108,10 +109,10 @@ struct svc_rqst {
 	u32			rq_vers;	/* program version */
 	u32			rq_proc;	/* procedure number */
 	u32			rq_prot;	/* IP protocol */
-	unsigned short		rq_verfed  : 1,	/* reply has verifier */
+	unsigned short
 				rq_userset : 1,	/* auth->setuser OK */
-				rq_secure  : 1,	/* secure port */
-				rq_auth    : 1;	/* check client */
+				rq_secure  : 1;	/* secure port */
+
 
 	void *			rq_argp;	/* decoded arguments */
 	void *			rq_resp;	/* xdr'd results */
@@ -128,7 +129,7 @@ struct svc_rqst {
 						 * to report (real or virtual)
 						 */
 
-	wait_queue_head_t	rq_wait;	/* synchronozation */
+	wait_queue_head_t	rq_wait;	/* synchronization */
 };
 
 /*

@@ -173,8 +173,6 @@ nfsd(struct svc_rqst *rqstp)
 	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 
 	nfsdstats.th_cnt++;
-	/* Let svc_process check client's authentication. */
-	rqstp->rq_auth = 1;
 
 	lockd_up();				/* start lockd */
 

@@ -1089,7 +1089,6 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 
 	rqstp->rq_secure  = ntohs(rqstp->rq_addr.sin_port) < 1024;
 	rqstp->rq_userset = 0;
-	rqstp->rq_verfed  = 0;
 
 	svc_getu32(&rqstp->rq_argbuf, rqstp->rq_xid);
 	svc_putu32(&rqstp->rq_resbuf, rqstp->rq_xid);

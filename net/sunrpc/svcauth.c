@@ -20,30 +20,40 @@
 #define RPCDBG_FACILITY	RPCDBG_AUTH
 
 /*
- * Type of authenticator function
- */
-typedef void	(*auth_fn_t)(struct svc_rqst *rqstp, u32 *statp, u32 *authp);
-
-/*
  * Builtin auth flavors
  */
-static void	svcauth_null(struct svc_rqst *rqstp, u32 *statp, u32 *authp);
-static void	svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp);
+static int	svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc);
+static int	svcauth_null_release(struct svc_rqst *rqstp);
+static int	svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc);
+static int	svcauth_unix_release(struct svc_rqst *rqstp);
+
+struct auth_ops svcauth_null = {
+	.name		= "null",
+	.flavour	= RPC_AUTH_NULL,
+	.accept 	= svcauth_null_accept,
+	.release	= svcauth_null_release,
+};
+
+struct auth_ops svcauth_unix = {
+	.name		= "unix",
+	.flavour	= RPC_AUTH_UNIX,
+	.accept 	= svcauth_unix_accept,
+	.release	= svcauth_unix_release,
+};
 
 /*
  * Table of authenticators
  */
-static auth_fn_t	authtab[RPC_AUTH_MAXFLAVOR] = {
-	svcauth_null,
-	svcauth_unix,
-	NULL,
+static struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR] = {
+	[0] = &svcauth_null,
+	[1] = &svcauth_unix,
 };
 
-void
-svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
+int
+svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp, int proc)
 {
 	rpc_authflavor_t	flavor;
-	auth_fn_t		func;
+	struct auth_ops		*aops;
 
 	*statp = rpc_success;
 	*authp = rpc_auth_ok;
@@ -52,21 +62,53 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 	flavor = ntohl(flavor);
 
 	dprintk("svc: svc_authenticate (%d)\n", flavor);
-	if (flavor >= RPC_AUTH_MAXFLAVOR || !(func = authtab[flavor])) {
+	if (flavor >= RPC_AUTH_MAXFLAVOR || !(aops = authtab[flavor])) {
 		*authp = rpc_autherr_badcred;
-		return;
+		return 0;
 	}
 
-	rqstp->rq_cred.cr_flavor = flavor;
-	func(rqstp, statp, authp);
+	rqstp->rq_authop = aops;
+	switch (aops->accept(rqstp, authp, proc)) {
+	case SVC_OK:
+		return 0;
+	case SVC_GARBAGE:
+		*statp = rpc_garbage_args;
+		return 0;
+	case SVC_SYSERR:
+		*statp = rpc_system_err;
+		return 0;
+	case SVC_DENIED:
+		return 0;
+	case SVC_DROP:
+		break;
+	}
+	return 1; /* drop the request */
+}
+
+/* A reqeust, which was authenticated, has now executed.
+ * Time to finalise the the credentials and verifier
+ * and release and resources
+ */
+int svc_authorise(struct svc_rqst *rqstp)
+{
+	struct auth_ops *aops = rqstp->rq_authop;
+	int rv = 0;
+
+	rqstp->rq_authop = NULL;
+	
+	if (aops) 
+		rv = aops->release(rqstp);
+
+	/* FIXME should I count and release authops */
+	return rv;
 }
 
 int
-svc_auth_register(rpc_authflavor_t flavor, auth_fn_t func)
+svc_auth_register(rpc_authflavor_t flavor, struct auth_ops *aops)
 {
 	if (flavor >= RPC_AUTH_MAXFLAVOR || authtab[flavor])
 		return -EINVAL;
-	authtab[flavor] = func;
+	authtab[flavor] = aops;
 	return 0;
 }
 
@@ -77,25 +119,24 @@ svc_auth_unregister(rpc_authflavor_t flavor)
 		authtab[flavor] = NULL;
 }
 
-static void
-svcauth_null(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
+static int
+svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 {
 	struct svc_buf	*argp = &rqstp->rq_argbuf;
 	struct svc_buf	*resp = &rqstp->rq_resbuf;
 
 	if ((argp->len -= 3) < 0) {
-		*statp = rpc_garbage_args;
-		return;
+		return SVC_GARBAGE;
 	}
 	if (*(argp->buf)++ != 0) {	/* we already skipped the flavor */
 		dprintk("svc: bad null cred\n");
 		*authp = rpc_autherr_badcred;
-		return;
+		return SVC_DENIED;
 	}
 	if (*(argp->buf)++ != RPC_AUTH_NULL || *(argp->buf)++ != 0) {
 		dprintk("svc: bad null verf\n");
 		*authp = rpc_autherr_badverf;
-		return;
+		return SVC_DENIED;
 	}
 
 	/* Signal that mapping to nobody uid/gid is required */
@@ -104,13 +145,19 @@ svcauth_null(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 	rqstp->rq_cred.cr_groups[0] = NOGROUP;
 
 	/* Put NULL verifier */
-	rqstp->rq_verfed = 1;
 	svc_putu32(resp, RPC_AUTH_NULL);
 	svc_putu32(resp, 0);
+	return SVC_OK;
 }
 
-static void
-svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
+static int
+svcauth_null_release(struct svc_rqst *rqstp)
+{
+	return 0; /* don't drop */
+}
+
+static int
+svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 {
 	struct svc_buf	*argp = &rqstp->rq_argbuf;
 	struct svc_buf	*resp = &rqstp->rq_resbuf;
@@ -118,14 +165,12 @@ svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 	u32		*bufp = argp->buf, slen, i;
 	int		len   = argp->len;
 
-	if ((len -= 3) < 0) {
-		*statp = rpc_garbage_args;
-		return;
-	}
+	if ((len -= 3) < 0)
+		return SVC_GARBAGE;
 
 	bufp++;					/* length */
 	bufp++;					/* time stamp */
-	slen = (ntohl(*bufp++) + 3) >> 2;	/* machname length */
+	slen = XDR_QUADLEN(ntohl(*bufp++));	/* machname length */
 	if (slen > 64 || (len -= slen + 3) < 0)
 		goto badcred;
 	bufp += slen;				/* skip machname */
@@ -144,19 +189,27 @@ svcauth_unix(struct svc_rqst *rqstp, u32 *statp, u32 *authp)
 
 	if (*bufp++ != RPC_AUTH_NULL || *bufp++ != 0) {
 		*authp = rpc_autherr_badverf;
-		return;
+		return SVC_DENIED;
 	}
 
 	argp->buf = bufp;
 	argp->len = len;
 
 	/* Put NULL verifier */
-	rqstp->rq_verfed = 1;
 	svc_putu32(resp, RPC_AUTH_NULL);
 	svc_putu32(resp, 0);
 
-	return;
+	return SVC_OK;
 
 badcred:
 	*authp = rpc_autherr_badcred;
+	return SVC_DENIED;
+}
+
+static int
+svcauth_unix_release(struct svc_rqst *rqstp)
+{
+	/* Verifier (such as it is) is already in place.
+	 */
+	return 0;
 }
