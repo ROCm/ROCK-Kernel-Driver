@@ -608,16 +608,17 @@ static inline void free_vm86_irq(int irqnumber)
 
 static inline int task_valid(struct task_struct *tsk)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	int ret = 0;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p)
 		if ((p == tsk) && (p->sig)) {
 			ret = 1;
-			break;
+			goto out;
 		}
-	}
+	while_each_thread(g, p);
+out:
 	read_unlock(&tasklist_lock);
 	return ret;
 }

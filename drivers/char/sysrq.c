@@ -299,7 +299,7 @@ static void send_sig_all(int sig)
 {
 	struct task_struct *p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if (p->mm && p->pid != 1)
 			/* Not swapper, init nor kernel thread */
 			force_sig(sig, p);
