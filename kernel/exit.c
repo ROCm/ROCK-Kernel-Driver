@@ -1228,6 +1228,58 @@ bail_ref:
 	return retval;
 }
 
+/*
+ * Handle do_wait work for one task in a live, non-stopped state.
+ * read_lock(&tasklist_lock) on entry.  If we return zero, we still hold
+ * the lock and this task is uninteresting.  If we return nonzero, we have
+ * released the lock and the system call should return.
+ */
+static int wait_task_continued(task_t *p, int noreap,
+			       struct siginfo __user *infop,
+			       int __user *stat_addr, struct rusage __user *ru)
+{
+	int retval;
+	pid_t pid;
+	uid_t uid;
+
+	if (unlikely(!p->signal))
+		return 0;
+
+	if (p->signal->stop_state >= 0)
+		return 0;
+
+	spin_lock_irq(&p->sighand->siglock);
+	if (p->signal->stop_state >= 0) { /* Re-check with the lock held.  */
+		spin_unlock_irq(&p->sighand->siglock);
+		return 0;
+	}
+	if (!noreap)
+		p->signal->stop_state = 0;
+	spin_unlock_irq(&p->sighand->siglock);
+
+	pid = p->pid;
+	uid = p->uid;
+	get_task_struct(p);
+	read_unlock(&tasklist_lock);
+
+	if (!infop) {
+		retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
+		put_task_struct(p);
+		if (!retval && stat_addr)
+			retval = put_user(0xffff, stat_addr);
+		if (!retval)
+			retval = p->pid;
+	} else {
+		retval = wait_noreap_copyout(p, pid, uid,
+					     CLD_CONTINUED, SIGCONT,
+					     infop, ru);
+		BUG_ON(retval == 0);
+	}
+
+	return retval;
+}
+
+
 static long do_wait(pid_t pid, int options, struct siginfo __user *infop,
 		    int __user *stat_addr, struct rusage __user *ru)
 {
@@ -1290,27 +1342,11 @@ repeat:
 check_continued:
 				if (!unlikely(options & WCONTINUED))
 					continue;
-				if (unlikely(!p->signal))
-					continue;
-				spin_lock_irq(&p->sighand->siglock);
-				if (p->signal->stop_state < 0) {
-					pid_t pid;
-					uid_t uid;
-
-					if (!(options & WNOWAIT))
-						p->signal->stop_state = 0;
-					spin_unlock_irq(&p->sighand->siglock);
-					pid = p->pid;
-					uid = p->uid;
-					get_task_struct(p);
-					read_unlock(&tasklist_lock);
-					retval = wait_noreap_copyout(p, pid,
-							uid, CLD_CONTINUED,
-							SIGCONT, infop, ru);
-					BUG_ON(retval == 0);
+				retval = wait_task_continued(
+					p, (options & WNOWAIT),
+					infop, stat_addr, ru);
+				if (retval != 0) /* He released the lock.  */
 					goto end;
-				}
-				spin_unlock_irq(&p->sighand->siglock);
 				break;
 			}
 		}
@@ -1412,7 +1448,8 @@ asmlinkage long sys_wait4(pid_t pid, int __user *stat_addr,
 {
 	long ret;
 
-	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
+	if (options & ~(WNOHANG|WUNTRACED|WCONTINUED|
+			__WNOTHREAD|__WCLONE|__WALL))
 		return -EINVAL;
 	ret = do_wait(pid, options | WEXITED, NULL, stat_addr, ru);
 
