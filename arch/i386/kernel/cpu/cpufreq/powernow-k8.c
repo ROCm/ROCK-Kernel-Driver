@@ -726,6 +726,13 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 			continue;
 		}
 
+		/* verify voltage is OK - BIOSs are using "off" to indicate invalid */
+		if (vid == 0x1f) {
+			dprintk(KERN_INFO PFX "invalid vid %u, ignoring\n", vid);
+			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+			continue;
+		}
+
 		/* verify only 1 entry from the lo frequency table */
 		if ((fid < HI_FID_TABLE_BOTTOM) && (cntlofreq++)) {
 			printk(KERN_ERR PFX "Too many lo freq table entries\n");
