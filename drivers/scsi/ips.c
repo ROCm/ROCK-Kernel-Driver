@@ -1155,13 +1155,6 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 
    ips_next(ha, IPS_INTR_IORL);
    
-   /* If We were using the CD Boot Flash Buffer, Restore the Old Values */
-   if ( ips_FlashData == ha->ioctl_data ) {                               
-      ha->ioctl_data = ha->flash_data;                           
-      ha->ioctl_order = ha->flash_order;                          
-      ha->ioctl_datasize = ha->flash_datasize;                       
-      ips_FlashDataInUse = 0;                                             
-   }
    return (0);
 }
 

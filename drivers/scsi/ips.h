@@ -714,7 +714,7 @@ typedef struct {
    uint16_t usConfigUpdateCount;
    uint8_t  ucBlkFlag;
    uint8_t  reserved;
-   uint16_t usAddrDeadDisk[IPS_MAX_CHANNELS * IPS_MAX_TARGETS];
+   uint16_t usAddrDeadDisk[IPS_MAX_CHANNELS * (IPS_MAX_TARGETS + 1)];
 } IPS_ENQ, *PIPS_ENQ;
 
 typedef struct {
