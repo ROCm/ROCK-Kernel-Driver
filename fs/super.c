@@ -432,16 +432,6 @@ static void generic_shutdown_super(struct super_block *sb)
 	remove_super(sb);
 }
 
-static void shutdown_super(struct super_block *sb)
-{
-	struct file_system_type *fs = sb->s_type;
-	struct block_device *bdev = sb->s_bdev;
-
-	generic_shutdown_super(sb);
-	bd_release(bdev);
-	blkdev_put(bdev, BDEV_FS);
-}
-
 void kill_super(struct super_block *sb)
 {
 	struct file_system_type *fs = sb->s_type;
@@ -450,10 +440,7 @@ void kill_super(struct super_block *sb)
 		return;
 
 	down_write(&sb->s_umount);
-	if (fs->kill_sb)
-		fs->kill_sb(sb);
-	else
-		shutdown_super(sb);
+	fs->kill_sb(sb);
 	put_filesystem(fs);
 }
 

@@ -1018,6 +1018,7 @@ static struct file_system_type ufs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"ufs",
 	get_sb:		ufs_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

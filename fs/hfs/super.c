@@ -105,6 +105,7 @@ static struct file_system_type hfs_fs = {
 	owner:		THIS_MODULE,
 	name:		"hfs",
 	get_sb:		hfs_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 
