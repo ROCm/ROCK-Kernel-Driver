@@ -73,6 +73,7 @@
 #include <linux/videodev.h>
 #include "videocodec.h"
 
+#include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
 

@@ -304,9 +304,9 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	mm = task->mm;
 	if(mm)
 		mm = mmgrab(mm);
-	if (process_tty(task)) {
-		tty_pgrp = process_tty(task)->pgrp;
-		tty_nr = new_encode_dev(tty_devnum(process_tty(task)));
+	if (task->tty) {
+		tty_pgrp = task->tty->pgrp;
+		tty_nr = new_encode_dev(tty_devnum(task->tty));
 	}
 	task_unlock(task);
 	if (mm) {
@@ -345,7 +345,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		state,
 		ppid,
 		process_group(task),
-		process_session(task),
+		task->session,
 		tty_nr,
 		tty_pgrp,
 		task->flags,

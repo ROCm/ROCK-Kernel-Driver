@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
+#include <linux/highmem.h>
 #include <linux/module.h>
 
 #include <asm/system.h>
@@ -55,6 +56,147 @@ void bust_spinlocks(int yes)
 	console_loglevel = loglevel_save;
 }
 
+/*
+ * Return EIP plus the CS segment base.  The segment limit is also
+ * adjusted, clamped to the kernel/user address space (whichever is
+ * appropriate), and returned in *eip_limit.
+ *
+ * The segment is checked, because it might have been changed by another
+ * task between the original faulting instruction and here.
+ *
+ * If CS is no longer a valid code segment, or if EIP is beyond the
+ * limit, or if it is a kernel address when CS is not a kernel segment,
+ * then the returned value will be greater than *eip_limit.
+ * 
+ * This is slow, but is very rarely executed.
+ */
+static inline unsigned long get_segment_eip(struct pt_regs *regs,
+					    unsigned long *eip_limit)
+{
+	unsigned long eip = regs->eip;
+	unsigned seg = regs->xcs & 0xffff;
+	u32 seg_ar, seg_limit, base, *desc;
+
+	/* The standard kernel/user address space limit. */
+	*eip_limit = (seg & 3) ? USER_DS.seg : KERNEL_DS.seg;
+
+	/* Unlikely, but must come before segment checks. */
+	if (unlikely((regs->eflags & VM_MASK) != 0))
+		return eip + (seg << 4);
+	
+	/* By far the most common cases. */
+	if (likely(seg == __USER_CS || seg == __KERNEL_CS))
+		return eip;
+
+	/* Check the segment exists, is within the current LDT/GDT size,
+	   that kernel/user (ring 0..3) has the appropriate privilege,
+	   that it's a code segment, and get the limit. */
+	__asm__ ("larl %3,%0; lsll %3,%1"
+		 : "=&r" (seg_ar), "=r" (seg_limit) : "0" (0), "rm" (seg));
+	if ((~seg_ar & 0x9800) || eip > seg_limit) {
+		*eip_limit = 0;
+		return 1;	 /* So that returned eip > *eip_limit. */
+	}
+
+	/* Get the GDT/LDT descriptor base. 
+	   When you look for races in this code remember that
+	   LDT and other horrors are only used in user space. */
+	if (seg & (1<<2)) {
+		/* Must lock the LDT while reading it. */
+		down(&current->mm->context.sem);
+		desc = current->mm->context.ldt;
+		desc = (void *)desc + (seg & ~7);
+	} else {
+		/* Must disable preemption while reading the GDT. */
+		desc = (u32 *)&cpu_gdt_table[get_cpu()];
+		desc = (void *)desc + (seg & ~7);
+	}
+
+	/* Decode the code segment base from the descriptor */
+	base =   (desc[0] >> 16) |
+		((desc[1] & 0xff) << 16) |
+		 (desc[1] & 0xff000000);
+
+	if (seg & (1<<2)) { 
+		up(&current->mm->context.sem);
+	} else
+		put_cpu();
+
+	/* Adjust EIP and segment limit, and clamp at the kernel limit.
+	   It's legitimate for segments to wrap at 0xffffffff. */
+	seg_limit += base;
+	if (seg_limit < *eip_limit && seg_limit >= base)
+		*eip_limit = seg_limit;
+	return eip + base;
+}
+
+/* 
+ * Sometimes AMD Athlon/Opteron CPUs report invalid exceptions on prefetch.
+ * Check that here and ignore it.
+ */
+static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
+{ 
+	unsigned long limit;
+	unsigned long instr = get_segment_eip (regs, &limit);
+	int scan_more = 1;
+	int prefetch = 0; 
+	int i;
+
+	for (i = 0; scan_more && i < 15; i++) { 
+		unsigned char opcode;
+		unsigned char instr_hi;
+		unsigned char instr_lo;
+
+		if (instr > limit)
+			break;
+		if (__get_user(opcode, (unsigned char *) instr))
+			break; 
+
+		instr_hi = opcode & 0xf0; 
+		instr_lo = opcode & 0x0f; 
+		instr++;
+
+		switch (instr_hi) { 
+		case 0x20:
+		case 0x30:
+			/* Values 0x26,0x2E,0x36,0x3E are valid x86 prefixes. */
+			scan_more = ((instr_lo & 7) == 0x6);
+			break;
+			
+		case 0x60:
+			/* 0x64 thru 0x67 are valid prefixes in all modes. */
+			scan_more = (instr_lo & 0xC) == 0x4;
+			break;		
+		case 0xF0:
+			/* 0xF0, 0xF2, and 0xF3 are valid prefixes */
+			scan_more = !instr_lo || (instr_lo>>1) == 1;
+			break;			
+		case 0x00:
+			/* Prefetch instruction is 0x0F0D or 0x0F18 */
+			scan_more = 0;
+			if (instr > limit)
+				break;
+			if (__get_user(opcode, (unsigned char *) instr)) 
+				break;
+			prefetch = (instr_lo == 0xF) &&
+				(opcode == 0x0D || opcode == 0x18);
+			break;			
+		default:
+			scan_more = 0;
+			break;
+		} 
+	}
+	return prefetch;
+}
+
+static inline int is_prefetch(struct pt_regs *regs, unsigned long addr)
+{
+	if (unlikely(boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+		     boot_cpu_data.x86 >= 6))
+		return __is_prefetch(regs, addr);
+	return 0;
+} 
+
 asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
 
 /*
@@ -86,6 +228,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	tsk = current;
 
+	info.si_code = SEGV_MAPERR;
+
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The
 	 * 'reference' page table is init_mm.pgd.
@@ -99,18 +243,24 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * (error_code & 4) == 0, and that the fault was not a
 	 * protection error (error_code & 1) == 0.
 	 */
-	if (address >= TASK_SIZE && !(error_code & 5))
-		goto vmalloc_fault;
+	if (unlikely(address >= TASK_SIZE)) { 
+		if (!(error_code & 5))
+			goto vmalloc_fault;
+		/* 
+		 * Don't take the mm semaphore here. If we fixup a prefetch
+		 * fault we could otherwise deadlock.
+		 */
+		goto bad_area_nosemaphore;
+	} 
 
 	mm = tsk->mm;
-	info.si_code = SEGV_MAPERR;
 
 	/*
 	 * If we're in an interrupt, have no user context or are running in an
 	 * atomic region then we must not take the fault..
 	 */
 	if (in_atomic() || !mm)
-		goto no_context;
+		goto bad_area_nosemaphore;
 
 	down_read(&mm->mmap_sem);
 
@@ -198,8 +348,16 @@ good_area:
 bad_area:
 	up_read(&mm->mmap_sem);
 
+bad_area_nosemaphore:
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
+		/* 
+		 * Valid to do another page fault here because this one came 
+		 * from user space.
+		 */
+		if (is_prefetch(regs, address))
+			return;
+
 		tsk->thread.cr2 = address;
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_no = 14;
@@ -231,6 +389,14 @@ no_context:
 	/* Are we prepared to handle this kernel fault?  */
 	if (fixup_exception(regs))
 		return;
+
+	/* 
+	 * Valid to do another page fault here, because if this fault
+	 * had been triggered by is_prefetch fixup_exception would have 
+	 * handled it.
+	 */
+ 	if (is_prefetch(regs, address))
+ 		return;
 
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
@@ -286,10 +452,14 @@ out_of_memory:
 do_sigbus:
 	up_read(&mm->mmap_sem);
 
-	/*
-	 * Send a sigbus, regardless of whether we were in kernel
-	 * or user mode.
-	 */
+	/* Kernel mode? Handle exceptions or die */
+	if (!(error_code & 4))
+		goto no_context;
+
+	/* User space => ok to do another page fault */
+	if (is_prefetch(regs, address))
+		return;
+
 	tsk->thread.cr2 = address;
 	tsk->thread.error_code = error_code;
 	tsk->thread.trap_no = 14;
@@ -298,10 +468,6 @@ do_sigbus:
 	info.si_code = BUS_ADRERR;
 	info.si_addr = (void *)address;
 	force_sig_info(SIGBUS, &info, tsk);
-
-	/* Kernel mode? Handle exceptions or die */
-	if (!(error_code & 4))
-		goto no_context;
 	return;
 
 vmalloc_fault:
