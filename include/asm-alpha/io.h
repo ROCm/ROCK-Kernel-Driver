@@ -65,13 +65,13 @@ static inline void * phys_to_virt(unsigned long address)
 #else
 static inline unsigned long virt_to_phys(void *address)
 {
-        unsigned long phys;
+        unsigned long phys = (unsigned long)address;
 
-        __asm__ (
-        "sll %1, 63-40, %0\n"
-        "sra %0, 63-40, %0\n"
-        : "=r" (phys) : "r" (address));
+	/* Sign-extend from bit 41.  */
+	phys <<= (64 - 41);
+	phys = (long)phys >> (64 - 41);
 
+	/* Crop to the physical address width of the processor.  */
         phys &= (1ul << hwrpb->pa_bits) - 1;
 
         return phys;
