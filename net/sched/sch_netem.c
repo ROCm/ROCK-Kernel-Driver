@@ -643,11 +643,17 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	PSCHED_TADD2(now, delay, cb->time_to_send);
 	
 	/* Always queue at tail to keep packets in order */
-	__skb_queue_tail(&q->delayed, skb);
-	sch->q.qlen++;
-	sch->stats.bytes += skb->len;
-	sch->stats.packets++;
-	return 0;
+	if (likely(q->delayed.qlen < q->limit)) {
+		__skb_queue_tail(&q->delayed, skb);
+		sch->q.qlen++;
+		sch->stats.bytes += skb->len;
+		sch->stats.packets++;
+		return 0;
+	}
+
+	sch->stats.drops++;
+	kfree_skb(skb);
+	return NET_XMIT_DROP;
 }
 
 /* Requeue packets but don't change time stamp */
