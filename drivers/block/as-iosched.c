@@ -1610,7 +1610,8 @@ static void as_merged_request(request_queue_t *q, struct request *req)
 		 */
 	}
 
-	q->last_merge = req;
+	if (arq->on_hash)
+		q->last_merge = req;
 }
 
 static void
