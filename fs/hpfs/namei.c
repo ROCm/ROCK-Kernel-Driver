@@ -448,14 +448,14 @@ int hpfs_symlink_readpage(struct file *file, struct page *page)
 	unlock_kernel();
 	SetPageUptodate(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 
 fail:
 	unlock_kernel();
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 	

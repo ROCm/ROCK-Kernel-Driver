@@ -94,7 +94,7 @@ smb_readpage_sync(struct dentry *dentry, struct page *page)
 
 io_error:
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return result;
 }
 
@@ -199,7 +199,7 @@ do_it:
 	get_page(page);
 	err = smb_writepage_sync(inode, page, 0, offset);
 	SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	put_page(page);
 	return err;
 }
@@ -354,7 +354,8 @@ smb_file_release(struct inode *inode, struct file * file)
 		/* We must flush any dirty pages now as we won't be able to
 		   write anything after close. mmap can trigger this.
 		   "openers" should perhaps include mmap'ers ... */
-		filemap_fdatasync(inode->i_mapping);
+		filemap_fdatawait(inode->i_mapping);
+		filemap_fdatawrite(inode->i_mapping);
 		filemap_fdatawait(inode->i_mapping);
 		smb_close(inode);
 	}

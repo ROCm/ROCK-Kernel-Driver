@@ -544,7 +544,7 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	 * vm_scan(). Shouldn't be a worry.
 	 */
 	while (i--) {
-		PageClearSlab(page);
+		ClearPageSlab(page);
 		page++;
 	}
 	free_pages((unsigned long)addr, cachep->gfporder);
@@ -1198,7 +1198,7 @@ static int kmem_cache_grow (kmem_cache_t * cachep, int flags)
 	do {
 		SET_PAGE_CACHE(page, cachep);
 		SET_PAGE_SLAB(page, slabp);
-		PageSetSlab(page);
+		SetPageSlab(page);
 		page++;
 	} while (--i);
 

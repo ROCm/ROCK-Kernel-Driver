@@ -8,110 +8,95 @@
 #define _ORINOCO_H
 
 /* To enable debug messages */
-/*  #define ORINOCO_DEBUG		3 */
+//#define ORINOCO_DEBUG		3
 
 #if (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10)
-#error "orinoco_cs requires Wireless extensions v10 or later."
+#error "orinoco driver requires Wireless extensions v10 or later."
 #endif /* (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10) */
 #define WIRELESS_SPY		// enable iwspy support
 
+#define ORINOCO_MAX_KEY_SIZE	14
+#define ORINOCO_MAX_KEYS	4
 
-#define DLDWD_MIN_MTU		256
-#define DLDWD_MAX_MTU		(HERMES_FRAME_LEN_MAX - ENCAPS_OVERHEAD)
+typedef struct orinoco_key {
+	u16 len;	/* always store little-endian */
+	char data[ORINOCO_MAX_KEY_SIZE];
+} __attribute__ ((packed)) orinoco_key_t;
 
-#define LTV_BUF_SIZE		128
-#define USER_BAP		0
-#define IRQ_BAP			1
-#define DLDWD_MACPORT		0
-#define IRQ_LOOP_MAX		10
-#define TX_NICBUF_SIZE		2048
-#define TX_NICBUF_SIZE_BUG	1585		/* Bug in Symbol firmware */
-#define MAX_KEYS		4
-#define MAX_KEY_SIZE		14
-#define LARGE_KEY_SIZE		13
-#define SMALL_KEY_SIZE		5
-#define MAX_FRAME_SIZE		2304
-
-typedef struct dldwd_key {
-	uint16_t len;	/* always store little-endian */
-	char data[MAX_KEY_SIZE];
-} __attribute__ ((packed)) dldwd_key_t;
-
-typedef dldwd_key_t dldwd_keys_t[MAX_KEYS];
+typedef orinoco_key_t orinoco_keys_t[ORINOCO_MAX_KEYS];
 
 /*====================================================================*/
 
-
-typedef struct dldwd_priv {
-	void* card;	/* Pointer to card dependant structure */
+struct orinoco_private {
+	void *card;	/* Pointer to card dependant structure */
 	/* card dependant extra reset code (i.e. bus/interface specific */
-	int (*card_reset_handler)(struct dldwd_priv *);
+	int (*hard_reset)(struct orinoco_private *);
 
 	spinlock_t lock;
 	long state;
-#define DLDWD_STATE_INIRQ 0
-#define DLDWD_STATE_DOIRQ 1
-	int hw_ready;	/* HW may be suspended by platform */
+#define ORINOCO_STATE_INIRQ 0
+#define ORINOCO_STATE_DOIRQ 1
 
 	/* Net device stuff */
-	struct net_device ndev;
+	struct net_device *ndev;
 	struct net_device_stats stats;
 	struct iw_statistics wstats;
 
-
 	/* Hardware control variables */
 	hermes_t hw;
-	uint16_t txfid;
+	u16 txfid;
 
 	/* Capabilities of the hardware/firmware */
 	int firmware_type;
-#define FIRMWARE_TYPE_LUCENT 1
+#define FIRMWARE_TYPE_AGERE 1
 #define FIRMWARE_TYPE_INTERSIL 2
 #define FIRMWARE_TYPE_SYMBOL 3
-	int has_ibss, has_port3, prefer_port3, has_ibss_any, ibss_port;
+	int has_ibss, has_port3, has_ibss_any, ibss_port;
 	int has_wep, has_big_wep;
 	int has_mwo;
 	int has_pm;
 	int has_preamble;
-	int need_card_reset, broken_reset, broken_allocate;
-	uint16_t channel_mask;
+	int has_sensitivity;
+	int nicbuf_size;
+	int broken_cor_reset;
+	u16 channel_mask;
 
-	/* Current configuration */
-	uint32_t iw_mode;
-	int port_type, allow_ibss;
-	uint16_t wep_on, wep_restrict, tx_key;
-	dldwd_keys_t keys;
+	/* Configuration paramaters */
+	u32 iw_mode;
+	int prefer_port3;
+	u16 wep_on, wep_restrict, tx_key;
+	orinoco_keys_t keys;
+	int bitratemode;
  	char nick[IW_ESSID_MAX_SIZE+1];
 	char desired_essid[IW_ESSID_MAX_SIZE+1];
-	uint16_t frag_thresh, mwo_robust;
-	uint16_t channel;
-	uint16_t ap_density, rts_thresh;
-	uint16_t tx_rate_ctrl;
-	uint16_t pm_on, pm_mcast, pm_period, pm_timeout;
-	uint16_t preamble;
-
-	int promiscuous, allmulti, mc_count;
-
+	u16 frag_thresh, mwo_robust;
+	u16 channel;
+	u16 ap_density, rts_thresh;
+	u16 pm_on, pm_mcast, pm_period, pm_timeout;
+	u16 preamble;
 #ifdef WIRELESS_SPY
 	int			spy_number;
 	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
 	struct iw_quality	spy_stat[IW_MAX_SPY];
 #endif
 
+	/* Configuration dependent variables */
+	int port_type, allow_ibss;
+	int promiscuous, mc_count;
+
+
 	/* /proc based debugging stuff */
 	struct proc_dir_entry *dir_dev;
-	struct proc_dir_entry *dir_regs;
-	struct proc_dir_entry *dir_recs;
-} dldwd_priv_t;
+};
 
 /*====================================================================*/
 
-extern struct list_head dldwd_instances;
+extern struct list_head orinoco_instances;
 
 #ifdef ORINOCO_DEBUG
-extern int dldwd_debug;
-#define DEBUG(n, args...) do { if (dldwd_debug>(n)) printk(KERN_DEBUG args); } while(0)
-#define DEBUGMORE(n, args...) do { if (dldwd_debug>(n)) printk(args); } while (0)
+extern int orinoco_debug;
+#define DEBUG(n, args...) do { if (orinoco_debug>(n)) printk(KERN_DEBUG args); } while(0)
+#define DEBUGMORE(n, args...) do { if (orinoco_debug>(n)) printk(args); } while (0)
 #else
 #define DEBUG(n, args...) do { } while (0)
 #define DEBUGMORE(n, args...) do { } while (0)
@@ -122,21 +107,12 @@ extern int dldwd_debug;
 
 #define RUP_EVEN(a) ( (a) % 2 ? (a) + 1 : (a) )
 
-/* struct net_device methods */
-extern int dldwd_init(struct net_device *dev);
-extern int dldwd_xmit(struct sk_buff *skb, struct net_device *dev);
-extern void dldwd_tx_timeout(struct net_device *dev);
-
-extern int dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
-extern int dldwd_change_mtu(struct net_device *dev, int new_mtu);
-extern void dldwd_set_multicast_list(struct net_device *dev);
-
 /* utility routines */
-extern void dldwd_shutdown(dldwd_priv_t *dev);
-extern int dldwd_reset(dldwd_priv_t *dev);
-extern int dldwd_setup(dldwd_priv_t* priv);
-extern int dldwd_proc_dev_init(dldwd_priv_t *dev);
-extern void dldwd_proc_dev_cleanup(dldwd_priv_t *priv);
-extern void dldwd_interrupt(int irq, void * dev_id, struct pt_regs *regs);
+struct net_device *alloc_orinocodev(int sizeof_card);
+extern void orinoco_shutdown(struct orinoco_private *dev);
+extern int orinoco_reset(struct orinoco_private *dev);
+extern int orinoco_proc_dev_init(struct orinoco_private *dev);
+extern void orinoco_proc_dev_cleanup(struct orinoco_private *priv);
+extern void orinoco_interrupt(int irq, void * dev_id, struct pt_regs *regs);
 
-#endif
+#endif /* _ORINOCO_H */

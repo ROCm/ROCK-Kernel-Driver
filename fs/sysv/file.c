@@ -13,8 +13,7 @@
  *  SystemV/Coherent regular file handling primitives
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
+#include "sysv.h"
 
 /*
  * We have mostly NULLs here: the current defaults are OK for
@@ -38,7 +37,6 @@ int sysv_sync_file(struct file * file, struct dentry *dentry, int datasync)
 	int err;
 
 	err = fsync_inode_buffers(inode);
-	err |= fsync_inode_data_buffers(inode);
 	if (!(inode->i_state & I_DIRTY))
 		return err;
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))

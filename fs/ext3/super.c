@@ -438,7 +438,7 @@ void ext3_put_super (struct super_block * sb)
 		 * floating about in memory - the physical journal device may
 		 * hotswapped, and it breaks the `ro-after' testing code.
 		 */
-		fsync_no_super(sbi->journal_bdev);
+		sync_blockdev(sbi->journal_bdev);
 		invalidate_bdev(sbi->journal_bdev, 0);
 		ext3_blkdev_remove(sbi);
 	}

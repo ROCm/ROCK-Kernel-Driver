@@ -154,7 +154,7 @@ typedef struct page {
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
-	unsigned long private;		/* fs-private opaque data */
+	unsigned long private;		/* mapping-private opaque data */
 
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
@@ -191,11 +191,6 @@ typedef struct page {
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 
 /*
- * Various page->flags bits:
- *
- * PG_reserved is set for special pages, which can never be swapped
- * out. Some of them might not even exist (eg empty_bad_page)...
- *
  * Multiple processes may "see" the same page. E.g. for untouched
  * mappings of /dev/null, all processes see the same page full of
  * zeroes, and text pages of executables and shared libraries have
@@ -224,8 +219,6 @@ typedef struct page {
  * page's address_space.  Usually, this is the address of a circular
  * list of the page's disk buffers.
  *
- * The PG_private bitflag is set if page->private contains a valid
- * value.
  * For pages belonging to inodes, the page->count is the number of
  * attaches, plus 1 if `private' contains something, plus one for
  * the page cache itself.
@@ -244,75 +237,13 @@ typedef struct page {
  *   to be written to disk,
  * - private pages which have been modified may need to be swapped out
  *   to swap space and (later) to be read back into memory.
- * During disk I/O, PG_locked is used. This bit is set before I/O
- * and reset when I/O completes. page_waitqueue(page) is a wait queue of all
- * tasks waiting for the I/O on this page to complete.
- * PG_uptodate tells whether the page's contents is valid.
- * When a read completes, the page becomes uptodate, unless a disk I/O
- * error happened.
- *
- * For choosing which pages to swap out, inode pages carry a
- * PG_referenced bit, which is set any time the system accesses
- * that page through the (mapping,index) hash table. This referenced
- * bit, together with the referenced bit in the page tables, is used
- * to manipulate page->age and move the page across the active,
- * inactive_dirty and inactive_clean lists.
- *
- * Note that the referenced bit, the page->lru list_head and the
- * active, inactive_dirty and inactive_clean lists are protected by
- * the pagemap_lru_lock, and *NOT* by the usual PG_locked bit!
- *
- * PG_skip is used on sparc/sparc64 architectures to "skip" certain
- * parts of the address space.
- *
- * PG_error is set to indicate that an I/O error occurred on this page.
- *
- * PG_arch_1 is an architecture specific page state bit.  The generic
- * code guarantees that this bit is cleared for a page when it first
- * is entered into the page cache.
- *
- * PG_highmem pages are not permanently mapped into the kernel virtual
- * address space, they need to be kmapped separately for doing IO on
- * the pages. The struct page (these bits with information) are always
- * mapped into kernel address space...
  */
-#define PG_locked		 0	/* Page is locked. Don't touch. */
-#define PG_error		 1
-#define PG_referenced		 2
-#define PG_uptodate		 3
-#define PG_dirty		 4
-#define PG_unused		 5
-#define PG_lru			 6
-#define PG_active		 7
-#define PG_slab			 8
-#define PG_skip			10
-#define PG_highmem		11
-#define PG_checked		12	/* kill me in 2.5.<early>. */
-#define PG_arch_1		13
-#define PG_reserved		14
-#define PG_launder		15	/* written out by VM pressure.. */
 
-#define PG_private		16	/* Has something at ->private */
-
-/* Make it prettier to test the above... */
-#define UnlockPage(page)	unlock_page(page)
-#define Page_Uptodate(page)	test_bit(PG_uptodate, &(page)->flags)
-#define SetPageUptodate(page)	set_bit(PG_uptodate, &(page)->flags)
-#define ClearPageUptodate(page)	clear_bit(PG_uptodate, &(page)->flags)
-#define PageDirty(page)		test_bit(PG_dirty, &(page)->flags)
-#define SetPageDirty(page)	set_bit(PG_dirty, &(page)->flags)
-#define ClearPageDirty(page)	clear_bit(PG_dirty, &(page)->flags)
-#define PageLocked(page)	test_bit(PG_locked, &(page)->flags)
-#define LockPage(page)		set_bit(PG_locked, &(page)->flags)
-#define TryLockPage(page)	test_and_set_bit(PG_locked, &(page)->flags)
-#define PageChecked(page)	test_bit(PG_checked, &(page)->flags)
-#define SetPageChecked(page)	set_bit(PG_checked, &(page)->flags)
-#define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
-#define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
-#define __SetPageReserved(page)	__set_bit(PG_reserved, &(page)->flags)
-#define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
-#define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)
-#define PagePrivate(page)	test_bit(PG_private, &(page)->flags)
+/*
+ * FIXME: take this include out, include page-flags.h in
+ * files which need it (119 of them)
+ */
+#include <linux/page-flags.h>
 
 /*
  * The zone field is never updated after free_area_init_core()
@@ -368,43 +299,6 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 
 #endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
 
-extern void FASTCALL(set_page_dirty(struct page *));
-
-/*
- * The first mb is necessary to safely close the critical section opened by the
- * TryLockPage(), the second mb is necessary to enforce ordering between
- * the clear_bit and the read of the waitqueue (to avoid SMP races with a
- * parallel wait_on_page).
- */
-#define PageError(page)		test_bit(PG_error, &(page)->flags)
-#define SetPageError(page)	set_bit(PG_error, &(page)->flags)
-#define ClearPageError(page)	clear_bit(PG_error, &(page)->flags)
-#define PageReferenced(page)	test_bit(PG_referenced, &(page)->flags)
-#define SetPageReferenced(page)	set_bit(PG_referenced, &(page)->flags)
-#define ClearPageReferenced(page)	clear_bit(PG_referenced, &(page)->flags)
-#define PageTestandClearReferenced(page)	test_and_clear_bit(PG_referenced, &(page)->flags)
-#define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
-#define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
-#define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
-#define PageReserved(page)	test_bit(PG_reserved, &(page)->flags)
-
-#define PageActive(page)	test_bit(PG_active, &(page)->flags)
-#define SetPageActive(page)	set_bit(PG_active, &(page)->flags)
-#define ClearPageActive(page)	clear_bit(PG_active, &(page)->flags)
-
-#define PageLRU(page)		test_bit(PG_lru, &(page)->flags)
-#define TestSetPageLRU(page)	test_and_set_bit(PG_lru, &(page)->flags)
-#define TestClearPageLRU(page)	test_and_clear_bit(PG_lru, &(page)->flags)
-
-#ifdef CONFIG_HIGHMEM
-#define PageHighMem(page)		test_bit(PG_highmem, &(page)->flags)
-#else
-#define PageHighMem(page)		0 /* needed to optimize away at compile time */
-#endif
-
-#define SetPageReserved(page)		set_bit(PG_reserved, &(page)->flags)
-#define ClearPageReserved(page)		clear_bit(PG_reserved, &(page)->flags)
-
 /*
  * Error return values for the *_nopage functions
  */
@@ -447,6 +341,26 @@ extern int ptrace_check_attach(struct task_struct *task, int kill);
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);
 
+int __set_page_dirty_buffers(struct page *page);
+int __set_page_dirty_nobuffers(struct page *page);
+
+/*
+ * If the mapping doesn't provide a set_page_dirty a_op, then
+ * just fall through and assume that it wants buffer_heads.
+ * FIXME: make the method unconditional.
+ */
+static inline int set_page_dirty(struct page *page)
+{
+	if (page->mapping) {
+		int (*spd)(struct page *);
+
+		spd = page->mapping->a_ops->set_page_dirty;
+		if (spd)
+			return (*spd)(page);
+	}
+	return __set_page_dirty_buffers(page);
+}
+
 /*
  * On a two-level page table, this ends up being trivial. Thus the
  * inlining and the symmetry break with pte_alloc_map() that does all
@@ -467,14 +381,6 @@ extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void swapin_readahead(swp_entry_t);
-
-extern struct address_space swapper_space;
-#define PageSwapCache(page) ((page)->mapping == &swapper_space)
-
-static inline int is_page_cache_freeable(struct page * page)
-{
-	return page_count(page) - !!PagePrivate(page) == 1;
-}
 
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
@@ -538,6 +444,10 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
+/* mm/page-writeback.c */
+int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write);
+int write_one_page(struct page *page, int wait);
+
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
@@ -546,6 +456,7 @@ void do_page_cache_readahead(struct file *file,
 void page_cache_readahead(struct file *file, unsigned long offset);
 void page_cache_readaround(struct file *file, unsigned long offset);
 void handle_ra_thrashing(struct file *file);
+extern unsigned long default_ra_pages;
 
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */
@@ -591,10 +502,8 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
-extern int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
-extern int pdflush_flush(unsigned long nr_pages);
-
 extern struct page * vmalloc_to_page(void *addr);
+extern unsigned long get_page_cache_size(void);
 
 #endif /* __KERNEL__ */
 

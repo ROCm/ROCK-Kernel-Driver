@@ -592,9 +592,6 @@ repeat:
 			JBUFFER_TRACE(jh, "file as BJ_Reserved");
 			__journal_file_buffer(jh, transaction, BJ_Reserved);
 
-			/* And pull it off BUF_DIRTY, onto BUF_CLEAN */
-			refile_buffer(jh2bh(jh));
-
 			/*
 			 * The buffer is now hidden from bdflush.   It is
 			 * metadata against the current transaction.
@@ -657,7 +654,7 @@ repeat:
 			spin_unlock(&journal_datalist_lock);
 			unlock_journal(journal);
 			/* commit wakes up all shadow buffers after IO */
-			sleep_on(&jh2bh(jh)->b_wait);
+			sleep_on_buffer(jh2bh(jh));
 			lock_journal(journal);
 			goto repeat;
 		}
@@ -812,8 +809,6 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 		jh->b_transaction = transaction;
 		JBUFFER_TRACE(jh, "file as BJ_Reserved");
 		__journal_file_buffer(jh, transaction, BJ_Reserved);
-		JBUFFER_TRACE(jh, "refile");
-		refile_buffer(jh2bh(jh));
 	} else if (jh->b_transaction == journal->j_committing_transaction) {
 		JBUFFER_TRACE(jh, "set next transaction");
 		jh->b_next_transaction = transaction;
@@ -1099,7 +1094,6 @@ int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
 	
 	spin_lock(&journal_datalist_lock);
 	set_bit(BH_JBDDirty, &bh->b_state);
-	set_buffer_flushtime(bh);
 
 	J_ASSERT_JH(jh, jh->b_transaction != NULL);
 	
@@ -1208,7 +1202,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 		/* If we are forgetting a buffer which is already part
 		 * of this transaction, then we can just drop it from
 		 * the transaction immediately. */
-		clear_bit(BH_Dirty, &bh->b_state);
+		clear_buffer_dirty(bh);
 		clear_bit(BH_JBDDirty, &bh->b_state);
 
 		JBUFFER_TRACE(jh, "belongs to current transaction: unfile");
@@ -1553,9 +1547,8 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	
 	__blist_del_buffer(list, jh);
 	jh->b_jlist = BJ_None;
-	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state)) {
-		set_bit(BH_Dirty, &jh2bh(jh)->b_state);
-	}
+	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state))
+		set_buffer_dirty(jh2bh(jh));
 }
 
 void journal_unfile_buffer(struct journal_head *jh)
@@ -1691,7 +1684,7 @@ int journal_try_to_free_buffers(journal_t *journal,
 out:
 	ret = 0;
 	if (call_ttfb)
-		ret = try_to_free_buffers(page, gfp_mask);
+		ret = try_to_free_buffers(page);
 	return ret;
 }
 
@@ -1862,12 +1855,11 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 
 zap_buffer:	
 	if (buffer_dirty(bh))
-		mark_buffer_clean(bh);
+		clear_buffer_dirty(bh);
 	J_ASSERT_BH(bh, !buffer_jdirty(bh));
-	clear_bit(BH_Uptodate, &bh->b_state);
-	clear_bit(BH_Mapped, &bh->b_state);
-	clear_bit(BH_Req, &bh->b_state);
-	clear_bit(BH_New, &bh->b_state);
+	clear_buffer_mapped(bh);
+	clear_buffer_req(bh);
+	clear_buffer_new(bh);
 	bh->b_bdev = NULL;
 	return may_free;
 }
@@ -1913,7 +1905,7 @@ int journal_flushpage(journal_t *journal,
 	unlock_journal(journal);
 
 	if (!offset) {
-		if (!may_free || !try_to_free_buffers(page, 0))
+		if (!may_free || !try_to_free_buffers(page))
 			return 0;
 		J_ASSERT(!page_has_buffers(page));
 	}
@@ -1982,7 +1974,7 @@ void __journal_file_buffer(struct journal_head *jh,
 
 	if (jlist == BJ_Metadata || jlist == BJ_Reserved || 
 	    jlist == BJ_Shadow || jlist == BJ_Forget) {
-		if (atomic_set_buffer_clean(jh2bh(jh))) {
+		if (test_clear_buffer_dirty(jh2bh(jh))) {
 			set_bit(BH_JBDDirty, &jh2bh(jh)->b_state);
 		}
 	}
@@ -2021,9 +2013,6 @@ void __journal_refile_buffer(struct journal_head *jh)
 	if (jh->b_transaction != NULL) {
 		__journal_file_buffer(jh, jh->b_transaction, BJ_Metadata);
 		J_ASSERT_JH(jh, jh->b_transaction->t_state == T_RUNNING);
-	} else {
-		/* Onto BUF_DIRTY for writeback */
-		refile_buffer(jh2bh(jh));
 	}
 }
 

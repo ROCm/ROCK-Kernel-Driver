@@ -175,9 +175,9 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   DEBUG(2, "blkmtd: readpage called, dev = `%s' page = %p index = %ld\n",
 	bdevname(rawdevice->binding), page, page->index);
 
-  if(Page_Uptodate(page)) {
+  if(PageUptodate(page)) {
     DEBUG(2, "blkmtd: readpage page %ld is already upto date\n", page->index);
-    UnlockPage(page);
+    unlock_page(page);
     return 0;
   }
 
@@ -203,7 +203,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
 	}
 	SetPageUptodate(page);
 	flush_dcache_page(page);
-	UnlockPage(page);
+	unlock_page(page);
 	spin_unlock(&mbd_writeq_lock);
 	return 0;
       }
@@ -281,7 +281,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
     err = 0;
   }
   flush_dcache_page(page);
-  UnlockPage(page);
+  unlock_page(page);
   DEBUG(2, "blkmtd: readpage: finished, err = %d\n", err);
   return 0;
 }
@@ -416,7 +416,7 @@ static int write_queue_task(void *data)
       write_queue_tail %= write_queue_sz;
       if(!item->iserase) {
 	for(i = 0 ; i < item->pagecnt; i++) {
-	  UnlockPage(item->pages[i]);
+	  unlock_page(item->pages[i]);
 	  __free_pages(item->pages[i], 0);
 	}
 	kfree(item->pages);
@@ -470,7 +470,7 @@ static int queue_page_write(mtd_raw_dev_data_t *rawdevice, struct page **pages,
       outpage = alloc_pages(GFP_KERNEL, 0);
       if(!outpage) {
 	while(i--) {
-	  UnlockPage(new_pages[i]);
+	  unlock_page(new_pages[i]);
 	  __free_pages(new_pages[i], 0);
 	}
 	kfree(new_pages);
@@ -607,7 +607,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
     if(!err) {
       while(pagecnt--) {
 	SetPageUptodate(pages[pagecnt]);
-	UnlockPage(pages[pagecnt]);
+	unlock_page(pages[pagecnt]);
 	page_cache_release(pages[pagecnt]);
 	flush_dcache_page(pages[pagecnt]);
       }
@@ -662,8 +662,8 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
     if(IS_ERR(page)) {
       return PTR_ERR(page);
     }
-    wait_on_page(page);
-    if(!Page_Uptodate(page)) {
+    wait_on_page_locked(page);
+    if(!PageUptodate(page)) {
       /* error reading page */
       printk("blkmtd: read: page not uptodate\n");
       page_cache_release(page);
@@ -806,7 +806,7 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
       }
       memcpy(page_address(page), buf, PAGE_SIZE);
       pages[pagecnt++] = page;
-      UnlockPage(page);
+      unlock_page(page);
       SetPageUptodate(page);
       pagenr++;
       pagesc--;
@@ -962,7 +962,7 @@ static void __exit cleanup_blkmtd(void)
     kfree(write_queue);
 
   if(erase_page) {
-    UnlockPage(erase_page);
+    unlock_page(erase_page);
     __free_pages(erase_page, 0);
   }
   printk("blkmtd: unloaded for %s\n", device);

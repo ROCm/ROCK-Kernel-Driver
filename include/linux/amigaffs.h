@@ -50,7 +50,7 @@ affs_getzeroblk(struct super_block *sb, int block)
 		bh = sb_getblk(sb, block);
 		lock_buffer(bh);
 		memset(bh->b_data, 0 , sb->s_blocksize);
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
 		return bh;
 	}
@@ -64,7 +64,7 @@ affs_getemptyblk(struct super_block *sb, int block)
 	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size) {
 		bh = sb_getblk(sb, block);
 		wait_on_buffer(bh);
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		return bh;
 	}
 	return NULL;

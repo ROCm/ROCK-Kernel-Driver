@@ -21,6 +21,7 @@
 #include <linux/fs.h>
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>
+#include <linux/smp_lock.h>
 
 static unsigned char ext3_filetype_table[] = {
 	DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR, DT_BLK, DT_FIFO, DT_SOCK, DT_LNK
@@ -30,7 +31,7 @@ static int ext3_readdir(struct file *, void *, filldir_t);
 
 struct file_operations ext3_dir_operations = {
 	read:		generic_read_dir,
-	readdir:	ext3_readdir,		/* BKL held */
+	readdir:	ext3_readdir,		/* we take BKL. needed?*/
 	ioctl:		ext3_ioctl,		/* BKL held */
 	fsync:		ext3_sync_file,		/* BKL held */
 };
@@ -76,6 +77,8 @@ static int ext3_readdir(struct file * filp,
 	struct super_block * sb;
 	int err;
 	struct inode *inode = filp->f_dentry->d_inode;
+
+	lock_kernel();
 
 	sb = inode->i_sb;
 
@@ -150,6 +153,7 @@ revalidate:
 				filp->f_pos = (filp->f_pos |
 						(sb->s_blocksize - 1)) + 1;
 				brelse (bh);
+				unlock_kernel();
 				return stored;
 			}
 			offset += le16_to_cpu(de->rec_len);
@@ -186,5 +190,6 @@ revalidate:
 		brelse (bh);
 	}
 	UPDATE_ATIME(inode);
+	unlock_kernel();
 	return 0;
 }

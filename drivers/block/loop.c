@@ -217,14 +217,14 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t po
 		offset = 0;
 		index++;
 		pos += size;
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 	}
 	up(&mapping->host->i_sem);
 	return 0;
 
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 fail:
 	up(&mapping->host->i_sem);
@@ -547,8 +547,6 @@ static int loop_thread(void *data)
 	lo->lo_state = Lo_bound;
 	atomic_inc(&lo->lo_pending);
 	spin_unlock_irq(&lo->lo_lock);
-
-	current->flags |= PF_NOIO;
 
 	/*
 	 * up sem, we are running

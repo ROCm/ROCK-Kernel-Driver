@@ -299,13 +299,6 @@ CONFIG_IDEDMA_IVB
 
   It is normally safe to answer Y; however, the default is N.
 
-CONFIG_IDEDMA_PCI_WIP
-  If you enable this you will be able to use and test highly
-  developmental projects. If you say N, the configurator will
-  simply skip those options.
-
-  It is SAFEST to say N to this question.
-
 CONFIG_BLK_DEV_PDC_ADMA
   Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
 
@@ -430,6 +423,15 @@ CONFIG_BLK_DEV_PIIX
   and also for the Efar Victory66 (slc90e66) chip.  This allows
   the kernel to change PIO, DMA and UDMA speeds and to configure
   the chip to optimum performance.
+
+CONFIG_BLK_DEV_PIIX_TRY133
+  The ICH2, ICH2-M, ICH3, ICH3-M, ICH3-S and CICH chips can support
+  UDMA133 in hardware, even though the specifications of the chips
+  say otherwise. By enabling this option, you allow the driver to
+  enable the UDMA133 mode on these chips.
+
+  If you want to stay on the safe side, say N here.
+  If you prefer maximum performance, say Y here.
 
 CONFIG_BLK_DEV_PDC202XX
   Promise Ultra33 or PDC20246

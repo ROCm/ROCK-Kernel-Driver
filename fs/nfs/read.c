@@ -145,7 +145,7 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 
 io_error:
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return result;
 }
 
@@ -226,7 +226,7 @@ nfs_async_read_error(struct list_head *head)
 		page = req->wb_page;
 		nfs_list_remove_request(req);
 		SetPageError(page);
-		UnlockPage(page);
+		unlock_page(page);
 		nfs_clear_request(req);
 		nfs_release_request(req);
 		nfs_unlock_request(req);
@@ -430,7 +430,7 @@ nfs_readpage_result(struct rpc_task *task)
 			SetPageError(page);
 		flush_dcache_page(page);
 		kunmap(page);
-		UnlockPage(page);
+		unlock_page(page);
 
 		dprintk("NFS: read (%s/%Ld %d@%Ld)\n",
                         req->wb_inode->i_sb->s_id,
@@ -483,7 +483,7 @@ out:
 	return error;
 
 out_error:
-	UnlockPage(page);
+	unlock_page(page);
 	goto out;
 }
 

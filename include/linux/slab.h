@@ -70,7 +70,6 @@ extern kmem_cache_t	*names_cachep;
 extern kmem_cache_t	*files_cachep;
 extern kmem_cache_t	*filp_cachep;
 extern kmem_cache_t	*dquot_cachep;
-extern kmem_cache_t	*bh_cachep;
 extern kmem_cache_t	*fs_cachep;
 extern kmem_cache_t	*sigact_cachep;
 extern kmem_cache_t	*bio_cachep;

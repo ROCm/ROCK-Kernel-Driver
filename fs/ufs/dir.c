@@ -17,6 +17,7 @@
 #include <linux/locks.h>
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
+#include <linux/smp_lock.h>
 
 #include "swab.h"
 #include "util.h"
@@ -61,6 +62,8 @@ ufs_readdir (struct file * filp, void * dirent, filldir_t filldir)
 	struct super_block * sb;
 	int de_reclen;
 	unsigned flags;
+
+	lock_kernel();
 
 	sb = inode->i_sb;
 	flags = sb->u.ufs_sb.s_flags;
@@ -117,6 +120,7 @@ revalidate:
 				              (sb->s_blocksize - 1)) +
 				               sb->s_blocksize;
 				brelse(bh);
+				unlock_kernel();
 				return stored;
 			}
 			if (!ufs_check_dir_entry ("ufs_readdir", inode, de,
@@ -127,6 +131,7 @@ revalidate:
 				              (sb->s_blocksize - 1)) +
 					       1;
 				brelse (bh);
+				unlock_kernel();
 				return stored;
 			}
 			offset += fs16_to_cpu(sb, de->d_reclen);
@@ -161,6 +166,7 @@ revalidate:
 		brelse (bh);
 	}
 	UPDATE_ATIME(inode);
+	unlock_kernel();
 	return 0;
 }
 

@@ -91,7 +91,7 @@ int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	}
 	inode->i_blocks++;
 	hpfs_i(inode)->mmu_private += 512;
-	bh_result->b_state |= 1UL << BH_New;
+	set_buffer_new(bh_result);
 	map_bh(bh_result, inode->i_sb, s);
 	return 0;
 }

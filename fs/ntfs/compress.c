@@ -198,7 +198,7 @@ return_error:
 			flush_dcache_page(dp);
 			kunmap(dp);
 			SetPageUptodate(dp);
-			UnlockPage(dp);
+			unlock_page(dp);
 			if (di == xpage)
 				*xpage_done = 1;
 			else
@@ -491,7 +491,7 @@ int ntfs_file_read_compressed_block(struct page *page)
 		kfree(bhs);
 		kfree(pages);
 		SetPageError(page);
-		UnlockPage(page);
+		unlock_page(page);
 		ntfs_error(vol->sb, "Failed to allocate internal buffers.");
 		return -ENOMEM;
 	}
@@ -521,13 +521,13 @@ int ntfs_file_read_compressed_block(struct page *page)
 			 * in and/or dirty or we would be losing data or at
 			 * least wasting our time.
 			 */
-			if (!PageDirty(page) && (!Page_Uptodate(page) ||
+			if (!PageDirty(page) && (!PageUptodate(page) ||
 					PageError(page))) {
 				ClearPageError(page);
 				kmap(page);
 				continue;
 			}
-			UnlockPage(page);
+			unlock_page(page);
 			page_cache_release(page);
 			pages[i] = NULL;
 		}
@@ -668,7 +668,7 @@ retry_remap:
 				flush_dcache_page(page);
 				kunmap(page);
 				SetPageUptodate(page);
-				UnlockPage(page);
+				unlock_page(page);
 				if (cur_page == xpage)
 					xpage_done = 1;
 				else
@@ -738,7 +738,7 @@ retry_remap:
 				flush_dcache_page(page);
 				kunmap(page);
 				SetPageUptodate(page);
-				UnlockPage(page);
+				unlock_page(page);
 				if (cur2_page == xpage)
 					xpage_done = 1;
 				else
@@ -775,7 +775,7 @@ retry_remap:
 						SetPageError(page);
 					flush_dcache_page(page);
 					kunmap(page);
-					UnlockPage(page);
+					unlock_page(page);
 					if (prev_cur_page != xpage)
 						page_cache_release(page);
 					pages[prev_cur_page] = NULL;
@@ -806,7 +806,7 @@ retry_remap:
 				SetPageError(page);
 			flush_dcache_page(page);
 			kunmap(page);
-			UnlockPage(page);
+			unlock_page(page);
 			if (cur_page != xpage)
 				page_cache_release(page);
 			pages[cur_page] = NULL;
@@ -853,7 +853,7 @@ err_out:
 				SetPageError(page);
 			flush_dcache_page(page);
 			kunmap(page);
-			UnlockPage(page);
+			unlock_page(page);
 			if (i != xpage)
 				page_cache_release(page);
 		}

@@ -47,7 +47,9 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     loff_t next_pos;
     char small_buf[32] ; /* avoid kmalloc if we can */
     struct reiserfs_dir_entry de;
+    int ret = 0;
 
+    lock_kernel();
 
     reiserfs_check_lock_depth("readdir") ;
 
@@ -66,7 +68,8 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 	if (search_res == IO_ERROR) {
 	    // FIXME: we could just skip part of directory which could
 	    // not be read
-	    return -EIO;
+	    ret = -EIO;
+	    goto out;
 	}
 	entry_num = de.de_entry_num;
 	bh = de.de_bh;
@@ -118,7 +121,8 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		    local_buf = reiserfs_kmalloc(d_reclen, GFP_NOFS, inode->i_sb) ;
 		    if (!local_buf) {
 			pathrelse (&path_to_entry);
-			return -ENOMEM ;
+			ret = -ENOMEM ;
+			goto out;
 		    }
 		    if (item_moved (&tmp_ih, &path_to_entry)) {
 			reiserfs_kfree(local_buf, d_reclen, inode->i_sb) ;
@@ -181,7 +185,9 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     pathrelse (&path_to_entry);
     reiserfs_check_path(&path_to_entry) ;
     UPDATE_ATIME(inode) ;
-    return 0;
+ out:
+    unlock_kernel();
+    return ret;
 }
 
 /* compose directory item containing "." and ".." entries (entries are

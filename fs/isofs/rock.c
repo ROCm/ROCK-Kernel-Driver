@@ -566,7 +566,7 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 	unlock_kernel();
 	SetPageUptodate(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 
 	/* error exit from macro */
@@ -584,7 +584,7 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 	unlock_kernel();
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return -EIO;
 }
 

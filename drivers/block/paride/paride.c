@@ -51,20 +51,28 @@ void pi_write_regr( PIA *pi, int cont, int regr, int val)
 {	pi->proto->write_regr(pi,cont,regr,val);
 }
 
+EXPORT_SYMBOL(pi_write_regr);
+
 int pi_read_regr( PIA *pi, int cont, int regr)
 
 {	return pi->proto->read_regr(pi,cont,regr);
 }
+
+EXPORT_SYMBOL(pi_read_regr);
 
 void pi_write_block( PIA *pi, char * buf, int count)
 
 {	pi->proto->write_block(pi,buf,count);
 }
 
+EXPORT_SYMBOL(pi_write_block);
+
 void pi_read_block( PIA *pi, char * buf, int count)
 
 {       pi->proto->read_block(pi,buf,count);
 }
+
+EXPORT_SYMBOL(pi_read_block);
 
 #ifdef CONFIG_PARPORT
 
@@ -116,6 +124,8 @@ void pi_do_claimed( PIA *pi, void(*cont)(void))
 
 #endif
 
+EXPORT_SYMBOL(pi_do_claimed);
+
 static void pi_claim( PIA *pi)
 
 {	if (pi->claimed) return;
@@ -141,11 +151,15 @@ void pi_connect( PIA *pi)
 	pi->proto->connect(pi);
 }
 
+EXPORT_SYMBOL(pi_connect);
+
 void pi_disconnect( PIA *pi)
 
 {	pi->proto->disconnect(pi);
 	pi_unclaim(pi);
 }
+
+EXPORT_SYMBOL(pi_disconnect);
 
 static void pi_unregister_parport( PIA *pi)
 
@@ -167,6 +181,8 @@ void pi_release( PIA *pi)
 #endif /* !CONFIG_PARPORT */
 	pi->proto->release_proto(pi);
 }
+
+EXPORT_SYMBOL(pi_release);
 
 #define WR(r,v)         pi_write_regr(pi,0,r,v)
 #define RR(r)           (pi_read_regr(pi,0,r))
@@ -226,6 +242,8 @@ int  pi_register( PIP *pr)
 	return 1;
 }	
 
+EXPORT_SYMBOL(pi_register);
+
 void pi_unregister( PIP *pr)
 
 {	if (!pr) return;
@@ -236,6 +254,8 @@ void pi_unregister( PIP *pr)
 	protocols[pr->index] = 0;
 	MOD_DEC_USE_COUNT;
 }
+
+EXPORT_SYMBOL(pi_unregister);
 
 static int pi_register_parport( PIA *pi, int verbose)
 
@@ -415,6 +435,8 @@ int pi_init(PIA *pi, int autoprobe, int port, int mode,
 
 	return 1;
 }
+
+EXPORT_SYMBOL(pi_init);
 
 #ifdef MODULE
 

@@ -49,7 +49,7 @@ struct capidrv_contr {
 
 	struct capidrv_contr *next;
 
-	__u32 contrnr;
+	u32 contrnr;
 	char name[20];
 
 	/*
@@ -62,14 +62,14 @@ struct capidrv_contr {
 	 * LISTEN state
 	 */
 	int state;
-	__u32 cipmask;
-	__u32 cipmask2;
+	u32 cipmask;
+	u32 cipmask2;
         struct timer_list listentimer;
 
 	/*
 	 * ID of capi message sent
 	 */
-	__u16 msgid;
+	u16 msgid;
 
 	/*
 	 * B-Channels
@@ -77,36 +77,36 @@ struct capidrv_contr {
 	int nbchan;
 	struct capidrv_bchan {
 		struct capidrv_contr *contr;
-		__u8 msn[ISDN_MSNLEN];
+		u8 msn[ISDN_MSNLEN];
 		int l2;
 		int l3;
-		__u8 num[ISDN_MSNLEN];
-		__u8 mynum[ISDN_MSNLEN];
+		u8 num[ISDN_MSNLEN];
+		u8 mynum[ISDN_MSNLEN];
 		int si1;
 		int si2;
 		int incoming;
 		int disconnecting;
 		struct capidrv_plci {
 			struct capidrv_plci *next;
-			__u32 plci;
-			__u32 ncci;	/* ncci for CONNECT_ACTIVE_IND */
-			__u16 msgid;	/* to identfy CONNECT_CONF */
+			u32 plci;
+			u32 ncci;	/* ncci for CONNECT_ACTIVE_IND */
+			u16 msgid;	/* to identfy CONNECT_CONF */
 			int chan;
 			int state;
 			int leasedline;
 			struct capidrv_ncci {
 				struct capidrv_ncci *next;
 				struct capidrv_plci *plcip;
-				__u32 ncci;
-				__u16 msgid;	/* to identfy CONNECT_B3_CONF */
+				u32 ncci;
+				u16 msgid;	/* to identfy CONNECT_B3_CONF */
 				int chan;
 				int state;
 				int oldstate;
 				/* */
-				__u16 datahandle;
+				u16 datahandle;
 				struct ncci_datahandle_queue {
 				    struct ncci_datahandle_queue *next;
-				    __u16                         datahandle;
+				    u16                         datahandle;
 				    int                           len;
 				} *ackqueue;
 			} *ncci_list;
@@ -117,15 +117,15 @@ struct capidrv_contr {
 	struct capidrv_plci *plci_list;
 
 	/* for q931 data */
-	__u8  q931_buf[4096];
-	__u8 *q931_read;
-	__u8 *q931_write;
-	__u8 *q931_end;
+	u8  q931_buf[4096];
+	u8 *q931_read;
+	u8 *q931_write;
+	u8 *q931_end;
 };
 
 
 struct capidrv_data {
-	__u16 appid;
+	u16 appid;
 	int ncontr;
 	struct capidrv_contr *contr_list;
 
@@ -149,11 +149,11 @@ static spinlock_t global_lock = SPIN_LOCK_UNLOCKED;
 static struct capi_interface *capifuncs;
 
 static void handle_dtrace_data(capidrv_contr *card,
-	int send, int level2, __u8 *data, __u16 len);
+	int send, int level2, u8 *data, u16 len);
 
 /* -------- convert functions ---------------------------------------- */
 
-static inline __u32 b1prot(int l2, int l3)
+static inline u32 b1prot(int l2, int l3)
 {
 	switch (l2) {
 	case ISDN_PROTO_L2_X75I:
@@ -176,7 +176,7 @@ static inline __u32 b1prot(int l2, int l3)
 	}
 }
 
-static inline __u32 b2prot(int l2, int l3)
+static inline u32 b2prot(int l2, int l3)
 {
 	switch (l2) {
 	case ISDN_PROTO_L2_X75I:
@@ -196,7 +196,7 @@ static inline __u32 b2prot(int l2, int l3)
 	}
 }
 
-static inline __u32 b3prot(int l2, int l3)
+static inline u32 b3prot(int l2, int l3)
 {
 	switch (l2) {
 	case ISDN_PROTO_L2_X75I:
@@ -215,7 +215,7 @@ static inline __u32 b3prot(int l2, int l3)
 	}
 }
 
-static _cstruct b1config_async_v110(__u16 rate)
+static _cstruct b1config_async_v110(u16 rate)
 {
 	/* CAPI-Spec "B1 Configuration" */
 	static unsigned char buf[9];
@@ -247,9 +247,9 @@ static _cstruct b1config(int l2, int l3)
 	}
 }
 
-static inline __u16 si2cip(__u8 si1, __u8 si2)
+static inline u16 si2cip(u8 si1, u8 si2)
 {
-	static const __u8 cip[17][5] =
+	static const u8 cip[17][5] =
 	{
 	/*  0  1  2  3  4  */
 		{0, 0, 0, 0, 0},	/*0 */
@@ -275,12 +275,12 @@ static inline __u16 si2cip(__u8 si1, __u8 si2)
 	if (si2 > 4)
 		si2 = 0;
 
-	return (__u16) cip[si1][si2];
+	return (u16) cip[si1][si2];
 }
 
-static inline __u8 cip2si1(__u16 cipval)
+static inline u8 cip2si1(u16 cipval)
 {
-	static const __u8 si[32] =
+	static const u8 si[32] =
 	{7, 1, 7, 7, 1, 1, 7, 7,	/*0-7 */
 	 7, 1, 0, 0, 0, 0, 0, 0,	/*8-15 */
 	 1, 2, 4, 10, 9, 9, 15, 7,	/*16-23 */
@@ -291,9 +291,9 @@ static inline __u8 cip2si1(__u16 cipval)
 	return si[cipval];
 }
 
-static inline __u8 cip2si2(__u16 cipval)
+static inline u8 cip2si2(u16 cipval)
 {
-	static const __u8 si[32] =
+	static const u8 si[32] =
 	{0, 0, 0, 0, 2, 3, 0, 0,	/*0-7 */
 	 0, 3, 0, 0, 0, 0, 0, 0,	/*8-15 */
 	 1, 2, 0, 0, 9, 0, 0, 0,	/*16-23 */
@@ -320,7 +320,7 @@ static inline capidrv_contr *findcontrbydriverid(int driverid)
 	return p;
 }
 
-static capidrv_contr *findcontrbynumber(__u32 contr)
+static capidrv_contr *findcontrbynumber(u32 contr)
 {
 	unsigned long flags;
 	capidrv_contr *p = global.contr_list;
@@ -357,7 +357,7 @@ static capidrv_plci *new_plci(capidrv_contr * card, int chan)
 	return plcip;
 }
 
-static capidrv_plci *find_plci_by_plci(capidrv_contr * card, __u32 plci)
+static capidrv_plci *find_plci_by_plci(capidrv_contr * card, u32 plci)
 {
 	capidrv_plci *p;
 	for (p = card->plci_list; p; p = p->next)
@@ -366,7 +366,7 @@ static capidrv_plci *find_plci_by_plci(capidrv_contr * card, __u32 plci)
 	return 0;
 }
 
-static capidrv_plci *find_plci_by_msgid(capidrv_contr * card, __u16 msgid)
+static capidrv_plci *find_plci_by_msgid(capidrv_contr * card, u16 msgid)
 {
 	capidrv_plci *p;
 	for (p = card->plci_list; p; p = p->next)
@@ -375,7 +375,7 @@ static capidrv_plci *find_plci_by_msgid(capidrv_contr * card, __u16 msgid)
 	return 0;
 }
 
-static capidrv_plci *find_plci_by_ncci(capidrv_contr * card, __u32 ncci)
+static capidrv_plci *find_plci_by_ncci(capidrv_contr * card, u32 ncci)
 {
 	capidrv_plci *p;
 	for (p = card->plci_list; p; p = p->next)
@@ -406,7 +406,7 @@ static void free_plci(capidrv_contr * card, capidrv_plci * plcip)
 
 static inline capidrv_ncci *new_ncci(capidrv_contr * card,
 				     capidrv_plci * plcip,
-				     __u32 ncci)
+				     u32 ncci)
 {
 	capidrv_ncci *nccip;
 
@@ -430,7 +430,7 @@ static inline capidrv_ncci *new_ncci(capidrv_contr * card,
 	return nccip;
 }
 
-static inline capidrv_ncci *find_ncci(capidrv_contr * card, __u32 ncci)
+static inline capidrv_ncci *find_ncci(capidrv_contr * card, u32 ncci)
 {
 	capidrv_plci *plcip;
 	capidrv_ncci *p;
@@ -445,7 +445,7 @@ static inline capidrv_ncci *find_ncci(capidrv_contr * card, __u32 ncci)
 }
 
 static inline capidrv_ncci *find_ncci_by_msgid(capidrv_contr * card,
-					       __u32 ncci, __u16 msgid)
+					       u32 ncci, u16 msgid)
 {
 	capidrv_plci *plcip;
 	capidrv_ncci *p;
@@ -474,7 +474,7 @@ static void free_ncci(capidrv_contr * card, struct capidrv_ncci *nccip)
 }
 
 static int capidrv_add_ack(struct capidrv_ncci *nccip,
-		           __u16 datahandle, int len)
+		           u16 datahandle, int len)
 {
 	struct ncci_datahandle_queue *n, **pp;
 
@@ -492,7 +492,7 @@ static int capidrv_add_ack(struct capidrv_ncci *nccip,
 	return 0;
 }
 
-static int capidrv_del_ack(struct capidrv_ncci *nccip, __u16 datahandle)
+static int capidrv_del_ack(struct capidrv_ncci *nccip, u16 datahandle)
 {
 	struct ncci_datahandle_queue **pp, *p;
 	int len;
@@ -798,9 +798,9 @@ static void handle_controller(_cmsg * cmsg)
 		if (   cmsg->ManuID == 0x214D5641
 		    && cmsg->Class == 0
 		    && cmsg->Function == 1) {
-		   __u8  *data = cmsg->ManuData+3;
-		   __u16  len = cmsg->ManuData[0];
-		   __u16 layer;
+		   u8  *data = cmsg->ManuData+3;
+		   u16  len = cmsg->ManuData[0];
+		   u16 layer;
 		   int direction;
 		   if (len == 255) {
 		      len = (cmsg->ManuData[1] | (cmsg->ManuData[2] << 8));
@@ -1123,10 +1123,10 @@ static void handle_plci(_cmsg * cmsg)
 				cmd.arg = plcip->chan;
 				sprintf(cmd.parm.num, "%lu",
 					(unsigned long)
-					((__u32) cmsg->InfoElement[1]
-				  | ((__u32) (cmsg->InfoElement[2]) << 8)
-				 | ((__u32) (cmsg->InfoElement[3]) << 16)
-					 | ((__u32) (cmsg->InfoElement[4]) << 24)));
+					((u32) cmsg->InfoElement[1]
+				  | ((u32) (cmsg->InfoElement[2]) << 8)
+				 | ((u32) (cmsg->InfoElement[3]) << 16)
+					 | ((u32) (cmsg->InfoElement[4]) << 24)));
 				card->interface.statcallb(&cmd);
 				break;
 			}
@@ -1373,7 +1373,7 @@ static void handle_data(_cmsg * cmsg, struct sk_buff *skb)
 
 static _cmsg s_cmsg;
 
-static void capidrv_signal(__u16 applid, void *dummy)
+static void capidrv_signal(u16 applid, void *dummy)
 {
 	struct sk_buff *skb = 0;
 
@@ -1415,9 +1415,9 @@ static void capidrv_signal(__u16 applid, void *dummy)
 	} while (0)
 
 static void handle_dtrace_data(capidrv_contr *card,
-			     int send, int level2, __u8 *data, __u16 len)
+			     int send, int level2, u8 *data, u16 len)
 {
-    	__u8 *p, *end;
+    	u8 *p, *end;
     	isdn_ctrl cmd;
 
     	if (!len) {
@@ -1439,7 +1439,7 @@ static void handle_dtrace_data(capidrv_contr *card,
     	}
 
 	for (p = data, end = data+len; p < end; p++) {
-		__u8 w;
+		u8 w;
 		PUTBYTE_TO_STATUS(card, ' ');
 		w = (*p >> 4) & 0xf;
 		PUTBYTE_TO_STATUS(card, (w < 10) ? '0'+w : 'A'-10+w);
@@ -1539,7 +1539,7 @@ static int decodeFVteln(char *teln, unsigned long *bmaskp, int *activep)
 	return 0;
 }
 
-static int FVteln2capi20(char *teln, __u8 AdditionalInfo[1+2+2+31])
+static int FVteln2capi20(char *teln, u8 AdditionalInfo[1+2+2+31])
 {
 	unsigned long bmask;
 	int active;
@@ -1569,7 +1569,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 	isdn_ctrl cmd;
 	struct capidrv_bchan *bchan;
 	struct capidrv_plci *plcip;
-	__u8 AdditionalInfo[1+2+2+31];
+	u8 AdditionalInfo[1+2+2+31];
         int rc, isleasedline = 0;
 
 	if (c->command == ISDN_CMD_IOCTL)
@@ -1577,8 +1577,8 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 
 	switch (c->command) {
 	case ISDN_CMD_DIAL:{
-			__u8 calling[ISDN_MSNLEN + 3];
-			__u8 called[ISDN_MSNLEN + 2];
+			u8 calling[ISDN_MSNLEN + 3];
+			u8 called[ISDN_MSNLEN + 2];
 
 			if (debugmode)
 				printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_DIAL(ch=%ld,\"%s,%d,%d,%s\")\n",
@@ -1870,8 +1870,8 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	capidrv_ncci *nccip;
 	int len = skb->len;
 	size_t msglen;
-	__u16 errcode;
-	__u16 datahandle;
+	u16 errcode;
+	u16 datahandle;
 
 	if (!card) {
 		printk(KERN_ERR "capidrv: if_sendbuf called with invalid driverId %d!\n",
@@ -1891,7 +1891,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	datahandle = nccip->datahandle;
 	capi_fill_DATA_B3_REQ(&sendcmsg, global.appid, card->msgid++,
 			      nccip->ncci,	/* adr */
-			      (__u32) skb->data,	/* Data */
+			      (u32) skb->data,	/* Data */
 			      skb->len,		/* DataLength */
 			      datahandle,	/* DataHandle */
 			      0	/* Flags */
@@ -1937,11 +1937,11 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	}
 }
 
-static int if_readstat(__u8 *buf, int len, int user, int id, int channel)
+static int if_readstat(u8 *buf, int len, int user, int id, int channel)
 {
 	capidrv_contr *card = findcontrbydriverid(id);
 	int count;
-	__u8 *p;
+	u8 *p;
 
 	if (!card) {
 		printk(KERN_ERR "capidrv: if_readstat called with invalid driverId %d!\n",
@@ -1963,11 +1963,11 @@ static int if_readstat(__u8 *buf, int len, int user, int id, int channel)
 
 static void enable_dchannel_trace(capidrv_contr *card)
 {
-        __u8 manufacturer[CAPI_MANUFACTURER_LEN];
+        u8 manufacturer[CAPI_MANUFACTURER_LEN];
         capi_version version;
-	__u16 contr = card->contrnr;
-	__u16 errcode;
-	__u16 avmversion[3];
+	u16 contr = card->contrnr;
+	u16 errcode;
+	u16 avmversion[3];
 
         errcode = (*capifuncs->capi_get_manufacturer)(contr, manufacturer);
         if (errcode != CAPI_NOERROR) {
@@ -2037,7 +2037,7 @@ static void listentimerfunc(unsigned long x)
 }
 
 
-static int capidrv_addcontr(__u16 contr, struct capi_profile *profp)
+static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 {
 	capidrv_contr *card;
 	long flags;
@@ -2135,7 +2135,7 @@ static int capidrv_addcontr(__u16 contr, struct capi_profile *profp)
 	return 0;
 }
 
-static int capidrv_delcontr(__u16 contr)
+static int capidrv_delcontr(u16 contr)
 {
 	capidrv_contr **pp, *card;
 	unsigned long flags;
@@ -2218,7 +2218,7 @@ static int capidrv_delcontr(__u16 contr)
 }
 
 
-static void lower_callback(unsigned int cmd, __u32 contr, void *data)
+static void lower_callback(unsigned int cmd, u32 contr, void *data)
 {
 
 	switch (cmd) {
@@ -2303,8 +2303,8 @@ static int __init capidrv_init(void)
 	capi_profile profile;
 	char rev[32];
 	char *p;
-	__u32 ncontr, contr;
-	__u16 errcode;
+	u32 ncontr, contr;
+	u16 errcode;
 
 	MOD_INC_USE_COUNT;
 

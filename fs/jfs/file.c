@@ -33,8 +33,6 @@ int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	struct inode *inode = dentry->d_inode;
 	int rc = 0;
 
-	rc = fsync_inode_data_buffers(inode);
-
 	if (!(inode->i_state & I_DIRTY))
 		return rc;
 	if (datasync || !(inode->i_state & I_DIRTY_DATASYNC))

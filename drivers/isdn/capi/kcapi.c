@@ -54,14 +54,14 @@ MODULE_PARM(showcapimsgs, "i");
 
 struct msgidqueue {
 	struct msgidqueue *next;
-	__u16 msgid;
+	u16 msgid;
 };
 
 struct capi_ncci {
 	struct capi_ncci *next;
-	__u16 applid;
-	__u32 ncci;
-	__u32 winsize;
+	u16 applid;
+	u32 ncci;
+	u32 winsize;
 	int   nmsg;
 	struct msgidqueue *msgidqueue;
 	struct msgidqueue *msgidlast;
@@ -70,11 +70,11 @@ struct capi_ncci {
 };
 
 struct capi_appl {
-	__u16 applid;
+	u16 applid;
 	capi_register_params rparam;
 	int releasing;
 	void *param;
-	void (*signal) (__u16 applid, void *param);
+	void (*signal) (u16 applid, void *param);
 	struct sk_buff_head recv_queue;
 	int nncci;
 	struct capi_ncci *nccilist;
@@ -88,9 +88,9 @@ struct capi_appl {
 struct capi_notifier {
 	struct capi_notifier *next;
 	unsigned int cmd;
-	__u32 controller;
-	__u16 applid;
-	__u32 ncci;
+	u32 controller;
+	u16 applid;
+	u32 ncci;
 };
 
 /* ------------------------------------------------------------- */
@@ -136,7 +136,7 @@ static char *cardstate2str(unsigned short cardstate)
 	}
 }
 
-static inline int capi_cmd_valid(__u8 cmd)
+static inline int capi_cmd_valid(u8 cmd)
 {
 	switch (cmd) {
 	case CAPI_ALERT:
@@ -159,7 +159,7 @@ static inline int capi_cmd_valid(__u8 cmd)
 	return 0;
 }
 
-static inline int capi_subcmd_valid(__u8 subcmd)
+static inline int capi_subcmd_valid(u8 subcmd)
 {
 	switch (subcmd) {
 	case CAPI_REQ:
@@ -511,8 +511,8 @@ static inline struct capi_notifier *notify_dequeue(void)
 	return np;
 }
 
-static int notify_push(unsigned int cmd, __u32 controller,
-				__u16 applid, __u32 ncci)
+static int notify_push(unsigned int cmd, u32 controller,
+				u16 applid, u32 ncci)
 {
 	struct capi_notifier *np;
 
@@ -541,7 +541,7 @@ static int notify_push(unsigned int cmd, __u32 controller,
 
 /* -------- KCI_CONTRUP --------------------------------------- */
 
-static void notify_up(__u32 contr)
+static void notify_up(u32 contr)
 {
 	struct capi_interface_user *p;
 
@@ -556,7 +556,7 @@ static void notify_up(__u32 contr)
 
 /* -------- KCI_CONTRDOWN ------------------------------------- */
 
-static void notify_down(__u32 contr)
+static void notify_down(u32 contr)
 {
 	struct capi_interface_user *p;
         printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);
@@ -570,7 +570,7 @@ static void notify_down(__u32 contr)
 
 /* -------- KCI_NCCIUP ---------------------------------------- */
 
-static void notify_ncciup(__u32 contr, __u16 applid, __u32 ncci)
+static void notify_ncciup(u32 contr, u16 applid, u32 ncci)
 {
 	struct capi_interface_user *p;
 	struct capi_ncciinfo n;
@@ -587,7 +587,7 @@ static void notify_ncciup(__u32 contr, __u16 applid, __u32 ncci)
 
 /* -------- KCI_NCCIDOWN -------------------------------------- */
 
-static void notify_nccidown(__u32 contr, __u16 applid, __u32 ncci)
+static void notify_nccidown(u32 contr, u16 applid, u32 ncci)
 {
 	struct capi_interface_user *p;
 	struct capi_ncciinfo n;
@@ -650,7 +650,7 @@ static inline void mq_init(struct capi_ncci * np)
 	}
 }
 
-static inline int mq_enqueue(struct capi_ncci * np, __u16 msgid)
+static inline int mq_enqueue(struct capi_ncci * np, u16 msgid)
 {
 	struct msgidqueue *mq;
 	if ((mq = np->msgidfree) == 0)
@@ -667,7 +667,7 @@ static inline int mq_enqueue(struct capi_ncci * np, __u16 msgid)
 	return 1;
 }
 
-static inline int mq_dequeue(struct capi_ncci * np, __u16 msgid)
+static inline int mq_dequeue(struct capi_ncci * np, u16 msgid)
 {
 	struct msgidqueue **pp;
 	for (pp = &np->msgidqueue; *pp; pp = &(*pp)->next) {
@@ -685,11 +685,11 @@ static inline int mq_dequeue(struct capi_ncci * np, __u16 msgid)
 	return 0;
 }
 
-static void controllercb_appl_registered(struct capi_ctr * card, __u16 appl)
+static void controllercb_appl_registered(struct capi_ctr * card, u16 appl)
 {
 }
 
-static void controllercb_appl_released(struct capi_ctr * card, __u16 appl)
+static void controllercb_appl_released(struct capi_ctr * card, u16 appl)
 {
 	struct capi_ncci **pp, **nextpp;
 	for (pp = &APPL(appl)->nccilist; *pp; pp = nextpp) {
@@ -716,7 +716,7 @@ static void controllercb_appl_released(struct capi_ctr * card, __u16 appl)
  */
 
 static void controllercb_new_ncci(struct capi_ctr * card,
-					__u16 appl, __u32 ncci, __u32 winsize)
+					u16 appl, u32 ncci, u32 winsize)
 {
 	struct capi_ncci *np;
 	if (!VALID_APPLID(appl)) {
@@ -745,7 +745,7 @@ static void controllercb_new_ncci(struct capi_ctr * card,
 }
 
 static void controllercb_free_ncci(struct capi_ctr * card,
-				__u16 appl, __u32 ncci)
+				u16 appl, u32 ncci)
 {
 	struct capi_ncci **pp;
 	if (!VALID_APPLID(appl)) {
@@ -767,7 +767,7 @@ static void controllercb_free_ncci(struct capi_ctr * card,
 }
 
 
-static struct capi_ncci *find_ncci(struct capi_appl * app, __u32 ncci)
+static struct capi_ncci *find_ncci(struct capi_appl * app, u32 ncci)
 {
 	struct capi_ncci *np;
 	for (np = app->nccilist; np; np = np->next) {
@@ -784,7 +784,7 @@ static void recv_handler(void *dummy)
 	struct sk_buff *skb;
 
 	while ((skb = skb_dequeue(&recv_queue)) != 0) {
-		__u16 appl = CAPIMSG_APPID(skb->data);
+		u16 appl = CAPIMSG_APPID(skb->data);
 		struct capi_ncci *np;
 		if (!VALID_APPLID(appl)) {
 			printk(KERN_ERR "kcapi: recv_handler: applid %d ? (%s)\n",
@@ -817,10 +817,10 @@ static void recv_handler(void *dummy)
 }
 
 static void controllercb_handle_capimsg(struct capi_ctr * card,
-				__u16 appl, struct sk_buff *skb)
+				u16 appl, struct sk_buff *skb)
 {
 	int showctl = 0;
-	__u8 cmd, subcmd;
+	u8 cmd, subcmd;
 
 	if (card->cardstate != CARD_RUNNING) {
 		printk(KERN_INFO "kcapi: controller %d not active, got: %s",
@@ -862,7 +862,7 @@ error:
 
 static void controllercb_ready(struct capi_ctr * card)
 {
-	__u16 appl;
+	u16 appl;
 
 	card->cardstate = CARD_RUNNING;
 
@@ -880,7 +880,7 @@ static void controllercb_ready(struct capi_ctr * card)
 
 static void controllercb_reseted(struct capi_ctr * card)
 {
-	__u16 appl;
+	u16 appl;
 
         if (card->cardstate == CARD_FREE)
 		return;
@@ -1088,7 +1088,7 @@ void detach_capi_driver(struct capi_driver *driver)
 /* -------- CAPI2.0 Interface ---------------------------------- */
 /* ------------------------------------------------------------- */
 
-static __u16 capi_isinstalled(void)
+static u16 capi_isinstalled(void)
 {
 	int i;
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
@@ -1098,7 +1098,7 @@ static __u16 capi_isinstalled(void)
 	return CAPI_REGNOTINSTALLED;
 }
 
-static __u16 capi_register(capi_register_params * rparam, __u16 * applidp)
+static u16 capi_register(capi_register_params * rparam, u16 * applidp)
 {
 	int appl;
 	int i;
@@ -1131,7 +1131,7 @@ static __u16 capi_register(capi_register_params * rparam, __u16 * applidp)
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_release(__u16 applid)
+static u16 capi_release(u16 applid)
 {
 	int i;
 
@@ -1154,12 +1154,12 @@ static __u16 capi_release(__u16 applid)
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_put_message(__u16 applid, struct sk_buff *skb)
+static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 {
 	struct capi_ncci *np;
-	__u32 contr;
+	u32 contr;
 	int showctl = 0;
-	__u8 cmd, subcmd;
+	u8 cmd, subcmd;
 
 	if (ncards == 0)
 		return CAPI_REGNOTINSTALLED;
@@ -1212,7 +1212,7 @@ static __u16 capi_put_message(__u16 applid, struct sk_buff *skb)
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_get_message(__u16 applid, struct sk_buff **msgp)
+static u16 capi_get_message(u16 applid, struct sk_buff **msgp)
 {
 	struct sk_buff *skb;
 
@@ -1224,8 +1224,8 @@ static __u16 capi_get_message(__u16 applid, struct sk_buff **msgp)
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_set_signal(__u16 applid,
-			     void (*signal) (__u16 applid, void *param),
+static u16 capi_set_signal(u16 applid,
+			     void (*signal) (u16 applid, void *param),
 			     void *param)
 {
 	if (!VALID_APPLID(applid))
@@ -1235,7 +1235,7 @@ static __u16 capi_set_signal(__u16 applid,
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_get_manufacturer(__u32 contr, __u8 buf[CAPI_MANUFACTURER_LEN])
+static u16 capi_get_manufacturer(u32 contr, u8 buf[CAPI_MANUFACTURER_LEN])
 {
 	if (contr == 0) {
 		strncpy(buf, capi_manufakturer, CAPI_MANUFACTURER_LEN);
@@ -1248,7 +1248,7 @@ static __u16 capi_get_manufacturer(__u32 contr, __u8 buf[CAPI_MANUFACTURER_LEN])
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_get_version(__u32 contr, struct capi_version *verp)
+static u16 capi_get_version(u32 contr, struct capi_version *verp)
 {
 	if (contr == 0) {
 		*verp = driver_version;
@@ -1261,7 +1261,7 @@ static __u16 capi_get_version(__u32 contr, struct capi_version *verp)
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_get_serial(__u32 contr, __u8 serial[CAPI_SERIAL_LEN])
+static u16 capi_get_serial(u32 contr, u8 serial[CAPI_SERIAL_LEN])
 {
 	if (contr == 0) {
 		strncpy(serial, driver_serial, CAPI_SERIAL_LEN);
@@ -1274,7 +1274,7 @@ static __u16 capi_get_serial(__u32 contr, __u8 serial[CAPI_SERIAL_LEN])
 	return CAPI_NOERROR;
 }
 
-static __u16 capi_get_profile(__u32 contr, struct capi_profile *profp)
+static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
 {
 	if (contr == 0) {
 		profp->ncontroller = ncards;

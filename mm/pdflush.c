@@ -56,7 +56,7 @@ static unsigned long last_empty_jifs;
  *
  * Thread pool management algorithm:
  * 
- * - The minumum and maximum number of pdflush instances are bound
+ * - The minimum and maximum number of pdflush instances are bound
  *   by MIN_PDFLUSH_THREADS and MAX_PDFLUSH_THREADS.
  * 
  * - If there have been no idle pdflush instances for 1 second, create
@@ -155,8 +155,8 @@ static int __pdflush(struct pdflush_work *my_work)
 /*
  * Of course, my_work wants to be just a local in __pdflush().  It is
  * separated out in this manner to hopefully prevent the compiler from
- * performing unfortunate optimisations agains the auto variables.  Because
- * there are visible to other tasks and CPUs.  (No problem has actually
+ * performing unfortunate optimisations against the auto variables.  Because
+ * these are visible to other tasks and CPUs.  (No problem has actually
  * been observed.  This is just paranoia).
  */
 static int pdflush(void *dummy)

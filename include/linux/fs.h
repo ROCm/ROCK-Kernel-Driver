@@ -112,6 +112,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_MOVE		8192
 #define MS_REC		16384
 #define MS_VERBOSE	32768
+#define MS_FLUSHING	(1<<16)	/* inodes are currently under writeout */
 #define MS_ACTIVE	(1<<30)
 #define MS_NOUSER	(1<<31)
 
@@ -155,6 +156,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define IS_RDONLY(inode) ((inode)->i_sb->s_flags & MS_RDONLY)
 #define IS_SYNC(inode)		(__IS_FLG(inode, MS_SYNCHRONOUS) || ((inode)->i_flags & S_SYNC))
 #define IS_MANDLOCK(inode)	__IS_FLG(inode, MS_MANDLOCK)
+#define IS_FLUSHING(inode)	__IS_FLG(inode, MS_FLUSHING)
 
 #define IS_QUOTAINIT(inode)	((inode)->i_flags & S_QUOTA)
 #define IS_NOQUOTA(inode)	((inode)->i_flags & S_NOQUOTA)
@@ -204,104 +206,12 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 extern void update_atime (struct inode *);
 #define UPDATE_ATIME(inode) update_atime (inode)
 
-extern void buffer_init(unsigned long);
 extern void inode_init(unsigned long);
 extern void mnt_init(unsigned long);
 extern void files_init(unsigned long);
 
-/* bh state bits */
-enum bh_state_bits {
-	BH_Uptodate,	/* 1 if the buffer contains valid data */
-	BH_Dirty,	/* 1 if the buffer is dirty */
-	BH_Lock,	/* 1 if the buffer is locked */
-	BH_Req,		/* 0 if the buffer has been invalidated */
-	BH_Mapped,	/* 1 if the buffer has a disk mapping */
-	BH_New,		/* 1 if the buffer is new and not yet written out */
-	BH_Async,	/* 1 if the buffer is under end_buffer_io_async I/O */
-	BH_Wait_IO,	/* 1 if we should write out this buffer */
-	BH_launder,	/* 1 if we should throttle on this buffer */
-	BH_JBD,		/* 1 if it has an attached journal_head */
-
-	BH_PrivateStart,/* not a state bit, but the first bit available
-			 * for private allocation by other entities
-			 */
-};
-
-/*
- * Try to keep the most commonly used fields in single cache lines (16
- * bytes) to improve performance.  This ordering should be
- * particularly beneficial on 32-bit processors.
- * 
- * We use the first 16 bytes for the data which is used in searches
- * over the block hash lists (ie. getblk() and friends).
- * 
- * The second 16 bytes we use for lru buffer scans, as used by
- * sync_buffers() and refill_freelist().  -- sct
- */
-struct buffer_head {
-	/* First cache line: */
-	struct buffer_head *b_next;	/* Hash queue list */
-	sector_t b_blocknr;		/* block number */
-	unsigned short b_size;		/* block size */
-	unsigned short b_list;		/* List that this buffer appears */
-	struct block_device *b_bdev;
-
-	atomic_t b_count;		/* users using this block */
-	unsigned long b_state;		/* buffer state bitmap (see above) */
-	unsigned long b_flushtime;	/* Time when (dirty) buffer should be written */
-
-	struct buffer_head *b_next_free;/* lru/free list linkage */
-	struct buffer_head *b_prev_free;/* doubly linked list of buffers */
-	struct buffer_head *b_this_page;/* circular list of buffers in one page */
-	struct buffer_head **b_pprev;	/* doubly linked list of hash-queue */
-	char * b_data;			/* pointer to data block */
-	struct page *b_page;		/* the page this bh is mapped to */
-	void (*b_end_io)(struct buffer_head *bh, int uptodate); /* I/O completion */
- 	void *b_private;		/* reserved for b_end_io */
-
-	wait_queue_head_t b_wait;
-
-	int b_inode;				/* will go away */
-	struct list_head     b_inode_buffers;	/* doubly linked list of inode dirty buffers */
-};
-
-typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
-void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
-
-#define __buffer_state(bh, state)	(((bh)->b_state & (1UL << BH_##state)) != 0)
-
-#define buffer_uptodate(bh)	__buffer_state(bh,Uptodate)
-#define buffer_dirty(bh)	__buffer_state(bh,Dirty)
-#define buffer_locked(bh)	__buffer_state(bh,Lock)
-#define buffer_req(bh)		__buffer_state(bh,Req)
-#define buffer_mapped(bh)	__buffer_state(bh,Mapped)
-#define buffer_new(bh)		__buffer_state(bh,New)
-#define buffer_async(bh)	__buffer_state(bh,Async)
-
-#define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
-
-extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long offset);
-
-#define touch_buffer(bh)	mark_page_accessed(bh->b_page)
-
-/* If we *know* page->private refers to buffer_heads */
-#define page_buffers(page)					\
-	({							\
-		if (!PagePrivate(page))				\
-			BUG();					\
-		((struct buffer_head *)(page)->private);	\
-	})
-#define page_has_buffers(page)	PagePrivate(page)
-#define set_page_buffers(page, buffers)				\
-	do {							\
-		SetPagePrivate(page);				\
-		page->private = (unsigned long)buffers;		\
-	} while (0)
-#define clear_page_buffers(page)				\
-	do {							\
-		ClearPagePrivate(page);				\
-		page->private = 0;				\
-	} while (0)
+struct buffer_head;
+typedef int (get_block_t)(struct inode*,sector_t,struct buffer_head*,int);
 
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
@@ -371,6 +281,16 @@ struct address_space_operations {
 	int (*writepage)(struct page *);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
+
+	/* Write back some dirty pages from this mapping. */
+	int (*writeback_mapping)(struct address_space *, int *nr_to_write);
+
+	/* Perform a writeback as a memory-freeing operation. */
+	int (*vm_writeback)(struct page *, int *nr_to_write);
+
+	/* Set a page dirty */
+	int (*set_page_dirty)(struct page *page);
+
 	/*
 	 * ext3 requires that a successful prepare_write() call be followed
 	 * by a commit_write() call - they must be balanced
@@ -391,13 +311,16 @@ struct address_space {
 	struct list_head	clean_pages;	/* list of clean pages */
 	struct list_head	dirty_pages;	/* list of dirty pages */
 	struct list_head	locked_pages;	/* list of locked pages */
+	struct list_head	io_pages;	/* being prepared for I/O */
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct inode		*host;		/* owner: inode, block_device */
 	list_t			i_mmap;		/* list of private mappings */
 	list_t			i_mmap_shared;	/* list of private mappings */
 	spinlock_t		i_shared_lock;  /* and spinlock protecting it */
+	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	int			gfp_mask;	/* how to allocate the pages */
+	unsigned long 		*ra_pages;	/* device readahead */
 };
 
 struct char_device {
@@ -426,9 +349,9 @@ struct inode {
 	struct list_head	i_hash;
 	struct list_head	i_list;
 	struct list_head	i_dentry;
-	
-	struct list_head	i_dirty_buffers;
-	struct list_head	i_dirty_data_buffers;
+
+	struct list_head	i_dirty_buffers;   /* uses i_bufferlist_lock */
+	spinlock_t		i_bufferlist_lock;
 
 	unsigned long		i_ino;
 	atomic_t		i_count;
@@ -513,6 +436,7 @@ struct file_ra_state {
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
+	unsigned long ra_pages;		/* Maximum readahead window */
 };
 
 struct file {
@@ -654,6 +578,8 @@ struct nameidata {
 	struct qstr last;
 	unsigned int flags;
 	int last_type;
+	struct dentry *old_dentry;
+	struct vfsmount *old_mnt;
 };
 
 #define DQUOT_USR_ENABLED	0x01		/* User diskquotas enabled */
@@ -679,7 +605,6 @@ struct quota_mount_options
 
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
-#include <linux/sysv_fs_sb.h>
 #include <linux/ufs_fs_sb.h>
 #include <linux/romfs_fs_sb.h>
 #include <linux/adfs_fs_sb.h>
@@ -693,8 +618,9 @@ struct super_block {
 	struct list_head	s_list;		/* Keep this first */
 	kdev_t			s_dev;
 	unsigned long		s_blocksize;
-	unsigned char		s_blocksize_bits;
 	unsigned long		s_old_blocksize;
+	unsigned short		s_writeback_gen;/* To avoid writeback livelock */
+	unsigned char		s_blocksize_bits;
 	unsigned char		s_dirt;
 	unsigned long long	s_maxbytes;	/* Max file size */
 	struct file_system_type	*s_type;
@@ -723,7 +649,6 @@ struct super_block {
 	union {
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
-		struct sysv_sb_info	sysv_sb;
 		struct ufs_sb_info	ufs_sb;
 		struct romfs_sb_info	romfs_sb;
 		struct adfs_sb_info	adfs_sb;
@@ -899,7 +824,7 @@ struct super_operations {
 	int (*show_options)(struct seq_file *, struct vfsmount *);
 };
 
-/* Inode state bits.. */
+/* Inode state bits.  Protected by inode_lock. */
 #define I_DIRTY_SYNC		1 /* Not dirty enough for O_DATASYNC */
 #define I_DIRTY_DATASYNC	2 /* Data-related inode changes pending */
 #define I_DIRTY_PAGES		4 /* Data-related inode changes pending */
@@ -918,11 +843,6 @@ static inline void mark_inode_dirty(struct inode *inode)
 static inline void mark_inode_dirty_sync(struct inode *inode)
 {
 	__mark_inode_dirty(inode, I_DIRTY_SYNC);
-}
-
-static inline void mark_inode_dirty_pages(struct inode *inode)
-{
-	__mark_inode_dirty(inode, I_DIRTY_PAGES);
 }
 
 struct dquot_operations {
@@ -1211,96 +1131,6 @@ extern struct file_operations rdwr_pipe_fops;
 
 extern int fs_may_remount_ro(struct super_block *);
 
-extern int try_to_free_buffers(struct page *, unsigned int);
-extern void refile_buffer(struct buffer_head * buf);
-extern void create_empty_buffers(struct page *, unsigned long);
-extern void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
-
-/* reiserfs_writepage needs this */
-extern void set_buffer_async_io(struct buffer_head *bh) ;
-
-#define BUF_CLEAN	0
-#define BUF_LOCKED	1	/* Buffers scheduled for write */
-#define BUF_DIRTY	2	/* Dirty buffers, not yet scheduled for write */
-#define NR_LIST		3
-
-static inline void get_bh(struct buffer_head * bh)
-{
-        atomic_inc(&(bh)->b_count);
-}
-
-static inline void put_bh(struct buffer_head *bh)
-{
-        smp_mb__before_atomic_dec();
-        atomic_dec(&bh->b_count);
-}
-
-/*
- * This is called by bh->b_end_io() handlers when I/O has completed.
- */
-static inline void mark_buffer_uptodate(struct buffer_head * bh, int on)
-{
-	if (on)
-		set_bit(BH_Uptodate, &bh->b_state);
-	else
-		clear_bit(BH_Uptodate, &bh->b_state);
-}
-
-#define atomic_set_buffer_clean(bh) test_and_clear_bit(BH_Dirty, &(bh)->b_state)
-
-static inline void __mark_buffer_clean(struct buffer_head *bh)
-{
-	refile_buffer(bh);
-}
-
-static inline void mark_buffer_clean(struct buffer_head * bh)
-{
-	if (atomic_set_buffer_clean(bh))
-		__mark_buffer_clean(bh);
-}
-
-extern void FASTCALL(__mark_dirty(struct buffer_head *bh));
-extern void FASTCALL(__mark_buffer_dirty(struct buffer_head *bh));
-extern void FASTCALL(mark_buffer_dirty(struct buffer_head *bh));
-extern void FASTCALL(buffer_insert_list(struct buffer_head *, struct list_head *));
-
-static inline void buffer_insert_inode_queue(struct buffer_head *bh, struct inode *inode)
-{
-	buffer_insert_list(bh, &inode->i_dirty_buffers);
-}
-static inline void buffer_insert_inode_data_queue(struct buffer_head *bh, struct inode *inode)
-{
-	buffer_insert_list(bh, &inode->i_dirty_data_buffers);
-}
-
-#define atomic_set_buffer_dirty(bh) test_and_set_bit(BH_Dirty, &(bh)->b_state)
-
-static inline void mark_buffer_async(struct buffer_head * bh, int on)
-{
-	if (on)
-		set_bit(BH_Async, &bh->b_state);
-	else
-		clear_bit(BH_Async, &bh->b_state);
-}
-
-/*
- * If an error happens during the make_request, this function
- * has to be recalled. It marks the buffer as clean and not
- * uptodate, and it notifys the upper layer about the end
- * of the I/O.
- */
-static inline void buffer_IO_error(struct buffer_head * bh)
-{
-	mark_buffer_clean(bh);
-
-	/*
-	 * b_end_io has to clear the BH_Uptodate bitflag in the read error
-	 * case, however buffer contents are not necessarily bad if a
-	 * write fails
-	 */
-	bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
-}
-
 /*
  * return READ, READA, or WRITE
  */
@@ -1311,46 +1141,14 @@ static inline void buffer_IO_error(struct buffer_head * bh)
  */
 #define bio_data_dir(bio)	((bio)->bi_rw & 1)
 
-extern void buffer_insert_inode_queue(struct buffer_head *, struct inode *);
-static inline void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
-{
-	mark_buffer_dirty(bh);
-	buffer_insert_inode_queue(bh, inode);
-}
-
-extern void set_buffer_flushtime(struct buffer_head *);
-extern void balance_dirty(void);
 extern int check_disk_change(kdev_t);
 extern int invalidate_inodes(struct super_block *);
 extern int invalidate_device(kdev_t, int);
 extern void invalidate_inode_pages(struct inode *);
 extern void invalidate_inode_pages2(struct address_space *);
-extern void invalidate_inode_buffers(struct inode *);
-#define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
-#define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
-extern void invalidate_bdev(struct block_device *, int);
-extern void __invalidate_buffers(kdev_t dev, int);
-extern void sync_inodes(void);
-extern void sync_unlocked_inodes(void);
 extern void write_inode_now(struct inode *, int);
-extern int sync_buffers(struct block_device *, int);
-extern int fsync_dev(kdev_t);
-extern int fsync_bdev(struct block_device *);
-extern int fsync_super(struct super_block *);
-extern int fsync_no_super(struct block_device *);
 extern void sync_inodes_sb(struct super_block *);
-extern int osync_buffers_list(struct list_head *);
-extern int fsync_buffers_list(struct list_head *);
-static inline int fsync_inode_buffers(struct inode *inode)
-{
-	return fsync_buffers_list(&inode->i_dirty_buffers);
-}
-static inline int fsync_inode_data_buffers(struct inode *inode)
-{
-	return fsync_buffers_list(&inode->i_dirty_data_buffers);
-}
-extern int inode_has_buffers(struct inode *);
-extern int filemap_fdatasync(struct address_space *);
+extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern int bmap(struct inode *, int);
@@ -1395,7 +1193,6 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 #define LOOKUP_CONTINUE		(4)
 #define LOOKUP_PARENT		(16)
 #define LOOKUP_NOALT		(32)
-#define LOOKUP_LOCKED		(64)
 
 /*
  * Type of the last component on LOOKUP_PARENT
@@ -1449,6 +1246,7 @@ static inline struct inode *iget(struct super_block *sb, unsigned long ino)
 	return iget4(sb, ino, NULL, NULL);
 }
 
+extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
 extern void remove_suid(struct dentry *);
@@ -1456,115 +1254,14 @@ extern void insert_inode_hash(struct inode *);
 extern void remove_inode_hash(struct inode *);
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
-extern struct buffer_head * __get_hash_table(struct block_device *, sector_t, int);
-static inline struct buffer_head * get_hash_table(kdev_t dev, sector_t block, int size)
-{
-	struct block_device *bdev;
-	struct buffer_head *bh;
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
-		BUG();
-	}
-	bh = __get_hash_table(bdev, block, size);
-	atomic_dec(&bdev->bd_count);
-	return bh;
-}
-extern struct buffer_head * __getblk(struct block_device *, sector_t, int);
-static inline struct buffer_head * getblk(kdev_t dev, sector_t block, int size)
-{
-	struct block_device *bdev;
-	struct buffer_head *bh;
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
-		BUG();
-	}
-	bh = __getblk(bdev, block, size);
-	atomic_dec(&bdev->bd_count);
-	return bh;
-}
 extern void ll_rw_block(int, int, struct buffer_head * bh[]);
 extern int submit_bh(int, struct buffer_head *);
 struct bio;
 extern int submit_bio(int, struct bio *);
 extern int is_read_only(kdev_t);
-extern void __brelse(struct buffer_head *);
-static inline void brelse(struct buffer_head *buf)
-{
-	if (buf)
-		__brelse(buf);
-}
-extern void __bforget(struct buffer_head *);
-static inline void bforget(struct buffer_head *buf)
-{
-	if (buf)
-		__bforget(buf);
-}
 extern int set_blocksize(kdev_t, int);
 extern int sb_set_blocksize(struct super_block *, int);
 extern int sb_min_blocksize(struct super_block *, int);
-extern struct buffer_head * __bread(struct block_device *, int, int);
-static inline struct buffer_head * bread(kdev_t dev, int block, int size)
-{
-	struct block_device *bdev;
-	struct buffer_head *bh;
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
-		BUG();
-	}
-	bh = __bread(bdev, block, size);
-	atomic_dec(&bdev->bd_count);
-	return bh;
-}
-static inline struct buffer_head * sb_bread(struct super_block *sb, int block)
-{
-	return __bread(sb->s_bdev, block, sb->s_blocksize);
-}
-static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
-{
-	return __getblk(sb->s_bdev, block, sb->s_blocksize);
-}
-static inline struct buffer_head * sb_get_hash_table(struct super_block *sb, int block)
-{
-	return __get_hash_table(sb->s_bdev, block, sb->s_blocksize);
-}
-static inline void map_bh(struct buffer_head *bh, struct super_block *sb, int block)
-{
-	bh->b_state |= 1 << BH_Mapped;
-	bh->b_bdev = sb->s_bdev;
-	bh->b_blocknr = block;
-}
-extern void wakeup_bdflush(void);
-extern void put_unused_buffer_head(struct buffer_head * bh);
-extern struct buffer_head * get_unused_buffer_head(int async);
-
-extern int brw_page(int, struct page *, struct block_device *, sector_t [], int);
-
-typedef int (get_block_t)(struct inode*,sector_t,struct buffer_head*,int);
-
-/* Generic buffer handling for block filesystems.. */
-extern int try_to_release_page(struct page * page, int gfp_mask);
-extern int discard_bh_page(struct page *, unsigned long, int);
-#define block_flushpage(page, offset) discard_bh_page(page, offset, 1)
-#define block_invalidate_page(page) discard_bh_page(page, 0, 0)
-extern int block_symlink(struct inode *, const char *, int);
-extern int block_write_full_page(struct page*, get_block_t*);
-extern int block_read_full_page(struct page*, get_block_t*);
-extern int block_prepare_write(struct page*, unsigned, unsigned, get_block_t*);
-extern int cont_prepare_write(struct page*, unsigned, unsigned, get_block_t*,
-				unsigned long *);
-extern int generic_cont_expand(struct inode *inode, loff_t size) ;
-extern int block_commit_write(struct page *page, unsigned from, unsigned to);
-extern int block_sync_page(struct page *);
-
-sector_t generic_block_bmap(struct address_space *, sector_t, get_block_t *);
-int generic_commit_write(struct file *, struct page *, unsigned, unsigned);
-int block_truncate_page(struct address_space *, loff_t, get_block_t *);
-extern int generic_direct_IO(int, struct inode *, struct kiobuf *, unsigned long, int, get_block_t *);
-extern int waitfor_one_page(struct page *);
-extern int writeout_one_page(struct page *);
 
 extern int generic_file_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
@@ -1575,6 +1272,8 @@ extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);
 extern int generic_file_open(struct inode * inode, struct file * filp);
+
+extern int generic_vm_writeback(struct page *page, int *nr_to_write);
 
 extern struct file_operations generic_ro_fops;
 
@@ -1603,8 +1302,6 @@ extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;
 
-extern void show_buffers(void);
-
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned int real_root_dev;
 #endif
@@ -1613,13 +1310,6 @@ extern ssize_t char_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t block_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t char_write(struct file *, const char *, size_t, loff_t *);
 extern ssize_t block_write(struct file *, const char *, size_t, loff_t *);
-
-extern int file_fsync(struct file *, struct dentry *, int);
-extern int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx, unsigned long end_idx);
-extern int generic_osync_inode(struct inode *, int);
-#define OSYNC_METADATA (1<<0)
-#define OSYNC_DATA (1<<1)
-#define OSYNC_INODE (1<<2)
 
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);
@@ -1632,6 +1322,8 @@ static inline ino_t parent_ino(struct dentry *dentry)
 	read_unlock(&dparent_lock);
 	return res;
 }
+
+#include <linux/buffer_head.h>
 
 #endif /* __KERNEL__ */
 

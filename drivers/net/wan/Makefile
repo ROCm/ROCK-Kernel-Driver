@@ -7,7 +7,8 @@
 
 O_TARGET := wan.o
 
-export-objs :=	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o
+export-objs :=	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o \
+		dlci.o
 
 wanpipe-y			:= sdlamain.o sdla_ft1.o
 wanpipe-$(CONFIG_WANPIPE_X25)	+= sdla_x25.o

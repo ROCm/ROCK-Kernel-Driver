@@ -17,6 +17,7 @@
 #include <linux/dcache.h>
 #include <linux/dirent.h>
 #include <linux/nls.h>
+#include <linux/smp_lock.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>
@@ -1906,6 +1907,8 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 
 	VERBOSE("%s/%s\n", DENTRY_PATH(dir));
 
+	lock_kernel();
+
 	smb_lock_server(server);
 
 	first = 1;
@@ -2012,6 +2015,7 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 
 unlock_return:
 	smb_unlock_server(server);
+	unlock_kernel();
 	return result;
 }
 
@@ -2171,6 +2175,8 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 		name:	"*",
 		len:	1,
 	};
+
+	lock_kernel();
 
 	/*
 	 * use info level 1 for older servers that don't do 260
@@ -2357,6 +2363,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 
 unlock_return:
 	smb_unlock_server(server);
+	unlock_kernel();
 	return result;
 }
 

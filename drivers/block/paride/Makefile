@@ -7,7 +7,7 @@
 
 L_TARGET := paride.a
 
-export-objs := bpck6.o
+export-objs := paride.o bpck6.o
 
 obj-$(CONFIG_PARIDE)		+= paride.o
 obj-$(CONFIG_PARIDE_PD)		+= pd.o

@@ -3,6 +3,7 @@
 # 18 Apr 1998, Michael Elizabeth Chastain, <mailto:mec@shout.net>
 # Rewritten to use lists instead of if-statements.
 
+O_TARGET	:= _oss.o
 
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
@@ -81,17 +82,17 @@ subdir-$(CONFIG_SOUND_EMU10K1) += emu10k1
 subdir-$(CONFIG_SOUND_CS4281) += cs4281
 
 ifeq ($(CONFIG_SOUND_EMU10K1),y)
-  obj-y += emu10k1/emu10k1.o
+  obj-y += emu10k1/_emu10k1.o
 endif
 
 ifeq ($(CONFIG_SOUND_CS4281),y)
-  obj-y += cs4281/cs4281.o
+  obj-y += cs4281/_cs4281.o
 endif
 
 subdir-$(CONFIG_DMASOUND) += dmasound
 
 ifeq ($(CONFIG_DMASOUND),y)
-  obj-y += dmasound/dmasound.o
+  obj-y += dmasound/_dmasound.o
 endif
 
 
@@ -110,8 +111,6 @@ sb_lib-objs	:= sb_common.o sb_audio.o sb_midi.o sb_mixer.o sb_ess.o
 vidc_mod-objs	:= vidc.o vidc_fill.o
 wavefront-objs  := wavfront.o wf_midi.o yss225.o
 
-
-O_TARGET	:= sounddrivers.o
 
 include $(TOPDIR)/Rules.make
 

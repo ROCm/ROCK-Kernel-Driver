@@ -1180,6 +1180,12 @@ M:	zwane@commfireservices.com
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 
+ORINOCO DRIVER
+P:	David Gibson
+M:	hermes@gibson.dropbear.id.au
+W:	http://www.ozlabs.org/people/dgibson/dldwd
+S:	Maintained
+
 PARALLEL PORT SUPPORT
 P:	Phil Blundell
 M:	Philip.Blundell@pobox.com

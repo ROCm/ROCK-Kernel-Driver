@@ -20,19 +20,15 @@
 #include <linux/config.h>
 #include <linux/isdn/capiutil.h>
 
-MODULE_DESCRIPTION("CAPI4Linux: CAPI message conversion support");
-MODULE_AUTHOR("Carsten Paeth");
-MODULE_LICENSE("GPL");
-
 /* from CAPI2.0 DDK AVM Berlin GmbH */
 
 #ifndef CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON
-char *capi_info2str(__u16 reason)
+char *capi_info2str(u16 reason)
 {
     return "..";
 }
 #else
-char *capi_info2str(__u16 reason)
+char *capi_info2str(u16 reason)
 {
     switch (reason) {
 
@@ -422,14 +418,14 @@ static unsigned char *cpars[] =
 
 /*-------------------------------------------------------*/
 
-#define byteTLcpy(x,y)        *(__u8 *)(x)=*(__u8 *)(y);
-#define wordTLcpy(x,y)        *(__u16 *)(x)=*(__u16 *)(y);
+#define byteTLcpy(x,y)        *(u8 *)(x)=*(u8 *)(y);
+#define wordTLcpy(x,y)        *(u16 *)(x)=*(u16 *)(y);
 #define dwordTLcpy(x,y)       memcpy(x,y,4);
 #define structTLcpy(x,y,l)    memcpy (x,y,l)
 #define structTLcpyovl(x,y,l) memmove (x,y,l)
 
-#define byteTRcpy(x,y)        *(__u8 *)(y)=*(__u8 *)(x);
-#define wordTRcpy(x,y)        *(__u16 *)(y)=*(__u16 *)(x);
+#define byteTRcpy(x,y)        *(u8 *)(y)=*(u8 *)(x);
+#define wordTRcpy(x,y)        *(u16 *)(y)=*(u16 *)(x);
 #define dwordTRcpy(x,y)       memcpy(y,x,4);
 #define structTRcpy(x,y,l)    memcpy (y,x,l)
 #define structTRcpyovl(x,y,l) memmove (y,x,l)
@@ -449,7 +445,7 @@ static unsigned command_2_index(unsigned c, unsigned sc)
 
 /*-------------------------------------------------------*/
 #define TYP (cdef[cmsg->par[cmsg->p]].typ)
-#define OFF (((__u8 *)cmsg)+cdef[cmsg->par[cmsg->p]].off)
+#define OFF (((u8 *)cmsg)+cdef[cmsg->par[cmsg->p]].off)
 
 static void jumpcstruct(_cmsg * cmsg)
 {
@@ -486,7 +482,7 @@ static void pars_2_message(_cmsg * cmsg)
 			cmsg->l += 4;
 			break;
 		case _CSTRUCT:
-			if (*(__u8 **) OFF == 0) {
+			if (*(u8 **) OFF == 0) {
 				*(cmsg->m + cmsg->l) = '\0';
 				cmsg->l++;
 			} else if (**(_cstruct *) OFF != 0xff) {
@@ -494,8 +490,8 @@ static void pars_2_message(_cmsg * cmsg)
 				cmsg->l += 1 + **(_cstruct *) OFF;
 			} else {
 				_cstruct s = *(_cstruct *) OFF;
-				structTLcpy(cmsg->m + cmsg->l, s, 3 + *(__u16 *) (s + 1));
-				cmsg->l += 3 + *(__u16 *) (s + 1);
+				structTLcpy(cmsg->m + cmsg->l, s, 3 + *(u16 *) (s + 1));
+				cmsg->l += 3 + *(u16 *) (s + 1);
 			}
 			break;
 		case _CMSTRUCT:
@@ -514,7 +510,7 @@ static void pars_2_message(_cmsg * cmsg)
 				pars_2_message(cmsg);
 				_ls = cmsg->l - _l - 1;
 				if (_ls < 255)
-					(cmsg->m + _l)[0] = (__u8) _ls;
+					(cmsg->m + _l)[0] = (u8) _ls;
 				else {
 					structTLcpyovl(cmsg->m + _l + 3, cmsg->m + _l + 1, _ls);
 					(cmsg->m + _l)[0] = 0xff;
@@ -527,7 +523,7 @@ static void pars_2_message(_cmsg * cmsg)
 }
 
 /*-------------------------------------------------------*/
-unsigned capi_cmsg2message(_cmsg * cmsg, __u8 * msg)
+unsigned capi_cmsg2message(_cmsg * cmsg, u8 * msg)
 {
 	cmsg->m = msg;
 	cmsg->l = 8;
@@ -564,12 +560,12 @@ static void message_2_pars(_cmsg * cmsg)
 			cmsg->l += 4;
 			break;
 		case _CSTRUCT:
-			*(__u8 **) OFF = cmsg->m + cmsg->l;
+			*(u8 **) OFF = cmsg->m + cmsg->l;
 
 			if (cmsg->m[cmsg->l] != 0xff)
 				cmsg->l += 1 + cmsg->m[cmsg->l];
 			else
-				cmsg->l += 3 + *(__u16 *) (cmsg->m + cmsg->l + 1);
+				cmsg->l += 3 + *(u16 *) (cmsg->m + cmsg->l + 1);
 			break;
 		case _CMSTRUCT:
 /*----- Metastruktur 0 -----*/
@@ -590,7 +586,7 @@ static void message_2_pars(_cmsg * cmsg)
 }
 
 /*-------------------------------------------------------*/
-unsigned capi_message2cmsg(_cmsg * cmsg, __u8 * msg)
+unsigned capi_message2cmsg(_cmsg * cmsg, u8 * msg)
 {
 	memset(cmsg, 0, sizeof(_cmsg));
 	cmsg->m = msg;
@@ -610,9 +606,9 @@ unsigned capi_message2cmsg(_cmsg * cmsg, __u8 * msg)
 }
 
 /*-------------------------------------------------------*/
-unsigned capi_cmsg_header(_cmsg * cmsg, __u16 _ApplId,
-			  __u8 _Command, __u8 _Subcommand,
-			  __u16 _Messagenumber, __u32 _Controller)
+unsigned capi_cmsg_header(_cmsg * cmsg, u16 _ApplId,
+			  u8 _Command, u8 _Subcommand,
+			  u16 _Messagenumber, u32 _Controller)
 {
 	memset(cmsg, 0, sizeof(_cmsg));
 	cmsg->ApplId = _ApplId;
@@ -708,7 +704,7 @@ static char *mnames[] =
 	"MANUFACTURER_RESP"
 };
 
-char *capi_cmd2str(__u8 cmd, __u8 subcmd)
+char *capi_cmd2str(u8 cmd, u8 subcmd)
 {
 	return mnames[command_2_index(cmd, subcmd)];
 }
@@ -785,7 +781,7 @@ static void bufprint(char *fmt,...)
 	p += strlen(p);
 }
 
-static void printstructlen(__u8 * m, unsigned len)
+static void printstructlen(u8 * m, unsigned len)
 {
 	unsigned hex = 0;
 	for (; len; len--, m++)
@@ -805,14 +801,14 @@ static void printstructlen(__u8 * m, unsigned len)
 		bufprint(">");
 }
 
-static void printstruct(__u8 * m)
+static void printstruct(u8 * m)
 {
 	unsigned len;
 	if (m[0] != 0xff) {
 		len = m[0];
 		m += 1;
 	} else {
-		len = ((__u16 *) (m + 1))[0];
+		len = ((u16 *) (m + 1))[0];
 		m += 3;
 	}
 	printstructlen(m, len);
@@ -833,15 +829,15 @@ static void protocol_message_2_pars(_cmsg * cmsg, int level)
 
 		switch (TYP) {
 		case _CBYTE:
-			bufprint("%-*s = 0x%x\n", slen, NAME, *(__u8 *) (cmsg->m + cmsg->l));
+			bufprint("%-*s = 0x%x\n", slen, NAME, *(u8 *) (cmsg->m + cmsg->l));
 			cmsg->l++;
 			break;
 		case _CWORD:
-			bufprint("%-*s = 0x%x\n", slen, NAME, *(__u16 *) (cmsg->m + cmsg->l));
+			bufprint("%-*s = 0x%x\n", slen, NAME, *(u16 *) (cmsg->m + cmsg->l));
 			cmsg->l += 2;
 			break;
 		case _CDWORD:
-			bufprint("%-*s = 0x%lx\n", slen, NAME, *(__u32 *) (cmsg->m + cmsg->l));
+			bufprint("%-*s = 0x%lx\n", slen, NAME, *(u32 *) (cmsg->m + cmsg->l));
 			cmsg->l += 4;
 			break;
 		case _CSTRUCT:
@@ -854,7 +850,7 @@ static void protocol_message_2_pars(_cmsg * cmsg, int level)
 			if (cmsg->m[cmsg->l] != 0xff)
 				cmsg->l += 1 + cmsg->m[cmsg->l];
 			else
-				cmsg->l += 3 + *(__u16 *) (cmsg->m + cmsg->l + 1);
+				cmsg->l += 3 + *(u16 *) (cmsg->m + cmsg->l + 1);
 
 			break;
 
@@ -877,7 +873,7 @@ static void protocol_message_2_pars(_cmsg * cmsg, int level)
 	}
 }
 /*-------------------------------------------------------*/
-char *capi_message2str(__u8 * msg)
+char *capi_message2str(u8 * msg)
 {
 
 	_cmsg cmsg;
@@ -909,9 +905,9 @@ char *capi_cmsg2str(_cmsg * cmsg)
 	cmsg->p = 0;
 	bufprint("%s ID=%03d #0x%04x LEN=%04d\n",
 		 mnames[command_2_index(cmsg->Command, cmsg->Subcommand)],
-		 ((__u16 *) cmsg->m)[1],
-		 ((__u16 *) cmsg->m)[3],
-		 ((__u16 *) cmsg->m)[0]);
+		 ((u16 *) cmsg->m)[1],
+		 ((u16 *) cmsg->m)[3],
+		 ((u16 *) cmsg->m)[0]);
 	protocol_message_2_pars(cmsg, 1);
 	return buf;
 }
@@ -923,15 +919,3 @@ EXPORT_SYMBOL(capi_cmd2str);
 EXPORT_SYMBOL(capi_cmsg2str);
 EXPORT_SYMBOL(capi_message2str);
 EXPORT_SYMBOL(capi_info2str);
-
-static int __init capiutil_init(void)
-{ 
-	return 0; 
-}
-
-static void __exit capiutil_exit(void)
-{
-}
-
-module_init(capiutil_init);
-module_exit(capiutil_exit);

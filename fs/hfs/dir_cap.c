@@ -188,6 +188,8 @@ static int cap_readdir(struct file * filp,
         struct hfs_cat_entry *entry;
 	struct inode *dir = filp->f_dentry->d_inode;
 
+	lock_kernel();
+
 	entry = HFS_I(dir)->entry;
 	type = HFS_ITYPE(dir->i_ino);
 	skip_dirs = (type == HFS_CAP_RDIR);
@@ -195,7 +197,7 @@ static int cap_readdir(struct file * filp,
 	if (filp->f_pos == 0) {
 		/* Entry 0 is for "." */
 		if (filldir(dirent, DOT->Name, DOT_LEN, 0, dir->i_ino, DT_DIR)) {
-			return 0;
+			goto out;
 		}
 		filp->f_pos = 1;
 	}
@@ -212,7 +214,7 @@ static int cap_readdir(struct file * filp,
 
 		if (filldir(dirent, DOT_DOT->Name,
 			    DOT_DOT_LEN, 1, ntohl(cnid), DT_DIR)) {
-			return 0;
+			goto out;
 		}
 		filp->f_pos = 2;
 	}
@@ -223,11 +225,11 @@ static int cap_readdir(struct file * filp,
 
 	    	if (hfs_cat_open(entry, &brec) ||
 	    	    hfs_cat_next(entry, &brec, filp->f_pos - 2, &cnid, &type)) {
-			return 0;
+			goto out;
 		}
 		while (filp->f_pos < (dir->i_size - 3)) {
 			if (hfs_cat_next(entry, &brec, 1, &cnid, &type)) {
-				return 0;
+				goto out;
 			}
 			if (!skip_dirs || (type != HFS_CDR_DIR)) {
 				ino_t ino;
@@ -240,7 +242,7 @@ static int cap_readdir(struct file * filp,
 				if (filldir(dirent, tmp_name, len,
 					    filp->f_pos, ino, DT_UNKNOWN)) {
 					hfs_cat_close(entry, &brec);
-					return 0;
+					goto out;
 				}
 			}
 			++filp->f_pos;
@@ -256,7 +258,7 @@ static int cap_readdir(struct file * filp,
 				    DOT_ROOTINFO_LEN, filp->f_pos,
 				    ntohl(entry->cnid) | HFS_CAP_FNDR,
 				    DT_UNKNOWN)) {
-				return 0;
+				goto out;
 			}
 		}
 		++filp->f_pos;
@@ -269,7 +271,7 @@ static int cap_readdir(struct file * filp,
 				    DOT_FINDERINFO_LEN, filp->f_pos,
 				    ntohl(entry->cnid) | HFS_CAP_FDIR,
 				    DT_UNKNOWN)) {
-				return 0;
+				goto out;
 			}
 		}
 		++filp->f_pos;
@@ -282,12 +284,14 @@ static int cap_readdir(struct file * filp,
 				    DOT_RESOURCE_LEN, filp->f_pos,
 				    ntohl(entry->cnid) | HFS_CAP_RDIR,
 				    DT_UNKNOWN)) {
-				return 0;
+				goto out;
 			}
 		}
 		++filp->f_pos;
 	}
 
+out:
+	unlock_kernel();
 	return 0;
 }
 

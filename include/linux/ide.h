@@ -283,16 +283,10 @@ struct ata_device {
 	 */
 	request_queue_t	queue;	/* per device request queue */
 
-	struct ata_device	*next;	/* circular list of hwgroup drives */
-
 	/* Those are directly injected jiffie values. They should go away and
 	 * we should use generic timers instead!!!
 	 */
-
-	unsigned long PADAM_sleep;		/* sleep until this time */
-	unsigned long PADAM_service_start;	/* time we started last request */
-	unsigned long PADAM_service_time;	/* service time of last request */
-	unsigned long PADAM_timeout;		/* max time to wait for irq */
+	unsigned long PADAM_sleep;	/* sleep until this time */
 
 	/* Flags requesting/indicating one of the following special commands
 	 * executed on the request queue.
@@ -374,7 +368,7 @@ struct ata_device {
 } ide_drive_t;
 
 /*
- * An ide_dmaproc_t() initiates/aborts DMA read/write operations on a drive.
+ * This initiates/aborts DMA read/write operations on a drive.
  *
  * The caller is assumed to have selected the drive and programmed the drive's
  * sector address using CHS or LBA.  All that remains is to prepare for DMA
@@ -391,8 +385,6 @@ typedef enum {	ide_dma_read,	ide_dma_write,		ide_dma_begin,
 		ide_dma_verbose,			ide_dma_retune,
 		ide_dma_lostirq,			ide_dma_timeout
 } ide_dma_action_t;
-
-typedef int (ide_dmaproc_t)(ide_dma_action_t, ide_drive_t *);
 
 enum {
 	ATA_PRIMARY	= 0,
@@ -446,7 +438,7 @@ struct ata_channel {
 	void (*atapi_read)(ide_drive_t *, void *, unsigned int);
 	void (*atapi_write)(ide_drive_t *, void *, unsigned int);
 
-	ide_dmaproc_t	*dmaproc;	/* dma read/write/abort routine */
+	int (*udma)(ide_dma_action_t, struct ata_device *, struct request *); /* dma read/write/abort routine */
 	unsigned int	*dmatable_cpu;	/* dma physical region descriptor table (cpu view) */
 	dma_addr_t	dmatable_dma;	/* dma physical region descriptor table (dma view) */
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */
@@ -500,31 +492,25 @@ typedef enum {
 } ide_startstop_t;
 
 /*
- *  Interrupt handler types.
+ *  Interrupt and timeout handler type.
  */
-struct ata_taskfile;
-typedef ide_startstop_t (ide_pre_handler_t)(ide_drive_t *, struct request *);
-typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
+typedef ide_startstop_t (ata_handler_t)(struct ata_device *, struct request *);
+typedef int (ata_expiry_t)(struct ata_device *, struct request *);
 
-/*
- * when ide_timer_expiry fires, invoke a handler of this type
- * to decide what to do.
- */
-typedef int (ide_expiry_t)(ide_drive_t *);
+struct ata_taskfile;
 
 #define IDE_BUSY	0	/* awaiting an interrupt */
 #define IDE_SLEEP	1
 #define IDE_DMA		2	/* DMA in progress */
 
 typedef struct hwgroup_s {
-	ide_handler_t *handler;		/* irq handler, if active */
+	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	unsigned long flags;		/* BUSY, SLEEPING */
-	struct ata_device *drive;	/* current drive */
+	struct ata_device *XXX_drive;	/* current drive */
 	struct request *rq;		/* current request */
 	struct timer_list timer;	/* failsafe timer */
-	struct request wrq;		/* local copy of current write rq */
 	unsigned long poll_timeout;	/* timeout value during long polls */
-	ide_expiry_t *expiry;		/* queried upon timeouts */
+	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
 } ide_hwgroup_t;
 
 /* structure attached to the request for IDE_TASK_CMDS */
@@ -616,7 +602,7 @@ struct ata_operations {
 	int (*cleanup)(struct ata_device *);
 	int (*standby)(struct ata_device *);
 	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
-	int (*end_request)(struct ata_device *, int);
+	int (*end_request)(struct ata_device *, struct request *, int);
 
 	int (*ioctl)(struct ata_device *, struct inode *, struct file *, unsigned int, unsigned long);
 	int (*open)(struct inode *, struct file *, struct ata_device *);
@@ -663,14 +649,15 @@ extern int noautodma;
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
-extern int __ide_end_request(ide_drive_t *drive, int uptodate, int nr_secs);
-extern int ide_end_request(ide_drive_t *drive, int uptodate);
+extern int __ide_end_request(struct ata_device *, struct request *, int, int);
+extern int ide_end_request(struct ata_device *drive, struct request *, int);
 
 /*
  * This is used on exit from the driver, to designate the next irq handler
  * and also to start the safety timer.
  */
-void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler, unsigned int timeout, ide_expiry_t *expiry);
+extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
+		unsigned long timeout, ata_expiry_t expiry);
 
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
@@ -687,7 +674,7 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
  * Issue a simple drive command
  * The drive must be selected beforehand.
  */
-void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler);
+void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ata_handler_t handler);
 
 /*
  * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
@@ -756,9 +743,9 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err);
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_hob_hdr  hobfile;
-	int			command_type;
-	ide_pre_handler_t	*prehandler;
-	ide_handler_t		*handler;
+	int command_type;
+	ide_startstop_t (*prehandler)(struct ata_device *, struct request *);
+	ide_startstop_t (*handler)(struct ata_device *, struct request *);
 };
 
 extern void ata_read(ide_drive_t *drive, void *buffer, unsigned int wcount);
@@ -774,10 +761,10 @@ extern ide_startstop_t ata_taskfile(ide_drive_t *drive,
  * Special Flagged Register Validation Caller
  */
 
-extern ide_startstop_t recal_intr(ide_drive_t *drive);
-extern ide_startstop_t set_geometry_intr(ide_drive_t *drive);
-extern ide_startstop_t set_multmode_intr(ide_drive_t *drive);
-extern ide_startstop_t task_no_data_intr(ide_drive_t *drive);
+extern ide_startstop_t recal_intr(struct ata_device *, struct request *);
+extern ide_startstop_t set_geometry_intr(struct ata_device *, struct request *);
+extern ide_startstop_t set_multmode_intr(struct ata_device *, struct request *);
+extern ide_startstop_t task_no_data_intr(struct ata_device *, struct request *);
 
 
 /* This is setting up all fields in args, which depend upon the command type.
@@ -871,9 +858,9 @@ void __init ide_scan_pcibus(int scan_direction);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func);
 void ide_destroy_dmatable (ide_drive_t *drive);
-ide_startstop_t ide_dma_intr (ide_drive_t *drive);
+extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
 int check_drive_lists (ide_drive_t *drive, int good_bad);
-int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
+int ide_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *);
 extern void ide_release_dma(struct ata_channel *hwif);
 extern void ide_setup_dma(struct ata_channel *hwif,
 		unsigned long dmabase, unsigned int num_ports) __init;

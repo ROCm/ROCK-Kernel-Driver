@@ -279,36 +279,24 @@ static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name,
 }
 
 /*for fastwalking*/
-static inline void undo_locked(struct nameidata *nd)
+static inline void unlock_nd(struct nameidata *nd)
 {
-	if(nd->flags & LOOKUP_LOCKED){
-		dget_locked(nd->dentry);
-		mntget(nd->mnt);
-		spin_unlock(&dcache_lock);
-		nd->flags &= ~LOOKUP_LOCKED;
-	}
+	struct vfsmount *mnt = nd->old_mnt;
+	struct dentry *dentry = nd->old_dentry;
+	mntget(nd->mnt);
+	dget_locked(nd->dentry);
+	nd->old_mnt = NULL;
+	nd->old_dentry = NULL;
+	spin_unlock(&dcache_lock);
+	dput(dentry);
+	mntput(mnt);
 }
 
-/*
- * For fast path lookup while holding the dcache_lock. 
- * SMP-safe
- */
-static struct dentry * cached_lookup_nd(struct nameidata * nd, struct qstr * name, int flags)
+static inline void lock_nd(struct nameidata *nd)
 {
-	struct dentry * dentry = NULL;
-	if(!(nd->flags & LOOKUP_LOCKED))
-		return cached_lookup(nd->dentry, name, flags);
-	
-	dentry = __d_lookup(nd->dentry, name);
-	
-	if (dentry && dentry->d_op && dentry->d_op->d_revalidate) {
-		undo_locked(nd);
-		if (!dentry->d_op->d_revalidate(dentry, flags) && !d_invalidate(dentry)) {
-			dput(dentry);
-			dentry = NULL;
-		}
-	}
-	return dentry;
+	spin_lock(&dcache_lock);
+	nd->old_mnt = nd->mnt;
+	nd->old_dentry = nd->dentry;
 }
 
 /*
@@ -326,7 +314,7 @@ static inline int exec_permission_lite(struct inode *inode)
 	umode_t	mode = inode->i_mode;
 
 	if ((inode->i_op && inode->i_op->permission))
-		return -EACCES;
+		return -EAGAIN;
 
 	if (current->fsuid == inode->i_uid)
 		mode >>= 6;
@@ -418,10 +406,10 @@ loop:
 	return -ELOOP;
 }
 
-static inline int __follow_up(struct vfsmount **mnt, struct dentry **base)
+int follow_up(struct vfsmount **mnt, struct dentry **dentry)
 {
 	struct vfsmount *parent;
-	struct dentry *dentry;
+	struct dentry *mountpoint;
 	spin_lock(&dcache_lock);
 	parent=(*mnt)->mnt_parent;
 	if (parent == *mnt) {
@@ -429,18 +417,27 @@ static inline int __follow_up(struct vfsmount **mnt, struct dentry **base)
 		return 0;
 	}
 	mntget(parent);
-	dentry=dget((*mnt)->mnt_mountpoint);
+	mountpoint=dget((*mnt)->mnt_mountpoint);
 	spin_unlock(&dcache_lock);
-	dput(*base);
-	*base = dentry;
+	dput(*dentry);
+	*dentry = mountpoint;
 	mntput(*mnt);
 	*mnt = parent;
 	return 1;
 }
 
-int follow_up(struct vfsmount **mnt, struct dentry **dentry)
+static int follow_mount(struct vfsmount **mnt, struct dentry **dentry)
 {
-	return __follow_up(mnt, dentry);
+	int res = 0;
+	while (d_mountpoint(*dentry)) {
+		struct vfsmount *mounted = lookup_mnt(*mnt, *dentry);
+		if (!mounted)
+			break;
+		*mnt = mounted;
+		*dentry = mounted->mnt_root;
+		res = 1;
+	}
+	return res;
 }
 
 static inline int __follow_down(struct vfsmount **mnt, struct dentry **dentry)
@@ -466,41 +463,83 @@ int follow_down(struct vfsmount **mnt, struct dentry **dentry)
 	return __follow_down(mnt,dentry);
 }
  
-static inline void follow_dotdot(struct nameidata *nd)
+static inline void follow_dotdot(struct vfsmount **mnt, struct dentry **dentry)
 {
 	while(1) {
 		struct vfsmount *parent;
-		struct dentry *dentry;
-		read_lock(&current->fs->lock);
-		if (nd->dentry == current->fs->root &&
-		    nd->mnt == current->fs->rootmnt)  {
-			read_unlock(&current->fs->lock);
+		if (*dentry == current->fs->root &&
+		    *mnt == current->fs->rootmnt)
+			break;
+		if (*dentry != (*mnt)->mnt_root) {
+			*dentry = (*dentry)->d_parent;
 			break;
 		}
-		read_unlock(&current->fs->lock);
-		spin_lock(&dcache_lock);
-		if (nd->dentry != nd->mnt->mnt_root) {
-			dentry = dget(nd->dentry->d_parent);
-			spin_unlock(&dcache_lock);
-			dput(nd->dentry);
-			nd->dentry = dentry;
+		parent=(*mnt)->mnt_parent;
+		if (parent == *mnt)
 			break;
-		}
-		parent=nd->mnt->mnt_parent;
-		if (parent == nd->mnt) {
-			spin_unlock(&dcache_lock);
-			break;
-		}
-		mntget(parent);
-		dentry=dget(nd->mnt->mnt_mountpoint);
-		spin_unlock(&dcache_lock);
-		dput(nd->dentry);
-		nd->dentry = dentry;
-		mntput(nd->mnt);
-		nd->mnt = parent;
+		*dentry=(*mnt)->mnt_mountpoint;
+		*mnt = parent;
 	}
-	while (d_mountpoint(nd->dentry) && __follow_down(&nd->mnt, &nd->dentry))
-		;
+	follow_mount(mnt, dentry);
+}
+
+struct path {
+	struct vfsmount *mnt;
+	struct dentry *dentry;
+};
+
+/*
+ *  It's more convoluted than I'd like it to be, but... it's still fairly
+ *  small and for now I'd prefer to have fast path as straight as possible.
+ *  It _is_ time-critical.
+ */
+static int do_lookup(struct nameidata *nd, struct qstr *name,
+		     struct path *path, struct path *cached_path,
+		     int flags)
+{
+	struct vfsmount *mnt = nd->mnt;
+	struct dentry *dentry = __d_lookup(nd->dentry, name);
+
+	if (!dentry)
+		goto dcache_miss;
+	if (dentry->d_op && dentry->d_op->d_revalidate)
+		goto need_revalidate;
+done:
+	path->mnt = mnt;
+	path->dentry = dentry;
+	return 0;
+
+dcache_miss:
+	unlock_nd(nd);
+
+need_lookup:
+	dentry = real_lookup(nd->dentry, name, LOOKUP_CONTINUE);
+	if (IS_ERR(dentry))
+		goto fail;
+	mntget(mnt);
+relock:
+	dput(cached_path->dentry);
+	mntput(cached_path->mnt);
+	cached_path->mnt = mnt;
+	cached_path->dentry = dentry;
+	lock_nd(nd);
+	goto done;
+
+need_revalidate:
+	mntget(mnt);
+	dget_locked(dentry);
+	unlock_nd(nd);
+	if (dentry->d_op->d_revalidate(dentry, flags))
+		goto relock;
+	if (d_invalidate(dentry))
+		goto relock;
+	dput(dentry);
+	mntput(mnt);
+	goto need_lookup;
+
+fail:
+	lock_nd(nd);
+	return PTR_ERR(dentry);
 }
 
 /*
@@ -513,11 +552,11 @@ static inline void follow_dotdot(struct nameidata *nd)
  */
 int link_path_walk(const char * name, struct nameidata *nd)
 {
-	struct dentry *dentry;
+	struct path next, pinned = {NULL, NULL};
 	struct inode *inode;
 	int err;
 	unsigned int lookup_flags = nd->flags;
-
+	
 	while (*name=='/')
 		name++;
 	if (!*name)
@@ -534,11 +573,11 @@ int link_path_walk(const char * name, struct nameidata *nd)
 		unsigned int c;
 
 		err = exec_permission_lite(inode);
-		if(err){
-			undo_locked(nd);
+		if (err == -EAGAIN) {
+			unlock_nd(nd);
 			err = permission(inode, MAY_EXEC);
+			lock_nd(nd);
 		}
-		dentry = ERR_PTR(err);
  		if (err)
 			break;
 
@@ -572,8 +611,7 @@ int link_path_walk(const char * name, struct nameidata *nd)
 			case 2:	
 				if (this.name[1] != '.')
 					break;
-				undo_locked(nd);
-				follow_dotdot(nd);
+				follow_dotdot(&nd->mnt, &nd->dentry);
 				inode = nd->dentry->d_inode;
 				/* fallthrough */
 			case 1:
@@ -589,35 +627,30 @@ int link_path_walk(const char * name, struct nameidata *nd)
 				break;
 		}
 		/* This does the actual lookups.. */
-		dentry = cached_lookup_nd(nd, &this, LOOKUP_CONTINUE);
-		if (!dentry) {
-			undo_locked(nd);
-			dentry = real_lookup(nd->dentry, &this, LOOKUP_CONTINUE);
-			err = PTR_ERR(dentry);
-			if (IS_ERR(dentry))
-				break;
-		}
+		err = do_lookup(nd, &this, &next, &pinned, LOOKUP_CONTINUE);
+		if (err)
+			break;
 		/* Check mountpoints.. */
-		if(d_mountpoint(dentry)){
-			undo_locked(nd);
-			while (d_mountpoint(dentry) && __follow_down(&nd->mnt, &dentry))
-				;
-		}
+		follow_mount(&next.mnt, &next.dentry);
 
 		err = -ENOENT;
-		inode = dentry->d_inode;
+		inode = next.dentry->d_inode;
 		if (!inode)
-			goto out_dput;
+			break;
 		err = -ENOTDIR; 
 		if (!inode->i_op)
-			goto out_dput;
+			break;
 
 		if (inode->i_op->follow_link) {
-			undo_locked(nd);
-			err = do_follow_link(dentry, nd);
-			dput(dentry);
+			mntget(next.mnt);
+			dget_locked(next.dentry);
+			unlock_nd(nd);
+			err = do_follow_link(next.dentry, nd);
+			dput(next.dentry);
+			mntput(next.mnt);
 			if (err)
 				goto return_err;
+			lock_nd(nd);
 			err = -ENOENT;
 			inode = nd->dentry->d_inode;
 			if (!inode)
@@ -626,9 +659,8 @@ int link_path_walk(const char * name, struct nameidata *nd)
 			if (!inode->i_op)
 				break;
 		} else {
-			if (!(nd->flags & LOOKUP_LOCKED))
-				dput(nd->dentry);
-			nd->dentry = dentry;
+			nd->mnt = next.mnt;
+			nd->dentry = next.dentry;
 		}
 		err = -ENOTDIR; 
 		if (!inode->i_op->lookup)
@@ -647,8 +679,7 @@ last_component:
 			case 2:	
 				if (this.name[1] != '.')
 					break;
-				undo_locked(nd);
-				follow_dotdot(nd);
+				follow_dotdot(&nd->mnt, &nd->dentry);
 				inode = nd->dentry->d_inode;
 				/* fallthrough */
 			case 1:
@@ -659,27 +690,26 @@ last_component:
 			if (err < 0)
 				break;
 		}
-		dentry = cached_lookup_nd(nd, &this, 0);
-		undo_locked(nd); 
-		if (!dentry) {
-			dentry = real_lookup(nd->dentry, &this, 0);
-			err = PTR_ERR(dentry);
-			if (IS_ERR(dentry))
-				break;
-		}
-		while (d_mountpoint(dentry) && __follow_down(&nd->mnt, &dentry))
-			;
-		inode = dentry->d_inode;
+		err = do_lookup(nd, &this, &next, &pinned, 0);
+		if (err)
+			break;
+		follow_mount(&next.mnt, &next.dentry);
+		inode = next.dentry->d_inode;
 		if ((lookup_flags & LOOKUP_FOLLOW)
 		    && inode && inode->i_op && inode->i_op->follow_link) {
-			err = do_follow_link(dentry, nd);
-			dput(dentry);
+			mntget(next.mnt);
+			dget_locked(next.dentry);
+			unlock_nd(nd);
+			err = do_follow_link(next.dentry, nd);
+			dput(next.dentry);
+			mntput(next.mnt);
 			if (err)
 				goto return_err;
 			inode = nd->dentry->d_inode;
+			lock_nd(nd);
 		} else {
-			dput(nd->dentry);
-			nd->dentry = dentry;
+			nd->mnt = next.mnt;
+			nd->dentry = next.dentry;
 		}
 		err = -ENOENT;
 		if (!inode)
@@ -700,22 +730,23 @@ lookup_parent:
 		else if (this.len == 2 && this.name[1] == '.')
 			nd->last_type = LAST_DOTDOT;
 return_base:
-		undo_locked(nd);
+		unlock_nd(nd);
+		dput(pinned.dentry);
+		mntput(pinned.mnt);
 		return 0;
-out_dput:
-		undo_locked(nd);
-		dput(dentry);
-		break;
 	}
-	undo_locked(nd);
+	unlock_nd(nd);
 	path_release(nd);
 return_err:
+	dput(pinned.dentry);
+	mntput(pinned.mnt);
 	return err;
 }
 
 int path_walk(const char * name, struct nameidata *nd)
 {
 	current->total_link_count = 0;
+	lock_nd(nd);
 	return link_path_walk(name, nd);
 }
 
@@ -803,6 +834,8 @@ walk_init_root(const char *name, struct nameidata *nd)
 int path_init(const char *name, unsigned int flags, struct nameidata *nd)
 {
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
+	nd->old_mnt = NULL;
+	nd->old_dentry = NULL;
 	nd->flags = flags;
 	if (*name=='/')
 		return walk_init_root(name,nd);
@@ -817,7 +850,7 @@ int path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 {
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
 	nd->flags = flags;
-	if (*name=='/'){
+	if (*name=='/') {
 		read_lock(&current->fs->lock);
 		if (current->fs->altroot && !(nd->flags & LOOKUP_NOALT)) {
 			nd->mnt = mntget(current->fs->altrootmnt);
@@ -827,20 +860,20 @@ int path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 				return 0;
 			read_lock(&current->fs->lock);
 		}
-		spin_lock(&dcache_lock); /*to avoid cacheline bouncing with d_count*/
+		read_unlock(&current->fs->lock);
+		spin_lock(&dcache_lock);
 		nd->mnt = current->fs->rootmnt;
 		nd->dentry = current->fs->root;
-		read_unlock(&current->fs->lock);
 	}
 	else{
-		read_lock(&current->fs->lock);
 		spin_lock(&dcache_lock);
 		nd->mnt = current->fs->pwdmnt;
 		nd->dentry = current->fs->pwd;
-		read_unlock(&current->fs->lock);
 	}
-	nd->flags |= LOOKUP_LOCKED;
-	return (path_walk(name, nd));
+	nd->old_mnt = NULL;
+	nd->old_dentry = NULL;
+	current->total_link_count = 0;
+	return link_path_walk(name, nd);
 }
 
 /*
@@ -2029,6 +2062,7 @@ __vfs_follow_link(struct nameidata *nd, const char *link)
 			/* weird __emul_prefix() stuff did it */
 			goto out;
 	}
+	lock_nd(nd);
 	res = link_path_walk(link, nd);
 out:
 	if (current->link_count || res || nd->last_type!=LAST_NORM)
@@ -2063,8 +2097,8 @@ static char *page_getlink(struct dentry * dentry, struct page **ppage)
 				NULL);
 	if (IS_ERR(page))
 		goto sync_fail;
-	wait_on_page(page);
-	if (!Page_Uptodate(page))
+	wait_on_page_locked(page);
+	if (!PageUptodate(page))
 		goto async_fail;
 	*ppage = page;
 	return kmap(page);

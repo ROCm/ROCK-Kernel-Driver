@@ -653,7 +653,7 @@ void unmap_kiobuf (struct kiobuf *iobuf)
 		map = iobuf->maplist[i];
 		if (map) {
 			if (iobuf->locked)
-				UnlockPage(map);
+				unlock_page(map);
 			/* FIXME: cache flush missing for rw==READ
 			 * FIXME: call the correct reference counting function
 			 */
@@ -698,11 +698,11 @@ int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
 			if (!page)
 				continue;
 			
-			if (TryLockPage(page)) {
+			if (TestSetPageLocked(page)) {
 				while (j--) {
 					struct page *tmp = *--ppage;
 					if (tmp)
-						UnlockPage(tmp);
+						unlock_page(tmp);
 				}
 				goto retry;
 			}
@@ -738,7 +738,7 @@ int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
 			return -EINVAL;
 		
 		/* Try again...  */
-		wait_on_page(page);
+		wait_on_page_locked(page);
 	}
 	
 	if (++repeat < 16)
@@ -768,7 +768,7 @@ int unlock_kiovec(int nr, struct kiobuf *iovec[])
 			page = *ppage;
 			if (!page)
 				continue;
-			UnlockPage(page);
+			unlock_page(page);
 		}
 	}
 	return 0;
@@ -982,7 +982,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!VALID_PAGE(old_page))
 		goto bad_wp_page;
 
-	if (!TryLockPage(old_page)) {
+	if (!TestSetPageLocked(old_page)) {
 		int reuse = can_share_swap_page(old_page);
 		unlock_page(old_page);
 		if (reuse) {

@@ -111,13 +111,13 @@ static int udf_symlink_filler(struct file *file, struct page *page)
 	unlock_kernel();
 	SetPageUptodate(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 out:
 	unlock_kernel();
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 

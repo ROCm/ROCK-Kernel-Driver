@@ -32,9 +32,12 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 	unsigned int offset;
 	int block;
 
+	lock_kernel();
+
 	if (f->f_pos & (BFS_DIRENT_SIZE-1)) {
 		printf("Bad f_pos=%08lx for %s:%08lx\n", (unsigned long)f->f_pos, 
 			dir->i_sb->s_id, dir->i_ino);
+		unlock_kernel();
 		return -EBADF;
 	}
 
@@ -52,6 +55,7 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 				int size = strnlen(de->name, BFS_NAMELEN);
 				if (filldir(dirent, de->name, size, f->f_pos, de->ino, DT_UNKNOWN) < 0) {
 					brelse(bh);
+					unlock_kernel();
 					return 0;
 				}
 			}
@@ -62,6 +66,7 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 	}
 
 	UPDATE_ATIME(dir);
+	unlock_kernel();
 	return 0;	
 }
 
