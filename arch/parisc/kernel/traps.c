@@ -27,6 +27,7 @@
 #include <linux/console.h>
 #include <linux/kallsyms.h>
 
+#include <asm/assembly.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -165,9 +166,11 @@ void show_trace(unsigned long *stack)
 
 	startstack = (unsigned long *)((unsigned long)stack & ~(THREAD_SIZE - 1));
 	i = 1;
+	stack = (long *)((long)(stack + 32) &~ (FRAME_SIZE-1)); /* Align */
 	printk("Kernel addresses on the stack:\n");
-	while (stack >= startstack) {
-		addr = *stack--;
+	while (stack > startstack) {
+		stack -= 16;	/* Stack frames are a multiple of 16 words */
+		addr = stack[16 - RP_OFFSET / sizeof(long)];
 		/*
 		 * If the address is either in the text segment of the
 		 * kernel, or in the region which contains vmalloc'ed

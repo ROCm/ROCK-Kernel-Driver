@@ -558,11 +558,9 @@ __kernel_thread:
 	.export	ret_from_kernel_thread
 ret_from_kernel_thread:
 
-#if CONFIG_PREEMPT || CONFIG_SMP
 	/* Call schedule_tail first though */
 	bl	schedule_tail, %r2
 	nop
-#endif
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN(%r30), %r1
 	LDREG	TASK_PT_GR25(%r1), %r26
@@ -2014,10 +2012,8 @@ wrapper_exit:
 
 	/* Set the return value for the child */
 child_return:
-#if CONFIG_SMP || CONFIG_PREEMPT
 	bl	schedule_tail, %r2
 	nop
-#endif
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE-FRAME_SIZE(%r30), %r1
 	LDREG	TASK_PT_GR19(%r1),%r2
