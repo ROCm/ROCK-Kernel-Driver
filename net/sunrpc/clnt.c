@@ -928,7 +928,7 @@ call_refreshresult(struct rpc_task *task)
 	task->tk_action = call_reserve;
 	if (status >= 0 && rpcauth_uptodatecred(task))
 		return;
-	if (rpcauth_deadcred(task)) {
+	if (status == -EACCES) {
 		rpc_exit(task, -EACCES);
 		return;
 	}

@@ -480,12 +480,14 @@ gss_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 	if (!cred)
 		goto err;
 	if (gss_err)
-		cred->cr_flags |= RPCAUTH_CRED_DEAD;
+		cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
 	else
 		gss_cred_set_ctx(cred, ctx);
 	spin_lock(&gss_auth->lock);
 	gss_msg = __gss_find_upcall(gss_auth, acred.uid);
 	if (gss_msg) {
+		if (gss_err)
+			gss_msg->msg.errno = -EACCES;
 		__gss_unhash_msg(gss_msg);
 		spin_unlock(&gss_auth->lock);
 		gss_release_msg(gss_msg);
