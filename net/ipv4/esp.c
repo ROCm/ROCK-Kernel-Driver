@@ -190,11 +190,10 @@ esp_hmac_digest(struct esp_data *esp, struct sk_buff *skb, int offset,
 	struct crypto_tfm *tfm = esp->auth.tfm;
 	char *digest = esp->auth.work_digest;
 
-	memset(auth_data, 0, esp->auth.authlen);
  	crypto_hmac_init(tfm, esp->auth.key, &esp->auth.key_len);
 	skb_digest_walk(skb, tfm, offset, len);
 	crypto_hmac_final(tfm, esp->auth.key, &esp->auth.key_len, digest);
-	memcpy(auth_data, digest, crypto_tfm_alg_digestsize(tfm));
+	memcpy(auth_data, digest, esp->auth.authlen);
 }
 
 /* Check that skb data bits are writable. If they are not, copy data
@@ -463,16 +462,16 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 
 	/* If integrity check is required, do this. */
 	if (esp->auth.authlen) {
-		int icvsize = crypto_tfm_alg_digestsize(esp->auth.tfm);
-		u8 sum[icvsize];
-		u8 sum1[icvsize];
+		u8 sum[esp->auth.authlen];
+		u8 sum1[esp->auth.authlen];
 
 		esp->auth.digest(esp, skb, 0, skb->len-esp->auth.authlen, sum);
 
-		if (skb_copy_bits(skb, skb->len-esp->auth.authlen, sum1, icvsize))
+		if (skb_copy_bits(skb, skb->len-esp->auth.authlen, sum1, 
+				esp->auth.authlen))
 			BUG();
 
-		if (unlikely(memcmp(sum, sum1, icvsize))) {
+		if (unlikely(memcmp(sum, sum1, esp->auth.authlen))) {
 			x->stats.integrity_failed++;
 			goto out;
 		}
@@ -605,14 +604,20 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	memset(esp, 0, sizeof(*esp));
 
 	if (x->aalg) {
+		int digestsize;
+
 		esp->auth.key = x->aalg->alg_key;
 		esp->auth.key_len = (x->aalg->alg_key_len+7)/8;
 		esp->auth.tfm = crypto_alloc_tfm(x->aalg->alg_name, 0);
 		if (esp->auth.tfm == NULL)
 			goto error;
 		esp->auth.digest = esp_hmac_digest;
-		esp->auth.authlen = crypto_tfm_alg_digestsize(esp->auth.tfm);
-		esp->auth.work_digest = kmalloc(esp->auth.authlen, GFP_KERNEL);
+		digestsize = crypto_tfm_alg_digestsize(esp->auth.tfm);
+		/* XXX RFC2403 and RFC 2404 truncate auth to 96 bit */
+		esp->auth.authlen = 12;
+		if (esp->auth.authlen > digestsize) /* XXX */
+			BUG();
+		esp->auth.work_digest = kmalloc(digestsize, GFP_KERNEL);
 		if (!esp->auth.work_digest)
 			goto error;
 	}
