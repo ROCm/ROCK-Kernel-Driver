@@ -18,9 +18,8 @@
 
 unsigned int __machine_arch_type;
 
-#include <linux/kernel.h>
+#include <linux/string.h>
 
-#include <asm/uaccess.h>
 #include <asm/arch/uncompress.h>
 
 #ifdef STANDALONE_DEBUG
