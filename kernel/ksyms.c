@@ -588,6 +588,7 @@ EXPORT_SYMBOL(tasklet_kill);
 EXPORT_SYMBOL(__run_task_queue);
 EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(raise_softirq);
+EXPORT_SYMBOL(open_softirq);
 EXPORT_SYMBOL(cpu_raise_softirq);
 EXPORT_SYMBOL(__tasklet_schedule);
 EXPORT_SYMBOL(__tasklet_hi_schedule);
