@@ -2235,19 +2235,6 @@ static int __init init_scsi(void)
 	bus_register(&scsi_driverfs_bus_type);
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	return 0;
-#ifdef CONFIG_PROC_FS
-out_proc_error:
-	remove_proc_entry("scsi", 0);
-#endif
-out_error:
-	for (i = 0; i < SG_MEMPOOL_NR; i++) {
-		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
-		mempool_destroy(sgp->pool);
-		kmem_cache_destroy(sgp->slab);
-		sgp->pool = NULL;
-		sgp->slab = NULL;
-	}
-	return -ENOMEM;
 }
 
 static void __exit exit_scsi(void)
