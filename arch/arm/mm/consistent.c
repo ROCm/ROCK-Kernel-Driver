@@ -94,17 +94,6 @@ no_page:
 	return NULL;
 }
 
-void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handle)
-{
-	int gfp = GFP_KERNEL;
-
-	if (hwdev == NULL || dev_is_sa1111(hwdev) ||
-	    hwdev->dma_mask != 0xffffffff)
-		gfp |= GFP_DMA;
-
-	return consistent_alloc(gfp, size, handle);
-}
-
 /*
  * free a page as defined by the above mapping.  We expressly forbid
  * calling this from interrupt context.

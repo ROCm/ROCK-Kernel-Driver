@@ -51,17 +51,21 @@ struct thread_info {
 	__u32			cpu;		/* cpu */
 	__u32			cpu_domain;	/* cpu domain */
 	struct cpu_context_save	cpu_context;	/* cpu context */
+	struct restart_block    restart_block;
 	union fp_state		fpstate;
 };
 
-#define INIT_THREAD_INFO(tsk)			\
-{						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	preempt_count:	0,			\
-	addr_limit:	KERNEL_DS,		\
-	INIT_EXTRA_THREAD_INFO,			\
+#define INIT_THREAD_INFO(tsk)				\
+{							\
+	.task		= &tsk,				\
+	.exec_domain	= &default_exec_domain,		\
+	.flags		= 0,				\
+	.preempt_count	= 1,				\
+	.addr_limit	= KERNEL_DS,			\
+	.restart_block	= {				\
+		.fn	= do_no_restart_syscall,	\
+	},						\
+	INIT_EXTRA_THREAD_INFO,				\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

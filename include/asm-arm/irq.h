@@ -40,7 +40,8 @@ extern void enable_irq(unsigned int);
 #define IRQT_PROBE	(1 << 4)
 
 int set_irq_type(unsigned int irq, unsigned int type);
-
+void disable_irq_wake(unsigned int irq);
+void enable_irq_wake(unsigned int irq);
 int setup_irq(unsigned int, struct irqaction *);
 
 #endif

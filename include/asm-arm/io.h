@@ -268,16 +268,6 @@ extern void __iounmap(void *addr);
 #endif
 
 /*
- * DMA-consistent mapping functions.  These allocate/free a region of
- * uncached, unwrite-buffered mapped memory space for use with DMA
- * devices.  This is the "generic" version.  The PCI specific version
- * is in pci.h
- */
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
-extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
-extern void consistent_sync(void *vaddr, size_t size, int rw);
-
-/*
  * can the hardware map this into one segment or not, given no other
  * constraints.
  */
