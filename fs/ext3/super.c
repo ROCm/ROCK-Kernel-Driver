@@ -501,7 +501,7 @@ static struct super_operations ext3_sops = {
 	put_inode:	ext3_put_inode,		/* BKL not held.  Don't need */
 	delete_inode:	ext3_delete_inode,	/* BKL not held.  We take it */
 	put_super:	ext3_put_super,		/* BKL held */
-	write_super:	ext3_write_super,	/* BKL held */
+	write_super:	ext3_write_super,	/* BKL not held. We take it. Needed? */
 	write_super_lockfs: ext3_write_super_lockfs, /* BKL not held. Take it */
 	unlockfs:	ext3_unlockfs,		/* BKL not held.  We take it */
 	statfs:		ext3_statfs,		/* BKL held */
@@ -1599,7 +1599,7 @@ MODULE_PARM_DESC(do_sync_supers, "Write superblocks synchronously");
 void ext3_write_super (struct super_block * sb)
 {
 	tid_t target;
-	
+	lock_kernel();	
 	if (down_trylock(&sb->s_lock) == 0)
 		BUG();		/* aviro detector */
 	sb->s_dirt = 0;
@@ -1610,6 +1610,7 @@ void ext3_write_super (struct super_block * sb)
 		log_wait_commit(EXT3_SB(sb)->s_journal, target);
 		lock_super(sb);
 	}
+	unlock_kernel();
 }
 
 /*

@@ -320,16 +320,21 @@ int jffs2_remount_fs (struct super_block *sb, int *flags, char *data)
 void jffs2_write_super (struct super_block *sb)
 {
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
+
+	lock_kernel();
 	sb->s_dirt = 0;
 
-	if (sb->s_flags & MS_RDONLY)
+	if (sb->s_flags & MS_RDONLY) {
+		unlock_kernel();	
 		return;
+	}
 
 	D1(printk("jffs2_write_super(): flush_wbuf before gc-trigger\n"));
 	jffs2_flush_wbuf(c, 2);
 	jffs2_garbage_collect_trigger(c);
 	jffs2_erase_pending_blocks(c);
 	jffs2_mark_erased_blocks(c);
+	unlock_kernel();
 }
 
 

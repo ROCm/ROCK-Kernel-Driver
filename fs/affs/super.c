@@ -38,7 +38,7 @@ static void
 affs_put_super(struct super_block *sb)
 {
 	struct affs_sb_info *sbi = AFFS_SB(sb);
-
+	lock_kernel();
 	pr_debug("AFFS: put_super()\n");
 
 	if (!(sb->s_flags & MS_RDONLY)) {
@@ -56,7 +56,7 @@ affs_put_super(struct super_block *sb)
 	affs_brelse(sbi->s_root_bh);
 	kfree(sbi);
 	sb->u.generic_sbp = NULL;
-
+	unlock_kernel();
 	return;
 }
 
@@ -65,7 +65,7 @@ affs_write_super(struct super_block *sb)
 {
 	int clean = 2;
 	struct affs_sb_info *sbi = AFFS_SB(sb);
-
+	lock_kernel();
 	if (!(sb->s_flags & MS_RDONLY)) {
 		//	if (sbi->s_bitmap[i].bm_bh) {
 		//		if (buffer_dirty(sbi->s_bitmap[i].bm_bh)) {
@@ -80,6 +80,7 @@ affs_write_super(struct super_block *sb)
 		sb->s_dirt = 0;
 
 	pr_debug("AFFS: write_super() at %lu, clean=%d\n", CURRENT_TIME, clean);
+	unlock_kernel();
 }
 
 static kmem_cache_t * affs_inode_cachep;

@@ -72,8 +72,10 @@ static void qnx4_delete_inode(struct inode *inode)
 
 static void qnx4_write_super(struct super_block *sb)
 {
+	lock_kernel();
 	QNX4DEBUG(("qnx4: write_super\n"));
 	sb->s_dirt = 0;
+	unlock_kernel();
 }
 
 static void qnx4_write_inode(struct inode *inode, int unused)

@@ -359,9 +359,11 @@ udf_parse_options(char *options, struct udf_options *uopt)
 void
 udf_write_super(struct super_block *sb)
 {
+	lock_kernel();
 	if (!(sb->s_flags & MS_RDONLY))
 		udf_open_lvid(sb);
 	sb->s_dirt = 0;
+	unlock_kernel();
 }
 
 static int

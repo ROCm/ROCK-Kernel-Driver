@@ -2612,10 +2612,8 @@ void __init buffer_init(unsigned long mempages)
 
 static void sync_old_buffers(unsigned long dummy)
 {
-	lock_kernel();
 	sync_unlocked_inodes();
 	sync_supers();
-	unlock_kernel();
 
 	for (;;) {
 		struct buffer_head *bh;
