@@ -137,14 +137,12 @@ DRIVERS-y += drivers/base/base.o \
 	drivers/misc/misc.o \
 	drivers/net/net.o \
 	drivers/media/media.o
-DRIVERS-$(CONFIG_AGP) += drivers/char/agp/agp.o
-DRIVERS-$(CONFIG_DRM) += drivers/char/drm/drm.o
 DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
 DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
 DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
 DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
 DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
-DRIVERS-$(CONFIG_FUSION_BOOT) += drivers/message/fusion/fusion.o
+DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
 DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
 
 ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
@@ -155,7 +153,6 @@ DRIVERS-$(CONFIG_SOUND) += sound/sound.o
 DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
 DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
 DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_PCMCIA_CHRDEV) += drivers/char/pcmcia/pcmcia_char.o
 DRIVERS-$(CONFIG_DIO) += drivers/dio/dio.a
 DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
 DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
@@ -170,7 +167,7 @@ DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
 DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
 DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
 DRIVERS-$(CONFIG_SERIO) += drivers/input/serio/seriodrv.o
-DRIVERS-$(CONFIG_I2O) += drivers/message/i2o/i2o.o
+DRIVERS-$(CONFIG_I2O) += drivers/message/message.o
 DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
 DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
 DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
@@ -381,17 +378,8 @@ else
 depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
 endif
 .PHONY: _modinst_post
-_modinst_post: _modinst_post_pcmcia
+_modinst_post:
 	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
-
-# Backwards compatibilty symlinks for people still using old versions
-# of pcmcia-cs with hard coded pathnames on insmod.  Remove
-# _modinst_post_pcmcia for kernel 2.4.1.
-.PHONY: _modinst_post_pcmcia
-_modinst_post_pcmcia:
-	cd $(MODLIB); \
-	mkdir -p pcmcia; \
-	find kernel -path '*/pcmcia/*' -name '*.o' | xargs -i -r ln -sf ../{} pcmcia
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :

@@ -5226,7 +5226,8 @@ static struct pnp_board pnp_devices[] __devinitdata = {
 
 static void inline avoid_irq_share(struct pci_dev *dev)
 {
-	int i, map = 0x1FF8;
+	int i;
+	unsigned long map = 0x1FF8;
 	struct serial_state *state = rs_table;
 	struct isapnp_irq *irq;
 	struct isapnp_resources *res = dev->sysdata;
