@@ -138,6 +138,7 @@ static struct timer_list rt_secret_timer;
 
 static struct dst_entry *ipv4_dst_check(struct dst_entry *dst, u32 cookie);
 static void		 ipv4_dst_destroy(struct dst_entry *dst);
+static void		 ipv4_dst_ifdown(struct dst_entry *dst, int how);
 static struct dst_entry *ipv4_negative_advice(struct dst_entry *dst);
 static void		 ipv4_link_failure(struct sk_buff *skb);
 static void		 ip_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
@@ -150,6 +151,7 @@ static struct dst_ops ipv4_dst_ops = {
 	.gc =			rt_garbage_collect,
 	.check =		ipv4_dst_check,
 	.destroy =		ipv4_dst_destroy,
+	.ifdown =		ipv4_dst_ifdown,
 	.negative_advice =	ipv4_negative_advice,
 	.link_failure =		ipv4_link_failure,
 	.update_pmtu =		ip_rt_update_pmtu,
@@ -1330,6 +1332,16 @@ static void ipv4_dst_destroy(struct dst_entry *dst)
 		inet_putpeer(peer);
 	}
 
+	if (idev) {
+		rt->idev = NULL;
+		in_dev_put(idev);
+	}
+}
+
+static void ipv4_dst_ifdown(struct dst_entry *dst, int how)
+{
+	struct rtable *rt = (struct rtable *) dst;
+	struct in_device *idev = rt->idev;
 	if (idev) {
 		rt->idev = NULL;
 		in_dev_put(idev);
