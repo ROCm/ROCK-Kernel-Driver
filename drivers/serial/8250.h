@@ -33,6 +33,20 @@ struct old_serial_port {
 	unsigned short iomem_reg_shift;
 };
 
+/*
+ * This replaces serial_uart_config in include/linux/serial.h
+ */
+struct serial8250_config {
+	const char	*name;
+	unsigned int	fifo_size;
+	unsigned int	tx_loadsz;
+	unsigned int	flags;
+};
+
+#define UART_CAP_FIFO	(1 << 8)	/* UART has FIFO */
+#define UART_CAP_EFR	(1 << 9)	/* UART has EFR */
+#define UART_CAP_SLEEP	(1 << 10)	/* UART has IER sleep */
+
 #undef SERIAL_DEBUG_PCI
 
 #if defined(__i386__) && (defined(CONFIG_M386) || defined(CONFIG_M486))
