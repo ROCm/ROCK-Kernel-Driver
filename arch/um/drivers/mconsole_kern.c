@@ -51,27 +51,26 @@ static struct notifier_block reboot_notifier = {
 
 LIST_HEAD(mc_requests);
 
-void mc_work_proc(void *unused)
+static void mc_work_proc(void *unused)
 {
 	struct mconsole_entry *req;
 	unsigned long flags;
-	int done;
 
-	do {
+	while(!list_empty(&mc_requests)){
 		local_save_flags(flags);
 		req = list_entry(mc_requests.next, struct mconsole_entry, 
 				 list);
 		list_del(&req->list);
-		done = list_empty(&mc_requests);
 		local_irq_restore(flags);
 		req->request.cmd->handler(&req->request);
 		kfree(req);
-	} while(!done);
+	}
 }
 
 DECLARE_WORK(mconsole_work, mc_work_proc, NULL);
 
-irqreturn_t mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mconsole_interrupt(int irq, void *dev_id,
+				      struct pt_regs *regs)
 {
 	int fd;
 	struct mconsole_entry *new;
@@ -91,7 +90,8 @@ irqreturn_t mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-	if(!list_empty(&mc_requests)) schedule_work(&mconsole_work);
+	if(!list_empty(&mc_requests))
+		schedule_work(&mconsole_work);
 	reactivate_fd(fd, MCONSOLE_IRQ);
 	return(IRQ_HANDLED);
 }
@@ -374,8 +374,8 @@ void mconsole_sysrq(struct mc_request *req)
 	ptr += strlen("sysrq");
 	while(isspace(*ptr)) ptr++;
 
-	handle_sysrq(*ptr, &current->thread.regs, NULL);
 	mconsole_reply(req, "", 0, 0);
+	handle_sysrq(*ptr, &current->thread.regs, NULL);
 }
 #else
 void mconsole_sysrq(struct mc_request *req)
