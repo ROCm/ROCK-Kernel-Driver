@@ -124,9 +124,6 @@ do {								\
 	}							\
 } while (0)
 
-struct __large_struct { unsigned long buf[100]; };
-#define __m(x) (*(struct __large_struct *)(x))
-
 /*
  * We don't tell gcc that we are accessing memory, but this is OK
  * because we do not write to any memory gcc knows about, so there
