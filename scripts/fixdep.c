@@ -214,7 +214,7 @@ void use_config(char *m, int slen)
 		if (*p == '_')
 			*p = '/';
 		else
-			*p = tolower(*p);
+			*p = tolower((unsigned char)*p);
 	}
 	printf("    $(wildcard %s/include/config/%s.h) \\\n", topdir, s);
 }
