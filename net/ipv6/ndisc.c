@@ -989,7 +989,7 @@ out:
 static void ndisc_router_discovery(struct sk_buff *skb)
 {
         struct ra_msg *ra_msg = (struct ra_msg *) skb->h.raw;
-	struct neighbour *neigh;
+	struct neighbour *neigh = NULL;
 	struct inet6_dev *in6_dev;
 	struct rt6_info *rt;
 	int lifetime;
@@ -1057,7 +1057,11 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 
 	rt = rt6_get_dflt_router(&skb->nh.ipv6h->saddr, skb->dev);
 
+	if (rt)
+		neigh = rt->rt6i_nexthop;
+
 	if (rt && lifetime == 0) {
+		neigh_clone(neigh);
 		ip6_del_rt(rt, NULL, NULL);
 		rt = NULL;
 	}
@@ -1130,7 +1134,10 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	 *	Process options.
 	 */
 
-	if (rt && (neigh = rt->rt6i_nexthop) != NULL) {
+	if (!neigh)
+		neigh = __neigh_lookup(&nd_tbl, &skb->nh.ipv6h->saddr,
+				       skb->dev, 1);
+	if (neigh) {
 		u8 *lladdr = NULL;
 		int lladdrlen;
 		if (ndopts.nd_opts_src_lladdr) {
@@ -1185,6 +1192,8 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 out:
 	if (rt)
 		dst_release(&rt->u.dst);
+	else if (neigh)
+		neigh_release(neigh);
 	in6_dev_put(in6_dev);
 }
 
