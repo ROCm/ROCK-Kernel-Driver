@@ -337,13 +337,11 @@ xfs_log_force(xfs_mount_t *mp,
 
 }	/* xfs_log_force */
 
-
 /*
- * This function will take a log sequence number and check to see if that
- * lsn has been flushed to disk.  If it has, then the callback function is
- * called with the callback argument.  If the relevant in-core log has not
- * been synced to disk, we add the callback to the callback list of the
- * in-core log.
+ * Attaches a new iclog I/O completion callback routine during
+ * transaction commit.  If the log is in error state, a non-zero
+ * return code is handed back and the caller is responsible for
+ * executing the callback at an appropriate time.
  */
 int
 xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
@@ -369,10 +367,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 		iclog->ic_callback_tail = &(cb->cb_next);
 	}
 	LOG_UNLOCK(log, spl);
-	if (abortflg) {
-		cb->cb_func(cb->cb_arg, abortflg);
-	}
-	return 0;
+	return abortflg;
 }	/* xfs_log_notify */
 
 int
