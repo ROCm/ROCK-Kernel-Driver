@@ -1143,6 +1143,7 @@ int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 static int __init assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
+	BUG_ON(irq >= NR_IRQS);
 	if (IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 next:
