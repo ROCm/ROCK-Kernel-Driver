@@ -766,16 +766,9 @@ static const char * chip_ids[ 16 ] =  {
 		SMC_outw( addr[4]|(addr[5] << 8), ioaddr, ADDR2_REG );	\
 	} while (0)
 
-#define SMC_CLEAR_MCAST()						\
-	do {								\
-		SMC_outw( 0, ioaddr, MCAST_REG1 );			\
-		SMC_outw( 0, ioaddr, MCAST_REG2 );			\
-		SMC_outw( 0, ioaddr, MCAST_REG3 );			\
-		SMC_outw( 0, ioaddr, MCAST_REG4 );			\
-	} while (0)
 #define SMC_SET_MCAST(x)						\
 	do {								\
-		unsigned char *mt = (x);				\
+		const unsigned char *mt = (x);				\
 		SMC_outw( mt[0] | (mt[1] << 8), ioaddr, MCAST_REG1 );	\
 		SMC_outw( mt[2] | (mt[3] << 8), ioaddr, MCAST_REG2 );	\
 		SMC_outw( mt[4] | (mt[5] << 8), ioaddr, MCAST_REG3 );	\

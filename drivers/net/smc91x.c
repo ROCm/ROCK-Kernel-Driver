@@ -1300,58 +1300,6 @@ static void smc_timeout(struct net_device *dev)
 }
 
 /*
- *    This sets the internal hardware table to filter out unwanted multicast
- *    packets before they take up memory.
- *
- *    The SMC chip uses a hash table where the high 6 bits of the CRC of
- *    address are the offset into the table.  If that bit is 1, then the
- *    multicast packet is accepted.  Otherwise, it's dropped silently.
- *
- *    To use the 6 bits as an offset into the table, the high 3 bits are the
- *    number of the 8 bit register, while the low 3 bits are the bit within
- *    that register.
- *
- *    This routine is based very heavily on the one provided by Peter Cammaert.
- */
-static void
-smc_setmulticast(unsigned long ioaddr, int count, struct dev_mc_list *addrs)
-{
-	int i;
-	unsigned char multicast_table[8];
-	struct dev_mc_list *cur_addr;
-
-	/* table for flipping the order of 3 bits */
-	static unsigned char invert3[] = { 0, 4, 2, 6, 1, 5, 3, 7 };
-
-	/* start with a table of all zeros: reject all */
-	memset(multicast_table, 0, sizeof(multicast_table));
-
-	cur_addr = addrs;
-	for (i = 0; i < count; i++, cur_addr = cur_addr->next) {
-		int position;
-
-		/* do we have a pointer here? */
-		if (!cur_addr)
-			break;
-		/* make sure this is a multicast address - shouldn't this
-		   be a given if we have it here ? */
-		if (!(*cur_addr->dmi_addr & 1))
-			continue;
-
-		/* only use the low order bits */
-		position = crc32_le(~0, cur_addr->dmi_addr, 6) & 0x3f;
-
-		/* do some messy swapping to put the bit in the right spot */
-		multicast_table[invert3[position&7]] |=
-					(1<<invert3[(position>>3)&7]);
-
-	}
-	/* now, the table can be loaded into the chipset */
-	SMC_SELECT_BANK(3);
-	SMC_SET_MCAST(multicast_table);
-}
-
-/*
  * This routine will, depending on the values passed to it,
  * either make it accept multicast packets, go into
  * promiscuous mode (for TCPDUMP and cousins) or accept
@@ -1361,14 +1309,14 @@ static void smc_set_multicast_list(struct net_device *dev)
 {
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
+	unsigned char multicast_table[8];
+	int update_multicast = 0;
 
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
 
-	SMC_SELECT_BANK(0);
 	if (dev->flags & IFF_PROMISC) {
 		DBG(2, "%s: RCR_PRMS\n", dev->name);
 		lp->rcr_cur_mode |= RCR_PRMS;
-		SMC_SET_RCR(lp->rcr_cur_mode);
 	}
 
 /* BUG?  I never disable promiscuous mode if multicasting was turned on.
@@ -1382,38 +1330,78 @@ static void smc_set_multicast_list(struct net_device *dev)
 	 * checked before the table is
 	 */
 	else if (dev->flags & IFF_ALLMULTI || dev->mc_count > 16) {
-		lp->rcr_cur_mode |= RCR_ALMUL;
-		SMC_SET_RCR(lp->rcr_cur_mode);
 		DBG(2, "%s: RCR_ALMUL\n", dev->name);
+		lp->rcr_cur_mode |= RCR_ALMUL;
 	}
 
 	/*
-	 * We just get all multicast packets even if we only want them
-	 * from one source.  This will be changed at some future point.
+	 * This sets the internal hardware table to filter out unwanted
+	 * multicast packets before they take up memory.
+	 *
+	 * The SMC chip uses a hash table where the high 6 bits of the CRC of
+	 * address are the offset into the table.  If that bit is 1, then the
+	 * multicast packet is accepted.  Otherwise, it's dropped silently.
+	 *
+	 * To use the 6 bits as an offset into the table, the high 3 bits are
+	 * the number of the 8 bit register, while the low 3 bits are the bit
+	 * within that register.
 	 */
 	else if (dev->mc_count)  {
-		/* support hardware multicasting */
+		int i;
+		struct dev_mc_list *cur_addr;
+
+		/* table for flipping the order of 3 bits */
+		static const unsigned char invert3[] = {0, 4, 2, 6, 1, 5, 3, 7};
+
+		/* start with a table of all zeros: reject all */
+		memset(multicast_table, 0, sizeof(multicast_table));
+
+		cur_addr = dev->mc_list;
+		for (i = 0; i < dev->mc_count; i++, cur_addr = cur_addr->next) {
+			int position;
+
+			/* do we have a pointer here? */
+			if (!cur_addr)
+				break;
+			/* make sure this is a multicast address -
+		   	   shouldn't this be a given if we have it here ? */
+			if (!(*cur_addr->dmi_addr & 1))
+				continue;
+
+			/* only use the low order bits */
+			position = crc32_le(~0, cur_addr->dmi_addr, 6) & 0x3f;
+
+			/* do some messy swapping to put the bit in the right spot */
+			multicast_table[invert3[position&7]] |=
+				(1<<invert3[(position>>3)&7]);
+		}
 
 		/* be sure I get rid of flags I might have set */
 		lp->rcr_cur_mode &= ~(RCR_PRMS | RCR_ALMUL);
-		SMC_SET_RCR(lp->rcr_cur_mode);
-		/*
-		 * NOTE: this has to set the bank, so make sure it is the
-		 * last thing called.  The bank is set to zero at the top
-		 */
-		smc_setmulticast(ioaddr, dev->mc_count, dev->mc_list);
+
+		/* now, the table can be loaded into the chipset */
+		update_multicast = 1;
 	} else  {
 		DBG(2, "%s: ~(RCR_PRMS|RCR_ALMUL)\n", dev->name);
 		lp->rcr_cur_mode &= ~(RCR_PRMS | RCR_ALMUL);
-		SMC_SET_RCR(lp->rcr_cur_mode);
 
 		/*
 		 * since I'm disabling all multicast entirely, I need to
 		 * clear the multicast list
 		 */
-		SMC_SELECT_BANK(3);
-		SMC_CLEAR_MCAST();
+		memset(multicast_table, 0, sizeof(multicast_table));
+		update_multicast = 1;
 	}
+
+	spin_lock_irq(&lp->lock);
+	SMC_SELECT_BANK(0);
+	SMC_SET_RCR(lp->rcr_cur_mode);
+	if (update_multicast) {
+		SMC_SELECT_BANK(3);
+		SMC_SET_MCAST(multicast_table);
+	}
+	SMC_SELECT_BANK(2);
+	spin_unlock_irq(&lp->lock);
 }
 
 
