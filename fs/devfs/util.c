@@ -77,28 +77,18 @@
 #define PRINTK(format, args...) \
    {printk (KERN_ERR "%s" format, __FUNCTION__ , ## args);}
 
-
-/*  Private functions follow  */
-
-/**
- *	devfs_register_tape - Register a tape device in the "/dev/tapes" hierarchy.
- *	@de: Any tape device entry in the device directory.
- */
-
-int devfs_register_tape (devfs_handle_t de)
+int devfs_register_tape(const char *name)
 {
-    int pos;
-    char name[32], dest[64];
-    static unsigned int tape_counter;
-    int n = tape_counter++;
+	char tname[32], dest[64];
+	static unsigned int tape_counter;
+	unsigned int n = tape_counter++;
 
-    pos = devfs_generate_path (de, dest + 3, sizeof dest - 3);
-    if (pos < 0) return -1;
-    strncpy (dest + pos, "../", 3);
-    sprintf (name, "tapes/tape%u", n);
-    devfs_mk_symlink (name, dest + pos);
-    return n;
-}   /*  End Function devfs_register_tape  */
+	sprintf(dest, "../%s", name);
+	sprintf(tname, "tapes/tape%u", n);
+	devfs_mk_symlink(tname, dest);
+
+	return n;
+}
 EXPORT_SYMBOL(devfs_register_tape);
 
 void devfs_unregister_tape(int num)

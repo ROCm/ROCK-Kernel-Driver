@@ -5571,7 +5571,7 @@ static int osst_attach(Scsi_Device * SDp)
 					S_IFCHR | S_IRUGO | S_IWUGO,
 					&osst_fops, NULL);
 	}
-	drive->number = devfs_register_tape (SDp->de);
+	drive->number = devfs_register_tape(SDp->devfs_name);
 
 	printk(KERN_INFO
 		"osst :I: Attached OnStream %.5s tape at scsi%d, channel %d, id %d, lun %d as %s\n",

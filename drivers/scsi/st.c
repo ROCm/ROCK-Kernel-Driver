@@ -3909,7 +3909,7 @@ static int st_attach(Scsi_Device * SDp)
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	}
-	disk->number = devfs_register_tape(SDp->de);
+	disk->number = devfs_register_tape(SDp->devfs_name);
 
 	printk(KERN_WARNING
 	"Attached scsi tape %s at scsi%d, channel %d, id %d, lun %d\n",

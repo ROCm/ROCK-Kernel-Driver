@@ -32,7 +32,7 @@ extern devfs_handle_t devfs_mk_dir(const char *fmt, ...)
 extern void devfs_remove(const char *fmt, ...)
 	__attribute__((format (printf, 1, 2)));
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
-extern int devfs_register_tape (devfs_handle_t de);
+extern int devfs_register_tape(const char *name);
 extern void devfs_unregister_tape(int num);
 extern void devfs_create_partitions(struct gendisk *dev);
 extern void devfs_create_cdrom(struct gendisk *dev);

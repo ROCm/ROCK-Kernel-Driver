@@ -6318,7 +6318,7 @@ static int idetape_attach (ide_drive_t *drive)
 			S_IFCHR | S_IRUGO | S_IWUGO,
 			&idetape_fops, NULL);
 
-	drive->disk->number = devfs_register_tape(drive->de);
+	drive->disk->number = devfs_register_tape(drive->devfs_name);
 	drive->disk->fops = &idetape_block_ops;
 	return 0;
 failed:
