@@ -2182,11 +2182,6 @@ pci_probe(struct net_device *dev, u_long ioaddr)
 
     if (lastPCI == NO_MORE_PCI) return;
 
-    if (!pci_present()) {
-	lastPCI = NO_MORE_PCI;
-	return;          /* No PCI bus in this machine! */
-    }
-    
     lp->bus = PCI;
     lp->bus_num = 0;
 
@@ -5863,7 +5858,6 @@ count_adapters(void)
 	if (EISA_signature(name, EISA_ID)) j++;
     }
 #endif
-    if (!pci_present()) return j;
 
     for (i=0; (pdev=pci_find_class(class, pdev))!= NULL; i++) {
 	vendor = pdev->vendor;
