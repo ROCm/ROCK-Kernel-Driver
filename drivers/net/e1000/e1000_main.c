@@ -2656,7 +2656,8 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
 			E1000_WRITE_REG(&adapter->hw, MANC, manc);
-			state = 0;
+			pci_enable_wake(pdev, 3, 1);
+			pci_enable_wake(pdev, 4, 1); /* 4 == D3 cold */
 		}
 	}
 
