@@ -26,7 +26,7 @@
 ARM Floating Point Instruction Classes
 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | 
 |c o n d|1 1 0 P|U|u|W|L|   Rn  |v|  Fd |0|0|0|1|  o f f s e t  | CPDT
-|c o n d|1 1 0 P|U|w|W|L|   Rn  |x|  Fd |0|0|0|1|  o f f s e t  | CPDT
+|c o n d|1 1 0 P|U|w|W|L|   Rn  |x|  Fd |0|0|1|0|  o f f s e t  | CPDT (copro 2)
 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | 
 |c o n d|1 1 1 0|a|b|c|d|e|  Fn |j|  Fd |0|0|0|1|f|g|h|0|i|  Fm | CPDO
 |c o n d|1 1 1 0|a|b|c|L|e|  Fn |   Rd  |0|0|0|1|f|g|h|1|i|  Fm | CPRT
@@ -34,7 +34,7 @@ ARM Floating Point Instruction Classes
 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | 
 
 CPDT		data transfer instructions
-		LDF, STF, LFM, SFM
+		LDF, STF, LFM (copro 2), SFM (copro 2)
 		
 CPDO		dyadic arithmetic instructions
 		ADF, MUF, SUF, RSF, DVF, RDF,

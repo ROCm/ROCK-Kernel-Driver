@@ -8,11 +8,6 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
- * Since this file should be linked before any other machine specific file,
- * the __initcall() here will be executed first.  This serves as default
- * initialization stuff for SA1100 machines which can be overriden later if
- * need be.
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -117,7 +112,7 @@ static int __init sa1100_init(void)
 	return 0;
 }
 
-__initcall(sa1100_init);
+core_initcall(sa1100_init);
 
 void (*sa1100fb_backlight_power)(int on);
 void (*sa1100fb_lcd_power)(int on);

@@ -181,4 +181,4 @@ static int __init integrator_cpu_init(void)
 	return 0;
 }
 
-__initcall(integrator_cpu_init);
+core_initcall(integrator_cpu_init);

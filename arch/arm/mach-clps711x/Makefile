@@ -9,8 +9,7 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:= leds-p720t.o
-
+obj-$(CONFIG_ARCH_CEIVA) += ceiva.o
 obj-$(CONFIG_ARCH_AUTCPU12) += autcpu12.o
 obj-$(CONFIG_ARCH_CDB89712) += cdb89712.o
 obj-$(CONFIG_ARCH_CLEP7312) += clep7312.o

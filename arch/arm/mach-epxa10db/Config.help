@@ -1,0 +1,8 @@
+CONFIG_PLD_HOTSWAP
+  This enables support for the dynamic loading and configuration of
+  compatible drivers when the contents of the PLD are changed. This
+  is still experimental and requires configuration tools which are
+  not yet generally available. Say N here. You must enable the kernel
+  module loader for this feature to work.
+
+

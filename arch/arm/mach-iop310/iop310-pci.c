@@ -55,22 +55,23 @@
 #define  DBG(x...) do { } while (0)
 #endif
 
-extern int (*external_fault)(unsigned long, struct pt_regs *);
-
-static u32 iop310_cfg_address(struct pci_dev *dev, int where)
+/*
+ * Calculate the address, etc from the bus, devfn and register
+ * offset.  Note that we have two root buses, so we need some
+ * method to determine whether we need config type 0 or 1 cycles.
+ * We use a root bus number in our bus->sysdata structure for this.
+ */
+static u32 iop310_cfg_address(struct pci_bus *bus, int devfn, int where)
 {
-	struct pci_sys_data *sys = dev->sysdata;
+	struct pci_sys_data *sys = bus->sysdata;
 	u32 addr;
 
-	where &= ~3;
-
-	if (sys->busnr == dev->bus->number)
-		addr = 1 << (PCI_SLOT(dev->devfn) + 16);
+	if (sys->busnr == bus->number)
+		addr = 1 << (PCI_SLOT(devfn) + 16);
 	else
-		addr = dev->bus->number << 16 |
-		       PCI_SLOT(dev->devfn) << 11 | 1;
+		addr = bus->number << 16 | PCI_SLOT(devfn) << 11 | 1;
 
-	addr |=	PCI_FUNC(dev->devfn) << 8 | where;
+	addr |=	PCI_FUNC(devfn) << 8 | (where & ~3);
 
 	return addr;
 }
@@ -106,9 +107,13 @@ static int iop310_pri_pci_status(void)
 	return ret;
 }
 
-static inline u32 iop310_pri_read(struct pci_dev *dev, int where)
+/*
+ * Simply write the address register and read the configuration
+ * data.  Note that the 4 nop's ensure that we are able to handle
+ * a delayed abort (in theory.)
+ */
+static inline u32 iop310_pri_read(unsigned long addr)
 {
-	unsigned long addr = iop310_cfg_address(dev, where);
 	u32 val;
 
 	__asm__ __volatile__(
@@ -125,111 +130,59 @@ static inline u32 iop310_pri_read(struct pci_dev *dev, int where)
 }
 
 static int
-iop310_pri_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
+iop310_pri_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		       int size, u32 *value)
 {
-	u8 val;
-
-	val = iop310_pri_read(dev, where) >> ((where & 3) * 8);
-
-	if (iop310_pri_pci_status())
-		val = 0xff;
-
-	*p = val;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_pri_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
-{
-	u16 val;
-
-	val = iop310_pri_read(dev, where) >> ((where & 3) * 8);
-
-	if (iop310_pri_pci_status())
-		val = 0xffff;
-
-	*p = val;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_pri_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
-{
-	u32 val;
-
-	val = iop310_pri_read(dev, where);
+	unsigned long addr = iop310_cfg_address(bus, devfn, where);
+	u32 val = iop310_pri_read(addr) >> ((where & 3) * 8);
 
 	if (iop310_pri_pci_status())
 		val = 0xffffffff;
 
-	*p = val;
+	*value = val;
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
-iop310_pri_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
+iop310_pri_write_config(struct pci_bus *bus, unsigned int devfn, int where
+			int size, u32 value)
 {
+	unsigned long addr = iop310_cfg_address(bus, devfn, where);
 	u32 val;
 
-	val = iop310_pri_read(dev, where);
+	if (size != 4) {
+		val = iop310_pri_read(addr);
+		if (!iop310_pri_pci_status() == 0)
+			return PCIBIOS_SUCCESSFUL;
 
-	if (iop310_pri_pci_status() == 0) {
 		where = (where & 3) * 8;
-		val &= ~(0xff << where);
-		val |= v << where;
-		*IOP310_POCCDR = val;
+
+		if (size == 1)
+			val &= ~(0xff << where);
+		else
+			val &= ~(0xffff << where);
+
+		*IOP310_POCCDR = val | v << where;
+	} else {
+		asm volatile(
+			"str	%1, [%2]\n\t"
+			"str	%0, [%3]\n\t"
+			"nop\n\t"
+			"nop\n\t"
+			"nop\n\t"
+			"nop\n\t"
+			:
+			: "r" (val), "r" (addr),
+			  "r" (IOP310_POCCAR), "r" (IOP310_POCCDR));
 	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_pri_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
-{
-	u32 val;
-
-	val = iop310_pri_read(dev, where);
-
-	if (iop310_pri_pci_status() == 0) {
-		where = (where & 2) * 8;
-		val &= ~(0xffff << where);
-		val |= v << where;
-		*IOP310_POCCDR = val;
-	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_pri_wr_cfg_dword(struct pci_dev *dev, int where, u32 val)
-{
-	unsigned long addr;
-
-	addr = iop310_cfg_address(dev, where);
-
-	__asm__ __volatile__(
-		"str	%1, [%2]\n\t"
-		"str	%0, [%3]\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		:
-		: "r" (val), "r" (addr), "r" (IOP310_POCCAR), "r" (IOP310_POCCDR));
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops iop310_primary_ops = {
-	iop310_pri_rd_cfg_byte,
-	iop310_pri_rd_cfg_word,
-	iop310_pri_rd_cfg_dword,
-	iop310_pri_wr_cfg_byte,
-	iop310_pri_wr_cfg_word,
-	iop310_pri_wr_cfg_dword,
+	.read	= iop310_pri_read_config,
+	.write	= iop310_pri_write_config,
 };
 
 /*
@@ -255,9 +208,13 @@ static int iop310_sec_pci_status(void)
 	return ret;
 }
 
-static inline u32 iop310_sec_read(struct pci_dev *dev, int where)
+/*
+ * Simply write the address register and read the configuration
+ * data.  Note that the 4 nop's ensure that we are able to handle
+ * a delayed abort (in theory.)
+ */
+static inline u32 iop310_sec_read(unsigned long addr)
 {
-	unsigned long addr = iop310_cfg_address(dev, where);
 	u32 val;
 
 	__asm__ __volatile__(
@@ -274,111 +231,60 @@ static inline u32 iop310_sec_read(struct pci_dev *dev, int where)
 }
 
 static int
-iop310_sec_rd_cfg_byte(struct pci_dev *dev, int where, u8 *p)
+iop310_sec_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		       int size, u32 *value)
 {
-	u8 val;
-
-	val = iop310_sec_read(dev, where) >> ((where & 3) * 8);
-
-	if (iop310_sec_pci_status())
-		val = 0xff;
-
-	*p = val;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_sec_rd_cfg_word(struct pci_dev *dev, int where, u16 *p)
-{
-	u16 val;
-
-	val = iop310_sec_read(dev, where) >> ((where & 3) * 8);
-
-	if (iop310_sec_pci_status())
-		val = 0xffff;
-
-	*p = val;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_sec_rd_cfg_dword(struct pci_dev *dev, int where, u32 *p)
-{
-	u32 val;
-
-	val = iop310_sec_read(dev, where);
+	unsigned long addr = iop310_cfg_address(bus, devfn, where);
+	u32 val = iop310_sec_read(addr) >> ((where & 3) * 8);
 
 	if (iop310_sec_pci_status())
 		val = 0xffffffff;
 
-	*p = val;
+	*value = val;
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
-iop310_sec_wr_cfg_byte(struct pci_dev *dev, int where, u8 v)
+iop310_sec_write_config(struct pci_bus *bus, unsigned int devfn, int where
+			int size, u32 value)
 {
+	unsigned long addr = iop310_cfg_address(bus, devfn, where);
 	u32 val;
 
-	val = iop310_sec_read(dev, where);
+	if (size != 4) {
+		val = iop310_sec_read(addr);
 
-	if (iop310_sec_pci_status() == 0) {
+		if (!iop310_sec_pci_status() == 0)
+			return PCIBIOS_SUCCESSFUL;
+
 		where = (where & 3) * 8;
-		val &= ~(0xff << where);
-		val |= v << where;
-		*IOP310_SOCCDR = val;
+
+		if (size == 1)
+			val &= ~(0xff << where);
+		else
+			val &= ~(0xffff << where);
+
+		*IOP310_SOCCDR = val | v << where;
+	} else {
+		asm volatile(
+			"str	%1, [%2]\n\t"
+			"str	%0, [%3]\n\t"
+			"nop\n\t"
+			"nop\n\t"
+			"nop\n\t"
+			"nop\n\t"
+			:
+			: "r" (val), "r" (addr),
+			  "r" (IOP310_SOCCAR), "r" (IOP310_SOCCDR));
 	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_sec_wr_cfg_word(struct pci_dev *dev, int where, u16 v)
-{
-	u32 val;
-
-	val = iop310_sec_read(dev, where);
-
-	if (iop310_sec_pci_status() == 0) {
-		where = (where & 2) * 8;
-		val &= ~(0xffff << where);
-		val |= v << where;
-		*IOP310_SOCCDR = val;
-	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-iop310_sec_wr_cfg_dword(struct pci_dev *dev, int where, u32 val)
-{
-	unsigned long addr;
-
-	addr = iop310_cfg_address(dev, where);
-
-	__asm__ __volatile__(
-		"str	%1, [%2]\n\t"
-		"str	%0, [%3]\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		:
-		: "r" (val), "r" (addr), "r" (IOP310_SOCCAR), "r" (IOP310_SOCCDR));
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops iop310_secondary_ops = {
-	iop310_sec_rd_cfg_byte,
-	iop310_sec_rd_cfg_word,
-	iop310_sec_rd_cfg_dword,
-	iop310_sec_wr_cfg_byte,
-	iop310_sec_wr_cfg_word,
-	iop310_sec_wr_cfg_dword,
+	.read	= iop310_sec_read_config,
+	.write	= iop310_sec_write_config,
 };
 
 /*
@@ -524,5 +430,5 @@ void iop310_init(void)
 	 */
 	*IOP310_PCR &= 0xfff8;
 
-	hook_fault_code(6, iop310_pci_abort, SIGBUS, "imprecise external abort");
+	hook_fault_code(16+6, iop310_pci_abort, SIGBUS, "imprecise external abort");
 }

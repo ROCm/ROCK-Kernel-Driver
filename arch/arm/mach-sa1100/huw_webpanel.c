@@ -52,7 +52,7 @@ static int __init init_huw_cs3(void)
 	return 0;
 }
 
-__initcall(init_huw_cs3);
+arch_initcall(init_huw_cs3);
 
 
 /**

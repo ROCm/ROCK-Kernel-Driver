@@ -181,11 +181,12 @@ static spinlock_t v3_lock = SPIN_LOCK_UNLOCKED;
 #undef V3_LB_BASE_PREFETCH
 #define V3_LB_BASE_PREFETCH 0
 
-static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
+static unsigned long v3_open_config_window(struct pci_bus *bus,
+					   unsigned int devfn, int offset)
 {
 	unsigned int address, mapaddress, busnr;
 
-	busnr = dev->bus->number;
+	busnr = bus->number;
 
 	/*
 	 * Trap out illegal values
@@ -194,11 +195,11 @@ static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
 		BUG();
 	if (busnr > 255)
 		BUG();
-	if (dev->devfn > 255)
+	if (devfn > 255)
 		BUG();
 
 	if (busnr == 0) {
-		int slot = PCI_SLOT(dev->devfn);
+		int slot = PCI_SLOT(devfn);
 
 		/*
 		 * local bus segment so need a type 0 config cycle
@@ -210,7 +211,7 @@ static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
 		 *  3:1 = config cycle (101)
 		 *  0   = PCI A1 & A0 are 0 (0)
 		 */
-		address = PCI_FUNC(dev->devfn) << 8;
+		address = PCI_FUNC(devfn) << 8;
 		mapaddress = V3_LB_MAP_TYPE_CONFIG;
 
 		if (slot > 12)
@@ -237,7 +238,7 @@ static unsigned long v3_open_config_window(struct pci_dev *dev, int offset)
 		 *  0   = PCI A1 & A0 from host bus (1)
 		 */
 		mapaddress = V3_LB_MAP_TYPE_CONFIG | V3_LB_MAP_AD_LOW_EN;
-		address = (busnr << 16) | (dev->devfn << 8);
+		address = (busnr << 16) | (devfn << 8);
 	}
 
 	/*
@@ -276,52 +277,29 @@ static void v3_close_config_window(void)
 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
 }
 
-static int v3_read_config_byte(struct pci_dev *dev, int where, u8 *val)
-{
-	unsigned long addr;
-	unsigned long flags;
-	u8 v;
-
-	spin_lock_irqsave(&v3_lock, flags);
-	addr = v3_open_config_window(dev, where);
-
-	v = __raw_readb(addr);
-
-	v3_close_config_window();
-	spin_unlock_irqrestore(&v3_lock, flags);
-
-	*val = v;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int v3_read_config_word(struct pci_dev *dev, int where, u16 *val)
-{
-	unsigned long addr;
-	unsigned long flags;
-	u16 v;
-
-	spin_lock_irqsave(&v3_lock, flags);
-	addr = v3_open_config_window(dev, where);
-
-	v = __raw_readw(addr);
-
-	v3_close_config_window();
-	spin_unlock_irqrestore(&v3_lock, flags);
-
-	*val = v;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int v3_read_config_dword(struct pci_dev *dev, int where, u32 *val)
+static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+			  int size, u32 *val)
 {
 	unsigned long addr;
 	unsigned long flags;
 	u32 v;
 
 	spin_lock_irqsave(&v3_lock, flags);
-	addr = v3_open_config_window(dev, where);
+	addr = v3_open_config_window(bus, devfn, where);
 
-	v = __raw_readl(addr);
+	switch (size) {
+	case 1:
+		v = __raw_readb(addr);
+		break;
+
+	case 2:
+		v = __raw_readw(addr);
+		break;
+
+	case 4:
+		v = __raw_readl(addr);
+		break;
+	}
 
 	v3_close_config_window();
 	spin_unlock_irqrestore(&v3_lock, flags);
@@ -330,50 +308,31 @@ static int v3_read_config_dword(struct pci_dev *dev, int where, u32 *val)
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int v3_write_config_byte(struct pci_dev *dev, int where, u8 val)
+static int v3_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+			   int size, u32 val)
 {
 	unsigned long addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&v3_lock, flags);
-	addr = v3_open_config_window(dev, where);
+	addr = v3_open_config_window(bus, devfn, where);
 
-	__raw_writeb(val, addr);
-	__raw_readb(addr);
-	
-	v3_close_config_window();
-	spin_unlock_irqrestore(&v3_lock, flags);
+	switch (size) {
+	case 1:
+		__raw_writeb((u8)val, addr);
+		__raw_readb(addr);
+		break;
 
-	return PCIBIOS_SUCCESSFUL;
-}
+	case 2:
+		__raw_writew((u16)val, addr);
+		__raw_readw(addr);
+		break;
 
-static int v3_write_config_word(struct pci_dev *dev, int where, u16 val)
-{
-	unsigned long addr;
-	unsigned long flags;
-
-	spin_lock_irqsave(&v3_lock, flags);
-	addr = v3_open_config_window(dev, where);
-
-	__raw_writew(val, addr);
-	__raw_readw(addr);
-
-	v3_close_config_window();
-	spin_unlock_irqrestore(&v3_lock, flags);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int v3_write_config_dword(struct pci_dev *dev, int where, u32 val)
-{
-	unsigned long addr;
-	unsigned long flags;
-
-	spin_lock_irqsave(&v3_lock, flags);
-	addr = v3_open_config_window(dev, where);
-
-	__raw_writel(val, addr);
-	__raw_readl(addr);
+	case 4:
+		__raw_writel(val, addr);
+		__raw_readl(addr);
+		break;
+	}
 
 	v3_close_config_window();
 	spin_unlock_irqrestore(&v3_lock, flags);
@@ -382,12 +341,8 @@ static int v3_write_config_dword(struct pci_dev *dev, int where, u32 val)
 }
 
 static struct pci_ops pci_v3_ops = {
-	.read_byte	= v3_read_config_byte,
-	.read_word	= v3_read_config_word,
-	.read_dword	= v3_read_config_dword,
-	.write_byte	= v3_write_config_byte,
-	.write_word	= v3_write_config_word,
-	.write_dword	= v3_write_config_dword,
+	.read	= v3_read_config,
+	.write	= v3_write_config,
 };
 
 static struct resource non_mem = {

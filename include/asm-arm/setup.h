@@ -65,14 +65,14 @@ struct tag_ramdisk {
 	u32 start;	/* starting block of floppy-based RAM disk image */
 };
 
-/* describes where the compressed ramdisk image lives */
+/* describes where the compressed ramdisk image lives (virtual address) */
 /*
  * this one accidentally used virtual addresses - as such,
  * its depreciated.
  */
 #define ATAG_INITRD	0x54410005
 
-/* describes where the compressed ramdisk image lives */
+/* describes where the compressed ramdisk image lives (physical address) */
 #define ATAG_INITRD2	0x54420005
 
 struct tag_initrd {

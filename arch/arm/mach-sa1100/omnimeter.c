@@ -39,7 +39,7 @@ static int __init omnimeter_init(void)
 	return 0;
 }
 
-__initcall(omnimeter_init);
+arch_initcall(omnimeter_init);
 
 static struct map_desc omnimeter_io_desc[] __initdata = {
  /* virtual     physical    length      type */

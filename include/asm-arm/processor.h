@@ -25,6 +25,7 @@
 
 #include <asm/atomic.h>
 #include <asm/ptrace.h>
+#include <asm/procinfo.h>
 #include <asm/arch/memory.h>
 #include <asm/proc/processor.h>
 

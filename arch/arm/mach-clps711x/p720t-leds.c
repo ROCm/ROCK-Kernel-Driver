@@ -64,4 +64,4 @@ static int __init leds_init(void)
 	return 0;
 }
 
-__initcall(leds_init);
+arch_initcall(leds_init);
