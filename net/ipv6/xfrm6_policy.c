@@ -52,7 +52,7 @@ static int __xfrm6_bundle_ok(struct xfrm_dst *xdst, struct flowi *fl)
 }
 
 static struct dst_entry *
-__xfrm6_find_bundle(struct flowi *fl, struct rtable *rt, struct xfrm_policy *policy)
+__xfrm6_find_bundle(struct flowi *fl, struct xfrm_policy *policy)
 {
 	struct dst_entry *dst;
 
