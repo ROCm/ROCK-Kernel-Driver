@@ -202,6 +202,11 @@ config CPU_FR551_COMPILE
 	  This causes appropriate flags to be passed to the compiler to
 	  optimise for the FR555 CPU
 
+config FRV_L1_CACHE_SHIFT
+	int
+	default "5" if CPU_FR401 || CPU_FR405 || CPU_FR451
+	default "6" if CPU_FR551
+
 endmenu
 
 choice

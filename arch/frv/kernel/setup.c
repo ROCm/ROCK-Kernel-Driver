@@ -8,7 +8,7 @@
  *  Copyright (C) 1995       Hamish Macdonald
  *  Copyright (C) 2000       Lineo Inc. (www.lineo.com)
  *  Copyright (C) 2001 	     Lineo, Inc. <www.lineo.com>
- *  Copyright (C) 2003 	     David Howells <dhowells@redhat.com>, Red Hat, Inc.
+ *  Copyright (C) 2003,2004  David Howells <dhowells@redhat.com>, Red Hat, Inc.
  */
 
 /*
@@ -499,7 +499,7 @@ static void __init determine_cpu(void)
 	case PSR_IMPLE_FR551:
 		cpu_series	= "fr550";
 		cpu_core	= "fr551";
-		pdm_suspend_mode = HSR0_PDM_PLL_STOP;
+		pdm_suspend_mode = HSR0_PDM_PLL_RUN;
 
 		switch (PSR_VERSION(psr)) {
 		case PSR_VERSION_FR551_MB93555:

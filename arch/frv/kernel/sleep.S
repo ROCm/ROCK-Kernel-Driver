@@ -23,10 +23,14 @@
 
 #define __addr_MASK	0xfeff9820	/* interrupt controller mask */
 
-#define __addr_SDRAMC	0xfe000400	/* SDRAM controller regs */
-#define SDRAMC_DSTS	0x28		/* SDRAM status */
-#define SDRAMC_DSTS_SSI	0x00000001	/* indicates that the SDRAM is in self-refresh mode */
-#define SDRAMC_DRCN	0x30		/* SDRAM refresh control */
+#define __addr_FR55X_DRCN	0xfeff0218      /* Address of DRCN register */
+#define FR55X_DSTS_OFFSET	-4		/* Offset from DRCN to DSTS */
+#define FR55X_SDRAMC_DSTS_SSI	0x00000002	/* indicates that the SDRAM is in self-refresh mode */
+
+#define __addr_FR4XX_DRCN	0xfe000430      /* Address of DRCN register */
+#define FR4XX_DSTS_OFFSET	-8		/* Offset from DRCN to DSTS */
+#define FR4XX_SDRAMC_DSTS_SSI	0x00000001	/* indicates that the SDRAM is in self-refresh mode */
+
 #define SDRAMC_DRCN_SR	0x00000001	/* transition SDRAM into self-refresh mode */
 
 	.section	.bss
@@ -101,6 +105,19 @@ frv_cpu_suspend:
 	movgs		gr8,psr
 	ori		gr8,#PSR_ET,gr8
 
+	srli		gr8,#28,gr4
+	subicc		gr4,#3,gr0,icc0
+	beq		icc0,#0,1f
+	# FR4xx
+	li		__addr_FR4XX_DRCN,gr4
+	li		FR4XX_SDRAMC_DSTS_SSI,gr5
+	li		FR4XX_DSTS_OFFSET,gr6
+	bra		__icache_lock_start
+1:
+	# FR5xx
+	li		__addr_FR55X_DRCN,gr4
+	li		FR55X_SDRAMC_DSTS_SSI,gr5
+	li		FR55X_DSTS_OFFSET,gr6
 	bra		__icache_lock_start
 
 	.size		frv_cpu_suspend, .-frv_cpu_suspend
@@ -118,7 +135,6 @@ __icache_lock_start:
 	#----------------------------------------------------
 	# put SDRAM in self-refresh mode
 	#----------------------------------------------------
-	li		__sleep_save_area,gr4
 
 	# Flush all data in the cache using the DCEF instruction.
 	dcef		@(gr0,gr0),#1
@@ -126,17 +142,17 @@ __icache_lock_start:
 	# Stop DMAC transfer
 
 	# Execute dummy load from SDRAM
-	ldi.p		@(gr4,#0),gr4
+	ldi		@(gr11,#0),gr11
 
 	# put the SDRAM into self-refresh mode
-	setlos		SDRAMC_DRCN_SR,gr3
-	li		__addr_SDRAMC,gr4
-	sti		gr3,@(gr4,#SDRAMC_DRCN)
+	ld              @(gr4,gr0),gr11
+	ori		gr11,#SDRAMC_DRCN_SR,gr11
+	st		gr11,@(gr4,gr0)
 	membar
 
 	# wait for SDRAM to reach self-refresh mode
-1:	ldi		@(gr4,#SDRAMC_DSTS),gr3
-	andicc		gr3,#SDRAMC_DSTS_SSI,gr3,icc0
+1:	ld		@(gr4,gr6),gr11
+	andcc		gr11,gr5,gr11,icc0
 	beq		icc0,#0,1b
 
 	#  Set the GPIO register so that the IRQ[3:0] pins become valid, as required.
@@ -173,11 +189,13 @@ __icache_lock_start:
 	#----------------------------------------------------
 	# wake SDRAM from self-refresh mode
 	#----------------------------------------------------
-	li		__addr_SDRAMC,gr4
-	sti		gr0,@(gr4,#SDRAMC_DRCN) // Turn off self-refresh.
+	ld              @(gr4,gr0),gr11
+	andi		gr11,#~SDRAMC_DRCN_SR,gr11
+	st		gr11,@(gr4,gr0)
+	membar
 2:
-	ldi		@(gr4,#SDRAMC_DSTS),gr3	// Wait for it to come back...
-	andicc		gr3,#SDRAMC_DSTS_SSI,gr0,icc0
+	ld		@(gr4,gr6),gr11	// Wait for it to come back...
+	andcc		gr11,gr5,gr0,icc0
 	bne		icc0,0,2b
 
 	# wait for the SDRAM to stabilise

@@ -94,9 +94,15 @@ void cpu_idle(void)
 
 void machine_restart(char * __unused)
 {
+	unsigned long reset_addr;
 #ifdef CONFIG_GDBSTUB
 	gdbstub_exit(0);
 #endif
+
+	if (PSR_IMPLE(__get_PSR()) == PSR_IMPLE_FR551)
+		reset_addr = 0xfefff500;
+	else
+		reset_addr = 0xfeff0500;
 
 	/* Software reset. */
 	asm volatile("      dcef @(gr0,gr0),1 ! membar !"
@@ -105,7 +111,7 @@ void machine_restart(char * __unused)
 		     "      nop ! nop ! nop ! nop ! nop ! "
 		     "      nop ! nop ! nop ! nop ! nop ! "
 		     "      nop ! nop ! nop ! nop ! nop ! "
-		     : : "r" (0xfeff0500), "r" (1) );
+		     : : "r" (reset_addr), "r" (1) );
 
 	for (;;)
 		;

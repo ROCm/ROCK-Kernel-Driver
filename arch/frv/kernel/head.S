@@ -1,6 +1,6 @@
 /* head.S: kernel entry point for FR-V kernel
  *
- * Copyright (C) 2003 Red Hat, Inc. All Rights Reserved.
+ * Copyright (C) 2003, 2004 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
  *
  * This program is free software; you can redistribute it and/or
@@ -16,6 +16,7 @@
 #include <asm/page.h>
 #include <asm/spr-regs.h>
 #include <asm/mb86943a.h>
+#include <asm/cache.h>
 #include "head.inc"
 
 ###############################################################################
@@ -194,7 +195,7 @@ __head_do_sdram:
 	bar
 	jmpl		@(gr18,gr0)
 
-	.balign		32
+	.balign		L1_CACHE_BYTES
 __head_move_sdram:
 	cst		gr20,@(gr14,gr0 ),	cc4,#1
 	cst		gr21,@(gr14,gr11),	cc5,#1
@@ -208,7 +209,7 @@ __head_move_sdram:
 	membar
 	jmpl		@(gr19,gr0)
 
-	.balign		32
+	.balign		L1_CACHE_BYTES
 __head_sdram_moved:
 	icul		gr18
 	add		gr18,gr5,gr4
