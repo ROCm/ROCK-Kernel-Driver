@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table_count
+ * FUNCTION:    acpi_tb_get_table_count
  *
  * PARAMETERS:  RSDP            - Pointer to the RSDP
  *              RSDT            - Pointer to the RSDT/XSDT
@@ -48,7 +47,7 @@
 
 u32
 acpi_tb_get_table_count (
-	RSDP_DESCRIPTOR         *RSDP,
+	rsdp_descriptor         *RSDP,
 	acpi_table_header       *RSDT)
 {
 	u32                     pointer_size;
@@ -80,9 +79,9 @@ acpi_tb_get_table_count (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_convert_to_xsdt
+ * FUNCTION:    acpi_tb_convert_to_xsdt
  *
- * PARAMETERS:  Table_info      - Info about the RSDT
+ * PARAMETERS:  table_info      - Info about the RSDT
  *
  * RETURN:      Status
  *
@@ -94,7 +93,7 @@ acpi_status
 acpi_tb_convert_to_xsdt (
 	acpi_table_desc         *table_info)
 {
-	ACPI_SIZE               table_size;
+	acpi_size               table_size;
 	u32                     i;
 	xsdt_descriptor         *new_table;
 
@@ -104,7 +103,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Compute size of the converted XSDT */
 
-	table_size = ((ACPI_SIZE) acpi_gbl_rsdt_table_count * sizeof (u64)) +
+	table_size = ((acpi_size) acpi_gbl_rsdt_table_count * sizeof (u64)) +
 			  sizeof (acpi_table_header);
 
 	/* Allocate an XSDT */
@@ -148,12 +147,12 @@ acpi_tb_convert_to_xsdt (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_convert_fadt1
+ * FUNCTION:    acpi_tb_convert_fadt1
  *
- * PARAMETERS:  Local_fadt      - Pointer to new FADT
- *              Original_fadt   - Pointer to old FADT
+ * PARAMETERS:  local_fadt      - Pointer to new FADT
+ *              original_fadt   - Pointer to old FADT
  *
- * RETURN:      Populates Local_fadt
+ * RETURN:      Populates local_fadt
  *
  * DESCRIPTION: Convert an ACPI 1.0 FADT to common internal format
  *
@@ -179,11 +178,11 @@ acpi_tb_convert_fadt1 (
 
 	/* Convert table pointers to 64-bit fields */
 
-	ACPI_STORE_ADDRESS (local_fadt->Xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
+	ACPI_STORE_ADDRESS (local_fadt->xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
 	ACPI_STORE_ADDRESS (local_fadt->Xdsdt, local_fadt->V1_dsdt);
 
 	/*
-	 * System Interrupt Model isn't used in ACPI 2.0 (Local_fadt->Reserved1 = 0;)
+	 * System Interrupt Model isn't used in ACPI 2.0 (local_fadt->Reserved1 = 0;)
 	 */
 
 	/*
@@ -215,26 +214,26 @@ acpi_tb_convert_fadt1 (
 	/*
 	 * Convert the V1.0 block addresses to V2.0 GAS structures
 	 */
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm2_cnt_blk, local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm_tmr_blk, local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe0_blk,  local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe1_blk,  local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm2_cnt_blk, local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm_tmr_blk, local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,  local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,  local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
 
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_convert_fadt2
+ * FUNCTION:    acpi_tb_convert_fadt2
  *
- * PARAMETERS:  Local_fadt      - Pointer to new FADT
- *              Original_fadt   - Pointer to old FADT
+ * PARAMETERS:  local_fadt      - Pointer to new FADT
+ *              original_fadt   - Pointer to old FADT
  *
- * RETURN:      Populates Local_fadt
+ * RETURN:      Populates local_fadt
  *
  * DESCRIPTION: Convert an ACPI 2.0 FADT to common internal format.
  *              Handles optional "X" fields.
@@ -256,58 +255,58 @@ acpi_tb_convert_fadt2 (
 	 * we must selectively expand V1.0 fields if the corresponding X field
 	 * is zero.
 	 */
-	if (!(local_fadt->Xfirmware_ctrl)) {
-		ACPI_STORE_ADDRESS (local_fadt->Xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
+	if (!(local_fadt->xfirmware_ctrl)) {
+		ACPI_STORE_ADDRESS (local_fadt->xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
 	}
 
 	if (!(local_fadt->Xdsdt)) {
 		ACPI_STORE_ADDRESS (local_fadt->Xdsdt, local_fadt->V1_dsdt);
 	}
 
-	if (!(local_fadt->Xpm1a_evt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_evt_blk,
+	if (!(local_fadt->xpm1a_evt_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_evt_blk,
 			local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
 	}
 
-	if (!(local_fadt->Xpm1b_evt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_evt_blk,
+	if (!(local_fadt->xpm1b_evt_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_evt_blk,
 			local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
 	}
 
-	if (!(local_fadt->Xpm1a_cnt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_cnt_blk,
+	if (!(local_fadt->xpm1a_cnt_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1a_cnt_blk,
 			local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
 	}
 
-	if (!(local_fadt->Xpm1b_cnt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_cnt_blk,
+	if (!(local_fadt->xpm1b_cnt_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_cnt_blk,
 			local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
 	}
 
-	if (!(local_fadt->Xpm2_cnt_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm2_cnt_blk,
+	if (!(local_fadt->xpm2_cnt_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm2_cnt_blk,
 			local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
 	}
 
-	if (!(local_fadt->Xpm_tmr_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm_tmr_blk,
+	if (!(local_fadt->xpm_tmr_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm_tmr_blk,
 			local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
 	}
 
-	if (!(local_fadt->Xgpe0_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe0_blk,
+	if (!(local_fadt->xgpe0_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,
 			local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
 	}
 
-	if (!(local_fadt->Xgpe1_blk.address)) {
-		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe1_blk,
+	if (!(local_fadt->xgpe1_blk.address)) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,
 			local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
 	}
 }
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_convert_table_fadt
+ * FUNCTION:    acpi_tb_convert_table_fadt
  *
  * PARAMETERS:  None
  *
@@ -328,11 +327,11 @@ acpi_tb_convert_table_fadt (void)
 	acpi_table_desc        *table_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_convert_table_fadt");
+	ACPI_FUNCTION_TRACE ("tb_convert_table_fadt");
 
 
 	/*
-	 * Acpi_gbl_FADT is valid
+	 * acpi_gbl_FADT is valid
 	 * Allocate and zero the 2.0 FADT buffer
 	 */
 	local_fadt = ACPI_MEM_CALLOCATE (sizeof (fadt_descriptor_rev2));
@@ -400,9 +399,9 @@ acpi_tb_convert_table_fadt (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_convert_table_facs
+ * FUNCTION:    acpi_tb_convert_table_facs
  *
- * PARAMETERS:  Table_info      - Info for currently installad FACS
+ * PARAMETERS:  table_info      - Info for currently installad FACS
  *
  * RETURN:      Status
  *
@@ -416,7 +415,7 @@ acpi_tb_build_common_facs (
 	acpi_table_desc         *table_info)
 {
 
-	ACPI_FUNCTION_TRACE ("Tb_build_common_facs");
+	ACPI_FUNCTION_TRACE ("tb_build_common_facs");
 
 
 	/* Absolute minimum length is 24, but the ACPI spec says 64 */
@@ -437,7 +436,7 @@ acpi_tb_build_common_facs (
 
 	if ((acpi_gbl_RSDP->revision < 2) ||
 		(acpi_gbl_FACS->length < 32) ||
-		(!(acpi_gbl_FACS->Xfirmware_waking_vector))) {
+		(!(acpi_gbl_FACS->xfirmware_waking_vector))) {
 		/* ACPI 1.0 FACS or short table or optional X_ field is zero */
 
 		acpi_gbl_common_fACS.firmware_waking_vector = ACPI_CAST_PTR (u64, &(acpi_gbl_FACS->firmware_waking_vector));
@@ -446,7 +445,7 @@ acpi_tb_build_common_facs (
 	else {
 		/* ACPI 2.0 FACS with valid X_ field */
 
-		acpi_gbl_common_fACS.firmware_waking_vector = &acpi_gbl_FACS->Xfirmware_waking_vector;
+		acpi_gbl_common_fACS.firmware_waking_vector = &acpi_gbl_FACS->xfirmware_waking_vector;
 		acpi_gbl_common_fACS.vector_width = 64;
 	}
 

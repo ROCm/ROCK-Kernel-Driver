@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -54,7 +53,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_enter_interpreter
+ * FUNCTION:    acpi_ex_enter_interpreter
  *
  * PARAMETERS:  None
  *
@@ -68,7 +67,7 @@ acpi_ex_enter_interpreter (void)
 {
 	acpi_status             status;
 
-	ACPI_FUNCTION_TRACE ("Ex_enter_interpreter");
+	ACPI_FUNCTION_TRACE ("ex_enter_interpreter");
 
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_EXECUTE);
@@ -82,7 +81,7 @@ acpi_ex_enter_interpreter (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_exit_interpreter
+ * FUNCTION:    acpi_ex_exit_interpreter
  *
  * PARAMETERS:  None
  *
@@ -106,7 +105,7 @@ acpi_ex_exit_interpreter (void)
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_exit_interpreter");
+	ACPI_FUNCTION_TRACE ("ex_exit_interpreter");
 
 
 	status = acpi_ut_release_mutex (ACPI_MTX_EXECUTE);
@@ -120,9 +119,9 @@ acpi_ex_exit_interpreter (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_truncate_for32bit_table
+ * FUNCTION:    acpi_ex_truncate_for32bit_table
  *
- * PARAMETERS:  Obj_desc        - Object to be truncated
+ * PARAMETERS:  obj_desc        - Object to be truncated
  *
  * RETURN:      none
  *
@@ -160,10 +159,10 @@ acpi_ex_truncate_for32bit_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_acquire_global_lock
+ * FUNCTION:    acpi_ex_acquire_global_lock
  *
- * PARAMETERS:  Field_flags           - Flags with Lock rule:
- *                                      Always_lock or Never_lock
+ * PARAMETERS:  field_flags           - Flags with Lock rule:
+ *                                      always_lock or never_lock
  *
  * RETURN:      TRUE/FALSE indicating whether the lock was actually acquired
  *
@@ -181,10 +180,10 @@ acpi_ex_acquire_global_lock (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_acquire_global_lock");
+	ACPI_FUNCTION_TRACE ("ex_acquire_global_lock");
 
 
-	/* Only attempt lock if the Always_lock bit is set */
+	/* Only attempt lock if the always_lock bit is set */
 
 	if (field_flags & AML_FIELD_LOCK_RULE_MASK) {
 		/* We should attempt to get the lock, wait forever */
@@ -205,10 +204,10 @@ acpi_ex_acquire_global_lock (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_release_global_lock
+ * FUNCTION:    acpi_ex_release_global_lock
  *
- * PARAMETERS:  Locked_by_me    - Return value from corresponding call to
- *                                Acquire_global_lock.
+ * PARAMETERS:  locked_by_me    - Return value from corresponding call to
+ *                                acquire_global_lock.
  *
  * RETURN:      Status
  *
@@ -223,7 +222,7 @@ acpi_ex_release_global_lock (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_release_global_lock");
+	ACPI_FUNCTION_TRACE ("ex_release_global_lock");
 
 
 	/* Only attempt unlock if the caller locked it */
@@ -246,7 +245,7 @@ acpi_ex_release_global_lock (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_digits_needed
+ * FUNCTION:    acpi_ex_digits_needed
  *
  * PARAMETERS:  Value           - Value to be represented
  *              Base            - Base of representation
@@ -265,7 +264,7 @@ acpi_ex_digits_needed (
 	acpi_integer            quotient;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_digits_needed");
+	ACPI_FUNCTION_TRACE ("ex_digits_needed");
 
 
 	/*
@@ -286,10 +285,10 @@ acpi_ex_digits_needed (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_eisa_id_to_string
+ * FUNCTION:    acpi_ex_eisa_id_to_string
  *
- * PARAMETERS:  Numeric_id      - EISA ID to be converted
- *              Out_string      - Where to put the converted string (8 bytes)
+ * PARAMETERS:  numeric_id      - EISA ID to be converted
+ *              out_string      - Where to put the converted string (8 bytes)
  *
  * DESCRIPTION: Convert a numeric EISA ID to string representation
  *
@@ -323,10 +322,10 @@ acpi_ex_eisa_id_to_string (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_unsigned_integer_to_string
+ * FUNCTION:    acpi_ex_unsigned_integer_to_string
  *
  * PARAMETERS:  Value           - Value to be converted
- *              Out_string      - Where to put the converted string (8 bytes)
+ *              out_string      - Where to put the converted string (8 bytes)
  *
  * RETURN:      Convert a number to string representation
  *

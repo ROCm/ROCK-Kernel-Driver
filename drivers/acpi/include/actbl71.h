@@ -3,7 +3,6 @@
  * Name: actbl71.h - IA-64 Extensions to the ACPI Spec Rev. 0.71
  *                   This file includes tables specific to this
  *                   specification revision.
- *       $Revision: 12 $
  *
  *****************************************************************************/
 
@@ -29,7 +28,7 @@
 #define __ACTBL71_H__
 
 
-/* 0.71 FADT Address_space data item bitmasks defines */
+/* 0.71 FADT address_space data item bitmasks defines */
 /* If the associated bit is zero then it is in memory space else in io space */
 
 #define SMI_CMD_ADDRESS_SPACE       0x01
@@ -105,16 +104,16 @@ typedef struct
 	u8                  S4bios_req;         /* Value to write to SMI CMD to enter S4BIOS state */
 	u8                  reserved2;          /* reserved - must be zero */
 	u64                 smi_cmd;            /* Port address of SMI command port */
-	u64                 pm1a_evt_blk;       /* Port address of Power Mgt 1a Acpi_event Reg Blk */
-	u64                 pm1b_evt_blk;       /* Port address of Power Mgt 1b Acpi_event Reg Blk */
+	u64                 pm1a_evt_blk;       /* Port address of Power Mgt 1a acpi_event Reg Blk */
+	u64                 pm1b_evt_blk;       /* Port address of Power Mgt 1b acpi_event Reg Blk */
 	u64                 pm1a_cnt_blk;       /* Port address of Power Mgt 1a Control Reg Blk */
 	u64                 pm1b_cnt_blk;       /* Port address of Power Mgt 1b Control Reg Blk */
 	u64                 pm2_cnt_blk;        /* Port address of Power Mgt 2 Control Reg Blk */
 	u64                 pm_tmr_blk;         /* Port address of Power Mgt Timer Ctrl Reg Blk */
-	u64                 gpe0_blk;           /* Port addr of General Purpose Acpi_event 0 Reg Blk */
-	u64                 gpe1_blk;           /* Port addr of General Purpose Acpi_event 1 Reg Blk */
-	u8                  pm1_evt_len;        /* Byte Length of ports at pm1_x_evt_blk */
-	u8                  pm1_cnt_len;        /* Byte Length of ports at pm1_x_cnt_blk */
+	u64                 gpe0_blk;           /* Port addr of General Purpose acpi_event 0 Reg Blk */
+	u64                 gpe1_blk;           /* Port addr of General Purpose acpi_event 1 Reg Blk */
+	u8                  pm1_evt_len;        /* Byte length of ports at pm1_x_evt_blk */
+	u8                  pm1_cnt_len;        /* Byte length of ports at pm1_x_cnt_blk */
 	u8                  pm2_cnt_len;        /* Byte Length of ports at pm2_cnt_blk */
 	u8                  pm_tm_len;          /* Byte Length of ports at pm_tm_blk */
 	u8                  gpe0_blk_len;       /* Byte Length of ports at gpe0_blk */

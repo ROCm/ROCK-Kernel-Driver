@@ -51,6 +51,9 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
+/* hack: OSS defines midi_devs, so undefine it (versioned symbols) */
+#undef midi_devs
+
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("Dummy soundcard for virtual rawmidi devices");
 MODULE_LICENSE("GPL");

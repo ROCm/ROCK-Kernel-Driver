@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_is_notify_object
+ * FUNCTION:    acpi_ev_is_notify_object
  *
  * PARAMETERS:  Node            - Node to check
  *
@@ -68,9 +67,9 @@ acpi_ev_is_notify_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_get_gpe_register_index
+ * FUNCTION:    acpi_ev_get_gpe_register_index
  *
- * PARAMETERS:  Gpe_number      - Raw GPE number
+ * PARAMETERS:  gpe_number      - Raw GPE number
  *
  * RETURN:      None.
  *
@@ -94,9 +93,9 @@ acpi_ev_get_gpe_register_index (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_get_gpe_number_index
+ * FUNCTION:    acpi_ev_get_gpe_number_index
  *
- * PARAMETERS:  Gpe_number      - Raw GPE number
+ * PARAMETERS:  gpe_number      - Raw GPE number
  *
  * RETURN:      None.
  *
@@ -120,7 +119,7 @@ acpi_ev_get_gpe_number_index (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_queue_notify_request
+ * FUNCTION:    acpi_ev_queue_notify_request
  *
  * PARAMETERS:
  *
@@ -142,7 +141,7 @@ acpi_ev_queue_notify_request (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_NAME ("Ev_queue_notify_request");
+	ACPI_FUNCTION_NAME ("ev_queue_notify_request");
 
 
 	/*
@@ -238,7 +237,7 @@ acpi_ev_queue_notify_request (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_notify_dispatch
+ * FUNCTION:    acpi_ev_notify_dispatch
  *
  * PARAMETERS:
  *
@@ -305,7 +304,7 @@ acpi_ev_notify_dispatch (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_global_lock_thread
+ * FUNCTION:    acpi_ev_global_lock_thread
  *
  * RETURN:      None
  *
@@ -338,7 +337,7 @@ acpi_ev_global_lock_thread (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_global_lock_handler
+ * FUNCTION:    acpi_ev_global_lock_handler
  *
  * RETURN:      Status
  *
@@ -385,7 +384,7 @@ acpi_ev_global_lock_handler (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_init_global_lock_handler
+ * FUNCTION:    acpi_ev_init_global_lock_handler
  *
  * RETURN:      Status
  *
@@ -399,7 +398,7 @@ acpi_ev_init_global_lock_handler (void)
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_init_global_lock_handler");
+	ACPI_FUNCTION_TRACE ("ev_init_global_lock_handler");
 
 
 	acpi_gbl_global_lock_present = TRUE;
@@ -424,7 +423,7 @@ acpi_ev_init_global_lock_handler (void)
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_ev_acquire_global_lock
+ * FUNCTION:    acpi_ev_acquire_global_lock
  *
  * RETURN:      Status
  *
@@ -440,7 +439,7 @@ acpi_ev_acquire_global_lock (
 	u8                      acquired = FALSE;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_acquire_global_lock");
+	ACPI_FUNCTION_TRACE ("ev_acquire_global_lock");
 
 
 #ifndef ACPI_APPLICATION
@@ -491,7 +490,7 @@ acpi_ev_acquire_global_lock (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_release_global_lock
+ * FUNCTION:    acpi_ev_release_global_lock
  *
  * DESCRIPTION: Releases ownership of the Global Lock.
  *
@@ -504,7 +503,7 @@ acpi_ev_release_global_lock (void)
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_release_global_lock");
+	ACPI_FUNCTION_TRACE ("ev_release_global_lock");
 
 
 	if (!acpi_gbl_global_lock_thread_count) {
@@ -542,7 +541,7 @@ acpi_ev_release_global_lock (void)
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_ev_terminate
+ * FUNCTION:    acpi_ev_terminate
  *
  * PARAMETERS:  none
  *
@@ -555,11 +554,11 @@ acpi_ev_release_global_lock (void)
 void
 acpi_ev_terminate (void)
 {
-	NATIVE_UINT_MAX32       i;
+	acpi_native_uint        i;
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_terminate");
+	ACPI_FUNCTION_TRACE ("ev_terminate");
 
 
 	if (acpi_gbl_events_initialized) {
@@ -572,9 +571,9 @@ acpi_ev_terminate (void)
 		 * Disable all fixed events
 		 */
 		for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
-			status = acpi_disable_event(i, ACPI_EVENT_FIXED, 0);
+			status = acpi_disable_event ((u32) i, ACPI_EVENT_FIXED, 0);
 			if (ACPI_FAILURE (status)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable fixed event %d\n", i));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable fixed event %d\n", (u32) i));
 			}
 		}
 
@@ -582,10 +581,10 @@ acpi_ev_terminate (void)
 		 * Disable all GPEs
 		 */
 		for (i = 0; i < acpi_gbl_gpe_number_max; i++) {
-			if (acpi_ev_get_gpe_number_index(i) != ACPI_GPE_INVALID) {
-				status = acpi_hw_disable_gpe(i);
+			if (acpi_ev_get_gpe_number_index ((u32)i) != ACPI_GPE_INVALID) {
+				status = acpi_hw_disable_gpe((u32) i);
 				if (ACPI_FAILURE (status)) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", i));
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", (u32) i));
 				}
 			}
 		}
@@ -593,7 +592,7 @@ acpi_ev_terminate (void)
 		/*
 		 * Remove SCI handler
 		 */
-		status = acpi_ev_remove_sci_handler();
+		status = acpi_ev_remove_sci_handler ();
 		if (ACPI_FAILURE(status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not remove SCI handler\n"));
 		}
@@ -605,7 +604,7 @@ acpi_ev_terminate (void)
 	if (acpi_gbl_original_mode == ACPI_SYS_MODE_LEGACY) {
 		status = acpi_disable ();
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_disable failed\n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "acpi_disable failed\n"));
 		}
 	}
 

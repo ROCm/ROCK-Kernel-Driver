@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 135 $
  *
  *****************************************************************************/
 
@@ -64,7 +63,7 @@ extern      u32                         acpi_gbl_nesting_level;
 
 /*
  * Table pointers.
- * Although these pointers are somewhat redundant with the global Acpi_table,
+ * Although these pointers are somewhat redundant with the global acpi_table,
  * they are convenient because they are typed pointers.
  *
  * These tables are single-table only; meaning that there can be at most one
@@ -73,7 +72,7 @@ extern      u32                         acpi_gbl_nesting_level;
  */
 ACPI_EXTERN u32                         acpi_gbl_table_flags;
 ACPI_EXTERN u32                         acpi_gbl_rsdt_table_count;
-ACPI_EXTERN RSDP_DESCRIPTOR            *acpi_gbl_RSDP;
+ACPI_EXTERN rsdp_descriptor            *acpi_gbl_RSDP;
 ACPI_EXTERN xsdt_descriptor            *acpi_gbl_XSDT;
 ACPI_EXTERN FADT_DESCRIPTOR            *acpi_gbl_FADT;
 ACPI_EXTERN acpi_table_header          *acpi_gbl_DSDT;
@@ -115,10 +114,10 @@ ACPI_EXTERN acpi_mutex_info             acpi_gbl_acpi_mutex_info [NUM_MTX];
  ****************************************************************************/
 
 
-ACPI_EXTERN ACPI_MEMORY_LIST            acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
-ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_drv_notify;
-ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
-ACPI_EXTERN ACPI_INIT_HANDLER           acpi_gbl_init_handler;
+ACPI_EXTERN acpi_memory_list            acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
+ACPI_EXTERN acpi_object_notify_handler  acpi_gbl_drv_notify;
+ACPI_EXTERN acpi_object_notify_handler  acpi_gbl_sys_notify;
+ACPI_EXTERN acpi_init_handler           acpi_gbl_init_handler;
 ACPI_EXTERN acpi_walk_state            *acpi_gbl_breakpoint_walk;
 ACPI_EXTERN acpi_handle                 acpi_gbl_global_lock_semaphore;
 
@@ -170,8 +169,8 @@ extern const acpi_predefined_names      acpi_gbl_pre_defined_names [NUM_PREDEFIN
 ACPI_EXTERN u32                         acpi_gbl_current_node_count;
 ACPI_EXTERN u32                         acpi_gbl_current_node_size;
 ACPI_EXTERN u32                         acpi_gbl_max_concurrent_node_count;
-ACPI_EXTERN ACPI_SIZE                   acpi_gbl_entry_stack_pointer;
-ACPI_EXTERN ACPI_SIZE                   acpi_gbl_lowest_stack_pointer;
+ACPI_EXTERN acpi_size                   acpi_gbl_entry_stack_pointer;
+ACPI_EXTERN acpi_size                   acpi_gbl_lowest_stack_pointer;
 ACPI_EXTERN u32                         acpi_gbl_deepest_nesting;
 #endif
 
@@ -182,7 +181,7 @@ ACPI_EXTERN u32                         acpi_gbl_deepest_nesting;
  ****************************************************************************/
 
 
-ACPI_EXTERN ACPI_THREAD_STATE           *acpi_gbl_current_walk_list;
+ACPI_EXTERN acpi_thread_state           *acpi_gbl_current_walk_list;
 
 /* Control method single step flag */
 
@@ -203,7 +202,7 @@ ACPI_EXTERN acpi_parse_object           *acpi_gbl_parsed_namespace_root;
  *
  ****************************************************************************/
 
-extern      ACPI_BIT_REGISTER_INFO      acpi_gbl_bit_register_info[ACPI_NUM_BITREG];
+extern      acpi_bit_register_info      acpi_gbl_bit_register_info[ACPI_NUM_BITREG];
 ACPI_EXTERN u8                          acpi_gbl_sleep_type_a;
 ACPI_EXTERN u8                          acpi_gbl_sleep_type_b;
 
@@ -215,14 +214,14 @@ ACPI_EXTERN u8                          acpi_gbl_sleep_type_b;
  ****************************************************************************/
 
 extern      acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS];
-ACPI_EXTERN ACPI_FIXED_EVENT_HANDLER    acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
+ACPI_EXTERN acpi_fixed_event_handler    acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
 
 ACPI_EXTERN acpi_handle                 acpi_gbl_gpe_obj_handle;
 ACPI_EXTERN u32                         acpi_gbl_gpe_register_count;
 ACPI_EXTERN u32                         acpi_gbl_gpe_number_max;
-ACPI_EXTERN ACPI_GPE_REGISTER_INFO     *acpi_gbl_gpe_register_info;
-ACPI_EXTERN ACPI_GPE_NUMBER_INFO       *acpi_gbl_gpe_number_info;
-ACPI_EXTERN ACPI_GPE_BLOCK_INFO         acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLOCKS];
+ACPI_EXTERN acpi_gpe_register_info     *acpi_gbl_gpe_register_info;
+ACPI_EXTERN acpi_gpe_number_info       *acpi_gbl_gpe_number_info;
+ACPI_EXTERN acpi_gpe_block_info         acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLOCKS];
 
 /*
  * GPE translation table
@@ -231,7 +230,7 @@ ACPI_EXTERN ACPI_GPE_BLOCK_INFO         acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLO
  * This table is needed because the GPE numbers supported by block 1 do not
  * have to be contiguous with the GPE numbers supported by block 0.
  */
-ACPI_EXTERN ACPI_GPE_INDEX_INFO        *acpi_gbl_gpe_number_to_index;
+ACPI_EXTERN acpi_gpe_index_info        *acpi_gbl_gpe_number_to_index;
 
 
 /*****************************************************************************

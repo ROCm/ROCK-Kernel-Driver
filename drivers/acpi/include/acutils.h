@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 150 $
  *
  *****************************************************************************/
 
@@ -28,7 +27,7 @@
 
 
 typedef
-acpi_status (*ACPI_PKG_CALLBACK) (
+acpi_status (*acpi_pkg_callback) (
 	u8                      object_type,
 	acpi_operand_object     *source_object,
 	acpi_generic_state      *state,
@@ -39,14 +38,14 @@ acpi_status
 acpi_ut_walk_package_tree (
 	acpi_operand_object     *source_object,
 	void                    *target_object,
-	ACPI_PKG_CALLBACK       walk_callback,
+	acpi_pkg_callback       walk_callback,
 	void                    *context);
 
 
 typedef struct acpi_pkg_info
 {
 	u8                      *free_space;
-	ACPI_SIZE               length;
+	acpi_size               length;
 	u32                     object_space;
 	u32                     num_packages;
 } acpi_pkg_info;
@@ -55,7 +54,7 @@ typedef struct acpi_pkg_info
 #define REF_DECREMENT       (u16) 1
 #define REF_FORCE_DELETE    (u16) 2
 
-/* Acpi_ut_dump_buffer */
+/* acpi_ut_dump_buffer */
 
 #define DB_BYTE_DISPLAY     1
 #define DB_WORD_DISPLAY     2
@@ -75,7 +74,7 @@ acpi_ut_terminate (
 
 
 /*
- * Ut_init - miscellaneous initialization and shutdown
+ * ut_init - miscellaneous initialization and shutdown
  */
 
 acpi_status
@@ -91,7 +90,7 @@ acpi_ut_validate_fadt (
 	void);
 
 /*
- * Ut_global - Global data structures and procedures
+ * ut_global - Global data structures and procedures
  */
 
 #if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
@@ -133,12 +132,12 @@ acpi_ut_allocate_owner_id (
 
 
 /*
- * Ut_clib - Local implementations of C library functions
+ * ut_clib - Local implementations of C library functions
  */
 
 #ifndef ACPI_USE_SYSTEM_CLIBRARY
 
-ACPI_SIZE
+acpi_size
 acpi_ut_strlen (
 	const char              *string);
 
@@ -151,13 +150,13 @@ char *
 acpi_ut_strncpy (
 	char                    *dst_string,
 	const char              *src_string,
-	ACPI_SIZE               count);
+	acpi_size               count);
 
 int
 acpi_ut_strncmp (
 	const char              *string1,
 	const char              *string2,
-	ACPI_SIZE               count);
+	acpi_size               count);
 
 int
 acpi_ut_strcmp (
@@ -173,7 +172,7 @@ char *
 acpi_ut_strncat (
 	char                    *dst_string,
 	const char              *src_string,
-	ACPI_SIZE               count);
+	acpi_size               count);
 
 u32
 acpi_ut_strtoul (
@@ -190,13 +189,13 @@ void *
 acpi_ut_memcpy (
 	void                    *dest,
 	const void              *src,
-	ACPI_SIZE               count);
+	acpi_size               count);
 
 void *
 acpi_ut_memset (
 	void                    *dest,
-	NATIVE_UINT             value,
-	ACPI_SIZE               count);
+	acpi_native_uint        value,
+	acpi_size               count);
 
 int
 acpi_ut_to_upper (
@@ -231,7 +230,7 @@ extern const u8 _acpi_ctype[];
 #endif /* ACPI_USE_SYSTEM_CLIBRARY */
 
 /*
- * Ut_copy - Object construction and conversion interfaces
+ * ut_copy - Object construction and conversion interfaces
  */
 
 acpi_status
@@ -300,7 +299,7 @@ acpi_ut_copy_iobject_to_iobject (
 
 
 /*
- * Ut_create - Object creation
+ * ut_create - Object creation
  */
 
 acpi_status
@@ -310,7 +309,7 @@ acpi_ut_update_object_reference (
 
 
 /*
- * Ut_debug - Debug interfaces
+ * ut_debug - Debug interfaces
  */
 
 void
@@ -410,7 +409,7 @@ acpi_ut_debug_print_raw (
 
 
 /*
- * Ut_delete - Object deletion
+ * ut_delete - Object deletion
  */
 
 void
@@ -431,7 +430,7 @@ acpi_ut_delete_internal_object_list (
 
 
 /*
- * Ut_eval - object evaluation
+ * ut_eval - object evaluation
  */
 
 /* Method name strings */
@@ -482,7 +481,7 @@ acpi_ut_execute_UID (
 
 
 /*
- * Ut_mutex - mutual exclusion interfaces
+ * ut_mutex - mutual exclusion interfaces
  */
 
 acpi_status
@@ -495,23 +494,23 @@ acpi_ut_mutex_terminate (
 
 acpi_status
 acpi_ut_create_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id);
+	acpi_mutex_handle       mutex_id);
 
 acpi_status
 acpi_ut_delete_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id);
+	acpi_mutex_handle       mutex_id);
 
 acpi_status
 acpi_ut_acquire_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id);
+	acpi_mutex_handle       mutex_id);
 
 acpi_status
 acpi_ut_release_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id);
+	acpi_mutex_handle       mutex_id);
 
 
 /*
- * Ut_object - internal object create/delete/cache routines
+ * ut_object - internal object create/delete/cache routines
  */
 
 acpi_operand_object  *
@@ -540,11 +539,11 @@ acpi_ut_valid_internal_object (
 
 acpi_operand_object *
 acpi_ut_create_buffer_object (
-	ACPI_SIZE               buffer_size);
+	acpi_size               buffer_size);
 
 
 /*
- * Ut_ref_cnt - Object reference count management
+ * ut_ref_cnt - Object reference count management
  */
 
 void
@@ -556,23 +555,23 @@ acpi_ut_remove_reference (
 	acpi_operand_object     *object);
 
 /*
- * Ut_size - Object size routines
+ * ut_size - Object size routines
  */
 
 acpi_status
 acpi_ut_get_simple_object_size (
 	acpi_operand_object     *obj,
-	ACPI_SIZE               *obj_length);
+	acpi_size               *obj_length);
 
 acpi_status
 acpi_ut_get_package_object_size (
 	acpi_operand_object     *obj,
-	ACPI_SIZE               *obj_length);
+	acpi_size               *obj_length);
 
 acpi_status
 acpi_ut_get_object_size(
 	acpi_operand_object     *obj,
-	ACPI_SIZE               *obj_length);
+	acpi_size               *obj_length);
 
 acpi_status
 acpi_ut_get_element_length (
@@ -583,7 +582,7 @@ acpi_ut_get_element_length (
 
 
 /*
- * Ut_state - Generic state creation/cache routines
+ * ut_state - Generic state creation/cache routines
  */
 
 void
@@ -600,7 +599,7 @@ acpi_generic_state *
 acpi_ut_create_generic_state (
 	void);
 
-ACPI_THREAD_STATE *
+acpi_thread_state *
 acpi_ut_create_thread_state (
 	void);
 
@@ -736,21 +735,21 @@ acpi_ut_validate_buffer (
 acpi_status
 acpi_ut_initialize_buffer (
 	acpi_buffer             *buffer,
-	ACPI_SIZE               required_length);
+	acpi_size               required_length);
 
 
 /* Memory allocation functions */
 
 void *
 acpi_ut_allocate (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line);
 
 void *
 acpi_ut_callocate (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line);
@@ -760,14 +759,14 @@ acpi_ut_callocate (
 
 void *
 acpi_ut_allocate_and_track (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line);
 
 void *
 acpi_ut_callocate_and_track (
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u32                     component,
 	char                    *module,
 	u32                     line);
@@ -788,7 +787,7 @@ acpi_status
 acpi_ut_track_allocation (
 	u32                     list_id,
 	acpi_debug_mem_block    *address,
-	ACPI_SIZE               size,
+	acpi_size               size,
 	u8                      alloc_type,
 	u32                     component,
 	char                    *module,

@@ -256,7 +256,7 @@ acpi_suspend (
 	if (state == ACPI_STATE_S2 || state == ACPI_STATE_S3) {
 		if (!acpi_wakeup_address)
 			return AE_ERROR;
-		acpi_set_firmware_waking_vector((ACPI_PHYSICAL_ADDRESS) acpi_wakeup_address);
+		acpi_set_firmware_waking_vector((acpi_physical_address) acpi_wakeup_address);
 	}
 
 	acpi_enter_sleep_state_prep(state);
@@ -283,7 +283,7 @@ acpi_suspend (
 	ACPI_ENABLE_IRQS();
 
 	/* reset firmware waking vector */
-	acpi_set_firmware_waking_vector((ACPI_PHYSICAL_ADDRESS) 0);
+	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
 	thaw_processes();
 
 	return status;

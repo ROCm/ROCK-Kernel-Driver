@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 43 $
  *
  *****************************************************************************/
 
@@ -27,7 +26,7 @@
 #define __ACTABLES_H__
 
 
-/* Used in Acpi_tb_map_acpi_table for size parameter if table header is to be used */
+/* Used in acpi_tb_map_acpi_table for size parameter if table header is to be used */
 
 #define SIZE_IN_HEADER          0
 
@@ -55,7 +54,7 @@ acpi_tb_build_common_facs (
 
 u32
 acpi_tb_get_table_count (
-	RSDP_DESCRIPTOR         *RSDP,
+	rsdp_descriptor         *RSDP,
 	acpi_table_header       *RSDT);
 
 /*
@@ -64,23 +63,23 @@ acpi_tb_get_table_count (
 
 acpi_status
 acpi_tb_get_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_desc         *table_info);
 
 acpi_status
 acpi_tb_get_table_header (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *return_header);
 
 acpi_status
 acpi_tb_get_table_body (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *header,
 	acpi_table_desc         *table_info);
 
 acpi_status
 acpi_tb_get_this_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_header       *header,
 	acpi_table_desc         *table_info);
 
@@ -97,11 +96,11 @@ acpi_tb_get_table_ptr (
 
 acpi_status
 acpi_tb_verify_rsdp (
-	ACPI_POINTER            *address);
+	acpi_pointer            *address);
 
 void
 acpi_tb_get_rsdt_address (
-	ACPI_POINTER            *out_address);
+	acpi_pointer            *out_address);
 
 acpi_status
 acpi_tb_validate_rsdt (
@@ -113,12 +112,12 @@ acpi_tb_get_required_tables (
 
 acpi_status
 acpi_tb_get_primary_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_table_desc         *table_info);
 
 acpi_status
 acpi_tb_get_secondary_table (
-	ACPI_POINTER            *address,
+	acpi_pointer            *address,
 	acpi_string             signature,
 	acpi_table_desc         *table_info);
 

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exoparg3 - AML execution - opcodes with 3 arguments
- *              $Revision: 15 $
  *
  *****************************************************************************/
 
@@ -60,9 +59,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_3A_0T_0R
+ * FUNCTION:    acpi_ex_opcode_3A_0T_0R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -75,24 +74,24 @@ acpi_ex_opcode_3A_0T_0R (
 	acpi_walk_state         *walk_state)
 {
 	acpi_operand_object     **operand = &walk_state->operands[0];
-	ACPI_SIGNAL_FATAL_INFO  *fatal;
+	acpi_signal_fatal_info  *fatal;
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
 
-	case AML_FATAL_OP:          /* Fatal (Fatal_type Fatal_code Fatal_arg)   */
+	case AML_FATAL_OP:          /* Fatal (fatal_type fatal_code fatal_arg)   */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"Fatal_op: Type %X Code %X Arg %X <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
+			"fatal_op: Type %X Code %X Arg %X <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
 			(u32) operand[0]->integer.value, (u32) operand[1]->integer.value,
 			(u32) operand[2]->integer.value));
 
 
-		fatal = ACPI_MEM_ALLOCATE (sizeof (ACPI_SIGNAL_FATAL_INFO));
+		fatal = ACPI_MEM_ALLOCATE (sizeof (acpi_signal_fatal_info));
 		if (fatal) {
 			fatal->type     = (u32) operand[0]->integer.value;
 			fatal->code     = (u32) operand[1]->integer.value;
@@ -112,7 +111,7 @@ acpi_ex_opcode_3A_0T_0R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -127,9 +126,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_3A_1T_1R
+ * FUNCTION:    acpi_ex_opcode_3A_1T_1R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -145,11 +144,11 @@ acpi_ex_opcode_3A_1T_1R (
 	acpi_operand_object     *return_desc = NULL;
 	char                    *buffer;
 	acpi_status             status = AE_OK;
-	NATIVE_UINT             index;
-	ACPI_SIZE               length;
+	acpi_native_uint        index;
+	acpi_size               length;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
@@ -167,8 +166,8 @@ acpi_ex_opcode_3A_1T_1R (
 
 		/* Get the Integer values from the objects */
 
-		index = (NATIVE_UINT) operand[1]->integer.value;
-		length = (ACPI_SIZE) operand[2]->integer.value;
+		index = (acpi_native_uint) operand[1]->integer.value;
+		length = (acpi_size) operand[2]->integer.value;
 
 		/*
 		 * If the index is beyond the length of the String/Buffer, or if the
@@ -180,12 +179,12 @@ acpi_ex_opcode_3A_1T_1R (
 
 			if ((index + length) >
 				operand[0]->string.length) {
-				length = (ACPI_SIZE) operand[0]->string.length - index;
+				length = (acpi_size) operand[0]->string.length - index;
 			}
 
 			/* Allocate a new buffer for the String/Buffer */
 
-			buffer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) length + 1);
+			buffer = ACPI_MEM_CALLOCATE ((acpi_size) length + 1);
 			if (!buffer) {
 				status = AE_NO_MEMORY;
 				goto cleanup;
@@ -206,7 +205,7 @@ acpi_ex_opcode_3A_1T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;

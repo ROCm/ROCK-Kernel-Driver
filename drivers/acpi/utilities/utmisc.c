@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 92 $
  *
  ******************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_print_string
+ * FUNCTION:    acpi_ut_print_string
  *
  * PARAMETERS:  String          - Null terminated ASCII string
  *
@@ -126,7 +125,7 @@ acpi_ut_print_string (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_dword_byte_swap
+ * FUNCTION:    acpi_ut_dword_byte_swap
  *
  * PARAMETERS:  Value           - Value to be converted
  *
@@ -165,7 +164,7 @@ acpi_ut_dword_byte_swap (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_set_integer_width
+ * FUNCTION:    acpi_ut_set_integer_width
  *
  * PARAMETERS:  Revision            From DSDT header
  *
@@ -197,9 +196,9 @@ acpi_ut_set_integer_width (
 #ifdef ACPI_DEBUG_OUTPUT
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_display_init_pathname
+ * FUNCTION:    acpi_ut_display_init_pathname
  *
- * PARAMETERS:  Obj_handle          - Handle whose pathname will be displayed
+ * PARAMETERS:  obj_handle          - Handle whose pathname will be displayed
  *              Path                - Additional path string to be appended.
  *                                      (NULL if no extra path)
  *
@@ -266,7 +265,7 @@ acpi_ut_display_init_pathname (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_valid_acpi_name
+ * FUNCTION:    acpi_ut_valid_acpi_name
  *
  * PARAMETERS:  Character           - The character to be examined
  *
@@ -304,7 +303,7 @@ acpi_ut_valid_acpi_name (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_valid_acpi_character
+ * FUNCTION:    acpi_ut_valid_acpi_character
  *
  * PARAMETERS:  Character           - The character to be examined
  *
@@ -329,7 +328,7 @@ acpi_ut_valid_acpi_character (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_strtoul64
+ * FUNCTION:    acpi_ut_strtoul64
  *
  * PARAMETERS:  String          - Null terminated string
  *              Terminater      - Where a pointer to the terminating byte is returned
@@ -475,11 +474,11 @@ error_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_strupr
+ * FUNCTION:    acpi_ut_strupr
  *
- * PARAMETERS:  Src_string      - The source string to convert to
+ * PARAMETERS:  src_string      - The source string to convert to
  *
- * RETURN:      Src_string
+ * RETURN:      src_string
  *
  * DESCRIPTION: Convert string to uppercase
  *
@@ -507,7 +506,7 @@ acpi_ut_strupr (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_mutex_initialize
+ * FUNCTION:    acpi_ut_mutex_initialize
  *
  * PARAMETERS:  None.
  *
@@ -525,7 +524,7 @@ acpi_ut_mutex_initialize (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_mutex_initialize");
+	ACPI_FUNCTION_TRACE ("ut_mutex_initialize");
 
 
 	/*
@@ -544,7 +543,7 @@ acpi_ut_mutex_initialize (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_mutex_terminate
+ * FUNCTION:    acpi_ut_mutex_terminate
  *
  * PARAMETERS:  None.
  *
@@ -561,7 +560,7 @@ acpi_ut_mutex_terminate (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_mutex_terminate");
+	ACPI_FUNCTION_TRACE ("ut_mutex_terminate");
 
 
 	/*
@@ -577,9 +576,9 @@ acpi_ut_mutex_terminate (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_mutex
+ * FUNCTION:    acpi_ut_create_mutex
  *
- * PARAMETERS:  Mutex_iD        - ID of the mutex to be created
+ * PARAMETERS:  mutex_iD        - ID of the mutex to be created
  *
  * RETURN:      Status
  *
@@ -589,12 +588,12 @@ acpi_ut_mutex_terminate (
 
 acpi_status
 acpi_ut_create_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ut_create_mutex", mutex_id);
+	ACPI_FUNCTION_TRACE_U32 ("ut_create_mutex", mutex_id);
 
 
 	if (mutex_id > MAX_MTX) {
@@ -614,9 +613,9 @@ acpi_ut_create_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_delete_mutex
+ * FUNCTION:    acpi_ut_delete_mutex
  *
- * PARAMETERS:  Mutex_iD        - ID of the mutex to be deleted
+ * PARAMETERS:  mutex_iD        - ID of the mutex to be deleted
  *
  * RETURN:      Status
  *
@@ -626,12 +625,12 @@ acpi_ut_create_mutex (
 
 acpi_status
 acpi_ut_delete_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ut_delete_mutex", mutex_id);
+	ACPI_FUNCTION_TRACE_U32 ("ut_delete_mutex", mutex_id);
 
 
 	if (mutex_id > MAX_MTX) {
@@ -649,9 +648,9 @@ acpi_ut_delete_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_acquire_mutex
+ * FUNCTION:    acpi_ut_acquire_mutex
  *
- * PARAMETERS:  Mutex_iD        - ID of the mutex to be acquired
+ * PARAMETERS:  mutex_iD        - ID of the mutex to be acquired
  *
  * RETURN:      Status
  *
@@ -661,14 +660,14 @@ acpi_ut_delete_mutex (
 
 acpi_status
 acpi_ut_acquire_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status;
 	u32                     i;
 	u32                     this_thread_id;
 
 
-	ACPI_FUNCTION_NAME ("Ut_acquire_mutex");
+	ACPI_FUNCTION_NAME ("ut_acquire_mutex");
 
 
 	if (mutex_id > MAX_MTX) {
@@ -727,9 +726,9 @@ acpi_ut_acquire_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_release_mutex
+ * FUNCTION:    acpi_ut_release_mutex
  *
- * PARAMETERS:  Mutex_iD        - ID of the mutex to be released
+ * PARAMETERS:  mutex_iD        - ID of the mutex to be released
  *
  * RETURN:      Status
  *
@@ -739,14 +738,14 @@ acpi_ut_acquire_mutex (
 
 acpi_status
 acpi_ut_release_mutex (
-	ACPI_MUTEX_HANDLE       mutex_id)
+	acpi_mutex_handle       mutex_id)
 {
 	acpi_status             status;
 	u32                     i;
 	u32                     this_thread_id;
 
 
-	ACPI_FUNCTION_NAME ("Ut_release_mutex");
+	ACPI_FUNCTION_NAME ("ut_release_mutex");
 
 
 	this_thread_id = acpi_os_get_thread_id ();
@@ -811,11 +810,11 @@ acpi_ut_release_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_update_state_and_push
+ * FUNCTION:    acpi_ut_create_update_state_and_push
  *
  * PARAMETERS:  *Object         - Object to be added to the new state
  *              Action          - Increment/Decrement
- *              State_list      - List the state will be added to
+ *              state_list      - List the state will be added to
  *
  * RETURN:      None
  *
@@ -853,11 +852,11 @@ acpi_ut_create_update_state_and_push (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_pkg_state_and_push
+ * FUNCTION:    acpi_ut_create_pkg_state_and_push
  *
  * PARAMETERS:  *Object         - Object to be added to the new state
  *              Action          - Increment/Decrement
- *              State_list      - List the state will be added to
+ *              state_list      - List the state will be added to
  *
  * RETURN:      None
  *
@@ -890,9 +889,9 @@ acpi_ut_create_pkg_state_and_push (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_push_generic_state
+ * FUNCTION:    acpi_ut_push_generic_state
  *
- * PARAMETERS:  List_head           - Head of the state stack
+ * PARAMETERS:  list_head           - Head of the state stack
  *              State               - State object to push
  *
  * RETURN:      Status
@@ -906,7 +905,7 @@ acpi_ut_push_generic_state (
 	acpi_generic_state      **list_head,
 	acpi_generic_state      *state)
 {
-	ACPI_FUNCTION_TRACE ("Ut_push_generic_state");
+	ACPI_FUNCTION_TRACE ("ut_push_generic_state");
 
 
 	/* Push the state object onto the front of the list (stack) */
@@ -920,9 +919,9 @@ acpi_ut_push_generic_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_pop_generic_state
+ * FUNCTION:    acpi_ut_pop_generic_state
  *
- * PARAMETERS:  List_head           - Head of the state stack
+ * PARAMETERS:  list_head           - Head of the state stack
  *
  * RETURN:      Status
  *
@@ -937,7 +936,7 @@ acpi_ut_pop_generic_state (
 	acpi_generic_state      *state;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_pop_generic_state");
+	ACPI_FUNCTION_TRACE ("ut_pop_generic_state");
 
 
 	/* Remove the state object at the head of the list (stack) */
@@ -955,7 +954,7 @@ acpi_ut_pop_generic_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_generic_state
+ * FUNCTION:    acpi_ut_create_generic_state
  *
  * PARAMETERS:  None
  *
@@ -989,7 +988,7 @@ acpi_ut_create_generic_state (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_thread_state
+ * FUNCTION:    acpi_ut_create_thread_state
  *
  * PARAMETERS:  None
  *
@@ -1000,14 +999,14 @@ acpi_ut_create_generic_state (void)
  *
  ******************************************************************************/
 
-ACPI_THREAD_STATE *
+acpi_thread_state *
 acpi_ut_create_thread_state (
 	void)
 {
 	acpi_generic_state      *state;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_create_thread_state");
+	ACPI_FUNCTION_TRACE ("ut_create_thread_state");
 
 
 	/* Create the generic state object */
@@ -1022,13 +1021,13 @@ acpi_ut_create_thread_state (
 	state->common.data_type = ACPI_DESC_TYPE_STATE_THREAD;
 	state->thread.thread_id = acpi_os_get_thread_id ();
 
-	return_PTR ((ACPI_THREAD_STATE *) state);
+	return_PTR ((acpi_thread_state *) state);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_update_state
+ * FUNCTION:    acpi_ut_create_update_state
  *
  * PARAMETERS:  Object              - Initial Object to be installed in the
  *                                    state
@@ -1050,7 +1049,7 @@ acpi_ut_create_update_state (
 	acpi_generic_state      *state;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ut_create_update_state", object);
+	ACPI_FUNCTION_TRACE_PTR ("ut_create_update_state", object);
 
 
 	/* Create the generic state object */
@@ -1072,7 +1071,7 @@ acpi_ut_create_update_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_pkg_state
+ * FUNCTION:    acpi_ut_create_pkg_state
  *
  * PARAMETERS:  Object              - Initial Object to be installed in the
  *                                    state
@@ -1093,7 +1092,7 @@ acpi_ut_create_pkg_state (
 	acpi_generic_state      *state;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ut_create_pkg_state", internal_object);
+	ACPI_FUNCTION_TRACE_PTR ("ut_create_pkg_state", internal_object);
 
 
 	/* Create the generic state object */
@@ -1117,7 +1116,7 @@ acpi_ut_create_pkg_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_create_control_state
+ * FUNCTION:    acpi_ut_create_control_state
  *
  * PARAMETERS:  None
  *
@@ -1135,7 +1134,7 @@ acpi_ut_create_control_state (
 	acpi_generic_state      *state;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_create_control_state");
+	ACPI_FUNCTION_TRACE ("ut_create_control_state");
 
 
 	/* Create the generic state object */
@@ -1156,7 +1155,7 @@ acpi_ut_create_control_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_delete_generic_state
+ * FUNCTION:    acpi_ut_delete_generic_state
  *
  * PARAMETERS:  State               - The state object to be deleted
  *
@@ -1171,7 +1170,7 @@ void
 acpi_ut_delete_generic_state (
 	acpi_generic_state      *state)
 {
-	ACPI_FUNCTION_TRACE ("Ut_delete_generic_state");
+	ACPI_FUNCTION_TRACE ("ut_delete_generic_state");
 
 
 	acpi_ut_release_to_cache (ACPI_MEM_LIST_STATE, state);
@@ -1181,7 +1180,7 @@ acpi_ut_delete_generic_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_delete_generic_state_cache
+ * FUNCTION:    acpi_ut_delete_generic_state_cache
  *
  * PARAMETERS:  None
  *
@@ -1196,7 +1195,7 @@ void
 acpi_ut_delete_generic_state_cache (
 	void)
 {
-	ACPI_FUNCTION_TRACE ("Ut_delete_generic_state_cache");
+	ACPI_FUNCTION_TRACE ("ut_delete_generic_state_cache");
 
 
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_STATE);
@@ -1206,9 +1205,9 @@ acpi_ut_delete_generic_state_cache (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_walk_package_tree
+ * FUNCTION:    acpi_ut_walk_package_tree
  *
- * PARAMETERS:  Obj_desc        - The Package object on which to resolve refs
+ * PARAMETERS:  obj_desc        - The Package object on which to resolve refs
  *
  * RETURN:      Status
  *
@@ -1220,7 +1219,7 @@ acpi_status
 acpi_ut_walk_package_tree (
 	acpi_operand_object     *source_object,
 	void                    *target_object,
-	ACPI_PKG_CALLBACK       walk_callback,
+	acpi_pkg_callback       walk_callback,
 	void                    *context)
 {
 	acpi_status             status = AE_OK;
@@ -1230,7 +1229,7 @@ acpi_ut_walk_package_tree (
 	acpi_operand_object     *this_source_obj;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_walk_package_tree");
+	ACPI_FUNCTION_TRACE ("ut_walk_package_tree");
 
 
 	state = acpi_ut_create_pkg_state (source_object, target_object, 0);
@@ -1322,7 +1321,7 @@ acpi_ut_walk_package_tree (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_generate_checksum
+ * FUNCTION:    acpi_ut_generate_checksum
  *
  * PARAMETERS:  Buffer          - Buffer to be scanned
  *              Length          - number of bytes to examine
@@ -1352,9 +1351,9 @@ acpi_ut_generate_checksum (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_get_resource_end_tag
+ * FUNCTION:    acpi_ut_get_resource_end_tag
  *
- * PARAMETERS:  Obj_desc        - The resource template buffer object
+ * PARAMETERS:  obj_desc        - The resource template buffer object
  *
  * RETURN:      Pointer to the end tag
  *
@@ -1405,11 +1404,11 @@ acpi_ut_get_resource_end_tag (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_report_error
+ * FUNCTION:    acpi_ut_report_error
  *
- * PARAMETERS:  Module_name         - Caller's module name (for error output)
- *              Line_number         - Caller's line number (for error output)
- *              Component_id        - Caller's component ID (for error output)
+ * PARAMETERS:  module_name         - Caller's module name (for error output)
+ *              line_number         - Caller's line number (for error output)
+ *              component_id        - Caller's component ID (for error output)
  *              Message             - Error message to use on failure
  *
  * RETURN:      None
@@ -1432,11 +1431,11 @@ acpi_ut_report_error (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_report_warning
+ * FUNCTION:    acpi_ut_report_warning
  *
- * PARAMETERS:  Module_name         - Caller's module name (for error output)
- *              Line_number         - Caller's line number (for error output)
- *              Component_id        - Caller's component ID (for error output)
+ * PARAMETERS:  module_name         - Caller's module name (for error output)
+ *              line_number         - Caller's line number (for error output)
+ *              component_id        - Caller's component ID (for error output)
  *              Message             - Error message to use on failure
  *
  * RETURN:      None
@@ -1458,11 +1457,11 @@ acpi_ut_report_warning (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_report_info
+ * FUNCTION:    acpi_ut_report_info
  *
- * PARAMETERS:  Module_name         - Caller's module name (for error output)
- *              Line_number         - Caller's line number (for error output)
- *              Component_id        - Caller's component ID (for error output)
+ * PARAMETERS:  module_name         - Caller's module name (for error output)
+ *              line_number         - Caller's line number (for error output)
+ *              component_id        - Caller's component ID (for error output)
  *              Message             - Error message to use on failure
  *
  * RETURN:      None

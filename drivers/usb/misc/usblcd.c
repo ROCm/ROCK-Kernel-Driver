@@ -98,7 +98,7 @@ ioctl_lcd(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		break;
 	default:
-		return -ENOIOCTLCMD;
+		return -ENOTTY;
 		break;
 	}
 

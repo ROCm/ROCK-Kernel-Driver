@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 94 $
  *
  ******************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_delete_internal_obj
+ * FUNCTION:    acpi_ut_delete_internal_obj
  *
  * PARAMETERS:  *Object        - Pointer to the list to be deleted
  *
@@ -54,7 +53,7 @@ acpi_ut_delete_internal_obj (
 	acpi_operand_object     *second_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ut_delete_internal_obj", object);
+	ACPI_FUNCTION_TRACE_PTR ("ut_delete_internal_obj", object);
 
 
 	if (!object) {
@@ -152,7 +151,7 @@ acpi_ut_delete_internal_obj (
 		second_desc = acpi_ns_get_secondary_object (object);
 		if (second_desc) {
 			/*
-			 * Free the Region_context if and only if the handler is one of the
+			 * Free the region_context if and only if the handler is one of the
 			 * default handlers -- and therefore, we created the context object
 			 * locally, it was not created by an external caller.
 			 */
@@ -205,9 +204,9 @@ acpi_ut_delete_internal_obj (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_delete_internal_object_list
+ * FUNCTION:    acpi_ut_delete_internal_object_list
  *
- * PARAMETERS:  *Obj_list       - Pointer to the list to be deleted
+ * PARAMETERS:  *obj_list       - Pointer to the list to be deleted
  *
  * RETURN:      None
  *
@@ -223,7 +222,7 @@ acpi_ut_delete_internal_object_list (
 	acpi_operand_object     **internal_obj;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_delete_internal_object_list");
+	ACPI_FUNCTION_TRACE ("ut_delete_internal_object_list");
 
 
 	/* Walk the null-terminated internal list */
@@ -241,7 +240,7 @@ acpi_ut_delete_internal_object_list (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_update_ref_count
+ * FUNCTION:    acpi_ut_update_ref_count
  *
  * PARAMETERS:  *Object         - Object whose ref count is to be updated
  *              Action          - What to do
@@ -261,7 +260,7 @@ acpi_ut_update_ref_count (
 	u16                     new_count;
 
 
-	ACPI_FUNCTION_NAME ("Ut_update_ref_count");
+	ACPI_FUNCTION_NAME ("ut_update_ref_count");
 
 
 	if (!object) {
@@ -348,7 +347,7 @@ acpi_ut_update_ref_count (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_update_object_reference
+ * FUNCTION:    acpi_ut_update_object_reference
  *
  * PARAMETERS:  *Object             - Increment ref count for this object
  *                                    and all sub-objects
@@ -381,7 +380,7 @@ acpi_ut_update_object_reference (
 	acpi_generic_state       *state;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ut_update_object_reference", object);
+	ACPI_FUNCTION_TRACE_PTR ("ut_update_object_reference", object);
 
 
 	/* Ignore a null object ptr */
@@ -544,7 +543,7 @@ error_exit:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_add_reference
+ * FUNCTION:    acpi_ut_add_reference
  *
  * PARAMETERS:  *Object        - Object whose reference count is to be
  *                                  incremented
@@ -560,7 +559,7 @@ acpi_ut_add_reference (
 	acpi_operand_object     *object)
 {
 
-	ACPI_FUNCTION_TRACE_PTR ("Ut_add_reference", object);
+	ACPI_FUNCTION_TRACE_PTR ("ut_add_reference", object);
 
 
 	/*
@@ -580,7 +579,7 @@ acpi_ut_add_reference (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_remove_reference
+ * FUNCTION:    acpi_ut_remove_reference
  *
  * PARAMETERS:  *Object        - Object whose ref count will be decremented
  *
@@ -595,7 +594,7 @@ acpi_ut_remove_reference (
 	acpi_operand_object     *object)
 {
 
-	ACPI_FUNCTION_TRACE_PTR ("Ut_remove_reference", object);
+	ACPI_FUNCTION_TRACE_PTR ("ut_remove_reference", object);
 
 	/*
 	 * Allow a NULL pointer to be passed in, just ignore it.  This saves

@@ -50,6 +50,7 @@ void mga_dma_service( DRM_IRQ_ARGS )
 		MGA_WRITE( MGA_ICLEAR, MGA_VLINEICLR );
 		atomic_inc(&dev->vbl_received);
 		DRM_WAKEUP(&dev->vbl_queue);
+		DRM(vbl_send_signals)( dev );
 	}
 }
 
@@ -64,7 +65,7 @@ int mga_vblank_wait(drm_device_t *dev, unsigned int *sequence)
 	 */
 	DRM_WAIT_ON( ret, dev->vbl_queue, 3*DRM_HZ, 
 		     ( ( ( cur_vblank = atomic_read(&dev->vbl_received ) )
-			 + ~*sequence + 1 ) <= (1<<23) ) );
+			 - *sequence ) <= (1<<23) ) );
 
 	*sequence = cur_vblank;
 

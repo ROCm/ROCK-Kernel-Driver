@@ -121,7 +121,10 @@ int usb_serial_bus_register(struct usb_serial_device_type *device)
 {
 	int retval;
 
-	device->driver.name = (char *)device->name;
+	if (device->short_name)
+		device->driver.name = (char *)device->short_name;
+	else
+		device->driver.name = (char *)device->name;
 	device->driver.bus = &usb_serial_bus_type;
 	device->driver.probe = usb_serial_device_probe;
 	device->driver.remove = usb_serial_device_remove;

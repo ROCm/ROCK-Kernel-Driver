@@ -7,7 +7,6 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#include <linux/kernel.h>
 #include <linux/oprofile.h>
 #include <linux/init.h>
  

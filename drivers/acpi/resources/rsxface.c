@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsxface - Public interfaces to the resource manager
- *              $Revision: 19 $
  *
  ******************************************************************************/
 
@@ -33,10 +32,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_irq_routing_table
+ * FUNCTION:    acpi_get_irq_routing_table
  *
- * PARAMETERS:  Device_handle   - a handle to the Bus device we are querying
- *              Ret_buffer      - a pointer to a buffer to receive the
+ * PARAMETERS:  device_handle   - a handle to the Bus device we are querying
+ *              ret_buffer      - a pointer to a buffer to receive the
  *                                current resources for the device
  *
  * RETURN:      Status
@@ -44,13 +43,13 @@
  * DESCRIPTION: This function is called to get the IRQ routing table for a
  *              specific bus.  The caller must first acquire a handle for the
  *              desired bus.  The routine table is placed in the buffer pointed
- *              to by the Ret_buffer variable parameter.
+ *              to by the ret_buffer variable parameter.
  *
  *              If the function fails an appropriate status will be returned
- *              and the value of Ret_buffer is undefined.
+ *              and the value of ret_buffer is undefined.
  *
  *              This function attempts to execute the _PRT method contained in
- *              the object indicated by the passed Device_handle.
+ *              the object indicated by the passed device_handle.
  *
  ******************************************************************************/
 
@@ -62,7 +61,7 @@ acpi_get_irq_routing_table (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_irq_routing_table ");
+	ACPI_FUNCTION_TRACE ("acpi_get_irq_routing_table ");
 
 
 	/*
@@ -87,11 +86,11 @@ acpi_get_irq_routing_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_current_resources
+ * FUNCTION:    acpi_get_current_resources
  *
- * PARAMETERS:  Device_handle   - a handle to the device object for the
+ * PARAMETERS:  device_handle   - a handle to the device object for the
  *                                device we are querying
- *              Ret_buffer      - a pointer to a buffer to receive the
+ *              ret_buffer      - a pointer to a buffer to receive the
  *                                current resources for the device
  *
  * RETURN:      Status
@@ -99,13 +98,13 @@ acpi_get_irq_routing_table (
  * DESCRIPTION: This function is called to get the current resources for a
  *              specific device.  The caller must first acquire a handle for
  *              the desired device.  The resource data is placed in the buffer
- *              pointed to by the Ret_buffer variable parameter.
+ *              pointed to by the ret_buffer variable parameter.
  *
  *              If the function fails an appropriate status will be returned
- *              and the value of Ret_buffer is undefined.
+ *              and the value of ret_buffer is undefined.
  *
  *              This function attempts to execute the _CRS method contained in
- *              the object indicated by the passed Device_handle.
+ *              the object indicated by the passed device_handle.
  *
  ******************************************************************************/
 
@@ -117,7 +116,7 @@ acpi_get_current_resources (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_current_resources");
+	ACPI_FUNCTION_TRACE ("acpi_get_current_resources");
 
 
 	/*
@@ -142,11 +141,11 @@ acpi_get_current_resources (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_get_possible_resources
+ * FUNCTION:    acpi_get_possible_resources
  *
- * PARAMETERS:  Device_handle   - a handle to the device object for the
+ * PARAMETERS:  device_handle   - a handle to the device object for the
  *                                device we are querying
- *              Ret_buffer      - a pointer to a buffer to receive the
+ *              ret_buffer      - a pointer to a buffer to receive the
  *                                resources for the device
  *
  * RETURN:      Status
@@ -154,10 +153,10 @@ acpi_get_current_resources (
  * DESCRIPTION: This function is called to get a list of the possible resources
  *              for a specific device.  The caller must first acquire a handle
  *              for the desired device.  The resource data is placed in the
- *              buffer pointed to by the Ret_buffer variable.
+ *              buffer pointed to by the ret_buffer variable.
  *
  *              If the function fails an appropriate status will be returned
- *              and the value of Ret_buffer is undefined.
+ *              and the value of ret_buffer is undefined.
  *
  ******************************************************************************/
 
@@ -169,7 +168,7 @@ acpi_get_possible_resources (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_possible_resources");
+	ACPI_FUNCTION_TRACE ("acpi_get_possible_resources");
 
 
 	/*
@@ -194,11 +193,11 @@ acpi_get_possible_resources (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_set_current_resources
+ * FUNCTION:    acpi_set_current_resources
  *
- * PARAMETERS:  Device_handle   - a handle to the device object for the
+ * PARAMETERS:  device_handle   - a handle to the device object for the
  *                                device we are changing the resources of
- *              In_buffer       - a pointer to a buffer containing the
+ *              in_buffer       - a pointer to a buffer containing the
  *                                resources to be set for the device
  *
  * RETURN:      Status
@@ -206,7 +205,7 @@ acpi_get_possible_resources (
  * DESCRIPTION: This function is called to set the current resources for a
  *              specific device.  The caller must first acquire a handle for
  *              the desired device.  The resource data is passed to the routine
- *              the buffer pointed to by the In_buffer variable.
+ *              the buffer pointed to by the in_buffer variable.
  *
  ******************************************************************************/
 
@@ -218,7 +217,7 @@ acpi_set_current_resources (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_set_current_resources");
+	ACPI_FUNCTION_TRACE ("acpi_set_current_resources");
 
 
 	/*

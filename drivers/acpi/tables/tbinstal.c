@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -34,15 +33,15 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_match_signature
+ * FUNCTION:    acpi_tb_match_signature
  *
  * PARAMETERS:  Signature           - Table signature to match
- *              Table_info          - Return data
+ *              table_info          - Return data
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Compare signature against the list of "ACPI-subsystem-owned"
- *              tables (DSDT/FADT/SSDT, etc.) Returns the Table_type_iD on match.
+ *              tables (DSDT/FADT/SSDT, etc.) Returns the table_type_iD on match.
  *
  ******************************************************************************/
 
@@ -52,10 +51,10 @@ acpi_tb_match_signature (
 	acpi_table_desc         *table_info,
 	u8                      search_type)
 {
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_match_signature");
+	ACPI_FUNCTION_TRACE ("tb_match_signature");
 
 
 	/*
@@ -92,9 +91,9 @@ acpi_tb_match_signature (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_install_table
+ * FUNCTION:    acpi_tb_install_table
  *
- * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table_body
+ * PARAMETERS:  table_info          - Return value from acpi_tb_get_table_body
  *
  * RETURN:      Status
  *
@@ -110,7 +109,7 @@ acpi_tb_install_table (
 {
 	acpi_status             status;
 
-	ACPI_FUNCTION_TRACE ("Tb_install_table");
+	ACPI_FUNCTION_TRACE ("tb_install_table");
 
 
 	/* Lock tables while installing */
@@ -140,9 +139,9 @@ acpi_tb_install_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_recognize_table
+ * FUNCTION:    acpi_tb_recognize_table
  *
- * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table_body
+ * PARAMETERS:  table_info          - Return value from acpi_tb_get_table_body
  *
  * RETURN:      Status
  *
@@ -167,7 +166,7 @@ acpi_tb_recognize_table (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_recognize_table");
+	ACPI_FUNCTION_TRACE ("tb_recognize_table");
 
 
 	/* Ensure that we have a valid table pointer */
@@ -197,7 +196,7 @@ acpi_tb_recognize_table (
 
 	/* Return the table type and length via the info struct */
 
-	table_info->length = (ACPI_SIZE) table_header->length;
+	table_info->length = (acpi_size) table_header->length;
 
 	return_ACPI_STATUS (status);
 }
@@ -205,10 +204,10 @@ acpi_tb_recognize_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_init_table_descriptor
+ * FUNCTION:    acpi_tb_init_table_descriptor
  *
- * PARAMETERS:  Table_type          - The type of the table
- *              Table_info          - A table info struct
+ * PARAMETERS:  table_type          - The type of the table
+ *              table_info          - A table info struct
  *
  * RETURN:      None.
  *
@@ -225,7 +224,7 @@ acpi_tb_init_table_descriptor (
 	acpi_table_desc         *table_desc;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Tb_init_table_descriptor", table_type);
+	ACPI_FUNCTION_TRACE_U32 ("tb_init_table_descriptor", table_type);
 
 	/*
 	 * Install the table into the global data structure
@@ -313,7 +312,7 @@ acpi_tb_init_table_descriptor (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_delete_acpi_tables
+ * FUNCTION:    acpi_tb_delete_acpi_tables
  *
  * PARAMETERS:  None.
  *
@@ -341,7 +340,7 @@ acpi_tb_delete_acpi_tables (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_delete_acpi_table
+ * FUNCTION:    acpi_tb_delete_acpi_table
  *
  * PARAMETERS:  Type                - The table type to be deleted
  *
@@ -357,7 +356,7 @@ acpi_tb_delete_acpi_table (
 	acpi_table_type             type)
 {
 
-	ACPI_FUNCTION_TRACE_U32 ("Tb_delete_acpi_table", type);
+	ACPI_FUNCTION_TRACE_U32 ("tb_delete_acpi_table", type);
 
 
 	if (type > ACPI_TABLE_MAX) {
@@ -408,9 +407,9 @@ acpi_tb_delete_acpi_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_free_acpi_tables_of_type
+ * FUNCTION:    acpi_tb_free_acpi_tables_of_type
  *
- * PARAMETERS:  Table_info          - A table info struct
+ * PARAMETERS:  table_info          - A table info struct
  *
  * RETURN:      None.
  *
@@ -428,7 +427,7 @@ acpi_tb_free_acpi_tables_of_type (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Tb_free_acpi_tables_of_type", list_head);
+	ACPI_FUNCTION_TRACE_PTR ("tb_free_acpi_tables_of_type", list_head);
 
 
 	/* Get the head of the list */
@@ -450,9 +449,9 @@ acpi_tb_free_acpi_tables_of_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_delete_single_table
+ * FUNCTION:    acpi_tb_delete_single_table
  *
- * PARAMETERS:  Table_info          - A table info struct
+ * PARAMETERS:  table_info          - A table info struct
  *
  * RETURN:      None.
  *
@@ -496,9 +495,9 @@ acpi_tb_delete_single_table (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_uninstall_table
+ * FUNCTION:    acpi_tb_uninstall_table
  *
- * PARAMETERS:  Table_info          - A table info struct
+ * PARAMETERS:  table_info          - A table info struct
  *
  * RETURN:      Pointer to the next table in the list (of same type)
  *
@@ -515,7 +514,7 @@ acpi_tb_uninstall_table (
 	acpi_table_desc         *next_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Acpi_tb_uninstall_table", table_desc);
+	ACPI_FUNCTION_TRACE_PTR ("acpi_tb_uninstall_table", table_desc);
 
 
 	if (!table_desc) {

@@ -1074,19 +1074,30 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	const u8 *data;
 	int size, dwords, tex_width, blit_width;
 	u32 y, height;
-	int ret = 0, i;
+	int i;
 	RING_LOCALS;
 
 	dev_priv->stats.boxes |= RADEON_BOX_TEXTURE_LOAD;
 
-	/* FIXME: Be smarter about this...
+	/* Flush the pixel cache.  This ensures no pixel data gets mixed
+	 * up with the texture data from the host data blit, otherwise
+	 * part of the texture image may be corrupted.
 	 */
-	buf = radeon_freelist_get( dev );
-	if ( !buf ) return DRM_ERR(EAGAIN);
+	BEGIN_RING( 4 );
+	RADEON_FLUSH_CACHE();
+	RADEON_WAIT_UNTIL_IDLE();
+	ADVANCE_RING();
 
-	DRM_DEBUG( "tex: ofs=0x%x p=%d f=%d x=%hd y=%hd w=%hd h=%hd\n",
-		   tex->offset >> 10, tex->pitch, tex->format,
-		   image->x, image->y, image->width, image->height );
+#ifdef __BIG_ENDIAN
+	/* The Mesa texture functions provide the data in little endian as the
+	 * chip wants it, but we need to compensate for the fact that the CP
+	 * ring gets byte-swapped
+	 */
+	BEGIN_RING( 2 );
+	OUT_RING_REG( RADEON_RBBM_GUICNTL, RADEON_HOST_DATA_SWAP_32BIT );
+	ADVANCE_RING();
+#endif
+
 
 	/* The compiler won't optimize away a division by a variable,
 	 * even if the only legal values are powers of two.  Thus, we'll
@@ -1120,127 +1131,113 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_DEBUG( "   tex=%dx%d  blit=%d\n",
-		   tex_width, tex->height, blit_width );
+	DRM_DEBUG("tex=%dx%d blit=%d\n", tex_width, tex->height, blit_width );
 
-	/* Flush the pixel cache.  This ensures no pixel data gets mixed
-	 * up with the texture data from the host data blit, otherwise
-	 * part of the texture image may be corrupted.
-	 */
-	BEGIN_RING( 4 );
+	do {
+		DRM_DEBUG( "tex: ofs=0x%x p=%d f=%d x=%hd y=%hd w=%hd h=%hd\n",
+			   tex->offset >> 10, tex->pitch, tex->format,
+			   image->x, image->y, image->width, image->height );
 
-	RADEON_FLUSH_CACHE();
-	RADEON_WAIT_UNTIL_IDLE();
-
-	ADVANCE_RING();
-
-#ifdef __BIG_ENDIAN
-	/* The Mesa texture functions provide the data in little endian as the
-	 * chip wants it, but we need to compensate for the fact that the CP
-	 * ring gets byte-swapped
-	 */
-	BEGIN_RING( 2 );
-	OUT_RING_REG( RADEON_RBBM_GUICNTL, RADEON_HOST_DATA_SWAP_32BIT );
-	ADVANCE_RING();
-#endif
-
-	/* Make a copy of the parameters in case we have to update them
-	 * for a multi-pass texture blit.
-	 */
-	y = image->y;
-	height = image->height;
-	data = (const u8 *)image->data;
-
-	size = height * blit_width;
-
-	if ( size > RADEON_MAX_TEXTURE_SIZE ) {
-		/* Texture image is too large, do a multipass upload */
-		ret = DRM_ERR(EAGAIN);
-
-		/* Adjust the blit size to fit the indirect buffer */
-		height = RADEON_MAX_TEXTURE_SIZE / blit_width;
+		/* Make a copy of the parameters in case we have to
+		 * update them for a multi-pass texture blit.
+		 */
+		y = image->y;
+		height = image->height;
+		data = (const u8 *)image->data;
+		
 		size = height * blit_width;
+
+		if ( size > RADEON_MAX_TEXTURE_SIZE ) {
+			height = RADEON_MAX_TEXTURE_SIZE / blit_width;
+			size = height * blit_width;
+		} else if ( size < 4 && size > 0 ) {
+			size = 4;
+		} else if ( size == 0 ) {
+			return 0;
+		}
 
 		/* Update the input parameters for next time */
 		image->y += height;
 		image->height -= height;
-		image->data = (const char *)image->data + size;
+		image->data += size;
 
-		if ( DRM_COPY_TO_USER( tex->image, image, sizeof(*image) ) ) {
-			DRM_ERROR( "EFAULT on tex->image\n" );
-			return DRM_ERR(EFAULT);
+		buf = radeon_freelist_get( dev );
+		if ( 0 && !buf ) {
+			radeon_do_cp_idle( dev_priv );
+			buf = radeon_freelist_get( dev );
 		}
-	} else if ( size < 4 && size > 0 ) {
-		size = 4;
-	}
-
-	dwords = size / 4;
-
-	/* Dispatch the indirect buffer.
-	 */
-	buffer = (u32 *)((char *)dev_priv->buffers->handle + buf->offset);
-
-	buffer[0] = CP_PACKET3( RADEON_CNTL_HOSTDATA_BLT, dwords + 6 );
-	buffer[1] = (RADEON_GMC_DST_PITCH_OFFSET_CNTL |
-		     RADEON_GMC_BRUSH_NONE |
-		     (format << 8) |
-		     RADEON_GMC_SRC_DATATYPE_COLOR |
-		     RADEON_ROP3_S |
-		     RADEON_DP_SRC_SOURCE_HOST_DATA |
-		     RADEON_GMC_CLR_CMP_CNTL_DIS |
-		     RADEON_GMC_WR_MSK_DIS);
-
-	buffer[2] = (tex->pitch << 22) | (tex->offset >> 10);
-	buffer[3] = 0xffffffff;
-	buffer[4] = 0xffffffff;
-	buffer[5] = (y << 16) | image->x;
-	buffer[6] = (height << 16) | image->width;
-	buffer[7] = dwords;
-
-	buffer += 8;
-
-	if ( tex_width >= 32 ) {
-		/* Texture image width is larger than the minimum, so we
-		 * can upload it directly.
-		 */
-		if ( DRM_COPY_FROM_USER( buffer, data, dwords * sizeof(u32) ) ) {
-			DRM_ERROR( "EFAULT on data, %d dwords\n", dwords );
-			return DRM_ERR(EFAULT);
+		if ( !buf ) {
+			DRM_DEBUG("radeon_cp_dispatch_texture: EAGAIN\n");
+			DRM_COPY_TO_USER( tex->image, image, sizeof(*image) );
+			return DRM_ERR(EAGAIN);
 		}
-	} else {
-		/* Texture image width is less than the minimum, so we
-		 * need to pad out each image scanline to the minimum
-		 * width.
+
+
+		/* Dispatch the indirect buffer.
 		 */
-		for ( i = 0 ; i < tex->height ; i++ ) {
-			if ( DRM_COPY_FROM_USER( buffer, data, tex_width ) ) {
-				DRM_ERROR( "EFAULT on pad, %d bytes\n",
-					   tex_width );
+		buffer = (u32*)((char*)dev_priv->buffers->handle + buf->offset);
+		dwords = size / 4;
+		buffer[0] = CP_PACKET3( RADEON_CNTL_HOSTDATA_BLT, dwords + 6 );
+		buffer[1] = (RADEON_GMC_DST_PITCH_OFFSET_CNTL |
+			     RADEON_GMC_BRUSH_NONE |
+			     (format << 8) |
+			     RADEON_GMC_SRC_DATATYPE_COLOR |
+			     RADEON_ROP3_S |
+			     RADEON_DP_SRC_SOURCE_HOST_DATA |
+			     RADEON_GMC_CLR_CMP_CNTL_DIS |
+			     RADEON_GMC_WR_MSK_DIS);
+		
+		buffer[2] = (tex->pitch << 22) | (tex->offset >> 10);
+		buffer[3] = 0xffffffff;
+		buffer[4] = 0xffffffff;
+		buffer[5] = (y << 16) | image->x;
+		buffer[6] = (height << 16) | image->width;
+		buffer[7] = dwords;
+		buffer += 8;
+
+		if ( tex_width >= 32 ) {
+			/* Texture image width is larger than the minimum, so we
+			 * can upload it directly.
+			 */
+			if ( DRM_COPY_FROM_USER( buffer, data, 
+						 dwords * sizeof(u32) ) ) {
+				DRM_ERROR( "EFAULT on data, %d dwords\n", 
+					   dwords );
 				return DRM_ERR(EFAULT);
 			}
-			buffer += 8;
-			data += tex_width;
+		} else {
+			/* Texture image width is less than the minimum, so we
+			 * need to pad out each image scanline to the minimum
+			 * width.
+			 */
+			for ( i = 0 ; i < tex->height ; i++ ) {
+				if ( DRM_COPY_FROM_USER( buffer, data, 
+							 tex_width ) ) {
+					DRM_ERROR( "EFAULT on pad, %d bytes\n",
+						   tex_width );
+					return DRM_ERR(EFAULT);
+				}
+				buffer += 8;
+				data += tex_width;
+			}
 		}
-	}
 
-	buf->pid = DRM_CURRENTPID;
-	buf->used = (dwords + 8) * sizeof(u32);
+		buf->pid = DRM_CURRENTPID;
+		buf->used = (dwords + 8) * sizeof(u32);
+		radeon_cp_dispatch_indirect( dev, buf, 0, buf->used );
+		radeon_cp_discard_buffer( dev, buf );
 
-	radeon_cp_dispatch_indirect( dev, buf, 0, buf->used );
-	radeon_cp_discard_buffer( dev, buf );
+	} while (image->height > 0);
 
 	/* Flush the pixel cache after the blit completes.  This ensures
 	 * the texture data is written out to memory before rendering
 	 * continues.
 	 */
 	BEGIN_RING( 4 );
-
 	RADEON_FLUSH_CACHE();
 	RADEON_WAIT_UNTIL_2D_IDLE();
-
 	ADVANCE_RING();
-
-	return ret;
+	return 0;
 }
 
 

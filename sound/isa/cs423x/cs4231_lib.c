@@ -445,6 +445,9 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
 	int result = 0;
+	unsigned int what;
+	snd_pcm_substream_t *s;
+	int do_start;
 
 #if 0
 	printk("codec trigger!!! - what = %i, enable = %i, status = 0x%x\n", what, enable, cs4231_inb(chip, CS4231P(STATUS)));
@@ -452,38 +455,39 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+		do_start = 1; break;
 	case SNDRV_PCM_TRIGGER_STOP:
-	{
-		unsigned int what = 0;
-		snd_pcm_substream_t *s = substream;
-		do {
-			if (s == chip->playback_substream) {
-				what |= CS4231_PLAYBACK_ENABLE;
-				snd_pcm_trigger_done(s, substream);
-			} else if (s == chip->capture_substream) {
-				what |= CS4231_RECORD_ENABLE;
-				snd_pcm_trigger_done(s, substream);
-			}
-			s = s->link_next;
-		} while (s != substream);
-		spin_lock(&chip->reg_lock);
-		if (cmd == SNDRV_PCM_TRIGGER_START) {
-			chip->image[CS4231_IFACE_CTRL] |= what;
-			if (chip->trigger)
-				chip->trigger(chip, what, 1);
-		} else {
-			chip->image[CS4231_IFACE_CTRL] &= ~what;
-			if (chip->trigger)
-				chip->trigger(chip, what, 0);
-		}
-		snd_cs4231_out(chip, CS4231_IFACE_CTRL, chip->image[CS4231_IFACE_CTRL]);
-		spin_unlock(&chip->reg_lock);
-		break;
-	}
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+		do_start = 0; break;
 	default:
-		result = -EINVAL;
-		break;
+		return -EINVAL;
 	}
+
+	what = 0;
+	s = substream;
+	do {
+		if (s == chip->playback_substream) {
+			what |= CS4231_PLAYBACK_ENABLE;
+			snd_pcm_trigger_done(s, substream);
+		} else if (s == chip->capture_substream) {
+			what |= CS4231_RECORD_ENABLE;
+			snd_pcm_trigger_done(s, substream);
+		}
+		s = s->link_next;
+	} while (s != substream);
+	spin_lock(&chip->reg_lock);
+	if (do_start) {
+		chip->image[CS4231_IFACE_CTRL] |= what;
+		if (chip->trigger)
+			chip->trigger(chip, what, 1);
+	} else {
+		chip->image[CS4231_IFACE_CTRL] &= ~what;
+		if (chip->trigger)
+			chip->trigger(chip, what, 0);
+	}
+	snd_cs4231_out(chip, CS4231_IFACE_CTRL, chip->image[CS4231_IFACE_CTRL]);
+	spin_unlock(&chip->reg_lock);
 #if 0
 	snd_cs4231_debug(chip);
 #endif
@@ -1188,7 +1192,9 @@ int snd_cs4231_probe(cs4231_t *chip)
 static snd_pcm_hardware_t snd_cs4231_playback =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME |
+				 SNDRV_PCM_INFO_SYNC_START),
 	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE),
 	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
@@ -1207,7 +1213,9 @@ static snd_pcm_hardware_t snd_cs4231_playback =
 static snd_pcm_hardware_t snd_cs4231_capture =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME |
+				 SNDRV_PCM_INFO_SYNC_START),
 	.formats =		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW | SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S16_BE),
 	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,

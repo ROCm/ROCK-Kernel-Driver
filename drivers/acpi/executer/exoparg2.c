@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -60,9 +59,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_2A_0T_0R
+ * FUNCTION:    acpi_ex_opcode_2A_0T_0R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -82,14 +81,14 @@ acpi_ex_opcode_2A_0T_0R (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_0T_0R",
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_0T_0R",
 			acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the opcode */
 
 	switch (walk_state->opcode) {
-	case AML_NOTIFY_OP:         /* Notify (Notify_object, Notify_value) */
+	case AML_NOTIFY_OP:         /* Notify (notify_object, notify_value) */
 
 		/* The first operand is a namespace node */
 
@@ -119,7 +118,7 @@ acpi_ex_opcode_2A_0T_0R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_2A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 	}
@@ -130,9 +129,9 @@ acpi_ex_opcode_2A_0T_0R (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_2A_2T_1R
+ * FUNCTION:    acpi_ex_opcode_2A_2T_1R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -151,14 +150,14 @@ acpi_ex_opcode_2A_2T_1R (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_2T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_2T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/*
 	 * Execute the opcode
 	 */
 	switch (walk_state->opcode) {
-	case AML_DIVIDE_OP:             /* Divide (Dividend, Divisor, Remainder_result Quotient_result) */
+	case AML_DIVIDE_OP:             /* Divide (Dividend, Divisor, remainder_result quotient_result) */
 
 		return_desc1 = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!return_desc1) {
@@ -172,7 +171,7 @@ acpi_ex_opcode_2A_2T_1R (
 			goto cleanup;
 		}
 
-		/* Quotient to Return_desc1, remainder to Return_desc2 */
+		/* Quotient to return_desc1, remainder to return_desc2 */
 
 		status = acpi_ut_divide (&operand[0]->integer.value, &operand[1]->integer.value,
 				   &return_desc1->integer.value, &return_desc2->integer.value);
@@ -184,7 +183,7 @@ acpi_ex_opcode_2A_2T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_2T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_2A_2T_1R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -227,9 +226,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_2A_1T_1R
+ * FUNCTION:    acpi_ex_opcode_2A_1T_1R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -247,10 +246,10 @@ acpi_ex_opcode_2A_1T_1R (
 	acpi_operand_object     *temp_desc = NULL;
 	u32                     index;
 	acpi_status             status = AE_OK;
-	ACPI_SIZE               length;
+	acpi_size               length;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/*
@@ -273,7 +272,7 @@ acpi_ex_opcode_2A_1T_1R (
 
 
 	switch (walk_state->opcode) {
-	case AML_MOD_OP:                /* Mod (Dividend, Divisor, Remainder_result (ACPI 2.0) */
+	case AML_MOD_OP:                /* Mod (Dividend, Divisor, remainder_result (ACPI 2.0) */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!return_desc) {
@@ -281,7 +280,7 @@ acpi_ex_opcode_2A_1T_1R (
 			goto cleanup;
 		}
 
-		/* Return_desc will contain the remainder */
+		/* return_desc will contain the remainder */
 
 		status = acpi_ut_divide (&operand[0]->integer.value, &operand[1]->integer.value,
 				  NULL, &return_desc->integer.value);
@@ -330,7 +329,7 @@ acpi_ex_opcode_2A_1T_1R (
 		break;
 
 
-	case AML_TO_STRING_OP:          /* To_string (Buffer, Length, Result) (ACPI 2.0) */
+	case AML_TO_STRING_OP:          /* to_string (Buffer, Length, Result) (ACPI 2.0) */
 
 		/*
 		 * Input object is guaranteed to be a buffer at this point (it may have
@@ -383,7 +382,7 @@ acpi_ex_opcode_2A_1T_1R (
 		break;
 
 
-	case AML_CONCAT_RES_OP:         /* Concatenate_res_template (Buffer, Buffer, Result) (ACPI 2.0) */
+	case AML_CONCAT_RES_OP:         /* concatenate_res_template (Buffer, Buffer, Result) (ACPI 2.0) */
 
 		status = acpi_ex_concat_template (operand[0], operand[1], &return_desc, walk_state);
 		break;
@@ -449,7 +448,7 @@ acpi_ex_opcode_2A_1T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_1T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_2A_1T_1R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		break;
@@ -460,7 +459,7 @@ store_result_to_target:
 
 	if (ACPI_SUCCESS (status)) {
 		/*
-		 * Store the result of the operation (which is now in Return_desc) into
+		 * Store the result of the operation (which is now in return_desc) into
 		 * the Target descriptor.
 		 */
 		status = acpi_ex_store (return_desc, operand[2], walk_state);
@@ -488,9 +487,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_2A_0T_1R
+ * FUNCTION:    acpi_ex_opcode_2A_0T_1R
  *
- * PARAMETERS:  Walk_state          - Current walk state
+ * PARAMETERS:  walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -508,7 +507,7 @@ acpi_ex_opcode_2A_0T_1R (
 	u8                      logical_result = FALSE;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Create the internal return object */
@@ -522,7 +521,7 @@ acpi_ex_opcode_2A_0T_1R (
 	/*
 	 * Execute the Opcode
 	 */
-	if (walk_state->op_info->flags & AML_LOGICAL) /* Logical_op (Operand0, Operand1) */ {
+	if (walk_state->op_info->flags & AML_LOGICAL) /* logical_op (Operand0, Operand1) */ {
 		logical_result = acpi_ex_do_logical_op (walk_state->opcode,
 				 operand[0]->integer.value,
 				 operand[1]->integer.value);
@@ -531,7 +530,7 @@ acpi_ex_opcode_2A_0T_1R (
 
 
 	switch (walk_state->opcode) {
-	case AML_ACQUIRE_OP:            /* Acquire (Mutex_object, Timeout) */
+	case AML_ACQUIRE_OP:            /* Acquire (mutex_object, Timeout) */
 
 		status = acpi_ex_acquire_mutex (operand[1], operand[0], walk_state);
 		if (status == AE_TIME) {
@@ -541,7 +540,7 @@ acpi_ex_opcode_2A_0T_1R (
 		break;
 
 
-	case AML_WAIT_OP:               /* Wait (Event_object, Timeout) */
+	case AML_WAIT_OP:               /* Wait (event_object, Timeout) */
 
 		status = acpi_ex_system_wait_event (operand[1], operand[0]);
 		if (status == AE_TIME) {
@@ -553,7 +552,7 @@ acpi_ex_opcode_2A_0T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_0T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_2A_0T_1R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -562,7 +561,7 @@ acpi_ex_opcode_2A_0T_1R (
 
 store_logical_result:
 	/*
-	 * Set return value to according to Logical_result. logical TRUE (all ones)
+	 * Set return value to according to logical_result. logical TRUE (all ones)
 	 * Default is FALSE (zero)
 	 */
 	if (logical_result) {

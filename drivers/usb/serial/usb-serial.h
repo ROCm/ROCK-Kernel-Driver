@@ -168,6 +168,9 @@ struct usb_serial {
  * @owner: pointer to the module that owns this device.
  * @name: pointer to a string that describes this device.  This string used
  *	in the syslog messages when a device is inserted or removed.
+ * @short_name: a pointer to a string that describes this device in
+ *	KOBJ_NAME_LEN characters or less.  This is used for the sysfs interface
+ *	to describe the driver.
  * @id_table: pointer to a list of usb_device_id structures that define all
  *	of the devices this structure can support.
  * @num_interrupt_in: the number of interrupt in endpoints this device will
@@ -201,6 +204,7 @@ struct usb_serial {
 struct usb_serial_device_type {
 	struct module *owner;
 	char	*name;
+	char	*short_name;
 	const struct usb_device_id *id_table;
 	char	num_interrupt_in;
 	char	num_bulk_in;

@@ -19,13 +19,10 @@
 
 #include <linux/sched.h>
 #include <linux/vmalloc.h>
-#include <linux/smp.h>
 #include <linux/errno.h>
-#include <linux/cache.h>
  
 #include "cpu_buffer.h"
 #include "oprof.h"
-#include "oprofile_stats.h"
 
 struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
 
@@ -68,6 +65,7 @@ int alloc_cpu_buffers(void)
 		b->sample_received = 0;
 		b->sample_lost_locked = 0;
 		b->sample_lost_overflow = 0;
+		b->sample_lost_task_exit = 0;
 	}
 	return 0;
 fail:
@@ -92,9 +90,6 @@ void oprofile_add_sample(unsigned long eip, unsigned long event, int cpu)
 	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[cpu];
 	struct task_struct * task;
 
-	/* temporary ? */
-	BUG_ON(!oprofile_started);
- 
 	cpu_buf->sample_received++;
  
 	if (!spin_trylock(&cpu_buf->int_lock)) {

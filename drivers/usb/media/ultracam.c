@@ -25,7 +25,7 @@ typedef struct {
 } ultracam_t;
 #define	ULTRACAM_T(uvd)	((ultracam_t *)((uvd)->user_data))
 
-static usbvideo_t *cams = NULL;
+static struct usbvideo *cams = NULL;
 
 static int debug = 0;
 

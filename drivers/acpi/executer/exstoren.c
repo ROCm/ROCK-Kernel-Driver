@@ -3,7 +3,6 @@
  *
  * Module Name: exstoren - AML Interpreter object store support,
  *                        Store to Node (namespace object)
- *              $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -36,16 +35,16 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_resolve_object
+ * FUNCTION:    acpi_ex_resolve_object
  *
- * PARAMETERS:  Source_desc_ptr     - Pointer to the source object
- *              Target_type         - Current type of the target
- *              Walk_state          - Current walk state
+ * PARAMETERS:  source_desc_ptr     - Pointer to the source object
+ *              target_type         - Current type of the target
+ *              walk_state          - Current walk state
  *
- * RETURN:      Status, resolved object in Source_desc_ptr.
+ * RETURN:      Status, resolved object in source_desc_ptr.
  *
  * DESCRIPTION: Resolve an object.  If the object is a reference, dereference
- *              it and return the actual object in the Source_desc_ptr.
+ *              it and return the actual object in the source_desc_ptr.
  *
  ******************************************************************************/
 
@@ -59,7 +58,7 @@ acpi_ex_resolve_object (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_resolve_object");
+	ACPI_FUNCTION_TRACE ("ex_resolve_object");
 
 
 	/*
@@ -114,7 +113,7 @@ acpi_ex_resolve_object (
 	case ACPI_TYPE_LOCAL_ALIAS:
 
 		/*
-		 * Aliases are resolved by Acpi_ex_prep_operands
+		 * Aliases are resolved by acpi_ex_prep_operands
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Store into Alias - should never happen\n"));
 		status = AE_AML_INTERNAL;
@@ -137,12 +136,12 @@ acpi_ex_resolve_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_store_object_to_object
+ * FUNCTION:    acpi_ex_store_object_to_object
  *
- * PARAMETERS:  Source_desc         - Object to store
- *              Dest_desc           - Object to receive a copy of the source
- *              New_desc            - New object if Dest_desc is obsoleted
- *              Walk_state          - Current walk state
+ * PARAMETERS:  source_desc         - Object to store
+ *              dest_desc           - Object to receive a copy of the source
+ *              new_desc            - New object if dest_desc is obsoleted
+ *              walk_state          - Current walk state
  *
  * RETURN:      Status
  *
@@ -164,7 +163,7 @@ acpi_ex_resolve_object (
  *              This module allows destination types of Number, String,
  *              Buffer, and Package.
  *
- *              Assumes parameters are already validated.  NOTE: Source_desc
+ *              Assumes parameters are already validated.  NOTE: source_desc
  *              resolution (from a reference object) must be performed by
  *              the caller if necessary.
  *
@@ -181,7 +180,7 @@ acpi_ex_store_object_to_object (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_store_object_to_object", source_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_store_object_to_object", source_desc);
 
 
 	actual_src_desc = source_desc;
@@ -201,8 +200,8 @@ acpi_ex_store_object_to_object (
 		 * Perform the "implicit conversion" of the source to the current type
 		 * of the target as per the ACPI specification.
 		 *
-		 * If no conversion performed, Actual_src_desc = Source_desc.
-		 * Otherwise, Actual_src_desc is a temporary object to hold the
+		 * If no conversion performed, actual_src_desc = source_desc.
+		 * Otherwise, actual_src_desc is a temporary object to hold the
 		 * converted object.
 		 */
 		status = acpi_ex_convert_to_target_type (ACPI_GET_OBJECT_TYPE (dest_desc), source_desc,
@@ -213,7 +212,7 @@ acpi_ex_store_object_to_object (
 
 		if (source_desc == actual_src_desc) {
 			/*
-			 * No conversion was performed.  Return the Source_desc as the
+			 * No conversion was performed.  Return the source_desc as the
 			 * new object.
 			 */
 			*new_desc = source_desc;

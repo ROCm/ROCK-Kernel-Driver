@@ -2,7 +2,6 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 93 $
  *
  *****************************************************************************/
 
@@ -35,12 +34,12 @@
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_get_handle
+ * FUNCTION:    acpi_get_handle
  *
  * PARAMETERS:  Parent          - Object to search under (search scope).
- *              Path_name       - Pointer to an asciiz string containing the
+ *              path_name       - Pointer to an asciiz string containing the
  *                                  name
- *              Ret_handle      - Where the return handle is placed
+ *              ret_handle      - Where the return handle is placed
  *
  * RETURN:      Status
  *
@@ -114,16 +113,16 @@ acpi_get_handle (
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_get_name
+ * FUNCTION:    acpi_get_name
  *
  * PARAMETERS:  Handle          - Handle to be converted to a pathname
- *              Name_type       - Full pathname or single segment
+ *              name_type       - Full pathname or single segment
  *              Buffer          - Buffer for returned path
  *
  * RETURN:      Pointer to a string containing the fully qualified Name.
  *
  * DESCRIPTION: This routine returns the fully qualified name associated with
- *              the Handle parameter.  This and the Acpi_pathname_to_handle are
+ *              the Handle parameter.  This and the acpi_pathname_to_handle are
  *              complementary functions.
  *
  ******************************************************************************/
@@ -195,7 +194,7 @@ unlock_and_exit:
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_get_object_info
+ * FUNCTION:    acpi_get_object_info
  *
  * PARAMETERS:  Handle          - Object Handle
  *              Info            - Where the info is returned

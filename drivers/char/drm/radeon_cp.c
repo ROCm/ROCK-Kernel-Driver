@@ -1497,7 +1497,7 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 		}
 	}
 
-	DRM_ERROR( "returning NULL!\n" );
+	DRM_DEBUG( "returning NULL!\n" );
 	return NULL;
 }
 #if 0

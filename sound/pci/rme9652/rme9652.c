@@ -1799,7 +1799,7 @@ snd_rme9652_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 	snd_iprintf(buffer, "\n");
 }
 
-static void __init snd_rme9652_proc_init(rme9652_t *rme9652)
+static void __devinit snd_rme9652_proc_init(rme9652_t *rme9652)
 {
 	snd_info_entry_t *entry;
 
@@ -1869,7 +1869,7 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 	return 0;
 }
 
-static int __init snd_rme9652_initialize_memory(rme9652_t *rme9652)
+static int __devinit snd_rme9652_initialize_memory(rme9652_t *rme9652)
 {
 	void *pb, *cb;
 	dma_addr_t pb_addr, cb_addr;
@@ -2523,7 +2523,7 @@ static snd_pcm_ops_t snd_rme9652_capture_ops = {
 	.copy =		snd_rme9652_capture_copy,
 };
 
-static int __init snd_rme9652_create_pcm(snd_card_t *card,
+static int __devinit snd_rme9652_create_pcm(snd_card_t *card,
 					 rme9652_t *rme9652)
 {
 	snd_pcm_t *pcm;
@@ -2547,7 +2547,7 @@ static int __init snd_rme9652_create_pcm(snd_card_t *card,
 	return 0;
 }
 
-static int __init snd_rme9652_create(snd_card_t *card,
+static int __devinit snd_rme9652_create(snd_card_t *card,
 				     rme9652_t *rme9652,
 				     int precise_ptr)
 {

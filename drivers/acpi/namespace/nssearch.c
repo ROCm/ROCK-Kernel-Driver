@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 94 $
  *
  ******************************************************************************/
 
@@ -34,12 +33,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_search_node
+ * FUNCTION:    acpi_ns_search_node
  *
- * PARAMETERS:  *Target_name        - Ascii ACPI name to search for
+ * PARAMETERS:  *target_name        - Ascii ACPI name to search for
  *              *Node               - Starting node where search will begin
  *              Type                - Object type to match
- *              **Return_node       - Where the matched Named obj is returned
+ *              **return_node       - Where the matched Named obj is returned
  *
  * RETURN:      Status
  *
@@ -69,7 +68,7 @@ acpi_ns_search_node (
 	acpi_namespace_node     *next_node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_search_node");
+	ACPI_FUNCTION_TRACE ("ns_search_node");
 
 
 #ifdef ACPI_DEBUG_OUTPUT
@@ -132,18 +131,18 @@ acpi_ns_search_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_search_parent_tree
+ * FUNCTION:    acpi_ns_search_parent_tree
  *
- * PARAMETERS:  *Target_name        - Ascii ACPI name to search for
+ * PARAMETERS:  *target_name        - Ascii ACPI name to search for
  *              *Node               - Starting node where search will begin
  *              Type                - Object type to match
- *              **Return_node       - Where the matched Named Obj is returned
+ *              **return_node       - Where the matched Named Obj is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Called when a name has not been found in the current namespace
  *              level.  Before adding it or giving up, ACPI scope rules require
- *              searching enclosing scopes in cases identified by Acpi_ns_local().
+ *              searching enclosing scopes in cases identified by acpi_ns_local().
  *
  *              "A name is located by finding the matching name in the current
  *              name space, and then in the parent name space. If the parent
@@ -166,7 +165,7 @@ acpi_ns_search_parent_tree (
 	acpi_namespace_node     *parent_node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_search_parent_tree");
+	ACPI_FUNCTION_TRACE ("ns_search_parent_tree");
 
 
 	parent_node = acpi_ns_get_parent_node (node);
@@ -223,16 +222,16 @@ acpi_ns_search_parent_tree (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_search_and_enter
+ * FUNCTION:    acpi_ns_search_and_enter
  *
- * PARAMETERS:  Target_name         - Ascii ACPI name to search for (4 chars)
- *              Walk_state          - Current state of the walk
+ * PARAMETERS:  target_name         - Ascii ACPI name to search for (4 chars)
+ *              walk_state          - Current state of the walk
  *              *Node               - Starting node where search will begin
- *              Interpreter_mode    - Add names only in ACPI_MODE_LOAD_PASS_x.
+ *              interpreter_mode    - Add names only in ACPI_MODE_LOAD_PASS_x.
  *                                    Otherwise,search only.
  *              Type                - Object type to match
  *              Flags               - Flags describing the search restrictions
- *              **Return_node       - Where the Node is returned
+ *              **return_node       - Where the Node is returned
  *
  * RETURN:      Status
  *
@@ -260,23 +259,23 @@ acpi_ns_search_and_enter (
 	acpi_namespace_node     *new_node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_search_and_enter");
+	ACPI_FUNCTION_TRACE ("ns_search_and_enter");
 
 
 	/* Parameter validation */
 
 	if (!node || !target_name || !return_node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null param: Node %p Name %X Return_node %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null param: Node %p Name %X return_node %p\n",
 			node, target_name, return_node));
 
-		ACPI_REPORT_ERROR (("Ns_search_and_enter: Null parameter\n"));
+		ACPI_REPORT_ERROR (("ns_search_and_enter: Null parameter\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Name must consist of printable characters */
 
 	if (!acpi_ut_valid_acpi_name (target_name)) {
-		ACPI_REPORT_ERROR (("Ns_search_and_enter: Bad character in ACPI Name: %X\n",
+		ACPI_REPORT_ERROR (("ns_search_and_enter: Bad character in ACPI Name: %X\n",
 			target_name));
 		return_ACPI_STATUS (AE_BAD_CHARACTER);
 	}

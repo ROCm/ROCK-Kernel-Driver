@@ -12,12 +12,9 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/pagemap.h>
-#include <linux/fs.h>
-#include <linux/dcache.h>
-#include <linux/file.h>
-#include <linux/namei.h>
 #include <linux/oprofile.h>
+#include <linux/fs.h>
+#include <linux/pagemap.h>
 #include <asm/uaccess.h>
 
 #include "oprof.h"

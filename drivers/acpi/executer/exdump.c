@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 164 $
  *
  *****************************************************************************/
 
@@ -42,9 +41,9 @@
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_dump_operand
+ * FUNCTION:    acpi_ex_dump_operand
  *
- * PARAMETERS:  *Obj_desc         - Pointer to entry to be dumped
+ * PARAMETERS:  *obj_desc         - Pointer to entry to be dumped
  *
  * RETURN:      Status
  *
@@ -62,7 +61,7 @@ acpi_ex_dump_operand (
 	u16                     element_index;
 
 
-	ACPI_FUNCTION_NAME ("Ex_dump_operand")
+	ACPI_FUNCTION_NAME ("ex_dump_operand")
 
 
 	if (!((ACPI_LV_EXEC & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
@@ -91,7 +90,7 @@ acpi_ex_dump_operand (
 		return;
 	}
 
-	/*  Obj_desc is a valid object */
+	/*  obj_desc is a valid object */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
 
@@ -122,7 +121,7 @@ acpi_ex_dump_operand (
 
 		case AML_REF_OF_OP:
 
-			acpi_os_printf ("Reference: (Ref_of) %p\n",
+			acpi_os_printf ("Reference: (ref_of) %p\n",
 					 obj_desc->reference.object);
 			break;
 
@@ -271,14 +270,14 @@ acpi_ex_dump_operand (
 
 	case ACPI_TYPE_LOCAL_BANK_FIELD:
 
-		acpi_os_printf ("Bank_field\n");
+		acpi_os_printf ("bank_field\n");
 		break;
 
 
 	case ACPI_TYPE_LOCAL_REGION_FIELD:
 
 		acpi_os_printf (
-			"Region_field: Bits=%X Acc_width=%X Lock=%X Update=%X at byte=%X bit=%X of below:\n",
+			"region_field: Bits=%X acc_width=%X Lock=%X Update=%X at byte=%X bit=%X of below:\n",
 			obj_desc->field.bit_length, obj_desc->field.access_byte_width,
 			obj_desc->field.field_flags & AML_FIELD_LOCK_RULE_MASK,
 			obj_desc->field.field_flags & AML_FIELD_UPDATE_RULE_MASK,
@@ -289,14 +288,14 @@ acpi_ex_dump_operand (
 
 	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
-		acpi_os_printf ("Index_field\n");
+		acpi_os_printf ("index_field\n");
 		break;
 
 
 	case ACPI_TYPE_BUFFER_FIELD:
 
 		acpi_os_printf (
-			"Buffer_field: %X bits at byte %X bit %X of \n",
+			"buffer_field: %X bits at byte %X bit %X of \n",
 			obj_desc->buffer_field.bit_length, obj_desc->buffer_field.base_byte_offset,
 			obj_desc->buffer_field.start_field_bit_offset);
 
@@ -371,11 +370,11 @@ acpi_ex_dump_operand (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_dump_operands
+ * FUNCTION:    acpi_ex_dump_operands
  *
- * PARAMETERS:  Interpreter_mode     - Load or Exec
+ * PARAMETERS:  interpreter_mode     - Load or Exec
  *              *Ident              - Identification
- *              Num_levels          - # of stack entries to dump above line
+ *              num_levels          - # of stack entries to dump above line
  *              *Note               - Output notation
  *
  * DESCRIPTION: Dump the object stack
@@ -392,11 +391,11 @@ acpi_ex_dump_operands (
 	char                    *module_name,
 	u32                     line_number)
 {
-	NATIVE_UINT             i;
+	acpi_native_uint        i;
 	acpi_operand_object     **obj_desc;
 
 
-	ACPI_FUNCTION_NAME ("Ex_dump_operands");
+	ACPI_FUNCTION_NAME ("ex_dump_operands");
 
 
 	if (!ident) {
@@ -431,7 +430,7 @@ acpi_ex_dump_operands (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_out*
+ * FUNCTION:    acpi_ex_out*
  *
  * PARAMETERS:  Title               - Descriptive text
  *              Value               - Value to be displayed
@@ -469,7 +468,7 @@ acpi_ex_out_integer (
 void
 acpi_ex_out_address (
 	char                    *title,
-	ACPI_PHYSICAL_ADDRESS   value)
+	acpi_physical_address   value)
 {
 
 #if ACPI_MACHINE_WIDTH == 16
@@ -483,7 +482,7 @@ acpi_ex_out_address (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_dump_node
+ * FUNCTION:    acpi_ex_dump_node
  *
  * PARAMETERS:  *Node           - Descriptor to dump
  *              Flags               - Force display
@@ -513,15 +512,15 @@ acpi_ex_dump_node (
 	acpi_ex_out_integer ("Owner Id",      node->owner_id);
 	acpi_ex_out_integer ("Reference Count", node->reference_count);
 	acpi_ex_out_pointer ("Attached Object", acpi_ns_get_attached_object (node));
-	acpi_ex_out_pointer ("Child_list",    node->child);
-	acpi_ex_out_pointer ("Next_peer",     node->peer);
+	acpi_ex_out_pointer ("child_list",    node->child);
+	acpi_ex_out_pointer ("next_peer",     node->peer);
 	acpi_ex_out_pointer ("Parent",        acpi_ns_get_parent_node (node));
 }
 
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_dump_object_descriptor
+ * FUNCTION:    acpi_ex_dump_object_descriptor
  *
  * PARAMETERS:  *Object             - Descriptor to dump
  *              Flags               - Force display
@@ -538,7 +537,7 @@ acpi_ex_dump_object_descriptor (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_dump_object_descriptor");
+	ACPI_FUNCTION_TRACE ("ex_dump_object_descriptor");
 
 
 	if (!flags) {
@@ -555,7 +554,7 @@ acpi_ex_dump_object_descriptor (
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
-		acpi_os_printf ("Ex_dump_object_descriptor: %p is not a valid ACPI object\n", obj_desc);
+		acpi_os_printf ("ex_dump_object_descriptor: %p is not a valid ACPI object\n", obj_desc);
 		return_VOID;
 	}
 
@@ -617,9 +616,9 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_DEVICE:
 
-		acpi_ex_out_pointer ("Addr_handler", obj_desc->device.addr_handler);
-		acpi_ex_out_pointer ("Sys_handler",  obj_desc->device.sys_handler);
-		acpi_ex_out_pointer ("Drv_handler",  obj_desc->device.drv_handler);
+		acpi_ex_out_pointer ("addr_handler", obj_desc->device.addr_handler);
+		acpi_ex_out_pointer ("sys_handler",  obj_desc->device.sys_handler);
+		acpi_ex_out_pointer ("drv_handler",  obj_desc->device.drv_handler);
 		break;
 
 
@@ -631,41 +630,41 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_METHOD:
 
-		acpi_ex_out_integer ("Param_count",  obj_desc->method.param_count);
+		acpi_ex_out_integer ("param_count",  obj_desc->method.param_count);
 		acpi_ex_out_integer ("Concurrency",  obj_desc->method.concurrency);
 		acpi_ex_out_pointer ("Semaphore",    obj_desc->method.semaphore);
-		acpi_ex_out_integer ("Owning_id",    obj_desc->method.owning_id);
-		acpi_ex_out_integer ("Aml_length",   obj_desc->method.aml_length);
-		acpi_ex_out_pointer ("Aml_start",    obj_desc->method.aml_start);
+		acpi_ex_out_integer ("owning_id",    obj_desc->method.owning_id);
+		acpi_ex_out_integer ("aml_length",   obj_desc->method.aml_length);
+		acpi_ex_out_pointer ("aml_start",    obj_desc->method.aml_start);
 		break;
 
 
 	case ACPI_TYPE_MUTEX:
 
-		acpi_ex_out_integer ("Sync_level",   obj_desc->mutex.sync_level);
-		acpi_ex_out_pointer ("Owner_thread", obj_desc->mutex.owner_thread);
-		acpi_ex_out_integer ("Acquisition_depth",obj_desc->mutex.acquisition_depth);
+		acpi_ex_out_integer ("sync_level",   obj_desc->mutex.sync_level);
+		acpi_ex_out_pointer ("owner_thread", obj_desc->mutex.owner_thread);
+		acpi_ex_out_integer ("acquisition_depth",obj_desc->mutex.acquisition_depth);
 		acpi_ex_out_pointer ("Semaphore",    obj_desc->mutex.semaphore);
 		break;
 
 
 	case ACPI_TYPE_REGION:
 
-		acpi_ex_out_integer ("Space_id",     obj_desc->region.space_id);
+		acpi_ex_out_integer ("space_id",     obj_desc->region.space_id);
 		acpi_ex_out_integer ("Flags",        obj_desc->region.flags);
 		acpi_ex_out_address ("Address",      obj_desc->region.address);
 		acpi_ex_out_integer ("Length",       obj_desc->region.length);
-		acpi_ex_out_pointer ("Addr_handler", obj_desc->region.addr_handler);
+		acpi_ex_out_pointer ("addr_handler", obj_desc->region.addr_handler);
 		acpi_ex_out_pointer ("Next",         obj_desc->region.next);
 		break;
 
 
 	case ACPI_TYPE_POWER:
 
-		acpi_ex_out_integer ("System_level", obj_desc->power_resource.system_level);
-		acpi_ex_out_integer ("Resource_order", obj_desc->power_resource.resource_order);
-		acpi_ex_out_pointer ("Sys_handler",  obj_desc->power_resource.sys_handler);
-		acpi_ex_out_pointer ("Drv_handler",  obj_desc->power_resource.drv_handler);
+		acpi_ex_out_integer ("system_level", obj_desc->power_resource.system_level);
+		acpi_ex_out_integer ("resource_order", obj_desc->power_resource.resource_order);
+		acpi_ex_out_pointer ("sys_handler",  obj_desc->power_resource.sys_handler);
+		acpi_ex_out_pointer ("drv_handler",  obj_desc->power_resource.drv_handler);
 		break;
 
 
@@ -673,18 +672,18 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_integer ("Processor ID", obj_desc->processor.proc_id);
 		acpi_ex_out_integer ("Length",       obj_desc->processor.length);
-		acpi_ex_out_address ("Address",      (ACPI_PHYSICAL_ADDRESS) obj_desc->processor.address);
-		acpi_ex_out_pointer ("Sys_handler",  obj_desc->processor.sys_handler);
-		acpi_ex_out_pointer ("Drv_handler",  obj_desc->processor.drv_handler);
-		acpi_ex_out_pointer ("Addr_handler", obj_desc->processor.addr_handler);
+		acpi_ex_out_address ("Address",      (acpi_physical_address) obj_desc->processor.address);
+		acpi_ex_out_pointer ("sys_handler",  obj_desc->processor.sys_handler);
+		acpi_ex_out_pointer ("drv_handler",  obj_desc->processor.drv_handler);
+		acpi_ex_out_pointer ("addr_handler", obj_desc->processor.addr_handler);
 		break;
 
 
 	case ACPI_TYPE_THERMAL:
 
-		acpi_ex_out_pointer ("Sys_handler",  obj_desc->thermal_zone.sys_handler);
-		acpi_ex_out_pointer ("Drv_handler",  obj_desc->thermal_zone.drv_handler);
-		acpi_ex_out_pointer ("Addr_handler", obj_desc->thermal_zone.addr_handler);
+		acpi_ex_out_pointer ("sys_handler",  obj_desc->thermal_zone.sys_handler);
+		acpi_ex_out_pointer ("drv_handler",  obj_desc->thermal_zone.drv_handler);
+		acpi_ex_out_pointer ("addr_handler", obj_desc->thermal_zone.addr_handler);
 		break;
 
 
@@ -693,29 +692,29 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_LOCAL_BANK_FIELD:
 	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
-		acpi_ex_out_integer ("Field_flags",  obj_desc->common_field.field_flags);
-		acpi_ex_out_integer ("Access_byte_width", obj_desc->common_field.access_byte_width);
-		acpi_ex_out_integer ("Bit_length",   obj_desc->common_field.bit_length);
-		acpi_ex_out_integer ("Fld_bit_offset", obj_desc->common_field.start_field_bit_offset);
-		acpi_ex_out_integer ("Base_byte_offset", obj_desc->common_field.base_byte_offset);
-		acpi_ex_out_integer ("Datum_valid_bits", obj_desc->common_field.datum_valid_bits);
-		acpi_ex_out_integer ("End_fld_valid_bits", obj_desc->common_field.end_field_valid_bits);
-		acpi_ex_out_integer ("End_buf_valid_bits", obj_desc->common_field.end_buffer_valid_bits);
-		acpi_ex_out_pointer ("Parent_node",  obj_desc->common_field.node);
+		acpi_ex_out_integer ("field_flags",  obj_desc->common_field.field_flags);
+		acpi_ex_out_integer ("access_byte_width", obj_desc->common_field.access_byte_width);
+		acpi_ex_out_integer ("bit_length",   obj_desc->common_field.bit_length);
+		acpi_ex_out_integer ("fld_bit_offset", obj_desc->common_field.start_field_bit_offset);
+		acpi_ex_out_integer ("base_byte_offset", obj_desc->common_field.base_byte_offset);
+		acpi_ex_out_integer ("datum_valid_bits", obj_desc->common_field.datum_valid_bits);
+		acpi_ex_out_integer ("end_fld_valid_bits", obj_desc->common_field.end_field_valid_bits);
+		acpi_ex_out_integer ("end_buf_valid_bits", obj_desc->common_field.end_buffer_valid_bits);
+		acpi_ex_out_pointer ("parent_node",  obj_desc->common_field.node);
 
 		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 		case ACPI_TYPE_BUFFER_FIELD:
-			acpi_ex_out_pointer ("Buffer_obj",   obj_desc->buffer_field.buffer_obj);
+			acpi_ex_out_pointer ("buffer_obj",   obj_desc->buffer_field.buffer_obj);
 			break;
 
 		case ACPI_TYPE_LOCAL_REGION_FIELD:
-			acpi_ex_out_pointer ("Region_obj",   obj_desc->field.region_obj);
+			acpi_ex_out_pointer ("region_obj",   obj_desc->field.region_obj);
 			break;
 
 		case ACPI_TYPE_LOCAL_BANK_FIELD:
 			acpi_ex_out_integer ("Value",        obj_desc->bank_field.value);
-			acpi_ex_out_pointer ("Region_obj",   obj_desc->bank_field.region_obj);
-			acpi_ex_out_pointer ("Bank_obj",     obj_desc->bank_field.bank_obj);
+			acpi_ex_out_pointer ("region_obj",   obj_desc->bank_field.region_obj);
+			acpi_ex_out_pointer ("bank_obj",     obj_desc->bank_field.bank_obj);
 			break;
 
 		case ACPI_TYPE_LOCAL_INDEX_FIELD:
@@ -733,10 +732,10 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_LOCAL_REFERENCE:
 
-		acpi_ex_out_integer ("Target_type",  obj_desc->reference.target_type);
+		acpi_ex_out_integer ("target_type",  obj_desc->reference.target_type);
 		acpi_ex_out_string ("Opcode",        (acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name);
 		acpi_ex_out_integer ("Offset",       obj_desc->reference.offset);
-		acpi_ex_out_pointer ("Obj_desc",     obj_desc->reference.object);
+		acpi_ex_out_pointer ("obj_desc",     obj_desc->reference.object);
 		acpi_ex_out_pointer ("Node",         obj_desc->reference.node);
 		acpi_ex_out_pointer ("Where",        obj_desc->reference.where);
 		break;
@@ -744,9 +743,9 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_LOCAL_ADDRESS_HANDLER:
 
-		acpi_ex_out_integer ("Space_id",     obj_desc->addr_handler.space_id);
+		acpi_ex_out_integer ("space_id",     obj_desc->addr_handler.space_id);
 		acpi_ex_out_pointer ("Next",         obj_desc->addr_handler.next);
-		acpi_ex_out_pointer ("Region_list",  obj_desc->addr_handler.region_list);
+		acpi_ex_out_pointer ("region_list",  obj_desc->addr_handler.region_list);
 		acpi_ex_out_pointer ("Node",         obj_desc->addr_handler.node);
 		acpi_ex_out_pointer ("Context",      obj_desc->addr_handler.context);
 		break;
@@ -764,7 +763,7 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_LOCAL_DATA:
 	default:
 
-		acpi_os_printf ("Ex_dump_object_descriptor: Display not implemented for object type %s\n",
+		acpi_os_printf ("ex_dump_object_descriptor: Display not implemented for object type %s\n",
 			acpi_ut_get_object_type_name (obj_desc));
 		break;
 	}

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 177 $
  *
  *****************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_format_exception
+ * FUNCTION:    acpi_format_exception
  *
  * PARAMETERS:  Status       - The acpi_status code to be formatted
  *
@@ -52,7 +51,7 @@ acpi_format_exception (
 	acpi_status             sub_status;
 
 
-	ACPI_FUNCTION_NAME ("Format_exception");
+	ACPI_FUNCTION_NAME ("format_exception");
 
 
 	sub_status = (status & ~AE_CODE_MASK);
@@ -209,7 +208,7 @@ const u8                        acpi_gbl_ns_properties[] =
 	ACPI_NS_NORMAL,                     /* 02 String           */
 	ACPI_NS_NORMAL,                     /* 03 Buffer           */
 	ACPI_NS_NORMAL,                     /* 04 Package          */
-	ACPI_NS_NORMAL,                     /* 05 Field_unit       */
+	ACPI_NS_NORMAL,                     /* 05 field_unit       */
 	ACPI_NS_NEWSCOPE,                   /* 06 Device           */
 	ACPI_NS_NORMAL,                     /* 07 Event            */
 	ACPI_NS_NEWSCOPE,                   /* 08 Method           */
@@ -218,12 +217,12 @@ const u8                        acpi_gbl_ns_properties[] =
 	ACPI_NS_NEWSCOPE,                   /* 11 Power            */
 	ACPI_NS_NEWSCOPE,                   /* 12 Processor        */
 	ACPI_NS_NEWSCOPE,                   /* 13 Thermal          */
-	ACPI_NS_NORMAL,                     /* 14 Buffer_field     */
-	ACPI_NS_NORMAL,                     /* 15 Ddb_handle       */
+	ACPI_NS_NORMAL,                     /* 14 buffer_field     */
+	ACPI_NS_NORMAL,                     /* 15 ddb_handle       */
 	ACPI_NS_NORMAL,                     /* 16 Debug Object     */
-	ACPI_NS_NORMAL,                     /* 17 Def_field        */
-	ACPI_NS_NORMAL,                     /* 18 Bank_field       */
-	ACPI_NS_NORMAL,                     /* 19 Index_field      */
+	ACPI_NS_NORMAL,                     /* 17 def_field        */
+	ACPI_NS_NORMAL,                     /* 18 bank_field       */
+	ACPI_NS_NORMAL,                     /* 19 index_field      */
 	ACPI_NS_NORMAL,                     /* 20 Reference        */
 	ACPI_NS_NORMAL,                     /* 21 Alias            */
 	ACPI_NS_NORMAL,                     /* 22 Notify           */
@@ -245,7 +244,7 @@ static const char           acpi_gbl_hex_to_ascii[] =
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ut_hex_to_ascii_char
+ * FUNCTION:    acpi_ut_hex_to_ascii_char
  *
  * PARAMETERS:  Integer             - Contains the hex digit
  *              Position            - bit position of the digit within the
@@ -304,7 +303,7 @@ ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
  *
  ******************************************************************************/
 
-ACPI_BIT_REGISTER_INFO      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
+acpi_bit_register_info      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
 {
 	/* Name                                     Parent Register             Register Bit Position                   Register Bit Mask       */
 
@@ -345,7 +344,7 @@ acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ut_get_region_name
+ * FUNCTION:    acpi_ut_get_region_name
  *
  * PARAMETERS:  None.
  *
@@ -359,14 +358,14 @@ acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 
 const char        *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 {
-	"System_memory",
-	"System_iO",
+	"system_memory",
+	"system_iO",
 	"PCI_Config",
-	"Embedded_control",
+	"embedded_control",
 	"SMBus",
 	"CMOS",
 	"PCIBARTarget",
-	"Data_table",
+	"data_table",
 };
 
 
@@ -377,12 +376,12 @@ acpi_ut_get_region_name (
 
 	if (space_id >= ACPI_USER_REGION_BEGIN)
 	{
-		return ("User_defined_region");
+		return ("user_defined_region");
 	}
 
 	else if (space_id >= ACPI_NUM_PREDEFINED_REGIONS)
 	{
-		return ("Invalid_space_iD");
+		return ("invalid_space_iD");
 	}
 
 	return ((char *) acpi_gbl_region_types[space_id]);
@@ -391,7 +390,7 @@ acpi_ut_get_region_name (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ut_get_event_name
+ * FUNCTION:    acpi_ut_get_event_name
  *
  * PARAMETERS:  None.
  *
@@ -406,10 +405,10 @@ acpi_ut_get_region_name (
 static const char        *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
 {
 	"PM_Timer",
-	"Global_lock",
-	"Power_button",
-	"Sleep_button",
-	"Real_time_clock",
+	"global_lock",
+	"power_button",
+	"sleep_button",
+	"real_time_clock",
 };
 
 
@@ -420,7 +419,7 @@ acpi_ut_get_event_name (
 
 	if (event_id > ACPI_EVENT_MAX)
 	{
-		return ("Invalid_event_iD");
+		return ("invalid_event_iD");
 	}
 
 	return ((char *) acpi_gbl_event_types[event_id]);
@@ -429,7 +428,7 @@ acpi_ut_get_event_name (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ut_get_type_name
+ * FUNCTION:    acpi_ut_get_type_name
  *
  * PARAMETERS:  None.
  *
@@ -440,7 +439,7 @@ acpi_ut_get_event_name (
  ****************************************************************************/
 
 /*
- * Elements of Acpi_gbl_Ns_type_names below must match
+ * Elements of acpi_gbl_ns_type_names below must match
  * one-to-one with values of acpi_object_type
  *
  * The type ACPI_TYPE_ANY (Untyped) is used as a "don't care" when searching; when
@@ -458,7 +457,7 @@ static const char           *acpi_gbl_ns_type_names[] = /* printable names of AC
 	/* 02 */ "String",
 	/* 03 */ "Buffer",
 	/* 04 */ "Package",
-	/* 05 */ "Field_unit",
+	/* 05 */ "field_unit",
 	/* 06 */ "Device",
 	/* 07 */ "Event",
 	/* 08 */ "Method",
@@ -467,18 +466,18 @@ static const char           *acpi_gbl_ns_type_names[] = /* printable names of AC
 	/* 11 */ "Power",
 	/* 12 */ "Processor",
 	/* 13 */ "Thermal",
-	/* 14 */ "Buffer_field",
-	/* 15 */ "Ddb_handle",
-	/* 16 */ "Debug_object",
-	/* 17 */ "Region_field",
-	/* 18 */ "Bank_field",
-	/* 19 */ "Index_field",
+	/* 14 */ "buffer_field",
+	/* 15 */ "ddb_handle",
+	/* 16 */ "debug_object",
+	/* 17 */ "region_field",
+	/* 18 */ "bank_field",
+	/* 19 */ "index_field",
 	/* 20 */ "Reference",
 	/* 21 */ "Alias",
 	/* 22 */ "Notify",
-	/* 23 */ "Addr_handler",
-	/* 24 */ "Resource_desc",
-	/* 25 */ "Resource_fld",
+	/* 23 */ "addr_handler",
+	/* 24 */ "resource_desc",
+	/* 25 */ "resource_fld",
 	/* 26 */ "Scope",
 	/* 27 */ "Extra",
 	/* 28 */ "Data",
@@ -523,7 +522,7 @@ acpi_ut_get_object_type_name (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ut_get_mutex_name
+ * FUNCTION:    acpi_ut_get_mutex_name
  *
  * PARAMETERS:  None.
  *
@@ -552,7 +551,7 @@ acpi_ut_get_mutex_name (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ut_valid_object_type
+ * FUNCTION:    acpi_ut_valid_object_type
  *
  * PARAMETERS:  Type            - Object type to be validated
  *
@@ -580,9 +579,9 @@ acpi_ut_valid_object_type (
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_ut_allocate_owner_id
+ * FUNCTION:    acpi_ut_allocate_owner_id
  *
- * PARAMETERS:  Id_type         - Type of ID (method or table)
+ * PARAMETERS:  id_type         - Type of ID (method or table)
  *
  * DESCRIPTION: Allocate a table or method owner id
  *
@@ -595,7 +594,7 @@ acpi_ut_allocate_owner_id (
 	acpi_owner_id           owner_id = 0xFFFF;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_allocate_owner_id");
+	ACPI_FUNCTION_TRACE ("ut_allocate_owner_id");
 
 
 	if (ACPI_FAILURE (acpi_ut_acquire_mutex (ACPI_MTX_CACHES)))
@@ -639,7 +638,7 @@ acpi_ut_allocate_owner_id (
 
 /****************************************************************************
  *
- * FUNCTION:    Acpi_ut_init_globals
+ * FUNCTION:    acpi_ut_init_globals
  *
  * PARAMETERS:  none
  *
@@ -655,11 +654,11 @@ acpi_ut_init_globals (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_init_globals");
+	ACPI_FUNCTION_TRACE ("ut_init_globals");
 
 	/* Memory allocation and cache lists */
 
-	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (ACPI_MEMORY_LIST) * ACPI_NUM_MEM_LISTS);
+	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (acpi_memory_list) * ACPI_NUM_MEM_LISTS);
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) ACPI_PTR_DIFF (&(((acpi_generic_state *) NULL)->common.next), NULL);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->common.next), NULL);
@@ -669,8 +668,8 @@ acpi_ut_init_globals (
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].object_size     = sizeof (acpi_namespace_node);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].object_size      = sizeof (acpi_generic_state);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (ACPI_PARSE_OBJ_COMMON);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (ACPI_PARSE_OBJ_NAMED);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (acpi_parse_obj_common);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (acpi_parse_obj_named);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].object_size    = sizeof (acpi_operand_object);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].object_size       = sizeof (acpi_walk_state);
 

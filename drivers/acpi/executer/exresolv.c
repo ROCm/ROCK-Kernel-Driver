@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 118 $
  *
  *****************************************************************************/
 
@@ -38,12 +37,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_resolve_to_value
+ * FUNCTION:    acpi_ex_resolve_to_value
  *
- * PARAMETERS:  **Stack_ptr         - Points to entry on Obj_stack, which can
+ * PARAMETERS:  **stack_ptr         - Points to entry on obj_stack, which can
  *                                    be either an (acpi_operand_object *)
  *                                    or an acpi_handle.
- *              Walk_state          - Current method state
+ *              walk_state          - Current method state
  *
  * RETURN:      Status
  *
@@ -59,7 +58,7 @@ acpi_ex_resolve_to_value (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_resolve_to_value", stack_ptr);
+	ACPI_FUNCTION_TRACE_PTR ("ex_resolve_to_value", stack_ptr);
 
 
 	if (!stack_ptr || !*stack_ptr) {
@@ -68,9 +67,9 @@ acpi_ex_resolve_to_value (
 	}
 
 	/*
-	 * The entity pointed to by the Stack_ptr can be either
+	 * The entity pointed to by the stack_ptr can be either
 	 * 1) A valid acpi_operand_object, or
-	 * 2) A acpi_namespace_node (Named_obj)
+	 * 2) A acpi_namespace_node (named_obj)
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_OPERAND) {
 		status = acpi_ex_resolve_object_to_value (stack_ptr, walk_state);
@@ -80,7 +79,7 @@ acpi_ex_resolve_to_value (
 	}
 
 	/*
-	 * Object on the stack may have changed if Acpi_ex_resolve_object_to_value()
+	 * Object on the stack may have changed if acpi_ex_resolve_object_to_value()
 	 * was called (i.e., we can't use an _else_ here.)
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_NAMED) {
@@ -99,11 +98,11 @@ acpi_ex_resolve_to_value (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_resolve_object_to_value
+ * FUNCTION:    acpi_ex_resolve_object_to_value
  *
- * PARAMETERS:  Stack_ptr       - Pointer to a stack location that contains a
+ * PARAMETERS:  stack_ptr       - Pointer to a stack location that contains a
  *                                ptr to an internal object.
- *              Walk_state      - Current method state
+ *              walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -124,7 +123,7 @@ acpi_ex_resolve_object_to_value (
 	u16                     opcode;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_resolve_object_to_value");
+	ACPI_FUNCTION_TRACE ("ex_resolve_object_to_value");
 
 
 	stack_desc = *stack_ptr;
@@ -141,7 +140,7 @@ acpi_ex_resolve_object_to_value (
 
 			/*
 			 * Convert indirect name ptr to a direct name ptr.
-			 * Then, Acpi_ex_resolve_node_to_value can be used to get the value
+			 * Then, acpi_ex_resolve_node_to_value can be used to get the value
 			 */
 			temp_node = stack_desc->reference.object;
 
@@ -175,7 +174,7 @@ acpi_ex_resolve_object_to_value (
 			acpi_ut_remove_reference (stack_desc);
 			*stack_ptr = obj_desc;
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %d] Value_obj is %p\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %d] value_obj is %p\n",
 				stack_desc->reference.offset, obj_desc));
 			break;
 
@@ -220,7 +219,7 @@ acpi_ex_resolve_object_to_value (
 				/* Invalid reference object */
 
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"Unknown Target_type %X in Index/Reference obj %p\n",
+					"Unknown target_type %X in Index/Reference obj %p\n",
 					stack_desc->reference.target_type, stack_desc));
 				status = AE_AML_INTERNAL;
 				break;
@@ -266,7 +265,7 @@ acpi_ex_resolve_object_to_value (
 	case ACPI_TYPE_LOCAL_BANK_FIELD:
 	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Source_desc=%p Type=%X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "field_read source_desc=%p Type=%X\n",
 			stack_desc, ACPI_GET_OBJECT_TYPE (stack_desc)));
 
 		status = acpi_ex_read_data_from_field (walk_state, stack_desc, &obj_desc);
@@ -283,12 +282,12 @@ acpi_ex_resolve_object_to_value (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_resolve_multiple
+ * FUNCTION:    acpi_ex_resolve_multiple
  *
- * PARAMETERS:  Walk_state          - Current state (contains AML opcode)
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
  *              Operand             - Starting point for resolution
- *              Return_type         - Where the object type is returned
- *              Return_desc         - Where the resolved object is returned
+ *              return_type         - Where the object type is returned
+ *              return_desc         - Where the resolved object is returned
  *
  * RETURN:      Status
  *
@@ -309,13 +308,13 @@ acpi_ex_resolve_multiple (
 	acpi_object_type        type;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_ex_resolve_multiple");
+	ACPI_FUNCTION_TRACE ("acpi_ex_resolve_multiple");
 
 
 	/*
-	 * For reference objects created via the Ref_of or Index operators,
+	 * For reference objects created via the ref_of or Index operators,
 	 * we need to get to the base object (as per the ACPI specification
-	 * of the Object_type and Size_of operators). This means traversing
+	 * of the object_type and size_of operators). This means traversing
 	 * the list of possibly many nested references.
 	 */
 	while (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_LOCAL_REFERENCE) {
@@ -402,7 +401,7 @@ acpi_ex_resolve_multiple (
 
 		case AML_DEBUG_OP:
 
-			/* The Debug Object is of type "Debug_object" */
+			/* The Debug Object is of type "debug_object" */
 
 			type = ACPI_TYPE_DEBUG_OBJECT;
 			goto exit;
@@ -410,7 +409,7 @@ acpi_ex_resolve_multiple (
 
 		default:
 
-			ACPI_REPORT_ERROR (("Acpi_ex_resolve_multiple: Unknown Reference subtype %X\n",
+			ACPI_REPORT_ERROR (("acpi_ex_resolve_multiple: Unknown Reference subtype %X\n",
 				obj_desc->reference.opcode));
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
@@ -418,7 +417,7 @@ acpi_ex_resolve_multiple (
 
 	/*
 	 * Now we are guaranteed to have an object that has not been created
-	 * via the Ref_of or Index operators.
+	 * via the ref_of or Index operators.
 	 */
 	type = ACPI_GET_OBJECT_TYPE (obj_desc);
 

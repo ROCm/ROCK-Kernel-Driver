@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psopcode - Parser/Interpreter opcode information table
- *              $Revision: 75 $
  *
  *****************************************************************************/
 
@@ -52,7 +51,7 @@
 
 /*******************************************************************************
  *
- * NAME:        Acpi_gbl_Aml_op_info
+ * NAME:        acpi_gbl_aml_op_info
  *
  * DESCRIPTION: Opcode table. Each entry contains <opcode, type, name, operands>
  *              The name is a simple ascii string, the operand specifier is an
@@ -195,7 +194,7 @@
  * All AML opcodes and the runtime arguments for each.  Used by the AML interpreter  Each list is compressed
  * into a 32-bit number and stored in the master opcode table at the end of this file.
  *
- * (Used by Prep_operands procedure and the ASL Compiler)
+ * (Used by prep_operands procedure and the ASL Compiler)
  */
 
 
@@ -664,7 +663,7 @@ static const u8 acpi_gbl_long_op_index[NUM_EXTENDED_OPCODE] =
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_opcode_info
+ * FUNCTION:    acpi_ps_get_opcode_info
  *
  * PARAMETERS:  Opcode              - The AML opcode
  *
@@ -680,7 +679,7 @@ const acpi_opcode_info *
 acpi_ps_get_opcode_info (
 	u16                     opcode)
 {
-	ACPI_FUNCTION_NAME ("Ps_get_opcode_info");
+	ACPI_FUNCTION_NAME ("ps_get_opcode_info");
 
 
 	/*
@@ -719,7 +718,7 @@ acpi_ps_get_opcode_info (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_opcode_name
+ * FUNCTION:    acpi_ps_get_opcode_name
  *
  * PARAMETERS:  Opcode              - The AML opcode
  *

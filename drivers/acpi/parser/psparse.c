@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 138 $
  *
  *****************************************************************************/
 
@@ -30,7 +29,7 @@
  * generated parser to tightly constrain stack and dynamic memory
  * usage.  At the same time, parsing is kept flexible and the code
  * fairly compact by parsing based on a list of AML opcode
- * templates in Aml_op_info[]
+ * templates in aml_op_info[]
  */
 
 #include "acpi.h"
@@ -49,7 +48,7 @@ static u32                  acpi_gbl_depth = 0;
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_opcode_size
+ * FUNCTION:    acpi_ps_get_opcode_size
  *
  * PARAMETERS:  Opcode          - An AML opcode
  *
@@ -78,9 +77,9 @@ acpi_ps_get_opcode_size (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_peek_opcode
+ * FUNCTION:    acpi_ps_peek_opcode
  *
- * PARAMETERS:  Parser_state        - A parser state object
+ * PARAMETERS:  parser_state        - A parser state object
  *
  * RETURN:      Status
  *
@@ -113,9 +112,9 @@ acpi_ps_peek_opcode (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_complete_this_op
+ * FUNCTION:    acpi_ps_complete_this_op
  *
- * PARAMETERS:  Walk_state      - Current State
+ * PARAMETERS:  walk_state      - Current State
  *              Op              - Op to complete
  *
  * RETURN:      None.
@@ -135,7 +134,7 @@ acpi_ps_complete_this_op (
 	acpi_parse_object       *replacement_op = NULL;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_complete_this_op", op);
+	ACPI_FUNCTION_TRACE_PTR ("ps_complete_this_op", op);
 
 
 	/* Check for null Op, can happen if AML code is corrupt */
@@ -164,7 +163,7 @@ acpi_ps_complete_this_op (
 			case AML_CLASS_CREATE:
 
 				/*
-				 * These opcodes contain Term_arg operands. The current
+				 * These opcodes contain term_arg operands. The current
 				 * op must be replaced by a placeholder return op
 				 */
 				replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
@@ -176,7 +175,7 @@ acpi_ps_complete_this_op (
 			case AML_CLASS_NAMED_OBJECT:
 
 				/*
-				 * These opcodes contain Term_arg operands. The current
+				 * These opcodes contain term_arg operands. The current
 				 * op must be replaced by a placeholder return op
 				 */
 				if ((op->common.parent->common.aml_opcode == AML_REGION_OP)      ||
@@ -269,9 +268,9 @@ acpi_ps_complete_this_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_next_parse_state
+ * FUNCTION:    acpi_ps_next_parse_state
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *
  * RETURN:      Status
  *
@@ -290,7 +289,7 @@ acpi_ps_next_parse_state (
 	acpi_status             status = AE_CTRL_PENDING;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_next_parse_state", op);
+	ACPI_FUNCTION_TRACE_PTR ("ps_next_parse_state", op);
 
 
 	switch (callback_status) {
@@ -390,9 +389,9 @@ acpi_ps_next_parse_state (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_parse_loop
+ * FUNCTION:    acpi_ps_parse_loop
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *
  * RETURN:      Status
  *
@@ -413,7 +412,7 @@ acpi_ps_parse_loop (
 	u8                      *aml_op_start = NULL;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_parse_loop", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ps_parse_loop", walk_state);
 
 	if (walk_state->descending_callback == NULL) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
@@ -452,7 +451,7 @@ acpi_ps_parse_loop (
 							acpi_format_exception (status)));
 
 					}
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Get_predicate Failed, %s\n",
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "get_predicate Failed, %s\n",
 						acpi_format_exception (status)));
 					return_ACPI_STATUS (status);
 				}
@@ -591,10 +590,10 @@ acpi_ps_parse_loop (
 
 				if (op->common.aml_opcode == AML_REGION_OP) {
 					/*
-					 * Defer final parsing of an Operation_region body,
+					 * Defer final parsing of an operation_region body,
 					 * because we don't have enough info in the first pass
 					 * to parse it correctly (i.e., there may be method
-					 * calls within the Term_arg elements of the body.)
+					 * calls within the term_arg elements of the body.)
 					 *
 					 * However, we must continue parsing because
 					 * the opregion is not a standalone package --
@@ -617,8 +616,8 @@ acpi_ps_parse_loop (
 
 				if (walk_state->op_info->flags & AML_CREATE) {
 					/*
-					 * Backup to beginning of Create_xXXfield declaration
-					 * Body_length is unknown until we parse the body
+					 * Backup to beginning of create_xXXfield declaration
+					 * body_length is unknown until we parse the body
 					 */
 					op->named.data    = aml_op_start;
 					op->named.length  = 0;
@@ -650,14 +649,14 @@ acpi_ps_parse_loop (
 
 			if (walk_state->op_info) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
-					"Opcode %4.4X [%s] Op %p Aml %p Aml_offset %5.5X\n",
+					"Opcode %4.4X [%s] Op %p Aml %p aml_offset %5.5X\n",
 					 (u32) op->common.aml_opcode, walk_state->op_info->name,
 					 op, parser_state->aml, op->common.aml_offset));
 			}
 		}
 
 
-		/* Start Arg_count at zero because we don't know if there are any args yet */
+		/* Start arg_count at zero because we don't know if there are any args yet */
 
 		walk_state->arg_count = 0;
 
@@ -722,7 +721,7 @@ acpi_ps_parse_loop (
 					op->named.data   = parser_state->aml;
 					op->named.length = (u32) (parser_state->pkg_end - parser_state->aml);
 					/*
-					 * Skip body of method.  For Op_regions, we must continue
+					 * Skip body of method.  For op_regions, we must continue
 					 * parsing because the opregion is not a standalone
 					 * package (We don't know where the end is).
 					 */
@@ -795,7 +794,7 @@ acpi_ps_parse_loop (
 				 * because we don't have enough info in the first pass
 				 * to parse them correctly.
 				 *
-				 * Completed parsing an Op_region declaration, we now
+				 * Completed parsing an op_region declaration, we now
 				 * know the length.
 				 */
 				op->named.length = (u32) (parser_state->aml - op->named.data);
@@ -804,10 +803,10 @@ acpi_ps_parse_loop (
 
 		if (walk_state->op_info->flags & AML_CREATE) {
 			/*
-			 * Backup to beginning of Create_xXXfield declaration (1 for
+			 * Backup to beginning of create_xXXfield declaration (1 for
 			 * Opcode)
 			 *
-			 * Body_length is unknown until we parse the body
+			 * body_length is unknown until we parse the body
 			 */
 			op->named.length = (u32) (parser_state->aml - op->named.data);
 		}
@@ -953,7 +952,7 @@ close_this_op:
 			op = NULL;
 		}
 
-	} /* while Parser_state->Aml */
+	} /* while parser_state->Aml */
 
 
 	/*
@@ -1014,12 +1013,12 @@ close_this_op:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_parse_aml
+ * FUNCTION:    acpi_ps_parse_aml
  *
- * PARAMETERS:  Start_scope     - The starting point of the parse.  Becomes the
+ * PARAMETERS:  start_scope     - The starting point of the parse.  Becomes the
  *                                root of the parsed op tree.
  *              Aml             - Pointer to the raw AML code to parse
- *              Aml_size        - Length of the AML to parse
+ *              aml_size        - Length of the AML to parse
  *
  *
  * RETURN:      Status
@@ -1034,14 +1033,14 @@ acpi_ps_parse_aml (
 {
 	acpi_status             status;
 	acpi_status             terminate_status;
-	ACPI_THREAD_STATE       *thread;
-	ACPI_THREAD_STATE       *prev_walk_list = acpi_gbl_current_walk_list;
+	acpi_thread_state       *thread;
+	acpi_thread_state       *prev_walk_list = acpi_gbl_current_walk_list;
 	acpi_walk_state         *previous_walk_state;
 
 
-	ACPI_FUNCTION_TRACE ("Ps_parse_aml");
+	ACPI_FUNCTION_TRACE ("ps_parse_aml");
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Entered with Walk_state=%p Aml=%p size=%X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Entered with walk_state=%p Aml=%p size=%X\n",
 		walk_state, walk_state->parser_state.aml, walk_state->parser_state.aml_size));
 
 
@@ -1071,7 +1070,7 @@ acpi_ps_parse_aml (
 	while (walk_state) {
 		if (ACPI_SUCCESS (status)) {
 			/*
-			 * The Parse_loop executes AML until the method terminates
+			 * The parse_loop executes AML until the method terminates
 			 * or calls another method.
 			 */
 			status = acpi_ps_parse_loop (walk_state);
@@ -1131,7 +1130,7 @@ acpi_ps_parse_aml (
 
 		previous_walk_state = walk_state;
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Return_value=%p, State=%p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "return_value=%p, State=%p\n",
 			walk_state->return_desc, walk_state));
 
 		/* Check if we have restarted a preempted walk */

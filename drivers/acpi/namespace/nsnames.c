@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 81 $
  *
  ******************************************************************************/
 
@@ -35,13 +34,13 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_build_external_path
+ * FUNCTION:    acpi_ns_build_external_path
  *
  * PARAMETERS:  Node            - NS node whose pathname is needed
  *              Size            - Size of the pathname
- *              *Name_buffer    - Where to return the pathname
+ *              *name_buffer    - Where to return the pathname
  *
- * RETURN:      Places the pathname into the Name_buffer, in external format
+ * RETURN:      Places the pathname into the name_buffer, in external format
  *              (name segments separated by path separators)
  *
  * DESCRIPTION: Generate a full pathaname
@@ -51,14 +50,14 @@
 void
 acpi_ns_build_external_path (
 	acpi_namespace_node     *node,
-	ACPI_SIZE               size,
+	acpi_size               size,
 	char                    *name_buffer)
 {
-	ACPI_SIZE               index;
+	acpi_size               index;
 	acpi_namespace_node     *parent_node;
 
 
-	ACPI_FUNCTION_NAME ("Ns_build_external_path");
+	ACPI_FUNCTION_NAME ("ns_build_external_path");
 
 
 	/* Special case for root */
@@ -106,7 +105,7 @@ acpi_ns_build_external_path (
 #ifdef ACPI_DEBUG_OUTPUT
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_external_pathname
+ * FUNCTION:    acpi_ns_get_external_pathname
  *
  * PARAMETERS:  Node            - NS node whose pathname is needed
  *
@@ -114,7 +113,7 @@ acpi_ns_build_external_path (
  *              the node, In external format (name segments separated by path
  *              separators.)
  *
- * DESCRIPTION: Used for debug printing in Acpi_ns_search_table().
+ * DESCRIPTION: Used for debug printing in acpi_ns_search_table().
  *
  ******************************************************************************/
 
@@ -123,10 +122,10 @@ acpi_ns_get_external_pathname (
 	acpi_namespace_node     *node)
 {
 	char                    *name_buffer;
-	ACPI_SIZE               size;
+	acpi_size               size;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ns_get_external_pathname", node);
+	ACPI_FUNCTION_TRACE_PTR ("ns_get_external_pathname", node);
 
 
 	/* Calculate required buffer size based on depth below root */
@@ -137,7 +136,7 @@ acpi_ns_get_external_pathname (
 
 	name_buffer = ACPI_MEM_CALLOCATE (size);
 	if (!name_buffer) {
-		ACPI_REPORT_ERROR (("Ns_get_table_pathname: allocation failure\n"));
+		ACPI_REPORT_ERROR (("ns_get_table_pathname: allocation failure\n"));
 		return_PTR (NULL);
 	}
 
@@ -151,7 +150,7 @@ acpi_ns_get_external_pathname (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_pathname_length
+ * FUNCTION:    acpi_ns_get_pathname_length
  *
  * PARAMETERS:  Node        - Namespace node
  *
@@ -161,11 +160,11 @@ acpi_ns_get_external_pathname (
  *
  ******************************************************************************/
 
-ACPI_SIZE
+acpi_size
 acpi_ns_get_pathname_length (
 	acpi_namespace_node     *node)
 {
-	ACPI_SIZE               size;
+	acpi_size               size;
 	acpi_namespace_node     *next_node;
 
 
@@ -190,9 +189,9 @@ acpi_ns_get_pathname_length (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_handle_to_pathname
+ * FUNCTION:    acpi_ns_handle_to_pathname
  *
- * PARAMETERS:  Target_handle           - Handle of named object whose name is
+ * PARAMETERS:  target_handle           - Handle of named object whose name is
  *                                        to be found
  *              Buffer                  - Where the pathname is returned
  *
@@ -209,10 +208,10 @@ acpi_ns_handle_to_pathname (
 {
 	acpi_status             status;
 	acpi_namespace_node     *node;
-	ACPI_SIZE               required_size;
+	acpi_size               required_size;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ns_handle_to_pathname", target_handle);
+	ACPI_FUNCTION_TRACE_PTR ("ns_handle_to_pathname", target_handle);
 
 
 	node = acpi_ns_map_handle_to_node (target_handle);
