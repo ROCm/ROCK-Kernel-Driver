@@ -788,7 +788,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 
 		add_wait_queue( &dev->lock.lock_queue, &entry );
 		for (;;) {
-			set_current_state(TASK_INTERRUPTIBLE);
+			__set_current_state(TASK_INTERRUPTIBLE);
 			if ( !dev->lock.hw_lock ) {
 				/* Device has been unregistered */
 				retcode = -EINTR;
@@ -808,7 +808,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 				break;
 			}
 		}
-		set_current_state(TASK_RUNNING);
+		__set_current_state(TASK_RUNNING);
 		remove_wait_queue( &dev->lock.lock_queue, &entry );
 		if( !retcode ) {
 			if (dev->fn_tbl.release)
@@ -988,7 +988,7 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 
 	add_wait_queue( &dev->lock.lock_queue, &entry );
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
+		__set_current_state(TASK_INTERRUPTIBLE);
 		if ( !dev->lock.hw_lock ) {
 			/* Device has been unregistered */
 			ret = -EINTR;
@@ -1009,7 +1009,7 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 			break;
 		}
 	}
-	set_current_state(TASK_RUNNING);
+	__set_current_state(TASK_RUNNING);
 	remove_wait_queue( &dev->lock.lock_queue, &entry );
 
 	sigemptyset( &dev->sigmask );
