@@ -36,11 +36,11 @@ static unsigned char sb_dma_bits[] = {
  * be relative to the given base -register
  */
 
-int             translate_code = 0;
+int      	pas_translate_code = 0;
 static int      pas_intr_mask = 0;
 static int      pas_irq = 0;
 static int      pas_sb_base = 0;
-spinlock_t		lock=SPIN_LOCK_UNLOCKED;
+spinlock_t	pas_lock=SPIN_LOCK_UNLOCKED;
 #ifndef CONFIG_PAS_JOYSTICK
 static int	joystick = 0;
 #else
@@ -79,12 +79,12 @@ extern void     mix_write(unsigned char data, int ioaddr);
 
 unsigned char pas_read(int ioaddr)
 {
-	return inb(ioaddr + translate_code);
+	return inb(ioaddr + pas_translate_code);
 }
 
 void pas_write(unsigned char data, int ioaddr)
 {
-	outb((data), ioaddr + translate_code);
+	outb((data), ioaddr + pas_translate_code);
 }
 
 /******************* Begin of the Interrupt Handler ********************/
@@ -301,7 +301,7 @@ static int __init detect_pas_hw(struct address_info *hw_config)
 
 	outb((0xBC), 0x9A01);	/* Activate first board */
 	outb((hw_config->io_base >> 2), 0x9A01);	/* Set base address */
-	translate_code = hw_config->io_base - 0x388;
+	pas_translate_code = hw_config->io_base - 0x388;
 	pas_write(1, 0xBF88);	/* Select one wait states */
 
 	board_id = pas_read(0x0B8B);
