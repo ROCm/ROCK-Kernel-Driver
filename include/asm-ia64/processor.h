@@ -17,6 +17,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
+#include <asm/ustack.h>
 
 #define IA64_NUM_DBG_REGS	8
 /*
@@ -235,6 +236,7 @@ struct thread_struct {
 	__u64 ksp;			/* kernel stack pointer */
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
+	__u64 rbs_bot;			/* the base address for the RBS */
 	int last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -283,6 +285,7 @@ struct thread_struct {
 	.on_ustack =	0,			\
 	.ksp =		0,			\
 	.map_base =	DEFAULT_MAP_BASE,	\
+	.rbs_bot =	DEFAULT_USER_STACK_SIZE,	\
 	.task_size =	DEFAULT_TASK_SIZE,	\
 	.last_fph_cpu =  -1,			\
 	INIT_THREAD_IA32			\
@@ -299,7 +302,7 @@ struct thread_struct {
 	regs->cr_iip = new_ip;									\
 	regs->ar_rsc = 0xf;		/* eager mode, privilege level 3 */			\
 	regs->ar_rnat = 0;									\
-	regs->ar_bspstore = IA64_RBS_BOT;							\
+	regs->ar_bspstore = current->thread.rbs_bot;						\
 	regs->ar_fpsr = FPSR_DEFAULT;								\
 	regs->loadrs = 0;									\
 	regs->r8 = current->mm->dumpable;	/* set "don't zap registers" flag */		\

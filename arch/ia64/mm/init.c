@@ -68,6 +68,16 @@ check_pgt_cache (void)
 	}
 }
 
+inline void
+ia64_set_rbs_bot (void)
+{
+	unsigned long stack_size = current->rlim[RLIMIT_STACK].rlim_max & -16;
+
+	if (stack_size > MAX_USER_STACK_SIZE)
+		stack_size = MAX_USER_STACK_SIZE;
+	current->thread.rbs_bot = STACK_TOP - stack_size;
+}
+
 /*
  * This performs some platform-dependent address space initialization.
  * On IA-64, we want to setup the VM area for the register backing
@@ -79,6 +89,8 @@ ia64_init_addr_space (void)
 {
 	struct vm_area_struct *vma;
 
+	ia64_set_rbs_bot();
+
 	/*
 	 * If we're out of memory and kmem_cache_alloc() returns NULL, we simply ignore
 	 * the problem.  When the process attempts to write to the register backing store
@@ -87,7 +99,7 @@ ia64_init_addr_space (void)
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 	if (vma) {
 		vma->vm_mm = current->mm;
-		vma->vm_start = IA64_RBS_BOT;
+		vma->vm_start = current->thread.rbs_bot;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
 		vma->vm_page_prot = protection_map[VM_DATA_DEFAULT_FLAGS & 0x7];
 		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;

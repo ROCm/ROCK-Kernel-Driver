@@ -8,6 +8,8 @@
  * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <asm/ustack.h>
+
 #define RLIMIT_CPU	0		/* CPU time in ms */
 #define RLIMIT_FSIZE	1		/* Maximum filesize */
 #define RLIMIT_DATA	2		/* max data size */
@@ -35,7 +37,7 @@
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
-	{      _STK_LIM, RLIM_INFINITY },		\
+	{      _STK_LIM, DEFAULT_USER_STACK_SIZE },	\
 	{             0, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{             0,             0 },		\

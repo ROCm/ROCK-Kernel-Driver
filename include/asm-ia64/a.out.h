@@ -30,9 +30,6 @@ struct exec {
 #define N_TXTOFF(x)	0
 
 #ifdef __KERNEL__
-# include <asm/page.h>
-# define STACK_TOP	(0x6000000000000000UL + (1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)
-# define IA64_RBS_BOT	(STACK_TOP - 0x80000000L + PAGE_SIZE)	/* bottom of reg. backing store */
+#include <asm/ustack.h>
 #endif
-
 #endif /* _ASM_IA64_A_OUT_H */
