@@ -828,6 +828,18 @@ _GLOBAL(sys_call_table32)
 	.llong .compat_fstatfs64
 	.llong .ppc32_fadvise64_64	/* 32bit only fadvise64_64 */
 	.llong .ppc_rtas		/* 255 */
+	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
+	.llong .sys_ni_syscall		/* 257 reserved for vserver */
+	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
+	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
+	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
+	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.llong .compat_sys_mq_open
+	.llong .sys_mq_unlink
+	.llong .compat_sys_mq_timedsend
+	.llong .compat_sys_mq_timedreceive /* 265 */
+	.llong .compat_sys_mq_notify
+	.llong .compat_sys_mq_getsetattr
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1087,3 +1099,15 @@ _GLOBAL(sys_call_table)
 	.llong .sys_fstatfs64
 	.llong .sys_ni_syscall		/* 32bit only fadvise64_64 */
 	.llong .ppc_rtas		/* 255 */
+	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
+	.llong .sys_ni_syscall		/* 257 reserved for vserver */
+	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
+	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
+	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
+	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.llong .sys_mq_open
+	.llong .sys_mq_unlink
+	.llong .sys_mq_timedsend
+	.llong .sys_mq_timedreceive	/* 265 */
+	.llong .sys_mq_notify
+	.llong .sys_mq_getsetattr

@@ -1232,7 +1232,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		schedule_timeout(timeout);
 
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		spin_lock_bh(&serv->sv_lock);
 		remove_wait_queue(&rqstp->rq_wait, &wait);

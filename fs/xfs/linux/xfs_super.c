@@ -464,7 +464,7 @@ syncd(void *arg)
 		schedule_timeout(xfs_syncd_interval);
 		/* swsusp */
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 		if (vfsp->vfs_flag & VFS_UMOUNT)
 			break;
 		if (vfsp->vfs_flag & VFS_RDONLY)

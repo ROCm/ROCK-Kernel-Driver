@@ -324,7 +324,7 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 	fp = (unsigned long) _ksp;
 	do {
 		/* Bogus frame pointer? */
-		if (fp < (task_base + sizeof(struct task_struct)) ||
+		if (fp < (task_base + sizeof(struct thread_info)) ||
 		    fp >= (task_base + (PAGE_SIZE << 1)))
 			break;
 		rw = (struct reg_window *) fp;
@@ -716,7 +716,7 @@ unsigned long get_wchan(struct task_struct *task)
 	fp = task->thread_info->ksp + bias;
 	do {
 		/* Bogus frame pointer? */
-		if (fp < (task_base + sizeof(struct task_struct)) ||
+		if (fp < (task_base + sizeof(struct thread_info)) ||
 		    fp >= (task_base + (2 * PAGE_SIZE)))
 			break;
 		rw = (struct reg_window *) fp;

@@ -1619,7 +1619,7 @@ static int rtl8139_thread (void *data)
 			timeout = interruptible_sleep_on_timeout (&tp->thr_wait, timeout);
 			/* make swsusp happy with our thread */
 			if (current->flags & PF_FREEZE)
-				refrigerator(PF_IOTHREAD);
+				refrigerator(PF_FREEZE);
 		} while (!signal_pending (current) && (timeout > 0));
 
 		if (signal_pending (current)) {

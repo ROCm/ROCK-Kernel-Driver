@@ -114,8 +114,8 @@ static int hfs_get_blocks(struct inode *inode, sector_t iblock, unsigned long ma
 	return ret;
 }
 
-static int hfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
-			 loff_t offset, unsigned long nr_segs)
+static ssize_t hfs_direct_IO(int rw, struct kiocb *iocb,
+		const struct iovec *iov, loff_t offset, unsigned long nr_segs)
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;

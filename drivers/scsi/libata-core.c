@@ -2759,7 +2759,7 @@ static int ata_thread (void *data)
                         flush_signals(current);
                         
                 if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
                                                         
 
                 if ((timeout < 0) || (ap->time_to_die))

@@ -172,7 +172,7 @@ loop:
 		 */
 		jbd_debug(1, "Now suspending kjournald\n");
 		spin_unlock(&journal->j_state_lock);
-		refrigerator(PF_IOTHREAD);
+		refrigerator(PF_FREEZE);
 		spin_lock(&journal->j_state_lock);
 	} else {
 		/*
