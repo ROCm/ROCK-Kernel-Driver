@@ -22,7 +22,6 @@
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/icmp.h>
-#include <net/esp.h>
 #include <net/ipcomp.h>
 
 static int ipcomp_decompress(struct xfrm_state *x, struct sk_buff *skb)
