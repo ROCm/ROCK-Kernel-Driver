@@ -376,8 +376,7 @@ struct thread_struct {
 	unsigned long		v86flags, v86mask, v86mode, saved_esp0;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
-/* TLS info and cached descriptor */
-	unsigned int tls_base, tls_limit, tls_flags;
+/* TLS cached descriptor */
 	struct desc_struct tls_desc;
 };
 
