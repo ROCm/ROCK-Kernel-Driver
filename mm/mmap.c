@@ -23,8 +23,8 @@
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 
-extern void unmap_page_range(mmu_gather_t *,struct vm_area_struct *vma, unsigned long address, unsigned long size);
-extern void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr);
+extern void unmap_page_range(struct mmu_gather *,struct vm_area_struct *vma, unsigned long address, unsigned long size);
+extern void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr);
 
 /*
  * WARNING: the debugging will use recursive algorithms so never enable this
@@ -900,7 +900,7 @@ struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long add
  * "prev", if it exists, points to a vma before the one
  * we just free'd - but there's no telling how much before.
  */
-static void free_pgtables(mmu_gather_t *tlb, struct vm_area_struct *prev,
+static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 	unsigned long start, unsigned long end)
 {
 	unsigned long first = start & PGDIR_MASK;
@@ -1008,7 +1008,7 @@ static void unmap_region(struct mm_struct *mm,
 	unsigned long start,
 	unsigned long end)
 {
-	mmu_gather_t *tlb;
+	struct mmu_gather *tlb;
 
 	tlb = tlb_gather_mmu(mm, 0);
 
@@ -1277,7 +1277,7 @@ void build_mmap_rb(struct mm_struct * mm)
 /* Release all mmaps. */
 void exit_mmap(struct mm_struct * mm)
 {
-	mmu_gather_t *tlb;
+	struct mmu_gather *tlb;
 	struct vm_area_struct * mpnt;
 
 	profile_exit_mmap(mm);

@@ -31,7 +31,7 @@ static inline void pte_free(struct page *page)
         __free_page(page);
 }
 
-static inline void __pte_free_tlb(mmu_gather_t *tlb, struct page *page)
+static inline void __pte_free_tlb(struct mmu_gather *tlb, struct page *page)
 {
 	tlb_remove_page(tlb, page);
 }

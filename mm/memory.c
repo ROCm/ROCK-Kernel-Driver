@@ -82,7 +82,7 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
  * Note: this doesn't free the actual pages themselves. That
  * has been handled earlier when unmapping all the memory regions.
  */
-static inline void free_one_pmd(mmu_gather_t *tlb, pmd_t * dir)
+static inline void free_one_pmd(struct mmu_gather *tlb, pmd_t * dir)
 {
 	struct page *page;
 
@@ -99,7 +99,7 @@ static inline void free_one_pmd(mmu_gather_t *tlb, pmd_t * dir)
 	pte_free_tlb(tlb, page);
 }
 
-static inline void free_one_pgd(mmu_gather_t *tlb, pgd_t * dir)
+static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 {
 	int j;
 	pmd_t * pmd;
@@ -124,7 +124,7 @@ static inline void free_one_pgd(mmu_gather_t *tlb, pgd_t * dir)
  *
  * Must be called with pagetable lock held.
  */
-void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr)
+void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr)
 {
 	pgd_t * page_dir = tlb->mm->pgd;
 
@@ -369,7 +369,8 @@ nomem:
 }
 
 static void
-zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
+zap_pte_range(struct mmu_gather *tlb, pmd_t * pmd,
+		unsigned long address, unsigned long size)
 {
 	unsigned long offset;
 	pte_t *ptep;
@@ -416,7 +417,9 @@ zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned lo
 	pte_unmap(ptep-1);
 }
 
-static void zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address, unsigned long size)
+static void
+zap_pmd_range(struct mmu_gather *tlb, pgd_t * dir,
+		unsigned long address, unsigned long size)
 {
 	pmd_t * pmd;
 	unsigned long end;
@@ -439,7 +442,8 @@ static void zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address,
 	} while (address < end);
 }
 
-void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned long address, unsigned long end)
+void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
+			unsigned long address, unsigned long end)
 {
 	pgd_t * dir;
 
@@ -462,7 +466,7 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 	tlb_end_vma(tlb, vma);
 }
 
-/* Dispose of an entire mmu_gather_t per rescheduling point */
+/* Dispose of an entire struct mmu_gather per rescheduling point */
 #if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
 #define ZAP_BLOCK_SIZE	(FREE_PTE_NR * PAGE_SIZE)
 #endif
@@ -486,7 +490,7 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	mmu_gather_t *tlb;
+	struct mmu_gather *tlb;
 	unsigned long end, block;
 
 	might_sleep();

@@ -44,7 +44,7 @@ extern char __init_begin, __init_end;
 extern long physmem_size;
 
 /* Not changed by UML */
-mmu_gather_t mmu_gathers[NR_CPUS];
+struct mmu_gather mmu_gathers[NR_CPUS];
 
 /* Changed during early boot */
 int kmalloc_ok = 0;

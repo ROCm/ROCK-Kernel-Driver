@@ -51,7 +51,7 @@
 # define tlb_fast_mode(tlb)	(1)
 #endif
 
-typedef struct {
+struct mmu_gather {
 	struct mm_struct	*mm;
 	unsigned int		nr;		/* == ~0U => fast mode */
 	unsigned char		fullmm;		/* non-zero means full mm flush */
@@ -60,17 +60,18 @@ typedef struct {
 	unsigned long		start_addr;
 	unsigned long		end_addr;
 	struct page 		*pages[FREE_PTE_NR];
-} mmu_gather_t;
+};
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
-extern mmu_gather_t	mmu_gathers[NR_CPUS];
+extern struct mmu_gather	mmu_gathers[NR_CPUS];
 
 /*
  * Flush the TLB for address range START to END and, if not in fast mode, release the
  * freed pages that where gathered up to this point.
  */
 static inline void
-ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
+ia64_tlb_flush_mmu(struct mmu_gather *tlb,
+		unsigned long start, unsigned long end)
 {
 	unsigned int nr;
 
@@ -120,12 +121,12 @@ ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 }
 
 /*
- * Return a pointer to an initialized mmu_gather_t.
+ * Return a pointer to an initialized struct mmu_gather.
  */
-static inline mmu_gather_t *
+static inline struct mmu_gather *
 tlb_gather_mmu (struct mm_struct *mm, unsigned int full_mm_flush)
 {
-	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
+	struct mmu_gather *tlb = &mmu_gathers[smp_processor_id()];
 
 	tlb->mm = mm;
 	/*
@@ -153,7 +154,7 @@ tlb_gather_mmu (struct mm_struct *mm, unsigned int full_mm_flush)
  * collected.  The page table lock is still held at this point.
  */
 static inline void
-tlb_finish_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
+tlb_finish_mmu (struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	unsigned long freed = tlb->freed;
 	struct mm_struct *mm = tlb->mm;
@@ -178,7 +179,7 @@ tlb_finish_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
  * this file).
  */
 static inline void
-tlb_remove_page (mmu_gather_t *tlb, struct page *page)
+tlb_remove_page (struct mmu_gather *tlb, struct page *page)
 {
 	tlb->need_flush = 1;
 
@@ -196,7 +197,8 @@ tlb_remove_page (mmu_gather_t *tlb, struct page *page)
  * PTE, not just those pointing to (normal) physical memory.
  */
 static inline void
-__tlb_remove_tlb_entry (mmu_gather_t *tlb, pte_t *ptep, unsigned long address)
+__tlb_remove_tlb_entry(struct mmu_gather *tlb,
+			pte_t *ptep, unsigned long address)
 {
 	if (tlb->start_addr == ~0UL)
 		tlb->start_addr = address;

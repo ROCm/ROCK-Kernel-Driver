@@ -34,7 +34,7 @@
 #include <asm/console.h>
 #include <asm/tlb.h>
 
-mmu_gather_t mmu_gathers[NR_CPUS];
+struct mmu_gather mmu_gathers[NR_CPUS];
 
 extern void die_if_kernel(char *,struct pt_regs *,long);
 
