@@ -447,18 +447,13 @@ static int icside_dma_stop(struct ata_device *drive)
 	return get_dma_residue(ch->hw.dma) != 0;
 }
 
-static int icside_dma_start(struct ata_device *drive, struct request *rq)
+static void icside_dma_start(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 
-	/*
-	 * We can not enable DMA on both channels.
-	 */
+	/* We can not enable DMA on both channels simultaneously. */
 	BUG_ON(dma_channel_active(ch->hw.dma));
-
 	enable_dma(ch->hw.dma);
-
-	return 0;
 }
 
 /*
@@ -524,10 +519,10 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 	u8 int cmd;
 
 	if (icside_dma_common(drive, rq, DMA_MODE_WRITE))
-		return 1;
+		return ide_stopped;
 
 	if (drive->type != ATA_DISK)
-		return 0;
+		return ide_started;
 
 	ata_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
 
@@ -543,7 +538,7 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 
 	enable_dma(ch->hw.dma);
 
-	return 0;
+	return ide_started;
 }
 
 static int icside_irq_status(struct ata_device *drive)

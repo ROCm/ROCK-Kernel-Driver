@@ -958,27 +958,25 @@ static ide_startstop_t idefloppy_transfer_pc(struct ata_device *drive, struct re
 	idefloppy_ireason_reg_t ireason;
 	int ret;
 
+	/* FIXME: Move this lock upwards.
+	 */
+	spin_lock_irqsave(ch->lock, flags);
 	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
 				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
 
-		return startstop;
-	}
-
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
-
-	spin_lock_irqsave(ch->lock, flags);
-	ireason.all=IN_BYTE (IDE_IREASON_REG);
-
-	if (!ireason.b.cod || ireason.b.io) {
-		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
-		ret = ide_stopped;
+		ret = startstop;
 	} else {
-		ata_set_handler (drive, idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
-		atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
-		ret = ide_started;
+		ireason.all=IN_BYTE (IDE_IREASON_REG);
+
+		if (!ireason.b.cod || ireason.b.io) {
+			printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
+			ret = ide_stopped;
+		} else {
+			ata_set_handler (drive, idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
+			atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
+			ret = ide_started;
+		}
 	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
@@ -1104,7 +1102,7 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 		udma_enable(drive, 0, 1);
 
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok = !udma_init(drive, rq);
+		dma_ok = udma_init(drive, rq);
 #endif
 
 	ata_irq_enable(drive, 1);
@@ -1279,8 +1277,10 @@ static void idefloppy_create_rw_cmd(idefloppy_floppy_t *floppy,
  */
 static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
+	struct ata_channel *ch = drive->channel;
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	struct atapi_packet_command *pc;
+	int ret;
 
 #if IDEFLOPPY_DEBUG_LOG
 	printk (KERN_INFO "rq_status: %d, rq_dev: %u, flags: %lx, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->flags,rq->errors);
@@ -1293,13 +1293,22 @@ static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct req
 				drive->name, floppy->failed_pc->c[0], floppy->sense_key, floppy->asc, floppy->ascq);
 		else
 			printk (KERN_ERR "ide-floppy: %s: I/O error\n", drive->name);
+
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		idefloppy_end_request(drive, rq, 0);
+		spin_lock_irq(ch->lock);
+
 		return ide_stopped;
 	}
 	if (rq->flags & REQ_CMD) {
 		if (rq->sector % floppy->bs_factor || rq->nr_sectors % floppy->bs_factor) {
 			printk ("%s: unsupported r/w request size\n", drive->name);
+			/* FIXME: make this unlocking go away*/
+			spin_unlock_irq(ch->lock);
 			idefloppy_end_request(drive, rq, 0);
+			spin_lock_irq(ch->lock);
+
 			return ide_stopped;
 		}
 		pc = idefloppy_next_pc_storage(drive);
@@ -1309,11 +1318,20 @@ static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct req
 		pc = (struct atapi_packet_command *) rq->buffer;
 	} else {
 		blk_dump_rq_flags(rq, "ide-floppy: unsupported command in queue");
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		idefloppy_end_request(drive, rq, 0);
+		spin_lock_irq(ch->lock);
+
 		return ide_stopped;
 	}
 
-	return idefloppy_issue_pc(drive, rq, pc);
+	/* FIXME: make this unlocking go away*/
+	spin_unlock_irq(ch->lock);
+	ret = idefloppy_issue_pc(drive, rq, pc);
+	spin_lock_irq(ch->lock);
+
+	return ret;
 }
 
 /*

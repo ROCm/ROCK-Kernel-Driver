@@ -126,9 +126,8 @@ EXPORT_SYMBOL(ata_status);
  * setting a timer to wake up at half second intervals thereafter, until
  * timeout is achieved, before timing out.
  *
- * FIXME: Channel lock should be held.
+ * Channel lock should be held.
  */
-
 int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
 		unsigned long timeout,
 		struct request *rq, ide_startstop_t *startstop)
@@ -159,6 +158,7 @@ int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
 		if (ata_status(drive, good, bad))
 			return 0;
 	}
+
 	*startstop = ata_error(drive, rq, "status error");
 
 	return 1;

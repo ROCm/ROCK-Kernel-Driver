@@ -251,7 +251,7 @@ static inline void balance_irq(int irq)
 	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
 
-	if (unlikely(entry->timestamp != now)) {
+	if ((entry->timestamp != now) && (smp_num_cpus > 1)) {
 		unsigned long allowed_mask;
 		int random_number;
 

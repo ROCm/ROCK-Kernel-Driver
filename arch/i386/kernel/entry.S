@@ -70,34 +70,15 @@ IF_MASK		= 0x00000200
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
-/*
- * These are offsets into the irq_stat structure
- * There is one per cpu and it is aligned to 32
- * byte boundry (we put that here as a shift count)
- */
-irq_array_shift	= CONFIG_X86_L1_CACHE_SHIFT
-local_irq_count	= 4
-local_bh_count	= 8
-
-#ifdef CONFIG_SMP
-#define GET_CPU_IDX \
-		movl TI_CPU(%ebx), %eax;  \
-		shll $irq_array_shift, %eax
-#define CPU_IDX (,%eax)
-#else
-#define GET_CPU_IDX
-#define CPU_IDX
-#endif
-
 #ifdef CONFIG_PREEMPT
-#define preempt_stop cli
-#define INC_PRE_COUNT(reg) incl TI_PRE_COUNT(reg);
-#define DEC_PRE_COUNT(reg) decl TI_PRE_COUNT(reg);
+#define preempt_stop		cli
+#define INC_PRE_COUNT(reg)	incl TI_PRE_COUNT(reg);
+#define DEC_PRE_COUNT(reg)	decl TI_PRE_COUNT(reg);
 #else
 #define preempt_stop
 #define INC_PRE_COUNT(reg)
 #define DEC_PRE_COUNT(reg)
-#define resume_kernel restore_all
+#define resume_kernel		restore_all
 #endif
 
 #define SAVE_ALL \
@@ -228,20 +209,20 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	cmpl $0,TI_PRE_COUNT(%ebx)
+	cmpl $0,TI_PRE_COUNT(%ebx)	# non-zero preempt_count ?
 	jnz restore_all
-	movl TI_FLAGS(%ebx), %ecx
+need_resched:
+	movl TI_FLAGS(%ebx), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
-	GET_CPU_IDX
-	movl irq_stat+local_bh_count CPU_IDX, %ecx
-	addl irq_stat+local_irq_count CPU_IDX, %ecx
-	jnz restore_all
+	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (execption path) ?
+	jz restore_all
 	movl $PREEMPT_ACTIVE,TI_PRE_COUNT(%ebx)
 	sti
 	call schedule
 	movl $0,TI_PRE_COUNT(%ebx) 
-	jmp restore_all
+	cli
+	jmp need_resched
 #endif
 
 	# system call handler stub

@@ -270,3 +270,25 @@ int ata_timing_compute(struct ata_device *drive, short speed, struct ata_timing 
 
 	return 0;
 }
+
+u8 ata_best_pio_mode(struct ata_device *drive)
+{
+	static u16 eide_pio_timing[6] = { 600, 383, 240, 180, 120, 90 };
+	u16 pio_min;
+	u8 pio;
+
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+
+	/* downgrade mode if necessary */
+	pio_min = (pio > 2) ? drive->id->eide_pio_iordy : drive->id->eide_pio;
+
+	if (pio_min)
+		while (pio && pio_min > eide_pio_timing[pio])
+			pio--;
+
+	if (!pio && drive->id->tPIO)
+		return XFER_PIO_SLOW;
+
+	/* don't allow XFER_PIO_5 for now */
+	return XFER_PIO_0 + min_t(u8, pio, 4);
+}

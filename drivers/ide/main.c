@@ -622,8 +622,6 @@ found:
 		struct ata_operations *tmp;
 		unsigned long flags;
 
-		struct ata_operations *sd = NULL;
-
 		spin_lock_irqsave(&ata_drivers_lock, flags);
 		for(tmp = ata_drivers; tmp; tmp = tmp->next) {
 			if (subdriver_match(ch, tmp) > 0)
