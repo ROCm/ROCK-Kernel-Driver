@@ -36,6 +36,7 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/jiffies.h>
+#include <linux/times.h>
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/in6.h>
@@ -960,8 +961,9 @@ static void igmp6_group_queried(struct ifmcaddr6 *ma, unsigned long resptime)
 {
 	unsigned long delay = resptime;
 
-	/* Do not start timer for addresses with link/host scope */
-	if (ipv6_addr_type(&ma->mca_addr)&(IPV6_ADDR_LINKLOCAL|IPV6_ADDR_LOOPBACK))
+	/* Do not start timer for these addresses */
+	if (ipv6_addr_is_ll_all_nodes(&ma->mca_addr) ||
+	    IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL)
 		return;
 
 	if (del_timer(&ma->mca_timer)) {
@@ -978,6 +980,7 @@ static void igmp6_group_queried(struct ifmcaddr6 *ma, unsigned long resptime)
 	ma->mca_timer.expires = jiffies + delay;
 	if (!mod_timer(&ma->mca_timer, jiffies + delay))
 		atomic_inc(&ma->mca_refcnt);
+	ma->mca_flags |= MAF_TIMER_RUNNING;
 }
 
 static void mld_marksources(struct ifmcaddr6 *pmc, int nsrcs,
@@ -1014,7 +1017,9 @@ int igmp6_event_query(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct in6_addr)))
 		return -EINVAL;
 
-	len = ntohs(skb->nh.ipv6h->payload_len);
+	/* compute payload length excluding extension headers */
+	len = ntohs(skb->nh.ipv6h->payload_len) + sizeof(struct ipv6hdr);
+	len -= (char *)skb->h.raw - (char *)skb->nh.ipv6h; 
 
 	/* Drop queries with not link local source */
 	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr)&IPV6_ADDR_LINKLOCAL))
@@ -2157,7 +2162,8 @@ static int igmp6_mc_seq_show(struct seq_file *seq, void *v)
 		   state->dev->ifindex, state->dev->name,
 		   NIP6(im->mca_addr),
 		   im->mca_users, im->mca_flags,
-		   (im->mca_flags&MAF_TIMER_RUNNING) ? im->mca_timer.expires-jiffies : 0);
+		   (im->mca_flags&MAF_TIMER_RUNNING) ?
+		   jiffies_to_clock_t(im->mca_timer.expires-jiffies) : 0);
 	return 0;
 }
 
