@@ -68,6 +68,7 @@ int ip_conntrack_max;
 static atomic_t ip_conntrack_count = ATOMIC_INIT(0);
 struct list_head *ip_conntrack_hash;
 static kmem_cache_t *ip_conntrack_cachep;
+static kmem_cache_t *ip_conntrack_expect_cachep;
 struct ip_conntrack ip_conntrack_untracked;
 
 extern struct ip_conntrack_protocol ip_conntrack_generic_protocol;
@@ -177,7 +178,7 @@ destroy_expect(struct ip_conntrack_expect *exp)
 	IP_NF_ASSERT(atomic_read(&exp->use) == 0);
 	IP_NF_ASSERT(!timer_pending(&exp->timeout));
 
-	kfree(exp);
+	kmem_cache_free(ip_conntrack_expect_cachep, exp);
 }
 
 inline void ip_conntrack_expect_put(struct ip_conntrack_expect *exp)
@@ -336,7 +337,7 @@ destroy_conntrack(struct nf_conntrack *nfct)
 			list_del(&ct->master->expected_list);
 			master = ct->master->expectant;
 		}
-		kfree(ct->master);
+		kmem_cache_free(ip_conntrack_expect_cachep, ct->master);
 	}
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
@@ -923,9 +924,8 @@ struct ip_conntrack_expect *
 ip_conntrack_expect_alloc(void)
 {
 	struct ip_conntrack_expect *new;
-	
-	new = (struct ip_conntrack_expect *)
-		kmalloc(sizeof(struct ip_conntrack_expect), GFP_ATOMIC);
+
+	new = kmem_cache_alloc(ip_conntrack_expect_cachep, GFP_ATOMIC);
 	if (!new) {
 		DEBUGP("expect_related: OOM allocating expect\n");
 		return NULL;
@@ -933,6 +933,7 @@ ip_conntrack_expect_alloc(void)
 
 	/* tuple_cmp compares whole union, we have to initialized cleanly */
 	memset(new, 0, sizeof(struct ip_conntrack_expect));
+	atomic_set(&new->use, 1);
 
 	return new;
 }
@@ -944,7 +945,6 @@ ip_conntrack_expect_insert(struct ip_conntrack_expect *new,
 	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
 	new->expectant = related_to;
 	new->sibling = NULL;
-	atomic_set(&new->use, 1);
 
 	/* add to expected list for this connection */
 	list_add_tail(&new->expected_list, &related_to->sibling_list);
@@ -997,7 +997,8 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 		}
 
 		WRITE_UNLOCK(&ip_conntrack_lock);
-		kfree(expect);
+		/* This expectation is not inserted so no need to lock */
+		kmem_cache_free(ip_conntrack_expect_cachep, expect);
 		return -EEXIST;
 
 	} else if (related_to->helper->max_expected && 
@@ -1015,7 +1016,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 				       related_to->helper->name,
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
  		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
-			kfree(expect);
+			kmem_cache_free(ip_conntrack_expect_cachep, expect);
 			return -EPERM;
 		}
 		DEBUGP("ip_conntrack: max number of expected "
@@ -1049,7 +1050,7 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 		WRITE_UNLOCK(&ip_conntrack_lock);
 		DEBUGP("expect_related: busy!\n");
 
-		kfree(expect);
+		kmem_cache_free(ip_conntrack_expect_cachep, expect);
 		return -EBUSY;
 	}
 
@@ -1368,6 +1369,7 @@ void ip_conntrack_cleanup(void)
 	}
 
 	kmem_cache_destroy(ip_conntrack_cachep);
+	kmem_cache_destroy(ip_conntrack_expect_cachep);
 	vfree(ip_conntrack_hash);
 	nf_unregister_sockopt(&so_getorigdst);
 }
@@ -1420,6 +1422,15 @@ int __init ip_conntrack_init(void)
 		printk(KERN_ERR "Unable to create ip_conntrack slab cache\n");
 		goto err_free_hash;
 	}
+
+	ip_conntrack_expect_cachep = kmem_cache_create("ip_conntrack_expect",
+					sizeof(struct ip_conntrack_expect),
+					0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+	if (!ip_conntrack_expect_cachep) {
+		printk(KERN_ERR "Unable to create ip_expect slab cache\n");
+		goto err_free_conntrack_slab;
+	}
+
 	/* Don't NEED lock here, but good form anyway. */
 	WRITE_LOCK(&ip_conntrack_lock);
 	/* Sew in builtin protocols. */
@@ -1447,6 +1458,8 @@ int __init ip_conntrack_init(void)
 
 	return ret;
 
+err_free_conntrack_slab:
+	kmem_cache_destroy(ip_conntrack_cachep);
 err_free_hash:
 	vfree(ip_conntrack_hash);
 err_unreg_sockopt:
