@@ -108,7 +108,7 @@ typedef struct {
 #endif
 } efi_memory_desc_t;
 
-typedef int efi_freemem_callback_t (unsigned long start, unsigned long end, void *arg);
+typedef int (*efi_freemem_callback_t) (unsigned long start, unsigned long end, void *arg);
 
 /*
  * Types and defines for Time Services
