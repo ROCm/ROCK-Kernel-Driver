@@ -281,19 +281,19 @@ unsigned long get_cmos_time(void)
 	return retval;
 }
 
-static struct sysdev_class rtc_sysclass = {
-	set_kset_name("rtc"),
+static struct sysdev_class pit_sysclass = {
+	set_kset_name("pit"),
 };
 
 /* XXX this driverfs stuff should probably go elsewhere later -john */
 static struct sys_device device_i8253 = {
-	.id		= 0,
-	.cls	= &rtc_sysclass,
+	.id	= 0,
+	.cls	= &pit_sysclass,
 };
 
 static int time_init_device(void)
 {
-	int error = sysdev_class_register(&rtc_sysclass);
+	int error = sysdev_class_register(&pit_sysclass);
 	if (!error)
 		error = sys_device_register(&device_i8253);
 	return error;

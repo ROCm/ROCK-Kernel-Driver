@@ -74,6 +74,8 @@ void sysdev_remove_file(struct sys_device * s, struct sysdev_attribute * a)
 	sysfs_remove_file(&s->kobj,&a->attr);
 }
 
+EXPORT_SYMBOL(sysdev_create_file);
+EXPORT_SYMBOL(sysdev_remove_file);
 
 /* 
  * declare system_subsys 
@@ -171,6 +173,9 @@ int sys_device_register(struct sys_device * sysdev)
 	/* Make sure the kset is set */
 	sysdev->kobj.kset = &cls->kset;
 
+	/* But make sure we point to the right type for sysfs translation */
+	sysdev->kobj.ktype = &ktype_sysdev;
+
 	/* set the kobject name */
 	snprintf(sysdev->kobj.name,KOBJ_NAME_LEN,"%s%d",
 		 cls->kset.kobj.name,sysdev->id);
@@ -218,9 +223,6 @@ void sys_device_unregister(struct sys_device * sysdev)
 		if (drv->remove)
 			drv->remove(sysdev);
 	}
-
-	list_del_init(&sysdev->entry);
-
 	up_write(&system_subsys.rwsem);
 
 	kobject_unregister(&sysdev->kobj);
