@@ -604,28 +604,27 @@ static inline int fd_eject(int drive)
 }
 #endif
 
-#ifdef DEBUGT
-static long unsigned debugtimer;
-#endif
-
 /*
  * Debugging
  * =========
  */
+#ifdef DEBUGT
+static long unsigned debugtimer;
+
 static inline void set_debugt(void)
 {
-#ifdef DEBUGT
 	debugtimer = jiffies;
-#endif
 }
 
 static inline void debugt(const char *message)
 {
-#ifdef DEBUGT
 	if (DP->flags & DEBUGT)
 		printk("%s dtime=%lu\n", message, jiffies - debugtimer);
-#endif
 }
+#else
+static inline void set_debugt(void) { }
+static inline void debugt(const char *message) { }
+#endif /* DEBUGT */
 
 typedef void (*timeout_fn) (unsigned long);
 static struct timer_list fd_timeout = TIMER_INITIALIZER(floppy_shutdown, 0, 0);
@@ -1546,9 +1545,8 @@ static void setup_rw_floppy(void)
 	for (i = 0; i < raw_cmd->cmd_count; i++)
 		r |= output_byte(raw_cmd->cmd[i]);
 
-#ifdef DEBUGT
 	debugt("rw_command: ");
-#endif
+
 	if (r) {
 		cont->error();
 		reset_fdc();
@@ -1570,9 +1568,7 @@ static int blind_seek;
  */
 static void seek_interrupt(void)
 {
-#ifdef DEBUGT
 	debugt("seek interrupt:");
-#endif
 	if (inr != 2 || (ST0 & 0xF8) != 0x20) {
 		DPRINT("seek failed\n");
 		DRS->track = NEED_2_RECAL;
@@ -1676,24 +1672,18 @@ static void seek_floppy(void)
 	output_byte(FD_SEEK);
 	output_byte(UNIT(current_drive));
 	LAST_OUT(track);
-#ifdef DEBUGT
 	debugt("seek command:");
-#endif
 }
 
 static void recal_interrupt(void)
 {
-#ifdef DEBUGT
 	debugt("recal interrupt:");
-#endif
 	if (inr != 2)
 		FDCS->reset = 1;
 	else if (ST0 & ST0_ECE) {
 		switch (DRS->track) {
 		case NEED_1_RECAL:
-#ifdef DEBUGT
 			debugt("recal interrupt need 1 recal:");
-#endif
 			/* after a second recalibrate, we still haven't
 			 * reached track 0. Probably no drive. Raise an
 			 * error, as failing immediately might upset
@@ -1702,9 +1692,7 @@ static void recal_interrupt(void)
 			cont->redo();
 			return;
 		case NEED_2_RECAL:
-#ifdef DEBUGT
 			debugt("recal interrupt need 2 recal:");
-#endif
 			/* If we already did a recalibrate,
 			 * and we are not at track 0, this
 			 * means we have moved. (The only way
@@ -1722,9 +1710,7 @@ static void recal_interrupt(void)
 			DRS->select_date = jiffies;
 			/* fall through */
 		default:
-#ifdef DEBUGT
 			debugt("recal interrupt default:");
-#endif
 			/* Recalibrate moves the head by at
 			 * most 80 steps. If after one
 			 * recalibrate we don't have reached
@@ -1813,9 +1799,7 @@ irqreturn_t floppy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void recalibrate_floppy(void)
 {
-#ifdef DEBUGT
 	debugt("recalibrate floppy:");
-#endif
 	do_floppy = recal_interrupt;
 	output_byte(FD_RECALIBRATE);
 	LAST_OUT(UNIT(current_drive));
@@ -1826,9 +1810,7 @@ static void recalibrate_floppy(void)
  */
 static void reset_interrupt(void)
 {
-#ifdef DEBUGT
 	debugt("reset interrupt:");
-#endif
 	result();		/* get the status ready for set_fdc */
 	if (FDCS->reset) {
 		printk("reset set in interrupt, calling %p\n", cont->error);
@@ -2266,9 +2248,7 @@ static void redo_format(void)
 	buffer_track = -1;
 	setup_format_params(format_req.track << STRETCH(_floppy));
 	floppy_start();
-#ifdef DEBUGT
 	debugt("queue format request");
-#endif
 }
 
 static struct cont_t format_cont = {
@@ -2992,9 +2972,7 @@ static void redo_fd_request(void)
 		if (TESTF(FD_NEED_TWADDLE))
 			twaddle();
 		schedule_bh(floppy_start);
-#ifdef DEBUGT
 		debugt("queue fd request");
-#endif
 		return;
 	}
 #undef REPEAT
