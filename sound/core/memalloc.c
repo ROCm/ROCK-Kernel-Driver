@@ -864,6 +864,16 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 			len += sprintf(page + len, "SBUS [%x]", mem->dev.dev.sbus->slot);
 			break;
 #endif
+#ifdef CONFIG_PCI
+		case SNDRV_DMA_TYPE_PCI:
+		case SNDRV_DMA_TYPE_PCI_SG:
+			if (mem->dev.dev.dev) {
+				len += sprintf(page + len, "%s [%s]",
+					       mem->dev.type == SNDRV_DMA_TYPE_PCI_SG ? "PCI" : "PCI-SG",
+					       mem->dev.dev.pci->slot_name);
+			}
+			break;
+#endif
 		case SNDRV_DMA_TYPE_DEV:
 		case SNDRV_DMA_TYPE_DEV_SG:
 			if (mem->dev.dev.dev) {
