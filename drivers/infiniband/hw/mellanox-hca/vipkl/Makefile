@@ -33,4 +33,6 @@ mod_vipkl-objs := \
     vipkl_mod_obj.o \
     VIP_rsct.o \
     vipkl_wrap_kernel.o \
-    vipklsyms.o
+    vipklsyms.o \
+    mt_bufpool.o
+
