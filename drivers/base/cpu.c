@@ -29,7 +29,7 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 	cpu->sysdev.id = num;
 	cpu->sysdev.cls = &cpu_sysdev_class;
 
-	error = sys_device_register(&cpu->sysdev);
+	error = sysdev_register(&cpu->sysdev);
 	if (!error && root)
 		error = sysfs_create_link(&root->sysdev.kobj,
 					  &cpu->sysdev.kobj,
