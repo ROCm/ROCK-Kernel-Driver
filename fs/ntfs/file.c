@@ -51,7 +51,6 @@ static int ntfs_file_open(struct inode *vi, struct file *filp)
 struct file_operations ntfs_file_ops = {
 	.llseek	= generic_file_llseek,	/* Seek inside file. */
 	.read	= generic_file_read,	/* Read from file. */
-	.write	= generic_file_write,	/* Write to a file. */
 	.mmap	= generic_file_mmap,	/* Mmap file. */
 	.open	= ntfs_file_open,	/* Open file. */
 };
