@@ -231,14 +231,7 @@ config PCMCIA
 
 source "drivers/base/Kconfig"
 
-menu "SCSI support"
-
-config SCSI
-	tristate "SCSI support"
-
 source "drivers/scsi/Kconfig"
-
-endmenu
 
 source "drivers/s390/Kconfig"
 
