@@ -109,7 +109,7 @@ static struct hlist_head *fz_hash_alloc(int divisor)
 {
 	unsigned long size = divisor * sizeof(struct hlist_head);
 
-	if (divisor <= 1024) {
+	if (size <= PAGE_SIZE) {
 		return kmalloc(size, GFP_KERNEL);
 	} else {
 		return (struct hlist_head *)
@@ -141,11 +141,12 @@ static inline void fn_rebuild_zone(struct fn_zone *fz,
 
 static void fz_hash_free(struct hlist_head *hash, int divisor)
 {
-	if (divisor <= 1024)
+	unsigned long size = divisor * sizeof(struct hlist_head);
+
+	if (size <= PAGE_SIZE)
 		kfree(hash);
 	else
-		free_pages((unsigned long) hash,
-			   get_order(divisor * sizeof(struct hlist_head)));
+		free_pages((unsigned long)hash, get_order(size));
 }
 
 static void fn_rehash_zone(struct fn_zone *fz)
@@ -447,7 +448,7 @@ static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
 			if (prio <= fa->fa_info->fib_priority)
 				break;
 		}
-		return fa;
+		return prev_fa;
 	}
 	return NULL;
 }
@@ -537,6 +538,8 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		 */
 		fa_orig = fa;
 		list_for_each_entry(fa, fa_orig->fa_list.prev, fa_list) {
+			if (fa->fa_tos != tos)
+				break;
 			if (fa->fa_info->fib_priority != fi->fib_priority)
 				break;
 			if (fa->fa_type == type &&
@@ -608,6 +611,7 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	struct fn_hash *table = (struct fn_hash*)tb->tb_data;
 	struct fib_node *f;
 	struct fib_alias *fa, *fa_to_delete;
+	struct list_head *fa_head;
 	int z = r->rtm_dst_len;
 	struct fn_zone *fz;
 	u32 key;
@@ -633,8 +637,12 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		return -ESRCH;
 
 	fa_to_delete = NULL;
-	list_for_each_entry(fa, fa->fa_list.prev, fa_list) {
+	fa_head = fa->fa_list.prev;
+	list_for_each_entry(fa, fa_head, fa_list) {
 		struct fib_info *fi = fa->fa_info;
+
+		if (fa->fa_tos != tos)
+			break;
 
 		if ((!r->rtm_type ||
 		     fa->fa_type == r->rtm_type) &&

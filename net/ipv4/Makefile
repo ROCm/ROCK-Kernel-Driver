@@ -11,7 +11,6 @@ obj-y     := utils.o route.o inetpeer.o protocol.o \
 
 obj-$(CONFIG_PROC_FS) += proc.o
 obj-$(CONFIG_IP_MULTIPLE_TABLES) += fib_rules.o
-obj-$(CONFIG_IP_ROUTE_NAT) += ip_nat_dumb.o
 obj-$(CONFIG_IP_MROUTE) += ipmr.o
 obj-$(CONFIG_NET_IPIP) += ipip.o
 obj-$(CONFIG_NET_IPGRE) += ip_gre.o

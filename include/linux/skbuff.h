@@ -271,7 +271,7 @@ struct sk_buff {
 #ifdef CONFIG_NET_CLS_ACT
 	__u32           tc_verd;               /* traffic control verdict */
 	__u32           tc_classid;            /* traffic control classid */
- #endif
+#endif
 
 #endif
 
