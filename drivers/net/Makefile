@@ -22,7 +22,7 @@ list-multi	:=	rcpci.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
 
 ifeq ($(CONFIG_E100),y)
-  obj-y += e1000/e100.o
+  obj-y += e100/e100.o
 endif
 ifeq ($(CONFIG_E1000),y)
   obj-y += e1000/e1000.o
