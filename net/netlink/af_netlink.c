@@ -1220,7 +1220,6 @@ MODULE_ALIAS_NETPROTO(PF_NETLINK);
 
 EXPORT_SYMBOL(netlink_ack);
 EXPORT_SYMBOL(netlink_broadcast);
-EXPORT_SYMBOL(netlink_broadcast_deliver);
 EXPORT_SYMBOL(netlink_dump_start);
 EXPORT_SYMBOL(netlink_kernel_create);
 EXPORT_SYMBOL(netlink_register_notifier);

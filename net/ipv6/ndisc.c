@@ -802,9 +802,9 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	}
 
 	if (inc)
-		nd_tbl.stats.rcv_probes_mcast++;
+		NEIGH_CACHE_STAT_INC(&nd_tbl, rcv_probes_mcast);
 	else
-		nd_tbl.stats.rcv_probes_ucast++;
+		NEIGH_CACHE_STAT_INC(&nd_tbl, rcv_probes_ucast);
 
 	/* 
 	 *	update / create cache entry
