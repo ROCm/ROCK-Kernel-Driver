@@ -1,7 +1,7 @@
 #ifndef _PPC64_PGALLOC_H
 #define _PPC64_PGALLOC_H
 
-#include <linux/threads.h>
+#include <linux/mm.h>
 #include <asm/processor.h>
 
 /*
@@ -78,8 +78,16 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-#define pte_alloc_one(mm, address) \
-	virt_to_page(pte_alloc_one_kernel((mm), (address)))
+static inline struct page *
+pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	pte_t *pte = pte_alloc_one_kernel(mm, address);
+
+	if (pte)
+		return virt_to_page(pte);
+
+	return NULL;
+}
 
 static inline void
 pte_free_kernel(pte_t *pte)

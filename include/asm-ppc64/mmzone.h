@@ -9,31 +9,67 @@
 
 #include <linux/config.h>
 
-typedef struct plat_pglist_data {
-	pg_data_t	gendata;
-} plat_pg_data_t;
+#ifdef CONFIG_DISCONTIGMEM
+
+extern struct pglist_data *node_data[];
 
 /*
- * Following are macros that are specific to this numa platform.
+ * Following are specific to this numa platform.
  */
 
-extern plat_pg_data_t plat_node_data[];
+extern int numa_node_exists[];
+extern int numa_cpu_lookup_table[];
+extern int numa_memory_lookup_table[];
 
-#define MAX_NUMNODES 4
+#define MAX_NUMNODES 16
+#define MAX_MEMORY (1UL << 41)
+/* 256MB regions */
+#define MEMORY_INCREMENT_SHIFT 28
+#define MEMORY_INCREMENT (1UL << MEMORY_INCREMENT_SHIFT)
 
-/* XXX grab this from the device tree - Anton */
-#define MEMORY_ZONE_BITS	33
-#define CPU_SHIFT_BITS          1
+#undef DEBUG_NUMA
 
-#define PHYSADDR_TO_NID(pa)		((pa) >> MEMORY_ZONE_BITS)
-#define PLAT_NODE_DATA(n)		(&plat_node_data[(n)])
-#define PLAT_NODE_DATA_STARTNR(n)	\
-	(PLAT_NODE_DATA(n)->gendata.node_start_mapnr)
-#define PLAT_NODE_DATA_SIZE(n)		(PLAT_NODE_DATA(n)->gendata.node_size)
-#define PLAT_NODE_DATA_LOCALNR(p, n)	\
-	(((p) >> PAGE_SHIFT) - PLAT_NODE_DATA(n)->gendata.node_start_pfn)
+static inline int pa_to_nid(unsigned long pa)
+{
+        int nid;
 
-#ifdef CONFIG_DISCONTIGMEM
+        nid = numa_memory_lookup_table[pa >> MEMORY_INCREMENT_SHIFT];
+
+#ifdef DEBUG_NUMA
+        /* the physical address passed in is not in the map for the system */
+        if (nid == -1) {
+                printk("bad address: %lx\n", pa);
+                BUG();
+        }
+#endif
+
+        return nid;
+}
+
+#define pfn_to_nid(pfn)		pa_to_nid((pfn) << PAGE_SHIFT)
+
+#define node_startnr(nid)	(node_data[nid]->node_start_mapnr)
+#define node_size(nid)		(node_data[nid]->node_size)
+#define node_localnr(pfn, nid)	((pfn) - node_data[nid]->node_start_pfn)
+
+#ifdef CONFIG_NUMA
+
+static inline int __cpu_to_node(int cpu)
+{
+        int node;
+
+        node = numa_cpu_lookup_table[cpu];
+
+#ifdef DEBUG_NUMA
+        if (node == -1)
+                BUG();
+#endif
+
+        return node;
+}
+
+#define numa_node_id()	__cpu_to_node(smp_processor_id())
+#endif /* CONFIG_NUMA */
 
 /*
  * Following are macros that each numa implmentation must define.
@@ -42,55 +78,39 @@ extern plat_pg_data_t plat_node_data[];
 /*
  * Given a kernel address, find the home node of the underlying memory.
  */
-#define KVADDR_TO_NID(kaddr)	PHYSADDR_TO_NID(__pa(kaddr))
+#define kvaddr_to_nid(kaddr)	pa_to_nid(__pa(kaddr))
 
 /*
  * Return a pointer to the node data for node n.
  */
-#define NODE_DATA(n)	(&((PLAT_NODE_DATA(n))->gendata))
+#define NODE_DATA(nid)		(node_data[nid])
 
-/*
- * NODE_MEM_MAP gives the kaddr for the mem_map of the node.
- */
-#define NODE_MEM_MAP(nid)	(NODE_DATA(nid)->node_mem_map)
+#define node_mem_map(nid)	(NODE_DATA(nid)->node_mem_map)
+#define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
 
-/*
- * Given a kaddr, ADDR_TO_MAPBASE finds the owning node of the memory
- * and returns the mem_map of that node.
- */
-#define ADDR_TO_MAPBASE(kaddr) \
-			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(kaddr)))
-
-/*
- * Given a kaddr, LOCAL_BASE_ADDR finds the owning node of the memory
- * and returns the kaddr corresponding to first physical page in the
- * node's mem_map.
- */
-#define LOCAL_BASE_ADDR(kaddr) \
-	((unsigned long)__va(NODE_DATA(KVADDR_TO_NID(kaddr))->node_start_pfn << PAGE_SHIFT))
-
-#define LOCAL_MAP_NR(kvaddr) \
-	(((unsigned long)(kvaddr)-LOCAL_BASE_ADDR(kvaddr)) >> PAGE_SHIFT)
+#define local_mapnr(kvaddr) \
+	( (__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)) 
 
 #if 0
 /* XXX fix - Anton */
-#define kern_addr_valid(kaddr)	test_bit(LOCAL_MAP_NR(kaddr), \
-					 NODE_DATA(KVADDR_TO_NID(kaddr))->valid_addr_bitmap)
+#define kern_addr_valid(kaddr)	test_bit(local_mapnr(kaddr), \
+		 NODE_DATA(kvaddr_to_nid(kaddr))->valid_addr_bitmap)
 #endif
 
+/* Written this way to avoid evaluating arguments twice */
 #define discontigmem_pfn_to_page(pfn) \
 ({ \
-	unsigned long kaddr = (unsigned long)__va(pfn << PAGE_SHIFT); \
-	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr)); \
+	unsigned long __tmp = pfn; \
+	(node_mem_map(pfn_to_nid(__tmp)) + \
+	 node_localnr(__tmp, pfn_to_nid(__tmp))); \
 })
 
-#ifdef CONFIG_NUMA
+#define discontigmem_page_to_pfn(p)	\
+({ \
+	struct page *__tmp = p; \
+	(((__tmp) - page_zone(__tmp)->zone_mem_map) + \
+	 page_zone(__tmp)->zone_start_pfn); \
+})
 
-/* XXX grab this from the device tree - Anton */
-#define cputonode(cpu)	((cpu) >> CPU_SHIFT_BITS)
-
-#define numa_node_id()	cputonode(smp_processor_id())
-
-#endif /* CONFIG_NUMA */
 #endif /* CONFIG_DISCONTIGMEM */
 #endif /* _ASM_MMZONE_H_ */

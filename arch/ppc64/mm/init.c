@@ -57,6 +57,7 @@
 #include <asm/naca.h>
 #include <asm/eeh.h>
 #include <asm/processor.h>
+#include <asm/mmzone.h>
 
 #include <asm/ppcdebug.h>
 
@@ -435,6 +436,7 @@ void __init mm_init_ppc64(void)
  * Initialize the bootmem system and give it all the memory we
  * have available.
  */
+#ifndef CONFIG_DISCONTIGMEM
 void __init do_init_bootmem(void)
 {
 	unsigned long i;
@@ -494,6 +496,7 @@ void __init paging_init(void)
 		zones_size[i] = 0;
 	free_area_init(zones_size);
 }
+#endif
 
 extern unsigned long prof_shift;
 extern unsigned long prof_len;
@@ -506,19 +509,39 @@ void initialize_paca_hardware_interrupt_stack(void);
 
 void __init mem_init(void)
 {
+#ifndef CONFIG_DISCONTIGMEM
 	extern char *sysmap; 
 	extern unsigned long sysmap_size;
 	unsigned long addr;
+#endif
 	int codepages = 0;
 	int datapages = 0;
 	int initpages = 0;
-	unsigned long va_rtas_base = (unsigned long)__va(rtas.base);
 
 	max_mapnr = max_low_pfn;
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 	num_physpages = max_mapnr;	/* RAM is assumed contiguous */
 	max_pfn = max_low_pfn;
 
+#ifdef CONFIG_DISCONTIGMEM
+{
+	int nid;
+
+        for (nid = 0; nid < MAX_NUMNODES; nid++) {
+		if (numa_node_exists[nid]) {
+			printk("freeing bootmem node %x\n", nid);
+			totalram_pages +=
+				free_all_bootmem_node(NODE_DATA(nid));
+		}
+	}
+
+	printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
+	       (unsigned long)nr_free_pages()<< (PAGE_SHIFT-10),
+	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
+	       initpages<< (PAGE_SHIFT-10),
+	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
+}
+#else
 	totalram_pages += free_all_bootmem();
 
 	if ( sysmap_size )
@@ -546,6 +569,7 @@ void __init mem_init(void)
 	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
 	       initpages<< (PAGE_SHIFT-10),
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
+#endif
 	mem_init_done = 1;
 
 	/* set the last page of each hardware interrupt stack to be protected */
