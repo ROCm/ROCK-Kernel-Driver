@@ -173,13 +173,7 @@ static int enter_state(u32 state)
  */
 int software_suspend(void)
 {
-	int error;
-
-	if (down_trylock(&pm_sem))
-		return -EBUSY;
-	error = pm_suspend_disk();
-	up(&pm_sem);
-	return error;
+	return enter_state(PM_SUSPEND_DISK);
 }
 
 
