@@ -1045,12 +1045,12 @@ static int lock_rdev(mdk_rdev_t *rdev, dev_t dev)
 	int err = 0;
 	struct block_device *bdev;
 
-	bdev = open_by_devnum(dev, FMODE_READ|FMODE_WRITE, BDEV_RAW);
+	bdev = open_by_devnum(dev, FMODE_READ|FMODE_WRITE);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 	err = bd_claim(bdev, rdev);
 	if (err) {
-		blkdev_put(bdev, BDEV_RAW);
+		blkdev_put(bdev);
 		return err;
 	}
 	rdev->bdev = bdev;
@@ -1064,7 +1064,7 @@ static void unlock_rdev(mdk_rdev_t *rdev)
 	if (!bdev)
 		MD_BUG();
 	bd_release(bdev);
-	blkdev_put(bdev, BDEV_RAW);
+	blkdev_put(bdev);
 }
 
 void md_autodetect_dev(dev_t dev);

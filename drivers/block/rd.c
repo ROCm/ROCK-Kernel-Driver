@@ -305,7 +305,7 @@ static void __exit rd_cleanup (void)
 		rd_bdev[i] = NULL;
 		if (bdev) {
 			invalidate_bdev(bdev, 1);
-			blkdev_put(bdev, BDEV_FILE);
+			blkdev_put(bdev);
 		}
 		del_gendisk(rd_disks[i]);
 		put_disk(rd_disks[i]);

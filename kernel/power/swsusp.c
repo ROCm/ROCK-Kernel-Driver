@@ -997,13 +997,13 @@ static int read_suspend_image(const char * specialfile, int noresume)
 		struct block_device *bdev;
 		printk("Resuming from device %s\n",
 				__bdevname(resume_device, b));
-		bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
+		bdev = open_by_devnum(resume_device, FMODE_READ);
 		if (IS_ERR(bdev)) {
 			error = PTR_ERR(bdev);
 		} else {
 			set_blocksize(bdev, PAGE_SIZE);
 			error = __read_suspend_image(bdev, cur, noresume);
-			blkdev_put(bdev, BDEV_RAW);
+			blkdev_put(bdev);
 		}
 	} else error = -ENOMEM;
 

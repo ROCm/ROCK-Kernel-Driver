@@ -353,12 +353,12 @@ static int open_dev(struct dm_dev *d, dev_t dev)
 	if (d->bdev)
 		BUG();
 
-	bdev = open_by_devnum(dev, d->mode, BDEV_RAW);
+	bdev = open_by_devnum(dev, d->mode);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 	r = bd_claim(bdev, _claim_ptr);
 	if (r)
-		blkdev_put(bdev, BDEV_RAW);
+		blkdev_put(bdev);
 	else
 		d->bdev = bdev;
 	return r;
@@ -373,7 +373,7 @@ static void close_dev(struct dm_dev *d)
 		return;
 
 	bd_release(d->bdev);
-	blkdev_put(d->bdev, BDEV_RAW);
+	blkdev_put(d->bdev);
 	d->bdev = NULL;
 }
 
