@@ -140,7 +140,7 @@
 	mov	level, %o0;				\
 	call	routine;				\
 	 add	%sp, STACK_BIAS + REGWIN_SZ, %o1;	\
-	ba,a,pt	%xcc, rtrap_clr_l6;
+	ba,a,pt	%xcc, rtrap_irq;
 	
 #define TICK_SMP_IRQ					\
 	rdpr	%pil, %g2;				\
@@ -150,7 +150,7 @@
 109:	 or	%g7, %lo(109b), %g7;			\
 	call	smp_percpu_timer_interrupt;		\
 	 add	%sp, STACK_BIAS + REGWIN_SZ, %o0;	\
-	ba,a,pt	%xcc, rtrap_clr_l6;
+	ba,a,pt	%xcc, rtrap_irq;
 
 #define TRAP_IVEC TRAP_NOSAVE(do_ivec)
 

@@ -100,6 +100,18 @@ int cpu_idle(void)
 
 #endif
 
+#ifdef CONFIG_PREEMPT
+void kpreempt_maybe(void)
+{
+	int cpu = smp_processor_id();
+
+	if (local_irq_count(cpu) == 0 &&
+	    local_bh_count(cpu) == 0)
+		preempt_schedule();
+	current_thread_info()->preempt_count--;
+}
+#endif
+
 extern char reboot_command [];
 
 #ifdef CONFIG_SUN_CONSOLE

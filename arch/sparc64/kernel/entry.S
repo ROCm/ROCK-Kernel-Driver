@@ -713,8 +713,8 @@ floppy_dosoftint:
 	call		sparc_floppy_irq
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o2
 
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 #endif /* CONFIG_BLK_DEV_FD */
 
@@ -883,7 +883,7 @@ cee_trap:
 	mov	%l5, %o1
 	call	cee_log
 	 add	%sp, STACK_BIAS + REGWIN_SZ, %o2
-	ba,a,pt	%xcc, rtrap_clr_l6
+	ba,a,pt	%xcc, rtrap_irq
 
 	/* Capture I/D/E-cache state into per-cpu error scoreboard.
 	 *
@@ -1109,7 +1109,7 @@ cheetah_fast_ecc:
 	mov		%l5, %o2
 	call		cheetah_fecc_handler
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	ba,a,pt		%xcc, rtrap_clr_l6
+	ba,a,pt		%xcc, rtrap_irq
 
 	/* Our caller has disabled I-cache and performed membar Sync. */
 	.globl		cheetah_cee
@@ -1135,7 +1135,7 @@ cheetah_cee:
 	mov		%l5, %o2
 	call		cheetah_cee_handler
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	ba,a,pt		%xcc, rtrap_clr_l6
+	ba,a,pt		%xcc, rtrap_irq
 
 	/* Our caller has disabled I-cache+D-cache and performed membar Sync. */
 	.globl		cheetah_deferred_trap
@@ -1161,7 +1161,7 @@ cheetah_deferred_trap:
 	mov		%l5, %o2
 	call		cheetah_deferred_handler
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	ba,a,pt		%xcc, rtrap_clr_l6
+	ba,a,pt		%xcc, rtrap_irq
 
 	.globl		__do_privact
 __do_privact:

@@ -5,6 +5,8 @@
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
  */
 
+#include <linux/config.h>
+
 #include <asm/asi.h>
 #include <asm/pstate.h>
 #include <asm/ptrace.h>
@@ -148,7 +150,13 @@ __handle_signal:
 		 andn			%l1, %l4, %l1
 
 		.align			64
-		.globl			rtrap_clr_l6, rtrap, irqsz_patchme
+		.globl			rtrap_irq, rtrap_clr_l6, rtrap, irqsz_patchme
+rtrap_irq:
+#ifdef CONFIG_PREEMPT
+		ldsw			[%g6 + TI_PRE_COUNT], %l0
+		sub			%l0, 1, %l0
+		stw			%l0, [%g6 + TI_PRE_COUNT]
+#endif
 rtrap_clr_l6:	clr			%l6
 rtrap:		ldub			[%g6 + TI_CPU], %l0
 		sethi			%hi(irq_stat), %l2	! &softirq_active
@@ -261,7 +269,18 @@ rt_continue:	ldx			[%sp + PTREGS_OFF + PT_V9_G1], %g1
 
 kern_rtt:	restore
 		retry
-to_kernel:	ldub			[%g6 + TI_FPDEPTH], %l5
+to_kernel:
+#ifdef CONFIG_PREEMPT
+		ldsw			[%g6 + TI_PRE_COUNT], %l5
+		brnz			%l5, kern_fpucheck
+		 add			%l5, 1, %l6
+		stw			%l6, [%g6 + TI_PRE_COUNT]
+		call			kpreempt_maybe
+		 wrpr			%g0, RTRAP_PSTATE, %pstate
+		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate		
+		stw			%l5, [%g6 + TI_PRE_COUNT]
+#endif
+kern_fpucheck:	ldub			[%g6 + TI_FPDEPTH], %l5
 		brz,pt			%l5, rt_continue
 		 srl			%l5, 1, %o0
 		add			%g6, TI_FPSAVED, %l6

@@ -902,7 +902,7 @@ void smp_migrate_task(int cpu, task_t *p)
 	if (smp_processors_ready && (cpu_present_map & mask) != 0) {
 		u64 data0 = (((u64)&xcall_migrate_task) & 0xffffffff);
 
-		spin_lock(&migration_lock);
+		_raw_spin_lock(&migration_lock);
 		new_task = p;
 
 		if (tlb_type == spitfire)
@@ -923,7 +923,7 @@ asmlinkage void smp_task_migration_interrupt(int irq, struct pt_regs *regs)
 	clear_softint(1 << irq);
 
 	p = new_task;
-	spin_unlock(&migration_lock);
+	_raw_spin_unlock(&migration_lock);
 	sched_task_migrated(p);
 }
 

@@ -18,6 +18,10 @@
 	/* On entry: %o5=current FPRS value, %g7 is callers address */
 	/* May clobber %o5, %g1, %g2, %g3, %g7, %icc, %xcc */
 
+	/* Nothing special need be done here to handle pre-emption, this
+	 * FPU save/restore mechanism is already preemption safe.
+	 */
+
 	.align		32
 VISenter:
 	ldub		[%g6 + TI_FPDEPTH], %g1

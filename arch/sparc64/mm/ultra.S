@@ -493,8 +493,8 @@ xcall_report_regs:
 109:	 or		%g7, %lo(109b), %g7
 	call		__show_regs
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 	.align		32
 	.globl		xcall_flush_dcache_page_cheetah
@@ -554,8 +554,8 @@ xcall_capture:
 109:	 or		%g7, %lo(109b), %g7
 	call		smp_penguin_jailcell
 	 nop
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 	.globl		xcall_promstop
 xcall_promstop:
@@ -681,8 +681,8 @@ xcall_call_function:
 109:	 or		%g7, %lo(109b), %g7
 	call		smp_call_function_client
 	 nop
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 	.globl		xcall_migrate_task
 xcall_migrate_task:

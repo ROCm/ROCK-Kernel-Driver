@@ -1700,6 +1700,7 @@ void trap_init(void)
 	    TI_KERN_CNTD1 != offsetof(struct thread_info, kernel_cntd1) ||
 	    TI_PCR != offsetof(struct thread_info, pcr_reg) ||
 	    TI_CEE_STUFF != offsetof(struct thread_info, cee_stuff) ||
+	    TI_PRE_COUNT != offsetof(struct thread_info, preempt_count) ||
 	    TI_FPREGS != offsetof(struct thread_info, fpregs) ||
 	    (TI_FPREGS & (64 - 1)))
 		thread_info_offsets_are_bolixed_dave();

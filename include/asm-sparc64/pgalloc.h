@@ -158,6 +158,7 @@ extern __inline__ void free_pgd_fast(pgd_t *pgd)
 {
 	struct page *page = virt_to_page(pgd);
 
+	preempt_disable();
 	if (!page->pprev_hash) {
 		(unsigned long *)page->next_hash = pgd_quicklist;
 		pgd_quicklist = (unsigned long *)page;
@@ -165,12 +166,14 @@ extern __inline__ void free_pgd_fast(pgd_t *pgd)
 	(unsigned long)page->pprev_hash |=
 		(((unsigned long)pgd & (PAGE_SIZE / 2)) ? 2 : 1);
 	pgd_cache_size++;
+	preempt_enable();
 }
 
 extern __inline__ pgd_t *get_pgd_fast(void)
 {
         struct page *ret;
 
+	preempt_disable();
         if ((ret = (struct page *)pgd_quicklist) != NULL) {
                 unsigned long mask = (unsigned long)ret->pprev_hash;
 		unsigned long off = 0;
@@ -186,16 +189,22 @@ extern __inline__ pgd_t *get_pgd_fast(void)
 			pgd_quicklist = (unsigned long *)ret->next_hash;
                 ret = (struct page *)(__page_address(ret) + off);
                 pgd_cache_size--;
+		preempt_enable();
         } else {
-		struct page *page = alloc_page(GFP_KERNEL);
+		struct page *page;
 
+		preempt_enable();
+		page = alloc_page(GFP_KERNEL);
 		if (page) {
 			ret = (struct page *)page_address(page);
 			clear_page(ret);
 			(unsigned long)page->pprev_hash = 2;
+
+			preempt_disable();
 			(unsigned long *)page->next_hash = pgd_quicklist;
 			pgd_quicklist = (unsigned long *)page;
 			pgd_cache_size++;
+			preempt_enable();
 		}
         }
         return (pgd_t *)ret;
@@ -205,20 +214,25 @@ extern __inline__ pgd_t *get_pgd_fast(void)
 
 extern __inline__ void free_pgd_fast(pgd_t *pgd)
 {
+	preempt_disable();
 	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
 	pgtable_cache_size++;
+	preempt_enable();
 }
 
 extern __inline__ pgd_t *get_pgd_fast(void)
 {
 	unsigned long *ret;
 
+	preempt_disable();
 	if((ret = pgd_quicklist) != NULL) {
 		pgd_quicklist = (unsigned long *)(*ret);
 		ret[0] = 0;
 		pgtable_cache_size--;
+		preempt_enable();
 	} else {
+		preempt_enable();
 		ret = (unsigned long *) __get_free_page(GFP_KERNEL);
 		if(ret)
 			memset(ret, 0, PAGE_SIZE);
@@ -258,20 +272,27 @@ extern __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long 
 
 	if (pte_quicklist[color] == NULL)
 		color = 1;
+
+	preempt_disable();
 	if((ret = (unsigned long *)pte_quicklist[color]) != NULL) {
 		pte_quicklist[color] = (unsigned long *)(*ret);
 		ret[0] = 0;
 		pgtable_cache_size--;
 	}
+	preempt_enable();
+
 	return (pmd_t *)ret;
 }
 
 extern __inline__ void free_pmd_fast(pmd_t *pmd)
 {
 	unsigned long color = DCACHE_COLOR((unsigned long)pmd);
+
+	preempt_disable();
 	*(unsigned long *)pmd = (unsigned long) pte_quicklist[color];
 	pte_quicklist[color] = (unsigned long *) pmd;
 	pgtable_cache_size++;
+	preempt_enable();
 }
 
 extern __inline__ void free_pmd_slow(pmd_t *pmd)
@@ -288,20 +309,25 @@ extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long 
 	unsigned long color = VPTE_COLOR(address);
 	unsigned long *ret;
 
+	preempt_disable();
 	if((ret = (unsigned long *)pte_quicklist[color]) != NULL) {
 		pte_quicklist[color] = (unsigned long *)(*ret);
 		ret[0] = 0;
 		pgtable_cache_size--;
 	}
+	preempt_enable();
 	return (pte_t *)ret;
 }
 
 extern __inline__ void free_pte_fast(pte_t *pte)
 {
 	unsigned long color = DCACHE_COLOR((unsigned long)pte);
+
+	preempt_disable();
 	*(unsigned long *)pte = (unsigned long) pte_quicklist[color];
 	pte_quicklist[color] = (unsigned long *) pte;
 	pgtable_cache_size++;
+	preempt_enable();
 }
 
 extern __inline__ void free_pte_slow(pte_t *pte)
