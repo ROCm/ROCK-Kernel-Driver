@@ -119,15 +119,15 @@ If a caller requires memory barrier semantics around an atomic_t
 operation which does not return a value, a set of interfaces are
 defined which accomplish this:
 
-	void smb_mb__before_atomic_dec(void);
-	void smb_mb__after_atomic_dec(void);
-	void smb_mb__before_atomic_inc(void);
-	void smb_mb__after_atomic_dec(void);
+	void smp_mb__before_atomic_dec(void);
+	void smp_mb__after_atomic_dec(void);
+	void smp_mb__before_atomic_inc(void);
+	void smp_mb__after_atomic_dec(void);
 
-For example, smb_mb__before_atomic_dec() can be used like so:
+For example, smp_mb__before_atomic_dec() can be used like so:
 
 	obj->dead = 1;
-	smb_mb__before_atomic_dec();
+	smp_mb__before_atomic_dec();
 	atomic_dec(&obj->ref_count);
 
 It makes sure that all memory operations preceeding the atomic_dec()
@@ -136,14 +136,14 @@ operation.  In the above example, it guarentees that the assignment of
 "1" to obj->dead will be globally visible to other cpus before the
 atomic counter decrement.
 
-Without the explicitl smb_mb__before_atomic_dec() call, the
+Without the explicitl smp_mb__before_atomic_dec() call, the
 implementation could legally allow the atomic counter update visible
 to other cpus before the "obj->dead = 1;" assignment.
 
 The other three interfaces listed are used to provide explicit
 ordering with respect to memory operations after an atomic_dec() call
-(smb_mb__after_atomic_dec()) and around atomic_inc() calls
-(smb_mb__{before,after}_atomic_inc()).
+(smp_mb__after_atomic_dec()) and around atomic_inc() calls
+(smp_mb__{before,after}_atomic_inc()).
 
 A missing memory barrier in the cases where they are required by the
 atomic_t implementation above can have disasterous results.  Here is
