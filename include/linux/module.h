@@ -253,6 +253,7 @@ static const struct gtype##_id * __module_##gtype##_table \
  * software modules
  *
  *	"GPL"				[GNU Public License v2 or later]
+ *	"GPL v2"			[GNU Public License v2]
  *	"GPL and additional rights"	[GNU Public License v2 rights and more]
  *	"Dual BSD/GPL"			[GNU Public License v2 or BSD license choice]
  *	"Dual MPL/GPL"			[GNU Public License v2 or Mozilla license choice]

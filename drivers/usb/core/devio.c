@@ -1067,6 +1067,10 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
        /* disconnect kernel driver from interface, leaving it unbound.  */
        case USBDEVFS_DISCONNECT:
 		/* this function is voodoo. */
+		/* which function ... usb_device_remove()?
+		 * FIXME either the module lock (BKL) should be involved
+		 * here too, or the 'default' case below is broken
+		 */
 		driver = ifp->driver;
 		if (driver) {
 			dbg ("disconnect '%s' from dev %d interface %d",
@@ -1081,26 +1085,28 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 		retval = usb_device_probe (&ifp->dev);
 		break;
 
-       /* talk directly to the interface's driver */
-       default:
-		lock_kernel(); /* against module unload */
-               driver = ifp->driver;
-               if (driver == 0 || driver->ioctl == 0) {
+	/* talk directly to the interface's driver */
+	default:
+		/* BKL used here to protect against changing the binding
+		 * of this driver to this device, as well as unloading its
+		 * driver module.
+		 */
+		lock_kernel ();
+		driver = ifp->driver;
+		if (driver == 0 || driver->ioctl == 0) {
 			unlock_kernel();
 			retval = -ENOSYS;
 		} else {
-			if (ifp->driver->owner) {
-				__MOD_INC_USE_COUNT(ifp->driver->owner);
+			if (driver->owner
+					&& !try_inc_mod_count (driver->owner)) {
 				unlock_kernel();
+				retval = -ENOSYS;
+				break;
 			}
-			/* ifno might usefully be passed ... */
-                       retval = driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
-			/* size = min_t(int, size, retval)? */
-			if (ifp->driver->owner) {
-				__MOD_DEC_USE_COUNT(ifp->driver->owner);
-			} else {
-				unlock_kernel();
-			}
+			unlock_kernel ();
+			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
+			if (driver->owner)
+				__MOD_DEC_USE_COUNT (driver->owner);
 		}
 		
 		if (retval == -ENOIOCTLCMD)

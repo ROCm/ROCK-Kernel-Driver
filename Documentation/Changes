@@ -55,7 +55,7 @@ o  util-linux             2.10o                   # fdformat --version
 o  modutils               2.4.2                   # insmod -V
 o  e2fsprogs              1.25                    # tune2fs
 o  jfsutils               1.0.14                  # fsck.jfs -V
-o  reiserfsprogs          3.x.1b                  # reiserfsck 2>&1|grep reiserfsprogs
+o  reiserfsprogs          3.6.3                   # reiserfsck -V 2>&1|grep reiserfsprogs
 o  xfsprogs               2.1.0                   # xfs_db -V
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
@@ -229,7 +229,6 @@ If you are running v0.1.17 or earlier, you should upgrade to
 version v0.99.0 or higher. Running old versions may cause problems
 with programs using shared memory.
 
-
 Networking
 ==========
 
@@ -326,7 +325,7 @@ o  <http://oss.software.ibm.com/jfs>
 
 Reiserfsprogs
 -------------
-o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.1b.tar.gz>
+o  <http://www.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.6.3.tar.gz>
 
 Xfsprogs
 --------

@@ -238,11 +238,11 @@ int copy_memory(memory_handle_t handle, copy_op_t *req);
 
 /* In rsrc_mgr */
 void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
-		  int force_low);
+		  int force_low, socket_info_t *s);
 int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
-		   char *name);
+		   char *name, socket_info_t *s);
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name);
+		    int force_low, char *name, socket_info_t *s);
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);

@@ -17,3 +17,9 @@ extern void (*sa1100fb_lcd_power)(int on);
 
 extern void sa1110_mb_enable(void);
 extern void sa1110_mb_disable(void);
+
+struct cpufreq_policy;
+
+extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
+extern void sa11x0_verify_speed(struct cpufreq_policy *policy);
+extern unsigned int sa11x0_getspeed(void);

@@ -264,11 +264,11 @@ static int setup_cis_mem(socket_info_t *s)
 	(s->cis_mem.sys_start == 0)) {
 	int low = !(s->cap.features & SS_CAP_PAGE_REGS);
 	vs = s;
-	validate_mem(cis_readable, checksum_match, low);
+	validate_mem(cis_readable, checksum_match, low, s);
 	s->cis_mem.sys_start = 0;
 	vs = NULL;
 	if (find_mem_region(&s->cis_mem.sys_start, s->cap.map_size,
-			    s->cap.map_size, low, "card services")) {
+			    s->cap.map_size, low, "card services", s)) {
 	    printk(KERN_NOTICE "cs: unable to map card memory!\n");
 	    return CS_OUT_OF_RESOURCE;
 	}

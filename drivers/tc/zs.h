@@ -38,7 +38,7 @@ struct serial_struct {
 /*
  * Definitions for ZILOG_struct (and serial_struct) flags field
  */
-#define ZILOG_HUP_NOTIFY 0x0001 /* Notify getty on hangups and closes 
+#define ZILOG_HUP_NOTIFY 0x0001 /* Notify getty on hangups and closes
 				   on the callout port */
 #define ZILOG_FOURPORT  0x0002	/* Set OU1, OUT2 per AST Fourport settings */
 #define ZILOG_SAK	0x0004	/* Secure Attention Key (Orange book) */
@@ -74,7 +74,7 @@ struct serial_struct {
 #ifdef __KERNEL__
 /*
  * This is our internal structure for each serial port's state.
- * 
+ *
  * Many fields are paralleled by the structure used by the serial_struct
  * structure.
  *

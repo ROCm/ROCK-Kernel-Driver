@@ -1006,9 +1006,7 @@ static void bluetooth_write_bulk_callback (struct urb *urb)
 	}
 
 	/* wake up our little function to let the tty layer know that something happened */
-	queue_task(&bluetooth->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
-	return;
+	schedule_task(&bluetooth->tqueue);
 }
 
 

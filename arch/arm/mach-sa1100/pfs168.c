@@ -17,7 +17,6 @@
 #include <asm/mach/serial_sa1100.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 
 static int __init pfs168_init(void)
@@ -36,7 +35,7 @@ static int __init pfs168_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	return sa1111_init(NULL, 0x40000000, IRQ_GPIO25);
+	return sa1111_init(0x40000000, IRQ_GPIO25);
 }
 
 arch_initcall(pfs168_init);

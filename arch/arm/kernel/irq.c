@@ -569,7 +569,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
  *	On a shared IRQ the caller must ensure the interrupt is disabled
  *	on the card it drives before calling this function.
  *
- *	This function may be called from interrupt context.
+ *	This function must not be called from interrupt context.
  */
 void free_irq(unsigned int irq, void *dev_id)
 {
@@ -591,15 +591,19 @@ void free_irq(unsigned int irq, void *dev_id)
 
 	    	/* Found it - now free it */
 		*p = action->next;
-		kfree(action);
-		goto out;
+		break;
 	}
-	printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
-#ifdef CONFIG_DEBUG_ERRORS
-	__backtrace();
-#endif
-out:
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
+
+	if (!action) {
+		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
+#ifdef CONFIG_DEBUG_ERRORS
+		__backtrace();
+#endif
+	} else {
+		synchronize_irq(irq);
+		kfree(action);
+	}
 }
 
 /* Start the interrupt probing.  Unlike other architectures,

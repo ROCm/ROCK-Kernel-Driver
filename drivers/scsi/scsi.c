@@ -566,22 +566,6 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 				   SCpnt->target,
 				   atomic_read(&SCpnt->host->host_active),
 				   SCpnt->host->host_failed));
-	if (SCpnt->host->host_failed != 0) {
-		SCSI_LOG_ERROR_RECOVERY(5, printk("Error handler thread %d %d\n",
-						SCpnt->host->in_recovery,
-						SCpnt->host->eh_active));
-	}
-	/*
-	 * If the host is having troubles, then look to see if this was the last
-	 * command that might have failed.  If so, wake up the error handler.
-	 */
-	if (SCpnt->host->in_recovery
-	    && !SCpnt->host->eh_active
-	    && SCpnt->host->host_busy == SCpnt->host->host_failed) {
-		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler thread (%d)\n",
-			     atomic_read(&SCpnt->host->eh_wait->count)));
-		up(SCpnt->host->eh_wait);
-	}
 
 	spin_unlock_irqrestore(&device_request_lock, flags);
 
@@ -1217,28 +1201,11 @@ void scsi_done(Scsi_Cmnd * SCpnt)
 	 * etc, etc.
 	 */
 	if (!tstatus) {
-		SCpnt->done_late = 1;
 		return;
 	}
+
 	/* Set the serial numbers back to zero */
 	SCpnt->serial_number = 0;
-
-	/*
-	 * First, see whether this command already timed out.  If so, we ignore
-	 * the response.  We treat it as if the command never finished.
-	 *
-	 * Since serial_number is now 0, the error handler cound detect this
-	 * situation and avoid to call the low level driver abort routine.
-	 * (DB)
-         *
-         * FIXME(eric) - I believe that this test is now redundant, due to
-         * the test of the return status of del_timer().
-	 */
-	if (SCpnt->state == SCSI_STATE_TIMEOUT) {
-		SCSI_LOG_MLCOMPLETE(1, printk("Ignoring completion of %p due to timeout status", SCpnt));
-		return;
-	}
-
 	SCpnt->serial_number_at_timeout = 0;
 	SCpnt->state = SCSI_STATE_BHQUEUE;
 	SCpnt->owner = SCSI_OWNER_BH_HANDLER;
@@ -1349,21 +1316,11 @@ static void scsi_softirq(struct softirq_action *h)
 					SCSI_LOG_MLCOMPLETE(3, print_sense("bh", SCpnt));
 				}
 				if (SCpnt->host->eh_wait != NULL) {
-					SCpnt->host->host_failed++;
+					scsi_eh_eflags_set(SCpnt, SCSI_EH_CMD_FAILED | SCSI_EH_CMD_ERR);
 					SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
 					SCpnt->state = SCSI_STATE_FAILED;
-					SCpnt->host->in_recovery = 1;
-					/*
-					 * If the host is having troubles, then
-					 * look to see if this was the last
-					 * command that might have failed.  If
-					 * so, wake up the error handler.
-					 */
-					if (SCpnt->host->host_busy == SCpnt->host->host_failed) {
-						SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler thread (%d)\n",
-										  atomic_read(&SCpnt->host->eh_wait->count)));
-						up(SCpnt->host->eh_wait);
-					}
+
+					scsi_host_failed_inc_and_test(SCpnt->host);
 				} else {
 					/*
 					 * We only get here if the error
@@ -1418,7 +1375,6 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	struct Scsi_Host *host;
 	Scsi_Device *device;
 	Scsi_Request * SRpnt;
-	unsigned long flags;
 
 	host = SCpnt->host;
 	device = SCpnt->device;
@@ -1432,10 +1388,7 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
          * one execution context, but the device and host structures are
          * shared.
          */
-	spin_lock_irqsave(host->host_lock, flags);
-	host->host_busy--;	/* Indicate that we are free */
-	device->device_busy--;	/* Decrement device usage counter. */
-	spin_unlock_irqrestore(host->host_lock, flags);
+	scsi_host_busy_dec_and_test(host, device);
 
         /*
          * Clear the flags which say that the device/host is no longer
@@ -1450,7 +1403,7 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	 * If we have valid sense information, then some kind of recovery
 	 * must have taken place.  Make a note of this.
 	 */
-	if (scsi_sense_valid(SCpnt)) {
+	if (SCSI_SENSE_VALID(SCpnt)) {
 		SCpnt->result |= (DRIVER_SENSE << 24);
 	}
 	SCSI_LOG_MLCOMPLETE(3, printk("Notifying upper driver of completion for device %d %x\n",

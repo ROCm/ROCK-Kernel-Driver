@@ -465,10 +465,8 @@ static void ipaq_write_bulk_callback(struct urb *urb)
 		priv->active = 0;
 		spin_unlock_irqrestore(&write_list_lock, flags);
 	}
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
-	
-	return;
+
+	schedule_task(&port->tqueue);
 }
 
 static int ipaq_write_room(struct usb_serial_port *port)

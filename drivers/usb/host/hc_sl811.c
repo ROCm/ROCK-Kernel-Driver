@@ -28,7 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
@@ -1158,6 +1158,7 @@ static hci_t *__devinit hc_alloc_hci (void)
 	bus = usb_alloc_bus (&hci_device_operations);
 	if (!bus) {
 		kfree (hci);
+		kfree (ps);
 		return NULL;
 	}
 
