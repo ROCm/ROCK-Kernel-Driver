@@ -350,7 +350,7 @@ void usbvideo_CameraRelease(uvd_t *uvd);
 int usbvideo_v4l_close(struct inode *inode, struct file *file);
 int usbvideo_v4l_initialize(struct video_device *dev);
 int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
-		       unsigned int ioctlnr, void *arg);
+		       unsigned int cmd, unsigned long arg);
 int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma);
 int usbvideo_v4l_open(struct inode *inode, struct file *file);
 int usbvideo_v4l_read(struct file *file, char *buf,
