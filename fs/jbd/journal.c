@@ -247,10 +247,8 @@ loop:
 
 static void journal_start_thread(journal_t *journal)
 {
-	kernel_thread(kjournald, (void *) journal,
-		      CLONE_VM | CLONE_FS | CLONE_FILES);
-	while (!journal->j_task)
-		sleep_on(&journal->j_wait_done_commit);
+	kernel_thread(kjournald, journal, CLONE_VM|CLONE_FS|CLONE_FILES);
+	wait_event(journal->j_wait_done_commit, journal->j_task != 0);
 }
 
 static void journal_kill_thread(journal_t *journal)
@@ -259,7 +257,7 @@ static void journal_kill_thread(journal_t *journal)
 
 	while (journal->j_task) {
 		wake_up(&journal->j_wait_commit);
-		sleep_on(&journal->j_wait_done_commit);
+		wait_event(journal->j_wait_done_commit, journal->j_task == 0);
 	}
 }
 

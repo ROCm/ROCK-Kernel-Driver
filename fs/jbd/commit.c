@@ -85,11 +85,18 @@ void journal_commit_transaction(journal_t *journal)
 
 	spin_lock(&commit_transaction->t_handle_lock);
 	while (commit_transaction->t_updates != 0) {
-		spin_unlock(&commit_transaction->t_handle_lock);
-		unlock_journal(journal);
-		sleep_on(&journal->j_wait_updates);
-		lock_journal(journal);
-		spin_lock(&commit_transaction->t_handle_lock);
+		DEFINE_WAIT(wait);
+
+		prepare_to_wait(&journal->j_wait_updates, &wait,
+					TASK_UNINTERRUPTIBLE);
+		if (commit_transaction->t_updates) {
+			spin_unlock(&commit_transaction->t_handle_lock);
+			unlock_journal(journal);
+			schedule();
+			lock_journal(journal);
+			spin_lock(&commit_transaction->t_handle_lock);
+		}
+		finish_wait(&journal->j_wait_updates, &wait);
 	}
 	spin_unlock(&commit_transaction->t_handle_lock);
 
