@@ -372,19 +372,6 @@ qla2x00_start_scsi(srb_t *sp)
 	if (index == MAX_OUTSTANDING_COMMANDS)
 		goto queuing_error;
 
-	/* Calculate the number of request entries needed. */
-	req_cnt = (ha->calc_request_entries)(cmd->request->nr_hw_segments);
-	if (ha->req_q_cnt < (req_cnt + 2)) {
-		cnt = RD_REG_WORD_RELAXED(ISP_REQ_Q_OUT(ha, reg));
-		if (ha->req_ring_index < cnt)
-			ha->req_q_cnt = cnt - ha->req_ring_index;
-		else
-			ha->req_q_cnt = ha->request_q_length -
-			    (ha->req_ring_index - cnt);
-	}
-	if (ha->req_q_cnt < (req_cnt + 2))
-		goto queuing_error;
-
 	/* Finally, we have enough space, now perform mappings. */
 	tot_dsds = 0;
 	if (cmd->use_sg) {
@@ -397,6 +384,22 @@ qla2x00_start_scsi(srb_t *sp)
 	    tot_dsds++;
 	}
 	req_cnt = (ha->calc_request_entries)(tot_dsds);
+
+	if (ha->req_q_cnt < (req_cnt + 2)) {
+		cnt = RD_REG_WORD_RELAXED(ISP_REQ_Q_OUT(ha, reg));
+		if (ha->req_ring_index < cnt)
+			ha->req_q_cnt = cnt - ha->req_ring_index;
+		else
+			ha->req_q_cnt = ha->request_q_length -
+				(ha->req_ring_index - cnt);
+	}
+	
+	if (ha->req_q_cnt < (req_cnt + 2)) {
+		if  (cmd->use_sg)
+			pci_unmap_sg(ha->pdev, sg, cmd->use_sg,
+					cmd->sc_data_direction);
+		goto queuing_error;
+	}
 
 	/* Build command packet */
 	ha->current_outstanding_cmd = handle;

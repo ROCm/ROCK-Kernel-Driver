@@ -9,6 +9,6 @@
 #ifndef __ASM_IA64_HDREG_H
 #define __ASM_IA64_HDREG_H
 
-typedef unsigned short ide_ioreg_t;
+typedef unsigned long ide_ioreg_t;
 
 #endif /* __ASM_IA64_HDREG_H */

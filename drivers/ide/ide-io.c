@@ -803,6 +803,9 @@ void ide_unpin_hwgroup(ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 
+	if (in_interrupt())
+		return;
+
 	if (hwgroup) {
 		spin_lock_irq(&ide_lock);
 		HWGROUP(drive)->busy = 0;
@@ -815,6 +818,9 @@ void ide_unpin_hwgroup(ide_drive_t *drive)
 void ide_pin_hwgroup(ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+
+	if (in_interrupt())
+		return;
 
 	/*
 	 * should only happen very early, so not a problem
