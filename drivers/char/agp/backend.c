@@ -214,17 +214,6 @@ static void agp_backend_cleanup(struct agp_bridge_data *bridge)
 				phys_to_virt(bridge->scratch_page_real));
 }
 
-static const drm_agp_t drm_agp = {
-	&agp_free_memory,
-	&agp_allocate_memory,
-	&agp_bind_memory,
-	&agp_unbind_memory,
-	&agp_enable,
-	&agp_backend_acquire,
-	&agp_backend_release,
-	&agp_copy_info
-};
-
 /* XXX Kludge alert: agpgart isn't ready for multiple bridges yet */
 struct agp_bridge_data *agp_alloc_bridge(void)
 {
@@ -277,9 +266,6 @@ int agp_add_bridge(struct agp_bridge_data *bridge)
 		goto frontend_err;
 	}
 
-	/* FIXME: What to do with this? */
-	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
-
 	agp_count++;
 	return 0;
 
@@ -298,7 +284,6 @@ void agp_remove_bridge(struct agp_bridge_data *bridge)
 	bridge->type = NOT_SUPPORTED;
 	agp_frontend_cleanup();
 	agp_backend_cleanup(bridge);
-	inter_module_unregister("drm_agp");
 	agp_count--;
 	module_put(bridge->driver->owner);
 }
