@@ -105,6 +105,7 @@ config DUMMY_CONSOLE
 config FRAMEBUFFER_CONSOLE
 	tristate "Framebuffer Console support"
 	depends on FB
+	select CRC32
 
 config FONTS
 	bool "Select compiled-in fonts"
