@@ -148,6 +148,8 @@ static void xfrm_policy_timer(unsigned long data)
 	int warn = 0;
 	int dir;
 
+	read_lock(&xp->lock);
+
 	if (xp->dead)
 		goto out;
 
@@ -197,6 +199,7 @@ static void xfrm_policy_timer(unsigned long data)
 		xfrm_pol_hold(xp);
 
 out:
+	read_unlock(&xp->lock);
 	xfrm_pol_put(xp);
 	return;
 

@@ -295,26 +295,33 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
  */
 #define OMAP_ID_REG		__REG32(0xfffed404)
 
+/* See also uncompress.h */
+#define OMAP_ID_730		0xB55F
+#define OMAP_ID_1510		0xB470
+#define OMAP_ID_1610		0xB576
+#define OMAP_ID_1710		0xB5F7
+#define OMAP_ID_5912		0xB58C
+
 #ifdef CONFIG_ARCH_OMAP730
 #include "omap730.h"
-#define cpu_is_omap730()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB55F)
+#define cpu_is_omap730()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_730)
 #else
 #define cpu_is_omap730()	0
 #endif
 
 #ifdef CONFIG_ARCH_OMAP1510
 #include "omap1510.h"
-#define cpu_is_omap1510()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB470)
+#define cpu_is_omap1510()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_1510)
 #else
 #define cpu_is_omap1510()	0
 #endif
 
 #ifdef CONFIG_ARCH_OMAP1610
 #include "omap1610.h"
-#define cpu_is_omap1710()       (((OMAP_ID_REG >> 12) & 0xffff) == 0xB5F7)
+#define cpu_is_omap1710()       (((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_1710)
 /* Detect 1710 as 1610 for now */
-#define cpu_is_omap1610()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB576 || \
-				 cpu_is_omap1710())
+#define cpu_is_omap1610()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_1610 \
+				|| cpu_is_omap1710())
 #else
 #define cpu_is_omap1610()	0
 #define cpu_is_omap1710()	0
@@ -322,7 +329,7 @@ typedef struct { volatile u32 offset[4096]; } __regbase32;
 
 #ifdef CONFIG_ARCH_OMAP5912
 #include "omap5912.h"
-#define cpu_is_omap5912()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB58C)
+#define cpu_is_omap5912()	(((OMAP_ID_REG >> 12) & 0xffff) == OMAP_ID_5912)
 #else
 #define cpu_is_omap5912()	0
 #endif

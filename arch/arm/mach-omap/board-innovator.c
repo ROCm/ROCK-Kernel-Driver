@@ -149,7 +149,7 @@ static void __init innovator_map_io(void)
 
 MACHINE_START(OMAP_INNOVATOR, "TI-Innovator")
 	MAINTAINER("MontaVista Software, Inc.")
-	BOOT_MEM(0x10000000, 0xe0000000, 0xe0000000)
+	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
 	BOOT_PARAMS(0x10000100)
 	MAPIO(innovator_map_io)
 	INITIRQ(innovator_init_irq)

@@ -181,6 +181,7 @@ static int ramfs_fill_super(struct super_block * sb, void * data, int silent)
 	struct inode * inode;
 	struct dentry * root;
 
+	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = RAMFS_MAGIC;

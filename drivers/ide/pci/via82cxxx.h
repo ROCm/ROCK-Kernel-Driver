@@ -21,7 +21,6 @@ static ide_pci_device_t via82cxxx_chipsets[] __devinitdata = {
 		.autodma	= NOAUTODMA,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},{	/* 1 */
 		.vendor		= PCI_VENDOR_ID_VIA,
 		.device		= PCI_DEVICE_ID_VIA_82C586_1,
@@ -32,12 +31,6 @@ static ide_pci_device_t via82cxxx_chipsets[] __devinitdata = {
 		.autodma	= NOAUTODMA,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

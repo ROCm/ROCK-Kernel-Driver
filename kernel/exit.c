@@ -24,6 +24,7 @@
 #include <linux/proc_fs.h>
 
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
@@ -1157,8 +1158,7 @@ end_wait4:
 	return retval;
 }
 
-#if !defined(__alpha__) && !defined(__ia64__) && \
-    !defined(__arm__) && !defined(__s390__)
+#ifdef __ARCH_WANT_SYS_WAITPID
 
 /*
  * sys_waitpid() remains for compatibility. waitpid() should be

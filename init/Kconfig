@@ -235,6 +235,17 @@ config KALLSYMS
 	   symbolic stack backtraces. This increases the size of the kernel
 	   somewhat, as all symbols have to be loaded into the kernel image.
 
+config KALLSYMS_ALL
+	bool "Include all symbols in kallsyms"
+	depends on DEBUG_KERNEL && KALLSYMS
+	help
+	   Normally kallsyms only contains the symbols of functions, for nicer
+	   OOPS messages.  Some debuggers can use kallsyms for other
+	   symbols too: say Y here to include all symbols, and you
+	   don't care about adding 300k to the size of your kernel.
+
+	   Say N.
+
 config FUTEX
 	bool "Enable futex support" if EMBEDDED
 	default y

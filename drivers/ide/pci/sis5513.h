@@ -16,18 +16,11 @@ static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
 		.device		= PCI_DEVICE_ID_SI_5513,
 		.name		= "SIS5513",
 		.init_chipset	= init_chipset_sis5513,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_sis5513,
 		.channels	= 2,
 		.autodma	= NOAUTODMA,
 		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

@@ -21,7 +21,6 @@
 /* includes */
 #include <linux/config.h>
 #include <linux/pci.h>
-#include <linux/netdevice.h>
 #include <linux/sched.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>

@@ -66,7 +66,7 @@ static void __init omap_generic_map_io(void)
 
 MACHINE_START(OMAP_GENERIC, "Generic OMAP-1510/1610")
 	MAINTAINER("Tony Lindgren <tony@atomide.com>")
-	BOOT_MEM(0x10000000, 0xe0000000, 0xe0000000)
+	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
 	BOOT_PARAMS(0x10000100)
 	MAPIO(omap_generic_map_io)
 	INITIRQ(omap_generic_init_irq)

@@ -618,7 +618,7 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 #endif
 #ifdef CONFIG_DEBUGGER
 	case PPC_MSG_DEBUGGER_BREAK:
-		debugger(regs);
+		debugger_ipi(regs);
 		break;
 #endif
 	default:

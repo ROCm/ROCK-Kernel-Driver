@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2003 Nokia Corporation
  * Author: Juha Yrjölä <juha.yrjola@nokia.com>
+ * DMA channel linking for 1610 by Samuel Ortiz <samuel.ortiz@nokia.com>
  *
  * Support functions for the OMAP internal DMA channels.
  *
@@ -34,6 +35,7 @@
 static int enable_1510_mode = 0;
 
 struct omap_dma_lch {
+	int next_lch;
 	int dev_id;
 	u16 saved_csr;
 	u16 enabled_irqs;
@@ -154,6 +156,38 @@ void omap_start_dma(int lch)
 {
 	u16 w;
 
+	if (!omap_dma_in_1510_mode()) {
+		int next_lch;
+
+		next_lch = dma_chan[lch].next_lch;
+
+		/* Enable the queue, if needed so. */
+		if (next_lch != -1) {
+			/* Clear the STOP_LNK bits */
+			w = omap_readw(OMAP_DMA_CLNK_CTRL_REG(lch));
+			w &= ~(1 << 14);
+			omap_writew(w, OMAP_DMA_CLNK_CTRL_REG(lch));
+			w = omap_readw(OMAP_DMA_CLNK_CTRL_REG(next_lch));
+			w &= ~(1 << 14);
+			omap_writew(w, OMAP_DMA_CLNK_CTRL_REG(next_lch));
+
+			/* And set the ENABLE_LNK bits */
+			omap_writew(next_lch | (1 << 15),
+				    OMAP_DMA_CLNK_CTRL_REG(lch));
+			/* The loop case */
+			if (dma_chan[next_lch].next_lch == lch)
+				omap_writew(lch | (1 << 15),
+					    OMAP_DMA_CLNK_CTRL_REG(next_lch));
+
+			/* Read CSR to make sure it's cleared. */
+			w = omap_readw(OMAP_DMA_CSR_REG(next_lch));
+			/* Enable some nice interrupts. */
+			omap_writew(dma_chan[next_lch].enabled_irqs,
+				    OMAP_DMA_CICR_REG(next_lch));
+			dma_chan[next_lch].flags |= OMAP_DMA_ACTIVE;
+		}
+	}
+
 	/* Read CSR to make sure it's cleared. */
 	w = omap_readw(OMAP_DMA_CSR_REG(lch));
 	/* Enable some nice interrupts. */
@@ -168,14 +202,37 @@ void omap_start_dma(int lch)
 void omap_stop_dma(int lch)
 {
 	u16 w;
+	int next_lch;
 
 	/* Disable all interrupts on the channel */
 	omap_writew(0, OMAP_DMA_CICR_REG(lch));
 
-	w = omap_readw(OMAP_DMA_CCR_REG(lch));
-	w &= ~OMAP_DMA_CCR_EN;
-	omap_writew(w, OMAP_DMA_CCR_REG(lch));
+	if (omap_dma_in_1510_mode()) {
+		w = omap_readw(OMAP_DMA_CCR_REG(lch));
+		w &= ~OMAP_DMA_CCR_EN;
+		omap_writew(w, OMAP_DMA_CCR_REG(lch));
+		dma_chan[lch].flags &= ~OMAP_DMA_ACTIVE;
+		return;
+	}
+
+	next_lch = dma_chan[lch].next_lch;
+
+	/*
+	 * According to thw HW spec, enabling the STOP_LNK bit
+	 * resets the CCR_EN bit at the same time.
+	 */
+	w = omap_readw(OMAP_DMA_CLNK_CTRL_REG(lch));
+	w |= (1 << 14);
+	w = omap_writew(w, OMAP_DMA_CLNK_CTRL_REG(lch));
 	dma_chan[lch].flags &= ~OMAP_DMA_ACTIVE;
+
+	if (next_lch != -1) {
+		omap_writew(0, OMAP_DMA_CICR_REG(next_lch));
+		w = omap_readw(OMAP_DMA_CLNK_CTRL_REG(next_lch));
+		w |= (1 << 14);
+		w = omap_writew(w, OMAP_DMA_CLNK_CTRL_REG(next_lch));
+		dma_chan[next_lch].flags &= ~OMAP_DMA_ACTIVE;
+	}
 }
 
 void omap_enable_dma_irq(int lch, u16 bits)
@@ -313,6 +370,56 @@ void omap_free_dma(int ch)
 int omap_dma_in_1510_mode(void)
 {
 	return enable_1510_mode;
+}
+
+/*
+ * lch_queue DMA will start right after lch_head one is finished.
+ * For this DMA link to start, you still need to start (see omap_start_dma)
+ * the first one. That will fire up the entire queue.
+ */
+void omap_dma_link_lch (int lch_head, int lch_queue)
+{
+	if (omap_dma_in_1510_mode()) {
+		printk(KERN_ERR "DMA linking is not supported in 1510 mode\n");
+		BUG();
+		return;
+	}
+
+	if ((dma_chan[lch_head].dev_id == -1) ||
+	    (dma_chan[lch_queue].dev_id == -1)) {
+		printk(KERN_ERR "omap_dma: trying to link non requested channels\n");
+		dump_stack();
+	}
+
+	dma_chan[lch_head].next_lch = lch_queue;
+}
+
+/*
+ * Once the DMA queue is stopped, we can destroy it.
+ */
+void omap_dma_unlink_lch (int lch_head, int lch_queue)
+{
+	if (omap_dma_in_1510_mode()) {
+		printk(KERN_ERR "DMA linking is not supported in 1510 mode\n");
+		BUG();
+		return;
+	}
+
+	if (dma_chan[lch_head].next_lch != lch_queue ||
+	    dma_chan[lch_head].next_lch == -1) {
+		printk(KERN_ERR "omap_dma: trying to unlink non linked channels\n");
+		dump_stack();
+	}
+
+
+	if ((dma_chan[lch_head].flags & OMAP_DMA_ACTIVE) ||
+	    (dma_chan[lch_head].flags & OMAP_DMA_ACTIVE)) {
+		printk(KERN_ERR "omap_dma: You need to stop the DMA channels before unlinking\n");
+		dump_stack();
+	}
+
+	dma_chan[lch_head].next_lch = -1;
+	dma_chan[lch_queue].next_lch = -1;
 }
 
 
@@ -522,6 +629,8 @@ static int __init omap_init_dma(void)
 
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		dma_chan[ch].dev_id = -1;
+		dma_chan[ch].next_lch = -1;
+
 		if (ch >= 6 && enable_1510_mode)
 			continue;
 
@@ -551,6 +660,8 @@ EXPORT_SYMBOL(omap_stop_dma);
 EXPORT_SYMBOL(omap_set_dma_transfer_params);
 EXPORT_SYMBOL(omap_set_dma_src_params);
 EXPORT_SYMBOL(omap_set_dma_dest_params);
+EXPORT_SYMBOL(omap_dma_link_lch);
+EXPORT_SYMBOL(omap_dma_unlink_lch);
 
 EXPORT_SYMBOL(omap_request_lcd_dma);
 EXPORT_SYMBOL(omap_free_lcd_dma);

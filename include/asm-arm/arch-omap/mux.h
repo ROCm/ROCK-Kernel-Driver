@@ -458,7 +458,7 @@ MUX_CFG("E19_1610_KBR4",	 3,   18,    0,	  0,   6,   1,	  0,	 1,  0)
 MUX_CFG("N19_1610_KBR5",	 6,  12,     1,	  1,   2,   1,	  1,	 1,  0)
 
 /* Power management */
-MUX_CFG("T20_1610_LOW_PWR",	 7,   12,    1,	  0,   0,   0,   NA,	 0,  0)
+MUX_CFG("T20_1610_LOW_PWR",	 7,   12,    1,	  NA,   0,   0,   NA,	 0,  0)
 };
 
 #endif	/* __MUX_C__ */

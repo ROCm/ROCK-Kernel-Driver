@@ -39,7 +39,7 @@ extern efi_status_t efi_call_phys (void *, ...);
 struct efi efi;
 EXPORT_SYMBOL(efi);
 static efi_runtime_services_t *runtime;
-static unsigned long mem_limit = ~0UL;
+static unsigned long mem_limit = ~0UL, max_addr = ~0UL;
 
 #define efi_call_virt(f, args...)	(*(f))(args)
 
@@ -290,6 +290,7 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 	void *efi_map_start, *efi_map_end, *p, *q;
 	efi_memory_desc_t *md, *check_md;
 	u64 efi_desc_size, start, end, granule_addr, last_granule_addr, first_non_wb_addr = 0;
+	unsigned long total_mem = 0;
 
 	efi_map_start = __va(ia64_boot_param->efi_memmap);
 	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
@@ -331,11 +332,17 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 			trim_top(md, last_granule_addr);
 
 		if (is_available_memory(md)) {
-			if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > mem_limit) {
-				if (md->phys_addr > mem_limit)
+			if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > max_addr) {
+				if (md->phys_addr > max_addr)
 					continue;
-				md->num_pages = (mem_limit - md->phys_addr) >> EFI_PAGE_SHIFT;
+				md->num_pages = (max_addr - md->phys_addr) >> EFI_PAGE_SHIFT;
 			}
+
+			if (total_mem >= mem_limit)
+				continue;
+			total_mem += (md->num_pages << EFI_PAGE_SHIFT);
+			if (total_mem > mem_limit)
+				md->num_pages -= ((total_mem - mem_limit) >> EFI_PAGE_SHIFT);
 
 			if (md->num_pages == 0)
 				continue;
@@ -470,7 +477,13 @@ efi_init (void)
 	for (cp = saved_command_line; *cp; ) {
 		if (memcmp(cp, "mem=", 4) == 0) {
 			cp += 4;
-			mem_limit = memparse(cp, &end) - 1;
+			mem_limit = memparse(cp, &end) - 2;
+			if (end != cp)
+				break;
+			cp = end;
+		} else if (memcmp(cp, "max_addr=", 9) == 0) {
+			cp += 9;
+			max_addr = memparse(cp, &end) - 1;
 			if (end != cp)
 				break;
 			cp = end;
@@ -481,8 +494,8 @@ efi_init (void)
 				++cp;
 		}
 	}
-	if (mem_limit != ~0UL)
-		printk(KERN_INFO "Ignoring memory above %luMB\n", mem_limit >> 20);
+	if (max_addr != ~0UL)
+		printk(KERN_INFO "Ignoring memory above %luMB\n", max_addr >> 20);
 
 	efi.systab = __va(ia64_boot_param->efi_systab);
 

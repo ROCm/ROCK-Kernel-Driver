@@ -516,11 +516,6 @@ W:	http://www.wittsend.com/computone.html
 L:	linux-computone@lazuli.wittsend.com
 S:	Supported
 
-COMX/MULTIGATE SYNC SERIAL DRIVERS
-P:	Pasztor Szilard
-M:	Pasztor Szilard <don@itc.hu>
-S:	Supported
-
 COSA/SRP SYNC SERIAL DRIVER
 P:	Jan "Yenya" Kasprzak
 M:	kas@fi.muni.cz
@@ -798,7 +793,7 @@ FRAMEBUFFER LAYER
 P:	James Simmons, Geert Uytterhoeven	
 M:	jsimmons@infradead.org, geert@linux-m68k.org	
 L:	linux-fbdev-devel@lists.sourceforge.net	
-W:	http://www.linux-fbdev.org
+W:	http://linux-fbdev.sourceforge.net/
 S:	Supported
 
 FILE LOCKING (flock() and fcntl()/lockf())
@@ -1189,8 +1184,8 @@ L:	autofs@linux.kernel.org
 S:	Odd Fixes
 
 KERNEL AUTOMOUNTER v4 (AUTOFS4)
-P:	Jeremy Fitzhardinge
-M:	jeremy@goop.org
+P:	Ian Kent
+M:	raven@themaw.net
 L:	autofs@linux.kernel.org
 S:	Maintained
 

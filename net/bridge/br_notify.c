@@ -38,30 +38,35 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 
 	br = p->br;
 
-	spin_lock_bh(&br->lock);
-	switch (event) 
-	{
+	switch (event) {
 	case NETDEV_CHANGEADDR:
+		spin_lock_bh(&br->lock);
 		br_fdb_changeaddr(p, dev->dev_addr);
 		if (br->dev->flags & IFF_UP)
 			br_stp_recalculate_bridge_id(br);
+		spin_unlock_bh(&br->lock);
 		break;
 
 	case NETDEV_DOWN:
-		if (br->dev->flags & IFF_UP)
+		if (br->dev->flags & IFF_UP) {
+			spin_lock_bh(&br->lock);
 			br_stp_disable_port(p);
+			spin_unlock_bh(&br->lock);
+		}
 		break;
 
 	case NETDEV_UP:
-		if (br->dev->flags & IFF_UP)
+		if (br->dev->flags & IFF_UP) {
+			spin_lock_bh(&br->lock);
 			br_stp_enable_port(p);
+			spin_unlock_bh(&br->lock);
+		}
 		break;
 
 	case NETDEV_UNREGISTER:
 		br_del_if(br, dev);
 		break;
 	}
-	spin_unlock_bh(&br->lock);
 
 	return NOTIFY_DONE;
 }

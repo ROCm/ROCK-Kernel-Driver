@@ -852,7 +852,8 @@ this time.
 The value  in  file-max  denotes  the  maximum number of file handles that the
 Linux kernel will allocate. When you get a lot of error messages about running
 out of  file handles, you might want to raise this limit. The default value is
-4096. To change it, just write the new number into the file:
+10% of  RAM in kilobytes.  To  change it, just  write the new number  into the
+file:
 
   # cat /proc/sys/fs/file-max 
   4096 
@@ -864,11 +865,14 @@ out of  file handles, you might want to raise this limit. The default value is
 This method  of  revision  is  useful  for  all customizable parameters of the
 kernel - simply echo the new value to the corresponding file.
 
-The three  values  in file-nr denote the number of allocated file handles, the
-number of  used file handles, and the maximum number of file handles. When the
-allocated file  handles  come close to the maximum, but the number of actually
-used ones  is  far  behind,  you've  encountered  a peak in your usage of file
-handles and you don't need to increase the maximum.
+Historically, the three values in file-nr denoted the number of allocated file
+handles,  the number of  allocated but  unused file  handles, and  the maximum
+number of file handles. Linux 2.6 always  reports 0 as the number of free file
+handles -- this  is not an error,  it just means that the  number of allocated
+file handles exactly matches the number of used file handles.
+
+Attempts to  allocate more  file descriptors than  file-max are  reported with
+printk, look for "VFS: file-max limit <number> reached".
 
 inode-state and inode-nr
 ------------------------

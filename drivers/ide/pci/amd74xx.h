@@ -21,7 +21,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
 	},{	/* 1 */
 		.vendor		= PCI_VENDOR_ID_AMD,
 		.device		= PCI_DEVICE_ID_AMD_VIPER_7409,
@@ -32,7 +31,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
 	},{	/* 2 */
 		.vendor		= PCI_VENDOR_ID_AMD,
 		.device		= PCI_DEVICE_ID_AMD_VIPER_7411,
@@ -43,7 +41,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
 	},{	/* 3 */
 		.vendor		= PCI_VENDOR_ID_AMD,
 		.device		= PCI_DEVICE_ID_AMD_OPUS_7441,
@@ -54,7 +51,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
 	},{	/* 4 */
 		.vendor		= PCI_VENDOR_ID_AMD,
 		.device		= PCI_DEVICE_ID_AMD_8111_IDE,
@@ -65,7 +61,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.channels	= 2,
 		.enablebits	= {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0
 	},
 	{	/* 5 */
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
@@ -77,7 +72,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x50,0x02,0x02}, {0x50,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},
 	{	/* 6 */
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
@@ -89,7 +83,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x50,0x02,0x02}, {0x50,0x01,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
 	},
 	{	/* 7 */
 		.vendor		= PCI_VENDOR_ID_NVIDIA,
@@ -156,12 +149,6 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x50,0x02,0x02}, {0x50,0x01,0x01}},
 		.bootable	= ON_BOARD,
-	},
-	{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

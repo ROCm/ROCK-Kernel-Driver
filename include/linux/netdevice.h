@@ -215,6 +215,8 @@ struct hh_cache
  */
 #define LL_RESERVED_SPACE(dev) \
 	(((dev)->hard_header_len&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
+#define LL_RESERVED_SPACE_EXTRA(dev,extra) \
+	((((dev)->hard_header_len+extra)&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
 
 /* These flag bits are private to the generic network queueing
  * layer, they may not be explicitly referenced by any other

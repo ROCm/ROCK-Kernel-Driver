@@ -14,6 +14,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/times.h>
 #include <linux/smp_lock.h>
 
 #include "br_private.h"
@@ -178,3 +179,10 @@ void br_stp_port_timer_init(struct net_bridge_port *p)
 	br_timer_init(&p->hold_timer, br_hold_timer_expired,
 		      (unsigned long) p);
 }	
+
+/* Report ticks left (in USER_HZ) used for API */
+unsigned long br_timer_value(const struct timer_list *timer)
+{
+	return timer_pending(timer)
+		? jiffies_to_clock_t(timer->expires - jiffies) : 0;
+}

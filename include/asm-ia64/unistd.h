@@ -4,7 +4,7 @@
 /*
  * IA-64 Linux syscall numbers and inline-functions.
  *
- * Copyright (C) 1998-2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -261,7 +261,20 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
+
 #define NR_syscalls			256 /* length of syscall table */
+
+#ifdef CONFIG_IA32_SUPPORT
+# define __ARCH_WANT_SYS_FADVISE64
+# define __ARCH_WANT_SYS_GETPGRP
+# define __ARCH_WANT_SYS_LLSEEK
+# define __ARCH_WANT_SYS_NICE
+# define __ARCH_WANT_SYS_OLD_GETRLIMIT
+# define __ARCH_WANT_SYS_OLDUMOUNT
+# define __ARCH_WANT_SYS_SIGPENDING
+# define __ARCH_WANT_SYS_SIGPROCMASK
+#endif
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 
@@ -304,10 +317,10 @@ lseek (int fd, off_t off, int whence)
 	return sys_lseek(fd, off, whence);
 }
 
-static inline long
+static inline void
 _exit (int value)
 {
-	return sys_exit(value);
+	sys_exit(value);
 }
 
 #define exit(x) _exit(x)
@@ -373,7 +386,7 @@ asmlinkage long sys_rt_sigaction(int sig,
  * proper prototype, but we can't use __typeof__ either, because not all cond_syscall()
  * declarations have prototypes at the moment.
  */
-#define cond_syscall(x) asmlinkage long x() __attribute__((weak,alias("sys_ni_syscall")));
+#define cond_syscall(x) asmlinkage long x (void) __attribute__((weak,alias("sys_ni_syscall")));
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */

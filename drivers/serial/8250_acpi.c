@@ -14,7 +14,6 @@
 #include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/serial.h>
-#include <linux/tty.h>
 #include <linux/serial_core.h>
 
 #include <acpi/acpi_bus.h>

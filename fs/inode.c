@@ -149,8 +149,20 @@ static struct inode *alloc_inode(struct super_block *sb)
 		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
 		mapping->assoc_mapping = NULL;
 		mapping->backing_dev_info = &default_backing_dev_info;
-		if (sb->s_bdev)
-			mapping->backing_dev_info = sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
+
+		/*
+		 * If the block_device provides a backing_dev_info for client
+		 * inodes then use that.  Otherwise the inode share the bdev's
+		 * backing_dev_info.
+		 */
+		if (sb->s_bdev) {
+			struct backing_dev_info *bdi;
+
+			bdi = sb->s_bdev->bd_inode_backing_dev_info;
+			if (!bdi)
+				bdi = sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
+			mapping->backing_dev_info = bdi;
+		}
 		memset(&inode->u, 0, sizeof(inode->u));
 		inode->i_mapping = mapping;
 	}

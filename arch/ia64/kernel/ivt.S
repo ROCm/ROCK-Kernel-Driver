@@ -182,6 +182,12 @@ ENTRY(vhpt_miss)
 	;;
 #ifdef CONFIG_SMP
 	/*
+	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
+	 * cannot possibly affect the following loads:
+	 */
+	dv_serialize_data
+
+	/*
 	 * Re-check L2 and L3 pagetable.  If they changed, we may have received a ptc.g
 	 * between reading the pagetable and the "itc".  If so, flush the entry we
 	 * inserted and retry.
@@ -229,6 +235,12 @@ ENTRY(itlb_miss)
 	itc.i r18
 	;;
 #ifdef CONFIG_SMP
+	/*
+	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
+	 * cannot possibly affect the following loads:
+	 */
+	dv_serialize_data
+
 	ld8 r19=[r17]				// read L3 PTE again and see if same
 	mov r20=PAGE_SHIFT<<2			// setup page size for purge
 	;;
@@ -267,6 +279,12 @@ dtlb_fault:
 	itc.d r18
 	;;
 #ifdef CONFIG_SMP
+	/*
+	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
+	 * cannot possibly affect the following loads:
+	 */
+	dv_serialize_data
+
 	ld8 r19=[r17]				// read L3 PTE again and see if same
 	mov r20=PAGE_SHIFT<<2			// setup page size for purge
 	;;
@@ -504,6 +522,12 @@ ENTRY(dirty_bit)
 	;;
 (p6)	itc.d r25				// install updated PTE
 	;;
+	/*
+	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
+	 * cannot possibly affect the following loads:
+	 */
+	dv_serialize_data
+
 	ld8 r18=[r17]				// read PTE again
 	;;
 	cmp.eq p6,p7=r18,r25			// is it same as the newly installed
@@ -563,6 +587,12 @@ ENTRY(iaccess_bit)
 	;;
 (p6)	itc.i r25				// install updated PTE
 	;;
+	/*
+	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
+	 * cannot possibly affect the following loads:
+	 */
+	dv_serialize_data
+
 	ld8 r18=[r17]				// read PTE again
 	;;
 	cmp.eq p6,p7=r18,r25			// is it same as the newly installed
@@ -610,6 +640,11 @@ ENTRY(daccess_bit)
 	cmp.eq p6,p7=r26,r18
 	;;
 (p6)	itc.d r25				// install updated PTE
+	/*
+	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
+	 * cannot possibly affect the following loads:
+	 */
+	dv_serialize_data
 	;;
 	ld8 r18=[r17]				// read PTE again
 	;;

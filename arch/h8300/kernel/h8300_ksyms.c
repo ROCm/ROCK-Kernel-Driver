@@ -17,6 +17,7 @@
 #include <asm/checksum.h>
 #include <asm/hardirq.h>
 #include <asm/current.h>
+#include <asm/gpio.h>
 
 //asmlinkage long long __ashrdi3 (long long, int);
 //asmlinkage long long __lshrdi3 (long long, int);
@@ -38,8 +39,6 @@ EXPORT_SYMBOL(strncmp);
 
 EXPORT_SYMBOL(ip_fast_csum);
 
-EXPORT_SYMBOL(mach_enable_irq);
-EXPORT_SYMBOL(mach_disable_irq);
 EXPORT_SYMBOL(kernel_thread);
 
 /* Networking helper routines. */
@@ -103,10 +102,10 @@ EXPORT_SYMBOL_NOVERS(__udivsi3);
 EXPORT_SYMBOL_NOVERS(__umoddi3);
 EXPORT_SYMBOL_NOVERS(__umodsi3);
 
-EXPORT_SYMBOL_NOVERS(_current_task);
-
+#ifdef MAGIC_ROM_PTR
 EXPORT_SYMBOL_NOVERS(is_in_rom);
+#endif
 
-EXPORT_SYMBOL_NOVERS(h8300_reserved_gpio)
-EXPORT_SYMBOL_NOVERS(h8300_free_gpio)
-EXPORT_SYMBOL_NOVERS(h8300_set_gpio_dir)
+EXPORT_SYMBOL_NOVERS(h8300_reserved_gpio);
+EXPORT_SYMBOL_NOVERS(h8300_free_gpio);
+EXPORT_SYMBOL_NOVERS(h8300_set_gpio_dir);

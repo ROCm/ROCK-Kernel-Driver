@@ -103,7 +103,7 @@ static void __init omap_perseus2_map_io(void)
 
 MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
 	MAINTAINER("Kevin Hilman <k-hilman@ti.com>")
-	BOOT_MEM(0x10000000, 0xe0000000, 0xe0000000)
+	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
 	BOOT_PARAMS(0x10000100)
 	MAPIO(omap_perseus2_map_io)
 	INITIRQ(omap_perseus2_init_irq)

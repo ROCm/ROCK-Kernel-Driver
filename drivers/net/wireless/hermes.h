@@ -384,7 +384,7 @@ static inline void hermes_read_words(struct hermes *hw, int off, void *buf, unsi
 
 static inline void hermes_write_words(struct hermes *hw, int off, const void *buf, unsigned count)
 {
-	off = off << hw->reg_spacing;;
+	off = off << hw->reg_spacing;
 
 	if (hw->io_space) {
 		outsw(hw->iobase + off, buf, count);
@@ -406,7 +406,7 @@ static inline void hermes_clear_words(struct hermes *hw, int off, unsigned count
 {
 	unsigned i;
 
-	off = off << hw->reg_spacing;;
+	off = off << hw->reg_spacing;
 
 	if (hw->io_space) {
 		for (i = 0; i < count; i++)

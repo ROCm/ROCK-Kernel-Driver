@@ -170,9 +170,7 @@ static int __init obsolete_checksetup(char *line)
    still work even if initially too large, it will just take slightly longer */
 unsigned long loops_per_jiffy = (1<<12);
 
-#ifndef __ia64__
 EXPORT_SYMBOL(loops_per_jiffy);
-#endif
 
 /* This is the number of bits of precision for the loops_per_jiffy.  Each
    bit takes on average 1.5/HZ seconds.  This (like the original) is a little
@@ -352,20 +350,17 @@ static void __init setup_per_cpu_areas(void)
 static void __init smp_init(void)
 {
 	unsigned int i;
-	unsigned j = 1;
 
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(i) {
 		if (num_online_cpus() >= max_cpus)
 			break;
-		if (!cpu_online(i)) {
+		if (!cpu_online(i))
 			cpu_up(i);
-			j++;
-		}
 	}
 
 	/* Any cleanup work */
-	printk("Brought up %u CPUs\n", j);
+	printk("Brought up %ld CPUs\n", (long)num_online_cpus());
 	smp_cpus_done(max_cpus);
 #if 0
 	/* Get other processors into their bootup holding patterns. */

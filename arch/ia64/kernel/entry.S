@@ -1429,7 +1429,7 @@ sys_call_table:
 	data8 sys_getcwd
 	data8 sys_capget			// 1185
 	data8 sys_capset
-	data8 sys_sendfile
+	data8 sys_sendfile64
 	data8 sys_ni_syscall		// sys_getpmsg (STREAMS)
 	data8 sys_ni_syscall		// sys_putpmsg (STREAMS)
 	data8 sys_socket			// 1190
