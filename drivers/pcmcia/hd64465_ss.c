@@ -37,6 +37,7 @@
 #include <linux/vmalloc.h>
 #include <asm/errno.h>
 #include <linux/irq.h>
+#include <linux/tqueue.h>
 
 #include <asm/io.h>
 #include <asm/hd64465.h>
