@@ -338,6 +338,7 @@ void reactivate_fd(int fd, int irqnum)
 		irq_unlock(flags);
 		return;
 	}
+
 	pollfds[i].fd = irq->fd;
 
 	irq_unlock(flags);
