@@ -715,8 +715,12 @@ modules: $(vmlinux-dirs) $(if $(KBUILD_BUILTIN),vmlinux)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
 
-#	Install modules
 
+# Target to prepare building external modules
+.PHONY: modules_prepare
+modules_prepare: prepare-all scripts
+
+# Target to install modules
 .PHONY: modules_install
 modules_install: _modinst_ _modinst_post
 

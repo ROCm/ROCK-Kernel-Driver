@@ -625,10 +625,9 @@ read_dump(const char *fname)
 	void *file = grab_file(fname, &size);
 	char *line;
 
-        if (!file) {
-                perror(fname);
-                abort();
-        }
+        if (!file)
+		/* No symbol versions, silently ignore */
+		return;
 
 	while ((line = get_next_line(&pos, file, size))) {
 		char *symname, *modname, *d;
