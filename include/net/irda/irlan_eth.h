@@ -25,7 +25,7 @@
 #ifndef IRLAN_ETH_H
 #define IRLAN_ETH_H
 
-int  irlan_eth_init(struct net_device *dev);
+void  irlan_eth_setup(struct net_device *dev);
 int  irlan_eth_open(struct net_device *dev);
 int  irlan_eth_close(struct net_device *dev);
 int  irlan_eth_receive(void *instance, void *sap, struct sk_buff *skb);

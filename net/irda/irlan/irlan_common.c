@@ -174,33 +174,6 @@ void __exit irlan_cleanup(void)
 }
 
 /*
- * Function irlan_register_netdev (self)
- *
- *    Registers the network device to be used. We should don't register until
- *    we have been binded to a particular provider or client.
- */
-int irlan_register_netdev(struct irlan_cb *self)
-{
-	int i=0;
-
-	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
-
-	/* Check if we should call the device eth<x> or irlan<x> */
-	if (!eth) {
-		/* Get the first free irlan<x> name */
-		do {
-			sprintf(self->dev.name, "%s%d", "irlan", i++);
-		} while (dev_get(self->dev.name));
-	}
-	
-	if (register_netdev(&self->dev) != 0) {
-		IRDA_DEBUG(2, "%s(), register_netdev() failed!\n", __FUNCTION__ );
-		return -1;
-	}
-	return 0;
-}
-
-/*
  * Function irlan_open (void)
  *
  *    Open new instance of a client/provider, we should only register the 
@@ -208,30 +181,25 @@ int irlan_register_netdev(struct irlan_cb *self)
  */
 struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 {
+	struct net_device *dev;
 	struct irlan_cb *self;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
-	/* 
-	 *  Initialize the irlan structure. 
-	 */
-	self = kmalloc(sizeof(struct irlan_cb), GFP_ATOMIC);
-	if (self == NULL)
+	/* Create network device with irlan */
+	dev = alloc_netdev(sizeof(*self), 
+			   eth ? "eth%d" : "irlan%d", 
+			   irlan_eth_setup);
+	if (!dev)
 		return NULL;
-	
-	memset(self, 0, sizeof(struct irlan_cb));
+
+	self = dev->priv;
+	self->dev = dev;
 
 	/*
 	 *  Initialize local device structure
 	 */
 	self->magic = IRLAN_MAGIC;
-
-	sprintf(self->dev.name, "%s", "unknown");
-
-	self->dev.priv = (void *) self;
-	self->dev.next = NULL;
-	self->dev.init = irlan_eth_init;
-	
 	self->saddr = saddr;
 	self->daddr = daddr;
 
@@ -242,15 +210,22 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 	init_timer(&self->watchdog_timer);
 	init_timer(&self->client.kick_timer);
 	init_waitqueue_head(&self->open_wait);	
-
-	list_add_rcu(&self->dev_list, &irlans);
 	
 	skb_queue_head_init(&self->client.txq);
 	
 	irlan_next_client_state(self, IRLAN_IDLE);
 	irlan_next_provider_state(self, IRLAN_IDLE);
 
-	irlan_register_netdev(self);
+	if (register_netdev(dev)) {
+		IRDA_DEBUG(2, "%s(), register_netdev() failed!\n", 
+			   __FUNCTION__ );
+		self = NULL;
+		kfree(dev);
+	} else {
+		rtnl_lock();
+		list_add_rcu(&self->dev_list, &irlans);
+		rtnl_unlock();
+	}
 
 	return self;
 }
@@ -258,7 +233,8 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
  * Function __irlan_close (self)
  *
  *    This function closes and deallocates the IrLAN client instances. Be 
- *    aware that other functions which calles client_close()
+ *    aware that other functions which calls client_close() must
+ *    remove self from irlans list first.
  */
 static void __irlan_close(struct irlan_cb *self)
 {
@@ -283,10 +259,8 @@ static void __irlan_close(struct irlan_cb *self)
 	while ((skb = skb_dequeue(&self->client.txq)))
 		dev_kfree_skb(skb);
 
-	unregister_netdevice(&self->dev);
-	
-	self->magic = 0;
-	kfree(self);
+	/* Unregister and free self via destructor */
+	unregister_netdevice(self->dev);
 }
 
 /* Find any instance of irlan, used for client discovery wakeup */
@@ -348,7 +322,7 @@ void irlan_connect_indication(void *instance, void *sap, struct qos_info *qos,
 		irlan_open_unicast_addr(self);
 	}
 	/* Ready to transfer Ethernet frames (at last) */
-	netif_start_queue(&self->dev); /* Clear reason */
+	netif_start_queue(self->dev); /* Clear reason */
 }
 
 void irlan_connect_confirm(void *instance, void *sap, struct qos_info *qos, 
@@ -382,7 +356,7 @@ void irlan_connect_confirm(void *instance, void *sap, struct qos_info *qos,
  	irlan_set_multicast_filter(self, TRUE);
 
 	/* Ready to transfer Ethernet frames */
-	netif_start_queue(&self->dev);
+	netif_start_queue(self->dev);
 	self->disconnect_reason = 0; /* Clear reason */
 #ifdef CONFIG_IRLAN_SEND_GRATUITOUS_ARP
 	irlan_eth_send_gratuitous_arp(&self->dev);
@@ -1110,7 +1084,7 @@ static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 		ASSERT(self->magic == IRLAN_MAGIC, break;);
 		
 		len += sprintf(buf+len, "ifname: %s,\n",
-			       self->dev.name);
+			       self->dev->name);
 		len += sprintf(buf+len, "client state: %s, ",
 			       irlan_state[ self->client.state]);
 		len += sprintf(buf+len, "provider state: %s,\n",
@@ -1132,7 +1106,7 @@ static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 					  buf+len);
 			
 		len += sprintf(buf+len, "tx busy: %s\n", 
-			       netif_queue_stopped(&self->dev) ? "TRUE" : "FALSE");
+			       netif_queue_stopped(self->dev) ? "TRUE" : "FALSE");
 			
 		len += sprintf(buf+len, "\n");
  	} 

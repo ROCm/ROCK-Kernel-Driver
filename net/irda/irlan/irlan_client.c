@@ -512,7 +512,7 @@ static void irlan_check_response_param(struct irlan_cb *self, char *param,
 		      bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], 
 		      bytes[5]);
 		for (i = 0; i < 6; i++) 
-			self->dev.dev_addr[i] = bytes[i];
+			self->dev->dev_addr[i] = bytes[i];
 	}
 }
 
