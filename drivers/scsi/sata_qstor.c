@@ -261,11 +261,11 @@ static void qs_fill_sg(struct ata_queued_cmd *qc)
 		u32 len;
 
 		addr = sg_dma_address(sg);
-		*(u64 *)prd = cpu_to_le64(addr);
+		*(__le64 *)prd = cpu_to_le64(addr);
 		prd += sizeof(u64);
 
 		len = sg_dma_len(sg);
-		*(u32 *)prd = cpu_to_le32(len);
+		*(__le32 *)prd = cpu_to_le32(len);
 		prd += sizeof(u64);
 
 		VPRINTK("PRD[%u] = (0x%llX, 0x%X)\n", nelem,
@@ -298,10 +298,10 @@ static void qs_qc_prep(struct ata_queued_cmd *qc)
 	/* host control block (HCB) */
 	buf[ 0] = QS_HCB_HDR;
 	buf[ 1] = hflags;
-	*(u32 *)(&buf[ 4]) = cpu_to_le32(qc->nsect * ATA_SECT_SIZE);
-	*(u32 *)(&buf[ 8]) = cpu_to_le32(qc->n_elem);
+	*(__le32 *)(&buf[ 4]) = cpu_to_le32(qc->nsect * ATA_SECT_SIZE);
+	*(__le32 *)(&buf[ 8]) = cpu_to_le32(qc->n_elem);
 	addr = ((u64)pp->pkt_dma) + QS_CPB_BYTES;
-	*(u64 *)(&buf[16]) = cpu_to_le64(addr);
+	*(__le64 *)(&buf[16]) = cpu_to_le64(addr);
 
 	/* device control block (DCB) */
 	buf[24] = QS_DCB_HDR;
@@ -566,10 +566,10 @@ static int qs_set_dma_masks(struct pci_dev *pdev, void __iomem *mmio_base)
 	int rc, have_64bit_bus = (bus_info & QS_HPHY_64BIT);
 
 	if (have_64bit_bus &&
-	    !pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
-		rc = pci_set_consistent_dma_mask(pdev, 0xffffffffffffffffULL);
+	    !pci_set_dma_mask(pdev, DMA_64BIT_MASK)) {
+		rc = pci_set_consistent_dma_mask(pdev, DMA_64BIT_MASK);
 		if (rc) {
-			rc = pci_set_consistent_dma_mask(pdev, 0xffffffffULL);
+			rc = pci_set_consistent_dma_mask(pdev, DMA_32BIT_MASK);
 			if (rc) {
 				printk(KERN_ERR DRV_NAME
 					"(%s): 64-bit DMA enable failed\n",
@@ -578,14 +578,14 @@ static int qs_set_dma_masks(struct pci_dev *pdev, void __iomem *mmio_base)
 			}
 		}
 	} else {
-		rc = pci_set_dma_mask(pdev, 0xffffffffULL);
+		rc = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
 		if (rc) {
 			printk(KERN_ERR DRV_NAME
 				"(%s): 32-bit DMA enable failed\n",
 				pci_name(pdev));
 			return rc;
 		}
-		rc = pci_set_consistent_dma_mask(pdev, 0xffffffffULL);
+		rc = pci_set_consistent_dma_mask(pdev, DMA_32BIT_MASK);
 		if (rc) {
 			printk(KERN_ERR DRV_NAME
 				"(%s): 32-bit consistent DMA enable failed\n",
