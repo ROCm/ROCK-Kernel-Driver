@@ -1,6 +1,7 @@
 #ifndef _SCSI_SCSI_CMND_H
 #define _SCSI_SCSI_CMND_H
 
+#include <linux/dma-mapping.h>
 #include <linux/list.h>
 #include <linux/types.h>
 
@@ -71,8 +72,8 @@ struct scsi_cmnd {
 
 	unsigned char cmd_len;
 	unsigned char old_cmd_len;
-	unsigned char sc_data_direction;
-	unsigned char sc_old_data_direction;
+	enum dma_data_direction sc_data_direction;
+	enum dma_data_direction sc_old_data_direction;
 
 	/* These elements define the operation we are about to perform */
 #define MAX_COMMAND_SIZE	16

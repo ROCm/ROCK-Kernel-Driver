@@ -35,7 +35,6 @@ static int i82092aa_set_io_map(struct pcmcia_socket *socket, struct pccard_io_ma
 static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_map *mem);
 static int i82092aa_init(struct pcmcia_socket *socket);
 static int i82092aa_suspend(struct pcmcia_socket *socket);
-static int i82092aa_register_callback(struct pcmcia_socket *socket, void (*handler)(void *, unsigned int), void * info);
 
 #endif
 

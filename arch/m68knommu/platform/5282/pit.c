@@ -17,6 +17,7 @@
 #include <linux/sched.h>
 #include <linux/param.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <asm/irq.h>
 #include <asm/coldfire.h>
 #include <asm/mcfpit.h>

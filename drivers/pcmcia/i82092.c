@@ -64,10 +64,8 @@ static struct pci_driver i82092aa_pci_drv = {
 
 /* the pccard structure and its functions */
 static struct pccard_operations i82092aa_operations = {
-	.owner			= THIS_MODULE,
 	.init 		 	= i82092aa_init,
 	.suspend	   	= i82092aa_suspend,
-	.register_callback 	= i82092aa_register_callback,
 	.get_status		= i82092aa_get_status,
 	.get_socket		= i82092aa_get_socket,
 	.set_socket		= i82092aa_set_socket,
@@ -84,12 +82,6 @@ struct socket_info {
 				    2 = card but not initialized,
 				    3 = operational card */
 	int 	io_base; 	/* base io address of the socket */
-	
-	unsigned int pending_events; /* Pending events on this interface */
-	
-	void	(*handler)(void *info, u_int events); 
-				/* callback to the driver of the card */
-	void	*info;		/* to be passed to the handler */
 	
 	struct pcmcia_socket socket;
 	struct pci_dev *dev;	/* The PCI device for the socket */
@@ -142,6 +134,7 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 		sockets[i].socket.map_size = 0x1000;
 		sockets[i].socket.irq_mask = 0;
 		sockets[i].socket.pci_irq  = dev->irq;
+		sockets[i].socket.owner = THIS_MODULE;
 
 		sockets[i].number = i;
 		
@@ -324,23 +317,6 @@ static int to_cycles(int ns)
 
 /* Interrupt handler functionality */
 
-static void i82092aa_bh(void *dummy)
-{
-        unsigned int events;
-	int i;
-                
-        for (i=0; i < socket_count; i++) {
-        	events = xchg(&(sockets[i].pending_events),0);
-        	printk("events = %x \n",events);
-                if (sockets[i].handler)
-                	sockets[i].handler(sockets[i].info, events);
-	}
-}
-                                                                                                                                        
-
-static DECLARE_WORK(i82092aa_task, i82092aa_bh, NULL);
-        
-
 static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
 	int i;
@@ -367,8 +343,7 @@ static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 			
 			csc = indirect_read(i,I365_CSC); /* card status change register */
 			
-			if ((csc==0) ||  /* no events on this socket */
-			   (sockets[i].handler==NULL)) /* no way to handle events */
+			if (csc==0)  /* no events on this socket */
 			   	continue;
 			handled = 1;
 			events = 0;
@@ -389,8 +364,7 @@ static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 			}
 			
 			if (events) {
-				sockets[i].pending_events |= events;
-				schedule_work(&i82092aa_task);
+				pcmcia_parse_events(&sockets[i].socket, events);
 			}
 			active |= events;
 		}
@@ -475,16 +449,6 @@ static int i82092aa_suspend(struct pcmcia_socket *sock)
         return retval;
 }
        
-static int i82092aa_register_callback(struct pcmcia_socket *socket, void (*handler)(void *, unsigned int), void * info)
-{
-	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
-	enter("i82092aa_register_callback");
-	sockets[sock].handler = handler;
-        sockets[sock].info = info;
-	leave("i82092aa_register_callback");
-	return 0;
-} /* i82092aa_register_callback */
-                                        
 static int i82092aa_get_status(struct pcmcia_socket *socket, u_int *value)
 {
 	unsigned int sock = container_of(socket, struct socket_info, socket)->number;

@@ -200,7 +200,7 @@ static void copy_from_user_state(struct xfrm_state *x, struct xfrm_usersa_info *
 	x->props.replay_window = p->replay_window;
 	x->props.reqid = p->reqid;
 	x->props.family = p->family;
-	x->props.saddr = x->sel.saddr;
+	x->props.saddr = p->saddr;
 }
 
 static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
@@ -260,7 +260,11 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	err = xfrm_state_replace(x, nlh->nlmsg_type == XFRM_MSG_NEWSA);
+	if (nlh->nlmsg_type == XFRM_MSG_NEWSA)
+		err = xfrm_state_add(x);
+	else
+		err = xfrm_state_update(x);
+
 	if (err < 0) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
@@ -296,6 +300,7 @@ static void copy_to_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 	memcpy(&p->lft, &x->lft, sizeof(p->lft));
 	memcpy(&p->curlft, &x->curlft, sizeof(p->curlft));
 	memcpy(&p->stats, &x->stats, sizeof(p->stats));
+	p->saddr = x->props.saddr;
 	p->mode = x->props.mode;
 	p->replay_window = x->props.replay_window;
 	p->reqid = x->props.reqid;

@@ -68,6 +68,7 @@ obj-$(CONFIG_SCSI_GENERIC_NCR5380) += g_NCR5380.o
 obj-$(CONFIG_SCSI_GENERIC_NCR5380_MMIO) += g_NCR5380_mmio.o
 obj-$(CONFIG_SCSI_NCR53C406A)	+= NCR53c406a.o
 obj-$(CONFIG_SCSI_NCR_D700)	+= NCR_D700.o 53c700.o
+obj-$(CONFIG_SCSI_NCR_Q720)	+= NCR_Q720_mod.o
 obj-$(CONFIG_SCSI_SYM53C416)	+= sym53c416.o
 obj-$(CONFIG_SCSI_QLOGIC_FAS)	+= qlogicfas.o
 obj-$(CONFIG_SCSI_QLOGIC_ISP)	+= qlogicisp.o 
@@ -81,7 +82,6 @@ obj-$(CONFIG_SCSI_DMX3191D)	+= dmx3191d.o
 obj-$(CONFIG_SCSI_DTC3280)	+= dtc.o
 obj-$(CONFIG_SCSI_SYM53C8XX_2)	+= sym53c8xx_2/
 obj-$(CONFIG_SCSI_SYM53C8XX)	+= sym53c8xx.o 
-obj-$(CONFIG_SCSI_NCR53C8XX)	+= ncr53c8xx.o 
 obj-$(CONFIG_SCSI_ZALON)	+= zalon7xx.o
 obj-$(CONFIG_SCSI_EATA_PIO)	+= eata_pio.o
 obj-$(CONFIG_SCSI_7000FASST)	+= wd7000.o
@@ -133,7 +133,17 @@ sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o
 a100u2w-objs	:= inia100.o i60uscsi.o
+ncr53c8xx-flags-$(CONFIG_SCSI_ZALON) \
+		:= -DCONFIG_NCR53C8XX_PREFETCH \
+			-DCONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS \
+			-DCONFIG_SCSI_NCR53C8XX_NO_NVRAM \
+			-DSCSI_NCR_BIG_ENDIAN -DSIMULATED_INTFLY
+ncr53c8xx-flags-$(CONFIG_SCSI_NCR_Q720) \
+		:= -DCONFIG_SCSI_NCR53C8XX_NO_NVRAM \
+			-DSIMULATED_INTFLY
+CFLAGS_ncr53c8xx.o	:= $(ncr53c8xx-flags-y) $(ncr53c8xx-flags-m)
 zalon7xx-objs	:= zalon.o ncr53c8xx.o
+NCR_Q720_mod-objs	:= NCR_Q720.o ncr53c8xx.o
 cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 

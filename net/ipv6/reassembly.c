@@ -435,7 +435,7 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
  				     csum_partial(skb->nh.raw, (u8*)(fhdr+1)-skb->nh.raw, 0));
 
 	/* Is this the final fragment? */
-	if (!(fhdr->frag_off & htons(0x0001))) {
+	if (!(fhdr->frag_off & htons(IP6_MF))) {
 		/* If we already have some bits beyond end
 		 * or have different end, the segment is corrupted.
 		 */

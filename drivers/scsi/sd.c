@@ -49,6 +49,8 @@
 
 #include "scsi.h"
 #include "hosts.h"
+
+#include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsicam.h>
 
@@ -161,11 +163,11 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 
 		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
 		if (rq_data_dir(rq) == WRITE)
-			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+			SCpnt->sc_data_direction = DMA_TO_DEVICE;
 		else if (rq->data_len)
-			SCpnt->sc_data_direction = SCSI_DATA_READ;
+			SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 		else
-			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+			SCpnt->sc_data_direction = DMA_NONE;
 
 		this_count = rq->data_len;
 		if (rq->timeout)
@@ -251,10 +253,10 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 			return 0;
 		}
 		SCpnt->cmnd[0] = WRITE_6;
-		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		SCpnt->sc_data_direction = DMA_TO_DEVICE;
 	} else if (rq_data_dir(SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_6;
-		SCpnt->sc_data_direction = SCSI_DATA_READ;
+		SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 	} else {
 		printk(KERN_ERR "sd: Unknown command %lx\n", 
 		       SCpnt->request->flags);
@@ -790,7 +792,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 			SRpnt->sr_cmd_len = 0;
 			SRpnt->sr_sense_buffer[0] = 0;
 			SRpnt->sr_sense_buffer[2] = 0;
-			SRpnt->sr_data_direction = SCSI_DATA_NONE;
+			SRpnt->sr_data_direction = DMA_NONE;
 
 			scsi_wait_req (SRpnt, (void *) cmd, (void *) buffer,
 				       0/*512*/, SD_TIMEOUT, SD_MAX_RETRIES);
@@ -850,7 +852,7 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 				SRpnt->sr_sense_buffer[0] = 0;
 				SRpnt->sr_sense_buffer[2] = 0;
 
-				SRpnt->sr_data_direction = SCSI_DATA_NONE;
+				SRpnt->sr_data_direction = DMA_NONE;
 				scsi_wait_req(SRpnt, (void *)cmd, 
 					      (void *) buffer, 0/*512*/, 
 					      SD_TIMEOUT, SD_MAX_RETRIES);
@@ -915,7 +917,7 @@ repeat:
 		SRpnt->sr_cmd_len = 0;
 		SRpnt->sr_sense_buffer[0] = 0;
 		SRpnt->sr_sense_buffer[2] = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		SRpnt->sr_data_direction = DMA_FROM_DEVICE;
 
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
 			      longrc ? 12 : 8, SD_TIMEOUT, SD_MAX_RETRIES);
@@ -1062,40 +1064,12 @@ got_data:
 }
 
 /* called with buffer of length 512 */
-static int
+static inline int
 sd_do_mode_sense(struct scsi_request *SRpnt, int dbd, int modepage,
-		 unsigned char *buffer, int len) {
-	unsigned char cmd[12];
-
-	memset((void *) &cmd[0], 0, 12);
-	cmd[1] = dbd;
-	cmd[2] = modepage;
-
-	if (SRpnt->sr_device->use_10_for_ms) {
-		if (len < 8)
-			len = 8;
-
-		cmd[0] = MODE_SENSE_10;
-		cmd[8] = len;
-	} else {
-		if (len < 4)
-			len = 4;
-
-		cmd[0] = MODE_SENSE;
-		cmd[4] = len;
-	}
-
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_sense_buffer[0] = 0;
-	SRpnt->sr_sense_buffer[2] = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
-
-	memset((void *) buffer, 0, len);
-
-	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-		      len, SD_TIMEOUT, SD_MAX_RETRIES);
-
-	return SRpnt->sr_result;
+		 unsigned char *buffer, int len, struct scsi_mode_data *data)
+{
+	return __scsi_mode_sense(SRpnt, dbd, modepage, buffer, len,
+				 SD_TIMEOUT, SD_MAX_RETRIES, data);
 }
 
 /*
@@ -1106,33 +1080,34 @@ static void
 sd_read_write_protect_flag(struct scsi_disk *sdkp, char *diskname,
 		   struct scsi_request *SRpnt, unsigned char *buffer) {
 	int res;
+	struct scsi_mode_data data;
 
 	/*
 	 * First attempt: ask for all pages (0x3F), but only 4 bytes.
 	 * We have to start carefully: some devices hang if we ask
 	 * for more than is available.
 	 */
-	res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 4);
+	res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 4, &data);
 
 	/*
 	 * Second attempt: ask for page 0
 	 * When only page 0 is implemented, a request for page 3F may return
 	 * Sense Key 5: Illegal Request, Sense Code 24: Invalid field in CDB.
 	 */
-	if (res)
-		res = sd_do_mode_sense(SRpnt, 0, 0, buffer, 4);
+	if (!scsi_status_is_good(res))
+		res = sd_do_mode_sense(SRpnt, 0, 0, buffer, 4, &data);
 
 	/*
 	 * Third attempt: ask 255 bytes, as we did earlier.
 	 */
-	if (res)
-		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 255);
+	if (!scsi_status_is_good(res))
+		res = sd_do_mode_sense(SRpnt, 0, 0x3F, buffer, 255, &data);
 
-	if (res) {
+	if (!scsi_status_is_good(res)) {
 		printk(KERN_WARNING
 		       "%s: test WP failed, assume Write Enabled\n", diskname);
 	} else {
-		sdkp->write_prot = ((buffer[2] & 0x80) != 0);
+		sdkp->write_prot = ((data.device_specific & 0x80) != 0);
 		printk(KERN_NOTICE "%s: Write Protect is %s\n", diskname,
 		       sdkp->write_prot ? "on" : "off");
 		printk(KERN_DEBUG "%s: Mode Sense: %02x %02x %02x %02x\n",
@@ -1149,43 +1124,45 @@ sd_read_cache_type(struct scsi_disk *sdkp, char *diskname,
 		   struct scsi_request *SRpnt, unsigned char *buffer) {
 	int len = 0, res;
 
-	const int dbd = 0x08;	   /* DBD */
+	const int dbd = 0;	   /* DBD */
 	const int modepage = 0x08; /* current values, cache page */
+	struct scsi_mode_data data;
+
 
 	/* cautiously ask */
-	res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer, 4);
+	res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer, 4, &data);
 
-	if (res == 0) {
+	if (scsi_status_is_good(res)) {
 		/* that went OK, now ask for the proper length */
-		len = buffer[0] + 1;
+		len = data.length;
 		if (len > 128)
 			len = 128;
-		res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer, len);
+		res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer,
+				       len, &data);
 	}
 
-	if (res == 0 && buffer[3] + 6 < len) {
+	if (scsi_status_is_good(res)) {
 		const char *types[] = {
 			"write through", "none", "write back",
 			"write back, no read (daft)"
 		};
 		int ct = 0;
-		int offset = buffer[3] + 4; /* start of mode page */
+		int offset = data.header_length +
+			data.block_descriptor_length + 2;
 
-		sdkp->WCE = ((buffer[offset + 2] & 0x04) != 0);
-		sdkp->RCD = ((buffer[offset + 2] & 0x01) != 0);
+		sdkp->WCE = ((buffer[offset] & 0x04) != 0);
+		sdkp->RCD = ((buffer[offset] & 0x01) != 0);
 
 		ct =  sdkp->RCD + 2*sdkp->WCE;
 
 		printk(KERN_NOTICE "SCSI device %s: drive cache: %s\n",
 		       diskname, types[ct]);
 	} else {
-		if (res == 0 ||
-		    (status_byte(res) == CHECK_CONDITION
-		     && (SRpnt->sr_sense_buffer[0] & 0x70) == 0x70
+		if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70
 		     && (SRpnt->sr_sense_buffer[2] & 0x0f) == ILLEGAL_REQUEST
 		     /* ASC 0x24 ASCQ 0x00: Invalid field in CDB */
 		     && SRpnt->sr_sense_buffer[12] == 0x24
-		     && SRpnt->sr_sense_buffer[13] == 0x00)) {
+		     && SRpnt->sr_sense_buffer[13] == 0x00) {
 			printk(KERN_NOTICE "%s: cache data unavailable\n",
 			       diskname);
 		} else {
@@ -1417,7 +1394,7 @@ static void sd_shutdown(struct device *dev)
 		return;
 	}
 
-	sreq->sr_data_direction = SCSI_DATA_NONE;
+	sreq->sr_data_direction = DMA_NONE;
 	for (retries = 3; retries > 0; --retries) {
 		unsigned char cmd[10] = { 0 };
 
