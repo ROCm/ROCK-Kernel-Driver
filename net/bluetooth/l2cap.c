@@ -57,7 +57,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.5"
+#define VERSION "2.6"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -1428,7 +1428,8 @@ static inline int l2cap_connect_req(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	sk->sk_state = BT_CONNECT2;
 	l2cap_pi(sk)->ident = cmd->ident;
 
-	if (l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT) {
+	if ((l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT) ||
+			(l2cap_pi(sk)->link_mode & L2CAP_LM_SECURE)) {
 		if (!hci_conn_encrypt(conn->hcon))
 			goto done;
 	} else if (l2cap_pi(sk)->link_mode & L2CAP_LM_AUTH) {
@@ -1947,7 +1948,8 @@ static int l2cap_auth_cfm(struct hci_conn *hcon, u8 status)
 		bh_lock_sock(sk);
 
 		if (sk->sk_state != BT_CONNECT2 ||
-				(l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT)) {
+				(l2cap_pi(sk)->link_mode & L2CAP_LM_ENCRYPT) ||
+				(l2cap_pi(sk)->link_mode & L2CAP_LM_SECURE)) {
 			bh_unlock_sock(sk);
 			continue;
 		}
@@ -2014,6 +2016,9 @@ static int l2cap_encrypt_cfm(struct hci_conn *hcon, u8 status)
 		rsp.status = __cpu_to_le16(0);
 		l2cap_send_cmd(conn, l2cap_pi(sk)->ident,
 				L2CAP_CONN_RSP, sizeof(rsp), &rsp);
+
+		if (l2cap_pi(sk)->link_mode & L2CAP_LM_SECURE)
+			hci_conn_change_link_key(hcon);
 
 		bh_unlock_sock(sk);
 	}
