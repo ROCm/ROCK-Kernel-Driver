@@ -32,15 +32,8 @@
  *  http://www.boulder.nist.gov/timefreq/pubs/bulletin/leapsecond.htm
  */
 
-#if defined(__linux__) && defined(__KERNEL__)
 #include <linux/types.h>
 #include <linux/kernel.h>
-#else
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#endif
-
 #include "udfdecl.h"
 
 #define EPOCH_YEAR 1970
@@ -86,9 +79,7 @@ time_t year_seconds[MAX_YEAR_SECONDS]= {
 /*2038*/ SPY(68,17,0)
 };
 
-#ifdef __KERNEL__
 extern struct timezone sys_tz;
-#endif
 
 #define SECS_PER_HOUR	(60 * 60)
 #define SECS_PER_DAY	(SECS_PER_HOUR * 24)
@@ -97,8 +88,8 @@ time_t *
 udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
 {
 	int yday;
-	Uint8 type = src.typeAndTimezone >> 12;
-	Sint16 offset;
+	uint8_t type = src.typeAndTimezone >> 12;
+	int16_t offset;
 
 	if (type == 1)
 	{
@@ -134,13 +125,8 @@ udf_time_to_stamp(timestamp *dest, time_t tv_sec, long tv_usec)
 {
 	long int days, rem, y;
 	const unsigned short int *ip;
-	Sint16 offset;
-#ifndef __KERNEL__
-	struct timeval tv;
-	struct timezone sys_tz;
+	int16_t offset;
 
-	gettimeofday(&tv, &sys_tz);
-#endif
 	offset = -sys_tz.tz_minuteswest;
 
 	if (!dest)

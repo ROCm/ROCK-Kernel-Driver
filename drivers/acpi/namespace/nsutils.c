@@ -2,12 +2,12 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 92 $
+ *              $Revision: 104 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include "actables.h"
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nsutils")
+	 ACPI_MODULE_NAME    ("nsutils")
 
 
 /*******************************************************************************
@@ -87,19 +87,19 @@ acpi_ns_valid_path_separator (
  *
  ******************************************************************************/
 
-acpi_object_type8
+acpi_object_type
 acpi_ns_get_type (
 	acpi_namespace_node     *node)
 {
-	FUNCTION_TRACE ("Ns_get_type");
+	ACPI_FUNCTION_TRACE ("Ns_get_type");
 
 
 	if (!node) {
-		REPORT_WARNING (("Ns_get_type: Null Node ptr"));
+		ACPI_REPORT_WARNING (("Ns_get_type: Null Node ptr"));
 		return_VALUE (ACPI_TYPE_ANY);
 	}
 
-	return_VALUE (node->type);
+	return_VALUE ((acpi_object_type) node->type);
 }
 
 
@@ -116,19 +116,19 @@ acpi_ns_get_type (
 
 u32
 acpi_ns_local (
-	acpi_object_type8       type)
+	acpi_object_type        type)
 {
-	FUNCTION_TRACE ("Ns_local");
+	ACPI_FUNCTION_TRACE ("Ns_local");
 
 
 	if (!acpi_ut_valid_object_type (type)) {
 		/* Type code out of range  */
 
-		REPORT_WARNING (("Ns_local: Invalid Object Type\n"));
-		return_VALUE (NSP_NORMAL);
+		ACPI_REPORT_WARNING (("Ns_local: Invalid Object Type\n"));
+		return_VALUE (ACPI_NS_NORMAL);
 	}
 
-	return_VALUE ((u32) acpi_gbl_ns_properties[type] & NSP_LOCAL);
+	return_VALUE ((u32) acpi_gbl_ns_properties[type] & ACPI_NS_LOCAL);
 }
 
 
@@ -154,7 +154,7 @@ acpi_ns_get_internal_name_length (
 	u32                     i;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	next_external_char = info->external_name;
@@ -175,7 +175,6 @@ acpi_ns_get_internal_name_length (
 		info->fully_qualified = TRUE;
 		next_external_char++;
 	}
-
 	else {
 		/*
 		 * Handle Carat prefixes
@@ -234,7 +233,7 @@ acpi_ns_build_internal_name (
 	u32                     i;
 
 
-	FUNCTION_TRACE ("Ns_build_internal_name");
+	ACPI_FUNCTION_TRACE ("Ns_build_internal_name");
 
 
 	/* Setup the correct prefixes, counts, and pointers */
@@ -268,15 +267,13 @@ acpi_ns_build_internal_name (
 			}
 		}
 
-		if (num_segments == 1) {
+		if (num_segments <= 1) {
 			result = &internal_name[i];
 		}
-
 		else if (num_segments == 2) {
 			internal_name[i] = AML_DUAL_NAME_PREFIX;
 			result = &internal_name[i+1];
 		}
-
 		else {
 			internal_name[i] = AML_MULTI_NAME_PREFIX_OP;
 			internal_name[i+1] = (char) num_segments;
@@ -295,11 +292,10 @@ acpi_ns_build_internal_name (
 
 				result[i] = '_';
 			}
-
 			else {
 				/* Convert the character to uppercase and save it */
 
-				result[i] = (char) TOUPPER (*external_name);
+				result[i] = (char) ACPI_TOUPPER (*external_name);
 				external_name++;
 			}
 		}
@@ -316,7 +312,6 @@ acpi_ns_build_internal_name (
 		external_name++;
 		result += ACPI_NAME_SIZE;
 	}
-
 
 	/* Terminate the string */
 
@@ -360,7 +355,7 @@ acpi_ns_internalize_name (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ns_internalize_name");
+	ACPI_FUNCTION_TRACE ("Ns_internalize_name");
 
 
 	if ((!external_name)     ||
@@ -368,7 +363,6 @@ acpi_ns_internalize_name (
 		(!converted_name)) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/* Get the length of the new internal name */
 
@@ -420,21 +414,20 @@ acpi_ns_externalize_name (
 {
 	u32                     prefix_length = 0;
 	u32                     names_index = 0;
-	u32                     names_count = 0;
+	u32                     num_segments = 0;
 	u32                     i = 0;
 	u32                     j = 0;
+	u32                     required_length;
 
 
-	FUNCTION_TRACE ("Ns_externalize_name");
+	ACPI_FUNCTION_TRACE ("Ns_externalize_name");
 
 
 	if (!internal_name_length   ||
 		!internal_name          ||
-		!converted_name_length  ||
 		!converted_name) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/*
 	 * Check for a prefix (one '\' | one or more '^').
@@ -464,36 +457,36 @@ acpi_ns_externalize_name (
 	 */
 	if (prefix_length < internal_name_length) {
 		switch (internal_name[prefix_length]) {
-
-		/* <count> 4-byte names */
-
 		case AML_MULTI_NAME_PREFIX_OP:
+
+			/* <count> 4-byte names */
+
 			names_index = prefix_length + 2;
-			names_count = (u32) internal_name[prefix_length + 1];
+			num_segments = (u32) (u8) internal_name[prefix_length + 1];
 			break;
-
-
-		/* two 4-byte names */
 
 		case AML_DUAL_NAME_PREFIX:
+
+			/* Two 4-byte names */
+
 			names_index = prefix_length + 1;
-			names_count = 2;
+			num_segments = 2;
 			break;
-
-
-		/* Null_name */
 
 		case 0:
+
+			/* Null_name */
+
 			names_index = 0;
-			names_count = 0;
+			num_segments = 0;
 			break;
 
-
-		/* one 4-byte name */
-
 		default:
+
+			/* one 4-byte name */
+
 			names_index = prefix_length;
-			names_count = 1;
+			num_segments = 1;
 			break;
 		}
 	}
@@ -503,23 +496,22 @@ acpi_ns_externalize_name (
 	 * of the prefix, length of all object names, length of any required
 	 * punctuation ('.') between object names, plus the NULL terminator.
 	 */
-	*converted_name_length = prefix_length + (4 * names_count) +
-			   ((names_count > 0) ? (names_count - 1) : 0) + 1;
+	required_length = prefix_length + (4 * num_segments) +
+			   ((num_segments > 0) ? (num_segments - 1) : 0) + 1;
 
 	/*
 	 * Check to see if we're still in bounds.  If not, there's a problem
 	 * with Internal_name (invalid format).
 	 */
-	if (*converted_name_length > internal_name_length) {
-		REPORT_ERROR (("Ns_externalize_name: Invalid internal name\n"));
+	if (required_length > internal_name_length) {
+		ACPI_REPORT_ERROR (("Ns_externalize_name: Invalid internal name\n"));
 		return_ACPI_STATUS (AE_BAD_PATHNAME);
 	}
 
 	/*
 	 * Build Converted_name...
 	 */
-
-	(*converted_name) = ACPI_MEM_CALLOCATE (*converted_name_length);
+	*converted_name = ACPI_MEM_CALLOCATE (required_length);
 	if (!(*converted_name)) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -530,8 +522,8 @@ acpi_ns_externalize_name (
 		(*converted_name)[j++] = internal_name[i];
 	}
 
-	if (names_count > 0) {
-		for (i = 0; i < names_count; i++) {
+	if (num_segments > 0) {
+		for (i = 0; i < num_segments; i++) {
 			if (i > 0) {
 				(*converted_name)[j++] = '.';
 			}
@@ -541,6 +533,10 @@ acpi_ns_externalize_name (
 			(*converted_name)[j++] = internal_name[names_index++];
 			(*converted_name)[j++] = internal_name[names_index++];
 		}
+	}
+
+	if (converted_name_length) {
+		*converted_name_length = required_length;
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -557,6 +553,9 @@ acpi_ns_externalize_name (
  *
  * DESCRIPTION: Convert a namespace handle to a real Node
  *
+ * Note: Real integer handles allow for more verification
+ *       and keep all pointers within this subsystem.
+ *
  ******************************************************************************/
 
 acpi_namespace_node *
@@ -564,13 +563,11 @@ acpi_ns_map_handle_to_node (
 	acpi_handle             handle)
 {
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/*
-	 * Simple implementation for now;
-	 * TBD: [Future] Real integer handles allow for more verification
-	 * and keep all pointers within this subsystem!
+	 * Simple implementation.
 	 */
 	if (!handle) {
 		return (NULL);
@@ -580,10 +577,9 @@ acpi_ns_map_handle_to_node (
 		return (acpi_gbl_root_node);
 	}
 
-
 	/* We can at least attempt to verify the handle */
 
-	if (!VALID_DESCRIPTOR_TYPE (handle, ACPI_DESC_TYPE_NAMED)) {
+	if (ACPI_GET_DESCRIPTOR_TYPE (handle) != ACPI_DESC_TYPE_NAMED) {
 		return (NULL);
 	}
 
@@ -611,8 +607,6 @@ acpi_ns_convert_entry_to_handle (
 
 	/*
 	 * Simple implementation for now;
-	 * TBD: [Future] Real integer handles allow for more verification
-	 * and keep all pointers within this subsystem!
 	 */
 	return ((acpi_handle) node);
 
@@ -654,7 +648,7 @@ acpi_ns_terminate (void)
 	acpi_namespace_node     *this_node;
 
 
-	FUNCTION_TRACE ("Ns_terminate");
+	ACPI_FUNCTION_TRACE ("Ns_terminate");
 
 
 	this_node = acpi_gbl_root_node;
@@ -702,25 +696,25 @@ acpi_ns_terminate (void)
 
 u32
 acpi_ns_opens_scope (
-	acpi_object_type8       type)
+	acpi_object_type        type)
 {
-	FUNCTION_TRACE_U32 ("Ns_opens_scope", type);
+	ACPI_FUNCTION_TRACE_U32 ("Ns_opens_scope", type);
 
 
 	if (!acpi_ut_valid_object_type (type)) {
 		/* type code out of range  */
 
-		REPORT_WARNING (("Ns_opens_scope: Invalid Object Type\n"));
-		return_VALUE (NSP_NORMAL);
+		ACPI_REPORT_WARNING (("Ns_opens_scope: Invalid Object Type %X\n", type));
+		return_VALUE (ACPI_NS_NORMAL);
 	}
 
-	return_VALUE (((u32) acpi_gbl_ns_properties[type]) & NSP_NEWSCOPE);
+	return_VALUE (((u32) acpi_gbl_ns_properties[type]) & ACPI_NS_NEWSCOPE);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_node
+ * FUNCTION:    Acpi_ns_get_node_by_path
  *
  * PARAMETERS:  *Pathname   - Name to be found, in external (ASL) format. The
  *                            \ (backslash) and ^ (carat) prefixes, and the
@@ -729,6 +723,8 @@ acpi_ns_opens_scope (
  *                            root of the name space.  If Name is fully
  *                            qualified (first s8 is '\'), the passed value
  *                            of Scope will not be accessed.
+ *              Flags       - Used to indicate whether to perform upsearch or
+ *                            not.
  *              Return_node - Where the Node is returned
  *
  * DESCRIPTION: Look up a name relative to a given scope and return the
@@ -739,9 +735,10 @@ acpi_ns_opens_scope (
  ******************************************************************************/
 
 acpi_status
-acpi_ns_get_node (
+acpi_ns_get_node_by_path (
 	NATIVE_CHAR             *pathname,
 	acpi_namespace_node     *start_node,
+	u32                     flags,
 	acpi_namespace_node     **return_node)
 {
 	acpi_generic_state      scope_info;
@@ -749,19 +746,12 @@ acpi_ns_get_node (
 	NATIVE_CHAR             *internal_path = NULL;
 
 
-	FUNCTION_TRACE_PTR ("Ns_get_node", pathname);
+	ACPI_FUNCTION_TRACE_PTR ("Ns_get_node_by_path", pathname);
 
-
-	/* Ensure that the namespace has been initialized */
-
-	if (!acpi_gbl_root_node) {
-		return_ACPI_STATUS (AE_NO_NAMESPACE);
-	}
 
 	if (!pathname) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/* Convert path to internal representation */
 
@@ -770,8 +760,12 @@ acpi_ns_get_node (
 		return_ACPI_STATUS (status);
 	}
 
+	/* Must lock namespace during lookup */
 
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/* Setup lookup scope (search starting point) */
 
@@ -780,20 +774,17 @@ acpi_ns_get_node (
 	/* Lookup the name in the namespace */
 
 	status = acpi_ns_lookup (&scope_info, internal_path,
-			 ACPI_TYPE_ANY, IMODE_EXECUTE,
-			 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
+			 ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
+			 (flags | ACPI_NS_DONT_OPEN_SCOPE),
 			 NULL, return_node);
-
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s, %s\n",
 				internal_path, acpi_format_exception (status)));
 	}
 
-
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-
 	/* Cleanup */
 
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	ACPI_MEM_FREE (internal_path);
 	return_ACPI_STATUS (status);
 }
@@ -820,16 +811,17 @@ acpi_ns_find_parent_name (
 	acpi_namespace_node     *parent_node;
 
 
-	FUNCTION_TRACE ("Ns_find_parent_name");
+	ACPI_FUNCTION_TRACE ("Ns_find_parent_name");
 
 
 	if (child_node) {
 		/* Valid entry.  Get the parent Node */
 
-		parent_node = acpi_ns_get_parent_object (child_node);
+		parent_node = acpi_ns_get_parent_node (child_node);
 		if (parent_node) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Parent of %p [%4.4s] is %p [%4.4s]\n",
-				child_node, (char*)&child_node->name, parent_node, (char*)&parent_node->name));
+				child_node, (char *) &child_node->name,
+				parent_node, (char *) &parent_node->name));
 
 			if (parent_node->name) {
 				return_VALUE (parent_node->name);
@@ -837,7 +829,7 @@ acpi_ns_find_parent_name (
 		}
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "unable to find parent of %p (%4.4s)\n",
-			child_node, (char*)&child_node->name));
+			child_node, (char *) &child_node->name));
 	}
 
 	return_VALUE (ACPI_UNKNOWN_NAME);
@@ -883,7 +875,7 @@ acpi_ns_exist_downstream_sibling (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_parent_object
+ * FUNCTION:    Acpi_ns_get_parent_node
  *
  * PARAMETERS:  Node       - Current table entry
  *
@@ -895,12 +887,10 @@ acpi_ns_exist_downstream_sibling (
 
 
 acpi_namespace_node *
-acpi_ns_get_parent_object (
+acpi_ns_get_parent_node (
 	acpi_namespace_node     *node)
 {
-
-
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	if (!node) {

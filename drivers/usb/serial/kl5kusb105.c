@@ -519,7 +519,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		}
 
 		if (urb->transfer_buffer == NULL) {
-			urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_KERNEL);
+			urb->transfer_buffer = kmalloc (URB_TRANSFER_BUFFER_SIZE, GFP_ATOMIC);
 			if (urb->transfer_buffer == NULL) {
 				err(__FUNCTION__ " - no more kernel memory...");
 				goto exit;
@@ -555,7 +555,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 
 
 		/* send the data out the bulk port */
-		result = usb_submit_urb(urb, GFP_KERNEL);
+		result = usb_submit_urb(urb, GFP_ATOMIC);
 		if (result) {
 			err(__FUNCTION__
 			    " - failed submitting write urb, error %d", result);
@@ -721,7 +721,7 @@ static void klsi_105_read_bulk_callback (struct urb *urb)
 		      port->read_urb->transfer_buffer_length,
 		      klsi_105_read_bulk_callback,
 		      port);
-	rc = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	rc = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (rc)
 		err(__FUNCTION__ 
 		    " - failed resubmitting read urb, error %d", rc);
@@ -1019,7 +1019,7 @@ static void klsi_105_unthrottle (struct usb_serial_port *port)
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	port->read_urb->dev = port->serial->dev;
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d",
 		    result);

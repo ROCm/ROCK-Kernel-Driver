@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 80 $
+ *              $Revision: 88 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #include "acdebug.h"
 
 #define _COMPONENT          ACPI_DISPATCHER
-	 MODULE_NAME         ("dsutils")
+	 ACPI_MODULE_NAME    ("dsutils")
 
 
 /*******************************************************************************
@@ -58,7 +58,7 @@ acpi_ds_is_result_used (
 	const acpi_opcode_info  *parent_info;
 
 
-	FUNCTION_TRACE_PTR ("Ds_is_result_used", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_is_result_used", op);
 
 
 	/* Must have both an Op and a Result Object */
@@ -67,7 +67,6 @@ acpi_ds_is_result_used (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Op\n"));
 		return_VALUE (TRUE);
 	}
-
 
 	/*
 	 * If there is no parent, the result can't possibly be used!
@@ -79,17 +78,14 @@ acpi_ds_is_result_used (
 		return_VALUE (FALSE);
 	}
 
-
 	/*
 	 * Get info on the parent.  The root Op is AML_SCOPE
 	 */
-
 	parent_info = acpi_ps_get_opcode_info (op->parent->opcode);
 	if (parent_info->class == AML_CLASS_UNKNOWN) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown parent opcode. Op=%p\n", op));
 		return_VALUE (FALSE);
 	}
-
 
 	/*
 	 * Decide what to do with the result based on the parent.  If
@@ -98,78 +94,80 @@ acpi_ds_is_result_used (
 	 * as an operand later.
 	 */
 	switch (parent_info->class) {
-	/*
-	 * In these cases, the parent will never use the return object
-	 */
-	case AML_CLASS_CONTROL:        /* IF, ELSE, WHILE only */
+	case AML_CLASS_CONTROL:
 
 		switch (op->parent->opcode) {
 		case AML_RETURN_OP:
 
 			/* Never delete the return value associated with a return opcode */
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-				"Result used, [RETURN] opcode=%X Op=%p\n", op->opcode, op));
-			return_VALUE (TRUE);
-			break;
+			goto result_used;
 
 		case AML_IF_OP:
 		case AML_WHILE_OP:
 
 			/*
 			 * If we are executing the predicate AND this is the predicate op,
-			 * we will use the return value!
+			 * we will use the return value
 			 */
-			if ((walk_state->control_state->common.state == CONTROL_PREDICATE_EXECUTING) &&
+			if ((walk_state->control_state->common.state == ACPI_CONTROL_PREDICATE_EXECUTING) &&
 				(walk_state->control_state->control.predicate_op == op)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-					"Result used as a predicate, [IF/WHILE] opcode=%X Op=%p\n",
-					op->opcode, op));
-				return_VALUE (TRUE);
+				goto result_used;
 			}
-
-			break;
 		}
 
+		/* The general control opcode returns no result */
 
-		/* Fall through to not used case below */
+		goto result_not_used;
 
 
-	case AML_CLASS_NAMED_OBJECT:   /* Scope, method, etc. */
 	case AML_CLASS_CREATE:
 
 		/*
 		 * These opcodes allow Term_arg(s) as operands and therefore
-		 * method calls.  The result is used.
+		 * the operands can be method calls.  The result is used.
 		 */
-		if ((op->parent->opcode == AML_REGION_OP)               ||
-			(op->parent->opcode == AML_CREATE_FIELD_OP)         ||
-			(op->parent->opcode == AML_CREATE_BIT_FIELD_OP)     ||
-			(op->parent->opcode == AML_CREATE_BYTE_FIELD_OP)    ||
-			(op->parent->opcode == AML_CREATE_WORD_FIELD_OP)    ||
-			(op->parent->opcode == AML_CREATE_DWORD_FIELD_OP)   ||
-			(op->parent->opcode == AML_CREATE_QWORD_FIELD_OP)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-				"Result used, [Region or Create_field] opcode=%X Op=%p\n",
-				op->opcode, op));
-			return_VALUE (TRUE);
+		goto result_used;
+
+
+	case AML_CLASS_NAMED_OBJECT:
+
+		if ((op->parent->opcode == AML_REGION_OP)       ||
+			(op->parent->opcode == AML_DATA_REGION_OP)) {
+			/*
+			 * These opcodes allow Term_arg(s) as operands and therefore
+			 * the operands can be method calls.  The result is used.
+			 */
+			goto result_used;
 		}
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-			"Result not used, Parent opcode=%X Op=%p\n", op->opcode, op));
+		goto result_not_used;
 
-		return_VALUE (FALSE);
-		break;
 
 	/*
 	 * In all other cases. the parent will actually use the return
 	 * object, so keep it.
 	 */
 	default:
-		break;
+		goto result_used;
 	}
 
+
+result_used:
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Result of [%s] used by Parent [%s] Op=%p\n",
+			acpi_ps_get_opcode_name (op->opcode),
+			acpi_ps_get_opcode_name (op->parent->opcode), op));
+
 	return_VALUE (TRUE);
+
+
+result_not_used:
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Result of [%s] not used by Parent [%s] Op=%p\n",
+			acpi_ps_get_opcode_name (op->opcode),
+			acpi_ps_get_opcode_name (op->parent->opcode), op));
+
+	return_VALUE (FALSE);
+
 }
 
 
@@ -200,7 +198,7 @@ acpi_ds_delete_result_if_not_used (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE_PTR ("Ds_delete_result_if_not_used", result_obj);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_delete_result_if_not_used", result_obj);
 
 
 	if (!op) {
@@ -252,16 +250,15 @@ acpi_ds_create_operand (
 	acpi_status             status = AE_OK;
 	NATIVE_CHAR             *name_string;
 	u32                     name_length;
-	acpi_object_type8       data_type;
 	acpi_operand_object     *obj_desc;
 	acpi_parse_object       *parent_op;
 	u16                     opcode;
-	u32                     flags;
-	operating_mode          interpreter_mode;
+	acpi_interpreter_mode   interpreter_mode;
 	const acpi_opcode_info  *op_info;
+	char                    *name;
 
 
-	FUNCTION_TRACE_PTR ("Ds_create_operand", arg);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_create_operand", arg);
 
 
 	/* A valid name must be looked up in the namespace */
@@ -298,25 +295,20 @@ acpi_ds_create_operand (
 			(parent_op->opcode != AML_INT_NAMEPATH_OP)) {
 			/* Enter name into namespace if not found */
 
-			interpreter_mode = IMODE_LOAD_PASS2;
+			interpreter_mode = ACPI_IMODE_LOAD_PASS2;
 		}
 
 		else {
 			/* Return a failure if name not found */
 
-			interpreter_mode = IMODE_EXECUTE;
+			interpreter_mode = ACPI_IMODE_EXECUTE;
 		}
 
 		status = acpi_ns_lookup (walk_state->scope_info, name_string,
 				 ACPI_TYPE_ANY, interpreter_mode,
-				 NS_SEARCH_PARENT | NS_DONT_OPEN_SCOPE,
+				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
 				 walk_state,
 				 (acpi_namespace_node **) &obj_desc);
-
-		/* Free the namestring created above */
-
-		ACPI_MEM_FREE (name_string);
-
 		/*
 		 * The only case where we pass through (ignore) a NOT_FOUND
 		 * error is for the Cond_ref_of opcode.
@@ -340,12 +332,17 @@ acpi_ds_create_operand (
 				 */
 				status = AE_AML_NAME_NOT_FOUND;
 
-				/* TBD: Externalize Name_string and print */
-
+				name = NULL;
+				acpi_ns_externalize_name (ACPI_UINT32_MAX, name_string, NULL, &name);
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-						"Object name was not found in namespace\n"));
+						"Object name [%s] was not found in namespace\n", name));
+				ACPI_MEM_FREE (name);
 			}
 		}
+
+		/* Free the namestring created above */
+
+		ACPI_MEM_FREE (name_string);
 
 		/* Check status from the lookup */
 
@@ -359,7 +356,7 @@ acpi_ds_create_operand (
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
-		DEBUGGER_EXEC (acpi_db_display_argument_object (obj_desc, walk_state));
+		ACPI_DEBUGGER_EXEC (acpi_db_display_argument_object (obj_desc, walk_state));
 	}
 
 
@@ -376,30 +373,25 @@ acpi_ds_create_operand (
 			opcode = AML_ZERO_OP;       /* Has no arguments! */
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Null namepath: Arg=%p\n", arg));
-
-			/*
-			 * TBD: [Investigate] anything else needed for the
-			 * zero op lvalue?
-			 */
 		}
 
 		else {
 			opcode = arg->opcode;
 		}
 
+		/* Get the object type of the argument */
 
-		/* Get the data type of the argument */
-
-		data_type = acpi_ds_map_opcode_to_data_type (opcode, &flags);
-		if (data_type == INTERNAL_TYPE_INVALID) {
+		op_info = acpi_ps_get_opcode_info (opcode);
+		if (op_info->object_type == INTERNAL_TYPE_INVALID) {
 			return_ACPI_STATUS (AE_NOT_IMPLEMENTED);
 		}
 
-		if (flags & OP_HAS_RETURN_VALUE) {
+		if (op_info->flags & AML_HAS_RETVAL) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 				"Argument previously created, already stacked \n"));
 
-			DEBUGGER_EXEC (acpi_db_display_argument_object (walk_state->operands [walk_state->num_operands - 1], walk_state));
+			ACPI_DEBUGGER_EXEC (acpi_db_display_argument_object (
+				walk_state->operands [walk_state->num_operands - 1], walk_state));
 
 			/*
 			 * Use value that was already previously returned
@@ -415,13 +407,12 @@ acpi_ds_create_operand (
 					acpi_format_exception (status)));
 				return_ACPI_STATUS (status);
 			}
-
 		}
 
 		else {
 			/* Create an ACPI_INTERNAL_OBJECT for the argument */
 
-			obj_desc = acpi_ut_create_internal_object (data_type);
+			obj_desc = acpi_ut_create_internal_object (op_info->object_type);
 			if (!obj_desc) {
 				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
@@ -443,7 +434,7 @@ acpi_ds_create_operand (
 			return_ACPI_STATUS (status);
 		}
 
-		DEBUGGER_EXEC (acpi_db_display_argument_object (obj_desc, walk_state));
+		ACPI_DEBUGGER_EXEC (acpi_db_display_argument_object (obj_desc, walk_state));
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -474,7 +465,7 @@ acpi_ds_create_operands (
 	u32                     arg_count = 0;
 
 
-	FUNCTION_TRACE_PTR ("Ds_create_operands", first_arg);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_create_operands", first_arg);
 
 
 	/* For all arguments in the list... */
@@ -534,17 +525,12 @@ acpi_ds_resolve_operands (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE_PTR ("Ds_resolve_operands", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_resolve_operands", walk_state);
 
 
 	/*
 	 * Attempt to resolve each of the valid operands
 	 * Method arguments are passed by value, not by reference
-	 */
-
-	/*
-	 * TBD: [Investigate] Note from previous parser:
-	 *   Ref_of problem with Acpi_ex_resolve_to_value() conversion.
 	 */
 	for (i = 0; i < walk_state->num_operands; i++) {
 		status = acpi_ex_resolve_to_value (&walk_state->operands[i], walk_state);
@@ -555,264 +541,4 @@ acpi_ds_resolve_operands (
 
 	return_ACPI_STATUS (status);
 }
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ds_map_opcode_to_data_type
- *
- * PARAMETERS:  Opcode          - AML opcode to map
- *              Out_flags       - Additional info about the opcode
- *
- * RETURN:      The ACPI type associated with the opcode
- *
- * DESCRIPTION: Convert a raw AML opcode to the associated ACPI data type,
- *              if any.  If the opcode returns a value as part of the
- *              intepreter execution, a flag is returned in Out_flags.
- *
- ******************************************************************************/
-
-acpi_object_type8
-acpi_ds_map_opcode_to_data_type (
-	u16                     opcode,
-	u32                     *out_flags)
-{
-	acpi_object_type8       data_type = INTERNAL_TYPE_INVALID;
-	const acpi_opcode_info  *op_info;
-	u32                     flags = 0;
-
-
-	PROC_NAME ("Ds_map_opcode_to_data_type");
-
-
-	op_info = acpi_ps_get_opcode_info (opcode);
-	if (op_info->class == AML_CLASS_UNKNOWN) {
-		/* Unknown opcode */
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown AML opcode: %x\n", opcode));
-		return (data_type);
-	}
-
-
-/*
- * TBD: Use op class
- */
-
-	switch (op_info->type) {
-
-	case AML_TYPE_LITERAL:
-
-		switch (opcode) {
-		case AML_BYTE_OP:
-		case AML_WORD_OP:
-		case AML_DWORD_OP:
-		case AML_QWORD_OP:
-
-			data_type = ACPI_TYPE_INTEGER;
-			break;
-
-
-		case AML_STRING_OP:
-
-			data_type = ACPI_TYPE_STRING;
-			break;
-
-		case AML_INT_NAMEPATH_OP:
-			data_type = INTERNAL_TYPE_REFERENCE;
-			break;
-
-		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Unknown (type LITERAL) AML opcode: %x\n", opcode));
-			break;
-		}
-		break;
-
-
-	case AML_TYPE_DATA_TERM:
-
-		switch (opcode) {
-		case AML_BUFFER_OP:
-
-			data_type = ACPI_TYPE_BUFFER;
-			break;
-
-		case AML_PACKAGE_OP:
-		case AML_VAR_PACKAGE_OP:
-
-			data_type = ACPI_TYPE_PACKAGE;
-			break;
-
-		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Unknown (type DATA_TERM) AML opcode: %x\n", opcode));
-			break;
-		}
-		break;
-
-
-	case AML_TYPE_CONSTANT:
-	case AML_TYPE_METHOD_ARGUMENT:
-	case AML_TYPE_LOCAL_VARIABLE:
-
-		data_type = INTERNAL_TYPE_REFERENCE;
-		break;
-
-
-	case AML_TYPE_EXEC_1A_0T_1R:
-	case AML_TYPE_EXEC_1A_1T_1R:
-	case AML_TYPE_EXEC_2A_0T_1R:
-	case AML_TYPE_EXEC_2A_1T_1R:
-	case AML_TYPE_EXEC_2A_2T_1R:
-	case AML_TYPE_EXEC_3A_1T_1R:
-	case AML_TYPE_EXEC_6A_0T_1R:
-	case AML_TYPE_RETURN:
-
-		flags = OP_HAS_RETURN_VALUE;
-		data_type = ACPI_TYPE_ANY;
-		break;
-
-
-	case AML_TYPE_METHOD_CALL:
-
-		flags = OP_HAS_RETURN_VALUE;
-		data_type = ACPI_TYPE_METHOD;
-		break;
-
-
-	case AML_TYPE_NAMED_FIELD:
-	case AML_TYPE_NAMED_SIMPLE:
-	case AML_TYPE_NAMED_COMPLEX:
-	case AML_TYPE_NAMED_NO_OBJ:
-
-		data_type = acpi_ds_map_named_opcode_to_data_type (opcode);
-		break;
-
-
-	case AML_TYPE_EXEC_1A_0T_0R:
-	case AML_TYPE_EXEC_2A_0T_0R:
-	case AML_TYPE_EXEC_3A_0T_0R:
-	case AML_TYPE_EXEC_1A_1T_0R:
-	case AML_TYPE_CONTROL:
-
-		/* No mapping needed at this time */
-
-		break;
-
-
-	default:
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Unimplemented data type opcode: %x\n", opcode));
-		break;
-	}
-
-	/* Return flags to caller if requested */
-
-	if (out_flags) {
-		*out_flags = flags;
-	}
-
-	return (data_type);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ds_map_named_opcode_to_data_type
- *
- * PARAMETERS:  Opcode              - The Named AML opcode to map
- *
- * RETURN:      The ACPI type associated with the named opcode
- *
- * DESCRIPTION: Convert a raw Named AML opcode to the associated data type.
- *              Named opcodes are a subsystem of the AML opcodes.
- *
- ******************************************************************************/
-
-acpi_object_type8
-acpi_ds_map_named_opcode_to_data_type (
-	u16                     opcode)
-{
-	acpi_object_type8       data_type;
-
-
-	FUNCTION_ENTRY ();
-
-
-	/* Decode Opcode */
-
-	switch (opcode) {
-	case AML_SCOPE_OP:
-		data_type = INTERNAL_TYPE_SCOPE;
-		break;
-
-	case AML_DEVICE_OP:
-		data_type = ACPI_TYPE_DEVICE;
-		break;
-
-	case AML_THERMAL_ZONE_OP:
-		data_type = ACPI_TYPE_THERMAL;
-		break;
-
-	case AML_METHOD_OP:
-		data_type = ACPI_TYPE_METHOD;
-		break;
-
-	case AML_POWER_RES_OP:
-		data_type = ACPI_TYPE_POWER;
-		break;
-
-	case AML_PROCESSOR_OP:
-		data_type = ACPI_TYPE_PROCESSOR;
-		break;
-
-	case AML_FIELD_OP:                              /* Field_op */
-		data_type = INTERNAL_TYPE_FIELD_DEFN;
-		break;
-
-	case AML_INDEX_FIELD_OP:                        /* Index_field_op */
-		data_type = INTERNAL_TYPE_INDEX_FIELD_DEFN;
-		break;
-
-	case AML_BANK_FIELD_OP:                         /* Bank_field_op */
-		data_type = INTERNAL_TYPE_BANK_FIELD_DEFN;
-		break;
-
-	case AML_INT_NAMEDFIELD_OP:                     /* NO CASE IN ORIGINAL  */
-		data_type = ACPI_TYPE_ANY;
-		break;
-
-	case AML_NAME_OP:                               /* Name_op - special code in original */
-	case AML_INT_NAMEPATH_OP:
-		data_type = ACPI_TYPE_ANY;
-		break;
-
-	case AML_ALIAS_OP:
-		data_type = INTERNAL_TYPE_ALIAS;
-		break;
-
-	case AML_MUTEX_OP:
-		data_type = ACPI_TYPE_MUTEX;
-		break;
-
-	case AML_EVENT_OP:
-		data_type = ACPI_TYPE_EVENT;
-		break;
-
-	case AML_DATA_REGION_OP:
-	case AML_REGION_OP:
-		data_type = ACPI_TYPE_REGION;
-		break;
-
-
-	default:
-		data_type = ACPI_TYPE_ANY;
-		break;
-
-	}
-
-	return (data_type);
-}
-
 

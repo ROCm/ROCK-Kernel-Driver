@@ -51,7 +51,6 @@
 
 static int io = CONFIG_RADIO_TERRATEC_PORT; 
 static int radio_nr = -1;
-static int users = 0;
 static spinlock_t lock;
 
 struct tt_device
@@ -186,89 +185,77 @@ int tt_getsigstr(struct tt_device *dev)		/* TODO */
 
 /* implement the video4linux api */
 
-static int tt_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int tt_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct tt_device *tt=dev->priv;
 	
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			strcpy(v.name, "ActiveRadio");
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
+			strcpy(v->name, "ActiveRadio");
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */ 
+			struct video_tuner *v = arg;
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v.rangelow=(87*16000);
-			v.rangehigh=(108*16000);
-			v.flags=VIDEO_TUNER_LOW;
-			v.mode=VIDEO_MODE_AUTO;
-			strcpy(v.name, "FM");
-			v.signal=0xFFFF*tt_getsigstr(tt);
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			v->rangelow=(87*16000);
+			v->rangehigh=(108*16000);
+			v->flags=VIDEO_TUNER_LOW;
+			v->mode=VIDEO_MODE_AUTO;
+			strcpy(v->name, "FM");
+			v->signal=0xFFFF*tt_getsigstr(tt);
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
 		case VIDIOCGFREQ:
-			if(copy_to_user(arg, &tt->curfreq, sizeof(tt->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			*freq = tt->curfreq;
 			return 0;
+		}
 		case VIDIOCSFREQ:
-			if(copy_from_user(&tt->curfreq, arg,sizeof(tt->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			tt->curfreq = *freq;
 			tt_setfreq(tt, tt->curfreq);
 			return 0;
+		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
-			memset(&v,0, sizeof(v));
-			v.flags|=VIDEO_AUDIO_MUTABLE|VIDEO_AUDIO_VOLUME;
-			v.volume=tt->curvol * 6554;
-			v.step=6554;
-			strcpy(v.name, "Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			struct video_audio *v = arg;
+			memset(v,0, sizeof(*v));
+			v->flags|=VIDEO_AUDIO_MUTABLE|VIDEO_AUDIO_VOLUME;
+			v->volume=tt->curvol * 6554;
+			v->step=6554;
+			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;	
-			if(v.audio) 
+			struct video_audio *v = arg;
+			if(v->audio) 
 				return -EINVAL;
-
-			if(v.flags&VIDEO_AUDIO_MUTE) 
+			if(v->flags&VIDEO_AUDIO_MUTE) 
 				tt_mute(tt);
 			else
-				tt_setvol(tt,v.volume/6554);	
-
+				tt_setvol(tt,v->volume/6554);
 			return 0;
 		}
 		default:
@@ -276,20 +263,15 @@ static int tt_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int tt_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	return 0;
-}
-
-static void tt_close(struct video_device *dev)
-{
-	users--;
-}
-
 static struct tt_device terratec_unit;
+
+static struct file_operations terratec_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device terratec_radio=
 {
@@ -297,9 +279,8 @@ static struct video_device terratec_radio=
 	name:		"TerraTec ActiveRadio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TERRATEC,
-	open:		tt_open,
-	close:		tt_close,
-	ioctl:		tt_ioctl,
+	fops:           &terratec_fops,
+	kernel_ioctl:	tt_ioctl,
 };
 
 static int __init terratec_init(void)

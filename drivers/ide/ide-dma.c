@@ -106,65 +106,64 @@ struct drive_list_entry {
 	char * id_firmware;
 };
 
-struct drive_list_entry drive_whitelist [] = {
-
-	{ "Micropolis 2112A"	,       "ALL"		},
-	{ "CONNER CTMA 4000"	,       "ALL"		},
-	{ "CONNER CTT8000-A"	,       "ALL"		},
-	{ "ST34342A"		,	"ALL"		},
-	{ 0			,	0		}
+struct drive_list_entry drive_whitelist[] = {
+	{ "Micropolis 2112A", NULL },
+	{ "CONNER CTMA 4000", NULL },
+	{ "CONNER CTT8000-A", NULL },
+	{ "ST34342A", NULL },
+	{ NULL, NULL }
 };
 
-struct drive_list_entry drive_blacklist [] = {
+struct drive_list_entry drive_blacklist[] = {
 
-	{ "WDC AC11000H"	,	"ALL"		},
-	{ "WDC AC22100H"	,	"ALL"		},
-	{ "WDC AC32500H"	,	"ALL"		},
-	{ "WDC AC33100H"	,	"ALL"		},
-	{ "WDC AC31600H"	,	"ALL"		},
-	{ "WDC AC32100H"	,	"24.09P07"	},
-	{ "WDC AC23200L"	,	"21.10N21"	},
-	{ "Compaq CRD-8241B"	,	"ALL"		},
-	{ "CRD-8400B"		,	"ALL"		},
-	{ "CRD-8480B",			"ALL"		},
-	{ "CRD-8480C",			"ALL"		},
-	{ "CRD-8482B",			"ALL"		},
- 	{ "CRD-84"		,	"ALL"		},
-	{ "SanDisk SDP3B"	,	"ALL"		},
-	{ "SanDisk SDP3B-64"	,	"ALL"		},
-	{ "SANYO CD-ROM CRD"	,	"ALL"		},
-	{ "HITACHI CDR-8"	,	"ALL"		},
-	{ "HITACHI CDR-8335"	,	"ALL"		},
-	{ "HITACHI CDR-8435"	,	"ALL"		},
-	{ "Toshiba CD-ROM XM-6202B"	,	"ALL"		},
-	{ "CD-532E-A"		,	"ALL"		},
-	{ "E-IDE CD-ROM CR-840",	"ALL"		},
-	{ "CD-ROM Drive/F5A",	"ALL"		},
-	{ "RICOH CD-R/RW MP7083A",	"ALL"		},
-	{ "WPI CDD-820",		"ALL"		},
-	{ "SAMSUNG CD-ROM SC-148C",	"ALL"		},
-	{ "SAMSUNG CD-ROM SC-148F",	"ALL"		},
-	{ "SAMSUNG CD-ROM SC",	"ALL"		},
-	{ "SanDisk SDP3B-64"	,	"ALL"		},
-	{ "SAMSUNG CD-ROM SN-124",	"ALL"		},
-	{ "PLEXTOR CD-R PX-W8432T",	"ALL"		},
-	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM",	"ALL"		},
-	{ "_NEC DV5800A",               "ALL"           },  
-	{ 0			,	0		}
+	{ "WDC AC11000H", NULL },
+	{ "WDC AC22100H", NULL },
+	{ "WDC AC32500H", NULL },
+	{ "WDC AC33100H", NULL },
+	{ "WDC AC31600H", NULL },
+	{ "WDC AC32100H", "24.09P07" },
+	{ "WDC AC23200L", "21.10N21" },
+	{ "Compaq CRD-8241B", NULL },
+	{ "CRD-8400B", NULL },
+	{ "CRD-8480B", NULL },
+	{ "CRD-8480C", NULL },
+	{ "CRD-8482B", NULL },
+	{ "CRD-84", NULL },
+	{ "SanDisk SDP3B", NULL },
+	{ "SanDisk SDP3B-64", NULL },
+	{ "SANYO CD-ROM CRD", NULL },
+	{ "HITACHI CDR-8", NULL },
+	{ "HITACHI CDR-8335", NULL },
+	{ "HITACHI CDR-8435", NULL },
+	{ "Toshiba CD-ROM XM-6202B", NULL },
+	{ "CD-532E-A", NULL },
+	{ "E-IDE CD-ROM CR-840", NULL },
+	{ "CD-ROM Drive/F5A", NULL },
+	{ "RICOH CD-R/RW MP7083A", NULL },
+	{ "WPI CDD-820", NULL },
+	{ "SAMSUNG CD-ROM SC-148C", NULL },
+	{ "SAMSUNG CD-ROM SC-148F", NULL },
+	{ "SAMSUNG CD-ROM SC", NULL },
+	{ "SanDisk SDP3B-64", NULL },
+	{ "SAMSUNG CD-ROM SN-124", NULL },
+	{ "PLEXTOR CD-R PX-W8432T", NULL },
+	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM", NULL },
+	{ "_NEC DV5800A", NULL },
+	{ NULL,	NULL }
 
 };
 
-int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
+static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
 {
 	for ( ; drive_table->id_model ; drive_table++)
 		if ((!strcmp(drive_table->id_model, id->model)) &&
-		    ((!strstr(drive_table->id_firmware, id->fw_rev)) ||
-		     (!strcmp(drive_table->id_firmware, "ALL"))))
+		    ((drive_table->id_firmware && !strstr(drive_table->id_firmware, id->fw_rev)) ||
+		     (!drive_table->id_firmware)))
 			return 1;
 	return 0;
 }
 
-#else /* !CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
+#else
 
 /*
  * good_dma_drives() lists the model names (from "hdparm -i")
@@ -185,7 +184,7 @@ const char *good_dma_drives[] = {"Micropolis 2112A",
  * This is an empirical list. Its generated from bug reports. That means
  * while it reflects actual problem distributions it doesn't answer whether
  * the drive or the controller, or cabling, or software, or some combination
- * thereof is the fault. If you don't happen to agree with the kernel's 
+ * thereof is the fault. If you don't happen to agree with the kernel's
  * opinion of your drive - use hdparm to turn DMA on.
  */
 const char *bad_dma_drives[] = {"WDC AC11000H",
@@ -194,9 +193,9 @@ const char *bad_dma_drives[] = {"WDC AC11000H",
 				"WDC AC32500H",
 				"WDC AC33100H",
 				"WDC AC31600H",
- 				NULL};
+				NULL};
 
-#endif /* CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
+#endif
 
 /*
  * dma_intr() is the handler for disk read/write DMA interrupts
@@ -498,11 +497,10 @@ static int config_drive_for_dma (ide_drive_t *drive)
 	return hwif->dmaproc(ide_dma_off_quietly, drive);
 }
 
-#ifndef CONFIG_BLK_DEV_IDEDMA_TIMEOUT
 /*
- * 1 dmaing, 2 error, 4 intr
+ * 1 dma-ing, 2 error, 4 intr
  */
-static int dma_timer_expiry (ide_drive_t *drive)
+static int dma_timer_expiry(ide_drive_t *drive)
 {
 	byte dma_stat = inb(HWIF(drive)->dma_base+2);
 
@@ -522,30 +520,6 @@ static int dma_timer_expiry (ide_drive_t *drive)
 		return WAIT_CMD;
 	return 0;
 }
-#else /* CONFIG_BLK_DEV_IDEDMA_TIMEOUT */
-static ide_startstop_t ide_dma_timeout_revovery (ide_drive_t *drive)
-{
-	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
-	ide_hwif_t *hwif	= HWIF(drive);
-	int enable_dma		= drive->using_dma;
-	unsigned long flags;
-	ide_startstop_t startstop;
-
-	spin_lock_irqsave(&ide_lock, flags);
-	hwgroup->handler = NULL;
-	del_timer(&hwgroup->timer);
-	spin_unlock_irqrestore(&ide_lock, flags);
-
-	drive->waiting_for_dma = 0;
-
-	startstop = ide_do_reset(drive);
-
-	if ((enable_dma) && !(drive->using_dma))
-		(void) hwif->dmaproc(ide_dma_on, drive);
-
-	return startstop;
-}
-#endif /* CONFIG_BLK_DEV_IDEDMA_TIMEOUT */
 
 static void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
@@ -614,11 +588,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			drive->waiting_for_dma = 1;
 			if (drive->type != ATA_DISK)
 				return 0;
-#ifdef CONFIG_BLK_DEV_IDEDMA_TIMEOUT
-			ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, NULL);	/* issue cmd to drive */
-#else
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-#endif
 			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
 			    (drive->addressing == 1)) {
 				ide_task_t *args = HWGROUP(drive)->rq->special;
@@ -659,41 +629,8 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_verbose:
 			return report_drive_dmaing(drive);
 		case ide_dma_timeout:
-			// FIXME: Many IDE chipsets do not permit command file register access
-			// FIXME: while the bus-master function is still active.
-			// FIXME: To prevent deadlock with those chipsets, we must be extremely
-			// FIXME: careful here (and in ide_intr() as well) to NOT access any
-			// FIXME: registers from the 0x1Fx/0x17x sets before terminating the
-			// FIXME: bus-master operation via the bus-master control reg.
-			// FIXME: Otherwise, chipset deadlock will occur, and some systems will
-			// FIXME: lock up completely!!
-#ifdef CONFIG_BLK_DEV_IDEDMA_TIMEOUT
-			/*
-			 * Have to issue an abort and requeue the request
-			 * DMA engine got turned off by a goofy ASIC, and
-			 * we have to clean up the mess, and here is as good
-			 * as any.  Do it globally for all chipsets.
-			 */
-			outb(0x00, dma_base);		/* stop DMA */
-			dma_stat = inb(dma_base+2);	/* get DMA status */
-			outb(dma_stat|6, dma_base+2);	/* clear the INTR & ERROR bits */
-			printk("%s: %s: Lets do it again!" \
-				"stat = 0x%02x, dma_stat = 0x%02x\n",
-				drive->name, ide_dmafunc_verbose(func),
-				GET_STAT(), dma_stat);
-
-			if (dma_stat & 0xF0)
-				return ide_dma_timeout_revovery(drive);
-
-			printk("%s: %s: (restart_request) Lets do it again!" \
-				"stat = 0x%02x, dma_stat = 0x%02x\n",
-				drive->name, ide_dmafunc_verbose(func),
-				GET_STAT(), dma_stat);
-
-			return restart_request(drive);  // BUG: return types do not match!!
-//#else
-//			return HWGROUP(drive)->handler(drive);
-#endif /* CONFIG_BLK_DEV_IDEDMA_TIMEOUT */
+			printk("ide_dmaproc: DMA timeout occured!\n");
+			return 1;
 		case ide_dma_retune:
 		case ide_dma_lostirq:
 			printk("ide_dmaproc: chipset supported %s func only: %d\n", ide_dmafunc_verbose(func),  func);
@@ -707,7 +644,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 /*
  * Needed for allowing full modular support of ide-driver
  */
-int ide_release_dma(ide_hwif_t *hwif)
+void ide_release_dma(ide_hwif_t *hwif)
 {
 	if (!hwif->dma_base)
 		return;
@@ -727,8 +664,6 @@ int ide_release_dma(ide_hwif_t *hwif)
 		release_region((hwif->dma_base + 16), hwif->dma_extra);
 	release_region(hwif->dma_base, 8);
 	hwif->dma_base = 0;
-
-	return 1;
 }
 
 /*

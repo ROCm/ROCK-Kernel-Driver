@@ -1239,6 +1239,24 @@ void __devinit  pcibios_fixup_bus(struct pci_bus *b)
 }
 
 
+struct pci_bus * __devinit pcibios_scan_root(int busnum)
+{
+	struct list_head *list;
+	struct pci_bus *bus;
+
+	list_for_each(list, &pci_root_buses) {
+		bus = pci_bus_b(list);
+		if (bus->number == busnum) {
+			/* Already scanned */
+			return bus;
+		}
+	}
+
+	printk("PCI: Probing PCI hardware (bus %02x)\n", busnum);
+
+	return pci_scan_bus(busnum, pci_root_ops, NULL);
+}
+
 void __devinit pcibios_config_init(void)
 {
 	/*
@@ -1285,7 +1303,7 @@ void __init pcibios_init(void)
 	}
 
 	printk("PCI: Probing PCI hardware\n");
-	pci_root_bus = pci_scan_bus(0, pci_root_ops, NULL);
+	pci_root_bus = pcibios_scan_root(0);
 	if (clustered_apic_mode && (numnodes > 1)) {
 		for (quad = 1; quad < numnodes; ++quad) {
 			printk("Scanning PCI bus %d for quad %d\n", 
@@ -1296,7 +1314,10 @@ void __init pcibios_init(void)
 	}
 
 	pcibios_irq_init();
-	pcibios_fixup_peer_bridges();
+
+	if (!pci_use_acpi_routing)
+		pcibios_fixup_peer_bridges();
+
 	pcibios_fixup_irqs();
 	pcibios_resource_survey();
 
@@ -1334,6 +1355,12 @@ char * __devinit  pcibios_setup(char *str)
 	}
 	else if (!strcmp(str, "conf2")) {
 		pci_probe = PCI_PROBE_CONF2 | PCI_NO_CHECKS;
+		return NULL;
+	}
+#endif
+#ifdef CONFIG_ACPI_PCI
+	else if (!strcmp(str, "noacpi")) {
+		pci_probe |= PCI_NO_ACPI_ROUTING;
 		return NULL;
 	}
 #endif

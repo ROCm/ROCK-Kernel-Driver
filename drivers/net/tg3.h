@@ -1,4 +1,4 @@
-/* $Id: tg3.h,v 1.37.2.30 2002/03/05 10:08:39 davem Exp $
+/* $Id: tg3.h,v 1.37.2.32 2002/03/11 12:18:18 davem Exp $
  * tg3.h: Definitions for Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
@@ -713,13 +713,17 @@
 #define  DEFAULT_RXCOL_TICKS		 0x00000048
 #define  HIGH_RXCOL_TICKS		 0x00000096
 #define HOSTCC_TXCOL_TICKS		0x00003c0c
+#define  LOW_TXCOL_TICKS		 0x00000096
 #define  DEFAULT_TXCOL_TICKS		 0x0000012c
+#define  HIGH_TXCOL_TICKS		 0x00000145
 #define HOSTCC_RXMAX_FRAMES		0x00003c10
 #define  LOW_RXMAX_FRAMES		 0x00000005
 #define  DEFAULT_RXMAX_FRAMES		 0x00000008
 #define  HIGH_RXMAX_FRAMES		 0x00000012
 #define HOSTCC_TXMAX_FRAMES		0x00003c14
+#define  LOW_TXMAX_FRAMES		 0x00000035
 #define  DEFAULT_TXMAX_FRAMES		 0x0000004b
+#define  HIGH_TXMAX_FRAMES		 0x00000052
 #define HOSTCC_RXCOAL_TICK_INT		0x00003c18
 #define  DEFAULT_RXCOAL_TICK_INT	 0x00000019
 #define HOSTCC_TXCOAL_TICK_INT		0x00003c1c
@@ -1681,17 +1685,42 @@ struct tg3_link_config {
 };
 
 struct tg3_coalesce_config {
+	/* Current settings. */
 	u32		rx_coalesce_ticks;
 	u32		rx_max_coalesced_frames;
 	u32		rx_coalesce_ticks_during_int;
 	u32		rx_max_coalesced_frames_during_int;
-
 	u32		tx_coalesce_ticks;
 	u32		tx_max_coalesced_frames;
 	u32		tx_coalesce_ticks_during_int;
 	u32		tx_max_coalesced_frames_during_int;
-
 	u32		stats_coalesce_ticks;
+
+	/* Default settings. */
+	u32		rx_coalesce_ticks_def;
+	u32		rx_max_coalesced_frames_def;
+	u32		rx_coalesce_ticks_during_int_def;
+	u32		rx_max_coalesced_frames_during_int_def;
+	u32		tx_coalesce_ticks_def;
+	u32		tx_max_coalesced_frames_def;
+	u32		tx_coalesce_ticks_during_int_def;
+	u32		tx_max_coalesced_frames_during_int_def;
+	u32		stats_coalesce_ticks_def;
+
+	/* Adaptive RX/TX coalescing parameters. */
+	u32		rate_sample_jiffies;
+	u32		pkt_rate_low;
+	u32		pkt_rate_high;
+
+	u32		rx_coalesce_ticks_low;
+	u32		rx_max_coalesced_frames_low;
+	u32		tx_coalesce_ticks_low;
+	u32		tx_max_coalesced_frames_low;
+
+	u32		rx_coalesce_ticks_high;
+	u32		rx_max_coalesced_frames_high;
+	u32		tx_coalesce_ticks_high;
+	u32		tx_max_coalesced_frames_high;
 };
 
 struct tg3_bufmgr_config {
@@ -1720,6 +1749,7 @@ struct tg3 {
 	spinlock_t			indirect_lock;
 
 	struct net_device_stats		net_stats;
+	struct net_device_stats		net_stats_prev;
 	unsigned long			phy_crc_errors;
 
 	/* Adaptive coalescing engine. */
@@ -1731,9 +1761,11 @@ struct tg3 {
 	u32				tg3_flags;
 #define TG3_FLAG_HOST_TXDS		0x00000001
 #define TG3_FLAG_TXD_MBOX_HWBUG		0x00000002
-#define TG3_FLAG_BROKEN_CHECKSUMS	0x00000004
+#define TG3_FLAG_RX_CHECKSUMS		0x00000004
 #define TG3_FLAG_USE_LINKCHG_REG	0x00000008
 #define TG3_FLAG_USE_MI_INTERRUPT	0x00000010
+#define TG3_FLAG_ADAPTIVE_RX		0x00000020
+#define TG3_FLAG_ADAPTIVE_TX		0x00000040
 #define TG3_FLAG_PHY_RESET_ON_INIT	0x00000100
 #define TG3_FLAG_PCIX_TARGET_HWBUG	0x00000200
 #define TG3_FLAG_TAGGED_IRQ_STATUS	0x00000400
@@ -1751,6 +1783,10 @@ struct tg3 {
 #define TG3_FLAG_AUTONEG_DISABLE	0x00400000
 #define TG3_FLAG_JUMBO_ENABLE		0x00800000
 #define TG3_FLAG_10_100_ONLY		0x01000000
+#define TG3_FLAG_PAUSE_AUTONEG		0x02000000
+#define TG3_FLAG_PAUSE_RX		0x04000000
+#define TG3_FLAG_PAUSE_TX		0x08000000
+#define TG3_FLAG_BROKEN_CHECKSUMS	0x10000000
 #define TG3_FLAG_INIT_COMPLETE		0x80000000
 
 	u32				msg_enable;
@@ -1763,6 +1799,13 @@ struct tg3 {
 	struct tg3_link_config		link_config;
 	struct tg3_coalesce_config	coalesce_config;
 	struct tg3_bufmgr_config	bufmgr_config;
+
+	u32				rx_pending;
+#if TG3_MINI_RING_WORKS
+	u32				rx_mini_pending;
+#endif
+	u32				rx_jumbo_pending;
+	u32				tx_pending;
 
 	/* cache h/w values, often passed straight to h/w */
 	u32				rx_mode;

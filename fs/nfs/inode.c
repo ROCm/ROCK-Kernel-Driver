@@ -144,7 +144,7 @@ nfs_clear_inode(struct inode *inode)
 void
 nfs_put_super(struct super_block *sb)
 {
-	struct nfs_server *server = &sb->u.nfs_sb.s_server;
+	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
 
 	/*
@@ -169,7 +169,7 @@ nfs_put_super(struct super_block *sb)
 void
 nfs_umount_begin(struct super_block *sb)
 {
-	struct nfs_server *server = &sb->u.nfs_sb.s_server;
+	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
 
 	/* -EIO all pending I/O */
@@ -225,7 +225,7 @@ nfs_block_size(unsigned long bsize, unsigned char *nrbitsp)
 static struct inode *
 nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh)
 {
-	struct nfs_server	*server = &sb->u.nfs_sb.s_server;
+	struct nfs_server	*server = NFS_SB(sb);
 	struct nfs_fattr	fattr;
 	struct inode		*inode;
 	int			error;
@@ -245,16 +245,13 @@ nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh)
  * and the root file handle obtained from the server's mount
  * daemon. We stash these away in the private superblock fields.
  */
-int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
+int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 {
-	struct nfs_mount_data	*data = (struct nfs_mount_data *) raw_data;
 	struct nfs_server	*server;
 	struct rpc_xprt		*xprt = NULL;
 	struct rpc_clnt		*clnt = NULL;
-	struct nfs_fh		*root = &data->root, fh;
 	struct inode		*root_inode = NULL;
 	unsigned int		authflavor;
-	struct sockaddr_in	srvaddr;
 	struct rpc_timeout	timeparms;
 	struct nfs_fsinfo	fsinfo;
 	int			tcp, version, maxlen;
@@ -262,36 +259,11 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", major(sb->s_dev), minor(sb->s_dev));
 
-	memset(&sb->u.nfs_sb, 0, sizeof(sb->u.nfs_sb));
-	if (!data)
-		goto out_miss_args;
-
-	memset(&fh, 0, sizeof(fh));
-	if (data->version != NFS_MOUNT_VERSION) {
-		printk("nfs warning: mount version %s than kernel\n",
-			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
-		if (data->version < 2)
-			data->namlen = 0;
-		if (data->version < 3)
-			data->bsize  = 0;
-		if (data->version < 4) {
-			data->flags &= ~NFS_MOUNT_VER3;
-			root = &fh;
-			root->size = NFS2_FHSIZE;
-			memcpy(root->data, data->old_root.data, NFS2_FHSIZE);
-		}
-	}
-
-	/* We now require that the mount process passes the remote address */
-	memcpy(&srvaddr, &data->addr, sizeof(srvaddr));
-	if (srvaddr.sin_addr.s_addr == INADDR_ANY)
-		goto out_no_remote;
-
 	sb->s_magic      = NFS_SUPER_MAGIC;
 	sb->s_op         = &nfs_sops;
 	sb->s_blocksize_bits = 0;
 	sb->s_blocksize  = nfs_block_size(data->bsize, &sb->s_blocksize_bits);
-	server           = &sb->u.nfs_sb.s_server;
+	server           = NFS_SB(sb);
 	server->rsize    = nfs_block_size(data->rsize, NULL);
 	server->wsize    = nfs_block_size(data->wsize, NULL);
 	server->flags    = data->flags & NFS_MOUNT_FLAGMASK;
@@ -352,7 +324,7 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 
 	/* Now create transport and client */
 	xprt = xprt_create_proto(tcp? IPPROTO_TCP : IPPROTO_UDP,
-						&srvaddr, &timeparms);
+						&server->addr, &timeparms);
 	if (xprt == NULL)
 		goto out_no_xprt;
 
@@ -383,7 +355,7 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	 * the root fh attributes.
 	 */
 	/* Did getting the root inode fail? */
-	if (!(root_inode = nfs_get_root(sb, root))
+	if (!(root_inode = nfs_get_root(sb, &server->fh))
 	    && (data->flags & NFS_MOUNT_VER3)) {
 		data->flags &= ~NFS_MOUNT_VER3;
 		rpciod_down();
@@ -400,7 +372,7 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_root->d_op = &nfs_dentry_operations;
 
 	/* Get some general file system info */
-        if (server->rpc_ops->statfs(server, root, &fsinfo) >= 0) {
+        if (server->rpc_ops->statfs(server, &server->fh, &fsinfo) >= 0) {
 		if (server->namelen == 0)
 			server->namelen = fsinfo.namelen;
 	} else {
@@ -499,13 +471,6 @@ out_free_host:
 out_unlock:
 	goto out_fail;
 
-out_no_remote:
-	printk("NFS: mount program didn't pass remote address!\n");
-	goto out_fail;
-
-out_miss_args:
-	printk("nfs_read_super: missing data argument\n");
-
 out_fail:
 	return -EINVAL;
 }
@@ -513,7 +478,7 @@ out_fail:
 static int
 nfs_statfs(struct super_block *sb, struct statfs *buf)
 {
-	struct nfs_server *server = &sb->u.nfs_sb.s_server;
+	struct nfs_server *server = NFS_SB(sb);
 	unsigned char blockbits;
 	unsigned long blockres;
 	struct nfs_fsinfo res;
@@ -561,7 +526,7 @@ static int nfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 		{ 0, NULL, NULL }
 	};
 	struct proc_nfs_info *nfs_infop;
-	struct nfs_server *nfss = &mnt->mnt_sb->u.nfs_sb.s_server;
+	struct nfs_server *nfss = NFS_SB(mnt->mnt_sb);
 
 	seq_printf(m, ",v%d", nfss->rpc_ops->version);
 	seq_printf(m, ",rsize=%d", nfss->rsize);
@@ -1139,23 +1104,106 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  * File system information
  */
 
-/*
- *  Right now we are using get_sb_nodev, but we ought to switch to
- *  get_anon_super() with appropriate comparison function.  The only
- *  question being, when two NFS mounts are the same?  Identical IP
- *  of server + identical root fhandle?  Trond?
- */
-static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+static int nfs_set_super(struct super_block *s, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, nfs_fill_super);
+	s->u.generic_sbp = data;
+	return set_anon_super(s, data);
+}
+ 
+static int nfs_compare_super(struct super_block *sb, void *data)
+{
+	struct nfs_server *server = data;
+	struct nfs_server *old = NFS_SB(sb);
+
+	if (old->addr.sin_addr.s_addr != server->addr.sin_addr.s_addr)
+		return 0;
+	if (old->addr.sin_port != server->addr.sin_port)
+		return 0;
+	return !memcmp(&old->fh, &server->fh, sizeof(struct nfs_fh));
+}
+
+static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *raw_data)
+{
+	int error;
+	struct nfs_server *server;
+	struct super_block *s;
+	struct nfs_fh *root;
+	struct nfs_mount_data *data = raw_data;
+
+	if (!data) {
+		printk("nfs_read_super: missing data argument\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	server = kmalloc(sizeof(struct nfs_server), GFP_KERNEL);
+	if (!server)
+		return ERR_PTR(-ENOMEM);
+	memset(server, 0, sizeof(struct nfs_server));
+
+	root = &server->fh;
+	memcpy(root, &data->root, sizeof(*root));
+	if (root->size < sizeof(root->data))
+		memset(root->data+root->size, 0, sizeof(root->data)-root->size);
+
+	if (data->version != NFS_MOUNT_VERSION) {
+		printk("nfs warning: mount version %s than kernel\n",
+			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
+		if (data->version < 2)
+			data->namlen = 0;
+		if (data->version < 3)
+			data->bsize  = 0;
+		if (data->version < 4) {
+			data->flags &= ~NFS_MOUNT_VER3;
+			memset(root, 0, sizeof(*root));
+			root->size = NFS2_FHSIZE;
+			memcpy(root->data, data->old_root.data, NFS2_FHSIZE);
+		}
+	}
+
+	if (root->size > sizeof(root->data)) {
+		printk("nfs_get_sb: invalid root filehandle\n");
+		return ERR_PTR(-EINVAL);
+	}
+	/* We now require that the mount process passes the remote address */
+	memcpy(&server->addr, &data->addr, sizeof(server->addr));
+	if (server->addr.sin_addr.s_addr == INADDR_ANY) {
+		printk("NFS: mount program didn't pass remote address!\n");
+		kfree(server);
+		return ERR_PTR(-EINVAL);
+	}
+
+	s = sget(fs_type, nfs_compare_super, nfs_set_super, server);
+
+	if (IS_ERR(s) || s->s_root) {
+		kfree(server);
+		return s;
+	}
+
+	s->s_flags = flags;
+
+	error = nfs_fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
+	if (error) {
+		up_write(&s->s_umount);
+		deactivate_super(s);
+		return ERR_PTR(error);
+	}
+	s->s_flags |= MS_ACTIVE;
+	return s;
+}
+
+static void nfs_kill_super(struct super_block *s)
+{
+	struct nfs_server *server = NFS_SB(s);
+	kill_anon_super(s);
+	kfree(server);
 }
 
 static struct file_system_type nfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"nfs",
 	get_sb:		nfs_get_sb,
-	kill_sb:	kill_anon_super,
+	kill_sb:	nfs_kill_super,
 	fs_flags:	FS_ODD_RENAME,
 };
 

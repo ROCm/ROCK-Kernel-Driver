@@ -24,7 +24,6 @@
 
 static int io = CONFIG_RADIO_RTRACK2_PORT; 
 static int radio_nr = -1;
-static int users = 0;
 static spinlock_t lock;
 
 struct rt_device
@@ -107,85 +106,75 @@ static int rt_getsigstr(struct rt_device *dev)
 	return 1;		/* signal present		*/
 }
 
-static int rt_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int rt_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct rt_device *rt=dev->priv;
 
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			strcpy(v.name, "RadioTrack II");
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
+			strcpy(v->name, "RadioTrack II");
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */ 
+			struct video_tuner *v = arg;
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v.rangelow=88*16000;
-			v.rangehigh=108*16000;
-			v.flags=VIDEO_TUNER_LOW;
-			v.mode=VIDEO_MODE_AUTO;
-			v.signal=0xFFFF*rt_getsigstr(rt);
-			strcpy(v.name, "FM");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			v->rangelow=88*16000;
+			v->rangehigh=108*16000;
+			v->flags=VIDEO_TUNER_LOW;
+			v->mode=VIDEO_MODE_AUTO;
+			v->signal=0xFFFF*rt_getsigstr(rt);
+			strcpy(v->name, "FM");
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
 		case VIDIOCGFREQ:
-			if(copy_to_user(arg, &rt->curfreq, sizeof(rt->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			*freq = rt->curfreq;
 			return 0;
+		}
 		case VIDIOCSFREQ:
-			if(copy_from_user(&rt->curfreq, arg,sizeof(rt->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			rt->curfreq = *freq;
 			rt_setfreq(rt, rt->curfreq);
 			return 0;
+		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
-			memset(&v,0, sizeof(v));
-			v.flags|=VIDEO_AUDIO_MUTABLE;
-			v.volume=1;
-			v.step=65535;
-			strcpy(v.name, "Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			struct video_audio *v = arg;
+			memset(v,0, sizeof(*v));
+			v->flags|=VIDEO_AUDIO_MUTABLE;
+			v->volume=1;
+			v->step=65535;
+			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;	
-			if(v.audio) 
+			struct video_audio *v = arg;
+			if(v->audio) 
 				return -EINVAL;
 
-			if(v.flags&VIDEO_AUDIO_MUTE) 
+			if(v->flags&VIDEO_AUDIO_MUTE) 
 				rt_mute(rt);
 			else
 			        rt_unmute(rt);
@@ -197,20 +186,15 @@ static int rt_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int rt_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	return 0;
-}
-
-static void rt_close(struct video_device *dev)
-{
-	users--;
-}
-
 static struct rt_device rtrack2_unit;
+
+static struct file_operations rtrack2_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device rtrack2_radio=
 {
@@ -218,9 +202,8 @@ static struct video_device rtrack2_radio=
 	name:		"RadioTrack II radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_RTRACK2,
-	open:		rt_open,
-	close:		rt_close,
-	ioctl:		rt_ioctl,
+	fops:           &rtrack2_fops,
+	kernel_ioctl:   rt_ioctl,
 };
 
 static int __init rtrack2_init(void)
@@ -275,6 +258,6 @@ module_exit(rtrack2_cleanup_module);
 
 /*
   Local variables:
-  compile-command: "gcc -c -DMODVERSIONS -D__KERNEL__ -DMODULE -O6 -Wall -Wstrict-prototypes -I /home/blp/tmp/linux-2.1.111-rtrack/include radio-rtrack2.c"
+  compile-command: "mmake"
   End:
 */

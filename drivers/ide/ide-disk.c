@@ -106,40 +106,51 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
-static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block);
-static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block);
-static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long long block);
+static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, unsigned long block);
+static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block);
+static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, unsigned long long block);
 
 /*
- * do_rw_disk() issues READ and WRITE commands to a disk,
- * using LBA if supported, or CHS otherwise, to address sectors.
- * It also takes care of issuing special DRIVE_CMDs.
+ * Issue a READ or WRITE command to a disk, using LBA if supported, or CHS
+ * otherwise, to address sectors.  It also takes care of issuing special
+ * DRIVE_CMDs.
  */
-static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idedisk_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
 {
-	if (drive->blocked)
-		panic("ide: Request while drive blocked? You don't like your data intact?");
+	/*
+	 * Wait until all request have bin finished.
+	 */
+
+	while (drive->blocked) {
+		yield();
+		// panic("ide: Request while drive blocked?");
+	}
+
 	if (!(rq->flags & REQ_CMD)) {
-		blk_dump_rq_flags(rq, "do_rw_disk, bad command");
+		blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
 		ide_end_request(drive, 0);
 		return ide_stopped;
 	}
 
 	if (IS_PDC4030_DRIVE) {
 		extern ide_startstop_t promise_rw_disk(ide_drive_t *, struct request *, unsigned long);
+
 		return promise_rw_disk(drive, rq, block);
 	}
 
-	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing))	/* 48-bit LBA */
-		return lba_48_rw_disk(drive, rq, block);
-	if (drive->select.b.lba)		/* 28-bit LBA */
-		return lba_28_rw_disk(drive, rq, block);
+	/* 48-bit LBA */
+	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing))
+		return lba48_do_request(drive, rq, block);
 
-	/* 28-bit CHS : DIE DIE DIE piece of legacy crap!!! */
-	return chs_rw_disk(drive, rq, block);
+	/* 28-bit LBA */
+	if (drive->select.b.lba)
+		return lba28_do_request(drive, rq, block);
+
+	/* 28-bit CHS */
+	return chs_do_request(drive, rq, block);
 }
 
-static task_ioreg_t get_command (ide_drive_t *drive, int cmd)
+static task_ioreg_t get_command(ide_drive_t *drive, int cmd)
 {
 	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
 
@@ -147,23 +158,25 @@ static task_ioreg_t get_command (ide_drive_t *drive, int cmd)
 	lba48bit = drive->addressing;
 #endif
 
-	if ((cmd == READ) && (drive->using_dma))
-		return (lba48bit) ? WIN_READDMA_EXT : WIN_READDMA;
-	else if ((cmd == READ) && (drive->mult_count))
-		return (lba48bit) ? WIN_MULTREAD_EXT : WIN_MULTREAD;
-	else if (cmd == READ)
-		return (lba48bit) ? WIN_READ_EXT : WIN_READ;
-	else if ((cmd == WRITE) && (drive->using_dma))
-		return (lba48bit) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
-	else if ((cmd == WRITE) && (drive->mult_count))
-		return (lba48bit) ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
-	else if (cmd == WRITE)
-		return (lba48bit) ? WIN_WRITE_EXT : WIN_WRITE;
-	else
-		return WIN_NOP;
+	if (cmd == READ) {
+		if (drive->using_dma)
+			return (lba48bit) ? WIN_READDMA_EXT : WIN_READDMA;
+		else if (drive->mult_count)
+			return (lba48bit) ? WIN_MULTREAD_EXT : WIN_MULTREAD;
+		else
+			return (lba48bit) ? WIN_READ_EXT : WIN_READ;
+	} else if (cmd == WRITE) {
+		if (drive->using_dma)
+			return (lba48bit) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+		else if (drive->mult_count)
+			return (lba48bit) ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
+		else
+			return (lba48bit) ? WIN_WRITE_EXT : WIN_WRITE;
+	}
+	return WIN_NOP;
 }
 
-static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
 {
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
@@ -203,19 +216,15 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
-	args.command_type	= ide_cmd_type_parser(&args);
-	args.prehandler		= ide_pre_handler_parser(&taskfile, &hobfile);
-	args.handler		= ide_handler_parser(&taskfile, &hobfile);
-	args.posthandler	= NULL;
-	args.rq			= (struct request *) rq;
-	args.block		= block;
-	rq->special		= NULL;
-	rq->special		= (ide_task_t *)&args;
+	ide_cmd_type_parser(&args);
+	args.rq	= rq;
+	args.block = block;
+	rq->special = &args;
 
 	return do_rw_taskfile(drive, &args);
 }
 
-static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
 {
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
@@ -250,14 +259,10 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
-	args.command_type	= ide_cmd_type_parser(&args);
-	args.prehandler		= ide_pre_handler_parser(&taskfile, &hobfile);
-	args.handler		= ide_handler_parser(&taskfile, &hobfile);
-	args.posthandler	= NULL;
-	args.rq			= (struct request *) rq;
-	args.block		= block;
-	rq->special		= NULL;
-	rq->special		= (ide_task_t *)&args;
+	ide_cmd_type_parser(&args);
+	args.rq = rq;
+	args.block = block;
+	rq->special = &args;
 
 	return do_rw_taskfile(drive, &args);
 }
@@ -268,7 +273,7 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
  * 1073741822 == 549756 MB or 48bit addressing fake drive
  */
 
-static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long long block)
+static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, unsigned long long block)
 {
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
@@ -314,13 +319,10 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
-	args.command_type	= ide_cmd_type_parser(&args);
-	args.prehandler		= ide_pre_handler_parser(&taskfile, &hobfile);
-	args.handler		= ide_handler_parser(&taskfile, &hobfile);
-	args.posthandler	= NULL;
-	args.rq			= (struct request *) rq;
-	args.block		= block;
-	rq->special		= (ide_task_t *)&args;
+	ide_cmd_type_parser(&args);
+	args.rq = rq;
+	args.block = block;
+	rq->special = &args;
 
 	return do_rw_taskfile(drive, &args);
 }
@@ -439,7 +441,7 @@ static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive
 	if ((args.tfRegister[IDE_STATUS_OFFSET] & 0x01) == 0) {
 		u32 high = ((args.hobRegister[IDE_HCYL_OFFSET_HOB])<<16) |
 			   ((args.hobRegister[IDE_LCYL_OFFSET_HOB])<<8) |
-  			    (args.hobRegister[IDE_SECTOR_OFFSET_HOB]); 
+			    (args.hobRegister[IDE_SECTOR_OFFSET_HOB]);
 		u32 low  = ((args.tfRegister[IDE_HCYL_OFFSET])<<16) |
 			   ((args.tfRegister[IDE_LCYL_OFFSET])<<8) |
 			    (args.tfRegister[IDE_SECTOR_OFFSET]);
@@ -458,7 +460,7 @@ static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long a
 {
 	ide_task_t args;
 	unsigned long addr_set = 0;
-	
+
 	addr_req--;
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(ide_task_t));
@@ -637,9 +639,9 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 		taskfile.high_cylinder	= drive->cyl>>8;
 		taskfile.device_head	= ((drive->head-1)|drive->select.all)&0xBF;
 		if (!IS_PDC4030_DRIVE) {
-			taskfile.sector_count	= drive->sect;
-			taskfile.command	= WIN_SPECIFY;
-			handler			= ide_handler_parser(&taskfile, &hobfile);
+			taskfile.sector_count = drive->sect;
+			taskfile.command = WIN_SPECIFY;
+			handler	= set_geometry_intr;;
 		}
 		do_taskfile(drive, &taskfile, &hobfile, handler);
 	} else if (s->b.recalibrate) {
@@ -651,7 +653,7 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 			taskfile.sector_count	= drive->sect;
 			taskfile.command	= WIN_RESTORE;
-			do_taskfile(drive, &taskfile, &hobfile, ide_handler_parser(&taskfile, &hobfile));
+			do_taskfile(drive, &taskfile, &hobfile, recal_intr);
 		}
 	} else if (s->b.set_multmode) {
 		s->b.set_multmode = 0;
@@ -907,13 +909,26 @@ static void idedisk_add_settings(ide_drive_t *drive)
 
 static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 {
-	int i;
 	ide_drive_t *drive = dev->driver_data;
 
+	/* I hope that every freeze operations from the upper levels have
+	 * already been done...
+	 */
+
+	/* wait until all commands are finished */
 	printk("ide_disk_suspend()\n");
 	while (HWGROUP(drive)->handler)
-		schedule();
+		yield();
+
+	/* set the drive to standby */
+	printk(KERN_INFO "suspending: %s ", drive->name);
+	if (ata_ops(drive)) {
+		if (ata_ops(drive)->standby)
+			ata_ops(drive)->standby(drive);
+	}
 	drive->blocked = 1;
+
+	return 0;
 }
 
 static int idedisk_resume(struct device *dev, u32 level)
@@ -921,7 +936,9 @@ static int idedisk_resume(struct device *dev, u32 level)
 	ide_drive_t *drive = dev->driver_data;
 	if (!drive->blocked)
 		panic("ide: Resume but not suspended?\n");
+
 	drive->blocked = 0;
+	return 0;
 }
 
 
@@ -1074,7 +1091,7 @@ static struct ata_operations idedisk_driver = {
 	owner:			THIS_MODULE,
 	cleanup:		idedisk_cleanup,
 	standby:		idedisk_standby,
-	do_request:		do_rw_disk,
+	do_request:		idedisk_do_request,
 	end_request:		NULL,
 	ioctl:			NULL,
 	open:			idedisk_open,
@@ -1112,7 +1129,7 @@ int idedisk_init (void)
 {
 	ide_drive_t *drive;
 	int failed = 0;
-	
+
 	MOD_INC_USE_COUNT;
 	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", NULL, failed++)) != NULL) {
 		if (ide_register_subdriver (drive, &idedisk_driver)) {

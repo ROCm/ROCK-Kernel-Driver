@@ -746,12 +746,6 @@ int ide_xlate_1024 (kdev_t, int, int, const char *);
 ide_drive_t *get_info_ptr (kdev_t i_rdev);
 
 /*
- * Start a reset operation for an IDE interface.
- * The caller should return immediately after invoking this.
- */
-ide_startstop_t ide_do_reset (ide_drive_t *);
-
-/*
  * Re-Start an operation for an IDE interface.
  * The caller should return immediately after invoking this.
  */
@@ -821,7 +815,6 @@ typedef struct ide_task_s {
 	int			command_type;
 	ide_pre_handler_t	*prehandler;
 	ide_handler_t		*handler;
-	ide_post_handler_t	*posthandler;
 	void			*special;	/* valid_t generally */
 	struct request		*rq;		/* copy of request */
 	unsigned long		block;		/* copy of block */
@@ -848,17 +841,17 @@ void do_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct
  * Special Flagged Register Validation Caller
  */
 
-ide_startstop_t set_multmode_intr (ide_drive_t *drive);
-ide_startstop_t task_no_data_intr (ide_drive_t *drive);
+extern ide_startstop_t recal_intr(ide_drive_t *drive);
+extern ide_startstop_t set_geometry_intr(ide_drive_t *drive);
+extern ide_startstop_t set_multmode_intr(ide_drive_t *drive);
+extern ide_startstop_t task_no_data_intr(ide_drive_t *drive);
 
 int ide_wait_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf);
 
 int ide_raw_taskfile (ide_drive_t *drive, ide_task_t *cmd, byte *buf);
 
-ide_pre_handler_t * ide_pre_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile);
-ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile);
 /* Expects args is a full set of TF registers and parses the command type */
-int ide_cmd_type_parser (ide_task_t *args);
+extern void ide_cmd_type_parser(ide_task_t *args);
 
 int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
@@ -953,7 +946,7 @@ void ide_destroy_dmatable (ide_drive_t *drive);
 ide_startstop_t ide_dma_intr (ide_drive_t *drive);
 int check_drive_lists (ide_drive_t *drive, int good_bad);
 int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
-int ide_release_dma (ide_hwif_t *hwif);
+extern void ide_release_dma(ide_hwif_t *hwif);
 void ide_setup_dma (ide_hwif_t *hwif, unsigned long dmabase, unsigned int num_ports) __init;
 #endif
 

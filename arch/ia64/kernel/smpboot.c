@@ -413,7 +413,7 @@ do_boot_cpu (int sapicid)
 	 * We remove it from the pidhash and the runqueue
 	 * once we got the process:
 	 */
-	idle = init_task.prev_task;
+	idle = prev_task(&init_task);
 	if (!idle)
 		panic("No idle process for CPU %d", cpu);
 

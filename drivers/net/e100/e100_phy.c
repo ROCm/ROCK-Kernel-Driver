@@ -2,9 +2,8 @@
 
 This software program is available to you under a choice of one of two 
 licenses. You may choose to be licensed under either the GNU General Public 
-License (GPL) Version 2, June 1991, available at 
-http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the 
-text of which follows:
+License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
+or the Intel BSD + Patent License, the text of which follows:
 
 Recipient has requested a license and Intel Corporation ("Intel") is willing
 to grant a license for the software entitled Linux Base Driver for the 
@@ -18,7 +17,7 @@ combined with the operating system referred to below.
 "Recipient" means the party to whom Intel delivers this Software.
 
 "Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU Public License version 2.0 or 
+any operating system available under the GNU General Public License 2.0 or 
 later.
 
 Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@ not add functionality or features when the Software is incorporated in any
 version of an operating system that has been distributed under the GNU 
 General Public License 2.0 or later. This patent license shall apply to the 
 combination of the Software and any operating system licensed under the GNU 
-Public License version 2.0 or later if, at the time Intel provides the 
+General Public License 2.0 or later if, at the time Intel provides the 
 Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU Public 
-License version 2.0 or later (whether in gold, beta or alpha form) causes 
+available versions of such operating systems available under the GNU General 
+Public License 2.0 or later (whether in gold, beta or alpha form) causes 
 such combination to be covered by the Licensed Patents. The patent license 
 shall not apply to any other combinations which include the Software. NO 
 hardware per se is licensed hereunder.
@@ -654,7 +653,7 @@ static void
 e100_force_speed_duplex(struct e100_private *bdp)
 {
 	u16 control;
-	int neg_timeout = 2 * HZ;	//2 sec in jiffies
+	unsigned long expires;
 
 	bdp->flags |= DF_SPEED_FORCED;
 
@@ -697,20 +696,18 @@ e100_force_speed_duplex(struct e100_private *bdp)
 	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, control);
 
 	/* loop must run at least once */
+	expires = jiffies + 2 * HZ;
 	do {
-		spin_unlock_bh(&(bdp->mdi_access_lock));
-
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(SLEEP_TIME);
-
-		spin_lock_bh(&(bdp->mdi_access_lock));
-
-		if (e100_update_link_state(bdp)) {
+		if (e100_update_link_state(bdp) || 
+		    time_after(jiffies, expires)) {
 			break;
+		} else {
+			spin_unlock_bh(&(bdp->mdi_access_lock));
+			yield();
+			spin_lock_bh(&(bdp->mdi_access_lock));
 		}
-		neg_timeout -= SLEEP_TIME;
 
-	} while (neg_timeout > 0);
+	} while (true);
 
 	spin_unlock_bh(&(bdp->mdi_access_lock));
 }
@@ -769,7 +766,7 @@ e100_set_fc(struct e100_private *bdp)
  * Arguments:  bdp - Pointer to the e100_private structure for the board
  *
  * Returns: true if link state was changed
- *	    B_FLASE otherwise
+ *	   false otherwise
  *
  */
 unsigned char
@@ -820,7 +817,7 @@ static void
 e100_auto_neg(struct e100_private *bdp, unsigned char force_restart)
 {
 	u16 stat_reg;
-	unsigned int i;
+	unsigned long expires;
 
 	bdp->flags &= ~DF_SPEED_FORCED;
 
@@ -841,22 +838,21 @@ e100_auto_neg(struct e100_private *bdp, unsigned char force_restart)
 			       BMCR_ANENABLE | BMCR_ANRESTART);
 
 		/* wait for autoneg to complete (up to 3 seconds) */
-		for (i = 0; i < 60; i++) {
+		expires = jiffies + HZ * 3;
+		do {
 			/* now re-read the value. Sticky so read twice */
 			e100_mdi_read(bdp, MII_BMSR, bdp->phy_addr, &stat_reg);
 			e100_mdi_read(bdp, MII_BMSR, bdp->phy_addr, &stat_reg);
 
-			if (stat_reg & BMSR_ANEGCOMPLETE)
+			if ((stat_reg & BMSR_ANEGCOMPLETE) ||
+			    time_after(jiffies, expires) ) {
 				goto exit;
-
-			spin_unlock_bh(&(bdp->mdi_access_lock));
-
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(SLEEP_TIME);
-
-			spin_lock_bh(&(bdp->mdi_access_lock));
-
-		}
+			} else {
+				spin_unlock_bh(&(bdp->mdi_access_lock));
+				yield();
+				spin_lock_bh(&(bdp->mdi_access_lock));
+			}
+		} while (true);
 	}
 
 exit:

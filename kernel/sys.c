@@ -839,7 +839,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	if (!p)
 		goto out;
 
-	if (p->p_pptr == current || p->p_opptr == current) {
+	if (p->parent == current || p->real_parent == current) {
 		err = -EPERM;
 		if (p->session != current->session)
 			goto out;

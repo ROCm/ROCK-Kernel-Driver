@@ -2,9 +2,8 @@
 
 This software program is available to you under a choice of one of two 
 licenses. You may choose to be licensed under either the GNU General Public 
-License (GPL) Version 2, June 1991, available at 
-http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the 
-text of which follows:
+License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
+or the Intel BSD + Patent License, the text of which follows:
 
 Recipient has requested a license and Intel Corporation ("Intel") is willing
 to grant a license for the software entitled Linux Base Driver for the 
@@ -18,7 +17,7 @@ combined with the operating system referred to below.
 "Recipient" means the party to whom Intel delivers this Software.
 
 "Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU Public License version 2.0 or 
+any operating system available under the GNU General Public License 2.0 or 
 later.
 
 Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@ not add functionality or features when the Software is incorporated in any
 version of an operating system that has been distributed under the GNU 
 General Public License 2.0 or later. This patent license shall apply to the 
 combination of the Software and any operating system licensed under the GNU 
-Public License version 2.0 or later if, at the time Intel provides the 
+General Public License 2.0 or later if, at the time Intel provides the 
 Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU Public 
-License version 2.0 or later (whether in gold, beta or alpha form) causes 
+available versions of such operating systems available under the GNU General 
+Public License 2.0 or later (whether in gold, beta or alpha form) causes 
 such combination to be covered by the Licensed Patents. The patent license 
 shall not apply to any other combinations which include the Software. NO 
 hardware per se is licensed hereunder.
@@ -69,6 +68,10 @@ ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED
 AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
 TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*******************************************************************************
+
+Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
+
 *******************************************************************************/
 
 /**********************************************************************
@@ -134,7 +137,7 @@ eeprom_set_semaphore(struct e100_private *adapter)
 	u16 data = 0;
 	unsigned long expiration_time = jiffies + HZ / 100 + 1;
 
-	while (time_before(jiffies, expiration_time)) {
+	do {
 		// Get current value of General Control 2
 		data = readb(&CSR_GENERAL_CONTROL2_FIELD(adapter));
 
@@ -151,10 +154,12 @@ eeprom_set_semaphore(struct e100_private *adapter)
 			return true;
 		}
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-	return false;
+		if (time_before(jiffies, expiration_time))
+			yield();
+		else
+			return false;
+
+	} while (true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -252,19 +257,12 @@ e100_eeprom_size(struct e100_private *adapter)
 // Returns: bits in an address for that size eeprom
 //----------------------------------------------------------------------------------------
 
-static u16
+static inline int
 eeprom_address_size(u16 size)
 {
-	switch (size) {
-	case 64:
-		return 6;
-	case 128:
-		return 7;
-	case 256:
-		return 8;
-	}
-
-	return 0;		//fix compiler warning or error!
+	int isize = size;
+	
+	return (ffs(isize) - 1);
 }
 
 //----------------------------------------------------------------------------------------
@@ -348,6 +346,7 @@ shift_out_bits(struct e100_private *adapter, u16 data, u16 count)
 			x |= EEDI;
 
 		writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+		readw(&(adapter->scb->scb_status)); /* flush command to card */
 		udelay(EEPROM_STALL_TIME);
 		raise_clock(adapter, &x);
 		lower_clock(adapter, &x);
@@ -374,6 +373,7 @@ raise_clock(struct e100_private *adapter, u16 *x)
 {
 	*x = *x | EESK;
 	writew(*x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 }
 
@@ -393,6 +393,7 @@ lower_clock(struct e100_private *adapter, u16 *x)
 {
 	*x = *x & ~EESK;
 	writew(*x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 }
 
@@ -498,7 +499,7 @@ e100_eeprom_write_word(struct e100_private *adapter, u16 reg, u16 data)
 	x = readw(&CSR_EEPROM_CONTROL_FIELD(adapter));
 	x &= ~(EEDI | EEDO | EESK);
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
-	wmb();
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 	x |= EECS;
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
@@ -580,17 +581,16 @@ eeprom_wait_cmd_done(struct e100_private *adapter)
 
 	eeprom_stand_by(adapter);
 
-	while (time_before(jiffies, expiration_time)) {
+	do {
 		rmb();
 		x = readw(&CSR_EEPROM_CONTROL_FIELD(adapter));
 		if (x & EEDO)
 			return true;
-
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-
-	return false;
+		if (time_before(jiffies, expiration_time))
+			yield();
+		else
+			return false;
+	} while (true);
 }
 
 //----------------------------------------------------------------------------------------
@@ -606,9 +606,10 @@ eeprom_stand_by(struct e100_private *adapter)
 	x = readw(&CSR_EEPROM_CONTROL_FIELD(adapter));
 	x &= ~(EECS | EESK);
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
-	wmb();
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 	x |= EECS;
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 }

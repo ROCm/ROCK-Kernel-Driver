@@ -170,6 +170,18 @@ CONFIG_USB_AUDIO
   The module will be called audio.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_USB_EMI26
+  This driver loads firmware to Emagic EMI 2|6 low latency USB
+  Audio interface.
+
+  After firmware load the device is handled with standard linux
+  USB Audio driver.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called audio.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_USB_ACM
   This driver supports USB modems and ISDN adapters which support the
   Communication Device Class Abstract Control Model interface.
@@ -316,12 +328,12 @@ CONFIG_USB_VICAM
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_USB_PEGASUS
-  Say Y here if you know you have Pegasus or Pegasus II based adapter.
+  Say Y here if you know you have Pegasus or Pegasus-II based adapter.
   If in doubt then look at linux/drivers/usb/pegasus.h for the complete
   list of supported devices.
   If your particular adapter is not in the list and you are _sure_ it
-  is Pegasus or Pegasus II based then send me (pmanolov@lnxw.com) vendor
-  and device IDs.
+  is Pegasus or Pegasus II based then send me (pmanolov@users.sourceforge.net)
+  vendor and device IDs.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -370,6 +382,7 @@ CONFIG_USB_KAWETH
 CONFIG_USB_CATC
   Say Y if you want to use one of the following 10Mbps USB Ethernet
   device based on the EL1210A chip. Supported devices are:
+    Belkin F5U011
     Belkin F5U111
     CATC NetMate
     CATC NetMate II

@@ -178,6 +178,7 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	if (!sbi)
 		return -ENOMEM;
 	s->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct minix_sb_info));
 
 	/* N.B. These should be compile-time tests.
 	   Unfortunately that is impossible. */

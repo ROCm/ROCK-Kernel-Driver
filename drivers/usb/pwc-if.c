@@ -120,28 +120,32 @@ static void *mem_leak = NULL; /* For delayed kfree()s. See below */
 
 /***/
 
-static int  pwc_video_open(struct video_device *vdev, int mode);
-static void pwc_video_close(struct video_device *vdev);
-static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long count, int noblock);
-static long pwc_video_write(struct video_device *vdev, const char *buf, unsigned long count, int noblock);
-static unsigned int pwc_video_poll(struct video_device *vdev, struct file *file, poll_table *wait);
-static int  pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *arg);
-static int  pwc_video_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size);
+static int pwc_video_open(struct inode *inode, struct file *file);
+static int pwc_video_close(struct inode *inode, struct file *file);
+static int pwc_video_read(struct file *file, char *buf,
+			  size_t count, loff_t *ppos);
+static unsigned int pwc_video_poll(struct file *file, poll_table *wait);
+static int  pwc_video_ioctl(struct inode *inode, struct file *file,
+			    unsigned int ioctlnr, void *arg);
+static int  pwc_video_mmap(struct file *file, struct vm_area_struct *vma);
 
+static struct file_operations pwc_fops = {
+	owner:		THIS_MODULE,
+	open:		pwc_video_open,
+	release:       	pwc_video_close,
+	read:		pwc_video_read,
+	poll:		pwc_video_poll,
+	mmap:		pwc_video_mmap,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
 static struct video_device pwc_template = {
 	owner:		THIS_MODULE,
 	name:		"Philips Webcam",	/* Filled in later */
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_PWC,
-	open:		pwc_video_open,
-	close:		pwc_video_close,
-	read:		pwc_video_read,
-	write:		pwc_video_write,
-	poll:		pwc_video_poll,
-	ioctl:		pwc_video_ioctl,
-	mmap:		pwc_video_mmap,
-	initialize:	NULL,			/* initialize */
-	minor:		0			/* minor */
+	fops:           &pwc_fops,
+	kernel_ioctl:	pwc_video_ioctl,
 };
 
 /***************************************************************************/
@@ -909,18 +913,19 @@ static inline void free_mem_leak(void)
 /***************************************************************************/
 /* Video4Linux functions */
 
-static int pwc_video_open(struct video_device *vdev, int mode)
+static int pwc_video_open(struct inode *inode, struct file *file)
 {
 	int i;
+	struct video_device *vdev = video_devdata(file);
 	struct pwc_device *pdev;
 
-	Trace(TRACE_OPEN, "video_open called(0x%p, 0%o).\n", vdev, mode);
+	Trace(TRACE_OPEN, "video_open called(0x%p).\n", vdev);
 	
-	if (vdev == NULL)
-		BUG();
 	pdev = (struct pwc_device *)vdev->priv;
 	if (pdev == NULL)
 		BUG();
+	if (pdev->vopen)
+		return -EBUSY;
 	
 	down(&pdev->modlock);
 	if (!pdev->usb_init) {
@@ -1008,6 +1013,7 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 	}
 
 	pdev->vopen++;
+	file->private_data = vdev;
 	/* lock decompressor; this has a small race condition, since we 
 	   could in theory unload pwcx.o between pwc_find_decompressor()
 	   above and this call. I doubt it's ever going to be a problem.
@@ -1020,8 +1026,9 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 }
 
 /* Note that all cleanup is done in the reverse order as in _open */
-static void pwc_video_close(struct video_device *vdev)
+static int pwc_video_close(struct inode *inode, struct file *file)
 {
+	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
 	int i;
 
@@ -1041,13 +1048,7 @@ static void pwc_video_close(struct video_device *vdev)
 	if (pdev->vframe_count > 20)
 		Info("Closing video device: %d frames received, dumped %d frames, %d frames with errors.\n", pdev->vframe_count, pdev->vframes_dumped, pdev->vframes_error);
 
-	if (pdev->unplugged) {
-		/* The device was unplugged or some other error occured */
-		/* We unregister the video_device */
-		Trace(TRACE_OPEN, "Delayed video device unregistered.\n");
-		video_unregister_device(pdev->vdev);
-	}
-	else {
+	if (!pdev->unplugged) {
 		/* Normal close: stop isochronuous and interrupt endpoint */
 		Trace(TRACE_OPEN, "Normal close(): setting interface to 0.\n");
 		usb_set_interface(pdev->udev, 0, 0);
@@ -1073,6 +1074,8 @@ static void pwc_video_close(struct video_device *vdev)
 	/* wake up _disconnect() routine */
 	if (pdev->unplugged)
 		wake_up(&pdev->remove_ok);
+	file->private_data = NULL;
+	return 0;
 }
 
 /*
@@ -1087,12 +1090,15 @@ static void pwc_video_close(struct video_device *vdev)
                 device is tricky anyhow.
  */
  
-static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long count, int noblock)
+static int pwc_video_read(struct file *file, char *buf,
+			  size_t count, loff_t *ppos)
 {
+	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
+	int noblock = file->f_flags & O_NONBLOCK;
 	DECLARE_WAITQUEUE(wait, current);
 
-	Trace(TRACE_READ, "video_read(0x%p, %p, %ld, %d) called.\n", vdev, buf, count, noblock);
+	Trace(TRACE_READ, "video_read(0x%p, %p, %d) called.\n", vdev, buf, count);
 	if (vdev == NULL)
 		return -EFAULT;
 	pdev = vdev->priv;
@@ -1143,14 +1149,9 @@ static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long c
 	return count;
 }
 
-
-static long pwc_video_write(struct video_device *vdev, const char *buf, unsigned long count, int noblock)
+static unsigned int pwc_video_poll(struct file *file, poll_table *wait)
 {
-	return -EINVAL;   
-}
-
-static unsigned int pwc_video_poll(struct video_device *vdev, struct file *file, poll_table *wait)
-{
+	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
 	
 	if (vdev == NULL)
@@ -1170,8 +1171,10 @@ static unsigned int pwc_video_poll(struct video_device *vdev, struct file *file,
 	return 0;
 }
         
-static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
+static int pwc_video_ioctl(struct inode *inode, struct file *file,
+			   unsigned int cmd, void *arg)
 {
+	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
 	DECLARE_WAITQUEUE(wait, current);
 	
@@ -1185,39 +1188,30 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		/* Query cabapilities */
 		case VIDIOCGCAP: 
 		{
-			struct video_capability caps;
+			struct video_capability *caps = arg;
 
-			strcpy(caps.name, vdev->name);
-			caps.type = VID_TYPE_CAPTURE;
-			caps.channels = 1;
-			caps.audios = 1;
-			caps.minwidth  = pdev->view_min.x;
-			caps.minheight = pdev->view_min.y;
-			caps.maxwidth  = pdev->view_max.x;
-			caps.maxheight = pdev->view_max.y;
-			if (copy_to_user(arg, &caps, sizeof(caps)))
-				return -EFAULT;
+			strcpy(caps->name, vdev->name);
+			caps->type = VID_TYPE_CAPTURE;
+			caps->channels = 1;
+			caps->audios = 1;
+			caps->minwidth  = pdev->view_min.x;
+			caps->minheight = pdev->view_min.y;
+			caps->maxwidth  = pdev->view_max.x;
+			caps->maxheight = pdev->view_max.y;
 			break;
 		}
 
 		/* Channel functions (simulate 1 channel) */
 		case VIDIOCGCHAN:
 		{
-			struct video_channel v;
+			struct video_channel *v = arg;
 
-			if (copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if (v.channel != 0)
+			if (v->channel != 0)
 				return -EINVAL;
-
-			v.flags = 0;
-			v.tuners = 0;
-			v.type = VIDEO_TYPE_CAMERA;
-			strcpy(v.name, "Webcam");
-
-			if (copy_to_user(arg, &v, sizeof(v)))
-				return -EFAULT;
-
+			v->flags = 0;
+			v->tuners = 0;
+			v->type = VIDEO_TYPE_CAMERA;
+			strcpy(v->name, "Webcam");
 			return 0;
 		}
 
@@ -1227,14 +1221,9 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			   the bttv driver uses a video_channel arg, which
 			   makes sense becasue it also has the norm flag.
 			 */
-			struct video_channel v;
-
-			if (copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-
-			if (v.channel != 0)
+			struct video_channel *v = arg;
+			if (v->channel != 0)
 				return -EINVAL;
-
 			return 0;
 		}
 
@@ -1242,48 +1231,41 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		/* Picture functions; contrast etc. */
 		case VIDIOCGPICT:
 		{
-			struct video_picture p;
+			struct video_picture *p = arg;
 			int val;
 
-			p.colour = 0x8000;
-			p.hue = 0x8000;
+			p->colour = 0x8000;
+			p->hue = 0x8000;
 			val = pwc_get_brightness(pdev);
 			if (val >= 0)
-				p.brightness = val;
+				p->brightness = val;
 			else
-				p.brightness = 0xffff;
+				p->brightness = 0xffff;
 			val = pwc_get_contrast(pdev);
 			if (val >= 0)
-				p.contrast = val;
+				p->contrast = val;
 			else
-				p.contrast = 0xffff;
+				p->contrast = 0xffff;
 			/* Gamma, Whiteness, what's the difference? :) */
 			val = pwc_get_gamma(pdev);
 			if (val >= 0)
-				p.whiteness = val;
+				p->whiteness = val;
 			else
-				p.whiteness = 0xffff;
+				p->whiteness = 0xffff;
 			val = pwc_get_saturation(pdev);
 			if (val >= 0)
-				p.colour = val;
+				p->colour = val;
 			else
-				p.colour = 0xffff;
-			p.depth = 24;
-			p.palette = pdev->vpalette;
-			p.hue = 0xFFFF; /* N/A */
-
-			if (copy_to_user(arg, &p, sizeof(p)))
-				return -EFAULT;
+				p->colour = 0xffff;
+			p->depth = 24;
+			p->palette = pdev->vpalette;
+			p->hue = 0xFFFF; /* N/A */
 			break;
 		}
 		
 		case VIDIOCSPICT:
 		{
-			struct video_picture p;
-
-			if (copy_from_user(&p, arg, sizeof(p)))
-				return -EFAULT;
-
+			struct video_picture *p = arg;
 			/*
 			 *	FIXME:	Suppose we are mid read
 			        ANSWER: No problem: the firmware of the camera
@@ -1292,50 +1274,44 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			                is used exactly once in the uncompress
 			                routine.
 			 */
-			pwc_set_brightness(pdev, p.brightness);
-			pwc_set_contrast(pdev, p.contrast);
-			pwc_set_gamma(pdev, p.whiteness);
-			pwc_set_saturation(pdev, p.colour);
-			if (p.palette && p.palette != pdev->vpalette) {
-				if (pwc_set_palette(pdev, p.palette) < 0)
+			if (p->palette && p->palette != pdev->vpalette) {
+				if (pwc_set_palette(pdev, p->palette) < 0)
 					return -EINVAL;
 			}
+			pwc_set_brightness(pdev, p->brightness);
+			pwc_set_contrast(pdev, p->contrast);
+			pwc_set_gamma(pdev, p->whiteness);
+			pwc_set_saturation(pdev, p->colour);
 			break;
 		}
 
 		/* Window/size parameters */		
 		case VIDIOCGWIN:
 		{
-			struct video_window vw;
+			struct video_window *vw = arg;
 			
-			vw.x = 0;
-			vw.y = 0;
-			vw.width = pdev->view.x;
-			vw.height = pdev->view.y;
-			vw.chromakey = 0;
-			vw.flags = (pdev->vframes << PWC_FPS_SHIFT) | 
+			vw->x = 0;
+			vw->y = 0;
+			vw->width = pdev->view.x;
+			vw->height = pdev->view.y;
+			vw->chromakey = 0;
+			vw->flags = (pdev->vframes << PWC_FPS_SHIFT) | 
 			           (pdev->vsnapshot ? PWC_FPS_SNAPSHOT : 0);
-			
-			if (copy_to_user(arg, &vw, sizeof(vw)))
-				return -EFAULT;			
 			break;
 		}
 		
 		case VIDIOCSWIN:
 		{
-			struct video_window vw;
+			struct video_window *vw = arg;
 			int fps, snapshot, ret;
-		
-			if (copy_from_user(&vw, arg, sizeof(vw)))
-				return -EFAULT;
 
-			fps = (vw.flags & PWC_FPS_FRMASK) >> PWC_FPS_SHIFT;
-			snapshot = vw.flags & PWC_FPS_SNAPSHOT;
+			fps = (vw->flags & PWC_FPS_FRMASK) >> PWC_FPS_SHIFT;
+			snapshot = vw->flags & PWC_FPS_SNAPSHOT;
 			if (fps == 0)
 				fps = pdev->vframes;
-			if (pdev->view.x == vw.width && pdev->view.y && fps == pdev->vframes && snapshot == pdev->vsnapshot)
+			if (pdev->view.x == vw->width && pdev->view.y && fps == pdev->vframes && snapshot == pdev->vsnapshot)
 				return 0;
-			ret = pwc_try_video_mode(pdev, vw.width, vw.height, fps, pdev->vcompression, snapshot);
+			ret = pwc_try_video_mode(pdev, vw->width, vw->height, fps, pdev->vcompression, snapshot);
 			if (ret)
 				return ret;
 			break;		
@@ -1344,16 +1320,9 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		/* We don't have overlay support (yet) */
 		case VIDIOCGFBUF:
 		{
-			struct video_buffer vb;
-			
-			vb.base = NULL;
-			vb.height = 0;
-			vb.width = 0;
-			vb.depth = 0;
-			vb.bytesperline = 0;
-			
-			if (copy_to_user((void *)arg, (void *)&vb, sizeof(vb)))
-				return -EFAULT;
+			struct video_buffer *vb = arg;
+
+			memset(vb,0,sizeof(*vb));
 			break;
 		}
 
@@ -1361,29 +1330,24 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		case VIDIOCGMBUF:
 		{
 			/* Tell the user program how much memory is needed for a mmap() */
-			struct video_mbuf vm;
+			struct video_mbuf *vm = arg;
 			int i;
 
-			memset(&vm, 0, sizeof(vm));
-			vm.size = default_mbufs * pdev->len_per_image;
-			vm.frames = default_mbufs; /* double buffering should be enough for most applications */
+			memset(vm, 0, sizeof(*vm));
+			vm->size = default_mbufs * pdev->len_per_image;
+			vm->frames = default_mbufs; /* double buffering should be enough for most applications */
 			for (i = 0; i < default_mbufs; i++)
-				vm.offsets[i] = i * pdev->len_per_image;
-
-			if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-				return -EFAULT;
+				vm->offsets[i] = i * pdev->len_per_image;
 			break;
 		}
 
 		case VIDIOCMCAPTURE:
 		{
 			/* Start capture into a given image buffer (called 'frame' in video_mmap structure) */
-			struct video_mmap vm;
+			struct video_mmap *vm = arg;
 
-			if (copy_from_user((void *)&vm, (void *)arg, sizeof(vm)))
-				return -EFAULT;
-			Trace(TRACE_READ, "VIDIOCMCAPTURE: %dx%d, frame %d, format %d\n", vm.width, vm.height, vm.frame, vm.format);
-			if (vm.frame < 0 || vm.frame >= default_mbufs)
+			Trace(TRACE_READ, "VIDIOCMCAPTURE: %dx%d, frame %d, format %d\n", vm->width, vm->height, vm->frame, vm->format);
+			if (vm->frame < 0 || vm->frame >= default_mbufs)
 				return -EINVAL;
 
 			/* xawtv is nasty. It probes the available palettes
@@ -1391,24 +1355,24 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			   various palettes... The driver doesn't support
 			   such small images, so I'm working around it.
 			 */
-			if (vm.format && vm.format != pdev->vpalette)
-				if (pwc_set_palette(pdev, vm.format) < 0)
+			if (vm->format && vm->format != pdev->vpalette)
+				if (pwc_set_palette(pdev, vm->format) < 0)
 					return -EINVAL;
 			 
-			if ((vm.width != pdev->view.x || vm.height != pdev->view.y) &&
-			    (vm.width >= pdev->view_min.x && vm.height >= pdev->view_min.y)) {
+			if ((vm->width != pdev->view.x || vm->height != pdev->view.y) &&
+			    (vm->width >= pdev->view_min.x && vm->height >= pdev->view_min.y)) {
 				int ret;
 				
 				Trace(TRACE_OPEN, "VIDIOCMCAPTURE: changing size to please xawtv :-(.\n");
-				ret = pwc_try_video_mode(pdev, vm.width, vm.height, pdev->vframes, pdev->vcompression, pdev->vsnapshot);
+				ret = pwc_try_video_mode(pdev, vm->width, vm->height, pdev->vframes, pdev->vcompression, pdev->vsnapshot);
 				if (ret)
 					return ret;
 			} /* ... size mismatch */
 
 			/* FIXME: should we lock here? */
-			if (pdev->image_used[vm.frame])
+			if (pdev->image_used[vm->frame])
 				return -EBUSY;	/* buffer wasn't available. Bummer */
-			pdev->image_used[vm.frame] = 1;
+			pdev->image_used[vm->frame] = 1;
 
 			/* Okay, we're done here. In the SYNC call we wait until a 
 			   frame comes available, then expand image into the given 
@@ -1438,18 +1402,16 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			   grabber card will then overwrite the buffer 
 			   you're working on.
 			 */
-			int mbuf, ret;
+			int *mbuf = arg;
+			int ret;
 
-			if (copy_from_user((void *)&mbuf, arg, sizeof(int)))
-				return -EFAULT;
-
-			Trace(TRACE_READ, "VIDIOCSYNC called (%d).\n", mbuf);
+			Trace(TRACE_READ, "VIDIOCSYNC called (%d).\n", *mbuf);
 
 			/* bounds check */
-			if (mbuf < 0 || mbuf >= default_mbufs)
+			if (*mbuf < 0 || *mbuf >= default_mbufs)
 				return -EINVAL;
 			/* check if this buffer was requested anyway */
-			if (pdev->image_used[mbuf] == 0)
+			if (pdev->image_used[*mbuf] == 0)
 				return -EINVAL;
 
 			/* Add ourselves to the frame wait-queue.
@@ -1471,8 +1433,8 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		                	set_current_state(TASK_RUNNING);
 		                	return -ERESTARTSYS;
 	        	        }
-	                	schedule();
 		                set_current_state(TASK_INTERRUPTIBLE);
+	                	schedule();
 			}
 			remove_wait_queue(&pdev->frameq, &wait);
 			set_current_state(TASK_RUNNING);
@@ -1484,10 +1446,10 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			   Grabber hardware may not be so forgiving.
 			 */
 			Trace(TRACE_READ, "VIDIOCSYNC: frame ready.\n");
-			pdev->fill_image = mbuf; /* tell in which buffer we want the image to be expanded */
+			pdev->fill_image = *mbuf; /* tell in which buffer we want the image to be expanded */
 			/* Decompress, etc */
 			ret = pwc_handle_frame(pdev);
-			pdev->image_used[mbuf] = 0;
+			pdev->image_used[*mbuf] = 0;
 			if (ret)
 				return -EFAULT;
 			break;
@@ -1495,44 +1457,35 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		
 		case VIDIOCGAUDIO:
 		{
-			struct video_audio v;
+			struct video_audio *v = arg;
 			
-			strcpy(v.name, "Microphone");
-			v.audio = -1; /* unknown audio minor */
-			v.flags = 0;
-			v.mode = VIDEO_SOUND_MONO;
-			v.volume = 0;
-			v.bass = 0;
-			v.treble = 0;
-			v.balance = 0x8000;
-			v.step = 1;
-			
-			if (copy_to_user(arg, &v, sizeof(v)))
-				return -EFAULT;
+			strcpy(v->name, "Microphone");
+			v->audio = -1; /* unknown audio minor */
+			v->flags = 0;
+			v->mode = VIDEO_SOUND_MONO;
+			v->volume = 0;
+			v->bass = 0;
+			v->treble = 0;
+			v->balance = 0x8000;
+			v->step = 1;
 			break;	
 		}
 		
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			
-			if (copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
 			/* Dummy: nothing can be set */
 			break;
 		}
 		
 		case VIDIOCGUNIT:
 		{
-			struct video_unit vu;
+			struct video_unit *vu = arg;
 			
-			vu.video = pdev->vdev->minor & 0x3F;
-			vu.audio = -1; /* not known yet */
-			vu.vbi = -1;
-			vu.radio = -1;
-			vu.teletext = -1;
-			if (copy_to_user(arg, &vu, sizeof(vu)))
-				return -EFAULT;
+			vu->video = pdev->vdev->minor & 0x3F;
+			vu->audio = -1; /* not known yet */
+			vu->vbi = -1;
+			vu->radio = -1;
+			vu->teletext = -1;
 			break;
 		}
 		default:
@@ -1541,13 +1494,15 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 	return 0;
 }	
 
-static int pwc_video_mmap(struct vm_area_struct *vma, struct video_device *vdev, const char *adr, unsigned long size)
+static int pwc_video_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
-	unsigned long start = (unsigned long)adr;
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
 	
-	Trace(TRACE_MEMORY, "mmap(0x%p, 0x%p, %lu) called.\n", vdev, adr, size);
+	Trace(TRACE_MEMORY, "mmap(0x%p, 0x%lx, %lu) called.\n", vdev, start, size);
 	pdev = vdev->priv;
 
 	/* FIXME - audit mmap during a read */		
@@ -1811,6 +1766,7 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 	
 	pdev->unplugged = 1;
 	if (pdev->vdev != NULL) {
+		video_unregister_device(pdev->vdev); 
 		if (pdev->vopen) {
 			Info("Disconnected while device/video is open!\n");
 			
@@ -1839,7 +1795,6 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 		else {
 			/* Normal disconnect; remove from available devices */
 			Trace(TRACE_PROBE, "Unregistering video device normally.\n");
-			video_unregister_device(pdev->vdev); 
 			kfree(pdev->vdev);
 			pdev->vdev = NULL;
 		}

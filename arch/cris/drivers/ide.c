@@ -2,7 +2,7 @@
  *
  * Etrax specific IDE functions, like init and PIO-mode setting etc.
  * Almost the entire ide.c is used for the rest of the Etrax ATA driver.
- * Copyright (c) 2000, 2001 Axis Communications AB 
+ * Copyright (c) 2000, 2001 Axis Communications AB
  *
  * Authors:    Bjorn Wesen        (initial version)
  *             Mikael Starvik     (pio setup stuff)
@@ -895,7 +895,14 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 /* ide.c calls this, but we don't need to do anything particular */
 
-int ide_release_dma (ide_hwif_t *hwif)
+/* Dear maintainer of this architecture please note that it would be a little
+ * more clever :-) to put this up into some header as static inline, so the
+ * spurious code below would just vanish.
+ *
+ * --- Marcin Dalecki
+ */
+
+void ide_release_dma (ide_hwif_t *hwif)
 {
-	return 1;
+	/* empty */
 }

@@ -147,6 +147,24 @@ static int tda9875_read(struct i2c_client *client)
 }
 #endif
 
+static int i2c_read_register(struct i2c_adapter *adap, int addr, int reg)
+{
+        unsigned char write[1];
+        unsigned char read[1];
+        struct i2c_msg msgs[2] = {
+                { addr, 0,        1, write },
+                { addr, I2C_M_RD, 1, read  }
+        };
+        write[0] = reg;
+
+        if (2 != i2c_transfer(adap,msgs,2)) {
+                printk(KERN_WARNING "tda9875: I/O error (read2)\n");
+                return -1;
+        }
+        dprintk("tda9875: chip_read2: reg%d=0x%x\n",reg,read[0]);
+        return read[0];
+}
+
 static void tda9875_set(struct i2c_client *client)
 {
 	struct tda9875 *tda = client->data;
@@ -215,6 +233,22 @@ static void do_tda9875_init(struct i2c_client *client)
  * i2c interface functions *
  * *********************** */
 
+static int tda9875_checkit(struct i2c_adapter *adap, int addr)
+{
+	int dic,rev;
+
+	dic=i2c_read_register(adap,addr,254);
+	rev=i2c_read_register(adap,addr,255);
+
+	if(dic==0 || dic==2) { // tda9875 and tda9875A
+		printk("tda9875: TDA9875%s Rev.%d detected at 0x%x\n",
+		dic==0?"":"A", rev,addr<<1);
+		return 1;
+	}
+	printk("tda9875: no such chip at 0x%x (dic=0x%x rev=0x%x)\n",addr<<1,dic,rev);
+	return(0);
+}
+
 static int tda9875_attach(struct i2c_adapter *adap, int addr,
 			  unsigned short flags, int kind)
 {
@@ -232,6 +266,11 @@ static int tda9875_attach(struct i2c_adapter *adap, int addr,
         client->adapter = adap;
         client->addr = addr;
 	client->data = t;
+
+	if(!tda9875_checkit(adap,addr)) {
+		kfree(t);
+		return 1;
+	}
 	
 	do_tda9875_init(client);
 	MOD_INC_USE_COUNT;
@@ -375,22 +414,19 @@ static struct i2c_client client_template =
         &driver
 };
 
-#ifdef MODULE
-int init_module(void)
-#else
-int tda9875_init(void)
-#endif
+static int tda9875_init(void)
 {
 	i2c_add_driver(&driver);
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void tda9875_fini(void)
 {
 	i2c_del_driver(&driver);
 }
-#endif
+
+module_init(tda9875_init);
+module_exit(tda9875_fini);
 
 /*
  * Local variables:

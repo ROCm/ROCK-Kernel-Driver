@@ -70,9 +70,8 @@ linux_syscall_for_solaris:
 	.align	32
 	.globl	solaris_sparc_syscall, entry64_personality_patch
 solaris_sparc_syscall:
-	ldx		[%g6 + TI_TASK], %l0
 entry64_personality_patch:
-	ldub		[%l0 + 0x0], %l0
+	ldub		[%g4 + 0x0], %l0
 	cmp		%g1, 255
 	bg,pn		%icc, solaris_unimplemented
 	 srl		%g1, 0, %g1

@@ -649,33 +649,32 @@ CONFIG_PM
   sending the processor to sleep and saving power.
 
 CONFIG_ACPI
-  ACPI/OSPM support for Linux is currently under development. As such,
-  this support is preliminary and EXPERIMENTAL.  Configuring ACPI
-  support enables kernel interfaces that allow higher level software
-  (OSPM) to manipulate ACPI defined hardware and software interfaces,
-  including the evaluation of ACPI control methods.  If unsure, choose
-  N here.  Note, this option will enlarge your kernel by about 120K.
+  Advanced Configuration and Power Interface (ACPI) support for 
+  Linux requires an ACPI compliant platform (hardware/firmware),
+  and assumes the presence of OS-directed configuration and power
+  management (OSPM) software.  This option will enlarge your 
+  kernel by about 70K.
 
-  This support requires an ACPI compliant platform (hardware/firmware).
-  If both ACPI and Advanced Power Management (APM) support are
-  configured, whichever is loaded first shall be used.
+  Linux ACPI provides a robust functional replacement for several 
+  legacy configuration and power management intefaces, including 
+  the Plug-and-Play BIOS specification (PnP BIOS), the 
+  MultiProcessor Specification (MPS), and the Advanced Power 
+  Management (APM) specification.  If both ACPI and APM support 
+  are configured, whichever is loaded first shall be used.
+  
+  The ACPI SourceForge project contains the latest source code, 
+  documentation, tools, mailing list subscription, and other 
+  information.  This project is available at:
+    <http://sourceforge.net/projects/acpi>
 
-  This code DOES NOT currently provide a complete OSPM implementation
-  -- it has not yet reached APM's level of functionality.  When fully
-  implemented, Linux ACPI/OSPM will provide a more robust functional
-  replacement for legacy configuration and power management
-  interfaces, including the Plug-and-Play BIOS specification (PnP
-  BIOS), the Multi-Processor Specification (MPS), and the Advanced
-  Power Management specification (APM).
+  Linux support for ACPI is based on Intel Corporation's ACPI
+  Component Architecture (ACPI CA).  For more information see:
+    <http://developer.intel.com/technology/iapc/acpi>
 
-  Linux support for ACPI/OSPM is based on Intel Corporation's ACPI
-  Component Architecture (ACPI CA). The latest ACPI CA source code,
-  documentation, debug builds, and implementation status information
-  can be downloaded from:
-  <http://developer.intel.com/technology/iapc/acpi/downloads.htm>.
-
-  The ACPI Sourceforge project may also be of interest:
-  <http://sf.net/projects/acpi/>
+  ACPI is an open industry specification co-developed by Compaq, 
+  Intel, Microsoft, Phoenix, and Toshiba.  The specification is 
+  available at:
+    <http://www.acpi.info>
 
 CONFIG_APM
   APM is a BIOS specification for saving power using several different
@@ -860,34 +859,6 @@ CONFIG_X86_CPUID
   be executed on a specific processor.  It is a character device
   with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
   /dev/cpu/31/cpuid.
-
-CONFIG_SOUND
-  If you have a sound card in your computer, i.e. if it can say more
-  than an occasional beep, say Y.  Be sure to have all the information
-  about your sound card and its configuration down (I/O port,
-  interrupt and DMA channel), because you will be asked for it.
-
-  You want to read the Sound-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>. General information about
-  the modular sound system is contained in the files
-  <file:Documentation/sound/Introduction>.  The file
-  <file:Documentation/sound/README.OSS> contains some slightly
-  outdated but still useful information as well.
-
-  If you have a PnP sound card and you want to configure it at boot
-  time using the ISA PnP tools (read
-  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
-  compile the sound card support as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want)
-  and load that module after the PnP configuration is finished.  To do
-  this, say M here and read <file:Documentation/modules.txt> as well
-  as <file:Documentation/sound/README.modules>; the module will be
-  called soundcore.o.
-
-  I'm told that even without a sound card, you can make your computer
-  say more than an occasional beep, by programming the PC speaker.
-  Kernel patches and supporting utilities to do that are in the pcsp
-  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
 
 CONFIG_MAGIC_SYSRQ
   If you say Y here, you will have some control over the system even

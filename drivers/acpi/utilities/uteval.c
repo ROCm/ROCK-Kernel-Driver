@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 31 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 
 #define _COMPONENT          ACPI_UTILITIES
-	 MODULE_NAME         ("uteval")
+	 ACPI_MODULE_NAME    ("uteval")
 
 
 /*******************************************************************************
@@ -60,7 +60,7 @@ acpi_ut_evaluate_numeric_object (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ut_evaluate_numeric_object");
+	ACPI_FUNCTION_TRACE ("Ut_evaluate_numeric_object");
 
 
 	/* Execute the method */
@@ -69,11 +69,11 @@ acpi_ut_evaluate_numeric_object (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s on %4.4s was not found\n",
-				object_name, (char*)&device_node->name));
+				object_name, (char *) &device_node->name));
 		}
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s on %4.4s failed with status %s\n",
-				object_name, (char*)&device_node->name,
+				object_name, (char *) &device_node->name,
 				acpi_format_exception (status)));
 		}
 
@@ -138,7 +138,7 @@ acpi_ut_execute_HID (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ut_execute_HID");
+	ACPI_FUNCTION_TRACE ("Ut_execute_HID");
 
 
 	/* Execute the method */
@@ -148,12 +148,11 @@ acpi_ut_execute_HID (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "_HID on %4.4s was not found\n",
-				(char*)&device_node->name));
+				(char *) &device_node->name));
 		}
-
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_HID on %4.4s failed %s\n",
-				(char*)&device_node->name, acpi_format_exception (status)));
+				(char *) &device_node->name, acpi_format_exception (status)));
 		}
 
 		return_ACPI_STATUS (status);
@@ -177,21 +176,111 @@ acpi_ut_execute_HID (
 			"Type returned from _HID not a number or string: %s(%X) \n",
 			acpi_ut_get_type_name (obj_desc->common.type), obj_desc->common.type));
 	}
-
 	else {
 		if (obj_desc->common.type == ACPI_TYPE_INTEGER) {
 			/* Convert the Numeric HID to string */
 
 			acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, hid->buffer);
 		}
-
 		else {
 			/* Copy the String HID from the returned object */
 
-			STRNCPY(hid->buffer, obj_desc->string.pointer, sizeof(hid->buffer));
+			ACPI_STRNCPY (hid->buffer, obj_desc->string.pointer, sizeof(hid->buffer));
 		}
 	}
 
+	/* On exit, we must delete the return object */
+
+	acpi_ut_remove_reference (obj_desc);
+
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_execute_CID
+ *
+ * PARAMETERS:  Device_node         - Node for the device
+ *              *Cid                - Where the CID is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Executes the _CID control method that returns one or more
+ *              compatible hardware IDs for the device.
+ *
+ *              NOTE: Internal function, no parameter validation
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ut_execute_CID (
+	acpi_namespace_node     *device_node,
+	acpi_device_id          *cid)
+{
+	acpi_operand_object     *obj_desc;
+	acpi_status             status;
+
+
+	ACPI_FUNCTION_TRACE ("Ut_execute_CID");
+
+	/* Execute the method */
+
+	status = acpi_ns_evaluate_relative (device_node,
+			 METHOD_NAME__CID, NULL, &obj_desc);
+	if (ACPI_FAILURE (status)) {
+		if (status == AE_NOT_FOUND) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "_CID on %4.4s was not found\n",
+				(char *)&device_node->name));
+		}
+		else {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_CID on %4.4s failed %s\n",
+				(char *)&device_node->name, acpi_format_exception (status)));
+		}
+
+		return_ACPI_STATUS (status);
+	}
+
+	/* Did we get a return object? */
+
+	if (!obj_desc) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object was returned from _CID\n"));
+		return_ACPI_STATUS (AE_TYPE);
+	}
+
+	/*
+	 *  A _CID can return either a single compatible ID or a package of compatible
+	 *  IDs.  Each compatible ID can be a Number (32 bit compressed EISA ID) or
+	 *  string (PCI ID format, e.g. "PCI\VEN_vvvv&DEV_dddd&SUBSYS_ssssssss").
+	 */
+	switch (obj_desc->common.type) {
+	case ACPI_TYPE_INTEGER:
+
+		/* Convert the Numeric CID to string */
+
+		acpi_ex_eisa_id_to_string ((u32) obj_desc->integer.value, cid->buffer);
+		break;
+
+	case ACPI_TYPE_STRING:
+
+		/* Copy the String CID from the returned object */
+
+		ACPI_STRNCPY (cid->buffer, obj_desc->string.pointer, sizeof(cid->buffer));
+		break;
+
+	case ACPI_TYPE_PACKAGE:
+
+		/* TBD: Parse package elements; need different return struct, etc. */
+		break;
+
+	default:
+
+		status = AE_TYPE;
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Type returned from _CID not a number, string, or package: %s(%X) \n",
+			acpi_ut_get_type_name (obj_desc->common.type), obj_desc->common.type));
+		break;
+	}
 
 	/* On exit, we must delete the return object */
 
@@ -226,7 +315,7 @@ acpi_ut_execute_UID (
 	acpi_status             status;
 
 
-	PROC_NAME ("Ut_execute_UID");
+	ACPI_FUNCTION_NAME ("Ut_execute_UID");
 
 
 	/* Execute the method */
@@ -236,13 +325,12 @@ acpi_ut_execute_UID (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "_UID on %4.4s was not found\n",
-				(char*)&device_node->name));
+				(char *) &device_node->name));
 		}
-
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"_UID on %4.4s failed %s\n",
-				(char*)&device_node->name, acpi_format_exception (status)));
+				(char *) &device_node->name, acpi_format_exception (status)));
 		}
 
 		return (status);
@@ -266,18 +354,16 @@ acpi_ut_execute_UID (
 			"Type returned from _UID was not a number or string: %X \n",
 			obj_desc->common.type));
 	}
-
 	else {
 		if (obj_desc->common.type == ACPI_TYPE_INTEGER) {
 			/* Convert the Numeric UID to string */
 
 			acpi_ex_unsigned_integer_to_string (obj_desc->integer.value, uid->buffer);
 		}
-
 		else {
 			/* Copy the String UID from the returned object */
 
-			STRNCPY(uid->buffer, obj_desc->string.pointer, sizeof(uid->buffer));
+			ACPI_STRNCPY (uid->buffer, obj_desc->string.pointer, sizeof(uid->buffer));
 		}
 	}
 
@@ -315,7 +401,7 @@ acpi_ut_execute_STA (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ut_execute_STA");
+	ACPI_FUNCTION_TRACE ("Ut_execute_STA");
 
 
 	/* Execute the method */
@@ -325,7 +411,7 @@ acpi_ut_execute_STA (
 	if (AE_NOT_FOUND == status) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 			"_STA on %4.4s was not found, assuming present.\n",
-			(char*)&device_node->name));
+			(char *) &device_node->name));
 
 		*flags = 0x0F;
 		status = AE_OK;
@@ -333,7 +419,7 @@ acpi_ut_execute_STA (
 
 	else if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_STA on %4.4s failed %s\n",
-			(char*)&device_node->name,
+			(char *) &device_node->name,
 			acpi_format_exception (status)));
 	}
 
@@ -353,7 +439,6 @@ acpi_ut_execute_STA (
 				"Type returned from _STA was not a number: %X \n",
 				obj_desc->common.type));
 		}
-
 		else {
 			/* Extract the status flags */
 

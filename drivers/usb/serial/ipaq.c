@@ -9,6 +9,16 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (8/3/2002) ganesh
+ * 	The ipaq sometimes emits a '\0' before the CLIENT string. At this
+ * 	point of time, the ppp ldisc is not yet attached to the tty, so
+ * 	n_tty echoes "^ " to the ipaq, which messes up the chat. In 2.5.6-pre2
+ * 	this causes a panic because echo_char() tries to sleep in interrupt
+ * 	context.
+ * 	The fix is to tell the upper layers that this is a raw device so that
+ * 	echoing is suppressed. Thanks to Lyle Lindholm for a detailed bug
+ * 	report.
+ *
  * (25/2/2002) ganesh
  * 	Added support for the HP Jornada 548 and 568. Completely untested.
  * 	Thanks to info from Heath Robinson and Arieh Davidoff.
@@ -148,6 +158,8 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		 */
 
 		port->tty->low_latency = 1;
+		port->tty->raw = 1;
+		port->tty->real_raw = 1;
 
 		/*
 		 * Lose the small buffers usbserial provides. Make larger ones.
@@ -285,7 +297,7 @@ static void ipaq_read_bulk_callback(struct urb *urb)
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ipaq_read_bulk_callback, port);
-	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
 		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 	return;
@@ -400,7 +412,7 @@ static int ipaq_write_flush(struct usb_serial_port *port)
 		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 		      port->write_urb->transfer_buffer, count, ipaq_write_bulk_callback,
 		      port);
-	result = usb_submit_urb(urb, GFP_KERNEL);
+	result = usb_submit_urb(urb, GFP_ATOMIC);
 	if (result) {
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 	}

@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: rsxface - Public interfaces to the resource manager
- *              $Revision: 15 $
+ *              $Revision: 18 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 #include "acresrc.h"
 
 #define _COMPONENT          ACPI_RESOURCES
-	 MODULE_NAME         ("rsxface")
+	 ACPI_MODULE_NAME    ("rsxface")
 
 
 /*******************************************************************************
@@ -64,7 +64,7 @@ acpi_get_irq_routing_table (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_get_irq_routing_table ");
+	ACPI_FUNCTION_TRACE ("Acpi_get_irq_routing_table ");
 
 
 	/*
@@ -73,10 +73,13 @@ acpi_get_irq_routing_table (
 	 * we also need a valid pointer in the buffer. If it's a zero buffer length,
 	 * we'll be returning the needed buffer size, so keep going.
 	 */
-	if ((!device_handle)        ||
-		(!ret_buffer)           ||
-		((!ret_buffer->pointer) && (ret_buffer->length))) {
+	if (!device_handle) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_ut_validate_buffer (ret_buffer);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_rs_get_prt_method_data (device_handle, ret_buffer);
@@ -116,7 +119,7 @@ acpi_get_current_resources (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_get_current_resources");
+	ACPI_FUNCTION_TRACE ("Acpi_get_current_resources");
 
 
 	/*
@@ -125,10 +128,13 @@ acpi_get_current_resources (
 	 * we also need a valid pointer in the buffer. If it's a zero buffer length,
 	 * we'll be returning the needed buffer size, so keep going.
 	 */
-	if ((!device_handle)        ||
-		(!ret_buffer)           ||
-		((ret_buffer->length) && (!ret_buffer->pointer))) {
+	if (!device_handle) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_ut_validate_buffer (ret_buffer);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_rs_get_crs_method_data (device_handle, ret_buffer);
@@ -165,7 +171,7 @@ acpi_get_possible_resources (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_get_possible_resources");
+	ACPI_FUNCTION_TRACE ("Acpi_get_possible_resources");
 
 
 	/*
@@ -174,10 +180,13 @@ acpi_get_possible_resources (
 	 * we also need a valid pointer in the buffer. If it's a zero buffer length,
 	 * we'll be returning the needed buffer size, so keep going.
 	 */
-	if ((!device_handle)        ||
-		(!ret_buffer)           ||
-		((ret_buffer->length) && (!ret_buffer->pointer))) {
+	if (!device_handle) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_ut_validate_buffer (ret_buffer);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_rs_get_prs_method_data (device_handle, ret_buffer);
@@ -211,7 +220,7 @@ acpi_set_current_resources (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_set_current_resources");
+	ACPI_FUNCTION_TRACE ("Acpi_set_current_resources");
 
 
 	/*

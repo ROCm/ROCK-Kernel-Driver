@@ -548,4 +548,13 @@ int pci_controller_num(struct pci_dev *pdev)
 	return ret;
 }
 
+int pcibios_prep_mwi(struct pci_dev *dev)
+{
+	/* We set correct PCI_CACHE_LINE_SIZE register values for every
+	 * device probed on this platform.  So there is nothing to check
+	 * and this always succeeds.
+	 */
+	return 0;
+}
+
 #endif /* !(CONFIG_PCI) */

@@ -14,8 +14,11 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 
+#include <linux/nfs_fs_sb.h>
+
 #include <linux/sunrpc/debug.h>
 #include <linux/sunrpc/auth.h>
+#include <linux/sunrpc/clnt.h>
 
 #include <linux/nfs.h>
 #include <linux/nfs2.h>
@@ -173,9 +176,10 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
 	return list_entry(inode, struct nfs_inode, vfs_inode);
 }
+#define NFS_SB(s)		((struct nfs_server *)(s->u.generic_sbp))
 
 #define NFS_FH(inode)			(&NFS_I(inode)->fh)
-#define NFS_SERVER(inode)		(&(inode)->i_sb->u.nfs_sb.s_server)
+#define NFS_SERVER(inode)		(NFS_SB(inode->i_sb))
 #define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
 #define NFS_PROTO(inode)		(NFS_SERVER(inode)->rpc_ops)
 #define NFS_REQUESTLIST(inode)		(NFS_SERVER(inode)->rw_requests)
@@ -418,6 +422,29 @@ extern void * nfs_root_data(void);
 		wait_event(wq, condition);				\
 	__retval;							\
 })
+
+#ifdef CONFIG_NFS_V3
+
+#define NFS_JUKEBOX_RETRY_TIME (5 * HZ)
+static inline int
+nfs_async_handle_jukebox(struct rpc_task *task)
+{
+	if (task->tk_status != -EJUKEBOX)
+		return 0;
+	task->tk_status = 0;
+	rpc_restart_call(task);
+	rpc_delay(task, NFS_JUKEBOX_RETRY_TIME);
+	return 1;
+}
+
+#else
+
+static inline int
+nfs_async_handle_jukebox(struct rpc_task *task)
+{
+	return 0;
+}
+#endif /* CONFIG_NFS_V3 */
 
 #endif /* __KERNEL__ */
 

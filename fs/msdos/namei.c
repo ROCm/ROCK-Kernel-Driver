@@ -6,8 +6,6 @@
  *  Rewritten for constant inumbers 1999 by Al Viro
  */
 
-
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/time.h>
@@ -23,8 +21,8 @@ static const char *reserved_names[] = {
     "CON     ","PRN     ","NUL     ","AUX     ",
     "LPT1    ","LPT2    ","LPT3    ","LPT4    ",
     "COM1    ","COM2    ","COM3    ","COM4    ",
-    NULL };
-
+    NULL
+};
 
 /* Characters that are undesirable in an MS-DOS file name */
   
@@ -32,12 +30,6 @@ static char bad_chars[] = "*?<>|\"";
 static char bad_if_strict_pc[] = "+=,; ";
 static char bad_if_strict_atari[] = " "; /* GEMDOS is less restrictive */
 #define	bad_if_strict(opts) ((opts)->atari ? bad_if_strict_atari : bad_if_strict_pc)
-
-/* Must die */
-void msdos_put_super(struct super_block *sb)
-{
-	fat_put_super(sb);
-}
 
 /***** Formats an MS-DOS file name. Rejects invalid names. */
 static int msdos_format_name(const char *name,int len,
@@ -603,17 +595,14 @@ struct inode_operations msdos_dir_inode_operations = {
 
 int msdos_fill_super(struct super_block *sb,void *data, int silent)
 {
-	struct super_block *res;
+	int res;
 
-	MSDOS_SB(sb)->options.isvfat = 0;
-	res = fat_read_super(sb, data, silent, &msdos_dir_inode_operations);
-	if (IS_ERR(res))
-		return PTR_ERR(res);
-	if (res == NULL) {
-		if (!silent)
+	res = fat_fill_super(sb, data, silent, &msdos_dir_inode_operations, 0);
+	if (res) {
+		if (res == -EINVAL && !silent)
 			printk(KERN_INFO "VFS: Can't find a valid"
 			       " MSDOS filesystem on dev %s.\n", sb->s_id);
-		return -EINVAL;
+		return res;
 	}
 
 	sb->s_root->d_op = &msdos_dentry_operations;

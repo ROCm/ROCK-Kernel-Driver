@@ -120,14 +120,17 @@ struct CHIPSTATE {
 	/* current settings */
 	__u16 left,right,treble,bass,mode;
 	int prevmode;
+	int norm;
 	/* thread */
 	struct task_struct  *thread;
 	struct semaphore    *notify;
 	wait_queue_head_t    wq;
 	struct timer_list    wt;
 	int                  done;
+	int                  watch_stereo;
 };
 
+#define VIDEO_MODE_RADIO 16      /* norm magic for radio mode */
 
 /* ---------------------------------------------------------------------- */
 /* i2c addresses                                                          */
@@ -139,7 +142,7 @@ static unsigned short normal_i2c[] = {
 	I2C_TDA9840   >> 1,
 	I2C_TDA985x_L >> 1,
 	I2C_TDA985x_H >> 1,
-	I2C_TDA9874A  >> 1,
+	I2C_TDA9874   >> 1,
 	I2C_PIC16C54  >> 1,
 	I2C_CLIENT_END };
 static unsigned short normal_i2c_range[2] = { I2C_CLIENT_END, I2C_CLIENT_END };
@@ -296,9 +299,9 @@ static int chip_thread(void *data)
 		dprintk("%s: thread wakeup\n", chip->c.name);
 		if (chip->done || signal_pending(current))
 			break;
-		
-		if (0 != chip->mode)
-			/* don't do anything if mode != auto */
+
+		/* don't do anything for radio or if mode != auto */
+		if (chip->norm == VIDEO_MODE_RADIO || chip->mode != 0)
 			continue;
 		
 		/* have a look what's going on */
@@ -316,7 +319,7 @@ static int chip_thread(void *data)
 	return 0;
 }
 
-void generic_checkmode(struct CHIPSTATE *chip)
+static void generic_checkmode(struct CHIPSTATE *chip)
 {
 	struct CHIPDESC  *desc = chiplist + chip->type;
 	int mode = desc->getmode(chip);
@@ -327,12 +330,12 @@ void generic_checkmode(struct CHIPSTATE *chip)
 	dprintk("%s: thread checkmode\n", chip->c.name);
 	chip->prevmode = mode;
 
-	if (mode & VIDEO_SOUND_LANG1)
+	if (mode & VIDEO_SOUND_STEREO)
+		desc->setmode(chip,VIDEO_SOUND_STEREO);
+	else if (mode & VIDEO_SOUND_LANG1)
 		desc->setmode(chip,VIDEO_SOUND_LANG1);
 	else if (mode & VIDEO_SOUND_LANG2)
 		desc->setmode(chip,VIDEO_SOUND_LANG2);
-	else if (mode & VIDEO_SOUND_STEREO)
-		desc->setmode(chip,VIDEO_SOUND_STEREO);
 	else
 		desc->setmode(chip,VIDEO_SOUND_MONO);
 }
@@ -360,7 +363,7 @@ void generic_checkmode(struct CHIPSTATE *chip)
 #define TDA9840_TEST_INT1SN 0x1 /* Integration time 0.5s when set */
 #define TDA9840_TEST_INTFU 0x02 /* Disables integrator function */
 
-int  tda9840_getmode(struct CHIPSTATE *chip)
+static int tda9840_getmode(struct CHIPSTATE *chip)
 {
 	int val, mode;
 	
@@ -376,7 +379,7 @@ int  tda9840_getmode(struct CHIPSTATE *chip)
 	return mode;
 }
 
-void tda9840_setmode(struct CHIPSTATE *chip, int mode)
+static void tda9840_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int update = 1;
 	int t = chip->shadow.bytes[TDA9840_SW + 1] & ~0x7e;
@@ -502,11 +505,11 @@ void tda9840_setmode(struct CHIPSTATE *chip, int mode)
  * -10% (0x2), nominal (0x3), +10% (0x6), +20% (0x5), +30% (0x4) */
 #define TDA985x_ADJ	1<<7 /* Stereo adjust on/off (wideband and spectral */
 
-int tda9855_volume(int val) { return val/0x2e8+0x27; }
-int tda9855_bass(int val)   { return val/0xccc+0x06; }
-int tda9855_treble(int val) { return (val/0x1c71+0x3)<<1; }
+static int tda9855_volume(int val) { return val/0x2e8+0x27; }
+static int tda9855_bass(int val)   { return val/0xccc+0x06; }
+static int tda9855_treble(int val) { return (val/0x1c71+0x3)<<1; }
 
-int  tda985x_getmode(struct CHIPSTATE *chip)
+static int  tda985x_getmode(struct CHIPSTATE *chip)
 {
 	int mode;
 
@@ -517,7 +520,7 @@ int  tda985x_getmode(struct CHIPSTATE *chip)
 	return mode | VIDEO_SOUND_MONO;
 }
 
-void tda985x_setmode(struct CHIPSTATE *chip, int mode)
+static void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int update = 1;
 	int c6 = chip->shadow.bytes[TDA985x_C6+1] & 0x3f;
@@ -657,7 +660,7 @@ void tda985x_setmode(struct CHIPSTATE *chip, int mode)
 #define TDA9873_STEREO      2 /* Stereo sound is identified     */
 #define TDA9873_DUAL        4 /* Dual sound is identified       */
 
-int tda9873_getmode(struct CHIPSTATE *chip)
+static int tda9873_getmode(struct CHIPSTATE *chip)
 {
 	int val,mode;
 
@@ -672,7 +675,7 @@ int tda9873_getmode(struct CHIPSTATE *chip)
 	return mode;
 }
 
-void tda9873_setmode(struct CHIPSTATE *chip, int mode)
+static void tda9873_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int sw_data  = chip->shadow.bytes[TDA9873_SW+1] & ~ TDA9873_TR_MASK;
 	/*	int adj_data = chip->shadow.bytes[TDA9873_AD+1] ; */
@@ -708,7 +711,7 @@ void tda9873_setmode(struct CHIPSTATE *chip, int mode)
 		mode, sw_data);
 }
 
-int tda9873_checkit(struct CHIPSTATE *chip)
+static int tda9873_checkit(struct CHIPSTATE *chip)
 {
 	int rc;
 
@@ -719,10 +722,10 @@ int tda9873_checkit(struct CHIPSTATE *chip)
 
 
 /* ---------------------------------------------------------------------- */
-/* audio chip description - defines+functions for tda9874a                */
+/* audio chip description - defines+functions for tda9874h and tda9874a   */
 /* Dariusz Kowalewski <darekk@automex.pl>                                 */
 
-/* Subaddresses for TDA9874A (slave rx) */
+/* Subaddresses for TDA9874H and TDA9874A (slave rx) */
 #define TDA9874A_AGCGR		0x00	/* AGC gain */
 #define TDA9874A_GCONR		0x01	/* general config */
 #define TDA9874A_MSR		0x02	/* monitor select */
@@ -747,10 +750,10 @@ int tda9873_checkit(struct CHIPSTATE *chip)
 #define TDA9874A_DAICONR	0x15	/* digital audio interface config */
 #define TDA9874A_I2SOSR		0x16	/* I2S-bus output select */
 #define TDA9874A_I2SOLAR	0x17	/* I2S-bus output level adj. */
-#define TDA9874A_MDACOSR	0x18	/* mono DAC output select */
-#define TDA9874A_ESP		0xFF	/* easy standard progr. */
+#define TDA9874A_MDACOSR	0x18	/* mono DAC output select (tda9874a) */
+#define TDA9874A_ESP		0xFF	/* easy standard progr. (tda9874a) */
 
-/* Subaddresses for TDA9874A (slave tx) */
+/* Subaddresses for TDA9874H and TDA9874A (slave tx) */
 #define TDA9874A_DSR		0x00	/* device status */
 #define TDA9874A_NSR		0x01	/* NICAM status */
 #define TDA9874A_NECR		0x02	/* NICAM error count */
@@ -767,37 +770,91 @@ int tda9873_checkit(struct CHIPSTATE *chip)
 
 static int tda9874a_mode = 1;		/* 0: A2, 1: NICAM */
 static int tda9874a_GCONR = 0xc0;	/* default config. input pin: SIFSEL=0 */
+static int tda9874a_NCONR = 0x01;	/* default NICAM config.: AMSEL=0,AMUTE=1 */
 static int tda9874a_ESP = 0x07;		/* default standard: NICAM D/K */
+static int tda9874a_dic = -1;		/* device id. code */
 
 /* insmod options for tda9874a */
 static int tda9874a_SIF = -1;
+static int tda9874a_AMSEL = -1;
 static int tda9874a_STD = -1;
 MODULE_PARM(tda9874a_SIF,"i");
+MODULE_PARM(tda9874a_AMSEL,"i");
 MODULE_PARM(tda9874a_STD,"i");
 
+/*
+ * initialization table for tda9874 decoder:
+ *  - carrier 1 freq. registers (3 bytes)
+ *  - carrier 2 freq. registers (3 bytes)
+ *  - demudulator config register
+ *  - FM de-emphasis register (slow identification mode)
+ * Note: frequency registers must be written in single i2c transfer.
+ */
+static struct tda9874a_MODES {
+	char *name;
+	audiocmd cmd;
+} tda9874a_modelist[9] = {
+  {	"A2, B/G",
+	{ 9, { TDA9874A_C1FRA, 0x72,0x95,0x55, 0x77,0xA0,0x00, 0x00,0x00 }} },
+  {	"A2, M (Korea)",
+	{ 9, { TDA9874A_C1FRA, 0x5D,0xC0,0x00, 0x62,0x6A,0xAA, 0x20,0x22 }} },
+  {	"A2, D/K (1)",
+	{ 9, { TDA9874A_C1FRA, 0x87,0x6A,0xAA, 0x82,0x60,0x00, 0x00,0x00 }} },
+  {	"A2, D/K (2)",
+	{ 9, { TDA9874A_C1FRA, 0x87,0x6A,0xAA, 0x8C,0x75,0x55, 0x00,0x00 }} },
+  {	"A2, D/K (3)",
+	{ 9, { TDA9874A_C1FRA, 0x87,0x6A,0xAA, 0x77,0xA0,0x00, 0x00,0x00 }} },
+  {	"NICAM, I",
+	{ 9, { TDA9874A_C1FRA, 0x7D,0x00,0x00, 0x88,0x8A,0xAA, 0x08,0x33 }} },
+  {	"NICAM, B/G",
+	{ 9, { TDA9874A_C1FRA, 0x72,0x95,0x55, 0x79,0xEA,0xAA, 0x08,0x33 }} },
+  {	"NICAM, D/K", /* default */
+	{ 9, { TDA9874A_C1FRA, 0x87,0x6A,0xAA, 0x79,0xEA,0xAA, 0x08,0x33 }} },
+  {	"NICAM, L",
+	{ 9, { TDA9874A_C1FRA, 0x87,0x6A,0xAA, 0x79,0xEA,0xAA, 0x09,0x33 }} }
+};
 
 static int tda9874a_setup(struct CHIPSTATE *chip)
 {
 	chip_write(chip, TDA9874A_AGCGR, 0x00); /* 0 dB */
 	chip_write(chip, TDA9874A_GCONR, tda9874a_GCONR);
 	chip_write(chip, TDA9874A_MSR, (tda9874a_mode) ? 0x03:0x02);
-	chip_write(chip, TDA9874A_FMMR, 0x80);
+	if(tda9874a_dic == 0x11) {
+		chip_write(chip, TDA9874A_FMMR, 0x80);
+	} else { /* dic == 0x07 */
+		chip_cmd(chip,"tda9874_modelist",&tda9874a_modelist[tda9874a_STD].cmd);
+		chip_write(chip, TDA9874A_FMMR, 0x00);
+	}
 	chip_write(chip, TDA9874A_C1OLAR, 0x00); /* 0 dB */
 	chip_write(chip, TDA9874A_C2OLAR, 0x00); /* 0 dB */
-	chip_write(chip, TDA9874A_NCONR, 0x00); /* not 0x04 as doc. table 10 says! */
+	chip_write(chip, TDA9874A_NCONR, tda9874a_NCONR);
 	chip_write(chip, TDA9874A_NOLAR, 0x00); /* 0 dB */
-	chip_write(chip, TDA9874A_AMCONR, 0xf9);
-	chip_write(chip, TDA9874A_SDACOSR, (tda9874a_mode) ? 0x81:0x80); /* 0x81 */
-	chip_write(chip, TDA9874A_AOSR, 0x80);
-	chip_write(chip, TDA9874A_MDACOSR, (tda9874a_mode) ? 0x82:0x80);
-	chip_write(chip, TDA9874A_ESP, tda9874a_ESP);
+	/* Note: If signal quality is poor you may want to change NICAM */
+	/* error limit registers (NLELR and NUELR) to some greater values. */
+	/* Then the sound would remain stereo, but won't be so clear. */
+	chip_write(chip, TDA9874A_NLELR, 0x14); /* default */
+	chip_write(chip, TDA9874A_NUELR, 0x50); /* default */
 
+	if(tda9874a_dic == 0x11) {
+		chip_write(chip, TDA9874A_AMCONR, 0xf9);
+		chip_write(chip, TDA9874A_SDACOSR, (tda9874a_mode) ? 0x81:0x80);
+		chip_write(chip, TDA9874A_AOSR, 0x80);
+		chip_write(chip, TDA9874A_MDACOSR, (tda9874a_mode) ? 0x82:0x80);
+		chip_write(chip, TDA9874A_ESP, tda9874a_ESP);
+	} else { /* dic == 0x07 */
+		chip_write(chip, TDA9874A_AMCONR, 0xfb);
+		chip_write(chip, TDA9874A_SDACOSR, (tda9874a_mode) ? 0x81:0x80);
+		chip_write(chip, TDA9874A_AOSR, 0x00); // or 0x10
+	}
+	dprintk("tda9874a_setup(): %s [0x%02X].\n",
+		tda9874a_modelist[tda9874a_STD].name,tda9874a_STD);
 	return 1;
 }
 
-int tda9874a_getmode(struct CHIPSTATE *chip)
+static int tda9874a_getmode(struct CHIPSTATE *chip)
 {
 	int dsr,nsr,mode;
+	int necr; /* just for debugging */
 
 	mode = VIDEO_SOUND_MONO;
 
@@ -805,55 +862,125 @@ int tda9874a_getmode(struct CHIPSTATE *chip)
 		return mode;
 	if(-1 == (nsr = chip_read2(chip,TDA9874A_NSR)))
 		return mode;
+	if(-1 == (necr = chip_read2(chip,TDA9874A_NECR)))
+		return mode;
+
+	/* need to store dsr/nsr somewhere */
+	chip->shadow.bytes[MAXREGS-2] = dsr;
+	chip->shadow.bytes[MAXREGS-1] = nsr;
 
 	if(tda9874a_mode) {
-		/* check also DSR.RSSF and DSR.AMSTAT bits? */
-		if(nsr & 0x02) /* NSR.S/MB */
+		/* Note: DSR.RSSF and DSR.AMSTAT bits are also checked.
+		 * If NICAM auto-muting is enabled, DSR.AMSTAT=1 indicates
+		 * that sound has (temporarily) switched from NICAM to
+		 * mono FM (or AM) on 1st sound carrier due to high NICAM bit
+		 * error count. So in fact there is no stereo in this case :-(
+		 * But changing the mode to VIDEO_SOUND_MONO would switch
+		 * external 4052 multiplexer in audio_hook().
+		 */
+#if 0
+		if((nsr & 0x02) && !(dsr & 0x10)) /* NSR.S/MB=1 and DSR.AMSTAT=0 */
 			mode |= VIDEO_SOUND_STEREO;
-		if(nsr & 0x01) /* NSR.D/SB */ 
+#else
+		if(nsr & 0x02) /* NSR.S/MB=1 */
+			mode |= VIDEO_SOUND_STEREO;
+#endif
+		if(nsr & 0x01) /* NSR.D/SB=1 */ 
 			mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
 	} else {
-		if(dsr & 0x02) /* DSR.IDSTE */
+		if(dsr & 0x02) /* DSR.IDSTE=1 */
 			mode |= VIDEO_SOUND_STEREO;
-		if(dsr & 0x04) /* DSR.IDDUA */
+		if(dsr & 0x04) /* DSR.IDDUA=1 */
 			mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
 	}
 
-	dprintk("tda9874a_getmode(): DSR=0x%X, NSR=0x%X, return: %d.\n",
-		 dsr, nsr, mode);
+	dprintk("tda9874a_getmode(): DSR=0x%X, NSR=0x%X, NECR=0x%X, return: %d.\n",
+		 dsr, nsr, necr, mode);
 	return mode;
 }
 
-void tda9874a_setmode(struct CHIPSTATE *chip, int mode)
+static void tda9874a_setmode(struct CHIPSTATE *chip, int mode)
 {
-	int aosr=0x80,mdacosr=0x82;
-
-	/* note: TDA9874A has auto-select function for audio output */
-	switch(mode) {
-	case VIDEO_SOUND_MONO:
-	case VIDEO_SOUND_STEREO:
-		break;
-	case VIDEO_SOUND_LANG1:
-		aosr = 0x80; /* dual A/A */
-		mdacosr = (tda9874a_mode) ? 0x82:0x80;
-		break;
-	case VIDEO_SOUND_LANG2:
-		aosr = 0xa0; /* dual B/B */
-		mdacosr = (tda9874a_mode) ? 0x83:0x81;
-		break;
-	default:
-		chip->mode = 0;
-		return;
+	/* Disable/enable NICAM auto-muting (based on DSR.RSSF status bit). */
+	/* If auto-muting is disabled, we can hear a signal of degrading quality. */
+	if(tda9874a_mode) {
+		if(chip->shadow.bytes[MAXREGS-2] & 0x20) /* DSR.RSSF=1 */
+			tda9874a_NCONR &= 0xfe; /* enable */
+		else
+			tda9874a_NCONR |= 0x01; /* disable */
+		chip_write(chip, TDA9874A_NCONR, tda9874a_NCONR);
 	}
 
-	chip_write(chip, TDA9874A_AOSR, aosr);
-	chip_write(chip, TDA9874A_MDACOSR, mdacosr);
+	/* Note: TDA9874A supports automatic FM dematrixing (FMMR register)
+	 * and has auto-select function for audio output (AOSR register).
+	 * Old TDA9874H doesn't support these features.
+	 * TDA9874A also has additional mono output pin (OUTM), which
+	 * on same (all?) tv-cards is not used, anyway (as well as MONOIN).
+	 */
+	if(tda9874a_dic == 0x11) {
+		int aosr = 0x80;
+		int mdacosr = (tda9874a_mode) ? 0x82:0x80;
 
-	dprintk("tda9874a_setmode(): req. mode %d; AOSR=0x%X, MDACOSR=0x%X.\n",
-		mode, aosr, mdacosr);
+		switch(mode) {
+		case VIDEO_SOUND_MONO:
+		case VIDEO_SOUND_STEREO:
+			break;
+		case VIDEO_SOUND_LANG1:
+			aosr = 0x80; /* auto-select, dual A/A */
+			mdacosr = (tda9874a_mode) ? 0x82:0x80;
+			break;
+		case VIDEO_SOUND_LANG2:
+			aosr = 0xa0; /* auto-select, dual B/B */
+			mdacosr = (tda9874a_mode) ? 0x83:0x81;
+			break;
+		default:
+			chip->mode = 0;
+			return;
+		}
+		chip_write(chip, TDA9874A_AOSR, aosr);
+		chip_write(chip, TDA9874A_MDACOSR, mdacosr);
+
+		dprintk("tda9874a_setmode(): req. mode %d; AOSR=0x%X, MDACOSR=0x%X.\n",
+			mode, aosr, mdacosr);
+
+	} else { /* dic == 0x07 */
+		int fmmr,aosr;
+
+		switch(mode) {
+		case VIDEO_SOUND_MONO:
+			fmmr = 0x00; /* mono */
+			aosr = 0x10; /* A/A */
+			break;
+		case VIDEO_SOUND_STEREO:
+			if(tda9874a_mode) {
+				fmmr = 0x00;
+				aosr = 0x00; /* handled by NICAM auto-mute */
+			} else {
+				fmmr = (tda9874a_ESP == 1) ? 0x05 : 0x04; /* stereo */
+				aosr = 0x00;
+			}
+			break;
+		case VIDEO_SOUND_LANG1:
+			fmmr = 0x02; /* dual */
+			aosr = 0x10; /* dual A/A */
+			break;
+		case VIDEO_SOUND_LANG2:
+			fmmr = 0x02; /* dual */
+			aosr = 0x20; /* dual B/B */
+			break;
+		default:
+			chip->mode = 0;
+			return;
+		}
+		chip_write(chip, TDA9874A_FMMR, fmmr);
+		chip_write(chip, TDA9874A_AOSR, aosr);
+
+		dprintk("tda9874a_setmode(): req. mode %d; FMMR=0x%X, AOSR=0x%X.\n",
+			mode, fmmr, aosr);
+	}
 }
 
-int tda9874a_checkit(struct CHIPSTATE *chip)
+static int tda9874a_checkit(struct CHIPSTATE *chip)
 {
 	int dic,sic;	/* device id. and software id. codes */
 
@@ -864,10 +991,15 @@ int tda9874a_checkit(struct CHIPSTATE *chip)
 
 	dprintk("tda9874a_checkit(): DIC=0x%X, SIC=0x%X.\n", dic, sic);
 
-	return((dic & 0xff) == 0x11);
+	if((dic == 0x11)||(dic == 0x07)) {
+		dprintk("tvaudio: found tda9874%s.\n",(dic == 0x11) ? "a (new)":"h (old)");
+		tda9874a_dic = dic;	/* remember device id. */
+		return 1;
+	}
+	return 0;	/* not found */
 }
 
-int tda9874a_initialize(struct CHIPSTATE *chip)
+static int tda9874a_initialize(struct CHIPSTATE *chip)
 {
 	if(tda9874a_SIF != -1) {
 		if(tda9874a_SIF == 1)
@@ -885,6 +1017,15 @@ int tda9874a_initialize(struct CHIPSTATE *chip)
 		} else {
 			printk(KERN_WARNING "tda9874a: STD parameter must be between 0 and 8.\n");
 		}
+	}
+
+	if(tda9874a_AMSEL != -1) {
+		if(tda9874a_AMSEL == 0)
+			tda9874a_NCONR = 0x01; /* auto-mute: analog mono input */
+		else if(tda9874a_AMSEL == 1)
+			tda9874a_NCONR = 0x05; /* auto-mute: 1st carrier FM or AM */
+		else
+			printk(KERN_WARNING "tda9874a: AMSEL parameter must be 0 or 1.\n");
 	}
 
 	tda9874a_setup(chip);
@@ -915,8 +1056,8 @@ int tda9874a_initialize(struct CHIPSTATE *chip)
 #define TEA6420_S_SE       0x04  /* stereo E */
 #define TEA6420_S_GMU      0x05  /* general mute */
 
-int tea6300_shift10(int val) { return val >> 10; }
-int tea6300_shift12(int val) { return val >> 12; }
+static int tea6300_shift10(int val) { return val >> 10; }
+static int tea6300_shift12(int val) { return val >> 12; }
 
 
 /* ---------------------------------------------------------------------- */
@@ -931,8 +1072,8 @@ int tea6300_shift12(int val) { return val >> 12; }
 #define TDA8425_S1_OFF     0xEE  /* audio off (mute on) */
 #define TDA8425_S1_ON      0xCE  /* audio on (mute off) - "linear stereo" mode */
 
-int tda8425_shift10(int val) { return val >> 10 | 0xc0; }
-int tda8425_shift12(int val) { return val >> 12 | 0xf0; }
+static int tda8425_shift10(int val) { return val >> 10 | 0xc0; }
+static int tda8425_shift12(int val) { return val >> 12 | 0xf0; }
 
 
 /* ---------------------------------------------------------------------- */
@@ -1015,13 +1156,13 @@ static struct CHIPDESC chiplist[] = {
 		
 	},
 	{
-		name:       "tda9874a",
-		id:         I2C_DRIVERID_TDA9874A,
+		name:       "tda9874h/a",
+		id:         I2C_DRIVERID_TDA9874,
 		checkit:    tda9874a_checkit,
 		initialize: tda9874a_initialize,
 		insmodopt:  &tda9874a,
-		addr_lo:    I2C_TDA9874A >> 1,
-		addr_hi:    I2C_TDA9874A >> 1,
+		addr_lo:    I2C_TDA9874 >> 1,
+		addr_hi:    I2C_TDA9874 >> 1,
 
 		getmode:    tda9874a_getmode,
 		setmode:    tda9874a_setmode,
@@ -1160,7 +1301,7 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 	chip->c.data = chip;
 
 	/* find description for the chip */
-	dprintk("tvaudio: chip @ addr=0x%x\n", addr<<1);
+	dprintk("tvaudio: chip found @ i2c-addr=0x%x\n", addr<<1);
 	for (desc = chiplist; desc->name != NULL; desc++) {
 		if (0 == *(desc->insmodopt))
 			continue;
@@ -1175,7 +1316,8 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 		dprintk("tvaudio: no matching chip description found\n");
 		return -EIO;
 	}
-	dprintk("tvaudio: %s matches:%s%s%s\n",desc->name,
+	printk("tvaudio: found %s\n",desc->name);
+	dprintk("tvaudio: matches:%s%s%s.\n",
 		(desc->flags & CHIP_HAS_VOLUME)     ? " volume"      : "",
 		(desc->flags & CHIP_HAS_BASSTREBLE) ? " bass/treble" : "",
 		(desc->flags & CHIP_HAS_INPUTSEL)   ? " audiomux"    : "");
@@ -1272,6 +1414,14 @@ static int chip_command(struct i2c_client *client,
 				chip_write_masked(chip,desc->inputreg,desc->inputmap[*sarg],desc->inputmask);
 		}
 		break;
+
+	case AUDC_SET_RADIO:
+		dprintk(KERN_DEBUG "tvaudio: AUDC_SET_RADIO\n");
+		chip->norm = VIDEO_MODE_RADIO;
+		chip->watch_stereo = 0;
+		/* del_timer(&chip->wt); */
+		break;
+
 	/* --- v4l ioctls --- */
 	/* take care: bttv does userspace copying, we'll get a
 	   kernel pointer here... */
@@ -1290,10 +1440,12 @@ static int chip_command(struct i2c_client *client,
 			va->bass   = chip->bass;
 			va->treble = chip->treble;
 		}
-		if (desc->getmode)
-			va->mode = desc->getmode(chip);
-		else
-			va->mode = VIDEO_SOUND_MONO;
+		if (chip->norm != VIDEO_MODE_RADIO) {
+			if (desc->getmode)
+				va->mode = desc->getmode(chip);
+			else
+				va->mode = VIDEO_SOUND_MONO;
+		}
 		break;
 	}
 
@@ -1316,9 +1468,19 @@ static int chip_command(struct i2c_client *client,
 			chip_write(chip,desc->treblereg,desc->treblefunc(chip->treble));
 		}
 		if (desc->setmode && va->mode) {
+			chip->watch_stereo = 0;
+			/* del_timer(&chip->wt); */
 			chip->mode = va->mode;
 			desc->setmode(chip,va->mode);
 		}
+		break;
+	}
+	case VIDIOCSCHAN:
+	{
+		struct video_channel *vc = arg;
+		
+		dprintk(KERN_DEBUG "tvaudio: VIDIOCSCHAN\n");
+		chip->norm = vc->norm;
 		break;
 	}
 	case VIDIOCSFREQ:
@@ -1339,7 +1501,7 @@ static int chip_command(struct i2c_client *client,
 
 static struct i2c_driver driver = {
         name:            "generic i2c audio driver",
-        id:              I2C_DRIVERID_TVAUDIO, /* FIXME */
+        id:              I2C_DRIVERID_TVAUDIO,
         flags:           I2C_DF_NOTIFY,
         attach_adapter:  chip_probe,
         detach_client:   chip_detach,
@@ -1349,10 +1511,11 @@ static struct i2c_driver driver = {
 static struct i2c_client client_template =
 {
         name:   "(unset)",
+	flags:  I2C_CLIENT_ALLOW_USE,
         driver: &driver,
 };
 
-int audiochip_init_module(void)
+static int audiochip_init_module(void)
 {
 	struct CHIPDESC  *desc;
 	printk(KERN_INFO "tvaudio: TV audio decoder + audio/video mux driver\n");
@@ -1364,7 +1527,7 @@ int audiochip_init_module(void)
 	return 0;
 }
 
-void audiochip_cleanup_module(void)
+static void audiochip_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }

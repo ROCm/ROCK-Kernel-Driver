@@ -38,6 +38,7 @@ void
 affs_read_inode(struct inode *inode)
 {
 	struct super_block	*sb = inode->i_sb;
+	struct affs_sb_info	*sbi = AFFS_SB(sb);
 	struct buffer_head	*bh;
 	struct affs_head	*head;
 	struct affs_tail	*tail;
@@ -83,35 +84,35 @@ affs_read_inode(struct inode *inode)
 	AFFS_I(inode)->i_lastalloc = 0;
 	AFFS_I(inode)->i_pa_cnt = 0;
 
-	if (AFFS_SB->s_flags & SF_SETMODE)
-		inode->i_mode = AFFS_SB->s_mode;
+	if (sbi->s_flags & SF_SETMODE)
+		inode->i_mode = sbi->s_mode;
 	else
 		inode->i_mode = prot_to_mode(prot);
 
 	id = be16_to_cpu(tail->uid);
-	if (id == 0 || AFFS_SB->s_flags & SF_SETUID)
-		inode->i_uid = AFFS_SB->s_uid;
-	else if (id == 0xFFFF && AFFS_SB->s_flags & SF_MUFS)
+	if (id == 0 || sbi->s_flags & SF_SETUID)
+		inode->i_uid = sbi->s_uid;
+	else if (id == 0xFFFF && sbi->s_flags & SF_MUFS)
 		inode->i_uid = 0;
 	else
 		inode->i_uid = id;
 
 	id = be16_to_cpu(tail->gid);
-	if (id == 0 || AFFS_SB->s_flags & SF_SETGID)
-		inode->i_gid = AFFS_SB->s_gid;
-	else if (id == 0xFFFF && AFFS_SB->s_flags & SF_MUFS)
+	if (id == 0 || sbi->s_flags & SF_SETGID)
+		inode->i_gid = sbi->s_gid;
+	else if (id == 0xFFFF && sbi->s_flags & SF_MUFS)
 		inode->i_gid = 0;
 	else
 		inode->i_gid = id;
 
 	switch (be32_to_cpu(tail->stype)) {
 	case ST_ROOT:
-		inode->i_uid = AFFS_SB->s_uid;
-		inode->i_gid = AFFS_SB->s_gid;
+		inode->i_uid = sbi->s_uid;
+		inode->i_gid = sbi->s_gid;
 		/* fall through */
 	case ST_USERDIR:
 		if (be32_to_cpu(tail->stype) == ST_USERDIR ||
-		    AFFS_SB->s_flags & SF_SETMODE) {
+		    sbi->s_flags & SF_SETMODE) {
 			if (inode->i_mode & S_IRUSR)
 				inode->i_mode |= S_IXUSR;
 			if (inode->i_mode & S_IRGRP)
@@ -147,13 +148,13 @@ affs_read_inode(struct inode *inode)
 		AFFS_I(inode)->mmu_private = inode->i_size = size;
 		if (inode->i_size) {
 			AFFS_I(inode)->i_blkcnt = (size - 1) /
-					       AFFS_SB->s_data_blksize + 1;
+					       sbi->s_data_blksize + 1;
 			AFFS_I(inode)->i_extcnt = (AFFS_I(inode)->i_blkcnt - 1) /
-					       AFFS_SB->s_hashsize + 1;
+					       sbi->s_hashsize + 1;
 		}
 		if (tail->link_chain)
 			inode->i_nlink = 2;
-		inode->i_mapping->a_ops = (AFFS_SB->s_flags & SF_OFS) ? &affs_aops_ofs : &affs_aops;
+		inode->i_mapping->a_ops = (sbi->s_flags & SF_OFS) ? &affs_aops_ofs : &affs_aops;
 		inode->i_op = &affs_file_inode_operations;
 		inode->i_fop = &affs_file_operations;
 		break;
@@ -207,18 +208,18 @@ affs_write_inode(struct inode *inode, int unused)
 		tail->protect = cpu_to_be32(AFFS_I(inode)->i_protect);
 		tail->size = cpu_to_be32(inode->i_size);
 		secs_to_datestamp(inode->i_mtime,&tail->change);
-		if (!(inode->i_ino == AFFS_SB->s_root_block)) {
+		if (!(inode->i_ino == AFFS_SB(sb)->s_root_block)) {
 			uid = inode->i_uid;
 			gid = inode->i_gid;
-			if (sb->u.affs_sb.s_flags & SF_MUFS) {
+			if (AFFS_SB(sb)->s_flags & SF_MUFS) {
 				if (inode->i_uid == 0 || inode->i_uid == 0xFFFF)
 					uid = inode->i_uid ^ ~0;
 				if (inode->i_gid == 0 || inode->i_gid == 0xFFFF)
 					gid = inode->i_gid ^ ~0;
 			}
-			if (!(sb->u.affs_sb.s_flags & SF_SETUID))
+			if (!(AFFS_SB(sb)->s_flags & SF_SETUID))
 				tail->uid = cpu_to_be16(uid);
-			if (!(sb->u.affs_sb.s_flags & SF_SETGID))
+			if (!(AFFS_SB(sb)->s_flags & SF_SETGID))
 				tail->gid = cpu_to_be16(gid);
 		}
 	}
@@ -240,11 +241,11 @@ affs_notify_change(struct dentry *dentry, struct iattr *attr)
 	if (error)
 		goto out;
 
-	if (((attr->ia_valid & ATTR_UID) && (inode->i_sb->u.affs_sb.s_flags & SF_SETUID)) ||
-	    ((attr->ia_valid & ATTR_GID) && (inode->i_sb->u.affs_sb.s_flags & SF_SETGID)) ||
+	if (((attr->ia_valid & ATTR_UID) && (AFFS_SB(inode->i_sb)->s_flags & SF_SETUID)) ||
+	    ((attr->ia_valid & ATTR_GID) && (AFFS_SB(inode->i_sb)->s_flags & SF_SETGID)) ||
 	    ((attr->ia_valid & ATTR_MODE) &&
-	     (inode->i_sb->u.affs_sb.s_flags & (SF_SETMODE | SF_IMMUTABLE)))) {
-		if (!(inode->i_sb->u.affs_sb.s_flags & SF_QUIET))
+	     (AFFS_SB(inode->i_sb)->s_flags & (SF_SETMODE | SF_IMMUTABLE)))) {
+		if (!(AFFS_SB(inode->i_sb)->s_flags & SF_QUIET))
 			error = -EPERM;
 		goto out;
 	}

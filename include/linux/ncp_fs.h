@@ -13,6 +13,7 @@
 #include <linux/types.h>
 
 #include <linux/ncp_fs_i.h>
+#include <linux/ncp_fs_sb.h>
 #include <linux/ipx.h>
 #include <linux/ncp_no.h>
 
@@ -190,7 +191,10 @@ struct ncp_entry_info {
 #define NCP_SUPER_MAGIC  0x564c
 
 
-#define NCP_SBP(sb)		(&((sb)->u.ncpfs_sb))
+static inline struct ncp_server *NCP_SBP(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 #define NCP_SERVER(inode)	NCP_SBP((inode)->i_sb)
 static inline struct ncp_inode_info *NCP_FINFO(struct inode *inode)

@@ -53,10 +53,11 @@
     active_mm:		&init_mm,					\
     run_list:		LIST_HEAD_INIT(tsk.run_list),			\
     time_slice:		HZ,						\
-    next_task:		&tsk,						\
-    prev_task:		&tsk,						\
-    p_opptr:		&tsk,						\
-    p_pptr:		&tsk,						\
+    tasks:		LIST_HEAD_INIT(tsk.tasks),			\
+    real_parent:	&tsk,						\
+    parent:		&tsk,						\
+    children:		LIST_HEAD_INIT(tsk.children),			\
+    sibling:		LIST_HEAD_INIT(tsk.sibling),			\
     thread_group:	LIST_HEAD_INIT(tsk.thread_group),		\
     wait_chldexit:	__WAIT_QUEUE_HEAD_INITIALIZER(tsk.wait_chldexit),\
     real_timer:		{						\

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 22 $
+ *              $Revision: 35 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "achware.h"
 
 #define _COMPONENT          ACPI_HARDWARE
-	 MODULE_NAME         ("hwsleep")
+	 ACPI_MODULE_NAME    ("hwsleep")
 
 
 /******************************************************************************
@@ -39,7 +39,7 @@
  * PARAMETERS:  Physical_address    - Physical address of ACPI real mode
  *                                    entry point.
  *
- * RETURN:      AE_OK or AE_ERROR
+ * RETURN:      Status
  *
  * DESCRIPTION: Access function for d_firmware_waking_vector field in FACS
  *
@@ -50,22 +50,16 @@ acpi_set_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS physical_address)
 {
 
-	FUNCTION_TRACE ("Acpi_set_firmware_waking_vector");
+	ACPI_FUNCTION_TRACE ("Acpi_set_firmware_waking_vector");
 
-
-	/* Make sure that we have an FACS */
-
-	if (!acpi_gbl_FACS) {
-		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
-	}
 
 	/* Set the vector */
 
-	if (acpi_gbl_FACS->vector_width == 32) {
-		* (u32 *) acpi_gbl_FACS->firmware_waking_vector = (u32) physical_address;
+	if (acpi_gbl_common_fACS.vector_width == 32) {
+		*(u32 *) acpi_gbl_common_fACS.firmware_waking_vector = (u32) physical_address;
 	}
 	else {
-		*acpi_gbl_FACS->firmware_waking_vector = physical_address;
+		*acpi_gbl_common_fACS.firmware_waking_vector = physical_address;
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -82,7 +76,7 @@ acpi_set_firmware_waking_vector (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Access function for d_firmware_waking_vector field in FACS
+ * DESCRIPTION: Access function for Firmware_waking_vector field in FACS
  *
  ******************************************************************************/
 
@@ -91,30 +85,85 @@ acpi_get_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS *physical_address)
 {
 
-	FUNCTION_TRACE ("Acpi_get_firmware_waking_vector");
+	ACPI_FUNCTION_TRACE ("Acpi_get_firmware_waking_vector");
 
 
 	if (!physical_address) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/* Make sure that we have an FACS */
-
-	if (!acpi_gbl_FACS) {
-		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
-	}
-
 	/* Get the vector */
 
-	if (acpi_gbl_FACS->vector_width == 32) {
-		*physical_address = * (u32 *) acpi_gbl_FACS->firmware_waking_vector;
+	if (acpi_gbl_common_fACS.vector_width == 32) {
+		*physical_address = *(u32 *) acpi_gbl_common_fACS.firmware_waking_vector;
 	}
 	else {
-		*physical_address = *acpi_gbl_FACS->firmware_waking_vector;
+		*physical_address = *acpi_gbl_common_fACS.firmware_waking_vector;
 	}
 
 	return_ACPI_STATUS (AE_OK);
 }
+
+
+/******************************************************************************
+ *
+ * FUNCTION:    Acpi_enter_sleep_state_prep
+ *
+ * PARAMETERS:  Sleep_state         - Which sleep state to enter
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Prepare to enter a system sleep state (see ACPI 2.0 spec p 231)
+ *              This function must execute with interrupts enabled.
+ *              We break sleeping into 2 stages so that OSPM can handle
+ *              various OS-specific tasks between the two steps.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_enter_sleep_state_prep (
+	u8                  sleep_state)
+{
+	acpi_status         status;
+	acpi_object_list    arg_list;
+	acpi_object         arg;
+
+
+	ACPI_FUNCTION_TRACE ("Acpi_enter_sleep_state_prep");
+
+
+	/*
+	 * _PSW methods could be run here to enable wake-on keyboard, LAN, etc.
+	 */
+	status = acpi_hw_get_sleep_type_data (sleep_state,
+			  &acpi_gbl_sleep_type_a, &acpi_gbl_sleep_type_b);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Setup parameter object */
+
+	arg_list.count = 1;
+	arg_list.pointer = &arg;
+
+	arg.type = ACPI_TYPE_INTEGER;
+	arg.integer.value = sleep_state;
+
+	/* Run the _PTS and _GTS methods */
+
+	status = acpi_evaluate_object (NULL, "\\_PTS", &arg_list, NULL);
+	if (ACPI_FAILURE (status) && status != AE_NOT_FOUND) {
+		return_ACPI_STATUS (status);
+	}
+
+	status = acpi_evaluate_object (NULL, "\\_GTS", &arg_list, NULL);
+	if (ACPI_FAILURE (status) && status != AE_NOT_FOUND) {
+		return_ACPI_STATUS (status);
+	}
+
+	return_ACPI_STATUS (AE_OK);
+}
+
 
 /******************************************************************************
  *
@@ -125,107 +174,88 @@ acpi_get_firmware_waking_vector (
  * RETURN:      Status
  *
  * DESCRIPTION: Enter a system sleep state (see ACPI 2.0 spec p 231)
+ *              THIS FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
  *
  ******************************************************************************/
 
 acpi_status
 acpi_enter_sleep_state (
-	u8                  sleep_state)
+	u8                      sleep_state)
 {
-	acpi_status         status;
-	acpi_object_list    arg_list;
-	acpi_object         arg;
-	u8                  type_a;
-	u8                  type_b;
-	u16                 PM1Acontrol;
-	u16                 PM1Bcontrol;
+	u16                     PM1Acontrol;
+	u16                     PM1Bcontrol;
+	ACPI_BIT_REGISTER_INFO  *sleep_type_reg_info;
+	ACPI_BIT_REGISTER_INFO  *sleep_enable_reg_info;
 
 
-	FUNCTION_TRACE ("Acpi_enter_sleep_state");
+	ACPI_FUNCTION_TRACE ("Acpi_enter_sleep_state");
 
 
-	/*
-	 * _PSW methods could be run here to enable wake-on keyboard, LAN, etc.
-	 */
-	status = acpi_hw_obtain_sleep_type_register_data (sleep_state, &type_a, &type_b);
-	if (!ACPI_SUCCESS (status)) {
-		return status;
+	if ((acpi_gbl_sleep_type_a > ACPI_SLEEP_TYPE_MAX) ||
+		(acpi_gbl_sleep_type_b > ACPI_SLEEP_TYPE_MAX)) {
+		ACPI_REPORT_ERROR (("Sleep values out of range: A=%x B=%x\n",
+			acpi_gbl_sleep_type_a, acpi_gbl_sleep_type_b));
+		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 	}
 
-	/* run the _PTS and _GTS methods */
 
-	MEMSET(&arg_list, 0, sizeof(arg_list));
-	arg_list.count = 1;
-	arg_list.pointer = &arg;
+	sleep_type_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_TYPE_A);
+	sleep_enable_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_ENABLE);
 
-	MEMSET(&arg, 0, sizeof(arg));
-	arg.type = ACPI_TYPE_INTEGER;
-	arg.integer.value = sleep_state;
+	/* Clear wake status */
 
-	acpi_evaluate_object (NULL, "\\_PTS", &arg_list, NULL);
-	acpi_evaluate_object (NULL, "\\_GTS", &arg_list, NULL);
+	acpi_hw_bit_register_write (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_LOCK);
+	acpi_hw_clear_acpi_status();
 
-	/* clear wake status */
-
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, WAK_STS, 1);
-
-	disable ();
+	/* TBD: Disable arbitration here? */
 
 	acpi_hw_disable_non_wakeup_gpes();
 
-	PM1Acontrol = (u16) acpi_hw_register_read (ACPI_MTX_LOCK, PM1_CONTROL);
+	/* Get current value of PM1A control */
 
+	PM1Acontrol = (u16) acpi_hw_register_read (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL);
 	ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Entering S%d\n", sleep_state));
 
-	/* mask off SLP_EN and SLP_TYP fields */
+	/* Clear SLP_EN and SLP_TYP fields */
 
-	PM1Acontrol &= ~(SLP_TYPE_X_MASK | SLP_EN_MASK);
+	PM1Acontrol &= ~(sleep_type_reg_info->access_bit_mask | sleep_enable_reg_info->access_bit_mask);
 	PM1Bcontrol = PM1Acontrol;
 
-	/* mask in SLP_TYP */
+	/* Insert SLP_TYP bits */
 
-	PM1Acontrol |= (type_a << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
-	PM1Bcontrol |= (type_b << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
+	PM1Acontrol |= (acpi_gbl_sleep_type_a << sleep_type_reg_info->bit_position);
+	PM1Bcontrol |= (acpi_gbl_sleep_type_b << sleep_type_reg_info->bit_position);
 
-	/* write #1: fill in SLP_TYP data */
+	/* Write #1: fill in SLP_TYP data */
 
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1A_CONTROL, PM1Acontrol);
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1B_CONTROL, PM1Bcontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
 
-	/* mask in SLP_EN */
+	/* Insert SLP_ENABLE bit */
 
-	PM1Acontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
-	PM1Bcontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
+	PM1Acontrol |= sleep_enable_reg_info->access_bit_mask;
+	PM1Bcontrol |= sleep_enable_reg_info->access_bit_mask;
 
-	/* flush caches */
+	/* Write #2: SLP_TYP + SLP_EN */
 
-	wbinvd();
-
-	/* write #2: SLP_TYP + SLP_EN */
-
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1A_CONTROL, PM1Acontrol);
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1B_CONTROL, PM1Bcontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
 
 	/*
 	 * Wait a second, then try again. This is to get S4/5 to work on all machines.
 	 */
 	if (sleep_state > ACPI_STATE_S3) {
-		acpi_os_stall(1000000);
+		acpi_os_stall (1000000);
 
-		acpi_hw_register_write (ACPI_MTX_LOCK, PM1_CONTROL,
-			(1 << acpi_hw_get_bit_shift (SLP_EN_MASK)));
+		acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL,
+				sleep_enable_reg_info->access_bit_mask);
 	}
 
-	/* wait until we enter sleep state */
+	/* Wait until we enter sleep state */
 
-	do {
-		acpi_os_stall(10000);
+	while (!acpi_hw_bit_register_read (ACPI_BITREG_WAKE_STATUS, ACPI_MTX_LOCK)) {
+		/* Spin until we wake */
 	}
-	while (!acpi_hw_register_bit_access (ACPI_READ, ACPI_MTX_LOCK, WAK_STS));
-
-	acpi_hw_enable_non_wakeup_gpes();
-
-	enable ();
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -248,21 +278,35 @@ acpi_leave_sleep_state (
 {
 	acpi_object_list    arg_list;
 	acpi_object         arg;
+	acpi_status         status;
 
 
-	FUNCTION_TRACE ("Acpi_leave_sleep_state");
+	ACPI_FUNCTION_TRACE ("Acpi_leave_sleep_state");
 
 
-	MEMSET (&arg_list, 0, sizeof(arg_list));
+	/* Ensure Enter_sleep_state_prep -> Enter_sleep_state ordering */
+
+	acpi_gbl_sleep_type_a = ACPI_SLEEP_TYPE_INVALID;
+
+	/* Setup parameter object */
+
 	arg_list.count = 1;
 	arg_list.pointer = &arg;
 
-	MEMSET (&arg, 0, sizeof(arg));
 	arg.type = ACPI_TYPE_INTEGER;
 	arg.integer.value = sleep_state;
 
-	acpi_evaluate_object (NULL, "\\_BFS", &arg_list, NULL);
-	acpi_evaluate_object (NULL, "\\_WAK", &arg_list, NULL);
+	/* Ignore any errors from these methods */
+
+	status = acpi_evaluate_object (NULL, "\\_BFS", &arg_list, NULL);
+	if (ACPI_FAILURE (status) && status != AE_NOT_FOUND) {
+		ACPI_REPORT_ERROR (("Method _BFS failed, %s\n", acpi_format_exception (status)));
+	}
+
+	status = acpi_evaluate_object (NULL, "\\_WAK", &arg_list, NULL);
+	if (ACPI_FAILURE (status) && status != AE_NOT_FOUND) {
+		ACPI_REPORT_ERROR (("Method _WAK failed, %s\n", acpi_format_exception (status)));
+	}
 
 	/* _WAK returns stuff - do we want to look at it? */
 

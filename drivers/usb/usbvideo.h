@@ -347,15 +347,14 @@ void usbvideo_Deregister(usbvideo_t **uvt);
 void usbvideo_Disconnect(struct usb_device *dev, void *ptr);
 void usbvideo_CameraRelease(uvd_t *uvd);
 
-void usbvideo_v4l_close(struct video_device *dev);
+int usbvideo_v4l_close(struct inode *inode, struct file *file);
 int usbvideo_v4l_initialize(struct video_device *dev);
-int usbvideo_v4l_ioctl(struct video_device *dev, unsigned int cmd, void *arg);
-int usbvideo_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size);
-int usbvideo_v4l_open(struct video_device *dev, int flags);
-long usbvideo_v4l_read(struct video_device *dev, char *buf,
-			unsigned long count, int noblock);
-long usbvideo_v4l_write(struct video_device *dev, const char *buf,
-			unsigned long count, int noblock);
+int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
+		       unsigned int ioctlnr, void *arg);
+int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma);
+int usbvideo_v4l_open(struct inode *inode, struct file *file);
+int usbvideo_v4l_read(struct file *file, char *buf,
+		      size_t count, loff_t *ppos);
 
 int usbvideo_GetFrame(uvd_t *uvd, int frameNum);
 int usbvideo_NewFrame(uvd_t *uvd, int framenum);

@@ -1073,7 +1073,7 @@ static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
 		if (fat_get_entry(dir, &offset, &bh, &de, &ino) < 0)
 			continue;
 		de->name[0] = DELETED_FLAG;
-		de->attr = 0;
+		de->attr = ATTR_NONE;
 		fat_mark_buffer_dirty(sb, bh);
 	}
 	if (bh) fat_brelse(sb, bh);
@@ -1285,25 +1285,25 @@ struct inode_operations vfat_dir_inode_operations = {
 
 int vfat_fill_super(struct super_block *sb, void *data, int silent)
 {
-	struct super_block *res;
+	int res;
+	struct msdos_sb_info *sbi;
   
-	MSDOS_SB(sb)->options.isvfat = 1;
-	res = fat_read_super(sb, data, silent, &vfat_dir_inode_operations);
-	if (IS_ERR(res))
-		return PTR_ERR(res);
-	if (res == NULL) {
-		if (!silent)
+	res = fat_fill_super(sb, data, silent, &vfat_dir_inode_operations, 1);
+	if (res) {
+		if (res == -EINVAL && !silent)
 			printk(KERN_INFO "VFS: Can't find a valid"
 			       " VFAT filesystem on dev %s.\n", sb->s_id);
-		return -EINVAL;
+		return res;
 	}
 
-	if (parse_options((char *) data, &(MSDOS_SB(sb)->options))) {
-		MSDOS_SB(sb)->options.dotsOK = 0;
-		if (MSDOS_SB(sb)->options.posixfs) {
-			MSDOS_SB(sb)->options.name_check = 's';
+	sbi = MSDOS_SB(sb);
+
+	if (parse_options((char *) data, &(sbi->options))) {
+		sbi->options.dotsOK = 0;
+		if (sbi->options.posixfs) {
+			sbi->options.name_check = 's';
 		}
-		if (MSDOS_SB(sb)->options.name_check != 's') {
+		if (sbi->options.name_check != 's') {
 			sb->s_root->d_op = &vfat_dentry_ops[0];
 		} else {
 			sb->s_root->d_op = &vfat_dentry_ops[2];

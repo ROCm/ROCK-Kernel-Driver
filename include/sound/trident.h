@@ -161,6 +161,12 @@ enum miscint_bits {
 #define NX_SPESO                    0x2c
 #define NX_SPCSTATUS                0x64
 
+/* Joystick */
+#define GAMEPORT_GCR                0x30
+#define GAMEPORT_MODE_ADC           0x80
+#define GAMEPORT_LEGACY             0x31
+#define GAMEPORT_AXES               0x34
+
 /* NX Specific Registers */
 #define NX_TLBC                     0x6c
 
@@ -437,6 +443,8 @@ struct _snd_trident {
 
 	spinlock_t reg_lock;
 	snd_info_entry_t *proc_entry;
+
+	struct snd_trident_gameport *gameport;
 };
 
 int snd_trident_create(snd_card_t * card,
@@ -446,6 +454,7 @@ int snd_trident_create(snd_card_t * card,
 		       int max_wavetable_size,
 		       trident_t ** rtrident);
 int snd_trident_free(trident_t *trident);
+void snd_trident_gameport(trident_t *trident);
 
 int snd_trident_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);
 int snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);

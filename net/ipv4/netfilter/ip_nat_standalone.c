@@ -42,7 +42,8 @@
 #define HOOKNAME(hooknum) ((hooknum) == NF_IP_POST_ROUTING ? "POST_ROUTING"  \
 			   : ((hooknum) == NF_IP_PRE_ROUTING ? "PRE_ROUTING" \
 			      : ((hooknum) == NF_IP_LOCAL_OUT ? "LOCAL_OUT"  \
-				 : "*ERROR*")))
+			         : ((hooknum) == NF_IP_LOCAL_IN ? "LOCAL_IN"  \
+				    : "*ERROR*")))
 
 static unsigned int
 ip_nat_fn(unsigned int hooknum,
@@ -95,6 +96,12 @@ ip_nat_fn(unsigned int hooknum,
 		}
 		/* Fall thru... (Only ICMPs can be IP_CT_IS_REPLY) */
 	case IP_CT_NEW:
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+		/* LOCAL_IN hook doesn't have a chain and thus doesn't care
+		 * about new packets -HW */
+		if (hooknum == NF_IP_LOCAL_IN)
+			return NF_ACCEPT;
+#endif
 		info = &ct->nat.info;
 
 		WRITE_LOCK(&ip_nat_lock);
@@ -205,6 +212,11 @@ static struct nf_hook_ops ip_nat_out_ops
 static struct nf_hook_ops ip_nat_local_out_ops
 = { { NULL, NULL }, ip_nat_local_fn, PF_INET, NF_IP_LOCAL_OUT, NF_IP_PRI_NAT_DST };
 
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+static struct nf_hook_ops ip_nat_local_in_ops
+= { { NULL, NULL }, ip_nat_fn, PF_INET, NF_IP_LOCAL_IN, NF_IP_PRI_NAT_SRC };
+#endif
+
 /* Protocol registration. */
 int ip_nat_protocol_register(struct ip_nat_protocol *proto)
 {
@@ -273,6 +285,13 @@ static int init_or_cleanup(int init)
 		printk("ip_nat_init: can't register local out hook.\n");
 		goto cleanup_outops;
 	}
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+	ret = nf_register_hook(&ip_nat_local_in_ops);
+	if (ret < 0) {
+		printk("ip_nat_init: can't register local in hook.\n");
+		goto cleanup_localoutops;
+	}
+#endif
 	if (ip_conntrack_module)
 		__MOD_INC_USE_COUNT(ip_conntrack_module);
 	return ret;
@@ -280,6 +299,10 @@ static int init_or_cleanup(int init)
  cleanup:
 	if (ip_conntrack_module)
 		__MOD_DEC_USE_COUNT(ip_conntrack_module);
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+	nf_unregister_hook(&ip_nat_local_in_ops);
+ cleanup_localoutops:
+#endif
 	nf_unregister_hook(&ip_nat_local_out_ops);
  cleanup_outops:
 	nf_unregister_hook(&ip_nat_out_ops);

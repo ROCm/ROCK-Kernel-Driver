@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acgcc.h - GCC specific defines, etc.
- *       $Revision: 14 $
+ *       $Revision: 19 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,14 +31,31 @@
 #define _IA64
 
 #define COMPILER_DEPENDENT_UINT64   unsigned long
+
+/*
+ * Calling conventions:
+ *
+ * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+ * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+ * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+ * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+ */
+#define ACPI_SYSTEM_XFACE
+#define ACPI_EXTERNAL_XFACE
+#define ACPI_INTERNAL_XFACE
+#define ACPI_INTERNAL_VAR_XFACE
+
 /* Single threaded */
+
 #define ACPI_APPLICATION
+
+/* Asm macros */
 
 #define ACPI_ASM_MACROS
 #define causeinterrupt(level)
 #define BREAKPOINT3
-#define disable() __cli()
-#define enable()  __sti()
+#define acpi_disable_irqs() __cli()
+#define acpi_enable_irqs()  __sti()
 
 /*! [Begin] no source code translation */
 
@@ -95,11 +112,27 @@
 #else /* DO IA32 */
 
 #define COMPILER_DEPENDENT_UINT64   unsigned long long
+
+/*
+ * Calling conventions:
+ *
+ * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+ * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+ * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+ * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+ */
+#define ACPI_SYSTEM_XFACE
+#define ACPI_EXTERNAL_XFACE
+#define ACPI_INTERNAL_XFACE
+#define ACPI_INTERNAL_VAR_XFACE
+
+/* Asm macros */
+
 #define ACPI_ASM_MACROS
 #define causeinterrupt(level)
 #define BREAKPOINT3
-#define disable() __cli()
-#define enable()  __sti()
+#define acpi_disable_irqs() __cli()
+#define acpi_enable_irqs()  __sti()
 #define halt()    __asm__ __volatile__ ("sti; hlt":::"memory")
 
 /*! [Begin] no source code translation
@@ -152,9 +185,9 @@
 
 #define ACPI_SHIFT_RIGHT_64(n_hi, n_lo) \
 	asm("shrl   $1,%2;"             \
-	    "rcrl   $1,%3;"             \
-	    :"=r"(n_hi), "=r"(n_lo)     \
-	    :"0"(n_hi), "1"(n_lo))
+		"rcrl   $1,%3;"             \
+		:"=r"(n_hi), "=r"(n_lo)     \
+		:"0"(n_hi), "1"(n_lo))
 
 /*! [End] no source code translation !*/
 

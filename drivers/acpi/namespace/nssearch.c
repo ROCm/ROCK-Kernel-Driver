@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 75 $
+ *              $Revision: 83 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nssearch")
+	 ACPI_MODULE_NAME    ("nssearch")
 
 
 /*******************************************************************************
@@ -64,29 +64,28 @@ acpi_status
 acpi_ns_search_node (
 	u32                     target_name,
 	acpi_namespace_node     *node,
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	acpi_namespace_node     **return_node)
 {
 	acpi_namespace_node     *next_node;
 
 
-	FUNCTION_TRACE ("Ns_search_node");
+	ACPI_FUNCTION_TRACE ("Ns_search_node");
 
 
 #ifdef ACPI_DEBUG
 	if (ACPI_LV_NAMES & acpi_dbg_level) {
 		NATIVE_CHAR         *scope_name;
 
-		scope_name = acpi_ns_get_table_pathname (node);
+		scope_name = acpi_ns_get_external_pathname (node);
 		if (scope_name) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s [%p] For %4.4s (type %X)\n",
-				scope_name, node, (char*)&target_name, type));
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s [%p] For %4.4s (type %s)\n",
+				scope_name, node, (char *) &target_name, acpi_ut_get_type_name (type)));
 
 			ACPI_MEM_FREE (scope_name);
 		}
 	}
 #endif
-
 
 	/*
 	 * Search for name in this table, which is to say that we must search
@@ -123,13 +122,12 @@ acpi_ns_search_node (
 			}
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Name %4.4s (actual type %X) found at %p\n",
-				(char*)&target_name, next_node->type, next_node));
+				"Name %4.4s Type [%s] found at %p\n",
+				(char *) &target_name, acpi_ut_get_type_name (next_node->type), next_node));
 
 			*return_node = next_node;
 			return_ACPI_STATUS (AE_OK);
 		}
-
 
 		/*
 		 * The last entry in the list points back to the parent,
@@ -146,11 +144,10 @@ acpi_ns_search_node (
 		next_node = next_node->peer;
 	}
 
-
 	/* Searched entire table, not found */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Name %4.4s (type %X) not found at %p\n",
-		(char*)&target_name, type, next_node));
+		(char *) &target_name, type, next_node));
 
 	return_ACPI_STATUS (AE_NOT_FOUND);
 }
@@ -185,17 +182,17 @@ static acpi_status
 acpi_ns_search_parent_tree (
 	u32                     target_name,
 	acpi_namespace_node     *node,
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	acpi_namespace_node     **return_node)
 {
 	acpi_status             status;
 	acpi_namespace_node     *parent_node;
 
 
-	FUNCTION_TRACE ("Ns_search_parent_tree");
+	ACPI_FUNCTION_TRACE ("Ns_search_parent_tree");
 
 
-	parent_node = acpi_ns_get_parent_object (node);
+	parent_node = acpi_ns_get_parent_node (node);
 
 	/*
 	 * If there is no parent (at the root) or type is "local", we won't be
@@ -205,33 +202,33 @@ acpi_ns_search_parent_tree (
 		(!parent_node)) {
 		if (!parent_node) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] has no parent\n",
-				(char*)&target_name));
+				(char *) &target_name));
 		}
 
 		if (acpi_ns_local (type)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] type %X is local(no search)\n",
-				(char*)&target_name, type));
+				(char *) &target_name, type));
 		}
 
 		return_ACPI_STATUS (AE_NOT_FOUND);
 	}
 
-
 	/* Search the parent tree */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching parent for %4.4s\n", (char*)&target_name));
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching parent for %4.4s\n", (char *) &target_name));
 
 	/*
 	 * Search parents until found the target or we have backed up to
 	 * the root
 	 */
 	while (parent_node) {
-		/* Search parent scope */
-		/* TBD: [Investigate] Why ACPI_TYPE_ANY? */
-
+		/*
+		 * Search parent scope.  Use TYPE_ANY because we don't care about the
+		 * object type at this point, we only care about the existence of
+		 * the actual name we are searching for.  Typechecking comes later.
+		 */
 		status = acpi_ns_search_node (target_name, parent_node,
 				   ACPI_TYPE_ANY, return_node);
-
 		if (ACPI_SUCCESS (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -240,9 +237,8 @@ acpi_ns_search_parent_tree (
 		 * Not found here, go up another level
 		 * (until we reach the root)
 		 */
-		parent_node = acpi_ns_get_parent_object (parent_node);
+		parent_node = acpi_ns_get_parent_node (parent_node);
 	}
-
 
 	/* Not found in parent tree */
 
@@ -280,8 +276,8 @@ acpi_ns_search_and_enter (
 	u32                     target_name,
 	acpi_walk_state         *walk_state,
 	acpi_namespace_node     *node,
-	operating_mode          interpreter_mode,
-	acpi_object_type8       type,
+	acpi_interpreter_mode   interpreter_mode,
+	acpi_object_type        type,
 	u32                     flags,
 	acpi_namespace_node     **return_node)
 {
@@ -289,7 +285,7 @@ acpi_ns_search_and_enter (
 	acpi_namespace_node     *new_node;
 
 
-	FUNCTION_TRACE ("Ns_search_and_enter");
+	ACPI_FUNCTION_TRACE ("Ns_search_and_enter");
 
 
 	/* Parameter validation */
@@ -298,10 +294,9 @@ acpi_ns_search_and_enter (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null param-  Table %p Name %X Return %p\n",
 			node, target_name, return_node));
 
-		REPORT_ERROR (("Ns_search_and_enter: bad (null) parameter\n"));
+		ACPI_REPORT_ERROR (("Ns_search_and_enter: bad (null) parameter\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/* Name must consist of printable characters */
 
@@ -309,14 +304,13 @@ acpi_ns_search_and_enter (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "*** Bad character in name: %08x *** \n",
 			target_name));
 
-		REPORT_ERROR (("Ns_search_and_enter: Bad character in ACPI Name\n"));
+		ACPI_REPORT_ERROR (("Ns_search_and_enter: Bad character in ACPI Name\n"));
 		return_ACPI_STATUS (AE_BAD_CHARACTER);
 	}
 
-
 	/* Try to find the name in the table specified by the caller */
 
-	*return_node = ENTRY_NOT_FOUND;
+	*return_node = ACPI_ENTRY_NOT_FOUND;
 	status = acpi_ns_search_node (target_name, node, type, return_node);
 	if (status != AE_NOT_FOUND) {
 		/*
@@ -324,8 +318,8 @@ acpi_ns_search_and_enter (
 		 * return the error
 		 */
 		if ((status == AE_OK) &&
-			(flags & NS_ERROR_IF_FOUND)) {
-			status = AE_EXIST;
+			(flags & ACPI_NS_ERROR_IF_FOUND)) {
+			status = AE_ALREADY_EXISTS;
 		}
 
 		/*
@@ -335,9 +329,8 @@ acpi_ns_search_and_enter (
 		return_ACPI_STATUS (status);
 	}
 
-
 	/*
-	 * Not found in the table.  If we are NOT performing the
+	 * The name was not found.  If we are NOT performing the
 	 * first pass (name entry) of loading the namespace, search
 	 * the parent tree (all the way to the root if necessary.)
 	 * We don't want to perform the parent search when the
@@ -345,8 +338,8 @@ acpi_ns_search_and_enter (
 	 * the search when namespace references are being resolved
 	 * (load pass 2) and during the execution phase.
 	 */
-	if ((interpreter_mode != IMODE_LOAD_PASS1) &&
-		(flags & NS_SEARCH_PARENT)) {
+	if ((interpreter_mode != ACPI_IMODE_LOAD_PASS1) &&
+		(flags & ACPI_NS_SEARCH_PARENT)) {
 		/*
 		 * Not found in table - search parent tree according
 		 * to ACPI specification
@@ -358,17 +351,15 @@ acpi_ns_search_and_enter (
 		}
 	}
 
-
 	/*
 	 * In execute mode, just search, never add names.  Exit now.
 	 */
-	if (interpreter_mode == IMODE_EXECUTE) {
+	if (interpreter_mode == ACPI_IMODE_EXECUTE) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s Not found in %p [Not adding]\n",
-			(char*)&target_name, node));
+			(char *) &target_name, node));
 
 		return_ACPI_STATUS (AE_NOT_FOUND);
 	}
-
 
 	/* Create the new named object */
 

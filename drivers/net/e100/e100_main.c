@@ -2,9 +2,8 @@
 
 This software program is available to you under a choice of one of two 
 licenses. You may choose to be licensed under either the GNU General Public 
-License (GPL) Version 2, June 1991, available at 
-http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the 
-text of which follows:
+License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
+or the Intel BSD + Patent License, the text of which follows:
 
 Recipient has requested a license and Intel Corporation ("Intel") is willing
 to grant a license for the software entitled Linux Base Driver for the 
@@ -18,7 +17,7 @@ combined with the operating system referred to below.
 "Recipient" means the party to whom Intel delivers this Software.
 
 "Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU Public License version 2.0 or 
+any operating system available under the GNU General Public License 2.0 or 
 later.
 
 Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@ not add functionality or features when the Software is incorporated in any
 version of an operating system that has been distributed under the GNU 
 General Public License 2.0 or later. This patent license shall apply to the 
 combination of the Software and any operating system licensed under the GNU 
-Public License version 2.0 or later if, at the time Intel provides the 
+General Public License 2.0 or later if, at the time Intel provides the 
 Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU Public 
-License version 2.0 or later (whether in gold, beta or alpha form) causes 
+available versions of such operating systems available under the GNU General 
+Public License 2.0 or later (whether in gold, beta or alpha form) causes 
 such combination to be covered by the Licensed Patents. The patent license 
 shall not apply to any other combinations which include the Software. NO 
 hardware per se is licensed hereunder.
@@ -69,6 +68,10 @@ ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED
 AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
 TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*******************************************************************************
+
+Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
+
 *******************************************************************************/
 
 /**********************************************************************
@@ -122,7 +125,6 @@ static int e100_do_ethtool_ioctl(struct net_device *, struct ifreq *);
 static void e100_get_speed_duplex_caps(struct e100_private *);
 static int e100_ethtool_get_settings(struct net_device *, struct ifreq *);
 static int e100_ethtool_set_settings(struct net_device *, struct ifreq *);
-static void e100_set_speed_duplex(struct e100_private *);
 
 #ifdef ETHTOOL_GDRVINFO
 static int e100_ethtool_get_drvinfo(struct net_device *, struct ifreq *);
@@ -163,7 +165,8 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.20-pre1"
+#define E100_VERSION  "2.0.24-pre1"
+
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
 const char *e100_version = E100_VERSION;
@@ -171,13 +174,19 @@ const char *e100_full_driver_name = E100_FULL_DRIVER_NAME E100_VERSION;
 char *e100_short_driver_name = "e100";
 static int e100nics = 0;
 
+#ifdef CONFIG_PM
+static int e100_save_state(struct pci_dev *pcid, u32 state);
+static int e100_suspend(struct pci_dev *pcid, u32 state);
+static int e100_enable_wake(struct pci_dev *pcid, u32 state, int enable);
+static int e100_resume(struct pci_dev *pcid);
+#endif
+
 /*********************************************************************/
 /*! This is a GCC extension to ANSI C.
  *  See the item "Labeled Elements in Initializers" in the section
  *  "Extensions to the C Language Family" of the GCC documentation.
  *********************************************************************/
-
-#define E100_PARAM_INIT { [0 ... E100_MAX_NIC-1] = -1 }
+#define E100_PARAM_INIT { [0 ... E100_MAX_NIC] = -1 }
 
 /* All parameters are treated the same, as an integer array of values.
  * This macro just reduces the need to repeat the same declaration code
@@ -203,6 +212,7 @@ struct net_device_stats *e100_get_stats(struct net_device *);
 static void e100intr(int, void *, struct pt_regs *);
 static void e100_print_brd_conf(struct e100_private *);
 static void e100_set_multi(struct net_device *);
+void e100_set_speed_duplex(struct e100_private *);
 
 char *e100_get_brand_msg(struct e100_private *);
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
@@ -517,6 +527,7 @@ e100_dis_intr(struct e100_private *bdp)
 {
 	/* Disable interrupts on our PCI board by setting the mask bit */
 	writeb(SCB_INT_MASK, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 }
 
 /**
@@ -530,6 +541,7 @@ static inline void
 e100_set_intr_mask(struct e100_private *bdp)
 {
 	writeb(bdp->intr_mask, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status)); /* flushes last write, read-safe */
 }
 
 static inline void
@@ -537,6 +549,7 @@ e100_trigger_SWI(struct e100_private *bdp)
 {
 	/* Trigger interrupt on our PCI board by asserting SWI bit */
 	writeb(SCB_SOFT_INT, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 }
 
 static int __devinit
@@ -728,8 +741,15 @@ e100_remove1(struct pci_dev *pcid)
 	}
 
 #ifdef ETHTOOL_GWOL
-	/* Set up wol options and enable PME */
-	e100_do_wol(pcid, bdp);
+	/* Set up wol options and enable PME if wol is enabled */
+	if (bdp->wolopts) {
+		e100_do_wol(pcid, bdp);
+		/* Enable PME for power state D3 */
+		pci_enable_wake(pcid, 3, 1);
+		/* Set power state to D1 in case driver is RELOADED */
+		/* If system powers down, device is switched from D1 to D3 */
+		pci_set_power_state(pcid, 1);
+	}
 #endif
 
 	e100_clear_structs(dev);
@@ -744,8 +764,15 @@ static struct pci_driver e100_driver = {
 	id_table:       e100_id_table,
 	probe:          e100_found1,
 	remove:         __devexit_p(e100_remove1),
+#ifdef CONFIG_PM
+	suspend:        e100_suspend,
+	resume:         e100_resume,
+	save_state:     e100_save_state,
+	enable_wake:    e100_enable_wake,
+#else
 	suspend:        NULL,
 	resume:         NULL,
+#endif
 };
 
 static int __init
@@ -774,79 +801,66 @@ module_exit(e100_cleanup_module);
 void __devinit
 e100_check_options(int board, struct e100_private *bdp)
 {
-	int val;
-
 	if (board >= E100_MAX_NIC) {
 		printk(KERN_NOTICE "No configuration available for board #%d\n",
 		       board);
 		printk(KERN_NOTICE "Using defaults for all values\n");
+		board = E100_MAX_NIC;
 	}
 
-	val = (board < E100_MAX_NIC) ? TxDescriptors[board] : -1;
-	e100_set_int_option(&(bdp->params.TxDescriptors), val, E100_MIN_TCB,
-			    E100_MAX_TCB, E100_DEFAULT_TCB,
+	e100_set_int_option(&(bdp->params.TxDescriptors), TxDescriptors[board],
+			    E100_MIN_TCB, E100_MAX_TCB, E100_DEFAULT_TCB,
 			    "TxDescriptor count");
 
-	val = (board < E100_MAX_NIC) ? RxDescriptors[board] : -1;
-	e100_set_int_option(&(bdp->params.RxDescriptors), val, E100_MIN_RFD,
-			    E100_MAX_RFD, E100_DEFAULT_RFD,
+	e100_set_int_option(&(bdp->params.RxDescriptors), RxDescriptors[board],
+			    E100_MIN_RFD, E100_MAX_RFD, E100_DEFAULT_RFD,
 			    "RxDescriptor count");
 
-	val = (board < E100_MAX_NIC) ? e100_speed_duplex[board] : -1;
-	e100_set_int_option(&(bdp->params.e100_speed_duplex), val, 0, 4,
+	e100_set_int_option(&(bdp->params.e100_speed_duplex),
+			    e100_speed_duplex[board], 0, 4,
 			    E100_DEFAULT_SPEED_DUPLEX, "speed/duplex mode");
 
-	val = (board < E100_MAX_NIC) ? ber[board] : -1;
-	e100_set_int_option(&(bdp->params.ber), val, 0, ZLOCK_MAX_ERRORS,
+	e100_set_int_option(&(bdp->params.ber), ber[board], 0, ZLOCK_MAX_ERRORS,
 			    E100_DEFAULT_BER, "Bit Error Rate count");
 
-	val = (board < E100_MAX_NIC) ? XsumRX[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_XSUMRX, E100_DEFAULT_XSUM,
+	e100_set_bool_option(bdp, XsumRX[board], PRM_XSUMRX, E100_DEFAULT_XSUM,
 			     "XsumRX value");
 
 	/* Default ucode value depended on controller revision */
-	val = (board < E100_MAX_NIC) ? ucode[board] : -1;
 	if (bdp->rev_id >= D101MA_REV_ID) {
-		e100_set_bool_option(bdp, val, PRM_UCODE, E100_DEFAULT_UCODE,
-				     "ucode value");
+		e100_set_bool_option(bdp, ucode[board], PRM_UCODE,
+				     E100_DEFAULT_UCODE, "ucode value");
 	} else {
-		e100_set_bool_option(bdp, val, PRM_UCODE, false, "ucode value");
+		e100_set_bool_option(bdp, ucode[board], PRM_UCODE, false,
+				     "ucode value");
 	}
 
-	val = (board < E100_MAX_NIC) ? flow_control[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_FC, E100_DEFAULT_FC,
+	e100_set_bool_option(bdp, flow_control[board], PRM_FC, E100_DEFAULT_FC,
 			     "flow control value");
 
-	val = (board < E100_MAX_NIC) ? IFS[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_IFS, E100_DEFAULT_IFS, "IFS value");
+	e100_set_bool_option(bdp, IFS[board], PRM_IFS, E100_DEFAULT_IFS,
+			     "IFS value");
 
-	val = (board < E100_MAX_NIC) ? BundleSmallFr[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_BUNDLE_SMALL,
+	e100_set_bool_option(bdp, BundleSmallFr[board], PRM_BUNDLE_SMALL,
 			     E100_DEFAULT_BUNDLE_SMALL_FR,
 			     "CPU saver bundle small frames value");
 
-	val = (board < E100_MAX_NIC) ? IntDelay[board] : -1;
-	e100_set_int_option(&(bdp->params.IntDelay), val, 0x0, 0xFFFF,
-			    E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY,
+	e100_set_int_option(&(bdp->params.IntDelay), IntDelay[board], 0x0,
+			    0xFFFF, E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY,
 			    "CPU saver interrupt delay value");
 
-	val = (board < E100_MAX_NIC) ? BundleMax[board] : -1;
-	e100_set_int_option(&(bdp->params.BundleMax), val, 0x1, 0xFFFF,
-			    E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
+	e100_set_int_option(&(bdp->params.BundleMax), BundleMax[board], 0x1,
+			    0xFFFF, E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
 			    "CPU saver bundle max value");
 
-	val = (board < E100_MAX_NIC) ? RxCongestionControl[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_RX_CONG,
+	e100_set_bool_option(bdp, RxCongestionControl[board], PRM_RX_CONG,
 			     E100_DEFAULT_RX_CONGESTION_CONTROL,
 			     "Rx Congestion Control value");
 
-	val = (board < E100_MAX_NIC) ? PollingMaxWork[board] : -1;
-	e100_set_int_option(&(bdp->params.PollingMaxWork), val, 1, E100_MAX_RFD,
-			    RxDescriptors[board], "Polling Max Work value");
-
-	if (val <= 0) {
-		bdp->params.b_params &= ~PRM_RX_CONG;
-	}
+	e100_set_int_option(&(bdp->params.PollingMaxWork),
+			    PollingMaxWork[board], 1, E100_MAX_RFD,
+			    bdp->params.RxDescriptors,
+			    "Polling Max Work value");
 }
 
 /**
@@ -1194,7 +1208,7 @@ e100_set_multi(struct net_device *dev)
 	/* reconfigure the chip if something has changed in its config space */
 	e100_config(bdp);
 
-	if ((promisc_enbl) || (mulcast_enbl)) {
+	if (promisc_enbl || mulcast_enbl) {
 		goto exit;	/* no need for Multicast Cmd */
 	}
 
@@ -1996,8 +2010,9 @@ e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
 		if (max_number_of_rfds && (rfd_cnt >= max_number_of_rfds)) {
 			break;
 		}
-		if (list_empty(&(bdp->active_rx_list)))
+		if (list_empty(&(bdp->active_rx_list))) {
 			break;
+		}
 
 		rx_struct = list_entry(bdp->active_rx_list.next,
 				       struct rx_list_elem, list_elem);
@@ -2030,10 +2045,8 @@ e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
 				    (data_sz + bdp->rfd_size),
 				    PCI_DMA_FROMDEVICE);
 
-		// we unmap using DMA_TODEVICE to avoid another memcpy from the 
-		// bounce buffer
 		pci_unmap_single(bdp->pdev, rx_struct->dma_addr,
-				 sizeof (rfd_t), PCI_DMA_TODEVICE);
+				 sizeof (rfd_t), PCI_DMA_FROMDEVICE);
 
 		list_add(&(rx_struct->list_elem), &(bdp->rx_struct_pool));
 
@@ -2146,6 +2159,34 @@ e100_refresh_txthld(struct e100_private *bdp)
 	}			/* end underrun check */
 }
 
+#ifdef E100_ZEROCOPY
+/**
+ * e100_pseudo_hdr_csum - compute IP pseudo-header checksum
+ * @ip: points to the header of the IP packet
+ *
+ * Return the 16 bit checksum of the IP pseudo-header.,which is computed
+ * on the fields: IP src, IP dst, next protocol, payload length.
+ * The checksum vaule is returned in network byte order.
+ */
+static inline u16
+e100_pseudo_hdr_csum(const struct iphdr *ip)
+{
+	u32 pseudo = 0;
+	u32 payload_len = 0;
+
+	payload_len = ntohs(ip->tot_len) - (ip->ihl * 4);
+
+	pseudo += htons(payload_len);
+	pseudo += (ip->protocol << 8);
+	pseudo += ip->saddr & 0x0000ffff;
+	pseudo += (ip->saddr & 0xffff0000) >> 16;
+	pseudo += ip->daddr & 0x0000ffff;
+	pseudo += (ip->daddr & 0xffff0000) >> 16;
+
+	return FOLD_CSUM(pseudo);
+}
+#endif /* E100_ZEROCOPY */
+
 /**
  * e100_prepare_xmit_buff - prepare a buffer for transmission
  * @bdp: atapter's private data struct
@@ -2165,6 +2206,12 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 
 	tcb = bdp->tcb_pool.data;
 	tcb += TCB_TO_USE(bdp->tcb_pool);
+
+	if (bdp->flags & USE_IPCB) {
+		tcb->tcbu.ipcb.ip_activation_high = IPCB_IP_ACTIVATION_DEFAULT;
+		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCP_PACKET;
+		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCPUDP_CHECKSUM_ENABLE;
+	}
 
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
@@ -2204,17 +2251,7 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 				chksum = &(udp->check);
 			}
 
-			*chksum = csum_tcpudp_magic(ip->daddr, ip->saddr,
-						    sizeof (struct tcphdr),
-						    ip->protocol, 0);
-		}
-	} else {
-		if (bdp->flags & USE_IPCB) {
-			tcb->tcbu.ipcb.ip_activation_high =
-				IPCB_IP_ACTIVATION_DEFAULT;
-			tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCP_PACKET;
-			tcb->tcbu.ipcb.ip_schedule &=
-				~IPCB_TCPUDP_CHECKSUM_ENABLE;
+			*chksum = e100_pseudo_hdr_csum(ip);
 		}
 	}
 
@@ -2319,9 +2356,8 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 		if (!e100_wait_cus_idle(bdp))
 			printk("%s cu_start: timeout waiting for cu\n",
 			       bdp->device->name);
-
 		if (!e100_wait_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
-					 SCB_CUC_START)) {
+					  SCB_CUC_START)) {
 			printk("%s cu_start: timeout waiting for scb\n",
 			       bdp->device->name);
 			e100_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
@@ -2378,6 +2414,7 @@ e100_selftest(struct e100_private *bdp, u32 *st_timeout, u32 *st_result)
 
 	/* Do the port command */
 	writel(selftest_cmd, &bdp->scb->scb_port);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 
 	/* Wait at least 10 milliseconds for the self-test to complete */
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -2385,8 +2422,6 @@ e100_selftest(struct e100_private *bdp, u32 *st_timeout, u32 *st_result)
 
 	/* disable interrupts since the're now enabled */
 	e100_dis_intr(bdp);
-
-	rmb();
 
 	/* if The First Self Test DWORD Still Zero, We've timed out. If the
 	 * second DWORD is not zero then we have an error. */
@@ -2670,7 +2705,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	cb_header_t *ntcb_hdr;
 	unsigned long lock_flag;
 	unsigned long expiration_time;
-	unsigned char rc = false;
+	unsigned char rc = true;
 
 	ntcb_hdr = (cb_header_t *) command->non_tx_cmd;	/* get hdr of non tcb cmd */
 
@@ -2681,7 +2716,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	wmb();
 
-	if (in_interrupt())
+	if (in_interrupt() || netif_running(bdp->device))
 		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
 	spin_lock_bh(&(bdp->bd_non_tx_lock));
@@ -2705,28 +2740,30 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START)) {
 		spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
+		rc = false;
 		goto exit;
 	}
 
 	bdp->next_cu_cmd = START_WAIT;
 	spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
 
-	/* now wait for completion of non-cu CB up to 20 msec*/
+	/* now wait for completion of non-cu CB up to 20 msec */
 	expiration_time = jiffies + HZ / 50 + 1;
-	while (time_before(jiffies, expiration_time)) {
-		rmb();
-		if ((ntcb_hdr->cb_status &
+	rmb();
+	while (!(ntcb_hdr->cb_status &
 		     __constant_cpu_to_le16(CB_STATUS_COMPLETE))) {
-			rc = true;
+
+		if (time_before(jiffies, expiration_time)) {
+			spin_unlock_bh(&(bdp->bd_non_tx_lock));
+			yield();
+			spin_lock_bh(&(bdp->bd_non_tx_lock));
+		} else {
+			rc = false;
 			goto exit;
 		}
-		spin_unlock_bh(&(bdp->bd_non_tx_lock));
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-		spin_lock_bh(&(bdp->bd_non_tx_lock));
+		rmb();
 	}
 
-	/* didn't get a C bit assume command failed */
 exit:
 	e100_free_non_tx_cmd(bdp, command);
 
@@ -2754,6 +2791,7 @@ e100_sw_reset(struct e100_private *bdp, u32 reset_cmd)
 {
 	/* Do  a selective reset first to avoid a potential PCI hang */
 	writel(PORT_SELECTIVE_RESET, &bdp->scb->scb_port);
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 
 	/* wait for the reset to take effect */
 	udelay(20);
@@ -3086,11 +3124,138 @@ e100_isolate_driver(struct e100_private *bdp)
 
 	del_timer_sync(&bdp->watchdog_timer);
 
-	netif_stop_queue(bdp->device);
+	if (netif_running(bdp->device))
+		netif_stop_queue(bdp->device);
 
 	bdp->last_tcb = NULL;
 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
+}
+
+void
+e100_set_speed_duplex(struct e100_private *bdp)
+{
+	e100_phy_set_speed_duplex(bdp, true);
+	e100_config_fc(bdp);	/* re-config flow-control if necessary */
+	e100_config(bdp);	
+}
+
+static void
+e100_tcb_add_C_bit(struct e100_private *bdp)
+{
+	tcb_t *tcb = (tcb_t *) bdp->tcb_pool.data;
+	int i;
+
+	for (i = 0; i < bdp->params.TxDescriptors; i++, tcb++) {
+		tcb->tcb_hdr.cb_status |= cpu_to_le16(CB_STATUS_COMPLETE);
+	}
+}
+
+/* 
+ * Procedure:   e100_hw_reset_recover
+ *
+ * Description: This routine will recover the hw after reset.
+ *
+ * Arguments:
+ *      bdp - Ptr to this card's e100_bdconfig structure
+ *        reset_cmd - s/w reset or selective reset. 
+ *
+ * Returns:
+ *        true upon success
+ *        false upon failure
+ */
+unsigned char
+e100_hw_reset_recover(struct e100_private *bdp, u32 reset_cmd)
+{
+	bdp->last_tcb = NULL;
+	if (reset_cmd == PORT_SOFTWARE_RESET) {
+
+		/*load CU & RU base */
+		if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE)) {
+			return false;
+		}
+
+		if (e100_load_microcode(bdp)) {
+			bdp->flags |= DF_UCODE_LOADED;
+		}
+
+		if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE)) {
+			return false;
+		}
+
+		/* Issue the load dump counters address command */
+		if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys,
+					  SCB_CUC_DUMP_ADDR)) {
+			return false;
+		}
+
+		if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr)) {
+			printk(KERN_ERR
+			       "e100_hw_reset_recover: setup iaaddr failed\n");
+			return false;
+		}
+
+		e100_set_multi_exec(bdp->device);
+
+		/* Change for 82558 enhancement */
+		/* If 82558/9 and if the user has enabled flow control, set up * the
+		 * Flow Control Reg. in the CSR */
+		if ((bdp->flags & IS_BACHELOR)
+		    && (bdp->params.b_params & PRM_FC)) {
+			writeb(DFLT_FC_THLD,
+			       &bdp->scb->scb_ext.d101_scb.scb_fc_thld);
+			writeb(DFLT_FC_CMD,
+			       &bdp->scb->scb_ext.d101_scb.scb_fc_xon_xoff);
+		}
+
+	}
+
+	e100_force_config(bdp);
+
+	return true;
+}
+
+void
+e100_deisolate_driver(struct e100_private *bdp, u8 recover, u8 full_init)
+{
+	if (full_init) {
+		e100_sw_reset(bdp, PORT_SOFTWARE_RESET);
+		if (!e100_hw_reset_recover(bdp, PORT_SOFTWARE_RESET))
+			printk(KERN_ERR "e100_deisolate_driver:"
+			       " HW SOFTWARE reset recover failed\n");
+	}
+
+	if (recover) {
+
+		bdp->next_cu_cmd = START_WAIT;
+		bdp->last_tcb = NULL;
+
+		/* lets reset the chip */
+		if (!full_init) {
+			e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
+
+			if (!e100_hw_reset_recover(bdp, PORT_SELECTIVE_RESET)) {
+				printk(KERN_ERR "e100_deisolate_driver:"
+				       " HW reset recover failed\n");
+			}
+		}
+		e100_start_ru(bdp);
+
+		/* relaunch watchdog timer in 2 sec */
+		mod_timer(&(bdp->watchdog_timer), jiffies + (2 * HZ));
+
+		// we must clear tcbs since we may have lost Tx intrrupt
+		// or have unsent frames on the tcb chain
+		e100_tcb_add_C_bit(bdp);
+		e100_tx_srv(bdp);
+
+		e100_set_intr_mask(bdp);
+
+		if (netif_running(bdp->device))
+			netif_wake_queue(bdp->device);
+	}
+
+	bdp->driver_isolated = false;
 }
 
 #ifdef E100_ETHTOOL_IOCTL
@@ -3458,14 +3623,6 @@ e100_get_speed_duplex_caps(struct e100_private *bdp)
 
 }
 
-static void
-e100_set_speed_duplex(struct e100_private *bdp)
-{
-	e100_phy_set_speed_duplex(bdp, true);
-	e100_config_fc(bdp);	/* re-config flow-control if necessary */
-	e100_config(bdp);	
-}
-
 #ifdef ETHTOOL_GWOL
 static unsigned char
 e100_setup_filter(struct e100_private *bdp)
@@ -3510,32 +3667,19 @@ exit:
 static void
 e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp)
 {
-	int enable = 0;
-	u32 state = 0;
+	e100_config_wol(bdp);
 
-	if (bdp->wolopts) {
-		e100_config_wol(bdp);
-
-		if (!e100_config(bdp)) {
-			printk("e100_config WOL options failed\n");
-			goto exit;
-		}
-
-		if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP)) {
-			if (!e100_setup_filter(bdp)) {
-				printk("e100_config WOL options failed\n");
-				goto exit;
-			}
-			state = 1;
-			pci_set_power_state(pcid, state);
-		}
-		enable = 1;
+	if (e100_config(bdp)) {
+		if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP))
+			if (!e100_setup_filter(bdp))
+				printk(KERN_ERR
+				       "e100_config WOL options failed\n");
+	} else {
+		printk(KERN_ERR "e100_config WOL failed\n");
 	}
-exit:
-	 pci_enable_wake(pcid, state, enable);
 }
 
-static u16 
+static u16
 e100_get_ip_lbytes(struct net_device *dev)
 {
 	struct in_ifaddr *ifa;
@@ -3795,3 +3939,84 @@ exit:
 	}
 	spin_unlock_bh(&(bdp->bd_non_tx_lock));
 }
+
+#ifdef CONFIG_PM
+static int
+e100_save_state(struct pci_dev *pcid, u32 state)
+{
+	struct net_device *dev;
+	struct e100_private *bdp;
+
+	/* Actually, PCI PM does NOT call this entry */
+	if (!(dev = (struct net_device *) pci_get_drvdata(pcid)))
+		return -1;
+	bdp = dev->priv;
+	pci_save_state(pcid, bdp->pci_state);
+	return 0;
+}
+
+static int
+e100_suspend(struct pci_dev *pcid, u32 state)
+{
+	struct net_device *netdev = pci_get_drvdata(pcid);
+	struct e100_private *bdp = netdev->priv;
+
+	e100_isolate_driver(bdp);
+	e100_save_state(pcid, state);
+
+	/* If wol is enabled */
+#ifdef ETHTOOL_GWOL
+	if (bdp->wolopts) {
+		bdp->ip_lbytes = e100_get_ip_lbytes(netdev);
+		e100_do_wol(pcid, bdp);
+		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
+		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
+	} else {
+		/* Disable bus mastering */
+		pci_disable_device(pcid);
+		pci_set_power_state(pcid, state);
+	}
+#else
+	pci_disable_device(pcid);
+	pci_set_power_state(pcid, state);
+#endif
+
+	return 0;
+}
+
+static int
+e100_resume(struct pci_dev *pcid)
+{
+	struct net_device *netdev = pci_get_drvdata(pcid);
+	struct e100_private *bdp = netdev->priv;
+	u8 recover = false;
+	u8 full_init = false;
+
+	pci_set_power_state(pcid, 0);
+	pci_enable_wake(pcid, 0, 0);	/* Clear PME status and disable PME */
+	pci_restore_state(pcid, bdp->pci_state);
+
+	if (netif_running(netdev)) {
+		recover = true;
+	}
+
+#ifdef ETHTOOL_GWOL
+	if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP)) {
+		full_init = true;
+	}
+#endif
+
+	e100_deisolate_driver(bdp, recover, full_init);
+
+	return 0;
+}
+
+static int
+e100_enable_wake(struct pci_dev *pcid, u32 state, int enable)
+{
+	/* Driver doesn't need to do anything because it will enable */
+	/* wol when suspended.                                       */
+	/* Actually, PCI PM does NOT call this entry.                */
+	return 0;
+}
+#endif /* CONFIG_PM */

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 14 $
+ *              $Revision: 19 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "achware.h"
 
 #define _COMPONENT          ACPI_HARDWARE
-	 MODULE_NAME         ("hwtimer")
+	 ACPI_MODULE_NAME    ("hwtimer")
 
 
 /******************************************************************************
@@ -47,7 +47,7 @@ acpi_status
 acpi_get_timer_resolution (
 	u32                     *resolution)
 {
-	FUNCTION_TRACE ("Acpi_get_timer_resolution");
+	ACPI_FUNCTION_TRACE ("Acpi_get_timer_resolution");
 
 
 	if (!resolution) {
@@ -57,7 +57,6 @@ acpi_get_timer_resolution (
 	if (0 == acpi_gbl_FADT->tmr_val_ext) {
 		*resolution = 24;
 	}
-
 	else {
 		*resolution = 32;
 	}
@@ -82,7 +81,7 @@ acpi_status
 acpi_get_timer (
 	u32                     *ticks)
 {
-	FUNCTION_TRACE ("Acpi_get_timer");
+	ACPI_FUNCTION_TRACE ("Acpi_get_timer");
 
 
 	if (!ticks) {
@@ -129,13 +128,12 @@ acpi_get_timer_duration (
 	u32                     *time_elapsed)
 {
 	u32                     delta_ticks = 0;
-	u32                     seconds = 0;
-	u32                     milliseconds = 0;
-	u32                     microseconds = 0;
-	u32                     remainder = 0;
+	uint64_overlay          normalized_ticks;
+	acpi_status             status;
+	acpi_integer            out_quotient;
 
 
-	FUNCTION_TRACE ("Acpi_get_timer_duration");
+	ACPI_FUNCTION_TRACE ("Acpi_get_timer_duration");
 
 
 	if (!time_elapsed) {
@@ -150,21 +148,18 @@ acpi_get_timer_duration (
 	if (start_ticks < end_ticks) {
 		delta_ticks = end_ticks - start_ticks;
 	}
-
 	else if (start_ticks > end_ticks) {
-		/* 24-bit Timer */
-
 		if (0 == acpi_gbl_FADT->tmr_val_ext) {
+			/* 24-bit Timer */
+
 			delta_ticks = (((0x00FFFFFF - start_ticks) + end_ticks) & 0x00FFFFFF);
 		}
-
-		/* 32-bit Timer */
-
 		else {
+			/* 32-bit Timer */
+
 			delta_ticks = (0xFFFFFFFF - start_ticks) + end_ticks;
 		}
 	}
-
 	else {
 		*time_elapsed = 0;
 		return_ACPI_STATUS (AE_OK);
@@ -173,49 +168,18 @@ acpi_get_timer_duration (
 	/*
 	 * Compute Duration:
 	 * -----------------
-	 * Since certain compilers (gcc/Linux, argh!) don't support 64-bit
-	 * divides in kernel-space we have to do some trickery to preserve
-	 * accuracy while using 32-bit math.
 	 *
-	 * TBD: Change to use 64-bit math when supported.
+	 * Requires a 64-bit divide:
 	 *
-	 * The process is as follows:
-	 *  1. Compute the number of seconds by dividing Delta Ticks by
-	 *     the timer frequency.
-	 *  2. Compute the number of milliseconds in the remainder from step #1
-	 *     by multiplying by 1000 and then dividing by the timer frequency.
-	 *  3. Compute the number of microseconds in the remainder from step #2
-	 *     by multiplying by 1000 and then dividing by the timer frequency.
-	 *  4. Add the results from steps 1, 2, and 3 to get the total duration.
-	 *
-	 * Example: The time elapsed for Delta_ticks = 0xFFFFFFFF should be
-	 *          1199864031 microseconds.  This is computed as follows:
-	 *          Step #1: Seconds = 1199; Remainder = 3092840
-	 *          Step #2: Milliseconds = 864; Remainder = 113120
-	 *          Step #3: Microseconds = 31; Remainder = <don't care!>
+	 * Time_elapsed = (Delta_ticks * 1000000) / PM_TIMER_FREQUENCY;
 	 */
+	normalized_ticks.full = ((u64) delta_ticks) * 1000000;
 
-	/* Step #1 */
+	status = acpi_ut_short_divide (&normalized_ticks.full, PM_TIMER_FREQUENCY,
+			   &out_quotient, NULL);
 
-	seconds = delta_ticks / PM_TIMER_FREQUENCY;
-	remainder = delta_ticks % PM_TIMER_FREQUENCY;
-
-	/* Step #2 */
-
-	milliseconds = (remainder * 1000) / PM_TIMER_FREQUENCY;
-	remainder = (remainder * 1000) % PM_TIMER_FREQUENCY;
-
-	/* Step #3 */
-
-	microseconds = (remainder * 1000) / PM_TIMER_FREQUENCY;
-
-	/* Step #4 */
-
-	*time_elapsed = seconds * 1000000;
-	*time_elapsed += milliseconds * 1000;
-	*time_elapsed += microseconds;
-
-	return_ACPI_STATUS (AE_OK);
+	*time_elapsed = (u32) out_quotient;
+	return_ACPI_STATUS (status);
 }
 
 

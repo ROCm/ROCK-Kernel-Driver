@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: rslist - Linked list utilities
- *              $Revision: 19 $
+ *              $Revision: 26 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "acresrc.h"
 
 #define _COMPONENT          ACPI_RESOURCES
-	 MODULE_NAME         ("rslist")
+	 ACPI_MODULE_NAME    ("rslist")
 
 
 /*******************************************************************************
@@ -49,29 +49,27 @@ acpi_rs_get_resource_type (
 	u8                      resource_start_byte)
 {
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/*
 	 * Determine if this is a small or large resource
 	 */
-	switch (resource_start_byte & RESOURCE_DESC_TYPE_MASK) {
-	case RESOURCE_DESC_TYPE_SMALL:
+	switch (resource_start_byte & ACPI_RDESC_TYPE_MASK) {
+	case ACPI_RDESC_TYPE_SMALL:
 
 		/*
 		 * Small Resource Type -- Only bits 6:3 are valid
 		 */
-		return ((u8) (resource_start_byte & RESOURCE_DESC_SMALL_MASK));
-		break;
+		return ((u8) (resource_start_byte & ACPI_RDESC_SMALL_MASK));
 
 
-	case RESOURCE_DESC_TYPE_LARGE:
+	case ACPI_RDESC_TYPE_LARGE:
 
 		/*
 		 * Large Resource Type -- All bits are valid
 		 */
 		return (resource_start_byte);
-		break;
 	}
 
 	return (0xFF);
@@ -98,18 +96,18 @@ acpi_status
 acpi_rs_byte_stream_to_list (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
-	u8                      **output_buffer)
+	u8                      *output_buffer)
 {
 	acpi_status             status;
 	u32                     bytes_parsed = 0;
 	u8                      resource_type = 0;
-	u32                     bytes_consumed = 0;
-	u8                      **buffer = output_buffer;
-	u32                     structure_size = 0;
+	ACPI_SIZE               bytes_consumed = 0;
+	u8                      *buffer = output_buffer;
+	ACPI_SIZE               structure_size = 0;
 	u8                      end_tag_processed = FALSE;
+	acpi_resource           *resource;
 
-
-	FUNCTION_TRACE ("Rs_byte_stream_to_list");
+	ACPI_FUNCTION_TRACE ("Rs_byte_stream_to_list");
 
 
 	while (bytes_parsed < byte_stream_buffer_length &&
@@ -120,148 +118,148 @@ acpi_rs_byte_stream_to_list (
 		resource_type = acpi_rs_get_resource_type (*byte_stream_buffer);
 
 		switch (resource_type) {
-		case RESOURCE_DESC_MEMORY_24:
+		case ACPI_RDESC_TYPE_MEMORY_24:
 			/*
 			 * 24-Bit Memory Resource
 			 */
 			status = acpi_rs_memory24_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_LARGE_VENDOR:
+		case ACPI_RDESC_TYPE_LARGE_VENDOR:
 			/*
 			 * Vendor Defined Resource
 			 */
 			status = acpi_rs_vendor_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_MEMORY_32:
+		case ACPI_RDESC_TYPE_MEMORY_32:
 			/*
 			 * 32-Bit Memory Range Resource
 			 */
 			status = acpi_rs_memory32_range_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_FIXED_MEMORY_32:
+		case ACPI_RDESC_TYPE_FIXED_MEMORY_32:
 			/*
 			 * 32-Bit Fixed Memory Resource
 			 */
 			status = acpi_rs_fixed_memory32_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_QWORD_ADDRESS_SPACE:
+		case ACPI_RDESC_TYPE_QWORD_ADDRESS_SPACE:
 			/*
 			 * 64-Bit Address Resource
 			 */
 			status = acpi_rs_address64_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_DWORD_ADDRESS_SPACE:
+		case ACPI_RDESC_TYPE_DWORD_ADDRESS_SPACE:
 			/*
 			 * 32-Bit Address Resource
 			 */
 			status = acpi_rs_address32_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_WORD_ADDRESS_SPACE:
+		case ACPI_RDESC_TYPE_WORD_ADDRESS_SPACE:
 			/*
 			 * 16-Bit Address Resource
 			 */
 			status = acpi_rs_address16_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_EXTENDED_XRUPT:
+		case ACPI_RDESC_TYPE_EXTENDED_XRUPT:
 			/*
 			 * Extended IRQ
 			 */
 			status = acpi_rs_extended_irq_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_IRQ_FORMAT:
+		case ACPI_RDESC_TYPE_IRQ_FORMAT:
 			/*
 			 * IRQ Resource
 			 */
 			status = acpi_rs_irq_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_DMA_FORMAT:
+		case ACPI_RDESC_TYPE_DMA_FORMAT:
 			/*
 			 * DMA Resource
 			 */
 			status = acpi_rs_dma_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_START_DEPENDENT:
+		case ACPI_RDESC_TYPE_START_DEPENDENT:
 			/*
 			 * Start Dependent Functions Resource
 			 */
-			status = acpi_rs_start_dependent_functions_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+			status = acpi_rs_start_depend_fns_resource (byte_stream_buffer,
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_END_DEPENDENT:
+		case ACPI_RDESC_TYPE_END_DEPENDENT:
 			/*
 			 * End Dependent Functions Resource
 			 */
-			status = acpi_rs_end_dependent_functions_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+			status = acpi_rs_end_depend_fns_resource (byte_stream_buffer,
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_IO_PORT:
+		case ACPI_RDESC_TYPE_IO_PORT:
 			/*
 			 * IO Port Resource
 			 */
 			status = acpi_rs_io_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_FIXED_IO_PORT:
+		case ACPI_RDESC_TYPE_FIXED_IO_PORT:
 			/*
 			 * Fixed IO Port Resource
 			 */
 			status = acpi_rs_fixed_io_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_SMALL_VENDOR:
+		case ACPI_RDESC_TYPE_SMALL_VENDOR:
 			/*
 			 * Vendor Specific Resource
 			 */
 			status = acpi_rs_vendor_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
-		case RESOURCE_DESC_END_TAG:
+		case ACPI_RDESC_TYPE_END_TAG:
 			/*
 			 * End Tag
 			 */
 			end_tag_processed = TRUE;
 			status = acpi_rs_end_tag_resource (byte_stream_buffer,
-					 &bytes_consumed, buffer, &structure_size);
+					 &bytes_consumed, &buffer, &structure_size);
 			break;
 
 
@@ -273,8 +271,7 @@ acpi_rs_byte_stream_to_list (
 			break;
 		}
 
-
-		if (!ACPI_SUCCESS(status)) {
+		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
 
@@ -291,7 +288,9 @@ acpi_rs_byte_stream_to_list (
 		/*
 		 * Set the Buffer to the next structure
 		 */
-		*buffer += structure_size;
+		resource = (acpi_resource *)buffer;
+		resource->length = ACPI_ALIGN_RESOURCE_SIZE(resource->length);
+		buffer += ACPI_ALIGN_RESOURCE_SIZE(structure_size);
 
 	} /*  end while */
 
@@ -331,15 +330,15 @@ acpi_status
 acpi_rs_list_to_byte_stream (
 	acpi_resource           *linked_list,
 	u32                     byte_stream_size_needed,
-	u8                      **output_buffer)
+	u8                      *output_buffer)
 {
 	acpi_status             status;
-	u8                      *buffer = *output_buffer;
-	u32                     bytes_consumed = 0;
+	u8                      *buffer = output_buffer;
+	ACPI_SIZE               bytes_consumed = 0;
 	u8                      done = FALSE;
 
 
-	FUNCTION_TRACE ("Rs_list_to_byte_stream");
+	ACPI_FUNCTION_TRACE ("Rs_list_to_byte_stream");
 
 
 	while (!done) {
@@ -362,7 +361,7 @@ acpi_rs_list_to_byte_stream (
 			/*
 			 * Start Dependent Functions Resource
 			 */
-			status = acpi_rs_start_dependent_functions_stream (linked_list,
+			status = acpi_rs_start_depend_fns_stream (linked_list,
 					  &buffer, &bytes_consumed);
 			break;
 
@@ -370,7 +369,7 @@ acpi_rs_list_to_byte_stream (
 			/*
 			 * End Dependent Functions Resource
 			 */
-			status = acpi_rs_end_dependent_functions_stream (linked_list,
+			status = acpi_rs_end_depend_fns_stream (linked_list,
 					  &buffer, &bytes_consumed);
 			break;
 
@@ -472,8 +471,7 @@ acpi_rs_list_to_byte_stream (
 
 		} /* switch (Linked_list->Id) */
 
-
-		if (!ACPI_SUCCESS(status)) {
+		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
 
@@ -485,7 +483,7 @@ acpi_rs_list_to_byte_stream (
 		/*
 		 * Point to the next object
 		 */
-		linked_list = POINTER_ADD (acpi_resource,
+		linked_list = ACPI_PTR_ADD (acpi_resource,
 				  linked_list, linked_list->length);
 	}
 

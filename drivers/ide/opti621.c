@@ -97,7 +97,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define OPTI621_MAX_PIO 3
 /* In fact, I do not have any PIO 4 drive
@@ -144,12 +144,16 @@ static void compute_pios(ide_drive_t *drive, byte pio)
 	int d;
 	ide_hwif_t *hwif = HWIF(drive);
 
-	drive->drive_data = ide_get_best_pio_mode(drive, pio, OPTI621_MAX_PIO, NULL);
+	if (pio == PIO_DONT_KNOW)
+		drive->drive_data = min(ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0, OPTI621_MAX_PIO);
+	else
+		drive->drive_data = pio;
+
 	for (d = 0; d < 2; ++d) {
 		drive = &hwif->drives[d];
 		if (drive->present) {
 			if (drive->drive_data == PIO_DONT_KNOW)
-				drive->drive_data = ide_get_best_pio_mode(drive, 255, OPTI621_MAX_PIO, NULL);
+				drive->drive_data = min(ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0, OPTI621_MAX_PIO);
 #ifdef OPTI621_DEBUG
 			printk("%s: Selected PIO mode %d\n", drive->name, drive->drive_data);
 #endif
@@ -210,27 +214,31 @@ typedef struct pio_clocks_s {
 static void compute_clocks(int pio, pio_clocks_t *clks)
 {
         if (pio != PIO_NOT_EXIST) {
-        	int adr_setup, data_pls;
+		int adr_setup;
+		int data_pls;
+		struct ata_timing *t;
 
- 	       	adr_setup = ide_pio_timings[pio].setup_time;
-  	      	data_pls = ide_pio_timings[pio].active_time;
-	  	clks->address_time = cmpt_clk(adr_setup, system_bus_speed);
-	     	clks->data_time = cmpt_clk(data_pls, system_bus_speed);
-     		clks->recovery_time = cmpt_clk(ide_pio_timings[pio].cycle_time
-     			- adr_setup-data_pls, system_bus_speed);
-     		if (clks->address_time<1) clks->address_time = 1;
-     		if (clks->address_time>4) clks->address_time = 4;
-     		if (clks->data_time<1) clks->data_time = 1;
-     		if (clks->data_time>16) clks->data_time = 16;
-     		if (clks->recovery_time<2) clks->recovery_time = 2;
-     		if (clks->recovery_time>17) clks->recovery_time = 17;
+		t = ata_timing_data(pio);
+
+		adr_setup = t->setup;
+		data_pls = t->active;
+		clks->address_time = cmpt_clk(adr_setup, system_bus_speed);
+		clks->data_time = cmpt_clk(data_pls, system_bus_speed);
+		clks->recovery_time = cmpt_clk(t->cycle
+			- adr_setup-data_pls, system_bus_speed);
+		if (clks->address_time<1) clks->address_time = 1;
+		if (clks->address_time>4) clks->address_time = 4;
+		if (clks->data_time<1) clks->data_time = 1;
+		if (clks->data_time>16) clks->data_time = 16;
+		if (clks->recovery_time<2) clks->recovery_time = 2;
+		if (clks->recovery_time>17) clks->recovery_time = 17;
 	} else {
 		clks->address_time = 1;
 		clks->data_time = 1;
 		clks->recovery_time = 2;
 		/* minimal values */
 	}
- 
+
 }
 
 /* Main tune procedure, called from tuneproc. */
@@ -248,8 +256,8 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 
 	/* sets drive->drive_data for both drives */
 	compute_pios(drive, pio);
- 	pio1 = hwif->drives[0].drive_data;
- 	pio2 = hwif->drives[1].drive_data;
+	pio1 = hwif->drives[0].drive_data;
+	pio2 = hwif->drives[1].drive_data;
 
 	compute_clocks(pio1, &first);
 	compute_clocks(pio2, &second);
@@ -273,10 +281,10 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */
 
-     	reg_base = hwif->io_ports[IDE_DATA_OFFSET];
+	reg_base = hwif->io_ports[IDE_DATA_OFFSET];
 	outb(0xc0, reg_base+CNTRL_REG);	/* allow Register-B */
 	outb(0xff, reg_base+5);		/* hmm, setupvic.exe does this ;-) */
-	inb(reg_base+CNTRL_REG); 	/* if reads 0xff, adapter not exist? */
+	inb(reg_base+CNTRL_REG);	/* if reads 0xff, adapter not exist? */
 	read_reg(CNTRL_REG);		/* if reads 0xc0, no interface exist? */
 	read_reg(STRAP_REG);		/* read version, probably 0 */
 
@@ -293,8 +301,8 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 	write_reg(0x85, CNTRL_REG);	/* use Register-A for drive 0 */
 					/* use Register-B for drive 1 */
 
- 	write_reg(misc, MISC_REG);	/* set address setup, DRDY timings,   */
- 					/*  and read prefetch for both drives */
+	write_reg(misc, MISC_REG);	/* set address setup, DRDY timings,   */
+					/*  and read prefetch for both drives */
 
 	restore_flags(flags);	/* all CPUs */
 }

@@ -64,8 +64,8 @@ static int debug = -1;			/* The debug level */
 
 /* A few values that may be tweaked. */
 /* The ring sizes should be a power of two for efficiency. */
-#define TX_RING_SIZE	32
-#define RX_RING_SIZE	32
+#define TX_RING_SIZE	64
+#define RX_RING_SIZE	64
 /* How much slots multicast filter setup may take.
    Do not descrease without changing set_rx_mode() implementaion. */
 #define TX_MULTICAST_SIZE   2
@@ -114,7 +114,6 @@ static int debug = -1;			/* The debug level */
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
-#include <linux/delay.h>
 
 MODULE_AUTHOR("Maintainer: Andrey V. Savochkin <saw@saw.sw.com.sg>");
 MODULE_DESCRIPTION("Intel i82557/i82558/i82559 PCI EtherExpressPro driver");
@@ -570,6 +569,19 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 	if (speedo_debug > 0  &&  did_version++ == 0)
 		printk(version);
 
+	/* save power state before pci_enable_device overwrites it */
+	pm = pci_find_capability(pdev, PCI_CAP_ID_PM);
+	if (pm) {
+		u16 pwr_command;
+		pci_read_config_word(pdev, pm + PCI_PM_CTRL, &pwr_command);
+		acpi_idle_state = pwr_command & PCI_PM_CTRL_STATE_MASK;
+	}
+
+	if (pci_enable_device(pdev))
+		goto err_out_free_mmio_region;
+
+	pci_set_master(pdev);
+
 	if (!request_region(pci_resource_start(pdev, 1),
 			pci_resource_len(pdev, 1), "eepro100")) {
 		printk (KERN_ERR "eepro100: cannot reserve I/O ports\n");
@@ -600,18 +612,6 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 			   pci_resource_start(pdev, 0), irq);
 #endif
 
-	/* save power state b4 pci_enable_device overwrites it */
-	pm = pci_find_capability(pdev, PCI_CAP_ID_PM);
-	if (pm) {
-		u16 pwr_command;
-		pci_read_config_word(pdev, pm + PCI_PM_CTRL, &pwr_command);
-		acpi_idle_state = pwr_command & PCI_PM_CTRL_STATE_MASK;
-	}
-
-	if (pci_enable_device(pdev))
-		goto err_out_free_mmio_region;
-
-	pci_set_master(pdev);
 
 	if (speedo_found1(pdev, ioaddr, cards_found, acpi_idle_state) == 0)
 		cards_found++;
@@ -1074,6 +1074,51 @@ static void speedo_resume(struct net_device *dev)
 	outw(CUStart | SCBMaskEarlyRx | SCBMaskFlowCtl, ioaddr + SCBCmd);
 }
 
+/*
+ * Sometimes the receiver stops making progress.  This routine knows how to
+ * get it going again, without losing packets or being otherwise nasty like
+ * a chip reset would be.  Previously the driver had a whole sequence
+ * of if RxSuspended, if it's no buffers do one thing, if it's no resources,
+ * do another, etc.  But those things don't really matter.  Separate logic
+ * in the ISR provides for allocating buffers--the other half of operation
+ * is just making sure the receiver is active.  speedo_rx_soft_reset does that.
+ * This problem with the old, more involved algorithm is shown up under
+ * ping floods on the order of 60K packets/second on a 100Mbps fdx network.
+ */
+static void
+speedo_rx_soft_reset(struct net_device *dev)
+{
+	struct speedo_private *sp = dev->priv;
+	struct RxFD *rfd;
+	long ioaddr;
+
+	ioaddr = dev->base_addr;
+	wait_for_cmd_done(ioaddr + SCBCmd);
+	if (inb(ioaddr + SCBCmd) != 0) {
+		printk("%s: previous command stalled\n", dev->name);
+		return;
+	}
+	/*
+	* Put the hardware into a known state.
+	*/
+	outb(RxAbort, ioaddr + SCBCmd);
+
+	rfd = sp->rx_ringp[sp->cur_rx % RX_RING_SIZE];
+
+	rfd->rx_buf_addr = 0xffffffff;
+
+	wait_for_cmd_done(ioaddr + SCBCmd);
+
+	if (inb(ioaddr + SCBCmd) != 0) {
+		printk("%s: RxAbort command stalled\n", dev->name);
+		return;
+	}
+	outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
+		ioaddr + SCBPointer);
+	outb(RxStart, ioaddr + SCBCmd);
+}
+
+
 /* Media monitoring and control. */
 static void speedo_timer(unsigned long data)
 {
@@ -1377,9 +1422,10 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* workaround for hardware bug on 10 mbit half duplex */
 
-	if ((sp->partner == 0) || (sp->chip_id == 1)) {
+	if ((sp->partner == 0) && (sp->chip_id == 1)) {
 		wait_for_cmd_done(ioaddr + SCBCmd);
 		outb(0 , ioaddr + SCBCmd);
+		udelay(1);
 	}
 
 	/* Trigger the command unit resume. */
@@ -1507,82 +1553,39 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if ((status & 0xfc00) == 0)
 			break;
 
-		/* Always check if all rx buffers are allocated.  --SAW */
-		speedo_refill_rx_buffers(dev, 0);
 
 		if ((status & 0x5000) ||	/* Packet received, or Rx error. */
 			(sp->rx_ring_state&(RrNoMem|RrPostponed)) == RrPostponed)
 									/* Need to gather the postponed packet. */
 			speedo_rx(dev);
 
-		if (status & 0x1000) {
-			spin_lock(&sp->lock);
-			if ((status & 0x003c) == 0x0028) {		/* No more Rx buffers. */
-				struct RxFD *rxf;
-				printk(KERN_WARNING "%s: card reports no RX buffers.\n",
-						dev->name);
-				rxf = sp->rx_ringp[sp->cur_rx % RX_RING_SIZE];
-				if (rxf == NULL) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: NULL cur_rx in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else if (rxf == sp->last_rxf) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: cur_rx is last in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else
-					outb(RxResumeNoResources, ioaddr + SCBCmd);
-			} else if ((status & 0x003c) == 0x0008) { /* No resources. */
-				struct RxFD *rxf;
-				printk(KERN_WARNING "%s: card reports no resources.\n",
-						dev->name);
-				rxf = sp->rx_ringp[sp->cur_rx % RX_RING_SIZE];
-				if (rxf == NULL) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: NULL cur_rx in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else if (rxf == sp->last_rxf) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: cur_rx is last in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else {
-					/* Restart the receiver. */
-					outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
-						 ioaddr + SCBPointer);
-					outb(RxStart, ioaddr + SCBCmd);
-				}
-			}
-			sp->stats.rx_errors++;
-			spin_unlock(&sp->lock);
+		/* Always check if all rx buffers are allocated.  --SAW */
+		speedo_refill_rx_buffers(dev, 0);
+		
+		spin_lock(&sp->lock);
+		/*
+		 * The chip may have suspended reception for various reasons.
+		 * Check for that, and re-prime it should this be the case.
+		 */
+		switch ((status >> 2) & 0xf) {
+		case 0: /* Idle */
+			break;
+		case 1:	/* Suspended */
+		case 2:	/* No resources (RxFDs) */
+		case 9:	/* Suspended with no more RBDs */
+		case 10: /* No resources due to no RBDs */
+		case 12: /* Ready with no RBDs */
+			speedo_rx_soft_reset(dev);
+			break;
+		case 3:  case 5:  case 6:  case 7:  case 8:
+		case 11:  case 13:  case 14:  case 15:
+			/* these are all reserved values */
+			break;
 		}
-
-		if ((sp->rx_ring_state&(RrNoMem|RrNoResources)) == RrNoResources) {
-			printk(KERN_WARNING
-					"%s: restart the receiver after a possible hang.\n",
-					dev->name);
-			spin_lock(&sp->lock);
-			/* Restart the receiver.
-			   I'm not sure if it's always right to restart the receiver
-			   here but I don't know another way to prevent receiver hangs.
-			   1999/12/25 SAW */
-			outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
-				 ioaddr + SCBPointer);
-			outb(RxStart, ioaddr + SCBCmd);
-			sp->rx_ring_state &= ~RrNoResources;
-			spin_unlock(&sp->lock);
-		}
-
+		
+		
 		/* User interrupt, Command/Tx unit interrupt or CU not active. */
 		if (status & 0xA400) {
-			spin_lock(&sp->lock);
 			speedo_tx_buffer_gc(dev);
 			if (sp->tx_full
 				&& (int)(sp->cur_tx - sp->dirty_tx) < TX_QUEUE_UNFULL) {
@@ -1590,8 +1593,9 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				sp->tx_full = 0;
 				netif_wake_queue(dev); /* Attention: under a spinlock.  --SAW */
 			}
-			spin_unlock(&sp->lock);
 		}
+		
+		spin_unlock(&sp->lock);
 
 		if (--boguscnt < 0) {
 			printk(KERN_ERR "%s: Too much work at interrupt, status=0x%4.4x.\n",
@@ -2202,6 +2206,8 @@ static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 
 	if (!netif_running(dev))
 		return 0;
+		
+	del_timer_sync(&sp->timer);
 
 	netif_device_detach(dev);
 	outl(PortPartialReset, ioaddr + SCBPort);
@@ -2234,6 +2240,8 @@ static int eepro100_resume(struct pci_dev *pdev)
 	sp->rx_mode = -1;
 	sp->flow_ctrl = sp->partner = 0;
 	set_rx_mode(dev);
+	sp->timer.expires = RUN_AT(2*HZ);
+	add_timer(&sp->timer);
 	return 0;
 }
 #endif /* CONFIG_PM */

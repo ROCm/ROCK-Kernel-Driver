@@ -283,6 +283,10 @@ EXPORT_SYMBOL(lease_get_mtime);
 EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
 EXPORT_SYMBOL(dcache_readdir);
+EXPORT_SYMBOL(simple_statfs);
+EXPORT_SYMBOL(simple_lookup);
+EXPORT_SYMBOL(simple_dir_operations);
+EXPORT_SYMBOL(simple_dir_inode_operations);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
 EXPORT_SYMBOL(get_sb_bdev);
@@ -292,6 +296,8 @@ EXPORT_SYMBOL(get_sb_single);
 EXPORT_SYMBOL(kill_anon_super);
 EXPORT_SYMBOL(kill_litter_super);
 EXPORT_SYMBOL(deactivate_super);
+EXPORT_SYMBOL(sget);
+EXPORT_SYMBOL(set_anon_super);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);

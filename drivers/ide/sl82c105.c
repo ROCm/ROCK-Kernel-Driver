@@ -22,7 +22,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 extern char *ide_xfer_verbose (byte xfer_rate);
 
@@ -31,13 +31,13 @@ extern char *ide_xfer_verbose (byte xfer_rate);
  * times for the interface.  This has protection against run-away
  * timings.
  */
-static unsigned int get_timing_sl82c105(ide_pio_data_t *p)
+static unsigned int get_timing_sl82c105(struct ata_timing *t)
 {
 	unsigned int cmd_on;
 	unsigned int cmd_off;
 
-	cmd_on = (ide_pio_timings[p->pio_mode].active_time + 29) / 30;
-	cmd_off = (p->cycle_time - 30 * cmd_on + 29) / 30;
+	cmd_on = (t->active + 29) / 30;
+	cmd_off = (t->cycle - 30 * cmd_on + 29) / 30;
 
 	if (cmd_on > 32)
 		cmd_on = 32;
@@ -49,7 +49,7 @@ static unsigned int get_timing_sl82c105(ide_pio_data_t *p)
 	if (cmd_off == 0)
 		cmd_off = 1;
 
-	return (cmd_on - 1) << 8 | (cmd_off - 1) | (p->use_iordy ? 0x40 : 0x00);
+	return (cmd_on - 1) << 8 | (cmd_off - 1) | ((t->mode > XFER_PIO_2) ? 0x40 : 0x00);
 }
 
 /*
@@ -59,25 +59,21 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
-	ide_pio_data_t p;
+	struct ata_timing *t;
 	unsigned short drv_ctrl = 0x909;
 	unsigned int xfer_mode, reg;
 
 	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
 
-	pio = ide_get_best_pio_mode(drive, pio, 5, &p);
+	if (pio == 255)
+		xfer_mode = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		xfer_mode = XFER_PIO_0 + min_t(byte, pio, 4);
 
-	switch (pio) {
-	default:
-	case 0:		xfer_mode = XFER_PIO_0;		break;
-	case 1:		xfer_mode = XFER_PIO_1;		break;
-	case 2:		xfer_mode = XFER_PIO_2;		break;
-	case 3:		xfer_mode = XFER_PIO_3;		break;
-	case 4:		xfer_mode = XFER_PIO_4;		break;
-	}
+	t = ata_timing_data(xfer_mode);
 
 	if (ide_config_drive_speed(drive, xfer_mode) == 0)
-		drv_ctrl = get_timing_sl82c105(&p);
+		drv_ctrl = get_timing_sl82c105(t);
 
 	if (drive->using_dma == 0) {
 		/*
@@ -89,7 +85,7 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 
 		if (report) {
 			printk("%s: selected %s (%dns) (%04X)\n", drive->name,
-			       ide_xfer_verbose(xfer_mode), p.cycle_time, drv_ctrl);
+			       ide_xfer_verbose(xfer_mode), t->cycle, drv_ctrl);
 		}
 	}
 }

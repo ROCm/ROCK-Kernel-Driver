@@ -934,6 +934,10 @@ void usbvideo_Disconnect(struct usb_device *dev, void *ptr)
 	usb_dec_dev_use(uvd->dev);
 	uvd->dev = NULL;    	    /* USB device is no more */
 
+	video_unregister_device(&uvd->vdev);
+	if (uvd->debug > 0)
+		info("%s: Video unregistered.", proc);
+
 	if (uvd->user)
 		info("%s: In use, disconnect pending.", proc);
 	else
@@ -961,9 +965,6 @@ void usbvideo_CameraRelease(uvd_t *uvd)
 		err("%s: Illegal call", proc);
 		return;
 	}
-	video_unregister_device(&uvd->vdev);
-	if (uvd->debug > 0)
-		info("%s: Video unregistered.", proc);
 
 #if USES_PROC_FS
 	assert(uvd->handle != NULL);
@@ -1013,6 +1014,23 @@ static int usbvideo_find_struct(usbvideo_t *cams)
 	return rv;
 }
 
+static struct file_operations usbvideo_fops = {
+	owner:	  THIS_MODULE,
+	open:     usbvideo_v4l_open,
+	release:  usbvideo_v4l_close,
+	read:     usbvideo_v4l_read,
+	mmap:     usbvideo_v4l_mmap,
+	ioctl:    video_generic_ioctl,
+	llseek:   no_llseek,
+};
+static struct video_device usbvideo_template = {
+	owner:	      THIS_MODULE,
+	type:         VID_TYPE_CAPTURE,
+	hardware:     VID_HARDWARE_CPIA,
+	fops:         &usbvideo_fops,
+	kernel_ioctl: usbvideo_v4l_ioctl,
+};
+
 uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams)
 {
 	int i, devnum;
@@ -1050,20 +1068,8 @@ uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams)
 	RingQueue_Initialize(&uvd->dp);
 
 	/* Initialize video device structure */
-	memset(&uvd->vdev, 0, sizeof(uvd->vdev));
-	i = sprintf(uvd->vdev.name, "%s USB Camera", cams->drvName);
-	if (i >= sizeof(uvd->vdev.name)) {
-		err("Wrote too much into uvd->vdev.name, expect trouble!");
-	}
-	uvd->vdev.type = VID_TYPE_CAPTURE;
-	uvd->vdev.hardware = VID_HARDWARE_CPIA;
-	uvd->vdev.open = usbvideo_v4l_open;
-	uvd->vdev.close = usbvideo_v4l_close;
-	uvd->vdev.read = usbvideo_v4l_read;
-	uvd->vdev.write = usbvideo_v4l_write;
-	uvd->vdev.ioctl = usbvideo_v4l_ioctl;
-	uvd->vdev.mmap = usbvideo_v4l_mmap;
-	uvd->vdev.initialize = usbvideo_v4l_initialize;
+	uvd->vdev = usbvideo_template;
+	sprintf(uvd->vdev.name, "%.20s USB Camera", cams->drvName);
 	/*
 	 * The client is free to overwrite those because we
 	 * return control to the client's probe function right now.
@@ -1136,21 +1142,11 @@ int usbvideo_RegisterVideoDevice(uvd_t *uvd)
 
 /* ******************************************************************** */
 
-int usbvideo_v4l_initialize(struct video_device *dev)
+int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	return 0;
-}
-
-long usbvideo_v4l_write(struct video_device *dev, const char *buf,
-			unsigned long count, int noblock)
-{
-	return -EINVAL;
-}
-
-int usbvideo_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
-{
-	uvd_t *uvd = (uvd_t *) dev;
-	unsigned long start = (unsigned long) adr;
+	uvd_t *uvd = file->private_data;
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
 
 	if (!CAMERA_IS_OPERATIONAL(uvd))
@@ -1190,15 +1186,16 @@ int usbvideo_v4l_mmap(struct vm_area_struct *vma, struct video_device *dev, cons
  * 27-Jan-2000 Used USBVIDEO_NUMSBUF as number of URB buffers.
  * 24-May-2000 Corrected to prevent race condition (MOD_xxx_USE_COUNT).
  */
-int usbvideo_v4l_open(struct video_device *dev, int flags)
+int usbvideo_v4l_open(struct inode *inode, struct file *file)
 {
 	static const char proc[] = "usbvideo_v4l_open";
+	struct video_device *dev = video_devdata(file);
 	uvd_t *uvd = (uvd_t *) dev;
 	const int sb_size = FRAMES_PER_DESC * uvd->iso_packet_len;
 	int i, errCode = 0;
 
 	if (uvd->debug > 1)
-		info("%s($%p,$%08x", proc, dev, flags);
+		info("%s($%p", proc, dev);
 
 	usbvideo_ClientIncModCount(uvd);
 	down(&uvd->lock);
@@ -1280,6 +1277,7 @@ int usbvideo_v4l_open(struct video_device *dev, int flags)
 				if (uvd->debug > 1)
 					info("%s: Open succeeded.", proc);
 				uvd->user++;
+				file->private_data = uvd;
 			}
 		}
 	}
@@ -1303,10 +1301,11 @@ int usbvideo_v4l_open(struct video_device *dev, int flags)
  * 27-Jan-2000 Used USBVIDEO_NUMSBUF as number of URB buffers.
  * 24-May-2000 Moved MOD_DEC_USE_COUNT outside of code that can sleep.
  */
-void usbvideo_v4l_close(struct video_device *dev)
+int usbvideo_v4l_close(struct inode *inode, struct file *file)
 {
 	static const char proc[] = "usbvideo_v4l_close";
-	uvd_t *uvd = (uvd_t *)dev;
+	struct video_device *dev = file->private_data;
+	uvd_t *uvd = (uvd_t *) dev;
 	int i;
 
 	if (uvd->debug > 1)
@@ -1338,6 +1337,8 @@ void usbvideo_v4l_close(struct video_device *dev)
 
 	if (uvd->debug > 1)
 		info("%s: Completed.", proc);
+	file->private_data = NULL;
+	return 0;
 }
 
 /*
@@ -1348,118 +1349,103 @@ void usbvideo_v4l_close(struct video_device *dev)
  * History:
  * 22-Jan-2000 Corrected VIDIOCSPICT to reject unsupported settings.
  */
-int usbvideo_v4l_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
-	uvd_t *uvd = (uvd_t *)dev;
+	uvd_t *uvd = file->private_data;
 
 	if (!CAMERA_IS_OPERATIONAL(uvd))
-		return -EFAULT;
+		return -EIO;
 
 	switch (cmd) {
 		case VIDIOCGCAP:
 		{
-			if (copy_to_user(arg, &uvd->vcap, sizeof(uvd->vcap)))
-				return -EFAULT;
+			struct video_capability *b = arg;
+			*b = uvd->vcap;
 			return 0;
 		}
 		case VIDIOCGCHAN:
 		{
-			if (copy_to_user(arg, &uvd->vchan, sizeof(uvd->vchan)))
-				return -EFAULT;
+			struct video_channel *v = arg;
+			*v = uvd->vchan;
 			return 0;
 		}
 		case VIDIOCSCHAN:
-		{	/* Not used but we return success */
-			int v;
-			if (copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
+		{	
+			struct video_channel *v = arg;
+			if (v->channel != 0)
+				return -EINVAL;
 			return 0;
 		}
 		case VIDIOCGPICT:
 		{
-			if (copy_to_user(arg, &uvd->vpic, sizeof(uvd->vpic)))
-				return -EFAULT;
+			struct video_picture *pic = arg;
+			*pic = uvd->vpic;
 			return 0;
 		}
 		case VIDIOCSPICT:
 		{
-			struct video_picture tmp;
+			struct video_picture *pic = arg;
 			/*
 			 * Use temporary 'video_picture' structure to preserve our
 			 * own settings (such as color depth, palette) that we
 			 * aren't allowing everyone (V4L client) to change.
 			 */
-			if (copy_from_user(&tmp, arg, sizeof(tmp)))
-				return -EFAULT;
-			uvd->vpic.brightness = tmp.brightness;
-			uvd->vpic.hue = tmp.hue;
-			uvd->vpic.colour = tmp.colour;
-			uvd->vpic.contrast = tmp.contrast;
+			uvd->vpic.brightness = pic->brightness;
+			uvd->vpic.hue = pic->hue;
+			uvd->vpic.colour = pic->colour;
+			uvd->vpic.contrast = pic->contrast;
 			uvd->settingsAdjusted = 0;	/* Will force new settings */
 			return 0;
 		}
 		case VIDIOCSWIN:
 		{
-			struct video_window vw;
+			struct video_window *vw = arg;
 
-			if (copy_from_user(&vw, arg, sizeof(vw)))
-				return -EFAULT;
-			if (vw.flags)
+			if (vw->flags)
 				return -EINVAL;
-			if (vw.clipcount)
+			if (vw->clipcount)
 				return -EINVAL;
-			if (vw.width != VIDEOSIZE_X(uvd->canvas))
+			if (vw->width != VIDEOSIZE_X(uvd->canvas))
 				return -EINVAL;
-			if (vw.height != VIDEOSIZE_Y(uvd->canvas))
+			if (vw->height != VIDEOSIZE_Y(uvd->canvas))
 				return -EINVAL;
 
 			return 0;
 		}
 		case VIDIOCGWIN:
 		{
-			struct video_window vw;
+			struct video_window *vw = arg;
 
-			vw.x = 0;
-			vw.y = 0;
-			vw.width = VIDEOSIZE_X(uvd->canvas);
-			vw.height = VIDEOSIZE_Y(uvd->canvas);
-			vw.chromakey = 0;
+			vw->x = 0;
+			vw->y = 0;
+			vw->width = VIDEOSIZE_X(uvd->canvas);
+			vw->height = VIDEOSIZE_Y(uvd->canvas);
+			vw->chromakey = 0;
 			if (VALID_CALLBACK(uvd, getFPS))
-				vw.flags = GET_CALLBACK(uvd, getFPS)(uvd);
+				vw->flags = GET_CALLBACK(uvd, getFPS)(uvd);
 			else 
-				vw.flags = 10; /* FIXME: do better! */
-
-			if (copy_to_user(arg, &vw, sizeof(vw)))
-				return -EFAULT;
-
+				vw->flags = 10; /* FIXME: do better! */
 			return 0;
 		}
 		case VIDIOCGMBUF:
 		{
-			struct video_mbuf vm;
+			struct video_mbuf *vm = arg;
 
-			memset(&vm, 0, sizeof(vm));
-			vm.size = uvd->max_frame_size * 2;
-			vm.frames = 2;
-			vm.offsets[0] = 0;
-			vm.offsets[1] = uvd->max_frame_size;
-
-			if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-				return -EFAULT;
-
+			memset(vm, 0, sizeof(*vm));
+			vm->size = uvd->max_frame_size * 2;
+			vm->frames = 2;
+			vm->offsets[0] = 0;
+			vm->offsets[1] = uvd->max_frame_size;
 			return 0;
 		}
 		case VIDIOCMCAPTURE:
 		{
-			struct video_mmap vm;
+			struct video_mmap *vm = arg;
 
-			if (copy_from_user((void *)&vm, (void *)arg, sizeof(vm))) {
-				err("VIDIOCMCAPTURE: copy_from_user() failed.");
-				return -EFAULT;
-			}
 			if (uvd->debug >= 1) {
 				info("VIDIOCMCAPTURE: frame=%d. size=%dx%d, format=%d.",
-				    vm.frame, vm.width, vm.height, vm.format);
+				     vm->frame, vm->width, vm->height, vm->format);
 			}
 			/*
 			 * Check if the requested size is supported. If the requestor
@@ -1474,56 +1460,53 @@ int usbvideo_v4l_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 			 * what size we support (returned by VIDIOCGCAP). However vidcat,
 			 * for one, does not care and allows to ask for any size.
 			 */
-			if ((vm.width > VIDEOSIZE_X(uvd->canvas)) ||
-			    (vm.height > VIDEOSIZE_Y(uvd->canvas))) {
+			if ((vm->width > VIDEOSIZE_X(uvd->canvas)) ||
+			    (vm->height > VIDEOSIZE_Y(uvd->canvas))) {
 				if (uvd->debug > 0) {
 					info("VIDIOCMCAPTURE: Size=%dx%d too large; "
-					     "allowed only up to %ldx%ld", vm.width, vm.height,
+					     "allowed only up to %ldx%ld", vm->width, vm->height,
 					     VIDEOSIZE_X(uvd->canvas), VIDEOSIZE_Y(uvd->canvas));
 				}
 				return -EINVAL;
 			}
 			/* Check if the palette is supported */
-			if (((1L << vm.format) & uvd->paletteBits) == 0) {
+			if (((1L << vm->format) & uvd->paletteBits) == 0) {
 				if (uvd->debug > 0) {
 					info("VIDIOCMCAPTURE: format=%d. not supported"
 					     " (paletteBits=$%08lx)",
-					     vm.format, uvd->paletteBits);
+					     vm->format, uvd->paletteBits);
 				}
 				return -EINVAL;
 			}
-			if ((vm.frame != 0) && (vm.frame != 1)) {
-				err("VIDIOCMCAPTURE: vm.frame=%d. !E [0,1]", vm.frame);
+			if ((vm->frame != 0) && (vm->frame != 1)) {
+				err("VIDIOCMCAPTURE: vm.frame=%d. !E [0,1]", vm->frame);
 				return -EINVAL;
 			}
-			if (uvd->frame[vm.frame].frameState == FrameState_Grabbing) {
+			if (uvd->frame[vm->frame].frameState == FrameState_Grabbing) {
 				/* Not an error - can happen */
 			}
-			uvd->frame[vm.frame].request = VIDEOSIZE(vm.width, vm.height);
-			uvd->frame[vm.frame].palette = vm.format;
+			uvd->frame[vm->frame].request = VIDEOSIZE(vm->width, vm->height);
+			uvd->frame[vm->frame].palette = vm->format;
 
 			/* Mark it as ready */
-			uvd->frame[vm.frame].frameState = FrameState_Ready;
+			uvd->frame[vm->frame].frameState = FrameState_Ready;
 
-			return usbvideo_NewFrame(uvd, vm.frame);
+			return usbvideo_NewFrame(uvd, vm->frame);
 		}
 		case VIDIOCSYNC:
 		{
-			int frameNum, ret;
+			int *frameNum = arg;
+			int ret;
 
-			if (copy_from_user((void *)&frameNum, arg, sizeof(frameNum))) {
-				err("VIDIOCSYNC: copy_from_user() failed.");
-				return -EFAULT;
-			}
-			if(frameNum < 0 || frameNum >= USBVIDEO_NUMFRAMES)
+			if (*frameNum < 0 || *frameNum >= USBVIDEO_NUMFRAMES)
 				return -EINVAL;
 				
 			if (uvd->debug >= 1)
-				info("VIDIOCSYNC: syncing to frame %d.", frameNum);
+				info("VIDIOCSYNC: syncing to frame %d.", *frameNum);
 			if (uvd->flags & FLAGS_NO_DECODING)
-				ret = usbvideo_GetFrame(uvd, frameNum);
+				ret = usbvideo_GetFrame(uvd, *frameNum);
 			else if (VALID_CALLBACK(uvd, getFrame)) {
-				ret = GET_CALLBACK(uvd, getFrame)(uvd, frameNum);
+				ret = GET_CALLBACK(uvd, getFrame)(uvd, *frameNum);
 				if ((ret < 0) && (uvd->debug >= 1)) {
 					err("VIDIOCSYNC: getFrame() returned %d.", ret);
 				}
@@ -1538,19 +1521,14 @@ int usbvideo_v4l_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 			 * the user space and it's up to the application to
 			 * make use of it until it asks for another frame.
 			 */
-			uvd->frame[frameNum].frameState = FrameState_Unused;
+			uvd->frame[*frameNum].frameState = FrameState_Unused;
 			return ret;
 		}
 		case VIDIOCGFBUF:
 		{
-			struct video_buffer vb;
+			struct video_buffer *vb = arg;
 
-			memset(&vb, 0, sizeof(vb));
-			vb.base = NULL;	/* frame buffer not supported, not used */
-
-			if (copy_to_user((void *)arg, (void *)&vb, sizeof(vb)))
-				return -EFAULT;
-
+			memset(vb, 0, sizeof(*vb));
  			return 0;
  		}
 		case VIDIOCKEY:
@@ -1588,10 +1566,12 @@ int usbvideo_v4l_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
  * 20-Oct-2000 Created.
  * 01-Nov-2000 Added mutex (uvd->lock).
  */
-long usbvideo_v4l_read(struct video_device *dev, char *buf, unsigned long count, int noblock)
+int usbvideo_v4l_read(struct file *file, char *buf,
+		      size_t count, loff_t *ppos)
 {
 	static const char proc[] = "usbvideo_v4l_read";
-	uvd_t *uvd = (uvd_t *) dev;
+	uvd_t *uvd = file->private_data;
+	int noblock = file->f_flags & O_NONBLOCK;
 	int frmx = -1;
 	usbvideo_frame_t *frame;
 
@@ -1599,7 +1579,7 @@ long usbvideo_v4l_read(struct video_device *dev, char *buf, unsigned long count,
 		return -EFAULT;
 
 	if (uvd->debug >= 1)
-		info("%s: %ld. bytes, noblock=%d.", proc, count, noblock);
+		info("%s: %d. bytes, noblock=%d.", proc, count, noblock);
 
 	down(&uvd->lock);	
 
@@ -1716,7 +1696,7 @@ long usbvideo_v4l_read(struct video_device *dev, char *buf, unsigned long count,
 	/* Update last read position */
 	frame->seqRead_Index += count;
 	if (uvd->debug >= 1) {
-		err("%s: {copy} count used=%ld, new seqRead_Index=%ld",
+		err("%s: {copy} count used=%d, new seqRead_Index=%ld",
 			proc, count, frame->seqRead_Index);
 	}
 

@@ -464,12 +464,16 @@ static inline int reset_mac( pegasus_t *pegasus )
 	if ( i == REG_TIMEOUT )
 		return 1;
 
-	if ( usb_dev_id[pegasus->dev_index].vendor == VENDOR_LINKSYS ||
-	     usb_dev_id[pegasus->dev_index].vendor == VENDOR_DLINK ) {
+	if (usb_dev_id[pegasus->dev_index].vendor == VENDOR_LINKSYS ||
+	    usb_dev_id[pegasus->dev_index].vendor == VENDOR_DLINK) {
 		__u16	auxmode;
-
-		read_mii_word( pegasus, 0, MII_TPISTATUS, &auxmode );
-		write_mii_word( pegasus, 0, MII_TPISTATUS, auxmode | 4 );
+		read_mii_word(pegasus, 1, MII_TPISTATUS, &auxmode);
+		write_mii_word(pegasus, 1, MII_TPISTATUS, auxmode | 4);
+	}
+	if (usb_dev_id[pegasus->dev_index].vendor == VENDOR_ELCON) {
+		__u16   auxmode;
+		read_mii_word(pegasus, 3, 0x1b, &auxmode);
+		write_mii_word(pegasus, 3, 0x1b, auxmode | 4);
 	}
 
 	return	0;

@@ -183,7 +183,7 @@ static struct pci_driver e1000_driver = {
 	name:     e1000_driver_name,
 	id_table: e1000_pci_tbl,
 	probe:    e1000_probe,
-	remove:   e1000_remove,
+	remove:   __devexit_p(e1000_remove),
 	/* Power Managment Hooks */
 	suspend:  NULL,
 	resume:   NULL

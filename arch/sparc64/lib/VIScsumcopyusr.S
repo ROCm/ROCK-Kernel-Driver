@@ -29,6 +29,7 @@
 #include <asm/asi.h>
 #include <asm/page.h>
 #include <asm/visasm.h>
+#include <asm/thread_info.h>
 #define ASI_BLK_XOR	0
 #define ASI_BLK_XOR1	(ASI_BLK_P ^ (ASI_BLK_P >> 3) ^ ASI_P)
 #define ASI_BLK_OR	(ASI_BLK_P & ~ASI_P)
@@ -860,9 +861,8 @@ ett:	rd		%gsr, %x3		/*  LSU		Group+4bubbles	*/
 1:	retl					/*  CTI		Group brk forced*/
 	 srl		%src, 0, %src		/*  IEU0			*/
 #else
-1:	sethi		%uhi(PAGE_OFFSET), %g4	/*  IEU0	Group		*/
-	retl					/*  CTI		Group brk forced*/
-	 sllx		%g4, 32, %g4		/*  IEU0			*/
+1:	retl					/*  CTI		Group brk forced*/
+	 ldx		[%g6 + TI_TASK], %g4	/*  Load			*/
 #endif
 26:	andcc		%len, 8, %g0		/*  IEU1	Group		*/
 	be,pn		%icc, 1f		/*  CTI				*/

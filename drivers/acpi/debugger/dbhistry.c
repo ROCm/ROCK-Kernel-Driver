@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dbhistry - debugger HISTORY command
- *              $Revision: 19 $
+ *              $Revision: 22 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbhistry")
+	 ACPI_MODULE_NAME    ("dbhistry")
 
 
 #define HI_NO_HISTORY       0
@@ -78,10 +78,9 @@ acpi_db_add_to_history (
 	NATIVE_CHAR             *command_line)
 {
 
-
 	/* Put command into the next available slot */
 
-	STRCPY (acpi_gbl_history_buffer[acpi_gbl_next_history_index].command, command_line);
+	ACPI_STRCPY (acpi_gbl_history_buffer[acpi_gbl_next_history_index].command, command_line);
 
 	acpi_gbl_history_buffer[acpi_gbl_next_history_index].cmd_num = acpi_gbl_next_cmd_num;
 
@@ -100,12 +99,10 @@ acpi_db_add_to_history (
 		acpi_gbl_next_history_index = 0;
 	}
 
-
 	acpi_gbl_next_cmd_num++;
 	if (acpi_gbl_num_history < HISTORY_SIZE) {
 		acpi_gbl_num_history++;
 	}
-
 }
 
 
@@ -171,9 +168,8 @@ acpi_db_get_from_history (
 	}
 
 	else {
-		cmd_num = STRTOUL (command_num_arg, NULL, 0);
+		cmd_num = ACPI_STRTOUL (command_num_arg, NULL, 0);
 	}
-
 
 	/* Search history buffer */
 

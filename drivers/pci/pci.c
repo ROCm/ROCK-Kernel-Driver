@@ -849,18 +849,19 @@ pci_set_master(struct pci_dev *dev)
 	pcibios_set_master(dev);
 }
 
+#ifndef HAVE_ARCH_PCI_MWI
 /**
- * pdev_set_mwi - arch helper function for pcibios_set_mwi
+ * pci_generic_prep_mwi - helper function for pci_set_mwi
  * @dev: the PCI device for which MWI is enabled
  *
- * Helper function for implementation the arch-specific pcibios_set_mwi
+ * Helper function for generic implementation of pcibios_prep_mwi
  * function.  Originally copied from drivers/net/acenic.c.
  * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
  *
- * RETURNS: An appriopriate -ERRNO error value on eror, or zero for success.
+ * RETURNS: An appropriate -ERRNO error value on eror, or zero for success.
  */
-int
-pdev_set_mwi(struct pci_dev *dev)
+static int
+pci_generic_prep_mwi(struct pci_dev *dev)
 {
 	int rc = 0;
 	u8 cache_size;
@@ -874,8 +875,8 @@ pdev_set_mwi(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cache_size);
 	cache_size <<= 2;
 	if (cache_size != SMP_CACHE_BYTES) {
-		printk(KERN_WARNING "PCI: %s PCI cache line size set incorrectly "
-		       "(%i bytes) by BIOS/FW, ",
+		printk(KERN_WARNING "PCI: %s PCI cache line size set "
+		       "incorrectly (%i bytes) by BIOS/FW, ",
 		       dev->slot_name, cache_size);
 		if (cache_size > SMP_CACHE_BYTES) {
 			printk("expecting %i\n", SMP_CACHE_BYTES);
@@ -889,6 +890,7 @@ pdev_set_mwi(struct pci_dev *dev)
 
 	return rc;
 }
+#endif /* !HAVE_ARCH_PCI_MWI */
 
 /**
  * pci_set_mwi - enables memory-write-validate PCI transaction
@@ -907,9 +909,9 @@ pci_set_mwi(struct pci_dev *dev)
 	u16 cmd;
 
 #ifdef HAVE_ARCH_PCI_MWI
-	rc = pcibios_set_mwi(dev);
+	rc = pcibios_prep_mwi(dev);
 #else
-	rc = pdev_set_mwi(dev);
+	rc = pci_generic_prep_mwi(dev);
 #endif
 
 	if (rc)
@@ -1011,13 +1013,15 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 			l = 0;
 		if ((l & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY) {
 			res->start = l & PCI_BASE_ADDRESS_MEM_MASK;
+			res->flags |= l & ~PCI_BASE_ADDRESS_MEM_MASK;
 			sz = pci_size(sz, PCI_BASE_ADDRESS_MEM_MASK);
 		} else {
 			res->start = l & PCI_BASE_ADDRESS_IO_MASK;
+			res->flags |= l & ~PCI_BASE_ADDRESS_IO_MASK;
 			sz = pci_size(sz, PCI_BASE_ADDRESS_IO_MASK & 0xffff);
 		}
 		res->end = res->start + (unsigned long) sz;
-		res->flags |= (l & 0xf) | pci_calc_resource_flags(l);
+		res->flags |= pci_calc_resource_flags(l);
 		if ((l & (PCI_BASE_ADDRESS_SPACE | PCI_BASE_ADDRESS_MEM_TYPE_MASK))
 		    == (PCI_BASE_ADDRESS_SPACE_MEMORY | PCI_BASE_ADDRESS_MEM_TYPE_64)) {
 			pci_read_config_dword(dev, reg+4, &l);
@@ -1706,7 +1710,6 @@ struct pci_pool {	/* the pool */
 	spinlock_t		lock;
 	size_t			blocks_per_page;
 	size_t			size;
-	int			flags;
 	struct pci_dev		*dev;
 	size_t			allocation;
 	char			name [32];
@@ -1723,8 +1726,6 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
 #define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
 #define	POOL_POISON_BYTE	0xa7
 
-// #define CONFIG_PCIPOOL_DEBUG
-
 
 /**
  * pci_pool_create - Creates a pool of pci consistent memory blocks, for dma.
@@ -1733,7 +1734,7 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
  * @size: size of the blocks in this pool.
  * @align: alignment requirement for blocks; must be a power of two
  * @allocation: returned blocks won't cross this boundary (or zero)
- * @flags: SLAB_* flags (not all are supported).
+ * @mem_flags: SLAB_* flags.
  *
  * Returns a pci allocation pool with the requested characteristics, or
  * null if one can't be created.  Given one of these pools, pci_pool_alloc()
@@ -1749,7 +1750,7 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
  */
 struct pci_pool *
 pci_pool_create (const char *name, struct pci_dev *pdev,
-	size_t size, size_t align, size_t allocation, int flags)
+	size_t size, size_t align, size_t allocation, int mem_flags)
 {
 	struct pci_pool		*retval;
 
@@ -1773,12 +1774,8 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	} else if (allocation < size)
 		return 0;
 
-	if (!(retval = kmalloc (sizeof *retval, flags)))
+	if (!(retval = kmalloc (sizeof *retval, mem_flags)))
 		return retval;
-
-#ifdef	CONFIG_PCIPOOL_DEBUG
-	flags |= SLAB_POISON;
-#endif
 
 	strncpy (retval->name, name, sizeof retval->name);
 	retval->name [sizeof retval->name - 1] = 0;
@@ -1787,16 +1784,9 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	INIT_LIST_HEAD (&retval->page_list);
 	spin_lock_init (&retval->lock);
 	retval->size = size;
-	retval->flags = flags;
 	retval->allocation = allocation;
 	retval->blocks_per_page = allocation / size;
 	init_waitqueue_head (&retval->waitq);
-
-#ifdef CONFIG_PCIPOOL_DEBUG
-	printk (KERN_DEBUG "pcipool create %s/%s size %d, %d/page (%d alloc)\n",
-		pdev ? pdev->slot_name : NULL, retval->name, size,
-		retval->blocks_per_page, allocation);
-#endif
 
 	return retval;
 }
@@ -1820,8 +1810,9 @@ pool_alloc_page (struct pci_pool *pool, int mem_flags)
 					    &page->dma);
 	if (page->vaddr) {
 		memset (page->bitmap, 0xff, mapsize);	// bit set == free
-		if (pool->flags & SLAB_POISON)
-			memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
+#ifdef	CONFIG_DEBUG_SLAB
+		memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
+#endif
 		list_add (&page->page_list, &pool->page_list);
 	} else {
 		kfree (page);
@@ -1847,8 +1838,9 @@ pool_free_page (struct pci_pool *pool, struct pci_page *page)
 {
 	dma_addr_t	dma = page->dma;
 
-	if (pool->flags & SLAB_POISON)
-		memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
+#ifdef	CONFIG_DEBUG_SLAB
+	memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
+#endif
 	pci_free_consistent (pool->dev, pool->allocation, page->vaddr, dma);
 	list_del (&page->page_list);
 	kfree (page);
@@ -1866,12 +1858,6 @@ void
 pci_pool_destroy (struct pci_pool *pool)
 {
 	unsigned long		flags;
-
-#ifdef CONFIG_PCIPOOL_DEBUG
-	printk (KERN_DEBUG "pcipool destroy %s/%s\n",
-		pool->dev ? pool->dev->slot_name : NULL,
-		pool->name);
-#endif
 
 	spin_lock_irqsave (&pool->lock, flags);
 	while (!list_empty (&pool->page_list)) {
@@ -2006,30 +1992,27 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 			pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
-#ifdef	CONFIG_PCIPOOL_DEBUG
-	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
-		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%lx\n",
-			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, vaddr, (unsigned long) dma);
-		return;
-	}
-#endif
 
 	block = dma - page->dma;
 	block /= pool->size;
 	map = block / BITS_PER_LONG;
 	block %= BITS_PER_LONG;
 
-#ifdef	CONFIG_PCIPOOL_DEBUG
+#ifdef	CONFIG_DEBUG_SLAB
+	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
+		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%lx\n",
+			pool->dev ? pool->dev->slot_name : NULL,
+			pool->name, vaddr, (unsigned long) dma);
+		return;
+	}
 	if (page->bitmap [map] & (1UL << block)) {
 		printk (KERN_ERR "pci_pool_free %s/%s, dma %x already free\n",
 			pool->dev ? pool->dev->slot_name : NULL,
 			pool->name, dma);
 		return;
 	}
+	memset (vaddr, POOL_POISON_BYTE, pool->size);
 #endif
-	if (pool->flags & SLAB_POISON)
-		memset (vaddr, POOL_POISON_BYTE, pool->size);
 
 	spin_lock_irqsave (&pool->lock, flags);
 	set_bit (block, &page->bitmap [map]);
@@ -2099,7 +2082,6 @@ EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_set_master);
 EXPORT_SYMBOL(pci_set_mwi);
 EXPORT_SYMBOL(pci_clear_mwi);
-EXPORT_SYMBOL(pdev_set_mwi);
 EXPORT_SYMBOL(pci_set_dma_mask);
 EXPORT_SYMBOL(pci_dac_set_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 82 $
+ *              $Revision: 92 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,10 +32,12 @@
 #include "amlcode.h"
 #include "acdebug.h"
 #include "acexcep.h"
+#include "acparser.h"
+#include "acdispat.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES
-	 MODULE_NAME         ("utxface")
+	 ACPI_MODULE_NAME    ("utxface")
 
 
 /*******************************************************************************
@@ -57,10 +59,10 @@ acpi_initialize_subsystem (
 {
 	acpi_status             status;
 
-	FUNCTION_TRACE ("Acpi_initialize_subsystem");
+	ACPI_FUNCTION_TRACE ("Acpi_initialize_subsystem");
 
 
-	DEBUG_EXEC(acpi_ut_init_stack_ptr_trace ());
+	ACPI_DEBUG_EXEC (acpi_ut_init_stack_ptr_trace ());
 
 
 	/* Initialize all globals used by the subsystem */
@@ -71,7 +73,7 @@ acpi_initialize_subsystem (
 
 	status = acpi_os_initialize ();
 	if (ACPI_FAILURE (status)) {
-		REPORT_ERROR (("OSD failed to initialize, %s\n",
+		ACPI_REPORT_ERROR (("OSD failed to initialize, %s\n",
 			acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
@@ -80,7 +82,7 @@ acpi_initialize_subsystem (
 
 	status = acpi_ut_mutex_initialize ();
 	if (ACPI_FAILURE (status)) {
-		REPORT_ERROR (("Global mutex creation failure, %s\n",
+		ACPI_REPORT_ERROR (("Global mutex creation failure, %s\n",
 			acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
@@ -92,7 +94,7 @@ acpi_initialize_subsystem (
 
 	status = acpi_ns_root_initialize ();
 	if (ACPI_FAILURE (status)) {
-		REPORT_ERROR (("Namespace initialization failure, %s\n",
+		ACPI_REPORT_ERROR (("Namespace initialization failure, %s\n",
 			acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
@@ -100,7 +102,7 @@ acpi_initialize_subsystem (
 
 	/* If configured, initialize the AML debugger */
 
-	DEBUGGER_EXEC (acpi_db_initialize ());
+	ACPI_DEBUGGER_EXEC (acpi_db_initialize ());
 
 	return_ACPI_STATUS (status);
 }
@@ -126,20 +128,13 @@ acpi_enable_subsystem (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE ("Acpi_enable_subsystem");
+	ACPI_FUNCTION_TRACE ("Acpi_enable_subsystem");
 
-
-	/* Sanity check the FADT for valid values */
-
-	status = acpi_ut_validate_fadt ();
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/*
-	 * Install the default Op_region handlers. These are
-	 * installed unless other handlers have already been
-	 * installed via the Install_address_space_handler interface
+	 * Install the default Op_region handlers. These are installed unless
+	 * other handlers have already been installed via the
+	 * Install_address_space_handler interface
 	 */
 	if (!(flags & ACPI_NO_ADDRESS_SPACE_INIT)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing default address space handlers\n"));
@@ -152,6 +147,7 @@ acpi_enable_subsystem (
 
 	/*
 	 * We must initialize the hardware before we can enable ACPI.
+	 * FADT values are validated here.
 	 */
 	if (!(flags & ACPI_NO_HARDWARE_INIT)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Initializing ACPI hardware\n"));
@@ -190,6 +186,16 @@ acpi_enable_subsystem (
 		}
 	}
 
+	/* Install SCI handler, Global Lock handler, GPE handlers */
+
+	if (!(flags & ACPI_NO_HANDLER_INIT)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Init] Installing SCI/GL/GPE handlers\n"));
+
+		status = acpi_ev_handler_initialize ();
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+	}
 
 	/*
 	 * Initialize all device objects in the namespace
@@ -203,7 +209,6 @@ acpi_enable_subsystem (
 			return_ACPI_STATUS (status);
 		}
 	}
-
 
 	/*
 	 * Initialize the objects that remain uninitialized.  This
@@ -219,8 +224,14 @@ acpi_enable_subsystem (
 		}
 	}
 
-	acpi_gbl_startup_flags |= ACPI_INITIALIZED_OK;
+	/*
+	 * Empty the caches (delete the cached objects) on the assumption that
+	 * the table load filled them up more than they will be at runtime --
+	 * thus wasting non-paged memory.
+	 */
+	status = acpi_purge_cached_objects ();
 
+	acpi_gbl_startup_flags |= ACPI_INITIALIZED_OK;
 	return_ACPI_STATUS (status);
 }
 
@@ -240,16 +251,12 @@ acpi_enable_subsystem (
 acpi_status
 acpi_terminate (void)
 {
-	FUNCTION_TRACE ("Acpi_terminate");
+	ACPI_FUNCTION_TRACE ("Acpi_terminate");
 
 
 	/* Terminate the AML Debugger if present */
 
-	DEBUGGER_EXEC(acpi_gbl_db_terminate_threads = TRUE);
-
-	/* TBD: [Investigate] This is no longer needed?*/
-/*    Acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_READY); */
-
+	ACPI_DEBUGGER_EXEC(acpi_gbl_db_terminate_threads = TRUE);
 
 	/* Shutdown and free all resources */
 
@@ -328,42 +335,39 @@ acpi_get_system_info (
 {
 	acpi_system_info        *info_ptr;
 	u32                     i;
+	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_get_system_info");
+	ACPI_FUNCTION_TRACE ("Acpi_get_system_info");
 
 
-	/*
-	 *  Must have a valid buffer
-	 */
-	if ((!out_buffer)         ||
-		(!out_buffer->pointer)) {
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	/* Parameter validation */
+
+	status = acpi_ut_validate_buffer (out_buffer);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
 
-	if (out_buffer->length < sizeof (acpi_system_info)) {
-		/*
-		 *  Caller's buffer is too small
-		 */
-		out_buffer->length = sizeof (acpi_system_info);
+	/* Validate/Allocate/Clear caller buffer */
 
-		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
+	status = acpi_ut_initialize_buffer (out_buffer, sizeof (acpi_system_info));
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
 
-
 	/*
-	 *  Set return length and get data
+	 * Populate the return buffer
 	 */
-	out_buffer->length = sizeof (acpi_system_info);
 	info_ptr = (acpi_system_info *) out_buffer->pointer;
 
 	info_ptr->acpi_ca_version   = ACPI_CA_VERSION;
 
 	/* System flags (ACPI capabilities) */
 
-	info_ptr->flags             = acpi_gbl_system_flags;
+	info_ptr->flags             = ACPI_SYS_MODE_ACPI;
 
 	/* Timer resolution - 24 or 32 bits  */
+
 	if (!acpi_gbl_FADT) {
 		info_ptr->timer_resolution = 0;
 	}
@@ -395,3 +399,28 @@ acpi_get_system_info (
 }
 
 
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_purge_cached_objects
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Empty all caches (delete the cached objects)
+ *
+ ****************************************************************************/
+
+acpi_status
+acpi_purge_cached_objects (void)
+{
+	ACPI_FUNCTION_TRACE ("Acpi_purge_cached_objects");
+
+
+	acpi_ut_delete_generic_state_cache ();
+	acpi_ut_delete_object_cache ();
+	acpi_ds_delete_walk_state_cache ();
+	acpi_ps_delete_parse_cache ();
+
+	return_ACPI_STATUS (AE_OK);
+}

@@ -25,7 +25,6 @@
 #include "../../../sound/oss/aci.h"
 #include "miropcm20-rds-core.h"
 
-static int users = 0;
 static int radio_nr = -1;
 MODULE_PARM(radio_nr, "i");
 
@@ -122,96 +121,86 @@ static int pcm20_getflags(struct pcm20_device *dev, __u32 *flags, __u16 *signal)
 	return 0;
 }
 
-static int pcm20_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int pcm20_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
-	struct pcm20_device *pcm20=dev->priv;
+	struct video_device *dev = video_devdata(file);
+	struct pcm20_device *pcm20 = dev->priv;
 	int i;
 	
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
-			v.type=VID_TYPE_TUNER;
-			strcpy(v.name, "Miro PCM20");
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			strcpy(v->name, "Miro PCM20");
+			v->channels=1;
+			v->audios=1;
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */ 
+			struct video_tuner *v = arg;
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v.rangelow=87*16000;
-			v.rangehigh=108*16000;
-			pcm20_getflags(pcm20, &v.flags, &v.signal);
-			v.flags|=VIDEO_TUNER_LOW;
-			v.mode=VIDEO_MODE_AUTO;
-			strcpy(v.name, "FM");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			v->rangelow=87*16000;
+			v->rangehigh=108*16000;
+			pcm20_getflags(pcm20, &v->flags, &v->signal);
+			v->flags|=VIDEO_TUNER_LOW;
+			v->mode=VIDEO_MODE_AUTO;
+			strcpy(v->name, "FM");
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
 		case VIDIOCGFREQ:
-			if(copy_to_user(arg, &pcm20->freq, sizeof(pcm20->freq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			*freq = pcm20->freq;
 			return 0;
+		}
 		case VIDIOCSFREQ:
-			if(copy_from_user(&pcm20->freq, arg, sizeof(pcm20->freq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			pcm20->freq = *freq;
 			i=pcm20_setfreq(pcm20, pcm20->freq);
 #if DEBUG
 			printk("First view (setfreq): 0x%x\n", i);
 #endif
 			return i;
+		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
-			memset(&v,0, sizeof(v));
-			v.flags=VIDEO_AUDIO_MUTABLE;
+			struct video_audio *v = arg;
+			memset(v,0, sizeof(*v));
+			v->flags=VIDEO_AUDIO_MUTABLE;
 			if (pcm20->muted)
-				v.flags|=VIDEO_AUDIO_MUTE;
-			v.mode=VIDEO_SOUND_STEREO;
+				v->flags|=VIDEO_AUDIO_MUTE;
+			v->mode=VIDEO_SOUND_STEREO;
 			if (pcm20->stereo)
-				v.mode|=VIDEO_SOUND_MONO;
-			/* v.step=2048; */
-			strcpy(v.name, "Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+				v->mode|=VIDEO_SOUND_MONO;
+			/* v->step=2048; */
+			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;
-			if(v.audio) 
+			struct video_audio *v = arg;
+			if(v->audio) 
 				return -EINVAL;
 
-			pcm20_mute(pcm20, !!(v.flags&VIDEO_AUDIO_MUTE));
-			if(v.flags&VIDEO_SOUND_MONO)
+			pcm20_mute(pcm20, !!(v->flags&VIDEO_AUDIO_MUTE));
+			if(v->flags&VIDEO_SOUND_MONO)
 				pcm20_stereo(pcm20, 0);
-			if(v.flags&VIDEO_SOUND_STEREO)
+			if(v->flags&VIDEO_SOUND_STEREO)
 				pcm20_stereo(pcm20, 1);
 
 			return 0;
@@ -221,25 +210,18 @@ static int pcm20_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int pcm20_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-static void pcm20_close(struct video_device *dev)
-{
-	users--;
-	MOD_DEC_USE_COUNT;
-}
-
 static struct pcm20_device pcm20_unit = {
 	freq:   87*16000,
 	muted:  1,
 	stereo: 0
+};
+
+static struct file_operations pcm20_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
 };
 
 static struct video_device pcm20_radio = {
@@ -247,9 +229,8 @@ static struct video_device pcm20_radio = {
 	name:		"Miro PCM 20 radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_RTRACK,
-	open:		pcm20_open,
-	close:		pcm20_close,
-	ioctl:		pcm20_ioctl,
+	fops:           &pcm20_fops,
+	kernel_ioctl:	pcm20_ioctl,
 	priv:		&pcm20_unit
 };
 

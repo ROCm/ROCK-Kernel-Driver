@@ -97,6 +97,13 @@ struct qnx4_super_block {
 #define QNX4DEBUG(X) (void) 0
 #endif
 
+struct qnx4_sb_info {
+	struct buffer_head	*sb_buf;	/* superblock buffer */
+	struct qnx4_super_block	*sb;		/* our superblock */
+	unsigned int		Version;	/* may be useful */
+	struct qnx4_inode_entry	*BitMap;	/* useful */
+};
+
 struct qnx4_inode_info {
 	struct qnx4_inode_entry raw;
 	unsigned long mmu_private;
@@ -125,6 +132,11 @@ extern int qnx4_rmdir(struct inode *dir, struct dentry *dentry);
 extern int qnx4_sync_file(struct file *file, struct dentry *dentry, int);
 extern int qnx4_sync_inode(struct inode *inode);
 extern int qnx4_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh, int create);
+
+static inline struct qnx4_sb_info *qnx4_sb(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline struct qnx4_inode_info *qnx4_i(struct inode *inode)
 {

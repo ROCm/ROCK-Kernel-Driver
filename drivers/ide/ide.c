@@ -149,7 +149,7 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /*
  * Those will be moved into separate header files eventually.
@@ -194,97 +194,6 @@ extern void buddha_init(void);
 extern void pnpide_init(int);
 #endif
 
-#ifdef CONFIG_BLK_DEV_IDE_MODES
-/*
- * Constant tables for PIO mode programming:
- */
-const ide_pio_timings_t ide_pio_timings[6] = {
-	{ 70,	165,	600 },	/* PIO Mode 0 */
-	{ 50,	125,	383 },	/* PIO Mode 1 */
-	{ 30,	100,	240 },	/* PIO Mode 2 */
-	{ 30,	80,	180 },	/* PIO Mode 3 with IORDY */
-	{ 25,	70,	120 },	/* PIO Mode 4 with IORDY */
-	{ 20,	50,	100 }	/* PIO Mode 5 with IORDY (nonstandard) */
-};
-
-/*
- * Black list. Some drives incorrectly report their maximal PIO mode,
- * at least in respect to CMD640. Here we keep info on some known drives.
- */
-static struct ide_pio_info {
-	const char	*name;
-	int		pio;
-} ide_pio_blacklist[] = {
-/*	{ "Conner Peripherals 1275MB - CFS1275A", 4 }, */
-	{ "Conner Peripherals 540MB - CFS540A", 3 },
-
-	{ "WDC AC2700",  3 },
-	{ "WDC AC2540",  3 },
-	{ "WDC AC2420",  3 },
-	{ "WDC AC2340",  3 },
-	{ "WDC AC2250",  0 },
-	{ "WDC AC2200",  0 },
-	{ "WDC AC21200", 4 },
-	{ "WDC AC2120",  0 },
-	{ "WDC AC2850",  3 },
-	{ "WDC AC1270",  3 },
-	{ "WDC AC1170",  1 },
-	{ "WDC AC1210",  1 },
-	{ "WDC AC280",   0 },
-/*	{ "WDC AC21000", 4 }, */
-	{ "WDC AC31000", 3 },
-	{ "WDC AC31200", 3 },
-/*	{ "WDC AC31600", 4 }, */
-
-	{ "Maxtor 7131 AT", 1 },
-	{ "Maxtor 7171 AT", 1 },
-	{ "Maxtor 7213 AT", 1 },
-	{ "Maxtor 7245 AT", 1 },
-	{ "Maxtor 7345 AT", 1 },
-	{ "Maxtor 7546 AT", 3 },
-	{ "Maxtor 7540 AV", 3 },
-
-	{ "SAMSUNG SHD-3121A", 1 },
-	{ "SAMSUNG SHD-3122A", 1 },
-	{ "SAMSUNG SHD-3172A", 1 },
-
-/*	{ "ST51080A", 4 },
- *	{ "ST51270A", 4 },
- *	{ "ST31220A", 4 },
- *	{ "ST31640A", 4 },
- *	{ "ST32140A", 4 },
- *	{ "ST3780A",  4 },
- */
-	{ "ST5660A",  3 },
-	{ "ST3660A",  3 },
-	{ "ST3630A",  3 },
-	{ "ST3655A",  3 },
-	{ "ST3391A",  3 },
-	{ "ST3390A",  1 },
-	{ "ST3600A",  1 },
-	{ "ST3290A",  0 },
-	{ "ST3144A",  0 },
-	{ "ST3491A",  1 },	/* reports 3, should be 1 or 2 (depending on
-				 * drive) according to Seagates FIND-ATA program */
-
-	{ "QUANTUM ELS127A", 0 },
-	{ "QUANTUM ELS170A", 0 },
-	{ "QUANTUM LPS240A", 0 },
-	{ "QUANTUM LPS210A", 3 },
-	{ "QUANTUM LPS270A", 3 },
-	{ "QUANTUM LPS365A", 3 },
-	{ "QUANTUM LPS540A", 3 },
-	{ "QUANTUM LIGHTNING 540A", 3 },
-	{ "QUANTUM LIGHTNING 730A", 3 },
-
-        { "QUANTUM FIREBALL_540", 3 }, /* Older Quantum Fireballs don't work */
-        { "QUANTUM FIREBALL_640", 3 },
-        { "QUANTUM FIREBALL_1080", 3 },
-        { "QUANTUM FIREBALL_1280", 3 },
-	{ NULL,	0 }
-};
-#endif
-
 /* default maximum number of failures */
 #define IDE_DEFAULT_MAX_FAILURES	1
 
@@ -315,107 +224,6 @@ int noautodma = 0;
  * This is declared extern in ide.h, for access by other IDE modules:
  */
 ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
-
-#ifdef CONFIG_BLK_DEV_IDE_MODES
-/*
- * This routine searches the ide_pio_blacklist for an entry
- * matching the start/whole of the supplied model name.
- *
- * Returns -1 if no match found.
- * Otherwise returns the recommended PIO mode from ide_pio_blacklist[].
- */
-int ide_scan_pio_blacklist (char *model)
-{
-	struct ide_pio_info *p;
-
-	for (p = ide_pio_blacklist; p->name != NULL; p++) {
-		if (strncmp(p->name, model, strlen(p->name)) == 0)
-			return p->pio;
-	}
-	return -1;
-}
-#endif
-
-/*
- * This routine returns the recommended PIO settings for a given drive,
- * based on the drive->id information and the ide_pio_blacklist[].
- * This is used by most chipset support modules when "auto-tuning".
- */
-
-/*
- * Drive PIO mode auto selection
- */
-byte ide_get_best_pio_mode (ide_drive_t *drive, byte mode_wanted, byte max_mode, ide_pio_data_t *d)
-{
-	int pio_mode;
-	int cycle_time = 0;
-	int use_iordy = 0;
-	struct hd_driveid* id = drive->id;
-	int overridden  = 0;
-	int blacklisted = 0;
-
-	if (mode_wanted != 255) {
-		pio_mode = mode_wanted;
-	} else if (!drive->id) {
-		pio_mode = 0;
-	} else if ((pio_mode = ide_scan_pio_blacklist(id->model)) != -1) {
-		overridden = 1;
-		blacklisted = 1;
-		use_iordy = (pio_mode > 2);
-	} else {
-		pio_mode = id->tPIO;
-		if (pio_mode > 2) {	/* 2 is maximum allowed tPIO value */
-			pio_mode = 2;
-			overridden = 1;
-		}
-		if (id->field_valid & 2) {	  /* drive implements ATA2? */
-			if (id->capability & 8) { /* drive supports use_iordy? */
-				use_iordy = 1;
-				cycle_time = id->eide_pio_iordy;
-				if (id->eide_pio_modes & 7) {
-					overridden = 0;
-					if (id->eide_pio_modes & 4)
-						pio_mode = 5;
-					else if (id->eide_pio_modes & 2)
-						pio_mode = 4;
-					else
-						pio_mode = 3;
-				}
-			} else {
-				cycle_time = id->eide_pio;
-			}
-		}
-
-#if 0
-		if (drive->id->major_rev_num & 0x0004) printk("ATA-2 ");
-#endif
-
-		/*
-		 * Conservative "downgrade" for all pre-ATA2 drives
-		 */
-		if (pio_mode && pio_mode < 4) {
-			pio_mode--;
-			overridden = 1;
-#if 0
-			use_iordy = (pio_mode > 2);
-#endif
-			if (cycle_time && cycle_time < ide_pio_timings[pio_mode].cycle_time)
-				cycle_time = 0; /* use standard timing */
-		}
-	}
-	if (pio_mode > max_mode) {
-		pio_mode = max_mode;
-		cycle_time = 0;
-	}
-	if (d) {
-		d->pio_mode = pio_mode;
-		d->cycle_time = cycle_time ? cycle_time : ide_pio_timings[pio_mode].cycle_time;
-		d->use_iordy = use_iordy;
-		d->overridden = overridden;
-		d->blacklisted = blacklisted;
-	}
-	return pio_mode;
-}
 
 #if (DISK_RECOVERY_TIME > 0)
 /*
@@ -887,14 +695,6 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 	return ide_started;
 }
 
-/*
- * ide_do_reset() is the entry point to the drive/interface reset code.
- */
-ide_startstop_t ide_do_reset (ide_drive_t *drive)
-{
-	return do_reset1 (drive, 0);
-}
-
 static inline u32 read_24 (ide_drive_t *drive)
 {
 	return  (IN_BYTE(IDE_HCYL_REG)<<16) |
@@ -1118,7 +918,7 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
 	} else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
-			return ide_do_reset(drive);
+			return do_reset1(drive, 0);
 		}
 		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
 			drive->special.b.recalibrate = 1;
@@ -2768,27 +2568,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			}
 			drive->nice1 = (arg >> IDE_NICE_1) & 1;
 			return 0;
-		case HDIO_DRIVE_RESET:
-		{
-			unsigned long flags;
-			ide_hwgroup_t *hwgroup = HWGROUP(drive);
-
-			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-#if 1
-			spin_lock_irqsave(&ide_lock, flags);
-			if (hwgroup->handler != NULL) {
-				printk("%s: ide_set_handler: handler not null; %p\n", drive->name, hwgroup->handler);
-				hwgroup->handler(drive);
-				hwgroup->timer.expires = jiffies + 0;;
-				del_timer(&hwgroup->timer);
-			}
-			spin_unlock_irqrestore(&ide_lock, flags);
-#endif
-			ide_do_reset(drive);
-			if (drive->suspend_reset)
-				return ide_revalidate_disk(inode->i_rdev);
-			return 0;
-		}
 		case BLKGETSIZE:
 		case BLKGETSIZE64:
 		case BLKROSET:
@@ -3492,7 +3271,6 @@ EXPORT_SYMBOL(ide_dump_status);
 EXPORT_SYMBOL(ide_error);
 EXPORT_SYMBOL(ide_fixstring);
 EXPORT_SYMBOL(ide_wait_stat);
-EXPORT_SYMBOL(ide_do_reset);
 EXPORT_SYMBOL(restart_request);
 EXPORT_SYMBOL(ide_init_drive_cmd);
 EXPORT_SYMBOL(ide_do_drive_cmd);

@@ -58,7 +58,8 @@ static int snd_dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	    /* 0,1,3,5,6,7 */
 static int snd_use_cs4232_midi[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; 
 
 MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_SYNTAX(snd_index, "Index value for WaveFront soundcard.");
+MODULE_PARM_DESC(snd_index, "Index value for WaveFront soundcard.");
+MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
 MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
 MODULE_PARM_DESC(snd_id, "ID string for WaveFront soundcard.");
 MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
@@ -99,7 +100,7 @@ MODULE_PARM_DESC(snd_fm_port, "FM port #.");
 MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_PORT12_DESC);
 MODULE_PARM(snd_use_cs4232_midi, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_use_cs4232_midi, "Use CS4232 MPU-401 interface (inaccessibly located inside your computer)");
-MODULE_PARM_SYNTAX(snd_use_cs4232_midi, SNDRV_ENABLED ",allows use of CS4323 MPU-401 interface");
+MODULE_PARM_SYNTAX(snd_use_cs4232_midi, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static snd_card_t *snd_wavefront_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -701,7 +702,7 @@ snd_wavefront_probe (int dev)
 static int __init snd_wavefront_isapnp_detect(struct isapnp_card *card,
                                               const struct isapnp_card_id *id)
 {
-        static int dev = 0;
+        static int dev;
         int res;
 
         for ( ; dev < SNDRV_CARDS; dev++) {

@@ -110,10 +110,11 @@ static struct hid_field *hid_register_field(struct hid_report *report, unsigned 
 	memset(field, 0, sizeof(struct hid_field) + usages * sizeof(struct hid_usage)
 		+ values * sizeof(unsigned));
 
-	report->field[report->maxfield++] = field;
+	report->field[report->maxfield] = field;
 	field->usage = (struct hid_usage *)(field + 1);
 	field->value = (unsigned *)(field->usage + usages);
 	field->report = report;
+	field->index = report->maxfield++;
 
 	return field;
 }
@@ -741,8 +742,20 @@ static void hid_process_event(struct hid_device *hid, struct hid_field *field, s
 	if (hid->claimed & HID_CLAIMED_INPUT)
 		hidinput_hid_event(hid, field, usage, value);
 #ifdef CONFIG_USB_HIDDEV
-	if (hid->claimed & HID_CLAIMED_HIDDEV)
-		hiddev_hid_event(hid, usage->hid, value);
+	if (hid->claimed & HID_CLAIMED_HIDDEV) {
+		struct hiddev_usage_ref uref;
+		unsigned type = field->report_type;
+		uref.report_type = 
+		  (type == HID_INPUT_REPORT) ? HID_REPORT_TYPE_INPUT :
+		  ((type == HID_OUTPUT_REPORT) ? HID_REPORT_TYPE_OUTPUT : 
+		   ((type == HID_FEATURE_REPORT) ? HID_REPORT_TYPE_FEATURE:0));
+		uref.report_id = field->report->id;
+		uref.field_index = field->index;
+		uref.usage_index = (usage - field->usage);
+		uref.usage_code = usage->hid;
+		uref.value = value;
+		hiddev_hid_event(hid, &uref);
+	}
 #endif
 }
 
@@ -838,6 +851,21 @@ static int hid_input_report(int type, struct urb *urb)
 		dbg("undefined report_id %d received", n);
 		return -1;
 	}
+
+#ifdef CONFIG_USB_HIDDEV
+	/* Notify listeners that a report has been received */
+	if (hid->claimed & HID_CLAIMED_HIDDEV) {
+		struct hiddev_usage_ref uref;
+		memset(&uref, 0, sizeof(uref));
+		uref.report_type = 
+		  (type == HID_INPUT_REPORT) ? HID_REPORT_TYPE_INPUT :
+		  ((type == HID_OUTPUT_REPORT) ? HID_REPORT_TYPE_OUTPUT : 
+		   ((type == HID_FEATURE_REPORT) ? HID_REPORT_TYPE_FEATURE:0));
+		uref.report_id = report->id;
+		uref.field_index = HID_FIELD_INDEX_NONE;
+		hiddev_hid_event(hid, &uref);
+	}
+#endif
 
 	size = ((report->size - 1) >> 3) + 1;
 
@@ -1096,6 +1124,9 @@ void hid_submit_report(struct hid_device *hid, struct hid_report *report, unsign
 	int head;
 	unsigned long flags;
 
+	if ((hid->quirks & HID_QUIRK_NOGET) && dir == USB_DIR_IN)
+		return;
+
 	if (hid->urbout && dir == USB_DIR_OUT && report->type == HID_OUTPUT_REPORT) {
 
 		spin_lock_irqsave(&hid->outlock, flags);
@@ -1238,18 +1269,27 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_POWERMATE		0x0410
 #define USB_DEVICE_ID_SOUNDKNOB		0x04AA
 
+#define USB_VENDOR_ID_ATEN             0x0557  
+#define USB_DEVICE_ID_ATEN_UC100KM     0x2004
+#define USB_DEVICE_ID_ATEN_CS124U      0x2202
+#define USB_DEVICE_ID_ATEN_2PORTKVM    0x2204
+
 struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
+	unsigned quirks;
 } hid_blacklist[] = {
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_GRAPHIRE },
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS },
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 1},
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 2},
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 3},
-	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 4},
-	{ USB_VENDOR_ID_GRIFFIN, USB_DEVICE_ID_POWERMATE },
-	{ USB_VENDOR_ID_GRIFFIN, USB_DEVICE_ID_SOUNDKNOB },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_GRAPHIRE, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 1, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 2, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 3, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS + 4, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_GRIFFIN, USB_DEVICE_ID_POWERMATE, HID_QUIRK_IGNORE  },
+	{ USB_VENDOR_ID_GRIFFIN, USB_DEVICE_ID_SOUNDKNOB, HID_QUIRK_IGNORE  },
+	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_UC100KM, HID_QUIRK_NOGET },
+	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_CS124U, HID_QUIRK_NOGET },
+	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_2PORTKVM, HID_QUIRK_NOGET },
 	{ 0, 0 }
 };
 
@@ -1258,13 +1298,17 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	struct usb_interface_descriptor *interface = dev->actconfig->interface[ifnum].altsetting + 0;
 	struct hid_descriptor *hdesc;
 	struct hid_device *hid;
-	unsigned rsize = 0;
+	unsigned quirks = 0, rsize = 0;
 	char *buf;
 	int n;
 
 	for (n = 0; hid_blacklist[n].idVendor; n++)
 		if ((hid_blacklist[n].idVendor == dev->descriptor.idVendor) &&
-			(hid_blacklist[n].idProduct == dev->descriptor.idProduct)) return NULL;
+			(hid_blacklist[n].idProduct == dev->descriptor.idProduct))
+				quirks = hid_blacklist[n].quirks;
+
+	if (quirks & HID_QUIRK_IGNORE)
+		return NULL;
 
 	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) && ((!interface->bNumEndpoints) ||
 		usb_get_extra_descriptor(&interface->endpoint[0], HID_DT_HID, &hdesc))) {
@@ -1301,6 +1345,8 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 			return NULL;
 		}
 	}
+
+	hid->quirks = quirks;
 
 	for (n = 0; n < interface->bNumEndpoints; n++) {
 

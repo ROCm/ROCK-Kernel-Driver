@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 50 $
+ *       $Revision: 57 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -27,60 +27,7 @@
 #define __ACDEBUG_H__
 
 
-#define DB_MAX_ARGS             8  /* Must be max method args + 1 */
-
-#define DB_COMMAND_PROMPT      '-'
-#define DB_EXECUTE_PROMPT      '%'
-
-
-extern int                      optind;
-extern NATIVE_CHAR              *optarg;
-extern u8                       *aml_start;
-extern u32                      aml_length;
-
-extern u8                       acpi_gbl_db_opt_tables;
-extern u8                       acpi_gbl_db_opt_disasm;
-extern u8                       acpi_gbl_db_opt_stats;
-extern u8                       acpi_gbl_db_opt_parse_jit;
-extern u8                       acpi_gbl_db_opt_verbose;
-extern u8                       acpi_gbl_db_opt_ini_methods;
-
-
-extern NATIVE_CHAR              *acpi_gbl_db_args[DB_MAX_ARGS];
-extern NATIVE_CHAR              acpi_gbl_db_line_buf[80];
-extern NATIVE_CHAR              acpi_gbl_db_scope_buf[40];
-extern NATIVE_CHAR              acpi_gbl_db_debug_filename[40];
-extern u8                       acpi_gbl_db_output_to_file;
-extern NATIVE_CHAR              *acpi_gbl_db_buffer;
-extern NATIVE_CHAR              *acpi_gbl_db_filename;
-extern NATIVE_CHAR              *acpi_gbl_db_disasm_indent;
-extern u8                       acpi_gbl_db_output_flags;
-extern u32                      acpi_gbl_db_debug_level;
-extern u32                      acpi_gbl_db_console_debug_level;
-extern acpi_table_header        *acpi_gbl_db_table_ptr;
-
-/*
- * Statistic globals
- */
-extern u16                      acpi_gbl_obj_type_count[INTERNAL_TYPE_NODE_MAX+1];
-extern u16                      acpi_gbl_node_type_count[INTERNAL_TYPE_NODE_MAX+1];
-extern u16                      acpi_gbl_obj_type_count_misc;
-extern u16                      acpi_gbl_node_type_count_misc;
-extern u32                      acpi_gbl_num_nodes;
-extern u32                      acpi_gbl_num_objects;
-
-
-extern u32                      acpi_gbl_size_of_parse_tree;
-extern u32                      acpi_gbl_size_of_method_trees;
-extern u32                      acpi_gbl_size_of_node_entries;
-extern u32                      acpi_gbl_size_of_acpi_objects;
-
-
 #define ACPI_DEBUG_BUFFER_SIZE  4196
-
-#define DB_REDIRECTABLE_OUTPUT  0x01
-#define DB_CONSOLE_OUTPUT       0x02
-#define DB_DUPLICATE_OUTPUT     0x03
 
 
 typedef struct command_info
@@ -306,7 +253,7 @@ acpi_db_create_execution_threads (
  * dbfileio - Debugger file I/O commands
  */
 
-acpi_object_type8
+acpi_object_type
 acpi_db_match_argument (
 	NATIVE_CHAR             *user_argument,
 	ARGUMENT_INFO           *arguments);
@@ -351,7 +298,7 @@ acpi_db_command_dispatch (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);
 
-void
+void ACPI_SYSTEM_XFACE
 acpi_db_execute_thread (
 	void                    *context);
 

@@ -15,6 +15,7 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
+#include <linux/brlock.h>
 #include <net/checksum.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_conntrack_lock)
@@ -35,6 +36,11 @@
 struct module *ip_conntrack_module = THIS_MODULE;
 MODULE_LICENSE("GPL");
 
+static int kill_proto(const struct ip_conntrack *i, void *data)
+{
+	return (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == 
+			*((u_int8_t *) data));
+}
 
 static unsigned int
 print_tuple(char *buffer, const struct ip_conntrack_tuple *tuple,
@@ -304,12 +310,24 @@ int ip_conntrack_protocol_register(struct ip_conntrack_protocol *proto)
 	return ret;
 }
 
-/* FIXME: Implement this --RR */
-#if 0
 void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 {
+	WRITE_LOCK(&ip_conntrack_lock);
+
+	/* find_proto() returns proto_generic in case there is no protocol 
+	 * helper. So this should be enough - HW */
+	LIST_DELETE(&protocol_list, proto);
+	WRITE_UNLOCK(&ip_conntrack_lock);
+	
+	/* Somebody could be still looking at the proto in bh. */
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
+
+	/* Remove all contrack entries for this protocol */
+	ip_ct_selective_cleanup(kill_proto, &proto->proto);
+
+	MOD_DEC_USE_COUNT;
 }
-#endif
 
 static int __init init(void)
 {
@@ -325,6 +343,7 @@ module_init(init);
 module_exit(fini);
 
 EXPORT_SYMBOL(ip_conntrack_protocol_register);
+EXPORT_SYMBOL(ip_conntrack_protocol_unregister);
 EXPORT_SYMBOL(invert_tuplepr);
 EXPORT_SYMBOL(ip_conntrack_alter_reply);
 EXPORT_SYMBOL(ip_conntrack_destroyed);
@@ -335,6 +354,7 @@ EXPORT_SYMBOL(ip_conntrack_helper_unregister);
 EXPORT_SYMBOL(ip_ct_selective_cleanup);
 EXPORT_SYMBOL(ip_ct_refresh);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
+EXPORT_SYMBOL(ip_conntrack_unexpect_related);
 EXPORT_SYMBOL(ip_conntrack_tuple_taken);
 EXPORT_SYMBOL(ip_ct_gather_frags);
 EXPORT_SYMBOL(ip_conntrack_htable_size);

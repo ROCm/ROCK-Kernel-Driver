@@ -2,7 +2,7 @@
  * acenic.c: Linux driver for the Alteon AceNIC Gigabit Ethernet card
  *           and other Tigon based cards.
  *
- * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
+ * Copyright 1998-2002 by Jes Sorensen, <jes@trained-monkey.org>.
  *
  * Thanks to Alteon and 3Com for providing hardware and documentation
  * enabling me to write this driver.
@@ -30,6 +30,7 @@
  *   Pierrick Pinasseau (CERN): For lending me an Ultra 5 to test the
  *                              driver under Linux/Sparc64
  *   Matt Domsch <Matt_Domsch@dell.com>: Detect Alteon 1000baseT cards
+ *                                       ETHTOOL_GDRVINFO support
  *   Chip Salzenberg <chip@valinux.com>: Fix race condition between tx
  *                                       handler and close() cleanup.
  *   Ken Aaker <kdaaker@rchland.vnet.ibm.com>: Correct check for whether
@@ -64,6 +65,7 @@
 #include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/sockios.h>
+#include <linux/if_vlan.h>
 
 #ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
@@ -83,8 +85,10 @@
 
 #ifdef CONFIG_ACENIC_OMIT_TIGON_I
 #define ACE_IS_TIGON_I(ap)	0
+#define ACE_TX_RING_ENTRIES(ap)	MAX_TX_RING_ENTRIES
 #else
 #define ACE_IS_TIGON_I(ap)	(ap->version == 1)
+#define ACE_TX_RING_ENTRIES(ap)	ap->tx_ring_entries
 #endif
 
 #ifndef PCI_VENDOR_ID_ALTEON
@@ -314,6 +318,12 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
 #define BOARD_IDX_STATIC	0
 #define BOARD_IDX_OVERFLOW	-1
 
+#if (defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)) && \
+	defined(NETIF_F_HW_VLAN_RX)
+#define ACENIC_DO_VLAN	1
+#else
+#define ACENIC_DO_VLAN	0
+#endif
 
 #include "acenic.h"
 
@@ -553,7 +563,7 @@ static int tx_ratio[ACE_MAX_MOD_PARMS];
 static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 static char version[] __initdata = 
-  "acenic.c: v0.85 11/08/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
+  "acenic.c: v0.88 03/14/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
 static struct net_device *root_dev;
@@ -620,10 +630,14 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		ap = dev->priv;
 		ap->pdev = pdev;
 
-		dev->irq = pdev->irq;
 		dev->open = &ace_open;
 		dev->hard_start_xmit = &ace_start_xmit;
 		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
+#if ACENIC_DO_VLAN
+		dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+		dev->vlan_rx_register = ace_vlan_rx_register;
+		dev->vlan_rx_kill_vid = ace_vlan_rx_kill_vid;
+#endif
 		if (1) {
 			static void ace_watchdog(struct net_device *dev);
 			dev->tx_timeout = &ace_watchdog;
@@ -725,9 +739,9 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		ap->name [sizeof (ap->name) - 1] = '\0';
 		printk("Gigabit Ethernet at 0x%08lx, ", dev->base_addr);
 #ifdef __sparc__
-		printk("irq %s\n", __irq_itoa(dev->irq));
+		printk("irq %s\n", __irq_itoa(pdev->irq));
 #else
-		printk("irq %i\n", dev->irq);
+		printk("irq %i\n", pdev->irq);
 #endif
 
 #ifdef CONFIG_ACENIC_OMIT_TIGON_I
@@ -960,6 +974,13 @@ static void ace_free_descriptors(struct net_device *dev)
 				    ap->evt_ring_dma);
 		ap->evt_ring = NULL;
 	}
+	if (ap->tx_ring != NULL && !ACE_IS_TIGON_I(ap)) {
+		size = (sizeof(struct tx_desc) * MAX_TX_RING_ENTRIES);
+		pci_free_consistent(ap->pdev, size, ap->tx_ring,
+				    ap->tx_ring_dma);
+	}
+	ap->tx_ring = NULL;
+
 	if (ap->evt_prd != NULL) {
 		pci_free_consistent(ap->pdev, sizeof(u32),
 				    (void *)ap->evt_prd, ap->evt_prd_dma);
@@ -1006,12 +1027,19 @@ static int ace_allocate_descriptors(struct net_device *dev)
 	if (ap->evt_ring == NULL)
 		goto fail;
 
-	size = (sizeof(struct tx_desc) * TX_RING_ENTRIES);
+	/*
+	 * Only allocate a host TX ring for the Tigon II, the Tigon I
+	 * has to use PCI registers for this ;-(
+	 */
+	if (!ACE_IS_TIGON_I(ap)) {
+		size = (sizeof(struct tx_desc) * MAX_TX_RING_ENTRIES);
 
-	ap->tx_ring = pci_alloc_consistent(ap->pdev, size, &ap->tx_ring_dma);
+		ap->tx_ring = pci_alloc_consistent(ap->pdev, size,
+						   &ap->tx_ring_dma);
 
-	if (ap->tx_ring == NULL)
-		goto fail;
+		if (ap->tx_ring == NULL)
+			goto fail;
+	}
 
 	ap->evt_prd = pci_alloc_consistent(ap->pdev, sizeof(u32),
 					   &ap->evt_prd_dma);
@@ -1086,6 +1114,7 @@ static int __init ace_init(struct net_device *dev)
 	struct ace_private *ap;
 	struct ace_regs *regs;
 	struct ace_info *info = NULL;
+	struct pci_dev *pdev;
 	unsigned long myjif;
 	u64 tmp_ptr;
 	u32 tig_ver, mac1, mac2, tmp, pci_state;
@@ -1144,6 +1173,7 @@ static int __init ace_init(struct net_device *dev)
 		       tigonFwReleaseFix);
 		writel(0, &regs->LocalCtrl);
 		ap->version = 1;
+		ap->tx_ring_entries = TIGON_I_TX_RING_ENTRIES;
 		break;
 #endif
 	case 6:
@@ -1159,6 +1189,7 @@ static int __init ace_init(struct net_device *dev)
 		writel(SRAM_BANK_512K, &regs->LocalCtrl);
 		writel(SYNC_SRAM_TIMING, &regs->MiscCfg);
 		ap->version = 2;
+		ap->tx_ring_entries = MAX_TX_RING_ENTRIES;
 		break;
 	default:
 		printk(KERN_WARNING "  Unsupported Tigon version detected "
@@ -1224,7 +1255,8 @@ static int __init ace_init(struct net_device *dev)
 	 * Ie. having two NICs in the machine, one will have the cache
 	 * line set at boot time, the other will not.
 	 */
-	pci_read_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE, &cache_size);
+	pdev = ap->pdev;
+	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache_size);
 	cache_size <<= 2;
 	if (cache_size != SMP_CACHE_BYTES) {
 		printk(KERN_INFO "  PCI cache line size set incorrectly "
@@ -1233,7 +1265,7 @@ static int __init ace_init(struct net_device *dev)
 			printk("expecting %i\n", SMP_CACHE_BYTES);
 		else {
 			printk("correcting to %i\n", SMP_CACHE_BYTES);
-			pci_write_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE,
+			pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
 					      SMP_CACHE_BYTES >> 2);
 		}
 	}
@@ -1265,7 +1297,7 @@ static int __init ace_init(struct net_device *dev)
 		    dis_pci_mem_inval[board_idx]) {
 			if (ap->pci_command & PCI_COMMAND_INVALIDATE) {
 				ap->pci_command &= ~PCI_COMMAND_INVALIDATE;
-				pci_write_config_word(ap->pdev, PCI_COMMAND,
+				pci_write_config_word(pdev, PCI_COMMAND,
 						      ap->pci_command);
 				printk(KERN_INFO "  Disabling PCI memory "
 				       "write and invalidate\n");
@@ -1292,7 +1324,7 @@ static int __init ace_init(struct net_device *dev)
 				       "supported, PCI write and invalidate "
 				       "disabled\n", SMP_CACHE_BYTES);
 				ap->pci_command &= ~PCI_COMMAND_INVALIDATE;
-				pci_write_config_word(ap->pdev, PCI_COMMAND,
+				pci_write_config_word(pdev, PCI_COMMAND,
 						      ap->pci_command);
 			}
 		}
@@ -1334,16 +1366,16 @@ static int __init ace_init(struct net_device *dev)
 	if (!(ap->pci_command & PCI_COMMAND_FAST_BACK)) {
 		printk(KERN_INFO "  Enabling PCI Fast Back to Back\n");
 		ap->pci_command |= PCI_COMMAND_FAST_BACK;
-		pci_write_config_word(ap->pdev, PCI_COMMAND, ap->pci_command);
+		pci_write_config_word(pdev, PCI_COMMAND, ap->pci_command);
 	}
 #endif
 		
 	/*
 	 * Configure DMA attributes.
 	 */
-	if (!pci_set_dma_mask(ap->pdev, 0xffffffffffffffffULL)) {
+	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
 		ap->pci_using_dac = 1;
-	} else if (!pci_set_dma_mask(ap->pdev, 0xffffffffULL)) {
+	} else if (!pci_set_dma_mask(pdev, 0xffffffffULL)) {
 		ap->pci_using_dac = 0;
 	} else {
 		ecode = -ENODEV;
@@ -1370,12 +1402,14 @@ static int __init ace_init(struct net_device *dev)
 		goto init_error;
 	}
 
-	ecode = request_irq(dev->irq, ace_interrupt, SA_SHIRQ, dev->name, dev);
+	ecode = request_irq(pdev->irq, ace_interrupt, SA_SHIRQ,
+			    dev->name, dev);
 	if (ecode) {
 		printk(KERN_WARNING "%s: Requested IRQ %d is busy\n",
-		       dev->name, dev->irq);
+		       dev->name, pdev->irq);
 		goto init_error;
-	}
+	} else
+		dev->irq = pdev->irq;
 
 	/*
 	 * Register the device here to be able to catch allocated
@@ -1386,7 +1420,7 @@ static int __init ace_init(struct net_device *dev)
 
 #ifdef INDEX_DEBUG
 	spin_lock_init(&ap->debug_lock);
-	ap->last_tx = TX_RING_ENTRIES - 1;
+	ap->last_tx = ACE_TX_RING_ENTRIES(ap) - 1;
 	ap->last_std_rx = 0;
 	ap->last_mini_rx = 0;
 #endif
@@ -1428,6 +1462,9 @@ static int __init ace_init(struct net_device *dev)
 	set_aceaddr(&info->rx_std_ctrl.rngptr, ap->rx_ring_base_dma);
 	info->rx_std_ctrl.max_len = ACE_STD_MTU + ETH_HLEN + 4;
 	info->rx_std_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
+#if ACENIC_DO_VLAN
+	info->rx_std_ctrl.flags |= RCB_FLG_VLAN_ASSIST;
+#endif
 
 	memset(ap->rx_std_ring, 0,
 	       RX_STD_RING_ENTRIES * sizeof(struct rx_desc));
@@ -1443,6 +1480,9 @@ static int __init ace_init(struct net_device *dev)
 		     (sizeof(struct rx_desc) * RX_STD_RING_ENTRIES)));
 	info->rx_jumbo_ctrl.max_len = 0;
 	info->rx_jumbo_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
+#if ACENIC_DO_VLAN
+	info->rx_jumbo_ctrl.flags |= RCB_FLG_VLAN_ASSIST;
+#endif
 
 	memset(ap->rx_jumbo_ring, 0,
 	       RX_JUMBO_RING_ENTRIES * sizeof(struct rx_desc));
@@ -1465,6 +1505,9 @@ static int __init ace_init(struct net_device *dev)
 		info->rx_mini_ctrl.max_len = ACE_MINI_SIZE;
 		info->rx_mini_ctrl.flags = 
 			RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
+#if ACENIC_DO_VLAN
+		info->rx_mini_ctrl.flags |= RCB_FLG_VLAN_ASSIST;
+#endif
 
 		for (i = 0; i < RX_MINI_RING_ENTRIES; i++)
 			ap->rx_mini_ring[i].flags =
@@ -1494,14 +1537,35 @@ static int __init ace_init(struct net_device *dev)
 	*(ap->rx_ret_prd) = 0;
 
 	writel(TX_RING_BASE, &regs->WinBase);
-	memset(ap->tx_ring, 0, TX_RING_ENTRIES * sizeof(struct tx_desc));
 
-	set_aceaddr(&info->tx_ctrl.rngptr, ap->tx_ring_dma);
+	if (ACE_IS_TIGON_I(ap)) {
+		ap->tx_ring = (struct tx_desc *)regs->Window;
+		for (i = 0; i < (TIGON_I_TX_RING_ENTRIES * 
+				 sizeof(struct tx_desc) / 4); i++) {
+			writel(0, (unsigned long)ap->tx_ring + i * 4);
+		}
 
-	info->tx_ctrl.max_len = TX_RING_ENTRIES;
-	tmp = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR|RCB_FLG_TX_HOST_RING;
+		set_aceaddr(&info->tx_ctrl.rngptr, TX_RING_BASE);
+	} else {
+		memset(ap->tx_ring, 0,
+		       MAX_TX_RING_ENTRIES * sizeof(struct tx_desc));
+
+		set_aceaddr(&info->tx_ctrl.rngptr, ap->tx_ring_dma);
+	}
+
+	info->tx_ctrl.max_len = ACE_TX_RING_ENTRIES(ap);
+	tmp = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
+
+	/*
+	 * The Tigon I does not like having the TX ring in host memory ;-(
+	 */
+	if (!ACE_IS_TIGON_I(ap))
+		tmp |= RCB_FLG_TX_HOST_RING;
 #if TX_COAL_INTS_ONLY
 	tmp |= RCB_FLG_COAL_INT_ONLY;
+#endif
+#if ACENIC_DO_VLAN
+	tmp |= RCB_FLG_VLAN_ASSIST;
 #endif
 	info->tx_ctrl.flags = tmp;
 
@@ -1528,7 +1592,7 @@ static int __init ace_init(struct net_device *dev)
 	ace_set_rxtx_parms(dev, 0);
 
 	if (board_idx == BOARD_IDX_OVERFLOW) {
-		printk(KERN_WARNING "%s: more than %i NICs detected, "
+		printk(KERN_WARNING "%s: more then %i NICs detected, "
 		       "ignoring module parameters!\n",
 		       dev->name, ACE_MAX_MOD_PARMS);
 	} else if (board_idx >= 0) {
@@ -2117,6 +2181,14 @@ static u32 ace_handle_event(struct net_device *dev, u32 evtcsm, u32 evtprd)
 }
 
 
+#if ACENIC_DO_VLAN
+static int ace_vlan_rx(struct ace_private *ap, struct sk_buff *skb, u16 vlan_tag)
+{
+	return vlan_hwaccel_rx(skb, ap->vlgrp, vlan_tag);
+}
+#endif
+
+
 static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 {
 	struct ace_private *ap = dev->priv;
@@ -2201,7 +2273,15 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 			skb->ip_summed = CHECKSUM_NONE;
 		}
 
-		netif_rx(skb);		/* send it up */
+		/* send it up */
+
+#if ACENIC_DO_VLAN
+		if (ap->vlgrp != NULL &&
+		    (bd_flags & BD_FLG_VLAN_TAG)) {
+			ace_vlan_rx(ap, skb, retdesc->vlan);
+		} else
+#endif
+			netif_rx(skb);
 
 		dev->last_rx = jiffies;
 		ap->stats.rx_packets++;
@@ -2260,7 +2340,7 @@ static inline void ace_tx_int(struct net_device *dev,
 			info->skb = NULL;
 		}
 
-		idx = (idx + 1) % TX_RING_ENTRIES;
+		idx = (idx + 1) % ACE_TX_RING_ENTRIES(ap);
 	} while (idx != txcsm);
 
 	if (netif_queue_stopped(dev))
@@ -2353,7 +2433,7 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 		 * update releases enough of space, otherwise we just
 		 * wait for device to make more work.
 		 */
-		if (!tx_ring_full(txcsm, ap->tx_prd))
+		if (!tx_ring_full(ap, txcsm, ap->tx_prd))
 			ace_tx_int(dev, txcsm, idx);
 	}
 
@@ -2423,6 +2503,37 @@ static void ace_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 		}
 	}
 }
+
+
+#if ACENIC_DO_VLAN
+static void ace_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
+{
+	struct ace_private *ap = dev->priv;
+	unsigned long flags;
+
+	save_flags(flags);
+	cli();
+
+	ap->vlgrp = grp;
+
+	restore_flags(flags);
+}
+
+
+static void ace_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
+{
+	struct ace_private *ap = dev->priv;
+	unsigned long flags;
+
+	save_flags(flags);
+	cli();
+
+	if (ap->vlgrp)
+		ap->vlgrp->vlan_devices[vid] = NULL;
+
+	restore_flags(flags);
+}
+#endif /* ACENIC_DO_VLAN */
 
 
 static int ace_open(struct net_device *dev)
@@ -2527,7 +2638,7 @@ static int ace_close(struct net_device *dev)
 	save_flags(flags);
 	cli();
 
-	for (i = 0; i < TX_RING_ENTRIES; i++) {
+	for (i = 0; i < ACE_TX_RING_ENTRIES(ap); i++) {
 		struct sk_buff *skb;
 		dma_addr_t mapping;
 		struct tx_ring_info *info;
@@ -2537,7 +2648,13 @@ static int ace_close(struct net_device *dev)
 		mapping = pci_unmap_addr(info, mapping);
 
 		if (mapping) {
-			memset(ap->tx_ring + i, 0, sizeof(struct tx_desc));
+			if (ACE_IS_TIGON_I(ap)) {
+				writel(0, &ap->tx_ring[i].addr.addrhi);
+				writel(0, &ap->tx_ring[i].addr.addrlo);
+				writel(0, &ap->tx_ring[i].flagsize);
+			} else
+				memset(ap->tx_ring + i, 0,
+				       sizeof(struct tx_desc));
 			pci_unmap_page(ap->pdev, mapping,
 				       pci_unmap_len(info, maplen),
 				       PCI_DMA_TODEVICE);
@@ -2562,6 +2679,7 @@ static int ace_close(struct net_device *dev)
 	return 0;
 }
 
+
 static inline dma_addr_t
 ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
 	       struct sk_buff *tail, u32 idx)
@@ -2582,15 +2700,28 @@ ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
 
 
 static inline void
-ace_load_tx_bd(struct tx_desc *desc, u64 addr, u32 flagsize)
+ace_load_tx_bd(struct ace_private *ap, struct tx_desc *desc, u64 addr,
+	       u32 flagsize, u32 vlan_tag)
 {
 #if !USE_TX_COAL_NOW
 	flagsize &= ~BD_FLG_COAL_NOW;
 #endif
 
-	desc->addr.addrhi = addr >> 32;
-	desc->addr.addrlo = addr;
-	desc->flagsize = flagsize;
+	if (!ACE_IS_TIGON_I(ap)) {
+		writel(addr >> 32, &desc->addr.addrhi);
+		writel(addr & 0xffffffff, &desc->addr.addrlo);
+		writel(flagsize, &desc->flagsize);
+#if ACENIC_DO_VLAN
+		writel(vlan_tag, &desc->vlanres);
+#endif
+	} else {
+		desc->addr.addrhi = addr >> 32;
+		desc->addr.addrlo = addr;
+		desc->flagsize = flagsize;
+#if ACENIC_DO_VLAN
+		desc->vlanres = vlan_tag;
+#endif
+	}
 }
 
 
@@ -2607,11 +2738,10 @@ static int ace_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (early_stop_netif_stop_queue(dev))
  		return 1;
 
-
 restart:
 	idx = ap->tx_prd;
 
-	if (tx_ring_full(ap->tx_ret_csm, idx))
+	if (tx_ring_full(ap, ap->tx_ret_csm, idx))
 		goto overflow;
 
 #if MAX_SKB_FRAGS
@@ -2619,33 +2749,47 @@ restart:
 #endif
 	{
 		dma_addr_t mapping;
+		u32 vlan_tag = 0;
 
 		mapping = ace_map_tx_skb(ap, skb, skb, idx);
 		flagsize = (skb->len << 16) | (BD_FLG_END);
 		if (skb->ip_summed == CHECKSUM_HW)
 			flagsize |= BD_FLG_TCP_UDP_SUM;
+#if ACENIC_DO_VLAN
+		if (vlan_tx_tag_present(skb)) {
+			flagsize |= BD_FLG_VLAN_TAG;
+			vlan_tag = vlan_tx_tag_get(skb);
+		}
+#endif
 		desc = ap->tx_ring + idx;
-		idx = (idx + 1) % TX_RING_ENTRIES;
+		idx = (idx + 1) % ACE_TX_RING_ENTRIES(ap);
 
 		/* Look at ace_tx_int for explanations. */
-		if (tx_ring_full(ap->tx_ret_csm, idx))
+		if (tx_ring_full(ap, ap->tx_ret_csm, idx))
 			flagsize |= BD_FLG_COAL_NOW;
 
-		ace_load_tx_bd(desc, mapping, flagsize);
+		ace_load_tx_bd(ap, desc, mapping, flagsize, vlan_tag);
 	}
 #if MAX_SKB_FRAGS
 	else {
 		dma_addr_t mapping;
+		u32 vlan_tag = 0;
 		int i, len = 0;
 
 		mapping = ace_map_tx_skb(ap, skb, NULL, idx);
 		flagsize = ((skb->len - skb->data_len) << 16);
 		if (skb->ip_summed == CHECKSUM_HW)
 			flagsize |= BD_FLG_TCP_UDP_SUM;
+#if ACENIC_DO_VLAN
+		if (vlan_tx_tag_present(skb)) {
+			flagsize |= BD_FLG_VLAN_TAG;
+			vlan_tag = vlan_tx_tag_get(skb);
+		}
+#endif
 
-		ace_load_tx_bd(ap->tx_ring + idx, mapping, flagsize);
+		ace_load_tx_bd(ap, ap->tx_ring + idx, mapping, flagsize, vlan_tag);
 
-		idx = (idx + 1) % TX_RING_ENTRIES;
+		idx = (idx + 1) % ACE_TX_RING_ENTRIES(ap);
 
 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
@@ -2662,11 +2806,11 @@ restart:
 			flagsize = (frag->size << 16);
 			if (skb->ip_summed == CHECKSUM_HW)
 				flagsize |= BD_FLG_TCP_UDP_SUM;
-			idx = (idx + 1) % TX_RING_ENTRIES;
+			idx = (idx + 1) % ACE_TX_RING_ENTRIES(ap);
 
 			if (i == skb_shinfo(skb)->nr_frags - 1) {
 				flagsize |= BD_FLG_END;
-				if (tx_ring_full(ap->tx_ret_csm, idx))
+				if (tx_ring_full(ap, ap->tx_ret_csm, idx))
 					flagsize |= BD_FLG_COAL_NOW;
 
 				/*
@@ -2679,7 +2823,7 @@ restart:
 			}
 			pci_unmap_addr_set(info, mapping, mapping);
 			pci_unmap_len_set(info, maplen, frag->size);
-			ace_load_tx_bd(desc, mapping, flagsize);
+			ace_load_tx_bd(ap, desc, mapping, flagsize, vlan_tag);
 		}
 	}
 #endif
@@ -2697,7 +2841,7 @@ restart:
 		 * serialized, this is the only situation we have to
 		 * re-test.
 		 */
-		if (!tx_ring_full(ap->tx_ret_csm, idx))
+		if (!tx_ring_full(ap, ap->tx_ret_csm, idx))
 			netif_wake_queue(dev);
 	}
 
@@ -2776,8 +2920,8 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -EOPNOTSUPP;
 	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof(ecmd)))
 		return -EFAULT;
-
-	if (ecmd.cmd == ETHTOOL_GSET) {
+	switch (ecmd.cmd) {
+	case ETHTOOL_GSET:
 		ecmd.supported =
 			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
@@ -2825,7 +2969,8 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if(copy_to_user(ifr->ifr_data, &ecmd, sizeof(ecmd)))
 			return -EFAULT;
 		return 0;
-	} else if (ecmd.cmd == ETHTOOL_SSET) {
+
+	case ETHTOOL_SSET:
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
@@ -2882,7 +3027,24 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			ace_issue_cmd(regs, &cmd);
 		}
 		return 0;
+
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "acenic", sizeof(info.driver) - 1);
+		sprintf(info.fw_version, "%i.%i.%i", 
+			 tigonFwReleaseMajor, tigonFwReleaseMinor,
+			 tigonFwReleaseFix);
+		strncpy(info.version, version, sizeof(info.version) - 1);
+		if (ap && ap->pdev)
+			strcpy(info.bus_info, ap->pdev->slot_name);
+		if (copy_to_user(ifr->ifr_data, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
 	}
+	default:
+		break;
+	}
+	
 #endif
 
 	return -EOPNOTSUPP;

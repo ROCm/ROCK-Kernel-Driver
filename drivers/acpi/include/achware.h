@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 56 $
+ *       $Revision: 58 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -60,13 +60,20 @@ acpi_hw_get_mode_capabilities (
 
 /* Register I/O Prototypes */
 
+ACPI_BIT_REGISTER_INFO *
+acpi_hw_get_bit_register_info (
+	u32                     register_id);
 
 u32
-acpi_hw_register_bit_access (
-	NATIVE_UINT             read_write,
-	u8                      use_lock,
+acpi_hw_bit_register_read (
 	u32                     register_id,
-	... /* DWORD Write Value */);
+	u32                     flags);
+
+u32
+acpi_hw_bit_register_write (
+	u32                     register_id,
+	u32                     value,
+	u32                     flags);
 
 u32
 acpi_hw_register_read (
@@ -95,10 +102,6 @@ acpi_hw_low_level_write (
 void
 acpi_hw_clear_acpi_status (
    void);
-
-u32
-acpi_hw_get_bit_shift (
-	u32                     mask);
 
 
 /* GPE support */
@@ -140,7 +143,7 @@ acpi_hw_enable_non_wakeup_gpes (
 /* Sleep Prototypes */
 
 acpi_status
-acpi_hw_obtain_sleep_type_register_data (
+acpi_hw_get_sleep_type_data (
 	u8                      sleep_state,
 	u8                      *slp_typ_a,
 	u8                      *slp_typ_b);

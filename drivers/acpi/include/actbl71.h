@@ -3,12 +3,12 @@
  * Name: actbl71.h - IA-64 Extensions to the ACPI Spec Rev. 0.71
  *                   This file includes tables specific to this
  *                   specification revision.
- *       $Revision: 11 $
+ *       $Revision: 12 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -111,13 +111,13 @@ typedef struct
 	u64                 pm1b_cnt_blk;       /* Port address of Power Mgt 1b Control Reg Blk */
 	u64                 pm2_cnt_blk;        /* Port address of Power Mgt 2 Control Reg Blk */
 	u64                 pm_tmr_blk;         /* Port address of Power Mgt Timer Ctrl Reg Blk */
-	u64                 gpe0blk;            /* Port addr of General Purpose Acpi_event 0 Reg Blk */
+	u64                 gpe0_blk;           /* Port addr of General Purpose Acpi_event 0 Reg Blk */
 	u64                 gpe1_blk;           /* Port addr of General Purpose Acpi_event 1 Reg Blk */
 	u8                  pm1_evt_len;        /* Byte Length of ports at pm1_x_evt_blk */
 	u8                  pm1_cnt_len;        /* Byte Length of ports at pm1_x_cnt_blk */
 	u8                  pm2_cnt_len;        /* Byte Length of ports at pm2_cnt_blk */
 	u8                  pm_tm_len;          /* Byte Length of ports at pm_tm_blk */
-	u8                  gpe0blk_len;        /* Byte Length of ports at gpe0_blk */
+	u8                  gpe0_blk_len;       /* Byte Length of ports at gpe0_blk */
 	u8                  gpe1_blk_len;       /* Byte Length of ports at gpe1_blk */
 	u8                  gpe1_base;          /* offset in gpe model where gpe1 events start */
 	u8                  reserved3;          /* reserved */

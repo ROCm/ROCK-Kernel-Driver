@@ -103,12 +103,12 @@ free_initmem (void)
 		free_page(addr);
 		++totalram_pages;
 	}
-	printk ("Freeing unused kernel memory: %ldkB freed\n",
-		(&__init_end - &__init_begin) >> 10);
+	printk(KERN_INFO "Freeing unused kernel memory: %ldkB freed\n",
+	       (&__init_end - &__init_begin) >> 10);
 }
 
 void
-free_initrd_mem(unsigned long start, unsigned long end)
+free_initrd_mem (unsigned long start, unsigned long end)
 {
 	/*
 	 * EFI uses 4KB pages while the kernel can use 4KB  or bigger.
@@ -145,7 +145,7 @@ free_initrd_mem(unsigned long start, unsigned long end)
 	end = end & PAGE_MASK;
 
 	if (start < end)
-		printk ("Freeing initrd memory: %ldkB freed\n", (end - start) >> 10);
+		printk(KERN_INFO "Freeing initrd memory: %ldkB freed\n", (end - start) >> 10);
 
 	for (; start < end; start += PAGE_SIZE) {
 		if (!VALID_PAGE(virt_to_page(start)))

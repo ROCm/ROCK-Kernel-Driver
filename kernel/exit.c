@@ -91,10 +91,10 @@ static int will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_task
 	for_each_task(p) {
 		if ((p == ignored_task) || (p->pgrp != pgrp) ||
 		    (p->state == TASK_ZOMBIE) ||
-		    (p->p_pptr->pid == 1))
+		    (p->parent->pid == 1))
 			continue;
-		if ((p->p_pptr->pgrp != pgrp) &&
-		    (p->p_pptr->session == p->session)) {
+		if ((p->parent->pgrp != pgrp) &&
+		    (p->parent->session == p->session)) {
 			read_unlock(&tasklist_lock);
  			return 0;
 		}
@@ -144,8 +144,8 @@ void reparent_to_init(void)
 
 	/* Reparent to init */
 	REMOVE_LINKS(current);
-	current->p_pptr = child_reaper;
-	current->p_opptr = child_reaper;
+	current->parent = child_reaper;
+	current->real_parent = child_reaper;
 	SET_LINKS(current);
 
 	/* Set the exit signal to SIGCHLD so we signal init on exit */
@@ -217,16 +217,16 @@ static inline void forget_original_parent(struct task_struct * father)
 		reaper = child_reaper;
 
 	for_each_task(p) {
-		if (p->p_opptr == father) {
+		if (p->real_parent == father) {
 			/* We dont want people slaying init */
 			p->exit_signal = SIGCHLD;
 			p->self_exec_id++;
 
 			/* Make sure we're not reparenting to ourselves */
 			if (p == reaper)
-				p->p_opptr = child_reaper;
+				p->real_parent = child_reaper;
 			else
-				p->p_opptr = reaper;
+				p->real_parent = reaper;
 
 			if (p->pdeath_signal) send_sig(p->pdeath_signal, p, 0);
 		}
@@ -400,7 +400,7 @@ static void exit_notify(void)
 	 * is about to become orphaned.
 	 */
 	 
-	t = current->p_pptr;
+	t = current->parent;
 	
 	if ((t->pgrp != current->pgrp) &&
 	    (t->session == current->session) &&
@@ -445,17 +445,12 @@ static void exit_notify(void)
 	write_lock_irq(&tasklist_lock);
 	current->state = TASK_ZOMBIE;
 	do_notify_parent(current, current->exit_signal);
-	while (current->p_cptr != NULL) {
-		p = current->p_cptr;
-		current->p_cptr = p->p_osptr;
-		p->p_ysptr = NULL;
+	while ((p = eldest_child(current))) {
+		list_del_init(&p->sibling);
 		p->ptrace = 0;
 
-		p->p_pptr = p->p_opptr;
-		p->p_osptr = p->p_pptr->p_cptr;
-		if (p->p_osptr)
-			p->p_osptr->p_ysptr = p;
-		p->p_pptr->p_cptr = p;
+		p->parent = p->real_parent;
+		list_add_tail(&p->sibling,&p->parent->children);
 		if (p->state == TASK_ZOMBIE)
 			do_notify_parent(p, p->exit_signal);
 		/*
@@ -568,7 +563,9 @@ repeat:
 	tsk = current;
 	do {
 		struct task_struct *p;
-	 	for (p = tsk->p_cptr ; p ; p = p->p_osptr) {
+		struct list_head *_p;
+		list_for_each(_p,&tsk->children) {
+			p = list_entry(_p,struct task_struct,sibling);
 			if (pid>0) {
 				if (p->pid != pid)
 					continue;
@@ -595,6 +592,12 @@ repeat:
 				if (!(options & WUNTRACED) && !(p->ptrace & PT_PTRACED))
 					continue;
 				read_unlock(&tasklist_lock);
+
+				/* move to end of parent's list to avoid starvation */
+				write_lock_irq(&tasklist_lock);
+				remove_parent(p);
+				add_parent(p, p->parent);
+				write_unlock_irq(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0; 
 				if (!retval && stat_addr) 
 					retval = put_user((p->exit_code << 8) | 0x7f, stat_addr);
@@ -613,11 +616,11 @@ repeat:
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;
-				if (p->p_opptr != p->p_pptr) {
+				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
-					REMOVE_LINKS(p);
-					p->p_pptr = p->p_opptr;
-					SET_LINKS(p);
+					remove_parent(p);
+					p->parent = p->real_parent;
+					add_parent(p, p->parent);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
 				} else

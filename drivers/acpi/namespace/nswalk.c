@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: nswalk - Functions for walking the ACPI namespace
- *              $Revision: 26 $
+ *              $Revision: 32 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nswalk")
+	 ACPI_MODULE_NAME    ("nswalk")
 
 
 /*******************************************************************************
@@ -54,14 +54,14 @@
 
 acpi_namespace_node *
 acpi_ns_get_next_node (
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	acpi_namespace_node     *parent_node,
 	acpi_namespace_node     *child_node)
 {
 	acpi_namespace_node     *next_node = NULL;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	if (!child_node) {
@@ -138,7 +138,7 @@ acpi_ns_get_next_node (
 
 acpi_status
 acpi_ns_walk_namespace (
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	acpi_handle             start_node,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
@@ -149,11 +149,11 @@ acpi_ns_walk_namespace (
 	acpi_status             status;
 	acpi_namespace_node     *child_node;
 	acpi_namespace_node     *parent_node;
-	acpi_object_type8        child_type;
+	acpi_object_type        child_type;
 	u32                     level;
 
 
-	FUNCTION_TRACE ("Ns_walk_namespace");
+	ACPI_FUNCTION_TRACE ("Ns_walk_namespace");
 
 
 	/* Special case for the namespace Root Node */
@@ -194,14 +194,20 @@ acpi_ns_walk_namespace (
 				 * callback function
 				 */
 				if (unlock_before_callback) {
-					acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+					status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+					if (ACPI_FAILURE (status)) {
+						return_ACPI_STATUS (status);
+					}
 				}
 
 				status = user_function (child_node, level,
 						 context, return_value);
 
 				if (unlock_before_callback) {
-					acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+					status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+					if (ACPI_FAILURE (status)) {
+						return_ACPI_STATUS (status);
+					}
 				}
 
 				switch (status) {
@@ -216,14 +222,12 @@ acpi_ns_walk_namespace (
 					/* Exit now, with OK status */
 
 					return_ACPI_STATUS (AE_OK);
-					break;
 
 				default:
 
 					/* All others are valid exceptions */
 
 					return_ACPI_STATUS (status);
-					break;
 				}
 			}
 
@@ -247,7 +251,6 @@ acpi_ns_walk_namespace (
 				}
 			}
 		}
-
 		else {
 			/*
 			 * No more children of this node (Acpi_ns_get_next_node
@@ -256,7 +259,7 @@ acpi_ns_walk_namespace (
 			 */
 			level--;
 			child_node = parent_node;
-			parent_node = acpi_ns_get_parent_object (parent_node);
+			parent_node = acpi_ns_get_parent_node (parent_node);
 		}
 	}
 

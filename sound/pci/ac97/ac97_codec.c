@@ -36,7 +36,7 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Universal interface for Audio Codec '97");
 MODULE_LICENSE("GPL");
 
-static int enable_loopback = 0;
+static int enable_loopback;
 
 MODULE_PARM(enable_loopback, "i");
 MODULE_PARM_DESC(enable_loopback, "Enable AC97 ADC/DAC Loopback Control");

@@ -60,7 +60,6 @@ ide-obj-$(CONFIG_BLK_DEV_QD65XX)	+= qd65xx.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_RAPIDE)	+= rapide.o
 ide-obj-$(CONFIG_BLK_DEV_RZ1000)	+= rz1000.o
 ide-obj-$(CONFIG_BLK_DEV_SIS5513)	+= sis5513.o
-ide-obj-$(CONFIG_BLK_DEV_SLC90E66)	+= slc90e66.o
 ide-obj-$(CONFIG_BLK_DEV_SL82C105)	+= sl82c105.o
 ide-obj-$(CONFIG_BLK_DEV_TRM290)	+= trm290.o
 ide-obj-$(CONFIG_BLK_DEV_UMC8672)	+= umc8672.o
@@ -75,7 +74,7 @@ obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
 ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 
-ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o $(ide-obj-y)
+ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make
 

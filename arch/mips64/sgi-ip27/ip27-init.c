@@ -491,7 +491,7 @@ void allowboot(void)
 			 * Linux can schedule processes on this slave.
 			 */
 			kernel_thread(0, NULL, CLONE_PID);
-			p = init_task.prev_task;
+			p = prev_task(&init_task);
 			sprintf(p->comm, "%s%d", "Idle", num_cpus);
 			init_tasks[num_cpus] = p;
 			alloc_cpupda(cpu, num_cpus);

@@ -27,13 +27,8 @@ struct nfs_server {
 				lru_dirty,
 				lru_commit,
 				lru_busy;
-};
-
-/*
- * nfs super-block data in memory
- */
-struct nfs_sb_info {
-	struct nfs_server	s_server;
+	struct nfs_fh		fh;
+	struct sockaddr_in	addr;
 };
 
 #endif

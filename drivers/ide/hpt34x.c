@@ -40,7 +40,7 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
@@ -145,16 +145,16 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 	return(err);
 }
 
-static void config_chipset_for_pio (ide_drive_t *drive)
+static void config_chipset_for_pio(ide_drive_t *drive)
 {
 	unsigned short eide_pio_timing[6] = {960, 480, 240, 180, 120, 90};
 	unsigned short xfer_pio = drive->id->eide_pio_modes;
 
 	byte	timing, speed, pio;
 
-	pio = ide_get_best_pio_mode(drive, 255, 5, NULL);
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
-	if (xfer_pio> 4)
+	if (xfer_pio > 4)
 		xfer_pio = 0;
 
 	if (drive->id->eide_pio_iordy > 0) {

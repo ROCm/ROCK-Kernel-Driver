@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 32 $
+ *       $Revision: 35 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -119,6 +119,11 @@ acpi_tb_install_table (
 	acpi_table_desc         *table_info);
 
 acpi_status
+acpi_tb_match_signature (
+	NATIVE_CHAR             *signature,
+	acpi_table_desc         *table_info);
+
+acpi_status
 acpi_tb_recognize_table (
 	acpi_table_header       *table_ptr,
 	acpi_table_desc         *table_info);
@@ -176,6 +181,13 @@ acpi_tb_find_rsdp (
 /*
  * tbutils - common table utilities
  */
+
+acpi_status
+acpi_tb_find_table (
+	NATIVE_CHAR             *signature,
+	NATIVE_CHAR             *oem_id,
+	NATIVE_CHAR             *oem_table_id,
+	acpi_table_header       **table_ptr);
 
 acpi_status
 acpi_tb_map_acpi_table (

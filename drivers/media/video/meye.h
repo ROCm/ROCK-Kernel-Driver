@@ -29,7 +29,7 @@
 #define _MEYE_PRIV_H_
 
 #define MEYE_DRIVER_MAJORVERSION	1
-#define MEYE_DRIVER_MINORVERSION	2
+#define MEYE_DRIVER_MINORVERSION	3
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */
@@ -300,7 +300,6 @@ struct meye {
 	struct meye_grab_buffer grab_buffer[MEYE_MAX_BUFNBRS];
 
 	/* other */
-	unsigned int open_count;	/* open() count */
 	struct semaphore lock;		/* semaphore for open/mmap... */
 
 	struct meye_queue grabq;	/* queue for buffers to be grabbed */

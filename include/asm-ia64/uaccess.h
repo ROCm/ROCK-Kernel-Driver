@@ -320,4 +320,22 @@ struct exception_fixup {
 extern struct exception_fixup search_exception_table (unsigned long addr);
 extern void handle_exception (struct pt_regs *regs, struct exception_fixup fixup);
 
+#ifdef GAS_HAS_LOCAL_TAGS
+#define SEARCH_EXCEPTION_TABLE(regs) search_exception_table(regs->cr_iip + ia64_psr(regs)->ri);
+#else
+#define SEARCH_EXCEPTION_TABLE(regs) search_exception_table(regs->cr_iip);
+#endif
+
+static inline int
+done_with_exception (struct pt_regs *regs)
+{
+	struct exception_fixup fix;
+	fix = SEARCH_EXCEPTION_TABLE(regs);
+	if (fix.cont) {
+		handle_exception(regs, fix);
+		return 1;
+	}
+	return 0;
+}
+
 #endif /* _ASM_IA64_UACCESS_H */

@@ -9,7 +9,7 @@
 
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -62,12 +62,12 @@ typedef struct acpi_fatal_info
  * Types specific to the OS service interfaces
  */
 
-typedef
-u32 (*OSD_HANDLER) (
+typedef u32
+(ACPI_SYSTEM_XFACE *OSD_HANDLER) (
 	void                    *context);
 
-typedef
-void (*OSD_EXECUTION_CALLBACK) (
+typedef void
+(ACPI_SYSTEM_XFACE *OSD_EXECUTION_CALLBACK) (
 	void                    *context);
 
 
@@ -121,11 +121,7 @@ acpi_os_signal_semaphore (
 
 void *
 acpi_os_allocate (
-	u32                     size);
-
-void *
-acpi_os_callocate (
-	u32                     size);
+	ACPI_SIZE               size);
 
 void
 acpi_os_free (
@@ -134,13 +130,13 @@ acpi_os_free (
 acpi_status
 acpi_os_map_memory (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
-	u32                     length,
+	ACPI_SIZE               size,
 	void                    **logical_address);
 
 void
 acpi_os_unmap_memory (
 	void                    *logical_address,
-	u32                     length);
+	ACPI_SIZE               size);
 
 acpi_status
 acpi_os_get_physical_address (
@@ -202,7 +198,7 @@ acpi_os_read_port (
 acpi_status
 acpi_os_write_port (
 	ACPI_IO_ADDRESS         address,
-	NATIVE_UINT             value,
+	acpi_integer            value,
 	u32                     width);
 
 
@@ -220,7 +216,7 @@ acpi_os_read_memory (
 acpi_status
 acpi_os_write_memory (
 	ACPI_PHYSICAL_ADDRESS   address,
-	NATIVE_UINT             value,
+	acpi_integer            value,
 	u32                     width);
 
 
@@ -240,7 +236,7 @@ acpi_status
 acpi_os_write_pci_configuration (
 	acpi_pci_id             *pci_id,
 	u32                     register,
-	NATIVE_UINT             value,
+	acpi_integer            value,
 	u32                     width);
 
 
@@ -272,12 +268,12 @@ acpi_os_signal (
  * Debug print routines
  */
 
-s32
+void ACPI_INTERNAL_VAR_XFACE
 acpi_os_printf (
 	const NATIVE_CHAR       *format,
 	...);
 
-s32
+void
 acpi_os_vprintf (
 	const NATIVE_CHAR       *format,
 	va_list                 args);

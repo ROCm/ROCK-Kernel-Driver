@@ -44,7 +44,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /* #define DEBUG */  /* remove comments for DEBUG messages */
 
@@ -199,20 +199,23 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 {
 	int active_time, recovery_time;
 	int active_cycles, recovery_cycles;
-	ide_pio_data_t d;
-	
+	struct ata_timing *t;
+
         if (pio) {
-		pio = ide_get_best_pio_mode(drive, pio, 5, &d);
-		
+		if (pio == 255)
+			pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+		else
+			pio = XFER_PIO_0 + min_t(byte, pio, 4);
+
+		t = ata_timing_data(pio);
+
 		/*
 		 *  Just like opti621.c we try to calculate the
 		 *  actual cycle time for recovery and activity
 		 *  according system bus speed.
 		 */
-		active_time = ide_pio_timings[pio].active_time;
-		recovery_time = d.cycle_time 
-			- active_time
-			- ide_pio_timings[pio].setup_time;
+		active_time = t->active;
+		recovery_time = t->cycle - active_time - t->setup;
 		/*
 		 *  Cycle times should be Vesa bus cycles
 		 */
@@ -227,7 +230,8 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 		if (recovery_cycles > 15) recovery_cycles = 0;  /* 0==16 */
 		
 #ifdef DEBUG
-		printk("ht6560b: drive %s setting pio=%d recovery=%d (%dns) active=%d (%dns)\n", drive->name, pio, recovery_cycles, recovery_time, active_cycles, active_time);
+		printk("ht6560b: drive %s setting pio=%d recovery=%d (%dns) active=%d (%dns)\n",
+			drive->name, pio - XFER_PIO_0, recovery_cycles, recovery_time, active_cycles, active_time);
 #endif
 		
 		return (byte)((recovery_cycles << 4) | active_cycles);

@@ -140,6 +140,9 @@ void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
 		page_dir++;
 	} while (--nr);
 	spin_unlock(&mm->page_table_lock);
+
+	/* keep the page table cache within bounds */
+	check_pgt_cache();
 }
 
 pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)

@@ -246,7 +246,7 @@ affs_empty_dir(struct inode *inode)
 		goto done;
 
 	retval = -ENOTEMPTY;
-	for (size = AFFS_SB->s_hashsize - 1; size >= 0; size--)
+	for (size = AFFS_SB(sb)->s_hashsize - 1; size >= 0; size--)
 		if (AFFS_HEAD(bh)->table[size])
 			goto not_empty;
 	retval = 0;
@@ -458,7 +458,7 @@ affs_error(struct super_block *sb, const char *function, const char *fmt, ...)
 	if (!(sb->s_flags & MS_RDONLY))
 		printk(KERN_WARNING "AFFS: Remounting filesystem read-only\n");
 	sb->s_flags |= MS_RDONLY;
-	AFFS_SB->s_flags |= SF_READONLY;	/* Don't allow to remount rw */
+	AFFS_SB(sb)->s_flags |= SF_READONLY;	/* Don't allow to remount rw */
 }
 
 void

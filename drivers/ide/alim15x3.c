@@ -26,7 +26,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define DISPLAY_ALI_TIMINGS
 
@@ -241,7 +241,7 @@ static struct pci_dev *isa_dev;
 
 static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 {
-	ide_pio_data_t d;
+	struct ata_timing *t;
 	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
 	int s_time, a_time, c_time;
@@ -251,14 +251,20 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	int portFIFO = hwif->channel ? 0x55 : 0x54;
 	byte cd_dma_fifo = 0;
 
-	pio = ide_get_best_pio_mode(drive, pio, 5, &d);
-	s_time = ide_pio_timings[pio].setup_time;
-	a_time = ide_pio_timings[pio].active_time;
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+
+	t = ata_timing_data(pio);
+
+	s_time = t->setup;
+	a_time = t->active;
 	if ((s_clc = (s_time * system_bus_speed + 999) / 1000) >= 8)
 		s_clc = 0;
 	if ((a_clc = (a_time * system_bus_speed + 999) / 1000) >= 8)
 		a_clc = 0;
-	c_time = ide_pio_timings[pio].cycle_time;
+	c_time = t->cycle;
 
 #if 0
 	if ((r_clc = ((c_time - s_time - a_time) * system_bus_speed + 999) / 1000) >= 16)
@@ -295,17 +301,6 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	pci_write_config_byte(dev, port, s_clc);
 	pci_write_config_byte(dev, port+drive->select.b.unit+2, (a_clc << 4) | r_clc);
 	__restore_flags(flags);
-
-	/*
-	 * setup   active  rec
-	 * { 70,   165,    365 },   PIO Mode 0
-	 * { 50,   125,    208 },   PIO Mode 1
-	 * { 30,   100,    110 },   PIO Mode 2
-	 * { 30,   80,     70  },   PIO Mode 3 with IORDY
-	 * { 25,   70,     25  },   PIO Mode 4 with IORDY  ns
-	 * { 20,   50,     30  }    PIO Mode 5 with IORDY (nonstandard)
-	 */
-
 }
 
 static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)

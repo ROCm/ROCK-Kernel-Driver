@@ -167,32 +167,36 @@ void fat_clear_inode(struct inode *inode)
 
 void fat_put_super(struct super_block *sb)
 {
-	if (MSDOS_SB(sb)->cvf_format->cvf_version) {
-		dec_cvf_format_use_count_by_version(MSDOS_SB(sb)->cvf_format->cvf_version);
-		MSDOS_SB(sb)->cvf_format->unmount_cvf(sb);
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+	if (sbi->cvf_format->cvf_version) {
+		dec_cvf_format_use_count_by_version(sbi->cvf_format->cvf_version);
+		sbi->cvf_format->unmount_cvf(sb);
 	}
-	if (MSDOS_SB(sb)->fat_bits == 32) {
+	if (sbi->fat_bits == 32) {
 		fat_clusters_flush(sb);
 	}
 	fat_cache_inval_dev(sb);
 	set_blocksize (sb->s_dev,BLOCK_SIZE);
-	if (MSDOS_SB(sb)->nls_disk) {
-		unload_nls(MSDOS_SB(sb)->nls_disk);
-		MSDOS_SB(sb)->nls_disk = NULL;
-		MSDOS_SB(sb)->options.codepage = 0;
+	if (sbi->nls_disk) {
+		unload_nls(sbi->nls_disk);
+		sbi->nls_disk = NULL;
+		sbi->options.codepage = 0;
 	}
-	if (MSDOS_SB(sb)->nls_io) {
-		unload_nls(MSDOS_SB(sb)->nls_io);
-		MSDOS_SB(sb)->nls_io = NULL;
+	if (sbi->nls_io) {
+		unload_nls(sbi->nls_io);
+		sbi->nls_io = NULL;
 	}
 	/*
 	 * Note: the iocharset option might have been specified
 	 * without enabling nls_io, so check for it here.
 	 */
-	if (MSDOS_SB(sb)->options.iocharset) {
-		kfree(MSDOS_SB(sb)->options.iocharset);
-		MSDOS_SB(sb)->options.iocharset = NULL;
+	if (sbi->options.iocharset) {
+		kfree(sbi->options.iocharset);
+		sbi->options.iocharset = NULL;
 	}
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 }
 
 
@@ -582,18 +586,14 @@ static struct super_operations fat_sops = {
 
 /*
  * Read the super block of an MS-DOS FS.
- *
- * Note that this may be called from vfat_read_super
- * with some fields already initialized.
  */
-struct super_block *
-fat_read_super(struct super_block *sb, void *data, int silent,
-		struct inode_operations *fs_dir_inode_ops)
+int fat_fill_super(struct super_block *sb, void *data, int silent,
+		   struct inode_operations *fs_dir_inode_ops, int isvfat)
 {
 	struct inode *root_inode;
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
-	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	struct msdos_sb_info *sbi;
 	int logical_sector_size, fat_clusters, debug, cp;
 	unsigned int total_sectors, rootdir_sectors;
 	long error = -EIO;
@@ -602,12 +602,19 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	char cvf_format[21];
 	char cvf_options[101];
 
+	sbi = kmalloc(sizeof(struct msdos_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct msdos_sb_info));
+
 	cvf_format[0] = '\0';
 	cvf_options[0] = '\0';
 	sbi->private_data = NULL;
 
 	sb->s_magic = MSDOS_SUPER_MAGIC;
 	sb->s_op = &fat_sops;
+	sbi->options.isvfat = isvfat;
 	sbi->dir_ops = fs_dir_inode_ops;
 	sbi->cvf_format = &default_cvf;
 
@@ -830,10 +837,10 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		sbi->cvf_format = cvf_formats[i];
 		++cvf_format_use_count[i];
 	}
-	return sb;
+	return 0;
 
 out_invalid:
-	error = 0;
+	error = -EINVAL;
 
 out_fail:
 	if (sbi->nls_io)
@@ -845,8 +852,10 @@ out_fail:
 	if (sbi->private_data)
 		kfree(sbi->private_data);
 	sbi->private_data = NULL;
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 
-	return ERR_PTR(error);
+	return error;
 }
 
 int fat_statfs(struct super_block *sb,struct statfs *buf)

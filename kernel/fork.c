@@ -666,7 +666,8 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 
 	INIT_LIST_HEAD(&p->run_list);
 
-	p->p_cptr = NULL;
+	INIT_LIST_HEAD(&p->children);
+	INIT_LIST_HEAD(&p->sibling);
 	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	if (clone_flags & CLONE_VFORK) {
@@ -766,12 +767,12 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	write_lock_irq(&tasklist_lock);
 
 	/* CLONE_PARENT re-uses the old parent */
-	p->p_opptr = current->p_opptr;
-	p->p_pptr = current->p_pptr;
+	p->real_parent = current->real_parent;
+	p->parent = current->parent;
 	if (!(clone_flags & CLONE_PARENT)) {
-		p->p_opptr = current;
+		p->real_parent = current;
 		if (!(p->ptrace & PT_PTRACED))
-			p->p_pptr = current;
+			p->parent = current;
 	}
 
 	if (clone_flags & CLONE_THREAD) {

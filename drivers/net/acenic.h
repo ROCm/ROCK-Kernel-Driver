@@ -417,7 +417,16 @@ struct cmd {
 #define BD_FLG_TCP_UDP_SUM	0x01
 #define BD_FLG_IP_SUM		0x02
 #define BD_FLG_END		0x04
+#define BD_FLG_MORE		0x08
 #define BD_FLG_JUMBO		0x10
+#define BD_FLG_UCAST		0x20
+#define BD_FLG_MCAST		0x40
+#define BD_FLG_BCAST		0x60
+#define BD_FLG_TYP_MASK		0x60
+#define BD_FLG_IP_FRAG		0x80
+#define BD_FLG_IP_FRAG_END	0x100
+#define BD_FLG_VLAN_TAG		0x200
+#define BD_FLG_FRAME_ERROR	0x400
 #define BD_FLG_COAL_NOW		0x800
 #define BD_FLG_MINI		0x1000
 
@@ -437,11 +446,12 @@ struct cmd {
 
 
 /*
- * TX ring
+ * TX ring - maximum TX ring entries for Tigon I's is 128
  */
-#define TX_RING_ENTRIES	256	
-#define TX_RING_SIZE	(TX_RING_ENTRIES * sizeof(struct tx_desc))
-#define TX_RING_BASE	0x3800
+#define MAX_TX_RING_ENTRIES	256
+#define TIGON_I_TX_RING_ENTRIES	128
+#define TX_RING_SIZE		(MAX_TX_RING_ENTRIES * sizeof(struct tx_desc))
+#define TX_RING_BASE		0x3800
 
 struct tx_desc{
         aceaddr	addr;
@@ -608,7 +618,7 @@ struct tx_ring_info {
  */
 struct ace_skb
 {
-	struct tx_ring_info	tx_skbuff[TX_RING_ENTRIES];
+	struct tx_ring_info	tx_skbuff[MAX_TX_RING_ENTRIES];
 	struct ring_info	rx_std_skbuff[RX_STD_RING_ENTRIES];
 	struct ring_info	rx_mini_skbuff[RX_MINI_RING_ENTRIES];
 	struct ring_info	rx_jumbo_skbuff[RX_JUMBO_RING_ENTRIES];
@@ -632,6 +642,10 @@ struct ace_private
 	struct ace_skb		*skb;
 	dma_addr_t		info_dma;	/* 32/64 bit */
 
+#if ACENIC_DO_VLAN
+	struct vlan_group	*vlgrp;
+#endif
+
 	int			version, link;
 	int			promisc, mcast_all;
 
@@ -642,6 +656,7 @@ struct ace_private
 	u32			tx_prd;
 	volatile u32		tx_ret_csm;
 	struct timer_list	timer;
+	int			tx_ring_entries;
 
 	/*
 	 * RX elements
@@ -692,17 +707,17 @@ struct ace_private
 
 #define TX_RESERVED	MAX_SKB_FRAGS
 
-static inline int tx_space (u32 csm, u32 prd)
+static inline int tx_space (struct ace_private *ap, u32 csm, u32 prd)
 {
-	return (csm - prd - 1) & (TX_RING_ENTRIES - 1);
+	return (csm - prd - 1) & (ACE_TX_RING_ENTRIES(ap) - 1);
 }
 
-#define tx_free(ap) 		tx_space((ap)->tx_ret_csm, (ap)->tx_prd)
+#define tx_free(ap) 		tx_space((ap)->tx_ret_csm, (ap)->tx_prd, ap)
 
 #if MAX_SKB_FRAGS
-#define tx_ring_full(csm, prd)	(tx_space(csm, prd) <= TX_RESERVED)
+#define tx_ring_full(ap, csm, prd)	(tx_space(ap, csm, prd) <= TX_RESERVED)
 #else
-#define tx_ring_full		0
+#define tx_ring_full			0
 #endif
 
 
@@ -711,7 +726,7 @@ static inline void set_aceaddr(aceaddr *aa, dma_addr_t addr)
 	u64 baddr = (u64) addr;
 	aa->addrlo = baddr & 0xffffffff;
 	aa->addrhi = baddr >> 32;
-	mb();
+	wmb();
 }
 
 
@@ -758,5 +773,9 @@ static void ace_free_descriptors(struct net_device *dev);
 static void ace_init_cleanup(struct net_device *dev);
 static struct net_device_stats *ace_get_stats(struct net_device *dev);
 static int read_eeprom_byte(struct net_device *dev, unsigned long offset);
+#if ACENIC_DO_VLAN
+static void ace_vlan_rx_register(struct net_device *dev, struct vlan_group *grp);
+static void ace_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid);
+#endif
 
 #endif /* _ACENIC_H_ */

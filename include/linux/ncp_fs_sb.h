@@ -81,8 +81,6 @@ struct ncp_server {
 	unsigned int flags;
 };
 
-#define ncp_sb_info	ncp_server
-
 #define NCP_FLAG_UTF8	1
 
 #define NCP_CLR_FLAG(server, flag)	((server)->flags &= ~(flag))

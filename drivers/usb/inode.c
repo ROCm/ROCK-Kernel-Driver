@@ -40,7 +40,6 @@
 #include <asm/byteorder.h>
 
 static struct super_operations usbfs_ops;
-static struct file_operations usbfs_dir_operations;
 static struct file_operations default_file_operations;
 static struct inode_operations usbfs_dir_inode_operations;
 static struct vfsmount *usbfs_mount;
@@ -141,21 +140,6 @@ static int parse_options(struct super_block *s, char *data)
 
 /* --------------------------------------------------------------------- */
 
-/* SMP-safe */
-static struct dentry *usbfs_lookup (struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
-}
-
-static int usbfs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = USBDEVICE_SUPER_MAGIC;
-	buf->f_bsize = PAGE_CACHE_SIZE;
-	buf->f_namelen = NAME_MAX;
-	return 0;
-}
-
 static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 {
 	struct inode *inode = new_inode(sb);
@@ -177,7 +161,7 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 			break;
 		case S_IFDIR:
 			inode->i_op = &usbfs_dir_inode_operations;
-			inode->i_fop = &usbfs_dir_operations;
+			inode->i_fop = &simple_dir_operations;
 			break;
 		}
 	}
@@ -296,11 +280,6 @@ static int default_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static struct file_operations usbfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-};
-
 static struct file_operations default_file_operations = {
 	read:		default_read_file,
 	write:		default_write_file,
@@ -310,14 +289,14 @@ static struct file_operations default_file_operations = {
 
 static struct inode_operations usbfs_dir_inode_operations = {
 	create:		usbfs_create,
-	lookup:		usbfs_lookup,
+	lookup:		simple_lookup,
 	unlink:		usbfs_unlink,
 	mkdir:		usbfs_mkdir,
 	rmdir:		usbfs_rmdir,
 };
 
 static struct super_operations usbfs_ops = {
-	statfs:		usbfs_statfs,
+	statfs:		simple_statfs,
 	put_inode:	force_delete,
 };
 

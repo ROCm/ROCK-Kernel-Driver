@@ -178,7 +178,7 @@ checkCPUtype:
  * we don't need to preserve eflags.
  */
 
-	movl $3,X86		# at least 386
+	movb $3,X86		# at least 386
 	pushfl			# push EFLAGS
 	popl %eax		# get EFLAGS
 	movl %eax,%ecx		# save original EFLAGS
@@ -191,7 +191,7 @@ checkCPUtype:
 	andl $0x40000,%eax	# check if AC bit changed
 	je is386
 
-	movl $4,X86		# at least 486
+	movb $4,X86		# at least 486
 	movl %ecx,%eax
 	xorl $0x200000,%eax	# check ID flag
 	pushl %eax

@@ -10,7 +10,6 @@ export-objs	:= isdn_common.o
 
 # Multipart objects.
 
-list-multi	:= isdn.o
 isdn-objs	:= isdn_net.o isdn_tty.o isdn_v110.o isdn_common.o
 
 # Optional parts of multipart objects.
@@ -50,8 +49,3 @@ obj-y += $(addsuffix /vmlinux-obj.o, $(subdir-y))
 # The global Rules.make.
 
 include $(TOPDIR)/Rules.make
-
-# Link rules for multi-part drivers.
-
-isdn.o: $(isdn-objs)
-	$(LD) -r -o $@ $(isdn-objs)

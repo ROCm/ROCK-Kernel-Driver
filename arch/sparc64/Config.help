@@ -1143,34 +1143,6 @@ CONFIG_RTC
   The module is called rtc.o. If you want to compile it as a module,
   say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_SOUND
-  If you have a sound card in your computer, i.e. if it can say more
-  than an occasional beep, say Y.  Be sure to have all the information
-  about your sound card and its configuration down (I/O port,
-  interrupt and DMA channel), because you will be asked for it.
-
-  You want to read the Sound-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>. General information about
-  the modular sound system is contained in the files
-  <file:Documentation/sound/Introduction>.  The file
-  <file:Documentation/sound/README.OSS> contains some slightly
-  outdated but still useful information as well.
-
-  If you have a PnP sound card and you want to configure it at boot
-  time using the ISA PnP tools (read
-  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
-  compile the sound card support as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want)
-  and load that module after the PnP configuration is finished.  To do
-  this, say M here and read <file:Documentation/modules.txt> as well
-  as <file:Documentation/sound/README.modules>; the module will be
-  called soundcore.o.
-
-  I'm told that even without a sound card, you can make your computer
-  say more than an occasional beep, by programming the PC speaker.
-  Kernel patches and supporting utilities to do that are in the pcsp
-  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
-
 CONFIG_MAGIC_SYSRQ
   If you say Y here, you will have some control over the system even
   if the system crashes for example during kernel debugging (e.g., you

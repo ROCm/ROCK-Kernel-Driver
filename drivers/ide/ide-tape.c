@@ -2108,7 +2108,7 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 #endif /* IDETAPE_DEBUG_LOG */
 			if (pc->c[0] == IDETAPE_REQUEST_SENSE_CMD) {
 				printk (KERN_ERR "ide-tape: I/O error in request sense command\n");
-				return ide_do_reset (drive);
+				return ide_stopped;
 			}
 #if IDETAPE_DEBUG_LOG
 			if (tape->debug_level >= 1)
@@ -2132,8 +2132,8 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-tape: The tape wants to issue more interrupts in DMA mode\n");
 		printk (KERN_ERR "ide-tape: DMA disabled, reverting to PIO\n");
-		(void) HWIF(drive)->dmaproc(ide_dma_off, drive);
-		return ide_do_reset (drive);
+		HWIF(drive)->dmaproc(ide_dma_off, drive);
+		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	bcount.b.high = IN_BYTE (IDE_BCOUNTH_REG);			/* Get the number of bytes to transfer */
@@ -2142,12 +2142,12 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 
 	if (ireason.b.cod) {
 		printk (KERN_ERR "ide-tape: CoD != 0 in idetape_pc_intr\n");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	if (ireason.b.io == test_bit (PC_WRITING, &pc->flags)) {	/* Hopefully, we will never get here */
 		printk (KERN_ERR "ide-tape: We wanted to %s, ", ireason.b.io ? "Write":"Read");
 		printk (KERN_ERR "ide-tape: but the tape wants us to %s !\n",ireason.b.io ? "Read":"Write");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	if (!test_bit (PC_WRITING, &pc->flags)) {			/* Reading - Check that we have enough space */
 		temp = pc->actually_transferred + bcount.all;
@@ -2252,7 +2252,7 @@ static ide_startstop_t idetape_transfer_pc(ide_drive_t *drive)
 	}
 	if (!ireason.b.cod || ireason.b.io) {
 		printk (KERN_ERR "ide-tape: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	tape->cmd_start_time = jiffies;
 	ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
@@ -2725,7 +2725,7 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 				idetape_media_access_finished (drive);
 				return ide_stopped;
 			} else {
-				return ide_do_reset (drive);
+				return ide_stopped;
 			}
 		} else if (jiffies - tape->dsc_polling_start > IDETAPE_DSC_MA_THRESHOLD)
 			tape->dsc_polling_frequency = IDETAPE_DSC_MA_SLOW;

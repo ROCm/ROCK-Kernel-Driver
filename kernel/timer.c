@@ -742,14 +742,14 @@ asmlinkage long sys_getppid(void)
 	struct task_struct * me = current;
 	struct task_struct * parent;
 
-	parent = me->p_opptr;
+	parent = me->real_parent;
 	for (;;) {
 		pid = parent->pid;
 #if CONFIG_SMP
 {
 		struct task_struct *old = parent;
 		mb();
-		parent = me->p_opptr;
+		parent = me->real_parent;
 		if (old != parent)
 			continue;
 }

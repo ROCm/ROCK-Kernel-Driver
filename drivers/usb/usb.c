@@ -2614,7 +2614,7 @@ static void __exit usb_exit(void)
 	usb_hub_cleanup();
 }
 
-module_init(usb_init);
+subsys_initcall(usb_init);
 module_exit(usb_exit);
 
 /*

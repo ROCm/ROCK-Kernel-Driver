@@ -31,14 +31,14 @@
  *
  */
 
-#if !defined(_LINUX_UDF_FS_H)
-#define _LINUX_UDF_FS_H
+#ifndef _UDF_FS_H
+#define _UDF_FS_H 1
 
 #define UDF_PREALLOCATE
 #define UDF_DEFAULT_PREALLOC_BLOCKS	8
 
-#define UDFFS_DATE			"2001/10/10"
-#define UDFFS_VERSION			"0.9.5"
+#define UDFFS_DATE			"2002/03/11"
+#define UDFFS_VERSION			"0.9.6"
 
 #if !defined(UDFFS_RW)
 
@@ -66,4 +66,4 @@
 #define udf_info(f, a...) \
 		printk (KERN_INFO "UDF-fs INFO " f, ##a);
 
-#endif /* !defined(_LINUX_UDF_FS_H) */
+#endif /* _UDF_FS_H */

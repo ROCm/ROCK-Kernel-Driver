@@ -94,7 +94,7 @@ cc_end_cruft:
 	or		%o5, %o4, %o4		! IEU0	Group
 	addcc		%o4, %sum, %sum		! IEU1
 	bcc,pt		%xcc, ccfold		! CTI
-	 sethi		%uhi(PAGE_OFFSET), %g4	! IEU0	Group
+	 nop					! IEU0	Group
 	b,pt		%xcc, ccfold		! CTI
 	 add		%sum, 1, %sum		! IEU1
 
@@ -174,14 +174,14 @@ cctbl:	CSUMCOPY_LASTCHUNK(0xe8,%g2,%g3)
 12:
 	andcc		%len, 0xf, %g7		! IEU1	Group
 ccte:	bne,pn		%icc, cc_end_cruft	! CTI
-	 sethi		%uhi(PAGE_OFFSET), %g4	! IEU0
+	 nop					! IEU0
 ccfold:	sllx		%sum, 32, %o0		! IEU0	Group
 	addcc		%sum, %o0, %o0		! IEU1	Group (regdep)
 	srlx		%o0, 32, %o0		! IEU0	Group (regdep)
 	bcs,a,pn	%xcc, 1f		! CTI
 	 add		%o0, 1, %o0		! IEU1	4 clocks (mispredict)
 1:	retl					! CTI	Group brk forced
-	 sllx		%g4, 32, %g4		! IEU0	Group
+	 ldx		[%g6 + TI_TASK], %g4	! Load
 
 ccslow:	mov	0, %g5
 	brlez,pn %len, 4f
@@ -321,7 +321,7 @@ cc_user_end_cruft:
 	or		%o5, %o4, %o4		! IEU0	Group
 	addcc		%o4, %sum, %sum		! IEU1
 	bcc,pt		%xcc, ccuserfold	! CTI
-	 sethi		%uhi(PAGE_OFFSET), %g4	! IEU0	Group
+	 nop					! IEU0	Group
 	b,pt		%xcc, ccuserfold	! CTI
 	 add		%sum, 1, %sum		! IEU1
 
@@ -404,7 +404,7 @@ ccusertbl:
 	andcc		%len, 0xf, %g7		! IEU1	Group
 ccuserte:
 	bne,pn		%icc, cc_user_end_cruft	! CTI
-	 sethi		%uhi(PAGE_OFFSET), %g4	! IEU0
+	 nop					! IEU0
 ccuserfold:
 	sllx		%sum, 32, %o0		! IEU0	Group
 	addcc		%sum, %o0, %o0		! IEU1	Group (regdep)
@@ -412,7 +412,7 @@ ccuserfold:
 	bcs,a,pn	%xcc, 1f		! CTI
 	 add		%o0, 1, %o0		! IEU1	4 clocks (mispredict)
 1:	retl					! CTI	Group brk forced
-	 sllx		%g4, 32, %g4		! IEU0	Group
+	 ldx		[%g6 + TI_TASK], %g4	! IEU0	Group
 
 ccuserslow:
 	mov	0, %g5
@@ -502,10 +502,9 @@ cpc_handler:
 	sub	%g0, EFAULT, %g2
 	brnz,a,pt %g1, 1f
 	 st	%g2, [%g1]
-1:	sethi	%uhi(PAGE_OFFSET), %g4
-	wr	%g3, %g0, %asi
+1:	wr	%g3, %g0, %asi
 	retl
-	 sllx	%g4, 32, %g4
+	 ldx	[%g6 + TI_TASK], %g4
 
 	.section __ex_table
 	.align  4

@@ -496,125 +496,93 @@ static long qc_capture(struct qcam_device *q, char *buf, unsigned long len)
  *	Video4linux interfacing
  */
 
-static int qcam_open(struct video_device *dev, int flags)
+static int qcam_ioctl(struct inode *inode, struct file *file,
+		      unsigned int cmd, void *arg)
 {
-	return 0;
-}
-
-static void qcam_close(struct video_device *dev)
-{
-}
-
-static long qcam_write(struct video_device *v, const char *buf, unsigned long count, int noblock)
-{
-	return -EINVAL;
-}
-
-static int qcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
-{
+	struct video_device *dev = video_devdata(file);
 	struct qcam_device *qcam=(struct qcam_device *)dev;
 	
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability b;
-			strcpy(b.name, "Quickcam");
-			b.type = VID_TYPE_CAPTURE|VID_TYPE_SCALES;
-			b.channels = 1;
-			b.audios = 0;
-			b.maxwidth = 320;
-			b.maxheight = 240;
-			b.minwidth = 80;
-			b.minheight = 60;
-			if(copy_to_user(arg, &b,sizeof(b)))
-				return -EFAULT;
+			struct video_capability *b = arg;
+			strcpy(b->name, "Quickcam");
+			b->type = VID_TYPE_CAPTURE|VID_TYPE_SCALES;
+			b->channels = 1;
+			b->audios = 0;
+			b->maxwidth = 320;
+			b->maxheight = 240;
+			b->minwidth = 80;
+			b->minheight = 60;
 			return 0;
 		}
 		case VIDIOCGCHAN:
 		{
-			struct video_channel v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.channel!=0)
+			struct video_channel *v = arg;
+			if(v->channel!=0)
 				return -EINVAL;
-			v.flags=0;
-			v.tuners=0;
+			v->flags=0;
+			v->tuners=0;
 			/* Good question.. its composite or SVHS so.. */
-			v.type = VIDEO_TYPE_CAMERA;
-			strcpy(v.name, "Camera");
-			if(copy_to_user(arg, &v, sizeof(v)))
-				return -EFAULT;
+			v->type = VIDEO_TYPE_CAMERA;
+			strcpy(v->name, "Camera");
 			return 0;
 		}
 		case VIDIOCSCHAN:
 		{
-			int v;
-			if(copy_from_user(&v, arg,sizeof(v)))
-				return -EFAULT;
-			if(v!=0)
+			struct video_channel *v = arg;
+			if(v->channel!=0)
 				return -EINVAL;
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v))!=0)
-				return -EFAULT;
-			if(v.tuner)
+			struct video_tuner *v = arg;
+			if(v->tuner)
 				return -EINVAL;
-			strcpy(v.name, "Format");
-			v.rangelow=0;
-			v.rangehigh=0;
-			v.flags= 0;
-			v.mode = VIDEO_MODE_AUTO;
-			if(copy_to_user(arg,&v,sizeof(v))!=0)
-				return -EFAULT;
+			memset(v,0,sizeof(*v));
+			strcpy(v->name, "Format");
+			v->mode = VIDEO_MODE_AUTO;
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v))!=0)
-				return -EFAULT;
-			if(v.tuner)
+			struct video_tuner *v = arg;
+			if(v->tuner)
 				return -EINVAL;
-			if(v.mode!=VIDEO_MODE_AUTO)
+			if(v->mode!=VIDEO_MODE_AUTO)
 				return -EINVAL;
 			return 0;
 		}
 		case VIDIOCGPICT:
 		{
-			struct video_picture p;
-			p.colour=0x8000;
-			p.hue=0x8000;
-			p.brightness=qcam->brightness<<8;
-			p.contrast=qcam->contrast<<8;
-			p.whiteness=qcam->whitebal<<8;
-			p.depth=24;
-			p.palette=VIDEO_PALETTE_RGB24;
-			if(copy_to_user(arg, &p, sizeof(p)))
-				return -EFAULT;
+			struct video_picture *p = arg;
+			p->colour=0x8000;
+			p->hue=0x8000;
+			p->brightness=qcam->brightness<<8;
+			p->contrast=qcam->contrast<<8;
+			p->whiteness=qcam->whitebal<<8;
+			p->depth=24;
+			p->palette=VIDEO_PALETTE_RGB24;
 			return 0;
 		}
 		case VIDIOCSPICT:
 		{
-			struct video_picture p;
-			if(copy_from_user(&p, arg, sizeof(p)))
-				return -EFAULT;
+			struct video_picture *p = arg;
 
 			/*
 			 *	Sanity check args
 			 */
-			if (p.depth != 24 || p.palette != VIDEO_PALETTE_RGB24)
+			if (p->depth != 24 || p->palette != VIDEO_PALETTE_RGB24)
 				return -EINVAL;
 			
 			/*
 			 *	Now load the camera.
 			 */
-			qcam->brightness = p.brightness>>8;
-			qcam->contrast = p.contrast>>8;
-			qcam->whitebal = p.whiteness>>8;
+			qcam->brightness = p->brightness>>8;
+			qcam->contrast = p->contrast>>8;
+			qcam->whitebal = p->whiteness>>8;
 
 			down(&qcam->lock);			
 			parport_claim_or_block(qcam->pdev);
@@ -625,30 +593,28 @@ static int qcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		}
 		case VIDIOCSWIN:
 		{
-			struct video_window vw;
+			struct video_window *vw = arg;
 
-			if(copy_from_user(&vw, arg,sizeof(vw)))
-				return -EFAULT;
-			if(vw.flags)
+			if(vw->flags)
 				return -EINVAL;
-			if(vw.clipcount)
+			if(vw->clipcount)
 				return -EINVAL;
-			if(vw.height<60||vw.height>240)
+			if(vw->height<60||vw->height>240)
 				return -EINVAL;
-			if(vw.width<80||vw.width>320)
+			if(vw->width<80||vw->width>320)
 				return -EINVAL;
 				
 			qcam->width = 80;
 			qcam->height = 60;
 			qcam->mode = QC_DECIMATION_4;
 			
-			if(vw.width>=160 && vw.height>=120)
+			if(vw->width>=160 && vw->height>=120)
 			{
 				qcam->width = 160;
 				qcam->height = 120;
 				qcam->mode = QC_DECIMATION_2;
 			}
-			if(vw.width>=320 && vw.height>=240)
+			if(vw->width>=320 && vw->height>=240)
 			{
 				qcam->width = 320;
 				qcam->height = 240;
@@ -656,7 +622,7 @@ static int qcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 			}
 			qcam->mode |= QC_MILLIONS;
 #if 0
-			if(vw.width>=640 && vw.height>=480)
+			if(vw->width>=640 && vw->height>=480)
 			{
 				qcam->width = 640;
 				qcam->height = 480;
@@ -674,28 +640,20 @@ static int qcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		}
 		case VIDIOCGWIN:
 		{
-			struct video_window vw;
-			memset(&vw, 0, sizeof(vw));
-			vw.width=qcam->width;
-			vw.height=qcam->height;
-			if(copy_to_user(arg, &vw, sizeof(vw)))
-				return -EFAULT;
+			struct video_window *vw = arg;
+			memset(vw, 0, sizeof(*vw));
+			vw->width=qcam->width;
+			vw->height=qcam->height;
 			return 0;
 		}
-		case VIDIOCCAPTURE:
-			return -EINVAL;
-		case VIDIOCGFBUF:
-			return -EINVAL;
-		case VIDIOCSFBUF:
-			return -EINVAL;
 		case VIDIOCKEY:
 			return 0;
+		case VIDIOCCAPTURE:
+		case VIDIOCGFBUF:
+		case VIDIOCSFBUF:
 		case VIDIOCGFREQ:
-			return -EINVAL;
 		case VIDIOCSFREQ:
-			return -EINVAL;
 		case VIDIOCGAUDIO:
-			return -EINVAL;
 		case VIDIOCSAUDIO:
 			return -EINVAL;
 		default:
@@ -704,8 +662,10 @@ static int qcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static long qcam_read(struct video_device *v, char *buf, unsigned long count,  int noblock)
+static int qcam_read(struct file *file, char *buf,
+		     size_t count, loff_t *ppos)
 {
+	struct video_device *v = video_devdata(file);
 	struct qcam_device *qcam=(struct qcam_device *)v;
 	int len;
 
@@ -719,17 +679,23 @@ static long qcam_read(struct video_device *v, char *buf, unsigned long count,  i
 }
 
 /* video device template */
+static struct file_operations qcam_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:          video_generic_ioctl,
+	read:		qcam_read,
+	llseek:         no_llseek,
+};
+
 static struct video_device qcam_template=
 {
 	owner:		THIS_MODULE,
 	name:		"Colour QuickCam",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_QCAM_C,
-	open:		qcam_open,
-	close:		qcam_close,
-	read:		qcam_read,
-	write:		qcam_write,
-	ioctl:		qcam_ioctl,
+	fops:           &qcam_fops,
+	kernel_ioctl:	qcam_ioctl,
 };
 
 /* Initialize the QuickCam driver control structure. */

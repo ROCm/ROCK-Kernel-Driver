@@ -48,7 +48,6 @@
 #define DRIVERFS_MAGIC 0x42454552
 
 static struct super_operations driverfs_ops;
-static struct file_operations driverfs_dir_operations;
 static struct file_operations driverfs_file_operations;
 static struct inode_operations driverfs_dir_inode_operations;
 static struct dentry_operations driverfs_dentry_dir_ops;
@@ -57,21 +56,6 @@ static struct dentry_operations driverfs_dentry_file_ops;
 static struct vfsmount *driverfs_mount;
 static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int mount_count = 0;
-
-static int driverfs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = DRIVERFS_MAGIC;
-	buf->f_bsize = PAGE_CACHE_SIZE;
-	buf->f_namelen = 255;
-	return 0;
-}
-
-/* SMP-safe */
-static struct dentry *driverfs_lookup(struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
-}
 
 struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 {
@@ -94,7 +78,7 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 			break;
 		case S_IFDIR:
 			inode->i_op = &driverfs_dir_inode_operations;
-			inode->i_fop = &driverfs_dir_operations;
+			inode->i_fop = &simple_dir_operations;
 			break;
 		}
 	}
@@ -375,14 +359,9 @@ static struct file_operations driverfs_file_operations = {
 	release:	driverfs_release,
 };
 
-static struct file_operations driverfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-};
-
 static struct inode_operations driverfs_dir_inode_operations = {
 	create:		driverfs_create,
-	lookup:		driverfs_lookup,
+	lookup:		simple_lookup,
 	unlink:		driverfs_unlink,
 	mkdir:		driverfs_mkdir,
 	rmdir:		driverfs_rmdir,
@@ -393,7 +372,7 @@ static struct dentry_operations driverfs_dentry_file_ops = {
 };
 
 static struct super_operations driverfs_ops = {
-	statfs:		driverfs_statfs,
+	statfs:		simple_statfs,
 	put_inode:	force_delete,
 };
 

@@ -15,8 +15,8 @@
  *	Each contributing author retains all rights to their own work.
  */
 
-#if !defined(_LINUX_UDF_FS_SB_H)
-#define _LINUX_UDF_FS_SB_H
+#ifndef _UDF_FS_SB_H
+#define _UDF_FS_SB_H 1
 
 #pragma pack(1)
 
@@ -115,4 +115,4 @@ struct udf_sb_info
 	struct inode		*s_vat;
 };
 
-#endif /* !defined(_LINUX_UDF_FS_SB_H) */
+#endif /* _UDF_FS_SB_H */

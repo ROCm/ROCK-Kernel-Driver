@@ -2,7 +2,7 @@
  * Edgeport USB Serial Converter driver
  *
  * Copyright(c) 2000 Inside Out Networks, All rights reserved.
- * Copyright(c) 2001 Greg Kroah-Hartman <greg@kroah.com>
+ * Copyright(c) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -25,6 +25,9 @@
  *
  * Version history:
  * 
+ * 2.3 2002_03_08 greg kroah-hartman
+ *	- fixed bug when multiple devices were attached at the same time.
+ *
  * 2.2 2001_11_14 greg kroah-hartman
  *	- fixed bug in edge_close that kept the port from being used more
  *	  than once.
@@ -787,7 +790,7 @@ static void edge_interrupt_callback (struct urb *urb)
 
 					/* we have pending bytes on the bulk in pipe, send a request */
 					edge_serial->read_urb->dev = edge_serial->serial->dev;
-					result = usb_submit_urb(edge_serial->read_urb, GFP_KERNEL);
+					result = usb_submit_urb(edge_serial->read_urb, GFP_ATOMIC);
 					if (result) {
 						dbg(__FUNCTION__" - usb_submit_urb(read bulk) failed with result = %d", result);
 					}
@@ -864,7 +867,7 @@ static void edge_bulk_in_callback (struct urb *urb)
 
 			/* there is, so resubmit our urb */
 			edge_serial->read_urb->dev = edge_serial->serial->dev;
-			status = usb_submit_urb(edge_serial->read_urb, GFP_KERNEL);
+			status = usb_submit_urb(edge_serial->read_urb, GFP_ATOMIC);
 			if (status) {
 				err(__FUNCTION__" - usb_submit_urb(read bulk) failed, status = %d", status);
 			}
@@ -1432,14 +1435,14 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 
 	/* build the data header for the buffer and port that we are about to send out */
 	count = fifo->count;
-	buffer = kmalloc (count+2, GFP_KERNEL);
+	buffer = kmalloc (count+2, GFP_ATOMIC);
 	if (buffer == NULL) {
 		err(__FUNCTION__" - no more kernel memory...");
 		edge_port->write_in_progress = FALSE;
 		return;
 	}
-	buffer[0] = IOSP_BUILD_DATA_HDR1 (edge_port->port->number, count);
-	buffer[1] = IOSP_BUILD_DATA_HDR2 (edge_port->port->number, count);
+	buffer[0] = IOSP_BUILD_DATA_HDR1 (edge_port->port->number - edge_port->port->serial->minor, count);
+	buffer[1] = IOSP_BUILD_DATA_HDR2 (edge_port->port->number - edge_port->port->serial->minor, count);
 
 	/* now copy our data */
 	bytesleft =  fifo->size - fifo->tail;
@@ -1471,7 +1474,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	urb->dev = edge_serial->serial->dev;
-	status = usb_submit_urb(urb, GFP_KERNEL);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
 		/* something went wrong */
 		dbg(__FUNCTION__" - usb_submit_urb(write bulk) failed");
@@ -2428,7 +2431,7 @@ static int send_iosp_ext_cmd (struct edgeport_port *edge_port, __u8 command, __u
 
 	dbg(__FUNCTION__" - %d, %d", command, param);
 
-	buffer =  kmalloc (10, GFP_KERNEL);
+	buffer =  kmalloc (10, GFP_ATOMIC);
 	if (!buffer) {
 		err(__FUNCTION__" - kmalloc(%d) failed.\n", 10);
 		return -ENOMEM;
@@ -2436,7 +2439,9 @@ static int send_iosp_ext_cmd (struct edgeport_port *edge_port, __u8 command, __u
 
 	currentCommand = buffer;
 
-	MAKE_CMD_EXT_CMD( &currentCommand, &length, edge_port->port->number, command, param);
+	MAKE_CMD_EXT_CMD (&currentCommand, &length,
+			  edge_port->port->number - edge_port->port->serial->minor,
+			  command, param);
 
 	status = write_cmd_usb (edge_port, buffer, length);
 	if (status) {
@@ -2462,7 +2467,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
 
 	/* Allocate our next urb */
-	urb = usb_alloc_urb (0, GFP_KERNEL);
+	urb = usb_alloc_urb (0, GFP_ATOMIC);
 	if (!urb)
 		return -ENOMEM;
 
@@ -2477,7 +2482,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
 	edge_port->commandPending = TRUE;
-	status = usb_submit_urb(urb, GFP_KERNEL);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 
 	if (status) {
 		/* something went wrong */
@@ -2516,9 +2521,9 @@ static int send_cmd_write_baud_rate (struct edgeport_port *edge_port, int baudRa
 	int cmdLen = 0;
 	int divisor;
 	int status;
-	unsigned char number = edge_port->port->number;
+	unsigned char number = edge_port->port->number - edge_port->port->serial->minor;
 
-	dbg(__FUNCTION__" - port = %d, baud = %d", number, baudRate);
+	dbg(__FUNCTION__" - port = %d, baud = %d", edge_port->port->number, baudRate);
 
 	status = calc_baud_rate_divisor (baudRate, &divisor);
 	if (status) {
@@ -2527,7 +2532,7 @@ static int send_cmd_write_baud_rate (struct edgeport_port *edge_port, int baudRa
 	}
 
 	// Alloc memory for the string of commands.
-	cmdBuffer =  kmalloc (0x100, GFP_KERNEL);
+	cmdBuffer =  kmalloc (0x100, GFP_ATOMIC);
 	if (!cmdBuffer) {
 		err(__FUNCTION__" - kmalloc(%d) failed.\n", 0x100);
 		return -ENOMEM;
@@ -2613,7 +2618,7 @@ static int send_cmd_write_uart_register (struct edgeport_port *edge_port, __u8 r
 	dbg (__FUNCTION__" - write to %s register 0x%02x", (regNum == MCR) ? "MCR" : "LCR", regValue);
 
 	// Alloc memory for the string of commands.
-	cmdBuffer = kmalloc (0x10, GFP_KERNEL);
+	cmdBuffer = kmalloc (0x10, GFP_ATOMIC);
 	if (cmdBuffer == NULL ) {
 		return -ENOMEM;
 	}
@@ -2621,7 +2626,9 @@ static int send_cmd_write_uart_register (struct edgeport_port *edge_port, __u8 r
 	currCmd = cmdBuffer;
 
 	// Build a cmd in the buffer to write the given register
-	MAKE_CMD_WRITE_REG(&currCmd, &cmdLen, edge_port->port->number, regNum, regValue);
+	MAKE_CMD_WRITE_REG (&currCmd, &cmdLen,
+			    edge_port->port->number - edge_port->port->serial->minor,
+			    regNum, regValue);
 
 	status = write_cmd_usb(edge_port, cmdBuffer, cmdLen);
 	if (status) {

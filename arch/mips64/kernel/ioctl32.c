@@ -739,7 +739,6 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_HANDLER(HDIO_GET_DMA, hdio_ioctl_trans),
 	IOCTL32_HANDLER(HDIO_GET_NICE, hdio_ioctl_trans),
 	IOCTL32_DEFAULT(HDIO_GET_IDENTITY),
-	IOCTL32_DEFAULT(HDIO_DRIVE_RESET),
 	// HDIO_TRISTATE_HWIF				/* not implemented */
 	// HDIO_DRIVE_TASK				/* To do, need specs */
 	IOCTL32_DEFAULT(HDIO_DRIVE_CMD),

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 33 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 #include "acinterp.h"
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nsinit")
+	 ACPI_MODULE_NAME    ("nsinit")
 
 
 /*******************************************************************************
@@ -54,7 +54,7 @@ acpi_ns_initialize_objects (
 	acpi_init_walk_info     info;
 
 
-	FUNCTION_TRACE ("Ns_initialize_objects");
+	ACPI_FUNCTION_TRACE ("Ns_initialize_objects");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
@@ -115,7 +115,7 @@ acpi_ns_initialize_devices (
 	acpi_device_walk_info   info;
 
 
-	FUNCTION_TRACE ("Ns_initialize_devices");
+	ACPI_FUNCTION_TRACE ("Ns_initialize_devices");
 
 
 	info.device_count = 0;
@@ -168,14 +168,14 @@ acpi_ns_init_one_object (
 	void                    *context,
 	void                    **return_value)
 {
-	acpi_object_type8       type;
+	acpi_object_type        type;
 	acpi_status             status;
 	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
 	acpi_namespace_node     *node = (acpi_namespace_node *) obj_handle;
 	acpi_operand_object     *obj_desc;
 
 
-	PROC_NAME ("Ns_init_one_object");
+	ACPI_FUNCTION_NAME ("Ns_init_one_object");
 
 
 	info->object_count++;
@@ -184,7 +184,7 @@ acpi_ns_init_one_object (
 	/* And even then, we are only interested in a few object types */
 
 	type = acpi_ns_get_type (obj_handle);
-	obj_desc = node->object;
+	obj_desc = acpi_ns_get_attached_object (node);
 	if (!obj_desc) {
 		return (AE_OK);
 	}
@@ -218,7 +218,7 @@ acpi_ns_init_one_object (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"%s while getting region arguments [%4.4s]\n",
-					acpi_format_exception (status), (char*)&node->name));
+					acpi_format_exception (status), (char *) &node->name));
 		}
 
 		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
@@ -241,7 +241,7 @@ acpi_ns_init_one_object (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"%s while getting buffer field arguments [%4.4s]\n",
-					acpi_format_exception (status), (char*)&node->name));
+					acpi_format_exception (status), (char *) &node->name));
 		}
 		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
@@ -291,7 +291,7 @@ acpi_ns_init_one_device (
 	acpi_device_walk_info  *info = (acpi_device_walk_info *) context;
 
 
-	FUNCTION_TRACE ("Ns_init_one_device");
+	ACPI_FUNCTION_TRACE ("Ns_init_one_device");
 
 
 	if (!(acpi_dbg_level & ACPI_LV_INIT)) {
@@ -300,20 +300,26 @@ acpi_ns_init_one_device (
 
 	info->device_count++;
 
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	node = acpi_ns_map_handle_to_node (obj_handle);
 	if (!node) {
-		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-		return (AE_BAD_PARAMETER);
+		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/*
 	 * Run _STA to determine if we can run _INI on the device.
 	 */
-	DEBUG_EXEC (acpi_ut_display_init_pathname (node, "_STA [Method]"));
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (node, "_STA [Method]"));
 	status = acpi_ut_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
 		/* Ignore error and move on to next device */
@@ -333,7 +339,7 @@ acpi_ns_init_one_device (
 	/*
 	 * The device is present. Run _INI.
 	 */
-	DEBUG_EXEC (acpi_ut_display_init_pathname (obj_handle, "_INI [Method]"));
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (obj_handle, "_INI [Method]"));
 	status = acpi_ns_evaluate_relative (obj_handle, "_INI", NULL, NULL);
 	if (AE_NOT_FOUND == status) {
 		/* No _INI means device requires no initialization */
@@ -345,7 +351,7 @@ acpi_ns_init_one_device (
 		/* Ignore error and move on to next device */
 
 #ifdef ACPI_DEBUG
-		NATIVE_CHAR *scope_name = acpi_ns_get_table_pathname (obj_handle);
+		NATIVE_CHAR *scope_name = acpi_ns_get_external_pathname (obj_handle);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
 				scope_name, acpi_format_exception (status)));

@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 23 $
+ *              $Revision: 29 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 
 #define _COMPONENT          ACPI_RESOURCES
-	 MODULE_NAME         ("rsutils")
+	 ACPI_MODULE_NAME    ("rsutils")
 
 
 /*******************************************************************************
@@ -58,15 +58,12 @@ acpi_rs_get_prt_method_data (
 {
 	acpi_operand_object     *ret_obj;
 	acpi_status             status;
-	u32                     buffer_space_needed;
 
 
-	FUNCTION_TRACE ("Rs_get_prt_method_data");
+	ACPI_FUNCTION_TRACE ("Rs_get_prt_method_data");
 
 
-	/* already validated params, so we won't repeat here */
-
-	buffer_space_needed = ret_buffer->length;
+	/* Parameters guaranteed valid by caller */
 
 	/*
 	 *  Execute the method, no parameters
@@ -83,34 +80,25 @@ acpi_rs_get_prt_method_data (
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
-
 	/*
-	 * The return object will be a package, so check the
-	 *  parameters.  If the return object is not a package,
-	 *  then the underlying AML code is corrupt or improperly
-	 *  written.
+	 * The return object will be a package, so check the parameters.  If the
+	 * return object is not a package, then the underlying AML code is corrupt
+	 * or improperly written.
 	 */
 	if (ACPI_TYPE_PACKAGE != ret_obj->common.type) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_PRT did not return a Package, returned %s\n",
+				acpi_ut_get_type_name (ret_obj->common.type)));
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
 
 	/*
-	 * Make the call to create a resource linked list from the
-	 *  byte stream buffer that comes back from the _CRS method
-	 *  execution.
+	 * Create a resource linked list from the byte stream buffer that comes
+	 * back from the _CRS method execution.
 	 */
-	status = acpi_rs_create_pci_routing_table (ret_obj, ret_buffer->pointer,
-			  &buffer_space_needed);
+	status = acpi_rs_create_pci_routing_table (ret_obj, ret_buffer);
 
-	/*
-	 * Tell the user how much of the buffer we have used or is needed
-	 *  and return the final status.
-	 */
-	ret_buffer->length = buffer_space_needed;
-
-
-	/* On exit, we must delete the object returned by evaluate_object */
+	/* On exit, we must delete the object returned by Evaluate_object */
 
 cleanup:
 
@@ -144,16 +132,15 @@ acpi_rs_get_crs_method_data (
 {
 	acpi_operand_object     *ret_obj;
 	acpi_status             status;
-	u32                     buffer_space_needed = ret_buffer->length;
 
 
-	FUNCTION_TRACE ("Rs_get_crs_method_data");
+	ACPI_FUNCTION_TRACE ("Rs_get_crs_method_data");
 
 
-	/* already validated params, so we won't repeat here */
+	/* Parameters guaranteed valid by caller */
 
 	/*
-	 *  Execute the method, no parameters
+	 * Execute the method, no parameters
 	 */
 	status = acpi_ns_evaluate_relative (handle, "_CRS", NULL, &ret_obj);
 	if (ACPI_FAILURE (status)) {
@@ -169,30 +156,23 @@ acpi_rs_get_crs_method_data (
 
 	/*
 	 * The return object will be a buffer, but check the
-	 *  parameters.  If the return object is not a buffer,
-	 *  then the underlying AML code is corrupt or improperly
-	 *  written.
+	 * parameters.  If the return object is not a buffer,
+	 * then the underlying AML code is corrupt or improperly
+	 * written.
 	 */
 	if (ACPI_TYPE_BUFFER != ret_obj->common.type) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_CRS did not return a Buffer, returned %s\n",
+				acpi_ut_get_type_name (ret_obj->common.type)));
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
 
 	/*
 	 * Make the call to create a resource linked list from the
-	 *  byte stream buffer that comes back from the _CRS method
-	 *  execution.
+	 * byte stream buffer that comes back from the _CRS method
+	 * execution.
 	 */
-	status = acpi_rs_create_resource_list (ret_obj, ret_buffer->pointer,
-			 &buffer_space_needed);
-
-
-	/*
-	 * Tell the user how much of the buffer we have used or is needed
-	 *  and return the final status.
-	 */
-	ret_buffer->length = buffer_space_needed;
-
+	status = acpi_rs_create_resource_list (ret_obj, ret_buffer);
 
 	/* On exit, we must delete the object returned by evaluate_object */
 
@@ -228,16 +208,15 @@ acpi_rs_get_prs_method_data (
 {
 	acpi_operand_object     *ret_obj;
 	acpi_status             status;
-	u32                     buffer_space_needed = ret_buffer->length;
 
 
-	FUNCTION_TRACE ("Rs_get_prs_method_data");
+	ACPI_FUNCTION_TRACE ("Rs_get_prs_method_data");
 
 
-	/* already validated params, so we won't repeat here */
+	/* Parameters guaranteed valid by caller */
 
 	/*
-	 *  Execute the method, no parameters
+	 * Execute the method, no parameters
 	 */
 	status = acpi_ns_evaluate_relative (handle, "_PRS", NULL, &ret_obj);
 	if (ACPI_FAILURE (status)) {
@@ -253,29 +232,23 @@ acpi_rs_get_prs_method_data (
 
 	/*
 	 * The return object will be a buffer, but check the
-	 *  parameters.  If the return object is not a buffer,
-	 *  then the underlying AML code is corrupt or improperly
-	 *  written..
+	 * parameters.  If the return object is not a buffer,
+	 * then the underlying AML code is corrupt or improperly
+	 * written..
 	 */
 	if (ACPI_TYPE_BUFFER != ret_obj->common.type) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "_PRS did not return a Buffer, returned %s\n",
+				acpi_ut_get_type_name (ret_obj->common.type)));
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
 
 	/*
 	 * Make the call to create a resource linked list from the
-	 *  byte stream buffer that comes back from the _CRS method
-	 *  execution.
+	 * byte stream buffer that comes back from the _CRS method
+	 * execution.
 	 */
-	status = acpi_rs_create_resource_list (ret_obj, ret_buffer->pointer,
-			 &buffer_space_needed);
-
-	/*
-	 * Tell the user how much of the buffer we have used or is needed
-	 *  and return the final status.
-	 */
-	ret_buffer->length = buffer_space_needed;
-
+	status = acpi_rs_create_resource_list (ret_obj, ret_buffer);
 
 	/* On exit, we must delete the object returned by evaluate_object */
 
@@ -311,50 +284,25 @@ acpi_rs_set_srs_method_data (
 {
 	acpi_operand_object     *params[2];
 	acpi_status             status;
-	u8                      *byte_stream = NULL;
-	u32                     buffer_size_needed = 0;
+	acpi_buffer             buffer;
 
 
-	FUNCTION_TRACE ("Rs_set_srs_method_data");
+	ACPI_FUNCTION_TRACE ("Rs_set_srs_method_data");
 
 
-	/* already validated params, so we won't repeat here */
+	/* Parameters guaranteed valid by caller */
 
 	/*
 	 * The In_buffer parameter will point to a linked list of
 	 * resource parameters.  It needs to be formatted into a
-	 * byte stream to be sent in as an input parameter.
+	 * byte stream to be sent in as an input parameter to _SRS
+	 *
+	 * Convert the linked list into a byte stream
 	 */
-	buffer_size_needed = 0;
-
-	/*
-	 * First call is to get the buffer size needed
-	 */
-	status = acpi_rs_create_byte_stream (in_buffer->pointer, byte_stream,
-			 &buffer_size_needed);
-	/*
-	 * We expect a return of AE_BUFFER_OVERFLOW
-	 * if not, exit with the error
-	 */
-	if (AE_BUFFER_OVERFLOW != status) {
-		return_ACPI_STATUS (status);
-	}
-
-	/*
-	 * Allocate the buffer needed
-	 */
-	byte_stream = ACPI_MEM_CALLOCATE (buffer_size_needed);
-	if (NULL == byte_stream) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/*
-	 * Now call to convert the linked list into a byte stream
-	 */
-	status = acpi_rs_create_byte_stream (in_buffer->pointer, byte_stream,
-			 &buffer_size_needed);
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+	status = acpi_rs_create_byte_stream (in_buffer->pointer, &buffer);
 	if (ACPI_FAILURE (status)) {
-		goto cleanup;
+		return_ACPI_STATUS (status);
 	}
 
 	/*
@@ -362,28 +310,26 @@ acpi_rs_set_srs_method_data (
 	 */
 	params[0] = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
 	if (!params[0]) {
-		status = AE_NO_MEMORY;
-		goto cleanup;
+		acpi_os_free (buffer.pointer);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
-	params [1] = NULL;
 
 	/*
-	 *  Set up the parameter object
+	 * Set up the parameter object
 	 */
-	params[0]->buffer.length  = buffer_size_needed;
-	params[0]->buffer.pointer = byte_stream;
+	params[0]->buffer.length  = buffer.length;
+	params[0]->buffer.pointer = buffer.pointer;
+	params[1] = NULL;
 
 	/*
 	 * Execute the method, no return value
 	 */
 	status = acpi_ns_evaluate_relative (handle, "_SRS", params, NULL);
-	acpi_ut_remove_reference (params[0]);
 
 	/*
 	 * Clean up and return the status from Acpi_ns_evaluate_relative
 	 */
-cleanup:
-
+	acpi_ut_remove_reference (params[0]);
 	return_ACPI_STATUS (status);
 }
 
