@@ -984,6 +984,19 @@ int usb_set_address(struct usb_device *dev)
 	return retval;
 }
 
+static inline void usb_show_string(struct usb_device *dev, char *id, int index)
+{
+	char *buf;
+
+	if (!index)
+		return;
+	if (!(buf = kmalloc(256, GFP_KERNEL)))
+		return;
+	if (usb_string(dev, index, buf, 256) > 0)
+		dev_printk(KERN_INFO, &dev->dev, "%s: %s\n", id, buf);
+	kfree(buf);
+}
+
 /*
  * By the time we get here, we chose a new device address
  * and is in the default state. We need to identify the thing and
