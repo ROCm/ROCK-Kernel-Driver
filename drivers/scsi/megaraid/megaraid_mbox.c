@@ -1554,7 +1554,7 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 
 	if (scb->dma_direction == PCI_DMA_TODEVICE) {
 		if (!scb->scp->use_sg) {	// sg list not used
-			pci_dma_sync_single(adapter->pdev, ccb->buf_dma_h,
+			pci_dma_sync_single_for_cpu(adapter->pdev, ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_TODEVICE);
 		}
@@ -2332,7 +2332,7 @@ megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
 
 	case MRAID_DMA_WBUF:
 		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_single(adapter->pdev,
+			pci_dma_sync_single_for_cpu(adapter->pdev,
 					ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_FROMDEVICE);

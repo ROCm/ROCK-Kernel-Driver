@@ -1,5 +1,5 @@
 /*
- *	$Id: pci.h,v 1.87 1998/10/11 15:13:12 mj Exp $
+ *	pci.h
  *
  *	PCI defines and function prototypes
  *	Copyright 1994, Drew Eckhardt
@@ -857,9 +857,6 @@ extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 /* Include architecture-dependent settings and functions */
 
 #include <asm/pci.h>
-
-/* Backwards compat, remove in 2.7.x */
-#define pci_dma_sync_single	pci_dma_sync_single_for_cpu
 
 /*
  *  If the system does not have PCI, clearly these return errors.  Define
