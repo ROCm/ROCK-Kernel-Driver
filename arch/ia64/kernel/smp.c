@@ -48,6 +48,7 @@
 #include <asm/ptrace.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/tlbflush.h>
 #include <asm/unistd.h>
 #include <asm/mca.h>
 
@@ -236,7 +237,7 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 	int cpus = 1;
 
 	if (cpuid == smp_processor_id()) {
-		printk(__FUNCTION__" trying to call self\n");
+		printk("%s: trying to call self\n", __FUNCTION__);
 		return -EBUSY;
 	}
 
