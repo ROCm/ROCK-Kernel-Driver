@@ -1051,7 +1051,7 @@ static void tg3_aux_stat_to_speed_duplex(struct tg3 *tp, u32 val, u16 *speed, u8
 	};
 }
 
-static int tg3_phy_copper_begin(struct tg3 *tp, int wait_for_link)
+static int tg3_phy_copper_begin(struct tg3 *tp)
 {
 	u32 new_adv;
 	int i;
@@ -1169,7 +1169,7 @@ static int tg3_phy_copper_begin(struct tg3 *tp, int wait_for_link)
 		tg3_readphy(tp, MII_BMCR, &orig_bmcr);
 		if (bmcr != orig_bmcr) {
 			tg3_writephy(tp, MII_BMCR, BMCR_LOOPBACK);
-			for (i = 0; i < 15000; i++) {
+			for (i = 0; i < 1500; i++) {
 				u32 tmp;
 
 				udelay(10);
@@ -1186,27 +1186,6 @@ static int tg3_phy_copper_begin(struct tg3 *tp, int wait_for_link)
 	} else {
 		tg3_writephy(tp, MII_BMCR,
 			     BMCR_ANENABLE | BMCR_ANRESTART);
-	}
-
-	if (wait_for_link) {
-		tp->link_config.active_speed = SPEED_INVALID;
-		tp->link_config.active_duplex = DUPLEX_INVALID;
-		for (i = 0; i < 300000; i++) {
-			u32 tmp;
-
-			udelay(10);
-			tg3_readphy(tp, MII_BMSR, &tmp);
-			tg3_readphy(tp, MII_BMSR, &tmp);
-			if (!(tmp & BMSR_LSTATUS))
-				continue;
-
-			tg3_readphy(tp, MII_TG3_AUX_STAT, &tmp);
-			tg3_aux_stat_to_speed_duplex(tp, tmp,
-						     &tp->link_config.active_speed,
-						     &tp->link_config.active_duplex);
-		}
-		if (tp->link_config.active_speed == SPEED_INVALID)
-			return -EINVAL;
 	}
 
 	return 0;
@@ -1411,7 +1390,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 	if (current_link_up == 0) {
 		u32 tmp;
 
-		tg3_phy_copper_begin(tp, 0);
+		tg3_phy_copper_begin(tp);
 
 		tg3_readphy(tp, MII_BMSR, &tmp);
 		tg3_readphy(tp, MII_BMSR, &tmp);
