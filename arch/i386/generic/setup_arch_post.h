@@ -1,7 +1,10 @@
-/* Hook for machine specific memory setup.
+/**
+ * machine_specific_memory_setup - Hook for machine specific memory setup.
  *
- * This is included late in kernel/setup.c so that it can make use of all of
- * the static functions. */
+ * Description:
+ *	This is included late in kernel/setup.c so that it can make
+ *	use of all of the static functions.
+ **/
 
 static inline char * __init machine_specific_memory_setup(void)
 {
