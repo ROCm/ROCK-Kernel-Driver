@@ -1771,7 +1771,8 @@ struct velocity_info {
 	struct velocity_td_info *td_infos[TX_QUEUE_NO];
 
 	int rd_curr;
-	int rd_used;
+	int rd_dirty;
+	u32 rd_filled;
 	struct rx_desc *rd_ring;
 	struct velocity_rd_info *rd_info;	/* It's an array */
 
