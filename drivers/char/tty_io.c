@@ -204,6 +204,8 @@ char *tty_name(struct tty_struct *tty, char *buf)
 	return _tty_make_name(tty, (tty)?tty->driver.name:NULL, buf);
 }
 
+EXPORT_SYMBOL(tty_name);
+
 inline int tty_paranoia_check(struct tty_struct *tty, kdev_t device,
 			      const char *routine)
 {
