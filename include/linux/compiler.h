@@ -1,6 +1,14 @@
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
+#ifdef __CHECKER__
+  #define __user	__attribute__((address_space(1)))
+  #define __kernel	/* default address space */
+#else
+  #define __user
+  #define __kernel
+#endif
+
 #if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define inline		__inline__ __attribute__((always_inline))
 #define __inline__	__inline__ __attribute__((always_inline))
