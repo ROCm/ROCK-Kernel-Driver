@@ -179,7 +179,7 @@ static struct nf_hook_ops ipt_ops[] = {
 		.priority	= NF_IP_PRI_MANGLE,
 	},
 	{
-		.hook		= ipt_local_hook,
+		.hook		= ipt_route_hook,
 		.pf		= PF_INET,
 		.hooknum	= NF_IP_LOCAL_IN,
 		.priority	= NF_IP_PRI_MANGLE,

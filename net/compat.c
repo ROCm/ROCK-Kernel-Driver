@@ -296,108 +296,6 @@ void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
 	__scm_destroy(scm);
 }
 
-/* In these cases we (currently) can just copy to data over verbatim
- * because all CMSGs created by the kernel have well defined types which
- * have the same layout in both the 32-bit and 64-bit API.  One must add
- * some special cased conversions here if we start sending control messages
- * with incompatible types.
- *
- * SCM_RIGHTS and SCM_CREDENTIALS are done by hand in recvmsg_compat right after
- * we do our work.  The remaining cases are:
- *
- * SOL_IP	IP_PKTINFO	struct in_pktinfo	32-bit clean
- *		IP_TTL		int			32-bit clean
- *		IP_TOS		__u8			32-bit clean
- *		IP_RECVOPTS	variable length		32-bit clean
- *		IP_RETOPTS	variable length		32-bit clean
- *		(these last two are clean because the types are defined
- *		 by the IPv4 protocol)
- *		IP_RECVERR	struct sock_extended_err +
- *				struct sockaddr_in	32-bit clean
- * SOL_IPV6	IPV6_RECVERR	struct sock_extended_err +
- *				struct sockaddr_in6	32-bit clean
- *		IPV6_PKTINFO	struct in6_pktinfo	32-bit clean
- *		IPV6_HOPLIMIT	int			32-bit clean
- *		IPV6_FLOWINFO	u32			32-bit clean
- *		IPV6_HOPOPTS	ipv6 hop exthdr		32-bit clean
- *		IPV6_DSTOPTS	ipv6 dst exthdr(s)	32-bit clean
- *		IPV6_RTHDR	ipv6 routing exthdr	32-bit clean
- *		IPV6_AUTHHDR	ipv6 auth exthdr	32-bit clean
- */
-static void cmsg_compat_recvmsg_fixup(struct msghdr *kmsg, unsigned long orig_cmsg_uptr)
-{
-	unsigned char *workbuf, *wp;
-	unsigned long bufsz, space_avail;
-	struct cmsghdr *ucmsg;
-
-	bufsz = ((unsigned long)kmsg->msg_control) - orig_cmsg_uptr;
-	space_avail = kmsg->msg_controllen + bufsz;
-	wp = workbuf = kmalloc(bufsz, GFP_KERNEL);
-	if(workbuf == NULL)
-		goto fail;
-
-	/* To make this more sane we assume the kernel sends back properly
-	 * formatted control messages.  Because of how the kernel will truncate
-	 * the cmsg_len for MSG_TRUNC cases, we need not check that case either.
-	 */
-	ucmsg = (struct cmsghdr *) orig_cmsg_uptr;
-	while(((unsigned long)ucmsg) <=
-	      (((unsigned long)kmsg->msg_control) - sizeof(struct cmsghdr))) {
-		struct compat_cmsghdr *kcmsg_compat = (struct compat_cmsghdr *) wp;
-		int clen64, clen32;
-
-		/* UCMSG is the 64-bit format CMSG entry in user-space.
-		 * KCMSG_COMPAT is within the kernel space temporary buffer
-		 * we use to convert into a 32-bit style CMSG.
-		 */
-		__get_user(kcmsg_compat->cmsg_len, &ucmsg->cmsg_len);
-		__get_user(kcmsg_compat->cmsg_level, &ucmsg->cmsg_level);
-		__get_user(kcmsg_compat->cmsg_type, &ucmsg->cmsg_type);
-
-		clen64 = kcmsg_compat->cmsg_len;
-		copy_from_user(CMSG_COMPAT_DATA(kcmsg_compat), CMSG_DATA(ucmsg),
-			       clen64 - CMSG_ALIGN(sizeof(*ucmsg)));
-		clen32 = ((clen64 - CMSG_ALIGN(sizeof(*ucmsg))) +
-			  CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)));
-		kcmsg_compat->cmsg_len = clen32;
-
-		ucmsg = (struct cmsghdr *) (((char *)ucmsg) + CMSG_ALIGN(clen64));
-		wp = (((char *)kcmsg_compat) + CMSG_COMPAT_ALIGN(clen32));
-	}
-
-	/* Copy back fixed up data, and adjust pointers. */
-	bufsz = (wp - workbuf);
-	copy_to_user((void *)orig_cmsg_uptr, workbuf, bufsz);
-
-	kmsg->msg_control = (struct cmsghdr *)
-		(((char *)orig_cmsg_uptr) + bufsz);
-	kmsg->msg_controllen = space_avail - bufsz;
-
-	kfree(workbuf);
-	return;
-
-fail:
-	/* If we leave the 64-bit format CMSG chunks in there,
-	 * the application could get confused and crash.  So to
-	 * ensure greater recovery, we report no CMSGs.
-	 */
-	kmsg->msg_controllen += bufsz;
-	kmsg->msg_control = (void *) orig_cmsg_uptr;
-}
-
-int put_compat_msg_controllen(struct msghdr *msg_sys,
-		struct compat_msghdr *msg_compat, unsigned long cmsg_ptr)
-{
-	unsigned long ucmsg_ptr;
-	compat_size_t uclen;
-
-	if ((unsigned long)msg_sys->msg_control != cmsg_ptr)
-		cmsg_compat_recvmsg_fixup(msg_sys, cmsg_ptr);
-	ucmsg_ptr = ((unsigned long)msg_sys->msg_control);
-	uclen = (compat_size_t) (ucmsg_ptr - cmsg_ptr);
-	return __put_user(uclen, &msg_compat->msg_controllen);
-}
-
 extern asmlinkage long sys_setsockopt(int fd, int level, int optname,
 				     char *optval, int optlen);
 
@@ -496,6 +394,7 @@ static int do_set_attach_filter(int fd, int level, int optname,
 	struct sock_fprog kfprog;
 	mm_segment_t old_fs;
 	compat_uptr_t uptr;
+	unsigned int fsize;
 	int ret;
 
 	if (!access_ok(VERIFY_READ, fprog32, sizeof(*fprog32)) ||
@@ -503,15 +402,14 @@ static int do_set_attach_filter(int fd, int level, int optname,
 	    __get_user(uptr, &fprog32->filter))
 		return -EFAULT;
 
-	kfprog.filter = compat_ptr(uptr);
-	/*
-	 * Since struct sock_filter is architecure independent,
-	 * we can just do the access_ok check and pass the
-	 * same pointer to the real syscall.
-	 */
-	if (!access_ok(VERIFY_READ, kfprog.filter,
-			kfprog.len * sizeof(struct sock_filter)))
+	fsize = kfprog.len * sizeof(struct sock_filter);
+	kfprog.filter = (struct sock_filter *)kmalloc(fsize, GFP_KERNEL);
+	if (kfprog.filter == NULL)
+		return -ENOMEM;
+	if (copy_from_user(kfprog.filter, compat_ptr(uptr), fsize)) {
+		kfree(kfprog.filter);
 		return -EFAULT;
+	}
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -519,6 +417,7 @@ static int do_set_attach_filter(int fd, int level, int optname,
 			     (char *)&kfprog, sizeof(kfprog));
 	set_fs(old_fs);
 
+	kfree(kfprog.filter);
 	return ret;
 }
 

@@ -171,10 +171,8 @@ EXPORT_SYMBOL(sock_kfree_s);
 EXPORT_SYMBOL(sock_map_fd);
 EXPORT_SYMBOL(sockfd_lookup);
 
-#ifdef CONFIG_FILTER
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
-#endif
 
 EXPORT_SYMBOL(neigh_table_init);
 EXPORT_SYMBOL(neigh_table_clear);

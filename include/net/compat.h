@@ -33,8 +33,6 @@ extern asmlinkage long compat_sys_sendmsg(int,struct compat_msghdr *,unsigned);
 extern asmlinkage long compat_sys_recvmsg(int,struct compat_msghdr *,unsigned);
 extern asmlinkage long compat_sys_getsockopt(int, int, int, char *, int *);
 extern int put_cmsg_compat(struct msghdr*, int, int, int, void *);
-extern int put_compat_msg_controllen(struct msghdr *, struct compat_msghdr *,
-		unsigned long);
 extern int cmsghdr_from_user_compat_to_kern(struct msghdr *, unsigned char *,
 		int);
 

@@ -170,15 +170,8 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	struct sk_buff *skb;
 	u8 *data;
 
-	if (in_interrupt() && (gfp_mask & __GFP_WAIT)) {
-		static int count;
-		if (++count < 5) {
-			printk(KERN_ERR "alloc_skb called nonatomically "
-			       "from interrupt %p\n", NET_CALLER(size));
- 			BUG();
-		}
-		gfp_mask &= ~__GFP_WAIT;
-	}
+	if (gfp_mask & __GFP_WAIT)
+		might_sleep();
 
 	/* Get the HEAD */
 	skb = skb_head_from_pool();

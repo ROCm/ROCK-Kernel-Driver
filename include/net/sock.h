@@ -48,9 +48,7 @@
 #include <linux/skbuff.h>	/* struct sk_buff */
 #include <linux/security.h>
 
-#ifdef CONFIG_FILTER
 #include <linux/filter.h>
-#endif
 
 #include <asm/atomic.h>
 #include <net/dst.h>
@@ -174,10 +172,8 @@ struct sock {
 	long			rcvtimeo;
 	long			sndtimeo;
 
-#ifdef CONFIG_FILTER
 	/* Socket Filtering Instructions */
 	struct sk_filter      	*filter;
-#endif /* CONFIG_FILTER */
 
 	/* This is where all the private (optional) areas that don't
 	 * overlap will eventually live. 
@@ -456,8 +452,6 @@ extern void sock_def_destruct(struct sock *);
 /* Initialise core socket variables */
 extern void sock_init_data(struct socket *sock, struct sock *sk);
 
-#ifdef CONFIG_FILTER
-
 /**
  *	__sk_filter - run a packet through a socket filter
  *	@sk: sock associated with &sk_buff
@@ -523,15 +517,6 @@ static inline void sk_filter_charge(struct sock *sk, struct sk_filter *fp)
 	atomic_inc(&fp->refcnt);
 	atomic_add(sk_filter_len(fp), &sk->omem_alloc);
 }
-
-#else
-
-static inline int __sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
-{
-	return 0;
-}
-
-#endif /* CONFIG_FILTER */
 
 static inline int sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
 {

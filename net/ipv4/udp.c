@@ -951,7 +951,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		return -1;
 	}
 
-#if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if (__udp_checksum_complete(skb)) {
 			UDP_INC_STATS_BH(UdpInErrors);
@@ -960,7 +959,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		}
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	}
-#endif
 
 	if (sock_queue_rcv_skb(sk,skb)<0) {
 		UDP_INC_STATS_BH(UdpInErrors);

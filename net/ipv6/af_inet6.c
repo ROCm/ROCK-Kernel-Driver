@@ -62,14 +62,15 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#ifdef MODULE
+#if 0 /*def MODULE*/
 static int unloadable = 0; /* XX: Turn to one when all is ok within the
 			      module for allowing unload */
+MODULE_PARM(unloadable, "i");
 #endif
 
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
-MODULE_PARM(unloadable, "i");
+MODULE_LICENSE("GPL");
 
 /* IPv6 procfs goodies... */
 
@@ -871,4 +872,3 @@ static void inet6_exit(void)
 }
 module_exit(inet6_exit);
 #endif /* MODULE */
-MODULE_LICENSE("GPL");

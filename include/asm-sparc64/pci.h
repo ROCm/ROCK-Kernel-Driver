@@ -205,9 +205,14 @@ extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 #define HAVE_ARCH_PCI_MWI
 extern int pcibios_prep_mwi(struct pci_dev *dev);
 
-#endif /* __KERNEL__ */
+extern void
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			struct resource *res);
 
-/* generic pci stuff */
-#include <asm-generic/pci.h>
+extern void
+pcibios_bus_to_resource(struct pci_dev *dev, struct resource *res,
+			struct pci_bus_region *region);
+
+#endif /* __KERNEL__ */
 
 #endif /* __SPARC64_PCI_H */

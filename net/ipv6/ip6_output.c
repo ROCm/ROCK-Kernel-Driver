@@ -50,6 +50,7 @@
 #include <net/addrconf.h>
 #include <net/rawv6.h>
 #include <net/icmp.h>
+#include <net/xfrm.h>
 
 static __inline__ void ipv6_select_ident(struct sk_buff *skb, struct frag_hdr *fhdr)
 {
@@ -747,6 +748,9 @@ int ip6_forward(struct sk_buff *skb)
 	if (ipv6_devconf.forwarding == 0)
 		goto error;
 
+	if (!xfrm6_policy_check(NULL, XFRM_POLICY_FWD, skb))
+		goto drop;
+
 	skb->ip_summed = CHECKSUM_NONE;
 
 	/*
@@ -780,6 +784,9 @@ int ip6_forward(struct sk_buff *skb)
 		kfree_skb(skb);
 		return -ETIMEDOUT;
 	}
+
+	if (!xfrm6_route_forward(skb))
+		goto drop;
 
 	/* IPv6 specs say nothing about it, but it is clear that we cannot
 	   send redirects to source routed frames.

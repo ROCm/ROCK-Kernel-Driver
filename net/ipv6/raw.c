@@ -273,7 +273,6 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 
 static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
 {
-#if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			/* FIXME: increment a raw6 drops counter here */
@@ -282,7 +281,7 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
 		}
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	}
-#endif
+
 	/* Charge it to the socket. */
 	if (sock_queue_rcv_skb(sk,skb)<0) {
 		/* FIXME: increment a raw6 drops counter here */

@@ -547,7 +547,6 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		return -1;
 	}
 
-#if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
 		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			UDP6_INC_STATS_BH(UdpInErrors);
@@ -556,7 +555,7 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		}
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	}
-#endif
+
 	if (sock_queue_rcv_skb(sk,skb)<0) {
 		UDP6_INC_STATS_BH(UdpInErrors);
 		kfree_skb(skb);
@@ -955,6 +954,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 static struct inet6_protocol udpv6_protocol = {
 	.handler	=	udpv6_rcv,
 	.err_handler	=	udpv6_err,
+	.no_policy	=	1,
 };
 
 #define LINE_LEN 190
