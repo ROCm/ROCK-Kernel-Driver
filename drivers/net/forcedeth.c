@@ -60,6 +60,7 @@
  * 			   addresses, really stop rx if already running
  * 			   in start_rx, clean up a bit.
  * 				(C) Carl-Daniel Hailfinger
+ * 	0.20: 07 Dev 2003: alloc fixes
  *
  * Known bugs:
  * The irq handling is wrong - no tx done interrupts are generated.
@@ -1297,7 +1298,8 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 
 	err = pci_enable_device(pci_dev);
 	if (err) {
-		printk(KERN_INFO "forcedeth: pci_enable_dev failed: %d\n", err);
+		printk(KERN_INFO "forcedeth: pci_enable_dev failed (%d) for device %s\n",
+				err, pci_name(pci_dev));
 		goto out_free;
 	}
 
@@ -1310,8 +1312,8 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 	err = -EINVAL;
 	addr = 0;
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
-		dprintk(KERN_DEBUG "forcedeth: resource %d start %p len %ld flags 0x%08lx.\n",
-				i, (void*)pci_resource_start(pci_dev, i),
+		dprintk(KERN_DEBUG "%s: resource %d start %p len %ld flags 0x%08lx.\n",
+				pci_name(pci_dev), i, (void*)pci_resource_start(pci_dev, i),
 				pci_resource_len(pci_dev, i),
 				pci_resource_flags(pci_dev, i));
 		if (pci_resource_flags(pci_dev, i) & IORESOURCE_MEM &&
@@ -1321,7 +1323,8 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 		}
 	}
 	if (i == DEVICE_COUNT_RESOURCE) {
-		printk(KERN_INFO "forcedeth: Couldn't find register window.\n");
+		printk(KERN_INFO "forcedeth: Couldn't find register window for device %s.\n",
+					pci_name(pci_dev));
 		goto out_relreg;
 	}
 
@@ -1348,15 +1351,6 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 
 	pci_set_drvdata(pci_dev, dev);
 
-	err = register_netdev(dev);
-	if (err) {
-		printk(KERN_INFO "forcedeth: unable to register netdev: %d\n", err);
-		goto out_freering;
-	}
-
-	printk(KERN_INFO "%s: forcedeth.c: subsystem: %05x:%04x\n",
-			dev->name, pci_dev->subsystem_vendor, pci_dev->subsystem_device);
-
 
 	/* read the mac address */
 	base = get_hwbase(dev);
@@ -1375,7 +1369,8 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 		 * Bad mac address. At least one bios sets the mac address
 		 * to 01:23:45:67:89:ab
 		 */
-		printk(KERN_ERR "%s: Invalid Mac address detected: %02x:%02x:%02x:%02x:%02x:%02x\n", dev->name,
+		printk(KERN_ERR "%s: Invalid Mac address detected: %02x:%02x:%02x:%02x:%02x:%02x\n",
+			pci_name(pci_dev),
 			dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
 			dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
 		printk(KERN_ERR "Please complain to your hardware vendor. Switching to a random MAC.\n");
@@ -1385,7 +1380,7 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 		get_random_bytes(&dev->dev_addr[3], 3);
 	}
 
-	dprintk(KERN_DEBUG "%s: MAC Address %02x:%02x:%02x:%02x:%02x:%02x\n", dev->name,
+	dprintk(KERN_DEBUG "%s: MAC Address %02x:%02x:%02x:%02x:%02x:%02x\n", pci_name(pci_dev),
 			dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
 			dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
 
@@ -1396,6 +1391,15 @@ static int __devinit probe_nic(struct pci_dev *pci_dev, const struct pci_device_
 		np->irqmask = NVREG_IRQMASK_WANTED_1;
 	if (id->driver_data & DEV_IRQMASK_2)
 		np->irqmask = NVREG_IRQMASK_WANTED_2;
+
+	err = register_netdev(dev);
+	if (err) {
+		printk(KERN_INFO "forcedeth: unable to register netdev: %d\n", err);
+		goto out_freering;
+	}
+	printk(KERN_INFO "%s: forcedeth.c: subsystem: %05x:%04x bound to %s\n",
+			dev->name, pci_dev->subsystem_vendor, pci_dev->subsystem_device,
+			pci_name(pci_dev));
 
 	return 0;
 
@@ -1409,7 +1413,7 @@ out_relreg:
 out_disable:
 	pci_disable_device(pci_dev);
 out_free:
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pci_dev, NULL);
 out:
 	return err;
