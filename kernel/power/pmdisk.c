@@ -803,7 +803,7 @@ static int __init relocate_pagedir(void)
 		return 0;
 	}
 
-	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order))) {
+	while ((m = (void *) __get_free_pages(GFP_ATOMIC | __GFP_NO_COMP, pagedir_order))) {
 		memset(m, 0, PAGE_SIZE);
 		if (!does_collide_order(old_pagedir, (unsigned long)m, pagedir_order))
 			break;
@@ -999,7 +999,7 @@ static int __init read_pagedir(void)
 
 	pagedir_order = get_bitmask_order(n);
 
-	addr =__get_free_pages(GFP_ATOMIC, pagedir_order);
+	addr =__get_free_pages(GFP_ATOMIC | __GFP_NO_COMP, pagedir_order);
 	if (!addr)
 		return -ENOMEM;
 	pm_pagedir_nosave = (struct pbe *)addr;

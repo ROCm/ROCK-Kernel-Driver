@@ -879,7 +879,7 @@ static int relocate_pagedir(void)
 		return 0;
 	}
 
-	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order))) {
+	while ((m = (void *) __get_free_pages(GFP_ATOMIC | __GFP_NO_COMP, pagedir_order))) {
 		memset(m, 0, PAGE_SIZE);
 		if (!does_collide_order(old_pagedir, (unsigned long)m, pagedir_order))
 			break;
@@ -1025,7 +1025,7 @@ static int __init __read_suspend_image(struct block_device *bdev, union diskpage
 	nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 
-	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
+	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_NO_COMP, pagedir_order);
 	if (!pagedir_nosave)
 		return -ENOMEM;
 

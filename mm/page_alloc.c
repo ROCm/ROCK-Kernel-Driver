@@ -79,9 +79,9 @@ static void bad_page(const char *function, struct page *page)
 {
 	printk(KERN_EMERG "Bad page state at %s (in process '%s', page %p)\n",
 		function, current->comm, page);
-	printk(KERN_EMERG "flags:0x%08lx mapping:%p mapped:%d count:%d\n",
+	printk(KERN_EMERG "flags:0x%08lx mapping:%p mapped:%d count:%d private:0x%08lx\n",
 		(unsigned long)page->flags, page->mapping,
-		page_mapped(page), page_count(page));
+		page_mapped(page), page_count(page), page->private);
 	printk(KERN_EMERG "Backtrace:\n");
 	dump_stack();
 	printk(KERN_EMERG "Trying to fix it up, but a reboot is needed\n");
@@ -143,9 +143,9 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 		struct page *p = page + i;
 
 		if (!PageCompound(p))
-			bad_page(__FUNCTION__, page);
+			bad_page(__FUNCTION__, p);
 		if (p->private != (unsigned long)page)
-			bad_page(__FUNCTION__, page);
+			bad_page(__FUNCTION__, p);
 		ClearPageCompound(p);
 	}
 }
@@ -280,8 +280,12 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	arch_free_page(page, order);
 
 	mod_page_state(pgfree, 1 << order);
-	for (i = 0 ; i < (1 << order) ; ++i)
-		free_pages_check(__FUNCTION__, page + i);
+	for (i = 0 ; i < (1 << order) ; ++i) {
+		struct page * _page = page + i;
+		if (unlikely(i))
+			 __put_page(_page);
+		free_pages_check(__FUNCTION__, _page);
+	}
 	list_add(&page->lru, &list);
 	kernel_map_pages(page, 1<<order, 0);
 	free_pages_bulk(page_zone(page), 1, &list, order);
@@ -324,19 +328,21 @@ static void prep_new_page(struct page * _page, int order)
 		    (page->flags & (
 				    1 << PG_private	|
 				    1 << PG_locked	|
-				    1 << PG_lru	|
+				    1 << PG_lru	        |
 				    1 << PG_active	|
 				    1 << PG_dirty	|
 				    1 << PG_reclaim	|
 				    1 << PG_anon	|
 				    1 << PG_maplock	|
 				    1 << PG_swapcache	|
-				    1 << PG_writeback )))
+				    1 << PG_writeback   |
+				    1 << PG_compound )))
 			bad_page(__FUNCTION__, page);
 
 		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 				 1 << PG_referenced | 1 << PG_arch_1 |
-				 1 << PG_checked | 1 << PG_mappedtodisk);
+				 1 << PG_checked | 1 << PG_mappedtodisk |
+				 1 << PG_compound);
 		page->private = 0;
 		set_page_count(page, 1);
 	}
