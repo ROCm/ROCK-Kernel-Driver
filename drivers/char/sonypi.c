@@ -44,7 +44,7 @@
 #include <linux/wait.h>
 #include <linux/acpi.h>
 #include <linux/dmi.h>
-#include <linux/sysdev.h>
+#include <linux/err.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -608,81 +608,91 @@ struct miscdevice sonypi_misc_device = {
 	-1, "sonypi", &sonypi_misc_fops
 };
 
-#ifdef CONFIG_PM
-static int old_camera_power;
-
-static int sonypi_suspend(struct sys_device *dev, u32 state) {
-	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
-	if (camera) {
-		old_camera_power = sonypi_device.camera_power;
-		sonypi_camera_off();
-	}
-	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-		sonypi_type2_dis();
-	else
-		sonypi_type1_dis();
-	/* disable ACPI mode */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf1, 0xb2);
-	return 0;
-}
-
-static int sonypi_resume(struct sys_device *dev) {
-	/* Enable ACPI mode to get Fn key events */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf0, 0xb2);
+static void sonypi_enable(unsigned int camera_on)
+{
 	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
 		sonypi_type2_srs();
 	else
 		sonypi_type1_srs();
+
 	sonypi_call1(0x82);
 	sonypi_call2(0x81, 0xff);
-	if (compat)
-		sonypi_call1(0x92); 
-	else
-		sonypi_call1(0x82);
-	if (camera && old_camera_power)
+	sonypi_call1(compat ? 0x92 : 0x82);
+
+	/* Enable ACPI mode to get Fn key events */
+	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
+		outb(0xf0, 0xb2);
+
+	if (camera && camera_on)
 		sonypi_camera_on();
+}
+
+static int sonypi_disable(void)
+{
+	sonypi_call2(0x81, 0);	/* make sure we don't get any more events */
+	if (camera)
+		sonypi_camera_off();
+
+	/* disable ACPI mode */
+	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
+		outb(0xf1, 0xb2);
+
+	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
+		sonypi_type2_dis();
+	else
+		sonypi_type1_dis();
 	return 0;
 }
 
-/* Old PM scheme */
-static int sonypi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data) {
+#ifdef CONFIG_PM
+static int old_camera_power;
 
-	switch (rqst) {
-		case PM_SUSPEND:
-			sonypi_suspend(NULL, 0);
-			break;
-		case PM_RESUME:
-			sonypi_resume(NULL);
-			break;
+static int sonypi_suspend(struct device *dev, u32 state, u32 level)
+{
+	if (level == SUSPEND_DISABLE) {
+		old_camera_power = sonypi_device.camera_power;
+		sonypi_disable();
 	}
 	return 0;
 }
 
-/* New PM scheme (device model) */
-static struct sysdev_class sonypi_sysclass = {
-	set_kset_name("sonypi"),
-	.suspend = sonypi_suspend,
-	.resume = sonypi_resume,
-};
-
-static struct sys_device sonypi_sysdev = {
-	.id = 0,
-	.cls = &sonypi_sysclass,
-};
+static int sonypi_resume(struct device *dev, u32 level)
+{
+	if (level == RESUME_ENABLE)
+		sonypi_enable(old_camera_power);
+	return 0;
+}
 #endif
 
-static int __devinit sonypi_probe(struct pci_dev *pcidev) {
+static void sonypi_shutdown(struct device *dev)
+{
+	sonypi_disable();
+}
+
+static struct device_driver sonypi_driver = {
+	.name		= "sonypi",
+	.bus		= &platform_bus_type,
+#ifdef CONFIG_PM
+	.suspend	= sonypi_suspend,
+	.resume		= sonypi_resume,
+#endif
+	.shutdown	= sonypi_shutdown,
+};
+
+static int __devinit sonypi_probe(void)
+{
 	int i, ret;
 	struct sonypi_ioport_list *ioport_list;
 	struct sonypi_irq_list *irq_list;
+	struct pci_dev *pcidev;
+
+	pcidev = pci_get_device(PCI_VENDOR_ID_INTEL,
+				PCI_DEVICE_ID_INTEL_82371AB_3, NULL);
 
 	sonypi_device.dev = pcidev;
-	if (pcidev)
-		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE1;
-	else
-		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE2;
+	sonypi_device.model = pcidev ?
+		SONYPI_DEVICE_MODEL_TYPE1 : SONYPI_DEVICE_MODEL_TYPE2;
+
 	sonypi_device.fifo_lock = SPIN_LOCK_UNLOCKED;
 	sonypi_device.fifo = kfifo_alloc(SONYPI_BUF_SIZE, GFP_KERNEL,
 					 &sonypi_device.fifo_lock);
@@ -743,29 +753,9 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		sonypi_device.irq = irq_list[i].irq;
 		sonypi_device.bits = irq_list[i].bits;
 
-		/* Enable sonypi IRQ settings */
-		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-			sonypi_type2_srs();
-		else
-			sonypi_type1_srs();
-
-		sonypi_call1(0x82);
-		sonypi_call2(0x81, 0xff);
-		if (compat)
-			sonypi_call1(0x92); 
-		else
-			sonypi_call1(0x82);
-
-		/* Now try requesting the irq from the system */
-		if (!request_irq(sonypi_device.irq, sonypi_irq, 
+		if (!request_irq(sonypi_device.irq, sonypi_irq,
 				 SA_SHIRQ, "sonypi", sonypi_irq))
 			break;
-
-		/* If request_irq failed, disable sonypi IRQ settings */
-		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-			sonypi_type2_dis();
-		else
-			sonypi_type1_dis();
 	}
 
 	if (!irq_list[i].irq) {
@@ -774,24 +764,14 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		goto out3;
 	}
 
-#ifdef CONFIG_PM
-	sonypi_device.pm = pm_register(PM_PCI_DEV, 0, sonypi_pm_callback);
-
-	if (sysdev_class_register(&sonypi_sysclass) != 0) {
-		printk(KERN_ERR "sonypi: sysdev_class_register failed\n");
-		ret = -ENODEV;
-		goto out4;
+	sonypi_device.pdev = platform_device_register_simple("sonypi", -1,
+							     NULL, 0);
+	if (IS_ERR(sonypi_device.pdev)) {
+		ret = PTR_ERR(sonypi_device.pdev);
+		goto out_platformdev;
 	}
-	if (sysdev_register(&sonypi_sysdev) != 0) {
-		printk(KERN_ERR "sonypi: sysdev_register failed\n");
-		ret = -ENODEV;
-		goto out5;
-	}
-#endif
 
-	/* Enable ACPI mode to get Fn key events */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf0, 0xb2);
+	sonypi_enable(0);
 
 	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver v%s.\n",
 	       SONYPI_DRIVER_VERSION);
@@ -834,12 +814,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 
 	return 0;
 
-#ifdef CONFIG_PM
-out5:
-	sysdev_class_unregister(&sonypi_sysclass);
-out4:
-	free_irq(sonypi_device.irq, sonypi_irq);
-#endif
+out_platformdev:
 out3:
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
 out2:
@@ -847,20 +822,16 @@ out2:
 out1:
 	kfifo_free(sonypi_device.fifo);
 out_fifo:
+	pci_dev_put(sonypi_device.dev);
 	return ret;
 }
 
-static void __devexit sonypi_remove(void) {
+static void __devexit sonypi_remove(void)
+{
+	sonypi_disable();
 
-#ifdef CONFIG_PM
-	pm_unregister(sonypi_device.pm);
+	platform_device_unregister(sonypi_device.pdev);
 
-	sysdev_unregister(&sonypi_sysdev);
-	sysdev_class_unregister(&sonypi_sysclass);
-#endif
-
-	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
-	
 #ifdef SONYPI_USE_INPUT
 	if (useinput) {
 		input_unregister_device(&sonypi_device.jog_dev);
@@ -868,19 +839,13 @@ static void __devexit sonypi_remove(void) {
 	}
 #endif /* SONYPI_USE_INPUT */
 
-	if (camera)
-		sonypi_camera_off();
-	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-		sonypi_type2_dis();
-	else
-		sonypi_type1_dis();
-	/* disable ACPI mode */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf1, 0xb2);
 	free_irq(sonypi_device.irq, sonypi_irq);
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
 	misc_deregister(&sonypi_misc_device);
+	if (sonypi_device.dev)
+		pci_disable_device(sonypi_device.dev);
 	kfifo_free(sonypi_device.fifo);
+	pci_dev_put(sonypi_device.dev);
 	printk(KERN_INFO "sonypi: removed.\n");
 }
 
@@ -904,18 +869,25 @@ static struct dmi_system_id __initdata sonypi_dmi_table[] = {
 
 static int __init sonypi_init(void)
 {
-	struct pci_dev *pcidev = NULL;
-	if (dmi_check_system(sonypi_dmi_table)) {
-		pcidev = pci_find_device(PCI_VENDOR_ID_INTEL, 
-					 PCI_DEVICE_ID_INTEL_82371AB_3, 
-					 NULL);
-		return sonypi_probe(pcidev);
-	}
-	else
+	int ret;
+
+	if (!dmi_check_system(sonypi_dmi_table))
 		return -ENODEV;
+
+	ret = driver_register(&sonypi_driver);
+	if (ret)
+		return ret;
+
+	ret = sonypi_probe();
+	if (ret)
+		driver_unregister(&sonypi_driver);
+
+	return ret;
 }
 
-static void __exit sonypi_exit(void) {
+static void __exit sonypi_exit(void)
+{
+	driver_unregister(&sonypi_driver);
 	sonypi_remove();
 }
 

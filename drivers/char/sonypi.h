@@ -45,7 +45,6 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/input.h>
-#include <linux/pm.h>
 #include <linux/acpi.h>
 #include <linux/kfifo.h>
 #include <linux/sonypi.h>
@@ -355,6 +354,7 @@ struct sonypi_eventtypes {
 
 struct sonypi_device {
 	struct pci_dev *dev;
+	struct platform_device *pdev;
 	u16 irq;
 	u16 bits;
 	u16 ioport1;
@@ -372,9 +372,6 @@ struct sonypi_device {
 	int model;
 #ifdef SONYPI_USE_INPUT
 	struct input_dev jog_dev;
-#endif
-#ifdef CONFIG_PM
-	struct pm_dev *pm;
 #endif
 };
 
