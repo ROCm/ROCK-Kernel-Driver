@@ -282,7 +282,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	ssize_t retval = 0;
 	struct device * dev;
 
-	entry = (struct driver_file_entry *)file->private_data;
+	entry = (struct driver_file_entry *)file->f_dentry->d_fsdata;
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
@@ -346,7 +346,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	ssize_t retval = 0;
 	char * page;
 
-	entry = (struct driver_file_entry *)file->private_data;
+	entry = (struct driver_file_entry *)file->f_dentry->d_fsdata;
 	if (!entry) {
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
@@ -417,12 +417,11 @@ static int driverfs_open_file(struct inode * inode, struct file * filp)
 	struct driver_file_entry * entry;
 	struct device * dev;
 
-	entry = (struct driver_file_entry *)inode->u.generic_ip;
+	entry = (struct driver_file_entry *)filp->f_dentry->d_fsdata;
 	if (!entry)
 		return -EFAULT;
 	dev = to_device(entry->parent);
 	get_device(dev);
-	filp->private_data = entry;
 	return 0;
 }
 
@@ -431,7 +430,7 @@ static int driverfs_release(struct inode * inode, struct file * filp)
 	struct driver_file_entry * entry;
 	struct device * dev;
 
-	entry = (struct driver_file_entry *)filp->private_data;
+	entry = (struct driver_file_entry *)filp->f_dentry->d_fsdata;
 	if (!entry)
 		return -EFAULT;
 	dev = to_device(entry->parent);
@@ -655,7 +654,6 @@ driverfs_create_file(struct driver_file_entry * entry,
 
 		/* Still good? Ok, then fill in the blanks: */
 		if (!error) {
-			dentry->d_inode->u.generic_ip = (void *)entry;
 			entry->parent = parent;
 		}
 	} else
