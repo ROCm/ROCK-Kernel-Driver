@@ -89,7 +89,7 @@ extern struct net_device *lance_probe(int unit);
 extern int mace_probe(struct net_device *dev);
 extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
-extern int mac89x0_probe(struct net_device *dev);
+extern struct net_device *mac89x0_probe(int unit);
 extern struct net_device *mc32_probe(int unit);
 extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
@@ -329,6 +329,10 @@ static struct devprobe m68k_probes[] __initdata = {
 #ifdef CONFIG_MAC8390           /* NuBus NS8390-based cards */
 	{mac8390_probe, 0},
 #endif
+	{NULL, 0},
+};
+
+static struct devprobe2 m68k_probes2[] __initdata = {
 #ifdef CONFIG_MAC89x0
  	{mac89x0_probe, 0},
 #endif
@@ -391,6 +395,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
+	probe_list2(unit, m68k_probes2, base_addr == 0) &&
 	probe_list2(unit, mips_probes, base_addr == 0) &&
 	probe_list2(unit, eisa_probes, base_addr == 0) &&
 	probe_list2(unit, mca_probes, base_addr == 0) &&
