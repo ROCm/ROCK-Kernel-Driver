@@ -83,6 +83,22 @@ exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 	return exp;
 }
 
+svc_export *
+exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
+{
+	int hash = EXPORT_HASH(mnt->mnt_sb->s_dev);
+	svc_export *exp;
+
+	if (!clp)
+		return NULL;
+
+	for (exp = clp->cl_export[hash]; exp; exp = exp->ex_next) {
+		if (exp->ex_dentry == dentry && exp->ex_mnt == mnt)
+			break;
+	}
+	return exp;
+}
+
 /*
  * Find the export entry for a given dentry.  <gam3@acm.org>
  */

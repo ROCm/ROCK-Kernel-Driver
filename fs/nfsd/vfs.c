@@ -132,7 +132,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 					dentry = dp;
 					for ( ; exp2 == NULL && dp->d_parent != dp;
 					      dp=dp->d_parent)
-						exp2 = exp_get(exp->ex_client, dp->d_inode->i_dev, dp->d_inode->i_ino);
+						exp2 = exp_get_by_name(exp->ex_client, mnt, dp);
 					if (exp2==NULL) {
 						dput(dentry);
 						dentry = dget(dparent);
@@ -159,9 +159,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 			struct dentry *mounts = dget(dentry);
 			while (follow_down(&mnt,&mounts)&&d_mountpoint(mounts))
 				;
-			exp2 = exp_get(rqstp->rq_client,
-				       mounts->d_inode->i_dev,
-				       mounts->d_inode->i_ino);
+			exp2 = exp_get_by_name(rqstp->rq_client, mnt, mounts);
 			if (exp2 && EX_CROSSMNT(exp2)) {
 				/* successfully crossed mount point */
 				exp = exp2;

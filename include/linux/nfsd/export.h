@@ -90,6 +90,9 @@ void			exp_unlock(void);
 struct svc_client *	exp_getclient(struct sockaddr_in *sin);
 void			exp_putclient(struct svc_client *clp);
 struct svc_export *	exp_get(struct svc_client *clp, kdev_t dev, ino_t ino);
+struct svc_export *	exp_get_by_name(struct svc_client *clp,
+					struct vfsmount *mnt,
+					struct dentry *dentry);
 int			exp_rootfh(struct svc_client *, 
 					char *path, struct knfsd_fh *, int maxsize);
 int			nfserrno(int errno);
