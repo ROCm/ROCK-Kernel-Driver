@@ -797,7 +797,7 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     d_instantiate(dentry, inode);
     journal_end(&th, dir->i_sb, jbegin_count) ;
 out_failed:
-    if (retval)
+    if (locked)
         reiserfs_write_unlock_xattrs (dir->i_sb);
     reiserfs_write_unlock(dir->i_sb);
     return retval;
