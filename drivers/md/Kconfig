@@ -212,4 +212,15 @@ config DM_FLAKEY
        ---help---
          A debug only target that intermittently fails io.
  
+config BLK_DEV_DM_BBR
+	tristate "Bad Block Relocation Device Target (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  Support for devices with software-based bad-block-relocation.
+
+	  To compile this as a module, choose M here: the module will be
+	  called dm-bbr.
+
+	  If unsure, say N.
+
 endmenu
