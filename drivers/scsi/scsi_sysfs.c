@@ -178,8 +178,10 @@ void scsi_device_dev_release(struct device *dev)
 
 		put_device(parent);
 	}
-	if (sdev->request_queue)
+	if (sdev->request_queue) {
+		sdev->request_queue->queuedata = NULL;
 		scsi_free_queue(sdev->request_queue);
+	}
 
 	kfree(sdev->inquiry);
 	kfree(sdev);

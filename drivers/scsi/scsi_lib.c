@@ -1230,6 +1230,22 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 }
 
 /*
+ * Kill requests for a dead device
+ */
+static void scsi_kill_requests(request_queue_t *q)
+{
+	struct request *req;
+
+	while ((req = elv_next_request(q)) != NULL) {
+		blkdev_dequeue_request(req);
+		req->flags |= REQ_QUIET;
+		while (end_that_request_first(req, 0, req->nr_sectors))
+			;
+		end_that_request_last(req);
+	}
+}
+
+/*
  * Function:    scsi_request_fn()
  *
  * Purpose:     Main strategy routine for SCSI.
@@ -1243,9 +1259,15 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 static void scsi_request_fn(struct request_queue *q)
 {
 	struct scsi_device *sdev = q->queuedata;
-	struct Scsi_Host *shost = sdev->host;
+	struct Scsi_Host *shost;
 	struct scsi_cmnd *cmd;
 	struct request *req;
+
+	if (!sdev) {
+		printk("scsi: killing requests for dead queue\n");
+		scsi_kill_requests(q);
+		return;
+	}
 
 	if(!get_device(&sdev->sdev_gendev))
 		/* We must be tearing the block queue down already */
@@ -1255,6 +1277,7 @@ static void scsi_request_fn(struct request_queue *q)
 	 * To start with, we keep looping until the queue is empty, or until
 	 * the host is no longer able to accept any more requests.
 	 */
+	shost = sdev->host;
 	while (!blk_queue_plugged(q)) {
 		int rtn;
 		/*
