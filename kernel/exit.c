@@ -828,9 +828,6 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	__exit_fs(tsk);
 	exit_namespace(tsk);
 	exit_thread();
-#ifdef CONFIG_NUMA
-	mpol_free(tsk->mempolicy);
-#endif
 
 	if (tsk->signal->leader)
 		disassociate_ctty(1);
@@ -841,6 +838,10 @@ asmlinkage NORET_TYPE void do_exit(long code)
 
 	tsk->exit_code = code;
 	exit_notify(tsk);
+#ifdef CONFIG_NUMA
+	mpol_free(tsk->mempolicy);
+	tsk->mempolicy = NULL;
+#endif
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */
