@@ -2293,7 +2293,7 @@ static int __init do_pci_device(struct pci_dev *pci_dev)
 	u8 irq = pci_dev->irq;
 
 	PRINTD (DBG_INFO, "found Madge ATM adapter (amb) at"
-		" IO %x, IRQ %u, MEM %p", pci_resource_start(pci_dev, 1),
+		" IO %lx, IRQ %u, MEM %p", pci_resource_start(pci_dev, 1),
 		irq, bus_to_virt(pci_resource_start(pci_dev, 0)));
 
 	// check IO region
