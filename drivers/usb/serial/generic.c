@@ -106,7 +106,7 @@ int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp)
 				   port);
 		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (result)
-			dev_err(port->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
+			dev_err(&port->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
 	}
 
 	return result;
@@ -176,7 +176,7 @@ int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const
 		/* send the data out the bulk port */
 		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result)
-			dev_err(port->dev, "%s - failed submitting write urb, error %d\n", __FUNCTION__, result);
+			dev_err(&port->dev, "%s - failed submitting write urb, error %d\n", __FUNCTION__, result);
 		else
 			result = count;
 
@@ -266,7 +266,7 @@ void usb_serial_generic_read_bulk_callback (struct urb *urb, struct pt_regs *reg
 			     usb_serial_generic_read_bulk_callback), port);
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
-		dev_err(port->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
+		dev_err(&port->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
 }
 
 void usb_serial_generic_write_bulk_callback (struct urb *urb, struct pt_regs *regs)

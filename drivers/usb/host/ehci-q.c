@@ -222,7 +222,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 static unsigned
 qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 {
-	struct ehci_qtd		*last = 0;
+	struct ehci_qtd		*last = 0, *end = qh->dummy;
 	struct list_head	*entry, *tmp;
 	int			stopped = 0;
 	unsigned		count = 0;
@@ -252,6 +252,10 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 			ehci_qtd_free (ehci, last);
 			last = 0;
 		}
+
+		/* ignore urbs submitted during completions we reported */
+		if (qtd == end)
+			break;
 
 		/* hardware copies qtd out of qh overlay */
 		rmb ();
@@ -967,25 +971,28 @@ static void
 scan_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	struct ehci_qh		*qh;
-	unsigned		count;
 
+	if (!++(ehci->stamp))
+		ehci->stamp++;
 rescan:
 	qh = ehci->async->qh_next.qh;
-	count = 0;
 	if (likely (qh != 0)) {
 		do {
 			/* clean any finished work for this qh */
-			if (!list_empty (&qh->qtd_list)) {
+			if (!list_empty (&qh->qtd_list)
+					&& qh->stamp != ehci->stamp) {
 				int temp;
 
 				/* unlinks could happen here; completion
-				 * reporting drops the lock.
+				 * reporting drops the lock.  rescan using
+				 * the latest schedule, but don't rescan
+				 * qhs we already finished (no looping).
 				 */
 				qh = qh_get (qh);
+				qh->stamp = ehci->stamp;
 				temp = qh_completions (ehci, qh, regs);
 				qh_put (ehci, qh);
 				if (temp != 0) {
-					count += temp;
 					goto rescan;
 				}
 			}

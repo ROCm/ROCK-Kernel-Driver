@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.5.52)
+ * Driver for USB Scanners (linux-2.5.54)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
@@ -328,13 +328,20 @@
  *    - Accept devices with more than one interface. Only use interfaces that
  *      look like belonging to scanners.
  *    - Fix compilation error when debugging is enabled.
+ *    - Add locking to ioctl_scanner(). Thanks to Oliver Neukum
+ *      <oliver@neukum.name>.
  *
+ * 0.4.10  01/07/2003
+ *    - Added vendor/product ids for Visioneer scanners.
+ *    - Print information about user-supplied ids only once at startup instead
+ *      of everytime any USB device is plugged in.
+ *    - Removed PV8630 ioctls. Use the standard ioctls instead.
+ *      
  * TODO
  *    - Remove the 2/3 endpoint limitation
  *    - Performance
  *    - Select/poll methods
  *    - More testing
- *    - Proper registry/assignment for LM9830 ioctl's
  *    - More general usage ioctl's
  *
  *
@@ -713,74 +720,22 @@ ioctl_scanner(struct inode *inode, struct file *file,
 {
 	struct usb_device *dev;
 	struct scn_usb_data *scn = file->private_data;
+	int retval = -ENOTTY;
 	int scn_minor;
 
 	scn_minor = USB_SCN_MINOR(inode);
+	down(&(scn->sem));
 
 	dev = scn->scn_dev;
 
 	switch (cmd)
 	{
 	case SCANNER_IOCTL_VENDOR :
-		return (put_user(dev->descriptor.idVendor, (unsigned int *) arg));
+		retval = (put_user(dev->descriptor.idVendor, (unsigned int *) arg));
+		break;
 	case SCANNER_IOCTL_PRODUCT :
-		return (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
-#ifdef PV8630
-	case PV8630_IOCTL_INREQUEST :
-	{
-		int result;
-
-		struct {
-			__u8  data;
-			__u8  request;
-			__u16 value;
-			__u16 index;
-		} args;
-
-		if (copy_from_user(&args, (void *)arg, sizeof(args)))
-			return -EFAULT;
-
-		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-					 args.request, USB_TYPE_VENDOR|
-					 USB_RECIP_DEVICE|USB_DIR_IN,
-					 args.value, args.index, &args.data,
-					 1, HZ*5);
-
-		dbg("ioctl_scanner(%d): inreq: args.data:%x args.value:%x args.index:%x args.request:%x\n", scn_minor, args.data, args.value, args.index, args.request);
-
-		if (copy_to_user((void *)arg, &args, sizeof(args)))
-			return -EFAULT;
-
-		dbg("ioctl_scanner(%d): inreq: result:%d\n", scn_minor, result);
-
-		return result;
-	}
-	case PV8630_IOCTL_OUTREQUEST :
-	{
-		int result;
-
-		struct {
-			__u8  request;
-			__u16 value;
-			__u16 index;
-		} args;
-
-		if (copy_from_user(&args, (void *)arg, sizeof(args)))
-			return -EFAULT;
-
-		dbg("ioctl_scanner(%d): outreq: args.value:%x args.index:%x args.request:%x\n", scn_minor, args.value, args.index, args.request);
-
-		result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-					 args.request, USB_TYPE_VENDOR|
-					 USB_RECIP_DEVICE|USB_DIR_OUT,
-					 args.value, args.index, NULL,
-					 0, HZ*5);
-
-		dbg("ioctl_scanner(%d): outreq: result:%d\n", scn_minor, result);
-
-		return result;
-	}
-#endif /* PV8630 */
+		retval = (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
+		break;
  	case SCANNER_IOCTL_CTRLMSG:
  	{
  		struct ctrlmsg_ioctl {
@@ -789,19 +744,26 @@ ioctl_scanner(struct inode *inode, struct file *file,
  		} cmsg;
  		int pipe, nb, ret;
  		unsigned char buf[64];
- 
- 		if (copy_from_user(&cmsg, (void *)arg, sizeof(cmsg)))
- 			return -EFAULT;
+		retval = 0;
+
+ 		if (copy_from_user(&cmsg, (void *)arg, sizeof(cmsg))) {
+			retval = -EFAULT;
+			break;
+		}
 
  		nb = cmsg.req.wLength;
 
- 		if (nb > sizeof(buf))
- 			return -EINVAL;
+ 		if (nb > sizeof(buf)) {
+ 			retval = -EINVAL;
+			break;
+		}
 
  		if ((cmsg.req.bRequestType & 0x80) == 0) {
  			pipe = usb_sndctrlpipe(dev, 0);
- 			if (nb > 0 && copy_from_user(buf, cmsg.data, nb))
- 				return -EFAULT;
+ 			if (nb > 0 && copy_from_user(buf, cmsg.data, nb)) {
+ 				retval = -EFAULT;
+				break;
+			}
  		} else {
  			pipe = usb_rcvctrlpipe(dev, 0);
 		}
@@ -814,18 +776,20 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
  		if (ret < 0) {
  			err("ioctl_scanner(%d): control_msg returned %d\n", scn_minor, ret);
- 			return -EIO;
+ 			retval = -EIO;
+			break;
  		}
 
  		if (nb > 0 && (cmsg.req.bRequestType & 0x80) && copy_to_user(cmsg.data, buf, nb))
- 			return -EFAULT;
+ 			retval = -EFAULT;
 
- 		return 0;
+ 		break;
  	}
 	default:
-		return -ENOTTY;
+		break;
 	}
-	return 0;
+	up(&(scn->sem));
+	return retval;
 }
 
 static struct
@@ -855,10 +819,6 @@ probe_scanner(struct usb_interface *intf,
 	char valid_device = 0;
 	char have_bulk_in, have_bulk_out, have_intr;
 	char name[10];
-
-	if (vendor != -1 && product != -1) {
-		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
-	}
 
 	dbg("probe_scanner: USB dev address:%p", dev);
 
@@ -1171,6 +1131,8 @@ usb_scanner_init (void)
                 return -1;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
+	if (vendor != -1 && product != -1)
+		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
 	return 0;
 }
 

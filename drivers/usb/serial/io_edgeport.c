@@ -572,7 +572,7 @@ static void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
 			record = (struct edge_firmware_image_record *)firmware;
 			response = rom_write (edge_serial->serial, record->ExtAddr, record->Addr, record->Len, &record->Data[0]);
 			if (response < 0) {
-				dev_err(edge_serial->serial->dev->dev, "sram_write failed (%x, %x, %d)\n", record->ExtAddr, record->Addr, record->Len);
+				dev_err(&edge_serial->serial->dev->dev, "sram_write failed (%x, %x, %d)\n", record->ExtAddr, record->Addr, record->Len);
 				break;
 			}
 			firmware += sizeof (struct edge_firmware_image_record) + record->Len;
@@ -840,7 +840,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 exit:
 	result = usb_submit_urb (urb, GFP_ATOMIC);
 	if (result) {
-		dev_err(urb->dev->dev, "%s - Error %d submitting control urb\n", __FUNCTION__, result);
+		dev_err(&urb->dev->dev, "%s - Error %d submitting control urb\n", __FUNCTION__, result);
 	}
 }
 
@@ -889,7 +889,7 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 			edge_serial->read_urb->dev = edge_serial->serial->dev;
 			status = usb_submit_urb(edge_serial->read_urb, GFP_ATOMIC);
 			if (status) {
-				dev_err(urb->dev->dev, "%s - usb_submit_urb(read bulk) failed, status = %d\n", __FUNCTION__, status);
+				dev_err(&urb->dev->dev, "%s - usb_submit_urb(read bulk) failed, status = %d\n", __FUNCTION__, status);
 			}
 		}
 	}
@@ -1057,7 +1057,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		 * this interrupt will continue as long as the edgeport is connected */
 		response = usb_submit_urb (edge_serial->interrupt_read_urb, GFP_KERNEL);
 		if (response) {
-			dev_err(port->dev, "%s - Error %d submitting control urb\n", __FUNCTION__, response);
+			dev_err(&port->dev, "%s - Error %d submitting control urb\n", __FUNCTION__, response);
 		}
 	}
 	
@@ -1081,7 +1081,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	response = send_iosp_ext_cmd (edge_port, IOSP_CMD_OPEN_PORT, 0);
 
 	if (response < 0) {
-		dev_err(port->dev, "%s - error sending open port command\n", __FUNCTION__);
+		dev_err(&port->dev, "%s - error sending open port command\n", __FUNCTION__);
 		edge_port->openPending = FALSE;
 		return -ENODEV;
 	}
@@ -1450,7 +1450,7 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	count = fifo->count;
 	buffer = kmalloc (count+2, GFP_ATOMIC);
 	if (buffer == NULL) {
-		dev_err(edge_serial->serial->dev->dev, "%s - no more kernel memory...\n", __FUNCTION__);
+		dev_err(&edge_serial->serial->dev->dev, "%s - no more kernel memory...\n", __FUNCTION__);
 		edge_port->write_in_progress = FALSE;
 		return;
 	}
@@ -2143,7 +2143,7 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 	}
         edge_port = usb_get_serial_port_data(port);
 	if (edge_port == NULL) {
-		dev_err(edge_serial->serial->dev->dev, "%s - edge_port == NULL for port %d\n", __FUNCTION__, edge_serial->rxPort);
+		dev_err(&edge_serial->serial->dev->dev, "%s - edge_port == NULL for port %d\n", __FUNCTION__, edge_serial->rxPort);
 		return;
 	}
 
@@ -2330,7 +2330,7 @@ static int sram_write (struct usb_serial *serial, __u16 extAddr, __u16 addr, __u
 
 	transfer_buffer =  kmalloc (64, GFP_KERNEL);
 	if (!transfer_buffer) {
-		dev_err(serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 64);
+		dev_err(&serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 64);
 		return -ENOMEM;
 	}
 
@@ -2375,7 +2375,7 @@ static int rom_write (struct usb_serial *serial, __u16 extAddr, __u16 addr, __u1
 
 	transfer_buffer =  kmalloc (64, GFP_KERNEL);
 	if (!transfer_buffer) {
-		dev_err(serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 64);
+		dev_err(&serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 64);
 		return -ENOMEM;
 	}
 
@@ -2420,7 +2420,7 @@ static int rom_read (struct usb_serial *serial, __u16 extAddr, __u16 addr, __u16
 
 	transfer_buffer =  kmalloc (64, GFP_KERNEL);
 	if (!transfer_buffer) {
-		dev_err(serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 64);
+		dev_err(&serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 64);
 		return -ENOMEM;
 	}
 
@@ -2463,7 +2463,7 @@ static int send_iosp_ext_cmd (struct edgeport_port *edge_port, __u8 command, __u
 
 	buffer =  kmalloc (10, GFP_ATOMIC);
 	if (!buffer) {
-		dev_err(edge_port->port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 10);
+		dev_err(&edge_port->port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 10);
 		return -ENOMEM;
 	}
 
@@ -2554,14 +2554,14 @@ static int send_cmd_write_baud_rate (struct edgeport_port *edge_port, int baudRa
 
 	status = calc_baud_rate_divisor (baudRate, &divisor);
 	if (status) {
-		dev_err(edge_port->port->dev, "%s - bad baud rate\n", __FUNCTION__);
+		dev_err(&edge_port->port->dev, "%s - bad baud rate\n", __FUNCTION__);
 		return status;
 	}
 
 	// Alloc memory for the string of commands.
 	cmdBuffer =  kmalloc (0x100, GFP_ATOMIC);
 	if (!cmdBuffer) {
-		dev_err(edge_port->port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 0x100);
+		dev_err(&edge_port->port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 0x100);
 		return -ENOMEM;
 	}
 	currCmd = cmdBuffer;
@@ -2838,7 +2838,7 @@ static void get_manufacturing_desc (struct edgeport_serial *edge_serial)
 			    (__u8 *)(&edge_serial->manuf_descriptor));
 
 	if (response < 1) {
-		dev_err(edge_serial->serial->dev->dev, "error in getting manufacturer descriptor\n");
+		dev_err(&edge_serial->serial->dev->dev, "error in getting manufacturer descriptor\n");
 	} else {
 		char string[30];
 		dbg("**Manufacturer Descriptor");
@@ -2877,7 +2877,7 @@ static void get_boot_desc (struct edgeport_serial *edge_serial)
 			    (__u8 *)(&edge_serial->boot_descriptor));
 
 	if (response < 1) {
-		dev_err(edge_serial->serial->dev->dev, "error in getting boot descriptor\n");
+		dev_err(&edge_serial->serial->dev->dev, "error in getting boot descriptor\n");
 	} else {
 		dbg("**Boot Descriptor:");
 		dbg("  BootCodeLength: %d", edge_serial->boot_descriptor.BootCodeLength);
@@ -2938,7 +2938,7 @@ static void load_application_firmware (struct edgeport_serial *edge_serial)
 		record = (struct edge_firmware_image_record *)firmware;
 		response = sram_write (edge_serial->serial, record->ExtAddr, record->Addr, record->Len, &record->Data[0]);
 		if (response < 0) {
-			dev_err(edge_serial->serial->dev->dev, "sram_write failed (%x, %x, %d)\n", record->ExtAddr, record->Addr, record->Len);
+			dev_err(&edge_serial->serial->dev->dev, "sram_write failed (%x, %x, %d)\n", record->ExtAddr, record->Addr, record->Len);
 			break;
 		}
 		firmware += sizeof (struct edge_firmware_image_record) + record->Len;
@@ -2974,7 +2974,7 @@ static int edge_startup (struct usb_serial *serial)
 	/* create our private serial structure */
 	edge_serial = kmalloc (sizeof(struct edgeport_serial), GFP_KERNEL);
 	if (edge_serial == NULL) {
-		dev_err(serial->dev->dev, "%s - Out of memory", __FUNCTION__);
+		dev_err(&serial->dev->dev, "%s - Out of memory", __FUNCTION__);
 		return -ENOMEM;
 	}
 	memset (edge_serial, 0, sizeof(struct edgeport_serial));
@@ -2988,7 +2988,7 @@ static int edge_startup (struct usb_serial *serial)
 
 	get_string(dev, dev->descriptor.iProduct, &edge_serial->name[i]);
 
-	dev_info(serial->dev->dev, "%s detected\n", edge_serial->name);
+	dev_info(&serial->dev->dev, "%s detected\n", edge_serial->name);
 
 	/* get the manufacturing descriptor for this device */
 	get_manufacturing_desc (edge_serial);
@@ -3030,7 +3030,7 @@ static int edge_startup (struct usb_serial *serial)
 	for (i = 0; i < serial->num_ports; ++i) {
 		edge_port = kmalloc (sizeof(struct edgeport_port), GFP_KERNEL);
 		if (edge_port == NULL) {
-			dev_err(serial->dev->dev, "%s - Out of memory", __FUNCTION__);
+			dev_err(&serial->dev->dev, "%s - Out of memory", __FUNCTION__);
 			usb_set_serial_data(serial, NULL);
 			kfree(edge_serial);
 			return -ENOMEM;
