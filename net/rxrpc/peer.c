@@ -48,7 +48,7 @@ static const struct rxrpc_timer_ops rxrpc_peer_timer_ops = {
 /*
  * create a peer record
  */
-static int __rxrpc_create_peer(struct rxrpc_transport *trans, uint32_t addr,
+static int __rxrpc_create_peer(struct rxrpc_transport *trans, __be32 addr,
 			       struct rxrpc_peer **_peer)
 {
 	struct rxrpc_peer *peer;
@@ -96,7 +96,7 @@ static int __rxrpc_create_peer(struct rxrpc_transport *trans, uint32_t addr,
  * - returns (if successful) with peer record usage incremented
  * - resurrects it from the graveyard if found there
  */
-int rxrpc_peer_lookup(struct rxrpc_transport *trans, uint32_t addr,
+int rxrpc_peer_lookup(struct rxrpc_transport *trans, __be32 addr,
 		      struct rxrpc_peer **_peer)
 {
 	struct rxrpc_peer *peer, *candidate = NULL;

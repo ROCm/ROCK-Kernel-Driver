@@ -14,7 +14,7 @@
 
 #ifdef __KERNEL__
 
-extern uint32_t rxrpc_epoch;
+extern __be32 rxrpc_epoch;
 
 #ifdef CONFIG_SYSCTL
 extern int rxrpc_ktrace;
