@@ -96,6 +96,10 @@ extern const unsigned char scsi_command_size[8];
 #define READ_ELEMENT_STATUS   0xb8
 #define SEND_VOLUME_TAG       0xb6
 #define WRITE_LONG_2          0xea
+#define READ_16               0x88
+#define WRITE_16              0x8a
+#define SERVICE_ACTION_IN     0x9e
+
 
 /*
  *  Status codes
