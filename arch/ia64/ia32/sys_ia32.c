@@ -1336,21 +1336,21 @@ msgctl32 (int first, int second, void *uptr)
 
 	      case IPC_SET:
 		if (version == IPC_64) {
-			err = get_user(m.msg_perm.uid, &up64->msg_perm.uid);
-			err |= get_user(m.msg_perm.gid, &up64->msg_perm.gid);
-			err |= get_user(m.msg_perm.mode, &up64->msg_perm.mode);
-			err |= get_user(m.msg_qbytes, &up64->msg_qbytes);
+			err = get_user(m64.msg_perm.uid, &up64->msg_perm.uid);
+			err |= get_user(m64.msg_perm.gid, &up64->msg_perm.gid);
+			err |= get_user(m64.msg_perm.mode, &up64->msg_perm.mode);
+			err |= get_user(m64.msg_qbytes, &up64->msg_qbytes);
 		} else {
-			err = get_user(m.msg_perm.uid, &up32->msg_perm.uid);
-			err |= get_user(m.msg_perm.gid, &up32->msg_perm.gid);
-			err |= get_user(m.msg_perm.mode, &up32->msg_perm.mode);
-			err |= get_user(m.msg_qbytes, &up32->msg_qbytes);
+			err = get_user(m64.msg_perm.uid, &up32->msg_perm.uid);
+			err |= get_user(m64.msg_perm.gid, &up32->msg_perm.gid);
+			err |= get_user(m64.msg_perm.mode, &up32->msg_perm.mode);
+			err |= get_user(m64.msg_qbytes, &up32->msg_qbytes);
 		}
 		if (err)
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_msgctl(first, second, &m);
+		err = sys_msgctl(first, second, &m64);
 		set_fs(old_fs);
 		break;
 
