@@ -29,7 +29,6 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 {
 
     struct reiserfs_transaction_handle th ;
-    int windex ;
 
     if (!S_ISREG (inode->i_mode))
 	BUG ();
@@ -59,9 +58,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 	   appended (we append by unformatted node only) or its direct
 	   item(s) had to be converted, then it may have to be
 	   indirect2direct converted */
-	windex = push_journal_writer("file_release") ;
 	reiserfs_truncate_file(inode, 0) ;
-	pop_journal_writer(windex) ;
     }
     up (&inode->i_sem); 
     reiserfs_write_unlock(inode->i_sb);

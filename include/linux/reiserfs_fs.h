@@ -1727,8 +1727,6 @@ int journal_end(struct reiserfs_transaction_handle *, struct super_block *, unsi
 int journal_end_sync(struct reiserfs_transaction_handle *, struct super_block *, unsigned long) ;
 int journal_mark_dirty_nolog(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
 int journal_mark_freed(struct reiserfs_transaction_handle *, struct super_block *, b_blocknr_t blocknr) ;
-int push_journal_writer(char *w) ;
-int pop_journal_writer(int windex) ;
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, b_blocknr_t *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;

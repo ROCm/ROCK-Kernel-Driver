@@ -408,7 +408,6 @@ void reiserfs_check_lock_depth(char *caller) {
 #ifdef CONFIG_SMP
   if (current->lock_depth < 0) {
     printk("%s called without kernel lock held\n", caller) ;
-    show_reiserfs_locks() ;
     BUG() ;
   }
 #else
@@ -442,52 +441,6 @@ static inline struct reiserfs_journal_cnode *get_journal_hash(struct super_block
     return (struct reiserfs_journal_cnode *)0 ;
   }
   return cn ;
-}
-
-/* once upon a time, the journal would deadlock.  a lot.  Now, when
-** CONFIG_REISERFS_CHECK is defined, anytime someone enters a
-** transaction, it pushes itself into this ugly static list, and pops
-** itself off before calling journal_end.  I made a SysRq key to dump
-** the list, and tell me what the writers are when I'm deadlocked.  */
-
-				/* are you depending on the compiler
-                                   to optimize this function away
-                                   everywhere it is called? It is not
-                                   obvious how this works, but I
-                                   suppose debugging code need not be
-                                   clear.  -Hans */
-static char *journal_writers[512] ;
-int push_journal_writer(char *s) {
-#ifdef CONFIG_REISERFS_CHECK
-  int i ;
-  for (i = 0 ; i < 512 ; i++) {
-    if (!journal_writers[i]) {
-      journal_writers[i] = s ;
-      return i ;
-    }
-  }
-  return -1 ;
-#else
-  return 0 ;
-#endif
-}
-int pop_journal_writer(int index) {
-#ifdef CONFIG_REISERFS_CHECK
-  if (index >= 0) {
-    journal_writers[index] = NULL ;
-  }
-#endif
-  return 0 ;
-}
-
-int dump_journal_writers(void) {
-  int i ;
-  for (i = 0 ; i < 512 ; i++) {
-    if (journal_writers[i]) {
-      printk("%d: %s\n", i, journal_writers[i]) ;
-    }
-  }
-  return 0 ;
 }
 
 /*
@@ -2095,7 +2048,6 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   journal_list_init(p_s_sb) ;
 
   memset(SB_JOURNAL(p_s_sb)->j_list_hash_table, 0, JOURNAL_HASH_SIZE * sizeof(struct reiserfs_journal_cnode *)) ;
-  memset(journal_writers, 0, sizeof(char *) * 512) ; /* debug code */
 
   INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_dirty_buffers) ;
   spin_lock_init(&SB_JOURNAL(p_s_sb)->j_dirty_buffers_lock) ;
@@ -2372,7 +2324,6 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
                             buffer_locked(bh) ? ' ' : '!',
 			    buffer_dirty(bh) ? ' ' : '!',
 			    buffer_journal_dirty(bh) ? ' ' : '!') ;
-    show_reiserfs_locks() ;
   }
   count_already_incd = clear_prepared_bits(bh) ;
 
@@ -2588,12 +2539,6 @@ int journal_end_sync(struct reiserfs_transaction_handle *th, struct super_block 
     journal_mark_dirty(th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
   }
   return do_journal_end(th, p_s_sb, nblocks, COMMIT_NOW | WAIT) ;
-}
-
-int show_reiserfs_locks(void) {
-
-  dump_journal_writers() ;
-  return 0 ;
 }
 
 /*

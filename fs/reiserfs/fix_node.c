@@ -2280,7 +2280,6 @@ int fix_nodes (int n_op_mode,
     ** during wait_tb_buffers_run
     */
     int wait_tb_buffers_run = 0 ; 
-    int windex ;
     struct buffer_head  * p_s_tbS0 = PATH_PLAST_BUFFER(p_s_tb->tb_path);
 
     ++ REISERFS_SB(p_s_tb -> tb_sb) -> s_fix_nodes;
@@ -2407,10 +2406,7 @@ int fix_nodes (int n_op_mode,
 		p_s_tb->insert_size[n_h + 1] = (DC_SIZE + KEY_SIZE) * (p_s_tb->blknum[n_h] - 1);
     }
 
-    
-    windex = push_journal_writer("fix_nodes") ;
     if ((n_ret_value = wait_tb_buffers_until_unlocked (p_s_tb)) == CARRY_ON) {
-	pop_journal_writer(windex) ;
 	if (FILESYSTEM_CHANGED_TB(p_s_tb)) {
 	    wait_tb_buffers_run = 1 ;
 	    n_ret_value = REPEAT_SEARCH ;
@@ -2420,7 +2416,6 @@ int fix_nodes (int n_op_mode,
 	}
     } else {
 	wait_tb_buffers_run = 1 ;
-	pop_journal_writer(windex) ;
 	goto repeat; 
     }
 

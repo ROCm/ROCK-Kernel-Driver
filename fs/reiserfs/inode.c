@@ -29,9 +29,7 @@ static int reiserfs_get_block (struct inode * inode, sector_t block,
 void reiserfs_delete_inode (struct inode * inode)
 {
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2; 
-    int windex ;
     struct reiserfs_transaction_handle th ;
-
   
     reiserfs_write_lock(inode->i_sb);
 
@@ -41,10 +39,8 @@ void reiserfs_delete_inode (struct inode * inode)
 
 	journal_begin(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_update_inode_transaction(inode) ;
-	windex = push_journal_writer("delete_inode") ;
 
 	reiserfs_delete_object (&th, inode);
-	pop_journal_writer(windex) ;
 
 	journal_end(&th, inode->i_sb, jbegin_count) ;
 
@@ -561,7 +557,6 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
     __u32 * item;
     int done;
     int fs_gen;
-    int windex ;
     struct reiserfs_transaction_handle th ;
     /* space reserved in transaction batch: 
         . 3 balancings in direct->indirect conversion
@@ -607,8 +602,6 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	 (have_small_tails (inode->i_sb) && inode->i_size < i_block_size(inode)) )
 	REISERFS_I(inode)->i_flags |= i_pack_on_close_mask ;
 
-    windex = push_journal_writer("reiserfs_get_block") ;
-  
     /* set the key of the first byte in the 'block'-th block of file */
     make_cpu_key (&key, inode, new_offset,
 		  TYPE_ANY, 3/*key length*/);
@@ -687,7 +680,6 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	}
 	set_block_dev_mapped(bh_result, unfm_ptr, inode);
 	pathrelse (&path);
-	pop_journal_writer(windex) ;
 	if (transaction_started)
 	    journal_end(&th, inode->i_sb, jbegin_count) ;
 
@@ -933,7 +925,6 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
       reiserfs_update_sd(&th, inode) ;
       journal_end(&th, inode->i_sb, jbegin_count) ;
     }
-    pop_journal_writer(windex) ;
     reiserfs_write_unlock(inode->i_sb);
     reiserfs_check_path(&path) ;
     return retval;
@@ -1836,7 +1827,6 @@ unlock:
 */
 void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct reiserfs_transaction_handle th ;
-    int windex ;
     /* we want the offset for the first byte after the end of the file */
     unsigned long offset = p_s_inode->i_size & (PAGE_CACHE_SIZE - 1) ;
     unsigned blocksize = p_s_inode->i_sb->s_blocksize ;
@@ -1871,14 +1861,12 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
        cut_from_item. 1 is for update_sd */
     journal_begin(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 + 1 ) ;
     reiserfs_update_inode_transaction(p_s_inode) ;
-    windex = push_journal_writer("reiserfs_vfs_truncate_file") ;
     if (update_timestamps)
 	    /* we are doing real truncate: if the system crashes before the last
 	       transaction of truncating gets committed - on reboot the file
 	       either appears truncated properly or not truncated at all */
 	add_save_link (&th, p_s_inode, 1);
     reiserfs_do_truncate (&th, p_s_inode, page, update_timestamps) ;
-    pop_journal_writer(windex) ;
     journal_end(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 + 1 ) ;
 
     if (update_timestamps)

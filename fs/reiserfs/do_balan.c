@@ -54,9 +54,7 @@ inline void do_balance_mark_leaf_dirty (struct tree_balance * tb,
 	    tb->need_balance_dirty = 1;
 	}
     } else {
-	int windex = push_journal_writer("do_balance") ;
 	journal_mark_dirty(tb->transaction_handle, tb->transaction_handle->t_super, bh) ;
-	pop_journal_writer(windex) ;
     }
 }
 

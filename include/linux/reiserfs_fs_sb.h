@@ -475,7 +475,6 @@ void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;
 int journal_mark_dirty(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
 int flush_old_commits(struct super_block *s, int) ;
-int show_reiserfs_locks(void) ;
 int reiserfs_resize(struct super_block *, unsigned long) ;
 
 #define CARRY_ON                0
