@@ -1565,6 +1565,18 @@ static struct ac97_quirk ac97_quirks[] = {
 		.name = "ASRock K7VM2",
 		.type = AC97_TUNE_HP_ONLY	/* VT1616 */
 	},
+	{
+		.vendor = 0x14cd,
+		.device = 0x7002,
+		.name = "Unknown",
+		.type = AC97_TUNE_ALC_JACK
+	},
+	{
+		.vendor = 0x1071,
+		.device = 0x8590,
+		.name = "Mitac Mobo",
+		.type = AC97_TUNE_ALC_JACK
+	},
 	{ } /* terminator */
 };
 

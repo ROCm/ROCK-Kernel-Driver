@@ -105,9 +105,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445372, 0xffffffff, "AD1981A",		patch_ad1981a,	NULL },
 { 0x41445374, 0xffffffff, "AD1981B",		patch_ad1981b,	NULL },
 { 0x41445375, 0xffffffff, "AD1985",		patch_ad1985,	NULL },
-{ 0x414c4300, 0xfffffff0, "RL5306",	 	NULL,		NULL },
-{ 0x414c4310, 0xfffffff0, "RL5382", 		NULL,		NULL },
-{ 0x414c4320, 0xfffffff0, "RL5383", 		NULL,		NULL },
+{ 0x414c4300, 0xffffff00, "ALC100/100P", 	NULL,		NULL },
 { 0x414c4710, 0xfffffff0, "ALC200/200P",	NULL,		NULL },
 { 0x414c4720, 0xfffffff0, "ALC650",		patch_alc650,	NULL },
 { 0x414c4721, 0xfffffff0, "ALC650D",		patch_alc650,	NULL },
@@ -274,6 +272,11 @@ void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
+	if ((ac97->id & 0xffffff00) == 0x414c4300) {
+		/* Fix H/W bug of ALC100/100P */
+		if (reg == AC97_MASTER || reg == AC97_HEADPHONE)
+			ac97->bus->write(ac97, AC97_RESET, 0);	/* reset audio codec */
+	}
 	ac97->bus->write(ac97, reg, value);
 }
 
@@ -689,7 +692,7 @@ AC97_DOUBLE("Surround Playback Volume", AC97_SURROUND_MASTER, 8, 0, 31, 1),
 };
 
 static const snd_kcontrol_new_t snd_ac97_control_eapd =
-AC97_SINGLE("External Amplifier Power Down", AC97_POWERDOWN, 15, 1, 0);
+AC97_SINGLE("External Amplifier", AC97_POWERDOWN, 15, 1, 1);
 
 static int snd_ac97_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -1940,6 +1943,15 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 			return -ENOMEM;
 		}
 	}
+	/* make sure the proper powerdown bits are cleared */
+	if (ac97->scaps) {
+		reg = snd_ac97_read(ac97, AC97_EXTENDED_ID);
+		if (ac97->scaps & AC97_SCAP_SURROUND_DAC) 
+			reg &= ~AC97_EA_PRJ;
+		if (ac97->scaps & AC97_SCAP_CENTER_LFE_DAC) 
+			reg &= ~(AC97_EA_PRI | AC97_EA_PRK);
+		snd_ac97_write_cache(ac97, AC97_EXTENDED_ID, reg);
+	}
 	snd_ac97_proc_init(ac97);
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
 		snd_ac97_free(ac97);
@@ -1994,11 +2006,18 @@ void snd_ac97_resume(ac97_t *ac97)
 	snd_ac97_write(ac97, AC97_GENERAL_PURPOSE, 0);
 
 	snd_ac97_write(ac97, AC97_POWERDOWN, ac97->regs[AC97_POWERDOWN]);
-	snd_ac97_write(ac97, AC97_MASTER, 0x8101);
+	ac97->bus->write(ac97, AC97_MASTER, 0x8101);
 	for (i = 0; i < 10; i++) {
 		if (snd_ac97_read(ac97, AC97_MASTER) == 0x8101)
 			break;
-		mdelay(1);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
+	}
+	/* FIXME: extra delay */
+	ac97->bus->write(ac97, AC97_MASTER, 0x8000);
+	if (snd_ac97_read(ac97, AC97_MASTER) != 0x8000) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/4);
 	}
 __reset_ready:
 
@@ -2139,10 +2158,28 @@ static int swap_surround(ac97_t *ac97)
 static int tune_ad_sharing(ac97_t *ac97)
 {
 	unsigned short scfg;
+	if ((ac97->id & 0xffffff00) != 0x41445300) {
+		snd_printk(KERN_ERR "ac97_quirk AD_SHARING is only for AD codecs\n");
+		return -EINVAL;
+	}
 	/* Turn on OMS bit to route microphone to back panel */
 	scfg = snd_ac97_read(ac97, AC97_AD_SERIAL_CFG);
 	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, scfg | 0x0200);
 	return 0;
+}
+
+static const snd_kcontrol_new_t snd_ac97_alc_jack_detect = 
+AC97_SINGLE("Jack Detect", AC97_ALC650_CLOCK, 5, 1, 0);
+
+static int tune_alc_jack(ac97_t *ac97)
+{
+	if ((ac97->id & 0xffffff00) != 0x414c4700) {
+		snd_printk(KERN_ERR "ac97_quirk ALC_JACK is only for Realtek codecs\n");
+		return -EINVAL;
+	}
+	snd_ac97_update_bits(ac97, 0x7a, 0x20, 0x20); /* select jack detect function */
+	snd_ac97_update_bits(ac97, 0x7a, 0x01, 0x01); /* Line-out auto mute */
+	return snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&snd_ac97_alc_jack_detect, ac97));
 }
 
 static int apply_quirk(ac97_t *ac97, int quirk)
@@ -2158,6 +2195,8 @@ static int apply_quirk(ac97_t *ac97, int quirk)
 		return swap_surround(ac97);
 	case AC97_TUNE_AD_SHARING:
 		return tune_ad_sharing(ac97);
+	case AC97_TUNE_ALC_JACK:
+		return tune_alc_jack(ac97);
 	}
 	return -EINVAL;
 }

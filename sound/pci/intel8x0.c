@@ -1674,6 +1674,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
+		.vendor = 0x1014,
+		.device = 0x1f00,
+		.name = "MS-9128",
+		.type = AC97_TUNE_ALC_JACK
+	},
+	{
 		.vendor = 0x1028,
 		.device = 0x00d8,
 		.name = "Dell Precision 530",	/* AD1885 */
@@ -1773,6 +1779,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
+#if 0 /* FIXME: this seems wrong on most boards */
 	{
 		.vendor = 0x8086,
 		.device = 0xa000,
@@ -1780,6 +1787,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_HP_ONLY
 	},
+#endif
 	{ } /* terminator */
 };
 

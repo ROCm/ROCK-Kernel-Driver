@@ -66,6 +66,8 @@
 #include "cs46xx_lib.h"
 #include "dsp_spos.h"
 
+static void amp_voyetra(cs46xx_t *chip, int change);
+
 static unsigned short snd_cs46xx_codec_read(cs46xx_t *chip,
 					    unsigned short reg,
 					    int codec_index)
@@ -203,6 +205,13 @@ static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 	chip->active_ctrl(chip, 1);
 	val = snd_cs46xx_codec_read(chip, reg, codec_index);
 	chip->active_ctrl(chip, -1);
+
+	/* HACK: voyetra uses EAPD bit in the reverse way.
+	 * we flip the bit to show the mixer status correctly
+	 */
+	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
+		val ^= 0x8000;
+
 	return val;
 }
 
@@ -283,6 +292,12 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 		codec_index = CS46XX_SECONDARY_CODEC_INDEX;
 	else
 		snd_assert(0,return);
+
+	/* HACK: voyetra uses EAPD bit in the reverse way.
+	 * we flip the bit to show the mixer status correctly
+	 */
+	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
+		val ^= 0x8000;
 
 	chip->active_ctrl(chip, 1);
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
@@ -2550,7 +2565,7 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	/* get EAPD mixer switch (for voyetra hack) */
 	memset(&id, 0, sizeof(id));
 	id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-	strcpy(id.name, "External Amplifier Power Down");
+	strcpy(id.name, "External Amplifier");
 	chip->eapd_switch = snd_ctl_find_id(chip->card, &id);
     
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
