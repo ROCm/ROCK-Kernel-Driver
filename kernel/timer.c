@@ -94,9 +94,11 @@ static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
 	} else if (idx <= 0xffffffffUL) {
 		int i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
 		vec = base->tv5.vec + i;
-	} else
+	} else {
 		/* Can only get here on architectures with 64-bit jiffies */
+		INIT_LIST_HEAD(&timer->entry);
 		return;
+	}
 	/*
 	 * Timers are FIFO:
 	 */
