@@ -293,7 +293,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 
 		/* stop scanning when we reach qtds the hc is using */
 		} else if (likely (!stopped
-				|| HCD_IS_RUNNING (ehci->hcd.state))) {
+				&& HCD_IS_RUNNING (ehci->hcd.state))) {
 			break;
 
 		} else {
@@ -690,12 +690,11 @@ done:
 
 	/* NOTE:  if (PIPE_INTERRUPT) { scheduler sets s-mask } */
 
-	/* init as halted, toggle clear, advance to dummy */
+	/* init as live, toggle clear, advance to dummy */
 	qh->qh_state = QH_STATE_IDLE;
 	qh->hw_info1 = cpu_to_le32 (info1);
 	qh->hw_info2 = cpu_to_le32 (info2);
 	qh_update (ehci, qh, qh->dummy);
-	qh->hw_token = cpu_to_le32 (QTD_STS_HALT);
 	usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe), !is_input, 1);
 	return qh;
 }

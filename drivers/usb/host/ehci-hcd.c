@@ -431,7 +431,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	pci_set_mwi (ehci->hcd.pdev);
 
 	/* clear interrupt enables, set irq latency */
-	temp = readl (&ehci->regs->command) & 0xff;
+	temp = readl (&ehci->regs->command) & 0x0fff;
 	if (log2_irq_thresh < 0 || log2_irq_thresh > 6)
 		log2_irq_thresh = 0;
 	temp |= 1 << (16 + log2_irq_thresh);
