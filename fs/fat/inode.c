@@ -1268,14 +1268,10 @@ retry:
 	    MSDOS_I(inode)->i_attrs;
 	raw_entry->start = CT_LE_W(MSDOS_I(inode)->i_logstart);
 	raw_entry->starthi = CT_LE_W(MSDOS_I(inode)->i_logstart >> 16);
-	fat_date_unix2dos(inode->i_mtime.tv_sec,&raw_entry->time,&raw_entry->date);
-	raw_entry->time = CT_LE_W(raw_entry->time);
-	raw_entry->date = CT_LE_W(raw_entry->date);
+	fat_date_unix2dos(inode->i_mtime.tv_sec, &raw_entry->time, &raw_entry->date);
 	if (MSDOS_SB(sb)->options.isvfat) {
 		fat_date_unix2dos(inode->i_ctime.tv_sec,&raw_entry->ctime,&raw_entry->cdate);
 		raw_entry->ctime_ms = MSDOS_I(inode)->i_ctime_ms; /* use i_ctime.tv_nsec? */
-		raw_entry->ctime = CT_LE_W(raw_entry->ctime);
-		raw_entry->cdate = CT_LE_W(raw_entry->cdate);
 	}
 	spin_unlock(&fat_inode_lock);
 	mark_buffer_dirty(bh);
