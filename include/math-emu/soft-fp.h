@@ -154,11 +154,11 @@ do {						\
 
 #define _FP_CLS_COMBINE(x,y)	(((x) << 2) | (y))
 
-#include "op-1.h"
-#include "op-2.h"
-#include "op-4.h"
-#include "op-8.h"
-#include "op-common.h"
+#include <math-emu/op-1.h>
+#include <math-emu/op-2.h>
+#include <math-emu/op-4.h>
+#include <math-emu/op-8.h>
+#include <math-emu/op-common.h>
 
 /* Sigh.  Silly things longlong.h needs.  */
 #define UWtype		_FP_W_TYPE

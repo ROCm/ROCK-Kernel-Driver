@@ -20,6 +20,8 @@
    of the stack frame of math_emulate() */
 #define SETUP_DATA_AREA(arg)	FPU_info = (struct info *) &arg
 
+/* s is always from a cpu register, and the cpu does bounds checking
+ * during register load --> no further bounds checks needed */
 #define LDT_DESCRIPTOR(s)	(((struct desc_struct *)current->mm->context.ldt)[(s) >> 3])
 #define SEG_D_SIZE(x)		((x).b & (3 << 21))
 #define SEG_G_BIT(x)		((x).b & (1 << 23))

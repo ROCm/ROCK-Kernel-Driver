@@ -140,7 +140,7 @@ int FPU_sub(int flags, int rm, int control_w)
   FPU_REG const *a, *b;
   FPU_REG *dest;
   u_char taga, tagb, signa, signb, saved_sign, sign;
-  int diff, tag, expa, expb, deststnr;
+  int diff, tag = 0, expa, expb, deststnr;
 
   a = &st(0);
   taga = FPU_gettag0();

@@ -174,7 +174,7 @@ static int compare(FPU_REG const *b, int tagb)
 /* This function requires that st(0) is not empty */
 int FPU_compare_st_data(FPU_REG const *loaded_data, u_char loaded_tag)
 {
-  int f, c;
+  int f = 0, c;
 
   c = compare(loaded_data, loaded_tag);
 
@@ -216,7 +216,7 @@ int FPU_compare_st_data(FPU_REG const *loaded_data, u_char loaded_tag)
 
 static int compare_st_st(int nr)
 {
-  int f, c;
+  int f = 0, c;
   FPU_REG *st_ptr;
 
   if ( !NOT_EMPTY(0) || !NOT_EMPTY(nr) )
@@ -268,7 +268,7 @@ static int compare_st_st(int nr)
 
 static int compare_u_st_st(int nr)
 {
-  int f, c;
+  int f = 0, c;
   FPU_REG *st_ptr;
 
   if ( !NOT_EMPTY(0) || !NOT_EMPTY(nr) )
