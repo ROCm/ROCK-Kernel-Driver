@@ -6,8 +6,6 @@
  * 
  *  Kai Germaschewski contributed to the list walking routines.
  *
- * FIXME: The suspend and shutdown walks are identical. The resume walk
- * is simply walking the list backward. Anyway we can combine these (cleanly)?
  */
 
 #include <linux/device.h>
@@ -17,13 +15,15 @@
 #define to_dev(node) container_of(node,struct device,g_list)
 
 /**
- * device_suspend - suspend all devices on the device tree
+ * device_suspend - suspend/remove all devices on the device ree
  * @state:	state we're entering
- * @level:	what stage of the suspend process we're at 
- * 
- * The entries in the global device list are inserted such that they're in a 
- * depth-first ordering. So, simply iterate over the list, and call the driver's
- * suspend callback for each device.
+ * @level:	what stage of the suspend process we're at
+ *    (emb: it seems that these two arguments are described backwards of what
+ *          they actually mean .. is this correct?)
+ *
+ * The entries in the global device list are inserted such that they're in a
+ * depth-first ordering.  So, simply interate over the list, and call the 
+ * driver's suspend or remove callback for each device.
  */
 int device_suspend(u32 state, u32 level)
 {
@@ -31,15 +31,23 @@ int device_suspend(u32 state, u32 level)
 	struct device * prev = NULL;
 	int error = 0;
 
-	printk(KERN_EMERG "Suspending Devices\n");
+	if(level == SUSPEND_POWER_DOWN)
+		printk(KERN_EMERG "Shutting down devices\n");
+	else
+		printk(KERN_EMERG "Suspending devices\n");
 
 	spin_lock(&device_lock);
 	list_for_each(node,&global_device_list) {
 		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
 			spin_unlock(&device_lock);
-			if (dev->driver && dev->driver->suspend)
-				error = dev->driver->suspend(dev,state,level);
+			if(dev->driver) {
+				if(level == SUSPEND_POWER_DOWN) {
+				       	if(dev->driver->remove)
+						dev->driver->remove(dev);
+				} else if(dev->driver->suspend) 
+					error = dev->driver->suspend(dev,state,level);
+			}
 			if (prev)
 				put_device(prev);
 			prev = dev;
@@ -83,36 +91,12 @@ void device_resume(u32 level)
 }
 
 /**
- * device_shutdown - queisce all the devices before reboot/shutdown
- *
- * Do depth first iteration over device tree, calling ->remove() for each
- * device. This should ensure the devices are put into a sane state before
- * we reboot the system.
- *
+ * device_shutdown - call device_suspend with status set to shutdown, to 
+ * cause all devices to remove themselves cleanly 
  */
 void device_shutdown(void)
 {
-	struct list_head * node, * next;
-	struct device * prev = NULL;
-
-	printk(KERN_EMERG "Shutting down devices\n");
-
-	spin_lock(&device_lock);
-	list_for_each_safe(node,next,&global_device_list) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			spin_unlock(&device_lock);
-			if (dev->driver && dev->driver->remove)
-				dev->driver->remove(dev);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
-		}
-	}
-	spin_unlock(&device_lock);
-	if (prev)
-		put_device(prev);
+	device_suspend(4, SUSPEND_POWER_DOWN);
 }
 
 EXPORT_SYMBOL(device_suspend);
