@@ -654,8 +654,6 @@ static void __init prom_initialize_lmb(void)
 #endif /* DEBUG_PROM */
 }
 
-static char hypertas_funcs[1024];
-
 static void __init
 prom_instantiate_rtas(void)
 {
@@ -665,6 +663,7 @@ prom_instantiate_rtas(void)
 	struct systemcfg *_systemcfg = RELOC(systemcfg);
 	ihandle prom_rtas;
         u32 getprop_rval;
+	char hypertas_funcs[4];
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_instantiate_rtas: start...\n"));
@@ -1556,7 +1555,7 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 		if (*mem_end != RELOC(initrd_start))
 			prom_panic(RELOC("No memory for copy_device_tree"));
 
-		prom_print("Huge device_tree: moving initrd\n");
+		prom_print(RELOC("Huge device_tree: moving initrd\n"));
 		/* Move by 4M. */
 		initrd_len = RELOC(initrd_end) - RELOC(initrd_start);
 		*mem_end = RELOC(initrd_start) + 4 * 1024 * 1024;
@@ -1590,6 +1589,7 @@ inspect_node(phandle node, struct device_node *dad,
 	char *prev_name, *namep;
 	unsigned char *valp;
 	unsigned long offset = reloc_offset();
+	phandle ibm_phandle;
 
 	np = make_room(mem_start, mem_end, struct device_node);
 	memset(np, 0, sizeof(*np));
@@ -1652,23 +1652,24 @@ inspect_node(phandle node, struct device_node *dad,
 		prev_propp = &pp->next;
 	}
 
-	/* Add a "linux_phandle" value */
-        if (np->node) {
-		u32 ibm_phandle = 0;
-		int len;
+	/* Add a "linux,phandle" property. */
+	namep = make_room(mem_start, mem_end, char[16]);
+	strcpy(namep, RELOC("linux,phandle"));
+	pp = make_room(mem_start, mem_end, struct property);
+	pp->name = PTRUNRELOC(namep);
+	pp->length = sizeof(phandle);
+	valp = make_room(mem_start, mem_end, phandle);
+	pp->value = PTRUNRELOC(valp);
+	*(phandle *)valp = node;
+	*prev_propp = PTRUNRELOC(pp);
+	pp->next = NULL;
 
-                /* First see if "ibm,phandle" exists and use its value */
-                len = (int)
-                        call_prom(RELOC("getprop"), 4, 1, node, RELOC("ibm,phandle"),
-                                  &ibm_phandle, sizeof(ibm_phandle));
-                if (len < 0) {
-                        np->linux_phandle = np->node;
-                } else {
-                        np->linux_phandle = ibm_phandle;
-		}
-	}
-
-	*prev_propp = 0;
+	/* Set np->linux_phandle to the value of the ibm,phandle property
+	   if it exists, otherwise to the phandle for this node. */
+	np->linux_phandle = node;
+	if ((int)call_prom(RELOC("getprop"), 4, 1, node, RELOC("ibm,phandle"),
+			   &ibm_phandle, sizeof(ibm_phandle)) > 0)
+		np->linux_phandle = ibm_phandle;
 
 	/* get the node's full name */
 	namep = (char *)*mem_start;
