@@ -180,8 +180,8 @@ Similarly the following switches are off: "IEC958 Mix Analog" and
 device automatically to the previous state.
 
 On the model 033, AC3 is implemented by the software conversion in
-the driver.  This prevents the mmap support.  If you need mmap
-support, pass the "soft_ac3=0" module option.  This doesn't matter
+the alsa-lib.  If you need to bypass the software conversion of IEC958
+subframes, pass the "soft_ac3=0" module option.  This doesn't matter
 on the newer models.
 
 

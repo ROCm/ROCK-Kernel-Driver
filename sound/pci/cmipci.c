@@ -58,7 +58,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
 static long mpu_port[SNDRV_CARDS];
 static long fm_port[SNDRV_CARDS];
-static int soft_ac3[SNDRV_CARDS]; /* obsoleted */
+static int soft_ac3[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)]=1};
 #ifdef SUPPORT_JOYSTICK
 static int joystick_port[SNDRV_CARDS];
 #endif
@@ -80,7 +80,7 @@ module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
 module_param_array(soft_ac3, bool, boot_devs, 0444);
-MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets [obsoleted].");
+MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
@@ -418,7 +418,6 @@ struct snd_stru_cmipci_pcm {
 	unsigned int is_dac;		/* is dac? */
 	int bytes_per_frame;
 	int shift;
-	int ac3_shift;	/* extra shift: 1 on soft ac3 mode */
 };
 
 /* mixer elements toggled/resumed during ac3 playback */
@@ -456,6 +455,7 @@ struct snd_stru_cmipci {
 	unsigned int can_ac3_sw: 1;
 	unsigned int can_ac3_hw: 1;
 	unsigned int can_multi_ch: 1;
+	unsigned int do_soft_ac3: 1;
 
 	unsigned int spdif_playback_avail: 1;	/* spdif ready? */
 	unsigned int spdif_playback_enabled: 1;	/* spdif switch enabled? */
@@ -2500,7 +2500,10 @@ static void __devinit query_chip(cmipci_t *cm)
 		if (! detect) {
 			cm->chip_version = 33;
 			cm->max_channels = 2;
-			cm->can_ac3_sw = 1;
+			if (cm->do_soft_ac3)
+				cm->can_ac3_sw = 1;
+			else
+				cm->can_ac3_hw = 1;
 			cm->has_dual_dac = 1;
 		} else {
 			cm->chip_version = 37;
@@ -2532,6 +2535,8 @@ static void __devinit query_chip(cmipci_t *cm)
 	if (cm->can_multi_ch)
 		sprintf(cm->card->driver + strlen(cm->card->driver),
 			"-MC%d", cm->max_channels);
+	else if (cm->can_ac3_sw)
+		strcpy(cm->card->driver + strlen(cm->card->driver), "-SWIEC");
 }
 
 
@@ -2628,6 +2633,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 
 	cm->chip_version = 0;
 	cm->max_channels = 2;
+	cm->do_soft_ac3 = soft_ac3[dev];
 
 	query_chip(cm);
 

@@ -270,7 +270,8 @@ Module parameters
 
     mpu_port	- 0x300,0x310,0x320,0x330, 0 = disable (default)
     fm_port     - 0x388 (default), 0 = disable (default)
-    soft_ac3    - Sofware-conversion of raw SPDIF packets (obsoleted now)
+    soft_ac3    - Sofware-conversion of raw SPDIF packets (model 033 only)
+                  (default = 1)
     joystick_port - Joystick port address (0 = disable, 1 = auto-detect)
 
     Module supports autoprobe and multiple chips (max 8).
