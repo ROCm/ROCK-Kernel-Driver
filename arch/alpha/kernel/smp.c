@@ -83,7 +83,6 @@ cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
 
 extern void calibrate_delay(void);
-extern asmlinkage void entInt(void);
 
 
 
@@ -150,6 +149,9 @@ smp_callin(void)
 
 	/* Get our local ticker going. */
 	smp_setup_percpu_timer(cpuid);
+
+	/* Call platform-specific callin, if specified */
+	if (alpha_mv.smp_callin) alpha_mv.smp_callin();
 
 	/* All kernel threads share the same mm context.  */
 	atomic_inc(&init_mm.mm_count);

@@ -1720,6 +1720,31 @@ config GEN_RTC
 	tristate "Generic /dev/rtc emulation" if !SUN3
 	depends on !ATARI
 	default y if SUN3
+	---help---
+	  If you say Y here and create a character special file /dev/rtc with
+	  major number 10 and minor number 135 using mknod ("man mknod"), you
+	  will get access to the real time clock (or hardware clock) built
+	  into your computer.
+
+	  It reports status information via the file /proc/driver/rtc and its
+	  behaviour is set by various ioctls on /dev/rtc. If you enable the
+	  "extended RTC operation" below it will also provide an emulation
+	  for RTC_UIE which is required by some programs and may improve
+	  precision in some cases.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module is called genrtc.o. If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>. To load the
+	  module automatically add 'alias char-major-10-135 genrtc' to your
+	  /etc/modules.conf
+
+config GEN_RTC_X
+	bool "Extended RTC operation"
+	depends on GEN_RTC
+	help
+	  Provides an emulation for RTC_UIE which is required by some programs
+	  and may improve precision of the generic RTC support in some cases.
 
 config UNIX98_PTYS
 	bool "Unix98 PTY support"

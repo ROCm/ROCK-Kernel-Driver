@@ -9,12 +9,10 @@
 #include <linux/kallsyms.h>
 #include <linux/module.h>
 
-static char kallsyms_dummy;
-
 /* These will be re-linked against their real values during the second link stage */
-extern unsigned long kallsyms_addresses[1] __attribute__((weak, alias("kallsyms_dummy")));
-extern unsigned long kallsyms_num_syms __attribute__((weak, alias("kallsyms_dummy")));
-extern char kallsyms_names[1] __attribute__((weak, alias("kallsyms_dummy")));
+extern unsigned long kallsyms_addresses[] __attribute__((weak));
+extern unsigned long kallsyms_num_syms __attribute__((weak));
+extern char kallsyms_names[] __attribute__((weak));
 
 /* Defined by the linker script. */
 extern char _stext[], _etext[];
@@ -28,8 +26,7 @@ const char *kallsyms_lookup(unsigned long addr,
 	unsigned long i, best = 0;
 
 	/* This kernel should never had been booted. */
-	if ((void *)kallsyms_addresses == &kallsyms_dummy)
-		BUG();
+	BUG_ON(!kallsyms_addresses);
 
 	namebuf[127] = 0;
 	namebuf[0] = 0;

@@ -404,58 +404,6 @@ sys32_rt_sigprocmask(int how, sigset32_t *set, sigset32_t *oset,
 	return 0;
 }
 
-static int
-put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
-{
-	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct statfs32)) ||
-	    __put_user (kbuf->f_type, &ubuf->f_type) ||
-	    __put_user (kbuf->f_bsize, &ubuf->f_bsize) ||
-	    __put_user (kbuf->f_blocks, &ubuf->f_blocks) ||
-	    __put_user (kbuf->f_bfree, &ubuf->f_bfree) ||
-	    __put_user (kbuf->f_bavail, &ubuf->f_bavail) ||
-	    __put_user (kbuf->f_files, &ubuf->f_files) ||
-	    __put_user (kbuf->f_ffree, &ubuf->f_ffree) ||
-	    __put_user (kbuf->f_namelen, &ubuf->f_namelen) ||
-	    __put_user (kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]) ||
-	    __put_user (kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]))
-		return -EFAULT;
-	return 0;
-}
-
-extern asmlinkage long sys_statfs(const char * path, struct statfs * buf);
-
-asmlinkage long
-sys32_statfs(const char * path, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_statfs((const char *)path, &s);
-	set_fs (old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
-}
-
-extern asmlinkage long sys_fstatfs(unsigned int fd, struct statfs * buf);
-
-asmlinkage long
-sys32_fstatfs(unsigned int fd, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-	
-	set_fs (KERNEL_DS);
-	ret = sys_fstatfs(fd, &s);
-	set_fs (old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
-}
-
 static inline long
 get_tv32(struct timeval *o, struct compat_timeval *i)
 {

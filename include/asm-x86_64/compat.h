@@ -68,4 +68,17 @@ struct compat_flock {
 	compat_pid_t	l_pid;
 };
 
+struct compat_statfs {
+	int		f_type;
+	int		f_bsize;
+	int		f_blocks;
+	int		f_bfree;
+	int		f_bavail;
+	int		f_files;
+	int		f_ffree;
+	compat_fsid_t	f_fsid;
+	int		f_namelen;	/* SunOS ignores this field. */
+	int		f_spare[6];
+};
+
 #endif /* _ASM_X86_64_COMPAT_H */

@@ -1960,7 +1960,6 @@ static void __devexit hamachi_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	if (dev) {
 		struct hamachi_private *hmp = dev->priv;
 

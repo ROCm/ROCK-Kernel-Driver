@@ -33,6 +33,12 @@ struct compat_tms {
 	compat_clock_t		tms_cstime;
 };
 
+#define _COMPAT_NSIG_WORDS	(_COMPAT_NSIG / _COMPAT_NSIG_BPW)
+
+typedef struct {
+	compat_sigset_word	sig[_COMPAT_NSIG_WORDS];
+} compat_sigset_t;
+
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
 extern int get_compat_flock(struct flock *, struct compat_flock *);
 extern int put_compat_flock(struct flock *, struct compat_flock *);

@@ -1773,7 +1773,6 @@ void cleanup_module(void)
 {
 	int slot;
 	
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	unregister_netdev(&this_device);
 
 	/*

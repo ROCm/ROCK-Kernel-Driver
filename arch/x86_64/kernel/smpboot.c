@@ -772,24 +772,16 @@ static void smp_tune_scheduling (void)
  * Cycle through the processors sending APIC IPIs to boot each.
  */
 
-extern int prof_multiplier[NR_CPUS];
-extern int prof_old_multiplier[NR_CPUS];
-extern int prof_counter[NR_CPUS];
-
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	int apicid, cpu;
 
 	/*
 	 * Initialize the logical to physical CPU number mapping
-	 * and the per-CPU profiling counter/multiplier
 	 */
 
 	for (apicid = 0; apicid < NR_CPUS; apicid++) {
 		x86_apicid_to_cpu[apicid] = -1;
-		prof_counter[apicid] = 1;
-		prof_old_multiplier[apicid] = 1;
-		prof_multiplier[apicid] = 1;
 	}
 
 	/*

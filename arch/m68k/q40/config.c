@@ -53,7 +53,10 @@ extern void q40_sched_init(void (*handler)(int, void *, struct pt_regs *));
 
 extern unsigned long q40_gettimeoffset (void);
 extern int q40_hwclk (int, struct rtc_time *);
+extern unsigned int q40_get_ss (void);
 extern int q40_set_clock_mmss (unsigned long);
+static int q40_get_rtc_pll(struct rtc_pll_info *pll);
+static int q40_set_rtc_pll(struct rtc_pll_info *pll);
 extern void q40_reset (void);
 void q40_halt(void);
 extern void q40_waitbut(void);
@@ -170,6 +173,9 @@ void __init config_q40(void)
     mach_init_IRQ        = q40_init_IRQ;   
     mach_gettimeoffset   = q40_gettimeoffset; 
     mach_hwclk           = q40_hwclk; 
+    mach_get_ss          = q40_get_ss;
+    mach_get_rtc_pll     = q40_get_rtc_pll;
+    mach_set_rtc_pll     = q40_set_rtc_pll;
     mach_set_clock_mmss	 = q40_set_clock_mmss;
 
     mach_reset		 = q40_reset;
@@ -290,6 +296,11 @@ int q40_hwclk(int op, struct rtc_time *t)
 	return 0;
 }
 
+unsigned int q40_get_ss()
+{
+	return bcd2bin(Q40_RTC_SECS);
+}
+
 /*
  * Set the minutes and seconds from seconds value 'nowtime'.  Fail if
  * clock is out by > 30 minutes.  Logic lifted from atari code.
@@ -321,3 +332,36 @@ int q40_set_clock_mmss (unsigned long nowtime)
 	return retval;
 }
 
+
+/* get and set PLL calibration of RTC clock */
+#define Q40_RTC_PLL_MASK ((1<<5)-1)
+#define Q40_RTC_PLL_SIGN (1<<5)
+
+static int q40_get_rtc_pll(struct rtc_pll_info *pll)
+{
+	int tmp=Q40_RTC_CTRL;
+	pll->pll_value = tmp & Q40_RTC_PLL_MASK;
+	if (tmp & Q40_RTC_PLL_SIGN)
+		pll->pll_value = -pll->pll_value;
+	pll->pll_max=31;
+	pll->pll_min=-31;
+	pll->pll_posmult=512;
+	pll->pll_negmult=256;
+	pll->pll_clock=125829120;
+	return 0;
+}
+
+static int q40_set_rtc_pll(struct rtc_pll_info *pll)
+{
+	if (!pll->pll_ctrl){
+		/* the docs are a bit unclear so I am doublesetting */
+		/* RTC_WRITE here ... */
+		int tmp = (pll->pll_value & 31) | (pll->pll_value<0 ? 32 : 0) |
+			  Q40_RTC_WRITE;
+		Q40_RTC_CTRL |= Q40_RTC_WRITE;
+		Q40_RTC_CTRL = tmp;
+		Q40_RTC_CTRL &= ~(Q40_RTC_WRITE);
+		return 0;
+	} else
+		return -EINVAL;
+}

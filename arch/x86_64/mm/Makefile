@@ -4,5 +4,5 @@
 
 export-objs := pageattr.o
 
-obj-y	 := init.o fault.o ioremap.o extable.o modutil.o pageattr.o
+obj-y	 := init.o fault.o ioremap.o extable.o pageattr.o
 obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o

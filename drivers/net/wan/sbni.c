@@ -1501,7 +1501,6 @@ cleanup_module( void )
 	struct net_device  *dev;
 	int  num;
 
-	/* No need to check MOD_IN_USE, as sys_delete_module( ) checks. */
 	for( num = 0;  num < SBNI_MAX_NUM_CARDS;  ++num )
 		if( (dev = sbni_cards[ num ]) != NULL ) {
 			unregister_netdev( dev );

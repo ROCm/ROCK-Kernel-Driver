@@ -234,10 +234,20 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	err = -EINVAL;
 
 	if (ida[IFLA_ADDRESS - 1]) {
+		if (!dev->set_mac_address) {
+			err = -EOPNOTSUPP;
+			goto out;
+		}
+		if (!netif_device_present(dev)) {
+			err = -ENODEV;
+			goto out;
+		}
 		if (ida[IFLA_ADDRESS - 1]->rta_len != RTA_LENGTH(dev->addr_len))
 			goto out;
-		memcpy(dev->dev_addr, RTA_DATA(ida[IFLA_ADDRESS - 1]),
-		       dev->addr_len);
+
+		err = dev->set_mac_address(dev, RTA_DATA(ida[IFLA_ADDRESS - 1]));
+		if (err)
+			goto out;
 	}
 
 	if (ida[IFLA_BROADCAST - 1]) {
@@ -250,6 +260,9 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	err = 0;
 
 out:
+	if (!err)
+		call_netdevice_notifiers(NETDEV_CHANGEADDR, dev);
+
 	dev_put(dev);
 	return err;
 }

@@ -345,9 +345,6 @@ static void __exit nicstar_module_exit(void)
    
    XPRINTK("nicstar: cleanup_module() called.\n");
 
-   if (MOD_IN_USE)
-      printk("nicstar: module in use, remove delayed.\n");
-
    del_timer(&ns_timer);
 
    for (i = 0; i < NS_MAX_CARDS; i++)

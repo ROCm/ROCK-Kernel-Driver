@@ -103,9 +103,6 @@ struct sa1100fb_info {
 	wait_queue_head_t	ctrlr_wait;
 	struct work_struct	task;
 
-#ifdef CONFIG_PM
-	struct pm_dev		*pm;
-#endif
 #ifdef CONFIG_CPU_FREQ
 	struct notifier_block	freq_transition;
 	struct notifier_block	freq_policy;
@@ -128,6 +125,7 @@ struct sa1100fb_info {
 #define C_REENABLE		(4)
 #define C_DISABLE_PM		(5)
 #define C_ENABLE_PM		(6)
+#define C_STARTUP		(7)
 
 #define SA1100_NAME	"SA1100"
 

@@ -73,11 +73,6 @@ SECTIONS
   . = ALIGN(4096); 
   .data.boot_pgt : { *(.data.boot_pgt) }
 
-  . = ALIGN(4096);
-  __initramfs_start = .;
-  .init.ramfs : { *(.init.ramfs) }
-  __initramfs_end = .;
-	
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
   .init.text : { *(.init.text) }
@@ -100,6 +95,10 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;	
   . = ALIGN(32);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }

@@ -46,6 +46,9 @@ static inline unsigned long __node_to_cpu_mask(int node)
 	return mask;
 }
 
+/* Cross-node load balancing interval. */
+#define NODE_BALANCE_RATE 10
+
 #else /* !CONFIG_NUMA */
 
 #define __cpu_to_node(cpu)		(0)

@@ -190,6 +190,8 @@ extern void _sethae (unsigned long addr);	/* cached version */
 # include <asm/jensen.h>
 #elif defined(CONFIG_ALPHA_LCA)
 # include <asm/core_lca.h>
+#elif defined(CONFIG_ALPHA_MARVEL)
+# include <asm/core_marvel.h>
 #elif defined(CONFIG_ALPHA_MCPCIA)
 # include <asm/core_mcpcia.h>
 #elif defined(CONFIG_ALPHA_POLARIS)

@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/ptrace.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 
 #include <asm/setup.h>
 #include <asm/traps.h>
@@ -34,10 +35,10 @@ int send_fault_sig(struct pt_regs *regs)
 		force_sig_info(siginfo.si_signo,
 			       &siginfo, current);
 	} else {
-		unsigned long fixup;
+		const struct exception_table_entry *fixup;
 
 		/* Are we prepared to handle this kernel fault? */
-		if ((fixup = search_exception_table(regs->pc))) {
+		if ((fixup = search_exception_tables(regs->pc))) {
 			struct pt_regs *tregs;
 			/* Create a new four word stack frame, discarding the old
 			   one.  */
@@ -45,7 +46,7 @@ int send_fault_sig(struct pt_regs *regs)
 			tregs =	(struct pt_regs *)((ulong)regs + regs->stkadj);
 			tregs->vector = regs->vector;
 			tregs->format = 0;
-			tregs->pc = fixup;
+			tregs->pc = fixup->fixup;
 			tregs->sr = regs->sr;
 			return -1;
 		}

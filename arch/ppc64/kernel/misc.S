@@ -541,7 +541,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_setreuid	        /* 70 */
 	.llong .sys_setregid
 	.llong .sys32_sigsuspend
-	.llong .sys32_sigpending
+	.llong .compat_sys_sigpending
 	.llong .sys32_sethostname
 	.llong .sys32_setrlimit	        /* 75 */
 	.llong .sys32_old_getrlimit
@@ -594,7 +594,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* old modify_ldt syscall */
 	.llong .sys32_adjtimex
 	.llong .sys_mprotect		/* 125 */
-	.llong .sys32_sigprocmask
+	.llong .compat_sys_sigprocmask
 	.llong .sys_ni_syscall		/* old create_module syscall */
 	.llong .sys32_init_module
 	.llong .sys32_delete_module

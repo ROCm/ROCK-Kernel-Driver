@@ -659,7 +659,6 @@ int init_module(void)
 void
 cleanup_module(void)
 {
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	unregister_netdev(&this_device);
 	/*
 	 * If we don't do this, we can't re-insmod it later.

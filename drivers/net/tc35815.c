@@ -1755,7 +1755,6 @@ static void __exit tc35815_cleanup_module(void)
 {
 	struct net_device *next_dev;
 
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	while (root_tc35815_dev) {
 		struct net_device *dev = root_tc35815_dev;
 		next_dev = ((struct tc35815_local *)dev->priv)->next_module;

@@ -23,6 +23,9 @@
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/debugreg.h>
+#include <asm/ldt.h>
+#include <asm/desc.h>
+#include <asm/proto.h>
 
 /*
  * does not yet catch signals sent when the child dies.
@@ -319,6 +322,22 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		wake_up_process(child);
 		ret = 0;
 		break;
+	case PTRACE_SET_THREAD_AREA: {
+		int old; 
+		get_user(old,  &((struct user_desc *)data)->entry_number); 
+		put_user(addr, &((struct user_desc *)data)->entry_number);
+		ret = do_set_thread_area(&child->thread, 
+					 (struct user_desc *)data);
+		put_user(old,  &((struct user_desc *)data)->entry_number); 
+		break;
+	case PTRACE_GET_THREAD_AREA:
+		get_user(old,  &((struct user_desc *)data)->entry_number); 
+		put_user(addr, &((struct user_desc *)data)->entry_number);
+		ret = do_get_thread_area(&child->thread, 
+					 (struct user_desc *)data);
+		put_user(old,  &((struct user_desc *)data)->entry_number); 
+		break;
+	} 
 	}
 
 /*
