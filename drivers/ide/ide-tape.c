@@ -6442,12 +6442,12 @@ static int idetape_attach (ide_drive_t *drive)
 		goto failed;
 	}
 	if (drive->scsi) {
-		if (strstr(drive->id->model, "OnStream DI-")) {
-			printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
-		} else {
-			printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
-			goto failed;
-		}
+		printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
+		goto failed;
+	}
+	if (strstr(drive->id->model, "OnStream DI-")) {
+		printk(KERN_WARNING "ide-tape: Use drive %s with ide-scsi emulation and osst.\n", drive->name);
+		printk(KERN_WARNING "ide-tape: OnStream support will be removed soon from ide-tape!\n");
 	}
 	tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
 	if (tape == NULL) {
