@@ -95,11 +95,6 @@ EXPORT_SYMBOL_ALIAS(kern_fp_enter,fp_enter);
 EXPORT_SYMBOL_ALIAS(fp_printk,printk);
 EXPORT_SYMBOL_ALIAS(fp_send_sig,send_sig);
 
-#ifdef CONFIG_CPU_26
-EXPORT_SYMBOL(fpundefinstr);
-EXPORT_SYMBOL(ret_from_exception);
-#endif
-
 #ifdef CONFIG_VT
 EXPORT_SYMBOL(kd_mksound);
 #endif
@@ -111,10 +106,8 @@ EXPORT_SYMBOL_NOVERS(__backtrace);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(udelay);
-#ifdef CONFIG_CPU_32
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(__iounmap);
-#endif
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(system_rev);
 EXPORT_SYMBOL(system_serial_low);
@@ -196,7 +189,6 @@ EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(__memzero);
 
 	/* user mem (segment) */
-#if defined(CONFIG_CPU_32)
 EXPORT_SYMBOL(__arch_copy_from_user);
 EXPORT_SYMBOL(__arch_copy_to_user);
 EXPORT_SYMBOL(__arch_clear_user);
@@ -206,11 +198,6 @@ EXPORT_SYMBOL(__arch_strnlen_user);
 EXPORT_SYMBOL(consistent_alloc);
 EXPORT_SYMBOL(consistent_free);
 EXPORT_SYMBOL(consistent_sync);
-
-#elif defined(CONFIG_CPU_26)
-EXPORT_SYMBOL(uaccess_kernel);
-EXPORT_SYMBOL(uaccess_user);
-#endif
 
 EXPORT_SYMBOL_NOVERS(__get_user_1);
 EXPORT_SYMBOL_NOVERS(__get_user_2);

@@ -21,10 +21,7 @@
 /*
  * Make sure that the compiler and target are compatible.
  */
-#if defined(__APCS_32__) && defined(CONFIG_CPU_26)
-#error Sorry, your compiler targets APCS-32 but this kernel requires APCS-26
-#endif
-#if defined(__APCS_26__) && defined(CONFIG_CPU_32)
+#if defined(__APCS_26__)
 #error Sorry, your compiler targets APCS-26 but this kernel requires APCS-32
 #endif
 #if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 95)
@@ -52,7 +49,6 @@ int main(void)
   BLANK();
   DEFINE(VM_EXEC,	       	VM_EXEC);
   BLANK();
-#ifdef CONFIG_CPU_32
   DEFINE(HPTE_TYPE_SMALL,      	PTE_TYPE_SMALL);
   DEFINE(HPTE_AP_READ,		PTE_AP_READ);
   DEFINE(HPTE_AP_WRITE,		PTE_AP_WRITE);
@@ -65,15 +61,7 @@ int main(void)
   DEFINE(LPTE_WRITE,		L_PTE_WRITE);
   DEFINE(LPTE_EXEC,		L_PTE_EXEC);
   DEFINE(LPTE_DIRTY,		L_PTE_DIRTY);
-#endif
   BLANK();
-#ifdef CONFIG_CPU_26
-  DEFINE(PAGE_PRESENT,		_PAGE_PRESENT);
-  DEFINE(PAGE_READONLY,		_PAGE_READONLY);
-  DEFINE(PAGE_NOT_USER,		_PAGE_NOT_USER);
-  DEFINE(PAGE_OLD,		_PAGE_OLD);
-  DEFINE(PAGE_CLEAN,		_PAGE_CLEAN);
-#endif
   BLANK();
   DEFINE(PAGE_SZ,	       	PAGE_SIZE);
   BLANK();

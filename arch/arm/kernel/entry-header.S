@@ -41,14 +41,8 @@
 @ Stack format (ensured by USER_* and SVC_*)
 @
 #define S_FRAME_SIZE	72
-#ifdef CONFIG_CPU_32
 #define S_OLD_R0	68
 #define S_PSR		64
-#else
-#define S_OLD_R0	64
-#define S_PSR		60
-#define S_PC		60
-#endif
 
 #define S_PC		60
 #define S_LR		56
@@ -67,8 +61,6 @@
 #define S_R1		4
 #define S_R0		0
 #define S_OFF		8
-
-#ifdef CONFIG_CPU_32
 
 	.macro	set_cpsr_c, reg, mode
 #if 1
@@ -159,58 +151,6 @@
 	mcr	p15, 0, \rtemp, c1, c0
 #endif
 	.endm
-
-#else
-	.macro	save_user_regs
-	str	r0, [sp, #-4]!
-	str	lr, [sp, #-4]!
-	sub	sp, sp, #15*4
-	stmia	sp, {r0 - lr}^
-	mov	r0, r0
-	.endm
-
-	.macro	restore_user_regs
-	ldmia	sp, {r0 - lr}^
-	mov	r0, r0
-	ldr	lr, [sp, #15*4]
-	add	sp, sp, #15*4+8
-	movs	pc, lr
-	.endm
-
-	.macro	fast_restore_user_regs
-	add	sp, sp, #S_OFF
-	ldmib	sp, {r1 - lr}^
-	mov	r0, r0
-	ldr	lr, [sp, #15*4]
-	add	sp, sp, #15*4+8
-	movs	pc, lr
-	.endm
-
-	.macro	mask_pc, rd, rm
-	bic	\rd, \rm, #PCMASK
-	.endm
-
-	.macro	enable_irqs, temp
-	teqp	pc, #0x00000003
-	.endm
-
-	.macro	initialise_traps_extra
-	.endm
-
-	.macro	get_thread_info, rd
-	mov	\rd, sp, lsr #13
-	mov	\rd, \rd, lsl #13
-	.endm
-
-	/*
-	 * Like adr, but force SVC mode (if required)
-	 */
-	.macro	adrsvc, cond, reg, label
-	adr\cond	\reg, \label
-	orr\cond	\reg, \reg, #0x08000003
-	.endm
-
-#endif
 
 
 /*

@@ -27,10 +27,8 @@ ifneq ($(MACHINE),ebsa110)
   obj-y		+= io.o
 endif
 
-ifeq ($(CONFIG_CPU_32),y)
 head-y			:= head.o
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
-endif
 
 extra-y := $(head-y) init_task.o
 
