@@ -30,7 +30,6 @@
 #include <asm/semaphore.h>
 #include <asm/errno.h>
 
-#include "pwc-uncompress.h"
 #include "pwc-ioctl.h"
 
 /* Defines and structures for the Philips webcam */
@@ -257,11 +256,6 @@ extern int pwc_camera_power(struct pwc_device *pdev, int power);
 
 /* Private ioctl()s; see pwc-ioctl.h */
 extern int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg);
-
-
-/** pwc-uncompress.c */
-/* Expand frame to image, possibly including decompression. Uses read_frame and fill_image */
-extern int pwc_decompress(struct pwc_device *pdev);
 
 #ifdef __cplusplus
 }

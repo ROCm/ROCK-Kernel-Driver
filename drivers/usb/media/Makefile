@@ -2,7 +2,7 @@
 # Makefile for USB Media drivers
 #
 
-pwc-objs	:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o
+pwc-objs	:= pwc-if.o pwc-misc.o pwc-ctrl.o
 sn9c102-objs	:= sn9c102_core.o sn9c102_pas106b.o sn9c102_tas5110c1b.o sn9c102_tas5130d1b.o sn9c102_pas202bcb.o
 
 obj-$(CONFIG_USB_DABUSB)	+= dabusb.o

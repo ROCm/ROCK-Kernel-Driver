@@ -34,7 +34,6 @@
  
 #include "pwc.h"
 #include "pwc-ioctl.h"
-#include "pwc-uncompress.h"
 
 /* Request types: video */
 #define SET_LUM_CTL			0x01
@@ -268,8 +267,6 @@ static inline int set_video_mode_Nala(struct pwc_device *pdev, int size, int fra
 		Debug("Failed to send video command... %d\n", ret);
 		return ret;
 	}
-	if (pEntry->compressed && pdev->decompressor != 0 && pdev->vpalette != VIDEO_PALETTE_RAW)
-		pdev->decompressor->init(pdev->type, pdev->release, buf, pdev->decompress_data);
 
 	pdev->cmd_len = 3;
 	memcpy(pdev->cmd_buf, buf, 3);
@@ -335,9 +332,6 @@ static inline int set_video_mode_Timon(struct pwc_device *pdev, int size, int fr
 	ret = send_video_command(pdev->udev, pdev->vendpoint, buf, 13);
 	if (ret < 0)
 		return ret;
-
-	if (pChoose->bandlength > 0 && pdev->decompressor != 0 && pdev->vpalette != VIDEO_PALETTE_RAW)
-		pdev->decompressor->init(pdev->type, pdev->release, buf, pdev->decompress_data);
 
 	pdev->cmd_len = 13;
 	memcpy(pdev->cmd_buf, buf, 13);
@@ -420,9 +414,6 @@ static inline int set_video_mode_Kiara(struct pwc_device *pdev, int size, int fr
 	ret = send_video_command(pdev->udev, 4 /* pdev->vendpoint */, buf, 12);
 	if (ret < 0)
 		return ret;
-
-	if (pChoose->bandlength > 0 && pdev->decompressor != 0 && pdev->vpalette != VIDEO_PALETTE_RAW)
-		pdev->decompressor->init(pdev->type, pdev->release, buf, pdev->decompress_data);
 
 	pdev->cmd_len = 12;
 	memcpy(pdev->cmd_buf, buf, 12);

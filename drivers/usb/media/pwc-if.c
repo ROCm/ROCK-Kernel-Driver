@@ -59,7 +59,6 @@
 
 #include "pwc.h"
 #include "pwc-ioctl.h"
-#include "pwc-uncompress.h"
 
 /* Function prototypes and driver templates */
 
@@ -302,14 +301,6 @@ static int pwc_allocate_buffers(struct pwc_device *pdev)
 	
 	/* Allocate decompressor table space */
 	kbuf = NULL;
-	if (pdev->decompressor != NULL) {
-		kbuf = kmalloc(pdev->decompressor->table_size, GFP_KERNEL);
-		if (kbuf == NULL) {
-			Err("Failed to allocate decompress table.\n");
-			return -ENOMEM;
-		}
-		Trace(TRACE_MEMORY, "Allocated decompress table %p.\n", kbuf);
-	}
 	pdev->decompress_data = kbuf;
 	
 	/* Allocate image buffer; double buffer for mmap() */
@@ -550,14 +541,6 @@ static int pwc_handle_frame(struct pwc_device *pdev)
 #if PWC_DEBUG
 			Trace(TRACE_SEQUENCE, "Decompressing frame %d\n", pdev->read_frame->sequence);
 #endif
-			/* Decompression is a lenghty process, so it's outside of the lock.
-			   This gives the isoc_handler the opportunity to fill more frames
-			   in the mean time.
-			*/
-			spin_unlock_irqrestore(&pdev->ptrlock, flags);
-			ret = pwc_decompress(pdev);
-			spin_lock_irqsave(&pdev->ptrlock, flags);
-
 			/* We're done with read_buffer, tack it to the end of the empty buffer list */
 			if (pdev->empty_frames == NULL) {
 				pdev->empty_frames = pdev->read_frame;
@@ -1014,11 +997,7 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 	if (pwc_set_leds(pdev, led_on, led_off) < 0)
 		Info("Failed to set LED on/off time.\n");
 
-	/* Find our decompressor, if any */
-	pdev->decompressor = pwc_find_decompressor(pdev->type);
-#if PWC_DEBUG	
-	Debug("Found decompressor for %d at 0x%p\n", pdev->type, pdev->decompressor);
-#endif
+	pdev->decompressor = NULL;
 	pwc_construct(pdev); /* set min/max sizes correct */
 
 	/* So far, so good. Allocate memory. */
@@ -1073,12 +1052,6 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 
 	pdev->vopen++;
 	file->private_data = vdev;
-	/* lock decompressor; this has a small race condition, since we 
-	   could in theory unload pwcx.o between pwc_find_decompressor()
-	   above and this call. I doubt it's ever going to be a problem.
-	 */
-	if (pdev->decompressor != NULL)
-		pdev->decompressor->lock();
 	up(&pdev->modlock);
 	Trace(TRACE_OPEN, "<< video_open() returns 0.\n");
 	return 0;
@@ -1103,12 +1076,6 @@ static int pwc_video_close(struct inode *inode, struct file *file)
 	 */
 	if (pdev->vframe_count > 20)
 		Info("Closing video device: %d frames received, dumped %d frames, %d frames with errors.\n", pdev->vframe_count, pdev->vframes_dumped, pdev->vframes_error);
-
-	if (pdev->decompressor != NULL) {
-		pdev->decompressor->exit();
-		pdev->decompressor->unlock();
-		pdev->decompressor = NULL;
-	}
 
 	pwc_isoc_cleanup(pdev);
 	pwc_free_buffers(pdev);
