@@ -905,6 +905,8 @@ static const snd_kcontrol_new_t snd_ac97_controls_ad1885[] = {
 	/* AC97_SINGLE("Digital Audio Mode", AC97_AD_MISC, 12, 1, 0), */ /* seems problematic */
 	AC97_SINGLE("Low Power Mixer", AC97_AD_MISC, 14, 1, 0),
 	AC97_SINGLE("Zero Fill DAC", AC97_AD_MISC, 15, 1, 0),
+	AC97_SINGLE("Headphone Jack Sense", AC97_AD_JACK_SPDIF, 9, 1, 1), /* inverted */
+	AC97_SINGLE("Line Jack Sense", AC97_AD_JACK_SPDIF, 8, 1, 1), /* inverted */
 };
 
 static int patch_ad1885_specific(ac97_t * ac97)
@@ -922,15 +924,9 @@ static struct snd_ac97_build_ops patch_ad1885_build_ops = {
 
 int patch_ad1885(ac97_t * ac97)
 {
-	unsigned short jack;
-
 	patch_ad1881(ac97);
 	/* This is required to deal with the Intel D815EEAL2 */
 	/* i.e. Line out is actually headphone out from codec */
-
-	/* turn off jack sense bits D8 & D9 */
-	jack = snd_ac97_read(ac97, AC97_AD_JACK_SPDIF);
-	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, jack | 0x0300);
 
 	/* set default */
 	snd_ac97_write_cache(ac97, AC97_AD_MISC, 0x0404);
