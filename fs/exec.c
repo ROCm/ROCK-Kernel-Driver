@@ -564,7 +564,7 @@ static int exec_mmap(struct mm_struct *mm)
  */
 static inline int de_thread(struct task_struct *tsk)
 {
-	struct signal_struct *newsig, *oldsig = tsk->signal;
+	struct signal_struct *sig = tsk->signal;
 	struct sighand_struct *newsighand, *oldsighand = tsk->sighand;
 	spinlock_t *lock = &oldsighand->siglock;
 	int count;
@@ -573,42 +573,15 @@ static inline int de_thread(struct task_struct *tsk)
 	 * If we don't share sighandlers, then we aren't sharing anything
 	 * and we can just re-use it all.
 	 */
-	if (atomic_read(&oldsighand->count) <= 1)
+	if (atomic_read(&oldsighand->count) <= 1) {
+		BUG_ON(atomic_read(&sig->count) != 1);
+		exit_itimers(sig);
 		return 0;
+	}
 
 	newsighand = kmem_cache_alloc(sighand_cachep, GFP_KERNEL);
 	if (!newsighand)
 		return -ENOMEM;
-
-	spin_lock_init(&newsighand->siglock);
-	atomic_set(&newsighand->count, 1);
-	memcpy(newsighand->action, oldsighand->action, sizeof(newsighand->action));
-
-	/*
-	 * See if we need to allocate a new signal structure
-	 */
-	newsig = NULL;
-	if (atomic_read(&oldsig->count) > 1) {
-		newsig = kmem_cache_alloc(signal_cachep, GFP_KERNEL);
-		if (!newsig) {
-			kmem_cache_free(sighand_cachep, newsighand);
-			return -ENOMEM;
-		}
-		atomic_set(&newsig->count, 1);
-		newsig->group_exit = 0;
-		newsig->group_exit_code = 0;
-		newsig->group_exit_task = NULL;
-		newsig->group_stop_count = 0;
-		newsig->curr_target = NULL;
-		init_sigpending(&newsig->shared_pending);
-		INIT_LIST_HEAD(&newsig->posix_timers);
-
-		newsig->tty = oldsig->tty;
-		newsig->pgrp = oldsig->pgrp;
-		newsig->session = oldsig->session;
-		newsig->leader = oldsig->leader;
-		newsig->tty_old_pgrp = oldsig->tty_old_pgrp;
-	}
 
 	if (thread_group_empty(current))
 		goto no_thread_group;
@@ -619,7 +592,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 */
 	read_lock(&tasklist_lock);
 	spin_lock_irq(lock);
-	if (oldsig->group_exit) {
+	if (sig->group_exit) {
 		/*
 		 * Another group action in progress, just
 		 * return so that the signal is processed.
@@ -627,11 +600,9 @@ static inline int de_thread(struct task_struct *tsk)
 		spin_unlock_irq(lock);
 		read_unlock(&tasklist_lock);
 		kmem_cache_free(sighand_cachep, newsighand);
-		if (newsig)
-			kmem_cache_free(signal_cachep, newsig);
 		return -EAGAIN;
 	}
-	oldsig->group_exit = 1;
+	sig->group_exit = 1;
 	zap_other_threads(current);
 	read_unlock(&tasklist_lock);
 
@@ -641,14 +612,16 @@ static inline int de_thread(struct task_struct *tsk)
 	count = 2;
 	if (current->pid == current->tgid)
 		count = 1;
-	while (atomic_read(&oldsig->count) > count) {
-		oldsig->group_exit_task = current;
-		oldsig->notify_count = count;
+	while (atomic_read(&sig->count) > count) {
+		sig->group_exit_task = current;
+		sig->notify_count = count;
 		__set_current_state(TASK_UNINTERRUPTIBLE);
 		spin_unlock_irq(lock);
 		schedule();
 		spin_lock_irq(lock);
 	}
+	sig->group_exit_task = NULL;
+	sig->notify_count = 0;
 	spin_unlock_irq(lock);
 
 	/*
@@ -723,31 +696,46 @@ static inline int de_thread(struct task_struct *tsk)
 		release_task(leader);
         }
 
+	/*
+	 * Now there are really no other threads at all,
+	 * so it's safe to stop telling them to kill themselves.
+	 */
+	sig->group_exit = 0;
+
 no_thread_group:
+	BUG_ON(atomic_read(&sig->count) != 1);
+	exit_itimers(sig);
 
-	write_lock_irq(&tasklist_lock);
-	spin_lock(&oldsighand->siglock);
-	spin_lock(&newsighand->siglock);
+	if (atomic_read(&oldsighand->count) == 1) {
+		/*
+		 * Now that we nuked the rest of the thread group,
+		 * it turns out we are not sharing sighand any more either.
+		 * So we can just keep it.
+		 */
+		kmem_cache_free(sighand_cachep, newsighand);
+	} else {
+		/*
+		 * Move our state over to newsighand and switch it in.
+		 */
+		spin_lock_init(&newsighand->siglock);
+		atomic_set(&newsighand->count, 1);
+		memcpy(newsighand->action, oldsighand->action,
+		       sizeof(newsighand->action));
 
-	if (current == oldsig->curr_target)
-		oldsig->curr_target = next_thread(current);
-	if (newsig)
-		current->signal = newsig;
-	current->sighand = newsighand;
-	init_sigpending(&current->pending);
-	recalc_sigpending();
+		write_lock_irq(&tasklist_lock);
+		spin_lock(&oldsighand->siglock);
+		spin_lock(&newsighand->siglock);
 
-	spin_unlock(&newsighand->siglock);
-	spin_unlock(&oldsighand->siglock);
-	write_unlock_irq(&tasklist_lock);
+		current->sighand = newsighand;
+		recalc_sigpending();
 
-	if (newsig && atomic_dec_and_test(&oldsig->count)) {
-		exit_itimers(oldsig);
-		kmem_cache_free(signal_cachep, oldsig);
+		spin_unlock(&newsighand->siglock);
+		spin_unlock(&oldsighand->siglock);
+		write_unlock_irq(&tasklist_lock);
+
+		if (atomic_dec_and_test(&oldsighand->count))
+			kmem_cache_free(sighand_cachep, oldsighand);
 	}
-
-	if (atomic_dec_and_test(&oldsighand->count))
-		kmem_cache_free(sighand_cachep, oldsighand);
 
 	if (!thread_group_empty(current))
 		BUG();
