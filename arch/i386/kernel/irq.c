@@ -225,7 +225,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 			count--;
 			printk(retval
 				? "irq event %d: bogus retval mask %x\n"
-				: "irq %d: nobody cared!n",
+				: "irq %d: nobody cared!\n",
 				irq, 
 				retval);
 		}
