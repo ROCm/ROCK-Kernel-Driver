@@ -49,7 +49,8 @@ static struct fb_fix_screeninfo vesafb_fix __initdata = {
 
 static int             inverse   = 0;
 static int             mtrr      = 1;
-static int	       vram __initdata = 0; /* Set amount of memory to be used */
+static int	       vram_remap __initdata = 0; /* Set amount of memory to be used */
+static int	       vram_total __initdata = 0; /* Set total amount of memory */
 static int             pmi_setpal = 0;	/* pmi for palette changes ??? */
 static int             ypan       = 0;  /* 0..nothing, 1..ypan, 2..ywrap */
 static unsigned short  *pmi_base  = NULL;
@@ -209,8 +210,10 @@ int __init vesafb_setup(char *options)
 			mtrr=1;
 		else if (! strcmp(this_opt, "nomtrr"))
 			mtrr=0;
-		else if (! strncmp(this_opt, "vram:", 5))
-			vram = simple_strtoul(this_opt+5, NULL, 0);
+		else if (! strncmp(this_opt, "vtotal:", 7))
+			vram_total = simple_strtoul(this_opt+7, NULL, 0);
+		else if (! strncmp(this_opt, "vremap:", 7))
+			vram_remap = simple_strtoul(this_opt+7, NULL, 0);
 	}
 	return 0;
 }
@@ -240,11 +243,14 @@ static int __init vesafb_probe(struct device *device)
 	/*   size_vmode -- that is the amount of memory needed for the
 	 *                 used video mode, i.e. the minimum amount of
 	 *                 memory we need. */
-	size_vmode = vesafb_fix.line_length * vesafb_defined.yres;
+	size_vmode = vesafb_defined.yres * vesafb_fix.line_length;
 
 	/*   size_total -- all video memory we have. Used for mtrr
-	 *                 entries and bounds checking. */
+	 *                 entries, ressource allocation and bounds
+	 *                 checking. */
 	size_total = screen_info.lfb_size * 65536;
+	if (vram_total)
+		size_total = vram_total * 1024 * 1024;
 	if (size_total < size_vmode)
 		size_total = size_vmode;
 
@@ -252,10 +258,11 @@ static int __init vesafb_probe(struct device *device)
 	 *                 use for vesafb.  With modern cards it is no
 	 *                 option to simply use size_total as that
 	 *                 wastes plenty of kernel address space. */
-	size_remap = size_vmode * 2;
-	if (vram)
-		size_remap = vram * 1024 * 1024;
-
+	size_remap  = size_vmode * 2;
+	if (vram_remap)
+		size_remap = vram_remap * 1024 * 1024;
+	if (size_remap < size_vmode)
+		size_remap = size_vmode;
 	if (size_remap > size_total)
 		size_remap = size_total;
 	vesafb_fix.smem_len = size_remap;
