@@ -17,6 +17,7 @@
 #include <linux/timer.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include <linux/crc32.h>
 #include <asm/prom.h>
 #include <asm/dbdma.h>
@@ -82,6 +83,7 @@ struct bmac_data {
 	int opened;
 	unsigned short hash_use_count[64];
 	unsigned short hash_table_mask[4];
+	spinlock_t lock;
 	struct net_device *next_bmac;
 };
 
@@ -159,9 +161,9 @@ static void bmac_init_chip(struct net_device *dev);
 static void bmac_init_registers(struct net_device *dev);
 static void bmac_enable_and_reset_chip(struct net_device *dev);
 static int bmac_set_address(struct net_device *dev, void *addr);
-static void bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs);
-static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs);
-static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void bmac_set_timeout(struct net_device *dev);
 static void bmac_tx_timeout(unsigned long data);
 static int bmac_proc_info ( char *buffer, char **start, off_t offset, int length);
@@ -485,7 +487,7 @@ bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_SLEEP_NOW:
 		netif_device_detach(dev);
 		/* prolly should wait for dma to finish & turn off the chip */
-		save_flags(flags); cli();
+		spin_lock_irqsave(&bp->lock, flags);
 		if (bp->timeout_active) {
 			del_timer(&bp->tx_timeout);
 			bp->timeout_active = 0;
@@ -494,7 +496,7 @@ bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		disable_irq(bp->tx_dma_intr);
 		disable_irq(bp->rx_dma_intr);
 		bp->sleeping = 1;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&bp->lock, flags);
 		if (bp->opened) {
 			volatile struct dbdma_regs *rd = bp->rx_dma;
 			volatile struct dbdma_regs *td = bp->tx_dma;
@@ -539,13 +541,14 @@ bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 static int bmac_set_address(struct net_device *dev, void *addr)
 {
+	struct bmac_data *bp = (struct bmac_data *) dev->priv;
 	unsigned char *p = addr;
 	unsigned short *pWord16;
 	unsigned long flags;
 	int i;
 
 	XXDEBUG(("bmac: enter set_address\n"));
-	save_flags(flags); cli();
+	spin_lock_irqsave(&bp->lock, flags);
 
 	for (i = 0; i < 6; ++i) {
 		dev->dev_addr[i] = p[i];
@@ -556,7 +559,7 @@ static int bmac_set_address(struct net_device *dev, void *addr)
 	bmwrite(dev, MADD1, *pWord16++);
 	bmwrite(dev, MADD2, *pWord16);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bp->lock, flags);
 	XXDEBUG(("bmac: exit set_address\n"));
 	return 0;
 }
@@ -566,8 +569,7 @@ static inline void bmac_set_timeout(struct net_device *dev)
 	struct bmac_data *bp = (struct bmac_data *) dev->priv;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&bp->lock, flags);
 	if (bp->timeout_active)
 		del_timer(&bp->tx_timeout);
 	bp->tx_timeout.expires = jiffies + TX_TIMEOUT;
@@ -575,7 +577,7 @@ static inline void bmac_set_timeout(struct net_device *dev)
 	bp->tx_timeout.data = (unsigned long) dev;
 	add_timer(&bp->tx_timeout);
 	bp->timeout_active = 1;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bp->lock, flags);
 }
 
 static void
@@ -703,7 +705,7 @@ static int bmac_transmit_packet(struct sk_buff *skb, struct net_device *dev)
 
 static int rxintcount;
 
-static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct bmac_data *bp = (struct bmac_data *) dev->priv;
@@ -715,7 +717,7 @@ static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 	int last;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&bp->lock, flags);
 
 	if (++rxintcount < 10) {
 		XXDEBUG(("bmac_rxdma_intr\n"));
@@ -769,18 +771,18 @@ static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 		bp->rx_empty = i;
 	}
 
-	restore_flags(flags);
-
 	dbdma_continue(rd);
+	spin_unlock_irqrestore(&bp->lock, flags);
 
 	if (rxintcount < 10) {
 		XXDEBUG(("bmac_rxdma_intr done\n"));
 	}
+	return IRQ_HANDLED;
 }
 
 static int txintcount;
 
-static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct bmac_data *bp = (struct bmac_data *) dev->priv;
@@ -788,7 +790,7 @@ static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 	int stat;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&bp->lock, flags);
 
 	if (txintcount++ < 10) {
 		XXDEBUG(("bmac_txdma_intr\n"));
@@ -824,13 +826,14 @@ static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 			break;
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bp->lock, flags);
 
 	if (txintcount < 10) {
 		XXDEBUG(("bmac_txdma_intr done->bmac_start\n"));
 	}
 
 	bmac_start(dev);
+	return IRQ_HANDLED;
 }
 
 static struct net_device_stats *bmac_stats(struct net_device *dev)
@@ -1096,7 +1099,7 @@ static void bmac_set_multicast(struct net_device *dev)
 
 static int miscintcount;
 
-static void bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct bmac_data *bp = (struct bmac_data *)dev->priv;
@@ -1117,6 +1120,7 @@ static void bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (status & TxErrorMask) bp->stats.tx_errors++;
 	if (status & TxUnderrun) bp->stats.tx_fifo_errors++;
 	if (status & TxNormalCollExp) bp->stats.collisions++;
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1249,7 +1253,7 @@ static void bmac_reset_and_enable(struct net_device *dev)
 	struct sk_buff *skb;
 	unsigned char *data;
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&bp->lock, flags);
 	bmac_enable_and_reset_chip(dev);
 	bmac_init_tx_ring(bp);
 	bmac_init_rx_ring(bp);
@@ -1270,7 +1274,7 @@ static void bmac_reset_and_enable(struct net_device *dev)
 		memcpy(data+6, dev->dev_addr, 6);
 		bmac_transmit_packet(skb, dev);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bp->lock, flags);
 }
 
 static int __init bmac_probe(void)
@@ -1336,6 +1340,7 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 	bp = (struct bmac_data *) dev->priv;
 	SET_MODULE_OWNER(dev);
 	bp->node = bmac;
+	spin_lock_init(&bp->lock);
 
 	if (!request_OF_resource(bmac, 0, " (bmac)")) {
 		printk(KERN_ERR "BMAC: can't request IO resource !\n");
@@ -1522,7 +1527,7 @@ bmac_start(struct net_device *dev)
 	if (bp->sleeping)
 		return;
 		
-	save_flags(flags); cli();
+	spin_lock_irqsave(&bp->lock, flags);
 	while (1) {
 		i = bp->tx_fill + 1;
 		if (i >= N_TX_RING)
@@ -1534,7 +1539,7 @@ bmac_start(struct net_device *dev)
 			break;
 		bmac_transmit_packet(skb, dev);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bp->lock, flags);
 }
 
 static int
@@ -1558,7 +1563,7 @@ static void bmac_tx_timeout(unsigned long data)
 	int i;
 
 	XXDEBUG(("bmac: tx_timeout called\n"));
-	save_flags(flags); cli();
+	spin_lock_irqsave(&bp->lock, flags);
 	bp->timeout_active = 0;
 
 	/* update various counters */
@@ -1614,7 +1619,7 @@ static void bmac_tx_timeout(unsigned long data)
 	oldConfig = bmread(dev, TXCFG);		
 	bmwrite(dev, TXCFG, oldConfig | TxMACEnable );
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bp->lock, flags);
 }
 
 #if 0
