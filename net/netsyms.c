@@ -190,11 +190,6 @@ EXPORT_SYMBOL(hippi_type_trans);
 PSCHED_EXPORTLIST;
 EXPORT_SYMBOL(pfifo_qdisc_ops);
 EXPORT_SYMBOL(bfifo_qdisc_ops);
-EXPORT_SYMBOL(register_qdisc);
-EXPORT_SYMBOL(unregister_qdisc);
-EXPORT_SYMBOL(qdisc_get_rtab);
-EXPORT_SYMBOL(qdisc_put_rtab);
-EXPORT_SYMBOL(qdisc_copy_stats);
 #ifdef CONFIG_NET_ESTIMATOR
 EXPORT_SYMBOL(qdisc_new_estimator);
 EXPORT_SYMBOL(qdisc_kill_estimator);

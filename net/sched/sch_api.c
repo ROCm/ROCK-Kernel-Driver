@@ -1255,3 +1255,9 @@ int __init pktsched_init(void)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(qdisc_copy_stats);
+EXPORT_SYMBOL(qdisc_get_rtab);
+EXPORT_SYMBOL(qdisc_put_rtab);
+EXPORT_SYMBOL(register_qdisc);
+EXPORT_SYMBOL(unregister_qdisc);
