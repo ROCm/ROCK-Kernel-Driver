@@ -51,6 +51,10 @@ CFLAGS += $(cflags-y)
 #default subarch .c files
 mcore-y  := mach-default
 
+#Voyager subarch support
+mflags-$(CONFIG_VOYAGER)	:= -Iinclude/asm-i386/mach-voyager
+mcore-$(CONFIG_VOYAGER)		:= mach-voyager
+
 #VISWS subarch support
 mflags-$(CONFIG_VISWS) := -Iinclude/asm-i386/mach-visws
 mcore-$(CONFIG_VISWS)  := mach-visws

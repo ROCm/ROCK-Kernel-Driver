@@ -39,6 +39,33 @@ source "init/Kconfig"
 menu "Processor type and features"
 
 choice
+	prompt "Subarchitecture Type"
+	default PC
+
+config PC
+	bool PC
+	help
+	  Choose this option if your computer is a standard PC or compatible.
+
+config VOYAGER
+	bool "NCR Voyager Architecture"
+	---help---
+	  Voyager is a MCA based 32 way capable SMP architecture proprietary
+	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are voyager based.
+	  
+	  *** WARNING ***
+	
+	  If you do not specifically know you have a Voyager based machine,
+	  say N here otherwise the kernel you build will not be bootable.
+
+# Visual Workstation support is utterly broken.
+# If you want to see it working mail an VW540 to hch@infradead.org 8)
+#bool 'SGI Visual Workstation support' CONFIG_VISWS
+
+endchoice
+
+
+choice
 	prompt "Processor family"
 	default M686
 
@@ -337,6 +364,7 @@ config PREEMPT
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors" if !SMP
+	depends on !VOYAGER
 	---help---
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -690,6 +718,7 @@ endmenu
 
 
 menu "Power management options (ACPI, APM)"
+	depends on !VOYAGER
 
 config PM
 	bool "Power Management support"
@@ -990,9 +1019,6 @@ endmenu
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
-# Visual Workstation support is utterly broken.
-# If you want to see it working mail an VW540 to hch@infradead.org 8)
-#bool 'SGI Visual Workstation support' CONFIG_VISWS
 config X86_VISWS_APIC
 	bool
 	depends on VISWS
@@ -1000,11 +1026,12 @@ config X86_VISWS_APIC
 
 config X86_LOCAL_APIC
 	bool
-	depends on !VISWS && SMP || VISWS
+	depends on ((!VISWS && SMP) || VISWS) && !VOYAGER
 	default y
 
 config PCI
 	bool "PCI support" if !VISWS
+	depends on !VOYAGER
 	default y if VISWS
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
@@ -1019,7 +1046,7 @@ config PCI
 
 config X86_IO_APIC
 	bool
-	depends on !VISWS && SMP
+	depends on !VISWS && SMP && !VOYAGER
 	default y
 
 choice
@@ -1063,6 +1090,7 @@ config PCI_DIRECT
 
 config SCx200
 	tristate "NatSemi SCx200 support"
+	depends on !VOYAGER
 	help
 	  This provides basic support for the National Semiconductor SCx200 
 	  processor.  Right now this is just a driver for the GPIO pins.
@@ -1076,6 +1104,7 @@ source "drivers/pci/Kconfig"
 
 config ISA
 	bool "ISA support"
+	depends on !VOYAGER
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -1101,12 +1130,16 @@ config EISA
 
 config MCA
 	bool "MCA support"
-	depends on !VISWS
+	depends on !VISWS && !VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and
 	  laptops.  It is a bus system similar to PCI or ISA. See
 	  <file:Documentation/mca.txt> (and especially the web page given
 	  there) before attempting to build an MCA bus kernel.
+
+config MCA
+	depends on VOYAGER
+	default y if VOYAGER
 
 source "drivers/mca/Kconfig"
 
@@ -1574,12 +1607,12 @@ config FRAME_POINTER
 
 config X86_EXTRA_IRQS
 	bool
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC || VOYAGER
 	default y
 
 config X86_FIND_SMP_CONFIG
 	bool
-	depends on X86_LOCAL_APIC
+	depends on X86_LOCAL_APIC || VOYAGER
 	default y
 
 config X86_MPPARSE
@@ -1597,15 +1630,16 @@ source "lib/Kconfig"
 
 config X86_SMP
 	bool
-	depends on SMP
+	depends on SMP && !VOYAGER
 	default y
 
 config X86_HT
 	bool
-	depends on SMP
+	depends on SMP && !VOYAGER
 	default y
 
 config X86_BIOS_REBOOT
 	bool
+	depends on !VOYAGER
 	default y
 
