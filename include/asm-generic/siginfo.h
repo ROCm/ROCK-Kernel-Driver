@@ -91,7 +91,7 @@ typedef struct siginfo {
 #define __SI_FAULT	(3 << 16)
 #define __SI_CHLD	(4 << 16)
 #define __SI_RT		(5 << 16)
-#define __SI_CODE(T,N)	((T) << 16 | ((N) & 0xffff))
+#define __SI_CODE(T,N)	((T) | ((N) & 0xffff))
 #else
 #define __SI_KILL	0
 #define __SI_TIMER	0
