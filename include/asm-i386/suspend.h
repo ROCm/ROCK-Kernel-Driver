@@ -15,22 +15,22 @@ arch_prepare_suspend(void)
 
 /* image of the saved processor state */
 struct saved_context {
-	u32 eax, ebx, ecx, edx;
-	u32 esp, ebp, esi, edi;
-	u16 es, fs, gs, ss;
-	u32 cr0, cr2, cr3, cr4;
+	unsigned long eax, ebx, ecx, edx;
+	unsigned long esp, ebp, esi, edi;
+  	u16 es, fs, gs, ss;
+	unsigned long cr0, cr2, cr3, cr4;
 	u16 gdt_pad;
 	u16 gdt_limit;
-	u32 gdt_base;
+	unsigned long gdt_base;
 	u16 idt_pad;
 	u16 idt_limit;
-	u32 idt_base;
+	unsigned long idt_base;
 	u16 ldt;
 	u16 tss;
-	u32 tr;
-	u32 safety;
-	u32 return_address;
-	u32 eflags;
+	unsigned long tr;
+	unsigned long safety;
+	unsigned long return_address;
+	unsigned long eflags;
 } __attribute__((packed));
 
 #define loaddebug(thread,register) \
@@ -52,11 +52,11 @@ extern unsigned long saved_edi;
 static inline void acpi_save_register_state(unsigned long return_point)
 {
 	saved_eip = return_point;
-	asm volatile ("movl %%esp,(%0)" : "=m" (saved_esp));
-	asm volatile ("movl %%ebp,(%0)" : "=m" (saved_ebp));
-	asm volatile ("movl %%ebx,(%0)" : "=m" (saved_ebx));
-	asm volatile ("movl %%edi,(%0)" : "=m" (saved_edi));
-	asm volatile ("movl %%esi,(%0)" : "=m" (saved_esi));
+	asm volatile ("movl %%esp,%0" : "=m" (saved_esp));
+	asm volatile ("movl %%ebp,%0" : "=m" (saved_ebp));
+	asm volatile ("movl %%ebx,%0" : "=m" (saved_ebx));
+	asm volatile ("movl %%edi,%0" : "=m" (saved_edi));
+	asm volatile ("movl %%esi,%0" : "=m" (saved_esi));
 }
 
 #define acpi_restore_register_state()  do {} while (0)

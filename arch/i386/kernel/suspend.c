@@ -54,10 +54,10 @@ static inline void save_processor_context (void)
 	/*
 	 * descriptor tables
 	 */
-	asm volatile ("sgdt (%0)" : "=m" (saved_context.gdt_limit));
-	asm volatile ("sidt (%0)" : "=m" (saved_context.idt_limit));
-	asm volatile ("sldt (%0)" : "=m" (saved_context.ldt));
-	asm volatile ("str (%0)"  : "=m" (saved_context.tr));
+	asm volatile ("sgdt %0" : "=m" (saved_context.gdt_limit));
+	asm volatile ("sidt %0" : "=m" (saved_context.idt_limit));
+	asm volatile ("sldt %0" : "=m" (saved_context.ldt));
+	asm volatile ("str %0"  : "=m" (saved_context.tr));
 
 	/*
 	 * save the general registers.
@@ -67,22 +67,22 @@ static inline void save_processor_context (void)
 	 * It's really not necessary, and kinda fishy (check the assembly output),
 	 * so it's avoided. 
 	 */
-	asm volatile ("movl %%esp, (%0)" : "=m" (saved_context.esp));
-	asm volatile ("movl %%eax, (%0)" : "=m" (saved_context.eax));
-	asm volatile ("movl %%ebx, (%0)" : "=m" (saved_context.ebx));
-	asm volatile ("movl %%ecx, (%0)" : "=m" (saved_context.ecx));
-	asm volatile ("movl %%edx, (%0)" : "=m" (saved_context.edx));
-	asm volatile ("movl %%ebp, (%0)" : "=m" (saved_context.ebp));
-	asm volatile ("movl %%esi, (%0)" : "=m" (saved_context.esi));
-	asm volatile ("movl %%edi, (%0)" : "=m" (saved_context.edi));
-
+	asm volatile ("movl %%esp, %0" : "=m" (saved_context.esp));
+	asm volatile ("movl %%eax, %0" : "=m" (saved_context.eax));
+	asm volatile ("movl %%ebx, %0" : "=m" (saved_context.ebx));
+	asm volatile ("movl %%ecx, %0" : "=m" (saved_context.ecx));
+	asm volatile ("movl %%edx, %0" : "=m" (saved_context.edx));
+	asm volatile ("movl %%ebp, %0" : "=m" (saved_context.ebp));
+	asm volatile ("movl %%esi, %0" : "=m" (saved_context.esi));
+	asm volatile ("movl %%edi, %0" : "=m" (saved_context.edi));
+	/* FIXME: Need to save XMM0..XMM15? */
 	/*
 	 * segment registers
 	 */
-	asm volatile ("movw %%es, %0" : "=r" (saved_context.es));
-	asm volatile ("movw %%fs, %0" : "=r" (saved_context.fs));
-	asm volatile ("movw %%gs, %0" : "=r" (saved_context.gs));
-	asm volatile ("movw %%ss, %0" : "=r" (saved_context.ss));
+	asm volatile ("movw %%es, %0" : "=m" (saved_context.es));
+	asm volatile ("movw %%fs, %0" : "=m" (saved_context.fs));
+	asm volatile ("movw %%gs, %0" : "=m" (saved_context.gs));
+	asm volatile ("movw %%ss, %0" : "=m" (saved_context.ss));
 
 	/*
 	 * control registers 
@@ -95,7 +95,7 @@ static inline void save_processor_context (void)
 	/*
 	 * eflags
 	 */
-	asm volatile ("pushfl ; popl (%0)" : "=m" (saved_context.eflags));
+	asm volatile ("pushfl ; popl %0" : "=m" (saved_context.eflags));
 }
 
 static void
@@ -125,9 +125,7 @@ static inline void restore_processor_context (void)
 	/*
 	 * first restore %ds, so we can access our data properly
 	 */
-	asm volatile (".align 4");
-	asm volatile ("movw %0, %%ds" :: "r" ((u16)__KERNEL_DS));
-
+	asm volatile ("movw %0, %%ds" :: "r" (__KERNEL_DS));
 
 	/*
 	 * control registers
@@ -136,7 +134,7 @@ static inline void restore_processor_context (void)
 	asm volatile ("movl %0, %%cr3" :: "r" (saved_context.cr3));
 	asm volatile ("movl %0, %%cr2" :: "r" (saved_context.cr2));
 	asm volatile ("movl %0, %%cr0" :: "r" (saved_context.cr0));
-	
+
 	/*
 	 * segment registers
 	 */
@@ -167,9 +165,9 @@ static inline void restore_processor_context (void)
 	 * now restore the descriptor tables to their proper values
 	 * ltr is done i fix_processor_context().
 	 */
-	asm volatile ("lgdt (%0)" :: "m" (saved_context.gdt_limit));
-	asm volatile ("lidt (%0)" :: "m" (saved_context.idt_limit));
-	asm volatile ("lldt (%0)" :: "m" (saved_context.ldt));
+	asm volatile ("lgdt %0" :: "m" (saved_context.gdt_limit));
+	asm volatile ("lidt %0" :: "m" (saved_context.idt_limit));
+	asm volatile ("lldt %0" :: "m" (saved_context.ldt));
 
 	fix_processor_context();
 
