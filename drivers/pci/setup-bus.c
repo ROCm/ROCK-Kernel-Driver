@@ -141,7 +141,7 @@ pci_setup_bridge(struct pci_bus *bus)
 	u32 l;
 
 	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
-			bus->number, bridge->dev.name));
+			bus->number, pci_name(bridge)));
 
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
 	pcibios_resource_to_bus(bridge, &region, bus->resource[0]);
