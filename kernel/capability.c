@@ -63,6 +63,7 @@ asmlinkage long sys_capget(cap_user_header_t header, cap_user_data_t dataptr)
      data.permitted = cap_t(target->cap_permitted);
      data.inheritable = cap_t(target->cap_inheritable); 
      data.effective = cap_t(target->cap_effective);
+     ret = security_ops->capget(target, &data.effective, &data.inheritable, &data.permitted);
 
 out:
      read_unlock(&tasklist_lock); 
@@ -87,9 +88,7 @@ static inline void cap_set_pg(int pgrp, kernel_cap_t *effective,
      for_each_task(target) {
              if (target->pgrp != pgrp)
                      continue;
-             target->cap_effective   = *effective;
-             target->cap_inheritable = *inheritable;
-             target->cap_permitted   = *permitted;
+	     security_ops->capset_set(target, effective, inheritable, permitted);
      }
 }
 
@@ -106,9 +105,7 @@ static inline void cap_set_all(kernel_cap_t *effective,
      for_each_task(target) {
              if (target == current || target->pid == 1)
                      continue;
-             target->cap_effective   = *effective;
-             target->cap_inheritable = *inheritable;
-             target->cap_permitted   = *permitted;
+	     security_ops->capset_set(target, effective, inheritable, permitted);
      }
 }
 
@@ -166,7 +163,9 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
 
      ret = -EPERM;
 
-     /* verify restrictions on target's new Inheritable set */
+     if (security_ops->capset_check(target, &effective, &inheritable, &permitted))
+	     goto out;
+
      if (!cap_issubset(inheritable, cap_combine(target->cap_inheritable,
                        current->cap_permitted)))
              goto out;
@@ -182,6 +181,8 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
 
      ret = 0;
 
+     /* having verified that the proposed changes are legal,
+           we now put them into effect. */
      if (pid < 0) {
              if (pid == -1)  /* all procs other than current and init */
                      cap_set_all(&effective, &inheritable, &permitted);
@@ -189,9 +190,7 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
              else            /* all procs in process group */
                      cap_set_pg(-pid, &effective, &inheritable, &permitted);
      } else {
-             target->cap_effective   = effective;
-             target->cap_inheritable = inheritable;
-             target->cap_permitted   = permitted;
+	     security_ops->capset_set(target, &effective, &inheritable, &permitted);
      }
 
 out:

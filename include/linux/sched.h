@@ -354,6 +354,8 @@ struct task_struct {
 	void *notifier_data;
 	sigset_t *notifier_mask;
 	
+	void *security;
+
 /* Thread group tracking */
    	u32 parent_exec_id;
    	u32 self_exec_id;
@@ -587,10 +589,9 @@ extern int request_irq(unsigned int,
 		       unsigned long, const char *, void *);
 extern void free_irq(unsigned int, void *);
 
-/*
- * capable() checks for a particular capability.
- * See include/linux/capability.h for defined capabilities.
- */
+/* capable prototype and code moved to security.[hc] */
+#include <linux/security.h>
+#if 0
 static inline int capable(int cap)
 {
 	if (cap_raised(current->cap_effective, cap)) {
@@ -599,6 +600,7 @@ static inline int capable(int cap)
 	}
 	return 0;
 }
+#endif	/* if 0 */
 
 /*
  * Routines for handling mm_structs

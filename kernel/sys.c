@@ -19,6 +19,7 @@
 #include <linux/tqueue.h>
 #include <linux/device.h>
 #include <linux/times.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -234,6 +235,7 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 
 	read_lock(&tasklist_lock);
 	for_each_task(p) {
+		int no_nice;
 		if (!proc_sel(p, which, who))
 			continue;
 		if (p->uid != current->euid &&
@@ -243,10 +245,17 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 		}
 		if (error == -ESRCH)
 			error = 0;
-		if (niceval < task_nice(p) && !capable(CAP_SYS_NICE))
+		if (niceval < task_nice(p) && !capable(CAP_SYS_NICE)) {
 			error = -EACCES;
-		else
-			set_user_nice(p, niceval);
+			continue;
+		}
+		no_nice = security_ops->task_setnice(p, niceval);
+		if (no_nice) {
+			error = no_nice;
+			continue;
+		}
+		set_user_nice(p, niceval);
+
 	}
 	read_unlock(&tasklist_lock);
 
@@ -416,6 +425,11 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 	int old_egid = current->egid;
 	int new_rgid = old_rgid;
 	int new_egid = old_egid;
+	int retval;
+
+	retval = security_ops->task_setgid(rgid, egid, (gid_t)-1, LSM_SETID_RE);
+	if (retval)
+		return retval;
 
 	if (rgid != (gid_t) -1) {
 		if ((old_rgid == rgid) ||
@@ -457,6 +471,11 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 asmlinkage long sys_setgid(gid_t gid)
 {
 	int old_egid = current->egid;
+	int retval;
+
+	retval = security_ops->task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_ID);
+	if (retval)
+		return retval;
 
 	if (capable(CAP_SETGID))
 	{
@@ -481,52 +500,6 @@ asmlinkage long sys_setgid(gid_t gid)
 	return 0;
 }
   
-/* 
- * cap_emulate_setxuid() fixes the effective / permitted capabilities of
- * a process after a call to setuid, setreuid, or setresuid.
- *
- *  1) When set*uiding _from_ one of {r,e,s}uid == 0 _to_ all of
- *  {r,e,s}uid != 0, the permitted and effective capabilities are
- *  cleared.
- *
- *  2) When set*uiding _from_ euid == 0 _to_ euid != 0, the effective
- *  capabilities of the process are cleared.
- *
- *  3) When set*uiding _from_ euid != 0 _to_ euid == 0, the effective
- *  capabilities are set to the permitted capabilities.
- *
- *  fsuid is handled elsewhere. fsuid == 0 and {r,e,s}uid!= 0 should 
- *  never happen.
- *
- *  -astor 
- *
- * cevans - New behaviour, Oct '99
- * A process may, via prctl(), elect to keep its capabilities when it
- * calls setuid() and switches away from uid==0. Both permitted and
- * effective sets will be retained.
- * Without this change, it was impossible for a daemon to drop only some
- * of its privilege. The call to setuid(!=0) would drop all privileges!
- * Keeping uid 0 is not an option because uid 0 owns too many vital
- * files..
- * Thanks to Olaf Kirch and Peter Benie for spotting this.
- */
-static inline void cap_emulate_setxuid(int old_ruid, int old_euid, 
-				       int old_suid)
-{
-	if ((old_ruid == 0 || old_euid == 0 || old_suid == 0) &&
-	    (current->uid != 0 && current->euid != 0 && current->suid != 0) &&
-	    !current->keep_capabilities) {
-		cap_clear(current->cap_permitted);
-		cap_clear(current->cap_effective);
-	}
-	if (old_euid == 0 && current->euid != 0) {
-		cap_clear(current->cap_effective);
-	}
-	if (old_euid != 0 && current->euid == 0) {
-		current->cap_effective = current->cap_permitted;
-	}
-}
-
 static int set_user(uid_t new_ruid, int dumpclear)
 {
 	struct user_struct *new_user, *old_user;
@@ -572,6 +545,11 @@ static int set_user(uid_t new_ruid, int dumpclear)
 asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 {
 	int old_ruid, old_euid, old_suid, new_ruid, new_euid;
+	int retval;
+
+	retval = security_ops->task_setuid(ruid, euid, (uid_t)-1, LSM_SETID_RE);
+	if (retval)
+		return retval;
 
 	new_ruid = old_ruid = current->uid;
 	new_euid = old_euid = current->euid;
@@ -608,11 +586,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 		current->suid = current->euid;
 	current->fsuid = current->euid;
 
-	if (!issecure(SECURE_NO_SETUID_FIXUP)) {
-		cap_emulate_setxuid(old_ruid, old_euid, old_suid);
-	}
-
-	return 0;
+	return security_ops->task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RE);
 }
 
 
@@ -632,6 +606,11 @@ asmlinkage long sys_setuid(uid_t uid)
 {
 	int old_euid = current->euid;
 	int old_ruid, old_suid, new_ruid, new_suid;
+	int retval;
+
+	retval = security_ops->task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_ID);
+	if (retval)
+		return retval;
 
 	old_ruid = new_ruid = current->uid;
 	old_suid = current->suid;
@@ -652,11 +631,7 @@ asmlinkage long sys_setuid(uid_t uid)
 	current->fsuid = current->euid = uid;
 	current->suid = new_suid;
 
-	if (!issecure(SECURE_NO_SETUID_FIXUP)) {
-		cap_emulate_setxuid(old_ruid, old_euid, old_suid);
-	}
-
-	return 0;
+	return security_ops->task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_ID);
 }
 
 
@@ -669,6 +644,11 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	int old_ruid = current->uid;
 	int old_euid = current->euid;
 	int old_suid = current->suid;
+	int retval;
+
+	retval = security_ops->task_setuid(ruid, euid, suid, LSM_SETID_RES);
+	if (retval)
+		return retval;
 
 	if (!capable(CAP_SETUID)) {
 		if ((ruid != (uid_t) -1) && (ruid != current->uid) &&
@@ -697,11 +677,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	if (suid != (uid_t) -1)
 		current->suid = suid;
 
-	if (!issecure(SECURE_NO_SETUID_FIXUP)) {
-		cap_emulate_setxuid(old_ruid, old_euid, old_suid);
-	}
-
-	return 0;
+	return security_ops->task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
 }
 
 asmlinkage long sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)
@@ -720,6 +696,12 @@ asmlinkage long sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)
  */
 asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 {
+	int retval;
+
+	retval = security_ops->task_setgid(rgid, egid, sgid, LSM_SETID_RES);
+	if (retval)
+		return retval;
+
 	if (!capable(CAP_SETGID)) {
 		if ((rgid != (gid_t) -1) && (rgid != current->gid) &&
 		    (rgid != current->egid) && (rgid != current->sgid))
@@ -768,6 +750,11 @@ asmlinkage long sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
 asmlinkage long sys_setfsuid(uid_t uid)
 {
 	int old_fsuid;
+	int retval;
+
+	retval = security_ops->task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
+	if (retval)
+		return retval;
 
 	old_fsuid = current->fsuid;
 	if (uid == current->uid || uid == current->euid ||
@@ -782,24 +769,9 @@ asmlinkage long sys_setfsuid(uid_t uid)
 		current->fsuid = uid;
 	}
 
-	/* We emulate fsuid by essentially doing a scaled-down version
-	 * of what we did in setresuid and friends. However, we only
-	 * operate on the fs-specific bits of the process' effective
-	 * capabilities 
-	 *
-	 * FIXME - is fsuser used for all CAP_FS_MASK capabilities?
-	 *          if not, we might be a bit too harsh here.
-	 */
-	
-	if (!issecure(SECURE_NO_SETUID_FIXUP)) {
-		if (old_fsuid == 0 && current->fsuid != 0) {
-			cap_t(current->cap_effective) &= ~CAP_FS_MASK;
-		}
-		if (old_fsuid != 0 && current->fsuid == 0) {
-			cap_t(current->cap_effective) |=
-				(cap_t(current->cap_permitted) & CAP_FS_MASK);
-		}
-	}
+	retval = security_ops->task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
+	if (retval)
+		return retval;
 
 	return old_fsuid;
 }
@@ -810,6 +782,11 @@ asmlinkage long sys_setfsuid(uid_t uid)
 asmlinkage long sys_setfsgid(gid_t gid)
 {
 	int old_fsgid;
+	int retval;
+
+	retval = security_ops->task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS);
+	if (retval)
+		return retval;
 
 	old_fsgid = current->fsgid;
 	if (gid == current->gid || gid == current->egid ||
@@ -904,6 +881,10 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	}
 
 ok_pgid:
+	err = security_ops->task_setpgid(p, pgid);
+	if (err)
+		goto out;
+
 	p->pgrp = pgid;
 	err = 0;
 out:
@@ -924,8 +905,11 @@ asmlinkage long sys_getpgid(pid_t pid)
 		p = find_task_by_pid(pid);
 
 		retval = -ESRCH;
-		if (p)
-			retval = p->pgrp;
+		if (p) {
+			retval = security_ops->task_getpgid(p);
+			if (!retval)
+				retval = p->pgrp;
+		}
 		read_unlock(&tasklist_lock);
 		return retval;
 	}
@@ -949,8 +933,11 @@ asmlinkage long sys_getsid(pid_t pid)
 		p = find_task_by_pid(pid);
 
 		retval = -ESRCH;
-		if(p)
-			retval = p->session;
+		if(p) {
+			retval = security_ops->task_getsid(p);
+			if (!retval)
+				retval = p->session;
+		}
 		read_unlock(&tasklist_lock);
 		return retval;
 	}
@@ -1008,12 +995,19 @@ asmlinkage long sys_getgroups(int gidsetsize, gid_t *grouplist)
  
 asmlinkage long sys_setgroups(int gidsetsize, gid_t *grouplist)
 {
+	gid_t groups[NGROUPS];
+	int retval;
+
 	if (!capable(CAP_SETGID))
 		return -EPERM;
 	if ((unsigned) gidsetsize > NGROUPS)
 		return -EINVAL;
-	if(copy_from_user(current->groups, grouplist, gidsetsize * sizeof(gid_t)))
+	if(copy_from_user(groups, grouplist, gidsetsize * sizeof(gid_t)))
 		return -EFAULT;
+	retval = security_ops->task_setgroups(gidsetsize, groups);
+	if (retval)
+		return retval;
+	memcpy(current->groups, groups, gidsetsize * sizeof(gid_t));
 	current->ngroups = gidsetsize;
 	return 0;
 }
@@ -1158,6 +1152,7 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit *rlim)
 asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
 {
 	struct rlimit new_rlim, *old_rlim;
+	int retval;
 
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
@@ -1172,6 +1167,11 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
 		if (new_rlim.rlim_cur > NR_OPEN || new_rlim.rlim_max > NR_OPEN)
 			return -EPERM;
 	}
+
+	retval = security_ops->task_setrlimit(resource, &new_rlim);
+	if (retval)
+		return retval;
+
 	*old_rlim = new_rlim;
 	return 0;
 }
@@ -1242,6 +1242,10 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 {
 	int error = 0;
 	int sig;
+
+	error = security_ops->task_prctl(option, arg2, arg3, arg4, arg5);
+	if (error)
+		return error;
 
 	switch (option) {
 		case PR_SET_PDEATHSIG:

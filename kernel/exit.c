@@ -14,6 +14,7 @@
 #include <linux/personality.h>
 #include <linux/tty.h>
 #include <linux/namespace.h>
+#include <linux/security.h>
 #include <linux/acct.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -61,6 +62,7 @@ static void release_task(struct task_struct * p)
 	wait_task_inactive(p);
 #endif
 	atomic_dec(&p->user->processes);
+	security_ops->task_free_security(p);
 	free_uid(p->user);
 	unhash_process(p);
 
@@ -187,10 +189,7 @@ void reparent_to_init(void)
 	/* cpus_allowed? */
 	/* rt_priority? */
 	/* signals? */
-	current->cap_effective = CAP_INIT_EFF_SET;
-	current->cap_inheritable = CAP_INIT_INH_SET;
-	current->cap_permitted = CAP_FULL_SET;
-	current->keep_capabilities = 0;
+	security_ops->task_reparent_to_init(current);
 	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
 	current->user = INIT_USER;
 
@@ -625,6 +624,10 @@ repeat:
 			if (((p->exit_signal != SIGCHLD) ^ ((options & __WCLONE) != 0))
 			    && !(options & __WALL))
 				continue;
+
+			if (security_ops->task_wait(p))
+				continue;
+
 			flag = 1;
 			switch (p->state) {
 			case TASK_STOPPED:

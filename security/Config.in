@@ -1,0 +1,7 @@
+#
+# Security configuration
+#
+mainmenu_option next_comment
+comment 'Security options'
+tristate 'Capabilities Support' CONFIG_SECURITY_CAPABILITIES
+endmenu
