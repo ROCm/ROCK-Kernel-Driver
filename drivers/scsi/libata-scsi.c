@@ -223,7 +223,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	struct ata_taskfile *tf = &qc->tf;
 	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
 
-	qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 	tf->flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	tf->hob_nsect = 0;
 	tf->hob_lbal = 0;
