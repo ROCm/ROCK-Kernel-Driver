@@ -169,7 +169,7 @@ int parport_register_driver (struct parport_driver *drv)
 
 /**
  *	parport_unregister_driver - deregister a parallel port device driver
- *	@arg: structure describing the driver that was given to
+ *	@drv: structure describing the driver that was given to
  *	      parport_register_driver()
  *
  *	This should be called by a parallel port device driver that
