@@ -37,6 +37,16 @@
 #include "cifs_unicode.h"
 #include "cifs_debug.h"
 
+#ifdef CIFS_POSIX
+static struct {
+	int index;
+	char *name;
+} protocols[] = {
+	{CIFS_PROT, "\2NT LM 0.12"}, 
+	{CIFS_PROT, "\2POSIX 2"},
+	{BAD_PROT, "\2"}
+};
+#else
 static struct {
 	int index;
 	char *name;
@@ -44,6 +54,7 @@ static struct {
 	{CIFS_PROT, "\2NT LM 0.12"}, 
 	{BAD_PROT, "\2"}
 };
+#endif
 
 
 /* Mark as invalid, all open files on tree connections since they
@@ -987,60 +998,59 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 
 int
 CIFSSMBCopy(const int xid, struct cifsTconInfo *tcon, const char * fromName, 
-              const __u16 target_tid, const char *toName, const int flags,
-              const struct nls_table *nls_codepage)
+            const __u16 target_tid, const char *toName, const int flags,
+            const struct nls_table *nls_codepage)
 {
-        int rc = 0;
-        COPY_REQ *pSMB = NULL;
-        COPY_RSP *pSMBr = NULL;
-        int bytes_returned;
-        int name_len, name_len2;
+	int rc = 0;
+	COPY_REQ *pSMB = NULL;
+	COPY_RSP *pSMBr = NULL;
+	int bytes_returned;
+	int name_len, name_len2;
 
-        cFYI(1, ("In CIFSSMBCopy"));
+	cFYI(1, ("In CIFSSMBCopy"));
 copyRetry:
-        rc = smb_init(SMB_COM_COPY, 1, tcon, (void **) &pSMB,
-                      (void **) &pSMBr);
-        if (rc)
-                return rc;
+	rc = smb_init(SMB_COM_COPY, 1, tcon, (void **) &pSMB,
+			(void **) &pSMBr);
+	if (rc)
+		return rc;
 
-        pSMB->BufferFormat = 0x04;
+	pSMB->BufferFormat = 0x04;
 	pSMB->Tid2 = target_tid;
 
 	if(flags & COPY_TREE)
 		pSMB->Flags |= COPY_TREE;
 	pSMB->Flags = cpu_to_le16(pSMB->Flags);
 
-        if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
-                name_len =
-                    cifs_strtoUCS((wchar_t *) pSMB->OldFileName, fromName, 530
-                                  /* find define for this maxpathcomponent */
-                                  , nls_codepage);
-                name_len++;     /* trailing null */
-                name_len *= 2;
-                pSMB->OldFileName[name_len] = 0x04;     /* pad */
-        /* protocol requires ASCII signature byte on Unicode string */
-                pSMB->OldFileName[name_len + 1] = 0x00;
-                name_len2 =
-                    cifs_strtoUCS((wchar_t *) & pSMB->
-                                  OldFileName[name_len + 2], toName, 530,
-                                  nls_codepage);
-                name_len2 += 1 /* trailing null */  + 1 /* Signature word */ ;
-                name_len2 *= 2; /* convert to bytes */
-        } else {                /* BB improve the check for buffer overruns BB */
-                name_len = strnlen(fromName, 530);
-                name_len++;     /* trailing null */
-                strncpy(pSMB->OldFileName, fromName, name_len);
-                name_len2 = strnlen(toName, 530);
-                name_len2++;    /* trailing null */
-                pSMB->OldFileName[name_len] = 0x04;  /* 2nd buffer format */
-                strncpy(&pSMB->OldFileName[name_len + 1], toName, name_len2);
-                name_len2++;    /* trailing null */
-                name_len2++;    /* signature byte */
-        }
+	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
+		name_len = cifs_strtoUCS((wchar_t *) pSMB->OldFileName, 
+				fromName, 
+				530 /* find define for this maxpathcomponent */,
+				nls_codepage);
+		name_len++;     /* trailing null */
+		name_len *= 2;
+		pSMB->OldFileName[name_len] = 0x04;     /* pad */
+		/* protocol requires ASCII signature byte on Unicode string */
+		pSMB->OldFileName[name_len + 1] = 0x00;
+		name_len2 = cifs_strtoUCS((wchar_t *) & pSMB->
+				OldFileName[name_len + 2], toName, 530,
+				nls_codepage);
+		name_len2 += 1 /* trailing null */  + 1 /* Signature word */ ;
+		name_len2 *= 2; /* convert to bytes */
+	} else {                /* BB improve the check for buffer overruns BB */
+		name_len = strnlen(fromName, 530);
+		name_len++;     /* trailing null */
+		strncpy(pSMB->OldFileName, fromName, name_len);
+		name_len2 = strnlen(toName, 530);
+		name_len2++;    /* trailing null */
+		pSMB->OldFileName[name_len] = 0x04;  /* 2nd buffer format */
+		strncpy(&pSMB->OldFileName[name_len + 1], toName, name_len2);
+		name_len2++;    /* trailing null */
+		name_len2++;    /* signature byte */
+	}
 
-        pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;
-        pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-        pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;
+	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 		(struct smb_hdr *) pSMBr, &bytes_returned, 0);
