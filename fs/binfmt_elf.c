@@ -39,19 +39,15 @@
 #include <asm/param.h>
 #include <asm/pgalloc.h>
 
-#define DLINFO_ITEMS 13
-
 #include <linux/elf.h>
 
 static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs);
 static int load_elf_library(struct file*);
 static unsigned long elf_map (struct file *, unsigned long, struct elf_phdr *, int, int);
 extern int dump_fpu (struct pt_regs *, elf_fpregset_t *);
-extern void dump_thread(struct pt_regs *, struct user *);
 
 #ifndef elf_addr_t
 #define elf_addr_t unsigned long
-#define elf_caddr_t char *
 #endif
 
 /*
@@ -88,9 +84,9 @@ static void set_brk(unsigned long start, unsigned long end)
 {
 	start = ELF_PAGEALIGN(start);
 	end = ELF_PAGEALIGN(end);
-	if (end <= start)
-		return;
-	do_brk(start, end - start);
+	if (end > start)
+		do_brk(start, end - start);
+	current->mm->start_brk = current->mm->brk = end;
 }
 
 
@@ -111,134 +107,149 @@ static void padzero(unsigned long elf_bss)
 	}
 }
 
-static elf_addr_t * 
-create_elf_tables(char *p, int argc, int envc,
-		  struct elfhdr * exec,
-		  unsigned long load_addr,
-		  unsigned long load_bias,
-		  unsigned long interp_load_addr, int ibcs)
+/* Let's use some macros to make this stack manipulation a litle clearer */
+#ifdef ARCH_STACK_GROWSUP
+#define STACK_ADD(sp, items) ((elf_addr_t *)(sp) + (items))
+#define STACK_ROUND(sp, items) \
+	((15 + (unsigned long) ((sp) + (items))) &~ 15UL)
+#define STACK_ALLOC(sp, len) ({ elf_addr_t old_sp = sp; sp += len; old_sp; })
+#else
+#define STACK_ADD(sp, items) ((elf_addr_t *)(sp) - (items))
+#define STACK_ROUND(sp, items) \
+	(((unsigned long) (sp - items)) &~ 15UL)
+#define STACK_ALLOC(sp, len) sp -= len
+#endif
+
+static void
+create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
+		int interp_aout, unsigned long load_addr,
+		unsigned long interp_load_addr)
 {
-	elf_caddr_t *argv;
-	elf_caddr_t *envp;
-	elf_addr_t *sp, *csp;
-	char *k_platform, *u_platform;
-	long hwcap;
-	size_t platform_len = 0;
-	size_t len;
+	unsigned long p = bprm->p;
+	int argc = bprm->argc;
+	int envc = bprm->envc;
+	elf_addr_t *argv, *envp;
+	elf_addr_t *sp, u_platform;
+	const char *k_platform = ELF_PLATFORM;
+	int items;
+	elf_addr_t elf_info[30];
+	int ei_index = 0;
 
 	/*
-	 * Get hold of platform and hardware capabilities masks for
-	 * the machine we are running on.  In some cases (Sparc), 
-	 * this info is impossible to get, in others (i386) it is
+	 * If this architecture has a platform capability string, copy it
+	 * to userspace.  In some cases (Sparc), this info is impossible
+	 * for userspace to get any other way, in others (i386) it is
 	 * merely difficult.
 	 */
 
-	hwcap = ELF_HWCAP;
-	k_platform = ELF_PLATFORM;
-
 	if (k_platform) {
-		platform_len = strlen(k_platform) + 1;
-		u_platform = p - platform_len;
-		__copy_to_user(u_platform, k_platform, platform_len);
-	} else
-		u_platform = p;
+		size_t len = strlen(k_platform) + 1;
 
 #if defined(__i386__) && defined(CONFIG_SMP)
-	/*
-	 * In some cases (e.g. Hyper-Threading), we want to avoid L1 evictions
-	 * by the processes running on the same package. One thing we can do
-	 * is to shuffle the initial stack for them.
-	 *
-	 * The conditionals here are unneeded, but kept in to make the
-	 * code behaviour the same as pre change unless we have hyperthreaded
-	 * processors. This should be cleaned up before 2.6
-	 */
+		/*
+		 * In some cases (e.g. Hyper-Threading), we want to avoid L1
+		 * evictions by the processes running on the same package. One
+		 * thing we can do is to shuffle the initial stack for them.
+		 *
+		 * The conditionals here are unneeded, but kept in to make the
+		 * code behaviour the same as pre change unless we have
+		 * hyperthreaded processors. This should be cleaned up
+		 * before 2.6
+		 */
 	 
-	if(smp_num_siblings > 1)
-		u_platform = u_platform - ((current->pid % 64) << 7);
-#endif	
-
-	/*
-	 * Force 16 byte _final_ alignment here for generality.
-	 */
-	sp = (elf_addr_t *)(~15UL & (unsigned long)(u_platform));
-	csp = sp;
-	csp -= (1+DLINFO_ITEMS)*2 + (k_platform ? 2 : 0);
-#ifdef DLINFO_ARCH_ITEMS
-	csp -= DLINFO_ARCH_ITEMS*2;
+		if (smp_num_siblings > 1)
+			STACK_ALLOC(p, ((current->pid % 64) << 7));
 #endif
-	csp -= envc+1;
-	csp -= argc+1;
-	csp -= (!ibcs ? 3 : 1);	/* argc itself */
-	if ((unsigned long)csp & 15UL)
-		sp -= ((unsigned long)csp & 15UL) / sizeof(*sp);
-
-	/*
-	 * Put the ELF interpreter info on the stack
-	 */
-#define NEW_AUX_ENT(nr, id, val) \
-	  __put_user ((id), sp+(nr*2)); \
-	  __put_user ((val), sp+(nr*2+1)); \
-
-	sp -= 2;
-	NEW_AUX_ENT(0, AT_NULL, 0);
-	if (k_platform) {
-		sp -= 2;
-		NEW_AUX_ENT(0, AT_PLATFORM, (elf_addr_t)(unsigned long) u_platform);
+		u_platform = STACK_ALLOC(p, len);
+		__copy_to_user((void *)u_platform, k_platform, len);
 	}
-	sp -= DLINFO_ITEMS*2;
-	NEW_AUX_ENT( 0, AT_HWCAP, hwcap);
-	NEW_AUX_ENT( 1, AT_PAGESZ, ELF_EXEC_PAGESIZE);
-	NEW_AUX_ENT( 2, AT_CLKTCK, CLOCKS_PER_SEC);
-	NEW_AUX_ENT( 3, AT_PHDR, load_addr + exec->e_phoff);
-	NEW_AUX_ENT( 4, AT_PHENT, sizeof (struct elf_phdr));
-	NEW_AUX_ENT( 5, AT_PHNUM, exec->e_phnum);
-	NEW_AUX_ENT( 6, AT_BASE, interp_load_addr);
-	NEW_AUX_ENT( 7, AT_FLAGS, 0);
-	NEW_AUX_ENT( 8, AT_ENTRY, load_bias + exec->e_entry);
-	NEW_AUX_ENT( 9, AT_UID, (elf_addr_t) current->uid);
-	NEW_AUX_ENT(10, AT_EUID, (elf_addr_t) current->euid);
-	NEW_AUX_ENT(11, AT_GID, (elf_addr_t) current->gid);
-	NEW_AUX_ENT(12, AT_EGID, (elf_addr_t) current->egid);
+
+	/* Create the ELF interpreter info */
+#define NEW_AUX_ENT(id, val) \
+	do { elf_info[ei_index++] = id; elf_info[ei_index++] = val; } while (0)
+
 #ifdef ARCH_DLINFO
 	/* 
-	 * ARCH_DLINFO must come last so platform specific code can enforce
-	 * special alignment requirements on the AUXV if necessary (eg. PPC).
+	 * ARCH_DLINFO must come first so PPC can do its special alignment of
+	 * AUXV.
 	 */
 	ARCH_DLINFO;
 #endif
+	NEW_AUX_ENT(AT_HWCAP, ELF_HWCAP);
+	NEW_AUX_ENT(AT_PAGESZ, ELF_EXEC_PAGESIZE);
+	NEW_AUX_ENT(AT_CLKTCK, CLOCKS_PER_SEC);
+	NEW_AUX_ENT(AT_PHDR, load_addr + exec->e_phoff);
+	NEW_AUX_ENT(AT_PHENT, sizeof (struct elf_phdr));
+	NEW_AUX_ENT(AT_PHNUM, exec->e_phnum);
+	NEW_AUX_ENT(AT_BASE, interp_load_addr);
+	NEW_AUX_ENT(AT_FLAGS, 0);
+	NEW_AUX_ENT(AT_ENTRY, exec->e_entry);
+	NEW_AUX_ENT(AT_UID, (elf_addr_t) current->uid);
+	NEW_AUX_ENT(AT_EUID, (elf_addr_t) current->euid);
+	NEW_AUX_ENT(AT_GID, (elf_addr_t) current->gid);
+	NEW_AUX_ENT(AT_EGID, (elf_addr_t) current->egid);
+	if (k_platform) {
+		NEW_AUX_ENT(AT_PLATFORM, u_platform);
+	}
+	NEW_AUX_ENT(AT_NULL, 0);
 #undef NEW_AUX_ENT
 
-	sp -= envc+1;
-	envp = (elf_caddr_t *) sp;
-	sp -= argc+1;
-	argv = (elf_caddr_t *) sp;
-	if (!ibcs) {
-		__put_user((elf_addr_t)(unsigned long) envp,--sp);
-		__put_user((elf_addr_t)(unsigned long) argv,--sp);
+	sp = STACK_ADD(p, ei_index);
+
+	items = (argc + 1) + (envc + 1);
+	if (interp_aout) {
+		items += 3; /* a.out interpreters require argv & envp too */
+	} else {
+		items += 1; /* ELF interpreters only put argc on the stack */
+	}
+	bprm->p = STACK_ROUND(sp, items);
+
+	/* Point sp at the lowest address on the stack */
+#ifdef ARCH_STACK_GROWSUP
+	sp = (elf_addr_t *)bprm->p - items - ei_index;
+	bprm->exec = (unsigned long) sp; /* XXX: PARISC HACK */
+#else
+	sp = (elf_addr_t *)bprm->p;
+#endif
+
+	/* Now, let's put argc (and argv, envp if appropriate) on the stack */
+	__put_user(argc, sp++);
+	if (interp_aout) {
+		argv = sp + 2;
+		envp = argv + argc + 1;
+		__put_user((elf_addr_t)argv, sp++);
+		__put_user((elf_addr_t)envp, sp++);
+	} else {
+		argv = sp;
+		envp = argv + argc + 1;
 	}
 
-	__put_user((elf_addr_t)argc,--sp);
-	current->mm->arg_start = (unsigned long) p;
-	while (argc-->0) {
-		__put_user((elf_caddr_t)(unsigned long)p,argv++);
-		len = strnlen_user(p, PAGE_SIZE*MAX_ARG_PAGES);
+	/* Populate argv and envp */
+	p = current->mm->arg_start;
+	while (argc-- > 0) {
+		size_t len;
+		__put_user((elf_addr_t)p, argv++);
+		len = strnlen_user((void *)p, PAGE_SIZE*MAX_ARG_PAGES);
 		if (!len || len > PAGE_SIZE*MAX_ARG_PAGES)
-			return NULL;
+			return;
 		p += len;
 	}
 	__put_user(NULL, argv);
-	current->mm->arg_end = current->mm->env_start = (unsigned long) p;
-	while (envc-->0) {
-		__put_user((elf_caddr_t)(unsigned long)p,envp++);
-		len = strnlen_user(p, PAGE_SIZE*MAX_ARG_PAGES);
+	current->mm->arg_end = current->mm->env_start = p;
+	while (envc-- > 0) {
+		size_t len;
+		__put_user((elf_addr_t)p, envp++);
+		len = strnlen_user((void *)p, PAGE_SIZE*MAX_ARG_PAGES);
 		if (!len || len > PAGE_SIZE*MAX_ARG_PAGES)
-			return NULL;
+			return;
 		p += len;
 	}
 	__put_user(NULL, envp);
-	current->mm->env_end = (unsigned long) p;
-	return sp;
+	current->mm->env_end = p;
+
+	/* Put the elf_info on the stack in the right place.  */
+	sp = (elf_addr_t *)envp + 1;
+	copy_to_user(sp, elf_info, ei_index * sizeof(elf_addr_t));
 }
 
 #ifndef elf_map
@@ -438,7 +449,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	unsigned char ibcs2_interpreter = 0;
 	unsigned long error;
 	struct elf_phdr * elf_ppnt, *elf_phdata;
-	unsigned long elf_bss, k, elf_brk;
+	unsigned long elf_bss, elf_brk;
 	int elf_exec_fileno;
 	int retval, i;
 	unsigned int size;
@@ -576,19 +587,15 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* OK, we are done with that, now set up the arg stuff,
 	   and then start this sucker up */
 
-	if (!bprm->sh_bang) {
-		char * passed_p;
+	if ((!bprm->sh_bang) && (interpreter_type == INTERPRETER_AOUT)) {
+		char *passed_p = passed_fileno;
+		sprintf(passed_fileno, "%d", elf_exec_fileno);
 
-		if (interpreter_type == INTERPRETER_AOUT) {
-		  sprintf(passed_fileno, "%d", elf_exec_fileno);
-		  passed_p = passed_fileno;
-
-		  if (elf_interpreter) {
-		    retval = copy_strings_kernel(1,&passed_p,bprm);
+		if (elf_interpreter) {
+			retval = copy_strings_kernel(1, &passed_p, bprm);
 			if (retval)
 				goto out_free_dentry; 
-		    bprm->argc++;
-		  }
+			bprm->argc++;
 		}
 	}
 
@@ -603,7 +610,10 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	current->mm->end_code = 0;
 	current->mm->mmap = NULL;
 	current->flags &= ~PF_FORKNOEXEC;
-	elf_entry = (unsigned long) elf_ex.e_entry;
+
+	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
+	   may depend on the personality.  */
+	SET_PERSONALITY(elf_ex, ibcs2_interpreter);
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
@@ -623,7 +633,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	for(i = 0, elf_ppnt = elf_phdata; i < elf_ex.e_phnum; i++, elf_ppnt++) {
 		int elf_prot = 0, elf_flags;
-		unsigned long vaddr;
+		unsigned long k, vaddr;
 
 		if (elf_ppnt->p_type != PT_LOAD)
 			continue;
@@ -656,7 +666,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		} else if (elf_ex.e_type == ET_DYN) {
 			/* Try and get dynamic programs out of the way of the default mmap
 			   base, as well as whatever program they might try to exec.  This
-		           is because the brk will follow the loader, and is not movable.  */
+			   is because the brk will follow the loader, and is not movable.  */
 			load_bias = ELF_PAGESTART(ELF_ET_DYN_BASE - vaddr);
 		}
 
@@ -681,7 +691,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 		if (k > elf_bss)
 			elf_bss = k;
-		if ((elf_ppnt->p_flags & PF_X) && end_code <  k)
+		if ((elf_ppnt->p_flags & PF_X) && end_code < k)
 			end_code = k;
 		if (end_data < k)
 			end_data = k;
@@ -690,7 +700,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			elf_brk = k;
 	}
 
-	elf_entry += load_bias;
+	elf_ex.e_entry += load_bias;
 	elf_bss += load_bias;
 	elf_brk += load_bias;
 	start_code += load_bias;
@@ -717,6 +727,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			send_sig(SIGSEGV, current, 0);
 			return 0;
 		}
+	} else {
+		elf_entry = elf_ex.e_entry;
 	}
 
 	kfree(elf_phdata);
@@ -728,18 +740,11 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	compute_creds(bprm);
 	current->flags &= ~PF_FORKNOEXEC;
-	bprm->p = (unsigned long)
-	  create_elf_tables((char *)bprm->p,
-			bprm->argc,
-			bprm->envc,
-			&elf_ex,
-			load_addr, load_bias,
-			interp_load_addr,
-			(interpreter_type == INTERPRETER_AOUT ? 0 : 1));
+	create_elf_tables(bprm, &elf_ex, (interpreter_type == INTERPRETER_AOUT),
+			load_addr, interp_load_addr);
 	/* N.B. passed_fileno might not be initialized? */
 	if (interpreter_type == INTERPRETER_AOUT)
 		current->mm->arg_start += strlen(passed_fileno) + 1;
-	current->mm->start_brk = current->mm->brk = elf_brk;
 	current->mm->end_code = end_code;
 	current->mm->start_code = start_code;
 	current->mm->start_data = start_data;
