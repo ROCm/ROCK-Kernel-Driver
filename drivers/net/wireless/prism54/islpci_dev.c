@@ -419,7 +419,7 @@ prism54_bring_down(islpci_private *priv)
 	 * currently in progress by emptying the TX and RX queues. */
 
 	/* wait until interrupts have finished executing on other CPUs */
-	prism54_synchronize_irq(priv->pdev->irq);
+	synchronize_irq(priv->pdev->irq);
 
 	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
 	reg &= ~(ISL38XX_CTRL_STAT_RESET | ISL38XX_CTRL_STAT_RAMBOOT);
