@@ -29,8 +29,6 @@
 #define LLC_GLOBAL_DEFAULT_MAX_NBR_SAPS		4
 #define LLC_GLOBAL_DEFAULT_MAX_NBR_CONNS	64
 
-extern struct llc_prim_if_block llc_ind_prim, llc_cfm_prim;
-
 /* LLC station component (SAP and connection resource manager) */
 /* Station component; one per adapter */
 struct llc_station {

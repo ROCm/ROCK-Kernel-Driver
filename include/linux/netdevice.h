@@ -162,7 +162,7 @@ struct netif_rx_stats
 	unsigned fastroute_deferred_out;
 	unsigned fastroute_latency_reduction;
 	unsigned cpu_collision;
-} __attribute__ ((__aligned__(SMP_CACHE_BYTES)));
+} ____cacheline_aligned;
 
 extern struct netif_rx_stats netdev_rx_stat[];
 
@@ -501,7 +501,7 @@ struct softnet_data
 	struct sk_buff		*completion_queue;
 
 	struct net_device	backlog_dev;	/* Sorry. 8) */
-} __attribute__((__aligned__(SMP_CACHE_BYTES)));
+} ____cacheline_aligned;
 
 
 extern struct softnet_data softnet_data[NR_CPUS];

@@ -82,7 +82,7 @@ int llc_conn_send_ev(struct sock *sk, struct llc_conn_state_ev *ev)
 	/* check if the connection was freed by the state machine by
 	 * means of llc_conn_disc */
 	if (rc == 2) {
-		printk(KERN_INFO __FUNCTION__ ": rc == 2\n");
+		printk(KERN_INFO "%s: rc == 2\n", __FUNCTION__);
 		rc = -ECONNABORTED;
 		goto out;
 	}
@@ -134,16 +134,18 @@ void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
 void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb,
 		      struct llc_conn_state_ev *ev)
 {
-	struct llc_prim_if_block *prim = &llc_ind_prim;
-	union llc_u_prim_data *prim_data = llc_ind_prim.data;
+	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sap *sap = llc->sap;
+	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
+	union llc_u_prim_data *prim_data = prim->data;
 
 	prim_data->data.sk   = sk;
 	prim_data->data.pri  = 0;
 	prim_data->data.skb  = skb;
-	prim_data->data.link = llc_sk(sk)->link;
+	prim_data->data.link = llc->link;
 	prim->data	     = prim_data;
 	prim->prim	     = LLC_DATA_PRIM;
-	prim->sap	     = llc_sk(sk)->sap;
+	prim->sap	     = sap;
 	ev->flag	     = 1;
 	/* saving prepd prim in event for future use in llc_conn_send_ev */
 	ev->ind_prim	     = prim;
