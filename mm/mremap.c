@@ -187,7 +187,14 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		 * On error, move entries back from new area to old,
 		 * which will succeed since page tables still there,
 		 * and then proceed to unmap new area instead of old.
+		 *
+		 * Subtle point from Rajesh Venkatasubramanian: before
+		 * moving file-based ptes, move new_vma before old vma
+		 * in the i_mmap or i_mmap_shared list, so when racing
+		 * against vmtruncate we cannot propagate pages to be
+		 * truncated back from new_vma into just cleaned old.
 		 */
+		vma_relink_file(vma, new_vma);
 		move_page_tables(new_vma, old_addr, new_addr, moved_len);
 		vma = new_vma;
 		old_len = new_len;

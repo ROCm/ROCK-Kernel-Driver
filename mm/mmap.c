@@ -1525,3 +1525,24 @@ struct vm_area_struct *copy_vma(struct vm_area_struct *vma,
 	}
 	return new_vma;
 }
+
+/*
+ * Position vma after prev in shared file list:
+ * for mremap move error recovery racing against vmtruncate.
+ */
+void vma_relink_file(struct vm_area_struct *vma, struct vm_area_struct *prev)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	struct address_space *mapping;
+
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_mapping;
+		if (mapping) {
+			down(&mapping->i_shared_sem);
+			spin_lock(&mm->page_table_lock);
+			list_move(&vma->shared, &prev->shared);
+			spin_unlock(&mm->page_table_lock);
+			up(&mapping->i_shared_sem);
+		}
+	}
+}
