@@ -877,7 +877,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 	/* Delete the association from the old endpoint's list of
 	 * associations.
 	 */
-	list_del(&assoc->asocs);
+	list_del_init(&assoc->asocs);
 
 	/* Decrement the backlog value for a TCP-style socket. */
 	if (sctp_style(oldsk, TCP))

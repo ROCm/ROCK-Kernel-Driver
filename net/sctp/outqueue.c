@@ -258,7 +258,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 
 	/* Throw away chunks that have been gap ACKed.  */
 	list_for_each_safe(lchunk, temp, &q->sacked) {
-		list_del(lchunk);
+		list_del_init(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
 		sctp_datamsg_fail(chunk, q->error);
@@ -267,7 +267,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 
 	/* Throw away any chunks in the retransmit queue. */
 	list_for_each_safe(lchunk, temp, &q->retransmit) {
-		list_del(lchunk);
+		list_del_init(lchunk);
 		chunk = list_entry(lchunk, struct sctp_chunk,
 				   transmitted_list);
 		sctp_datamsg_fail(chunk, q->error);
@@ -445,7 +445,7 @@ void sctp_retransmit_mark(struct sctp_outq *q,
 			/* Move the chunk to the retransmit queue. The chunks
 			 * on the retransmit queue is always kept in order.
 			 */
-			list_del(lchunk);
+			list_del_init(lchunk);
 			sctp_retransmit_insert(lchunk, q);
 		}
 	}
@@ -1007,7 +1007,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 	struct sctp_association *asoc = q->asoc;
 	struct sctp_transport *transport;
 	struct sctp_chunk *tchunk;
-	struct list_head *lchunk, *transport_list, *pos;
+	struct list_head *lchunk, *transport_list, *pos, *temp;
 	sctp_sack_variable_t *frags = sack->variable;
 	__u32 sack_ctsn, ctsn, tsn;
 	__u32 highest_tsn, highest_new_tsn;
@@ -1115,14 +1115,12 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 			  "%p is 0x%x.\n", __FUNCTION__, asoc, ctsn);
 
 	/* Throw away stuff rotting on the sack queue.  */
-	list_for_each(lchunk, &q->sacked) {
+	list_for_each_safe(lchunk, temp, &q->sacked) {
 		tchunk = list_entry(lchunk, struct sctp_chunk,
 				    transmitted_list);
 		tsn = ntohl(tchunk->subh.data_hdr->tsn);
-		if (TSN_lte(tsn, ctsn)) {
-			lchunk = lchunk->prev;
+		if (TSN_lte(tsn, ctsn))
 			sctp_chunk_free(tchunk);
-		}
 	}
 
 	/* ii) Set rwnd equal to the newly received a_rwnd minus the
