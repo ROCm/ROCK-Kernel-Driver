@@ -58,7 +58,7 @@ static void ehci_hcd_free (struct usb_hcd *hcd)
 
 /* Allocate the key transfer structures from the previously allocated pool */
 
-static void ehci_qtd_init (struct ehci_qtd *qtd, dma_addr_t dma)
+static inline void ehci_qtd_init (struct ehci_qtd *qtd, dma_addr_t dma)
 {
 	memset (qtd, 0, sizeof *qtd);
 	qtd->qtd_dma = dma;
