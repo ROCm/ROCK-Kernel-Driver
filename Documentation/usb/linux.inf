@@ -31,7 +31,7 @@ DriverVer           = 03/30/2004,0.0.0.0
 %LinuxDevice%    = RNDIS, USB\VID_0525&PID_a4a2
 
 [LinuxDevices.NT.5.1]
-%LinuxDevice%    = RNDIS.NT.5.1, USB\VID_0525&PID_a4a1
+%LinuxDevice%    = RNDIS.NT.5.1, USB\VID_0525&PID_a4a2
 
 [ControlFlags]
 ExcludeFromSelect=*
@@ -57,7 +57,7 @@ HKR, Ndi\Interfaces, LowerRange,       0, "ethernet"
 HKR, Ndi\Install,    ndis3,            0, "RNDIS_Install_98"
 HKR, Ndi\Install,    ndis4,            0, "RNDIS_Install_98"
 HKR, Ndi\Install,    ndis5,            0, "RNDIS_Install_98"
-HKR, Ndi,            DeviceId,         0, "USB\VID_0525&PID_a4a1"
+HKR, Ndi,            DeviceId,         0, "USB\VID_0525&PID_a4a2"
 
 [RNDIS_Install_98]
 CopyFiles=RNDIS_CopyFiles_98
@@ -89,7 +89,7 @@ HKR, Ndi\Interfaces, LowerRange,       0, "ethernet"
 HKR, Ndi\Install,    ndis3,            0, "RNDIS_Install_ME"
 HKR, Ndi\Install,    ndis4,            0, "RNDIS_Install_ME"
 HKR, Ndi\Install,    ndis5,            0, "RNDIS_Install_ME"
-HKR, Ndi,            DeviceId,         0, "USB\VID_0525&PID_a4a1"
+HKR, Ndi,            DeviceId,         0, "USB\VID_0525&PID_a4a2"
 
 [RNDIS_Install_ME]
 CopyFiles=RNDIS_CopyFiles_ME
