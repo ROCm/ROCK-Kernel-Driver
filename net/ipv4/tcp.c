@@ -333,7 +333,7 @@ int tcp_mem_schedule(struct sock *sk, int size, int kind)
 suppress_allocation:
 
 	if (!kind) {
-		tcp_moderate_sndbuf(sk);
+		sk_stream_moderate_sndbuf(sk);
 
 		/* Fail only if socket is _under_ its sndbuf.
 		 * In this case we cannot block, so that we have to fail.
@@ -358,14 +358,6 @@ void __tcp_mem_reclaim(struct sock *sk)
 		    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0])
 			tcp_memory_pressure = 0;
 	}
-}
-
-void tcp_rfree(struct sk_buff *skb)
-{
-	struct sock *sk = skb->sk;
-
-	atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
-	sk->sk_forward_alloc += skb->truesize;
 }
 
 /*
@@ -636,102 +628,6 @@ static void tcp_listen_stop (struct sock *sk)
 	BUG_TRAP(!sk->sk_ack_backlog);
 }
 
-/*
- *	Wait for a socket to get into the connected state
- *
- *	Note: Must be called with the socket locked.
- */
-static int wait_for_tcp_connect(struct sock *sk, int flags, long *timeo_p)
-{
-	struct tcp_opt *tp = tcp_sk(sk);
-	struct task_struct *tsk = current;
-	DEFINE_WAIT(wait);
-
-	while ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
-		if (sk->sk_err)
-			return sock_error(sk);
-		if ((1 << sk->sk_state) & ~(TCPF_SYN_SENT | TCPF_SYN_RECV))
-			return -EPIPE;
-		if (!*timeo_p)
-			return -EAGAIN;
-		if (signal_pending(tsk))
-			return sock_intr_errno(*timeo_p);
-
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
-		tp->write_pending++;
-
-		release_sock(sk);
-		*timeo_p = schedule_timeout(*timeo_p);
-		lock_sock(sk);
-
-		finish_wait(sk->sk_sleep, &wait);
-		tp->write_pending--;
-	}
-	return 0;
-}
-
-/*
- *	Wait for more memory for a socket
- */
-static int wait_for_tcp_memory(struct sock *sk, long *timeo)
-{
-	struct tcp_opt *tp = tcp_sk(sk);
-	int err = 0;
-	long vm_wait = 0;
-	long current_timeo = *timeo;
-	DEFINE_WAIT(wait);
-
-	if (sk_stream_memory_free(sk))
-		current_timeo = vm_wait = (net_random() % (HZ / 5)) + 2;
-
-	for (;;) {
-		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
-
-		if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
-			goto do_error;
-		if (!*timeo)
-			goto do_nonblock;
-		if (signal_pending(current))
-			goto do_interrupted;
-		clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-		if (sk_stream_memory_free(sk) && !vm_wait)
-			break;
-
-		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
-		tp->write_pending++;
-		release_sock(sk);
-		if (!sk_stream_memory_free(sk) || vm_wait)
-			current_timeo = schedule_timeout(current_timeo);
-		lock_sock(sk);
-		tp->write_pending--;
-
-		if (vm_wait) {
-			vm_wait -= current_timeo;
-			current_timeo = *timeo;
-			if (current_timeo != MAX_SCHEDULE_TIMEOUT &&
-			    (current_timeo -= vm_wait) < 0)
-				current_timeo = 0;
-			vm_wait = 0;
-		}
-		*timeo = current_timeo;
-	}
-out:
-	finish_wait(sk->sk_sleep, &wait);
-	return err;
-
-do_error:
-	err = -EPIPE;
-	goto out;
-do_nonblock:
-	err = -EAGAIN;
-	goto out;
-do_interrupted:
-	err = sock_intr_errno(*timeo);
-	goto out;
-}
-
 static inline void fill_page_desc(struct sk_buff *skb, int i,
 				  struct page *page, int off, int size)
 {
@@ -763,8 +659,8 @@ static inline void skb_entail(struct sock *sk, struct tcp_opt *tp,
 	TCP_SKB_CB(skb)->sacked = 0;
 	__skb_queue_tail(&sk->sk_write_queue, skb);
 	sk_charge_skb(sk, skb);
-	if (!tp->send_head)
-		tp->send_head = skb;
+	if (!sk->sk_send_head)
+		sk->sk_send_head = skb;
 	else if (tp->nonagle&TCP_NAGLE_PUSH)
 		tp->nonagle &= ~TCP_NAGLE_PUSH; 
 }
@@ -782,7 +678,7 @@ static inline void tcp_mark_urg(struct tcp_opt *tp, int flags,
 static inline void tcp_push(struct sock *sk, struct tcp_opt *tp, int flags,
 			    int mss_now, int nonagle)
 {
-	if (tp->send_head) {
+	if (sk->sk_send_head) {
 		struct sk_buff *skb = sk->sk_write_queue.prev;
 		if (!(flags & MSG_MORE) || forced_push(tp))
 			tcp_mark_push(tp, skb);
@@ -790,15 +686,6 @@ static inline void tcp_push(struct sock *sk, struct tcp_opt *tp, int flags,
 		__tcp_push_pending_frames(sk, tp, mss_now,
 					  (flags & MSG_MORE) ? TCP_NAGLE_CORK : nonagle);
 	}
-}
-
-static int tcp_error(struct sock *sk, int flags, int err)
-{
-	if (err == -EPIPE)
-		err = sock_error(sk) ? : -EPIPE;
-	if (err == -EPIPE && !(flags & MSG_NOSIGNAL))
-		send_sig(SIGPIPE, current, 0);
-	return err;
 }
 
 static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffset,
@@ -812,7 +699,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 
 	/* Wait for a connection to finish. */
 	if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
-		if ((err = wait_for_tcp_connect(sk, 0, &timeo)) != 0)
+		if ((err = sk_stream_wait_connect(sk, &timeo)) != 0)
 			goto out_err;
 
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
@@ -831,7 +718,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 		int offset = poffset % PAGE_SIZE;
 		int size = min_t(size_t, psize, PAGE_SIZE - offset);
 
-		if (!tp->send_head || (copy = mss_now - skb->len) <= 0) {
+		if (!sk->sk_send_head || (copy = mss_now - skb->len) <= 0) {
 new_segment:
 			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
@@ -879,7 +766,7 @@ new_segment:
 		if (forced_push(tp)) {
 			tcp_mark_push(tp, skb);
 			__tcp_push_pending_frames(sk, tp, mss_now, TCP_NAGLE_PUSH);
-		} else if (skb == tp->send_head)
+		} else if (skb == sk->sk_send_head)
 			tcp_push_one(sk, mss_now);
 		continue;
 
@@ -889,7 +776,7 @@ wait_for_memory:
 		if (copied)
 			tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
 
-		if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
+		if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
 			goto do_error;
 
 		mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
@@ -904,7 +791,7 @@ do_error:
 	if (copied)
 		goto out;
 out_err:
-	return tcp_error(sk, flags, err);
+	return sk_stream_error(sk, flags, err);
 }
 
 ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
@@ -965,7 +852,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	/* Wait for a connection to finish. */
 	if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
-		if ((err = wait_for_tcp_connect(sk, flags, &timeo)) != 0)
+		if ((err = sk_stream_wait_connect(sk, &timeo)) != 0)
 			goto out_err;
 
 	/* This should be in poll */
@@ -993,7 +880,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 			skb = sk->sk_write_queue.prev;
 
-			if (!tp->send_head ||
+			if (!sk->sk_send_head ||
 			    (copy = mss_now - skb->len) <= 0) {
 
 new_segment:
@@ -1122,7 +1009,7 @@ new_segment:
 			if (forced_push(tp)) {
 				tcp_mark_push(tp, skb);
 				__tcp_push_pending_frames(sk, tp, mss_now, TCP_NAGLE_PUSH);
-			} else if (skb == tp->send_head)
+			} else if (skb == sk->sk_send_head)
 				tcp_push_one(sk, mss_now);
 			continue;
 
@@ -1132,7 +1019,7 @@ wait_for_memory:
 			if (copied)
 				tcp_push(sk, tp, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
 
-			if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
+			if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
 				goto do_error;
 
 			mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
@@ -1148,17 +1035,17 @@ out:
 
 do_fault:
 	if (!skb->len) {
-		if (tp->send_head == skb)
-			tp->send_head = NULL;
+		if (sk->sk_send_head == skb)
+			sk->sk_send_head = NULL;
 		__skb_unlink(skb, skb->list);
-		tcp_free_skb(sk, skb);
+		sk_stream_free_skb(sk, skb);
 	}
 
 do_error:
 	if (copied)
 		goto out;
 out_err:
-	err = tcp_error(sk, flags, err);
+	err = sk_stream_error(sk, flags, err);
 	TCP_CHECK_TIMER(sk);
 	release_sock(sk);
 	return err;
@@ -1747,17 +1634,6 @@ void tcp_shutdown(struct sock *sk, int how)
 	}
 }
 
-
-/*
- *	Return 1 if we still have things to send in our buffers.
- */
-
-static inline int closing(struct sock *sk)
-{
-	return (1 << sk->sk_state) &
-	       (TCPF_FIN_WAIT1 | TCPF_CLOSING | TCPF_LAST_ACK);
-}
-
 static __inline__ void tcp_kill_sk_queues(struct sock *sk)
 {
 	/* First the read buffer. */
@@ -1900,22 +1776,7 @@ void tcp_close(struct sock *sk, long timeout)
 		tcp_send_fin(sk);
 	}
 
-	if (timeout) {
-		struct task_struct *tsk = current;
-		DEFINE_WAIT(wait);
-
-		do {
-			prepare_to_wait(sk->sk_sleep, &wait,
-					TASK_INTERRUPTIBLE);
-			if (!closing(sk))
-				break;
-			release_sock(sk);
-			timeout = schedule_timeout(timeout);
-			lock_sock(sk);
-		} while (!signal_pending(tsk) && timeout);
-
-		finish_wait(sk->sk_sleep, &wait);
-	}
+	sk_stream_wait_close(sk, timeout);
 
 adjudge_to_death:
 	/* It is the last release_sock in its life. It will remove backlog. */
@@ -2046,7 +1907,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_set_ca_state(tp, TCP_CA_Open);
 	tcp_clear_retrans(tp);
 	tcp_delack_init(tp);
-	tp->send_head = NULL;
+	sk->sk_send_head = NULL;
 	tp->saw_tstamp = 0;
 	tcp_sack_reset(tp);
 	__sk_dst_reset(sk);

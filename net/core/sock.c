@@ -1147,6 +1147,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	skb_queue_head_init(&sk->sk_write_queue);
 	skb_queue_head_init(&sk->sk_error_queue);
 
+	sk->sk_send_head	=	NULL;
+
 	init_timer(&sk->sk_timer);
 	
 	sk->sk_allocation	=	GFP_KERNEL;
@@ -1176,6 +1178,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_peercred.pid 	=	0;
 	sk->sk_peercred.uid	=	-1;
 	sk->sk_peercred.gid	=	-1;
+	sk->sk_write_pending	=	0;
 	sk->sk_rcvlowat		=	1;
 	sk->sk_rcvtimeo		=	MAX_SCHEDULE_TIMEOUT;
 	sk->sk_sndtimeo		=	MAX_SCHEDULE_TIMEOUT;
