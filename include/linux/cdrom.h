@@ -916,7 +916,6 @@ struct mode_page_header {
 
 /* Uniform cdrom data structures for cdrom.c */
 struct cdrom_device_info {
-	atomic_t all_use;
 	struct cdrom_device_ops  *ops;  /* link to device_ops */
 	struct cdrom_device_info *next; /* next device_info for this major */
 	struct gendisk *disk;		/* matching block layer disk */

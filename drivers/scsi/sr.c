@@ -113,6 +113,28 @@ static struct cdrom_device_ops sr_dops = {
 	.generic_packet		= sr_packet,
 };
 
+static void sr_kobject_release(struct kobject *kobj);
+
+static struct kobj_type scsi_cdrom_kobj_type = {
+	.release = sr_kobject_release,
+};
+
+/*
+ * The get and put routines for the struct scsi_cd.  Note this entity
+ * has a scsi_device pointer and owns a reference to this.
+ */
+static inline int scsi_cd_get(struct scsi_cd *cd)
+{
+	if (!kobject_get(&cd->kobj))
+		return -ENODEV;
+	return 0;
+}
+
+static inline void scsi_cd_put(struct scsi_cd *cd)
+{
+	kobject_put(&cd->kobj);
+}
+
 /*
  * This function checks to see if the media has been changed in the
  * CDROM drive.  It is possible that we have already sensed a change,
@@ -419,36 +441,20 @@ queue:
 static int sr_block_open(struct inode *inode, struct file *file)
 {
 	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
-	struct scsi_device *sdev = cd->device;
-	int retval;
-
-	retval = scsi_device_get(sdev);
-	if (retval)
-		return retval;
-	
-	retval = cdrom_open(&cd->cdi, inode, file);
-	if (retval)
-		scsi_device_put(sdev);
-
-	return retval;
-}
-
-static void sr_cleanup(struct scsi_cd *cd)
-{
-	if (!unregister_cdrom(&cd->cdi)) {
-		scsi_device_put(cd->device);
-		kfree(cd);
-	}
+	return cdrom_open(&cd->cdi, inode, file);
 }
 
 static int sr_block_release(struct inode *inode, struct file *file)
 {
-	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
 	int ret;
-
+	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
 	ret = cdrom_release(&cd->cdi, file);
-	sr_cleanup(cd);
-	return ret;
+	if(ret)
+		return ret;
+	
+	scsi_cd_put(cd);
+
+	return 0;
 }
 
 static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
@@ -490,6 +496,10 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	struct scsi_device *sdev = cd->device;
 	int retval;
 
+	retval = scsi_cd_get(cd);
+	if (retval)
+		return retval;
+	
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
@@ -508,7 +518,7 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	return 0;
 
 error_out:
-	scsi_device_put(sdev);
+	scsi_cd_put(cd);
 	return retval;	
 }
 
@@ -518,6 +528,7 @@ static void sr_release(struct cdrom_device_info *cdi)
 
 	if (cd->device->sector_size > 2048)
 		sr_set_blocklength(cd, 2048);
+
 }
 
 static int sr_probe(struct device *dev)
@@ -531,11 +542,17 @@ static int sr_probe(struct device *dev)
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
 		goto fail;
 
+	if ((error = scsi_device_get(sdev)) != 0)
+		goto fail_put_sdev;
+
 	error = -ENOMEM;
 	cd = kmalloc(sizeof(*cd), GFP_KERNEL);
 	if (!cd)
 		goto fail;
 	memset(cd, 0, sizeof(*cd));
+
+	kobject_init(&cd->kobj);
+	cd->kobj.ktype = &scsi_cdrom_kobj_type;
 
 	disk = alloc_disk(1);
 	if (!disk)
@@ -605,6 +622,8 @@ fail_put:
 	put_disk(disk);
 fail_free:
 	kfree(cd);
+fail_put_sdev:
+	scsi_device_put(sdev);
 fail:
 	return error;
 }
@@ -880,19 +899,31 @@ static int sr_packet(struct cdrom_device_info *cdi,
 	return cgc->stat;
 }
 
+static void sr_kobject_release(struct kobject *kobj)
+{
+	struct scsi_cd *cd = container_of(kobj, struct scsi_cd, kobj);
+	struct scsi_device *sdev = cd->device;
+
+	spin_lock(&sr_index_lock);
+	clear_bit(cd->disk->first_minor, sr_index_bits);
+	spin_unlock(&sr_index_lock);
+
+	unregister_cdrom(&cd->cdi);
+
+	put_disk(cd->disk);
+
+	kfree(cd);
+
+	scsi_device_put(sdev);
+}
+
 static int sr_remove(struct device *dev)
 {
 	struct scsi_cd *cd = dev_get_drvdata(dev);
 
 	del_gendisk(cd->disk);
 
-	spin_lock(&sr_index_lock);
-	clear_bit(cd->disk->first_minor, sr_index_bits);
-	spin_unlock(&sr_index_lock);
-
-	put_disk(cd->disk);
-
-	sr_cleanup(cd);
+	scsi_cd_put(cd);
 
 	return 0;
 }
