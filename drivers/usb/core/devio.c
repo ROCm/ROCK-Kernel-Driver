@@ -239,18 +239,14 @@ extern __inline__ struct async *async_getpending(struct dev_state *ps, void *use
 {
         unsigned long flags;
         struct async *as;
-        struct list_head *p;
 
         spin_lock_irqsave(&ps->lock, flags);
-        for (p = ps->async_pending.next; p != &ps->async_pending; ) {
-                as = list_entry(p, struct async, asynclist);
-                p = p->next;
-                if (as->userurb != userurb)
-                        continue;
-                list_del_init(&as->asynclist);
-                spin_unlock_irqrestore(&ps->lock, flags);
-                return as;
-        }
+	list_for_each_entry(as, &ps->async_pending, asynclist)
+		if (as->userurb == userurb) {
+			list_del_init(&as->asynclist);
+			spin_unlock_irqrestore(&ps->lock, flags);
+			return as;
+		}
         spin_unlock_irqrestore(&ps->lock, flags);
         return NULL;
 }
@@ -295,19 +291,14 @@ static void destroy_async (struct dev_state *ps, struct list_head *list)
 
 static void destroy_async_on_interface (struct dev_state *ps, unsigned int intf)
 {
-	struct async *as;
-	struct list_head *p, hitlist;
+	struct list_head *p, *q, hitlist;
 	unsigned long flags;
 
 	INIT_LIST_HEAD(&hitlist);
 	spin_lock_irqsave(&ps->lock, flags);
-	for (p = ps->async_pending.next; p != &ps->async_pending; ) {
-		as = list_entry(p, struct async, asynclist);
-		p = p->next;
-
-		if (as->intf == intf)
-			list_move_tail(&as->asynclist, &hitlist);
-	}
+	list_for_each_safe(p, q, &ps->async_pending)
+		if (intf == list_entry(p, struct async, asynclist)->intf)
+			list_move_tail(p, &hitlist);
 	spin_unlock_irqrestore(&ps->lock, flags);
 	destroy_async(ps, &hitlist);
 }
