@@ -51,13 +51,6 @@
 
 #define PREFIX			"ACPI: "
 
-asm (".weak iosapic_register_intr");
-asm (".weak iosapic_override_isa_irq");
-asm (".weak iosapic_register_platform_intr");
-asm (".weak iosapic_init");
-asm (".weak iosapic_system_init");
-asm (".weak iosapic_version");
-
 void (*pm_idle) (void);
 void (*pm_power_off) (void);
 
@@ -241,8 +234,7 @@ acpi_parse_iosapic (acpi_table_entry_header *header)
 
 	acpi_table_print_madt_entry(header);
 
-	if (iosapic_init)
-		iosapic_init(iosapic->address, iosapic->global_irq_base);
+	iosapic_init(iosapic->address, iosapic->global_irq_base);
 
 	return 0;
 }
@@ -259,11 +251,6 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
-
-	if (!iosapic_register_platform_intr) {
-		printk(KERN_WARNING PREFIX "No ACPI platform interrupt support\n");
-		return -ENODEV;
-	}
 
 	/*
 	 * Get vector assignment for this interrupt, set attributes,
@@ -292,10 +279,6 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
-
-	/* Ignore if the platform doesn't support overrides */
-	if (!iosapic_override_isa_irq)
-		return 0;
 
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
 				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
@@ -334,8 +317,7 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 #else
 	has_8259 = acpi_madt->flags.pcat_compat;
 #endif
-	if (iosapic_system_init)
-		iosapic_system_init(has_8259);
+	iosapic_system_init(has_8259);
 
 	/* Get base address of IPI Message Block */
 
@@ -549,9 +531,6 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
 
-	if (!iosapic_register_intr)
-		return 0;	/* just ignore the rest */
-
 	sci_irq = fadt->sci_int;
 
 	if (has_8259 && sci_irq < 16)
@@ -722,9 +701,6 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 
 	if (has_8259 && (gsi < 16))
 		return isa_irq_to_vector(gsi);
-
-	if (!iosapic_register_intr)
-		return 0;
 
 	/* Turn it on */
 	vector = iosapic_register_intr (gsi,
