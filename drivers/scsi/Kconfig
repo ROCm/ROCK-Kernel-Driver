@@ -465,6 +465,14 @@ config SCSI_SATA_SIS
 
 	  If unsure, say N.
 
+config SCSI_SATA_ULI
+	tristate "ULi Electronics SATA support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for ULi Electronics SATA.
+
+	  If unsure, say N.
+
 config SCSI_SATA_VIA
 	tristate "VIA SATA support"
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
