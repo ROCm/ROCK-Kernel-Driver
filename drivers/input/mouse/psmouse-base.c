@@ -40,7 +40,7 @@ MODULE_LICENSE("GPL");
 
 static int psmouse_noext;
 int psmouse_resolution;
-unsigned int psmouse_rate = 60;
+unsigned int psmouse_rate;
 int psmouse_smartscroll = PSMOUSE_LOGITECH_SMARTSCROLL;
 unsigned int psmouse_resetafter;
 
@@ -471,13 +471,16 @@ static void psmouse_initialize(struct psmouse *psmouse)
  * We set the mouse report rate.
  */
 
-	psmouse_set_rate(psmouse);
+	if (psmouse_rate)
+		psmouse_set_rate(psmouse);
 
 /*
  * We also set the resolution and scaling.
  */
 
-	psmouse_set_resolution(psmouse);
+	if (psmouse_resolution)
+		psmouse_set_resolution(psmouse);
+
 	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
 
 /*
@@ -651,10 +654,17 @@ static int __init psmouse_resetafter_setup(char *str)
 	return 1;
 }
 
+static int __init psmouse_rate_setup(char *str)
+{
+	get_option(&str, &psmouse_rate);
+	return 1;
+}
+
 __setup("psmouse_noext", psmouse_noext_setup);
 __setup("psmouse_resolution=", psmouse_resolution_setup);
 __setup("psmouse_smartscroll=", psmouse_smartscroll_setup);
 __setup("psmouse_resetafter=", psmouse_resetafter_setup);
+__setup("psmouse_rate=", psmouse_rate_setup);
 
 #endif
 
