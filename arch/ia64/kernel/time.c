@@ -115,33 +115,53 @@ do_settimeofday (struct timeval *tv)
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long seq, nsec, usec, sec, old;
+	unsigned long seq, nsec, usec, sec, old, offset;
 
 	while (1) {
 		seq = read_seqbegin(&xtime_lock);
-
-		nsec = gettimeoffset();
-
-		/*
-		 * Ensure time never goes backwards, even when ITC on different CPUs are
-		 * not perfectly synchronized.
-		 */
-		old = last_nsec_offset;
-		if (unlikely(nsec <= old))
-			/* someone else has seen a newer time-offset; use that one instead */
-			nsec = old;
-		else if (unlikely(cmpxchg(&last_nsec_offset, old, nsec) != old))
-			/* someone else beat us to updating last_nsec_offset; try again */
+		{
+			old = last_nsec_offset;
+			offset = gettimeoffset();
+			sec = xtime.tv_sec;
+			nsec = xtime.tv_nsec;
+		}
+		if (unlikely(read_seqretry(&xtime_lock, seq)))
 			continue;
-
-		sec = xtime.tv_sec;
-		nsec += xtime.tv_nsec;
-
-		if (likely(!read_seqretry(&xtime_lock, seq)))
+		/*
+		 * Ensure that for any pair of causally ordered gettimeofday() calls, time
+		 * never goes backwards (even when ITC on different CPUs are not perfectly
+		 * synchronized).  (A pair of concurrent calls to gettimeofday() is by
+		 * definition non-causal and hence it makes no sense to talk about
+		 * time-continuity for such calls.)
+		 *
+		 * Doing this in a lock-free and race-free manner is tricky.  Here is why
+		 * it works (most of the time): read_seqretry() just succeeded, which
+		 * implies we calculated a consistent (valid) value for "offset".  If the
+		 * cmpxchg() below succeeds, we further know that last_nsec_offset still
+		 * has the same value as at the beginning of the loop, so there was
+		 * presumably no timer-tick or other updates to last_nsec_offset in the
+		 * meantime.  This isn't 100% true though: there _is_ a possibility of a
+		 * timer-tick occurring right right after read_seqretry() and then getting
+		 * zero or more other readers which will set last_nsec_offset to the same
+		 * value as the one we read at the beginning of the loop.  If this
+		 * happens, we'll end up returning a slightly newer time than we ought to
+		 * (the jump forward is at most "offset" nano-seconds).  There is no
+		 * danger of causing time to go backwards, though, so we are safe in that
+		 * sense.  We could make the probability of this unlucky case occurring
+		 * arbitrarily small by encoding a version number in last_nsec_offset, but
+		 * even without versioning, the probability of this unlucky case should be
+		 * so small that we won't worry about it.
+		 */
+		if (offset <= old) {
+			offset = old;
 			break;
+		} else if (likely(cmpxchg(&last_nsec_offset, old, offset) == old))
+			break;
+
+		/* someone else beat us to updating last_nsec_offset; try again */
 	}
 
-	usec = nsec / 1000;
+	usec = (nsec + offset) / 1000;
 
 	while (unlikely(usec >= 1000000)) {
 		usec -= 1000000;
