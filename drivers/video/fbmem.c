@@ -940,51 +940,91 @@ fb_load_cursor_image(struct fb_info *info)
 int
 fb_cursor(struct fb_info *info, struct fb_cursor __user *sprite)
 {
+	struct fb_cursor cursor_user;
 	struct fb_cursor cursor;
-	int err;
+	char *data = NULL, *mask = NULL;
+	u16 *red = NULL, *green = NULL, *blue = NULL, *transp = NULL;
+	int err = -EINVAL;
 	
-	if (copy_from_user(&cursor, sprite, sizeof(struct fb_cursor)))
+	if (copy_from_user(&cursor_user, sprite, sizeof(struct fb_cursor_user)))
 		return -EFAULT;
+
+	memcpy(&cursor, &cursor_user, sizeof(cursor));
+	cursor.mask = NULL;
+	cursor.image.data = NULL;
+	cursor.image.cmap.red = NULL;
+	cursor.image.cmap.green = NULL;
+	cursor.image.cmap.blue = NULL;
+	cursor.image.cmap.transp = NULL;
 
 	if (cursor.set & FB_CUR_SETCUR)
 		info->cursor.enable = 1;
 	
 	if (cursor.set & FB_CUR_SETCMAP) {
-		err = fb_copy_cmap(&cursor.image.cmap, &sprite->image.cmap, 1);
-		if (err)
-			return err;
+		unsigned len = cursor.image.cmap.len;
+		if ((int)len <= 0)
+			goto out;
+		len *= 2;
+		err = -ENOMEM;
+		red = kmalloc(len, GFP_USER);
+		green = kmalloc(len, GFP_USER);
+		blue = kmalloc(len, GFP_USER);
+		if (!red || !green || !blue)
+			goto out;
+		if (cursor_user.image.cmap.transp) {
+			transp = kmalloc(len, GFP_USER);
+			if (!transp)
+				goto out;
+		}
+		err = -EFAULT;
+		if (copy_from_user(red, cursor_user.image.cmap.red, len))
+			goto out;
+		if (copy_from_user(green, cursor_user.image.cmap.green, len))
+			goto out;
+		if (copy_from_user(blue, cursor_user.image.cmap.blue, len))
+			goto out;
+		if (transp) {
+			if (copy_from_user(transp,
+					   cursor_user.image.cmap.transp, len))
+				goto out;
+		}
+		cursor.image.cmap.red = red;
+		cursor.image.cmap.green = green;
+		cursor.image.cmap.blue = blue;
+		cursor.image.cmap.transp = transp;
 	}
 	
 	if (cursor.set & FB_CUR_SETSHAPE) {
 		int size = ((cursor.image.width + 7) >> 3) * cursor.image.height;		
-		char *data, *mask;
 
 		if ((cursor.image.height != info->cursor.image.height) ||
 		    (cursor.image.width != info->cursor.image.width))
 			cursor.set |= FB_CUR_SETSIZE;
 		
-		data = kmalloc(size, GFP_KERNEL);
-		if (!data)
-			return -ENOMEM;
+		err = -ENOMEM;
+		data = kmalloc(size, GFP_USER);
+		mask = kmalloc(size, GFP_USER);
+		if (!mask || !data)
+			goto out;
 		
-		mask = kmalloc(size, GFP_KERNEL);
-		if (!mask) {
-			kfree(data);
-			return -ENOMEM;
-		}
+		err = -EFAULT;
+		if (copy_from_user(data, cursor_user.image.data, size) ||
+		    copy_from_user(mask, cursor_user.mask, size))
+			goto out;
 		
-		if (copy_from_user(data, cursor.image.data, size) ||
-		    copy_from_user(mask, cursor.mask, size)) {
-			kfree(data);
-			kfree(mask);
-			return -EFAULT;
-		}
 		cursor.image.data = data;
 		cursor.mask = mask;
 	}
 	info->cursor.set = cursor.set;
 	info->cursor.rop = cursor.rop;
 	err = info->fbops->fb_cursor(info, &cursor);
+out:
+	kfree(data);
+	kfree(mask);
+	kfree(red);
+	kfree(green);
+	kfree(blue);
+	kfree(transp);
 	return err;
 }
 
