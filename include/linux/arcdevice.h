@@ -305,7 +305,7 @@ struct arcnet_local {
 					void *buf, int count);
 	} hw;
 
-	void *mem_start;	/* pointer to ioremap'ed MMIO */
+	void __iomem *mem_start;	/* pointer to ioremap'ed MMIO */
 };
 
 
