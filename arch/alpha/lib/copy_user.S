@@ -30,29 +30,28 @@
 #define EXI(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda $31, $exitin-99b($31);	\
 	.previous
 
 #define EXO(x,y...)			\
 	99: x,##y;			\
 	.section __ex_table,"a";	\
-	.gprel32 99b;			\
+	.long 99b - .;			\
 	lda $31, $exitout-99b($31);	\
 	.previous
 
 	.set noat
-	.align 3
+	.align 4
 	.globl __copy_user
 	.ent __copy_user
 __copy_user:
-	ldgp $29,0($27)			# we do exceptions -- we need the gp.
-	.prologue 1
+	.prologue 0
 	and $6,7,$3
 	beq $0,$35
 	beq $3,$36
 	subq $3,8,$3
-	.align 5
+	.align 4
 $37:
 	EXI( ldq_u $1,0($7) )
 	EXO( ldq_u $2,0($6) )
@@ -73,7 +72,7 @@ $36:
 	beq $1,$43
 	beq $4,$48
 	EXI( ldq_u $3,0($7) )
-	.align 5
+	.align 4
 $50:
 	EXI( ldq_u $2,8($7) )
 	subq $4,8,$4
@@ -88,7 +87,7 @@ $50:
 	bne $4,$50
 $48:
 	beq $0,$41
-	.align 5
+	.align 4
 $57:
 	EXI( ldq_u $1,0($7) )
 	EXO( ldq_u $2,0($6) )
@@ -105,7 +104,7 @@ $57:
 	.align 4
 $43:
 	beq $4,$65
-	.align 5
+	.align 4
 $66:
 	EXI( ldq $1,0($7) )
 	subq $4,8,$4
