@@ -3280,7 +3280,7 @@ module_exit(alsa_card_cmipci_exit)
 #ifndef MODULE
 
 /* format is: snd-cmipci=enable,index,id,
-			 mpu_port,fm_port,soft_ac3,joystick */
+			 mpu_port,fm_port,soft_ac3,joystick_port */
 
 static int __init alsa_card_cmipci_setup(char *str)
 {
@@ -3297,7 +3297,7 @@ static int __init alsa_card_cmipci_setup(char *str)
 	       && get_option(&str,&soft_ac3[nr_dev]) == 2
 #endif
 #ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick[nr_dev]) == 2
+	       && get_option(&str,&joystick_port[nr_dev]) == 2
 #endif
 	       );
 	nr_dev++;
