@@ -469,8 +469,8 @@ int pnp_check_dma(struct pnp_dev * dev, int idx)
 }
 
 
-EXPORT_SYMBOL(pnp_register_dependent_resource);
-EXPORT_SYMBOL(pnp_register_independent_resource);
+EXPORT_SYMBOL(pnp_register_dependent_option);
+EXPORT_SYMBOL(pnp_register_independent_option);
 EXPORT_SYMBOL(pnp_register_irq_resource);
 EXPORT_SYMBOL(pnp_register_dma_resource);
 EXPORT_SYMBOL(pnp_register_port_resource);
