@@ -577,7 +577,6 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 
 	case 8:		/* C5M/C5N */
-		return -ENODEV; // Waiting on updated docs from VIA before this is usable
 		longhaul_version=3;
 		numscales=32;
 		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
@@ -614,14 +613,20 @@ static int __init longhaul_init (void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 
-	if ((c->x86_vendor != X86_VENDOR_CENTAUR) || (c->x86 !=6) )
+	if (c->x86_vendor != X86_VENDOR_CENTAUR || c->x86 != 6)
 		return -ENODEV;
 
 	switch (c->x86_model) {
 	case 6 ... 7:
 		return cpufreq_register_driver(&longhaul_driver);
 	case 8:
-		return -ENODEV;
+		printk (KERN_INFO PFX "Ezra-T unsupported: Waiting on updated docs "
+						"from VIA before this is usable.\n");
+		break;
+	case 9:
+		printk (KERN_INFO PFX "Nehemiah unsupported: Waiting on working silicon "
+						"from VIA before this is usable.\n");
+		break;
 	default:
 		printk (KERN_INFO PFX "Unknown VIA CPU. Contact davej@codemonkey.org.uk\n");
 	}
