@@ -426,7 +426,7 @@ do { \
 device_create_file(&client->dev, &dev_attr_in_input##offset); \
 device_create_file(&client->dev, &dev_attr_in_min##offset); \
 device_create_file(&client->dev, &dev_attr_in_max##offset); \
-} while (0);
+} while (0)
 
 #define show_fan_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
@@ -484,8 +484,10 @@ sysfs_fan_offset(3);
 sysfs_fan_min_offset(3);
 
 #define device_create_file_fan(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_fan_input##offset); \
 device_create_file(&client->dev, &dev_attr_fan_min##offset); \
+} while (0)
 
 #define show_temp_reg(reg) \
 static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
@@ -568,9 +570,11 @@ sysfs_temp_offsets(2);
 sysfs_temp_offsets(3);
 
 #define device_create_file_temp(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_temp_input##offset); \
 device_create_file(&client->dev, &dev_attr_temp_max##offset); \
-device_create_file(&client->dev, &dev_attr_temp_min##offset);
+device_create_file(&client->dev, &dev_attr_temp_min##offset); \
+} while (0)
 
 static ssize_t
 show_vid_reg(struct device *dev, char *buf)
@@ -693,8 +697,10 @@ sysfs_beep(ENABLE, enable);
 sysfs_beep(MASK, mask);
 
 #define device_create_file_beep(client) \
+do { \
 device_create_file(&client->dev, &dev_attr_beep_enable); \
-device_create_file(&client->dev, &dev_attr_beep_mask);
+device_create_file(&client->dev, &dev_attr_beep_mask); \
+} while (0)
 
 /* w83697hf only has two fans */
 static ssize_t
@@ -771,7 +777,9 @@ sysfs_fan_div(2);
 sysfs_fan_div(3);
 
 #define device_create_file_fan_div(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_fan_div##offset); \
+} while (0)
 
 /* w83697hf only has two fans */
 static ssize_t
@@ -883,10 +891,14 @@ sysfs_pwm(3);
 sysfs_pwm(4);
 
 #define device_create_file_pwm(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_pwm##offset); \
+} while (0)
 
 #define device_create_file_pwmenable(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_pwm_enable##offset); \
+} while (0)
 
 static ssize_t
 show_sensor_reg(struct device *dev, char *buf, int nr)
@@ -959,7 +971,9 @@ sysfs_sensor(2);
 sysfs_sensor(3);
 
 #define device_create_file_sensor(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_sensor##offset); \
+} while (0)
 
 #ifdef W83781D_RT
 static ssize_t
@@ -1018,7 +1032,9 @@ sysfs_rt(2);
 sysfs_rt(3);
 
 #define device_create_file_rt(client, offset) \
+do { \
 device_create_file(&client->dev, &dev_attr_rt##offset); \
+} while (0)
 
 #endif				/* ifdef W83781D_RT */
 
