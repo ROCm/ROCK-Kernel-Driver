@@ -366,8 +366,12 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 		}
 	} else {
 		dprintk("svc: calling dispatcher\n");
-		if (!versp->vs_dispatch(rqstp, statp))
+		if (!versp->vs_dispatch(rqstp, statp)) {
+			/* Release reply info */
+			if (procp->pc_release)
+				procp->pc_release(rqstp, NULL, rqstp->rq_resp);
 			goto dropit;
+		}
 	}
 
 	/* Check RPC status result */
