@@ -582,6 +582,17 @@ static int __init hugetlb_init(void)
 }
 module_init(hugetlb_init);
 
+int hugetlb_report_meminfo(char *buf)
+{
+	return sprintf(buf,
+			"HugePages_Total: %5lu\n"
+			"HugePages_Free:  %5lu\n"
+			"Hugepagesize:    %5lu kB\n",
+			htlbzone_pages,
+			htlbpagemem,
+			HPAGE_SIZE/1024);
+}
+
 static struct page * hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int unused)
 {
 	BUG();
