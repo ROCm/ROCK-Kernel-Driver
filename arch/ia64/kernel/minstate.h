@@ -1,5 +1,7 @@
 #include <linux/config.h>
 
+#include <asm/cache.h>
+
 #include "entry.h"
 
 /*
@@ -126,14 +128,6 @@
 	;;											  \
 	SAVE_IFS;										  \
 	MINSTATE_START_SAVE_MIN									  \
-	add r17=L1_CACHE_BYTES,r1			/* really: biggest cache-line size */	  \
-	;;											  \
-	st8 [r1]=rCRIPSR;	/* save cr.ipsr */						  \
-	lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES;						  \
-	add r16=16,r1;					/* initialize first base pointer */	  \
-	;;											  \
-	lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES;						  \
-	;;											  \
 	lfetch.fault.excl.nt1 [r17];								  \
 	adds r17=8,r1;					/* initialize second base pointer */	  \
 (pKern)	mov r18=r0;		/* make sure r18 isn't NaT */					  \
