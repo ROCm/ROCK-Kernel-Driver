@@ -62,11 +62,15 @@
 	- Add CONFIG_SUNDANCE_MMIO config option (jgarzik)
 	- Better rx buf size calculation (Donald Becker)
 
+	Version LK1.05 (D-Link):
+	- fix DFE-580TX packet drop issue
+	- fix reset_tx logic
+
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.04d"
-#define DRV_RELDATE	"19-Sep-2002"
+#define DRV_VERSION	"1.01+LK1.05"
+#define DRV_RELDATE	"28-Sep-2002"
 
 
 /* The user-configurable values.
