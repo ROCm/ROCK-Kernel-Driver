@@ -1939,8 +1939,8 @@ sba_init(void)
 
 #ifdef CONFIG_PCI
 	{
-		struct pci_bus *b;
-		pci_for_each_bus(b)
+		struct pci_bus *b = NULL;
+		while ((b = pci_find_next_bus(b)) != NULL)
 			sba_connect_bus(b);
 	}
 #endif
