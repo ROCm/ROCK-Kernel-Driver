@@ -16,8 +16,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include "miropcm20-rds-core.h"
 
-devfs_handle_t dfsh;
-char * text_buffer;
+static char * text_buffer;
 static int rds_users = 0;
 
 
@@ -114,26 +113,21 @@ static struct file_operations rds_f_ops = {
 
 static int __init miropcm20_rds_init(void)
 {
-	if ((dfsh = devfs_register(NULL, "v4l/rds/radiotext", 
+	if (!devfs_register(NULL, "v4l/rds/radiotext", 
 				   DEVFS_FL_DEFAULT | DEVFS_FL_AUTO_DEVNUM,
 				   0, 0, S_IRUGO | S_IFCHR, &rds_f_ops, NULL))
-	    == NULL)
-		goto devfs_register;
+		return -EINVAL;
 
 	printk("miropcm20-rds: userinterface driver loaded.\n");
 #if DEBUG
 	printk("v4l-name: %s\n", devfs_get_name(pcm20_radio.devfs_handle, 0));
 #endif
-
 	return 0;
-
- devfs_register:
-	return -EINVAL;
 }
 
 static void __exit miropcm20_rds_cleanup(void)
 {
-	devfs_unregister(dfsh);
+	devfs_remove("v4l/rds/radiotext");
 }
 
 module_init(miropcm20_rds_init);
