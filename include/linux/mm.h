@@ -421,6 +421,9 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 int zeromap_page_range(struct vm_area_struct *vma, unsigned long from,
 			unsigned long size, pgprot_t prot);
 
+extern void invalidate_mmap_range(struct address_space *mapping,
+				  loff_t const holebegin,
+				  loff_t const holelen);
 extern int vmtruncate(struct inode * inode, loff_t offset);
 extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
 extern pte_t *FASTCALL(pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
