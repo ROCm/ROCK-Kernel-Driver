@@ -1889,6 +1889,7 @@ EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
 EXPORT_SYMBOL(blk_attempt_remerge);
 EXPORT_SYMBOL(blk_max_low_pfn);
+EXPORT_SYMBOL(blk_max_pfn);
 EXPORT_SYMBOL(blk_queue_max_sectors);
 EXPORT_SYMBOL(blk_queue_max_phys_segments);
 EXPORT_SYMBOL(blk_queue_max_hw_segments);
@@ -1902,6 +1903,8 @@ EXPORT_SYMBOL(submit_bio);
 EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
+EXPORT_SYMBOL(blk_get_request);
+EXPORT_SYMBOL(blk_put_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
