@@ -514,16 +514,15 @@ static int do_sys32_msgsnd (int first, int second, int third, void *uptr)
 	if (!p)
 		return -ENOMEM;
 
+	err = -EINVAL;
 	if (second > MSGMAX || first < 0 || second < 0)
-		return -EINVAL;
+		goto out;
 
 	err = -EFAULT;
 	if (!uptr)
 		goto out;
-
-	err = get_user (p->mtype, &up->mtype);
-	err |= __copy_from_user (p->mtext, &up->mtext, second);
-	if (err)
+        if (get_user (p->mtype, &up->mtype) ||
+	    __copy_from_user (p->mtext, &up->mtext, second))
 		goto out;
 	old_fs = get_fs ();
 	set_fs (KERNEL_DS);
@@ -1953,15 +1952,17 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 			return -EINVAL;
 	}
 
-	spin_lock_irq(&current->sigmask_lock);
-	sig = dequeue_signal(&these, &info);
+	spin_lock_irq(&current->sig->siglock);
+	sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
+	if (!sig)
+		sig = dequeue_signal(&current->pending, &these, &info);
 	if (!sig) {
 		/* None ready -- temporarily unblock those we're interested
 		   in so that we'll be awakened when they arrive.  */
-		sigset_t oldblocked = current->blocked;
+		current->real_blocked = current->blocked;
 		sigandsets(&current->blocked, &current->blocked, &these);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1971,12 +1972,15 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 		current->state = TASK_INTERRUPTIBLE;
 		timeout = schedule_timeout(timeout);
 
-		spin_lock_irq(&current->sigmask_lock);
-		sig = dequeue_signal(&these, &info);
-		current->blocked = oldblocked;
+		spin_lock_irq(&current->sig->siglock);
+		sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
+		if (!sig)
+			sig = dequeue_signal(&current->pending, &these, &info);
+		current->blocked = current->real_blocked;
+		siginitset(&current->real_blocked, 0);
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (sig) {
 		ret = sig;
@@ -3988,13 +3992,13 @@ extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
 
 typedef __kernel_ssize_t32 ssize_t32;
 
-asmlinkage ssize_t32 sys32_pread(unsigned int fd, char *ubuf,
+asmlinkage ssize_t32 sys32_pread64(unsigned int fd, char *ubuf,
 				 __kernel_size_t32 count, u32 poshi, u32 poslo)
 {
 	return sys_pread64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
-asmlinkage ssize_t32 sys32_pwrite(unsigned int fd, char *ubuf,
+asmlinkage ssize_t32 sys32_pwrite64(unsigned int fd, char *ubuf,
 				  __kernel_size_t32 count, u32 poshi, u32 poslo)
 {
 	return sys_pwrite64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
@@ -4522,3 +4526,34 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 
 	return ret;
 }
+
+asmlinkage int 
+sys_futex(void *uaddr, int op, int val, struct timespec *utime);
+
+asmlinkage int
+sys32_futex(void *uaddr, int op, int val, 
+		 struct timespec32 *timeout32)
+{
+	long ret;
+	struct timespec tmp, *timeout;
+
+	ret = -ENOMEM;
+	timeout = kmalloc(sizeof(*timeout), GFP_USER);
+	if (!timeout)
+		goto out;
+
+	ret = -EINVAL;
+	if (get_user (tmp.tv_sec,  &timeout32->tv_sec)  ||
+	    get_user (tmp.tv_nsec, &timeout32->tv_nsec) ||
+	    put_user (tmp.tv_sec,  &timeout->tv_sec)    ||
+	    put_user (tmp.tv_nsec, &timeout->tv_nsec))
+		goto out_free;
+
+	ret = sys_futex(uaddr, op, val, timeout);
+
+out_free:
+	kfree(timeout);
+out:
+	return ret;
+}
+

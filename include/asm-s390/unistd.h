@@ -231,6 +231,16 @@
 #define __NR_futex		238
 #define __NR_sched_setaffinity	239
 #define __NR_sched_getaffinity	240
+#define __NR_security		241	/* syscall for security modules */
+/*
+ * Number 242 is reserved for tux
+ */
+#define __NR_io_setup		243
+#define __NR_io_destroy		244
+#define __NR_io_getevents	245
+#define __NR_io_submit		246
+#define __NR_io_cancel		247
+#define __NR_exit_group		248
 
 
 /* user-visible error numbers are in the range -1 - -122: see <asm-s390/errno.h> */

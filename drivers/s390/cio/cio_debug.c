@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio_debug.c
  *   S/390 common I/O routines -- message ids for debugging
- *   $Revision: 1.4 $
+ *   $Revision: 1.5 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -69,4 +69,4 @@ cio_debug_init (void)
 	return ret;
 }
 
-__initcall (cio_debug_init);
+arch_initcall (cio_debug_init);

@@ -327,6 +327,7 @@
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/system.h>
+#include <asm/io.h>
 #include <asm/scatterlist.h>
 
 #ifdef CONFIG_KBUILD_2_5
@@ -350,15 +351,15 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 545 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 584 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
  */
 
 /*
- * Change sbp2_max_speed on module load if you have a bad IEEE-1394 controller
- * that has trouble running 2KB packets at 400mb.
+ * Change sbp2_max_speed on module load if you have a bad IEEE-1394
+ * controller that has trouble running 2KB packets at 400mb.
  *
  * NOTE: On certain OHCI parts I have seen short packets on async transmit
  * (probably due to PCI latency/throughput issues with the part). You can
@@ -374,48 +375,54 @@ MODULE_PARM_DESC(sbp2_max_speed, "Force max speed (2 = 400mb default, 1 = 200mb,
 static int sbp2_max_speed = SPEED_400;
 
 /*
- * Set sbp2_serialize_io to 1 if you'd like only one scsi command sent down to
- * us at a time (debugging). This might be necessary for very badly behaved sbp2 devices.
+ * Set sbp2_serialize_io to 1 if you'd like only one scsi command sent
+ * down to us at a time (debugging). This might be necessary for very
+ * badly behaved sbp2 devices.
  */
 MODULE_PARM(sbp2_serialize_io,"i");
 MODULE_PARM_DESC(sbp2_serialize_io, "Serialize all I/O coming down from the scsi drivers (default = 0)");
 static int sbp2_serialize_io = 0;	/* serialize I/O - available for debugging purposes */
 
 /*
- * Bump up sbp2_max_sectors if you'd like to support very large sized transfers. Please note 
- * that some older sbp2 bridge chips are broken for transfers greater or equal to 128KB.
- * Default is a value of 255 sectors, or just under 128KB (at 512 byte sector size). I can note
- * that the Oxsemi sbp2 chipsets have no problems supporting very large transfer sizes.
+ * Bump up sbp2_max_sectors if you'd like to support very large sized
+ * transfers. Please note that some older sbp2 bridge chips are broken for
+ * transfers greater or equal to 128KB.  Default is a value of 255
+ * sectors, or just under 128KB (at 512 byte sector size). I can note that
+ * the Oxsemi sbp2 chipsets have no problems supporting very large
+ * transfer sizes.
  */
 MODULE_PARM(sbp2_max_sectors,"i");
 MODULE_PARM_DESC(sbp2_max_sectors, "Change max sectors per I/O supported (default = 255)");
 static int sbp2_max_sectors = SBP2_MAX_SECTORS;
 
 /*
- * Adjust sbp2_max_outstanding_cmds to tune performance if you have many sbp2 devices attached
- * (or if you need to do some debugging).
+ * Adjust sbp2_max_outstanding_cmds to tune performance if you have many
+ * sbp2 devices attached (or if you need to do some debugging).
  */
 MODULE_PARM(sbp2_max_outstanding_cmds,"i");
 MODULE_PARM_DESC(sbp2_max_outstanding_cmds, "Change max outstanding concurrent commands (default = 8)");
 static int sbp2_max_outstanding_cmds = SBP2SCSI_MAX_OUTSTANDING_CMDS;
 
 /*
- * Adjust sbp2_max_cmds_per_lun to tune performance. Enabling more than one concurrent/linked 
- * command per sbp2 device may allow some performance gains, but some older sbp2 devices have 
- * firmware bugs resulting in problems when linking commands... so, enable this with care. 
- * I can note that the Oxsemi OXFW911 sbp2 chipset works very well with large numbers of 
- * concurrent/linked commands.  =)
+ * Adjust sbp2_max_cmds_per_lun to tune performance. Enabling more than
+ * one concurrent/linked command per sbp2 device may allow some
+ * performance gains, but some older sbp2 devices have firmware bugs
+ * resulting in problems when linking commands... so, enable this with
+ * care.  I can note that the Oxsemi OXFW911 sbp2 chipset works very well
+ * with large numbers of concurrent/linked commands.  =)
  */
 MODULE_PARM(sbp2_max_cmds_per_lun,"i");
 MODULE_PARM_DESC(sbp2_max_cmds_per_lun, "Change max concurrent commands per sbp2 device (default = 1)");
 static int sbp2_max_cmds_per_lun = SBP2SCSI_MAX_CMDS_PER_LUN;
 
 /*
- * Exclusive login to sbp2 device? In most cases, the sbp2 driver should do an exclusive login, as it's
- * generally unsafe to have two hosts talking to a single sbp2 device at the same time (filesystem
- * coherency, etc.). If you're running an sbp2 device that supports multiple logins, and you're either
- * running read-only filesystems or some sort of special filesystem supporting multiple hosts, then
- * set sbp2_exclusive_login to zero. Note: The Oxsemi OXFW911 sbp2 chipset supports up to four
+ * Exclusive login to sbp2 device? In most cases, the sbp2 driver should
+ * do an exclusive login, as it's generally unsafe to have two hosts
+ * talking to a single sbp2 device at the same time (filesystem coherency,
+ * etc.). If you're running an sbp2 device that supports multiple logins,
+ * and you're either running read-only filesystems or some sort of special
+ * filesystem supporting multiple hosts, then set sbp2_exclusive_login to
+ * zero. Note: The Oxsemi OXFW911 sbp2 chipset supports up to four
  * concurrent logins.
  */
 MODULE_PARM(sbp2_exclusive_login,"i");
@@ -423,9 +430,14 @@ MODULE_PARM_DESC(sbp2_exclusive_login, "Exclusive login to sbp2 device (default 
 static int sbp2_exclusive_login = 1;
 
 /*
- * SCSI inquiry hack for really badly behaved sbp2 devices. Turn this on if your sbp2 device
- * is not properly handling the SCSI inquiry command. This hack makes the inquiry look more
- * like a typical MS Windows inquiry.
+ * SCSI inquiry hack for really badly behaved sbp2 devices. Turn this on
+ * if your sbp2 device is not properly handling the SCSI inquiry command.
+ * This hack makes the inquiry look more like a typical MS Windows
+ * inquiry.
+ * 
+ * If sbp2_force_inquiry_hack=1 is required for your device to work,
+ * please submit the logged sbp2_firmware_revision value of this device to
+ * the linux1394-devel mailing list.
  */
 MODULE_PARM(sbp2_force_inquiry_hack,"i");
 MODULE_PARM_DESC(sbp2_force_inquiry_hack, "Force SCSI inquiry hack (default = 0)");
@@ -550,12 +562,16 @@ static struct hpsb_protocol_driver sbp2_driver = {
 	.update = 	sbp2_update
 };
 
-/* List of device firmware's that require a forced 36 byte inquiry. Note
- * the final 0x0 needs to be there for denoting end of list.  */
+/* List of device firmware's that require a forced 36 byte inquiry.  */
 static u32 sbp2_broken_inquiry_list[] = {
 	0x00002800,	/* Stefan Richter <richtest@bauwesen.tu-cottbus.de> */
-	0x0
+			/* DViCO Momobay CX-1 */
+	0x00000200	/* Andreas Plesch <plesch@fas.harvard.edu> */
+			/* QPS Fire DVDBurner */
 };
+
+#define NUM_BROKEN_INQUIRY_DEVS \
+	(sizeof(sbp2_broken_inquiry_list)/sizeof(*sbp2_broken_inquiry_list))
 
 /**************************************
  * General utility functions
@@ -787,7 +803,7 @@ sbp2util_allocate_write_request_packet(struct sbp2scsi_host_info *hi,
 		request_packet->tq.routine = (void (*)(void*))sbp2util_free_request_packet;
 		request_packet->tq.data = request_packet;
 		request_packet->hi_context = hi;
-		queue_task(&request_packet->tq, &packet->complete_tq);
+		hpsb_add_packet_complete_task(packet, &request_packet->tq);
 
 		/*
 		 * Now, put the packet on the in-use list.
@@ -1914,7 +1930,10 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 			/* Firmware revision */
 			scsi_id->sbp2_firmware_revision
 				= CONFIG_ROM_VALUE(ud->quadlets[i]);
-			SBP2_DEBUG("sbp2_firmware_revision = %x",
+			if (sbp2_force_inquiry_hack)
+				SBP2_INFO("sbp2_firmware_revision = %x",
+				   (unsigned int) scsi_id->sbp2_firmware_revision);
+			else	SBP2_DEBUG("sbp2_firmware_revision = %x",
 				   (unsigned int) scsi_id->sbp2_firmware_revision);
 			break;
 
@@ -1948,19 +1967,14 @@ static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id)
 
 	/* Check for a blacklisted set of devices that require us to force
 	 * a 36 byte host inquiry. This can be overriden as a module param
-	 * (to force all hosts).
-	 *
-	 * XXX If this does not detect your firmware as being defective,
-	 * but using the sbp2_force_inquiry_hack allows your device to
-	 * work, please submit the value of your firmware revision to the
-	 * linux1394-devel mailing list.  */
-	for (i = 0; sbp2_broken_inquiry_list[i]; i++) {
+	 * (to force all hosts).  */
+	for (i = 0; i < NUM_BROKEN_INQUIRY_DEVS; i++) {
 		if ((scsi_id->sbp2_firmware_revision & 0xffff00) ==
 				sbp2_broken_inquiry_list[i]) {
 			SBP2_WARN("Node " NODE_BUS_FMT ": Using 36byte inquiry workaround",
 					NODE_BUS_ARGS(scsi_id->ne->nodeid));
 			scsi_id->workarounds |= SBP2_BREAKAGE_INQUIRY_HACK;
-			break; // No need to continue.
+			break; /* No need to continue. */
 		}
 	}
 }

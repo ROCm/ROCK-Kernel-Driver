@@ -17,7 +17,7 @@ static u8 piix_proc;
 
 static int piix_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t piix_procs[] __initdata = {
+static ide_pci_host_proc_t piix_procs[] __devinitdata = {
 	{
 		name:		"piix",
 		set:		1,
@@ -28,7 +28,7 @@ static ide_pci_host_proc_t piix_procs[] __initdata = {
 #endif  /* defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 static void init_setup_piix(struct pci_dev *, ide_pci_device_t *);
-static unsigned int __init init_chipset_piix(struct pci_dev *, const char *);
+static unsigned int __devinit init_chipset_piix(struct pci_dev *, const char *);
 static void init_hwif_piix(ide_hwif_t *);
 static void init_dma_piix(ide_hwif_t *, unsigned long);
 
@@ -38,7 +38,7 @@ static void init_dma_piix(ide_hwif_t *, unsigned long);
  *
  */
  
-static ide_pci_device_t piix_pci_info[] __initdata = {
+static ide_pci_device_t piix_pci_info[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_INTEL,
 		device:		PCI_DEVICE_ID_INTEL_82371FB_0,

@@ -858,6 +858,7 @@ static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_dev
 	d->init_hwif = init_hwif_common_ali15x3;
 #endif /* CONFIG_SPARC64 */
 	ide_setup_pci_device(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

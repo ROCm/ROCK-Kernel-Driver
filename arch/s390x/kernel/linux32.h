@@ -8,8 +8,6 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/export.h>
 
-#ifdef CONFIG_S390_SUPPORT
-
 /* Macro that masks the high order bit of an 32 bit pointer and converts it*/
 /*       to a 64 bit pointer */
 #define A(__x) ((unsigned long)((__x) & 0x7FFFFFFFUL))
@@ -194,6 +192,32 @@ typedef struct
         __u32	addr;
 } _psw_t32 __attribute__ ((aligned(8)));
 
+#define PSW32_MASK_PER		0x40000000UL
+#define PSW32_MASK_DAT		0x04000000UL
+#define PSW32_MASK_IO		0x02000000UL
+#define PSW32_MASK_EXT		0x01000000UL
+#define PSW32_MASK_KEY		0x00F00000UL
+#define PSW32_MASK_MCHECK	0x00040000UL
+#define PSW32_MASK_WAIT		0x00020000UL
+#define PSW32_MASK_PSTATE	0x00010000UL
+#define PSW32_MASK_ASC		0x0000C000UL
+#define PSW32_MASK_CC		0x00003000UL
+#define PSW32_MASK_PM		0x00000f00UL
+
+#define PSW32_ADDR_AMODE31	0x80000000UL
+#define PSW32_ADDR_INSN		0x7FFFFFFFUL
+
+#define PSW32_BASE_BITS		0x00080000UL
+
+#define PSW32_ASC_PRIMARY	0x00000000UL
+#define PSW32_ASC_ACCREG	0x00004000UL
+#define PSW32_ASC_SECONDARY	0x00008000UL
+#define PSW32_ASC_HOME		0x0000C000UL
+
+#define PSW32_USER_BITS	(PSW32_BASE_BITS | PSW32_MASK_DAT | PSW32_ASC_HOME | \
+			 PSW32_MASK_IO | PSW32_MASK_EXT | PSW32_MASK_MCHECK | \
+			 PSW32_MASK_PSTATE)
+
 typedef struct
 {
 	_psw_t32	psw;
@@ -241,6 +265,4 @@ struct ucontext32 {
 	sigset_t32		uc_sigmask;	/* mask last for extensibility */
 };
 
-#endif /* !CONFIG_S390_SUPPORT */
- 
 #endif /* _ASM_S390X_S390_H */

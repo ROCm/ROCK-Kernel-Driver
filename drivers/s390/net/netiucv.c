@@ -88,7 +88,7 @@ typedef struct connection_profile_t {
 	unsigned long doios_multi;
 	unsigned long txlen;
 	unsigned long tx_time;
-	struct timeval send_stamp;
+	struct timespec send_stamp;
 } connection_profile;
 
 /**

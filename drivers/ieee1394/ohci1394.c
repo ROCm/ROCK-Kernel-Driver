@@ -154,7 +154,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 555 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 578 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(attempt_root,"i");
@@ -595,7 +595,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	      ((((buf) >> 16) & 0xf) + (((buf) >> 20) & 0xf) * 10),
 	      ((((buf) >> 4) & 0xf) + ((buf) & 0xf) * 10), ohci->dev->irq,
 	      pci_resource_start(ohci->dev, 0),
-	      pci_resource_start(ohci->dev, 0) + OHCI1394_REGISTER_SIZE,
+	      pci_resource_start(ohci->dev, 0) + OHCI1394_REGISTER_SIZE - 1,
 	      ohci->max_packet_size);
 }
 
@@ -810,7 +810,6 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 {
 	struct ti_ohci *ohci = host->hostdata;
 	struct dma_trm_ctx *d;
-	unsigned char tcode;
 	unsigned long flags;
 
 	if (packet->data_size > ohci->max_packet_size) {
@@ -821,10 +820,14 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 	}
 
 	/* Decide wether we have an iso, a request, or a response packet */
-	tcode = (packet->header[0]>>4)&0xf;
-	if (tcode == TCODE_ISO_DATA) d = &ohci->it_context;
-	else if (tcode & 0x02) d = &ohci->at_resp_context;
-	else d = &ohci->at_req_context;
+	if (packet->type == hpsb_raw)
+		d = &ohci->at_req_context;
+	else if (packet->tcode == TCODE_ISO_DATA)
+		d = &ohci->it_context;
+	else if (packet->tcode & 0x02)
+		d = &ohci->at_resp_context;
+	else 
+		d = &ohci->at_req_context;
 
 	spin_lock_irqsave(&d->lock,flags);
 

@@ -48,9 +48,11 @@
 
 struct rwsem_waiter;
 
-extern struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem);
-extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem);
+extern struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *);
+extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *);
 extern struct rw_semaphore *rwsem_wake(struct rw_semaphore *);
+extern struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *);
+extern struct rw_semaphore *rwsem_downgrade_write(struct rw_semaphore *);
 
 /*
  * the semaphore definition
@@ -105,6 +107,27 @@ static inline void __down_read(struct rw_semaphore *sem)
 }
 
 /*
+ * trylock for reading -- returns 1 if successful, 0 if contention
+ */
+static inline int __down_read_trylock(struct rw_semaphore *sem)
+{
+	signed long old, new;
+
+	__asm__ __volatile__(
+		"   l    %0,0(%2)\n"
+		"0: ltr  %1,%0\n"
+		"   jm   1f\n"
+		"   ahi  %1,%3\n"
+		"   cs   %0,%1,0(%2)\n"
+		"   jl   0b\n"
+		"1:"
+                : "=&d" (old), "=&d" (new)
+		: "a" (&sem->count), "i" (RWSEM_ACTIVE_READ_BIAS)
+		: "cc", "memory" );
+	return old >= 0 ? 1 : 0;
+}
+
+/*
  * lock for writing
  */
 static inline void __down_write(struct rw_semaphore *sem)
@@ -123,6 +146,26 @@ static inline void __down_write(struct rw_semaphore *sem)
 		: "cc", "memory" );
 	if (old != 0)
 		rwsem_down_write_failed(sem);
+}
+
+/*
+ * trylock for writing -- returns 1 if successful, 0 if contention
+ */
+static inline int __down_write_trylock(struct rw_semaphore *sem)
+{
+	signed long old;
+
+	__asm__ __volatile__(
+		"   l    %0,0(%1)\n"
+		"0: ltr  %0,%0\n"
+		"   jnz  1f\n"
+		"   cs   %0,%2,0(%1)\n"
+		"   jl   0b\n"
+		"1:"
+                : "=&d" (old)
+		: "a" (&sem->count), "d" (RWSEM_ACTIVE_WRITE_BIAS)
+		: "cc", "memory" );
+	return (old == RWSEM_UNLOCKED_VALUE) ? 1 : 0;
 }
 
 /*
@@ -166,6 +209,27 @@ static inline void __up_write(struct rw_semaphore *sem)
 	if (new < 0)
 		if ((new & RWSEM_ACTIVE_MASK) == 0)
 			rwsem_wake(sem);
+}
+
+/*
+ * downgrade write lock to read lock
+ */
+static inline void __downgrade_write(struct rw_semaphore *sem)
+{
+	signed long old, new, tmp;
+
+	tmp = -RWSEM_WAITING_BIAS;
+	__asm__ __volatile__(
+		"   l    %0,0(%2)\n"
+		"0: lr   %1,%0\n"
+		"   a    %1,%3\n"
+		"   cs   %0,%1,0(%2)\n"
+		"   jl   0b"
+                : "=&d" (old), "=&d" (new)
+		: "a" (&sem->count), "m" (tmp)
+		: "cc", "memory" );
+	if (new > 1) // FIXME: is this correct ?!?
+		rwsem_downgrade_wake(sem);
 }
 
 /*

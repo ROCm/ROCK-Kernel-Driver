@@ -1045,8 +1045,8 @@ int lmc_probe (struct net_device *dev) /*fold00*/
     unsigned int pci_irq_line;
     u16 vendor, subvendor, device, subdevice;
     u32 foundaddr = 0;
-    unsigned char pci_bus, pci_device_fn;
     u8 intcf = 0;
+    struct pci_dev *pdev = NULL;
 
     /* The card is only available on PCI, so if we don't have a
      * PCI bus, we are in trouble.
@@ -1057,21 +1057,7 @@ int lmc_probe (struct net_device *dev) /*fold00*/
         return -1;
     }
     /* Loop basically until we don't find anymore. */
-    while (pci_index < 0xff){
-    	struct pci_dev *pdev;
-        /* The tulip is considered an ethernet class of card... */
-        if (pcibios_find_class (PCI_CLASS_NETWORK_ETHERNET << 8,
-                                pci_index, &pci_bus,
-                                &pci_device_fn) != PCIBIOS_SUCCESSFUL) {
-            /* No card found on this pass */
-            break;
-        }
-        /* Read the info we need to determine if this is
-         * our card or not
-         */
-	pdev = pci_find_slot (pci_bus, pci_device_fn);
-	if (!pdev) break;
-
+    while ((pdev = pci_find_class (PCI_CLASS_NETWORK_ETHERNET << 8, pdev))) {
 	if (pci_enable_device(pdev))
 		break;
 

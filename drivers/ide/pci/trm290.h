@@ -7,7 +7,7 @@
 
 extern void init_hwif_trm290(ide_hwif_t *);
 
-static ide_pci_device_t trm290_chipsets[] __initdata = {
+static ide_pci_device_t trm290_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_TEKRAM,
 		device:		PCI_DEVICE_ID_TEKRAM_DC290,

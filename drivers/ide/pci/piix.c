@@ -529,7 +529,7 @@ no_dma_set:
  *	out to be nice and simple
  */
  
-static unsigned int __init init_chipset_piix (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_piix (struct pci_dev *dev, const char *name)
 {
         switch(dev->device) {
 		case PCI_DEVICE_ID_INTEL_82801AA_1:
@@ -680,6 +680,7 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

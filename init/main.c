@@ -494,13 +494,6 @@ static void __init do_basic_setup(void)
 	sysctl_init();
 #endif
 
-	/*
-	 * Ok, at this point all CPU's should be initialized, so
-	 * we can start looking into devices..
-	 */
-#if defined(CONFIG_ARCH_S390)
-	s390_init_machine_check();
-#endif
 	/* Networking initialization needs a process context */ 
 	sock_init();
 

@@ -12,23 +12,16 @@
  */
 
 #include <linux/config.h>
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
-#include <linux/slab.h>
+#include <linux/buffer_head.h>
 #include <linux/hdreg.h>
-#include <linux/ioctl.h>
-#include <linux/version.h>
+#include <linux/slab.h>
+#include <asm/dasd.h>
 #include <asm/ebcdic.h>
 #include <asm/uaccess.h>
-#include <asm/dasd.h>
-
-#include "ibm.h"
-#include "check.h"
 #include <asm/vtoc.h>
+
+#include "check.h"
+#include "ibm.h"
 
 /*
  * compute the block number from a 

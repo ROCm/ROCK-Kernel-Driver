@@ -31,19 +31,26 @@ CONFIG_MODULES=y
 CONFIG_KMOD=y
 
 #
+# Base setup
+#
+
+#
 # Processor type and features
 #
 CONFIG_SMP=y
 CONFIG_MATHEMU=y
 
 #
-# Base setup
+# I/O subsystem configuration
 #
-CONFIG_FAST_IRQ=y
 CONFIG_MACHCHK_WARNING=y
-CONFIG_CHSC=y
 CONFIG_QDIO=m
 # CONFIG_QDIO_PERF_STATS is not set
+
+#
+# Misc
+#
+# CONFIG_PREEMPT is not set
 CONFIG_IPL=y
 # CONFIG_IPL_TAPE is not set
 CONFIG_IPL_VM=y
@@ -84,9 +91,6 @@ CONFIG_SCSI_LOGGING=y
 #
 # CONFIG_SCSI_7000FASST is not set
 # CONFIG_SCSI_ACARD is not set
-# CONFIG_SCSI_AHA152X is not set
-# CONFIG_SCSI_AHA1542 is not set
-# CONFIG_SCSI_AHA1740 is not set
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_DPT_I2O is not set
@@ -114,7 +118,6 @@ CONFIG_SCSI_LOGGING=y
 # CONFIG_SCSI_PCI2220I is not set
 # CONFIG_SCSI_PSI240I is not set
 # CONFIG_SCSI_QLOGIC_FAS is not set
-# CONFIG_SCSI_SIM710 is not set
 # CONFIG_SCSI_SYM53C416 is not set
 # CONFIG_SCSI_T128 is not set
 # CONFIG_SCSI_U14_34F is not set
@@ -153,7 +156,7 @@ CONFIG_MD_RAID0=m
 CONFIG_MD_RAID1=m
 CONFIG_MD_RAID5=m
 # CONFIG_MD_MULTIPATH is not set
-CONFIG_BLK_DEV_LVM=m
+# CONFIG_BLK_DEV_LVM is not set
 
 #
 # Character device drivers
@@ -226,25 +229,22 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_INET_ECN is not set
 # CONFIG_SYN_COOKIES is not set
 CONFIG_IPV6=m
-# CONFIG_KHTTPD is not set
+
+#
+#    SCTP Configuration (EXPERIMENTAL)
+#
+CONFIG_IPV6_SCTP__=m
+# CONFIG_IP_SCTP is not set
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
-
-#
-#  
-#
+# CONFIG_LLC is not set
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
-
-#
-# Appletalk devices
-#
 # CONFIG_DEV_APPLETALK is not set
 # CONFIG_DECNET is not set
 # CONFIG_BRIDGE is not set
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
-# CONFIG_LLC is not set
 # CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
@@ -299,7 +299,7 @@ CONFIG_RAMFS=y
 # CONFIG_HPFS_FS is not set
 CONFIG_PROC_FS=y
 CONFIG_DEVFS_FS=y
-CONFIG_DEVFS_MOUNT=y
+# CONFIG_DEVFS_MOUNT is not set
 # CONFIG_DEVFS_DEBUG is not set
 # CONFIG_DEVPTS_FS is not set
 # CONFIG_QNX4FS_FS is not set
@@ -311,6 +311,9 @@ CONFIG_EXT2_FS=y
 # CONFIG_UDF_RW is not set
 # CONFIG_UFS_FS is not set
 # CONFIG_UFS_FS_WRITE is not set
+# CONFIG_XFS_FS is not set
+# CONFIG_XFS_RT is not set
+# CONFIG_XFS_QUOTA is not set
 
 #
 # Network File Systems
@@ -361,6 +364,11 @@ CONFIG_IBM_PARTITION=y
 # Kernel hacking
 #
 CONFIG_MAGIC_SYSRQ=y
+
+#
+# Security options
+#
+CONFIG_SECURITY_CAPABILITIES=y
 
 #
 # Library routines

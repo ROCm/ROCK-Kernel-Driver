@@ -611,11 +611,17 @@ struct scsi_device {
 				 * this device */
 	unsigned expecting_cc_ua:1;	/* Expecting a CHECK_CONDITION/UNIT_ATTN
 					 * because we did a bus reset. */
-	unsigned device_blocked:1;	/* Device returned QUEUE_FULL. */
 	unsigned ten:1;		/* support ten byte read / write */
 	unsigned remap:1;	/* support remapping  */
 	unsigned starved:1;	/* unable to process commands because
 				   host busy */
+
+	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
+
+	unsigned int max_device_blocked; /* what device_blocked counts down from  */
+  	/* default value if the device doesn't override */
+	#define SCSI_DEFAULT_DEVICE_BLOCKED	3
+
 
 	// Flag to allow revalidate to succeed in sd_open
 	int allow_revalidate;

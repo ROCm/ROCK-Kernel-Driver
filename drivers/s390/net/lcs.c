@@ -126,6 +126,7 @@ whether it is should wake up a process currently issuing lan commands.
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/tqueue.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>

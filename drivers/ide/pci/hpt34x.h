@@ -35,7 +35,7 @@ static unsigned int init_chipset_hpt34x(struct pci_dev *, const char *);
 static void init_hwif_hpt34x(ide_hwif_t *);
 static void init_dma_hpt34x(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t hpt34x_chipsets[] __initdata = {
+static ide_pci_device_t hpt34x_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_TTI,
 		device:		PCI_DEVICE_ID_TTI_HPT343,

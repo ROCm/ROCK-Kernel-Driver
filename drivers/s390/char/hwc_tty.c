@@ -188,15 +188,19 @@ hwc_tty_input (unsigned char *buf, unsigned int count)
 	struct tty_struct *tty = hwc_tty_data.tty;
 
 	if (tty != NULL) {
-		char *cchar;
-		if ((cchar = ctrlchar_handle (buf, count, tty))) {
-			if (cchar == (char *) -1)
-				return;
+		unsigned int cchar = ctrlchar_handle(buf, count, tty);
+
+		switch (cchar & CTRLCHAR_MASK) {
+		case CTRLCHAR_SYSRQ:
+			return;
+
+		case CTRLCHAR_CTRL:
 			tty->flip.count++;
 			*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-			*tty->flip.char_buf_ptr++ = *cchar;
-		} else {
+			*tty->flip.char_buf_ptr++ = cchar;
+			break;
 
+		case CTRLCHAR_NONE:
 			memcpy (tty->flip.char_buf_ptr, buf, count);
 			if (count < 2 || (
 					 strncmp (buf + count - 2, "^n", 2) ||
@@ -209,6 +213,7 @@ hwc_tty_input (unsigned char *buf, unsigned int count)
 			tty->flip.char_buf_ptr += count;
 			tty->flip.flag_buf_ptr += count;
 			tty->flip.count += count;
+			break;
 		}
 		tty_flip_buffer_push (tty);
 		hwc_tty_wake_up ();
@@ -220,8 +225,6 @@ hwc_tty_init (void)
 {
 	if (!CONSOLE_IS_HWC)
 		return;
-
-	ctrlchar_init ();
 
 	memset (&hwc_tty_driver, 0, sizeof (struct tty_driver));
 	memset (&hwc_tty_data, 0, sizeof (hwc_tty_data_struct));
