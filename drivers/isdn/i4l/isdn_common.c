@@ -1072,7 +1072,7 @@ isdn_write(struct file *file, const char *buf, size_t count, loff_t * off)
 			goto out;
 		}
 		chidx = isdn_minor2chan(minor);
-		while (isdn_writebuf_stub(drvidx, chidx, buf, count, 1) != count)
+		while (isdn_writebuf_stub(drvidx, chidx, buf, count) != count)
 			interruptible_sleep_on(&dev->drv[drvidx]->snd_waitq[chidx]);
 		retval = count;
 		goto out;
@@ -1838,8 +1838,7 @@ isdn_unexclusive_channel(int di, int ch)
  *  writebuf replacement for SKB_ABLE drivers
  */
 static int
-isdn_writebuf_stub(int drvidx, int chan, const u_char * buf, int len,
-		   int user)
+isdn_writebuf_stub(int drvidx, int chan, const u_char __user * buf, int len)
 {
 	int ret;
 	int hl = dev->drv[drvidx]->interface->hl_hdrlen;
@@ -1848,10 +1847,7 @@ isdn_writebuf_stub(int drvidx, int chan, const u_char * buf, int len,
 	if (!skb)
 		return 0;
 	skb_reserve(skb, hl);
-	if (user)
-		copy_from_user(skb_put(skb, len), buf, len);
-	else
-		memcpy(skb_put(skb, len), buf, len);
+	copy_from_user(skb_put(skb, len), buf, len);
 	ret = dev->drv[drvidx]->interface->writebuf_skb(drvidx, chan, 1, skb);
 	if (ret <= 0)
 		dev_kfree_skb(skb);
