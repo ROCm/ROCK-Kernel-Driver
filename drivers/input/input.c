@@ -685,25 +685,47 @@ struct class input_class = {
 static int __init input_init(void)
 {
 	struct proc_dir_entry *entry;
+	int retval = -ENOMEM;
 
 	class_register(&input_class);
 
 #ifdef CONFIG_PROC_FS
 	proc_bus_input_dir = proc_mkdir("input", proc_bus);
+	if (proc_bus_input_dir == NULL)
+		return -ENOMEM;
 	proc_bus_input_dir->owner = THIS_MODULE;
 	entry = create_proc_read_entry("devices", 0, proc_bus_input_dir, input_devices_read, NULL);
+	if (entry == NULL) {
+		remove_proc_entry("input", proc_bus);
+		return -ENOMEM;
+	}
 	entry->owner = THIS_MODULE;
 	entry->proc_fops->poll = input_devices_poll;
 	entry = create_proc_read_entry("handlers", 0, proc_bus_input_dir, input_handlers_read, NULL);
+	if (entry == NULL) {
+		remove_proc_entry("devices", proc_bus_input_dir);
+		remove_proc_entry("input", proc_bus);
+		return -ENOMEM;
+	}
 	entry->owner = THIS_MODULE;
 #endif
-	if (register_chrdev(INPUT_MAJOR, "input", &input_fops)) {
+	retval = register_chrdev(INPUT_MAJOR, "input", &input_fops);
+	if (retval) {
 		printk(KERN_ERR "input: unable to register char major %d", INPUT_MAJOR);
-		return -EBUSY;
+		remove_proc_entry("devices", proc_bus_input_dir);
+		remove_proc_entry("handlers", proc_bus_input_dir);
+		remove_proc_entry("input", proc_bus);
+		return retval;
 	}
 
-	devfs_mk_dir("input");
-	return 0;
+	retval = devfs_mk_dir("input");
+	if (retval) {
+		remove_proc_entry("devices", proc_bus_input_dir);
+		remove_proc_entry("handlers", proc_bus_input_dir);
+		remove_proc_entry("input", proc_bus);
+		unregister_chrdev(INPUT_MAJOR, "input");
+	}
+	return retval;
 }
 
 static void __exit input_exit(void)
@@ -714,8 +736,7 @@ static void __exit input_exit(void)
 	remove_proc_entry("input", proc_bus);
 #endif
 	devfs_remove("input");
-        if (unregister_chrdev(INPUT_MAJOR, "input"))
-                printk(KERN_ERR "input: can't unregister char major %d", INPUT_MAJOR);
+	unregister_chrdev(INPUT_MAJOR, "input");
 	class_unregister(&input_class);
 }
 
