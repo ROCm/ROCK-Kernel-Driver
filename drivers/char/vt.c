@@ -440,10 +440,10 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 
 	/*
 	 * To have permissions to do most of the vt ioctls, we either have
-	 * to be the owner of the tty, or super-user.
+	 * to be the owner of the tty, or have CAP_SYS_TTY_CONFIG.
 	 */
 	perm = 0;
-	if (current->tty == tty || suser())
+	if (current->tty == tty || capable(CAP_SYS_TTY_CONFIG))
 		perm = 1;
  
 	kbd = kbd_table + console;
@@ -508,7 +508,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	{
 		struct kbd_repeat kbrep;
 		
-		if (!capable(CAP_SYS_ADMIN))
+		if (!capable(CAP_SYS_TTY_CONFIG))
 			return -EPERM;
 
 		if (copy_from_user(&kbrep, (void *)arg,
@@ -621,7 +621,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 
 	case KDGETKEYCODE:
 	case KDSETKEYCODE:
-		if(!capable(CAP_SYS_ADMIN))
+		if(!capable(CAP_SYS_TTY_CONFIG))
 			perm=0;
 		return do_kbkeycode_ioctl(cmd, (struct kbkeycode *)arg, perm);
 
@@ -1038,12 +1038,12 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		return do_unimap_ioctl(cmd, (struct unimapdesc *)arg, perm);
 
 	case VT_LOCKSWITCH:
-		if (!suser())
+		if (!capable(CAP_SYS_TTY_CONFIG))
 		   return -EPERM;
 		vt_dont_switch = 1;
 		return 0;
 	case VT_UNLOCKSWITCH:
-		if (!suser())
+		if (!capable(CAP_SYS_TTY_CONFIG))
 		   return -EPERM;
 		vt_dont_switch = 0;
 		return 0;

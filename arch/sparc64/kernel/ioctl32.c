@@ -2059,9 +2059,9 @@ static int vt_check(struct file *file)
 	
 	/*
 	 * To have permissions to do most of the vt ioctls, we either have
-	 * to be the owner of the tty, or super-user.
+	 * to be the owner of the tty, or have CAP_SYS_TTY_CONFIG.
 	 */
-	if (current->tty == tty || suser())
+	if (current->tty == tty || capable(CAP_SYS_TTY_CONFIG))
 		return 1;
 	return 0;                                                    
 }
