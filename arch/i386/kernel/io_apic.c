@@ -41,8 +41,6 @@
 
 #include "io_ports.h"
 
-#undef APIC_LOCKUP_DEBUG
-
 #define APIC_LOCKUP_DEBUG
 
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
@@ -127,83 +125,50 @@ static void __init replace_pin_at_irq(unsigned int irq,
 	}
 }
 
-/* mask = 1 */
-static void __mask_IO_APIC_irq (unsigned int irq)
+static void __modify_IO_APIC_irq (unsigned int irq, unsigned long enable, unsigned long disable)
 {
-	int pin;
 	struct irq_pin_list *entry = irq_2_pin + irq;
+	unsigned int pin, reg;
 
 	for (;;) {
-		unsigned int reg;
 		pin = entry->pin;
 		if (pin == -1)
 			break;
 		reg = io_apic_read(entry->apic, 0x10 + pin*2);
-		io_apic_modify(entry->apic, 0x10 + pin*2, reg |= 0x00010000);
+		reg &= ~disable;
+		reg |= enable;
+		io_apic_modify(entry->apic, 0x10 + pin*2, reg);
 		if (!entry->next)
 			break;
 		entry = irq_2_pin + entry->next;
 	}
+}
+
+/* mask = 1 */
+static void __mask_IO_APIC_irq (unsigned int irq)
+{
+	struct irq_pin_list *entry = irq_2_pin + irq;
+	__modify_IO_APIC_irq(irq, 0x00010000, 0);
+	/* Is it needed? Or do others need it too? */
 	io_apic_sync(entry->apic);
 }
 
 /* mask = 0 */
 static void __unmask_IO_APIC_irq (unsigned int irq)
 {
-	int pin;
-	struct irq_pin_list *entry = irq_2_pin + irq;
-
-	for (;;) {
-		unsigned int reg;
-		pin = entry->pin;
-		if (pin == -1)
-			break;
-		reg = io_apic_read(entry->apic, 0x10 + pin*2);
-		io_apic_modify(entry->apic, 0x10 + pin*2, reg &= 0xfffeffff);
-		if (!entry->next)
-			break;
-		entry = irq_2_pin + entry->next;
-	}
+	__modify_IO_APIC_irq(irq, 0, 0x00010000);
 }
 
 /* mask = 1, trigger = 0 */
 static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
 {
-	int pin;
-	struct irq_pin_list *entry = irq_2_pin + irq;
-
-	for (;;) {
-		unsigned int reg;
-		pin = entry->pin;
-		if (pin == -1)
-			break;
-		reg = io_apic_read(entry->apic, 0x10 + pin*2);
-		reg = (reg & 0xffff7fff) | 0x00010000;
-		io_apic_modify(entry->apic, 0x10 + pin*2, reg);
-		if (!entry->next)
-			break;
-		entry = irq_2_pin + entry->next;
-	}
+	__modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
 }
 
 /* mask = 0, trigger = 1 */
 static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
 {
-	int pin;
-	struct irq_pin_list *entry = irq_2_pin + irq;
-
-	for (;;) {
-		unsigned int reg;
-		pin = entry->pin;
-		if (pin == -1)
-			break;
-		reg = io_apic_read(entry->apic, 0x10 + pin*2);
-		reg = (reg & 0xfffeffff) | 0x00008000;
-		io_apic_modify(entry->apic, 0x10 + pin*2, reg);
-		if (!entry->next)
-			break;
-		entry = irq_2_pin + entry->next;
-	}
+	__modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
 }
 
 static void mask_IO_APIC_irq (unsigned int irq)
