@@ -322,7 +322,7 @@ static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsi
 int agp_3_0_node_enable(u32 mode, u32 minor)
 {
 	struct pci_dev *td = agp_bridge->dev, *dev;
-	u8 bus_num, mcapndx;
+	u8 mcapndx;
 	u32 isoch, arqsz, cal_cycle, tmp, rate;
 	u32 tstatus, tcmd, mcmd, mstatus, ncapid;
 	u32 mmajor, mminor;
@@ -343,23 +343,30 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	head = &dev_list->list;
 	INIT_LIST_HEAD(head);
 
-	/* 
-	 * Find all the devices on this bridge's secondary bus and add them
-	 * to dev_list. 
-	 */
-	pci_read_config_byte(td, PCI_SECONDARY_BUS, &bus_num);
-	pci_for_each_dev(dev) {
-		if(dev->bus->number == bus_num) {
-			if((cur = kmalloc(sizeof(*cur), GFP_KERNEL)) == NULL) {
-				ret = -ENOMEM;
-				goto free_and_exit;
-			}
-			
-			cur->dev = dev;
+	/* Find all AGP devices, and add them to dev_list. */
+	pci_for_each_dev(dev) { 
+		switch ((dev->class >>8) & 0xff00) {
+			case 0x0001:    /* Unclassified device */
+			case 0x0300:    /* Display controller */
+			case 0x0400:    /* Multimedia controller */
+			case 0x0600:    /* Bridge */
+				mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
+				if (mcapndx == 0)
+					continue;
 
-			pos = &cur->list;
-			list_add(pos, head);
-			ndevs++;
+				if((cur = kmalloc(sizeof(*cur), GFP_KERNEL)) == NULL) {
+					ret = -ENOMEM;
+					goto free_and_exit;
+				}
+				cur->dev = dev;
+
+				pos = &cur->list;
+				list_add(pos, head);
+				ndevs++;
+				continue;
+
+			default:
+				continue;
 		}
 	}
 
