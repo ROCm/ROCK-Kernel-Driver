@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.105 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.107 $"
 
 #include "zfcp_ext.h"
 
@@ -1078,17 +1078,6 @@ zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
 {
 	char dbf_name[20];
 
-	/* debug feature area which records fsf request sequence numbers */
-	sprintf(dbf_name, ZFCP_REQ_DBF_NAME "%s",
-		zfcp_get_busid_by_adapter(adapter));
-	adapter->req_dbf = debug_register(dbf_name,
-					  ZFCP_REQ_DBF_INDEX,
-					  ZFCP_REQ_DBF_AREAS,
-					  ZFCP_REQ_DBF_LENGTH);
-	debug_register_view(adapter->req_dbf, &debug_hex_ascii_view);
-	debug_set_level(adapter->req_dbf, ZFCP_REQ_DBF_LEVEL);
-	debug_text_event(adapter->req_dbf, 1, "zzz");
-
 	/* debug feature area which records SCSI command failures (hostbyte) */
 	rwlock_init(&adapter->cmd_dbf_lock);
 	sprintf(dbf_name, ZFCP_CMD_DBF_NAME "%s",
@@ -1131,7 +1120,7 @@ zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
 	debug_register_view(adapter->erp_dbf, &debug_hex_ascii_view);
 	debug_set_level(adapter->erp_dbf, ZFCP_ERP_DBF_LEVEL);
 
-	if (adapter->req_dbf && adapter->cmd_dbf && adapter->abort_dbf &&
+	if (adapter->cmd_dbf && adapter->abort_dbf &&
 	    adapter->in_els_dbf && adapter->erp_dbf)
 		return 0;
 
@@ -1147,7 +1136,6 @@ void
 zfcp_adapter_debug_unregister(struct zfcp_adapter *adapter)
 {
 	debug_unregister(adapter->erp_dbf);
-	debug_unregister(adapter->req_dbf);
 	debug_unregister(adapter->cmd_dbf);
 	debug_unregister(adapter->abort_dbf);
 	debug_unregister(adapter->in_els_dbf);

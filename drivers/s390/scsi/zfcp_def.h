@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.71 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.72 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -450,18 +450,11 @@ struct zfcp_ls_rnid_acc {
 #define ZFCP_ERP_DBF_LEVEL     3
 #define ZFCP_ERP_DBF_NAME      "zfcperp"
 
-#define ZFCP_REQ_DBF_INDEX     1
-#define ZFCP_REQ_DBF_AREAS     1
-#define ZFCP_REQ_DBF_LENGTH    8
-#define ZFCP_REQ_DBF_LEVEL     1
-#define ZFCP_REQ_DBF_NAME      "zfcpreq"
-
 #define ZFCP_CMD_DBF_INDEX     2
 #define ZFCP_CMD_DBF_AREAS     1
 #define ZFCP_CMD_DBF_LENGTH    8
 #define ZFCP_CMD_DBF_LEVEL     3
 #define ZFCP_CMD_DBF_NAME      "zfcpcmd"
-
 
 #define ZFCP_ABORT_DBF_INDEX   2
 #define ZFCP_ABORT_DBF_AREAS   1
@@ -474,11 +467,6 @@ struct zfcp_ls_rnid_acc {
 #define ZFCP_IN_ELS_DBF_LENGTH 8
 #define ZFCP_IN_ELS_DBF_LEVEL  6
 #define ZFCP_IN_ELS_DBF_NAME   "zfcpels"
-
-#define ZFCP_ADAPTER_REQ_DBF_INDEX  4 
-#define ZFCP_ADAPTER_REQ_DBF_AREAS  1
-#define ZFCP_ADAPTER_REQ_DBF_LENGTH 8
-#define ZFCP_ADAPTER_REQ_DBF_LEVEL  6
 
 /******************** LOGGING MACROS AND DEFINES *****************************/
 
@@ -986,7 +974,6 @@ struct zfcp_adapter {
 	struct zfcp_port	*nameserver_port;  /* adapter's nameserver */
         debug_info_t            *erp_dbf;          /* S/390 debug features */
 	debug_info_t            *abort_dbf;
-	debug_info_t            *req_dbf;
 	debug_info_t            *in_els_dbf;
 	debug_info_t            *cmd_dbf;
 	rwlock_t                cmd_dbf_lock;

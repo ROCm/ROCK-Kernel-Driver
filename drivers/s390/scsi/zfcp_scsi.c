@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.59 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.60 $"
 
 #include <linux/blkdev.h>
 
@@ -297,10 +297,6 @@ zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
 	if (unlikely(tmp < 0)) {
 		ZFCP_LOG_DEBUG("error: initiation of Send FCP Cmnd failed\n");
 		retval = SCSI_MLQUEUE_HOST_BUSY;
-	} else {
-		debug_text_event(adapter->req_dbf, 3, "q_scpnt");
-		debug_event(adapter->req_dbf, 3, &scpnt,
-			    sizeof (unsigned long));
 	}
 
 out:
