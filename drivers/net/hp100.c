@@ -405,7 +405,7 @@ int __init hp100_probe(struct net_device *dev)
 	/* First: scan PCI bus(es) */
 
 #ifdef CONFIG_PCI
-	if (pci_present()) {
+	{
 		int pci_index;
 		struct pci_dev *pci_dev = NULL;
 		int pci_id_index;
@@ -2973,8 +2973,10 @@ static int __init hp100_module_init(void)
 {
 	int i, cards;
 
-	if (hp100_port == 0 && !EISA_bus && !pci_present())
+#ifndef CONFIG_PCI
+	if (hp100_port == 0 && !EISA_bus)
 		printk("hp100: You should not use auto-probing with insmod!\n");
+#endif
 
 	/* Loop on all possible base addresses */
 	i = -1;
