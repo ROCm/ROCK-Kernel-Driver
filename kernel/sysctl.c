@@ -971,7 +971,7 @@ int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
 	vleft = table->maxlen / sizeof(int);
 	left = *lenp;
 	
-	for (; left && vleft--; i++, first=0) {
+	for (; left && vleft--; i++, min++, max++, first=0) {
 		if (write) {
 			while (left) {
 				char c;
@@ -1007,9 +1007,7 @@ int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
 			buffer += len;
 			left -= len;
 
-			if (min && val < *min++)
-				continue;
-			if (max && val > *max++)
+			if ((min && val < *min) || (max && val > *max))
 				continue;
 			*i = val;
 		} else {
@@ -1074,7 +1072,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 	vleft = table->maxlen / sizeof(unsigned long);
 	left = *lenp;
 	
-	for (; left && vleft--; i++, first=0) {
+	for (; left && vleft--; i++, min++, max++, first=0) {
 		if (write) {
 			while (left) {
 				char c;
@@ -1112,9 +1110,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 
 			if(neg)
 				continue;
-			if (min && val < *min++)
-				continue;
-			if (max && val > *max++)
+			if ((min && val < *min) || (max && val > *max))
 				continue;
 			*i = val;
 		} else {
