@@ -1254,6 +1254,8 @@ menu "Network File Systems"
 config NFS_FS
 	tristate "NFS file system support"
 	depends on INET
+	select LOCKD
+	select SUNRPC
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1309,6 +1311,8 @@ config NFS_V4
 config NFSD
 	tristate "NFS server support"
 	depends on INET
+	select LOCKD
+	select SUNRPC
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1371,8 +1375,6 @@ config ROOT_NFS
 
 config LOCKD
 	tristate
-	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
-	default y if NFS_FS=y || NFSD=y
 
 config LOCKD_V4
 	bool
@@ -1385,8 +1387,6 @@ config EXPORTFS
 
 config SUNRPC
 	tristate
-	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
-	default y if NFS_FS=y || NFSD=y
 
 config SUNRPC_GSS
 	tristate "Provide RPCSEC_GSS authentication (EXPERIMENTAL)"
@@ -1565,6 +1565,7 @@ config AFS_FS
 # for fs/nls/Config.in
 	tristate "Andrew File System support (AFS) (Experimental)"
 	depends on INET && EXPERIMENTAL
+	select RXRPC
 	help
 	  If you say Y here, you will get an experimental Andrew File System
 	  driver. It currently only supports unsecured read-only AFS access.
@@ -1575,8 +1576,6 @@ config AFS_FS
 
 config RXRPC
 	tristate
-	default m if AFS_FS=m
-	default y if AFS_FS=y
 
 endmenu
 

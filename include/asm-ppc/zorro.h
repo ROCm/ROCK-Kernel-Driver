@@ -27,4 +27,4 @@ extern void *__ioremap(unsigned long address, unsigned long size,
 #define z_ioremap ioremap
 #define z_iounmap iounmap
 
-#endif /* _ASM_ZORRO_H */
+#endif /* _ASM_PPC_ZORRO_H */

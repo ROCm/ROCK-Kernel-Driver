@@ -171,3 +171,12 @@ int do_settimeofday(struct timespec *tv)
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
 }
+
+/*
+ * Scheduler clock - returns current time in ns units.
+ */
+unsigned long long sched_clock(void)
+{
+       return (unsigned long long)jiffies*(1000000000/HZ);
+}
+

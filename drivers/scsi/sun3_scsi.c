@@ -308,7 +308,6 @@ int sun3scsi_detect(Scsi_Host_Template * tpnt)
 	return 1;
 }
 
-#ifdef MODULE
 int sun3scsi_release (struct Scsi_Host *shpnt)
 {
 	if (shpnt->irq != SCSI_IRQ_NONE)
@@ -318,7 +317,6 @@ int sun3scsi_release (struct Scsi_Host *shpnt)
 
 	return 0;
 }
-#endif
 
 #ifdef RESET_BOOT
 /*

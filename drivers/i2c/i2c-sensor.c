@@ -133,7 +133,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 		     i += 2) {
 			if (((adapter_id == address_data->probe[i]) ||
 			     ((address_data->
-			       probe[i] == ANY_I2C_BUS) & !is_isa))
+			       probe[i] == ANY_I2C_BUS) && !is_isa))
 			    && (addr == address_data->probe[i + 1])) {
 				dev_dbg(&adapter->dev, "found probe parameter for adapter %d, addr %04x\n", adapter_id, addr);
 				found = 1;
@@ -141,7 +141,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 		}
 		for (i = 0; !found && (address_data->probe_range[i] != I2C_CLIENT_END); i += 3) {
 			if ( ((adapter_id == address_data->probe_range[i]) ||
-			      ((address_data->probe_range[i] == ANY_I2C_BUS) & !is_isa)) &&
+			      ((address_data->probe_range[i] == ANY_I2C_BUS) && !is_isa)) &&
 			     (addr >= address_data->probe_range[i + 1]) &&
 			     (addr <= address_data->probe_range[i + 2])) {
 				found = 1;

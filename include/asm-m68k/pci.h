@@ -7,6 +7,8 @@
  * Written by Wout Klaren.
  */
 
+#include <asm/scatterlist.h>
+
 struct pci_ops;
 
 /*

@@ -12,10 +12,11 @@ config INPUT_KEYBOARD
 	  If unsure, say Y.
 
 config KEYBOARD_ATKBD
-	tristate "AT keyboard support" if EMBEDDED || !X86 
+	tristate "AT keyboard support" if !PC
 	default y
 	depends on INPUT && INPUT_KEYBOARD
-	select SERIO_I8042
+	select SERIO
+	select SERIO_I8042 if PC
 	help
 	  Say Y here if you want to use a standard AT or PS/2 keyboard. Usually
 	  you'll need this, unless you have a different type keyboard (USB, ADB

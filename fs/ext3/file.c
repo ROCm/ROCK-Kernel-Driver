@@ -47,7 +47,7 @@ static int ext3_release_file (struct inode * inode, struct file * filp)
  * the caller didn't specify O_LARGEFILE.  On 64bit systems we force
  * on this flag in sys_open.
  */
-static int ext3_open_file (struct inode * inode, struct file * filp)
+static int ext3_open_file (struct inode *inode, struct file *filp)
 {
 	if (!(filp->f_flags & O_LARGEFILE) &&
 	    inode->i_size > 0x7FFFFFFFLL)
@@ -56,7 +56,7 @@ static int ext3_open_file (struct inode * inode, struct file * filp)
 }
 
 static ssize_t
-ext3_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
+ext3_file_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode;
@@ -117,8 +117,8 @@ struct file_operations ext3_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,
-	.aio_read		= generic_file_aio_read,
-	.aio_write		= ext3_file_write,
+	.aio_read	= generic_file_aio_read,
+	.aio_write	= ext3_file_write,
 	.readv		= generic_file_readv,
 	.writev		= generic_file_writev,
 	.ioctl		= ext3_ioctl,

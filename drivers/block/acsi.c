@@ -63,6 +63,7 @@ typedef void Scsi_Device; /* hack to avoid including scsi.h */
 #include <linux/hdreg.h> /* for HDIO_GETGEO */
 #include <linux/blkpg.h>
 #include <linux/buffer_head.h>
+#include <linux/blkdev.h>
 
 #include <asm/setup.h>
 #include <asm/pgtable.h>
@@ -346,7 +347,7 @@ struct acsi_error {
 static int acsicmd_dma( const char *cmd, char *buffer, int blocks, int
                         rwflag, int enable);
 static int acsi_reqsense( char *buffer, int targ, int lun);
-static void acsi_print_error(const unsigned char *errblk, int struct acsi_info_struct *aip);
+static void acsi_print_error(const unsigned char *errblk, struct acsi_info_struct *aip);
 static irqreturn_t acsi_interrupt (int irq, void *data, struct pt_regs *fp);
 static void unexpected_acsi_interrupt( void );
 static void bad_rw_intr( void );
