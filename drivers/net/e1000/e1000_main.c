@@ -783,12 +783,6 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	E1000_WRITE_REG(&adapter->shared, TCTL, tctl);
 
-#ifdef CONFIG_PPC
-	if(adapter->shared.mac_type >= e1000_82543) {
-		E1000_WRITE_REG(&adapter->shared, TXDCTL, 0x00020000);
-	}
-#endif
-
 	/* Setup Transmit Descriptor Settings for this adapter */
 	adapter->txd_cmd = E1000_TXD_CMD_IFCS;
 
@@ -926,12 +920,6 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 		rxcsum |= E1000_RXCSUM_TUOFL;
 		E1000_WRITE_REG(&adapter->shared, RXCSUM, rxcsum);
 	}
-
-#ifdef CONFIG_PPC
-	if(adapter->shared.mac_type >= e1000_82543) {
-		E1000_WRITE_REG(&adapter->shared, RXDCTL, 0x00020000);
-	}
-#endif
 
 	/* Enable Receives */
 
