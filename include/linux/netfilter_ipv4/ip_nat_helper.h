@@ -44,6 +44,9 @@ extern void ip_nat_helper_unregister(struct ip_nat_helper *me);
 extern struct ip_nat_helper *
 ip_nat_find_helper(const struct ip_conntrack_tuple *tuple);
 
+extern struct ip_nat_helper *
+__ip_nat_find_helper(const struct ip_conntrack_tuple *tuple);
+
 /* These return true or false. */
 extern int ip_nat_mangle_tcp_packet(struct sk_buff **skb,
 				struct ip_conntrack *ct,
