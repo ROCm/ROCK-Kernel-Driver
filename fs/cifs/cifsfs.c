@@ -41,8 +41,6 @@
 #include "cifs_fs_sb.h"
 #include <linux/mm.h>
 #define CIFS_MAGIC_NUMBER 0xFF534D42	/* the first four bytes of SMB PDUs */
-/* BB when mempool_resize is added back in, we will resize pool on new mount */
-#define CIFS_MIN_RCV_POOL 11 /* enough for progress to five servers */
 
 #ifdef CONFIG_CIFS_QUOTA
 static struct quotactl_ops cifs_quotactl_ops;
@@ -742,6 +740,7 @@ init_cifs(void)
  */
 	atomic_set(&sesInfoAllocCount, 0);
 	atomic_set(&tconInfoAllocCount, 0);
+	atomic_set(&tcpSesAllocCount,0);
 	atomic_set(&tcpSesReconnectCount, 0);
 	atomic_set(&tconInfoReconnectCount, 0);
 

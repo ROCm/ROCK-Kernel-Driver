@@ -28,6 +28,7 @@
 #include <linux/pagemap.h>
 #include <linux/ctype.h>
 #include <linux/utsname.h>
+#include <linux/mempool.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include "cifspdu.h"
@@ -48,6 +49,8 @@ extern void SMBencrypt(unsigned char *passwd, unsigned char *c8,
 extern void SMBNTencrypt(unsigned char *passwd, unsigned char *c8,
 			 unsigned char *p24);
 extern int cifs_inet_pton(int, const char *, void *dst);
+
+extern mempool_t *cifs_req_poolp;
 
 struct smb_vol {
 	char *username;
@@ -204,6 +207,15 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	current->flags |= PF_MEMALLOC;
 	server->tsk = current;	/* save process info to wake at shutdown */
 	cFYI(1, ("Demultiplex PID: %d", current->pid));
+	write_lock(&GlobalSMBSeslock);
+	atomic_inc(&tcpSesAllocCount);
+	length = tcpSesAllocCount.counter;
+	write_unlock(&GlobalSMBSeslock);
+	if(length  > 1) {
+		mempool_resize(cifs_req_poolp,
+			length + CIFS_MIN_RCV_POOL,
+			GFP_KERNEL);
+	}
 
 	while (server->tcpStatus != CifsExiting) {
 		if (smb_buffer == NULL)
@@ -466,6 +478,16 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		coming home not much else we can do but free the memory */
 	}
 	kfree(server);
+
+	write_lock(&GlobalSMBSeslock);
+	atomic_dec(&tcpSesAllocCount);
+	length = tcpSesAllocCount.counter;
+	write_unlock(&GlobalSMBSeslock);
+	if(length  > 0) {
+		mempool_resize(cifs_req_poolp,
+			length + CIFS_MIN_RCV_POOL,
+			GFP_KERNEL);
+	}
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ/4);
