@@ -188,7 +188,7 @@ static int __init i2c_pcfisa_init(void)
 #ifdef __alpha__
 	/* check to see we have memory mapped PCF8584 connected to the 
 	Cypress cy82c693 PCI-ISA bridge as on UP2000 board */
-	if ((base == 0) && pci_present()) {
+	if (base == 0) {
 		
 		struct pci_dev *cy693_dev =
                     pci_find_device(PCI_VENDOR_ID_CONTAQ, 
