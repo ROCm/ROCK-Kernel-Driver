@@ -1447,6 +1447,10 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	pgd = pgd_offset(mm, address);
 
 	inc_page_state(pgfault);
+
+	if (is_vm_hugetlb_page(vma))
+		return VM_FAULT_SIGBUS;	/* mapping truncation does this. */
+
 	/*
 	 * We need the page table lock to synchronize with kswapd
 	 * and the SMP-safe atomic PTE updates.
