@@ -137,9 +137,11 @@ struct address_space_operations swap_aops = {
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 };
 
+#if defined(CONFIG_SOFTWARE_SUSPEND) || defined(CONFIG_PM_DISK)
+
 /*
  * A scruffy utility function to read or write an arbitrary swap page
- * and wait on the I/O.
+ * and wait on the I/O.  The caller must have a ref on the page.
  */
 int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 {
@@ -151,8 +153,18 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	lock_page(page);
 
 	BUG_ON(page->mapping);
-	page->mapping = &swapper_space;
-	page->index = entry.val;
+	ret = add_to_page_cache(page, &swapper_space,
+				entry.val, GFP_NOIO|__GFP_NOFAIL);
+	if (ret) {
+		unlock_page(page);
+		goto out;
+	}
+
+	/*
+	 * get one more reference to make page non-exclusive so
+	 * remove_exclusive_swap_page won't mess with it.
+	 */
+	page_cache_get(page);
 
 	if (rw == READ) {
 		ret = swap_readpage(NULL, page);
@@ -161,8 +173,16 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 		ret = swap_writepage(page, &swap_wbc);
 		wait_on_page_writeback(page);
 	}
-	page->mapping = NULL;
+
+	lock_page(page);
+	remove_from_page_cache(page);
+	unlock_page(page);
+	page_cache_release(page);
+	page_cache_release(page);	/* For add_to_page_cache() */
+
 	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
 		ret = -EIO;
+out:
 	return ret;
 }
+#endif
