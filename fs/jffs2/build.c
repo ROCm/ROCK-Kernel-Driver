@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.64 2004/11/20 10:44:07 dwmw2 Exp $
+ * $Id: build.c,v 1.65 2004/11/20 16:19:38 dwmw2 Exp $
  *
  */
 
@@ -191,9 +191,12 @@ static void jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jf
 
 	D1(printk(KERN_DEBUG "JFFS2: Removing ino #%u with nlink == zero.\n", ic->ino));
 	
-	for (raw = ic->nodes; raw != (void *)ic; raw = raw->next_in_ino) {
+	raw = ic->nodes;
+	while (raw != (void *)ic) {
+		struct jffs2_raw_node_ref *next = raw->next_in_ino;
 		D1(printk(KERN_DEBUG "obsoleting node at 0x%08x\n", ref_offset(raw)));
 		jffs2_mark_node_obsolete(c, raw);
+		raw = next;
 	}
 
 	if (ic->scan_dents) {
