@@ -314,8 +314,8 @@ extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
-extern int blk_set_readahead(kdev_t dev, unsigned sectors);
-extern unsigned blk_get_readahead(kdev_t dev);
+extern int blk_set_readahead(struct block_device *bdev, unsigned sectors);
+extern unsigned blk_get_readahead(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);

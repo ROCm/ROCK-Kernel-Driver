@@ -115,13 +115,14 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
  *
  * Returns zero on success, else negative errno
  */
-int blk_set_readahead(kdev_t dev, unsigned sectors)
+int blk_set_readahead(struct block_device *bdev, unsigned sectors)
 {
 	int ret = -EINVAL;
-	request_queue_t *q = blk_get_queue(dev);
+	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
 	if (q) {
 		q->ra_sectors = sectors;
+		blk_put_queue(q);
 		ret = 0;
 	}
 	return ret;
@@ -139,13 +140,15 @@ int blk_set_readahead(kdev_t dev, unsigned sectors)
  * Will return zero if the queue has never had its readahead
  * setting altered.
  */
-unsigned blk_get_readahead(kdev_t dev)
+unsigned blk_get_readahead(struct block_device *bdev)
 {
 	unsigned ret = 0;
-	request_queue_t *q = blk_get_queue(dev);
+	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
-	if (q)
+	if (q) {
 		ret = q->ra_sectors;
+		blk_put_queue(q);
+	}
 	return ret;
 }
 

@@ -240,13 +240,13 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFRASET:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			return blk_set_readahead(dev, arg);
+			return blk_set_readahead(bdev, arg);
 
 		case BLKRAGET:
 		case BLKFRAGET:
 			if (!arg)
 				return -EINVAL;
-			return put_user(blk_get_readahead(dev), (long *)arg);
+			return put_user(blk_get_readahead(bdev), (long *)arg);
 
 		case BLKSECTGET:
 			if ((q = blk_get_queue(dev)) == NULL)

@@ -1577,7 +1577,7 @@ static int device_size_calculation(mddev_t * mddev)
 	if (!md_size[mdidx(mddev)])
 		md_size[mdidx(mddev)] = sb->size * data_disks;
 
-	readahead = (blk_get_readahead(rdev->dev) * 512) / PAGE_SIZE;
+	readahead = (blk_get_readahead(rdev->bdev) * 512) / PAGE_SIZE;
 	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
 		readahead = (mddev->sb->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
 		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
