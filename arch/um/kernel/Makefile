@@ -23,9 +23,6 @@ obj-$(CONFIG_MODE_SKAS) += skas/
 
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
-# user_syms.o not included here because Rules.make has its own ideas about
-# building anything in export-objs
-
 USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
 	process.o tempfile.o time.o tty_log.o umid.o user_util.o user_syms.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
@@ -47,7 +44,7 @@ CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES-y) $(DMODVERSIONS-y) \
 CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
 
 $(USER_OBJS) : %.o: %.c
-	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
 $(obj)/unmap.o: $(src)/unmap.c
 	$(CC) $(UNMAP_CFLAGS) -c -o $@ $<

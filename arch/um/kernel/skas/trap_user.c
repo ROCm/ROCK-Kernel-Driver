@@ -44,7 +44,7 @@ void user_signal(int sig, union uml_pt_regs *regs)
 	if(sig == SIGVTALRM)
 		missed_ticks[cpu()]++;
 	regs->skas.is_user = 1;
-	regs->fault_addr = 0;
+	regs->skas.fault_addr = 0;
 	regs->skas.fault_type = 0;
 	regs->skas.trap_type = 0;
 	info = &sig_info[sig];
