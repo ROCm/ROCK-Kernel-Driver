@@ -577,6 +577,21 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 	return rc;
 }
 
+static int can_set_xattr(struct inode *inode, const char *name)
+{
+	if (IS_RDONLY(inode))
+		return -EROFS;
+
+	if (IS_IMMUTABLE(inode) || IS_APPEND(inode) || S_ISLNK(inode->i_mode))
+		return -EPERM;
+
+	if (!S_ISREG(inode->i_mode) &&
+	    (!S_ISDIR(inode->i_mode) || inode->i_mode &S_ISVTX))
+		return -EPERM;
+
+	return permission(inode, MAY_WRITE);
+}
+
 int __jfs_setxattr(struct inode *inode, const char *name, void *value,
 		   size_t value_len, int flags)
 {
@@ -588,8 +603,11 @@ int __jfs_setxattr(struct inode *inode, const char *name, void *value,
 	int new_size;
 	int namelen = strlen(name);
 	int found = 0;
-	int rc = 0;
+	int rc;
 	int length;
+
+	if ((rc = can_set_xattr(inode, name)))
+		return rc;
 
 	xattr_size = ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
@@ -710,6 +728,11 @@ int jfs_setxattr(struct dentry *dentry, const char *name, void *value,
 	return __jfs_setxattr(dentry->d_inode, name, value, value_len, flags);
 }
 
+static int can_get_xattr(struct inode *inode, const char *name)
+{
+	return permission(inode, MAY_READ);
+}
+
 ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
 		       size_t buf_size)
 {
@@ -719,7 +742,11 @@ ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
 	int xattr_size;
 	ssize_t size;
 	int namelen = strlen(name);
+	int rc;
 	char *value;
+
+	if ((rc = can_get_xattr(inode, name)))
+		return rc;
 
 	xattr_size = ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
