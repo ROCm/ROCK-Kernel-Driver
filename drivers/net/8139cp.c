@@ -615,8 +615,10 @@ rx_next:
 		if (cpr16(IntrStatus) & cp_rx_intr_mask)
 			goto rx_status_loop;
 
-		netif_rx_complete(dev);
+		local_irq_disable();
 		cpw16_f(IntrMask, cp_intr_mask);
+		__netif_rx_complete(dev);
+		local_irq_enable();
 
 		return 0;	/* done */
 	}
@@ -643,6 +645,12 @@ cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 
 	spin_lock(&cp->lock);
 
+	/* close possible race's with dev_close */
+	if (unlikely(!netif_running(dev))) {
+		cpw16(IntrMask, 0);
+		goto out;
+	}
+
 	if (status & (RxOK | RxErr | RxEmpty | RxFIFOOvr)) {
 		if (netif_rx_schedule_prep(dev)) {
 			cpw16_f(IntrMask, cp_norx_intr_mask);
@@ -664,7 +672,7 @@ cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 
 		/* TODO: reset hardware */
 	}
-
+out:
 	spin_unlock(&cp->lock);
 	return IRQ_HANDLED;
 }
