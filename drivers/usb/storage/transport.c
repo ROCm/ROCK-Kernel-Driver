@@ -69,32 +69,35 @@
  * as those occurring during device-specific initialization, must be handled
  * by a separate code path.)
  *
- * The abort function first sets the machine state, then atomically
- * tests-and-clears the CAN_CANCEL bit in us->flags to see if the current_urb
- * needs to be aborted.
+ * The abort function (usb_storage_command_abort() in scsiglue.c) first
+ * sets the machine state and the ABORTING bit in us->flags to prevent
+ * new URBs from being submitted.  It then calls usb_stor_stop_transport()
+ * below, which atomically tests-and-clears the URB_ACTIVE bit in us->flags
+ * to see if the current_urb needs to be stopped.  Likewise, the SG_ACTIVE
+ * bit is tested to see if the current_sg scatter-gather request needs to be
+ * stopped.
  *
- * The submit function first verifies that the submission completed without
- * errors, and only then sets the CAN_CANCEL bit.  This prevents the abort
- * function from trying to cancel the URB while the submit call is underway.
- * Next, the submit function must test the state to see if we got aborted
- * before the submission or before setting the CAN_CANCEL bit.  If so, it's
- * essential to abort the URB if it hasn't been cancelled already (i.e.,
- * if the CAN_CANCEL bit is still set).  Either way, the function must then
- * wait for the URB to finish.  Note that because the URB_ASYNC_UNLINK flag
- * is set, the URB can still be in progress even after a call to
- * usb_unlink_urb() returns.
+ * When a disconnect occurs, the DISCONNECTING bit in us->flags is set to
+ * prevent new URBs from being submitted, and usb_stor_stop_transport() is
+ * called to stop any ongoing requests.
  *
- * (It's also permissible, but not necessary, to test the state -before-
- * submitting the URB.  Doing so would prevent an unnecessary submission if
- * the transaction had already been aborted, but this is very unlikely to
- * happen, because the abort would have to have been requested during actual
- * kernel processing rather than during an I/O delay.)
+ * The submit function first verifies that the submitting is allowed
+ * (neither ABORTING nor DISCONNECTING bits are set) and that the submit
+ * completes without errors, and only then sets the URB_ACTIVE bit.  This
+ * prevents the stop_transport() function from trying to cancel the URB
+ * while the submit call is underway.  Next, the submit function must test
+ * the flags to see if an abort or disconnect occurred during the submission
+ * or before the URB_ACTIVE bit was set.  If so, it's essential to cancel
+ * the URB if it hasn't been cancelled already (i.e., if the URB_ACTIVE bit
+ * is still set).  Either way, the function must then wait for the URB to
+ * finish.  Note that because the URB_ASYNC_UNLINK flag is set, the URB can
+ * still be in progress even after a call to usb_unlink_urb() returns.
  *
- * The idea is that (1) once the state is changed to ABORTING, either the
- * aborting function or the submitting function is guaranteed to call
- * usb_unlink_urb() for an active URB, and (2) test_and_clear_bit() prevents
- * usb_unlink_urb() from being called more than once or from being called
- * during usb_submit_urb().
+ * The idea is that (1) once the ABORTING or DISCONNECTING bit is set,
+ * either the stop_transport() function or the submitting function
+ * is guaranteed to call usb_unlink_urb() for an active URB,
+ * and (2) test_and_clear_bit() prevents usb_unlink_urb() from being
+ * called more than once or from being called during usb_submit_urb().
  */
 
 /* This is the completion handler which will wake us up when an URB
@@ -118,6 +121,10 @@ static int usb_stor_msg_common(struct us_data *us)
 	struct completion urb_done;
 	int status;
 
+	/* don't submit URBS during abort/disconnect processing */
+	if (us->flags & DONT_SUBMIT)
+		return -ECONNRESET;
+
 	/* set up data structures for the wakeup system */
 	init_completion(&urb_done);
 
@@ -137,13 +144,13 @@ static int usb_stor_msg_common(struct us_data *us)
 
 	/* since the URB has been submitted successfully, it's now okay
 	 * to cancel it */
-	set_bit(US_FLIDX_CAN_CANCEL, &us->flags);
+	set_bit(US_FLIDX_URB_ACTIVE, &us->flags);
 
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+	/* did an abort/disconnect occur during the submission? */
+	if (us->flags & DONT_SUBMIT) {
 
 		/* cancel the URB, if it hasn't been cancelled already */
-		if (test_and_clear_bit(US_FLIDX_CAN_CANCEL, &us->flags)) {
+		if (test_and_clear_bit(US_FLIDX_URB_ACTIVE, &us->flags)) {
 			US_DEBUGP("-- cancelling URB\n");
 			usb_unlink_urb(us->current_urb);
 		}
@@ -151,7 +158,7 @@ static int usb_stor_msg_common(struct us_data *us)
 
 	/* wait for the completion of the URB */
 	wait_for_completion(&urb_done);
-	clear_bit(US_FLIDX_CAN_CANCEL, &us->flags);
+	clear_bit(US_FLIDX_URB_ACTIVE, &us->flags);
 
 	/* return the URB status */
 	return us->current_urb->status;
@@ -410,7 +417,7 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
  * Transfer a scatter-gather list via bulk transfer
  *
  * This function does basically the same thing as usb_stor_bulk_transfer_buf()
- * above, but it uses the usbcore scatter-gather primitives
+ * above, but it uses the usbcore scatter-gather library.
  */
 int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		struct scatterlist *sg, int num_sg, unsigned int length,
@@ -418,6 +425,10 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 {
 	int result;
 	unsigned int partial;
+
+	/* don't submit s-g requests during abort/disconnect processing */
+	if (us->flags & DONT_SUBMIT)
+		return USB_STOR_XFER_ERROR;
 
 	/* initialize the scatter-gather request block */
 	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %u bytes, "
@@ -431,13 +442,13 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 
 	/* since the block has been initialized successfully, it's now
 	 * okay to cancel it */
-	set_bit(US_FLIDX_CANCEL_SG, &us->flags);
+	set_bit(US_FLIDX_SG_ACTIVE, &us->flags);
 
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+	/* did an abort/disconnect occur during the submission? */
+	if (us->flags & DONT_SUBMIT) {
 
 		/* cancel the request, if it hasn't been cancelled already */
-		if (test_and_clear_bit(US_FLIDX_CANCEL_SG, &us->flags)) {
+		if (test_and_clear_bit(US_FLIDX_SG_ACTIVE, &us->flags)) {
 			US_DEBUGP("-- cancelling sg request\n");
 			usb_sg_cancel(us->current_sg);
 		}
@@ -445,7 +456,7 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 
 	/* wait for the completion of the transfer */
 	usb_sg_wait(us->current_sg);
-	clear_bit(US_FLIDX_CANCEL_SG, &us->flags);
+	clear_bit(US_FLIDX_SG_ACTIVE, &us->flags);
 
 	result = us->current_sg->status;
 	partial = us->current_sg->bytes;
@@ -693,56 +704,32 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	Handle_Abort:
 	srb->result = DID_ABORT << 16;
 	if (us->protocol == US_PR_BULK) {
+
+		/* permit the reset transfer to take place */
+		clear_bit(US_FLIDX_ABORTING, &us->flags);
 		us->transport_reset(us);
 	}
 }
 
-/* Abort the currently running scsi command or device reset.
- * This must be called with scsi_lock(us->srb->host) held */
-int usb_stor_abort_transport(struct us_data *us)
+/* Stop the current URB transfer */
+void usb_stor_stop_transport(struct us_data *us)
 {
-	struct Scsi_Host *host;
-	int state = atomic_read(&us->sm_state);
-
-	US_DEBUGP("usb_stor_abort_transport called\n");
-
-	/* Normally the current state is RUNNING.  If the control thread
-	 * hasn't even started processing this command, the state will be
-	 * IDLE.  Anything else is a bug. */
-	if (state != US_STATE_RUNNING && state != US_STATE_IDLE) {
-		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, state);
-		return FAILED;
-	}
-
-	/* set state to abort and release the lock */
-	atomic_set(&us->sm_state, US_STATE_ABORTING);
-	host = us->srb->device->host;
-	scsi_unlock(host);
+	US_DEBUGP("%s called\n", __FUNCTION__);
 
 	/* If the state machine is blocked waiting for an URB,
-	 * let's wake it up */
-
-	/* If we have an URB pending, cancel it.  The test_and_clear_bit()
-	 * call guarantees that if a URB has just been submitted, it
-	 * won't be cancelled more than once. */
-	if (test_and_clear_bit(US_FLIDX_CAN_CANCEL, &us->flags)) {
+	 * let's wake it up.  The test_and_clear_bit() call
+	 * guarantees that if a URB has just been submitted,
+	 * it won't be cancelled more than once. */
+	if (test_and_clear_bit(US_FLIDX_URB_ACTIVE, &us->flags)) {
 		US_DEBUGP("-- cancelling URB\n");
 		usb_unlink_urb(us->current_urb);
 	}
 
 	/* If we are waiting for a scatter-gather operation, cancel it. */
-	if (test_and_clear_bit(US_FLIDX_CANCEL_SG, &us->flags)) {
+	if (test_and_clear_bit(US_FLIDX_SG_ACTIVE, &us->flags)) {
 		US_DEBUGP("-- cancelling sg request\n");
 		usb_sg_cancel(us->current_sg);
 	}
-
-	/* Wait for the aborted command to finish */
-	wait_for_completion(&us->notify);
-
-	/* Reacquire the lock: note that us->srb is now NULL */
-	scsi_lock(host);
-	return SUCCESS;
 }
 
 /*

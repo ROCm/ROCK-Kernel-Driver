@@ -941,15 +941,12 @@ static void storage_disconnect(struct usb_interface *intf)
 		sdev->online = 0;
 	scsi_unlock(us->host);
 
+	/* prevent new USB transfers and stop the current command */
+	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
+	usb_stor_stop_transport(us);
+
 	/* lock device access -- no need to unlock, as we're going away */
 	down(&(us->dev_semaphore));
-
-	/* Complete all pending commands with * cmd->result = DID_ERROR << 16.
-	 * Since we only queue one command at a time, this is pretty easy. */
-	if (us->srb) {
-		us->srb->result = DID_ERROR << 16;
-		us->srb->scsi_done(us->srb);
-	}
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */

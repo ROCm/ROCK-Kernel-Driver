@@ -156,7 +156,7 @@ extern int usb_stor_Bulk_max_lun(struct us_data*);
 extern int usb_stor_Bulk_reset(struct us_data*);
 
 extern void usb_stor_invoke_transport(Scsi_Cmnd*, struct us_data*);
-extern int usb_stor_abort_transport(struct us_data*);
+extern void usb_stor_stop_transport(struct us_data*);
 
 extern int usb_stor_bulk_msg(struct us_data *us, void *data,
 		unsigned int pipe, unsigned int len, unsigned int *act_len);
