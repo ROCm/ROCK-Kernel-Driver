@@ -319,6 +319,8 @@ xfs_read(
 	xfs_rw_enter_trace(XFS_READ_ENTER, &ip->i_iocore,
 				(void *)iovp, segs, *offset, ioflags);
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
+	if (ret == -EIOCBQUEUED)
+		ret = wait_on_sync_kiocb(iocb);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
@@ -846,6 +848,9 @@ retry:
 
 	current->backing_dev_info = NULL;
 
+	if (ret == -EIOCBQUEUED)
+		ret = wait_on_sync_kiocb(iocb);
+
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
 	    !(ioflags & IO_INVIS)) {
@@ -953,13 +958,15 @@ retry:
 					goto out_unlock_internal;
 			}
 		}
-
+	
 		xfs_rwunlock(bdp, locktype);
+		if (need_isem)
+			up(&inode->i_sem);
 
 		error = sync_page_range(inode, mapping, pos, ret);
 		if (!error)
-			error = -ret;
-		goto out_unlock_isem;
+			error = ret;
+		return error;
 	}
 
  out_unlock_internal:

@@ -107,7 +107,8 @@ char command_line[COMMAND_LINE_SIZE];
 struct resource standard_io_resources[] = {
 	{ "dma1", 0x00, 0x1f, IORESOURCE_BUSY | IORESOURCE_IO },
 	{ "pic1", 0x20, 0x21, IORESOURCE_BUSY | IORESOURCE_IO },
-	{ "timer", 0x40, 0x5f, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "timer0", 0x40, 0x43, IORESOURCE_BUSY | IORESOURCE_IO },
+	{ "timer1", 0x50, 0x53, IORESOURCE_BUSY | IORESOURCE_IO },
 	{ "keyboard", 0x60, 0x6f, IORESOURCE_BUSY | IORESOURCE_IO },
 	{ "dma page reg", 0x80, 0x8f, IORESOURCE_BUSY | IORESOURCE_IO },
 	{ "pic2", 0xa0, 0xa1, IORESOURCE_BUSY | IORESOURCE_IO },
