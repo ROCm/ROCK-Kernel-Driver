@@ -1081,7 +1081,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	struct name_ent *owner = NULL;
 	struct name_ent *group = NULL;
 	struct svc_fh tempfh;
-	struct statfs statfs;
+	struct kstatfs statfs;
 	int buflen = *countp << 2;
 	u32 *attrlenp;
 	u32 dummy;

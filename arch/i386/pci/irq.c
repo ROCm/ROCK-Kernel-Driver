@@ -107,7 +107,7 @@ static void __init pirq_peer_trick(void)
 		 *  It might be a secondary bus, but in this case its parent is already
 		 *  known (ascending bus order) and therefore pci_scan_bus returns immediately.
 		 */
-		if (busmap[i] && pci_scan_bus(i, pci_root_bus->ops, NULL))
+		if (busmap[i] && pci_scan_bus(i, &pci_root_ops, NULL))
 			printk(KERN_INFO "PCI: Discovered primary peer bus %02x [IRQ]\n", i);
 	pcibios_last_bus = -1;
 }

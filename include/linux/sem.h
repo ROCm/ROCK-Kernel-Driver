@@ -128,13 +128,11 @@ struct sem_undo {
 struct sem_undo_list {
 	atomic_t	refcnt;
 	spinlock_t	lock;
-	volatile unsigned long	add_count;
 	struct sem_undo	*proc_list;
 };
 
 struct sysv_sem {
 	struct sem_undo_list *undo_list;
-	struct sem_queue *sleep_list;
 };
 
 asmlinkage long sys_semget (key_t key, int nsems, int semflg);
@@ -142,6 +140,8 @@ asmlinkage long sys_semop (int semid, struct sembuf __user *sops, unsigned nsops
 asmlinkage long sys_semctl (int semid, int semnum, int cmd, union semun arg);
 asmlinkage long sys_semtimedop(int semid, struct sembuf __user *sops,
 			unsigned nsops, const struct timespec __user *timeout);
+
+void exit_sem(struct task_struct *p);
 
 #endif /* __KERNEL__ */
 

@@ -34,7 +34,7 @@
 /* VFS super_block ops */
 static void coda_clear_inode(struct inode *);
 static void coda_put_super(struct super_block *);
-static int coda_statfs(struct super_block *sb, struct statfs *buf);
+static int coda_statfs(struct super_block *sb, struct kstatfs *buf);
 
 static kmem_cache_t * coda_inode_cachep;
 
@@ -273,7 +273,7 @@ struct inode_operations coda_file_inode_operations = {
 	.setattr	= coda_setattr,
 };
 
-static int coda_statfs(struct super_block *sb, struct statfs *buf)
+static int coda_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int error;
 	

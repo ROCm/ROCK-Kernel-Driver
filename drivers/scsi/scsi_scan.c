@@ -583,8 +583,6 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 				sdev->host->host_no, sdev->channel,
 				sdev->id, sdev->lun);
 
-	scsi_device_register(sdev);
-
 	/*
 	 * End driverfs/devfs code.
 	 */
@@ -647,10 +645,17 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
 
 	sdev->use_10_for_rw = 1;
-	sdev->use_10_for_ms = 0;
+	sdev->use_10_for_ms = 1;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
+
+	/*
+	 * Ok, the device is now all set up, we can
+	 * register it and tell the rest of the kernel
+	 * about it.
+	 */
+	scsi_device_register(sdev);
 
 	return SCSI_SCAN_LUN_PRESENT;
 }

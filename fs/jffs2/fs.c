@@ -22,7 +22,7 @@
 #include <linux/vfs.h>
 #include "nodelist.h"
 
-int jffs2_statfs(struct super_block *sb, struct statfs *buf)
+int jffs2_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
 	unsigned long avail;

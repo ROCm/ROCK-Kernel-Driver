@@ -34,7 +34,7 @@
 static void ext2_sync_super(struct super_block *sb,
 			    struct ext2_super_block *es);
 static int ext2_remount (struct super_block * sb, int * flags, char * data);
-static int ext2_statfs (struct super_block * sb, struct statfs * buf);
+static int ext2_statfs (struct super_block * sb, struct kstatfs * buf);
 
 static char error_buf[1024];
 
@@ -939,7 +939,7 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 	return 0;
 }
 
-static int ext2_statfs (struct super_block * sb, struct statfs * buf)
+static int ext2_statfs (struct super_block * sb, struct kstatfs * buf)
 {
 	struct ext2_sb_info *sbi = EXT2_SB(sb);
 	unsigned long overhead;

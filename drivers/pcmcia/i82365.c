@@ -1471,6 +1471,10 @@ static int __init init_i82365(void)
 			    pcmcia_unregister_socket(&socket[i].socket);
 		    break;
 	    }
+	   class_device_create_file(&socket[i].socket.dev,
+			   	    &class_device_attr_info);
+	   class_device_create_file(&socket[i].socket.dev,
+			   	    &class_device_attr_exca);
     }
 
     /* Finally, schedule a polling interrupt */
@@ -1481,9 +1485,6 @@ static int __init init_i82365(void)
     	poll_timer.expires = jiffies + poll_interval;
 	add_timer(&poll_timer);
     }
-
-    class_device_create_file(&socket[i].socket.dev, &class_device_attr_info);
-    class_device_create_file(&socket[i].socket.dev, &class_device_attr_exca);
     
     return 0;
     

@@ -2,7 +2,7 @@
 /* Linux driver for Disk-On-Chip 2000       */
 /* (c) 1999 Machine Vision Holdings, Inc.   */
 /* Author: David Woodhouse <dwmw2@mvhi.com> */
-/* $Id: doc2000.h,v 1.16 2003/05/23 11:29:33 dwmw2 Exp $ */
+/* $Id: doc2000.h,v 1.17 2003/06/12 01:20:46 gerg Exp $ */
 
 #ifndef __MTD_DOC2000_H__
 #define __MTD_DOC2000_H__
@@ -44,7 +44,7 @@
 #define DoC_Mplus_AccessStatus		0x1008
 #define DoC_Mplus_DeviceSelect		0x1008
 #define DoC_Mplus_Configuration		0x100a
-#define DoC_Mplus_OutputControl		0x1002
+#define DoC_Mplus_OutputControl		0x100c
 #define DoC_Mplus_FlashControl		0x1020
 #define DoC_Mplus_FlashSelect 		0x1022
 #define DoC_Mplus_FlashCmd		0x1024

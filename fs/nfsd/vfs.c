@@ -1505,7 +1505,7 @@ out:
  * N.B. After this call fhp needs an fh_put
  */
 int
-nfsd_statfs(struct svc_rqst *rqstp, struct svc_fh *fhp, struct statfs *stat)
+nfsd_statfs(struct svc_rqst *rqstp, struct svc_fh *fhp, struct kstatfs *stat)
 {
 	int err = fh_verify(rqstp, fhp, 0, MAY_NOP);
 	if (!err && vfs_statfs(fhp->fh_dentry->d_inode->i_sb,stat))

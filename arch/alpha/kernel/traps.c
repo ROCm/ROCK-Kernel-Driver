@@ -148,7 +148,7 @@ void show_trace_task(struct task_struct * tsk)
 
 static int kstack_depth_to_print = 24;
 
-void show_stack(unsigned long *sp)
+void show_stack(struct task_struct *task, unsigned long *sp)
 {
 	unsigned long *stack;
 	int i;
@@ -174,7 +174,7 @@ void show_stack(unsigned long *sp)
 
 void dump_stack(void)
 {
-	show_stack(NULL);
+	show_stack(NULL, NULL);
 }
 
 void

@@ -1,5 +1,5 @@
 /* This version ported to the Linux-MTD system by dwmw2@infradead.org
- * $Id: ftl.c,v 1.50 2003/05/21 10:49:47 dwmw2 Exp $
+ * $Id: ftl.c,v 1.51 2003/06/23 12:00:08 dwmw2 Exp $
  *
  * Fixes: Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  * - fixes some leaks on failure in build_maps and ftl_notify_add, cleanups
@@ -984,37 +984,20 @@ static int ftl_write(partition_t *part, caddr_t buffer,
     return 0;
 } /* ftl_write */
 
-/*======================================================================
-
-    IOCTL calls for getting device parameters.
-
-======================================================================*/
-
-static int ftl_ioctl(struct mtd_blktrans_dev *dev, struct inode *inode, 
-		     struct file *file, u_int cmd, u_long arg)
+static int ftl_getgeo(struct mtd_blktrans_dev *dev, struct hd_geometry *geo)
 {
-    struct hd_geometry *geo = (struct hd_geometry *)arg;
-    partition_t *part = (void *)dev;
-    u_long sect;
+	partition_t *part = (void *)dev;
+	u_long sect;
 
-    switch (cmd) {
-    case HDIO_GETGEO:
-	/* Sort of arbitrary: round size down to 4K boundary */
+	/* Sort of arbitrary: round size down to 4KiB boundary */
 	sect = le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE;
-	if (put_user(1, (char *)&geo->heads) ||
-	    put_user(8, (char *)&geo->sectors) ||
-	    put_user((sect>>3), (short *)&geo->cylinders) ||
-	    put_user(0, (u_long *)&geo->start))
-		return -EFAULT;
 
-    case BLKFLSBUF:
-	    return 0;
-    }
-    return -ENOTTY;
-} /* ftl_ioctl */
+	geo->heads = 1;
+	geo->sectors = 8;
+	geo->cylinders = sect >> 3;
 
-
-/*======================================================================*/
+	return 0;
+}
 
 static int ftl_readsect(struct mtd_blktrans_dev *dev,
 			      unsigned long block, char *buf)
@@ -1102,7 +1085,7 @@ struct mtd_blktrans_ops ftl_tr = {
 	.part_bits	= PART_BITS,
 	.readsect	= ftl_readsect,
 	.writesect	= ftl_writesect,
-	.ioctl		= ftl_ioctl,
+	.getgeo		= ftl_getgeo,
 	.add_mtd	= ftl_add_mtd,
 	.remove_dev	= ftl_remove_dev,
 	.owner		= THIS_MODULE,
@@ -1110,7 +1093,7 @@ struct mtd_blktrans_ops ftl_tr = {
 
 int init_ftl(void)
 {
-	DEBUG(0, "$Id: ftl.c,v 1.50 2003/05/21 10:49:47 dwmw2 Exp $\n");
+	DEBUG(0, "$Id: ftl.c,v 1.51 2003/06/23 12:00:08 dwmw2 Exp $\n");
 
 	return register_mtd_blktrans(&ftl_tr);
 }

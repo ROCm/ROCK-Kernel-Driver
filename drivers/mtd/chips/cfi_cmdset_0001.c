@@ -4,7 +4,7 @@
  *
  * (C) 2000 Red Hat. GPL'd
  *
- * $Id: cfi_cmdset_0001.c,v 1.123 2003/05/28 12:51:48 dwmw2 Exp $
+ * $Id: cfi_cmdset_0001.c,v 1.126 2003/06/23 07:45:48 dwmw2 Exp $
  *
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
@@ -936,7 +936,7 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 	struct cfi_private *cfi = map->fldrv_priv;
 	cfi_word status, status_OK;
 	unsigned long cmd_adr, timeo;
-	int wbufsize, z, ret=0;
+	int wbufsize, z, ret=0, bytes, words;
 
 	wbufsize = CFIDEV_INTERLEAVE << cfi->cfiq->MaxBufWriteSize;
 	adr += chip->start;
@@ -995,10 +995,13 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 	}
 
 	/* Write length of data to come */
-	cfi_write(map, CMD(len/CFIDEV_BUSWIDTH-1), cmd_adr );
+	bytes = len & (CFIDEV_BUSWIDTH-1);
+	words = len / CFIDEV_BUSWIDTH;
+	cfi_write(map, CMD(words - !bytes), cmd_adr );
 
 	/* Write data */
-	for (z = 0; z < len; z += CFIDEV_BUSWIDTH) {
+	z = 0;
+	while(z < words * CFIDEV_BUSWIDTH) {
 		if (cfi_buswidth_is_1()) {
 			map_write8 (map, *((__u8*)buf)++, adr+z);
 		} else if (cfi_buswidth_is_2()) {
@@ -1007,6 +1010,26 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 			map_write32 (map, *((__u32*)buf)++, adr+z);
 		} else if (cfi_buswidth_is_8()) {
 			map_write64 (map, *((__u64*)buf)++, adr+z);
+		} else {
+			ret = -EINVAL;
+			goto out;
+		}
+		z += CFIDEV_BUSWIDTH;
+	}
+	if (bytes) {
+		int i = 0, n = 0;
+		u_char tmp_buf[8], *tmp_p = tmp_buf;
+
+		while (bytes--)
+			tmp_buf[i++] = buf[n++];
+		while (i < CFIDEV_BUSWIDTH)
+			tmp_buf[i++] = 0xff;
+		if (cfi_buswidth_is_2()) {
+			map_write16 (map, *((__u16*)tmp_p)++, adr+z);
+		} else if (cfi_buswidth_is_4()) {
+			map_write32 (map, *((__u32*)tmp_p)++, adr+z);
+		} else if (cfi_buswidth_is_8()) {
+			map_write64 (map, *((__u64*)tmp_p)++, adr+z);
 		} else {
 			ret = -EINVAL;
 			goto out;
@@ -1119,12 +1142,12 @@ static int cfi_intelext_write_buffers (struct mtd_info *mtd, loff_t to,
 	}
 
 	/* Write buffer is worth it only if more than one word to write... */
-	while(len > CFIDEV_BUSWIDTH) {
+	while(len) {
 		/* We must not cross write block boundaries */
 		int size = wbufsize - (ofs & (wbufsize-1));
 
 		if (size > len)
-			size = len & ~(CFIDEV_BUSWIDTH-1);
+			size = len;
 		ret = do_write_buffer(map, &cfi->chips[chipnum], 
 				      ofs, buf, size);
 		if (ret)
@@ -1142,17 +1165,6 @@ static int cfi_intelext_write_buffers (struct mtd_info *mtd, loff_t to,
 				return 0;
 		}
 	}
-
-	/* ... and write the remaining bytes */
-	if (len > 0) {
-		size_t local_retlen;
-		ret = cfi_intelext_write_words(mtd, ofs + (chipnum << cfi->chipshift),
-					       len, &local_retlen, buf);
-		if (ret)
-			return ret;
-		(*retlen) += local_retlen;
-	}
-
 	return 0;
 }
 
@@ -1423,6 +1435,7 @@ static void cfi_intelext_sync (struct mtd_info *mtd)
 			 * with the chip now anyway.
 			 */
 		}
+		spin_unlock(chip->mutex);
 	}
 
 	/* Unlock the chips again */

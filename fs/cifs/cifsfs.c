@@ -146,7 +146,7 @@ cifs_put_super(struct super_block *sb)
 }
 
 int
-cifs_statfs(struct super_block *sb, struct statfs *buf)
+cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int xid, rc;
 	struct cifs_sb_info *cifs_sb;

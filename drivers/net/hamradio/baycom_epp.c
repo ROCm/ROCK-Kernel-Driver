@@ -376,7 +376,6 @@ static int eppconfig(struct baycom_state *bc)
 	char portarg[16];
         char *argv[] = { eppconfig_path, "-s", "-p", portarg, "-m", modearg,
 			 NULL };
-        int ret;
 
 	/* set up arguments */
 	sprintf(modearg, "%sclk,%smodem,fclk=%d,bps=%d,divider=%d%s,extstat",
@@ -1164,7 +1163,6 @@ static int baycom_setmode(struct baycom_state *bc, const char *modestr)
 static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct baycom_state *bc;
-	struct baycom_ioctl bi;
 	struct hdlcdrv_ioctl hi;
 
 	baycom_paranoia_check(dev, "baycom_ioctl", -EINVAL);

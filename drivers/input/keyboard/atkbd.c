@@ -89,7 +89,7 @@ static unsigned char atkbd_set3_keycode[512] = {
 #define ATKBD_CMD_GETID		0x02f2
 #define ATKBD_CMD_ENABLE	0x00f4
 #define ATKBD_CMD_RESET_DIS	0x00f5
-#define ATKBD_CMD_RESET_BAT	0x01ff
+#define ATKBD_CMD_RESET_BAT	0x02ff
 #define ATKBD_CMD_SETALL_MB	0x00f8
 #define ATKBD_CMD_RESEND	0x00fe
 #define ATKBD_CMD_EX_ENABLE	0x10ea
@@ -255,7 +255,8 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 
 	while (atkbd->cmdcnt && timeout--) {
 
-		if (atkbd->cmdcnt == 1 && command == ATKBD_CMD_RESET_BAT)
+		if (atkbd->cmdcnt == 1 &&
+		    command == ATKBD_CMD_RESET_BAT && timeout > 100000)
 			timeout = 100000;
 
 		if (atkbd->cmdcnt == 1 && command == ATKBD_CMD_GETID &&
@@ -270,6 +271,9 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 	if (param)
 		for (i = 0; i < receive; i++)
 			param[i] = atkbd->cmdbuf[(receive - 1) - i];
+
+	if (command == ATKBD_CMD_RESET_BAT && atkbd->cmdcnt == 1)
+		atkbd->cmdcnt = 0;
 
 	if (atkbd->cmdcnt) {
 		atkbd->cmdcnt = 0;

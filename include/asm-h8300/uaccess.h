@@ -6,6 +6,8 @@
  */
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/string.h>
+
 #include <asm/segment.h>
 
 #define VERIFY_READ	0
@@ -159,7 +161,7 @@ static inline unsigned long
 clear_user(void *to, unsigned long n)
 {
 	memset(to, 0, n);
-    return(0);
+	return 0;
 }
 
 #endif /* _H8300_UACCESS_H */

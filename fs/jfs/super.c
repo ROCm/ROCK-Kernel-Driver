@@ -117,7 +117,7 @@ static void jfs_destroy_inode(struct inode *inode)
 	kmem_cache_free(jfs_inode_cachep, ji);
 }
 
-static int jfs_statfs(struct super_block *sb, struct statfs *buf)
+static int jfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	s64 maxinodes;

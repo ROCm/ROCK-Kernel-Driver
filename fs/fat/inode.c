@@ -1019,7 +1019,7 @@ out_fail:
 	return error;
 }
 
-int fat_statfs(struct super_block *sb,struct statfs *buf)
+int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int free,nr;
        

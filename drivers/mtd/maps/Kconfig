@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.11 2003/05/28 15:16:56 dwmw2 Exp $
+# $Id: Kconfig,v 1.12 2003/06/23 07:38:11 dwmw2 Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -476,7 +476,7 @@ config MTD_PCMCIA
 
 config MTD_UCLINUX
 	tristate "Generic uClinux RAM/ROM filesystem support"
-	depends on MTD_PARTITIONS
+	depends on MTD_PARTITIONS && !MMU
 	help
 	  Map driver to support image based filesystems for uClinux.
 

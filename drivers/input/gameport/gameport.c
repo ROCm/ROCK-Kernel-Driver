@@ -84,6 +84,7 @@ static int gameport_measure_speed(struct gameport *gameport)
 		if ((t = DELTA(t2,t1) - DELTA(t3,t2)) < tx) tx = t;
 	}
 
+	gameport_close(gameport);
 	return 59659 / (tx < 1 ? 1 : tx);
 
 #else
@@ -93,11 +94,10 @@ static int gameport_measure_speed(struct gameport *gameport)
 	j = jiffies; while (j == jiffies);
 	j = jiffies; while (j == jiffies) { t++; gameport_read(gameport); }
 
+	gameport_close(gameport);
 	return t * HZ / 1000;
 
 #endif
-
-	gameport_close(gameport);
 }
 
 static void gameport_find_dev(struct gameport *gameport)

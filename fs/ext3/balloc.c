@@ -54,7 +54,7 @@ struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 
 		return NULL;
 	}
-	
+
 	group_desc = block_group / EXT3_DESC_PER_BLOCK(sb);
 	desc = block_group % EXT3_DESC_PER_BLOCK(sb);
 	if (!EXT3_SB(sb)->s_group_desc[group_desc]) {
@@ -64,7 +64,7 @@ struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 			     block_group, group_desc, desc);
 		return NULL;
 	}
-	
+
 	gdp = (struct ext3_group_desc *) 
 	      EXT3_SB(sb)->s_group_desc[group_desc]->b_data;
 	if (bh)
@@ -83,7 +83,7 @@ read_block_bitmap(struct super_block *sb, unsigned int block_group)
 {
 	struct ext3_group_desc * desc;
 	struct buffer_head * bh = NULL;
-	
+
 	desc = ext3_get_group_desc (sb, block_group, NULL);
 	if (!desc)
 		goto error_out;
@@ -174,19 +174,19 @@ do_more:
 	err = ext3_journal_get_undo_access(handle, bitmap_bh, NULL);
 	if (err)
 		goto error_return;
-	
+
 	/*
 	 * We are about to modify some metadata.  Call the journal APIs
 	 * to unshare ->b_data if a currently-committing transaction is
 	 * using it
 	 */
 	BUFFER_TRACE(gd_bh, "get_write_access");
-	err = ext3_journal_get_write_access(handle, gd_bh);	
+	err = ext3_journal_get_write_access(handle, gd_bh);
 	if (err)
 		goto error_return;
 
 	jbd_lock_bh_state(bitmap_bh);
-	
+
 	for (i = 0; i < count; i++) {
 		/*
 		 * An HJ special.  This is expensive...
@@ -316,7 +316,7 @@ static int find_next_usable_block(int start, struct buffer_head *bh,
 {
 	int here, next;
 	char *p, *r;
-	
+
 	if (start > 0) {
 		/*
 		 * The goal was occupied; search forward for a free 
@@ -331,15 +331,14 @@ static int find_next_usable_block(int start, struct buffer_head *bh,
 		if (here < end_goal &&
 			ext3_test_allocatable(here, bh, have_access))
 			return here;
-		
-		ext3_debug ("Bit not found near goal\n");
-		
-	}
 	
+		ext3_debug ("Bit not found near goal\n");
+	}
+
 	here = start;
 	if (here < 0)
 		here = 0;
-	
+
 	/*
 	 * There has been no free block found in the near vicinity of
 	 * the goal: do a search forward through the block groups,
@@ -351,10 +350,10 @@ static int find_next_usable_block(int start, struct buffer_head *bh,
 	p = ((char *) bh->b_data) + (here >> 3);
 	r = memscan(p, 0, (maxblocks - here + 7) >> 3);
 	next = (r - ((char *) bh->b_data)) << 3;
-	
+
 	if (next < maxblocks && ext3_test_allocatable(next, bh, have_access))
 		return next;
-	
+
 	/* The bitmap search --- search forward alternately
 	 * through the actual bitmap and the last-committed copy
 	 * until we find a bit free in both. */
@@ -547,7 +546,7 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 				EXT3_BLOCKS_PER_GROUP(sb));
 		bitmap_bh = read_block_bitmap(sb, group_no);
 		if (!bitmap_bh)
-			goto io_error;	
+			goto io_error;
 		ret_block = ext3_try_to_allocate(sb, handle, group_no,
 					bitmap_bh, ret_block, &fatal);
 		if (fatal)
@@ -555,7 +554,7 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 		if (ret_block >= 0)
 			goto allocated;
 	}
-	
+
 	/*
 	 * Now search the rest of the groups.  We assume that 
 	 * i and gdp correctly point to the last group visited.
@@ -675,7 +674,7 @@ allocated:
 	*errp = 0;
 	brelse(bitmap_bh);
 	return ret_block;
-	
+
 io_error:
 	*errp = -EIO;
 out:
@@ -690,7 +689,6 @@ out:
 		DQUOT_FREE_BLOCK(inode, 1);
 	brelse(bitmap_bh);
 	return 0;
-	
 }
 
 unsigned long ext3_count_free_blocks(struct super_block *sb)
@@ -702,7 +700,7 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 	struct ext3_super_block *es;
 	unsigned long bitmap_count, x;
 	struct buffer_head *bitmap_bh = NULL;
-	
+
 	lock_super(sb);
 	es = EXT3_SB(sb)->s_es;
 	desc_count = 0;
@@ -717,7 +715,7 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 		bitmap_bh = read_block_bitmap(sb, i);
 		if (bitmap_bh == NULL)
 			continue;
-		
+
 		x = ext3_count_free(bitmap_bh, sb->s_blocksize);
 		printk("group %d: stored = %d, counted = %lu\n",
 			i, le16_to_cpu(gdp->bg_free_blocks_count), x);

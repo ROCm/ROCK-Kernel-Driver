@@ -259,15 +259,41 @@ void flush_workqueue(struct workqueue_struct *wq)
 	}
 }
 
+static int create_workqueue_thread(struct workqueue_struct *wq,
+				   const char *name,
+				   int cpu)
+{
+	startup_t startup;
+	struct cpu_workqueue_struct *cwq = wq->cpu_wq + cpu;
+	int ret;
+
+	spin_lock_init(&cwq->lock);
+	cwq->wq = wq;
+	cwq->thread = NULL;
+	cwq->insert_sequence = 0;
+	cwq->remove_sequence = 0;
+	INIT_LIST_HEAD(&cwq->worklist);
+	init_waitqueue_head(&cwq->more_work);
+	init_waitqueue_head(&cwq->work_done);
+	init_completion(&cwq->exit);
+
+	init_completion(&startup.done);
+	startup.cwq = cwq;
+	startup.name = name;
+	ret = kernel_thread(worker_thread, &startup, CLONE_FS | CLONE_FILES);
+	if (ret >= 0) {
+		wait_for_completion(&startup.done);
+		BUG_ON(!cwq->thread);
+	}
+	return ret;
+}
+
 struct workqueue_struct *create_workqueue(const char *name)
 {
-	int ret, cpu, destroy = 0;
-	struct cpu_workqueue_struct *cwq;
-	startup_t startup;
+	int cpu, destroy = 0;
 	struct workqueue_struct *wq;
 
 	BUG_ON(strlen(name) > 10);
-	startup.name = name;
 
 	wq = kmalloc(sizeof(*wq), GFP_KERNEL);
 	if (!wq)
@@ -276,27 +302,8 @@ struct workqueue_struct *create_workqueue(const char *name)
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))
 			continue;
-		cwq = wq->cpu_wq + cpu;
-
-		spin_lock_init(&cwq->lock);
-		cwq->wq = wq;
-		cwq->thread = NULL;
-		cwq->insert_sequence = 0;
-		cwq->remove_sequence = 0;
-		INIT_LIST_HEAD(&cwq->worklist);
-		init_waitqueue_head(&cwq->more_work);
-		init_waitqueue_head(&cwq->work_done);
-
-		init_completion(&startup.done);
-		startup.cwq = cwq;
-		ret = kernel_thread(worker_thread, &startup,
-						CLONE_FS | CLONE_FILES);
-		if (ret < 0)
+		if (create_workqueue_thread(wq, name, cpu) < 0)
 			destroy = 1;
-		else {
-			wait_for_completion(&startup.done);
-			BUG_ON(!cwq->thread);
-		}
 	}
 	/*
 	 * Was there any error during startup? If yes then clean up:
@@ -308,27 +315,29 @@ struct workqueue_struct *create_workqueue(const char *name)
 	return wq;
 }
 
-void destroy_workqueue(struct workqueue_struct *wq)
+static void cleanup_workqueue_thread(struct workqueue_struct *wq, int cpu)
 {
 	struct cpu_workqueue_struct *cwq;
+
+	cwq = wq->cpu_wq + cpu;
+	if (cwq->thread) {
+		/* Tell thread to exit and wait for it. */
+		cwq->thread = NULL;
+		wake_up(&cwq->more_work);
+
+		wait_for_completion(&cwq->exit);
+	}
+}
+
+void destroy_workqueue(struct workqueue_struct *wq)
+{
 	int cpu;
 
 	flush_workqueue(wq);
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
-		cwq = wq->cpu_wq + cpu;
-		if (!cwq->thread)
-			continue;
-		/*
-		 * Initiate an exit and wait for it:
-		 */
-		init_completion(&cwq->exit);
-		cwq->thread = NULL;
-		wake_up(&cwq->more_work);
-
-		wait_for_completion(&cwq->exit);
+		if (cpu_online(cpu))
+			cleanup_workqueue_thread(wq, cpu);
 	}
 	kfree(wq);
 }
