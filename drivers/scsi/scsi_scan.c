@@ -254,10 +254,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	sdev->request_queue->queuedata = sdev;
 	scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
 
-	if (shost->transportt->device_setup) {
-		if (shost->transportt->device_setup(sdev))
-			goto out_free_queue;
-	}
+	scsi_sysfs_device_initialize(sdev);
 
 	if (shost->hostt->slave_alloc) {
 		ret = shost->hostt->slave_alloc(sdev);
@@ -272,10 +269,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		}
 	}
 
-	if (scsi_sysfs_device_initialize(sdev) != 0)
-		goto out_cleanup_slave;
-
-
 	/* NOTE: this target initialisation code depends critically on
 	 * lun scanning being sequential. */
 	if (scsi_sysfs_target_initialize(sdev))
@@ -288,13 +281,11 @@ out_remove_siblings:
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 	spin_unlock_irqrestore(shost->host_lock, flags);
-out_cleanup_slave:
+
 	if (shost->hostt->slave_destroy)
 		shost->hostt->slave_destroy(sdev);
 out_device_destroy:
-	if (shost->transportt->device_destroy)
-		shost->transportt->device_destroy(sdev);
-out_free_queue:
+	transport_destroy_device(&sdev->sdev_gendev);
 	scsi_free_queue(sdev->request_queue);
 out_free_dev:
 	kfree(sdev);
@@ -629,8 +620,7 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (*bflags & BLIST_NOT_LOCKABLE)
 		sdev->lockable = 0;
 
-	if (sdev->host->transportt->device_configure)
-		sdev->host->transportt->device_configure(sdev);
+	transport_configure_device(&sdev->sdev_gendev);
 
 	if (sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
@@ -749,8 +739,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	} else {
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
-		if (sdev->host->transportt->device_destroy)
-			sdev->host->transportt->device_destroy(sdev);
+		transport_destroy_device(&sdev->sdev_gendev);
 		put_device(&sdev->sdev_gendev);
 	}
  out:
@@ -1330,8 +1319,7 @@ void scsi_free_host_dev(struct scsi_device *sdev)
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
-	if (sdev->host->transportt->device_destroy)
-		sdev->host->transportt->device_destroy(sdev);
+	transport_destroy_device(&sdev->sdev_gendev);
 	put_device(&sdev->sdev_gendev);
 }
 EXPORT_SYMBOL(scsi_free_host_dev);

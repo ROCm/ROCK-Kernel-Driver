@@ -2,6 +2,7 @@
  *  Parallel SCSI (SPI) transport specific attributes exported to sysfs.
  *
  *  Copyright (c) 2003 Silicon Graphics, Inc.  All rights reserved.
+ *  Copyright (c) 2004, 2005 James Bottomley <James.Bottomley@SteelEye.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -36,9 +37,6 @@
 #include <scsi/scsi_transport_spi.h>
 
 #define SPI_PRINTK(x, l, f, a...)	dev_printk(l, &(x)->dev, f , ##a)
-
-static void transport_class_release(struct class_device *class_dev);
-static void host_class_release(struct class_device *class_dev);
 
 #define SPI_NUM_ATTRS 10	/* increase this if you add attributes */
 #define SPI_OTHER_ATTRS 1	/* Increase this if you add "always
@@ -119,40 +117,39 @@ static inline enum spi_signal_type spi_signal_to_value(const char *name)
 	return SPI_SIGNAL_UNKNOWN;
 }
 
-
-struct class spi_transport_class = {
-	.name = "spi_transport",
-	.release = transport_class_release,
-};
-
-struct class spi_host_class = {
-	.name = "spi_host",
-	.release = host_class_release,
-};
-
-static __init int spi_transport_init(void)
+static int spi_host_setup(struct device *dev)
 {
-	int error = class_register(&spi_host_class);
-	if (error)
-		return error;
-	return class_register(&spi_transport_class);
-}
+	struct Scsi_Host *shost = dev_to_shost(dev);
 
-static void __exit spi_transport_exit(void)
-{
-	class_unregister(&spi_transport_class);
-	class_unregister(&spi_host_class);
-}
-
-static int spi_setup_host_attrs(struct Scsi_Host *shost)
-{
 	spi_signalling(shost) = SPI_SIGNAL_UNKNOWN;
 
 	return 0;
 }
 
-static int spi_configure_device(struct scsi_device *sdev)
+static DECLARE_TRANSPORT_CLASS(spi_host_class,
+			       "spi_host",
+			       spi_host_setup,
+			       NULL,
+			       NULL);
+
+static int spi_host_match(struct attribute_container *cont,
+			  struct device *dev)
 {
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_host_device(dev))
+		return 0;
+
+	shost = dev_to_shost(dev);
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &spi_host_class.class)
+		return 0;
+	return 1;
+}
+
+static int spi_device_configure(struct device *dev)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
 	struct scsi_target *starget = sdev->sdev_target;
 
 	/* Populate the target capability fields with the values
@@ -168,8 +165,10 @@ static int spi_configure_device(struct scsi_device *sdev)
 	return 0;
 }
 
-static int spi_setup_transport_attrs(struct scsi_target *starget)
+static int spi_setup_transport_attrs(struct device *dev)
 {
+	struct scsi_target *starget = to_scsi_target(dev);
+
 	spi_period(starget) = -1;	/* illegal value */
 	spi_offset(starget) = 0;	/* async */
 	spi_width(starget) = 0;	/* narrow */
@@ -185,18 +184,6 @@ static int spi_setup_transport_attrs(struct scsi_target *starget)
 	init_MUTEX(&spi_dv_sem(starget));
 
 	return 0;
-}
-
-static void transport_class_release(struct class_device *class_dev)
-{
-	struct scsi_target *starget = transport_class_to_starget(class_dev);
-	put_device(&starget->dev);
-}
-
-static void host_class_release(struct class_device *class_dev)
-{
-	struct Scsi_Host *shost = transport_class_to_shost(class_dev);
-	put_device(&shost->shost_gendev);
 }
 
 #define spi_transport_show_function(field, format_string)		\
@@ -823,6 +810,48 @@ EXPORT_SYMBOL(spi_schedule_dv_device);
 	i->host_attrs[count] = &i->private_host_attrs[count];		\
 	count++
 
+static int spi_device_match(struct attribute_container *cont,
+			    struct device *dev)
+{
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_sdev_device(dev))
+		return 0;
+
+	sdev = to_scsi_device(dev);
+	shost = sdev->host;
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &spi_host_class.class)
+		return 0;
+	return 1;
+}
+
+static int spi_target_match(struct attribute_container *cont,
+			    struct device *dev)
+{
+	struct Scsi_Host *shost;
+
+	if (!scsi_is_target_device(dev))
+		return 0;
+
+	shost = dev_to_shost(dev->parent);
+	if (!shost->transportt  || shost->transportt->host_attrs.class
+	    != &spi_host_class.class)
+		return 0;
+	return 1;
+}
+
+static DECLARE_TRANSPORT_CLASS(spi_transport_class,
+			       "spi_transport",
+			       spi_setup_transport_attrs,
+			       NULL,
+			       NULL);
+
+static DECLARE_ANON_TRANSPORT_CLASS(spi_device_class,
+				    spi_device_match,
+				    spi_device_configure);
+
 struct scsi_transport_template *
 spi_attach_transport(struct spi_function_template *ft)
 {
@@ -835,14 +864,15 @@ spi_attach_transport(struct spi_function_template *ft)
 	memset(i, 0, sizeof(struct spi_internal));
 
 
-	i->t.target_attrs = &i->attrs[0];
-	i->t.target_class = &spi_transport_class;
-	i->t.target_setup = &spi_setup_transport_attrs;
-	i->t.device_configure = &spi_configure_device;
+	i->t.target_attrs.class = &spi_transport_class.class;
+	i->t.target_attrs.attrs = &i->attrs[0];
+	i->t.target_attrs.match = spi_target_match;
+	attribute_container_register(&i->t.target_attrs);
 	i->t.target_size = sizeof(struct spi_transport_attrs);
-	i->t.host_attrs = &i->host_attrs[0];
-	i->t.host_class = &spi_host_class;
-	i->t.host_setup = &spi_setup_host_attrs;
+	i->t.host_attrs.class = &spi_host_class.class;
+	i->t.host_attrs.attrs = &i->host_attrs[0];
+	i->t.host_attrs.match = spi_host_match;
+	attribute_container_register(&i->t.host_attrs);
 	i->t.host_size = sizeof(struct spi_host_attrs);
 	i->f = ft;
 
@@ -884,6 +914,21 @@ void spi_release_transport(struct scsi_transport_template *t)
 }
 EXPORT_SYMBOL(spi_release_transport);
 
+static __init int spi_transport_init(void)
+{
+	int error = transport_class_register(&spi_transport_class);
+	if (error)
+		return error;
+	error = anon_transport_class_register(&spi_device_class);
+	return transport_class_register(&spi_host_class);
+}
+
+static void __exit spi_transport_exit(void)
+{
+	transport_class_unregister(&spi_transport_class);
+	anon_transport_class_unregister(&spi_device_class);
+	transport_class_unregister(&spi_host_class);
+}
 
 MODULE_AUTHOR("Martin Hicks");
 MODULE_DESCRIPTION("SPI Transport Attributes");

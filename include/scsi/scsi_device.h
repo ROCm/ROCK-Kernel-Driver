@@ -123,8 +123,6 @@ struct scsi_device {
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;
 
-	struct class_device	transport_classdev;
-
 	enum scsi_device_state sdev_state;
 	unsigned long		sdev_data[0];
 } __attribute__((aligned(sizeof(unsigned long))));
@@ -133,7 +131,7 @@ struct scsi_device {
 #define	class_to_sdev(d)	\
 	container_of(d, struct scsi_device, sdev_classdev)
 #define transport_class_to_sdev(class_dev) \
-	container_of(class_dev, struct scsi_device, transport_classdev)
+	to_scsi_device(class_dev->dev)
 
 /*
  * scsi_target: representation of a scsi target, for now, this is only
@@ -146,7 +144,6 @@ struct scsi_target {
 	unsigned int		channel;
 	unsigned int		id; /* target id ... replace
 				     * scsi_device.id eventually */
-	struct class_device	transport_classdev;
 	unsigned long		create:1; /* signal that it needs to be added */
 	unsigned long		starget_data[0];
 } __attribute__((aligned(sizeof(unsigned long))));
@@ -157,7 +154,7 @@ static inline struct scsi_target *scsi_target(struct scsi_device *sdev)
 	return to_scsi_target(sdev->sdev_gendev.parent);
 }
 #define transport_class_to_starget(class_dev) \
-	container_of(class_dev, struct scsi_target, transport_classdev)
+	to_scsi_target(class_dev->dev)
 
 extern struct scsi_device *__scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint, void *hostdata);
@@ -226,6 +223,8 @@ extern void scsi_device_resume(struct scsi_device *sdev);
 extern void scsi_target_quiesce(struct scsi_target *);
 extern void scsi_target_resume(struct scsi_target *);
 extern const char *scsi_device_state_name(enum scsi_device_state);
+extern int scsi_is_sdev_device(const struct device *);
+extern int scsi_is_target_device(const struct device *);
 static inline int scsi_device_online(struct scsi_device *sdev)
 {
 	return sdev->sdev_state != SDEV_OFFLINE;
