@@ -826,7 +826,14 @@ SystemCall_common:
 _GLOBAL(do_hash_page_ISI)
 	li	r4,0
 _GLOBAL(do_hash_page_DSI)
-	rlwimi	r4,r23,32-13,30,30	/* Insert MSR_PR as _PAGE_USER */
+	/*
+	 * We need to set the _PAGE_USER bit if MSR_PR is set or if we are
+	 * accessing a userspace segment (even from the kernel). We assume
+	 * kernel addresses always have the high bit set.
+	 */
+	rotldi	r0,r3,15		/* Move high bit into MSR_PR position */
+	orc	r0,r23,r0
+	rlwimi	r4,r0,32-13,30,30	/* Insert into _PAGE_USER */
 	ori	r4,r4,1			/* add _PAGE_PRESENT */
 
 	mflr	r21			/* Save LR in r21 */
