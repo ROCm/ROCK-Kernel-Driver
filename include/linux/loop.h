@@ -70,7 +70,6 @@ typedef	int (* transfer_proc_t)(struct loop_device *, int cmd,
  */
 #define LO_FLAGS_DO_BMAP	1
 #define LO_FLAGS_READ_ONLY	2
-#define LO_FLAGS_BH_REMAP	4
 
 #include <asm/posix_types.h>	/* for __kernel_old_dev_t */
 #include <asm/types.h>		/* for __u64 */

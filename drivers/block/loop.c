@@ -120,12 +120,6 @@ static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
 	return 0;
 }
 
-static int none_status(struct loop_device *lo, const struct loop_info64 *info)
-{
-	lo->lo_flags |= LO_FLAGS_BH_REMAP;
-	return 0;
-}
-
 static int xor_status(struct loop_device *lo, const struct loop_info64 *info)
 {
 	if (info->lo_encrypt_key_size <= 0)
@@ -136,7 +130,6 @@ static int xor_status(struct loop_device *lo, const struct loop_info64 *info)
 struct loop_func_table none_funcs = { 
 	.number = LO_CRYPT_NONE,
 	.transfer = transfer_none,
-	.init = none_status,
 }; 	
 
 struct loop_func_table xor_funcs = { 
@@ -481,14 +474,6 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 	struct bio *bio;
 
 	/*
-	 * for xfer_funcs that can operate on the same bh, do that
-	 */
-	if (lo->lo_flags & LO_FLAGS_BH_REMAP) {
-		bio = rbh;
-		goto out_bh;
-	}
-
-	/*
 	 * When called on the page reclaim -> writepage path, this code can
 	 * trivially consume all memory.  So we drop PF_MEMALLOC to avoid
 	 * stealing all the page reserves and throttle to the writeout rate.
@@ -507,8 +492,6 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 
 	bio->bi_end_io = loop_end_io_transfer;
 	bio->bi_private = rbh;
-
-out_bh:
 	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
 	bio->bi_rw = rbh->bi_rw;
 	bio->bi_bdev = lo->lo_device;
