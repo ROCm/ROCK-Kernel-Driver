@@ -137,9 +137,4 @@ static inline struct vio_dev *to_vio_dev(struct device *dev)
 	return container_of(dev, struct vio_dev, dev);
 }
 
-static inline int vio_dma_mapping_error(dma_addr_t dma_addr)
-{
-	return dma_mapping_error(dma_addr);
-}
-
 #endif /* _ASM_VIO_H */
