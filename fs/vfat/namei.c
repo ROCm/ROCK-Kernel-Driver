@@ -117,6 +117,17 @@ vfat_strnicmp(struct nls_table *t, const unsigned char *s1,
 	return 0;
 }
 
+/* returns the length of a struct qstr, ignoring trailing dots */
+static unsigned int vfat_striptail_len(struct qstr *qstr)
+{
+	unsigned int len = qstr->len;
+
+	while (len && qstr->name[len-1] == '.')
+		len--;
+
+	return len;
+}
+
 /*
  * Compute the hash for the vfat name corresponding to the dentry.
  * Note: if the name is invalid, we leave the hash code unchanged so
@@ -125,15 +136,7 @@ vfat_strnicmp(struct nls_table *t, const unsigned char *s1,
  */
 static int vfat_hash(struct dentry *dentry, struct qstr *qstr)
 {
-	const unsigned char *name;
-	int len;
-
-	len = qstr->len;
-	name = qstr->name;
-	while (len && name[len-1] == '.')
-		len--;
-
-	qstr->hash = full_name_hash(name, len);
+	qstr->hash = full_name_hash(qstr->name, vfat_striptail_len(qstr));
 
 	return 0;
 }
@@ -148,13 +151,11 @@ static int vfat_hashi(struct dentry *dentry, struct qstr *qstr)
 {
 	struct nls_table *t = MSDOS_SB(dentry->d_inode->i_sb)->nls_io;
 	const unsigned char *name;
-	int len;
+	unsigned int len;
 	unsigned long hash;
 
-	len = qstr->len;
 	name = qstr->name;
-	while (len && name[len-1] == '.')
-		len--;
+	len = vfat_striptail_len(qstr);
 
 	hash = init_name_hash();
 	while (len--)
@@ -170,15 +171,11 @@ static int vfat_hashi(struct dentry *dentry, struct qstr *qstr)
 static int vfat_cmpi(struct dentry *dentry, struct qstr *a, struct qstr *b)
 {
 	struct nls_table *t = MSDOS_SB(dentry->d_inode->i_sb)->nls_io;
-	int alen, blen;
+	unsigned int alen, blen;
 
 	/* A filename cannot end in '.' or we treat it like it has none */
-	alen = a->len;
-	blen = b->len;
-	while (alen && a->name[alen-1] == '.')
-		alen--;
-	while (blen && b->name[blen-1] == '.')
-		blen--;
+	alen = vfat_striptail_len(a);
+	blen = vfat_striptail_len(b);
 	if (alen == blen) {
 		if (vfat_strnicmp(t, a->name, b->name, alen) == 0)
 			return 0;
@@ -191,15 +188,11 @@ static int vfat_cmpi(struct dentry *dentry, struct qstr *a, struct qstr *b)
  */
 static int vfat_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b)
 {
-	int alen, blen;
+	unsigned int alen, blen;
 
 	/* A filename cannot end in '.' or we treat it like it has none */
-	alen = a->len;
-	blen = b->len;
-	while (alen && a->name[alen-1] == '.')
-		alen--;
-	while (blen && b->name[blen-1] == '.')
-		blen--;
+	alen = vfat_striptail_len(a);
+	blen = vfat_striptail_len(b);
 	if (alen == blen) {
 		if (strncmp(a->name, b->name, alen) == 0)
 			return 0;
@@ -764,7 +757,7 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 	struct msdos_dir_slot *dir_slots;
 	loff_t offset;
 	int slots, slot;
-	int res, len;
+	int res;
 	struct msdos_dir_entry *dummy_de;
 	struct buffer_head *dummy_bh;
 	loff_t dummy_i_pos;
@@ -774,10 +767,7 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 	if (dir_slots == NULL)
 		return -ENOMEM;
 
-	len = qname->len;
-	while (len && qname->name[len-1] == '.')
-		len--;
-	res = vfat_build_slots(dir, qname->name, len,
+	res = vfat_build_slots(dir, qname->name, vfat_striptail_len(qname),
 			       dir_slots, &slots, is_dir);
 	if (res < 0)
 		goto cleanup;
@@ -828,12 +818,9 @@ static int vfat_find(struct inode *dir,struct qstr* qname,
 {
 	struct super_block *sb = dir->i_sb;
 	loff_t offset;
-	int res,len;
+	int res;
 
-	len = qname->len;
-	while (len && qname->name[len-1] == '.') 
-		len--;
-	res = fat_search_long(dir, qname->name, len,
+	res = fat_search_long(dir, qname->name, vfat_striptail_len(qname),
 			(MSDOS_SB(sb)->options.name_check != 's'),
 			&offset,&sinfo->longname_offset);
 	if (res>0) {
