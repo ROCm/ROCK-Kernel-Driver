@@ -584,24 +584,6 @@ extern int request_irq(unsigned int,
 extern void free_irq(unsigned int, void *);
 
 /*
- * This has now become a routine instead of a macro, it sets a flag if
- * it returns true (to do BSD-style accounting where the process is flagged
- * if it uses root privs). The implication of this is that you should do
- * normal permissions checks first, and check fsuser() last.
- *
- * suser() is gone, fsuser() should go soon too...
- */
-
-static inline int fsuser(void)
-{
-	if (!issecure(SECURE_NOROOT) && current->fsuid == 0) {
-		current->flags |= PF_SUPERPRIV;
-		return 1;
-	}
-	return 0;
-}
-
-/*
  * capable() checks for a particular capability.
  * See include/linux/capability.h for defined capabilities.
  */
