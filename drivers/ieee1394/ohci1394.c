@@ -2376,10 +2376,6 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 		event &= ~OHCI1394_busReset;
 	}
 
-	/* XXX: We need a way to also queue the OHCI1394_reqTxComplete,
-	 * but for right now we simply run it upon reception, to make sure
-	 * we get sent acks before response packets. This sucks mainly
-	 * because it halts the interrupt handler.  */
 	if (event & OHCI1394_reqTxComplete) {
 		struct dma_trm_ctx *d = &ohci->at_req_context;
 		DBGMSG(ohci->id, "Got reqTxComplete interrupt "
@@ -2388,7 +2384,7 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 			ohci1394_stop_context(ohci, d->ctrlClear,
 					      "reqTxComplete");
 		else
-			dma_trm_tasklet ((unsigned long)d);
+			tasklet_schedule(&d->task);
 		event &= ~OHCI1394_reqTxComplete;
 	}
 	if (event & OHCI1394_respTxComplete) {
