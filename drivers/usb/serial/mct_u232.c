@@ -521,15 +521,25 @@ static void mct_u232_read_int_callback (struct urb *urb)
 	struct usb_serial *serial = port->serial;
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
+	int status;
 
         dbg("%s - port %d", __FUNCTION__, port->number);
 
-	/* The urb might have been killed. */
-        if (urb->status) {
-                dbg("%s - nonzero read bulk status received: %d", __FUNCTION__,
-		    urb->status);
-                return;
-        }
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
+
 	if (!serial) {
 		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
 		return;
@@ -549,8 +559,7 @@ static void mct_u232_read_int_callback (struct urb *urb)
 			}
 			tty_flip_buffer_push(tty);
 		}
-		/* INT urbs are automatically re-submitted */
-		return;
+		goto exit;
 	}
 	
 	/*
@@ -587,8 +596,11 @@ static void mct_u232_read_int_callback (struct urb *urb)
 		}
 	}
 #endif
-
-	/* INT urbs are automatically re-submitted */
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 } /* mct_u232_read_int_callback */
 
 

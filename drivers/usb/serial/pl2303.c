@@ -592,25 +592,36 @@ static void pl2303_read_int_callback (struct urb *urb)
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	//unsigned char *data = urb->transfer_buffer;
-	//int i;
+	int status;
 
-//ints auto restart...
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+		goto exit;
+	}
 
 	if (!serial) {
 		return;
 	}
 
-	if (urb->status) {
-		urb->status = 0;
-		return;
-	}
-
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
-#if 0
-//FIXME need to update state of terminal lines variable
-#endif
 
-	return;
+	//FIXME need to update state of terminal lines variable
+
+exit:
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 
