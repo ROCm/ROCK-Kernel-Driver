@@ -21,7 +21,7 @@
 
 struct task_struct;
 
-extern struct task_struct *resume(void *, void *);
+extern struct task_struct *__switch_to(void *, void *);
 
 #ifdef __s390x__
 #define __FLAG_SHIFT 56
@@ -88,7 +88,7 @@ static inline void restore_fp_regs(s390_fp_regs *fpregs)
 		break;							     \
 	save_fp_regs(&prev->thread.fp_regs);				     \
 	restore_fp_regs(&next->thread.fp_regs);				     \
-	prev = resume(prev,next);					     \
+	prev = __switch_to(prev,next);					     \
 } while (0)
 
 #define nop() __asm__ __volatile__ ("nop")

@@ -111,16 +111,16 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
  * Returns:
  *  gpr2 = prev
  */
-        .globl  resume
-resume:
+        .globl  __switch_to
+__switch_to:
 	tm	__THREAD_per+4(%r3),0xe8 # is the new process using per ?
-	jz	resume_noper		# if not we're fine
+	jz	__switch_to_noper		# if not we're fine
         stctg   %c9,%c11,48(%r15)       # We are using per stuff
         clc     __THREAD_per(24,%r3),48(%r15)
-        je      resume_noper            # we got away without bashing TLB's
+        je      __switch_to_noper            # we got away without bashing TLB's
         lctlg   %c9,%c11,__THREAD_per(%r3)	# Nope we didn't
-resume_noper:
-        stmg    %r6,%r15,48(%r15)       # store resume registers of prev task
+__switch_to_noper:
+        stmg    %r6,%r15,48(%r15)       # store __switch_to registers of prev task
 	stg	%r15,__THREAD_ksp(%r2)	# store kernel stack to prev->tss.ksp
 	lg	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
         stam    %a2,%a2,__THREAD_ar2(%r2)	# store kernel access reg. 2
@@ -187,6 +187,8 @@ sysc_noemu:
 
 sysc_return:
 	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
+        tm      SP_PSW+1(%r15),0x01    # returning to user ?
+        jno     sysc_leave
 	tm	__TI_flags+7(%r9),_TIF_WORK_SVC
 	jnz	sysc_work         # there is work to do (signals etc.)
 sysc_leave:

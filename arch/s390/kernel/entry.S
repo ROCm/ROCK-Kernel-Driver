@@ -123,18 +123,18 @@ entry_base:
  * Returns:
  *  gpr2 = prev
  */
-        .globl  resume
-resume:
+        .globl  __switch_to
+__switch_to:
         basr    %r1,0
-resume_base:
+__switch_to_base:
 	tm	__THREAD_per(%r3),0xe8		# new process is using per ?
-	bz	resume_noper-resume_base(%r1)	# if not we're fine
+	bz	__switch_to_noper-__switch_to_base(%r1)	# if not we're fine
         stctl   %c9,%c11,24(%r15)		# We are using per stuff
         clc     __THREAD_per(12,%r3),24(%r15)
-        be      resume_noper-resume_base(%r1)	# we got away w/o bashing TLB's
+        be      __switch_to_noper-__switch_to_base(%r1)	# we got away w/o bashing TLB's
         lctl    %c9,%c11,__THREAD_per(%r3)	# Nope we didn't
-resume_noper:
-        stm     %r6,%r15,24(%r15)       # store resume registers of prev task
+__switch_to_noper:
+        stm     %r6,%r15,24(%r15)       # store __switch_to registers of prev task
 	st	%r15,__THREAD_ksp(%r2)	# store kernel stack to prev->tss.ksp
 	l	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
 	stam    %a2,%a2,__THREAD_ar2(%r2)	# store kernel access reg. 2
@@ -199,6 +199,8 @@ sysc_do_restart:
 
 sysc_return:
 	stnsm   24(%r15),0xfc     # disable I/O and ext. interrupts
+	tm	SP_PSW+1(%r15),0x01	# returning to user ?
+	bno	BASED(sysc_leave)
 	tm	__TI_flags+3(%r9),_TIF_WORK_SVC
 	bnz	BASED(sysc_work)  # there is work to do (signals etc.)
 sysc_leave:

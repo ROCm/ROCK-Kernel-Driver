@@ -55,6 +55,14 @@ static u64 xtime_cc;
 
 extern unsigned long wall_jiffies;
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	return (get_clock() - jiffies_timer_cc) >> 2;
+}
+
 void tod_to_timeval(__u64 todval, struct timespec *xtime)
 {
 	unsigned long long sec;
@@ -70,8 +78,7 @@ static inline unsigned long do_gettimeoffset(void)
 {
 	__u64 now;
 
-	asm volatile ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
-        now = (now - jiffies_timer_cc) >> 12;
+        now = (get_clock() - jiffies_timer_cc) >> 12;
 	/* We require the offset from the latest update of xtime */
 	now -= (__u64) wall_jiffies*USECS_PER_JIFFY;
 	return (unsigned long) now;
@@ -165,8 +172,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 	__u32 ticks;
 
 	/* Calculate how many ticks have passed. */
-	asm volatile ("STCK 0(%0)" : : "a" (&tmp) : "memory", "cc");
-	tmp = tmp - S390_lowcore.jiffy_timer;
+	tmp = get_clock() - S390_lowcore.jiffy_timer;
 	if (tmp >= 2*CLK_TICKS_PER_JIFFY) {  /* more than one tick ? */
 		ticks = __calculate_ticks(tmp);
 		S390_lowcore.jiffy_timer +=

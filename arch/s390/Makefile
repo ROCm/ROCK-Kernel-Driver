@@ -30,7 +30,7 @@ endif
 
 cflags-$(CONFIG_MARCH_G5)   += $(call check_gcc,-march=g5,)
 cflags-$(CONFIG_MARCH_Z900) += $(call check_gcc,-march=z900,)
-cflags-$(CONFIG_MARCH_Z990) += $(call check_gcc,-march=trex,)
+cflags-$(CONFIG_MARCH_Z990) += $(call check_gcc,-march=z990,)
 
 CFLAGS		+= $(cflags-y)
 CFLAGS		+= $(call check_gcc,-finline-limit=10000,)

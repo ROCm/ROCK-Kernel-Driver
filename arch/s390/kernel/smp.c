@@ -231,6 +231,18 @@ void machine_restart_smp(char * __unused)
         on_each_cpu(do_machine_restart, NULL, 0, 0);
 }
 
+static void do_wait_for_stop(void)
+{
+	unsigned long cr[16];
+
+	__ctl_store(cr, 0, 15);
+	cr[0] &= ~0xffff;
+	cr[6] = 0;
+	__ctl_load(cr, 0, 15);
+	for (;;)
+		enabled_wait();
+}
+
 static void do_machine_halt(void * __unused)
 {
 	if (smp_processor_id() == 0) {
@@ -240,8 +252,7 @@ static void do_machine_halt(void * __unused)
 		signal_processor(smp_processor_id(),
 				 sigp_stop_and_store_status);
 	}
-	for (;;)
-		enabled_wait();
+	do_wait_for_stop();
 }
 
 void machine_halt_smp(void)
@@ -258,8 +269,7 @@ static void do_machine_power_off(void * __unused)
 		signal_processor(smp_processor_id(),
 				 sigp_stop_and_store_status);
 	}
-	for (;;)
-		enabled_wait();
+	do_wait_for_stop();
 }
 
 void machine_power_off_smp(void)
@@ -577,6 +587,7 @@ int setup_profiling_timer(unsigned int multiplier)
         return 0;
 }
 
+EXPORT_SYMBOL(cpu_possible_map);
 EXPORT_SYMBOL(lowcore_ptr);
 EXPORT_SYMBOL(smp_ctl_set_bit);
 EXPORT_SYMBOL(smp_ctl_clear_bit);
