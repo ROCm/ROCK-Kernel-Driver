@@ -149,7 +149,7 @@ maketools: include/asm-arm/.arch \
 bzImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
 
-zImage Image bootpImage: vmlinux
+zImage Image bootpImage uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 zinstall install: vmlinux
