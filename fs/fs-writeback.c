@@ -535,6 +535,9 @@ void write_inode_now(struct inode *inode, int sync)
 		.sync_mode = WB_SYNC_ALL,
 	};
 
+	if (inode->i_mapping->backing_dev_info->memory_backed)
+		return;
+
 	spin_lock(&inode_lock);
 	__writeback_single_inode(inode, &wbc);
 	spin_unlock(&inode_lock);

@@ -176,7 +176,7 @@ static int proc_read_node(char *buf, char **start, off_t pos,
 	return len;
 }
 
-static int proc_write_node(struct file *file, const char *buf,
+static int proc_write_node(struct file *file, const char __user *buf,
                            unsigned long count, void *data)
 {
 	struct pnp_bios_node *node;

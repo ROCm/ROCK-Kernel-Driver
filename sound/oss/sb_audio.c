@@ -836,7 +836,7 @@ static signed short *lbuf16 = (signed short *)lbuf8;
 static void
 sb16_copy_from_user(int dev,
 		char *localbuf, int localoffs,
-		const char *userbuf, int useroffs,
+		const char __user *userbuf, int useroffs,
 		int max_in, int max_out,
 		int *used, int *returned,
 		int len)

@@ -1571,7 +1571,7 @@ static void amd8111e_set_multicast_list(struct net_device *dev)
 This function handles all the  ethtool ioctls. It gives driver info, gets/sets driver speed, gets memory mapped register values, forces auto negotiation, sets/gets WOL options for ethtool application. 
 */
 	
-static int amd8111e_ethtool_ioctl(struct net_device* dev, void* useraddr)
+static int amd8111e_ethtool_ioctl(struct net_device* dev, void __user *useraddr)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
 	struct pci_dev *pci_dev = lp->pci_dev;
@@ -1704,7 +1704,7 @@ static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return amd8111e_ethtool_ioctl(dev, (void *) ifr->ifr_data);
+		return amd8111e_ethtool_ioctl(dev, ifr->ifr_data);
 	case SIOCGMIIPHY:
 		data->phy_id = PHY_ID;
 

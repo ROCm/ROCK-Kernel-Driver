@@ -543,7 +543,7 @@ int snd_rawmidi_info(snd_rawmidi_substream_t *substream, snd_rawmidi_info_t *inf
 	return 0;
 }
 
-static int snd_rawmidi_info_user(snd_rawmidi_substream_t *substream, snd_rawmidi_info_t * _info)
+static int snd_rawmidi_info_user(snd_rawmidi_substream_t *substream, snd_rawmidi_info_t __user * _info)
 {
 	snd_rawmidi_info_t info;
 	int err;
@@ -579,7 +579,7 @@ int snd_rawmidi_info_select(snd_card_t *card, snd_rawmidi_info_t *info)
 }
 
 static int snd_rawmidi_info_select_user(snd_card_t *card,
-					snd_rawmidi_info_t *_info)
+					snd_rawmidi_info_t __user *_info)
 {
 	int err;
 	snd_rawmidi_info_t info;
@@ -679,17 +679,18 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 			     unsigned int cmd, unsigned long arg)
 {
 	snd_rawmidi_file_t *rfile;
+	void __user *argp = (void __user *)arg;
 
 	rfile = snd_magic_cast(snd_rawmidi_file_t, file->private_data, return -ENXIO);
 	if (((cmd >> 8) & 0xff) != 'W')
 		return -ENOTTY;
 	switch (cmd) {
 	case SNDRV_RAWMIDI_IOCTL_PVERSION:
-		return put_user(SNDRV_RAWMIDI_VERSION, (int *)arg) ? -EFAULT : 0;
+		return put_user(SNDRV_RAWMIDI_VERSION, (int __user *)argp) ? -EFAULT : 0;
 	case SNDRV_RAWMIDI_IOCTL_INFO:
 	{
 		snd_rawmidi_stream_t stream;
-		snd_rawmidi_info_t *info = (snd_rawmidi_info_t *) arg;
+		snd_rawmidi_info_t __user *info = argp;
 		if (get_user(stream, &info->stream))
 			return -EFAULT;
 		switch (stream) {
@@ -704,7 +705,7 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_PARAMS:
 	{
 		snd_rawmidi_params_t params;
-		if (copy_from_user(&params, (snd_rawmidi_params_t *) arg, sizeof(snd_rawmidi_params_t)))
+		if (copy_from_user(&params, argp, sizeof(snd_rawmidi_params_t)))
 			return -EFAULT;
 		switch (params.stream) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -723,7 +724,7 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	{
 		int err = 0;
 		snd_rawmidi_status_t status;
-		if (copy_from_user(&status, (snd_rawmidi_status_t *) arg, sizeof(snd_rawmidi_status_t)))
+		if (copy_from_user(&status, argp, sizeof(snd_rawmidi_status_t)))
 			return -EFAULT;
 		switch (status.stream) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -741,14 +742,14 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 		}
 		if (err < 0)
 			return err;
-		if (copy_to_user((snd_rawmidi_status_t *) arg, &status, sizeof(snd_rawmidi_status_t)))
+		if (copy_to_user(argp, &status, sizeof(snd_rawmidi_status_t)))
 			return -EFAULT;
 		return 0;
 	}
 	case SNDRV_RAWMIDI_IOCTL_DROP:
 	{
 		int val;
-		if (get_user(val, (long *) arg))
+		if (get_user(val, (long __user *) argp))
 			return -EFAULT;
 		switch (val) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -762,7 +763,7 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_DRAIN:
 	{
 		int val;
-		if (get_user(val, (long *) arg))
+		if (get_user(val, (long __user *) argp))
 			return -EFAULT;
 		switch (val) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -788,6 +789,7 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 			      unsigned int cmd, unsigned long arg)
 {
+	void __user *argp = (void __user *)arg;
 	unsigned int tmp;
 
 	tmp = card->number * SNDRV_RAWMIDI_DEVICES;
@@ -796,7 +798,7 @@ int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 	{
 		int device;
 		
-		if (get_user(device, (int *)arg))
+		if (get_user(device, (int __user *)argp))
 			return -EFAULT;
 		device = device < 0 ? 0 : device + 1;
 		while (device < SNDRV_RAWMIDI_DEVICES) {
@@ -806,7 +808,7 @@ int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 		}
 		if (device == SNDRV_RAWMIDI_DEVICES)
 			device = -1;
-		if (put_user(device, (int *)arg))
+		if (put_user(device, (int __user *)argp))
 			return -EFAULT;
 		return 0;
 	}
@@ -814,13 +816,13 @@ int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 	{
 		int val;
 		
-		if (get_user(val, (int *)arg))
+		if (get_user(val, (int __user *)argp))
 			return -EFAULT;
 		control->prefer_rawmidi_subdevice = val;
 		return 0;
 	}
 	case SNDRV_CTL_IOCTL_RAWMIDI_INFO:
-		return snd_rawmidi_info_select_user(card, (snd_rawmidi_info_t *)arg);
+		return snd_rawmidi_info_select_user(card, argp);
 	}
 	return -ENOIOCTLCMD;
 }
@@ -934,7 +936,7 @@ long snd_rawmidi_kernel_read(snd_rawmidi_substream_t *substream, unsigned char *
 	return snd_rawmidi_kernel_read1(substream, buf, count, 1);
 }
 
-static ssize_t snd_rawmidi_read(struct file *file, char *buf, size_t count, loff_t *offset)
+static ssize_t snd_rawmidi_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	long result;
 	int count1;
@@ -1166,7 +1168,7 @@ long snd_rawmidi_kernel_write(snd_rawmidi_substream_t * substream, const unsigne
 	return snd_rawmidi_kernel_write1(substream, buf, count, 1);
 }
 
-static ssize_t snd_rawmidi_write(struct file *file, const char *buf, size_t count, loff_t *offset)
+static ssize_t snd_rawmidi_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
 {
 	long result, timeout;
 	int count1;

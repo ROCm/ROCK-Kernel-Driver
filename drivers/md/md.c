@@ -1934,7 +1934,7 @@ static int autostart_array(dev_t startdev)
 }
 
 
-static int get_version(void * arg)
+static int get_version(void __user * arg)
 {
 	mdu_version_t ver;
 
@@ -1948,7 +1948,7 @@ static int get_version(void * arg)
 	return 0;
 }
 
-static int get_array_info(mddev_t * mddev, void * arg)
+static int get_array_info(mddev_t * mddev, void __user * arg)
 {
 	mdu_array_info_t info;
 	int nr,working,active,failed,spare;
@@ -1998,7 +1998,7 @@ static int get_array_info(mddev_t * mddev, void * arg)
 	return 0;
 }
 
-static int get_disk_info(mddev_t * mddev, void * arg)
+static int get_disk_info(mddev_t * mddev, void __user * arg)
 {
 	mdu_disk_info_t info;
 	unsigned int nr;
@@ -2389,7 +2389,8 @@ static int md_ioctl(struct inode *inode, struct file *file,
 {
 	char b[BDEVNAME_SIZE];
 	int err = 0;
-	struct hd_geometry *loc = (struct hd_geometry *) arg;
+	void __user *argp = (void __user *)arg;
+	struct hd_geometry __user *loc = argp;
 	mddev_t *mddev = NULL;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -2402,7 +2403,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	switch (cmd)
 	{
 		case RAID_VERSION:
-			err = get_version((void *)arg);
+			err = get_version(argp);
 			goto done;
 
 		case PRINT_RAID_DEBUG:
@@ -2482,7 +2483,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 				mdu_array_info_t info;
 				if (!arg)
 					memset(&info, 0, sizeof(info));
-				else if (copy_from_user(&info, (void*)arg, sizeof(info))) {
+				else if (copy_from_user(&info, argp, sizeof(info))) {
 					err = -EFAULT;
 					goto abort_unlock;
 				}
@@ -2513,11 +2514,11 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	switch (cmd)
 	{
 		case GET_ARRAY_INFO:
-			err = get_array_info(mddev, (void *)arg);
+			err = get_array_info(mddev, argp);
 			goto done_unlock;
 
 		case GET_DISK_INFO:
-			err = get_disk_info(mddev, (void *)arg);
+			err = get_disk_info(mddev, argp);
 			goto done_unlock;
 
 		case RESTART_ARRAY_RW:
@@ -2543,18 +2544,18 @@ static int md_ioctl(struct inode *inode, struct file *file,
 				err = -EINVAL;
 				goto abort_unlock;
 			}
-			err = put_user (2, (char *) &loc->heads);
+			err = put_user (2, (char __user *) &loc->heads);
 			if (err)
 				goto abort_unlock;
-			err = put_user (4, (char *) &loc->sectors);
+			err = put_user (4, (char __user *) &loc->sectors);
 			if (err)
 				goto abort_unlock;
 			err = put_user(get_capacity(mddev->gendisk)/8,
-						(short *) &loc->cylinders);
+					(short __user *) &loc->cylinders);
 			if (err)
 				goto abort_unlock;
 			err = put_user (get_start_sect(inode->i_bdev),
-						(long *) &loc->start);
+						(long __user *) &loc->start);
 			goto done_unlock;
 	}
 
@@ -2573,7 +2574,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		case ADD_NEW_DISK:
 		{
 			mdu_disk_info_t info;
-			if (copy_from_user(&info, (void*)arg, sizeof(info)))
+			if (copy_from_user(&info, argp, sizeof(info)))
 				err = -EFAULT;
 			else
 				err = add_new_disk(mddev, &info);

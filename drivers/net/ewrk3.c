@@ -1518,13 +1518,13 @@ static int __init EISA_signature(char *name, s32 eisa_id)
 	return status;		/* return the device name string */
 }
 
-static int ewrk3_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int ewrk3_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
 	u_long iobase = dev->base_addr;
 	u32 ethcmd;
 
-	if (get_user(ethcmd, (u32 *)useraddr))
+	if (get_user(ethcmd, (u32 __user *)useraddr))
 		return -EFAULT;
 
 	switch (ethcmd) {
@@ -1721,7 +1721,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	/* ethtool IOCTLs are handled elsewhere */
 	if (cmd == SIOCETHTOOL)
-		return ewrk3_ethtool_ioctl(dev, (void *)rq->ifr_data);
+		return ewrk3_ethtool_ioctl(dev, rq->ifr_data);
 
 	/* Other than ethtool, all we handle are private IOCTLs */
 	if (cmd != EWRK3IOCTL)

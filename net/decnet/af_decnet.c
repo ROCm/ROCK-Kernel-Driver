@@ -1212,7 +1212,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	{
 	case SIOCGIFADDR:
 	case SIOCSIFADDR:
-		return dn_dev_ioctl(cmd, (void *)arg);
+		return dn_dev_ioctl(cmd, (void __user *)arg);
 
 	case SIOCATMARK:
 		lock_sock(sk);
@@ -1226,7 +1226,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
-		err = put_user(amount, (int *)arg);
+		err = put_user(amount, (int __user *)arg);
 		break;
 
 	case TIOCINQ:
@@ -1244,7 +1244,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			}
 		}
 		release_sock(sk);
-		err = put_user(amount, (int *)arg);
+		err = put_user(amount, (int __user *)arg);
 		break;
 
 	default:
@@ -1325,7 +1325,7 @@ static int dn_setsockopt(struct socket *sock, int level, int optname, char __use
 	return err;
 }
 
-static int __dn_setsockopt(struct socket *sock, int level,int optname, char __user __user *optval, int optlen, int flags) 
+static int __dn_setsockopt(struct socket *sock, int level,int optname, char __user *optval, int optlen, int flags) 
 {
 	struct	sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);

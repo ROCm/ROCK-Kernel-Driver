@@ -800,7 +800,7 @@ static struct nf_hook_ops br_nf_ops[] = {
 #ifdef CONFIG_SYSCTL
 static
 int brnf_sysctl_call_tables(ctl_table *ctl, int write, struct file * filp,
-			void *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp)
 {
 	int ret;
 

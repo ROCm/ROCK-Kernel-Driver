@@ -166,9 +166,9 @@ struct edd_info {
 	u8 device;
 	u8 version;
 	u16 interface_support;
-	u16 legacy_cylinders;
-	u8 legacy_heads;
-	u8 legacy_sectors;
+	u16 legacy_max_cylinder;
+	u8 legacy_max_head;
+	u8 legacy_sectors_per_track;
 	struct edd_device_params params;
 } __attribute__ ((packed));
 

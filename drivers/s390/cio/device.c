@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.117 $
+ *   $Revision: 1.119 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -159,6 +159,11 @@ init_ccw_bus_type (void)
 		ret = -ENOMEM; /* FIXME: better errno ? */
 		goto out_err;
 	}
+	slow_path_wq = create_singlethread_workqueue("kslowcrw");
+	if (!slow_path_wq) {
+		ret = -ENOMEM; /* FIXME: better errno ? */
+		goto out_err;
+	}
 	if ((ret = bus_register (&ccw_bus_type)))
 		goto out_err;
 
@@ -174,6 +179,8 @@ out_err:
 		destroy_workqueue(ccw_device_work);
 	if (ccw_device_notify_work)
 		destroy_workqueue(ccw_device_notify_work);
+	if (slow_path_wq)
+		destroy_workqueue(slow_path_wq);
 	return ret;
 }
 
@@ -646,9 +653,7 @@ ccw_device_call_sch_unregister(void *data)
 	struct subchannel *sch;
 
 	sch = to_subchannel(cdev->dev.parent);
-	/* Check if device is registered. */
-	if (!list_empty(&sch->dev.node))
-		device_unregister(&sch->dev);
+	device_unregister(&sch->dev);
 	/* Reset intparm to zeroes. */
 	sch->schib.pmcw.intparm = 0;
 	cio_modify(sch);
@@ -677,7 +682,7 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 		sch = to_subchannel(cdev->dev.parent);
 		INIT_WORK(&cdev->private->kick_work,
 			  ccw_device_call_sch_unregister, (void *) cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+		queue_work(slow_path_wq, &cdev->private->kick_work);
 		break;
 	case DEV_STATE_BOXED:
 		/* Device did not respond in time. */

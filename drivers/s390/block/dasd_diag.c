@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.34 $
+ * $Revision: 1.36 $
  */
 
 #include <linux/config.h>
@@ -34,6 +34,8 @@
 #define PRINTK_HEADER "dasd(diag):"
 
 MODULE_LICENSE("GPL");
+
+struct dasd_discipline dasd_diag_discipline;
 
 struct dasd_diag_private {
 	struct dasd_diag_characteristics rdc_data;
@@ -292,7 +294,7 @@ dasd_diag_check_device(struct dasd_device *device)
 		mdsk_term_io(device);
 	}
 	if (bsize <= PAGE_SIZE && label[3] == bsize &&
-	    label[0] == 0xc3d4e2f1 && label[13] != 0) {
+	    label[0] == 0xc3d4e2f1) {
 		device->blocks = label[7];
 		device->bp_block = bsize;
 		device->s2b_shift = 0;	/* bits to shift 512 to get a block */
@@ -489,6 +491,7 @@ dasd_diag_init(void)
 
 	ctl_set_bit(0, 9);
 	register_external_interrupt(0x2603, dasd_ext_handler);
+	dasd_diag_discipline_pointer = &dasd_diag_discipline;
 	return 0;
 }
 
@@ -503,6 +506,7 @@ dasd_diag_cleanup(void)
 	}
 	unregister_external_interrupt(0x2603, dasd_ext_handler);
 	ctl_clear_bit(0, 9);
+	dasd_diag_discipline_pointer = NULL;
 }
 
 module_init(dasd_diag_init);

@@ -1028,7 +1028,7 @@ get_counters(const struct ip6t_table_info *t,
 static int
 copy_entries_to_user(unsigned int total_size,
 		     struct ip6t_table *table,
-		     void *userptr)
+		     void __user *userptr)
 {
 	unsigned int off, num, countersize;
 	struct ip6t_entry *e;

@@ -1576,7 +1576,7 @@ static int __set_mac_addr(struct net_device *dev)
 }
 	
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct netdev_private *np = dev->priv;
 	u32 ethcmd;
@@ -1668,7 +1668,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return -EINVAL;
 
 	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	else {
 		spin_lock_irq(&np->lock);

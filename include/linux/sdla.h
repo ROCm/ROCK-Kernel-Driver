@@ -58,7 +58,7 @@
 struct sdla_mem {
    int  addr;
    int  len;
-   void *data;
+   void __user *data;
 };
 
 #define SDLA_START			(FRAD_LAST_IOCTL + 7)

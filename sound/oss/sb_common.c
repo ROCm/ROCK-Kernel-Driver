@@ -943,7 +943,10 @@ void sb_setmixer(sb_devc * devc, unsigned int port, unsigned int value)
 {
 	unsigned long flags;
 
-	if (devc->model == MDL_ESS) return ess_setmixer (devc, port, value);
+	if (devc->model == MDL_ESS) {
+		ess_setmixer (devc, port, value);
+		return;
+	}
 
 	spin_lock_irqsave(&devc->lock, flags);
 

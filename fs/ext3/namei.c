@@ -1962,8 +1962,6 @@ int ext3_orphan_del(handle_t *handle, struct inode *inode)
 		goto out_brelse;
 	NEXT_ORPHAN(inode) = 0;
 	err = ext3_mark_iloc_dirty(handle, inode, &iloc);
-	if (err)
-		goto out_brelse;
 
 out_err:
 	ext3_std_error(inode->i_sb, err);

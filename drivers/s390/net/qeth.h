@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.108 $"
+#define VERSION_QETH_H 		"$Revision: 1.109 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -91,10 +91,14 @@
 		debug_event(qeth_dbf_##name,level,(void*)(addr),len); \
 	} while (0)
 
-#define QETH_DBF_TEXT_(name,level,text...)				  \
-	do {								  \
-		sprintf(qeth_dbf_text_buf, text);			  \
-		debug_text_event(qeth_dbf_##name,level,qeth_dbf_text_buf);\
+extern DEFINE_PER_CPU(char[256], qeth_dbf_txt_buf);
+
+#define QETH_DBF_TEXT_(name,level,text...)				\
+	do {								\
+		char* dbf_txt_buf = get_cpu_var(qeth_dbf_txt_buf);	\
+		sprintf(dbf_txt_buf, text);			  	\
+		debug_text_event(qeth_dbf_##name,level,dbf_txt_buf);	\
+		put_cpu_var(qeth_dbf_txt_buf);				\
 	} while (0)
 
 #define QETH_DBF_SPRINTF(name,level,text...) \

@@ -1869,7 +1869,7 @@ static void set_rx_mode(struct net_device *dev)
 	}
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct hamachi_private *np = dev->priv;
 	u32 ethcmd;
@@ -1944,7 +1944,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return -EINVAL;
 
 	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	else if (cmd == (SIOCDEVPRIVATE+3)) { /* set rx,tx intr params */
 		u32 *d = (u32 *)&rq->ifr_data;

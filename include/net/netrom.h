@@ -206,7 +206,7 @@ extern void nr_check_iframes_acked(struct sock *, unsigned short);
 extern void nr_rt_device_down(struct net_device *);
 extern struct net_device *nr_dev_first(void);
 extern struct net_device *nr_dev_get(ax25_address *);
-extern int  nr_rt_ioctl(unsigned int, void *);
+extern int  nr_rt_ioctl(unsigned int, void __user *);
 extern void nr_link_failed(ax25_cb *, int);
 extern int  nr_route_frame(struct sk_buff *, ax25_cb *);
 extern struct file_operations nr_nodes_fops;

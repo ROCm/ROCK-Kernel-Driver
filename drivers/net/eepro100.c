@@ -2017,7 +2017,7 @@ speedo_get_stats(struct net_device *dev)
 	return &sp->stats;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 	struct speedo_private *sp = netdev_priv(dev);
@@ -2129,7 +2129,7 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		pci_set_power_state(sp->pdev, saved_acpi);
 		return 0;
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}

@@ -370,11 +370,4 @@ struct efi_generic_dev_path {
 	u16 length;
 } __attribute ((packed));
 
-/*
- * efi_dir is allocated in arch/ia64/kernel/efi.c.
- */
-#ifdef CONFIG_PROC_FS
-extern struct proc_dir_entry *efi_dir;
-#endif
-
 #endif /* _LINUX_EFI_H */

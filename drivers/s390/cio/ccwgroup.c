@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.27 $
+ *   $Revision: 1.28 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -179,12 +179,12 @@ ccwgroup_create(struct device *root,
 		    || gdev->cdev[i]->id.driver_info !=
 		    gdev->cdev[0]->id.driver_info) {
 			rc = -EINVAL;
-			goto error;
+			goto free_dev;
 		}
 		/* Don't allow a device to belong to more than one group. */
 		if (gdev->cdev[i]->dev.driver_data) {
 			rc = -EINVAL;
-			goto error;
+			goto free_dev;
 		}
 	}
 	for (i = 0; i < argc; i++)
@@ -207,8 +207,8 @@ ccwgroup_create(struct device *root,
 	rc = device_register(&gdev->dev);
 	
 	if (rc)
-		goto error;
-
+		goto free_dev;
+	get_device(&gdev->dev);
 	rc = device_create_file(&gdev->dev, &dev_attr_ungroup);
 
 	if (rc) {
@@ -217,12 +217,21 @@ ccwgroup_create(struct device *root,
 	}
 
 	rc = __ccwgroup_create_symlinks(gdev);
-	if (!rc)
+	if (!rc) {
+		put_device(&gdev->dev);
 		return 0;
-
+	}
 	device_remove_file(&gdev->dev, &dev_attr_ungroup);
 	device_unregister(&gdev->dev);
 error:
+	for (i = 0; i < argc; i++)
+		if (gdev->cdev[i]) {
+			put_device(&gdev->cdev[i]->dev);
+			gdev->cdev[i]->dev.driver_data = NULL;
+		}
+	put_device(&gdev->dev);
+	return rc;
+free_dev:
 	for (i = 0; i < argc; i++)
 		if (gdev->cdev[i]) {
 			put_device(&gdev->cdev[i]->dev);
@@ -230,7 +239,6 @@ error:
 				gdev->cdev[i]->dev.driver_data = NULL;
 		}
 	kfree(gdev);
-
 	return rc;
 }
 

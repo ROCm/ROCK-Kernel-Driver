@@ -192,10 +192,20 @@ static int wait_for_helper(void *data)
 	allow_signal(SIGCHLD);
 
 	pid = kernel_thread(____call_usermodehelper, sub_info, SIGCHLD);
-	if (pid < 0)
+	if (pid < 0) {
 		sub_info->retval = pid;
-	else
-		sys_wait4(pid, &sub_info->retval, 0, NULL);
+	} else {
+		/*
+		 * Normally it is bogus to call wait4() from in-kernel because
+		 * wait4() wants to write the exit code to a userspace address.
+		 * But wait_for_helper() always runs as keventd, and put_user()
+		 * to a kernel address works OK for kernel threads, due to their
+		 * having an mm_segment_t which spans the entire address space.
+		 *
+		 * Thus the __user pointer cast is valid here.
+		 */
+		sys_wait4(pid, (int __user *) &sub_info->retval, 0, NULL);
+	}
 
 	complete(sub_info->complete);
 	return 0;

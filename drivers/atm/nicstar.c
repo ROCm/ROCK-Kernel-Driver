@@ -239,7 +239,7 @@ static void recycle_iov_buf(ns_dev *card, struct sk_buff *iovb);
 static void dequeue_sm_buf(ns_dev *card, struct sk_buff *sb);
 static void dequeue_lg_buf(ns_dev *card, struct sk_buff *lb);
 static int ns_proc_read(struct atm_dev *dev, loff_t *pos, char *page);
-static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg);
+static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void __user *arg);
 static void which_list(ns_dev *card, struct sk_buff *skb);
 static void ns_poll(unsigned long arg);
 static int ns_parse_mac(char *mac, unsigned char *esi);
@@ -2765,7 +2765,7 @@ static int ns_proc_read(struct atm_dev *dev, loff_t *pos, char *page)
 
 
 
-static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
+static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void __user *arg)
 {
    ns_dev *card;
    pool_levels pl;
@@ -2776,7 +2776,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
    switch (cmd)
    {
       case NS_GETPSTAT:
-         if (get_user(pl.buftype, &((pool_levels *) arg)->buftype))
+         if (get_user(pl.buftype, &((pool_levels __user *) arg)->buftype))
 	    return -EFAULT;
          switch (pl.buftype)
 	 {
@@ -2812,7 +2812,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
 	       return -ENOIOCTLCMD;
 
 	 }
-         if (!copy_to_user((pool_levels *) arg, &pl, sizeof(pl)))
+         if (!copy_to_user((pool_levels __user *) arg, &pl, sizeof(pl)))
 	    return (sizeof(pl));
 	 else
 	    return -EFAULT;
@@ -2820,7 +2820,7 @@ static int ns_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg)
       case NS_SETBUFLEV:
          if (!capable(CAP_NET_ADMIN))
 	    return -EPERM;
-         if (copy_from_user(&pl, (pool_levels *) arg, sizeof(pl)))
+         if (copy_from_user(&pl, (pool_levels __user *) arg, sizeof(pl)))
 	    return -EFAULT;
 	 if (pl.level.min >= pl.level.init || pl.level.init >= pl.level.max)
 	    return -EINVAL;

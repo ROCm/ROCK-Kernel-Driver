@@ -258,7 +258,7 @@ struct ip6t_replace
 	/* Number of counters (must be equal to current number of entries). */
 	unsigned int num_counters;
 	/* The old entries' counters. */
-	struct ip6t_counters *counters;
+	struct ip6t_counters __user *counters;
 
 	/* The entries (hang off end: not really an array). */
 	struct ip6t_entry entries[0];

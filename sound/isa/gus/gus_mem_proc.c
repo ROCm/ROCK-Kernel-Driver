@@ -33,7 +33,7 @@ typedef struct gus_proc_private {
 } gus_proc_private_t;
 
 static long snd_gf1_mem_proc_dump(snd_info_entry_t *entry, void *file_private_data,
-			          struct file *file, char *buf, long count)
+			          struct file *file, char __user *buf, long count)
 {
 	long size;
 	gus_proc_private_t *priv = snd_magic_cast(gus_proc_private_t, entry->private_data, return -ENXIO);

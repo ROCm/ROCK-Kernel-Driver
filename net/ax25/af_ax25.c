@@ -336,7 +336,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
  *		  includes a KILL command to abort any connection.
  *		  VERY useful for debugging ;-)
  */
-static int ax25_ctl_ioctl(const unsigned int cmd, void *arg)
+static int ax25_ctl_ioctl(const unsigned int cmd, void __user *arg)
 {
 	struct ax25_ctl_struct ax25_ctl;
 	ax25_digi digi;
@@ -1669,6 +1669,7 @@ static int ax25_shutdown(struct socket *sk, int how)
 static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
+	void __user *argp = (void __user *)arg;
 	int res = 0;
 
 	lock_sock(sk);
@@ -1678,7 +1679,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
-		res = put_user(amount, (int *)arg);
+		res = put_user(amount, (int __user *)argp);
 		break;
 	}
 
@@ -1688,13 +1689,13 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
 		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
-		res = put_user(amount, (int *)arg);
+		res = put_user(amount, (int __user *)argp);
 		break;
 	}
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			res = sock_get_timestamp(sk, (struct timeval __user *)arg);
+			res = sock_get_timestamp(sk, argp);
 			break;
 	 	}
 		res = -EINVAL;
@@ -1704,7 +1705,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCAX25DELUID:	/* Delete a uid from the uid/call map table */
 	case SIOCAX25GETUID: {
 		struct sockaddr_ax25 sax25;
-		if (copy_from_user(&sax25, (void *)arg, sizeof(sax25))) {
+		if (copy_from_user(&sax25, argp, sizeof(sax25))) {
 			res = -EFAULT;
 			break;
 		}
@@ -1718,7 +1719,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			res = -EPERM;
 			break;
 		}
-		if (get_user(amount, (long *)arg)) {
+		if (get_user(amount, (long __user *)argp)) {
 			res = -EFAULT;
 			break;
 		}
@@ -1738,7 +1739,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			res = -EPERM;
 			break;
 		}
-		res = ax25_rt_ioctl(cmd, (void *)arg);
+		res = ax25_rt_ioctl(cmd, argp);
 		break;
 
 	case SIOCAX25CTLCON:
@@ -1746,7 +1747,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			res = -EPERM;
 			break;
 		}
-		res = ax25_ctl_ioctl(cmd, (void *)arg);
+		res = ax25_ctl_ioctl(cmd, argp);
 		break;
 
 	case SIOCAX25GETINFO:
@@ -1783,12 +1784,12 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 				warned=1;
 			}
 
-			if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct_deprecated))) {
+			if (copy_to_user(argp, &ax25_info, sizeof(struct ax25_info_struct_deprecated))) {
 				res = -EFAULT;
 				break;
 			}
 		} else {
-			if (copy_to_user((void *)arg, &ax25_info, sizeof(struct ax25_info_struct))) {
+			if (copy_to_user(argp, &ax25_info, sizeof(struct ax25_info_struct))) {
 				res = -EINVAL;
 				break;
 			}
@@ -1804,7 +1805,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			res = -EPERM;
 			break;
 		}
-		if (copy_from_user(&ax25_fwd, (void *)arg, sizeof(ax25_fwd))) {
+		if (copy_from_user(&ax25_fwd, argp, sizeof(ax25_fwd))) {
 			res = -EFAULT;
 			break;
 		}
@@ -1826,7 +1827,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		res = dev_ioctl(cmd, (void __user *)arg);
+		res = dev_ioctl(cmd, argp);
 		break;
 	}
 	release_sock(sk);

@@ -37,7 +37,7 @@
 
 #define SERIAL_S3C2410_NAME	"ttySAC"
 #define SERIAL_S3C2410_MAJOR	204
-#define SERIAL_S3C2410_MINOR	4
+#define SERIAL_S3C2410_MINOR	64
 
 /* we can support 3 uarts, but not always use them */
 

@@ -11,19 +11,24 @@
 
 #ifndef __ASSEMBLY__
 /* Device Control Registers */
-#define mfdcr(rn) mfdcr_or_dflt(rn, 0)
-#define mfdcr_or_dflt(rn,default_rval)					\
-	({unsigned int rval;						\
-	if (rn == 0)							\
-		rval = default_rval;					\
-	else								\
-		asm volatile("mfdcr %0," __stringify(rn) : "=r" (rval)); \
+void __mtdcr(int reg, unsigned int val);
+unsigned int __mfdcr(int reg);
+#define mfdcr(rn)						\
+	({unsigned int rval;					\
+	if (__builtin_constant_p(rn))				\
+		asm volatile("mfdcr %0," __stringify(rn)	\
+		              : "=r" (rval));			\
+	else							\
+		rval = __mfdcr(rn);				\
 	rval;})
 
-#define mtdcr(rn, v)							\
-do {									\
-	if (rn != 0)							\
-		asm volatile("mtdcr " __stringify(rn) ",%0" : : "r" (v)); \
+#define mtdcr(rn, v)						\
+do {								\
+	if (__builtin_constant_p(rn))				\
+		asm volatile("mtdcr " __stringify(rn) ",%0"	\
+			      : : "r" (v)); 			\
+	else							\
+		__mtdcr(rn, v);					\
 } while (0)
 
 /* R/W of indirect DCRs make use of standard naming conventions for DCRs */

@@ -1714,13 +1714,11 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct scc_mem_config memcfg;
 	struct scc_hw_config hwcfg;
 	struct scc_calibrate cal;
-	struct scc_channel *scc;
+	struct scc_channel *scc = (struct scc_channel *) dev->priv;
 	int chan;
 	unsigned char device_name[IFNAMSIZ];
-	void *arg;
+	void __user *arg = ifr->ifr_data;
 	
-	scc = (struct scc_channel *) dev->priv;
-	arg = (void *) ifr->ifr_data;
 	
 	if (!Driver_Initialized)
 	{

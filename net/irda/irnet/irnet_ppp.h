@@ -66,11 +66,11 @@ static int
 			struct file *);
 static ssize_t
 	dev_irnet_write(struct file *,
-			const char *,
+			const char __user *,
 			size_t,
 			loff_t *),
 	dev_irnet_read(struct file *,
-		       char *,
+		       char __user *,
 		       size_t,
 		       loff_t *);
 static unsigned int

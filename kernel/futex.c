@@ -38,6 +38,7 @@
 #include <linux/futex.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
+#include <linux/syscalls.h>
 
 #define FUTEX_HASHBITS 8
 
@@ -354,7 +355,7 @@ static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 		   before *uaddr1.  */
 		smp_mb();
 
-		if (get_user(curval, (int *)uaddr1) != 0) {
+		if (get_user(curval, (int __user *)uaddr1) != 0) {
 			ret = -EFAULT;
 			goto out;
 		}

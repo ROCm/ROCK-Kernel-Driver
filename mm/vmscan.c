@@ -813,8 +813,9 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 		struct zone *zone = zones[i];
 		int max_scan;
 
-		if (zone->free_pages < zone->pages_high)
-			zone->temp_priority = priority;
+		zone->temp_priority = priority;
+		if (zone->prev_priority > priority)
+			zone->prev_priority = priority;
 
 		if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 			continue;	/* Let kswapd poll it */
@@ -945,7 +946,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		zone->temp_priority = DEF_PRIORITY;
 	}
 
-	for (priority = DEF_PRIORITY; priority; priority--) {
+	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int all_zones_ok = 1;
 		int end_zone = 0;	/* Inclusive.  0 = ZONE_DMA */
 
@@ -995,6 +996,8 @@ scan:
 					all_zones_ok = 0;
 			}
 			zone->temp_priority = priority;
+			if (zone->prev_priority > priority)
+				zone->prev_priority = priority;
 			max_scan = (zone->nr_active + zone->nr_inactive)
 								>> priority;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,

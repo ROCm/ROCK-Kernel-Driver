@@ -13,7 +13,7 @@ int msg_to_mpoad(struct k_message *msg, struct mpoa_client *mpc);
 
 /* Functions for ioctl(ATMMPC_*) operations */
 int atm_mpoa_mpoad_attach(struct atm_vcc *vcc, int arg);
-int atm_mpoa_vcc_attach(struct atm_vcc *vcc, long arg);
+int atm_mpoa_vcc_attach(struct atm_vcc *vcc, void __user *arg);
 
 struct mpoa_client {
         struct mpoa_client *next;

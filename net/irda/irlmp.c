@@ -804,7 +804,7 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
  * Note : separate from irlmp_do_discovery() so that we can handle
  * passive discovery properly.
  */
-void irlmp_do_expiry()
+void irlmp_do_expiry(void)
 {
 	struct lap_cb *lap;
 
@@ -1078,7 +1078,7 @@ void irlmp_discovery_expiry(discinfo_t *expiries, int number)
  *    Used by IrLAP to get the discovery info it needs when answering
  *    discovery requests by other devices.
  */
-discovery_t *irlmp_get_discovery_response()
+discovery_t *irlmp_get_discovery_response(void)
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 

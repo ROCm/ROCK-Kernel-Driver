@@ -143,7 +143,7 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		b.gc_timer_value = br_timer_value(&br->gc_timer);
 	        rcu_read_unlock();
 
-		if (copy_to_user((void *)args[1], &b, sizeof(b)))
+		if (copy_to_user((void __user *)args[1], &b, sizeof(b)))
 			return -EFAULT;
 
 		return 0;
@@ -168,7 +168,7 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		memset(indices, 0, num*sizeof(int));
 
 		get_port_ifindices(br, indices, num);
-		if (copy_to_user((void *)args[1], indices, num*sizeof(int)))
+		if (copy_to_user((void __user *)args[1], indices, num*sizeof(int)))
 			num =  -EFAULT;
 		kfree(indices);
 		return num;
@@ -241,7 +241,7 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		rcu_read_unlock();
 
-		if (copy_to_user((void *)args[1], &p, sizeof(p)))
+		if (copy_to_user((void __user *)args[1], &p, sizeof(p)))
 			return -EFAULT;
 
 		return 0;
@@ -308,11 +308,11 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	return -EOPNOTSUPP;
 }
 
-static int old_deviceless(unsigned long uarg)
+static int old_deviceless(void __user *uarg)
 {
 	unsigned long args[3];
 
-	if (copy_from_user(args, (void *)uarg, sizeof(args)))
+	if (copy_from_user(args, uarg, sizeof(args)))
 		return -EFAULT;
 
 	switch (args[0]) {
@@ -331,7 +331,7 @@ static int old_deviceless(unsigned long uarg)
 		memset(indices, 0, args[2]*sizeof(int));
 		args[2] = get_bridge_ifindices(indices, args[2]);
 
-		ret = copy_to_user((void *)args[1], indices, args[2]*sizeof(int))
+		ret = copy_to_user((void __user *)args[1], indices, args[2]*sizeof(int))
 			? -EFAULT : args[2];
 
 		kfree(indices);
@@ -346,7 +346,7 @@ static int old_deviceless(unsigned long uarg)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(buf, (void *)args[1], IFNAMSIZ))
+		if (copy_from_user(buf, (void __user *)args[1], IFNAMSIZ))
 			return -EFAULT;
 
 		buf[IFNAMSIZ-1] = 0;
@@ -361,7 +361,7 @@ static int old_deviceless(unsigned long uarg)
 	return -EOPNOTSUPP;
 }
 
-int br_ioctl_deviceless_stub(unsigned int cmd, unsigned long uarg)
+int br_ioctl_deviceless_stub(unsigned int cmd, void __user *uarg)
 {
 	switch (cmd) {
 	case SIOCGIFBR:
@@ -376,7 +376,7 @@ int br_ioctl_deviceless_stub(unsigned int cmd, unsigned long uarg)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(buf, (void __user *) uarg, IFNAMSIZ))
+		if (copy_from_user(buf, uarg, IFNAMSIZ))
 			return -EFAULT;
 
 		buf[IFNAMSIZ-1] = 0;

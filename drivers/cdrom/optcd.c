@@ -1440,12 +1440,12 @@ static int cdromresume(void)
 }
 
 
-static int cdromplaymsf(unsigned long arg)
+static int cdromplaymsf(void __user *arg)
 {
 	int status;
 	struct cdrom_msf msf;
 
-	if (copy_from_user(&msf, (void *) arg, sizeof msf))
+	if (copy_from_user(&msf, arg, sizeof msf))
 		return -EFAULT;
 
 	bin2bcd(&msf);
@@ -1461,13 +1461,13 @@ static int cdromplaymsf(unsigned long arg)
 }
 
 
-static int cdromplaytrkind(unsigned long arg)
+static int cdromplaytrkind(void __user *arg)
 {
 	int status;
 	struct cdrom_ti ti;
 	struct cdrom_msf msf;
 
-	if (copy_from_user(&ti, (void *) arg, sizeof ti))
+	if (copy_from_user(&ti, arg, sizeof ti))
 		return -EFAULT;
 
 	if (ti.cdti_trk0 < disk_info.first
@@ -1505,23 +1505,23 @@ static int cdromplaytrkind(unsigned long arg)
 }
 
 
-static int cdromreadtochdr(unsigned long arg)
+static int cdromreadtochdr(void __user *arg)
 {
 	struct cdrom_tochdr tochdr;
 
 	tochdr.cdth_trk0 = disk_info.first;
 	tochdr.cdth_trk1 = disk_info.last;
 
-	return copy_to_user((void *)arg, &tochdr, sizeof tochdr) ? -EFAULT : 0;
+	return copy_to_user(arg, &tochdr, sizeof tochdr) ? -EFAULT : 0;
 }
 
 
-static int cdromreadtocentry(unsigned long arg)
+static int cdromreadtocentry(void __user *arg)
 {
 	struct cdrom_tocentry entry;
 	struct cdrom_subchnl *tocptr;
 
-	if (copy_from_user(&entry, (void *) arg, sizeof entry))
+	if (copy_from_user(&entry, arg, sizeof entry))
 		return -EFAULT;
 
 	if (entry.cdte_track == CDROM_LEADOUT)
@@ -1544,17 +1544,17 @@ static int cdromreadtocentry(unsigned long arg)
 	else if (entry.cdte_format != CDROM_MSF)
 		return -EINVAL;
 
-	return copy_to_user((void *)arg, &entry, sizeof entry) ? -EFAULT : 0;
+	return copy_to_user(arg, &entry, sizeof entry) ? -EFAULT : 0;
 }
 
 
-static int cdromvolctrl(unsigned long arg)
+static int cdromvolctrl(void __user *arg)
 {
 	int status;
 	struct cdrom_volctrl volctrl;
 	struct cdrom_msf msf;
 
-	if (copy_from_user(&volctrl, (char *) arg, sizeof volctrl))
+	if (copy_from_user(&volctrl, arg, sizeof volctrl))
 		return -EFAULT;
 
 	msf.cdmsf_min0 = 0x10;
@@ -1573,12 +1573,12 @@ static int cdromvolctrl(unsigned long arg)
 }
 
 
-static int cdromsubchnl(unsigned long arg)
+static int cdromsubchnl(void __user *arg)
 {
 	int status;
 	struct cdrom_subchnl subchnl;
 
-	if (copy_from_user(&subchnl, (void *) arg, sizeof subchnl))
+	if (copy_from_user(&subchnl, arg, sizeof subchnl))
 		return -EFAULT;
 
 	if (subchnl.cdsc_format != CDROM_LBA
@@ -1591,7 +1591,7 @@ static int cdromsubchnl(unsigned long arg)
 		return -EIO;
 	}
 
-	if (copy_to_user((void *)arg, &subchnl, sizeof subchnl))
+	if (copy_to_user(arg, &subchnl, sizeof subchnl))
 		return -EFAULT;
 	return 0;
 }
@@ -1600,12 +1600,12 @@ static int cdromsubchnl(unsigned long arg)
 static struct gendisk *optcd_disk;
 
 
-static int cdromread(unsigned long arg, int blocksize, int cmd)
+static int cdromread(void __user *arg, int blocksize, int cmd)
 {
 	int status;
 	struct cdrom_msf msf;
 
-	if (copy_from_user(&msf, (void *) arg, sizeof msf))
+	if (copy_from_user(&msf, arg, sizeof msf))
 		return -EFAULT;
 
 	bin2bcd(&msf);
@@ -1621,19 +1621,19 @@ static int cdromread(unsigned long arg, int blocksize, int cmd)
 
 	fetch_data(optcd_disk->private_data, blocksize);
 
-	if (copy_to_user((void *)arg, optcd_disk->private_data, blocksize))
+	if (copy_to_user(arg, optcd_disk->private_data, blocksize))
 		return -EFAULT;
 
 	return 0;
 }
 
 
-static int cdromseek(unsigned long arg)
+static int cdromseek(void __user *arg)
 {
 	int status;
 	struct cdrom_msf msf;
 
-	if (copy_from_user(&msf, (void *)arg, sizeof msf))
+	if (copy_from_user(&msf, arg, sizeof msf))
 		return -EFAULT;
 
 	bin2bcd(&msf);
@@ -1648,11 +1648,11 @@ static int cdromseek(unsigned long arg)
 
 
 #ifdef MULTISESSION
-static int cdrommultisession(unsigned long arg)
+static int cdrommultisession(void __user *arg)
 {
 	struct cdrom_multisession ms;
 
-	if (copy_from_user(&ms, (void*) arg, sizeof ms))
+	if (copy_from_user(&ms, arg, sizeof ms))
 		return -EFAULT;
 
 	ms.addr.msf.minute = disk_info.last_session.minute;
@@ -1667,7 +1667,7 @@ static int cdrommultisession(unsigned long arg)
 
 	ms.xa_flag = disk_info.xa;
 
-  	if (copy_to_user((void *)arg, &ms, sizeof(struct cdrom_multisession)))
+  	if (copy_to_user(arg, &ms, sizeof(struct cdrom_multisession)))
 		return -EFAULT;
 
 #if DEBUG_MULTIS
@@ -1717,6 +1717,7 @@ static int opt_ioctl(struct inode *ip, struct file *fp,
                      unsigned int cmd, unsigned long arg)
 {
 	int status, err, retval = 0;
+	void __user *argp = (void __user *)arg;
 
 	DEBUG((DEBUG_VFS, "starting opt_ioctl"));
 
@@ -1767,10 +1768,10 @@ static int opt_ioctl(struct inode *ip, struct file *fp,
 	switch (cmd) {
 	case CDROMPAUSE:	retval = cdrompause(); break;
 	case CDROMRESUME:	retval = cdromresume(); break;
-	case CDROMPLAYMSF:	retval = cdromplaymsf(arg); break;
-	case CDROMPLAYTRKIND:	retval = cdromplaytrkind(arg); break;
-	case CDROMREADTOCHDR:	retval = cdromreadtochdr(arg); break;
-	case CDROMREADTOCENTRY:	retval = cdromreadtocentry(arg); break;
+	case CDROMPLAYMSF:	retval = cdromplaymsf(argp); break;
+	case CDROMPLAYTRKIND:	retval = cdromplaytrkind(argp); break;
+	case CDROMREADTOCHDR:	retval = cdromreadtochdr(argp); break;
+	case CDROMREADTOCENTRY:	retval = cdromreadtocentry(argp); break;
 
 	case CDROMSTOP:		err = exec_cmd(COMSTOP);
 				if (err < 0) {
@@ -1799,8 +1800,8 @@ static int opt_ioctl(struct inode *ip, struct file *fp,
 				}
 				break;
 
-	case CDROMVOLCTRL:	retval = cdromvolctrl(arg); break;
-	case CDROMSUBCHNL:	retval = cdromsubchnl(arg); break;
+	case CDROMVOLCTRL:	retval = cdromvolctrl(argp); break;
+	case CDROMSUBCHNL:	retval = cdromsubchnl(argp); break;
 
 	/* The drive detects the mode and automatically delivers the
 	   correct 2048 bytes, so we don't need these IOCTLs */
@@ -1814,7 +1815,7 @@ static int opt_ioctl(struct inode *ip, struct file *fp,
 				break;
 
 #ifdef MULTISESSION
-	case CDROMMULTISESSION:	retval = cdrommultisession(arg); break;
+	case CDROMMULTISESSION:	retval = cdrommultisession(argp); break;
 #endif
 
 	case CDROM_GET_MCN:	retval = -EINVAL; break; /* not implemented */
@@ -1822,16 +1823,16 @@ static int opt_ioctl(struct inode *ip, struct file *fp,
 
 	case CDROMREADRAW:
 			/* this drive delivers 2340 bytes in raw mode */
-			retval = cdromread(arg, CD_FRAMESIZE_RAW1, COMREADRAW);
+			retval = cdromread(argp, CD_FRAMESIZE_RAW1, COMREADRAW);
 			break;
 	case CDROMREADCOOKED:
-			retval = cdromread(arg, CD_FRAMESIZE, COMREAD);
+			retval = cdromread(argp, CD_FRAMESIZE, COMREAD);
 			break;
 	case CDROMREADALL:
-			retval = cdromread(arg, CD_FRAMESIZE_RAWER, COMREADALL);
+			retval = cdromread(argp, CD_FRAMESIZE_RAWER, COMREADALL);
 			break;
 
-	case CDROMSEEK:		retval = cdromseek(arg); break;
+	case CDROMSEEK:		retval = cdromseek(argp); break;
 	case CDROMPLAYBLK:	retval = -EINVAL; break; /* not implemented */
 	case CDROMCLOSETRAY:	break;	/* The action was taken earlier */
 	default:		retval = -EINVAL;
