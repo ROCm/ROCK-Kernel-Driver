@@ -620,16 +620,10 @@ static int __init i8042_check_mux(struct i8042_values *values)
 		(~param >> 4) & 0xf, ~param & 0xf);
 
 /*
- * In MUX mode the keyboard translation seems to be always off.
- */
- 
-	i8042_direct = 1;
-
-/*
  * Disable all muxed ports by disabling AUX.
  */
 
-	i8042_ctr &= I8042_CTR_AUXDIS;
+	i8042_ctr |= I8042_CTR_AUXDIS;
 	i8042_ctr &= ~I8042_CTR_AUXINT;
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
