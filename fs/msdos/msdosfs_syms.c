@@ -31,11 +31,11 @@ static struct super_block *msdos_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type msdos_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"msdos",
-	get_sb:		msdos_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "msdos",
+	.get_sb		= msdos_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_msdos_fs(void)

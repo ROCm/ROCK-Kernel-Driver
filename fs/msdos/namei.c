@@ -189,8 +189,8 @@ old_compare:
 
 
 static struct dentry_operations msdos_dentry_operations = {
-	d_hash:		msdos_hash,
-	d_compare:	msdos_cmp,
+	.d_hash		= msdos_hash,
+	.d_compare	= msdos_cmp,
 };
 
 /*
@@ -590,13 +590,13 @@ rename_done:
 
 /* The public inode operations for the msdos fs */
 struct inode_operations msdos_dir_inode_operations = {
-	create:		msdos_create,
-	lookup:		msdos_lookup,
-	unlink:		msdos_unlink,
-	mkdir:		msdos_mkdir,
-	rmdir:		msdos_rmdir,
-	rename:		msdos_rename,
-	setattr:	fat_notify_change,
+	.create		= msdos_create,
+	.lookup		= msdos_lookup,
+	.unlink		= msdos_unlink,
+	.mkdir		= msdos_mkdir,
+	.rmdir		= msdos_rmdir,
+	.rename		= msdos_rename,
+	.setattr	= fat_notify_change,
 };
 
 int msdos_fill_super(struct super_block *sb,void *data, int silent)
