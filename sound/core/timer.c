@@ -458,12 +458,14 @@ static int _snd_timer_stop(snd_timer_instance_t * timeri, int keep_flag, enum sn
 		return -EINVAL;
 	spin_lock_irqsave(&timer->lock, flags);
 	list_del_init(&timeri->ack_list);
+#if 0   /* FIXME: this causes dead lock with the sequencer timer */
 	/* wait until the callback is finished */
 	while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
 		spin_unlock_irqrestore(&timer->lock, flags);
 		udelay(10);
 		spin_lock_irqsave(&timer->lock, flags);
 	}
+#endif
 	list_del_init(&timeri->active_list);
 	if ((timeri->flags & SNDRV_TIMER_IFLG_RUNNING) &&
 	    !(timeri->flags & SNDRV_TIMER_IFLG_SLAVE) &&
@@ -1688,9 +1690,10 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 				break;
 			}
 		}
-		spin_unlock_irq(&tu->qlock);
 		if (err < 0)
 			break;
+
+		spin_unlock_irq(&tu->qlock);
 
 		if (tu->tread) {
 			if (copy_to_user(buffer, &tu->tqueue[tu->qhead++], sizeof(snd_timer_tread_t))) {
@@ -1712,6 +1715,7 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 		spin_lock_irq(&tu->qlock);
 		tu->qused--;
 	}
+	spin_unlock_irq(&tu->qlock);
 	return result > 0 ? result : err;
 }
 

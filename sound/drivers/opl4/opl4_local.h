@@ -163,8 +163,10 @@ typedef struct opl4_voice {
 	int note;
 	int velocity;
 	const opl4_sound_t *sound;
+	u8 level_direct;
 	u8 reg_f_number;
 	u8 reg_misc;
+	u8 reg_lfo_vibrato;
 } opl4_voice_t;
 
 struct opl4 {

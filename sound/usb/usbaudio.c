@@ -153,6 +153,9 @@ struct snd_usb_substream {
 	int direction;	/* playback or capture */
 	int interface;	/* current interface */
 	int endpoint;	/* assigned endpoint */
+	struct audioformat *cur_audiofmt;	/* current audioformat pointer (for hw_params callback) */
+	unsigned int cur_rate;		/* current rate (for hw_params callback) */
+	unsigned int period_bytes;	/* current period bytes (for hw_params callback) */
 	unsigned int format;     /* USB data format */
 	unsigned int datapipe;   /* the data i/o pipe */
 	unsigned int syncpipe;   /* 1 - async out or adaptive in */
@@ -385,6 +388,7 @@ static int prepare_playback_sync_urb(snd_usb_substream_t *subs,
 		urb->iso_frame_desc[i].length = 3;
 		urb->iso_frame_desc[i].offset = offs;
 	}
+	urb->interval = 1;
 	return 0;
 }
 
@@ -509,6 +513,7 @@ static int prepare_playback_urb(snd_usb_substream_t *subs,
 	spin_unlock_irqrestore(&subs->lock, flags);
 	urb->transfer_buffer_length = offs * stride;
 	ctx->transfer = offs;
+	urb->interval = 1;
 
 	return 0;
 }
@@ -808,14 +813,15 @@ static void release_substream_urbs(snd_usb_substream_t *subs, int force)
 /*
  * initialize a substream for plaback/capture
  */
-static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
+static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_bytes,
+			       unsigned int rate, unsigned int frame_bits)
 {
 	unsigned int maxsize, n, i;
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
 	unsigned int npacks[MAX_URBS], total_packs;
 
 	/* calculate the frequency in 10.14 format */
-	subs->freqn = subs->freqm = get_usb_rate(runtime->rate);
+	subs->freqn = subs->freqm = get_usb_rate(rate);
 	subs->freqmax = subs->freqn + (subs->freqn >> 2); /* max. allowed frequency */
 	subs->phase = 0;
 
@@ -828,7 +834,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 	subs->unlink_mask = 0;
 
 	/* calculate the max. size of packet */
-	maxsize = ((subs->freqmax + 0x3fff) * (runtime->frame_bits >> 3)) >> 14;
+	maxsize = ((subs->freqmax + 0x3fff) * (frame_bits >> 3)) >> 14;
 	if (subs->maxpacksize && maxsize > subs->maxpacksize) {
 		//snd_printd(KERN_DEBUG "maxsize %d is greater than defined size %d\n",
 		//	   maxsize, subs->maxpacksize);
@@ -839,7 +845,6 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 		subs->curpacksize = subs->maxpacksize;
 	else
 		subs->curpacksize = maxsize;
-	subs->curframesize = bytes_to_frames(runtime, subs->curpacksize);
 
 	/* allocate a temporary buffer for playback */
 	if (is_playback) {
@@ -851,7 +856,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 	}
 
 	/* decide how many packets to be used */
-	total_packs = (frames_to_bytes(runtime, runtime->period_size) + maxsize - 1) / maxsize;
+	total_packs = (period_bytes + maxsize - 1) / maxsize;
 	if (total_packs < 2 * MIN_PACKS_URB)
 		total_packs = 2 * MIN_PACKS_URB;
 	subs->nurbs = (total_packs + nrpacks - 1) / nrpacks;
@@ -945,7 +950,8 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 /*
  * find a matching audio format
  */
-static struct audioformat *find_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
+static struct audioformat *find_format(snd_usb_substream_t *subs, unsigned int format,
+				       unsigned int rate, unsigned int channels)
 {
 	struct list_head *p;
 	struct audioformat *found = NULL;
@@ -953,23 +959,21 @@ static struct audioformat *find_format(snd_usb_substream_t *subs, snd_pcm_runtim
 	list_for_each(p, &subs->fmt_list) {
 		struct audioformat *fp;
 		fp = list_entry(p, struct audioformat, list);
-		if (fp->format != runtime->format ||
-		    fp->channels != runtime->channels)
+		if (fp->format != format || fp->channels != channels)
 			continue;
-		if (runtime->rate < fp->rate_min || runtime->rate > fp->rate_max)
+		if (rate < fp->rate_min || rate > fp->rate_max)
 			continue;
-		if (fp->rates & SNDRV_PCM_RATE_CONTINUOUS) {
-			if (! found || fp->maxpacksize > found->maxpacksize)
-				found = fp;
-		} else {
+		if (! (fp->rates & SNDRV_PCM_RATE_CONTINUOUS)) {
 			unsigned int i;
 			for (i = 0; i < fp->nr_rates; i++)
-				if (fp->rate_table[i] == runtime->rate) {
-					if (! found || fp->maxpacksize > found->maxpacksize)
-						found = fp;
+				if (fp->rate_table[i] == rate)
 					break;
-				}
+			if (i >= fp->nr_rates)
+				continue;
 		}
+		/* find the format with the largest max. packet size */
+		if (! found || fp->maxpacksize > found->maxpacksize)
+			found = fp;
 	}
 	return found;
 }
@@ -1042,29 +1046,24 @@ static int init_usb_sample_rate(struct usb_device *dev, int iface,
 /*
  * find a matching format and set up the interface
  */
-static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
+static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 {
 	struct usb_device *dev = subs->dev;
 	struct usb_host_config *config = dev->actconfig;
 	struct usb_host_interface *alts;
 	struct usb_interface_descriptor *altsd;
 	struct usb_interface *iface;
-	struct audioformat *fmt;
 	unsigned int ep, attr;
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
 	int err;
-
-	fmt = find_format(subs, runtime);
-	if (! fmt) {
-		snd_printd(KERN_DEBUG "cannot set format: format = %s, rate = %d, channels = %d\n",
-			   snd_pcm_format_name(runtime->format), runtime->rate, runtime->channels);
-		return -EINVAL;
-	}
 
 	iface = &config->interface[fmt->iface];
 	alts = &iface->altsetting[fmt->altset_idx];
 	altsd = get_iface_desc(alts);
 	snd_assert(altsd->bAlternateSetting == fmt->altsetting, return -EINVAL);
+
+	if (fmt == subs->cur_audiofmt)
+		return 0;
 
 	/* close the old interface */
 	if (subs->interface >= 0 && subs->interface != fmt->iface) {
@@ -1093,7 +1092,6 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		subs->datapipe = usb_rcvisocpipe(dev, ep);
 	subs->syncpipe = subs->syncinterval = 0;
 	subs->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
-	subs->maxframesize = bytes_to_frames(runtime, subs->maxpacksize);
 	subs->fill_max = 0;
 
 	/* we need a sync pipe in async OUT or adaptive IN mode */
@@ -1123,18 +1121,18 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		subs->syncinterval = get_endpoint(alts, 1)->bRefresh;
 	}
 
-	if ((err = init_usb_pitch(dev, subs->interface, alts, fmt)) < 0 ||
-	    (err = init_usb_sample_rate(dev, subs->interface, alts, fmt,
-					runtime->rate)) < 0)
-		return err;
-
 	/* always fill max packet size */
 	if (fmt->attributes & EP_CS_ATTR_FILL_MAX)
 		subs->fill_max = 1;
 
+	if ((err = init_usb_pitch(dev, subs->interface, alts, fmt)) < 0)
+		return err;
+
+	subs->cur_audiofmt = fmt;
+
 #if 0
 	printk("setting done: format = %d, rate = %d, channels = %d\n",
-	       runtime->format, runtime->rate, runtime->channels);
+	       fmt->format, fmt->rate, fmt->channels);
 	printk("  datapipe = 0x%0x, syncpipe = 0x%0x\n",
 	       subs->datapipe, subs->syncpipe);
 #endif
@@ -1143,7 +1141,9 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 }
 
 /*
- * allocate a buffer.
+ * hw_params callback
+ *
+ * allocate a buffer and set the given audio format.
  *
  * so far we use a physically linear buffer although packetize transfer
  * doesn't need a continuous area.
@@ -1153,33 +1153,91 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 static int snd_usb_hw_params(snd_pcm_substream_t *substream,
 			     snd_pcm_hw_params_t *hw_params)
 {
-	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+	snd_usb_substream_t *subs = (snd_usb_substream_t *)substream->runtime->private_data;
+	struct audioformat *fmt;
+	unsigned int channels, rate, format;
+	int ret, changed;
+
+	ret = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+	if (ret < 0)
+		return ret;
+	
+	format = params_format(hw_params);
+	rate = params_rate(hw_params);
+	channels = params_channels(hw_params);
+	fmt = find_format(subs, format, rate, channels);
+	if (! fmt) {
+		snd_printd(KERN_DEBUG "cannot set format: format = %s, rate = %d, channels = %d\n",
+			   snd_pcm_format_name(format), rate, channels);
+		return -EINVAL;
+	}
+
+	changed = subs->cur_audiofmt != fmt ||
+		subs->period_bytes != params_period_bytes(hw_params) ||
+		subs->cur_rate != rate;
+	if ((ret = set_format(subs, fmt)) < 0)
+		return ret;
+
+	if (subs->cur_rate != rate) {
+		struct usb_host_config *config = subs->dev->actconfig;
+		struct usb_host_interface *alts;
+		struct usb_interface *iface;
+		iface = &config->interface[fmt->iface];
+		alts = &iface->altsetting[fmt->altset_idx];
+		ret = init_usb_sample_rate(subs->dev, subs->interface, alts, fmt, rate);
+		if (ret < 0)
+			return ret;
+		subs->cur_rate = rate;
+	}
+
+	if (changed) {
+		/* format changed */
+		release_substream_urbs(subs, 0);
+		/* influenced: period_bytes, channels, rate, format, */
+		ret = init_substream_urbs(subs, params_period_bytes(hw_params),
+					  params_rate(hw_params),
+					  snd_pcm_format_physical_width(params_format(hw_params)) * params_channels(hw_params));
+	}
+
+	return ret;
 }
 
 /*
- * free the buffer
+ * hw_free callback
+ *
+ * reset the audio format and release the buffer
  */
 static int snd_usb_hw_free(snd_pcm_substream_t *substream)
 {
+	snd_usb_substream_t *subs = (snd_usb_substream_t *)substream->runtime->private_data;
+
+	subs->cur_audiofmt = NULL;
+	subs->cur_rate = 0;
+	subs->period_bytes = 0;
+	release_substream_urbs(subs, 0);
 	return snd_pcm_lib_free_pages(substream);
 }
 
 /*
  * prepare callback
  *
- * set format and initialize urbs
+ * only a few subtle things...
  */
 static int snd_usb_pcm_prepare(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_usb_substream_t *subs = (snd_usb_substream_t *)runtime->private_data;
-	int err;
 
-	release_substream_urbs(subs, 0);
-	if ((err = set_format(subs, runtime)) < 0)
-		return err;
+	if (! subs->cur_audiofmt) {
+		snd_printk(KERN_ERR "usbaudio: no format is specified!\n");
+		return -ENXIO;
+	}
 
-	return init_substream_urbs(subs, runtime);
+	/* some unit conversions in runtime */
+	subs->maxframesize = bytes_to_frames(runtime, subs->maxpacksize);
+	subs->curframesize = bytes_to_frames(runtime, subs->curpacksize);
+
+	return 0;
 }
 
 static snd_pcm_hardware_t snd_usb_playback =
@@ -1536,9 +1594,10 @@ static int snd_usb_pcm_close(snd_pcm_substream_t *substream, int direction)
 	snd_usb_stream_t *as = snd_pcm_substream_chip(substream);
 	snd_usb_substream_t *subs = &as->substream[direction];
 
-	release_substream_urbs(subs, 0);
-	if (subs->interface >= 0)
+	if (subs->interface >= 0) {
 		usb_set_interface(subs->dev, subs->interface, 0);
+		subs->interface = -1;
+	}
 	subs->pcm_substream = NULL;
 	return 0;
 }
@@ -2163,8 +2222,10 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		/* skip invalid one */
 		if ((altsd->bInterfaceClass != USB_CLASS_AUDIO &&
 		     altsd->bInterfaceClass != USB_CLASS_VENDOR_SPEC) ||
-		    altsd->bInterfaceSubClass != USB_SUBCLASS_AUDIO_STREAMING ||
-		    altsd->bNumEndpoints < 1)
+		    (altsd->bInterfaceSubClass != USB_SUBCLASS_AUDIO_STREAMING &&
+		     altsd->bInterfaceSubClass != USB_SUBCLASS_VENDOR_SPEC) ||
+		    altsd->bNumEndpoints < 1 ||
+		    get_endpoint(alts, 0)->wMaxPacketSize == 0)
 			continue;
 		/* must be isochronous */
 		if ((get_endpoint(alts, 0)->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) !=
@@ -2278,6 +2339,32 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 
 
 /*
+ * disconnect streams
+ * called from snd_usb_audio_disconnect()
+ */
+static void snd_usb_stream_disconnect(struct list_head *head, struct usb_driver *driver)
+{
+	int idx;
+	snd_usb_stream_t *as;
+	snd_usb_substream_t *subs;
+	struct list_head *p;
+
+	as = list_entry(head, snd_usb_stream_t, list);
+	for (idx = 0; idx < 2; idx++) {
+		subs = &as->substream[idx];
+		if (!subs->num_formats)
+			return;
+		release_substream_urbs(subs, 1);
+		subs->interface = -1;
+		/* release interfaces */
+		list_for_each(p, &subs->fmt_list) {
+			struct audioformat *fp = list_entry(p, struct audioformat, list);
+			usb_driver_release_interface(driver, usb_ifnum_to_if(subs->dev, fp->iface));
+		}
+	}
+}
+
+/*
  * parse audio control descriptor and create pcm/midi streams
  */
 static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif)
@@ -2381,7 +2468,8 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
  * create a stream for an interface with proper descriptors
  */
 static int create_standard_interface_quirk(snd_usb_audio_t *chip,
-					   struct usb_interface *iface)
+					   struct usb_interface *iface,
+					   const snd_usb_audio_quirk_t *quirk)
 {
 	struct usb_host_interface *alts;
 	struct usb_interface_descriptor *altsd;
@@ -2389,19 +2477,18 @@ static int create_standard_interface_quirk(snd_usb_audio_t *chip,
 
 	alts = &iface->altsetting[0];
 	altsd = get_iface_desc(alts);
-	switch (altsd->bInterfaceSubClass) {
-	case USB_SUBCLASS_AUDIO_STREAMING:
+	switch (quirk->type) {
+	case QUIRK_AUDIO_STANDARD_INTERFACE:
 		err = parse_audio_endpoints(chip, altsd->bInterfaceNumber);
 		if (!err)
 			usb_set_interface(chip->dev, altsd->bInterfaceNumber, 0); /* reset the current interface */
 		break;
-	case USB_SUBCLASS_MIDI_STREAMING:
+	case QUIRK_MIDI_STANDARD_INTERFACE:
 		err = snd_usb_create_midi_interface(chip, iface, NULL);
 		break;
 	default:
-		snd_printk(KERN_ERR "if %d: non-supported subclass %d\n",
-			   altsd->bInterfaceNumber, altsd->bInterfaceSubClass);
-		return -ENODEV;
+		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
+		return -ENXIO;
 	}
 	if (err < 0) {
 		snd_printk(KERN_ERR "cannot setup if %d: error %d\n",
@@ -2495,8 +2582,9 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 		return create_composite_quirk(chip, iface, quirk);
 	case QUIRK_AUDIO_FIXED_ENDPOINT:
 		return create_fixed_stream_quirk(chip, iface, quirk);
-	case QUIRK_STANDARD_INTERFACE:
-		return create_standard_interface_quirk(chip, iface);
+	case QUIRK_AUDIO_STANDARD_INTERFACE:
+	case QUIRK_MIDI_STANDARD_INTERFACE:
+		return create_standard_interface_quirk(chip, iface, quirk);
 	default:
 		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
 		return -ENXIO;
@@ -2635,11 +2723,6 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	if (quirk && quirk->ifnum != QUIRK_ANY_INTERFACE && ifnum != quirk->ifnum)
 		goto __err_val;
 
-	if (usb_set_configuration(dev, get_cfg_desc(config)->bConfigurationValue) < 0) {
-		snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", get_cfg_desc(config)->bConfigurationValue);
-		goto __err_val;
-	}
-
 	/* SB Extigy needs special boot-up sequence */
 	/* if more models come, this will go to the quirk list. */
 	if (dev->descriptor.idVendor == 0x041e && dev->descriptor.idProduct == 0x3000) {
@@ -2669,6 +2752,11 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		/* it's a fresh one.
 		 * now look for an empty slot and create a new card instance
 		 */
+		/* first, set the current configuration for this device */
+		if (usb_set_configuration(dev, get_cfg_desc(config)->bConfigurationValue) < 0) {
+			snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", get_cfg_desc(config)->bConfigurationValue);
+			goto __error;
+		}
 		for (i = 0; i < SNDRV_CARDS; i++)
 			if (enable[i] && ! usb_chip[i] &&
 			    (vid[i] == -1 || vid[i] == dev->descriptor.idVendor) &&
@@ -2746,21 +2834,11 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 		snd_card_disconnect(card);
 		/* release the pcm resources */
 		list_for_each(p, &chip->pcm_list) {
-			snd_usb_stream_t *as;
-			int idx;
-			as = list_entry(p, snd_usb_stream_t, list);
-			for (idx = 0; idx < 2; idx++) {
-				snd_usb_substream_t *subs;
-				subs = &as->substream[idx];
-				if (!subs->num_formats)
-					continue;
-				release_substream_urbs(subs, 1);
-				subs->interface = -1;
-			}
+			snd_usb_stream_disconnect(p, &usb_audio_driver);
 		}
 		/* release the midi resources */
 		list_for_each(p, &chip->midi_list) {
-			snd_usbmidi_disconnect(p);
+			snd_usbmidi_disconnect(p, &usb_audio_driver);
 		}
 		up(&register_mutex);
 		snd_card_free_in_thread(card);

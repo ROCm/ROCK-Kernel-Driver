@@ -57,8 +57,8 @@
 #define SNDRV_SEQ_EVENT_CHANPRESS	12
 #define SNDRV_SEQ_EVENT_PITCHBEND	13	/**< from -8192 to 8191 */
 #define SNDRV_SEQ_EVENT_CONTROL14	14	/**< 14 bit controller value */
-#define SNDRV_SEQ_EVENT_NONREGPARAM	15	/**< 14 bit NRPN */
-#define SNDRV_SEQ_EVENT_REGPARAM	16	/**< 14 bit RPN */
+#define SNDRV_SEQ_EVENT_NONREGPARAM	15	/**< 14 bit NRPN address + 14 bit unsigned value */
+#define SNDRV_SEQ_EVENT_REGPARAM	16	/**< 14 bit RPN address + 14 bit unsigned value */
 
 /** synchronisation messages
  * event data type = #sndrv_seq_ev_ctrl

@@ -453,6 +453,36 @@
 		}
 	}
 },
+{	/*
+	 * This quirk is for the "Advanced Driver" mode of the Edirol UA-5.
+	 * If the advanced mode switch at the back of the unit is off, the
+	 * UA-5 has ID 0x0582/0x0011 and is standard compliant (no quirks),
+	 * but offers only 16-bit PCM.
+	 * In advanced mode, the UA-5 will output S24_3LE samples (two
+	 * channels) at the rate indicated on the front switch, including
+	 * the 96kHz sample rate.
+	 */
+	USB_DEVICE(0x0582, 0x0010),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "EDIROL",
+		.product_name = "UA-5",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = -1
+			}
+		}
+	}
+},
 {
 	USB_DEVICE(0x0582, 0x0012),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
@@ -520,15 +550,15 @@
 		.data = & (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
-				.type = QUIRK_STANDARD_INTERFACE
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
 			},
 			{
 				.ifnum = 2,
-				.type = QUIRK_STANDARD_INTERFACE
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
 			},
 			{
 				.ifnum = 3,
-				.type = QUIRK_STANDARD_INTERFACE
+				.type = QUIRK_MIDI_STANDARD_INTERFACE
 			},
 			{
 				.ifnum = -1

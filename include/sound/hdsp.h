@@ -24,6 +24,7 @@
 typedef enum {
 	Digiface,
 	Multiface,
+	H9652,
 	Undefined,
 } HDSP_IO_Type;
 

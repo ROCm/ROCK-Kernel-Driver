@@ -3077,7 +3077,8 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 /*
  * gameport interface
  */
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 
 typedef struct snd_trident_gameport {
 	struct gameport info;
@@ -3173,12 +3174,6 @@ void __devinit snd_trident_gameport(trident_t *chip)
  */
 inline static void do_delay(trident_t *chip)
 {
-#ifdef CONFIG_PM
-	if (chip->in_suspend) {
-		mdelay((1000 + HZ - 1) / HZ);
-		return;
-	}
-#endif
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(1);
 }
@@ -3273,7 +3268,7 @@ static void snd_trident_proc_read(snd_info_entry_t *entry,
 			snd_iprintf(buffer, "Memory Free    : %d\n", snd_util_mem_avail(trident->tlb.memhdr));
 		}
 	}
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	snd_iprintf(buffer,"\nWavetable Synth\n");
 	snd_iprintf(buffer, "Memory Maximum : %d\n", trident->synth.max_size);
 	snd_iprintf(buffer, "Memory Used    : %d\n", trident->synth.current_size);
@@ -3636,7 +3631,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 int snd_trident_free(trident_t *trident)
 {
-#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	if (trident->gameport) {
 		gameport_unregister_port(&trident->gameport->info);
 		kfree(trident->gameport);
@@ -3796,7 +3791,7 @@ static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *
   ---------------------------------------------------------------------------*/
 int snd_trident_attach_synthesizer(trident_t *trident)
 {	
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (snd_seq_device_new(trident->card, 1, SNDRV_SEQ_DEV_ID_TRIDENT,
 			       sizeof(trident_t*), &trident->seq_dev) >= 0) {
 		strcpy(trident->seq_dev->name, "4DWave");
@@ -3808,7 +3803,7 @@ int snd_trident_attach_synthesizer(trident_t *trident)
 
 int snd_trident_detach_synthesizer(trident_t *trident)
 {
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (trident->seq_dev) {
 		snd_device_free(trident->card, trident->seq_dev);
 		trident->seq_dev = NULL;

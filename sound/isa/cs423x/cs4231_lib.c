@@ -1401,8 +1401,10 @@ static int snd_cs4231_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *d
 
 	switch (rqst) {
 	case PM_SUSPEND:
-		if (chip->suspend)
+		if (chip->suspend) {
+			snd_pcm_suspend_all(chip->pcm);
 			(*chip->suspend)(chip);
+		}
 		break;
 	case PM_RESUME:
 		if (chip->resume)

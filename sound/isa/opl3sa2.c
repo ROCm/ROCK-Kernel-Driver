@@ -552,9 +552,8 @@ static void snd_opl3sa2_suspend(opl3sa2_t *chip)
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return;
 
-	/* FIXME: is this order ok? */
+	snd_pcm_suspend_all(chip->cs4231->pcm); /* stop before saving regs */
 	chip->cs4231_suspend(chip->cs4231);
-	snd_pcm_suspend_all(chip->cs4231->pcm);
 
 	/* power down */
 	snd_opl3sa2_write(chip, OPL3SA2_PM_CTRL, OPL3SA2_PM_D3);
