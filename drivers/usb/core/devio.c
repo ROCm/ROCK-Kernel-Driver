@@ -1139,7 +1139,6 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		return -ENODEV;
 	}
 
-	down(&ps->dev->serialize);
 	if (ps->dev->state != USB_STATE_CONFIGURED)
 		retval = -ENODEV;
 	else if (!(ifp = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
@@ -1177,7 +1176,6 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		}
 		up_read(&usb_bus_type.subsys.rwsem);
 	}
-	up(&ps->dev->serialize);
 
 	/* cleanup and return */
 	if (retval >= 0
