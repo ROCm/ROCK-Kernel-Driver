@@ -66,6 +66,7 @@
 #include <linux/suspend.h>
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
+#include <linux/completion.h>
 
 #include <asm/uaccess.h>
 
@@ -148,14 +149,12 @@ static struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 	&xor_funcs
 };
 
-static int
-figure_loop_size(struct loop_device *lo)
+static loff_t get_loop_size(struct loop_device *lo, struct file *file)
 {
 	loff_t size, offset, loopsize;
-	sector_t x;
 
 	/* Compute loopsize in bytes */
-	size = i_size_read(lo->lo_backing_file->f_mapping->host);
+	size = i_size_read(file->f_mapping->host);
 	offset = lo->lo_offset;
 	loopsize = size - offset;
 	if (lo->lo_sizelimit > 0 && lo->lo_sizelimit < loopsize)
@@ -165,8 +164,14 @@ figure_loop_size(struct loop_device *lo)
 	 * Unfortunately, if we want to do I/O on the device,
 	 * the number of 512-byte sectors has to fit into a sector_t.
 	 */
-	size = loopsize >> 9;
-	x = (sector_t)size;
+	return loopsize >> 9;
+}
+
+static int
+figure_loop_size(struct loop_device *lo)
+{
+	loff_t size = get_loop_size(lo, lo->lo_backing_file);
+	sector_t x = (sector_t)size;
 
 	if ((loff_t)x != size)
 		return -EFBIG;
@@ -429,12 +434,24 @@ inactive:
 	goto out;
 }
 
+struct switch_request {
+	struct file *file;
+	struct completion wait;
+};
+
+static void do_loop_switch(struct loop_device *, struct switch_request *);
+
 static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 {
 	int ret;
 
-	ret = do_bio_filebacked(lo, bio);
-	bio_endio(bio, bio->bi_size, ret);
+	if (unlikely(!bio->bi_bdev)) {
+		do_loop_switch(lo, bio->bi_private);
+		bio_put(bio);
+	} else {
+		ret = do_bio_filebacked(lo, bio);
+		bio_endio(bio, bio->bi_size, ret);
+	}
 }
 
 /*
@@ -495,6 +512,103 @@ static int loop_thread(void *data)
 	return 0;
 }
 
+/*
+ * loop_switch performs the hard work of switching a backing store.
+ * First it needs to flush existing IO, it does this by sending a magic
+ * BIO down the pipe. The completion of this BIO does the actual switch.
+ */
+static int loop_switch(struct loop_device *lo, struct file *file)
+{
+	struct switch_request w;
+	struct bio *bio = bio_alloc(GFP_KERNEL, 1);
+	if (!bio)
+		return -ENOMEM;
+	init_completion(&w.wait);
+	w.file = file;
+	bio->bi_private = &w;
+	bio->bi_bdev = NULL;
+	loop_make_request(lo->lo_queue, bio);
+	wait_for_completion(&w.wait);
+	return 0;
+}
+
+/*
+ * Do the actual switch; called from the BIO completion routine
+ */
+static void do_loop_switch(struct loop_device *lo, struct switch_request *p)
+{
+	struct file *file = p->file;
+	struct file *old_file = lo->lo_backing_file;
+	struct address_space *mapping = file->f_mapping;
+
+	mapping_set_gfp_mask(old_file->f_mapping, lo->old_gfp_mask);
+	lo->lo_backing_file = file;
+	lo->lo_blocksize = mapping->host->i_blksize;
+	lo->old_gfp_mask = mapping_gfp_mask(mapping);
+	mapping_set_gfp_mask(mapping, lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
+	complete(&p->wait);
+}
+
+
+/*
+ * loop_change_fd switched the backing store of a loopback device to
+ * a new file. This is useful for operating system installers to free up
+ * the original file and in High Availability environments to switch to
+ * an alternative location for the content in case of server meltdown.
+ * This can only work if the loop device is used read-only, and if the
+ * new backing store is the same size and type as the old backing store.
+ */
+static int loop_change_fd(struct loop_device *lo, struct file *lo_file,
+		       struct block_device *bdev, unsigned int arg)
+{
+	struct file	*file, *old_file;
+	struct inode	*inode;
+	int		error;
+
+	error = -ENXIO;
+	if (lo->lo_state != Lo_bound)
+		goto out;
+
+	/* the loop device has to be read-only */
+	error = -EINVAL;
+	if (lo->lo_flags != LO_FLAGS_READ_ONLY)
+		goto out;
+
+	error = -EBADF;
+	file = fget(arg);
+	if (!file)
+		goto out;
+
+	inode = file->f_mapping->host;
+	old_file = lo->lo_backing_file;
+
+	error = -EINVAL;
+
+	if (!S_ISREG(inode->i_mode) && !S_ISBLK(inode->i_mode))
+		goto out_putf;
+
+	/* new backing store needs to support loop (eg sendfile) */
+	if (!inode->i_fop->sendfile)
+		goto out_putf;
+
+	/* size of the new backing store needs to be the same */
+	if (get_loop_size(lo, file) != get_loop_size(lo, old_file))
+		goto out_putf;
+
+	/* and ... switch */
+	error = loop_switch(lo, file);
+	if (error)
+		goto out_putf;
+
+	fput(old_file);
+	return 0;
+
+ out_putf:
+	fput(file);
+ out:
+	return error;
+}
+
 static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		       struct block_device *bdev, unsigned int arg)
 {
@@ -505,6 +619,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	unsigned lo_blocksize;
 	int		lo_flags = 0;
 	int		error;
+	loff_t		size;
 
 	/* This is safe, since we have a reference from open(). */
 	__module_get(THIS_MODULE);
@@ -543,6 +658,13 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		goto out_putf;
 	}
 
+	size = get_loop_size(lo, file);
+
+	if ((loff_t)(sector_t)size != size) {
+		error = -EFBIG;
+		goto out_putf;
+	}
+
 	if (!(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
@@ -555,10 +677,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->transfer = NULL;
 	lo->ioctl = NULL;
 	lo->lo_sizelimit = 0;
-	if (figure_loop_size(lo)) {
-		error = -EFBIG;
-		goto out_putf;
-	}
 	lo->old_gfp_mask = mapping_gfp_mask(mapping);
 	mapping_set_gfp_mask(mapping, lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
 
@@ -570,6 +688,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	 */
 	blk_queue_make_request(lo->lo_queue, loop_make_request);
 	lo->lo_queue->queuedata = lo;
+
+	set_capacity(disks[lo->lo_number], size);
 
 	set_blocksize(bdev, lo_blocksize);
 
@@ -880,6 +1000,9 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 	switch (cmd) {
 	case LOOP_SET_FD:
 		err = loop_set_fd(lo, file, inode->i_bdev, arg);
+		break;
+	case LOOP_CHANGE_FD:
+		err = loop_change_fd(lo, file, inode->i_bdev, arg);
 		break;
 	case LOOP_CLR_FD:
 		err = loop_clr_fd(lo, inode->i_bdev);
