@@ -114,6 +114,8 @@ typedef struct {
 
 	struct iw_spy_data spy_data; /* iwspy support */
 
+	int monitor_type; /* ARPHRD_IEEE80211 or ARPHRD_IEEE80211_PRISM */
+
 	struct islpci_acl acl;
 
 	/* PCI bus allocation & configuration members */

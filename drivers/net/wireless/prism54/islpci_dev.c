@@ -715,9 +715,9 @@ islpci_setup(struct pci_dev *pdev)
 	priv = netdev_priv(ndev);
 	priv->ndev = ndev;
 	priv->pdev = pdev;
-
+	priv->monitor_type = ARPHRD_IEEE80211;
 	priv->ndev->type = (priv->iw_mode == IW_MODE_MONITOR) ?
-		ARPHRD_IEEE80211: ARPHRD_ETHER;
+		priv->monitor_type : ARPHRD_ETHER;
 
 	/* save the start and end address of the PCI memory area */
 	ndev->mem_start = (unsigned long) priv->device_base;

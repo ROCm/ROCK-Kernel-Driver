@@ -24,10 +24,12 @@
 #include <linux/delay.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/if_arp.h>
 
 #include "isl_38xx.h"
 #include "islpci_eth.h"
 #include "islpci_mgt.h"
+#include "oid_mgt.h"
 
 /******************************************************************************
     Network Interface functions
@@ -246,6 +248,69 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	return err;
 }
 
+static inline int
+islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
+{
+	/* The card reports full 802.11 packets but with a 20 bytes
+	 * header and without the FCS. But there a is a bit that
+	 * indicates if the packet is corrupted :-) */
+	struct rfmon_header *hdr = (struct rfmon_header *) (*skb)->data;
+	if (hdr->flags & 0x01)
+		/* This one is bad. Drop it ! */
+		return -1;
+	if (priv->ndev->type == ARPHRD_IEEE80211_PRISM) {
+		struct avs_80211_1_header *avs;
+		/* extract the relevant data from the header */
+		u32 clock = hdr->clock;
+		u8 rate = hdr->rate;
+		u16 freq = be16_to_cpu(hdr->freq);
+		u8 rssi = hdr->rssi;
+
+		skb_pull(*skb, sizeof (struct rfmon_header));
+
+		if (skb_headroom(*skb) < sizeof (struct avs_80211_1_header)) {
+			struct sk_buff *newskb = skb_copy_expand(*skb,
+								 sizeof (struct
+									 avs_80211_1_header),
+								 0, GFP_ATOMIC);
+			if (newskb) {
+				kfree_skb(*skb);
+				*skb = newskb;
+			} else
+				return -1;
+			/* This behavior is not very subtile... */
+		}
+
+		/* make room for the new header and fill it. */
+		avs =
+		    (struct avs_80211_1_header *) skb_push(*skb,
+							   sizeof (struct
+								   avs_80211_1_header));
+
+		avs->version = htonl(P80211CAPTURE_VERSION);
+		avs->length = htonl(sizeof (struct avs_80211_1_header));
+		avs->mactime = __cpu_to_be64(clock);
+		avs->hosttime = __cpu_to_be64(jiffies);
+		avs->phytype = htonl(6);	/*OFDM: 6 for (g), 8 for (a) */
+		avs->channel = htonl(channel_of_freq(freq));
+		avs->datarate = htonl(rate * 5);
+		avs->antenna = htonl(0);	/*unknown */
+		avs->priority = htonl(0);	/*unknown */
+		avs->ssi_type = htonl(2);	/*2: dBm, 3: raw RSSI */
+		avs->ssi_signal = htonl(rssi);
+		avs->ssi_noise = htonl(priv->local_iwstatistics.qual.noise);	/*better than 'undefined', I assume */
+		avs->preamble = htonl(0);	/*unknown */
+		avs->encoding = htonl(0);	/*unknown */
+	} else
+		skb_pull(*skb, sizeof (struct rfmon_header));
+
+	(*skb)->protocol = htons(ETH_P_802_2);
+	(*skb)->mac.raw = (*skb)->data;
+	(*skb)->pkt_type = PACKET_OTHERHOST;
+
+	return 0;
+}
+
 int
 islpci_eth_receive(islpci_private *priv)
 {
@@ -315,37 +380,29 @@ islpci_eth_receive(islpci_private *priv)
 	/* do some additional sk_buff and network layer parameters */
 	skb->dev = ndev;
 
-	/* take care of monitor mode */
-	if (priv->iw_mode == IW_MODE_MONITOR) {
-		/* The card reports full 802.11 packets but with a 20 bytes
-		 * header and without the FCS. But there a is a bit that
-		 * indicates if the packet is corrupted :-) */
-		if (skb->data[8] & 0x01)
-			/* This one is bad. Drop it ! */
-			discard = 1;
-		skb_pull(skb, 20);
-		skb->protocol = htons(ETH_P_802_2);
-		skb->mac.raw = skb->data;
-		skb->pkt_type = PACKET_OTHERHOST;
-	} else {
+	/* take care of monitor mode and spy monitoring. */
+	if (priv->iw_mode == IW_MODE_MONITOR)
+		discard = islpci_monitor_rx(priv, &skb);
+	else {
 		if (skb->data[2 * ETH_ALEN] == 0) {
 			/* The packet has a rx_annex. Read it for spy monitoring, Then
 			 * remove it, while keeping the 2 leading MAC addr.
 			 */
 			struct iw_quality wstats;
-			struct obj_rx_annex *annex =
-			    (struct obj_rx_annex *) skb->data;
-			wstats.level = annex->rssi;
+			struct rx_annex_header *annex =
+			    (struct rx_annex_header *) skb->data;
+			wstats.level = annex->rfmon.rssi;
 			/* The noise value can be a bit outdated if nobody's 
 			 * reading wireless stats... */
-			wstats.noise = priv->iwstatistics.qual.noise;
+			wstats.noise = priv->local_iwstatistics.qual.noise;
 			wstats.qual = wstats.level - wstats.noise;
 			wstats.updated = 0x07;
 			/* Update spy records */
 			wireless_spy_update(ndev, annex->addr2, &wstats);
-			/* 20 = sizeof(struct obj_rx_annex) - 2*ETH_ALEN */
-			memcpy(skb->data + 20, skb->data, 2 * ETH_ALEN);
-			skb_pull(skb, 20);
+
+			memcpy(skb->data + sizeof (struct rfmon_header),
+			       skb->data, 2 * ETH_ALEN);
+			skb_pull(skb, sizeof (struct rfmon_header));
 		}
 		skb->protocol = eth_type_trans(skb, ndev);
 	}

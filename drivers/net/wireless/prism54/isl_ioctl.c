@@ -327,34 +327,15 @@ prism54_set_freq(struct net_device *ndev, struct iw_request_info *info,
 {
 	islpci_private *priv = netdev_priv(ndev);
 	int rvalue;
-	u32 c = 0;
+	u32 c;
 
-	/* prepare the structure for the set object */
 	if (fwrq->m < 1000)
-		/* structure value contains a channel indication */
+		/* we have a channel number */
 		c = fwrq->m;
-	else {
-		/* structure contains a frequency indication and fwrq->e = 1 */
-		int f = fwrq->m / 100000;
+	else
+		c = (fwrq->e == 1) ? channel_of_freq(fwrq->m / 100000) : 0;
 
-		if (fwrq->e != 1)
-			return -EINVAL;
-		if ((f >= 2412) && (f <= 2484)) {
-			while ((c < 14) && (f != frequency_list_bg[c]))
-				c++;
-			if (c >= 14)
-				return -EINVAL;
-		} else if ((f >= (int) 5170) && (f <= (int) 5320)) {
-			while ((c < 12) && (f != frequency_list_a[c]))
-				c++;
-			if (c >= 12)
-				return -EINVAL;
-		} else
-			return -EINVAL;
-		c++;
-	}
-
-	rvalue = mgt_set_request(priv, DOT11_OID_CHANNEL, 0, &c);
+	rvalue = c ? mgt_set_request(priv, DOT11_OID_CHANNEL, 0, &c) : -EINVAL;
 
 	/* Call commit handler */
 	return (rvalue ? rvalue : -EINPROGRESS);
@@ -410,7 +391,7 @@ prism54_set_mode(struct net_device *ndev, struct iw_request_info *info,
 
 	mgt_commit(priv);
 	priv->ndev->type = (priv->iw_mode == IW_MODE_MONITOR)
-	    ? ARPHRD_IEEE80211 : ARPHRD_ETHER;
+	    ? priv->monitor_type : ARPHRD_ETHER;
 	up_write(&priv->mib_sem);
 
 	return 0;
@@ -1963,6 +1944,28 @@ prism54_get_wpa(struct net_device *ndev, struct iw_request_info *info,
 }
 
 int
+prism54_set_prismhdr(struct net_device *ndev, struct iw_request_info *info,
+		     __u32 * uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	priv->monitor_type =
+	    (*uwrq ? ARPHRD_IEEE80211_PRISM : ARPHRD_IEEE80211);
+	if (priv->iw_mode == IW_MODE_MONITOR)
+		priv->ndev->type = priv->monitor_type;
+
+	return 0;
+}
+
+int
+prism54_get_prismhdr(struct net_device *ndev, struct iw_request_info *info,
+		     __u32 * uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	*uwrq = (priv->monitor_type == ARPHRD_IEEE80211_PRISM);
+	return 0;
+}
+
+int
 prism54_set_maxframeburst(struct net_device *ndev, struct iw_request_info *info,
 			  __u32 * uwrq, char *extra)
 {
@@ -2198,6 +2201,9 @@ static const iw_handler prism54_handler[] = {
 #define	PRISM54_SET_OID_STR	SIOCIWFIRSTPRIV+20
 #define	PRISM54_SET_OID_ADDR	SIOCIWFIRSTPRIV+22
 
+#define PRISM54_GET_PRISMHDR	SIOCIWFIRSTPRIV+23
+#define PRISM54_SET_PRISMHDR	SIOCIWFIRSTPRIV+24
+
 #define IWPRIV_SET_U32(n,x)	{ n, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_"x }
 #define IWPRIV_SET_SSID(n,x)	{ n, IW_PRIV_TYPE_CHAR | IW_PRIV_SIZE_FIXED | 1, 0, "set_"x }
 #define IWPRIV_SET_ADDR(n,x)	{ n, IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0, "set_"x }
@@ -2212,6 +2218,10 @@ static const iw_handler prism54_handler[] = {
 static const struct iw_priv_args prism54_private_args[] = {
 /*{ cmd, set_args, get_args, name } */
 	{PRISM54_RESET, 0, 0, "reset"},
+	{PRISM54_GET_PRISMHDR, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 "get_prismhdr"},
+	{PRISM54_SET_PRISMHDR, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,
+	 "set_prismhdr"},
 	{PRISM54_GET_POLICY, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "getPolicy"},
 	{PRISM54_SET_POLICY, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0,
@@ -2321,7 +2331,8 @@ static const iw_handler prism54_private_handler[] = {
 	(iw_handler) prism54_set_raw,
 	(iw_handler) NULL,
 	(iw_handler) prism54_set_raw,
-
+	(iw_handler) prism54_get_prismhdr,
+	(iw_handler) prism54_set_prismhdr,
 };
 
 const struct iw_handler_def prism54_handler_def = {

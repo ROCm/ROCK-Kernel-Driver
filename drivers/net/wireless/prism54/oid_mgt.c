@@ -31,6 +31,27 @@ const int frequency_list_a[] = { 5170, 5180, 5190, 5200, 5210, 5220, 5230,
 	5240, 5260, 5280, 5300, 5320
 };
 
+int
+channel_of_freq(int f)
+{
+	int c = 0;
+
+	if ((f >= 2412) && (f <= 2484)) {
+		while ((c < 14) && (f != frequency_list_bg[c]))
+			c++;
+		if (c >= 14)
+			return 0;
+	} else if ((f >= (int) 5170) && (f <= (int) 5320)) {
+		while ((c < 12) && (f != frequency_list_a[c]))
+			c++;
+		if (c >= 12)
+			return 0;
+	} else
+		return 0;
+
+	return ++c;
+}
+
 #define OID_STRUCT(name,oid,s,t) [name] = {oid, 0, sizeof(s), t}
 #define OID_STRUCT_C(name,oid,s,t) OID_STRUCT(name,oid,s,t | OID_FLAG_CACHED)
 #define OID_U32(name,oid) OID_STRUCT(name,oid,u32,OID_TYPE_U32)
