@@ -35,29 +35,29 @@
  */
 struct jfs_superblock {
 	char s_magic[4];	/* 4: magic number */
-	u32 s_version;		/* 4: version number */
+	__le32 s_version;	/* 4: version number */
 
-	s64 s_size;		/* 8: aggregate size in hardware/LVM blocks;
+	__le64 s_size;		/* 8: aggregate size in hardware/LVM blocks;
 				 * VFS: number of blocks
 				 */
-	s32 s_bsize;		/* 4: aggregate block size in bytes; 
+	__le32 s_bsize;		/* 4: aggregate block size in bytes; 
 				 * VFS: fragment size
 				 */
-	s16 s_l2bsize;		/* 2: log2 of s_bsize */
-	s16 s_l2bfactor;	/* 2: log2(s_bsize/hardware block size) */
-	s32 s_pbsize;		/* 4: hardware/LVM block size in bytes */
-	s16 s_l2pbsize;		/* 2: log2 of s_pbsize */
-	s16 pad;		/* 2: padding necessary for alignment */
+	__le16 s_l2bsize;	/* 2: log2 of s_bsize */
+	__le16 s_l2bfactor;	/* 2: log2(s_bsize/hardware block size) */
+	__le32 s_pbsize;	/* 4: hardware/LVM block size in bytes */
+	__le16 s_l2pbsize;	/* 2: log2 of s_pbsize */
+	__le16 pad;		/* 2: padding necessary for alignment */
 
-	u32 s_agsize;		/* 4: allocation group size in aggr. blocks */
+	__le32 s_agsize;	/* 4: allocation group size in aggr. blocks */
 
-	u32 s_flag;		/* 4: aggregate attributes:
+	__le32 s_flag;		/* 4: aggregate attributes:
 				 *    see jfs_filsys.h
 				 */
-	u32 s_state;		/* 4: mount/unmount/recovery state: 
+	__le32 s_state;		/* 4: mount/unmount/recovery state: 
 				 *    see jfs_filsys.h
 				 */
-	s32 s_compress;		/* 4: > 0 if data compression */
+	__le32 s_compress;		/* 4: > 0 if data compression */
 
 	pxd_t s_ait2;		/* 8: first extent of secondary
 				 *    aggregate inode table
@@ -66,15 +66,15 @@ struct jfs_superblock {
 	pxd_t s_aim2;		/* 8: first extent of secondary
 				 *    aggregate inode map
 				 */
-	u32 s_logdev;		/* 4: device address of log */
-	s32 s_logserial;	/* 4: log serial number at aggregate mount */
+	__le32 s_logdev;		/* 4: device address of log */
+	__le32 s_logserial;	/* 4: log serial number at aggregate mount */
 	pxd_t s_logpxd;		/* 8: inline log extent */
 
 	pxd_t s_fsckpxd;	/* 8: inline fsck work space extent */
 
 	struct timestruc_t s_time;	/* 8: time last updated */
 
-	s32 s_fsckloglen;	/* 4: Number of filesystem blocks reserved for
+	__le32 s_fsckloglen;	/* 4: Number of filesystem blocks reserved for
 				 *    the fsck service log.  
 				 *    N.B. These blocks are divided among the
 				 *         versions kept.  This is not a per
@@ -95,7 +95,7 @@ struct jfs_superblock {
 				 */
 
 	/* extendfs() parameter under s_state & FM_EXTENDFS */
-	s64 s_xsize;		/* 8: extendfs s_size */
+	__le64 s_xsize;		/* 8: extendfs s_size */
 	pxd_t s_xfsckpxd;	/* 8: extendfs fsckpxd */
 	pxd_t s_xlogpxd;	/* 8: extendfs logpxd */
 	/* - 128 byte boundary - */

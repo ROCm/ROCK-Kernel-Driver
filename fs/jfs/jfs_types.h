@@ -45,8 +45,8 @@ typedef u16 lid_t;
  * Almost identical to Linux's timespec, but not quite
  */
 struct timestruc_t {
-	u32 tv_sec;
-	u32 tv_nsec;
+	__le32 tv_sec;
+	__le32 tv_nsec;
 };
 
 /*
@@ -96,7 +96,7 @@ struct lxdlist {
 typedef struct {
 	unsigned len:24;
 	unsigned addr1:8;
-	u32 addr2;
+	__le32 addr2;
 } pxd_t;
 
 /* xd_t field construction */
@@ -127,11 +127,11 @@ struct pxdlist {
  */
 typedef struct {
 	unsigned flag:8;	/* 1: flags */
-	unsigned rsrvd:24;	/* 3: */
-	u32 size;		/* 4: size in byte */
+	unsigned rsrvd:24;
+	__le32 size;		/* 4: size in byte */
 	unsigned len:24;	/* 3: length in unit of fsblksize */
 	unsigned addr1:8;	/* 1: address in unit of fsblksize */
-	u32 addr2;		/* 4: address in unit of fsblksize */
+	__le32 addr2;		/* 4: address in unit of fsblksize */
 } dxd_t;			/* - 16 - */
 
 /* dxd_t flags */
@@ -168,10 +168,10 @@ struct dasd {
 	u8 delta;		/* Alert Threshold delta (in percent)   */
 	u8 rsrvd1;
 	u8 limit_hi;		/* DASD limit (in logical blocks)       */
-	u32 limit_lo;		/* DASD limit (in logical blocks)       */
+	__le32 limit_lo;	/* DASD limit (in logical blocks)       */
 	u8 rsrvd2[3];
 	u8 used_hi;		/* DASD usage (in logical blocks)       */
-	u32 used_lo;		/* DASD usage (in logical blocks)       */
+	__le32 used_lo;		/* DASD usage (in logical blocks)       */
 };
 
 #define DASDLIMIT(dasdp) \

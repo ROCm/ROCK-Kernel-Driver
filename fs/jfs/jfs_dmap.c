@@ -194,7 +194,7 @@ static s8 budtab[256] = {
 int dbMount(struct inode *ipbmap)
 {
 	struct bmap *bmp;
-	struct dbmap *dbmp_le;
+	struct dbmap_disk *dbmp_le;
 	struct metapage *mp;
 	int i;
 
@@ -216,7 +216,7 @@ int dbMount(struct inode *ipbmap)
 	}
 
 	/* copy the on-disk bmap descriptor to its in-memory version. */
-	dbmp_le = (struct dbmap *) mp->data;
+	dbmp_le = (struct dbmap_disk *) mp->data;
 	bmp->db_mapsize = le64_to_cpu(dbmp_le->dn_mapsize);
 	bmp->db_nfree = le64_to_cpu(dbmp_le->dn_nfree);
 	bmp->db_l2nbperpage = le32_to_cpu(dbmp_le->dn_l2nbperpage);
@@ -301,7 +301,7 @@ int dbUnmount(struct inode *ipbmap, int mounterror)
  */
 int dbSync(struct inode *ipbmap)
 {
-	struct dbmap *dbmp_le;
+	struct dbmap_disk *dbmp_le;
 	struct bmap *bmp = JFS_SBI(ipbmap->i_sb)->bmap;
 	struct metapage *mp;
 	int i;
@@ -318,7 +318,7 @@ int dbSync(struct inode *ipbmap)
 		return -EIO;
 	}
 	/* copy the in-memory version of the bmap to the on-disk version */
-	dbmp_le = (struct dbmap *) mp->data;
+	dbmp_le = (struct dbmap_disk *) mp->data;
 	dbmp_le->dn_mapsize = cpu_to_le64(bmp->db_mapsize);
 	dbmp_le->dn_nfree = cpu_to_le64(bmp->db_nfree);
 	dbmp_le->dn_l2nbperpage = cpu_to_le32(bmp->db_l2nbperpage);
@@ -3782,7 +3782,7 @@ static int dbInitDmap(struct dmap * dp, s64 Blkno, int nblocks)
 
 	/* set the rest of the words in the page to allocated (ONES) */
 	for (i = w; i < LPERDMAP; i++)
-		dp->pmap[i] = dp->wmap[i] = ONES;
+		dp->pmap[i] = dp->wmap[i] = cpu_to_le32(ONES);
 
 	/*
 	 * init tree
