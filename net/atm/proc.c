@@ -31,7 +31,7 @@
 #include "common.h" /* atm_proc_init prototype */
 #include "signaling.h" /* to get sigd - ugly too */
 
-static ssize_t proc_dev_atm_read(struct file *file,char *buf,size_t count,
+static ssize_t proc_dev_atm_read(struct file *file,char __user *buf,size_t count,
     loff_t *pos);
 
 static struct file_operations proc_atm_dev_ops = {
@@ -384,8 +384,8 @@ static struct file_operations svc_seq_fops = {
 	.release	= vcc_seq_release,
 };
 
-static ssize_t proc_dev_atm_read(struct file *file,char *buf,size_t count,
-    loff_t *pos)
+static ssize_t proc_dev_atm_read(struct file *file, char __user *buf,
+				 size_t count, loff_t *pos)
 {
 	struct atm_dev *dev;
 	unsigned long page;
