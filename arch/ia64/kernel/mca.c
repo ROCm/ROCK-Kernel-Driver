@@ -3,6 +3,9 @@
  * Purpose:	Generic MCA handling layer
  *
  * Updated for latest kernel
+ * Copyright (C) 2003 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *
  * Copyright (C) 2002 Dell Computer Corporation
  * Copyright (C) Matt Domsch (Matt_Domsch@dell.com)
  *
@@ -18,6 +21,7 @@
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander(vijay@engr.sgi.com)
  *
+ * 03/04/15 D. Mosberger Added INIT backtrace support.
  * 02/03/25 M. Domsch	GUID cleanups
  *
  * 02/01/04 J. Hall	Aligned MCA stack to 16 bytes, added platform vs. CPU
@@ -320,9 +324,7 @@ void
 init_handler_platform (sal_log_processor_info_t *proc_ptr,
 		       struct pt_regs *pt, struct switch_stack *sw)
 {
-	unsigned long ip, sp, bsp;
 	struct unw_frame_info info;
-	char buf[80];
 
 	/* if a kernel debugger is available call it here else just dump the registers */
 
@@ -338,19 +340,8 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 
 	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
 
-	printk("\nCall Trace:\n");
 	unw_init_from_interruption(&info, current, pt, sw);
-	do {
-		unw_get_ip(&info, &ip);
-		if (ip == 0)
-			break;
-
-		unw_get_sp(&info, &sp);
-		unw_get_bsp(&info, &bsp);
-		snprintf(buf, sizeof(buf), " [<%016lx>] %%s\n\t\tsp=%016lx bsp=%016lx\n",
-			 ip, sp, bsp);
-		print_symbol(buf, ip);
-	} while (unw_unwind(&info) >= 0);
+	ia64_do_show_stack(&info, NULL);
 
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
