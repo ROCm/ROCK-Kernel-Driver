@@ -119,29 +119,26 @@ ip_nat_used_tuple(const struct ip_conntrack_tuple *tuple,
 }
 
 /* If we source map this tuple so reply looks like reply_tuple, will
- * that meet the constraints of mr. */
+ * that meet the constraints of range. */
 static int
 in_range(const struct ip_conntrack_tuple *tuple,
-	 const struct ip_nat_multi_range *mr)
+	 const struct ip_nat_range *range)
 {
 	struct ip_nat_protocol *proto = ip_nat_find_proto(tuple->dst.protonum);
-	unsigned int i;
 
-	for (i = 0; i < mr->rangesize; i++) {
-		/* If we are supposed to map IPs, then we must be in the
-		   range specified. */
-		if (mr->range[i].flags & IP_NAT_RANGE_MAP_IPS) {
-			if (ntohl(tuple->src.ip) < ntohl(mr->range[i].min_ip)
-			    || (ntohl(tuple->src.ip)
-				> ntohl(mr->range[i].max_ip)))
-				continue;
-		}
-
-		if (!(mr->range[i].flags & IP_NAT_RANGE_PROTO_SPECIFIED)
-		    || proto->in_range(tuple, IP_NAT_MANIP_SRC,
-				       &mr->range[i].min, &mr->range[i].max))
-			return 1;
+	/* If we are supposed to map IPs, then we must be in the
+	   range specified, otherwise let this drag us onto a new src IP. */
+	if (range->flags & IP_NAT_RANGE_MAP_IPS) {
+		if (ntohl(tuple->src.ip) < ntohl(range->min_ip)
+		    || ntohl(tuple->src.ip) > ntohl(range->max_ip))
+			return 0;
 	}
+
+	if (!(range->flags & IP_NAT_RANGE_PROTO_SPECIFIED)
+	    || proto->in_range(tuple, IP_NAT_MANIP_SRC,
+			       &range->min, &range->max))
+		return 1;
+
 	return 0;
 }
 
@@ -161,7 +158,7 @@ same_src(const struct ip_conntrack *ct,
 static int
 find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 		     struct ip_conntrack_tuple *result,
-		     const struct ip_nat_multi_range *mr)
+		     const struct ip_nat_range *range)
 {
 	unsigned int h = hash_by_src(&tuple->src, tuple->dst.protonum);
 	struct ip_conntrack *ct;
@@ -175,7 +172,7 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 				       &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
 			result->dst = tuple->dst;
 
-			if (in_range(result, mr))
+			if (in_range(result, range))
 				return 1;
 		}
 	}
@@ -239,25 +236,19 @@ count_maps(u_int32_t src, u_int32_t dst, u_int16_t protonum,
    if the range specifies 1.2.3.4 ports 10000-10005 and 1.2.3.5 ports
    1-65535, we don't do pro-rata allocation based on ports; we choose
    the ip with the lowest src-ip/dst-ip/proto usage.
-
-   If an allocation then fails (eg. all 6 ports used in the 1.2.3.4
-   range), we eliminate that and try again.  This is not the most
-   efficient approach, but if you're worried about that, don't hand us
-   ranges you don't really have.  */
-static struct ip_nat_range *
+*/
+static int
 find_best_ips_proto(struct ip_conntrack_tuple *tuple,
-		    const struct ip_nat_multi_range *mr,
+		    const struct ip_nat_range *range,
 		    const struct ip_conntrack *conntrack,
 		    unsigned int hooknum)
 {
-	unsigned int i;
-	struct {
-		const struct ip_nat_range *range;
-		unsigned int score;
-		struct ip_conntrack_tuple tuple;
-	} best = { NULL,  0xFFFFFFFF };
+	unsigned int best_score = 0xFFFFFFFF;
+	struct ip_conntrack_tuple best_tuple;
 	u_int32_t *var_ipp, *other_ipp, saved_ip, orig_dstip;
 	static unsigned int randomness;
+	/* Host order */
+	u_int32_t minip, maxip, j;
 
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC) {
 		var_ipp = &tuple->src.ip;
@@ -272,115 +263,94 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
            explicit socket bindings, for example) */
 	orig_dstip = tuple->dst.ip;
 
-	IP_NF_ASSERT(mr->rangesize >= 1);
-	for (i = 0; i < mr->rangesize; i++) {
-		/* Host order */
-		u_int32_t minip, maxip, j;
+	if (range->flags & IP_NAT_RANGE_MAP_IPS) {
+		minip = ntohl(range->min_ip);
+		maxip = ntohl(range->max_ip);
+	} else
+		minip = maxip = ntohl(*var_ipp);
 
-		/* Don't do ranges which are already eliminated. */
-		if (mr->range[i].flags & IP_NAT_RANGE_FULL) {
+	randomness++;
+	for (j = 0; j < maxip - minip + 1; j++) {
+		unsigned int score;
+
+		*var_ipp = htonl(minip + (randomness + j) 
+				 % (maxip - minip + 1));
+
+		/* Reset the other ip in case it was mangled by
+		 * do_extra_mangle last time. */
+		*other_ipp = saved_ip;
+
+		if (hooknum == NF_IP_LOCAL_OUT
+		    && *var_ipp != orig_dstip
+		    && !do_extra_mangle(*var_ipp, other_ipp)) {
+			DEBUGP("Range %u %u.%u.%u.%u rt failed!\n",
+			       i, NIPQUAD(*var_ipp));
+			/* Can't route?  This whole range part is
+			 * probably screwed, but keep trying
+			 * anyway. */
 			continue;
 		}
 
-		if (mr->range[i].flags & IP_NAT_RANGE_MAP_IPS) {
-			minip = ntohl(mr->range[i].min_ip);
-			maxip = ntohl(mr->range[i].max_ip);
-		} else
-			minip = maxip = ntohl(*var_ipp);
+		/* Count how many others map onto this. */
+		score = count_maps(tuple->src.ip, tuple->dst.ip,
+				   tuple->dst.protonum, conntrack);
+		if (score < best_score) {
+			/* Optimization: doesn't get any better than
+			   this. */
+			if (score == 0)
+				return 1;
 
-		randomness++;
-		for (j = 0; j < maxip - minip + 1; j++) {
-			unsigned int score;
-
-			*var_ipp = htonl(minip + (randomness + j) 
-					 % (maxip - minip + 1));
-
-			/* Reset the other ip in case it was mangled by
-			 * do_extra_mangle last time. */
-			*other_ipp = saved_ip;
-
-			if (hooknum == NF_IP_LOCAL_OUT
-			    && *var_ipp != orig_dstip
-			    && !do_extra_mangle(*var_ipp, other_ipp)) {
-				DEBUGP("Range %u %u.%u.%u.%u rt failed!\n",
-				       i, NIPQUAD(*var_ipp));
-				/* Can't route?  This whole range part is
-				 * probably screwed, but keep trying
-				 * anyway. */
-				continue;
-			}
-
-			/* Count how many others map onto this. */
-			score = count_maps(tuple->src.ip, tuple->dst.ip,
-					   tuple->dst.protonum, conntrack);
-			if (score < best.score) {
-				/* Optimization: doesn't get any better than
-				   this. */
-				if (score == 0)
-					return (struct ip_nat_range *)
-						&mr->range[i];
-
-				best.score = score;
-				best.tuple = *tuple;
-				best.range = &mr->range[i];
-			}
+			best_score = score;
+			best_tuple = *tuple;
 		}
 	}
-	*tuple = best.tuple;
 
-	/* Discard const. */
-	return (struct ip_nat_range *)best.range;
+	if (best_score == 0xFFFFFFFF)
+		return 0;
+
+	*tuple = best_tuple;
+	return 1;
 }
 
 /* Fast version doesn't iterate through hash chains, but only handles
    common case of single IP address (null NAT, masquerade) */
-static struct ip_nat_range *
+static int
 find_best_ips_proto_fast(struct ip_conntrack_tuple *tuple,
-			 const struct ip_nat_multi_range *mr,
+			 const struct ip_nat_range *range,
 			 const struct ip_conntrack *conntrack,
 			 unsigned int hooknum)
 {
-	if (mr->rangesize != 1
-	    || (mr->range[0].flags & IP_NAT_RANGE_FULL)
-	    || ((mr->range[0].flags & IP_NAT_RANGE_MAP_IPS)
-		&& mr->range[0].min_ip != mr->range[0].max_ip))
-		return find_best_ips_proto(tuple, mr, conntrack, hooknum);
+	/* Leave IP address alone if we're not to map IP addresses. */
+	if (!(range->flags & IP_NAT_RANGE_MAP_IPS))
+		return 1;
 
-	if (mr->range[0].flags & IP_NAT_RANGE_MAP_IPS) {
-		if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
-			tuple->src.ip = mr->range[0].min_ip;
-		else {
-			/* Only do extra mangle when required (breaks
-                           socket binding) */
-			if (tuple->dst.ip != mr->range[0].min_ip
-			    && hooknum == NF_IP_LOCAL_OUT
-			    && !do_extra_mangle(mr->range[0].min_ip,
-						&tuple->src.ip))
-				return NULL;
-			tuple->dst.ip = mr->range[0].min_ip;
-		}
+	if (range->min_ip != range->max_ip)
+		return find_best_ips_proto(tuple, range, conntrack, hooknum);
+
+	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
+		tuple->src.ip = range->min_ip;
+	else {
+		/* Only do extra mangle when required (breaks socket
+		   binding) */
+		if (tuple->dst.ip != range->min_ip
+		    && hooknum == NF_IP_LOCAL_OUT
+		    && !do_extra_mangle(range->min_ip, &tuple->src.ip))
+			return 0;
+		tuple->dst.ip = range->min_ip;
 	}
 
-	/* Discard const. */
-	return (struct ip_nat_range *)&mr->range[0];
+	return 1;
 }
 
 static int
 get_unique_tuple(struct ip_conntrack_tuple *tuple,
 		 const struct ip_conntrack_tuple *orig_tuple,
-		 const struct ip_nat_multi_range *mrr,
+		 const struct ip_nat_range *range,
 		 struct ip_conntrack *conntrack,
 		 unsigned int hooknum)
 {
 	struct ip_nat_protocol *proto
 		= ip_nat_find_proto(orig_tuple->dst.protonum);
-	struct ip_nat_range *rptr;
-	unsigned int i;
-	int ret;
-
-	/* We temporarily use flags for marking full parts, but we
-	   always clean up afterwards */
-	struct ip_nat_multi_range *mr = (void *)mrr;
 
 	/* 1) If this srcip/proto/src-proto-part is currently mapped,
 	   and that same mapping gives a unique tuple within the given
@@ -390,7 +360,7 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 	   So far, we don't do local source mappings, so multiple
 	   manips not an issue.  */
 	if (hooknum == NF_IP_POST_ROUTING) {
-		if (find_appropriate_src(orig_tuple, tuple, mr)) {
+		if (find_appropriate_src(orig_tuple, tuple, range)) {
 			DEBUGP("get_unique_tuple: Found current src map\n");
 			if (!ip_nat_used_tuple(tuple, conntrack))
 				return 1;
@@ -398,69 +368,43 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 	}
 
 	/* 2) Select the least-used IP/proto combination in the given
-	   range.
-	*/
+	   range. */
 	*tuple = *orig_tuple;
-	while ((rptr = find_best_ips_proto_fast(tuple, mr, conntrack, hooknum))
-	       != NULL) {
-		DEBUGP("Found best for "); DUMP_TUPLE(tuple);
-		/* 3) The per-protocol part of the manip is made to
-		   map into the range to make a unique tuple. */
+	if (!find_best_ips_proto_fast(tuple, range, conntrack, hooknum))
+		return 0;
 
-		/* Only bother mapping if it's not already in range
-		   and unique */
-		if ((!(rptr->flags & IP_NAT_RANGE_PROTO_SPECIFIED)
-		     || proto->in_range(tuple, HOOK2MANIP(hooknum),
-					&rptr->min, &rptr->max))
-		    && !ip_nat_used_tuple(tuple, conntrack)) {
-			ret = 1;
-			goto clear_fulls;
-		} else {
-			if (proto->unique_tuple(tuple, rptr,
-						HOOK2MANIP(hooknum),
-						conntrack)) {
-				/* Must be unique. */
-				IP_NF_ASSERT(!ip_nat_used_tuple(tuple,
-								conntrack));
-				ret = 1;
-				goto clear_fulls;
-			} else if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
-				/* Try implicit source NAT; protocol
-                                   may be able to play with ports to
-                                   make it unique. */
-				struct ip_nat_range r
-					= { IP_NAT_RANGE_MAP_IPS, 
-					    tuple->src.ip, tuple->src.ip,
-					    { 0 }, { 0 } };
-				DEBUGP("Trying implicit mapping\n");
-				if (proto->unique_tuple(tuple, &r,
-							IP_NAT_MANIP_SRC,
-							conntrack)) {
-					/* Must be unique. */
-					IP_NF_ASSERT(!ip_nat_used_tuple
-						     (tuple, conntrack));
-					ret = 1;
-					goto clear_fulls;
-				}
-			}
-			DEBUGP("Protocol can't get unique tuple %u.\n",
-			       hooknum);
-		}
+	/* 3) The per-protocol part of the manip is made to map into
+	   the range to make a unique tuple. */
 
-		/* Eliminate that from range, and try again. */
-		rptr->flags |= IP_NAT_RANGE_FULL;
-		*tuple = *orig_tuple;
+	/* Only bother mapping if it's not already in range and unique */
+	if ((!(range->flags & IP_NAT_RANGE_PROTO_SPECIFIED)
+	     || proto->in_range(tuple, HOOK2MANIP(hooknum),
+				&range->min, &range->max))
+	    && !ip_nat_used_tuple(tuple, conntrack))
+		return 1;
+
+	if (proto->unique_tuple(tuple, range, HOOK2MANIP(hooknum), conntrack)){
+		/* Must be unique. */
+		IP_NF_ASSERT(!ip_nat_used_tuple(tuple, conntrack));
+		return 1;
 	}
 
-	ret = 0;
-
- clear_fulls:
-	/* Clear full flags. */
-	IP_NF_ASSERT(mr->rangesize >= 1);
-	for (i = 0; i < mr->rangesize; i++)
-		mr->range[i].flags &= ~IP_NAT_RANGE_FULL;
-
-	return ret;
+	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
+		/* Try implicit source NAT; protocol may be able to
+		   play with ports to make it unique. */
+		struct ip_nat_range r
+			= { IP_NAT_RANGE_MAP_IPS, 
+			    tuple->src.ip, tuple->src.ip, { 0 }, { 0 } };
+		DEBUGP("Trying implicit mapping\n");
+		if (proto->unique_tuple(tuple, &r, IP_NAT_MANIP_SRC,
+					conntrack)) {
+			/* Must be unique. */
+			IP_NF_ASSERT(!ip_nat_used_tuple(tuple, conntrack));
+			return 1;
+		}
+		DEBUGP("Protocol can't get unique tuple %u.\n", hooknum);
+	}
+	return 0;
 }
 
 /* Where to manip the reply packets (will be reverse manip). */
@@ -473,7 +417,7 @@ static unsigned int opposite_hook[NF_IP_NUMHOOKS]
 
 unsigned int
 ip_nat_setup_info(struct ip_conntrack *conntrack,
-		  const struct ip_nat_multi_range *mr,
+		  const struct ip_nat_range *range,
 		  unsigned int hooknum)
 {
 	struct ip_conntrack_tuple new_tuple, inv_tuple, reply;
@@ -524,7 +468,7 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 #endif
 
 	do {
-		if (!get_unique_tuple(&new_tuple, &orig_tp, mr, conntrack,
+		if (!get_unique_tuple(&new_tuple, &orig_tp, range, conntrack,
 				      hooknum)) {
 			DEBUGP("ip_nat_setup_info: Can't get unique for %p.\n",
 			       conntrack);

@@ -107,7 +107,7 @@ tftp_nat_expected(struct sk_buff **pskb,
 	const struct ip_conntrack *master = ct->master->expectant;
 	const struct ip_conntrack_tuple *orig = 
 			&master->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
-	struct ip_nat_multi_range mr;
+	struct ip_nat_range range;
 #if 0
 	const struct ip_conntrack_tuple *repl =
 			&master->tuplehash[IP_CT_DIR_REPLY].tuple;
@@ -124,21 +124,19 @@ tftp_nat_expected(struct sk_buff **pskb,
 	IP_NF_ASSERT(master);
 	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
 
-	mr.rangesize = 1;
-	mr.range[0].flags = IP_NAT_RANGE_MAP_IPS;
+	range.flags = IP_NAT_RANGE_MAP_IPS;
 
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC) {
-		mr.range[0].min_ip = mr.range[0].max_ip = orig->dst.ip; 
+		range.min_ip = range.max_ip = orig->dst.ip; 
 		DEBUGP("orig: %u.%u.%u.%u:%u <-> %u.%u.%u.%u:%u "
 			"newsrc: %u.%u.%u.%u\n",
                         NIPQUAD((*pskb)->nh.iph->saddr), ntohs(uh->source),
  			NIPQUAD((*pskb)->nh.iph->daddr), ntohs(uh->dest),
 			NIPQUAD(orig->dst.ip));
 	} else {
-		mr.range[0].min_ip = mr.range[0].max_ip = orig->src.ip;
-		mr.range[0].min.udp.port = mr.range[0].max.udp.port = 
-							orig->src.u.udp.port;
-		mr.range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
+		range.min_ip = range.max_ip = orig->src.ip;
+		range.min.udp.port = range.max.udp.port = orig->src.u.udp.port;
+		range.flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
 
 		DEBUGP("orig: %u.%u.%u.%u:%u <-> %u.%u.%u.%u:%u "
 			"newdst: %u.%u.%u.%u:%u\n",
@@ -147,7 +145,7 @@ tftp_nat_expected(struct sk_buff **pskb,
                         NIPQUAD(orig->src.ip), ntohs(orig->src.u.udp.port));
 	}
 
-	return ip_nat_setup_info(ct,&mr,hooknum);
+	return ip_nat_setup_info(ct, &range, hooknum);
 }
 
 static struct ip_nat_helper tftp[MAX_PORTS];

@@ -44,7 +44,7 @@ ftp_nat_expected(struct sk_buff **pskb,
 		 struct ip_conntrack *ct,
 		 struct ip_nat_info *info)
 {
-	struct ip_nat_multi_range mr;
+	struct ip_nat_range range;
 	u_int32_t newdstip, newsrcip, newip;
 	struct ip_ct_ftp_expect *exp_ftp_info;
 
@@ -80,20 +80,19 @@ ftp_nat_expected(struct sk_buff **pskb,
 
 	DEBUGP("nat_expected: IP to %u.%u.%u.%u\n", NIPQUAD(newip));
 
-	mr.rangesize = 1;
 	/* We don't want to manip the per-protocol, just the IPs... */
-	mr.range[0].flags = IP_NAT_RANGE_MAP_IPS;
-	mr.range[0].min_ip = mr.range[0].max_ip = newip;
+	range.flags = IP_NAT_RANGE_MAP_IPS;
+	range.min_ip = range.max_ip = newip;
 
 	/* ... unless we're doing a MANIP_DST, in which case, make
 	   sure we map to the correct port */
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
-		mr.range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
-		mr.range[0].min = mr.range[0].max
+		range.flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
+		range.min = range.max
 			= ((union ip_conntrack_manip_proto)
 				{ .tcp = { htons(exp_ftp_info->port) } });
 	}
-	return ip_nat_setup_info(ct, &mr, hooknum);
+	return ip_nat_setup_info(ct, &range, hooknum);
 }
 
 static int

@@ -41,10 +41,10 @@ struct ip_nat_range
 	union ip_conntrack_manip_proto min, max;
 };
 
-/* A range consists of an array of 1 or more ip_nat_range */
-struct ip_nat_multi_range
+/* For backwards compat: don't use in modern code. */
+struct ip_nat_multi_range_compat
 {
-	unsigned int rangesize;
+	unsigned int rangesize; /* Must be 1. */
 
 	/* hangs off end. */
 	struct ip_nat_range range[1];
@@ -96,7 +96,7 @@ struct ip_nat_info
 
 /* Set up the info structure to map into this range. */
 extern unsigned int ip_nat_setup_info(struct ip_conntrack *conntrack,
-				      const struct ip_nat_multi_range *mr,
+				      const struct ip_nat_range *range,
 				      unsigned int hooknum);
 
 /* Is this tuple already taken? (not by us)*/
@@ -107,5 +107,7 @@ extern int ip_nat_used_tuple(const struct ip_conntrack_tuple *tuple,
 extern u_int16_t ip_nat_cheat_check(u_int32_t oldvalinv,
 				    u_int32_t newval,
 				    u_int16_t oldcheck);
+#else  /* !__KERNEL__: iptables wants this to compile. */
+#define ip_nat_multi_range ip_nat_multi_range_compat
 #endif /*__KERNEL__*/
 #endif
